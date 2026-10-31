@@ -1,12 +1,12 @@
-// Carte interactive : enveloppe <Card> (SVG identique au rendu serveur) avec
+// Fiche interactive : enveloppe <Card> (SVG identique au rendu serveur) avec
 // l'inclinaison 3D (12° max, pointeur ou gyroscope, retour élastique), le reflet
-// holographique, le glare, le grain et le balayage de révélation.
+// néon (couleurs du niveau), le glare, le grain et le balayage de révélation.
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { CardData, Lang } from "../../../shared/types";
 import { styleOf } from "../../../shared/types";
 import { Card } from "../../../shared/card/Card";
 import { CARD_MASK_URL, CARD_PATH } from "../../../shared/card/geometry";
-import { themeCssVars, themeFor } from "../../../shared/card/themes";
+import { themeCssVars, themeOf } from "../../../shared/card/themes";
 import "./fonts.css";
 import "./card.css";
 
@@ -193,14 +193,16 @@ export function CardView({ card, lang, interactive = true, reveal = false, idPre
     };
   }, [live]);
 
-  const vars = { ...themeCssVars(style), "--tys-mask": CARD_MASK_URL } as CSSProperties;
+  const th = themeOf(card);
+  const vars = { ...themeCssVars(th), "--tys-mask": CARD_MASK_URL } as CSSProperties;
 
   return (
     <div
       ref={ref}
       className={["tys-card", revealing ? "is-revealing" : "", className ?? ""].filter(Boolean).join(" ")}
       data-style={style}
-      data-dark={themeFor(style).dark ? "true" : "false"}
+      data-dark="true"
+      data-level={th.key}
       data-interactive={interactive ? "true" : "false"}
       data-static={live ? "false" : "true"}
       style={vars}

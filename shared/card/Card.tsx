@@ -1,17 +1,18 @@
-// La carte de compétences : un seul composant SVG React pur, rendu à
+// La fiche de dev (SPEC §17.3) : un seul composant SVG React pur, rendu à
 // l'identique dans le navigateur et côté serveur (renderToStaticMarkup → resvg).
-// Uniquement des fonctionnalités SVG que resvg sait rendre : dégradés, motifs,
-// clipPath, mask, filtres (turbulence, matrice de couleur, flou), texte, image.
+// Uniquement des fonctionnalités SVG que resvg sait rendre : dégradés, clipPath,
+// filtres (turbulence, matrice de couleur, flou, transfert de composantes,
+// convolution), texte, image. Mise en page calquée sur la maquette web/gta.html.
 import { useId, type ReactNode } from "react";
-import type { CardData, Lang, Stat, StatusInstance, StatusTone } from "../types";
-import { styleOf } from "../types";
+import type { CardData, Lang, Stat, StatusInstance } from "../types";
+import { LEVEL_LABELS, starsFor } from "../types";
 import { AzeritGem, AzeritGemDefs } from "./AzeritGem";
 import { fontAttrs, type FontKey } from "./fonts";
 import { CARD_H, CARD_W, cardPath } from "./geometry";
 import { t } from "./i18n";
 import { langIcon } from "./languages";
 import { fit, measure, truncate, upper } from "./text";
-import { themeFor, type CardTheme, type Stop } from "./themes";
+import { PALETTE, themeOf, type CardTheme, type Stop } from "./themes";
 
 export interface CardProps {
   card: CardData;
@@ -32,33 +33,42 @@ export interface CardGraphicProps extends CardProps {
 }
 
 /* ------------------------------------------------------------------ */
-/* Mise en page (unités du viewBox 360 × 520)                          */
+/* Mise en page (unités du viewBox 360 × 520, marges 20 / 18)          */
 /* ------------------------------------------------------------------ */
 
 const L = {
-  frame: 5, // épaisseur de l'anneau métallique
-  filet: 10, // filet intérieur lumineux
-  col: 68, // axe de la colonne note / poste / langage / club
-  overallY: 100,
-  positionY: 121,
-  sepY: 130,
-  langY: 147,
-  clubY: 179,
-  portrait: { x: 114, y: 20, s: 226, cx: 227, cy: 136 },
-  nameY: 274,
-  ruleY: 289,
-  statsY: [320, 347, 374],
-  statsTop: 301,
-  statsBottom: 381,
-  pillsTop: 386,
-  pillsBottom: 455,
-  footerY: 473.5,
-  footerBand: [459, 481] as const,
+  left: 20,
+  right: CARD_W - 18,
+  stars: { x: 20, y: 18, size: 19, gap: 4 },
+  overall: { x: 18, y: 130, size: 118 },
+  levelY: 156,
+  metaLabelY: 176,
+  metaValueY: 192,
+  mug: { x: 178, y: 44, w: 164, h: 206, r: 6 },
+  photo: { w: 140, h: 168 },
+  placard: { w: 136, h: 44, bottom: 10 },
+  formTop: 262,
+  formLabelY: 277,
+  formValueY: 293,
+  statsTop: 306,
+  statRow: 25,
+  chargesTitleY: 411,
+  chargesFirstY: 432,
+  chargeRow: 20,
+  footerY: 506,
 };
 
-const PILL_H = 20.5;
-const PILL_GAP = 3.5;
-const PILL_MAX = 286;
+const STAR = "M12 2.6l2.9 6.1 6.7.8-4.9 4.6 1.3 6.6L12 17.4l-6 3.3 1.3-6.6L2.4 9.5l6.7-.8z";
+const PALM = [
+  "M46 140c2-34 5-62 12-86l4 1c-8 24-11 52-12 85z",
+  "M60 54C40 38 20 38 4 50c18-4 36 0 56 7z",
+  "M60 54C36 56 18 68 10 88c14-14 30-22 50-30z",
+  "M60 54c18-22 40-28 60-20-20 0-40 8-60 24z",
+  "M60 54c26-2 44 10 54 30-14-14-32-22-54-26z",
+  "M60 54c-6-22-2-40 8-52-2 16 0 32-4 50z",
+  "M60 54c10-20 26-32 44-34-16 8-30 20-42 36z",
+  "M60 54c-14-14-18-30-14-48 4 16 10 30 16 46z",
+];
 
 /* ------------------------------------------------------------------ */
 
@@ -70,6 +80,19 @@ function sanitize(id: string) {
   return id.replace(/[^a-zA-Z0-9_-]/g, "");
 }
 
+/** Numéro de dossier : l'id court de la carte, en majuscules, 4 à 6 signes. */
+function caseNumber(id: string): string {
+  const clean = id.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+  return (clean || "0000").slice(0, 6);
+}
+
+function caseDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(d.getUTCDate())}.${p(d.getUTCMonth() + 1)}.${String(d.getUTCFullYear()).slice(2)}`;
+}
+
 interface TxtProps {
   x: number;
   y: number;
@@ -78,161 +101,15 @@ interface TxtProps {
   fill: string;
   ls?: number;
   anchor?: "start" | "middle" | "end";
-  emboss?: { color: string; opacity: number; dy?: number };
   opacity?: number;
   children: ReactNode;
 }
 
-/** Texte avec un liseré de gravure optionnel (copie décalée d'un demi-pixel). */
-function Txt({ x, y, font, size, fill, ls = 0, anchor = "start", emboss, opacity, children }: TxtProps) {
-  const common = { ...fontAttrs(font), fontSize: size, letterSpacing: ls || undefined, textAnchor: anchor } as const;
+function Txt({ x, y, font, size, fill, ls = 0, anchor = "start", opacity, children }: TxtProps) {
   return (
-    <g opacity={opacity}>
-      {emboss && emboss.opacity > 0 && (
-        <text x={x} y={y + (emboss.dy ?? 0.9)} {...common} fill={emboss.color} fillOpacity={emboss.opacity}>
-          {children}
-        </text>
-      )}
-      <text x={x} y={y} {...common} fill={fill}>
-        {children}
-      </text>
-    </g>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Defs : textures par tier                                            */
-/* ------------------------------------------------------------------ */
-
-function TextureDefs({ id, th }: { id: string; th: CardTheme }) {
-  const region = { x: 0, y: 0, width: CARD_W, height: CARD_H, filterUnits: "userSpaceOnUse" as const, colorInterpolationFilters: "sRGB" as const };
-  switch (th.texture) {
-    case "grain":
-      // cuivre mat : grain serré, points sombres et clairs
-      return (
-        <filter id={`${id}-tex`} {...region}>
-          <feTurbulence type="fractalNoise" baseFrequency="0.95" numOctaves={2} seed={7} result="n" />
-          <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.12  0 0 0 0 0.05  0 0 0 0 0.02  -3 0 0 0 1.42" result="d" />
-          <feColorMatrix in="n" type="matrix" values="0 0 0 0 1  0 0 0 0 0.9  0 0 0 0 0.8  3 0 0 0 -1.62" result="l" />
-          <feMerge>
-            <feMergeNode in="d" />
-            <feMergeNode in="l" />
-          </feMerge>
-        </filter>
-      );
-    case "brushed":
-      // acier brossé : bruit étiré à l'horizontale
-      return (
-        <filter id={`${id}-tex`} {...region}>
-          <feTurbulence type="fractalNoise" baseFrequency="0.003 0.62" numOctaves={3} seed={4} result="n" />
-          <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.1  0 0 0 0 0.13  0 0 0 0 0.16  -3.2 0 0 0 1.5" result="d" />
-          <feColorMatrix in="n" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  3.2 0 0 0 -1.62" result="l" />
-          <feMerge>
-            <feMergeNode in="d" />
-            <feMergeNode in="l" />
-          </feMerge>
-        </filter>
-      );
-    case "glints":
-      // or : paillettes claires éparses sur un grain très fin
-      return (
-        <filter id={`${id}-tex`} {...region}>
-          <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves={2} seed={11} result="n" />
-          <feColorMatrix in="n" type="matrix" values="0 0 0 0 1  0 0 0 0 0.98  0 0 0 0 0.85  7 0 0 0 -4.3" result="g" />
-          <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.35  0 0 0 0 0.2  0 0 0 0 0  -2.2 0 0 0 0.95" result="d" />
-          <feMerge>
-            <feMergeNode in="d" />
-            <feMergeNode in="g" />
-          </feMerge>
-        </filter>
-      );
-    case "pearl":
-      // nacre : marbrures pastel à basse fréquence
-      return (
-        <filter id={`${id}-tex`} {...region}>
-          <feTurbulence type="fractalNoise" baseFrequency="0.009 0.014" numOctaves={3} seed={23} result="n" />
-          <feColorMatrix in="n" type="matrix" values="1.6 0 0 0 0.05  0 1.6 0 0 0.05  0 0 1.6 0 0.1  0 0 0 0 0.55" />
-        </filter>
-      );
-    case "energy":
-    case "halftone":
-    case "pinstripe":
-      // flashback et TOTW : un grain léger en plus du motif
-      return (
-        <filter id={`${id}-tex`} {...region}>
-          <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves={2} seed={3} result="n" />
-          <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.2  0 0 0 0 0.08  0 0 0 0 0.12  -2.6 0 0 0 1.25" result="d" />
-          <feColorMatrix in="n" type="matrix" values="0 0 0 0 1  0 0 0 0 0.95  0 0 0 0 0.9  2.6 0 0 0 -1.45" result="l" />
-          <feMerge>
-            <feMergeNode in="d" />
-            <feMergeNode in="l" />
-          </feMerge>
-        </filter>
-      );
-  }
-}
-
-/** Traînées d'énergie (Wonderkid), tirées une fois avec une graine fixe. */
-const STREAKS = (() => {
-  let seed = 20261014;
-  const r = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  return Array.from({ length: 46 }, () => ({
-    x: r() * 440 - 90,
-    y: r() * 600 - 40,
-    len: 60 + r() * 240,
-    w: 0.4 + r() * r() * 3.6,
-    o: 0.35 + r() * 0.65,
-    lime: r() > 0.55,
-  }));
-})();
-
-/** Facettes cristallines du fond, inspirées des deux faces de la gemme. */
-const FACETS: { d: string; light: boolean }[] = [
-  { d: "M0 0 L150 0 L64 300 L0 236 Z", light: true },
-  { d: "M150 0 L360 0 L360 96 L214 226 Z", light: false },
-  { d: "M360 96 L360 318 L214 226 Z", light: true },
-  { d: "M150 0 L214 226 L64 300 Z", light: false },
-  { d: "M0 236 L64 300 L0 404 Z", light: false },
-  { d: "M214 226 L360 318 L360 520 L292 520 Z", light: false },
-  { d: "M64 300 L214 226 L292 520 L118 520 Z", light: true },
-];
-
-/* ------------------------------------------------------------------ */
-/* Pictogrammes                                                         */
-/* ------------------------------------------------------------------ */
-
-function ToneGlyph({ tone, cx, cy, color }: { tone: StatusTone; cx: number; cy: number; color: string }) {
-  const s = { stroke: color, strokeWidth: 1.4, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, fill: "none" };
-  switch (tone) {
-    case "negative":
-      return <path d={`M${cx - 2.6} ${cy - 1.3} L${cx} ${cy + 1.6} L${cx + 2.6} ${cy - 1.3}`} {...s} />;
-    case "positive":
-      return <path d={`M${cx - 2.6} ${cy + 1.3} L${cx} ${cy - 1.6} L${cx + 2.6} ${cy + 1.3}`} {...s} />;
-    case "special":
-      return (
-        <path
-          d={`M${cx} ${cy - 3.2} Q${cx + 0.6} ${cy - 0.6} ${cx + 3.2} ${cy} Q${cx + 0.6} ${cy + 0.6} ${cx} ${cy + 3.2} Q${cx - 0.6} ${cy + 0.6} ${cx - 3.2} ${cy} Q${cx - 0.6} ${cy - 0.6} ${cx} ${cy - 3.2} Z`}
-          fill={color}
-        />
-      );
-    case "gap":
-      return (
-        <g {...s} strokeWidth={1.2}>
-          <path d={`M${cx - 2.6} ${cy - 1.2} H${cx + 2.6} M${cx - 2.6} ${cy + 1.2} H${cx + 2.6}`} />
-          <path d={`M${cx + 1.4} ${cy - 3} L${cx - 1.4} ${cy + 3}`} />
-        </g>
-      );
-  }
-}
-
-/** Petit pictogramme « vent » pour BUZZ. */
-function Wind({ x, y, color }: { x: number; y: number; color: string }) {
-  return (
-    <g fill="none" stroke={color} strokeWidth={1.3} strokeLinecap="round" transform={`translate(${x} ${y})`}>
-      <path d="M0 -3.2 H6.2 a1.9 1.9 0 1 0 -1.9 -1.9" />
-      <path d="M0 0 H9 a1.9 1.9 0 1 1 -1.9 1.9" />
-      <path d="M0 3.2 H4.4" />
-    </g>
+    <text x={x} y={y} {...fontAttrs(font)} fontSize={size} letterSpacing={ls || undefined} textAnchor={anchor} fill={fill} opacity={opacity}>
+      {children}
+    </text>
   );
 }
 
@@ -240,99 +117,95 @@ function Wind({ x, y, color }: { x: number; y: number; color: string }) {
 /* Blocs                                                                */
 /* ------------------------------------------------------------------ */
 
-function StatCell({ stat, x, y, th, lang, align }: { stat: Stat; x: number; y: number; th: CardTheme; lang: Lang; align: "left" | "right" }) {
-  // x = bord droit de la valeur ; le code suit à droite.
-  void align;
-  const isBuzz = stat.code === "BUZZ";
-  const weak = !stat.sufficient;
-  const valueFill = isBuzz ? th.buzz : th.ink;
-  const codeFill = isBuzz ? th.buzz : th.inkSoft;
-  const codeX = x + 6;
-  const codeW = measure(stat.code, "mono-500", 12.5, 0.6);
-  const emb = { color: th.emboss, opacity: th.embossOpacity * (weak ? 0.5 : 1) };
-  void lang;
+function Stars({ n, th, id }: { n: number; th: CardTheme; id: string }) {
+  const { x, y, size, gap } = L.stars;
+  const k = size / 24;
   return (
     <g>
-      {isBuzz && (
-        <rect
-          x={x - 33}
-          y={y - 20}
-          width={codeW + 58}
-          height={26}
-          rx={5}
-          fill={th.buzz}
-          fillOpacity={th.dark ? 0.1 : 0.09}
-          stroke={th.buzz}
-          strokeOpacity={0.55}
-          strokeWidth={0.8}
-          strokeDasharray="2.4 2"
-        />
-      )}
-      <Txt x={x} y={y} font="display-800" size={27} anchor="end" fill={valueFill} emboss={emb} opacity={weak ? 0.42 : 1}>
-        {stat.value}
-      </Txt>
-      <Txt x={codeX} y={y - 1} font="mono-500" size={12.5} ls={0.6} fill={codeFill} opacity={weak ? 0.5 : 1}>
+      {[1, 2, 3, 4, 5].map((i) => {
+        const tx = x + (i - 1) * (size + gap);
+        const on = i <= n;
+        return (
+          <g key={i} transform={`translate(${tx} ${y}) scale(${k})`}>
+            {on && <path d={STAR} fill={th.accent} opacity={0.9} filter={`url(#${id}-starglow)`} />}
+            {on ? (
+              <path d={STAR} fill={PALETTE.star} />
+            ) : (
+              <path d={STAR} fill="none" stroke="#fff" strokeOpacity={0.22} strokeWidth={1.4 / k} />
+            )}
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
+function StatRow({ stat, x, y, th, idp }: { stat: Stat; x: number; y: number; th: CardTheme; idp: string }) {
+  const isBuzz = stat.code === "BUZZ";
+  const weak = !stat.sufficient;
+  const col = 153;
+  const barX = x + 34 + 8;
+  const barW = col - 34 - 26 - 16;
+  const barY = y + 5;
+  const fill = isBuzz ? th.buzz : th.accent;
+  const v = Math.max(0, Math.min(99, stat.value));
+  const w = (barW * v) / 100;
+  return (
+    <g>
+      <Txt x={x} y={y + 13} font="mono-700" size={10.5} ls={0.4} fill={th.inkSoft}>
         {stat.code}
       </Txt>
-      {isBuzz && <Wind x={codeX + codeW + 4} y={y - 5.5} color={th.buzz} />}
-      {weak && (
-        // marqueur « données insuffisantes » : petit cercle pointillé avec un point d'interrogation
-        <g transform={`translate(${codeX + codeW + 8} ${y - 5})`}>
-          <circle r={4.8} fill={th.dark ? "#000" : th.pillBg} fillOpacity={th.dark ? 0.6 : th.pillBgOpacity} />
-          <text y={2.4} {...fontAttrs("mono-700")} fontSize={7} textAnchor="middle" fill={th.pillText}>
-            ?
-          </text>
+      <rect x={barX} y={barY} width={barW} height={8} rx={2} fill="#fff" fillOpacity={0.08} />
+      {w > 0 && (
+        <g opacity={weak ? 0.45 : 1}>
+          <rect x={barX} y={barY} width={w} height={8} rx={2} fill={fill} opacity={0.55} filter={`url(#${idp}-barglow)`} />
+          <rect x={barX} y={barY} width={w} height={8} rx={2} fill={fill} />
         </g>
+      )}
+      {/* dix segments : neuf séparateurs à la couleur de la nuit */}
+      {Array.from({ length: 9 }, (_, i) => (
+        <rect key={i} x={barX + ((i + 1) * barW) / 10 - 1} y={barY - 0.5} width={2} height={9} fill={PALETTE.night} />
+      ))}
+      <Txt x={x + col} y={y + 15} font="display-700" size={18} anchor="end" fill={isBuzz ? th.buzz : th.ink} opacity={weak ? 0.55 : 1}>
+        {stat.value}
+      </Txt>
+      {weak && (
+        <text x={x + col - 28} y={y + 14} {...fontAttrs("mono-700")} fontSize={9} textAnchor="end" fill={th.inkMuted}>
+          ?
+        </text>
       )}
     </g>
   );
 }
 
-function StatusPills({ statuses, th, lang, id }: { statuses: StatusInstance[]; th: CardTheme; lang: Lang; id: string }) {
-  const list = statuses.slice(0, 3);
-  const n = list.length;
-  if (n === 0) return null;
-  const totalH = n * PILL_H + (n - 1) * PILL_GAP;
-  const top = L.pillsTop + (L.pillsBottom - L.pillsTop - totalH) / 2;
+function Charges({ statuses, th, lang, idp }: { statuses: StatusInstance[]; th: CardTheme; lang: Lang; idp: string }) {
   const s = t(lang);
+  const list = statuses.slice(0, 3);
+  const textX = L.left + 14;
+  const maxW = L.right - textX;
   return (
     <g>
+      <Txt x={L.left} y={L.chargesTitleY} font="mono-700" size={8.5} ls={1.5} fill={th.inkMuted}>
+        {upper(s.charges, lang)}
+      </Txt>
       {list.map((st, i) => {
-        const aiW = st.byAI ? 22 : 0;
-        const fontSize = 10.5;
-        const maxText = PILL_MAX - 26 - 11 - aiW;
-        const label = truncate(st.label[lang] ?? st.label.fr, "sans-600", fontSize, maxText, 0.05);
-        const tw = measure(label, "sans-600", fontSize, 0.05);
-        const w = 26 + tw + 11 + aiW;
-        const x = 180 - w / 2;
-        const y = top + i * (PILL_H + PILL_GAP);
+        const y = L.chargesFirstY + i * L.chargeRow;
         const tone = th.tones[st.tone];
+        const aiTag = st.byAI ? ` · ${s.ai}` : "";
+        const aiW = st.byAI ? measure(aiTag, "mono-400", 9) : 0;
+        const label = truncate(st.label[lang] ?? st.label.fr, "sans-500", 12.5, maxW - aiW);
+        const lw = measure(label, "sans-500", 12.5);
         return (
           <g key={st.id + i}>
-            <rect x={x} y={y + 1} width={w} height={PILL_H} rx={PILL_H / 2} fill="#000" fillOpacity={th.dark ? 0.3 : 0.18} />
-            <rect x={x} y={y} width={w} height={PILL_H} rx={PILL_H / 2} fill={th.pillBg} fillOpacity={th.pillBgOpacity} />
-            <rect
-              x={x + 0.4}
-              y={y + 0.4}
-              width={w - 0.8}
-              height={PILL_H - 0.8}
-              rx={(PILL_H - 0.8) / 2}
-              fill="none"
-              stroke={`url(#${id}-pillrim)`}
-              strokeWidth={0.8}
-            />
-            <circle cx={x + 12} cy={y + PILL_H / 2} r={6.6} fill={tone} fillOpacity={0.18} />
-            <ToneGlyph tone={st.tone} cx={x + 12} cy={y + PILL_H / 2} color={tone} />
-            <text x={x + 23.5} y={y + 14.2} {...fontAttrs("sans-600")} fontSize={fontSize} letterSpacing={0.05} fill={th.pillText}>
+            <circle cx={L.left + 3} cy={y - 4.2} r={4.5} fill={tone} opacity={0.6} filter={`url(#${idp}-dotglow)`} />
+            <circle cx={L.left + 3} cy={y - 4.2} r={3} fill={tone} />
+            <Txt x={textX} y={y} font="sans-500" size={12.5} fill={th.ink}>
               {label}
-            </text>
+            </Txt>
             {st.byAI && (
-              <g transform={`translate(${x + w - 9 - 18} ${y + 4})`}>
-                <rect width={18} height={12.5} rx={3.2} fill="none" stroke={tone} strokeOpacity={0.9} strokeWidth={0.85} />
-                <text x={9} y={9.2} {...fontAttrs("mono-700")} fontSize={7.6} letterSpacing={0.3} textAnchor="middle" fill={tone}>
-                  {s.ai}
-                </text>
-              </g>
+              <Txt x={textX + lw / 1.03 + 3} y={y} font="mono-400" size={9} fill={th.inkMuted}>
+                {aiTag}
+              </Txt>
             )}
           </g>
         );
@@ -342,60 +215,56 @@ function StatusPills({ statuses, th, lang, id }: { statuses: StatusInstance[]; t
 }
 
 /* ------------------------------------------------------------------ */
-/* Carte                                                                */
+/* Fiche                                                                */
 /* ------------------------------------------------------------------ */
 
 export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, className, x, y, width, height }: CardGraphicProps) {
   const rid = sanitize(useId());
-  const id = sanitize(idPrefix ?? `tys${rid}`);
+  const idp = sanitize(idPrefix ?? `tys${rid}`);
   const lang: Lang = langProp ?? card.lang ?? "fr";
   const s = t(lang);
-  const style = styleOf(card);
-  const th = themeFor(style);
-  // avatarHref === "" : pas d'avatar exploitable (initiales), même si card.avatarUrl existe
+  const th = themeOf(card);
+  const stars = starsFor(card.overall);
+  const levelLabel = LEVEL_LABELS[stars][lang];
   const avatar = avatarHref !== undefined ? avatarHref || undefined : card.avatarUrl;
-  const P = L.portrait;
-  const u = (k: string) => `url(#${id}-${k})`;
-  const emb = { color: th.emboss, opacity: th.embossOpacity };
-  const inkFill = th.inkGradient ? u("ink") : th.ink;
+  const u = (k: string) => `url(#${idp}-${k})`;
+  const M = L.mug;
 
   // Textes ajustés
-  const name = fit(upper(card.name, lang), { font: "display-700", size: 38, minSize: 22, maxWidth: 296, letterSpacing: 0.6, minLetterSpacing: 0 });
-  const club = fit(upper(card.club ?? s.freeAgent, lang), { font: "sans-600", size: 8, minSize: 6.6, maxWidth: 88, letterSpacing: 0.5, minLetterSpacing: 0.2 });
-  const sourceLabel =
-    card.source === "cv"
-      ? s.sourceCv
-      : card.login && card.login.toLowerCase() !== card.name.toLowerCase()
-        ? `${s.sourceGithub} · @${card.login.toUpperCase()}`
-        : s.sourceGithub;
-  const source = fit(sourceLabel, { font: "mono-500", size: 7.4, minSize: 6.2, maxWidth: 150, letterSpacing: 1.4, minLetterSpacing: 0.6 });
-  const position = card.position;
-  const posFit = fit(position, { font: "mono-700", size: 15, minSize: 10, maxWidth: 76, letterSpacing: 1.2, minLetterSpacing: 0.2 });
-  const overallSize = card.overall >= 100 ? 58 : 72;
+  const level = fit(upper(levelLabel, lang), { font: "mono-700", size: 12, minSize: 9, maxWidth: M.x - L.left - 6, letterSpacing: 1.9, minLetterSpacing: 0.6 });
+  const placardName = fit(upper(card.login ?? card.name, lang), { font: "display-700", size: 20, minSize: 12, maxWidth: L.placard.w - 16, letterSpacing: 1.6, minLetterSpacing: 0.3 });
+  const caseLine = `${s.caseNo} ${caseNumber(card.id)} · ${caseDate(card.createdAt)}`;
+  const caseFit = fit(caseLine, { font: "mono-400", size: 8.5, minSize: 7, maxWidth: L.placard.w - 12, letterSpacing: 0.85, minLetterSpacing: 0.2 });
+  const overallSize = card.overall >= 100 ? 92 : L.overall.size;
   const icon = langIcon(card.mainLanguage);
+  const langName = card.mainLanguage ? prettyLanguage(card.mainLanguage, icon?.title) : "—";
+
+  // Ligne spécialité / arme / affiliation
+  const formW = L.right - L.left;
+  const unit = (formW - 20) / 3.3;
+  const cols = [
+    { x: L.left, w: unit, label: s.specialty, value: s.positions[card.position] ?? card.position },
+    { x: L.left + unit + 10, w: unit, label: s.weapon, value: langName },
+    { x: L.left + 2 * unit + 20, w: unit * 1.3, label: s.affiliation, value: card.club ?? s.loneWolf },
+  ];
 
   // Pied
-  const judged = s.judged(card.judgedInSeconds);
-  const rel = s.percent(card.reliability);
-  const footerText = `${judged} · ${s.reliability} `;
-  const footerFit = fit(`${footerText}${rel}`, { font: "mono-500", size: 10, minSize: 7.5, maxWidth: 244, letterSpacing: 0, minLetterSpacing: 0 });
-  const footerSize = footerFit.size;
-  const relColor = card.reliability < 50 ? th.tones.negative : card.reliability >= 75 ? th.tones.positive : th.pillText;
+  const questioned = s.questioned(card.judgedInSeconds);
+  const footer = `${questioned} · ${s.evidence} ${s.percent(card.reliability)}`;
+  const footerFit = fit(footer, { font: "mono-400", size: 9.5, minSize: 7.5, maxWidth: formW, letterSpacing: 0.3, minLetterSpacing: 0 });
+
+  const badge = th.badge ? fit(upper(th.label[lang], lang), { font: "mono-700", size: 8.5, minSize: 7, maxWidth: 150, letterSpacing: 1.4, minLetterSpacing: 0.5 }) : null;
+  const badgeW = badge ? badge.width + 16 : 0;
 
   const left = card.stats.slice(0, 3);
   const right = card.stats.slice(3, 6);
 
-  const label = upper(th.label[lang], lang);
-  const badge = fit(label, { font: "display-700", size: 11, minSize: 8.5, maxWidth: 98, letterSpacing: th.badge ? 1.6 : 2.4, minLetterSpacing: 0.6 });
-  // cartouche du tier : sombre, lettres dans le métal clair du cadre ; badge coloré pour les spéciales
-  const plate = th.badge ?? { bg: [], ink: th.frame[3][1], border: th.pillBorder };
-
-  const nameW = name.width;
-  const ruleGap = Math.max(nameW, source.width) / 2;
-  void ruleGap;
-  const sourceHalf = source.width / 2 + 9;
-
-  const ariaLabel = `${s.card} ${th.label[lang]} ${card.overall} — ${card.name}`;
+  const ariaLabel = `${s.card} ${levelLabel} ${card.overall} — ${card.name}`;
+  const photoX = M.x + (M.w - L.photo.w) / 2;
+  const photoY = M.y + M.h - L.photo.h;
+  const plX = M.x + (M.w - L.placard.w) / 2;
+  const plY = M.y + M.h - L.placard.bottom - L.placard.h;
+  const grainOpacity = 0.07;
 
   return (
     <svg
@@ -411,350 +280,268 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
       style={width === undefined ? { display: "block", width: "100%", height: "auto" } : undefined}
     >
       <defs>
-        <linearGradient id={`${id}-frame`} x1="0" y1="0" x2="1" y2="1">
-          {stops(th.frame)}
+        <linearGradient id={`${idp}-body`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#0d0d26" />
+          <stop offset="0.55" stopColor={PALETTE.night} />
+          <stop offset="1" stopColor="#08081a" />
         </linearGradient>
-        <linearGradient id={`${id}-framev`} x1="0" y1="0" x2="0.35" y2="1">
-          {stops(th.frame)}
+        <linearGradient id={`${idp}-num`} x1="0" y1="0" x2="1" y2="1">
+          {stops(th.num)}
         </linearGradient>
-        <linearGradient id={`${id}-body`} x1="0" y1="0" x2="0.2" y2="1">
-          {stops(th.body)}
-        </linearGradient>
-        <linearGradient id={`${id}-sheen`} x1="0" y1="0" x2="1" y2="0.72">
-          {stops(th.sheen)}
-        </linearGradient>
-        {th.inkGradient && (
-          <linearGradient id={`${id}-ink`} x1="0" y1="0" x2="0" y2="1">
-            {stops(th.inkGradient)}
-          </linearGradient>
-        )}
-        <linearGradient id={`${id}-bevel`} x1="0" y1="0" x2="0.6" y2="1">
-          <stop offset="0" stopColor="#fff" stopOpacity={0.85} />
-          <stop offset="0.45" stopColor="#fff" stopOpacity={0.1} />
-          <stop offset="0.55" stopColor="#000" stopOpacity={0.05} />
-          <stop offset="1" stopColor="#000" stopOpacity={0.55} />
-        </linearGradient>
-        <linearGradient id={`${id}-pillrim`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor={th.pillBorder} stopOpacity={0.55} />
-          <stop offset="1" stopColor={th.pillBorder} stopOpacity={0.08} />
-        </linearGradient>
-        <radialGradient id={`${id}-halo`} cx={P.cx} cy={P.cy} r={150} gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor={th.halo} stopOpacity={th.haloOpacity} />
-          <stop offset="0.45" stopColor={th.halo} stopOpacity={th.haloOpacity * 0.45} />
-          <stop offset="1" stopColor={th.halo} stopOpacity={0} />
+        <radialGradient id={`${idp}-haze1`} cx={65} cy={42} r={240} gradientUnits="userSpaceOnUse" gradientTransform={`translate(65 42) scale(1 0.85) translate(-65 -42)`}>
+          <stop offset="0" stopColor={th.accent} stopOpacity={0.55} />
+          <stop offset="0.7" stopColor={th.accent} stopOpacity={0} />
         </radialGradient>
-        <radialGradient id={`${id}-vignette`} cx="180" cy="230" r="330" gradientUnits="userSpaceOnUse">
-          <stop offset="0.55" stopColor="#000" stopOpacity={0} />
-          <stop offset="1" stopColor="#000" stopOpacity={th.dark ? 0.55 : 0.32} />
+        <radialGradient id={`${idp}-haze2`} cx={317} cy={62} r={240} gradientUnits="userSpaceOnUse" gradientTransform={`translate(317 62) scale(1 0.77) translate(-317 -62)`}>
+          <stop offset="0" stopColor={th.accent2} stopOpacity={0.4} />
+          <stop offset="0.7" stopColor={th.accent2} stopOpacity={0} />
         </radialGradient>
-        {/* fondu elliptique du portrait, entièrement contenu dans l'image (aucun bord visible) */}
-        <radialGradient id={`${id}-pfade`} cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform={`translate(${P.cx} ${P.y + 104}) scale(${P.s / 2 - 2} ${P.s / 2 + 6})`}>
-          <stop offset="0" stopColor="#fff" />
-          <stop offset="0.5" stopColor="#fff" />
-          <stop offset="0.78" stopColor="#888" />
-          <stop offset="1" stopColor="#000" />
-        </radialGradient>
-        <linearGradient id={`${id}-pfadev`} x1="0" y1={P.y} x2="0" y2={P.y + P.s} gradientUnits="userSpaceOnUse">
-          <stop offset="0.6" stopColor="#fff" />
-          <stop offset="0.8" stopColor="#777" />
-          <stop offset="0.99" stopColor="#000" />
-        </linearGradient>
-        <radialGradient id={`${id}-raysfade`} cx={P.cx} cy={P.cy} r={230} gradientUnits="userSpaceOnUse">
-          <stop offset="0.15" stopColor="#fff" />
-          <stop offset="1" stopColor="#000" />
-        </radialGradient>
-        <linearGradient id={`${id}-rulefade`} x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor={th.rule} stopOpacity={0} />
-          <stop offset="0.5" stopColor={th.rule} stopOpacity={0.9} />
-          <stop offset="1" stopColor={th.rule} stopOpacity={0} />
-        </linearGradient>
-        <linearGradient id={`${id}-vdiv`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor={th.rule} stopOpacity={0} />
-          <stop offset="0.5" stopColor={th.rule} stopOpacity={0.6} />
-          <stop offset="1" stopColor={th.rule} stopOpacity={0} />
-        </linearGradient>
-        {th.badge && (
-          <linearGradient id={`${id}-badge`} x1="0" y1="0" x2="1" y2="0">
-            {stops(th.badge.bg)}
-          </linearGradient>
-        )}
-        <AzeritGemDefs id={id} />
-
-        <clipPath id={`${id}-outer`}>
-          <path d={cardPath(0)} />
-        </clipPath>
-        <clipPath id={`${id}-filet-clip`}>
-          <path d={cardPath(L.filet)} />
-        </clipPath>
-        <clipPath id={`${id}-body-clip`}>
-          <path d={cardPath(L.frame)} />
-        </clipPath>
-
-        <mask id={`${id}-pmask-r`} maskUnits="userSpaceOnUse" x="0" y="0" width={CARD_W} height={CARD_H}>
-          <rect width={CARD_W} height={CARD_H} fill={u("pfade")} />
-        </mask>
-        <mask id={`${id}-pmask-v`} maskUnits="userSpaceOnUse" x="0" y="0" width={CARD_W} height={CARD_H}>
-          <rect width={CARD_W} height={CARD_H} fill={u("pfadev")} />
-        </mask>
-        <mask id={`${id}-raysmask`} maskUnits="userSpaceOnUse" x="0" y="0" width={CARD_W} height={CARD_H}>
-          <rect width={CARD_W} height={CARD_H} fill={u("raysfade")} />
-        </mask>
-
-        <TextureDefs id={id} th={th} />
-        {th.texture === "energy" && (
+        {th.holoBand && (
           <>
-            {/* traînées atténuées derrière les stats, pour la lisibilité */}
-            <linearGradient id={`${id}-streakfade`} x1="0" y1="0" x2="0" y2={CARD_H} gradientUnits="userSpaceOnUse">
-              <stop offset="0.45" stopColor="#fff" />
-              <stop offset="0.62" stopColor="#555" />
-              <stop offset="0.9" stopColor="#777" />
-            </linearGradient>
-            <mask id={`${id}-streakmask`} maskUnits="userSpaceOnUse" x="0" y="0" width={CARD_W} height={CARD_H}>
-              <rect width={CARD_W} height={CARD_H} fill={u("streakfade")} />
-            </mask>
-            <linearGradient id={`${id}-streak-a`} x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0" stopColor="#dde27d" stopOpacity={0} />
-              <stop offset="0.7" stopColor="#eef29a" stopOpacity={1} />
-              <stop offset="1" stopColor="#dde27d" stopOpacity={0} />
-            </linearGradient>
-            <linearGradient id={`${id}-streak-b`} x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0" stopColor="#52d0bd" stopOpacity={0} />
-              <stop offset="0.65" stopColor="#7fe6d4" stopOpacity={1} />
-              <stop offset="1" stopColor="#52d0bd" stopOpacity={0} />
+            <radialGradient id={`${idp}-haze3`} cx={180} cy={520} r={300} gradientUnits="userSpaceOnUse" gradientTransform="translate(180 520) scale(1 0.53) translate(-180 -520)">
+              <stop offset="0" stopColor={PALETTE.orange} stopOpacity={0.25} />
+              <stop offset="0.7" stopColor={PALETTE.orange} stopOpacity={0} />
+            </radialGradient>
+            <linearGradient id={`${idp}-holoband`} x1="0" y1="0" x2="1" y2="0.45">
+              <stop offset="0.3" stopColor={PALETTE.yellow} stopOpacity={0} />
+              <stop offset="0.42" stopColor={PALETTE.yellow} stopOpacity={0.14} />
+              <stop offset="0.5" stopColor={PALETTE.pink} stopOpacity={0.18} />
+              <stop offset="0.58" stopColor={PALETTE.cyan} stopOpacity={0.16} />
+              <stop offset="0.7" stopColor={PALETTE.cyan} stopOpacity={0} />
             </linearGradient>
           </>
         )}
-        {th.texture === "halftone" && (
-          <pattern id={`${id}-dots`} width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(30)">
-            <circle cx="2.5" cy="2.5" r="1.15" fill={th.ink} />
-          </pattern>
-        )}
-        {th.texture === "pinstripe" && (
-          <pattern id={`${id}-stripes`} width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-            <rect width="0.9" height="7" fill={th.rule} />
-          </pattern>
-        )}
+        <linearGradient id={`${idp}-wall`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#c3ccd6" />
+          <stop offset="0.7" stopColor="#a6b1be" />
+          <stop offset="1" stopColor="#8f9aa8" />
+        </linearGradient>
+        <AzeritGemDefs id={idp} />
 
-        <filter id={`${id}-glow`} x="-5%" y="-5%" width="110%" height="110%">
-          <feGaussianBlur stdDeviation="2.2" />
+        <clipPath id={`${idp}-outer`}>
+          <path d={cardPath(0)} />
+        </clipPath>
+        <clipPath id={`${idp}-mug`}>
+          <rect x={M.x} y={M.y} width={M.w} height={M.h} rx={M.r} />
+        </clipPath>
+
+        {/* grain : bruit blanc très léger sur toute la fiche */}
+        <filter id={`${idp}-grain`} x="0" y="0" width={CARD_W} height={CARD_H} filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
+          <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves={2} seed={5} stitchTiles="stitch" result="n" />
+          <feColorMatrix in="n" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.5 0" />
         </filter>
-        <filter id={`${id}-soft`} x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur stdDeviation="6" />
+        <filter id={`${idp}-starglow`} x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="2.6" />
+        </filter>
+        <filter id={`${idp}-levelglow`} x="-10%" y="-60%" width="120%" height="220%">
+          <feGaussianBlur stdDeviation="3" />
+        </filter>
+        <filter id={`${idp}-barglow`} x="-10%" y="-100%" width="120%" height="300%">
+          <feGaussianBlur stdDeviation="3" />
+        </filter>
+        <filter id={`${idp}-dotglow`} x="-100%" y="-100%" width="300%" height="300%">
+          <feGaussianBlur stdDeviation="2" />
+        </filter>
+        <filter id={`${idp}-numshadow`} x="-5%" y="-5%" width="110%" height="115%">
+          <feOffset dy="2" />
+        </filter>
+        {/* Portrait « illustration » : aplats (posterisation), saturation, et un
+            trait d'encre sur les contours (laplacien de la luminance). */}
+        <filter id={`${idp}-ink`} x="0" y="0" width="1" height="1" colorInterpolationFilters="sRGB">
+          <feColorMatrix in="SourceGraphic" type="saturate" values="1.3" result="sat" />
+          <feComponentTransfer in="sat" result="post">
+            <feFuncR type="discrete" tableValues="0 0.14 0.28 0.42 0.56 0.7 0.84 1" />
+            <feFuncG type="discrete" tableValues="0 0.14 0.28 0.42 0.56 0.7 0.84 1" />
+            <feFuncB type="discrete" tableValues="0 0.14 0.28 0.42 0.56 0.7 0.84 1" />
+          </feComponentTransfer>
+          <feColorMatrix in="SourceGraphic" type="matrix" values="0.3 0.59 0.11 0 0  0.3 0.59 0.11 0 0  0.3 0.59 0.11 0 0  0 0 0 1 0" result="gray" />
+          <feGaussianBlur in="gray" stdDeviation="1" result="g" />
+          <feConvolveMatrix in="g" order="3" kernelMatrix="-1 -1 -1 -1 8 -1 -1 -1 -1" divisor="1" bias="0" preserveAlpha="true" edgeMode="duplicate" result="edge" />
+          <feColorMatrix in="edge" type="matrix" values="0 0 0 0 0.03  0 0 0 0 0.02  0 0 0 0 0.06  2.5 2.5 2.5 0 -0.3" result="inkA" />
+          <feComposite in="inkA" in2="post" operator="over" />
         </filter>
         {card.source === "cv" && (
           <>
-            <filter id={`${id}-stampnoise`} x="0" y="0" width="1" height="1">
+            <filter id={`${idp}-stampnoise`} x="0" y="0" width="1" height="1">
               <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves={2} seed={2} result="n" />
               <feColorMatrix in="n" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  7 0 0 0 -2.55" />
             </filter>
-            <mask id={`${id}-stampmask`} maskUnits="userSpaceOnUse" x="-90" y="-40" width="180" height="80">
+            <mask id={`${idp}-stampmask`} maskUnits="userSpaceOnUse" x="-90" y="-40" width="180" height="80">
               <rect x="-90" y="-40" width="180" height="80" fill="#fff" filter={u("stampnoise")} />
             </mask>
           </>
         )}
       </defs>
 
-      {/* Anneau métallique */}
-      <path d={cardPath(0)} fill={u("frame")} />
+      {/* Corps de nuit, halos néon, palmier, grain */}
       <g clipPath={u("outer")}>
-        <path d={cardPath(0)} fill="none" stroke={u("bevel")} strokeWidth={3.2} />
-      </g>
-
-      {/* Corps */}
-      <g clipPath={u("body-clip")}>
         <rect width={CARD_W} height={CARD_H} fill={u("body")} />
-
-        {/* Texture du métal */}
-        <rect width={CARD_W} height={CARD_H} filter={u("tex")} opacity={th.texture === "energy" ? 0.35 : th.textureOpacity} />
-        {th.texture === "energy" && (
-          <g mask={u("streakmask")}>
-          <g opacity={0.8} filter={u("soft")}>
-            {STREAKS.filter((_, i) => i % 3 === 0).map((k, i) => (
-              <rect key={i} x={k.x} y={k.y - 3} width={k.len} height={k.w + 6} fill={u(k.lime ? "streak-a" : "streak-b")} opacity={k.o * 0.5} transform={`rotate(-28 ${k.x + k.len / 2} ${k.y})`} />
+        <rect width={CARD_W} height={CARD_H} fill={u("haze1")} opacity={th.haze} />
+        <rect width={CARD_W} height={CARD_H} fill={u("haze2")} opacity={th.haze} />
+        {th.holoBand && <rect width={CARD_W} height={CARD_H} fill={u("haze3")} />}
+        {th.palms > 0 && (
+          <g transform="translate(232 316) scale(1.5)" fill="#05050f" opacity={th.palms}>
+            {PALM.map((d, i) => (
+              <path key={i} d={d} />
             ))}
           </g>
-          <g opacity={th.textureOpacity}>
-            {STREAKS.map((k, i) => (
-              <rect
-                key={i}
-                x={k.x}
-                y={k.y}
-                width={k.len}
-                height={k.w}
-                rx={k.w / 2}
-                fill={u(k.lime ? "streak-a" : "streak-b")}
-                opacity={k.o}
-                transform={`rotate(-28 ${k.x + k.len / 2} ${k.y})`}
-              />
-            ))}
-          </g>
-          </g>
         )}
-        {th.texture === "halftone" && <rect width={CARD_W} height={CARD_H} fill={u("dots")} opacity={th.textureOpacity} />}
-        {th.texture === "pinstripe" && <rect width={CARD_W} height={CARD_H} fill={u("stripes")} opacity={th.textureOpacity} />}
-
-        {/* Facettes */}
-        {FACETS.map((f, i) => (
-          <path key={i} d={f.d} fill={f.light ? "#fff" : "#000"} fillOpacity={f.light ? th.facetLight : th.facetDark} />
-        ))}
-
-        {/* Reflets */}
-        <rect width={CARD_W} height={CARD_H} fill={u("sheen")} />
-
-        {/* Halo et rayons derrière le portrait */}
-        {th.rays > 0 && (
-          <g mask={u("raysmask")} opacity={th.rays}>
-            {Array.from({ length: 18 }, (_, i) => {
-              const a0 = (i / 18) * Math.PI * 2;
-              const a1 = a0 + Math.PI / 36;
-              const R = 300;
-              return (
-                <path
-                  key={i}
-                  d={`M${P.cx} ${P.cy} L${P.cx + R * Math.cos(a0)} ${P.cy + R * Math.sin(a0)} L${P.cx + R * Math.cos(a1)} ${P.cy + R * Math.sin(a1)} Z`}
-                  fill={th.dark ? th.halo : "#fff"}
-                />
-              );
-            })}
-          </g>
-        )}
-        <circle cx={P.cx} cy={P.cy} r={150} fill={u("halo")} />
-
-        {/* Portrait */}
-        {avatar ? (
-          <g mask={u("pmask-v")}>
-            <g mask={u("pmask-r")}>
-              <image href={avatar} x={P.x} y={P.y} width={P.s} height={P.s} preserveAspectRatio="xMidYMid slice" />
-            </g>
-          </g>
-        ) : (
-          <Initials initials={card.initials} th={th} id={id} />
-        )}
-
-        {/* Tampon CV */}
-        {card.source === "cv" && (
-          <g transform="translate(262 222) rotate(-9)">
-            <g mask={u("stampmask")} opacity={0.88}>
-              <rect x={-64} y={-16} width={128} height={32} rx={3} fill="none" stroke={th.dark ? "#ff8b7b" : "#a3261b"} strokeWidth={2.2} />
-              <rect x={-60} y={-12} width={120} height={24} rx={1.5} fill="none" stroke={th.dark ? "#ff8b7b" : "#a3261b"} strokeWidth={0.8} />
-              <text x={0} y={5.4} {...fontAttrs("display-800")} fontSize={15.5} letterSpacing={1.4} textAnchor="middle" fill={th.dark ? "#ff8b7b" : "#a3261b"}>
-                {fit(s.cvStamp, { font: "display-800", size: 15.5, minSize: 11, maxWidth: 108, letterSpacing: 1.4, minLetterSpacing: 0.4 }).text}
-              </text>
-            </g>
-          </g>
-        )}
-
-        {/* Vignettage */}
-        <rect width={CARD_W} height={CARD_H} fill={u("vignette")} />
+        <rect width={CARD_W} height={CARD_H} filter={u("grain")} opacity={grainOpacity} />
       </g>
 
-      {/* Filets : séparation cadre / corps, puis bord intérieur lumineux */}
-      <path d={cardPath(L.frame)} fill="none" stroke="#000" strokeOpacity={0.4} strokeWidth={0.9} />
-      <path d={cardPath(L.frame + 0.9)} fill="none" stroke="#fff" strokeOpacity={th.dark ? 0.12 : 0.35} strokeWidth={0.6} />
-      <path d={cardPath(L.filet)} fill="none" stroke={th.innerGlow} strokeOpacity={th.dark ? 0.7 : 0.55} strokeWidth={2.4} filter={u("glow")} />
-      <path d={cardPath(L.filet)} fill="none" stroke={u("framev")} strokeWidth={1.1} />
-      <path d={cardPath(L.filet)} fill="none" stroke={th.innerLine} strokeOpacity={0.55} strokeWidth={0.45} />
+      {/* Étoiles de recherche */}
+      <Stars n={stars} th={th} id={idp} />
 
-      {/* Tier ou badge spécial dans la couronne, en cartouche */}
+      {/* Marque Azerit, en haut à droite */}
       <g>
-        <rect x={180 - badge.width / 2 - 11} y={14.5} width={badge.width + 22} height={16} rx={3} fill={th.badge ? u("badge") : th.pillBg} fillOpacity={th.badge ? 1 : th.pillBgOpacity} />
-        <rect x={180 - badge.width / 2 - 11} y={14.5} width={badge.width + 22} height={16} rx={3} fill="none" stroke={plate.border} strokeOpacity={th.badge ? 0.8 : 0.45} strokeWidth={0.7} />
-        <text x={180 + badge.letterSpacing / 2} y={26.4} {...fontAttrs("display-700")} fontSize={badge.size} letterSpacing={badge.letterSpacing} textAnchor="middle" fill={plate.ink}>
-          {badge.text}
-        </text>
+        <Txt x={L.right} y={L.stars.y + 11.5} font="sans-700" size={10.5} ls={2.3} anchor="end" fill={th.inkSoft}>
+          AZERIT
+        </Txt>
+        <AzeritGem id={idp} x={L.right - measure("AZERIT", "sans-700", 10.5, 2.3) - 15} y={L.stars.y + 0.5} h={13} />
       </g>
 
-      {/* Colonne gauche : note, poste, langage, club */}
-      <Txt x={L.col} y={L.overallY} font="display-800" size={overallSize} ls={-1.5} anchor="middle" fill={inkFill} emboss={emb}>
+      {/* La note, dans le dégradé du niveau */}
+      <text x={L.overall.x} y={L.overall.y} {...fontAttrs("display-800")} fontSize={overallSize} letterSpacing={-2.4} fill="#000" fillOpacity={0.5} filter={u("numshadow")}>
         {card.overall}
-      </Txt>
-      <Txt x={L.col} y={L.positionY} font="mono-700" size={posFit.size} ls={posFit.letterSpacing} anchor="middle" fill={th.ink} emboss={emb}>
-        {posFit.text}
-      </Txt>
-      <line x1={L.col - 17} x2={L.col + 17} y1={L.sepY} y2={L.sepY} stroke={th.rule} strokeOpacity={0.6} strokeWidth={0.8} />
-      {icon ? (
-        <g transform={`translate(${L.col - 11} ${L.langY - 11}) scale(${22 / 24})`}>
-          {th.embossOpacity > 0 && <path d={icon.path} fill={th.emboss} fillOpacity={th.embossOpacity} transform="translate(0 1)" />}
-          <path d={icon.path} fill={th.ink} />
-        </g>
-      ) : (
-        <Txt x={L.col} y={L.langY + 6} font="mono-700" size={17} anchor="middle" fill={th.ink} emboss={emb}>
-          {"{}"}
-        </Txt>
-      )}
-      <line x1={L.col - 17} x2={L.col + 17} y1={L.langY + 17} y2={L.langY + 17} stroke={th.rule} strokeOpacity={0.6} strokeWidth={0.8} />
-      <Txt x={L.col} y={L.clubY} font="sans-600" size={club.size} ls={club.letterSpacing} anchor="middle" fill={th.inkSoft} emboss={emb}>
-        {club.text}
+      </text>
+      <text x={L.overall.x} y={L.overall.y} {...fontAttrs("display-800")} fontSize={overallSize} letterSpacing={-2.4} fill={u("num")}>
+        {card.overall}
+      </text>
+
+      {/* Niveau, en mono néon : une copie floue dessous, le texte net dessus */}
+      <text x={L.left} y={L.levelY} {...fontAttrs("mono-700")} fontSize={level.size} letterSpacing={level.letterSpacing} fill={th.accent} filter={u("levelglow")} opacity={0.6}>
+        {level.text}
+      </text>
+      <Txt x={L.left} y={L.levelY} font="mono-700" size={level.size} ls={level.letterSpacing} fill={th.accent}>
+        {level.text}
       </Txt>
 
-      {/* Gemme Azerit */}
-      <AzeritGem id={id} x={305} y={40} h={25} outline={th.dark ? undefined : "#ffffff"} />
-
-      {/* Bandeau nom */}
-      <Txt x={180} y={L.nameY} font="display-700" size={name.size} ls={name.letterSpacing} anchor="middle" fill={inkFill} emboss={emb}>
-        {name.text}
+      {/* Dossier : GitHub ou CV */}
+      <Txt x={L.left} y={L.metaLabelY} font="mono-400" size={10} ls={0.6} fill={th.inkMuted}>
+        {s.file}
       </Txt>
+      <Txt x={L.left} y={L.metaValueY} font="sans-500" size={12} fill={th.ink}>
+        {card.source === "cv" ? s.sourceCv : s.sourceGithub}
+      </Txt>
+
+      {/* Photo d'identité judiciaire */}
       <g>
-        <rect x={34} y={L.ruleY - 0.4} width={180 - sourceHalf - 34} height={0.8} fill={u("rulefade")} />
-        <rect x={180 + sourceHalf} y={L.ruleY - 0.4} width={326 - 180 - sourceHalf} height={0.8} fill={u("rulefade")} />
-        <path d={`M${180 - sourceHalf} ${L.ruleY} l3 -3 l3 3 l-3 3 Z`} fill={th.rule} opacity={0.8} />
-        <path d={`M${180 + sourceHalf} ${L.ruleY} l-3 -3 l-3 3 l3 3 Z`} fill={th.rule} opacity={0.8} />
-        <Txt x={180} y={L.ruleY + 2.6} font="mono-500" size={source.size} ls={source.letterSpacing} anchor="middle" fill={th.inkSoft}>
-          {source.text}
-        </Txt>
+        <rect x={M.x} y={M.y + 10} width={M.w} height={M.h} rx={M.r} fill="#000" opacity={0.5} filter={u("levelglow")} />
+        <g clipPath={u("mug")}>
+          <rect x={M.x} y={M.y} width={M.w} height={M.h} fill={u("wall")} />
+          {Array.from({ length: 8 }, (_, i) => (
+            <rect key={i} x={M.x} y={M.y + 25 + i * 26.5} width={M.w} height={1.5} fill="#141c28" opacity={0.42} />
+          ))}
+          {["190", "180", "170", "160"].map((tck, i) => (
+            <text key={tck} x={M.x + 6} y={M.y + 21 + i * 53} {...fontAttrs("mono-700")} fontSize={8} letterSpacing={0.4} fill="#141c28" fillOpacity={0.7}>
+              {tck}
+            </text>
+          ))}
+          {avatar ? (
+            <image href={avatar} x={photoX} y={photoY} width={L.photo.w} height={L.photo.h} preserveAspectRatio="xMidYMin slice" filter={u("ink")} />
+          ) : (
+            <Initials initials={card.initials} />
+          )}
+          {card.source === "cv" && (
+            <g transform={`translate(${M.x + M.w / 2} ${M.y + 40}) rotate(-9)`}>
+              <g mask={u("stampmask")} opacity={0.88}>
+                <rect x={-64} y={-16} width={128} height={32} rx={3} fill="none" stroke="#a3261b" strokeWidth={2.2} />
+                <rect x={-60} y={-12} width={120} height={24} rx={1.5} fill="none" stroke="#a3261b" strokeWidth={0.8} />
+                <text x={0} y={5.4} {...fontAttrs("display-800")} fontSize={15.5} letterSpacing={1.4} textAnchor="middle" fill="#a3261b">
+                  {fit(s.cvStamp, { font: "display-800", size: 15.5, minSize: 11, maxWidth: 108, letterSpacing: 1.4, minLetterSpacing: 0.4 }).text}
+                </text>
+              </g>
+            </g>
+          )}
+          {/* Écriteau */}
+          <g transform={`rotate(-1.2 ${plX + L.placard.w / 2} ${plY + L.placard.h / 2})`}>
+            <rect x={plX} y={plY + 4} width={L.placard.w} height={L.placard.h} rx={3} fill="#000" opacity={0.45} filter={u("dotglow")} />
+            <rect x={plX} y={plY} width={L.placard.w} height={L.placard.h} rx={3} fill="#111111" />
+            <rect x={plX + 0.5} y={plY + 0.5} width={L.placard.w - 1} height={L.placard.h - 1} rx={2.5} fill="none" stroke="#fff" strokeOpacity={0.08} />
+            <text x={plX + L.placard.w / 2 + placardName.letterSpacing / 2} y={plY + 22} {...fontAttrs("display-700")} fontSize={placardName.size} letterSpacing={placardName.letterSpacing} textAnchor="middle" fill="#f4f1ea">
+              {placardName.text}
+            </text>
+            <text x={plX + L.placard.w / 2 + caseFit.letterSpacing / 2} y={plY + 35} {...fontAttrs("mono-400")} fontSize={caseFit.size} letterSpacing={caseFit.letterSpacing} textAnchor="middle" fill="#bdb8ad">
+              {caseFit.text}
+            </text>
+          </g>
+        </g>
+        <rect x={M.x + 0.5} y={M.y + 0.5} width={M.w - 1} height={M.h - 1} rx={M.r} fill="none" stroke="#fff" strokeOpacity={0.12} />
       </g>
 
-      {/* Stats */}
-      <rect x={179.6} y={L.statsTop} width={0.8} height={L.statsBottom - L.statsTop} fill={u("vdiv")} />
+      {/* Badge de spéciale, posé sur le haut de la photo */}
+      {badge && th.badge && (
+        <g transform={`translate(${L.right - badgeW} 36) rotate(-2 ${badgeW} 0)`}>
+          <rect width={badgeW} height={16} rx={3} fill={th.badge.bg} />
+          <rect width={badgeW} height={16} rx={3} fill={th.badge.bg} opacity={0.5} filter={u("starglow")} />
+          <text x={badgeW / 2 + badge.letterSpacing / 2} y={11.2} {...fontAttrs("mono-700")} fontSize={badge.size} letterSpacing={badge.letterSpacing} textAnchor="middle" fill={th.badge.ink}>
+            {badge.text}
+          </text>
+        </g>
+      )}
+
+      {/* Spécialité / arme / affiliation */}
+      <rect x={L.left} y={L.formTop} width={formW} height={1} fill="#fff" fillOpacity={0.1} />
+      {cols.map((c, i) => {
+        const v = fit(c.value, { font: "sans-600", size: 12.5, minSize: 10, maxWidth: c.w, letterSpacing: 0, minLetterSpacing: 0 });
+        return (
+          <g key={i}>
+            <Txt x={c.x} y={L.formLabelY} font="mono-400" size={8.5} ls={1.2} fill={th.inkMuted}>
+              {upper(c.label, lang)}
+            </Txt>
+            {i === 1 && icon && (
+              <g transform={`translate(${c.x} ${L.formValueY - 9.5}) scale(${11 / 24})`}>
+                <path d={icon.path} fill={th.inkSoft} />
+              </g>
+            )}
+            <Txt x={c.x + (i === 1 && icon ? 15 : 0)} y={L.formValueY} font="sans-600" size={v.size} fill={th.ink}>
+              {i === 1 && icon ? fit(c.value, { font: "sans-600", size: 12.5, minSize: 10, maxWidth: c.w - 15, letterSpacing: 0 }).text : v.text}
+            </Txt>
+          </g>
+        );
+      })}
+
+      {/* Stats en barres segmentées */}
       {left.map((st, i) => (
-        <StatCell key={st.code} stat={st} x={111} y={L.statsY[i]} th={th} lang={lang} align="left" />
+        <StatRow key={st.code} stat={st} x={L.left} y={L.statsTop + i * L.statRow} th={th} idp={idp} />
       ))}
       {right.map((st, i) => (
-        <StatCell key={st.code} stat={st} x={244} y={L.statsY[i]} th={th} lang={lang} align="right" />
+        <StatRow key={st.code} stat={st} x={L.left + 153 + 16} y={L.statsTop + i * L.statRow} th={th} idp={idp} />
       ))}
 
-      {/* Statuts */}
-      <StatusPills statuses={card.statuses} th={th} lang={lang} id={id} />
+      {/* Chefs d'accusation */}
+      <Charges statuses={card.statuses} th={th} lang={lang} idp={idp} />
 
-      {/* Pied : bande sombre gravée, « Jugé par une IA en 9 s · fiabilité 34 % » */}
-      <g clipPath={u("filet-clip")}>
-        <rect x={0} y={L.footerBand[0]} width={CARD_W} height={L.footerBand[1] - L.footerBand[0]} fill={th.dark ? "#000" : th.pillBg} fillOpacity={th.dark ? 0.45 : 0.8} />
-        <rect x={0} y={L.footerBand[0]} width={CARD_W} height={0.7} fill={th.innerLine} fillOpacity={0.55} />
-        <rect x={0} y={L.footerBand[1] - 0.7} width={CARD_W} height={0.7} fill="#000" fillOpacity={0.35} />
-      </g>
-      <text x={180} y={L.footerY} {...fontAttrs("mono-500")} fontSize={footerSize} textAnchor="middle" fill={th.pillText}>
-        <tspan fillOpacity={0.88}>{footerText}</tspan>
-        <tspan {...fontAttrs("mono-700")} fill={relColor}>
-          {rel}
-        </tspan>
-      </text>
-      <path d="M180 489 l3.2 3.6 l-3.2 3.6 l-3.2 -3.6 Z" fill={th.rule} opacity={0.75} />
+      {/* Pied */}
+      <Txt x={L.left} y={L.footerY} font="mono-400" size={footerFit.size} ls={footerFit.letterSpacing} fill={th.inkMuted}>
+        {footerFit.text}
+      </Txt>
+
+      {/* Reflet statique de l'ennemi public, et liseré */}
+      {th.holoBand && <path d={cardPath(0)} fill={u("holoband")} />}
+      <path d={cardPath(0.5)} fill="none" stroke="#fff" strokeOpacity={0.07} strokeWidth={1} />
     </svg>
   );
 }
 
-function Initials({ initials, th, id }: { initials: string; th: CardTheme; id: string }) {
-  const P = L.portrait;
+function Initials({ initials }: { initials: string }) {
+  const M = L.mug;
   const txt = initials.slice(0, 3).toUpperCase();
-  const f = fit(txt, { font: "display-800", size: 124, minSize: 70, maxWidth: 190, letterSpacing: -2 });
+  const f = fit(txt, { font: "display-800", size: 72, minSize: 40, maxWidth: M.w - 20, letterSpacing: -1 });
   return (
-    <g>
-      <circle cx={P.cx} cy={P.cy} r={86} fill="none" stroke={th.rule} strokeOpacity={0.35} strokeWidth={0.8} />
-      <circle cx={P.cx} cy={P.cy} r={80} fill="none" stroke={th.rule} strokeOpacity={0.18} strokeWidth={4} />
-      <text x={P.cx} y={P.cy + f.size * 0.35 + 1.4} {...fontAttrs("display-800")} fontSize={f.size} letterSpacing={f.letterSpacing} textAnchor="middle" fill={th.emboss} fillOpacity={th.embossOpacity}>
-        {f.text}
-      </text>
-      <text x={P.cx} y={P.cy + f.size * 0.35} {...fontAttrs("display-800")} fontSize={f.size} letterSpacing={f.letterSpacing} textAnchor="middle" fill={`url(#${id}-framev)`}>
-        {f.text}
-      </text>
-      <text x={P.cx} y={P.cy + f.size * 0.35} {...fontAttrs("display-800")} fontSize={f.size} letterSpacing={f.letterSpacing} textAnchor="middle" fill={th.ink} fillOpacity={th.dark ? 0.15 : 0.35}>
-        {f.text}
-      </text>
-    </g>
+    <text x={M.x + M.w / 2} y={M.y + 54 + f.size * 0.78} {...fontAttrs("display-800")} fontSize={f.size} letterSpacing={f.letterSpacing} textAnchor="middle" fill="#2b3442" fillOpacity={0.9}>
+      {f.text}
+    </text>
   );
 }
 
-/** La carte seule, responsive (width 100 %). */
+/** Nom d'affichage du langage : le titre de l'icône, sinon la clé linguist capitalisée. */
+function prettyLanguage(key: string, title?: string): string {
+  if (title) return title;
+  return key.charAt(0).toUpperCase() + key.slice(1);
+}
+
+/** La fiche seule, responsive (width 100 %). */
 export function Card(props: CardProps) {
   return <CardGraphic {...props} />;
 }

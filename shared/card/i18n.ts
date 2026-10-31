@@ -1,42 +1,72 @@
-// Libellés de la carte et des compositions d'images, en français et en anglais.
+// Libellés de la fiche et des compositions d'images, en français et en anglais.
 import type { Lang } from "../types";
 
-const NBSP = " ";
+const NBSP = " ";
 
 export const STRINGS = {
   fr: {
-    freeAgent: "Agent libre",
-    judged: (s: number) => `Jugé par une IA en ${s}${NBSP}s`,
-    reliability: "fiabilité",
+    loneWolf: "Loup solitaire",
+    /** Pied : « Interrogé par une IA pendant 9 s · preuves 34 % ». */
+    questioned: (s: number) => `Interrogé par une IA pendant ${s}${NBSP}s`,
+    evidence: "preuves",
     percent: (n: number) => `${n}${NBSP}%`,
     ai: "IA",
     cvStamp: "D'APRÈS LE CV",
-    sourceGithub: "GITHUB",
+    sourceGithub: "GitHub",
     sourceCv: "CV",
+    file: "Dossier",
+    specialty: "Spécialité",
+    weapon: "Arme",
+    affiliation: "Affiliation",
+    charges: "Chefs d'accusation",
+    caseNo: "N°",
     insufficient: "données insuffisantes",
     buzzNote: "hors note",
     cta: "Fais la tienne",
-    card: "Carte",
+    card: "Fiche",
+    stars: (n: number) => `${n} étoile${n > 1 ? "s" : ""} sur 5`,
     cvSide: "Ce que ton CV déclare",
     githubSide: "Ce que ton GitHub prouve",
     overall: "Note",
+    /** Alias de l'ancienne carte, encore lus par les compositions serveur. */
+    freeAgent: "Loup solitaire",
+    judged: (s: number) => `Interrogé par une IA pendant ${s}${NBSP}s`,
+    reliability: "preuves",
+    positions: {
+      FS: "Full-stack", BE: "Backend", FE: "Frontend", MOB: "Mobile", DATA: "Data", ML: "Machine learning",
+      OPS: "Ops", SEC: "Sécurité", EMB: "Embarqué", PM: "Produit", DESIGN: "Design", CTO: "CTO autoproclamé",
+    } as Record<string, string>,
   },
   en: {
-    freeAgent: "Free agent",
-    judged: (s: number) => `Judged by an AI in ${s}${NBSP}s`,
-    reliability: "reliability",
+    loneWolf: "Lone wolf",
+    questioned: (s: number) => `Questioned by an AI for ${s}${NBSP}s`,
+    evidence: "evidence",
     percent: (n: number) => `${n}%`,
     ai: "AI",
     cvStamp: "PER THE CV",
-    sourceGithub: "GITHUB",
+    sourceGithub: "GitHub",
     sourceCv: "CV",
+    file: "File",
+    specialty: "Specialty",
+    weapon: "Weapon",
+    affiliation: "Affiliation",
+    charges: "Charges",
+    caseNo: "No.",
     insufficient: "not enough data",
     buzzNote: "not rated",
     cta: "Make yours",
-    card: "Card",
+    card: "Sheet",
+    stars: (n: number) => `${n} star${n > 1 ? "s" : ""} out of 5`,
     cvSide: "What your CV claims",
     githubSide: "What your GitHub proves",
     overall: "Rating",
+    freeAgent: "Lone wolf",
+    judged: (s: number) => `Questioned by an AI for ${s}${NBSP}s`,
+    reliability: "evidence",
+    positions: {
+      FS: "Full-stack", BE: "Backend", FE: "Frontend", MOB: "Mobile", DATA: "Data", ML: "Machine learning",
+      OPS: "Ops", SEC: "Security", EMB: "Embedded", PM: "Product", DESIGN: "Design", CTO: "Self-styled CTO",
+    } as Record<string, string>,
   },
 } satisfies Record<Lang, Record<string, unknown>>;
 
