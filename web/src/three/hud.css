@@ -100,7 +100,8 @@
 .dive-hud__radio {
   position: absolute;
   left: 50%;
-  bottom: calc(var(--hud-pad) + 12px + env(safe-area-inset-bottom, 0px));
+  /* au-dessus du bouton « passer l'animation », au centre */
+  bottom: calc(var(--hud-pad) + 64px + env(safe-area-inset-bottom, 0px));
   transform: translate(-50%, 8px);
   display: flex;
   align-items: center;

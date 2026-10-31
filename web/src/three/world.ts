@@ -56,7 +56,7 @@ void main(){
   vec3 c = h < 0.0 ? mix(horizon, uBelow, smoothstep(0.0, 0.12, -h))
     : mix(horizon, mix(uHigh, uZenith, smoothstep(0.12, 0.6, h)), smoothstep(0.0, 0.1, h));
   // fine bande de lueur orangée juste au-dessus de l'horizon, côté soleil
-  c += uGlow * 0.5 * sun * exp(-abs(h - 0.012) * 70.0);
+  c += uGlow * 0.3 * sun * exp(-abs(h - 0.012) * 70.0);
   gl_FragColor = vec4(c, 1.0);
 }`;
 
@@ -68,7 +68,7 @@ function makeSkyScene(): THREE.Scene {
     uniforms: {
       uZenith: { value: new THREE.Color(0x07061c) },
       uHigh: { value: new THREE.Color(0x1d1448) },
-      uHorizon: { value: new THREE.Color(0xb0407a) },
+      uHorizon: { value: new THREE.Color(0x9c3f7c) },
       uGlow: { value: new THREE.Color(0xff8a52) },
       uBelow: { value: new THREE.Color(0x1a0c24) },
     },
