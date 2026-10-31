@@ -4,7 +4,7 @@
 
 ## 0. En une phrase
 
-Un outil de communication pour azerit.tech : tu donnes ton pseudo GitHub ou ton CV, tu reçois en dix secondes une carte de joueur façon FIFA Ultimate Team, belle, partageable, avec des statuts ironiques. Et deux cartes si tu donnes les deux : **ce que ton CV déclare** contre **ce que ton GitHub prouve**. L'écart entre les deux, c'est la blague, la critique et le message d'Azerit en un seul écran.
+Un outil de communication pour azerit.tech : tu donnes ton pseudo GitHub ou ton CV, tu reçois en dix secondes une fiche de dev dans l'univers de GTA 6 (étoiles de recherche, photo d'identité judiciaire, chefs d'accusation ; jusqu'au 31 octobre 2026 c'était une carte de joueur façon FIFA Ultimate Team, voir §17), belle, partageable, avec des statuts ironiques. Et deux cartes si tu donnes les deux : **ce que ton CV déclare** contre **ce que ton GitHub prouve**. L'écart entre les deux, c'est la blague, la critique et le message d'Azerit en un seul écran.
 
 ## 1. Pourquoi on le fait
 
@@ -31,6 +31,8 @@ Chaque point ci-dessous est une instruction. Si une fonctionnalité contredit l'
 9. **Fonctionne sur mobile** aussi bien que sur desktop. La majorité des clics viendront de LinkedIn sur téléphone.
 
 ## 3. La carte
+
+*Version FIFA, remplacée par l'univers de GTA 6 le 31 octobre 2026 : voir §17. Conservée comme historique et comme liste de ce qu'on garde.*
 
 ### 3.1 Anatomie
 
@@ -267,6 +269,8 @@ Sur desktop, le champ a le focus à l'arrivée. Pas sur mobile : le clavier cach
 
 ### 6.2 Attente
 
+*Version FIFA, remplacée par l'univers de GTA 6 le 31 octobre 2026 : voir §17. Conservée comme historique et comme liste de ce qu'on garde.*
+
 Entre cinq et quinze secondes. Afficher des messages qui défilent, en lien avec les faits déjà collectés quand c'est possible :
 
 - « Lecture de tes {n} commits « wip »… »
@@ -277,6 +281,8 @@ Entre cinq et quinze secondes. Afficher des messages qui défilent, en lien avec
 - « Comparaison avec {n} devs sourcés par Azerit… »
 
 ### 6.3 Révélation
+
+*Version FIFA, remplacée par l'univers de GTA 6 le 31 octobre 2026 : voir §17. Conservée comme historique et comme liste de ce qu'on garde.*
 
 Walkout calqué sur FC 27, **en vraie 3D** (Three.js, WebGL), transposé dans un décor qui parle à tout le monde : **l'ascenseur qui monte jusqu'à l'étage du dev**. Les portes d'ascenseur remplacent celles du tunnel, et le compteur d'étages fait monter le suspense. Les portes s'ouvrent sur un open space de nuit, avec la ville derrière les baies. La séquence est sautable avec le bouton ou Échap ; un clic saute aussi, sauf pendant la fenêtre des feux d'artifice. La scène finit au pixel près sur la carte HTML. Dans l'ordre :
 
@@ -407,6 +413,8 @@ Quand les deux sources sont là : les deux cartes côte à côte sur desktop, em
 - **La carte comparée** a aussi son URL et son image, avec les deux cartes.
 
 ## 8. Le visuel
+
+*Version FIFA, remplacée par l'univers de GTA 6 le 31 octobre 2026 : voir §17. Conservée comme historique et comme liste de ce qu'on garde.*
 
 ### 8.1 Système
 
@@ -548,3 +556,100 @@ La calibration du §4.6 sur les dumps de sourcing reste à faire : leur lecture 
 - **Une vraie cabine à la place du code** (16 octobre 2026) : à la demande de Jacques, pour qui Sketchfab a des modèles très réalistes, ascenseurs compris, et qui veut ne générer presque rien nous-mêmes, la cabine construite en code laisse place à un modèle de Sketchfab. Candidats regardés (CC BY ou CC0, téléchargeables) : les cabines de thyssenkrupp de Mikhail-9971 (justes mais coupées pour l'exposition, sans paroi gauche ni portes, textures de 512 px), « Modern Apartment Elevator » (côté palier seulement), « Elevator Interior Scene » (gris, sans matières), « Luxury Elevator » (189 000 faces, vue de l'extérieur), plusieurs scans (graffitis, gaines) et des cabines de jeu. « JNKM Design - Elevator Cab Interior » l'emporte : une cabine complète dessinée par un studio de cabines, la façade, les portes et la boîte à boutons vues de l'intérieur, presque aux cotes de la scène (2 m de large, portes de 0,99 × 2,07 m), 46 000 faces dont 34 000 pour les boutons, ramenées à 21 000. Le précalcul de lumière de la cabine (`cabin.py`) disparaît avec elle ; restent en code les portes qui s'ouvrent, l'afficheur, le bouton et les numéros de l'étage d'arrivée, les filets du tier et la lumière de la gaine. Revue indépendante le même jour, dans une seconde session : 84 modèles d'ascenseur téléchargeables passés au crible par l'API de Sketchfab (CC BY ou CC0 seulement, un outil marketing exclut le CC BY-NC) ; la seule autre vraie cabine, « ELEVATOR » de MINH (boîte chromée d'immeuble, 232 000 faces, 37 Mo, textures bruitées), et celle de JNKM Design ont été rendues dans Cycles depuis la position de la caméra, avec six spots chauds : brutes, aucune ne vaut l'ancienne cabine en noyer ; c'est l'adaptation (verre laqué, joints, reflets de la cabine) qui fait le résultat. Les modèles d'ascenseur les plus appréciés du site ne sont pas téléchargeables (vitrine seulement) ou sont CC BY-NC ; la boutique payante de Sketchfab n'existe plus. Devant la cabine en verre blanc, Jacques a envoyé en exemple « Elevator with Animation LOWPOLY » d'EFX (CC BY, 1 072 faces, bois en une texture de 512 × 256 px, portes chromées plates, sol en tôle larmée), rendu lui aussi depuis la caméra : flou de près. Il a choisi de garder le modèle de JNKM Design en habillant ses parois du noyer de la scène, plutôt que d'importer ce modèle ou de revenir à la cabine en code.
 - **Révélation préparée avant de jouer** (16 octobre 2026) : à la demande de Jacques (« une plus grande partie peut être chargée avant »), la scène 3D se télécharge dès les premières saisies dans le formulaire au lieu d'attendre l'envoi, et l'attente du scoring sert à la préparer (§6.3). Mesuré sur un M1 : 1,35 s de blocage au début de la révélation (construction 0,46 s, compilation des shaders à la première image 0,89 s) ramenées à 0,37 s. Les textures d'éclairage passent en WebP qualité 75 : 3,3 Mo → 0,84 Mo, sans différence visible ; la scène pèse environ 7 Mo au lieu de 9,4.
 - **Poste du dev en vrais modèles** (16 octobre 2026) : à la demande de Jacques (Sketchfab a des modèles très réalistes : ne presque rien générer nous-mêmes), le bureau construit en code (plateau arrondi, piètement en T) devient un vrai bureau assis-debout de Sketchfab, et la souris, le sous-main et tout ce qui traîne sur le bureau sont de vrais modèles (§6.3). Le bureau passe de 2,45 × 0,9 m à 2,2 × 0,84 m (plateau), assez pour les trois écrans ; la lampe recule de 4 cm pour ne pas déborder. Le plateau garde le noyer de la scène, posé sur des uv en mètres que `prepare.py` calcule. Pas de bras d'écran : aucun modèle libre crédible. Sur le plateau, de vrais modèles aussi pour ce qui traîne sur un poste : casque, carnet en cuir et stylo plume, bloc de post-it, téléphone retourné, gourde inox, plante grasse. Temps d'image inchangé, mesuré en masquant puis montrant tous ces objets et le bureau à l'instant 13,5 (107 ms dans les deux cas, M1 très chargé).
+
+## 17. Virage : l'univers de GTA 6 à la place de FIFA
+
+*Décision de Jacques du 31 octobre 2026 : « je veux faire l'univers de GTA 6 plutôt que FIFA ». Cette section est la nouvelle cible. Les sections 3, 6.2, 6.3 et 8 ci-dessus décrivent la version FIFA ; elles restent comme historique et comme réservoir de ce qu'on garde, jusqu'à leur réécriture étape par étape (§17.9). Ce qui ne parle ni de carte ni de révélation (le jugement §4, les statuts §5, le partage §7, la stack §9, les données §11, les garde-fous §12) ne change pas.*
+
+### 17.1 Pourquoi ça marche mieux que FIFA
+
+- **Le calendrier.** GTA 6 sort le 19 novembre 2026 sur PS5 et Xbox. Pendant deux mois, c'est l'univers dont tout le monde parle, joueurs ou non. Une carte FIFA, il faut aimer le foot ; GTA, tout le monde reconnaît les étoiles de recherche, l'écran « Wasted », la police du logo et le coucher de soleil rose sur les palmiers.
+- **La thèse d'Azerit tient dans la métaphore sans forcer.** Le CV, c'est le délit : il déclare ce que le code ne prouve pas. Le GitHub, c'est la pièce à conviction. L'IA, c'est le flic pressé qui boucle le dossier en neuf secondes. La carte devient une **fiche de police**, les statuts deviennent des **chefs d'accusation**, la note devient un **niveau de recherche** en étoiles, et la comparaison CV × GitHub devient **le butin** : ce que le CV a volé au code. Le statut de repli existant, « Casier vierge », était déjà dans le ton.
+- **La promesse marketing s'y lit mieux** : les cinq meilleures cartes de la semaine, c'est la liste des **cinq plus recherchés**.
+
+### 17.2 Ce qu'on prend, ce qu'on ne prend jamais
+
+On prend l'**univers** : la côte au crépuscule, les néons rose, orange et violet, les palmiers en ombre chinoise, l'art déco, les étoiles de recherche, le HUD (mini-carte en bas à gauche, étoiles en haut à droite), la plongée de caméra du changement de personnage, les cartons de fin de mission, l'écran de chargement à illustrations peintes avec sa barre jaune, le compteur d'argent vert, la radio de police.
+
+On ne prend **jamais** les marques ni les fichiers : ni « Grand Theft Auto », ni « GTA », ni « VI », ni « Rockstar », ni « Vice City », ni « Leonida », ni le logo, ni une capture, un modèle, une musique ou une voix du jeu, ni ses personnages. Take-Two attaque bien plus volontiers qu'EA les projets qui reprennent ses marques ; un pastiche de style est licite, une reprise de marque ne l'est pas. Les lieux et noms sont les nôtres, ou aucun. Pas d'« -ida » ni de « Vice » dans les textes.
+
+**Typo.** La police du logo du jeu, Pricedown (Typodermic), est gratuite pour un usage bureau, commercial compris, mais **pas en police web** : il faut une licence à part (Fontspring). Donc : Barlow Condensed 800 (déjà dans le projet) pour les gros chiffres et les cartons, avec le dégradé coucher de soleil ; une licence web Pricedown s'achète seulement si Jacques veut l'écran « Wasted » à l'identique.
+
+**Couleurs** (variables CSS, définies une fois) : nuit `#0a0a1f`, rose néon `#ff3fa4`, orange `#ff7a3d`, jaune `#ffd23f`, cyan `#3fd8ff`, violet `#7b3fe4`, étoiles blanc chaud `#fff4e0`, argent du HUD vert `#8ce06b`. Le **dégradé coucher de soleil** va du jaune à l'orange, au rose puis au violet, en diagonale.
+
+### 17.3 La fiche (remplace la carte du §3)
+
+Même proportions (9 sur 13, 360 × 520 sur desktop), même anatomie de données ; seul le rendu change. La note globale, les six stats, le barème, la fiabilité et les statuts sont strictement les mêmes qu'avant (§3.3 à §3.5, §4, §5). De haut en bas :
+
+- **Haut gauche** : les **étoiles de recherche**, cinq emplacements, allumées selon la note ; dessous la note globale en très grand, remplie du dégradé coucher de soleil ; dessous, en mono, le libellé du niveau, la spécialité (le poste) et l'arme de prédilection (le langage principal, avec son logo).
+- **Haut droite** : la marque Azerit, petite, inchangée.
+- **Centre** : le **portrait en photo d'identité judiciaire** : un mur gris-bleu gradué (170, 180, 190 cm), l'avatar GitHub ou la photo LinkedIn devant, légèrement posterisée pour tirer vers l'illustration peinte du jeu, et dans les mains un **écriteau** noir : le pseudo ou le nom en grandes lettres, dessous le numéro de dossier (l'id court de la carte) et la date. Sans photo, les initiales sur le mur.
+- **Dessous** : l'**affiliation** (l'employeur déclaré, « Loup solitaire » sinon). Pas « gang » : une entreprise ne veut pas de ce mot sur une image partagée.
+- **Stats** : les six, sur deux colonnes, en **barres segmentées** façon compétences du jeu (dix segments, valeur à droite), BUZZ en orange d'alerte comme aujourd'hui.
+- **Chefs d'accusation** : un à trois statuts, en liste à puces colorées par ton, à la place des pastilles. Le ton reste taquin ; on accuse des pratiques, jamais une personne (§2.4). « Casier vierge » quand rien ne s'applique.
+- **Pied**, en mono : « Interrogé par une IA pendant 9 s · preuves 34 % ». La fiabilité devient les preuves.
+
+**Les étoiles et les niveaux** (la note pilote tout le rendu, comme le tier avant) :
+
+| Étoiles | Note | Niveau (FR) | Niveau (EN) | Rendu |
+|---|---|---|---|---|
+| ★ | moins de 45 | Petit délit | Petty crime | nuit sourde, un seul néon ambre |
+| ★★ | 45 à 59 | Suspect | Suspect | nuit, néon rose discret |
+| ★★★ | 60 à 74 | Recherché | Wanted | néon rose et cyan |
+| ★★★★ | 75 à 89 | Dangereux | Dangerous | dégradé coucher de soleil, palmiers |
+| ★★★★★ | 90 et plus | Ennemi public | Public enemy | dégradé complet, holo, étoiles qui pulsent |
+
+Les quatre tiers du §3.2 restent dans le code et le barème (Bronze couvre ★ et ★★) ; seul le rendu et le vocabulaire changent. Les cartes spéciales deviennent : **Wonderkid → « Nouveau en ville »**, **Flashback → « Affaire classée »** (cold case), **Team of the Week → « Les 5 plus recherchés »** de la semaine. Mêmes règles de déclenchement.
+
+Les effets CSS (inclinaison, reflet, balayage) sont gardés ; le reflet holographique n'est plus métallique mais néon : il prend les couleurs du dégradé.
+
+### 17.4 La révélation (remplace le §6.3) : la plongée du changement de personnage
+
+La séquence la plus reconnaissable du jeu : la caméra part du ciel, survole la ville et plonge jusqu'au personnage, surpris dans sa vie de tous les jours. Chez nous, elle plonge jusqu'au dev à son bureau. Toujours **un seul plan-séquence, dans l'axe, qui ne fait qu'avancer**, les règles de caméra du §6.3 restent. Environ dix-huit secondes, sautable. Dans l'ordre :
+
+1. **Le ciel.** Nuages, la côte très loin en bas, l'heure bleue juste après le coucher du soleil, la mer d'un côté, la ville en néons de l'autre. Le HUD apparaît : la mini-carte en bas à gauche avec le point du dev, cinq emplacements d'étoiles vides en haut à droite. Clic ou délai : la plongée commence. (Le pack qu'on ouvrait disparaît : on ne déballe pas une fiche de police.)
+2. **La plongée : les étoiles, c'est la note.** La caméra descend vers la ville, de plus en plus vite puis freine. À chaque seuil franchi (45, 60, 75, 90), une **étoile s'allume** avec le crépitement de la radio de police ; les statuts de la montée (le tableau « Touriste » à « Cheat code » du §6.3, inchangé) passent en messages radio sur le HUD, un à la fois, 0,9 s, comme les paliers de l'ascenseur. Les indices chromés (poste, langage, source, employeur) deviennent des lignes du HUD, dans le même ordre : spécialité, arme, dossier (GitHub, CV ou les deux), affiliation.
+3. **La ville.** Palmiers, façades art déco aux néons rose et cyan, l'océan, une avenue du bord de mer ; la caméra traverse la baie vitrée d'une tour et entre dans l'open space.
+4. **Le dev** : exactement celui d'aujourd'hui, assis à son poste, qui code puis se retourne. L'open space garde ses meubles et son précalcul de lumière ; seule la lumière change : la nuit de bureau à 4 500 K laisse place aux néons de la ville qui entrent par les baies, rose d'un côté, cyan de l'autre, avec le ciel du crépuscule derrière. Clic ou Espace : feux d'artifice sur la baie, comme avant.
+5. **Le carton de fin de mission.** Plein écran, le niveau en très grand dans le dégradé (« RECHERCHÉ »), la note dessous, et le roulement de batterie du jeu synthétisé en direct (Web Audio, aucun fichier, comme le son de l'ascenseur). Même carton pour tous les niveaux : un « Wasted » gris au ralenti pour ★ serait drôle, mais il vise la personne plus que la pratique ; reste à trancher par Jacques (§17.8).
+6. **La fiche se forme** et **la passation** au pixel près à la carte HTML : inchangées (§6.3, étapes 6 et 7).
+
+**Ce qu'on garde du travail FIFA** : le dev scanné et ses animations (`player.ts`), le poste et ses objets (`workstation.ts`), l'open space et son pipeline de précalcul (`office.py`, `baked.ts`), le rail de caméra en splines, la carte 3D et la passation (`cardMesh.ts`, `cardTexture.ts`), le préchargement et l'échauffement de la scène, l'étalonnage photographique (albédos, ACES, objectif), la synthèse sonore (elle change de sons : radio, sirène lointaine, roulement, plus de moteur ni de « ding »), et le pipeline de ville (`city.py`, `osm.py`) : on remplace l'emprise `AREA` de La Défense par un front de mer de style Miami Beach, rendu à l'heure bleue avec des façades néon, et la texture de ville devient le sol de la plongée, pas seulement le fond des baies.
+
+**Ce qui part** : la cabine d'ascenseur et tout ce qui s'y accroche (`cabin.ts`, `cabin.glb`, l'afficheur d'étage, les boutons, le son de l'ascenseur), les objets chromés de la montée, la photo de cabine, l'étape « pack ».
+
+**Ce qu'il faut de neuf** : le ciel et les nuages, la ville vue de dessus (OSM donne les emprises, il faut un rendu praticable de haut puis de face : soit deux textures, soit des blocs extrudés simples avec les façades texturées), des palmiers (Poly Haven ou Sketchfab CC BY, comme le reste), le HUD en 2D par-dessus la scène (mini-carte, étoiles, messages), le carton de fin, les nouveaux sons.
+
+### 17.5 L'attente (remplace le §6.2) : l'écran de chargement
+
+L'écran de chargement du jeu, reconnaissable entre tous : des illustrations peintes qui défilent en fondu, et en bas une **barre jaune** qui avance. Les illustrations sont un jeu fixe d'une dizaine d'images de devs et de bureaux dans le style, générées une fois par IA et retouchées, jamais par visiteur (coût, délai, et droit à l'image). Les messages du §6.2 (« Lecture de tes {n} commits « wip »… ») passent sous la barre, à la place des astuces du jeu. La préparation de la scène 3D pendant l'attente ne change pas.
+
+### 17.6 L'accueil et les textes
+
+- Le fond de nuit garde ses hex ; le dégradé coucher de soleil entre dans le titre et sur la fiche. Deux palmiers en ombre chinoise dans les coins, rien d'autre d'ajouté : la règle « pas un mot de plus » du §6.1 tient.
+- Promesse : « Ta fiche de dev. Les 5 plus recherchés ont un entretien. »
+- Sous la fiche : « Pourquoi cette note ? » devient **« Pièces à conviction »** (même contenu : la formule et les axes). « Contester ma note » devient **« Appeler mon avocat »**. « Passer en mode roast » devient **« Garde à vue »** (toujours réservé au propriétaire du compte via OAuth). « Reçois ta carte par email » devient « Reçois ta fiche ». Le CTA Azerit ne change pas.
+- La comparaison (§6.5) s'appelle **« Le butin »** : les deux fiches côte à côte, et entre elles le delta par stat ; le titre devient un compteur d'argent vert façon HUD : « Ton CV a volé {n} points à ton code » ou « Ton code vaut {n} points de plus que ton CV. Change de CV. ».
+- Textes de partage : « Fiche ★★★★, 78. Chef d'accusation : « Commits : fix, fix2, final fix ». Interrogé par une IA en 9 s. Fais la tienne : {url} ».
+- Le nom : « Grand Theft CV » dit toute la thèse en trois mots, mais c'est un dérivé direct d'une marque déposée ; à ne pas utiliser sans avis juridique. Le nom reste « Testyourskills » et le sous-domaine `skills.azerit.tech` (§16) tant que ce n'est pas tranché.
+
+### 17.7 Maquette
+
+`web/gta.html`, HTML et CSS sans React, données fictives (les mêmes profils que `shared/fixtures.ts`), les cinq niveaux, la fiche de Jacques et « Les 5 plus recherchés ». C'est l'étape 1 du §14 rejouée : fini quand Jacques veut la partager telle quelle. Rien de l'existant n'est retiré avant cette validation.
+
+### 17.8 À trancher par Jacques
+
+- Un « Wasted » gris au ralenti pour ★ (moins de 45), ou le même carton pour tous.
+- Acheter la licence web de Pricedown (une cinquantaine d'euros sur Fontspring) pour les cartons et la note, ou rester sur Barlow Condensed.
+- Le mot pour l'employeur sur la fiche : « Affiliation » (proposé) ou autre chose.
+- Les illustrations de l'écran de chargement : générées par IA (proposé), ou commandées à un illustrateur.
+- Garder le nom « Testyourskills » ou prendre un risque sur « Grand Theft CV ».
+
+### 17.9 Ordre de construction
+
+1. **Maquette de la fiche** (§17.7). Fini quand validée sur captures, desktop et mobile.
+2. **Le composant carte** : `shared/card/Card.tsx` et `themes.ts` réécrits pour la fiche, rendu SVG identique à l'écran et en PNG, les cinq niveaux et les trois spéciales, les effets CSS adaptés. Fini quand la galerie et `render-fixtures` sortent les fiches.
+3. **La révélation** : la ville de style Miami Beach depuis OSM (`city.py`), le ciel, la plongée, le HUD, la relumière de l'open space, le carton de fin, les sons ; retrait de la cabine. Fini quand la séquence tourne en un plan-séquence sautable sur M1 et mobile, aux temps d'image d'aujourd'hui ou mieux.
+4. **L'attente** en écran de chargement, les illustrations.
+5. **Textes et accueil** : i18n FR et EN, textes de partage, OG.
+6. Réécriture des §3, §6.2, §6.3 et §8 à partir de ce qui a été construit, puis suppression du §17 devenu redondant.
