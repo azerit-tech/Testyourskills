@@ -166,10 +166,11 @@ def fmt(bb):
     return ",".join(f"{v:.4f}" for v in bb)
 
 
-def load(frame, area):
+def load(frame, area, water=True):
     """Bâtiments, rues et eau de l'emprise (sud, ouest, nord, est), en mètres
     dans le repère de l'œil. L'emprise est fixe, pour que le cache serve
-    encore quand on retouche le cadrage."""
+    encore quand on retouche le cadrage. Sans `water` : pas de plans d'eau
+    (sur une côte, la relation de l'océan est énorme et Overpass cale)."""
     bb = area
     els = {}
     for t in tiles(bb, 3):
@@ -178,8 +179,10 @@ def load(frame, area):
             els[(el["type"], el["id"])] = el
     q = f'[out:json][timeout:300];way["highway"~"^({ROADS})$"]({fmt(bb)});out geom;'
     roads_raw = overpass(q)["elements"]
-    q = f'[out:json][timeout:300];(way["natural"="water"]({fmt(bb)});relation["natural"="water"]({fmt(bb)});way["waterway"="riverbank"]({fmt(bb)});relation["waterway"="riverbank"]({fmt(bb)}););out geom;'
-    water_raw = overpass(q)["elements"]
+    water_raw = []
+    if water:
+        q = f'[out:json][timeout:300];(way["natural"="water"]({fmt(bb)});relation["natural"="water"]({fmt(bb)});way["waterway"="riverbank"]({fmt(bb)});relation["waterway"="riverbank"]({fmt(bb)}););out geom;'
+        water_raw = overpass(q)["elements"]
 
     P = lambda ring: [frame.xy(*p) for p in ring]
     # bâtiments : leurs parties quand elles existent (règle « Simple 3D Buildings »),
@@ -226,10 +229,45 @@ def load(frame, area):
     return {"buildings": buildings, "roads": roads, "water": water, "bbox": bb}
 
 
+def load_tall(frame, area, min_height=35.0, min_levels=10):
+    """Seulement les grands bâtiments d'une emprise lointaine (une ligne de
+    tours à l'horizon) : une requête légère, en une fois."""
+    bb = fmt(area)
+    cond = f'(if:number(t["height"])>={min_height} || number(t["building:levels"])>={min_levels})'
+    q = f'[out:json][timeout:300];(way["building"]{cond}({bb});relation["building"]["type"="multipolygon"]{cond}({bb});way["building:part"]{cond}({bb}););out geom;'
+    out = []
+    for el in overpass(q)["elements"]:
+        tags = el.get("tags", {})
+        for outer, holes in polygons(el):
+            out.append({"id": el["id"], "tags": tags, "outer": [frame.xy(*p) for p in outer], "holes": [[frame.xy(*p) for p in h] for h in holes]})
+    return out
+
+
+def load_extras(area):
+    """Plages, parcs et pelouses, trait de côte de l'emprise (sud, ouest, nord,
+    est), en (lat, lon) bruts : city.py les projette lui-même."""
+    bb = fmt(area)
+    q = f'[out:json][timeout:300];(way["natural"="beach"]({bb});relation["natural"="beach"]({bb});way["natural"="sand"]({bb});way["leisure"~"^(park|garden|golf_course|pitch)$"]({bb});relation["leisure"~"^(park|garden|golf_course)$"]({bb});way["landuse"~"^(grass|recreation_ground|cemetery)$"]({bb}););out geom;'
+    els = overpass(q)["elements"]
+    out = {"beach": [], "green": []}
+    for el in els:
+        t = el.get("tags", {})
+        kind = "beach" if t.get("natural") in ("beach", "sand") else "green"
+        for outer, holes in polygons(el):
+            out[kind].append({"outer": outer, "holes": holes})
+    q = f'[out:json][timeout:300];way["natural"="coastline"]({bb});out geom;'
+    out["coast"] = [[(p["lat"], p["lon"]) for p in el.get("geometry", [])] for el in overpass(q)["elements"]]
+    return out
+
+
 if __name__ == "__main__":
     import sys
 
     sys.path.insert(0, os.path.dirname(__file__))
-    f = Frame(48.8846, 2.2622, 294.0)
-    d = load(f, bbox_for(f, 100.0, 6000.0))
-    print(len(d["buildings"]), "bâtiments,", len(d["roads"]), "rues,", len(d["water"]), "plans d'eau, emprise", d["bbox"])
+    # les deux emprises de city.py : South Beach (Miami Beach) et, au loin, le centre de Miami
+    f = Frame(25.7893, -80.1288, 0.0)
+    d = load(f, (25.758, -80.152, 25.815, -80.116), water=False)
+    print(len(d["buildings"]), "bâtiments,", len(d["roads"]), "rues, emprise", d["bbox"])
+    print(len(load_tall(f, (25.752, -80.205, 25.800, -80.170))), "tours au loin")
+    x = load_extras((25.758, -80.152, 25.815, -80.116))
+    print(len(x["beach"]), "plages,", len(x["green"]), "espaces verts,", len(x["coast"]), "tronçons de côte")
