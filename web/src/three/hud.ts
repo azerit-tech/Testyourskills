@@ -3,7 +3,8 @@
 // avec le point du dev (deux pour une comparaison), les messages de la radio,
 // les quatre lignes du dossier (spécialité, arme, dossier, affiliation) et le
 // carton de fin de mission. Piloté image par image par la scène (walkout.ts) ;
-// ne redessine que ce qui change. Styles : hud.css.
+// ne redessine que ce qui change. Styles : hud.css. La mini-carte est en
+// option (map) : l'ascenseur ne s'en sert pas.
 import type { HudTexts } from "./hudTexts";
 
 export interface HudState {
@@ -38,7 +39,7 @@ export interface Hud {
 
 const STAR = "M12 2.6l2.9 6.1 6.7.8-4.9 4.6 1.3 6.6L12 17.4l-6 3.3 1.3-6.6L2.4 9.5l6.7-.8z";
 
-export function createHud(host: HTMLElement, o: { texts: HudTexts; lines: HudLines; title: string; overall: number; double: boolean; accent: string }): Hud {
+export function createHud(host: HTMLElement, o: { texts: HudTexts; lines: HudLines; title: string; overall: number; double: boolean; accent: string; map?: boolean }): Hud {
   const root = document.createElement("div");
   root.className = "dive-hud";
   root.style.setProperty("--hud-accent", o.accent);
@@ -51,7 +52,7 @@ export function createHud(host: HTMLElement, o: { texts: HudTexts; lines: HudLin
         .join("")}
     </div>
     <div class="dive-hud__radio"><i></i><span class="dive-hud__dispatch">${esc(o.texts.dispatch)}</span><span class="dive-hud__msg"></span></div>
-    <div class="dive-hud__map"><canvas width="176" height="176"></canvas><div class="dive-hud__cone"></div></div>
+    ${o.map === false ? "" : `<div class="dive-hud__map"><canvas width="176" height="176"></canvas><div class="dive-hud__cone"></div></div>`}
     <div class="dive-hud__mission">
       <div class="dive-hud__band">
         <div class="dive-hud__title">${esc(o.title)}</div>
@@ -64,8 +65,8 @@ export function createHud(host: HTMLElement, o: { texts: HudTexts; lines: HudLin
   const radio = root.querySelector<HTMLElement>(".dive-hud__radio")!;
   const msg = root.querySelector<HTMLElement>(".dive-hud__msg")!;
   const mission = root.querySelector<HTMLElement>(".dive-hud__mission")!;
-  const canvas = root.querySelector<HTMLCanvasElement>("canvas")!;
-  const g = canvas.getContext("2d")!;
+  const canvas = root.querySelector<HTMLCanvasElement>("canvas");
+  const g = canvas?.getContext("2d") ?? null;
 
   let shownStars = -1;
   let shownLines = -1;
@@ -76,6 +77,7 @@ export function createHud(host: HTMLElement, o: { texts: HudTexts; lines: HudLin
 
   /** La mini-carte : des rues en damier qui se resserrent avec l'altitude, le point du dev devant. */
   const drawMap = (distance: number, altitude: number) => {
+    if (!canvas || !g) return;
     const S = canvas.width;
     const c = S / 2;
     g.clearRect(0, 0, S, S);

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ascenseur · Inspection</title>
+    <style>
+      :root { color-scheme: dark; font-family: system-ui, sans-serif; }
+      body { margin: 0; background: #101216; }
+      canvas { display: block; width: 100vw; height: 100dvh; touch-action: none; }
+      aside { position: fixed; top: 16px; left: 16px; right: 16px; width: fit-content; max-width: calc(100% - 64px); padding: 14px 16px; border: 1px solid #ffffff25; border-radius: 12px; background: #11151de8; z-index: 1; }
+      h1 { margin: 0 0 6px; font-size: 16px; font-weight: 600; }
+      p { margin: 6px 0; color: #b3bac5; font-size: 12px; }
+      nav { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+      button { cursor: pointer; padding: 8px 10px; border: 1px solid #ffffff30; border-radius: 6px; background: #242b36; color: #f1f3f6; }
+      button:hover { background: #354155; }
+      button:disabled { cursor: wait; opacity: .45; }
+      #status { margin-top: 10px; }
+    </style>
+  </head>
+  <body>
+    <aside>
+      <h1>Ascenseur · Inspection</h1>
+      <p>Animation en pause. Glisse pour tourner, utilise la molette pour zoomer.</p>
+      <p>Clic droit + glisser pour déplacer la vue. Sur mobile : deux doigts.</p>
+      <nav aria-label="Points de vue">
+        <button data-view="cabin" disabled>Vue cabine</button>
+        <button data-view="panel" disabled>Commandes</button>
+        <button data-view="sill" disabled>Seuil</button>
+        <button data-view="floor" disabled>Sol</button>
+        <button data-view="photo" disabled>Photo</button>
+        <button data-view="notice" disabled>Pancarte</button>
+        <button id="doors" disabled>Ouvrir les portes</button>
+      </nav>
+      <p id="status" role="status">Chargement de la scène…</p>
+    </aside>
+    <script type="module" src="/src/cabinPreview.ts"></script>
+  </body>
+</html>

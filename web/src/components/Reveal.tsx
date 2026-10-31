@@ -1,16 +1,23 @@
-// Révélation (§17.4) : la machine à états autour de la scène 3D (Walkout3D).
-// « ready » : le ciel et le HUD, clic ou délai pour plonger. « playing » : la
-// séquence 3D joue. « handoff » : la carte HTML apparaît par-dessus la carte 3D
+// Révélation (SPEC §17.4) : la machine à états autour de la scène 3D (Walkout3D).
+// « ready » : le pack flotte dans la cabine, clic ou délai pour l'ouvrir.
+// « playing » : la séquence 3D joue (l'ascenseur monte jusqu'au dev). « handoff » : la carte HTML apparaît par-dessus la carte 3D
 // posée au même endroit, le canvas s'efface. « done » : la page vit.
 // Sautable d'un clic, désactivée en mouvement réduit.
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { CardData, Lang } from "../../../shared/types";
 import { styleOf } from "../../../shared/types";
+import { themeOf } from "../../../shared/card/themes";
 import { CardView } from "../card/CardView";
 import { useT } from "../i18n";
 import { isMock } from "../lib/api";
-import { accentOf } from "../lib/util";
+
+/** Les couleurs du niveau (SPEC §17.2, thème de la fiche), pour la scène 3D et
+ * le halo de l'emplacement : les néons du thème, plus les ors du tier. */
+export function levelAccent(card: Pick<CardData, "overall" | "special">): { a: string; b: string; ink: string } {
+  const th = themeOf(card);
+  return { a: th.accent, b: th.accent2, ink: th.ink };
+}
 
 export type Phase = "ready" | "playing" | "handoff" | "done";
 
@@ -35,7 +42,7 @@ export function useReveal(animate: boolean) {
 
   useEffect(() => {
     if (!animate) return;
-    // Mode démo : ?freeze=ready reste dans le ciel, pour la mise au point.
+    // Mode démo : ?freeze=ready reste dans la cabine, pour la mise au point.
     if (isMock() && new URLSearchParams(window.location.search).get("freeze") === "ready") return;
     const id = window.setTimeout(open, AUTO_OPEN);
     return () => window.clearTimeout(id);
@@ -60,7 +67,7 @@ interface RevealCardProps {
 
 export function RevealCard({ card, lang, phase, idPrefix, primary = true, anchor = primary }: RevealCardProps) {
   const { t } = useT();
-  const accent = accentOf(card);
+  const accent = levelAccent(card);
   const style = styleOf(card);
   const showCard = phase === "handoff" || phase === "done";
   const vars = { "--ca": accent.a, "--cb": accent.b, "--ink": accent.ink } as CSSProperties;

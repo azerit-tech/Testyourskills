@@ -1,6 +1,6 @@
-/* Le HUD de la plongée (SPEC §17.4, hud.ts) : étoiles de recherche, lignes du
-   dossier, radio, mini-carte, carton de fin. Posé par-dessus le canvas
-   (z-index 1), sous la carte HTML. Tout en DOM, rien dans la scène. */
+/* Le HUD de la révélation (SPEC §17.4, hud.ts) : étoiles de recherche, lignes
+   du dossier, radio, mini-carte (en option), carton de fin. Posé par-dessus le
+   canvas, sous la carte HTML et les boutons. Tout en DOM, rien dans la scène. */
 .dive-hud {
   --hud-accent: #ff3fa4;
   --hud-pink: #ff3fa4;
@@ -108,9 +108,9 @@
   gap: 10px;
   padding: 8px 14px;
   border-radius: 6px;
-  background: rgba(6, 6, 22, 0.62);
+  /* pas de flou d'arrière-plan : au-dessus d'un canvas WebGL, il coûte une image sur deux */
+  background: rgba(6, 6, 22, 0.78);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(6px);
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: clamp(11px, 1.2vw, 13px);
   font-weight: 700;
@@ -209,7 +209,7 @@
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.55)) drop-shadow(0 0 28px rgba(255, 63, 164, 0.35));
+  filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.55));
   transform: scale(1.08);
   transition: transform 0.5s cubic-bezier(0.2, 1.2, 0.3, 1), letter-spacing 0.6s ease;
 }

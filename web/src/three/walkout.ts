@@ -1,50 +1,73 @@
-// La révélation en 3D (Three.js), dans l'univers de GTA 6 (SPEC §17.4) : la
-// plongée du changement de personnage, du ciel jusqu'au dev à son bureau.
-// 1. le ciel de l'heure bleue, la côte très loin en bas ; le HUD apparaît
-//    (mini-carte, cinq étoiles vides) ; clic ou délai : la plongée commence ;
-// 2. la plongée : la caméra descend vers la ville en néons ; à chaque seuil de
-//    note franchi (45, 60, 75, 90), une étoile de recherche s'allume avec le
-//    crépitement de la radio ; les statuts de palier passent en messages radio ;
-//    les lignes du dossier (spécialité, arme, dossier, affiliation) s'affichent ;
-// 3. la caméra arrive sur la tour, traverse la baie et entre dans l'open space,
-//    dans l'axe de l'allée, jusqu'au dev qui code, de dos ; les néons s'allument
-//    rangée par rangée ; sa chaise pivote ;
-// 4. le carton de fin de mission : le niveau en très grand, la note, le
-//    roulement de batterie ; la carte se forme, tourne, la note claque et la
-//    carte se pose au pixel près sur la carte HTML.
-// Un seul plan-séquence, dans l'axe (x = 0), qui ne fait qu'avancer. Assets :
-// web/src/three/assets.ts ; monde de la plongée : world.ts ; HUD : hud.ts.
+// La révélation en 3D (Three.js), SPEC §17.4 : l'ascenseur qui monte jusqu'à
+// l'étage du dev, transposé dans l'univers de GTA 6. Un seul plan-séquence.
+// 1. le pack flotte dans la cabine d'un ascenseur de nuit ; il éclate ;
+// 2. l'ascenseur monte : l'étage (la note) défile sur l'afficheur à droite des
+//    portes, la lumière des paliers passe dans le jour entre les portes ; en
+//    haut à droite du HUD, les cinq étoiles de recherche s'allument aux seuils
+//    45 / 60 / 75 / 90 avec un crépitement de radio de police ; les statuts
+//    de palier passent sur l'afficheur et en message radio ;
+// 3. sur l'écran, et en 3D chromée devant lui : la spécialité, l'arme (le
+//    langage), le dossier (GitHub, CV, ou les deux), puis l'affiliation, qui
+//    se fait attendre ; chaque ligne reste inscrite en haut à gauche du HUD ;
+// 4. « ding » : l'ascenseur arrive, les portes s'ouvrent sur l'open space de
+//    nuit relevé au néon (rose à gauche, cyan à droite), la ville derrière les
+//    baies ;
+// 5. au bout de l'allée lumineuse, le dev code à son poste (feux d'artifice sur
+//    la ville au clic ou à Espace), sa chaise pivote, le carton de fin de
+//    mission (le niveau, la note, roulement de batterie), puis la carte se
+//    forme devant lui, tourne, la note claque et la carte se pose au pixel
+//    près sur la carte HTML. Une flèche pour une carte seule, deux pour une
+//    comparaison GitHub × CV (le « double »). Assets : web/src/three/assets.ts ;
+//    HUD : hud.ts ; sons : elevatorSound.ts et radioSound.ts.
 import * as THREE from "three";
 import { BloomEffect, EffectComposer, EffectPass, NoiseEffect, RenderPass, ToneMappingEffect, ToneMappingMode, VignetteEffect, BlendFunction } from "postprocessing";
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { TextGeometry } from "three/examples/jsm/geometries/TextGeometry.js";
+import { SVGLoader } from "three/examples/jsm/loaders/SVGLoader.js";
+import { PALETTE } from "../../../shared/card/themes";
 import { sharedResources, type WalkoutAssets } from "./assets";
+import { CAB_H, DOOR_W, createCabin } from "./cabin";
 import { MEAN_LUMA, grainAlbedo } from "./albedo";
 import { createBakedLighting } from "./baked";
 import { createCardMesh } from "./cardMesh";
 import { chairMaterial, createChair } from "./chair";
+import { createElevatorSound } from "./elevatorSound";
 import { createHud, type Hud } from "./hud";
 import type { HudTexts } from "./hudTexts";
+import { createRadioSound } from "./radioSound";
 import { LensEffect, WhiteBalanceEffect, makeLensDirtTexture, whiteBalanceGains } from "./lens";
 import { createPlayer } from "./player";
-import { createRadioSound } from "./radioSound";
 import { createWorkstation } from "./workstation";
-import { CYAN, GROUND, PINK, createWorld } from "./world";
+import { createCityBackdrop, createGlassReflection, createStudioEnvironment } from "./stage";
 import * as T from "./textures";
 
 export type WalkoutCue = "fireworks" | null;
 
 export interface WalkoutTexts {
-  /** Les quatre lignes du dossier, en clair : spécialité (le poste), arme (le langage), dossier (la source), affiliation (l'employeur). */
-  specialty: string;
-  weapon: string;
-  file: string;
-  affiliation: string;
+  /** Langage principal (le « drapeau ») ; null si aucun. */
+  langName: string;
+  langLabel: string;
+  /** La ligue : la source (GitHub, CV, ou les deux). */
+  leagueName: string;
+  leagueLabel: string;
+  /** Code du poste (« FS ») et son nom en clair (« Full-stack »). */
+  position: string;
+  positionName: string;
+  positionLabel: string;
+  club: string;
+  clubLabel: string;
+  /** « Statut », au-dessus du statut affiché pendant la montée. */
+  statusLabel: string;
   /** Les statuts par note, du plus bas au plus haut : à partir de `min`. */
   statuses: { min: number; label: string }[];
+  /** Écran en veille. */
+  idleTitle: string;
+  idleSubtitle: string;
   /** Sous-titre du graphe de contributions sur l'écran du dev. */
   graphLabel: string;
-  /** Le niveau, pour le carton de fin (« Recherché »). */
+  /** Le carton de fin de mission : le niveau (LEVEL_LABELS de shared/types.ts). */
   levelLabel: string;
+  /** Les libellés du HUD (lignes du dossier, radio, note). */
   hud: HudTexts;
 }
 
@@ -53,26 +76,29 @@ export interface WalkoutOptions {
    * textures envoyées au GPU, sans jamais être jouée ni affichée. */
   warm?: boolean;
   lang: "fr" | "en";
-  /** Comparaison GitHub × CV : deux points sur la mini-carte. */
+  /** Comparaison GitHub × CV : deux flèches au lieu d'une. */
   double: boolean;
   accent: { a: string; b: string; ink: string };
   texts: WalkoutTexts;
   /** Clé du langage principal (code sur l'écran du dev) et pseudo affiché. */
   langKey?: string;
   login: string;
+  /** Chemins SVG (24 × 24) : logo du langage, logo de la ligue. */
+  logoPath: string;
+  leaguePath: string;
   overall: number;
   assets: WalkoutAssets;
   /** Texture de la carte, résolue en arrière-plan pendant la séquence. */
   cardTexture: Promise<THREE.Texture>;
   /** Rect de l'emplacement HTML de la carte, pour la passation. */
   anchor: () => DOMRect | null;
-  /** Où poser le HUD (DOM) ; sans lui, pas de HUD (échauffement). */
-  hudHost?: HTMLElement;
   onHandoff: () => void;
   onDone: () => void;
   onCue?: (cue: WalkoutCue) => void;
   /** Son coupé au départ (choix mémorisé du visiteur). */
   muted?: boolean;
+  /** Reçoit le HUD en DOM (hud.ts) ; sans lui, pas de HUD. */
+  hudHost?: HTMLElement;
 }
 
 export interface WalkoutHandle {
@@ -84,7 +110,7 @@ export interface WalkoutHandle {
   skip(): void;
   /** Clic ou Espace pendant la séquence : vrai si la scène l'a utilisé (feux d'artifice). */
   interact(): boolean;
-  /** Coupe ou remet le son. */
+  /** Coupe ou remet le son (ascenseur et radio). */
   setMuted(muted: boolean): void;
   dispose(): void;
 }
@@ -97,6 +123,8 @@ const outCubic = (p: number) => 1 - Math.pow(1 - p, 3);
 const inCubic = (p: number) => p * p * p;
 const inOut = (p: number) => (p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2);
 const outBack = (p: number) => 1 + 2.2 * Math.pow(p - 1, 3) + 1.2 * Math.pow(p - 1, 2);
+/** Bruit lisse et non périodique dans [-1, 1] (somme de sinus incommensurables). */
+const smoothNoise = (x: number) => 0.5 * Math.sin(x) + 0.3 * Math.sin(x * 2.31 + 1.7) + 0.2 * Math.sin(x * 4.87 + 4.2);
 const within = (t: number, w: [number, number]) => t >= w[0] && t < w[1];
 const rnd = (i: number, s: number) => {
   const x = Math.sin(i * 127.1 + s * 311.7) * 43758.5453;
@@ -105,41 +133,54 @@ const rnd = (i: number, s: number) => {
 const hdr = (hex: THREE.ColorRepresentation, k: number) => new THREE.Color(hex).multiplyScalar(k);
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 
-/* ---------- géométrie (mètres) : sol à y = 0, les baies vers -z, la mer au-delà ---------- */
+/* ---------- géométrie (mètres) : sol à y = 0, l'ascenseur s'ouvre vers -z ---------- */
 const ROOM_W = 22; // open space : x de -11 à 11, z de 0 à -14 (baies)
 const WIN_Z = -14;
 const CEIL = 3.3;
 const DESK_Z = -7.8;
-/** La caméra entre par la baie et regarde vers +z : pose finale et emplacement de la carte, entre la baie et le dev. */
-const F_POS = V(0, 1.5, DESK_Z - 4.6);
-const CARD_POS = V(0, 1.45, DESK_Z - 1.5);
+/** Le pack et la caméra dans la cabine ; pose finale de la caméra (regard droit vers -z) et emplacement de la carte. */
+const PACK_POS = V(0, 1.5, 0.7);
+const CAB_CAM = V(0, 1.5, 2.8);
+const F_POS = V(0, 1.5, -3.2);
+const CARD_POS = V(0, 1.45, -6.3);
 const CARD_W3 = 1.2;
 const CARD_H3 = (CARD_W3 * 520) / 360;
+const TELL_POS = V(0, 1.24, 0.5);
 /** Les plantes : x, z, hauteur, rotation (à reporter dans tools/bake/office.py, PLANTS). */
 const PLANTS: [number, number, number, number][] = [
   [-2.25, DESK_Z - 1.3, 1.65, 0.35],
   [3.1, DESK_Z - 3.0, 1.3, 2.4],
 ];
-/** Les seuils de note qui allument une étoile (SPEC §17.3) ; la première à la première note. */
-const STAR_AT = [1, 45, 60, 75, 90];
 
 /* ---------- chronologie ---------- */
 type Win = [number, number];
 const PLAN = {
-  /** La plongée : la note monte avec la descente (profil de vitesse en trapèze). */
-  dive: [0.3, 10.7] as Win,
-  /** Les lignes du dossier, une à la fois. */
-  lines: [2.0, 4.0, 6.0, 8.2],
-  fireworks: [3.6, 10.2] as Win,
-  autoFire: [4.3, 5.7, 7.2, 8.6],
-  /** La baie traversée. */
-  glass: 11.0,
+  /** Après l'éclatement, l'ascenseur s'établit seul : l'afficheur passe à
+   * l'étage 00, la flèche s'allume, le bouton aussi. Rien d'autre. */
+  depart: 1.9,
+  /** L'étage défile, vite puis de plus en plus lentement. */
+  ascent: [1.9, 10.9] as Win,
+  /** Les révélations ne commencent qu'une fois la montée lancée : une chose à la fois. */
+  position: [2.7, 4.5] as Win,
+  lang: [4.5, 6.2] as Win,
+  league: [6.2, 7.8] as Win,
+  loading: [7.8, 8.6] as Win,
+  club: [8.6, 10.5] as Win,
+  arrive: 10.9,
+  doors: 11.3,
   /** Les néons de l'open space, rangée par rangée. */
-  lights: 11.25,
-  turn: 13.4,
-  mission: [14.3, 15.8] as Win,
-  card: 15.8,
+  lights: 11.45,
+  fireworks: [12.2, 15.6] as Win,
+  autoFire: [12.6, 13.4, 14.3, 15.0],
+  /** Le carton de fin de mission, plein écran, une fois le dev tourné. */
+  mission: [15.2, 16.7] as Win,
+  card: 16.7,
 };
+/** Les étoiles de recherche (SPEC §17.3) : seuils de note, dans l'ordre. */
+const STAR_AT = [1, 45, 60, 75, 90];
+/** Les néons de l'open space : rose côté gauche, cyan côté droit. */
+const PINK = PALETTE.pink;
+const CYAN = PALETTE.cyan;
 
 interface Burst {
   points: THREE.Points;
@@ -175,35 +216,34 @@ let warming: WalkoutHandle | null = null;
 export function createWalkout(o: WalkoutOptions): WalkoutHandle {
   const { accent, assets } = o;
   const plan = PLAN;
+  const T_BURST = 0.5;
   const T_CARD = plan.card;
   const T_SLAM = T_CARD + 1.0;
   const T_SETTLE = T_CARD + 1.6;
   const T_HANDOFF = T_SETTLE + 1.15;
   const T_END = T_HANDOFF + 0.6;
-  const T_TURN = plan.turn;
+  const T_TURN = plan.mission[0] - 0.65;
   const low = isLow();
 
   /* ---------- rendu ---------- */
   const renderer = getRenderer();
   const canvas = renderer.domElement;
   const scene = new THREE.Scene();
-  // la brume de l'horizon : négligeable sur les douze mètres de l'open space
-  scene.fog = new THREE.FogExp2(0x3a1e4a, 0.0015);
-  const world = createWorld(renderer, assets, scene.fog, { winZ: WIN_Z, roomW: ROOM_W, ceil: CEIL, low });
-  scene.add(world.group);
-  scene.fog.color.copy(world.haze);
-  scene.background = world.background;
-  // Reflets : le ciel de l'heure bleue, faibles partout ; les matières qui
-  // règlent leur propre intensité reçoivent la carte d'environnement en direct,
-  // sinon three.js applique l'intensité de la scène à leur place.
-  const sky = world.environment;
-  scene.environment = sky;
-  scene.environmentIntensity = 0.2;
-  const camera = new THREE.PerspectiveCamera(50, 1, 0.05, 6000);
+  scene.background = new THREE.Color(0x05070d);
+  scene.fog = new THREE.FogExp2(0x05070d, 0.025);
+  // Reflets : faibles partout ; les matières qui règlent leur propre intensité
+  // (carte, métaux, pack) reçoivent la carte d'environnement en direct, sinon
+  // three.js applique l'intensité de la scène à leur place.
+  const studio = createStudioEnvironment(renderer, accent.a);
+  scene.environment = studio;
+  scene.environmentIntensity = 0.12;
+  const camera = new THREE.PerspectiveCamera(50, 1, 0.05, 400);
+  camera.position.copy(CAB_CAM);
   scene.add(camera);
 
+  const glowTex = T.makeGlowTexture();
   const sparkTex = T.makeSparkTexture();
-  const disposables: { dispose(): void }[] = [sparkTex, world];
+  const disposables: { dispose(): void }[] = [glowTex, sparkTex];
   const keep = <X extends { dispose(): void }>(x: X): X => {
     disposables.push(x);
     return x;
@@ -217,18 +257,25 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
   };
 
   const accentGlow = new THREE.MeshBasicMaterial({ color: hdr(accent.a, 2), toneMapped: false });
-  const sound = createRadioSound(o.muted ?? false);
+  const cab = createCabin({ scene, renderer, accent: accent.a, model: assets.cabin, floor: Math.max(1, Math.min(99, o.overall)) });
+  disposables.push(cab);
+  const sound = createElevatorSound({ depart: plan.depart, arrive: plan.arrive, doors: plan.doors }, o.muted ?? false);
   disposables.push(sound);
+  const radio = createRadioSound(o.muted ?? false);
+  disposables.push(radio);
+  const { doors, screen, brushedSteel, shaftTex, shaftMat, shaftGap, btnOn, seam, seamMat } = cab;
 
   /* ---------- l'open space ----------
    * Le décor fixe (sol, plafond, murs, baies, luminaires, îlots, lattes, tapis)
    * est modélisé et éclairé dans Blender (tools/bake/office.py) : ses matières
    * lisent la lumière précalculée et n'évaluent aucune lumière en direct.
    * Restent en code ce qui s'allume ou bouge : barres des néons, écrans, allée,
-   * verre, plantes, poste du dev. */
+   * verre et ville, plantes, poste du dev. */
   const office = new THREE.Group();
   scene.add(office);
   const baked = createBakedLighting(assets.office);
+  // la lumière de la ville dans le bureau : rose d'un côté, cyan de l'autre
+  baked.setCitySides(new THREE.Color(PINK).multiplyScalar(0.9), new THREE.Color(CYAN).multiplyScalar(0.8), 7);
   /** Une texture d'asset partagée, en tuile de `metres` (le décor de Blender a ses uv0 en mètres). */
   const tiled = (t: THREE.Texture, metres: number) => {
     const c = keep(t.clone());
@@ -289,8 +336,8 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
     ),
     // les fauteuils du fond : lumière par sommet, cuir noir
     chairs: baked.applyVertex(chairMaterial(chairSource, 0x1d2023)),
-    // l'inox des tableaux de porte de l'ascenseur, au fond de la pièce
-    steel: new THREE.MeshStandardMaterial({ color: 0xb9c2cc, metalness: 1, roughness: 0.35, envMapIntensity: 0.8 }),
+    // l'inox des tableaux de porte est un métal : rien à lire dans la lumière diffuse
+    steel: brushedSteel,
   };
   assets.office.scene.updateMatrixWorld(true);
   assets.office.scene.traverse((src) => {
@@ -303,13 +350,27 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
     mesh.matrixAutoUpdate = false;
     office.add(mesh);
   });
-  // le liseré de LED au pied des murs, à la couleur du tier
+  // le liseré de LED au pied des murs, à la couleur du niveau
   for (const sx of [-1, 1]) box(0.02, 0.025, -WIN_Z, accentGlow, sx * (ROOM_W / 2 - 0.06), 0.06, WIN_Z / 2, office);
-  // les baies : le verre fumé, vu des deux côtés (la caméra le traverse)
-  const glassMat = new THREE.MeshPhysicalMaterial({ color: 0x0b1424, roughness: 0.04, metalness: 0, transparent: true, opacity: 0.18, envMapIntensity: 0.9, depthWrite: false, side: THREE.DoubleSide });
-  const glass = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W, CEIL), glassMat);
+  // les baies : le verre fumé
+  const glass = new THREE.Mesh(
+    new THREE.PlaneGeometry(ROOM_W, CEIL),
+    new THREE.MeshPhysicalMaterial({ color: 0x0b1424, roughness: 0.04, metalness: 0, transparent: true, opacity: 0.16, envMapIntensity: 0.8, depthWrite: false }),
+  );
   glass.position.set(0, CEIL / 2, WIN_Z + 0.02);
   office.add(glass);
+  // la nuit, les baies reflètent le bureau éclairé (le décor précalculé ne coûte presque rien à redessiner)
+  let glassReflection: ReturnType<typeof createGlassReflection> | null = null;
+  if (!low) {
+    glassReflection = createGlassReflection(ROOM_W, CEIL - 0.25, new THREE.Vector2(640, 160));
+    glassReflection.mesh.position.set(0, (CEIL - 0.25) / 2, WIN_Z + 0.04);
+    scene.add(glassReflection.mesh);
+    disposables.push({ dispose: () => glassReflection?.mesh.dispose() });
+  }
+  // la ville de nuit
+  const city = createCityBackdrop(assets.city, 120, 1.5, scene.background);
+  city.mesh.position.set(0, 0, DESK_Z);
+  scene.add(city.mesh);
 
   // Les barres lumineuses des luminaires suspendus (leurs boîtiers sont dans le décor).
   const ROWS = 8;
@@ -323,21 +384,20 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
       office.add(bar);
     }
   }
-  /** Les trois zones de néons précalculées : rangées 0-2, 3-5, 6-7 ; la plus proche des baies en premier. */
-  const ZONES = [[6, 7], [3, 4, 5], [0, 1, 2]];
-  const rows = (zone: number) => ZONES[zone] ?? [];
-  // l'éclairage d'ensemble des objets en direct (le dev, son poste, les plantes) : la ville en néons
-  const hemi = new THREE.HemisphereLight(0x9a6aa8, 0x403026, 0.18);
+  /** Les trois zones de néons précalculées : rangées 0-2, 3-5, 6-7. */
+  const ZONES = [[0, 1, 2], [3, 4, 5], [6, 7]];
+  // l'éclairage d'ensemble des objets en direct (le dev, son poste, les plantes)
+  const hemi = new THREE.HemisphereLight(0xa1b8ce, 0x403026, 0.18);
   scene.add(hemi);
 
-  // les repères de LED au sol, de la baie jusqu'au poste du dev
+  // l'allée de LED au sol, de l'ascenseur jusqu'au poste du dev
   const PATH_N = 12;
   const pathGeo = new THREE.BoxGeometry(0.025, 0.006, 0.12);
   const path = new THREE.InstancedMesh(pathGeo, new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }), PATH_N * 2);
   const dummy = new THREE.Object3D();
   for (let i = 0; i < PATH_N; i++)
     for (const sx of [-1, 1]) {
-      dummy.position.set(sx * 1.38, 0.008, WIN_Z + 0.6 + (i / (PATH_N - 1)) * (DESK_Z - 1.6 - (WIN_Z + 0.6)));
+      dummy.position.set(sx * 1.38, 0.008, -0.5 - (i / (PATH_N - 1)) * (-DESK_Z - 2.3));
       dummy.updateMatrix();
       path.setMatrixAt(i * 2 + (sx > 0 ? 1 : 0), dummy.matrix);
       path.setColorAt(i * 2 + (sx > 0 ? 1 : 0), new THREE.Color(0, 0, 0));
@@ -386,16 +446,41 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
 
   /* ---------- lumières de la carte ---------- */
   const key = new THREE.SpotLight(0xffffff, 0, 12, 0.5, 0.6, 1.4);
-  key.position.set(0.8, CEIL - 0.2, CARD_POS.z - 3.0);
+  key.position.set(0.8, CEIL - 0.2, CARD_POS.z + 3.0);
   key.target.position.copy(CARD_POS);
   scene.add(key, key.target);
   const cardRimL = new THREE.PointLight(accent.a, 0, 5, 1.6);
-  cardRimL.position.set(-1.3, CARD_POS.y + 0.6, CARD_POS.z + 0.9);
+  cardRimL.position.set(-1.3, CARD_POS.y + 0.6, CARD_POS.z - 0.9);
   const cardRimR = new THREE.PointLight(accent.b, 0, 5, 1.6);
-  cardRimR.position.set(1.3, CARD_POS.y - 0.2, CARD_POS.z + 0.9);
+  cardRimR.position.set(1.3, CARD_POS.y - 0.2, CARD_POS.z - 0.9);
   scene.add(cardRimL, cardRimR);
 
-  /* ---------- particules : les feux d'artifice sur la baie ---------- */
+  /* ---------- le pack (état prêt) ---------- */
+  const packFace = keep(T.makePackFaceTexture(accent.a, accent.b, o.lang));
+  const packBackTex = keep(T.makePackBackTexture(accent.a));
+  const foilSide = new THREE.MeshStandardMaterial({ color: 0x3a4a5c, metalness: 0.95, roughness: 0.3, transparent: true, envMapIntensity: 1.2 });
+  const foilFront = new THREE.MeshPhysicalMaterial({ map: packFace, emissiveMap: packFace, emissive: 0xffffff, emissiveIntensity: 0.3, metalness: 0.6, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.1, transparent: true, envMapIntensity: 1.1 });
+  const foilBack = new THREE.MeshPhysicalMaterial({ map: packBackTex, metalness: 0.85, roughness: 0.3, clearcoat: 0.8, transparent: true, envMapIntensity: 1.2 });
+  const pack = new THREE.Group();
+  const packBody = new THREE.Mesh(new RoundedBoxGeometry(1.0, 1.5, 0.09, 3, 0.035), [foilSide, foilSide, foilSide, foilSide, foilFront, foilBack]);
+  const crimpMat = new THREE.MeshStandardMaterial({ color: 0xb9c6d2, metalness: 1, roughness: 0.4, envMapIntensity: 1.1 });
+  const crimpGeo = new THREE.BoxGeometry(1.06, 0.11, 0.13);
+  const crimpTop = new THREE.Mesh(crimpGeo, crimpMat);
+  crimpTop.position.y = 0.79;
+  const crimpBottom = new THREE.Mesh(crimpGeo, crimpMat);
+  crimpBottom.position.y = -0.79;
+  const packSeamMat = new THREE.MeshBasicMaterial({ color: hdr("#ffffff", 4), transparent: true, opacity: 0, toneMapped: false });
+  const packSeam = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 0.035), packSeamMat);
+  packSeam.position.set(0, 0.71, 0.06);
+  pack.add(packBody, crimpTop, crimpBottom, packSeam);
+  pack.scale.setScalar(0.62);
+  pack.position.copy(PACK_POS);
+  scene.add(pack);
+  const packLight = new THREE.PointLight(accent.a, 2, 5, 1.6);
+  packLight.position.set(0, PACK_POS.y + 0.3, PACK_POS.z + 1.0);
+  scene.add(packLight);
+
+  /* ---------- particules ---------- */
   const bursts: Burst[] = [];
   const makeBurst = (n: number, color: string, speed: number, spread: number, up: number, size: number, life: number, gravity: number): Burst => {
     const vel = new Float32Array(n * 3);
@@ -418,17 +503,22 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
     bursts.push(b);
     return b;
   };
-  const FW_COLORS = [PINK, "#ffd66b", "#ffffff", CYAN, "#ff9ec6", "#8fe3ff"];
-  const fireworks = Array.from({ length: 10 }, (_, i) => makeBurst(220, FW_COLORS[i % FW_COLORS.length]!, 22, 1, 0.25, 3.2, 2.2, 7));
+  const packBurst = makeBurst(260, accent.a, 3.2, 0.9, 0.8, 0.07, 1.2, 6);
+  packBurst.origin.copy(PACK_POS);
+  packBurst.start = T_BURST;
+  const packBurst2 = makeBurst(100, "#ffffff", 2.4, 1.2, 0.6, 0.05, 1.0, 5);
+  packBurst2.origin.copy(PACK_POS);
+  packBurst2.start = T_BURST;
+  // feux d'artifice sur la ville : un réservoir recyclé (automatiques + au clic)
+  const FW_COLORS = [accent.a, PALETTE.yellow, "#ffffff", accent.b, PINK, CYAN];
+  const fireworks = Array.from({ length: 10 }, (_, i) => makeBurst(220, FW_COLORS[i % FW_COLORS.length]!, 9, 1, 0.25, 1.1, 1.9, 4));
   let fwNext = 0;
   const launch = (t: number) => {
     const b = fireworks[fwNext++ % fireworks.length]!;
     const i = fwNext;
     const side = i % 2 ? 1 : -1;
-    // au-dessus de la plage, devant la caméra qui descend
-    b.origin.set(side * (30 + rnd(i, 61) * 140), -GROUND + 70 + rnd(i, 62) * 70, -150 - rnd(i, 63) * 90);
+    b.origin.set(side * (6 + rnd(i, 61) * 16), 3 + rnd(i, 62) * 6, -62 - rnd(i, 63) * 20);
     b.start = t;
-    sound.pop();
   };
   // flash plein écran
   const whiteMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthTest: false, depthWrite: false, toneMapped: false, fog: false });
@@ -437,12 +527,82 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
   white.renderOrder = 999;
   camera.add(white);
 
+  /* ---------- les révélations 3D devant les portes ---------- */
+  const metal = (color: THREE.ColorRepresentation, emissive = 0) =>
+    new THREE.MeshPhysicalMaterial({ color, metalness: 1, roughness: 0.2, clearcoat: 1, clearcoatRoughness: 0.08, emissive: new THREE.Color(color), emissiveIntensity: emissive, envMapIntensity: 1.6 });
+  const text3D = (str: string, size: number, depth: number, mat: THREE.Material, maxWidth?: number): THREE.Mesh => {
+    const g = new TextGeometry(str, { font: assets.font, size, depth, curveSegments: 6, bevelEnabled: true, bevelThickness: depth * 0.22, bevelSize: size * 0.025, bevelSegments: 3 });
+    g.computeBoundingBox();
+    g.center();
+    const m = new THREE.Mesh(g, mat);
+    const w = g.boundingBox!.max.x - g.boundingBox!.min.x;
+    if (maxWidth && w > maxWidth) m.scale.setScalar(maxWidth / w);
+    m.castShadow = true;
+    return m;
+  };
+  const logo3D = (path: string, size: number, mat: THREE.Material): THREE.Mesh => {
+    const data = new SVGLoader().parse(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="${path}"/></svg>`);
+    const shapes = data.paths.flatMap((p) => SVGLoader.createShapes(p));
+    const geo = new THREE.ExtrudeGeometry(shapes, { depth: 3.2, bevelEnabled: true, bevelThickness: 0.5, bevelSize: 0.4, bevelSegments: 4, curveSegments: 12 });
+    geo.center();
+    const s = size / 24;
+    geo.scale(s, -s, -s);
+    const m = new THREE.Mesh(geo, mat);
+    m.castShadow = true;
+    return m;
+  };
+  // chaque révélation : l'objet chromé et son nom en lettres 3D au-dessus
+  const tells: { obj: THREE.Object3D; win: Win }[] = [];
+  const named = (obj: THREE.Object3D, name: string) => {
+    const g = new THREE.Group();
+    const n = text3D(name.toUpperCase(), 0.13, 0.026, metal(0xf2f5f8, 0.14), 1.3);
+    n.position.y = 0.4;
+    g.add(obj, n);
+    return g;
+  };
+  {
+    const g = new THREE.Group();
+    const code = text3D(o.texts.position, 0.36, 0.07, metal(accent.a, 0.12));
+    const n = text3D(o.texts.positionName.toUpperCase(), 0.1, 0.02, metal(0xf2f5f8, 0.14), 1.0);
+    n.position.y = 0.34;
+    g.add(code, n);
+    tells.push({ obj: g, win: plan.position });
+  }
+  tells.push({ obj: named(logo3D(o.logoPath, 0.42, metal(0xe6ecf3, 0.06)), o.texts.langName), win: plan.lang });
+  tells.push({ obj: named(logo3D(o.leaguePath, 0.4, metal(accent.a, 0.1)), o.texts.leagueName), win: plan.league });
+  {
+    const shield = new THREE.Shape();
+    const S = 0.27;
+    shield.moveTo(-1 * S, 1.05 * S);
+    shield.lineTo(1 * S, 1.05 * S);
+    shield.lineTo(1 * S, -0.25 * S);
+    shield.lineTo(0, -1.25 * S);
+    shield.lineTo(-1 * S, -0.25 * S);
+    shield.closePath();
+    const outer = new THREE.Mesh(new THREE.ExtrudeGeometry(shield, { depth: 0.05, bevelEnabled: true, bevelThickness: 0.015, bevelSize: 0.015, bevelSegments: 3 }), metal(accent.a, 0.06));
+    const inner = new THREE.Mesh(new THREE.ExtrudeGeometry(shield, { depth: 0.012, bevelEnabled: false }), new THREE.MeshStandardMaterial({ color: 0x0b1119, metalness: 0.5, roughness: 0.45 }));
+    inner.scale.set(0.84, 0.84, 1);
+    inner.position.set(0, -0.007, 0.06);
+    const name = text3D(o.texts.club.toUpperCase(), 0.085, 0.018, metal(0xf2f5f8, 0.15), 0.38);
+    name.position.set(0, 0.075, 0.07);
+    const grp = new THREE.Group();
+    grp.add(outer, inner, name);
+    tells.push({ obj: grp, win: plan.club });
+  }
+  for (const tl of tells) {
+    tl.obj.visible = false;
+    scene.add(tl.obj);
+  }
+  const tellKey = new THREE.SpotLight(0xffffff, 0, 6, 0.5, 0.6, 1.4);
+  tellKey.position.set(0.8, CAB_H - 0.1, TELL_POS.z + 1.6);
+  tellKey.target.position.copy(TELL_POS);
+  scene.add(tellKey, tellKey.target);
+
   /* ---------- le dev à son poste ---------- */
-  // De dos, face à ses écrans, tourné vers le fond de la pièce : la caméra
-  // arrive par la baie derrière lui ; la chaise pivote vers elle juste avant le carton.
+  // De dos, face à ses écrans et aux baies ; la chaise pivote vers la caméra juste avant la carte.
   const desk = createWorkstation({ accent: accent.a, lang: o.langKey, login: o.login, seed: o.overall, graphLabel: o.texts.graphLabel, wood: assets.wood, chair: createChair(assets.chair, 0x1d2023), props: assets.desk });
   const player = createPlayer(assets.player);
-  desk.group.rotation.y = 0;
+  desk.group.rotation.y = Math.PI;
   desk.group.position.set(0, 0, DESK_Z);
   // un peu en avant sur l'assise : le dos ne traverse pas le dossier du fauteuil
   player.root.position.set(0, 0.03, 0.06);
@@ -450,33 +610,22 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
   scene.add(desk.group);
   disposables.push(desk);
   const heroSpot = new THREE.SpotLight(0xffe0b9, 0, 10, 0.72, 0.85, 1.4);
-  heroSpot.position.set(-1.8, CEIL - 0.1, DESK_Z - 1.8);
+  heroSpot.position.set(-1.8, CEIL - 0.1, DESK_Z + 1.8);
   heroSpot.target.position.set(0, 0.6, DESK_Z);
   heroSpot.castShadow = !low;
   heroSpot.shadow.mapSize.set(1024, 1024);
   heroSpot.shadow.bias = -0.0004;
   scene.add(heroSpot, heroSpot.target);
-  // la ville par les baies, sur le dev : rose d'un côté, cyan de l'autre
+  // les enseignes de la ville sur le dev : rose à gauche, cyan à droite
   const neonL = new THREE.SpotLight(PINK, 0, 10, 0.9, 0.9, 1.5);
-  neonL.position.set(-3.4, 2.6, DESK_Z - 3.4);
+  neonL.position.set(-2.8, 2.8, DESK_Z - 2.4);
   neonL.target.position.set(0, 0.9, DESK_Z);
   const neonR = new THREE.SpotLight(CYAN, 0, 10, 0.9, 0.9, 1.5);
-  neonR.position.set(3.4, 2.6, DESK_Z - 3.4);
+  neonR.position.set(2.8, 2.8, DESK_Z - 2.4);
   neonR.target.position.set(0, 0.9, DESK_Z);
-  // (toujours présentes : retirer une lumière recompile les shaders de toute la scène)
   scene.add(neonL, neonL.target, neonR, neonR.target);
 
   /* ---------- la carte ---------- */
-  const metal = (color: THREE.ColorRepresentation, emissive = 0) =>
-    new THREE.MeshPhysicalMaterial({ color, metalness: 1, roughness: 0.2, clearcoat: 1, clearcoatRoughness: 0.08, emissive: new THREE.Color(color), emissiveIntensity: emissive, envMapIntensity: 1.6 });
-  const text3D = (str: string, size: number, depth: number, mat: THREE.Material): THREE.Mesh => {
-    const g = new TextGeometry(str, { font: assets.font, size, depth, curveSegments: 6, bevelEnabled: true, bevelThickness: depth * 0.22, bevelSize: size * 0.025, bevelSegments: 3 });
-    g.computeBoundingBox();
-    g.center();
-    const m = new THREE.Mesh(g, mat);
-    m.castShadow = true;
-    return m;
-  };
   const maskTex = keep(T.makeCardMaskTexture());
   const backTex = keep(T.makeCardBackTexture(accent.a));
   const cardMesh = createCardMesh(CARD_W3, { frontMap: backTex, backMap: backTex, edgeColor: accent.a, foil: true });
@@ -503,8 +652,6 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
   const glintMat = new THREE.PointsMaterial({ map: sparkTex, size: 0.16, color: hdr("#ffffff", 2), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
   card.add(new THREE.Points(glintGeo, glintMat));
   card.position.copy(CARD_POS);
-  // la face de la carte regarde la caméra, vers -z
-  card.rotation.y = Math.PI;
   card.visible = false;
   scene.add(card);
   let cardReady = false;
@@ -528,45 +675,53 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
     const mats = (obj as THREE.Mesh).material;
     for (const m of Array.isArray(mats) ? mats : mats ? [mats] : []) {
       const std = m as THREE.MeshStandardMaterial;
-      if (std.isMeshStandardMaterial && std.envMapIntensity !== 1 && !std.envMap) std.envMap = sky;
+      // la cabine a déjà la sienne : ses propres reflets, photographiés de l'intérieur
+      if (std.isMeshStandardMaterial && std.envMapIntensity !== 1 && !std.envMap) std.envMap = studio;
     }
   });
 
-  /* ---------- le HUD ---------- */
-  const hud: Hud | null = o.hudHost
-    ? createHud(o.hudHost, {
-        texts: o.texts.hud,
-        lines: { specialty: o.texts.specialty, weapon: o.texts.weapon, file: o.texts.file, affiliation: o.texts.affiliation },
-        title: o.texts.levelLabel,
-        overall: o.overall,
-        double: o.double,
-        accent: accent.a,
-      })
-    : null;
-  if (hud) disposables.push(hud);
-
   /* ---------- post-traitement ---------- */
-  // Anticrénelage à deux échantillons : le rendu de la scène, en
-  // demi-flottants, est la passe la plus chère ; pas de flou de profondeur, tout est net.
+  // Anticrénelage à deux échantillons (quatre avant) : le rendu de la scène,
+  // en demi-flottants, est la passe la plus chère ; plus de flou de
+  // profondeur (décision du 17 octobre 2026), tout est net.
   const composer = new EffectComposer(renderer, { frameBufferType: THREE.HalfFloatType, multisampling: low ? 0 : 2 });
   composer.addPass(new RenderPass(scene, camera));
   const bloom = new BloomEffect({ mipmapBlur: true, luminanceThreshold: 1.0, luminanceSmoothing: 0.2, intensity: 0.6, radius: 0.65 });
-  // Vignettage d'un objectif ouvert : −0,7 IL dans les coins, rien au centre.
+  // Vignettage d'un objectif ouvert : −0,7 IL dans les coins, rien au centre
+  // ni presque au milieu des bords (il faisait −1,7 IL, un effet visible).
   const vignette = new VignetteEffect({ darkness: 0.35, offset: 0.35 });
   const noise = new NoiseEffect({ blendFunction: BlendFunction.OVERLAY, premultiply: false });
-  noise.blendMode.opacity.value = 0.1;
-  // ACES (SPEC §6.3) : le rendu garde ses noirs et ses néons.
+  noise.blendMode.opacity.value = 0.14;
+  // ACES (three.js) plutôt qu'AgX : l'AgX de three.js n'a que le look « Base »
+  // (noirs levés, LED du tier délavées), pas le « Medium High Contrast » du
+  // rendu de la ville dans Blender, déjà une image finie (SPEC §6.3).
   const toneMapping = new ToneMappingEffect({ mode: ToneMappingMode.ACES_FILMIC });
-  // Balance des blancs : neutre dehors, dans la lumière de l'heure bleue ;
-  // réglée sur 5 600 K une fois à l'intérieur, comme une balance automatique qui
+  // Balance des blancs : neutre dans la cabine, à la lumière chaude voulue ;
+  // réglée sur 5 600 K une fois dehors, comme une balance automatique qui
   // s'adapte aux suspensions (≈ 4 500 K) : il leur reste un peu de chaleur.
-  const WB_SKY = whiteBalanceGains(6504);
+  const WB_CABIN = whiteBalanceGains(6504);
   const WB_OFFICE = whiteBalanceGains(5600);
-  const whiteBalance = new WhiteBalanceEffect(WB_SKY.clone());
+  const whiteBalance = new WhiteBalanceEffect(WB_CABIN.clone());
   // l'objectif (aberration radiale, saleté) : fusionné dans la même passe, coupé sur mobile
   const lens = low ? null : new LensEffect(bloom.texture, keep(makeLensDirtTexture()), { aberration: 0.001, dirt: 3 });
   const gradePass = new EffectPass(camera, ...(lens ? [lens] : []), bloom, whiteBalance, vignette, noise, toneMapping);
   composer.addPass(gradePass);
+
+  /* ---------- le HUD (hud.ts) ---------- */
+  const hud: Hud | null =
+    o.hudHost && !o.warm
+      ? createHud(o.hudHost, {
+          texts: o.texts.hud,
+          lines: { specialty: o.texts.positionName, weapon: o.texts.langName, file: o.texts.leagueName, affiliation: o.texts.club },
+          title: o.texts.levelLabel,
+          overall: o.overall,
+          double: o.double,
+          accent: accent.a,
+          // pas de mini-carte : dans une cabine, on ne va nulle part
+          map: false,
+        })
+      : null;
+  if (hud) disposables.push(hud);
 
   /* ---------- état ---------- */
   let t0 = 0;
@@ -583,13 +738,20 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
   let held: number | null = null;
   let freeCamera = false; // inspection locale uniquement, via __tys3d
   let frameMs = 16;
-  /** Le statut ne s'affiche qu'au franchissement d'un palier, 0,9 s. */
+  let wallState = "";
+  let wallSwitch = -99;
+  /** Le statut ne s'affiche qu'au franchissement d'un palier, puis l'afficheur revient à l'étage seul. */
   const STATUS_HOLD = 0.9;
   let lastStatus = -1;
   let statusUntil = -99;
-  let lastStars = 0;
-  let lastT = -1;
   const autoFired = new Set<number>();
+  /** Étoiles allumées à l'image précédente ; le message radio en cours. */
+  let lastStars = 0;
+  let radioMsg = "";
+  let radioUntil = -99;
+  let prevT = -1;
+  const starsAt = (level: number) => STAR_AT.filter((th) => level >= th).length;
+  const shakeSeed = Math.random() * 100;
   let cardTarget: THREE.Vector3 | null = null;
   const camPos = new THREE.Vector3();
   const camLook = new THREE.Vector3();
@@ -598,10 +760,10 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
   /** Couleurs et intensités des groupes de lumière précalculée (réglées à l'œil, d'après les captures). */
   const NEON = new THREE.Color(0xffdfb8);
   const WARM = new THREE.Color(0xffe0b9);
-  const CITY = new THREE.Color(0xffffff);
-  const tierColor = new THREE.Color(accent.a);
-  const LIGHT = { neon: 1, hero: 1, city: 1.1, accent: 1 };
-  baked.setCitySides(new THREE.Color(PINK).multiplyScalar(0.9), new THREE.Color(CYAN).multiplyScalar(0.8), 7);
+  // la lumière de la ville est teintée par côté (baked.setCitySides) : blanche ici
+  const CITY = new THREE.Color(0xe6eaff);
+  const levelColor = new THREE.Color(accent.a);
+  const LIGHT = { neon: 1, hero: 1, city: 1.45, accent: 1, glass: 1.6 };
 
   const resize = () => {
     const nw = Math.max(1, canvas.clientWidth || window.innerWidth);
@@ -620,7 +782,7 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
   /** Champ vertical : plus large en portrait pour garder la scène dans le cadre. */
   const fovFor = (base: number) => (camera.aspect < 0.8 ? base + 16 : camera.aspect < 1.2 ? base + 7 : base);
 
-  /** Position de la carte 3D qui coïncide avec l'emplacement HTML (caméra en pose finale, regard vers +z : la droite de l'écran est vers -x). */
+  /** Position de la carte 3D qui coïncide avec l'emplacement HTML (caméra en pose finale). */
   const computeCardTarget = () => {
     const r = o.anchor();
     if (!r || r.width < 10) return CARD_POS.clone();
@@ -628,28 +790,34 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
     const d = (CARD_H3 * h) / (2 * r.height * tanH);
     const nx = ((r.left + r.width / 2) / w) * 2 - 1;
     const ny = 1 - ((r.top + r.height / 2) / h) * 2;
-    return V(F_POS.x - nx * d * tanH * camera.aspect, F_POS.y + ny * d * tanH, F_POS.z + d);
+    return V(F_POS.x + nx * d * tanH * camera.aspect, F_POS.y + ny * d * tanH, F_POS.z - d);
   };
 
+  const setWall = (state: string, t: number, draw: () => void, glitch = true) => {
+    if (wallState === state) return;
+    wallState = state;
+    if (glitch) wallSwitch = t;
+    draw();
+  };
   const setCue = (c: WalkoutCue) => {
     if (c === cue) return;
     cue = c;
     o.onCue?.(c);
   };
 
-  /** La plongée (0 → 1) : la chute accélère, file, puis freine à l'approche de la tour. */
+  /** La montée (0 → 1) : la cabine accélère doucement, file à vitesse constante, puis freine à l'approche. */
   const ACC = 0.18;
   const DEC = 0.3;
   const VMAX = 1 / (1 - ACC / 2 - DEC / 2);
-  const dive = (t: number) => {
-    const p = seg(t, plan.dive[0], plan.dive[1] - plan.dive[0]);
+  const ascent = (t: number) => {
+    const p = seg(t, plan.ascent[0], plan.ascent[1] - plan.ascent[0]);
     if (p < ACC) return (VMAX * p * p) / (2 * ACC);
     if (p < 1 - DEC) return VMAX * (ACC / 2 + (p - ACC));
     return 1 - (VMAX * (1 - p) * (1 - p)) / (2 * DEC);
   };
-  /** Vitesse de la chute, de 0 à 1. */
-  const diveSpeed = (t: number) => {
-    const p = seg(t, plan.dive[0], plan.dive[1] - plan.dive[0]);
+  /** Vitesse de la cabine, de 0 (arrêt) à 1 (pleine vitesse). */
+  const ascentSpeed = (t: number) => {
+    const p = seg(t, plan.ascent[0], plan.ascent[1] - plan.ascent[0]);
     if (p <= 0 || p >= 1) return 0;
     return p < ACC ? p / ACC : p < 1 - DEC ? 1 : (1 - p) / DEC;
   };
@@ -661,15 +829,14 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
     });
     return i;
   };
-  const starsAt = (level: number) => STAR_AT.filter((th) => level >= th).length;
 
   /* ---------- la caméra : un seul plan-séquence ----------
-   * Pas une coupe : la caméra part du ciel, au-dessus de la mer, face à la
-   * ville, descend vers la tour, traverse la baie et vient se poser dans l'axe
-   * de l'allée, face au dev. Images-clés interpolées par des splines d'Hermite
-   * en temps, tangentes monotones (Fritsch-Carlson) : position, visée et focale
-   * continues, leur vitesse aussi, sans dépassement. Tout reste sur x = 0, et la
-   * caméra ne fait qu'avancer (z croît) et descendre (y décroît). */
+   * Pas une coupe : la caméra est dans la cabine, face aux portes, et s'en
+   * approche lentement pendant la montée ; les portes s'ouvrent, elle sort
+   * dans l'axe de l'allée et vient se poser face à la carte. Images-clés
+   * interpolées par des splines d'Hermite en temps, tangentes monotones
+   * (Fritsch-Carlson) : position, visée et focale continues, leur vitesse
+   * aussi, sans dépassement. La translation reste dans l'axe (x = 0). */
   interface Key {
     t: number;
     pos: THREE.Vector3;
@@ -678,15 +845,14 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
   }
   const K = (t: number, pos: THREE.Vector3, look: THREE.Vector3, fov: number): Key => ({ t, pos, look, fov });
   const keys: Key[] = [
-    K(0, V(0, 240, -700), V(0, 20, 0), 52),
-    K(3.2, V(0, 150, -450), V(0, 8, -20), 54),
-    K(6.4, V(0, 62, -215), V(0, 3, -25), 56),
-    K(8.8, V(0, 14, -62), V(0, 2, -12), 55),
-    K(10.4, V(0, 2.4, -19), V(0, 1.55, DESK_Z), 52),
-    K(plan.glass, V(0, 1.62, WIN_Z), V(0, 1.5, DESK_Z), 50),
-    K(plan.glass + 1.4, V(0, 1.56, F_POS.z - 0.3), V(0, 1.25, DESK_Z), 44),
-    K(T_TURN - 0.4, V(0, 1.52, F_POS.z - 0.1), V(0, 1.25, DESK_Z), 41),
-    K(T_SETTLE, F_POS.clone(), V(F_POS.x, F_POS.y, F_POS.z + 10), 40),
+    K(0, CAB_CAM.clone(), PACK_POS.clone().add(V(0, 0.05, 0)), 54),
+    K(plan.depart, V(0, 1.48, 2.77), V(0.12, 1.55, 0), 60),
+    K(plan.league[0], V(0, 1.48, 2.67), V(0.12, 1.53, 0), 60),
+    K(plan.club[1], V(0, 1.48, 2.47), V(0.08, 1.5, 0), 58),
+    K(plan.doors + 0.35, V(0, 1.5, 1.95), V(0, 1.4, -6), 58),
+    K(plan.doors + 2.0, V(0, 1.53, -1.5), V(0, 1.2, DESK_Z), 44),
+    K(T_TURN - 0.4, V(0, 1.51, -2.9), V(0, 1.25, DESK_Z), 41),
+    K(T_SETTLE, F_POS.clone(), V(F_POS.x, F_POS.y, F_POS.z - 10), 40),
   ];
   /** Tangente monotone : nulle quand la courbe change de sens, pour ne jamais dépasser une image-clé. */
   const slope = (prev: number, cur: number, next: number, ta: number, tb: number, tc: number) => {
@@ -728,18 +894,39 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
     const s3 = s2 * s;
     return a.fov * (2 * s3 - 3 * s2 + 1) + fovTan[i]! * (s3 - 2 * s2 + s) * dt + b.fov * (-2 * s3 + 3 * s2) + fovTan[i + 1]! * (s3 - s2) * dt;
   };
-  const camera_ = (t: number) => {
+  const camera_ = (t: number, wall: number) => {
     if (import.meta.env.DEV && freeCamera) return;
     let fov = 40;
     if (t < T_SETTLE) {
-      fov = rail(Math.max(0, t));
+      fov = rail(t);
     } else {
       // pose finale exacte : la carte HTML vient s'y superposer au pixel près
       camPos.copy(F_POS);
-      camLook.set(F_POS.x, F_POS.y, F_POS.z + 10);
+      camLook.set(F_POS.x, F_POS.y, F_POS.z - 10);
     }
     camera.position.copy(camPos);
+    // la cabine tasse au départ et à l'arrivée : un simple creux vertical, pas une secousse
+    const lurch = (at: number, sign: number) => {
+      const p = seg(t, at, 0.55);
+      return p > 0 && p < 1 ? sign * 0.018 * Math.sin(Math.PI * p) * (1 - p * 0.4) : 0;
+    };
+    camera.position.y += lurch(plan.depart, -1) + lurch(plan.arrive - 0.1, 1);
+    // En portrait, garder toute la platine latérale dans le cadre pendant
+    // la montée et l'arrivée, puis revenir dans l'axe en sortant.
+    if (camera.aspect < 0.8) {
+      const lookDistance = (camera.position.z - camLook.z) / Math.max(camera.position.z, 1.5);
+      camLook.x += 0.22 * lookDistance * inOut(seg(t, T_BURST + 0.3, 1.1)) * (1 - inOut(seg(t, plan.doors + 0.65, 0.85)));
+    }
     camera.lookAt(camLook);
+    // une seule secousse : l'éclatement du pack (traumatisme au carré, en rotation)
+    const trauma = t >= T_BURST ? Math.max(0, 0.5 * (1 - (t - T_BURST) / 0.6)) : 0;
+    if (trauma > 0) {
+      const s = trauma * trauma;
+      const f = wall * 18 + shakeSeed;
+      camera.rotateY(s * 0.025 * smoothNoise(f));
+      camera.rotateX(s * 0.025 * smoothNoise(f + 13.3));
+      camera.rotateZ(s * 0.015 * smoothNoise(f + 27.9));
+    }
     const fv = fovFor(fov);
     if (Math.abs(camera.fov - fv) > 0.01) {
       camera.fov = fv;
@@ -752,73 +939,121 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
     tNow = t;
     const wall = now / 1000;
     const dim = t >= T_SETTLE ? 1 - 0.8 * inOut(seg(t, T_SETTLE, 1.0)) : 1;
-    // retour en arrière (mise au point) : on rejoue les repères
-    if (t < lastT - 0.5) {
-      lastStars = 0;
-      lastStatus = -1;
-    }
-    const crossed = (at: number) => lastT < at && t >= at && Math.abs(t - lastT) < 0.5;
 
-    /* la plongée : la note monte avec la descente ; les étoiles s'allument aux seuils */
-    const progress = dive(t);
-    const speed = diveSpeed(t);
+    /* la montée : l'étage est la note ; la gaine défile dans les fentes */
+    const climb = ascent(t);
+    const speed = ascentSpeed(t);
     sound.update(t, speed);
-    const level = t >= plan.dive[0] ? Math.max(1, Math.round(progress * SCORE)) : 0;
-    const stars = starsAt(level);
-    if (stars > lastStars && t >= 0) sound.crackle();
+    const moving = t >= plan.ascent[0] && t < plan.arrive;
+    const level = Math.round(climb * SCORE);
+    screen.floor(level, o.double ? 2 : 1, moving);
+    const crossed = (at: number) => prevT < at && t >= at;
+    /* les étoiles de recherche : une de plus à chaque seuil, avec la radio */
+    const stars = t >= plan.depart ? starsAt(level) : 0;
+    if (stars > lastStars && t >= plan.depart) radio.crackle();
     lastStars = stars;
-    world.update(t, dim);
+    if (crossed(plan.mission[0])) radio.sting();
+    shaftTex.offset.y = climb * 7;
+    shaftMat.opacity = speed * dim;
+    shaftGap.visible = t < plan.arrive;
+    cab.setLight(dim);
 
-    /* la radio : le statut change à chaque palier franchi, 0,9 s ; le dernier reste jusqu'au demi-tour */
-    let radio = "";
-    if (level > 0 && t < T_TURN) {
-      const si = statusAt(level);
+    /* l'afficheur : le pack, puis l'étage 00 seul (l'ascenseur s'établit),
+     * puis le statut, qui change à chaque palier franchi */
+    screen.uniforms.uTime.value = wall;
+    if (t < T_BURST + 0.35) setWall("idle", t, () => screen.caption(o.texts.idleSubtitle, o.texts.idleTitle));
+    else if (t < plan.depart) setWall("ground", t, () => screen.caption("", ""));
+    else {
+      const si = statusAt(Math.max(1, level));
       if (si !== lastStatus) {
         lastStatus = si;
         statusUntil = t + STATUS_HOLD;
+        // le même statut passe à la radio, en bas de l'écran
+        radioMsg = o.texts.statuses[si]?.label ?? "";
+        radioUntil = statusUntil;
       }
-      if (t < statusUntil || t >= plan.dive[1]) radio = o.texts.statuses[si]?.label ?? "";
+      // à l'arrivée, le statut final reste
+      if (t < statusUntil || t >= plan.arrive) setWall(`status-${si}`, t, () => screen.caption(o.texts.statusLabel, o.texts.statuses[si]?.label ?? ""));
+      else setWall("floor", t, () => screen.caption("", ""), false);
     }
+    const glitch = t >= 0 ? 1 - seg(t, wallSwitch, 0.22) : 0;
+    screen.uniforms.uGlitch.value = glitch * 0.6;
+    screen.uniforms.uOn.value = dim;
+    // le bouton de l'étage s'allume un peu avant le départ, puis s'éteint à l'arrivée
+    btnOn.color.copy(hdr(accent.a, t >= plan.depart - 0.5 && t < plan.arrive ? 2.4 : 0.35));
 
-    /* la baie traversée */
-    if (crossed(plan.glass)) sound.whoosh();
-    if (crossed(plan.mission[0])) sound.sting();
+    /* les portes */
+    const open = t >= plan.doors ? inOut(seg(t, plan.doors, 1.0)) : 0;
+    for (const d of doors) d.mesh.position.x = d.closed + d.dir * open * (DOOR_W / 2 + 0.02);
+    seamMat.color.copy(hdr("#ffffff", t >= plan.arrive ? 5 * seg(t, plan.arrive + 0.1, 0.3) * (1 - seg(t, plan.doors + 0.1, 0.4)) : 0));
+    seam.visible = open < 0.05;
 
-    /* l'open space : le poste du dev déjà allumé, la ville par les baies ; les néons rangée par rangée une fois entré */
+    /* l'open space : les néons rangée par rangée, les écrans, l'allée */
     let lit = 0;
     const pops = rowMats.map((m, r) => {
-      const zone = ZONES.findIndex((rows) => rows.includes(r));
-      const at = plan.lights + zone * 0.4 + (rows(zone).indexOf(r)) * 0.14;
+      const at = plan.lights + r * 0.16;
       const pop = seg(t, at, 0.65);
       m.color.copy(hdr("#ffe1bc", (0.03 + 1.35 * pop) * dim));
       lit += (t >= at ? 1 : 0) / ROWS;
       return pop;
     });
     // la lumière précalculée suit les barres : chaque zone à la moyenne de ses rangées
-    ZONES.forEach((rows, z) => baked.set(`z${2 - z}` as "z0", NEON, (rows.reduce((a, r) => a + pops[r]!, 0) / rows.length) * dim * LIGHT.neon));
-    baked.set("hero", WARM, dim * LIGHT.hero);
+    ZONES.forEach((rows, z) => baked.set(`z${z}` as "z0", NEON, (rows.reduce((a, r) => a + pops[r]!, 0) / rows.length) * dim * LIGHT.neon));
+    baked.set("hero", WARM, seg(t, plan.doors + 0.2, 1.0) * dim * LIGHT.hero);
     baked.set("city", CITY, dim * LIGHT.city);
-    baked.set("accent", tierColor, seg(t, plan.glass + 0.2, 0.9) * dim * LIGHT.accent);
-    hemi.intensity = (0.16 + 0.5 * lit) * dim;
-    pendantMat.color.copy(hdr(0xffdfb8, 1.5 * dim));
+    baked.set("accent", levelColor, seg(t, plan.doors + 0.3, 0.9) * dim * LIGHT.accent);
+    hemi.intensity = (0.12 + 0.6 * lit) * dim;
+    city.uBright.value = 0.85 * dim;
+    if (glassReflection) {
+      // le miroir redessine la scène : seulement une fois les portes ouvertes
+      glassReflection.mesh.visible = t >= plan.doors;
+      glassReflection.strength.value = (0.15 + 0.85 * lit) * dim * LIGHT.glass;
+    }
+    pendantMat.color.copy(hdr(0xffdfb8, (0.05 + 1.5 * seg(t, plan.doors + 0.6, 0.8)) * dim));
     deskSpots.forEach((d, k) => {
       const on = 0.25 + 0.75 * seg(t, plan.lights + d.row * 0.16, 0.3);
       otherScreens.setColorAt(k, tmpColor.setScalar(on * 0.35 * dim));
     });
     otherScreens.instanceColor!.needsUpdate = true;
     for (let i = 0; i < PATH_N; i++) {
-      const on = seg(t, plan.glass + 0.2 + i * 0.05, 0.25) * dim;
+      const on = seg(t, plan.doors + 0.3 + i * 0.05, 0.25) * dim;
       const c = on > 0 ? tmpColor.set(accent.a).multiplyScalar(0.8 * on) : black;
       path.setColorAt(i * 2, c);
       path.setColorAt(i * 2 + 1, c);
     }
     path.instanceColor!.needsUpdate = true;
-    heroSpot.intensity = 28 * seg(t, plan.glass - 1.0, 1.0) * dim;
-    neonL.intensity = neonR.intensity = 9 * seg(t, plan.glass - 1.2, 1.0) * dim;
+    heroSpot.intensity = 28 * seg(t, plan.doors + 0.5, 0.8) * dim;
+    neonL.intensity = neonR.intensity = 14 * seg(t, plan.doors + 0.6, 0.8) * dim;
 
-    /* flashs : la baie traversée, la carte */
+    /* le pack */
+    if (t < T_BURST + 0.45) {
+      pack.visible = true;
+      const shake = t >= 0 ? seg(t, 0, T_BURST) : 0;
+      const amp = shake * shake * 0.04;
+      const kk = Math.floor(now / 14);
+      pack.position.set(PACK_POS.x + (rnd(kk, 3) - 0.5) * amp, PACK_POS.y + Math.sin(wall * 1.3) * 0.03 + (rnd(kk, 4) - 0.5) * amp, PACK_POS.z);
+      pack.rotation.set(Math.sin(wall * 0.7) * 0.06, Math.sin(wall * 0.45) * 0.3 + (rnd(kk, 5) - 0.5) * amp * 3, (rnd(kk, 6) - 0.5) * amp);
+      packSeamMat.opacity = shake;
+      packSeam.scale.x = 0.2 + shake * 0.8;
+      packLight.intensity = lerp(2, 8, shake) + (t >= T_BURST ? 40 * (1 - seg(t, T_BURST, 0.5)) : 0);
+      if (t >= T_BURST) {
+        const p = seg(t, T_BURST, 0.45);
+        const s = 1 + p * 0.3;
+        packBody.scale.set(s, s, s);
+        foilFront.opacity = foilBack.opacity = foilSide.opacity = 1 - inCubic(p);
+        crimpBottom.position.y = -0.79 - p * 0.5;
+        crimpTop.position.y = 0.79 + p * 3;
+        crimpTop.rotation.x = p * 7;
+        crimpTop.rotation.z = p * 2;
+      }
+    } else {
+      pack.visible = false;
+      packLight.intensity = 0;
+    }
+
+    /* flashs : l'éclatement du pack, la carte */
     let wo = 0;
-    if (t >= plan.glass - 0.08) wo = Math.max(wo, 0.55 * Math.min(seg(t, plan.glass - 0.08, 0.08), 1 - seg(t, plan.glass, 0.3)));
+    if (t >= T_BURST) wo = Math.max(wo, 0.7 * Math.min(seg(t, T_BURST, 0.06), 1 - seg(t, T_BURST + 0.06, 0.35)));
     if (t >= T_CARD - 0.18) wo = Math.max(wo, Math.min(seg(t, T_CARD - 0.18, 0.18), 1 - seg(t, T_CARD, 0.3)) * 0.75);
     whiteMat.opacity = wo;
 
@@ -847,13 +1082,31 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
       }
     setCue(within(t, plan.fireworks) ? "fireworks" : null);
 
+    /* les révélations devant les portes */
+    tellKey.intensity = tells.some((tl) => within(t, tl.win)) ? 14 : 0;
+    for (const tl of tells) {
+      const [a, b] = tl.win;
+      const tau = t - a;
+      const dur = b - a;
+      tl.obj.visible = tau >= 0 && tau < dur;
+      if (!tl.obj.visible) continue;
+      const pin = outBack(seg(tau, 0, 0.45));
+      const pout = inCubic(seg(tau, dur - 0.3, 0.3));
+      tl.obj.position.set(TELL_POS.x, TELL_POS.y + Math.sin(tau * 2.4) * 0.015 + pout * 0.2, lerp(0.05, TELL_POS.z, Math.min(1, pin)));
+      tl.obj.scale.setScalar(Math.max(0.001, Math.min(1.1, pin) * (1 - pout)));
+      tl.obj.rotation.set(0, lerp(-Math.PI * 1.5, 0, outCubic(seg(tau, 0, 0.7))) + Math.sin(tau * 1.6) * 0.25, 0);
+    }
+
     /* le dev */
+    // Le poste reste présent derrière les portes dès la première image.
+    // Masquer son groupe retire aussi ses lumières : sa réapparition forçait
+    // une recompilation des shaders de toute la scène juste avant l'ouverture.
     {
       const turn = inOut(seg(t, T_TURN, 0.75));
       desk.swivel.rotation.y = turn * Math.PI;
       const typing = 1 - seg(t, T_TURN - 0.15, 0.3);
       player.pose(t, typing, turn, camera.position);
-      desk.update(Math.max(0, t), dim);
+      desk.update(Math.max(0, t - plan.doors), seg(t, plan.doors - 0.2, 0.6) * dim);
     }
 
     /* la carte */
@@ -869,13 +1122,13 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
       if (t < T_SETTLE) {
         card.position.copy(CARD_POS);
         card.scale.setScalar(Math.max(0.001, sc));
-        card.rotation.set(0, Math.PI + spin, 0);
+        card.rotation.set(0, spin, 0);
       } else {
         if (!cardTarget) cardTarget = computeCardTarget();
         const p = inOut(seg(t, T_SETTLE, 1.05));
         card.position.lerpVectors(CARD_POS, cardTarget, p);
         card.scale.setScalar(1);
-        card.rotation.set(0, Math.PI, 0);
+        card.rotation.set(0, 0, 0);
       }
       // la carte HTML va se poser dessus : on rapproche le rendu de l'image à plat
       const flat = inOut(seg(t, T_SETTLE, 1.0));
@@ -895,32 +1148,33 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
         const pout = inOut(seg(ts, 0.85, 0.45));
         card.updateMatrixWorld();
         const target = V(-0.39, 0.6, 0.05).applyMatrix4(card.matrixWorld);
-        const from = V(CARD_POS.x, CARD_POS.y + 0.05, CARD_POS.z - 0.9);
+        const from = V(CARD_POS.x, CARD_POS.y + 0.05, CARD_POS.z + 0.9);
         slam.position.lerpVectors(from, target, pout);
-        slam.rotation.y = Math.PI + lerp(0.5, 0, outCubic(pin));
+        slam.rotation.y = lerp(0.5, 0, outCubic(pin));
         slam.scale.setScalar(Math.max(0.001, lerp(outBack(pin), 0.2, pout) * (pin < 1 ? lerp(2.2, 1, outCubic(pin)) : 1)));
         slamMat.opacity = pin * (1 - seg(ts, 1.1, 0.2));
       } else slam.visible = false;
     } else card.visible = false;
 
-    camera_(t);
-    bloom.intensity = lerp(0.75, 0.35, seg(t, plan.glass, 1)) + (t >= plan.glass ? 0.8 * (1 - seg(t, plan.glass, 0.5)) : 0);
-    noise.blendMode.opacity.value = lerp(0.1, 0.055, seg(t, plan.glass, 1));
-    whiteBalance.gains.lerpVectors(WB_SKY, WB_OFFICE, inOut(seg(t, plan.glass + 0.3, 1.5)));
+    camera_(t, wall);
+    bloom.intensity = lerp(0.6, 0.35, seg(t, plan.doors, 1)) + (t >= T_BURST ? 0.8 * (1 - seg(t, T_BURST, 0.5)) : 0);
+    noise.blendMode.opacity.value = lerp(0.14, 0.055, seg(t, plan.doors, 1));
+    whiteBalance.gains.lerpVectors(WB_CABIN, WB_OFFICE, inOut(seg(t, plan.doors + 0.3, 1.5)));
     void dt;
 
-    /* le HUD */
+    /* le HUD : étoiles, radio, lignes du dossier (chacune reste une fois sa
+     * révélation chromée repartie), carton de fin de mission, fondu à la passation */
     hud?.update({
       t,
       stars,
-      radio,
-      lines: plan.lines.filter((at) => t >= at).length,
+      radio: t >= plan.depart && t < radioUntil ? radioMsg : "",
+      lines: tells.filter((tl) => t >= tl.win[1] - 0.35).length,
       mission: within(t, plan.mission) ? Math.min(seg(t, plan.mission[0], 0.3), 1 - seg(t, plan.mission[1] - 0.25, 0.25)) : 0,
-      distance: Math.hypot(camera.position.z - DESK_Z, camera.position.y - 1.2),
-      altitude: camera.position.y + GROUND,
-      opacity: t >= T_SETTLE ? 1 - seg(t, T_SETTLE, 0.6) : 1,
+      distance: 0,
+      altitude: level,
+      opacity: t < 0 ? 0 : 1 - seg(t, T_HANDOFF - 0.4, 0.4),
     });
-    lastT = t;
+    prevT = t;
 
     if (t >= T_HANDOFF && !handoffSent) {
       handoffSent = true;
@@ -954,6 +1208,7 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
       seek: (s: number) => {
         held = null;
         opened = true;
+        prevT = s;
         t0 = performance.now() - s * 1000;
       },
       /** Fige la séquence à l'instant s (mise au point des plans). */
@@ -978,7 +1233,7 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
       warming = null;
     }
   };
-  // Préparer aussi les matières hors du champ de départ, avant que la
+  // Préparer aussi les matières hors du champ de la cabine, avant que la
   // caméra ne découvre les bureaux (notamment leurs géométries instanciées).
   // Sans compilation parallèle, l'échauffement compile au premier rendu.
   const compiled = renderer.compileAsync(scene, camera).catch((error: unknown) => {
@@ -1005,6 +1260,7 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
     },
     skip() {
       sound.setMuted(true);
+      radio.setMuted(true);
       if (!doneSent) {
         doneSent = true;
         handoffSent = true;
@@ -1014,6 +1270,7 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
     },
     setMuted(m) {
       sound.setMuted(m);
+      radio.setMuted(m);
     },
     interact() {
       if (!within(tNow, plan.fireworks)) return false;
@@ -1035,6 +1292,7 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
         if (mat) for (const mm of Array.isArray(mat) ? mat : [mat]) if (!sharedResources.has(mm)) mm.dispose();
       });
       for (const d of disposables) d.dispose();
+      studio.dispose();
       composer.dispose();
       if (warming === handle) warming = null;
     },
