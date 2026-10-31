@@ -94,16 +94,29 @@ Original work for Testyourskills: open-space set modelled and lit in Blender
 (tools/bake/office.py), lighting baked with Cycles. Contains the chair above
 and casts shadows from the plant below.
 
-city.webp
-Night view of La Défense from Neuilly-sur-Seine, modelled and rendered in
+city.webp, sky.webp
+South Beach (Miami Beach, Florida) at blue hour, modelled and rendered in
 Blender (tools/bake/city.py) from OpenStreetMap data: building footprints,
-heights and building parts, streets and water.
+heights and building parts, streets, beaches, parks; the towers of downtown
+Miami and Brickell in the distance. city.webp is the cylindrical panorama
+seen from the dev's window (100°, rendered with Cycles), sky.webp the
+equirectangular blue-hour sky (procedural, original work).
 Map data © OpenStreetMap contributors, available under the Open Database
 License (ODbL) 1.0. https://www.openstreetmap.org/copyright
 https://opendatacommons.org/licenses/odbl/1-0/
-Changes: buildings extruded from their tagged or estimated heights; lit
-windows, facades, generic rooftop signs (no real brand), street lights and
-traffic are invented for the render.
+Changes: buildings extruded from their tagged or estimated heights; the
+viewpoint is a fictional 20th floor over the dune at 16th Street; pastel
+facades, lit windows, neon strips and signs (no real brand or venue),
+street lights are invented for the render. Nothing is taken from any video
+game: no name, logo, asset or sound.
+
+palm trees (visible in city.webp only)
+"Coconut Palm" by evolveduk, CC BY 4.0.
+https://sketchfab.com/3d-models/coconut-palm-26e787f2ff2e4c0fb004c3b0210805a3
+https://creativecommons.org/licenses/by/4.0/
+Changes: the two trunks joined into one mesh, rescaled to about 9 m, textures
+reduced to 512 px, instanced along Ocean Drive and the dune for the render;
+the model itself is not shipped.
 
 plant-v2.glb
 Source: Poly Haven, potted_plant_02, CC0.
