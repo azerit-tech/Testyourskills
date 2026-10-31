@@ -230,7 +230,7 @@ export function makePackFaceTexture(accentA: string, accentB: string, lang: "fr"
   g.textAlign = "center";
   g.fillStyle = "rgba(230,236,242,0.75)";
   g.font = `700 20px ${MONO}`;
-  g.fillText(lang === "fr" ? "AZERIT · SAISON 26" : "AZERIT · SEASON 26", W / 2, 120);
+  g.fillText(lang === "fr" ? "AZERIT · SCELLÉ N° 26" : "AZERIT · SEALED EVIDENCE 26", W / 2, 120);
   const tg = g.createLinearGradient(0, 480, 0, 640);
   tg.addColorStop(0, "#ffffff");
   tg.addColorStop(0.55, "#b8c7d6");
