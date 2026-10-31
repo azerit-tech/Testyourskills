@@ -2,14 +2,14 @@
 // portrait 1080 × 1350, et leurs variantes « comparaison ». Tout est en SVG,
 // la carte y est imbriquée telle quelle (même composant qu'à l'écran).
 import type { CardData, ComparisonData, Lang, StatCode } from "../../../shared/types";
-import { STAT_CODES, styleOf } from "../../../shared/types";
+import { STAT_CODES } from "../../../shared/types";
 import { CardGraphic } from "../../../shared/card/Card";
 import { AzeritGem, AzeritGemDefs } from "../../../shared/card/AzeritGem";
 import { fontAttrs } from "../../../shared/card/fonts";
 import { CARD_H, CARD_PATH, CARD_W } from "../../../shared/card/geometry";
 import { t } from "../../../shared/card/i18n";
 import { fit, measure, upper, wrap } from "../../../shared/card/text";
-import { themeFor } from "../../../shared/card/themes";
+import { themeOf } from "../../../shared/card/themes";
 
 const BG = "#0a0f16";
 const TEXT = "#e6ecf2";
@@ -37,9 +37,9 @@ export function ctaHost(): string {
   }
 }
 
-/** Couleur claire représentative du métal d'une carte (lumière du fond). */
+/** Couleur claire représentative du néon d'une fiche (lumière du fond). */
 function lightOf(card: CardData): string {
-  const th = themeFor(styleOf(card));
+  const th = themeOf(card);
   return th.dark ? th.innerGlow : th.frame[3][1];
 }
 
@@ -186,9 +186,8 @@ function Cta({ x, y, lang, anchor = "start", size = 1 }: { x: number; y: number;
 }
 
 function tierKicker(card: CardData, lang: Lang): string {
-  const th = themeFor(styleOf(card));
-  const s = t(lang);
-  return upper(`${s.card} ${th.label[lang]} · ${card.overall}`, lang);
+  const th = themeOf(card);
+  return upper(`${th.label[lang]} · ${card.overall}`, lang);
 }
 
 function mainStatus(card: CardData, lang: Lang): string | null {
@@ -220,7 +219,7 @@ export function OgImage({ card, lang, avatars }: { card: CardData; lang: Lang; a
   const cx = 104;
   const cy = 32;
   const s = t(lang);
-  const th = themeFor(styleOf(card));
+  const th = themeOf(card);
   const light = lightOf(card);
   const tx = 600;
   const maxW = 540;
@@ -270,7 +269,7 @@ export function PortraitImage({ card, lang, avatars }: { card: CardData; lang: L
   const cx = (W - cw) / 2;
   const cy = 176;
   const light = lightOf(card);
-  const th = themeFor(styleOf(card));
+  const th = themeOf(card);
   const kicker = tierKicker(card, lang);
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
