@@ -100,6 +100,7 @@ export function ComparisonStage({ cmp, phase }: { cmp: ComparisonData; phase: Ph
   return (
     <div className={`cmp phase-${phase}${settled ? " is-settled" : ""}`}>
       <div className="cmp-head">
+        <p className="cmp-loot">{t.compare.loot}</p>
         <Headline text={pick(cmp.headline, lang)} tone={headTone} />
       </div>
 

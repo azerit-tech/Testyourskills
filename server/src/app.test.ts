@@ -530,12 +530,12 @@ describe("page /c/:id et images", () => {
     expect(res.status).toBe(200);
     const html = await res.text();
     const overall = FIXTURES.gold.overall;
-    expect(html).toContain(`<meta property="og:title" content="Carte Or, ${overall} — Léa Martin-Dubois">`);
+    expect(html).toContain(`<meta property="og:title" content="Fiche ★★★★, ${overall} — Léa Martin-Dubois">`);
     expect(html).toContain(`<meta property="og:image" content="https://skills.test/og/${id}.png">`);
     expect(html).toContain(`<meta property="og:url" content="https://skills.test/c/${id}">`);
     expect(html).toContain(`<meta property="og:image:width" content="1200">`);
     expect(html).toContain(`<meta name="twitter:card" content="summary_large_image">`);
-    expect(html).toMatch(/og:description" content="Statut : « Typé jusqu&#39;au bout »\. Jugé par une IA en \d+ s\./);
+    expect(html).toMatch(/og:description" content="Chef d&#39;accusation : « Typé jusqu&#39;au bout »\. Interrogé par une IA en \d+ s\./);
   });
 
   it("injecte les balises dans le index.html du front", async () => {

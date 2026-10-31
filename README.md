@@ -1,6 +1,6 @@
 # Testyourskills
 
-Carte de compétences façon FIFA pour azerit.tech : un pseudo GitHub ou un CV en PDF, une carte en dix secondes, et la comparaison des deux. La spécification de référence est `SPEC.md`.
+Fiche de dev dans l'univers de GTA 6 pour azerit.tech : un pseudo GitHub ou un CV en PDF, une fiche en dix secondes (étoiles de recherche, chefs d'accusation), et la comparaison des deux. La spécification de référence est `SPEC.md`.
 
 ## Dev local
 

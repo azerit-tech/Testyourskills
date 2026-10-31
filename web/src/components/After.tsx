@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, FormEvent } from "react";
 import type { CardData, ComparisonData, Lang, Stat } from "../../../shared/types";
-import { STAT_CODES, styleOf } from "../../../shared/types";
+import { STAT_CODES, starsFor } from "../../../shared/types";
 import { pick, useT } from "../i18n";
 import { api, images, isMock, tokens } from "../lib/api";
 import { navigate } from "../lib/router";
@@ -53,7 +53,7 @@ export function ShareBar({ item, toast }: { item: Shareable; toast: (m: string) 
   const text = (withUrl: string) => {
     if (item.kind === "card") {
       const c = item.card;
-      return ts.text(t.tierCard(t.tiers[styleOf(c)]), c.overall, bestStatus(c, lang), c.judgedInSeconds, withUrl);
+      return ts.text("★".repeat(starsFor(c.overall)), c.overall, bestStatus(c, lang), c.judgedInSeconds, withUrl);
     }
     const cmp = item.comparison;
     return ts.textCompare(cmp.cv.overall, cmp.github.overall, pick(cmp.headline, lang), withUrl);
