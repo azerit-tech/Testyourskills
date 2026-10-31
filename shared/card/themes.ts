@@ -2,6 +2,26 @@
 // le SVG les lit directement, le web en dérive ses variables CSS (holo, lueur).
 import type { CardStyle, Fact, StatusTone } from "../types";
 
+/** Palette de l'univers GTA 6 (SPEC §17.2), source unique pour le SVG et le CSS. */
+export const PALETTE = {
+  night: "#0a0a1f",
+  night2: "#12122e",
+  pink: "#ff3fa4",
+  orange: "#ff7a3d",
+  yellow: "#ffd23f",
+  cyan: "#3fd8ff",
+  violet: "#7b3fe4",
+  star: "#fff4e0",
+  money: "#8ce06b",
+  ink: "#f3f1ff",
+  inkSoft: "#b9b6d6",
+  inkMuted: "#7d7a9c",
+  neg: "#ff5c7a",
+  pos: "#8ce06b",
+  special: "#3fd8ff",
+  gap: "#ffd23f",
+} as const;
+
 /** Arrêt de dégradé : [offset 0..1, couleur, opacité?] */
 export type Stop = [number, string, number?];
 

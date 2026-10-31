@@ -130,3 +130,24 @@ export function tierFor(overall: number): Tier {
 export function styleOf(card: Pick<CardData, "tier" | "special">): CardStyle {
   return card.special ?? card.tier;
 }
+
+/** Niveau de recherche de la fiche (SPEC §17.3) : étoiles allumées selon la note.
+ *  Les tiers (barème, serveur) restent ; les étoiles ne pilotent que le rendu et
+ *  le vocabulaire. Bronze couvre ★ et ★★. */
+export type Stars = 1 | 2 | 3 | 4 | 5;
+
+export function starsFor(overall: number): Stars {
+  if (overall >= 90) return 5;
+  if (overall >= 75) return 4;
+  if (overall >= 60) return 3;
+  if (overall >= 45) return 2;
+  return 1;
+}
+
+export const LEVEL_LABELS: Record<Stars, Fact> = {
+  1: { fr: "Petit délit", en: "Petty crime" },
+  2: { fr: "Suspect", en: "Suspect" },
+  3: { fr: "Recherché", en: "Wanted" },
+  4: { fr: "Dangereux", en: "Dangerous" },
+  5: { fr: "Ennemi public", en: "Public enemy" },
+};
