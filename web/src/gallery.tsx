@@ -12,20 +12,20 @@ const renders = import.meta.glob("../../var/renders/*.png", { eager: true, query
 const css = `
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
-  body { margin: 0; background: #0a0f16; color: #e6ecf2; font-family: Inter, system-ui, sans-serif;
-    background-image: radial-gradient(1200px 600px at 10% -10%, rgba(82,208,189,.10), transparent 60%),
-      radial-gradient(900px 600px at 100% 110%, rgba(108,182,255,.08), transparent 60%); background-attachment: fixed; }
+  body { margin: 0; background: #0a0a1f; color: #f3f1ff; font-family: Inter, system-ui, sans-serif;
+    background-image: radial-gradient(1200px 600px at 10% -10%, rgba(255,63,164,.14), transparent 60%),
+      radial-gradient(900px 600px at 100% 110%, rgba(63,216,255,.10), transparent 60%); background-attachment: fixed; }
   header { position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center;
     justify-content: space-between; padding: 14px 16px; background: rgba(10,15,22,.82); backdrop-filter: blur(10px);
     border-bottom: 1px solid #223040; }
   h1 { margin: 0; font: 700 22px/1 "Barlow Condensed", sans-serif; letter-spacing: .06em; text-transform: uppercase; }
-  h1 span { color: #52d0bd; }
+  h1 span { color: #ff3fa4; }
   h2 { margin: 56px 0 20px; font: 500 12px/1 "JetBrains Mono", monospace; letter-spacing: .22em; text-transform: uppercase; color: #8494a5; }
   .controls { display: flex; gap: 8px; flex-wrap: wrap; }
   .seg { display: inline-flex; border: 1px solid #223040; border-radius: 999px; overflow: hidden; background: #101722; }
   .seg button { appearance: none; border: 0; background: transparent; color: #8494a5; padding: 8px 14px;
     font: 500 12px/1 "JetBrains Mono", monospace; letter-spacing: .08em; cursor: pointer; }
-  .seg button[aria-pressed="true"] { background: #52d0bd; color: #0a0f16; }
+  .seg button[aria-pressed="true"] { background: #ff3fa4; color: #0a0a1f; }
   main { max-width: 1560px; margin: 0 auto; padding: 8px 16px 96px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr)); gap: 56px 32px; justify-items: center; }
   figure { margin: 0; display: grid; gap: 14px; justify-items: center; width: 100%; }
@@ -107,7 +107,7 @@ function Gallery() {
           <div className="deltas">
             {STAT_CODES.map((c) => {
               const d = FIXTURE_COMPARISON.deltas[c];
-              const col = c === "BUZZ" ? "#ffc861" : d > 0 ? "#52d0bd" : d < 0 ? "#ff8b7b" : "#8494a5";
+              const col = c === "BUZZ" ? "#ffd23f" : d > 0 ? "#8ce06b" : d < 0 ? "#ff5c7a" : "#7d7a9c";
               return (
                 <div key={c} className="delta" style={{ borderColor: col + "66", background: col + "1a" }}>
                   <span style={{ color: "#8494a5" }}>{c}</span>
