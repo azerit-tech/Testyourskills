@@ -1,9 +1,11 @@
-// Assets de la scène 3D (web/public/3d) : la ville de nuit derrière les baies,
-// le décor de l'open space et sa lumière précalculés dans Blender
-// (tools/bake/office.py), la cabine d'ascenseur (tools/bake/prepare.py),
-// matières PBR de bois et de moquette, plante, fauteuil, bureau et objets du poste, personnage habillé et police Barlow Condensed. Sources et
-// licences : public/3d/CREDITS.txt. Modèles compressés meshopt, textures
-// WebP, préchargés pendant le scoring, une seule fois par page.
+// Assets de la scène 3D (web/public/3d) : le décor de l'open space et sa
+// lumière précalculés dans Blender (tools/bake/office.py), matières PBR de
+// bois et de moquette, plante, fauteuil, bureau et objets du poste, personnage
+// habillé et police Barlow Condensed ; et, pour la plongée (SPEC §17.4), le
+// ciel, la ville et les palmiers quand ils existent (chantier B1), sinon la
+// scène met un remplaçant procédural. Sources et licences :
+// public/3d/CREDITS.txt. Modèles compressés meshopt, textures WebP,
+// préchargés pendant le scoring, une seule fois par page.
 import * as THREE from "three";
 import { GLTFLoader, type GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { FontLoader, type Font } from "three/examples/jsm/loaders/FontLoader.js";
@@ -17,7 +19,13 @@ export interface PbrSet {
 }
 
 export interface WalkoutAssets {
-  city: THREE.Texture;
+  /** L'ancien panorama de la ville derrière les baies, s'il est encore là (horizon lointain). */
+  skyline?: THREE.Texture;
+  /** Le ciel de l'heure bleue en équirectangulaire (sky.webp), s'il existe. */
+  sky?: THREE.Texture;
+  /** La ville de la plongée (city.glb) et un palmier (palm.glb), s'ils existent. */
+  city?: GLTF;
+  palm?: GLTF;
   player: GLTF;
   font: Font;
   wood: PbrSet;
@@ -27,8 +35,6 @@ export interface WalkoutAssets {
   /** Le poste du dev : bureau et objets (tools/bake/prepare.py). */
   desk: Record<DeskModel, GLTF>;
   office: BakedOffice;
-  /** La cabine d'ascenseur (modèle de JNKM Design, préparé par tools/bake/prepare.py). */
-  cabin: GLTF;
 }
 
 const BASE = "/3d/";
@@ -79,16 +85,21 @@ async function bakedOffice(gltf: GLTFLoader): Promise<BakedOffice> {
   return { scene: model.scene, lightA, lightB, scale };
 }
 
+/** Un asset facultatif : absent, on continue sans. */
+const optional = <X,>(p: Promise<X>): Promise<X | undefined> => p.catch(() => undefined);
+
 /** Lance (une fois) le chargement des assets ; sans risque à appeler souvent. */
 export function preloadWalkoutAssets(): Promise<WalkoutAssets> {
   if (!pending) {
     const tex = new THREE.TextureLoader();
     const gltf = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
     pending = Promise.all([
-      texture(tex, "city.webp", true).then((t) => {
-        t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
-        return t;
-      }),
+      optional(
+        texture(tex, "city.webp", true).then((t) => {
+          t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+          return t;
+        }),
+      ),
       gltf.loadAsync(BASE + "developer-v3.glb"),
       new FontLoader().loadAsync(BASE + "barlow-800.typeface.json"),
       surface(tex, "walnut"),
@@ -97,14 +108,21 @@ export function preloadWalkoutAssets(): Promise<WalkoutAssets> {
       gltf.loadAsync(BASE + "plant-v2.glb"),
       gltf.loadAsync(BASE + "chair.glb"),
       Promise.all(DESK_MODELS.map((n) => gltf.loadAsync(`${BASE}${n}.glb`))),
-      gltf.loadAsync(BASE + "cabin.glb"),
-    ]).then(([city, player, font, wood, office, carpet, plant, chair, deskModels, cabin]) => {
-      for (const g of [player, plant, chair, ...deskModels, cabin]) share(g);
+      optional(texture(tex, "sky.webp", true)),
+      optional(gltf.loadAsync(BASE + "city.glb")),
+      optional(gltf.loadAsync(BASE + "palm.glb")),
+    ]).then(([skyline, player, font, wood, office, carpet, plant, chair, deskModels, sky, city, palm]) => {
+      for (const g of [player, plant, chair, ...deskModels]) share(g);
+      if (city) share(city);
+      if (palm) share(palm);
       office.scene.traverse((o) => {
         if ((o as THREE.Mesh).isMesh) sharedResources.add((o as THREE.Mesh).geometry);
       });
       return {
+        skyline,
+        sky,
         city,
+        palm,
         player,
         font,
         wood,
@@ -113,7 +131,6 @@ export function preloadWalkoutAssets(): Promise<WalkoutAssets> {
         plant,
         chair,
         desk: Object.fromEntries(DESK_MODELS.map((n, i) => [n, deskModels[i]!])) as Record<DeskModel, GLTF>,
-        cabin,
       };
     });
     // un échec ne doit pas rester en cache : on retentera à la prochaine révélation

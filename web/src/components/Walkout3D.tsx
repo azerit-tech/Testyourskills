@@ -1,19 +1,21 @@
-// Enveloppe React de la scène 3D (web/src/three/walkout.ts) : place le canvas
-// plein écran, attend les polices et les assets 3D (préchargés pendant
-// l'attente), relaie le clic d'ouverture, les feux d'artifice (clic ou
-// Espace), la passation à la carte HTML et la fin. Sans WebGL ou sans assets :
-// on passe directement au résultat. Pendant l'attente, warmWalkout prépare le
-// moteur de rendu avec une scène d'échauffement.
+// Enveloppe React de la scène 3D (web/src/three/walkout.ts, la plongée du
+// §17.4) : place le canvas plein écran et l'hôte du HUD, attend les polices et
+// les assets 3D (préchargés pendant l'attente), relaie le clic de départ, les
+// feux d'artifice (clic ou Espace), la passation à la carte HTML et la fin.
+// Sans WebGL ou sans assets : on passe directement au résultat. Pendant
+// l'attente, warmWalkout prépare le moteur de rendu avec une scène d'échauffement.
 import { useEffect, useRef, useState } from "react";
 import type { MutableRefObject, RefObject } from "react";
-import { siGithub } from "simple-icons";
 import type { CardData, Lang } from "../../../shared/types";
+import { LEVEL_LABELS, starsFor } from "../../../shared/types";
 import { langIcon, langTitle } from "../../../shared/card/languages";
 import { useT } from "../i18n";
 import { accentOf } from "../lib/util";
 import { preloadWalkoutAssets } from "../three/assets";
 import { loadCardTexture } from "../three/cardTexture";
 import { loadSceneFonts } from "../three/textures";
+import { HUD_TEXTS } from "../three/hudTexts";
+import "../three/hud.css";
 import * as THREE from "three";
 import { STYLE_ACCENT } from "../lib/util";
 import { createWalkout, type WalkoutCue, type WalkoutHandle } from "../three/walkout";
@@ -35,23 +37,15 @@ export async function warmWalkout(lang: Lang): Promise<void> {
     double: false,
     accent: STYLE_ACCENT.gold,
     texts: {
-      langName: "·",
-      langLabel: "·",
-      leagueName: "·",
-      leagueLabel: "·",
-      position: "·",
-      positionName: "·",
-      positionLabel: "·",
-      club: "·",
-      clubLabel: "·",
-      statusLabel: "·",
+      specialty: "·",
+      weapon: "·",
+      file: "·",
+      affiliation: "·",
       statuses: [{ min: 0, label: "·" }],
-      idleTitle: "DEV PACK",
-      idleSubtitle: "·",
       graphLabel: "·",
+      levelLabel: "·",
+      hud: HUD_TEXTS[lang],
     },
-    logoPath: CODE_PATH,
-    leaguePath: siGithub.path,
     login: "dev",
     overall: 1,
     assets,
@@ -64,13 +58,9 @@ export async function warmWalkout(lang: Lang): Promise<void> {
   await h.ready;
 }
 
-/** Document (CV) en 24 × 24, logo de la ligue CV. */
-const DOC_PATH = "M6 2h8l6 6v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm7 1.5V9h5.5L13 3.5zM8 12h8v2H8v-2zm0 4h8v2H8v-2z";
-/** Chevrons de code en 24 × 24, quand aucun langage n'est reconnu. */
-const CODE_PATH = "M8.7 16.6 4.1 12l4.6-4.6L7.3 6l-6 6 6 6 1.4-1.4zm6.6 0 4.6-4.6-4.6-4.6L16.7 6l6 6-6 6-1.4-1.4z";
 /** Au-delà, on renonce à la scène plutôt que de faire attendre. */
 const ASSET_TIMEOUT = 12000;
-/** Le choix du visiteur pour le son de l'ascenseur, d'une révélation à l'autre. */
+/** Le choix du visiteur pour le son, d'une révélation à l'autre. */
 const MUTE_KEY = "tys-walkout-muted";
 const readMuted = () => {
   try {
@@ -88,7 +78,7 @@ export interface WalkoutControl {
 interface Props {
   card: CardData;
   lang: Lang;
-  /** Comparaison GitHub × CV : le « double walkout ». */
+  /** Comparaison GitHub × CV : deux points sur la mini-carte. */
   double: boolean;
   phase: Phase;
   /** Élément contenant un [data-scene-anchor] : la carte 3D vient s'y poser. */
@@ -101,6 +91,7 @@ interface Props {
 export function Walkout3D({ card, lang, double, phase, anchorRef, controlRef, onHandoff, onDone }: Props) {
   const { t } = useT();
   const hostRef = useRef<HTMLDivElement>(null);
+  const hudRef = useRef<HTMLDivElement>(null);
   const handle = useRef<WalkoutHandle | null>(null);
   const pendingOpen = useRef(false);
   const cb = useRef({ onHandoff, onDone });
@@ -122,23 +113,16 @@ export function Walkout3D({ card, lang, double, phase, anchorRef, controlRef, on
     const host = hostRef.current;
     if (!host) return;
     let alive = true;
-    const icon = langIcon(card.mainLanguage);
-    const tells = t.reveal.tells;
+    const hud = HUD_TEXTS[lang];
     const texts = {
-      langName: icon ? langTitle(card.mainLanguage) : tells.noLanguage,
-      langLabel: tells.language,
-      leagueName: double ? tells.leagueBoth : card.source === "cv" ? tells.leagueCv : tells.leagueGithub,
-      leagueLabel: tells.league,
-      position: card.position,
-      positionName: t.positions[card.position],
-      positionLabel: tells.position,
-      club: card.club ?? tells.freeAgent,
-      clubLabel: tells.club,
-      statusLabel: t.reveal.statusLabel,
+      specialty: t.positions[card.position],
+      weapon: langIcon(card.mainLanguage) ? langTitle(card.mainLanguage) : hud.polyglot,
+      file: double ? hud.fileBoth : card.source === "cv" ? hud.fileCv : hud.fileGithub,
+      affiliation: card.club ?? hud.loneWolf,
       statuses: t.reveal.statuses,
-      idleTitle: "DEV PACK",
-      idleSubtitle: tells.idle,
-      graphLabel: tells.graph,
+      graphLabel: t.reveal.tells.graph,
+      levelLabel: LEVEL_LABELS[starsFor(card.overall)][lang],
+      hud,
     };
     (async () => {
       const timeout = new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error("assets 3D trop lents")), ASSET_TIMEOUT));
@@ -157,8 +141,7 @@ export function Walkout3D({ card, lang, double, phase, anchorRef, controlRef, on
           double,
           accent: accentOf(card),
           texts,
-          logoPath: icon?.path ?? CODE_PATH,
-          leaguePath: card.source === "cv" && !double ? DOC_PATH : siGithub.path,
+          hudHost: hudRef.current ?? undefined,
           langKey: card.mainLanguage,
           login: card.login ?? card.name,
           overall: card.overall,
@@ -211,8 +194,9 @@ export function Walkout3D({ card, lang, double, phase, anchorRef, controlRef, on
 
   return (
     <>
-      {/* le canvas du moteur de rendu partagé y est placé (walkout.ts) */}
+      {/* le canvas du moteur de rendu partagé y est placé (walkout.ts), et le HUD (hud.ts) */}
       <div ref={hostRef} style={{ display: "contents" }} />
+      <div ref={hudRef} style={{ display: "contents" }} />
       {phase === "playing" && (
         <button type="button" className="sound-btn" aria-pressed={!muted} aria-label={muted ? t.reveal.unmute : t.reveal.mute} title={muted ? t.reveal.unmute : t.reveal.mute} onClick={toggleSound}>
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>

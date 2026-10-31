@@ -84,6 +84,10 @@ export function limitLights(mat: THREE.Material, keep: ("NUM_RECT_AREA" | "NUM_P
 export interface BakedLighting {
   /** Couleur × intensité de chaque groupe, partagées par toutes les matières du décor. */
   set(group: LightGroup, color: THREE.Color, k: number): void;
+  /** La lumière de la ville par les baies change de teinte avec x : `left` à gauche
+   * (x négatif), `right` à droite, fondu sur la largeur `width` (m). Multiplie la
+   * couleur du groupe « city ». */
+  setCitySides(left: THREE.Color, right: THREE.Color, width: number): void;
   /** Branche une matière du décor sur la lumière précalculée (atlas, uv1). */
   apply(mat: THREE.MeshStandardMaterial): THREE.MeshStandardMaterial;
   /** Idem, lumière stockée par sommet, pour les objets trop découpés pour l'atlas :
@@ -95,7 +99,17 @@ export function createBakedLighting(office: BakedOffice): BakedLighting {
   const tints = LIGHT_GROUPS.map(() => new THREE.Vector3());
   const uTints = { value: tints };
   const uLightB = { value: office.lightB };
+  const uCityL = { value: new THREE.Vector3(1, 1, 1) };
+  const uCityR = { value: new THREE.Vector3(1, 1, 1) };
+  const uCityW = { value: 1 };
+  const CITY_PARS = "uniform vec3 uCityL;\nuniform vec3 uCityR;\nuniform float uCityW;\nvarying float vBakedX;\n";
+  const citySide = "mix( uCityL, uCityR, smoothstep( -uCityW, uCityW, vBakedX ) )";
   return {
+    setCitySides(left, right, width) {
+      uCityL.value.set(left.r, left.g, left.b);
+      uCityR.value.set(right.r, right.g, right.b);
+      uCityW.value = width;
+    },
     set(group, color, k) {
       const i = LIGHT_GROUPS.indexOf(group);
       const s = office.scale[group] * k;
@@ -109,14 +123,17 @@ export function createBakedLighting(office: BakedOffice): BakedLighting {
         previous.call(mat, shader, renderer);
         shader.uniforms.uLightB = uLightB;
         shader.uniforms.uTints = uTints;
-        shader.vertexShader = noLights(shader.vertexShader);
+        shader.uniforms.uCityL = uCityL;
+        shader.uniforms.uCityR = uCityR;
+        shader.uniforms.uCityW = uCityW;
+        shader.vertexShader = noLights(shader.vertexShader.replace("void main() {", "varying float vBakedX;\nvoid main() {\n\tvBakedX = ( modelMatrix * vec4( position, 1.0 ) ).x;"));
         shader.fragmentShader = noLights(shader.fragmentShader)
-          .replace("void main() {", `uniform sampler2D uLightB;\nuniform vec3 uTints[ ${LIGHT_GROUPS.length} ];\nvoid main() {`)
+          .replace("void main() {", `uniform sampler2D uLightB;\nuniform vec3 uTints[ ${LIGHT_GROUPS.length} ];\n${CITY_PARS}void main() {`)
           .replace(
             "vec3 lightMapIrradiance = lightMapTexel.rgb * lightMapIntensity;",
             `vec3 lightMapB = texture2D( uLightB, vLightMapUv ).rgb;
             vec3 lightMapIrradiance = ( uTints[ 0 ] * lightMapTexel.r + uTints[ 1 ] * lightMapTexel.g + uTints[ 2 ] * lightMapTexel.b
-              + uTints[ 3 ] * lightMapB.r + uTints[ 4 ] * lightMapB.g + uTints[ 5 ] * lightMapB.b ) * lightMapIntensity;`,
+              + uTints[ 3 ] * lightMapB.r + uTints[ 4 ] * ${citySide} * lightMapB.g + uTints[ 5 ] * lightMapB.b ) * lightMapIntensity;`,
           );
       };
       const key = mat.customProgramCacheKey.bind(mat);
@@ -128,16 +145,19 @@ export function createBakedLighting(office: BakedOffice): BakedLighting {
       mat.onBeforeCompile = (shader, renderer) => {
         previous.call(mat, shader, renderer);
         shader.uniforms.uTints = uTints;
+        shader.uniforms.uCityL = uCityL;
+        shader.uniforms.uCityR = uCityR;
+        shader.uniforms.uCityW = uCityW;
         shader.vertexShader = noLights(
           shader.vertexShader
-            .replace("void main() {", "attribute vec4 color;\nattribute vec2 uv1;\nvarying vec4 vLmA;\nvarying vec2 vLmB;\nvoid main() {\n\tvLmA = color * 2.0;\n\tvLmB = uv1;"),
+            .replace("void main() {", "attribute vec4 color;\nattribute vec2 uv1;\nvarying vec4 vLmA;\nvarying vec2 vLmB;\nvarying float vBakedX;\nvoid main() {\n\tvLmA = color * 2.0;\n\tvLmB = uv1;\n\tvBakedX = ( modelMatrix * vec4( position, 1.0 ) ).x;"),
         );
         shader.fragmentShader = noLights(
           shader.fragmentShader
-            .replace("void main() {", `uniform vec3 uTints[ ${LIGHT_GROUPS.length} ];\nvarying vec4 vLmA;\nvarying vec2 vLmB;\nvoid main() {`)
+            .replace("void main() {", `uniform vec3 uTints[ ${LIGHT_GROUPS.length} ];\n${CITY_PARS}varying vec4 vLmA;\nvarying vec2 vLmB;\nvoid main() {`)
             .replace(
               "#include <lights_fragment_end>",
-              `irradiance += uTints[ 0 ] * vLmA.x + uTints[ 1 ] * vLmA.y + uTints[ 2 ] * vLmA.z + uTints[ 3 ] * vLmA.w + uTints[ 4 ] * vLmB.x + uTints[ 5 ] * vLmB.y;
+              `irradiance += uTints[ 0 ] * vLmA.x + uTints[ 1 ] * vLmA.y + uTints[ 2 ] * vLmA.z + uTints[ 3 ] * vLmA.w + uTints[ 4 ] * ${citySide} * vLmB.x + uTints[ 5 ] * vLmB.y;
               #include <lights_fragment_end>`,
             ),
         );

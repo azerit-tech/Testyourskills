@@ -1,0 +1,261 @@
+/* Le HUD de la plongée (SPEC §17.4, hud.ts) : étoiles de recherche, lignes du
+   dossier, radio, mini-carte, carton de fin. Posé par-dessus le canvas
+   (z-index 1), sous la carte HTML. Tout en DOM, rien dans la scène. */
+.dive-hud {
+  --hud-accent: #ff3fa4;
+  --hud-pink: #ff3fa4;
+  --hud-orange: #ff7a3d;
+  --hud-yellow: #ffd23f;
+  --hud-violet: #7b3fe4;
+  --hud-star: #fff4e0;
+  --hud-sunset: linear-gradient(135deg, #ffd23f 0%, #ff7a3d 32%, #ff3fa4 66%, #7b3fe4 100%);
+  --hud-pad: clamp(14px, 3vw, 34px);
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  font-family: "Barlow Condensed", "Arial Narrow", sans-serif;
+  color: #f3f1ff;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+  visibility: hidden;
+}
+.dive-hud.is-on {
+  visibility: visible;
+}
+
+/* les étoiles de recherche */
+.dive-hud__stars {
+  position: absolute;
+  top: calc(var(--hud-pad) + env(safe-area-inset-top, 0px));
+  right: var(--hud-pad);
+  display: flex;
+  gap: clamp(3px, 0.6vw, 7px);
+}
+.dive-hud__stars svg {
+  width: clamp(22px, 3.2vw, 34px);
+  height: clamp(22px, 3.2vw, 34px);
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.28);
+  stroke-width: 1.3;
+  transition: fill 0.25s, stroke 0.25s;
+}
+.dive-hud__stars svg.is-on {
+  fill: var(--hud-star);
+  stroke: var(--hud-star);
+  filter: drop-shadow(0 0 7px rgba(255, 63, 164, 0.9)) drop-shadow(0 0 2px rgba(255, 244, 224, 0.9));
+}
+.dive-hud__stars svg.is-pop {
+  animation: dive-star-pop 0.55s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+@keyframes dive-star-pop {
+  0% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+  40% {
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* les lignes du dossier */
+.dive-hud__lines {
+  position: absolute;
+  top: calc(var(--hud-pad) + env(safe-area-inset-top, 0px));
+  left: var(--hud-pad);
+  display: grid;
+  gap: clamp(6px, 1vw, 10px);
+}
+.dive-hud__line {
+  display: grid;
+  opacity: 0;
+  transform: translateX(-18px);
+  transition: opacity 0.45s ease, transform 0.45s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+.dive-hud__line.is-in {
+  opacity: 1;
+  transform: none;
+}
+.dive-hud__line span {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: clamp(9px, 1vw, 11px);
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(243, 241, 255, 0.6);
+}
+.dive-hud__line b {
+  font-weight: 700;
+  font-size: clamp(22px, 3vw, 34px);
+  line-height: 1;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+}
+
+/* la radio */
+.dive-hud__radio {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--hud-pad) + 12px + env(safe-area-inset-bottom, 0px));
+  transform: translate(-50%, 8px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  background: rgba(6, 6, 22, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(6px);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: clamp(11px, 1.2vw, 13px);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.2s;
+}
+.dive-hud__radio.is-in {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+.dive-hud__radio i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--hud-pink);
+  box-shadow: 0 0 8px var(--hud-pink);
+  animation: dive-blink 0.9s steps(2) infinite;
+}
+.dive-hud__dispatch {
+  color: rgba(243, 241, 255, 0.55);
+}
+.dive-hud__radio.is-glitch .dive-hud__msg {
+  animation: dive-glitch 0.35s steps(5) both;
+}
+@keyframes dive-blink {
+  to {
+    opacity: 0.2;
+  }
+}
+@keyframes dive-glitch {
+  0% {
+    opacity: 0.2;
+    transform: translateX(-3px);
+  }
+  40% {
+    opacity: 1;
+    transform: translateX(2px);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+/* la mini-carte */
+.dive-hud__map {
+  position: absolute;
+  left: var(--hud-pad);
+  bottom: calc(var(--hud-pad) + env(safe-area-inset-bottom, 0px));
+  width: clamp(96px, 13vw, 150px);
+  height: clamp(96px, 13vw, 150px);
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+.dive-hud__map canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.dive-hud__cone {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 60%;
+  height: 50%;
+  transform: translate(-50%, -100%);
+  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.07));
+  clip-path: polygon(30% 100%, 70% 100%, 100% 0, 0 0);
+}
+
+/* le carton de fin de mission */
+.dive-hud__mission {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+}
+.dive-hud__band {
+  width: 100%;
+  padding: clamp(18px, 3vh, 34px) 16px;
+  text-align: center;
+  background: linear-gradient(90deg, rgba(5, 5, 20, 0) 0%, rgba(5, 5, 20, 0.78) 18%, rgba(5, 5, 20, 0.78) 82%, rgba(5, 5, 20, 0) 100%);
+}
+.dive-hud__title {
+  font-weight: 800;
+  font-size: clamp(56px, 13vw, 170px);
+  line-height: 0.9;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  background: var(--hud-sunset);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.55)) drop-shadow(0 0 28px rgba(255, 63, 164, 0.35));
+  transform: scale(1.08);
+  transition: transform 0.5s cubic-bezier(0.2, 1.2, 0.3, 1), letter-spacing 0.6s ease;
+}
+.dive-hud__mission.is-in .dive-hud__title {
+  transform: scale(1);
+  letter-spacing: 0.04em;
+}
+.dive-hud__score {
+  margin-top: 10px;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: clamp(10px, 1.1vw, 12px);
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(243, 241, 255, 0.7);
+}
+.dive-hud__score b {
+  font-family: "Barlow Condensed", "Arial Narrow", sans-serif;
+  font-weight: 800;
+  font-size: clamp(30px, 5vw, 56px);
+  line-height: 1;
+  letter-spacing: 0;
+  color: #fff;
+}
+
+@media (max-width: 560px) {
+  .dive-hud__lines {
+    max-width: 58vw;
+  }
+  .dive-hud__line b {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .dive-hud__radio {
+    max-width: calc(100vw - 32px);
+    white-space: normal;
+    text-align: center;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dive-hud__stars svg.is-pop,
+  .dive-hud__radio i,
+  .dive-hud__radio.is-glitch .dive-hud__msg {
+    animation: none;
+  }
+}

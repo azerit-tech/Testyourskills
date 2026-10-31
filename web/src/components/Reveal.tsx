@@ -1,5 +1,5 @@
-// Révélation (§6.3) : la machine à états autour de la scène 3D (Walkout3D).
-// « ready » : le pack flotte, clic ou délai pour ouvrir. « playing » : la
+// Révélation (§17.4) : la machine à états autour de la scène 3D (Walkout3D).
+// « ready » : le ciel et le HUD, clic ou délai pour plonger. « playing » : la
 // séquence 3D joue. « handoff » : la carte HTML apparaît par-dessus la carte 3D
 // posée au même endroit, le canvas s'efface. « done » : la page vit.
 // Sautable d'un clic, désactivée en mouvement réduit.
@@ -35,7 +35,7 @@ export function useReveal(animate: boolean) {
 
   useEffect(() => {
     if (!animate) return;
-    // Mode démo : ?freeze=ready garde le pack fermé, pour la mise au point.
+    // Mode démo : ?freeze=ready reste dans le ciel, pour la mise au point.
     if (isMock() && new URLSearchParams(window.location.search).get("freeze") === "ready") return;
     const id = window.setTimeout(open, AUTO_OPEN);
     return () => window.clearTimeout(id);
