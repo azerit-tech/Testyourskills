@@ -3,7 +3,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { CardData, Fact, JobState, ProgressEvent } from "../../../shared/types";
-import { styleOf } from "../../../shared/types";
+import { LEVEL_LABELS, starsFor } from "../../../shared/types";
 import { AddSource, AzeritCta, Contest, DeleteCard, EmailForm, LinkedInPhoto, Roast, ShareBar, Why, useToast } from "../components/After";
 import type { Shareable } from "../components/After";
 import { ComparisonStage } from "../components/Comparison";
@@ -284,7 +284,7 @@ function Result({ item, animate, owner, fresh, notice, onDeleted }: ResultProps)
           </button>
         )}
         <p className="sr-only" aria-live="polite">
-          {settled ? t.reveal.revealed(t.tiers[styleOf(main)], main.overall) : ""}
+          {settled ? t.reveal.revealed(LEVEL_LABELS[starsFor(main.overall)][lang], main.overall) : ""}
         </p>
       </section>
 
