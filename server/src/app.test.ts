@@ -93,7 +93,7 @@ function setup(over: Partial<Deps> = {}, appOver: Partial<AppOptions> = {}) {
       const deltas = Object.fromEntries(
         cv.stats.map((s) => [s.code, github.stats.find((g) => g.code === s.code)!.value - s.value]),
       ) as Record<StatCode, number>;
-      return { cv, github, deltas, headline: { fr: "Ton CV te vend 7 points de plus que ton code", en: "Your CV sells you 7 points above your code" } };
+      return { cv, github, deltas, headline: { fr: "Ton CV a volé 7 points à ton code", en: "Your CV stole 7 points from your code" } };
     },
     async renderImage(input) {
       calls.render.push(input.format + ":" + (input.card ? "card" : "comparison"));
@@ -555,7 +555,7 @@ describe("page /c/:id et images", () => {
     await ctx.pipeline.wait(json.id);
     const html = await (await ctx.app.request(`/c/${json.id}`)).text();
     // Demandée en anglais (postCv envoie lang=en).
-    expect(html).toContain("Your CV sells you 7 points above your code — Léa Martin-Dubois");
+    expect(html).toContain("Your CV stole 7 points from your code — Léa Martin-Dubois");
     expect(html).toContain('<meta property="og:locale" content="en_US">');
     expect(html).toContain(`/og/${json.id}.png`);
     const png = await ctx.app.request(`/og/${json.id}-portrait.png`);

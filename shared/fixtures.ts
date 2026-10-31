@@ -98,7 +98,7 @@ export const FIXTURE_COMPARISON: ComparisonData = (() => {
     deltas,
     headline:
       n > 0
-        ? { fr: `Ton CV te vend ${n} points de plus que ton code`, en: `Your CV sells you ${n} points above your code` }
-        : { fr: `Ton code vaut ${-n} points de plus que ton CV, change de CV`, en: `Your code is worth ${-n} points more than your CV. Rewrite the CV.` },
+        ? { fr: `Ton CV a volé ${n} points à ton code`, en: `Your CV stole ${n} points from your code` }
+        : { fr: `Ton code vaut ${-n} points de plus que ton CV. Change de CV.`, en: `Your code is worth ${-n} points more than your CV. Rewrite the CV.` },
   };
 })();
