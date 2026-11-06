@@ -670,5 +670,5 @@ Jacques a dit « vasy », puis, la plongée à peine commitée : « l'ascenseur 
 
 **Non vérifié** : le rendu téléphone de la fiche, de l'attente et de l'accueil (le redimensionnement de fenêtre de Chrome par l'outil n'a pas pris, trois fois) ; à regarder sur un vrai téléphone.
 
-**Reste à faire** : les illustrations et l'essai de portrait dès que le solde OpenRouter le permet, la vérification mobile, la réécriture des §3, §6 et §8 à partir de ce journal.
+**Reste à faire** : le précalcul de l'open space (`blender -b -P tools/bake/office.py -- --cpu`, plusieurs heures de processeur), repoussé par Jacques le 6 novembre 2026 aux touches finales : `office.py` a déjà le bureau à 1,06 m, le fauteuil repoussé et le dev debout, mais `office.glb` et ses cartes d'éclairage gardent les ombres du poste assis ; les illustrations et l'essai de portrait dès que le solde OpenRouter le permet, la vérification mobile, la réécriture des §3, §6 et §8 à partir de ce journal.
 
