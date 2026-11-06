@@ -71,13 +71,35 @@ MODELS = [
     {"polyhaven": "office_notepads", "out": "postit.glb", "size": ("width", 0.072), "face": 0, "keep": r"_sticky_stack$", "tex": 512},
     {"polyhaven": "stationery_supplies", "out": "pen.glb", "size": ("width", 0.131), "face": 0, "keep": r"_pen_fancy$", "tex": 512},
     {"polyhaven": "potted_plant_04", "out": "desk-plant.glb", "size": ("height", 0.22), "face": 0, "tex": 512, "decimate": 0.6},
-    # Le dev : un humain scanné, riggé (squelette complet, doigts, yeux), sans son animation de marche.
-    # Renderpeople, CC BY 4.0. Il regarde vers +z three.js ; la scène le pose assis (web/src/three/player.ts).
-    {"uid": "143a2b1ea5eb4385ae90a73657aca3bc", "out": "developer-v3.glb", "size": ("height", 1.78), "rigged": True},
+    # Le dev : un personnage Character Creator riggé (squelette complet, doigts, yeux), sans son
+    # animation ni ses brassards de combat, sans la peau des jambes (le pantalon la couvre et elle le
+    # traversait aux genoux une fois assis) ; lacets et coutures des baskets allégés.
+    # Jungle Jim, CC BY 4.0. Il regarde vers +z three.js ; la scène le pose assis (web/src/three/player.ts).
+    {"uid": "dbf9fe0cb81d4758ad2525a56d10e2fc", "out": "developer-v4.glb", "size": ("height", 1.8), "rigged": True,
+     "drop": r"^(OSteel_|Std_Skin_Leg$)", "decimate": (r"^G8FLincolnSocks_Shape_(Laces|InnerPadding|LaceBrace|SockBody)", 0.25)},
     # La cabine d'ascenseur : un vrai projet de cabine de bureaux (verre blanc laqué, inox brossé,
     # plafond lumineux, boîte à boutons). JNKM Design (Josh Nelson), CC BY 4.0. Voir prepare_cabin.
     {"uid": "be05f33b31dc4b4ebf7ad7ff4cea1631", "out": "cabin.glb", "cabin": True},
 ]
+
+# Les os de Character Creator sous les noms de Renderpeople, ceux que pose
+# web/src/three/player.ts. Les os de torsion, de partage (coude, genou) et du
+# visage gardent leur nom et suivent leur parent. L'avant-bras porte deux os de
+# torsion : le second, entre le coude et le poignet, prend la pronation.
+CC_BONES = {
+    "Hip": "hip", "Waist": "spine_01", "Spine01": "spine_02", "Spine02": "spine_03",
+    "NeckTwist01": "neck", "Head": "head",
+    **{
+        k.replace("#", s.upper()): v.replace("#", s)
+        for s in "lr"
+        for k, v in {
+            "#_Eye": "eye_#", "#_Clavicle": "shoulder_#", "#_Upperarm": "upperarm_#", "#_Forearm": "lowerarm_#",
+            "#_ForearmTwist02": "lowerarm_twist_#", "#_Hand": "hand_#",
+            "#_Thigh": "upperleg_#", "#_Calf": "lowerleg_#", "#_Foot": "foot_#", "#_ToeBase": "ball_#",
+            **{f"#_{cc}{i}": f"{rp}_0{i}_#" for cc, rp in (("Index", "index"), ("Mid", "middle"), ("Ring", "ring"), ("Pinky", "pinky"), ("Thumb", "thumb")) for i in (1, 2, 3)},
+        }.items()
+    },
+}
 
 # La cabine, aux cotes de la scène (web/src/three/cabin.ts) : portes de 2,1 m
 # de haut, la face intérieure de la façade en z = 0, la cabine vers +z.
@@ -208,14 +230,30 @@ def prepare_rigged(spec):
     prefix = os.path.commonprefix([b.name for b in named])
     for b in named:
         b.name = re.sub(r"_\d+$", "", b.name[len(prefix):])
+    # un squelette Character Creator (« CC_Base_L_Forearm ») prend les noms de web/src/three/player.ts
+    for b in named:
+        b.name = CC_BONES.get(b.name, b.name)
     # les nœuds d'emballage de Sketchfab et les formes de bones de l'import
     bpy.ops.object.select_all(action="DESELECT")
     arm.select_set(True)
     bpy.context.view_layer.objects.active = arm
     bpy.ops.object.parent_clear(type="CLEAR_KEEP_TRANSFORM")
     for o in list(bpy.data.objects):
-        if o is not arm and o not in body:
+        # (les pièces se reconnaissent au nom de leur maillage ou de leur matière : Sketchfab numérote les objets)
+        if o is not arm and o not in body or "drop" in spec and o.type == "MESH" and any(re.search(spec["drop"], n) for n in [o.data.name, *(m.name for m in o.data.materials if m)]):
             bpy.data.objects.remove(o)
+    body = [o for o in bpy.data.objects if o.type == "MESH"]
+    for o in body:
+        # les expressions du visage (148 formes par maillage chez Character Creator) pèseraient
+        # plusieurs mégaoctets : la scène anime le visage par les os
+        o.shape_key_clear()
+        if "decimate" in spec and re.search(spec["decimate"][0], o.data.name):
+            # avant le squelette : les poids des sommets restants sont interpolés
+            mod = o.modifiers.new("decimate", "DECIMATE")
+            mod.ratio = spec["decimate"][1]
+            with bpy.context.temp_override(object=o, active_object=o, selected_objects=[o]):
+                bpy.ops.object.modifier_move_to_index(modifier=mod.name, index=0)
+                bpy.ops.object.modifier_apply(modifier=mod.name)
     bpy.context.view_layer.update()
     vs = [b.matrix_world @ v.co for b in body for v in b.data.vertices]
     lo = Vector([min(v[i] for v in vs) for i in range(3)])
@@ -715,7 +753,10 @@ def prepare_cabin(spec):
 
 def prepare(spec):
     bpy.ops.wm.read_factory_settings(use_empty=True)
-    bpy.ops.import_scene.gltf(filepath=fetch(spec))
+    # un personnage : la pose de repos vient des nœuds, pas des matrices de liaison ; chez Character
+    # Creator, la cuisse, le bras et l'avant-bras ne pèsent sur aucun sommet (leurs os de torsion le
+    # font) et leur matrice de liaison les mettrait à l'origine
+    bpy.ops.import_scene.gltf(filepath=fetch(spec), guess_original_bind_pose=not spec.get("rigged"))
     if spec.get("rigged"):
         return prepare_rigged(spec)
     if spec.get("cabin"):
