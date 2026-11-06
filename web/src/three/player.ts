@@ -38,9 +38,13 @@ const HIP: V3 = [0, 0.545, 0.0];
 /** Les poignets sur le clavier (la rangée de repos), une main de chaque côté du bloc des lettres. */
 const KEYS_L: V3 = [0.15, 0.825, 0.32];
 const KEYS_R: V3 = [-0.06, 0.825, 0.32];
-/** Les poignets posés sur les cuisses, une fois tourné (des cuisses épaisses : les mains restent dessus). */
-const LAP_L: V3 = [0.15, 0.75, 0.22];
-const LAP_R: V3 = [-0.15, 0.75, 0.22];
+/** Une fois tourné, adossé : le poignet gauche sur le bout de l'accoudoir (son dessus est à 0,75 m,
+ * entre x = 0,27 et 0,34), la main droite à plat sur la cuisse, épaisse : elle reste dessus. */
+const LAP_L: V3 = [0.3, 0.79, 0.07];
+const LAP_R: V3 = [-0.14, 0.75, 0.2];
+/** La direction des doigts une fois tourné : droit devant sur l'accoudoir, vers le genou sur la cuisse. */
+const LAP_DIR_L: V3 = [-0.05, -0.3, 1];
+const LAP_DIR_R: V3 = [0.2, -0.5, 1];
 /** Les chevilles, pieds à plat. */
 const ANKLE_L: V3 = [0.15, 0.085, 0.36];
 const ANKLE_R: V3 = [-0.14, 0.085, 0.33];
@@ -220,6 +224,7 @@ export function createPlayer(gltf: GLTF): Player {
       footDir: restDir(`foot_${s}`, `ball_${s}`),
       keys: V(...(s === "l" ? KEYS_L : KEYS_R)),
       lap: V(...(s === "l" ? LAP_L : LAP_R)),
+      lapDir: V(...(s === "l" ? LAP_DIR_L : LAP_DIR_R)),
       ankle: V(...(s === "l" ? ANKLE_L : ANKLE_R)),
     };
   };
@@ -302,7 +307,7 @@ export function createPlayer(gltf: GLTF): Player {
     const sway = 0.02 * drift(t, 0.31, 1);
     orient(hips, fromAngles(q2, -0.1, sway * 0.5, 0));
     // penché vers l'écran en tapant, redressé et adossé une fois tourné
-    const lean = 0.2 * typing + 0.03 * (1 - typing) - 0.02 * turned + 0.02 * drift(t, 0.23, 3);
+    const lean = 0.2 * typing + 0.03 * (1 - typing) - 0.1 * turned + 0.02 * drift(t, 0.23, 3);
     const yaw = sway - 0.18 * swing;
     const roll = 0.015 * drift(t, 0.19, 7);
     spine.forEach((b, i) => {
@@ -324,6 +329,8 @@ export function createPlayer(gltf: GLTF): Player {
       hp += (cp - hp) * w;
     }
     hy += 0.02 * drift(t, 0.6, 11);
+    // tourné, adossé : le menton baisse un peu, il regarde la caméra par en dessous
+    hp += 0.09 * turned;
     hp += 0.015 * drift(t, 0.8, 13) + 0.008 * breath;
     const hr = 0.03 * drift(t, 0.27, 17) + 0.04 * turned;
     orient(neck, fromAngles(q2, hp * 0.4 + lean * 0.5, hy * 0.45, hr * 0.5));
@@ -373,7 +380,7 @@ export function createPlayer(gltf: GLTF): Player {
       orient(s.fore, frameRotation(q, s.armDir, PALM, d, n));
       if (s.twist) orient(s.twist, frameRotation(q, s.armDir, PALM, d, n2));
       // la main : doigts vers le clavier (ou le long de la cuisse), légèrement fléchie
-      d.set(-sg * 0.18, -0.42 - 0.12 * dip, 1).lerp(tmp.set(-sg * 0.2, -0.5, 1), 1 - typing);
+      d.set(-sg * 0.18, -0.42 - 0.12 * dip, 1).lerp(s.lapDir, 1 - typing);
       orient(s.hand, frameRotation(q, s.handDir, PALM, d, n2));
       s.fingers.forEach((seg, f) => {
         let extra = 0;
