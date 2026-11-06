@@ -852,6 +852,11 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
     K(plan.doors + 0.35, V(0, 1.5, 1.95), V(0, 1.4, -6), 58),
     K(plan.doors + 2.0, V(0, 1.53, -1.5), V(0, 1.2, DESK_Z), 44),
     K(T_TURN - 0.4, V(0, 1.51, -2.9), V(0, 1.25, DESK_Z), 41),
+    // le dev se retourne : l'objectif se resserre sur lui, à mi-corps, comme le portrait d'un
+    // personnage qu'on retrouve ; il tient pendant le carton, puis s'ouvre quand la carte naît
+    K(T_TURN + 0.65, V(0, 1.5, -3.0), V(0, 1.1, DESK_Z), 13),
+    K(plan.mission[1] - 0.45, V(0, 1.5, -3.08), V(0, 1.12, DESK_Z), 11.5),
+    K(T_CARD + 0.35, V(0, 1.5, -3.15), V(0, 1.42, CARD_POS.z - 2), 38),
     K(T_SETTLE, F_POS.clone(), V(F_POS.x, F_POS.y, F_POS.z - 10), 40),
   ];
   /** Tangente monotone : nulle quand la courbe change de sens, pour ne jamais dépasser une image-clé. */
@@ -1023,7 +1028,8 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
     }
     path.instanceColor!.needsUpdate = true;
     heroSpot.intensity = 28 * seg(t, plan.doors + 0.5, 0.8) * dim;
-    neonL.intensity = neonR.intensity = 14 * seg(t, plan.doors + 0.6, 0.8) * dim;
+    // une fois retourné, les néons sont derrière lui : ils le détourent, comme les enseignes de la rue
+    neonL.intensity = neonR.intensity = (14 + 18 * inOut(seg(t, T_TURN, 0.9))) * seg(t, plan.doors + 0.6, 0.8) * dim;
 
     /* le pack */
     if (t < T_BURST + 0.45) {
