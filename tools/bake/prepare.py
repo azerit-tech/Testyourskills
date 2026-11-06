@@ -53,8 +53,8 @@ MODELS = [
     {"uid": "093e9b607a4544818e0c169074037e5f", "out": "lamp.glb", "size": ("height", 0.46), "face": 0, "drop": r"^Object_(2|5|7)$"},
     # Bureau assis-debout à piètement noir (colonnes télescopiques, pieds en T,
     # boîtier de commande) ; le plateau, à part et nommé « top », reçoit le noyer
-    # de la scène. Chairsolutions, CC BY 4.0.
-    {"uid": "b7341ee22ddd43efaef9ad3016a224f3", "out": "desk.glb", "size": ("width", 2.2), "face": 180, "top": r"^Object_1[56]$", "top_at": 0.7725, "lift": (0.15, 0.35), "decimate": 0.4},
+    # de la scène, réglé à hauteur debout (le dev tape debout). Chairsolutions, CC BY 4.0.
+    {"uid": "b7341ee22ddd43efaef9ad3016a224f3", "out": "desk.glb", "size": ("width", 2.2), "face": 180, "top": r"^Object_1[56]$", "top_at": 1.06, "lift": (0.15, 0.35), "decimate": 0.4},
     # Souris Logitech MX Master 3S, scannée (Scaniverse), allégée. Zhirayr, CC BY 4.0.
     {"uid": "be1d82499209475c8cd1d009df9aaa00", "out": "mouse.glb", "size": ("depth", 0.125), "face": 0, "decimate": 0.15},
     # Sous-main de bureau. mfk, CC BY 4.0.

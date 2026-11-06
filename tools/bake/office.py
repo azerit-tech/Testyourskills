@@ -319,29 +319,30 @@ def pbox(w, h, d, lx, ly, lz, rx=0.0):
     box("proxy", w, h, d, *ws(lx, ly, lz), rx=-rx)
 
 
-pbox(2.45, 0.065, 0.9, 0, Y0 + 0.74, 0.75)  # plateau
+# le plateau est réglé à hauteur debout : 1,06 m au lieu de 77 cm (workstation.ts, LIFT)
+LIFT = 1.06 - 0.7725
+pbox(2.45, 0.065, 0.9, 0, Y0 + 0.74 + LIFT, 0.75)  # plateau
 for lx in (-1.04, 1.04):
-    pbox(0.055, 0.7, 0.055, lx, Y0 + 0.35, 0.46)
-    pbox(0.055, 0.7, 0.055, lx, Y0 + 0.35, 1.04)
+    pbox(0.055, 0.7 + LIFT, 0.055, lx, Y0 + (0.7 + LIFT) / 2, 0.46)
+    pbox(0.055, 0.7 + LIFT, 0.055, lx, Y0 + (0.7 + LIFT) / 2, 1.04)
     pbox(0.065, 0.045, 0.68, lx, Y0 + 0.045, 0.75)
-pbox(2.08, 0.065, 0.045, 0, Y0 + 0.65, 1.04)
+pbox(2.08, 0.065, 0.045, 0, Y0 + 0.65 + LIFT, 1.04)
 for mx, mz, w, h in ((0, 1.0, 0.79, 0.445), (-0.71, 0.88, 0.57, 0.34), (0.71, 0.88, 0.57, 0.34)):
-    pbox(w + 0.025, h + 0.025, 0.025, mx, Y0 + 1.14, mz)
-    pbox(0.04, 0.24, 0.03, mx, Y0 + 0.88, mz + 0.03)
-    pbox(0.22, 0.012, 0.14, mx, Y0 + 0.765, mz + 0.02)
-pbox(0.44, 0.018, 0.15, 0.02, Y0 + 0.791, 0.5)  # clavier
-pbox(0.17, 0.018, 0.17, 1.03, Y0 + 0.79, 0.88)  # lampe
-pbox(0.018, 0.52, 0.018, 1.03, Y0 + 1.05, 0.88)
-pbox(0.32, 0.03, 0.09, 0.9, Y0 + 1.31, 0.88)
-cylinder("proxy", 0.04, 0.036, 0.1, *ws(-0.76, Y0 + 0.823, 0.5), seg=12)  # tasse
-# le fauteuil (le même modèle, complet) et le dev assis, de dos
-put("proxy", load_model(CHAIR), Matrix.Translation(ws(0, Y0, -0.02)))
-pbox(0.36, 0.5, 0.22, 0, Y0 + 0.88, -0.12, rx=0.08)  # buste
-ellipsoid("proxy", 0.09, 0.12, 0.1, Matrix.Translation(ws(0, Y0 + 1.3, -0.08)))  # tête
+    pbox(w + 0.025, h + 0.025, 0.025, mx, Y0 + 1.14 + LIFT, mz)
+    pbox(0.04, 0.24, 0.03, mx, Y0 + 0.88 + LIFT, mz + 0.03)
+    pbox(0.22, 0.012, 0.14, mx, Y0 + 0.765 + LIFT, mz + 0.02)
+pbox(0.44, 0.018, 0.15, 0.02, Y0 + 0.791 + LIFT, 0.5)  # clavier
+pbox(0.17, 0.018, 0.17, 1.03, Y0 + 0.79 + LIFT, 0.88)  # lampe
+pbox(0.018, 0.52, 0.018, 1.03, Y0 + 1.05 + LIFT, 0.88)
+pbox(0.32, 0.03, 0.09, 0.9, Y0 + 1.31 + LIFT, 0.88)
+cylinder("proxy", 0.04, 0.036, 0.1, *ws(-0.76, Y0 + 0.823 + LIFT, 0.5), seg=12)  # tasse
+# le fauteuil (le même modèle, complet), repoussé sur la droite du dev, et le dev debout, de dos
+put("proxy", load_model(CHAIR), three_matrix(*ws(-1.05, Y0, -0.3), ry=-0.7))
+pbox(0.4, 0.6, 0.26, 0, Y0 + 1.2, 0.1)  # buste
+ellipsoid("proxy", 0.09, 0.12, 0.1, Matrix.Translation(ws(0, Y0 + 1.66, 0.12)))  # tête
 for sx in (-1, 1):
-    pbox(0.14, 0.13, 0.45, sx * 0.11, Y0 + 0.56, 0.2)  # cuisses
-    pbox(0.1, 0.46, 0.11, sx * 0.11, Y0 + 0.26, 0.42)  # jambes
-    pbox(0.08, 0.08, 0.36, sx * 0.22, Y0 + 0.85, 0.2)  # bras vers le clavier
+    pbox(0.15, 0.9, 0.16, sx * 0.11, Y0 + 0.47, 0.12)  # jambes
+    pbox(0.08, 0.08, 0.3, sx * 0.22, Y0 + 1.12, 0.3)  # bras vers le clavier
 
 # ---------- objets Blender ----------
 objects = {}
@@ -536,7 +537,7 @@ for dx, dz, face, row, _zc in desk_spots:
 pendant_light("hero", 0, DESK_Z - 0.5, 2.8, 0.12, 2.75, 110, 40)
 spot_pos = Vector((-1.8, CEIL - 0.1, DESK_Z + 1.8))
 add_light("hero", "SPOT", spot_pos, Vector((0, 0.6, DESK_Z)) - spot_pos, 220, spot=(2 * 0.72, 0.85))
-add_light("hero", "POINT", ws(0.87, Y0 + 1.24, 0.78), (0, -1, 0), 8, (0.04, 0.04))
+add_light("hero", "POINT", ws(0.87, Y0 + 1.24 + LIFT, 0.78), (0, -1, 0), 8, (0.04, 0.04))
 add_light("hero", "AREA", (0, 1.1, -0.04), (0, 0, -1), 60, (0.95, 2.0))
 
 # la ville : la nuit qui entre par les baies, le contre-jour bleuté sur le
@@ -545,7 +546,7 @@ add_light("city", "AREA", (0, (CEIL - 0.25) / 2, WIN_Z + 0.06), (0, -0.1, 1), 22
 win_pos = Vector((2.5, 2.8, DESK_Z - 2.4))
 add_light("city", "SPOT", win_pos, Vector((0, 0.9, DESK_Z)) - win_pos, 90, spot=(2 * 0.85, 0.9))
 for mx, mz, w, h in ((0, 1.0, 0.79, 0.445), (-0.71, 0.88, 0.57, 0.34), (0.71, 0.88, 0.57, 0.34)):
-    add_light("city", "AREA", ws(mx, Y0 + 1.14, mz - 0.03), (0, 0, 1), 4, (w, h))
+    add_light("city", "AREA", ws(mx, Y0 + 1.14 + LIFT, mz - 0.03), (0, 0, 1), 4, (w, h))
 
 # le liseré du tier au pied des murs et les plots de l'allée
 for sx in (-1, 1):

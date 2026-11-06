@@ -167,10 +167,12 @@ export function createWorkstation(o: { accent: string; lang?: string; login: str
 
   // le tapis est dans le décor précalculé (tools/bake/office.py), 2 cm d'épaisseur
   const Y0 = 0.02;
-  const TOP = Y0 + 0.7725; // le dessus du plateau
+  /** De combien le plateau est monté de la hauteur assise (77 cm) à la hauteur debout. */
+  const LIFT = 1.06 - 0.7725;
+  const TOP = Y0 + 1.06; // le dessus du plateau
 
   // Le bureau assis-debout (Chairsolutions Ascend) : plateau de 2,2 × 0,84 m, colonnes
-  // télescopiques réglées pour un plateau à 77 cm. Plateau en noyer, tout le
+  // télescopiques réglées pour un plateau à 1,06 m : le dev tape debout. Plateau en noyer, tout le
   // reste en acier poudré noir sauf l'afficheur du boîtier de commande.
   const desk = place(o.props.desk, 0, Y0, 0.75);
   tint(desk, (m, mesh) => {
@@ -219,7 +221,7 @@ export function createWorkstation(o: { accent: string; lang?: string; login: str
   });
   group.add(lamp);
   const lampLight = new THREE.PointLight(0xffd1a0, 0, 2.2, 2);
-  lampLight.position.set(0.83, Y0 + 1.24, 0.8);
+  lampLight.position.set(0.83, Y0 + 1.24 + LIFT, 0.8);
   group.add(lampLight);
 
   // trois écrans face au dev
@@ -249,17 +251,19 @@ export function createWorkstation(o: { accent: string; lang?: string; login: str
   addMonitor(-0.71, 0.88, -0.28, "term");
   addMonitor(0.71, 0.88, 0.28, "graph");
 
-  // le fauteuil (Sketchfab, CC BY), tourné vers les écrans ; il pivote avec le dev
+  // le dev se tient debout dans ce groupe, qui pivote avec lui ; le fauteuil (Sketchfab, CC BY)
+  // ne lui sert plus : repoussé sur sa droite, de biais, comme on le laisse en se levant
   const swivel = new THREE.Group();
+  swivel.position.z = 0.12;
   group.add(swivel);
-  o.chair.rotation.y = Math.PI;
-  o.chair.position.set(0, Y0, -0.02);
-  swivel.add(o.chair);
+  o.chair.rotation.y = Math.PI - 0.7;
+  o.chair.position.set(-1.05, Y0, -0.3);
+  group.add(o.chair);
 
   // la lumière des écrans sur le dev
   const screenLight = new THREE.SpotLight(0x9cc4ff, 0, 4, 0.9, 0.8, 1.5);
-  screenLight.position.set(0, Y0 + 1.15, 0.9);
-  screenLight.target.position.set(0, Y0 + 1.0, -0.2);
+  screenLight.position.set(0, Y0 + 1.15 + LIFT, 0.9);
+  screenLight.target.position.set(0, Y0 + 1.45, -0.2);
   group.add(screenLight, screenLight.target);
 
   /* ---------- les écrans ---------- */

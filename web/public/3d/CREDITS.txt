@@ -47,9 +47,9 @@ desk.glb
 "(CS) Ascend - Sit-stand, Workstation, Black" by chairsolutions, CC BY 4.0.
 https://sketchfab.com/3d-models/cs-ascend-sit-stand-workstation-black-b7341ee22ddd43efaef9ad3016a224f3
 Changes: rescaled to 2.2 m, reoriented, simplified (decimated); columns
-shortened so the top sits at 77 cm; desktop split off with UVs in metres; the
-renderer gives the desktop the walnut veneer below and the frame a black
-powder coat.
+lengthened so the top sits at standing height, 1.06 m; desktop split off
+with UVs in metres; the renderer gives the desktop the walnut veneer below
+and the frame a black powder coat.
 
 mouse.glb
 "Logitech MX Master 3S by Scaniverse" by Zhirayr, CC BY 4.0.
