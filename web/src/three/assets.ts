@@ -113,7 +113,7 @@ export function preloadWalkoutAssets(): Promise<WalkoutAssets> {
           console.warn("[walkout] city.webp indisponible, nuit unie derrière les baies", error);
           return plainNight();
         }),
-      gltf.loadAsync(BASE + "developer-v3.glb"),
+      gltf.loadAsync(BASE + "developer-v4.glb"),
       new FontLoader().loadAsync(BASE + "barlow-800.typeface.json"),
       surface(tex, "walnut"),
       bakedOffice(gltf),

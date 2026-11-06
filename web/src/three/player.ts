@@ -1,4 +1,4 @@
-// Le dev : un humain scanné et riggé (Renderpeople, CC BY ; tools/bake/prepare.py),
+// Le dev : un personnage Character Creator riggé (Jungle Jim, CC BY ; tools/bake/prepare.py),
 // posé assis et animé par code. Chaque os reçoit une orientation exprimée
 // dans le repère du personnage, par rapport à sa pose de repos (en T) : bras
 // et jambes par cinématique inverse à deux segments (mains sur le clavier,
@@ -38,9 +38,9 @@ const HIP: V3 = [0, 0.545, 0.0];
 /** Les poignets sur le clavier (la rangée de repos), une main de chaque côté du bloc des lettres. */
 const KEYS_L: V3 = [0.15, 0.825, 0.32];
 const KEYS_R: V3 = [-0.06, 0.825, 0.32];
-/** Les poignets posés sur les cuisses, une fois tourné. */
-const LAP_L: V3 = [0.13, 0.69, 0.2];
-const LAP_R: V3 = [-0.13, 0.69, 0.2];
+/** Les poignets posés sur les cuisses, une fois tourné (des cuisses épaisses : les mains restent dessus). */
+const LAP_L: V3 = [0.15, 0.75, 0.22];
+const LAP_R: V3 = [-0.15, 0.75, 0.22];
 /** Les chevilles, pieds à plat. */
 const ANKLE_L: V3 = [0.15, 0.085, 0.36];
 const ANKLE_R: V3 = [-0.14, 0.085, 0.33];
@@ -137,39 +137,35 @@ export function createPlayer(gltf: GLTF): Player {
     const m = o as THREE.SkinnedMesh;
     if (!m.isMesh) return;
     const material = (m.material as THREE.MeshStandardMaterial).clone();
+    const name = material.name;
     material.metalness = 0;
     material.envMapIntensity = 0.7;
-    // Une seule texture (le scan) : la peau, chaude et saturée, est plus satinée que le coton et le denim.
-    material.onBeforeCompile = (shader) => {
-      // le t-shirt bleu très clair du scan brûlait sous le projecteur : on le ramène à un gris chiné, plis et grain gardés
-      shader.fragmentShader = shader.fragmentShader.replace(
-        "#include <map_fragment>",
-        `#include <map_fragment>
-        {
-          vec3 c = diffuseColor.rgb;
-          float lum = dot( c, vec3( 0.2126, 0.7152, 0.0722 ) );
-          float hi = max( c.r, max( c.g, c.b ) );
-          float sat = ( hi - min( c.r, min( c.g, c.b ) ) ) / max( hi, 1e-3 );
-          // le coton clair : lumineux, peu saturé, plus bleu que rouge (la peau est rouge, le denim saturé et sombre)
-          float shirt = smoothstep( 0.1, 0.2, lum ) * ( 1.0 - smoothstep( 0.33, 0.45, sat ) ) * smoothstep( 0.0, 0.05, c.b - c.r );
-          diffuseColor.rgb = mix( c, vec3( lum ) * vec3( 0.3, 0.31, 0.33 ), shirt );
-        }`,
-      );
-      shader.fragmentShader = shader.fragmentShader.replace(
-        "#include <roughnessmap_fragment>",
-        `#include <roughnessmap_fragment>
-        vec3 scan = diffuseColor.rgb;
-        float hi = max( scan.r, max( scan.g, scan.b ) );
-        float sat = ( hi - min( scan.r, min( scan.g, scan.b ) ) ) / max( hi, 1e-3 );
-        float skin = smoothstep( 0.22, 0.42, sat ) * step( scan.b, scan.g ) * step( scan.g, scan.r );
-        roughnessFactor = mix( 0.9, 0.58, skin );`,
-      );
-    };
-    material.customProgramCacheKey = () => "developer-scan";
-    // le scan est ouvert (double face) : seules ses faces arrière portent l'ombre, sans acné sur la peau
+    if (/^Std_Skin_|^Std_Nails$/.test(name)) {
+      // la peau : satinée, ses pores dans la normal map
+      material.roughness = 0.52;
+    } else if (/^Std_Cornea_/.test(name)) {
+      // la cornée n'ajoute que ses reflets : c'est la petite lumière dans l'œil
+      material.color.set(0x000000);
+      material.roughness = 0.04;
+      material.envMapIntensity = 1.4;
+      material.transparent = true;
+      material.opacity = 1;
+      material.blending = THREE.AdditiveBlending;
+      material.depthWrite = false;
+    } else if (/^Std_Eye_/.test(name)) {
+      // sans l'ombre portée des paupières (Character Creator la dessine dans un maillage que le modèle n'a pas),
+      // le blanc de l'œil brillait sous les projecteurs
+      material.color.setScalar(0.72);
+    } else if (/^Std_Eyelash$/.test(name)) {
+      material.depthWrite = false;
+    } else if (!/^(Std_Eye_|Std_Tongue$|Teeth$|Mouth$)/.test(name)) {
+      // le denim, le coton, les baskets : mats
+      material.roughness = 0.88;
+    }
+    // les vêtements n'ont qu'une épaisseur (double face) : seules leurs faces arrière portent l'ombre, sans acné
     material.shadowSide = THREE.BackSide;
     m.material = material;
-    m.castShadow = true;
+    m.castShadow = !material.transparent;
     m.receiveShadow = true;
     m.frustumCulled = false;
   });
@@ -377,7 +373,7 @@ export function createPlayer(gltf: GLTF): Player {
       orient(s.fore, frameRotation(q, s.armDir, PALM, d, n));
       if (s.twist) orient(s.twist, frameRotation(q, s.armDir, PALM, d, n2));
       // la main : doigts vers le clavier (ou le long de la cuisse), légèrement fléchie
-      d.set(-sg * 0.18, -0.42 - 0.12 * dip, 1).lerp(tmp.set(-sg * 0.2, -0.9, 1), 1 - typing);
+      d.set(-sg * 0.18, -0.42 - 0.12 * dip, 1).lerp(tmp.set(-sg * 0.2, -0.5, 1), 1 - typing);
       orient(s.hand, frameRotation(q, s.handDir, PALM, d, n2));
       s.fingers.forEach((seg, f) => {
         let extra = 0;

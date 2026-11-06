@@ -1,14 +1,16 @@
 Testyourskills — 3D scene asset credits
 
-developer-v3.glb
-"Nathan Animated 003 - Walking 3D Man" by Renderpeople, CC BY 4.0.
-https://sketchfab.com/3d-models/nathan-animated-003-walking-3d-man-143a2b1ea5eb4385ae90a73657aca3bc
+developer-v4.glb
+"Balthazar (rigged & animated)" by Jungle Jim, CC BY 4.0.
+https://sketchfab.com/3d-models/balthazar-rigged-animated-dbf9fe0cb81d4758ad2525a56d10e2fc
 https://creativecommons.org/licenses/by/4.0/
-Changes: walking animation removed, rest pose kept, bone names shortened,
-rescaled to 1.78 m (tools/bake/prepare.py); texture converted to WebP,
-meshopt compression; seated pose and typing animated in code; light blue
-T-shirt recoloured heather grey in the renderer.
-This scanned model is a generic scene character, not a portrait of the scored user.
+Changes: animation, facial blend shapes, steel arm guards and the leg skin
+hidden under the trousers removed; shoe laces and padding simplified
+(decimated); rest pose kept, bone names renamed, rescaled to 1.80 m
+(tools/bake/prepare.py); textures converted to WebP, meshopt compression;
+seated pose and typing animated in code; skin, eye and cloth shading adjusted
+in the renderer.
+This model is a generic scene character, not a portrait of the scored user.
 
 chair.glb
 "Ergonomic office chair with armrests" by Giimann, CC BY 4.0.
