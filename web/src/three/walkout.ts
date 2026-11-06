@@ -599,19 +599,18 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
   scene.add(tellKey, tellKey.target);
 
   /* ---------- le dev à son poste ---------- */
-  // De dos, face à ses écrans et aux baies ; la chaise pivote vers la caméra juste avant la carte.
+  // De dos, debout face à ses écrans et aux baies ; il se retourne vers la caméra juste avant la carte.
   const desk = createWorkstation({ accent: accent.a, lang: o.langKey, login: o.login, seed: o.overall, graphLabel: o.texts.graphLabel, wood: assets.wood, chair: createChair(assets.chair, 0x1d2023), props: assets.desk });
   const player = createPlayer(assets.player);
   desk.group.rotation.y = Math.PI;
   desk.group.position.set(0, 0, DESK_Z);
-  // un peu en avant sur l'assise : le dos ne traverse pas le dossier du fauteuil
-  player.root.position.set(0, 0.03, 0.06);
+  player.root.position.set(0, 0.03, 0);
   desk.swivel.add(player.root);
   scene.add(desk.group);
   disposables.push(desk);
   const heroSpot = new THREE.SpotLight(0xffe0b9, 0, 10, 0.72, 0.85, 1.4);
   heroSpot.position.set(-1.8, CEIL - 0.1, DESK_Z + 1.8);
-  heroSpot.target.position.set(0, 0.6, DESK_Z);
+  heroSpot.target.position.set(0, 0.9, DESK_Z);
   heroSpot.castShadow = !low;
   heroSpot.shadow.mapSize.set(1024, 1024);
   heroSpot.shadow.bias = -0.0004;
@@ -619,10 +618,10 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
   // les enseignes de la ville sur le dev : rose à gauche, cyan à droite
   const neonL = new THREE.SpotLight(PINK, 0, 10, 0.9, 0.9, 1.5);
   neonL.position.set(-2.8, 2.8, DESK_Z - 2.4);
-  neonL.target.position.set(0, 0.9, DESK_Z);
+  neonL.target.position.set(0, 1.3, DESK_Z);
   const neonR = new THREE.SpotLight(CYAN, 0, 10, 0.9, 0.9, 1.5);
   neonR.position.set(2.8, 2.8, DESK_Z - 2.4);
-  neonR.target.position.set(0, 0.9, DESK_Z);
+  neonR.target.position.set(0, 1.3, DESK_Z);
   scene.add(neonL, neonL.target, neonR, neonR.target);
 
   /* ---------- la carte ---------- */
@@ -850,12 +849,12 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
     K(plan.league[0], V(0, 1.48, 2.67), V(0.12, 1.53, 0), 60),
     K(plan.club[1], V(0, 1.48, 2.47), V(0.08, 1.5, 0), 58),
     K(plan.doors + 0.35, V(0, 1.5, 1.95), V(0, 1.4, -6), 58),
-    K(plan.doors + 2.0, V(0, 1.53, -1.5), V(0, 1.2, DESK_Z), 44),
-    K(T_TURN - 0.4, V(0, 1.51, -2.9), V(0, 1.25, DESK_Z), 41),
+    K(plan.doors + 2.0, V(0, 1.53, -1.5), V(0, 1.3, DESK_Z), 44),
+    K(T_TURN - 0.4, V(0, 1.51, -2.9), V(0, 1.38, DESK_Z), 41),
     // le dev se retourne : l'objectif se resserre sur lui, à mi-corps, comme le portrait d'un
     // personnage qu'on retrouve ; il tient pendant le carton, puis s'ouvre quand la carte naît
-    K(T_TURN + 0.65, V(0, 1.5, -3.0), V(0, 1.1, DESK_Z), 13),
-    K(plan.mission[1] - 0.45, V(0, 1.5, -3.08), V(0, 1.12, DESK_Z), 11.5),
+    K(T_TURN + 0.65, V(0, 1.5, -3.0), V(0, 1.38, DESK_Z), 13),
+    K(plan.mission[1] - 0.45, V(0, 1.5, -3.08), V(0, 1.42, DESK_Z), 11.5),
     K(T_CARD + 0.35, V(0, 1.5, -3.15), V(0, 1.42, CARD_POS.z - 2), 38),
     K(T_SETTLE, F_POS.clone(), V(F_POS.x, F_POS.y, F_POS.z - 10), 40),
   ];

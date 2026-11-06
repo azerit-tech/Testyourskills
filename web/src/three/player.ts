@@ -1,5 +1,5 @@
 // Le dev : un personnage Character Creator riggé (Jungle Jim, CC BY ; tools/bake/prepare.py),
-// posé assis et animé par code. Chaque os reçoit une orientation exprimée
+// debout à son poste et animé par code. Chaque os reçoit une orientation exprimée
 // dans le repère du personnage, par rapport à sa pose de repos (en T) : bras
 // et jambes par cinématique inverse à deux segments (mains sur le clavier,
 // pieds au sol), tronc, tête et yeux par angles. Tout est une fonction du
@@ -32,27 +32,33 @@ const drift = (t: number, f: number, seed: number) =>
   0.55 * Math.sin(t * f + seed) + 0.3 * Math.sin(t * f * 2.13 + seed * 1.7) + 0.15 * Math.sin(t * f * 4.37 + seed * 2.9);
 
 /* Repère du personnage (celui de `root`) : x à sa gauche, y en haut, z devant lui.
- * L'origine est sur l'axe du fauteuil, au ras du tapis à 1 cm près ; les cotes
- * suivent le poste de workstation.ts, où `root` est posé en (0, 0.03, 0.06). */
-const HIP: V3 = [0, 0.545, 0.0];
+ * L'origine est entre ses pieds, au ras du tapis à 1 cm près, sur l'axe autour
+ * duquel il pivote ; les cotes suivent le poste de workstation.ts (plateau à
+ * 1,06 m), où `root` est posé en (0, 0.03, 0) dans le groupe qui pivote, lui-même
+ * à 12 cm du bord du bureau. */
+/** Le bassin, genoux à peine fléchis (la jambe tendue fait 0,89 m, la hanche est à 0,98 m au repos). */
+const HIP: V3 = [0, 0.97, -0.01];
 /** Les poignets sur le clavier (la rangée de repos), une main de chaque côté du bloc des lettres. */
-const KEYS_L: V3 = [0.15, 0.825, 0.32];
-const KEYS_R: V3 = [-0.06, 0.825, 0.32];
-/** Une fois tourné, adossé : le poignet gauche sur le bout de l'accoudoir (son dessus est à 0,75 m,
- * entre x = 0,27 et 0,34), la main droite à plat sur la cuisse, épaisse : elle reste dessus. */
-const LAP_L: V3 = [0.3, 0.79, 0.07];
-const LAP_R: V3 = [-0.14, 0.75, 0.2];
-/** La direction des doigts une fois tourné : droit devant sur l'accoudoir, vers le genou sur la cuisse. */
-const LAP_DIR_L: V3 = [-0.05, -0.3, 1];
-const LAP_DIR_R: V3 = [0.2, -0.5, 1];
-/** Les chevilles, pieds à plat. */
-const ANKLE_L: V3 = [0.15, 0.085, 0.36];
-const ANKLE_R: V3 = [-0.14, 0.085, 0.33];
-/** Les écrans, vus de son siège : le code au centre, le terminal à droite, le graphe à gauche. */
+const KEYS_L: V3 = [0.15, 1.11, 0.26];
+const KEYS_R: V3 = [-0.06, 1.11, 0.26];
+/** Une fois tourné, les bras croisés : le gauche dessous, contre le buste, le droit par-dessus,
+ * chaque main posée sur le biceps opposé. */
+const LAP_L: V3 = [-0.1, 1.19, 0.21];
+const LAP_R: V3 = [0.08, 1.25, 0.25];
+/** La direction des doigts une fois tourné : vers le bras opposé. */
+const LAP_DIR_L: V3 = [-1, 0.15, -0.25];
+const LAP_DIR_R: V3 = [0.7, -0.6, -0.35];
+/** La paume une fois tourné : la main du dessous vers le haut, celle du dessus vers le bas, contre le bras. */
+const LAP_PALM_L: V3 = [0, 0.5, -1];
+const LAP_PALM_R: V3 = [0, -0.6, -1];
+/** Les chevilles, pieds à plat, un peu écartés et ouverts. */
+const ANKLE_L: V3 = [0.13, 0.07, 0.0];
+const ANKLE_R: V3 = [-0.13, 0.07, -0.01];
+/** Les écrans, vus de sa place : le code au centre, le terminal à droite, le graphe à gauche. */
 const SCREENS: V3[] = [
-  [0, 1.08, 0.95],
-  [-0.66, 1.03, 0.8],
-  [0.66, 1.03, 0.8],
+  [0, 1.37, 0.89],
+  [-0.66, 1.32, 0.74],
+  [0.66, 1.32, 0.74],
 ];
 
 const FINGERS = ["index", "middle", "ring", "pinky"] as const;
@@ -225,6 +231,7 @@ export function createPlayer(gltf: GLTF): Player {
       keys: V(...(s === "l" ? KEYS_L : KEYS_R)),
       lap: V(...(s === "l" ? LAP_L : LAP_R)),
       lapDir: V(...(s === "l" ? LAP_DIR_L : LAP_DIR_R)),
+      lapPalm: V(...(s === "l" ? LAP_PALM_L : LAP_PALM_R)),
       ankle: V(...(s === "l" ? ANKLE_L : ANKLE_R)),
     };
   };
@@ -295,21 +302,27 @@ export function createPlayer(gltf: GLTF): Player {
   const pose = (t: number, typingIn: number, lookIn: number, gaze?: THREE.Vector3) => {
     const typing = smooth(0, 1, typingIn);
     const turned = smooth(0, 1, lookIn);
-    // pendant le demi-tour : la tête devance le fauteuil, le buste traîne un peu
+    // pendant le demi-tour : la tête devance le corps, le buste traîne un peu
     const swing = 4 * lookIn * (1 - lookIn);
+    // le corps (root) a pivoté de θ ; chaque pied le suit en un pas, le gauche d'abord
+    const theta = Math.PI * lookIn;
     const breath = Math.sin((t * 2 * Math.PI) / 4.3);
     root.updateWorldMatrix(true, false);
     root.getWorldQuaternion(qRoot);
 
     /* le bassin et le tronc */
     hips.parent!.updateWorldMatrix(true, false);
-    hips.position.copy(hips.parent!.worldToLocal(root.localToWorld(tmp.copy(hipAt))));
+    // une fois tourné, le poids sur la jambe droite : la hanche part de ce côté et s'incline
+    tmp.copy(hipAt);
+    tmp.x -= 0.03 * turned;
+    tmp.y -= 0.004 * turned + 0.012 * swing;
+    hips.position.copy(hips.parent!.worldToLocal(root.localToWorld(tmp)));
     const sway = 0.02 * drift(t, 0.31, 1);
-    orient(hips, fromAngles(q2, -0.1, sway * 0.5, 0));
-    // penché vers l'écran en tapant, redressé et adossé une fois tourné
-    const lean = 0.2 * typing + 0.03 * (1 - typing) - 0.1 * turned + 0.02 * drift(t, 0.23, 3);
+    orient(hips, fromAngles(q2, 0.02, sway * 0.5, -0.05 * turned));
+    // penché vers le clavier en tapant, le torse sorti une fois tourné
+    const lean = 0.1 * typing + 0.02 * (1 - typing) - 0.05 * turned + 0.015 * drift(t, 0.23, 3);
     const yaw = sway - 0.18 * swing;
-    const roll = 0.015 * drift(t, 0.19, 7);
+    const roll = 0.015 * drift(t, 0.19, 7) + 0.05 * turned;
     spine.forEach((b, i) => {
       const k = (i + 1) / 3;
       orient(b, fromAngles(q2, lean * k - 0.012 * breath * (i === 2 ? 1 : 0), yaw * k, roll * k));
@@ -329,10 +342,10 @@ export function createPlayer(gltf: GLTF): Player {
       hp += (cp - hp) * w;
     }
     hy += 0.02 * drift(t, 0.6, 11);
-    // tourné, adossé : le menton baisse un peu, il regarde la caméra par en dessous
+    // tourné : le menton baisse un peu, il regarde la caméra par en dessous
     hp += 0.09 * turned;
     hp += 0.015 * drift(t, 0.8, 13) + 0.008 * breath;
-    const hr = 0.03 * drift(t, 0.27, 17) + 0.04 * turned;
+    const hr = 0.03 * drift(t, 0.27, 17) - 0.02 * turned;
     orient(neck, fromAngles(q2, hp * 0.4 + lean * 0.5, hy * 0.45, hr * 0.5));
     orient(head, fromAngles(q2, hp, hy, hr));
     // les yeux visent le point regardé ; quelques clignements
@@ -366,8 +379,8 @@ export function createPlayer(gltf: GLTF): Player {
       W.y += 0.006 * drift(t, 2.2, hand * 5 + 3) - 0.006 * dip;
       W.lerp(s.lap, 1 - typing);
       W.y += 0.05 * swing;
-      // coude en dehors et en arrière
-      pole.set(sg * 0.55, -1, -0.35);
+      // coude en dehors et en arrière ; bras croisés, en dehors et en avant
+      pole.set(sg * 0.55, -1, -0.35).lerp(tmp.set(sg, -0.45, 0.25), 1 - typing);
       bend(E, S, W, s.upperLen, s.foreLen, pole);
       d.subVectors(E, S);
       n.subVectors(W, E);
@@ -375,11 +388,11 @@ export function createPlayer(gltf: GLTF): Player {
       // la paume vers le bas ; l'avant-bras ne porte que la moitié de la pronation, son os de torsion le reste
       d.subVectors(W, E);
       n.copy(PALM).applyQuaternion(q2);
-      n2.set(sg * 0.15, -1, 0.1 * typing);
+      n2.set(sg * 0.15, -1, 0.1 * typing).lerp(s.lapPalm, 1 - typing).normalize();
       n.lerp(n2, 0.5);
       orient(s.fore, frameRotation(q, s.armDir, PALM, d, n));
       if (s.twist) orient(s.twist, frameRotation(q, s.armDir, PALM, d, n2));
-      // la main : doigts vers le clavier (ou le long de la cuisse), légèrement fléchie
+      // la main : doigts vers le clavier (ou vers le bras opposé), légèrement fléchie
       d.set(-sg * 0.18, -0.42 - 0.12 * dip, 1).lerp(s.lapDir, 1 - typing);
       orient(s.hand, frameRotation(q, s.handDir, PALM, d, n2));
       s.fingers.forEach((seg, f) => {
@@ -398,11 +411,13 @@ export function createPlayer(gltf: GLTF): Player {
     /* les jambes */
     arms.forEach((s) => {
       posOf(s.thigh, S);
-      W.copy(s.ankle);
-      // les pieds se soulèvent pendant que le fauteuil tourne
-      W.y += 0.06 * swing;
-      W.z += 0.01 * drift(t, 0.4, s.sign * 3);
-      pole.set(s.sign * 0.12, 0.45, 1);
+      // le pied posé ne tourne pas avec le corps : il reste à son angle (phi) jusqu'à son pas
+      const u = s.sign > 0 ? smooth(0, 0.6, lookIn) : smooth(0.4, 1, lookIn);
+      const rel = Math.PI * u - theta;
+      W.copy(s.ankle).applyAxisAngle(UP, rel);
+      W.y += 0.07 * Math.sin(Math.PI * u);
+      W.z += 0.006 * drift(t, 0.4, s.sign * 3);
+      pole.set(s.sign * 0.12, 0.45, 1).applyAxisAngle(UP, rel * 0.6);
       bend(E, S, W, s.thighLen, s.shinLen, pole);
       d.subVectors(E, S);
       n.subVectors(W, E).negate();
@@ -410,7 +425,8 @@ export function createPlayer(gltf: GLTF): Player {
       d.subVectors(W, E);
       n.subVectors(E, S);
       orient(s.shin, frameRotation(q2, s.legDir, FWD, d, n));
-      d.set(s.sign * 0.12, -0.12, 1);
+      // à plat : la pente de repos du pied (de la cheville à l'avant-pied), ouvert de 8°
+      d.set(s.sign * 0.14, -0.27, 1).applyAxisAngle(UP, rel);
       orient(s.foot, frameRotation(q2, s.footDir, UP, d, UP));
     });
   };
