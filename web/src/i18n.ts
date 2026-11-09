@@ -70,7 +70,7 @@ const fr = {
     icon: "Priorité absolue",
     wonderkid: "Nouveau en ville",
     flashback: "Affaire classée",
-    totw: "Les 5 plus recherchés",
+    totw: "Top 5 de la semaine",
   } satisfies Record<CardStyle, string>,
   tierCard: (level: string) => `Fiche ${level}`,
   waiting: {
@@ -405,7 +405,7 @@ const en: Dict = {
     icon: "Top priority",
     wonderkid: "New in town",
     flashback: "Cold case",
-    totw: "5 most wanted",
+    totw: "This week's top 5",
   },
   tierCard: (level) => `${level} sheet`,
   waiting: {

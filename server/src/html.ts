@@ -16,8 +16,8 @@ export interface PageMeta {
 }
 
 const SPECIAL_NAMES: Record<Lang, Record<Special, string>> = {
-  fr: { wonderkid: "Nouveau en ville", flashback: "Affaire classée", totw: "Les 5 plus recherchés" },
-  en: { wonderkid: "New in town", flashback: "Cold case", totw: "5 most wanted" },
+  fr: { wonderkid: "Nouveau en ville", flashback: "Affaire classée", totw: "Top 5 de la semaine" },
+  en: { wonderkid: "New in town", flashback: "Cold case", totw: "This week's top 5" },
 };
 
 const SITE = "Testyourskills · azerit.tech";

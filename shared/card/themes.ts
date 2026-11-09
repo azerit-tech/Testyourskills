@@ -162,7 +162,7 @@ export const THEMES: Record<ThemeKey, CardTheme> = {
     grad: "bg", bg: [PALETTE.cold, PALETTE.coldLow], bar: PALETTE.peach, palm: "#323e4a", gray: true,
     badge: { bg: PALETTE.peach, ink: PALETTE.ink0 },
   }),
-  totw: theme("totw", { fr: "Les 5 plus recherchés", en: "Top 5 most wanted" }, {
+  totw: theme("totw", { fr: "Top 5 de la semaine", en: "This week's top 5" }, {
     grad: "num", bg: [PALETTE.indigo, PALETTE.indigo], bar: PALETTE.peach, palm: "#34407a",
     badge: { bg: PALETTE.cream, ink: PALETTE.ink0 }, accent2: PALETTE.duskC,
   }),
