@@ -1,5 +1,5 @@
 // Fiche interactive : enveloppe <Card> (SVG identique au rendu serveur) avec
-// l'inclinaison 3D (12° max, pointeur ou gyroscope, retour élastique), le grain
+// l'inclinaison 3D (12° max, doigt ou souris, retour élastique), le grain
 // et le balayage de révélation. Style mat (SPEC §18.18) : ni reflet
 // holographique ni glare ; seul ★★★★★★ porte un halo, son contour éclairé.
 import { useEffect, useRef, useState, type CSSProperties } from "react";
@@ -142,55 +142,19 @@ export function CardView({ card, lang, interactive = true, reveal = false, idPre
       const r = el.getBoundingClientRect();
       aim((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
     };
+    // Le doigt ou la souris, rien d'autre : aucun capteur de mouvement, donc
+    // aucune demande d'accès sur iPhone (§18.27). Le toucher incline dès qu'il se pose.
+    el.addEventListener("pointerdown", onMove);
     el.addEventListener("pointermove", onMove);
     el.addEventListener("pointerleave", rest);
     el.addEventListener("pointercancel", rest);
 
-    // Gyroscope sur mobile, si disponible (iOS : permission au premier toucher)
-    let base: { b: number; g: number } | null = null;
-    let lastGyro = 0;
-    const onOrient = (e: DeviceOrientationEvent) => {
-      if (e.beta == null || e.gamma == null) return;
-      if (!base) base = { b: e.beta, g: e.gamma };
-      // la référence suit lentement la tenue du téléphone
-      base.b += (e.beta - base.b) * 0.01;
-      base.g += (e.gamma - base.g) * 0.01;
-      const dx = Math.max(-1, Math.min(1, (e.gamma - base.g) / 22));
-      const dy = Math.max(-1, Math.min(1, (e.beta - base.b) / 22));
-      lastGyro = performance.now();
-      aim(0.5 + dx / 2, 0.5 + dy / 2);
-    };
-    const coarse = window.matchMedia?.("(pointer: coarse)").matches;
-    let gyroOn = false;
-    const enableGyro = () => {
-      if (gyroOn || !coarse || typeof DeviceOrientationEvent === "undefined") return;
-      gyroOn = true;
-      window.addEventListener("deviceorientation", onOrient);
-    };
-    const DOE = (typeof DeviceOrientationEvent !== "undefined" ? DeviceOrientationEvent : undefined) as
-      | (typeof DeviceOrientationEvent & { requestPermission?: () => Promise<string> })
-      | undefined;
-    const onFirstTouch = () => {
-      if (DOE?.requestPermission) {
-        DOE.requestPermission().then((p) => p === "granted" && enableGyro()).catch(() => {});
-      }
-    };
-    if (DOE && !DOE.requestPermission) enableGyro();
-    else el.addEventListener("pointerdown", onFirstTouch, { once: true });
-
-    // Sans nouvelle mesure du gyroscope, retour au repos
-    const idle = window.setInterval(() => {
-      if (gyroOn && lastGyro && performance.now() - lastGyro > 1500) rest();
-    }, 1000);
-
     return () => {
       cancelAnimationFrame(raf);
-      window.clearInterval(idle);
+      el.removeEventListener("pointerdown", onMove);
       el.removeEventListener("pointermove", onMove);
       el.removeEventListener("pointerleave", rest);
       el.removeEventListener("pointercancel", rest);
-      el.removeEventListener("pointerdown", onFirstTouch);
-      window.removeEventListener("deviceorientation", onOrient);
     };
   }, [live]);
 
