@@ -1,0 +1,41 @@
+[
+  {
+    "linkedinUrl": "https://fr.linkedin.com/in/Sacha-Valdor",
+    "fullName": "Sacha Valdor",
+    "headline": "Data engineer chez Brumes",
+    "jobTitle": "Data engineer",
+    "about": "Pipelines Spark et Airflow. Passionné de data.",
+    "profilePicHighQuality": "https://media.example.invalid/sacha.jpg",
+    "experiences": [
+      {
+        "title": "Brumes",
+        "subtitle": "CDI · 4 ans",
+        "subComponents": [
+          {
+            "title": "Data engineer",
+            "caption": "janv. 2023 - aujourd'hui · 2 ans 10 mois",
+            "description": [{ "type": "textComponent", "text": "Migration des pipelines vers Airflow." }]
+          },
+          {
+            "title": "Data analyst",
+            "caption": "sept. 2021 - déc. 2022 · 1 an 4 mois"
+          }
+        ]
+      },
+      {
+        "title": "Stagiaire data",
+        "subtitle": "Nébuleuse · Stage",
+        "caption": "2021 - 2021"
+      }
+    ],
+    "educations": [
+      {
+        "title": "Université de Nantes",
+        "subtitle": "Master, Statistique",
+        "caption": "2019 - 2021"
+      }
+    ],
+    "skills": [{ "title": "Python" }, { "title": "Apache Spark" }, { "title": "python" }],
+    "contactInfo": { "websites": ["https://sacha.example.org"] }
+  }
+]

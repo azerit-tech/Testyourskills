@@ -1,0 +1,81 @@
+[
+  {
+    "matched_on": "https://www.linkedin.com/in/camille-ardent",
+    "match_type": "professional_network_profile_url",
+    "match_status": "matched",
+    "matches": [
+      {
+        "confidence_score": 1.0,
+        "person_data": {
+          "crustdata_person_id": 9900001,
+          "basic_profile": {
+            "name": "Camille Ardent",
+            "first_name": "Camille",
+            "last_name": "Ardent",
+            "headline": "Senior Full-Stack Engineer | TypeScript, React, Node.js | Passionné·e d'architecture agile",
+            "current_title": "Senior Full-Stack Engineer",
+            "professional_network_name": "Camille Ardent",
+            "summary": "Ingénieur·e full-stack depuis 7 ans. J'ai livré la refonte du paiement en 2023 et mis en place la CI GitLab avec des tests de bout en bout.",
+            "location": { "city": "Lyon", "state": null, "country": "France", "continent": "Europe", "raw": "Lyon, Auvergne-Rhône-Alpes, France" },
+            "languages": ["French", "English"],
+            "last_updated": "2026-10-02T08:12:44.000000Z",
+            "profile_picture_permalink": "https://media.example.invalid/camille.jpg"
+          },
+          "experience": {
+            "employment_details": {
+              "current": [
+                {
+                  "name": "Paysolde",
+                  "title": "Senior Full-Stack Engineer",
+                  "crustdata_company_id": 4400012,
+                  "company_website_domain": "paysolde.example",
+                  "start_date": "2022-03-01T00:00:00+00:00",
+                  "end_date": null,
+                  "description": "Refonte du tunnel de paiement en React et Node.js, livrée en juin 2023. Mise en place de la CI GitLab et des tests Playwright.",
+                  "location": { "raw": "Lyon, France" },
+                  "employment_type": "Full-time",
+                  "seniority_level": "Senior"
+                }
+              ],
+              "past": [
+                {
+                  "name": "Studio Bleu",
+                  "title": "Développeur·se web",
+                  "crustdata_company_id": 4400099,
+                  "start_date": "2019-01-01T00:00:00+00:00",
+                  "end_date": "2022-02-01T00:00:00+00:00",
+                  "description": "Sites Vue.js pour des clients du secteur culturel.",
+                  "location": { "raw": "Grenoble, France" },
+                  "employment_type": "Full-time",
+                  "seniority_level": "Entry Level"
+                }
+              ]
+            },
+            "years_of_experience": "6 to 10 years",
+            "years_of_experience_raw": 7
+          },
+          "education": {
+            "schools": [
+              {
+                "school": "INSA Lyon",
+                "degree": "Diplôme d'ingénieur",
+                "field_of_study": "Informatique",
+                "start_year": 2014,
+                "end_year": 2019,
+                "location": { "raw": "Villeurbanne, France" }
+              }
+            ]
+          },
+          "skills": { "professional_network_skills": ["TypeScript", "React", "Node.js", "PostgreSQL", "Agile", "typescript"] },
+          "social_handles": {
+            "professional_network_identifier": { "profile_url": "https://www.linkedin.com/in/camille-ardent" },
+            "dev_platform_identifier": { "profile_url": "https://github.com/camille-ardent" }
+          },
+          "dev_platform_profiles": [
+            { "profile_url": "https://github.com/camille-ardent" }
+          ]
+        }
+      }
+    ]
+  }
+]

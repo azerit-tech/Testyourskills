@@ -1,0 +1,46 @@
+[
+  {
+    "id": "ACoAAFictif0000000000000000000000000001",
+    "publicIdentifier": "camille-ardent",
+    "linkedinUrl": "https://www.linkedin.com/in/camille-ardent/",
+    "firstName": "Camille",
+    "lastName": "Ardent",
+    "headline": "Senior Full-Stack Engineer | TypeScript, React, Node.js",
+    "about": "Full-stack depuis 7 ans. Refonte du paiement livrée en 2023, CI GitLab et tests de bout en bout. Code : https://github.com/camille-ardent/paiement-demo",
+    "photo": "https://media.example.invalid/camille.jpg",
+    "location": { "linkedinText": "Lyon, Auvergne-Rhône-Alpes, France" },
+    "websites": [{ "url": "https://camille.example.dev" }, { "url": "https://github.com/camille-ardent" }],
+    "experience": [
+      {
+        "position": "Développement web",
+        "companyName": "Studio Bleu",
+        "employmentType": "Full-time",
+        "duration": "3 yrs 1 mo",
+        "description": "Sites Vue.js pour des clients du secteur culturel. Dépôt : https://github.com/studio-bleu/site",
+        "startDate": { "month": "Jan", "year": 2019, "text": "Jan 2019" },
+        "endDate": { "month": "Feb", "year": 2022, "text": "Feb 2022" }
+      },
+      {
+        "position": "Senior Full-Stack Engineer",
+        "companyName": "Paysolde",
+        "employmentType": "Full-time",
+        "duration": "3 yrs 9 mos",
+        "description": "Refonte du tunnel de paiement en React et Node.js, livrée en juin 2023.",
+        "startDate": { "month": "Mar", "year": 2022, "text": "Mar 2022" },
+        "endDate": { "text": "Present" }
+      }
+    ],
+    "education": [
+      {
+        "schoolName": "INSA Lyon",
+        "degree": "Diplôme d'ingénieur",
+        "fieldOfStudy": "Informatique",
+        "startDate": { "year": 2014, "text": "2014" },
+        "endDate": { "year": 2019, "text": "2019" },
+        "period": "2014 - 2019"
+      }
+    ],
+    "skills": [{ "name": "TypeScript", "endorsements": "12" }, { "name": "React" }, { "name": "Node.js" }],
+    "topSkills": "TypeScript • React • Node.js"
+  }
+]

@@ -19,6 +19,14 @@ export type Position =
 
 export type Source = "github" | "cv";
 
+/** Ce qui déclare, face au GitHub qui prouve : un CV en PDF, ou le profil LinkedIn (§18.24). */
+export type DeclaredSource = "cv" | "linkedin";
+
+/** Source déclarative d'une carte ou d'une comparaison : « cv » si rien n'est dit. */
+export function declaredOf(x: { declaredSource?: DeclaredSource } | null | undefined): DeclaredSource {
+  return x?.declaredSource === "linkedin" ? "linkedin" : "cv";
+}
+
 /** Un fait lisible qui justifie une stat (« Pourquoi cette note ? », §6.4). */
 export interface Fact {
   fr: string;
@@ -91,6 +99,8 @@ export interface CardSentence {
 export interface CardData {
   id: string;
   source: Source;
+  /** Carte déclarative (source `cv`) jugée sur un profil LinkedIn plutôt qu'un PDF (§18.24). Absent : un CV. */
+  declaredSource?: DeclaredSource;
   createdAt: string; // ISO
   /** Version du barème (data/scoring.json) qui a produit la carte. */
   scoringVersion: string;
@@ -137,6 +147,8 @@ export interface CardData {
 export interface ComparisonData {
   id: string;
   createdAt: string;
+  /** Ce que `cv` est vraiment : un CV en PDF, ou le profil LinkedIn (§18.24). Absent : un CV. */
+  declaredSource?: DeclaredSource;
   cv: CardData;
   github: CardData;
   /** github - cv par stat (positif = le code vaut plus que le CV). */
@@ -205,6 +217,8 @@ export type ErrorCode =
   | "busy"
   /** Fiche ou login masqué par son propriétaire revendiqué (§18.1) : « Ce dossier a quitté la ville ». */
   | "gone"
+  /** Entrée LinkedIn impossible : pas de clé, budget du jour épuisé, profil introuvable (§18.24). */
+  | "linkedin"
   | "internal";
 
 /** Messages d'attente nourris par les faits déjà collectés (§6.2). */

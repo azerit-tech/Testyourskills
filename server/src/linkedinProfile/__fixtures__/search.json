@@ -1,0 +1,22 @@
+{
+  "profiles": [
+    {
+      "crustdata_person_id": 9900001,
+      "social_handles": {
+        "professional_network_identifier": { "profile_url": "https://www.linkedin.com/in/Camille-Ardent/" },
+        "dev_platform_identifier": { "profile_url": "https://github.com/camille-ardent" }
+      }
+    },
+    {
+      "crustdata_person_id": 9900002,
+      "social_handles": {
+        "professional_network_identifier": { "profile_url": "https://www.linkedin.com/in/camille-ardent-2" },
+        "dev_platform_identifier": { "profile_url": "https://github.com/c-ardent" }
+      }
+    }
+  ],
+  "next_cursor": null,
+  "total_count": 2,
+  "total_count_relation": null,
+  "remarks": []
+}

@@ -6,12 +6,14 @@ import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import type { CardData, ComparisonData, Source } from "../../shared/types";
+import { ensureLinkedinTables, purgeLinkedin } from "./linkedinProfile/store";
 
 export const RETENTION_MS = 90 * 24 * 3600 * 1000;
 export const CACHE_MS = 24 * 3600 * 1000;
 
 export type CardKind = "card" | "comparison";
-export type RowSource = Source | "both";
+/** `linkedin` : fiche jugée sur un profil LinkedIn, seule ou en comparaison contre GitHub (§18.24). */
+export type RowSource = Source | "both" | "linkedin";
 
 export interface CardRow {
   id: string;
@@ -197,6 +199,8 @@ export function migrate(db: Database.Database) {
   if (!cols.has("degraded")) db.exec(`ALTER TABLE cards ADD COLUMN degraded INTEGER NOT NULL DEFAULT 0`);
   if (!cols.has("denounced_by")) db.exec(`ALTER TABLE cards ADD COLUMN denounced_by TEXT`);
   if (!cols.has("denouncer_login")) db.exec(`ALTER TABLE cards ADD COLUMN denouncer_login TEXT`);
+  // Cache et budget de la lecture des profils LinkedIn (§18.24) : tables neuves.
+  ensureLinkedinTables(db);
 }
 
 export class Store {
@@ -346,6 +350,7 @@ export class Store {
     // Compteurs de limite : on ne garde que les deux derniers jours.
     const cutoff = new Date(now - 2 * 24 * 3600 * 1000).toISOString().slice(0, 10);
     this.db.prepare(`DELETE FROM ratelimit WHERE day < ?`).run(cutoff);
+    purgeLinkedin(this.db, now);
     return ids;
   }
 
