@@ -202,21 +202,19 @@ const fr = {
       linkedinHint: "Texte copié : colle-le dans ton post LinkedIn.",
       copiedLink: "Lien copié.",
       downloadDemo: "Image indisponible en mode démo (rendue par le serveur).",
-      /** `finding` : la trouvaille la plus forte (§18.26), à la place du chef d'accusation quand elle existe. */
-      text: (
-        stars: string,
-        overall: number,
-        profile: string | null,
-        status: string | null,
-        secs: number,
-        url: string,
-        rank: string | null = null,
-        finding: string | null = null,
-      ) =>
-        `Fiche ${stars}, ${overall}${profile ? ` · ${profile}` : ""}${rank ? ` · ${rank}` : ""}.${finding ? ` ${finding}` : status ? ` Chef d'accusation : « ${status} ».` : ""} Interrogatoire par une IA : ${secs} s. Fais la tienne : ${url}`,
-      /** `src` : « CV » ou « LinkedIn » (§18.24). */
-      textCompare: (src: string, cv: number, gh: number, profile: string | null, headline: string, url: string, rank: string | null = null) =>
-        `Mon ${src} : ${cv}. Mon GitHub : ${gh}${profile ? ` · ${profile}` : ""}${rank ? ` · ${rank}` : ""}. ${headline}. Fais la tienne : ${url}`,
+      /** Les morceaux du texte de partage, assemblés et raccourcis par lib/shareText.ts (§18.27). */
+      words: {
+        plea: (pleaded: string, verdict: string) => `Je plaidais ${pleaded}. Verdict : ${verdict}.`,
+        sheet: (stars: string, overall: number) => `Fiche ${stars}, ${overall}`,
+        /** Après la ligne du pari : le verdict porte déjà les étoiles. */
+        score: (overall: number) => `Note ${overall}`,
+        charge: (status: string) => `Chef d'accusation : « ${status} ».`,
+        ai: (secs: number) => `Interrogatoire par une IA : ${secs} s.`,
+        /** `src` : « CV » ou « LinkedIn » (§18.24). */
+        compare: (src: string, declared: number, github: number, stars: string | null) =>
+          `Mon ${src} : ${declared}. Mon GitHub : ${stars ? `${stars}, ` : ""}${github}`,
+        cta: "Fais la tienne :",
+      },
     },
     /* Rang de la semaine (§18.22), en tête de l'après-fiche. « n° 1 » plutôt que « 1er » : rien ne s'accorde. */
     week: {
@@ -610,10 +608,15 @@ const en: Dict = {
       linkedinHint: "Text copied: paste it into your LinkedIn post.",
       copiedLink: "Link copied.",
       downloadDemo: "Image unavailable in demo mode (rendered by the server).",
-      text: (stars, overall, profile, status, secs, url, rank = null, finding = null) =>
-        `${stars} sheet, ${overall}${profile ? ` · ${profile}` : ""}${rank ? ` · ${rank}` : ""}.${finding ? ` ${finding}` : status ? ` Charge: “${status}”.` : ""} Interrogated by an AI for ${secs}s. Make yours: ${url}`,
-      textCompare: (src, cv, gh, profile, headline, url, rank = null) =>
-        `My ${src}: ${cv}. My GitHub: ${gh}${profile ? ` · ${profile}` : ""}${rank ? ` · ${rank}` : ""}. ${headline}. Make yours: ${url}`,
+      words: {
+        plea: (pleaded, verdict) => `I pleaded ${pleaded}. Verdict: ${verdict}.`,
+        sheet: (stars, overall) => `${stars} sheet, ${overall}`,
+        score: (overall) => `Score ${overall}`,
+        charge: (status) => `Charge: “${status}”.`,
+        ai: (secs) => `Interrogated by an AI for ${secs}s.`,
+        compare: (src, declared, github, stars) => `My ${src}: ${declared}. My GitHub: ${stars ? `${stars}, ` : ""}${github}`,
+        cta: "Make yours:",
+      },
     },
     week: {
       line: (rank, total, gap) => `#${rank} of ${total} this week · ${gap} ${gap === 1 ? "point" : "points"} from the top 5`,

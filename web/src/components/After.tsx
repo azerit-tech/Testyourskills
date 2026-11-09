@@ -6,7 +6,9 @@ import { declaredOf, STAT_CODES, starsFor } from "../../../shared/types";
 import { pick, useT } from "../i18n";
 import { api, images, isMock, tokens, weekOf } from "../lib/api";
 import { navigate } from "../lib/router";
+import { getPlea } from "../lib/plea";
 import { setPrefill } from "../lib/session";
+import { shareLead, shareText, shareTextX, type ShareInput } from "../lib/shareText";
 import { copyText, isTouch, shareUrl } from "../lib/util";
 import { IconDownload, IconLink, IconLinkedIn, IconShare, IconX } from "./Icons";
 import { ProveGithub } from "./ProveGithub";
@@ -68,6 +70,40 @@ function bestStatus(card: CardData, lang: Lang): string | null {
   return sorted[0] ? pick(sorted[0].label, lang) : null;
 }
 
+/** Ce que le texte de partage dit d'une fiche (lib/shareText.ts) ; le pari vient de ce navigateur. */
+export function shareInput(item: Shareable, lang: Lang, rank: string | null): ShareInput {
+  const plea = getPlea(idOf(item));
+  if (item.kind === "card") {
+    const c = item.card;
+    return {
+      kind: "card",
+      stars: starsFor(c.overall),
+      overall: c.overall,
+      profile: c.profile ? pick(c.profile.label, lang) : null,
+      // La trouvaille la plus forte (§18.26) prend la place du chef d'accusation.
+      finding: c.findings?.[0] ? pick(c.findings[0].text, lang) : null,
+      status: bestStatus(c, lang),
+      secs: c.judgedInSeconds,
+      rank,
+      plea,
+    };
+  }
+  const cmp = item.comparison;
+  // Le profil de la fiche GitHub : après la comparaison, c'est lui qui porte l'écart (Faussaire).
+  const profile = cmp.github.profile ?? cmp.cv.profile;
+  return {
+    kind: "comparison",
+    stars: starsFor(cmp.github.overall),
+    src: declaredOf(cmp) === "linkedin" ? "LinkedIn" : "CV",
+    declared: cmp.cv.overall,
+    github: cmp.github.overall,
+    profile: profile ? pick(profile.label, lang) : null,
+    headline: pick(cmp.headline, lang),
+    rank,
+    plea,
+  };
+}
+
 export function ShareBar({ item, toast }: { item: Shareable; toast: (m: string) => void }) {
   const { t, lang } = useT();
   const id = idOf(item);
@@ -77,20 +113,7 @@ export function ShareBar({ item, toast }: { item: Shareable; toast: (m: string) 
   // Le rang n'entre dans le texte que pendant sa semaine : « 7e cette semaine ».
   const rank = week && !week.closed ? t.result.week.share(week.rank) : null;
 
-  const text = (withUrl: string) => {
-    if (item.kind === "card") {
-      const c = item.card;
-      const profile = c.profile ? pick(c.profile.label, lang) : null;
-      // La trouvaille la plus forte (§18.26) prend la place du chef d'accusation.
-      const finding = c.findings?.[0] ? pick(c.findings[0].text, lang) : null;
-      return ts.text("★".repeat(starsFor(c.overall)), c.overall, profile, bestStatus(c, lang), c.judgedInSeconds, withUrl, rank, finding);
-    }
-    const cmp = item.comparison;
-    // Le profil de la fiche GitHub : après la comparaison, c'est lui qui porte l'écart (Faussaire).
-    const profile = cmp.github.profile ?? cmp.cv.profile;
-    const src = declaredOf(cmp) === "linkedin" ? "LinkedIn" : "CV";
-    return ts.textCompare(src, cmp.cv.overall, cmp.github.overall, profile ? pick(profile.label, lang) : null, pick(cmp.headline, lang), withUrl, rank);
-  };
+  const input = shareInput(item, lang, rank);
 
   const liHref = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
   const track = (channel: string) => api.track("card_shared", id, { channel, kind: item.kind });
@@ -98,7 +121,7 @@ export function ShareBar({ item, toast }: { item: Shareable; toast: (m: string) 
 
   const onNative = async () => {
     try {
-      await navigator.share({ title: "Testyourskills", text: text("").trim(), url });
+      await navigator.share({ title: "Testyourskills", text: shareLead(ts.words, input), url });
       track("native");
     } catch {
       /* partage annulé */
@@ -109,7 +132,7 @@ export function ShareBar({ item, toast }: { item: Shareable; toast: (m: string) 
     // Bouton plutôt que lien : certains bloqueurs masquent les liens de partage LinkedIn.
     window.open(liHref, "_blank", "noopener");
     // LinkedIn n'accepte plus de texte prérempli : on le met dans le presse-papier.
-    const ok = await copyText(text(url));
+    const ok = await copyText(shareText(ts.words, input, url));
     if (ok) toast(ts.linkedinHint);
     track("linkedin");
   };
@@ -121,7 +144,7 @@ export function ShareBar({ item, toast }: { item: Shareable; toast: (m: string) 
   };
 
   const filename = `testyourskills-${item.kind === "card" ? item.card.login ?? item.card.initials : "comparaison"}.png`;
-  const xHref = `https://x.com/intent/post?text=${encodeURIComponent(text("").trim())}&url=${encodeURIComponent(url)}`;
+  const xHref = `https://x.com/intent/post?text=${encodeURIComponent(shareTextX(ts.words, input))}&url=${encodeURIComponent(url)}`;
 
   return (
     <section className="after-block out" aria-labelledby="out-title">
