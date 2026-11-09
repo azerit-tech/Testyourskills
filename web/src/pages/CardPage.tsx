@@ -348,7 +348,8 @@ function Result({ item, animate, owner, fresh, notice, me, onMe, onDeleted }: Re
       </section>
 
       <div className={`after${settled ? " is-in" : ""}`} aria-hidden={!settled} inert={!settled ? true : undefined}>
-        <ShareBar item={item} toast={toast.show} />
+        {/* Fiche masquée : /og/* et /c/:id répondent 404 / 410 à tous, l'image ne se télécharge pas et le lien ne montre rien. */}
+        {!(claimed && me?.hidden) && <ShareBar item={item} toast={toast.show} />}
         <LinkedInPhoto cardId={id} hasAvatar={item.kind === "card" ? !!item.card.avatarUrl : !!item.comparison.cv.avatarUrl} />
         <Claim cardId={id} login={cardLogin} lawyer={!owner} me={me} onMe={onMe} toast={toast.show} />
         <Why item={item} />
