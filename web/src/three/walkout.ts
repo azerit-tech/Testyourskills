@@ -33,7 +33,7 @@ import { createCardMesh } from "./cardMesh";
 import { chairMaterial, createChair } from "./chair";
 import { createElevatorSound } from "./elevatorSound";
 import { createHud, type Hud } from "./hud";
-import type { HudTexts } from "./hudTexts";
+import { STAR_THRESHOLDS, type HudTexts } from "./hudTexts";
 import { createRadioSound } from "./radioSound";
 import { LensEffect, WhiteBalanceEffect, makeLensDirtTexture, whiteBalanceGains } from "./lens";
 import { createPlayer } from "./player";
@@ -178,8 +178,6 @@ const PLAN = {
   mission: [15.2, 16.7] as Win,
   card: 16.7,
 };
-/** Les étoiles de recherche (SPEC §17.3) : seuils de note, dans l'ordre. */
-const STAR_AT = [1, 45, 60, 75, 90];
 /** Les néons de l'open space : rose côté gauche, cyan côté droit. */
 const PINK = PALETTE.pink;
 const CYAN = PALETTE.cyan;
@@ -721,6 +719,8 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
           accent: accent.a,
           // pas de mini-carte : dans une cabine, on ne va nulle part
           map: false,
+          // « Voir ma fiche » sur le carton : la séquence s'arrête, la fiche s'affiche
+          onCta: () => handle.skip(),
         })
       : null;
   if (hud) disposables.push(hud);
@@ -749,10 +749,8 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
   const autoFired = new Set<number>();
   /** Étoiles allumées à l'image précédente ; le message radio en cours. */
   let lastStars = 0;
-  let radioMsg = "";
-  let radioUntil = -99;
   let prevT = -1;
-  const starsAt = (level: number) => STAR_AT.filter((th) => level >= th).length;
+  const starsAt = (level: number) => STAR_THRESHOLDS.filter((th) => level >= th).length;
   const shakeSeed = Math.random() * 100;
   let cardTarget: THREE.Vector3 | null = null;
   const camPos = new THREE.Vector3();
@@ -975,9 +973,6 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
       if (si !== lastStatus) {
         lastStatus = si;
         statusUntil = t + STATUS_HOLD;
-        // le même statut passe à la radio, en bas de l'écran
-        radioMsg = o.texts.statuses[si]?.label ?? "";
-        radioUntil = statusUntil;
       }
       // à l'arrivée, le statut final reste
       if (t < statusUntil || t >= plan.arrive) setWall(`status-${si}`, t, () => screen.caption(o.texts.statusLabel, o.texts.statuses[si]?.label ?? ""));
@@ -1170,12 +1165,11 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
     whiteBalance.gains.lerpVectors(WB_CABIN, WB_OFFICE, inOut(seg(t, plan.doors + 0.3, 1.5)));
     void dt;
 
-    /* le HUD : étoiles, radio, lignes du dossier (chacune reste une fois sa
+    /* le HUD : étoiles, lignes du dossier (chacune reste une fois sa
      * révélation chromée repartie), carton de fin de mission, fondu à la passation */
     hud?.update({
       t,
       stars,
-      radio: t >= plan.depart && t < radioUntil ? radioMsg : "",
       lines: tells.filter((tl) => t >= tl.win[1] - 0.35).length,
       mission: within(t, plan.mission) ? Math.min(seg(t, plan.mission[0], 0.3), 1 - seg(t, plan.mission[1] - 0.25, 0.25)) : 0,
       distance: 0,
