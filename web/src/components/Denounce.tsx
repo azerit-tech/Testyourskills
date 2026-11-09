@@ -4,6 +4,7 @@
 // révélation de l'autre. L'attente reste dans le bloc.
 import { useEffect, useId, useRef, useState } from "react";
 import type { FormEvent } from "react";
+import { starsLine } from "../../../shared/stars";
 import type { CardData, Lang } from "../../../shared/types";
 import { LEVEL_LABELS, starsFor } from "../../../shared/types";
 import { pick, useT } from "../i18n";
@@ -201,12 +202,13 @@ export function Denounce({ cardId, selfLogin, toast }: Props) {
 }
 
 /** Ce que le dénonciateur reçoit : la fiche du complice résumée, prête à partager. */
-function Wanted({ card, x, toast, onAgain }: { card: CardData; x: string | null; toast: (m: string) => void; onAgain: () => void }) {
+export function Wanted({ card, x, toast, onAgain }: { card: CardData; x: string | null; toast: (m: string) => void; onAgain: () => void }) {
   const { t, lang } = useT();
   const d = t.denounce;
   const login = card.login ?? card.name;
   const n = starsFor(card.overall);
-  const stars = "★".repeat(n);
+  // Les six, pleines puis vides (§18.27).
+  const stars = starsLine(n);
   const tag = tagOf(card, lang);
   const status = bestStatus(card, lang);
   const url = shareUrl(card.id);

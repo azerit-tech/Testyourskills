@@ -2,6 +2,7 @@
 // lisent les balises Open Graph et Twitter sans exécuter de JS, puis le
 // navigateur charge le front SPA qui affiche la carte.
 
+import { starsLine } from "../../shared/stars";
 import type { CardData, ComparisonData, Lang, Special } from "../../shared/types";
 import { declaredOf, LEVEL_LABELS, starsFor } from "../../shared/types";
 
@@ -26,9 +27,9 @@ export function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]!);
 }
 
-/** « Fiche ★★★★, 78 » / « ★★★★ sheet, 78 » ; une spéciale ajoute son nom (§17.3). */
+/** « Fiche ★★★★★☆, 78 » / « ★★★★★☆ sheet, 78 » ; une spéciale ajoute son nom (§17.3). */
 export function cardLabel(card: Pick<CardData, "tier" | "special" | "overall">, lang: Lang): string {
-  const stars = "★".repeat(starsFor(card.overall));
+  const stars = starsLine(starsFor(card.overall));
   const special = card.special ? ` ${SPECIAL_NAMES[lang][card.special]}` : "";
   return lang === "fr" ? `Fiche ${stars}${special}, ${card.overall}` : `${stars}${special} sheet, ${card.overall}`;
 }
@@ -67,12 +68,12 @@ export function metaFor(data: CardData | ComparisonData, baseUrl: string): PageM
   const lang = data.lang ?? "fr";
   const fr = lang === "fr";
   const label = cardLabel(data, lang);
-  // §18.7 : « @X est dans le viseur ★★★★ · Oiseau de nuit » (épicène, §18.18) ;
-  // sans profil (fiche d'avant le barème 0.2.0), le niveau.
+  // §18.7 : « @X est dans le viseur ★★★★☆☆ · Oiseau de nuit » (épicène, §18.18 ;
+  // les six étoiles, §18.27) ; sans profil (fiche d'avant le barème 0.2.0), le niveau.
   const who = data.login ? `@${data.login}` : data.name;
   const n = starsFor(data.overall);
   const tag = data.profile ? data.profile.label[lang] : LEVEL_LABELS[n][lang];
-  const title = `${who} ${fr ? "est dans le viseur" : "is in the crosshairs"} ${"★".repeat(n)} · ${tag}`;
+  const title = `${who} ${fr ? "est dans le viseur" : "is in the crosshairs"} ${starsLine(n)} · ${tag}`;
   const status = data.statuses[0]?.label[lang];
   const parts = [
     status ? (fr ? `Chef d'accusation : « ${status} ».` : `Charge: "${status}".`) : "",

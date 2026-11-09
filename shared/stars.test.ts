@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { LEVEL_LABELS, STAR_THRESHOLDS, starsFor, type Stars } from "./types";
 import { THEMES, themeOf } from "./card/themes";
+import { starsLine } from "./stars";
 
 describe("six étoiles", () => {
   it("allume une étoile à chaque seuil", () => {
@@ -31,5 +32,11 @@ describe("six étoiles", () => {
     for (let n = 1; n <= 6; n++) expect(THEMES[`s${n as Stars}`]).toBeDefined();
     expect(themeOf({ overall: 95 }).key).toBe("s6");
     expect(themeOf({ overall: 95, special: "totw" }).key).toBe("totw");
+  });
+
+  it("dans un texte, toujours les six, pleines puis vides (§18.27)", () => {
+    expect(starsLine(starsFor(78))).toBe("★★★★★☆");
+    expect(starsLine(1)).toBe("★☆☆☆☆☆");
+    expect(starsLine(6)).toBe("★★★★★★");
   });
 });

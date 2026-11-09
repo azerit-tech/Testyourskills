@@ -227,10 +227,10 @@ describe("événements de la dénonciation", () => {
 });
 
 describe("balises OG de /c/:id (§18.7)", () => {
-  it("« @X est dans le viseur ★★★★★ · {profil} »", async () => {
+  it("« @X est dans le viseur ★★★★★☆ · {profil} »", async () => {
     const ctx = setup();
     const { json } = await post(ctx, { login: "leamd" });
     const html = await (await ctx.app.request(`/c/${json.id}`)).text();
-    expect(html).toContain(`<meta property="og:title" content="@leamd est dans le viseur ★★★★★ · ${FIXTURES.gold.profile!.label.fr}">`);
+    expect(html).toContain(`<meta property="og:title" content="@leamd est dans le viseur ★★★★★☆ · ${FIXTURES.gold.profile!.label.fr}">`);
   });
 });

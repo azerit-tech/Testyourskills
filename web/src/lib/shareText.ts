@@ -1,6 +1,7 @@
 // Le texte de partage (§18.27), en fonction pure : six étoiles pleines puis
 // vides, le pari s'il existe, le profil, la trouvaille, le rang, le lien.
 // Les mots viennent d'i18n (`result.share.words`) ; rien ici ne lit le navigateur.
+import { starsLine } from "../../../shared/stars";
 import type { Dict } from "../i18n";
 
 export type ShareWords = Dict["result"]["share"]["words"];
@@ -38,11 +39,7 @@ export interface ComparisonShare extends Common {
 
 export type ShareInput = CardShare | ComparisonShare;
 
-/** Six étoiles, pleines puis vides : ★★★★☆☆. */
-export function starsLine(n: number): string {
-  const on = Math.max(0, Math.min(6, Math.round(Number.isFinite(n) ? n : 0)));
-  return "★".repeat(on) + "☆".repeat(6 - on);
-}
+export { starsLine };
 
 /** X plafonne un post à 280 caractères et compte tout lien pour 23. */
 export const X_MAX = 280;

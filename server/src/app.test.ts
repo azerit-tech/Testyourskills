@@ -899,9 +899,10 @@ describe("page /c/:id et images", () => {
     expect(res.status).toBe(200);
     const html = await res.text();
     const overall = FIXTURES.gold.overall;
-    // §18.7 : « @X est dans le viseur ★★★★★ · {profil} ».
+    // §18.7 : « @X est dans le viseur ★★★★★☆ · {profil} », les six étoiles (§18.27).
     expect(overall).toBeGreaterThanOrEqual(75);
-    expect(html).toContain(`<meta property="og:title" content="@leamd est dans le viseur ★★★★★ · ${FIXTURES.gold.profile!.label.fr}">`);
+    expect(html).toContain(`<meta property="og:title" content="@leamd est dans le viseur ★★★★★☆ · ${FIXTURES.gold.profile!.label.fr}">`);
+    expect(html).toContain(`content="Fiche ★★★★★☆, ${overall}, fiche de dev de`);
     expect(html).toContain(`<meta property="og:image" content="https://skills.test/og/${id}.png">`);
     expect(html).toContain(`<meta property="og:url" content="https://skills.test/c/${id}">`);
     expect(html).toContain(`<meta property="og:image:width" content="1200">`);
