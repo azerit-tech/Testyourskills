@@ -23,6 +23,8 @@ export const STRINGS = {
     insufficient: "données insuffisantes",
     buzzNote: "hors note",
     cta: "Fais la tienne",
+    /** Titre des images de partage, comme la page partagée (§18.18). */
+    poster: "Avis de recherche",
     card: "Fiche",
     stars: (n: number) => `${n} étoile${n > 1 ? "s" : ""} sur 6`,
     cvSide: "Ce que ton CV déclare",
@@ -55,6 +57,7 @@ export const STRINGS = {
     insufficient: "not enough data",
     buzzNote: "not rated",
     cta: "Make yours",
+    poster: "Wanted",
     card: "Sheet",
     stars: (n: number) => `${n} star${n > 1 ? "s" : ""} out of 6`,
     cvSide: "What your CV claims",

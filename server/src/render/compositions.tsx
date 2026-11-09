@@ -1,23 +1,33 @@
 // Compositions des images partagées : carte seule, aperçu de lien 1200 × 630,
 // portrait 1080 × 1350, et leurs variantes « comparaison ». Tout est en SVG,
 // la carte y est imbriquée telle quelle (même composant qu'à l'écran).
+// Style mat (SPEC §18.18, maquette web/gta-image.html) : une illustration en
+// aplats superposés derrière la fiche, et AUCUN dégradé en plus de celui de
+// la fiche. Seule lumière : le halo de ★★★★★★, un rectangle flou derrière la
+// fiche (le drop-shadow CSS de l'écran ne passe pas dans le PNG).
+import type { ReactNode } from "react";
 import type { CardData, ComparisonData, Lang, StatCode } from "../../../shared/types";
 import { STAT_CODES } from "../../../shared/types";
 import { CardGraphic } from "../../../shared/card/Card";
 import { AzeritGem } from "../../../shared/card/AzeritGem";
 import { fontAttrs } from "../../../shared/card/fonts";
-import { CARD_H, CARD_PATH, CARD_W } from "../../../shared/card/geometry";
+import { CARD_H, CARD_R, CARD_W } from "../../../shared/card/geometry";
 import { t } from "../../../shared/card/i18n";
-import { fit, measure, upper, wrap } from "../../../shared/card/text";
-import { themeOf } from "../../../shared/card/themes";
+import { fit, upper, wrap } from "../../../shared/card/text";
+import { PALETTE, themeOf } from "../../../shared/card/themes";
 
-const BG = "#0a0f16";
-const TEXT = "#e6ecf2";
-const MUTED = "#8494a5";
-const TEAL = "#52d0bd";
-const BLUE = "#6cb6ff";
-const RED = "#ff8b7b";
-const AMBER = "#ffc861";
+/** Aplats de l'illustration (maquette web/gta-image.html). */
+const SCENE = {
+  sky: "#2d2a66",
+  sun: "#e98a98",
+  far: "#463b84",
+  palm: "#241f55",
+  near: "#1d1946",
+  ground: "#121130",
+  window: "#ffc46b",
+};
+
+const PALM = "M46 140c2-34 5-62 12-86l4 1c-8 24-11 52-12 85zM60 54C40 38 20 38 4 50c18-4 36 0 56 7zM60 54C36 56 18 68 10 88c14-14 30-22 50-30zM60 54c18-22 40-28 60-20-20 0-40 8-60 24zM60 54c26-2 44 10 54 30-14-14-32-22-54-26zM60 54c-6-22-2-40 8-52-2 16 0 32-4 50zM60 54c10-20 26-32 44-34-16 8-30 20-42 36zM60 54c-14-14-18-30-14-48 4 16 10 30 16 46z";
 
 export interface Avatars {
   [cardId: string]: string | undefined;
@@ -37,157 +47,121 @@ export function ctaHost(): string {
   }
 }
 
-/** Couleur claire représentative du néon d'une fiche (lumière du fond). */
-function lightOf(card: CardData): string {
-  return themeOf(card).accent;
-}
-
+/* ------------------------------------------------------------------ */
+/* Décor                                                                */
 /* ------------------------------------------------------------------ */
 
-function Backdrop({ w, h, glows, id }: { w: number; h: number; glows: { x: number; y: number; r: number; color: string; o: number }[]; id: string }) {
-  return (
-    <>
-      <defs>
-        {glows.map((g, i) => (
-          <radialGradient key={i} id={`${id}-g${i}`} cx={g.x} cy={g.y} r={g.r} gradientUnits="userSpaceOnUse">
-            <stop offset="0" stopColor={g.color} stopOpacity={g.o} />
-            <stop offset="0.5" stopColor={g.color} stopOpacity={g.o * 0.3} />
-            <stop offset="1" stopColor={g.color} stopOpacity={0} />
-          </radialGradient>
-        ))}
-        <radialGradient id={`${id}-teal`} cx={0} cy={0} r={w * 0.7} gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor={TEAL} stopOpacity={0.16} />
-          <stop offset="1" stopColor={TEAL} stopOpacity={0} />
-        </radialGradient>
-        <radialGradient id={`${id}-blue`} cx={w} cy={h} r={w * 0.7} gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor={BLUE} stopOpacity={0.12} />
-          <stop offset="1" stopColor={BLUE} stopOpacity={0} />
-        </radialGradient>
-        <pattern id={`${id}-dots`} width="22" height="22" patternUnits="userSpaceOnUse">
-          <circle cx="11" cy="11" r="1" fill="#ffffff" />
-        </pattern>
-        <radialGradient id={`${id}-dotfade`} cx={w / 2} cy={h / 2} r={Math.max(w, h) * 0.62} gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#fff" stopOpacity={0.7} />
-          <stop offset="1" stopColor="#fff" stopOpacity={0} />
-        </radialGradient>
-        <mask id={`${id}-dotmask`} maskUnits="userSpaceOnUse" x="0" y="0" width={w} height={h}>
-          <rect width={w} height={h} fill={`url(#${id}-dotfade)`} />
-        </mask>
-        <filter id={`${id}-noise`} x="0" y="0" width={w} height={h} filterUnits="userSpaceOnUse">
-          <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves={2} seed={8} result="n" />
-          <feColorMatrix in="n" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  2.2 0 0 0 -1.05" />
-        </filter>
-        <linearGradient id={`${id}-vig`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#000" stopOpacity={0.35} />
-          <stop offset="0.25" stopColor="#000" stopOpacity={0} />
-          <stop offset="0.75" stopColor="#000" stopOpacity={0} />
-          <stop offset="1" stopColor="#000" stopOpacity={0.45} />
-        </linearGradient>
-      </defs>
-      <rect width={w} height={h} fill={BG} />
-      <rect width={w} height={h} fill={`url(#${id}-teal)`} />
-      <rect width={w} height={h} fill={`url(#${id}-blue)`} />
-      <rect width={w} height={h} fill={`url(#${id}-dots)`} opacity={0.07} mask={`url(#${id}-dotmask)`} />
-      {glows.map((_, i) => (
-        <rect key={i} width={w} height={h} fill={`url(#${id}-g${i})`} />
-      ))}
-      <rect width={w} height={h} filter={`url(#${id}-noise)`} opacity={0.035} />
-      <rect width={w} height={h} fill={`url(#${id}-vig)`} />
-    </>
-  );
+/** Une rangée d'immeubles en aplat jusqu'à l'horizon `y`, pseudo-aléatoire mais stable. */
+function skyline(w: number, y: number, fill: string, seed: number, maxH: number, lights: boolean): ReactNode[] {
+  const out: ReactNode[] = [];
+  let x = 0;
+  let r = seed;
+  const rnd = () => (r = (r * 9301 + 49297) % 233280) / 233280;
+  while (x < w) {
+    const bw = 26 + rnd() * 50;
+    const bh = 30 + rnd() * (maxH - 30);
+    out.push(<rect key={`b${x}`} x={+x.toFixed(1)} y={+(y - bh).toFixed(1)} width={+(bw + 1).toFixed(1)} height={+(bh + 2).toFixed(1)} fill={fill} />);
+    if (lights) {
+      for (let k = 0; k < bh / 18 - 1; k++)
+        for (let j = 0; j < bw / 14 - 1; j++)
+          if (rnd() > 0.55) out.push(<rect key={`w${x}-${k}-${j}`} x={+(x + 6 + j * 13).toFixed(1)} y={+(y - bh + 10 + k * 17).toFixed(1)} width={4} height={5} fill={SCENE.window} fillOpacity={0.75} />);
+    }
+    x += bw;
+  }
+  return out;
 }
 
-/** Ombre portée de la silhouette, sous une carte placée en (x, y) de largeur w. */
-function CardShadow({ x, y, w, id }: { x: number; y: number; w: number; id: string }) {
-  const s = w / CARD_W;
+function Palm({ x, y, k, flip }: { x: number; y: number; k: number; flip?: boolean }) {
   return (
-    <>
-      <defs>
-        <filter id={`${id}-sh`} x="-30%" y="-30%" width="160%" height="160%">
-          <feGaussianBlur stdDeviation={10 / s > 0 ? 14 : 14} />
-        </filter>
-      </defs>
-      <g transform={`translate(${x} ${y + w * 0.05}) scale(${s})`}>
-        <path d={CARD_PATH} fill="#000" opacity={0.7} filter={`url(#${id}-sh)`} transform="translate(0 6)" />
-      </g>
-    </>
-  );
-}
-
-/** Lueur au sol sous la pointe de la carte. */
-function FloorGlow({ x, y, rx, color, id }: { x: number; y: number; rx: number; color: string; id: string }) {
-  return (
-    <>
-      <defs>
-        <radialGradient id={`${id}-floor`} cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform={`translate(${x} ${y}) scale(${rx} ${rx * 0.09})`}>
-          <stop offset="0" stopColor={color} stopOpacity={0.45} />
-          <stop offset="0.4" stopColor={color} stopOpacity={0.14} />
-          <stop offset="1" stopColor={color} stopOpacity={0} />
-        </radialGradient>
-      </defs>
-      <ellipse cx={x} cy={y} rx={rx} ry={rx * 0.09} fill={`url(#${id}-floor)`} />
-    </>
-  );
-}
-
-function Brand({ x, y, anchor = "start", size = 1 }: { x: number; y: number; id: string; anchor?: "start" | "middle"; size?: number }) {
-  const label = "TESTYOURSKILLS";
-  const fs = 15 * size;
-  const ls = 4 * size;
-  const tw = measure(label, "mono-700", fs, ls);
-  const gemH = 26 * size;
-  const gemW = gemH * (104 / 120);
-  const total = gemW + 12 * size + tw;
-  const x0 = anchor === "middle" ? x - total / 2 : x;
-  return (
-    <g>
-      <AzeritGem x={x0} y={y - gemH * 0.78} h={gemH} />
-      <text x={x0 + gemW + 12 * size} y={y} {...fontAttrs("mono-700")} fontSize={fs} letterSpacing={ls} fill={TEXT} fillOpacity={0.82}>
-        {label}
-      </text>
+    <g transform={`translate(${x} ${y}) scale(${flip ? -k : k} ${k})`} fill={SCENE.palm}>
+      <path d={PALM} />
     </g>
   );
 }
 
-/** « Fais la tienne → skills.azerit.tech » ; la flèche est dessinée (absente des TTF). */
-function Cta({ x, y, lang, anchor = "start", size = 1 }: { x: number; y: number; lang: Lang; anchor?: "start" | "middle"; size?: number }) {
-  const s = t(lang);
-  const fs = 20 * size;
-  const ls = 0.4 * size;
-  const host = ctaHost();
-  const w1 = measure(s.cta, "mono-500", fs, ls);
-  const arrow = 26 * size;
-  const w2 = measure(host, "mono-500", fs, ls);
-  const total = w1 + arrow + w2;
-  const x0 = anchor === "middle" ? x - total / 2 : x;
-  const ay = y - fs * 0.34;
+/** Le front de mer au crépuscule, en aplats : ciel, soleil, deux rangées d'immeubles, palmiers, sol. */
+function Scene({ w, h, horizon, sun, maxH, palms }: { w: number; h: number; horizon: number; sun: { x: number; y: number; r: number }; maxH: number; palms: { x: number; y: number; k: number; flip?: boolean }[] }) {
   return (
     <g>
-      <text x={x0} y={y} {...fontAttrs("mono-500")} fontSize={fs} letterSpacing={ls} fill={MUTED}>
-        {s.cta}
-      </text>
-      <path
-        d={`M${x0 + w1 + 6 * size} ${ay} H${x0 + w1 + arrow - 7 * size} M${x0 + w1 + arrow - 12 * size} ${ay - 5 * size} L${x0 + w1 + arrow - 7 * size} ${ay} L${x0 + w1 + arrow - 12 * size} ${ay + 5 * size}`}
-        fill="none"
-        stroke={TEAL}
-        strokeWidth={2 * size}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <text x={x0 + w1 + arrow} y={y} {...fontAttrs("mono-500")} fontSize={fs} letterSpacing={ls} fill={TEXT}>
+      <rect width={w} height={h} fill={SCENE.sky} />
+      <circle cx={sun.x} cy={sun.y} r={sun.r} fill={SCENE.sun} />
+      {skyline(w, horizon, SCENE.far, 7, maxH, false)}
+      {palms.map((p, i) => (
+        <Palm key={i} {...p} />
+      ))}
+      {skyline(w, horizon, SCENE.near, 31, maxH * 0.8, true)}
+      <rect y={horizon} width={w} height={h - horizon} fill={SCENE.ground} />
+    </g>
+  );
+}
+
+/** Fond d'encre plat, pour les comparaisons (deux fiches, déjà chargées). */
+function Ink({ w, h }: { w: number; h: number }) {
+  return <rect width={w} height={h} fill={PALETTE.ink0} />;
+}
+
+/** Halo extérieur de ★★★★★★ : un rectangle flou derrière la fiche, rien pour les autres niveaux. */
+function CardHalo({ card, x, y, w, id }: { card: CardData; x: number; y: number; w: number; id: string }) {
+  if (!themeOf(card).rim) return null;
+  const s = w / CARD_W;
+  const h = CARD_H * s;
+  const blur = 10 * s;
+  return (
+    <>
+      <defs>
+        <filter id={`${id}-halo`} x={x - blur * 4} y={y - blur * 4} width={w + blur * 8} height={h + blur * 8} filterUnits="userSpaceOnUse">
+          <feGaussianBlur stdDeviation={blur} />
+        </filter>
+      </defs>
+      <rect x={x - 2 * s} y={y - 2 * s} width={w + 4 * s} height={h + 4 * s} rx={(CARD_R + 2) * s} fill={PALETTE.rimGlow} fillOpacity={0.55} filter={`url(#${id}-halo)`} />
+      <rect x={x - 0.6 * s} y={y - 0.6 * s} width={w + 1.2 * s} height={h + 1.2 * s} rx={(CARD_R + 0.6) * s} fill="none" stroke={PALETTE.rimCore} strokeWidth={1.2 * s} />
+    </>
+  );
+}
+
+/** La fiche posée dans une composition, avec son halo si elle est ★★★★★★. */
+function Placed({ card, lang, avatars, id, x, y, w }: { card: CardData; lang: Lang; avatars: Avatars; id: string; x: number; y: number; w: number }) {
+  return (
+    <>
+      <CardHalo card={card} x={x} y={y} w={w} id={id} />
+      <CardGraphic card={card} lang={lang} avatarHref={av(avatars, card.id)} idPrefix={`${id}c`} x={x} y={y} width={w} height={(w * CARD_H) / CARD_W} />
+    </>
+  );
+}
+
+/** « skills.azerit.tech » précédé de la gemme, centré ou calé à gauche. */
+function Host({ x, y, size, anchor = "middle" }: { x: number; y: number; size: number; anchor?: "start" | "middle" }) {
+  const host = upper(ctaHost(), "en");
+  const ls = size * 0.2;
+  const f = fit(host, { font: "sans-600", size, minSize: size, maxWidth: 4000, letterSpacing: ls });
+  const gemH = size * 1.15;
+  const gemW = gemH * (104 / 120);
+  const gap = size * 0.5;
+  const total = gemW + gap + f.width;
+  const x0 = anchor === "middle" ? x - total / 2 : x;
+  return (
+    <g>
+      <AzeritGem x={x0} y={y - gemH * 0.9} h={gemH} />
+      <text x={x0 + gemW + gap} y={y} {...fontAttrs("sans-600")} fontSize={size} letterSpacing={ls} fill={PALETTE.lilac} fillOpacity={0.8}>
         {host}
       </text>
     </g>
   );
 }
 
-function tierKicker(card: CardData, lang: Lang): string {
-  const th = themeOf(card);
-  return upper(`${th.label[lang]} · ${card.overall}`, lang);
+/** Surtitre « AVIS DE RECHERCHE », crème plat. */
+function Poster({ x, y, size, lang, anchor = "middle" }: { x: number; y: number; size: number; lang: Lang; anchor?: "start" | "middle" }) {
+  const ls = size * 0.34;
+  return (
+    <text x={anchor === "middle" ? x + ls / 2 : x} y={y} {...fontAttrs("sans-600")} fontSize={size} letterSpacing={ls} textAnchor={anchor} fill={PALETTE.cream} fillOpacity={0.6}>
+      {upper(t(lang).poster, lang)}
+    </text>
+  );
 }
 
 function mainStatus(card: CardData, lang: Lang): string | null {
-  const st = card.statuses.find((x) => x.tone !== "positive") ?? card.statuses[0];
+  const order = ["gap", "negative", "special", "positive"];
+  const st = [...card.statuses].sort((a, b) => order.indexOf(a.tone) - order.indexOf(b.tone))[0];
   return st ? st.label[lang] ?? st.label.fr : null;
 }
 
@@ -207,48 +181,44 @@ export function CardOnly({ card, lang, avatars }: { card: CardData; lang: Lang; 
 /* Aperçu de lien 1200 × 630                                            */
 /* ------------------------------------------------------------------ */
 
+/** La fiche à gauche ; à droite seulement ce qui ne s'y lit pas en vignette :
+ *  le nom en grand et le chef d'accusation le plus drôle. La note, le niveau
+ *  et le pied sont sur la fiche, ils ne sont pas répétés. */
 export function OgImage({ card, lang, avatars }: { card: CardData; lang: Lang; avatars: Avatars }) {
   const W = 1200;
   const H = 630;
   const ch = 566;
   const cw = (ch * CARD_W) / CARD_H;
-  const cx = 104;
+  const cx = 88;
   const cy = 32;
   const s = t(lang);
-  const th = themeOf(card);
-  const light = lightOf(card);
-  const tx = 600;
-  const maxW = 540;
+  const tx = 560;
+  const maxW = W - tx - 64;
   const name = fit(upper(card.name, lang), { font: "display-700", size: 84, minSize: 50, maxWidth: maxW, letterSpacing: 0.5 });
   const quote = mainStatus(card, lang);
-  const quoted = quote ? (lang === "fr" ? `«\u00a0${quote}\u00a0»` : `“${quote}”`) : "";
-  const qLines = quote ? wrap(quoted, "sans-600", 34, maxW, 2) : [];
-  const kicker = tierKicker(card, lang);
-  const kickColor = th.ink;
-  const footer = `${s.judged(card.judgedInSeconds)} · ${s.reliability} ${s.percent(card.reliability)}`;
+  const quoted = quote ? (lang === "fr" ? `« ${quote} »` : `“${quote}”`) : "";
+  const qLines = quote ? wrap(quoted, "sans-600", 36, maxW, 2) : [];
+  const cta = lang === "fr" ? `${s.cta}\u00a0:` : `${s.cta}:`;
+  const ctaW = fit(cta, { font: "sans-500", size: 26, minSize: 26, maxWidth: 4000 }).width;
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
-      <Backdrop w={W} h={H} id="og" glows={[{ x: cx + cw / 2, y: cy + ch * 0.42, r: 420, color: light, o: 0.32 }]} />
-      <CardShadow x={cx} y={cy} w={cw} id="og" />
-      <CardGraphic card={card} lang={lang} avatarHref={av(avatars, card.id)} idPrefix="ogc" x={cx} y={cy} width={cw} height={ch} />
-
-      <Brand x={tx} y={96} id="og" />
-      <text x={tx} y={172} {...fontAttrs("mono-700")} fontSize={18} letterSpacing={4} fill={kickColor}>
-        {kicker}
-      </text>
-      <text x={tx} y={272} {...fontAttrs("display-700")} fontSize={name.size} letterSpacing={name.letterSpacing} fill={TEXT}>
+      <Scene w={W} h={H} horizon={556} sun={{ x: cx + cw / 2, y: 470, r: 300 }} maxH={120} palms={[{ x: W - 170, y: 300, k: 1.6, flip: true }]} />
+      <Placed card={card} lang={lang} avatars={avatars} id="og" x={cx} y={cy} w={cw} />
+      <Poster x={tx} y={118} size={22} lang={lang} anchor="start" />
+      <text x={tx - 2} y={212} {...fontAttrs("display-700")} fontSize={name.size} letterSpacing={name.letterSpacing} fill={PALETTE.cream}>
         {name.text}
       </text>
-      <rect x={tx} y={296} width={64} height={3} rx={1.5} fill={TEAL} />
       {qLines.map((l, i) => (
-        <text key={i} x={tx} y={362 + i * 44} {...fontAttrs("sans-600")} fontSize={34} fill={TEXT} fillOpacity={0.92}>
+        <text key={i} x={tx} y={286 + i * 46} {...fontAttrs("sans-600")} fontSize={36} fill={PALETTE.blush}>
           {l}
         </text>
       ))}
-      <text x={tx} y={362 + Math.max(1, qLines.length) * 44 + 12} {...fontAttrs("mono-400")} fontSize={17} fill={MUTED}>
-        {footer}
+      <text x={tx} y={604} {...fontAttrs("sans-500")} fontSize={26} fill={PALETTE.lilac} fillOpacity={0.8}>
+        {cta}
       </text>
-      <Cta x={tx} y={574} lang={lang} />
+      <text x={tx + ctaW + 10} y={604} {...fontAttrs("sans-600")} fontSize={26} fill={PALETTE.cream}>
+        {ctaHost()}
+      </text>
     </svg>
   );
 }
@@ -257,27 +227,31 @@ export function OgImage({ card, lang, avatars }: { card: CardData; lang: Lang; a
 /* Portrait 1080 × 1350                                                 */
 /* ------------------------------------------------------------------ */
 
+/** La fiche en grand (76 % de la largeur, lisible en miniature dans un fil),
+ *  le titre « Avis de recherche » au-dessus, l'adresse dessous. Le profil est
+ *  déjà sur la fiche : il n'est pas répété. */
 export function PortraitImage({ card, lang, avatars }: { card: CardData; lang: Lang; avatars: Avatars }) {
   const W = 1080;
   const H = 1350;
-  const cw = 736;
-  const ch = (cw * CARD_H) / CARD_W;
+  const cw = 820;
   const cx = (W - cw) / 2;
-  const cy = 176;
-  const light = lightOf(card);
-  const th = themeOf(card);
-  const kicker = tierKicker(card, lang);
+  const cy = 92;
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
-      <Backdrop w={W} h={H} id="pt" glows={[{ x: W / 2, y: cy + ch * 0.4, r: 640, color: light, o: 0.34 }]} />
-      <Brand x={W / 2} y={82} id="pt" anchor="middle" size={1.1} />
-      <text x={W / 2} y={136} {...fontAttrs("mono-700")} fontSize={21} letterSpacing={5} textAnchor="middle" fill={th.ink}>
-        {kicker}
-      </text>
-      <FloorGlow x={W / 2} y={cy + ch + 6} rx={cw * 0.55} color={light} id="pt" />
-      <CardShadow x={cx} y={cy} w={cw} id="pt" />
-      <CardGraphic card={card} lang={lang} avatarHref={av(avatars, card.id)} idPrefix="ptc" x={cx} y={cy} width={cw} height={ch} />
-      <Cta x={W / 2} y={1306} lang={lang} anchor="middle" size={1.2} />
+      <Scene
+        w={W}
+        h={H}
+        horizon={1180}
+        sun={{ x: W / 2, y: 900, r: 470 }}
+        maxH={170}
+        palms={[
+          { x: -150, y: 640, k: 3.6 },
+          { x: 1230, y: 740, k: 3, flip: true },
+        ]}
+      />
+      <Poster x={W / 2} y={64} size={40} lang={lang} />
+      <Placed card={card} lang={lang} avatars={avatars} id="pt" x={cx} y={cy} w={cw} />
+      <Host x={W / 2} y={1322} size={28} />
     </svg>
   );
 }
@@ -286,10 +260,12 @@ export function PortraitImage({ card, lang, avatars }: { card: CardData; lang: L
 /* Comparaison                                                          */
 /* ------------------------------------------------------------------ */
 
+const MUTED = "rgba(229,221,255,0.62)";
+
 function deltaColor(code: StatCode, d: number): string {
-  if (code === "BUZZ") return AMBER;
-  if (d > 0) return TEAL;
-  if (d < 0) return RED;
+  if (code === "BUZZ") return PALETTE.peach;
+  if (d > 0) return PALETTE.lime;
+  if (d < 0) return PALETTE.blush;
   return MUTED;
 }
 
@@ -307,8 +283,8 @@ function DeltaColumn({ cmp, x, y, rowH, w }: { cmp: ComparisonData; x: number; y
         const cy = y + i * rowH;
         return (
           <g key={code}>
-            <rect x={x - w / 2} y={cy - 17} width={w} height={34} rx={17} fill={c} fillOpacity={0.1} stroke={c} strokeOpacity={0.45} strokeWidth={1} />
-            <text x={x - w / 2 + 18} y={cy + 6} {...fontAttrs("mono-500")} fontSize={15} letterSpacing={1} fill={MUTED}>
+            <rect x={x - w / 2} y={cy - 17} width={w} height={34} rx={17} fill={PALETTE.ink1} />
+            <text x={x - w / 2 + 18} y={cy + 6} {...fontAttrs("sans-600")} fontSize={15} letterSpacing={1} fill={MUTED}>
               {code}
             </text>
             <text x={x + w / 2 - 18} y={cy + 8} {...fontAttrs("display-800")} fontSize={24} textAnchor="end" fill={c}>
@@ -323,7 +299,7 @@ function DeltaColumn({ cmp, x, y, rowH, w }: { cmp: ComparisonData; x: number; y
 
 function SideLabel({ x, y, text, color, size = 14 }: { x: number; y: number; text: string; color: string; size?: number }) {
   return (
-    <text x={x} y={y} {...fontAttrs("mono-700")} fontSize={size} letterSpacing={size * 0.22} textAnchor="middle" fill={color}>
+    <text x={x} y={y} {...fontAttrs("sans-600")} fontSize={size} letterSpacing={size * 0.18} textAnchor="middle" fill={color}>
       {text}
     </text>
   );
@@ -341,26 +317,16 @@ export function ComparisonOg({ cmp, lang, avatars }: { cmp: ComparisonData; lang
   const head = fit(upper(cmp.headline[lang], lang), { font: "display-700", size: 46, minSize: 30, maxWidth: 1080, letterSpacing: 0.4 });
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
-      <Backdrop
-        w={W}
-        h={H}
-        id="cog"
-        glows={[
-          { x: lx + cw / 2, y: cy + ch * 0.45, r: 300, color: lightOf(cmp.cv), o: 0.24 },
-          { x: rx + cw / 2, y: cy + ch * 0.45, r: 300, color: lightOf(cmp.github), o: 0.24 },
-        ]}
-      />
-      <text x={W / 2} y={70} {...fontAttrs("display-700")} fontSize={head.size} letterSpacing={head.letterSpacing} textAnchor="middle" fill={TEXT}>
+      <Ink w={W} h={H} />
+      <text x={W / 2} y={70} {...fontAttrs("display-700")} fontSize={head.size} letterSpacing={head.letterSpacing} textAnchor="middle" fill={PALETTE.cream}>
         {head.text}
       </text>
       <SideLabel x={lx + cw / 2} y={120} text={upper(s.cvSide, lang)} color={MUTED} size={12} />
-      <SideLabel x={rx + cw / 2} y={120} text={upper(s.githubSide, lang)} color={TEAL} size={12} />
-      <CardShadow x={lx} y={cy} w={cw} id="cog-l" />
-      <CardShadow x={rx} y={cy} w={cw} id="cog-r" />
-      <CardGraphic card={cmp.cv} lang={lang} avatarHref={av(avatars, cmp.cv.id)} idPrefix="cogcv" x={lx} y={cy} width={cw} height={ch} />
-      <CardGraphic card={cmp.github} lang={lang} avatarHref={av(avatars, cmp.github.id)} idPrefix="coggh" x={rx} y={cy} width={cw} height={ch} />
+      <SideLabel x={rx + cw / 2} y={120} text={upper(s.githubSide, lang)} color={PALETTE.lime} size={12} />
+      <Placed card={cmp.cv} lang={lang} avatars={avatars} id="cogcv" x={lx} y={cy} w={cw} />
+      <Placed card={cmp.github} lang={lang} avatars={avatars} id="coggh" x={rx} y={cy} w={cw} />
       <DeltaColumn cmp={cmp} x={W / 2} y={cy + 52} rowH={64} w={150} />
-      <Cta x={W / 2} y={606} lang={lang} anchor="middle" size={0.8} />
+      <Host x={W / 2} y={606} size={18} />
     </svg>
   );
 }
@@ -385,29 +351,18 @@ export function ComparisonPortrait({ cmp, lang, avatars }: { cmp: ComparisonData
   }
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
-      <Backdrop
-        w={W}
-        h={H}
-        id="cpt"
-        glows={[
-          { x: lx + cw / 2, y: cy + ch * 0.45, r: 420, color: lightOf(cmp.cv), o: 0.24 },
-          { x: rx + cw / 2, y: cy + ch * 0.45, r: 420, color: lightOf(cmp.github), o: 0.24 },
-        ]}
-      />
-      <Brand x={W / 2} y={92} id="cpt" anchor="middle" />
+      <Ink w={W} h={H} />
       {lines.map((l, i) => (
-        <text key={i} x={W / 2} y={(lines.length === 1 ? 225 : 190) + i * hs * 1.03} {...fontAttrs("display-700")} fontSize={hs} letterSpacing={0.4} textAnchor="middle" fill={TEXT}>
+        <text key={i} x={W / 2} y={(lines.length === 1 ? 225 : 190) + i * hs * 1.03} {...fontAttrs("display-700")} fontSize={hs} letterSpacing={0.4} textAnchor="middle" fill={PALETTE.cream}>
           {l}
         </text>
       ))}
       <SideLabel x={lx + cw / 2} y={cy - 22} text={upper(s.cvSide, lang)} color={MUTED} size={15} />
-      <SideLabel x={rx + cw / 2} y={cy - 22} text={upper(s.githubSide, lang)} color={TEAL} size={15} />
-      <CardShadow x={lx} y={cy} w={cw} id="cpt-l" />
-      <CardShadow x={rx} y={cy} w={cw} id="cpt-r" />
-      <CardGraphic card={cmp.cv} lang={lang} avatarHref={av(avatars, cmp.cv.id)} idPrefix="cptcv" x={lx} y={cy} width={cw} height={ch} />
-      <CardGraphic card={cmp.github} lang={lang} avatarHref={av(avatars, cmp.github.id)} idPrefix="cptgh" x={rx} y={cy} width={cw} height={ch} />
+      <SideLabel x={rx + cw / 2} y={cy - 22} text={upper(s.githubSide, lang)} color={PALETTE.lime} size={15} />
+      <Placed card={cmp.cv} lang={lang} avatars={avatars} id="cptcv" x={lx} y={cy} w={cw} />
+      <Placed card={cmp.github} lang={lang} avatars={avatars} id="cptgh" x={rx} y={cy} w={cw} />
       <DeltaRow cmp={cmp} y={cy + ch + 70} W={W} />
-      <Cta x={W / 2} y={1296} lang={lang} anchor="middle" size={1.15} />
+      <Host x={W / 2} y={1296} size={26} />
     </svg>
   );
 }
@@ -425,8 +380,8 @@ function DeltaRow({ cmp, y, W }: { cmp: ComparisonData; y: number; W: number }) 
         const x = x0 + i * (w + gap);
         return (
           <g key={code}>
-            <rect x={x} y={y - 30} width={w} height={60} rx={14} fill={c} fillOpacity={0.1} stroke={c} strokeOpacity={0.45} strokeWidth={1.2} />
-            <text x={x + 18} y={y + 7} {...fontAttrs("mono-500")} fontSize={17} letterSpacing={1} fill={MUTED}>
+            <rect x={x} y={y - 30} width={w} height={60} rx={14} fill={PALETTE.ink1} />
+            <text x={x + 18} y={y + 7} {...fontAttrs("sans-600")} fontSize={17} letterSpacing={1} fill={MUTED}>
               {code}
             </text>
             <text x={x + w - 18} y={y + 12} {...fontAttrs("display-800")} fontSize={34} textAnchor="end" fill={c}>
