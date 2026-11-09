@@ -12,7 +12,7 @@ Un outil de communication pour azerit.tech : tu donnes ton pseudo GitHub ou ton 
 - **Faire circuler le nom** : chaque carte partagée sur LinkedIn ou X porte le domaine. La carte est le support, la landing est l'atterrissage.
 - **Montrer ce que l'IA sait faire** sur un cas concret, avec une pointe d'ironie sur le fait qu'une IA vient de juger quelqu'un en dix secondes sur deux pages de PDF, comme un recruteur pressé.
 - **Récupérer des leads** : parmi ceux qui jouent, certains recrutent. Un email optionnel après la carte, et un CTA vers azerit.tech.
-- **Le coup marketing** (décision du 15 octobre 2026) : chaque semaine, les cinq meilleures cartes décrochent un entretien avec une entreprise qui recrute via Azerit. C'est la promesse en haut de l'accueil, et la raison de jouer avec son vrai GitHub plutôt que de regarder.
+- **Le coup marketing** (décision du 15 octobre 2026) : chaque semaine, les cinq meilleures cartes décrochent un entretien avec une entreprise qui recrute via Azerit. C'est la promesse en haut de l'accueil, et la raison de jouer avec son vrai GitHub plutôt que de regarder. Proposition du 9 novembre 2026 : remplacé par les primes des entreprises partenaires, par ligue (stage, alternance, CDI), voir §18.4.
 
 Audience de l'outil : les devs, en français et en anglais. Audience de la landing : ceux qui recrutent. Les deux ne se mélangent pas (voir §10).
 
@@ -672,3 +672,164 @@ Jacques a dit « vasy », puis, la plongée à peine commitée : « l'ascenseur 
 
 **Reste à faire** : le précalcul de l'open space (`blender -b -P tools/bake/office.py -- --cpu`, plusieurs heures de processeur), repoussé par Jacques le 6 novembre 2026 aux touches finales : `office.py` a déjà le bureau à 1,06 m, le fauteuil repoussé et le dev debout, mais `office.glb` et ses cartes d'éclairage gardent les ombres du poste assis ; les illustrations et l'essai de portrait dès que le solde OpenRouter le permet, la vérification mobile, la réécriture des §3, §6 et §8 à partir de ce journal.
 
+
+## 18. Saison 1 : les primes, et ce qui fait partager
+
+*Proposition du 9 novembre 2026, à valider point par point par Jacques. Rien ici n'est construit. Elle part d'un constat : la fiche se vit seul, une note isolée ne dit rien, seuls les bons partagent, et le plus beau moment (la révélation) ne se partage pas. Ailleurs, ce qui circule, c'est l'identité (Spotify Wrapped), la comparaison (« top 1 % ») et le groupe ; les dizaines d'outils « roast my GitHub » n'ont pas décollé, la moquerie seule ne suffit pas. Les entreprises partenaires sont l'affaire de Jacques et ne sont pas décrites ici.*
+
+### 18.0 Prérequis : la mise en ligne
+
+Lancement visé le jeudi 19 novembre 2026, jour de sortie de GTA 6.
+
+- Docker, Caddy, `skills.azerit.tech`, page de confidentialité, comme prévu au §14 étape 6.
+- **Crédit OpenRouter** rechargé (0,26 $ le 31 octobre : sans crédit, aucune fiche ne sort). Une fiche coûte environ 0,002 $ en Haiku 5.5 (environ 15 000 tokens d'entrée) ; un plafond de dépense par jour coupe proprement le service avec un message plutôt qu'une erreur.
+- **Limite de l'API GitHub** : 5 000 appels par heure et par token ; une fiche en consomme quelques dizaines. Plusieurs tokens en rotation (`GITHUB_TOKENS`, liste séparée par des virgules), le cache de 24 h, et une file d'attente avec sa position affichée quand on approche de la limite.
+- **Mesure de la diffusion** : chaque lien partagé porte `?r={id de la fiche}` ; la table `cards` gagne `ref_card_id`. Le tableau du §13 ajoute les fiches nées d'un partage, les dénonciations, les revendications et les candidats par prime.
+- Test sur un vrai téléphone, dans le navigateur intégré de LinkedIn.
+
+### 18.1 La revendication : « C'est moi »
+
+Socle de la garde à vue, du concours, du masquage et de la dénonciation en retour.
+
+- **Parcours** : bouton « C'est moi » sous la fiche (ou « Appeler mon avocat » pour une fiche dénoncée), puis GitHub OAuth sans aucun scope (le profil public suffit à prouver l'identité). Au retour sur `/auth/github/callback`, si le login correspond à la fiche, la personne en devient propriétaire, ainsi que de toutes les fiches de ce login.
+- **Session** : un cookie httpOnly signé (HMAC, `SESSION_SECRET`), valable 30 jours, qui dit « propriétaire du login X ». Pas de compte, pas de mot de passe.
+- **Données** : table `owners` (login, identifiant GitHub, date de revendication, `hidden`, email, consentements). Variables `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `SESSION_SECRET` ; l'application OAuth est créée par Jacques.
+- **Ce que ça ouvre** : masquer sa fiche (la page dit « Fiche retirée par son propriétaire ») et refuser toute nouvelle fiche à son nom (« Ce dev a quitté la ville ») ; la garde à vue (le roast du §5.1) ; concourir (§18.4) ; dénoncer en retour (§18.6) ; apparaître dans les classements (§18.10).
+- Une fiche revendiquée reste en ligne toute la saison au lieu des 90 jours du §11, et se supprime sur demande.
+
+### 18.2 Le profil criminel et la peine
+
+Ce qui rend partageable une fiche à une étoile : une identité drôle et un peu flatteuse pour tous.
+
+- **Le profil** : exactement un par fiche, choisi par règles dans une liste fermée (`data/profiles.json`, même mécanique que `data/statuses.json`). On évalue dans l'ordre de priorité et la première règle vraie gagne : même entrée, même profil. Liste de départ (le nom, puis la règle) :
+  1. **Faussaire** / Forger : le CV vaut 15 points de plus que le code (comparaison), ou BUZZ du CV à 85 ou plus.
+  2. **Légende du milieu** / Kingpin : dix PR fusionnées chez les autres, ou un repo avec dix contributeurs externes.
+  3. **Cerveau** / Mastermind : ARCH à 80 ou plus et TEC à 75 ou plus.
+  4. **Machine à livrer** / Delivery machine : SHIP à 85 ou plus.
+  5. **Oiseau de nuit** / Night owl : 15 % des commits entre 1 h et 5 h.
+  6. **Pyromane** / Arsonist : 30 % des commits le vendredi après 18 h.
+  7. **Récidiviste** / Repeat offender : 40 % de commits paresseux.
+  8. **Collectionneur** / Hoarder : dix repos ou plus, 20 % vivants au plus.
+  9. **Caméléon** / Chameleon : six langages ou plus.
+  10. **Jeune pousse** / Fresh blood : la règle de la carte Nouveau en ville.
+  11. **Vieille école** / Old school : la règle d'Affaire classée.
+  12. **Fantôme** / Ghost : moins de trois repos publics.
+  13. **Agent dormant** / Sleeper agent : repli quand rien ne s'applique.
+
+  Chacun porte une phrase d'accroche fixe en français et en anglais (« Livre plus vite que la police ne lit »). **Noms épicènes ou métaphores uniquement**, jamais de mot qui suppose un genre (pas « Parrain », pas « Beau parleur », pas d'accord en « é·e ») : le principe 4 vaut aussi pour la grammaire.
+- **La peine**, par règle, d'après l'axe le plus faible parmi TEC, SHIP, ARCH et DOC (`data/sentences.json`) : ARCH donne « Peine : {n} mois de tests unitaires » avec n = arrondi supérieur de (80 − ARCH) / 5 ; DOC, « {n} README de 300 mots » ; SHIP, « {n} semaines de commits » ; TEC, « relire {n} PR de mainteneurs ». La **caution**, c'est le geste le plus simple qui lèverait un chef d'accusation (§18.11) : « Caution : un dossier de tests ». Tous les axes à 80 ou plus : « Relaxe. Le tribunal s'excuse. »
+- **Où** : le profil en grand sur la fiche, sous le bandeau du nom (à placer d'abord dans la maquette `web/gta.html`) ; la peine dans « Pièces à conviction » et sur l'image de partage ; le profil est annoncé par la radio et inscrit sur le carton de fin de mission (« SUSPECT IDENTIFIÉ : OISEAU DE NUIT ») ; il entre dans le texte de partage.
+- **Code** : `CardData` gagne `profile` (`id`, `label`, `tagline`) et `sentence` ; `server/src/scoring/profiles.ts`, pur et testé (une fixture par profil) ; le barème change de version.
+- **Contrôle après lancement** : aucun profil au-dessus de 25 % des fiches, sinon on recale les seuils.
+
+### 18.3 Le rang qui parle
+
+- « Plus recherché que 83 % des devs Python sourcés par Azerit » et « Chef d'accusation rare : 2 % des fiches ». La référence, c'est les devs que les entreprises recrutent vraiment : le pourcentage est exigeant, et c'est le message.
+- **Référence** : `scripts/percentiles.ts`, **lancé par Jacques lui-même** (les dumps de sourcing sont des données personnelles, refusées aux agents, §16.1). Le script passe environ 1 000 profils des dumps dans le moteur, IA comprise (environ 2 $), et n'écrit que des quantiles agrégés dans `data/percentiles.json` : les 99 centiles de la note globale, en tout, par langage et par poste, et la fréquence de chaque statut. Aucun login ni aucun fait individuel n'en sort. C'est aussi la calibration du §4.6.
+- **Affichage** : le meilleur des deux groupes (langage ou poste) s'il compte au moins 100 profils de référence, sinon le rang global. C'est un choix fixe, donc explicable. Une ligne sur la fiche sous la note (« Top 17 % Python ») et dans le texte de partage ; la rareté d'un chef d'accusation s'affiche sous 5 %.
+- **Après la saison** : quand un groupe compte 300 fiches de joueurs revendiquées, la référence peut mêler joueurs et profils sourcés ; à trancher alors.
+
+### 18.4 Les ligues et les primes
+
+Remplace « les cinq meilleures cartes de la semaine » du §1. Ce n'est pas une note qui juge, c'est le poste.
+
+- **La saison** : du 19 novembre au 31 décembre 2026 (proposé), dans `data/season.json`, que Jacques modifie sans toucher au code. Chaque **prime** : identifiant, entreprise, logo (dans `web/public/primes/`), contrat (`stage`, `alternance` ou `cdi`), postes visés (parmi ceux du §3.4), langages souhaités, nombre d'entretiens, lieu ou télétravail, dates d'ouverture et de clôture, une phrase de présentation en français et en anglais.
+- **Les ligues** : un clic après la fiche, jamais avant (le principe 2 tient) : « Tu cherches un stage, une alternance, un CDI, ou rien, juste pour le fun ? ». Le contrat choisi est la ligue : un stagiaire ne joue que contre des stagiaires.
+- **Éligibilité à une prime** : même contrat, poste parmi ceux visés, fiche GitHub (le CV seul ne concourt pas : il déclare, il ne prouve pas). Aucun filtre sur l'âge, l'école, le genre ou l'origine ; le lieu ne sert qu'à demander « Tu peux travailler à {ville} ? », jamais à classer.
+- **Le classement d'une prime** : note globale, plus un bonus d'adéquation de 0 à 10, égal à 10 fois la part des octets récents écrits dans les langages de la prime. À égalité : les preuves (la fiabilité), puis la date d'inscription. La formule s'affiche dans les pièces à conviction de la prime (principe 5).
+- **Concourir** : revendiquer sa fiche (§18.1), un email, la case « J'accepte que mon profil soit transmis à {entreprise} si je suis finaliste, selon le règlement », et jusqu'à trois liens de preuves facultatifs (projet en ligne, Hugging Face, Kaggle) pour le travail privé. On se retire à tout moment.
+- **Pendant la saison** : on peut se refaire juger une fois par jour (§18.11) ; le classement prend la dernière fiche. Chaque prime affiche publiquement ses vingt premiers (revendiqués et consentants) ; chacun voit son propre rang (« 7e sur 143 »).
+- **Triche** : un login, une candidature, garantie par la revendication. Signalés pour la relecture, sans exclusion automatique : compte de moins de six mois très actif, jours à plus de 50 commits répétés, commits datés d'avant la création du repo ou du compte.
+- **Clôture** : à la date de fin, le classement est figé. `scripts/finalists.ts --prime X` sort les dix premiers (login, email, lien de fiche, preuves, signalements) ; Azerit lit leur travail à la main et choisit les gagnants ; `scripts/winners.ts` les marque ; une page des gagnants s'ouvre, avec leur accord.
+- **Données** : table `entries` (login, prime, fiche, contrat, email, preuves, date du consentement, score, signalé, état : en course, finaliste, gagnant, retiré). Sans victoire, l'inscription est effacée 30 jours après la fin de saison.
+- **Pages** : `/primes`, le tableau ; `/primes/:id`, l'avis de recherche de l'entreprise, son classement et le champ « Tente ta chance » ; une image de partage par prime en 1200 × 630 et 1080 × 1350, **celle que l'entreprise poste sur sa page** ; `/reglement`.
+- **Événements** : `prime_view`, `prime_join`, `prime_withdraw`.
+
+### 18.5 L'accueil et « Tu es en course »
+
+- **L'accueil** : la promesse devient « Ton GitHub remplace ton CV. Les plus recherchés passent un entretien. », puis le champ, puis la rangée des logos partenaires. Sous le champ (sous la fiche de Jacques sur mobile), les primes ouvertes défilent à l'horizontale : logo, poste, contrat, places, « J-12 ». La règle « pas un mot de plus » du §6.1 tient : ce sont des cartes, pas des paragraphes.
+- **« Tu es en course »**, en tête de l'après-fiche (`After.tsx`), avant même de s'inscrire : « Tu serais 7e sur 143 pour Stagiaire backend chez X ». Le rang hypothétique donne envie de concourir. Un bouton « Concourir » mène à la revendication puis au consentement.
+
+### 18.6 « Dénonce un complice »
+
+La boucle principale : l'obligation de répondre fait venir les gens. Tranche le point ouvert du §15 (fiche sur le pseudo d'un autre) : oui, en mode taquin.
+
+- **Parcours** : juste après les boutons de partage, « Dénonce un complice », un champ de pseudo et trois suggestions : les contributeurs des repos actifs du joueur, que la collecte connaît déjà (`collect.ts`). La fiche du complice sort par le moteur habituel, en mode taquin uniquement ; la garde à vue reste réservée au propriétaire. Limite : cinq dénonciations par jour et par adresse IP.
+- **Le texte de partage tague la cible** : son compte X s'il figure sur son profil GitHub (champ `twitter_username` de l'API), son nom sinon (LinkedIn n'accepte pas de texte prérempli : il part dans le presse-papier, comme aujourd'hui). « @X est recherché ★★★, Oiseau de nuit. Chef d'accusation : … Il a le droit de faire appel : {lien} ».
+- **La cible arrive** sur `/c/:id` avec un bandeau « Avis de recherche à ton nom » et « Appeler mon avocat » : elle revendique (§18.1), puis voit les pièces, masque, passe en garde à vue, concourt ou dénonce en retour.
+- **Le nom du dénonciateur** n'apparaît que s'il a revendiqué sa propre fiche (« Dénoncé par @Y ») ; sinon, « par un complice anonyme ».
+- **Données** : `cards.denounced_by` ; événements `denounce_sent`, `denounce_landed`, `denounce_claimed`.
+
+### 18.7 La page partagée
+
+Là où arrive presque tout le monde, depuis LinkedIn.
+
+- En tête : « @X est recherché ★★★★ · Oiseau de nuit », la fiche, puis « Voir l'arrestation » : six secondes de la révélation, des portes à la fiche, avec la scène existante démarrée par `seek` à l'ouverture des portes, et sur les téléphones trop faibles une version animée en CSS.
+- Puis « Et toi ? » (le champ du §6.1) et, dès qu'on a sa propre fiche, une ligne de comparaison : « Toi 78 · @X 71 : une étoile d'avance ». C'est le face-à-face du pauvre, en attendant celui du §18.9.
+- Balises OG : « @X est recherché ★★★★ — Oiseau de nuit ».
+
+### 18.8 Le clip vertical (après le lancement)
+
+- 8 secondes en 1080 × 1920 : portes qui s'ouvrent, étoiles qui s'allument une à une, flash, profil, fiche, avec le son. MP4 H.264, plus une version 4:5 pour le fil LinkedIn.
+- **Rendu côté serveur avec Remotion** (comme `../video`), en 2D : la fiche est déjà un composant React SVG (`shared/card/`), Remotion l'anime tel quel. Rendre la vraie scène 3D sans carte graphique serait trop lent. Les sons sont pré-rendus une fois en WAV depuis la synthèse existante (`OfflineAudioContext`).
+- Rendu à la demande (« Télécharger la vidéo »), mis en cache, limité par jour. Sur téléphone, `navigator.share` avec le fichier l'envoie directement dans Instagram ou LinkedIn.
+
+### 18.9 Le face-à-face (après le lancement)
+
+- `/vs/:a/:b` : les deux fiches (générées si besoin, cache de 24 h), un écran versus, deux photos d'identité, les six stats en barres qui se remplissent, un verdict par règle (« @a a deux étoiles d'avance », « Égalité : complices »). Image OG avec les deux fiches.
+- **Une galerie de devs connus** (une trentaine, liste choisie par Jacques, français et internationaux), calculés et rafraîchis chaque semaine comme la vitrine : « Toi contre Linus ». Mode taquin seulement, retrait sur simple demande.
+
+### 18.10 Les bandes (après le lancement)
+
+- Classements par **entreprise** (champ entreprise du profil GitHub normalisé, plus les organisations publiques), par **école** (déclarée au moment de concourir, dans une liste fermée pour normaliser les noms) et par **langage**. Pas de classement par ville (principe 4).
+- Seules comptent les fiches revendiquées dont le propriétaire a coché « Apparaître dans le classement de mon entreprise / mon école ». Un groupe ne s'affiche qu'à partir de cinq membres. Le score du groupe est la médiane de ses notes (un seul crack ne fait pas le groupe), affichée avec le nombre de membres.
+- Pages `/bandes` et `/bandes/:type/:nom`, avec une image de partage : « Les devs de X : ★★★★ de médiane, 12e de France ». C'est le pont vers les recruteurs, l'audience d'Azerit : une ligne de CTA sur la page d'une entreprise.
+
+### 18.11 « Purge ta peine » (après le lancement)
+
+- Chaque chef d'accusation négatif reçoit dans `data/statuses.json` un champ `fix` : comment le lever (« Ajoute un dossier de tests dans un de tes cinq repos actifs »). Il s'affiche dans les pièces à conviction.
+- « Repasser devant le juge » : pour une fiche revendiquée, une fois par jour, on ignore le cache de 24 h. La nouvelle fiche montre l'écart : « Chef d'accusation levé : Tests : bientôt. +6 en ARCH. Nouvelle étoile. », avec son propre texte de partage (« J'ai purgé ma peine »).
+
+### 18.12 Le badge du README (après le lancement)
+
+- `GET /badge/:login.png` : un petit avis de recherche (étoiles, note, profil, `skills.azerit.tech`), rendu par la chaîne PNG existante, en double densité. `/u/:login` mène à la dernière fiche.
+- Après la fiche : « Mets ton avis de recherche dans ton README », avec le markdown à copier (`[![Avis de recherche](…/badge/x.png)](…/u/x?r=badge)`).
+- Recalculé chaque semaine pour les badges demandés dans les sept derniers jours, avec un plafond (2 000 par semaine, environ 4 $) ; `Cache-Control` d'une heure pour le proxy d'images de GitHub.
+
+### 18.13 Les scènes
+
+- **L'attente devient l'interrogatoire.** Elle remplace les six scènes SVG bouche-trou, en 2D (la scène 3D compile pendant ce temps). Dans l'ordre, au fil des faits collectés : le flash, puis l'avatar pris en photo d'identité devant la toise, graduée en années d'expérience, avec la plaque « @login · date » ; les trois repos actifs qui tombent dans des sachets de scellés ; la radio de police qui lit à voix haute son pire vrai message de commit (`speechSynthesis` du navigateur, gratuit, coupé avec le son). Le serveur ajoute trois événements de progression : `mugshot` (l'avatar), `evidence` (les noms des repos) et `worst_commit` (60 caractères au plus, écarté s'il contient une URL, un email, quelque chose qui ressemble à un secret ou un mot de la liste d'exclusion). La barre jaune reste.
+- **L'ascenseur, personnalisé** : les messages radio citent ses faits (`hudTexts.ts`) : « Suspect repéré : 47 commits « fix » », « Dernière activité : 3 h 12 du matin », « Arme : TypeScript ».
+- **La panne** : juste avant la dernière étoile, la cabine freine et s'arrête entre deux étages pendant 1,2 s, le plafonnier vacille, l'afficheur montre « -- », la radio dit « Coupure de courant… », puis elle repart. Fonction du temps, comme le reste (`hold` et `seek` donnent la même image) ; environ 1,5 s de plus. **À trancher par Jacques** : les règles de caméra du §6.3 n'autorisent qu'une secousse (l'éclatement du pack) ; proposé : aucune secousse de caméra à la panne, seulement la lumière, l'afficheur et le son.
+- **Le flash de l'arrivée** : quand le dev se retourne et regarde l'objectif (le portrait serré), un flash blanc et un déclic synthétisé, l'image gèle 0,3 s, la toise et la plaque passent par-dessus en 2D (`hud.ts`) : la photo d'identité, puis la fiche se forme.
+
+### 18.14 Les petits détails : chaque objet raconte la personne
+
+Règle : **chaque détail sort d'un fait** (même entrée, même scène, comme la fiche) ou **d'un choix de la personne**. Rien n'est deviné. En particulier, jamais de genre déduit du prénom ou de la photo : on se tromperait et on blesserait quelqu'un, et le principe 4 l'interdit.
+
+- **Le personnage, au choix.** Pendant l'interrogatoire, l'attente devient un écran de sélection de personnage façon roue du jeu : « Choisis ton suspect », trois ou quatre personnages (au moins une femme, un homme, et des carrures, des âges et des couleurs de peau variés), un tap et c'est pris. Ça occupe un temps mort et c'est très dans l'univers. Sans choix, le premier de la roue. Le choix est mémorisé dans le navigateur et, pour une fiche revendiquée, sur le serveur. Les textes ne s'accordent jamais au personnage : ils restent épicènes (§18.2). **Technique** : d'autres personnages Character Creator (Sketchfab ou Renderpeople, CC BY), qui partagent le squelette de Jungle Jim (`hip`, `spine_01`…) pour que `player.ts` (cinématique inverse, frappe, demi-tour, bras croisés) les anime sans changement ; à préparer par `tools/bake/prepare.py` ; les ombres du précalcul ne changent pas, elles sont celles du bureau.
+- **Les écrans** : le graphe de contributions est aujourd'hui pseudo-aléatoire (`drawGraph`, `workstation.ts`) ; il devient son vrai calendrier des 26 dernières semaines. L'écran de code montre l'extrait que l'IA a cité (`evidence_file` et `evidence_quote`, déjà dans la lecture). Le terminal lance ses vrais noms de repos et, si « Tests : bientôt », affiche « 0 tests found ».
+- **Les post-it** : ses vrais messages de commit paresseux (« fix2 », « final fix »).
+- **Les plantes** : une plante fanée par repo abandonné quand « {n} repos, {m} vivants » s'applique ; verte sinon.
+- **La tasse** : remplacée par un mug à son pire message de commit, ou au logo de son langage.
+- **Les gobelets de café** empilés, en nombre selon la part de commits de nuit.
+- **Selon le chef d'accusation** : « Push sur main le vendredi soir » pose un extincteur sur le bureau ; « node_modules commité » pose un énorme carton étiqueté node_modules au pied du bureau ; « README en construction » pose un panneau de chantier.
+- **Selon le poste** : ML, un boîtier de GPU qui chauffe ; OPS, un pager et une baie de serveurs ; MOB, des téléphones de test alignés ; DATA, des graphiques imprimés ; DESIGN, une tablette et son stylet ; CTO autoproclamé, une plaque de porte « CTO ».
+- **L'identité** : son avatar dans un cadre photo sur le bureau, un badge d'entreprise au cordon avec le nom de son affiliation (en texte seulement, jamais un logo de marque), son login sur l'afficheur de l'ascenseur à l'arrivée, et la radio qui prononce son pseudo.
+- **Contrainte** : chaque objet vient d'une bibliothèque (Sketchfab ou Poly Haven, CC BY) ; le code ne fait que les poser et les montrer ou non. Les objets fixes restent dans le précalcul ; ceux qui dépendent de la fiche sont posés en direct, sans ombre précalculée, et placés là où ça ne se voit pas (au sol, sur le bureau à l'ombre de la lampe).
+
+### 18.15 Ordre de construction proposé
+
+- **Avant le 19 novembre** : la mise en ligne (§18.0), la revendication (§18.1), le profil et la peine (§18.2), les primes et les ligues (§18.4), l'accueil et « Tu es en course » (§18.5), la dénonciation (§18.6), la page partagée (§18.7), le rang (§18.3, dès que Jacques a lancé le script). **Minimum vital si on prend du retard** : §18.0, §18.1, §18.2, §18.4 et §18.5.
+- **Semaines 1 et 2** : le clip, le face-à-face et sa galerie, les bandes, le badge.
+- **Ensuite** : la purge, l'interrogatoire et le choix du personnage, l'ascenseur personnalisé et sa panne, le flash, les petits détails, le précalcul final de l'open space.
+- **Fin de saison** : finalistes, relecture humaine, annonce des gagnants, témoignages.
+
+### 18.16 À trancher par Jacques
+
+- La fiche sur le pseudo d'un autre, en taquin, revendicable et masquable (proposé : oui).
+- Les dates de la saison (proposé : du 19 novembre au 31 décembre 2026).
+- Le lancement le 19 sans le précalcul final de l'open space (proposé : oui).
+- La panne de l'ascenseur, sans secousse de caméra (proposé : lumière, afficheur et son seulement).
+- La liste des profils criminels et de leurs accroches, et la liste des devs connus de la galerie.
+- Le règlement du concours : brouillon par Claude, relecture juridique à prévoir.
