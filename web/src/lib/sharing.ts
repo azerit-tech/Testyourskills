@@ -135,5 +135,6 @@ const subscribe = (l: () => void) => {
 };
 
 export function useTextCopied(id: string): boolean {
-  return useSyncExternalStore(subscribe, () => copied.has(id));
+  const read = () => copied.has(id);
+  return useSyncExternalStore(subscribe, read, read);
 }
