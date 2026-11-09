@@ -1,6 +1,6 @@
 // La tuile de profil (SPEC §18.28) : le « lieu du crime » du profil criminel,
 // au ratio 3:2, le nom en capitales crème et la phrase en rose poudré, en bas à
-// gauche. L'illustration (`/profiles/{id}.webp`) se pose si elle existe ; sinon
+// gauche. L'illustration (`/profiles/{id}.jpg`, 1152 × 768) se pose si elle existe ; sinon
 // la tuile garde un aplat de la teinte de carte et un grand palmier ton sur ton.
 // Dessous, la peine et la caution, en petit.
 import { useState } from "react";
@@ -48,7 +48,16 @@ export function ProfileTile({ card }: { card: CardData }) {
           <path d={PALM} />
         </svg>
         {id && art !== "failed" && (
-          <img src={`/profiles/${id}.webp`} alt="" loading="lazy" decoding="async" onLoad={() => setArt("loaded")} onError={() => setArt("failed")} />
+          <img
+            src={`/profiles/${id}.jpg`}
+            width={1152}
+            height={768}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            onLoad={() => setArt("loaded")}
+            onError={() => setArt("failed")}
+          />
         )}
         <div className="profile-copy">
           <p className="profile-kicker">{t.result.profile}</p>

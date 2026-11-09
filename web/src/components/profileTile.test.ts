@@ -21,7 +21,7 @@ describe("tuile de profil (§18.28)", () => {
     const card = FIXTURES.gold;
     expect(card.profile).toBeDefined();
     const html = render(card);
-    expect(html).toContain(`src="/profiles/${card.profile!.id}.webp"`);
+    expect(html).toContain(`src="/profiles/${card.profile!.id}.jpg" width="1152" height="768"`);
     expect(html).toMatch(/<img[^>]*alt=""[^>]*loading="lazy"/);
     expect(html).toMatch(/class="profile-kicker">Profil</);
     expect(html).toContain(`>${card.profile!.label.fr}</h2>`);
