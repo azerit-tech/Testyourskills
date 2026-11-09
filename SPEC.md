@@ -1030,7 +1030,7 @@ Après chaque fusion, on vérifie la grille suivante. On corrige ce qui manque, 
 - **La démonstration de force : l'enquête en direct.** Pendant l'attente, les trouvailles tombent une à une, datées et chiffrées (premier commit, heure de code, LinkedIn retrouvé, complice principal, langage abandonné). Sur la fiche, les trouvailles les plus rares ; dans le partage, la plus folle. Données publiques seulement : jamais d'adresse, de famille, d'âge, de genre ni de photo personnelle.
 - **Les autres témoins** (GitLab, npm, PyPI, crates.io, Stack Overflow, Hugging Face, Kaggle, Codeforces, site personnel) viennent après le lancement, trouvés d'abord dans le profil GitHub.
 - **Les entreprises partenaires** : Jacques et Azerit les cherchent. Le système des primes se construit quand même ; tant que `data/season.json` n'a aucune prime ouverte, le site affiche « Primes : bientôt ».
-- **Le budget Crustdata** reste plafonné à 100 crédits par jour (`CRUSTDATA_DAILY_CREDITS`) tant que Jacques n'en décide pas autrement.
+- **Le budget LinkedIn** : la lecture des profils passe par Apify, plafonnée à 300 profils par jour (`LINKEDIN_DAILY_PROFILES`, §18.24) ; Crustdata reste une option.
 
 ### 18.26 L'enquête en direct, construite (9 novembre 2026)
 
