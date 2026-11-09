@@ -1368,6 +1368,10 @@ svg {
   .make-yours:active {
     transform: translateX(-50%);
   }
+  /* le toast, rendu juste après elle, passe au-dessus (12 + 52 + 4 de liseré + 12 px) */
+  .make-yours:not(.is-off) ~ .toast {
+    bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+  }
   .make-yours.is-off {
     transform: translate(-50%, 160%);
     opacity: 0;
