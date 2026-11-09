@@ -14,6 +14,7 @@ import {
   parsePatchOffset,
   type TreeEntry,
 } from "./detect";
+import { pickAccomplices, type RawContributor } from "./accomplices";
 import type { CommitFact, GithubFacts, GithubRepo, RepoTree } from "./facts";
 import { EngineError, graphql, headOf, lastPageOf, makeCtx, rawFile, rest, soft, type Ctx, type GithubAuth } from "./http";
 
@@ -34,6 +35,8 @@ const LIMITS = {
   firstCommitRepos: 4,
   tutorialCountRepos: 10,
   contributorRepos: 3,
+  /** Repos actifs dont les contributeurs deviennent les complices suggérés (§18.6). */
+  accompliceRepos: 3,
   maxYears: 20,
   patchSamples: 6,
   /** Au-delà (Ko) : arbre lu en surface, historique non filtré par auteur (trop lent côté GitHub). */
@@ -53,6 +56,7 @@ interface RestUser {
   created_at: string;
   public_repos: number;
   node_id: string;
+  twitter_username?: string | null;
 }
 
 interface RestRepo {
@@ -194,19 +198,36 @@ export async function collectGithub(
       r.commitCount = (await soft(ctx, () => commitCount(ctx, r)))?.count ?? null;
     }),
   );
+  // Une liste de contributeurs par repo, lue une seule fois : elle sert au compte
+  // des contributeurs externes (barème) et aux complices suggérés (§18.6).
+  const contributorLists = new Map<string, Promise<ContributorsResult>>();
+  const contributorsOf = (r: GithubRepo) => {
+    let p = contributorLists.get(r.name);
+    if (!p) {
+      p = fetchContributors(ctx, r);
+      p.catch(() => {});
+      contributorLists.set(r.name, p);
+    }
+    return p;
+  };
   const contributorsP = Promise.all(
     [...repos]
       .sort((a, b) => b.stars - a.stars)
       .slice(0, LIMITS.contributorRepos)
       .filter((r) => r.stars > 0)
       .map(async (r) => {
-        r.externalContributors = await soft(ctx, () => externalContributors(ctx, r, u.login));
+        r.externalContributors = await soft(ctx, async () => externalContributors(await contributorsOf(r), u.login));
       }),
   );
+  // Les complices : les repos actifs, pas les plus étoilés. Un repo déjà lu
+  // ci-dessus ne coûte rien ; les autres, un appel chacun, en parallèle.
+  const accomplicesP = Promise.all(
+    active.slice(0, LIMITS.accompliceRepos).map((r) => soft(ctx, async () => (await contributorsOf(r)).list)),
+  ).then((lists) => pickAccomplices(lists, u.login));
 
   const timed = <T,>(label: string, p: Promise<T>) =>
     process.env.TYS_DEBUG ? p.then((v) => (console.error(`[collect] ${label} ${Date.now() - now} ms`), v)) : p;
-  const [trees, , details, , commitsRes, , , years, externalPRs, firstOld] = await Promise.all([
+  const [trees, , details, , commitsRes, , , years, externalPRs, firstOld, accomplices] = await Promise.all([
     timed("trees", treesP),
     timed("readmes", readmesP),
     timed("details", detailsP),
@@ -217,6 +238,7 @@ export async function collectGithub(
     timed("years", yearsP),
     timed("prs", prsP),
     timed("first", firstP),
+    timed("accomplices", accomplicesP),
   ]);
   // Repli rare : aucun vieux repo n'a 10 commits, on cherche dans les repos actifs.
   const firstRealCommit =
@@ -256,6 +278,8 @@ export async function collectGithub(
       followers: u.followers,
       createdAt: u.created_at,
       publicRepos: u.public_repos,
+      // Le texte de partage d'une dénonciation tague ce compte X (§18.6).
+      twitterUsername: typeof u.twitter_username === "string" && /^[A-Za-z0-9_]{1,15}$/.test(u.twitter_username) ? u.twitter_username : null,
     },
     repoCount: reposTruncated ? Math.max(repos.length, u.public_repos) : repos.length,
     reposTruncated,
@@ -273,6 +297,7 @@ export async function collectGithub(
     externalMergedPRs: externalPRs ?? 0,
     firstRealCommit,
     trees: trees.map((t) => t.tree),
+    accomplices,
   };
 }
 
@@ -577,11 +602,22 @@ async function detectOffset(ctx: Ctx, commits: CommitFact[], byName: Map<string,
   return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]?.[0] ?? null;
 }
 
+interface ContributorsResult {
+  status: number;
+  /** Les 100 premiers contributeurs, par nombre de commits ; null si GitHub ne les donne pas. */
+  list: (RawContributor & { login: string; type: string })[] | null;
+}
+
+/** Un seul appel par repo : GET /repos/{repo}/contributors, 100 au plus. */
+async function fetchContributors(ctx: Ctx, r: GithubRepo): Promise<ContributorsResult> {
+  const res = await rest<NonNullable<ContributorsResult["list"]>>(ctx, `/repos/${r.fullName}/contributors?per_page=100`);
+  return { status: res.status, list: Array.isArray(res.data) ? res.data : null };
+}
+
 /** Contributeurs hors propriétaire et bots, plafonné à 100. Liste trop grande pour l'API → 100. */
-async function externalContributors(ctx: Ctx, r: GithubRepo, login: string): Promise<number | null> {
-  const res = await rest<{ login: string; type: string }[]>(ctx, `/repos/${r.fullName}/contributors?per_page=100`);
+function externalContributors(res: ContributorsResult, login: string): number | null {
   if (res.status === 403) return 100;
   if (res.status === 204) return 0;
-  if (!Array.isArray(res.data)) return res.status === 200 ? 0 : null;
-  return res.data.filter((c) => c.type !== "Bot" && !c.login.endsWith("[bot]") && c.login.toLowerCase() !== login.toLowerCase()).length;
+  if (!res.list) return res.status === 200 ? 0 : null;
+  return res.list.filter((c) => c.type !== "Bot" && !c.login.endsWith("[bot]") && c.login.toLowerCase() !== login.toLowerCase()).length;
 }

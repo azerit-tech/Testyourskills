@@ -1,6 +1,8 @@
 // Faits GitHub collectés pour un pseudo. Sérialisable JSON, sans calcul de note :
 // le barème (server/src/scoring) transforme ces faits en carte. SPEC §4.2.
 
+import type { Accomplice } from "./accomplices";
+
 export interface GithubProfile {
   login: string;
   name: string | null;
@@ -11,6 +13,8 @@ export interface GithubProfile {
   createdAt: string; // ISO
   /** Repos publics déclarés par GitHub (forks compris). */
   publicRepos: number;
+  /** Compte X déclaré sur le profil (`twitter_username`), sans @ ; absent des faits collectés avant le §18.6. */
+  twitterUsername?: string | null;
 }
 
 export interface GithubRepo {
@@ -106,4 +110,10 @@ export interface GithubFacts {
   firstRealCommit: { repo: string; date: string } | null;
   /** Arborescences des repos actifs. */
   trees: RepoTree[];
+  /**
+   * « Dénonce un complice » (§18.6) : contributeurs des repos actifs, sans le
+   * joueur ni les bots, au plus six. Ne sert pas au barème. Absent des faits
+   * collectés avant le §18.6.
+   */
+  accomplices?: Accomplice[];
 }
