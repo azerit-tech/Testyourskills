@@ -3,7 +3,7 @@
 // "slow" (attente longue puis timeout). Les pseudos des fixtures donnent leur carte.
 import type { CardData, ComparisonData, JobState, ProgressEvent, Stat, StatCode } from "../../../shared/types";
 import { FIXTURES, FIXTURE_COMPARISON } from "../../../shared/fixtures";
-import type { CreateInput, CreateResult } from "./api";
+import type { CaseInfo, CreateInput, CreateResult } from "./api";
 import { ApiError } from "./errors";
 
 type FixtureKey = keyof typeof FIXTURES;
@@ -16,7 +16,11 @@ interface MockJob {
   lang: "fr" | "en";
   timeline: ProgressEvent[];
   doneAt: number;
+  denouncedBy?: string;
 }
+
+/** Complices suggérés en démo (§18.6) : des pseudos qui ont leur fixture. */
+const MOCK_ACCOMPLICES = ["camroux", "nour-rs", "jplefevre"].map((login) => ({ login, avatarUrl: `https://github.com/${login}.png?size=80` }));
 
 const jobs = new Map<string, MockJob>();
 /** Cartes dont la photo vient de LinkedIn (simulé). */
@@ -225,9 +229,10 @@ export const mockApi = {
     else if (lower === "org") kind = "org";
     else if (lower === "slow") kind = "slow";
     else kind = BY_LOGIN[lower] ?? ROTATION[hash(lower) % ROTATION.length];
-    const id = `m-${kind}-${rand()}`;
+    // Fiche dénoncée : « D » après le type (rand() est en minuscules), pour la reconnaître après un rechargement.
+    const id = `m-${kind}-${input.denouncedBy ? "D" : ""}${rand()}`;
     const { timeline, doneAt } = timelineFor(kind);
-    jobs.set(id, { kind, start: Date.now() + queueMs, login, lang: input.lang, timeline, doneAt });
+    jobs.set(id, { kind, start: Date.now() + queueMs, login, lang: input.lang, timeline, doneAt, denouncedBy: input.denouncedBy });
     return { id, deleteToken: `tok-${rand()}`, cached: false };
   },
 
@@ -257,6 +262,24 @@ export const mockApi = {
       return { state: "error", code: "timeout", message: { fr: "Trop long, on arrête là.", en: "Too long, stopping here." } };
     if (kind === "cmp") return { state: "done", kind: "comparison", comparison: buildComparison(id, job) };
     return { state: "done", kind: "card", card: buildCard(kind as FixtureKey, id, job) };
+  },
+
+  /**
+   * Dénonciation en démo : /c/m-silver-Dxxxx est une fiche dénoncée anonymement,
+   * /c/m-silver-Nxxxx une fiche dénoncée par @leamd (revendiquée). @nour-rs a un compte X.
+   */
+  async getCase(id: string): Promise<CaseInfo> {
+    await sleep(80);
+    const job = jobs.get(id) ?? null;
+    const marker = /^m-[a-zA-Z]+-([DN])/.exec(id)?.[1];
+    const kind = job?.kind ?? kindFromId(id);
+    const login = (job?.login ?? (kind && kind in FIXTURES ? FIXTURES[kind as FixtureKey].login : undefined))?.toLowerCase();
+    return {
+      denounced: !!marker,
+      by: marker === "N" ? "leamd" : null,
+      x: login === "nour-rs" ? "nour_codes" : null,
+      accomplices: MOCK_ACCOMPLICES.filter((a) => a.login !== login),
+    };
   },
 
   async sendEmail(cardId: string, email: string) {

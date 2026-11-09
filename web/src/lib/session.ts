@@ -47,6 +47,70 @@ export function freshSince(id: string): number | null {
   return fresh.get(id) ?? null;
 }
 
+// --- Ma fiche (§18.7) --------------------------------------------------------
+// La dernière fiche faite ou revendiquée dans ce navigateur, pour la ligne de
+// comparaison d'une fiche partagée (« Toi 78 · @X 71 »). localStorage, repli en
+// RAM si le stockage est bloqué.
+
+export interface MyCard {
+  id: string;
+  login: string | null;
+  overall: number;
+}
+
+const MINE_KEY = "tys_mine";
+let memMine: MyCard | null = null;
+
+export function rememberMine(card: MyCard) {
+  memMine = { id: card.id, login: card.login ? card.login.toLowerCase() : null, overall: card.overall };
+  try {
+    localStorage.setItem(MINE_KEY, JSON.stringify(memMine));
+  } catch {
+    /* stockage bloqué : la RAM suffit pour cette visite */
+  }
+}
+
+export function myCard(): MyCard | null {
+  try {
+    const raw = localStorage.getItem(MINE_KEY);
+    if (raw) {
+      const v = JSON.parse(raw) as Partial<MyCard>;
+      if (typeof v.id === "string" && typeof v.overall === "number" && Number.isFinite(v.overall)) {
+        return { id: v.id, login: typeof v.login === "string" ? v.login : null, overall: v.overall };
+      }
+    }
+  } catch {
+    /* rien */
+  }
+  return memMine;
+}
+
+/** Fiches dénoncées depuis ce navigateur (§18.6) : leur dénonciateur n'y voit pas « Avis de recherche à ton nom ». */
+const DENOUNCED_KEY = "tys_denounced";
+const memDenounced = new Set<string>();
+
+export function rememberDenounced(id: string) {
+  memDenounced.add(id);
+  try {
+    const list = JSON.parse(localStorage.getItem(DENOUNCED_KEY) ?? "[]") as unknown;
+    const ids = Array.isArray(list) ? list.filter((x): x is string => typeof x === "string") : [];
+    if (!ids.includes(id)) ids.push(id);
+    localStorage.setItem(DENOUNCED_KEY, JSON.stringify(ids.slice(-50)));
+  } catch {
+    /* la RAM suffit */
+  }
+}
+
+export function iDenounced(id: string): boolean {
+  if (memDenounced.has(id)) return true;
+  try {
+    const list = JSON.parse(localStorage.getItem(DENOUNCED_KEY) ?? "[]") as unknown;
+    return Array.isArray(list) && list.includes(id);
+  } catch {
+    return false;
+  }
+}
+
 // --- Origine du visiteur (§18.0) ---------------------------------------------
 // Un lien partagé porte ?r={id de la fiche}. On garde la première origine de la
 // session dans sessionStorage, pour la joindre aux fiches créées ensuite. Le

@@ -7,12 +7,26 @@ import { currentRef } from "./session";
 
 export { ApiError };
 
-export type AnalyticsEvent = "card_generated" | "card_shared" | "card_email" | "cta_azerit_clicked" | "shared_visit";
+export type AnalyticsEvent = "card_generated" | "card_shared" | "card_email" | "cta_azerit_clicked" | "shared_visit" | "denounce_landed";
 
 export interface CreateInput {
   login?: string;
   cv?: File;
   lang: Lang;
+  /** « Dénonce un complice » (§18.6) : l'id de la fiche du dénonciateur. */
+  denouncedBy?: string;
+}
+
+/** GET /api/card/:id/case (§18.6, §18.7). */
+export interface CaseInfo {
+  /** Fiche née d'une dénonciation. */
+  denounced: boolean;
+  /** Login du dénonciateur, seulement s'il a revendiqué sa fiche ; sinon null : dénonciation anonyme. */
+  by: string | null;
+  /** Compte X de la personne de la fiche, sans @. */
+  x: string | null;
+  /** Au plus trois complices à suggérer. */
+  accomplices: { login: string; avatarUrl: string }[];
 }
 
 export interface CreateResult {
@@ -165,7 +179,7 @@ async function createCard(input: CreateInput): Promise<CreateResult> {
       res = await fetch("/api/card", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ login: input.login, lang: input.lang, ref }),
+        body: JSON.stringify({ login: input.login, lang: input.lang, ref, denouncedBy: input.denouncedBy }),
       });
     }
   } catch {
@@ -203,6 +217,25 @@ async function fetchJob(id: string): Promise<JobState> {
   }
   if (!res.ok) throw await readError(res);
   return res.json();
+}
+
+/** Dénonciation et complices d'une fiche ; une fiche sans rien en cas d'erreur, jamais d'exception. */
+async function getCase(id: string): Promise<CaseInfo> {
+  const none: CaseInfo = { denounced: false, by: null, x: null, accomplices: [] };
+  if (isMock()) return mockApi.getCase(id);
+  try {
+    const res = await fetch(`/api/card/${encodeURIComponent(id)}/case`, { headers: { Accept: "application/json" } });
+    if (!res.ok) return none;
+    const c = (await res.json()) as Partial<CaseInfo>;
+    return {
+      denounced: c.denounced === true,
+      by: typeof c.by === "string" ? c.by : null,
+      x: typeof c.x === "string" ? c.x : null,
+      accomplices: Array.isArray(c.accomplices) ? c.accomplices.filter((a) => typeof a?.login === "string" && typeof a?.avatarUrl === "string") : [],
+    };
+  } catch {
+    return none;
+  }
 }
 
 async function sendEmail(cardId: string, email: string): Promise<void> {
@@ -260,7 +293,7 @@ async function getTop(): Promise<WeekTop | null> {
   }
 }
 
-export const api = { createCard, getJob, sendEmail, deleteCard, track, getConfig, startLinkedInPhoto, getShowcase, getTop, getMe, startClaim, setHidden, logout };
+export const api = { createCard, getJob, getCase, sendEmail, deleteCard, track, getConfig, startLinkedInPhoto, getShowcase, getTop, getMe, startClaim, setHidden, logout };
 
 /** URLs des images rendues par le serveur (§7). */
 export const images = {

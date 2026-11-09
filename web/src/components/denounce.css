@@ -1,0 +1,171 @@
+/* « Dénonce un complice » (§18.6) et l'arrivée sur une fiche dénoncée (§18.7).
+   Style mat (§18.18, §18.20) : aplats, titres crème en Barlow Condensed 700,
+   pilules rose poudré, aucune lueur, aucun dégradé (celui de la fiche suffit).
+   Téléphone d'abord ; zones à toucher de 44 px au moins. */
+
+/* ---------- le bloc sous le partage ---------- */
+
+.denounce-form {
+  display: grid;
+  gap: 8px;
+}
+.denounce-form .pill {
+  width: 100%;
+}
+.denounce .denounce-error {
+  font: 500 14px/1.4 var(--f-text);
+  color: var(--siren-ink);
+}
+.denounce-suggest {
+  display: grid;
+  gap: 8px;
+}
+.denounce-suggest ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+}
+.denounce-who {
+  gap: 10px;
+  padding: 0 16px 0 8px;
+  max-width: 100%;
+}
+.denounce-who img {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--ink-1);
+  object-fit: cover;
+}
+.denounce-who span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* attente : une ligne et une barre plate, dans le bloc */
+.denounce-pending {
+  display: grid;
+  gap: 12px;
+}
+.denounce .denounce-pending p {
+  font: 500 16px/1.3 var(--f-text);
+  color: var(--cream);
+}
+.denounce-bar {
+  position: relative;
+  display: block;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--lilac-faint);
+}
+.denounce-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 35%;
+  border-radius: inherit;
+  background: var(--blush);
+  animation: denounce-bar 1.4s var(--ease-out) infinite;
+}
+@keyframes denounce-bar {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(290%);
+  }
+}
+
+/* prêt à partager (prune, comme le bloc qu'il remplace : le partage au-dessus est marine) */
+.denounce-head {
+  overflow-wrap: anywhere;
+}
+.denounce-who-name {
+  color: var(--blush);
+}
+.denounce-stars {
+  color: var(--star);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.denounce-actions {
+  display: grid;
+  gap: 8px;
+}
+.denounce-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 16px;
+}
+
+@media (min-width: 561px) {
+  .denounce-form {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .denounce-form .pill {
+    width: auto;
+  }
+  .denounce-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ---------- arrivée sur une fiche dénoncée (CardPage) ---------- */
+
+.denounced {
+  display: grid;
+  gap: 10px;
+  padding: 18px 20px 20px;
+  border-radius: var(--r-card);
+  background: var(--plum);
+}
+.denounced-title {
+  font: 700 30px/0.95 var(--f-name);
+  text-transform: uppercase;
+  color: var(--cream);
+}
+.denounced-by {
+  font: 500 13px/1.3 var(--f-mono);
+  color: var(--lilac-2);
+}
+.denounced .pill {
+  justify-self: start;
+}
+
+/* la phrase sous le nom : « est dans le viseur ★★★★ · Profil » */
+.wanted-verb {
+  font: 500 17px/1 var(--f-text);
+  color: var(--lilac);
+}
+.wanted-level {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+/* la ligne de comparaison, dans « Et toi ? » */
+.you .versus-line {
+  font: 700 26px/1.05 var(--f-name);
+  text-transform: uppercase;
+  color: var(--cream);
+  overflow-wrap: anywhere;
+}
+.you > .pill {
+  justify-self: start;
+}
+
+@media (min-width: 900px) {
+  .denounced-title {
+    font-size: 40px;
+  }
+  .wanted-verb {
+    font-size: 22px;
+  }
+  .you .versus-line {
+    font-size: 32px;
+  }
+}
