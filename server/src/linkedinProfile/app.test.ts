@@ -155,6 +155,8 @@ describe("entrée GitHub : le LinkedIn trouvé devient une comparaison", () => {
     // La carte GitHub de la comparaison entre au top de la semaine.
     expect(ctx.store.getCard(cmp.github.id)).toMatchObject({ source: "github", login: "camille-ardent" });
     expect(weekRank(ctx.store.db, cmp.github.id)).not.toBeNull();
+    // « LinkedIn retrouvé » au dossier de l'enquête (§18.26).
+    expect(cmp.github.findings?.find((f) => f.source === "linkedin")).toMatchObject({ kind: "linkedin_found", proof: URL_ });
   });
 
   it("cache 24 h : le même pseudo rend la comparaison, sans rien relire", async () => {
@@ -223,6 +225,7 @@ describe("entrée LinkedIn (le champ unique)", () => {
     expect(ctx.store.getCard(json.id)).toMatchObject({ source: "linkedin", login: null, facts: { linkedinUrl: URL_ } });
     expect(weekRank(ctx.store.db, json.id)).toBeNull();
     expect(ctx.calls.collect).toHaveLength(0);
+    expect(s.state === "done" && s.kind === "card" && s.card.findings?.[0]?.text.fr).toBe("LinkedIn retrouvé : « Senior Full-Stack Engineer ».");
     const again = await post(ctx, { linkedin: "https://fr.linkedin.com/in/camille-ardent?trk=abc" });
     expect(again).toMatchObject({ status: 200, json: { id: json.id, cached: true } });
     expect(ctx.calls.forUrl).toHaveLength(1);

@@ -8,6 +8,7 @@ import type { LinkedinProfile, LinkedinProvider, ProviderResult } from "./profil
 import { LinkedinCache } from "./store";
 import { profileToText, asLinkedinCard } from "./text";
 import { linkedinFromGithub } from "./url";
+import { linkedinFindings } from "./findings";
 
 const NOW = Date.parse("2026-11-09T12:00:00Z");
 const DAY = 24 * 3600 * 1000;
@@ -219,6 +220,18 @@ describe("configuration", () => {
     expect(p?.providerName).toBe("apify");
     expect(fetchImpl).not.toHaveBeenCalled();
     expect(linkedinProfilesFromEnv({}, new Database(":memory:"))).toBeNull();
+  });
+});
+
+describe("trouvailles LinkedIn (§18.26)", () => {
+  it("« LinkedIn retrouvé » avec le titre ; les compétences seulement à partir de 15", () => {
+    const [found, ...rest] = linkedinFindings(profile());
+    expect(found).toMatchObject({ kind: "linkedin_found", source: "linkedin", proof: CAMILLE, key: { fr: "Senior Full-Stack Engineer" } });
+    expect(found!.text.en).toBe("LinkedIn found: “Senior Full-Stack Engineer”.");
+    expect(rest).toEqual([]);
+    const many = linkedinFindings({ ...profile(), skills: Array.from({ length: 41 }, (_, i) => `s${i}`) });
+    expect(many[1]).toMatchObject({ kind: "linkedin_skills", text: { fr: "41 compétences déclarées sur LinkedIn.", en: "41 skills declared on LinkedIn." }, score: 39 });
+    expect(JSON.stringify(many)).not.toContain("Paysolde");
   });
 });
 

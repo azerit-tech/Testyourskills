@@ -14,6 +14,7 @@ import type { NewCardRow, Store } from "./db";
 import { TokenPool } from "./github/tokens";
 import type { LinkedinFinder, LinkedinProfile } from "./linkedinProfile/index";
 import { asLinkedinCard, asLinkedinComparison, profileToText } from "./linkedinProfile/text";
+import { linkedinFindings } from "./linkedinProfile/findings";
 
 export type CardBody = Omit<CardData, "id" | "createdAt">;
 
@@ -679,7 +680,8 @@ export class Pipeline {
 
     // Déclaratif seul (CV, ou LinkedIn sans GitHub), ou profil non dev : pas de carte GitHub (§4.7).
     if (!gh || !reading.is_dev_profile) {
-      const card = asDeclared({ ...deps.scoreCv(reading, declared.counts, { lang, judgedInSeconds }), id, createdAt });
+      const found = linkedinUrl ? strongest(ctx.findings()) : [];
+      const card = asDeclared({ ...deps.scoreCv(reading, declared.counts, { lang, judgedInSeconds }), ...(found.length ? { findings: found } : {}), id, createdAt });
       return [cvRow(card, null)];
     }
 
@@ -746,6 +748,7 @@ export class Pipeline {
     }
     if (!profile) return null;
     if (soft) ctx.emit("linkedin");
+    ctx.find(linkedinFindings(profile));
     let text = profileToText(profile);
     const counts = deps.cvTextCounts(text, 1);
     let reading: CvReading | null = null;
