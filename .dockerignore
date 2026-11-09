@@ -1,14 +1,50 @@
+# Contexte de build : seulement ce qu'il faut pour `npm ci`, `vite build` et
+# lancer server/src par tsx. Tout ce qui est lourd, local ou secret reste dehors.
+#
+# Ce qui DOIT entrer (ne jamais l'exclure) :
+#   package.json, package-lock.json, tsconfig.json (tsx y lit "jsx": "react-jsx"),
+#   vite.config.ts, web/ (dont web/public/ et web/public/3d/ : modèles glb,
+#   textures, city.webp, copiés dans dist/web par vite), server/ (dont
+#   server/fonts/, lues par le rendu des PNG), shared/, data/ (barème, statuts).
+
+# Node : réinstallé dans l'image, front rebâti dans l'image
 node_modules
+**/node_modules
 dist
+tsconfig.tsbuildinfo
+
+# Données locales (la base vit sur le volume /data) et secrets
 var
-.git
 .env
 .env.*
 !.env.example
-*.db
-*.db-*
+**/*.db
+**/*.db-*
+.deployed_commit
+.deployed_commit.precedent
+
+# Pipeline Blender (tools/bake : scripts, .cache de modèles bruts, __pycache__)
+# et sources 3D lourdes : seuls les fichiers déjà exportés dans web/public/3d servent.
+tools
+**/__pycache__
+**/*.pyc
+**/*.blend
+**/*.blend1
+**/*.fbx
+**/*.exr
+**/*.hdr
+
+# Outillage du dépôt, hors image
+.git
+.gitignore
+.claude
+scripts
+ops
 **/*.test.ts
-.DS_Store
-**/.DS_Store
+vitest.config.ts
 docker-compose.yml
 caddy-snippet.txt
+*.md
+**/*.log
+.DS_Store
+**/.DS_Store
