@@ -13,12 +13,15 @@ import { checkOpenRouterCredits } from "./ai/credits";
 import { linkedinFromEnv } from "./linkedin";
 import { Store } from "./db";
 import { realDeps } from "./deps";
+import { TokenPool, tokensFromEnv } from "./github/tokens";
 
 const prod = process.env.NODE_ENV === "production";
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 const port = Number(process.env.PORT ?? 8787);
-const githubToken = process.env.GITHUB_TOKEN ?? "";
+// GITHUB_TOKENS (plusieurs jetons, séparés par des virgules) ou, à défaut, GITHUB_TOKEN.
+const githubTokens = tokensFromEnv(process.env);
+const githubToken = githubTokens[0] ?? "";
 const baseUrl = (process.env.BASE_URL ?? (prod ? "https://skills.azerit.tech" : "http://localhost:5180")).replace(/\/+$/, "");
 const dbPath = resolve(process.env.DB_PATH ?? join(projectRoot, "var/cards.db"));
 const ogDir = join(dirname(dbPath), "og");
@@ -29,10 +32,12 @@ const linkedin = linkedinFromEnv(process.env);
 
 if (!githubToken) {
   if (prod) {
-    console.error("GITHUB_TOKEN manquant : impossible de collecter les profils GitHub. Renseigne-le dans .env.");
+    console.error("GITHUB_TOKENS / GITHUB_TOKEN manquant : impossible de collecter les profils GitHub. Renseigne-le dans .env.");
     process.exit(1);
   }
   console.warn("[dev] GITHUB_TOKEN absent : l'API GitHub sera limitée à 60 requêtes par heure.");
+} else {
+  console.log(`GitHub : ${githubTokens.length} jeton(s) en rotation.`);
 }
 if (!process.env.OPENROUTER_API_KEY) {
   console.warn("OPENROUTER_API_KEY absent : cartes sans lecture IA (TEC peu fiable, CV illisibles).");
@@ -64,6 +69,7 @@ const { app, pipeline } = createApp({
   store,
   deps: realDeps,
   githubToken,
+  githubPool: new TokenPool(githubTokens),
   baseUrl,
   ogDir,
   leadsEndpoint: process.env.LEADS_ENDPOINT || undefined,

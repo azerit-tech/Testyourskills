@@ -16,11 +16,15 @@ import { ID_RE, MAX_PDF_BYTES, MESSAGES, Pipeline, type Deps, type RenderInput }
 import { CARDS_PER_DAY, RateLimiter, clientIp } from "./ratelimit";
 import { inlineAvatar, mountLinkedin, removeAvatars, type LinkedinConfig } from "./linkedin";
 import { aiStatus as budgetAiStatus, type AiStatus } from "./ai/budget";
+import type { TokenPool } from "./github/tokens";
 
 export interface AppOptions {
   store: Store;
   deps: Deps;
+  /** Premier jeton GitHub (ou vide) : sert au diagnostic et de repli si `githubPool` est absent. */
   githubToken: string;
+  /** Jetons GitHub en rotation (GITHUB_TOKENS). Absent : `githubToken` seul. */
+  githubPool?: TokenPool;
   /** URL publique sans / final, ex. https://skills.azerit.tech */
   baseUrl: string;
   /** Cache disque des PNG (var/og en dev, /data/og en prod). */
@@ -136,7 +140,13 @@ export async function purge(store: Store, ogDir: string, now = Date.now(), avata
 
 export function createApp(opts: AppOptions) {
   const { store, deps, baseUrl, ogDir } = opts;
-  const pipeline = new Pipeline({ store, deps, githubToken: opts.githubToken, timeoutMs: opts.timeoutMs });
+  const pipeline = new Pipeline({
+    store,
+    deps,
+    githubToken: opts.githubToken,
+    githubPool: opts.githubPool,
+    timeoutMs: opts.timeoutMs,
+  });
   const limiter = new RateLimiter(store, opts.ipSalt ?? "testyourskills");
   const cardsPerDay = opts.cardsPerDay ?? CARDS_PER_DAY;
   const fetchImpl = opts.fetchImpl ?? fetch;

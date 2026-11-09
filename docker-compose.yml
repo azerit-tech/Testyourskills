@@ -11,7 +11,7 @@ services:
     image: testyourskills
     container_name: testyourskills
     restart: unless-stopped
-    env_file: .env              # OPENROUTER_API_KEY, GITHUB_TOKEN, BASE_URL,
+    env_file: .env              # OPENROUTER_API_KEY, GITHUB_TOKENS (ou GITHUB_TOKEN), BASE_URL,
                                 # LEADS_ENDPOINT, AI_MODEL_CODE, AI_MODEL_CV,
                                 # AI_DAILY_BUDGET_USD, LINKEDIN_CLIENT_ID,
                                 # LINKEDIN_CLIENT_SECRET (voir .env.example)

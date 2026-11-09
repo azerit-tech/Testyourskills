@@ -15,7 +15,7 @@ import {
   type TreeEntry,
 } from "./detect";
 import type { CommitFact, GithubFacts, GithubRepo, RepoTree } from "./facts";
-import { EngineError, graphql, headOf, lastPageOf, makeCtx, rawFile, rest, soft, type Ctx } from "./http";
+import { EngineError, graphql, headOf, lastPageOf, makeCtx, rawFile, rest, soft, type Ctx, type GithubAuth } from "./http";
 
 export { EngineError } from "./http";
 export type { GithubFacts, GithubRepo, GithubProfile, RepoTree, CommitFact } from "./facts";
@@ -77,7 +77,7 @@ type Progress = (e: { key: string; n?: number }) => void;
 
 export async function collectGithub(
   login: string,
-  opts: { token: string; onProgress?: Progress; signal?: AbortSignal },
+  opts: { token: GithubAuth; onProgress?: Progress; signal?: AbortSignal },
 ): Promise<GithubFacts> {
   const user = parseLogin(login);
   if (!user) throw new EngineError("unknown_user", `pseudo invalide : ${login}`);

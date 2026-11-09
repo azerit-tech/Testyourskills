@@ -10,8 +10,12 @@ import { randomBytes, randomInt } from "node:crypto";
 import type { CardData, ComparisonData, ErrorCode, Fact, JobState, Lang, ProgressEvent } from "../../shared/types";
 import type { CodeReadingResult, CvReading, CvTextCounts, RepoFiles } from "../../shared/readings";
 import type { NewCardRow, Store } from "./db";
+import { TokenPool } from "./github/tokens";
 
 export type CardBody = Omit<CardData, "id" | "createdAt">;
+
+/** Un jeton GitHub seul, ou le pool de jetons en rotation partagé par toutes les fiches. */
+export type GithubAuth = string | TokenPool;
 
 export interface RenderInput {
   format: "card" | "og" | "portrait";
@@ -28,9 +32,9 @@ export interface RenderInput {
 export interface Deps {
   collectGithub(
     login: string,
-    opts: { token: string; onProgress?: (e: { key: string; n?: number }) => void; signal?: AbortSignal },
+    opts: { token: GithubAuth; onProgress?: (e: { key: string; n?: number }) => void; signal?: AbortSignal },
   ): Promise<unknown>;
-  pickFilesForReading(facts: unknown, opts: { token: string; signal?: AbortSignal }): Promise<RepoFiles[]>;
+  pickFilesForReading(facts: unknown, opts: { token: GithubAuth; signal?: AbortSignal }): Promise<RepoFiles[]>;
   readCode(repos: RepoFiles[], opts?: { signal?: AbortSignal }): Promise<CodeReadingResult | null>;
   /** IA configurée. Plafond atteint ou crédit épuisé : readCode/readCv lèvent une erreur `closed`. */
   aiAvailable(): boolean;
@@ -174,7 +178,10 @@ export function classifyError(err: unknown): JobError {
 export interface PipelineOptions {
   store: Store;
   deps: Deps;
-  githubToken: string;
+  /** Jeton GitHub unique, si `githubPool` n'est pas donné. */
+  githubToken?: string;
+  /** Jetons GitHub en rotation (GITHUB_TOKENS), partagés par toutes les fiches. */
+  githubPool?: TokenPool;
   /** Timeout global d'une carte (SPEC §12). */
   timeoutMs?: number;
   /** Durée de conservation en mémoire d'un job en erreur. */
@@ -220,10 +227,12 @@ export class Pipeline {
   private inflight = new Map<string, string>(); // pseudo en minuscules → id du job GitHub en cours
   private readonly timeoutMs: number;
   private readonly errorTtlMs: number;
+  readonly github: TokenPool;
 
   constructor(private opts: PipelineOptions) {
     this.timeoutMs = opts.timeoutMs ?? 30_000;
     this.errorTtlMs = opts.errorTtlMs ?? 3600_000;
+    this.github = opts.githubPool ?? new TokenPool(opts.githubToken ? [opts.githubToken] : []);
   }
 
   /** État en mémoire d'un job en cours ou en erreur. null : voir la base. */
@@ -395,14 +404,14 @@ export class Pipeline {
   }
 
   private async githubBranch(login: string, ctx: Ctx, allowCache: boolean): Promise<GithubResult> {
-    const { deps, store, githubToken } = this.opts;
+    const { deps, store } = this.opts;
     if (allowCache) {
       // Comparaison sur un pseudo jugé il y a moins de 24 h : on ne refait pas les appels.
       const row = store.findRecentGithub(login);
       if (row?.facts && row.kind === "card") return { facts: row.facts, ai: null, cached: row.data as CardData };
     }
     const facts = await deps.collectGithub(login, {
-      token: githubToken,
+      token: this.github,
       signal: ctx.signal,
       onProgress: (e) => ctx.emit(e.key, e.n),
     });
@@ -410,7 +419,7 @@ export class Pipeline {
     let ai: CodeReadingResult | null = null;
     if (deps.aiAvailable()) {
       try {
-        const files = await deps.pickFilesForReading(facts, { token: githubToken, signal: ctx.signal });
+        const files = await deps.pickFilesForReading(facts, { token: this.github, signal: ctx.signal });
         if (files.length) ai = await deps.readCode(files, { signal: ctx.signal });
       } catch (err) {
         // IA coupée : pas de fiche sans lecture (§2.3), la fiche échoue en `closed`.

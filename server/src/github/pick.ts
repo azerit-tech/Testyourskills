@@ -6,7 +6,7 @@ import type { RepoFiles } from "../../../shared/readings";
 import { SCORING } from "../scoring/config";
 import { isSourceCandidate } from "./detect";
 import type { GithubFacts } from "./facts";
-import { makeCtx, rawFile, rest, soft } from "./http";
+import { makeCtx, rawFile, rest, soft, type GithubAuth } from "./http";
 
 const PICK = {
   filesPerRepo: 10,
@@ -32,7 +32,7 @@ export function truncateTo(text: string, max: number): string {
   return cut + marker;
 }
 
-export async function pickFilesForReading(facts: GithubFacts, opts: { token: string; signal?: AbortSignal }): Promise<RepoFiles[]> {
+export async function pickFilesForReading(facts: GithubFacts, opts: { token: GithubAuth; signal?: AbortSignal }): Promise<RepoFiles[]> {
   const ctx = makeCtx(opts.token, opts.signal);
   const byName = new Map(facts.repos.map((r) => [r.name, r]));
   const chosen = facts.activeRepos
