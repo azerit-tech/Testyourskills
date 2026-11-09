@@ -484,6 +484,37 @@ describe("ce que la session du propriétaire ouvre sans le jeton de la fiche", (
   });
 });
 
+describe("suppression par le propriétaire (§11)", () => {
+  const del = (ctx: Ctx, id: string, headers: Record<string, string> = {}) => ctx.app.request(`/api/card/${id}`, { method: "DELETE", headers });
+
+  it("DELETE sans jeton : accepté pour ses fiches, comparaison entière et images comprises", async () => {
+    const ctx = setup();
+    const cmp = insertComparison(ctx.store);
+    insertCard(ctx.store);
+    writeFileSync(join(ctx.ogDir, `${cmp.id}.png`), "png");
+    const { session } = await claim(ctx);
+    expect((await del(ctx, cmp.id)).status).toBe(403);
+    const ok = await del(ctx, cmp.cv.id, asOwner(session, { origin: BASE }));
+    expect(ok.status).toBe(200);
+    for (const id of [cmp.id, cmp.cv.id, cmp.github.id]) expect(ctx.store.getCard(id)).toBeNull();
+    expect(existsSync(join(ctx.ogDir, `${cmp.id}.png`))).toBe(false);
+    // Ses autres fiches restent : on supprime une fiche, pas un compte.
+    expect(ctx.store.getCard("CardAAAA01")).not.toBeNull();
+  });
+
+  it("refusé pour la fiche d'un autre, depuis un autre site, et par le lien GET sans jeton", async () => {
+    const ctx = setup();
+    insertCard(ctx.store);
+    insertCard(ctx.store, "CardBBBB02", "autre");
+    const { session } = await claim(ctx);
+    expect((await del(ctx, "CardBBBB02", asOwner(session))).status).toBe(403);
+    expect((await del(ctx, "CardAAAA01", asOwner(session, { origin: "https://evil.test" }))).status).toBe(403);
+    expect((await ctx.app.request("/api/card/CardAAAA01/delete", { headers: asOwner(session) })).status).toBe(403);
+    expect(ctx.store.getCard("CardAAAA01")).not.toBeNull();
+    expect(ctx.store.getCard("CardBBBB02")).not.toBeNull();
+  });
+});
+
 describe("conservation", () => {
   it("expires_at à NULL après revendication, cartes CV des comparaisons comprises, et pour les fiches suivantes", async () => {
     const ctx = setup();

@@ -303,9 +303,11 @@ async function sendEmail(cardId: string, email: string): Promise<void> {
   if (!res.ok) throw await readError(res);
 }
 
-async function deleteCard(id: string, token: string): Promise<void> {
-  if (isMock()) return mockApi.deleteCard(id, token);
-  const res = await fetch(`/api/card/${encodeURIComponent(id)}?token=${encodeURIComponent(token)}`, { method: "DELETE" });
+/** `token` null : la session du propriétaire revendiqué (cookie) fait foi. */
+async function deleteCard(id: string, token: string | null): Promise<void> {
+  if (isMock()) return mockApi.deleteCard(id, token ?? "");
+  const qs = token ? `?token=${encodeURIComponent(token)}` : "";
+  const res = await fetch(`/api/card/${encodeURIComponent(id)}${qs}`, { method: "DELETE" });
   if (!res.ok) throw await readError(res);
 }
 

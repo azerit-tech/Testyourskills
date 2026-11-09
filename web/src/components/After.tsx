@@ -691,7 +691,8 @@ export function DeleteCard({ cardId, onDeleted }: { cardId: string; onDeleted: (
   const d = t.result.del;
   const token = tokens.get(cardId);
   const [step, setStep] = useState<"idle" | "confirm" | "busy" | "error">("idle");
-  if (!token) return null;
+  // Qui a créé la fiche (jeton), ou le propriétaire connecté de son pseudo GitHub (§11).
+  if (!token && !isMine(cardId)) return null;
 
   const run = async () => {
     setStep("busy");

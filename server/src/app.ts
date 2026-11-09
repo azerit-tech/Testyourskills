@@ -422,7 +422,7 @@ export function createApp(opts: AppOptions) {
     // Spéciale « Top 5 de la semaine » et rang de la semaine, relus à chaque fois (§18.22).
     const { data, week } = withWeekSpecial(store.db, stripToken(row.data));
     const rank = week ? { week } : {};
-    // `mine` : la session est propriétaire du login de la fiche ; le front lui ouvre l'email sans jeton.
+    // `mine` : la session est propriétaire du login de la fiche ; le front lui ouvre l'email et la suppression sans jeton.
     const extra = { ...rank, ...(ownedBy(c, row) ? { mine: true } : {}) };
     const state: JobState =
       row.kind === "comparison"
@@ -432,12 +432,13 @@ export function createApp(opts: AppOptions) {
   });
 
   // Suppression (§11) : DELETE pour le front, GET pour le lien d'un email.
-  const deleteCard = async (c: Context): Promise<{ status: 200 | 403 | 404; ids?: string[] }> => {
+  // Le jeton de la fiche, ou (`bySession`) la session du propriétaire revendiqué de son login.
+  const deleteCard = async (c: Context, bySession = false): Promise<{ status: 200 | 403 | 404; ids?: string[] }> => {
     const id = c.req.param("id") ?? "";
     if (!ID_RE.test(id)) return { status: 404 };
     const row = store.getCard(id);
     if (!row) return { status: 404 };
-    if (!tokenMatches(c.req.query("token"), row.deleteToken)) return { status: 403 };
+    if (!tokenMatches(c.req.query("token"), row.deleteToken) && !(bySession && ownedBy(c, row))) return { status: 403 };
     // Fiche LinkedIn supprimée : le profil en cache part avec elle (§18.24).
     forgetLinkedinOfCard(store.db, (row.parentId ? store.getCard(row.parentId) : row)?.facts);
     const ids = store.deleteGroup(id);
@@ -446,13 +447,14 @@ export function createApp(opts: AppOptions) {
   };
 
   app.delete("/api/card/:id", async (c) => {
-    const r = await deleteCard(c);
+    const r = await deleteCard(c, true);
     if (r.status === 200) return c.json({ ok: true, deleted: r.ids });
     if (r.status === 403)
       return c.json({ ok: false, message: { fr: "Jeton de suppression invalide.", en: "Invalid deletion token." } }, 403);
     return c.json({ ok: false, message: MESSAGES.not_found }, 404);
   });
 
+  // Le lien GET ne vaut que par son jeton : un cookie de session part aussi sur un simple clic venu d'ailleurs.
   app.get("/api/card/:id/delete", async (c) => {
     const r = await deleteCard(c);
     if (r.status === 200)
