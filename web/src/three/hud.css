@@ -12,7 +12,7 @@
   --star-off-ink: rgba(255, 255, 255, 0.13); /* sur le fond d'encre du carton */
   --dusk: linear-gradient(180deg, #6f7cf0 0%, #b05ad8 35%, #f0589a 65%, #ffb366 100%);
   --f-name: "Barlow Condensed", "Arial Narrow", sans-serif;
-  --f-text: "Outfit", "Inter", system-ui, sans-serif;
+  --f-text: "Outfit", system-ui, sans-serif;
   --hud-pad: clamp(14px, 3vw, 34px);
   --star-size: clamp(20px, 2.6vw, 30px);
   --star-gap: 3px;

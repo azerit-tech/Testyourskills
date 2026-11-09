@@ -12,14 +12,6 @@
 @font-face { font-family: "Outfit"; font-weight: 600; font-display: swap; src: url("../../../server/fonts/outfit-600.ttf") format("truetype"); }
 @font-face { font-family: "Outfit"; font-weight: 700; font-display: swap; src: url("../../../server/fonts/outfit-700.ttf") format("truetype"); }
 
-/* Inter : seulement pour la scène 3D (web/src/three), plus par le site ni par la fiche. */
-@font-face { font-family: "Inter"; font-weight: 400; font-display: swap; src: url("../../../server/fonts/inter-400.ttf") format("truetype"); }
-@font-face { font-family: "Inter"; font-weight: 500; font-display: swap; src: url("../../../server/fonts/inter-500.ttf") format("truetype"); }
-@font-face { font-family: "Inter"; font-weight: 600; font-display: swap; src: url("../../../server/fonts/inter-600.ttf") format("truetype"); }
-@font-face { font-family: "Inter"; font-weight: 700; font-display: swap; src: url("../../../server/fonts/inter-700.ttf") format("truetype"); }
-@font-face { font-family: "Inter Medium"; font-weight: 500; font-display: swap; src: url("../../../server/fonts/inter-500.ttf") format("truetype"); }
-@font-face { font-family: "Inter SemiBold"; font-weight: 600; font-display: swap; src: url("../../../server/fonts/inter-600.ttf") format("truetype"); }
-
 @font-face { font-family: "JetBrains Mono"; font-weight: 400; font-display: swap; src: url("../../../server/fonts/jetbrains-mono-400.ttf") format("truetype"); }
 @font-face { font-family: "JetBrains Mono"; font-weight: 500; font-display: swap; src: url("../../../server/fonts/jetbrains-mono-500.ttf") format("truetype"); }
 @font-face { font-family: "JetBrains Mono"; font-weight: 700; font-display: swap; src: url("../../../server/fonts/jetbrains-mono-700.ttf") format("truetype"); }

@@ -10,7 +10,7 @@ const MONO = "'JetBrains Mono', ui-monospace, monospace";
 /** Précharge les polices utilisées par les textes de la scène. */
 export async function loadSceneFonts(): Promise<void> {
   if (!("fonts" in document)) return;
-  const want = ["800 64px 'Barlow Condensed'", "700 64px 'Barlow Condensed'", "600 64px 'Barlow Condensed'", "700 32px 'JetBrains Mono'", "500 24px 'JetBrains Mono'", "600 32px 'Inter'"];
+  const want = ["800 64px 'Barlow Condensed'", "700 64px 'Barlow Condensed'", "600 64px 'Barlow Condensed'", "700 32px 'JetBrains Mono'", "500 24px 'JetBrains Mono'"];
   await Promise.all(want.map((f) => document.fonts.load(f).catch(() => undefined)));
 }
 

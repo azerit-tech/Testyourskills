@@ -12,7 +12,7 @@ const renders = import.meta.glob("../../var/renders/*.png", { eager: true, query
 const css = `
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
-  body { margin: 0; background: #0a0a1f; color: #f3f1ff; font-family: Inter, system-ui, sans-serif;
+  body { margin: 0; background: #0a0a1f; color: #f3f1ff; font-family: Outfit, system-ui, sans-serif;
     background-image: radial-gradient(1200px 600px at 10% -10%, rgba(255,63,164,.14), transparent 60%),
       radial-gradient(900px 600px at 100% 110%, rgba(63,216,255,.10), transparent 60%); background-attachment: fixed; }
   header { position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center;
