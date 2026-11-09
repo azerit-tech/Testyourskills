@@ -15,6 +15,7 @@ import { ChatHttpError } from "./ai/client";
 import { readCode } from "./ai/readCode";
 import { fakeClient } from "./ai/testing";
 import { TokenPool } from "./github/tokens";
+import { facts as ghFacts } from "./scoring/__fixtures__/make";
 
 class EngineError extends Error {
   constructor(readonly code: string) {
@@ -184,6 +185,38 @@ describe("création d'une carte GitHub", () => {
       expect(done.state.card.deleteToken).toBeUndefined();
     }
     expect(ctx.store.listEvents("card_generated")).toHaveLength(1);
+  });
+
+  it("l'enquête en direct (§18.26) : les trouvailles sortent avant la lecture IA, la fiche garde les trois plus fortes", async () => {
+    const gate = deferred();
+    const ctx = setup({
+      async collectGithub() {
+        return ghFacts({ externalMergedPRs: 12 });
+      },
+      async readCode() {
+        await gate.promise;
+        return { readings: [], ai_status: "ai_typed" };
+      },
+    });
+    const { json } = await postLogin(ctx, "leamd");
+    let pending = await getState(ctx, json.id);
+    for (let i = 0; i < 20 && pending.state.state === "pending" && !pending.state.findings; i++) {
+      await new Promise((r) => setTimeout(r, 5));
+      pending = await getState(ctx, json.id);
+    }
+    expect(pending.state.state).toBe("pending");
+    const shown = pending.state.state === "pending" ? pending.state.findings ?? [] : [];
+    expect(shown.map((f) => f.kind).sort()).toEqual(["account_age", "contributions_year", "external_prs", "first_commit"]);
+    // de la plus banale à la plus forte
+    expect(shown.map((f) => f.score)).toEqual([...shown.map((f) => f.score)].sort((a, b) => a - b));
+
+    gate.resolve();
+    await ctx.pipeline.wait(json.id);
+    const card = ctx.store.getCard(json.id)!.data as CardData;
+    expect(card.findings).toHaveLength(3);
+    expect(card.findings!.map((f) => f.kind)).toEqual(shown.slice(-3).reverse().map((f) => f.kind));
+    // la note ne bouge pas
+    expect(card.overall).toBe(FIXTURES.gold.overall);
   });
 
   it("lit le code quand l'IA est disponible, et s'en passe sinon", async () => {

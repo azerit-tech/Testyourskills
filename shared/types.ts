@@ -59,6 +59,28 @@ export interface CardProfile {
   tagline: Fact;
 }
 
+/** D'où vient une trouvaille : GitHub, puis LinkedIn (§18.24) et les autres témoins (§18.25). */
+export type FindingSource = "github" | "linkedin";
+
+/**
+ * Une trouvaille de l'enquête en direct (§18.26) : une phrase courte, datée ou
+ * chiffrée, et sa preuve publique. Elle ne touche jamais la note. Toutes les
+ * sources poussent dans la même liste, triée par `score`.
+ */
+export interface Finding {
+  /** Type stable (ex. "first_commit", "night_share") : une trouvaille par type et par source. */
+  kind: string;
+  source: FindingSource;
+  /** Tournure de procès-verbal, sans « tu » : elle passe telle quelle dans le texte de partage. */
+  text: Fact;
+  /** Le chiffre clé, présent tel quel dans `text` (mis en rose poudré). */
+  key?: Fact;
+  /** La preuve : URL publique du commit, du repo ou du profil. */
+  proof: string;
+  /** Surprise de 0 à 100, fixée par type et par valeur : plus c'est précis, rare ou drôle, plus c'est haut. */
+  score: number;
+}
+
 /** La peine (axe le plus faible) et la caution (le geste qui lèverait un chef d'accusation), §18.2. */
 export interface CardSentence {
   label: Fact;
@@ -105,6 +127,8 @@ export interface CardData {
 
   /** Jeton de suppression : jamais renvoyé par GET public, seulement à la création. */
   deleteToken?: string;
+  /** Les trois trouvailles les plus fortes de l'enquête (§18.26), la plus forte d'abord. Absentes des fiches d'avant. */
+  findings?: Finding[];
   /** « Plus recherché que `percent` % » des profils sourcés par Azerit, dans le groupe dit (§18.3). Absent sans table de référence. */
   rank?: { percent: number; group: { kind: "language" | "position" | "all"; key?: string } };
 }
@@ -163,7 +187,8 @@ export interface WeekTop {
 /** Réponse de GET /api/card/:id pendant et après le traitement. */
 export type JobState =
   /** `queue` : rang dans la file d'attente (1 = la prochaine à passer). Absent dès que la fiche est en traitement. */
-  | { state: "pending"; progress: ProgressEvent[]; queue?: number }
+  /** `findings` : les trouvailles déjà sorties (§18.26), dans l'ordre où les montrer, la plus forte en dernier. */
+  | { state: "pending"; progress: ProgressEvent[]; queue?: number; findings?: Finding[] }
   | { state: "done"; kind: "card"; card: CardData; week?: WeekRank }
   | { state: "done"; kind: "comparison"; comparison: ComparisonData; week?: WeekRank }
   | { state: "error"; code: ErrorCode; message: Fact };

@@ -7,7 +7,8 @@
 // Les deux : branches en parallèle, puis scoreCv avec les faits GitHub, puis compareCards.
 
 import { randomBytes, randomInt } from "node:crypto";
-import type { CardData, ComparisonData, ErrorCode, Fact, JobState, Lang, ProgressEvent } from "../../shared/types";
+import type { CardData, ComparisonData, ErrorCode, Fact, Finding, JobState, Lang, ProgressEvent } from "../../shared/types";
+import { forReveal, githubFindings, strongest } from "./findings";
 import type { CodeReadingResult, CvReading, CvTextCounts, RepoFiles } from "../../shared/readings";
 import type { NewCardRow, Store } from "./db";
 import { TokenPool } from "./github/tokens";
@@ -239,6 +240,8 @@ interface Job {
   input: JobInput;
   deleteToken: string;
   progress: ProgressEvent[];
+  /** Trouvailles de l'enquête (§18.26), toutes sources, dans l'ordre d'arrivée. */
+  findings: Finding[];
   /** Entrée en file, puis début du traitement : les `at` de la progression partent de là. */
   startedAt: number;
   finishedAt?: number;
@@ -258,6 +261,9 @@ interface JobInput {
 interface Ctx {
   signal: AbortSignal;
   emit(key: string, n?: number): void;
+  /** Verse des trouvailles au dossier (§18.26) : toutes les sources poussent dans la même liste. */
+  find(list: Finding[]): void;
+  findings(): Finding[];
   seconds(): number;
 }
 
@@ -306,7 +312,10 @@ export class Pipeline {
     const job = this.jobs.get(id);
     if (!job) return null;
     if (job.state === "queued") return { state: "pending", progress: [], queue: this.queue.indexOf(job) + 1 };
-    if (job.state === "running") return { state: "pending", progress: [...job.progress] };
+    if (job.state === "running") {
+      const findings = forReveal(job.findings);
+      return { state: "pending", progress: [...job.progress], ...(findings.length ? { findings } : {}) };
+    }
     return { state: "error", code: job.error!.code, message: job.error!.msg };
   }
 
@@ -353,7 +362,7 @@ export class Pipeline {
     const deleteToken = newToken();
     let settle!: () => void;
     const settled = new Promise<void>((r) => (settle = r));
-    const job: Job = { id, state: "queued", input, deleteToken, progress: [], startedAt: Date.now(), done: settled, settle };
+    const job: Job = { id, state: "queued", input, deleteToken, progress: [], findings: [], startedAt: Date.now(), done: settled, settle };
     this.jobs.set(id, job);
     const key = input.login && !input.pdf ? input.login.toLowerCase() : null;
     if (key) this.inflight.set(key, id);
@@ -453,6 +462,11 @@ export class Pipeline {
         job.progress.push(ev);
       },
       seconds: () => Math.max(1, Math.round((Date.now() - job.startedAt) / 1000)),
+      find: (list) => {
+        if (job.state !== "running" || ac.signal.aborted || !list.length) return;
+        job.findings = [...job.findings, ...list];
+      },
+      findings: () => job.findings,
     };
 
     try {
@@ -493,7 +507,9 @@ export class Pipeline {
 
     const githubCard = (cardId: string): CardData => {
       if (gh!.cached) return { ...gh!.cached, id: cardId, createdAt };
-      return { ...deps.scoreGithub(gh!.facts, gh!.ai, { lang, judgedInSeconds }), id: cardId, createdAt };
+      // Les trois trouvailles les plus fortes, toutes sources : elles ne changent pas la note.
+      const found = strongest(ctx.findings());
+      return { ...deps.scoreGithub(gh!.facts, gh!.ai, { lang, judgedInSeconds }), ...(found.length ? { findings: found } : {}), id: cardId, createdAt };
     };
     const githubRow = (card: CardData, parentId: string | null): NewCardRow => ({
       id: card.id,
@@ -572,6 +588,8 @@ export class Pipeline {
       onProgress: (e) => ctx.emit(e.key, e.n),
     });
     ctx.emit("recruiter");
+    // L'enquête en direct (§18.26) : les trouvailles sortent avant la lecture IA, pour l'attente.
+    ctx.find(githubFindings(facts));
     let ai: CodeReadingResult | null = null;
     // Sans IA, rien n'a été lu : fiche dégradée. Rien à lire (aucun fichier) : la
     // fiche est la même à chaque fois, elle se met en cache normalement.
