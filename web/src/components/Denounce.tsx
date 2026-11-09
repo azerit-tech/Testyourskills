@@ -132,7 +132,6 @@ export function Denounce({ cardId, selfLogin, toast }: Props) {
         </div>
       ) : (
         <>
-          <p>{d.text}</p>
           <form className="denounce-form" onSubmit={submit} noValidate>
             <div className="field">
               <label htmlFor={`${uid}-gh`} className="sr-only">

@@ -298,7 +298,6 @@ const fr = {
   /* « Dénonce un complice » (§18.6) et la page partagée (§18.7). Épicène : « dans le viseur », jamais « recherché ». */
   denounce: {
     title: "Dénonce un complice",
-    text: "Son pseudo GitHub : sa fiche sort, tu la partages.",
     label: "Pseudo GitHub du complice",
     placeholder: "pseudo",
     btn: "Dénoncer",
@@ -668,7 +667,6 @@ const en: Dict = {
   },
   denounce: {
     title: "Turn in an accomplice",
-    text: "Their GitHub username: their sheet comes out, you share it.",
     label: "Accomplice's GitHub username",
     placeholder: "username",
     btn: "Turn in",
