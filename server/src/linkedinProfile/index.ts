@@ -42,9 +42,20 @@ export type UrlLookup =
   /** Plafond du jour atteint, limite de l'IP atteinte, fournisseur en panne ou trop lent. */
   | { status: "unavailable" };
 
+/**
+ * Le profil lu pour un GitHub. `proven` : le lien entre ce LinkedIn et ce GitHub
+ * est prouvé, parce que GitHub affiche lui-même cette adresse ou que la recherche
+ * l'a trouvée. Une adresse seulement donnée par le joueur ne prouve rien : la
+ * comparaison sort, mais ne passe jamais pour la fiche de ce pseudo (cards.ts, top.ts).
+ */
+export interface GithubLookup {
+  profile: LinkedinProfile;
+  proven: boolean;
+}
+
 /** Ce que le pipeline demande ; les tests en donnent un faux. */
 export interface LinkedinFinder {
-  forGithub(facts: unknown, opts?: LookupOptions & { url?: string }): Promise<LinkedinProfile | null>;
+  forGithub(facts: unknown, opts?: LookupOptions & { url?: string }): Promise<GithubLookup | null>;
   forUrl(url: string, opts?: LookupOptions): Promise<UrlLookup>;
 }
 
@@ -79,16 +90,16 @@ export class LinkedinProfiles implements LinkedinFinder {
     return true;
   }
 
-  async forGithub(facts: unknown, opts: LookupOptions & { url?: string } = {}): Promise<LinkedinProfile | null> {
+  async forGithub(facts: unknown, opts: LookupOptions & { url?: string } = {}): Promise<GithubLookup | null> {
     const { cache, provider, search } = this.opts;
     const gh = githubDeclaredOf(facts);
     if (!gh) return null;
     const explicit = opts.url ? normalizeLinkedinUrl(opts.url) : null;
     const declared = linkedinFromGithub(gh);
     // L'adresse donnée par le joueur passe devant, mais ne lie jamais un profil à
-    // un GitHub : seuls ce que GitHub affiche et la recherche le font.
+    // un GitHub : seuls ce que GitHub affiche (cette même adresse) et la recherche le font.
     let url = explicit ?? declared;
-    let proves = !explicit && !!declared;
+    let proves = !!declared && (!explicit || explicit === declared);
     if (!url && search) {
       const prev = cache.getLookup(gh.login, this.now());
       if (prev !== undefined) url = prev;
@@ -110,7 +121,7 @@ export class LinkedinProfiles implements LinkedinFinder {
     if (hit) {
       if (!hit.found) return null;
       if (proves && hit.githubLogin == null) cache.linkGithub(url, gh.login);
-      return hit.profile;
+      return { profile: hit.profile, proven: proves };
     }
     if (!this.take(opts)) return null;
     try {
@@ -118,7 +129,7 @@ export class LinkedinProfiles implements LinkedinFinder {
       const r = await provider.fetchProfile(url, { signal: opts.signal });
       const link = proves ? gh.login : r.githubChecked ? r.githubLogin : undefined;
       cache.putProfile(url, r.profile, r.profile ? link : undefined, this.now());
-      return r.profile;
+      return r.profile ? { profile: r.profile, proven: proves } : null;
     } catch (err) {
       warn("profil", err);
       return null;

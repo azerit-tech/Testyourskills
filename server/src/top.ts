@@ -3,6 +3,9 @@
 // GitHub d'une comparaison), sorties avec la lecture IA, encore en ligne, dont le
 // login n'est pas masqué, et dont le compte a 5 000 abonnés au plus : les
 // célébrités gardent leur fiche mais ne bouchent pas le haut du tableau.
+// La carte GitHub d'une comparaison LinkedIn n'entre que si le lien est prouvé
+// (GitHub affiche ce LinkedIn, §18.24) : une comparaison montée par un tiers
+// sur le pseudo d'un autre ne le classe pas.
 // Une ligne par login : sa meilleure note de la semaine ; à égalité, la fiche la
 // plus ancienne passe devant. Tout se calcule à la lecture, rien n'est écrit.
 // Le classement d'une semaine est gardé 60 s en mémoire : il est demandé à
@@ -33,6 +36,12 @@ interface Ranked {
 export function isoWeekNumber(monday: number): number {
   return Number(isoWeekLabel(monday).slice(-2));
 }
+
+/** Écarte la carte `c` d'une comparaison LinkedIn dont le lien avec ce GitHub n'est pas prouvé. */
+const PROVEN_SQL = `NOT EXISTS (
+           SELECT 1 FROM cards p
+           WHERE p.id = c.parent_id AND p.source = 'linkedin'
+             AND COALESCE(json_extract(p.facts_json, '$.linkedinProven'), 0) <> 1)`;
 
 /** Durée pendant laquelle le classement d'une semaine est gardé en mémoire. */
 export const RANK_CACHE_MS = 60_000;
@@ -74,6 +83,7 @@ function computeWeek(db: Database.Database, monday: number, now: number): Ranked
          AND (c.expires_at IS NULL OR c.expires_at > ?)
          AND COALESCE(json_extract(c.facts_json, '$.profile.followers'), 0) <= ?
          AND NOT EXISTS (SELECT 1 FROM owners o WHERE o.login = c.login AND o.hidden = 1)
+         AND ${PROVEN_SQL}
        ORDER BY overall DESC, c.created_at ASC, c.id ASC`,
     )
     .all(monday, monday + WEEK_MS, now, CELEBRITY_FOLLOWERS) as Ranked[];
@@ -135,7 +145,8 @@ export function weekRankDetail(
       `SELECT 1 FROM cards c
        WHERE c.id = ? AND c.kind = 'card' AND c.source = 'github' AND c.degraded = 0
          AND (c.expires_at IS NULL OR c.expires_at > ?)
-         AND COALESCE(json_extract(c.facts_json, '$.profile.followers'), 0) <= ?`,
+         AND COALESCE(json_extract(c.facts_json, '$.profile.followers'), 0) <= ?
+         AND ${PROVEN_SQL}`,
     )
     .get(cardId, now, CELEBRITY_FOLLOWERS);
   if (!own) return null;

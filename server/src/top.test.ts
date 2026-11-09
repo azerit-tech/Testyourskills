@@ -117,6 +117,32 @@ describe("weekTop", () => {
     expect(top.entries.map((e) => [e.login, e.cardId])).toEqual([["both", child.id]]);
   });
 
+  it("comparaison LinkedIn : sa carte GitHub n'entre que si le lien est prouvé (§18.24)", () => {
+    const store = newStore();
+    const cmp = (id: string, login: string, facts: unknown, overall: number) => {
+      const child = gh(login, overall, W46 + H, { parentId: id });
+      store.insertCards([
+        { id, createdAt: W46 + H, source: "linkedin", login, kind: "comparison", data: { ...FIXTURES.gold, id } as never, facts, deleteToken: "t" },
+        child,
+      ]);
+      return child;
+    };
+    const proven = cmp("cmpProven1", "prouve", { linkedinUrl: "https://www.linkedin.com/in/a", linkedinProven: true }, 70);
+    const forged = cmp("cmpForged1", "victime", { linkedinUrl: "https://www.linkedin.com/in/b", linkedinProven: false }, 95);
+    // Une comparaison d'avant ce champ n'est pas prouvée.
+    const legacy = cmp("cmpLegacy1", "avant", { linkedinUrl: "https://www.linkedin.com/in/c" }, 90);
+    expect(weekTop(store.db, { now: NOW }).entries.map((e) => [e.login, e.cardId])).toEqual([["prouve", proven.id]]);
+    expect(weekRank(store.db, forged.id, NOW)).toBeNull();
+    expect(weekRank(store.db, legacy.id, NOW)).toBeNull();
+
+    // La fiche GitHub du pseudo entre, elle ; la carte de la comparaison non prouvée ne prend pas son rang.
+    const own = gh("victime", 60, W46 + 2 * H);
+    store.insertCards([own]);
+    expect(weekTop(store.db, { now: NOW }).entries.map((e) => e.cardId)).toEqual([proven.id, own.id]);
+    expect(weekRank(store.db, forged.id, NOW)).toBeNull();
+    expect(withWeekSpecial(store.db, forged.data as CardData, NOW).week).toBeNull();
+  });
+
   it("change de semaine le lundi 00:00 UTC", () => {
     const store = newStore();
     store.insertCards([gh("sunday", 90, W46 - 1), gh("monday", 50, W46)]);

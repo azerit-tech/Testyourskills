@@ -12,7 +12,8 @@ import { forReveal, githubFindings, strongest } from "./findings";
 import type { CodeReadingResult, CvReading, CvTextCounts, RepoFiles } from "../../shared/readings";
 import type { NewCardRow, Store } from "./db";
 import { TokenPool } from "./github/tokens";
-import type { LinkedinFinder, LinkedinProfile } from "./linkedinProfile/index";
+import type { GithubLookup, LinkedinFinder, LinkedinProfile } from "./linkedinProfile/index";
+import { githubShowsLinkedin } from "./linkedinProfile/url";
 import { asLinkedinCard, asLinkedinComparison, profileToText } from "./linkedinProfile/text";
 import { linkedinFindings } from "./linkedinProfile/findings";
 
@@ -320,6 +321,8 @@ interface Ctx {
 
 interface LinkedinResult {
   profile: LinkedinProfile;
+  /** Le chercheur dit le lien avec ce GitHub prouvé (GitHub affiche ce LinkedIn, ou la recherche). */
+  proven: boolean;
   cv: CvResult;
 }
 
@@ -604,7 +607,7 @@ export class Pipeline {
     // Le LinkedIn se lit en parallèle de la lecture du code : dès l'entrée, ou
     // dès que les faits GitHub disent où il est (entrée GitHub).
     const lk: { p?: Promise<LinkedinResult | null> } = {};
-    if (entry) lk.p = this.linkedinBranch(Promise.resolve(entry.profile), ctx, false);
+    if (entry) lk.p = this.linkedinBranch(Promise.resolve({ profile: entry.profile, proven: false }), ctx, false);
     const finder = !pdf && !input.noLinkedin ? this.opts.linkedin : undefined;
     const slow = linkedinSlow(ctx);
     const onFacts =
@@ -691,6 +694,13 @@ export class Pipeline {
       return [cvRow(card, null)];
     }
 
+    // Le lien entre ce LinkedIn et ce GitHub est-il prouvé ? Par le chercheur, ou
+    // parce que le GitHub affiche lui-même ce LinkedIn (entrée LinkedIn : le
+    // profil donne un GitHub, qui doit le lui rendre). Une comparaison non prouvée
+    // se lit à son adresse et par le cache de son adresse LinkedIn, mais ne passe
+    // jamais devant la fiche GitHub du pseudo et n'entre pas au top (§18.24).
+    const linkedinProven = !!li && !!linkedinUrl && (li.proven || githubShowsLinkedin(gh.facts, linkedinUrl));
+
     // Comparaison : trois lignes, la comparaison et ses deux cartes, chacune son id.
     ctx.emit("compare");
     const cvCard: CardData = {
@@ -717,7 +727,7 @@ export class Pipeline {
         login,
         kind: "comparison",
         data: comparison,
-        ...(linkedinUrl ? { facts: { linkedinUrl } } : {}),
+        ...(linkedinUrl ? { facts: { linkedinUrl, linkedinProven } } : {}),
         deleteToken,
         degraded: gh.degraded,
       },
@@ -744,15 +754,16 @@ export class Pipeline {
    * Le texte ne vit que le temps de la lecture. Entrée GitHub (`soft`) : toute
    * panne rend null, la fiche GitHub sort seule.
    */
-  private async linkedinBranch(profileP: Promise<LinkedinProfile | null>, ctx: Ctx, soft: boolean): Promise<LinkedinResult | null> {
+  private async linkedinBranch(foundP: Promise<GithubLookup | null>, ctx: Ctx, soft: boolean): Promise<LinkedinResult | null> {
     const { deps } = this.opts;
-    let profile: LinkedinProfile | null;
+    let found: GithubLookup | null;
     try {
-      profile = await profileP;
+      found = await foundP;
     } catch {
-      profile = null;
+      found = null;
     }
-    if (!profile) return null;
+    if (!found) return null;
+    const { profile, proven } = found;
     if (soft) ctx.emit("linkedin");
     ctx.find(linkedinFindings(profile));
     let text = profileToText(profile);
@@ -767,7 +778,7 @@ export class Pipeline {
       }
     }
     text = "";
-    return { profile, cv: { counts, reading } };
+    return { profile, proven, cv: { counts, reading } };
   }
 
   private async githubBranch(login: string, ctx: Ctx, allowCache: boolean, onFacts?: (facts: unknown) => void): Promise<GithubResult> {

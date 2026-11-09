@@ -8,9 +8,12 @@ import { forgetLinkedin } from "./store";
 /**
  * Fiche LinkedIn de moins de 24 h, sortie avec la lecture IA : par adresse
  * LinkedIn (fiche seule ou comparaison), ou par login (comparaison). L'id, ou null.
+ * Par login, seulement une comparaison prouvée (`linkedinProven` : GitHub affiche
+ * lui-même ce LinkedIn) : sinon n'importe qui collerait le LinkedIn de son choix
+ * au pseudo d'un tiers, et tous ceux qui tapent ce pseudo le verraient 24 h.
  */
 export function recentLinkedinCard(db: Database.Database, by: { url?: string; login?: string }, now = Date.now()): string | null {
-  const where = by.url ? `json_extract(facts_json, '$.linkedinUrl') = ?` : `login = ?`;
+  const where = by.url ? `json_extract(facts_json, '$.linkedinUrl') = ?` : `json_extract(facts_json, '$.linkedinProven') = 1 AND login = ?`;
   const key = by.url ?? by.login?.toLowerCase();
   if (!key) return null;
   const r = db

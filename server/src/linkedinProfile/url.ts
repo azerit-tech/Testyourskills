@@ -66,6 +66,12 @@ export function githubDeclaredOf(facts: unknown): GithubDeclared | null {
   };
 }
 
+/** Ce GitHub affiche-t-il lui-même cette adresse LinkedIn (déjà normalisée) ? C'est ce qui prouve le lien entre les deux. */
+export function githubShowsLinkedin(facts: unknown, url: string): boolean {
+  const gh = githubDeclaredOf(facts);
+  return !!gh && linkedinFromGithub(gh) === url;
+}
+
 /** Le profil GitHub de `login`, pour vérifier une correspondance Crustdata. */
 export function sameGithub(url: unknown, login: string): boolean {
   if (typeof url !== "string") return false;

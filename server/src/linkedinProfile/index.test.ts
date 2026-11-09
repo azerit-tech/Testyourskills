@@ -74,14 +74,16 @@ describe("forGithub", () => {
   it("lit le profil que GitHub affiche, le garde 30 jours sans photo, et lie le compte", async () => {
     const t = setup();
     const p = await t.finder.forGithub(facts({ blog: "linkedin.com/in/Camille-Ardent" }));
-    expect(p?.name).toBe("Camille Ardent");
+    expect(p?.profile.name).toBe("Camille Ardent");
+    expect(p?.proven).toBe(true);
     expect(t.calls).toEqual([{ url: CAMILLE, withGithub: undefined }]);
     const hit = t.cache.getProfile(CAMILLE, NOW + 29 * DAY);
     expect(hit).toMatchObject({ found: true, githubLogin: "camille-ardent" });
     expect(hit?.found && hit.profile.photoUrl).toBeUndefined();
     expect(t.cache.getProfile(CAMILLE, NOW + 31 * DAY)).toBeNull();
     // Deuxième fiche : le cache, aucun appel.
-    await t.finder.forGithub(facts({ blog: "linkedin.com/in/camille-ardent" }));
+    const again = await t.finder.forGithub(facts({ blog: "linkedin.com/in/camille-ardent" }));
+    expect(again?.proven).toBe(true);
     expect(t.calls).toHaveLength(1);
     expect(t.cache.readsToday(NOW)).toBe(1);
   });
@@ -94,9 +96,20 @@ describe("forGithub", () => {
 
   it("l'adresse donnée par le joueur passe devant, mais ne lie pas le compte GitHub", async () => {
     const t = setup((u) => ({ profile: profile(u), githubLogin: null, githubChecked: true }));
-    await t.finder.forGithub(facts({ blog: "linkedin.com/in/camille-ardent" }), { url: "https://linkedin.com/in/autre-personne/" });
+    const other = await t.finder.forGithub(facts({ blog: "linkedin.com/in/camille-ardent" }), { url: "https://linkedin.com/in/autre-personne/" });
     expect(t.calls[0]!.url).toBe("https://www.linkedin.com/in/autre-personne");
     expect(t.cache.getProfile("https://www.linkedin.com/in/autre-personne", NOW)).toMatchObject({ githubLogin: null });
+    // Le lien n'est pas prouvé, à la lecture comme depuis le cache ; ni sur un GitHub qui n'affiche rien.
+    expect(other?.proven).toBe(false);
+    expect((await t.finder.forGithub(facts({ blog: "linkedin.com/in/camille-ardent" }), { url: "https://linkedin.com/in/autre-personne/" }))?.proven).toBe(false);
+    expect((await t.finder.forGithub(facts(), { url: CAMILLE }))?.proven).toBe(false);
+  });
+
+  it("l'adresse donnée par le joueur est celle que GitHub affiche : le lien est prouvé", async () => {
+    const t = setup();
+    const p = await t.finder.forGithub(facts({ blog: "linkedin.com/in/camille-ardent" }), { url: "https://fr.linkedin.com/in/Camille-Ardent/?trk=x" });
+    expect(p?.proven).toBe(true);
+    expect(t.cache.getProfile(CAMILLE, NOW)).toMatchObject({ githubLogin: "camille-ardent" });
   });
 
   it("introuvable : gardé 7 jours, sans nouvel appel", async () => {
@@ -143,7 +156,7 @@ describe("forGithub", () => {
 
   it("recherche payante seulement si configurée ; résultat gardé, y compris « rien »", async () => {
     const t = setup(undefined, { search: async () => ({ url: CAMILLE, credits: 0.83 }) });
-    expect((await t.finder.forGithub(facts()))?.name).toBe("Camille Ardent");
+    expect(await t.finder.forGithub(facts())).toMatchObject({ profile: { name: "Camille Ardent" }, proven: true });
     expect(t.search!.searchByGithub).toHaveBeenCalledTimes(1);
     expect(t.cache.getLookup("camille-ardent", NOW)).toBe(CAMILLE);
     expect(t.cache.getProfile(CAMILLE, NOW)).toMatchObject({ githubLogin: "camille-ardent" });
