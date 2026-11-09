@@ -51,17 +51,45 @@ function Deltas({ cmp, className = "" }: { cmp: ComparisonData; className?: stri
   );
 }
 
-/** Le chiffre du titre ressort en couleur ; le reste du titre reste blanc. */
-function Headline({ text, tone }: { text: string; tone: Tone }) {
-  const parts = text.split(/(\d+)/);
+/**
+ * Le chiffre du titre ressort en couleur ; le reste du titre reste blanc. `who` (le @login) reste
+ * tel quel, même s'il porte des chiffres. Un h1 pour qui a fait la fiche ; un h2 pour le
+ * visiteur, dont la page a déjà son h1 (« Avis de recherche : @x »).
+ */
+function Headline({ text, tone, who }: { text: string; tone: Tone; who: string | null }) {
+  const chunks = who ? text.split(who).flatMap((c, i) => (i === 0 ? [c] : [who, c])) : [text];
+  const Tag = who ? "h2" : "h1";
+  let k = 0;
   return (
-    <h1 className={`cmp-headline tone-${tone}`}>
-      {parts.map((p, i) => (/^\d+$/.test(p) ? <em key={i}>{p}</em> : <span key={i}>{p}</span>))}
-    </h1>
+    <Tag className={`cmp-headline tone-${tone}`}>
+      {chunks.map((c, j) =>
+        who && j % 2 === 1 ? (
+          <span key={k++}>{c}</span>
+        ) : (
+          c.split(/(\d+)/).map((p) => (/^\d+$/.test(p) ? <em key={k++}>{p}</em> : p ? <span key={k++}>{p}</span> : null))
+        ),
+      )}
+    </Tag>
   );
 }
 
-export function ComparisonStage({ cmp, phase }: { cmp: ComparisonData; phase: Phase }) {
+/** Le titre de l'écart : celui du serveur, qui tutoie ; pour un visiteur, à la troisième personne. */
+function headlineText(cmp: ComparisonData, who: string | null, t: ReturnType<typeof useT>["t"], lang: ReturnType<typeof useT>["lang"]): string {
+  const n = cmp.cv.overall - cmp.github.overall;
+  // À égalité, le titre ne s'adresse à personne : on garde celui du serveur.
+  if (!who || n === 0) return pick(cmp.headline, lang);
+  const src = declaredOf(cmp) === "linkedin" ? "LinkedIn" : "CV";
+  return n > 0 ? t.compare.them.declaredAhead(who, src, n) : t.compare.them.codeAhead(who, src, -n);
+}
+
+interface StageProps {
+  cmp: ComparisonData;
+  phase: Phase;
+  /** Vue par un visiteur : « @login », à la troisième personne. Absent : qui a fait la fiche, tutoyé. */
+  who?: string | null;
+}
+
+export function ComparisonStage({ cmp, phase, who = null }: StageProps) {
   const { t, lang } = useT();
   const desktop = useMediaQuery("(min-width: 980px)");
   const [active, setActive] = useState<0 | 1>(1);
@@ -92,18 +120,19 @@ export function ComparisonStage({ cmp, phase }: { cmp: ComparisonData; phase: Ph
     if (el) el.scrollTo({ left: i === 0 ? 0 : el.scrollWidth, behavior: "smooth" });
   };
 
+  const labels = who ? t.compare.them : t.compare;
   const cards = [
     declaredOf(cmp) === "linkedin"
-      ? { card: cmp.cv, label: t.compare.liLabel, short: t.compare.liShort, prefix: "cmp-cv", anchor: false }
-      : { card: cmp.cv, label: t.compare.cvLabel, short: t.compare.cvShort, prefix: "cmp-cv", anchor: false },
-    { card: cmp.github, label: t.compare.ghLabel, short: t.compare.ghShort, prefix: "cmp-gh", anchor: true },
+      ? { card: cmp.cv, label: labels.liLabel, short: t.compare.liShort, prefix: "cmp-cv", anchor: false }
+      : { card: cmp.cv, label: labels.cvLabel, short: t.compare.cvShort, prefix: "cmp-cv", anchor: false },
+    { card: cmp.github, label: labels.ghLabel, short: t.compare.ghShort, prefix: "cmp-gh", anchor: true },
   ];
 
   return (
     <div className={`cmp phase-${phase}${settled ? " is-settled" : ""}`}>
       <div className="cmp-head">
         <p className="cmp-loot">{t.compare.loot}</p>
-        <Headline text={pick(cmp.headline, lang)} tone={headTone} />
+        <Headline text={headlineText(cmp, who, t, lang)} tone={headTone} who={who} />
       </div>
 
       {!desktop && (

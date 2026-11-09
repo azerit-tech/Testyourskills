@@ -413,7 +413,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
               <RevealCard card={item.card} lang={lang} phase={phase} idPrefix="result" />
             </div>
           ) : (
-            <ComparisonStage cmp={item.comparison} phase={phase} />
+            // Le visiteur n'est pas la personne fichée : la comparaison parle d'elle, pas à lui.
+            <ComparisonStage cmp={item.comparison} phase={phase} who={visitor ? (main.login ? `@${main.login}` : main.name) : null} />
           )}
           {animating && phase !== "ready" && (
             <button

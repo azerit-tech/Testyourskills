@@ -4,7 +4,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CardData } from "../../../shared/types";
-import { FIXTURES } from "../../../shared/fixtures";
+import { FIXTURE_COMPARISON, FIXTURES } from "../../../shared/fixtures";
 import { LangProvider } from "../i18n";
 import { Fold, type Shareable } from "../components/After";
 import { JuryLine } from "../components/Jury";
@@ -157,6 +157,49 @@ describe("bloc recruteur", () => {
 
   it("en anglais : « Hiring? »", () => {
     expect(renderResult(card({ id: "HireCard003" }), { owner: false, lang: "en-US" })).toContain(">Hiring?</h2>");
+  });
+});
+
+describe("comparaison GitHub contre CV ou LinkedIn", () => {
+  const cmp = (login = FIXTURES.gold.login, declaredSource?: "linkedin"): Shareable => ({
+    kind: "comparison",
+    comparison: { ...FIXTURE_COMPARISON, ...(declaredSource ? { declaredSource } : {}), github: { ...FIXTURE_COMPARISON.github, login } },
+  });
+  const n = Math.abs(FIXTURE_COMPARISON.cv.overall - FIXTURE_COMPARISON.github.overall);
+  const textOf = (html: string, re: RegExp) => (re.exec(html)?.[0] ?? "").replace(/<[^>]+>/g, "");
+
+  it("visiteur : un seul h1, le titre de l'écart parle de @login à la troisième personne", () => {
+    const html = renderResult(cmp(), { owner: false });
+    expect(html.match(/<h1/g)).toHaveLength(1);
+    const head = textOf(html, /<h2 class="cmp-headline[^"]*">.*?<\/h2>/);
+    expect(head).toContain(`@${FIXTURES.gold.login}`);
+    expect(head).toContain(String(n));
+    expect(head).not.toMatch(/\b(ton|ta|tes|toi)\b/i);
+    expect(html).toContain("Ce que son CV déclare");
+    expect(html).toContain("Ce que son GitHub prouve");
+    expect(html).not.toMatch(/Ce que ton (CV|GitHub|LinkedIn)/);
+  });
+
+  it("visiteur, LinkedIn, en anglais : « their », jamais « your »", () => {
+    const html = renderResult(cmp(FIXTURES.gold.login, "linkedin"), { owner: false, lang: "en-US" });
+    const head = textOf(html, /<h2 class="cmp-headline[^"]*">.*?<\/h2>/);
+    expect(head.replace(/&#x27;/g, "'")).toMatch(new RegExp(`^@${FIXTURES.gold.login}'s (LinkedIn|code) .* their `));
+    expect(html).toContain("What their LinkedIn claims");
+    expect(html).not.toMatch(/What your (CV|GitHub|LinkedIn)/);
+  });
+
+  it("les chiffres d'un pseudo ne passent pas en couleur, seul l'écart", () => {
+    const html = renderResult(cmp("dev42"), { owner: false });
+    const head = /<h2 class="cmp-headline[^"]*">.*?<\/h2>/.exec(html)?.[0] ?? "";
+    expect(head.match(/<em>(\d+)<\/em>/g)).toEqual([`<em>${n}</em>`]);
+    expect(head).toContain("<span>@dev42</span>");
+  });
+
+  it("qui a fait la fiche : le titre du serveur, tutoyé, en h1", () => {
+    const html = renderResult(cmp(), { owner: true });
+    expect(html.match(/<h1/g)).toHaveLength(1);
+    expect(textOf(html, /<h1 class="cmp-headline[^"]*">.*?<\/h1>/)).toBe(FIXTURE_COMPARISON.headline.fr);
+    expect(html).toContain("Ce que ton CV déclare");
   });
 });
 
