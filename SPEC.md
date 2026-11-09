@@ -999,3 +999,12 @@ Après chaque fusion, on vérifie la grille suivante. On corrige ce qui manque, 
 - **Balises OG** de `/c/:id` : « @X est dans le viseur ★★★★ · profil » (le niveau sans profil) ; les comparaisons gardent leur titre.
 - **Événements** : `denounce_sent` (serveur, à l'envoi), `denounce_claimed` (serveur, revendication d'une fiche dénoncée), `denounce_landed` (front, une fois par session sur une fiche dénoncée).
 - **Pas fait** : « Voir l'arrestation ». `seek` n'existe que dans le crochet de mise au point (`__tys3d`, en dev) ; démarrer la scène aux portes demande une option de départ dans `createWalkout`, la version CSS des téléphones faibles, et télécharge plusieurs Mo de 3D pour un visiteur venu de LinkedIn. À reprendre avec le clip du §18.8, qui couvre le même besoin. Pas fait non plus : les dénonciations dans le tableau de `npm run weekly`.
+
+### 18.25 Le cap, tranché par Jacques le 9 novembre 2026
+
+- **Le partage massif d'abord.** Le site est un jeu en façade, un test de recrutement dans le moteur. Quand les deux s'opposent, le jeu gagne : l'humour, la surprise et l'envie de montrer passent devant la précision au point près. La note reste calculée par le barème, jamais par l'IA.
+- **L'entrée accepte un GitHub ou un LinkedIn** (§18.24). Chacun cherche l'autre ; si on trouve les deux, la fiche devient « LinkedIn contre GitHub ».
+- **La démonstration de force : l'enquête en direct.** Pendant l'attente, les trouvailles tombent une à une, datées et chiffrées (premier commit, heure de code, LinkedIn retrouvé, complice principal, langage abandonné). Sur la fiche, les trouvailles les plus rares ; dans le partage, la plus folle. Données publiques seulement : jamais d'adresse, de famille, d'âge, de genre ni de photo personnelle.
+- **Les autres témoins** (GitLab, npm, PyPI, crates.io, Stack Overflow, Hugging Face, Kaggle, Codeforces, site personnel) viennent après le lancement, trouvés d'abord dans le profil GitHub.
+- **Les entreprises partenaires** : Jacques et Azerit les cherchent. Le système des primes se construit quand même ; tant que `data/season.json` n'a aucune prime ouverte, le site affiche « Primes : bientôt ».
+- **Le budget Crustdata** reste plafonné à 100 crédits par jour (`CRUSTDATA_DAILY_CREDITS`) tant que Jacques n'en décide pas autrement.
