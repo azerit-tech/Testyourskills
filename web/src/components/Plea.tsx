@@ -73,7 +73,7 @@ interface PleaVerdictProps {
   shown: boolean;
 }
 
-/** Sous la fiche : « Tu plaidais ★★★★★☆. Verdict : ★★★★☆☆. » et le mot de l'écart. Rien sans pari. */
+/** Sous la fiche : « Tu plaidais ★★★★★☆ », « Verdict : ★★★★☆☆ » (sans point après les étoiles) et le mot de l'écart. Rien sans pari. */
 export function PleaVerdict({ cardId, overall, shown }: PleaVerdictProps) {
   const { t } = useT();
   const p = t.plea;
@@ -100,10 +100,10 @@ export function PleaVerdict({ cardId, overall, shown }: PleaVerdictProps) {
     <section className="plea-verdict" aria-label={p.verdict.replace(/\s*:$/, "")}>
       <p className="plea-said">
         <span>
-          {p.pleaded} <Stars n={v.pleaded} label={p.count(v.pleaded)} />.
+          {p.pleaded} <Stars n={v.pleaded} label={p.count(v.pleaded)} />
         </span>{" "}
         <span>
-          {p.verdict} <Stars n={v.actual} label={p.count(v.actual)} />.
+          {p.verdict} <Stars n={v.actual} label={p.count(v.actual)} />
         </span>
       </p>
       <p className="plea-word">{p.gap[v.gap]}</p>
