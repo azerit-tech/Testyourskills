@@ -22,6 +22,8 @@ const fr = {
   },
   home: {
     kicker: "Une IA juge ton GitHub · 10 s",
+    /** Fin de la saison 1 (§18.4, dates proposées) : à lire dans data/season.json quand les primes existeront. */
+    season: "Saison 1 · jusqu'au 31 décembre",
     titleA: "Ton GitHub remplace ton CV.",
     titleB: "Le haut du classement décroche un entretien.",
     tabGithub: "Ton GitHub",
@@ -39,6 +41,7 @@ const fr = {
     dropOr: "ou",
     dropBrowse: "choisis un PDF",
     dropHint: "PDF · 5 Mo · 10 pages max",
+    sizeUnits: { mb: "Mo", kb: "Ko" },
     dropReplace: "Changer de fichier",
     dropRemove: "Retirer le fichier",
     reassure: "Sans compte. Ton CV est lu en mémoire puis jeté.",
@@ -170,6 +173,9 @@ const fr = {
     sharedBanner: (name: string) => `La fiche de ${name}, jugée par une IA en quelques secondes.`,
     makeYours: "Fais la tienne",
     yourTurn: "À toi : ton pseudo suffit.",
+    /* en tête d'une fiche partagée (§18.20) */
+    wanted: "Avis de recherche",
+    wantedStars: (n: number, level: string) => `${n} étoiles sur 6 · ${level}`,
     reliability: (n: number) => `Preuves ${n} %`,
     share: {
       title: "Partage-la",
@@ -295,6 +301,7 @@ const fr = {
   },
   footer: {
     privacy: "Confidentialité",
+    credits3d: "Crédits 3D",
   },
   privacy: {
     title: "Confidentialité",
@@ -358,6 +365,7 @@ const en: Dict = {
   },
   home: {
     kicker: "Judged by an AI on your GitHub · 10 s",
+    season: "Season 1 · until 31 December",
     titleA: "Your GitHub replaces your CV.",
     titleB: "The top of the board lands an interview.",
     tabGithub: "Your GitHub",
@@ -375,6 +383,7 @@ const en: Dict = {
     dropOr: "or",
     dropBrowse: "pick a PDF",
     dropHint: "PDF · 5 MB · 10 pages max",
+    sizeUnits: { mb: "MB", kb: "KB" },
     dropReplace: "Change file",
     dropRemove: "Remove file",
     reassure: "No account. Your CV is read in memory, then thrown away.",
@@ -500,6 +509,8 @@ const en: Dict = {
     sharedBanner: (name) => `${name}'s rap sheet, judged by an AI in a few seconds.`,
     makeYours: "Make yours",
     yourTurn: "Your turn: a username is enough.",
+    wanted: "Wanted",
+    wantedStars: (n, level) => `${n} of 6 stars · ${level}`,
     reliability: (n) => `Evidence ${n}%`,
     share: {
       title: "Share it",
@@ -624,6 +635,7 @@ const en: Dict = {
   },
   footer: {
     privacy: "Privacy",
+    credits3d: "3D credits",
   },
   privacy: {
     title: "Privacy",

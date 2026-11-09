@@ -274,7 +274,7 @@ export function EntryForm({ inputRef, variant = "full" }: Props) {
     setError(null);
   };
 
-  const sizeLabel = (n: number) => (n > 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} Mo` : `${Math.max(1, Math.round(n / 1024))} Ko`).replace("Mo", lang === "fr" ? "Mo" : "MB").replace("Ko", lang === "fr" ? "Ko" : "KB");
+  const sizeLabel = (n: number) => (n > 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} ${h.sizeUnits.mb}` : `${Math.max(1, Math.round(n / 1024))} ${h.sizeUnits.kb}`);
 
   const veil =
     drag &&

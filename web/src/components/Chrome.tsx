@@ -28,13 +28,10 @@ export function SkipLink() {
   );
 }
 
-/** Fin de la saison 1 (§18.4, dates proposées) : à lire dans data/season.json quand les primes existeront. */
-const SEASON_BAND = { fr: "Saison 1 · jusqu'au 31 décembre", en: "Season 1 · until 31 December" };
-
 /** Le bandeau de la saison, en aplat pêche au-dessus de l'accueil. */
 export function SeasonBand() {
-  const { lang } = useT();
-  return <p className="season-band">{SEASON_BAND[lang]}</p>;
+  const { t } = useT();
+  return <p className="season-band">{t.home.season}</p>;
 }
 
 export function TopBar() {
@@ -65,7 +62,7 @@ export function Footer() {
           {t.footer.privacy}
         </a>
         <a href="/3d/CREDITS.txt" target="_blank" rel="noopener">
-          {lang === "fr" ? "Crédits 3D" : "3D credits"}
+          {t.footer.credits3d}
         </a>
       </nav>
     </footer>

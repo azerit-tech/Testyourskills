@@ -380,18 +380,16 @@ function WantedStars({ n, label }: { n: number; label: string }) {
 }
 
 const STAR = "M12 2.6l2.9 6.1 6.7.8-4.9 4.6 1.3 6.6L12 17.4l-6 3.3 1.3-6.6L2.4 9.5l6.7-.8z";
-/** Pas encore de clé dans i18n.ts : à y reporter (result.wanted). */
-const WANTED = { fr: "Avis de recherche", en: "Wanted" };
 
 /** En tête d'une fiche partagée : qui, à quel niveau, quel profil, quelle peine. */
 function WantedHead({ card }: { card: CardData }) {
-  const { lang } = useT();
+  const { t, lang } = useT();
   const n = starsFor(card.overall);
   const level = pick(LEVEL_LABELS[n], lang);
-  const starsLabel = lang === "fr" ? `${n} étoiles sur 6 · ${level}` : `${n} of 6 stars · ${level}`;
+  const starsLabel = t.result.wantedStars(n, level);
   return (
     <header className="wanted">
-      <p className="surtitre">{WANTED[lang]}</p>
+      <p className="surtitre">{t.result.wanted}</p>
       <h1 className="wanted-name">{card.login ? `@${card.login}` : card.name}</h1>
       <p className="wanted-line">
         <WantedStars n={n} label={starsLabel} />
