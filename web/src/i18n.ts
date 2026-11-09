@@ -176,10 +176,10 @@ const fr = {
       linkedinHint: "Texte copié : colle-le dans ton post LinkedIn.",
       copiedLink: "Lien copié.",
       downloadDemo: "Image indisponible en mode démo (rendue par le serveur).",
-      text: (stars: string, overall: number, status: string | null, secs: number, url: string) =>
-        `Fiche ${stars}, ${overall}.${status ? ` Chef d'accusation : « ${status} ».` : ""} Interrogé par une IA en ${secs} s. Fais la tienne : ${url}`,
-      textCompare: (cv: number, gh: number, headline: string, url: string) =>
-        `Mon CV : ${cv}. Mon GitHub : ${gh}. ${headline}. Fais la tienne : ${url}`,
+      text: (stars: string, overall: number, profile: string | null, status: string | null, secs: number, url: string) =>
+        `Fiche ${stars}, ${overall}${profile ? ` · ${profile}` : ""}.${status ? ` Chef d'accusation : « ${status} ».` : ""} Interrogé par une IA en ${secs} s. Fais la tienne : ${url}`,
+      textCompare: (cv: number, gh: number, profile: string | null, headline: string, url: string) =>
+        `Mon CV : ${cv}. Mon GitHub : ${gh}${profile ? ` · ${profile}` : ""}. ${headline}. Fais la tienne : ${url}`,
     },
     linkedin: {
       kicker: "Personnaliser ma fiche",
@@ -473,9 +473,9 @@ const en: Dict = {
       linkedinHint: "Text copied: paste it into your LinkedIn post.",
       copiedLink: "Link copied.",
       downloadDemo: "Image unavailable in demo mode (rendered by the server).",
-      text: (stars, overall, status, secs, url) =>
-        `${stars} sheet, ${overall}.${status ? ` Charge: “${status}”.` : ""} Interrogated by an AI for ${secs}s. Make yours: ${url}`,
-      textCompare: (cv, gh, headline, url) => `My CV: ${cv}. My GitHub: ${gh}. ${headline}. Make yours: ${url}`,
+      text: (stars, overall, profile, status, secs, url) =>
+        `${stars} sheet, ${overall}${profile ? ` · ${profile}` : ""}.${status ? ` Charge: “${status}”.` : ""} Interrogated by an AI for ${secs}s. Make yours: ${url}`,
+      textCompare: (cv, gh, profile, headline, url) => `My CV: ${cv}. My GitHub: ${gh}${profile ? ` · ${profile}` : ""}. ${headline}. Make yours: ${url}`,
     },
     linkedin: {
       kicker: "Customize my sheet",

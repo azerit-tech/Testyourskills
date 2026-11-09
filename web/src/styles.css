@@ -2008,6 +2008,21 @@ svg {
   background: rgba(6, 10, 15, 0.5);
   border: 1px solid var(--border);
 }
+/* la peine et la caution (§18.2) : une ligne courte, lisible à 390 px */
+.why-sentence {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text);
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 201, 92, 0.06);
+  border: 1px solid rgba(255, 201, 92, 0.22);
+  text-wrap: balance;
+}
+.why-sentence-sep {
+  color: var(--amber);
+}
 .why-stats {
   list-style: none;
   display: flex;

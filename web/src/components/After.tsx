@@ -53,10 +53,13 @@ export function ShareBar({ item, toast }: { item: Shareable; toast: (m: string) 
   const text = (withUrl: string) => {
     if (item.kind === "card") {
       const c = item.card;
-      return ts.text("★".repeat(starsFor(c.overall)), c.overall, bestStatus(c, lang), c.judgedInSeconds, withUrl);
+      const profile = c.profile ? pick(c.profile.label, lang) : null;
+      return ts.text("★".repeat(starsFor(c.overall)), c.overall, profile, bestStatus(c, lang), c.judgedInSeconds, withUrl);
     }
     const cmp = item.comparison;
-    return ts.textCompare(cmp.cv.overall, cmp.github.overall, pick(cmp.headline, lang), withUrl);
+    // Le profil de la fiche GitHub : après la comparaison, c'est lui qui porte l'écart (Faussaire).
+    const profile = cmp.github.profile ?? cmp.cv.profile;
+    return ts.textCompare(cmp.cv.overall, cmp.github.overall, profile ? pick(profile.label, lang) : null, pick(cmp.headline, lang), withUrl);
   };
 
   const liHref = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
@@ -201,11 +204,26 @@ function StatRow({ stat, index }: { stat: Stat; index: number }) {
 }
 
 function WhyCard({ card }: { card: CardData }) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const w = t.result.why;
   const stats = STAT_CODES.map((c) => card.stats.find((s) => s.code === c)).filter((s): s is Stat => !!s);
+  const sentence = card.sentence;
   return (
     <>
+      {/* La peine et la caution (§18.2) : une ligne, qui se replie au mot sur téléphone */}
+      {sentence && (
+        <p className="why-sentence">
+          <span>{pick(sentence.label, lang)}</span>
+          {sentence.bail && (
+            <>
+              <span className="why-sentence-sep" aria-hidden>
+                {" · "}
+              </span>
+              <span>{pick(sentence.bail, lang)}</span>
+            </>
+          )}
+        </p>
+      )}
       <p className="why-formula">{w.overallLine}</p>
       <ol className="why-stats">
         {stats.map((s, i) => (
