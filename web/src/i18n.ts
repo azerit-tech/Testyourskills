@@ -21,14 +21,11 @@ const fr = {
     skipToContent: "Aller au contenu",
   },
   home: {
-    kicker: "Une IA juge ton GitHub · 10 s",
     /** Fin de la saison 1 (§18.4, dates proposées) : à lire dans data/season.json quand les primes existeront. */
     season: "Saison 1 · jusqu'au 31 décembre",
     titleA: "Ton GitHub remplace ton CV.",
     titleB: "Le haut du classement décroche un entretien.",
     tabGithub: "Ton GitHub",
-    tabCv: "Ton CV",
-    tabsLabel: "Source de la fiche",
     loginLabel: "Pseudo GitHub ou URL du profil",
     loginPlaceholder: "ton-pseudo",
     submit: "Ouvrir mon dossier",
@@ -42,7 +39,6 @@ const fr = {
     dropBrowse: "choisis un PDF",
     dropHint: "PDF · 5 Mo · 10 pages max",
     sizeUnits: { mb: "Mo", kb: "Ko" },
-    dropReplace: "Changer de fichier",
     dropRemove: "Retirer le fichier",
     reassure: "Sans compte. Ton CV est lu en mémoire puis jeté.",
     dropAnywhere: "Lâche ton CV, on s'occupe du reste",
@@ -169,14 +165,11 @@ const fr = {
     CTO: "CTO sur parole",
   } satisfies Record<Position, string>,
   result: {
-    yourCard: "Ta fiche",
-    sharedBanner: (name: string) => `La fiche de ${name}, jugée par une IA en quelques secondes.`,
     makeYours: "Fais la tienne",
     yourTurn: "À toi : ton pseudo suffit.",
     /* en tête d'une fiche partagée (§18.20) */
     wanted: "Avis de recherche",
     wantedStars: (n: number, level: string) => `${n} étoiles sur 6 · ${level}`,
-    reliability: (n: number) => `Preuves ${n} %`,
     share: {
       title: "Partage-la",
       linkedin: "LinkedIn",
@@ -202,8 +195,6 @@ const fr = {
     why: {
       title: "Pièces à conviction",
       overallLine: "Note globale = TEC 30 % · SHIP 20 % · ARCH 20 % · DOC 15 % · XP 15 %.",
-      buzzNote: "BUZZ ne compte pas dans la note globale. C'est la stat qu'on affiche pour rire.",
-      insufficient: "Données insuffisantes",
       tabCv: "Fiche CV",
       tabGithub: "Fiche GitHub",
     },
@@ -211,7 +202,6 @@ const fr = {
       button: "Appeler mon avocat",
       again: "Rappeler mon avocat",
       title: "Réponse de l'avocat",
-      seeFacts: "Voir les faits",
       replies: [
         "Ton avocat a relu le dossier. Il te conseille de plaider coupable.",
         "Ta réclamation a été transmise au service compétent : un fichier TODO.md qui n'existe pas encore.",
@@ -225,11 +215,6 @@ const fr = {
     },
     addCv: { title: "Ajoute ton CV pour voir l'écart", text: "Ce que ton CV déclare contre ce que ton GitHub prouve. Deux fiches, le butin entre les deux.", btn: "Ajouter mon CV" },
     addGithub: { title: "Ajoute ton GitHub pour voir l'écart", text: "Ton CV a parlé. Voyons si ton code est d'accord.", btn: "Ajouter mon GitHub" },
-    roast: {
-      title: "Garde à vue",
-      soon: "Bientôt",
-      text: "L'interrogatoire musclé. Réservé au propriétaire du compte, après connexion GitHub. On ne cuisine pas les autres.",
-    },
     claim: {
       kicker: "C'est ta fiche ?",
       kickerLawyer: "Avis de recherche à ton nom ?",
@@ -364,13 +349,10 @@ const en: Dict = {
     skipToContent: "Skip to content",
   },
   home: {
-    kicker: "Judged by an AI on your GitHub · 10 s",
     season: "Season 1 · until 31 December",
     titleA: "Your GitHub replaces your CV.",
     titleB: "The top of the board lands an interview.",
     tabGithub: "Your GitHub",
-    tabCv: "Your CV",
-    tabsLabel: "Sheet source",
     loginLabel: "GitHub username or profile URL",
     loginPlaceholder: "your-username",
     submit: "Open my file",
@@ -384,7 +366,6 @@ const en: Dict = {
     dropBrowse: "pick a PDF",
     dropHint: "PDF · 5 MB · 10 pages max",
     sizeUnits: { mb: "MB", kb: "KB" },
-    dropReplace: "Change file",
     dropRemove: "Remove file",
     reassure: "No account. Your CV is read in memory, then thrown away.",
     dropAnywhere: "Let go of your CV, we'll take it from here",
@@ -505,13 +486,10 @@ const en: Dict = {
     CTO: "Self-proclaimed CTO",
   },
   result: {
-    yourCard: "Your sheet",
-    sharedBanner: (name) => `${name}'s rap sheet, judged by an AI in a few seconds.`,
     makeYours: "Make yours",
     yourTurn: "Your turn: a username is enough.",
     wanted: "Wanted",
     wantedStars: (n, level) => `${n} of 6 stars · ${level}`,
-    reliability: (n) => `Evidence ${n}%`,
     share: {
       title: "Share it",
       linkedin: "LinkedIn",
@@ -536,8 +514,6 @@ const en: Dict = {
     why: {
       title: "Exhibits",
       overallLine: "Overall = TEC 30% · SHIP 20% · ARCH 20% · DOC 15% · XP 15%.",
-      buzzNote: "BUZZ doesn't count toward the overall rating. It's the stat we show for laughs.",
-      insufficient: "Not enough data",
       tabCv: "CV sheet",
       tabGithub: "GitHub sheet",
     },
@@ -545,7 +521,6 @@ const en: Dict = {
       button: "Call my lawyer",
       again: "Call my lawyer (again)",
       title: "Your lawyer says",
-      seeFacts: "See the facts",
       replies: [
         "Your lawyer read the file. They advise you to plead guilty.",
         "Your complaint has been forwarded to the relevant department: a TODO.md that doesn't exist yet.",
@@ -559,11 +534,6 @@ const en: Dict = {
     },
     addCv: { title: "Add your CV to see the gap", text: "What your CV claims against what your GitHub proves. Two sheets, the loot in between.", btn: "Add my CV" },
     addGithub: { title: "Add your GitHub to see the gap", text: "Your CV has spoken. Let's see if your code agrees.", btn: "Add my GitHub" },
-    roast: {
-      title: "Custody",
-      soon: "Soon",
-      text: "The hard interrogation. Only for the account owner, after GitHub sign-in. We don't grill other people.",
-    },
     claim: {
       kicker: "Is this your sheet?",
       kickerLawyer: "Wanted under your name?",
