@@ -77,7 +77,7 @@ export function createWallScreen(accent: string, size: DisplaySize): WallScreen 
   let label = "";
   let value = "";
 
-  const text = (s: string, x: number, y: number, px: number, o: { font?: string; weight?: number; color?: string; spacing?: number; glow?: string; maxWidth?: number } = {}) => {
+  const text = (s: string, x: number, y: number, px: number, o: { font?: string; weight?: number; color?: string; spacing?: number; maxWidth?: number } = {}) => {
     g.font = `${o.weight ?? 800} ${px}px ${o.font ?? DISPLAY}`;
     if ("letterSpacing" in g) (g as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = `${o.spacing ?? 0}px`;
     g.textAlign = "center";
@@ -90,10 +90,6 @@ export function createWallScreen(accent: string, size: DisplaySize): WallScreen 
     g.save();
     g.translate(x, y);
     g.scale(scale, 1);
-    if (o.glow) {
-      g.shadowColor = o.glow;
-      g.shadowBlur = px * 0.3;
-    }
     g.fillStyle = o.color ?? "#ffffff";
     g.fillText(s, 0, 0);
     g.restore();
@@ -115,7 +111,7 @@ export function createWallScreen(accent: string, size: DisplaySize): WallScreen 
       texture.needsUpdate = true;
       return;
     }
-    text(arrows, SPLIT * 0.24, H / 2, H * 0.34, { font: MONO, color: accent, glow: accent, spacing: 4 });
+    text(arrows, SPLIT * 0.24, H / 2, H * 0.34, { font: MONO, color: accent, spacing: 4 });
     text(String(floorN).padStart(2, "0"), SPLIT * 0.66, H / 2 + 3, H * 0.78, { color: "#ffffff", spacing: 4 });
     g.fillStyle = accent;
     g.globalAlpha = 0.6;

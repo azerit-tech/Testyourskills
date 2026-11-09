@@ -165,25 +165,6 @@ export function makePackFaceTexture(accentA: string, accentB: string, lang: "fr"
   base.addColorStop(1, "#0a121c");
   g.fillStyle = base;
   g.fillRect(0, 0, W, H);
-  const halo = g.createRadialGradient(W / 2, H * 0.38, 10, W / 2, H * 0.38, W * 0.7);
-  halo.addColorStop(0, hexA(accentA, 0.45));
-  halo.addColorStop(1, "rgba(0,0,0,0)");
-  g.fillStyle = halo;
-  g.fillRect(0, 0, W, H);
-  // rayons
-  g.save();
-  g.translate(W / 2, H * 0.38);
-  for (let i = 0; i < 24; i++) {
-    g.rotate((Math.PI * 2) / 24);
-    g.fillStyle = hexA(accentA, 0.09);
-    g.beginPath();
-    g.moveTo(0, 0);
-    g.lineTo(-18, -520);
-    g.lineTo(18, -520);
-    g.closePath();
-    g.fill();
-  }
-  g.restore();
   // liseré
   g.strokeStyle = hexA(accentA, 0.8);
   g.lineWidth = 4;
@@ -208,8 +189,6 @@ export function makePackFaceTexture(accentA: string, accentB: string, lang: "fr"
   g.stroke();
   g.translate(-52 * 0.85, -60 * 0.85);
   g.scale(0.85, 0.85);
-  g.shadowColor = accentA;
-  g.shadowBlur = 30;
   g.fillStyle = "#dde27d";
   g.beginPath();
   g.moveTo(52, 8);
