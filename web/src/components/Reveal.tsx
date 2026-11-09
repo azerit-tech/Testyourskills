@@ -77,7 +77,6 @@ export function RevealCard({ card, lang, phase, idPrefix, primary = true, anchor
 
   return (
     <div className={`card-slot phase-${phase}${showCard ? " show-front" : ""}`} style={vars} data-style={style} data-scene-anchor={anchor ? "" : undefined}>
-      <div className="slot-halo" aria-hidden />
       <div className="card-rig">{showCard && <CardView card={card} lang={lang} interactive={phase === "done"} reveal={phase === "handoff"} idPrefix={idPrefix} />}</div>
       {primary && phase === "ready" && <span className="pack-hint">{touch ? t.reveal.tap : t.reveal.click}</span>}
     </div>

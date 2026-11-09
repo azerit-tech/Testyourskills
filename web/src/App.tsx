@@ -1,5 +1,5 @@
-// Racine : langue, routes, décor commun.
-import { Ambient, Footer, SkipLink, TopBar } from "./components/Chrome";
+// Racine : langue, routes, barre du haut et pied de page.
+import { Footer, SeasonBand, SkipLink, TopBar } from "./components/Chrome";
 import { LangProvider } from "./i18n";
 import { isMock } from "./lib/api";
 import { usePath } from "./lib/router";
@@ -47,12 +47,13 @@ function Routes() {
 }
 
 export function App() {
+  const path = usePath();
   if (window.location.pathname === "/__devices" && isMock()) return <Devices />;
   return (
     <LangProvider>
       <SkipLink />
-      <Ambient />
       <div className="shell">
+        {(path === "/" || path === "") && <SeasonBand />}
         <TopBar />
         <Routes />
         <Footer />

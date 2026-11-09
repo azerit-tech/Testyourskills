@@ -110,7 +110,6 @@ export function Waiting({ progress, startedAt, queue }: { progress: ProgressEven
           {PAINTED.length ? <img src={PAINTED[slide]} alt="" /> : Scene && <Scene />}
         </div>
       </div>
-      <div className="load-vignette" aria-hidden />
 
       <div className="load-foot">
         <div className="load-bar" aria-hidden>
@@ -129,7 +128,6 @@ export function Waiting({ progress, startedAt, queue }: { progress: ProgressEven
           )}
         </div>
         <p className="load-title" aria-hidden>
-          <span className="load-dot" />
           {t.waiting.title}
         </p>
         {/* Une seule annonce à la fois pour les lecteurs d'écran. */}

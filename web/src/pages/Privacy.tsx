@@ -34,9 +34,6 @@ export function NotFound() {
   return (
     <main className="page page-card" id="main">
       <div className="panel-center error-panel">
-        <span className="error-code" aria-hidden>
-          404
-        </span>
         <h1>{t.notFound.title}</h1>
         <p>{t.notFound.text}</p>
         <a className="btn-primary" href="/" onClick={(e) => onLinkClick(e, "/")}>
