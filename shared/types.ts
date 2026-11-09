@@ -121,12 +121,51 @@ export interface ComparisonData {
   headline: Fact;
 }
 
+/** Rang d'une fiche GitHub dans le top de sa semaine (§18.22). Absent : hors classement. */
+export interface WeekRank {
+  /** 1 = en tête. Une ligne par login, sa meilleure note de la semaine. */
+  rank: number;
+  /** Nombre de logins classés cette semaine-là. */
+  total: number;
+  /** Points qui manquent pour passer devant le 5e ; 0 dans le top 5. */
+  gapToTop5: number;
+  inTop5: boolean;
+  /** Numéro de la semaine ISO (lundi 00:00 UTC au dimanche 23:59 UTC). */
+  week: number;
+  /** La semaine est finie : le classement ne bouge plus. */
+  closed: boolean;
+}
+
+/** Une ligne du top de la semaine (GET /api/top). Rien de privé : ce qui est déjà sur la fiche publique. */
+export interface TopEntry {
+  rank: number;
+  cardId: string;
+  login: string;
+  avatarUrl?: string;
+  overall: number;
+  stars: Stars;
+  /** Nom du profil criminel (§18.2), si la fiche en a un. */
+  profile?: Fact;
+}
+
+export interface WeekTop {
+  /** Lundi 00:00 UTC, en ms. */
+  weekStart: number;
+  /** Lundi suivant 00:00 UTC, en ms : la fin de la semaine. */
+  endsAt: number;
+  /** Numéro de la semaine ISO. */
+  week: number;
+  /** Nombre de logins classés cette semaine. */
+  total: number;
+  entries: TopEntry[];
+}
+
 /** Réponse de GET /api/card/:id pendant et après le traitement. */
 export type JobState =
   /** `queue` : rang dans la file d'attente (1 = la prochaine à passer). Absent dès que la fiche est en traitement. */
   | { state: "pending"; progress: ProgressEvent[]; queue?: number }
-  | { state: "done"; kind: "card"; card: CardData }
-  | { state: "done"; kind: "comparison"; comparison: ComparisonData }
+  | { state: "done"; kind: "card"; card: CardData; week?: WeekRank }
+  | { state: "done"; kind: "comparison"; comparison: ComparisonData; week?: WeekRank }
   | { state: "error"; code: ErrorCode; message: Fact };
 
 export type ErrorCode =

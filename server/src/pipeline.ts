@@ -503,7 +503,8 @@ export class Pipeline {
       login: login!,
       kind: "card",
       data: card,
-      facts: parentId ? null : gh!.facts,
+      // Aussi sur la carte GitHub d'une comparaison : le top de la semaine y lit les abonnés (§18.22).
+      facts: gh!.facts,
       deleteToken,
       degraded: gh!.degraded,
     });

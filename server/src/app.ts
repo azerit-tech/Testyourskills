@@ -18,6 +18,7 @@ import { inlineAvatar, mountLinkedin, removeAvatars, type LinkedinConfig } from 
 import { mountAuth, ownerFromRequest, type GithubAuthConfig } from "./auth";
 import { aiStatus as budgetAiStatus, type AiStatus } from "./ai/budget";
 import type { TokenPool } from "./github/tokens";
+import { weekRank, weekTop } from "./top";
 
 export interface AppOptions {
   store: Store;
@@ -219,6 +220,13 @@ export function createApp(opts: AppOptions) {
     return c.json({ card: opts.showcasePhoto ? { ...card, avatarUrl: opts.showcasePhoto, photoSource: "linkedin" } : card });
   });
 
+  // GET /api/top : le haut du classement de la semaine (§18.22). Rien de privé,
+  // ce qui est déjà sur les fiches publiques. Marche aussi sans crédit IA.
+  app.get("/api/top", (c) => {
+    c.header("Cache-Control", "public, max-age=60");
+    return c.json(weekTop(store.db, { now: Date.now(), limit: 10 }));
+  });
+
   // POST /api/card : JSON { login, lang, ref? } ou multipart (cv, login?, lang?, ref?).
   app.post(
     "/api/card",
@@ -319,10 +327,14 @@ export function createApp(opts: AppOptions) {
     const live = pipeline.jobState(id);
     if (live) return c.json(live);
     if (!row) return c.json(errorBody("internal", MESSAGES.not_found), 404);
+    // Rang de la semaine (§18.22), relu à chaque fois ; pour une comparaison, celui de sa carte GitHub.
+    const ranked = row.kind === "comparison" ? (row.data as ComparisonData).github.id : row.id;
+    const week = weekRank(store.db, ranked);
+    const rank = week ? { week } : {};
     const state: JobState =
       row.kind === "comparison"
-        ? { state: "done", kind: "comparison", comparison: stripToken(row.data as ComparisonData) }
-        : { state: "done", kind: "card", card: stripToken(row.data as CardData) };
+        ? { state: "done", kind: "comparison", comparison: stripToken(row.data as ComparisonData), ...rank }
+        : { state: "done", kind: "card", card: stripToken(row.data as CardData), ...rank };
     return c.json(state);
   });
 

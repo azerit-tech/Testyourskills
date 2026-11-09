@@ -1,0 +1,138 @@
+// Le top de la semaine (SPEC §18.22). Semaine du lundi 00:00 UTC au dimanche
+// 23:59 UTC. Entrent les fiches GitHub de la semaine (fiche seule ou carte
+// GitHub d'une comparaison), sorties avec la lecture IA, encore en ligne, dont le
+// login n'est pas masqué, et dont le compte a 5 000 abonnés au plus : les
+// célébrités gardent leur fiche mais ne bouchent pas le haut du tableau.
+// Une ligne par login : sa meilleure note de la semaine ; à égalité, la fiche la
+// plus ancienne passe devant. Tout se calcule à la lecture, rien n'est écrit.
+
+import type Database from "better-sqlite3";
+import type { CardData, Fact, TopEntry, WeekRank, WeekTop } from "../../shared/types";
+import { starsFor } from "../../shared/types";
+import { isoWeekLabel, weekStart } from "./weekly";
+
+export const WEEK_MS = 7 * 24 * 3600 * 1000;
+/** Au-delà, le compte est hors concours (célébrité). */
+export const CELEBRITY_FOLLOWERS = 5000;
+/** Taille du top qui donne la spéciale « Top 5 de la semaine ». */
+export const TOP_N = 5;
+
+interface Ranked {
+  id: string;
+  login: string;
+  overall: number;
+  createdAt: number;
+}
+
+/** Numéro de la semaine ISO de ce lundi (« 2026-W46 » donne 46). */
+export function isoWeekNumber(monday: number): number {
+  return Number(isoWeekLabel(monday).slice(-2));
+}
+
+/**
+ * Le classement d'une semaine, du premier au dernier : une ligne par login.
+ * La requête rend toutes les fiches qui entrent, dans l'ordre du classement ;
+ * la première de chaque login est la sienne.
+ */
+function rankWeek(db: Database.Database, monday: number, now: number): Ranked[] {
+  const rows = db
+    .prepare(
+      `SELECT c.id, c.login, c.created_at AS createdAt, json_extract(c.json, '$.overall') AS overall
+       FROM cards c
+       WHERE c.created_at >= ? AND c.created_at < ?
+         AND c.kind = 'card' AND c.source = 'github' AND c.login IS NOT NULL
+         AND c.degraded = 0
+         AND (c.expires_at IS NULL OR c.expires_at > ?)
+         AND COALESCE(json_extract(c.facts_json, '$.profile.followers'), 0) <= ?
+         AND NOT EXISTS (SELECT 1 FROM owners o WHERE o.login = c.login AND o.hidden = 1)
+       ORDER BY overall DESC, c.created_at ASC, c.id ASC`,
+    )
+    .all(monday, monday + WEEK_MS, now, CELEBRITY_FOLLOWERS) as Ranked[];
+  const seen = new Set<string>();
+  const out: Ranked[] = [];
+  for (const r of rows) {
+    if (typeof r.overall !== "number" || seen.has(r.login)) continue;
+    seen.add(r.login);
+    out.push(r);
+  }
+  return out;
+}
+
+/** Le haut du classement de la semaine en cours. */
+export function weekTop(db: Database.Database, opts: { now?: number; limit?: number } = {}): WeekTop {
+  const now = opts.now ?? Date.now();
+  const limit = Math.max(0, Math.floor(opts.limit ?? 10));
+  const monday = weekStart(now);
+  const ranked = rankWeek(db, monday, now);
+  const get = db.prepare(`SELECT json FROM cards WHERE id = ?`);
+  const entries: TopEntry[] = ranked.slice(0, limit).map((r, i) => {
+    const raw = get.get(r.id) as { json: string } | undefined;
+    const card = (raw ? JSON.parse(raw.json) : {}) as Partial<CardData>;
+    const profile: Fact | undefined = card.profile?.label;
+    return {
+      rank: i + 1,
+      cardId: r.id,
+      login: card.login ?? r.login,
+      ...(card.avatarUrl ? { avatarUrl: card.avatarUrl } : {}),
+      overall: r.overall,
+      stars: starsFor(r.overall),
+      ...(profile ? { profile } : {}),
+    };
+  });
+  return { weekStart: monday, endsAt: monday + WEEK_MS, week: isoWeekNumber(monday), total: ranked.length, entries };
+}
+
+/**
+ * Rang du login de cette fiche dans la semaine où elle est née, ou null si la
+ * fiche n'entre pas au classement (CV, sortie sans IA, célébrité, masquée,
+ * expirée). `entry` dit si c'est cette fiche-là qui porte le rang du login.
+ */
+export function weekRankDetail(
+  db: Database.Database,
+  cardId: string,
+  now = Date.now(),
+): (WeekRank & { entry: boolean; createdAt: number }) | null {
+  const row = db.prepare(`SELECT login, created_at FROM cards WHERE id = ?`).get(cardId) as
+    | { login: string | null; created_at: number }
+    | undefined;
+  if (!row?.login) return null;
+  const monday = weekStart(row.created_at);
+  const ranked = rankWeek(db, monday, now);
+  const i = ranked.findIndex((r) => r.login === row.login);
+  if (i < 0) return null;
+  // Cette fiche doit entrer elle-même : une fiche dégradée ne prend pas le rang d'une autre.
+  const own = db
+    .prepare(
+      `SELECT 1 FROM cards c
+       WHERE c.id = ? AND c.kind = 'card' AND c.source = 'github' AND c.degraded = 0
+         AND (c.expires_at IS NULL OR c.expires_at > ?)
+         AND COALESCE(json_extract(c.facts_json, '$.profile.followers'), 0) <= ?`,
+    )
+    .get(cardId, now, CELEBRITY_FOLLOWERS);
+  if (!own) return null;
+  const me = ranked[i]!;
+  const fifth = ranked[TOP_N - 1];
+  const inTop5 = i < TOP_N;
+  return {
+    rank: i + 1,
+    total: ranked.length,
+    // Passer devant le 5e : à égalité, la fiche la plus ancienne garde sa place.
+    gapToTop5: inTop5 || !fifth ? 0 : fifth.overall - me.overall + 1,
+    inTop5,
+    week: isoWeekNumber(monday),
+    closed: now >= monday + WEEK_MS,
+    entry: me.id === cardId,
+    createdAt: row.created_at,
+  };
+}
+
+function publicRank(d: WeekRank & { entry: boolean; createdAt: number }): WeekRank {
+  const { entry: _e, createdAt: _c, ...rank } = d;
+  return rank;
+}
+
+/** Rang de la semaine pour l'API : sans les détails internes. */
+export function weekRank(db: Database.Database, cardId: string, now = Date.now()): WeekRank | null {
+  const d = weekRankDetail(db, cardId, now);
+  return d ? publicRank(d) : null;
+}

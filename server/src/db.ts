@@ -110,6 +110,8 @@ CREATE TABLE IF NOT EXISTS cards (
 CREATE INDEX IF NOT EXISTS cards_login ON cards(login, created_at) WHERE parent_id IS NULL;
 CREATE INDEX IF NOT EXISTS cards_parent ON cards(parent_id);
 CREATE INDEX IF NOT EXISTS cards_expires ON cards(expires_at);
+-- Top de la semaine (top.ts) : les fiches nées entre deux dates.
+CREATE INDEX IF NOT EXISTS cards_created ON cards(created_at);
 
 CREATE TABLE IF NOT EXISTS events (
   id      INTEGER PRIMARY KEY AUTOINCREMENT,
