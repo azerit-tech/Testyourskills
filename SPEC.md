@@ -1084,3 +1084,17 @@ Chaque profil criminel a son « lieu du crime » : une illustration peinte en ap
 - **Pas dans la fiche** : la photo d'identité et la note couvriraient le sujet, et la fiche reste un SVG léger (texture 3D, PNG).
 - **Fichiers** : les originaux (1536 × 1024, générés par Jacques le 9 novembre 2026) dans `Azerit/design/profiles/{id}.png`, hors du dépôt ; les versions web dans `web/public/profiles/` : `{id}.jpg` (1152 × 768) et `{id}-s.jpg` (576 × 384). JPEG et non WebP : lu partout, et par le rendu PNG du serveur.
 - **Tant qu'une image manque**, la tuile garde un aplat de la teinte de la carte et un palmier ton sur ton.
+
+### 18.29 La lumière : les pages sont des ciels (9 novembre 2026)
+
+*Remarque de Jacques devant le site du jeu : « c'est tellement plus stylé ». Tranché par Claude, avec les quatorze illustrations du §18.28 et rien d'autre.*
+
+Ce qui fait l'écart, vu côte à côte : chez eux l'image remplit l'écran et l'interface flotte dessus ; chez nous, des boîtes prune sur un fond d'encre, et les images en vignettes sous un voile. Le fond d'encre du §18.18 reste celui des sections de lecture, mais **chaque page s'ouvre sur un ciel**.
+
+- **La page d'une fiche** (partagée ou non) : l'illustration du profil en fond de page, de bord à bord, derrière la barre du haut, sur la moitié haute de l'écran ; elle se fond dans l'encre par le bas. « AVIS DE RECHERCHE » et « @login » se posent sur le ciel, la fiche chevauche le bas de l'image. Sans profil : l'image `default`. La tuile de profil sous la fiche n'a plus d'image : la peine et la caution restent, en texte.
+- **L'accueil** : le premier écran est un ciel, les lieux du crime qui se succèdent en fondu lent derrière la promesse. Plus bas, le mur des 13 profils.
+- **Aucun voile sur une image au-delà de ce que le texte exige** : les illustrations ont leur aplat sombre en bas, le texte s'y pose.
+- **La voix qui annonce** (`docs/inspiration-gta6.md` §1.3) : les surtitres et titres posés sur un ciel sont en Outfit 600, capitales, très espacées (0,15 em). Barlow Condensed garde les noms.
+- **Mouvement** : un lent travelling sur les ciels (échelle 1,05 à 1,12), rien avec `prefers-reduced-motion`.
+- Les interdits du §4 de l'étude tiennent : pas de personnage, pas de bloc central dans un collage, aucune marque.
+
