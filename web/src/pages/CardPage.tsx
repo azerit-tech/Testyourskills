@@ -6,16 +6,18 @@ import { LEVEL_LABELS, starsFor } from "../../../shared/types";
 import { AddSource, AzeritCta, Claim, Contest, DeleteCard, EmailForm, LinkedInPhoto, ShareBar, Why, useMe, useToast } from "../components/After";
 import type { Shareable } from "../components/After";
 import { ComparisonStage } from "../components/Comparison";
+import { Denounce } from "../components/Denounce";
 import { EntryForm } from "../components/EntryForm";
 import { RevealCard, useReveal } from "../components/Reveal";
 import type { WalkoutControl } from "../components/Walkout3D";
 import { Waiting } from "../components/Waiting";
 import { pick, useT } from "../i18n";
-import { api, ApiError, tokens } from "../lib/api";
+import { api, ApiError, tokens, type CaseInfo } from "../lib/api";
 import { isClosed } from "../lib/errors";
 import { navigate, onLinkClick } from "../lib/router";
-import { freshSince, prefillFromLast } from "../lib/session";
+import { freshSince, iDenounced, myCard, prefillFromLast, rememberMine, type MyCard } from "../lib/session";
 import { useReducedMotion } from "../lib/util";
+import { verdict } from "../lib/versus";
 
 /** La révélation 3D et Three.js, hors du bundle de l'accueil. */
 const loadWalkout = () => import("../components/Walkout3D");
@@ -291,6 +293,37 @@ function Result({ item, animate, owner, fresh, notice, me, onMe, onDeleted }: Re
   const claimed = !!me && !!cardLogin && me.login === cardLogin.toLowerCase();
   const visitor = !owner && !claimed;
 
+  // Dénonciation (§18.6) et page partagée (§18.7).
+  const [kase, setKase] = useState<CaseInfo | null>(null);
+  const [claimOn, setClaimOn] = useState(false);
+  const [mine] = useState<MyCard | null>(() => myCard());
+  useEffect(() => {
+    let alive = true;
+    void api.getCase(id).then((c) => alive && setKase(c));
+    void api.getConfig().then((c) => alive && setClaimOn(c.claim));
+    return () => {
+      alive = false;
+    };
+  }, [id]);
+  // Sa propre fiche, faite ou revendiquée ici : la référence des comparaisons à venir.
+  useEffect(() => {
+    if (!visitor) rememberMine({ id: main.id, login: main.login ?? null, overall: main.overall });
+  }, [visitor, main.id, main.login, main.overall]);
+  // « Avis de recherche à ton nom » : pas pour qui a dénoncé cette fiche depuis ce navigateur.
+  const wantedYou = visitor && !!kase?.denounced && !iDenounced(id);
+  useEffect(() => {
+    if (!wantedYou) return;
+    const key = `tys_landed_${id}`;
+    try {
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, "1");
+    } catch {
+      /* stockage bloqué : une fois par page */
+    }
+    api.track("denounce_landed", id);
+  }, [wantedYou, id]);
+  const other = mine && mine.id !== id && !(mine.login && main.login && mine.login === main.login.toLowerCase()) ? mine : null;
+
   return (
     <main className={`page page-card page-result${animating ? " is-animating" : ""}${visitor ? " is-visitor" : ""}`} id="main">
       {claimed && me?.hidden && (
@@ -301,7 +334,13 @@ function Result({ item, animate, owner, fresh, notice, me, onMe, onDeleted }: Re
 
       <div className="result-top">
         {/* Lien partagé (§18.7, maquette web/gta-partage.html) : la page personnage de la fiche. */}
-        {visitor && <WantedHead card={main} />}
+        {visitor && (
+          <WantedHead
+            card={main}
+            denounced={wantedYou ? { by: kase?.by ?? null } : null}
+            onLawyer={claimOn && cardLogin ? () => api.startClaim(id, cardLogin) : null}
+          />
+        )}
 
         {animating && (
           <Suspense fallback={null}>
@@ -334,10 +373,21 @@ function Result({ item, animate, owner, fresh, notice, me, onMe, onDeleted }: Re
         </section>
 
         {visitor && (
-          <section className="you" aria-labelledby="you-title">
-            <h2 id="you-title">{t.result.makeYours}</h2>
-            <p>{t.result.yourTurn}</p>
-            <EntryForm variant="inline" />
+          <section className="you" id="you" aria-labelledby="you-title">
+            <h2 id="you-title">{t.denounce.andYou}</h2>
+            {other ? (
+              <>
+                <p className="versus-line">{versusLine(t.denounce, other, main)}</p>
+                <a className="pill pill-peach" href={`/c/${other.id}`} onClick={(e) => onLinkClick(e, `/c/${other.id}`)}>
+                  {t.denounce.mine}
+                </a>
+              </>
+            ) : (
+              <>
+                <p>{t.result.yourTurn}</p>
+                <EntryForm variant="inline" />
+              </>
+            )}
           </section>
         )}
       </div>
@@ -345,8 +395,11 @@ function Result({ item, animate, owner, fresh, notice, me, onMe, onDeleted }: Re
       <div className={`after${settled ? " is-in" : ""}`} aria-hidden={!settled} inert={!settled ? true : undefined}>
         {/* Fiche masquée : /og/* et /c/:id répondent 404 / 410 à tous, l'image ne se télécharge pas et le lien ne montre rien. */}
         {!visitor && !(claimed && me?.hidden) && <ShareBar item={item} toast={toast.show} />}
+        {/* Dénonce un complice (§18.6), juste après le partage. */}
+        {!visitor && <Denounce cardId={id} selfLogin={cardLogin} toast={toast.show} />}
         <LinkedInPhoto cardId={id} hasAvatar={item.kind === "card" ? !!item.card.avatarUrl : !!item.comparison.cv.avatarUrl} />
-        <Claim cardId={id} login={cardLogin} lawyer={!owner} me={me} onMe={onMe} toast={toast.show} />
+        {/* Fiche dénoncée : « Appeler mon avocat » est déjà en tête de page. */}
+        {!(wantedYou && claimOn) && <Claim cardId={id} login={cardLogin} lawyer={!owner} me={me} onMe={onMe} toast={toast.show} />}
         <Why item={item} withSentence={!visitor} />
         {!visitor && <Contest card={main} />}
         {!visitor && item.kind === "card" && <AddSource card={item.card} />}
@@ -381,19 +434,60 @@ function WantedStars({ n, label }: { n: number; label: string }) {
 
 const STAR = "M12 2.6l2.9 6.1 6.7.8-4.9 4.6 1.3 6.6L12 17.4l-6 3.3 1.3-6.6L2.4 9.5l6.7-.8z";
 
-/** En tête d'une fiche partagée : qui, à quel niveau, quel profil, quelle peine. */
-function WantedHead({ card }: { card: CardData }) {
+type Dict = ReturnType<typeof useT>["t"];
+
+/** « Toi 78 · @X 71 · une étoile d'avance » (§18.7). */
+function versusLine(d: Dict["denounce"], mine: MyCard, card: CardData): string {
+  const v = verdict(mine.overall, card.overall);
+  const said =
+    v.by === "tie" ? d.tie : v.by === "stars" ? (v.ahead ? d.starsAhead(v.n) : d.starsBehind(v.n)) : v.ahead ? d.pointsAhead(v.n) : d.pointsBehind(v.n);
+  return d.versus(mine.overall, card.login ? `@${card.login}` : card.name, card.overall, said);
+}
+
+interface WantedHeadProps {
+  card: CardData;
+  /** Fiche dénoncée (§18.6) : bandeau « Avis de recherche à ton nom », dénonciateur nommé s'il a revendiqué sa fiche. */
+  denounced: { by: string | null } | null;
+  /** Revendication par GitHub ; null si elle est désactivée : le bouton mène alors à « Fais la tienne ». */
+  onLawyer: (() => void) | null;
+}
+
+/** En tête d'une fiche partagée : qui, « dans le viseur » à quel niveau, quel profil, quelle peine. */
+function WantedHead({ card, denounced, onLawyer }: WantedHeadProps) {
   const { t, lang } = useT();
+  const d = t.denounce;
   const n = starsFor(card.overall);
   const level = pick(LEVEL_LABELS[n], lang);
   const starsLabel = t.result.wantedStars(n, level);
+  const toForm = () => {
+    const input = document.querySelector<HTMLInputElement>("#you input");
+    input?.scrollIntoView({ behavior: "smooth", block: "center" });
+    input?.focus({ preventScroll: true });
+  };
   return (
     <header className="wanted">
-      <p className="surtitre">{t.result.wanted}</p>
+      {denounced ? (
+        <div className="denounced" role="note">
+          <p className="denounced-title">{d.banner}</p>
+          <p className="denounced-by">{denounced.by ? d.by(denounced.by) : d.anonymous}</p>
+          <button type="button" className="pill" onClick={onLawyer ?? toForm}>
+            {onLawyer ? d.lawyer : t.result.makeYours}
+          </button>
+        </div>
+      ) : (
+        <p className="surtitre">{t.result.wanted}</p>
+      )}
       <h1 className="wanted-name">{card.login ? `@${card.login}` : card.name}</h1>
       <p className="wanted-line">
-        <WantedStars n={n} label={starsLabel} />
-        <strong>{card.profile ? pick(card.profile.label, lang) : level}</strong>
+        <span className="wanted-verb">{d.inSights}</span>
+        {/* Les étoiles et le profil passent à la ligne ensemble, jamais un « · » en tête de ligne. */}
+        <span className="wanted-level">
+          <WantedStars n={n} label={starsLabel} />
+          <strong>
+            <span aria-hidden>· </span>
+            {card.profile ? pick(card.profile.label, lang) : level}
+          </strong>
+        </span>
       </p>
       {card.profile && <p className="wanted-hook">{pick(card.profile.tagline, lang)}</p>}
       {card.sentence && (
