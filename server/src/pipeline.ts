@@ -12,6 +12,8 @@ import { forReveal, githubFindings, strongest } from "./findings";
 import type { CodeReadingResult, CvReading, CvTextCounts, RepoFiles } from "../../shared/readings";
 import type { NewCardRow, Store } from "./db";
 import { TokenPool } from "./github/tokens";
+import type { LinkedinFinder, LinkedinProfile } from "./linkedinProfile/index";
+import { asLinkedinCard, asLinkedinComparison, profileToText } from "./linkedinProfile/text";
 
 export type CardBody = Omit<CardData, "id" | "createdAt">;
 
@@ -81,7 +83,12 @@ type MessageKey =
   | "cv_unreadable"
   | "not_found"
   | "withdrawn"
-  | "bad_request";
+  | "bad_request"
+  | "linkedin_off"
+  | "linkedin_busy"
+  | "linkedin_not_found"
+  | "linkedin_bad_url"
+  | "linkedin_unreadable";
 
 export const MESSAGES: Record<MessageKey, Fact> = {
   unknown_user: {
@@ -143,6 +150,30 @@ export const MESSAGES: Record<MessageKey, Fact> = {
   not_found: {
     fr: "Carte introuvable : elle a expiré ou a été supprimée.",
     en: "Card not found: it expired or was deleted.",
+  },
+  linkedin: {
+    fr: "Entrée LinkedIn indisponible, tape ton pseudo GitHub.",
+    en: "LinkedIn entry unavailable, type your GitHub username.",
+  },
+  linkedin_off: {
+    fr: "Entrée LinkedIn indisponible, tape ton pseudo GitHub.",
+    en: "LinkedIn entry unavailable, type your GitHub username.",
+  },
+  linkedin_busy: {
+    fr: "Entrée LinkedIn indisponible pour aujourd'hui, tape ton pseudo GitHub.",
+    en: "LinkedIn entry unavailable for today, type your GitHub username.",
+  },
+  linkedin_not_found: {
+    fr: "Profil LinkedIn introuvable (privé ou trop récent). Tape ton pseudo GitHub.",
+    en: "LinkedIn profile not found (private or too new). Type your GitHub username.",
+  },
+  linkedin_bad_url: {
+    fr: "Ce lien n'est pas un profil LinkedIn (linkedin.com/in/…).",
+    en: "That link isn't a LinkedIn profile (linkedin.com/in/…).",
+  },
+  linkedin_unreadable: {
+    fr: "On n'a pas réussi à lire ce profil LinkedIn pour l'instant. Réessaie dans un instant.",
+    en: "We couldn't read this LinkedIn profile right now. Try again in a moment.",
   },
   bad_request: {
     fr: "Donne un pseudo GitHub valide, un CV en PDF, ou les deux.",
@@ -220,9 +251,15 @@ export interface PipelineOptions {
   queueTimeoutMs?: number;
   /** Jetons GitHub épuisés : on garde la fiche en file si la remise à zéro arrive avant ce délai, sinon `busy`. */
   busyAfterMs?: number;
+  /** LinkedIn contre GitHub (§18.24). Absent : pas de jeton de fournisseur, la fonctionnalité n'existe pas. */
+  linkedin?: LinkedinFinder;
 }
 
 export const MAX_CONCURRENT_CARDS = 4;
+/** Entrée GitHub : le LinkedIn n'est attendu que jusqu'à cette marge avant le délai de la fiche. */
+export const LINKEDIN_MARGIN_MS = 2500;
+/** Après une lecture de profil lente : le temps laissé à la lecture IA et au barème. */
+export const LINKEDIN_AFTER_MS = 25_000;
 export const QUEUE_TIMEOUT_MS = 3 * 60_000;
 export const BUSY_AFTER_MS = 2 * 60_000;
 
@@ -252,10 +289,19 @@ interface Job {
   queueTimer?: ReturnType<typeof setTimeout>;
 }
 
-interface JobInput {
+export interface JobInput {
   lang: Lang;
   login?: string;
   pdf?: Uint8Array;
+  /**
+   * Adresse LinkedIn normalisée (§18.24). Seule : entrée LinkedIn. Avec un
+   * pseudo : la comparaison avec ce LinkedIn-là (« Ajoute ton GitHub »).
+   */
+  linkedinUrl?: string;
+  /** Pas de recherche LinkedIn (carte vitrine : elle doit rester une fiche GitHub). */
+  noLinkedin?: boolean;
+  /** Prend une unité de la limite par IP avant une lecture payante de profil ; false : refusé. */
+  linkedinSpend?: () => boolean;
 }
 
 interface Ctx {
@@ -265,6 +311,51 @@ interface Ctx {
   find(list: Finding[]): void;
   findings(): Finding[];
   seconds(): number;
+  /** Fin du délai de la fiche (ms epoch). */
+  deadline(): number;
+  /** Repousse la fin du délai (lecture LinkedIn lente, §18.24). Jamais en arrière. */
+  extendTo(at: number): void;
+}
+
+interface LinkedinResult {
+  profile: LinkedinProfile;
+  cv: CvResult;
+}
+
+/**
+ * Une lecture de profil commence (jusqu'à 60 s chez Apify) : la fiche gagne ce
+ * temps plus de quoi lire le profil par l'IA, et l'attente le dit au front, qui
+ * patiente d'autant.
+ */
+function linkedinSlow(ctx: Ctx) {
+  return (ms: number) => {
+    ctx.emit("linkedin_wait");
+    ctx.extendTo(Date.now() + ms + LINKEDIN_AFTER_MS);
+  };
+}
+
+/** Le GitHub donné n'existe pas (ou plus), ou c'est une organisation. */
+function isMissingGithub(err: unknown): boolean {
+  const code = (err as { code?: unknown } | null)?.code;
+  return code === "unknown_user" || code === "organization";
+}
+
+/**
+ * La valeur de `p` si elle arrive avant `at()` (ms epoch, relu à l'échéance :
+ * le délai peut avoir été repoussé entre-temps), sinon null ; une erreur vaut null.
+ */
+function settleBefore<T>(p: Promise<T>, at: () => number): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<null>((resolve) => {
+    const arm = () => {
+      const wait = at() - Date.now();
+      if (wait <= 0) return resolve(null);
+      timer = setTimeout(arm, wait);
+      timer.unref?.();
+    };
+    arm();
+  });
+  return Promise.race([p.catch(() => null), late]).finally(() => clearTimeout(timer));
 }
 
 interface GithubResult {
@@ -364,7 +455,7 @@ export class Pipeline {
     const settled = new Promise<void>((r) => (settle = r));
     const job: Job = { id, state: "queued", input, deleteToken, progress: [], findings: [], startedAt: Date.now(), done: settled, settle };
     this.jobs.set(id, job);
-    const key = input.login && !input.pdf ? input.login.toLowerCase() : null;
+    const key = input.login && !input.pdf && !input.linkedinUrl ? input.login.toLowerCase() : null;
     if (key) this.inflight.set(key, id);
     job.done = settled.finally(() => {
       if (key && this.inflight.get(key) === id) this.inflight.delete(key);
@@ -447,11 +538,13 @@ export class Pipeline {
     let timedOut = false;
     let rejectTimeout: (e: unknown) => void = () => {};
     const timeoutP = new Promise<never>((_, reject) => (rejectTimeout = reject));
-    const timer = setTimeout(() => {
+    const fire = () => {
       timedOut = true;
       ac.abort(new JobError("timeout", MESSAGES.timeout));
       rejectTimeout(new JobError("timeout", MESSAGES.timeout));
-    }, this.timeoutMs);
+    };
+    let deadline = job.startedAt + this.timeoutMs;
+    let timer = setTimeout(fire, this.timeoutMs);
 
     const ctx: Ctx = {
       signal: ac.signal,
@@ -467,6 +560,13 @@ export class Pipeline {
         job.findings = [...job.findings, ...list];
       },
       findings: () => job.findings,
+      deadline: () => deadline,
+      extendTo: (at) => {
+        if (timedOut || at <= deadline) return;
+        deadline = at;
+        clearTimeout(timer);
+        timer = setTimeout(fire, Math.max(0, at - Date.now()));
+      },
     };
 
     try {
@@ -493,13 +593,38 @@ export class Pipeline {
 
   private async work(id: string, deleteToken: string, input: JobInput, ctx: Ctx): Promise<NewCardRow[]> {
     const { deps } = this.opts;
-    const { lang, login, pdf } = input;
-    const both = !!login && !!pdf;
+    const { lang, pdf } = input;
+    let login = input.login;
 
+    // Entrée LinkedIn (§18.24) : le profil, et le GitHub que ses liens donnent.
+    const entry = input.linkedinUrl && !login && !pdf ? await this.linkedinEntry(input.linkedinUrl, input, ctx) : null;
+    if (entry?.githubLogin) login = entry.githubLogin;
+
+    // Le LinkedIn se lit en parallèle de la lecture du code : dès l'entrée, ou
+    // dès que les faits GitHub disent où il est (entrée GitHub).
+    const lk: { p?: Promise<LinkedinResult | null> } = {};
+    if (entry) lk.p = this.linkedinBranch(Promise.resolve(entry.profile), ctx, false);
+    const finder = !pdf && !input.noLinkedin ? this.opts.linkedin : undefined;
+    const slow = linkedinSlow(ctx);
+    const onFacts =
+      finder && !entry
+        ? (facts: unknown) => {
+            const found = finder.forGithub(facts, { url: input.linkedinUrl, spend: input.linkedinSpend, onSlow: slow, signal: ctx.signal });
+            lk.p = this.linkedinBranch(found, ctx, true);
+            lk.p.catch(() => {});
+          }
+        : undefined;
+
+    const ghP = login ? this.githubBranch(login, ctx, !!pdf || !!input.linkedinUrl, onFacts) : Promise.resolve(null);
     const [gh, cv] = await Promise.all([
-      login ? this.githubBranch(login, ctx, both) : Promise.resolve(null),
+      // Le GitHub que le profil donne n'existe plus : la fiche LinkedIn sort seule.
+      entry ? ghP.catch((err) => (!ctx.signal.aborted && isMissingGithub(err) ? null : Promise.reject(err))) : ghP,
       pdf ? this.cvBranch(pdf, ctx) : Promise.resolve(null),
     ]);
+    // Entrée LinkedIn : sa lecture est la fiche, on l'attend. Entrée GitHub : la
+    // comparaison est un bonus, on ne l'attend que jusqu'à la marge du délai.
+    const li = entry ? await lk.p! : lk.p ? await settleBefore(lk.p, () => ctx.deadline() - LINKEDIN_MARGIN_MS) : null;
+    const declared: (CvResult & { linkedinUrl?: string }) | null = cv ?? (li ? { ...li.cv, linkedinUrl: li.profile.url } : null);
 
     const now = Date.now();
     const createdAt = new Date(now).toISOString();
@@ -511,7 +636,7 @@ export class Pipeline {
       const found = strongest(ctx.findings());
       return { ...deps.scoreGithub(gh!.facts, gh!.ai, { lang, judgedInSeconds }), ...(found.length ? { findings: found } : {}), id: cardId, createdAt };
     };
-    const githubRow = (card: CardData, parentId: string | null): NewCardRow => ({
+    const githubRow = (card: CardData, parentId: string | null, degraded = gh!.degraded): NewCardRow => ({
       id: card.id,
       parentId,
       createdAt: now,
@@ -522,45 +647,52 @@ export class Pipeline {
       // Aussi sur la carte GitHub d'une comparaison : le top de la semaine y lit les abonnés (§18.22).
       facts: gh!.facts,
       deleteToken,
-      degraded: gh!.degraded,
+      degraded,
     });
 
-    // GitHub seul.
-    if (gh && !cv) return [githubRow(githubCard(id), null)];
-
-    // CV illisible par l'IA : la carte GitHub seule si on l'a, sinon une erreur honnête.
-    if (!cv!.reading) {
-      if (gh) return [githubRow(githubCard(id), null)];
-      throw new JobError("internal", MESSAGES.cv_unreadable);
+    // Rien de déclaratif à lire (GitHub seul), ou illisible par l'IA : la carte
+    // GitHub seule si on l'a, sinon une erreur honnête. Un LinkedIn trouvé mais
+    // pas lu : la fiche sort, hors cache 24 h.
+    if (!declared?.reading) {
+      if (gh) return [githubRow(githubCard(id), null, gh.degraded || (!!li && !li.cv.reading))];
+      throw new JobError("internal", entry ? MESSAGES.linkedin_unreadable : MESSAGES.cv_unreadable);
     }
 
-    const reading = cv!.reading;
+    const reading = declared.reading;
+    const linkedinUrl = declared.linkedinUrl;
+    const asDeclared = (c: CardData): CardData => (linkedinUrl ? asLinkedinCard(c) : c);
     const cvRow = (card: CardData, parentId: string | null): NewCardRow => ({
       id: card.id,
       parentId,
       createdAt: now,
-      source: "cv",
+      source: linkedinUrl ? "linkedin" : "cv",
       login: null,
       kind: "card",
       data: card,
+      // Fiche LinkedIn seule : l'adresse sert au cache de 24 h et à l'oubli du profil (§11).
+      ...(linkedinUrl && !parentId ? { facts: { linkedinUrl } } : {}),
       deleteToken,
     });
 
-    // CV seul, ou profil non dev : carte CV seule, pas de carte GitHub (§4.7).
+    // Profil non dev face à un GitHub : la fiche GitHub seule ; un CV en PDF garde sa fiche CV (§4.7).
+    if (gh && !reading.is_dev_profile && !pdf) return [githubRow(githubCard(id), null)];
+
+    // Déclaratif seul (CV, ou LinkedIn sans GitHub), ou profil non dev : pas de carte GitHub (§4.7).
     if (!gh || !reading.is_dev_profile) {
-      const card: CardData = { ...deps.scoreCv(reading, cv!.counts, { lang, judgedInSeconds }), id, createdAt };
+      const card = asDeclared({ ...deps.scoreCv(reading, declared.counts, { lang, judgedInSeconds }), id, createdAt });
       return [cvRow(card, null)];
     }
 
     // Comparaison : trois lignes, la comparaison et ses deux cartes, chacune son id.
     ctx.emit("compare");
     const cvCard: CardData = {
-      ...deps.scoreCv(reading, cv!.counts, { lang, judgedInSeconds, github: gh.facts }),
+      ...deps.scoreCv(reading, declared.counts, { lang, judgedInSeconds, github: gh.facts }),
       id: newId(),
       createdAt,
     };
     const ghCard = githubCard(newId());
-    const cmp = deps.compareCards(cvCard, ghCard);
+    const raw = deps.compareCards(cvCard, ghCard);
+    const cmp = linkedinUrl ? asLinkedinComparison(raw) : raw;
     const comparison: ComparisonData = {
       ...cmp,
       id,
@@ -569,24 +701,82 @@ export class Pipeline {
       github: { ...cmp.github, id: ghCard.id, createdAt },
     };
     return [
-      { id, parentId: null, createdAt: now, source: "both", login, kind: "comparison", data: comparison, deleteToken, degraded: gh.degraded },
+      {
+        id,
+        parentId: null,
+        createdAt: now,
+        source: linkedinUrl ? "linkedin" : "both",
+        login,
+        kind: "comparison",
+        data: comparison,
+        ...(linkedinUrl ? { facts: { linkedinUrl } } : {}),
+        deleteToken,
+        degraded: gh.degraded,
+      },
       cvRow(comparison.cv, id),
       githubRow(comparison.github, id),
     ];
   }
 
-  private async githubBranch(login: string, ctx: Ctx, allowCache: boolean): Promise<GithubResult> {
+  /** Entrée LinkedIn : le profil, ou une erreur claire (pas de clé, budget, introuvable, propriétaire parti). */
+  private async linkedinEntry(url: string, input: JobInput, ctx: Ctx) {
+    const finder = this.opts.linkedin;
+    if (!finder) throw new JobError("linkedin", MESSAGES.linkedin_off);
+    const r = await finder.forUrl(url, { spend: input.linkedinSpend, onSlow: linkedinSlow(ctx), signal: ctx.signal });
+    if (r.status === "not_found") throw new JobError("linkedin", MESSAGES.linkedin_not_found);
+    if (r.status === "unavailable") throw new JobError("linkedin", MESSAGES.linkedin_busy);
+    // Le GitHub lié est masqué par son propriétaire : pas de fiche à son nom (§18.1).
+    if (r.githubLogin && this.opts.store.isHidden(r.githubLogin)) throw new JobError("gone", MESSAGES.gone);
+    ctx.emit("linkedin");
+    return r;
+  }
+
+  /**
+   * Le profil LinkedIn, lu comme un CV : texte déclaratif, comptages, lecture IA.
+   * Le texte ne vit que le temps de la lecture. Entrée GitHub (`soft`) : toute
+   * panne rend null, la fiche GitHub sort seule.
+   */
+  private async linkedinBranch(profileP: Promise<LinkedinProfile | null>, ctx: Ctx, soft: boolean): Promise<LinkedinResult | null> {
+    const { deps } = this.opts;
+    let profile: LinkedinProfile | null;
+    try {
+      profile = await profileP;
+    } catch {
+      profile = null;
+    }
+    if (!profile) return null;
+    if (soft) ctx.emit("linkedin");
+    let text = profileToText(profile);
+    const counts = deps.cvTextCounts(text, 1);
+    let reading: CvReading | null = null;
+    if (deps.aiAvailable()) {
+      try {
+        reading = await deps.readCv(text, { signal: ctx.signal });
+      } catch (err) {
+        if (!soft && (ctx.signal.aborted || isAiClosed(err))) throw err;
+        console.warn("[linkedin] lecture IA échouée :", (err as Error).message);
+      }
+    }
+    text = "";
+    return { profile, cv: { counts, reading } };
+  }
+
+  private async githubBranch(login: string, ctx: Ctx, allowCache: boolean, onFacts?: (facts: unknown) => void): Promise<GithubResult> {
     const { deps, store } = this.opts;
     if (allowCache) {
       // Comparaison sur un pseudo jugé il y a moins de 24 h : on ne refait pas les appels.
       const row = store.findRecentGithub(login);
-      if (row?.facts && row.kind === "card") return { facts: row.facts, ai: null, degraded: false, cached: row.data as CardData };
+      if (row?.facts && row.kind === "card") {
+        onFacts?.(row.facts);
+        return { facts: row.facts, ai: null, degraded: false, cached: row.data as CardData };
+      }
     }
     const facts = await deps.collectGithub(login, {
       token: this.github,
       signal: ctx.signal,
       onProgress: (e) => ctx.emit(e.key, e.n),
     });
+    onFacts?.(facts);
     ctx.emit("recruiter");
     // L'enquête en direct (§18.26) : les trouvailles sortent avant la lecture IA, pour l'attente.
     ctx.find(githubFindings(facts));

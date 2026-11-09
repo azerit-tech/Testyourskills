@@ -11,6 +11,7 @@ import { createApp, purge } from "./app";
 import { useBudgetDb } from "./ai/budget";
 import { startCreditsWatch, stopCreditsWatch } from "./ai/credits";
 import { linkedinFromEnv } from "./linkedin";
+import { linkedinProfilesFromEnv } from "./linkedinProfile/index";
 import { githubAuthFromEnv } from "./auth";
 import { Store } from "./db";
 import { realDeps } from "./deps";
@@ -75,7 +76,13 @@ useBudgetDb(store.db);
 // Solde OpenRouter lu au démarrage puis toutes les 5 minutes, sans jamais
 // retarder le démarrage : sous AI_MIN_CREDIT_USD (0,50 $), commissariat fermé.
 startCreditsWatch();
+// LinkedIn contre GitHub (§18.24) : sans jeton du fournisseur (APIFY_TOKEN, ou
+// CRUSTDATA_API_KEY avec LINKEDIN_PROVIDER=crustdata), la fonctionnalité est absente.
+const linkedinProfiles = linkedinProfilesFromEnv(process.env, store.db) ?? undefined;
+if (linkedinProfiles) console.log(`LinkedIn : profils lus par ${linkedinProfiles.providerName}.`);
+else console.warn("Fournisseur LinkedIn sans jeton : LinkedIn contre GitHub et l'entrée LinkedIn désactivés.");
 const { app, pipeline } = createApp({
+  linkedinProfiles,
   store,
   deps: realDeps,
   githubToken,

@@ -20,6 +20,8 @@ import { DENOUNCE_LIMITED, DENOUNCE_PER_DAY, mountDenounce, parseDenunciation } 
 import { aiStatus as budgetAiStatus, type AiStatus } from "./ai/budget";
 import type { TokenPool } from "./github/tokens";
 import { weekTop, withWeekSpecial } from "./top";
+import { normalizeLinkedinUrl, PAID_CALLS_PER_IP, type LinkedinFinder } from "./linkedinProfile/index";
+import { forgetLinkedinOfCard, recentLinkedinCard } from "./linkedinProfile/cards";
 
 export interface AppOptions {
   store: Store;
@@ -60,6 +62,8 @@ export interface AppOptions {
   showcasePhoto?: string;
   /** État de l'IA (plafond du jour, crédit). Défaut : le suivi de ai/budget.ts. */
   aiStatus?: () => AiStatus;
+  /** LinkedIn contre GitHub, et l'entrée LinkedIn (§18.24). Absent : pas de jeton de fournisseur, fonctionnalité absente. */
+  linkedinProfiles?: LinkedinFinder;
 }
 
 /** La carte vitrine est recalculée au plus une fois par semaine. */
@@ -91,7 +95,21 @@ const loginSchema = z
 
 const langSchema = z.enum(["fr", "en"]).catch("fr");
 
-const jsonCardSchema = z.object({ login: loginSchema, lang: langSchema.optional() });
+const jsonCardSchema = z.object({
+  login: loginSchema.optional(),
+  /** Adresse de profil LinkedIn (§18.24), validée à part pour un message clair. */
+  linkedin: z.string().max(300).optional(),
+  lang: langSchema.optional(),
+});
+
+/** Le champ unique de l'accueil envoie aussi une adresse LinkedIn dans `login` : on la range dans `linkedin`. */
+function linkedinInLogin(raw: unknown): unknown {
+  const o = raw as { login?: unknown; linkedin?: unknown } | null;
+  if (!o || typeof o !== "object" || typeof o.login !== "string" || o.linkedin !== undefined) return raw;
+  if (!/linkedin\.com/i.test(o.login)) return raw;
+  const { login, ...rest } = o;
+  return { ...rest, linkedin: login };
+}
 
 const emailSchema = z.object({
   cardId: z.string().regex(ID_RE),
@@ -165,6 +183,7 @@ export function createApp(opts: AppOptions) {
     maxConcurrent: opts.maxConcurrentCards,
     queueTimeoutMs: opts.queueTimeoutMs,
     busyAfterMs: opts.busyAfterMs,
+    linkedin: opts.linkedinProfiles,
   });
   const limiter = new RateLimiter(store, opts.ipSalt ?? "testyourskills");
   const cardsPerDay = opts.cardsPerDay ?? CARDS_PER_DAY;
@@ -206,7 +225,8 @@ export function createApp(opts: AppOptions) {
   );
 
   // Ce que le front doit afficher ou masquer.
-  app.get("/api/config", (c) => c.json({ linkedin: !!opts.linkedin, claim: !!opts.githubAuth }));
+  // linkedinEntry : le champ de l'accueil accepte une adresse LinkedIn (§18.24).
+  app.get("/api/config", (c) => c.json({ linkedin: !!opts.linkedin, claim: !!opts.githubAuth, linkedinEntry: !!opts.linkedinProfiles }));
 
   // GET /api/showcase : la vraie carte du pseudo vitrine, pour l'accueil (§6.1).
   // Hors quota. Null tant qu'aucune n'existe ; on en lance une si la dernière
@@ -219,7 +239,7 @@ export function createApp(opts: AppOptions) {
     // Vitrine sortie sans lecture IA : on la retente au bout d'une heure, pas d'une semaine.
     const stale = !row || Date.now() - row.createdAt > (row.degraded ? SHOWCASE_DEGRADED_MS : SHOWCASE_MS);
     // Jetons GitHub épuisés : la vitrine attendra, elle ne prend pas la place d'une vraie fiche.
-    if (stale && !pipeline.inflightFor(login) && !pipeline.githubBusy()) pipeline.start({ lang: "fr", login });
+    if (stale && !pipeline.inflightFor(login) && !pipeline.githubBusy()) pipeline.start({ lang: "fr", login, noLinkedin: true });
     if (!row) return c.json({ card: null });
     const card = stripToken(row.data as CardData);
     return c.json({ card: opts.showcasePhoto ? { ...card, avatarUrl: opts.showcasePhoto, photoSource: "linkedin" } : card });
@@ -247,6 +267,7 @@ export function createApp(opts: AppOptions) {
       let ref: string | undefined;
       // Fiche du dénonciateur (§18.6, denounce.ts) : JSON seulement, on dénonce un pseudo, pas un CV.
       let denouncedBy: unknown;
+      let linkedinUrl: string | undefined;
 
       if (ct.startsWith("multipart/form-data")) {
         const body = await c.req.parseBody();
@@ -267,7 +288,7 @@ export function createApp(opts: AppOptions) {
           return c.json(errorBody("not_a_pdf", MESSAGES.not_a_pdf), 400);
         }
       } else {
-        const raw = await c.req.json().catch(() => null);
+        const raw = linkedinInLogin(await c.req.json().catch(() => null));
         const parsed = jsonCardSchema.safeParse(raw);
         if (!parsed.success) {
           const hasLogin = typeof (raw as { login?: unknown } | null)?.login === "string";
@@ -279,9 +300,23 @@ export function createApp(opts: AppOptions) {
         lang = parsed.data.lang ?? "fr";
         ref = parseRef((raw as { ref?: unknown }).ref, store);
         denouncedBy = (raw as { denouncedBy?: unknown }).denouncedBy;
+        // Entrée LinkedIn (§18.24) : une adresse de profil, rien d'autre.
+        if (parsed.data.linkedin !== undefined) {
+          linkedinUrl = normalizeLinkedinUrl(parsed.data.linkedin) ?? undefined;
+          if (!linkedinUrl) return c.json(errorBody("linkedin", MESSAGES.linkedin_bad_url), 400);
+        }
       }
 
-      if (!login && !pdf) return c.json(errorBody("internal", MESSAGES.bad_request), 400);
+      if (!login && !pdf && !linkedinUrl) return c.json(errorBody("internal", MESSAGES.bad_request), 400);
+      // Sans fournisseur de profils, l'entrée LinkedIn n'existe pas ; avec un pseudo, le lien est ignoré.
+      if (linkedinUrl && !opts.linkedinProfiles) {
+        if (!login) return c.json(errorBody("linkedin", MESSAGES.linkedin_off), 400);
+        linkedinUrl = undefined;
+      }
+      if (linkedinUrl && !login) {
+        const cached = recentLinkedinCard(store.db, { url: linkedinUrl });
+        if (cached) return c.json({ id: cached, cached: true }, 200);
+      }
 
       // Login masqué par son propriétaire : personne d'autre que lui n'en refait une fiche (§18.1).
       if (login && hiddenFrom(c, login)) return c.json(errorBody("gone", MESSAGES.gone), 410);
@@ -303,7 +338,13 @@ export function createApp(opts: AppOptions) {
       };
 
       // Cache 24 h et déduplication des jobs en cours, pour GitHub seul (§4.7, §12).
-      if (login && !pdf) {
+      if (login && !pdf && !linkedinUrl) {
+        // Une comparaison LinkedIn contre GitHub récente passe devant la fiche GitHub seule (§18.24).
+        const compared = opts.linkedinProfiles ? recentLinkedinCard(store.db, { login }) : null;
+        if (compared) {
+          denounced(compared);
+          return c.json({ id: compared, cached: true }, 200);
+        }
         const cached = store.findRecentGithub(login);
         if (cached) {
           denounced(cached.id);
@@ -336,7 +377,14 @@ export function createApp(opts: AppOptions) {
         return c.json(errorBody("rate_limited", MESSAGES.rate_limited), 429);
       }
 
-      const { id, deleteToken } = pipeline.start({ lang, login, pdf });
+      const { id, deleteToken } = pipeline.start({
+        lang,
+        login,
+        pdf,
+        linkedinUrl,
+        // Lectures payantes de profils LinkedIn : une limite par IP en plus du budget du jour (§18.24).
+        linkedinSpend: () => limiter.take("linkedin", ip, PAID_CALLS_PER_IP),
+      });
       denounced(id);
       // L'insertion arrive toujours après ce retour (le pipeline attend au moins
       // une fois) : la ref est écrite dans la ligne, puis oubliée en fin de job.
@@ -375,6 +423,8 @@ export function createApp(opts: AppOptions) {
     const row = store.getCard(id);
     if (!row) return { status: 404 };
     if (!tokenMatches(c.req.query("token"), row.deleteToken)) return { status: 403 };
+    // Fiche LinkedIn supprimée : le profil en cache part avec elle (§18.24).
+    forgetLinkedinOfCard(store.db, (row.parentId ? store.getCard(row.parentId) : row)?.facts);
     const ids = store.deleteGroup(id);
     await Promise.all([removeImages(ogDir, ids), removeAvatars(avatarDir, ids)]);
     return { status: 200, ids };

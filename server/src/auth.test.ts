@@ -156,7 +156,7 @@ describe("configuration", () => {
   it("sans les variables : bouton caché, routes absentes, /api/me nul", async () => {
     const ctx = setup({ configured: false });
     insertCard(ctx.store);
-    expect(await (await ctx.app.request("/api/config")).json()).toEqual({ linkedin: false, claim: false });
+    expect(await (await ctx.app.request("/api/config")).json()).toEqual({ linkedin: false, claim: false, linkedinEntry: false });
     expect((await start(ctx, "card=CardAAAA01")).status).toBe(404);
     expect((await ctx.app.request(`/auth/github/callback?code=${CODE}&state=x`)).status).toBe(404);
     expect((await ctx.app.request("/api/owner/hide", { method: "POST" })).status).toBe(404);
@@ -169,7 +169,7 @@ describe("configuration", () => {
 
   it("avec les variables : /api/config le dit", async () => {
     const ctx = setup();
-    expect(await (await ctx.app.request("/api/config")).json()).toEqual({ linkedin: false, claim: true });
+    expect(await (await ctx.app.request("/api/config")).json()).toEqual({ linkedin: false, claim: true, linkedinEntry: false });
   });
 });
 
