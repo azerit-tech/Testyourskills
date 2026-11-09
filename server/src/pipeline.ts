@@ -75,6 +75,7 @@ export const MAX_PDF_PAGES = 10;
 type MessageKey =
   | ErrorCode
   | "github_rate_limited"
+  | "queue_timeout"
   | "empty_pdf"
   | "cv_unreadable"
   | "not_found"
@@ -117,6 +118,14 @@ export const MESSAGES: Record<MessageKey, Fact> = {
     fr: "Le commissariat est fermé pour ce soir. Reviens demain.",
     en: "The station is closed for tonight. Come back tomorrow.",
   },
+  busy: {
+    fr: "Le commissariat déborde : trop de suspects d'un coup, GitHub nous fait souffler. Reviens dans quelques minutes.",
+    en: "The station is overflowing: too many suspects at once, GitHub is making us take a breather. Come back in a few minutes.",
+  },
+  queue_timeout: {
+    fr: "Trop de monde au commissariat : ton dossier a attendu plus de 3 minutes sans passer. Réessaie dans un instant.",
+    en: "The station is packed: your file waited more than 3 minutes without being seen. Try again in a moment.",
+  },
   cv_unreadable: {
     fr: "On n'a pas réussi à lire ce CV pour l'instant. Réessaie dans un instant.",
     en: "We couldn't read this CV right now. Try again in a moment.",
@@ -148,6 +157,15 @@ export class JobError extends Error {
 /** IA coupée (AiClosedError : plafond du jour ou crédit épuisé), reconnue à son `code`. */
 export function isAiClosed(err: unknown): boolean {
   return (err as { code?: unknown } | null)?.code === "closed";
+}
+
+/** `busy` avec le temps à attendre avant que GitHub nous rende la main. */
+export function busyError(waitMs: number): JobError {
+  const n = Math.max(1, Math.ceil(waitMs / 60_000));
+  return new JobError("busy", {
+    fr: `Le commissariat déborde : trop de suspects d'un coup, GitHub nous fait souffler. Reviens dans ${n} minute${n > 1 ? "s" : ""}.`,
+    en: `The station is overflowing: too many suspects at once, GitHub is making us take a breather. Come back in ${n} minute${n > 1 ? "s" : ""}.`,
+  });
 }
 
 /** EngineError, CvError et AiClosedError sont reconnus à leur champ `code`, sans importer leurs modules. */
@@ -186,16 +204,40 @@ export interface PipelineOptions {
   timeoutMs?: number;
   /** Durée de conservation en mémoire d'un job en erreur. */
   errorTtlMs?: number;
+  /** Fiches traitées en même temps (MAX_CONCURRENT_CARDS) ; les suivantes attendent en file. */
+  maxConcurrent?: number;
+  /** Au-delà de ce temps en file, la fiche échoue en `timeout`. */
+  queueTimeoutMs?: number;
+  /** Jetons GitHub épuisés : on garde la fiche en file si la remise à zéro arrive avant ce délai, sinon `busy`. */
+  busyAfterMs?: number;
 }
+
+export const MAX_CONCURRENT_CARDS = 4;
+export const QUEUE_TIMEOUT_MS = 3 * 60_000;
+export const BUSY_AFTER_MS = 2 * 60_000;
+
+/**
+ * Marge d'appels GitHub qu'il faut sur un jeton pour lancer une fiche. Une fiche
+ * en consomme quelques dizaines en REST (pages de repos, arbres, commits) et
+ * quelques requêtes GraphQL (calendrier, années, premier commit).
+ */
+const CARD_GITHUB_NEED = { core: 200, graphql: 40 };
 
 interface Job {
   id: string;
-  state: "pending" | "error";
+  /** queued : en file ; running : en traitement ; error : échec gardé en mémoire. */
+  state: "queued" | "running" | "error";
+  input: JobInput;
+  deleteToken: string;
   progress: ProgressEvent[];
+  /** Entrée en file, puis début du traitement : les `at` de la progression partent de là. */
   startedAt: number;
   finishedAt?: number;
   error?: JobError;
   done: Promise<void>;
+  /** Résout `done` (fin du traitement, ou échec avant même de démarrer). */
+  settle: () => void;
+  queueTimer?: ReturnType<typeof setTimeout>;
 }
 
 interface JobInput {
@@ -227,20 +269,50 @@ export class Pipeline {
   private inflight = new Map<string, string>(); // pseudo en minuscules → id du job GitHub en cours
   private readonly timeoutMs: number;
   private readonly errorTtlMs: number;
+  private readonly maxConcurrent: number;
+  private readonly queueTimeoutMs: number;
+  private readonly busyAfterMs: number;
+  /** File d'attente, dans l'ordre d'arrivée. */
+  private queue: Job[] = [];
+  private running = 0;
+  private recheck?: ReturnType<typeof setTimeout>;
   readonly github: TokenPool;
 
   constructor(private opts: PipelineOptions) {
     this.timeoutMs = opts.timeoutMs ?? 30_000;
     this.errorTtlMs = opts.errorTtlMs ?? 3600_000;
+    this.maxConcurrent = Math.max(1, Math.floor(opts.maxConcurrent ?? MAX_CONCURRENT_CARDS));
+    this.queueTimeoutMs = opts.queueTimeoutMs ?? QUEUE_TIMEOUT_MS;
+    this.busyAfterMs = opts.busyAfterMs ?? BUSY_AFTER_MS;
     this.github = opts.githubPool ?? new TokenPool(opts.githubToken ? [opts.githubToken] : []);
   }
 
-  /** État en mémoire d'un job en cours ou en erreur. null : voir la base. */
+  /** État en mémoire d'un job en file, en cours ou en erreur. null : voir la base. */
   jobState(id: string): JobState | null {
     const job = this.jobs.get(id);
     if (!job) return null;
-    if (job.state === "pending") return { state: "pending", progress: [...job.progress] };
+    if (job.state === "queued") return { state: "pending", progress: [], queue: this.queue.indexOf(job) + 1 };
+    if (job.state === "running") return { state: "pending", progress: [...job.progress] };
     return { state: "error", code: job.error!.code, message: job.error!.msg };
+  }
+
+  /** Fiches en traitement et en file (diagnostic, tests). */
+  load(): { running: number; queued: number } {
+    return { running: this.running, queued: this.queue.length };
+  }
+
+  /**
+   * Jetons GitHub épuisés pour plus de `busyAfterMs` : l'erreur `busy` à rendre
+   * tout de suite plutôt que de mettre une fiche GitHub en file. null : ça passe.
+   */
+  githubBusy(): JobError | null {
+    const r = this.githubReadiness();
+    return !r.ok && r.waitMs >= this.busyAfterMs ? busyError(r.waitMs) : null;
+  }
+
+  private githubReadiness() {
+    // Sans jeton (dev), pas de file d'attente sur GitHub : 60 appels par heure, on fait avec.
+    return this.github.anonymous ? ({ ok: true } as const) : this.github.readiness(CARD_GITHUB_NEED);
   }
 
   /** Job GitHub seul déjà en cours pour ce pseudo (déduplication). */
@@ -257,19 +329,86 @@ export class Pipeline {
     await Promise.all([...this.jobs.values()].map((j) => j.done));
   }
 
-  /** Lance une carte. Le jeton de suppression n'est rendu qu'ici, au créateur. */
+  /**
+   * Met une carte en file ; elle démarre tout de suite s'il reste une place.
+   * Le jeton de suppression n'est rendu qu'ici, au créateur.
+   */
   start(input: JobInput): { id: string; deleteToken: string } {
     this.sweep();
     const id = newId();
     const deleteToken = newToken();
-    const job: Job = { id, state: "pending", progress: [], startedAt: Date.now(), done: Promise.resolve() };
+    let settle!: () => void;
+    const settled = new Promise<void>((r) => (settle = r));
+    const job: Job = { id, state: "queued", input, deleteToken, progress: [], startedAt: Date.now(), done: settled, settle };
     this.jobs.set(id, job);
     const key = input.login && !input.pdf ? input.login.toLowerCase() : null;
     if (key) this.inflight.set(key, id);
-    job.done = this.execute(job, deleteToken, input).finally(() => {
+    job.done = settled.finally(() => {
       if (key && this.inflight.get(key) === id) this.inflight.delete(key);
     });
+    job.queueTimer = setTimeout(() => this.expire(job), this.queueTimeoutMs);
+    job.queueTimer.unref?.();
+    this.queue.push(job);
+    this.pump();
     return { id, deleteToken };
+  }
+
+  /**
+   * Fait passer les fiches en file tant qu'il reste des places, dans l'ordre
+   * d'arrivée. Jetons GitHub épuisés : les fiches GitHub attendent la remise à
+   * zéro si elle arrive avant `busyAfterMs` (les fiches CV seules passent
+   * devant), sinon elles échouent en `busy` sans attendre.
+   */
+  private pump(): void {
+    clearTimeout(this.recheck);
+    this.recheck = undefined;
+    const needsGithub = (j: Job) => !!j.input.login;
+    const gh = this.githubReadiness();
+    if (!gh.ok && gh.waitMs >= this.busyAfterMs) {
+      for (const job of this.queue.filter(needsGithub)) this.fail(job, busyError(gh.waitMs));
+      this.queue = this.queue.filter((j) => !needsGithub(j));
+    }
+    for (let i = 0; i < this.queue.length && this.running < this.maxConcurrent; ) {
+      const job = this.queue[i]!;
+      if (!gh.ok && needsGithub(job)) {
+        i++;
+        continue;
+      }
+      this.queue.splice(i, 1);
+      this.run(job);
+    }
+    if (!gh.ok && this.queue.some(needsGithub)) {
+      this.recheck = setTimeout(() => this.pump(), gh.waitMs + 250);
+      this.recheck.unref?.();
+    }
+  }
+
+  private run(job: Job): void {
+    clearTimeout(job.queueTimer);
+    job.state = "running";
+    job.startedAt = Date.now();
+    this.running++;
+    void this.execute(job).finally(() => {
+      this.running--;
+      job.settle();
+      this.pump();
+    });
+  }
+
+  /** Trop longtemps en file : échec propre en `timeout` plutôt qu'une attente sans fin. */
+  private expire(job: Job): void {
+    if (job.state !== "queued") return;
+    this.queue = this.queue.filter((j) => j !== job);
+    this.fail(job, new JobError("timeout", MESSAGES.queue_timeout));
+  }
+
+  /** Échec d'une fiche qui n'a pas démarré. */
+  private fail(job: Job, err: JobError): void {
+    clearTimeout(job.queueTimer);
+    job.state = "error";
+    job.error = err;
+    job.finishedAt = Date.now();
+    job.settle();
   }
 
   private sweep() {
@@ -279,7 +418,8 @@ export class Pipeline {
     }
   }
 
-  private async execute(job: Job, deleteToken: string, input: JobInput): Promise<void> {
+  private async execute(job: Job): Promise<void> {
+    const { deleteToken, input } = job;
     const ac = new AbortController();
     let timedOut = false;
     let rejectTimeout: (e: unknown) => void = () => {};
@@ -293,7 +433,7 @@ export class Pipeline {
     const ctx: Ctx = {
       signal: ac.signal,
       emit: (key, n) => {
-        if (job.state !== "pending" || ac.signal.aborted) return;
+        if (job.state !== "running" || ac.signal.aborted) return;
         const ev: ProgressEvent = { key, at: Date.now() - job.startedAt };
         if (typeof n === "number" && Number.isFinite(n)) ev.n = n;
         job.progress.push(ev);

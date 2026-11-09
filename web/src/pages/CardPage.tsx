@@ -28,7 +28,7 @@ const CLIENT_TIMEOUT = 45_000;
 
 type View =
   | { s: "loading" }
-  | { s: "pending"; progress: ProgressEvent[] }
+  | { s: "pending"; progress: ProgressEvent[]; queue?: number }
   | { s: "done"; item: Shareable }
   | { s: "error"; message: Fact | string; notFound?: boolean }
   | { s: "deleted" };
@@ -41,14 +41,16 @@ function useJob(id: string, nonce: number) {
   useEffect(() => {
     let alive = true;
     let timer = 0;
-    const started = freshSince(id) ?? Date.now();
+    // Le temps passé en file d'attente ne compte pas : le serveur coupe lui-même au bout de 3 min.
+    let started = freshSince(id) ?? Date.now();
     const poll = async () => {
       try {
         const job: JobState = await api.getJob(id);
         if (!alive) return;
         if (job.state === "pending") {
           setSawPending(true);
-          setView({ s: "pending", progress: job.progress ?? [] });
+          setView({ s: "pending", progress: job.progress ?? [], queue: job.queue });
+          if (job.queue) started = Date.now();
           if (Date.now() - started > CLIENT_TIMEOUT) {
             setView({ s: "error", message: t.errors.timeout });
             return;
@@ -142,7 +144,7 @@ export function CardPage({ id }: { id: string }) {
   if (view.s === "pending") {
     return (
       <main className="page page-card" id="main">
-        <Waiting progress={view.progress} startedAt={startedAt} />
+        <Waiting progress={view.progress} startedAt={startedAt} queue={view.queue} />
       </main>
     );
   }

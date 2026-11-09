@@ -210,6 +210,14 @@ export const mockApi = {
         en: "Twenty cards today from this address. Come back tomorrow, your code won't have moved.",
       });
     }
+    if (lower === "busy") {
+      throw new ApiError(503, "busy", {
+        fr: "Le commissariat déborde : trop de suspects d'un coup, GitHub nous fait souffler. Reviens dans 12 minutes.",
+        en: "The station is overflowing: too many suspects at once, GitHub is making us take a breather. Come back in 12 minutes.",
+      });
+    }
+    // « queue » : trois fiches avant, une toutes les 1,5 s, puis la fiche normale.
+    const queueMs = lower === "queue" ? 4500 : 0;
     let kind: Kind;
     if (input.cv && login) kind = "cmp";
     else if (input.cv) kind = "cv";
@@ -219,7 +227,7 @@ export const mockApi = {
     else kind = BY_LOGIN[lower] ?? ROTATION[hash(lower) % ROTATION.length];
     const id = `m-${kind}-${rand()}`;
     const { timeline, doneAt } = timelineFor(kind);
-    jobs.set(id, { kind, start: Date.now(), login, lang: input.lang, timeline, doneAt });
+    jobs.set(id, { kind, start: Date.now() + queueMs, login, lang: input.lang, timeline, doneAt });
     return { id, deleteToken: `tok-${rand()}`, cached: false };
   },
 
@@ -229,6 +237,7 @@ export const mockApi = {
     const kind = job?.kind ?? kindFromId(id);
     if (!kind) throw new ApiError(404, "not_found", null);
     const elapsed = job ? Date.now() - job.start : Infinity;
+    if (job && elapsed < 0) return { state: "pending", progress: [], queue: Math.ceil(-elapsed / 1500) };
     if (job && elapsed < job.doneAt) {
       return { state: "pending", progress: job.timeline.filter((e) => e.at <= elapsed) };
     }

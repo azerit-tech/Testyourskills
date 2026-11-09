@@ -99,7 +99,8 @@ export interface ComparisonData {
 
 /** Réponse de GET /api/card/:id pendant et après le traitement. */
 export type JobState =
-  | { state: "pending"; progress: ProgressEvent[] }
+  /** `queue` : rang dans la file d'attente (1 = la prochaine à passer). Absent dès que la fiche est en traitement. */
+  | { state: "pending"; progress: ProgressEvent[]; queue?: number }
   | { state: "done"; kind: "card"; card: CardData }
   | { state: "done"; kind: "comparison"; comparison: ComparisonData }
   | { state: "error"; code: ErrorCode; message: Fact };
@@ -112,6 +113,8 @@ export type ErrorCode =
   | "pdf_too_large"
   | "timeout"
   | "rate_limited"
+  /** Tous les jetons GitHub épuisés pour plus de 2 minutes : la fiche n'est pas gardée en file. */
+  | "busy"
   | "internal";
 
 /** Messages d'attente nourris par les faits déjà collectés (§6.2). */

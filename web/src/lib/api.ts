@@ -36,7 +36,8 @@ export function isMock(): boolean {
 }
 
 async function readError(res: Response): Promise<ApiError> {
-  const fallback = res.status === 429 ? "rate_limited" : res.status === 404 ? "not_found" : "internal";
+  const fallback =
+    res.status === 429 ? "rate_limited" : res.status === 503 ? "busy" : res.status === 404 ? "not_found" : "internal";
   try {
     const body = await res.json();
     // Deux formes acceptées : { error: { code, message } } ou { state: "error", code, message }.

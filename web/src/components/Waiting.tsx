@@ -1,7 +1,8 @@
 // Attente (§17.5) : l'écran de chargement du jeu. Des illustrations défilent en
 // fondu plein écran, avec un lent zoom ; en bas, une barre jaune avance sur la
 // durée estimée, et les messages du §6.2 passent dessous, nourris par les
-// ProgressEvent quand il y en a, sinon par du remplissage.
+// ProgressEvent quand il y en a, sinon par du remplissage. En file d'attente,
+// une seule ligne dit combien de fiches passent avant, et la barre attend.
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ProgressEvent } from "../../../shared/types";
 import { useT } from "../i18n";
@@ -20,7 +21,7 @@ const SLIDE_MS = 4600; // une illustration toutes les 4 à 5 s
 /** Durée estimée d'une carte : la barre y arrive presque, jamais tout à fait. */
 const EXPECTED_MS = 11_000;
 
-export function Waiting({ progress, startedAt }: { progress: ProgressEvent[]; startedAt: number }) {
+export function Waiting({ progress, startedAt, queue }: { progress: ProgressEvent[]; startedAt: number; queue?: number }) {
   const { t } = useT();
   const [lines, setLines] = useState<Line[]>([]);
   const [now, setNow] = useState(() => Date.now());
@@ -69,16 +70,24 @@ export function Waiting({ progress, startedAt }: { progress: ProgressEvent[]; st
   }, []);
 
   const textOf = (l: Line) => (l.filler !== undefined ? t.waiting.fillers[l.filler] : known[l.key]?.(l.n) ?? "");
-  const current = lines[lines.length - 1];
-  const previous = lines[lines.length - 2];
+  // En file d'attente, une seule ligne : combien passent avant toi.
+  const queued = queue !== undefined && queue > 0;
+  const queueLine: Line | undefined = queued ? { uid: -(queue ?? 1), key: "queue" } : undefined;
+  const current = queueLine ?? lines[lines.length - 1];
+  const previous = queued ? undefined : lines[lines.length - 2];
+  const lineText = (l: Line) => (l.key === "queue" ? t.waiting.queue(queue ?? 1) : textOf(l));
 
   const elapsed = Math.max(0, now - startedAt);
+  // La barre reste au départ tant que la fiche est en file, et part quand elle passe.
+  const barFrom = useRef(startedAt);
+  if (queued) barFrom.current = now;
+  const barElapsed = Math.max(0, now - Math.max(startedAt, barFrom.current));
   // La barre avance sur la durée estimée, puis ralentit : elle ne touche jamais 100 avant la fin.
   const pct = useMemo(() => {
-    const linear = Math.min(1, elapsed / EXPECTED_MS) * 82;
-    const tail = 14 * (1 - Math.exp(-Math.max(0, elapsed - EXPECTED_MS) / 6000));
+    const linear = Math.min(1, barElapsed / EXPECTED_MS) * 82;
+    const tail = 14 * (1 - Math.exp(-Math.max(0, barElapsed - EXPECTED_MS) / 6000));
     return Math.round(linear + tail);
-  }, [elapsed]);
+  }, [barElapsed]);
 
   // Les illustrations : les peintes si elles existent, sinon les scènes dessinées.
   const count = PAINTED.length || SCENES.length;
@@ -115,7 +124,7 @@ export function Waiting({ progress, startedAt }: { progress: ProgressEvent[]; st
           )}
           {current && (
             <p className="load-line is-current" key={current.uid}>
-              {textOf(current)}
+              {lineText(current)}
             </p>
           )}
         </div>
@@ -125,7 +134,7 @@ export function Waiting({ progress, startedAt }: { progress: ProgressEvent[]; st
         </p>
         {/* Une seule annonce à la fois pour les lecteurs d'écran. */}
         <p className="sr-only" aria-live="polite">
-          {current ? textOf(current) : ""}
+          {current ? lineText(current) : ""}
         </p>
       </div>
     </section>

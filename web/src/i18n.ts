@@ -76,6 +76,8 @@ const fr = {
   waiting: {
     title: "Chargement du dossier",
     elapsed: "écoulé",
+    /** Fiche en file d'attente : n fiches passent avant (rang dans la file). */
+    queue: (n: number) => (n === 1 ? "1 suspect avant toi au commissariat" : `${n} suspects avant toi au commissariat`),
     progress: {
       lazy_commits: (n?: number) => `Lecture de tes ${n ?? "nombreux"} commits « wip »…`,
       buzzwords: (n?: number) => `Comptage des buzzwords… ${n ?? 0} pour l'instant`,
@@ -374,6 +376,7 @@ const en: Dict = {
   waiting: {
     title: "Loading your file",
     elapsed: "elapsed",
+    queue: (n) => (n === 1 ? "1 suspect ahead of you at the station" : `${n} suspects ahead of you at the station`),
     progress: {
       lazy_commits: (n) => `Reading your ${n ?? "many"} “wip” commits…`,
       buzzwords: (n) => `Counting buzzwords… ${n ?? 0} so far`,

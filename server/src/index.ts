@@ -22,6 +22,8 @@ const port = Number(process.env.PORT ?? 8787);
 // GITHUB_TOKENS (plusieurs jetons, séparés par des virgules) ou, à défaut, GITHUB_TOKEN.
 const githubTokens = tokensFromEnv(process.env);
 const githubToken = githubTokens[0] ?? "";
+// Fiches traitées en même temps ; les suivantes attendent leur tour (le VPS est partagé).
+const maxConcurrentCards = Math.floor(Number(process.env.MAX_CONCURRENT_CARDS)) || undefined;
 const baseUrl = (process.env.BASE_URL ?? (prod ? "https://skills.azerit.tech" : "http://localhost:5180")).replace(/\/+$/, "");
 const dbPath = resolve(process.env.DB_PATH ?? join(projectRoot, "var/cards.db"));
 const ogDir = join(dirname(dbPath), "og");
@@ -70,6 +72,7 @@ const { app, pipeline } = createApp({
   deps: realDeps,
   githubToken,
   githubPool: new TokenPool(githubTokens),
+  maxConcurrentCards,
   baseUrl,
   ogDir,
   leadsEndpoint: process.env.LEADS_ENDPOINT || undefined,

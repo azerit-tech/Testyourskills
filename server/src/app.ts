@@ -31,6 +31,10 @@ export interface AppOptions {
   ogDir: string;
   leadsEndpoint?: string;
   timeoutMs?: number;
+  /** File d'attente des fiches (voir PipelineOptions). */
+  maxConcurrentCards?: number;
+  queueTimeoutMs?: number;
+  busyAfterMs?: number;
   cardsPerDay?: number;
   /** Sel du hash des IP pour les compteurs de limite. */
   ipSalt?: string;
@@ -146,6 +150,9 @@ export function createApp(opts: AppOptions) {
     githubToken: opts.githubToken,
     githubPool: opts.githubPool,
     timeoutMs: opts.timeoutMs,
+    maxConcurrent: opts.maxConcurrentCards,
+    queueTimeoutMs: opts.queueTimeoutMs,
+    busyAfterMs: opts.busyAfterMs,
   });
   const limiter = new RateLimiter(store, opts.ipSalt ?? "testyourskills");
   const cardsPerDay = opts.cardsPerDay ?? CARDS_PER_DAY;
@@ -179,7 +186,8 @@ export function createApp(opts: AppOptions) {
     if (!login) return c.json({ card: null });
     const row = store.findLatestGithub(login);
     const stale = !row || Date.now() - row.createdAt > SHOWCASE_MS;
-    if (stale && !pipeline.inflightFor(login)) pipeline.start({ lang: "fr", login });
+    // Jetons GitHub épuisés : la vitrine attendra, elle ne prend pas la place d'une vraie fiche.
+    if (stale && !pipeline.inflightFor(login) && !pipeline.githubBusy()) pipeline.start({ lang: "fr", login });
     if (!row) return c.json({ card: null });
     const card = stripToken(row.data as CardData);
     return c.json({ card: opts.showcasePhoto ? { ...card, avatarUrl: opts.showcasePhoto, photoSource: "linkedin" } : card });
@@ -249,6 +257,12 @@ export function createApp(opts: AppOptions) {
       }
 
       // 20 cartes par IP et par jour : seules les cartes réellement calculées comptent.
+      // GitHub nous a coupé l'accès pour longtemps : on le dit tout de suite, sans entamer le quota de l'IP.
+      if (login) {
+        const busy = pipeline.githubBusy();
+        if (busy) return c.json(errorBody(busy.code, busy.msg), 503);
+      }
+
       if (!limiter.take("card", clientIp(c), cardsPerDay)) {
         return c.json(errorBody("rate_limited", MESSAGES.rate_limited), 429);
       }

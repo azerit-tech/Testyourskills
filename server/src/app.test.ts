@@ -14,6 +14,7 @@ import { noteCreditsExhausted, recordUsage, resetBudgetForTests, type AiStatus }
 import { ChatHttpError } from "./ai/client";
 import { readCode } from "./ai/readCode";
 import { fakeClient } from "./ai/testing";
+import { TokenPool } from "./github/tokens";
 
 class EngineError extends Error {
   constructor(readonly code: string) {
@@ -801,5 +802,137 @@ describe("divers", () => {
     expect(await spa.text()).toContain("SPA");
     expect((await ctx.app.request("/api/nope")).status).toBe(404);
     expect((await ctx.app.request("/og/nope")).status).toBe(404);
+  });
+});
+
+describe("file d'attente (MAX_CONCURRENT_CARDS)", () => {
+  /** collectGithub qui attend qu'on libère chaque pseudo, et note l'ordre de passage. */
+  function gated() {
+    const gates = new Map<string, () => void>();
+    const order: string[] = [];
+    const deps: Partial<Deps> = {
+      async collectGithub(login) {
+        order.push(login);
+        await new Promise<void>((r) => gates.set(login, r));
+        return { login };
+      },
+    };
+    const release = async (login: string) => {
+      for (let i = 0; i < 50 && !gates.has(login); i++) await new Promise((r) => setTimeout(r, 2));
+      gates.get(login)!();
+    };
+    return { deps, order, release };
+  }
+
+  it("traite au plus N fiches à la fois, les suivantes attendent dans l'ordre avec leur rang", async () => {
+    const g = gated();
+    const ctx = setup(g.deps, { maxConcurrentCards: 2 });
+    const ids: string[] = [];
+    for (const login of ["a1", "a2", "a3", "a4"]) ids.push((await postLogin(ctx, login)).json.id);
+    expect(ctx.pipeline.load()).toEqual({ running: 2, queued: 2 });
+
+    const s = await Promise.all(ids.map((id) => getState(ctx, id)));
+    expect(s[0]!.state).toMatchObject({ state: "pending" });
+    expect(s[0]!.state).not.toHaveProperty("queue");
+    expect(s[2]!.state).toEqual({ state: "pending", progress: [], queue: 1 });
+    expect(s[3]!.state).toEqual({ state: "pending", progress: [], queue: 2 });
+
+    await g.release("a1");
+    await ctx.pipeline.wait(ids[0]!);
+    // a3 passe en traitement, a4 avance d'un rang.
+    expect((await getState(ctx, ids[2]!)).state).not.toHaveProperty("queue");
+    expect((await getState(ctx, ids[3]!)).state).toMatchObject({ queue: 1 });
+    expect(ctx.pipeline.load()).toEqual({ running: 2, queued: 1 });
+
+    for (const login of ["a2", "a3", "a4"]) await g.release(login);
+    await ctx.pipeline.drain();
+    expect(g.order).toEqual(["a1", "a2", "a3", "a4"]);
+    for (const id of ids) expect((await getState(ctx, id)).state).toMatchObject({ state: "done" });
+  });
+
+  it("le timeout de 30 s ne compte qu'à partir du traitement, pas de l'attente", async () => {
+    const g = gated();
+    const ctx = setup(g.deps, { maxConcurrentCards: 1, timeoutMs: 80 });
+    const a = await postLogin(ctx, "a1");
+    const b = await postLogin(ctx, "a2");
+    await new Promise((r) => setTimeout(r, 50));
+    await g.release("a1"); // a1 finit vers 50 ms ; a2 a attendu autant en file
+    await ctx.pipeline.wait(a.json.id);
+    await new Promise((r) => setTimeout(r, 40)); // a2 tourne depuis 40 ms, sous les 80 ms
+    await g.release("a2");
+    await ctx.pipeline.wait(b.json.id);
+    expect((await getState(ctx, b.json.id)).state).toMatchObject({ state: "done" });
+  });
+
+  it("une fiche restée trop longtemps en file échoue en timeout au lieu de pendre", async () => {
+    const g = gated();
+    const ctx = setup(g.deps, { maxConcurrentCards: 1, queueTimeoutMs: 40 });
+    const a = await postLogin(ctx, "a1");
+    const b = await postLogin(ctx, "a2");
+    await ctx.pipeline.wait(b.json.id);
+    const s = await getState(ctx, b.json.id);
+    expect(s.state).toMatchObject({ state: "error", code: "timeout" });
+    expect((s.state as { message: Fact }).message.fr).toMatch(/3 minutes/);
+    expect(ctx.pipeline.load()).toEqual({ running: 1, queued: 0 });
+    await g.release("a1");
+    await ctx.pipeline.wait(a.json.id);
+    expect(g.order).toEqual(["a1"]);
+  });
+
+  it("jetons épuisés pour longtemps : busy tout de suite, sans entamer le quota de l'IP", async () => {
+    const pool = new TokenPool(["t1", "t2"]);
+    const reset = String(Math.floor(Date.now() / 1000) + 25 * 60);
+    for (const slot of [0, 1]) {
+      pool.record(
+        { slot, token: `t${slot + 1}`, resource: "core" },
+        new Headers({ "x-ratelimit-resource": "core", "x-ratelimit-remaining": "3", "x-ratelimit-reset": reset }),
+      );
+    }
+    const ctx = setup({}, { githubPool: pool, cardsPerDay: 1 });
+    const { res, json } = await postLogin(ctx, "leamd");
+    expect(res.status).toBe(503);
+    expect(json).toMatchObject({ state: "error", code: "busy" });
+    expect(json.message!.fr).toMatch(/commissariat/);
+    expect(json.message!.fr).toMatch(/2[56] minutes/);
+    expect(json.message!.en).toMatch(/station/);
+    expect(ctx.calls.collect).toBe(0);
+    // Le CV seul ne dépend pas de GitHub : il passe, et c'est lui qui prend le quota.
+    const cv = await postCv(ctx, PDF);
+    expect(cv.res.status).toBe(202);
+    await ctx.pipeline.wait(cv.json.id);
+    expect((await getState(ctx, cv.json.id)).state).toMatchObject({ state: "done" });
+  });
+
+  it("jetons épuisés pour peu de temps : la fiche reste en file, puis passe à la remise à zéro", async () => {
+    const pool = new TokenPool(["t1"]);
+    pool.exhaust(pool.acquire("core").lease!, Date.now() + 150);
+    const ctx = setup({}, { githubPool: pool });
+    const { res, json } = await postLogin(ctx, "leamd");
+    expect(res.status).toBe(202);
+    expect((await getState(ctx, json.id)).state).toEqual({ state: "pending", progress: [], queue: 1 });
+    // Une fiche CV seule arrivée après passe devant : elle n'a pas besoin de GitHub.
+    const cv = await postCv(ctx, PDF);
+    await ctx.pipeline.wait(cv.json.id);
+    expect((await getState(ctx, cv.json.id)).state).toMatchObject({ state: "done" });
+    expect(ctx.calls.collect).toBe(0);
+    await ctx.pipeline.wait(json.id);
+    expect((await getState(ctx, json.id)).state).toMatchObject({ state: "done" });
+    expect(ctx.calls.collect).toBe(1);
+  });
+
+  it("jetons épuisés pendant l'attente : les fiches en file passent en busy", async () => {
+    const g = gated();
+    const pool = new TokenPool(["t1"]);
+    const ctx = setup(g.deps, { githubPool: pool, maxConcurrentCards: 1 });
+    const a = await postLogin(ctx, "a1");
+    const b = await postLogin(ctx, "a2");
+    expect((await getState(ctx, b.json.id)).state).toMatchObject({ queue: 1 });
+    // La première fiche vide le compteur jusqu'à dans 40 minutes.
+    pool.exhaust(pool.acquire("core").lease!, Date.now() + 40 * 60_000);
+    await g.release("a1");
+    await ctx.pipeline.wait(a.json.id);
+    await ctx.pipeline.wait(b.json.id);
+    expect((await getState(ctx, b.json.id)).state).toMatchObject({ state: "error", code: "busy" });
+    expect(g.order).toEqual(["a1"]);
   });
 });
