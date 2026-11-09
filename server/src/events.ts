@@ -1,16 +1,18 @@
-// Mesure (SPEC §9, §13, §16) : quatre événements enregistrés dans la table
-// `events`, pas d'outil d'analytics. L'email laissé sur une carte est relayé à
-// LEADS_ENDPOINT au même format que la page Try de la landing.
+// Mesure (SPEC §9, §13, §16, §18.0) : cinq événements enregistrés dans la table
+// `events`, pas d'outil d'analytics. shared_visit marque l'arrivée par un lien
+// partagé (?r=), une fois par session, avec la fiche d'origine. L'email laissé
+// sur une carte est relayé à LEADS_ENDPOINT au même format que la page Try de
+// la landing.
 
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
-export const EVENT_NAMES = ["card_generated", "card_shared", "card_email", "cta_azerit_clicked"] as const;
+export const EVENT_NAMES = ["card_generated", "card_shared", "card_email", "cta_azerit_clicked", "shared_visit"] as const;
 export type EventName = (typeof EVENT_NAMES)[number];
 
 /** Événements que le front peut envoyer. card_generated est posé par le serveur seul. */
 export const clientEventSchema = z.object({
-  event: z.enum(["card_shared", "card_email", "cta_azerit_clicked"]),
+  event: z.enum(["card_shared", "card_email", "cta_azerit_clicked", "shared_visit"]),
   cardId: z.string().regex(/^[A-Za-z0-9]{6,32}$/).optional(),
   meta: z
     .record(z.string().max(40), z.union([z.string().max(200), z.number(), z.boolean(), z.null()]))

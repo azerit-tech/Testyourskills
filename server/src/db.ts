@@ -25,6 +25,8 @@ export interface CardRow {
   email: string | null;
   deleteToken: string;
   expiresAt: number | null;
+  /** Fiche par le lien partagé de laquelle on est arrivé (?r=), sinon null (§18.0). */
+  refCardId: string | null;
 }
 
 export interface NewCardRow {
@@ -37,6 +39,7 @@ export interface NewCardRow {
   data: CardData | ComparisonData;
   facts?: unknown;
   deleteToken: string;
+  refCardId?: string | null;
 }
 
 interface RawRow {
@@ -51,6 +54,7 @@ interface RawRow {
   email: string | null;
   delete_token: string;
   expires_at: number | null;
+  ref_card_id: string | null;
 }
 
 const SCHEMA = `
@@ -65,7 +69,8 @@ CREATE TABLE IF NOT EXISTS cards (
   facts_json   TEXT,              -- faits GitHub publics (réutilisés par le cache 24 h)
   email        TEXT,
   delete_token TEXT NOT NULL,
-  expires_at   INTEGER            -- NULL = conservée (email laissé)
+  expires_at   INTEGER,           -- NULL = conservée (email laissé)
+  ref_card_id  TEXT               -- fiche d'origine du lien partagé (?r=), sinon NULL ; voir migrate()
 );
 CREATE INDEX IF NOT EXISTS cards_login ON cards(login, created_at) WHERE parent_id IS NULL;
 CREATE INDEX IF NOT EXISTS cards_parent ON cards(parent_id);
@@ -101,6 +106,7 @@ function toRow(r: RawRow): CardRow {
     email: r.email,
     deleteToken: r.delete_token,
     expiresAt: r.expires_at,
+    refCardId: r.ref_card_id ?? null,
   };
 }
 
@@ -113,8 +119,23 @@ export function stripToken<T extends CardData | ComparisonData>(data: T): T {
   return rest as T;
 }
 
+/**
+ * Migrations des bases déjà en production : CREATE TABLE IF NOT EXISTS ne touche
+ * pas une table existante, on ajoute donc ici les colonnes qui lui manquent.
+ * Idempotent, sans perte de données.
+ */
+export function migrate(db: Database.Database) {
+  const cols = new Set((db.prepare(`PRAGMA table_info(cards)`).all() as { name: string }[]).map((c) => c.name));
+  if (!cols.has("ref_card_id")) db.exec(`ALTER TABLE cards ADD COLUMN ref_card_id TEXT`);
+}
+
 export class Store {
   readonly db: Database.Database;
+  /**
+   * Origine (?r=) des fiches en cours de calcul, posée par l'API au lancement et
+   * écrite dans la ligne à son insertion : le pipeline n'a pas à la connaître.
+   */
+  private pendingRefs = new Map<string, string>();
 
   constructor(path: string) {
     if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
@@ -122,17 +143,28 @@ export class Store {
     this.db.pragma("journal_mode = WAL");
     this.db.pragma("busy_timeout = 5000");
     this.db.exec(SCHEMA);
+    migrate(this.db);
   }
 
   close() {
     this.db.close();
   }
 
+  /** Retient l'origine d'une fiche lancée, écrite quand sa ligne sera insérée. */
+  expectRef(id: string, refCardId: string) {
+    this.pendingRefs.set(id, refCardId);
+  }
+
+  /** Oublie l'origine d'une fiche dont le calcul est fini (insérée ou en erreur). */
+  forgetRef(id: string) {
+    this.pendingRefs.delete(id);
+  }
+
   /** Insère une carte, ou une comparaison et ses deux cartes, en une transaction. */
   insertCards(rows: NewCardRow[]) {
     const stmt = this.db.prepare(
-      `INSERT INTO cards (id, parent_id, created_at, source, login, kind, json, facts_json, email, delete_token, expires_at)
-       VALUES (@id, @parent_id, @created_at, @source, @login, @kind, @json, @facts_json, NULL, @delete_token, @expires_at)`,
+      `INSERT INTO cards (id, parent_id, created_at, source, login, kind, json, facts_json, email, delete_token, expires_at, ref_card_id)
+       VALUES (@id, @parent_id, @created_at, @source, @login, @kind, @json, @facts_json, NULL, @delete_token, @expires_at, @ref_card_id)`,
     );
     const tx = this.db.transaction((list: NewCardRow[]) => {
       for (const r of list) {
@@ -147,10 +179,13 @@ export class Store {
           facts_json: r.facts === undefined || r.facts === null ? null : JSON.stringify(r.facts),
           delete_token: r.deleteToken,
           expires_at: r.createdAt + RETENTION_MS,
+          // L'origine va sur la fiche racine seule, pas sur les cartes d'une comparaison.
+          ref_card_id: r.refCardId ?? (r.parentId ? null : (this.pendingRefs.get(r.id) ?? null)),
         });
       }
     });
     tx(rows);
+    for (const r of rows) this.pendingRefs.delete(r.id);
   }
 
   getCard(id: string): CardRow | null {

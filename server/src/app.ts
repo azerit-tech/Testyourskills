@@ -79,6 +79,15 @@ const emailSchema = z.object({
   email: z.email().max(254),
 });
 
+/**
+ * Origine d'une fiche (?r= du lien partagé, §18.0) : l'id d'une fiche existante,
+ * sinon rien. Jamais d'erreur pour ça, une ref douteuse est ignorée en silence.
+ */
+function parseRef(raw: unknown, store: Store): string | undefined {
+  if (typeof raw !== "string" || !ID_RE.test(raw)) return undefined;
+  return store.getCard(raw) ? raw : undefined;
+}
+
 const PDF_MAGIC = [0x25, 0x50, 0x44, 0x46, 0x2d]; // %PDF-
 
 function isPdf(buf: Uint8Array): boolean {
@@ -160,7 +169,7 @@ export function createApp(opts: AppOptions) {
     return c.json({ card: opts.showcasePhoto ? { ...card, avatarUrl: opts.showcasePhoto, photoSource: "linkedin" } : card });
   });
 
-  // POST /api/card : JSON { login, lang } ou multipart (cv, login?, lang?).
+  // POST /api/card : JSON { login, lang, ref? } ou multipart (cv, login?, lang?, ref?).
   app.post(
     "/api/card",
     bodyLimit({
@@ -172,10 +181,12 @@ export function createApp(opts: AppOptions) {
       let login: string | undefined;
       let lang: Lang = "fr";
       let pdf: Uint8Array | undefined;
+      let ref: string | undefined;
 
       if (ct.startsWith("multipart/form-data")) {
         const body = await c.req.parseBody();
         const file = body["cv"];
+        ref = parseRef(body["ref"], store);
         if (typeof body["lang"] === "string") lang = langSchema.parse(body["lang"]);
         const rawLogin = typeof body["login"] === "string" ? body["login"].trim() : "";
         if (rawLogin) {
@@ -201,6 +212,7 @@ export function createApp(opts: AppOptions) {
         }
         login = parsed.data.login;
         lang = parsed.data.lang ?? "fr";
+        ref = parseRef((raw as { ref?: unknown }).ref, store);
       }
 
       if (!login && !pdf) return c.json(errorBody("internal", MESSAGES.bad_request), 400);
@@ -219,6 +231,12 @@ export function createApp(opts: AppOptions) {
       }
 
       const { id, deleteToken } = pipeline.start({ lang, login, pdf });
+      // L'insertion arrive toujours après ce retour (le pipeline attend au moins
+      // une fois) : la ref est écrite dans la ligne, puis oubliée en fin de job.
+      if (ref) {
+        store.expectRef(id, ref);
+        void pipeline.wait(id).finally(() => store.forgetRef(id));
+      }
       return c.json({ id, deleteToken, cached: false }, 202);
     },
   );
