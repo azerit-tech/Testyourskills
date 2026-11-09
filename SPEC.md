@@ -917,4 +917,34 @@ Ce qui est retenu :
 - **La gemme Azerit est en facettes plates.**
 - **Page partagée :** « Avis de recherche : @X », et en phrase « @X est dans le viseur ».
 
-**La spéciale « Les 5 plus recherchés » devient « Top 5 de la semaine »** (EN « This week's top 5 »). Tous les autres textes qui s'accordent avec la personne sont réécrits en tournure épicène. La liste est relue par Jacques avant d'être appliquée.
+**La spéciale « Les 5 plus recherchés » devient « Top 5 de la semaine »** (EN « This week's top 5 »). Tous les autres textes qui s'accordent avec la personne sont réécrits en tournure épicène. Claude tranche la liste et l'applique (consigne de Jacques : décider, pas demander).
+
+### 18.19 Grille de relecture, à chaque phase
+
+Consigne de Jacques du 9 novembre 2026 :
+- les choix de produit et de design se tranchent sans lui demander, et ils sont reportés ici ;
+- tout texte ou visuel qui n'aide pas à comprendre quelque chose est retiré.
+
+Après chaque fusion, on vérifie la grille suivante. On corrige ce qui manque, puis on vérifie de nouveau.
+
+1. **Ça marche.**
+   - Pseudo → fiche → partage, sans erreur, en téléphone à 390 px puis en ordinateur.
+   - Tests et typecheck passent.
+   - Le site en ligne répond.
+2. **On comprend en 3 secondes.**
+   - Chaque écran dit une chose.
+   - Chaque texte ou visuel sert à comprendre ; le reste part.
+3. **Ça donne envie de partager.**
+   - La fiche se lit en miniature.
+   - Le texte de partage et l'image OG parlent d'eux-mêmes.
+   - Le lien ramène vers « Fais la tienne ».
+4. **Le style tient** (§18.18).
+   - Mat, un seul dégradé par écran.
+   - Aucune lueur, sauf le contour de ★★★★★★.
+   - Zones à toucher d'au moins 44 px.
+5. **Les règles tiennent.**
+   - Textes épicènes.
+   - Aucune marque du jeu.
+   - L'IA ne note jamais.
+   - Aucun secret affiché.
+   - Rien de lourd sur le Mac.
