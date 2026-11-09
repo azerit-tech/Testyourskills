@@ -1,6 +1,6 @@
 // Tests de l'API et du pipeline avec des dépendances fausses, base en mémoire.
 
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -383,6 +383,109 @@ describe("carte vitrine de l'accueil (§6.1)", () => {
     await ctx.pipeline.drain();
     const json = (await (await ctx.app.request("/api/showcase")).json()) as { card: CardData | null };
     expect(json.card).toMatchObject({ avatarUrl: "/jmougeot-linkedin.jpg", photoSource: "linkedin" });
+  });
+});
+
+describe("image d'aperçu de l'accueil (/og/home.png)", () => {
+  const INDEX = readFileSync(join(__dirname, "../../web/index.html"), "utf8");
+  const count = (html: string, re: RegExp) => (html.match(re) ?? []).length;
+
+  it("le index.html du front porte l'image en adresse absolue, avec ses dimensions", () => {
+    expect(INDEX).toContain(`<meta property="og:image" content="https://skills.azerit.tech/og/home.png" />`);
+    expect(INDEX).toContain(`<meta property="og:image:width" content="1200" />`);
+    expect(INDEX).toContain(`<meta property="og:image:height" content="630" />`);
+    expect(INDEX).toContain(`<meta name="twitter:image" content="https://skills.azerit.tech/og/home.png" />`);
+  });
+
+  it("l'accueil et le repli SPA la donnent à l'adresse du serveur, sans doublon", async () => {
+    const root = mkdtempSync(join(tmpdir(), "tys-web-"));
+    writeFileSync(join(root, "index.html"), INDEX);
+    const ctx = setup({}, { staticRoot: root, indexHtml: async () => INDEX });
+    for (const path of ["/", "/privacy"]) {
+      const res = await ctx.app.request(path);
+      expect(res.status).toBe(200);
+      const html = await res.text();
+      expect(html).toContain(`<meta property="og:image" content="https://skills.test/og/home.png">`);
+      expect(html).toContain(`<meta property="og:image:width" content="1200">`);
+      expect(html).toContain(`<meta property="og:image:height" content="630">`);
+      expect(html).toContain(`<meta name="twitter:image" content="https://skills.test/og/home.png">`);
+      expect(count(html, /property="og:image"/g)).toBe(1);
+      expect(count(html, /name="twitter:image"/g)).toBe(1);
+      expect(html).not.toContain("skills.azerit.tech/og/home.png");
+      // Le reste du index.html ne bouge pas.
+      expect(html).toContain(`<meta name="twitter:card" content="summary_large_image" />`);
+      expect(html).toContain(`<div id="root">`);
+    }
+  });
+
+  it("la page d'une fiche garde sa propre image", async () => {
+    const ctx = setup({}, { indexHtml: async () => INDEX });
+    const { id } = await generate(ctx);
+    const html = await (await ctx.app.request(`/c/${id}`)).text();
+    expect(html).toContain(`<meta property="og:image" content="https://skills.test/og/${id}.png">`);
+    expect(html).not.toContain("home.png");
+    expect(count(html, /property="og:image"/g)).toBe(1);
+  });
+
+  it("sans vitrine : la fiche d'exemple, rendue une seule fois, en PNG mis en cache", async () => {
+    const inputs: { format: string; login?: string; avatarUrl?: string; lang: string }[] = [];
+    const root = mkdtempSync(join(tmpdir(), "tys-web-"));
+    writeFileSync(join(root, "jmougeot-linkedin.jpg"), new Uint8Array([0xff, 0xd8, 0xff, 1]));
+    const ctx = setup(
+      {
+        async renderImage(input) {
+          inputs.push({ format: input.format, login: input.card?.login, avatarUrl: input.card?.avatarUrl, lang: input.lang });
+          return new Uint8Array([0x89, 0x50, 0x4e, 0x47, 9]);
+        },
+      },
+      { staticRoot: root },
+    );
+    const res = await ctx.app.request("/og/home.png");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/png");
+    expect(res.headers.get("cache-control")).toBe("public, max-age=3600");
+    expect(Array.from(new Uint8Array(await res.arrayBuffer()))).toEqual([0x89, 0x50, 0x4e, 0x47, 9]);
+    expect((await ctx.app.request("/og/home.png")).status).toBe(200);
+    expect(inputs).toHaveLength(1);
+    expect(inputs[0]).toMatchObject({ format: "home", login: "jmougeot", lang: "fr" });
+    // La photo servie par le front est lue sur disque : le rendu n'appelle pas le réseau.
+    expect(inputs[0]!.avatarUrl).toBe(`data:image/jpeg;base64,${Buffer.from([0xff, 0xd8, 0xff, 1]).toString("base64")}`);
+  });
+
+  it("avec vitrine : sa fiche, sans jeton, et l'image suit la fiche", async () => {
+    const cards: CardData[] = [];
+    const ctx = setup(
+      {
+        async renderImage(input) {
+          if (input.format === "home") cards.push(input.card!);
+          return new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+        },
+      },
+      { showcaseLogin: "leamd" },
+    );
+    await ctx.app.request("/og/home.png");
+    expect(cards.map((c) => c.login)).toEqual(["jmougeot"]);
+    const { id } = await generate(ctx, "leamd");
+    await ctx.app.request("/og/home.png");
+    await ctx.app.request("/og/home.png");
+    expect(cards.map((c) => c.id)).toEqual(["jmougeot", id]);
+    expect(cards[1]!.deleteToken).toBeUndefined();
+    // Fiche supprimée : retour à la fiche d'exemple.
+    ctx.store.deleteGroup(id);
+    await ctx.app.request("/og/home.png");
+    expect(cards.map((c) => c.id)).toEqual(["jmougeot", id, "jmougeot"]);
+  });
+
+  it("un rendu raté ne reste pas en mémoire", async () => {
+    let n = 0;
+    const ctx = setup({
+      async renderImage() {
+        if (++n === 1) throw new Error("resvg");
+        return new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+      },
+    });
+    expect((await ctx.app.request("/og/home.png")).status).toBe(500);
+    expect((await ctx.app.request("/og/home.png")).status).toBe(200);
   });
 });
 

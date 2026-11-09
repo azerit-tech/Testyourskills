@@ -1,5 +1,6 @@
 // Compositions des images partagées : carte seule, aperçu de lien 1200 × 630,
-// portrait 1080 × 1350, et leurs variantes « comparaison ». Tout est en SVG,
+// portrait 1080 × 1350, leurs variantes « comparaison », et l'aperçu de lien de
+// l'accueil (la promesse et la fiche de la vitrine). Tout est en SVG,
 // la carte y est imbriquée telle quelle (même composant qu'à l'écran).
 // Style mat (SPEC §18.18, maquette web/gta-image.html) : une illustration en
 // aplats superposés derrière la fiche, et AUCUN dégradé en plus de celui de
@@ -191,15 +192,12 @@ export function OgImage({ card, lang, avatars }: { card: CardData; lang: Lang; a
   const cw = (ch * CARD_W) / CARD_H;
   const cx = 88;
   const cy = 32;
-  const s = t(lang);
   const tx = 560;
   const maxW = W - tx - 64;
   const name = fit(upper(card.name, lang), { font: "display-700", size: 84, minSize: 50, maxWidth: maxW, letterSpacing: 0.5 });
   const quote = mainStatus(card, lang);
   const quoted = quote ? (lang === "fr" ? `« ${quote} »` : `“${quote}”`) : "";
   const qLines = quote ? wrap(quoted, "sans-600", 36, maxW, 2) : [];
-  const cta = lang === "fr" ? `${s.cta}\u00a0:` : `${s.cta}:`;
-  const ctaW = fit(cta, { font: "sans-500", size: 26, minSize: 26, maxWidth: 4000 }).width;
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
       <Scene w={W} h={H} horizon={556} sun={{ x: cx + cw / 2, y: 470, r: 300 }} maxH={120} palms={[{ x: W - 170, y: 300, k: 1.6, flip: true }]} />
@@ -213,12 +211,63 @@ export function OgImage({ card, lang, avatars }: { card: CardData; lang: Lang; a
           {l}
         </text>
       ))}
-      <text x={tx} y={604} {...fontAttrs("sans-500")} fontSize={26} fill={PALETTE.lilac} fillOpacity={0.8}>
+      <CtaLine x={tx} y={604} lang={lang} />
+    </svg>
+  );
+}
+
+/** « Fais la tienne : skills.azerit.tech », au pied des aperçus de lien. */
+function CtaLine({ x, y, lang }: { x: number; y: number; lang: Lang }) {
+  const s = t(lang);
+  const cta = lang === "fr" ? `${s.cta}\u00a0:` : `${s.cta}:`;
+  const ctaW = fit(cta, { font: "sans-500", size: 26, minSize: 26, maxWidth: 4000 }).width;
+  return (
+    <>
+      <text x={x} y={y} {...fontAttrs("sans-500")} fontSize={26} fill={PALETTE.lilac} fillOpacity={0.8}>
         {cta}
       </text>
-      <text x={tx + ctaW + 10} y={604} {...fontAttrs("sans-600")} fontSize={26} fill={PALETTE.cream}>
+      <text x={x + ctaW + 10} y={y} {...fontAttrs("sans-600")} fontSize={26} fill={PALETTE.cream}>
         {ctaHost()}
       </text>
+    </>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Aperçu de lien de l'accueil 1200 × 630                               */
+/* ------------------------------------------------------------------ */
+
+/** La promesse, une ligne par souffle ; la dernière, ce qu'on remplace, en rose. */
+const PROMISE: Record<Lang, string[]> = {
+  fr: ["Ton GitHub", "remplace", "ton CV."],
+  en: ["Your GitHub", "replaces", "your CV."],
+};
+
+/** Même mise en page que l'aperçu d'une fiche : la fiche de la vitrine à gauche,
+ *  et à droite la promesse en grand à la place du nom. */
+export function HomeOg({ card, lang, avatars }: { card: CardData; lang: Lang; avatars: Avatars }) {
+  const W = 1200;
+  const H = 630;
+  const ch = 566;
+  const cw = (ch * CARD_W) / CARD_H;
+  const cx = 88;
+  const cy = 32;
+  const tx = 560;
+  const maxW = W - tx - 64;
+  const lines = PROMISE[lang].map((l) => upper(l, lang));
+  // Une seule taille pour les trois lignes : celle que la plus longue permet.
+  const size = Math.min(...lines.map((l) => fit(l, { font: "display-700", size: 112, minSize: 60, maxWidth: maxW, letterSpacing: 0.5 }).size));
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
+      <Scene w={W} h={H} horizon={556} sun={{ x: cx + cw / 2, y: 470, r: 300 }} maxH={120} palms={[{ x: W - 170, y: 300, k: 1.6, flip: true }]} />
+      <Placed card={card} lang={lang} avatars={avatars} id="home" x={cx} y={cy} w={cw} />
+      <Poster x={tx} y={118} size={22} lang={lang} anchor="start" />
+      {lines.map((l, i) => (
+        <text key={i} x={tx - 2} y={136 + (i + 1) * size * 0.94} {...fontAttrs("display-700")} fontSize={size} letterSpacing={0.5} fill={i === lines.length - 1 ? PALETTE.blush : PALETTE.cream}>
+          {l}
+        </text>
+      ))}
+      <CtaLine x={tx} y={604} lang={lang} />
     </svg>
   );
 }

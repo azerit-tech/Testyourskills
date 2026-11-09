@@ -8,10 +8,11 @@ import { timingSafeEqual } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { z } from "zod";
+import { FIXTURES } from "../../shared/fixtures";
 import type { CardData, ComparisonData, ErrorCode, Fact, JobState, Lang } from "../../shared/types";
 import { stripToken, type CardRow, type Store } from "./db";
 import { buildLead, clientEventSchema, sendLead } from "./events";
-import { genericMeta, injectMeta, messagePage, metaFor, standalonePage } from "./html";
+import { genericMeta, HOME_IMAGE_PATH, injectHomeImage, injectMeta, messagePage, metaFor, standalonePage } from "./html";
 import { ID_RE, MAX_PDF_BYTES, MESSAGES, Pipeline, type Deps, type RenderInput } from "./pipeline";
 import { CARDS_PER_DAY, RateLimiter, clientIp } from "./ratelimit";
 import { inlineAvatar, mountLinkedin, removeAvatars, type LinkedinConfig } from "./linkedin";
@@ -192,6 +193,8 @@ export function createApp(opts: AppOptions) {
   const cardsPerDay = opts.cardsPerDay ?? CARDS_PER_DAY;
   const fetchImpl = opts.fetchImpl ?? fetch;
   const rendering = new Map<string, Promise<Uint8Array>>();
+  /** Image de l'accueil déjà rendue : une par fiche de vitrine et par processus (un déploiement la refait). */
+  let homeImage: { key: string; png: Promise<Uint8Array> } | null = null;
   const avatarDir = opts.avatarDir ?? defaultAvatarDir(ogDir);
   const aiStatus = opts.aiStatus ?? budgetAiStatus;
 
@@ -254,9 +257,47 @@ export function createApp(opts: AppOptions) {
     // Jetons GitHub épuisés : la vitrine attendra, elle ne prend pas la place d'une vraie fiche.
     if (stale && !pipeline.inflightFor(login) && !pipeline.githubBusy()) pipeline.start({ lang: "fr", login, noLinkedin: true });
     if (!row) return c.json({ card: null });
-    const card = stripToken(row.data as CardData);
-    return c.json({ card: opts.showcasePhoto ? { ...card, avatarUrl: opts.showcasePhoto, photoSource: "linkedin" } : card });
+    return c.json({ card: showcaseCard(row.data as CardData) });
   });
+
+  /** La fiche de la vitrine telle que l'accueil la montre : sans jeton, avec la photo de la vitrine. */
+  const showcaseCard = (data: CardData): CardData => {
+    const card = stripToken(data);
+    return opts.showcasePhoto ? { ...card, avatarUrl: opts.showcasePhoto, photoSource: "linkedin" } : card;
+  };
+
+  /**
+   * Avatar servi par le front (« /photo.jpg », vitrine et fiche d'exemple) : lu
+   * sur disque en data URI pour le rendu, sinon son adresse absolue.
+   */
+  const frontAvatar = async (card: CardData): Promise<CardData> => {
+    const p = card.avatarUrl;
+    if (!p || !/^\/[^/]/.test(p)) return card;
+    const type = /\.png$/i.test(p) ? "image/png" : /\.jpe?g$/i.test(p) ? "image/jpeg" : null;
+    const bytes = type && opts.staticRoot ? await readFile(join(opts.staticRoot, p)).catch(() => null) : null;
+    return { ...card, avatarUrl: bytes ? `data:${type};base64,${bytes.toString("base64")}` : `${baseUrl}${p}` };
+  };
+
+  // GET /og/home.png : l'aperçu de lien de l'accueil (1200 × 630), la promesse
+  // et la fiche de la vitrine, ou la fiche d'exemple tant qu'elle n'existe pas.
+  // Adresse stable pour og:image ; l'image suit la vitrine, d'où le cache d'une heure.
+  const serveHomeImage = async (c: Context) => {
+    const login = opts.showcaseLogin;
+    const row = login && !store.isHidden(login) ? store.findLatestGithub(login) : null;
+    const key = row?.id ?? "exemple";
+    let entry = homeImage;
+    if (entry?.key !== key) {
+      const card = row ? showcaseCard(row.data as CardData) : FIXTURES.jmougeot;
+      const png = (async () => deps.renderImage({ format: "home", card: await inlineAvatar(await frontAvatar(card), baseUrl, avatarDir), lang: "fr" }))();
+      const fresh = (entry = { key, png });
+      // Un rendu raté ne reste pas en mémoire : la demande suivante réessaie.
+      png.catch(() => {
+        if (homeImage === fresh) homeImage = null;
+      });
+      homeImage = fresh;
+    }
+    return c.body(new Uint8Array(await entry.png), 200, { "Content-Type": "image/png", "Cache-Control": "public, max-age=3600" });
+  };
 
   // GET /api/top : le haut du classement de la semaine (§18.22). Rien de privé,
   // ce qui est déjà sur les fiches publiques. Marche aussi sans crédit IA.
@@ -507,6 +548,7 @@ export function createApp(opts: AppOptions) {
 
   // Images : /og/:id.png (1200×630), /og/:id-portrait.png (1080×1350), /og/:id-card.png.
   app.get("/og/:file", async (c) => {
+    if (`/og/${c.req.param("file")}` === HOME_IMAGE_PATH) return serveHomeImage(c);
     const m = OG_FILE_RE.exec(c.req.param("file"));
     if (!m) return c.notFound();
     const id = m[1]!;
@@ -601,6 +643,19 @@ export function createApp(opts: AppOptions) {
   // Prod : front statique, puis repli SPA sur index.html hors /api, /og, /c.
   if (opts.staticRoot) {
     const root = opts.staticRoot;
+    // L'accueil et le repli SPA : le index.html du front, avec l'image de l'accueil à l'adresse de ce serveur.
+    const frontPage = async (c: Context): Promise<Response | null> => {
+      const template = opts.indexHtml ? await opts.indexHtml().catch(() => null) : null;
+      if (!template) return null;
+      c.header("Cache-Control", "no-cache");
+      return c.html(injectHomeImage(template, baseUrl));
+    };
+    // Avant le statique, qui servirait le fichier tel quel.
+    app.get("/", async (c, next) => {
+      const page = await frontPage(c);
+      if (page) return page;
+      await next();
+    });
     // Fichiers fingerprintés par Vite : cache long.
     app.use("/assets/*", async (c, next) => {
       await next();
@@ -615,10 +670,7 @@ export function createApp(opts: AppOptions) {
     app.get("*", async (c) => {
       const p = c.req.path;
       if (/^\/(api|og|c|auth|avatar)\//.test(p)) return c.notFound();
-      const template = opts.indexHtml ? await opts.indexHtml().catch(() => null) : null;
-      if (!template) return c.notFound();
-      c.header("Cache-Control", "no-cache");
-      return c.html(template);
+      return (await frontPage(c)) ?? c.notFound();
     });
   }
 

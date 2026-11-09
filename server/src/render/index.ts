@@ -6,11 +6,12 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { CardData, ComparisonData, Lang } from "../../../shared/types";
 import { fetchAvatar } from "./avatar";
 import {
-  CardOnly, ComparisonCard, ComparisonOg, ComparisonPortrait, OgImage, PortraitImage, type Avatars,
+  CardOnly, ComparisonCard, ComparisonOg, ComparisonPortrait, HomeOg, OgImage, PortraitImage, type Avatars,
 } from "./compositions";
 import { fontFiles } from "./fonts";
 
-export type ImageFormat = "card" | "og" | "portrait";
+/** `home` : l'aperçu de lien de l'accueil, la promesse et la fiche donnée (celle de la vitrine). */
+export type ImageFormat = "card" | "og" | "portrait" | "home";
 
 export interface RenderInput {
   format: ImageFormat;
@@ -20,7 +21,7 @@ export interface RenderInput {
 }
 
 /** Largeur de sortie par format (la hauteur suit le viewBox). */
-const OUTPUT_WIDTH: Record<ImageFormat, number> = { card: 1080, og: 1200, portrait: 1080 };
+const OUTPUT_WIDTH: Record<ImageFormat, number> = { card: 1080, og: 1200, portrait: 1080, home: 1200 };
 
 async function avatarsFor(cards: CardData[]): Promise<Avatars> {
   const out: Avatars = {};
@@ -45,6 +46,7 @@ export async function buildElement(input: RenderInput): Promise<ReactElement> {
   if (!card) throw new Error("renderImage : card ou comparison requis");
   const avatars = await avatarsFor([card]);
   const props = { card, lang, avatars };
+  if (format === "home") return createElement(HomeOg, props);
   if (format === "og") return createElement(OgImage, props);
   if (format === "portrait") return createElement(PortraitImage, props);
   return createElement(CardOnly, props);

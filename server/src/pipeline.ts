@@ -23,7 +23,8 @@ export type CardBody = Omit<CardData, "id" | "createdAt">;
 export type GithubAuth = string | TokenPool;
 
 export interface RenderInput {
-  format: "card" | "og" | "portrait";
+  /** `home` : l'aperçu de lien de l'accueil (/og/home.png), avec la fiche de la vitrine. */
+  format: "card" | "og" | "portrait" | "home";
   card?: CardData;
   comparison?: ComparisonData;
   lang: Lang;

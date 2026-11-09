@@ -103,6 +103,29 @@ export function genericMeta(baseUrl: string, path: string, lang: Lang = "fr"): P
   };
 }
 
+/** L'image de l'accueil (la promesse et la fiche de la vitrine), à cette adresse stable. */
+export const HOME_IMAGE_PATH = "/og/home.png";
+
+/**
+ * Pages du front sans fiche (accueil, repli SPA) : l'image de l'accueil en
+ * adresse absolue, celle de ce serveur. Le index.html porte déjà ces balises
+ * avec l'adresse de production ; elles sont remplacées, jamais doublées.
+ */
+export function injectHomeImage(template: string, baseUrl: string): string {
+  const e = escapeHtml;
+  const image = `${baseUrl}${HOME_IMAGE_PATH}`;
+  const tags = [
+    `<meta property="og:image" content="${e(image)}">`,
+    `<meta property="og:image:type" content="image/png">`,
+    `<meta property="og:image:width" content="1200">`,
+    `<meta property="og:image:height" content="630">`,
+    `<meta property="og:image:alt" content="${e("Testyourskills : ton GitHub remplace ton CV")}">`,
+    `<meta name="twitter:image" content="${e(image)}">`,
+  ].join("\n    ");
+  const cleaned = template.replace(/<meta\s+(?:property|name)=["'](?:og:image(?::[a-z_]+)?|twitter:image)["'][^>]*>\s*/gi, "");
+  return /<\/head>/i.test(cleaned) ? cleaned.replace(/<\/head>/i, `    ${tags}\n  </head>`) : cleaned;
+}
+
 export function metaTags(m: PageMeta): string {
   const e = escapeHtml;
   return [
