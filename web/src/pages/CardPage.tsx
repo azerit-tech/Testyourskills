@@ -11,6 +11,7 @@ import { EntryForm } from "../components/EntryForm";
 import { Dossier } from "../components/Findings";
 import { Jury, JuryLine } from "../components/Jury";
 import { MakeYours } from "../components/MakeYours";
+import { PleaVerdict } from "../components/Plea";
 import { RevealCard, useReveal } from "../components/Reveal";
 import { ShareDock } from "../components/ShareDock";
 import type { WalkoutControl } from "../components/Walkout3D";
@@ -424,6 +425,7 @@ function Result({ item, animate, owner, fresh, notice, me, onMe, onDeleted }: Re
       </div>
 
       <div className={`after${settled ? " is-in" : ""}`} aria-hidden={!settled} inert={!settled ? true : undefined}>
+        {!visitor && <PleaVerdict cardId={id} overall={main.overall} shown={settled} />}
         {!visitor && <JuryLine jury={kase?.jury ?? null} />}
         {/* L'enquête en direct (§18.26) : les trois trouvailles les plus fortes, chacune vers sa preuve. */}
         <Dossier card={main} />

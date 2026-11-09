@@ -20,12 +20,14 @@ export const EVENT_NAMES = [
   "denounce_claimed",
   // Le jury (§18.27) : un vote posé, par le serveur seul.
   "jury_vote",
+  // Le pari (§18.27) : étoiles plaidées et écart avec le verdict, envoyé par le front quand le verdict s'affiche.
+  "plea",
 ] as const;
 export type EventName = (typeof EVENT_NAMES)[number];
 
 /** Événements que le front peut envoyer. card_generated, denounce_sent, denounce_claimed et jury_vote sont posés par le serveur seul. */
 export const clientEventSchema = z.object({
-  event: z.enum(["card_shared", "card_email", "cta_azerit_clicked", "shared_visit", "denounce_landed"]),
+  event: z.enum(["card_shared", "card_email", "cta_azerit_clicked", "shared_visit", "denounce_landed", "plea"]),
   cardId: z.string().regex(/^[A-Za-z0-9]{6,32}$/).optional(),
   meta: z
     .record(z.string().max(40), z.union([z.string().max(200), z.number(), z.boolean(), z.null()]))

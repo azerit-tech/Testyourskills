@@ -863,6 +863,17 @@ describe("email et événements", () => {
     expect(events.map((e) => e.event)).toEqual(["card_shared", "cta_azerit_clicked"]);
     expect(events[0]).toMatchObject({ cardId: "AbCdEf1234", meta: { network: "linkedin" } });
   });
+
+  it("enregistre le pari (§18.27) : étoiles plaidées et écart", async () => {
+    const ctx = setup();
+    const res = await ctx.app.request("/api/event", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ event: "plea", cardId: "AbCdEf1234", meta: { stars: 5, gap: 1 } }),
+    });
+    expect(res.status).toBe(202);
+    expect(ctx.store.listEvents("plea")).toMatchObject([{ cardId: "AbCdEf1234", meta: { stars: 5, gap: 1 } }]);
+  });
 });
 
 describe("purge 90 jours", () => {

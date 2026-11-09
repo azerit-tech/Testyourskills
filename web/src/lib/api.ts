@@ -7,7 +7,7 @@ import { currentRef } from "./session";
 
 export { ApiError };
 
-export type AnalyticsEvent = "card_generated" | "card_shared" | "card_email" | "cta_azerit_clicked" | "shared_visit" | "denounce_landed";
+export type AnalyticsEvent = "card_generated" | "card_shared" | "card_email" | "cta_azerit_clicked" | "shared_visit" | "denounce_landed" | "plea";
 
 export interface CreateInput {
   login?: string;

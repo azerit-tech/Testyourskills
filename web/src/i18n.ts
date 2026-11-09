@@ -172,6 +172,16 @@ const fr = {
       graph: "contributions · 52 semaines",
     },
   },
+  /* le pari (§18.27) : avant le verdict, combien d'étoiles la personne plaide */
+  plea: {
+    ask: "Tu plaides combien d'étoiles ?",
+    star: (n: number) => (n === 1 ? "Plaider 1 étoile" : `Plaider ${n} étoiles`),
+    count: (n: number) => (n === 1 ? "1 étoile sur 6" : `${n} étoiles sur 6`),
+    pleading: "Tu plaides",
+    pleaded: "Tu plaidais",
+    verdict: "Verdict :",
+    gap: { over: "Excès de confiance", exact: "Lucide", under: "Modestie suspecte" },
+  },
   positions: {
     FS: "Full-stack",
     BE: "Backend",
@@ -598,6 +608,15 @@ const en: Dict = {
       idle: "AZERIT · CASE OPEN",
       graph: "contributions · 52 weeks",
     },
+  },
+  plea: {
+    ask: "How many stars do you plead?",
+    star: (n) => (n === 1 ? "Plead 1 star" : `Plead ${n} stars`),
+    count: (n) => (n === 1 ? "1 of 6 stars" : `${n} of 6 stars`),
+    pleading: "You plead",
+    pleaded: "You pleaded",
+    verdict: "Verdict:",
+    gap: { over: "Overconfidence", exact: "Clear-eyed", under: "Suspicious modesty" },
   },
   positions: {
     FS: "Full-stack",

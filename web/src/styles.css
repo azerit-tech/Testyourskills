@@ -932,6 +932,100 @@ svg {
   color: var(--lilac-dim);
 }
 
+/* le pari (§18.27) : « Tu plaides combien d'étoiles ? », six étoiles à toucher
+   (44 px chacune) pendant l'attente, puis une ligne ; sous la fiche, le verdict */
+.plea {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+}
+.plea-ask {
+  font: 700 24px/1 var(--f-name);
+  text-transform: uppercase;
+  color: var(--cream);
+}
+.plea-stars {
+  display: flex;
+}
+.plea-star {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: none;
+}
+.plea-star svg {
+  width: 30px;
+  height: 30px;
+  fill: var(--star-off-ink);
+  stroke: var(--lilac-dim);
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+  transition: transform 0.18s var(--ease-out);
+}
+.plea-star:active svg {
+  transform: scale(0.88);
+}
+/* la n-ième allume les n premières : aperçu au survol et au clavier */
+.plea-stars:focus-within .plea-star svg {
+  fill: var(--star);
+  stroke: var(--star);
+}
+.plea-star:focus ~ .plea-star svg {
+  fill: var(--star-off-ink);
+  stroke: var(--lilac-dim);
+}
+@media (hover: hover) {
+  .plea-stars:hover .plea-star svg {
+    fill: var(--star);
+    stroke: var(--star);
+  }
+  .plea-star:hover ~ .plea-star svg {
+    fill: var(--star-off-ink);
+    stroke: var(--lilac-dim);
+  }
+}
+.plea-line {
+  display: block;
+  font: 500 14px/24px var(--f-text);
+  color: var(--lilac-2);
+  animation: line-in 0.4s var(--ease-out);
+}
+.plea-row {
+  display: inline-flex;
+  gap: 2px;
+  vertical-align: -3px;
+}
+.plea-row svg {
+  width: 16px;
+  height: 16px;
+  fill: var(--star-off-ink);
+}
+.plea-row svg.on {
+  fill: var(--star);
+}
+.plea-verdict {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 0 4px 10px;
+  text-align: center;
+}
+.plea-said {
+  font: 500 15px/1.6 var(--f-text);
+  color: var(--lilac-2);
+}
+.plea-said > span {
+  white-space: nowrap;
+}
+.plea-word {
+  font: 700 36px/0.95 var(--f-name);
+  text-transform: uppercase;
+  color: var(--cream);
+  text-wrap: balance;
+}
+
 .stage-slot {
   position: relative;
   width: var(--card-w);
