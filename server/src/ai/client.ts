@@ -1,19 +1,22 @@
 // Appel structuré via OpenRouter (API compatible OpenAI, `fetch` natif) : sortie
 // JSON contrainte par schéma (`response_format: json_schema`, strict), puis
 // validation côté code. Une sortie invalide relance une fois, puis rend null (SPEC §12).
-// Plafond du jour atteint ou crédit épuisé (402) : lève AiClosedError, la fiche
-// échoue en `closed` au lieu de sortir sans lecture (SPEC §2.3).
+// Plafond du jour atteint, solde sous AI_MIN_CREDIT_USD, 402 ou réponse tronquée
+// (OpenRouter rabote `max_tokens` quand le crédit baisse, sans 402) : lève
+// AiClosedError, la fiche échoue en `closed` au lieu de sortir sans lecture (SPEC §2.3).
 
 import { z } from "zod";
 import {
   AiClosedError,
   aiConfigured,
+  creditsBelowMin,
   noteCreditsExhausted,
   noteCreditsOk,
   recordUsage,
   withinBudget,
   type UsageLike,
 } from "./budget";
+import { refreshCredits } from "./credits";
 
 // ---------------------------------------------------------------------------
 // Transport
@@ -229,6 +232,11 @@ export async function callStructured<T>(call: StructuredCall<T>): Promise<T | nu
       console.warn(`[ai] ${call.label}: plafond du jour atteint, commissariat fermé`);
       throw new AiClosedError("budget");
     }
+    // Solde sous le seuil : OpenRouter tronquerait la réponse, on n'appelle pas.
+    if (creditsBelowMin()) {
+      console.warn(`[ai] ${call.label}: solde OpenRouter sous le seuil, commissariat fermé`);
+      throw new AiClosedError("credits");
+    }
 
     const isLast = attempt === MAX_ATTEMPTS - 1;
     const userParts: ChatContentPart[] = [{ type: "text", text: call.userText }];
@@ -258,6 +266,7 @@ export async function callStructured<T>(call: StructuredCall<T>): Promise<T | nu
       if (call.signal?.aborted) return null;
       if (isCreditError(err)) {
         noteCreditsExhausted();
+        void refreshCredits();
         console.warn(`[ai] ${call.label}: crédit OpenRouter épuisé (HTTP 402), commissariat fermé`);
         throw new AiClosedError("credits");
       }
@@ -272,17 +281,26 @@ export async function callStructured<T>(call: StructuredCall<T>): Promise<T | nu
 
     if (creditErrorIn(res)) {
       noteCreditsExhausted();
+      void refreshCredits();
       console.warn(`[ai] ${call.label}: crédit OpenRouter épuisé (402 dans la réponse), commissariat fermé`);
       throw new AiClosedError("credits");
     }
-    noteCreditsOk();
 
     issues = [];
     const choice = res.choices?.[0];
     const finish = choice?.finish_reason;
+    // Réponse coupée par max_tokens : c'est ainsi qu'OpenRouter signale un crédit
+    // bas (il rabote max_tokens au lieu de répondre 402). Traitée comme un crédit
+    // épuisé, pas comme une sortie invalide ordinaire : pas de fiche sans lecture.
+    if (finish === "length" && !res.error && !choice?.error) {
+      noteCreditsExhausted();
+      void refreshCredits();
+      console.warn(`[ai] ${call.label}: réponse tronquée (crédit OpenRouter bas ?), commissariat fermé`);
+      throw new AiClosedError("credits");
+    }
+    noteCreditsOk();
     if (res.error || choice?.error || !choice) issues.push("the provider returned an error");
     else if (finish === "content_filter") issues.push("the request was refused");
-    else if (finish === "length") issues.push("the answer was cut by max_tokens; be more concise");
 
     if (issues.length === 0) {
       let raw: unknown;
@@ -299,6 +317,13 @@ export async function callStructured<T>(call: StructuredCall<T>): Promise<T | nu
       }
     }
     console.warn(`[ai] ${call.label}: sortie invalide (essai ${attempt + 1}/${MAX_ATTEMPTS})`);
+    // Une sortie invalide peut cacher un crédit qui fond : on relit le solde
+    // (délai borné), et sous le seuil la fiche échoue en `closed`.
+    await refreshCredits();
+    if (creditsBelowMin()) {
+      console.warn(`[ai] ${call.label}: solde OpenRouter sous le seuil, commissariat fermé`);
+      throw new AiClosedError("credits");
+    }
   }
   return null;
 }

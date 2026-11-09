@@ -264,6 +264,11 @@ interface Ctx {
 interface GithubResult {
   facts: unknown;
   ai: CodeReadingResult | null;
+  /**
+   * Il y avait du code à lire, mais aucune lecture IA n'est revenue (IA non
+   * configurée, panne, sortie invalide) : la fiche sort, hors cache 24 h (§12).
+   */
+  degraded: boolean;
   /** Carte de moins de 24 h réutilisée telle quelle (comparaison). */
   cached?: CardData;
 }
@@ -500,6 +505,7 @@ export class Pipeline {
       data: card,
       facts: parentId ? null : gh!.facts,
       deleteToken,
+      degraded: gh!.degraded,
     });
 
     // GitHub seul.
@@ -546,7 +552,7 @@ export class Pipeline {
       github: { ...cmp.github, id: ghCard.id, createdAt },
     };
     return [
-      { id, parentId: null, createdAt: now, source: "both", login, kind: "comparison", data: comparison, deleteToken },
+      { id, parentId: null, createdAt: now, source: "both", login, kind: "comparison", data: comparison, deleteToken, degraded: gh.degraded },
       cvRow(comparison.cv, id),
       githubRow(comparison.github, id),
     ];
@@ -557,7 +563,7 @@ export class Pipeline {
     if (allowCache) {
       // Comparaison sur un pseudo jugé il y a moins de 24 h : on ne refait pas les appels.
       const row = store.findRecentGithub(login);
-      if (row?.facts && row.kind === "card") return { facts: row.facts, ai: null, cached: row.data as CardData };
+      if (row?.facts && row.kind === "card") return { facts: row.facts, ai: null, degraded: false, cached: row.data as CardData };
     }
     const facts = await deps.collectGithub(login, {
       token: this.github,
@@ -566,18 +572,25 @@ export class Pipeline {
     });
     ctx.emit("recruiter");
     let ai: CodeReadingResult | null = null;
+    // Sans IA, rien n'a été lu : fiche dégradée. Rien à lire (aucun fichier) : la
+    // fiche est la même à chaque fois, elle se met en cache normalement.
+    let degraded = !deps.aiAvailable();
     if (deps.aiAvailable()) {
       try {
         const files = await deps.pickFilesForReading(facts, { token: this.github, signal: ctx.signal });
-        if (files.length) ai = await deps.readCode(files, { signal: ctx.signal });
+        if (files.length) {
+          ai = await deps.readCode(files, { signal: ctx.signal });
+          degraded = ai === null;
+        }
       } catch (err) {
         // IA coupée : pas de fiche sans lecture (§2.3), la fiche échoue en `closed`.
         if (ctx.signal.aborted || isAiClosed(err)) throw err;
         console.warn(`[github ${login}] lecture IA indisponible, carte sans lecture :`, (err as Error).message);
         ai = null;
+        degraded = true;
       }
     }
-    return { facts, ai };
+    return { facts, ai, degraded };
   }
 
   private async cvBranch(pdf: Uint8Array, ctx: Ctx): Promise<CvResult> {

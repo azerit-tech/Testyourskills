@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { RepoFiles } from "../../../shared/readings";
 import { aiCostToday, resetBudgetForTests } from "./budget";
 import { ChatHttpError, resetToolModeForTests } from "./client";
@@ -117,10 +117,13 @@ describe("readCode", () => {
     expect(calls).toHaveLength(2);
   });
 
-  it("relance si la sortie est coupée par max_tokens", async () => {
+  it("sortie coupée par max_tokens : crédit bas, la fiche échoue en closed sans relance", async () => {
+    // OpenRouter rabote max_tokens au lieu de répondre 402 quand le solde baisse.
     const { client, calls } = fakeClient([{ stop: "length", body: VALID }, VALID]);
-    expect(await readCode(REPOS, { client })).not.toBeNull();
-    expect(calls).toHaveLength(2);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await expect(readCode(REPOS, { client })).rejects.toMatchObject({ code: "closed", reason: "credits" });
+    expect(calls).toHaveLength(1);
+    warn.mockRestore();
   });
 
   it("rejette une preuve hors des fichiers fournis", async () => {

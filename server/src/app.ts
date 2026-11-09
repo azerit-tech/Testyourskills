@@ -62,6 +62,7 @@ export interface AppOptions {
 
 /** La carte vitrine est recalculée au plus une fois par semaine. */
 const SHOWCASE_MS = 7 * 24 * 3600 * 1000;
+const SHOWCASE_DEGRADED_MS = 3600 * 1000;
 
 export function defaultAvatarDir(ogDir: string): string {
   return join(dirname(ogDir), "avatars");
@@ -192,7 +193,8 @@ export function createApp(opts: AppOptions) {
   };
 
   // Public : jamais de montant. ai = ok | budget (plafond du jour atteint) |
-  // credits (402 OpenRouter vu dans les 10 dernières minutes) | off (pas de clé).
+  // credits (solde sous AI_MIN_CREDIT_USD, ou 402 / réponse tronquée vus dans
+  // les 10 dernières minutes sans solde suffisant lu depuis) | off (pas de clé).
   app.get("/api/health", (c) =>
     c.json({ ok: true, ai: safeAiStatus(aiStatus) ?? "off", github: !!opts.githubToken, linkedin: !!opts.linkedin }),
   );
@@ -208,7 +210,8 @@ export function createApp(opts: AppOptions) {
     const login = opts.showcaseLogin;
     if (!login || store.isHidden(login)) return c.json({ card: null });
     const row = store.findLatestGithub(login);
-    const stale = !row || Date.now() - row.createdAt > SHOWCASE_MS;
+    // Vitrine sortie sans lecture IA : on la retente au bout d'une heure, pas d'une semaine.
+    const stale = !row || Date.now() - row.createdAt > (row.degraded ? SHOWCASE_DEGRADED_MS : SHOWCASE_MS);
     // Jetons GitHub épuisés : la vitrine attendra, elle ne prend pas la place d'une vraie fiche.
     if (stale && !pipeline.inflightFor(login) && !pipeline.githubBusy()) pipeline.start({ lang: "fr", login });
     if (!row) return c.json({ card: null });
@@ -275,10 +278,12 @@ export function createApp(opts: AppOptions) {
         if (running) return c.json({ id: running, cached: true }, 200);
       }
 
-      // Plafond IA du jour atteint : commissariat fermé, sans lancer de job ni
-      // entamer le quota. Le cache ci-dessus reste servi. (Un 402 n'est pas
-      // anticipé : le crédit peut revenir à tout moment, on retente l'appel.)
-      if (safeAiStatus(aiStatus) === "budget") {
+      // Plafond IA du jour atteint, ou crédit OpenRouter sous le seuil (solde lu
+      // toutes les 5 minutes, 402 ou réponse tronquée vus) : commissariat fermé,
+      // sans lancer de job ni entamer le quota. Le cache ci-dessus reste servi.
+      // Une recharge rouvre dès la lecture suivante du solde.
+      const ai = safeAiStatus(aiStatus);
+      if (ai === "budget" || ai === "credits") {
         return c.json(errorBody("closed", MESSAGES.closed), 503);
       }
 

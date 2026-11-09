@@ -9,7 +9,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createApp, purge } from "./app";
 import { useBudgetDb } from "./ai/budget";
-import { checkOpenRouterCredits } from "./ai/credits";
+import { startCreditsWatch, stopCreditsWatch } from "./ai/credits";
 import { linkedinFromEnv } from "./linkedin";
 import { githubAuthFromEnv } from "./auth";
 import { Store } from "./db";
@@ -72,8 +72,9 @@ const indexHtml = prod
 const store = new Store(dbPath);
 // Dépense IA du jour persistée : un redémarrage ne remet pas le plafond à zéro.
 useBudgetDb(store.db);
-// Solde OpenRouter : simple avertissement sous 2 $, sans jamais retarder le démarrage.
-void checkOpenRouterCredits();
+// Solde OpenRouter lu au démarrage puis toutes les 5 minutes, sans jamais
+// retarder le démarrage : sous AI_MIN_CREDIT_USD (0,50 $), commissariat fermé.
+startCreditsWatch();
 const { app, pipeline } = createApp({
   store,
   deps: realDeps,
@@ -110,6 +111,7 @@ const server = serve({ fetch: app.fetch, port }, (info) => {
 // Arrêt propre : on laisse 8 s aux cartes en cours, sous les 10 s de Docker.
 const shutdown = async () => {
   server.close();
+  stopCreditsWatch();
   await Promise.race([pipeline.drain(), new Promise((r) => setTimeout(r, 8000))]);
   useBudgetDb(null);
   store.close();

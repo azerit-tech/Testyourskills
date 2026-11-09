@@ -46,6 +46,7 @@ GITHUB_TOKEN=…                   # obligatoire : sans lui l'app s'arrête en p
 AI_MODEL_CODE=anthropic/claude-haiku-5.5
 AI_MODEL_CV=anthropic/claude-haiku-5.5
 AI_DAILY_BUDGET_USD=5
+AI_MIN_CREDIT_USD=0.5            # sous ce solde OpenRouter, commissariat fermé
 LEADS_ENDPOINT=…                 # relais des emails laissés sous la carte
 LINKEDIN_CLIENT_ID=…             # redirect URL : https://skills.azerit.tech/auth/linkedin/callback
 LINKEDIN_CLIENT_SECRET=…

@@ -26,7 +26,8 @@ Sans `GITHUB_TOKEN`, l'API démarre en dev avec un avertissement (GitHub limite 
 | `OPENROUTER_API_KEY` | lecture du code et du CV par l'IA, via OpenRouter | sans IA si absent |
 | `AI_MODEL_CODE` | modèle OpenRouter pour la lecture du code | `anthropic/claude-haiku-4.5` (`.env.example` : `anthropic/claude-haiku-5.5`) |
 | `AI_MODEL_CV` | modèle OpenRouter pour la lecture du CV | `anthropic/claude-haiku-4.5` (`.env.example` : `anthropic/claude-haiku-5.5`) |
-| `AI_DAILY_BUDGET_USD` | budget IA par jour ; au-delà, cartes sans lecture IA | `5` |
+| `AI_DAILY_BUDGET_USD` | budget IA par jour ; au-delà, « commissariat fermé », aucune fiche sans lecture | `5` |
+| `AI_MIN_CREDIT_USD` | solde OpenRouter, lu toutes les 5 minutes, sous lequel l'IA ferme de même | `0.5` |
 | `BASE_URL` | URL publique, pour `og:url`, `og:image` et les liens | `https://skills.azerit.tech` en prod, `http://localhost:5180` en dev |
 | `DB_PATH` | base SQLite ; le cache des PNG vit à côté, dans `og/` | `./var/cards.db` |
 | `LEADS_ENDPOINT` | webhook qui reçoit les emails laissés, au format de la landing | aucun |

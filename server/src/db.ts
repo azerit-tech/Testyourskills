@@ -27,6 +27,8 @@ export interface CardRow {
   expiresAt: number | null;
   /** Fiche par le lien partagé de laquelle on est arrivé (?r=), sinon null (§18.0). */
   refCardId: string | null;
+  /** Sortie sans lecture IA : visible à son adresse, jamais resservie par le cache 24 h (§12). */
+  degraded: boolean;
 }
 
 export interface OwnerRow {
@@ -69,6 +71,8 @@ export interface NewCardRow {
   facts?: unknown;
   deleteToken: string;
   refCardId?: string | null;
+  /** Sortie sans lecture IA (panne de l'IA) : pas de cache 24 h. */
+  degraded?: boolean;
 }
 
 interface RawRow {
@@ -84,6 +88,7 @@ interface RawRow {
   delete_token: string;
   expires_at: number | null;
   ref_card_id: string | null;
+  degraded: number | null;
 }
 
 const SCHEMA = `
@@ -99,7 +104,8 @@ CREATE TABLE IF NOT EXISTS cards (
   email        TEXT,
   delete_token TEXT NOT NULL,
   expires_at   INTEGER,           -- NULL = conservée (email laissé)
-  ref_card_id  TEXT               -- fiche d'origine du lien partagé (?r=), sinon NULL ; voir migrate()
+  ref_card_id  TEXT,              -- fiche d'origine du lien partagé (?r=), sinon NULL ; voir migrate()
+  degraded     INTEGER NOT NULL DEFAULT 0 -- 1 = sortie sans lecture IA, hors cache 24 h ; voir migrate()
 );
 CREATE INDEX IF NOT EXISTS cards_login ON cards(login, created_at) WHERE parent_id IS NULL;
 CREATE INDEX IF NOT EXISTS cards_parent ON cards(parent_id);
@@ -155,6 +161,7 @@ function toRow(r: RawRow): CardRow {
     deleteToken: r.delete_token,
     expiresAt: r.expires_at,
     refCardId: r.ref_card_id ?? null,
+    degraded: r.degraded === 1,
   };
 }
 
@@ -175,6 +182,7 @@ export function stripToken<T extends CardData | ComparisonData>(data: T): T {
 export function migrate(db: Database.Database) {
   const cols = new Set((db.prepare(`PRAGMA table_info(cards)`).all() as { name: string }[]).map((c) => c.name));
   if (!cols.has("ref_card_id")) db.exec(`ALTER TABLE cards ADD COLUMN ref_card_id TEXT`);
+  if (!cols.has("degraded")) db.exec(`ALTER TABLE cards ADD COLUMN degraded INTEGER NOT NULL DEFAULT 0`);
 }
 
 export class Store {
@@ -211,8 +219,8 @@ export class Store {
   /** Insère une carte, ou une comparaison et ses deux cartes, en une transaction. */
   insertCards(rows: NewCardRow[]) {
     const stmt = this.db.prepare(
-      `INSERT INTO cards (id, parent_id, created_at, source, login, kind, json, facts_json, email, delete_token, expires_at, ref_card_id)
-       VALUES (@id, @parent_id, @created_at, @source, @login, @kind, @json, @facts_json, NULL, @delete_token, @expires_at, @ref_card_id)`,
+      `INSERT INTO cards (id, parent_id, created_at, source, login, kind, json, facts_json, email, delete_token, expires_at, ref_card_id, degraded)
+       VALUES (@id, @parent_id, @created_at, @source, @login, @kind, @json, @facts_json, NULL, @delete_token, @expires_at, @ref_card_id, @degraded)`,
     );
     const tx = this.db.transaction((list: NewCardRow[]) => {
       // Login revendiqué : ses nouvelles fiches sont à son propriétaire et n'expirent pas non plus (§18.1).
@@ -231,6 +239,7 @@ export class Store {
           expires_at: kept ? null : r.createdAt + RETENTION_MS,
           // L'origine va sur la fiche racine seule, pas sur les cartes d'une comparaison.
           ref_card_id: r.refCardId ?? (r.parentId ? null : (this.pendingRefs.get(r.id) ?? null)),
+          degraded: r.degraded ? 1 : 0,
         });
       }
     });
@@ -243,12 +252,15 @@ export class Store {
     return r ? toRow(r) : null;
   }
 
-  /** Carte GitHub seule pour ce pseudo, de moins de 24 h (SPEC §4.7, §12). */
+  /**
+   * Carte GitHub seule pour ce pseudo, de moins de 24 h (SPEC §4.7, §12). Une
+   * fiche sortie sans lecture IA n'en est pas : la demande suivante la recalcule.
+   */
   findRecentGithub(login: string, now = Date.now()): CardRow | null {
     const r = this.db
       .prepare(
         `SELECT * FROM cards
-         WHERE parent_id IS NULL AND kind = 'card' AND source = 'github' AND login = ? AND created_at > ?
+         WHERE parent_id IS NULL AND kind = 'card' AND source = 'github' AND login = ? AND created_at > ? AND degraded = 0
          ORDER BY created_at DESC LIMIT 1`,
       )
       .get(login.toLowerCase(), now - CACHE_MS) as RawRow | undefined;

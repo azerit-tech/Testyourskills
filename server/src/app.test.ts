@@ -10,7 +10,7 @@ import type { CvReading, CvTextCounts } from "../../shared/readings";
 import { createApp, normalizeLogin, purge, type AppOptions } from "./app";
 import { RETENTION_MS, Store } from "./db";
 import type { CardBody, Deps } from "./pipeline";
-import { noteCreditsExhausted, recordUsage, resetBudgetForTests, type AiStatus } from "./ai/budget";
+import { noteCreditBalance, noteCreditsExhausted, recordUsage, resetBudgetForTests, type AiStatus } from "./ai/budget";
 import { ChatHttpError } from "./ai/client";
 import { readCode } from "./ai/readCode";
 import { fakeClient } from "./ai/testing";
@@ -573,11 +573,115 @@ describe("commissariat fermé (plafond IA ou crédit épuisé)", () => {
     await ctx.pipeline.drain();
   });
 
-  it("un 402 vu ne bloque pas les demandes suivantes", async () => {
-    const ctx = setup({}, { aiStatus: () => "credits" });
-    const { res } = await postLogin(ctx, "leamd");
-    expect(res.status).toBe(202);
+  it("crédit sous le seuil : 503 closed tout de suite, sans job ni quota, le cache reste servi", async () => {
+    let status: AiStatus = "ok";
+    const ctx = setup({}, { aiStatus: () => status, cardsPerDay: 2 });
+    const cachedCard = await generate(ctx, "leamd");
+
+    status = "credits";
+    const { res, json } = await postLogin(ctx, "octocat");
+    expect(res.status).toBe(503);
+    expect(json).toMatchObject({ state: "error", code: "closed", message: { fr: CLOSED_FR, en: CLOSED_EN } });
+    // CV seul aussi : il lui faut l'IA.
+    expect((await postCv(ctx, PDF.slice())).res.status).toBe(503);
+    expect(ctx.calls.collect).toBe(1);
+    expect(ctx.store.findRecentGithub("octocat")).toBeNull();
+    expect((await postLogin(ctx, "leamd")).json).toMatchObject({ id: cachedCard.id, cached: true });
+
+    // Recharge lue : la fiche passe, le quota n'a pas été entamé par les refus.
+    status = "ok";
+    expect((await postLogin(ctx, "octocat")).res.status).toBe(202);
     await ctx.pipeline.drain();
+  });
+
+  it("le vrai suivi : solde lu sous le seuil, puis réponse tronquée, jamais de fiche stockée", async () => {
+    const saved = process.env.OPENROUTER_API_KEY;
+    process.env.OPENROUTER_API_KEY = "sk-or-test";
+    resetBudgetForTests();
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      // Réponse coupée par max_tokens, comme OpenRouter le fait avec 0,26 $ de crédit.
+      const { client, calls: aiCalls } = fakeClient([{ stop: "length", body: { readings: [] } }]);
+      const ctx = setup({ readCode: (repos, opts) => readCode(repos, { ...opts, client }) });
+      const { res, json } = await postLogin(ctx, "octocat");
+      expect(res.status).toBe(202);
+      await ctx.pipeline.wait(json.id);
+      expect((await getState(ctx, json.id)).state).toMatchObject({ state: "error", code: "closed" });
+      expect(aiCalls).toHaveLength(1);
+      expect(ctx.store.getCard(json.id)).toBeNull();
+      expect(ctx.store.findRecentGithub("octocat")).toBeNull();
+      // La suite est refusée d'entrée, et la santé le dit.
+      expect((await postLogin(ctx, "octocat")).res.status).toBe(503);
+      expect(((await (await ctx.app.request("/api/health")).json()) as { ai: string }).ai).toBe("credits");
+
+      // Solde lu au-dessus du seuil : rouvert. Puis il fond : refermé, sans un appel de plus.
+      noteCreditBalance(5);
+      expect(((await (await ctx.app.request("/api/health")).json()) as { ai: string }).ai).toBe("ok");
+      noteCreditBalance(0.26);
+      expect((await postLogin(ctx, "octocat")).res.status).toBe(503);
+      expect(aiCalls).toHaveLength(1);
+    } finally {
+      vi.restoreAllMocks();
+      resetBudgetForTests();
+      if (saved === undefined) delete process.env.OPENROUTER_API_KEY;
+      else process.env.OPENROUTER_API_KEY = saved;
+    }
+  });
+});
+
+describe("fiche sortie sans lecture IA (dégradée)", () => {
+  it("n'est pas resservie par le cache 24 h : la demande suivante la recalcule", async () => {
+    let fail = true;
+    const ctx = setup({
+      async readCode() {
+        if (fail) return null; // sortie invalide deux fois, crédit suffisant : panne ordinaire du §12
+        return { readings: [], ai_status: "ai_typed" };
+      },
+    });
+    const first = await generate(ctx, "leamd");
+    const row = ctx.store.getCard(first.id)!;
+    expect(row.degraded).toBe(true);
+    expect((row.data as CardData).scoringVersion).toBe("no-ai");
+    expect(ctx.store.findRecentGithub("leamd")).toBeNull();
+
+    fail = false;
+    const again = await postLogin(ctx, "leamd");
+    expect(again.res.status).toBe(202);
+    expect(again.json.id).not.toBe(first.id);
+    await ctx.pipeline.wait(again.json.id);
+    expect(ctx.store.getCard(again.json.id)!.degraded).toBe(false);
+    expect(ctx.calls.collect).toBe(2);
+    // La fiche lue, elle, se met en cache.
+    expect((await postLogin(ctx, "leamd")).json).toMatchObject({ id: again.json.id, cached: true });
+
+    // La fiche dégradée reste visible à son adresse.
+    expect((await getState(ctx, first.id)).state).toMatchObject({ state: "done", kind: "card" });
+    expect((await ctx.app.request(`/c/${first.id}`)).status).toBe(200);
+  });
+
+  it("une erreur de lecture, ou l'IA absente, marquent aussi la fiche ; rien à lire ne la marque pas", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const a = setup({ readCode: async () => Promise.reject(new Error("HTTP 500")) });
+    expect(a.store.getCard((await generate(a)).id)!.degraded).toBe(true);
+    const b = setup({ aiAvailable: () => false });
+    expect(b.store.getCard((await generate(b)).id)!.degraded).toBe(true);
+    // Aucun fichier à lire : la fiche est la même à chaque fois, elle va en cache.
+    const c = setup({ pickFilesForReading: async () => [] });
+    const card = await generate(c);
+    expect(c.store.getCard(card.id)!.degraded).toBe(false);
+    expect(c.store.findRecentGithub("leamd")?.id).toBe(card.id);
+    vi.restoreAllMocks();
+  });
+
+  it("une comparaison ne réutilise pas une fiche GitHub dégradée", async () => {
+    let fail = true;
+    const ctx = setup({ readCode: async () => (fail ? null : { readings: [], ai_status: "ai_typed" }) });
+    await generate(ctx, "leamd");
+    fail = false;
+    const { json } = await postCv(ctx, PDF.slice(), "leamd");
+    await ctx.pipeline.wait(json.id);
+    expect(ctx.calls.collect).toBe(2);
+    expect((await getState(ctx, json.id)).state).toMatchObject({ state: "done", kind: "comparison" });
   });
 });
 
@@ -776,6 +880,11 @@ describe("divers", () => {
       noteCreditsExhausted();
       expect(await ai()).toBe("credits");
       noteCreditsExhausted(Date.now() - 11 * 60 * 1000);
+      expect(await ai()).toBe("budget");
+      // Le solde fait foi : sous 0,50 $, credits, même sans 402 vu.
+      noteCreditBalance(0.26);
+      expect(await ai()).toBe("credits");
+      noteCreditBalance(12);
       expect(await ai()).toBe("budget");
       delete process.env.OPENROUTER_API_KEY;
       expect(await ai()).toBe("off");

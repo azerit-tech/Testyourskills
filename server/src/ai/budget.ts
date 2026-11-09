@@ -175,12 +175,27 @@ export class AiClosedError extends Error {
   }
 }
 
-/** Durée pendant laquelle /api/health signale un 402 vu. */
+/** Durée pendant laquelle un 402 (ou une réponse tronquée) vu ferme le commissariat. */
 export const CREDITS_WINDOW_MS = 10 * 60 * 1000;
 
 let creditsExhaustedAt: number | null = null;
 
-/** OpenRouter a répondu 402 (crédit insuffisant). */
+/**
+ * Dernier solde OpenRouter lu (credits.ts), en dollars. null : jamais lu, ou
+ * illisible depuis le démarrage. Le solde fait foi : sous AI_MIN_CREDIT_USD,
+ * OpenRouter ne renvoie pas de 402 mais rabote `max_tokens` à ce que le crédit
+ * permet, et la lecture sort tronquée. On ferme donc avant d'appeler.
+ */
+let creditBalanceUsd: number | null = null;
+
+/** Seuil de solde sous lequel l'IA est fermée (AI_MIN_CREDIT_USD, défaut 0,50 $). */
+export function minCreditUsd(): number {
+  const raw = process.env.AI_MIN_CREDIT_USD;
+  const n = Number(raw);
+  return raw !== undefined && raw !== "" && Number.isFinite(n) && n >= 0 ? n : 0.5;
+}
+
+/** OpenRouter a répondu 402 (crédit insuffisant), ou a tronqué une réponse faute de crédit. */
 export function noteCreditsExhausted(now = Date.now()): void {
   creditsExhaustedAt = now;
 }
@@ -191,13 +206,35 @@ export function noteCreditsOk(): void {
 }
 
 /**
- * État public de l'IA, sans montant : `off` sans clé, `credits` si un 402 a été
- * vu dans les 10 dernières minutes, `budget` si le plafond du jour est atteint.
+ * Solde lu sur OpenRouter. Au-dessus du seuil, il lève aussi un 402 vu
+ * auparavant : le solde fait foi, la recharge rouvre tout de suite.
+ */
+export function noteCreditBalance(usd: number): void {
+  creditBalanceUsd = usd;
+  if (usd >= minCreditUsd()) creditsExhaustedAt = null;
+}
+
+/** Dernier solde connu (diagnostic, tests), jamais exposé au public. */
+export function lastCreditBalance(): number | null {
+  return creditBalanceUsd;
+}
+
+/** Solde connu et sous le seuil : aucun appel ne part, la fiche échoue en `closed`. */
+export function creditsBelowMin(): boolean {
+  return creditBalanceUsd !== null && creditBalanceUsd < minCreditUsd();
+}
+
+/**
+ * État public de l'IA, sans montant : `off` sans clé ; `credits` si le solde
+ * est sous le seuil, ou si un 402 (ou une réponse tronquée) a été vu dans les
+ * 10 dernières minutes sans qu'un solde suffisant l'ait démenti depuis ;
+ * `budget` si le plafond du jour est atteint.
  */
 export type AiStatus = "ok" | "budget" | "credits" | "off";
 
 export function aiStatus(now = Date.now()): AiStatus {
   if (!aiConfigured()) return "off";
+  if (creditsBelowMin()) return "credits";
   if (creditsExhaustedAt !== null && now - creditsExhaustedAt < CREDITS_WINDOW_MS) return "credits";
   if (!withinBudget()) return "budget";
   return "ok";
@@ -208,4 +245,5 @@ export function resetBudgetForTests(): void {
   totals = empty(today());
   ledger = null;
   creditsExhaustedAt = null;
+  creditBalanceUsd = null;
 }
