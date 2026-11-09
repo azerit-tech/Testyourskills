@@ -52,10 +52,7 @@ En local : `npx vite build && npm start` sert le front de `dist/web` et l'API su
 
 Sur le VPS partagé, comme `../App` : pas de Caddy propre, ruby-caddy route `skills.azerit.tech` vers le conteneur `testyourskills` par le réseau docker `ruby_default`.
 
-1. DNS : `skills.azerit.tech` pointe sur le VPS.
-2. Dans le dossier du projet sur le VPS : créer `.env` (voir `.env.example`), puis `docker compose up -d --build`.
-3. Copier le bloc de `caddy-snippet.txt` dans `/opt/caddy-sites/testyourskills.caddy`, puis `docker exec ruby-caddy caddy validate --config /etc/caddy/Caddyfile` et `docker exec ruby-caddy caddy reload --config /etc/caddy/Caddyfile`.
-4. Vérifier : `curl https://skills.azerit.tech/api/health`.
+Première mise en ligne (DNS, `.env` du serveur, fichier Caddy), mises à jour et retour arrière : [`ops/DEPLOY.md`](ops/DEPLOY.md). Ensuite, depuis le Mac, sur `master` à jour : `scripts/deploy.sh --plan`, puis `scripts/deploy.sh`.
 
 La base et les PNG sont dans le volume `testyourskills-data` (`/data`). Les cartes de plus de 90 jours sans email sont purgées au démarrage puis toutes les heures, avec leurs images.
 
