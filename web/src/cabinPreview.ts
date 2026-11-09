@@ -5,6 +5,7 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { PerspectiveCamera } from "three";
 import { siGithub, siTypescript } from "simple-icons";
 import { FIXTURES } from "../../shared/fixtures";
+import { LEVEL_LABELS, starsFor } from "../../shared/types";
 import { levelAccent } from "./components/Reveal";
 import { preloadWalkoutAssets } from "./three/assets";
 import { loadCardTexture } from "./three/cardTexture";
@@ -32,7 +33,7 @@ async function start() {
       langName: "TypeScript", langLabel: "Arme", leagueName: "GitHub", leagueLabel: "Dossier",
       position: card.position, positionName: "Full-stack", positionLabel: "Spécialité",
       club: card.club ?? "", clubLabel: "Affiliation", statusLabel: "Statut", statuses: [{ min: 0, label: "Confirmé" }],
-      idleTitle: "DOSSIER", idleSubtitle: "", graphLabel: "Contributions", levelLabel: "Dangereux",
+      idleTitle: "DOSSIER", idleSubtitle: "", graphLabel: "Contributions", levelLabel: LEVEL_LABELS[starsFor(card.overall)].fr,
       hud: { specialty: "Spécialité", weapon: "Arme", file: "Dossier", affiliation: "Affiliation", suspect: "Profil identifié :", cta: "Voir ma fiche" },
     },
   });

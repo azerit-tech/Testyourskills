@@ -33,7 +33,7 @@ import { createCardMesh } from "./cardMesh";
 import { chairMaterial, createChair } from "./chair";
 import { createElevatorSound } from "./elevatorSound";
 import { createHud, type Hud } from "./hud";
-import { STAR_THRESHOLDS, type HudTexts } from "./hudTexts";
+import { HUD_STAR_AT, type HudTexts } from "./hudTexts";
 import { createRadioSound } from "./radioSound";
 import { LensEffect, WhiteBalanceEffect, makeLensDirtTexture, whiteBalanceGains } from "./lens";
 import { createPlayer } from "./player";
@@ -750,7 +750,7 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
   /** Étoiles allumées à l'image précédente ; le message radio en cours. */
   let lastStars = 0;
   let prevT = -1;
-  const starsAt = (level: number) => STAR_THRESHOLDS.filter((th) => level >= th).length;
+  const starsAt = (level: number) => HUD_STAR_AT.filter((th) => level >= th).length;
   const shakeSeed = Math.random() * 100;
   let cardTarget: THREE.Vector3 | null = null;
   const camPos = new THREE.Vector3();

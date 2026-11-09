@@ -3,15 +3,14 @@
 // (reveal.tells, partagés avec les révélations chromées) ; le mot du niveau, de
 // LEVEL_LABELS (shared/types.ts), lu par Walkout3D. Ici : ce qui n'existe que
 // sur le carton de fin, et les seuils des étoiles de la montée.
-import type { Lang } from "../../../shared/types";
+import { STAR_THRESHOLDS, type Lang } from "../../../shared/types";
 
 /**
- * Les étoiles de la montée (SPEC §18.18) : la note affichée allume une étoile à
- * chaque seuil franchi. Autant d'emplacements que de seuils. Doit rester
- * aligné sur `starsFor` de shared/types.ts (une étoile de plus à 30, 45, 60, 75
- * et 90) : à relier à une constante de shared/ si elle y apparaît.
+ * Les étoiles de la montée (SPEC §18.18) : la note affichée allume la première
+ * étoile dès 1, puis une de plus à chaque seuil de `STAR_THRESHOLDS`
+ * (shared/types.ts), comme `starsFor`. Autant d'emplacements que de seuils ici.
  */
-export const STAR_THRESHOLDS = [1, 30, 45, 60, 75, 90] as const;
+export const HUD_STAR_AT: readonly number[] = [1, ...STAR_THRESHOLDS];
 
 export interface HudTexts {
   /** Les quatre lignes, dans l'ordre : spécialité, arme, dossier, affiliation. */

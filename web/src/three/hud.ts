@@ -5,12 +5,12 @@
 // mission : le niveau en --dusk, la note, « Profil identifié : {profil} », puis « Voir ma fiche ».
 // Piloté image par image par la scène (walkout.ts) ; ne redessine que ce qui change. Styles :
 // hud.css. La mini-carte est en option (map) : l'ascenseur ne s'en sert pas.
-import { STAR_THRESHOLDS, type HudTexts } from "./hudTexts";
+import { HUD_STAR_AT, type HudTexts } from "./hudTexts";
 
 export interface HudState {
   /** Temps de la séquence (s), négatif avant le départ. */
   t: number;
-  /** Étoiles allumées, 0 à STAR_THRESHOLDS.length. */
+  /** Étoiles allumées, 0 à HUD_STAR_AT.length. */
   stars: number;
   /** Lignes du dossier déjà révélées (0 à 4). */
   lines: number;
@@ -56,7 +56,7 @@ export function createHud(
   root.className = "dive-hud";
   root.setAttribute("aria-hidden", "true");
   root.innerHTML = `
-    <div class="dive-hud__stars">${STAR_THRESHOLDS.map(() => `<svg viewBox="0 0 24 24"><path d="${STAR}"/></svg>`).join("")}</div>
+    <div class="dive-hud__stars">${HUD_STAR_AT.map(() => `<svg viewBox="0 0 24 24"><path d="${STAR}"/></svg>`).join("")}</div>
     <div class="dive-hud__lines">
       ${(["specialty", "weapon", "file", "affiliation"] as const)
         .map((k) => `<div class="dive-hud__line"><span>${esc(o.texts[k])}</span><b>${esc(o.lines[k])}</b></div>`)
