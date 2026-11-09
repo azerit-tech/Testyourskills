@@ -12,7 +12,7 @@ Un outil de communication pour azerit.tech : tu donnes ton pseudo GitHub ou ton 
 - **Faire circuler le nom** : chaque carte partagée sur LinkedIn ou X porte le domaine. La carte est le support, la landing est l'atterrissage.
 - **Montrer ce que l'IA sait faire** sur un cas concret, avec une pointe d'ironie sur le fait qu'une IA vient de juger quelqu'un en dix secondes sur deux pages de PDF, comme un recruteur pressé.
 - **Récupérer des leads** : parmi ceux qui jouent, certains recrutent. Un email optionnel après la carte, et un CTA vers azerit.tech.
-- **Le coup marketing** (décision du 15 octobre 2026) : chaque semaine, les cinq meilleures cartes décrochent un entretien avec une entreprise qui recrute via Azerit. C'est la promesse en haut de l'accueil, et la raison de jouer avec son vrai GitHub plutôt que de regarder. Proposition du 9 novembre 2026 : remplacé par les primes des entreprises partenaires, par ligue (stage, alternance, CDI), voir §18.4.
+- **Le coup marketing** (décision du 15 octobre 2026) : chaque semaine, les cinq meilleures cartes décrochent un entretien avec une entreprise qui recrute via Azerit. C'est la promesse en haut de l'accueil, et la raison de jouer avec son vrai GitHub plutôt que de regarder. Depuis le 9 novembre 2026 : remplacé par les primes des entreprises partenaires, par ligue (stage, alternance, CDI), voir §18.4.
 
 Audience de l'outil : les devs, en français et en anglais. Audience de la landing : ceux qui recrutent. Les deux ne se mélangent pas (voir §10).
 
@@ -675,7 +675,7 @@ Jacques a dit « vasy », puis, la plongée à peine commitée : « l'ascenseur 
 
 ## 18. Saison 1 : les primes, et ce qui fait partager
 
-*Proposition du 9 novembre 2026, à valider point par point par Jacques. Rien ici n'est construit. Elle part d'un constat : la fiche se vit seul, une note isolée ne dit rien, seuls les bons partagent, et le plus beau moment (la révélation) ne se partage pas. Ailleurs, ce qui circule, c'est l'identité (Spotify Wrapped), la comparaison (« top 1 % ») et le groupe ; les dizaines d'outils « roast my GitHub » n'ont pas décollé, la moquerie seule ne suffit pas. Les entreprises partenaires sont l'affaire de Jacques et ne sont pas décrites ici.*
+*Proposée et validée le 9 novembre 2026 (Jacques : « oui à tout »). La construction commence par la mise en ligne (§18.0). Elle part d'un constat : la fiche se vit seul, une note isolée ne dit rien, seuls les bons partagent, et le plus beau moment (la révélation) ne se partage pas. Ailleurs, ce qui circule, c'est l'identité (Spotify Wrapped), la comparaison (« top 1 % ») et le groupe ; les dizaines d'outils « roast my GitHub » n'ont pas décollé, la moquerie seule ne suffit pas. Les entreprises partenaires sont l'affaire de Jacques et ne sont pas décrites ici.*
 
 ### 18.0 Prérequis : la mise en ligne
 
@@ -825,7 +825,10 @@ Règle : **chaque détail sort d'un fait** (même entrée, même scène, comme l
 - **Ensuite** : la purge, l'interrogatoire et le choix du personnage, l'ascenseur personnalisé et sa panne, le flash, les petits détails, le précalcul final de l'open space.
 - **Fin de saison** : finalistes, relecture humaine, annonce des gagnants, témoignages.
 
-### 18.16 À trancher par Jacques
+### 18.16 Tranché par Jacques le 9 novembre 2026
+
+Oui à toutes les propositions ci-dessous : elles sont la cible.
+
 
 - La fiche sur le pseudo d'un autre, en taquin, revendicable et masquable (proposé : oui).
 - Les dates de la saison (proposé : du 19 novembre au 31 décembre 2026).
