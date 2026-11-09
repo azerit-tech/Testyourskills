@@ -726,7 +726,7 @@ describe("page /c/:id et images", () => {
     expect(res.status).toBe(200);
     const html = await res.text();
     const overall = FIXTURES.gold.overall;
-    expect(html).toContain(`<meta property="og:title" content="Fiche ★★★★, ${overall} — Léa Martin-Dubois">`);
+    expect(html).toContain(`<meta property="og:title" content="Fiche ★★★★★, ${overall} — Léa Martin-Dubois">`);
     expect(html).toContain(`<meta property="og:image" content="https://skills.test/og/${id}.png">`);
     expect(html).toContain(`<meta property="og:url" content="https://skills.test/c/${id}">`);
     expect(html).toContain(`<meta property="og:image:width" content="1200">`);

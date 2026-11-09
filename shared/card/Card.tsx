@@ -39,7 +39,7 @@ export interface CardGraphicProps extends CardProps {
 const L = {
   left: 20,
   right: CARD_W - 18,
-  stars: { x: 20, y: 18, size: 19, gap: 4 },
+  stars: { x: 20, y: 18, size: 16, gap: 3 },
   overall: { x: 18, y: 130, size: 118 },
   levelY: 156,
   metaLabelY: 176,
@@ -141,9 +141,9 @@ function Stars({ n, th, id }: { n: number; th: CardTheme; id: string }) {
   const k = size / 24;
   return (
     <g>
-      {[1, 2, 3, 4, 5].map((i) => {
+      {[1, 2, 3, 4, 5, 6].map((i) => {
         const tx = x + (i - 1) * (size + gap);
-        const on = i <= n;
+        const on = i > 6 - n;
         return (
           <g key={i} transform={`translate(${tx} ${y}) scale(${k})`}>
             {on && <path d={STAR} fill={th.accent} opacity={0.9} filter={`url(#${id}-starglow)`} />}

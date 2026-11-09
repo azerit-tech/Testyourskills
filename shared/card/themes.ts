@@ -107,27 +107,35 @@ export const THEMES: Record<ThemeKey, CardTheme> = {
     haze: 0.28,
     fx: { holo: 0.3, glare: 0.35, grain: 0.3, holoColors: ["#f6c37a", "#c98430", "#ffd9a0", "#a86a22", "#f0a848"], glow: "rgba(240,168,72,0.3)" },
   }),
-  s2: base("s2", { fr: "Suspect", en: "Suspect" }, {
+  s2: base("s2", { fr: "Délit", en: "Misdemeanor" }, {
     accent: PALETTE.pink, accent2: PALETTE.pink,
     num: [[0, "#ff8ccb"], [1, PALETTE.pink]],
     haze: 0.38,
     fx: { holo: 0.4, glare: 0.4, grain: 0.26, holoColors: ["#ff8ccb", PALETTE.pink, "#ffc2e2", "#c22a7c", "#ff5fb5"], glow: "rgba(255,63,164,0.32)" },
   }),
-  s3: base("s3", { fr: "Recherché", en: "Wanted" }, {
+  s3: base("s3", { fr: "Avis de recherche", en: "Wanted" }, {
     accent: PALETTE.pink, accent2: PALETTE.cyan,
     num: [[0, PALETTE.pink], [1, PALETTE.cyan]],
     haze: 0.5,
     palms: 0.85,
     fx: { holo: 0.55, glare: 0.45, grain: 0.22, holoColors: [PALETTE.pink, "#b06cff", PALETTE.cyan, "#7af0ff", "#ff7ec6"], glow: "rgba(255,63,164,0.36)" },
   }),
-  s4: base("s4", { fr: "Dangereux", en: "Dangerous" }, {
+  s4: base("s4", { fr: "Haute surveillance", en: "High surveillance" }, {
     accent: PALETTE.orange, accent2: PALETTE.pink,
     num: [[0, PALETTE.yellow], [0.45, PALETTE.orange], [1, PALETTE.pink]],
     haze: 0.62,
     palms: 0.95,
     fx: { holo: 0.65, glare: 0.5, grain: 0.2, holoColors: [PALETTE.yellow, PALETTE.orange, PALETTE.pink, "#ff9a5a", "#ffd97a"], glow: "rgba(255,122,61,0.4)" },
   }),
-  s5: base("s5", { fr: "Ennemi public", en: "Public enemy" }, {
+  s5: base("s5", { fr: "Menace publique", en: "Public menace" }, {
+    accent: PALETTE.pink, accent2: PALETTE.violet,
+    num: SUNSET,
+    haze: 0.78,
+    palms: 0.95,
+    holoBand: true,
+    fx: { holo: 0.8, glare: 0.55, grain: 0.18, holoColors: [PALETTE.yellow, PALETTE.orange, PALETTE.pink, PALETTE.violet, PALETTE.cyan], glow: "rgba(255,63,164,0.5)" },
+  }),
+  s6: base("s6", { fr: "Priorité absolue", en: "Top priority" }, {
     accent: PALETTE.pink, accent2: PALETTE.violet,
     num: SUNSET,
     haze: 0.78,
@@ -168,14 +176,14 @@ export function themeOf(card: Pick<CardData, "overall" | "special">): CardTheme 
 }
 
 /** Compatibilité : les compositions serveur passent encore le style (tier ou spéciale).
- *  Les tiers ne distinguent pas ★ de ★★ : bronze donne ★. Préférer themeOf(card). */
+ *  Les tiers ne distinguent pas ★ à ★★★ : bronze donne ★. Préférer themeOf(card). */
 export function themeFor(style: CardStyle | Stars): CardTheme {
   if (typeof style === "number") return THEMES[`s${style}`];
   switch (style) {
     case "bronze": return THEMES.s1;
-    case "silver": return THEMES.s3;
-    case "gold": return THEMES.s4;
-    case "icon": return THEMES.s5;
+    case "silver": return THEMES.s4;
+    case "gold": return THEMES.s5;
+    case "icon": return THEMES.s6;
     default: return THEMES[style];
   }
 }

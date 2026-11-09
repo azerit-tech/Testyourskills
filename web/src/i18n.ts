@@ -62,12 +62,12 @@ const fr = {
     XP: { name: "Expérience", what: "L'ancienneté réelle ou déclarée." },
     BUZZ: { name: "Buzzwords", what: "La densité de vent. Ne compte pas dans la note." },
   } satisfies Record<StatCode, { name: string; what: string }>,
-  /* Niveaux de recherche (§17.3) : Bronze couvre ★ et ★★, on garde le premier. */
+  /* Niveaux de recherche (§18.18) : Bronze couvre ★ à ★★★, on garde le premier. */
   tiers: {
     bronze: "Petit délit",
-    silver: "Recherché",
-    gold: "Dangereux",
-    icon: "Ennemi public",
+    silver: "Haute surveillance",
+    gold: "Menace publique",
+    icon: "Priorité absolue",
     wonderkid: "Nouveau en ville",
     flashback: "Affaire classée",
     totw: "Les 5 plus recherchés",
@@ -400,9 +400,9 @@ const en: Dict = {
   },
   tiers: {
     bronze: "Petty crime",
-    silver: "Wanted",
-    gold: "Dangerous",
-    icon: "Public enemy",
+    silver: "High surveillance",
+    gold: "Public menace",
+    icon: "Top priority",
     wonderkid: "New in town",
     flashback: "Cold case",
     totw: "5 most wanted",
