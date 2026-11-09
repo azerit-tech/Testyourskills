@@ -1,5 +1,7 @@
 // Petit routeur sur l'API history : un chemin, des écouteurs, rien de plus.
 import { useSyncExternalStore } from "react";
+import { isReservedSegment, isUpcomingPath } from "../../../shared/routes";
+import { parseLogin } from "./util";
 
 const listeners = new Set<() => void>();
 
@@ -43,4 +45,35 @@ export function onLinkClick(e: React.MouseEvent<HTMLAnchorElement>, to: string) 
   if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
   e.preventDefault();
   navigate(to);
+}
+
+export type Route =
+  | { kind: "home" }
+  | { kind: "card"; id: string }
+  | { kind: "privacy" }
+  | { kind: "direct"; login: string }
+  /** Page à venir (§18.27) : retour à l'accueil, jamais de fiche. */
+  | { kind: "upcoming" }
+  | { kind: "notFound" };
+
+function safeDecode(s: string): string {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+}
+
+/** Ce que montre un chemin. Un mot réservé (shared/routes.ts) n'est jamais un pseudo. */
+export function routeOf(path: string): Route {
+  const card = /^\/c\/([A-Za-z0-9_-]+)\/?$/.exec(path);
+  if (card) return { kind: "card", id: card[1] };
+  if (path === "/" || path === "") return { kind: "home" };
+  if (/^\/(confidentialite|privacy)\/?$/.test(path)) return { kind: "privacy" };
+  if (isUpcomingPath(path)) return { kind: "upcoming" };
+  // /{pseudo} : la carte sans champ (§6.1).
+  const direct = /^\/([^/]+)\/?$/.exec(path);
+  const login = direct ? parseLogin(safeDecode(direct[1])) : null;
+  if (login && !isReservedSegment(login)) return { kind: "direct", login };
+  return { kind: "notFound" };
 }

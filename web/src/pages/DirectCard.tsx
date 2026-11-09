@@ -2,6 +2,7 @@
 // remplace l'URL par /c/:id. En cas d'erreur, retour à l'entrée avec le pseudo
 // prérempli et le message. Les robots n'exécutent pas ce code : aucun coût sur un crawl.
 import { useEffect, useRef } from "react";
+import { isReservedSegment } from "../../../shared/routes";
 import { useT } from "../i18n";
 import { api, tokens } from "../lib/api";
 import { errorFact } from "../lib/errors";
@@ -16,6 +17,11 @@ export function DirectCard({ login }: { login: string }) {
     // Un seul départ, même quand StrictMode rejoue l'effet en dev.
     if (once.current) return;
     once.current = true;
+    // Un mot réservé (« primes ») n'est jamais un pseudo : aucune fiche, retour à l'accueil.
+    if (isReservedSegment(login)) {
+      navigate("/", { replace: true });
+      return;
+    }
     document.title = t.meta.title;
     api.createCard({ login, lang }).then(
       (res) => {

@@ -9,6 +9,7 @@ import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { z } from "zod";
 import { FIXTURES } from "../../shared/fixtures";
+import { isUpcomingPath } from "../../shared/routes";
 import type { CardData, ComparisonData, ErrorCode, Fact, JobState, Lang } from "../../shared/types";
 import { stripToken, type CardRow, type Store } from "./db";
 import { buildLead, clientEventSchema, sendLead } from "./events";
@@ -633,6 +634,13 @@ export function createApp(opts: AppOptions) {
     claim: !!opts.githubAuth,
     secure: opts.secureCookies ?? baseUrl.startsWith("https://"),
     stateSecret: opts.githubAuth?.sessionSecret,
+  });
+
+  // Pages à venir (/primes, /vs, /u…, §18.27) : jamais un pseudo, retour à l'accueil, query gardée (?mock=1).
+  app.get("*", async (c, next) => {
+    if (!isUpcomingPath(c.req.path)) return next();
+    c.header("Cache-Control", "no-store");
+    return c.redirect(`/${new URL(c.req.url).search}`, 302);
   });
 
   app.notFound((c) => {

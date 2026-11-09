@@ -1257,3 +1257,28 @@ describe("file d'attente (MAX_CONCURRENT_CARDS)", () => {
     expect(g.order).toEqual(["a1"]);
   });
 });
+
+describe("pages à venir (§18.27)", () => {
+  it("/primes, /vs, /u/… ramènent à l'accueil en 302, query gardée, sans fiche", async () => {
+    const root = mkdtempSync(join(tmpdir(), "tys-web-"));
+    const index = `<html><head></head><body><div id="root"></div></body></html>`;
+    writeFileSync(join(root, "index.html"), index);
+    const ctx = setup({}, { staticRoot: root, indexHtml: async () => index });
+    const cases: [string, string][] = [
+      ["/primes", "/"],
+      ["/Reglement/", "/"],
+      ["/vs/a/b?mock=1", "/?mock=1"],
+      ["/bandes", "/"],
+      ["/badge/octocat", "/"],
+      ["/u/octocat?mock=1&x=2", "/?mock=1&x=2"],
+    ];
+    for (const [path, to] of cases) {
+      const res = await ctx.app.request(path);
+      expect(res.status, path).toBe(302);
+      expect(res.headers.get("location"), path).toBe(to);
+    }
+    expect(ctx.calls.collect).toBe(0);
+    // Un vrai pseudo qui commence par un mot réservé passe au front.
+    for (const path of ["/usain", "/badger"]) expect((await ctx.app.request(path)).status, path).toBe(200);
+  });
+});
