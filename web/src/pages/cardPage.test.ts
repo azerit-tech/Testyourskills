@@ -60,9 +60,9 @@ const card = (over: Partial<CardData> = {}): Shareable => ({ kind: "card", card:
 afterEach(() => vi.unstubAllGlobals());
 
 describe("page partagée, vue par un visiteur", () => {
-  it("une ligne d'en-tête, la fiche, puis le jury, le profil, le dossier, « Et toi ? »", () => {
+  it("l'en-tête, la fiche, puis le jury, la peine, le dossier, « Et toi ? »", () => {
     const html = renderResult(card(), { owner: false });
-    const order = at(html, ['class="wanted"', 'class="result-stage"', 'class="jury"', 'class="profile-tile', 'class="after-block dossier"', 'id="you"']);
+    const order = at(html, ['class="wanted"', 'class="result-stage"', 'class="jury"', 'class="penalty"', 'class="after-block dossier"', 'id="you"']);
     expect(ascending(order), JSON.stringify(order)).toBe(true);
   });
 
@@ -75,11 +75,12 @@ describe("page partagée, vue par un visiteur", () => {
     expect(head).not.toContain("svg");
   });
 
-  it("le profil et la peine passent dans la tuile, sous la fiche", () => {
+  it("la peine, en texte sous la fiche : l'image du profil est en ciel de page, plus en tuile", () => {
     const html = renderResult(card(), { owner: false });
-    const tile = html.indexOf('class="profile-tile');
-    expect(tile).toBeGreaterThan(html.indexOf('class="result-stage"'));
-    if (FIXTURES.gold.sentence) expect(html.indexOf("Peine")).toBeGreaterThan(tile);
+    const penalty = html.indexOf('class="penalty"');
+    expect(penalty).toBeGreaterThan(html.indexOf('class="result-stage"'));
+    expect(html.indexOf("Peine")).toBeGreaterThan(penalty);
+    expect(html.match(/<img src="\/profiles\//g)).toHaveLength(1);
   });
 
   it("ni partage, ni dénonciation, ni pièces à conviction pour le visiteur", () => {
@@ -89,20 +90,19 @@ describe("page partagée, vue par un visiteur", () => {
     expect(html).not.toContain('class="fold why"');
   });
 
-  it("sans profil : pas de tuile, le reste en place", () => {
+  it("sans profil : la peine reste, le reste en place", () => {
     const { profile: _p, ...bare } = FIXTURES.gold;
     const html = renderResult({ kind: "card", card: { ...(bare as CardData), id: "VisitCard02" } }, { owner: false });
-    expect(html).not.toContain("profile-tile");
-    expect(ascending(at(html, ['class="result-stage"', 'class="jury"', 'id="you"']))).toBe(true);
+    expect(ascending(at(html, ['class="result-stage"', 'class="jury"', 'class="penalty"', 'id="you"']))).toBe(true);
   });
 });
 
 describe("après-fiche, vue par qui a fait la fiche (§18.27)", () => {
   const mine = (id: string) => card({ id });
 
-  it("le pari et le jury, le profil, le partage, la dénonciation, le dossier, puis le reste en lignes", () => {
+  it("le pari et le jury, la peine, le partage, la dénonciation, le dossier, puis le reste en lignes", () => {
     const html = renderResult(mine("OwnCard0001"), { owner: true, token: "tok", plea: 6 });
-    const order = at(html, ['class="after-head"', 'class="plea-verdict"', 'class="profile-tile', 'class="after-block out"', 'class="after-block denounce"', 'class="after-block dossier"', 'class="rest"', 'class="after-foot"']);
+    const order = at(html, ['class="after-head"', 'class="plea-verdict"', 'class="penalty"', 'class="after-block out"', 'class="after-block denounce"', 'class="after-block dossier"', 'class="rest"', 'class="after-foot"']);
     expect(ascending(order), JSON.stringify(order)).toBe(true);
     // l'en-tête sur le ciel, en tête de page, et un seul h1 ; pas de « Et toi ? »
     expect(html.indexOf('class="wanted"')).toBeLessThan(html.indexOf('class="result-stage"'));
@@ -133,9 +133,14 @@ describe("après-fiche, vue par qui a fait la fiche (§18.27)", () => {
     expect(html).not.toContain("fold add-source");
   });
 
-  it("la peine passe dans la tuile : « Pourquoi cette note » ne la répète pas", () => {
+  it("la peine est sous la fiche : « Pourquoi cette note » ne la répète pas", () => {
     const html = renderResult(mine("OwnCard0004"), { owner: true });
     expect(html).not.toContain("why-sentence");
+    // comparaison sans profil : la peine une fois, sous les fiches, pas dans la ligne repliée
+    const { profile: _p, ...gh } = { ...FIXTURE_COMPARISON.github, sentence: FIXTURES.gold.sentence };
+    const cmp = renderResult({ kind: "comparison", comparison: { ...FIXTURE_COMPARISON, id: "OwnCmp0001", github: gh as CardData } }, { owner: true });
+    expect(cmp).toContain('class="penalty"');
+    expect(cmp).not.toContain("why-sentence");
   });
 
   it("le jury du propriétaire : une ligne de texte courant, pas un titre", () => {

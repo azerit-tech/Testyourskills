@@ -1769,89 +1769,18 @@ a.dossier-item:hover {
   text-wrap: pretty;
 }
 
-/* la tuile de profil (§18.28) : le lieu du crime au ratio 3:2, le nom et la phrase en bas à gauche.
-   Sans illustration : un aplat de la teinte de carte et un grand palmier ton sur ton. */
-.profile-tile {
-  display: grid;
-  gap: 10px;
-  min-width: 0;
-}
-.tint-plum {
-  --tile: var(--plum);
-  --tile-palm: #5a3a64;
-}
-.tint-navy {
-  --tile: var(--navy);
-  --tile-palm: #2c3a60;
-}
-.profile-art {
-  position: relative;
-  display: flex;
-  align-items: flex-end;
-  aspect-ratio: 3 / 2;
-  overflow: hidden;
-  /* le rayon des grandes cartes du site */
-  border-radius: 25.6px;
-  background: var(--tile);
-}
-.profile-palm {
-  position: absolute;
-  right: -6%;
-  bottom: -6%;
-  width: 56%;
-  height: auto;
-  fill: var(--tile-palm);
-}
-.profile-art img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-/* un voile d'encre, pas un dégradé de couleur : nul en haut (le sujet), à 75 % à partir de 45 % de la hauteur,
-   sous tout le texte, qui en occupe jusqu'à la moitié basse à 390 px (contraste AA même sur un ciel clair) */
-.profile-tile.has-art .profile-art::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to bottom, rgba(12, 13, 27, 0) 0%, rgba(12, 13, 27, 0.75) 45%, rgba(12, 13, 27, 0.75) 100%);
-}
-.profile-copy {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  gap: 4px;
-  max-width: 82%;
-  padding: 18px;
-}
-.profile-kicker {
-  font: 600 11px/1.2 var(--f-text);
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--lilac);
-}
-.profile-name {
-  font: 700 34px/0.92 var(--f-name);
-  text-transform: uppercase;
-  color: var(--cream);
-  text-wrap: balance;
-  overflow-wrap: anywhere;
-}
-.profile-hook {
-  font: 500 16px/1.3 var(--f-text);
-  color: var(--blush);
-  text-wrap: pretty;
-}
-.profile-sentence {
+/* sous la fiche (§18.29) : la peine, puis la caution, en texte, sans cadre ; l'image est en ciel de page */
+.penalty {
   display: grid;
   gap: 2px;
+  min-width: 0;
   padding: 0 4px;
-  font: 500 13px/1.4 var(--f-text);
-  color: var(--lilac);
+  font: 600 15px/1.35 var(--f-text);
+  color: var(--cream);
+  text-wrap: pretty;
 }
-.profile-sentence span + span {
-  font-weight: 400;
+.penalty span + span {
+  font: 400 14px/1.4 var(--f-text);
   color: var(--lilac-2);
 }
 

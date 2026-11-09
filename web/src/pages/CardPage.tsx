@@ -13,7 +13,7 @@ import { Dossier } from "../components/Findings";
 import { Jury, JuryLine } from "../components/Jury";
 import { MakeYours } from "../components/MakeYours";
 import { PleaVerdict } from "../components/Plea";
-import { ProfileSky, ProfileTile } from "../components/ProfileTile";
+import { Penalty, ProfileSky } from "../components/ProfileTile";
 import { CardViewOptions } from "../card/CardView";
 import { RevealCard, useReveal } from "../components/Reveal";
 import { ShareDock } from "../components/ShareDock";
@@ -440,14 +440,14 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
           </p>
         </section>
 
-        {/* Sous la fiche, pour le visiteur : le jury, le profil, le dossier, puis « Et toi ? ». */}
+        {/* Sous la fiche, pour le visiteur : le jury, la peine, le dossier, puis « Et toi ? ». */}
         {visitor && (
           <div className="visitor-col">
             {/* Fiche dénoncée (§18.6) : « Avis de recherche à ton nom », juste sous la fiche. */}
             {wantedYou && <Denounced by={kase?.by ?? null} onLawyer={claimOn && cardLogin ? () => api.startClaim(id, cardLogin) : null} />}
             {/* Le jury (§18.27) : un geste à un toucher, avant « Et toi ? ». */}
             <Jury cardId={id} card={main} jury={kase?.jury ?? null} toast={toast.show} />
-            <ProfileTile card={main} />
+            <Penalty card={main} />
             {/* L'enquête en direct (§18.26) : les trois trouvailles les plus fortes, chacune vers sa preuve. */}
             <Dossier card={main} />
             <section className="you" id="you" aria-labelledby="you-title">
@@ -471,14 +471,14 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
       </div>
 
       <div className={`after${settled ? " is-in" : ""}`} aria-hidden={!settled} inert={!settled ? true : undefined}>
-        {/* L'après-fiche raccourci (§18.27) : le pari et le jury, le profil, le partage, la dénonciation, le dossier, puis le reste en lignes. */}
+        {/* L'après-fiche raccourci (§18.27) : le pari et le jury, la peine, le partage, la dénonciation, le dossier, puis le reste en lignes. */}
         {!visitor && (
           <div className="after-head">
             <PleaVerdict cardId={id} overall={main.overall} shown={settled} />
             <JuryLine jury={kase?.jury ?? null} />
           </div>
         )}
-        {!visitor && <ProfileTile card={main} />}
+        {!visitor && <Penalty card={main} />}
         {/* Fiche masquée : /og/* et /c/:id répondent 404 / 410 à tous, l'image ne se télécharge pas et le lien ne montre rien. */}
         {!visitor && !(claimed && me?.hidden) && <ShareBar item={item} toast={toast.show} />}
         {/* Dénonce un complice (§18.6), juste après le partage. */}
@@ -488,9 +488,9 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
         {/* Fiche LinkedIn seule (§18.24) : « Ajoute ton GitHub pour prouver » est l'appel principal, pas une ligne repliée. */}
         {!visitor && proveFirst && <AddSource card={main} />}
         <div className="rest">
-          {/* La peine est déjà sous la tuile de profil. */}
+          {/* La peine est déjà sous la fiche. */}
           {/* Fiche seule : ses pièces à conviction sont au dos (§18.27). La comparaison garde la ligne. */}
-          {!visitor && item.kind === "comparison" && <Why item={item} withSentence={!main.profile} />}
+          {!visitor && item.kind === "comparison" && <Why item={item} withSentence={false} />}
           {/* Fiche dénoncée : « Appeler mon avocat » est déjà sous la fiche. */}
           {!(wantedYou && claimOn) && <Claim cardId={id} login={cardLogin} lawyer={!owner} me={me} onMe={onMe} toast={toast.show} />}
           {!visitor && <LinkedInPhoto cardId={id} hasAvatar={item.kind === "card" ? !!item.card.avatarUrl : !!item.comparison.cv.avatarUrl} />}
