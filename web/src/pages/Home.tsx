@@ -1,5 +1,5 @@
 // Entrée (§6.1, §18.5, maquette web/gta-accueil.html) : la promesse, le champ, la fiche de Jacques,
-// puis le top de la semaine (§18.22). Rien d'autre.
+// puis le mur des 13 profils (§18.28) et le top de la semaine (§18.22). Rien d'autre.
 // L'exemple est la vraie fiche de Jacques (fondateur d'Azerit) : la maquette
 // s'affiche d'abord, la fiche calculée par le serveur la remplace dès qu'elle existe.
 // Le seul dégradé de l'écran est le ciel de cette fiche.
@@ -9,6 +9,7 @@ import { LEVEL_LABELS, starsFor } from "../../../shared/types";
 import { FIXTURES } from "../../../shared/fixtures";
 import { CardView } from "../card/CardView";
 import { EntryForm } from "../components/EntryForm";
+import { ProfileWall } from "../components/ProfileWall";
 import { WeekBoard } from "../components/WeekBoard";
 import { useT } from "../i18n";
 import { api } from "../lib/api";
@@ -57,14 +58,16 @@ export function Home() {
     document.title = t.meta.title;
   }, [t]);
 
-  /** Une place libre du top : retour au champ du pseudo, prêt à taper. */
+  /** Une place libre du top, « Découvre le tien » : retour au champ du pseudo,
+   * prêt à taper. Le focus se donne dans le geste, sinon l'iPhone n'ouvre pas le clavier. */
   const play = () => {
+    const behavior: ScrollBehavior = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
     const input = inputRef.current;
     if (!input) {
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      window.scrollTo({ top: 0, behavior });
       return;
     }
-    input.scrollIntoView({ block: "center", behavior: "smooth" });
+    input.scrollIntoView({ block: "center", behavior });
     input.focus({ preventScroll: true });
   };
 
@@ -78,6 +81,7 @@ export function Home() {
         </div>
         <ExampleCard />
       </section>
+      <ProfileWall onPlay={play} />
       <WeekBoard onPlay={play} />
     </main>
   );

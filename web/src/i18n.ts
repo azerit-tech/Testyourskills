@@ -52,6 +52,12 @@ const fr = {
     inlineCv: "ou avec ton CV",
     exampleLabel: "Exemple de fiche",
     exampleCaption: "La vraie fiche de Jacques, fondateur d'Azerit",
+    /* Mur des 13 profils (§18.28) */
+    wall: {
+      title: "Lequel es-tu ?",
+      you: "Et toi ?",
+      cta: "Découvre le tien",
+    },
     /* Top de la semaine (§18.22) */
     top: {
       title: "Top de la semaine",
@@ -517,6 +523,11 @@ const en: Dict = {
     inlineCv: "or with your CV",
     exampleLabel: "Example sheet",
     exampleCaption: "The real sheet of Jacques, Azerit's founder",
+    wall: {
+      title: "Which one are you?",
+      you: "And you?",
+      cta: "Find yours",
+    },
     top: {
       title: "This week's top",
       meta: (week, n, left) => [`Week ${week}`, showsTotal(n) && `${n} files`, `ends in ${left}`].filter(Boolean).join(" · "),
