@@ -199,7 +199,9 @@ const fr = {
       copy: "Copier le lien",
       download: "Télécharger l'image",
       native: "Partager",
-      linkedinHint: "Texte copié : colle-le dans ton post LinkedIn.",
+      /** Le libellé du bouton LinkedIn une fois le texte dans le presse-papier ; `copiedShort` dans la barre du pouce. */
+      linkedinCopied: "Texte copié · colle-le dans ton post",
+      copiedShort: "Texte copié",
       copiedLink: "Lien copié.",
       downloadDemo: "Image indisponible en mode démo (rendue par le serveur).",
       /** Les morceaux du texte de partage, assemblés et raccourcis par lib/shareText.ts (§18.27). */
@@ -605,7 +607,8 @@ const en: Dict = {
       copy: "Copy link",
       download: "Download image",
       native: "Share",
-      linkedinHint: "Text copied: paste it into your LinkedIn post.",
+      linkedinCopied: "Text copied · paste it into your post",
+      copiedShort: "Text copied",
       copiedLink: "Link copied.",
       downloadDemo: "Image unavailable in demo mode (rendered by the server).",
       words: {

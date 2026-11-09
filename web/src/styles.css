@@ -1274,6 +1274,13 @@ a.dossier-item:hover {
 .out .out-second {
   width: 100%;
 }
+/* « Texte copié · colle-le dans ton post » : à 390 px, le libellé passe sur deux lignes plutôt que de déborder */
+.out .is-copied {
+  padding-block: 8px;
+  line-height: 1.2;
+  white-space: normal;
+  text-wrap: balance;
+}
 .out-more {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

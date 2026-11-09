@@ -9,7 +9,7 @@ import { navigate } from "../lib/router";
 import { getPlea } from "../lib/plea";
 import { setPrefill } from "../lib/session";
 import { shareLead, shareText, shareTextX, type ShareInput } from "../lib/shareText";
-import { hasNativeShare, portraitFile, preloadPortrait, shareSheet } from "../lib/sharing";
+import { hasNativeShare, markTextCopied, portraitFile, preloadPortrait, shareSheet, useTextCopied } from "../lib/sharing";
 import { copyText, isTouch, shareUrl } from "../lib/util";
 import { IconDownload, IconLink, IconLinkedIn, IconShare, IconX } from "./Icons";
 import { ProveGithub } from "./ProveGithub";
@@ -144,37 +144,53 @@ export function useSharing(item: Shareable, toast: (m: string) => void) {
   };
 
   const liHref = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
-  const onLinkedIn = async (from?: string) => {
-    // Bouton plutôt que lien : certains bloqueurs masquent les liens de partage LinkedIn.
-    window.open(liHref, "_blank", "noopener");
-    // LinkedIn n'accepte plus de texte prérempli : on le met dans le presse-papier.
-    const ok = await copyText(shareText(ts.words, input, url));
-    if (ok) toast(ts.linkedinHint);
+  const textCopied = useTextCopied(id);
+  /**
+   * Au clic sur le lien LinkedIn. LinkedIn n'accepte pas de texte prérempli : il part dans le
+   * presse-papier, dans le geste et avant que l'onglet s'ouvre (Safari refuse une copie tardive).
+   */
+  const onLinkedIn = (from?: string) => {
+    void copyText(shareText(ts.words, input, url)).then((ok) => ok && markTextCopied(id));
     track("linkedin", from);
   };
 
-  return { id, url, input, filename, native, file, track, share, onLinkedIn };
+  return { id, url, input, filename, native, file, track, share, liHref, onLinkedIn, textCopied };
 }
 
 export type Sharing = ReturnType<typeof useSharing>;
 
-/** Le bouton principal : « Partager » sur téléphone, LinkedIn ailleurs. La barre du pouce a le même. */
-export function ShareMain({ kit, className = "", from }: { kit: Sharing; className?: string; from?: string }) {
+/**
+ * LinkedIn : un vrai lien, qui s'ouvre même là où `window.open` est bloqué. Son libellé garde
+ * « Texte copié » : on le lit au retour sur l'onglet, pas dans un message déjà parti.
+ */
+function LinkedInLink({ kit, className, from, short = false }: { kit: Sharing; className: string; from?: string; short?: boolean }) {
   const { t } = useT();
   const ts = t.result.share;
+  return (
+    <a
+      className={`${className}${kit.textCopied ? " is-copied" : ""}`}
+      href={kit.liHref}
+      target="_blank"
+      rel="noopener"
+      onClick={() => kit.onLinkedIn(from)}
+    >
+      <IconLinkedIn />
+      <span aria-live="polite">{kit.textCopied ? (short ? ts.copiedShort : ts.linkedinCopied) : ts.linkedin}</span>
+    </a>
+  );
+}
+
+/** Le bouton principal : « Partager » sur téléphone, LinkedIn ailleurs. La barre du pouce a le même. */
+export function ShareMain({ kit, className = "", from, short }: { kit: Sharing; className?: string; from?: string; short?: boolean }) {
+  const { t } = useT();
   if (kit.native)
     return (
       <button type="button" className={`pill pill-big ${className}`} onClick={() => kit.share(from)}>
         <IconShare />
-        {ts.native}
+        {t.result.share.native}
       </button>
     );
-  return (
-    <button type="button" className={`pill pill-big ${className}`} onClick={() => void kit.onLinkedIn(from)}>
-      <IconLinkedIn />
-      {ts.linkedin}
-    </button>
-  );
+  return <LinkedInLink kit={kit} className={`pill pill-big ${className}`} from={from} short={short} />;
 }
 
 export function ShareBar({ item, toast }: { item: Shareable; toast: (m: string) => void }) {
@@ -197,12 +213,7 @@ export function ShareBar({ item, toast }: { item: Shareable; toast: (m: string) 
       <h2 id="out-title">{ts.title}</h2>
       <ShareMain kit={kit} className="out-main" />
       {/* Trois boutons secondaires au plus. Sur téléphone, X passe par la feuille de partage. */}
-      {kit.native && (
-        <button type="button" className="pill pill-ghost out-second" onClick={() => void kit.onLinkedIn()}>
-          <IconLinkedIn />
-          {ts.linkedin}
-        </button>
-      )}
+      {kit.native && <LinkedInLink kit={kit} className="pill pill-ghost out-second" />}
       <div className="out-more">
         {!kit.native && (
           <button

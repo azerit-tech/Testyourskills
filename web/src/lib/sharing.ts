@@ -1,5 +1,6 @@
 // Le partage côté navigateur (§18.27) : l'image portrait préchargée en fichier,
 // la feuille de partage du système, et ce qu'on sait du navigateur intégré.
+import { useSyncExternalStore } from "react";
 import { images, isMock } from "./api";
 import { mockApi } from "./mock";
 import { copyText } from "./util";
@@ -111,4 +112,28 @@ export async function shareFile(file: File): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/* ---------- « texte copié », retenu par fiche ---------- */
+
+// Le bloc sous la fiche et la barre du pouce montrent le même état, et il tient
+// tant que la page vit : on le lit au retour de l'onglet LinkedIn.
+const copied = new Set<string>();
+const listeners = new Set<() => void>();
+
+export function markTextCopied(id: string): void {
+  if (copied.has(id)) return;
+  copied.add(id);
+  listeners.forEach((l) => l());
+}
+
+const subscribe = (l: () => void) => {
+  listeners.add(l);
+  return () => {
+    listeners.delete(l);
+  };
+};
+
+export function useTextCopied(id: string): boolean {
+  return useSyncExternalStore(subscribe, () => copied.has(id));
 }
