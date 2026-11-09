@@ -135,3 +135,11 @@ rebâtirait. Pour un retour durable : `git revert` sur `master`, push, puis
 ssh azerit 'cat /opt/testyourskills/.deployed_commit; docker ps --filter name=testyourskills'
 ssh azerit 'docker logs --tail 80 testyourskills'
 ```
+
+## Le tableau de la semaine
+
+Les chiffres du §13 de la spec, dont le coefficient viral, lus dans la base de production :
+
+```sh
+ssh azerit docker exec testyourskills node_modules/.bin/tsx scripts/weekly.ts --weeks 8
+```
