@@ -1492,31 +1492,28 @@ svg {
 
 /* ============ fiche partagée : la page personnage (§18.7) ============ */
 
-/* une ligne au-dessus de la fiche : « AVIS DE RECHERCHE @LOGIN » ; la fiche tient entière sous elle à 390 × 844 */
+/* au-dessus de la fiche, sur le ciel (§18.29) : « AVIS DE RECHERCHE » qui annonce, « @LOGIN » qui nomme ;
+   70 px à 390 px, la fiche tient entière sous lui à 390 × 844 */
 .wanted {
   min-width: 0;
-  padding-top: 4px;
+  padding-top: 8px;
 }
 .wanted-head {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
   min-width: 0;
-  font: 700 28px/1.1 var(--f-name);
-  text-transform: uppercase;
-  color: var(--cream);
-}
-.wanted-kicker {
-  flex: none;
-  font-size: 15px;
-  letter-spacing: 0.14em;
 }
 /* un pseudo trop long se coupe par des points de suspension, jamais sur deux lignes */
 .wanted-name {
   min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font: 700 clamp(36px, 11.5vw, 56px) / 0.95 var(--f-name);
+  text-transform: uppercase;
+  color: var(--cream);
 }
 
 /* sous la fiche du visiteur : le jury, le profil, le dossier, « Et toi ? » */
@@ -2633,10 +2630,10 @@ a.dossier-item:hover {
     padding: 24px 28px;
   }
   .wanted-head {
-    font-size: 44px;
+    gap: 8px;
   }
-  .wanted-kicker {
-    font-size: 18px;
+  .wanted-name {
+    font-size: 64px;
   }
   .you {
     padding: 28px 28px 24px;
@@ -2686,6 +2683,154 @@ a.dossier-item:hover {
   .deltas-col .deltas-legend {
     flex-direction: column;
     gap: 4px;
+  }
+}
+
+/* ============ §18.29 la page d'une fiche s'ouvre sur un ciel ============
+   L'illustration du profil, de bord à bord derrière la barre du haut, fondue dans l'encre par le bas :
+   c'est le seul dégradé ajouté, et aucun voile ne la couvre. L'en-tête se pose sur le ciel, la fiche
+   chevauche le bas de l'image. Le texte posé sur le ciel suit son heure : crème sur l'heure bleue,
+   encre sur l'heure rose (AA mesuré sur les 14 images, ProfileTile.tsx). */
+
+/* la voix qui annonce (docs/inspiration-gta6.md §1.3) : un surtitre posé sur un ciel */
+.announce {
+  font: 600 13px/1.2 var(--f-text);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--cream);
+}
+
+/* le ciel passe sous tout le contenu, barre du haut comprise : la coquille fait pile à part */
+.shell:has(> .page-result > .card-sky) {
+  isolation: isolate;
+}
+.card-sky {
+  /* La hauteur de l'image, plus grande que le cadre : son cinquième haut, du ciel seul, couvre la barre
+     et l'en-tête (64 + 70 px) ; l'aplat sombre du bas sort du cadre. Rendue en 1 230 × 820 à 390 px. */
+  --sky-img: 820px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: -1;
+  height: 50vh;
+  height: 50svh;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.9s ease;
+  -webkit-mask-image: linear-gradient(to bottom, #000 62%, transparent);
+  mask-image: linear-gradient(to bottom, #000 62%, transparent);
+}
+.card-sky.is-in {
+  opacity: 1;
+}
+.card-sky img {
+  width: 100%;
+  max-width: none;
+  height: var(--sky-img);
+  object-fit: cover;
+  object-position: 50% 0;
+  transform: scale(1.05);
+  transform-origin: 50% 30%;
+}
+/* comparaison : son titre et le sélecteur tiennent sur le ciel, jusqu'à 345 px */
+.card-sky.is-tall {
+  --sky-img: 1750px;
+  height: 600px;
+  -webkit-mask-image: linear-gradient(to bottom, #000 60%, transparent);
+  mask-image: linear-gradient(to bottom, #000 60%, transparent);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .card-sky.is-in img {
+    animation: sky-drift 20s ease-in-out infinite alternate;
+  }
+}
+@keyframes sky-drift {
+  from {
+    transform: scale(1.05);
+  }
+  to {
+    transform: scale(1.12);
+  }
+}
+
+/* l'en-tête attend la fiche : pendant la révélation 3D, il garde sa place sans se montrer */
+.page-result .wanted {
+  transition:
+    opacity 0.6s ease,
+    visibility 0s;
+}
+.page-result.is-animating .wanted {
+  opacity: 0;
+  visibility: hidden;
+  transition: none;
+}
+.wanted-kicker,
+.wanted-name,
+.cmp-loot,
+.cmp-headline,
+.topbar .brand,
+.topbar .lang-toggle button {
+  transition: color 0.9s ease;
+}
+
+/* ciel clair (heure rose) : le texte posé dessus passe à l'encre */
+.page-result:has(> .card-sky.sky-light.is-in) :is(.wanted-kicker, .wanted-name, .cmp-loot, .cmp-headline, .cmp-card figcaption) {
+  color: var(--ink-0);
+}
+.page-result:has(> .card-sky.sky-light.is-in) .cmp-headline em {
+  color: var(--plum);
+}
+.page-result:has(> .card-sky.sky-light.is-in) .cmp-switch {
+  box-shadow: inset 0 0 0 1.5px rgba(12, 13, 27, 0.35);
+}
+.page-result:has(> .card-sky.sky-light.is-in) .cmp-switch button:not([aria-selected="true"]) {
+  color: var(--ink-0);
+}
+.shell:has(> .page-result > .card-sky.sky-light.is-in) .topbar :is(.brand, .demo-pill) {
+  color: var(--ink-0);
+}
+.shell:has(> .page-result > .card-sky.sky-light.is-in) .topbar .lang-toggle {
+  box-shadow: inset 0 0 0 1.5px rgba(12, 13, 27, 0.35);
+}
+.shell:has(> .page-result > .card-sky.sky-light.is-in) .topbar .lang-toggle button {
+  color: var(--ink-0);
+}
+.shell:has(> .page-result > .card-sky.sky-light.is-in) .topbar .lang-toggle button[aria-pressed="true"] {
+  background: var(--ink-0);
+  color: var(--cream);
+}
+/* ciel sombre (heure bleue) : les petits textes lilas passent au crème ou au lilac plein */
+.page-result:has(> .card-sky.sky-dark.is-in) :is(.cmp-loot, .cmp-card figcaption) {
+  color: var(--cream);
+}
+.shell:has(> .page-result > .card-sky.sky-dark.is-in) .topbar .brand {
+  color: var(--cream);
+}
+.shell:has(> .page-result > .card-sky.sky-dark.is-in) .topbar .lang-toggle button:not([aria-pressed="true"]) {
+  color: var(--lilac);
+}
+
+@media (min-width: 900px) {
+  /* un bandeau sur toute la largeur ; fondu à 55 % : le texte de la colonne de gauche, sous le jury, est sur l'encre */
+  .card-sky {
+    --sky-img: 1200px;
+    height: clamp(380px, 46vh, 520px);
+    -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent);
+    mask-image: linear-gradient(to bottom, #000 55%, transparent);
+  }
+  .card-sky.is-tall {
+    --sky-img: 1400px;
+    height: clamp(420px, 52vh, 600px);
+  }
+  .wanted-kicker {
+    font-size: 15px;
+  }
+  /* qui a fait la fiche : une seule colonne, l'en-tête centré au-dessus de la fiche */
+  .page-result:not(.is-visitor) .wanted-head {
+    justify-items: center;
+    text-align: center;
   }
 }
 

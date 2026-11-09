@@ -7,6 +7,7 @@ import type { CardData } from "../../../shared/types";
 import { FIXTURE_COMPARISON, FIXTURES } from "../../../shared/fixtures";
 import { LangProvider } from "../i18n";
 import { Fold, type Shareable } from "../components/After";
+import { skyOf } from "../components/ProfileTile";
 import { JuryLine } from "../components/Jury";
 import { tokens } from "../lib/api";
 import { setPlea } from "../lib/plea";
@@ -103,8 +104,9 @@ describe("après-fiche, vue par qui a fait la fiche (§18.27)", () => {
     const html = renderResult(mine("OwnCard0001"), { owner: true, token: "tok", plea: 6 });
     const order = at(html, ['class="after-head"', 'class="plea-verdict"', 'class="profile-tile', 'class="after-block out"', 'class="after-block denounce"', 'class="after-block dossier"', 'class="rest"', 'class="after-foot"']);
     expect(ascending(order), JSON.stringify(order)).toBe(true);
-    // ni en-tête de visiteur, ni « Et toi ? »
-    expect(html).not.toContain('class="wanted"');
+    // l'en-tête sur le ciel, en tête de page, et un seul h1 ; pas de « Et toi ? »
+    expect(html.indexOf('class="wanted"')).toBeLessThan(html.indexOf('class="result-stage"'));
+    expect(html.match(/<h1/g)).toHaveLength(1);
     expect(html).not.toContain('id="you"');
   });
 
@@ -140,6 +142,35 @@ describe("après-fiche, vue par qui a fait la fiche (§18.27)", () => {
     stub("fr-FR");
     const html = renderToStaticMarkup(createElement(LangProvider, null, createElement(JuryLine, { jury: { guilty: 3, cleared: 1, mine: null } })));
     expect(html).toBe('<p class="jury-line">Le jury : 75 % coupable · 4 votes</p>');
+  });
+});
+
+describe("le ciel de la page (§18.29)", () => {
+  it("l'illustration du profil en premier, derrière la barre, chargée en priorité, muette pour les lecteurs d'écran", () => {
+    for (const owner of [false, true]) {
+      const html = renderResult(card({ id: owner ? "SkyCard0002" : "SkyCard0001" }), { owner });
+      const sky = /<div class="card-sky[^"]*" aria-hidden="true"><img[^>]*><\/div>/.exec(html)?.[0] ?? "";
+      expect(html).toContain(`id="main">${sky}`);
+      expect(sky).toContain(`src="/profiles/${FIXTURES.gold.profile!.id}.jpg"`);
+      expect(sky).toMatch(/width="1152" height="768" alt="" decoding="async" fetchpriority="high"/i);
+      // pas encore chargée : le texte reste crème sur l'encre
+      expect(sky).not.toContain("is-in");
+    }
+  });
+
+  it("le ton suit l'heure de l'image : l'heure rose est claire, l'heure bleue et l'image par défaut sombres", () => {
+    expect(skyOf("arsonist")).toEqual({ src: "/profiles/arsonist.jpg", tone: "light" });
+    expect(skyOf("night_owl").tone).toBe("dark");
+    expect(skyOf(undefined)).toEqual({ src: "/profiles/default.jpg", tone: "dark" });
+    expect(skyOf("../x").src).toBe("/profiles/default.jpg");
+    const { profile: _p, ...bare } = FIXTURES.gold;
+    const html = renderResult({ kind: "card", card: { ...(bare as CardData), id: "SkyCard0003" } }, { owner: false });
+    expect(html).toContain('<div class="card-sky sky-dark" aria-hidden="true"><img src="/profiles/default.jpg"');
+  });
+
+  it("comparaison : un ciel plus haut, sous son titre", () => {
+    const html = renderResult({ kind: "comparison", comparison: FIXTURE_COMPARISON }, { owner: true });
+    expect(html).toMatch(/<div class="card-sky sky-(light|dark) is-tall"/);
   });
 });
 

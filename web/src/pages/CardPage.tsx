@@ -13,7 +13,7 @@ import { Dossier } from "../components/Findings";
 import { Jury, JuryLine } from "../components/Jury";
 import { MakeYours } from "../components/MakeYours";
 import { PleaVerdict } from "../components/Plea";
-import { ProfileTile } from "../components/ProfileTile";
+import { ProfileSky, ProfileTile } from "../components/ProfileTile";
 import { CardViewOptions } from "../card/CardView";
 import { RevealCard, useReveal } from "../components/Reveal";
 import { ShareDock } from "../components/ShareDock";
@@ -390,6 +390,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
 
   return (
     <main className={`page page-card page-result${animating ? " is-animating" : ""}${visitor ? " is-visitor" : ""}`} id="main">
+      {/* Le ciel de la page (§18.29) : derrière la barre du haut, une fois la fiche posée. */}
+      <ProfileSky card={main} shown={settled} tall={item.kind === "comparison"} />
       {claimed && me?.hidden && (
         <p className="hidden-banner" role="status">
           {t.result.claim.hiddenBanner}
@@ -397,8 +399,9 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
       )}
 
       <div className="result-top">
-        {/* Lien partagé (§18.7) : une ligne, puis la fiche entière au-dessus de la ligne de flottaison. */}
-        {visitor && <WantedHead card={main} />}
+        {/* L'en-tête posé sur le ciel, puis la fiche entière au-dessus de la ligne de flottaison (§18.7, §18.29).
+            Comparaison de qui l'a faite : son titre tient déjà ce rôle. */}
+        {(visitor || item.kind === "card") && <WantedHead card={main} />}
 
         {animating && (
           // Morceau 3D introuvable : même repli que sans WebGL, la fiche sort sans révélation.
@@ -525,15 +528,15 @@ function versusLine(d: Dict["denounce"], mine: MyCard, card: CardData): string {
 }
 
 /**
- * En tête d'une fiche partagée, une seule ligne : « Avis de recherche · @login ». La fiche dit
- * le reste (étoiles, profil, note) ; la tuile de profil, la peine. Lu « Avis de recherche : @x ».
+ * En tête d'une fiche, posé sur le ciel : « AVIS DE RECHERCHE » dans la voix qui annonce, puis « @LOGIN ».
+ * La fiche dit le reste (étoiles, profil, note) ; le texte sous la fiche, la peine. Lu « Avis de recherche : @x ».
  */
 export function WantedHead({ card }: { card: CardData }) {
   const { t } = useT();
   return (
     <header className="wanted">
       <h1 className="wanted-head">
-        <span className="wanted-kicker">{t.result.wanted}</span>
+        <span className="wanted-kicker announce">{t.result.wanted}</span>
         <span className="sr-only">{t.result.wantedSep}</span>
         <span className="wanted-name">{card.login ? `@${card.login}` : card.name}</span>
       </h1>
