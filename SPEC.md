@@ -898,3 +898,23 @@ Barlow Condensed reste pour les titres, en 700, crème plat. Le texte courant po
 | ★★★★★★ | 90 et plus | Priorité absolue | Top priority |
 
 Pendant la montée de l'ascenseur, une étoile s'allume à 1, 30, 45, 60, 75 et 90. Les quatre tiers du barème (§3.2) ne changent pas. Seuls `starsFor`, `LEVEL_LABELS`, le rendu des étoiles (fiche, HUD, textes de partage) et les seuils du HUD changent, ainsi que les tests qui les fixent.
+
+**Maquette validée par Jacques le 9 novembre 2026** (`web/gta.html`, `gta-accueil.html`, `gta-partage.html`, `gta-carton.html`, `gta-image.html`, `gta.css`, `gta-card.js`), avec deux retouches :
+
+- **Le carton de fin devient mat.** Le mot du niveau est en `--dusk`, sans halo ni ombre lumineuse.
+- **L'image de partage portrait (1080 × 1350) agrandit la fiche.** Elle doit se lire en miniature dans un fil.
+
+Ce qui est retenu :
+
+- **Typographie :** Outfit pour le texte courant ; JetBrains Mono seulement pour la voix policière (pied de fiche, écriteau, horodatage).
+- **Étoiles et marque :** les étoiles en haut à droite de la fiche, la marque en haut à gauche.
+- **Fonds par niveau :**
+  - ★ à ★★★ : un fond qui descend dans son ton ;
+  - ★★★★ : la note en dégradé ;
+  - ★★★★★ et ★★★★★★ : un ciel en aplats, immeubles et palmiers.
+- **★★★★★★ seul a un contour éclairé par l'arrière.**
+- **Les spéciales portent une pilule plate.**
+- **La gemme Azerit est en facettes plates.**
+- **Page partagée :** « Avis de recherche : @X », et en phrase « @X est dans le viseur ».
+
+**La spéciale « Les 5 plus recherchés » devient « Top 5 de la semaine »** (EN « This week's top 5 »). Tous les autres textes qui s'accordent avec la personne sont réécrits en tournure épicène. La liste est relue par Jacques avant d'être appliquée.
