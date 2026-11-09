@@ -3160,6 +3160,41 @@ svg {
   }
 }
 
+/* téléphone : toute zone à toucher fait au moins 44 px de haut (§2.9). On
+   agrandit la zone (min-height, padding), jamais le texte. Ordinateur inchangé. */
+@media (max-width: 560px) {
+  /* en colonne, `flex: 1` portait sur la hauteur : le champ tombait à 24 px */
+  .email-form input {
+    flex: none;
+    height: 48px;
+  }
+  .email-form .btn-secondary {
+    width: 100%;
+  }
+  .lang-toggle button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .azerit-cta a {
+    min-height: 44px;
+    padding: 0 4px;
+  }
+  .link-arrow,
+  .link-danger,
+  .link-quiet,
+  .link-both,
+  .footer-azerit,
+  .footer-links a {
+    min-height: 44px;
+  }
+  .example-caption a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 2px 0;
+  }
+}
+
 @media (max-width: 380px) {
   .field-prefix {
     display: none;
