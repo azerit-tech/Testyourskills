@@ -2,7 +2,7 @@
 // étoiles de recherche en haut à droite, la mini-carte ronde en bas à gauche
 // avec le point du dev (deux pour une comparaison), les messages de la radio,
 // les quatre lignes du dossier (spécialité, arme, dossier, affiliation) et le
-// carton de fin de mission. Piloté image par image par la scène (walkout.ts) ;
+// carton de fin de mission (le niveau, « Suspect identifié : {profil} », la note). Piloté image par image par la scène (walkout.ts) ;
 // ne redessine que ce qui change. Styles : hud.css. La mini-carte est en
 // option (map) : l'ascenseur ne s'en sert pas.
 import type { HudTexts } from "./hudTexts";
@@ -39,7 +39,10 @@ export interface Hud {
 
 const STAR = "M12 2.6l2.9 6.1 6.7.8-4.9 4.6 1.3 6.6L12 17.4l-6 3.3 1.3-6.6L2.4 9.5l6.7-.8z";
 
-export function createHud(host: HTMLElement, o: { texts: HudTexts; lines: HudLines; title: string; overall: number; double: boolean; accent: string; map?: boolean }): Hud {
+export function createHud(
+  host: HTMLElement,
+  o: { texts: HudTexts; lines: HudLines; title: string; overall: number; double: boolean; accent: string; map?: boolean; profile?: string },
+): Hud {
   const root = document.createElement("div");
   root.className = "dive-hud";
   root.style.setProperty("--hud-accent", o.accent);
@@ -56,6 +59,7 @@ export function createHud(host: HTMLElement, o: { texts: HudTexts; lines: HudLin
     <div class="dive-hud__mission">
       <div class="dive-hud__band">
         <div class="dive-hud__title">${esc(o.title)}</div>
+        ${o.profile ? `<div class="dive-hud__suspect"><span>${esc(o.texts.suspect)}</span> <b>${esc(o.profile)}</b></div>` : ""}
         <div class="dive-hud__score"><span>${esc(o.texts.score)}</span><b>${o.overall}</b></div>
       </div>
     </div>`;

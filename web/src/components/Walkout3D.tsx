@@ -10,7 +10,7 @@ import { siGithub } from "simple-icons";
 import type { CardData, Lang } from "../../../shared/types";
 import { LEVEL_LABELS, starsFor } from "../../../shared/types";
 import { langIcon, langTitle } from "../../../shared/card/languages";
-import { useT } from "../i18n";
+import { pick, useT } from "../i18n";
 import { preloadWalkoutAssets } from "../three/assets";
 import { loadCardTexture } from "../three/cardTexture";
 import { HUD_TEXTS } from "../three/hudTexts";
@@ -144,6 +144,7 @@ export function Walkout3D({ card, lang, double, phase, anchorRef, controlRef, on
       idleSubtitle: tells.idle,
       graphLabel: tells.graph,
       levelLabel: LEVEL_LABELS[starsFor(card.overall)][lang],
+      profileLabel: card.profile ? pick(card.profile.label, lang) : undefined,
       hud: { specialty: tells.position, weapon: tells.language, file: tells.league, affiliation: tells.club, ...HUD_TEXTS[lang] },
     };
     (async () => {

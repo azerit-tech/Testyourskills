@@ -217,6 +217,19 @@
   transform: scale(1);
   letter-spacing: 0.04em;
 }
+/* le profil criminel (§18.2), dans le mono du libellé de la note */
+.dive-hud__suspect {
+  margin-top: 12px;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: clamp(10px, 1.1vw, 12px);
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(243, 241, 255, 0.7);
+}
+.dive-hud__suspect b {
+  color: #fff;
+}
 .dive-hud__score {
   margin-top: 10px;
   display: inline-flex;

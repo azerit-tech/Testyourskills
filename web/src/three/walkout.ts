@@ -67,6 +67,8 @@ export interface WalkoutTexts {
   graphLabel: string;
   /** Le carton de fin de mission : le niveau (LEVEL_LABELS de shared/types.ts). */
   levelLabel: string;
+  /** Le profil criminel (§18.2), inscrit sur le carton de fin ; absent sur une fiche d'avant 0.2.0. */
+  profileLabel?: string;
   /** Les libellés du HUD (lignes du dossier, radio, note). */
   hud: HudTexts;
 }
@@ -713,6 +715,7 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
           texts: o.texts.hud,
           lines: { specialty: o.texts.positionName, weapon: o.texts.langName, file: o.texts.leagueName, affiliation: o.texts.club },
           title: o.texts.levelLabel,
+          profile: o.texts.profileLabel,
           overall: o.overall,
           double: o.double,
           accent: accent.a,

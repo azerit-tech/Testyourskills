@@ -14,9 +14,11 @@ export interface HudTexts {
   dispatch: string;
   /** Sous le titre du carton de fin. */
   score: string;
+  /** Devant le profil criminel sur le carton de fin (§18.2). */
+  suspect: string;
 }
 
-export const HUD_TEXTS: Record<Lang, Pick<HudTexts, "dispatch" | "score">> = {
-  fr: { dispatch: "Central", score: "Note" },
-  en: { dispatch: "Dispatch", score: "Rating" },
+export const HUD_TEXTS: Record<Lang, Pick<HudTexts, "dispatch" | "score" | "suspect">> = {
+  fr: { dispatch: "Central", score: "Note", suspect: "Suspect identifié :" },
+  en: { dispatch: "Dispatch", score: "Rating", suspect: "Suspect identified:" },
 };
