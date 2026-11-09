@@ -791,7 +791,9 @@ export class Pipeline {
     ctx.find(githubFindings(facts));
     let ai: CodeReadingResult | null = null;
     // Sans IA, rien n'a été lu : fiche dégradée. Rien à lire (aucun fichier) : la
-    // fiche est la même à chaque fois, elle se met en cache normalement.
+    // fiche est la même à chaque fois, elle se met en cache normalement. Des
+    // fichiers à lire mais aucun téléchargé : pickFilesForReading lève, la fiche
+    // sort dégradée (ni resservie du cache, ni classée), comme sans lecture IA.
     let degraded = !deps.aiAvailable();
     if (deps.aiAvailable()) {
       try {

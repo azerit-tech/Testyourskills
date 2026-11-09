@@ -1,6 +1,9 @@
 // Choix des fichiers pour la lecture IA (SPEC §4.3) : 3 repos les plus actifs,
 // jusqu'à 10 fichiers chacun, les plus modifiés par les derniers commits puis les
 // plus gros, hors générés/vendored/lockfiles/minifiés, 40 Ko au total.
+// Les contenus viennent de raw.githubusercontent.com, sans jeton : si aucun des
+// fichiers choisis ne se télécharge (panne, limite par IP), la fonction lève
+// plutôt que de rendre une liste vide, qui voudrait dire « rien à lire ».
 
 import type { RepoFiles } from "../../../shared/readings";
 import { SCORING } from "../scoring/config";
@@ -20,6 +23,14 @@ const isTestFile = (p: string) => /(^|\/)(tests?|spec|__tests__)\/|[._-](test|sp
 
 const enc = new TextEncoder();
 const bytes = (s: string) => enc.encode(s).length;
+
+/** Des fichiers étaient à lire, aucun n'a pu être téléchargé : la fiche sortirait sans lecture, comme si le code n'existait pas. */
+export class NoFilesReadError extends Error {
+  constructor(wanted: number) {
+    super(`aucun des ${wanted} fichiers choisis n'a pu être téléchargé`);
+    this.name = "NoFilesReadError";
+  }
+}
 
 /** Tronque à `max` octets, à la dernière fin de ligne. */
 export function truncateTo(text: string, max: number): string {
@@ -65,10 +76,14 @@ export async function pickFilesForReading(facts: GithubFacts, opts: { token: Git
 
   // Contenus, répartis sur le budget total.
   let remaining = PICK.totalBytes;
+  let wanted = 0;
+  let fetched = 0;
   const out: RepoFiles[] = [];
   for (let i = 0; i < ranked.length; i++) {
     const { repo, files } = ranked[i];
     const contents = await Promise.all(files.map((f) => soft(ctx, () => rawFile(ctx, repo.fullName, repo.defaultBranch, f.path, 150_000))));
+    wanted += files.length;
+    fetched += contents.filter((c) => c !== null).length;
     const valid = files.map((f, j) => ({ path: f.path, content: contents[j] })).filter((f) => f.content && !f.content.includes("\u0000"));
     let budget = Math.floor(remaining / (ranked.length - i));
     const picked: { path: string; content: string }[] = [];
@@ -81,5 +96,6 @@ export async function pickFilesForReading(facts: GithubFacts, opts: { token: Git
     }
     if (picked.length) out.push({ repo: repo.name, activity: Math.max(1, repo.activity), files: picked });
   }
+  if (wanted > 0 && fetched === 0) throw new NoFilesReadError(wanted);
   return out;
 }

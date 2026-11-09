@@ -14,7 +14,9 @@ import { noteCreditBalance, noteCreditsExhausted, recordUsage, resetBudgetForTes
 import { ChatHttpError } from "./ai/client";
 import { readCode } from "./ai/readCode";
 import { fakeClient } from "./ai/testing";
+import { NoFilesReadError } from "./github/pick";
 import { TokenPool } from "./github/tokens";
+import { weekRank, weekTop } from "./top";
 import { facts as ghFacts } from "./scoring/__fixtures__/make";
 
 class EngineError extends Error {
@@ -703,6 +705,34 @@ describe("fiche sortie sans lecture IA (dégradée)", () => {
     const card = await generate(c);
     expect(c.store.getCard(card.id)!.degraded).toBe(false);
     expect(c.store.findRecentGithub("leamd")?.id).toBe(card.id);
+    vi.restoreAllMocks();
+  });
+
+  it("des fichiers à lire mais aucun téléchargé : fiche dégradée, ni resservie du cache ni classée", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    let down = true;
+    const ctx = setup({
+      async pickFilesForReading() {
+        if (down) throw new NoFilesReadError(12);
+        return [{ repo: "r", activity: 1, files: [{ path: "a.ts", content: "x" }] }];
+      },
+    });
+    const first = await generate(ctx, "leamd");
+    const row = ctx.store.getCard(first.id)!;
+    expect(row.degraded).toBe(true);
+    expect((row.data as CardData).scoringVersion).toBe("no-ai");
+    expect(ctx.calls.readCode).toBe(0);
+    expect(ctx.store.findRecentGithub("leamd")).toBeNull();
+    expect(weekRank(ctx.store.db, first.id)).toBeNull();
+    expect(weekTop(ctx.store.db).total).toBe(0);
+
+    // Les téléchargements reviennent : la demande suivante recalcule, et cette fiche-là compte.
+    down = false;
+    const again = await postLogin(ctx, "leamd");
+    expect(again.json.cached).toBe(false);
+    await ctx.pipeline.wait(again.json.id);
+    expect(ctx.store.getCard(again.json.id)!.degraded).toBe(false);
+    expect(weekRank(ctx.store.db, again.json.id)?.rank).toBe(1);
     vi.restoreAllMocks();
   });
 
