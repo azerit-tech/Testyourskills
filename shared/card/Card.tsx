@@ -58,6 +58,25 @@ const L = {
   footerY: 506,
 };
 
+type Layout = typeof L & { profileY?: number; taglineY?: number };
+
+/** Avec un profil criminel (§18.2) : la photo raccourcit de 14, le profil se
+ *  loge dessous sur toute la largeur, et les blocs du bas se resserrent. */
+const LP: Layout = {
+  ...L,
+  mug: { ...L.mug, h: 192 },
+  profileY: 266,
+  taglineY: 282,
+  formTop: 294,
+  formLabelY: 309,
+  formValueY: 325,
+  statsTop: 338,
+  statRow: 23,
+  chargesTitleY: 421,
+  chargesFirstY: 440,
+  chargeRow: 19,
+};
+
 const STAR = "M12 2.6l2.9 6.1 6.7.8-4.9 4.6 1.3 6.6L12 17.4l-6 3.3 1.3-6.6L2.4 9.5l6.7-.8z";
 const PALM = [
   "M46 140c2-34 5-62 12-86l4 1c-8 24-11 52-12 85z",
@@ -178,18 +197,18 @@ function StatRow({ stat, x, y, th, idp }: { stat: Stat; x: number; y: number; th
   );
 }
 
-function Charges({ statuses, th, lang, idp }: { statuses: StatusInstance[]; th: CardTheme; lang: Lang; idp: string }) {
+function Charges({ statuses, th, lang, idp, ly }: { statuses: StatusInstance[]; th: CardTheme; lang: Lang; idp: string; ly: Layout }) {
   const s = t(lang);
   const list = statuses.slice(0, 3);
   const textX = L.left + 14;
   const maxW = L.right - textX;
   return (
     <g>
-      <Txt x={L.left} y={L.chargesTitleY} font="mono-700" size={8.5} ls={1.5} fill={th.inkMuted}>
+      <Txt x={L.left} y={ly.chargesTitleY} font="mono-700" size={8.5} ls={1.5} fill={th.inkMuted}>
         {upper(s.charges, lang)}
       </Txt>
       {list.map((st, i) => {
-        const y = L.chargesFirstY + i * L.chargeRow;
+        const y = ly.chargesFirstY + i * ly.chargeRow;
         const tone = th.tones[st.tone];
         const aiTag = st.byAI ? ` · ${s.ai}` : "";
         const aiW = st.byAI ? measure(aiTag, "mono-400", 9) : 0;
@@ -228,7 +247,8 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
   const levelLabel = LEVEL_LABELS[stars][lang];
   const avatar = avatarHref !== undefined ? avatarHref || undefined : card.avatarUrl;
   const u = (k: string) => `url(#${idp}-${k})`;
-  const M = L.mug;
+  const ly: Layout = card.profile ? LP : L;
+  const M = ly.mug;
 
   // Textes ajustés
   const level = fit(upper(levelLabel, lang), { font: "mono-700", size: 12, minSize: 9, maxWidth: M.x - L.left - 6, letterSpacing: 1.9, minLetterSpacing: 0.6 });
@@ -247,6 +267,15 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
     { x: L.left + unit + 10, w: unit, label: s.weapon, value: langName },
     { x: L.left + 2 * unit + 20, w: unit * 1.3, label: s.affiliation, value: card.club ?? s.loneWolf },
   ];
+
+  // Profil criminel (§18.2) : le nom en grand, lisible à l'échelle 1 d'un
+  // téléphone (15 unités au moins) ; l'accroche seulement si elle tient entière.
+  const profileName = card.profile
+    ? fit(upper(card.profile.label[lang] ?? card.profile.label.fr, lang), { font: "display-800", size: 26, minSize: 15, maxWidth: formW, letterSpacing: 0.8, minLetterSpacing: 0.2 })
+    : null;
+  const taglineText = card.profile ? (card.profile.tagline[lang] ?? card.profile.tagline.fr) : "";
+  const taglineFit = taglineText ? fit(taglineText, { font: "sans-500", size: 10.5, minSize: 9, maxWidth: formW }) : null;
+  const tagline = taglineFit && taglineFit.text === taglineText ? taglineFit : null;
 
   // Pied
   const questioned = s.questioned(card.judgedInSeconds);
@@ -440,7 +469,7 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
           {avatar ? (
             <image href={avatar} x={photoX} y={photoY} width={L.photo.w} height={L.photo.h} preserveAspectRatio="xMidYMin slice" filter={u("ink")} />
           ) : (
-            <Initials initials={card.initials} />
+            <Initials initials={card.initials} M={M} />
           )}
           {card.source === "cv" && (
             <g transform={`translate(${M.x + M.w / 2} ${M.y + 40}) rotate(-9)`}>
@@ -480,21 +509,38 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
         </g>
       )}
 
+      {/* Profil criminel, sous la photo et son écriteau */}
+      {profileName && ly.profileY !== undefined && (
+        <g>
+          <text x={L.left} y={ly.profileY} {...fontAttrs("display-800")} fontSize={profileName.size} letterSpacing={profileName.letterSpacing} fill="#000" fillOpacity={0.5} filter={u("numshadow")}>
+            {profileName.text}
+          </text>
+          <text x={L.left} y={ly.profileY} {...fontAttrs("display-800")} fontSize={profileName.size} letterSpacing={profileName.letterSpacing} fill={u("num")}>
+            {profileName.text}
+          </text>
+          {tagline && ly.taglineY !== undefined && (
+            <Txt x={L.left} y={ly.taglineY} font="sans-500" size={tagline.size} fill={th.inkSoft}>
+              {tagline.text}
+            </Txt>
+          )}
+        </g>
+      )}
+
       {/* Spécialité / arme / affiliation */}
-      <rect x={L.left} y={L.formTop} width={formW} height={1} fill="#fff" fillOpacity={0.1} />
+      <rect x={L.left} y={ly.formTop} width={formW} height={1} fill="#fff" fillOpacity={0.1} />
       {cols.map((c, i) => {
         const v = fit(c.value, { font: "sans-600", size: 12.5, minSize: 10, maxWidth: c.w, letterSpacing: 0, minLetterSpacing: 0 });
         return (
           <g key={i}>
-            <Txt x={c.x} y={L.formLabelY} font="mono-400" size={8.5} ls={1.2} fill={th.inkMuted}>
+            <Txt x={c.x} y={ly.formLabelY} font="mono-400" size={8.5} ls={1.2} fill={th.inkMuted}>
               {upper(c.label, lang)}
             </Txt>
             {i === 1 && icon && (
-              <g transform={`translate(${c.x} ${L.formValueY - 9.5}) scale(${11 / 24})`}>
+              <g transform={`translate(${c.x} ${ly.formValueY - 9.5}) scale(${11 / 24})`}>
                 <path d={icon.path} fill={th.inkSoft} />
               </g>
             )}
-            <Txt x={c.x + (i === 1 && icon ? 15 : 0)} y={L.formValueY} font="sans-600" size={v.size} fill={th.ink}>
+            <Txt x={c.x + (i === 1 && icon ? 15 : 0)} y={ly.formValueY} font="sans-600" size={v.size} fill={th.ink}>
               {i === 1 && icon ? fit(c.value, { font: "sans-600", size: 12.5, minSize: 10, maxWidth: c.w - 15, letterSpacing: 0 }).text : v.text}
             </Txt>
           </g>
@@ -503,14 +549,14 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
 
       {/* Stats en barres segmentées */}
       {left.map((st, i) => (
-        <StatRow key={st.code} stat={st} x={L.left} y={L.statsTop + i * L.statRow} th={th} idp={idp} />
+        <StatRow key={st.code} stat={st} x={L.left} y={ly.statsTop + i * ly.statRow} th={th} idp={idp} />
       ))}
       {right.map((st, i) => (
-        <StatRow key={st.code} stat={st} x={L.left + 153 + 16} y={L.statsTop + i * L.statRow} th={th} idp={idp} />
+        <StatRow key={st.code} stat={st} x={L.left + 153 + 16} y={ly.statsTop + i * ly.statRow} th={th} idp={idp} />
       ))}
 
       {/* Chefs d'accusation */}
-      <Charges statuses={card.statuses} th={th} lang={lang} idp={idp} />
+      <Charges statuses={card.statuses} th={th} lang={lang} idp={idp} ly={ly} />
 
       {/* Pied */}
       <Txt x={L.left} y={L.footerY} font="mono-400" size={footerFit.size} ls={footerFit.letterSpacing} fill={th.inkMuted}>
@@ -524,8 +570,7 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
   );
 }
 
-function Initials({ initials }: { initials: string }) {
-  const M = L.mug;
+function Initials({ initials, M }: { initials: string; M: Layout["mug"] }) {
   const txt = initials.slice(0, 3).toUpperCase();
   const f = fit(txt, { font: "display-800", size: 72, minSize: 40, maxWidth: M.w - 20, letterSpacing: -1 });
   return (
