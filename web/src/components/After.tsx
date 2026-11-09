@@ -727,17 +727,21 @@ export function EmailForm({ cardId }: { cardId: string }) {
   );
 }
 
-/* ---------- CTA Azerit ---------- */
+/* ---------- le bloc recruteur ---------- */
 
-export function AzeritCta({ cardId }: { cardId: string | null }) {
+/** En fin de page, pour le visiteur comme pour qui a fait la fiche : « Vous recrutez ? », une phrase, une pilule. */
+export function Hiring({ cardId }: { cardId: string | null }) {
   const { t } = useT();
+  const c = t.result.cta;
   return (
-    <p className="azerit-cta">
-      <span>{t.result.cta.text}</span>{" "}
-      <a href="https://azerit.tech" target="_blank" rel="noopener" onClick={() => api.track("cta_azerit_clicked", cardId, { from: "result" })}>
-        {t.result.cta.link}
+    <section className="after-block hire" aria-labelledby="hire-title">
+      <h2 id="hire-title">{c.title}</h2>
+      <p>{c.text}</p>
+      <a className="pill pill-ghost" href="https://azerit.tech" target="_blank" rel="noopener" onClick={() => api.track("cta_azerit_clicked", cardId, { from: "result" })}>
+        {c.link}
+        <span aria-hidden>↗</span>
       </a>
-    </p>
+    </section>
   );
 }
 

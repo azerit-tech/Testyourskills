@@ -142,6 +142,24 @@ describe("après-fiche, vue par qui a fait la fiche (§18.27)", () => {
   });
 });
 
+describe("bloc recruteur", () => {
+  it("en fin de page, pour le visiteur comme pour qui a fait la fiche : un titre, une phrase, une pilule vers azerit.tech", () => {
+    const visitor = renderResult(card({ id: "HireCard001" }), { owner: false });
+    const owner = renderResult(card({ id: "HireCard002" }), { owner: true });
+    expect(visitor.indexOf('class="after-block hire"')).toBeGreaterThan(visitor.indexOf('id="you"'));
+    expect(owner.indexOf('class="after-block hire"')).toBeGreaterThan(owner.indexOf('class="rest"'));
+    expect(owner.indexOf('class="after-block hire"')).toBeLessThan(owner.indexOf('class="after-foot"'));
+    const block = /<section class="after-block hire".*?<\/section>/.exec(visitor)?.[0] ?? "";
+    expect(block).toContain('<h2 id="hire-title">Vous recrutez ?</h2>');
+    expect(block).toMatch(/<a class="pill pill-ghost" href="https:\/\/azerit\.tech" target="_blank" rel="noopener">azerit\.tech/);
+    expect(visitor).not.toContain("azerit-cta");
+  });
+
+  it("en anglais : « Hiring? »", () => {
+    expect(renderResult(card({ id: "HireCard003" }), { owner: false, lang: "en-US" })).toContain(">Hiring?</h2>");
+  });
+});
+
 describe("ligne repliée", () => {
   const fold = (attention: boolean) =>
     renderToStaticMarkup(createElement(Fold, { name: "email", title: "Recevoir ma fiche par email", attention, children: createElement("p", null, "corps") }));

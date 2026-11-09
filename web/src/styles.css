@@ -1884,20 +1884,20 @@ a.dossier-item:hover {
   color: var(--siren-ink) !important;
 }
 
-/* Azerit, pour les recruteurs */
-.azerit-cta {
-  padding: 4px 4px 0;
-  font: 400 14px/1.5 var(--f-text);
-  color: var(--lilac-dim);
+/* le bloc recruteur, en fin de page : un aplat relevé, discret à côté des cartes du jeu */
+.hire {
+  gap: 10px;
+  background: var(--ink-1);
 }
-/* en ligne : le padding vertical donne 44 px de zone tactile sans écarter les lignes */
-.azerit-cta a {
-  padding: 13px 2px;
-  font-weight: 600;
-  color: var(--blush);
-  text-decoration: underline;
-  text-decoration-color: rgba(255, 178, 198, 0.4);
-  text-underline-offset: 4px;
+.hire h2 {
+  font-size: 26px;
+}
+.hire p {
+  max-width: 34ch;
+  text-wrap: pretty;
+}
+.hire .pill {
+  margin-top: 4px;
 }
 
 .after-foot {

@@ -3,7 +3,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import type { CardData, Fact, Finding, JobState, ProgressEvent } from "../../../shared/types";
 import { declaredOf, LEVEL_LABELS, starsFor } from "../../../shared/types";
-import { AddSource, AzeritCta, Claim, Contest, DeleteCard, EmailForm, LinkedInPhoto, ShareBar, Why, useMe, useToast } from "../components/After";
+import { AddSource, Claim, Contest, DeleteCard, EmailForm, Hiring, LinkedInPhoto, ShareBar, Why, useMe, useToast } from "../components/After";
 import type { Shareable } from "../components/After";
 import { ComparisonStage } from "../components/Comparison";
 import { Denounce } from "../components/Denounce";
@@ -489,7 +489,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
           {!visitor && <EmailForm cardId={id} />}
           {!visitor && <Contest card={main} />}
         </div>
-        <AzeritCta cardId={id} />
+        <Hiring cardId={id} />
         {!visitor && (
           <div className="after-foot">
             <a className="link-alt" href="/" onClick={(e) => onLinkClick(e, "/")}>

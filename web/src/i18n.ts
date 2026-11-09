@@ -326,7 +326,8 @@ const fr = {
       error: "L'envoi a échoué. Réessaie plus tard.",
       note: "Optionnel. Garde aussi ta fiche au-delà de 90 jours.",
     },
-    cta: { text: "Vous recrutez ? Azerit lit le GitHub de vos candidats à votre place.", link: "azerit.tech" },
+    /* le bloc recruteur, en fin de page : on vouvoie qui recrute */
+    cta: { title: "Vous recrutez ?", text: "Azerit vous présente des devs sur preuves : leur code, pas leur CV.", link: "azerit.tech" },
     del: {
       link: "Supprimer ma fiche",
       confirm: "Supprimer définitivement ?",
@@ -757,7 +758,7 @@ const en: Dict = {
       error: "Sending failed. Try again later.",
       note: "Optional. Also keeps your sheet beyond 90 days.",
     },
-    cta: { text: "Hiring? Azerit reads your candidates' GitHub for you.", link: "azerit.tech" },
+    cta: { title: "Hiring?", text: "Azerit introduces you to devs on evidence: their code, not their CV.", link: "azerit.tech" },
     del: {
       link: "Delete my sheet",
       confirm: "Delete for good?",
