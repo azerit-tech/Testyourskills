@@ -453,7 +453,7 @@ Reprendre les habitudes des autres projets Azerit, pas de nouvelle stack.
 - **Stockage** : SQLite, une table `cards` avec id, date, source, pseudo, JSON de la carte, email optionnel, jeton de suppression. Jamais le texte du CV.
 - **Déploiement** : Docker, docker-compose, extrait Caddy, comme `../App` et `../Linkedin_mcp`. Sous-domaine à confirmer, proposition `skills.azerit.tech`.
 - **Variables d'environnement** : `OPENROUTER_API_KEY`, `GITHUB_TOKEN`, `BASE_URL`, `DB_PATH`, `LEADS_ENDPOINT`.
-- **Mesure** : le même outil d'analytics que la landing, quatre événements : `card_generated`, `card_shared`, `card_email`, `cta_azerit_clicked`.
+- **Mesure** : le même outil d'analytics que la landing, cinq événements : `card_generated`, `card_shared`, `card_email`, `cta_azerit_clicked` et, depuis le 9 novembre 2026, `shared_visit` (arrivée par un lien partagé, §18.0).
 
 Le barème (§4.4, §4.5), le catalogue de statuts (§5) et la liste des mots creux vivent dans trois fichiers de données séparés du code, pour qu'on puisse les ajuster sans toucher à la logique.
 
@@ -476,7 +476,7 @@ Le barème (§4.4, §4.5), le catalogue de statuts (§5) et la liste des mots cr
 - Vingt cartes par adresse IP et par jour.
 - Une carte par pseudo par 24 h, servie depuis le cache.
 - Timeout de 30 secondes par carte, au-delà message d'erreur honnête et pas de carte vide.
-- Budget de tokens par carte plafonné, coût suivi par jour.
+- Budget de tokens par carte plafonné, coût suivi par jour, persisté en base. Plafond du jour atteint ou crédit OpenRouter épuisé : « Le commissariat est fermé pour ce soir », jamais une fiche sans lecture (§18.0).
 - Tout ce qui sort de l'IA est validé par schéma, une sortie invalide relance une fois puis rend une carte à fiabilité réduite sans TEC.
 
 ## 13. Ce qu'on mesure
@@ -510,7 +510,7 @@ Chaque étape a sa définition de « fini ». On ne passe à la suivante qu'une 
 - **Polices côté serveur** : resvg ne parcourt pas une liste `font-family`, il prend la police par défaut quand le premier nom est inconnu. Chaque clé de police (`shared/card/fonts.ts`) résout donc un fichier TTF précis. resvg-js 2.6 ne décode pas le webp : un avatar webp retombe sur les initiales.
 - **Un seul paquet** : `web/` (Vite, React 19), `server/` (Hono, Node 22, exécuté par tsx), `shared/` (types, composant carte, fixtures), `data/` (barème, statuts, mots creux).
 - **Génération sur le pseudo de quelqu'un d'autre en v1** : oui, en mode taquin (proposition du §15 retenue).
-- **Analytics** : la landing n'embarque aucun outil d'analytics. Les quatre événements du §9 sont enregistrés par le serveur dans une table `events` SQLite (`POST /api/event`) et relayés à `LEADS_ENDPOINT` si défini.
+- **Analytics** : la landing n'embarque aucun outil d'analytics. Les événements du §9 sont enregistrés par le serveur dans une table `events` SQLite (`POST /api/event`) et relayés à `LEADS_ENDPOINT` si défini.
 - **Fournisseur IA : OpenRouter** à la place de l'API Anthropic directe (demande de Jacques, 14 octobre 2026). Mêmes modèles Claude, appelés par `https://openrouter.ai/api/v1/chat/completions` avec `response_format` json_schema strict et `cache_control` sur le prompt système. Modèles surchargeables par `AI_MODEL_CODE` et `AI_MODEL_CV`, budget du jour par `AI_DAILY_BUDGET_USD`.
 - **Modèle IA : Haiku 5.5** (`anthropic/claude-haiku-5.5`) à la place de Haiku 4.5 (demande de Jacques, 14 octobre 2026) : successeur direct, 0,10 $ / 0,50 $ par million de tokens sur OpenRouter contre 1 $ / 5 $, soit dix fois moins cher, avec `structured_outputs`. Comme Sonnet et Opus 5, il refuse `temperature` : le client ne l'envoie pas (sinon OpenRouter répond 404 avec `require_parameters`). Réglé par `AI_MODEL_CODE` et `AI_MODEL_CV` ; la valeur de repli du code reste Haiku 4.5 tant que la calibration (§4.6) n'a pas tourné sur 5.5.
 - **Photo LinkedIn** (demande de Jacques, 14 octobre 2026) : après la carte, le créateur (celui qui détient le jeton de suppression) peut cliquer sur « Mettre ma photo LinkedIn ». Le bouton passe par « Sign in with LinkedIn using OpenID Connect » (scopes `openid profile`) et récupère le claim `picture`. Pas de scraping de LinkedIn : c'est interdit par leurs conditions, bloqué par le mur d'authentification, et ça permettrait de mettre la photo de quelqu'un sur une carte qu'il n'a pas demandée. La photo est téléchargée, stockée avec la carte et supprimée avec elle. Le token LinkedIn n'est jamais conservé. Les variables `LINKEDIN_CLIENT_ID` et `LINKEDIN_CLIENT_SECRET` sont nécessaires ; sans elles, le bouton est masqué.
@@ -836,3 +836,16 @@ Oui à toutes les propositions ci-dessous : elles sont la cible.
 - La panne de l'ascenseur, sans secousse de caméra (proposé : lumière, afficheur et son seulement).
 - La liste des profils criminels et de leurs accroches, et la liste des devs connus de la galerie.
 - Le règlement du concours : brouillon par Claude, relecture juridique à prévoir.
+
+### 18.17 Journal du 9 novembre 2026 : la mise en ligne, côté code
+
+Chaque tâche confiée à un agent, relue, testée (229 tests, typecheck) puis fusionnée sur `master`.
+
+- **DNS** : `skills.azerit.tech` en A vers 167.233.42.205 chez OVH (enregistrement 5447821741, TTL par défaut de la zone, comme `app` et `linkedin`).
+- **Jetons GitHub** (`server/src/github/tokens.ts`, `http.ts`) : `GITHUB_TOKENS` (repli sur `GITHUB_TOKEN`), un compteur par jeton et par ressource (core, graphql, search), d'après `x-ratelimit-resource` ; le jeton le plus large est choisi à chaque appel ; une limite secondaire ou un 401 écarte un jeton pour un temps ; les logs ne nomment un jeton que par son numéro. Les PR fusionnées chez les autres passent par la recherche GraphQL, pas par `/search`.
+- **File d'attente** (`pipeline.ts`) : au plus `MAX_CONCURRENT_CARDS` fiches à la fois (4 par défaut), dans l'ordre d'arrivée ; le rang s'affiche à l'attente (« 3 suspects avant toi au commissariat ») ; le délai de 30 s ne court qu'au début du traitement ; 3 minutes en file, puis `timeout`. Une fiche ne démarre que s'il reste 200 appels REST et 40 GraphQL sur un jeton (estimation, à mesurer) ; sinon elle attend si la remise à zéro arrive dans moins de 2 minutes, et les fiches CV seules passent devant, ou elle échoue en `busy`.
+- **Budget IA** (`ai/budget.ts`, `ai/client.ts`, `ai/credits.ts`) : la dépense du jour est dans la table `ai_spend`, un redémarrage ne la remet plus à zéro. Plafond atteint (refusé dès `POST /api/card`, sans entamer le quota de l'IP, le cache restant servi) ou 402 d'OpenRouter (reconnu en HTTP comme dans le corps) : la fiche échoue en `closed`, rien n'est stocké, le même pseudo marche dès que le crédit revient. Avant, la fiche sortait sans lecture et restait 24 h en cache. Les autres pannes de l'IA (5xx, réseau, sortie invalide) donnent toujours une fiche sans TEC, comme le dit le §12. Le solde OpenRouter est lu au démarrage (avertissement sous 2 $) ; `/api/health` dit `ai` : `ok`, `budget`, `credits` ou `off`, sans montant.
+- **Mesure de la diffusion** : les liens partagés portent `?r={id}` ; la page `/c/:id` et ses balises OG restent identiques avec ou sans (vérifié octet pour octet) ; le front garde la première origine de la session (`sessionStorage`, repli en mémoire) et nettoie l'adresse ; `cards.ref_card_id` (migration au démarrage) ; événement `shared_visit` ; `npm run weekly` imprime le tableau du §13 par semaine ISO avec le coefficient viral (fiches nées d'un partage, hors même pseudo, sur fiches générées). En production : `ssh azerit docker exec testyourskills node_modules/.bin/tsx scripts/weekly.ts`.
+- **Déploiement** (`scripts/deploy.sh`, `scripts/deploy-remote.sh`, `ops/DEPLOY.md`) : sur le modèle de Sequence Mail ; refuse un `master` sale ou différent d'`origin` ; n'envoie que les fichiers versionnés (`git archive`, rsync à blanc puis en vrai) ; ne touche jamais au `.env` du serveur ; garde l'image précédente (`--retour`) ; compilation en `nice -n 10` dans le build Docker ; contexte de build ramené de 800 Mo à 14 Mo, assets 3D compris. `IP_SALT` est documenté : sans lui, le sel par défaut est public.
+
+**Reste pour la mise en ligne** : le `.env` du serveur, le site Caddy, le premier build, la vérification en production (pages, image OG, aperçu LinkedIn, téléphone) et le crédit OpenRouter (0,26 $ le 9 novembre : sans recharge, le site répond « commissariat fermé »).
