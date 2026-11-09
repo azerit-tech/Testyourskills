@@ -221,7 +221,7 @@ export const BUSY_AFTER_MS = 2 * 60_000;
  * en consomme quelques dizaines en REST (pages de repos, arbres, commits) et
  * quelques requêtes GraphQL (calendrier, années, premier commit).
  */
-const CARD_GITHUB_NEED = { core: 200, graphql: 40 };
+export const CARD_GITHUB_NEED = { core: 200, graphql: 40 };
 
 interface Job {
   id: string;
