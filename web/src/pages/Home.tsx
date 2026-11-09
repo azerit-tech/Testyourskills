@@ -1,14 +1,15 @@
-// Entrée (§6.1, §18.5, maquette web/gta-accueil.html) : la promesse, le champ, la fiche de Jacques,
-// puis le mur des 13 profils (§18.28) et le top de la semaine (§18.22). Rien d'autre.
+// Entrée (§6.1, §18.5, maquette web/gta-accueil.html) : le ciel (§18.29), la promesse, le champ,
+// la fiche de Jacques, puis le mur des 13 profils (§18.28) et le top de la semaine (§18.22). Rien d'autre.
 // L'exemple est la vraie fiche de Jacques (fondateur d'Azerit) : la maquette
 // s'affiche d'abord, la fiche calculée par le serveur la remplace dès qu'elle existe.
-// Le seul dégradé de l'écran est le ciel de cette fiche.
+// Le ciel se fond dans l'encre par le bas : c'est le seul dégradé de la page, avec celui de la fiche.
 import { useEffect, useRef, useState } from "react";
 import type { CardData } from "../../../shared/types";
 import { LEVEL_LABELS, starsFor } from "../../../shared/types";
 import { FIXTURES } from "../../../shared/fixtures";
 import { CardView } from "../card/CardView";
 import { EntryForm } from "../components/EntryForm";
+import { HomeSky } from "../components/HomeSky";
 import { ProfileWall } from "../components/ProfileWall";
 import { WeekBoard } from "../components/WeekBoard";
 import { useT } from "../i18n";
@@ -73,14 +74,17 @@ export function Home() {
 
   return (
     <main className="page page-home" id="main">
-      <section className="hero">
-        <div className="hero-copy">
-          <h1 className="hero-title">{h.titleA}</h1>
-          <p className="hero-hook">{h.titleB}</p>
-          <EntryForm inputRef={inputRef} />
-        </div>
-        <ExampleCard />
-      </section>
+      <div className="home-top">
+        <HomeSky />
+        <section className="hero">
+          <div className="hero-copy">
+            <h1 className="hero-title">{h.titleA}</h1>
+            <p className="hero-hook">{h.titleB}</p>
+            <EntryForm inputRef={inputRef} />
+          </div>
+          <ExampleCard />
+        </section>
+      </div>
       <ProfileWall onPlay={play} />
       <WeekBoard onPlay={play} />
     </main>

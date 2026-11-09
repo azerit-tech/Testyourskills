@@ -2,7 +2,7 @@
 import type { Lang } from "../../../shared/types";
 import { useT } from "../i18n";
 import { api, isMock } from "../lib/api";
-import { onLinkClick } from "../lib/router";
+import { onLinkClick, usePath } from "../lib/router";
 import { Brand } from "./Brand";
 
 export function LangToggle() {
@@ -34,10 +34,13 @@ export function SeasonBand() {
   return <p className="season-band">{t.home.season}</p>;
 }
 
+/** Sur l'accueil, la barre flotte sur le ciel (§18.29) : la marque et la langue sur des pastilles d'encre. */
 export function TopBar() {
   const { t } = useT();
+  const path = usePath();
+  const home = path === "/" || path === "";
   return (
-    <header className="topbar">
+    <header className={home ? "topbar topbar-home" : "topbar"}>
       <a href="/" className="topbar-brand" onClick={(e) => onLinkClick(e, "/")} aria-label="Testyourskills">
         <Brand />
       </a>

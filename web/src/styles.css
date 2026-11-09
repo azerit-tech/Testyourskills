@@ -444,6 +444,144 @@ svg {
   color: var(--cream);
 }
 
+/* ============ le ciel de l'accueil (§18.29) ============
+   Les lieux du crime en fondu enchaîné (HomeSky.tsx) derrière la promesse.
+   Téléphone : de bord à bord sous le bandeau de saison, derrière la barre du
+   haut, au 3:2 entier (260 px à 390). La première ligne du titre se pose sur
+   l'aplat sombre du bas de l'image, sa ligne de base sur le bord : ses
+   capitales (0,70 em) tiennent dans l'aplat même là où il est le plus mince
+   (night_owl, 20 % de la hauteur), le reste du titre est sur l'encre.
+   Ordinateur : un bandeau de toute la largeur (70 vh au plus) derrière le
+   premier écran ; le texte s'y lit sur une plaque d'encre, l'image n'est
+   assombrie que derrière lui. Le seul dégradé ajouté : le fondu vers l'encre.
+   Travelling 1,05 → 1,12 ancré en bas : l'aplat sombre ne fait que grandir. */
+.topbar.topbar-home {
+  position: relative;
+  z-index: 2;
+}
+/* la marque et la langue sur des pastilles d'encre : lisibles sur un ciel clair comme sur la nuit */
+.topbar-home .topbar-brand {
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--ink-0);
+}
+.topbar-home .lang-toggle {
+  background: var(--ink-0);
+}
+.topbar-home .demo-pill {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: var(--ink-0);
+}
+.home-top {
+  --home-bar: 64px;
+  position: relative;
+}
+.home-sky {
+  position: relative;
+  z-index: 0;
+  overflow: hidden;
+  aspect-ratio: 3 / 2;
+  margin-top: calc(-1 * var(--home-bar));
+  background: var(--ink-1);
+}
+.home-sky::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: linear-gradient(to bottom, rgba(12, 13, 27, 0) 78%, rgba(12, 13, 27, 0.3) 86%, rgba(12, 13, 27, 0.7) 93%, var(--ink-0) 100%);
+}
+.home-sky-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transform: scale(1.05);
+  transform-origin: 50% 100%;
+}
+/* le nouveau ciel se fond par-dessus l'ancien, qui reste plein dessous */
+.home-sky-img.is-on {
+  z-index: 2;
+  opacity: 1;
+  transition: opacity 1.2s ease;
+}
+.home-sky-img.is-prev {
+  z-index: 1;
+  opacity: 1;
+}
+/* 6 s à l'écran plus 1,2 s de fondu ; la même animation continue quand il passe dessous */
+.home-sky-img.is-on,
+.home-sky-img.is-prev {
+  animation: home-sky-drift 7.2s linear both;
+  will-change: transform;
+}
+.home-sky.is-paused .home-sky-img {
+  animation-play-state: paused;
+}
+@keyframes home-sky-drift {
+  from {
+    transform: scale(1.05);
+  }
+  to {
+    transform: scale(1.12);
+  }
+}
+.home-top .hero {
+  position: relative;
+  z-index: 1;
+  padding-top: 0;
+}
+.home-top .hero-title {
+  margin-top: -0.84em;
+}
+@media (min-width: 900px) {
+  .home-top {
+    --home-bar: 76px;
+  }
+  .home-sky {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    height: min(70vh, 66.667vw);
+    max-height: calc(100% + var(--home-bar));
+    aspect-ratio: auto;
+  }
+  .home-sky::after {
+    background: linear-gradient(to bottom, rgba(12, 13, 27, 0) 60%, rgba(12, 13, 27, 0.45) 80%, var(--ink-0) 100%);
+  }
+  /* le haut n'est que du ciel : on rogne surtout là */
+  .home-sky-img {
+    object-position: 50% 62%;
+  }
+  .home-top .hero {
+    padding-top: 28px;
+  }
+  .home-top .hero-title {
+    margin-top: 0;
+    font-size: clamp(64px, 7.2vw, 104px);
+  }
+  /* 0,74 d'encre : crème, rose, lilas et alerte au-dessus de 4,5:1 sur le point le plus clair des cinq ciels */
+  .home-top .hero-copy {
+    padding: clamp(24px, 2.8vw, 40px);
+    border-radius: var(--r-card);
+    background: rgba(12, 13, 27, 0.74);
+  }
+  .home-top .showcase figcaption a {
+    padding: 0 16px;
+    border-radius: 999px;
+    background: var(--ink-0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-sky-img {
+    animation: none !important;
+  }
+}
+
 /* --- mur des 13 profils (§18.28) : téléphone, un rail aimanté qui sort du bord
    droit (tuile de 260 px, la suivante dépasse de 100 px à 390, de 70 à 360) ;
    ordinateur, une grille pleine de 15 cases, « Et toi ? » sur deux. Le décor

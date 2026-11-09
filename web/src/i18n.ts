@@ -24,7 +24,8 @@ const fr = {
   home: {
     /** Fin de la saison 1 (§18.4, dates proposées) : à lire dans data/season.json quand les primes existeront. */
     season: "Saison 1 · jusqu'au 31 décembre",
-    titleA: "Ton GitHub remplace ton CV.",
+    /** Insécables : le titre se coupe en « Ton GitHub / remplace / ton CV. », jamais « CV. » seul. */
+    titleA: "Ton\u00a0GitHub remplace ton\u00a0CV.",
     titleB: "Le haut du classement décroche un entretien.",
     tabGithub: "Ton GitHub",
     loginLabel: "Pseudo GitHub ou URL du profil",
@@ -496,7 +497,7 @@ const en: Dict = {
   },
   home: {
     season: "Season 1 · until 31 December",
-    titleA: "Your GitHub replaces your CV.",
+    titleA: "Your\u00a0GitHub replaces your\u00a0CV.",
     titleB: "The top of the board lands an interview.",
     tabGithub: "Your GitHub",
     loginLabel: "GitHub username or profile URL",
