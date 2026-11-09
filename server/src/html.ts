@@ -83,7 +83,7 @@ export function genericMeta(baseUrl: string, path: string, lang: Lang = "fr"): P
   return {
     lang,
     url: `${baseUrl}${path}`,
-    title: fr ? "Testyourskills — ta fiche de dev" : "Testyourskills — your dev rap sheet",
+    title: fr ? "Testyourskills · Ton GitHub remplace ton CV" : "Testyourskills · Your GitHub replaces your CV",
     description: fr
       ? "Ton pseudo GitHub ou ton CV, et une IA t'interroge en dix secondes : étoiles de recherche et chefs d'accusation. Ce que ton CV déclare contre ce que ton code prouve."
       : "Your GitHub username or your CV, and an AI interrogates you in ten seconds: wanted stars and charges. What your CV claims vs what your code proves.",

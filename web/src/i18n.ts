@@ -6,7 +6,7 @@ import type { CardStyle, Lang, Position, StatCode } from "../../shared/types";
 
 const fr = {
   meta: {
-    title: "Testyourskills · Ta fiche de dev, jugée par ton GitHub",
+    title: "Testyourskills · Ton GitHub remplace ton CV",
     titleCard: (name: string, overall: number) => `${name} · ${overall} · Testyourskills`,
   },
   common: {
@@ -349,7 +349,7 @@ export type Dict = typeof fr;
 
 const en: Dict = {
   meta: {
-    title: "Testyourskills · Your dev rap sheet, judged by your GitHub",
+    title: "Testyourskills · Your GitHub replaces your CV",
     titleCard: (name, overall) => `${name} · ${overall} · Testyourskills`,
   },
   common: {
