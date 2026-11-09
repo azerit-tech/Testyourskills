@@ -119,6 +119,7 @@ const fr = {
     opening: "Ouverture du dossier",
     revealed: (level: string, overall: number) => `Fiche ${level}, note ${overall}.`,
     fireworks: "Clique ou Espace : feux d'artifice",
+    fireworksTouch: "Touche l'écran : feux d'artifice",
     statusLabel: "Statut",
     /* la montée de l'ascenseur : le statut change à chaque palier de note */
     statuses: [
@@ -450,6 +451,7 @@ const en: Dict = {
     opening: "Opening the case file",
     revealed: (level, overall) => `${level} sheet, rated ${overall}.`,
     fireworks: "Click or Space: fireworks",
+    fireworksTouch: "Tap the screen: fireworks",
     statusLabel: "Status",
     statuses: [
       { min: 1, label: "Tourist" },

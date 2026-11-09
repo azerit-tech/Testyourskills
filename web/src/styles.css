@@ -3217,3 +3217,14 @@ svg {
     transform: translate(-50%, -6px);
   }
 }
+/* téléphone : en haut, l'indication chevauchait les lignes du dossier du HUD
+   (« SPÉCIALITÉ BACKEND ») et les étoiles. En bas, au-dessus du bouton
+   Passer (24 + 44 px) et de la radio du HUD (jusqu'à deux lignes), dans la zone sûre. */
+@media (max-width: 560px) {
+  .walkout-cue {
+    top: auto;
+    bottom: calc(136px + env(safe-area-inset-bottom, 0px));
+    max-width: calc(100vw - 32px);
+    letter-spacing: 0.1em;
+  }
+}

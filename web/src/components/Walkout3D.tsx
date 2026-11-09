@@ -11,6 +11,7 @@ import type { CardData, Lang } from "../../../shared/types";
 import { LEVEL_LABELS, starsFor } from "../../../shared/types";
 import { langIcon, langTitle } from "../../../shared/card/languages";
 import { pick, useT } from "../i18n";
+import { useMediaQuery } from "../lib/util";
 import { preloadWalkoutAssets } from "../three/assets";
 import { loadCardTexture } from "../three/cardTexture";
 import { HUD_TEXTS } from "../three/hudTexts";
@@ -110,6 +111,8 @@ export function Walkout3D({ card, lang, double, phase, anchorRef, controlRef, on
   const cb = useRef({ onHandoff, onDone });
   cb.current = { onHandoff, onDone };
   const [cue, setCue] = useState<WalkoutCue>(null);
+  // Sur écran tactile, ni clic ni Espace : on touche l'écran.
+  const touch = useMediaQuery("(pointer: coarse)");
   const [muted, setMuted] = useState(readMuted);
   const toggleSound = () => {
     const m = !muted;
@@ -236,7 +239,7 @@ export function Walkout3D({ card, lang, double, phase, anchorRef, controlRef, on
       )}
       {cue && phase === "playing" && (
         <p key={cue} className="walkout-cue" aria-hidden>
-          {t.reveal.fireworks}
+          {touch ? t.reveal.fireworksTouch : t.reveal.fireworks}
         </p>
       )}
     </>
