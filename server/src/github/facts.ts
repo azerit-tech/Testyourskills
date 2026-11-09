@@ -6,6 +6,7 @@ import type { Accomplice } from "./accomplices";
 export interface GithubProfile {
   login: string;
   name: string | null;
+  /** Vide quand GitHub ne sert que son avatar par défaut (identicon) : voir avatar.ts. */
   avatarUrl: string;
   bio: string | null;
   /** Champ « site » du profil. Absent des faits collectés avant le §18.24. */

@@ -15,6 +15,7 @@ import {
   type TreeEntry,
 } from "./detect";
 import { pickAccomplices, type RawContributor } from "./accomplices";
+import { isDefaultGithubAvatar } from "./avatar";
 import type { CommitFact, GithubFacts, GithubRepo, RepoTree } from "./facts";
 import { EngineError, graphql, headOf, lastPageOf, makeCtx, rawFile, rest, soft, type Ctx, type GithubAuth } from "./http";
 
@@ -135,6 +136,9 @@ export async function collectGithub(
   );
   // Comptes sociaux affichés (§18.24) : le LinkedIn s'y trouve, un appel de plus, sans bloquer.
   const socialP = soft(ctx, () => rest<{ provider: string; url: string }[]>(ctx, `/users/${user}/social_accounts`));
+  // Avatar par défaut (identicon) : une requête sur l'image elle-même, hors API,
+  // 2 s au plus ; la fiche montre alors les initiales. Dans le doute, on garde l'avatar.
+  const defaultAvatarP = userP.then((u) => isDefaultGithubAvatar(u.avatar_url, { signal: opts.signal })).catch(() => false);
   // Évite les rejets non observés si une étape lève avant l'attente finale.
   for (const p of [calP, prsP, page1P, reposP, yearsP, firstP, socialP]) p.catch(() => {});
 
@@ -277,6 +281,7 @@ export async function collectGithub(
 
   const weeks = cal?.weeks.slice(-52) ?? [];
   const social = await socialP.catch(() => null);
+  const defaultAvatar = await defaultAvatarP;
   const socialAccounts = Array.isArray(social?.data)
     ? social.data.filter((a) => typeof a?.provider === "string" && typeof a?.url === "string").slice(0, 10).map((a) => ({ provider: a.provider, url: a.url }))
     : [];
@@ -287,7 +292,8 @@ export async function collectGithub(
     profile: {
       login: u.login,
       name: u.name,
-      avatarUrl: u.avatar_url,
+      // Vide pour l'avatar par défaut : la fiche, le PNG et la texture 3D montrent les initiales.
+      avatarUrl: defaultAvatar ? "" : u.avatar_url,
       bio: u.bio,
       blog: u.blog || null,
       socialAccounts,
