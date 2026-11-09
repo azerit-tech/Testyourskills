@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import profilesJson from "../../data/profiles.json";
 import { FIXTURES } from "../fixtures";
 import type { CardData, Lang } from "../types";
+import { LEVEL_LABELS, starsFor } from "../types";
 import { CardGraphic, LAYOUT, profileTagline } from "./Card";
 import { measure, upper } from "./text";
 import { THEMES } from "./themes";
@@ -54,6 +55,23 @@ describe("phrase du profil", () => {
         if (!card.profile) continue;
         const words = card.profile.tagline[lang].split(/[ \t\n]+/);
         for (const w of words) expect(svg).toContain(w.replace(/&/g, "&amp;").replace(/'/g, "&#x27;"));
+      }
+    }
+  });
+});
+
+describe("fiche sans profil", () => {
+  it("le niveau prend la place du nom de profil, en grand, entier, pour les six niveaux", () => {
+    const base = { ...FIXTURES.silver, profile: undefined } as CardData;
+    for (const overall of [20, 35, 50, 67, 80, 95]) {
+      for (const lang of LANGS) {
+        const card = { ...base, overall };
+        const svg = render(card, lang);
+        const label = upper(LEVEL_LABELS[starsFor(overall)][lang], lang).replace(/'/g, "&#x27;");
+        // En capitales, mot à mot, jamais tronqué ; en Barlow 32 au plus, comme le nom de profil
+        for (const w of label.split(" ")) expect(svg).toContain(w);
+        expect(svg).toMatch(/font-size="(2\d|3[0-2])(\.\d+)?"[^>]*>[A-ZÉÈ ]+</);
+        expect(svg).not.toContain("…");
       }
     }
   });

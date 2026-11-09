@@ -44,7 +44,11 @@ const RIGHT = CARD_W - 18;
 const FW = RIGHT - LEFT;
 /** Photo d'identité : raccourcie quand un profil criminel se loge dessous. */
 const MUG = { x: 178, y: 44, w: 164, h: 192, r: 6 };
-const MUG_NO_PROFILE_H = 236;
+/** Sans profil (fiches d'avant le barème 0.2.0), la photo descend jusqu'au filet
+ *  et le niveau prend la place du nom de profil, en grand, à gauche de la photo. */
+const MUG_NO_PROFILE_H = 266;
+/** Niveau en grand des fiches sans profil : dernière ligne de base, taille. */
+const BIG_LEVEL = { bottom: 306, size: 32, minSize: 20 };
 const PLACARD = { w: 136, h: 44, bottom: 10 };
 /** Horizon des fiches au ciel peint (★★★★★, ★★★★★★). */
 const HY = 242;
@@ -309,6 +313,8 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
   // Haut gauche : la note, le niveau, la pilule des spéciales
   const overallSize = card.overall >= 100 ? 92 : 118;
   const level = fit(upper(levelLabel, lang), { font: "sans-600", size: 11, minSize: 9, maxWidth: M.x - LEFT - 8, letterSpacing: 1.65, minLetterSpacing: 0.5 });
+  const bigLevel = card.profile ? null : fitLines(upper(levelLabel, lang), { font: "display-700", size: BIG_LEVEL.size, minSize: BIG_LEVEL.minSize, maxWidth: M.x - LEFT - 10, letterSpacing: 0.4 });
+  const badgeY = card.profile ? 172 : 148;
   const badge = th.badge ? fit(upper(th.label[lang], lang), { font: "sans-600", size: 8.5, minSize: 7.5, maxWidth: M.x - LEFT - 8 - 18, letterSpacing: 1.2, minLetterSpacing: 0.4 }) : null;
 
   // Écriteau
@@ -445,13 +451,21 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
         <text x={16} y={134} {...fontAttrs("display-800")} fontSize={overallSize} letterSpacing={-2.4} fill={th.grad === "num" ? u("g") : th.ink}>
           {card.overall}
         </text>
-        <Txt x={LEFT} y={157} font="sans-600" size={level.size} ls={level.letterSpacing} fill={th.inkSoft}>
-          {level.text}
-        </Txt>
+        {bigLevel ? (
+          bigLevel.lines.map((line, i, all) => (
+            <Txt key={i} x={LEFT - 1} y={+(BIG_LEVEL.bottom - (all.length - 1 - i) * bigLevel.size * 0.98).toFixed(2)} font="display-700" size={bigLevel.size} ls={0.4} fill={th.ink}>
+              {line}
+            </Txt>
+          ))
+        ) : (
+          <Txt x={LEFT} y={157} font="sans-600" size={level.size} ls={level.letterSpacing} fill={th.inkSoft}>
+            {level.text}
+          </Txt>
+        )}
         {badge && th.badge && (
           <g>
-            <rect x={LEFT} y={172} width={+(badge.width + 18).toFixed(2)} height={20} rx={10} fill={th.badge.bg} />
-            <Txt x={LEFT + 9} y={185.2} font="sans-600" size={badge.size} ls={badge.letterSpacing} fill={th.badge.ink}>
+            <rect x={LEFT} y={badgeY} width={+(badge.width + 18).toFixed(2)} height={20} rx={10} fill={th.badge.bg} />
+            <Txt x={LEFT + 9} y={badgeY + 13.2} font="sans-600" size={badge.size} ls={badge.letterSpacing} fill={th.badge.ink}>
               {badge.text}
             </Txt>
           </g>
@@ -551,7 +565,7 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
 function Initials({ initials, M }: { initials: string; M: typeof MUG }) {
   const f = fit(initials.slice(0, 3).toUpperCase(), { font: "display-800", size: 72, minSize: 40, maxWidth: M.w - 30 });
   return (
-    <Txt x={M.x + M.w / 2} y={M.y + 108} font="display-800" size={f.size} anchor="middle" fill="#2b3442" opacity={0.85}>
+    <Txt x={M.x + M.w / 2} y={M.y + 108 + (M.h - MUG.h) / 2} font="display-800" size={f.size} anchor="middle" fill="#2b3442" opacity={0.85}>
       {f.text}
     </Txt>
   );
