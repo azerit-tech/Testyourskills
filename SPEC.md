@@ -855,6 +855,21 @@ Chaque tâche confiée à un agent, relue, testée (229 tests, typecheck) puis f
 
 **Reste** : le crédit OpenRouter (0,26 $ : sans recharge, le site répond « commissariat fermé ») ; l'adresse de retour `https://skills.azerit.tech/auth/linkedin/callback` à autoriser dans l'application LinkedIn ; un second jeton GitHub (`GITHUB_TOKENS`) avant le pic du 19 ; `LEADS_ENDPOINT`, vide, donc les emails laissés sous une fiche ne partent nulle part ; et, dès qu'une vraie fiche existe, l'image OG, l'aperçu LinkedIn et un vrai téléphone.
 
+**Deuxième passe, en ligne le 9 novembre 2026, commit `be1321e`** (452 tests, typecheck) :
+
+- **« C'est moi »** (`server/src/auth.ts`, table `owners`) : GitHub OAuth sans aucun scope ; le token sert à un seul `GET /user`, puis il est jeté ; cookie `tys_owner` signé, 30 jours ; `ownerFromRequest(c)` pour les fonctions suivantes. Revendiquer retire l'expiration de toutes les fiches du login. Masquer répond 410 sur `/c/:id` et `/api/card/:id` et 404 sur `/og/*`, et refuse une nouvelle fiche de ce login aux autres (« Ce dev a quitté la ville »). Le propriétaire garde sa fiche, sans barre de partage. Inactif tant que `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` et `SESSION_SECRET` manquent.
+- **Le solde fait foi** : sous `AI_MIN_CREDIT_USD` (0,50 $), OpenRouter ne répond pas 402, il rabote `max_tokens`. Le solde est donc lu au démarrage, toutes les 5 minutes et après chaque sortie suspecte ; sous le seuil, aucun appel IA ne part et `POST /api/card` répond `closed`. Une réponse tronquée ferme la fiche sans relance. **Cela remplace « un 402 n'est pas anticipé »** : après un 402 ou une troncature, le site reste fermé jusqu'à 10 minutes, sauf si une relecture du solde le dément. Une fiche sortie sans lecture IA est marquée `cards.degraded` : le cache 24 h ne la ressert pas.
+- **Recette** : le pack devient « DOSSIER · 1 FICHE · JUGÉE PAR BARÈME » ; l'invite des feux d'artifice a sa version tactile et passe en bas sur téléphone ; les zones à toucher font au moins 44 px ; le pied de fiche dit « Interrogatoire par une IA : 9 s » ; le carton dit « Profil identifié : ».
+- La fiche de test octocat (`VrEL7kMgtX`), sortie dégradée, est supprimée de la base de production avec son événement et son image.
+- **Textes encore genrés**, relevés par la recette, à reprendre avec la maquette du §18.18 :
+  - « Les 5 plus recherchés » ;
+  - « Jugé par une IA » sur l'accueil ;
+  - « 1 suspect avant toi » ;
+  - « Si tu es arrivé » ;
+  - « CTO autoproclamé » ;
+  - « Loup solitaire » ;
+  - dans `data/statuses.json` : « Accepté chez les autres », « Contributeur fantôme », « Mainteneur », « Passionné », « Dit ce qu'il fait », « Stars : sa mère et lui ».
+
 ### 18.18 Virage du 9 novembre 2026 : le style mat du jeu, et six étoiles
 
 *Décisions de Jacques, après l'étude `docs/inspiration-gta6.md`. Elles remplacent les couleurs du §17.2 et le tableau des niveaux du §17.3.*
