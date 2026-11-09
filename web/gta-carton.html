@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="robots" content="noindex" />
+    <title>Testyourskills · Maquette du carton de fin de mission</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800&family=Barlow+Semi+Condensed:wght@700&family=Outfit:wght@500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="gta.css" />
+    <style>
+      /* Carton de fin de mission (inspiration §3.5), plein écran.
+         C'est le seul endroit, avec la fiche ★★★★★★, où la lumière est permise :
+         le mot du niveau est éclairé par l'arrière, puis se remplit de --dusk
+         de bas en haut. --dusk est le seul dégradé de l'écran. 1,5 s en tout. */
+      html, body { height: 100%; background: #000; }
+      body { display: grid; grid-template-rows: auto 1fr auto; min-height: 100vh; min-height: 100dvh; padding: max(14px, env(safe-area-inset-top)) var(--gutter) max(18px, env(safe-area-inset-bottom)); }
+      .hud { display: flex; justify-content: space-between; align-items: center; }
+      .hud .pv { font-size: 11px; color: rgba(229, 221, 255, 0.5); }
+      .hud .hud-stars svg { width: 22px; height: 22px; }
+      .center { display: grid; align-content: center; justify-items: center; gap: 26px; text-align: center; }
+      .word { position: relative; display: grid; line-height: 0.84; font-family: var(--f-name); font-weight: 800; text-transform: uppercase; }
+      .word > span { grid-area: 1 / 1; display: grid; }
+      .word span span { display: block; white-space: nowrap; }
+      /* calque arrière : presque invisible, éclairé par l'arrière */
+      .word .back { color: #0c0d1b; text-shadow: 0 0 1px var(--rim-core), 0 0 3px var(--blush), 0 0 10px rgba(255, 138, 92, 0.8), 0 0 22px rgba(255, 106, 61, 0.38); animation: rim 0.4s ease-out both; }
+      /* calque avant : --dusk qui monte du bas */
+      .word .front { background: var(--dusk); -webkit-background-clip: text; background-clip: text; color: transparent; animation: fill 0.5s 0.4s cubic-bezier(0.3, 0, 0.2, 1) both; }
+      .score { font: 800 112px/0.8 var(--f-name); color: var(--cream); letter-spacing: -0.02em; animation: up 0.4s 0.85s ease-out both; }
+      .score small { font: 700 24px/1 var(--f-name); color: rgba(255, 249, 203, 0.5); letter-spacing: 0; }
+      .id { margin: 0; font: 600 13px/1.5 var(--f-text); letter-spacing: 0.2em; text-transform: uppercase; color: rgba(255, 249, 203, 0.82); animation: up 0.4s 1.05s ease-out both; }
+      .id b { display: block; font: 700 30px/1 var(--f-name); letter-spacing: 0.04em; color: var(--cream); margin-top: 4px; }
+      .next { justify-self: center; animation: up 0.4s 1.4s ease-out both; }
+      @keyframes rim { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes fill { from { clip-path: inset(100% 0 0 0); } to { clip-path: inset(0 0 0 0); } }
+      @keyframes up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+      @media (min-width: 900px) {
+        body { padding: 28px 40px 32px; }
+        .score { font-size: 150px; }
+        .id { font-size: 15px; }
+        .id b { font-size: 40px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="hud">
+      <span class="pv">DOSSIER BOUCLÉ · 00:09.12</span>
+      <span id="stars"></span>
+    </div>
+    <div class="center">
+      <div class="word" id="word" aria-label="Haute surveillance">
+        <span class="back" aria-hidden="true"><span>Haute</span><span>surveillance</span></span>
+        <span class="front"><span>Haute</span><span>surveillance</span></span>
+      </div>
+      <div class="score">67</div>
+      <p class="id">Profil identifié :<b>Oiseau de nuit</b></p>
+    </div>
+    <a class="pill pill--big next" href="gta-partage.html">Voir ma fiche</a>
+
+    <script src="gta-card.js"></script>
+    <script>
+      // Chaque ligne du mot prend toute la largeur (les deux lignes ont la même
+      // chasse, comme un titre d'affiche). Le vrai carton le fera en SVG ou en CSS.
+      TYS.ready().then(() => {
+        document.getElementById("stars").innerHTML = TYS.hudStars(4);
+        const word = document.getElementById("word");
+        const W = Math.min(innerWidth - 32, 980);
+        const maxH = innerHeight * 0.36;
+        const lines = [...word.querySelectorAll(".front > span")];
+        const sizes = lines.map((l) => (W / TYS.measure(l.textContent.toUpperCase(), TYS.FONTS.name8, 100)) * 100);
+        const total = sizes.reduce((a, b) => a + b * 0.84, 0);
+        const k = Math.min(1, maxH / total);
+        word.querySelectorAll(".back > span, .front > span").forEach((l, i) => (l.style.fontSize = `${sizes[i % lines.length] * k}px`));
+        document.documentElement.dataset.ready = "1";
+      });
+    </script>
+  </body>
+</html>
