@@ -1458,9 +1458,9 @@ svg {
   grid-template-areas:
     "no proof"
     "text text";
-  gap: 8px 12px;
+  gap: 6px 12px;
   min-height: 44px;
-  padding: 14px 16px 16px;
+  padding: 12px 16px 14px;
   border-radius: 16px;
   background: var(--ink-0);
 }
@@ -1479,7 +1479,7 @@ a.dossier-item:hover {
 }
 .dossier-text {
   grid-area: text;
-  font: 500 17px/1.35 var(--f-text);
+  font: 500 16px/1.35 var(--f-text);
   color: var(--cream);
   text-wrap: pretty;
 }
