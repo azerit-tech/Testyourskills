@@ -1098,3 +1098,19 @@ Ce qui fait l'écart, vu côte à côte : chez eux l'image remplit l'écran et l
 - **Mouvement** : un lent travelling sur les ciels (échelle 1,05 à 1,12), rien avec `prefers-reduced-motion`.
 - Les interdits du §4 de l'étude tiennent : pas de personnage, pas de bloc central dans un collage, aucune marque.
 
+**Précisions à la construction des §18.27 à §18.29 (9 novembre 2026, vague 2).**
+
+- **Routes réservées** : une seule liste, `shared/routes.ts`. `/primes`, `/reglement`, `/vs`, `/bandes`, `/badge`, `/u` ramènent à l'accueil (302 côté serveur) ; les routes du site ne sont jamais un pseudo. `POST /api/card` accepte toujours un pseudo qui porte un de ces noms.
+- **Filet** : `ErrorBoundary` à la racine (« La page n'a pas chargé », « Recharger ») ; autour de la scène 3D, il n'affiche rien et la fiche sort sans révélation.
+- **Top de la semaine** : le seuil de 20 dossiers est `MIN_SHOWN_TOTAL` (`shared/week.ts`).
+- **Étoiles en texte** : `starsLine` (`shared/stars.ts`), les six, pleines puis vides, partout.
+- **La fiche** : la phrase du profil est le deuxième texte le plus lisible (Outfit 600, 18, deux lignes, jamais coupée) ; chefs d'accusation en 14, crème. Les niveaux ★ à ★★★★ ont un horizon ton sur ton qui grandit avec le niveau. Sans profil, le niveau s'écrit en grand à la place du nom de profil.
+- **Avatar par défaut de GitHub** : un PNG de 8 Ko ou moins est un identicon ; `avatarUrl` reste alors vide et la fiche montre les initiales. Au moindre doute, on garde l'avatar. Les fiches déjà en base ne changent pas.
+- **Le dos de la fiche** (`shared/card/CardBack.tsx`) : « Pièces à conviction », chaque axe avec son premier fait, puis le calcul avec les valeurs de la fiche. Un toucher retourne, un glissé de plus de 8 px non ; un bouton rond en bas à droite pour le clavier. Jamais pendant la révélation 3D. Fiche seule : la ligne « Pourquoi cette note » disparaît ; la comparaison la garde.
+- **Les étoiles s'allument une à une** (120 ms) à l'arrivée d'une fiche servie sans révélation.
+- **Page partagée** : un seul `<h1>`, « AVIS DE RECHERCHE » et « @login ». Ordre : la fiche, le jury, la peine et la caution, le dossier, « Et toi ? », « C'est ta fiche ? » en ligne repliée, « Vous recrutez ? ». Le visiteur d'une comparaison lit « le CV de @x », jamais « ton CV » (les titres d'aperçu du serveur disent encore « ton » : à reprendre).
+- **Après-fiche du propriétaire** : le pari et le jury en une bande, la peine, le partage, la dénonciation, le dossier, puis les lignes repliées (photo LinkedIn, ajout d'une source, email, contester), « Vous recrutez ? ». Une ligne s'ouvre seule quand elle demande l'attention.
+- **Le ciel de la page d'une fiche** : le texte posé dessus passe en encre sur les dix ciels clairs et reste crème sur les quatre ciels d'heure bleue. Sur téléphone, le cadre montre surtout le ciel : la fiche couvre le sujet. Bandeau de 46 vh sur ordinateur.
+- **Le ciel de l'accueil** : `kingpin`, `arsonist`, `delivery_machine`, `night_owl`, `default`, une image toutes les 6 s ; les quatre dernières ne se chargent qu'après la première. La première ligne du titre repose sur l'aplat sombre de l'image.
+- **Le mur « Lequel es-tu ? »** : rail aimanté jusqu'à 899 px, grille au-delà, la dernière case « Et toi ? » ramène au champ.
+
