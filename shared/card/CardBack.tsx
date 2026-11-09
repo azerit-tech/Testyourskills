@@ -159,7 +159,7 @@ export function CardBackGraphic({ card, lang: langProp, idPrefix, className, x, 
         </Txt>
         <Stars n={n} onSky={false} />
 
-        <Txt x={LEFT} y={BACK_LAYOUT.title.y - 21} font="mono-400" size={8} ls={0.6} fill={th.inkSoft} opacity={0.6}>
+        <Txt x={LEFT} y={BACK_LAYOUT.title.y - 27} font="mono-400" size={8} ls={0.6} fill={th.inkSoft} opacity={0.6}>
           {sub}
         </Txt>
         <Txt x={LEFT - 1} y={BACK_LAYOUT.title.y + 8} font="display-700" size={BACK_LAYOUT.title.size} ls={0.4} fill={th.ink}>
