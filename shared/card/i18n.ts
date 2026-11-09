@@ -6,8 +6,8 @@ const NBSP = " ";
 export const STRINGS = {
   fr: {
     loneWolf: "Loup solitaire",
-    /** Pied : « Interrogé par une IA pendant 9 s · preuves 34 % ». */
-    questioned: (s: number) => `Interrogé par une IA pendant ${s}${NBSP}s`,
+    /** Pied : « Interrogatoire par une IA : 9 s · preuves 34 % ». Épicène (§2.4) : rien ne s'accorde avec la personne. */
+    questioned: (s: number) => `Interrogatoire par une IA${NBSP}: ${s}${NBSP}s`,
     evidence: "preuves",
     percent: (n: number) => `${n}${NBSP}%`,
     ai: "IA",
@@ -30,7 +30,7 @@ export const STRINGS = {
     overall: "Note",
     /** Alias de l'ancienne carte, encore lus par les compositions serveur. */
     freeAgent: "Loup solitaire",
-    judged: (s: number) => `Interrogé par une IA pendant ${s}${NBSP}s`,
+    judged: (s: number) => `Interrogatoire par une IA${NBSP}: ${s}${NBSP}s`,
     reliability: "preuves",
     positions: {
       FS: "Full-stack", BE: "Backend", FE: "Frontend", MOB: "Mobile", DATA: "Data", ML: "Machine learning",

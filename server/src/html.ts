@@ -64,7 +64,8 @@ export function metaFor(data: CardData | ComparisonData, baseUrl: string): PageM
   const status = data.statuses[0]?.label[lang];
   const parts = [
     status ? (fr ? `Chef d'accusation : « ${status} ».` : `Charge: "${status}".`) : "",
-    fr ? `Interrogé par une IA en ${data.judgedInSeconds} s.` : `Interrogated by an AI for ${data.judgedInSeconds}s.`,
+    // Épicène (§2.4) : « interrogé » s'accordait avec la personne.
+    fr ? `Interrogatoire par une IA : ${data.judgedInSeconds} s.` : `Interrogated by an AI for ${data.judgedInSeconds}s.`,
     fr ? "Fais la tienne." : "Make yours.",
   ].filter(Boolean);
   return {

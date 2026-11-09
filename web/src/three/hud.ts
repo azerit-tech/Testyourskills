@@ -2,7 +2,7 @@
 // étoiles de recherche en haut à droite, la mini-carte ronde en bas à gauche
 // avec le point du dev (deux pour une comparaison), les messages de la radio,
 // les quatre lignes du dossier (spécialité, arme, dossier, affiliation) et le
-// carton de fin de mission (le niveau, « Suspect identifié : {profil} », la note). Piloté image par image par la scène (walkout.ts) ;
+// carton de fin de mission (le niveau, « Profil identifié : {profil} », la note). Piloté image par image par la scène (walkout.ts) ;
 // ne redessine que ce qui change. Styles : hud.css. La mini-carte est en
 // option (map) : l'ascenseur ne s'en sert pas.
 import type { HudTexts } from "./hudTexts";

@@ -182,7 +182,7 @@ const fr = {
       copiedLink: "Lien copié.",
       downloadDemo: "Image indisponible en mode démo (rendue par le serveur).",
       text: (stars: string, overall: number, profile: string | null, status: string | null, secs: number, url: string) =>
-        `Fiche ${stars}, ${overall}${profile ? ` · ${profile}` : ""}.${status ? ` Chef d'accusation : « ${status} ».` : ""} Interrogé par une IA en ${secs} s. Fais la tienne : ${url}`,
+        `Fiche ${stars}, ${overall}${profile ? ` · ${profile}` : ""}.${status ? ` Chef d'accusation : « ${status} ».` : ""} Interrogatoire par une IA : ${secs} s. Fais la tienne : ${url}`,
       textCompare: (cv: number, gh: number, profile: string | null, headline: string, url: string) =>
         `Mon CV : ${cv}. Mon GitHub : ${gh}${profile ? ` · ${profile}` : ""}. ${headline}. Fais la tienne : ${url}`,
     },

@@ -33,7 +33,7 @@ async function start() {
       position: card.position, positionName: "Full-stack", positionLabel: "Spécialité",
       club: card.club ?? "", clubLabel: "Affiliation", statusLabel: "Statut", statuses: [{ min: 0, label: "Confirmé" }],
       idleTitle: "DOSSIER", idleSubtitle: "", graphLabel: "Contributions", levelLabel: "Dangereux",
-      hud: { specialty: "Spécialité", weapon: "Arme", file: "Dossier", affiliation: "Affiliation", dispatch: "Central", score: "Note", suspect: "Suspect identifié :" },
+      hud: { specialty: "Spécialité", weapon: "Arme", file: "Dossier", affiliation: "Affiliation", dispatch: "Central", score: "Note", suspect: "Profil identifié :" },
     },
   });
   document.body.append(scene.canvas);
