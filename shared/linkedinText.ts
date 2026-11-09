@@ -9,6 +9,7 @@ const FR: [RegExp, string][] = [
   [/\bdu CV\b/g, "du profil LinkedIn"],
   [/\bsur le CV\b/g, "sur LinkedIn"],
   [/\bd'après le CV\b/g, "d'après LinkedIn"],
+  [/\b(depuis|selon) le CV\b/g, "$1 LinkedIn"],
   [/\b([Ll])e CV\b/g, "$1e profil LinkedIn"],
   [/\b([Uu])n CV\b/g, "$1n profil LinkedIn"],
   [/\bChange de CV\b/g, "Change de LinkedIn"],
