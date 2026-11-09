@@ -2741,6 +2741,21 @@ a.dossier-item:hover {
   color: var(--lilac);
 }
 
+/* moins de boîtes : les blocs respirent (16 px), le bloc recruteur se pose sur l'encre sans aplat ;
+   le jury, le dossier, le partage et la dénonciation gardent leur fond de carte */
+.page-result .visitor-col,
+.page-result .after {
+  gap: 16px;
+}
+.page-result.is-visitor .after {
+  padding-top: 16px;
+}
+.page-result .hire {
+  padding: 4px 4px 0;
+  border-radius: 0;
+  background: none;
+}
+
 @media (min-width: 900px) {
   /* un bandeau sur toute la largeur ; fondu à 55 % : le texte de la colonne de gauche, sous le jury, est sur l'encre */
   .card-sky {
@@ -2755,6 +2770,9 @@ a.dossier-item:hover {
   }
   .wanted-kicker {
     font-size: 15px;
+  }
+  .page-result.is-visitor .after {
+    padding-top: 40px;
   }
   /* qui a fait la fiche : une seule colonne, l'en-tête centré au-dessus de la fiche */
   .page-result:not(.is-visitor) .wanted-head {
