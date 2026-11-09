@@ -7,6 +7,7 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import type { CardData, ComparisonData, Source } from "../../shared/types";
 import { ensureLinkedinTables, purgeLinkedin } from "./linkedinProfile/store";
+import { forgetWeekRanks } from "./top";
 
 export const RETENTION_MS = 90 * 24 * 3600 * 1000;
 export const CACHE_MS = 24 * 3600 * 1000;
@@ -280,6 +281,8 @@ export class Store {
     });
     tx(rows);
     for (const r of rows) this.pendingRefs.delete(r.id);
+    // Le classement de la semaine gardé en mémoire (top.ts) : la fiche née doit y lire son rang tout de suite.
+    forgetWeekRanks(this.db);
   }
 
   getCard(id: string): CardRow | null {
@@ -359,6 +362,7 @@ export class Store {
         votes.run(i);
       }),
     )();
+    forgetWeekRanks(this.db);
     return ids;
   }
 
@@ -380,6 +384,7 @@ export class Store {
     const cutoff = new Date(now - 2 * 24 * 3600 * 1000).toISOString().slice(0, 10);
     this.db.prepare(`DELETE FROM ratelimit WHERE day < ?`).run(cutoff);
     purgeLinkedin(this.db, now);
+    if (ids.length) forgetWeekRanks(this.db);
     return ids;
   }
 
@@ -491,11 +496,14 @@ export class Store {
         .prepare(`UPDATE cards SET expires_at = NULL WHERE login = ? OR parent_id IN (SELECT id FROM cards WHERE login = ?)`)
         .run(l, l);
     })();
+    // Un renommage déplace des fiches d'un login à l'autre.
+    forgetWeekRanks(this.db);
     return this.getOwner(l)!;
   }
 
   setOwnerHidden(login: string, hidden: boolean) {
     this.db.prepare(`UPDATE owners SET hidden = ? WHERE login = ?`).run(hidden ? 1 : 0, login.toLowerCase());
+    forgetWeekRanks(this.db);
   }
 
   /** true si le propriétaire de ce login a masqué ses fiches. */

@@ -5,6 +5,9 @@
 // célébrités gardent leur fiche mais ne bouchent pas le haut du tableau.
 // Une ligne par login : sa meilleure note de la semaine ; à égalité, la fiche la
 // plus ancienne passe devant. Tout se calcule à la lecture, rien n'est écrit.
+// Le classement d'une semaine est gardé 60 s en mémoire : il est demandé à
+// chaque page de fiche, chaque image et chaque lecture du top. La base
+// (db.ts) l'oublie dès qu'une fiche naît, part, ou qu'un login est masqué.
 
 import type Database from "better-sqlite3";
 import type { CardData, ComparisonData, Fact, TopEntry, WeekRank, WeekTop } from "../../shared/types";
@@ -31,12 +34,36 @@ export function isoWeekNumber(monday: number): number {
   return Number(isoWeekLabel(monday).slice(-2));
 }
 
+/** Durée pendant laquelle le classement d'une semaine est gardé en mémoire. */
+export const RANK_CACHE_MS = 60_000;
+
+/** Par base, puis par lundi : le classement et l'instant (`now` de l'appel) où il a été calculé. */
+const rankCache = new WeakMap<Database.Database, Map<number, { at: number; ranked: Ranked[] }>>();
+
+/** Oublie les classements gardés : une fiche est née, supprimée ou purgée, un login masqué ou revendiqué. */
+export function forgetWeekRanks(db: Database.Database): void {
+  rankCache.delete(db);
+}
+
+/** Le classement d'une semaine, gardé RANK_CACHE_MS. Ne pas modifier le tableau rendu. */
+function rankWeek(db: Database.Database, monday: number, now: number): readonly Ranked[] {
+  let weeks = rankCache.get(db);
+  const hit = weeks?.get(monday);
+  if (hit && Math.abs(now - hit.at) < RANK_CACHE_MS) return hit.ranked;
+  if (!weeks) rankCache.set(db, (weeks = new Map()));
+  // Les semaines qu'on ne regarde plus ne restent pas en mémoire.
+  for (const [k, v] of weeks) if (Math.abs(now - v.at) >= RANK_CACHE_MS) weeks.delete(k);
+  const ranked = computeWeek(db, monday, now);
+  weeks.set(monday, { at: now, ranked });
+  return ranked;
+}
+
 /**
  * Le classement d'une semaine, du premier au dernier : une ligne par login.
  * La requête rend toutes les fiches qui entrent, dans l'ordre du classement ;
  * la première de chaque login est la sienne.
  */
-function rankWeek(db: Database.Database, monday: number, now: number): Ranked[] {
+function computeWeek(db: Database.Database, monday: number, now: number): Ranked[] {
   const rows = db
     .prepare(
       `SELECT c.id, c.login, c.created_at AS createdAt, json_extract(c.json, '$.overall') AS overall

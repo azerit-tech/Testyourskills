@@ -3,13 +3,13 @@
 import { mkdtempSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { FIXTURES } from "../../shared/fixtures";
 import type { CardData, ComparisonData, JobState, WeekTop } from "../../shared/types";
 import { createApp } from "./app";
 import { RETENTION_MS, Store, type NewCardRow } from "./db";
 import type { Deps } from "./pipeline";
-import { TOTW_MIN_ENTRIES, weekRank, weekTop, withWeekSpecial } from "./top";
+import { RANK_CACHE_MS, TOTW_MIN_ENTRIES, weekRank, weekTop, withWeekSpecial } from "./top";
 import { weekStart } from "./weekly";
 
 const stores: Store[] = [];
@@ -132,6 +132,74 @@ describe("weekTop", () => {
     expect(top.entries).toHaveLength(10);
     expect(top.total).toBe(14);
     expect(top.entries[0]!.login).toBe("dev13");
+  });
+});
+
+describe("classement gardé 60 s en mémoire", () => {
+  /** Nombre de fois où la requête du classement est partie. */
+  function countRankings(store: Store) {
+    const spy = vi.spyOn(store.db, "prepare");
+    return () => spy.mock.calls.filter(([sql]) => /ORDER BY overall DESC/.test(String(sql))).length;
+  }
+
+  it("une seule requête pour le top, les rangs et les spéciales d'une même minute, puis recalcul", () => {
+    const store = newStore();
+    const rows = Array.from({ length: 6 }, (_, i) => gh(`dev${i}`, 50 + i, W46 + H));
+    store.insertCards(rows);
+    const rankings = countRankings(store);
+    expect(weekTop(store.db, { now: NOW }).total).toBe(6);
+    for (const r of rows) expect(weekRank(store.db, r.id, NOW + 1000)?.total).toBe(6);
+    withWeekSpecial(store.db, rows[0]!.data as CardData, NOW + 2000);
+    expect(rankings()).toBe(1);
+    // Un changement fait sans passer par la base (Store) n'est vu qu'au bout de la minute.
+    store.db.prepare(`UPDATE cards SET degraded = 1 WHERE id = ?`).run(rows[5]!.id);
+    expect(weekTop(store.db, { now: NOW + RANK_CACHE_MS - 1 }).total).toBe(6);
+    expect(weekTop(store.db, { now: NOW + RANK_CACHE_MS }).total).toBe(5);
+    expect(rankings()).toBe(2);
+    vi.restoreAllMocks();
+  });
+
+  it("chaque semaine a son classement", () => {
+    const store = newStore();
+    const old = gh("old", 60, W45 + H);
+    store.insertCards([old, gh("new", 70, W46 + H)]);
+    const rankings = countRankings(store);
+    expect(weekTop(store.db, { now: NOW }).entries.map((e) => e.login)).toEqual(["new"]);
+    expect(weekRank(store.db, old.id, NOW)).toMatchObject({ rank: 1, total: 1, week: 45, closed: true });
+    expect(weekTop(store.db, { now: NOW }).entries.map((e) => e.login)).toEqual(["new"]);
+    expect(rankings()).toBe(2);
+    vi.restoreAllMocks();
+  });
+
+  it("oublié dès qu'une fiche naît, est supprimée ou purgée, ou qu'un login est masqué ou rendu visible", () => {
+    const store = newStore();
+    const a = gh("lea", 80, W46 + H);
+    const b = gh("kevin", 70, W46 + 2 * H);
+    store.insertCards([a, b]);
+    const logins = () => weekTop(store.db, { now: NOW }).entries.map((e) => e.login);
+    expect(logins()).toEqual(["lea", "kevin"]);
+
+    // Une fiche née lit son rang tout de suite.
+    const c = gh("sam", 90, W46 + 3 * H);
+    store.insertCards([c]);
+    expect(weekRank(store.db, c.id, NOW)?.rank).toBe(1);
+    expect(logins()).toEqual(["sam", "lea", "kevin"]);
+
+    store.deleteGroup(c.id);
+    expect(logins()).toEqual(["lea", "kevin"]);
+
+    store.claimOwner("lea", 4242);
+    store.setOwnerHidden("lea", true);
+    expect(logins()).toEqual(["kevin"]);
+    expect(weekRank(store.db, a.id, NOW)).toBeNull();
+    store.setOwnerHidden("lea", false);
+    expect(logins()).toEqual(["lea", "kevin"]);
+
+    // Purge : la fiche expirée sort du classement de sa semaine sans attendre.
+    const later = W46 + 2 * H + RETENTION_MS - 1;
+    expect(weekRank(store.db, b.id, later)?.total).toBe(2);
+    expect(store.purgeExpired(later + 2)).toEqual([b.id]);
+    expect(weekRank(store.db, a.id, later + 3)?.total).toBe(1);
   });
 });
 
