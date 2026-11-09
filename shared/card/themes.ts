@@ -1,172 +1,170 @@
-// Thèmes de rendu de la fiche (SPEC §17.3) : un par nombre d'étoiles, plus les
-// trois spéciales. Source unique des couleurs : le SVG les lit directement, le
-// web en dérive ses variables CSS (reflet néon, lueur).
+// Thèmes de rendu de la fiche (SPEC §18.18) : un par nombre d'étoiles, plus les
+// trois spéciales. Style mat : fonds plats teintés, UN seul dégradé par fiche
+// (le fond, la note ou le ciel), palmiers ton sur ton, aucune lueur sauf le
+// contour éclairé de ★★★★★★. Valeurs reprises de la maquette web/gta.css.
 import type { CardData, CardStyle, Fact, Stars, StatusTone } from "../types";
 import { starsFor } from "../types";
 
-/** Palette de l'univers GTA 6 (SPEC §17.2), source unique pour le SVG et le CSS. */
+/** Palette mate (docs/inspiration-gta6.md §2), source unique pour le SVG et le CSS. */
 export const PALETTE = {
-  night: "#0a0a1f",
-  night2: "#12122e",
+  /* Encre et fonds de carte */
+  ink0: "#0c0d1b",
+  ink1: "#1f1f38",
+  slate: "#252644",
+  slateLow: "#17182d",
+  navy: "#243152",
+  navyLow: "#131a30",
+  indigo: "#2c3868",
+  plum: "#4b2f54",
+  plumLow: "#24172f",
+  moss: "#162623",
+  mossLow: "#0c1614",
+  cold: "#2b3540",
+  coldLow: "#161c23",
+  /* --dusk : la note de ★★★★ et de la spéciale « Top 5 » */
+  duskA: "#6f7cf0",
+  duskB: "#b05ad8",
+  duskC: "#f0589a",
+  duskD: "#ffb366",
+  /* Ciel de ★★★★★ (l'heure rose, un ton plus bas pour lire le crème) */
+  roseA: "#5560cf",
+  roseB: "#9150c8",
+  roseC: "#e5558f",
+  roseD: "#ffb366",
+  duskGround: "#2a1c3c",
+  /* Ciel de ★★★★★★ (l'heure bleue) */
+  blueA: "#191b45",
+  blueB: "#3d42a8",
+  blueC: "#9a4aa8",
+  blueD: "#ff6a3d",
+  blueGround: "#12132e",
+  /* Encres */
+  cream: "#fff9cb",
+  lilac: "#e5ddff",
+  lilac2: "#ccc2f5",
+  blush: "#ffb2c6",
+  peach: "#ffd3a5",
+  lime: "#effa9e",
+  siren: "#c8283a",
+  /* HUD */
+  star: "#ffffff",
+  /* Lumière : seulement le contour éclairé par l'arrière (★★★★★★) */
+  rimCore: "#ffd8c8",
+  rimGlow: "#ff8a5c",
+  /* Néons de l'ancienne palette, encore lus par la scène 3D (web/src/three) ; plus par la fiche. */
   pink: "#ff3fa4",
   orange: "#ff7a3d",
   yellow: "#ffd23f",
   cyan: "#3fd8ff",
   violet: "#7b3fe4",
-  star: "#fff4e0",
-  money: "#8ce06b",
-  ink: "#f3f1ff",
-  inkSoft: "#b9b6d6",
-  inkMuted: "#7d7a9c",
-  neg: "#ff5c7a",
-  pos: "#8ce06b",
-  special: "#3fd8ff",
-  gap: "#ffd23f",
 } as const;
 
-/** Arrêt de dégradé : [offset 0..1, couleur, opacité?] */
-export type Stop = [number, string, number?];
+/** Arrêt de dégradé : [offset 0..1, couleur]. */
+export type Stop = [number, string];
 
 export type ThemeKey = `s${Stars}` | "wonderkid" | "flashback" | "totw";
 
+/** Où se trouve l'unique dégradé de la fiche. */
+export type GradientSlot = "bg" | "num" | "sky";
+
 export interface CardTheme {
   key: ThemeKey;
-  /** Libellé du niveau ou de la spéciale (le badge pour les spéciales). */
+  /** Libellé du niveau ou de la spéciale (la pilule pour les spéciales). */
   label: Fact;
-  /** Toujours vrai : le corps est de nuit. Gardé pour les compositions serveur. */
-  dark: true;
-  /** Néon principal (étoiles, niveau, barres) et second néon (halo de droite). */
-  accent: string;
-  accent2: string;
-  /** Dégradé de la note, en diagonale. Au moins quatre arrêts (frame[3] est lu par le serveur). */
+  /** Emplacement du seul dégradé : le fond qui descend dans son ton, la note, ou le ciel peint. */
+  grad: GradientSlot;
+  /** Fond : haut et bas (« bg »), ou aplat (bg[0]) quand le dégradé est ailleurs. */
+  bg: [string, string];
+  /** Ciel peint (★★★★★ et ★★★★★★) : quatre teintes du haut vers l'horizon, sol, soleil, fenêtres allumées. */
+  sky?: { stops: [string, string, string, string]; ground: string; sun?: string; lights?: boolean };
+  /** Dégradé de la note (« num ») ; vide sinon. */
   num: Stop[];
-  /** Même chose, pour les compositions qui lisent `frame`. */
-  frame: Stop[];
-  /** Opacité du halo néon. */
-  haze: number;
-  /** Palmier en ombre chinoise dans le coin. */
-  palms: number;
-  /** Reflet statique (★★★★★) dans le PNG. */
-  holoBand: boolean;
-  /** Encre. */
+  /** Couleur des barres de stats. */
+  bar: string;
+  /** Palmier ton sur ton dans le coin bas droit ; null : aucun. */
+  palm: string | null;
+  /** Contour éclairé par l'arrière : réservé à ★★★★★★. */
+  rim: boolean;
+  /** Photo désaturée (Affaire classée : la caméra-piéton). */
+  gray: boolean;
+  /** Encres : titres et note, texte courant. */
   ink: string;
   inkSoft: string;
-  inkMuted: string;
-  rule: string;
-  innerLine: string;
-  innerGlow: string;
+  /** Pastilles des chefs d'accusation. */
   tones: Record<StatusTone, string>;
   buzz: string;
-  /** Badge de carte spéciale. */
+  /** Pilule plate des spéciales. */
   badge?: { bg: string; ink: string };
-  /** Réglages des calques CSS côté web. */
-  fx: {
-    holo: number;
-    glare: number;
-    grain: number;
-    holoColors: [string, string, string, string, string];
-    glow: string;
-  };
+  /** Teintes du niveau pour la scène 3D et la révélation (Reveal.tsx). */
+  accent: string;
+  accent2: string;
+  /** Grain CSS côté web (0..1). */
+  fx: { grain: number };
 }
 
 const TONES: Record<StatusTone, string> = {
-  negative: PALETTE.neg,
-  positive: PALETTE.pos,
-  special: PALETTE.special,
-  gap: PALETTE.gap,
+  negative: PALETTE.siren,
+  positive: PALETTE.cream,
+  special: PALETTE.lilac2,
+  gap: PALETTE.peach,
 };
 
-const SUNSET: Stop[] = [[0, PALETTE.yellow], [0.32, PALETTE.orange], [0.66, PALETTE.pink], [1, PALETTE.violet]];
+const DUSK: Stop[] = [[0, PALETTE.duskA], [0.35, PALETTE.duskB], [0.65, PALETTE.duskC], [1, PALETTE.duskD]];
 
-function base(key: ThemeKey, label: Fact, o: Partial<CardTheme> & Pick<CardTheme, "accent" | "accent2" | "num" | "haze" | "fx">): CardTheme {
+type ThemeInput = Pick<CardTheme, "grad" | "bg" | "bar" | "palm"> & Partial<CardTheme>;
+
+function theme(key: ThemeKey, label: Fact, o: ThemeInput): CardTheme {
   return {
     key,
     label,
-    dark: true,
-    frame: o.num.length >= 4 ? o.num : [...o.num, o.num[o.num.length - 1], o.num[o.num.length - 1], o.num[o.num.length - 1]],
-    palms: 0,
-    holoBand: false,
-    ink: PALETTE.ink,
-    inkSoft: PALETTE.inkSoft,
-    inkMuted: PALETTE.inkMuted,
-    rule: "rgba(255,255,255,0.1)",
-    innerLine: PALETTE.star,
-    innerGlow: o.accent,
+    num: o.grad === "num" ? DUSK : [],
+    rim: false,
+    gray: false,
+    ink: PALETTE.cream,
+    inkSoft: PALETTE.lilac,
     tones: TONES,
-    buzz: PALETTE.orange,
+    buzz: PALETTE.siren,
+    accent: o.bar,
+    accent2: o.bg[0],
+    fx: { grain: 0.12 },
     ...o,
   };
 }
 
-const AMBER = "#f0a848";
-
 export const THEMES: Record<ThemeKey, CardTheme> = {
-  s1: base("s1", { fr: "Petit délit", en: "Petty crime" }, {
-    accent: AMBER, accent2: AMBER,
-    num: [[0, "#f6c37a"], [1, "#c98430"]],
-    haze: 0.28,
-    fx: { holo: 0.3, glare: 0.35, grain: 0.3, holoColors: ["#f6c37a", "#c98430", "#ffd9a0", "#a86a22", "#f0a848"], glow: "rgba(240,168,72,0.3)" },
+  s1: theme("s1", { fr: "Petit délit", en: "Petty crime" }, {
+    grad: "bg", bg: [PALETTE.slate, PALETTE.slateLow], bar: PALETTE.lilac2, palm: null,
   }),
-  s2: base("s2", { fr: "Délit", en: "Misdemeanor" }, {
-    accent: PALETTE.pink, accent2: PALETTE.pink,
-    num: [[0, "#ff8ccb"], [1, PALETTE.pink]],
-    haze: 0.38,
-    fx: { holo: 0.4, glare: 0.4, grain: 0.26, holoColors: ["#ff8ccb", PALETTE.pink, "#ffc2e2", "#c22a7c", "#ff5fb5"], glow: "rgba(255,63,164,0.32)" },
+  s2: theme("s2", { fr: "Délit", en: "Misdemeanor" }, {
+    grad: "bg", bg: [PALETTE.navy, PALETTE.navyLow], bar: PALETTE.blush, palm: "#2c3a60",
   }),
-  s3: base("s3", { fr: "Avis de recherche", en: "Wanted" }, {
-    accent: PALETTE.pink, accent2: PALETTE.cyan,
-    num: [[0, PALETTE.pink], [1, PALETTE.cyan]],
-    haze: 0.5,
-    palms: 0.85,
-    fx: { holo: 0.55, glare: 0.45, grain: 0.22, holoColors: [PALETTE.pink, "#b06cff", PALETTE.cyan, "#7af0ff", "#ff7ec6"], glow: "rgba(255,63,164,0.36)" },
+  s3: theme("s3", { fr: "Avis de recherche", en: "Wanted" }, {
+    grad: "bg", bg: [PALETTE.plum, PALETTE.plumLow], bar: PALETTE.blush, palm: "#3a2442",
   }),
-  s4: base("s4", { fr: "Haute surveillance", en: "High surveillance" }, {
-    accent: PALETTE.orange, accent2: PALETTE.pink,
-    num: [[0, PALETTE.yellow], [0.45, PALETTE.orange], [1, PALETTE.pink]],
-    haze: 0.62,
-    palms: 0.95,
-    fx: { holo: 0.65, glare: 0.5, grain: 0.2, holoColors: [PALETTE.yellow, PALETTE.orange, PALETTE.pink, "#ff9a5a", "#ffd97a"], glow: "rgba(255,122,61,0.4)" },
+  s4: theme("s4", { fr: "Haute surveillance", en: "High surveillance" }, {
+    grad: "num", bg: [PALETTE.plum, PALETTE.plum], bar: PALETTE.peach, palm: "#5a3a64", accent2: PALETTE.duskC,
   }),
-  s5: base("s5", { fr: "Menace publique", en: "Public menace" }, {
-    accent: PALETTE.pink, accent2: PALETTE.violet,
-    num: SUNSET,
-    haze: 0.78,
-    palms: 0.95,
-    holoBand: true,
-    fx: { holo: 0.8, glare: 0.55, grain: 0.18, holoColors: [PALETTE.yellow, PALETTE.orange, PALETTE.pink, PALETTE.violet, PALETTE.cyan], glow: "rgba(255,63,164,0.5)" },
+  s5: theme("s5", { fr: "Menace publique", en: "Public menace" }, {
+    grad: "sky", bg: [PALETTE.duskGround, PALETTE.duskGround], bar: PALETTE.peach, palm: "#35244a",
+    sky: { stops: [PALETTE.roseA, PALETTE.roseB, PALETTE.roseC, PALETTE.roseD], ground: PALETTE.duskGround, sun: "#ffe0b8" },
+    accent2: PALETTE.roseC,
   }),
-  s6: base("s6", { fr: "Priorité absolue", en: "Top priority" }, {
-    accent: PALETTE.pink, accent2: PALETTE.violet,
-    num: SUNSET,
-    haze: 0.78,
-    palms: 0.95,
-    holoBand: true,
-    fx: { holo: 0.8, glare: 0.55, grain: 0.18, holoColors: [PALETTE.yellow, PALETTE.orange, PALETTE.pink, PALETTE.violet, PALETTE.cyan], glow: "rgba(255,63,164,0.5)" },
+  s6: theme("s6", { fr: "Priorité absolue", en: "Top priority" }, {
+    grad: "sky", bg: [PALETTE.blueGround, PALETTE.blueGround], bar: PALETTE.peach, palm: "#1b1c3e",
+    sky: { stops: [PALETTE.blueA, PALETTE.blueB, PALETTE.blueC, PALETTE.blueD], ground: PALETTE.blueGround, lights: true },
+    rim: true, accent: PALETTE.rimGlow, accent2: PALETTE.blueB,
   }),
-  wonderkid: base("wonderkid", { fr: "Nouveau en ville", en: "New in town" }, {
-    accent: PALETTE.pink, accent2: PALETTE.cyan,
-    num: [[0, PALETTE.pink], [1, PALETTE.cyan]],
-    haze: 0.5,
-    palms: 0.85,
-    badge: { bg: PALETTE.money, ink: "#06180a" },
-    fx: { holo: 0.55, glare: 0.45, grain: 0.22, holoColors: [PALETTE.money, PALETTE.cyan, PALETTE.pink, "#c7f26a", "#7af0ff"], glow: "rgba(140,224,107,0.4)" },
+  wonderkid: theme("wonderkid", { fr: "Nouveau en ville", en: "New in town" }, {
+    grad: "bg", bg: [PALETTE.moss, PALETTE.mossLow], bar: PALETTE.lime, palm: "#1f3430",
+    badge: { bg: PALETTE.lime, ink: PALETTE.ink0 },
   }),
-  flashback: base("flashback", { fr: "Affaire classée", en: "Cold case" }, {
-    accent: PALETTE.cyan, accent2: PALETTE.pink,
-    num: [[0, PALETTE.cyan], [1, PALETTE.pink]],
-    haze: 0.5,
-    palms: 0.85,
-    badge: { bg: PALETTE.cyan, ink: "#00161c" },
-    fx: { holo: 0.55, glare: 0.45, grain: 0.3, holoColors: [PALETTE.cyan, "#7af0ff", PALETTE.pink, "#b06cff", "#3fd8ff"], glow: "rgba(63,216,255,0.4)" },
+  flashback: theme("flashback", { fr: "Affaire classée", en: "Cold case" }, {
+    grad: "bg", bg: [PALETTE.cold, PALETTE.coldLow], bar: PALETTE.peach, palm: "#323e4a", gray: true,
+    badge: { bg: PALETTE.peach, ink: PALETTE.ink0 },
   }),
-  totw: base("totw", { fr: "Les 5 plus recherchés", en: "Top 5 most wanted" }, {
-    accent: PALETTE.orange, accent2: PALETTE.pink,
-    num: [[0, PALETTE.yellow], [0.45, PALETTE.orange], [1, PALETTE.pink]],
-    haze: 0.62,
-    palms: 0.95,
-    holoBand: true,
-    badge: { bg: PALETTE.yellow, ink: "#140b00" },
-    fx: { holo: 0.7, glare: 0.5, grain: 0.2, holoColors: [PALETTE.yellow, PALETTE.orange, PALETTE.pink, "#ffe9a8", PALETTE.violet], glow: "rgba(255,210,63,0.42)" },
+  totw: theme("totw", { fr: "Les 5 plus recherchés", en: "Top 5 most wanted" }, {
+    grad: "num", bg: [PALETTE.indigo, PALETTE.indigo], bar: PALETTE.peach, palm: "#34407a",
+    badge: { bg: PALETTE.cream, ink: PALETTE.ink0 }, accent2: PALETTE.duskC,
   }),
 };
 
@@ -188,20 +186,12 @@ export function themeFor(style: CardStyle | Stars): CardTheme {
   }
 }
 
-/** Variables CSS dérivées du thème, pour les calques d'effets du web. */
+/** Variables CSS dérivées du thème, pour les calques du web (grain, contour de ★★★★★★). */
 export function themeCssVars(th: CardTheme): Record<string, string> {
-  const [a, b, c, d, e] = th.fx.holoColors;
   return {
-    "--tys-holo": String(th.fx.holo),
-    "--tys-glare": String(th.fx.glare),
     "--tys-grain": String(th.fx.grain),
-    "--tys-h1": a,
-    "--tys-h2": b,
-    "--tys-h3": c,
-    "--tys-h4": d,
-    "--tys-h5": e,
-    "--tys-glow": th.fx.glow,
     "--tys-accent": th.accent,
-    "--tys-frame": `linear-gradient(135deg, ${th.num.map(([o, col]) => `${col} ${Math.round(o * 100)}%`).join(", ")})`,
+    "--tys-rim-core": PALETTE.rimCore,
+    "--tys-rim-glow": PALETTE.rimGlow,
   };
 }

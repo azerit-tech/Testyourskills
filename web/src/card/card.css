@@ -1,9 +1,10 @@
-/* Effets de la fiche dans le navigateur : inclinaison 3D, reflet néon
-   (technique des cartes Pokémon en CSS), glare, grain métallique, balayage de
-   lumière. Calques posés au-dessus du SVG, masqués à la silhouette de la carte.
-   Absents de l'image partagée (SPEC §16). Variables pilotées par CardView :
-   --rx --ry (deg), --mx --my (%), --bgx --bgy (%), --active (0..1). Intensités
-   par niveau : --tys-holo --tys-glare --tys-grain, teintes --tys-h1..5. */
+/* Effets de la fiche dans le navigateur : inclinaison 3D, grain, balayage de
+   lumière à la révélation. Style mat (SPEC §18.18) : ni reflet holographique
+   ni glare ni aura ; seul ★★★★★★ a un halo, le contour éclairé par l'arrière
+   qui déborde de la fiche (dans le SVG, il est dessiné vers l'intérieur).
+   Variables pilotées par CardView : --rx --ry (deg), --mx --my (%), --bgx
+   --bgy (%), --active (0..1). Par niveau : --tys-grain, --tys-rim-core,
+   --tys-rim-glow. */
 
 .tys-card {
   --rx: 0;
@@ -39,16 +40,14 @@
   height: auto;
 }
 
-/* Ombre et lueur portées, décalées à l'opposé de l'inclinaison.
+/* Ombre portée, décalée à l'opposé de l'inclinaison.
    Le masque est sur le pseudo-élément et le flou sur le parent : sinon le
    masque rognerait le flou et dessinerait un liseré net. */
-.tys-card__shadow,
-.tys-card__aura {
+.tys-card__shadow {
   position: absolute;
   pointer-events: none;
 }
-.tys-card__shadow::before,
-.tys-card__aura::before {
+.tys-card__shadow::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -69,14 +68,10 @@
 .tys-card__shadow::before {
   background: rgba(0, 0, 0, 0.8);
 }
-.tys-card__aura {
-  inset: 4%;
-  filter: blur(42px);
-  opacity: calc(0.45 + var(--active) * 0.55);
-  z-index: -2;
-}
-.tys-card__aura::before {
-  background: var(--tys-glow);
+/* ★★★★★★ : le contour éclairé par l'arrière déborde de la fiche à l'écran,
+   comme dans la maquette (web/gta.css, .fiche-wrap.rim). Le seul halo du site. */
+.tys-card[data-level="s6"] .tys-card__svg {
+  filter: drop-shadow(0 0 1px var(--tys-rim-core)) drop-shadow(0 0 10px rgba(255, 138, 92, 0.55));
 }
 
 /* Calques d'effets communs */
@@ -92,69 +87,7 @@
   mask-repeat: no-repeat;
 }
 
-/* Reflet holographique : bandes arc-en-ciel répétées + stries de feuille,
-   déplacées avec le pointeur, en color-dodge. */
-.tys-card__holo {
-  --space: 5%;
-  background-image:
-    repeating-linear-gradient(
-      0deg,
-      var(--tys-h1) calc(var(--space) * 1),
-      var(--tys-h2) calc(var(--space) * 2),
-      var(--tys-h3) calc(var(--space) * 3),
-      var(--tys-h4) calc(var(--space) * 4),
-      var(--tys-h5) calc(var(--space) * 5),
-      var(--tys-h1) calc(var(--space) * 6)
-    ),
-    repeating-linear-gradient(
-      133deg,
-      #0e152e 0%,
-      hsl(180, 10%, 60%) 3.8%,
-      hsl(180, 29%, 66%) 4.5%,
-      hsl(180, 10%, 60%) 5.2%,
-      #0e152e 10%,
-      #0e152e 12%
-    ),
-    radial-gradient(farthest-corner circle at var(--mx) var(--my), rgba(0, 0, 0, 0.1) 12%, rgba(0, 0, 0, 0.15) 20%, rgba(0, 0, 0, 0.25) 120%);
-  background-blend-mode: exclusion, hue, hard-light;
-  background-size: 200% 700%, 300% 100%, 200% 100%;
-  background-position: 0% var(--bgy), var(--bgx) var(--bgy), var(--bgx) var(--bgy);
-  /* corps de nuit : color-dodge fait monter les néons sans délaver l'encre */
-  mix-blend-mode: color-dodge;
-  filter: brightness(0.55) contrast(1.8) saturate(1.1);
-  opacity: calc(var(--tys-holo) * (0.3 + var(--active) * 0.7));
-}
-.tys-card[data-level="s5"] .tys-card__holo,
-.tys-card[data-level="totw"] .tys-card__holo {
-  --space: 4%;
-  filter: brightness(0.6) contrast(1.6) saturate(1.4);
-}
-
-/* Glare spéculaire qui suit le pointeur */
-.tys-card__glare {
-  background-image: radial-gradient(
-    farthest-corner circle at var(--mx) var(--my),
-    rgba(255, 255, 255, 0.85) 8%,
-    rgba(255, 255, 255, 0.55) 22%,
-    rgba(0, 0, 0, 0.5) 92%
-  );
-  mix-blend-mode: soft-light;
-  opacity: calc(var(--tys-glare) * var(--active));
-}
-/* point spéculaire net, discret */
-.tys-card__glare::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at var(--mx) var(--my), rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 28%);
-  mix-blend-mode: overlay;
-  opacity: 0.6;
-}
-.tys-card .tys-card__glare {
-  mix-blend-mode: overlay;
-}
-
-/* Grain de feuille métallique (bruit SVG), qui glisse légèrement */
+/* Grain d'impression (bruit SVG), qui glisse légèrement */
 .tys-card__grain {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 1.4 -0.2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
   background-size: 160px 160px;

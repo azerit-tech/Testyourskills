@@ -1,6 +1,7 @@
 // Fiche interactive : enveloppe <Card> (SVG identique au rendu serveur) avec
-// l'inclinaison 3D (12° max, pointeur ou gyroscope, retour élastique), le reflet
-// néon (couleurs du niveau), le glare, le grain et le balayage de révélation.
+// l'inclinaison 3D (12° max, pointeur ou gyroscope, retour élastique), le grain
+// et le balayage de révélation. Style mat (SPEC §18.18) : ni reflet
+// holographique ni glare ; seul ★★★★★★ porte un halo, son contour éclairé.
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { CardData, Lang } from "../../../shared/types";
 import { styleOf } from "../../../shared/types";
@@ -15,7 +16,7 @@ export { CARD_PATH, CARD_MASK_URL };
 export interface CardViewProps {
   card: CardData;
   lang?: Lang;
-  /** Défaut true : inclinaison + holo qui suit le pointeur. */
+  /** Défaut true : inclinaison qui suit le pointeur. */
   interactive?: boolean;
   /** Joue le balayage de lumière à l'apparition. */
   reveal?: boolean;
@@ -207,13 +208,10 @@ export function CardView({ card, lang, interactive = true, reveal = false, idPre
       data-static={live ? "false" : "true"}
       style={vars}
     >
-      <div className="tys-card__aura" aria-hidden />
       <div className="tys-card__rotator">
         <div className="tys-card__shadow" aria-hidden />
         <Card card={card} lang={lang} idPrefix={idPrefix} className="tys-card__svg" />
-        <div className="tys-card__fx tys-card__holo" aria-hidden />
         <div className="tys-card__fx tys-card__grain" aria-hidden />
-        <div className="tys-card__fx tys-card__glare" aria-hidden />
         <div className="tys-card__fx tys-card__sweep" aria-hidden />
       </div>
     </div>

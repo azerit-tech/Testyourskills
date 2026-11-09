@@ -4,7 +4,7 @@
 import type { CardData, ComparisonData, Lang, StatCode } from "../../../shared/types";
 import { STAT_CODES } from "../../../shared/types";
 import { CardGraphic } from "../../../shared/card/Card";
-import { AzeritGem, AzeritGemDefs } from "../../../shared/card/AzeritGem";
+import { AzeritGem } from "../../../shared/card/AzeritGem";
 import { fontAttrs } from "../../../shared/card/fonts";
 import { CARD_H, CARD_PATH, CARD_W } from "../../../shared/card/geometry";
 import { t } from "../../../shared/card/i18n";
@@ -39,8 +39,7 @@ export function ctaHost(): string {
 
 /** Couleur claire représentative du néon d'une fiche (lumière du fond). */
 function lightOf(card: CardData): string {
-  const th = themeOf(card);
-  return th.dark ? th.innerGlow : th.frame[3][1];
+  return themeOf(card).accent;
 }
 
 /* ------------------------------------------------------------------ */
@@ -131,7 +130,7 @@ function FloorGlow({ x, y, rx, color, id }: { x: number; y: number; rx: number; 
   );
 }
 
-function Brand({ x, y, id, anchor = "start", size = 1 }: { x: number; y: number; id: string; anchor?: "start" | "middle"; size?: number }) {
+function Brand({ x, y, anchor = "start", size = 1 }: { x: number; y: number; id: string; anchor?: "start" | "middle"; size?: number }) {
   const label = "TESTYOURSKILLS";
   const fs = 15 * size;
   const ls = 4 * size;
@@ -142,10 +141,7 @@ function Brand({ x, y, id, anchor = "start", size = 1 }: { x: number; y: number;
   const x0 = anchor === "middle" ? x - total / 2 : x;
   return (
     <g>
-      <defs>
-        <AzeritGemDefs id={`${id}-brand`} />
-      </defs>
-      <AzeritGem id={`${id}-brand`} x={x0} y={y - gemH * 0.78} h={gemH} />
+      <AzeritGem x={x0} y={y - gemH * 0.78} h={gemH} />
       <text x={x0 + gemW + 12 * size} y={y} {...fontAttrs("mono-700")} fontSize={fs} letterSpacing={ls} fill={TEXT} fillOpacity={0.82}>
         {label}
       </text>
@@ -228,7 +224,7 @@ export function OgImage({ card, lang, avatars }: { card: CardData; lang: Lang; a
   const quoted = quote ? (lang === "fr" ? `«\u00a0${quote}\u00a0»` : `“${quote}”`) : "";
   const qLines = quote ? wrap(quoted, "sans-600", 34, maxW, 2) : [];
   const kicker = tierKicker(card, lang);
-  const kickColor = th.dark ? th.innerLine : light;
+  const kickColor = th.ink;
   const footer = `${s.judged(card.judgedInSeconds)} · ${s.reliability} ${s.percent(card.reliability)}`;
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
@@ -275,7 +271,7 @@ export function PortraitImage({ card, lang, avatars }: { card: CardData; lang: L
     <svg xmlns="http://www.w3.org/2000/svg" width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
       <Backdrop w={W} h={H} id="pt" glows={[{ x: W / 2, y: cy + ch * 0.4, r: 640, color: light, o: 0.34 }]} />
       <Brand x={W / 2} y={82} id="pt" anchor="middle" size={1.1} />
-      <text x={W / 2} y={136} {...fontAttrs("mono-700")} fontSize={21} letterSpacing={5} textAnchor="middle" fill={th.dark ? th.innerLine : light}>
+      <text x={W / 2} y={136} {...fontAttrs("mono-700")} fontSize={21} letterSpacing={5} textAnchor="middle" fill={th.ink}>
         {kicker}
       </text>
       <FloorGlow x={W / 2} y={cy + ch + 6} rx={cw * 0.55} color={light} id="pt" />

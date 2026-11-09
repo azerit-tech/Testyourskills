@@ -1,18 +1,21 @@
-// La fiche de dev (SPEC §17.3) : un seul composant SVG React pur, rendu à
+// La fiche de dev (SPEC §18.18) : un seul composant SVG React pur, rendu à
 // l'identique dans le navigateur et côté serveur (renderToStaticMarkup → resvg).
-// Uniquement des fonctionnalités SVG que resvg sait rendre : dégradés, clipPath,
-// filtres (turbulence, matrice de couleur, flou, transfert de composantes,
-// convolution), texte, image. Mise en page calquée sur la maquette web/gta.html.
+// Calquée sur la maquette validée web/gta-card.js : style mat, six étoiles,
+// UN seul dégradé par fiche (fond, note ou ciel), aplats partout ailleurs,
+// aucune lueur sauf le contour éclairé par l'arrière de ★★★★★★.
+// Uniquement ce que resvg sait rendre : aplats, un dégradé linéaire, texte,
+// clipPath, image, feColorMatrix/feComponentTransfer (photo), feTurbulence
+// (grain) et un flou (le contour de ★★★★★★).
 import { useId, type ReactNode } from "react";
-import type { CardData, Lang, Stat, StatusInstance } from "../types";
+import type { CardData, Lang, Stat, StatusInstance, StatusTone } from "../types";
 import { LEVEL_LABELS, starsFor } from "../types";
-import { AzeritGem, AzeritGemDefs } from "./AzeritGem";
+import { AzeritGem } from "./AzeritGem";
 import { fontAttrs, type FontKey } from "./fonts";
-import { CARD_H, CARD_W, cardPath } from "./geometry";
+import { CARD_H, CARD_R, CARD_W } from "./geometry";
 import { t } from "./i18n";
 import { langIcon } from "./languages";
-import { fit, measure, truncate, upper } from "./text";
-import { PALETTE, themeOf, type CardTheme, type Stop } from "./themes";
+import { fit, measure, upper } from "./text";
+import { PALETTE, themeOf, type CardTheme } from "./themes";
 
 export interface CardProps {
   card: CardData;
@@ -33,49 +36,20 @@ export interface CardGraphicProps extends CardProps {
 }
 
 /* ------------------------------------------------------------------ */
-/* Mise en page (unités du viewBox 360 × 520, marges 20 / 18)          */
+/* Cotes (unités du viewBox 360 × 520), celles de la maquette           */
 /* ------------------------------------------------------------------ */
 
-const L = {
-  left: 20,
-  right: CARD_W - 18,
-  stars: { x: 20, y: 18, size: 16, gap: 3 },
-  overall: { x: 18, y: 130, size: 118 },
-  levelY: 156,
-  metaLabelY: 176,
-  metaValueY: 192,
-  mug: { x: 178, y: 44, w: 164, h: 206, r: 6 },
-  photo: { w: 140, h: 168 },
-  placard: { w: 136, h: 44, bottom: 10 },
-  formTop: 262,
-  formLabelY: 277,
-  formValueY: 293,
-  statsTop: 306,
-  statRow: 25,
-  chargesTitleY: 411,
-  chargesFirstY: 432,
-  chargeRow: 20,
-  footerY: 506,
-};
-
-type Layout = typeof L & { profileY?: number; taglineY?: number };
-
-/** Avec un profil criminel (§18.2) : la photo raccourcit de 14, le profil se
- *  loge dessous sur toute la largeur, et les blocs du bas se resserrent. */
-const LP: Layout = {
-  ...L,
-  mug: { ...L.mug, h: 192 },
-  profileY: 266,
-  taglineY: 282,
-  formTop: 294,
-  formLabelY: 309,
-  formValueY: 325,
-  statsTop: 338,
-  statRow: 23,
-  chargesTitleY: 421,
-  chargesFirstY: 440,
-  chargeRow: 19,
-};
+const LEFT = 20;
+const RIGHT = CARD_W - 18;
+const FW = RIGHT - LEFT;
+/** Photo d'identité : raccourcie quand un profil criminel se loge dessous. */
+const MUG = { x: 178, y: 44, w: 164, h: 192, r: 6 };
+const MUG_NO_PROFILE_H = 236;
+const PLACARD = { w: 136, h: 44, bottom: 10 };
+/** Horizon des fiches au ciel peint (★★★★★, ★★★★★★). */
+const HY = 248;
+const STAR_SIZE = 17;
+const STAR_GAP = 3;
 
 const STAR = "M12 2.6l2.9 6.1 6.7.8-4.9 4.6 1.3 6.6L12 17.4l-6 3.3 1.3-6.6L2.4 9.5l6.7-.8z";
 const PALM = [
@@ -87,13 +61,16 @@ const PALM = [
   "M60 54c-6-22-2-40 8-52-2 16 0 32-4 50z",
   "M60 54c10-20 26-32 44-34-16 8-30 20-42 36z",
   "M60 54c-14-14-18-30-14-48 4 16 10 30 16 46z",
-];
+].join("");
+
+/** Immeubles bas de l'horizon peint : [x, largeur, hauteur], une trouée au milieu pour le soleil. */
+const BLOCKS: [number, number, number][] = [[0, 12, 14], [12, 9, 24], [21, 14, 15], [35, 8, 31], [43, 12, 19], [124, 10, 22], [134, 9, 36], [143, 14, 18], [157, 8, 27], [165, 15, 14]];
+/** Trois palmiers de l'horizon : [x, échelle]. */
+const SKY_PALMS: [number, number][] = [[50, 0.42], [92, 0.28], [104, 0.35]];
+
+const STAT_ORDER = ["TEC", "SHIP", "ARCH", "DOC", "XP", "BUZZ"] as const;
 
 /* ------------------------------------------------------------------ */
-
-function stops(s: Stop[]) {
-  return s.map(([o, c, a], i) => <stop key={i} offset={o} stopColor={c} stopOpacity={a ?? 1} />);
-}
 
 function sanitize(id: string) {
   return id.replace(/[^a-zA-Z0-9_-]/g, "");
@@ -126,7 +103,7 @@ interface TxtProps {
 
 function Txt({ x, y, font, size, fill, ls = 0, anchor = "start", opacity, children }: TxtProps) {
   return (
-    <text x={x} y={y} {...fontAttrs(font)} fontSize={size} letterSpacing={ls || undefined} textAnchor={anchor} fill={fill} opacity={opacity}>
+    <text x={x} y={y} {...fontAttrs(font)} fontSize={size} letterSpacing={ls ? +ls.toFixed(2) : undefined} textAnchor={anchor} fill={fill} fillOpacity={opacity}>
       {children}
     </text>
   );
@@ -136,21 +113,24 @@ function Txt({ x, y, font, size, fill, ls = 0, anchor = "start", opacity, childr
 /* Blocs                                                                */
 /* ------------------------------------------------------------------ */
 
-function Stars({ n, th, id }: { n: number; th: CardTheme; id: string }) {
-  const { x, y, size, gap } = L.stars;
-  const k = size / 24;
+/** Étoiles du HUD : six emplacements, les allumées blanches et mates calées à
+ *  droite ; les éteintes pleines et sombres (blanc à 13 % sur l'encre). */
+function Stars({ n, onSky }: { n: number; onSky: boolean }) {
+  const k = STAR_SIZE / 24;
+  const x0 = RIGHT - 6 * STAR_SIZE - 5 * STAR_GAP;
   return (
     <g>
-      {[1, 2, 3, 4, 5, 6].map((i) => {
-        const tx = x + (i - 1) * (size + gap);
-        const on = i > 6 - n;
+      {[0, 1, 2, 3, 4, 5].map((i) => {
+        const on = i >= 6 - n;
         return (
-          <g key={i} transform={`translate(${tx} ${y}) scale(${k})`}>
-            {on && <path d={STAR} fill={th.accent} opacity={0.9} filter={`url(#${id}-starglow)`} />}
+          <g key={i} transform={`translate(${x0 + i * (STAR_SIZE + STAR_GAP)} 15) scale(${k})`}>
+            {on && <path d={STAR} transform={`translate(0 ${+(1 / k).toFixed(3)})`} fill="#000" fillOpacity={0.28} />}
             {on ? (
               <path d={STAR} fill={PALETTE.star} />
+            ) : onSky ? (
+              <path d={STAR} fill="#14141e" fillOpacity={0.55} />
             ) : (
-              <path d={STAR} fill="none" stroke="#fff" strokeOpacity={0.22} strokeWidth={1.4 / k} />
+              <path d={STAR} fill="#fff" fillOpacity={0.13} />
             )}
           </g>
         );
@@ -159,76 +139,109 @@ function Stars({ n, th, id }: { n: number; th: CardTheme; id: string }) {
   );
 }
 
-function StatRow({ stat, x, y, th, idp }: { stat: Stat; x: number; y: number; th: CardTheme; idp: string }) {
-  const isBuzz = stat.code === "BUZZ";
+/** Pastille d'un chef d'accusation : un pictogramme par ton. */
+function Pastille({ tone, cx, cy, th }: { tone: StatusTone; cx: number; cy: number; th: CardTheme }) {
+  const ink = tone === "negative" ? "#fff" : PALETTE.ink0;
+  return (
+    <g transform={`translate(${cx} ${cy})`}>
+      <circle r={5.6} fill={th.tones[tone]} />
+      {tone === "negative" && (
+        <>
+          <rect x={-0.85} y={-3.4} width={1.7} height={4.1} rx={0.8} fill={ink} />
+          <circle cx={0} cy={2.5} r={0.95} fill={ink} />
+        </>
+      )}
+      {tone === "positive" && <path d="M-2.5 0.1 L-0.7 1.9 L2.6 -1.9" fill="none" stroke={ink} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />}
+      {tone === "special" && <path d="M0 -3.2 L0.9 -0.9 L3.2 0 L0.9 0.9 L0 3.2 L-0.9 0.9 L-3.2 0 L-0.9 -0.9 Z" fill={ink} />}
+      {tone === "gap" && <path d="M-2.6 -1.1h5.2M-2.6 1.1h5.2M1.4 -3 L-1.4 3" stroke={ink} strokeWidth={1.3} strokeLinecap="round" />}
+    </g>
+  );
+}
+
+/** Une stat : code, barre de dix segments séparés en aplats, valeur. */
+function StatRow({ stat, x, y, th }: { stat: Stat; x: number; y: number; th: CardTheme }) {
   const weak = !stat.sufficient;
-  const col = 153;
-  const barX = x + 34 + 8;
-  const barW = col - 34 - 26 - 16;
-  const barY = y + 5;
-  const fill = isBuzz ? th.buzz : th.accent;
+  const col = stat.code === "BUZZ" ? th.buzz : th.bar;
   const v = Math.max(0, Math.min(99, stat.value));
-  const w = (barW * v) / 100;
+  const bx = x + 40;
+  const bw = 153 - 40 - 28;
+  const seg = (bw - 9 * 2) / 10;
   return (
     <g>
-      <Txt x={x} y={y + 13} font="mono-700" size={10.5} ls={0.4} fill={th.inkSoft}>
+      <Txt x={x} y={y + 13} font="sans-600" size={10} ls={0.6} fill={th.inkSoft} opacity={0.75}>
         {stat.code}
       </Txt>
-      <rect x={barX} y={barY} width={barW} height={8} rx={2} fill="#fff" fillOpacity={0.08} />
-      {w > 0 && (
-        <g opacity={weak ? 0.45 : 1}>
-          <rect x={barX} y={barY} width={w} height={8} rx={2} fill={fill} opacity={0.55} filter={`url(#${idp}-barglow)`} />
-          <rect x={barX} y={barY} width={w} height={8} rx={2} fill={fill} />
-        </g>
-      )}
-      {/* dix segments : neuf séparateurs à la couleur de la nuit */}
-      {Array.from({ length: 9 }, (_, i) => (
-        <rect key={i} x={barX + ((i + 1) * barW) / 10 - 1} y={barY - 0.5} width={2} height={9} fill={PALETTE.night} />
-      ))}
-      <Txt x={x + col} y={y + 15} font="display-700" size={18} anchor="end" fill={isBuzz ? th.buzz : th.ink} opacity={weak ? 0.55 : 1}>
+      {Array.from({ length: 10 }, (_, j) => {
+        const sx = +(bx + j * (seg + 2)).toFixed(2);
+        const fw = Math.max(0, Math.min(seg, ((v - j * 10) / 10) * seg));
+        return (
+          <g key={j}>
+            <rect x={sx} y={y + 5} width={+seg.toFixed(2)} height={8} rx={1} fill="#fff" fillOpacity={0.09} />
+            {fw > 0 && <rect x={sx} y={y + 5} width={+fw.toFixed(2)} height={8} rx={1} fill={col} fillOpacity={weak ? 0.45 : undefined} />}
+          </g>
+        );
+      })}
+      <Txt x={x + 153} y={y + 15} font="display-700" size={18} anchor="end" fill={th.ink} opacity={weak ? 0.55 : undefined}>
         {stat.value}
       </Txt>
       {weak && (
-        <text x={x + col - 28} y={y + 14} {...fontAttrs("mono-700")} fontSize={9} textAnchor="end" fill={th.inkMuted}>
+        <Txt x={x + 153 - 25} y={y + 14} font="mono-700" size={9} anchor="end" fill={th.inkSoft} opacity={0.6}>
           ?
-        </text>
+        </Txt>
       )}
     </g>
   );
 }
 
-function Charges({ statuses, th, lang, idp, ly }: { statuses: StatusInstance[]; th: CardTheme; lang: Lang; idp: string; ly: Layout }) {
+function Charges({ statuses, th, lang }: { statuses: StatusInstance[]; th: CardTheme; lang: Lang }) {
   const s = t(lang);
-  const list = statuses.slice(0, 3);
-  const textX = L.left + 14;
-  const maxW = L.right - textX;
   return (
     <g>
-      <Txt x={L.left} y={ly.chargesTitleY} font="mono-700" size={8.5} ls={1.5} fill={th.inkMuted}>
+      <Txt x={LEFT} y={429} font="sans-600" size={8.5} ls={1.3} fill={th.inkSoft} opacity={0.62}>
         {upper(s.charges, lang)}
       </Txt>
-      {list.map((st, i) => {
-        const y = ly.chargesFirstY + i * ly.chargeRow;
-        const tone = th.tones[st.tone];
-        const aiTag = st.byAI ? ` · ${s.ai}` : "";
-        const aiW = st.byAI ? measure(aiTag, "mono-400", 9) : 0;
-        const label = truncate(st.label[lang] ?? st.label.fr, "sans-500", 12.5, maxW - aiW);
-        const lw = measure(label, "sans-500", 12.5);
+      {statuses.slice(0, 3).map((st, i) => {
+        const y = 448 + i * 18;
+        const tag = st.byAI ? ` · ${s.ai}` : "";
+        const tagW = st.byAI ? measure(tag, "mono-400", 9) : 0;
+        const label = fit(st.label[lang] ?? st.label.fr, { font: "sans-500", size: 12.5, minSize: 12.5, maxWidth: FW - 15 - tagW });
         return (
           <g key={st.id + i}>
-            <circle cx={L.left + 3} cy={y - 4.2} r={4.5} fill={tone} opacity={0.6} filter={`url(#${idp}-dotglow)`} />
-            <circle cx={L.left + 3} cy={y - 4.2} r={3} fill={tone} />
-            <Txt x={textX} y={y} font="sans-500" size={12.5} fill={th.ink}>
-              {label}
+            <Pastille tone={st.tone} cx={LEFT + 5.6} cy={y - 4.3} th={th} />
+            <Txt x={LEFT + 16} y={y} font="sans-500" size={12.5} fill={th.inkSoft}>
+              {label.text}
             </Txt>
             {st.byAI && (
-              <Txt x={textX + lw / 1.03 + 3} y={y} font="mono-400" size={9} fill={th.inkMuted}>
-                {aiTag}
+              <Txt x={LEFT + 16 + label.width + 2} y={y} font="mono-400" size={9} fill={th.inkSoft} opacity={0.55}>
+                {tag}
               </Txt>
             )}
           </g>
         );
       })}
+    </g>
+  );
+}
+
+/** Horizon peint : immeubles bas et palmiers en aplat de la teinte du sol,
+ *  fenêtres allumées pour l'heure bleue. */
+function Skyline({ ground, lights }: { ground: string; lights?: boolean }) {
+  return (
+    <g>
+      {BLOCKS.map(([x, w, h]) => (
+        <g key={x}>
+          <rect x={x} y={HY - h} width={w + 0.5} height={h + 1} fill={ground} />
+          {lights &&
+            Array.from({ length: Math.floor(h / 8) }, (_, k) => (
+              <rect key={k} x={x + 2.5 + (k % 2) * 3.5} y={HY - h + 4 + k * 7} width={1.6} height={1.6} fill="#ffc46b" fillOpacity={0.8} />
+            ))}
+        </g>
+      ))}
+      {SKY_PALMS.map(([x, k]) => (
+        <g key={x} transform={`translate(${x} ${+(HY - 140 * k).toFixed(2)}) scale(${k})`} fill={ground}>
+          <path d={PALM} />
+        </g>
+      ))}
     </g>
   );
 }
@@ -243,57 +256,46 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
   const lang: Lang = langProp ?? card.lang ?? "fr";
   const s = t(lang);
   const th = themeOf(card);
-  const stars = starsFor(card.overall);
-  const levelLabel = LEVEL_LABELS[stars][lang];
+  const n = starsFor(card.overall);
+  const levelLabel = LEVEL_LABELS[n][lang];
   const avatar = avatarHref !== undefined ? avatarHref || undefined : card.avatarUrl;
   const u = (k: string) => `url(#${idp}-${k})`;
-  const ly: Layout = card.profile ? LP : L;
-  const M = ly.mug;
+  const sky = th.grad === "sky" && th.sky ? th.sky : null;
+  const M = { ...MUG, h: card.profile ? MUG.h : MUG_NO_PROFILE_H };
 
-  // Textes ajustés
-  const level = fit(upper(levelLabel, lang), { font: "mono-700", size: 12, minSize: 9, maxWidth: M.x - L.left - 6, letterSpacing: 1.9, minLetterSpacing: 0.6 });
-  const placardName = fit(upper(card.login ?? card.name, lang), { font: "display-700", size: 20, minSize: 12, maxWidth: L.placard.w - 16, letterSpacing: 1.6, minLetterSpacing: 0.3 });
-  const caseLine = `${s.caseNo} ${caseNumber(card.id)} · ${caseDate(card.createdAt)}`;
-  const caseFit = fit(caseLine, { font: "mono-400", size: 8.5, minSize: 7, maxWidth: L.placard.w - 12, letterSpacing: 0.85, minLetterSpacing: 0.2 });
-  const overallSize = card.overall >= 100 ? 92 : L.overall.size;
-  const icon = langIcon(card.mainLanguage);
-  const langName = card.mainLanguage ? prettyLanguage(card.mainLanguage, icon?.title) : "—";
+  // Haut gauche : la note, le niveau, la pilule des spéciales
+  const overallSize = card.overall >= 100 ? 92 : 118;
+  const level = fit(upper(levelLabel, lang), { font: "sans-600", size: 11, minSize: 9, maxWidth: M.x - LEFT - 8, letterSpacing: 1.65, minLetterSpacing: 0.5 });
+  const badge = th.badge ? fit(upper(th.label[lang], lang), { font: "sans-600", size: 8.5, minSize: 7.5, maxWidth: M.x - LEFT - 8 - 18, letterSpacing: 1.2, minLetterSpacing: 0.4 }) : null;
 
-  // Ligne spécialité / arme / affiliation
-  const formW = L.right - L.left;
-  const unit = (formW - 20) / 3.3;
-  const cols = [
-    { x: L.left, w: unit, label: s.specialty, value: s.positions[card.position] ?? card.position },
-    { x: L.left + unit + 10, w: unit, label: s.weapon, value: langName },
-    { x: L.left + 2 * unit + 20, w: unit * 1.3, label: s.affiliation, value: card.club ?? s.loneWolf },
-  ];
+  // Écriteau
+  const plX = M.x + (M.w - PLACARD.w) / 2;
+  const plY = M.y + M.h - PLACARD.bottom - PLACARD.h;
+  const placardName = fit(upper(card.login ?? card.name, lang), { font: "display-700", size: 20, minSize: 12, maxWidth: PLACARD.w - 16, letterSpacing: 1.6, minLetterSpacing: 0.3 });
+  const caseFit = fit(`${s.caseNo} ${caseNumber(card.id)} · ${caseDate(card.createdAt)}`, { font: "mono-400", size: 8.5, minSize: 7, maxWidth: PLACARD.w - 12, letterSpacing: 0.85, minLetterSpacing: 0.2 });
 
-  // Profil criminel (§18.2) : le nom en grand, lisible à l'échelle 1 d'un
-  // téléphone (15 unités au moins) ; l'accroche seulement si elle tient entière.
+  // Profil criminel (§18.2) : le nom comme une page personnage, l'accroche seulement si elle tient entière
   const profileName = card.profile
-    ? fit(upper(card.profile.label[lang] ?? card.profile.label.fr, lang), { font: "display-800", size: 26, minSize: 15, maxWidth: formW, letterSpacing: 0.8, minLetterSpacing: 0.2 })
+    ? fit(upper(card.profile.label[lang] ?? card.profile.label.fr, lang), { font: "display-700", size: 30, minSize: 20, maxWidth: FW, letterSpacing: 0.4, minLetterSpacing: 0 })
     : null;
   const taglineText = card.profile ? (card.profile.tagline[lang] ?? card.profile.tagline.fr) : "";
-  const taglineFit = taglineText ? fit(taglineText, { font: "sans-500", size: 10.5, minSize: 9, maxWidth: formW }) : null;
+  const taglineFit = taglineText ? fit(taglineText, { font: "sans-500", size: 13, minSize: 11, maxWidth: FW }) : null;
   const tagline = taglineFit && taglineFit.text === taglineText ? taglineFit : null;
 
-  // Pied
-  const questioned = s.questioned(card.judgedInSeconds);
-  const footer = `${questioned} · ${s.evidence} ${s.percent(card.reliability)}`;
-  const footerFit = fit(footer, { font: "mono-400", size: 9.5, minSize: 7.5, maxWidth: formW, letterSpacing: 0.3, minLetterSpacing: 0 });
+  // Spécialité / arme / affiliation
+  const unit = (FW - 20) / 3.3;
+  const icon = langIcon(card.mainLanguage);
+  const cols = [
+    { x: LEFT, w: unit, label: s.specialty, value: s.positions[card.position] ?? card.position },
+    { x: LEFT + unit + 10, w: unit, label: s.weapon, value: card.mainLanguage ? prettyLanguage(card.mainLanguage, icon?.title) : "—" },
+    { x: LEFT + 2 * unit + 20, w: unit * 1.3, label: s.affiliation, value: card.club ?? s.loneWolf },
+  ];
 
-  const badge = th.badge ? fit(upper(th.label[lang], lang), { font: "mono-700", size: 8.5, minSize: 7, maxWidth: 150, letterSpacing: 1.4, minLetterSpacing: 0.5 }) : null;
-  const badgeW = badge ? badge.width + 16 : 0;
+  // Pied, en procès-verbal
+  const footerFit = fit(`${s.questioned(card.judgedInSeconds)} · ${s.evidence} ${s.percent(card.reliability)}`, { font: "mono-400", size: 9, minSize: 7.5, maxWidth: FW, letterSpacing: 0.2, minLetterSpacing: 0 });
 
-  const left = card.stats.slice(0, 3);
-  const right = card.stats.slice(3, 6);
-
-  const ariaLabel = `${s.card} ${levelLabel} ${card.overall} — ${card.name}`;
-  const photoX = M.x + (M.w - L.photo.w) / 2;
-  const photoY = M.y + M.h - L.photo.h;
-  const plX = M.x + (M.w - L.placard.w) / 2;
-  const plY = M.y + M.h - L.placard.bottom - L.placard.h;
-  const grainOpacity = 0.07;
+  const stats = STAT_ORDER.map((code) => card.stats.find((st) => st.code === code)).filter((st): st is Stat => !!st);
+  const ariaLabel = `${s.card} ${levelLabel} ${card.overall}, ${s.stars(n)} — ${card.name}`;
 
   return (
     <svg
@@ -306,277 +308,209 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
       className={className}
       role="img"
       aria-label={ariaLabel}
+      data-stars={n}
       style={width === undefined ? { display: "block", width: "100%", height: "auto" } : undefined}
     >
       <defs>
-        <linearGradient id={`${idp}-body`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#0d0d26" />
-          <stop offset="0.55" stopColor={PALETTE.night} />
-          <stop offset="1" stopColor="#08081a" />
-        </linearGradient>
-        <linearGradient id={`${idp}-num`} x1="0" y1="0" x2="1" y2="1">
-          {stops(th.num)}
-        </linearGradient>
-        <radialGradient id={`${idp}-haze1`} cx={65} cy={42} r={240} gradientUnits="userSpaceOnUse" gradientTransform={`translate(65 42) scale(1 0.85) translate(-65 -42)`}>
-          <stop offset="0" stopColor={th.accent} stopOpacity={0.55} />
-          <stop offset="0.7" stopColor={th.accent} stopOpacity={0} />
-        </radialGradient>
-        <radialGradient id={`${idp}-haze2`} cx={317} cy={62} r={240} gradientUnits="userSpaceOnUse" gradientTransform={`translate(317 62) scale(1 0.77) translate(-317 -62)`}>
-          <stop offset="0" stopColor={th.accent2} stopOpacity={0.4} />
-          <stop offset="0.7" stopColor={th.accent2} stopOpacity={0} />
-        </radialGradient>
-        {th.holoBand && (
-          <>
-            <radialGradient id={`${idp}-haze3`} cx={180} cy={520} r={300} gradientUnits="userSpaceOnUse" gradientTransform="translate(180 520) scale(1 0.53) translate(-180 -520)">
-              <stop offset="0" stopColor={PALETTE.orange} stopOpacity={0.25} />
-              <stop offset="0.7" stopColor={PALETTE.orange} stopOpacity={0} />
-            </radialGradient>
-            <linearGradient id={`${idp}-holoband`} x1="0" y1="0" x2="1" y2="0.45">
-              <stop offset="0.3" stopColor={PALETTE.yellow} stopOpacity={0} />
-              <stop offset="0.42" stopColor={PALETTE.yellow} stopOpacity={0.14} />
-              <stop offset="0.5" stopColor={PALETTE.pink} stopOpacity={0.18} />
-              <stop offset="0.58" stopColor={PALETTE.cyan} stopOpacity={0.16} />
-              <stop offset="0.7" stopColor={PALETTE.cyan} stopOpacity={0} />
-            </linearGradient>
-          </>
-        )}
-        <linearGradient id={`${idp}-wall`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#c3ccd6" />
-          <stop offset="0.7" stopColor="#a6b1be" />
-          <stop offset="1" stopColor="#8f9aa8" />
-        </linearGradient>
-        <AzeritGemDefs id={idp} />
-
-        <clipPath id={`${idp}-outer`}>
-          <path d={cardPath(0)} />
+        <clipPath id={`${idp}-card`}>
+          <rect width={CARD_W} height={CARD_H} rx={CARD_R} />
         </clipPath>
         <clipPath id={`${idp}-mug`}>
           <rect x={M.x} y={M.y} width={M.w} height={M.h} rx={M.r} />
         </clipPath>
-
-        {/* grain : bruit blanc très léger sur toute la fiche */}
-        <filter id={`${idp}-grain`} x="0" y="0" width={CARD_W} height={CARD_H} filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
-          <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves={2} seed={5} stitchTiles="stitch" result="n" />
-          <feColorMatrix in="n" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.5 0" />
+        {/* Le seul dégradé de la fiche */}
+        {th.grad === "bg" && (
+          <linearGradient id={`${idp}-g`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor={th.bg[0]} />
+            <stop offset="1" stopColor={th.bg[1]} />
+          </linearGradient>
+        )}
+        {th.grad === "num" && (
+          <linearGradient id={`${idp}-g`} x1="0" y1="0" x2="0" y2="1">
+            {th.num.map(([o, c]) => (
+              <stop key={o} offset={o} stopColor={c} />
+            ))}
+          </linearGradient>
+        )}
+        {sky && (
+          <linearGradient id={`${idp}-g`} x1="0" y1="0" x2="0" y2={HY} gradientUnits="userSpaceOnUse">
+            <stop offset="0" stopColor={sky.stops[0]} />
+            <stop offset="0.5" stopColor={sky.stops[1]} />
+            <stop offset="0.84" stopColor={sky.stops[2]} />
+            <stop offset="1" stopColor={sky.stops[3]} />
+          </linearGradient>
+        )}
+        {/* Photo « peinte » : ombres poussées vers le violet, sans posterisation dure */}
+        <filter id={`${idp}-photo`} colorInterpolationFilters="sRGB">
+          {th.gray ? (
+            <>
+              <feColorMatrix type="saturate" values="0" />
+              <feComponentTransfer>
+                <feFuncR type="table" tableValues="0.16 0.62 0.93" />
+                <feFuncG type="table" tableValues="0.17 0.64 0.95" />
+                <feFuncB type="table" tableValues="0.21 0.68 0.98" />
+              </feComponentTransfer>
+            </>
+          ) : (
+            <>
+              <feColorMatrix type="saturate" values="1.08" />
+              <feComponentTransfer>
+                <feFuncR type="table" tableValues="0.19 0.56 1" />
+                <feFuncG type="table" tableValues="0.12 0.48 0.98" />
+                <feFuncB type="table" tableValues="0.31 0.6 0.98" />
+              </feComponentTransfer>
+            </>
+          )}
         </filter>
-        <filter id={`${idp}-starglow`} x="-60%" y="-60%" width="220%" height="220%">
-          <feGaussianBlur stdDeviation="2.6" />
+        <filter id={`${idp}-grain`} x="0" y="0" width={CARD_W} height={CARD_H} filterUnits="userSpaceOnUse">
+          <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves={2} seed={5} stitchTiles="stitch" />
+          <feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.5 0" />
         </filter>
-        <filter id={`${idp}-levelglow`} x="-10%" y="-60%" width="120%" height="220%">
-          <feGaussianBlur stdDeviation="3" />
-        </filter>
-        <filter id={`${idp}-barglow`} x="-10%" y="-100%" width="120%" height="300%">
-          <feGaussianBlur stdDeviation="3" />
-        </filter>
-        <filter id={`${idp}-dotglow`} x="-100%" y="-100%" width="300%" height="300%">
-          <feGaussianBlur stdDeviation="2" />
-        </filter>
-        <filter id={`${idp}-numshadow`} x="-5%" y="-5%" width="110%" height="115%">
-          <feOffset dy="2" />
-        </filter>
-        {/* Portrait « illustration » : aplats (posterisation), saturation, et un
-            trait d'encre sur les contours (laplacien de la luminance). */}
-        <filter id={`${idp}-ink`} x="0" y="0" width="1" height="1" colorInterpolationFilters="sRGB">
-          <feColorMatrix in="SourceGraphic" type="saturate" values="1.3" result="sat" />
-          <feComponentTransfer in="sat" result="post">
-            <feFuncR type="discrete" tableValues="0 0.14 0.28 0.42 0.56 0.7 0.84 1" />
-            <feFuncG type="discrete" tableValues="0 0.14 0.28 0.42 0.56 0.7 0.84 1" />
-            <feFuncB type="discrete" tableValues="0 0.14 0.28 0.42 0.56 0.7 0.84 1" />
-          </feComponentTransfer>
-          <feColorMatrix in="SourceGraphic" type="matrix" values="0.3 0.59 0.11 0 0  0.3 0.59 0.11 0 0  0.3 0.59 0.11 0 0  0 0 0 1 0" result="gray" />
-          <feGaussianBlur in="gray" stdDeviation="1" result="g" />
-          <feConvolveMatrix in="g" order="3" kernelMatrix="-1 -1 -1 -1 8 -1 -1 -1 -1" divisor="1" bias="0" preserveAlpha="true" edgeMode="duplicate" result="edge" />
-          <feColorMatrix in="edge" type="matrix" values="0 0 0 0 0.03  0 0 0 0 0.02  0 0 0 0 0.06  2.5 2.5 2.5 0 -0.3" result="inkA" />
-          <feComposite in="inkA" in2="post" operator="over" />
-        </filter>
-        {card.source === "cv" && (
-          <>
-            <filter id={`${idp}-stampnoise`} x="0" y="0" width="1" height="1">
-              <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves={2} seed={2} result="n" />
-              <feColorMatrix in="n" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  7 0 0 0 -2.55" />
-            </filter>
-            <mask id={`${idp}-stampmask`} maskUnits="userSpaceOnUse" x="-90" y="-40" width="180" height="80">
-              <rect x="-90" y="-40" width="180" height="80" fill="#fff" filter={u("stampnoise")} />
-            </mask>
-          </>
+        {th.rim && (
+          <filter id={`${idp}-rim`} x="-5%" y="-5%" width="110%" height="110%">
+            <feGaussianBlur stdDeviation="5" />
+          </filter>
         )}
       </defs>
 
-      {/* Corps de nuit, halos néon, palmier, grain */}
-      <g clipPath={u("outer")}>
-        <rect width={CARD_W} height={CARD_H} fill={u("body")} />
-        <rect width={CARD_W} height={CARD_H} fill={u("haze1")} opacity={th.haze} />
-        <rect width={CARD_W} height={CARD_H} fill={u("haze2")} opacity={th.haze} />
-        {th.holoBand && <rect width={CARD_W} height={CARD_H} fill={u("haze3")} />}
-        {th.palms > 0 && (
-          <g transform="translate(232 316) scale(1.5)" fill="#05050f" opacity={th.palms}>
-            {PALM.map((d, i) => (
-              <path key={i} d={d} />
-            ))}
+      <g clipPath={u("card")}>
+        {/* Fond */}
+        {th.grad === "bg" && <rect width={CARD_W} height={CARD_H} fill={u("g")} />}
+        {th.grad === "num" && <rect width={CARD_W} height={CARD_H} fill={th.bg[0]} />}
+        {sky && (
+          <>
+            <rect width={CARD_W} height={HY} fill={u("g")} />
+            {sky.sun && <circle cx={96} cy={HY - 2} r={20} fill={sky.sun} fillOpacity={0.85} />}
+            <rect y={HY} width={CARD_W} height={CARD_H - HY} fill={sky.ground} />
+            <Skyline ground={sky.ground} lights={sky.lights} />
+          </>
+        )}
+        {th.palm && (
+          <g transform="translate(236 318) scale(1.45)" fill={th.palm}>
+            <path d={PALM} />
           </g>
         )}
-        <rect width={CARD_W} height={CARD_H} filter={u("grain")} opacity={grainOpacity} />
-      </g>
+        <rect width={CARD_W} height={CARD_H} filter={u("grain")} opacity={0.05} />
 
-      {/* Étoiles de recherche */}
-      <Stars n={stars} th={th} id={idp} />
-
-      {/* Marque Azerit, en haut à droite */}
-      <g>
-        <Txt x={L.right} y={L.stars.y + 11.5} font="sans-700" size={10.5} ls={2.3} anchor="end" fill={th.inkSoft}>
+        {/* Haut : la marque à gauche, les étoiles du HUD à droite */}
+        <AzeritGem x={LEFT} y={18} h={13} />
+        <Txt x={LEFT + 17} y={29.5} font="sans-600" size={10} ls={2.2} fill={th.inkSoft} opacity={0.85}>
           AZERIT
         </Txt>
-        <AzeritGem id={idp} x={L.right - measure("AZERIT", "sans-700", 10.5, 2.3) - 15} y={L.stars.y + 0.5} h={13} />
-      </g>
+        <Stars n={n} onSky={!!sky} />
 
-      {/* La note, dans le dégradé du niveau */}
-      <text x={L.overall.x} y={L.overall.y} {...fontAttrs("display-800")} fontSize={overallSize} letterSpacing={-2.4} fill="#000" fillOpacity={0.5} filter={u("numshadow")}>
-        {card.overall}
-      </text>
-      <text x={L.overall.x} y={L.overall.y} {...fontAttrs("display-800")} fontSize={overallSize} letterSpacing={-2.4} fill={u("num")}>
-        {card.overall}
-      </text>
+        {/* La note : crème plat, ou le seul dégradé de la fiche */}
+        <text x={16} y={134} {...fontAttrs("display-800")} fontSize={overallSize} letterSpacing={-2.4} fill={th.grad === "num" ? u("g") : th.ink}>
+          {card.overall}
+        </text>
+        <Txt x={LEFT} y={157} font="sans-600" size={level.size} ls={level.letterSpacing} fill={th.inkSoft}>
+          {level.text}
+        </Txt>
+        {badge && th.badge && (
+          <g>
+            <rect x={LEFT} y={172} width={+(badge.width + 18).toFixed(2)} height={20} rx={10} fill={th.badge.bg} />
+            <Txt x={LEFT + 9} y={185.2} font="sans-600" size={badge.size} ls={badge.letterSpacing} fill={th.badge.ink}>
+              {badge.text}
+            </Txt>
+          </g>
+        )}
 
-      {/* Niveau, en mono néon : une copie floue dessous, le texte net dessus */}
-      <text x={L.left} y={L.levelY} {...fontAttrs("mono-700")} fontSize={level.size} letterSpacing={level.letterSpacing} fill={th.accent} filter={u("levelglow")} opacity={0.6}>
-        {level.text}
-      </text>
-      <Txt x={L.left} y={L.levelY} font="mono-700" size={level.size} ls={level.letterSpacing} fill={th.accent}>
-        {level.text}
-      </Txt>
-
-      {/* Dossier : GitHub ou CV */}
-      <Txt x={L.left} y={L.metaLabelY} font="mono-400" size={10} ls={0.6} fill={th.inkMuted}>
-        {s.file}
-      </Txt>
-      <Txt x={L.left} y={L.metaValueY} font="sans-500" size={12} fill={th.ink}>
-        {card.source === "cv" ? s.sourceCv : s.sourceGithub}
-      </Txt>
-
-      {/* Photo d'identité judiciaire */}
-      <g>
-        <rect x={M.x} y={M.y + 10} width={M.w} height={M.h} rx={M.r} fill="#000" opacity={0.5} filter={u("levelglow")} />
+        {/* Photo d'identité judiciaire */}
         <g clipPath={u("mug")}>
-          <rect x={M.x} y={M.y} width={M.w} height={M.h} fill={u("wall")} />
-          {Array.from({ length: 8 }, (_, i) => (
-            <rect key={i} x={M.x} y={M.y + 25 + i * 26.5} width={M.w} height={1.5} fill="#141c28" opacity={0.42} />
+          <rect x={M.x} y={M.y} width={M.w} height={M.h} fill={th.gray ? "#a9b0b6" : "#b4bfcb"} />
+          {Array.from({ length: Math.floor((M.h - 25) / 26.5) + 1 }, (_, i) => (
+            <rect key={i} x={M.x} y={M.y + 25 + i * 26.5} width={M.w} height={1.5} fill="#141c28" fillOpacity={0.32} />
           ))}
           {["190", "180", "170", "160"].map((tck, i) => (
-            <text key={tck} x={M.x + 6} y={M.y + 21 + i * 53} {...fontAttrs("mono-700")} fontSize={8} letterSpacing={0.4} fill="#141c28" fillOpacity={0.7}>
+            <Txt key={tck} x={M.x + 6} y={M.y + 21 + i * 53} font="mono-700" size={8} fill="#141c28" opacity={0.6}>
               {tck}
-            </text>
+            </Txt>
           ))}
           {avatar ? (
-            <image href={avatar} x={photoX} y={photoY} width={L.photo.w} height={L.photo.h} preserveAspectRatio="xMidYMin slice" filter={u("ink")} />
+            <image href={avatar} x={M.x + 12} y={M.y + M.h - 168} width={140} height={168} preserveAspectRatio="xMidYMin slice" filter={u("photo")} />
           ) : (
             <Initials initials={card.initials} M={M} />
           )}
           {card.source === "cv" && (
-            <g transform={`translate(${M.x + M.w / 2} ${M.y + 40}) rotate(-9)`}>
-              <g mask={u("stampmask")} opacity={0.88}>
-                <rect x={-64} y={-16} width={128} height={32} rx={3} fill="none" stroke="#a3261b" strokeWidth={2.2} />
-                <rect x={-60} y={-12} width={120} height={24} rx={1.5} fill="none" stroke="#a3261b" strokeWidth={0.8} />
-                <text x={0} y={5.4} {...fontAttrs("display-800")} fontSize={15.5} letterSpacing={1.4} textAnchor="middle" fill="#a3261b">
-                  {fit(s.cvStamp, { font: "display-800", size: 15.5, minSize: 11, maxWidth: 108, letterSpacing: 1.4, minLetterSpacing: 0.4 }).text}
-                </text>
-              </g>
+            <g transform={`translate(${M.x + M.w / 2} ${M.y + 40}) rotate(-9)`} opacity={0.88}>
+              <rect x={-64} y={-16} width={128} height={32} rx={3} fill="none" stroke="#a3261b" strokeWidth={2.2} />
+              <rect x={-60} y={-12} width={120} height={24} rx={1.5} fill="none" stroke="#a3261b" strokeWidth={0.8} />
+              <Txt x={0} y={5.4} font="display-800" size={15.5} ls={1.4} anchor="middle" fill="#a3261b">
+                {fit(s.cvStamp, { font: "display-800", size: 15.5, minSize: 11, maxWidth: 108, letterSpacing: 1.4, minLetterSpacing: 0.4 }).text}
+              </Txt>
             </g>
           )}
-          {/* Écriteau */}
-          <g transform={`rotate(-1.2 ${plX + L.placard.w / 2} ${plY + L.placard.h / 2})`}>
-            <rect x={plX} y={plY + 4} width={L.placard.w} height={L.placard.h} rx={3} fill="#000" opacity={0.45} filter={u("dotglow")} />
-            <rect x={plX} y={plY} width={L.placard.w} height={L.placard.h} rx={3} fill="#111111" />
-            <rect x={plX + 0.5} y={plY + 0.5} width={L.placard.w - 1} height={L.placard.h - 1} rx={2.5} fill="none" stroke="#fff" strokeOpacity={0.08} />
-            <text x={plX + L.placard.w / 2 + placardName.letterSpacing / 2} y={plY + 22} {...fontAttrs("display-700")} fontSize={placardName.size} letterSpacing={placardName.letterSpacing} textAnchor="middle" fill="#f4f1ea">
+          <g transform={`rotate(-1.2 ${plX + PLACARD.w / 2} ${plY + PLACARD.h / 2})`}>
+            <rect x={plX} y={plY} width={PLACARD.w} height={PLACARD.h} rx={3} fill="#111111" />
+            <Txt x={plX + PLACARD.w / 2 + placardName.letterSpacing / 2} y={plY + 22} font="display-700" size={placardName.size} ls={placardName.letterSpacing} anchor="middle" fill="#f4f1ea">
               {placardName.text}
-            </text>
-            <text x={plX + L.placard.w / 2 + caseFit.letterSpacing / 2} y={plY + 35} {...fontAttrs("mono-400")} fontSize={caseFit.size} letterSpacing={caseFit.letterSpacing} textAnchor="middle" fill="#bdb8ad">
+            </Txt>
+            <Txt x={plX + PLACARD.w / 2} y={plY + 35} font="mono-400" size={caseFit.size} ls={caseFit.letterSpacing} anchor="middle" fill="#bdb8ad">
               {caseFit.text}
-            </text>
+            </Txt>
           </g>
         </g>
-        <rect x={M.x + 0.5} y={M.y + 0.5} width={M.w - 1} height={M.h - 1} rx={M.r} fill="none" stroke="#fff" strokeOpacity={0.12} />
+        <rect x={M.x + 0.5} y={M.y + 0.5} width={M.w - 1} height={M.h - 1} rx={M.r} fill="none" stroke="#fff" strokeOpacity={0.14} />
+
+        {/* Profil criminel : le nom d'une page personnage, puis l'accroche rose */}
+        {profileName && (
+          <Txt x={LEFT - 1} y={276} font="display-700" size={profileName.size} ls={profileName.letterSpacing} fill={th.ink}>
+            {profileName.text}
+          </Txt>
+        )}
+        {tagline && (
+          <Txt x={LEFT} y={295} font="sans-500" size={tagline.size} fill={PALETTE.blush}>
+            {tagline.text}
+          </Txt>
+        )}
+
+        {/* Spécialité, arme, affiliation */}
+        <rect x={LEFT} y={306} width={FW} height={1} fill="#fff" fillOpacity={0.12} />
+        {cols.map((c) => {
+          const v = fit(c.value, { font: "sans-600", size: 12.5, minSize: 10, maxWidth: c.w });
+          return (
+            <g key={c.label}>
+              <Txt x={c.x} y={321} font="sans-600" size={8.5} ls={1.2} fill={th.inkSoft} opacity={0.62}>
+                {upper(c.label, lang)}
+              </Txt>
+              <Txt x={c.x} y={337} font="sans-600" size={v.size} fill={th.ink}>
+                {v.text}
+              </Txt>
+            </g>
+          );
+        })}
+
+        {/* Six stats en barres de dix segments */}
+        {stats.map((st, i) => (
+          <StatRow key={st.code} stat={st} x={LEFT + (i < 3 ? 0 : 169)} y={348 + (i % 3) * 22} th={th} />
+        ))}
+
+        <Charges statuses={card.statuses} th={th} lang={lang} />
+
+        <Txt x={LEFT} y={507} font="mono-400" size={footerFit.size} ls={footerFit.letterSpacing} fill={th.inkSoft} opacity={0.55}>
+          {footerFit.text}
+        </Txt>
+
+        {/* Liseré ; pour ★★★★★★, le contour éclairé par l'arrière, la seule lumière */}
+        {th.rim ? (
+          <>
+            <rect width={CARD_W} height={CARD_H} rx={CARD_R} fill="none" stroke={PALETTE.rimGlow} strokeWidth={12} strokeOpacity={0.75} filter={u("rim")} />
+            <rect x={0.75} y={0.75} width={CARD_W - 1.5} height={CARD_H - 1.5} rx={CARD_R - 0.75} fill="none" stroke={PALETTE.rimCore} strokeWidth={1.5} />
+          </>
+        ) : (
+          <rect x={0.5} y={0.5} width={CARD_W - 1} height={CARD_H - 1} rx={CARD_R - 0.5} fill="none" stroke="#fff" strokeOpacity={0.08} />
+        )}
       </g>
-
-      {/* Badge de spéciale, posé sur le haut de la photo */}
-      {badge && th.badge && (
-        <g transform={`translate(${L.right - badgeW} 36) rotate(-2 ${badgeW} 0)`}>
-          <rect width={badgeW} height={16} rx={3} fill={th.badge.bg} />
-          <rect width={badgeW} height={16} rx={3} fill={th.badge.bg} opacity={0.5} filter={u("starglow")} />
-          <text x={badgeW / 2 + badge.letterSpacing / 2} y={11.2} {...fontAttrs("mono-700")} fontSize={badge.size} letterSpacing={badge.letterSpacing} textAnchor="middle" fill={th.badge.ink}>
-            {badge.text}
-          </text>
-        </g>
-      )}
-
-      {/* Profil criminel, sous la photo et son écriteau */}
-      {profileName && ly.profileY !== undefined && (
-        <g>
-          <text x={L.left} y={ly.profileY} {...fontAttrs("display-800")} fontSize={profileName.size} letterSpacing={profileName.letterSpacing} fill="#000" fillOpacity={0.5} filter={u("numshadow")}>
-            {profileName.text}
-          </text>
-          <text x={L.left} y={ly.profileY} {...fontAttrs("display-800")} fontSize={profileName.size} letterSpacing={profileName.letterSpacing} fill={u("num")}>
-            {profileName.text}
-          </text>
-          {tagline && ly.taglineY !== undefined && (
-            <Txt x={L.left} y={ly.taglineY} font="sans-500" size={tagline.size} fill={th.inkSoft}>
-              {tagline.text}
-            </Txt>
-          )}
-        </g>
-      )}
-
-      {/* Spécialité / arme / affiliation */}
-      <rect x={L.left} y={ly.formTop} width={formW} height={1} fill="#fff" fillOpacity={0.1} />
-      {cols.map((c, i) => {
-        const v = fit(c.value, { font: "sans-600", size: 12.5, minSize: 10, maxWidth: c.w, letterSpacing: 0, minLetterSpacing: 0 });
-        return (
-          <g key={i}>
-            <Txt x={c.x} y={ly.formLabelY} font="mono-400" size={8.5} ls={1.2} fill={th.inkMuted}>
-              {upper(c.label, lang)}
-            </Txt>
-            {i === 1 && icon && (
-              <g transform={`translate(${c.x} ${ly.formValueY - 9.5}) scale(${11 / 24})`}>
-                <path d={icon.path} fill={th.inkSoft} />
-              </g>
-            )}
-            <Txt x={c.x + (i === 1 && icon ? 15 : 0)} y={ly.formValueY} font="sans-600" size={v.size} fill={th.ink}>
-              {i === 1 && icon ? fit(c.value, { font: "sans-600", size: 12.5, minSize: 10, maxWidth: c.w - 15, letterSpacing: 0 }).text : v.text}
-            </Txt>
-          </g>
-        );
-      })}
-
-      {/* Stats en barres segmentées */}
-      {left.map((st, i) => (
-        <StatRow key={st.code} stat={st} x={L.left} y={ly.statsTop + i * ly.statRow} th={th} idp={idp} />
-      ))}
-      {right.map((st, i) => (
-        <StatRow key={st.code} stat={st} x={L.left + 153 + 16} y={ly.statsTop + i * ly.statRow} th={th} idp={idp} />
-      ))}
-
-      {/* Chefs d'accusation */}
-      <Charges statuses={card.statuses} th={th} lang={lang} idp={idp} ly={ly} />
-
-      {/* Pied */}
-      <Txt x={L.left} y={L.footerY} font="mono-400" size={footerFit.size} ls={footerFit.letterSpacing} fill={th.inkMuted}>
-        {footerFit.text}
-      </Txt>
-
-      {/* Reflet statique de l'ennemi public, et liseré */}
-      {th.holoBand && <path d={cardPath(0)} fill={u("holoband")} />}
-      <path d={cardPath(0.5)} fill="none" stroke="#fff" strokeOpacity={0.07} strokeWidth={1} />
     </svg>
   );
 }
 
-function Initials({ initials, M }: { initials: string; M: Layout["mug"] }) {
-  const txt = initials.slice(0, 3).toUpperCase();
-  const f = fit(txt, { font: "display-800", size: 72, minSize: 40, maxWidth: M.w - 20, letterSpacing: -1 });
+function Initials({ initials, M }: { initials: string; M: typeof MUG }) {
+  const f = fit(initials.slice(0, 3).toUpperCase(), { font: "display-800", size: 72, minSize: 40, maxWidth: M.w - 30 });
   return (
-    <text x={M.x + M.w / 2} y={M.y + 54 + f.size * 0.78} {...fontAttrs("display-800")} fontSize={f.size} letterSpacing={f.letterSpacing} textAnchor="middle" fill="#2b3442" fillOpacity={0.9}>
+    <Txt x={M.x + M.w / 2} y={M.y + 108} font="display-800" size={f.size} anchor="middle" fill="#2b3442" opacity={0.85}>
       {f.text}
-    </text>
+    </Txt>
   );
 }
 
