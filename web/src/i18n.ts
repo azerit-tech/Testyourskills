@@ -204,6 +204,9 @@ const fr = {
       copiedShort: "Texte copié",
       copiedLink: "Lien copié.",
       downloadDemo: "Image indisponible en mode démo (rendue par le serveur).",
+      /** Sous l'image en plein écran, là où rien ne se télécharge (navigateurs intégrés). */
+      holdToSave: "Appui long pour enregistrer",
+      imageAlt: "Ta fiche",
       /** Les morceaux du texte de partage, assemblés et raccourcis par lib/shareText.ts (§18.27). */
       words: {
         plea: (pleaded: string, verdict: string) => `Je plaidais ${pleaded}. Verdict : ${verdict}.`,
@@ -611,6 +614,8 @@ const en: Dict = {
       copiedShort: "Text copied",
       copiedLink: "Link copied.",
       downloadDemo: "Image unavailable in demo mode (rendered by the server).",
+      holdToSave: "Press and hold to save",
+      imageAlt: "Your sheet",
       words: {
         plea: (pleaded, verdict) => `I pleaded ${pleaded}. Verdict: ${verdict}.`,
         sheet: (stars, overall) => `${stars} sheet, ${overall}`,

@@ -1,6 +1,7 @@
 // Tout ce qui vient sous la carte (§6.4), dans l'ordre de la spec.
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
+import { createPortal } from "react-dom";
 import type { CardData, ComparisonData, Lang, WeekRank } from "../../../shared/types";
 import { declaredOf, STAT_CODES, starsFor } from "../../../shared/types";
 import { pick, useT } from "../i18n";
@@ -9,9 +10,9 @@ import { navigate } from "../lib/router";
 import { getPlea } from "../lib/plea";
 import { setPrefill } from "../lib/session";
 import { shareLead, shareText, shareTextX, type ShareInput } from "../lib/shareText";
-import { hasNativeShare, markTextCopied, portraitFile, preloadPortrait, shareSheet, useTextCopied } from "../lib/sharing";
+import { canShareFile, hasNativeShare, inAppBrowser, markTextCopied, portraitFile, preloadPortrait, shareFile, shareSheet, useTextCopied } from "../lib/sharing";
 import { copyText, isTouch, shareUrl } from "../lib/util";
-import { IconDownload, IconLink, IconLinkedIn, IconShare, IconX } from "./Icons";
+import { IconClose, IconDownload, IconLink, IconLinkedIn, IconShare, IconX } from "./Icons";
 import { ProveGithub } from "./ProveGithub";
 
 /* ---------- petit toast partagé ---------- */
@@ -232,23 +233,127 @@ export function ShareBar({ item, toast }: { item: Shareable; toast: (m: string) 
           <IconLink />
           {ts.copy}
         </button>
-        <a
+        <SaveImage kit={kit} toast={toast} />
+      </div>
+    </section>
+  );
+}
+
+/** Une adresse `blob:` pour un fichier, rendue à la mémoire quand il change ou que le bloc part. */
+function useObjectUrl(file: File | null): string | null {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!file) return;
+    let made: string;
+    try {
+      made = URL.createObjectURL(file);
+    } catch {
+      return;
+    }
+    setUrl(made);
+    return () => {
+      setUrl(null);
+      URL.revokeObjectURL(made);
+    };
+  }, [file]);
+  return url;
+}
+
+/**
+ * « Télécharger l'image » : sur téléphone, l'image seule dans la feuille de partage ;
+ * dans un navigateur intégré (LinkedIn, Instagram, Facebook), où `download` ne fait
+ * rien, l'image en plein écran ; ailleurs, le téléchargement du navigateur.
+ */
+function SaveImage({ kit, toast }: { kit: Sharing; toast: (m: string) => void }) {
+  const { t } = useT();
+  const ts = t.result.share;
+  const { file, track } = kit;
+  const [open, setOpen] = useState(false);
+  const close = useCallback(() => setOpen(false), []);
+  // En démo, le serveur ne rend pas l'image : le carton de mock.ts, quand il est prêt.
+  const demo = useObjectUrl(isMock() ? file : null);
+  const src = isMock() ? demo : images.portrait(kit.id);
+  const label = (
+    <>
+      <IconDownload />
+      {ts.download}
+    </>
+  );
+
+  if (kit.native && canShareFile(file))
+    return (
+      <button type="button" className="pill pill-ghost" onClick={() => void shareFile(file).then((ok) => ok && track("download"))}>
+        {label}
+      </button>
+    );
+
+  if (inAppBrowser(navigator.userAgent))
+    return (
+      <>
+        <button
+          type="button"
           className="pill pill-ghost"
-          href={images.portrait(id)}
-          download={kit.filename}
-          onClick={(e) => {
-            if (isMock()) {
-              e.preventDefault();
-              toast(ts.downloadDemo);
-            }
+          aria-haspopup="dialog"
+          onClick={() => {
+            if (!src) return toast(ts.downloadDemo);
+            setOpen(true);
             track("download");
           }}
         >
-          <IconDownload />
-          {ts.download}
-        </a>
-      </div>
-    </section>
+          {label}
+        </button>
+        {open && src && <ImagePanel src={src} onClose={close} />}
+      </>
+    );
+
+  return (
+    <a
+      className="pill pill-ghost"
+      href={src ?? images.portrait(kit.id)}
+      download={kit.filename}
+      onClick={(e) => {
+        if (!src) {
+          e.preventDefault();
+          return toast(ts.downloadDemo);
+        }
+        track("download");
+      }}
+    >
+      {label}
+    </a>
+  );
+}
+
+/** L'image seule, sur tout l'écran : un appui long l'enregistre, là où rien ne se télécharge. */
+function ImagePanel({ src, onClose }: { src: string; onClose: () => void }) {
+  const { t } = useT();
+  const closeBtn = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const before = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    closeBtn.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    // La page ne défile pas derrière le panneau.
+    const root = document.documentElement;
+    const overflow = root.style.overflow;
+    root.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      root.style.overflow = overflow;
+      before?.focus({ preventScroll: true });
+    };
+  }, [onClose]);
+  return createPortal(
+    <div className="out-panel" role="dialog" aria-modal="true" aria-label={t.result.share.download}>
+      <button ref={closeBtn} type="button" className="out-panel-close" onClick={onClose} aria-label={t.common.close}>
+        <IconClose />
+      </button>
+      <img src={src} alt={t.result.share.imageAlt} />
+      <p>{t.result.share.holdToSave}</p>
+    </div>,
+    document.body,
   );
 }
 

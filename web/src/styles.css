@@ -1295,6 +1295,45 @@ a.dossier-item:hover {
   grid-column: 1 / -1;
 }
 
+/* l'image en plein écran, là où rien ne se télécharge (navigateurs intégrés) : un appui long l'enregistre */
+.out-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: calc(68px + env(safe-area-inset-top, 0px)) var(--gutter) max(20px, env(safe-area-inset-bottom));
+  background: var(--ink-0);
+}
+.out-panel img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  /* le menu de l'appui long doit rester permis */
+  -webkit-touch-callout: default;
+  -webkit-user-select: auto;
+  user-select: auto;
+}
+.out-panel p {
+  font: 500 16px/1.3 var(--f-text);
+  color: var(--cream);
+  text-align: center;
+}
+.out-panel-close {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  right: var(--gutter);
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink-1);
+  color: var(--cream);
+}
+
 /* personnaliser : photo LinkedIn */
 .personalize {
   background: var(--ink-1);
