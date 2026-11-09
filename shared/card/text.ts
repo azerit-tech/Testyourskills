@@ -88,6 +88,49 @@ export function upper(text: string, lang: string): string {
   return text.toLocaleUpperCase(lang === "fr" ? "fr-FR" : "en-US");
 }
 
+export interface FittedLines {
+  lines: string[];
+  size: number;
+  /** true seulement si le texte n'a tenu à aucune taille et a dû être tronqué. */
+  truncated: boolean;
+}
+
+/** Meilleure coupe en deux lignes au mot : la plus équilibrée parmi celles qui tiennent. */
+function splitInTwo(words: string[], font: FontKey, size: number, maxWidth: number, ls: number): string[] | null {
+  let best: string[] | null = null;
+  let bestW = Infinity;
+  for (let i = 1; i < words.length; i++) {
+    // Jamais de ponctuation haute (« : », « ; », « ? »…) en tête de ligne.
+    if (/^[:;!?»)]/.test(words[i])) continue;
+    const a = words.slice(0, i).join(" ");
+    const b = words.slice(i).join(" ");
+    const w = Math.max(measure(a, font, size, ls), measure(b, font, size, ls));
+    if (w <= maxWidth && w < bestW) {
+      best = [a, b];
+      bestW = w;
+    }
+  }
+  return best;
+}
+
+/**
+ * Pose un texte sur une ou deux lignes sans jamais le couper : une ligne s'il
+ * tient, sinon deux lignes équilibrées ; la taille descend par quarts de point
+ * jusqu'à minSize. Tronque seulement en dernier recours (truncated: true), ce
+ * que les tests interdisent pour les phrases de profil.
+ */
+export function fitLines(text: string, o: { font: FontKey; size: number; minSize: number; maxWidth: number; letterSpacing?: number }): FittedLines {
+  const ls = o.letterSpacing ?? 0;
+  // Les espaces insécables (« publique : du ») ne sont pas des points de coupe.
+  const words = text.split(/[ \t\n]+/).filter(Boolean);
+  for (let size = o.size; size >= o.minSize - 1e-9; size -= 0.25) {
+    if (measure(text, o.font, size, ls) <= o.maxWidth) return { lines: [text], size, truncated: false };
+    const two = splitInTwo(words, o.font, size, o.maxWidth, ls);
+    if (two) return { lines: two, size, truncated: false };
+  }
+  return { lines: wrap(text, o.font, o.minSize, o.maxWidth, 2, ls), size: o.minSize, truncated: true };
+}
+
 /** Coupe un texte en lignes (au mot) ; la dernière ligne est tronquée si besoin. */
 export function wrap(text: string, font: FontKey, size: number, maxWidth: number, maxLines: number, letterSpacing = 0): string[] {
   const words = text.split(/\s+/).filter(Boolean);

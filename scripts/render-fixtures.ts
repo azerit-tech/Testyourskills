@@ -1,11 +1,14 @@
 // Rend chaque fixture en PNG dans var/renders/ : carte seule, aperçu OG,
 // portrait, plus la comparaison et une planche contact de toutes les cartes.
 // Usage : npx tsx scripts/render-fixtures.ts [clé…] [--sheet-only] [--lang=en]
+//   --profiles : planche des 13 profils de data/profiles.json (noms et phrases),
+//   posés tour à tour sur les fiches de la maquette, plus une fiche sans profil.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Resvg } from "@resvg/resvg-js";
+import profilesJson from "../data/profiles.json";
 import { FIXTURES, FIXTURE_COMPARISON } from "../shared/fixtures";
 import type { CardData, Lang } from "../shared/types";
 import { CardGraphic } from "../shared/card/Card";
@@ -20,12 +23,13 @@ mkdirSync(OUT, { recursive: true });
 const args = process.argv.slice(2);
 const only = args.filter((a) => !a.startsWith("--"));
 const sheetOnly = args.includes("--sheet-only");
+const profilesSheet = args.includes("--profiles");
 const langArg = args.find((a) => a.startsWith("--lang="))?.slice(7) as Lang | undefined;
 
 const entries = Object.entries(FIXTURES).filter(([k]) => only.length === 0 || only.includes(k)) as [string, CardData][];
 
 /** Planche contact : toutes les cartes sur fond sombre, pour juger d'un coup d'œil. */
-async function sheet(cards: [string, CardData][], lang?: Lang) {
+async function sheet(cards: [string, CardData][], lang?: Lang, label = "sheet") {
   const cols = Math.min(4, cards.length);
   const rows = Math.ceil(cards.length / cols);
   const pad = 28;
@@ -57,13 +61,30 @@ async function sheet(cards: [string, CardData][], lang?: Lang) {
   })
     .render()
     .asPng();
-  const name = `sheet${lang ? "-" + lang : ""}${only.length ? "-" + only.join("_") : ""}.png`;
+  const name = `${label}${lang ? "-" + lang : ""}${only.length && label === "sheet" ? "-" + only.join("_") : ""}.png`;
   writeFileSync(resolve(OUT, name), png);
   console.log("→", name);
 }
 
+/** Les 13 profils sur des fiches de la maquette (tous niveaux), sans photo, plus une fiche sans profil. */
+function profileCards(): [string, CardData][] {
+  const bases = Object.values(FIXTURES) as CardData[];
+  const out: [string, CardData][] = profilesJson.profiles.map((p, i) => {
+    const base = bases[i % bases.length];
+    return [p.id, { ...base, avatarUrl: undefined, profile: { id: p.id, label: p.label, tagline: p.tagline } }];
+  });
+  out.push(["noprofile", { ...FIXTURES.silver, profile: undefined }]);
+  out.push(["noprofile-sky", { ...FIXTURES.icon, avatarUrl: undefined, profile: undefined }]);
+  out.push(["noprofile-special", { ...FIXTURES.totw, avatarUrl: undefined, profile: undefined }]);
+  return out;
+}
+
 async function main() {
   const t0 = Date.now();
+  if (profilesSheet) {
+    await sheet(profileCards(), langArg ?? "fr", "profiles");
+    return;
+  }
   await sheet(entries, langArg);
   if (sheetOnly) return;
   const formats: ImageFormat[] = ["card", "og", "portrait"];

@@ -14,7 +14,7 @@ import { fontAttrs, type FontKey } from "./fonts";
 import { CARD_H, CARD_R, CARD_W } from "./geometry";
 import { t } from "./i18n";
 import { langIcon } from "./languages";
-import { fit, measure, upper } from "./text";
+import { fit, fitLines, measure, upper, type FittedLines } from "./text";
 import { PALETTE, themeOf, type CardTheme } from "./themes";
 
 export interface CardProps {
@@ -47,9 +47,25 @@ const MUG = { x: 178, y: 44, w: 164, h: 192, r: 6 };
 const MUG_NO_PROFILE_H = 236;
 const PLACARD = { w: 136, h: 44, bottom: 10 };
 /** Horizon des fiches au ciel peint (★★★★★, ★★★★★★). */
-const HY = 248;
+const HY = 242;
 const STAR_SIZE = 17;
 const STAR_GAP = 3;
+
+/**
+ * Hiérarchie de lecture (de la plus forte à la plus faible) : la note, le nom
+ * du profil, sa phrase (la blague qu'on capture), les chefs d'accusation, puis
+ * le reste. Lignes de base, de haut en bas, sous la photo.
+ */
+export const LAYOUT = {
+  profileName: { y: 270, size: 30, minSize: 20 },
+  /** La phrase du profil : une ou deux lignes, jamais coupée (tests). */
+  tagline: { y: 292, size: 18, minSize: 15, lineH: 21 },
+  divider: 323,
+  facts: { labelY: 334, valueY: 348, labelSize: 7.5 },
+  stats: { y: 355, rowH: 20 },
+  charges: { labelY: 427, y: 445, size: 14, minSize: 12, lineH: 19, labelSize: 7.5 },
+  footer: { y: 510, size: 8, minSize: 7 },
+} as const;
 
 const STAR = "M12 2.6l2.9 6.1 6.7.8-4.9 4.6 1.3 6.6L12 17.4l-6 3.3 1.3-6.6L2.4 9.5l6.7-.8z";
 const PALM = [
@@ -143,7 +159,7 @@ function Stars({ n, onSky }: { n: number; onSky: boolean }) {
 function Pastille({ tone, cx, cy, th }: { tone: StatusTone; cx: number; cy: number; th: CardTheme }) {
   const ink = tone === "negative" ? "#fff" : PALETTE.ink0;
   return (
-    <g transform={`translate(${cx} ${cy})`}>
+    <g transform={`translate(${cx} ${cy}) scale(1.1)`}>
       <circle r={5.6} fill={th.tones[tone]} />
       {tone === "negative" && (
         <>
@@ -195,24 +211,25 @@ function StatRow({ stat, x, y, th }: { stat: Stat; x: number; y: number; th: Car
 
 function Charges({ statuses, th, lang }: { statuses: StatusInstance[]; th: CardTheme; lang: Lang }) {
   const s = t(lang);
+  const C = LAYOUT.charges;
   return (
     <g>
-      <Txt x={LEFT} y={429} font="sans-600" size={8.5} ls={1.3} fill={th.inkSoft} opacity={0.62}>
+      <Txt x={LEFT} y={C.labelY} font="sans-600" size={C.labelSize} ls={1.1} fill={th.inkSoft} opacity={0.62}>
         {upper(s.charges, lang)}
       </Txt>
       {statuses.slice(0, 3).map((st, i) => {
-        const y = 448 + i * 18;
+        const y = C.y + i * C.lineH;
         const tag = st.byAI ? ` · ${s.ai}` : "";
         const tagW = st.byAI ? measure(tag, "mono-400", 9) : 0;
-        const label = fit(st.label[lang] ?? st.label.fr, { font: "sans-500", size: 12.5, minSize: 12.5, maxWidth: FW - 15 - tagW });
+        const label = fit(st.label[lang] ?? st.label.fr, { font: "sans-500", size: C.size, minSize: C.minSize, maxWidth: FW - 18 - tagW });
         return (
           <g key={st.id + i}>
-            <Pastille tone={st.tone} cx={LEFT + 5.6} cy={y - 4.3} th={th} />
-            <Txt x={LEFT + 16} y={y} font="sans-500" size={12.5} fill={th.inkSoft}>
+            <Pastille tone={st.tone} cx={LEFT + 6.2} cy={y - 4.9} th={th} />
+            <Txt x={LEFT + 18} y={y} font="sans-500" size={label.size} fill={th.ink}>
               {label.text}
             </Txt>
             {st.byAI && (
-              <Txt x={LEFT + 16 + label.width + 2} y={y} font="mono-400" size={9} fill={th.inkSoft} opacity={0.55}>
+              <Txt x={LEFT + 18 + label.width + 2} y={y} font="mono-400" size={9} fill={th.inkSoft} opacity={0.55}>
                 {tag}
               </Txt>
             )}
@@ -276,11 +293,9 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
 
   // Profil criminel (§18.2) : le nom comme une page personnage, l'accroche seulement si elle tient entière
   const profileName = card.profile
-    ? fit(upper(card.profile.label[lang] ?? card.profile.label.fr, lang), { font: "display-700", size: 30, minSize: 20, maxWidth: FW, letterSpacing: 0.4, minLetterSpacing: 0 })
+    ? fit(upper(card.profile.label[lang] ?? card.profile.label.fr, lang), { font: "display-700", size: LAYOUT.profileName.size, minSize: LAYOUT.profileName.minSize, maxWidth: FW, letterSpacing: 0.4, minLetterSpacing: 0 })
     : null;
-  const taglineText = card.profile ? (card.profile.tagline[lang] ?? card.profile.tagline.fr) : "";
-  const taglineFit = taglineText ? fit(taglineText, { font: "sans-500", size: 13, minSize: 11, maxWidth: FW }) : null;
-  const tagline = taglineFit && taglineFit.text === taglineText ? taglineFit : null;
+  const tagline = card.profile ? profileTagline(card.profile.tagline[lang] ?? card.profile.tagline.fr) : null;
 
   // Spécialité / arme / affiliation
   const unit = (FW - 20) / 3.3;
@@ -292,7 +307,7 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
   ];
 
   // Pied, en procès-verbal
-  const footerFit = fit(`${s.questioned(card.judgedInSeconds)} · ${s.evidence} ${s.percent(card.reliability)}`, { font: "mono-400", size: 9, minSize: 7.5, maxWidth: FW, letterSpacing: 0.2, minLetterSpacing: 0 });
+  const footerFit = fit(`${s.questioned(card.judgedInSeconds)} · ${s.evidence} ${s.percent(card.reliability)}`, { font: "mono-400", size: LAYOUT.footer.size, minSize: LAYOUT.footer.minSize, maxWidth: FW - 30, letterSpacing: 0, minLetterSpacing: 0 });
 
   const stats = STAT_ORDER.map((code) => card.stats.find((st) => st.code === code)).filter((st): st is Stat => !!st);
   const ariaLabel = `${s.card} ${levelLabel} ${card.overall}, ${s.stars(n)} — ${card.name}`;
@@ -454,26 +469,27 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
 
         {/* Profil criminel : le nom d'une page personnage, puis l'accroche rose */}
         {profileName && (
-          <Txt x={LEFT - 1} y={276} font="display-700" size={profileName.size} ls={profileName.letterSpacing} fill={th.ink}>
+          <Txt x={LEFT - 1} y={LAYOUT.profileName.y} font="display-700" size={profileName.size} ls={profileName.letterSpacing} fill={th.ink}>
             {profileName.text}
           </Txt>
         )}
-        {tagline && (
-          <Txt x={LEFT} y={295} font="sans-500" size={tagline.size} fill={PALETTE.blush}>
-            {tagline.text}
-          </Txt>
-        )}
+        {tagline &&
+          tagline.lines.map((line, i) => (
+            <Txt key={i} x={LEFT} y={LAYOUT.tagline.y + i * LAYOUT.tagline.lineH} font="sans-600" size={tagline.size} fill={PALETTE.blush}>
+              {line}
+            </Txt>
+          ))}
 
         {/* Spécialité, arme, affiliation */}
-        <rect x={LEFT} y={306} width={FW} height={1} fill="#fff" fillOpacity={0.12} />
+        <rect x={LEFT} y={LAYOUT.divider} width={FW} height={1} fill="#fff" fillOpacity={0.12} />
         {cols.map((c) => {
           const v = fit(c.value, { font: "sans-600", size: 12.5, minSize: 10, maxWidth: c.w });
           return (
             <g key={c.label}>
-              <Txt x={c.x} y={321} font="sans-600" size={8.5} ls={1.2} fill={th.inkSoft} opacity={0.62}>
+              <Txt x={c.x} y={LAYOUT.facts.labelY} font="sans-600" size={LAYOUT.facts.labelSize} ls={1} fill={th.inkSoft} opacity={0.62}>
                 {upper(c.label, lang)}
               </Txt>
-              <Txt x={c.x} y={337} font="sans-600" size={v.size} fill={th.ink}>
+              <Txt x={c.x} y={LAYOUT.facts.valueY} font="sans-600" size={v.size} fill={th.ink}>
                 {v.text}
               </Txt>
             </g>
@@ -482,12 +498,12 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
 
         {/* Six stats en barres de dix segments */}
         {stats.map((st, i) => (
-          <StatRow key={st.code} stat={st} x={LEFT + (i < 3 ? 0 : 169)} y={348 + (i % 3) * 22} th={th} />
+          <StatRow key={st.code} stat={st} x={LEFT + (i < 3 ? 0 : 169)} y={LAYOUT.stats.y + (i % 3) * LAYOUT.stats.rowH} th={th} />
         ))}
 
         <Charges statuses={card.statuses} th={th} lang={lang} />
 
-        <Txt x={LEFT} y={507} font="mono-400" size={footerFit.size} ls={footerFit.letterSpacing} fill={th.inkSoft} opacity={0.55}>
+        <Txt x={LEFT} y={LAYOUT.footer.y} font="mono-400" size={footerFit.size} ls={footerFit.letterSpacing} fill={th.inkSoft} opacity={0.5}>
           {footerFit.text}
         </Txt>
 
@@ -512,6 +528,12 @@ function Initials({ initials, M }: { initials: string; M: typeof MUG }) {
       {f.text}
     </Txt>
   );
+}
+
+/** La phrase du profil posée comme sur la fiche : une ou deux lignes, sans coupe. */
+export function profileTagline(text: string): FittedLines {
+  const T = LAYOUT.tagline;
+  return fitLines(text, { font: "sans-600", size: T.size, minSize: T.minSize, maxWidth: FW });
 }
 
 /** Nom d'affichage du langage : le titre de l'icône, sinon la clé linguist capitalisée. */
