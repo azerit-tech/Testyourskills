@@ -59,7 +59,7 @@ export async function renderImage(input: RenderInput): Promise<Buffer> {
   const svg = await renderSvg(input);
   const width = input.comparison && input.format === "card" ? 1920 : OUTPUT_WIDTH[input.format];
   const opts: ResvgRenderOptions = {
-    font: { fontFiles: fontFiles(), loadSystemFonts: false, defaultFontFamily: "Inter" },
+    font: { fontFiles: fontFiles(), loadSystemFonts: false, defaultFontFamily: "Outfit" },
     fitTo: { mode: "width", value: width },
     shapeRendering: 2,
     textRendering: 1,

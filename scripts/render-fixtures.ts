@@ -52,7 +52,7 @@ async function sheet(cards: [string, CardData][], lang?: Lang) {
   );
   const svg = renderToStaticMarkup(el);
   const png = new Resvg(svg, {
-    font: { fontFiles: fontFiles(), loadSystemFonts: false, defaultFontFamily: "Inter" },
+    font: { fontFiles: fontFiles(), loadSystemFonts: false, defaultFontFamily: "Outfit" },
     fitTo: { mode: "width", value: Math.round(W * 1.6) },
   })
     .render()
