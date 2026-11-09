@@ -442,7 +442,7 @@ export function createApp(opts: AppOptions) {
   app.get("/api/card/:id/delete", async (c) => {
     const r = await deleteCard(c);
     if (r.status === 200)
-      return c.html(messagePage("Ta carte et ses images sont supprimées.", "Your card and its images are deleted."));
+      return c.html(messagePage("Ta fiche et ses images sont supprimées.", "Your sheet and its images are deleted."));
     if (r.status === 403)
       return c.html(messagePage("Ce lien de suppression n'est pas valide.", "This deletion link is not valid."), 403);
     return c.html(messagePage(MESSAGES.not_found.fr, MESSAGES.not_found.en), 404);

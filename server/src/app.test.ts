@@ -9,7 +9,7 @@ import type { CardData, ComparisonData, Fact, JobState, StatCode } from "../../s
 import type { CvReading, CvTextCounts } from "../../shared/readings";
 import { createApp, normalizeLogin, purge, type AppOptions } from "./app";
 import { RETENTION_MS, Store } from "./db";
-import type { CardBody, Deps } from "./pipeline";
+import { MESSAGES, type CardBody, type Deps } from "./pipeline";
 import { noteCreditBalance, noteCreditsExhausted, recordUsage, resetBudgetForTests, type AiStatus } from "./ai/budget";
 import { ChatHttpError } from "./ai/client";
 import { readCode } from "./ai/readCode";
@@ -393,7 +393,7 @@ describe("limite de 20 cartes par IP et par jour", () => {
     const third = await postLogin(ctx, "a3", ip);
     expect(third.res.status).toBe(429);
     expect(third.json).toMatchObject({ state: "error", code: "rate_limited" });
-    expect(third.json.message?.fr).toContain("20 cartes par jour");
+    expect(third.json.message?.fr).toContain("20 fiches par jour");
     // Une autre IP n'est pas concernée, la dernière entrée de X-Forwarded-For fait foi.
     expect((await postLogin(ctx, "a3", { "x-forwarded-for": "203.0.113.9, 198.51.100.1" })).res.status).toBe(202);
     await ctx.pipeline.drain();
@@ -896,6 +896,13 @@ describe("divers", () => {
     expect(normalizeLogin(" @lea ")).toBe("lea");
     expect(normalizeLogin("https://github.com/Lea-MD/")).toBe("Lea-MD");
     expect(normalizeLogin("github.com/lea/repo?tab=1")).toBe("lea");
+  });
+
+  it("les messages visibles disent « fiche » et « sheet », jamais « carte » ni « card »", () => {
+    for (const [key, m] of Object.entries(MESSAGES)) {
+      expect(m.fr, key).not.toMatch(/\bcartes?\b/i);
+      expect(m.en, key).not.toMatch(/\bcards?\b/i);
+    }
   });
 
   it("health", async () => {

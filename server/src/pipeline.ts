@@ -113,12 +113,12 @@ export const MESSAGES: Record<MessageKey, Fact> = {
     en: "PDF too long: 5 MB and 10 pages max. A recruiter wouldn't read more.",
   },
   timeout: {
-    fr: "Le jugement a pris plus de 30 secondes. Plutôt que d'inventer une carte, on s'arrête là : réessaie dans un instant.",
-    en: "Judging took more than 30 seconds. Rather than make up a card, we stopped: try again in a moment.",
+    fr: "Le jugement a pris plus de 30 secondes. Plutôt que d'inventer une fiche, on s'arrête là : réessaie dans un instant.",
+    en: "Judging took more than 30 seconds. Rather than make up a sheet, we stopped: try again in a moment.",
   },
   rate_limited: {
-    fr: "20 cartes par jour, c'est le maximum. Reviens demain : même les recruteurs font des pauses.",
-    en: "20 cards a day is the limit. Come back tomorrow: even recruiters take breaks.",
+    fr: "20 fiches par jour, c'est le maximum. Reviens demain : même les recruteurs font des pauses.",
+    en: "20 sheets a day is the limit. Come back tomorrow: even recruiters take breaks.",
   },
   github_rate_limited: {
     fr: "GitHub nous demande de ralentir. Réessaie dans quelques minutes.",
@@ -149,8 +149,8 @@ export const MESSAGES: Record<MessageKey, Fact> = {
     en: "We couldn't read this CV right now. Try again in a moment.",
   },
   not_found: {
-    fr: "Carte introuvable : elle a expiré ou a été supprimée.",
-    en: "Card not found: it expired or was deleted.",
+    fr: "Fiche introuvable : elle a expiré ou a été supprimée.",
+    en: "Sheet not found: it expired or was deleted.",
   },
   linkedin: {
     fr: "Entrée LinkedIn indisponible, tape ton pseudo GitHub.",

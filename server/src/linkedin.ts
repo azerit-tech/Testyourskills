@@ -235,9 +235,9 @@ export function mountLinkedin(app: Hono, o: LinkedinRoutesOptions) {
     if (!o.config) return c.json({ ok: false, message: { fr: "Connexion LinkedIn désactivée.", en: "LinkedIn sign-in is disabled." } }, 404);
     const id = c.req.query("card") ?? "";
     const row = ID_RE.test(id) ? o.store.getCard(id) : null;
-    if (!row) return c.json({ ok: false, message: { fr: "Carte introuvable.", en: "Card not found." } }, 404);
+    if (!row) return c.json({ ok: false, message: { fr: "Fiche introuvable.", en: "Sheet not found." } }, 404);
     if (!o.tokenMatches(c.req.query("token"), row.deleteToken)) {
-      return c.json({ ok: false, message: { fr: "Changer la photo est réservé à qui a créé la fiche.", en: "Only the card's creator can change its photo." } }, 403);
+      return c.json({ ok: false, message: { fr: "Changer la photo est réservé à qui a créé la fiche.", en: "Only the sheet's creator can change its photo." } }, 403);
     }
     const url = new URL(AUTHORIZE_URL);
     url.searchParams.set("response_type", "code");
