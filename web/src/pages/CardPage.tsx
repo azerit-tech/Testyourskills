@@ -14,6 +14,7 @@ import { Jury, JuryLine } from "../components/Jury";
 import { MakeYours } from "../components/MakeYours";
 import { PleaVerdict } from "../components/Plea";
 import { ProfileTile } from "../components/ProfileTile";
+import { CardViewOptions } from "../card/CardView";
 import { RevealCard, useReveal } from "../components/Reveal";
 import { ShareDock } from "../components/ShareDock";
 import type { WalkoutControl } from "../components/Walkout3D";
@@ -410,7 +411,10 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
         <section ref={stageRef} className="result-stage" onClick={animating ? onStageClick : undefined}>
           {item.kind === "card" ? (
             <div className="single-stage">
-              <RevealCard card={item.card} lang={lang} phase={phase} idPrefix="result" />
+              {/* La fiche se retourne (§18.27). Les étoiles ne s'allument ici que sans révélation 3D : sinon elles se rallumeraient sur la carte posée. */}
+              <CardViewOptions.Provider value={{ flippable: true, starsIntro: !animate }}>
+                <RevealCard card={item.card} lang={lang} phase={phase} idPrefix="result" />
+              </CardViewOptions.Provider>
             </div>
           ) : (
             // Le visiteur n'est pas la personne fichée : la comparaison parle d'elle, pas à lui.
@@ -482,7 +486,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
         {!visitor && proveFirst && <AddSource card={main} />}
         <div className="rest">
           {/* La peine est déjà sous la tuile de profil. */}
-          {!visitor && <Why item={item} withSentence={!main.profile} />}
+          {/* Fiche seule : ses pièces à conviction sont au dos (§18.27). La comparaison garde la ligne. */}
+          {!visitor && item.kind === "comparison" && <Why item={item} withSentence={!main.profile} />}
           {/* Fiche dénoncée : « Appeler mon avocat » est déjà sous la fiche. */}
           {!(wantedYou && claimOn) && <Claim cardId={id} login={cardLogin} lawyer={!owner} me={me} onMe={onMe} toast={toast.show} />}
           {!visitor && <LinkedInPhoto cardId={id} hasAvatar={item.kind === "card" ? !!item.card.avatarUrl : !!item.comparison.cv.avatarUrl} />}

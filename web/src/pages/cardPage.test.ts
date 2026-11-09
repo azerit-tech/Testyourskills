@@ -112,8 +112,9 @@ describe("après-fiche, vue par qui a fait la fiche (§18.27)", () => {
     const html = renderResult(mine("OwnCard0002"), { owner: true, token: "tok" });
     const rest = html.slice(html.indexOf('class="rest"'), html.indexOf('class="after-foot"'));
     const rows = [...rest.matchAll(/<details class="fold ([a-z- ]+)"( open="")?><summary class="fold-row"><span>([^<]+)<\/span><svg class="fold-chevron"/g)];
-    expect(rows.map((r) => r[1])).toEqual(["why", "add-source", "email", "contest"]);
-    expect(rows.map((r) => r[3])).toEqual(["Pourquoi cette note", "Ajoute ton CV pour voir l&#x27;écart", "Recevoir ma fiche par email", "Contester"]);
+    // Fiche seule : « Pourquoi cette note » est au dos de la fiche, plus dans les lignes.
+    expect(rows.map((r) => r[1])).toEqual(["add-source", "email", "contest"]);
+    expect(rows.map((r) => r[3])).toEqual(["Ajoute ton CV pour voir l&#x27;écart", "Recevoir ma fiche par email", "Contester"]);
     // toutes fermées au départ
     expect(rows.every((r) => !r[2])).toBe(true);
     // le contenu reste monté, fermé : le formulaire d'email est là
