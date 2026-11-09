@@ -20,7 +20,7 @@
 //    comparaison GitHub × CV (le « double »). Assets : web/src/three/assets.ts ;
 //    HUD : hud.ts ; sons : elevatorSound.ts et radioSound.ts.
 import * as THREE from "three";
-import { BloomEffect, EffectComposer, EffectPass, NoiseEffect, RenderPass, ToneMappingEffect, ToneMappingMode, VignetteEffect, BlendFunction } from "postprocessing";
+import { EffectComposer, EffectPass, NoiseEffect, RenderPass, ToneMappingEffect, ToneMappingMode, VignetteEffect, BlendFunction } from "postprocessing";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { TextGeometry } from "three/examples/jsm/geometries/TextGeometry.js";
 import { SVGLoader } from "three/examples/jsm/loaders/SVGLoader.js";
@@ -35,7 +35,7 @@ import { createElevatorSound } from "./elevatorSound";
 import { createHud, type Hud } from "./hud";
 import { HUD_STAR_AT, type HudTexts } from "./hudTexts";
 import { createRadioSound } from "./radioSound";
-import { LensEffect, WhiteBalanceEffect, makeLensDirtTexture, whiteBalanceGains } from "./lens";
+import { LensEffect, WhiteBalanceEffect, whiteBalanceGains } from "./lens";
 import { createPlayer } from "./player";
 import { createWorkstation } from "./workstation";
 import { createCityBackdrop, createGlassReflection, createStudioEnvironment } from "./stage";
@@ -669,7 +669,6 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
   // profondeur (décision du 17 octobre 2026), tout est net.
   const composer = new EffectComposer(renderer, { frameBufferType: THREE.HalfFloatType, multisampling: low ? 0 : 2 });
   composer.addPass(new RenderPass(scene, camera));
-  const bloom = new BloomEffect({ mipmapBlur: true, luminanceThreshold: 1.0, luminanceSmoothing: 0.2, intensity: 0.6, radius: 0.65 });
   // Vignettage d'un objectif ouvert : −0,7 IL dans les coins, rien au centre
   // ni presque au milieu des bords (il faisait −1,7 IL, un effet visible).
   const vignette = new VignetteEffect({ darkness: 0.35, offset: 0.35 });
@@ -685,9 +684,11 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
   const WB_CABIN = whiteBalanceGains(6504);
   const WB_OFFICE = whiteBalanceGains(5600);
   const whiteBalance = new WhiteBalanceEffect(WB_CABIN.clone());
-  // l'objectif (aberration radiale, saleté) : fusionné dans la même passe, coupé sur mobile
-  const lens = low ? null : new LensEffect(bloom.texture, keep(makeLensDirtTexture()), { aberration: 0.001, dirt: 3 });
-  const gradePass = new EffectPass(camera, ...(lens ? [lens] : []), bloom, whiteBalance, vignette, noise, toneMapping);
+  // Ni bloom ni saleté d'objectif (SPEC §18.21) : le style mat n'éclaire
+  // rien au-delà de sa matière. Reste l'aberration radiale, fusionnée dans la
+  // même passe, coupée sur mobile.
+  const lens = low ? null : new LensEffect({ aberration: 0.001 });
+  const gradePass = new EffectPass(camera, ...(lens ? [lens] : []), whiteBalance, vignette, noise, toneMapping);
   composer.addPass(gradePass);
 
   /* ---------- le HUD (hud.ts) ---------- */
@@ -1140,7 +1141,6 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
     } else card.visible = false;
 
     camera_(t, wall);
-    bloom.intensity = lerp(0.6, 0.35, seg(t, plan.doors, 1)) + (t >= T_BURST ? 0.8 * (1 - seg(t, T_BURST, 0.5)) : 0);
     noise.blendMode.opacity.value = lerp(0.14, 0.055, seg(t, plan.doors, 1));
     whiteBalance.gains.lerpVectors(WB_CABIN, WB_OFFICE, inOut(seg(t, plan.doors + 0.3, 1.5)));
     void dt;
@@ -1175,11 +1175,10 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
       camera,
       get freeCamera() { return freeCamera; },
       set freeCamera(value: boolean) { freeCamera = value; },
-      bloom,
       /** Intensités de la lumière précalculée, réglables en direct. */
       light: LIGHT,
       /** L'objectif et le développement, réglables en direct. */
-      post: { pass: gradePass, bloom, vignette, noise, toneMapping, whiteBalance, lens, setKelvin: (k: number) => WB_OFFICE.copy(whiteBalanceGains(k)) },
+      post: { pass: gradePass, vignette, noise, toneMapping, whiteBalance, lens, setKelvin: (k: number) => WB_OFFICE.copy(whiteBalanceGains(k)) },
       get t() {
         return tNow;
       },
