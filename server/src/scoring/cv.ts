@@ -7,6 +7,7 @@ import type { GithubFacts } from "../github/facts";
 import { df, fact, initialsOf, nf, orderStats, overallOf, reliabilityOf, specialOf, valuesOf } from "./common";
 import { AI_BUZZ_KEY, BUZZWORDS, SCORING } from "./config";
 import { deriveGithub } from "./derive";
+import { pickProfile, sentenceFor } from "./profiles";
 import { currentRole } from "./rules";
 import { clampScore, scoreOn } from "./scale";
 import { composeStatuses, evaluateRules } from "./statuses";
@@ -199,7 +200,9 @@ export function scoreCv(
   const values = valuesOf(stats);
   const overall = overallOf(values);
   const gh = opts.github ? { facts: opts.github, m: deriveGithub(opts.github) } : undefined;
-  const candidates = evaluateRules(["cv"], { stats: values, github: gh, cv: { reading: r, counts, buzzPer100: per100 } });
+  const cvCtx = { reading: r, counts, buzzPer100: per100 };
+  const candidates = evaluateRules(["cv"], { stats: values, github: gh, cv: cvCtx });
+  const statuses = composeStatuses(candidates);
 
   const name =
     r.full_name?.trim() || opts.github?.profile.name?.trim() || opts.github?.login || (opts.lang === "fr" ? "CV anonyme" : "Anonymous CV");
@@ -218,7 +221,11 @@ export function scoreCv(
     mainLanguage: cvMainLanguage(r),
     club,
     stats,
-    statuses: composeStatuses(candidates),
+    statuses,
+    // Le profil de la fiche CV ne lit que le CV : les faits GitHub d'une
+    // comparaison font le profil de la fiche GitHub (compare.ts ajoute l'écart).
+    profile: pickProfile({ stats: values, cv: cvCtx }),
+    sentence: sentenceFor(values, statuses),
     reliability: reliabilityOf(stats),
     judgedInSeconds: opts.judgedInSeconds,
     lang: opts.lang,

@@ -20,6 +20,7 @@ import {
 import { SCORING } from "./config";
 import { deriveGithub, type GithubMetrics } from "./derive";
 import { githubPosition } from "./position";
+import { pickProfile, sentenceFor } from "./profiles";
 import { clampScore, interpolate, scoreOn, stepBonus } from "./scale";
 import { aiStatus, composeStatuses, evaluateRules } from "./statuses";
 
@@ -206,6 +207,7 @@ export function scoreGithub(
   const fromAI = aiStatus(ai?.ai_status);
   if (fromAI) candidates.push(fromAI);
 
+  const statuses = composeStatuses(candidates);
   const name = facts.profile.name?.trim() || facts.login;
   const special = specialOf(values, m.flashback);
   return {
@@ -222,7 +224,9 @@ export function scoreGithub(
     mainLanguage: m.mainLanguage?.toLowerCase() ?? undefined,
     club: cleanCompany(facts.profile.company),
     stats,
-    statuses: composeStatuses(candidates),
+    statuses,
+    profile: pickProfile({ stats: values, github: { facts, m } }),
+    sentence: sentenceFor(values, statuses),
     reliability: reliabilityOf(stats),
     judgedInSeconds: opts.judgedInSeconds,
     lang: opts.lang,

@@ -1,0 +1,93 @@
+{
+  "version": "0.1.0",
+  "_doc": "Profils criminels (SPEC §18.2). Exactement un par fiche : on évalue dans l'ordre de la liste, la première règle vraie gagne, le repli (`fallback`) ferme la liste. Ids stables : on ajoute, on ne supprime pas. Une condition = une clé de règle (`rule`) implémentée dans server/src/scoring/rules.ts ou profiles.ts, et ses seuils (`params`). `any` : une condition vraie suffit ; `all` : toutes doivent l'être. Nom et accroche fixes, sans placeholder. Noms et accroches épicènes ou métaphoriques : aucun mot qui suppose un genre, aucun accord qui renvoie à la personne (vérifié par profiles.test.ts).",
+  "profiles": [
+    {
+      "id": "forger",
+      "any": [
+        { "rule": "cv_ahead_of_code", "params": { "atLeast": 15 } },
+        { "rule": "cv_stat_at_least", "params": { "BUZZ": 85 } }
+      ],
+      "label": { "fr": "Faussaire", "en": "Forger" },
+      "tagline": { "fr": "Le CV le plus convaincant de la ville", "en": "The most convincing CV in town" }
+    },
+    {
+      "id": "kingpin",
+      "any": [
+        { "rule": "external_prs", "params": { "atLeast": 10 } },
+        { "rule": "maintainer", "params": { "atLeast": 10 } }
+      ],
+      "label": { "fr": "Légende du milieu", "en": "Underworld legend" },
+      "tagline": { "fr": "Ses PR font la loi dans tous les quartiers", "en": "PRs that run every block in town" }
+    },
+    {
+      "id": "mastermind",
+      "all": [
+        { "rule": "stat_at_least", "params": { "ARCH": 80 } },
+        { "rule": "stat_at_least", "params": { "TEC": 75 } }
+      ],
+      "label": { "fr": "Cerveau", "en": "Mastermind" },
+      "tagline": { "fr": "Chaque casse commence par un schéma d'architecture", "en": "Every heist starts with an architecture diagram" }
+    },
+    {
+      "id": "delivery_machine",
+      "any": [{ "rule": "stat_at_least", "params": { "SHIP": 85 } }],
+      "label": { "fr": "Machine à livrer", "en": "Delivery machine" },
+      "tagline": { "fr": "Livre plus vite que la police ne lit", "en": "Ships faster than the cops can read" }
+    },
+    {
+      "id": "night_owl",
+      "any": [{ "rule": "night_commits", "params": { "minShare": 0.15, "minSample": 10 } }],
+      "label": { "fr": "Oiseau de nuit", "en": "Night owl" },
+      "tagline": { "fr": "Les meilleurs coups partent à 3 h du matin", "en": "The best jobs go out at 3am" }
+    },
+    {
+      "id": "arsonist",
+      "any": [{ "rule": "friday_evening", "params": { "minShare": 0.3, "minSample": 10 } }],
+      "label": { "fr": "Pyromane", "en": "Arsonist" },
+      "tagline": { "fr": "Déploie le vendredi soir. Sans peur, sans rollback", "en": "Deploys on Friday night. No fear, no rollback" }
+    },
+    {
+      "id": "repeat_offender",
+      "any": [{ "rule": "lazy_commits", "params": { "minShare": 0.4, "minSample": 10 } }],
+      "label": { "fr": "Récidiviste", "en": "Repeat offender" },
+      "tagline": { "fr": "fix, fix2, final fix : une signature de légende", "en": "fix, fix2, final fix: a signature move" }
+    },
+    {
+      "id": "hoarder",
+      "any": [{ "rule": "repos_alive", "params": { "minRepos": 10, "maxAliveShare": 0.2 } }],
+      "label": { "fr": "Écureuil", "en": "Hoarder" },
+      "tagline": { "fr": "Des repos en planque partout, au cas où", "en": "Repos stashed everywhere, just in case" }
+    },
+    {
+      "id": "chameleon",
+      "any": [{ "rule": "polyglot", "params": { "atLeast": 6 } }],
+      "label": { "fr": "Caméléon", "en": "Chameleon" },
+      "tagline": { "fr": "Change de langage comme de planque", "en": "Switches languages like safehouses" }
+    },
+    {
+      "id": "fresh_blood",
+      "any": [{ "rule": "wonderkid", "params": {} }],
+      "label": { "fr": "Jeune pousse", "en": "Fresh blood" },
+      "tagline": { "fr": "À peine en ville, déjà sur tous les radars", "en": "New in town, already on every radar" }
+    },
+    {
+      "id": "old_school",
+      "any": [{ "rule": "old_activity", "params": {} }],
+      "label": { "fr": "Vieille école", "en": "Old school" },
+      "tagline": { "fr": "Du code d'époque, toujours en état de marche", "en": "Vintage code, still in working order" }
+    },
+    {
+      "id": "ghost",
+      "any": [{ "rule": "few_public_repos", "params": { "below": 3 } }],
+      "label": { "fr": "Fantôme", "en": "Ghost" },
+      "tagline": { "fr": "Aucune trace publique : du travail de pro", "en": "No public trace: strictly pro work" }
+    },
+    {
+      "id": "sleeper_agent",
+      "fallback": true,
+      "label": { "fr": "Cellule dormante", "en": "Sleeper agent" },
+      "tagline": { "fr": "En sommeil, jusqu'au jour du grand coup", "en": "Lying low until the big score" }
+    }
+  ]
+}

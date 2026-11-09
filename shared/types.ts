@@ -49,6 +49,23 @@ export interface StatusInstance {
   rarity?: number;
 }
 
+/** Profil criminel (SPEC §18.2) : exactement un par fiche, choisi par règles
+ *  dans la liste fermée de data/profiles.json. Nom et accroche fixes. */
+export interface CardProfile {
+  /** Identifiant stable (data/profiles.json). */
+  id: string;
+  label: Fact;
+  /** Phrase d'accroche, 60 signes au plus. */
+  tagline: Fact;
+}
+
+/** La peine (axe le plus faible) et la caution (le geste qui lèverait un chef d'accusation), §18.2. */
+export interface CardSentence {
+  label: Fact;
+  /** Absente pour une relaxe, ou si aucun chef d'accusation n'a de caution. */
+  bail?: Fact;
+}
+
 export interface CardData {
   id: string;
   source: Source;
@@ -78,6 +95,9 @@ export interface CardData {
   /** Toujours dans l'ordre STAT_CODES. */
   stats: Stat[];
   statuses: StatusInstance[]; // 1..3
+  /** Facultatifs : les fiches produites avant le barème 0.2.0 n'en ont pas. */
+  profile?: CardProfile;
+  sentence?: CardSentence;
 
   reliability: number; // 0..95
   judgedInSeconds: number;

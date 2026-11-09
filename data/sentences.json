@@ -1,0 +1,53 @@
+{
+  "version": "0.1.0",
+  "_doc": "Peine et caution (SPEC §18.2). Règle `weakest_axis` (server/src/scoring/profiles.ts) : l'axe le plus faible parmi `axes` (à égalité, le premier de la liste) ; si sa valeur est sous `threshold`, n = arrondi supérieur de (threshold − valeur) / step, au moins 1, et la peine de cet axe (`labelOne` quand n vaut 1) ; sinon la relaxe, sans caution. La caution : le geste le plus simple qui lèverait un chef d'accusation, celui du premier statut de la fiche qui en a une (clé = id stable de data/statuses.json). Formulations sans participe accordé à la personne.",
+  "rule": "weakest_axis",
+  "params": { "threshold": 80, "step": 5 },
+  "axes": ["TEC", "SHIP", "ARCH", "DOC"],
+  "sentences": {
+    "TEC": {
+      "label": { "fr": "Peine : relire {n} PR de mainteneurs", "en": "Sentence: review {n} maintainer PRs" },
+      "labelOne": { "fr": "Peine : relire 1 PR de mainteneur", "en": "Sentence: review 1 maintainer PR" }
+    },
+    "SHIP": {
+      "label": { "fr": "Peine : {n} semaines de commits", "en": "Sentence: {n} weeks of commits" },
+      "labelOne": { "fr": "Peine : 1 semaine de commits", "en": "Sentence: 1 week of commits" }
+    },
+    "ARCH": {
+      "label": { "fr": "Peine : {n} mois de tests unitaires", "en": "Sentence: {n} months of unit tests" },
+      "labelOne": { "fr": "Peine : 1 mois de tests unitaires", "en": "Sentence: 1 month of unit tests" }
+    },
+    "DOC": {
+      "label": { "fr": "Peine : {n} README de 300 mots", "en": "Sentence: {n} READMEs of 300 words" },
+      "labelOne": { "fr": "Peine : 1 README de 300 mots", "en": "Sentence: 1 README of 300 words" }
+    }
+  },
+  "acquittal": { "fr": "Relaxe. Le tribunal s'excuse.", "en": "Case dismissed. The court apologizes." },
+  "bail": {
+    "gh_private_talent": { "fr": "Caution : un repo public", "en": "Bail: one public repo" },
+    "gh_archaeologist": { "fr": "Caution : un commit cette année", "en": "Bail: one commit this year" },
+    "gh_lazy_commits": { "fr": "Caution : un message de commit de cinq mots", "en": "Bail: one five-word commit message" },
+    "gh_no_tests": { "fr": "Caution : un dossier de tests", "en": "Bail: one test folder" },
+    "gh_readme_wip": { "fr": "Caution : 50 mots dans le README", "en": "Bail: 50 words in the README" },
+    "gh_friday_push": { "fr": "Caution : un push le lundi matin", "en": "Bail: one Monday-morning push" },
+    "gh_3am_commit": { "fr": "Caution : un commit à l'heure du café", "en": "Bail: one commit at coffee time" },
+    "gh_finished_tutorial": { "fr": "Caution : un projet hors tutoriel", "en": "Bail: one project off the tutorial" },
+    "gh_repos_alive": { "fr": "Caution : archiver les repos morts", "en": "Bail: archive the dead repos" },
+    "gh_ghost_contributor": { "fr": "Caution : une PR chez les autres", "en": "Bail: one PR to someone else's repo" },
+    "gh_framework_hopper": { "fr": "Caution : un an sur le même framework", "en": "Bail: one year on the same framework" },
+    "gh_stars_mom": { "fr": "Caution : un README qui donne envie", "en": "Bail: a README worth a star" },
+    "gh_polyglot": { "fr": "Caution : choisir un langage", "en": "Bail: pick one language" },
+    "gh_node_modules": { "fr": "Caution : un .gitignore", "en": "Bail: one .gitignore" },
+    "cv_senior_from_cv": { "fr": "Caution : des dates exactes sur le CV", "en": "Bail: exact dates on the CV" },
+    "cv_longer_than_readmes": { "fr": "Caution : un README plus long que le CV", "en": "Bail: one README longer than the CV" },
+    "cv_buzzwords": { "fr": "Caution : rayer « synergie » du CV", "en": "Bail: strike “synergy” from the CV" },
+    "cv_passion": { "fr": "Caution : une « passion » de moins", "en": "Bail: one “passion” fewer" },
+    "cv_expert_frameworks": { "fr": "Caution : un CV à cinq technos", "en": "Bail: a five-tech CV" },
+    "cv_ai_title": { "fr": "Caution : un vrai projet IA", "en": "Bail: one real AI project" },
+    "ai_short_vars": { "fr": "Caution : des noms de variables qui parlent", "en": "Bail: variable names that talk" },
+    "ai_400_lines": { "fr": "Caution : une fonction en quatre morceaux", "en": "Bail: one function in four pieces" },
+    "ai_franglais": { "fr": "Caution : des commentaires en une langue", "en": "Bail: comments in one language" },
+    "ai_console_log": { "fr": "Caution : un vrai logger", "en": "Bail: one real logger" },
+    "ai_copy_paste": { "fr": "Caution : une fonction partagée", "en": "Bail: one shared function" }
+  }
+}

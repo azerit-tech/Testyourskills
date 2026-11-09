@@ -3,6 +3,8 @@
 import scoringJson from "../../../data/scoring.json";
 import statusesJson from "../../../data/statuses.json";
 import buzzwordsJson from "../../../data/buzzwords.json";
+import profilesJson from "../../../data/profiles.json";
+import sentencesJson from "../../../data/sentences.json";
 import type { Fact, Position, StatCode, StatusTone } from "../../../shared/types";
 
 export type Scale = [number, number][];
@@ -101,9 +103,48 @@ export interface BuzzwordsConfig {
   passionStems: string[];
 }
 
+/** Une condition de profil : une clé de règle et ses seuils. */
+export interface ProfileCondition {
+  rule: string;
+  params?: Record<string, number>;
+}
+
+export interface ProfileDef {
+  id: string;
+  /** Une condition vraie suffit. */
+  any?: ProfileCondition[];
+  /** Toutes les conditions doivent être vraies. */
+  all?: ProfileCondition[];
+  /** Repli quand rien ne s'applique ; le dernier de la liste. */
+  fallback?: boolean;
+  label: Fact;
+  tagline: Fact;
+}
+
+export interface ProfilesConfig {
+  version: string;
+  profiles: ProfileDef[];
+}
+
+export type SentenceAxis = Exclude<StatCode, "XP" | "BUZZ">;
+
+export interface SentencesConfig {
+  version: string;
+  rule: string;
+  params: { threshold: number; step: number };
+  /** Ordre de départage à égalité. */
+  axes: SentenceAxis[];
+  sentences: Record<SentenceAxis, { label: Fact; labelOne: Fact }>;
+  acquittal: Fact;
+  /** Caution par id de statut (data/statuses.json). */
+  bail: Record<string, Fact>;
+}
+
 export const SCORING = scoringJson as unknown as ScoringConfig;
 export const STATUSES = statusesJson as unknown as StatusesConfig;
 export const BUZZWORDS = buzzwordsJson as unknown as BuzzwordsConfig;
+export const PROFILES = profilesJson as unknown as ProfilesConfig;
+export const SENTENCES = sentencesJson as unknown as SentencesConfig;
 
 /** Clé utilisée dans CvTextCounts.buzzwords pour les mentions d'IA. */
 export const AI_BUZZ_KEY = "IA/AI";

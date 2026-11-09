@@ -1,5 +1,5 @@
 {
-  "version": "0.1.1",
+  "version": "0.2.0",
   "_doc": "Barème versionné (SPEC §4.4, §4.5). Échelles : points [x, note], interpolation linéaire, arrondi, bornes 1..99. Changer un point = changer la version.",
   "bounds": { "min": 1, "max": 99 },
   "weights": { "TEC": 0.3, "SHIP": 0.2, "ARCH": 0.2, "DOC": 0.15, "XP": 0.15 },

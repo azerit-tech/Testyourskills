@@ -35,6 +35,10 @@ function checkShape(card: Omit<CardData, "id" | "createdAt">) {
   expect(card.reliability).toBeLessThanOrEqual(95);
   expect(card.reliability % 19).toBe(0);
   expect(card.initials).toMatch(/^[A-Z0-9?]{1,2}$/);
+  // Profil et peine (§18.2), depuis le barème 0.2.0.
+  expect(card.profile?.id).toBeTruthy();
+  expect(card.profile?.label.fr && card.profile.label.en && card.profile.tagline.fr && card.profile.tagline.en).toBeTruthy();
+  expect(card.sentence?.label.fr).toMatch(/^(Peine : |Relaxe)/);
   // Sérialisable tel quel.
   expect(JSON.parse(JSON.stringify(card))).toEqual(card);
 }
@@ -54,6 +58,11 @@ describe("contrat sur faits réels figés", () => {
     expect(card.avatarUrl).toMatch(/^https:\/\/avatars\.githubusercontent\.com\//);
     expect(card.statuses.map((s) => s.id)).toEqual(["gh_lazy_commits", "gh_finished_tutorial", "gh_accepted_elsewhere"]);
     expect(card.stats.find((s) => s.code === "SHIP")!.facts[0]).toEqual({ fr: "35 semaines actives sur 52", en: "35 active weeks out of 52" });
+    expect(card.profile?.id).toBe("kingpin"); // dix PR fusionnées chez les autres ou plus
+    expect(card.sentence).toEqual({
+      label: { fr: "Peine : 7 README de 300 mots", en: "Sentence: 7 READMEs of 300 words" }, // DOC 47
+      bail: { fr: "Caution : un message de commit de cinq mots", en: "Bail: one five-word commit message" },
+    });
   });
 
   it("gaearon avec lecture IA niveau 4 et statut IA", () => {
@@ -76,5 +85,8 @@ describe("contrat sur faits réels figés", () => {
     expect(card.tier).toBe("bronze");
     expect(card.statuses[0].id).toBe("gh_private_talent");
     expect(card.reliability).toBe(19);
+    expect(card.profile?.id).toBe("ghost");
+    expect(card.sentence?.label.fr).toBe("Peine : 12 semaines de commits"); // SHIP 20
+    expect(card.sentence?.bail?.fr).toBe("Caution : un repo public");
   });
 });

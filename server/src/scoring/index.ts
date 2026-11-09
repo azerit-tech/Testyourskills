@@ -8,7 +8,8 @@ import { parsePercentileTable, withReference, type PercentileTable } from "./per
 
 export { cvTextCounts, scoreCv } from "./cv";
 export { compareCards } from "./compare";
-export { SCORING, STATUSES, BUZZWORDS } from "./config";
+export { SCORING, STATUSES, BUZZWORDS, PROFILES, SENTENCES } from "./config";
+export { pickProfile, sentenceFor } from "./profiles";
 export { isLazyCommit } from "./derive";
 
 /** Table de référence écrite par scripts/percentiles.ts (§18.3). Absente tant que Jacques ne l'a pas lancé. */
