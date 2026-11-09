@@ -8,6 +8,10 @@ export interface GithubProfile {
   name: string | null;
   avatarUrl: string;
   bio: string | null;
+  /** Champ « site » du profil. Absent des faits collectés avant le §18.24. */
+  blog?: string | null;
+  /** Comptes sociaux affichés (GET /users/{login}/social_accounts), dont LinkedIn (§18.24). */
+  socialAccounts?: { provider: string; url: string }[];
   company: string | null;
   followers: number;
   createdAt: string; // ISO

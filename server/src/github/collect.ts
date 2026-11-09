@@ -51,6 +51,7 @@ interface RestUser {
   name: string | null;
   avatar_url: string;
   bio: string | null;
+  blog?: string | null;
   company: string | null;
   followers: number;
   created_at: string;
@@ -132,8 +133,10 @@ export async function collectGithub(
       ),
     ),
   );
+  // Comptes sociaux affichés (§18.24) : le LinkedIn s'y trouve, un appel de plus, sans bloquer.
+  const socialP = soft(ctx, () => rest<{ provider: string; url: string }[]>(ctx, `/users/${user}/social_accounts`));
   // Évite les rejets non observés si une étape lève avant l'attente finale.
-  for (const p of [calP, prsP, page1P, reposP, yearsP, firstP]) p.catch(() => {});
+  for (const p of [calP, prsP, page1P, reposP, yearsP, firstP, socialP]) p.catch(() => {});
 
   const [u, cal, repos] = await Promise.all([userP, calP, reposP]);
   emit({ key: "recruiter" });
@@ -273,6 +276,10 @@ export async function collectGithub(
   emit({ key: "compare" });
 
   const weeks = cal?.weeks.slice(-52) ?? [];
+  const social = await socialP.catch(() => null);
+  const socialAccounts = Array.isArray(social?.data)
+    ? social.data.filter((a) => typeof a?.provider === "string" && typeof a?.url === "string").slice(0, 10).map((a) => ({ provider: a.provider, url: a.url }))
+    : [];
   return {
     schema: 1,
     login: u.login,
@@ -282,6 +289,8 @@ export async function collectGithub(
       name: u.name,
       avatarUrl: u.avatar_url,
       bio: u.bio,
+      blog: u.blog || null,
+      socialAccounts,
       company: u.company,
       followers: u.followers,
       createdAt: u.created_at,
