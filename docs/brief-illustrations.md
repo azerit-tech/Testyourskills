@@ -24,7 +24,7 @@ Le test qui décide de tout : **réduite à 175 px de large, l'image doit encore
 - **Fichier** : PNG, ou JPG en qualité 90 et plus, sRGB.
 - **Image nue** : pas de cadre, pas de coins arrondis, pas de bordure blanche, pas de filigrane, pas de signature. L'arrondi et le voile se font en CSS.
 - **Nom** : `{id}.png` (les `id` sont dans le tableau du §6).
-- **Dépôt** : dossier `design/profiles/` à la racine du projet. Il n'est pas versionné. Claude en tire les versions web (WebP, 1536 et 768 px, environ 120 Ko) dans `web/public/profiles/`.
+- **Dépôt** : dossier `design/profiles/`, à côté du projet (`Azerit/design/profiles/`). Il n'est pas versionné. Claude en tire les versions web dans `web/public/profiles/` : `{id}.jpg` (1152 × 768, environ 140 Ko) et `{id}-s.jpg` (576 × 384, environ 40 Ko).
 
 ## 3. Composition
 

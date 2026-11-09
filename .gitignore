@@ -9,4 +9,3 @@ tsconfig.tsbuildinfo
 tools/bake/.cache/
 .claude/worktrees/
 tools/bake/__pycache__/
-design/profiles/

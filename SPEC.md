@@ -1082,5 +1082,5 @@ Chaque profil criminel a son « lieu du crime » : une illustration peinte en ap
 
 - **Où elles vont** : la tuile de profil sous la fiche et sur la page partagée (le nom en capitales crème et la phrase, en bas à gauche, sur un voile) ; le mur des 13 profils de l'accueil ; le fond des images de partage ; le carton de fin.
 - **Pas dans la fiche** : la photo d'identité et la note couvriraient le sujet, et la fiche reste un SVG léger (texture 3D, PNG).
-- **Fichiers** : les originaux dans `design/profiles/{id}.png`, non versionnés ; les versions web dans `web/public/profiles/`.
+- **Fichiers** : les originaux (1536 × 1024, générés par Jacques le 9 novembre 2026) dans `Azerit/design/profiles/{id}.png`, hors du dépôt ; les versions web dans `web/public/profiles/` : `{id}.jpg` (1152 × 768) et `{id}-s.jpg` (576 × 384). JPEG et non WebP : lu partout, et par le rendu PNG du serveur.
 - **Tant qu'une image manque**, la tuile garde un aplat de la teinte de la carte et un palmier ton sur ton.
