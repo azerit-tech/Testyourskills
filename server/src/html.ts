@@ -3,7 +3,7 @@
 // navigateur charge le front SPA qui affiche la carte.
 
 import type { CardData, ComparisonData, Lang, Special } from "../../shared/types";
-import { starsFor } from "../../shared/types";
+import { LEVEL_LABELS, starsFor } from "../../shared/types";
 
 export interface PageMeta {
   lang: Lang;
@@ -63,6 +63,12 @@ export function metaFor(data: CardData | ComparisonData, baseUrl: string): PageM
   const lang = data.lang ?? "fr";
   const fr = lang === "fr";
   const label = cardLabel(data, lang);
+  // §18.7 : « @X est dans le viseur ★★★★ · Oiseau de nuit » (épicène, §18.18) ;
+  // sans profil (fiche d'avant le barème 0.2.0), le niveau.
+  const who = data.login ? `@${data.login}` : data.name;
+  const n = starsFor(data.overall);
+  const tag = data.profile ? data.profile.label[lang] : LEVEL_LABELS[n][lang];
+  const title = `${who} ${fr ? "est dans le viseur" : "is in the crosshairs"} ${"★".repeat(n)} · ${tag}`;
   const status = data.statuses[0]?.label[lang];
   const parts = [
     status ? (fr ? `Chef d'accusation : « ${status} ».` : `Charge: "${status}".`) : "",
@@ -74,7 +80,7 @@ export function metaFor(data: CardData | ComparisonData, baseUrl: string): PageM
     lang,
     url,
     image,
-    title: `${label} — ${data.name}`,
+    title,
     description: parts.join(" "),
     imageAlt: fr ? `${label}, fiche de dev de ${data.name}` : `${label}, ${data.name}'s dev rap sheet`,
   };
