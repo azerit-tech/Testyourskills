@@ -10,6 +10,7 @@ import { Denounce } from "../components/Denounce";
 import { EntryForm } from "../components/EntryForm";
 import { Dossier } from "../components/Findings";
 import { RevealCard, useReveal } from "../components/Reveal";
+import { ShareDock } from "../components/ShareDock";
 import type { WalkoutControl } from "../components/Walkout3D";
 import { Waiting } from "../components/Waiting";
 import { pick, useT } from "../i18n";
@@ -441,6 +442,8 @@ function Result({ item, animate, owner, fresh, notice, me, onMe, onDeleted }: Re
           </div>
         )}
       </div>
+      {/* La barre du pouce (§18.27) : mêmes conditions que le bloc de partage, une fois la fiche posée. Avant le toast, qui se cale dessus. */}
+      {!visitor && !(claimed && me?.hidden) && <ShareDock item={item} ready={settled} toast={toast.show} />}
       {toast.node}
     </main>
   );

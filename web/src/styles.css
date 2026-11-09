@@ -1295,6 +1295,43 @@ a.dossier-item:hover {
   grid-column: 1 / -1;
 }
 
+/* la barre du pouce (§18.27) : téléphone seulement (ShareDock ne la rend pas au-delà de 640 px), fond d'encre plat.
+   Elle sort par le bas quand le bloc de partage est à l'écran ou qu'un champ a le focus. */
+.dock {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 70;
+  display: flex;
+  gap: 8px;
+  padding: 10px var(--gutter) calc(10px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--lilac-faint);
+  background: var(--ink-0);
+  transform: translateY(100%);
+  visibility: hidden;
+  transition:
+    transform 0.35s var(--ease-out),
+    visibility 0s 0.35s;
+}
+.dock.is-on {
+  transform: none;
+  visibility: visible;
+  transition-delay: 0s;
+}
+.dock .dock-main {
+  flex: 1;
+  min-width: 0;
+}
+/* le toast passe au-dessus de la barre (10 + 52 + 10 px) */
+.dock.is-on ~ .toast {
+  bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+}
+/* marge basse : la barre ne couvre jamais les derniers liens de la page */
+.has-dock .footer-links {
+  padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px));
+}
+
 /* l'image en plein écran, là où rien ne se télécharge (navigateurs intégrés) : un appui long l'enregistre */
 .out-panel {
   position: fixed;
