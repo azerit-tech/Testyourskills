@@ -149,19 +149,21 @@ export function Txt({ x, y, font, size, fill, ls = 0, anchor = "start", opacity,
 export function Stars({ n, onSky }: { n: number; onSky: boolean }) {
   const k = STAR_SIZE / 24;
   const x0 = RIGHT - 6 * STAR_SIZE - 5 * STAR_GAP;
+  // Une étoile allumée garde son emplacement éteint dessous : à l'arrivée (option
+  // starsIntro de CardView), le calque allumé apparaît par-dessus, dans l'ordre
+  // data-star : 0 = la première allumée, la plus à droite, puis vers la gauche.
   return (
     <g>
       {[0, 1, 2, 3, 4, 5].map((i) => {
         const on = i >= 6 - n;
         return (
           <g key={i} transform={`translate(${x0 + i * (STAR_SIZE + STAR_GAP)} 15) scale(${k})`}>
-            {on && <path d={STAR} transform={`translate(0 ${+(1 / k).toFixed(3)})`} fill="#000" fillOpacity={0.28} />}
-            {on ? (
-              <path d={STAR} fill={PALETTE.star} />
-            ) : onSky ? (
-              <path d={STAR} fill="#14141e" fillOpacity={0.55} />
-            ) : (
-              <path d={STAR} fill="#fff" fillOpacity={0.13} />
+            {onSky ? <path d={STAR} fill="#14141e" fillOpacity={0.55} /> : <path d={STAR} fill="#fff" fillOpacity={0.13} />}
+            {on && (
+              <g className="tys-star-on" data-star={5 - i}>
+                <path d={STAR} transform={`translate(0 ${+(1 / k).toFixed(3)})`} fill="#000" fillOpacity={0.28} />
+                <path d={STAR} fill={PALETTE.star} />
+              </g>
             )}
           </g>
         );

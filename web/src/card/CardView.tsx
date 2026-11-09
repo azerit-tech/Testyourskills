@@ -2,8 +2,8 @@
 // l'inclinaison 3D (12° max, doigt ou souris, retour élastique), le grain
 // et le balayage de révélation. Style mat (SPEC §18.18) : ni reflet
 // holographique ni glare ; seul ★★★★★★ porte un halo, son contour éclairé.
-// En option (désactivée par défaut) : la fiche qui se retourne (§18.27, le
-// dos <CardBack>).
+// En option (désactivées par défaut) : la fiche qui se retourne (§18.27, le
+// dos <CardBack>) et les étoiles qui s'allument une à une à l'arrivée.
 import { createContext, useContext, useEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import type { CardData, Lang } from "../../../shared/types";
 import { styleOf } from "../../../shared/types";
@@ -28,11 +28,14 @@ export interface CardViewProps {
   className?: string;
   /** La fiche se retourne (§18.27) : un toucher ou un clic, ou le bouton rond du coin. Défaut false. */
   flippable?: boolean;
+  /** Au montage, les étoiles s'allument une à une, de la première (la plus à droite)
+   *  à la dernière, 120 ms d'écart ; rien en mouvement réduit. Défaut false. */
+  starsIntro?: boolean;
 }
 
 /** Options par défaut des fiches d'un sous-arbre, pour les brancher sans toucher
  *  aux composants intermédiaires (RevealCard) : une prop explicite l'emporte. */
-export const CardViewOptions = createContext<Pick<CardViewProps, "flippable">>({});
+export const CardViewOptions = createContext<Pick<CardViewProps, "flippable" | "starsIntro">>({});
 
 const MAX_TILT = 12;
 /** Au-delà (px), le doigt a glissé : ce n'est plus un toucher, la fiche ne se retourne pas. */
@@ -87,11 +90,14 @@ export function CardView(props: CardViewProps) {
   const defaults = useContext(CardViewOptions);
   const { card, lang, interactive = true, reveal = false, idPrefix, className } = props;
   const flippable = (props.flippable ?? defaults.flippable ?? false) && interactive;
+  const starsIntroWanted = props.starsIntro ?? defaults.starsIntro ?? false;
   const ref = useRef<HTMLDivElement>(null);
   const reduced = useReducedMotion();
   const live = interactive && !reduced;
   const [revealing, setRevealing] = useState(false);
   const [flipped, setFlipped] = useState(false);
+  // Décidé une fois, au montage : l'allumage ne rejoue pas quand la fiche change.
+  const [starsIntro] = useState(() => starsIntroWanted && !readReduced());
   const tap = useRef<{ x: number; y: number; moved: boolean } | null>(null);
   const style = styleOf(card);
   const s = cardT(lang ?? card.lang ?? "fr");
@@ -213,7 +219,7 @@ export function CardView(props: CardViewProps) {
   return (
     <div
       ref={ref}
-      className={["tys-card", revealing ? "is-revealing" : "", className ?? ""].filter(Boolean).join(" ")}
+      className={["tys-card", revealing ? "is-revealing" : "", starsIntro ? "is-stars-intro" : "", className ?? ""].filter(Boolean).join(" ")}
       data-style={style}
       data-dark="true"
       data-level={th.key}

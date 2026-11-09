@@ -152,6 +152,35 @@
 }
 
 /* ------------------------------------------------------------------ */
+/* Les étoiles s'allument à l'arrivée, option starsIntro de CardView :  */
+/* une à une, 120 ms d'écart, de la première allumée (data-star 0, la   */
+/* plus à droite) à la dernière. Rien en mouvement réduit.              */
+/* ------------------------------------------------------------------ */
+
+.tys-card.is-stars-intro .tys-card__svg:not([data-side="back"]) .tys-star-on {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: tys-star-on 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
+  animation-delay: var(--tys-star-delay, 0ms);
+}
+.tys-star-on[data-star="1"] { --tys-star-delay: 120ms; }
+.tys-star-on[data-star="2"] { --tys-star-delay: 240ms; }
+.tys-star-on[data-star="3"] { --tys-star-delay: 360ms; }
+.tys-star-on[data-star="4"] { --tys-star-delay: 480ms; }
+.tys-star-on[data-star="5"] { --tys-star-delay: 600ms; }
+
+@keyframes tys-star-on {
+  0% { opacity: 0; transform: scale(0.55); }
+  70% { opacity: 1; transform: scale(1.12); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tys-card.is-stars-intro .tys-star-on {
+    animation: none !important;
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* La fiche se retourne (§18.27), option flippable de CardView.         */
 /* Rotation Y de 180° en 0,5 s ; mouvement réduit : un fondu.           */
 /* ------------------------------------------------------------------ */
