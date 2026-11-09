@@ -11,6 +11,7 @@ import { createApp, purge } from "./app";
 import { useBudgetDb } from "./ai/budget";
 import { checkOpenRouterCredits } from "./ai/credits";
 import { linkedinFromEnv } from "./linkedin";
+import { githubAuthFromEnv } from "./auth";
 import { Store } from "./db";
 import { realDeps } from "./deps";
 import { TokenPool, tokensFromEnv } from "./github/tokens";
@@ -31,6 +32,7 @@ const devWebUrl = (process.env.DEV_WEB_URL ?? "http://localhost:5180").replace(/
 const webRoot = join(projectRoot, "dist/web");
 const avatarDir = join(dirname(dbPath), "avatars");
 const linkedin = linkedinFromEnv(process.env);
+const githubAuth = githubAuthFromEnv(process.env);
 
 if (!githubToken) {
   if (prod) {
@@ -45,6 +47,11 @@ if (!process.env.OPENROUTER_API_KEY) {
   console.warn("OPENROUTER_API_KEY absent : cartes sans lecture IA (TEC peu fiable, CV illisibles).");
 }
 if (!linkedin) console.warn("LINKEDIN_CLIENT_ID / LINKEDIN_CLIENT_SECRET absents : photo LinkedIn désactivée.");
+if (!githubAuth) {
+  console.warn("GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET / SESSION_SECRET absents : « C'est moi » (revendication GitHub) désactivé.");
+} else if (githubAuth.sessionSecret.length < 32) {
+  console.warn("SESSION_SECRET trop court : prends au moins 32 caractères aléatoires (openssl rand -hex 32).");
+}
 if (prod && !existsSync(join(webRoot, "index.html"))) {
   console.warn(`Front introuvable dans ${webRoot} : lance \`npx vite build\` avant \`npm start\`.`);
 }
@@ -82,6 +89,8 @@ const { app, pipeline } = createApp({
   staticRoot: prod ? webRoot : undefined,
   indexHtml,
   linkedin,
+  githubAuth,
+  secureCookies: prod,
   avatarDir,
 });
 

@@ -29,6 +29,35 @@ export interface CardRow {
   refCardId: string | null;
 }
 
+export interface OwnerRow {
+  login: string;
+  githubId: number;
+  claimedAt: number;
+  hidden: boolean;
+  email: string | null;
+  consentsJson: string | null;
+}
+
+interface RawOwner {
+  login: string;
+  github_id: number;
+  claimed_at: number;
+  hidden: number;
+  email: string | null;
+  consents_json: string | null;
+}
+
+function toOwner(r: RawOwner): OwnerRow {
+  return {
+    login: r.login,
+    githubId: r.github_id,
+    claimedAt: r.claimed_at,
+    hidden: r.hidden === 1,
+    email: r.email,
+    consentsJson: r.consents_json,
+  };
+}
+
 export interface NewCardRow {
   id: string;
   parentId?: string | null;
@@ -98,6 +127,17 @@ CREATE TABLE IF NOT EXISTS ai_spend (
   input_tokens  INTEGER,
   output_tokens INTEGER,
   calls         INTEGER
+);
+
+-- Propriétaires revendiqués par GitHub OAuth (§18.1). Une table neuve : CREATE
+-- TABLE IF NOT EXISTS suffit aussi sur une base déjà en production.
+CREATE TABLE IF NOT EXISTS owners (
+  login         TEXT PRIMARY KEY,         -- pseudo GitHub en minuscules
+  github_id     INTEGER NOT NULL UNIQUE,  -- identifiant numérique : fait foi si le compte est renommé
+  claimed_at    INTEGER NOT NULL,         -- ms epoch, première revendication
+  hidden        INTEGER NOT NULL DEFAULT 0, -- 1 = fiches masquées à tous sauf au propriétaire
+  email         TEXT,                     -- pour plus tard (concours, §18.4)
+  consents_json TEXT                      -- pour plus tard (consentements, §18.4)
 );
 `;
 
@@ -175,6 +215,8 @@ export class Store {
        VALUES (@id, @parent_id, @created_at, @source, @login, @kind, @json, @facts_json, NULL, @delete_token, @expires_at, @ref_card_id)`,
     );
     const tx = this.db.transaction((list: NewCardRow[]) => {
+      // Login revendiqué : ses nouvelles fiches sont à son propriétaire et n'expirent pas non plus (§18.1).
+      const kept = list.some((r) => r.login && this.getOwner(r.login));
       for (const r of list) {
         stmt.run({
           id: r.id,
@@ -186,7 +228,7 @@ export class Store {
           json: JSON.stringify(stripToken(r.data)),
           facts_json: r.facts === undefined || r.facts === null ? null : JSON.stringify(r.facts),
           delete_token: r.deleteToken,
-          expires_at: r.createdAt + RETENTION_MS,
+          expires_at: kept ? null : r.createdAt + RETENTION_MS,
           // L'origine va sur la fiche racine seule, pas sur les cartes d'une comparaison.
           ref_card_id: r.refCardId ?? (r.parentId ? null : (this.pendingRefs.get(r.id) ?? null)),
         });
@@ -303,5 +345,58 @@ export class Store {
       | { n: number }
       | undefined;
     return r?.n ?? 0;
+  }
+
+  // --- Propriétaires (§18.1) -----------------------------------------------
+
+  /** Login d'une fiche : le sien, ou celui de sa comparaison (la carte CV d'une comparaison n'en a pas). */
+  loginOf(row: Pick<CardRow, "login" | "parentId">): string | null {
+    if (row.login) return row.login;
+    if (!row.parentId) return null;
+    const p = this.db.prepare(`SELECT login FROM cards WHERE id = ?`).get(row.parentId) as { login: string | null } | undefined;
+    return p?.login ?? null;
+  }
+
+  getOwner(login: string): OwnerRow | null {
+    const r = this.db.prepare(`SELECT * FROM owners WHERE login = ?`).get(login.toLowerCase()) as RawOwner | undefined;
+    return r ? toOwner(r) : null;
+  }
+
+  getOwnerById(githubId: number): OwnerRow | null {
+    const r = this.db.prepare(`SELECT * FROM owners WHERE github_id = ?`).get(githubId) as RawOwner | undefined;
+    return r ? toOwner(r) : null;
+  }
+
+  /**
+   * Revendication : le compte GitHub `githubId`, aujourd'hui nommé `login`,
+   * devient propriétaire de toutes les fiches de ce login, qui n'expirent plus.
+   * L'identifiant numérique fait foi : un compte renommé garde sa ligne (date de
+   * revendication, masquage) et ses anciennes fiches passent sous le nouveau
+   * nom ; une ligne d'un autre compte sur ce même nom (nom libéré puis repris)
+   * est remplacée.
+   */
+  claimOwner(login: string, githubId: number, now = Date.now()): OwnerRow {
+    const l = login.toLowerCase();
+    this.db.transaction(() => {
+      this.db.prepare(`DELETE FROM owners WHERE login = ? AND github_id <> ?`).run(l, githubId);
+      const prev = this.getOwnerById(githubId);
+      if (!prev) {
+        this.db.prepare(`INSERT INTO owners (login, github_id, claimed_at, hidden) VALUES (?, ?, ?, 0)`).run(l, githubId, now);
+      } else if (prev.login !== l) {
+        this.db.prepare(`UPDATE owners SET login = ? WHERE github_id = ?`).run(l, githubId);
+        this.db.prepare(`UPDATE cards SET login = ? WHERE login = ?`).run(l, prev.login);
+      }
+      this.db
+        .prepare(`UPDATE cards SET expires_at = NULL WHERE login = ? OR parent_id IN (SELECT id FROM cards WHERE login = ?)`)
+        .run(l, l);
+    })();
+    return this.getOwner(l)!;
+  }
+
+  /** true si le propriétaire de ce login a masqué ses fiches. */
+  isHidden(login: string | null | undefined): boolean {
+    if (!login) return false;
+    const r = this.db.prepare(`SELECT hidden FROM owners WHERE login = ?`).get(login.toLowerCase()) as { hidden: number } | undefined;
+    return r?.hidden === 1;
   }
 }

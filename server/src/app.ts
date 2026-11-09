@@ -15,6 +15,7 @@ import { genericMeta, injectMeta, messagePage, metaFor, standalonePage } from ".
 import { ID_RE, MAX_PDF_BYTES, MESSAGES, Pipeline, type Deps, type RenderInput } from "./pipeline";
 import { CARDS_PER_DAY, RateLimiter, clientIp } from "./ratelimit";
 import { inlineAvatar, mountLinkedin, removeAvatars, type LinkedinConfig } from "./linkedin";
+import { mountAuth, type GithubAuthConfig } from "./auth";
 import { aiStatus as budgetAiStatus, type AiStatus } from "./ai/budget";
 import type { TokenPool } from "./github/tokens";
 
@@ -45,6 +46,10 @@ export interface AppOptions {
   fetchImpl?: typeof fetch;
   /** Photo LinkedIn (OpenID Connect). Absent : fonctionnalité désactivée. */
   linkedin?: LinkedinConfig;
+  /** « C'est moi » par GitHub OAuth (§18.1). Absent : fonctionnalité désactivée, bouton caché. */
+  githubAuth?: GithubAuthConfig;
+  /** Cookies de session en Secure. Défaut : si baseUrl est en https. */
+  secureCookies?: boolean;
   /** Photos LinkedIn sur disque. Défaut : à côté de ogDir, dans avatars/. */
   avatarDir?: string;
   /** Pseudo GitHub de la carte d'exemple de l'accueil (§6.1). Absent : pas de vitrine. */
@@ -168,6 +173,17 @@ export function createApp(opts: AppOptions) {
     return c.json(errorBody("internal", MESSAGES.internal), 500);
   });
 
+  // Revendication GitHub (§18.1), montée en tête : son middleware doit passer
+  // avant les routes qui demandent ownerFromRequest.
+  mountAuth(app, {
+    store,
+    config: opts.githubAuth,
+    baseUrl,
+    secure: opts.secureCookies ?? baseUrl.startsWith("https://"),
+    limiter,
+    fetchImpl,
+  });
+
   // Public : jamais de montant. ai = ok | budget (plafond du jour atteint) |
   // credits (402 OpenRouter vu dans les 10 dernières minutes) | off (pas de clé).
   app.get("/api/health", (c) =>
@@ -175,7 +191,7 @@ export function createApp(opts: AppOptions) {
   );
 
   // Ce que le front doit afficher ou masquer.
-  app.get("/api/config", (c) => c.json({ linkedin: !!opts.linkedin }));
+  app.get("/api/config", (c) => c.json({ linkedin: !!opts.linkedin, claim: !!opts.githubAuth }));
 
   // GET /api/showcase : la vraie carte du pseudo vitrine, pour l'accueil (§6.1).
   // Hors quota. Null tant qu'aucune n'existe ; on en lance une si la dernière
