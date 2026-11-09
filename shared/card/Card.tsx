@@ -60,6 +60,9 @@ const STAR_GAP = 3;
  * du profil, sa phrase (la blague qu'on capture), les chefs d'accusation, puis
  * le reste. Lignes de base, de haut en bas, sous la photo.
  */
+/** Coin bas droit gardé libre pour le bouton rond qui retourne la fiche (web). */
+export const FLIP_CORNER = 36;
+
 export const LAYOUT = {
   profileName: { y: 270, size: 30, minSize: 20 },
   /** La phrase du profil : une ou deux lignes, jamais coupée (tests). */
@@ -100,12 +103,12 @@ const STAT_ORDER = ["TEC", "SHIP", "ARCH", "DOC", "XP", "BUZZ"] as const;
 
 /* ------------------------------------------------------------------ */
 
-function sanitize(id: string) {
+export function sanitize(id: string) {
   return id.replace(/[^a-zA-Z0-9_-]/g, "");
 }
 
 /** Numéro de dossier : l'id court de la carte, en majuscules, 4 à 6 signes. */
-function caseNumber(id: string): string {
+export function caseNumber(id: string): string {
   const clean = id.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
   return (clean || "0000").slice(0, 6);
 }
@@ -129,7 +132,7 @@ interface TxtProps {
   children: ReactNode;
 }
 
-function Txt({ x, y, font, size, fill, ls = 0, anchor = "start", opacity, children }: TxtProps) {
+export function Txt({ x, y, font, size, fill, ls = 0, anchor = "start", opacity, children }: TxtProps) {
   return (
     <text x={x} y={y} {...fontAttrs(font)} fontSize={size} letterSpacing={ls ? +ls.toFixed(2) : undefined} textAnchor={anchor} fill={fill} fillOpacity={opacity}>
       {children}
@@ -143,7 +146,7 @@ function Txt({ x, y, font, size, fill, ls = 0, anchor = "start", opacity, childr
 
 /** Étoiles du HUD : six emplacements, les allumées blanches et mates calées à
  *  droite ; les éteintes pleines et sombres (blanc à 13 % sur l'encre). */
-function Stars({ n, onSky }: { n: number; onSky: boolean }) {
+export function Stars({ n, onSky }: { n: number; onSky: boolean }) {
   const k = STAR_SIZE / 24;
   const x0 = RIGHT - 6 * STAR_SIZE - 5 * STAR_GAP;
   return (
@@ -233,7 +236,8 @@ function Charges({ statuses, th, lang }: { statuses: StatusInstance[]; th: CardT
         const y = C.y + i * C.lineH;
         const tag = st.byAI ? ` · ${s.ai}` : "";
         const tagW = st.byAI ? measure(tag, "mono-400", 9) : 0;
-        const label = fit(st.label[lang] ?? st.label.fr, { font: "sans-500", size: C.size, minSize: C.minSize, maxWidth: FW - 18 - tagW });
+        // La troisième ligne laisse le coin bas droit au bouton « Retourner la fiche » (web).
+        const label = fit(st.label[lang] ?? st.label.fr, { font: "sans-500", size: C.size, minSize: C.minSize, maxWidth: FW - 18 - tagW - (i === 2 ? FLIP_CORNER : 0) });
         return (
           <g key={st.id + i}>
             <Pastille tone={st.tone} cx={LEFT + 6.2} cy={y - 4.9} th={th} />

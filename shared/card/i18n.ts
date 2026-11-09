@@ -40,6 +40,16 @@ export const STRINGS = {
       FS: "Full-stack", BE: "Backend", FE: "Frontend", MOB: "Mobile", DATA: "Data", ML: "Machine learning",
       OPS: "Ops", SEC: "Sécurité", EMB: "Embarqué", PM: "Produit", DESIGN: "Design", CTO: "CTO sur parole",
     } as Record<string, string>,
+    /** Dos de la fiche (§18.27) : chaque axe, son fait le plus fort, puis la formule. */
+    back: {
+      title: "Pièces à conviction",
+      axes: { TEC: "Technique", SHIP: "Livraison", ARCH: "Rigueur", DOC: "Communication", XP: "Expérience", BUZZ: "Buzzwords" },
+      noFact: "Aucun fait relevé",
+      rating: "La note",
+      /** Un poids de la formule : « 30 % ». */
+      weight: (w: number) => `${Math.round(w * 100)}${NBSP}%`,
+      flip: "Retourner la fiche",
+    },
   },
   en: {
     loneWolf: "Lone wolf",
@@ -74,6 +84,14 @@ export const STRINGS = {
       FS: "Full-stack", BE: "Backend", FE: "Frontend", MOB: "Mobile", DATA: "Data", ML: "Machine learning",
       OPS: "Ops", SEC: "Security", EMB: "Embedded", PM: "Product", DESIGN: "Design", CTO: "Self-styled CTO",
     } as Record<string, string>,
+    back: {
+      title: "Exhibits",
+      axes: { TEC: "Technique", SHIP: "Shipping", ARCH: "Rigor", DOC: "Communication", XP: "Experience", BUZZ: "Buzzwords" },
+      noFact: "No fact on file",
+      rating: "The rating",
+      weight: (w: number) => `${Math.round(w * 100)}%`,
+      flip: "Flip the card",
+    },
   },
 } satisfies Record<Lang, Record<string, unknown>>;
 

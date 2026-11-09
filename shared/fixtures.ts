@@ -20,12 +20,23 @@ function sentence(axis: Axis | "acquittal", n = 1, bailId?: keyof typeof sentenc
   return bailId ? { label, bail: sentencesJson.bail[bailId] } : { label };
 }
 
+/** Faits de la maquette, dans la tournure du barème (server/src/scoring/github.ts),
+ *  chiffrés d'après la valeur pour que le dos de la fiche (§18.27) se lise comme en vrai. */
+const MOCK_FACTS: Record<StatCode, (v: number) => Fact> = {
+  TEC: (v) => ({ fr: `Niveau lu par l'IA : ${(v / 20).toFixed(1).replace(".", ",")}/5 sur 4 repos`, en: `Level read by the AI: ${(v / 20).toFixed(1)}/5 across 4 repos` }),
+  SHIP: (v) => ({ fr: `${Math.round((v / 99) * 52)} semaines actives sur 52`, en: `${Math.round((v / 99) * 52)} active weeks out of 52` }),
+  ARCH: (v) => ({ fr: `Tests trouvés dans ${Math.max(0, Math.round(v / 14))} repos sur 7`, en: `Tests found in ${Math.max(0, Math.round(v / 14))} of 7 repos` }),
+  DOC: (v) => ({ fr: `README de 150 mots ou plus : ${Math.round(v / 14)} repos sur 7`, en: `README of 150+ words: ${Math.round(v / 14)} of 7 repos` }),
+  XP: (v) => ({ fr: `Premier vrai commit en ${2026 - Math.round(v / 8)} (il y a ${Math.round(v / 8)} ans)`, en: `First real commit in ${2026 - Math.round(v / 8)} (${Math.round(v / 8)} years ago)` }),
+  BUZZ: (v) => ({ fr: `${Math.round(v / 10)} repos tutoriels sur 31`, en: `${Math.round(v / 10)} tutorial repos out of 31` }),
+};
+
 function stats(values: Record<StatCode, number>, insufficient: StatCode[] = []): Stat[] {
   return STAT_CODES.map((code) => ({
     code,
     value: values[code],
     sufficient: !insufficient.includes(code),
-    facts: [{ fr: `Fait fictif pour ${code}.`, en: `Mock fact for ${code}.` }],
+    facts: [MOCK_FACTS[code](values[code])],
   }));
 }
 

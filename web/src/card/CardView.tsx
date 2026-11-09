@@ -2,10 +2,14 @@
 // l'inclinaison 3D (12° max, doigt ou souris, retour élastique), le grain
 // et le balayage de révélation. Style mat (SPEC §18.18) : ni reflet
 // holographique ni glare ; seul ★★★★★★ porte un halo, son contour éclairé.
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+// En option (désactivée par défaut) : la fiche qui se retourne (§18.27, le
+// dos <CardBack>).
+import { createContext, useContext, useEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import type { CardData, Lang } from "../../../shared/types";
 import { styleOf } from "../../../shared/types";
 import { Card } from "../../../shared/card/Card";
+import { CardBack } from "../../../shared/card/CardBack";
+import { t as cardT } from "../../../shared/card/i18n";
 import { CARD_MASK_URL, CARD_PATH } from "../../../shared/card/geometry";
 import { themeCssVars, themeOf } from "../../../shared/card/themes";
 import "./fonts.css";
@@ -22,9 +26,17 @@ export interface CardViewProps {
   reveal?: boolean;
   idPrefix?: string;
   className?: string;
+  /** La fiche se retourne (§18.27) : un toucher ou un clic, ou le bouton rond du coin. Défaut false. */
+  flippable?: boolean;
 }
 
+/** Options par défaut des fiches d'un sous-arbre, pour les brancher sans toucher
+ *  aux composants intermédiaires (RevealCard) : une prop explicite l'emporte. */
+export const CardViewOptions = createContext<Pick<CardViewProps, "flippable">>({});
+
 const MAX_TILT = 12;
+/** Au-delà (px), le doigt a glissé : ce n'est plus un toucher, la fiche ne se retourne pas. */
+const TAP_SLOP = 8;
 
 /** Silhouette de la carte, pour réutiliser le masque ailleurs (pack, comparaison). */
 export function useCardShape() {
@@ -71,12 +83,22 @@ function step(s: Spring, k: number, damping: number) {
   s.x += s.v;
 }
 
-export function CardView({ card, lang, interactive = true, reveal = false, idPrefix, className }: CardViewProps) {
+export function CardView(props: CardViewProps) {
+  const defaults = useContext(CardViewOptions);
+  const { card, lang, interactive = true, reveal = false, idPrefix, className } = props;
+  const flippable = (props.flippable ?? defaults.flippable ?? false) && interactive;
   const ref = useRef<HTMLDivElement>(null);
   const reduced = useReducedMotion();
   const live = interactive && !reduced;
   const [revealing, setRevealing] = useState(false);
+  const [flipped, setFlipped] = useState(false);
+  const tap = useRef<{ x: number; y: number; moved: boolean } | null>(null);
   const style = styleOf(card);
+  const s = cardT(lang ?? card.lang ?? "fr");
+
+  useEffect(() => {
+    if (!flippable) setFlipped(false);
+  }, [flippable]);
 
   // Balayage à l'apparition (et à chaque passage de reveal à true)
   useEffect(() => {
@@ -161,6 +183,33 @@ export function CardView({ card, lang, interactive = true, reveal = false, idPre
   const th = themeOf(card);
   const vars = { ...themeCssVars(th), "--tys-mask": CARD_MASK_URL } as CSSProperties;
 
+  // Toucher ou clic sur la fiche : retourne, sauf si le doigt ou la souris a glissé
+  // (inclinaison, défilement : un glissé n'est pas un toucher).
+  const onPointerDown = (e: ReactPointerEvent) => {
+    tap.current = { x: e.clientX, y: e.clientY, moved: false };
+  };
+  const onPointerMove = (e: ReactPointerEvent) => {
+    const t0 = tap.current;
+    if (t0 && Math.hypot(e.clientX - t0.x, e.clientY - t0.y) > TAP_SLOP) t0.moved = true;
+  };
+  const onPointerCancel = () => {
+    tap.current = null;
+  };
+  const onClick = (e: ReactMouseEvent) => {
+    const t0 = tap.current;
+    tap.current = null;
+    if (!t0 || t0.moved || Math.hypot(e.clientX - t0.x, e.clientY - t0.y) > TAP_SLOP) return;
+    setFlipped((f) => !f);
+  };
+
+  const front = (
+    <>
+      <Card card={card} lang={lang} idPrefix={idPrefix} className="tys-card__svg" />
+      <div className="tys-card__fx tys-card__grain" aria-hidden />
+      <div className="tys-card__fx tys-card__sweep" aria-hidden />
+    </>
+  );
+
   return (
     <div
       ref={ref}
@@ -170,14 +219,46 @@ export function CardView({ card, lang, interactive = true, reveal = false, idPre
       data-level={th.key}
       data-interactive={interactive ? "true" : "false"}
       data-static={live ? "false" : "true"}
+      data-flippable={flippable ? "true" : undefined}
+      data-flipped={flippable && flipped ? "true" : undefined}
+      data-flip={flippable ? (reduced ? "fade" : "turn") : undefined}
       style={vars}
+      {...(flippable ? { onPointerDown, onPointerMove, onPointerCancel, onClick } : {})}
     >
       <div className="tys-card__rotator">
         <div className="tys-card__shadow" aria-hidden />
-        <Card card={card} lang={lang} idPrefix={idPrefix} className="tys-card__svg" />
-        <div className="tys-card__fx tys-card__grain" aria-hidden />
-        <div className="tys-card__fx tys-card__sweep" aria-hidden />
+        {flippable ? (
+          <div className="tys-card__flipper">
+            <div className="tys-card__face tys-card__front" aria-hidden={flipped || undefined}>
+              {front}
+            </div>
+            <div className="tys-card__face tys-card__back" aria-hidden={!flipped || undefined}>
+              <CardBack card={card} lang={lang} idPrefix={idPrefix ? `${idPrefix}-back` : undefined} className="tys-card__svg" />
+              <div className="tys-card__fx tys-card__grain" aria-hidden />
+            </div>
+          </div>
+        ) : (
+          front
+        )}
       </div>
+      {flippable && (
+        <button
+          type="button"
+          className="tys-card__flip"
+          aria-label={s.back.flip}
+          aria-pressed={flipped}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            setFlipped((f) => !f);
+          }}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden focusable="false">
+            <path d="M5.5 9.5a7 7 0 0 1 12.2-3.6M18.5 14.5a7 7 0 0 1-12.2 3.6" />
+            <path d="M18 2.8v3.6h-3.6M6 21.2v-3.6h3.6" />
+          </svg>
+        </button>
+      )}
     </div>
   );
 }

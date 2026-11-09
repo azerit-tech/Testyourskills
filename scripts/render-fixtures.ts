@@ -3,6 +3,7 @@
 // Usage : npx tsx scripts/render-fixtures.ts [clé…] [--sheet-only] [--lang=en]
 //   --profiles : planche des 13 profils de data/profiles.json (noms et phrases),
 //   posés tour à tour sur les fiches de la maquette, plus une fiche sans profil.
+//   --back : planche des dos de fiche (§18.27), plus un dos aux faits très longs.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createElement } from "react";
@@ -12,6 +13,7 @@ import profilesJson from "../data/profiles.json";
 import { FIXTURES, FIXTURE_COMPARISON } from "../shared/fixtures";
 import type { CardData, Lang } from "../shared/types";
 import { CardGraphic } from "../shared/card/Card";
+import { CardBackGraphic } from "../shared/card/CardBack";
 import { CARD_H, CARD_W } from "../shared/card/geometry";
 import { renderImage, type ImageFormat } from "../server/src/render/index";
 import { fetchAvatar } from "../server/src/render/avatar";
@@ -24,12 +26,13 @@ const args = process.argv.slice(2);
 const only = args.filter((a) => !a.startsWith("--"));
 const sheetOnly = args.includes("--sheet-only");
 const profilesSheet = args.includes("--profiles");
+const backSheet = args.includes("--back");
 const langArg = args.find((a) => a.startsWith("--lang="))?.slice(7) as Lang | undefined;
 
 const entries = Object.entries(FIXTURES).filter(([k]) => only.length === 0 || only.includes(k)) as [string, CardData][];
 
 /** Planche contact : toutes les cartes sur fond sombre, pour juger d'un coup d'œil. */
-async function sheet(cards: [string, CardData][], lang?: Lang, label = "sheet") {
+async function sheet(cards: [string, CardData][], lang?: Lang, label = "sheet", back = false) {
   const cols = Math.min(4, cards.length);
   const rows = Math.ceil(cards.length / cols);
   const pad = 28;
@@ -41,11 +44,11 @@ async function sheet(cards: [string, CardData][], lang?: Lang, label = "sheet") 
     { xmlns: "http://www.w3.org/2000/svg", width: W, height: H, viewBox: `0 0 ${W} ${H}` },
     createElement("rect", { width: W, height: H, fill: "#0a0f16" }),
     ...cards.map(([k, c], i) =>
-      createElement(CardGraphic, {
+      createElement(back ? CardBackGraphic : CardGraphic, {
         key: k,
         card: c,
         lang: lang ?? c.lang,
-        avatarHref: avatars[i] ?? "",
+        ...(back ? {} : { avatarHref: avatars[i] ?? "" }),
         idPrefix: `s${i}`,
         x: pad + (i % cols) * (CARD_W + pad),
         y: pad + Math.floor(i / cols) * (CARD_H + pad),
@@ -81,6 +84,18 @@ function profileCards(): [string, CardData][] {
 
 async function main() {
   const t0 = Date.now();
+  if (backSheet) {
+    const long = { ...FIXTURES.longName, id: "longfacts" } as CardData;
+    long.stats = long.stats.map((st) => ({
+      ...st,
+      facts: [{
+        fr: `Exemples : « fix », « wip », « final final », « vraiment final cette fois », « ok » sur ${st.code}, et bien d'autres encore`,
+        en: `Examples: "fix", "wip", "final final", "really final this time", "ok" on ${st.code}, and many more besides`,
+      }],
+    }));
+    await sheet([...entries, ["longfacts", long]], langArg ?? "fr", "back", true);
+    return;
+  }
   if (profilesSheet) {
     await sheet(profileCards(), langArg ?? "fr", "profiles");
     return;

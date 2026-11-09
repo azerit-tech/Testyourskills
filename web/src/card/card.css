@@ -150,3 +150,104 @@
 .tys-card[data-interactive="true"]:not([data-static="true"]) {
   cursor: grab;
 }
+
+/* ------------------------------------------------------------------ */
+/* La fiche se retourne (§18.27), option flippable de CardView.         */
+/* Rotation Y de 180° en 0,5 s ; mouvement réduit : un fondu.           */
+/* ------------------------------------------------------------------ */
+
+.tys-card[data-flippable="true"] {
+  cursor: pointer;
+}
+.tys-card__flipper {
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.5s cubic-bezier(0.3, 0.7, 0.2, 1);
+}
+.tys-card__face {
+  position: relative;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+.tys-card__back {
+  position: absolute;
+  inset: 0;
+  transform: rotateY(180deg);
+}
+.tys-card[data-flipped="true"] .tys-card__flipper {
+  transform: rotateY(180deg);
+}
+
+/* Fondu : les deux faces l'une sur l'autre, sans rotation */
+.tys-card[data-flip="fade"] .tys-card__flipper,
+.tys-card[data-flip="fade"] .tys-card__back {
+  transform: none;
+  transition: none;
+}
+.tys-card[data-flip="fade"] .tys-card__face {
+  transition: opacity 0.3s ease;
+}
+.tys-card[data-flip="fade"]:not([data-flipped="true"]) .tys-card__back,
+.tys-card[data-flip="fade"][data-flipped="true"] .tys-card__front {
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tys-card[data-flippable="true"] .tys-card__flipper,
+  .tys-card[data-flippable="true"] .tys-card__back {
+    transform: none !important;
+    transition: none !important;
+  }
+  .tys-card[data-flippable="true"] .tys-card__face {
+    transition: opacity 0.3s ease;
+  }
+  .tys-card[data-flippable="true"]:not([data-flipped="true"]) .tys-card__back,
+  .tys-card[data-flippable="true"][data-flipped="true"] .tys-card__front {
+    opacity: 0;
+  }
+}
+
+/* Le bouton rond du coin bas droit : cible de 44 px, pastille mate de 30 px */
+.tys-card__flip {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  z-index: 2;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: #fff9cb;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  -webkit-tap-highlight-color: transparent;
+}
+.tys-card__flip::before {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  border-radius: 50%;
+  background: rgba(12, 13, 27, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(255, 249, 203, 0.26);
+  transition: background-color 0.15s ease;
+}
+.tys-card__flip:hover::before,
+.tys-card__flip[aria-pressed="true"]::before {
+  background: rgba(12, 13, 27, 0.9);
+}
+.tys-card__flip:focus-visible {
+  outline: 2px solid #ffb2c6;
+  outline-offset: -4px;
+}
+.tys-card__flip svg {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
