@@ -51,12 +51,6 @@ export const PALETTE = {
   /* Lumière : seulement le contour éclairé par l'arrière (★★★★★★) */
   rimCore: "#ffd8c8",
   rimGlow: "#ff8a5c",
-  /* Néons de l'ancienne palette, encore lus par la scène 3D (web/src/three) ; plus par la fiche. */
-  pink: "#ff3fa4",
-  orange: "#ff7a3d",
-  yellow: "#ffd23f",
-  cyan: "#3fd8ff",
-  violet: "#7b3fe4",
 } as const;
 
 /** Arrêt de dégradé : [offset 0..1, couleur]. */

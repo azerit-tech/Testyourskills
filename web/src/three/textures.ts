@@ -20,23 +20,6 @@ function srgb(t: THREE.Texture): THREE.Texture {
   return t;
 }
 
-/** Disque lumineux doux (sprites de lueur, flashs). */
-export function makeGlowTexture(size = 256, inner = 0.0): THREE.CanvasTexture {
-  const c = document.createElement("canvas");
-  c.width = c.height = size;
-  const g = c.getContext("2d")!;
-  const r = size / 2;
-  const grad = g.createRadialGradient(r, r, 0, r, r, r);
-  grad.addColorStop(0, "rgba(255,255,255,1)");
-  grad.addColorStop(Math.max(0.01, inner), "rgba(255,255,255,0.85)");
-  grad.addColorStop(0.35, "rgba(255,255,255,0.32)");
-  grad.addColorStop(0.7, "rgba(255,255,255,0.06)");
-  grad.addColorStop(1, "rgba(255,255,255,0)");
-  g.fillStyle = grad;
-  g.fillRect(0, 0, size, size);
-  return new THREE.CanvasTexture(c);
-}
-
 /** Étoile à quatre branches pour les étincelles. */
 export function makeSparkTexture(size = 64): THREE.CanvasTexture {
   const c = document.createElement("canvas");

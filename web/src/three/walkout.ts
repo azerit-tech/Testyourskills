@@ -10,8 +10,8 @@
 //    langage), le dossier (GitHub, CV, ou les deux), puis l'affiliation, qui
 //    se fait attendre ; chaque ligne reste inscrite en haut à gauche du HUD ;
 // 4. « ding » : l'ascenseur arrive, les portes s'ouvrent sur l'open space de
-//    nuit relevé au néon (rose à gauche, cyan à droite), la ville derrière les
-//    baies ;
+//    fin de journée, lumière chaude et mate (SPEC §18.21), la ville au
+//    crépuscule derrière les baies ;
 // 5. au bout de l'allée lumineuse, le dev code à son poste (feux d'artifice sur
 //    la ville au clic ou à Espace), sa chaise pivote, le carton de fin de
 //    mission (le niveau, la note, roulement de batterie), puis la carte se
@@ -178,9 +178,6 @@ const PLAN = {
   mission: [15.2, 16.7] as Win,
   card: 16.7,
 };
-/** Les néons de l'open space : rose côté gauche, cyan côté droit. */
-const PINK = PALETTE.pink;
-const CYAN = PALETTE.cyan;
 
 interface Burst {
   points: THREE.Points;
@@ -241,9 +238,8 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
   camera.position.copy(CAB_CAM);
   scene.add(camera);
 
-  const glowTex = T.makeGlowTexture();
   const sparkTex = T.makeSparkTexture();
-  const disposables: { dispose(): void }[] = [glowTex, sparkTex];
+  const disposables: { dispose(): void }[] = [sparkTex];
   const keep = <X extends { dispose(): void }>(x: X): X => {
     disposables.push(x);
     return x;
@@ -256,7 +252,6 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
     return m;
   };
 
-  const accentGlow = new THREE.MeshBasicMaterial({ color: hdr(accent.a, 2), toneMapped: false });
   const cab = createCabin({ scene, renderer, accent: accent.a, model: assets.cabin, floor: Math.max(1, Math.min(99, o.overall)) });
   disposables.push(cab);
   const sound = createElevatorSound({ depart: plan.depart, arrive: plan.arrive, doors: plan.doors }, o.muted ?? false);
@@ -274,8 +269,6 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
   const office = new THREE.Group();
   scene.add(office);
   const baked = createBakedLighting(assets.office);
-  // la lumière de la ville dans le bureau : rose d'un côté, cyan de l'autre
-  baked.setCitySides(new THREE.Color(PINK).multiplyScalar(0.9), new THREE.Color(CYAN).multiplyScalar(0.8), 7);
   /** Une texture d'asset partagée, en tuile de `metres` (le décor de Blender a ses uv0 en mètres). */
   const tiled = (t: THREE.Texture, metres: number) => {
     const c = keep(t.clone());
@@ -350,8 +343,6 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
     mesh.matrixAutoUpdate = false;
     office.add(mesh);
   });
-  // le liseré de LED au pied des murs, à la couleur du niveau
-  for (const sx of [-1, 1]) box(0.02, 0.025, -WIN_Z, accentGlow, sx * (ROOM_W / 2 - 0.06), 0.06, WIN_Z / 2, office);
   // les baies : le verre fumé
   const glass = new THREE.Mesh(
     new THREE.PlaneGeometry(ROOM_W, CEIL),
@@ -482,7 +473,7 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
 
   /* ---------- particules ---------- */
   const bursts: Burst[] = [];
-  const makeBurst = (n: number, color: string, speed: number, spread: number, up: number, size: number, life: number, gravity: number): Burst => {
+  const makeBurst = (n: number, color: string, speed: number, spread: number, up: number, size: number, life: number, gravity: number, gain = 3): Burst => {
     const vel = new Float32Array(n * 3);
     for (let i = 0; i < n; i++) {
       const a = rnd(i, 21 + bursts.length) * Math.PI * 2;
@@ -494,7 +485,7 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
     }
     const g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(n * 3), 3));
-    const mat = new THREE.PointsMaterial({ map: sparkTex, size, color: hdr(color, 3), transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+    const mat = new THREE.PointsMaterial({ map: sparkTex, size, color: hdr(color, gain), transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
     const points = new THREE.Points(g, mat);
     points.visible = false;
     points.frustumCulled = false;
@@ -510,8 +501,9 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
   packBurst2.origin.copy(PACK_POS);
   packBurst2.start = T_BURST;
   // feux d'artifice sur la ville : un réservoir recyclé (automatiques + au clic)
-  const FW_COLORS = [accent.a, PALETTE.yellow, "#ffffff", accent.b, PINK, CYAN];
-  const fireworks = Array.from({ length: 10 }, (_, i) => makeBurst(220, FW_COLORS[i % FW_COLORS.length]!, 9, 1, 0.25, 1.1, 1.9, 4));
+  // aux couleurs de la palette mate, assez basses pour rester des couleurs (pas des lueurs blanches)
+  const FW_COLORS = [accent.a, PALETTE.peach, PALETTE.cream, PALETTE.blush, PALETTE.lilac];
+  const fireworks = Array.from({ length: 10 }, (_, i) => makeBurst(220, FW_COLORS[i % FW_COLORS.length]!, 9, 1, 0.25, 1.1, 1.9, 4, 1.4));
   let fwNext = 0;
   const launch = (t: number) => {
     const b = fireworks[fwNext++ % fireworks.length]!;
@@ -615,14 +607,6 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
   heroSpot.shadow.mapSize.set(1024, 1024);
   heroSpot.shadow.bias = -0.0004;
   scene.add(heroSpot, heroSpot.target);
-  // les enseignes de la ville sur le dev : rose à gauche, cyan à droite
-  const neonL = new THREE.SpotLight(PINK, 0, 10, 0.9, 0.9, 1.5);
-  neonL.position.set(-2.8, 2.8, DESK_Z - 2.4);
-  neonL.target.position.set(0, 1.3, DESK_Z);
-  const neonR = new THREE.SpotLight(CYAN, 0, 10, 0.9, 0.9, 1.5);
-  neonR.position.set(2.8, 2.8, DESK_Z - 2.4);
-  neonR.target.position.set(0, 1.3, DESK_Z);
-  scene.add(neonL, neonL.target, neonR, neonR.target);
 
   /* ---------- la carte ---------- */
   const maskTex = keep(T.makeCardMaskTexture());
@@ -760,10 +744,9 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
   /** Couleurs et intensités des groupes de lumière précalculée (réglées à l'œil, d'après les captures). */
   const NEON = new THREE.Color(0xffdfb8);
   const WARM = new THREE.Color(0xffe0b9);
-  // la lumière de la ville est teintée par côté (baked.setCitySides) : blanche ici
-  const CITY = new THREE.Color(0xe6eaff);
-  const levelColor = new THREE.Color(accent.a);
-  const LIGHT = { neon: 1, hero: 1, city: 1.45, accent: 1, glass: 1.6 };
+  // la lumière du crépuscule par les baies : pêche, la même des deux côtés (SPEC §18.21)
+  const CITY = new THREE.Color(PALETTE.peach);
+  const LIGHT = { neon: 1, hero: 1, city: 1.45, glass: 1.6 };
 
   const resize = () => {
     const nw = Math.max(1, canvas.clientWidth || window.innerWidth);
@@ -1003,7 +986,6 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
     ZONES.forEach((rows, z) => baked.set(`z${z}` as "z0", NEON, (rows.reduce((a, r) => a + pops[r]!, 0) / rows.length) * dim * LIGHT.neon));
     baked.set("hero", WARM, seg(t, plan.doors + 0.2, 1.0) * dim * LIGHT.hero);
     baked.set("city", CITY, dim * LIGHT.city);
-    baked.set("accent", levelColor, seg(t, plan.doors + 0.3, 0.9) * dim * LIGHT.accent);
     hemi.intensity = (0.12 + 0.6 * lit) * dim;
     city.uBright.value = 0.85 * dim;
     if (glassReflection) {
@@ -1025,8 +1007,6 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
     }
     path.instanceColor!.needsUpdate = true;
     heroSpot.intensity = 28 * seg(t, plan.doors + 0.5, 0.8) * dim;
-    // une fois retourné, les néons sont derrière lui : ils le détourent, comme les enseignes de la rue
-    neonL.intensity = neonR.intensity = (14 + 18 * inOut(seg(t, T_TURN, 0.9))) * seg(t, plan.doors + 0.6, 0.8) * dim;
 
     /* le pack */
     if (t < T_BURST + 0.45) {
