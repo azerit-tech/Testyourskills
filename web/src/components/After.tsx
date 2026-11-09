@@ -161,7 +161,7 @@ export function useSharing(item: Shareable, toast: (m: string) => void) {
 export type Sharing = ReturnType<typeof useSharing>;
 
 /** Le lien vise `target` pour ce clic (le navigateur suit l'adresse après les écouteurs), puis reprend `rest`. */
-function aimAt(a: HTMLAnchorElement, target: string, rest: string) {
+export function aimAt(a: HTMLAnchorElement, target: string, rest: string) {
   a.href = target;
   window.setTimeout(() => {
     a.href = rest;

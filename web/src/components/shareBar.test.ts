@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { FIXTURES } from "../../../shared/fixtures";
 import { LangProvider } from "../i18n";
 import { markTextCopied } from "../lib/sharing";
-import { ShareBar } from "./After";
+import { aimAt, ShareBar } from "./After";
 import { ShareDock } from "./ShareDock";
 
 const DESKTOP = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15";
@@ -55,7 +55,9 @@ describe("bloc de partage selon l'appareil (§18.27)", () => {
   it("ordinateur : LinkedIn en vrai lien, puis X, le lien, l'image à télécharger", () => {
     const html = render({ ua: DESKTOP, touch: false, share: false });
     expect(main(html)).toMatch(/^<a /);
-    expect(main(html)).toContain('href="https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fskills.test%2Fc%2FAbCdEf1234%3Fr%3DAbCdEf1234"');
+    // L'adresse de LinkedIn n'est jamais dans la page : un bloqueur de contenu masquerait le bouton.
+    expect(main(html)).toContain('href="https://skills.test/c/AbCdEf1234?r=AbCdEf1234"');
+    expect(html).not.toContain("linkedin.com");
     expect(main(html)).toContain('target="_blank"');
     expect(main(html)).toContain('rel="noopener"');
     expect(ghosts(html)).toHaveLength(3);
@@ -67,7 +69,7 @@ describe("bloc de partage selon l'appareil (§18.27)", () => {
     expect(main(html)).toMatch(/^<button /);
     expect(main(html)).toContain("Partager");
     expect(ghosts(html)).toHaveLength(3);
-    expect(html).toMatch(/<a class="pill pill-ghost out-second" href="https:\/\/www\.linkedin\.com\/sharing/);
+    expect(html).toMatch(/<a class="pill pill-ghost out-second" href="https:\/\/skills\.test\/c\//);
     expect(html).not.toContain(">X</button>");
     expect(html).toMatch(/LinkedIn.*Copier le lien.*Télécharger l&#x27;image/);
   });
@@ -99,11 +101,24 @@ describe("barre du pouce (§18.27)", () => {
 
   it("sans feuille de partage : le même lien LinkedIn que le bouton principal", () => {
     const html = renderDock({ ua: LINKEDIN_ANDROID, touch: true, share: false, narrow: true }, true);
-    expect(html).toMatch(/<a class="pill pill-big dock-main" href="https:\/\/www\.linkedin\.com\/sharing/);
+    expect(html).toMatch(/<a class="pill pill-big dock-main" href="https:\/\/skills\.test\/c\//);
   });
 
   it("pas pendant la révélation, pas sur ordinateur", () => {
     expect(renderDock(phone, false)).toBe("");
     expect(renderDock({ ua: DESKTOP, touch: false, share: false, narrow: false }, true)).toBe("");
+  });
+});
+
+describe("lien LinkedIn sous un bloqueur de contenu", () => {
+  it("vise LinkedIn le temps du clic, puis reprend l'adresse de la fiche", () => {
+    vi.useFakeTimers();
+    const a = { href: "https://skills.test/c/x" } as HTMLAnchorElement;
+    vi.stubGlobal("window", { setTimeout });
+    aimAt(a, "https://www.linkedin.com/sharing/share-offsite/?url=x", "https://skills.test/c/x");
+    expect(a.href).toContain("linkedin.com/sharing");
+    vi.runAllTimers();
+    expect(a.href).toBe("https://skills.test/c/x");
+    vi.useRealTimers();
   });
 });
