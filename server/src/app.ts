@@ -15,7 +15,7 @@ import { genericMeta, injectMeta, messagePage, metaFor, standalonePage } from ".
 import { ID_RE, MAX_PDF_BYTES, MESSAGES, Pipeline, type Deps, type RenderInput } from "./pipeline";
 import { CARDS_PER_DAY, RateLimiter, clientIp } from "./ratelimit";
 import { inlineAvatar, mountLinkedin, removeAvatars, type LinkedinConfig } from "./linkedin";
-import { mountAuth, type GithubAuthConfig } from "./auth";
+import { mountAuth, ownerFromRequest, type GithubAuthConfig } from "./auth";
 import { aiStatus as budgetAiStatus, type AiStatus } from "./ai/budget";
 import type { TokenPool } from "./github/tokens";
 
@@ -174,7 +174,7 @@ export function createApp(opts: AppOptions) {
   });
 
   // Revendication GitHub (§18.1), montée en tête : son middleware doit passer
-  // avant les routes qui demandent ownerFromRequest.
+  // avant les routes qui demandent ownerFromRequest (fiches masquées).
   mountAuth(app, {
     store,
     config: opts.githubAuth,
@@ -182,7 +182,14 @@ export function createApp(opts: AppOptions) {
     secure: opts.secureCookies ?? baseUrl.startsWith("https://"),
     limiter,
     fetchImpl,
+    removeImages: (ids) => removeImages(ogDir, ids),
   });
+
+  /** Login masqué par son propriétaire, vu par quelqu'un d'autre que lui (§18.1). */
+  const hiddenFrom = (c: Context, login: string | null | undefined): boolean => {
+    if (!login || !store.isHidden(login)) return false;
+    return ownerFromRequest(c)?.login !== login.toLowerCase();
+  };
 
   // Public : jamais de montant. ai = ok | budget (plafond du jour atteint) |
   // credits (402 OpenRouter vu dans les 10 dernières minutes) | off (pas de clé).
@@ -199,7 +206,7 @@ export function createApp(opts: AppOptions) {
   app.get("/api/showcase", (c) => {
     c.header("Cache-Control", "public, max-age=300");
     const login = opts.showcaseLogin;
-    if (!login) return c.json({ card: null });
+    if (!login || store.isHidden(login)) return c.json({ card: null });
     const row = store.findLatestGithub(login);
     const stale = !row || Date.now() - row.createdAt > SHOWCASE_MS;
     // Jetons GitHub épuisés : la vitrine attendra, elle ne prend pas la place d'une vraie fiche.
@@ -257,6 +264,9 @@ export function createApp(opts: AppOptions) {
 
       if (!login && !pdf) return c.json(errorBody("internal", MESSAGES.bad_request), 400);
 
+      // Login masqué par son propriétaire : personne d'autre que lui n'en refait une fiche (§18.1).
+      if (login && hiddenFrom(c, login)) return c.json(errorBody("gone", MESSAGES.gone), 410);
+
       // Cache 24 h et déduplication des jobs en cours, pour GitHub seul (§4.7, §12).
       if (login && !pdf) {
         const cached = store.findRecentGithub(login);
@@ -299,9 +309,10 @@ export function createApp(opts: AppOptions) {
     c.header("Cache-Control", "no-store");
     const id = c.req.param("id");
     if (!ID_RE.test(id)) return c.json(errorBody("internal", MESSAGES.not_found), 404);
+    const row = store.getCard(id);
+    if (row && hiddenFrom(c, store.loginOf(row))) return c.json(errorBody("gone", MESSAGES.withdrawn), 410);
     const live = pipeline.jobState(id);
     if (live) return c.json(live);
-    const row = store.getCard(id);
     if (!row) return c.json(errorBody("internal", MESSAGES.not_found), 404);
     const state: JobState =
       row.kind === "comparison"
@@ -378,7 +389,8 @@ export function createApp(opts: AppOptions) {
     const id = m[1]!;
     const format: RenderInput["format"] = m[2] === "-portrait" ? "portrait" : m[2] === "-card" ? "card" : "og";
     const row = store.getCard(id);
-    if (!row) return c.notFound();
+    // Fiche masquée : aucune image, pour personne (les robots n'ont pas de session).
+    if (!row || store.isHidden(store.loginOf(row))) return c.notFound();
 
     const path = join(ogDir, `${id}${m[2] ?? ""}.png`);
     let png: Uint8Array | null = await readFile(path).catch(() => null);
@@ -418,8 +430,18 @@ export function createApp(opts: AppOptions) {
   app.get("/c/:id", async (c) => {
     const id = c.req.param("id");
     const row = ID_RE.test(id) ? store.getCard(id) : null;
-    const meta = row ? metaFor(row.data, baseUrl) : genericMeta(baseUrl, `/c/${id}`);
     const template = opts.indexHtml ? await opts.indexHtml().catch(() => null) : null;
+    const login = row ? store.loginOf(row) : null;
+    if (row && store.isHidden(login)) {
+      // Masquée (§18.1) : balises génériques, sans image de la fiche ; 410 pour
+      // tous, sauf le propriétaire, à qui le front montre la fiche et le bandeau.
+      const generic = genericMeta(baseUrl, `/c/${id}`);
+      const mine = !hiddenFrom(c, login);
+      const page = template ?? messagePage(MESSAGES.withdrawn.fr, MESSAGES.withdrawn.en);
+      c.header("Cache-Control", "private, no-store");
+      return c.html(injectMeta(page, generic), mine ? 200 : 410);
+    }
+    const meta = row ? metaFor(row.data, baseUrl) : genericMeta(baseUrl, `/c/${id}`);
     const html = template ? injectMeta(template, meta) : standalonePage(meta);
     c.header("Cache-Control", "public, max-age=300");
     return c.html(html, row ? 200 : 404);

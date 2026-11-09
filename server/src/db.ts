@@ -357,6 +357,15 @@ export class Store {
     return p?.login ?? null;
   }
 
+  /** Ids de toutes les fiches d'un login, cartes CV de ses comparaisons comprises. */
+  idsForLogin(login: string): string[] {
+    const l = login.toLowerCase();
+    const rows = this.db
+      .prepare(`SELECT id FROM cards WHERE login = ? OR parent_id IN (SELECT id FROM cards WHERE login = ?)`)
+      .all(l, l) as { id: string }[];
+    return rows.map((r) => r.id);
+  }
+
   getOwner(login: string): OwnerRow | null {
     const r = this.db.prepare(`SELECT * FROM owners WHERE login = ?`).get(login.toLowerCase()) as RawOwner | undefined;
     return r ? toOwner(r) : null;
@@ -391,6 +400,10 @@ export class Store {
         .run(l, l);
     })();
     return this.getOwner(l)!;
+  }
+
+  setOwnerHidden(login: string, hidden: boolean) {
+    this.db.prepare(`UPDATE owners SET hidden = ? WHERE login = ?`).run(hidden ? 1 : 0, login.toLowerCase());
   }
 
   /** true si le propriétaire de ce login a masqué ses fiches. */

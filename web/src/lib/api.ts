@@ -107,11 +107,14 @@ async function getMe(): Promise<Me | null> {
   }
 }
 
-/** Part chez GitHub prouver que la fiche est la sienne ; le serveur revient sur la page en cours. */
-function startClaim(cardId: string, login: string) {
+/**
+ * Part chez GitHub prouver que la fiche est la sienne ; le serveur revient sur
+ * la page en cours. `login` ne sert qu'au mode démo (une fiche retirée ne le donne pas).
+ */
+function startClaim(cardId: string, login = "leamd") {
   const back = window.location.pathname + window.location.search;
   if (isMock()) {
-    mockMe = { login: login.toLowerCase(), hidden: false };
+    mockMe = { login: login.toLowerCase(), hidden: mockMe?.hidden ?? false };
     const u = new URL(back, window.location.origin);
     u.searchParams.set("claim", "ok");
     u.searchParams.set("as", login.toLowerCase());
@@ -120,6 +123,19 @@ function startClaim(cardId: string, login: string) {
     return;
   }
   window.location.href = `/auth/github/start?card=${encodeURIComponent(cardId)}&return=${encodeURIComponent(back)}`;
+}
+
+/** Masque (ou rend visibles) toutes les fiches du login connecté (§18.1). */
+async function setHidden(hidden: boolean): Promise<Me> {
+  if (isMock()) {
+    if (!mockMe) throw new ApiError(401, "internal", null);
+    mockMe = { ...mockMe, hidden };
+    return mockMe;
+  }
+  const res = await fetch(hidden ? "/api/owner/hide" : "/api/owner/unhide", { method: "POST" });
+  if (!res.ok) throw await readError(res);
+  const body = (await res.json()) as { login: string; hidden: boolean };
+  return { login: body.login, hidden: body.hidden };
 }
 
 async function logout(): Promise<void> {
@@ -213,7 +229,7 @@ async function getShowcase(): Promise<CardData | null> {
   return body.card ?? null;
 }
 
-export const api = { createCard, getJob, sendEmail, deleteCard, track, getConfig, startLinkedInPhoto, getShowcase, getMe, startClaim, logout };
+export const api = { createCard, getJob, sendEmail, deleteCard, track, getConfig, startLinkedInPhoto, getShowcase, getMe, startClaim, setHidden, logout };
 
 /** URLs des images rendues par le serveur (§7). */
 export const images = {

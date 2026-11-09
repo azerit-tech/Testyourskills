@@ -1,11 +1,11 @@
 // « C'est moi » (§18.1) avec un fetch factice pour GitHub : jamais d'appel réseau réel.
 
-import { mkdirSync, mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FIXTURES } from "../../shared/fixtures";
-import type { CardData, ComparisonData } from "../../shared/types";
+import type { CardData, ComparisonData, JobState } from "../../shared/types";
 import { createApp } from "./app";
 import { GH_AUTHORIZE_URL, GH_TOKEN_URL, GH_USER_URL, SESSION_COOKIE, SESSION_TTL_MS, STATE_COOKIE, safeReturnPath, signSession, verifySession } from "./auth";
 import { Store } from "./db";
@@ -159,6 +159,7 @@ describe("configuration", () => {
     expect(await (await ctx.app.request("/api/config")).json()).toEqual({ linkedin: false, claim: false });
     expect((await start(ctx, "card=CardAAAA01")).status).toBe(404);
     expect((await ctx.app.request(`/auth/github/callback?code=${CODE}&state=x`)).status).toBe(404);
+    expect((await ctx.app.request("/api/owner/hide", { method: "POST" })).status).toBe(404);
     expect(await me(ctx)).toBeNull();
     // Même un cookie bien signé ne vaut rien quand l'OAuth n'est pas configuré.
     ctx.store.claimOwner("leamd", 4242);
@@ -371,6 +372,7 @@ describe("callback", () => {
     const ctx = setup({ user: () => user });
     insertCard(ctx.store, "CardOLD001", "old-name");
     const first = await claim(ctx, "CardOLD001");
+    ctx.store.setOwnerHidden("old-name", true);
 
     // Le compte s'appelle désormais new-name ; quelqu'un a fait sa fiche sous ce nom.
     user = { login: "New-Name", id: 4242 };
@@ -378,12 +380,12 @@ describe("callback", () => {
     const second = await claim(ctx, "CardNEW001");
 
     const rows = ctx.store.db.prepare("SELECT login, github_id, hidden FROM owners").all();
-    expect(rows).toEqual([{ login: "new-name", github_id: 4242, hidden: 0 }]);
+    expect(rows).toEqual([{ login: "new-name", github_id: 4242, hidden: 1 }]);
     expect(ctx.store.getCard("CardOLD001")!.login).toBe("new-name");
     expect(ctx.store.getCard("CardOLD001")!.expiresAt).toBeNull();
     // L'ancien cookie (old-name) désigne toujours la même personne, sous son nouveau nom.
-    expect(await me(ctx, first.session)).toEqual({ login: "new-name", hidden: false });
-    expect(await me(ctx, second.session)).toEqual({ login: "new-name", hidden: false });
+    expect(await me(ctx, first.session)).toEqual({ login: "new-name", hidden: true });
+    expect(await me(ctx, second.session)).toEqual({ login: "new-name", hidden: true });
   });
 
   it("un nom repris par un autre compte remplace l'ancienne revendication", async () => {
@@ -452,5 +454,120 @@ describe("conservation", () => {
     expect(ctx.store.getCard("LaterAAA01")!.expiresAt).toBeNull();
     // La purge des 90 jours ne les touche plus.
     expect(ctx.store.purgeExpired(Date.now() + 365 * 24 * 3600 * 1000)).toEqual(["OtherAAA01"]);
+  });
+});
+
+describe("masquer", () => {
+  const TEMPLATE = `<!doctype html><html lang="fr"><head><title>T</title><meta property="og:title" content="générique"></head><body><div id="root"></div></body></html>`;
+
+  async function hidden(ctx: Ctx) {
+    insertCard(ctx.store, "CardAAAA01", "leamd", Date.now() - 2 * 24 * 3600 * 1000);
+    insertComparison(ctx.store);
+    const { session } = await claim(ctx);
+    const res = await ctx.app.request("/api/owner/hide", { method: "POST", headers: asOwner(session) });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, login: "leamd", hidden: true });
+    return session;
+  }
+
+  it("réservé au propriétaire, et à une requête du site", async () => {
+    const ctx = setup();
+    insertCard(ctx.store);
+    expect((await ctx.app.request("/api/owner/hide", { method: "POST" })).status).toBe(401);
+    expect((await ctx.app.request("/api/owner/hide", { method: "POST", headers: asOwner(signSession("faux".repeat(10), { login: "leamd", githubId: 4242 })) })).status).toBe(401);
+    const { session } = await claim(ctx);
+    const cross = await ctx.app.request("/api/owner/hide", { method: "POST", headers: asOwner(session, { origin: "https://evil.example" }) });
+    expect(cross.status).toBe(403);
+    expect(ctx.store.isHidden("leamd")).toBe(false);
+    const same = await ctx.app.request("/api/owner/hide", { method: "POST", headers: asOwner(session, { origin: BASE }) });
+    expect(same.status).toBe(200);
+    expect(await me(ctx, session)).toEqual({ login: "leamd", hidden: true });
+  });
+
+  it("masquée : /c/:id en 410 avec balises génériques et sans image, /og en 404, l'API en gone", async () => {
+    const ctx = setup({ indexHtml: async () => TEMPLATE });
+    // Un PNG déjà rendu : il est effacé au masquage.
+    writeFileSync(join(ctx.ogDir, "CardAAAA01.png"), "png");
+    const session = await hidden(ctx);
+    expect(existsSync(join(ctx.ogDir, "CardAAAA01.png"))).toBe(false);
+
+    for (const id of ["CardAAAA01", "CompAAAA01", "CvCardAA01"]) {
+      const page = await ctx.app.request(`/c/${id}`);
+      expect(page.status, id).toBe(410);
+      expect(page.headers.get("cache-control")).toBe("private, no-store");
+      const html = await page.text();
+      expect(html).toContain("og:title");
+      expect(html).not.toContain("og:image");
+      expect(html).not.toContain(FIXTURES.gold.name);
+      expect(html).not.toContain(`/og/${id}`);
+      expect(html).toContain('<div id="root">');
+
+      expect((await ctx.app.request(`/og/${id}.png`)).status).toBe(404);
+      expect((await ctx.app.request(`/og/${id}-portrait.png`)).status).toBe(404);
+
+      const api = await ctx.app.request(`/api/card/${id}`);
+      expect(api.status).toBe(410);
+      const state = (await api.json()) as JobState;
+      expect(state).toMatchObject({ state: "error", code: "gone", message: { fr: "Fiche retirée par son propriétaire." } });
+    }
+
+    // Le propriétaire, lui, voit toujours ses fiches (mais pas d'image OG publique).
+    const mine = await ctx.app.request("/c/CardAAAA01", { headers: asOwner(session) });
+    expect(mine.status).toBe(200);
+    expect(await mine.text()).not.toContain("og:image");
+    const api = await ctx.app.request("/api/card/CardAAAA01", { headers: asOwner(session) });
+    expect(api.status).toBe(200);
+    expect(((await api.json()) as JobState).state).toBe("done");
+  });
+
+  it("sans front buildé : la page dit « Fiche retirée par son propriétaire »", async () => {
+    const ctx = setup();
+    await hidden(ctx);
+    const page = await ctx.app.request("/c/CardAAAA01");
+    expect(page.status).toBe(410);
+    const html = await page.text();
+    expect(html).toContain("Fiche retirée par son propriétaire.");
+    expect(html).toContain("og:title");
+    expect(html).not.toContain("og:image");
+  });
+
+  it("nouvelle fiche refusée en gone pour un autre, acceptée pour le propriétaire", async () => {
+    const ctx = setup();
+    const session = await hidden(ctx);
+    const post = (headers: Record<string, string> = {}) =>
+      ctx.app.request("/api/card", {
+        method: "POST",
+        headers: { "content-type": "application/json", ...headers },
+        body: JSON.stringify({ login: "LeaMD", lang: "fr" }),
+      });
+
+    const refused = await post();
+    expect(refused.status).toBe(410);
+    const body = (await refused.json()) as JobState;
+    expect(body).toMatchObject({ state: "error", code: "gone", message: { fr: expect.stringContaining("Ce dev a quitté la ville"), en: expect.stringContaining("left town") } });
+
+    // CV + pseudo masqué : refusé aussi.
+    const form = new FormData();
+    form.append("cv", new File([new TextEncoder().encode("%PDF-1.7 x")], "cv.pdf", { type: "application/pdf" }));
+    form.append("login", "leamd");
+    expect((await ctx.app.request("/api/card", { method: "POST", body: form })).status).toBe(410);
+
+    const accepted = await post(asOwner(session));
+    expect(accepted.status).toBe(202);
+    const { id } = (await accepted.json()) as { id: string };
+    await ctx.pipeline.wait(id);
+    expect(ctx.store.getCard(id)!.expiresAt).toBeNull();
+    // Masquée elle aussi pour les autres.
+    expect((await ctx.app.request(`/api/card/${id}`)).status).toBe(410);
+  });
+
+  it("rendre visible : tout revient", async () => {
+    const ctx = setup();
+    const session = await hidden(ctx);
+    const res = await ctx.app.request("/api/owner/unhide", { method: "POST", headers: asOwner(session) });
+    expect(await res.json()).toEqual({ ok: true, login: "leamd", hidden: false });
+    expect((await ctx.app.request("/c/CardAAAA01")).status).toBe(200);
+    expect((await ctx.app.request("/og/CardAAAA01.png")).status).toBe(200);
+    expect((await ctx.app.request("/api/card/CardAAAA01")).status).toBe(200);
   });
 });

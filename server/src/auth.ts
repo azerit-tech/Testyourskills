@@ -241,13 +241,15 @@ export async function fetchGithubUser(
 
 export interface AuthRoutesOptions {
   store: Store;
-  /** Absent : ni bouton, ni /auth/github/* ; /api/me répond null. */
+  /** Absent : ni bouton, ni /auth/github/*, ni /api/owner/* ; /api/me répond null. */
   config?: GithubAuthConfig;
   baseUrl: string;
   /** Cookies Secure (production, en HTTPS). */
   secure: boolean;
   limiter: RateLimiter;
   fetchImpl: typeof fetch;
+  /** Invalide les PNG en cache des ids donnés (fiches masquées). */
+  removeImages(ids: string[]): Promise<void>;
 }
 
 type ClaimResult = "ok" | "mismatch" | "error" | "limited";
@@ -353,4 +355,20 @@ export function mountAuth(app: Hono, o: AuthRoutesOptions) {
     setCookie(c, SESSION_COOKIE, signSession(cfg.sessionSecret, owner), { ...cookieBase, path: "/", maxAge: SESSION_TTL_MS / 1000 });
     return c.redirect(back(st.r, "ok", owner.login), 302);
   });
+
+  // Masquer ou rendre visibles toutes les fiches de son login (§18.1).
+  const setHidden = async (c: Context, hidden: boolean) => {
+    c.header("Cache-Control", "no-store");
+    if (!sameOrigin(c, o.baseUrl)) return c.json({ ok: false }, 403);
+    const owner = ownerFromRequest(c);
+    if (!owner) {
+      return c.json({ ok: false, message: { fr: "Revendique d'abord ta fiche avec GitHub.", en: "Claim your sheet with GitHub first." } }, 401);
+    }
+    o.store.setOwnerHidden(owner.login, hidden);
+    // Les PNG déjà rendus ne restent pas sur le disque d'une fiche masquée.
+    if (hidden) await o.removeImages(o.store.idsForLogin(owner.login));
+    return c.json({ ok: true, login: owner.login, hidden });
+  };
+  app.post("/api/owner/hide", (c) => setHidden(c, true));
+  app.post("/api/owner/unhide", (c) => setHidden(c, false));
 }

@@ -436,6 +436,15 @@ export function Claim({ cardId, login, lawyer, me, onMe, toast }: ClaimProps) {
           <span className="claim-who">@{me.login}</span>
         </p>
         <div className="claim-actions">
+          <button
+            type="button"
+            className="btn-secondary claim-hide"
+            disabled={busy}
+            aria-pressed={me.hidden}
+            onClick={() => run(() => api.setHidden(!me.hidden), me.hidden ? c.shownDone : c.hiddenDone)}
+          >
+            {me.hidden ? c.unhide : c.hide}
+          </button>
           <button type="button" className="link-quiet claim-logout" disabled={busy} onClick={() => run(() => api.logout().then(() => null), c.loggedOut)}>
             {c.logout}
           </button>

@@ -79,6 +79,7 @@ type MessageKey =
   | "empty_pdf"
   | "cv_unreadable"
   | "not_found"
+  | "withdrawn"
   | "bad_request";
 
 export const MESSAGES: Record<MessageKey, Fact> = {
@@ -121,6 +122,14 @@ export const MESSAGES: Record<MessageKey, Fact> = {
   busy: {
     fr: "Le commissariat déborde : trop de suspects d'un coup, GitHub nous fait souffler. Reviens dans quelques minutes.",
     en: "The station is overflowing: too many suspects at once, GitHub is making us take a breather. Come back in a few minutes.",
+  },
+  gone: {
+    fr: "Ce dev a quitté la ville : sa fiche a été retirée par son propriétaire.",
+    en: "This dev has left town: their sheet was withdrawn by its owner.",
+  },
+  withdrawn: {
+    fr: "Fiche retirée par son propriétaire.",
+    en: "Sheet withdrawn by its owner.",
   },
   queue_timeout: {
     fr: "Trop de monde au commissariat : ton dossier a attendu plus de 3 minutes sans passer. Réessaie dans un instant.",

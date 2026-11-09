@@ -31,6 +31,8 @@ type View =
   | { s: "pending"; progress: ProgressEvent[]; queue?: number }
   | { s: "done"; item: Shareable }
   | { s: "error"; message: Fact | string; notFound?: boolean }
+  /** Masquée par son propriétaire revendiqué (§18.1) : 410 de l'API. */
+  | { s: "withdrawn" }
   | { s: "deleted" };
 
 function useJob(id: string, nonce: number) {
@@ -68,6 +70,7 @@ function useJob(id: string, nonce: number) {
       } catch (e) {
         if (!alive) return;
         if (e instanceof ApiError && e.status === 404) setView({ s: "error", message: t.errors.notFound, notFound: true });
+        else if (e instanceof ApiError && e.status === 410) setView({ s: "withdrawn" });
         else if (e instanceof ApiError && e.fact) setView({ s: "error", message: e.fact });
         else timer = window.setTimeout(poll, POLL_MS * 3); // réseau capricieux : on retente
       }
@@ -192,6 +195,14 @@ export function CardPage({ id }: { id: string }) {
     );
   }
 
+  if (view.s === "withdrawn") {
+    return (
+      <main className="page page-card" id="main">
+        <Withdrawn cardId={id} notice={notice?.text ?? null} />
+      </main>
+    );
+  }
+
   if (view.s === "error") {
     const msg = typeof view.message === "string" ? view.message : pick(view.message, lang);
     return (
@@ -290,6 +301,12 @@ function Result({ item, animate, owner, fresh, notice, me, onMe, onDeleted }: Re
 
   return (
     <main className={`page page-card page-result${animating ? " is-animating" : ""}`} id="main" style={style}>
+      {claimed && me?.hidden && (
+        <p className="hidden-banner" role="status">
+          <span className="hidden-dot" aria-hidden />
+          {t.result.claim.hiddenBanner}
+        </p>
+      )}
       {visitor && (
         <div className="visitor-banner">
           <p>
@@ -356,5 +373,42 @@ function Result({ item, animate, owner, fresh, notice, me, onMe, onDeleted }: Re
       </div>
       {toast.node}
     </main>
+  );
+}
+
+/** Fiche masquée vue par quelqu'un d'autre ; son propriétaire peut se reconnecter d'ici. */
+function Withdrawn({ cardId, notice }: { cardId: string; notice: string | null }) {
+  const { t } = useT();
+  const w = t.result.withdrawn;
+  const [claim, setClaim] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    void api.getConfig().then((c) => alive && setClaim(c.claim));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return (
+    <div className="panel-center error-panel withdrawn-panel">
+      <span className="error-code" aria-hidden>
+        410
+      </span>
+      <h1>{w.title}</h1>
+      <p>{w.text}</p>
+      {notice && (
+        <p className="withdrawn-notice" role="status">
+          {notice}
+        </p>
+      )}
+      <a className="btn-primary" href="/" onClick={(e) => onLinkClick(e, "/")}>
+        {t.result.makeYours}
+        <IconArrow />
+      </a>
+      {claim && (
+        <button type="button" className="link-quiet withdrawn-claim" onClick={() => api.startClaim(cardId)}>
+          {w.mine}
+        </button>
+      )}
+    </div>
   );
 }
