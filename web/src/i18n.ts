@@ -3,6 +3,7 @@
 import { createContext, createElement, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import type { CardStyle, Lang, Position, StatCode } from "../../shared/types";
+import { showsTotal } from "../../shared/week";
 
 const fr = {
   meta: {
@@ -54,7 +55,8 @@ const fr = {
     /* Top de la semaine (§18.22) */
     top: {
       title: "Top de la semaine",
-      meta: (week: number, n: number, left: string) => `Semaine ${week} · ${n} ${n > 1 ? "dossiers" : "dossier"} · fin dans ${left}`,
+      /* Le nombre de dossiers à partir de 20 seulement (§18.27). */
+      meta: (week: number, n: number, left: string) => [`Semaine ${week}`, showsTotal(n) && `${n} dossiers`, `fin dans ${left}`].filter(Boolean).join(" · "),
       left: (d: number, h: number, m: number) => (d > 0 ? `${d} j ${h} h` : h > 0 ? `${h} h ${m} min` : `${m} min`),
       cut: "Top 5",
       free: "Place libre",
@@ -235,9 +237,9 @@ const fr = {
     /* Rang de la semaine (§18.22), en tête de l'après-fiche. « n° 1 » plutôt que « 1er » : rien ne s'accorde. */
     week: {
       line: (rank: number, total: number, gap: number) =>
-        `${rank}e sur ${total} cette semaine · ${gap} ${gap > 1 ? "points" : "point"} du top 5`,
+        `${rank}e${showsTotal(total) ? ` sur ${total}` : ""} cette semaine · ${gap} ${gap > 1 ? "points" : "point"} du top 5`,
       top5: "Top 5 de la semaine · défends ta place jusqu'à dimanche",
-      closedLine: (rank: number, total: number, week: number) => `${rank}e sur ${total}, semaine ${week}`,
+      closedLine: (rank: number, total: number, week: number) => `${rank}e${showsTotal(total) ? ` sur ${total}` : ""}, semaine ${week}`,
       closedTop5: (week: number) => `Top 5 de la semaine ${week}`,
       share: (rank: number) => `${rank === 1 ? "n° 1" : `${rank}e`} cette semaine`,
     },
@@ -500,7 +502,7 @@ const en: Dict = {
     exampleCaption: "The real sheet of Jacques, Azerit's founder",
     top: {
       title: "This week's top",
-      meta: (week, n, left) => `Week ${week} · ${n} ${n === 1 ? "file" : "files"} · ends in ${left}`,
+      meta: (week, n, left) => [`Week ${week}`, showsTotal(n) && `${n} files`, `ends in ${left}`].filter(Boolean).join(" · "),
       left: (d, h, m) => (d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m}min` : `${m}min`),
       cut: "Top 5",
       free: "Open spot",
@@ -663,9 +665,9 @@ const en: Dict = {
       },
     },
     week: {
-      line: (rank, total, gap) => `#${rank} of ${total} this week · ${gap} ${gap === 1 ? "point" : "points"} from the top 5`,
+      line: (rank, total, gap) => `#${rank}${showsTotal(total) ? ` of ${total}` : ""} this week · ${gap} ${gap === 1 ? "point" : "points"} from the top 5`,
       top5: "This week's top 5 · hold your spot until Sunday",
-      closedLine: (rank, total, week) => `#${rank} of ${total}, week ${week}`,
+      closedLine: (rank, total, week) => `#${rank}${showsTotal(total) ? ` of ${total}` : ""}, week ${week}`,
       closedTop5: (week) => `Top 5 of week ${week}`,
       share: (rank) => `#${rank} this week`,
     },
