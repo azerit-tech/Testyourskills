@@ -11,6 +11,7 @@ import { pick, useT } from "../i18n";
 import { api, tokens } from "../lib/api";
 import { errorFact } from "../lib/errors";
 import { navigate } from "../lib/router";
+import { unlockAudio } from "../lib/audio";
 import { markFresh, rememberInput, setPrefill, takePrefill } from "../lib/session";
 import type { Mode, Tab } from "../lib/session";
 import { checkPdf, isTouch, parseLogin } from "../lib/util";
@@ -108,6 +109,8 @@ export function EntryForm({ inputRef, variant = "full" }: Props) {
   const start = async (input: { login?: string; file?: File | null; linkedin?: string }) => {
     if (busyRef.current) return;
     busyRef.current = true;
+    // Le geste qui lance la fiche débloque le son de la révélation (§18.27) : avant tout await.
+    unlockAudio();
     setError(null);
     setBusy(true);
     try {

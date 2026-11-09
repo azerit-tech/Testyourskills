@@ -1,7 +1,9 @@
 // Le son de l'ascenseur, synthétisé en direct (Web Audio, aucun fichier) :
 // le frein qui se relâche au départ, le moteur qui ronfle et le souffle de la
 // gaine qui suivent la vitesse de la cabine, le « ding » de l'arrivée, le
-// moteur des portes. Piloté par le temps de la séquence (walkout.ts).
+// moteur des portes. Piloté par le temps de la séquence (walkout.ts). Il joue
+// dans le contexte audio de la page (lib/audio.ts), débloqué par un geste.
+import { sharedAudio } from "../lib/audio";
 
 export interface ElevatorCues {
   depart: number;
@@ -22,6 +24,7 @@ export function createElevatorSound(cues: ElevatorCues, muted: boolean): Elevato
   let ctx: AudioContext | null = null;
   let master: GainNode | null = null;
   let hum: { gain: GainNode; osc: OscillatorNode; wind: GainNode } | null = null;
+  let sources: AudioScheduledSourceNode[] = [];
   let isMuted = muted;
   let last = -1;
   let disposed = false;
@@ -34,15 +37,10 @@ export function createElevatorSound(cues: ElevatorCues, muted: boolean): Elevato
   };
 
   const start = () => {
-    if (ctx || disposed) return;
-    const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!Ctor) return;
-    try {
-      ctx = new Ctor();
-    } catch {
-      return;
-    }
-    void ctx.resume().catch(() => undefined);
+    // Son coupé : aucun contexte n'est demandé tant que la personne ne le remet pas.
+    if (ctx || disposed || isMuted) return;
+    ctx = sharedAudio();
+    if (!ctx) return;
     master = ctx.createGain();
     master.gain.value = isMuted ? 0 : VOLUME;
     master.connect(ctx.destination);
@@ -76,6 +74,7 @@ export function createElevatorSound(cues: ElevatorCues, muted: boolean): Elevato
     osc.start();
     sub.start();
     air.start();
+    sources = [osc, sub, air];
     hum = { gain, osc, wind };
   };
 
@@ -168,7 +167,18 @@ export function createElevatorSound(cues: ElevatorCues, muted: boolean): Elevato
     },
     dispose() {
       disposed = true;
-      void ctx?.close().catch(() => undefined);
+      // le contexte est celui de la page : on arrête nos sources et on se débranche, sans le fermer
+      for (const src of sources) {
+        try {
+          src.stop();
+        } catch {
+          /* déjà arrêtée */
+        }
+      }
+      sources = [];
+      master?.disconnect();
+      master = null;
+      hum = null;
       ctx = null;
     },
   };

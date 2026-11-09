@@ -11,6 +11,7 @@ import type { CardData, DeclaredSource, Lang } from "../../../shared/types";
 import { LEVEL_LABELS, starsFor } from "../../../shared/types";
 import { langIcon, langTitle } from "../../../shared/card/languages";
 import { pick, useT } from "../i18n";
+import { readMuted, unlockAudio, writeMuted } from "../lib/audio";
 import { useMediaQuery } from "../lib/util";
 import { preloadWalkoutAssets } from "../three/assets";
 import { loadCardTexture } from "../three/cardTexture";
@@ -74,16 +75,6 @@ const DOC_PATH = "M6 2h8l6 6v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm7
 const CODE_PATH = "M8.7 16.6 4.1 12l4.6-4.6L7.3 6l-6 6 6 6 1.4-1.4zm6.6 0 4.6-4.6-4.6-4.6L16.7 6l6 6-6 6-1.4-1.4z";
 /** Au-delà, on renonce à la scène plutôt que de faire attendre. */
 const ASSET_TIMEOUT = 12000;
-/** Le choix du visiteur pour le son de l'ascenseur, d'une révélation à l'autre. */
-const MUTE_KEY = "tys-walkout-muted";
-const readMuted = () => {
-  try {
-    return window.localStorage.getItem(MUTE_KEY) === "1";
-  } catch {
-    return false;
-  }
-};
-
 export interface WalkoutControl {
   /** Clic sur la scène pendant la séquence : vrai si la scène l'a utilisé. */
   interact(): boolean;
@@ -119,12 +110,10 @@ export function Walkout3D({ card, lang, double, declared = "cv", phase, anchorRe
   const toggleSound = () => {
     const m = !muted;
     setMuted(m);
+    writeMuted(m);
+    // Remettre le son est un geste : le contexte audio se crée ou se relance ici.
+    if (!m) unlockAudio();
     handle.current?.setMuted(m);
-    try {
-      window.localStorage.setItem(MUTE_KEY, m ? "1" : "0");
-    } catch {
-      // stockage indisponible (navigation privée) : le choix vaut pour cette fois
-    }
   };
 
   useEffect(() => {

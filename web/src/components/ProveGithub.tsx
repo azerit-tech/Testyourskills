@@ -7,6 +7,7 @@ import { pick, useT } from "../i18n";
 import { api, tokens } from "../lib/api";
 import { errorFact } from "../lib/errors";
 import { navigate } from "../lib/router";
+import { unlockAudio } from "../lib/audio";
 import { markFresh, rememberInput } from "../lib/session";
 import { parseLogin } from "../lib/util";
 
@@ -26,6 +27,7 @@ export function ProveGithub({ linkedinUrl }: { linkedinUrl: string }) {
       setError(login.trim() ? t.home.errLogin : t.home.errEmptyLogin);
       return;
     }
+    unlockAudio();
     setBusy(true);
     setError(null);
     try {

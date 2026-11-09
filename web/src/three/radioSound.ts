@@ -2,7 +2,9 @@
 // vent qui suit la vitesse de la chute, le crépitement de la radio de police à
 // chaque étoile, le souffle de la baie traversée, le roulement de batterie du
 // carton de fin. Piloté par le temps de la séquence (walkout.ts), qui décide
-// des repères ; ici on ne fait que jouer.
+// des repères ; ici on ne fait que jouer, dans le contexte audio de la page
+// (lib/audio.ts), débloqué par un geste.
+import { sharedAudio } from "../lib/audio";
 
 export interface RadioSound {
   /** À chaque image : temps de la séquence (s) et vitesse de la chute (0 → 1). */
@@ -28,6 +30,7 @@ export function createRadioSound(muted: boolean): RadioSound {
   let isMuted = muted;
   let disposed = false;
   let noise: AudioBuffer | null = null;
+  let loop: AudioBufferSourceNode | null = null;
 
   const noiseBuffer = (c: AudioContext, seconds: number) => {
     const b = c.createBuffer(1, Math.floor(c.sampleRate * seconds), c.sampleRate);
@@ -37,15 +40,10 @@ export function createRadioSound(muted: boolean): RadioSound {
   };
 
   const start = () => {
-    if (ctx || disposed) return;
-    const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!Ctor) return;
-    try {
-      ctx = new Ctor();
-    } catch {
-      return;
-    }
-    void ctx.resume().catch(() => undefined);
+    // Son coupé : aucun contexte n'est demandé tant que la personne ne le remet pas.
+    if (ctx || disposed || isMuted) return;
+    ctx = sharedAudio();
+    if (!ctx) return;
     master = ctx.createGain();
     master.gain.value = isMuted ? 0 : VOLUME;
     master.connect(ctx.destination);
@@ -62,6 +60,7 @@ export function createRadioSound(muted: boolean): RadioSound {
     gain.gain.value = 0;
     air.connect(band).connect(gain).connect(master);
     air.start();
+    loop = air;
     wind = { gain, band };
   };
 
@@ -161,7 +160,16 @@ export function createRadioSound(muted: boolean): RadioSound {
     },
     dispose() {
       disposed = true;
-      void ctx?.close().catch(() => undefined);
+      // le contexte est celui de la page : on arrête le vent et on se débranche, sans le fermer
+      try {
+        loop?.stop();
+      } catch {
+        /* déjà arrêté */
+      }
+      loop = null;
+      master?.disconnect();
+      master = null;
+      wind = null;
       ctx = null;
     },
   };

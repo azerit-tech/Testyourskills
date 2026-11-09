@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { api } from "./lib/api";
+import { watchGestures } from "./lib/audio";
 import { captureRef } from "./lib/session";
 import "./styles.css";
 
@@ -9,6 +10,9 @@ import "./styles.css";
 // avant le premier rendu, pour que la fiche créée ensuite la porte (§18.0).
 const visitRef = captureRef();
 if (visitRef) api.track("shared_visit", visitRef, { ref: visitRef });
+
+// Le son de la révélation se débloque au premier geste (§18.27).
+watchGestures();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
