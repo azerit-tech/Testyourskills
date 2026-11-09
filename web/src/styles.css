@@ -1228,6 +1228,46 @@ svg {
   text-wrap: balance;
 }
 
+/* « Fais la tienne » toujours visible (§18.27) : téléphone seulement */
+.make-yours {
+  display: none;
+}
+@media (max-width: 640px) {
+  .make-yours {
+    display: inline-flex;
+    position: fixed;
+    left: 50%;
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    z-index: 70;
+    max-width: calc(100vw - 32px);
+    /* un liseré d'encre la détache de ce qui défile dessous, sans ombre */
+    box-shadow: 0 0 0 4px var(--ink-0);
+    transform: translateX(-50%);
+    transition:
+      transform 0.3s var(--ease-out),
+      opacity 0.2s,
+      visibility 0s;
+  }
+  .make-yours:hover,
+  .make-yours:active {
+    transform: translateX(-50%);
+  }
+  .make-yours.is-off {
+    transform: translate(-50%, 160%);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+      transform 0.3s var(--ease-out),
+      opacity 0.2s,
+      visibility 0s 0.3s;
+  }
+  /* la pilule ne masque jamais le dernier contenu de la page */
+  .shell:has(.page-result.is-visitor) .footer-links {
+    padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 /* ============ sous la fiche ============ */
 
 .after {

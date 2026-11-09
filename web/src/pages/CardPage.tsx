@@ -10,6 +10,7 @@ import { Denounce } from "../components/Denounce";
 import { EntryForm } from "../components/EntryForm";
 import { Dossier } from "../components/Findings";
 import { Jury, JuryLine } from "../components/Jury";
+import { MakeYours } from "../components/MakeYours";
 import { RevealCard, useReveal } from "../components/Reveal";
 import { ShareDock } from "../components/ShareDock";
 import type { WalkoutControl } from "../components/Walkout3D";
@@ -449,6 +450,8 @@ function Result({ item, animate, owner, fresh, notice, me, onMe, onDeleted }: Re
       </div>
       {/* La barre du pouce (§18.27) : mêmes conditions que le bloc de partage, une fois la fiche posée. Avant le toast, qui se cale dessus. */}
       {!visitor && !(claimed && me?.hidden) && <ShareDock item={item} ready={settled} toast={toast.show} />}
+      {/* « Fais la tienne » toujours visible sur téléphone (§18.27). */}
+      {visitor && settled && <MakeYours mine={other} />}
       {toast.node}
     </main>
   );
