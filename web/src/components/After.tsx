@@ -160,9 +160,21 @@ export function useSharing(item: Shareable, toast: (m: string) => void) {
 
 export type Sharing = ReturnType<typeof useSharing>;
 
+/** Le lien vise `target` pour ce clic (le navigateur suit l'adresse après les écouteurs), puis reprend `rest`. */
+function aimAt(a: HTMLAnchorElement, target: string, rest: string) {
+  a.href = target;
+  window.setTimeout(() => {
+    a.href = rest;
+  }, 0);
+}
+
 /**
  * LinkedIn : un vrai lien, qui s'ouvre même là où `window.open` est bloqué. Son libellé garde
  * « Texte copié » : on le lit au retour sur l'onglet, pas dans un message déjà parti.
+ *
+ * Les bloqueurs de contenu masquent tout lien dont l'adresse est celle du partage LinkedIn
+ * (listes « réseaux sociaux ») : le bouton principal disparaissait. Le lien porte donc l'adresse
+ * de la fiche, et ne prend celle de LinkedIn que le temps du clic.
  */
 function LinkedInLink({ kit, className, from, short = false }: { kit: Sharing; className: string; from?: string; short?: boolean }) {
   const { t } = useT();
@@ -170,10 +182,14 @@ function LinkedInLink({ kit, className, from, short = false }: { kit: Sharing; c
   return (
     <a
       className={`${className}${kit.textCopied ? " is-copied" : ""}`}
-      href={kit.liHref}
+      href={kit.url}
       target="_blank"
       rel="noopener"
-      onClick={() => kit.onLinkedIn(from)}
+      onClick={(e) => {
+        aimAt(e.currentTarget, kit.liHref, kit.url);
+        kit.onLinkedIn(from);
+      }}
+      onAuxClick={(e) => aimAt(e.currentTarget, kit.liHref, kit.url)}
     >
       <IconLinkedIn />
       <span aria-live="polite">{kit.textCopied ? (short ? ts.copiedShort : ts.linkedinCopied) : ts.linkedin}</span>
