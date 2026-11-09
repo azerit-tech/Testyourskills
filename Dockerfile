@@ -9,11 +9,14 @@ WORKDIR /app
 RUN apt-get update \
  && apt-get install -y --no-install-recommends python3 make g++ \
  && rm -rf /var/lib/apt/lists/*
+# `nice -n 10` ICI, dans le conteneur de build : le VPS est partagé avec d'autres
+# apps de prod. Un `nice` devant `docker compose` ne baisse que la priorité du
+# client docker, pas celle des étapes RUN, lancées par le démon.
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN nice -n 10 npm ci
 COPY . .
-RUN npx vite build \
- && npm prune --omit=dev
+RUN nice -n 10 npx vite build \
+ && nice -n 10 npm prune --omit=dev
 
 # --- Étape 2 : runtime ---------------------------------------------------------
 FROM node:22-slim
@@ -27,6 +30,8 @@ RUN mkdir -p /data/og && chown -R node:node /data
 USER node
 VOLUME /data
 EXPOSE 8787
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+# --start-interval : sondé toutes les 3 s pendant le démarrage, « healthy » en
+# quelques secondes au lieu de 30 (Docker 25 et plus ; le VPS a Docker 29).
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --start-interval=3s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8787)+'/api/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"
 CMD ["node_modules/.bin/tsx", "server/src/index.ts"]
