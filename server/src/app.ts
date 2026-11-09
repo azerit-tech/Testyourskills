@@ -151,8 +151,10 @@ export function createApp(opts: AppOptions) {
     return c.json(errorBody("internal", MESSAGES.internal), 500);
   });
 
+  // Public : jamais de montant. ai = ok | budget (plafond du jour atteint) |
+  // credits (402 OpenRouter vu dans les 10 dernières minutes) | off (pas de clé).
   app.get("/api/health", (c) =>
-    c.json({ ok: true, ai: safeAiAvailable(deps), github: !!opts.githubToken, linkedin: !!opts.linkedin }),
+    c.json({ ok: true, ai: safeAiStatus(aiStatus) ?? "off", github: !!opts.githubToken, linkedin: !!opts.linkedin }),
   );
 
   // Ce que le front doit afficher ou masquer.
@@ -430,13 +432,5 @@ function safeAiStatus(status: () => AiStatus): AiStatus | null {
     return status();
   } catch {
     return null;
-  }
-}
-
-function safeAiAvailable(deps: Deps): boolean {
-  try {
-    return deps.aiAvailable();
-  } catch {
-    return false;
   }
 }

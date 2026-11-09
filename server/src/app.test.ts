@@ -10,7 +10,7 @@ import type { CvReading, CvTextCounts } from "../../shared/readings";
 import { createApp, normalizeLogin, purge, type AppOptions } from "./app";
 import { RETENTION_MS, Store } from "./db";
 import type { CardBody, Deps } from "./pipeline";
-import type { AiStatus } from "./ai/budget";
+import { noteCreditsExhausted, recordUsage, resetBudgetForTests, type AiStatus } from "./ai/budget";
 import { ChatHttpError } from "./ai/client";
 import { readCode } from "./ai/readCode";
 import { fakeClient } from "./ai/testing";
@@ -748,8 +748,43 @@ describe("divers", () => {
   });
 
   it("health", async () => {
-    const ctx = setup();
-    expect(await (await ctx.app.request("/api/health")).json()).toEqual({ ok: true, ai: true, github: true, linkedin: false });
+    const ctx = setup({}, { aiStatus: () => "ok" });
+    expect(await (await ctx.app.request("/api/health")).json()).toEqual({ ok: true, ai: "ok", github: true, linkedin: false });
+  });
+
+  it.each<AiStatus>(["ok", "budget", "credits", "off"])("health : ai = %s, sans montant", async (status) => {
+    const ctx = setup({}, { aiStatus: () => status });
+    const res = await ctx.app.request("/api/health");
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    expect(JSON.parse(text)).toMatchObject({ ok: true, ai: status });
+    expect(text).not.toMatch(/usd|\$|cost|credit_|total/i);
+  });
+
+  it("health suit le vrai budget : plafond du jour, puis 402 vu", async () => {
+    const saved = { key: process.env.OPENROUTER_API_KEY, budget: process.env.AI_DAILY_BUDGET_USD };
+    resetBudgetForTests();
+    process.env.OPENROUTER_API_KEY = "test";
+    process.env.AI_DAILY_BUDGET_USD = "0.01";
+    try {
+      const ctx = setup();
+      const ai = async () => ((await (await ctx.app.request("/api/health")).json()) as { ai: string }).ai;
+      expect(await ai()).toBe("ok");
+      recordUsage("anthropic/claude-haiku-4.5", { prompt_tokens: 0, completion_tokens: 0, cost: 0.02 });
+      expect(await ai()).toBe("budget");
+      noteCreditsExhausted();
+      expect(await ai()).toBe("credits");
+      noteCreditsExhausted(Date.now() - 11 * 60 * 1000);
+      expect(await ai()).toBe("budget");
+      delete process.env.OPENROUTER_API_KEY;
+      expect(await ai()).toBe("off");
+    } finally {
+      resetBudgetForTests();
+      if (saved.key === undefined) delete process.env.OPENROUTER_API_KEY;
+      else process.env.OPENROUTER_API_KEY = saved.key;
+      if (saved.budget === undefined) delete process.env.AI_DAILY_BUDGET_USD;
+      else process.env.AI_DAILY_BUDGET_USD = saved.budget;
+    }
   });
 
   it("prod : sert le front statique avec repli SPA hors /api, /og, /c", async () => {

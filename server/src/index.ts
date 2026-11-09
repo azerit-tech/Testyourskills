@@ -9,6 +9,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createApp, purge } from "./app";
 import { useBudgetDb } from "./ai/budget";
+import { checkOpenRouterCredits } from "./ai/credits";
 import { linkedinFromEnv } from "./linkedin";
 import { Store } from "./db";
 import { realDeps } from "./deps";
@@ -57,6 +58,8 @@ const indexHtml = prod
 const store = new Store(dbPath);
 // Dépense IA du jour persistée : un redémarrage ne remet pas le plafond à zéro.
 useBudgetDb(store.db);
+// Solde OpenRouter : simple avertissement sous 2 $, sans jamais retarder le démarrage.
+void checkOpenRouterCredits();
 const { app, pipeline } = createApp({
   store,
   deps: realDeps,
