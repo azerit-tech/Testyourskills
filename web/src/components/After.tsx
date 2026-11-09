@@ -9,6 +9,7 @@ import { navigate } from "../lib/router";
 import { getPlea } from "../lib/plea";
 import { setPrefill } from "../lib/session";
 import { shareLead, shareText, shareTextX, type ShareInput } from "../lib/shareText";
+import { hasNativeShare, portraitFile, preloadPortrait, shareSheet } from "../lib/sharing";
 import { copyText, isTouch, shareUrl } from "../lib/util";
 import { IconDownload, IconLink, IconLinkedIn, IconShare, IconX } from "./Icons";
 import { ProveGithub } from "./ProveGithub";
@@ -104,38 +105,83 @@ export function shareInput(item: Shareable, lang: Lang, rank: string | null): Sh
   };
 }
 
-export function ShareBar({ item, toast }: { item: Shareable; toast: (m: string) => void }) {
+/** Ce qu'un bouton de partage sait d'une fiche : le bloc sous la fiche et la barre du pouce s'en servent. */
+export function useSharing(item: Shareable, toast: (m: string) => void) {
   const { t, lang } = useT();
+  const ts = t.result.share;
   const id = idOf(item);
   const url = shareUrl(id);
-  const ts = t.result.share;
   const week = weekOf(id);
   // Le rang n'entre dans le texte que pendant sa semaine : « 7e cette semaine ».
   const rank = week && !week.closed ? t.result.week.share(week.rank) : null;
-
   const input = shareInput(item, lang, rank);
+  const filename = `testyourskills-${item.kind === "card" ? item.card.login ?? item.card.initials : "comparaison"}.png`;
+  // Sur téléphone, « Partager » ouvre la feuille du système. Sans elle (ordinateur, WebView Android), LinkedIn reste devant.
+  const native = isTouch() && hasNativeShare();
 
-  const liHref = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
-  const track = (channel: string) => api.track("card_shared", id, { channel, kind: item.kind });
-  const canNative = typeof navigator !== "undefined" && typeof navigator.share === "function" && isTouch();
+  // L'image portrait se charge dès le montage : au clic, elle est déjà un fichier.
+  const [file, setFile] = useState<File | null>(() => portraitFile(id));
+  useEffect(() => {
+    if (!native && !isMock()) return;
+    let alive = true;
+    void preloadPortrait(id, filename).then((f) => alive && setFile(f));
+    return () => {
+      alive = false;
+    };
+  }, [id, filename, native]);
 
-  const onNative = async () => {
-    try {
-      await navigator.share({ title: "Testyourskills", text: shareLead(ts.words, input), url });
-      track("native");
-    } catch {
-      /* partage annulé */
-    }
+  /** `from` : « dock » quand le geste vient de la barre du pouce. */
+  const track = (channel: string, from?: string) => api.track("card_shared", id, { channel, kind: item.kind, ...(from ? { from } : {}) });
+
+  /** Geste direct : rien n'attend avant `navigator.share`. L'image part si elle est déjà là. */
+  const share = (from?: string) => {
+    void shareSheet({ title: "Testyourskills", text: shareLead(ts.words, input), url, file }).then((r) => {
+      if (r === null) return;
+      if (r === "copy_failed") return toast(url);
+      if (r === "copy") toast(ts.copiedLink);
+      track(r, from);
+    });
   };
 
-  const onLinkedIn = async () => {
+  const liHref = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
+  const onLinkedIn = async (from?: string) => {
     // Bouton plutôt que lien : certains bloqueurs masquent les liens de partage LinkedIn.
     window.open(liHref, "_blank", "noopener");
     // LinkedIn n'accepte plus de texte prérempli : on le met dans le presse-papier.
     const ok = await copyText(shareText(ts.words, input, url));
     if (ok) toast(ts.linkedinHint);
-    track("linkedin");
+    track("linkedin", from);
   };
+
+  return { id, url, input, filename, native, file, track, share, onLinkedIn };
+}
+
+export type Sharing = ReturnType<typeof useSharing>;
+
+/** Le bouton principal : « Partager » sur téléphone, LinkedIn ailleurs. La barre du pouce a le même. */
+export function ShareMain({ kit, className = "", from }: { kit: Sharing; className?: string; from?: string }) {
+  const { t } = useT();
+  const ts = t.result.share;
+  if (kit.native)
+    return (
+      <button type="button" className={`pill pill-big ${className}`} onClick={() => kit.share(from)}>
+        <IconShare />
+        {ts.native}
+      </button>
+    );
+  return (
+    <button type="button" className={`pill pill-big ${className}`} onClick={() => void kit.onLinkedIn(from)}>
+      <IconLinkedIn />
+      {ts.linkedin}
+    </button>
+  );
+}
+
+export function ShareBar({ item, toast }: { item: Shareable; toast: (m: string) => void }) {
+  const { t } = useT();
+  const ts = t.result.share;
+  const kit = useSharing(item, toast);
+  const { id, url, track } = kit;
 
   const onCopy = async () => {
     const ok = await copyText(url);
@@ -143,35 +189,34 @@ export function ShareBar({ item, toast }: { item: Shareable; toast: (m: string) 
     track("copy");
   };
 
-  const filename = `testyourskills-${item.kind === "card" ? item.card.login ?? item.card.initials : "comparaison"}.png`;
-  const xHref = `https://x.com/intent/post?text=${encodeURIComponent(shareTextX(ts.words, input))}&url=${encodeURIComponent(url)}`;
+  const xHref = `https://x.com/intent/post?text=${encodeURIComponent(shareTextX(ts.words, kit.input))}&url=${encodeURIComponent(url)}`;
 
   return (
     <section className="after-block out" aria-labelledby="out-title">
-      <WeekLine week={week} />
+      <WeekLine week={weekOf(id)} />
       <h2 id="out-title">{ts.title}</h2>
-      <button type="button" className="pill pill-big out-main" onClick={onLinkedIn}>
-        <IconLinkedIn />
-        {ts.linkedin}
-      </button>
+      <ShareMain kit={kit} className="out-main" />
+      {/* Trois boutons secondaires au plus. Sur téléphone, X passe par la feuille de partage. */}
+      {kit.native && (
+        <button type="button" className="pill pill-ghost out-second" onClick={() => void kit.onLinkedIn()}>
+          <IconLinkedIn />
+          {ts.linkedin}
+        </button>
+      )}
       <div className="out-more">
-        {canNative && (
-          <button type="button" className="pill pill-ghost" onClick={onNative}>
-            <IconShare />
-            {ts.native}
+        {!kit.native && (
+          <button
+            type="button"
+            className="pill pill-ghost"
+            onClick={() => {
+              window.open(xHref, "_blank", "noopener");
+              track("x");
+            }}
+          >
+            <IconX />
+            {ts.x}
           </button>
         )}
-        <button
-          type="button"
-          className="pill pill-ghost"
-          onClick={() => {
-            window.open(xHref, "_blank", "noopener");
-            track("x");
-          }}
-        >
-          <IconX />
-          {ts.x}
-        </button>
         <button type="button" className="pill pill-ghost" onClick={onCopy}>
           <IconLink />
           {ts.copy}
@@ -179,7 +224,7 @@ export function ShareBar({ item, toast }: { item: Shareable; toast: (m: string) 
         <a
           className="pill pill-ghost"
           href={images.portrait(id)}
-          download={filename}
+          download={kit.filename}
           onClick={(e) => {
             if (isMock()) {
               e.preventDefault();

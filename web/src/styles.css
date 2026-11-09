@@ -1211,7 +1211,8 @@ svg {
   justify-self: start;
 }
 
-/* partage (classes « out » : les bloqueurs masquent les « share ») : LinkedIn en grand, le reste en pilules à contour */
+/* partage (classes « out » : les bloqueurs masquent les « share ») : un bouton en grand (« Partager » sur téléphone,
+   LinkedIn ailleurs), trois pilules à contour au plus */
 /* marine : la fiche au-dessus est souvent prune */
 .out {
   background: var(--navy);
@@ -1269,7 +1270,8 @@ a.dossier-item:hover {
   font: 600 16px/1.25 var(--f-text);
   color: var(--blush);
 }
-.out .out-main {
+.out .out-main,
+.out .out-second {
   width: 100%;
 }
 .out-more {

@@ -358,6 +358,32 @@ export const mockApi = {
     photos.add(id);
   },
 
+  /**
+   * L'image portrait en démo : le serveur ne la rend pas. Un carton à sa taille
+   * (1080 × 1350) suffit pour essayer le partage de fichier sur un téléphone.
+   */
+  async portrait(): Promise<Blob | null> {
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1080;
+      canvas.height = 1350;
+      const g = canvas.getContext("2d");
+      if (!g) return null;
+      g.fillStyle = "#0c0d1b";
+      g.fillRect(0, 0, canvas.width, canvas.height);
+      g.textAlign = "center";
+      g.fillStyle = "#fff9cb";
+      g.font = "700 104px 'Barlow Condensed', 'Arial Narrow', sans-serif";
+      g.fillText("TESTYOURSKILLS", 540, 660);
+      g.fillStyle = "#ffb2c6";
+      g.font = "500 44px Outfit, system-ui, sans-serif";
+      g.fillText("Mode démo · image fictive", 540, 740);
+      return await new Promise<Blob | null>((done) => canvas.toBlob(done, "image/png"));
+    } catch {
+      return null;
+    }
+  },
+
   async deleteCard(id: string, token: string) {
     await sleep(400);
     jobs.delete(id);
