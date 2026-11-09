@@ -854,3 +854,32 @@ Chaque tâche confiée à un agent, relue, testée (229 tests, typecheck) puis f
 **En ligne le 9 novembre 2026** sur `https://skills.azerit.tech`, commit `3aead6f` : `.env` du serveur en `600` (clés de `.env.example`, `IP_SALT` tiré au hasard, sans la clé Sketchfab), site Caddy validé puis rechargé (les autres sites répondent comme avant), certificat Let's Encrypt, premier build de 42 s sur le VPS (mémoire au plus haut à 2,1 Go utilisés, aucun autre conteneur redémarré). Vérifié par curl : santé, accueil, bundle, assets 3D, `/api/showcase` (vide tant que l'IA n'a pas de crédit).
 
 **Reste** : le crédit OpenRouter (0,26 $ : sans recharge, le site répond « commissariat fermé ») ; l'adresse de retour `https://skills.azerit.tech/auth/linkedin/callback` à autoriser dans l'application LinkedIn ; un second jeton GitHub (`GITHUB_TOKENS`) avant le pic du 19 ; `LEADS_ENDPOINT`, vide, donc les emails laissés sous une fiche ne partent nulle part ; et, dès qu'une vraie fiche existe, l'image OG, l'aperçu LinkedIn et un vrai téléphone.
+
+### 18.18 Virage du 9 novembre 2026 : le style mat du jeu, et six étoiles
+
+*Décisions de Jacques, après l'étude `docs/inspiration-gta6.md`. Elles remplacent les couleurs du §17.2 et le tableau des niveaux du §17.3.*
+
+**Le style mat.** Notre néon nocturne (rose et cyan saturés, lueurs partout, dégradé sur la note, le titre et le carton) évoquait le jeu de 2002 ou la synthwave, pas celui de 2026. Le site officiel du jeu est mat, et on s'aligne dessus, sans jamais reprendre ses marques ni ses fichiers (§17.2) :
+
+- fond d'encre `#0c0d1b` ;
+- titres crème plat `#fff9cb` ;
+- boutons en pilules rose poudré `#ffb2c6` ;
+- cartes à fond prune ou marine ;
+- **un seul dégradé par écran** ;
+- palmiers ton sur ton ;
+- plus de lueurs ni d'holographique, sauf un contour éclairé par l'arrière, réservé au niveau le plus haut.
+
+Barlow Condensed reste pour les titres, en 700, crème plat. Le texte courant pourra passer à Outfit. Les valeurs exactes, et la palette corrigée proposée, sont au §2 de `docs/inspiration-gta6.md`. **On refait d'abord la maquette `web/gta.html`, en téléphone (390 px) puis en ordinateur**, et on ne touche au composant de fiche et au site qu'une fois la maquette validée par Jacques (même règle qu'au §17.7).
+
+**Six étoiles**, comme le HUD du jeu. Les étoiles allumées sont blanches et mates, calées à droite ; les éteintes sont pleines et sombres. Les niveaux sont redécoupés, et leurs libellés sont épicènes : « Recherché » et « Dangereux » s'accordaient avec la personne.
+
+| Étoiles | Note | Niveau (FR) | Niveau (EN) |
+|---|---|---|---|
+| ★ | moins de 30 | Petit délit | Petty crime |
+| ★★ | 30 à 44 | Délit | Misdemeanor |
+| ★★★ | 45 à 59 | Avis de recherche | Wanted |
+| ★★★★ | 60 à 74 | Haute surveillance | High surveillance |
+| ★★★★★ | 75 à 89 | Menace publique | Public menace |
+| ★★★★★★ | 90 et plus | Priorité absolue | Top priority |
+
+Pendant la montée de l'ascenseur, une étoile s'allume à 1, 30, 45, 60, 75 et 90. Les quatre tiers du barème (§3.2) ne changent pas. Seuls `starsFor`, `LEVEL_LABELS`, le rendu des étoiles (fiche, HUD, textes de partage) et les seuils du HUD changent, ainsi que les tests qui les fixent.
