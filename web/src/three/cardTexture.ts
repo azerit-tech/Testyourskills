@@ -23,6 +23,10 @@ const FONT_FILES: [family: string, weight: number, file: string][] = [
   ["JetBrains Mono", 400, "jetbrains-mono-400.ttf"],
   ["JetBrains Mono", 500, "jetbrains-mono-500.ttf"],
   ["JetBrains Mono", 700, "jetbrains-mono-700.ttf"],
+  ["Outfit", 400, "outfit-400.ttf"],
+  ["Outfit", 500, "outfit-500.ttf"],
+  ["Outfit", 600, "outfit-600.ttf"],
+  ["Outfit", 700, "outfit-700.ttf"],
 ];
 
 let fontCss: Promise<string> | null = null;
