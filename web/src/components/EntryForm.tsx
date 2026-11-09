@@ -118,7 +118,7 @@ export function EntryForm({ inputRef, variant = "full" }: Props) {
       if (res.deleteToken) tokens.set(res.id, res.deleteToken);
       // « Réessayer » remet le lien LinkedIn dans le champ unique.
       rememberInput({ login: input.login ?? input.linkedin, file: input.file ?? null });
-      markFresh(res.id);
+      markFresh(res.id, input.login);
       navigate(`/c/${res.id}`);
     } catch (err) {
       busyRef.current = false;

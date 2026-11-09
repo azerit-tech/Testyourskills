@@ -34,7 +34,7 @@ export function ProveGithub({ linkedinUrl }: { linkedinUrl: string }) {
       const res = await api.createCard({ login: gh, linkedin: linkedinUrl, lang });
       if (res.deleteToken) tokens.set(res.id, res.deleteToken);
       rememberInput({ login: gh, file: null });
-      markFresh(res.id);
+      markFresh(res.id, gh);
       navigate(`/c/${res.id}`);
     } catch (err) {
       setBusy(false);

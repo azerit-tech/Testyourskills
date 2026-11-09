@@ -754,68 +754,93 @@ svg {
   }
 }
 
-/* ============ attente : l'écran de chargement (§17.5) ============ */
+/* ============ attente : la photo d'identité (§18.27) ============ */
 
+/* fond d'encre plat ; en colonne : la photo, le pari, les pièces, puis la barre
+   en bas. Reste par-dessus la fiche tant que la scène 3D n'est pas prête. */
 .loadscreen {
   position: fixed;
   inset: 0;
   z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: max(20px, env(safe-area-inset-top)) var(--gutter) max(16px, env(safe-area-inset-bottom));
   background: var(--ink-0);
   overflow: hidden;
 }
-.load-slides,
-.load-slide {
-  position: absolute;
-  inset: 0;
-}
-/* les illustrations de secours (LoadingScenes) sont néon : on les éteint, en
-   attendant des illustrations peintes au style mat (§17.5, §18.13) */
-.load-slides {
-  filter: saturate(0.45) brightness(0.85);
-}
-.load-slide .load-scene,
-.load-slide img {
-  position: absolute;
-  inset: 0;
+.load-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  max-width: 560px;
+  margin: 0 auto;
 }
-.load-slide.is-current {
-  animation:
-    fade-in 0.9s ease-out both,
-    load-zoom 9s linear both;
+/* le cadre de la fiche (toise et plaque) ; il cède de la place sur un écran bas */
+.load-mug {
+  flex: none;
+  width: clamp(124px, 27vh, 208px);
 }
-.load-slide.is-prev {
-  animation: load-zoom 9s linear both;
-  animation-delay: -4.6s;
+.load-mug svg {
+  width: 100%;
+  height: auto;
 }
-@keyframes load-zoom {
-  to {
-    transform: scale(1.08);
+.load-mug-photo {
+  animation: fade-in 0.2s ease-out both;
+}
+/* écran très bas (téléphone couché) : les pièces et la barre d'abord */
+@media (max-height: 480px) {
+  .load-mug {
+    display: none;
   }
 }
-/* le texte se lit sur un aplat d'encre, comme la radio du HUD */
+/* ordinateur : la colonne descend un peu, la photo garde sa taille de fiche */
+@media (min-width: 900px) and (min-height: 760px) {
+  .loadscreen {
+    padding-top: 9vh;
+    padding-bottom: 6vh;
+  }
+}
+/* le flash de la photo : un blanc bref sur tout l'écran, une seule fois */
+.load-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  background: #fff;
+  opacity: 0;
+  pointer-events: none;
+  animation: load-flash 0.5s ease-out both;
+}
+@keyframes load-flash {
+  from {
+    opacity: 0.9;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .load-flash {
+    display: none;
+  }
+}
 .load-foot {
-  position: absolute;
-  left: var(--gutter);
-  right: var(--gutter);
-  bottom: max(16px, env(safe-area-inset-bottom));
+  flex: none;
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-width: 760px;
+  width: 100%;
+  max-width: 560px;
   margin: 0 auto;
-  padding: 16px 18px 18px;
-  border-radius: 20px;
-  background: rgba(12, 13, 27, 0.82);
+  background: var(--ink-0);
 }
-.load-title {
-  order: 1;
-  font: 600 11px/1.2 var(--f-text);
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--lilac-dim);
+/* le son demande un geste : la pilule, à portée de pouce */
+.load-open {
+  width: 100%;
+  animation: line-in 0.4s var(--ease-out);
 }
 .load-lines {
   order: 2;
@@ -859,24 +884,31 @@ svg {
   background: var(--blush);
   transition: width 0.4s linear;
 }
+/* la fiche est prête, la scène 3D se charge : la barre ne sait plus où elle en est, elle défile */
+.load-bar.is-busy span {
+  width: 34% !important;
+  transition: none;
+  animation: load-busy 1.3s ease-in-out infinite;
+}
+@keyframes load-busy {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(295%);
+  }
+}
 
 /* l'enquête en direct (§18.26) : une pièce versée au dossier toutes les 2,5 s,
-   les précédentes en pile dessous ; la progression passe en petit */
+   sous la photo, les précédentes en pile dessous ; la progression passe en petit */
 .load-dossier {
-  position: absolute;
-  left: var(--gutter);
-  right: var(--gutter);
-  top: max(20px, env(safe-area-inset-top));
-  bottom: 132px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 100%;
+  padding-top: 4px;
   pointer-events: none;
 }
 .pile {
   display: grid;
   width: 100%;
-  max-width: 560px;
 }
 .pile > * {
   grid-area: 1 / 1;
@@ -895,8 +927,8 @@ svg {
 .piece {
   display: grid;
   align-content: start;
-  gap: 14px;
-  padding: 22px 20px 26px;
+  gap: 12px;
+  padding: 18px 18px 22px;
   border-radius: 20px;
   border: 1px solid var(--lilac-faint);
   background: var(--ink-0);
@@ -915,7 +947,7 @@ svg {
   color: var(--lilac-dim);
 }
 .piece-text {
-  font: 500 clamp(23px, 6.2vw, 34px) / 1.2 var(--f-text);
+  font: 500 clamp(20px, 5.6vw, 30px) / 1.2 var(--f-text);
   color: var(--cream);
   text-wrap: balance;
 }
@@ -924,6 +956,7 @@ svg {
   color: var(--blush);
 }
 .load-foot.is-quiet .load-lines {
+  order: 4;
   min-height: 0;
 }
 .load-foot.is-quiet .load-line {
@@ -2274,8 +2307,5 @@ a.dossier-item:hover {
     animation-delay: 0ms !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
-  }
-  .load-slide {
-    animation: none !important;
   }
 }

@@ -95,6 +95,8 @@ const fr = {
     piece: (n: number) => `Pièce ${String(n).padStart(2, "0")}`,
     /** Fiche en file d'attente : n fiches passent avant (rang dans la file). */
     queue: (n: number) => (n === 1 ? "1 dossier devant toi au commissariat" : `${n} dossiers devant toi au commissariat`),
+    /** La fiche est prête, la scène 3D pas encore (§18.27). */
+    scene: "La scène se charge",
     progress: {
       lazy_commits: (n?: number) => `Lecture de tes ${n ?? "nombreux"} commits « wip »…`,
       buzzwords: (n?: number) => `Comptage des buzzwords… ${n ?? 0} pour l'instant`,
@@ -132,6 +134,8 @@ const fr = {
     click: "Clique pour ouvrir",
     /* titre du dossier à l'écran de la cabine, avant l'ouverture */
     packTitle: "DOSSIER",
+    /* la pilule de l'attente, quand le son demande un geste pour démarrer (§18.27) */
+    open: "Ouvrir mon dossier",
     skip: "Passer l'animation",
     mute: "Couper le son",
     unmute: "Activer le son",
@@ -536,6 +540,7 @@ const en: Dict = {
     elapsed: "elapsed",
     piece: (n) => `Exhibit ${String(n).padStart(2, "0")}`,
     queue: (n) => (n === 1 ? "1 suspect ahead of you at the station" : `${n} suspects ahead of you at the station`),
+    scene: "Loading the scene",
     progress: {
       lazy_commits: (n) => `Reading your ${n ?? "many"} “wip” commits…`,
       buzzwords: (n) => `Counting buzzwords… ${n ?? 0} so far`,
@@ -571,6 +576,7 @@ const en: Dict = {
     tap: "Tap to open",
     click: "Click to open",
     packTitle: "CASE FILE",
+    open: "Open my case file",
     skip: "Skip animation",
     mute: "Mute",
     unmute: "Unmute",

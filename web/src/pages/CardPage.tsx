@@ -20,7 +20,7 @@ import { pick, useT } from "../i18n";
 import { api, ApiError, tokens, type CaseInfo } from "../lib/api";
 import { isClosed } from "../lib/errors";
 import { navigate, onLinkClick } from "../lib/router";
-import { freshSince, iDenounced, myCard, prefillFromLast, rememberMine, type MyCard } from "../lib/session";
+import { freshLogin, freshSince, iDenounced, myCard, prefillFromLast, rememberMine, type MyCard } from "../lib/session";
 import { useReducedMotion } from "../lib/util";
 import { verdict } from "../lib/versus";
 
@@ -198,6 +198,9 @@ export function CardPage({ id }: { id: string }) {
     return (
       <main className="page page-card" id="main">
         <Waiting
+          cardId={id}
+          login={freshLogin(id)}
+          plea={owner}
           progress={w.progress}
           startedAt={startedAt}
           queue={w.queue}

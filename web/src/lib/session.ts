@@ -18,6 +18,8 @@ let prefill: Prefill | null = null;
 let lastInput: { login?: string; file?: File | null } = {};
 /** Cartes demandées dans cet onglet : elles ont droit à l'ouverture de pack. */
 const fresh = new Map<string, number>();
+/** Le pseudo GitHub tapé pour chacune : l'attente en montre l'avatar dès la première seconde (§18.27). */
+const freshLogins = new Map<string, string>();
 
 export function setPrefill(p: Prefill) {
   prefill = { file: lastInput.file ?? null, ...p };
@@ -39,8 +41,15 @@ export function rememberInput(i: { login?: string; file?: File | null }) {
   lastInput = i;
 }
 
-export function markFresh(id: string) {
+/** `login` : le pseudo GitHub de la demande, s'il y en a un (ni lien LinkedIn, ni CV seul). */
+export function markFresh(id: string, login?: string | null) {
   fresh.set(id, Date.now());
+  if (login) freshLogins.set(id, login);
+}
+
+/** Le pseudo GitHub tapé pour cette fiche dans cet onglet, ou null. */
+export function freshLogin(id: string): string | null {
+  return freshLogins.get(id) ?? null;
 }
 
 export function freshSince(id: string): number | null {

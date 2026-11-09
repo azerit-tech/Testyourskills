@@ -21,7 +21,7 @@ export function DirectCard({ login }: { login: string }) {
       (res) => {
         if (res.deleteToken) tokens.set(res.id, res.deleteToken);
         rememberInput({ login });
-        markFresh(res.id);
+        markFresh(res.id, login);
         navigate(`/c/${res.id}`, { replace: true });
       },
       (err: unknown) => {
