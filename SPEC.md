@@ -703,18 +703,20 @@ Ce qui rend partageable une fiche à une étoile : une identité drôle et un pe
 
 - **Le profil** : exactement un par fiche, choisi par règles dans une liste fermée (`data/profiles.json`, même mécanique que `data/statuses.json`). On évalue dans l'ordre de priorité et la première règle vraie gagne : même entrée, même profil. Liste de départ (le nom, puis la règle) :
   1. **Faussaire** / Forger : le CV vaut 15 points de plus que le code (comparaison), ou BUZZ du CV à 85 ou plus.
-  2. **Légende du milieu** / Kingpin : dix PR fusionnées chez les autres, ou un repo avec dix contributeurs externes.
+  2. **Légende du milieu** / Underworld legend : dix PR fusionnées chez les autres, ou un repo avec dix contributeurs externes.
   3. **Cerveau** / Mastermind : ARCH à 80 ou plus et TEC à 75 ou plus.
   4. **Machine à livrer** / Delivery machine : SHIP à 85 ou plus.
   5. **Oiseau de nuit** / Night owl : 15 % des commits entre 1 h et 5 h.
   6. **Pyromane** / Arsonist : 30 % des commits le vendredi après 18 h.
   7. **Récidiviste** / Repeat offender : 40 % de commits paresseux.
-  8. **Collectionneur** / Hoarder : dix repos ou plus, 20 % vivants au plus.
+  8. **Écureuil** / Hoarder : dix repos ou plus, 20 % vivants au plus.
   9. **Caméléon** / Chameleon : six langages ou plus.
   10. **Jeune pousse** / Fresh blood : la règle de la carte Nouveau en ville.
   11. **Vieille école** / Old school : la règle d'Affaire classée.
   12. **Fantôme** / Ghost : moins de trois repos publics.
-  13. **Agent dormant** / Sleeper agent : repli quand rien ne s'applique.
+  13. **Cellule dormante** / Sleeper agent : repli quand rien ne s'applique.
+
+  Trois noms ont changé à la construction (9 novembre 2026), parce qu'ils supposaient un genre : « Collectionneur » (masculin) devient « Écureuil », « Agent dormant » (« dormant » s'accorde) devient « Cellule dormante », et l'anglais « Kingpin » devient « Underworld legend ». Les noms d'animaux ou de choses (Cerveau, Caméléon, Fantôme, Écureuil) sont des métaphores, pas des noms de personne : ils passent la règle.
 
   Chacun porte une phrase d'accroche fixe en français et en anglais (« Livre plus vite que la police ne lit »). **Noms épicènes ou métaphores uniquement**, jamais de mot qui suppose un genre (pas « Parrain », pas « Beau parleur », pas d'accord en « é·e ») : le principe 4 vaut aussi pour la grammaire.
 - **La peine**, par règle, d'après l'axe le plus faible parmi TEC, SHIP, ARCH et DOC (`data/sentences.json`) : ARCH donne « Peine : {n} mois de tests unitaires » avec n = arrondi supérieur de (80 − ARCH) / 5 ; DOC, « {n} README de 300 mots » ; SHIP, « {n} semaines de commits » ; TEC, « relire {n} PR de mainteneurs ». La **caution**, c'est le geste le plus simple qui lèverait un chef d'accusation (§18.11) : « Caution : un dossier de tests ». Tous les axes à 80 ou plus : « Relaxe. Le tribunal s'excuse. »
@@ -727,6 +729,7 @@ Ce qui rend partageable une fiche à une étoile : une identité drôle et un pe
 - « Plus recherché que 83 % des devs Python sourcés par Azerit » et « Chef d'accusation rare : 2 % des fiches ». La référence, c'est les devs que les entreprises recrutent vraiment : le pourcentage est exigeant, et c'est le message.
 - **Référence** : `scripts/percentiles.ts`, **lancé par Jacques lui-même** (les dumps de sourcing sont des données personnelles, refusées aux agents, §16.1). Le script passe environ 1 000 profils des dumps dans le moteur, IA comprise (environ 2 $), et n'écrit que des quantiles agrégés dans `data/percentiles.json` : les 99 centiles de la note globale, en tout, par langage et par poste, et la fréquence de chaque statut. Aucun login ni aucun fait individuel n'en sort. C'est aussi la calibration du §4.6.
 - **Affichage** : le meilleur des deux groupes (langage ou poste) s'il compte au moins 100 profils de référence, sinon le rang global. C'est un choix fixe, donc explicable. Une ligne sur la fiche sous la note (« Top 17 % Python ») et dans le texte de partage ; la rareté d'un chef d'accusation s'affiche sous 5 %.
+- **Lecture IA de la référence** (décidé le 9 novembre 2026) : le script fait lire le code par l'IA sur **tous** les profils (`--ai-sample` au moins égal au nombre de profils, environ 2 $ pour 1 000), plutôt que sur un échantillon avec un TEC estimé pour les autres, qui resserrait les notes et rendait les rangs extrêmes trop flatteurs.
 - **Après la saison** : quand un groupe compte 300 fiches de joueurs revendiquées, la référence peut mêler joueurs et profils sourcés ; à trancher alors.
 
 ### 18.4 Les ligues et les primes
