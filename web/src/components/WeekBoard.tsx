@@ -1,6 +1,7 @@
-// Top de la semaine sur l'accueil (§18.22) : les dix premiers dossiers de la
-// semaine, une ligne chacun. Les places vides appellent à jouer : un toucher
-// ramène au champ du pseudo. Mat, sans dégradé : celui de l'écran est la fiche.
+// Top de la semaine sur l'accueil (§18.22) : jusqu'à dix dossiers de la semaine,
+// une ligne chacun. Les cinq places du top 5 sont toujours là, les vides
+// appellent à jouer (un toucher ramène au champ du pseudo) ; les places 6 à 10
+// n'apparaissent qu'occupées. Mat, sans dégradé : celui de l'écran est la fiche.
 import { useEffect, useState } from "react";
 import type { TopEntry, WeekTop } from "../../../shared/types";
 import { useT } from "../i18n";
@@ -93,19 +94,29 @@ export function WeekBoard({ onPlay }: { onPlay: () => void }) {
   const d = Math.floor(left / 86_400_000);
   const h = Math.floor((left % 86_400_000) / 3_600_000);
   const m = Math.floor((left % 3_600_000) / 60_000);
-  const rows = Array.from({ length: SIZE }, (_, i) => top.entries[i] ?? null);
-  const list = (from: number, to: number) =>
-    rows.slice(from, to).map((e, i) => (e ? <Row key={e.cardId} e={e} /> : <Free key={`free-${from + i}`} rank={from + i + 1} onPlay={onPlay} />));
+  // Le top 5 en entier, places libres comprises ; au-delà, seulement les occupées.
+  const rest = top.entries.slice(TOP, SIZE);
 
   return (
     <section className="board" aria-labelledby="board-title">
       <h2 id="board-title">{tt.title}</h2>
       <p className="board-meta">{tt.meta(top.week, top.total, tt.left(d, h, m))}</p>
-      <ol className="board-list is-top">{list(0, TOP)}</ol>
-      <p className="board-cut">{tt.cut}</p>
-      <ol className="board-list" start={TOP + 1}>
-        {list(TOP, SIZE)}
-      </ol>
+      <div className="board-top">
+        {rest.length > 0 && <p className="board-tag">{tt.cut}</p>}
+        <ol className="board-list is-top">
+          {Array.from({ length: TOP }, (_, i) => {
+            const e = top.entries[i];
+            return e ? <Row key={e.cardId} e={e} /> : <Free key={`free-${i}`} rank={i + 1} onPlay={onPlay} />;
+          })}
+        </ol>
+      </div>
+      {rest.length > 0 && (
+        <ol className="board-list is-rest" start={TOP + 1}>
+          {rest.map((e) => (
+            <Row key={e.cardId} e={e} />
+          ))}
+        </ol>
+      )}
     </section>
   );
 }

@@ -556,30 +556,40 @@ svg {
 .board-row.is-free:focus-visible .board-login {
   color: var(--cream);
 }
-/* la démarcation entre le 5e et le 6e */
-.board-cut {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px 2px;
-  font: 600 11px/1.2 var(--f-text);
-  letter-spacing: 0.18em;
+/* le top 5 : une étiquette de dossier en tête de l'aplat, posée seulement
+   quand des lignes suivent ; puis un filet avant le 6e */
+.board-top {
+  display: grid;
+}
+.board-tag {
+  justify-self: start;
+  padding: 7px 14px 3px;
+  border-radius: 10px 10px 0 0;
+  background: var(--navy);
+  font: 600 11px/1.2 var(--f-mono);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--lilac-dim);
 }
-.board-cut::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: var(--lilac-faint);
+.board-tag + .board-list.is-top {
+  border-top-left-radius: 0;
+}
+.board-list.is-rest {
+  margin-top: 4px;
+  border-top: 1px solid var(--lilac-faint);
 }
 @media (min-width: 900px) {
   .board {
     padding-bottom: 80px;
   }
+  /* centré sous le héros : ses deux colonnes partagent ce même axe */
+  .board {
+    justify-items: center;
+    text-align: center;
+  }
   .board > * {
     width: 100%;
-    max-width: 620px;
+    max-width: 680px;
   }
   .board h2 {
     font-size: 44px;

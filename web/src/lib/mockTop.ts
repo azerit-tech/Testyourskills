@@ -1,5 +1,5 @@
 // Mode démo : le top de la semaine (§18.22) avec des données fictives. Sept
-// classés, pour voir les places libres comme au lancement.
+// classés par défaut ; `?top=1` montre le lancement, `?top=8` le bloc du 6e au 8e.
 import type { CardData, TopEntry, WeekRank, WeekTop } from "../../../shared/types";
 import { starsFor } from "../../../shared/types";
 
@@ -20,7 +20,7 @@ function isoWeek(monday: number): number {
   return Math.floor((thursday.getTime() - mondayOf(jan4)) / WEEK) + 1;
 }
 
-const PLAYERS: [string, number][] = [
+const ALL: [string, number][] = [
   ["sindresorhus", 91],
   ["leamd", 84],
   ["nour-rs", 79],
@@ -28,21 +28,37 @@ const PLAYERS: [string, number][] = [
   ["jplefevre", 68],
   ["kevin-dev42", 52],
   ["ghost-coder", 31],
+  ["mira-k", 27],
+  ["tdubois", 22],
+  ["pixel-ops", 18],
 ];
+
+/** Combien de classés fictifs : 7 par défaut, `?top=1` pour le lancement, `?top=8`… (0 à 10). */
+function players(): [string, number][] {
+  let n = 7;
+  try {
+    const q = new URLSearchParams(window.location.search).get("top");
+    if (q !== null && /^\d+$/.test(q)) n = Math.min(ALL.length, Number(q));
+  } catch {
+    /* hors navigateur : le défaut */
+  }
+  return ALL.slice(0, n);
+}
 
 /** Rang de démo d'une fiche fraîche parmi les classés fictifs ; null pour une fiche CV. */
 export function mockWeekRank(card: CardData, now = Date.now()): WeekRank | null {
   if (card.source !== "github") return null;
+  const PLAYERS = players();
   const monday = mondayOf(now);
   const rank = PLAYERS.filter(([, o]) => o >= card.overall).length + 1;
-  const fifth = PLAYERS[4]![1];
+  const fifth = PLAYERS[4]?.[1] ?? 0;
   const inTop5 = rank <= 5;
   return { rank, total: PLAYERS.length + 1, gapToTop5: inTop5 ? 0 : fifth - card.overall + 1, inTop5, week: isoWeek(monday), closed: false };
 }
 
 export function mockTop(now = Date.now()): WeekTop {
   const monday = mondayOf(now);
-  const entries: TopEntry[] = PLAYERS.map(([login, overall], i) => ({
+  const entries: TopEntry[] = players().map(([login, overall], i) => ({
     rank: i + 1,
     // Une fiche de démo qui s'ouvre vraiment (mock.ts lit le type dans l'id).
     cardId: `m-gold-${login.replace(/[^a-z0-9]/g, "")}`,
