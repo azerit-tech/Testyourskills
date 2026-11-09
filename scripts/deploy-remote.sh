@@ -120,7 +120,9 @@ deploy() {
   log "==> build et bascule (nice -n 10)"
   # Le build tourne dans le démon docker : la vraie basse priorité est posée
   # dans le Dockerfile (RUN nice -n 10 …). Celle-ci couvre le client compose.
-  if ! nice -n 10 docker compose up -d --build; then
+  # </dev/null partout : ce script arrive par l'entrée standard de bash, une
+  # commande qui la lirait mangerait la suite du script.
+  if ! nice -n 10 docker compose up -d --build </dev/null; then
     show_logs
     die "docker compose up a échoué : si c'est le build, l'ancien conteneur sert toujours"
   fi
@@ -144,7 +146,7 @@ rollback() {
   trap 'release_lock' EXIT
   log "==> retour à $IMAGE:precedent ($(first_word .deployed_commit.precedent))"
   docker tag "$IMAGE:precedent" "$IMAGE:latest"
-  docker compose up -d --no-build --force-recreate
+  docker compose up -d --no-build --force-recreate </dev/null
   if [ -f .deployed_commit.precedent ]; then
     cat .deployed_commit.precedent > .deployed_commit
     log ".deployed_commit = $(first_word .deployed_commit)"
