@@ -84,13 +84,14 @@ function sameString(a: string, b: string): boolean {
   return x.length === y.length && timingSafeEqual(x, y);
 }
 
-function sign(secret: string, purpose: string, payload: object): string {
+/** Valeur signée `{charge}.{signature}` ; `purpose` empêche qu'une valeur passe pour une autre (aussi pour linkedin.ts). */
+export function sign(secret: string, purpose: string, payload: object): string {
   const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
   return `${body}.${mac(secret, purpose, body)}`;
 }
 
 /** Charge d'une valeur signée, ou null si la signature ne correspond pas. Comparaison en temps constant. */
-function unsign(secret: string, purpose: string, value: string | undefined): Record<string, unknown> | null {
+export function unsign(secret: string, purpose: string, value: string | undefined): Record<string, unknown> | null {
   if (!value || value.length > 2048) return null;
   const dot = value.indexOf(".");
   if (dot <= 0) return null;

@@ -114,8 +114,8 @@ function getConfig(): Promise<AppConfig> {
   return configPromise;
 }
 
-/** Démarre la connexion LinkedIn pour poser la photo sur la carte. */
-function startLinkedInPhoto(id: string, token: string) {
+/** Démarre la connexion LinkedIn pour poser la photo sur la carte. `token` null : la session du propriétaire fait foi. */
+function startLinkedInPhoto(id: string, token: string | null) {
   if (isMock()) {
     mockApi.setPhoto(id);
     // Simule le retour du serveur après l'autorisation.
@@ -123,7 +123,7 @@ function startLinkedInPhoto(id: string, token: string) {
     window.dispatchEvent(new PopStateEvent("popstate"));
     return;
   }
-  window.location.href = `/auth/linkedin/start?card=${encodeURIComponent(id)}&token=${encodeURIComponent(token)}`;
+  window.location.href = `/auth/linkedin/start?card=${encodeURIComponent(id)}${token ? `&token=${encodeURIComponent(token)}` : ""}`;
 }
 
 // --- « C'est moi » (§18.1) ---------------------------------------------------
@@ -223,6 +223,13 @@ export function weekOf(id: string): WeekRank | null {
 
 /** Fiches lues dont la session GitHub est propriétaire revendiquée (§18.1), d'après le serveur. */
 const mine = new Set<string>();
+/** Fiches lues qui portent un pseudo GitHub. */
+const withGithub = new Set<string>();
+
+/** La fiche porte un pseudo GitHub : quand la revendication est active, sa photo est au propriétaire connecté. */
+export function hasGithub(id: string): boolean {
+  return withGithub.has(id);
+}
 
 /** La session est propriétaire du login de cette fiche : ce que le jeton de la fiche ouvre lui est ouvert aussi. */
 export function isMine(id: string): boolean {
@@ -239,6 +246,8 @@ async function getJob(id: string): Promise<JobState> {
     const owned = isMock() ? !!mockMe && mockMe.login === main.login?.toLowerCase() : job.mine === true;
     if (owned) mine.add(id);
     else mine.delete(id);
+    if (main.login) withGithub.add(id);
+    else withGithub.delete(id);
   }
   return job;
 }

@@ -422,7 +422,7 @@ export function createApp(opts: AppOptions) {
     // Spéciale « Top 5 de la semaine » et rang de la semaine, relus à chaque fois (§18.22).
     const { data, week } = withWeekSpecial(store.db, stripToken(row.data));
     const rank = week ? { week } : {};
-    // `mine` : la session est propriétaire du login de la fiche ; le front lui ouvre l'email et la suppression sans jeton.
+    // `mine` : la session est propriétaire du login de la fiche ; le front lui ouvre l'email, la photo et la suppression sans jeton.
     const extra = { ...rank, ...(ownedBy(c, row) ? { mine: true } : {}) };
     const state: JobState =
       row.kind === "comparison"
@@ -588,6 +588,9 @@ export function createApp(opts: AppOptions) {
     fetchImpl,
     tokenMatches,
     removeImages: (ids) => removeImages(ogDir, ids),
+    claim: !!opts.githubAuth,
+    secure: opts.secureCookies ?? baseUrl.startsWith("https://"),
+    stateSecret: opts.githubAuth?.sessionSecret,
   });
 
   app.notFound((c) => {

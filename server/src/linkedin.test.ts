@@ -7,8 +7,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { FIXTURES } from "../../shared/fixtures";
 import type { CardData, ComparisonData } from "../../shared/types";
 import { createApp } from "./app";
+import { SESSION_COOKIE, signSession } from "./auth";
 import { Store } from "./db";
-import { AUTHORIZE_URL, TOKEN_URL, USERINFO_URL } from "./linkedin";
+import { AUTHORIZE_URL, LI_STATE_COOKIE, TOKEN_URL, USERINFO_URL } from "./linkedin";
 import type { Deps, RenderInput } from "./pipeline";
 
 const BASE = "https://skills.test";
@@ -44,7 +45,13 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function setup(fetchImpl: typeof fetch = fakeFetch() as unknown as typeof fetch, linkedin = true) {
+const SESSION_SECRET = "s".repeat(40);
+
+/** Cookie d'état posé par le dernier /start : le navigateur qui a lancé le flux le renvoie au retour. */
+let jar = "";
+
+function setup(fetchImpl: typeof fetch = fakeFetch() as unknown as typeof fetch, linkedin = true, claim = false) {
+  jar = "";
   const store = new Store(":memory:");
   stores.push(store);
   const dir = mkdtempSync(join(tmpdir(), "tys-li-"));
@@ -68,6 +75,7 @@ function setup(fetchImpl: typeof fetch = fakeFetch() as unknown as typeof fetch,
     avatarDir,
     fetchImpl,
     linkedin: linkedin ? { clientId: "client", clientSecret: "secret" } : undefined,
+    githubAuth: claim ? { clientId: "gh", clientSecret: "gh-secret", sessionSecret: SESSION_SECRET } : undefined,
   });
   return { app, store, ogDir, avatarDir, renders };
 }
@@ -91,8 +99,17 @@ function insertComparison(store: Store) {
   return cmp;
 }
 
-async function start(ctx: ReturnType<typeof setup>, card: string, token = "tok") {
-  return ctx.app.request(`/auth/linkedin/start?card=${card}&token=${token}`);
+async function start(ctx: ReturnType<typeof setup>, card: string, token = "tok", headers: Record<string, string> = {}) {
+  const res = await ctx.app.request(`/auth/linkedin/start?card=${card}&token=${token}`, { headers });
+  const set = res.headers.getSetCookie().find((h) => h.startsWith(`${LI_STATE_COOKIE}=`));
+  if (set) jar = set.split(";")[0]!;
+  return res;
+}
+
+/** Session du propriétaire revendiqué de `login`, comme la pose /auth/github/callback. */
+function ownerSession(store: Store, login: string, githubId: number) {
+  store.claimOwner(login, githubId);
+  return { cookie: `${SESSION_COOKIE}=${encodeURIComponent(signSession(SESSION_SECRET, { login, githubId }))}` };
 }
 
 async function stateOf(ctx: ReturnType<typeof setup>, card: string) {
@@ -101,8 +118,8 @@ async function stateOf(ctx: ReturnType<typeof setup>, card: string) {
   return new URL(res.headers.get("location")!).searchParams.get("state")!;
 }
 
-async function callback(ctx: ReturnType<typeof setup>, qs: string) {
-  const res = await ctx.app.request(`/auth/linkedin/callback?${qs}`);
+async function callback(ctx: ReturnType<typeof setup>, qs: string, cookie = jar) {
+  const res = await ctx.app.request(`/auth/linkedin/callback?${qs}`, cookie ? { headers: { cookie } } : {});
   expect(res.status).toBe(302);
   return res.headers.get("location");
 }
@@ -144,6 +161,43 @@ describe("start", () => {
       scope: "openid profile",
     });
     expect(loc.searchParams.get("state")!.length).toBeGreaterThanOrEqual(32);
+    // L'état est lié à ce navigateur par un cookie httpOnly signé, qui ne porte pas l'état en clair.
+    const set = res.headers.getSetCookie().find((h) => h.startsWith(`${LI_STATE_COOKIE}=`))!;
+    expect(set).toMatch(/HttpOnly/i);
+    expect(set).toMatch(/SameSite=Lax/i);
+    expect(set).toMatch(/Path=\/auth\/linkedin/i);
+    expect(set).toMatch(/Secure/i);
+  });
+});
+
+describe("revendication active : la photo est au propriétaire connecté du pseudo", () => {
+  it("le jeton de la fiche ne suffit plus pour une fiche à pseudo GitHub, comparaison comprise", async () => {
+    const ctx = setup(undefined, true, true);
+    insertCard(ctx.store);
+    const cmp = insertComparison(ctx.store);
+    expect((await start(ctx, "CardAAAA01")).status).toBe(403);
+    expect((await start(ctx, cmp.cv.id)).status).toBe(403);
+    // Connecté comme propriétaire d'un autre pseudo : refusé aussi.
+    expect((await start(ctx, "CardAAAA01", "tok", ownerSession(ctx.store, "autre", 7))).status).toBe(403);
+    expect(jar).toBe("");
+  });
+
+  it("le propriétaire connecté pose sa photo, sans jeton", async () => {
+    const ctx = setup(undefined, true, true);
+    insertCard(ctx.store);
+    const res = await start(ctx, "CardAAAA01", "", ownerSession(ctx.store, "leamd", 4242));
+    expect(res.status).toBe(302);
+    const state = new URL(res.headers.get("location")!).searchParams.get("state")!;
+    expect(await callback(ctx, `code=abc&state=${state}`)).toBe(`${BASE}/c/CardAAAA01?photo=linkedin`);
+    expect((ctx.store.getCard("CardAAAA01")!.data as CardData).photoSource).toBe("linkedin");
+  });
+
+  it("une fiche sans pseudo GitHub reste à qui l'a créée", async () => {
+    const ctx = setup(undefined, true, true);
+    const cv: CardData = { ...FIXTURES.cv, id: "CvSeuleA01" };
+    ctx.store.insertCards([{ id: cv.id, createdAt: Date.now(), source: "cv", kind: "card", data: cv, deleteToken: "tok" }]);
+    expect((await start(ctx, cv.id, "mauvais")).status).toBe(403);
+    expect((await start(ctx, cv.id)).status).toBe(302);
   });
 });
 
@@ -155,6 +209,25 @@ describe("callback", () => {
     const state = await stateOf(ctx, "CardAAAA01");
     expect(await callback(ctx, `code=c&state=${state}`)).toBe(`${BASE}/c/CardAAAA01?photo=linkedin`);
     expect(await callback(ctx, `code=c&state=${state}`)).toBe(`${BASE}/?photo=error`);
+  });
+
+  it("état lancé par un autre navigateur (sans cookie, ou cookie d'un autre flux) → error, carte inchangée", async () => {
+    const fetchImpl = fakeFetch();
+    const ctx = setup(fetchImpl as unknown as typeof fetch);
+    insertCard(ctx.store);
+    insertCard(ctx.store, "CardBBBB02");
+    // Lien de retour forgé, ouvert par quelqu'un qui n'a jamais lancé le flux.
+    const forged = await stateOf(ctx, "CardAAAA01");
+    expect(await callback(ctx, `code=c&state=${forged}`, "")).toBe(`${BASE}/?photo=error`);
+    // Ouvert par quelqu'un qui a lancé le sien : son cookie ne vaut pas pour cet état.
+    const other = await stateOf(ctx, "CardAAAA01");
+    await stateOf(ctx, "CardBBBB02");
+    expect(await callback(ctx, `code=c&state=${other}`)).toBe(`${BASE}/?photo=error`);
+    // Cookie falsifié.
+    const again = await stateOf(ctx, "CardAAAA01");
+    expect(await callback(ctx, `code=c&state=${again}`, `${LI_STATE_COOKIE}=${again}`)).toBe(`${BASE}/?photo=error`);
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect((ctx.store.getCard("CardAAAA01")!.data as CardData).photoSource).toBeUndefined();
   });
 
   it("annulation sur LinkedIn → /c/:id?photo=error", async () => {

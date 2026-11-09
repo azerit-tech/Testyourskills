@@ -1,13 +1,26 @@
 // Photo LinkedIn sur la carte, par « Sign in with LinkedIn using OpenID Connect »
 // (scopes openid profile) : la personne consent, LinkedIn rend le claim
-// `picture`. Pas de scraping. Seul le créateur de la carte (porteur du jeton de
-// suppression) peut lancer le flux. Le token d'accès n'est ni stocké ni loggué.
+// `picture`. Pas de scraping. Le token d'accès n'est ni stocké ni loggué.
+//
+// Qui peut lancer le flux :
+// - fiche d'un pseudo GitHub, revendication active (§18.1) : seulement la
+//   personne connectée comme propriétaire de ce pseudo. Le jeton de la fiche ne
+//   suffit pas : il est à qui a tapé le pseudo en premier, et sa photo serait
+//   vue de tous ceux à qui le cache ressert la fiche, et au top de la semaine ;
+// - sinon (fiche sans pseudo, ou revendication non configurée) : le créateur de
+//   la fiche, porteur de son jeton de suppression.
+//
+// L'état OAuth est lié au navigateur qui a lancé le flux par un cookie httpOnly
+// signé (`tys_li`, 10 min, chemin /auth/linkedin), comme celui d'auth.ts : un
+// lien de retour forgé, ouvert par quelqu'un d'autre, ne pose pas sa photo.
 
 import { randomBytes } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Hono } from "hono";
+import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import type { CardData, ComparisonData } from "../../shared/types";
+import { ownerFromRequest, sign, unsign } from "./auth";
 import type { CardRow, Store } from "./db";
 import { ID_RE } from "./pipeline";
 
@@ -24,6 +37,8 @@ const PHOTO_MAX_BYTES = 2 * 1024 * 1024;
 const PHOTO_TIMEOUT_MS = 3000;
 const API_TIMEOUT_MS = 5000;
 const STATE_TTL_MS = 10 * 60 * 1000;
+export const LI_STATE_COOKIE = "tys_li";
+const STATE_PATH = "/auth/linkedin";
 
 export function linkedinFromEnv(env: NodeJS.ProcessEnv): LinkedinConfig | undefined {
   const clientId = env.LINKEDIN_CLIENT_ID?.trim();
@@ -212,10 +227,19 @@ export interface LinkedinRoutesOptions {
   tokenMatches(given: string | undefined, expected: string): boolean;
   /** Invalide les PNG en cache des ids donnés. */
   removeImages(ids: string[]): Promise<void>;
+  /** Revendication GitHub active (§18.1) : la photo d'une fiche à pseudo GitHub est à son propriétaire connecté. */
+  claim?: boolean;
+  /** Cookie d'état en Secure (production, en HTTPS). */
+  secure?: boolean;
+  /** Secret de signature du cookie d'état (SESSION_SECRET). Absent : tiré au hasard, pour la durée du processus. */
+  stateSecret?: string;
 }
 
 export function mountLinkedin(app: Hono, o: LinkedinRoutesOptions) {
   const states = new StateStore();
+  // Les états ne survivent pas non plus à un redémarrage : un secret du processus suffit.
+  const secret = o.stateSecret ?? randomBytes(32).toString("base64url");
+  const cookieBase = { httpOnly: true, secure: o.secure ?? o.baseUrl.startsWith("https://"), sameSite: "Lax" as const, path: STATE_PATH };
   const redirectUri = `${o.baseUrl}/auth/linkedin/callback`;
   const back = (id: string | null, result: "linkedin" | "error") =>
     id ? `${o.baseUrl}/c/${id}?photo=${result}` : `${o.baseUrl}/?photo=${result}`;
@@ -236,14 +260,30 @@ export function mountLinkedin(app: Hono, o: LinkedinRoutesOptions) {
     const id = c.req.query("card") ?? "";
     const row = ID_RE.test(id) ? o.store.getCard(id) : null;
     if (!row) return c.json({ ok: false, message: { fr: "Fiche introuvable.", en: "Sheet not found." } }, 404);
-    if (!o.tokenMatches(c.req.query("token"), row.deleteToken)) {
+    const login = o.store.loginOf(row);
+    if (o.claim && login) {
+      if (ownerFromRequest(c)?.login !== login.toLowerCase()) {
+        return c.json(
+          {
+            ok: false,
+            message: {
+              fr: "Changer la photo est réservé au compte GitHub de la fiche : clique d'abord sur « C'est moi ».",
+              en: "Only the sheet's GitHub account can change its photo: click “That's me” first.",
+            },
+          },
+          403,
+        );
+      }
+    } else if (!o.tokenMatches(c.req.query("token"), row.deleteToken)) {
       return c.json({ ok: false, message: { fr: "Changer la photo est réservé à qui a créé la fiche.", en: "Only the sheet's creator can change its photo." } }, 403);
     }
+    const state = states.create(id);
+    setCookie(c, LI_STATE_COOKIE, sign(secret, "linkedin", { s: state, e: Date.now() + STATE_TTL_MS }), { ...cookieBase, maxAge: STATE_TTL_MS / 1000 });
     const url = new URL(AUTHORIZE_URL);
     url.searchParams.set("response_type", "code");
     url.searchParams.set("client_id", o.config.clientId);
     url.searchParams.set("redirect_uri", redirectUri);
-    url.searchParams.set("state", states.create(id));
+    url.searchParams.set("state", state);
     url.searchParams.set("scope", "openid profile");
     c.header("Cache-Control", "no-store");
     return c.redirect(url.toString(), 302);
@@ -251,8 +291,15 @@ export function mountLinkedin(app: Hono, o: LinkedinRoutesOptions) {
 
   app.get("/auth/linkedin/callback", async (c) => {
     c.header("Cache-Control", "no-store");
-    const id = states.take(c.req.query("state"));
-    if (!id || !o.config) return c.redirect(back(null, "error"), 302);
+    const given = c.req.query("state");
+    const bound = unsign(secret, "linkedin", getCookie(c, LI_STATE_COOKIE));
+    // Usage unique : le cookie d'état et l'état partent quoi qu'il arrive.
+    deleteCookie(c, LI_STATE_COOKIE, cookieBase);
+    const id = states.take(given);
+    // L'état de l'URL doit être celui que ce navigateur a reçu au départ, comparé en temps constant.
+    const sameBrowser =
+      typeof bound?.s === "string" && typeof bound.e === "number" && bound.e > Date.now() && o.tokenMatches(given, bound.s);
+    if (!id || !sameBrowser || !o.config) return c.redirect(back(null, "error"), 302);
     const code = c.req.query("code");
     // Annulation côté LinkedIn : ?error=user_cancelled_login, pas de code.
     if (!code || c.req.query("error")) return c.redirect(back(id, "error"), 302);

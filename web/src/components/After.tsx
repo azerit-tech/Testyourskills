@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import type { CardData, ComparisonData, Lang, WeekRank } from "../../../shared/types";
 import { declaredOf, STAT_CODES, starsFor } from "../../../shared/types";
 import { pick, useT } from "../i18n";
-import { api, images, isMine, isMock, tokens, weekOf } from "../lib/api";
+import { api, hasGithub, images, isMine, isMock, tokens, weekOf } from "../lib/api";
 import { navigate } from "../lib/router";
 import { getPlea } from "../lib/plea";
 import { setPrefill } from "../lib/session";
@@ -359,20 +359,25 @@ function ImagePanel({ src, onClose }: { src: string; onClose: () => void }) {
 
 /* ---------- photo LinkedIn ---------- */
 
-/** Visible seulement si le serveur a LinkedIn et si on connaît le jeton de la carte. */
+/**
+ * Visible seulement si le serveur a LinkedIn, et à qui peut poser la photo :
+ * le propriétaire connecté pour une fiche à pseudo GitHub quand la
+ * revendication est active, sinon qui a créé la fiche (son jeton).
+ */
 export function LinkedInPhoto({ cardId, hasAvatar }: { cardId: string; hasAvatar: boolean }) {
   const { t } = useT();
   const l = t.result.linkedin;
   const token = tokens.get(cardId);
-  const [enabled, setEnabled] = useState(false);
+  const [cfg, setCfg] = useState<{ linkedin: boolean; claim: boolean } | null>(null);
   useEffect(() => {
     let alive = true;
-    void api.getConfig().then((c) => alive && setEnabled(c.linkedin));
+    void api.getConfig().then((c) => alive && setCfg(c));
     return () => {
       alive = false;
     };
   }, []);
-  if (!enabled || !token) return null;
+  if (!cfg?.linkedin) return null;
+  if (cfg.claim && hasGithub(cardId) ? !isMine(cardId) : !token) return null;
   return (
     <section className={`after-block personalize${hasAvatar ? "" : " is-featured"}`} aria-labelledby="perso-title">
       <div className="personalize-copy">
