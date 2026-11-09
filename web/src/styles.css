@@ -585,8 +585,9 @@ svg {
 /* --- mur des 13 profils (§18.28) : téléphone, un rail aimanté qui sort du bord
    droit (tuile de 260 px, la suivante dépasse de 100 px à 390, de 70 à 360) ;
    ordinateur, une grille pleine de 15 cases, « Et toi ? » sur deux. Le décor
-   porte déjà un aplat sombre en bas ; un voile d'encre (pas un dégradé de
-   couleur) tient le contraste AA du nom et de la phrase par-dessus le sujet. --- */
+   porte déjà un aplat sombre en bas : le nom et la phrase s'y posent, et un
+   voile d'encre attaché au texte (pas à la tuile) ne fait que le strict
+   nécessaire là où ils débordent sur la scène. --- */
 .wall {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -643,20 +644,29 @@ svg {
   height: 100%;
   object-fit: cover;
 }
-.wall-tile:not(.wall-cta)::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to bottom, rgba(12, 13, 27, 0) 30%, rgba(12, 13, 27, 0.62) 58%, rgba(12, 13, 27, 0.9) 100%);
-}
 .wall-text {
   position: absolute;
   z-index: 1;
   right: 12px;
-  bottom: 11px;
+  bottom: 10px;
   left: 12px;
   display: grid;
-  gap: 4px;
+  gap: 3px;
+}
+/* le voile suit le bloc de texte : nul 24 px au-dessus, 0,38 sous le nom, 0,7
+   sous la phrase, 0,56 au bord. Mesuré sur les 13 décors (le point le plus clair
+   à 99 %, tuiles de 210 à 367 px, phrase sur une ou deux lignes) : nom crème
+   ≥ 3,2:1 (grand texte), phrase rose ≥ 4,8:1. Les plus exigeants : fresh_blood,
+   chameleon, kingpin. Plus de la moitié haute de l'image n'a aucun voile. */
+.wall-text::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: -24px;
+  right: -12px;
+  bottom: -10px;
+  left: -12px;
+  background: linear-gradient(to bottom, rgba(12, 13, 27, 0) 0, rgba(12, 13, 27, 0.38) 22px, rgba(12, 13, 27, 0.7) 46px, rgba(12, 13, 27, 0.56) 100%);
 }
 .wall-name {
   font: 700 22px/0.95 var(--f-name);
@@ -669,7 +679,7 @@ svg {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   line-clamp: 2;
-  font: 500 13px/1.3 var(--f-text);
+  font: 500 13px/1.25 var(--f-text);
   color: var(--blush);
 }
 /* la dernière case : l'appel, sur un aplat marine */
