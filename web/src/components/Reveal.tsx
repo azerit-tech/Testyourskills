@@ -11,6 +11,7 @@ import { themeOf } from "../../../shared/card/themes";
 import { CardView } from "../card/CardView";
 import { useT } from "../i18n";
 import { isMock } from "../lib/api";
+import { useMediaQuery } from "../lib/util";
 
 /** Les couleurs du niveau (SPEC §17.2, thème de la fiche), pour la scène 3D et
  * le halo de l'emplacement : les néons du thème, plus les ors du tier. */
@@ -59,7 +60,7 @@ interface RevealCardProps {
   lang: Lang;
   phase: Phase;
   idPrefix: string;
-  /** Porte l'invite « touche pour ouvrir » (carte seule). */
+  /** Porte l'invite « touche / clique pour ouvrir » (carte seule). */
   primary?: boolean;
   /** La carte 3D vient se poser sur cet emplacement. */
   anchor?: boolean;
@@ -70,13 +71,15 @@ export function RevealCard({ card, lang, phase, idPrefix, primary = true, anchor
   const accent = levelAccent(card);
   const style = styleOf(card);
   const showCard = phase === "handoff" || phase === "done";
+  // Le dossier s'ouvre seul (AUTO_OPEN), mais un toucher ou un clic l'ouvre plus tôt.
+  const touch = useMediaQuery("(pointer: coarse)");
   const vars = { "--ca": accent.a, "--cb": accent.b, "--ink": accent.ink } as CSSProperties;
 
   return (
     <div className={`card-slot phase-${phase}${showCard ? " show-front" : ""}`} style={vars} data-style={style} data-scene-anchor={anchor ? "" : undefined}>
       <div className="slot-halo" aria-hidden />
       <div className="card-rig">{showCard && <CardView card={card} lang={lang} interactive={phase === "done"} reveal={phase === "handoff"} idPrefix={idPrefix} />}</div>
-      {primary && phase === "ready" && <span className="pack-hint">{t.reveal.tap}</span>}
+      {primary && phase === "ready" && <span className="pack-hint">{touch ? t.reveal.tap : t.reveal.click}</span>}
     </div>
   );
 }

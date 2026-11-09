@@ -108,11 +108,15 @@ const fr = {
     ],
   },
   reveal: {
+    /* le dossier s'ouvre seul au bout d'1,6 s, ou plus tôt au toucher / au clic */
     tap: "Touche pour ouvrir",
+    click: "Clique pour ouvrir",
+    /* titre du dossier à l'écran de la cabine, avant l'ouverture */
+    packTitle: "DOSSIER",
     skip: "Passer l'animation",
     mute: "Couper le son",
     unmute: "Activer le son",
-    opening: "Ouverture du pack",
+    opening: "Ouverture du dossier",
     revealed: (level: string, overall: number) => `Fiche ${level}, note ${overall}.`,
     fireworks: "Clique ou Espace : feux d'artifice",
     statusLabel: "Statut",
@@ -438,10 +442,12 @@ const en: Dict = {
   },
   reveal: {
     tap: "Tap to open",
+    click: "Click to open",
+    packTitle: "CASE FILE",
     skip: "Skip animation",
     mute: "Mute",
     unmute: "Unmute",
-    opening: "Opening the pack",
+    opening: "Opening the case file",
     revealed: (level, overall) => `${level} sheet, rated ${overall}.`,
     fireworks: "Click or Space: fireworks",
     statusLabel: "Status",

@@ -150,7 +150,7 @@ export function makeCardBackTexture(accent: string): THREE.CanvasTexture {
   return srgb(new THREE.CanvasTexture(c)) as THREE.CanvasTexture;
 }
 
-/** Face du pack : sachet sombre, liseré, gemme, « DEV PACK ». */
+/** Face du pack : sachet sombre, liseré, gemme, « DOSSIER » (« CASE FILE » en anglais). */
 export function makePackFaceTexture(accentA: string, accentB: string, lang: "fr" | "en"): THREE.CanvasTexture {
   const W = 512;
   const H = 768;
@@ -236,12 +236,19 @@ export function makePackFaceTexture(accentA: string, accentB: string, lang: "fr"
   tg.addColorStop(0.55, "#b8c7d6");
   tg.addColorStop(1, "#7a8ea3");
   g.fillStyle = tg;
-  g.font = `800 118px ${DISPLAY}`;
-  g.fillText("DEV", W / 2, 560);
-  g.fillText("PACK", W / 2, 655);
+  // Univers du §17 : un dossier de police scellé, plus un pack de cartes.
+  const title = lang === "fr" ? ["DOSSIER"] : ["CASE", "FILE"];
+  // Taille réduite si un mot déborde du sachet (marge de 36 px de chaque côté).
+  let size = 118;
+  g.font = `800 ${size}px ${DISPLAY}`;
+  const widest = Math.max(...title.map((l) => g.measureText(l).width));
+  if (widest > W - 72) size = Math.floor((size * (W - 72)) / widest);
+  g.font = `800 ${size}px ${DISPLAY}`;
+  if (title.length === 1) g.fillText(title[0]!, W / 2, 610);
+  else title.forEach((l, i) => g.fillText(l, W / 2, 560 + i * 95));
   g.fillStyle = "rgba(230,236,242,0.7)";
   g.font = `500 18px ${MONO}`;
-  g.fillText(lang === "fr" ? "1 CARTE · NOTÉE PAR BARÈME" : "1 CARD · RUBRIC-RATED", W / 2, 706);
+  g.fillText(lang === "fr" ? "1 FICHE · JUGÉE PAR BARÈME" : "1 SHEET · JUDGED BY RUBRIC", W / 2, 706);
   return srgb(new THREE.CanvasTexture(c)) as THREE.CanvasTexture;
 }
 

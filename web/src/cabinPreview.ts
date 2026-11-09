@@ -32,7 +32,7 @@ async function start() {
       langName: "TypeScript", langLabel: "Arme", leagueName: "GitHub", leagueLabel: "Dossier",
       position: card.position, positionName: "Full-stack", positionLabel: "Spécialité",
       club: card.club ?? "", clubLabel: "Affiliation", statusLabel: "Statut", statuses: [{ min: 0, label: "Confirmé" }],
-      idleTitle: "DEV PACK", idleSubtitle: "", graphLabel: "Contributions", levelLabel: "Dangereux",
+      idleTitle: "DOSSIER", idleSubtitle: "", graphLabel: "Contributions", levelLabel: "Dangereux",
       hud: { specialty: "Spécialité", weapon: "Arme", file: "Dossier", affiliation: "Affiliation", dispatch: "Central", score: "Note", suspect: "Suspect identifié :" },
     },
   });
