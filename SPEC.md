@@ -28,7 +28,7 @@ Chaque point ci-dessous est une instruction. Si une fonctionnalité contredit l'
 6. **Le CV n'est jamais stocké.** Il est lu en mémoire, les constats sont gardés, le fichier et le texte sont jetés.
 7. **Azerit est visible, pas envahissant.** Un logo discret sur la carte, une ligne de CTA sous la carte, c'est tout.
 8. **Bilingue français et anglais** dès la v1, car la landing est en anglais.
-9. **Fonctionne sur mobile** aussi bien que sur desktop. La majorité des clics viendront de LinkedIn sur téléphone.
+9. **D'abord le téléphone, ensuite l'ordinateur** (décision de Jacques du 9 novembre 2026). Chaque écran se dessine et se vérifie d'abord à 390 px de large, dans le navigateur intégré de LinkedIn, puis s'étend à l'ordinateur. La majorité des clics viendront de LinkedIn sur téléphone.
 
 ## 3. La carte
 
