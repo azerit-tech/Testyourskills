@@ -31,6 +31,7 @@ import { MEAN_LUMA, grainAlbedo } from "./albedo";
 import { createBakedLighting } from "./baked";
 import { createCardMesh } from "./cardMesh";
 import { chairMaterial, createChair } from "./chair";
+import { buzz } from "../lib/haptics";
 import { createElevatorSound } from "./elevatorSound";
 import { createHud, type Hud } from "./hud";
 import { HUD_STAR_AT, type HudTexts } from "./hudTexts";
@@ -923,7 +924,11 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
     const crossed = (at: number) => prevT < at && t >= at;
     /* les étoiles de recherche : une de plus à chaque seuil, avec la radio */
     const stars = t >= plan.depart ? starsAt(level) : 0;
-    if (stars > lastStars && t >= plan.depart) radio.crackle();
+    if (stars > lastStars && t >= plan.depart) {
+      radio.crackle();
+      // le corps répond (§18.27) : une vibration courte à chaque étoile, son coupé ou non
+      if (!o.warm) buzz(12);
+    }
     lastStars = stars;
     if (crossed(plan.mission[0])) radio.sting();
     shaftTex.offset.y = climb * 7;
