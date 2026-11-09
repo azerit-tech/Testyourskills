@@ -38,7 +38,10 @@ tools
 .git
 .gitignore
 .claude
-scripts
+# scripts/ reste dehors, sauf le tableau de la semaine, lancé dans le conteneur :
+#   docker exec testyourskills node_modules/.bin/tsx scripts/weekly.ts
+scripts/*
+!scripts/weekly.ts
 ops
 **/*.test.ts
 vitest.config.ts
