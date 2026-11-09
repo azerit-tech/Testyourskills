@@ -1,5 +1,5 @@
-// Le champ unique de l'entrée (§6.1) : deux onglets GitHub / CV,
-// et un lien discret « les deux » pour la comparaison.
+// Le champ unique de l'entrée (§6.1) : le pseudo GitHub, et à un lien de là
+// le CV, puis « les deux » pour la comparaison.
 // Variante « inline » : le champ GitHub seul, dans le bandeau d'une carte partagée.
 // Raccourcis : coller une URL GitHub ou déposer un PDF n'importe où sur la page lance la carte.
 import { useEffect, useId, useRef, useState } from "react";
@@ -13,7 +13,7 @@ import { markFresh, rememberInput, setPrefill, takePrefill } from "../lib/sessio
 import type { Mode, Tab } from "../lib/session";
 import { checkPdf, isTouch, parseLogin } from "../lib/util";
 import type { PdfCheck } from "../lib/util";
-import { IconArrow, IconClose, IconDoc, IconGithub, IconUpload } from "./Icons";
+import { IconClose } from "./Icons";
 
 interface Props {
   inputRef?: React.RefObject<HTMLInputElement | null>;
@@ -323,27 +323,32 @@ export function EntryForm({ inputRef, variant = "full" }: Props) {
     </p>
   );
 
+
+  /** Le champ du pseudo, en pilule, avec son « @ » (maquette web/gta-accueil.html). */
+  const loginField = (
+    <div className="field">
+      <label htmlFor={`${uid}-gh`} className="sr-only">
+        {h.loginLabel}
+      </label>
+      <span className="field-prefix" aria-hidden>
+        @
+      </span>
+      {loginInput}
+    </div>
+  );
+
   if (inline) {
     return (
       <form className="entry entry-inline" onSubmit={submit} onInput={prefetchReveal} onPointerDown={prefetchReveal} noValidate>
-        <div className="field">
-          <label htmlFor={`${uid}-gh`} className="sr-only">
-            {h.loginLabel}
-          </label>
-          <span className="field-prefix" aria-hidden>
-            github.com/
-          </span>
-          {loginInput}
-          <button type="submit" className="btn-primary field-submit" disabled={busy}>
-            <span>{busy ? h.submitting : h.submit}</span>
-            <IconArrow />
-          </button>
-        </div>
+        {loginField}
+        <button type="submit" className="pill pill-big entry-submit" disabled={busy}>
+          {busy ? h.submitting : h.submit}
+        </button>
         {errorLine}
         <div className="entry-foot" id={`${uid}-hint`}>
           <button
             type="button"
-            className="link-both"
+            className="link-alt"
             onClick={() => {
               setPrefill({ tab: "cv" });
               navigate("/");
@@ -357,112 +362,89 @@ export function EntryForm({ inputRef, variant = "full" }: Props) {
     );
   }
 
+  // Un seul chemin à l'écran : le pseudo d'abord ; le CV, puis la comparaison, à un lien de là.
   return (
     <form className={`entry mode-${mode}`} onSubmit={submit} onInput={prefetchReveal} onPointerDown={prefetchReveal} onDragEnter={prefetchReveal} noValidate>
-      {mode === "single" ? (
-        <div className="seg entry-tabs" role="tablist" aria-label={h.tabsLabel}>
-          <span className="seg-thumb" data-pos={tab === "github" ? 0 : 1} aria-hidden />
-          <button type="button" role="tab" id={`${uid}-tg`} aria-selected={tab === "github"} aria-controls={`${uid}-panel`} onClick={() => switchTab("github")}>
-            <IconGithub />
-            {h.tabGithub}
-          </button>
-          <button type="button" role="tab" id={`${uid}-tc`} aria-selected={tab === "cv"} aria-controls={`${uid}-panel`} onClick={() => switchTab("cv")}>
-            <IconDoc />
-            {h.tabCv}
-          </button>
-        </div>
-      ) : (
-        <div className="entry-both-head">
-          <span className="both-badge">
-            <i>CV</i>
-            <b>vs</b>
-            <i>GH</i>
-          </span>
-          <span>{h.bothActive}</span>
+      {mode === "both" && <p className="entry-both-head">{h.bothActive}</p>}
+
+      {showGithub && loginField}
+
+      {showCv && (
+        <div className={`drop${drag ? " is-drag" : ""}${file ? " has-file" : ""}`}>
+          <input
+            ref={fileInput}
+            id={`${uid}-file`}
+            type="file"
+            accept="application/pdf,.pdf"
+            className="sr-only"
+            onChange={(e) => {
+              void pickFile(e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
+          {file ? (
+            <div className="drop-file">
+              <span className="drop-file-meta">
+                <b>{file.name}</b>
+                <span>{sizeLabel(file.size)}</span>
+              </span>
+              <button type="button" className="icon-btn" onClick={() => setFile(null)} aria-label={h.dropRemove}>
+                <IconClose />
+              </button>
+            </div>
+          ) : (
+            <label htmlFor={`${uid}-file`} className="drop-empty">
+              <span className="drop-title">{h.dropTitle}</span>
+              <span className="drop-sub">
+                {h.dropOr} <u>{h.dropBrowse}</u> · {h.dropHint}
+              </span>
+            </label>
+          )}
         </div>
       )}
 
-      <div className="entry-panel" id={`${uid}-panel`} role={mode === "single" ? "tabpanel" : undefined} aria-labelledby={mode === "single" ? (tab === "github" ? `${uid}-tg` : `${uid}-tc`) : undefined}>
-        {showGithub && (
-          <div className="field">
-            <label htmlFor={`${uid}-gh`} className="sr-only">
-              {h.loginLabel}
-            </label>
-            <span className="field-prefix" aria-hidden>
-              github.com/
-            </span>
-            {loginInput}
-            {mode === "single" && (
-              <button type="submit" className="btn-primary field-submit" disabled={busy}>
-                <span>{busy ? h.submitting : h.submit}</span>
-                <IconArrow />
-              </button>
-            )}
-          </div>
-        )}
-
-        {showCv && (
-          <div className={`drop${drag ? " is-drag" : ""}${file ? " has-file" : ""}`}>
-            <input
-              ref={fileInput}
-              id={`${uid}-file`}
-              type="file"
-              accept="application/pdf,.pdf"
-              className="sr-only"
-              onChange={(e) => {
-                void pickFile(e.target.files?.[0]);
-                e.target.value = "";
-              }}
-            />
-            {file ? (
-              <div className="drop-file">
-                <span className="drop-file-icon" aria-hidden>
-                  PDF
-                </span>
-                <span className="drop-file-meta">
-                  <b>{file.name}</b>
-                  <span>{sizeLabel(file.size)}</span>
-                </span>
-                <button type="button" className="icon-btn" onClick={() => setFile(null)} aria-label={h.dropRemove}>
-                  <IconClose />
-                </button>
-              </div>
-            ) : (
-              <label htmlFor={`${uid}-file`} className="drop-empty">
-                <span className="drop-icon" aria-hidden>
-                  <IconUpload />
-                </span>
-                <span className="drop-title">{h.dropTitle}</span>
-                <span className="drop-sub">
-                  {h.dropOr} <u>{h.dropBrowse}</u> · {h.dropHint}
-                </span>
-              </label>
-            )}
-          </div>
-        )}
-
-        {(mode === "both" || tab === "cv") && (
-          <button type="submit" className="btn-primary entry-submit" disabled={busy}>
-            <span>{busy ? h.submitting : mode === "both" ? h.submitBoth : h.submit}</span>
-            <IconArrow />
-          </button>
-        )}
-      </div>
+      <button type="submit" className="pill pill-big entry-submit" disabled={busy}>
+        {busy ? h.submitting : mode === "both" ? h.submitBoth : h.submit}
+      </button>
 
       {errorLine}
 
       <div className="entry-foot" id={`${uid}-hint`}>
         {showCv && <span className="entry-reassure">{h.reassure}</span>}
-        <button
-          type="button"
-          className="link-both"
-          onClick={() => {
-            setMode((m) => (m === "single" ? "both" : "single"));
-            setError(null);
-          }}
-        >
-          {mode === "single" ? h.bothLink : h.bothBack}
-        </button>
+        {mode === "single" && tab === "github" && (
+          <button type="button" className="link-alt" onClick={() => switchTab("cv")}>
+            {h.inlineCv}
+          </button>
+        )}
+        {mode === "single" && tab === "cv" && (
+          <>
+            <button type="button" className="link-alt" onClick={() => switchTab("github")}>
+              ← {h.tabGithub}
+            </button>
+            <button
+              type="button"
+              className="link-alt"
+              onClick={() => {
+                setMode("both");
+                setError(null);
+              }}
+            >
+              {h.bothLink}
+            </button>
+          </>
+        )}
+        {mode === "both" && (
+          <button
+            type="button"
+            className="link-alt"
+            onClick={() => {
+              setMode("single");
+              setError(null);
+            }}
+          >
+            {h.bothBack}
+          </button>
+        )}
       </div>
       {veil}
     </form>
