@@ -1,7 +1,7 @@
 // Client de l'API. En mode démo (?mock=1 ou VITE_MOCK=1), tout passe par mock.ts.
-import type { CardData, JobState, Lang, WeekTop } from "../../../shared/types";
+import type { CardData, JobState, Lang, WeekRank, WeekTop } from "../../../shared/types";
 import { mockApi } from "./mock";
-import { mockTop } from "./mockTop";
+import { mockTop, mockWeekRank } from "./mockTop";
 import { ApiError } from "./errors";
 import { currentRef } from "./session";
 
@@ -175,7 +175,25 @@ async function createCard(input: CreateInput): Promise<CreateResult> {
   return res.json();
 }
 
+/** Rang de la semaine des fiches lues (§18.22), gardé pour l'après-fiche. */
+const weeks = new Map<string, WeekRank>();
+
+/** Rang de la semaine de cette fiche, lu avec elle ; null : hors classement. */
+export function weekOf(id: string): WeekRank | null {
+  return weeks.get(id) ?? null;
+}
+
 async function getJob(id: string): Promise<JobState> {
+  const job = await fetchJob(id);
+  if (job.state === "done") {
+    const week = isMock() ? mockWeekRank(job.kind === "card" ? job.card : job.comparison.github) : job.week;
+    if (week) weeks.set(id, week);
+    else weeks.delete(id);
+  }
+  return job;
+}
+
+async function fetchJob(id: string): Promise<JobState> {
   if (isMock()) return mockApi.getJob(id);
   let res: Response;
   try {

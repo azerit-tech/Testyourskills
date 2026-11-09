@@ -1,10 +1,10 @@
 // Tout ce qui vient sous la carte (§6.4), dans l'ordre de la spec.
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import type { CardData, ComparisonData, Lang } from "../../../shared/types";
+import type { CardData, ComparisonData, Lang, WeekRank } from "../../../shared/types";
 import { STAT_CODES, starsFor } from "../../../shared/types";
 import { pick, useT } from "../i18n";
-import { api, images, isMock, tokens } from "../lib/api";
+import { api, images, isMock, tokens, weekOf } from "../lib/api";
 import { navigate } from "../lib/router";
 import { setPrefill } from "../lib/session";
 import { copyText, isTouch, shareUrl } from "../lib/util";
@@ -29,6 +29,29 @@ export function useToast() {
   return { show, node };
 }
 
+/* ---------- rang de la semaine (§18.22) ---------- */
+
+/** Une ligne, en tête de l'après-fiche : le rang, puis ce qui manque (ou la place à défendre). Hors classement : rien. */
+function WeekLine({ week }: { week: WeekRank | null }) {
+  const { t } = useT();
+  const w = t.result.week;
+  if (!week) return null;
+  const text = week.closed
+    ? week.inTop5
+      ? w.closedTop5(week.week)
+      : w.closedLine(week.rank, week.total, week.week)
+    : week.inTop5
+      ? w.top5
+      : w.line(week.rank, week.total, week.gapToTop5);
+  const [head, ...rest] = text.split(" · ");
+  return (
+    <p className="week-rank" role="status">
+      <span>{head}</span>
+      {rest.length > 0 && <span className="week-rank-next">{rest.join(" · ")}</span>}
+    </p>
+  );
+}
+
 /* ---------- partage ---------- */
 
 export type Shareable = { kind: "card"; card: CardData } | { kind: "comparison"; comparison: ComparisonData };
@@ -49,17 +72,20 @@ export function ShareBar({ item, toast }: { item: Shareable; toast: (m: string) 
   const id = idOf(item);
   const url = shareUrl(id);
   const ts = t.result.share;
+  const week = weekOf(id);
+  // Le rang n'entre dans le texte que pendant sa semaine : « 7e cette semaine ».
+  const rank = week && !week.closed ? t.result.week.share(week.rank) : null;
 
   const text = (withUrl: string) => {
     if (item.kind === "card") {
       const c = item.card;
       const profile = c.profile ? pick(c.profile.label, lang) : null;
-      return ts.text("★".repeat(starsFor(c.overall)), c.overall, profile, bestStatus(c, lang), c.judgedInSeconds, withUrl);
+      return ts.text("★".repeat(starsFor(c.overall)), c.overall, profile, bestStatus(c, lang), c.judgedInSeconds, withUrl, rank);
     }
     const cmp = item.comparison;
     // Le profil de la fiche GitHub : après la comparaison, c'est lui qui porte l'écart (Faussaire).
     const profile = cmp.github.profile ?? cmp.cv.profile;
-    return ts.textCompare(cmp.cv.overall, cmp.github.overall, profile ? pick(profile.label, lang) : null, pick(cmp.headline, lang), withUrl);
+    return ts.textCompare(cmp.cv.overall, cmp.github.overall, profile ? pick(profile.label, lang) : null, pick(cmp.headline, lang), withUrl, rank);
   };
 
   const liHref = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
@@ -95,6 +121,7 @@ export function ShareBar({ item, toast }: { item: Shareable; toast: (m: string) 
 
   return (
     <section className="after-block out" aria-labelledby="out-title">
+      <WeekLine week={week} />
       <h2 id="out-title">{ts.title}</h2>
       <button type="button" className="pill pill-big out-main" onClick={onLinkedIn}>
         <IconLinkedIn />

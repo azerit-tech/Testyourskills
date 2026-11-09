@@ -190,10 +190,19 @@ const fr = {
       linkedinHint: "Texte copié : colle-le dans ton post LinkedIn.",
       copiedLink: "Lien copié.",
       downloadDemo: "Image indisponible en mode démo (rendue par le serveur).",
-      text: (stars: string, overall: number, profile: string | null, status: string | null, secs: number, url: string) =>
-        `Fiche ${stars}, ${overall}${profile ? ` · ${profile}` : ""}.${status ? ` Chef d'accusation : « ${status} ».` : ""} Interrogatoire par une IA : ${secs} s. Fais la tienne : ${url}`,
-      textCompare: (cv: number, gh: number, profile: string | null, headline: string, url: string) =>
-        `Mon CV : ${cv}. Mon GitHub : ${gh}${profile ? ` · ${profile}` : ""}. ${headline}. Fais la tienne : ${url}`,
+      text: (stars: string, overall: number, profile: string | null, status: string | null, secs: number, url: string, rank: string | null = null) =>
+        `Fiche ${stars}, ${overall}${profile ? ` · ${profile}` : ""}${rank ? ` · ${rank}` : ""}.${status ? ` Chef d'accusation : « ${status} ».` : ""} Interrogatoire par une IA : ${secs} s. Fais la tienne : ${url}`,
+      textCompare: (cv: number, gh: number, profile: string | null, headline: string, url: string, rank: string | null = null) =>
+        `Mon CV : ${cv}. Mon GitHub : ${gh}${profile ? ` · ${profile}` : ""}${rank ? ` · ${rank}` : ""}. ${headline}. Fais la tienne : ${url}`,
+    },
+    /* Rang de la semaine (§18.22), en tête de l'après-fiche. « n° 1 » plutôt que « 1er » : rien ne s'accorde. */
+    week: {
+      line: (rank: number, total: number, gap: number) =>
+        `${rank}e sur ${total} cette semaine · ${gap} ${gap > 1 ? "points" : "point"} du top 5`,
+      top5: "Top 5 de la semaine · défends ta place jusqu'à dimanche",
+      closedLine: (rank: number, total: number, week: number) => `${rank}e sur ${total}, semaine ${week}`,
+      closedTop5: (week: number) => `Top 5 de la semaine ${week}`,
+      share: (rank: number) => `${rank === 1 ? "n° 1" : `${rank}e`} cette semaine`,
     },
     linkedin: {
       kicker: "Personnaliser ma fiche",
@@ -519,9 +528,17 @@ const en: Dict = {
       linkedinHint: "Text copied: paste it into your LinkedIn post.",
       copiedLink: "Link copied.",
       downloadDemo: "Image unavailable in demo mode (rendered by the server).",
-      text: (stars, overall, profile, status, secs, url) =>
-        `${stars} sheet, ${overall}${profile ? ` · ${profile}` : ""}.${status ? ` Charge: “${status}”.` : ""} Interrogated by an AI for ${secs}s. Make yours: ${url}`,
-      textCompare: (cv, gh, profile, headline, url) => `My CV: ${cv}. My GitHub: ${gh}${profile ? ` · ${profile}` : ""}. ${headline}. Make yours: ${url}`,
+      text: (stars, overall, profile, status, secs, url, rank = null) =>
+        `${stars} sheet, ${overall}${profile ? ` · ${profile}` : ""}${rank ? ` · ${rank}` : ""}.${status ? ` Charge: “${status}”.` : ""} Interrogated by an AI for ${secs}s. Make yours: ${url}`,
+      textCompare: (cv, gh, profile, headline, url, rank = null) =>
+        `My CV: ${cv}. My GitHub: ${gh}${profile ? ` · ${profile}` : ""}${rank ? ` · ${rank}` : ""}. ${headline}. Make yours: ${url}`,
+    },
+    week: {
+      line: (rank, total, gap) => `#${rank} of ${total} this week · ${gap} ${gap === 1 ? "point" : "points"} from the top 5`,
+      top5: "This week's top 5 · hold your spot until Sunday",
+      closedLine: (rank, total, week) => `#${rank} of ${total}, week ${week}`,
+      closedTop5: (week) => `Top 5 of week ${week}`,
+      share: (rank) => `#${rank} this week`,
     },
     linkedin: {
       kicker: "Customize my sheet",

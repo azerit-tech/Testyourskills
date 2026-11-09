@@ -1134,6 +1134,21 @@ svg {
 .out {
   background: var(--navy);
 }
+/* rang de la semaine (§18.22) : une ligne forte, en tête du partage */
+.after-block .week-rank {
+  display: grid;
+  gap: 4px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--lilac-faint);
+  /* pas de capitales : « 6e » resterait « 6E » */
+  font: 700 30px/1 var(--f-name);
+  color: var(--cream);
+  text-wrap: balance;
+}
+.week-rank-next {
+  font: 600 16px/1.25 var(--f-text);
+  color: var(--blush);
+}
 .out .out-main {
   width: 100%;
 }

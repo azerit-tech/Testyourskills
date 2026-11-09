@@ -1,6 +1,6 @@
 // Mode démo : le top de la semaine (§18.22) avec des données fictives. Sept
 // classés, pour voir les places libres comme au lancement.
-import type { TopEntry, WeekTop } from "../../../shared/types";
+import type { CardData, TopEntry, WeekRank, WeekTop } from "../../../shared/types";
 import { starsFor } from "../../../shared/types";
 
 const DAY = 24 * 3600 * 1000;
@@ -29,6 +29,16 @@ const PLAYERS: [string, number][] = [
   ["kevin-dev42", 52],
   ["ghost-coder", 31],
 ];
+
+/** Rang de démo d'une fiche fraîche parmi les classés fictifs ; null pour une fiche CV. */
+export function mockWeekRank(card: CardData, now = Date.now()): WeekRank | null {
+  if (card.source !== "github") return null;
+  const monday = mondayOf(now);
+  const rank = PLAYERS.filter(([, o]) => o >= card.overall).length + 1;
+  const fifth = PLAYERS[4]![1];
+  const inTop5 = rank <= 5;
+  return { rank, total: PLAYERS.length + 1, gapToTop5: inTop5 ? 0 : fifth - card.overall + 1, inTop5, week: isoWeek(monday), closed: false };
+}
 
 export function mockTop(now = Date.now()): WeekTop {
   const monday = mondayOf(now);
