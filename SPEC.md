@@ -971,3 +971,18 @@ Après chaque fusion, on vérifie la grille suivante. On corrige ce qui manque, 
 - **Afficheur de l'ascenseur** : crème sur encre, la couleur du niveau n'y figure plus. Le bouton de l'étage garde la couleur du niveau, sans lueur.
 - **Gardés** : l'allée au sol, qui mène au dev, à la couleur du niveau, et les feux d'artifice (l'invite du HUD les annonce), aux couleurs de la palette mate et sans halo. L'aberration radiale de l'objectif reste.
 - **Inter** n'est plus chargé : aucun texte de la scène ne l'utilisait. Ses TTF sont supprimés ; la galerie de dev passe à Outfit.
+
+### 18.22 Le top de la semaine (9 novembre 2026)
+
+*Décidé par Jacques, construit par Claude. Il fait revenir : on voit le haut du tableau, on veut y grimper.*
+
+- **La semaine** va du lundi 00:00 UTC au dimanche 23:59 UTC.
+- **Qui entre** : les fiches GitHub de la semaine, fiche seule ou carte GitHub d'une comparaison. Pas les fiches CV, pas les fiches sorties sans lecture IA, pas les fiches expirées ou supprimées, pas les logins masqués par leur propriétaire.
+- **Hors concours** : les comptes de plus de 5 000 abonnés GitHub. Les célébrités gardent leur fiche, elles ne bouchent pas le haut du tableau. La règle est fixe, donc explicable. La carte GitHub d'une comparaison garde désormais ses faits pour qu'on y lise les abonnés.
+- **Une ligne par login** : sa meilleure note de la semaine. À égalité, la fiche la plus ancienne passe devant.
+- **Tout se calcule à la lecture** (`server/src/top.ts`), rien n'est écrit dans les fiches. Une fiche supprimée ou purgée sort aussi du classement d'une semaine finie.
+- **La spéciale « Top 5 de la semaine »** va à la fiche qui porte le rang d'un login du top 5 de sa semaine : en direct pendant la semaine, pour toujours ensuite. Une fiche qui a déjà une spéciale garde la sienne. Pour une comparaison, c'est sa carte GitHub. Au lancement, moins de cinq dossiers par semaine : tous l'ont.
+- **Images** : la spéciale entre dans la clé du cache disque et dans l'adresse `og:image`. Pendant la semaine en cours, une image se garde 5 minutes ; ensuite, un an.
+- **API** : `GET /api/top` donne les dix premiers (cache 60 s). `GET /api/card/:id` ajoute le rang de la semaine (champ `week`). Rien de privé : ce qui est déjà sur la fiche publique.
+- **Accueil** : sous le héros, « Top de la semaine », puis une ligne : « Semaine 46 · 143 dossiers · fin dans 2 j 14 h », mise à jour chaque minute. Dix lignes : rang, avatar, @login, six étoiles, note. Le top 5 est sur un aplat marine, une démarcation « Top 5 » le sépare du 6e. Une place vide dit « Place libre » et ramène au champ du pseudo. Le tableau s'affiche même quand le commissariat est fermé.
+- **Après la fiche** : en tête du bloc de partage, une ligne forte, « 7e sur 143 cette semaine », puis « 3 points du top 5 » ; dans le top 5, « Top 5 de la semaine · défends ta place jusqu'à dimanche ». Hors classement, rien. Le texte de partage ajoute « 7e cette semaine » tant que la semaine court. La première place s'écrit « n° 1 » : « 1er » s'accorderait.
