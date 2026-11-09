@@ -45,6 +45,8 @@ export interface StatusInstance {
   rule: Fact;
   /** Posé par l'IA (liste fermée §5.3) plutôt que par une règle. */
   byAI?: boolean;
+  /** Statut rare (§18.3) : part des fiches de référence qui l'ont, en %, sous 5. Absent sans table de référence. */
+  rarity?: number;
 }
 
 export interface CardData {
@@ -83,6 +85,8 @@ export interface CardData {
 
   /** Jeton de suppression : jamais renvoyé par GET public, seulement à la création. */
   deleteToken?: string;
+  /** « Plus recherché que `percent` % » des profils sourcés par Azerit, dans le groupe dit (§18.3). Absent sans table de référence. */
+  rank?: { percent: number; group: { kind: "language" | "position" | "all"; key?: string } };
 }
 
 /** Comparaison CV contre GitHub (§6.5). */
