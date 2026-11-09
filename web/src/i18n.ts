@@ -22,7 +22,7 @@ const fr = {
   },
   home: {
     kicker: "Une IA juge ton GitHub · 10 s",
-    titleA: "Ta fiche de dev.",
+    titleA: "Ton GitHub remplace ton CV.",
     titleB: "Le haut du classement décroche un entretien.",
     tabGithub: "Ton GitHub",
     tabCv: "Ton CV",
@@ -358,8 +358,8 @@ const en: Dict = {
   },
   home: {
     kicker: "Judged by an AI on your GitHub · 10 s",
-    titleA: "Your dev rap sheet.",
-    titleB: "The 5 most wanted get an interview.",
+    titleA: "Your GitHub replaces your CV.",
+    titleB: "The top of the board lands an interview.",
     tabGithub: "Your GitHub",
     tabCv: "Your CV",
     tabsLabel: "Sheet source",
