@@ -690,8 +690,7 @@ describe("suppression", () => {
     const ctx = setup();
     const { id, deleteToken } = await generate(ctx);
     await ctx.app.request(`/og/${id}.png`);
-    // Seule fiche de la semaine : top 5, son image porte la spéciale et sa propre clé (§18.22).
-    expect(existsSync(join(ctx.ogDir, `${id}-totw.png`))).toBe(true);
+    expect(existsSync(join(ctx.ogDir, `${id}.png`))).toBe(true);
 
     expect((await ctx.app.request(`/api/card/${id}?token=nope`, { method: "DELETE" })).status).toBe(403);
     expect((await ctx.app.request(`/api/card/${id}`, { method: "DELETE" })).status).toBe(403);
@@ -700,7 +699,7 @@ describe("suppression", () => {
     const ok = await ctx.app.request(`/api/card/${id}?token=${deleteToken}`, { method: "DELETE" });
     expect(ok.status).toBe(200);
     expect(ctx.store.getCard(id)).toBeNull();
-    expect(existsSync(join(ctx.ogDir, `${id}-totw.png`))).toBe(false);
+    expect(existsSync(join(ctx.ogDir, `${id}.png`))).toBe(false);
     expect((await getState(ctx, id)).status).toBe(404);
   });
 
@@ -727,9 +726,8 @@ describe("page /c/:id et images", () => {
     expect(res.status).toBe(200);
     const html = await res.text();
     const overall = FIXTURES.gold.overall;
-    // Seule fiche de la semaine : elle est dans le top 5 (§18.22).
-    expect(html).toContain(`<meta property="og:title" content="Fiche ★★★★★ Top 5 de la semaine, ${overall} — Léa Martin-Dubois">`);
-    expect(html).toContain(`<meta property="og:image" content="https://skills.test/og/${id}.png?s=totw">`);
+    expect(html).toContain(`<meta property="og:title" content="Fiche ★★★★★, ${overall} — Léa Martin-Dubois">`);
+    expect(html).toContain(`<meta property="og:image" content="https://skills.test/og/${id}.png">`);
     expect(html).toContain(`<meta property="og:url" content="https://skills.test/c/${id}">`);
     expect(html).toContain(`<meta property="og:image:width" content="1200">`);
     expect(html).toContain(`<meta name="twitter:card" content="summary_large_image">`);
@@ -774,8 +772,7 @@ describe("page /c/:id et images", () => {
     const a = await ctx.app.request(`/og/${id}.png`);
     expect(a.status).toBe(200);
     expect(a.headers.get("content-type")).toBe("image/png");
-    // Semaine en cours : la spéciale de la semaine peut encore changer, cache court (§18.22).
-    expect(a.headers.get("cache-control")).toBe("public, max-age=300");
+    expect(a.headers.get("cache-control")).toContain("max-age=31536000");
     const b = await ctx.app.request(`/og/${id}.png`);
     expect(new Uint8Array(await b.arrayBuffer())[0]).toBe(0x89);
     await ctx.app.request(`/og/${id}-portrait.png`);

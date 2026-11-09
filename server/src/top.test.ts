@@ -9,7 +9,7 @@ import type { CardData, ComparisonData, JobState, WeekTop } from "../../shared/t
 import { createApp } from "./app";
 import { RETENTION_MS, Store, type NewCardRow } from "./db";
 import type { Deps } from "./pipeline";
-import { weekRank, weekTop, withWeekSpecial } from "./top";
+import { TOTW_MIN_ENTRIES, weekRank, weekTop, withWeekSpecial } from "./top";
 import { weekStart } from "./weekly";
 
 const stores: Store[] = [];
@@ -166,13 +166,44 @@ describe("weekRank", () => {
   });
 });
 
+/** `n` logins de plus, notés bas, pour atteindre le seuil de la spéciale. */
+function crowd(prefix: string, n: number, at: number): NewCardRow[] {
+  return Array.from({ length: n }, (_, i) => gh(`${prefix}${i}`, 10, at));
+}
+
 describe("withWeekSpecial", () => {
+  it(`seuil : ${TOTW_MIN_ENTRIES} logins classés dans la semaine, sinon pas de spéciale`, () => {
+    const store = newStore();
+    const first = gh("first", 90, W46 + H);
+    store.insertCards([first, ...crowd("c", TOTW_MIN_ENTRIES - 2, W46 + H)]);
+    const read = (now: number) => withWeekSpecial(store.db, store.getCard(first.id)!.data as CardData, now);
+    // 19 classés : le rang reste, la spéciale non.
+    expect(read(NOW).week).toMatchObject({ rank: 1, total: 19, inTop5: true });
+    expect(read(NOW).data.special).toBeUndefined();
+    // 20 classés : la spéciale.
+    store.insertCards(crowd("d", 1, W46 + 2 * H));
+    expect(read(NOW).week!.total).toBe(20);
+    expect(read(NOW).data.special).toBe("totw");
+    // Semaine close : son total final compte, une fiche de la semaine suivante n'y change rien.
+    store.insertCards([gh("next", 99, W46 + 8 * DAY)]);
+    expect(read(NOW + 10 * DAY).data.special).toBe("totw");
+  });
+
+  it("semaine close sous le seuil : jamais de spéciale", () => {
+    const store = newStore();
+    const first = gh("solo", 90, W45 + H);
+    store.insertCards([first, ...crowd("p", TOTW_MIN_ENTRIES - 2, W45 + H), ...crowd("q", 5, W46 + H)]);
+    const out = withWeekSpecial(store.db, store.getCard(first.id)!.data as CardData, NOW);
+    expect(out.week).toMatchObject({ total: 19, closed: true, inTop5: true });
+    expect(out.data.special).toBeUndefined();
+  });
+
   it("pose « Top 5 de la semaine » sur la fiche classée du top 5, jamais ailleurs", () => {
     const store = newStore();
     const rows = [90, 85, 81, 80, 79, 78].map((n, i) => gh(`s${i}`, n, W46 + H));
     const lower = gh("s0", 60, W46 + 2 * H); // même login que le 1er, fiche moins bonne
     const kid = gh("kid", 95, W46 + H, {}, { special: "wonderkid" });
-    store.insertCards([...rows, lower, kid]);
+    store.insertCards([...rows, lower, kid, ...crowd("f", TOTW_MIN_ENTRIES - 7, W46 + H)]);
     const read = (r: NewCardRow) => withWeekSpecial(store.db, store.getCard(r.id)!.data as CardData, NOW);
     expect(read(rows[0]!).data.special).toBe("totw");
     expect(read(rows[0]!).totw).toBe(true);
@@ -196,7 +227,11 @@ describe("withWeekSpecial", () => {
     const cmpId = "cmp00002";
     const child = gh("pair", 80, W46 + H, { parentId: cmpId });
     const cmp = { id: cmpId, createdAt: new Date(W46 + H).toISOString(), cv: { ...FIXTURES.cv, id: "cvchild1" }, github: child.data as CardData, deltas: {}, headline: { fr: "", en: "" } } as unknown as ComparisonData;
-    store.insertCards([{ id: cmpId, createdAt: W46 + H, source: "both", login: "pair", kind: "comparison", data: cmp, deleteToken: "t" }, child]);
+    store.insertCards([
+      { id: cmpId, createdAt: W46 + H, source: "both", login: "pair", kind: "comparison", data: cmp, deleteToken: "t" },
+      child,
+      ...crowd("g", TOTW_MIN_ENTRIES - 1, W46 + H),
+    ]);
     const out = withWeekSpecial(store.db, cmp, NOW);
     expect(out.data.github.special).toBe("totw");
     expect(out.data.cv.special).toBeUndefined();
@@ -235,10 +270,10 @@ describe("routes", () => {
     const { app, store } = setup();
     const now = Date.now();
     const rows = [90, 85, 81, 80, 79, 70].map((n, i) => gh(`r${i}`, n, now - 1000 - i));
-    store.insertCards(rows);
+    store.insertCards([...rows, ...crowd("h", TOTW_MIN_ENTRIES - 6, now - 2000)]);
     const top = (await (await app.request(`/api/card/${rows[0]!.id}`)).json()) as Extract<JobState, { state: "done"; kind: "card" }>;
     expect(top.card.special).toBe("totw");
-    expect(top.week).toMatchObject({ rank: 1, total: 6, inTop5: true, gapToTop5: 0, closed: false });
+    expect(top.week).toMatchObject({ rank: 1, total: TOTW_MIN_ENTRIES, inTop5: true, gapToTop5: 0, closed: false });
     const sixth = (await (await app.request(`/api/card/${rows[5]!.id}`)).json()) as Extract<JobState, { state: "done"; kind: "card" }>;
     expect(sixth.card.special).toBeUndefined();
     expect(sixth.week).toMatchObject({ rank: 6, gapToTop5: 10, inTop5: false });
@@ -253,11 +288,11 @@ describe("routes", () => {
     const { app, store, ogDir, renders } = setup();
     const now = Date.now();
     const mine = gh("me", 60, now - 1000);
-    store.insertCards([mine]);
+    store.insertCards([mine, ...crowd("i", TOTW_MIN_ENTRIES - 1, now - 2000)]);
     let res = await app.request(`/og/${mine.id}.png`);
     expect(res.status).toBe(200);
     expect(res.headers.get("cache-control")).toBe("public, max-age=300");
-    expect(renders).toEqual(["og:totw"]); // seul classé : top 5
+    expect(renders).toEqual(["og:totw"]); // 1er sur 20 : top 5
     expect(readdirSync(ogDir)).toEqual([`${mine.id}-totw.png`]);
     // Cinq fiches meilleures arrivent : la spéciale part, une autre image est rendue.
     store.insertCards([91, 92, 93, 94, 95].map((n, i) => gh(`top${i}`, n, now - 500)));
@@ -273,7 +308,7 @@ describe("routes", () => {
   it("/og : semaine close, l'image ne bouge plus, cache long", async () => {
     const { app, store, renders } = setup();
     const old = gh("past", 70, weekStart(Date.now()) - 2 * DAY);
-    store.insertCards([old]);
+    store.insertCards([old, ...crowd("j", TOTW_MIN_ENTRIES - 1, weekStart(Date.now()) - 2 * DAY)]);
     const res = await app.request(`/og/${old.id}-portrait.png`);
     expect(res.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
     expect(renders).toEqual(["portrait:totw"]);

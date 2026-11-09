@@ -106,8 +106,7 @@ describe("page /c/:id avec ?r=", () => {
     expect(html).toBe(await plain.text());
     expect(html).toContain(`<meta property="og:url" content="https://skills.test/c/${id}">`);
     expect(html).toContain(`<link rel="canonical" href="https://skills.test/c/${id}">`);
-    // Seule fiche de la semaine : elle est dans le top 5, son image a sa propre adresse (§18.22).
-    expect(html).toContain(`<meta property="og:image" content="https://skills.test/og/${id}.png?s=totw">`);
+    expect(html).toContain(`<meta property="og:image" content="https://skills.test/og/${id}.png">`);
     expect(html).not.toContain("?r=");
     expect(withRef.headers.get("cache-control")).toBe(plain.headers.get("cache-control"));
   });

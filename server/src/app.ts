@@ -445,8 +445,9 @@ export function createApp(opts: AppOptions) {
     }
     return c.body(new Uint8Array(png), 200, {
       "Content-Type": "image/png",
-      // Semaine en cours : la spéciale peut encore venir ou partir, cache court.
-      "Cache-Control": week.live ? "public, max-age=300" : "public, max-age=31536000, immutable",
+      // Spéciale portée pendant la semaine en cours : elle peut encore partir, cache court.
+      // Sinon cache long ; si elle arrive plus tard, og:image change d'adresse (?s=totw).
+      "Cache-Control": week.totw && week.live ? "public, max-age=300" : "public, max-age=31536000, immutable",
     });
   });
 

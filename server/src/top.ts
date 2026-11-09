@@ -16,6 +16,8 @@ export const WEEK_MS = 7 * 24 * 3600 * 1000;
 export const CELEBRITY_FOLLOWERS = 5000;
 /** Taille du top qui donne la spéciale « Top 5 de la semaine ». */
 export const TOP_N = 5;
+/** Logins classés qu'il faut dans la semaine pour que la spéciale ait un sens ; semaine close : le total final. */
+export const TOTW_MIN_ENTRIES = 20;
 
 interface Ranked {
   id: string;
@@ -142,6 +144,8 @@ export function weekRank(db: Database.Database, cardId: string, now = Date.now()
  * sur la fiche qui porte le rang d'un login du top 5 de sa semaine, en direct
  * pendant la semaine et pour toujours ensuite. Une fiche qui a déjà une
  * spéciale garde la sienne. Pour une comparaison, c'est sa carte GitHub.
+ * Seulement si la semaine compte au moins TOTW_MIN_ENTRIES logins classés
+ * (une semaine close : son total final) : portée par tous, elle ne dirait rien.
  * `live` : la semaine de la fiche n'est pas finie, la spéciale peut encore
  * venir ou partir (ses images ne se gardent pas longtemps en cache).
  */
@@ -156,7 +160,7 @@ export function withWeekSpecial<T extends CardData | ComparisonData>(
   const live = Number.isFinite(born) && now < weekStart(born) + WEEK_MS;
   const d = weekRankDetail(db, card.id, now);
   const week = d ? publicRank(d) : null;
-  if (!d || !d.inTop5 || !d.entry || card.special) return { data, totw: false, live, week };
+  if (!d || d.total < TOTW_MIN_ENTRIES || !d.inTop5 || !d.entry || card.special) return { data, totw: false, live, week };
   const marked: CardData = { ...card, special: "totw" };
   const out = (isCmp ? { ...(data as ComparisonData), github: marked } : marked) as T;
   return { data: out, totw: true, live, week };
