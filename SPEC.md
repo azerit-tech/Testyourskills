@@ -1000,6 +1000,29 @@ Après chaque fusion, on vérifie la grille suivante. On corrige ce qui manque, 
 - **Événements** : `denounce_sent` (serveur, à l'envoi), `denounce_claimed` (serveur, revendication d'une fiche dénoncée), `denounce_landed` (front, une fois par session sur une fiche dénoncée).
 - **Pas fait** : « Voir l'arrestation ». `seek` n'existe que dans le crochet de mise au point (`__tys3d`, en dev) ; démarrer la scène aux portes demande une option de départ dans `createWalkout`, la version CSS des téléphones faibles, et télécharge plusieurs Mo de 3D pour un visiteur venu de LinkedIn. À reprendre avec le clip du §18.8, qui couvre le même besoin. Pas fait non plus : les dénonciations dans le tableau de `npm run weekly`.
 
+### 18.24 LinkedIn contre GitHub (9 novembre 2026)
+
+*Ce que la personne déclare contre ce qu'elle prouve. Construit sur le moteur de la comparaison CV.*
+
+- **Un seul champ** : pseudo GitHub, adresse GitHub ou lien `linkedin.com/in/…` (avec ou sans `www`, sous-domaine de langue, `/` final ou paramètres de suivi), reconnus par `shared/entry.ts`. Le placeholder dit « pseudo GitHub ou lien LinkedIn » seulement si le serveur sait lire LinkedIn (`/api/config` → `linkedinEntry`). Sinon, un lien LinkedIn reçoit « Entrée LinkedIn indisponible, tape ton pseudo GitHub ». Avec un CV en PDF, le champ reste GitHub.
+- **Pseudo GitHub** : le LinkedIn vient de ce que GitHub affiche, gratuitement. Dans l'ordre : comptes sociaux (`/users/:login/social_accounts`, un appel gardé avec les faits), site, bio. Il est lu en parallèle du code. Si le profil est lu et que c'est un profil dev, la fiche devient « LinkedIn contre GitHub ». Sinon, ou en cas de panne ou de lenteur, la fiche GitHub sort seule, sans message.
+- **Lien LinkedIn** : le profil est lu, puis le GitHub que ses liens donnent (sites, section contact, résumé ; jamais les postes, qui citent les dépôts de l'employeur). Si un GitHub est trouvé, la même comparaison sort. Sinon, une fiche LinkedIn seule, jugée par le chemin CV (fiabilité basse comme un CV). Sous elle, un seul appel : « Ajoute ton GitHub pour prouver », qui relance en comparaison (`CardData.linkedinUrl`).
+- **Le jugement** : le profil devient un texte déclaratif (titre, résumé, postes datés, formation, compétences). L'IA le lit comme un CV et le barème le note, sans changement. Les textes de sortie disent « LinkedIn » à la place de « CV » (`shared/linkedinText.ts`, `declaredSource: "linkedin"`) : fiche, tampon « D'APRÈS LINKEDIN », onglets, légende, HUD, images, aperçu de lien. Partage : « Mon LinkedIn : 82. Mon GitHub : 61. {titre de l'écart}. Fais la tienne : {lien} ». Le mode CV en PDF ne change pas.
+- **L'attente** : « LinkedIn retrouvé. Comparaison des déclarations… ». Au dossier de l'enquête (§18.26) : « LinkedIn retrouvé : « titre » », et le nombre de compétences déclarées à partir de 15. Une lecture lente repousse le délai de la fiche (jusqu'à 60 s de plus). Le front patiente alors jusqu'à 2 min.
+- **Le fournisseur** (`server/src/linkedinProfile/`, à ne pas confondre avec l'OAuth de la photo) :
+  - `LINKEDIN_PROVIDER=apify` (défaut) : `POST https://api.apify.com/v2/acts/{APIFY_LINKEDIN_ACTOR}/run-sync-get-dataset-items`, jeton `APIFY_TOKEN`, acteur `harvestapi~linkedin-profile-scraper` par défaut (sans cookies ni email, 4 $ les 1 000), 60 s au plus. Un normaliseur tolérant lit les formes de sortie des acteurs courants.
+  - `crustdata` : `POST /person/enrich` (API 2025-11-01).
+  - La recherche payante du LinkedIn d'un GitHub qui n'en affiche pas (`/person/search` de Crustdata) n'existe que derrière `LINKEDIN_AUTOFIND=crustdata`.
+- **Garde-fous** :
+  - cache de 30 jours par adresse normalisée (introuvable : 7 jours) ;
+  - au plus `LINKEDIN_DAILY_PROFILES` profils lus par jour (300 par défaut ; remplace le plafond de crédits du §18.25) ;
+  - six lectures par IP et par jour ;
+  - cache de 24 h des fiches, par adresse et par pseudo ;
+  - la vitrine n'est jamais comparée.
+- **Gardé, et rien de plus** : le profil réduit (titre, résumé, postes, formation, compétences), sans photo, lieu ni contact, pour 30 jours. La fiche suit la règle des 90 jours. Supprimer la fiche efface le profil gardé. Un GitHub masqué par son propriétaire bloque aussi l'entrée par son LinkedIn. La page Confidentialité nomme « un service tiers de collecte de profils publics ».
+- **Top de la semaine** : une fiche LinkedIn seule n'y entre pas. Une comparaison y entre par sa carte GitHub.
+- **Pas fait** : aucun appel réel n'a été fait, faute de jeton Apify. La forme exacte de la sortie de l'acteur reste à vérifier sur un vrai profil avant le lancement. Les trouvailles d'une comparaison ne passent pas dans son texte de partage (§18.26).
+
 ### 18.25 Le cap, tranché par Jacques le 9 novembre 2026
 
 - **Le partage massif d'abord.** Le site est un jeu en façade, un test de recrutement dans le moteur. Quand les deux s'opposent, le jeu gagne : l'humour, la surprise et l'envie de montrer passent devant la précision au point près. La note reste calculée par le barème, jamais par l'IA.
