@@ -7,7 +7,7 @@
 // plus ancienne passe devant. Tout se calcule à la lecture, rien n'est écrit.
 
 import type Database from "better-sqlite3";
-import type { CardData, Fact, TopEntry, WeekRank, WeekTop } from "../../shared/types";
+import type { CardData, ComparisonData, Fact, TopEntry, WeekRank, WeekTop } from "../../shared/types";
 import { starsFor } from "../../shared/types";
 import { isoWeekLabel, weekStart } from "./weekly";
 
@@ -135,4 +135,29 @@ function publicRank(d: WeekRank & { entry: boolean; createdAt: number }): WeekRa
 export function weekRank(db: Database.Database, cardId: string, now = Date.now()): WeekRank | null {
   const d = weekRankDetail(db, cardId, now);
   return d ? publicRank(d) : null;
+}
+
+/**
+ * La spéciale « Top 5 de la semaine », posée à la lecture (jamais écrite) :
+ * sur la fiche qui porte le rang d'un login du top 5 de sa semaine, en direct
+ * pendant la semaine et pour toujours ensuite. Une fiche qui a déjà une
+ * spéciale garde la sienne. Pour une comparaison, c'est sa carte GitHub.
+ * `live` : la semaine de la fiche n'est pas finie, la spéciale peut encore
+ * venir ou partir (ses images ne se gardent pas longtemps en cache).
+ */
+export function withWeekSpecial<T extends CardData | ComparisonData>(
+  db: Database.Database,
+  data: T,
+  now = Date.now(),
+): { data: T; totw: boolean; live: boolean; week: WeekRank | null } {
+  const isCmp = "cv" in data && "github" in data;
+  const card = isCmp ? (data as ComparisonData).github : (data as CardData);
+  const born = Date.parse(card.createdAt);
+  const live = Number.isFinite(born) && now < weekStart(born) + WEEK_MS;
+  const d = weekRankDetail(db, card.id, now);
+  const week = d ? publicRank(d) : null;
+  if (!d || !d.inTop5 || !d.entry || card.special) return { data, totw: false, live, week };
+  const marked: CardData = { ...card, special: "totw" };
+  const out = (isCmp ? { ...(data as ComparisonData), github: marked } : marked) as T;
+  return { data: out, totw: true, live, week };
 }

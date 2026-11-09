@@ -39,7 +39,9 @@ function isComparison(d: CardData | ComparisonData): d is ComparisonData {
 
 export function metaFor(data: CardData | ComparisonData, baseUrl: string): PageMeta {
   const url = `${baseUrl}/c/${data.id}`;
-  const image = `${baseUrl}/og/${data.id}.png`;
+  // Spéciale de la semaine (§18.22) : une autre adresse d'image, pour que les réseaux ne resservent pas l'ancienne.
+  const totw = (isComparison(data) ? data.github.special : data.special) === "totw";
+  const image = `${baseUrl}/og/${data.id}.png${totw ? "?s=totw" : ""}`;
 
   if (isComparison(data)) {
     const lang = data.cv.lang ?? data.github.lang ?? "fr";

@@ -1,15 +1,15 @@
 // Top de la semaine (§18.22) sur une base de test en mémoire.
 
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { FIXTURES } from "../../shared/fixtures";
-import type { CardData, JobState, WeekTop } from "../../shared/types";
+import type { CardData, ComparisonData, JobState, WeekTop } from "../../shared/types";
 import { createApp } from "./app";
 import { RETENTION_MS, Store, type NewCardRow } from "./db";
 import type { Deps } from "./pipeline";
-import { weekRank, weekTop } from "./top";
+import { weekRank, weekTop, withWeekSpecial } from "./top";
 import { weekStart } from "./weekly";
 
 const stores: Store[] = [];
@@ -166,6 +166,43 @@ describe("weekRank", () => {
   });
 });
 
+describe("withWeekSpecial", () => {
+  it("pose « Top 5 de la semaine » sur la fiche classée du top 5, jamais ailleurs", () => {
+    const store = newStore();
+    const rows = [90, 85, 81, 80, 79, 78].map((n, i) => gh(`s${i}`, n, W46 + H));
+    const lower = gh("s0", 60, W46 + 2 * H); // même login que le 1er, fiche moins bonne
+    const kid = gh("kid", 95, W46 + H, {}, { special: "wonderkid" });
+    store.insertCards([...rows, lower, kid]);
+    const read = (r: NewCardRow) => withWeekSpecial(store.db, store.getCard(r.id)!.data as CardData, NOW);
+    expect(read(rows[0]!).data.special).toBe("totw");
+    expect(read(rows[0]!).totw).toBe(true);
+    expect(read(rows[0]!).live).toBe(true);
+    // Le 6e (kid est 1er, donc s4 sort du top 5).
+    expect(read(rows[4]!).data.special).toBeUndefined();
+    expect(read(lower).data.special).toBeUndefined();
+    // Une autre spéciale reste.
+    expect(read(kid).data.special).toBe("wonderkid");
+    expect(read(kid).totw).toBe(false);
+    // Rien n'est écrit dans la ligne.
+    expect((store.getCard(rows[0]!.id)!.data as CardData).special).toBeUndefined();
+    // La semaine finie, elle reste.
+    const later = withWeekSpecial(store.db, store.getCard(rows[0]!.id)!.data as CardData, NOW + 30 * DAY);
+    expect(later.data.special).toBe("totw");
+    expect(later.live).toBe(false);
+  });
+
+  it("sur une comparaison, c'est sa carte GitHub qui la porte", () => {
+    const store = newStore();
+    const cmpId = "cmp00002";
+    const child = gh("pair", 80, W46 + H, { parentId: cmpId });
+    const cmp = { id: cmpId, createdAt: new Date(W46 + H).toISOString(), cv: { ...FIXTURES.cv, id: "cvchild1" }, github: child.data as CardData, deltas: {}, headline: { fr: "", en: "" } } as unknown as ComparisonData;
+    store.insertCards([{ id: cmpId, createdAt: W46 + H, source: "both", login: "pair", kind: "comparison", data: cmp, deleteToken: "t" }, child]);
+    const out = withWeekSpecial(store.db, cmp, NOW);
+    expect(out.data.github.special).toBe("totw");
+    expect(out.data.cv.special).toBeUndefined();
+  });
+});
+
 describe("routes", () => {
   function setup() {
     const store = newStore();
@@ -194,19 +231,51 @@ describe("routes", () => {
     expect(top.entries.map((e) => e.login)).toEqual(["alpha", "beta"]);
   });
 
-  it("GET /api/card/:id : le rang de la semaine", async () => {
+  it("GET /api/card/:id : le rang de la semaine et la spéciale lue à la volée", async () => {
     const { app, store } = setup();
     const now = Date.now();
     const rows = [90, 85, 81, 80, 79, 70].map((n, i) => gh(`r${i}`, n, now - 1000 - i));
     store.insertCards(rows);
     const top = (await (await app.request(`/api/card/${rows[0]!.id}`)).json()) as Extract<JobState, { state: "done"; kind: "card" }>;
+    expect(top.card.special).toBe("totw");
     expect(top.week).toMatchObject({ rank: 1, total: 6, inTop5: true, gapToTop5: 0, closed: false });
     const sixth = (await (await app.request(`/api/card/${rows[5]!.id}`)).json()) as Extract<JobState, { state: "done"; kind: "card" }>;
+    expect(sixth.card.special).toBeUndefined();
     expect(sixth.week).toMatchObject({ rank: 6, gapToTop5: 10, inTop5: false });
     // Hors classement : pas de champ week.
     const cv = { ...gh("cvonly", 99, now - 1000), source: "cv" as const, login: null };
     store.insertCards([cv]);
     const cvState = (await (await app.request(`/api/card/${cv.id}`)).json()) as Record<string, unknown>;
     expect("week" in cvState).toBe(false);
+  });
+
+  it("/og : la spéciale change la clé du cache disque ; semaine en cours, cache court", async () => {
+    const { app, store, ogDir, renders } = setup();
+    const now = Date.now();
+    const mine = gh("me", 60, now - 1000);
+    store.insertCards([mine]);
+    let res = await app.request(`/og/${mine.id}.png`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("public, max-age=300");
+    expect(renders).toEqual(["og:totw"]); // seul classé : top 5
+    expect(readdirSync(ogDir)).toEqual([`${mine.id}-totw.png`]);
+    // Cinq fiches meilleures arrivent : la spéciale part, une autre image est rendue.
+    store.insertCards([91, 92, 93, 94, 95].map((n, i) => gh(`top${i}`, n, now - 500)));
+    res = await app.request(`/og/${mine.id}.png`);
+    expect(renders).toEqual(["og:totw", "og:-"]);
+    expect(readdirSync(ogDir).sort()).toEqual([`${mine.id}-totw.png`, `${mine.id}.png`].sort());
+    // Page /c/:id : l'image de partage d'une fiche du top 5 a sa propre adresse.
+    const html = await (await app.request(`/c/${store.getCard(weekTop(store.db).entries[0]!.cardId)!.id}`)).text();
+    expect(html).toContain("?s=totw");
+    expect(html).toContain("Top 5 de la semaine");
+  });
+
+  it("/og : semaine close, l'image ne bouge plus, cache long", async () => {
+    const { app, store, renders } = setup();
+    const old = gh("past", 70, weekStart(Date.now()) - 2 * DAY);
+    store.insertCards([old]);
+    const res = await app.request(`/og/${old.id}-portrait.png`);
+    expect(res.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+    expect(renders).toEqual(["portrait:totw"]);
   });
 });

@@ -18,7 +18,7 @@ import { inlineAvatar, mountLinkedin, removeAvatars, type LinkedinConfig } from 
 import { mountAuth, ownerFromRequest, type GithubAuthConfig } from "./auth";
 import { aiStatus as budgetAiStatus, type AiStatus } from "./ai/budget";
 import type { TokenPool } from "./github/tokens";
-import { weekRank, weekTop } from "./top";
+import { weekTop, withWeekSpecial } from "./top";
 
 export interface AppOptions {
   store: Store;
@@ -133,10 +133,14 @@ function tokenMatches(given: string | undefined, expected: string): boolean {
 
 const OG_FILE_RE = /^([A-Za-z0-9]{6,32})(-portrait|-card)?\.png$/;
 const OG_SUFFIXES = ["", "-portrait", "-card"];
+/** Fichier sur disque d'une image qui porte la spéciale « Top 5 de la semaine » (§18.22) : une autre clé de cache. */
+const TOTW_TAG = "-totw";
 
 export async function removeImages(ogDir: string, ids: string[]) {
   await Promise.all(
-    ids.flatMap((id) => OG_SUFFIXES.map((s) => rm(join(ogDir, `${id}${s}.png`), { force: true }))),
+    ids.flatMap((id) =>
+      OG_SUFFIXES.flatMap((s) => ["", TOTW_TAG].map((tag) => rm(join(ogDir, `${id}${tag}${s}.png`), { force: true }))),
+    ),
   );
 }
 
@@ -327,14 +331,13 @@ export function createApp(opts: AppOptions) {
     const live = pipeline.jobState(id);
     if (live) return c.json(live);
     if (!row) return c.json(errorBody("internal", MESSAGES.not_found), 404);
-    // Rang de la semaine (§18.22), relu à chaque fois ; pour une comparaison, celui de sa carte GitHub.
-    const ranked = row.kind === "comparison" ? (row.data as ComparisonData).github.id : row.id;
-    const week = weekRank(store.db, ranked);
+    // Spéciale « Top 5 de la semaine » et rang de la semaine, relus à chaque fois (§18.22).
+    const { data, week } = withWeekSpecial(store.db, stripToken(row.data));
     const rank = week ? { week } : {};
     const state: JobState =
       row.kind === "comparison"
-        ? { state: "done", kind: "comparison", comparison: stripToken(row.data as ComparisonData), ...rank }
-        : { state: "done", kind: "card", card: stripToken(row.data as CardData), ...rank };
+        ? { state: "done", kind: "comparison", comparison: data as ComparisonData, ...rank }
+        : { state: "done", kind: "card", card: data as CardData, ...rank };
     return c.json(state);
   });
 
@@ -409,10 +412,13 @@ export function createApp(opts: AppOptions) {
     // Fiche masquée : aucune image, pour personne (les robots n'ont pas de session).
     if (!row || store.isHidden(store.loginOf(row))) return c.notFound();
 
-    const path = join(ogDir, `${id}${m[2] ?? ""}.png`);
+    // La spéciale de la semaine change l'image : elle entre dans la clé du cache disque (§18.22).
+    const week = withWeekSpecial(store.db, row.data);
+    const tag = week.totw ? TOTW_TAG : "";
+    const path = join(ogDir, `${id}${tag}${m[2] ?? ""}.png`);
     let png: Uint8Array | null = await readFile(path).catch(() => null);
     if (!png) {
-      const key = `${id}:${format}`;
+      const key = `${id}${tag}:${format}`;
       let p = rendering.get(key);
       if (!p) {
         p = (async () => {
@@ -420,10 +426,10 @@ export function createApp(opts: AppOptions) {
           const inline = (card: CardData) => inlineAvatar(card, baseUrl, avatarDir);
           let input: RenderInput;
           if (row.kind === "comparison") {
-            const cmp = row.data as ComparisonData;
+            const cmp = week.data as ComparisonData;
             input = { format, comparison: { ...cmp, cv: await inline(cmp.cv), github: await inline(cmp.github) }, lang: cmp.cv.lang };
           } else {
-            const card = row.data as CardData;
+            const card = week.data as CardData;
             input = { format, card: await inline(card), lang: card.lang };
           }
           const buf = await deps.renderImage(input);
@@ -439,7 +445,8 @@ export function createApp(opts: AppOptions) {
     }
     return c.body(new Uint8Array(png), 200, {
       "Content-Type": "image/png",
-      "Cache-Control": "public, max-age=31536000, immutable",
+      // Semaine en cours : la spéciale peut encore venir ou partir, cache court.
+      "Cache-Control": week.live ? "public, max-age=300" : "public, max-age=31536000, immutable",
     });
   });
 
@@ -458,7 +465,7 @@ export function createApp(opts: AppOptions) {
       c.header("Cache-Control", "private, no-store");
       return c.html(injectMeta(page, generic), mine ? 200 : 410);
     }
-    const meta = row ? metaFor(row.data, baseUrl) : genericMeta(baseUrl, `/c/${id}`);
+    const meta = row ? metaFor(withWeekSpecial(store.db, row.data).data, baseUrl) : genericMeta(baseUrl, `/c/${id}`);
     const html = template ? injectMeta(template, meta) : standalonePage(meta);
     c.header("Cache-Control", "public, max-age=300");
     return c.html(html, row ? 200 : 404);
