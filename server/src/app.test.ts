@@ -629,32 +629,39 @@ describe("commissariat fermé (plafond IA ou crédit épuisé)", () => {
     await ctx.pipeline.drain();
   });
 
-  it("le vrai suivi : solde lu sous le seuil, puis réponse tronquée, jamais de fiche stockée", async () => {
+  it("le vrai suivi : une réponse tronquée seule ne ferme rien (fiche dégradée), un solde lu sous le seuil ferme", async () => {
     const saved = process.env.OPENROUTER_API_KEY;
     process.env.OPENROUTER_API_KEY = "sk-or-test";
     resetBudgetForTests();
     vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
-      // Réponse coupée par max_tokens, comme OpenRouter le fait avec 0,26 $ de crédit.
+      // Réponse coupée par max_tokens, sans que le solde dise un crédit bas : sortie
+      // invalide ordinaire (§12), une relance, puis une fiche sans TEC, marquée dégradée.
       const { client, calls: aiCalls } = fakeClient([{ stop: "length", body: { readings: [] } }]);
       const ctx = setup({ readCode: (repos, opts) => readCode(repos, { ...opts, client }) });
+      const health = async () => ((await (await ctx.app.request("/api/health")).json()) as { ai: string }).ai;
       const { res, json } = await postLogin(ctx, "octocat");
       expect(res.status).toBe(202);
       await ctx.pipeline.wait(json.id);
-      expect((await getState(ctx, json.id)).state).toMatchObject({ state: "error", code: "closed" });
-      expect(aiCalls).toHaveLength(1);
-      expect(ctx.store.getCard(json.id)).toBeNull();
+      expect(aiCalls).toHaveLength(2);
+      const row = ctx.store.getCard(json.id)!;
+      expect(row.degraded).toBe(true);
+      expect((row.data as CardData).scoringVersion).toBe("no-ai");
       expect(ctx.store.findRecentGithub("octocat")).toBeNull();
-      // La suite est refusée d'entrée, et la santé le dit.
-      expect((await postLogin(ctx, "octocat")).res.status).toBe(503);
-      expect(((await (await ctx.app.request("/api/health")).json()) as { ai: string }).ai).toBe("credits");
+      // Le commissariat reste ouvert : la demande suivante repart.
+      expect(await health()).toBe("ok");
+      const next = await postLogin(ctx, "octocat");
+      expect(next.res.status).toBe(202);
+      await ctx.pipeline.wait(next.json.id);
+      expect(aiCalls).toHaveLength(4);
 
-      // Solde lu au-dessus du seuil : rouvert. Puis il fond : refermé, sans un appel de plus.
-      noteCreditBalance(5);
-      expect(((await (await ctx.app.request("/api/health")).json()) as { ai: string }).ai).toBe("ok");
+      // Solde lu sous le seuil : fermé, sans un appel de plus. Au-dessus : rouvert.
       noteCreditBalance(0.26);
       expect((await postLogin(ctx, "octocat")).res.status).toBe(503);
-      expect(aiCalls).toHaveLength(1);
+      expect(await health()).toBe("credits");
+      expect(aiCalls).toHaveLength(4);
+      noteCreditBalance(5);
+      expect(await health()).toBe("ok");
     } finally {
       vi.restoreAllMocks();
       resetBudgetForTests();

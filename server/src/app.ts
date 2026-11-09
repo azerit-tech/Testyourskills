@@ -231,8 +231,8 @@ export function createApp(opts: AppOptions) {
   };
 
   // Public : jamais de montant. ai = ok | budget (plafond du jour atteint) |
-  // credits (solde sous AI_MIN_CREDIT_USD, ou 402 / réponse tronquée vus dans
-  // les 10 dernières minutes sans solde suffisant lu depuis) | off (pas de clé).
+  // credits (solde sous AI_MIN_CREDIT_USD, ou 402 vu dans les 10 dernières
+  // minutes sans solde suffisant lu depuis) | off (pas de clé).
   app.get("/api/health", (c) =>
     c.json({ ok: true, ai: safeAiStatus(aiStatus) ?? "off", github: !!opts.githubToken, linkedin: !!opts.linkedin }),
   );
@@ -371,7 +371,7 @@ export function createApp(opts: AppOptions) {
       }
 
       // Plafond IA du jour atteint, ou crédit OpenRouter sous le seuil (solde lu
-      // toutes les 5 minutes, 402 ou réponse tronquée vus) : commissariat fermé,
+      // toutes les 5 minutes et après une sortie suspecte, ou 402 vu) : commissariat fermé,
       // sans lancer de job ni entamer le quota. Le cache ci-dessus reste servi.
       // Une recharge rouvre dès la lecture suivante du solde.
       const ai = safeAiStatus(aiStatus);

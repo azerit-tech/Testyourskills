@@ -117,12 +117,14 @@ describe("readCode", () => {
     expect(calls).toHaveLength(2);
   });
 
-  it("sortie coupée par max_tokens : crédit bas, la fiche échoue en closed sans relance", async () => {
-    // OpenRouter rabote max_tokens au lieu de répondre 402 quand le solde baisse.
+  it("sortie coupée par max_tokens, sans solde bas confirmé : sortie invalide ordinaire, relancée une fois", async () => {
+    // Seul un solde relu sous le seuil ferme (credits.test.ts) ; ici rien ne le dit.
     const { client, calls } = fakeClient([{ stop: "length", body: VALID }, VALID]);
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    await expect(readCode(REPOS, { client })).rejects.toMatchObject({ code: "closed", reason: "credits" });
-    expect(calls).toHaveLength(1);
+    const res = await readCode(REPOS, { client });
+    expect(res?.readings).toHaveLength(2);
+    expect(calls).toHaveLength(2);
+    expect(userText(calls[1]!)).toContain("cut off");
     warn.mockRestore();
   });
 

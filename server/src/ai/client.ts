@@ -1,9 +1,12 @@
 // Appel structuré via OpenRouter (API compatible OpenAI, `fetch` natif) : sortie
 // JSON contrainte par schéma (`response_format: json_schema`, strict), puis
 // validation côté code. Une sortie invalide relance une fois, puis rend null (SPEC §12).
-// Plafond du jour atteint, solde sous AI_MIN_CREDIT_USD, 402 ou réponse tronquée
-// (OpenRouter rabote `max_tokens` quand le crédit baisse, sans 402) : lève
+// Plafond du jour atteint, solde sous AI_MIN_CREDIT_USD ou 402 : lève
 // AiClosedError, la fiche échoue en `closed` au lieu de sortir sans lecture (SPEC §2.3).
+// Une réponse tronquée (`finish_reason: length`) peut venir d'un crédit bas
+// (OpenRouter rabote `max_tokens`, sans 402) comme d'une réponse trop longue : le
+// solde est relu, et seul un solde sous le seuil ferme. Sinon c'est une sortie
+// invalide ordinaire.
 
 import { z } from "zod";
 import {
@@ -289,18 +292,17 @@ export async function callStructured<T>(call: StructuredCall<T>): Promise<T | nu
     issues = [];
     const choice = res.choices?.[0];
     const finish = choice?.finish_reason;
-    // Réponse coupée par max_tokens : c'est ainsi qu'OpenRouter signale un crédit
-    // bas (il rabote max_tokens au lieu de répondre 402). Traitée comme un crédit
-    // épuisé, pas comme une sortie invalide ordinaire : pas de fiche sans lecture.
-    if (finish === "length" && !res.error && !choice?.error) {
-      noteCreditsExhausted();
-      void refreshCredits();
-      console.warn(`[ai] ${call.label}: réponse tronquée (crédit OpenRouter bas ?), commissariat fermé`);
-      throw new AiClosedError("credits");
+    // Réponse coupée par max_tokens : un crédit bas (OpenRouter rabote max_tokens
+    // au lieu de répondre 402) ou simplement une réponse trop longue. Elle ne
+    // ferme rien par elle-même : c'est la relecture du solde, plus bas, qui
+    // tranche. Elle ne prouve pas non plus que le crédit est revenu.
+    const truncated = finish === "length" && !res.error && !choice?.error;
+    if (truncated) issues.push("the answer was cut off before its end: answer more concisely");
+    else {
+      noteCreditsOk();
+      if (res.error || choice?.error || !choice) issues.push("the provider returned an error");
+      else if (finish === "content_filter") issues.push("the request was refused");
     }
-    noteCreditsOk();
-    if (res.error || choice?.error || !choice) issues.push("the provider returned an error");
-    else if (finish === "content_filter") issues.push("the request was refused");
 
     if (issues.length === 0) {
       let raw: unknown;
@@ -316,9 +318,10 @@ export async function callStructured<T>(call: StructuredCall<T>): Promise<T | nu
         if (isLast && v.fallback) return v.fallback;
       }
     }
-    console.warn(`[ai] ${call.label}: sortie invalide (essai ${attempt + 1}/${MAX_ATTEMPTS})`);
-    // Une sortie invalide peut cacher un crédit qui fond : on relit le solde
-    // (délai borné), et sous le seuil la fiche échoue en `closed`.
+    console.warn(`[ai] ${call.label}: ${truncated ? "réponse tronquée" : "sortie invalide"} (essai ${attempt + 1}/${MAX_ATTEMPTS})`);
+    // Une sortie invalide ou tronquée peut cacher un crédit qui fond : on relit le
+    // solde (délai borné), et sous le seuil la fiche échoue en `closed`. Sinon,
+    // sortie invalide ordinaire : une relance, puis une fiche sans TEC (§12).
     await refreshCredits();
     if (creditsBelowMin()) {
       console.warn(`[ai] ${call.label}: solde OpenRouter sous le seuil, commissariat fermé`);

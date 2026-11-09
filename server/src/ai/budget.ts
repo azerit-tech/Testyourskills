@@ -175,7 +175,7 @@ export class AiClosedError extends Error {
   }
 }
 
-/** Durée pendant laquelle un 402 (ou une réponse tronquée) vu ferme le commissariat. */
+/** Durée pendant laquelle un 402 vu ferme le commissariat. */
 export const CREDITS_WINDOW_MS = 10 * 60 * 1000;
 
 let creditsExhaustedAt: number | null = null;
@@ -195,7 +195,7 @@ export function minCreditUsd(): number {
   return raw !== undefined && raw !== "" && Number.isFinite(n) && n >= 0 ? n : 0.5;
 }
 
-/** OpenRouter a répondu 402 (crédit insuffisant), ou a tronqué une réponse faute de crédit. */
+/** OpenRouter a répondu 402 (crédit insuffisant). Une réponse tronquée ne passe pas par ici : le solde relu tranche. */
 export function noteCreditsExhausted(now = Date.now()): void {
   creditsExhaustedAt = now;
 }
@@ -226,8 +226,8 @@ export function creditsBelowMin(): boolean {
 
 /**
  * État public de l'IA, sans montant : `off` sans clé ; `credits` si le solde
- * est sous le seuil, ou si un 402 (ou une réponse tronquée) a été vu dans les
- * 10 dernières minutes sans qu'un solde suffisant l'ait démenti depuis ;
+ * est sous le seuil, ou si un 402 a été vu dans les 10 dernières minutes sans
+ * qu'un solde suffisant l'ait démenti depuis ;
  * `budget` si le plafond du jour est atteint.
  */
 export type AiStatus = "ok" | "budget" | "credits" | "off";

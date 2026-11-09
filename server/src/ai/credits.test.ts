@@ -224,7 +224,7 @@ describe("vérification périodique du solde", () => {
     expect(calls).toHaveLength(0);
   });
 
-  it("réponse tronquée (finish_reason length) : closed sans relance, et le solde est relu", async () => {
+  it("réponse tronquée (finish_reason length), solde relu sous le seuil : closed sans relance", async () => {
     const warns: string[] = [];
     vi.spyOn(console, "warn").mockImplementation((...a: unknown[]) => void warns.push(a.join(" ")));
     const state = { left: 5 as number | Error };
@@ -236,21 +236,36 @@ describe("vérification périodique du solde", () => {
     const { client, calls } = fakeClient([{ stop: "length", body: { readings: [] } }]);
     await expect(readCode(REPOS, { client })).rejects.toMatchObject({ code: "closed", reason: "credits" });
     expect(calls).toHaveLength(1); // pas de relance qui brûlerait le reste du crédit
+    expect(fetchImpl).toHaveBeenCalledTimes(2); // le solde est relu avant de décider
     expect(aiStatus()).toBe("credits");
-    await vi.advanceTimersByTimeAsync(0);
-    expect(fetchImpl).toHaveBeenCalledTimes(2); // le solde est relu tout de suite
     expect(lastCreditBalance()).toBeCloseTo(0.3, 9);
     expect(aiStatus()).toBe("credits");
     expect(warns.some((w) => /réponse tronquée/.test(w))).toBe(true);
     expect(warns.join("\n")).not.toContain(KEY);
   });
 
-  it("réponse tronquée avec un solde suffisant : closed pour cette fiche, puis rouvert par le solde", async () => {
+  it("réponse tronquée avec un solde suffisant : sortie invalide ordinaire, le commissariat ne ferme pas un instant", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    await watchWith(balanceFetch({ left: 5 }));
-    const { client } = fakeClient([{ stop: "length", body: {} }]);
-    await expect(readCode(REPOS, { client })).rejects.toMatchObject({ code: "closed" });
-    await vi.advanceTimersByTimeAsync(0);
+    const fetchImpl = balanceFetch({ left: 5 });
+    await watchWith(fetchImpl);
+    const { client, calls } = fakeClient([{ stop: "length", body: {} }]);
+    const statuses: string[] = [];
+    const spy = { ...client, complete: (...a: Parameters<typeof client.complete>) => (statuses.push(aiStatus()), client.complete(...a)) };
+    await expect(readCode(REPOS, { client: spy })).resolves.toBeNull();
+    expect(calls).toHaveLength(2); // une relance, puis null : la fiche sortira sans TEC, dégradée
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(statuses).toEqual(["ok", "ok"]);
+    expect(aiStatus()).toBe("ok");
+  });
+
+  it("réponse tronquée, solde illisible : rien ne confirme un crédit bas, le commissariat reste ouvert", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const state = { left: 5 as number | Error };
+    await watchWith(balanceFetch(state));
+    state.left = new TypeError("fetch failed");
+    const { client, calls } = fakeClient([{ stop: "length", body: {} }]);
+    await expect(readCode(REPOS, { client })).resolves.toBeNull();
+    expect(calls).toHaveLength(2);
     expect(aiStatus()).toBe("ok");
   });
 
