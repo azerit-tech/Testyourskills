@@ -1159,6 +1159,75 @@ svg {
   margin-top: 6px;
 }
 
+/* le jury (§18.27) : un geste à un toucher, entre la fiche et « Et toi ? » */
+.page-result .jury {
+  position: relative;
+  z-index: 2;
+}
+.jury {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 12px;
+  padding: 20px;
+  border-radius: var(--r-card);
+  background: var(--plum);
+}
+.jury h2 {
+  font: 700 28px/0.95 var(--f-name);
+  text-transform: uppercase;
+  color: var(--cream);
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+/* les deux états ont la même hauteur : le décompte ne fait pas sauter la page */
+.jury-choices,
+.jury-result {
+  min-height: 52px;
+}
+.jury-choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.jury-choices .pill {
+  min-height: 52px;
+  font-size: 16px;
+}
+.jury-choices .pill-ghost {
+  box-shadow: inset 0 0 0 1.5px var(--lilac-dim);
+}
+.jury-result {
+  display: grid;
+  align-content: center;
+  gap: 10px;
+}
+/* deux aplats : coupable en rose poudré, relaxe en lilas */
+.jury-bar {
+  display: flex;
+  gap: 3px;
+  height: 12px;
+}
+.jury-bar span {
+  flex: 0 1 0;
+  min-width: 0;
+  border-radius: 999px;
+  background: var(--blush);
+}
+.jury-bar .is-cleared {
+  background: var(--lilac-2);
+}
+.jury-tally {
+  font: 600 17px/1.2 var(--f-text);
+  color: var(--cream);
+}
+/* pour qui a fait la fiche : le décompte, en tête de l'après-fiche */
+.jury-line {
+  padding: 0 4px;
+  font: 700 26px/1 var(--f-name);
+  color: var(--cream);
+  text-wrap: balance;
+}
+
 /* ============ sous la fiche ============ */
 
 .after {
@@ -1969,7 +2038,7 @@ a.dossier-item:hover {
   .is-visitor .result-top {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 360px;
-    grid-template-rows: auto 1fr;
+    grid-template-rows: auto auto 1fr;
     column-gap: 72px;
     row-gap: 36px;
     align-items: start;
@@ -1981,12 +2050,19 @@ a.dossier-item:hover {
   }
   .is-visitor .result-stage {
     grid-column: 2;
-    grid-row: 1 / span 2;
+    grid-row: 1 / span 3;
     padding: 0;
+  }
+  /* le jury puis « Et toi ? », l'un sous l'autre dans la colonne du texte */
+  .is-visitor .jury {
+    grid-column: 1;
+    grid-row: 2;
+    margin-bottom: -20px;
+    padding: 24px 28px;
   }
   .is-visitor .you {
     grid-column: 1;
-    grid-row: 2;
+    grid-row: 3;
     align-self: start;
   }
   .wanted-name {

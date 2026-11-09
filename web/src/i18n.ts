@@ -366,6 +366,17 @@ const fr = {
     pointsBehind: (n: number) => (n === 1 ? "1 point de retard" : `${n} points de retard`),
     tie: "à égalité",
   },
+  /* le jury de la page partagée (§18.27) : on vote sur le chef d'accusation, jamais sur la personne */
+  jury: {
+    title: "Coupable ou relaxe\u00a0?",
+    titleCharge: (charge: string) => `Coupable de «\u00a0${charge}\u00a0»\u00a0?`,
+    guilty: "Coupable",
+    cleared: "Relaxe",
+    /* « votes » plutôt que « jurés », qui s'accorde */
+    tally: (pct: number, n: number) => `${pct}\u00a0% coupable · ${n}\u00a0${n === 1 ? "vote" : "votes"}`,
+    owner: (tally: string) => `Le jury : ${tally}`,
+    failed: "Vote non compté. Réessaie.",
+  },
   errors: {
     title: "Pas de fiche cette fois",
     retry: "Réessayer",
@@ -415,8 +426,12 @@ const fr = {
         p: "Si tu donnes un lien LinkedIn, ou si ton GitHub en affiche un, un service tiers de collecte de profils publics lit ce profil public. On le garde 30 jours pour ne pas le relire : titre, résumé, postes, formation, compétences. Ni photo, ni lieu, ni contact. La fiche suit la règle des 90 jours. Pour t'y opposer : masque ta fiche (« C'est moi »), supprime-la, le profil gardé part avec elle, ou écris-nous.",
       },
       {
+        h: "Le jury",
+        p: "Si tu votes sur une fiche partagée, on garde ton vote (coupable ou relaxe) avec une empreinte hachée de ton adresse IP, jamais l'adresse elle-même : c'est ce qui limite à un vote par fiche. Les votes partent avec la fiche.",
+      },
+      {
         h: "Mesure",
-        p: "Huit événements anonymes, enregistrés par notre serveur : fiche générée, fiche partagée, visite par un lien partagé, email donné, clic vers azerit.tech, dénonciation envoyée, arrivée sur une fiche dénoncée, fiche dénoncée revendiquée. Pas de cookie publicitaire, pas d'outil tiers.",
+        p: "Neuf événements anonymes, enregistrés par notre serveur : fiche générée, fiche partagée, visite par un lien partagé, email donné, clic vers azerit.tech, dénonciation envoyée, arrivée sur une fiche dénoncée, fiche dénoncée revendiquée, vote du jury. Pas de cookie publicitaire, pas d'outil tiers.",
       },
     ],
     contact: "Une question : hello@azerit.tech",
@@ -765,6 +780,15 @@ const en: Dict = {
     pointsBehind: (n) => (n === 1 ? "1 point behind" : `${n} points behind`),
     tie: "dead heat",
   },
+  jury: {
+    title: "Guilty or cleared?",
+    titleCharge: (charge) => `Guilty of “${charge}”?`,
+    guilty: "Guilty",
+    cleared: "Cleared",
+    tally: (pct, n) => `${pct}% guilty · ${n}\u00a0${n === 1 ? "vote" : "votes"}`,
+    owner: (tally) => `The jury: ${tally}`,
+    failed: "Vote not counted. Try again.",
+  },
   errors: {
     title: "No sheet this time",
     retry: "Try again",
@@ -814,8 +838,12 @@ const en: Dict = {
         p: "If you give a LinkedIn link, or your GitHub shows one, a third-party service that collects public profiles reads that public profile. We keep it 30 days so we don't read it twice: headline, summary, positions, education, skills. No photo, location or contact details. The sheet follows the 90-day rule. To object: hide your sheet (“That's me”), delete it, and the stored profile goes with it, or write to us.",
       },
       {
+        h: "The jury",
+        p: "If you vote on a shared sheet, we keep your vote (guilty or cleared) with a hash of your IP address, never the address itself: that's what limits it to one vote per sheet. Votes are deleted with the sheet.",
+      },
+      {
         h: "Measurement",
-        p: "Eight anonymous events, recorded by our own server: sheet generated, sheet shared, visit from a shared link, email given, click to azerit.tech, tip-off sent, arrival on a turned-in sheet, turned-in sheet claimed. No ad cookies, no third-party tools.",
+        p: "Nine anonymous events, recorded by our own server: sheet generated, sheet shared, visit from a shared link, email given, click to azerit.tech, tip-off sent, arrival on a turned-in sheet, turned-in sheet claimed, jury vote. No ad cookies, no third-party tools.",
       },
     ],
     contact: "Questions: hello@azerit.tech",

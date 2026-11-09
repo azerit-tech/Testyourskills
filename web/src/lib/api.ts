@@ -19,7 +19,24 @@ export interface CreateInput {
   denouncedBy?: string;
 }
 
-/** GET /api/card/:id/case (§18.6, §18.7). */
+export type Verdict = "guilty" | "cleared";
+
+/** Décompte du jury d'une fiche (§18.27) ; `mine` : le vote déjà posé depuis cette adresse, sinon null. */
+export interface Jury {
+  guilty: number;
+  cleared: number;
+  mine: Verdict | null;
+}
+
+const NO_JURY: Jury = { guilty: 0, cleared: 0, mine: null };
+
+function readJury(raw: unknown): Jury {
+  const j = raw as Partial<Jury> | null | undefined;
+  const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v > 0 ? Math.floor(v) : 0);
+  return { guilty: n(j?.guilty), cleared: n(j?.cleared), mine: j?.mine === "guilty" || j?.mine === "cleared" ? j.mine : null };
+}
+
+/** GET /api/card/:id/case (§18.6, §18.7, §18.27). */
 export interface CaseInfo {
   /** Fiche née d'une dénonciation. */
   denounced: boolean;
@@ -29,6 +46,8 @@ export interface CaseInfo {
   x: string | null;
   /** Au plus trois complices à suggérer. */
   accomplices: { login: string; avatarUrl: string }[];
+  /** « Coupable ou relaxe ? » : le décompte de la page partagée. */
+  jury: Jury;
 }
 
 export interface CreateResult {
@@ -225,7 +244,7 @@ async function fetchJob(id: string): Promise<JobState> {
 
 /** Dénonciation et complices d'une fiche ; une fiche sans rien en cas d'erreur, jamais d'exception. */
 async function getCase(id: string): Promise<CaseInfo> {
-  const none: CaseInfo = { denounced: false, by: null, x: null, accomplices: [] };
+  const none: CaseInfo = { denounced: false, by: null, x: null, accomplices: [], jury: NO_JURY };
   if (isMock()) return mockApi.getCase(id);
   try {
     const res = await fetch(`/api/card/${encodeURIComponent(id)}/case`, { headers: { Accept: "application/json" } });
@@ -236,10 +255,28 @@ async function getCase(id: string): Promise<CaseInfo> {
       by: typeof c.by === "string" ? c.by : null,
       x: typeof c.x === "string" ? c.x : null,
       accomplices: Array.isArray(c.accomplices) ? c.accomplices.filter((a) => typeof a?.login === "string" && typeof a?.avatarUrl === "string") : [],
+      jury: readJury(c.jury),
     };
   } catch {
     return none;
   }
+}
+
+/** POST /api/vote (§18.27) : pose le vote et rend le décompte ; déjà voté depuis cette adresse, le premier vote reste. */
+async function vote(cardId: string, verdict: Verdict): Promise<Jury> {
+  if (isMock()) return mockApi.vote(cardId, verdict);
+  let res: Response;
+  try {
+    res = await fetch("/api/vote", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ cardId, verdict }),
+    });
+  } catch {
+    throw new ApiError(0, "network", null);
+  }
+  if (!res.ok) throw await readError(res);
+  return readJury(((await res.json()) as { jury?: unknown }).jury);
 }
 
 async function sendEmail(cardId: string, email: string): Promise<void> {
@@ -297,7 +334,7 @@ async function getTop(): Promise<WeekTop | null> {
   }
 }
 
-export const api = { createCard, getJob, getCase, sendEmail, deleteCard, track, getConfig, startLinkedInPhoto, getShowcase, getTop, getMe, startClaim, setHidden, logout };
+export const api = { createCard, getJob, getCase, vote, sendEmail, deleteCard, track, getConfig, startLinkedInPhoto, getShowcase, getTop, getMe, startClaim, setHidden, logout };
 
 /** URLs des images rendues par le serveur (§7). */
 export const images = {

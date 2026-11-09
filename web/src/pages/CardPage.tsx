@@ -9,6 +9,7 @@ import { ComparisonStage } from "../components/Comparison";
 import { Denounce } from "../components/Denounce";
 import { EntryForm } from "../components/EntryForm";
 import { Dossier } from "../components/Findings";
+import { Jury, JuryLine } from "../components/Jury";
 import { RevealCard, useReveal } from "../components/Reveal";
 import { ShareDock } from "../components/ShareDock";
 import type { WalkoutControl } from "../components/Walkout3D";
@@ -398,6 +399,9 @@ function Result({ item, animate, owner, fresh, notice, me, onMe, onDeleted }: Re
           </p>
         </section>
 
+        {/* Le jury (§18.27) : un geste à un toucher, avant « Et toi ? ». */}
+        {visitor && <Jury cardId={id} card={main} jury={kase?.jury ?? null} toast={toast.show} />}
+
         {visitor && (
           <section className="you" id="you" aria-labelledby="you-title">
             <h2 id="you-title">{t.denounce.andYou}</h2>
@@ -419,6 +423,7 @@ function Result({ item, animate, owner, fresh, notice, me, onMe, onDeleted }: Re
       </div>
 
       <div className={`after${settled ? " is-in" : ""}`} aria-hidden={!settled} inert={!settled ? true : undefined}>
+        {!visitor && <JuryLine jury={kase?.jury ?? null} />}
         {/* L'enquête en direct (§18.26) : les trois trouvailles les plus fortes, chacune vers sa preuve. */}
         <Dossier card={main} />
         {/* Fiche masquée : /og/* et /c/:id répondent 404 / 410 à tous, l'image ne se télécharge pas et le lien ne montre rien. */}
