@@ -768,6 +768,14 @@ svg {
   padding: max(20px, env(safe-area-inset-top)) var(--gutter) max(16px, env(safe-area-inset-bottom));
   background: var(--ink-0);
   overflow: hidden;
+  /* un glissement du doigt ne fait pas défiler la page restée dessous */
+  touch-action: pinch-zoom;
+}
+/* elle se lève : fondu sur la scène 3D (ou la fiche) déjà dessous, jamais sur du noir */
+.loadscreen.is-leaving {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.26s ease-out;
 }
 .load-main {
   flex: 1;
@@ -788,6 +796,7 @@ svg {
 .load-mug svg {
   width: 100%;
   height: auto;
+  aspect-ratio: 164 / 192;
 }
 .load-mug-photo {
   animation: fade-in 0.2s ease-out both;
@@ -1130,26 +1139,6 @@ svg {
 /* la fiche HTML prend le relais de la fiche 3D, posée au même endroit */
 .card-slot.phase-handoff .card-rig {
   animation: fade-in 0.5s ease-out both;
-}
-
-/* invite sous le dossier 3D */
-.pack-hint {
-  position: absolute;
-  bottom: -6px;
-  left: 50%;
-  z-index: 3;
-  transform: translateX(-50%);
-  font: 600 11px/1 var(--f-text);
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--cream);
-  white-space: nowrap;
-  animation: hint 1.6s ease-in-out infinite;
-}
-@keyframes hint {
-  50% {
-    opacity: 0.35;
-  }
 }
 
 .skip-btn,

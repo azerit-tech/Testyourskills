@@ -58,11 +58,13 @@ interface WaitingProps {
   scene?: "loading" | "tap";
   /** Le geste de la pilule « Ouvrir mon dossier ». */
   onOpen?: () => void;
+  /** L'écran se lève : il s'efface en fondu sur la scène (ou la fiche) déjà dessous. */
+  leaving?: boolean;
 }
 
 const idOf = (f: Finding) => `${f.source}:${f.kind}`;
 
-export function Waiting({ cardId, progress, startedAt, queue, findings = [], login, avatarUrl, plea = false, ready = false, onRelease, scene, onOpen }: WaitingProps) {
+export function Waiting({ cardId, progress, startedAt, queue, findings = [], login, avatarUrl, plea = false, ready = false, onRelease, scene, onOpen, leaving = false }: WaitingProps) {
   const { t, lang } = useT();
   const [lines, setLines] = useState<Line[]>([]);
   const [now, setNow] = useState(() => Date.now());
@@ -168,7 +170,7 @@ export function Waiting({ cardId, progress, startedAt, queue, findings = [], log
   }, [barElapsed, ready]);
 
   return (
-    <section className="loadscreen" aria-labelledby="waiting-title">
+    <section className={`loadscreen${leaving ? " is-leaving" : ""}`} aria-labelledby="waiting-title" inert={leaving ? true : undefined}>
       <h1 id="waiting-title" className="sr-only">
         {t.waiting.title}
       </h1>

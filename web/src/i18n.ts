@@ -129,9 +129,6 @@ const fr = {
     ],
   },
   reveal: {
-    /* le dossier s'ouvre seul au bout d'1,6 s, ou plus tôt au toucher / au clic */
-    tap: "Touche pour ouvrir",
-    click: "Clique pour ouvrir",
     /* titre du dossier à l'écran de la cabine, avant l'ouverture */
     packTitle: "DOSSIER",
     /* la pilule de l'attente, quand le son demande un geste pour démarrer (§18.27) */
@@ -573,8 +570,6 @@ const en: Dict = {
     ],
   },
   reveal: {
-    tap: "Tap to open",
-    click: "Click to open",
     packTitle: "CASE FILE",
     open: "Open my case file",
     skip: "Skip animation",

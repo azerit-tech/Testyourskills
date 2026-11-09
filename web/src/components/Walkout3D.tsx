@@ -3,7 +3,9 @@
 // (préchargés pendant l'attente), relaie le clic d'ouverture, les feux d'artifice (clic ou
 // Espace), la passation à la carte HTML et la fin. Sans WebGL ou sans assets :
 // on passe directement au résultat. Pendant l'attente, warmWalkout prépare le
-// moteur de rendu avec une scène d'échauffement.
+// moteur de rendu avec une scène d'échauffement. La page garde l'écran
+// d'attente par-dessus jusqu'à `onReady` (la première image est rendue) : plus
+// d'écran noir (§18.27) ; c'est elle qui renonce si les assets tardent trop.
 import { useEffect, useRef, useState } from "react";
 import type { MutableRefObject, RefObject } from "react";
 import { siGithub } from "simple-icons";
@@ -24,11 +26,16 @@ import "../three/hud.css";
 
 export { preloadWalkoutAssets };
 
+/** Une vraie scène est montée : l'échauffement n'a plus lieu d'être. */
+let staged = 0;
+
 /** Pendant l'attente du scoring : charge tout et construit une scène
  * d'échauffement, jamais affichée, pour que la révélation démarre sans
  * compiler ses shaders ni envoyer ses textures au GPU. Sans danger à rappeler. */
 export async function warmWalkout(lang: Lang): Promise<void> {
   const [assets] = await Promise.all([preloadWalkoutAssets(), loadSceneFonts()]);
+  // Les assets arrivent après la fiche (réseau lent) : la vraie scène se construit, pas deux.
+  if (staged > 0) return;
   const blank = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1);
   blank.colorSpace = THREE.SRGBColorSpace;
   blank.needsUpdate = true;
@@ -73,8 +80,7 @@ export async function warmWalkout(lang: Lang): Promise<void> {
 const DOC_PATH = "M6 2h8l6 6v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm7 1.5V9h5.5L13 3.5zM8 12h8v2H8v-2zm0 4h8v2H8v-2z";
 /** Chevrons de code en 24 × 24, quand aucun langage n'est reconnu. */
 const CODE_PATH = "M8.7 16.6 4.1 12l4.6-4.6L7.3 6l-6 6 6 6 1.4-1.4zm6.6 0 4.6-4.6-4.6-4.6L16.7 6l6 6-6 6-1.4-1.4z";
-/** Au-delà, on renonce à la scène plutôt que de faire attendre. */
-const ASSET_TIMEOUT = 12000;
+
 export interface WalkoutControl {
   /** Clic sur la scène pendant la séquence : vrai si la scène l'a utilisé. */
   interact(): boolean;
@@ -91,18 +97,20 @@ interface Props {
   /** Élément contenant un [data-scene-anchor] : la carte 3D vient s'y poser. */
   anchorRef: RefObject<HTMLElement | null>;
   controlRef: MutableRefObject<WalkoutControl | null>;
+  /** La scène a rendu sa première image : l'écran d'attente peut se lever. */
+  onReady?: () => void;
   onHandoff: () => void;
   onDone: () => void;
 }
 
-export function Walkout3D({ card, lang, double, declared = "cv", phase, anchorRef, controlRef, onHandoff, onDone }: Props) {
+export function Walkout3D({ card, lang, double, declared = "cv", phase, anchorRef, controlRef, onReady, onHandoff, onDone }: Props) {
   const { t } = useT();
   const hostRef = useRef<HTMLDivElement>(null);
   const hudRef = useRef<HTMLDivElement>(null);
   const handle = useRef<WalkoutHandle | null>(null);
   const pendingOpen = useRef(false);
-  const cb = useRef({ onHandoff, onDone });
-  cb.current = { onHandoff, onDone };
+  const cb = useRef({ onReady, onHandoff, onDone });
+  cb.current = { onReady, onHandoff, onDone };
   const [cue, setCue] = useState<WalkoutCue>(null);
   // Sur écran tactile, ni clic ni Espace : on touche l'écran.
   const touch = useMediaQuery("(pointer: coarse)");
@@ -120,6 +128,7 @@ export function Walkout3D({ card, lang, double, declared = "cv", phase, anchorRe
     const host = hostRef.current;
     if (!host) return;
     let alive = true;
+    staged++;
     const icon = langIcon(card.mainLanguage);
     const tells = t.reveal.tells;
     const texts = {
@@ -144,10 +153,9 @@ export function Walkout3D({ card, lang, double, declared = "cv", phase, anchorRe
       hud: { specialty: tells.position, weapon: tells.language, file: tells.league, affiliation: tells.club, ...HUD_TEXTS[lang] },
     };
     (async () => {
-      const timeout = new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error("assets 3D trop lents")), ASSET_TIMEOUT));
       let assets;
       try {
-        [assets] = await Promise.race([Promise.all([preloadWalkoutAssets(), loadSceneFonts()]), timeout]);
+        [assets] = await Promise.all([preloadWalkoutAssets(), loadSceneFonts()]);
       } catch (e) {
         console.warn("[walkout] assets indisponibles, affichage direct", e);
         if (alive) cb.current.onDone();
@@ -180,6 +188,14 @@ export function Walkout3D({ card, lang, double, declared = "cv", phase, anchorRe
         host.appendChild(h.canvas);
         controlRef.current = { interact: () => h.interact() };
         if (pendingOpen.current) h.open();
+        // Prête : shaders compilés, puis deux images rendues (la première paie l'envoi des textures au GPU).
+        void h.ready.then(() =>
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() => {
+              if (alive) cb.current.onReady?.();
+            }),
+          ),
+        );
       } catch (e) {
         console.warn("[walkout] WebGL indisponible, affichage direct", e);
         cb.current.onDone();
@@ -187,6 +203,7 @@ export function Walkout3D({ card, lang, double, declared = "cv", phase, anchorRe
     })();
     return () => {
       alive = false;
+      staged--;
       controlRef.current = null;
       handle.current?.dispose();
       handle.current?.canvas.remove();

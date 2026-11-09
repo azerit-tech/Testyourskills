@@ -19,6 +19,7 @@ import { Waiting } from "../components/Waiting";
 import { pick, useT } from "../i18n";
 import { api, ApiError, tokens, type CaseInfo } from "../lib/api";
 import { isClosed } from "../lib/errors";
+import { useHold, type SceneState } from "../lib/hold";
 import { navigate, onLinkClick } from "../lib/router";
 import { freshLogin, freshSince, iDenounced, myCard, prefillFromLast, rememberMine, type MyCard } from "../lib/session";
 import { useReducedMotion } from "../lib/util";
@@ -160,55 +161,63 @@ export function CardPage({ id }: { id: string }) {
     document.title = t.meta.titleCard(c.name, c.overall);
   }, [view, t]);
 
-  // La scène 3D (Three.js et ses assets) se charge pendant l'attente du
-  // scoring, et s'y prépare : shaders compilés, textures sur le GPU.
+  // La scène 3D (Three.js et ses assets) se charge dès que la fiche est
+  // demandée, et s'y prépare pendant l'attente du scoring : shaders compilés,
+  // textures sur le GPU. Jamais en mouvement réduit : il n'y aura pas de scène.
   useEffect(() => {
-    if (view.s === "pending")
+    if (!reduced && (view.s === "pending" || (view.s === "loading" && fresh)))
       loadWalkout()
         .then((m) => m.warmWalkout(lang))
         .catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view.s]);
 
-  // L'enquête en direct (§18.26) : fiche prête avant la fin des trouvailles, on
-  // laisse tomber au moins trois pièces avant la révélation (Waiting rend la main).
+  // Plus d'écran noir (§18.27) : fiche prête, l'attente reste par-dessus la page
+  // tant que les pièces du dossier ne sont pas lues (§18.26, Waiting rend la
+  // main) et que la scène 3D n'a pas rendu sa première image ; 20 s au plus.
+  // Vaut pour une fiche fraîche servie du cache, qui n'a ni pièces ni pari.
   const lastPending = useRef<{ progress: ProgressEvent[]; queue?: number; findings?: Finding[] }>({ progress: [] });
   if (view.s === "pending") lastPending.current = view;
-  const [released, setReleased] = useState(false);
-  const holding = view.s === "done" && sawPending && !released && (lastPending.current.findings?.length ?? 0) > 0;
-  // Filet : jamais plus de 12 s de plus, même si l'onglet a dormi.
-  useEffect(() => {
-    if (!holding) return;
-    const t = window.setTimeout(() => setReleased(true), 12_000);
-    return () => window.clearTimeout(t);
-  }, [holding]);
+  const animate = view.s === "done" && (fresh || sawPending) && !reduced;
+  const hold = useHold({ active: view.s === "done" && (animate || sawPending), animate });
 
-  if (view.s === "loading") {
-    return (
-      <main className="page page-card" id="main">
-        <div className="stage-slot loading-slot" aria-busy="true">
-          <span className="sr-only">{t.common.loading}</span>
-        </div>
-      </main>
-    );
-  }
+  // La photo d'identité : l'avatar du pseudo tapé dès la première seconde ; sinon, fiche prête, sa photo.
+  const typed = freshLogin(id);
+  const doneCard = view.s === "done" ? (view.item.kind === "card" ? view.item.card : view.item.comparison.github) : null;
+  const w = view.s === "pending" ? view : lastPending.current;
+  // L'attente garde la même instance de bout en bout (clé fixe) : la photo, le pari et les pièces restent en place.
+  const waiting =
+    view.s === "pending" || (view.s === "loading" && fresh) || hold.show ? (
+      <Waiting
+        key="waiting"
+        cardId={id}
+        login={typed ?? doneCard?.login}
+        avatarUrl={typed ? null : doneCard?.avatarUrl}
+        plea={owner && sawPending}
+        progress={w.progress}
+        startedAt={startedAt}
+        queue={w.queue}
+        findings={w.findings}
+        ready={view.s === "done"}
+        onRelease={hold.onRelease}
+        scene={hold.line}
+        onOpen={hold.onOpen}
+        leaving={hold.leaving}
+      />
+    ) : null;
 
-  if (view.s === "pending" || holding) {
-    const w = view.s === "pending" ? view : lastPending.current;
+  if (view.s === "loading" || view.s === "pending") {
     return (
-      <main className="page page-card" id="main">
-        <Waiting
-          cardId={id}
-          login={freshLogin(id)}
-          plea={owner}
-          progress={w.progress}
-          startedAt={startedAt}
-          queue={w.queue}
-          findings={w.findings}
-          ready={holding}
-          onRelease={() => setReleased(true)}
-        />
-      </main>
+      <>
+        {waiting}
+        <main className="page page-card" id="main">
+          {!waiting && (
+            <div className="stage-slot loading-slot" aria-busy="true">
+              <span className="sr-only">{t.common.loading}</span>
+            </div>
+          )}
+        </main>
+      </>
     );
   }
 
@@ -258,23 +267,35 @@ export function CardPage({ id }: { id: string }) {
   }
 
   return (
-    <Result
-      key={id}
-      item={view.item}
-      animate={(fresh || sawPending) && !reduced}
-      owner={owner}
-      fresh={fresh}
-      notice={notice}
-      me={me}
-      onMe={setMe}
-      onDeleted={() => setView({ s: "deleted" })}
-    />
+    <>
+      {waiting}
+      <Result
+        key={id}
+        item={view.item}
+        animate={animate}
+        start={hold.start}
+        abort={hold.abort}
+        onScene={hold.onScene}
+        owner={owner}
+        fresh={fresh}
+        notice={notice}
+        me={me}
+        onMe={setMe}
+        onDeleted={() => setView({ s: "deleted" })}
+      />
+    </>
   );
 }
 
 interface ResultProps {
   item: Shareable;
   animate: boolean;
+  /** L'écran d'attente s'est levé : la révélation peut partir (§18.27). */
+  start: boolean;
+  /** La scène 3D n'est pas venue à temps : la fiche sort sans révélation. */
+  abort: boolean;
+  /** La scène 3D a rendu sa première image (« ready »), ou n'aura pas lieu (« off »). */
+  onScene: (state: SceneState) => void;
   owner: boolean;
   fresh: boolean;
   notice: { text: string; n: number } | null;
@@ -283,11 +304,18 @@ interface ResultProps {
   onDeleted: () => void;
 }
 
-function Result({ item, animate, owner, fresh, notice, me, onMe, onDeleted }: ResultProps) {
+function Result({ item, animate, start, abort, onScene, owner, fresh, notice, me, onMe, onDeleted }: ResultProps) {
   const { t, lang } = useT();
   const id = item.kind === "card" ? item.card.id : item.comparison.id;
   const main: CardData = item.kind === "card" ? item.card : item.comparison.github;
-  const { phase, open, skip, handoff, finish, animating, settled } = useReveal(animate);
+  const { phase, open, skip, handoff, finish, animating, settled } = useReveal(animate, start);
+  // La scène ne viendra pas (délai dépassé, WebGL absent, animation passée) : l'attente n'a plus à la guetter.
+  useEffect(() => {
+    if (abort) skip();
+  }, [abort, skip]);
+  useEffect(() => {
+    if (animate && phase === "done") onScene("off");
+  }, [animate, phase, onScene]);
   const toast = useToast();
   const tracked = useRef(false);
   const stageRef = useRef<HTMLElement>(null);
@@ -376,7 +404,7 @@ function Result({ item, animate, owner, fresh, notice, me, onMe, onDeleted }: Re
 
         {animating && (
           <Suspense fallback={null}>
-            <Walkout3D card={main} lang={lang} double={item.kind === "comparison"} declared={declaredOf(item.kind === "comparison" ? item.comparison : item.card)} phase={phase} anchorRef={stageRef} controlRef={walkoutCtl} onHandoff={handoff} onDone={finish} />
+            <Walkout3D card={main} lang={lang} double={item.kind === "comparison"} declared={declaredOf(item.kind === "comparison" ? item.comparison : item.card)} phase={phase} anchorRef={stageRef} controlRef={walkoutCtl} onReady={() => onScene("ready")} onHandoff={handoff} onDone={finish} />
           </Suspense>
         )}
         <section ref={stageRef} className="result-stage" onClick={animating ? onStageClick : undefined}>

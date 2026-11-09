@@ -62,7 +62,8 @@ export function Mugshot({ cardId, login, src }: MugshotProps) {
   const plX = (W - PLACARD.w) / 2;
   const plY = H - PLACARD.bottom - PLACARD.h;
   const name = login ? fit(upper(`@${login}`, lang), { font: "display-700", size: 20, minSize: 12, maxWidth: PLACARD.w - 16, letterSpacing: 1.6, minLetterSpacing: 0.3 }) : null;
-  const file = fit(caseLine(cardId, cardT(lang).caseNo), { font: "mono-400", size: 8.5, minSize: 7, maxWidth: PLACARD.w - 12, letterSpacing: 0.85, minLetterSpacing: 0.2 });
+  // Sans pseudo, le numéro du dossier tient seul la plaque, un peu plus grand.
+  const file = fit(caseLine(cardId, cardT(lang).caseNo), { font: "mono-400", size: name ? 8.5 : 10, minSize: 7, maxWidth: PLACARD.w - 12, letterSpacing: 0.85, minLetterSpacing: 0.2 });
 
   return (
     <div className="load-mug" aria-hidden>
@@ -108,7 +109,7 @@ export function Mugshot({ cardId, login, src }: MugshotProps) {
                 {name.text}
               </text>
             )}
-            <text x={W / 2} y={plY + (name ? 35 : 27)} {...fontAttrs("mono-400")} fontSize={name ? file.size : file.size + 1.5} letterSpacing={+file.letterSpacing.toFixed(2)} textAnchor="middle" fill={name ? "#bdb8ad" : "#f4f1ea"}>
+            <text x={W / 2} y={plY + (name ? 35 : 27)} {...fontAttrs("mono-400")} fontSize={file.size} letterSpacing={+file.letterSpacing.toFixed(2)} textAnchor="middle" fill={name ? "#bdb8ad" : "#f4f1ea"}>
               {file.text}
             </text>
           </g>
