@@ -10,6 +10,10 @@ import type { CvReading, CvTextCounts } from "../../shared/readings";
 import { createApp, normalizeLogin, purge, type AppOptions } from "./app";
 import { RETENTION_MS, Store } from "./db";
 import type { CardBody, Deps } from "./pipeline";
+import type { AiStatus } from "./ai/budget";
+import { ChatHttpError } from "./ai/client";
+import { readCode } from "./ai/readCode";
+import { fakeClient } from "./ai/testing";
 
 class EngineError extends Error {
   constructor(readonly code: string) {
@@ -486,6 +490,93 @@ describe("CV et comparaison", () => {
     const jb = (await postCv(b, PDF.slice())).json;
     await b.pipeline.wait(jb.id);
     expect((await getState(b, jb.id)).state).toMatchObject({ state: "error", code: "internal" });
+  });
+});
+
+describe("commissariat fermé (plafond IA ou crédit épuisé)", () => {
+  /** Erreur telle que la lève ai/client.ts (AiClosedError), reconnue à son code. */
+  const closed = (reason: "budget" | "credits") => Object.assign(new Error(reason), { code: "closed", reason });
+  const CLOSED_FR = "Le commissariat est fermé pour ce soir. Reviens demain.";
+  const CLOSED_EN = "The station is closed for tonight. Come back tomorrow.";
+
+  it("un 402 sur la lecture du code fait échouer la fiche en closed, sans fiche dégradée", async () => {
+    // Vrai readCode, faux client OpenRouter qui répond 402.
+    const { client, calls: aiCalls } = fakeClient([{ error: new ChatHttpError(402, "Insufficient credits") }]);
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const ctx = setup({ readCode: (repos, opts) => readCode(repos, { ...opts, client }) });
+    const { res, json } = await postLogin(ctx, "leamd");
+    expect(res.status).toBe(202);
+    await ctx.pipeline.wait(json.id);
+    const s = await getState(ctx, json.id);
+    expect(s.status).toBe(200);
+    expect(s.state).toEqual({ state: "error", code: "closed", message: { fr: CLOSED_FR, en: CLOSED_EN } });
+    expect(aiCalls).toHaveLength(1);
+    expect(ctx.store.getCard(json.id)).toBeNull();
+    vi.restoreAllMocks();
+  });
+
+  it("ne met pas en cache une fiche closed : le même pseudo repasse dès que le crédit revient", async () => {
+    let credit = false;
+    const ctx = setup({
+      async readCode() {
+        if (!credit) throw closed("credits");
+        return { readings: [], ai_status: "ai_typed" };
+      },
+    });
+    const first = await generate(ctx, "leamd");
+    expect((await getState(ctx, first.id)).state).toMatchObject({ state: "error", code: "closed" });
+    expect(ctx.store.findRecentGithub("leamd")).toBeNull();
+    expect(ctx.pipeline.inflightFor("leamd")).toBeUndefined();
+
+    credit = true;
+    const again = await postLogin(ctx, "leamd");
+    expect(again.res.status).toBe(202);
+    expect(again.json.cached).toBe(false);
+    expect(again.json.id).not.toBe(first.id);
+    await ctx.pipeline.wait(again.json.id);
+    const done = await getState(ctx, again.json.id);
+    expect(done.state).toMatchObject({ state: "done", kind: "card", card: { scoringVersion: "ai" } });
+  });
+
+  it("CV seul ou comparaison : closed aussi, jamais une carte sans lecture", async () => {
+    const a = setup({ readCv: async () => Promise.reject(closed("credits")) });
+    const ja = (await postCv(a, PDF.slice())).json;
+    await a.pipeline.wait(ja.id);
+    expect((await getState(a, ja.id)).state).toMatchObject({ state: "error", code: "closed" });
+
+    // Comparaison : le CV fermé ne doit pas laisser sortir la carte GitHub seule.
+    const b = setup({ readCv: async () => Promise.reject(closed("credits")) });
+    const jb = (await postCv(b, PDF.slice(), "leamd")).json;
+    await b.pipeline.wait(jb.id);
+    expect((await getState(b, jb.id)).state).toMatchObject({ state: "error", code: "closed" });
+    expect(b.store.getCard(jb.id)).toBeNull();
+  });
+
+  it("plafond du jour atteint : 503 closed tout de suite, sans job ni quota, le cache reste servi", async () => {
+    let status: AiStatus = "ok";
+    // Quota de 2 : la première carte en prend un, le refus closed ne doit pas prendre le second.
+    const ctx = setup({}, { aiStatus: () => status, cardsPerDay: 2 });
+    const cachedCard = await generate(ctx, "leamd");
+
+    status = "budget";
+    const { res, json } = await postLogin(ctx, "other");
+    expect(res.status).toBe(503);
+    expect(json).toMatchObject({ state: "error", code: "closed", message: { fr: CLOSED_FR, en: CLOSED_EN } });
+    expect(ctx.calls.collect).toBe(1);
+    // Une fiche de moins de 24 h n'a pas besoin de l'IA.
+    expect((await postLogin(ctx, "leamd")).json).toMatchObject({ id: cachedCard.id, cached: true });
+
+    // Le refus n'a pas entamé le quota : le lendemain (plafond levé), la carte passe.
+    status = "ok";
+    expect((await postLogin(ctx, "other")).res.status).toBe(202);
+    await ctx.pipeline.drain();
+  });
+
+  it("un 402 vu ne bloque pas les demandes suivantes", async () => {
+    const ctx = setup({}, { aiStatus: () => "credits" });
+    const { res } = await postLogin(ctx, "leamd");
+    expect(res.status).toBe(202);
+    await ctx.pipeline.drain();
   });
 });
 

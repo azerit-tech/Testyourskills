@@ -1,9 +1,19 @@
 // Appel structuré via OpenRouter (API compatible OpenAI, `fetch` natif) : sortie
 // JSON contrainte par schéma (`response_format: json_schema`, strict), puis
 // validation côté code. Une sortie invalide relance une fois, puis rend null (SPEC §12).
+// Plafond du jour atteint ou crédit épuisé (402) : lève AiClosedError, la fiche
+// échoue en `closed` au lieu de sortir sans lecture (SPEC §2.3).
 
 import { z } from "zod";
-import { aiAvailable, recordUsage, withinBudget, type UsageLike } from "./budget";
+import {
+  AiClosedError,
+  aiConfigured,
+  noteCreditsExhausted,
+  noteCreditsOk,
+  recordUsage,
+  withinBudget,
+  type UsageLike,
+} from "./budget";
 
 // ---------------------------------------------------------------------------
 // Transport
@@ -82,12 +92,39 @@ export const openRouterClient: ChatClient = {
     });
     const json = (await res.json().catch(() => null)) as ChatResponse | null;
     if (!res.ok) {
-      throw new ChatHttpError(res.status, json?.error?.message ?? `HTTP ${res.status}`);
+      // Le code du corps prime : OpenRouter y range parfois le 402 sous un autre statut.
+      const status = isCreditCode(json?.error?.code) ? 402 : res.status;
+      throw new ChatHttpError(status, json?.error?.message ?? `HTTP ${res.status}`);
     }
     if (!json) throw new ChatHttpError(res.status, "réponse illisible");
     return json;
   },
 };
+
+// ---------------------------------------------------------------------------
+// Crédit épuisé (402)
+//
+// OpenRouter signale un crédit insuffisant par un HTTP 402 et un corps
+// `{"error":{"code":402,"message":"Insufficient credits…"}}` (ou « This request
+// requires more credits, or fewer max_tokens… »). Le même objet peut aussi
+// arriver dans une réponse 200, au niveau racine ou dans `choices[0].error`.
+
+const CREDIT_MESSAGE_RE = /insufficient credits|more credits/i;
+
+function isCreditCode(code: unknown): boolean {
+  return Number(code) === 402;
+}
+
+/** L'erreur levée par le client est-elle un manque de crédit ? */
+export function isCreditError(err: unknown): boolean {
+  return err instanceof ChatHttpError && (err.status === 402 || CREDIT_MESSAGE_RE.test(err.message));
+}
+
+/** La réponse, bien que reçue, porte-t-elle une erreur de crédit dans son corps ? */
+export function creditErrorIn(res: ChatResponse): boolean {
+  const errors = [res.error, res.choices?.[0]?.error];
+  return errors.some((e) => !!e && (isCreditCode(e.code) || CREDIT_MESSAGE_RE.test(e.message ?? "")));
+}
 
 // ---------------------------------------------------------------------------
 // Modèles
@@ -185,8 +222,13 @@ export async function callStructured<T>(call: StructuredCall<T>): Promise<T | nu
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     if (call.signal?.aborted) return null;
-    // Sans client injecté il faut une clé ; dans tous les cas le budget du jour.
-    if (call.client ? !withinBudget() : !aiAvailable()) return null;
+    // Sans client injecté il faut une clé : sans elle, l'IA n'est pas configurée (dev).
+    if (!call.client && !aiConfigured()) return null;
+    // Plafond du jour atteint : la fiche échoue en `closed`, aucun appel n'est fait.
+    if (!withinBudget()) {
+      console.warn(`[ai] ${call.label}: plafond du jour atteint, commissariat fermé`);
+      throw new AiClosedError("budget");
+    }
 
     const isLast = attempt === MAX_ATTEMPTS - 1;
     const userParts: ChatContentPart[] = [{ type: "text", text: call.userText }];
@@ -214,6 +256,11 @@ export async function callStructured<T>(call: StructuredCall<T>): Promise<T | nu
       }
     } catch (err) {
       if (call.signal?.aborted) return null;
+      if (isCreditError(err)) {
+        noteCreditsExhausted();
+        console.warn(`[ai] ${call.label}: crédit OpenRouter épuisé (HTTP 402), commissariat fermé`);
+        throw new AiClosedError("credits");
+      }
       // On ne loggue jamais le contenu, seulement la nature de l'erreur.
       const status = err instanceof ChatHttpError ? ` (HTTP ${err.status})` : "";
       console.warn(`[ai] ${call.label}: échec de l'appel${status}`);
@@ -222,6 +269,13 @@ export async function callStructured<T>(call: StructuredCall<T>): Promise<T | nu
 
     if (res.usage) recordUsage(call.model, res.usage);
     else recordUsage(call.model, { prompt_tokens: 0, completion_tokens: 0 });
+
+    if (creditErrorIn(res)) {
+      noteCreditsExhausted();
+      console.warn(`[ai] ${call.label}: crédit OpenRouter épuisé (402 dans la réponse), commissariat fermé`);
+      throw new AiClosedError("credits");
+    }
+    noteCreditsOk();
 
     issues = [];
     const choice = res.choices?.[0];

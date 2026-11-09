@@ -3,7 +3,8 @@
 // prérempli et le message. Les robots n'exécutent pas ce code : aucun coût sur un crawl.
 import { useEffect, useRef } from "react";
 import { useT } from "../i18n";
-import { api, ApiError, tokens } from "../lib/api";
+import { api, tokens } from "../lib/api";
+import { errorFact } from "../lib/errors";
 import { navigate } from "../lib/router";
 import { markFresh, rememberInput, setPrefill } from "../lib/session";
 
@@ -24,7 +25,7 @@ export function DirectCard({ login }: { login: string }) {
         navigate(`/c/${res.id}`, { replace: true });
       },
       (err: unknown) => {
-        setPrefill({ login, error: err instanceof ApiError && err.fact ? err.fact : t.home.errNetwork });
+        setPrefill({ login, error: errorFact(err, t.errors.closed, t.home.errNetwork) });
         navigate("/", { replace: true });
       },
     );

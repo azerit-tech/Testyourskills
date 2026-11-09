@@ -14,6 +14,7 @@ import type { WalkoutControl } from "../components/Walkout3D";
 import { Waiting } from "../components/Waiting";
 import { pick, useT } from "../i18n";
 import { api, ApiError, tokens } from "../lib/api";
+import { isClosed } from "../lib/errors";
 import { navigate, onLinkClick } from "../lib/router";
 import { freshSince, prefillFromLast } from "../lib/session";
 import { accentOf, useReducedMotion } from "../lib/util";
@@ -55,6 +56,10 @@ function useJob(id: string, nonce: number) {
           timer = window.setTimeout(poll, POLL_MS);
         } else if (job.state === "done") {
           setView({ s: "done", item: job.kind === "card" ? { kind: "card", card: job.card } : { kind: "comparison", comparison: job.comparison } });
+        } else if (isClosed(job.code)) {
+          // Commissariat fermé : retour à l'entrée, pseudo prérempli, message affiché.
+          prefillFromLast(job.message ?? t.errors.closed);
+          navigate("/", { replace: true });
         } else {
           setView({ s: "error", message: job.message });
         }

@@ -6,7 +6,8 @@ import { useEffect, useId, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { pick, useT } from "../i18n";
-import { api, ApiError, tokens } from "../lib/api";
+import { api, tokens } from "../lib/api";
+import { errorFact } from "../lib/errors";
 import { navigate } from "../lib/router";
 import { markFresh, rememberInput, setPrefill, takePrefill } from "../lib/session";
 import type { Mode, Tab } from "../lib/session";
@@ -104,8 +105,8 @@ export function EntryForm({ inputRef, variant = "full" }: Props) {
     } catch (err) {
       busyRef.current = false;
       setBusy(false);
-      if (err instanceof ApiError && err.fact) setError(pick(err.fact, lang));
-      else setError(h.errNetwork);
+      const msg = errorFact(err, t.errors.closed, h.errNetwork);
+      setError(typeof msg === "string" ? msg : pick(msg, lang));
     }
   };
 

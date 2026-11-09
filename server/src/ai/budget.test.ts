@@ -3,7 +3,21 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Store } from "../db";
-import { aiAvailable, aiCostToday, costOf, recordUsage, resetBudgetForTests, useBudgetDb, withinBudget } from "./budget";
+import {
+  aiConfigured,
+  aiCostToday,
+  aiStatus,
+  costOf,
+  CREDITS_WINDOW_MS,
+  noteCreditsExhausted,
+  noteCreditsOk,
+  recordUsage,
+  resetBudgetForTests,
+  useBudgetDb,
+  withinBudget,
+} from "./budget";
+import { ChatHttpError } from "./client";
+import { readCv } from "./readCv";
 import { readCode } from "./readCode";
 import { fakeClient } from "./testing";
 
@@ -43,14 +57,29 @@ describe("budget", () => {
     expect(t.usd).toBeGreaterThan(0);
   });
 
-  it("aiAvailable exige la clé et un budget restant", () => {
+  it("aiStatus exige la clé et un budget restant", () => {
     delete process.env.OPENROUTER_API_KEY;
-    expect(aiAvailable()).toBe(false);
+    expect(aiConfigured()).toBe(false);
+    expect(aiStatus()).toBe("off");
     process.env.OPENROUTER_API_KEY = "test";
     process.env.AI_DAILY_BUDGET_USD = "0.01";
-    expect(aiAvailable()).toBe(true);
+    expect(aiConfigured()).toBe(true);
+    expect(aiStatus()).toBe("ok");
     recordUsage("anthropic/claude-haiku-4.5", { prompt_tokens: 0, completion_tokens: 10_000 }); // 0,05 $
-    expect(aiAvailable()).toBe(false);
+    expect(withinBudget()).toBe(false);
+    expect(aiStatus()).toBe("budget");
+  });
+
+  it("aiStatus signale un 402 pendant 10 minutes, ou jusqu'au prochain appel réussi", () => {
+    process.env.OPENROUTER_API_KEY = "test";
+    const t0 = 1_000_000;
+    noteCreditsExhausted(t0);
+    expect(aiStatus(t0 + 1000)).toBe("credits");
+    expect(aiStatus(t0 + CREDITS_WINDOW_MS - 1)).toBe("credits");
+    expect(aiStatus(t0 + CREDITS_WINDOW_MS)).toBe("ok");
+    noteCreditsExhausted(t0);
+    noteCreditsOk();
+    expect(aiStatus(t0 + 1000)).toBe("ok");
   });
 
   it("persiste la dépense du jour : fermer et rouvrir la base ne remet pas le compteur à zéro", () => {
@@ -96,9 +125,10 @@ describe("budget", () => {
     useBudgetDb(store.db);
     expect(withinBudget()).toBe(false);
     const { client, calls } = fakeClient([{}]);
-    const res = await readCode([{ repo: "r", activity: 1, files: [{ path: "a.ts", content: "export {}" }] }], { client });
-    expect(res).toBeNull();
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    await expect(readCode(REPOS, { client })).rejects.toMatchObject({ code: "closed", reason: "budget" });
     expect(calls).toHaveLength(0);
+    vi.restoreAllMocks();
     useBudgetDb(null);
     store.close();
   });
@@ -116,8 +146,67 @@ describe("budget", () => {
   it("n'appelle plus l'IA une fois le budget du jour dépassé", async () => {
     process.env.AI_DAILY_BUDGET_USD = "0";
     const { client, calls } = fakeClient([{}]);
-    const res = await readCode([{ repo: "r", activity: 1, files: [{ path: "a.ts", content: "export {}" }] }], { client });
-    expect(res).toBeNull();
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    await expect(readCode(REPOS, { client })).rejects.toMatchObject({ code: "closed", reason: "budget" });
     expect(calls).toHaveLength(0);
+    vi.restoreAllMocks();
+  });
+});
+
+const REPOS = [{ repo: "r", activity: 1, files: [{ path: "a.ts", content: "export {}" }] }];
+
+describe("crédit OpenRouter épuisé (402)", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it("un HTTP 402 ferme le commissariat, sans relance", async () => {
+    process.env.OPENROUTER_API_KEY = "test";
+    const { client, calls } = fakeClient([{ error: new ChatHttpError(402, "Insufficient credits. Add more using https://openrouter.ai/credits") }]);
+    await expect(readCode(REPOS, { client })).rejects.toMatchObject({ code: "closed", reason: "credits" });
+    expect(calls).toHaveLength(1);
+    expect(aiStatus()).toBe("credits");
+  });
+
+  it("un 402 rangé dans le corps d'une réponse 200 ferme aussi le commissariat", async () => {
+    const bodies = [
+      { error: { code: 402, message: "This request requires more credits, or fewer max_tokens." } },
+      { choices: [{ error: { code: "402", message: "Insufficient credits" }, finish_reason: "error" }] },
+    ];
+    for (const body of bodies) {
+      const client = { complete: async () => ({ ...body, usage: { prompt_tokens: 0, completion_tokens: 0 } }) };
+      await expect(readCv("Développeuse React depuis 2019.", { client })).rejects.toMatchObject({ code: "closed" });
+    }
+  });
+
+  it("le vrai client OpenRouter traduit un 402 HTTP, et le crédit revenu repasse tout de suite", async () => {
+    process.env.OPENROUTER_API_KEY = "sk-or-secret";
+    let credit = false;
+    const fetchMock = vi.fn(async () =>
+      credit
+        ? new Response(JSON.stringify({ choices: [{ message: { content: "{}" }, finish_reason: "stop" }], usage: { prompt_tokens: 1, completion_tokens: 1, cost: 0 } }), { status: 200 })
+        : new Response(JSON.stringify({ error: { code: 402, message: "Insufficient credits" } }), { status: 402 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(readCode(REPOS)).rejects.toMatchObject({ code: "closed", reason: "credits" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(aiStatus()).toBe("credits");
+
+    // Recharge : pas de quarantaine, l'appel suivant part et réussit à passer.
+    credit = true;
+    await readCode(REPOS); // sortie {} invalide pour le schéma : null, mais l'appel a eu lieu
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(aiStatus()).toBe("ok");
+  });
+
+  it("une autre erreur HTTP ne ferme pas le commissariat", async () => {
+    const { client } = fakeClient([{ error: new ChatHttpError(500, "upstream error") }]);
+    await expect(readCode(REPOS, { client })).resolves.toBeNull();
+    process.env.OPENROUTER_API_KEY = "test";
+    expect(aiStatus()).toBe("ok");
   });
 });

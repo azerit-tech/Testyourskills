@@ -15,6 +15,7 @@ import { genericMeta, injectMeta, messagePage, metaFor, standalonePage } from ".
 import { ID_RE, MAX_PDF_BYTES, MESSAGES, Pipeline, type Deps, type RenderInput } from "./pipeline";
 import { CARDS_PER_DAY, RateLimiter, clientIp } from "./ratelimit";
 import { inlineAvatar, mountLinkedin, removeAvatars, type LinkedinConfig } from "./linkedin";
+import { aiStatus as budgetAiStatus, type AiStatus } from "./ai/budget";
 
 export interface AppOptions {
   store: Store;
@@ -42,6 +43,8 @@ export interface AppOptions {
   showcaseLogin?: string;
   /** Photo de la carte vitrine, à la place de l'avatar GitHub. */
   showcasePhoto?: string;
+  /** État de l'IA (plafond du jour, crédit). Défaut : le suivi de ai/budget.ts. */
+  aiStatus?: () => AiStatus;
 }
 
 /** La carte vitrine est recalculée au plus une fois par semaine. */
@@ -139,6 +142,7 @@ export function createApp(opts: AppOptions) {
   const fetchImpl = opts.fetchImpl ?? fetch;
   const rendering = new Map<string, Promise<Uint8Array>>();
   const avatarDir = opts.avatarDir ?? defaultAvatarDir(ogDir);
+  const aiStatus = opts.aiStatus ?? budgetAiStatus;
 
   const app = new Hono();
 
@@ -223,6 +227,13 @@ export function createApp(opts: AppOptions) {
         if (cached) return c.json({ id: cached.id, cached: true }, 200);
         const running = pipeline.inflightFor(login);
         if (running) return c.json({ id: running, cached: true }, 200);
+      }
+
+      // Plafond IA du jour atteint : commissariat fermé, sans lancer de job ni
+      // entamer le quota. Le cache ci-dessus reste servi. (Un 402 n'est pas
+      // anticipé : le crédit peut revenir à tout moment, on retente l'appel.)
+      if (safeAiStatus(aiStatus) === "budget") {
+        return c.json(errorBody("closed", MESSAGES.closed), 503);
       }
 
       // 20 cartes par IP et par jour : seules les cartes réellement calculées comptent.
@@ -412,6 +423,14 @@ export function createApp(opts: AppOptions) {
   }
 
   return { app, pipeline };
+}
+
+function safeAiStatus(status: () => AiStatus): AiStatus | null {
+  try {
+    return status();
+  } catch {
+    return null;
+  }
 }
 
 function safeAiAvailable(deps: Deps): boolean {

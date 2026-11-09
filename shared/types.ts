@@ -105,6 +105,7 @@ export type JobState =
   | { state: "error"; code: ErrorCode; message: Fact };
 
 export type ErrorCode =
+  | "closed" // IA coupée : plafond du jour atteint ou crédit OpenRouter épuisé
   | "unknown_user"
   | "organization"
   | "not_a_pdf"

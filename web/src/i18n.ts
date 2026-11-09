@@ -258,6 +258,7 @@ const fr = {
     notFound: "Cette fiche n'existe pas, ou plus. Elle a peut-être été supprimée.",
     timeout: "Ça prend plus de 30 secondes, on préfère s'arrêter là plutôt que d'inventer. Réessaie.",
     generic: "Quelque chose a cassé de notre côté.",
+    closed: "Le commissariat est fermé pour ce soir. Reviens demain.",
   },
   footer: {
     privacy: "Confidentialité",
@@ -552,6 +553,7 @@ const en: Dict = {
     notFound: "This sheet doesn't exist, or no longer does. It may have been deleted.",
     timeout: "It's taking over 30 seconds. We'd rather stop than make things up. Try again.",
     generic: "Something broke on our side.",
+    closed: "The station is closed for tonight. Come back tomorrow.",
   },
   footer: {
     privacy: "Privacy",

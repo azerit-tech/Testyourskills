@@ -32,6 +32,7 @@ export interface Deps {
   ): Promise<unknown>;
   pickFilesForReading(facts: unknown, opts: { token: string; signal?: AbortSignal }): Promise<RepoFiles[]>;
   readCode(repos: RepoFiles[], opts?: { signal?: AbortSignal }): Promise<CodeReadingResult | null>;
+  /** IA configurée. Plafond atteint ou crédit épuisé : readCode/readCv lèvent une erreur `closed`. */
   aiAvailable(): boolean;
   scoreGithub(facts: unknown, ai: CodeReadingResult | null, opts: { lang: Lang; judgedInSeconds: number }): CardBody;
   extractPdfText(buf: Uint8Array): Promise<{ text: string; pages: number }>;
@@ -108,6 +109,10 @@ export const MESSAGES: Record<MessageKey, Fact> = {
     fr: "GitHub nous demande de ralentir. Réessaie dans quelques minutes.",
     en: "GitHub is asking us to slow down. Try again in a few minutes.",
   },
+  closed: {
+    fr: "Le commissariat est fermé pour ce soir. Reviens demain.",
+    en: "The station is closed for tonight. Come back tomorrow.",
+  },
   cv_unreadable: {
     fr: "On n'a pas réussi à lire ce CV pour l'instant. Réessaie dans un instant.",
     en: "We couldn't read this CV right now. Try again in a moment.",
@@ -136,11 +141,18 @@ export class JobError extends Error {
   }
 }
 
-/** EngineError et CvError sont reconnus à leur champ `code`, sans importer leurs modules. */
+/** IA coupée (AiClosedError : plafond du jour ou crédit épuisé), reconnue à son `code`. */
+export function isAiClosed(err: unknown): boolean {
+  return (err as { code?: unknown } | null)?.code === "closed";
+}
+
+/** EngineError, CvError et AiClosedError sont reconnus à leur champ `code`, sans importer leurs modules. */
 export function classifyError(err: unknown): JobError {
   if (err instanceof JobError) return err;
   const code = (err as { code?: unknown } | null)?.code;
   switch (code) {
+    case "closed":
+      return new JobError("closed", MESSAGES.closed);
     case "unknown_user":
     case "organization":
     case "not_a_pdf":
@@ -401,7 +413,8 @@ export class Pipeline {
         const files = await deps.pickFilesForReading(facts, { token: githubToken, signal: ctx.signal });
         if (files.length) ai = await deps.readCode(files, { signal: ctx.signal });
       } catch (err) {
-        if (ctx.signal.aborted) throw err;
+        // IA coupée : pas de fiche sans lecture (§2.3), la fiche échoue en `closed`.
+        if (ctx.signal.aborted || isAiClosed(err)) throw err;
         console.warn(`[github ${login}] lecture IA indisponible, carte sans lecture :`, (err as Error).message);
         ai = null;
       }
@@ -429,7 +442,7 @@ export class Pipeline {
       try {
         reading = await deps.readCv(text, { signal: ctx.signal });
       } catch (err) {
-        if (ctx.signal.aborted) throw err;
+        if (ctx.signal.aborted || isAiClosed(err)) throw err;
         console.warn("[cv] lecture IA échouée :", (err as Error).message);
       }
     }

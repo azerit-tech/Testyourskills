@@ -154,13 +154,58 @@ export function withinBudget(): boolean {
   return current().usd < dailyBudgetUsd();
 }
 
-/** OPENROUTER_API_KEY présent et budget du jour non dépassé. */
-export function aiAvailable(): boolean {
-  return Boolean(process.env.OPENROUTER_API_KEY) && withinBudget();
+/** OPENROUTER_API_KEY présent : l'IA est configurée (le budget est vérifié à chaque appel). */
+export function aiConfigured(): boolean {
+  return Boolean(process.env.OPENROUTER_API_KEY);
+}
+
+// ---------------------------------------------------------------------------
+// Commissariat fermé : plafond du jour atteint ou crédit OpenRouter épuisé
+
+/**
+ * L'IA est coupée pour la journée. La fiche échoue avec le code public `closed`
+ * plutôt que de sortir sans lecture : une même entrée donne toujours la même
+ * fiche (SPEC §2.3). Reconnue par le pipeline à son champ `code`.
+ */
+export class AiClosedError extends Error {
+  readonly code = "closed" as const;
+  constructor(readonly reason: "budget" | "credits") {
+    super(reason === "budget" ? "plafond IA du jour atteint" : "crédit OpenRouter épuisé");
+    this.name = "AiClosedError";
+  }
+}
+
+/** Durée pendant laquelle /api/health signale un 402 vu. */
+export const CREDITS_WINDOW_MS = 10 * 60 * 1000;
+
+let creditsExhaustedAt: number | null = null;
+
+/** OpenRouter a répondu 402 (crédit insuffisant). */
+export function noteCreditsExhausted(now = Date.now()): void {
+  creditsExhaustedAt = now;
+}
+
+/** Un appel est passé : le crédit est revenu, inutile d'attendre 10 minutes pour le dire. */
+export function noteCreditsOk(): void {
+  creditsExhaustedAt = null;
+}
+
+/**
+ * État public de l'IA, sans montant : `off` sans clé, `credits` si un 402 a été
+ * vu dans les 10 dernières minutes, `budget` si le plafond du jour est atteint.
+ */
+export type AiStatus = "ok" | "budget" | "credits" | "off";
+
+export function aiStatus(now = Date.now()): AiStatus {
+  if (!aiConfigured()) return "off";
+  if (creditsExhaustedAt !== null && now - creditsExhaustedAt < CREDITS_WINDOW_MS) return "credits";
+  if (!withinBudget()) return "budget";
+  return "ok";
 }
 
 /** Pour les tests uniquement : remet la mémoire à zéro et débranche la base. */
 export function resetBudgetForTests(): void {
   totals = empty(today());
   ledger = null;
+  creditsExhaustedAt = null;
 }
