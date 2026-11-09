@@ -948,3 +948,13 @@ Après chaque fusion, on vérifie la grille suivante. On corrige ce qui manque, 
    - L'IA ne note jamais.
    - Aucun secret affiché.
    - Rien de lourd sur le Mac.
+
+### 18.20 Le site au style mat (9 novembre 2026)
+
+*Tranché par Claude en passant les pages au style mat de la maquette (§18.18), avec la règle du §18.19 : ce qui n'aide pas à comprendre part.*
+
+- **Partout** : fond d'encre plat, titres crème en Barlow Condensed 700, texte en Outfit, actions en pilules (rose poudré pour la principale, pêche pour la secondaire, contour lilas pour le reste). Plus de halos d'ambiance, de grain, de lignes de terrain ni de palmiers flottants dans les pages : le seul dégradé d'un écran est celui de la fiche. Les polices sont servies par le site (`server/fonts`), plus par Google Fonts ; Inter ne reste que pour la scène 3D.
+- **Accueil** : bandeau pêche « Saison 1 · jusqu'au 31 décembre » (date proposée au §18.4, à lire dans `data/season.json` avec les primes), la promesse en crème, l'accroche en rose, le champ « @ » et la pilule, puis « ou avec ton CV ». Les onglets GitHub / CV deviennent ce lien ; « les deux » est proposé depuis le mode CV. Ni surtitre, ni tableau des primes tant que le §18.4 n'est pas construit.
+- **Fiche partagée** (visiteur) : « Avis de recherche », @pseudo en grand, les six étoiles et le profil, l'accroche, la peine, puis la fiche et « Fais la tienne » sur une carte marine. Le visiteur n'a plus la barre de partage ni le second « Fais la tienne » en bas de page.
+- **Sous la fiche** : « Pièces à conviction » ne répète plus les valeurs et les barres de la fiche ; elle donne la peine, le sens de chaque sigle et la formule. Retirés : la garde à vue verrouillée (« Bientôt »), l'aperçu du texte de partage, les mini-cartes « CV vs GH », le lien « Voir les faits » de l'avocat, les gros codes « 404 », « 410 » et « VAR » des pages d'erreur.
+- **Attente** : le texte se lit sur un aplat d'encre, barre rose poudré sans lueur ; les illustrations de secours, néon, sont désaturées en attendant les illustrations peintes.
