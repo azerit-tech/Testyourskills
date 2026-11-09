@@ -219,6 +219,22 @@ const fr = {
       soon: "Bientôt",
       text: "L'interrogatoire musclé. Réservé au propriétaire du compte, après connexion GitHub. On ne cuisine pas les autres.",
     },
+    claim: {
+      kicker: "C'est ta fiche ?",
+      kickerLawyer: "Avis de recherche à ton nom ?",
+      text: "Prouve que ce compte GitHub est le tien : on lit ton pseudo public, rien d'autre, et on ne garde aucun accès.",
+      textLawyer: "Ce compte GitHub est le tien ? Prouve-le et reprends la main sur ta fiche.",
+      btn: "C'est moi",
+      btnLawyer: "Appeler mon avocat",
+      owned: "Ta fiche",
+      logout: "Se déconnecter",
+      loggedOut: "Déconnexion faite. La fiche reste à toi.",
+      claimed: (login: string) => `Fiche revendiquée. Bienvenue au commissariat, @${login}.`,
+      mismatch: (login: string) => `Ce n'est pas ta fiche : tu es sur le compte GitHub @${login}.`,
+      error: "GitHub n'a pas confirmé. Réessaie dans un instant.",
+      limited: "Trop de tentatives aujourd'hui. Reviens demain.",
+      failed: "Ça n'a pas marché. Réessaie.",
+    },
     email: {
       title: "Reçois ta fiche",
       label: "Adresse email",
@@ -288,6 +304,10 @@ const fr = {
       {
         h: "La fiche de quelqu'un d'autre",
         p: "On peut générer une fiche sur n'importe quel pseudo public : elle repose sur des données publiques et reste en mode taquin. Le propriétaire du pseudo peut la faire supprimer en prouvant son compte GitHub.",
+      },
+      {
+        h: "Revendiquer ta fiche",
+        p: "Si tu te connectes avec GitHub, on lit seulement ton pseudo et ton identifiant publics, sans aucune autorisation sur ton compte, et le jeton d'accès est jeté aussitôt. Un cookie signé, valable 30 jours, retient que tes fiches sont à toi. Une fiche revendiquée reste en ligne jusqu'à ce que tu la supprimes.",
       },
       {
         h: "Photo LinkedIn",
@@ -515,6 +535,22 @@ const en: Dict = {
       soon: "Soon",
       text: "The hard interrogation. Only for the account owner, after GitHub sign-in. We don't grill other people.",
     },
+    claim: {
+      kicker: "Is this your sheet?",
+      kickerLawyer: "Wanted under your name?",
+      text: "Prove this GitHub account is yours: we read your public username, nothing else, and keep no access.",
+      textLawyer: "Is this GitHub account yours? Prove it and take your sheet back.",
+      btn: "That's me",
+      btnLawyer: "Call my lawyer",
+      owned: "Your sheet",
+      logout: "Sign out",
+      loggedOut: "Signed out. The sheet is still yours.",
+      claimed: (login) => `Sheet claimed. Welcome to the station, @${login}.`,
+      mismatch: (login) => `Not your sheet: you're on the GitHub account @${login}.`,
+      error: "GitHub didn't confirm. Try again in a moment.",
+      limited: "Too many attempts today. Come back tomorrow.",
+      failed: "That didn't work. Try again.",
+    },
     email: {
       title: "Get your sheet",
       label: "Email address",
@@ -584,6 +620,10 @@ const en: Dict = {
       {
         h: "Someone else's sheet",
         p: "Anyone can generate a sheet for any public username: it relies on public data and stays in teasing mode. The username's owner can have it deleted by proving the GitHub account is theirs.",
+      },
+      {
+        h: "Claiming your sheet",
+        p: "If you sign in with GitHub, we only read your public username and ID, with no permission on your account, and the access token is thrown away at once. A signed cookie, valid for 30 days, remembers that your sheets are yours. A claimed sheet stays online until you delete it.",
       },
       {
         h: "LinkedIn photo",

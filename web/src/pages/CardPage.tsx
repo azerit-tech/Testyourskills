@@ -4,7 +4,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { CardData, Fact, JobState, ProgressEvent } from "../../../shared/types";
 import { LEVEL_LABELS, starsFor } from "../../../shared/types";
-import { AddSource, AzeritCta, Contest, DeleteCard, EmailForm, LinkedInPhoto, Roast, ShareBar, Why, useToast } from "../components/After";
+import { AddSource, AzeritCta, Claim, Contest, DeleteCard, EmailForm, LinkedInPhoto, Roast, ShareBar, Why, useMe, useToast } from "../components/After";
 import type { Shareable } from "../components/After";
 import { ComparisonStage } from "../components/Comparison";
 import { EntryForm } from "../components/EntryForm";
@@ -92,6 +92,8 @@ export function CardPage({ id }: { id: string }) {
   const owner = fresh || tokens.get(id) !== null;
   const reduced = useReducedMotion();
   const [startedAt] = useState(() => freshSince(id) ?? Date.now());
+  const [meNonce, setMeNonce] = useState(0);
+  const [me, setMe] = useMe(meNonce);
 
   // Retour de LinkedIn : ?photo=linkedin|error. On prévient, on recharge, on nettoie l'URL.
   useEffect(() => {
@@ -104,6 +106,32 @@ export function CardPage({ id }: { id: string }) {
       window.history.replaceState(window.history.state, "", window.location.pathname + (qs ? `?${qs}` : ""));
       setNotice({ text: photo === "linkedin" ? t.result.linkedin.updated : t.result.linkedin.error, n: Date.now() });
       if (photo === "linkedin") setNonce((n) => n + 1);
+    };
+    read();
+    window.addEventListener("popstate", read);
+    return () => window.removeEventListener("popstate", read);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Retour de GitHub (§18.1) : ?claim=ok|mismatch|error|limited, &as={login}. On prévient, on relit la session, on nettoie l'URL.
+  useEffect(() => {
+    const read = () => {
+      const params = new URLSearchParams(window.location.search);
+      const claim = params.get("claim");
+      if (!claim) return;
+      const as = (params.get("as") ?? "").replace(/[^A-Za-z0-9-]/g, "").slice(0, 39);
+      params.delete("claim");
+      params.delete("as");
+      const qs = params.toString();
+      window.history.replaceState(window.history.state, "", window.location.pathname + (qs ? `?${qs}` : ""));
+      const c = t.result.claim;
+      const text =
+        claim === "ok" && as ? c.claimed(as) : claim === "mismatch" && as ? c.mismatch(as) : claim === "limited" ? c.limited : c.error;
+      setNotice({ text, n: Date.now() });
+      if (claim === "ok") {
+        setMeNonce((n) => n + 1);
+        setNonce((n) => n + 1);
+      }
     };
     read();
     window.addEventListener("popstate", read);
@@ -198,6 +226,8 @@ export function CardPage({ id }: { id: string }) {
       owner={owner}
       fresh={fresh}
       notice={notice}
+      me={me}
+      onMe={setMe}
       onDeleted={() => setView({ s: "deleted" })}
     />
   );
@@ -209,10 +239,12 @@ interface ResultProps {
   owner: boolean;
   fresh: boolean;
   notice: { text: string; n: number } | null;
+  me: Awaited<ReturnType<typeof api.getMe>>;
+  onMe: (me: Awaited<ReturnType<typeof api.getMe>>) => void;
   onDeleted: () => void;
 }
 
-function Result({ item, animate, owner, fresh, notice, onDeleted }: ResultProps) {
+function Result({ item, animate, owner, fresh, notice, me, onMe, onDeleted }: ResultProps) {
   const { t, lang } = useT();
   const id = item.kind === "card" ? item.card.id : item.comparison.id;
   const main: CardData = item.kind === "card" ? item.card : item.comparison.github;
@@ -251,7 +283,10 @@ function Result({ item, animate, owner, fresh, notice, onDeleted }: ResultProps)
   };
 
   const style = { "--ca": accent.a, "--cb": accent.b, "--ink": accent.ink } as CSSProperties;
-  const visitor = !owner;
+  // Revendiquée par la personne connectée (§18.1) : sa fiche, même sans le jeton de cet appareil.
+  const cardLogin = main.login;
+  const claimed = !!me && !!cardLogin && me.login === cardLogin.toLowerCase();
+  const visitor = !owner && !claimed;
 
   return (
     <main className={`page page-card page-result${animating ? " is-animating" : ""}`} id="main" style={style}>
@@ -298,11 +333,12 @@ function Result({ item, animate, owner, fresh, notice, onDeleted }: ResultProps)
       <div className={`after${settled ? " is-in" : ""}`} aria-hidden={!settled} inert={!settled ? true : undefined}>
         <ShareBar item={item} toast={toast.show} />
         <LinkedInPhoto cardId={id} hasAvatar={item.kind === "card" ? !!item.card.avatarUrl : !!item.comparison.cv.avatarUrl} />
+        <Claim cardId={id} login={cardLogin} lawyer={!owner} me={me} onMe={onMe} toast={toast.show} />
         <Why item={item} />
-        {owner && <Contest card={main} />}
-        {owner && item.kind === "card" && <AddSource card={item.card} />}
-        {owner && <Roast />}
-        {owner && <EmailForm cardId={id} />}
+        {!visitor && <Contest card={main} />}
+        {!visitor && item.kind === "card" && <AddSource card={item.card} />}
+        {!visitor && <Roast />}
+        {!visitor && <EmailForm cardId={id} />}
         <AzeritCta cardId={id} />
         <div className="after-foot">
           {visitor ? (

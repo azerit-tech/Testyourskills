@@ -51,6 +51,14 @@ async function readError(res: Response): Promise<ApiError> {
 
 export interface AppConfig {
   linkedin: boolean;
+  /** « C'est moi » : l'OAuth GitHub est configuré côté serveur (§18.1). */
+  claim: boolean;
+}
+
+/** Propriétaire connecté par GitHub (§18.1). */
+export interface Me {
+  login: string;
+  hidden: boolean;
 }
 
 let configPromise: Promise<AppConfig> | null = null;
@@ -59,11 +67,11 @@ let configPromise: Promise<AppConfig> | null = null;
 function getConfig(): Promise<AppConfig> {
   if (!configPromise) {
     configPromise = isMock()
-      ? Promise.resolve({ linkedin: true })
+      ? Promise.resolve({ linkedin: true, claim: true })
       : fetch("/api/config", { headers: { Accept: "application/json" } })
-          .then((r): Promise<{ linkedin?: boolean }> => (r.ok ? r.json() : Promise.resolve({})))
-          .then((c) => ({ linkedin: c?.linkedin === true }))
-          .catch(() => ({ linkedin: false }));
+          .then((r): Promise<{ linkedin?: boolean; claim?: boolean }> => (r.ok ? r.json() : Promise.resolve({})))
+          .then((c) => ({ linkedin: c?.linkedin === true, claim: c?.claim === true }))
+          .catch(() => ({ linkedin: false, claim: false }));
   }
   return configPromise;
 }
@@ -78,6 +86,49 @@ function startLinkedInPhoto(id: string, token: string) {
     return;
   }
   window.location.href = `/auth/linkedin/start?card=${encodeURIComponent(id)}&token=${encodeURIComponent(token)}`;
+}
+
+// --- « C'est moi » (§18.1) ---------------------------------------------------
+// La session est un cookie httpOnly posé par le serveur : le front ne la lit
+// pas, il demande /api/me. En mode démo, tout reste en mémoire.
+
+let mockMe: Me | null = null;
+
+/** Qui est connecté par GitHub, ou null. Jamais d'erreur : null au moindre doute. */
+async function getMe(): Promise<Me | null> {
+  if (isMock()) return mockMe;
+  try {
+    const res = await fetch("/api/me", { headers: { Accept: "application/json" } });
+    if (!res.ok) return null;
+    const me = (await res.json()) as Me | null;
+    return me && typeof me.login === "string" ? { login: me.login, hidden: me.hidden === true } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Part chez GitHub prouver que la fiche est la sienne ; le serveur revient sur la page en cours. */
+function startClaim(cardId: string, login: string) {
+  const back = window.location.pathname + window.location.search;
+  if (isMock()) {
+    mockMe = { login: login.toLowerCase(), hidden: false };
+    const u = new URL(back, window.location.origin);
+    u.searchParams.set("claim", "ok");
+    u.searchParams.set("as", login.toLowerCase());
+    window.history.replaceState(window.history.state, "", u.pathname + u.search);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    return;
+  }
+  window.location.href = `/auth/github/start?card=${encodeURIComponent(cardId)}&return=${encodeURIComponent(back)}`;
+}
+
+async function logout(): Promise<void> {
+  if (isMock()) {
+    mockMe = null;
+    return;
+  }
+  const res = await fetch("/auth/logout", { method: "POST" });
+  if (!res.ok) throw await readError(res);
 }
 
 async function createCard(input: CreateInput): Promise<CreateResult> {
@@ -162,7 +213,7 @@ async function getShowcase(): Promise<CardData | null> {
   return body.card ?? null;
 }
 
-export const api = { createCard, getJob, sendEmail, deleteCard, track, getConfig, startLinkedInPhoto, getShowcase };
+export const api = { createCard, getJob, sendEmail, deleteCard, track, getConfig, startLinkedInPhoto, getShowcase, getMe, startClaim, logout };
 
 /** URLs des images rendues par le serveur (§7). */
 export const images = {
