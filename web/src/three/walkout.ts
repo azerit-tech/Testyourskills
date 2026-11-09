@@ -440,11 +440,6 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
   key.position.set(0.8, CEIL - 0.2, CARD_POS.z + 3.0);
   key.target.position.copy(CARD_POS);
   scene.add(key, key.target);
-  const cardRimL = new THREE.PointLight(accent.a, 0, 5, 1.6);
-  cardRimL.position.set(-1.3, CARD_POS.y + 0.6, CARD_POS.z - 0.9);
-  const cardRimR = new THREE.PointLight(accent.b, 0, 5, 1.6);
-  cardRimR.position.set(1.3, CARD_POS.y - 0.2, CARD_POS.z - 0.9);
-  scene.add(cardRimL, cardRimR);
 
   /* ---------- le pack (état prêt) ---------- */
   const packFace = keep(T.makePackFaceTexture(accent.a, accent.b, o.lang));
@@ -612,31 +607,10 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
   scene.add(heroSpot, heroSpot.target);
 
   /* ---------- la carte ---------- */
-  const maskTex = keep(T.makeCardMaskTexture());
   const backTex = keep(T.makeCardBackTexture(accent.a));
-  const cardMesh = createCardMesh(CARD_W3, { frontMap: backTex, backMap: backTex, edgeColor: accent.a, foil: true });
+  const cardMesh = createCardMesh(CARD_W3, { frontMap: backTex, backMap: backTex, edgeColor: accent.a, foil: false });
   const card = new THREE.Group();
   card.add(cardMesh.group);
-  const sheenTex = keep(T.makeStreakTexture(512, 128));
-  sheenTex.wrapS = sheenTex.wrapT = THREE.ClampToEdgeWrapping;
-  sheenTex.center.set(0.5, 0.5);
-  sheenTex.rotation = 0.55;
-  sheenTex.repeat.set(1.3, 2.2);
-  const sheenMat = new THREE.MeshBasicMaterial({ map: sheenTex, alphaMap: maskTex, color: hdr("#ffffff", 1.4), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
-  const sheen = new THREE.Mesh(new THREE.PlaneGeometry(CARD_W3, CARD_H3), sheenMat);
-  sheen.position.z = cardMesh.depth / 2 + 0.002;
-  card.add(sheen);
-  const GLINTS = 46;
-  const glintPos = new Float32Array(GLINTS * 3);
-  for (let i = 0; i < GLINTS; i++) {
-    glintPos[i * 3] = (rnd(i, 31) - 0.5) * (CARD_W3 + 1.2);
-    glintPos[i * 3 + 1] = (rnd(i, 32) - 0.5) * (CARD_H3 + 1.0);
-    glintPos[i * 3 + 2] = 0.1 + rnd(i, 33) * 0.5;
-  }
-  const glintGeo = new THREE.BufferGeometry();
-  glintGeo.setAttribute("position", new THREE.BufferAttribute(glintPos, 3));
-  const glintMat = new THREE.PointsMaterial({ map: sparkTex, size: 0.16, color: hdr("#ffffff", 2), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
-  card.add(new THREE.Points(glintGeo, glintMat));
   card.position.copy(CARD_POS);
   card.visible = false;
   scene.add(card);
@@ -1122,12 +1096,6 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
       cardMesh.front.emissiveIntensity = lerp(0.22, 0.85, flat);
       cardMesh.front.envMapIntensity = lerp(0.55, 0.15, flat);
       key.intensity = lerp(9, 2, flat) * (1 - seg(t, T_HANDOFF, 0.4));
-      cardRimL.intensity = cardRimR.intensity = 5 * (1 - flat);
-      const sw = seg(tau, 1.2, 0.75);
-      sheenMat.opacity = sw > 0 && sw < 1 ? 0.5 * Math.sin(Math.PI * sw) : 0;
-      sheenTex.offset.set(lerp(-0.9, 0.9, sw), 0);
-      glintMat.opacity = seg(tau, 0.5, 0.4) * (1 - seg(t, T_HANDOFF - 0.3, 0.3));
-      glintMat.size = 0.1 + Math.abs(Math.sin(wall * 5)) * 0.1;
       if (t >= T_SLAM && t < T_SLAM + 1.3) {
         slam.visible = true;
         const ts = t - T_SLAM;

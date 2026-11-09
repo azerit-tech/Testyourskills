@@ -1,5 +1,5 @@
-// Textures procédurales (canvas 2D) pour la scène 3D : lueurs, étincelles, face
-// et dos du pack, masque et dos de carte. Générées au vol ; les assets chargés
+// Textures procédurales (canvas 2D) pour la scène 3D : étincelles, face et
+// dos du pack, dos de carte. Générées au vol ; les assets chargés
 // (stade, matières, joueur, police) sont dans assets.ts.
 import * as THREE from "three";
 import { CARD_H, CARD_PATH, CARD_W } from "../../../shared/card/geometry";
@@ -41,40 +41,6 @@ export function makeSparkTexture(size = 64): THREE.CanvasTexture {
   g.moveTo(0, r);
   g.lineTo(size, r);
   g.stroke();
-  return new THREE.CanvasTexture(c);
-}
-
-/** Trait horizontal doux (éclat de lentille, rayon). */
-export function makeStreakTexture(w = 512, h = 32): THREE.CanvasTexture {
-  const c = document.createElement("canvas");
-  c.width = w;
-  c.height = h;
-  const g = c.getContext("2d")!;
-  const grad = g.createLinearGradient(0, 0, w, 0);
-  grad.addColorStop(0, "rgba(255,255,255,0)");
-  grad.addColorStop(0.5, "rgba(255,255,255,1)");
-  grad.addColorStop(1, "rgba(255,255,255,0)");
-  g.fillStyle = grad;
-  g.fillRect(0, 0, w, h);
-  const v = g.createLinearGradient(0, 0, 0, h);
-  v.addColorStop(0, "rgba(0,0,0,1)");
-  v.addColorStop(0.5, "rgba(0,0,0,0)");
-  v.addColorStop(1, "rgba(0,0,0,1)");
-  g.globalCompositeOperation = "destination-out";
-  g.fillStyle = v;
-  g.fillRect(0, 0, w, h);
-  return new THREE.CanvasTexture(c);
-}
-
-/** Masque de la silhouette de carte (coins coupés), blanc sur transparent. */
-export function makeCardMaskTexture(): THREE.CanvasTexture {
-  const c = document.createElement("canvas");
-  c.width = CARD_W * 2;
-  c.height = CARD_H * 2;
-  const g = c.getContext("2d")!;
-  g.scale(2, 2);
-  g.fillStyle = "#fff";
-  g.fill(new Path2D(CARD_PATH));
   return new THREE.CanvasTexture(c);
 }
 
