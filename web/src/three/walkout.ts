@@ -3,10 +3,10 @@
 // 1. le pack flotte dans la cabine d'un ascenseur de nuit ; il éclate ;
 // 2. l'ascenseur monte : l'étage (la note) défile sur l'afficheur à droite des
 //    portes, la lumière des paliers passe dans le jour entre les portes ; en
-//    haut à droite du HUD, les cinq étoiles de recherche s'allument aux seuils
-//    45 / 60 / 75 / 90 avec un crépitement de radio de police ; les statuts
+//    haut à droite du HUD, les six étoiles de recherche s'allument aux seuils
+//    du HUD (hudTexts.ts) avec un crépitement de radio de police ; les statuts
 //    de palier passent sur l'afficheur et en message radio ;
-// 3. sur l'écran, et en 3D chromée devant lui : la spécialité, l'arme (le
+// 3. sur l'écran, et en 3D mate devant lui : la spécialité, l'arme (le
 //    langage), le dossier (GitHub, CV, ou les deux), puis l'affiliation, qui
 //    se fait attendre ; chaque ligne reste inscrite en haut à gauche du HUD ;
 // 4. « ding » : l'ascenseur arrive, les portes s'ouvrent sur l'open space de
@@ -231,7 +231,7 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
   // Reflets : faibles partout ; les matières qui règlent leur propre intensité
   // (carte, métaux, pack) reçoivent la carte d'environnement en direct, sinon
   // three.js applique l'intensité de la scène à leur place.
-  const studio = createStudioEnvironment(renderer, accent.a);
+  const studio = createStudioEnvironment(renderer);
   scene.environment = studio;
   scene.environmentIntensity = 0.12;
   const camera = new THREE.PerspectiveCamera(50, 1, 0.05, 400);
@@ -450,7 +450,8 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
   const packFace = keep(T.makePackFaceTexture(accent.a, accent.b, o.lang));
   const packBackTex = keep(T.makePackBackTexture(accent.a));
   const foilSide = new THREE.MeshStandardMaterial({ color: 0x3a4a5c, metalness: 0.95, roughness: 0.3, transparent: true, envMapIntensity: 1.2 });
-  const foilFront = new THREE.MeshPhysicalMaterial({ map: packFace, emissiveMap: packFace, emissive: 0xffffff, emissiveIntensity: 0.3, metalness: 0.6, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.1, transparent: true, envMapIntensity: 1.1 });
+  // vernis satiné : un reflet large et doux, pas un point de lumière (style mat)
+  const foilFront = new THREE.MeshPhysicalMaterial({ map: packFace, emissiveMap: packFace, emissive: 0xffffff, emissiveIntensity: 0.3, metalness: 0.6, roughness: 0.45, clearcoat: 1, clearcoatRoughness: 0.45, transparent: true, envMapIntensity: 1.1 });
   const foilBack = new THREE.MeshPhysicalMaterial({ map: packBackTex, metalness: 0.85, roughness: 0.3, clearcoat: 0.8, transparent: true, envMapIntensity: 1.2 });
   const pack = new THREE.Group();
   const packBody = new THREE.Mesh(new RoundedBoxGeometry(1.0, 1.5, 0.09, 3, 0.035), [foilSide, foilSide, foilSide, foilSide, foilFront, foilBack]);
@@ -519,9 +520,11 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
   white.renderOrder = 999;
   camera.add(white);
 
-  /* ---------- les révélations 3D devant les portes ---------- */
-  const metal = (color: THREE.ColorRepresentation, emissive = 0) =>
-    new THREE.MeshPhysicalMaterial({ color, metalness: 1, roughness: 0.2, clearcoat: 1, clearcoatRoughness: 0.08, emissive: new THREE.Color(color), emissiveIntensity: emissive, envMapIntensity: 1.6 });
+  /* ---------- les révélations 3D devant les portes ----------
+   * En matière mate, aux couleurs de la palette (SPEC §18.21) : ni chrome, ni
+   * émission, ni reflet teinté ; seul le relief du biseau les modèle. */
+  const matte = (color: THREE.ColorRepresentation) => new THREE.MeshStandardMaterial({ color, roughness: 0.62, metalness: 0, envMapIntensity: 0.25 });
+  const CREAM = PALETTE.cream;
   const text3D = (str: string, size: number, depth: number, mat: THREE.Material, maxWidth?: number): THREE.Mesh => {
     const g = new TextGeometry(str, { font: assets.font, size, depth, curveSegments: 6, bevelEnabled: true, bevelThickness: depth * 0.22, bevelSize: size * 0.025, bevelSegments: 3 });
     g.computeBoundingBox();
@@ -543,25 +546,25 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
     m.castShadow = true;
     return m;
   };
-  // chaque révélation : l'objet chromé et son nom en lettres 3D au-dessus
+  // chaque révélation : l'objet et son nom en lettres 3D au-dessus, en crème
   const tells: { obj: THREE.Object3D; win: Win }[] = [];
   const named = (obj: THREE.Object3D, name: string) => {
     const g = new THREE.Group();
-    const n = text3D(name.toUpperCase(), 0.13, 0.026, metal(0xf2f5f8, 0.14), 1.3);
+    const n = text3D(name.toUpperCase(), 0.13, 0.026, matte(CREAM), 1.3);
     n.position.y = 0.4;
     g.add(obj, n);
     return g;
   };
   {
     const g = new THREE.Group();
-    const code = text3D(o.texts.position, 0.36, 0.07, metal(accent.a, 0.12));
-    const n = text3D(o.texts.positionName.toUpperCase(), 0.1, 0.02, metal(0xf2f5f8, 0.14), 1.0);
+    const code = text3D(o.texts.position, 0.36, 0.07, matte(accent.a));
+    const n = text3D(o.texts.positionName.toUpperCase(), 0.1, 0.02, matte(CREAM), 1.0);
     n.position.y = 0.34;
     g.add(code, n);
     tells.push({ obj: g, win: plan.position });
   }
-  tells.push({ obj: named(logo3D(o.logoPath, 0.42, metal(0xe6ecf3, 0.06)), o.texts.langName), win: plan.lang });
-  tells.push({ obj: named(logo3D(o.leaguePath, 0.4, metal(accent.a, 0.1)), o.texts.leagueName), win: plan.league });
+  tells.push({ obj: named(logo3D(o.logoPath, 0.42, matte(CREAM)), o.texts.langName), win: plan.lang });
+  tells.push({ obj: named(logo3D(o.leaguePath, 0.4, matte(accent.a)), o.texts.leagueName), win: plan.league });
   {
     const shield = new THREE.Shape();
     const S = 0.27;
@@ -571,11 +574,11 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
     shield.lineTo(0, -1.25 * S);
     shield.lineTo(-1 * S, -0.25 * S);
     shield.closePath();
-    const outer = new THREE.Mesh(new THREE.ExtrudeGeometry(shield, { depth: 0.05, bevelEnabled: true, bevelThickness: 0.015, bevelSize: 0.015, bevelSegments: 3 }), metal(accent.a, 0.06));
-    const inner = new THREE.Mesh(new THREE.ExtrudeGeometry(shield, { depth: 0.012, bevelEnabled: false }), new THREE.MeshStandardMaterial({ color: 0x0b1119, metalness: 0.5, roughness: 0.45 }));
+    const outer = new THREE.Mesh(new THREE.ExtrudeGeometry(shield, { depth: 0.05, bevelEnabled: true, bevelThickness: 0.015, bevelSize: 0.015, bevelSegments: 3 }), matte(accent.a));
+    const inner = new THREE.Mesh(new THREE.ExtrudeGeometry(shield, { depth: 0.012, bevelEnabled: false }), matte(PALETTE.ink0));
     inner.scale.set(0.84, 0.84, 1);
     inner.position.set(0, -0.007, 0.06);
-    const name = text3D(o.texts.club.toUpperCase(), 0.085, 0.018, metal(0xf2f5f8, 0.15), 0.38);
+    const name = text3D(o.texts.club.toUpperCase(), 0.085, 0.018, matte(CREAM), 0.38);
     name.position.set(0, 0.075, 0.07);
     const grp = new THREE.Group();
     grp.add(outer, inner, name);
@@ -647,8 +650,8 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
       cardReady = true;
     })
     .catch(() => undefined);
-  // la note qui claque
-  const slamMat = metal(accent.a, 0.55);
+  // la note qui claque, en crème comme sur la fiche
+  const slamMat = matte(CREAM);
   slamMat.transparent = true;
   const slam = text3D(String(o.overall), 0.95, 0.22, slamMat);
   slam.visible = false;
@@ -965,8 +968,8 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
     const glitch = t >= 0 ? 1 - seg(t, wallSwitch, 0.22) : 0;
     screen.uniforms.uGlitch.value = glitch * 0.6;
     screen.uniforms.uOn.value = dim;
-    // le bouton de l'étage s'allume un peu avant le départ, puis s'éteint à l'arrivée
-    btnOn.color.copy(hdr(accent.a, t >= plan.depart - 0.5 && t < plan.arrive ? 2.4 : 0.35));
+    // le bouton de l'étage s'allume un peu avant le départ (sa couleur, sans lueur), puis s'éteint à l'arrivée
+    btnOn.color.copy(hdr(accent.a, t >= plan.depart - 0.5 && t < plan.arrive ? 1 : 0.35));
 
     /* les portes */
     const open = t >= plan.doors ? inOut(seg(t, plan.doors, 1.0)) : 0;

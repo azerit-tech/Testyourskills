@@ -150,7 +150,7 @@ function railOf(mesh: THREE.Mesh, side: -1 | 1, rail: THREE.Vector4, along: THRE
 export interface CabinOptions {
   scene: THREE.Scene;
   renderer: THREE.WebGLRenderer;
-  /** Couleur du tier (afficheur et bouton de l'étage). */
+  /** Couleur du niveau (bouton de l'étage). */
   accent: string;
   /** Le modèle de la cabine (cabin.glb, tools/bake/prepare.py). */
   model: GLTF;
@@ -314,7 +314,7 @@ export function createCabin(o: CabinOptions): Cabin {
 
   // Un seul afficheur, à hauteur des yeux, sur la platine latérale du modèle.
   const DISP = { w: 0.34, h: 0.32 };
-  const screen = keep(createWallScreen(o.accent, DISP));
+  const screen = keep(createWallScreen(DISP));
   // Les UV du GLB ont déjà été retournés par l'export glTF.
   screen.texture.flipY = false;
   (parts.cop_display as THREE.Mesh).material = screen.material;

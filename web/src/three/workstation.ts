@@ -135,7 +135,6 @@ export function createWorkstation(o: { accent: string; lang?: string; login: str
   const accent = new THREE.Color(o.accent);
   // piètement en acier poudré noir : une peinture, donc un diélectrique
   const powder = keep(new THREE.MeshStandardMaterial({ color: 0x202224, roughness: 0.55, metalness: 0, envMapIntensity: 0.5 }));
-  const glow = new THREE.MeshBasicMaterial({ color: accent, toneMapped: false });
   // Plateau en noyer (Poly Haven, black_walnut_veneer_02), le fil dans la
   // longueur. Le scan est un placage brut (L* 55) ; huilé, le noyer fonce
   // sans changer de teinte : un gris neutre l'amène à L* 38, a* 7, b* 15.
@@ -349,7 +348,6 @@ export function createWorkstation(o: { accent: string; lang?: string; login: str
     screenLight,
     update(t, on) {
       for (const m of keyMats) m.emissiveIntensity = 0.2 + 0.8 * on;
-      glow.color.copy(accent).multiplyScalar(0.25 + 0.65 * on);
       screenLight.intensity = 2 * on;
       lampLight.intensity = 1.3 * on;
       // ~20 images/s suffisent pour un écran

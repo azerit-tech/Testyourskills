@@ -6,7 +6,7 @@ import * as THREE from "three";
 import { Reflector } from "three/examples/jsm/objects/Reflector.js";
 
 /** Environnement de reflets : une pièce sombre et quelques boîtes à lumière. */
-export function createStudioEnvironment(renderer: THREE.WebGLRenderer, accent: string): THREE.Texture {
+export function createStudioEnvironment(renderer: THREE.WebGLRenderer): THREE.Texture {
   const env = new THREE.Scene();
   const room = new THREE.Mesh(new THREE.BoxGeometry(14, 10, 14), new THREE.MeshBasicMaterial({ color: 0x07090d, side: THREE.BackSide }));
   room.position.y = 3;
@@ -19,7 +19,7 @@ export function createStudioEnvironment(renderer: THREE.WebGLRenderer, accent: s
   };
   panel(7, 0.7, 0xffffff, 7, [0, 6.5, -1], [0, 0, -1]); // bande du plafond
   panel(0.6, 6, 0xdfe9ff, 5, [-6.5, 3, 1], [0, 2, 0]); // bande verticale gauche
-  panel(0.6, 6, accent, 4, [6.5, 3, -1], [0, 2, 0]); // bande verticale droite, teinte du tier
+  panel(0.6, 6, 0xffd3a5, 4, [6.5, 3, -1], [0, 2, 0]); // bande verticale droite, pêche (plus la teinte du niveau : aucun reflet coloré, SPEC §18.21)
   panel(7, 3.5, 0xffffff, 2.6, [1.5, 2.5, 6.5], [0, 1.5, 0]); // grande boîte à lumière de face (faces planes des métaux)
   panel(9, 2.5, 0x9fc3ff, 2.4, [0, 2, -6.8], [0, 2, 0]); // contre-jour (les baies)
   const pmrem = new THREE.PMREMGenerator(renderer);
