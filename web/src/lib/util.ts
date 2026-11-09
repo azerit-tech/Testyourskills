@@ -80,8 +80,12 @@ export function useMediaQuery(q: string): boolean {
   return m;
 }
 
+/**
+ * Lien partagé d'une fiche : il porte son origine (?r=) pour compter les fiches
+ * nées d'un partage (§18.0). La page /c/:id garde son og:url sans r.
+ */
 export function shareUrl(id: string): string {
-  return `${window.location.origin}/c/${id}`;
+  return `${window.location.origin}/c/${id}?r=${encodeURIComponent(id)}`;
 }
 
 export async function copyText(text: string): Promise<boolean> {

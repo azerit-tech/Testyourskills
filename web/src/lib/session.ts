@@ -1,4 +1,5 @@
-// Mémoire de session (en RAM) : pré-remplissage de l'entrée, cartes fraîches.
+// Mémoire de session : pré-remplissage de l'entrée et cartes fraîches (en RAM),
+// origine du visiteur venu par un lien partagé (sessionStorage).
 import type { Fact } from "../../../shared/types";
 
 export type Mode = "single" | "both";
@@ -44,4 +45,72 @@ export function markFresh(id: string) {
 
 export function freshSince(id: string): number | null {
   return fresh.get(id) ?? null;
+}
+
+// --- Origine du visiteur (§18.0) ---------------------------------------------
+// Un lien partagé porte ?r={id de la fiche}. On garde la première origine de la
+// session dans sessionStorage, pour la joindre aux fiches créées ensuite. Le
+// stockage peut être bloqué (navigateur intégré de LinkedIn) : chaque accès est
+// protégé, et la RAM prend le relais pour la page en cours.
+
+const REF_KEY = "tys_ref";
+const REF_VISIT_KEY = "tys_ref_visit";
+/** Format des ids de fiche : 10 caractères base62 (newId côté serveur). */
+const CARD_ID_RE = /^[A-Za-z0-9]{10}$/;
+
+let memRef: string | null = null;
+let memVisitSent = false;
+
+function readSession(key: string): string | null {
+  try {
+    return sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeSession(key: string, value: string) {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {
+    /* stockage bloqué : la RAM suffit pour cette page */
+  }
+}
+
+/** Origine de la session : l'id de la fiche par le lien de laquelle on est arrivé. */
+export function currentRef(): string | null {
+  const stored = readSession(REF_KEY);
+  return stored && CARD_ID_RE.test(stored) ? stored : memRef;
+}
+
+/**
+ * À l'arrivée : lit ?r=, garde la première origine valide de la session et
+ * retire r de la barre d'adresse sans recharger ni changer de route. Renvoie
+ * l'origine si la visite est à compter (une seule fois par session), sinon null.
+ */
+export function captureRef(): string | null {
+  let url: URL;
+  try {
+    url = new URL(window.location.href);
+  } catch {
+    return null;
+  }
+  if (!url.searchParams.has("r")) return null;
+  const r = url.searchParams.get("r") ?? "";
+  url.searchParams.delete("r");
+  try {
+    // Même chemin, même état : le routeur n'a rien à recalculer.
+    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+  } catch {
+    /* rien */
+  }
+  if (!CARD_ID_RE.test(r)) return null;
+  if (!currentRef()) {
+    memRef = r;
+    writeSession(REF_KEY, r);
+  }
+  if (memVisitSent || readSession(REF_VISIT_KEY)) return null;
+  memVisitSent = true;
+  writeSession(REF_VISIT_KEY, "1");
+  return currentRef();
 }

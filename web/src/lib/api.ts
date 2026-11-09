@@ -2,10 +2,11 @@
 import type { CardData, JobState, Lang } from "../../../shared/types";
 import { mockApi } from "./mock";
 import { ApiError } from "./errors";
+import { currentRef } from "./session";
 
 export { ApiError };
 
-export type AnalyticsEvent = "card_generated" | "card_shared" | "card_email" | "cta_azerit_clicked";
+export type AnalyticsEvent = "card_generated" | "card_shared" | "card_email" | "cta_azerit_clicked" | "shared_visit";
 
 export interface CreateInput {
   login?: string;
@@ -81,18 +82,21 @@ function startLinkedInPhoto(id: string, token: string) {
 async function createCard(input: CreateInput): Promise<CreateResult> {
   if (isMock()) return mockApi.createCard(input);
   let res: Response;
+  // Fiche d'origine si on est arrivé par un lien partagé (§18.0) ; le serveur l'ignore si elle n'existe pas.
+  const ref = currentRef() ?? undefined;
   try {
     if (input.cv) {
       const fd = new FormData();
       fd.append("cv", input.cv);
       if (input.login) fd.append("login", input.login);
       fd.append("lang", input.lang);
+      if (ref) fd.append("ref", ref);
       res = await fetch("/api/card", { method: "POST", body: fd });
     } else {
       res = await fetch("/api/card", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ login: input.login, lang: input.lang }),
+        body: JSON.stringify({ login: input.login, lang: input.lang, ref }),
       });
     }
   } catch {
