@@ -1,7 +1,5 @@
-// Petits utilitaires du front : saisie, PDF, tiers, mouvement réduit.
+// Petits utilitaires du front : saisie, PDF, mouvement réduit, partage.
 import { useEffect, useState } from "react";
-import type { CardData, CardStyle } from "../../../shared/types";
-import { styleOf } from "../../../shared/types";
 
 const LOGIN_RE = /^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$/;
 
@@ -38,21 +36,6 @@ export async function checkPdf(file: File): Promise<PdfCheck> {
     /* lecture impossible : le serveur tranchera */
   }
   return { ok: true };
-}
-
-/** Couleurs d'accent par rendu de carte, pour le flash, le tampon et les halos. */
-export const STYLE_ACCENT: Record<CardStyle, { a: string; b: string; ink: string }> = {
-  bronze: { a: "#e0955f", b: "#8a4b2a", ink: "#f0b184" },
-  silver: { a: "#dfe7ef", b: "#7d8a98", ink: "#e9eff5" },
-  gold: { a: "#ffd66b", b: "#c08a1e", ink: "#ffd877" },
-  icon: { a: "#ffffff", b: "#a8e8ff", ink: "#f4fbff" },
-  wonderkid: { a: "#7bf5c8", b: "#2d9cdb", ink: "#8ff7d2" },
-  flashback: { a: "#ff8a5c", b: "#b04ad8", ink: "#ff9d74" },
-  totw: { a: "#6cb6ff", b: "#1f3d8f", ink: "#9ccbff" },
-};
-
-export function accentOf(card: Pick<CardData, "tier" | "special">) {
-  return STYLE_ACCENT[styleOf(card)];
 }
 
 export function useReducedMotion(): boolean {
