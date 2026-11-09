@@ -1,6 +1,7 @@
 // Racine : langue, routes, barre du haut et pied de page.
 import { useEffect } from "react";
 import { Footer, SeasonBand, SkipLink, TopBar } from "./components/Chrome";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { LangProvider } from "./i18n";
 import { isMock } from "./lib/api";
 import { navigate, routeOf, usePath } from "./lib/router";
@@ -51,13 +52,15 @@ export function App() {
   if (window.location.pathname === "/__devices" && isMock()) return <Devices />;
   return (
     <LangProvider>
-      <SkipLink />
-      <div className="shell">
-        {(path === "/" || path === "") && <SeasonBand />}
-        <TopBar />
-        <Routes />
-        <Footer />
-      </div>
+      <ErrorBoundary>
+        <SkipLink />
+        <div className="shell">
+          {(path === "/" || path === "") && <SeasonBand />}
+          <TopBar />
+          <Routes />
+          <Footer />
+        </div>
+      </ErrorBoundary>
     </LangProvider>
   );
 }

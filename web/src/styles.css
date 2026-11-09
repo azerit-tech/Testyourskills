@@ -2037,6 +2037,14 @@ a.dossier-item:hover {
   font-size: 16px;
   color: var(--lilac-2);
 }
+/* Le filet (ErrorBoundary) : seul à l'écran, centré, sur l'encre. */
+.crash {
+  min-height: 100svh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ink-0);
+}
 .deleted-msg {
   font: 700 clamp(32px, 9vw, 44px) / 0.95 var(--f-name) !important;
   text-transform: uppercase;

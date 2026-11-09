@@ -8,6 +8,7 @@ import type { Shareable } from "../components/After";
 import { ComparisonStage } from "../components/Comparison";
 import { Denounce } from "../components/Denounce";
 import { EntryForm } from "../components/EntryForm";
+import { ErrorBoundary } from "../components/ErrorBoundary";
 import { Dossier } from "../components/Findings";
 import { Jury, JuryLine } from "../components/Jury";
 import { MakeYours } from "../components/MakeYours";
@@ -403,9 +404,12 @@ function Result({ item, animate, start, abort, onScene, owner, fresh, notice, me
         )}
 
         {animating && (
-          <Suspense fallback={null}>
-            <Walkout3D card={main} lang={lang} double={item.kind === "comparison"} declared={declaredOf(item.kind === "comparison" ? item.comparison : item.card)} phase={phase} anchorRef={stageRef} controlRef={walkoutCtl} onReady={() => onScene("ready")} onHandoff={handoff} onDone={finish} />
-          </Suspense>
+          // Morceau 3D introuvable : même repli que sans WebGL, la fiche sort sans révélation.
+          <ErrorBoundary fallback={null} onError={finish}>
+            <Suspense fallback={null}>
+              <Walkout3D card={main} lang={lang} double={item.kind === "comparison"} declared={declaredOf(item.kind === "comparison" ? item.comparison : item.card)} phase={phase} anchorRef={stageRef} controlRef={walkoutCtl} onReady={() => onScene("ready")} onHandoff={handoff} onDone={finish} />
+            </Suspense>
+          </ErrorBoundary>
         )}
         <section ref={stageRef} className="result-stage" onClick={animating ? onStageClick : undefined}>
           {item.kind === "card" ? (

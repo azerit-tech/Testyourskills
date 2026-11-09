@@ -448,6 +448,7 @@ const fr = {
     contact: "Une question : hello@azerit.tech",
   },
   notFound: { title: "Page introuvable", text: "Même GitHub renverrait une 404 ici.", home: "Retour à l'accueil" },
+  crash: { title: "La page n'a pas chargé", text: "Le réseau a peut-être coupé, ou le site vient d'être mis à jour.", reload: "Recharger" },
 };
 
 export type Dict = typeof fr;
@@ -869,6 +870,7 @@ const en: Dict = {
     contact: "Questions: hello@azerit.tech",
   },
   notFound: { title: "Page not found", text: "Even GitHub would return a 404 here.", home: "Back to home" },
+  crash: { title: "The page didn't load", text: "The network may have dropped, or the site was just updated.", reload: "Reload" },
 };
 
 export const DICTS: Record<Lang, Dict> = { fr, en };
