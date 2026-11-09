@@ -16,6 +16,7 @@ import { ID_RE, MAX_PDF_BYTES, MESSAGES, Pipeline, type Deps, type RenderInput }
 import { CARDS_PER_DAY, RateLimiter, clientIp } from "./ratelimit";
 import { inlineAvatar, mountLinkedin, removeAvatars, type LinkedinConfig } from "./linkedin";
 import { mountAuth, ownerFromRequest, type GithubAuthConfig } from "./auth";
+import { DENOUNCE_LIMITED, DENOUNCE_PER_DAY, mountDenounce, parseDenunciation } from "./denounce";
 import { aiStatus as budgetAiStatus, type AiStatus } from "./ai/budget";
 import type { TokenPool } from "./github/tokens";
 import { weekTop, withWeekSpecial } from "./top";
@@ -244,6 +245,8 @@ export function createApp(opts: AppOptions) {
       let lang: Lang = "fr";
       let pdf: Uint8Array | undefined;
       let ref: string | undefined;
+      // Fiche du dénonciateur (§18.6, denounce.ts) : JSON seulement, on dénonce un pseudo, pas un CV.
+      let denouncedBy: unknown;
 
       if (ct.startsWith("multipart/form-data")) {
         const body = await c.req.parseBody();
@@ -275,6 +278,7 @@ export function createApp(opts: AppOptions) {
         login = parsed.data.login;
         lang = parsed.data.lang ?? "fr";
         ref = parseRef((raw as { ref?: unknown }).ref, store);
+        denouncedBy = (raw as { denouncedBy?: unknown }).denouncedBy;
       }
 
       if (!login && !pdf) return c.json(errorBody("internal", MESSAGES.bad_request), 400);
@@ -282,12 +286,34 @@ export function createApp(opts: AppOptions) {
       // Login masqué par son propriétaire : personne d'autre que lui n'en refait une fiche (§18.1).
       if (login && hiddenFrom(c, login)) return c.json(errorBody("gone", MESSAGES.gone), 410);
 
+      // Dénonciation (§18.6) : cinq par jour et par IP, vérifiées avant tout calcul.
+      const ip = clientIp(c);
+      const denounce = login && !pdf ? parseDenunciation(denouncedBy, login, store, c) : undefined;
+      if (denounce && !limiter.allowed("denounce", ip, DENOUNCE_PER_DAY)) {
+        return c.json(errorBody("rate_limited", DENOUNCE_LIMITED), 429);
+      }
+      /** Compte la dénonciation et marque la fiche du complice, dès qu'elle existe. */
+      const denounced = (id: string) => {
+        if (!denounce) return;
+        limiter.take("denounce", ip, DENOUNCE_PER_DAY);
+        store.recordEvent("denounce_sent", id, { by: denounce.byCardId });
+        const mark = () => store.markDenounced(id, denounce.byCardId, denounce.named);
+        if (store.getCard(id)) mark();
+        else void pipeline.wait(id).then(mark);
+      };
+
       // Cache 24 h et déduplication des jobs en cours, pour GitHub seul (§4.7, §12).
       if (login && !pdf) {
         const cached = store.findRecentGithub(login);
-        if (cached) return c.json({ id: cached.id, cached: true }, 200);
+        if (cached) {
+          denounced(cached.id);
+          return c.json({ id: cached.id, cached: true }, 200);
+        }
         const running = pipeline.inflightFor(login);
-        if (running) return c.json({ id: running, cached: true }, 200);
+        if (running) {
+          denounced(running);
+          return c.json({ id: running, cached: true }, 200);
+        }
       }
 
       // Plafond IA du jour atteint, ou crédit OpenRouter sous le seuil (solde lu
@@ -306,11 +332,12 @@ export function createApp(opts: AppOptions) {
         if (busy) return c.json(errorBody(busy.code, busy.msg), 503);
       }
 
-      if (!limiter.take("card", clientIp(c), cardsPerDay)) {
+      if (!limiter.take("card", ip, cardsPerDay)) {
         return c.json(errorBody("rate_limited", MESSAGES.rate_limited), 429);
       }
 
       const { id, deleteToken } = pipeline.start({ lang, login, pdf });
+      denounced(id);
       // L'insertion arrive toujours après ce retour (le pipeline attend au moins
       // une fois) : la ref est écrite dans la ligne, puis oubliée en fin de job.
       if (ref) {
@@ -471,6 +498,9 @@ export function createApp(opts: AppOptions) {
     c.header("Cache-Control", "public, max-age=300");
     return c.html(html, row ? 200 : 404);
   });
+
+  // GET /api/card/:id/case : dénonciation et complices suggérés (§18.6, §18.7).
+  mountDenounce(app, { store, hiddenFrom, notFound: MESSAGES.not_found, withdrawn: MESSAGES.withdrawn });
 
   mountLinkedin(app, {
     store,

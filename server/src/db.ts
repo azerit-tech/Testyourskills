@@ -29,6 +29,10 @@ export interface CardRow {
   refCardId: string | null;
   /** Sortie sans lecture IA : visible à son adresse, jamais resservie par le cache 24 h (§12). */
   degraded: boolean;
+  /** Fiche de la personne qui a dénoncé celle-ci (§18.6), sinon null. */
+  denouncedBy: string | null;
+  /** Login du dénonciateur, posé seulement s'il était connecté comme propriétaire de sa fiche ; sinon anonyme. */
+  denouncerLogin: string | null;
 }
 
 export interface OwnerRow {
@@ -89,6 +93,8 @@ interface RawRow {
   expires_at: number | null;
   ref_card_id: string | null;
   degraded: number | null;
+  denounced_by?: string | null;
+  denouncer_login?: string | null;
 }
 
 const SCHEMA = `
@@ -105,7 +111,9 @@ CREATE TABLE IF NOT EXISTS cards (
   delete_token TEXT NOT NULL,
   expires_at   INTEGER,           -- NULL = conservée (email laissé)
   ref_card_id  TEXT,              -- fiche d'origine du lien partagé (?r=), sinon NULL ; voir migrate()
-  degraded     INTEGER NOT NULL DEFAULT 0 -- 1 = sortie sans lecture IA, hors cache 24 h ; voir migrate()
+  degraded     INTEGER NOT NULL DEFAULT 0, -- 1 = sortie sans lecture IA, hors cache 24 h ; voir migrate()
+  denounced_by    TEXT,           -- fiche du dénonciateur (§18.6), sinon NULL ; voir migrate()
+  denouncer_login TEXT            -- son login s'il était propriétaire connecté, sinon NULL (anonyme)
 );
 CREATE INDEX IF NOT EXISTS cards_login ON cards(login, created_at) WHERE parent_id IS NULL;
 CREATE INDEX IF NOT EXISTS cards_parent ON cards(parent_id);
@@ -164,6 +172,8 @@ function toRow(r: RawRow): CardRow {
     expiresAt: r.expires_at,
     refCardId: r.ref_card_id ?? null,
     degraded: r.degraded === 1,
+    denouncedBy: r.denounced_by ?? null,
+    denouncerLogin: r.denouncer_login ?? null,
   };
 }
 
@@ -185,6 +195,8 @@ export function migrate(db: Database.Database) {
   const cols = new Set((db.prepare(`PRAGMA table_info(cards)`).all() as { name: string }[]).map((c) => c.name));
   if (!cols.has("ref_card_id")) db.exec(`ALTER TABLE cards ADD COLUMN ref_card_id TEXT`);
   if (!cols.has("degraded")) db.exec(`ALTER TABLE cards ADD COLUMN degraded INTEGER NOT NULL DEFAULT 0`);
+  if (!cols.has("denounced_by")) db.exec(`ALTER TABLE cards ADD COLUMN denounced_by TEXT`);
+  if (!cols.has("denouncer_login")) db.exec(`ALTER TABLE cards ADD COLUMN denouncer_login TEXT`);
 }
 
 export class Store {
@@ -279,6 +291,16 @@ export class Store {
       )
       .get(login.toLowerCase()) as RawRow | undefined;
     return r ? toRow(r) : null;
+  }
+
+  /**
+   * Marque une fiche comme dénoncée (§18.6). La première dénonciation reste :
+   * une fiche déjà dénoncée garde son dénonciateur.
+   */
+  markDenounced(id: string, byCardId: string, byLogin: string | null) {
+    this.db
+      .prepare(`UPDATE cards SET denounced_by = ?, denouncer_login = ? WHERE id = ? AND denounced_by IS NULL`)
+      .run(byCardId, byLogin ? byLogin.toLowerCase() : null, id);
   }
 
   /** Remplace le JSON d'une carte ou d'une comparaison (photo LinkedIn). */

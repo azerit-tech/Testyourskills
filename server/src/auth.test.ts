@@ -267,6 +267,16 @@ describe("redirection ouverte", () => {
     const res = await callback(ctx, `code=${CODE}&state=${state}`, cookie);
     expect(res.headers.get("location")).toBe(`${BASE}/c/CardAAAA01?from=denounce&claim=ok&as=leamd`);
   });
+
+  it("revendiquer une fiche dénoncée compte denounce_claimed (§18.6), une fiche ordinaire non", async () => {
+    const ctx = setup();
+    insertCard(ctx.store);
+    await claim(ctx);
+    expect(ctx.store.listEvents("denounce_claimed")).toHaveLength(0);
+    ctx.store.markDenounced("CardAAAA01", "Denonce001", null);
+    await claim(ctx);
+    expect(ctx.store.listEvents("denounce_claimed")).toMatchObject([{ cardId: "CardAAAA01" }]);
+  });
 });
 
 describe("callback", () => {

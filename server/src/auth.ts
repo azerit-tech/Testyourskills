@@ -352,6 +352,8 @@ export function mountAuth(app: Hono, o: AuthRoutesOptions) {
     if (user.login !== cardLogin.toLowerCase()) return c.redirect(back(st.r, "mismatch", user.login), 302);
 
     const owner = o.store.claimOwner(user.login, user.githubId);
+    // La cible d'une dénonciation a appelé son avocat (§18.6).
+    if (row?.denouncedBy) o.store.recordEvent("denounce_claimed", row.id);
     setCookie(c, SESSION_COOKIE, signSession(cfg.sessionSecret, owner), { ...cookieBase, path: "/", maxAge: SESSION_TTL_MS / 1000 });
     return c.redirect(back(st.r, "ok", owner.login), 302);
   });
