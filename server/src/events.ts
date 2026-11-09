@@ -1,4 +1,4 @@
-// Mesure (SPEC §9, §13, §16, §18.0, §18.6) : huit événements enregistrés dans la table
+// Mesure (SPEC §9, §13, §16, §18.0, §18.6, §18.27) : neuf événements enregistrés dans la table
 // `events`, pas d'outil d'analytics. shared_visit marque l'arrivée par un lien
 // partagé (?r=), une fois par session, avec la fiche d'origine. L'email laissé
 // sur une carte est relayé à LEADS_ENDPOINT au même format que la page Try de
@@ -18,10 +18,12 @@ export const EVENT_NAMES = [
   "denounce_sent",
   "denounce_landed",
   "denounce_claimed",
+  // Le jury (§18.27) : un vote posé, par le serveur seul.
+  "jury_vote",
 ] as const;
 export type EventName = (typeof EVENT_NAMES)[number];
 
-/** Événements que le front peut envoyer. card_generated, denounce_sent et denounce_claimed sont posés par le serveur seul. */
+/** Événements que le front peut envoyer. card_generated, denounce_sent, denounce_claimed et jury_vote sont posés par le serveur seul. */
 export const clientEventSchema = z.object({
   event: z.enum(["card_shared", "card_email", "cta_azerit_clicked", "shared_visit", "denounce_landed"]),
   cardId: z.string().regex(/^[A-Za-z0-9]{6,32}$/).optional(),

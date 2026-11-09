@@ -36,8 +36,13 @@ export class RateLimiter {
     private salt: string,
   ) {}
 
+  /** Hash salé de l'IP : la seule forme sous laquelle elle est gardée (compteurs, votes du jury). */
+  hash(ip: string): string {
+    return createHash("sha256").update(this.salt + ip).digest("hex").slice(0, 32);
+  }
+
   private key(scope: string, ip: string) {
-    return scope + ":" + createHash("sha256").update(this.salt + ip).digest("hex").slice(0, 32);
+    return scope + ":" + this.hash(ip);
   }
 
   /** true si l'IP peut encore consommer une unité sur cette portée aujourd'hui (sans consommer). */

@@ -37,6 +37,15 @@ export interface CardRow {
   denouncerLogin: string | null;
 }
 
+export type Verdict = "guilty" | "cleared";
+
+/** Décompte du jury d'une fiche (§18.27) ; `mine` : le vote de l'IP qui demande, sinon null. */
+export interface Jury {
+  guilty: number;
+  cleared: number;
+  mine: Verdict | null;
+}
+
 export interface OwnerRow {
   login: string;
   githubId: number;
@@ -201,6 +210,14 @@ export function migrate(db: Database.Database) {
   if (!cols.has("denouncer_login")) db.exec(`ALTER TABLE cards ADD COLUMN denouncer_login TEXT`);
   // Cache et budget de la lecture des profils LinkedIn (§18.24) : tables neuves.
   ensureLinkedinTables(db);
+  // Le jury de la page partagée (§18.27) : un vote par fiche et par IP, l'IP en hash seulement.
+  db.exec(`CREATE TABLE IF NOT EXISTS votes (
+    card_id    TEXT NOT NULL,
+    ip_hash    TEXT NOT NULL,
+    verdict    TEXT NOT NULL CHECK (verdict IN ('guilty', 'cleared')),
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (card_id, ip_hash)
+  )`);
 }
 
 export class Store {
@@ -335,7 +352,13 @@ export class Store {
   deleteGroup(id: string): string[] {
     const ids = this.groupIds(id);
     const stmt = this.db.prepare(`DELETE FROM cards WHERE id = ?`);
-    this.db.transaction(() => ids.forEach((i) => stmt.run(i)))();
+    const votes = this.db.prepare(`DELETE FROM votes WHERE card_id = ?`);
+    this.db.transaction(() =>
+      ids.forEach((i) => {
+        stmt.run(i);
+        votes.run(i);
+      }),
+    )();
     return ids;
   }
 
@@ -346,7 +369,13 @@ export class Store {
       .all(now) as { id: string }[];
     const ids = rows.map((r) => r.id);
     const stmt = this.db.prepare(`DELETE FROM cards WHERE id = ?`);
-    this.db.transaction(() => ids.forEach((i) => stmt.run(i)))();
+    const votes = this.db.prepare(`DELETE FROM votes WHERE card_id = ?`);
+    this.db.transaction(() =>
+      ids.forEach((i) => {
+        stmt.run(i);
+        votes.run(i);
+      }),
+    )();
     // Compteurs de limite : on ne garde que les deux derniers jours.
     const cutoff = new Date(now - 2 * 24 * 3600 * 1000).toISOString().slice(0, 10);
     this.db.prepare(`DELETE FROM ratelimit WHERE day < ?`).run(cutoff);
@@ -386,6 +415,28 @@ export class Store {
       | { n: number }
       | undefined;
     return r?.n ?? 0;
+  }
+
+  // --- Jury (§18.27) --------------------------------------------------------
+
+  /** Pose le vote de cette IP sur cette fiche. Le premier reste : false si elle avait déjà voté. */
+  castVote(cardId: string, ipHash: string, verdict: Verdict, now = Date.now()): boolean {
+    const r = this.db
+      .prepare(`INSERT INTO votes (card_id, ip_hash, verdict, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(card_id, ip_hash) DO NOTHING`)
+      .run(cardId, ipHash, verdict, now);
+    return r.changes === 1;
+  }
+
+  jury(cardId: string, ipHash: string): Jury {
+    const rows = this.db.prepare(`SELECT verdict, COUNT(*) AS n FROM votes WHERE card_id = ? GROUP BY verdict`).all(cardId) as {
+      verdict: Verdict;
+      n: number;
+    }[];
+    const mine = this.db.prepare(`SELECT verdict FROM votes WHERE card_id = ? AND ip_hash = ?`).get(cardId, ipHash) as
+      | { verdict: Verdict }
+      | undefined;
+    const n = (v: Verdict) => rows.find((r) => r.verdict === v)?.n ?? 0;
+    return { guilty: n("guilty"), cleared: n("cleared"), mine: mine?.verdict ?? null };
   }
 
   // --- Propriétaires (§18.1) -----------------------------------------------

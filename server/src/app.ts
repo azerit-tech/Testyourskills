@@ -17,6 +17,7 @@ import { CARDS_PER_DAY, RateLimiter, clientIp } from "./ratelimit";
 import { inlineAvatar, mountLinkedin, removeAvatars, type LinkedinConfig } from "./linkedin";
 import { mountAuth, ownerFromRequest, type GithubAuthConfig } from "./auth";
 import { DENOUNCE_LIMITED, DENOUNCE_PER_DAY, mountDenounce, parseDenunciation } from "./denounce";
+import { mountJury } from "./jury";
 import { aiStatus as budgetAiStatus, type AiStatus } from "./ai/budget";
 import type { TokenPool } from "./github/tokens";
 import { weekTop, withWeekSpecial } from "./top";
@@ -550,7 +551,9 @@ export function createApp(opts: AppOptions) {
   });
 
   // GET /api/card/:id/case : dénonciation et complices suggérés (§18.6, §18.7).
-  mountDenounce(app, { store, hiddenFrom, notFound: MESSAGES.not_found, withdrawn: MESSAGES.withdrawn });
+  // POST /api/vote : le jury de la page partagée (§18.27) ; son décompte part aussi avec /case.
+  const jury = mountJury(app, { store, limiter, notFound: MESSAGES.not_found, withdrawn: MESSAGES.withdrawn });
+  mountDenounce(app, { store, hiddenFrom, notFound: MESSAGES.not_found, withdrawn: MESSAGES.withdrawn, jury });
 
   mountLinkedin(app, {
     store,

@@ -8,16 +8,17 @@
 // sinon la dénonciation est anonyme, et personne ne peut signer au nom d'un autre
 // en passant l'id de sa fiche.
 //
-// Lecture : GET /api/card/:id/case → { denounced, by, x, accomplices }.
+// Lecture : GET /api/card/:id/case → { denounced, by, x, accomplices, jury }.
 //   denounced    la fiche est née d'une dénonciation (ou a été dénoncée depuis le cache) ;
 //   by           le login du dénonciateur nommé, sinon null (« Dénonciation anonyme ») ;
 //   x            le compte X de la personne de la fiche (twitter_username), sinon null ;
-//   accomplices  au plus trois complices à suggérer, tirés des faits de la collecte.
+//   accomplices  au plus trois complices à suggérer, tirés des faits de la collecte ;
+//   jury         le décompte des votes de la page partagée (§18.27, jury.ts).
 
 import type { Context, Hono } from "hono";
 import type { Fact } from "../../shared/types";
 import { ownerFromRequest } from "./auth";
-import type { CardRow, Store } from "./db";
+import type { CardRow, Jury, Store } from "./db";
 import type { Accomplice } from "./github/accomplices";
 import { ID_RE } from "./pipeline";
 
@@ -103,13 +104,23 @@ export function caseInfo(store: Store, row: CardRow): CaseInfo {
   };
 }
 
-export function mountDenounce(app: Hono, o: { store: Store; hiddenFrom: (c: Context, login: string | null | undefined) => boolean; notFound: Fact; withdrawn: Fact }) {
+export function mountDenounce(
+  app: Hono,
+  o: {
+    store: Store;
+    hiddenFrom: (c: Context, login: string | null | undefined) => boolean;
+    notFound: Fact;
+    withdrawn: Fact;
+    /** Décompte du jury pour qui demande (§18.27). */
+    jury: (c: Context, cardId: string) => Jury;
+  },
+) {
   app.get("/api/card/:id/case", (c) => {
     c.header("Cache-Control", "no-store");
     const id = c.req.param("id");
     const row = ID_RE.test(id) ? o.store.getCard(id) : null;
     if (!row) return c.json({ state: "error", code: "internal", message: o.notFound }, 404);
     if (o.hiddenFrom(c, o.store.loginOf(row))) return c.json({ state: "error", code: "gone", message: o.withdrawn }, 410);
-    return c.json(caseInfo(o.store, row));
+    return c.json({ ...caseInfo(o.store, row), jury: o.jury(c, row.id) });
   });
 }
