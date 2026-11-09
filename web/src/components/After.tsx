@@ -1,14 +1,14 @@
 // Tout ce qui vient sous la carte (§6.4), dans l'ordre de la spec.
 import { useEffect, useRef, useState } from "react";
-import type { CSSProperties, FormEvent } from "react";
-import type { CardData, ComparisonData, Lang, Stat } from "../../../shared/types";
+import type { FormEvent } from "react";
+import type { CardData, ComparisonData, Lang } from "../../../shared/types";
 import { STAT_CODES, starsFor } from "../../../shared/types";
 import { pick, useT } from "../i18n";
 import { api, images, isMock, tokens } from "../lib/api";
 import { navigate } from "../lib/router";
 import { setPrefill } from "../lib/session";
 import { copyText, isTouch, shareUrl } from "../lib/util";
-import { IconArrow, IconChevron, IconDownload, IconFlame, IconLink, IconLinkedIn, IconLock, IconShare, IconWhistle, IconX } from "./Icons";
+import { IconDownload, IconLink, IconLinkedIn, IconShare, IconX } from "./Icons";
 
 /* ---------- petit toast partagé ---------- */
 
@@ -94,38 +94,36 @@ export function ShareBar({ item, toast }: { item: Shareable; toast: (m: string) 
   const xHref = `https://x.com/intent/post?text=${encodeURIComponent(text("").trim())}&url=${encodeURIComponent(url)}`;
 
   return (
-    <section className="after-block out-block" aria-labelledby="out-title">
-      <h2 id="out-title" className="after-kicker">
-        {ts.title}
-      </h2>
-      <div className="out-grid">
+    <section className="after-block out" aria-labelledby="out-title">
+      <h2 id="out-title">{ts.title}</h2>
+      <button type="button" className="pill pill-big out-main" onClick={onLinkedIn}>
+        <IconLinkedIn />
+        {ts.linkedin}
+      </button>
+      <div className="out-more">
         {canNative && (
-          <button type="button" className="out-btn sb-native" onClick={onNative}>
+          <button type="button" className="pill pill-ghost" onClick={onNative}>
             <IconShare />
-            <span>{ts.native}</span>
+            {ts.native}
           </button>
         )}
-        <button type="button" className="out-btn sb-li" onClick={onLinkedIn}>
-          <IconLinkedIn />
-          <span>{ts.linkedin}</span>
-        </button>
         <button
           type="button"
-          className="out-btn sb-tw"
+          className="pill pill-ghost"
           onClick={() => {
             window.open(xHref, "_blank", "noopener");
             track("x");
           }}
         >
           <IconX />
-          <span>{ts.x}</span>
+          {ts.x}
         </button>
-        <button type="button" className="out-btn" onClick={onCopy}>
+        <button type="button" className="pill pill-ghost" onClick={onCopy}>
           <IconLink />
-          <span>{ts.copy}</span>
+          {ts.copy}
         </button>
         <a
-          className="out-btn"
+          className="pill pill-ghost"
           href={images.portrait(id)}
           download={filename}
           onClick={(e) => {
@@ -137,15 +135,9 @@ export function ShareBar({ item, toast }: { item: Shareable; toast: (m: string) 
           }}
         >
           <IconDownload />
-          <span>{ts.download}</span>
+          {ts.download}
         </a>
       </div>
-      <p className="out-preview">
-        <span className="out-quote" aria-hidden>
-          ❝
-        </span>
-        {text(url)}
-      </p>
     </section>
   );
 }
@@ -169,12 +161,12 @@ export function LinkedInPhoto({ cardId, hasAvatar }: { cardId: string; hasAvatar
   return (
     <section className={`after-block personalize${hasAvatar ? "" : " is-featured"}`} aria-labelledby="perso-title">
       <div className="personalize-copy">
-        <h2 id="perso-title" className="after-kicker">
+        <h2 id="perso-title">
           {l.kicker}
         </h2>
         {!hasAvatar && <p>{l.noPhoto}</p>}
       </div>
-      <button type="button" className="btn-linkedin" onClick={() => api.startLinkedInPhoto(cardId, token)}>
+      <button type="button" className="pill pill-peach" onClick={() => api.startLinkedInPhoto(cardId, token)}>
         <IconLinkedIn />
         <span>{l.btn}</span>
       </button>
@@ -182,85 +174,54 @@ export function LinkedInPhoto({ cardId, hasAvatar }: { cardId: string; hasAvatar
   );
 }
 
-/* ---------- pourquoi cette note ---------- */
+/* ---------- pièces à conviction ---------- */
 
-function StatRow({ stat, index }: { stat: Stat; index: number }) {
-  const { t } = useT();
-  const meta = t.stats[stat.code];
-  const isBuzz = stat.code === "BUZZ";
-  return (
-    <li className={`why-stat${isBuzz ? " is-buzz" : ""}${stat.sufficient ? "" : " is-thin"}`} style={{ ["--i" as string]: index } as CSSProperties}>
-      <div className="why-stat-head">
-        <span className="why-code">{stat.code}</span>
-        <span className="why-name">{meta.name}</span>
-        {!stat.sufficient && <span className="why-tag">{t.result.why.insufficient}</span>}
-        <span className="why-value">{stat.value}</span>
-      </div>
-      <div className="why-bar" aria-hidden>
-        <span style={{ width: `${(stat.value / 99) * 100}%` }} />
-      </div>
-    </li>
-  );
-}
-
-function WhyCard({ card }: { card: CardData }) {
+/** Ce que la fiche ne dit pas : la peine, ce que veut dire chaque sigle, et le poids de chacun.
+ * Les valeurs et les barres sont déjà sur la fiche : on ne les répète pas. */
+function WhyCard({ card, withSentence }: { card: CardData; withSentence: boolean }) {
   const { t, lang } = useT();
-  const w = t.result.why;
-  const stats = STAT_CODES.map((c) => card.stats.find((s) => s.code === c)).filter((s): s is Stat => !!s);
-  const sentence = card.sentence;
+  const sentence = withSentence ? card.sentence : undefined;
   return (
     <>
-      {/* La peine et la caution (§18.2) : une ligne, qui se replie au mot sur téléphone */}
+      {/* La peine et la caution (§18.2) */}
       {sentence && (
         <p className="why-sentence">
           <span>{pick(sentence.label, lang)}</span>
-          {sentence.bail && (
-            <>
-              <span className="why-sentence-sep" aria-hidden>
-                {" · "}
-              </span>
-              <span>{pick(sentence.bail, lang)}</span>
-            </>
-          )}
+          {sentence.bail && <span className="why-bail">{pick(sentence.bail, lang)}</span>}
         </p>
       )}
-      <p className="why-formula">{w.overallLine}</p>
-      <ol className="why-stats">
-        {stats.map((s, i) => (
-          <StatRow key={s.code} stat={s} index={i} />
+      <dl className="why-legend">
+        {STAT_CODES.map((code) => (
+          <div key={code} className={code === "BUZZ" ? "is-buzz" : undefined}>
+            <dt>{code}</dt>
+            <dd>
+              <b>{t.stats[code].name}</b> {t.stats[code].what}
+            </dd>
+          </div>
         ))}
-      </ol>
-      <p className="why-buzz">{w.buzzNote}</p>
+      </dl>
+      <p className="why-formula">{t.result.why.overallLine}</p>
     </>
   );
 }
 
-export function Why({ item }: { item: Shareable }) {
+export function Why({ item, withSentence = true }: { item: Shareable; withSentence?: boolean }) {
   const { t } = useT();
   const [side, setSide] = useState<"cv" | "github">("github");
-  const [open, setOpen] = useState(true);
   return (
-    <section className={`after-block why${open ? " is-open" : ""}`} id="why">
-      <h2 className="why-toggle-wrap">
-        <button type="button" className="why-toggle" aria-expanded={open} aria-controls="why-body" onClick={() => setOpen((o) => !o)}>
-          <span>{t.result.why.title}</span>
-          <IconChevron />
-        </button>
-      </h2>
-      <div className="why-body" id="why-body" hidden={!open}>
-        {item.kind === "comparison" && (
-          <div className="seg seg-small" role="tablist" aria-label={t.compare.switchLabel}>
-            <span className="seg-thumb" data-pos={side === "cv" ? 0 : 1} aria-hidden />
-            <button type="button" role="tab" aria-selected={side === "cv"} onClick={() => setSide("cv")}>
-              {t.result.why.tabCv}
-            </button>
-            <button type="button" role="tab" aria-selected={side === "github"} onClick={() => setSide("github")}>
-              {t.result.why.tabGithub}
-            </button>
-          </div>
-        )}
-        <WhyCard card={item.kind === "card" ? item.card : side === "cv" ? item.comparison.cv : item.comparison.github} />
-      </div>
+    <section className="after-block why" id="why" aria-labelledby="why-title">
+      <h2 id="why-title">{t.result.why.title}</h2>
+      {item.kind === "comparison" && (
+        <div className="seg" role="tablist" aria-label={t.compare.switchLabel}>
+          <button type="button" role="tab" aria-selected={side === "cv"} onClick={() => setSide("cv")}>
+            {t.result.why.tabCv}
+          </button>
+          <button type="button" role="tab" aria-selected={side === "github"} onClick={() => setSide("github")}>
+            {t.result.why.tabGithub}
+          </button>
+        </div>
+      )}
+      <WhyCard card={item.kind === "card" ? item.card : side === "cv" ? item.comparison.cv : item.comparison.github} withSentence={withSentence} />
     </section>
   );
 }
@@ -281,30 +242,16 @@ export function Contest({ card }: { card: CardData }) {
     setRound((r) => r + 1);
   };
 
-  const toFacts = () => {
-    const el = document.getElementById("why");
-    el?.scrollIntoView({ behavior: "smooth", block: "start" });
-    el?.querySelector<HTMLButtonElement>(".why-toggle")?.focus({ preventScroll: true });
-  };
-
   return (
     <section className="after-block contest">
-      <button type="button" className="btn-quiet" onClick={ask} aria-expanded={reply !== null}>
-        <IconWhistle />
-        <span>{reply === null ? c.button : c.again}</span>
+      <button type="button" className="pill pill-ghost" onClick={ask} aria-expanded={reply !== null}>
+        {reply === null ? c.button : c.again}
       </button>
       {reply !== null && (
         <div className="var-panel" key={round} role="status">
-          <div className="var-head">
-            <span className="var-dot" aria-hidden />
-            <span>{c.title}</span>
-            <span className="var-verdict">{round > 1 ? `#${round}` : ""}</span>
-          </div>
+          <p className="surtitre">{c.title}</p>
           <p className="var-text">{c.replies[reply]}</p>
           {lowest && <p className="var-hint">{c.lowest(lowest.code, lowest.value)}</p>}
-          <button type="button" className="link-arrow" onClick={toFacts}>
-            {c.seeFacts} <IconArrow />
-          </button>
         </div>
       )}
     </section>
@@ -319,48 +266,18 @@ export function AddSource({ card }: { card: CardData }) {
   const copy = fromGithub ? t.result.addCv : t.result.addGithub;
   return (
     <section className="after-block add-source">
-      <div className="add-source-cards" aria-hidden>
-        <span className="mini-card mc-a">CV</span>
-        <span className="mini-vs">vs</span>
-        <span className="mini-card mc-b">GH</span>
-      </div>
-      <div className="add-source-copy">
-        <h2>{copy.title}</h2>
-        <p>{copy.text}</p>
-      </div>
+      <h2>{copy.title}</h2>
+      <p>{copy.text}</p>
       <button
         type="button"
-        className="btn-secondary"
+        className="pill pill-peach"
         onClick={() => {
           setPrefill({ mode: "both", login: fromGithub ? card.login : undefined, tab: fromGithub ? "cv" : "github" });
           navigate("/");
         }}
       >
         {copy.btn}
-        <IconArrow />
       </button>
-    </section>
-  );
-}
-
-/* ---------- mode roast (verrouillé) ---------- */
-
-export function Roast() {
-  const { t } = useT();
-  return (
-    <section className="after-block roast" aria-disabled="true">
-      <span className="roast-icon" aria-hidden>
-        <IconFlame />
-      </span>
-      <div>
-        <h2>
-          {t.result.roast.title}
-          <span className="badge-soon">
-            <IconLock /> {t.result.roast.soon}
-          </span>
-        </h2>
-        <p>{t.result.roast.text}</p>
-      </div>
     </section>
   );
 }
@@ -438,14 +355,14 @@ export function Claim({ cardId, login, lawyer, me, onMe, toast }: ClaimProps) {
         <div className="claim-actions">
           <button
             type="button"
-            className="btn-secondary claim-hide"
+            className="pill pill-ghost"
             disabled={busy}
             aria-pressed={me.hidden}
             onClick={() => run(() => api.setHidden(!me.hidden), me.hidden ? c.shownDone : c.hiddenDone)}
           >
             {me.hidden ? c.unhide : c.hide}
           </button>
-          <button type="button" className="link-quiet claim-logout" disabled={busy} onClick={() => run(() => api.logout().then(() => null), c.loggedOut)}>
+          <button type="button" className="link-alt" disabled={busy} onClick={() => run(() => api.logout().then(() => null), c.loggedOut)}>
             {c.logout}
           </button>
         </div>
@@ -456,12 +373,12 @@ export function Claim({ cardId, login, lawyer, me, onMe, toast }: ClaimProps) {
   return (
     <section className="after-block claim" aria-labelledby="claim-title">
       <div className="claim-copy">
-        <h2 id="claim-title" className="after-kicker">
+        <h2 id="claim-title">
           {lawyer ? c.kickerLawyer : c.kicker}
         </h2>
         <p>{lawyer ? c.textLawyer : c.text}</p>
       </div>
-      <button type="button" className="btn-claim" onClick={() => api.startClaim(cardId, login)}>
+      <button type="button" className="pill pill-peach" onClick={() => api.startClaim(cardId, login)}>
         <GhMark />
         <span>{lawyer ? c.btnLawyer : c.btn}</span>
       </button>
@@ -521,7 +438,7 @@ export function EmailForm({ cardId }: { cardId: string }) {
             aria-invalid={state === "invalid"}
             aria-describedby="email-note"
           />
-          <button type="submit" className="btn-secondary" disabled={state === "sending"}>
+          <button type="submit" className="pill pill-ghost" disabled={state === "sending"}>
             {state === "sending" ? e.sending : e.btn}
           </button>
         </form>
@@ -542,7 +459,6 @@ export function AzeritCta({ cardId }: { cardId: string | null }) {
       <span>{t.result.cta.text}</span>{" "}
       <a href="https://azerit.tech" target="_blank" rel="noopener" onClick={() => api.track("cta_azerit_clicked", cardId, { from: "result" })}>
         {t.result.cta.link}
-        <IconArrow />
       </a>
     </p>
   );

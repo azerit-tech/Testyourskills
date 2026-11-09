@@ -1,14 +1,12 @@
 // Route /c/:id : attente, révélation puis résultat pour une carte fraîche ;
 // affichage direct (sans pack) pour un lien partagé.
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import type { CSSProperties } from "react";
 import type { CardData, Fact, JobState, ProgressEvent } from "../../../shared/types";
 import { LEVEL_LABELS, starsFor } from "../../../shared/types";
-import { AddSource, AzeritCta, Claim, Contest, DeleteCard, EmailForm, LinkedInPhoto, Roast, ShareBar, Why, useMe, useToast } from "../components/After";
+import { AddSource, AzeritCta, Claim, Contest, DeleteCard, EmailForm, LinkedInPhoto, ShareBar, Why, useMe, useToast } from "../components/After";
 import type { Shareable } from "../components/After";
 import { ComparisonStage } from "../components/Comparison";
 import { EntryForm } from "../components/EntryForm";
-import { IconArrow } from "../components/Icons";
 import { RevealCard, useReveal } from "../components/Reveal";
 import type { WalkoutControl } from "../components/Walkout3D";
 import { Waiting } from "../components/Waiting";
@@ -17,7 +15,7 @@ import { api, ApiError, tokens } from "../lib/api";
 import { isClosed } from "../lib/errors";
 import { navigate, onLinkClick } from "../lib/router";
 import { freshSince, prefillFromLast } from "../lib/session";
-import { accentOf, useReducedMotion } from "../lib/util";
+import { useReducedMotion } from "../lib/util";
 
 /** La révélation 3D et Three.js, hors du bundle de l'accueil. */
 const loadWalkout = () => import("../components/Walkout3D");
@@ -208,9 +206,6 @@ export function CardPage({ id }: { id: string }) {
     return (
       <main className="page page-card" id="main">
         <div className="panel-center error-panel" role="alert">
-          <span className="error-code" aria-hidden>
-            {view.notFound ? "404" : "VAR"}
-          </span>
           <h1>{t.errors.title}</h1>
           <p>{msg}</p>
           <button
@@ -222,7 +217,6 @@ export function CardPage({ id }: { id: string }) {
             }}
           >
             {view.notFound ? t.result.makeYours : t.errors.retry}
-            <IconArrow />
           </button>
         </div>
       </main>
@@ -259,7 +253,6 @@ function Result({ item, animate, owner, fresh, notice, me, onMe, onDeleted }: Re
   const { t, lang } = useT();
   const id = item.kind === "card" ? item.card.id : item.comparison.id;
   const main: CardData = item.kind === "card" ? item.card : item.comparison.github;
-  const accent = item.kind === "card" ? accentOf(main) : { a: "#52d0bd", b: "#6cb6ff", ink: "#52d0bd" };
   const { phase, open, skip, handoff, finish, animating, settled } = useReveal(animate);
   const toast = useToast();
   const tracked = useRef(false);
@@ -293,87 +286,125 @@ function Result({ item, animate, owner, fresh, notice, me, onMe, onDeleted }: Re
     else if (animating && !walkoutCtl.current?.interact()) skip();
   };
 
-  const style = { "--ca": accent.a, "--cb": accent.b, "--ink": accent.ink } as CSSProperties;
   // Revendiquée par la personne connectée (§18.1) : sa fiche, même sans le jeton de cet appareil.
   const cardLogin = main.login;
   const claimed = !!me && !!cardLogin && me.login === cardLogin.toLowerCase();
   const visitor = !owner && !claimed;
 
   return (
-    <main className={`page page-card page-result${animating ? " is-animating" : ""}`} id="main" style={style}>
+    <main className={`page page-card page-result${animating ? " is-animating" : ""}${visitor ? " is-visitor" : ""}`} id="main">
       {claimed && me?.hidden && (
         <p className="hidden-banner" role="status">
-          <span className="hidden-dot" aria-hidden />
           {t.result.claim.hiddenBanner}
         </p>
       )}
-      {visitor && (
-        <div className="visitor-banner">
-          <p>
-            {t.result.sharedBanner(main.name)} <b>{t.result.yourTurn}</b>
-          </p>
-          <EntryForm variant="inline" />
-        </div>
-      )}
 
-      {animating && (
-        <Suspense fallback={null}>
-          <Walkout3D card={main} lang={lang} double={item.kind === "comparison"} phase={phase} anchorRef={stageRef} controlRef={walkoutCtl} onHandoff={handoff} onDone={finish} />
-        </Suspense>
-      )}
-      <section ref={stageRef} className="result-stage" onClick={animating ? onStageClick : undefined}>
-        <div className="stage-glow" aria-hidden />
-        {item.kind === "card" ? (
-          <div className="single-stage">
-            <RevealCard card={item.card} lang={lang} phase={phase} idPrefix="result" />
-          </div>
-        ) : (
-          <ComparisonStage cmp={item.comparison} phase={phase} />
+      <div className="result-top">
+        {/* Lien partagé (§18.7, maquette web/gta-partage.html) : la page personnage de la fiche. */}
+        {visitor && <WantedHead card={main} />}
+
+        {animating && (
+          <Suspense fallback={null}>
+            <Walkout3D card={main} lang={lang} double={item.kind === "comparison"} phase={phase} anchorRef={stageRef} controlRef={walkoutCtl} onHandoff={handoff} onDone={finish} />
+          </Suspense>
         )}
-        {animating && phase !== "ready" && (
-          <button
-            type="button"
-            className="skip-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              skip();
-            }}
-          >
-            {t.reveal.skip}
-          </button>
+        <section ref={stageRef} className="result-stage" onClick={animating ? onStageClick : undefined}>
+          {item.kind === "card" ? (
+            <div className="single-stage">
+              <RevealCard card={item.card} lang={lang} phase={phase} idPrefix="result" />
+            </div>
+          ) : (
+            <ComparisonStage cmp={item.comparison} phase={phase} />
+          )}
+          {animating && phase !== "ready" && (
+            <button
+              type="button"
+              className="skip-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                skip();
+              }}
+            >
+              {t.reveal.skip}
+            </button>
+          )}
+          <p className="sr-only" aria-live="polite">
+            {settled ? t.reveal.revealed(LEVEL_LABELS[starsFor(main.overall)][lang], main.overall) : ""}
+          </p>
+        </section>
+
+        {visitor && (
+          <section className="you" aria-labelledby="you-title">
+            <h2 id="you-title">{t.result.makeYours}</h2>
+            <p>{t.result.yourTurn}</p>
+            <EntryForm variant="inline" />
+          </section>
         )}
-        <p className="sr-only" aria-live="polite">
-          {settled ? t.reveal.revealed(LEVEL_LABELS[starsFor(main.overall)][lang], main.overall) : ""}
-        </p>
-      </section>
+      </div>
 
       <div className={`after${settled ? " is-in" : ""}`} aria-hidden={!settled} inert={!settled ? true : undefined}>
         {/* Fiche masquée : /og/* et /c/:id répondent 404 / 410 à tous, l'image ne se télécharge pas et le lien ne montre rien. */}
-        {!(claimed && me?.hidden) && <ShareBar item={item} toast={toast.show} />}
+        {!visitor && !(claimed && me?.hidden) && <ShareBar item={item} toast={toast.show} />}
         <LinkedInPhoto cardId={id} hasAvatar={item.kind === "card" ? !!item.card.avatarUrl : !!item.comparison.cv.avatarUrl} />
         <Claim cardId={id} login={cardLogin} lawyer={!owner} me={me} onMe={onMe} toast={toast.show} />
-        <Why item={item} />
+        <Why item={item} withSentence={!visitor} />
         {!visitor && <Contest card={main} />}
         {!visitor && item.kind === "card" && <AddSource card={item.card} />}
-        {!visitor && <Roast />}
         {!visitor && <EmailForm cardId={id} />}
         <AzeritCta cardId={id} />
-        <div className="after-foot">
-          {visitor ? (
-            <a className="btn-primary" href="/" onClick={(e) => onLinkClick(e, "/")}>
-              {t.result.makeYours}
-              <IconArrow />
+        {!visitor && (
+          <div className="after-foot">
+            <a className="link-alt" href="/" onClick={(e) => onLinkClick(e, "/")}>
+              {t.result.again}
             </a>
-          ) : (
-            <a className="link-arrow" href="/" onClick={(e) => onLinkClick(e, "/")}>
-              {t.result.again} <IconArrow />
-            </a>
-          )}
-          <DeleteCard cardId={id} onDeleted={onDeleted} />
-        </div>
+            <DeleteCard cardId={id} onDeleted={onDeleted} />
+          </div>
+        )}
       </div>
       {toast.node}
     </main>
+  );
+}
+
+/** Six étoiles du HUD : les éteintes à gauche, pleines et sombres ; les allumées à droite, blanches et mates. */
+function WantedStars({ n, label }: { n: number; label: string }) {
+  return (
+    <span className="wanted-stars" role="img" aria-label={label}>
+      {Array.from({ length: 6 }, (_, i) => (
+        <svg key={i} viewBox="0 0 24 24" className={i >= 6 - n ? "on" : "off"} aria-hidden>
+          <path d={STAR} />
+        </svg>
+      ))}
+    </span>
+  );
+}
+
+const STAR = "M12 2.6l2.9 6.1 6.7.8-4.9 4.6 1.3 6.6L12 17.4l-6 3.3 1.3-6.6L2.4 9.5l6.7-.8z";
+/** Pas encore de clé dans i18n.ts : à y reporter (result.wanted). */
+const WANTED = { fr: "Avis de recherche", en: "Wanted" };
+
+/** En tête d'une fiche partagée : qui, à quel niveau, quel profil, quelle peine. */
+function WantedHead({ card }: { card: CardData }) {
+  const { lang } = useT();
+  const n = starsFor(card.overall);
+  const level = pick(LEVEL_LABELS[n], lang);
+  const starsLabel = lang === "fr" ? `${n} étoiles sur 6 · ${level}` : `${n} of 6 stars · ${level}`;
+  return (
+    <header className="wanted">
+      <p className="surtitre">{WANTED[lang]}</p>
+      <h1 className="wanted-name">{card.login ? `@${card.login}` : card.name}</h1>
+      <p className="wanted-line">
+        <WantedStars n={n} label={starsLabel} />
+        <strong>{card.profile ? pick(card.profile.label, lang) : level}</strong>
+      </p>
+      {card.profile && <p className="wanted-hook">{pick(card.profile.tagline, lang)}</p>}
+      {card.sentence && (
+        <p className="wanted-sentence">
+          {pick(card.sentence.label, lang)}
+          {card.sentence.bail && <span>{pick(card.sentence.bail, lang)}</span>}
+        </p>
+      )}
+    </header>
   );
 }
 
@@ -391,9 +422,6 @@ function Withdrawn({ cardId, notice }: { cardId: string; notice: string | null }
   }, []);
   return (
     <div className="panel-center error-panel withdrawn-panel">
-      <span className="error-code" aria-hidden>
-        410
-      </span>
       <h1>{w.title}</h1>
       <p>{w.text}</p>
       {notice && (
@@ -403,7 +431,6 @@ function Withdrawn({ cardId, notice }: { cardId: string; notice: string | null }
       )}
       <a className="btn-primary" href="/" onClick={(e) => onLinkClick(e, "/")}>
         {t.result.makeYours}
-        <IconArrow />
       </a>
       {claim && (
         <button type="button" className="link-quiet withdrawn-claim" onClick={() => api.startClaim(cardId)}>
