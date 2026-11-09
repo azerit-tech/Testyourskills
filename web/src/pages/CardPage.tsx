@@ -13,6 +13,7 @@ import { Dossier } from "../components/Findings";
 import { Jury, JuryLine } from "../components/Jury";
 import { MakeYours } from "../components/MakeYours";
 import { PleaVerdict } from "../components/Plea";
+import { ProfileTile } from "../components/ProfileTile";
 import { RevealCard, useReveal } from "../components/Reveal";
 import { ShareDock } from "../components/ShareDock";
 import type { WalkoutControl } from "../components/Walkout3D";
@@ -288,7 +289,7 @@ export function CardPage({ id }: { id: string }) {
   );
 }
 
-interface ResultProps {
+export interface ResultProps {
   item: Shareable;
   animate: boolean;
   /** L'écran d'attente s'est levé : la révélation peut partir (§18.27). */
@@ -305,7 +306,7 @@ interface ResultProps {
   onDeleted: () => void;
 }
 
-function Result({ item, animate, start, abort, onScene, owner, fresh, notice, me, onMe, onDeleted }: ResultProps) {
+export function Result({ item, animate, start, abort, onScene, owner, fresh, notice, me, onMe, onDeleted }: ResultProps) {
   const { t, lang } = useT();
   const id = item.kind === "card" ? item.card.id : item.comparison.id;
   const main: CardData = item.kind === "card" ? item.card : item.comparison.github;
@@ -394,14 +395,8 @@ function Result({ item, animate, start, abort, onScene, owner, fresh, notice, me
       )}
 
       <div className="result-top">
-        {/* Lien partagé (§18.7, maquette web/gta-partage.html) : la page personnage de la fiche. */}
-        {visitor && (
-          <WantedHead
-            card={main}
-            denounced={wantedYou ? { by: kase?.by ?? null } : null}
-            onLawyer={claimOn && cardLogin ? () => api.startClaim(id, cardLogin) : null}
-          />
-        )}
+        {/* Lien partagé (§18.7) : une ligne, puis la fiche entière au-dessus de la ligne de flottaison. */}
+        {visitor && <WantedHead card={main} />}
 
         {animating && (
           // Morceau 3D introuvable : même repli que sans WebGL, la fiche sort sans révélation.
@@ -436,26 +431,33 @@ function Result({ item, animate, start, abort, onScene, owner, fresh, notice, me
           </p>
         </section>
 
-        {/* Le jury (§18.27) : un geste à un toucher, avant « Et toi ? ». */}
-        {visitor && <Jury cardId={id} card={main} jury={kase?.jury ?? null} toast={toast.show} />}
-
+        {/* Sous la fiche, pour le visiteur : le jury, le profil, le dossier, puis « Et toi ? ». */}
         {visitor && (
-          <section className="you" id="you" aria-labelledby="you-title">
-            <h2 id="you-title">{t.denounce.andYou}</h2>
-            {other ? (
-              <>
-                <p className="versus-line">{versusLine(t.denounce, other, main)}</p>
-                <a className="pill pill-peach" href={`/c/${other.id}`} onClick={(e) => onLinkClick(e, `/c/${other.id}`)}>
-                  {t.denounce.mine}
-                </a>
-              </>
-            ) : (
-              <>
-                <p>{t.result.yourTurn}</p>
-                <EntryForm variant="inline" />
-              </>
-            )}
-          </section>
+          <div className="visitor-col">
+            {/* Fiche dénoncée (§18.6) : « Avis de recherche à ton nom », juste sous la fiche. */}
+            {wantedYou && <Denounced by={kase?.by ?? null} onLawyer={claimOn && cardLogin ? () => api.startClaim(id, cardLogin) : null} />}
+            {/* Le jury (§18.27) : un geste à un toucher, avant « Et toi ? ». */}
+            <Jury cardId={id} card={main} jury={kase?.jury ?? null} toast={toast.show} />
+            <ProfileTile card={main} />
+            {/* L'enquête en direct (§18.26) : les trois trouvailles les plus fortes, chacune vers sa preuve. */}
+            <Dossier card={main} />
+            <section className="you" id="you" aria-labelledby="you-title">
+              <h2 id="you-title">{t.denounce.andYou}</h2>
+              {other ? (
+                <>
+                  <p className="versus-line">{versusLine(t.denounce, other, main)}</p>
+                  <a className="pill pill-peach" href={`/c/${other.id}`} onClick={(e) => onLinkClick(e, `/c/${other.id}`)}>
+                    {t.denounce.mine}
+                  </a>
+                </>
+              ) : (
+                <>
+                  <p>{t.result.yourTurn}</p>
+                  <EntryForm variant="inline" />
+                </>
+              )}
+            </section>
+          </div>
         )}
       </div>
 
@@ -463,15 +465,15 @@ function Result({ item, animate, start, abort, onScene, owner, fresh, notice, me
         {!visitor && <PleaVerdict cardId={id} overall={main.overall} shown={settled} />}
         {!visitor && <JuryLine jury={kase?.jury ?? null} />}
         {/* L'enquête en direct (§18.26) : les trois trouvailles les plus fortes, chacune vers sa preuve. */}
-        <Dossier card={main} />
+        {!visitor && <Dossier card={main} />}
         {/* Fiche masquée : /og/* et /c/:id répondent 404 / 410 à tous, l'image ne se télécharge pas et le lien ne montre rien. */}
         {!visitor && !(claimed && me?.hidden) && <ShareBar item={item} toast={toast.show} />}
         {/* Dénonce un complice (§18.6), juste après le partage. */}
         {!visitor && <Denounce cardId={id} selfLogin={cardLogin} toast={toast.show} />}
         <LinkedInPhoto cardId={id} hasAvatar={item.kind === "card" ? !!item.card.avatarUrl : !!item.comparison.cv.avatarUrl} />
-        {/* Fiche dénoncée : « Appeler mon avocat » est déjà en tête de page. */}
+        {/* Fiche dénoncée : « Appeler mon avocat » est déjà sous la fiche. */}
         {!(wantedYou && claimOn) && <Claim cardId={id} login={cardLogin} lawyer={!owner} me={me} onMe={onMe} toast={toast.show} />}
-        <Why item={item} withSentence={!visitor} />
+        {!visitor && <Why item={item} />}
         {!visitor && <Contest card={main} />}
         {!visitor && item.kind === "card" && <AddSource card={item.card} />}
         {!visitor && <EmailForm cardId={id} />}
@@ -494,21 +496,6 @@ function Result({ item, animate, start, abort, onScene, owner, fresh, notice, me
   );
 }
 
-/** Six étoiles du HUD : les éteintes à gauche, pleines et sombres ; les allumées à droite, blanches et mates. */
-function WantedStars({ n, label }: { n: number; label: string }) {
-  return (
-    <span className="wanted-stars" role="img" aria-label={label}>
-      {Array.from({ length: 6 }, (_, i) => (
-        <svg key={i} viewBox="0 0 24 24" className={i >= 6 - n ? "on" : "off"} aria-hidden>
-          <path d={STAR} />
-        </svg>
-      ))}
-    </span>
-  );
-}
-
-const STAR = "M12 2.6l2.9 6.1 6.7.8-4.9 4.6 1.3 6.6L12 17.4l-6 3.3 1.3-6.6L2.4 9.5l6.7-.8z";
-
 type Dict = ReturnType<typeof useT>["t"];
 
 /** « Toi 78 · @X 71 · une étoile d'avance » (§18.7). */
@@ -519,59 +506,47 @@ function versusLine(d: Dict["denounce"], mine: MyCard, card: CardData): string {
   return d.versus(mine.overall, card.login ? `@${card.login}` : card.name, card.overall, said);
 }
 
-interface WantedHeadProps {
-  card: CardData;
-  /** Fiche dénoncée (§18.6) : bandeau « Avis de recherche à ton nom », dénonciateur nommé s'il a revendiqué sa fiche. */
-  denounced: { by: string | null } | null;
+/**
+ * En tête d'une fiche partagée, une seule ligne : « Avis de recherche · @login ». La fiche dit
+ * le reste (étoiles, profil, note) ; la tuile de profil, la peine. Lu « Avis de recherche : @x ».
+ */
+export function WantedHead({ card }: { card: CardData }) {
+  const { t } = useT();
+  return (
+    <header className="wanted">
+      <h1 className="wanted-head">
+        <span className="wanted-kicker">{t.result.wanted}</span>
+        <span className="sr-only">{t.result.wantedSep}</span>
+        <span className="wanted-name">{card.login ? `@${card.login}` : card.name}</span>
+      </h1>
+    </header>
+  );
+}
+
+interface DenouncedProps {
+  /** Le dénonciateur, nommé s'il a revendiqué sa fiche ; sinon « Dénonciation anonyme ». */
+  by: string | null;
   /** Revendication par GitHub ; null si elle est désactivée : le bouton mène alors à « Fais la tienne ». */
   onLawyer: (() => void) | null;
 }
 
-/** En tête d'une fiche partagée : qui, « dans le viseur » à quel niveau, quel profil, quelle peine. */
-function WantedHead({ card, denounced, onLawyer }: WantedHeadProps) {
-  const { t, lang } = useT();
+/** Fiche dénoncée (§18.6), vue par sa cible : « Avis de recherche à ton nom », juste sous la fiche. */
+function Denounced({ by, onLawyer }: DenouncedProps) {
+  const { t } = useT();
   const d = t.denounce;
-  const n = starsFor(card.overall);
-  const level = pick(LEVEL_LABELS[n], lang);
-  const starsLabel = t.result.wantedStars(n, level);
   const toForm = () => {
     const input = document.querySelector<HTMLInputElement>("#you input");
     input?.scrollIntoView({ behavior: "smooth", block: "center" });
     input?.focus({ preventScroll: true });
   };
   return (
-    <header className="wanted">
-      {denounced ? (
-        <div className="denounced" role="note">
-          <p className="denounced-title">{d.banner}</p>
-          <p className="denounced-by">{denounced.by ? d.by(denounced.by) : d.anonymous}</p>
-          <button type="button" className="pill" onClick={onLawyer ?? toForm}>
-            {onLawyer ? d.lawyer : t.result.makeYours}
-          </button>
-        </div>
-      ) : (
-        <p className="surtitre">{t.result.wanted}</p>
-      )}
-      <h1 className="wanted-name">{card.login ? `@${card.login}` : card.name}</h1>
-      <p className="wanted-line">
-        <span className="wanted-verb">{d.inSights}</span>
-        {/* Les étoiles et le profil passent à la ligne ensemble, jamais un « · » en tête de ligne. */}
-        <span className="wanted-level">
-          <WantedStars n={n} label={starsLabel} />
-          <strong>
-            <span aria-hidden>· </span>
-            {card.profile ? pick(card.profile.label, lang) : level}
-          </strong>
-        </span>
-      </p>
-      {card.profile && <p className="wanted-hook">{pick(card.profile.tagline, lang)}</p>}
-      {card.sentence && (
-        <p className="wanted-sentence">
-          {pick(card.sentence.label, lang)}
-          {card.sentence.bail && <span>{pick(card.sentence.bail, lang)}</span>}
-        </p>
-      )}
-    </header>
+    <div className="denounced" role="note">
+      <p className="denounced-title">{d.banner}</p>
+      <p className="denounced-by">{by ? d.by(by) : d.anonymous}</p>
+      <button type="button" className="pill" onClick={onLawyer ?? toForm}>
+        {onLawyer ? d.lawyer : t.result.makeYours}
+      </button>
+    </div>
   );
 }
 
