@@ -9,6 +9,7 @@ import { FIXTURES } from "../fixtures";
 import type { CardData, Lang } from "../types";
 import { CardGraphic, LAYOUT, profileTagline } from "./Card";
 import { measure, upper } from "./text";
+import { THEMES } from "./themes";
 
 const LANGS: Lang[] = ["fr", "en"];
 const FW = 360 - 18 - 20;
@@ -54,6 +55,32 @@ describe("phrase du profil", () => {
         const words = card.profile.tagline[lang].split(/[ \t\n]+/);
         for (const w of words) expect(svg).toContain(w.replace(/&/g, "&amp;").replace(/'/g, "&#x27;"));
       }
+    }
+  });
+});
+
+describe("horizon des petites notes", () => {
+  it("★ à ★★★★ ont un horizon ton sur ton qui grandit avec le niveau ; les ciels peints n'en ont pas", () => {
+    const low = (["s1", "s2", "s3", "s4"] as const).map((k) => THEMES[k].horizon!);
+    for (const h of low) expect(h).toBeTruthy();
+    for (let i = 1; i < low.length; i++) {
+      expect(low[i].scale).toBeGreaterThanOrEqual(low[i - 1].scale);
+      expect(low[i].palms).toBeGreaterThanOrEqual(low[i - 1].palms);
+    }
+    expect(THEMES.s5.horizon).toBeUndefined();
+    expect(THEMES.s6.horizon).toBeUndefined();
+  });
+
+  it("la silhouette est une teinte voisine du fond, jamais noire", () => {
+    const lum = (hex: string) => {
+      const n = parseInt(hex.slice(1), 16);
+      return 0.2126 * (n >> 16) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255);
+    };
+    for (const th of Object.values(THEMES)) {
+      if (!th.horizon) continue;
+      const d = lum(th.horizon.color) - lum(th.bg[0]);
+      expect(Math.abs(d)).toBeLessThan(20);
+      expect(lum(th.horizon.color)).toBeGreaterThan(30);
     }
   });
 });

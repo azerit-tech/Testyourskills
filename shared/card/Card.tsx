@@ -83,6 +83,14 @@ const PALM = [
 const BLOCKS: [number, number, number][] = [[0, 12, 14], [12, 9, 24], [21, 14, 15], [35, 8, 31], [43, 12, 19], [124, 10, 22], [134, 9, 36], [143, 14, 18], [157, 8, 27], [165, 15, 14]];
 /** Trois palmiers de l'horizon : [x, échelle]. */
 const SKY_PALMS: [number, number][] = [[50, 0.42], [92, 0.28], [104, 0.35]];
+/** Horizon ton sur ton des niveaux bas : immeubles serrés à gauche de la photo
+ *  (et un peu à droite), hauteur à l'échelle 1 ; [x, largeur, hauteur]. */
+const LOW_BLOCKS: [number, number, number][] = [
+  [0, 14, 22], [14, 10, 34], [24, 16, 18], [40, 9, 44], [49, 14, 26], [63, 11, 52], [74, 18, 30], [92, 8, 40],
+  [100, 16, 20], [116, 12, 36], [128, 9, 58], [137, 15, 28], [152, 10, 42], [162, 18, 24], [340, 10, 30], [350, 10, 46],
+];
+/** Palmiers de l'horizon bas, dans l'ordre où ils apparaissent avec le niveau : [x, échelle]. */
+const LOW_PALMS: [number, number][] = [[104, 0.34], [30, 0.3], [150, 0.26]];
 
 const STAT_ORDER = ["TEC", "SHIP", "ARCH", "DOC", "XP", "BUZZ"] as const;
 
@@ -263,6 +271,24 @@ function Skyline({ ground, lights }: { ground: string; lights?: boolean }) {
   );
 }
 
+/** Horizon ton sur ton (★ à ★★★★ et spéciales) : silhouettes en aplat posées sur
+ *  la ligne d'horizon, sans sol ni soleil ni fenêtres, plus basses que le ciel peint. */
+function LowHorizon({ color, scale, palms }: NonNullable<CardTheme["horizon"]>) {
+  return (
+    <g fill={color}>
+      {LOW_BLOCKS.map(([x, w, h]) => {
+        const hh = +(h * scale).toFixed(2);
+        return <rect key={x} x={x} y={+(HY - hh).toFixed(2)} width={w + 0.5} height={hh} />;
+      })}
+      {LOW_PALMS.slice(0, palms).map(([x, k]) => (
+        <g key={x} transform={`translate(${x} ${+(HY - 140 * k).toFixed(2)}) scale(${k})`}>
+          <path d={PALM} />
+        </g>
+      ))}
+    </g>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /* Fiche                                                                */
 /* ------------------------------------------------------------------ */
@@ -400,6 +426,7 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
             <Skyline ground={sky.ground} lights={sky.lights} />
           </>
         )}
+        {!sky && th.horizon && <LowHorizon {...th.horizon} />}
         {th.palm && (
           <g transform="translate(236 318) scale(1.45)" fill={th.palm}>
             <path d={PALM} />

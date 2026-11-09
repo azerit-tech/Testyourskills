@@ -71,6 +71,10 @@ export interface CardTheme {
   bg: [string, string];
   /** Ciel peint (★★★★★ et ★★★★★★) : quatre teintes du haut vers l'horizon, sol, soleil, fenêtres allumées. */
   sky?: { stops: [string, string, string, string]; ground: string; sun?: string; lights?: boolean };
+  /** Horizon ton sur ton des niveaux sans ciel peint : silhouettes en aplat d'une
+   *  teinte voisine du fond, sans sol, sans soleil ni fenêtres. Il grandit avec le
+   *  niveau (hauteur des immeubles, nombre de palmiers) et reste sous le ciel de ★★★★★. */
+  horizon?: { color: string; scale: number; palms: 0 | 1 | 2 | 3 };
   /** Dégradé de la note (« num ») ; vide sinon. */
   num: Stop[];
   /** Couleur des barres de stats. */
@@ -128,15 +132,19 @@ function theme(key: ThemeKey, label: Fact, o: ThemeInput): CardTheme {
 export const THEMES: Record<ThemeKey, CardTheme> = {
   s1: theme("s1", { fr: "Petit délit", en: "Petty crime" }, {
     grad: "bg", bg: [PALETTE.slate, PALETTE.slateLow], bar: PALETTE.lilac2, palm: null,
+    horizon: { color: "#2c2d50", scale: 0.55, palms: 0 },
   }),
   s2: theme("s2", { fr: "Délit", en: "Misdemeanor" }, {
     grad: "bg", bg: [PALETTE.navy, PALETTE.navyLow], bar: PALETTE.blush, palm: "#2c3a60",
+    horizon: { color: "#2b385c", scale: 0.7, palms: 1 },
   }),
   s3: theme("s3", { fr: "Avis de recherche", en: "Wanted" }, {
     grad: "bg", bg: [PALETTE.plum, PALETTE.plumLow], bar: PALETTE.blush, palm: "#3a2442",
+    horizon: { color: "#4a2e55", scale: 0.85, palms: 2 },
   }),
   s4: theme("s4", { fr: "Haute surveillance", en: "High surveillance" }, {
     grad: "num", bg: [PALETTE.plum, PALETTE.plum], bar: PALETTE.peach, palm: "#5a3a64", accent2: PALETTE.duskC,
+    horizon: { color: "#5a3a64", scale: 1, palms: 3 },
   }),
   s5: theme("s5", { fr: "Menace publique", en: "Public menace" }, {
     grad: "sky", bg: [PALETTE.duskGround, PALETTE.duskGround], bar: PALETTE.peach, palm: "#35244a",
@@ -151,14 +159,17 @@ export const THEMES: Record<ThemeKey, CardTheme> = {
   wonderkid: theme("wonderkid", { fr: "Débarque en ville", en: "New in town" }, {
     grad: "bg", bg: [PALETTE.moss, PALETTE.mossLow], bar: PALETTE.lime, palm: "#1f3430",
     badge: { bg: PALETTE.lime, ink: PALETTE.ink0 },
+    horizon: { color: "#1d302c", scale: 0.7, palms: 1 },
   }),
   flashback: theme("flashback", { fr: "Affaire classée", en: "Cold case" }, {
     grad: "bg", bg: [PALETTE.cold, PALETTE.coldLow], bar: PALETTE.peach, palm: "#323e4a", gray: true,
     badge: { bg: PALETTE.peach, ink: PALETTE.ink0 },
+    horizon: { color: "#2d3945", scale: 0.7, palms: 1 },
   }),
   totw: theme("totw", { fr: "Top 5 de la semaine", en: "This week's top 5" }, {
     grad: "num", bg: [PALETTE.indigo, PALETTE.indigo], bar: PALETTE.peach, palm: "#34407a",
     badge: { bg: PALETTE.cream, ink: PALETTE.ink0 }, accent2: PALETTE.duskC,
+    horizon: { color: "#34407a", scale: 1, palms: 3 },
   }),
 };
 
