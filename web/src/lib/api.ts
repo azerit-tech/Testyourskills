@@ -1,6 +1,7 @@
 // Client de l'API. En mode démo (?mock=1 ou VITE_MOCK=1), tout passe par mock.ts.
-import type { CardData, JobState, Lang } from "../../../shared/types";
+import type { CardData, JobState, Lang, WeekTop } from "../../../shared/types";
 import { mockApi } from "./mock";
+import { mockTop } from "./mockTop";
 import { ApiError } from "./errors";
 import { currentRef } from "./session";
 
@@ -229,7 +230,19 @@ async function getShowcase(): Promise<CardData | null> {
   return body.card ?? null;
 }
 
-export const api = { createCard, getJob, sendEmail, deleteCard, track, getConfig, startLinkedInPhoto, getShowcase, getMe, startClaim, setHidden, logout };
+/** Le haut du classement de la semaine (§18.22) ; null si le serveur ne répond pas. */
+async function getTop(): Promise<WeekTop | null> {
+  if (isMock()) return mockTop();
+  try {
+    const res = await fetch("/api/top", { headers: { Accept: "application/json" } });
+    if (!res.ok) return null;
+    return (await res.json()) as WeekTop;
+  } catch {
+    return null;
+  }
+}
+
+export const api = { createCard, getJob, sendEmail, deleteCard, track, getConfig, startLinkedInPhoto, getShowcase, getTop, getMe, startClaim, setHidden, logout };
 
 /** URLs des images rendues par le serveur (§7). */
 export const images = {

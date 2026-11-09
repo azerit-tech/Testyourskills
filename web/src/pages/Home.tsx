@@ -1,4 +1,5 @@
-// Entrée (§6.1, §18.5, maquette web/gta-accueil.html) : la promesse, le champ, la fiche de Jacques. Rien d'autre.
+// Entrée (§6.1, §18.5, maquette web/gta-accueil.html) : la promesse, le champ, la fiche de Jacques,
+// puis le top de la semaine (§18.22). Rien d'autre.
 // L'exemple est la vraie fiche de Jacques (fondateur d'Azerit) : la maquette
 // s'affiche d'abord, la fiche calculée par le serveur la remplace dès qu'elle existe.
 // Le seul dégradé de l'écran est le ciel de cette fiche.
@@ -8,6 +9,7 @@ import { LEVEL_LABELS, starsFor } from "../../../shared/types";
 import { FIXTURES } from "../../../shared/fixtures";
 import { CardView } from "../card/CardView";
 import { EntryForm } from "../components/EntryForm";
+import { WeekBoard } from "../components/WeekBoard";
 import { useT } from "../i18n";
 import { api } from "../lib/api";
 import { onLinkClick } from "../lib/router";
@@ -55,6 +57,17 @@ export function Home() {
     document.title = t.meta.title;
   }, [t]);
 
+  /** Une place libre du top : retour au champ du pseudo, prêt à taper. */
+  const play = () => {
+    const input = inputRef.current;
+    if (!input) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    input.scrollIntoView({ block: "center", behavior: "smooth" });
+    input.focus({ preventScroll: true });
+  };
+
   return (
     <main className="page page-home" id="main">
       <section className="hero">
@@ -65,6 +78,7 @@ export function Home() {
         </div>
         <ExampleCard />
       </section>
+      <WeekBoard onPlay={play} />
     </main>
   );
 }
