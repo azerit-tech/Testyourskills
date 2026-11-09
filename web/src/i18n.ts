@@ -205,6 +205,8 @@ const fr = {
     /* en tête d'une fiche partagée (§18.20) */
     wanted: "Avis de recherche",
     wantedStars: (n: number, level: string) => `${n} étoiles sur 6 · ${level}`,
+    /** Surtitre de la tuile de profil (§18.28). */
+    profile: "Profil",
     share: {
       title: "Partage-la",
       linkedin: "LinkedIn",
@@ -641,6 +643,7 @@ const en: Dict = {
     yourTurn: "Your turn: a username is enough.",
     wanted: "Wanted",
     wantedStars: (n, level) => `${n} of 6 stars · ${level}`,
+    profile: "Profile",
     share: {
       title: "Share it",
       linkedin: "LinkedIn",
