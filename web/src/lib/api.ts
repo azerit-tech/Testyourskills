@@ -177,6 +177,7 @@ async function setHidden(hidden: boolean): Promise<Me> {
 }
 
 async function logout(): Promise<void> {
+  mine.clear();
   if (isMock()) {
     mockMe = null;
     return;
@@ -220,12 +221,24 @@ export function weekOf(id: string): WeekRank | null {
   return weeks.get(id) ?? null;
 }
 
+/** Fiches lues dont la session GitHub est propriétaire revendiquée (§18.1), d'après le serveur. */
+const mine = new Set<string>();
+
+/** La session est propriétaire du login de cette fiche : ce que le jeton de la fiche ouvre lui est ouvert aussi. */
+export function isMine(id: string): boolean {
+  return mine.has(id);
+}
+
 async function getJob(id: string): Promise<JobState> {
   const job = await fetchJob(id);
   if (job.state === "done") {
-    const week = isMock() ? mockWeekRank(job.kind === "card" ? job.card : job.comparison.github) : job.week;
+    const main = job.kind === "card" ? job.card : job.comparison.github;
+    const week = isMock() ? mockWeekRank(main) : job.week;
     if (week) weeks.set(id, week);
     else weeks.delete(id);
+    const owned = isMock() ? !!mockMe && mockMe.login === main.login?.toLowerCase() : job.mine === true;
+    if (owned) mine.add(id);
+    else mine.delete(id);
   }
   return job;
 }
@@ -284,7 +297,8 @@ async function sendEmail(cardId: string, email: string): Promise<void> {
   const res = await fetch("/api/email", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ cardId, email }),
+    // Le jeton de la fiche prouve qu'on l'a créée ; sans lui, la session du propriétaire (cookie) fait foi.
+    body: JSON.stringify({ cardId, email, token: tokens.get(cardId) ?? undefined }),
   });
   if (!res.ok) throw await readError(res);
 }

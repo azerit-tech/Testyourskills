@@ -203,8 +203,9 @@ export type JobState =
   /** `queue` : rang dans la file d'attente (1 = la prochaine à passer). Absent dès que la fiche est en traitement. */
   /** `findings` : les trouvailles déjà sorties (§18.26), dans l'ordre où les montrer, la plus forte en dernier. */
   | { state: "pending"; progress: ProgressEvent[]; queue?: number; findings?: Finding[] }
-  | { state: "done"; kind: "card"; card: CardData; week?: WeekRank }
-  | { state: "done"; kind: "comparison"; comparison: ComparisonData; week?: WeekRank }
+  /** `mine` : la session GitHub est propriétaire revendiquée du login de la fiche (§18.1). */
+  | { state: "done"; kind: "card"; card: CardData; week?: WeekRank; mine?: boolean }
+  | { state: "done"; kind: "comparison"; comparison: ComparisonData; week?: WeekRank; mine?: boolean }
   | { state: "error"; code: ErrorCode; message: Fact };
 
 export type ErrorCode =

@@ -9,13 +9,13 @@ import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { z } from "zod";
 import type { CardData, ComparisonData, ErrorCode, Fact, JobState, Lang } from "../../shared/types";
-import { stripToken, type Store } from "./db";
+import { stripToken, type CardRow, type Store } from "./db";
 import { buildLead, clientEventSchema, sendLead } from "./events";
 import { genericMeta, injectMeta, messagePage, metaFor, standalonePage } from "./html";
 import { ID_RE, MAX_PDF_BYTES, MESSAGES, Pipeline, type Deps, type RenderInput } from "./pipeline";
 import { CARDS_PER_DAY, RateLimiter, clientIp } from "./ratelimit";
 import { inlineAvatar, mountLinkedin, removeAvatars, type LinkedinConfig } from "./linkedin";
-import { mountAuth, ownerFromRequest, type GithubAuthConfig } from "./auth";
+import { mountAuth, ownerFromRequest, sameOrigin, type GithubAuthConfig } from "./auth";
 import { DENOUNCE_LIMITED, DENOUNCE_PER_DAY, mountDenounce, parseDenunciation } from "./denounce";
 import { mountJury } from "./jury";
 import { aiStatus as budgetAiStatus, type AiStatus } from "./ai/budget";
@@ -115,6 +115,8 @@ function linkedinInLogin(raw: unknown): unknown {
 const emailSchema = z.object({
   cardId: z.string().regex(ID_RE),
   email: z.email().max(254),
+  /** Jeton de la fiche, connu du navigateur qui l'a créée. Absent : il faut la session du propriétaire. */
+  token: z.string().max(200).optional(),
 });
 
 /**
@@ -216,6 +218,16 @@ export function createApp(opts: AppOptions) {
   const hiddenFrom = (c: Context, login: string | null | undefined): boolean => {
     if (!login || !store.isHidden(login)) return false;
     return ownerFromRequest(c)?.login !== login.toLowerCase();
+  };
+
+  /**
+   * La personne connectée est propriétaire revendiquée du login de cette fiche
+   * (§18.1). Pour agir sur la fiche, la requête doit aussi venir du site.
+   */
+  const ownedBy = (c: Context, row: CardRow): boolean => {
+    const login = store.loginOf(row);
+    const owner = login ? ownerFromRequest(c) : null;
+    return !!owner && owner.login === login!.toLowerCase() && sameOrigin(c, baseUrl);
   };
 
   // Public : jamais de montant. ai = ok | budget (plafond du jour atteint) |
@@ -410,10 +422,12 @@ export function createApp(opts: AppOptions) {
     // Spéciale « Top 5 de la semaine » et rang de la semaine, relus à chaque fois (§18.22).
     const { data, week } = withWeekSpecial(store.db, stripToken(row.data));
     const rank = week ? { week } : {};
+    // `mine` : la session est propriétaire du login de la fiche ; le front lui ouvre l'email sans jeton.
+    const extra = { ...rank, ...(ownedBy(c, row) ? { mine: true } : {}) };
     const state: JobState =
       row.kind === "comparison"
-        ? { state: "done", kind: "comparison", comparison: data as ComparisonData, ...rank }
-        : { state: "done", kind: "card", card: data as CardData, ...rank };
+        ? { state: "done", kind: "comparison", comparison: data as ComparisonData, ...extra }
+        : { state: "done", kind: "card", card: data as CardData, ...extra };
     return c.json(state);
   });
 
@@ -463,13 +477,22 @@ export function createApp(opts: AppOptions) {
   });
 
   // POST /api/email : email optionnel après la carte (§6.4). Prolonge la conservation (§11).
+  // Réservé à qui a créé la fiche (son jeton) ou au propriétaire revendiqué de son login :
+  // sinon n'importe qui écraserait l'email d'une fiche et lèverait son expiration.
   app.post("/api/email", async (c) => {
     const parsed = emailSchema.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) {
       return c.json({ ok: false, message: { fr: "Cet email n'a pas l'air valide.", en: "That email doesn't look valid." } }, 400);
     }
-    const { cardId, email } = parsed.data;
-    if (!store.getCard(cardId)) return c.json({ ok: false, message: MESSAGES.not_found }, 404);
+    const { cardId, email, token } = parsed.data;
+    const row = store.getCard(cardId);
+    if (!row) return c.json({ ok: false, message: MESSAGES.not_found }, 404);
+    if (!tokenMatches(token, row.deleteToken) && !ownedBy(c, row)) {
+      return c.json(
+        { ok: false, message: { fr: "Seule la personne qui a créé cette fiche peut y laisser un email.", en: "Only the person who made this sheet can leave an email on it." } },
+        403,
+      );
+    }
     if (!limiter.take("email", clientIp(c), 10)) {
       return c.json({ ok: false, message: MESSAGES.rate_limited }, 429);
     }

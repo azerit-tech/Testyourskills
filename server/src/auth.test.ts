@@ -450,6 +450,40 @@ describe("cookie de session", () => {
   });
 });
 
+describe("ce que la session du propriétaire ouvre sans le jeton de la fiche", () => {
+  const postEmail = (ctx: Ctx, headers: Record<string, string>, cardId = "CardAAAA01") =>
+    ctx.app.request("/api/email", {
+      method: "POST",
+      headers: { "content-type": "application/json", ...headers },
+      body: JSON.stringify({ cardId, email: "lea@example.com" }),
+    });
+
+  it("GET /api/card/:id dit `mine` au propriétaire, et à lui seul", async () => {
+    const ctx = setup();
+    insertCard(ctx.store);
+    insertCard(ctx.store, "CardBBBB02", "autre");
+    const { session } = await claim(ctx);
+    const get = async (id: string, headers: Record<string, string> = {}) =>
+      (await (await ctx.app.request(`/api/card/${id}`, { headers })).json()) as JobState & { mine?: boolean };
+    expect((await get("CardAAAA01", asOwner(session))).mine).toBe(true);
+    expect((await get("CardAAAA01")).mine).toBeUndefined();
+    expect((await get("CardBBBB02", asOwner(session))).mine).toBeUndefined();
+  });
+
+  it("POST /api/email : accepté pour ses fiches, refusé pour celles d'un autre ou depuis un autre site", async () => {
+    const ctx = setup();
+    insertCard(ctx.store);
+    insertCard(ctx.store, "CardBBBB02", "autre");
+    const { session } = await claim(ctx);
+    expect((await postEmail(ctx, {})).status).toBe(403);
+    expect((await postEmail(ctx, asOwner(session), "CardBBBB02")).status).toBe(403);
+    expect((await postEmail(ctx, asOwner(session, { origin: "https://evil.test" }))).status).toBe(403);
+    expect(ctx.store.getCard("CardAAAA01")!.email).toBeNull();
+    expect((await postEmail(ctx, asOwner(session, { origin: BASE }))).status).toBe(200);
+    expect(ctx.store.getCard("CardAAAA01")!.email).toBe("lea@example.com");
+  });
+});
+
 describe("conservation", () => {
   it("expires_at à NULL après revendication, cartes CV des comparaisons comprises, et pour les fiches suivantes", async () => {
     const ctx = setup();

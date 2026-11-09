@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import type { CardData, ComparisonData, Lang, WeekRank } from "../../../shared/types";
 import { declaredOf, STAT_CODES, starsFor } from "../../../shared/types";
 import { pick, useT } from "../i18n";
-import { api, images, isMock, tokens, weekOf } from "../lib/api";
+import { api, images, isMine, isMock, tokens, weekOf } from "../lib/api";
 import { navigate } from "../lib/router";
 import { getPlea } from "../lib/plea";
 import { setPrefill } from "../lib/session";
@@ -628,6 +628,9 @@ export function EmailForm({ cardId }: { cardId: string }) {
       setState("error");
     }
   };
+
+  // Le serveur n'accepte l'email que de qui a créé la fiche (jeton) ou du propriétaire connecté.
+  if (!tokens.get(cardId) && !isMine(cardId)) return null;
 
   return (
     <section className="after-block email" aria-labelledby="email-title">

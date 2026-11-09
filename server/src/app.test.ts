@@ -822,11 +822,11 @@ describe("email et événements", () => {
   it("stocke l'email, lève l'expiration et relaie au format de la landing", async () => {
     const fetchImpl = vi.fn(async () => new Response("{}", { status: 200 }));
     const ctx = setup({}, { leadsEndpoint: "https://leads.test/hook", fetchImpl: fetchImpl as unknown as typeof fetch });
-    const { id } = await generate(ctx);
+    const { id, deleteToken } = await generate(ctx);
     const res = await ctx.app.request("/api/email", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ cardId: id, email: "lea@example.com" }),
+      body: JSON.stringify({ cardId: id, email: "lea@example.com", token: deleteToken }),
     });
     expect(res.status).toBe(200);
     const row = ctx.store.getCard(id)!;
@@ -840,6 +840,25 @@ describe("email et événements", () => {
     expect(lead).toMatchObject({ email: "lea@example.com", role: "", event: "card_email", cardId: id, cardUrl: `https://skills.test/c/${id}` });
     expect(lead.id).toMatch(/^[0-9a-f-]{36}$/);
     expect(new Date(lead.createdAt).toString()).not.toBe("Invalid Date");
+  });
+
+  it("sans le jeton de la fiche : 403, ni email écrit, ni expiration levée, ni relais", async () => {
+    const fetchImpl = vi.fn(async () => new Response("{}", { status: 200 }));
+    const ctx = setup({}, { leadsEndpoint: "https://leads.test/hook", fetchImpl: fetchImpl as unknown as typeof fetch });
+    const { id, deleteToken } = await generate(ctx);
+    const post = (b: unknown) =>
+      ctx.app.request("/api/email", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) });
+    expect((await post({ cardId: id, email: "intrus@example.com" })).status).toBe(403);
+    expect((await post({ cardId: id, email: "intrus@example.com", token: "nope" })).status).toBe(403);
+    const row = ctx.store.getCard(id)!;
+    expect(row.email).toBeNull();
+    expect(row.expiresAt).not.toBeNull();
+    expect(ctx.store.listEvents("card_email")).toHaveLength(0);
+    expect(fetchImpl).not.toHaveBeenCalled();
+    // Le jeton ne s'écrase pas non plus par un tiers une fois l'email posé.
+    expect((await post({ cardId: id, email: "lea@example.com", token: deleteToken })).status).toBe(200);
+    expect((await post({ cardId: id, email: "intrus@example.com" })).status).toBe(403);
+    expect(ctx.store.getCard(id)!.email).toBe("lea@example.com");
   });
 
   it("refuse un email invalide ou une carte inconnue", async () => {
