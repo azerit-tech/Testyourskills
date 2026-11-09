@@ -1073,3 +1073,14 @@ Après chaque fusion, on vérifie la grille suivante. On corrige ce qui manque, 
 - **La photo LinkedIn** : quand la revendication est active, seule la personne connectée comme propriétaire du pseudo peut la poser ; le jeton de la fiche ne suffit plus.
 - **Une comparaison LinkedIn est « prouvée »** quand le GitHub affiche ce LinkedIn ou que la recherche l'a trouvé. Non prouvée, elle reste à son adresse mais ne passe jamais pour la fiche du pseudo et n'entre pas au top.
 - **L'image d'aperçu de l'accueil** (`/og/home.png`) : la promesse et la fiche de la vitrine, en français seulement.
+
+### 18.28 Les décors de profil (9 novembre 2026)
+
+*Tranché par Claude, à la demande de Jacques qui génère les images.*
+
+Chaque profil criminel a son « lieu du crime » : une illustration peinte en aplats, sans personne ni texte, au ratio 3:2. Une quatorzième sert aux fiches sans profil. Le brief complet (format, zones, style, quatre lumières, prompts, grille de tri) est dans `docs/brief-illustrations.md`.
+
+- **Où elles vont** : la tuile de profil sous la fiche et sur la page partagée (le nom en capitales crème et la phrase, en bas à gauche, sur un voile) ; le mur des 13 profils de l'accueil ; le fond des images de partage ; le carton de fin.
+- **Pas dans la fiche** : la photo d'identité et la note couvriraient le sujet, et la fiche reste un SVG léger (texture 3D, PNG).
+- **Fichiers** : les originaux dans `design/profiles/{id}.png`, non versionnés ; les versions web dans `web/public/profiles/`.
+- **Tant qu'une image manque**, la tuile garde un aplat de la teinte de la carte et un palmier ton sur ton.
