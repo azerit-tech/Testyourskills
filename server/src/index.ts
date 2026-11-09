@@ -8,6 +8,7 @@ import { readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createApp, purge } from "./app";
+import { useBudgetDb } from "./ai/budget";
 import { linkedinFromEnv } from "./linkedin";
 import { Store } from "./db";
 import { realDeps } from "./deps";
@@ -54,6 +55,8 @@ const indexHtml = prod
     };
 
 const store = new Store(dbPath);
+// Dépense IA du jour persistée : un redémarrage ne remet pas le plafond à zéro.
+useBudgetDb(store.db);
 const { app, pipeline } = createApp({
   store,
   deps: realDeps,
@@ -87,6 +90,7 @@ const server = serve({ fetch: app.fetch, port }, (info) => {
 const shutdown = async () => {
   server.close();
   await Promise.race([pipeline.drain(), new Promise((r) => setTimeout(r, 8000))]);
+  useBudgetDb(null);
   store.close();
   process.exit(0);
 };

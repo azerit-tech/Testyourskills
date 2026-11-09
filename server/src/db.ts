@@ -91,6 +91,14 @@ CREATE TABLE IF NOT EXISTS ratelimit (
   n   INTEGER NOT NULL,
   PRIMARY KEY (key, day)
 );
+
+CREATE TABLE IF NOT EXISTS ai_spend (
+  day           TEXT PRIMARY KEY, -- AAAA-MM-JJ (UTC)
+  usd           REAL NOT NULL,    -- dépense IA du jour, en dollars
+  input_tokens  INTEGER,
+  output_tokens INTEGER,
+  calls         INTEGER
+);
 `;
 
 function toRow(r: RawRow): CardRow {

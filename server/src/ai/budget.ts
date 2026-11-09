@@ -1,6 +1,10 @@
-// Suivi du coût IA par jour, en mémoire (SPEC §12), alimenté par le `usage`
-// d'OpenRouter. Remis à zéro au changement de jour UTC ou au redémarrage du
-// serveur : c'est un garde-fou, pas une compta.
+// Suivi du coût IA par jour (SPEC §12, §18.0), alimenté par le `usage`
+// d'OpenRouter. Le total du jour UTC est persisté dans SQLite (table `ai_spend`)
+// dès que index.ts branche la base : un redémarrage ne remet pas le compteur à
+// zéro, donc AI_DAILY_BUDGET_USD ne se contourne pas en relançant le serveur.
+// Sans base branchée (tests, scripts), le total vit en mémoire.
+
+import type Database from "better-sqlite3";
 
 /** Champ `usage` d'une réponse OpenRouter (toujours présent). */
 export interface UsageLike {
@@ -48,6 +52,9 @@ interface DayTotals {
 
 let totals: DayTotals = empty(today());
 
+/** Base où persister la dépense, avec ses requêtes préparées. */
+let ledger: { add: Database.Statement; get: Database.Statement } | null = null;
+
 function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -56,10 +63,48 @@ function empty(day: string): DayTotals {
   return { day, usd: 0, inputTokens: 0, outputTokens: 0, calls: 0 };
 }
 
-function current(): DayTotals {
+/** Total en mémoire du jour UTC courant. */
+function memory(): DayTotals {
   const d = today();
   if (totals.day !== d) totals = empty(d);
   return totals;
+}
+
+/**
+ * Branche la base SQLite du serveur (table `ai_spend`, créée par db.ts).
+ * null débranche. Le total déjà en mémoire n'est pas recopié dans la base.
+ */
+export function useBudgetDb(db: Database.Database | null): void {
+  ledger = db
+    ? {
+        add: db.prepare(
+          `INSERT INTO ai_spend (day, usd, input_tokens, output_tokens, calls) VALUES (?, ?, ?, ?, 1)
+           ON CONFLICT(day) DO UPDATE SET
+             usd = usd + excluded.usd,
+             input_tokens = COALESCE(input_tokens, 0) + excluded.input_tokens,
+             output_tokens = COALESCE(output_tokens, 0) + excluded.output_tokens,
+             calls = COALESCE(calls, 0) + 1`,
+        ),
+        get: db.prepare(`SELECT usd, input_tokens, output_tokens, calls FROM ai_spend WHERE day = ?`),
+      }
+    : null;
+}
+
+/** Total du jour : la base fait foi si elle est branchée et lisible, sinon la mémoire. */
+function current(): DayTotals {
+  const mem = memory();
+  if (!ledger) return mem;
+  try {
+    const r = ledger.get.get(mem.day) as
+      | { usd: number; input_tokens: number | null; output_tokens: number | null; calls: number | null }
+      | undefined;
+    if (!r) return empty(mem.day);
+    return { day: mem.day, usd: r.usd, inputTokens: r.input_tokens ?? 0, outputTokens: r.output_tokens ?? 0, calls: r.calls ?? 0 };
+  } catch (err) {
+    // Base fermée ou verrouillée : on garde au moins ce que ce processus a dépensé.
+    console.warn("[ai] budget : lecture de ai_spend impossible :", (err as Error).message);
+    return mem;
+  }
 }
 
 function priceFor(model: string): Price {
@@ -79,11 +124,19 @@ export function costOf(model: string, usage: UsageLike): number {
 
 /** Enregistre la consommation d'un appel. */
 export function recordUsage(model: string, usage: UsageLike): void {
-  const t = current();
-  t.usd += costOf(model, usage);
+  const usd = costOf(model, usage);
+  // La mémoire est toujours tenue : c'est le repli si la base devient illisible.
+  const t = memory();
+  t.usd += usd;
   t.inputTokens += usage.prompt_tokens;
   t.outputTokens += usage.completion_tokens;
   t.calls += 1;
+  if (!ledger) return;
+  try {
+    ledger.add.run(t.day, usd, usage.prompt_tokens, usage.completion_tokens);
+  } catch (err) {
+    console.warn("[ai] budget : écriture dans ai_spend impossible :", (err as Error).message);
+  }
 }
 
 export function dailyBudgetUsd(): number {
@@ -106,7 +159,8 @@ export function aiAvailable(): boolean {
   return Boolean(process.env.OPENROUTER_API_KEY) && withinBudget();
 }
 
-/** Pour les tests uniquement. */
+/** Pour les tests uniquement : remet la mémoire à zéro et débranche la base. */
 export function resetBudgetForTests(): void {
   totals = empty(today());
+  ledger = null;
 }
