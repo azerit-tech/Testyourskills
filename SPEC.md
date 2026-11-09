@@ -726,7 +726,7 @@ Ce qui rend partageable une fiche à une étoile : une identité drôle et un pe
 
 ### 18.3 Le rang qui parle
 
-- « Plus recherché que 83 % des devs Python sourcés par Azerit » et « Chef d'accusation rare : 2 % des fiches ». La référence, c'est les devs que les entreprises recrutent vraiment : le pourcentage est exigeant, et c'est le message.
+- « Devant 83 % des devs Python sourcés par Azerit » et « Chef d'accusation rare : 2 % des fiches ». La référence, c'est les devs que les entreprises recrutent vraiment : le pourcentage est exigeant, et c'est le message.
 - **Référence** : `scripts/percentiles.ts`, **lancé par Jacques lui-même** (les dumps de sourcing sont des données personnelles, refusées aux agents, §16.1). Le script passe environ 1 000 profils des dumps dans le moteur, IA comprise (environ 2 $), et n'écrit que des quantiles agrégés dans `data/percentiles.json` : les 99 centiles de la note globale, en tout, par langage et par poste, et la fréquence de chaque statut. Aucun login ni aucun fait individuel n'en sort. C'est aussi la calibration du §4.6.
 - **Affichage** : le meilleur des deux groupes (langage ou poste) s'il compte au moins 100 profils de référence, sinon le rang global. C'est un choix fixe, donc explicable. Une ligne sur la fiche sous la note (« Top 17 % Python ») et dans le texte de partage ; la rareté d'un chef d'accusation s'affiche sous 5 %.
 - **Lecture IA de la référence** (décidé le 9 novembre 2026) : le script fait lire le code par l'IA sur **tous** les profils (`--ai-sample` au moins égal au nombre de profils, environ 2 $ pour 1 000), plutôt que sur un échantillon avec un TEC estimé pour les autres, qui resserrait les notes et rendait les rangs extrêmes trop flatteurs.
@@ -750,7 +750,7 @@ Remplace « les cinq meilleures cartes de la semaine » du §1. Ce n'est pas une
 
 ### 18.5 L'accueil et « Tu es en course »
 
-- **L'accueil** : la promesse devient « Ton GitHub remplace ton CV. Les plus recherchés passent un entretien. », puis le champ, puis la rangée des logos partenaires. Sous le champ (sous la fiche de Jacques sur mobile), les primes ouvertes défilent à l'horizontale : logo, poste, contrat, places, « J-12 ». La règle « pas un mot de plus » du §6.1 tient : ce sont des cartes, pas des paragraphes.
+- **L'accueil** : la promesse devient « Ton GitHub remplace ton CV. Le haut du classement décroche un entretien. », puis le champ, puis la rangée des logos partenaires. Sous le champ (sous la fiche de Jacques sur mobile), les primes ouvertes défilent à l'horizontale : logo, poste, contrat, places, « J-12 ». La règle « pas un mot de plus » du §6.1 tient : ce sont des cartes, pas des paragraphes.
 - **« Tu es en course »**, en tête de l'après-fiche (`After.tsx`), avant même de s'inscrire : « Tu serais 7e sur 143 pour Stagiaire backend chez X ». Le rang hypothétique donne envie de concourir. Un bouton « Concourir » mène à la revendication puis au consentement.
 
 ### 18.6 « Dénonce un complice »
@@ -758,18 +758,18 @@ Remplace « les cinq meilleures cartes de la semaine » du §1. Ce n'est pas une
 La boucle principale : l'obligation de répondre fait venir les gens. Tranche le point ouvert du §15 (fiche sur le pseudo d'un autre) : oui, en mode taquin.
 
 - **Parcours** : juste après les boutons de partage, « Dénonce un complice », un champ de pseudo et trois suggestions : les contributeurs des repos actifs du joueur, que la collecte connaît déjà (`collect.ts`). La fiche du complice sort par le moteur habituel, en mode taquin uniquement ; la garde à vue reste réservée au propriétaire. Limite : cinq dénonciations par jour et par adresse IP.
-- **Le texte de partage tague la cible** : son compte X s'il figure sur son profil GitHub (champ `twitter_username` de l'API), son nom sinon (LinkedIn n'accepte pas de texte prérempli : il part dans le presse-papier, comme aujourd'hui). « @X est recherché ★★★, Oiseau de nuit. Chef d'accusation : … Il a le droit de faire appel : {lien} ».
+- **Le texte de partage tague la cible** : son compte X s'il figure sur son profil GitHub (champ `twitter_username` de l'API), son nom sinon (LinkedIn n'accepte pas de texte prérempli : il part dans le presse-papier, comme aujourd'hui). « @X est dans le viseur ★★★, Oiseau de nuit. Chef d'accusation : … Droit de faire appel : {lien} ».
 - **La cible arrive** sur `/c/:id` avec un bandeau « Avis de recherche à ton nom » et « Appeler mon avocat » : elle revendique (§18.1), puis voit les pièces, masque, passe en garde à vue, concourt ou dénonce en retour.
-- **Le nom du dénonciateur** n'apparaît que s'il a revendiqué sa propre fiche (« Dénoncé par @Y ») ; sinon, « par un complice anonyme ».
+- **Le nom du dénonciateur** n'apparaît que s'il a revendiqué sa propre fiche (« Dénonciation : @Y ») ; sinon, « Dénonciation anonyme ».
 - **Données** : `cards.denounced_by` ; événements `denounce_sent`, `denounce_landed`, `denounce_claimed`.
 
 ### 18.7 La page partagée
 
 Là où arrive presque tout le monde, depuis LinkedIn.
 
-- En tête : « @X est recherché ★★★★ · Oiseau de nuit », la fiche, puis « Voir l'arrestation » : six secondes de la révélation, des portes à la fiche, avec la scène existante démarrée par `seek` à l'ouverture des portes, et sur les téléphones trop faibles une version animée en CSS.
+- En tête : « @X est dans le viseur ★★★★ · Oiseau de nuit », la fiche, puis « Voir l'arrestation » : six secondes de la révélation, des portes à la fiche, avec la scène existante démarrée par `seek` à l'ouverture des portes, et sur les téléphones trop faibles une version animée en CSS.
 - Puis « Et toi ? » (le champ du §6.1) et, dès qu'on a sa propre fiche, une ligne de comparaison : « Toi 78 · @X 71 : une étoile d'avance ». C'est le face-à-face du pauvre, en attendant celui du §18.9.
-- Balises OG : « @X est recherché ★★★★ — Oiseau de nuit ».
+- Balises OG : « @X est dans le viseur ★★★★ — Oiseau de nuit ».
 
 ### 18.8 Le clip vertical (après le lancement)
 
@@ -810,7 +810,7 @@ Là où arrive presque tout le monde, depuis LinkedIn.
 
 Règle : **chaque détail sort d'un fait** (même entrée, même scène, comme la fiche) ou **d'un choix de la personne**. Rien n'est deviné. En particulier, jamais de genre déduit du prénom ou de la photo : on se tromperait et on blesserait quelqu'un, et le principe 4 l'interdit.
 
-- **Le personnage, au choix.** Pendant l'interrogatoire, l'attente devient un écran de sélection de personnage façon roue du jeu : « Choisis ton suspect », trois ou quatre personnages (au moins une femme, un homme, et des carrures, des âges et des couleurs de peau variés), un tap et c'est pris. Ça occupe un temps mort et c'est très dans l'univers. Sans choix, le premier de la roue. Le choix est mémorisé dans le navigateur et, pour une fiche revendiquée, sur le serveur. Les textes ne s'accordent jamais au personnage : ils restent épicènes (§18.2). **Technique** : d'autres personnages Character Creator (Sketchfab ou Renderpeople, CC BY), qui partagent le squelette de Jungle Jim (`hip`, `spine_01`…) pour que `player.ts` (cinématique inverse, frappe, demi-tour, bras croisés) les anime sans changement ; à préparer par `tools/bake/prepare.py` ; les ombres du précalcul ne changent pas, elles sont celles du bureau.
+- **Le personnage, au choix.** Pendant l'interrogatoire, l'attente devient un écran de sélection de personnage façon roue du jeu : « Choisis ton personnage », trois ou quatre personnages (au moins une femme, un homme, et des carrures, des âges et des couleurs de peau variés), un tap et c'est pris. Ça occupe un temps mort et c'est très dans l'univers. Sans choix, le premier de la roue. Le choix est mémorisé dans le navigateur et, pour une fiche revendiquée, sur le serveur. Les textes ne s'accordent jamais au personnage : ils restent épicènes (§18.2). **Technique** : d'autres personnages Character Creator (Sketchfab ou Renderpeople, CC BY), qui partagent le squelette de Jungle Jim (`hip`, `spine_01`…) pour que `player.ts` (cinématique inverse, frappe, demi-tour, bras croisés) les anime sans changement ; à préparer par `tools/bake/prepare.py` ; les ombres du précalcul ne changent pas, elles sont celles du bureau.
 - **Les écrans** : le graphe de contributions est aujourd'hui pseudo-aléatoire (`drawGraph`, `workstation.ts`) ; il devient son vrai calendrier des 26 dernières semaines. L'écran de code montre l'extrait que l'IA a cité (`evidence_file` et `evidence_quote`, déjà dans la lecture). Le terminal lance ses vrais noms de repos et, si « Tests : bientôt », affiche « 0 tests found ».
 - **Les post-it** : ses vrais messages de commit paresseux (« fix2 », « final fix »).
 - **Les plantes** : une plante fanée par repo abandonné quand « {n} repos, {m} vivants » s'applique ; verte sinon.
@@ -917,7 +917,7 @@ Ce qui est retenu :
 - **La gemme Azerit est en facettes plates.**
 - **Page partagée :** « Avis de recherche : @X », et en phrase « @X est dans le viseur ».
 
-**La spéciale « Les 5 plus recherchés » devient « Top 5 de la semaine »** (EN « This week's top 5 »). Tous les autres textes qui s'accordent avec la personne sont réécrits en tournure épicène. Claude tranche la liste et l'applique (consigne de Jacques : décider, pas demander).
+**La spéciale « Les 5 plus recherchés » devient « Top 5 de la semaine »** (EN « This week's top 5 »). Tous les autres textes qui s'accordent avec la personne sont réécrits en tournure épicène. Claude tranche la liste et l'applique (consigne de Jacques : décider, pas demander). Exemples : « Mainteneur » → « Maintient des projets », « Loup solitaire » → « Sans bande », « Nouveau en ville » → « Débarque en ville », « CTO autoproclamé » → « CTO sur parole », « n suspects avant toi » → « n dossiers devant toi », et en phrase « @X est dans le viseur ».
 
 ### 18.19 Grille de relecture, à chaque phase
 
