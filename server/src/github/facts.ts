@@ -97,6 +97,12 @@ export interface GithubFacts {
     weeksActive: number;
     weeks: number;
     totalContributions: number;
+    /**
+     * Contributions jour par jour sur le calendrier (environ 371 jours), du plus
+     * ancien au plus récent ; `start` est le premier jour (AAAA-MM-JJ). Sert aux
+     * trouvailles (§18.26) : série, jour de la semaine. Absent des faits d'avant.
+     */
+    days?: { start: string; counts: number[] };
   };
   /** Contributions par fenêtre glissante d'un an (0 = les 12 derniers mois), null si indisponible. */
   activityByYear: { yearsAgo: number; contributions: number }[] | null;
@@ -107,7 +113,14 @@ export interface GithubFacts {
   /** PR fusionnées chez les autres (`type:pr author:X is:merged -user:X`). */
   externalMergedPRs: number;
   /** Plus ancien commit de l'utilisateur dans un repo qui en compte au moins 10. */
-  firstRealCommit: { repo: string; date: string } | null;
+  firstRealCommit: {
+    repo: string;
+    date: string;
+    /** Le commit lui-même (preuve des trouvailles, §18.26) ; absent des faits d'avant. */
+    oid?: string;
+    /** Décalage UTC de ce commit (minutes), lu dans son patch ; null si illisible. */
+    offsetMinutes?: number | null;
+  } | null;
   /** Arborescences des repos actifs. */
   trees: RepoTree[];
   /**

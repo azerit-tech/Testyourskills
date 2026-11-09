@@ -38,7 +38,7 @@ describe("complices suggérés (§18.6)", () => {
     const many = Array.from({ length: 10 }, (_, i) => user(`dev${i}`, 100 - i));
     const got = pickAccomplices([null, undefined, [{ login: 42 }, { login: "bad name" }, ...many]], "me");
     expect(got).toHaveLength(6);
-    expect(got[0]).toEqual({ login: "dev0", avatarUrl: "https://avatars.githubusercontent.com/u/4" });
+    expect(got[0]).toEqual({ login: "dev0", avatarUrl: "https://avatars.githubusercontent.com/u/4", commits: 100 });
   });
 
   it("n'accepte qu'un avatar en https, sinon celui de github.com", () => {

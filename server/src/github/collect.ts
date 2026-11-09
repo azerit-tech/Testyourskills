@@ -120,12 +120,16 @@ export async function collectGithub(
   });
   const yearsP = userP.then((u) => soft(ctx, () => fetchYears(ctx, user, now, Date.parse(u.created_at))));
   // Premier vrai commit : parmi les repos les plus anciens, n'attend que la liste.
-  const firstP = Promise.all([userP, reposP]).then(([u, repos]) =>
-    findFirstRealCommit(
+  const firstP = Promise.all([userP, reposP]).then(async ([u, repos]) =>
+    withOffset(
       ctx,
-      [...repos].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).slice(0, LIMITS.oldestCandidates),
-      u.login,
-      u.node_id,
+      repos,
+      await findFirstRealCommit(
+        ctx,
+        [...repos].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).slice(0, LIMITS.oldestCandidates),
+        u.login,
+        u.node_id,
+      ),
     ),
   );
   // Évite les rejets non observés si une étape lève avant l'attente finale.
@@ -243,11 +247,15 @@ export async function collectGithub(
   // Repli rare : aucun vieux repo n'a 10 commits, on cherche dans les repos actifs.
   const firstRealCommit =
     firstOld ??
-    (await findFirstRealCommit(
+    (await withOffset(
       ctx,
-      active.filter((r) => (r.commitCount ?? 0) >= SCORING.github.XP.sufficientRepoCommits),
-      u.login,
-      u.node_id,
+      repos,
+      await findFirstRealCommit(
+        ctx,
+        active.filter((r) => (r.commitCount ?? 0) >= SCORING.github.XP.sufficientRepoCommits),
+        u.login,
+        u.node_id,
+      ),
     ));
 
   for (const t of trees) {
@@ -290,6 +298,7 @@ export async function collectGithub(
       weeksActive: weeks.filter((w) => w > 0).length,
       weeks: weeks.length,
       totalContributions: cal?.total ?? 0,
+      ...(cal?.days ? { days: cal.days } : {}),
     },
     activityByYear: years,
     commits: commitsRes.commits,
@@ -341,12 +350,25 @@ async function findFirstRealCommit(ctx: Ctx, candidates: GithubRepo[], login: st
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
     .slice(0, LIMITS.firstCommitRepos);
   const dates = await Promise.all(eligible.map((r) => soft(ctx, () => oldestUserCommit(ctx, r, { count: r.commitCount! }, login, userId))));
-  let first: { repo: string; date: string } | null = null;
+  let first: { repo: string; date: string; oid?: string } | null = null;
   for (let i = 0; i < eligible.length; i++) {
     const d = dates[i];
-    if (d && (!first || Date.parse(d) < Date.parse(first.date))) first = { repo: eligible[i].name, date: d };
+    if (d && (!first || Date.parse(d.date) < Date.parse(first.date)))
+      first = { repo: eligible[i].name, date: d.date, ...(d.oid ? { oid: d.oid } : {}) };
   }
   return first;
+}
+
+/**
+ * L'heure locale du premier commit (§18.26) : son propre décalage UTC, lu dans
+ * l'en-tête de son patch (4 Ko au plus), plutôt que celui d'aujourd'hui.
+ */
+async function withOffset<T extends { repo: string; oid?: string }>(ctx: Ctx, repos: GithubRepo[], first: T | null) {
+  if (!first?.oid) return first;
+  const full = repos.find((r) => r.name === first.repo)?.fullName;
+  if (!full) return first;
+  const head = await soft(ctx, () => headOf(ctx, `https://github.com/${full}/commit/${first.oid}.patch`, /^Date:.*$/m, 4096));
+  return { ...first, offsetMinutes: head ? parsePatchOffset(head) : null };
 }
 
 function uniqRepos(rs: GithubRepo[]): GithubRepo[] {
@@ -362,13 +384,15 @@ interface CalendarResult {
   /** Contributions par semaine, de la plus ancienne à la plus récente. */
   weeks: number[];
   byRepo: { owner: string; name: string; count: number }[];
+  /** Jour par jour, du plus ancien au plus récent (§18.26). Absent si les dates ne se suivent pas. */
+  days?: { start: string; counts: number[] };
 }
 
 async function fetchCalendar(ctx: Ctx, login: string): Promise<CalendarResult | null> {
   const q = `query($login:String!){
     user(login:$login){ id
       contributionsCollection{
-        contributionCalendar{ totalContributions weeks{ contributionDays{ contributionCount } } }
+        contributionCalendar{ totalContributions weeks{ contributionDays{ contributionCount date } } }
         commitContributionsByRepository(maxRepositories:25){ repository{ name owner{ login } } contributions{ totalCount } }
       }
     }
@@ -377,7 +401,7 @@ async function fetchCalendar(ctx: Ctx, login: string): Promise<CalendarResult | 
     user: {
       id: string;
       contributionsCollection: {
-        contributionCalendar: { totalContributions: number; weeks: { contributionDays: { contributionCount: number }[] }[] };
+        contributionCalendar: { totalContributions: number; weeks: { contributionDays: { contributionCount: number; date?: string }[] }[] };
         commitContributionsByRepository: { repository: { name: string; owner: { login: string } }; contributions: { totalCount: number } }[];
       };
     } | null;
@@ -385,7 +409,9 @@ async function fetchCalendar(ctx: Ctx, login: string): Promise<CalendarResult | 
   const { data } = await graphql<D>(ctx, q, { login });
   if (!data?.user) return null;
   const cc = data.user.contributionsCollection;
+  const flat = cc.contributionCalendar.weeks.flatMap((w) => w.contributionDays);
   return {
+    days: dailyCounts(flat),
     userId: data.user.id,
     total: cc.contributionCalendar.totalContributions,
     weeks: cc.contributionCalendar.weeks.map((w) => w.contributionDays.reduce((s, d) => s + d.contributionCount, 0)),
@@ -395,6 +421,17 @@ async function fetchCalendar(ctx: Ctx, login: string): Promise<CalendarResult | 
       count: c.contributions.totalCount,
     })),
   };
+}
+
+/** Le calendrier jour par jour, gardé seulement si chaque jour suit le précédent (pas de trou, pas de date illisible). */
+function dailyCounts(days: { contributionCount: number; date?: string }[]): CalendarResult["days"] {
+  const start = days[0]?.date;
+  if (!start || !/^\d{4}-\d{2}-\d{2}$/.test(start)) return undefined;
+  const t0 = Date.parse(`${start}T00:00:00Z`);
+  for (let i = 0; i < days.length; i++) {
+    if (days[i]!.date !== new Date(t0 + i * DAY).toISOString().slice(0, 10)) return undefined;
+  }
+  return { start, counts: days.map((d) => d.contributionCount) };
 }
 
 /** PR fusionnées dans les repos des autres. */
@@ -558,29 +595,35 @@ async function fetchUserCommits(ctx: Ctx, r: GithubRepo, login: string, userId: 
     .map((c) => ({ repo: r.name, oid: c.sha, message: c.commit.message.split("\n")[0].slice(0, 100), date: c.commit.author.date }));
 }
 
-/** Date du plus ancien commit de l'utilisateur dans un repo (curseur « oid N » de l'historique). */
-async function oldestUserCommit(ctx: Ctx, r: GithubRepo, c: { count: number }, login: string, userId: string): Promise<string | null> {
+/** Date et oid du plus ancien commit de l'utilisateur dans un repo (curseur « oid N » de l'historique). */
+async function oldestUserCommit(
+  ctx: Ctx,
+  r: GithubRepo,
+  c: { count: number },
+  login: string,
+  userId: string,
+): Promise<{ date: string; oid?: string } | null> {
+  const found = (n: HistoryNode | undefined) => (n ? { date: n.authoredDate, oid: n.oid } : null);
   if (userId && c.count <= LIMITS.hugeHistory) {
     const authorArg = `author:{id:${JSON.stringify(userId)}}`;
     const first = await soft(ctx, () => history(ctx, r, `first:1, ${authorArg}`, "oid authoredDate", 5000));
     if (first) {
       if (first.totalCount === 0) return null;
-      if (first.totalCount === 1) return first.nodes[0]?.authoredDate ?? null;
+      if (first.totalCount === 1) return found(first.nodes[0]);
       const last = await soft(ctx, () =>
         history(ctx, r, `first:1, ${authorArg}, after:${JSON.stringify(`${first.head} ${first.totalCount - 2}`)}`, "oid authoredDate", 5000),
       );
-      if (last?.nodes[0]) return last.nodes[0].authoredDate;
+      if (last?.nodes[0]) return found(last.nodes[0]);
     }
   }
   // Repli : plus ancien commit du repo, retenu s'il est de l'utilisateur.
-  const res = await rest<{ commit: { author: { date: string } }; author: { login: string } | null; committer: { login: string } | null }[]>(
-    ctx,
-    `/repos/${r.fullName}/commits?per_page=1&page=${c.count}&sha=${encodeURIComponent(r.defaultBranch)}`,
-  );
+  const res = await rest<
+    { sha?: string; commit: { author: { date: string } }; author: { login: string } | null; committer: { login: string } | null }[]
+  >(ctx, `/repos/${r.fullName}/commits?per_page=1&page=${c.count}&sha=${encodeURIComponent(r.defaultBranch)}`);
   const o = res.data?.[0];
   if (!o) return null;
   const mine = [o.author?.login, o.committer?.login].some((l) => l?.toLowerCase() === login.toLowerCase());
-  return mine ? o.commit.author.date : null;
+  return mine ? { date: o.commit.author.date, ...(typeof o.sha === "string" ? { oid: o.sha } : {}) } : null;
 }
 
 /** Décalage UTC dominant, lu dans l'en-tête Date des patchs (l'API ne donne que l'UTC). */

@@ -5,6 +5,8 @@
 export interface Accomplice {
   login: string;
   avatarUrl: string;
+  /** Total de ses commits sur les repos actifs du joueur (« Complice principal », §18.26) ; absent des faits d'avant. */
+  commits?: number;
 }
 
 /** Une ligne de GET /repos/{repo}/contributors. */
@@ -51,5 +53,5 @@ export function pickAccomplices(lists: (RawContributor[] | null | undefined)[], 
   return [...seen.values()]
     .sort((x, y) => y.total - x.total || x.first - y.first)
     .slice(0, max)
-    .map((v) => v.a);
+    .map((v) => ({ ...v.a, commits: v.total }));
 }
