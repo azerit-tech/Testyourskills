@@ -69,7 +69,7 @@ export function buzzPer100(reading: CvReading, counts: CvTextCounts): number {
   return (total / counts.words) * 100;
 }
 
-const SENIORITY_FR: Record<string, string> = { junior: "junior", mid: "confirmé", senior: "senior", lead: "lead", staff: "staff" };
+const SENIORITY_FR: Record<string, string> = { junior: "junior", mid: "intermédiaire", senior: "senior", lead: "lead", staff: "staff" };
 
 const uniq = (xs: string[]) => [...new Set(xs.map((x) => x.trim().toLowerCase()).filter(Boolean))];
 

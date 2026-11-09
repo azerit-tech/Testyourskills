@@ -212,7 +212,7 @@ export const mockApi = {
     }
     if (lower === "busy") {
       throw new ApiError(503, "busy", {
-        fr: "Le commissariat déborde : trop de suspects d'un coup, GitHub nous fait souffler. Reviens dans 12 minutes.",
+        fr: "Le commissariat déborde : trop de dossiers d'un coup, GitHub nous fait souffler. Reviens dans 12 minutes.",
         en: "The station is overflowing: too many suspects at once, GitHub is making us take a breather. Come back in 12 minutes.",
       });
     }

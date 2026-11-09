@@ -544,7 +544,7 @@ describe("masquer", () => {
     const refused = await post();
     expect(refused.status).toBe(410);
     const body = (await refused.json()) as JobState;
-    expect(body).toMatchObject({ state: "error", code: "gone", message: { fr: expect.stringContaining("Ce dev a quitté la ville"), en: expect.stringContaining("left town") } });
+    expect(body).toMatchObject({ state: "error", code: "gone", message: { fr: expect.stringContaining("Ce dossier a quitté la ville"), en: expect.stringContaining("left town") } });
 
     // CV + pseudo masqué : refusé aussi.
     const form = new FormData();

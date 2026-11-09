@@ -152,7 +152,7 @@ describe("règles GitHub", () => {
     expect(ids).toContain("gh_framework_hopper");
   });
 
-  it("contributeur fantôme : aucune PR externe, compte de 3 ans ou plus", () => {
+  it("contributions fantômes : aucune PR externe, compte de 3 ans ou plus", () => {
     expect(all(facts({ externalMergedPRs: 0 }))).toContain("gh_ghost_contributor");
     const young = facts({ externalMergedPRs: 0 });
     young.profile.createdAt = daysAgo(365);

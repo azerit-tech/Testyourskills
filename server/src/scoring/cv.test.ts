@@ -67,7 +67,7 @@ describe("barème CV §4.5", () => {
     expect(stat(scoreCv(cvReading({ describes_ai_project: true }), counts, opts), "BUZZ").value).toBe(65);
   });
 
-  it("CTO autoproclamé : titre CTO et entreprise non identifiable", () => {
+  it("CTO sur parole : titre CTO et entreprise non identifiable", () => {
     const role = (company: string) => [{ title: "CTO & co-founder", company, start: "2024-01", end: null, responsibilities: [] }];
     expect(scoreCv(cvReading({ roles: role("Stealth Startup") }), cvCounts(), opts).position).toBe("CTO");
     expect(scoreCv(cvReading({ roles: role("") }), cvCounts(), opts).position).toBe("CTO");
@@ -98,7 +98,7 @@ describe("barème CV §4.5", () => {
     expect(scoreCv(noYear, cvCounts(), opts).statuses.find((x) => x.id === "cv_ai_title")?.label.fr).toBe("A ajouté IA à son titre");
     expect(ids(scoreCv(cvReading({ title_mentions_ai: true, describes_ai_project: true }), cvCounts(), opts))).not.toContain("cv_ai_title");
     const passion = scoreCv(cvReading(), cvCounts({ passionCount: 3 }), opts).statuses.find((x) => x.id === "cv_passion");
-    expect(passion?.label.fr).toBe("Passionné (mentionné 3 fois)");
+    expect(passion?.label.fr).toBe("Passion citée 3 fois");
   });
 
   it("écarts avec GitHub : Senior depuis le CV, CV plus long que ses README", () => {

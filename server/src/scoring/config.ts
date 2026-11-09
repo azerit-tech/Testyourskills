@@ -99,7 +99,7 @@ export interface BuzzwordsConfig {
   words: { fr: string[]; en: string[] };
   /** Mentions d'IA : comptées comme mot creux seulement si aucun projet IA n'est décrit. */
   ai: { caseSensitive: string[]; caseInsensitive: string[] };
-  /** Racines comptées pour « Passionné (mentionné {n} fois) ». */
+  /** Racines comptées pour « Passion citée {n} fois ». */
   passionStems: string[];
 }
 

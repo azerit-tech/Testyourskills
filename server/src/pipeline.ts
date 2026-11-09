@@ -120,11 +120,11 @@ export const MESSAGES: Record<MessageKey, Fact> = {
     en: "The station is closed for tonight. Come back tomorrow.",
   },
   busy: {
-    fr: "Le commissariat déborde : trop de suspects d'un coup, GitHub nous fait souffler. Reviens dans quelques minutes.",
+    fr: "Le commissariat déborde : trop de dossiers d'un coup, GitHub nous fait souffler. Reviens dans quelques minutes.",
     en: "The station is overflowing: too many suspects at once, GitHub is making us take a breather. Come back in a few minutes.",
   },
   gone: {
-    fr: "Ce dev a quitté la ville : sa fiche a été retirée par son propriétaire.",
+    fr: "Ce dossier a quitté la ville : fiche retirée par son propriétaire.",
     en: "This dev has left town: their sheet was withdrawn by its owner.",
   },
   withdrawn: {
@@ -172,7 +172,7 @@ export function isAiClosed(err: unknown): boolean {
 export function busyError(waitMs: number): JobError {
   const n = Math.max(1, Math.ceil(waitMs / 60_000));
   return new JobError("busy", {
-    fr: `Le commissariat déborde : trop de suspects d'un coup, GitHub nous fait souffler. Reviens dans ${n} minute${n > 1 ? "s" : ""}.`,
+    fr: `Le commissariat déborde : trop de dossiers d'un coup, GitHub nous fait souffler. Reviens dans ${n} minute${n > 1 ? "s" : ""}.`,
     en: `The station is overflowing: too many suspects at once, GitHub is making us take a breather. Come back in ${n} minute${n > 1 ? "s" : ""}.`,
   });
 }

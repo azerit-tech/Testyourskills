@@ -51,7 +51,7 @@
     },
     {
       "id": "gh_ghost_contributor", "source": "github", "tone": "negative", "rule": "ghost_contributor", "params": { "minAccountYears": 3 },
-      "label": { "fr": "Contributeur fantôme", "en": "Ghost contributor" },
+      "label": { "fr": "Contributions fantômes", "en": "Ghost contributor" },
       "ruleText": { "fr": "Aucune PR fusionnée chez les autres en {n} ans de compte.", "en": "No merged PR elsewhere in {n} years on GitHub." }
     },
     {
@@ -61,12 +61,12 @@
     },
     {
       "id": "gh_stars_mom", "source": "github", "tone": "negative", "rule": "few_stars", "params": { "maxStars": 2, "minRepos": 5 },
-      "label": { "fr": "Stars : sa mère et lui", "en": "Stars: mom and me" },
+      "label": { "fr": "Stars : la famille", "en": "Stars: mom and me" },
       "ruleText": { "fr": "{n} star(s) au total sur {m} repos.", "en": "{n} star(s) in total across {m} repos." }
     },
     {
       "id": "gh_polyglot", "source": "github", "tone": "negative", "rule": "polyglot", "params": { "atLeast": 6 },
-      "label": { "fr": "Polyglotte (ou indécis)", "en": "Polyglot (or undecided)" },
+      "label": { "fr": "Polyglotte (ou girouette)", "en": "Polyglot (or undecided)" },
       "ruleText": { "fr": "{n} langages avec 10 Ko de code ou plus (seuil {t}).", "en": "{n} languages with 10 KB of code or more (threshold {t})." }
     },
     {
@@ -81,7 +81,7 @@
     },
     {
       "id": "gh_accepted_elsewhere", "source": "github", "tone": "positive", "rule": "external_prs", "params": { "atLeast": 10 },
-      "label": { "fr": "Accepté chez les autres", "en": "Merged elsewhere" },
+      "label": { "fr": "PR acceptées ailleurs", "en": "Merged elsewhere" },
       "ruleText": { "fr": "{n} PR fusionnées dans les repos des autres (seuil {t}).", "en": "{n} PRs merged into other people's repos (threshold {t})." }
     },
     {
@@ -91,12 +91,12 @@
     },
     {
       "id": "gh_read_by_others", "source": "github", "tone": "positive", "rule": "stars_total", "params": { "atLeast": 100 },
-      "label": { "fr": "Lu par d'autres", "en": "Read by others" },
+      "label": { "fr": "Code lu par d'autres", "en": "Read by others" },
       "ruleText": { "fr": "{n} stars cumulées (seuil {t}).", "en": "{n} total stars (threshold {t})." }
     },
     {
       "id": "gh_maintainer", "source": "github", "tone": "positive", "rule": "maintainer", "params": { "atLeast": 10 },
-      "label": { "fr": "Mainteneur", "en": "Maintainer" },
+      "label": { "fr": "Maintient des projets", "en": "Maintainer" },
       "ruleText": { "fr": "{m} : {n} contributeurs externes (seuil {t}).", "en": "{m}: {n} outside contributors (threshold {t})." }
     },
 
@@ -117,12 +117,12 @@
     },
     {
       "id": "cv_passion", "source": "cv", "tone": "negative", "rule": "passion", "params": { "atLeast": 2 },
-      "label": { "fr": "Passionné (mentionné {n} fois)", "en": "Passionate (mentioned {n} times)" },
+      "label": { "fr": "Passion citée {n} fois", "en": "Passionate (mentioned {n} times)" },
       "ruleText": { "fr": "« passion… » apparaît {n} fois (seuil {t}).", "en": "\"passion…\" appears {n} times (threshold {t})." }
     },
     {
       "id": "cv_expert_frameworks", "source": "cv", "tone": "negative", "rule": "many_technos_listed", "params": { "atLeast": 12 },
-      "label": { "fr": "Expert en {n} frameworks (d'après le CV)", "en": "Expert in {n} frameworks (per the CV)" },
+      "label": { "fr": "{n} frameworks maîtrisés (d'après le CV)", "en": "Expert in {n} frameworks (per the CV)" },
       "ruleText": { "fr": "{n} technos listées (seuil {t}).", "en": "{n} technologies listed (threshold {t})." }
     },
     {
@@ -133,7 +133,7 @@
     },
     {
       "id": "cv_says_what", "source": "cv", "tone": "positive", "rule": "described_technos", "params": { "atLeast": 5 },
-      "label": { "fr": "Dit ce qu'il fait", "en": "Says what they do" },
+      "label": { "fr": "Des faits, pas des mots", "en": "Says what they do" },
       "ruleText": { "fr": "{n} technos rattachées à une responsabilité concrète (seuil {t}).", "en": "{n} technologies tied to a concrete responsibility (threshold {t})." }
     },
 
@@ -169,7 +169,7 @@
     },
     {
       "id": "ai_typed", "source": "ai", "tone": "positive", "rule": "ai", "params": {},
-      "label": { "fr": "Typé jusqu'au bout", "en": "Typed all the way down" },
+      "label": { "fr": "Typage jusqu'au bout", "en": "Typed all the way down" },
       "ruleText": { "fr": "Choisi par l'IA après lecture du code.", "en": "Picked by the AI after reading the code." }
     },
     {

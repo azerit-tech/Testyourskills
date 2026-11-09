@@ -21,9 +21,9 @@ const fr = {
     skipToContent: "Aller au contenu",
   },
   home: {
-    kicker: "Jugé par une IA sur ton GitHub · 10 s",
+    kicker: "Une IA juge ton GitHub · 10 s",
     titleA: "Ta fiche de dev.",
-    titleB: "Les 5 plus recherchés ont un entretien.",
+    titleB: "Le haut du classement décroche un entretien.",
     tabGithub: "Ton GitHub",
     tabCv: "Ton CV",
     tabsLabel: "Source de la fiche",
@@ -68,7 +68,7 @@ const fr = {
     silver: "Haute surveillance",
     gold: "Menace publique",
     icon: "Priorité absolue",
-    wonderkid: "Nouveau en ville",
+    wonderkid: "Débarque en ville",
     flashback: "Affaire classée",
     totw: "Top 5 de la semaine",
   } satisfies Record<CardStyle, string>,
@@ -77,7 +77,7 @@ const fr = {
     title: "Chargement du dossier",
     elapsed: "écoulé",
     /** Fiche en file d'attente : n fiches passent avant (rang dans la file). */
-    queue: (n: number) => (n === 1 ? "1 suspect avant toi au commissariat" : `${n} suspects avant toi au commissariat`),
+    queue: (n: number) => (n === 1 ? "1 dossier devant toi au commissariat" : `${n} dossiers devant toi au commissariat`),
     progress: {
       lazy_commits: (n?: number) => `Lecture de tes ${n ?? "nombreux"} commits « wip »…`,
       buzzwords: (n?: number) => `Comptage des buzzwords… ${n ?? 0} pour l'instant`,
@@ -146,7 +146,7 @@ const fr = {
       leagueBoth: "GitHub × CV",
       position: "Spécialité",
       club: "Affiliation",
-      freeAgent: "Loup solitaire",
+      freeAgent: "Sans bande",
       idle: "AZERIT · DOSSIER OUVERT",
       graph: "contributions · 52 semaines",
     },
@@ -163,7 +163,7 @@ const fr = {
     EMB: "Embarqué",
     PM: "Product",
     DESIGN: "Design",
-    CTO: "CTO autoproclamé",
+    CTO: "CTO sur parole",
   } satisfies Record<Position, string>,
   result: {
     yourCard: "Ta fiche",
@@ -247,7 +247,7 @@ const fr = {
     },
     withdrawn: {
       title: "Fiche retirée par son propriétaire",
-      text: "Ce dev a quitté la ville. Il ne reste rien à voir ici.",
+      text: "Ce dossier a quitté la ville. Plus rien à voir ici.",
       mine: "C'est ta fiche ? Connecte-toi avec GitHub",
     },
     email: {
@@ -302,7 +302,7 @@ const fr = {
     sections: [
       {
         h: "Ce qu'on garde",
-        p: "Les faits publics tirés de GitHub (déjà calculés), les constats de l'IA, les notes, les statuts. Ton email, seulement si tu le donnes. Si tu es arrivé par le lien d'une fiche partagée, l'identifiant de cette fiche.",
+        p: "Les faits publics tirés de GitHub (déjà calculés), les constats de l'IA, les notes, les statuts. Ton email, seulement si tu le donnes. Si tu viens du lien d'une fiche partagée, l'identifiant de cette fiche.",
       },
       {
         h: "Ce qu'on ne garde jamais",

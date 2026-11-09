@@ -139,7 +139,7 @@ export type ErrorCode =
   | "rate_limited"
   /** Tous les jetons GitHub épuisés pour plus de 2 minutes : la fiche n'est pas gardée en file. */
   | "busy"
-  /** Fiche ou login masqué par son propriétaire revendiqué (§18.1) : « Ce dev a quitté la ville ». */
+  /** Fiche ou login masqué par son propriétaire revendiqué (§18.1) : « Ce dossier a quitté la ville ». */
   | "gone"
   | "internal";
 

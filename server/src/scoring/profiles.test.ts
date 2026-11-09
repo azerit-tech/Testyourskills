@@ -140,7 +140,7 @@ describe("un profil par règle, dans l'ordre de priorité", () => {
     expect(pick({ github: gh(facts({ repos })) })).toBe("chameleon");
   });
 
-  it("Jeune pousse : la règle de la carte Nouveau en ville", () => {
+  it("Jeune pousse : la règle de la carte Débarque en ville", () => {
     expect(pick({ stats: { ...N, XP: 44, TEC: 70 } })).toBe("fresh_blood");
     expect(pick({ stats: { ...N, XP: 45, TEC: 70 } })).toBe("sleeper_agent");
   });

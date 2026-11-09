@@ -31,7 +31,7 @@ export const PROFILE_RULES: Record<string, ProfileRule> = {
     const v = c.cv ? c.stats[code] : code === "BUZZ" ? c.comparison?.cvBuzz : undefined;
     return v !== undefined && v >= t ? { n: v, t } : null;
   },
-  /** La règle de la carte « Nouveau en ville » (common.ts, specialOf). */
+  /** La règle de la carte « Débarque en ville » (common.ts, specialOf). */
   wonderkid: (c) => (specialOf(c.stats, false) === "wonderkid" ? {} : null),
 };
 

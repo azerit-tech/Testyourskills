@@ -154,7 +154,7 @@ export const THEMES: Record<ThemeKey, CardTheme> = {
     sky: { stops: [PALETTE.blueA, PALETTE.blueB, PALETTE.blueC, PALETTE.blueD], ground: PALETTE.blueGround, lights: true },
     rim: true, accent: PALETTE.rimGlow, accent2: PALETTE.blueB,
   }),
-  wonderkid: theme("wonderkid", { fr: "Nouveau en ville", en: "New in town" }, {
+  wonderkid: theme("wonderkid", { fr: "Débarque en ville", en: "New in town" }, {
     grad: "bg", bg: [PALETTE.moss, PALETTE.mossLow], bar: PALETTE.lime, palm: "#1f3430",
     badge: { bg: PALETTE.lime, ink: PALETTE.ink0 },
   }),

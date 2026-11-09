@@ -5,7 +5,7 @@ const NBSP = " ";
 
 export const STRINGS = {
   fr: {
-    loneWolf: "Loup solitaire",
+    loneWolf: "Sans bande",
     /** Pied : « Interrogatoire par une IA : 9 s · preuves 34 % ». Épicène (§2.4) : rien ne s'accorde avec la personne. */
     questioned: (s: number) => `Interrogatoire par une IA${NBSP}: ${s}${NBSP}s`,
     evidence: "preuves",
@@ -31,12 +31,12 @@ export const STRINGS = {
     githubSide: "Ce que ton GitHub prouve",
     overall: "Note",
     /** Alias de l'ancienne carte, encore lus par les compositions serveur. */
-    freeAgent: "Loup solitaire",
+    freeAgent: "Sans bande",
     judged: (s: number) => `Interrogatoire par une IA${NBSP}: ${s}${NBSP}s`,
     reliability: "preuves",
     positions: {
       FS: "Full-stack", BE: "Backend", FE: "Frontend", MOB: "Mobile", DATA: "Data", ML: "Machine learning",
-      OPS: "Ops", SEC: "Sécurité", EMB: "Embarqué", PM: "Produit", DESIGN: "Design", CTO: "CTO autoproclamé",
+      OPS: "Ops", SEC: "Sécurité", EMB: "Embarqué", PM: "Produit", DESIGN: "Design", CTO: "CTO sur parole",
     } as Record<string, string>,
   },
   en: {

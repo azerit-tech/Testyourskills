@@ -731,7 +731,7 @@ describe("page /c/:id et images", () => {
     expect(html).toContain(`<meta property="og:url" content="https://skills.test/c/${id}">`);
     expect(html).toContain(`<meta property="og:image:width" content="1200">`);
     expect(html).toContain(`<meta name="twitter:card" content="summary_large_image">`);
-    expect(html).toMatch(/og:description" content="Chef d&#39;accusation : « Typé jusqu&#39;au bout »\. Interrogatoire par une IA : \d+ s\./);
+    expect(html).toMatch(/og:description" content="Chef d&#39;accusation : « Typage jusqu&#39;au bout »\. Interrogatoire par une IA : \d+ s\./);
   });
 
   it("injecte les balises dans le index.html du front", async () => {
