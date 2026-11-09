@@ -58,6 +58,11 @@ export function weekday(i: number, lang: Lang): string {
   return WEEKDAYS[lang][i]!;
 }
 
+/** Typographie française : espace insécable avant « : ; ! ? » et dans les guillemets, pour qu'aucun signe ne passe seul à la ligne. */
+export function frTypo(s: string): string {
+  return s.replace(/ ([:;!?»])/g, `${NBSP}$1`).replace(/« /g, `«${NBSP}`);
+}
+
 /** Singulier ou pluriel, sur le nombre seulement : jamais d'accord avec la personne. */
 export function plural(n: number, one: string, many: string): string {
   return Math.abs(n) === 1 ? one : many;

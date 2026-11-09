@@ -17,7 +17,7 @@
 
 import type { Finding, Fact } from "../../../shared/types";
 import type { CommitFact, GithubFacts, GithubRepo } from "../github/facts";
-import { clock, dayDate, monthYear, num, NBSP, pct, plural, weekday } from "./format";
+import { clock, dayDate, frTypo, monthYear, num, NBSP, pct, plural, weekday } from "./format";
 
 const DAY = 86_400_000;
 const YEAR = 365.25 * DAY;
@@ -80,9 +80,11 @@ interface Ctx {
   commitUrl(c: { repo: string; oid?: string }): string | null;
 }
 
-function make(kind: GithubFindingKind, score: number, text: Fact, key: Fact | undefined, proof: string | null): Finding | null {
+function make(kind: GithubFindingKind, score: number, raw: Fact, rawKey: Fact | undefined, proof: string | null): Finding | null {
   if (!proof || !proof.startsWith("https://github.com/")) return null;
-  if (!text.fr.trim() || !text.en.trim()) return null;
+  if (!raw.fr.trim() || !raw.en.trim()) return null;
+  const text = { fr: frTypo(raw.fr), en: raw.en };
+  const key = rawKey && { fr: frTypo(rawKey.fr), en: rawKey.en };
   // Le chiffre clé doit se lire tel quel dans la phrase, sinon on ne le met pas en rose.
   const k = key && text.fr.includes(key.fr) && text.en.includes(key.en) ? key : undefined;
   return { kind, source: "github", text, ...(k ? { key: k } : {}), proof, score: Math.max(0, Math.min(100, Math.round(score))) };

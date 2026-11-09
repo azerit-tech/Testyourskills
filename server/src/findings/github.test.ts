@@ -7,6 +7,8 @@ import { CARD_MAX, forReveal, githubFindings, REVEAL_MAX, strongest } from "./in
 
 const NB = " ";
 const DAY = 86_400_000;
+/** Les attentes s'écrivent avec des espaces simples avant « : » et dans les guillemets ; le texte a des insécables. */
+const plain = (s: string) => s.replace(/ ([:;!?»])/g, " $1").replace(/« /g, "« ");
 
 const commit = (i: number, date: string, message = `Add feature number ${i} with a decent message`, repoName = "react-thing"): CommitFact => ({
   repo: repoName,
@@ -67,63 +69,63 @@ describe("trouvailles GitHub (§18.26), chaque type", () => {
 
   it("le plus vieux commit, à l'heure de son propre fuseau, avec sa preuve", () => {
     const f = all.get("first_commit")!;
-    expect(f.text.fr).toBe(`Plus vieux commit retrouvé : 14${NB}mars 2016, à 2${NB}h${NB}47 du matin.`);
+    expect(plain(f.text.fr)).toBe(`Plus vieux commit retrouvé : 14${NB}mars 2016, à 2${NB}h${NB}47 du matin.`);
     expect(f.text.en).toBe(`Oldest commit on record: March${NB}14, 2016, at 2:47${NB}a.m.`);
     expect(f.proof).toBe("https://github.com/dev/php-blog/commit/abc1234def");
     expect(f.key?.fr).toBe(`14${NB}mars 2016`);
   });
 
   it("la part des commits de nuit, et le commit le plus nocturne", () => {
-    expect(all.get("night_share")!.text.fr).toBe(`62${NB}% des derniers commits partent entre 22${NB}h et 5${NB}h.`);
+    expect(plain(all.get("night_share")!.text.fr)).toBe(`62${NB}% des derniers commits partent entre 22${NB}h et 5${NB}h.`);
     const late = all.get("latest_commit")!;
-    expect(late.text.fr).toBe(`Commit le plus nocturne : 3${NB}h${NB}52 du matin, dans api-server.`);
+    expect(plain(late.text.fr)).toBe(`Commit le plus nocturne : 3${NB}h${NB}52 du matin, dans api-server.`);
     expect(late.proof).toMatch(/^https:\/\/github\.com\/dev\/api-server\/commit\/[0-9a-f]{40}$/);
   });
 
   it("le vendredi soir, le message préféré", () => {
-    expect(all.get("friday_evening")!.text.fr).toBe(`6 commits poussés un vendredi après 18${NB}h.`);
-    expect(all.get("lazy_message")!.text.fr).toBe(`Message de commit préféré : « fix », 5${NB}fois.`);
+    expect(plain(all.get("friday_evening")!.text.fr)).toBe(`6 commits poussés un vendredi après 18${NB}h.`);
+    expect(plain(all.get("lazy_message")!.text.fr)).toBe(`Message de commit préféré : « fix », 5${NB}fois.`);
     expect(all.get("lazy_message")!.text.en).toBe(`Favourite commit message: “fix”, 5${NB}times.`);
   });
 
   it("le calendrier : dimanche contre lundi, la plus longue série", () => {
-    expect(all.get("sunday_over_monday")!.text.fr).toMatch(/^Le dimanche, plus de contributions que le lundi : \d+ contre 6 sur un an\.$/);
-    expect(all.get("longest_streak")!.text.fr).toBe(`Plus longue série de l'année : 43${NB}jours de contributions d'affilée.`);
+    expect(plain(all.get("sunday_over_monday")!.text.fr)).toMatch(/^Le dimanche, plus de contributions que le lundi : \d+ contre 6 sur un an\.$/);
+    expect(plain(all.get("longest_streak")!.text.fr)).toBe(`Plus longue série de l'année : 43${NB}jours de contributions d'affilée.`);
   });
 
   it("les repos : le plus étoilé, l'abandonné, ceux d'un jour, le langage abandonné", () => {
-    expect(all.get("top_starred")!.text.fr).toBe(`Repo le plus étoilé : react-thing, 1${NB}240${NB}étoiles.`);
+    expect(plain(all.get("top_starred")!.text.fr)).toBe(`Repo le plus étoilé : react-thing, 1${NB}240${NB}étoiles.`);
     expect(all.get("top_starred")!.text.en).toBe(`Most-starred repo: react-thing, 1,240${NB}stars.`);
-    expect(all.get("abandoned_repo")!.text.fr).toBe("Repo abandonné le plus ancien : todo-app-v3, dernier push en 2018.");
-    expect(all.get("one_day_repos")!.text.fr).toBe("3 repos sur 6 n'ont jamais reçu de push après leur premier jour.");
-    expect(all.get("dead_language")!.text.fr).toBe("Langage abandonné : PHP, dernier repo poussé en 2019.");
+    expect(plain(all.get("abandoned_repo")!.text.fr)).toBe("Repo abandonné le plus ancien : todo-app-v3, dernier push en 2018.");
+    expect(plain(all.get("one_day_repos")!.text.fr)).toBe("3 repos sur 6 n'ont jamais reçu de push après leur premier jour.");
+    expect(plain(all.get("dead_language")!.text.fr)).toBe("Langage abandonné : PHP, dernier repo poussé en 2019.");
     expect(all.get("dead_language")!.proof).toBe("https://github.com/dev/php-blog");
   });
 
   it("le complice, les PR chez les autres, l'âge du compte, le volume", () => {
-    expect(all.get("accomplice")!.text.fr).toBe("Complice principal : @camille, 214 commits sur les mêmes repos.");
+    expect(plain(all.get("accomplice")!.text.fr)).toBe("Complice principal : @camille, 214 commits sur les mêmes repos.");
     expect(all.get("accomplice")!.proof).toBe("https://github.com/camille");
-    expect(all.get("external_prs")!.text.fr).toBe("38 PR fusionnées dans les repos des autres.");
+    expect(plain(all.get("external_prs")!.text.fr)).toBe("38 PR fusionnées dans les repos des autres.");
     expect(all.get("external_prs")!.proof).toContain("https://github.com/search?q=");
-    expect(all.get("account_age")!.text.fr).toMatch(/^Compte GitHub ouvert en .+\s\d{4} : 5 ans de maison\.$/);
-    expect(all.get("contributions_year")!.text.fr).toBe("800 contributions sur les 12 derniers mois.");
+    expect(plain(all.get("account_age")!.text.fr)).toMatch(/^Compte GitHub ouvert en .+\s\d{4} : 5 ans de maison\.$/);
+    expect(plain(all.get("contributions_year")!.text.fr)).toBe("800 contributions sur les 12 derniers mois.");
   });
 
   it("matin plutôt que nuit, week-end plutôt que dimanche, jour le plus chargé", () => {
     const early = rich({ commits: Array.from({ length: 40 }, (_, i) => commit(i, i < 10 ? "2026-10-07T05:30:00Z" : "2026-10-07T13:00:00Z")) });
     const got = byKind(githubFindings(early));
     expect(got.has("night_share")).toBe(false);
-    expect(got.get("early_bird")!.text.fr).toBe(`25${NB}% des derniers commits partent avant 8${NB}h du matin.`);
+    expect(plain(got.get("early_bird")!.text.fr)).toBe(`25${NB}% des derniers commits partent avant 8${NB}h du matin.`);
 
     const start = calendarDays().start;
     const t0 = Date.parse(`${start}T00:00:00Z`);
     const dow = (i: number) => new Date(t0 + i * DAY).getUTCDay();
     const weekend = byKind(githubFindings(rich({ calendar: { available: true, weeksActive: 52, weeks: 52, totalContributions: 900, days: { start, counts: Array.from({ length: 371 }, (_, i) => (dow(i) === 6 ? 5 : dow(i) === 1 ? 4 : 1)) } } })));
     expect(weekend.has("sunday_over_monday")).toBe(false);
-    expect(weekend.get("weekend")!.text.fr).toMatch(/^\d+ % des contributions tombent le week-end\.$/);
+    expect(plain(weekend.get("weekend")!.text.fr)).toMatch(/^\d+ % des contributions tombent le week-end\.$/);
 
-    const plain = byKind(githubFindings(rich({ calendar: { available: true, weeksActive: 52, weeks: 52, totalContributions: 900, days: { start, counts: Array.from({ length: 371 }, (_, i) => (dow(i) === 2 ? 4 : dow(i) === 0 ? 0 : 1)) } } })));
-    expect(plain.get("busiest_day")!.text.fr).toMatch(/^Jour le plus chargé : le mardi, \d+ contributions sur un an\.$/);
+    const busy = byKind(githubFindings(rich({ calendar: { available: true, weeksActive: 52, weeks: 52, totalContributions: 900, days: { start, counts: Array.from({ length: 371 }, (_, i) => (dow(i) === 2 ? 4 : dow(i) === 0 ? 0 : 1)) } } })));
+    expect(plain(busy.get("busiest_day")!.text.fr)).toMatch(/^Jour le plus chargé : le mardi, \d+ contributions sur un an\.$/);
   });
 });
 
@@ -135,7 +137,7 @@ describe("trouvailles GitHub : rien de vide, rien de faux", () => {
 
   it("sans le fuseau du commit, le plus vieux commit n'a que sa date", () => {
     const f = byKind(githubFindings(facts())).get("first_commit")!;
-    expect(f.text.fr).toMatch(/^Plus vieux commit retrouvé : \d+(er)? \S+ \d{4}\.$/);
+    expect(plain(f.text.fr)).toMatch(/^Plus vieux commit retrouvé : \d+(er)? \S+ \d{4}\.$/);
     // sans oid : la preuve est le repo
     expect(f.proof).toBe("https://github.com/dev/a");
   });
@@ -203,6 +205,13 @@ describe("trouvailles : ton et épicène", () => {
       expect(t).not.toMatch(/\b(tu|ton|ta|tes|toi|t')\b/i);
       expect(t).not.toMatch(/\b(you|your)\b/i);
     }
+  });
+
+  it("typographie française : aucun « : » ni guillemet ne passe seul à la ligne", () => {
+    for (const t of githubFindings(rich()).map((f) => f.text.fr)) {
+      expect(t).not.toMatch(/ [:;!?»]|« /);
+    }
+    expect(byKind(githubFindings(rich())).get("lazy_message")!.text.fr).toContain(`«${NB}fix${NB}»`);
   });
 
   it("rien ne s'accorde avec la personne", () => {
