@@ -385,6 +385,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
     api.track("denounce_landed", id);
   }, [wantedYou, id]);
   const other = mine && mine.id !== id && !(mine.login && main.login && mine.login === main.login.toLowerCase()) ? mine : null;
+  const proveFirst = item.kind === "card" && declaredOf(item.card) === "linkedin";
 
   return (
     <main className={`page page-card page-result${animating ? " is-animating" : ""}${visitor ? " is-visitor" : ""}`} id="main">
@@ -462,21 +463,32 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
       </div>
 
       <div className={`after${settled ? " is-in" : ""}`} aria-hidden={!settled} inert={!settled ? true : undefined}>
-        {!visitor && <PleaVerdict cardId={id} overall={main.overall} shown={settled} />}
-        {!visitor && <JuryLine jury={kase?.jury ?? null} />}
-        {/* L'enquête en direct (§18.26) : les trois trouvailles les plus fortes, chacune vers sa preuve. */}
-        {!visitor && <Dossier card={main} />}
+        {/* L'après-fiche raccourci (§18.27) : le pari et le jury, le profil, le partage, la dénonciation, le dossier, puis le reste en lignes. */}
+        {!visitor && (
+          <div className="after-head">
+            <PleaVerdict cardId={id} overall={main.overall} shown={settled} />
+            <JuryLine jury={kase?.jury ?? null} />
+          </div>
+        )}
+        {!visitor && <ProfileTile card={main} />}
         {/* Fiche masquée : /og/* et /c/:id répondent 404 / 410 à tous, l'image ne se télécharge pas et le lien ne montre rien. */}
         {!visitor && !(claimed && me?.hidden) && <ShareBar item={item} toast={toast.show} />}
         {/* Dénonce un complice (§18.6), juste après le partage. */}
         {!visitor && <Denounce cardId={id} selfLogin={cardLogin} toast={toast.show} />}
-        <LinkedInPhoto cardId={id} hasAvatar={item.kind === "card" ? !!item.card.avatarUrl : !!item.comparison.cv.avatarUrl} />
-        {/* Fiche dénoncée : « Appeler mon avocat » est déjà sous la fiche. */}
-        {!(wantedYou && claimOn) && <Claim cardId={id} login={cardLogin} lawyer={!owner} me={me} onMe={onMe} toast={toast.show} />}
-        {!visitor && <Why item={item} />}
-        {!visitor && <Contest card={main} />}
-        {!visitor && item.kind === "card" && <AddSource card={item.card} />}
-        {!visitor && <EmailForm cardId={id} />}
+        {/* L'enquête en direct (§18.26) : les trois trouvailles les plus fortes, chacune vers sa preuve. */}
+        {!visitor && <Dossier card={main} />}
+        {/* Fiche LinkedIn seule (§18.24) : « Ajoute ton GitHub pour prouver » est l'appel principal, pas une ligne repliée. */}
+        {!visitor && proveFirst && <AddSource card={main} />}
+        <div className="rest">
+          {/* La peine est déjà sous la tuile de profil. */}
+          {!visitor && <Why item={item} withSentence={!main.profile} />}
+          {/* Fiche dénoncée : « Appeler mon avocat » est déjà sous la fiche. */}
+          {!(wantedYou && claimOn) && <Claim cardId={id} login={cardLogin} lawyer={!owner} me={me} onMe={onMe} toast={toast.show} />}
+          {!visitor && <LinkedInPhoto cardId={id} hasAvatar={item.kind === "card" ? !!item.card.avatarUrl : !!item.comparison.cv.avatarUrl} />}
+          {!visitor && item.kind === "card" && !proveFirst && <AddSource card={item.card} />}
+          {!visitor && <EmailForm cardId={id} />}
+          {!visitor && <Contest card={main} />}
+        </div>
         <AzeritCta cardId={id} />
         {!visitor && (
           <div className="after-foot">

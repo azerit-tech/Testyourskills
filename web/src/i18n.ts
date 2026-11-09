@@ -248,7 +248,6 @@ const fr = {
       share: (rank: number) => `${rank === 1 ? "n° 1" : `${rank}e`} cette semaine`,
     },
     linkedin: {
-      kicker: "Personnaliser ma fiche",
       btn: "Mettre ma photo LinkedIn",
       noPhoto: "Ta fiche n'a pas encore de photo. Prends celle de ton profil LinkedIn, rien d'autre n'est lu.",
       updated: "Photo mise à jour.",
@@ -259,8 +258,14 @@ const fr = {
       title: "Le dossier",
       proof: "Preuve",
     },
+    /* « Le reste » sous la fiche (§18.27) : une ligne repliée par bloc. */
+    rest: {
+      why: "Pourquoi cette note",
+      photo: "Ma photo LinkedIn",
+      email: "Recevoir ma fiche par email",
+      contest: "Contester",
+    },
     why: {
-      title: "Pièces à conviction",
       overallLine: "Note globale = TEC 30 % · SHIP 20 % · ARCH 20 % · DOC 15 % · XP 15 %.",
       tabCv: "Fiche CV",
       tabLinkedin: "Fiche LinkedIn",
@@ -312,7 +317,6 @@ const fr = {
       mine: "C'est ta fiche ? Connecte-toi avec GitHub",
     },
     email: {
-      title: "Reçois ta fiche",
       label: "Adresse email",
       placeholder: "toi@exemple.dev",
       btn: "Recevoir",
@@ -678,7 +682,6 @@ const en: Dict = {
       share: (rank) => `#${rank} this week`,
     },
     linkedin: {
-      kicker: "Customize my sheet",
       btn: "Use my LinkedIn photo",
       noPhoto: "Your sheet has no photo yet. Use your LinkedIn profile picture, nothing else is read.",
       updated: "Photo updated.",
@@ -688,8 +691,13 @@ const en: Dict = {
       title: "The file",
       proof: "Proof",
     },
+    rest: {
+      why: "Why this rating",
+      photo: "My LinkedIn photo",
+      email: "Get my sheet by email",
+      contest: "Contest it",
+    },
     why: {
-      title: "Exhibits",
       overallLine: "Overall = TEC 30% · SHIP 20% · ARCH 20% · DOC 15% · XP 15%.",
       tabCv: "CV sheet",
       tabLinkedin: "LinkedIn sheet",
@@ -740,7 +748,6 @@ const en: Dict = {
       mine: "Your sheet? Sign in with GitHub",
     },
     email: {
-      title: "Get your sheet",
       label: "Email address",
       placeholder: "you@example.dev",
       btn: "Send it",

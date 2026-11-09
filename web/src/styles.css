@@ -1050,8 +1050,8 @@ svg {
 .plea-verdict {
   display: grid;
   justify-items: center;
-  gap: 8px;
-  padding: 0 4px 10px;
+  gap: 6px;
+  padding: 0 4px;
   text-align: center;
 }
 .plea-said {
@@ -1325,12 +1325,22 @@ svg {
   font: 600 17px/1.2 var(--f-text);
   color: var(--cream);
 }
-/* pour qui a fait la fiche : le décompte, en tête de l'après-fiche */
+/* pour qui a fait la fiche : le décompte, en texte courant, sous le pari */
 .jury-line {
   padding: 0 4px;
-  font: 700 26px/1 var(--f-name);
-  color: var(--cream);
+  font: 500 14px/1.4 var(--f-text);
+  color: var(--lilac-2);
   text-wrap: balance;
+}
+/* en tête de l'après-fiche : le pari et le jury, centrés dans la même bande */
+.after-head {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  text-align: center;
+}
+.after-head:empty {
+  display: none;
 }
 
 /* « Fais la tienne » toujours visible (§18.27) : téléphone seulement */
@@ -1675,32 +1685,72 @@ a.dossier-item:hover {
   color: var(--cream);
 }
 
-/* personnaliser : photo LinkedIn */
-.personalize {
+/* « Le reste » (§18.27) : des lignes de 52 px sur un aplat relevé, chacune s'ouvre sur place */
+.rest {
+  display: grid;
+  overflow: hidden;
+  border-radius: var(--r-card);
   background: var(--ink-1);
 }
-.personalize-copy {
+.rest:empty {
+  display: none;
+}
+.fold + .fold {
+  border-top: 1px solid var(--lilac-faint);
+}
+.fold-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  padding: 14px 20px;
+  list-style: none;
+  cursor: pointer;
+  font: 600 16px/1.25 var(--f-text);
+  color: var(--cream);
+  -webkit-tap-highlight-color: transparent;
+}
+.fold-row::-webkit-details-marker {
+  display: none;
+}
+.fold-row:focus-visible {
+  outline-offset: -4px;
+  border-radius: 12px;
+}
+.fold-chevron {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  color: var(--lilac-dim);
+  transition: transform 0.2s var(--ease-out);
+}
+.fold[open] .fold-chevron {
+  transform: rotate(180deg);
+}
+.fold-body {
   display: grid;
-  gap: 6px;
+  gap: 12px;
+  padding: 0 20px 20px;
+}
+.fold-body p {
+  color: var(--lilac-2);
+}
+.fold-body > .pill {
+  justify-self: start;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fold-chevron {
+    transition: none;
+  }
 }
 
 /* « C'est moi » : revendication GitHub (§18.1) */
-.claim-copy {
-  display: grid;
-  gap: 6px;
-}
 .claim-owned {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 12px;
-}
-.claim-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font: 700 28px/1 var(--f-name);
-  text-transform: uppercase;
   color: var(--cream);
 }
 .claim-who {
@@ -1728,9 +1778,6 @@ a.dossier-item:hover {
 }
 
 /* pièces à conviction : la peine, le sens des sigles, le poids de chacun */
-.why {
-  background: var(--ink-1);
-}
 .why-sentence {
   display: grid;
   gap: 2px;
@@ -1775,10 +1822,6 @@ a.dossier-item:hover {
 }
 
 /* contester */
-.contest {
-  background: none;
-  padding: 0;
-}
 .var-panel {
   display: grid;
   gap: 8px;
@@ -1797,15 +1840,12 @@ a.dossier-item:hover {
   color: var(--lilac-dim) !important;
 }
 
-/* ajouter l'autre source */
-.add-source {
+/* fiche LinkedIn seule : « Ajoute ton GitHub pour prouver », en bloc */
+.after-block.add-source {
   background: var(--navy);
 }
 
 /* email */
-.email {
-  background: var(--ink-1);
-}
 .email-form {
   display: grid;
   gap: 8px;

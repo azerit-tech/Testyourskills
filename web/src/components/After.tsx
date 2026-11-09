@@ -1,6 +1,6 @@
 // Tout ce qui vient sous la carte (§6.4), dans l'ordre de la spec.
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { FormEvent } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { CardData, ComparisonData, Lang, WeekRank } from "../../../shared/types";
 import { declaredOf, STAT_CODES, starsFor } from "../../../shared/types";
@@ -32,6 +32,55 @@ export function useToast() {
     </div>
   );
   return { show, node };
+}
+
+/* ---------- lignes repliées (§18.27) ---------- */
+
+const Chevron = () => (
+  <svg className="fold-chevron" viewBox="0 0 24 24" aria-hidden>
+    <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+interface FoldProps {
+  /** Classe du bloc (why, claim, email…), gardée sur la ligne. */
+  name: string;
+  title: ReactNode;
+  /** Un état qui demande l'attention (erreur, fiche masquée) : la ligne s'ouvre d'elle-même. */
+  attention?: boolean;
+  /** À chaque ouverture par la personne. */
+  onOpen?: () => void;
+  children: ReactNode;
+}
+
+/**
+ * « Le reste » sous la fiche : une ligne de 52 px qui s'ouvre sur place (un `<details>`, donc
+ * le clavier et les lecteurs d'écran savent l'ouvrir). Fermée, son contenu reste monté : un
+ * champ à moitié rempli ne se perd pas.
+ */
+export function Fold({ name, title, attention = false, onOpen, children }: FoldProps) {
+  const [open, setOpen] = useState(attention);
+  useEffect(() => {
+    if (attention) setOpen(true);
+  }, [attention]);
+  return (
+    <details
+      className={`fold ${name}`}
+      open={open}
+      onToggle={(e) => {
+        const now = e.currentTarget.open;
+        if (now === open) return;
+        setOpen(now);
+        if (now) onOpen?.();
+      }}
+    >
+      <summary className="fold-row">
+        <span>{title}</span>
+        <Chevron />
+      </summary>
+      <div className="fold-body">{children}</div>
+    </details>
+  );
 }
 
 /* ---------- rang de la semaine (§18.22) ---------- */
@@ -395,18 +444,13 @@ export function LinkedInPhoto({ cardId, hasAvatar }: { cardId: string; hasAvatar
   if (!cfg?.linkedin) return null;
   if (cfg.claim && hasGithub(cardId) ? !isMine(cardId) : !token) return null;
   return (
-    <section className={`after-block personalize${hasAvatar ? "" : " is-featured"}`} aria-labelledby="perso-title">
-      <div className="personalize-copy">
-        <h2 id="perso-title">
-          {l.kicker}
-        </h2>
-        {!hasAvatar && <p>{l.noPhoto}</p>}
-      </div>
+    <Fold name="personalize" title={t.result.rest.photo}>
+      {!hasAvatar && <p>{l.noPhoto}</p>}
       <button type="button" className="pill pill-peach" onClick={() => api.startLinkedInPhoto(cardId, token)}>
         <IconLinkedIn />
         <span>{l.btn}</span>
       </button>
-    </section>
+    </Fold>
   );
 }
 
@@ -445,8 +489,7 @@ export function Why({ item, withSentence = true }: { item: Shareable; withSenten
   const { t } = useT();
   const [side, setSide] = useState<"cv" | "github">("github");
   return (
-    <section className="after-block why" id="why" aria-labelledby="why-title">
-      <h2 id="why-title">{t.result.why.title}</h2>
+    <Fold name="why" title={t.result.rest.why}>
       {item.kind === "comparison" && (
         <div className="seg" role="tablist" aria-label={t.compare.switchLabel}>
           <button type="button" role="tab" aria-selected={side === "cv"} onClick={() => setSide("cv")}>
@@ -458,7 +501,7 @@ export function Why({ item, withSentence = true }: { item: Shareable; withSenten
         </div>
       )}
       <WhyCard card={item.kind === "card" ? item.card : side === "cv" ? item.comparison.cv : item.comparison.github} withSentence={withSentence} />
-    </section>
+    </Fold>
   );
 }
 
@@ -478,11 +521,9 @@ export function Contest({ card }: { card: CardData }) {
     setRound((r) => r + 1);
   };
 
+  // Ouvrir la ligne, c'est appeler l'avocat : sa réponse est déjà là.
   return (
-    <section className="after-block contest">
-      <button type="button" className="pill pill-ghost" onClick={ask} aria-expanded={reply !== null}>
-        {reply === null ? c.button : c.again}
-      </button>
+    <Fold name="contest" title={t.result.rest.contest} onOpen={() => reply === null && ask()}>
       {reply !== null && (
         <div className="var-panel" key={round} role="status">
           <p className="surtitre">{c.title}</p>
@@ -490,7 +531,10 @@ export function Contest({ card }: { card: CardData }) {
           {lowest && <p className="var-hint">{c.lowest(lowest.code, lowest.value)}</p>}
         </div>
       )}
-    </section>
+      <button type="button" className="pill pill-ghost" onClick={ask}>
+        {reply === null ? c.button : c.again}
+      </button>
+    </Fold>
   );
 }
 
@@ -503,8 +547,7 @@ export function AddSource({ card }: { card: CardData }) {
   const fromGithub = card.source === "github";
   const copy = fromGithub ? t.result.addCv : t.result.addGithub;
   return (
-    <section className="after-block add-source">
-      <h2>{copy.title}</h2>
+    <Fold name="add-source" title={copy.title}>
       <p>{copy.text}</p>
       <button
         type="button"
@@ -516,7 +559,7 @@ export function AddSource({ card }: { card: CardData }) {
       >
         {copy.btn}
       </button>
-    </section>
+    </Fold>
   );
 }
 
@@ -581,13 +624,11 @@ export function Claim({ cardId, login, lawyer, me, onMe, toast }: ClaimProps) {
         setBusy(false);
       }
     };
+    // Fiche masquée : la ligne s'ouvre d'elle-même, le bouton pour la rendre visible est là.
     return (
-      <section className="after-block claim is-owned" aria-label={c.owned}>
+      <Fold name="claim is-owned" title={c.owned} attention={me.hidden}>
         <p className="claim-owned">
-          <span className="claim-badge">
-            <GhMark />
-            {c.owned}
-          </span>
+          <GhMark />
           <span className="claim-who">@{me.login}</span>
         </p>
         <div className="claim-actions">
@@ -604,23 +645,18 @@ export function Claim({ cardId, login, lawyer, me, onMe, toast }: ClaimProps) {
             {c.logout}
           </button>
         </div>
-      </section>
+      </Fold>
     );
   }
 
   return (
-    <section className="after-block claim" aria-labelledby="claim-title">
-      <div className="claim-copy">
-        <h2 id="claim-title">
-          {lawyer ? c.kickerLawyer : c.kicker}
-        </h2>
-        <p>{lawyer ? c.textLawyer : c.text}</p>
-      </div>
+    <Fold name="claim" title={lawyer ? c.kickerLawyer : c.kicker}>
+      <p>{lawyer ? c.textLawyer : c.text}</p>
       <button type="button" className="pill pill-peach" onClick={() => api.startClaim(cardId, login)}>
         <GhMark />
         <span>{lawyer ? c.btnLawyer : c.btn}</span>
       </button>
-    </section>
+    </Fold>
   );
 }
 
@@ -653,9 +689,9 @@ export function EmailForm({ cardId }: { cardId: string }) {
   // Le serveur n'accepte l'email que de qui a créé la fiche (jeton) ou du propriétaire connecté.
   if (!tokens.get(cardId) && !isMine(cardId)) return null;
 
+  // Une adresse refusée ou un envoi raté : la ligne reste ouverte sur le message.
   return (
-    <section className="after-block email" aria-labelledby="email-title">
-      <h2 id="email-title">{e.title}</h2>
+    <Fold name="email" title={t.result.rest.email} attention={state === "invalid" || state === "error"}>
       {state === "done" ? (
         <p className="email-done" role="status">
           <span aria-hidden>✓</span> {e.done}
@@ -687,7 +723,7 @@ export function EmailForm({ cardId }: { cardId: string }) {
       <p id="email-note" className={`email-note${state === "invalid" || state === "error" ? " is-error" : ""}`} role={state === "invalid" || state === "error" ? "alert" : undefined}>
         {state === "invalid" ? e.invalid : state === "error" ? e.error : e.note}
       </p>
-    </section>
+    </Fold>
   );
 }
 

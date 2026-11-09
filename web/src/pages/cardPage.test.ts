@@ -6,7 +6,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CardData } from "../../../shared/types";
 import { FIXTURES } from "../../../shared/fixtures";
 import { LangProvider } from "../i18n";
-import type { Shareable } from "../components/After";
+import { Fold, type Shareable } from "../components/After";
+import { JuryLine } from "../components/Jury";
+import { tokens } from "../lib/api";
+import { setPlea } from "../lib/plea";
 import { Result, type ResultProps } from "./CardPage";
 
 const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1";
@@ -23,8 +26,11 @@ function stub(lang: string) {
   vi.stubGlobal("document", { documentElement: { dataset: {}, classList: { add: () => undefined, remove: () => undefined } }, querySelector: () => null, getElementById: () => null });
 }
 
-export function renderResult(item: Shareable, opts: { owner: boolean; lang?: string }): string {
+function renderResult(item: Shareable, opts: { owner: boolean; lang?: string; token?: string; plea?: number }): string {
   stub(opts.lang ?? "fr-FR");
+  const id = item.kind === "card" ? item.card.id : item.comparison.id;
+  if (opts.token) tokens.set(id, opts.token);
+  if (opts.plea) setPlea(id, opts.plea);
   const props: ResultProps = {
     item,
     animate: false,
@@ -87,5 +93,66 @@ describe("page partagée, vue par un visiteur", () => {
     const html = renderResult({ kind: "card", card: { ...(bare as CardData), id: "VisitCard02" } }, { owner: false });
     expect(html).not.toContain("profile-tile");
     expect(ascending(at(html, ['class="result-stage"', 'class="jury"', 'id="you"']))).toBe(true);
+  });
+});
+
+describe("après-fiche, vue par qui a fait la fiche (§18.27)", () => {
+  const mine = (id: string) => card({ id });
+
+  it("le pari et le jury, le profil, le partage, la dénonciation, le dossier, puis le reste en lignes", () => {
+    const html = renderResult(mine("OwnCard0001"), { owner: true, token: "tok", plea: 6 });
+    const order = at(html, ['class="after-head"', 'class="plea-verdict"', 'class="profile-tile', 'class="after-block out"', 'class="after-block denounce"', 'class="after-block dossier"', 'class="rest"', 'class="after-foot"']);
+    expect(ascending(order), JSON.stringify(order)).toBe(true);
+    // ni en-tête de visiteur, ni « Et toi ? »
+    expect(html).not.toContain('class="wanted"');
+    expect(html).not.toContain('id="you"');
+  });
+
+  it("le reste : des lignes repliées, chacune un vrai titre et un chevron", () => {
+    const html = renderResult(mine("OwnCard0002"), { owner: true, token: "tok" });
+    const rest = html.slice(html.indexOf('class="rest"'), html.indexOf('class="after-foot"'));
+    const rows = [...rest.matchAll(/<details class="fold ([a-z- ]+)"( open="")?><summary class="fold-row"><span>([^<]+)<\/span><svg class="fold-chevron"/g)];
+    expect(rows.map((r) => r[1])).toEqual(["why", "add-source", "email", "contest"]);
+    expect(rows.map((r) => r[3])).toEqual(["Pourquoi cette note", "Ajoute ton CV pour voir l&#x27;écart", "Recevoir ma fiche par email", "Contester"]);
+    // toutes fermées au départ
+    expect(rows.every((r) => !r[2])).toBe(true);
+    // le contenu reste monté, fermé : le formulaire d'email est là
+    expect(rest).toContain('id="email-input"');
+  });
+
+  it("sans jeton de cette fiche, pas de ligne d'email ; fiche LinkedIn seule, « Ajoute ton GitHub » en bloc, hors des lignes", () => {
+    const li = card({ id: "OwnCard0003", source: "cv", declaredSource: "linkedin", linkedinUrl: "https://www.linkedin.com/in/x" });
+    const html = renderResult(li, { owner: true });
+    expect(html).not.toContain("fold email");
+    const prove = html.indexOf('class="after-block add-source"');
+    expect(prove).toBeGreaterThan(html.indexOf('class="after-block dossier"'));
+    expect(prove).toBeLessThan(html.indexOf('class="rest"'));
+    expect(html).not.toContain("fold add-source");
+  });
+
+  it("la peine passe dans la tuile : « Pourquoi cette note » ne la répète pas", () => {
+    const html = renderResult(mine("OwnCard0004"), { owner: true });
+    expect(html).not.toContain("why-sentence");
+  });
+
+  it("le jury du propriétaire : une ligne de texte courant, pas un titre", () => {
+    stub("fr-FR");
+    const html = renderToStaticMarkup(createElement(LangProvider, null, createElement(JuryLine, { jury: { guilty: 3, cleared: 1, mine: null } })));
+    expect(html).toBe('<p class="jury-line">Le jury : 75 % coupable · 4 votes</p>');
+  });
+});
+
+describe("ligne repliée", () => {
+  const fold = (attention: boolean) =>
+    renderToStaticMarkup(createElement(Fold, { name: "email", title: "Recevoir ma fiche par email", attention, children: createElement("p", null, "corps") }));
+
+  it("fermée par défaut, le contenu monté", () => {
+    expect(fold(false)).toBe(
+      '<details class="fold email"><summary class="fold-row"><span>Recevoir ma fiche par email</span><svg class="fold-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></summary><div class="fold-body"><p>corps</p></div></details>',
+    );
+  });
+
+  it("un état qui demande l'attention l'ouvre", () => {
+    expect(fold(true)).toMatch(/^<details class="fold email" open="">/);
   });
 });
