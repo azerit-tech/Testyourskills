@@ -3,7 +3,7 @@
 // navigateur charge le front SPA qui affiche la carte.
 
 import type { CardData, ComparisonData, Lang, Special } from "../../shared/types";
-import { LEVEL_LABELS, starsFor } from "../../shared/types";
+import { declaredOf, LEVEL_LABELS, starsFor } from "../../shared/types";
 
 export interface PageMeta {
   lang: Lang;
@@ -48,15 +48,19 @@ export function metaFor(data: CardData | ComparisonData, baseUrl: string): PageM
     const name = data.github.name || data.cv.name;
     const head = data.headline[lang];
     const fr = lang === "fr";
+    // LinkedIn contre GitHub (§18.24) : « LinkedIn » partout où une comparaison dirait « CV ».
+    const li = declaredOf(data) === "linkedin";
+    const src = li ? "LinkedIn" : "CV";
+    const the = li ? "LinkedIn" : fr ? "le CV" : "the CV";
     return {
       lang,
       url,
       image,
       title: `${head} — ${name}`,
       description: fr
-        ? `CV : ${cardLabel(data.cv, lang)}. GitHub : ${cardLabel(data.github, lang)}. Le butin : ce que le CV déclare contre ce que le code prouve. Fais la tienne.`
-        : `CV: ${cardLabel(data.cv, lang)}. GitHub: ${cardLabel(data.github, lang)}. The loot: what the CV claims vs what the code proves. Make yours.`,
-      imageAlt: fr ? `Fiche CV contre fiche GitHub de ${name}` : `${name}'s CV sheet vs GitHub sheet`,
+        ? `${src} : ${cardLabel(data.cv, lang)}. GitHub : ${cardLabel(data.github, lang)}. Le butin : ce que ${the} déclare contre ce que le code prouve. Fais la tienne.`
+        : `${src}: ${cardLabel(data.cv, lang)}. GitHub: ${cardLabel(data.github, lang)}. The loot: what ${the} claims vs what the code proves. Make yours.`,
+      imageAlt: fr ? `Fiche ${src} contre fiche GitHub de ${name}` : `${name}'s ${src} sheet vs GitHub sheet`,
     };
   }
 

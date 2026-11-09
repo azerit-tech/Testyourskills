@@ -436,7 +436,7 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
               <rect x={-64} y={-16} width={128} height={32} rx={3} fill="none" stroke="#a3261b" strokeWidth={2.2} />
               <rect x={-60} y={-12} width={120} height={24} rx={1.5} fill="none" stroke="#a3261b" strokeWidth={0.8} />
               <Txt x={0} y={5.4} font="display-800" size={15.5} ls={1.4} anchor="middle" fill="#a3261b">
-                {fit(s.cvStamp, { font: "display-800", size: 15.5, minSize: 11, maxWidth: 108, letterSpacing: 1.4, minLetterSpacing: 0.4 }).text}
+                {fit(card.declaredSource === "linkedin" ? s.linkedinStamp : s.cvStamp, { font: "display-800", size: 15.5, minSize: 11, maxWidth: 108, letterSpacing: 1.4, minLetterSpacing: 0.4 }).text}
               </Txt>
             </g>
           )}

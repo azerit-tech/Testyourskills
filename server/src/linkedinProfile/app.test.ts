@@ -157,6 +157,11 @@ describe("entrée GitHub : le LinkedIn trouvé devient une comparaison", () => {
     expect(weekRank(ctx.store.db, cmp.github.id)).not.toBeNull();
     // « LinkedIn retrouvé » au dossier de l'enquête (§18.26).
     expect(cmp.github.findings?.find((f) => f.source === "linkedin")).toMatchObject({ kind: "linkedin_found", proof: URL_ });
+    // L'aperçu de lien dit « LinkedIn », jamais « CV ».
+    const page = await (await ctx.app.request(`/c/${json.id}`)).text();
+    expect(page).toContain("LinkedIn : Fiche");
+    expect(page).toContain("ce que LinkedIn déclare");
+    expect(page).not.toMatch(/\bCV\b/);
   });
 
   it("cache 24 h : le même pseudo rend la comparaison, sans rien relire", async () => {

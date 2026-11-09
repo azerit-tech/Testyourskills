@@ -7,7 +7,7 @@
 // fiche (le drop-shadow CSS de l'écran ne passe pas dans le PNG).
 import type { ReactNode } from "react";
 import type { CardData, ComparisonData, Lang, StatCode } from "../../../shared/types";
-import { STAT_CODES } from "../../../shared/types";
+import { declaredOf, STAT_CODES } from "../../../shared/types";
 import { CardGraphic } from "../../../shared/card/Card";
 import { AzeritGem } from "../../../shared/card/AzeritGem";
 import { fontAttrs } from "../../../shared/card/fonts";
@@ -321,7 +321,7 @@ export function ComparisonOg({ cmp, lang, avatars }: { cmp: ComparisonData; lang
       <text x={W / 2} y={70} {...fontAttrs("display-700")} fontSize={head.size} letterSpacing={head.letterSpacing} textAnchor="middle" fill={PALETTE.cream}>
         {head.text}
       </text>
-      <SideLabel x={lx + cw / 2} y={120} text={upper(s.cvSide, lang)} color={MUTED} size={12} />
+      <SideLabel x={lx + cw / 2} y={120} text={upper(declaredOf(cmp) === "linkedin" ? s.linkedinSide : s.cvSide, lang)} color={MUTED} size={12} />
       <SideLabel x={rx + cw / 2} y={120} text={upper(s.githubSide, lang)} color={PALETTE.lime} size={12} />
       <Placed card={cmp.cv} lang={lang} avatars={avatars} id="cogcv" x={lx} y={cy} w={cw} />
       <Placed card={cmp.github} lang={lang} avatars={avatars} id="coggh" x={rx} y={cy} w={cw} />
@@ -357,7 +357,7 @@ export function ComparisonPortrait({ cmp, lang, avatars }: { cmp: ComparisonData
           {l}
         </text>
       ))}
-      <SideLabel x={lx + cw / 2} y={cy - 22} text={upper(s.cvSide, lang)} color={MUTED} size={15} />
+      <SideLabel x={lx + cw / 2} y={cy - 22} text={upper(declaredOf(cmp) === "linkedin" ? s.linkedinSide : s.cvSide, lang)} color={MUTED} size={15} />
       <SideLabel x={rx + cw / 2} y={cy - 22} text={upper(s.githubSide, lang)} color={PALETTE.lime} size={15} />
       <Placed card={cmp.cv} lang={lang} avatars={avatars} id="cptcv" x={lx} y={cy} w={cw} />
       <Placed card={cmp.github} lang={lang} avatars={avatars} id="cptgh" x={rx} y={cy} w={cw} />
