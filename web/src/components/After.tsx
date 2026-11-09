@@ -80,7 +80,9 @@ export function ShareBar({ item, toast }: { item: Shareable; toast: (m: string) 
     if (item.kind === "card") {
       const c = item.card;
       const profile = c.profile ? pick(c.profile.label, lang) : null;
-      return ts.text("★".repeat(starsFor(c.overall)), c.overall, profile, bestStatus(c, lang), c.judgedInSeconds, withUrl, rank);
+      // La trouvaille la plus forte (§18.26) prend la place du chef d'accusation.
+      const finding = c.findings?.[0] ? pick(c.findings[0].text, lang) : null;
+      return ts.text("★".repeat(starsFor(c.overall)), c.overall, profile, bestStatus(c, lang), c.judgedInSeconds, withUrl, rank, finding);
     }
     const cmp = item.comparison;
     // Le profil de la fiche GitHub : après la comparaison, c'est lui qui porte l'écart (Faussaire).

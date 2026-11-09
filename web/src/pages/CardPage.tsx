@@ -1,13 +1,14 @@
 // Route /c/:id : attente, révélation puis résultat pour une carte fraîche ;
 // affichage direct (sans pack) pour un lien partagé.
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import type { CardData, Fact, JobState, ProgressEvent } from "../../../shared/types";
+import type { CardData, Fact, Finding, JobState, ProgressEvent } from "../../../shared/types";
 import { LEVEL_LABELS, starsFor } from "../../../shared/types";
 import { AddSource, AzeritCta, Claim, Contest, DeleteCard, EmailForm, LinkedInPhoto, ShareBar, Why, useMe, useToast } from "../components/After";
 import type { Shareable } from "../components/After";
 import { ComparisonStage } from "../components/Comparison";
 import { Denounce } from "../components/Denounce";
 import { EntryForm } from "../components/EntryForm";
+import { Dossier } from "../components/Findings";
 import { RevealCard, useReveal } from "../components/Reveal";
 import type { WalkoutControl } from "../components/Walkout3D";
 import { Waiting } from "../components/Waiting";
@@ -28,7 +29,7 @@ const CLIENT_TIMEOUT = 45_000;
 
 type View =
   | { s: "loading" }
-  | { s: "pending"; progress: ProgressEvent[]; queue?: number }
+  | { s: "pending"; progress: ProgressEvent[]; queue?: number; findings?: Finding[] }
   | { s: "done"; item: Shareable }
   | { s: "error"; message: Fact | string; notFound?: boolean }
   /** Masquée par son propriétaire revendiqué (§18.1) : 410 de l'API. */
@@ -51,7 +52,7 @@ function useJob(id: string, nonce: number) {
         if (!alive) return;
         if (job.state === "pending") {
           setSawPending(true);
-          setView({ s: "pending", progress: job.progress ?? [], queue: job.queue });
+          setView({ s: "pending", progress: job.progress ?? [], queue: job.queue, findings: job.findings });
           if (job.queue) started = Date.now();
           if (Date.now() - started > CLIENT_TIMEOUT) {
             setView({ s: "error", message: t.errors.timeout });
@@ -162,6 +163,19 @@ export function CardPage({ id }: { id: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view.s]);
 
+  // L'enquête en direct (§18.26) : fiche prête avant la fin des trouvailles, on
+  // laisse tomber au moins trois pièces avant la révélation (Waiting rend la main).
+  const lastPending = useRef<{ progress: ProgressEvent[]; queue?: number; findings?: Finding[] }>({ progress: [] });
+  if (view.s === "pending") lastPending.current = view;
+  const [released, setReleased] = useState(false);
+  const holding = view.s === "done" && sawPending && !released && (lastPending.current.findings?.length ?? 0) > 0;
+  // Filet : jamais plus de 12 s de plus, même si l'onglet a dormi.
+  useEffect(() => {
+    if (!holding) return;
+    const t = window.setTimeout(() => setReleased(true), 12_000);
+    return () => window.clearTimeout(t);
+  }, [holding]);
+
   if (view.s === "loading") {
     return (
       <main className="page page-card" id="main">
@@ -172,10 +186,18 @@ export function CardPage({ id }: { id: string }) {
     );
   }
 
-  if (view.s === "pending") {
+  if (view.s === "pending" || holding) {
+    const w = view.s === "pending" ? view : lastPending.current;
     return (
       <main className="page page-card" id="main">
-        <Waiting progress={view.progress} startedAt={startedAt} queue={view.queue} />
+        <Waiting
+          progress={w.progress}
+          startedAt={startedAt}
+          queue={w.queue}
+          findings={w.findings}
+          ready={holding}
+          onRelease={() => setReleased(true)}
+        />
       </main>
     );
   }
@@ -393,6 +415,8 @@ function Result({ item, animate, owner, fresh, notice, me, onMe, onDeleted }: Re
       </div>
 
       <div className={`after${settled ? " is-in" : ""}`} aria-hidden={!settled} inert={!settled ? true : undefined}>
+        {/* L'enquête en direct (§18.26) : les trois trouvailles les plus fortes, chacune vers sa preuve. */}
+        <Dossier card={main} />
         {/* Fiche masquée : /og/* et /c/:id répondent 404 / 410 à tous, l'image ne se télécharge pas et le lien ne montre rien. */}
         {!visitor && !(claimed && me?.hidden) && <ShareBar item={item} toast={toast.show} />}
         {/* Dénonce un complice (§18.6), juste après le partage. */}

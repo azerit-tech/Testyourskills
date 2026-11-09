@@ -1,7 +1,7 @@
 // Mode démo : simule l'API avec les fixtures et une progression réaliste.
 // Pseudos spéciaux : "unknown" (inconnu), "org" (organisation), "ratelimit" (429),
 // "slow" (attente longue puis timeout). Les pseudos des fixtures donnent leur carte.
-import type { CardData, ComparisonData, JobState, ProgressEvent, Stat, StatCode } from "../../../shared/types";
+import type { CardData, ComparisonData, Finding, JobState, ProgressEvent, Stat, StatCode } from "../../../shared/types";
 import { FIXTURES, FIXTURE_COMPARISON } from "../../../shared/fixtures";
 import type { CaseInfo, CreateInput, CreateResult } from "./api";
 import { ApiError } from "./errors";
@@ -151,6 +151,33 @@ const CV_FACTS: Record<StatCode, { fr: string; en: string }[]> = {
   ],
 };
 
+/** L'enquête en direct en démo (§18.26) : huit trouvailles, de la plus banale à la plus folle. */
+const NB = " ";
+function mockFindings(login: string): Finding[] {
+  const gh = `https://github.com/${login}`;
+  const f = (kind: string, score: number, fr: string, en: string, key: [string, string], proof = gh): Finding => ({
+    kind,
+    source: "github",
+    score,
+    text: { fr, en },
+    key: { fr: key[0], en: key[1] },
+    proof,
+  });
+  return [
+    f("account_age", 14, `Compte GitHub ouvert en avril${NB}2016\u00a0: 10${NB}ans de maison.`, `GitHub account opened in April${NB}2016: 10${NB}years on the books.`, [`10${NB}ans`, `10${NB}years`]),
+    f("top_starred", 44, `Repo le plus étoilé\u00a0: dotfiles, 312${NB}étoiles.`, `Most-starred repo: dotfiles, 312${NB}stars.`, [`312${NB}étoiles`, `312${NB}stars`], `${gh}/dotfiles`),
+    f("longest_streak", 47, `Plus longue série de l'année\u00a0: 43${NB}jours de contributions d'affilée.`, `Longest streak of the year: 43${NB}days of contributions in a row.`, [`43${NB}jours`, `43${NB}days`]),
+    f("abandoned_repo", 50, "Repo abandonné le plus ancien\u00a0: todo-app-v3, dernier push en 2018.", "Oldest abandoned repo: todo-app-v3, last push in 2018.", ["2018", "2018"], `${gh}/todo-app-v3`),
+    f("accomplice", 57, "Complice principal\u00a0: @camroux, 214 commits sur les mêmes repos.", "Main accomplice: @camroux, 214 commits on the same repos.", ["@camroux", "@camroux"], "https://github.com/camroux"),
+    f("lazy_message", 58, `Message de commit préféré\u00a0: «\u00a0fix\u00a0», 37${NB}fois.`, `Favourite commit message: “fix”, 37${NB}times.`, [`37${NB}fois`, `37${NB}times`]),
+    f("night_share", 70, `61${NB}% des derniers commits partent entre 22${NB}h et 5${NB}h.`, `61% of recent commits go out between 10${NB}p.m. and 5${NB}a.m.`, [`61${NB}%`, "61%"]),
+    f("first_commit", 74, `Plus vieux commit retrouvé\u00a0: 14${NB}mars 2016, à 2${NB}h${NB}47 du matin.`, `Oldest commit on record: March${NB}14, 2016, at 2:47${NB}a.m.`, [`14${NB}mars 2016`, `March${NB}14, 2016`]),
+  ];
+}
+/** Les trouvailles tombent après la collecte simulée (un quart de l'attente) : la fiche est prête avant la fin, comme souvent en vrai. */
+const FINDINGS_AT = 0.25;
+const strongest3 = (list: Finding[]) => [...list].sort((a, b) => b.score - a.score).slice(0, 3);
+
 function withFacts(card: CardData): CardData {
   const bank = card.source === "cv" ? CV_FACTS : GH_FACTS;
   const stats: Stat[] = card.stats.map((s) => ({ ...s, facts: bank[s.code] }));
@@ -173,6 +200,7 @@ function buildCard(key: FixtureKey, id: string, job: MockJob | null): CardData {
     card.avatarUrl = `https://github.com/${login}.png?size=256`;
   }
   if (photos.has(id)) card.avatarUrl = MOCK_PHOTO;
+  if (card.source === "github") card.findings = strongest3(mockFindings(card.login ?? "dev"));
   return card;
 }
 
@@ -184,6 +212,7 @@ function buildComparison(id: string, job: MockJob | null): ComparisonData {
     cmp.github = { ...cmp.github, name: login, login, initials: initialsOf(login), avatarUrl: `https://github.com/${login}.png?size=256` };
     cmp.cv = { ...cmp.cv, name: login, initials: initialsOf(login) };
   }
+  cmp.github = { ...cmp.github, findings: strongest3(mockFindings(cmp.github.login ?? "dev")) };
   if (photos.has(id)) {
     cmp.cv = { ...cmp.cv, avatarUrl: MOCK_PHOTO };
     cmp.github = { ...cmp.github, avatarUrl: MOCK_PHOTO };
@@ -244,7 +273,10 @@ export const mockApi = {
     const elapsed = job ? Date.now() - job.start : Infinity;
     if (job && elapsed < 0) return { state: "pending", progress: [], queue: Math.ceil(-elapsed / 1500) };
     if (job && elapsed < job.doneAt) {
-      return { state: "pending", progress: job.timeline.filter((e) => e.at <= elapsed) };
+      const progress = job.timeline.filter((e) => e.at <= elapsed);
+      const github = job.kind !== "cv" && job.kind !== "unknown" && job.kind !== "org";
+      if (!github || elapsed < job.doneAt * FINDINGS_AT) return { state: "pending", progress };
+      return { state: "pending", progress, findings: mockFindings(job.login || "dev") };
     }
     if (kind === "unknown")
       return {

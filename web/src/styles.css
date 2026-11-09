@@ -860,6 +860,78 @@ svg {
   transition: width 0.4s linear;
 }
 
+/* l'enquête en direct (§18.26) : une pièce versée au dossier toutes les 2,5 s,
+   les précédentes en pile dessous ; la progression passe en petit */
+.load-dossier {
+  position: absolute;
+  left: var(--gutter);
+  right: var(--gutter);
+  top: max(20px, env(safe-area-inset-top));
+  bottom: 132px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.pile {
+  display: grid;
+  width: 100%;
+  max-width: 560px;
+}
+.pile > * {
+  grid-area: 1 / 1;
+}
+.pile-sheet {
+  border-radius: 20px;
+  background: var(--ink-1);
+}
+.pile-sheet.is-1 {
+  transform: translateY(8px) rotate(-2deg);
+}
+.pile-sheet.is-2 {
+  transform: translateY(14px) rotate(2.5deg);
+  opacity: 0.6;
+}
+.piece {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 22px 20px 26px;
+  border-radius: 20px;
+  border: 1px solid var(--lilac-faint);
+  background: var(--ink-0);
+  animation: piece-in 0.5s var(--ease-out) both;
+}
+@keyframes piece-in {
+  from {
+    opacity: 0;
+    transform: translateY(-32px) rotate(-3deg);
+  }
+}
+.piece-no {
+  font: 500 12px/1 var(--f-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--lilac-dim);
+}
+.piece-text {
+  font: 500 clamp(23px, 6.2vw, 34px) / 1.2 var(--f-text);
+  color: var(--cream);
+  text-wrap: balance;
+}
+.finding-key {
+  font-weight: 700;
+  color: var(--blush);
+}
+.load-foot.is-quiet .load-lines {
+  min-height: 0;
+}
+.load-foot.is-quiet .load-line {
+  font: 400 13px/1.35 var(--f-text);
+  text-transform: none;
+  color: var(--lilac-dim);
+}
+
 .stage-slot {
   position: relative;
   width: var(--card-w);
@@ -1143,6 +1215,44 @@ svg {
 /* marine : la fiche au-dessus est souvent prune */
 .out {
   background: var(--navy);
+}
+
+/* « Le dossier » (§18.26) : les trois trouvailles les plus fortes, chacune vers sa preuve */
+.dossier-list {
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+.dossier-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "no proof"
+    "text text";
+  gap: 8px 12px;
+  min-height: 44px;
+  padding: 14px 16px 16px;
+  border-radius: 16px;
+  background: var(--ink-0);
+}
+a.dossier-item:hover {
+  background: var(--ink-1);
+}
+.dossier-item .piece-no {
+  grid-area: no;
+}
+.dossier-proof {
+  grid-area: proof;
+  font: 500 12px/1 var(--f-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--blush);
+}
+.dossier-text {
+  grid-area: text;
+  font: 500 17px/1.35 var(--f-text);
+  color: var(--cream);
+  text-wrap: pretty;
 }
 /* rang de la semaine (§18.22) : une ligne forte, en tête du partage */
 .after-block .week-rank {

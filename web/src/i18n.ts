@@ -85,6 +85,8 @@ const fr = {
   waiting: {
     title: "Chargement du dossier",
     elapsed: "écoulé",
+    /** L'enquête en direct (§18.26) : le numéro de la trouvaille versée au dossier. */
+    piece: (n: number) => `Pièce ${String(n).padStart(2, "0")}`,
     /** Fiche en file d'attente : n fiches passent avant (rang dans la file). */
     queue: (n: number) => (n === 1 ? "1 dossier devant toi au commissariat" : `${n} dossiers devant toi au commissariat`),
     progress: {
@@ -190,8 +192,18 @@ const fr = {
       linkedinHint: "Texte copié : colle-le dans ton post LinkedIn.",
       copiedLink: "Lien copié.",
       downloadDemo: "Image indisponible en mode démo (rendue par le serveur).",
-      text: (stars: string, overall: number, profile: string | null, status: string | null, secs: number, url: string, rank: string | null = null) =>
-        `Fiche ${stars}, ${overall}${profile ? ` · ${profile}` : ""}${rank ? ` · ${rank}` : ""}.${status ? ` Chef d'accusation : « ${status} ».` : ""} Interrogatoire par une IA : ${secs} s. Fais la tienne : ${url}`,
+      /** `finding` : la trouvaille la plus forte (§18.26), à la place du chef d'accusation quand elle existe. */
+      text: (
+        stars: string,
+        overall: number,
+        profile: string | null,
+        status: string | null,
+        secs: number,
+        url: string,
+        rank: string | null = null,
+        finding: string | null = null,
+      ) =>
+        `Fiche ${stars}, ${overall}${profile ? ` · ${profile}` : ""}${rank ? ` · ${rank}` : ""}.${finding ? ` ${finding}` : status ? ` Chef d'accusation : « ${status} ».` : ""} Interrogatoire par une IA : ${secs} s. Fais la tienne : ${url}`,
       textCompare: (cv: number, gh: number, profile: string | null, headline: string, url: string, rank: string | null = null) =>
         `Mon CV : ${cv}. Mon GitHub : ${gh}${profile ? ` · ${profile}` : ""}${rank ? ` · ${rank}` : ""}. ${headline}. Fais la tienne : ${url}`,
     },
@@ -210,6 +222,11 @@ const fr = {
       noPhoto: "Ta fiche n'a pas encore de photo. Prends celle de ton profil LinkedIn, rien d'autre n'est lu.",
       updated: "Photo mise à jour.",
       error: "LinkedIn n'a pas voulu, réessaie.",
+    },
+    /* L'enquête en direct (§18.26) : les trois trouvailles les plus fortes, chacune vers sa preuve. */
+    dossier: {
+      title: "Le dossier",
+      proof: "Preuve",
     },
     why: {
       title: "Pièces à conviction",
@@ -463,6 +480,7 @@ const en: Dict = {
   waiting: {
     title: "Loading your file",
     elapsed: "elapsed",
+    piece: (n) => `Exhibit ${String(n).padStart(2, "0")}`,
     queue: (n) => (n === 1 ? "1 suspect ahead of you at the station" : `${n} suspects ahead of you at the station`),
     progress: {
       lazy_commits: (n) => `Reading your ${n ?? "many"} “wip” commits…`,
@@ -562,8 +580,8 @@ const en: Dict = {
       linkedinHint: "Text copied: paste it into your LinkedIn post.",
       copiedLink: "Link copied.",
       downloadDemo: "Image unavailable in demo mode (rendered by the server).",
-      text: (stars, overall, profile, status, secs, url, rank = null) =>
-        `${stars} sheet, ${overall}${profile ? ` · ${profile}` : ""}${rank ? ` · ${rank}` : ""}.${status ? ` Charge: “${status}”.` : ""} Interrogated by an AI for ${secs}s. Make yours: ${url}`,
+      text: (stars, overall, profile, status, secs, url, rank = null, finding = null) =>
+        `${stars} sheet, ${overall}${profile ? ` · ${profile}` : ""}${rank ? ` · ${rank}` : ""}.${finding ? ` ${finding}` : status ? ` Charge: “${status}”.` : ""} Interrogated by an AI for ${secs}s. Make yours: ${url}`,
       textCompare: (cv, gh, profile, headline, url, rank = null) =>
         `My CV: ${cv}. My GitHub: ${gh}${profile ? ` · ${profile}` : ""}${rank ? ` · ${rank}` : ""}. ${headline}. Make yours: ${url}`,
     },
@@ -580,6 +598,10 @@ const en: Dict = {
       noPhoto: "Your sheet has no photo yet. Use your LinkedIn profile picture, nothing else is read.",
       updated: "Photo updated.",
       error: "LinkedIn said no. Try again.",
+    },
+    dossier: {
+      title: "The file",
+      proof: "Proof",
     },
     why: {
       title: "Exhibits",

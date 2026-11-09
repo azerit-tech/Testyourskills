@@ -3,9 +3,16 @@
 // durée estimée, et les messages du §6.2 passent dessous, nourris par les
 // ProgressEvent quand il y en a, sinon par du remplissage. En file d'attente,
 // une seule ligne dit combien de fiches passent avant, et la barre attend.
+//
+// L'enquête en direct (§18.26) : dès que la collecte a parlé, les trouvailles
+// tombent une à une, toutes les 2,5 s, comme des pièces versées au dossier ; la
+// dernière reste. Les messages de progression passent alors en petit, sous la
+// barre. Fiche prête avant la fin : `ready`, et on rend la main (`onRelease`)
+// une fois au moins trois pièces versées et lues.
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ProgressEvent } from "../../../shared/types";
+import type { Finding, ProgressEvent } from "../../../shared/types";
 import { useT } from "../i18n";
+import { FindingText } from "./Findings";
 import { PAINTED, SCENES } from "./LoadingScenes";
 
 interface Line {
@@ -20,9 +27,26 @@ const FILL_AFTER = 2300; // silence avant un message de remplissage
 const SLIDE_MS = 4600; // une illustration toutes les 4 à 5 s
 /** Durée estimée d'une carte : la barre y arrive presque, jamais tout à fait. */
 const EXPECTED_MS = 11_000;
+/** Une trouvaille toutes les 2,5 s. */
+const PIECE_MS = 2500;
+/** Fiche prête : on laisse au moins ce nombre de trouvailles tomber avant la révélation. */
+const MIN_PIECES = 3;
 
-export function Waiting({ progress, startedAt, queue }: { progress: ProgressEvent[]; startedAt: number; queue?: number }) {
-  const { t } = useT();
+interface WaitingProps {
+  progress: ProgressEvent[];
+  startedAt: number;
+  queue?: number;
+  /** Les trouvailles déjà sorties, dans l'ordre où les montrer (§18.26). */
+  findings?: Finding[];
+  /** La fiche est prête : rendre la main dès que les trouvailles minimales sont lues. */
+  ready?: boolean;
+  onRelease?: () => void;
+}
+
+const idOf = (f: Finding) => `${f.source}:${f.kind}`;
+
+export function Waiting({ progress, startedAt, queue, findings = [], ready = false, onRelease }: WaitingProps) {
+  const { t, lang } = useT();
   const [lines, setLines] = useState<Line[]>([]);
   const [now, setNow] = useState(() => Date.now());
   const consumed = useRef(0);
@@ -31,6 +55,15 @@ export function Waiting({ progress, startedAt, queue }: { progress: ProgressEven
   const usedFillers = useRef<Set<number>>(new Set());
   const progressRef = useRef(progress);
   progressRef.current = progress;
+  // Les pièces versées, dans l'ordre où elles sont tombées : une source arrivée
+  // plus tard (LinkedIn) se range après, sans réordonner ce qui est déjà lu.
+  const [pieces, setPieces] = useState<Finding[]>([]);
+  const piecesRef = useRef<Finding[]>([]);
+  const lastPieceAt = useRef(0);
+  const findingsRef = useRef(findings);
+  findingsRef.current = findings;
+  const release = useRef({ ready, onRelease, done: false });
+  release.current = { ...release.current, ready, onRelease };
 
   const known = t.waiting.progress;
 
@@ -38,6 +71,28 @@ export function Waiting({ progress, startedAt, queue }: { progress: ProgressEven
     const tick = () => {
       const ts = Date.now();
       setNow(ts);
+      // Fiche prête : au moins trois pièces (ou toutes s'il y en a moins), la dernière lue.
+      // Vérifié avant de verser la suivante, sinon elle tomberait au moment même de rendre la main.
+      const r = release.current;
+      if (r.done) return;
+      if (r.ready) {
+        const need = Math.min(MIN_PIECES, new Set([...piecesRef.current, ...findingsRef.current].map(idOf)).size);
+        if (piecesRef.current.length >= need && (need === 0 || ts - lastPieceAt.current >= PIECE_MS)) {
+          r.done = true;
+          r.onRelease?.();
+          return;
+        }
+      }
+      // Une pièce de plus au dossier, toutes les PIECE_MS.
+      if (ts - lastPieceAt.current >= PIECE_MS) {
+        const seen = new Set(piecesRef.current.map(idOf));
+        const next = findingsRef.current.find((f) => !seen.has(idOf(f)));
+        if (next) {
+          lastPieceAt.current = ts;
+          piecesRef.current = [...piecesRef.current, next];
+          setPieces(piecesRef.current);
+        }
+      }
       const evts = progressRef.current.filter((e) => known[e.key]);
       if (ts - lastAt.current < MIN_GAP) return;
       if (consumed.current < evts.length) {
@@ -74,7 +129,9 @@ export function Waiting({ progress, startedAt, queue }: { progress: ProgressEven
   const queued = queue !== undefined && queue > 0;
   const queueLine: Line | undefined = queued ? { uid: -(queue ?? 1), key: "queue" } : undefined;
   const current = queueLine ?? lines[lines.length - 1];
-  const previous = queued ? undefined : lines[lines.length - 2];
+  // L'enquête a commencé : la progression passe en une petite ligne, les pièces prennent la place.
+  const piece = pieces[pieces.length - 1];
+  const previous = queued || piece ? undefined : lines[lines.length - 2];
   const lineText = (l: Line) => (l.key === "queue" ? t.waiting.queue(queue ?? 1) : textOf(l));
 
   const elapsed = Math.max(0, now - startedAt);
@@ -111,7 +168,23 @@ export function Waiting({ progress, startedAt, queue }: { progress: ProgressEven
         </div>
       </div>
 
-      <div className="load-foot">
+      {piece && (
+        <div className="load-dossier" aria-hidden>
+          {/* les pièces d'avant, en pile sous la dernière */}
+          <div className="pile">
+            {pieces.length > 2 && <span className="pile-sheet is-2" />}
+            {pieces.length > 1 && <span className="pile-sheet is-1" />}
+            <article className="piece" key={idOf(piece)}>
+              <p className="piece-no">{t.waiting.piece(pieces.length)}</p>
+              <p className="piece-text">
+                <FindingText finding={piece} lang={lang} />
+              </p>
+            </article>
+          </div>
+        </div>
+      )}
+
+      <div className={`load-foot${piece ? " is-quiet" : ""}`}>
         <div className="load-bar" aria-hidden>
           <span style={{ width: `${pct}%` }} />
         </div>
@@ -132,7 +205,7 @@ export function Waiting({ progress, startedAt, queue }: { progress: ProgressEven
         </p>
         {/* Une seule annonce à la fois pour les lecteurs d'écran. */}
         <p className="sr-only" aria-live="polite">
-          {current ? lineText(current) : ""}
+          {piece ? `${t.waiting.piece(pieces.length)} : ${piece.text[lang]}` : current ? lineText(current) : ""}
         </p>
       </div>
     </section>
