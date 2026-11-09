@@ -1621,6 +1621,11 @@ svg {
   color: var(--text);
   border-color: var(--dim);
 }
+/* pendant le carton de fin, son bouton « Voir ma fiche » fait la même chose :
+   la page retire « Passer » elle-même, sans attendre que le carton le couvre */
+.page-result:has(.dive-hud.is-mission) .skip-btn {
+  visibility: hidden;
+}
 
 /* le son de l'ascenseur, à côté du bouton Passer */
 .sound-btn {
