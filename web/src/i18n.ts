@@ -268,7 +268,7 @@ const fr = {
     sections: [
       {
         h: "Ce qu'on garde",
-        p: "Les faits publics tirés de GitHub (déjà calculés), les constats de l'IA, les notes, les statuts. Ton email, seulement si tu le donnes.",
+        p: "Les faits publics tirés de GitHub (déjà calculés), les constats de l'IA, les notes, les statuts. Ton email, seulement si tu le donnes. Si tu es arrivé par le lien d'une fiche partagée, l'identifiant de cette fiche.",
       },
       {
         h: "Ce qu'on ne garde jamais",
@@ -292,7 +292,7 @@ const fr = {
       },
       {
         h: "Mesure",
-        p: "Quatre événements anonymes, enregistrés par notre serveur : fiche générée, fiche partagée, email donné, clic vers azerit.tech. Pas de cookie publicitaire, pas d'outil tiers.",
+        p: "Cinq événements anonymes, enregistrés par notre serveur : fiche générée, fiche partagée, visite par un lien partagé, email donné, clic vers azerit.tech. Pas de cookie publicitaire, pas d'outil tiers.",
       },
     ],
     contact: "Une question : hello@azerit.tech",
@@ -562,7 +562,7 @@ const en: Dict = {
     sections: [
       {
         h: "What we keep",
-        p: "Public facts derived from GitHub (already computed), the AI's findings, the ratings, the statuses. Your email, only if you give it.",
+        p: "Public facts derived from GitHub (already computed), the AI's findings, the ratings, the statuses. Your email, only if you give it. If you arrived through a shared sheet's link, that sheet's ID.",
       },
       {
         h: "What we never keep",
@@ -586,7 +586,7 @@ const en: Dict = {
       },
       {
         h: "Measurement",
-        p: "Four anonymous events, recorded by our own server: sheet generated, sheet shared, email given, click to azerit.tech. No ad cookies, no third-party tools.",
+        p: "Five anonymous events, recorded by our own server: sheet generated, sheet shared, visit from a shared link, email given, click to azerit.tech. No ad cookies, no third-party tools.",
       },
     ],
     contact: "Questions: hello@azerit.tech",
