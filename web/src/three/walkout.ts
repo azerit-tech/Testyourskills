@@ -35,7 +35,7 @@ import { createElevatorSound } from "./elevatorSound";
 import { createHud, type Hud } from "./hud";
 import { HUD_STAR_AT, type HudTexts } from "./hudTexts";
 import { createRadioSound } from "./radioSound";
-import { LensEffect, WhiteBalanceEffect, whiteBalanceGains } from "./lens";
+import { LensEffect, WhiteBalanceEffect, unlitColor, whiteBalanceGains } from "./lens";
 import { createPlayer } from "./player";
 import { createWorkstation } from "./workstation";
 import { createCityBackdrop, createGlassReflection, createStudioEnvironment } from "./stage";
@@ -148,6 +148,8 @@ const CARD_POS = V(0, 1.45, -6.3);
 const CARD_W3 = 1.2;
 const CARD_H3 = (CARD_W3 * 520) / 360;
 const TELL_POS = V(0, 1.24, 0.5);
+/** La balance des blancs de la caméra une fois dans l'open space (kelvins). */
+const OFFICE_KELVIN = 5600;
 /** Les plantes : x, z, hauteur, rotation (à reporter dans tools/bake/office.py, PLANTS). */
 const PLANTS: [number, number, number, number][] = [
   [-2.25, DESK_Z - 1.3, 1.65, 0.35],
@@ -520,8 +522,9 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
    * émission, ni reflet teinté ; seul le relief du biseau les modèle. */
   const matte = (color: THREE.ColorRepresentation) => new THREE.MeshStandardMaterial({ color, roughness: 0.62, metalness: 0, envMapIntensity: 0.25 });
   const CREAM = PALETTE.cream;
-  const text3D = (str: string, size: number, depth: number, mat: THREE.Material, maxWidth?: number): THREE.Mesh => {
-    const g = new TextGeometry(str, { font: assets.font, size, depth, curveSegments: 6, bevelEnabled: true, bevelThickness: depth * 0.22, bevelSize: size * 0.025, bevelSegments: 3 });
+  /** Un texte en relief ; `mat` : une matière, ou [face, tranche et biseau]. */
+  const text3D = (str: string, size: number, depth: number, mat: THREE.Material | THREE.Material[], maxWidth?: number, bevel = 0.025): THREE.Mesh => {
+    const g = new TextGeometry(str, { font: assets.font, size, depth, curveSegments: 6, bevelEnabled: true, bevelThickness: depth * 0.22, bevelSize: size * bevel, bevelSegments: 3 });
     g.computeBoundingBox();
     g.center();
     const m = new THREE.Mesh(g, mat);
@@ -624,10 +627,14 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
       cardReady = true;
     })
     .catch(() => undefined);
-  // la note qui claque, en crème comme sur la fiche
-  const slamMat = matte(CREAM);
-  slamMat.transparent = true;
-  const slam = text3D(String(o.overall), 0.95, 0.22, slamMat);
+  // La note qui claque : un aplat crème que l'éclairage ne grise pas, cerné
+  // d'encre (la tranche et un biseau large) pour se détacher de la carte.
+  // Sans éclairage ni émission : sa couleur est corrigée pour sortir exacte
+  // du développement (balance des blancs du bureau, ACES), sans lueur.
+  const wbOffice = whiteBalanceGains(OFFICE_KELVIN);
+  const unlit = (hex: string) => new THREE.MeshBasicMaterial({ color: unlitColor(hex, wbOffice), transparent: true, fog: false });
+  const slamMats = [unlit(CREAM), unlit(PALETTE.ink0)];
+  const slam = text3D(String(o.overall), 0.95, 0.22, slamMats, undefined, 0.06);
   slam.visible = false;
   scene.add(slam);
 
@@ -659,7 +666,7 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
   // réglée sur 5 600 K une fois dehors, comme une balance automatique qui
   // s'adapte aux suspensions (≈ 4 500 K) : il leur reste un peu de chaleur.
   const WB_CABIN = whiteBalanceGains(6504);
-  const WB_OFFICE = whiteBalanceGains(5600);
+  const WB_OFFICE = whiteBalanceGains(OFFICE_KELVIN);
   const whiteBalance = new WhiteBalanceEffect(WB_CABIN.clone());
   // Ni bloom ni saleté d'objectif (SPEC §18.21) : le style mat n'éclaire
   // rien au-delà de sa matière. Reste l'aberration radiale, fusionnée dans la
@@ -1107,7 +1114,7 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
         slam.position.lerpVectors(from, target, pout);
         slam.rotation.y = lerp(0.5, 0, outCubic(pin));
         slam.scale.setScalar(Math.max(0.001, lerp(outBack(pin), 0.2, pout) * (pin < 1 ? lerp(2.2, 1, outCubic(pin)) : 1)));
-        slamMat.opacity = pin * (1 - seg(ts, 1.1, 0.2));
+        for (const m of slamMats) m.opacity = pin * (1 - seg(ts, 1.1, 0.2));
       } else slam.visible = false;
     } else card.visible = false;
 

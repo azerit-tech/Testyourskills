@@ -85,3 +85,39 @@ export function whiteBalanceGains(kelvin: number): THREE.Vector3 {
   const lum = 0.2126 * g.x + 0.7152 * g.y + 0.0722 * g.z;
   return g.divideScalar(lum);
 }
+
+/** L'ACES de three.js (ACESFilmicToneMapping, exposition 1), en sRGB linéaire. */
+function acesFilmic(c: THREE.Vector3): THREE.Vector3 {
+  const x = c.clone().divideScalar(0.6);
+  const i = new THREE.Vector3(
+    0.59719 * x.x + 0.35458 * x.y + 0.04823 * x.z,
+    0.076 * x.x + 0.90834 * x.y + 0.01566 * x.z,
+    0.0284 * x.x + 0.13383 * x.y + 0.83777 * x.z,
+  );
+  const fit = (v: number) => (v * (v + 0.0245786) - 0.000090537) / (v * (0.983729 * v + 0.432951) + 0.238081);
+  i.set(fit(i.x), fit(i.y), fit(i.z));
+  return new THREE.Vector3(
+    1.60475 * i.x - 0.53108 * i.y - 0.07367 * i.z,
+    -0.10208 * i.x + 1.10813 * i.y - 0.00605 * i.z,
+    -0.00327 * i.x - 0.07276 * i.y + 1.07602 * i.z,
+  ).clampScalar(0, 1);
+}
+
+/**
+ * La couleur d'une matière non éclairée qui sort à l'écran exactement en `hex`
+ * après la balance des blancs (`gains`) et l'ACES du développement : un aplat
+ * de la palette, ni grisé par l'ACES ni plus lumineux que sa couleur.
+ */
+export function unlitColor(hex: THREE.ColorRepresentation, gains: THREE.Vector3): THREE.Color {
+  const c = new THREE.Color(hex);
+  // Un canal à 1 ne s'atteint qu'à l'infini : on vise juste en dessous. Les
+  // canaux de l'ACES se mêlent un peu : un crème très saturé en rouge et vert
+  // sort avec un bleu à peine plus haut (#fff9cb donne #fdf9cf).
+  const target = new THREE.Vector3(c.r, c.g, c.b).clampScalar(0, 0.98);
+  const x = target.clone();
+  for (let k = 0; k < 60; k++) {
+    const y = acesFilmic(x);
+    x.set(x.x * (target.x / Math.max(y.x, 1e-4)), x.y * (target.y / Math.max(y.y, 1e-4)), x.z * (target.z / Math.max(y.z, 1e-4)));
+  }
+  return new THREE.Color(x.x / gains.x, x.y / gains.y, x.z / gains.z);
+}
