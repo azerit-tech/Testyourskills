@@ -28,6 +28,12 @@ const fr = {
     tabGithub: "Ton GitHub",
     loginLabel: "Pseudo GitHub ou URL du profil",
     loginPlaceholder: "ton-pseudo",
+    /** Le champ unique, quand le serveur lit LinkedIn (§18.24). */
+    entryLabel: "Pseudo GitHub ou lien LinkedIn",
+    entryPlaceholder: "pseudo GitHub ou lien LinkedIn",
+    errEntry: "Ni un pseudo GitHub, ni un lien de profil LinkedIn.",
+    errLinkedinOff: "Entrée LinkedIn indisponible, tape ton pseudo GitHub.",
+    errLinkedinCv: "Avec un CV, donne ton pseudo GitHub.",
     submit: "Ouvrir mon dossier",
     submitBoth: "Comparer les deux",
     submitting: "Ouverture…",
@@ -97,6 +103,8 @@ const fr = {
       recruiter: () => "Un recruteur aurait déjà fini. On prend le temps.",
       compare: (n?: number) => `Comparaison avec ${n ? n.toLocaleString("fr-FR") : "des milliers de"} devs sourcés par Azerit…`,
       profile: () => "Profil trouvé. Il existe, c'est un début.",
+      linkedin_wait: () => "Lecture du profil LinkedIn public…",
+      linkedin: () => "LinkedIn retrouvé. Comparaison des déclarations…",
       repos: (n?: number) => `${n ?? "Quelques"} repos publics repérés, forks exclus…`,
       calendar: () => "Lecture du calendrier de contributions sur 52 semaines…",
       commits: (n?: number) => `Lecture de ${n ?? 100} messages de commit…`,
@@ -155,6 +163,8 @@ const fr = {
       leagueGithub: "GitHub",
       leagueCv: "CV",
       leagueBoth: "GitHub × CV",
+      leagueLinkedin: "LinkedIn",
+      leagueBothLinkedin: "GitHub × LinkedIn",
       position: "Spécialité",
       club: "Affiliation",
       freeAgent: "Sans bande",
@@ -204,8 +214,9 @@ const fr = {
         finding: string | null = null,
       ) =>
         `Fiche ${stars}, ${overall}${profile ? ` · ${profile}` : ""}${rank ? ` · ${rank}` : ""}.${finding ? ` ${finding}` : status ? ` Chef d'accusation : « ${status} ».` : ""} Interrogatoire par une IA : ${secs} s. Fais la tienne : ${url}`,
-      textCompare: (cv: number, gh: number, profile: string | null, headline: string, url: string, rank: string | null = null) =>
-        `Mon CV : ${cv}. Mon GitHub : ${gh}${profile ? ` · ${profile}` : ""}${rank ? ` · ${rank}` : ""}. ${headline}. Fais la tienne : ${url}`,
+      /** `src` : « CV » ou « LinkedIn » (§18.24). */
+      textCompare: (src: string, cv: number, gh: number, profile: string | null, headline: string, url: string, rank: string | null = null) =>
+        `Mon ${src} : ${cv}. Mon GitHub : ${gh}${profile ? ` · ${profile}` : ""}${rank ? ` · ${rank}` : ""}. ${headline}. Fais la tienne : ${url}`,
     },
     /* Rang de la semaine (§18.22), en tête de l'après-fiche. « n° 1 » plutôt que « 1er » : rien ne s'accorde. */
     week: {
@@ -232,6 +243,7 @@ const fr = {
       title: "Pièces à conviction",
       overallLine: "Note globale = TEC 30 % · SHIP 20 % · ARCH 20 % · DOC 15 % · XP 15 %.",
       tabCv: "Fiche CV",
+      tabLinkedin: "Fiche LinkedIn",
       tabGithub: "Fiche GitHub",
     },
     contest: {
@@ -251,6 +263,8 @@ const fr = {
     },
     addCv: { title: "Ajoute ton CV pour voir l'écart", text: "Ce que ton CV déclare contre ce que ton GitHub prouve. Deux fiches, le butin entre les deux.", btn: "Ajouter mon CV" },
     addGithub: { title: "Ajoute ton GitHub pour voir l'écart", text: "Ton CV a parlé. Voyons si ton code est d'accord.", btn: "Ajouter mon GitHub" },
+    /** Fiche LinkedIn seule (§18.24) : un seul appel, relancé en comparaison. */
+    prove: { title: "Ajoute ton GitHub pour prouver", label: "Pseudo GitHub", btn: "Prouver" },
     claim: {
       kicker: "C'est ta fiche ?",
       kickerLawyer: "Avis de recherche à ton nom ?",
@@ -304,10 +318,13 @@ const fr = {
     ghLabel: "Ce que ton GitHub prouve",
     cvShort: "CV",
     ghShort: "GitHub",
+    liLabel: "Ce que ton LinkedIn déclare",
+    liShort: "LinkedIn",
     loot: "Le butin",
     deltaTitle: "Le butin, stat par stat",
     legendUp: "le code vaut plus",
     legendDown: "le CV a volé",
+    legendDownLi: "LinkedIn a volé",
     overall: "Globale",
     buzzHint: "BUZZ : plus bas, c'est mieux",
     switchLabel: "Fiche affichée",
@@ -388,7 +405,11 @@ const fr = {
       },
       {
         h: "Photo LinkedIn",
-        p: "Seulement si tu connectes LinkedIn toi-même : on récupère ta photo de profil, rangée avec la fiche et supprimée avec elle. Rien d'autre n'est lu sur LinkedIn.",
+        p: "Seulement si tu connectes LinkedIn toi-même : on récupère ta photo de profil, rangée avec la fiche et supprimée avec elle. Rien d'autre n'est lu par cette connexion.",
+      },
+      {
+        h: "Profil LinkedIn",
+        p: "Si tu donnes un lien LinkedIn, ou si ton GitHub en affiche un, un service tiers de collecte de profils publics lit ce profil public. On le garde 30 jours pour ne pas le relire : titre, résumé, postes, formation, compétences. Ni photo, ni lieu, ni contact. La fiche suit la règle des 90 jours. Pour t'y opposer : masque ta fiche (« C'est moi »), supprime-la, le profil gardé part avec elle, ou écris-nous.",
       },
       {
         h: "Mesure",
@@ -425,6 +446,11 @@ const en: Dict = {
     tabGithub: "Your GitHub",
     loginLabel: "GitHub username or profile URL",
     loginPlaceholder: "your-username",
+    entryLabel: "GitHub username or LinkedIn link",
+    entryPlaceholder: "GitHub username or LinkedIn link",
+    errEntry: "Neither a GitHub username nor a LinkedIn profile link.",
+    errLinkedinOff: "LinkedIn entry unavailable, type your GitHub username.",
+    errLinkedinCv: "With a CV, give your GitHub username.",
     submit: "Open my file",
     submitBoth: "Compare both",
     submitting: "Opening…",
@@ -490,6 +516,8 @@ const en: Dict = {
       recruiter: () => "A recruiter would be done by now. We're taking our time.",
       compare: (n) => `Comparing with ${n ? n.toLocaleString("en-US") : "thousands of"} devs sourced by Azerit…`,
       profile: () => "Profile found. It exists, that's a start.",
+      linkedin_wait: () => "Reading the public LinkedIn profile…",
+      linkedin: () => "LinkedIn found. Comparing the claims…",
       repos: (n) => `${n ?? "A few"} public repos spotted, forks excluded…`,
       calendar: () => "Reading 52 weeks of contribution calendar…",
       commits: (n) => `Reading ${n ?? 100} commit messages…`,
@@ -544,6 +572,8 @@ const en: Dict = {
       leagueGithub: "GitHub",
       leagueCv: "CV",
       leagueBoth: "GitHub × CV",
+      leagueLinkedin: "LinkedIn",
+      leagueBothLinkedin: "GitHub × LinkedIn",
       position: "Specialty",
       club: "Affiliation",
       freeAgent: "Lone wolf",
@@ -582,8 +612,8 @@ const en: Dict = {
       downloadDemo: "Image unavailable in demo mode (rendered by the server).",
       text: (stars, overall, profile, status, secs, url, rank = null, finding = null) =>
         `${stars} sheet, ${overall}${profile ? ` · ${profile}` : ""}${rank ? ` · ${rank}` : ""}.${finding ? ` ${finding}` : status ? ` Charge: “${status}”.` : ""} Interrogated by an AI for ${secs}s. Make yours: ${url}`,
-      textCompare: (cv, gh, profile, headline, url, rank = null) =>
-        `My CV: ${cv}. My GitHub: ${gh}${profile ? ` · ${profile}` : ""}${rank ? ` · ${rank}` : ""}. ${headline}. Make yours: ${url}`,
+      textCompare: (src, cv, gh, profile, headline, url, rank = null) =>
+        `My ${src}: ${cv}. My GitHub: ${gh}${profile ? ` · ${profile}` : ""}${rank ? ` · ${rank}` : ""}. ${headline}. Make yours: ${url}`,
     },
     week: {
       line: (rank, total, gap) => `#${rank} of ${total} this week · ${gap} ${gap === 1 ? "point" : "points"} from the top 5`,
@@ -607,6 +637,7 @@ const en: Dict = {
       title: "Exhibits",
       overallLine: "Overall = TEC 30% · SHIP 20% · ARCH 20% · DOC 15% · XP 15%.",
       tabCv: "CV sheet",
+      tabLinkedin: "LinkedIn sheet",
       tabGithub: "GitHub sheet",
     },
     contest: {
@@ -626,6 +657,7 @@ const en: Dict = {
     },
     addCv: { title: "Add your CV to see the gap", text: "What your CV claims against what your GitHub proves. Two sheets, the loot in between.", btn: "Add my CV" },
     addGithub: { title: "Add your GitHub to see the gap", text: "Your CV has spoken. Let's see if your code agrees.", btn: "Add my GitHub" },
+    prove: { title: "Add your GitHub to prove it", label: "GitHub username", btn: "Prove it" },
     claim: {
       kicker: "Is this your sheet?",
       kickerLawyer: "Wanted under your name?",
@@ -679,10 +711,13 @@ const en: Dict = {
     ghLabel: "What your GitHub proves",
     cvShort: "CV",
     ghShort: "GitHub",
+    liLabel: "What your LinkedIn claims",
+    liShort: "LinkedIn",
     loot: "The loot",
     deltaTitle: "The loot, stat by stat",
     legendUp: "code is worth more",
     legendDown: "the CV stole",
+    legendDownLi: "LinkedIn stole",
     overall: "Overall",
     buzzHint: "BUZZ: lower is better",
     switchLabel: "Sheet shown",
@@ -761,7 +796,11 @@ const en: Dict = {
       },
       {
         h: "LinkedIn photo",
-        p: "Only if you connect LinkedIn yourself: we fetch your profile picture, stored with the sheet and deleted with it. Nothing else is read from LinkedIn.",
+        p: "Only if you connect LinkedIn yourself: we fetch your profile picture, stored with the sheet and deleted with it. Nothing else is read through this connection.",
+      },
+      {
+        h: "LinkedIn profile",
+        p: "If you give a LinkedIn link, or your GitHub shows one, a third-party service that collects public profiles reads that public profile. We keep it 30 days so we don't read it twice: headline, summary, positions, education, skills. No photo, location or contact details. The sheet follows the 90-day rule. To object: hide your sheet (“That's me”), delete it, and the stored profile goes with it, or write to us.",
       },
       {
         h: "Measurement",

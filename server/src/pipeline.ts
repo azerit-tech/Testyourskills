@@ -681,7 +681,13 @@ export class Pipeline {
     // Déclaratif seul (CV, ou LinkedIn sans GitHub), ou profil non dev : pas de carte GitHub (§4.7).
     if (!gh || !reading.is_dev_profile) {
       const found = linkedinUrl ? strongest(ctx.findings()) : [];
-      const card = asDeclared({ ...deps.scoreCv(reading, declared.counts, { lang, judgedInSeconds }), ...(found.length ? { findings: found } : {}), id, createdAt });
+      const card = asDeclared({
+        ...deps.scoreCv(reading, declared.counts, { lang, judgedInSeconds }),
+        ...(found.length ? { findings: found } : {}),
+        ...(linkedinUrl ? { linkedinUrl } : {}),
+        id,
+        createdAt,
+      });
       return [cvRow(card, null)];
     }
 

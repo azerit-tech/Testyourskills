@@ -2,13 +2,14 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import type { CardData, ComparisonData, Lang, WeekRank } from "../../../shared/types";
-import { STAT_CODES, starsFor } from "../../../shared/types";
+import { declaredOf, STAT_CODES, starsFor } from "../../../shared/types";
 import { pick, useT } from "../i18n";
 import { api, images, isMock, tokens, weekOf } from "../lib/api";
 import { navigate } from "../lib/router";
 import { setPrefill } from "../lib/session";
 import { copyText, isTouch, shareUrl } from "../lib/util";
 import { IconDownload, IconLink, IconLinkedIn, IconShare, IconX } from "./Icons";
+import { ProveGithub } from "./ProveGithub";
 
 /* ---------- petit toast partagé ---------- */
 
@@ -87,7 +88,8 @@ export function ShareBar({ item, toast }: { item: Shareable; toast: (m: string) 
     const cmp = item.comparison;
     // Le profil de la fiche GitHub : après la comparaison, c'est lui qui porte l'écart (Faussaire).
     const profile = cmp.github.profile ?? cmp.cv.profile;
-    return ts.textCompare(cmp.cv.overall, cmp.github.overall, profile ? pick(profile.label, lang) : null, pick(cmp.headline, lang), withUrl, rank);
+    const src = declaredOf(cmp) === "linkedin" ? "LinkedIn" : "CV";
+    return ts.textCompare(src, cmp.cv.overall, cmp.github.overall, profile ? pick(profile.label, lang) : null, pick(cmp.headline, lang), withUrl, rank);
   };
 
   const liHref = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
@@ -243,7 +245,7 @@ export function Why({ item, withSentence = true }: { item: Shareable; withSenten
       {item.kind === "comparison" && (
         <div className="seg" role="tablist" aria-label={t.compare.switchLabel}>
           <button type="button" role="tab" aria-selected={side === "cv"} onClick={() => setSide("cv")}>
-            {t.result.why.tabCv}
+            {declaredOf(item.comparison) === "linkedin" ? t.result.why.tabLinkedin : t.result.why.tabCv}
           </button>
           <button type="button" role="tab" aria-selected={side === "github"} onClick={() => setSide("github")}>
             {t.result.why.tabGithub}
@@ -291,6 +293,8 @@ export function Contest({ card }: { card: CardData }) {
 
 export function AddSource({ card }: { card: CardData }) {
   const { t } = useT();
+  // Fiche LinkedIn seule (§18.24) : un seul appel, « Ajoute ton GitHub pour prouver ».
+  if (declaredOf(card) === "linkedin") return card.linkedinUrl ? <ProveGithub linkedinUrl={card.linkedinUrl} /> : null;
   const fromGithub = card.source === "github";
   const copy = fromGithub ? t.result.addCv : t.result.addGithub;
   return (

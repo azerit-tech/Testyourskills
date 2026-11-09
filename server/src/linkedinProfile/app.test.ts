@@ -226,7 +226,7 @@ describe("entrée LinkedIn (le champ unique)", () => {
     const ctx = setup({ forUrl: async () => ({ status: "found", profile: PROFILE, githubLogin: null }) });
     const { json } = await post(ctx, { linkedin: "linkedin.com/in/camille-ardent" });
     const s = await state(ctx, json.id);
-    expect(s).toMatchObject({ state: "done", kind: "card", card: { source: "cv", declaredSource: "linkedin" } });
+    expect(s).toMatchObject({ state: "done", kind: "card", card: { source: "cv", declaredSource: "linkedin", linkedinUrl: URL_ } });
     expect(ctx.store.getCard(json.id)).toMatchObject({ source: "linkedin", login: null, facts: { linkedinUrl: URL_ } });
     expect(weekRank(ctx.store.db, json.id)).toBeNull();
     expect(ctx.calls.collect).toHaveLength(0);

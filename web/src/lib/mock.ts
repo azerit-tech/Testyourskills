@@ -1,18 +1,23 @@
 // Mode démo : simule l'API avec les fixtures et une progression réaliste.
 // Pseudos spéciaux : "unknown" (inconnu), "org" (organisation), "ratelimit" (429),
 // "slow" (attente longue puis timeout). Les pseudos des fixtures donnent leur carte.
+// LinkedIn contre GitHub (§18.24) : le pseudo "camille-ardent", ou n'importe quel
+// lien linkedin.com/in/… ; linkedin.com/in/sans-github donne la fiche LinkedIn seule.
 import type { CardData, ComparisonData, Finding, JobState, ProgressEvent, Stat, StatCode } from "../../../shared/types";
 import { FIXTURES, FIXTURE_COMPARISON } from "../../../shared/fixtures";
+import { asLinkedinCard, asLinkedinComparison } from "../../../shared/linkedinText";
 import type { CaseInfo, CreateInput, CreateResult } from "./api";
 import { ApiError } from "./errors";
 
 type FixtureKey = keyof typeof FIXTURES;
-type Kind = FixtureKey | "cmp" | "unknown" | "org" | "slow";
+/** licmp : LinkedIn contre GitHub ; li : fiche LinkedIn seule. */
+type Kind = FixtureKey | "cmp" | "licmp" | "li" | "unknown" | "org" | "slow";
 
 interface MockJob {
   kind: Kind;
   start: number;
   login?: string;
+  linkedin?: string;
   lang: "fr" | "en";
   timeline: ProgressEvent[];
   doneAt: number;
@@ -98,6 +103,11 @@ function baseTimeline(kind: Kind): { timeline: ProgressEvent[]; doneAt: number }
     const tl = [...mk(CV_TIMELINE.slice(0, 4)), ...mk(GH_TIMELINE.slice(1), 2800)].sort((a, b) => a.at - b.at);
     return { timeline: tl, doneAt: 10800 };
   }
+  if (kind === "licmp") {
+    const tl = [...mk(GH_TIMELINE), ...mk([["linkedin_wait", 1300], ["linkedin", 3000]])].sort((a, b) => a.at - b.at);
+    return { timeline: tl, doneAt: 9200 };
+  }
+  if (kind === "li") return { timeline: mk([["linkedin_wait", 300], ["linkedin", 2600], ["recruiter", 3800], ["scoring", 5000]]), doneAt: 5800 };
   if (kind === "cv") return { timeline: mk(CV_TIMELINE), doneAt: 6700 };
   if (kind === "unknown") return { timeline: mk(GH_TIMELINE.slice(0, 1)), doneAt: 1400 };
   if (kind === "org") return { timeline: mk(GH_TIMELINE.slice(0, 1)), doneAt: 1200 };
@@ -174,6 +184,18 @@ function mockFindings(login: string): Finding[] {
     f("first_commit", 74, `Plus vieux commit retrouvé\u00a0: 14${NB}mars 2016, à 2${NB}h${NB}47 du matin.`, `Oldest commit on record: March${NB}14, 2016, at 2:47${NB}a.m.`, [`14${NB}mars 2016`, `March${NB}14, 2016`]),
   ];
 }
+/** « LinkedIn retrouvé » (§18.24), versé au même dossier. */
+const MOCK_LINKEDIN = "https://www.linkedin.com/in/camille-ardent";
+function mockLinkedinFinding(url = MOCK_LINKEDIN): Finding {
+  return {
+    kind: "linkedin_found",
+    source: "linkedin",
+    score: 32,
+    text: { fr: "LinkedIn retrouvé : « Lead developer · Expert React ».", en: "LinkedIn found: “Lead developer · React expert”." },
+    key: { fr: "Lead developer · Expert React", en: "Lead developer · React expert" },
+    proof: url,
+  };
+}
 /** Les trouvailles tombent après la collecte simulée (un quart de l'attente) : la fiche est prête avant la fin, comme souvent en vrai. */
 const FINDINGS_AT = 0.25;
 const strongest3 = (list: Finding[]) => [...list].sort((a, b) => b.score - a.score).slice(0, 3);
@@ -204,15 +226,24 @@ function buildCard(key: FixtureKey, id: string, job: MockJob | null): CardData {
   return card;
 }
 
-function buildComparison(id: string, job: MockJob | null): ComparisonData {
+/** Fiche LinkedIn seule : la fiche déclarative, réécrite comme le serveur le fait. */
+function buildLinkedinCard(id: string, job: MockJob | null): CardData {
+  const base = withFacts(FIXTURES.cv);
+  const url = job?.linkedin ?? "https://www.linkedin.com/in/sans-github";
+  return asLinkedinCard({ ...base, id, lang: job?.lang ?? base.lang, linkedinUrl: url, findings: [mockLinkedinFinding(url)] });
+}
+
+function buildComparison(id: string, job: MockJob | null, linkedin = false): ComparisonData {
   const c = FIXTURE_COMPARISON;
-  const cmp: ComparisonData = { ...c, id, cv: withFacts(c.cv), github: withFacts(c.github) };
+  let cmp: ComparisonData = { ...c, id, cv: withFacts(c.cv), github: withFacts(c.github) };
   const login = job?.login;
   if (login && !BY_LOGIN[login.toLowerCase()]) {
     cmp.github = { ...cmp.github, name: login, login, initials: initialsOf(login), avatarUrl: `https://github.com/${login}.png?size=256` };
     cmp.cv = { ...cmp.cv, name: login, initials: initialsOf(login) };
   }
-  cmp.github = { ...cmp.github, findings: strongest3(mockFindings(cmp.github.login ?? "dev")) };
+  const found = mockFindings(cmp.github.login ?? "dev");
+  cmp.github = { ...cmp.github, findings: strongest3(linkedin ? [...found, mockLinkedinFinding(job?.linkedin)] : found) };
+  if (linkedin) cmp = asLinkedinComparison(cmp);
   if (photos.has(id)) {
     cmp.cv = { ...cmp.cv, avatarUrl: MOCK_PHOTO };
     cmp.github = { ...cmp.github, avatarUrl: MOCK_PHOTO };
@@ -224,7 +255,7 @@ function kindFromId(id: string): Kind | null {
   const m = /^m-([a-zA-Z]+)-/.exec(id);
   if (!m) return null;
   const k = m[1] as Kind;
-  if (k === "cmp" || k in FIXTURES) return k;
+  if (k === "cmp" || k === "licmp" || k === "li" || k in FIXTURES) return k;
   return null;
 }
 
@@ -252,7 +283,9 @@ export const mockApi = {
     // « queue » : trois fiches avant, une toutes les 1,5 s, puis la fiche normale.
     const queueMs = lower === "queue" ? 4500 : 0;
     let kind: Kind;
-    if (input.cv && login) kind = "cmp";
+    if (input.linkedin) kind = login || !/\/in\/sans-github$/.test(input.linkedin) ? "licmp" : "li";
+    else if (lower === "camille-ardent") kind = "licmp";
+    else if (input.cv && login) kind = "cmp";
     else if (input.cv) kind = "cv";
     else if (lower === "unknown") kind = "unknown";
     else if (lower === "org") kind = "org";
@@ -261,7 +294,7 @@ export const mockApi = {
     // Fiche dénoncée : « D » après le type (rand() est en minuscules), pour la reconnaître après un rechargement.
     const id = `m-${kind}-${input.denouncedBy ? "D" : ""}${rand()}`;
     const { timeline, doneAt } = timelineFor(kind);
-    jobs.set(id, { kind, start: Date.now() + queueMs, login, lang: input.lang, timeline, doneAt, denouncedBy: input.denouncedBy });
+    jobs.set(id, { kind, start: Date.now() + queueMs, login, linkedin: input.linkedin, lang: input.lang, timeline, doneAt, denouncedBy: input.denouncedBy });
     return { id, deleteToken: `tok-${rand()}`, cached: false };
   },
 
@@ -274,9 +307,10 @@ export const mockApi = {
     if (job && elapsed < 0) return { state: "pending", progress: [], queue: Math.ceil(-elapsed / 1500) };
     if (job && elapsed < job.doneAt) {
       const progress = job.timeline.filter((e) => e.at <= elapsed);
-      const github = job.kind !== "cv" && job.kind !== "unknown" && job.kind !== "org";
-      if (!github || elapsed < job.doneAt * FINDINGS_AT) return { state: "pending", progress };
-      return { state: "pending", progress, findings: mockFindings(job.login || "dev") };
+      const github = job.kind !== "cv" && job.kind !== "li" && job.kind !== "unknown" && job.kind !== "org";
+      const li = progress.some((e) => e.key === "linkedin") ? [mockLinkedinFinding(job.linkedin)] : [];
+      if (!github || elapsed < job.doneAt * FINDINGS_AT) return { state: "pending", progress, ...(li.length ? { findings: li } : {}) };
+      return { state: "pending", progress, findings: [...mockFindings(job.login || "dev"), ...li] };
     }
     if (kind === "unknown")
       return {
@@ -292,7 +326,8 @@ export const mockApi = {
       };
     if (kind === "slow")
       return { state: "error", code: "timeout", message: { fr: "Trop long, on arrête là.", en: "Too long, stopping here." } };
-    if (kind === "cmp") return { state: "done", kind: "comparison", comparison: buildComparison(id, job) };
+    if (kind === "cmp" || kind === "licmp") return { state: "done", kind: "comparison", comparison: buildComparison(id, job, kind === "licmp") };
+    if (kind === "li") return { state: "done", kind: "card", card: buildLinkedinCard(id, job) };
     return { state: "done", kind: "card", card: buildCard(kind as FixtureKey, id, job) };
   },
 

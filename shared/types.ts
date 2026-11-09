@@ -101,6 +101,8 @@ export interface CardData {
   source: Source;
   /** Carte déclarative (source `cv`) jugée sur un profil LinkedIn plutôt qu'un PDF (§18.24). Absent : un CV. */
   declaredSource?: DeclaredSource;
+  /** Fiche LinkedIn seule : l'adresse publique du profil, pour la relancer avec un GitHub (§18.24). */
+  linkedinUrl?: string;
   createdAt: string; // ISO
   /** Version du barème (data/scoring.json) qui a produit la carte. */
   scoringVersion: string;

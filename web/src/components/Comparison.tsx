@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { ComparisonData, StatCode } from "../../../shared/types";
-import { STAT_CODES } from "../../../shared/types";
+import { declaredOf, STAT_CODES } from "../../../shared/types";
 import { pick, useT } from "../i18n";
 import { useMediaQuery } from "../lib/util";
 import { RevealCard } from "./Reveal";
@@ -44,7 +44,7 @@ function Deltas({ cmp, className = "" }: { cmp: ComparisonData; className?: stri
       </ol>
       <p className="deltas-legend">
         <span className="lg lg-up">{t.compare.legendUp}</span>
-        <span className="lg lg-down">{t.compare.legendDown}</span>
+        <span className="lg lg-down">{declaredOf(cmp) === "linkedin" ? t.compare.legendDownLi : t.compare.legendDown}</span>
       </p>
       <p className="deltas-buzz">{t.compare.buzzHint}</p>
     </div>
@@ -93,7 +93,9 @@ export function ComparisonStage({ cmp, phase }: { cmp: ComparisonData; phase: Ph
   };
 
   const cards = [
-    { card: cmp.cv, label: t.compare.cvLabel, short: t.compare.cvShort, prefix: "cmp-cv", anchor: false },
+    declaredOf(cmp) === "linkedin"
+      ? { card: cmp.cv, label: t.compare.liLabel, short: t.compare.liShort, prefix: "cmp-cv", anchor: false }
+      : { card: cmp.cv, label: t.compare.cvLabel, short: t.compare.cvShort, prefix: "cmp-cv", anchor: false },
     { card: cmp.github, label: t.compare.ghLabel, short: t.compare.ghShort, prefix: "cmp-gh", anchor: true },
   ];
 

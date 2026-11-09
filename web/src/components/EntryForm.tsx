@@ -1,10 +1,12 @@
-// Le champ unique de l'entrée (§6.1) : le pseudo GitHub, et à un lien de là
-// le CV, puis « les deux » pour la comparaison.
+// Le champ unique de l'entrée (§6.1) : le pseudo GitHub, ou un lien de profil
+// LinkedIn quand le serveur sait le lire (§18.24) ; à un lien de là le CV, puis
+// « les deux » pour la comparaison.
 // Variante « inline » : le champ GitHub seul, dans le bandeau d'une carte partagée.
 // Raccourcis : coller une URL GitHub ou déposer un PDF n'importe où sur la page lance la carte.
 import { useEffect, useId, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { createPortal } from "react-dom";
+import { detectEntry } from "../../../shared/entry";
 import { pick, useT } from "../i18n";
 import { api, tokens } from "../lib/api";
 import { errorFact } from "../lib/errors";
@@ -21,8 +23,9 @@ interface Props {
   variant?: "full" | "inline";
 }
 
-/** Un collage ne lance la carte que s'il ressemble à une URL GitHub, pas à un simple mot. */
+/** Un collage ne lance la carte que s'il ressemble à une URL GitHub (ou LinkedIn), pas à un simple mot. */
 const GITHUB_URL_RE = /github\.com\//i;
+const LINKEDIN_URL_RE = /linkedin\.com\/in\//i;
 
 /** Dès que le visiteur commence à saisir, la scène 3D de la révélation se
  * télécharge (quelques Mo) ; l'attente du scoring sert ensuite à la préparer
@@ -71,9 +74,20 @@ export function EntryForm({ inputRef, variant = "full" }: Props) {
   const showGithub = inline || mode === "both" || tab === "github";
   const showCv = !inline && (mode === "both" || tab === "cv");
 
+  // Le champ accepte aussi un lien LinkedIn si le serveur sait le lire (§18.24) ; pas avec un CV.
+  const [liOn, setLiOn] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    void api.getConfig().then((c) => alive && setLiOn(c.linkedinEntry));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const liField = liOn && !showCv;
+
   // Les écouteurs posés sur le document lisent toujours l'état courant.
-  const state = useRef({ mode, tab, login, file });
-  state.current = { mode, tab, login, file };
+  const state = useRef({ mode, tab, login, file, liField });
+  state.current = { mode, tab, login, file, liField };
   // Verrou immédiat : deux départs rapprochés (collage puis dépôt) n'en font qu'un.
   const busyRef = useRef(false);
 
@@ -90,16 +104,17 @@ export function EntryForm({ inputRef, variant = "full" }: Props) {
   const pdfError = (check: Exclude<PdfCheck, { ok: true }>) =>
     check.reason === "not_pdf" ? h.errNotPdf : check.reason === "too_large" ? h.errTooLarge(check.mb) : h.errTooManyPages(check.pages);
 
-  /** Lance la carte : un pseudo validé et/ou un PDF validé. */
-  const start = async (input: { login?: string; file?: File | null }) => {
+  /** Lance la carte : un pseudo validé et/ou un PDF validé, ou un lien LinkedIn normalisé. */
+  const start = async (input: { login?: string; file?: File | null; linkedin?: string }) => {
     if (busyRef.current) return;
     busyRef.current = true;
     setError(null);
     setBusy(true);
     try {
-      const res = await api.createCard({ login: input.login, cv: input.file ?? undefined, lang });
+      const res = await api.createCard({ login: input.login, linkedin: input.linkedin, cv: input.file ?? undefined, lang });
       if (res.deleteToken) tokens.set(res.id, res.deleteToken);
-      rememberInput({ login: input.login, file: input.file ?? null });
+      // « Réessayer » remet le lien LinkedIn dans le champ unique.
+      rememberInput({ login: input.login ?? input.linkedin, file: input.file ?? null });
       markFresh(res.id);
       navigate(`/c/${res.id}`);
     } catch (err) {
@@ -174,6 +189,8 @@ export function EntryForm({ inputRef, variant = "full" }: Props) {
   receivePdfRef.current = receivePdf;
   const receiveLoginRef = useRef(receiveLogin);
   receiveLoginRef.current = receiveLogin;
+  const startRef = useRef(start);
+  startRef.current = start;
 
   // Dépôt n'importe où sur la page, avec un voile pendant le survol.
   useEffect(() => {
@@ -233,6 +250,14 @@ export function EntryForm({ inputRef, variant = "full" }: Props) {
         return;
       }
       const text = dt.getData("text");
+      if (LINKEDIN_URL_RE.test(text)) {
+        const entry = detectEntry(text);
+        if (!state.current.liField || entry?.kind !== "linkedin") return;
+        e.preventDefault();
+        setLogin(entry.url);
+        void startRef.current({ linkedin: entry.url });
+        return;
+      }
       if (!GITHUB_URL_RE.test(text)) return;
       const p = parseLogin(text);
       if (!p) return;
@@ -254,9 +279,20 @@ export function EntryForm({ inputRef, variant = "full" }: Props) {
         loginRef.current?.focus();
         return;
       }
+      // Un lien LinkedIn : seul, et seulement si le serveur sait le lire (§18.24).
+      const entry = detectEntry(login);
+      if (entry?.kind === "linkedin" || /linkedin\.com/i.test(login)) {
+        if (showCv || !liOn || entry?.kind !== "linkedin") {
+          setError(showCv ? h.errLinkedinCv : !liOn ? h.errLinkedinOff : h.errEntry);
+          loginRef.current?.focus();
+          return;
+        }
+        void start({ linkedin: entry.url });
+        return;
+      }
       const p = parseLogin(login);
       if (!p) {
-        setError(h.errLogin);
+        setError(liField ? h.errEntry : h.errLogin);
         loginRef.current?.focus();
         return;
       }
@@ -302,13 +338,14 @@ export function EntryForm({ inputRef, variant = "full" }: Props) {
       autoCapitalize="none"
       autoCorrect="off"
       spellCheck={false}
-      placeholder={h.loginPlaceholder}
+      placeholder={liField ? h.entryPlaceholder : h.loginPlaceholder}
       value={login}
       onChange={(e) => {
         setLogin(e.target.value);
         if (error) setError(null);
       }}
       onBlur={() => {
+        if (/linkedin\.com/i.test(login)) return;
         const p = parseLogin(login);
         if (p && p !== login) setLogin(p);
       }}
@@ -328,11 +365,14 @@ export function EntryForm({ inputRef, variant = "full" }: Props) {
   const loginField = (
     <div className="field">
       <label htmlFor={`${uid}-gh`} className="sr-only">
-        {h.loginLabel}
+        {liField ? h.entryLabel : h.loginLabel}
       </label>
-      <span className="field-prefix" aria-hidden>
-        @
-      </span>
+      {/* Le « @ » va à un pseudo ; devant un lien, ou devant « pseudo GitHub ou lien LinkedIn », il gêne. */}
+      {(!liField || /^@?[\w-]+$/.test(login.trim())) && (
+        <span className="field-prefix" aria-hidden>
+          @
+        </span>
+      )}
       {loginInput}
     </div>
   );

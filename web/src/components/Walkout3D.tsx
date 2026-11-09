@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { MutableRefObject, RefObject } from "react";
 import { siGithub } from "simple-icons";
-import type { CardData, Lang } from "../../../shared/types";
+import type { CardData, DeclaredSource, Lang } from "../../../shared/types";
 import { LEVEL_LABELS, starsFor } from "../../../shared/types";
 import { langIcon, langTitle } from "../../../shared/card/languages";
 import { pick, useT } from "../i18n";
@@ -94,6 +94,8 @@ interface Props {
   lang: Lang;
   /** Comparaison GitHub × CV : le « double walkout ». */
   double: boolean;
+  /** Ce que la fiche déclarative a lu : un CV ou un profil LinkedIn (§18.24). */
+  declared?: DeclaredSource;
   phase: Phase;
   /** Élément contenant un [data-scene-anchor] : la carte 3D vient s'y poser. */
   anchorRef: RefObject<HTMLElement | null>;
@@ -102,7 +104,7 @@ interface Props {
   onDone: () => void;
 }
 
-export function Walkout3D({ card, lang, double, phase, anchorRef, controlRef, onHandoff, onDone }: Props) {
+export function Walkout3D({ card, lang, double, declared = "cv", phase, anchorRef, controlRef, onHandoff, onDone }: Props) {
   const { t } = useT();
   const hostRef = useRef<HTMLDivElement>(null);
   const hudRef = useRef<HTMLDivElement>(null);
@@ -134,7 +136,9 @@ export function Walkout3D({ card, lang, double, phase, anchorRef, controlRef, on
     const texts = {
       langName: icon ? langTitle(card.mainLanguage) : tells.noLanguage,
       langLabel: tells.language,
-      leagueName: double ? tells.leagueBoth : card.source === "cv" ? tells.leagueCv : tells.leagueGithub,
+      leagueName: double
+        ? declared === "linkedin" ? tells.leagueBothLinkedin : tells.leagueBoth
+        : card.source === "cv" ? (declared === "linkedin" ? tells.leagueLinkedin : tells.leagueCv) : tells.leagueGithub,
       leagueLabel: tells.league,
       position: card.position,
       positionName: t.positions[card.position],

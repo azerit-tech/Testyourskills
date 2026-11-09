@@ -2,7 +2,7 @@
 // affichage direct (sans pack) pour un lien partagé.
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import type { CardData, Fact, Finding, JobState, ProgressEvent } from "../../../shared/types";
-import { LEVEL_LABELS, starsFor } from "../../../shared/types";
+import { declaredOf, LEVEL_LABELS, starsFor } from "../../../shared/types";
 import { AddSource, AzeritCta, Claim, Contest, DeleteCard, EmailForm, LinkedInPhoto, ShareBar, Why, useMe, useToast } from "../components/After";
 import type { Shareable } from "../components/After";
 import { ComparisonStage } from "../components/Comparison";
@@ -26,6 +26,9 @@ const Walkout3D = lazy(() => loadWalkout().then((m) => ({ default: m.Walkout3D }
 
 const POLL_MS = 600;
 const CLIENT_TIMEOUT = 45_000;
+/** Un profil LinkedIn en lecture (§18.24) : le serveur se donne jusqu'à 60 s de plus, le front patiente d'autant. */
+const CLIENT_TIMEOUT_LINKEDIN = 120_000;
+const readingLinkedin = (progress: ProgressEvent[]) => progress.some((e) => e.key === "linkedin_wait" || e.key === "linkedin");
 
 type View =
   | { s: "loading" }
@@ -54,7 +57,7 @@ function useJob(id: string, nonce: number) {
           setSawPending(true);
           setView({ s: "pending", progress: job.progress ?? [], queue: job.queue, findings: job.findings });
           if (job.queue) started = Date.now();
-          if (Date.now() - started > CLIENT_TIMEOUT) {
+          if (Date.now() - started > (readingLinkedin(job.progress ?? []) ? CLIENT_TIMEOUT_LINKEDIN : CLIENT_TIMEOUT)) {
             setView({ s: "error", message: t.errors.timeout });
             return;
           }
@@ -366,7 +369,7 @@ function Result({ item, animate, owner, fresh, notice, me, onMe, onDeleted }: Re
 
         {animating && (
           <Suspense fallback={null}>
-            <Walkout3D card={main} lang={lang} double={item.kind === "comparison"} phase={phase} anchorRef={stageRef} controlRef={walkoutCtl} onHandoff={handoff} onDone={finish} />
+            <Walkout3D card={main} lang={lang} double={item.kind === "comparison"} declared={declaredOf(item.kind === "comparison" ? item.comparison : item.card)} phase={phase} anchorRef={stageRef} controlRef={walkoutCtl} onHandoff={handoff} onDone={finish} />
           </Suspense>
         )}
         <section ref={stageRef} className="result-stage" onClick={animating ? onStageClick : undefined}>

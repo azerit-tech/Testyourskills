@@ -13,6 +13,8 @@ export interface CreateInput {
   login?: string;
   cv?: File;
   lang: Lang;
+  /** Adresse de profil LinkedIn (§18.24) : seule, ou avec un pseudo pour la comparaison. */
+  linkedin?: string;
   /** « Dénonce un complice » (§18.6) : l'id de la fiche du dénonciateur. */
   denouncedBy?: string;
 }
@@ -68,6 +70,8 @@ export interface AppConfig {
   linkedin: boolean;
   /** « C'est moi » : l'OAuth GitHub est configuré côté serveur (§18.1). */
   claim: boolean;
+  /** Le champ unique accepte un lien LinkedIn : le serveur a un fournisseur de profils (§18.24). */
+  linkedinEntry: boolean;
 }
 
 /** Propriétaire connecté par GitHub (§18.1). */
@@ -82,11 +86,11 @@ let configPromise: Promise<AppConfig> | null = null;
 function getConfig(): Promise<AppConfig> {
   if (!configPromise) {
     configPromise = isMock()
-      ? Promise.resolve({ linkedin: true, claim: true })
+      ? Promise.resolve({ linkedin: true, claim: true, linkedinEntry: true })
       : fetch("/api/config", { headers: { Accept: "application/json" } })
-          .then((r): Promise<{ linkedin?: boolean; claim?: boolean }> => (r.ok ? r.json() : Promise.resolve({})))
-          .then((c) => ({ linkedin: c?.linkedin === true, claim: c?.claim === true }))
-          .catch(() => ({ linkedin: false, claim: false }));
+          .then((r): Promise<{ linkedin?: boolean; claim?: boolean; linkedinEntry?: boolean }> => (r.ok ? r.json() : Promise.resolve({})))
+          .then((c) => ({ linkedin: c?.linkedin === true, claim: c?.claim === true, linkedinEntry: c?.linkedinEntry === true }))
+          .catch(() => ({ linkedin: false, claim: false, linkedinEntry: false }));
   }
   return configPromise;
 }
@@ -179,7 +183,7 @@ async function createCard(input: CreateInput): Promise<CreateResult> {
       res = await fetch("/api/card", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ login: input.login, lang: input.lang, ref, denouncedBy: input.denouncedBy }),
+        body: JSON.stringify({ login: input.login, linkedin: input.linkedin, lang: input.lang, ref, denouncedBy: input.denouncedBy }),
       });
     }
   } catch {
