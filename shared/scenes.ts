@@ -27,6 +27,11 @@ export const SCENE_LIGHT: Record<string, Light> = {
 /** Le décor d'une fiche sans profil. */
 export const DEFAULT_SCENE = "default";
 
+/** Le décor d'une fiche : celui de son profil s'il existe, sinon `default`. */
+export function sceneOf(profileId: string | undefined): string {
+  return profileId && Object.prototype.hasOwnProperty.call(SCENE_LIGHT, profileId) ? profileId : DEFAULT_SCENE;
+}
+
 /** Seuls les identifiants de data/profiles.json (minuscules, chiffres, `_`) deviennent une adresse ou un fichier. */
 export const safeSceneId = (id: string | undefined | null): string | null => (id && /^[a-z0-9_]{1,40}$/.test(id) ? id : null);
 
