@@ -256,6 +256,12 @@ export interface PipelineOptions {
   busyAfterMs?: number;
   /** LinkedIn contre GitHub (§18.24). Absent : pas de jeton de fournisseur, la fonctionnalité n'existe pas. */
   linkedin?: LinkedinFinder;
+  /**
+   * Lien LinkedIn ↔ GitHub dont le serveur se porte garant (la vitrine, §18.35) :
+   * `linkedinUrl` normalisée. Ce pseudo lit ce LinkedIn quand le joueur n'en donne
+   * pas, et leur comparaison compte comme prouvée.
+   */
+  vouched?: { login: string; linkedinUrl: string };
 }
 
 export const MAX_CONCURRENT_CARDS = 4;
@@ -301,8 +307,6 @@ export interface JobInput {
    * pseudo : la comparaison avec ce LinkedIn-là (« Ajoute ton GitHub »).
    */
   linkedinUrl?: string;
-  /** Pas de recherche LinkedIn (carte vitrine : elle doit rester une fiche GitHub). */
-  noLinkedin?: boolean;
   /** Prend une unité de la limite par IP avant une lecture payante de profil ; false : refusé. */
   linkedinSpend?: () => boolean;
 }
@@ -605,16 +609,21 @@ export class Pipeline {
     const entry = input.linkedinUrl && !login && !pdf ? await this.linkedinEntry(input.linkedinUrl, input, ctx) : null;
     if (entry?.githubLogin) login = entry.githubLogin;
 
+    // Le LinkedIn lu : celui que le joueur donne, sinon, pour le pseudo dont le
+    // serveur se porte garant, le sien (§18.35) ; sinon celui que GitHub affiche.
+    const vouched = this.vouchedFor(login);
+    const linkedinAsked = input.linkedinUrl ?? (!pdf ? vouched?.linkedinUrl : undefined);
+
     // Le LinkedIn se lit en parallèle de la lecture du code : dès l'entrée, ou
     // dès que les faits GitHub disent où il est (entrée GitHub).
     const lk: { p?: Promise<LinkedinResult | null> } = {};
     if (entry) lk.p = this.linkedinBranch(Promise.resolve({ profile: entry.profile, proven: false }), ctx, false);
-    const finder = !pdf && !input.noLinkedin ? this.opts.linkedin : undefined;
+    const finder = !pdf ? this.opts.linkedin : undefined;
     const slow = linkedinSlow(ctx);
     const onFacts =
       finder && !entry
         ? (facts: unknown) => {
-            const found = finder.forGithub(facts, { url: input.linkedinUrl, spend: input.linkedinSpend, onSlow: slow, signal: ctx.signal });
+            const found = finder.forGithub(facts, { url: linkedinAsked, spend: input.linkedinSpend, onSlow: slow, signal: ctx.signal });
             lk.p = this.linkedinBranch(found, ctx, true);
             lk.p.catch(() => {});
           }
@@ -694,12 +703,14 @@ export class Pipeline {
       return [cvRow(card, null)];
     }
 
-    // Le lien entre ce LinkedIn et ce GitHub est-il prouvé ? Par le chercheur, ou
+    // Le lien entre ce LinkedIn et ce GitHub est-il prouvé ? Par le chercheur,
     // parce que le GitHub affiche lui-même ce LinkedIn (entrée LinkedIn : le
-    // profil donne un GitHub, qui doit le lui rendre). Une comparaison non prouvée
+    // profil donne un GitHub, qui doit le lui rendre), ou parce que le serveur se
+    // porte garant de ce lien-là (la vitrine, §18.35). Une comparaison non prouvée
     // se lit à son adresse et par le cache de son adresse LinkedIn, mais ne passe
     // jamais devant la fiche GitHub du pseudo et n'entre pas au top (§18.24).
-    const linkedinProven = !!li && !!linkedinUrl && (li.proven || githubShowsLinkedin(gh.facts, linkedinUrl));
+    const vouchedLink = !!vouched && linkedinAsked === vouched.linkedinUrl;
+    const linkedinProven = !!li && !!linkedinUrl && (li.proven || vouchedLink || githubShowsLinkedin(gh.facts, linkedinUrl));
 
     // Comparaison : trois lignes, la comparaison et ses deux cartes, chacune son id.
     ctx.emit("compare");
@@ -736,6 +747,12 @@ export class Pipeline {
     ];
   }
 
+  /** Le lien garanti par le serveur, si ce pseudo est le sien (sans égard à la casse). */
+  private vouchedFor(login: string | undefined): PipelineOptions["vouched"] {
+    const v = this.opts.vouched;
+    return v && login && login.toLowerCase() === v.login.toLowerCase() ? v : undefined;
+  }
+
   /** Entrée LinkedIn : le profil, ou une erreur claire (pas de clé, budget, introuvable, propriétaire parti). */
   private async linkedinEntry(url: string, input: JobInput, ctx: Ctx) {
     const finder = this.opts.linkedin;
@@ -743,10 +760,13 @@ export class Pipeline {
     const r = await finder.forUrl(url, { spend: input.linkedinSpend, onSlow: linkedinSlow(ctx), signal: ctx.signal });
     if (r.status === "not_found") throw new JobError("linkedin", MESSAGES.linkedin_not_found);
     if (r.status === "unavailable") throw new JobError("linkedin", MESSAGES.linkedin_busy);
+    // Le LinkedIn de la vitrine ne donne pas de GitHub : le serveur sait lequel (§18.35).
+    const vouched = this.opts.vouched;
+    const githubLogin = r.githubLogin ?? (vouched && url === vouched.linkedinUrl ? vouched.login : null);
     // Le GitHub lié est masqué par son propriétaire : pas de fiche à son nom (§18.1).
-    if (r.githubLogin && this.opts.store.isHidden(r.githubLogin)) throw new JobError("gone", MESSAGES.gone);
+    if (githubLogin && this.opts.store.isHidden(githubLogin)) throw new JobError("gone", MESSAGES.gone);
     ctx.emit("linkedin");
-    return r;
+    return { ...r, githubLogin };
   }
 
   /**

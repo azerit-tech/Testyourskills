@@ -63,6 +63,11 @@ export interface AppOptions {
   showcaseLogin?: string;
   /** Photo de la carte vitrine, à la place de l'avatar GitHub. */
   showcasePhoto?: string;
+  /**
+   * LinkedIn de la vitrine (§18.35), adresse normalisée (`normalizeLinkedinUrl`).
+   * Son GitHub ne l'affiche pas : le serveur se porte garant du lien.
+   */
+  showcaseLinkedin?: string;
   /** État de l'IA (plafond du jour, crédit). Défaut : le suivi de ai/budget.ts. */
   aiStatus?: () => AiStatus;
   /** LinkedIn contre GitHub, et l'entrée LinkedIn (§18.24). Absent : pas de jeton de fournisseur, fonctionnalité absente. */
@@ -202,6 +207,7 @@ export function createApp(opts: AppOptions) {
     queueTimeoutMs: opts.queueTimeoutMs,
     busyAfterMs: opts.busyAfterMs,
     linkedin: opts.linkedinProfiles,
+    vouched: opts.showcaseLogin && opts.showcaseLinkedin ? { login: opts.showcaseLogin, linkedinUrl: opts.showcaseLinkedin } : undefined,
   });
   const limiter = new RateLimiter(store, opts.ipSalt ?? "testyourskills");
   const cardsPerDay = opts.cardsPerDay ?? CARDS_PER_DAY;
@@ -269,7 +275,7 @@ export function createApp(opts: AppOptions) {
     // Vitrine sortie sans lecture IA : on la retente au bout d'une heure, pas d'une semaine.
     const stale = !row || Date.now() - row.createdAt > (row.degraded ? SHOWCASE_DEGRADED_MS : SHOWCASE_MS);
     // Jetons GitHub épuisés : la vitrine attendra, elle ne prend pas la place d'une vraie fiche.
-    if (stale && !pipeline.inflightFor(login) && !pipeline.githubBusy()) pipeline.start({ lang: "fr", login, noLinkedin: true });
+    if (stale && !pipeline.inflightFor(login) && !pipeline.githubBusy()) pipeline.start({ lang: "fr", login });
     if (!row) return c.json({ card: null });
     return c.json({ card: showcaseCard(row.data as CardData) });
   });

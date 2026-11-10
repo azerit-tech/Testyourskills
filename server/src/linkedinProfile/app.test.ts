@@ -210,11 +210,85 @@ describe("entrée GitHub : le LinkedIn trouvé devient une comparaison", () => {
     expect(ctx.calls.forGithub[0]!.url).toBe(URL_);
   });
 
-  it("la carte vitrine ne cherche jamais de LinkedIn", async () => {
-    const ctx = setup({ forGithub: async () => FOUND }, {}, { showcaseLogin: "jmougeot" });
+});
+
+describe("la vitrine : le serveur se porte garant de son LinkedIn (§18.35)", () => {
+  const JACQUES = "https://www.linkedin.com/in/jacquesmougeot";
+  const VITRINE = { showcaseLogin: "jmougeot", showcaseLinkedin: JACQUES };
+  /** Le chercheur lit l'adresse qu'on lui donne, sans rien prouver : GitHub ne l'affiche pas. */
+  const reads: LinkedinFinder["forGithub"] = async (_f, o) => (o?.url ? { profile: { ...PROFILE, url: o.url }, proven: false } : null);
+  /** La dernière fiche racine du pseudo. */
+  const latest = (ctx: Ctx, login: string) => {
+    const r = ctx.store.db.prepare(`SELECT id FROM cards WHERE parent_id IS NULL AND login = ? ORDER BY created_at DESC, rowid DESC LIMIT 1`).get(login) as { id: string } | undefined;
+    return r ? ctx.store.getCard(r.id) : null;
+  };
+
+  it("la carte vitrine lit ce LinkedIn : comparaison prouvée", async () => {
+    const ctx = setup({ forGithub: reads }, {}, VITRINE);
     await ctx.app.request("/api/showcase");
     await ctx.pipeline.drain();
-    expect(ctx.calls.forGithub).toHaveLength(0);
+    expect(ctx.calls.forGithub.map((c) => c.url)).toEqual([JACQUES]);
+    const row = latest(ctx, "jmougeot");
+    expect(row).toMatchObject({ kind: "comparison", source: "linkedin", login: "jmougeot", facts: { linkedinUrl: JACQUES, linkedinProven: true } });
+  });
+
+  it("qui tape le pseudo, quelle que soit la casse, lit ce LinkedIn ; le cache 24 h ressert la comparaison", async () => {
+    const ctx = setup({ forGithub: reads }, {}, VITRINE);
+    const first = await post(ctx, { login: "JMougeot" });
+    expect(ctx.calls.forGithub[0]!.url).toBe(JACQUES);
+    expect(ctx.store.getCard(first.json.id)).toMatchObject({ kind: "comparison", facts: { linkedinProven: true } });
+    expect(await post(ctx, { login: "jmougeot" })).toMatchObject({ status: 200, json: { id: first.json.id, cached: true } });
+    expect(ctx.calls.forGithub).toHaveLength(1);
+  });
+
+  it("un autre LinkedIn collé avec ce pseudo n'est pas prouvé, ni servi sous le pseudo", async () => {
+    const ctx = setup({ forGithub: reads }, {}, VITRINE);
+    const forged = await post(ctx, { login: "jmougeot", linkedin: URL_ });
+    expect(ctx.calls.forGithub[0]!.url).toBe(URL_);
+    expect(ctx.store.getCard(forged.json.id)).toMatchObject({ kind: "comparison", facts: { linkedinUrl: URL_, linkedinProven: false } });
+    const typed = await post(ctx, { login: "jmougeot" });
+    expect(typed.status).toBe(202);
+    expect(ctx.store.getCard(typed.json.id)).toMatchObject({ kind: "comparison", facts: { linkedinUrl: JACQUES, linkedinProven: true } });
+    expect(latest(ctx, "jmougeot")?.id).toBe(typed.json.id);
+  });
+
+  it("un autre pseudo n'en profite pas", async () => {
+    const ctx = setup({ forGithub: reads }, {}, VITRINE);
+    const { json } = await post(ctx, { login: "leamd" });
+    expect(ctx.calls.forGithub[0]!.url).toBeUndefined();
+    expect(await state(ctx, json.id)).toMatchObject({ state: "done", kind: "card" });
+    const pasted = await post(ctx, { login: "leamd", linkedin: JACQUES });
+    expect(ctx.store.getCard(pasted.json.id)).toMatchObject({ kind: "comparison", facts: { linkedinProven: false } });
+  });
+
+  it("entrée LinkedIn par ce lien, sans GitHub dans le profil : la comparaison avec le pseudo de la vitrine, prouvée", async () => {
+    const ctx = setup({ forUrl: async (url) => ({ status: "found", profile: { ...PROFILE, url }, githubLogin: null }) }, {}, VITRINE);
+    const { json } = await post(ctx, { linkedin: "fr.linkedin.com/in/JacquesMougeot/" });
+    expect(ctx.calls.collect).toEqual(["jmougeot"]);
+    expect(ctx.store.getCard(json.id)).toMatchObject({ kind: "comparison", login: "jmougeot", facts: { linkedinUrl: JACQUES, linkedinProven: true } });
+    expect(await post(ctx, { login: "jmougeot" })).toMatchObject({ status: 200, json: { id: json.id, cached: true } });
+  });
+
+  it("entrée LinkedIn par un autre profil qui donne ce GitHub : pas prouvée", async () => {
+    const ctx = setup({ forUrl: async () => ({ status: "found", profile: PROFILE, githubLogin: "jmougeot" }) }, {}, VITRINE);
+    const { json } = await post(ctx, { linkedin: URL_ });
+    expect(ctx.store.getCard(json.id)).toMatchObject({ kind: "comparison", login: "jmougeot", facts: { linkedinProven: false } });
+  });
+
+  it("entrée LinkedIn par ce lien, vitrine masquée par son propriétaire : pas de fiche", async () => {
+    const ctx = setup({ forUrl: async (url) => ({ status: "found", profile: { ...PROFILE, url }, githubLogin: null }) }, {}, VITRINE);
+    ctx.store.claimOwner("jmougeot", 7);
+    ctx.store.setOwnerHidden("jmougeot", true);
+    const { json } = await post(ctx, { linkedin: JACQUES });
+    expect(await state(ctx, json.id)).toMatchObject({ state: "error", code: "gone" });
+    expect(ctx.calls.collect).toHaveLength(0);
+  });
+
+  it("lecture du LinkedIn en échec : la fiche GitHub sort seule", async () => {
+    const ctx = setup({ forGithub: async () => null }, {}, VITRINE);
+    await ctx.app.request("/api/showcase");
+    await ctx.pipeline.drain();
+    expect(latest(ctx, "jmougeot")).toMatchObject({ kind: "card", source: "github" });
   });
 });
 

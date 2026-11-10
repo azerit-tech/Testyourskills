@@ -12,7 +12,7 @@ import { createApp, pruneStaleImages, purge } from "./app";
 import { useBudgetDb } from "./ai/budget";
 import { startCreditsWatch, stopCreditsWatch } from "./ai/credits";
 import { linkedinFromEnv } from "./linkedin";
-import { linkedinProfilesFromEnv } from "./linkedinProfile/index";
+import { linkedinProfilesFromEnv, normalizeLinkedinUrl } from "./linkedinProfile/index";
 import { githubAuthFromEnv } from "./auth";
 import { Store } from "./db";
 import { realDeps } from "./deps";
@@ -36,6 +36,10 @@ const devWebUrl = (process.env.DEV_WEB_URL ?? "http://localhost:5180").replace(/
 const webRoot = join(projectRoot, "dist/web");
 const avatarDir = join(dirname(dbPath), "avatars");
 const linkedin = linkedinFromEnv(process.env);
+// Le LinkedIn de la vitrine (§18.35) : par défaut celui de Jacques, avec le pseudo par défaut.
+const showcaseLinkedinRaw = process.env.SHOWCASE_LINKEDIN ?? (process.env.SHOWCASE_LOGIN ? undefined : "https://www.linkedin.com/in/jacquesmougeot");
+const showcaseLinkedin = showcaseLinkedinRaw?.trim() ? (normalizeLinkedinUrl(showcaseLinkedinRaw) ?? undefined) : undefined;
+if (showcaseLinkedinRaw?.trim() && !showcaseLinkedin) console.warn("SHOWCASE_LINKEDIN n'est pas une adresse de profil (linkedin.com/in/…) : vitrine sans LinkedIn.");
 const githubAuth = githubAuthFromEnv(process.env);
 
 if (!githubToken) {
@@ -97,6 +101,7 @@ const { app, pipeline } = createApp({
   ipSalt: process.env.IP_SALT || undefined,
   showcaseLogin: process.env.SHOWCASE_LOGIN ?? "jmougeot",
   showcasePhoto: process.env.SHOWCASE_PHOTO ?? (process.env.SHOWCASE_LOGIN ? undefined : "/jmougeot-linkedin.jpg"),
+  showcaseLinkedin,
   staticRoot: prod ? webRoot : undefined,
   indexHtml,
   linkedin,
