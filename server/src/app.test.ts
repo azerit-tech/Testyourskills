@@ -52,6 +52,8 @@ const READING: CvReading = {
   is_dev_profile: true,
   title_mentions_ai: false,
   describes_ai_project: false,
+  school_name: "",
+  school_tier: "none",
 };
 
 const COUNTS: CvTextCounts = { words: 500, pages: 2, buzzwords: { agile: 2, synergie: 1 }, buzzwordsPer100: 0.6, passionCount: 0 };

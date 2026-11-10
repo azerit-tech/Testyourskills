@@ -80,7 +80,14 @@ export interface CvReading {
   title_mentions_ai: boolean;
   /** Au moins un projet IA décrit concrètement. */
   describes_ai_project: boolean;
+  /** L'école la mieux classée du profil, telle qu'écrite ; "" sans études supérieures. */
+  school_name: string;
+  /** Rang donné par l'IA ; le barème le remplace par celui de sa liste (server/src/scoring/school.ts). */
+  school_tier: SchoolTier;
 }
+
+export const SCHOOL_TIERS = ["S", "A", "B", "C", "none"] as const;
+export type SchoolTier = (typeof SCHOOL_TIERS)[number];
 
 /** Comptages faits par le code sur le texte du CV, avant de jeter le texte (§4.5, §6). */
 export interface CvTextCounts {

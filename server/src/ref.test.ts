@@ -33,6 +33,8 @@ const READING = {
   is_dev_profile: true,
   title_mentions_ai: false,
   describes_ai_project: false,
+  school_name: "",
+  school_tier: "none",
 } satisfies CvReading;
 
 const PDF = new TextEncoder().encode("%PDF-1.7\nfake pdf body");

@@ -2,7 +2,7 @@
 // code. Le texte n'est ni loggué ni stocké ; seuls les constats sortent d'ici (§11).
 
 import { z } from "zod";
-import type { CvReading, CvRole } from "../../../shared/readings";
+import { SCHOOL_TIERS, type CvReading, type CvRole } from "../../../shared/readings";
 import { callStructured, DEFAULT_MODEL, fence, strictJsonSchema, type ChatClient, type Validation } from "./client";
 import { CV_POSITIONS, CV_SYSTEM_PROMPT, SENIORITIES } from "./prompts/cv";
 import { clip, locate, scrubContact } from "./text";
@@ -40,6 +40,8 @@ const ApiSchema = z.object({
   is_dev_profile: z.boolean(),
   title_mentions_ai: z.boolean(),
   describes_ai_project: z.boolean(),
+  school_name: z.string(),
+  school_tier: z.enum(SCHOOL_TIERS),
 });
 export const CV_OUTPUT_SCHEMA = strictJsonSchema(ApiSchema);
 
@@ -126,6 +128,12 @@ export function validateCvOutput(raw: unknown, cvText: string): Validation<CvRea
 
   const name = d.full_name ? clip(scrubContact(d.full_name), 80) : "";
 
+  // L'école doit figurer dans le texte (espaces, accents et ponctuation ignorés) :
+  // une école inventée par l'IA ne finit pas sur la carte.
+  const school = clip(scrubContact(d.school_name), 80);
+  const schoolKey = norm(school);
+  const hasSchool = schoolKey.length > 0 && norm(cvText).includes(schoolKey);
+
   return {
     ok: true,
     value: {
@@ -143,6 +151,8 @@ export function validateCvOutput(raw: unknown, cvText: string): Validation<CvRea
       is_dev_profile: d.is_dev_profile,
       title_mentions_ai: d.title_mentions_ai,
       describes_ai_project: d.describes_ai_project,
+      school_name: hasSchool ? school : "",
+      school_tier: hasSchool ? d.school_tier : "none",
     },
   };
 }

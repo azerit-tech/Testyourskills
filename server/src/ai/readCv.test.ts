@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { resetBudgetForTests } from "./budget";
 import { CV_SYSTEM_PROMPT } from "./prompts/cv";
-import { MAX_CV_CHARS, normMonth, readCv } from "./readCv";
+import { CV_OUTPUT_SCHEMA, MAX_CV_CHARS, normMonth, readCv } from "./readCv";
 import { fakeClient, userText } from "./testing";
 
 const CV = `Camille Durand
@@ -13,7 +13,8 @@ Développeuse Back-end — Parcelio, mars 2021 – aujourd'hui
 - Mise en place de la CI GitHub Actions avec tests d'intégration
 Développeuse — WebFactory, 2018 – 2021
 - Sites clients en PHP
-Compétences : Go, PHP, PostgreSQL, Docker, Kubernetes, Agile`;
+Compétences : Go, PHP, PostgreSQL, Docker, Kubernetes, Agile
+Formation : Diplôme d'ingénieur, Centrale Méditerranée, 2015 – 2018`;
 
 const VALID = {
   language: "fr",
@@ -45,6 +46,8 @@ const VALID = {
   is_dev_profile: true,
   title_mentions_ai: false,
   describes_ai_project: false,
+  school_name: "Centrale Méditerranée",
+  school_tier: "B",
 };
 
 beforeEach(() => {
@@ -66,6 +69,26 @@ describe("readCv", () => {
     expect(res!.technos_described).toEqual(["Go", "PostgreSQL", "GitHub Actions", "PHP"]);
     // Une mention inventée est retirée.
     expect(res!.tests_ci_review_mentions).toEqual([{ quote: "Mise en place de la CI GitHub Actions avec tests d'intégration" }]);
+  });
+
+  it("école : gardée si elle figure dans le texte, sinon aucune", async () => {
+    const read = async (over: object, text = CV) => (await readCv(text, { client: fakeClient([{ ...VALID, ...over }]).client }))!;
+    expect(await read({})).toMatchObject({ school_name: "Centrale Méditerranée", school_tier: "B" });
+    // Casse, accents et espaces ignorés pour la vérification ; le nom reste tel que rendu.
+    expect(await read({ school_name: "centrale mediterranee" })).toMatchObject({ school_name: "centrale mediterranee", school_tier: "B" });
+    // Inventée : retirée, rang ramené à none.
+    expect(await read({ school_name: "Stanford University", school_tier: "S" })).toMatchObject({ school_name: "", school_tier: "none" });
+    expect(await read({ school_name: "  ", school_tier: "A" })).toMatchObject({ school_name: "", school_tier: "none" });
+    // Rang hors liste : sortie invalide, relance.
+    const bad = fakeClient([{ ...VALID, school_tier: "A+" }, VALID]);
+    expect(await readCv(CV, { client: bad.client })).not.toBeNull();
+    expect(userText(bad.calls[1])).toContain("school_tier");
+  });
+
+  it("le schéma exige l'école et son rang", () => {
+    const schema = CV_OUTPUT_SCHEMA as { required: string[]; properties: Record<string, { enum?: string[] }> };
+    expect(schema.required).toEqual(expect.arrayContaining(["school_name", "school_tier"]));
+    expect(schema.properties.school_tier.enum).toEqual(["S", "A", "B", "C", "none"]);
   });
 
   it("encadre le CV dans le message utilisateur, système en cache", async () => {

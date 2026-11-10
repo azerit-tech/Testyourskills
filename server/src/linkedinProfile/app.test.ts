@@ -47,6 +47,8 @@ const READING: CvReading = {
   is_dev_profile: true,
   title_mentions_ai: false,
   describes_ai_project: false,
+  school_name: "",
+  school_tier: "none",
 };
 
 function body(card: CardData): CardBody {
