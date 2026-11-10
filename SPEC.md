@@ -1192,3 +1192,16 @@ Jacques n'aime plus la révélation en ascenseur. Il veut une course-poursuite :
 - **Aperçu de lien d'une comparaison, à la troisième personne** : « Le LinkedIn de @lea a volé 21 points à son code », « Le code de @lea vaut 12 points de plus que son LinkedIn ». Le titre se calcule depuis les deux notes ; le site et l'aperçu partagent `shared/compareText.ts`.
 - **Pas vérifié** : le partage du fichier story sur un vrai téléphone, les aperçus réels de LinkedIn, X et WhatsApp, la lecture des décors dans l'image Docker.
 - **Pas fait** : le clip vidéo (§18.8), qui attend la poursuite (§18.33).
+
+### 18.35 Les fondateurs au dossier (10 novembre 2026)
+
+Demande de Jacques : son LinkedIn doit entrer dans son jugement, et Lumine Trentelivres (`@LumBuilds0`), cofondatrice, doit avoir le sien en entier. Les deux ont été jugés pour de vrai le 10 novembre, GitHub et LinkedIn.
+
+- **Un LinkedIn lu à côté d'un GitHub donne toujours la comparaison**, quel que soit le métier qu'il déclare. Avant, un profil lu « non dev » était jeté sans rien dire et la fiche GitHub sortait seule : c'était le cas des deux fondateurs (cofondateur, chercheur quant, étudiante), et de la plupart des gens que la porte LinkedIn vise (§18.30). Côté LinkedIn, un profil non dev garde le poste PM ou DESIGN. Un CV en PDF garde la règle du §4.7.
+- **La vitrine est jugée avec son LinkedIn.** Le GitHub de Jacques n'affiche pas son LinkedIn : le serveur se porte garant du lien (`SHOWCASE_LINKEDIN`, par défaut `linkedin.com/in/jacquesmougeot` avec le pseudo par défaut). Toute fiche demandée pour le pseudo de la vitrine lit ce LinkedIn, et la comparaison compte comme prouvée (§18.24). Un autre LinkedIn collé avec ce pseudo ne l'est pas.
+- **L'accueil** montre la carte GitHub de cette comparaison, et dessous les deux notes (« LinkedIn 55 · GitHub 71 ») avec le lien vers la comparaison : c'est l'exemple du titre (§18.30). Sans lecteur LinkedIn, ou lecture en échec : la fiche GitHub seule, retentée au bout d'une heure.
+- **Résultats du 10 novembre.** Jacques : LinkedIn 55 (« Cellule dormante »), GitHub 71 (« Légende du milieu »), « Ton code vaut 16 points de plus que ton LinkedIn ». Lumine : LinkedIn 44, GitHub 35 (« Fantôme », fiabilité 19), « Ton LinkedIn a volé 9 points à ton code » : son GitHub public tient en deux repos et deux contributions sur douze mois, son code est dans des repos privés.
+- **Lumine n'est pas sur l'accueil** tant que son GitHub public ne montre pas son travail. Sa fiche se fait comme celle de tout le monde, par `/LumBuilds0` : son GitHub affiche son LinkedIn, la comparaison est prouvée sans réglage.
+- **Lecture d'un LinkedIn par GLM 5.3 Flash** (question ouverte du §18.32), sur six lectures : 5 à 9 s quatre fois, plus de 25 s deux fois (appel coupé, la fiche GitHub sort seule et hors cache). Le métier lu est stable (PM, non dev), le nombre de postes relevés varie d'une lecture à l'autre (1 à 4 sur 4), donc la note LinkedIn aussi (51 à 55 pour Jacques).
+- **Dépend de Jacques et Lumine** : `APIFY_TOKEN` sur le serveur (sans lui, aucun LinkedIn n'est lu, vitrine comprise) ; ajouter son LinkedIn à son profil GitHub (Jacques) ; rendre publics des repos ou afficher les contributions privées (Lumine).
+- **Pas vérifié** : la lecture par Apify de ces deux profils (les tests locaux ont lu les profils relevés à la main, sans jeton).
