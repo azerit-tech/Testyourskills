@@ -25,12 +25,16 @@ import { isClosed } from "../lib/errors";
 import { useHold, type SceneState } from "../lib/hold";
 import { navigate, onLinkClick } from "../lib/router";
 import { freshLogin, freshSince, iDenounced, myCard, prefillFromLast, rememberMine, type MyCard } from "../lib/session";
+import { revealScene, revealToPlay } from "../lib/revealScene";
 import { useReducedMotion } from "../lib/util";
 import { verdict } from "../lib/versus";
 
 /** La révélation 3D et Three.js, hors du bundle de l'accueil. */
 const loadWalkout = () => import("../components/Walkout3D");
 const Walkout3D = lazy(() => loadWalkout().then((m) => ({ default: m.Walkout3D })));
+/** La poursuite 2D (§18.33) : quand elle joue, rien de la scène 3D ne se télécharge. */
+const loadChase = () => import("../components/Chase");
+const Chase = lazy(() => loadChase().then((m) => ({ default: m.Chase })));
 
 const POLL_MS = 600;
 const CLIENT_TIMEOUT = 45_000;
@@ -167,11 +171,16 @@ export function CardPage({ id }: { id: string }) {
   // La scène 3D (Three.js et ses assets) se charge dès que la fiche est
   // demandée, et s'y prépare pendant l'attente du scoring : shaders compilés,
   // textures sur le GPU. Jamais en mouvement réduit : il n'y aura pas de scène.
+  // La poursuite (§18.33) n'a rien à préparer : son module seul, sans Three.js.
   useEffect(() => {
-    if (!reduced && (view.s === "pending" || (view.s === "loading" && fresh)))
-      loadWalkout()
-        .then((m) => m.warmWalkout(lang))
-        .catch(() => undefined);
+    const scene = revealToPlay(revealScene(), reduced);
+    if (scene && (view.s === "pending" || (view.s === "loading" && fresh))) {
+      if (scene === "chase") loadChase().catch(() => undefined);
+      else
+        loadWalkout()
+          .then((m) => m.warmWalkout(lang))
+          .catch(() => undefined);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view.s]);
 
@@ -323,6 +332,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
   const tracked = useRef(false);
   const stageRef = useRef<HTMLElement>(null);
   const walkoutCtl = useRef<WalkoutControl | null>(null);
+  const [scene] = useState(revealScene);
 
   useEffect(() => {
     if (fresh && !tracked.current) {
@@ -407,7 +417,11 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
           // Morceau 3D introuvable : même repli que sans WebGL, la fiche sort sans révélation.
           <ErrorBoundary fallback={null} onError={finish}>
             <Suspense fallback={null}>
-              <Walkout3D card={main} lang={lang} double={item.kind === "comparison"} declared={declaredOf(item.kind === "comparison" ? item.comparison : item.card)} phase={phase} anchorRef={stageRef} controlRef={walkoutCtl} onReady={() => onScene("ready")} onHandoff={handoff} onDone={finish} />
+              {scene === "chase" ? (
+                <Chase card={main} lang={lang} double={item.kind === "comparison"} phase={phase} onReady={() => onScene("ready")} onHandoff={handoff} onDone={finish} onTap={onStageClick} />
+              ) : (
+                <Walkout3D card={main} lang={lang} double={item.kind === "comparison"} declared={declaredOf(item.kind === "comparison" ? item.comparison : item.card)} phase={phase} anchorRef={stageRef} controlRef={walkoutCtl} onReady={() => onScene("ready")} onHandoff={handoff} onDone={finish} />
+              )}
             </Suspense>
           </ErrorBoundary>
         )}

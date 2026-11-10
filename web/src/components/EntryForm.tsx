@@ -15,6 +15,7 @@ import { api, tokens } from "../lib/api";
 import { errorFact } from "../lib/errors";
 import { navigate } from "../lib/router";
 import { unlockAudio } from "../lib/audio";
+import { revealScene } from "../lib/revealScene";
 import { markFresh, rememberDoor, rememberInput, sessionDoor, setPrefill, takePrefill } from "../lib/session";
 import type { Mode, Tab } from "../lib/session";
 import { checkPdf, isTouch, parseLogin } from "../lib/util";
@@ -43,7 +44,9 @@ function prefetchReveal() {
   if (prefetched) return;
   prefetched = true;
   if ((navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData) return;
-  void import("./Walkout3D").then((m) => m.preloadWalkoutAssets()).catch(() => undefined);
+  // La poursuite (§18.33) : son seul module, quelques Ko ; ni Three.js ni les assets 3D.
+  if (revealScene() === "chase") void import("./Chase").catch(() => undefined);
+  else void import("./Walkout3D").then((m) => m.preloadWalkoutAssets()).catch(() => undefined);
 }
 
 function isEditable(el: EventTarget | null): boolean {
