@@ -49,6 +49,14 @@ export const STRINGS = {
       /** Un poids de la formule : « 30 % ». */
       weight: (w: number) => `${Math.round(w * 100)}${NBSP}%`,
       flip: "Retourner la fiche",
+      /** Le barème de recrutement (§18.37) : la note est la moyenne pondérée des critères notés, × 10. */
+      gridRating: "La note · moyenne pondérée × 10",
+      criteria: { EDU: "École", XP: "Expérience", EMP: "Parcours", STK: "Stack", CODE: "Code", ACT: "Activité", OWN: "Ownership", OSS: "Open source" },
+      /** « Code 7 × 2 » : la note sur 10 et son coefficient, jamais un « + n ». */
+      term: (name: string, score: number, coef: string) => `${name} ${score}${NBSP}×${NBSP}${coef}`,
+      divide: (den: string) => `÷${NBSP}${den}`,
+      capped: `plafond 85, aucun code prouvé`,
+      empty: `Dossier vide${NBSP}: moins d'un quart des coefficients notés`,
     },
   },
   en: {
@@ -91,6 +99,12 @@ export const STRINGS = {
       rating: "The rating",
       weight: (w: number) => `${Math.round(w * 100)}%`,
       flip: "Flip the card",
+      gridRating: "The rating · weighted mean × 10",
+      criteria: { EDU: "School", XP: "Experience", EMP: "Career", STK: "Stack", CODE: "Code", ACT: "Activity", OWN: "Ownership", OSS: "Open source" },
+      term: (name: string, score: number, coef: string) => `${name} ${score}${NBSP}×${NBSP}${coef}`,
+      divide: (den: string) => `÷${NBSP}${den}`,
+      capped: "capped at 85, no code proven",
+      empty: "Empty file: under a quarter of the weights scored",
     },
   },
 } satisfies Record<Lang, Record<string, unknown>>;

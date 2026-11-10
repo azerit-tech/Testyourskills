@@ -3,8 +3,11 @@
 // pour pouvoir un jour le rendre en PNG (renderToStaticMarkup → resvg).
 // De haut en bas : la marque et les étoiles, le titre, chaque axe (TEC, SHIP,
 // ARCH, DOC, XP, BUZZ) avec sa valeur et son fait le plus fort (le premier de
-// `stat.facts`, celui que le barème pose en tête), puis la formule de la note.
+// `stat.facts`, celui que le barème pose en tête), puis la formule de la note :
+// celle du barème de recrutement quand la fiche a sa grille (§18.37, « Code 7 × 2
+// + Stack 6 × 1,5 + … »), celle des six barres pour les fiches d'avant.
 import { useId } from "react";
+import { dec, gridMath, usableGrid } from "../gridText";
 import type { CardData, Lang, Stat, StatCode } from "../types";
 import { STAT_CODES, starsFor } from "../types";
 import { AzeritGem } from "./AzeritGem";
@@ -46,13 +49,31 @@ export function formulaTerms(card: Pick<CardData, "stats">, lang: Lang): string[
   });
 }
 
+/**
+ * La formule du barème de recrutement, avec les notes de la fiche : chaque
+ * critère compté, sa note sur 10 et son coefficient (« Code 7 × 2 »), puis la
+ * division par la somme des coefficients (« ÷ 8,5 »). Le libellé dit « moyenne
+ * pondérée × 10 ». Dossier vide : une phrase, pas de terme. Sans grille : null.
+ */
+export function gridFormula(card: Pick<CardData, "grid">, lang: Lang): { terms: string[]; tail?: string } | null {
+  if (!usableGrid(card.grid)) return null;
+  const s = t(lang).back;
+  const m = gridMath(card.grid);
+  if (m.rule === "empty_file" || !m.terms.length) return { terms: [s.empty] };
+  const terms = m.terms.map((x) => s.term(s.criteria[x.code], x.score, dec(x.weight, lang)));
+  const tail = `${s.divide(dec(m.den, lang))}${m.capHit ? `, ${s.capped}` : ""}`;
+  return { terms, tail };
+}
+
 /** Range les termes de la formule en lignes (jamais un terme coupé), trois au plus ;
- *  le corps descend d'un quart de point tant qu'il en faudrait plus. */
-export function packTerms(terms: string[], size: number, maxWidth: number): { lines: string[]; size: number } {
+ *  le corps descend d'un quart de point tant qu'il en faudrait plus. `tail` suit le
+ *  dernier terme sans « + » (la division de la moyenne). */
+export function packTerms(terms: string[], size: number, maxWidth: number, tail?: string): { lines: string[]; size: number } {
+  const pieces = tail ? [...terms, tail] : terms;
   for (let sz = size; ; sz -= 0.25) {
     const lines: string[] = [];
     let cur = "";
-    for (const [i, term] of terms.entries()) {
+    for (const [i, term] of pieces.entries()) {
       const piece = i < terms.length - 1 ? `${term} +` : term;
       const next = cur ? `${cur} ${piece}` : piece;
       if (cur && measure(next, "sans-500", sz) > maxWidth) {
@@ -110,7 +131,8 @@ export function CardBackGraphic({ card, lang: langProp, idPrefix, className, x, 
   const F = BACK_LAYOUT.formula;
 
   const resultW = measure(`= ${card.overall}`, "display-800", F.result, -1) + 12;
-  const formula = packTerms(formulaTerms(card, lang), F.size, FW - resultW);
+  const grid = gridFormula(card, lang);
+  const formula = grid ? packTerms(grid.terms, F.size, FW - resultW, grid.tail) : packTerms(formulaTerms(card, lang), F.size, FW - resultW);
   const handle = card.login ? `@${upper(card.login, lang)}` : upper(card.name, lang);
   const sub = wrap(`${handle} · ${s.caseNo} ${caseNumber(card.id)}`, "mono-400", 8, FW, 1, 0.6)[0];
 
@@ -179,10 +201,10 @@ export function CardBackGraphic({ card, lang: langProp, idPrefix, className, x, 
           />
         ))}
 
-        {/* La formule : les cinq axes notés, leurs poids, et la note */}
+        {/* La formule : les critères notés du barème et leurs coefficients (avant 0.4.0 : les cinq axes et leurs poids), et la note */}
         <rect x={LEFT} y={F.labelY - 16} width={FW} height={1} fill="#fff" fillOpacity={0.22} />
         <Txt x={LEFT} y={F.labelY} font="sans-600" size={7.5} ls={1.1} fill={th.inkSoft} opacity={0.62}>
-          {upper(s.back.rating, lang)}
+          {upper(grid ? s.back.gridRating : s.back.rating, lang)}
         </Txt>
         {formula.lines.map((line, i) => (
           <Txt key={i} x={LEFT} y={F.y + i * F.lineH} font="sans-500" size={formula.size} fill={th.inkSoft}>

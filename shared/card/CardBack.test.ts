@@ -7,9 +7,9 @@ import { describe, expect, it } from "vitest";
 import scoring from "../../data/scoring.json";
 import { fontFiles } from "../../server/src/render/fonts";
 import { FIXTURES } from "../fixtures";
-import type { CardData, Lang } from "../types";
+import type { CardData, CriterionCode, Grid, GridCriterion, Lang } from "../types";
 import { STAT_CODES } from "../types";
-import { BACK_LAYOUT, CardBackGraphic, OVERALL_WEIGHTS, formulaTerms, packTerms, strongestFact } from "./CardBack";
+import { BACK_LAYOUT, CardBackGraphic, OVERALL_WEIGHTS, formulaTerms, gridFormula, packTerms, strongestFact } from "./CardBack";
 import { measure } from "./text";
 
 const FW = 360 - 18 - 20;
@@ -60,6 +60,41 @@ describe("dos de la fiche", () => {
     const card = { ...FIXTURES.silver, stats: FIXTURES.silver.stats.map((s) => ({ ...s, facts: [] })) };
     expect(back(card, "fr")).toContain("Aucun fait relevé");
     expect(back(card, "en")).toContain("No fact on file");
+  });
+
+  it("avec la grille du barème : les critères notés et leurs coefficients, sans « + n », en trois lignes", () => {
+    const crit = (code: CriterionCode, score: number | null, counted = score !== null): GridCriterion => ({
+      code,
+      score,
+      counted,
+      state: score === null ? "unproven" : "scored",
+      source: "github",
+      reached: { fr: "", en: "" },
+      flags: [],
+    });
+    const full: Grid = { overall: 57, criteria: [crit("EDU", 6), crit("XP", 3), crit("EMP", 4), crit("STK", 6), crit("CODE", 7), crit("ACT", 8), crit("OWN", 6), crit("OSS", 6)] };
+    const capped: Grid = { overall: 85, rule: "capped_unproven", criteria: [crit("XP", 9), crit("EMP", 9), crit("CODE", null)] };
+    const empty: Grid = { overall: 20, rule: "empty_file", criteria: [crit("STK", 2, false), crit("CODE", null)] };
+    const F = BACK_LAYOUT.formula;
+    for (const lang of ["fr", "en"] as Lang[]) {
+      for (const grid of [full, capped, empty]) {
+        const card = { ...FIXTURES.gold, grid, overall: grid.overall };
+        const f = gridFormula(card, lang)!;
+        const resultW = measure(`= ${card.overall}`, "display-800", F.result, -1) + 12;
+        const p = packTerms(f.terms, F.size, FW - resultW, f.tail);
+        expect(p.lines.length).toBeLessThanOrEqual(F.maxLines);
+        const text = p.lines.join(" ");
+        expect(text).not.toMatch(/[+−]\s?\d/);
+        const svg = back(card, lang);
+        expect(svg).toContain(lang === "fr" ? "MOYENNE PONDÉRÉE" : "WEIGHTED MEAN");
+        expect(svg).toContain(`= ${grid.overall}`);
+        if (grid === empty) expect(f.tail).toBeUndefined();
+        else expect(f.tail).toContain("÷");
+      }
+      expect(gridFormula({ ...FIXTURES.gold, grid: full }, lang)!.terms[0]).toBe("Code 7 × 2");
+      expect(gridFormula({ ...FIXTURES.gold, grid: capped }, lang)!.tail).toContain("85");
+    }
+    expect(gridFormula(FIXTURES.gold, "fr")).toBeNull();
   });
 
   it("se rend en PNG par resvg, comme la face", () => {
