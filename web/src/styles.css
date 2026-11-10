@@ -929,6 +929,36 @@ svg {
 .field-input::placeholder {
   color: rgba(229, 221, 255, 0.38);
 }
+/* le préfixe de la porte LinkedIn, un cran plus petit : à 360 px, « linkedin.com/in/ »
+   (106 px en 15) laisse 180 px au slug, assez pour « ton-profil » (71 px en 17) */
+.field-li .field-prefix {
+  font-size: 15px;
+}
+
+/* --- les deux portes (EntryForm) : LinkedIn, puis GitHub, au-dessus du champ.
+   La piste des onglets (.seg), en pilule de la largeur du champ, sur le même fond ;
+   la porte ouverte en crème, texte d'encre, l'autre transparente, texte lilas,
+   comme le choix de la langue. Texte seul, ni logo ni lueur. 44 px de haut,
+   10 px jusqu'au champ (l'écart de .entry). --- */
+.entry-doors {
+  background: var(--ink-2);
+}
+.entry-doors button {
+  color: var(--lilac-2);
+}
+.entry-doors button[aria-checked="true"] {
+  background: var(--cream);
+  color: var(--ink-0);
+}
+.entry-doors button:hover:not([aria-checked="true"]) {
+  color: var(--lilac);
+}
+/* la ligne d'aide de « Où est mon lien ? », sous les liens du pied */
+.entry-help {
+  flex-basis: 100%;
+  font: 400 13px/1.4 var(--f-text);
+  color: var(--lilac-2);
+}
 .entry-submit {
   width: 100%;
 }
@@ -2516,6 +2546,15 @@ a.dossier-item:hover {
   }
   .entry > :not(.field):not(.entry-submit) {
     grid-column: 1 / -1;
+  }
+  /* les portes au-dessus du champ seul, de sa largeur ; la pilule reste à côté du champ */
+  .entry.has-doors > .entry-doors {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .entry.has-doors > .field,
+  .entry.has-doors > .entry-submit {
+    grid-row: 2;
   }
   .entry .drop {
     grid-column: 1 / -1;

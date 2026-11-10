@@ -100,18 +100,48 @@ export interface Me {
 }
 
 let configPromise: Promise<AppConfig> | null = null;
+const MOCK_CONFIG: AppConfig = { linkedin: true, claim: true, linkedinEntry: true };
+const CONFIG_KEY = "tys_config";
+/** La configuration une fois connue : en RAM, et dans sessionStorage pour la page suivante. */
+let configMemo: AppConfig | null = null;
 
 /** Fonctions disponibles côté serveur (ex. connexion LinkedIn), lue une fois. */
 function getConfig(): Promise<AppConfig> {
   if (!configPromise) {
     configPromise = isMock()
-      ? Promise.resolve({ linkedin: true, claim: true, linkedinEntry: true })
+      ? Promise.resolve(MOCK_CONFIG)
       : fetch("/api/config", { headers: { Accept: "application/json" } })
-          .then((r): Promise<{ linkedin?: boolean; claim?: boolean; linkedinEntry?: boolean }> => (r.ok ? r.json() : Promise.resolve({})))
-          .then((c) => ({ linkedin: c?.linkedin === true, claim: c?.claim === true, linkedinEntry: c?.linkedinEntry === true }))
+          .then(async (r) => {
+            const c = (r.ok ? await r.json() : {}) as { linkedin?: boolean; claim?: boolean; linkedinEntry?: boolean } | null;
+            const cfg = { linkedin: c?.linkedin === true, claim: c?.claim === true, linkedinEntry: c?.linkedinEntry === true };
+            // Seule une vraie réponse est gardée pour la session : une panne passagère ne fige rien.
+            if (r.ok) {
+              try {
+                sessionStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
+              } catch {
+                /* stockage bloqué : la RAM suffit */
+              }
+            }
+            return cfg;
+          })
           .catch(() => ({ linkedin: false, claim: false, linkedinEntry: false }));
+    void configPromise.then((c) => (configMemo = c));
   }
   return configPromise;
+}
+
+/** La configuration si elle est déjà connue (cette page ou plus tôt dans la session), sinon null. Synchrone. */
+function knownConfig(): AppConfig | null {
+  if (configMemo) return configMemo;
+  if (isMock()) return MOCK_CONFIG;
+  try {
+    const raw = sessionStorage.getItem(CONFIG_KEY);
+    if (!raw) return null;
+    const c = JSON.parse(raw) as Partial<AppConfig> | null;
+    return { linkedin: c?.linkedin === true, claim: c?.claim === true, linkedinEntry: c?.linkedinEntry === true };
+  } catch {
+    return null;
+  }
 }
 
 /** Démarre la connexion LinkedIn pour poser la photo sur la carte. `token` null : la session du propriétaire fait foi. */
@@ -359,7 +389,7 @@ async function getTop(): Promise<WeekTop | null> {
   }
 }
 
-export const api = { createCard, getJob, getCase, vote, sendEmail, deleteCard, track, getConfig, startLinkedInPhoto, getShowcase, getTop, getMe, startClaim, setHidden, logout };
+export const api = { createCard, getJob, getCase, vote, sendEmail, deleteCard, track, getConfig, knownConfig, startLinkedInPhoto, getShowcase, getTop, getMe, startClaim, setHidden, logout };
 
 /** URLs des images rendues par le serveur (§7). */
 export const images = {

@@ -1,5 +1,6 @@
 // Mémoire de session : pré-remplissage de l'entrée et cartes fraîches (en RAM),
 // origine du visiteur venu par un lien partagé (sessionStorage).
+import type { Door } from "../../../shared/entry";
 import type { Fact } from "../../../shared/types";
 
 export type Mode = "single" | "both";
@@ -54,6 +55,25 @@ export function freshLogin(id: string): string | null {
 
 export function freshSince(id: string): number | null {
   return fresh.get(id) ?? null;
+}
+
+// --- La porte de l'entrée ----------------------------------------------------
+// LinkedIn ou GitHub : la porte choisie tient pour la session, d'un formulaire à
+// l'autre (accueil, « Et toi ? ») et d'une page à l'autre. RAM, recopiée dans
+// sessionStorage pour survivre à un rechargement.
+
+const DOOR_KEY = "tys_door";
+let memDoor: Door | null = null;
+
+export function sessionDoor(): Door {
+  if (memDoor) return memDoor;
+  const stored = readSession(DOOR_KEY);
+  return stored === "github" || stored === "linkedin" ? stored : "linkedin";
+}
+
+export function rememberDoor(door: Door) {
+  memDoor = door;
+  writeSession(DOOR_KEY, door);
 }
 
 // --- Ma fiche (§18.7) --------------------------------------------------------

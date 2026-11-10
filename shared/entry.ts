@@ -68,3 +68,51 @@ export function detectEntry(raw: unknown): Entry | null {
   const login = parseGithubLogin(raw);
   return login ? { kind: "github", login } : null;
 }
+
+// --- Les deux portes de l'accueil -------------------------------------------
+// Le formulaire montre deux portes, LinkedIn d'abord, puis GitHub. Le champ de
+// la porte LinkedIn porte le préfixe fixe « linkedin.com/in/ » : on y tape ce qui
+// suit, ou on y colle le lien entier. Une adresse de l'autre porte bascule.
+
+export type Door = "linkedin" | "github";
+
+/** Le slug décodé d'un lien de profil LinkedIn valide (« céline-dupré »), sinon null. */
+export function linkedinSlug(raw: unknown): string | null {
+  const url = normalizeLinkedinUrl(raw);
+  if (!url) return null;
+  return decodeURIComponent(url.slice("https://www.linkedin.com/in/".length));
+}
+
+/**
+ * Ce que donne le champ d'une porte à l'envoi.
+ * - `linkedin` / `github` : de quoi lancer la fiche ; `switchTo` quand l'entrée
+ *   appartient à l'autre porte (le formulaire bascule, puis lance) ;
+ * - `error` : `empty` (rien de tapé), `linkedin` (pas un profil LinkedIn),
+ *   `github` (pas un pseudo GitHub).
+ */
+export type DoorResult =
+  | { kind: "linkedin"; url: string; switchTo?: Door }
+  | { kind: "github"; login: string; switchTo?: Door }
+  | { kind: "error"; error: "empty" | "linkedin" | "github" };
+
+export function resolveDoor(door: Door, raw: string): DoorResult {
+  const s = raw.trim();
+  if (!s) return { kind: "error", error: "empty" };
+  const hasLinkedin = /linkedin\.com/i.test(s);
+  const hasGithub = !hasLinkedin && /github\.com/i.test(s);
+  if (door === "linkedin") {
+    if (hasGithub) {
+      const login = parseGithubLogin(s);
+      return login ? { kind: "github", login, switchTo: "github" } : { kind: "error", error: "linkedin" };
+    }
+    // Ce qui suit le préfixe : « camille-ardent », « /in/camille-ardent », « in/camille-ardent/ ».
+    const url = normalizeLinkedinUrl(hasLinkedin ? s : `linkedin.com/in/${s.replace(/^\/?(?:in\/)?/i, "")}`);
+    return url ? { kind: "linkedin", url } : { kind: "error", error: "linkedin" };
+  }
+  if (hasLinkedin) {
+    const url = normalizeLinkedinUrl(s);
+    return url ? { kind: "linkedin", url, switchTo: "linkedin" } : { kind: "error", error: "linkedin" };
+  }
+  const login = parseGithubLogin(s);
+  return login ? { kind: "github", login } : { kind: "error", error: "github" };
+}

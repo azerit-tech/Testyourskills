@@ -1,18 +1,21 @@
-// Le champ unique de l'entrée (§6.1) : le pseudo GitHub, ou un lien de profil
-// LinkedIn quand le serveur sait le lire (§18.24) ; à un lien de là le CV, puis
-// « les deux » pour la comparaison.
-// Variante « inline » : le champ GitHub seul, dans le bandeau d'une carte partagée.
-// Raccourcis : coller une URL GitHub ou déposer un PDF n'importe où sur la page lance la carte.
+// L'entrée (§6.1). Quand le serveur sait lire LinkedIn (§18.24), deux portes au-dessus
+// du champ : LinkedIn d'abord (préfixe « linkedin.com/in/ »), puis GitHub (« @ »).
+// Sinon, le champ GitHub seul. À un lien de là le CV, puis « les deux » pour la
+// comparaison : ces deux-là gardent le champ GitHub, sans portes.
+// Variante « inline » : les portes et le champ, dans le bandeau d'une carte partagée.
+// Raccourcis : coller une URL GitHub ou LinkedIn, ou déposer un PDF, n'importe où sur
+// la page lance la carte (et ouvre la bonne porte).
 import { useEffect, useId, useRef, useState } from "react";
-import type { FormEvent } from "react";
+import type { FormEvent, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
 import { createPortal } from "react-dom";
-import { detectEntry } from "../../../shared/entry";
+import { detectEntry, linkedinSlug, parseGithubLogin, resolveDoor } from "../../../shared/entry";
+import type { Door } from "../../../shared/entry";
 import { pick, useT } from "../i18n";
 import { api, tokens } from "../lib/api";
 import { errorFact } from "../lib/errors";
 import { navigate } from "../lib/router";
 import { unlockAudio } from "../lib/audio";
-import { markFresh, rememberInput, setPrefill, takePrefill } from "../lib/session";
+import { markFresh, rememberDoor, rememberInput, sessionDoor, setPrefill, takePrefill } from "../lib/session";
 import type { Mode, Tab } from "../lib/session";
 import { checkPdf, isTouch, parseLogin } from "../lib/util";
 import type { PdfCheck } from "../lib/util";
@@ -20,9 +23,11 @@ import { IconClose } from "./Icons";
 
 interface Props {
   inputRef?: React.RefObject<HTMLInputElement | null>;
-  /** « inline » : le champ GitHub seul, sans onglets, pour le bandeau d'une carte partagée. */
+  /** « inline » : sans onglets ni CV, pour le bandeau d'une carte partagée. */
   variant?: "full" | "inline";
 }
+
+const DOORS: Door[] = ["linkedin", "github"];
 
 /** Un collage ne lance la carte que s'il ressemble à une URL GitHub (ou LinkedIn), pas à un simple mot. */
 const GITHUB_URL_RE = /github\.com\//i;
@@ -55,14 +60,26 @@ function fileFrom(dt: DataTransfer | null): File | null {
   return files.find((f) => f.type === "application/pdf" || /\.pdf$/i.test(f.name)) ?? files[0] ?? null;
 }
 
+/** La porte et le texte du champ au départ : un « Réessayer » rouvre la porte de sa saisie. */
+function initialEntry(raw: string | undefined): { door: Door; login: string } {
+  const s = raw ?? "";
+  const slug = /linkedin\.com/i.test(s) ? linkedinSlug(s) : null;
+  if (slug) return { door: "linkedin", login: slug };
+  if (s && parseGithubLogin(s)) return { door: "github", login: s };
+  return { door: sessionDoor(), login: s };
+}
+
 export function EntryForm({ inputRef, variant = "full" }: Props) {
   const inline = variant === "inline";
   const { t, lang } = useT();
   const h = t.home;
   const [init] = useState(() => (inline ? null : takePrefill()));
+  const [first] = useState(() => initialEntry(init?.login));
   const [mode, setMode] = useState<Mode>(init?.mode ?? "single");
   const [tab, setTab] = useState<Tab>(init?.tab ?? "github");
-  const [login, setLogin] = useState(init?.login ?? "");
+  const [door, setDoor] = useState<Door>(first.door);
+  const [login, setLogin] = useState(first.login);
+  const [help, setHelp] = useState(false);
   const [file, setFile] = useState<File | null>(init?.file ?? null);
   const [error, setError] = useState<string | null>(init?.error ? (typeof init.error === "string" ? init.error : pick(init.error, lang)) : null);
   const [busy, setBusy] = useState(false);
@@ -75,8 +92,9 @@ export function EntryForm({ inputRef, variant = "full" }: Props) {
   const showGithub = inline || mode === "both" || tab === "github";
   const showCv = !inline && (mode === "both" || tab === "cv");
 
-  // Le champ accepte aussi un lien LinkedIn si le serveur sait le lire (§18.24) ; pas avec un CV.
-  const [liOn, setLiOn] = useState(false);
+  // Les portes, si le serveur sait lire LinkedIn (§18.24) ; pas avec un CV. Optimiste
+  // tant que la config est inconnue, puis lue d'emblée : ni les portes ni le titre ne clignent.
+  const [liOn, setLiOn] = useState(() => api.knownConfig()?.linkedinEntry ?? true);
   useEffect(() => {
     let alive = true;
     void api.getConfig().then((c) => alive && setLiOn(c.linkedinEntry));
@@ -84,11 +102,16 @@ export function EntryForm({ inputRef, variant = "full" }: Props) {
       alive = false;
     };
   }, []);
-  const liField = liOn && !showCv;
+  const doorsOn = liOn && !showCv;
+  /** La porte du champ visible : GitHub dès qu'il n'y a pas de portes. */
+  const fieldDoor: Door = doorsOn ? door : "github";
+
+  useEffect(() => rememberDoor(door), [door]);
 
   // Les écouteurs posés sur le document lisent toujours l'état courant.
-  const state = useRef({ mode, tab, login, file, liField });
-  state.current = { mode, tab, login, file, liField };
+  const state = useRef({ mode, tab, login, file, doorsOn });
+  state.current = { mode, tab, login, file, doorsOn };
+  const doorBtns = useRef<Record<Door, HTMLButtonElement | null>>({ linkedin: null, github: null });
   // Verrou immédiat : deux départs rapprochés (collage puis dépôt) n'en font qu'un.
   const busyRef = useRef(false);
 
@@ -173,7 +196,7 @@ export function EntryForm({ inputRef, variant = "full" }: Props) {
     void start({ file: f });
   };
 
-  /** URL GitHub collée : on en tire le pseudo et on lance la carte. */
+  /** URL GitHub collée : on en tire le pseudo et on lance la carte (porte GitHub, même depuis la porte LinkedIn). */
   const receiveLogin = (p: string) => {
     const s = state.current;
     if (busyRef.current) return;
@@ -185,6 +208,7 @@ export function EntryForm({ inputRef, variant = "full" }: Props) {
       return;
     }
     if (!inline) setTab("github");
+    setDoor("github");
     void start({ login: p });
   };
 
@@ -239,7 +263,7 @@ export function EntryForm({ inputRef, variant = "full" }: Props) {
     };
   }, []);
 
-  // Collage n'importe où : une URL GitHub ou un PDF.
+  // Collage n'importe où : une URL GitHub, un lien LinkedIn ou un PDF.
   useEffect(() => {
     const onPaste = (e: ClipboardEvent) => {
       const dt = e.clipboardData;
@@ -255,9 +279,12 @@ export function EntryForm({ inputRef, variant = "full" }: Props) {
       const text = dt.getData("text");
       if (LINKEDIN_URL_RE.test(text)) {
         const entry = detectEntry(text);
-        if (!state.current.liField || entry?.kind !== "linkedin") return;
+        if (!state.current.doorsOn || entry?.kind !== "linkedin") return;
         e.preventDefault();
-        setLogin(entry.url);
+        // Porte LinkedIn, et dans le champ seulement ce qui suit le préfixe.
+        setDoor("linkedin");
+        setError(null);
+        setLogin(linkedinSlug(entry.url) ?? entry.url);
         void startRef.current({ linkedin: entry.url });
         return;
       }
@@ -275,6 +302,24 @@ export function EntryForm({ inputRef, variant = "full" }: Props) {
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (busy) return;
+    // Les portes : chacune lit son champ ; une adresse de l'autre porte y bascule et lance.
+    if (doorsOn) {
+      const r = resolveDoor(door, login);
+      if (r.kind === "error") {
+        setError(r.error === "github" ? h.errLogin : r.error === "linkedin" || door === "linkedin" ? h.errLinkedin : h.errEmptyLogin);
+        loginRef.current?.focus();
+        return;
+      }
+      if (r.switchTo) setDoor(r.switchTo);
+      if (r.kind === "linkedin") {
+        setLogin(linkedinSlug(r.url) ?? login);
+        void start({ linkedin: r.url });
+      } else {
+        setLogin(r.login);
+        void start({ login: r.login });
+      }
+      return;
+    }
     let parsed: string | undefined;
     if (showGithub) {
       if (!login.trim()) {
@@ -282,20 +327,15 @@ export function EntryForm({ inputRef, variant = "full" }: Props) {
         loginRef.current?.focus();
         return;
       }
-      // Un lien LinkedIn : seul, et seulement si le serveur sait le lire (§18.24).
-      const entry = detectEntry(login);
-      if (entry?.kind === "linkedin" || /linkedin\.com/i.test(login)) {
-        if (showCv || !liOn || entry?.kind !== "linkedin") {
-          setError(showCv ? h.errLinkedinCv : !liOn ? h.errLinkedinOff : h.errEntry);
-          loginRef.current?.focus();
-          return;
-        }
-        void start({ linkedin: entry.url });
+      // Sans portes, pas de LinkedIn : avec un CV, ou si le serveur ne sait pas le lire (§18.24).
+      if (/linkedin\.com/i.test(login)) {
+        setError(showCv ? h.errLinkedinCv : h.errLinkedinOff);
+        loginRef.current?.focus();
         return;
       }
       const p = parseLogin(login);
       if (!p) {
-        setError(liField ? h.errEntry : h.errLogin);
+        setError(h.errLogin);
         loginRef.current?.focus();
         return;
       }
@@ -311,6 +351,38 @@ export function EntryForm({ inputRef, variant = "full" }: Props) {
   const switchTab = (next: Tab) => {
     setTab(next);
     setError(null);
+  };
+
+  /** Un clic sur une porte : sur ordinateur le champ prend le focus ; au doigt, pas de clavier ;
+   * au clavier (Espace, Entrée : detail 0), le focus reste sur la porte. */
+  const pickDoor = (next: Door, e: ReactMouseEvent) => {
+    if (next !== door) {
+      setDoor(next);
+      setError(null);
+    }
+    if (e.detail > 0 && !isTouch()) loginRef.current?.focus();
+  };
+
+  /** Flèches (et Début, Fin) : la porte suivante, focus compris (tabindex itinérant). */
+  const doorKey = (e: ReactKeyboardEvent) => {
+    const i = DOORS.indexOf(door);
+    const next =
+      e.key === "ArrowLeft" || e.key === "ArrowUp"
+        ? DOORS[(i + DOORS.length - 1) % DOORS.length]
+        : e.key === "ArrowRight" || e.key === "ArrowDown"
+          ? DOORS[(i + 1) % DOORS.length]
+          : e.key === "Home"
+            ? DOORS[0]
+            : e.key === "End"
+              ? DOORS[DOORS.length - 1]
+              : null;
+    if (!next) return;
+    e.preventDefault();
+    if (next !== door) {
+      setDoor(next);
+      setError(null);
+    }
+    doorBtns.current[next]?.focus();
   };
 
   const sizeLabel = (n: number) => (n > 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} ${h.sizeUnits.mb}` : `${Math.max(1, Math.round(n / 1024))} ${h.sizeUnits.kb}`);
@@ -341,14 +413,20 @@ export function EntryForm({ inputRef, variant = "full" }: Props) {
       autoCapitalize="none"
       autoCorrect="off"
       spellCheck={false}
-      placeholder={liField ? h.entryPlaceholder : h.loginPlaceholder}
+      placeholder={fieldDoor === "linkedin" ? h.linkedinPlaceholder : h.loginPlaceholder}
       value={login}
       onChange={(e) => {
         setLogin(e.target.value);
         if (error) setError(null);
       }}
       onBlur={() => {
-        if (/linkedin\.com/i.test(login)) return;
+        // Un lien LinkedIn tapé à la main devient ce qui suit « /in/ » ; pas à chaque frappe.
+        if (/linkedin\.com/i.test(login)) {
+          const slug = fieldDoor === "linkedin" ? linkedinSlug(login) : null;
+          if (slug) setLogin(slug);
+          return;
+        }
+        if (fieldDoor === "linkedin") return;
         const p = parseLogin(login);
         if (p && p !== login) setLogin(p);
       }}
@@ -364,31 +442,77 @@ export function EntryForm({ inputRef, variant = "full" }: Props) {
   );
 
 
-  /** Le champ du pseudo, en pilule, avec son « @ » (maquette web/gta-accueil.html). */
+  /** Le champ, en pilule (maquette web/gta-accueil.html) : « @ » devant un pseudo GitHub,
+   * « linkedin.com/in/ » devant un profil, sauf quand on y tape une adresse entière. */
   const loginField = (
-    <div className="field">
+    <div
+      className={`field${fieldDoor === "linkedin" ? " field-li" : ""}`}
+      onClick={(e) => {
+        if (e.target !== loginRef.current) loginRef.current?.focus();
+      }}
+    >
       <label htmlFor={`${uid}-gh`} className="sr-only">
-        {liField ? h.entryLabel : h.loginLabel}
+        {fieldDoor === "linkedin" ? h.linkedinLabel : h.loginLabel}
       </label>
-      {/* Le « @ » va à un pseudo ; devant un lien, ou devant « pseudo GitHub ou lien LinkedIn », il gêne. */}
-      {(!liField || /^@?[\w-]+$/.test(login.trim())) && (
+      {fieldDoor === "github" ? (
         <span className="field-prefix" aria-hidden>
           @
         </span>
+      ) : (
+        !/(?:linkedin|github)\.com/i.test(login) && (
+          <span className="field-prefix" aria-hidden>
+            linkedin.com/in/
+          </span>
+        )
       )}
       {loginInput}
     </div>
   );
 
+  /** Les deux portes, LinkedIn d'abord : un groupe de boutons radio, comme le choix de la langue. */
+  const doorsSwitch = doorsOn && (
+    <div className="seg entry-doors" role="radiogroup" aria-label={h.doorsLabel} onKeyDown={doorKey}>
+      {DOORS.map((d) => (
+        <button
+          key={d}
+          ref={(el) => {
+            doorBtns.current[d] = el;
+          }}
+          type="button"
+          role="radio"
+          aria-checked={door === d}
+          tabIndex={door === d ? 0 : -1}
+          onClick={(e) => pickDoor(d, e)}
+        >
+          {d === "linkedin" ? h.doorLinkedin : h.doorGithub}
+        </button>
+      ))}
+    </div>
+  );
+
+  /** Porte LinkedIn : « Où est mon lien ? » ouvre une ligne d'aide, sous les liens du pied. */
+  const whereLink = fieldDoor === "linkedin" && (
+    <button type="button" className="link-alt" aria-expanded={help} aria-controls={`${uid}-help`} onClick={() => setHelp((v) => !v)}>
+      {h.linkedinWhere}
+    </button>
+  );
+  const helpLine = fieldDoor === "linkedin" && (
+    <p id={`${uid}-help`} className="entry-help" hidden={!help}>
+      {h.linkedinHelp}
+    </p>
+  );
+
   if (inline) {
     return (
-      <form className="entry entry-inline" onSubmit={submit} onInput={prefetchReveal} onPointerDown={prefetchReveal} noValidate>
+      <form className={`entry entry-inline${doorsOn ? " has-doors" : ""}`} onSubmit={submit} onInput={prefetchReveal} onPointerDown={prefetchReveal} noValidate>
+        {doorsSwitch}
         {loginField}
         <button type="submit" className="pill pill-big entry-submit" disabled={busy}>
           {busy ? h.submitting : h.submit}
         </button>
         {errorLine}
         <div className="entry-foot" id={`${uid}-hint`}>
+          {whereLink}
           <button
             type="button"
             className="link-alt"
@@ -399,6 +523,7 @@ export function EntryForm({ inputRef, variant = "full" }: Props) {
           >
             {h.inlineCv}
           </button>
+          {helpLine}
         </div>
         {veil}
       </form>
@@ -407,9 +532,10 @@ export function EntryForm({ inputRef, variant = "full" }: Props) {
 
   // Un seul chemin à l'écran : le pseudo d'abord ; le CV, puis la comparaison, à un lien de là.
   return (
-    <form className={`entry mode-${mode}`} onSubmit={submit} onInput={prefetchReveal} onPointerDown={prefetchReveal} onDragEnter={prefetchReveal} noValidate>
+    <form className={`entry mode-${mode}${doorsOn ? " has-doors" : ""}`} onSubmit={submit} onInput={prefetchReveal} onPointerDown={prefetchReveal} onDragEnter={prefetchReveal} noValidate>
       {mode === "both" && <p className="entry-both-head">{h.bothActive}</p>}
 
+      {doorsSwitch}
       {showGithub && loginField}
 
       {showCv && (
@@ -455,9 +581,13 @@ export function EntryForm({ inputRef, variant = "full" }: Props) {
       <div className="entry-foot" id={`${uid}-hint`}>
         {showCv && <span className="entry-reassure">{h.reassure}</span>}
         {mode === "single" && tab === "github" && (
-          <button type="button" className="link-alt" onClick={() => switchTab("cv")}>
-            {h.inlineCv}
-          </button>
+          <>
+            {whereLink}
+            <button type="button" className="link-alt" onClick={() => switchTab("cv")}>
+              {h.inlineCv}
+            </button>
+            {helpLine}
+          </>
         )}
         {mode === "single" && tab === "cv" && (
           <>
