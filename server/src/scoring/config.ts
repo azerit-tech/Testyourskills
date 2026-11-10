@@ -5,6 +5,7 @@ import statusesJson from "../../../data/statuses.json";
 import buzzwordsJson from "../../../data/buzzwords.json";
 import profilesJson from "../../../data/profiles.json";
 import sentencesJson from "../../../data/sentences.json";
+import type { SchoolTier } from "../../../shared/readings";
 import type { Fact, Position, StatCode, StatusTone } from "../../../shared/types";
 
 export type Scale = [number, number][];
@@ -44,7 +45,11 @@ export interface ScoringConfig {
     BUZZ: { weights: { tutorials: number; lazy: number }; scale: Scale };
   };
   cv: {
-    TEC: { seniority: Record<string, number>; perDescribedTechno: number };
+    TEC: {
+      seniority: Record<string, number>;
+      perDescribedTechno: number;
+      school: { aiMaxTier: SchoolTier; list: { school: string; tier: SchoolTier; pattern: string }[] };
+    };
     SHIP: { scale: Scale };
     ARCH: { scale: Scale };
     DOC: { scale: Scale; longCvWords: number; longCvPenalty: number };
