@@ -1,0 +1,39 @@
+[
+  {
+    "linkedinUrl": "https://www.linkedin.com/in/exemple-deux",
+    "firstName": "Exemple",
+    "lastName": "Deux",
+    "headline": "Cofondatrice d'Azerit",
+    "about": "Ingénieure de CentraleSupélec.",
+    "location": { "linkedinText": "Paris, Île-de-France, France" },
+    "experience": [
+      {
+        "position": "Cofondatrice & CEO",
+        "companyName": "Azerit",
+        "startDate": { "month": "Jan", "year": 2026, "text": "Jan 2026" },
+        "endDate": { "text": "Present" }
+      },
+      {
+        "position": "Fondatrice",
+        "companyName": "Sejo",
+        "startDate": { "month": "Sep", "year": 2024, "text": "Sep 2024" },
+        "endDate": { "month": "Aug", "year": 2025, "text": "Aug 2025" }
+      }
+    ],
+    "education": [
+      {
+        "schoolName": "CentraleSupélec",
+        "degree": "Diplôme d'ingénieur",
+        "fieldOfStudy": "Informatique",
+        "period": "2021 - 2025"
+      },
+      {
+        "schoolName": "ETH Zürich",
+        "degree": "Exchange semester",
+        "fieldOfStudy": "Computer Science",
+        "period": "2024 - 2024"
+      }
+    ],
+    "skills": []
+  }
+]

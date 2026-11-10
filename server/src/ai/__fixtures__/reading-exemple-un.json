@@ -1,0 +1,57 @@
+{
+  "language": "fr",
+  "position": "PM",
+  "full_name": "Exemple Un",
+  "years_declared": 3,
+  "seniority_claimed": "mid",
+  "roles": [
+    {
+      "title": "Cofondateur",
+      "company": "Azerit",
+      "start": "2026-04",
+      "end": null,
+      "responsibilities": ["Recrutement d'ingénieurs à partir de leur code public."],
+      "employer_type": "startup",
+      "kind": "job"
+    },
+    {
+      "title": "Quantitative Research Intern",
+      "company": "Fonds Exemple",
+      "start": "2025-09",
+      "end": "2026-03",
+      "responsibilities": ["Modèles de volatilité en Python."],
+      "employer_type": "unknown",
+      "kind": "internship"
+    },
+    {
+      "title": "Research Intern",
+      "company": "McMaster University",
+      "start": "2025-02",
+      "end": "2025-11",
+      "responsibilities": ["Contributions à la bibliothèque standard d'Agda."],
+      "employer_type": "public_research",
+      "kind": "internship"
+    },
+    {
+      "title": "Trésorier",
+      "company": "Centrale Méditerranée Finance",
+      "start": "2023-12",
+      "end": "2024-12",
+      "responsibilities": ["Association de finance de l'école."],
+      "employer_type": "public_research",
+      "kind": "student_association"
+    }
+  ],
+  "technos_listed": ["Python", "TypeScript", "Agda"],
+  "technos_described": ["Python", "Agda"],
+  "tests_ci_review_mentions": [],
+  "projects_with_dated_outcome": 0,
+  "writing_quality": 3,
+  "is_dev_profile": false,
+  "title_mentions_ai": false,
+  "describes_ai_project": false,
+  "school_name": "Centrale Méditerranée",
+  "school_tier": "B",
+  "selection_signals": [],
+  "management_quote": ""
+}

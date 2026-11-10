@@ -1,0 +1,50 @@
+[
+  {
+    "linkedinUrl": "https://www.linkedin.com/in/exemple-un",
+    "firstName": "Exemple",
+    "lastName": "Un",
+    "headline": "Cofondateur d'Azerit",
+    "about": "Ingénieur de Centrale Méditerranée. Je construis Azerit.",
+    "location": { "linkedinText": "Marseille, Provence-Alpes-Côte d'Azur, France" },
+    "experience": [
+      {
+        "position": "Cofondateur",
+        "companyName": "Azerit",
+        "description": "Recrutement d'ingénieurs à partir de leur code public.",
+        "startDate": { "month": "Apr", "year": 2026, "text": "Apr 2026" },
+        "endDate": { "text": "Present" }
+      },
+      {
+        "position": "Quantitative Research Intern",
+        "companyName": "Fonds Exemple",
+        "employmentType": "Internship",
+        "description": "Modèles de volatilité en Python.",
+        "startDate": { "month": "Sep", "year": 2025, "text": "Sep 2025" },
+        "endDate": { "month": "Mar", "year": 2026, "text": "Mar 2026" }
+      },
+      {
+        "position": "Research Intern",
+        "companyName": "McMaster University",
+        "description": "Contributions à la bibliothèque standard d'Agda.",
+        "startDate": { "month": "Feb", "year": 2025, "text": "Feb 2025" },
+        "endDate": { "month": "Nov", "year": 2025, "text": "Nov 2025" }
+      },
+      {
+        "position": "Trésorier",
+        "companyName": "Centrale Méditerranée Finance",
+        "description": "Association de finance de l'école.",
+        "startDate": { "month": "Dec", "year": 2023, "text": "Dec 2023" },
+        "endDate": { "month": "Dec", "year": 2024, "text": "Dec 2024" }
+      }
+    ],
+    "education": [
+      {
+        "schoolName": "Centrale Méditerranée",
+        "degree": "Diplôme d'ingénieur",
+        "fieldOfStudy": "Mathématiques appliquées",
+        "period": "2022 - 2026"
+      }
+    ],
+    "skills": [{ "name": "Python" }, { "name": "TypeScript" }]
+  }
+]

@@ -1,0 +1,39 @@
+{
+  "language": "fr",
+  "position": "PM",
+  "full_name": "Exemple Deux",
+  "years_declared": 1.5,
+  "seniority_claimed": "junior",
+  "roles": [
+    {
+      "title": "Cofondatrice & CEO",
+      "company": "Azerit",
+      "start": "2026-01",
+      "end": null,
+      "responsibilities": [],
+      "employer_type": "startup",
+      "kind": "job"
+    },
+    {
+      "title": "Fondatrice",
+      "company": "Sejo",
+      "start": "2024-09",
+      "end": "2025-08",
+      "responsibilities": [],
+      "employer_type": "startup",
+      "kind": "job"
+    }
+  ],
+  "technos_listed": [],
+  "technos_described": [],
+  "tests_ci_review_mentions": [],
+  "projects_with_dated_outcome": 0,
+  "writing_quality": 2,
+  "is_dev_profile": false,
+  "title_mentions_ai": false,
+  "describes_ai_project": false,
+  "school_name": "CentraleSupélec",
+  "school_tier": "A",
+  "selection_signals": [],
+  "management_quote": ""
+}
