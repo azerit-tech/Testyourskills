@@ -62,6 +62,17 @@ const fr = {
     inlineCv: "ou avec ton CV",
     exampleLabel: "Exemple de fiche",
     exampleCaption: "La vraie fiche de Jacques, fondateur d'Azerit",
+    /* La couverture (§18.31) : les plaques des photos d'identité, en capitales mono. */
+    cover: {
+      player: (login: string, rank: number) => `@${login}, n° ${rank} de la semaine`,
+      playerPlate: (rank: number, week: number) => `N° ${rank} · SEMAINE ${week}`,
+      founderPlate: "FONDATEUR D'AZERIT",
+      free: "Ta place",
+      freeLabel: "Ta place : ouvre ton dossier",
+      freePlate: "DOSSIER À OUVRIR",
+    },
+    /** La flèche sous le héros, sur ordinateur. */
+    next: "Voir la suite",
     /* Mur des 13 profils (§18.28) */
     wall: {
       title: "Lequel es-tu ?",
@@ -538,6 +549,15 @@ const en: Dict = {
     inlineCv: "or with your CV",
     exampleLabel: "Example sheet",
     exampleCaption: "The real sheet of Jacques, Azerit's founder",
+    cover: {
+      player: (login, rank) => `@${login}, #${rank} this week`,
+      playerPlate: (rank, week) => `NO. ${rank} · WEEK ${week}`,
+      founderPlate: "AZERIT FOUNDER",
+      free: "Your spot",
+      freeLabel: "Your spot: open your file",
+      freePlate: "FILE TO OPEN",
+    },
+    next: "See more",
     wall: {
       title: "Which one are you?",
       you: "And you?",

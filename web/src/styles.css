@@ -621,6 +621,100 @@ svg {
   }
 }
 
+/* ============ la couverture de l'accueil (§18.31) ============
+   Une mosaïque encadrée (Cover.tsx) : un cadre prune foncé plat, des cases
+   séparées par des joints d'encre (le fond du cadre), autant de marge que de
+   joint. Les grilles viennent de lib/cover.ts par variables (--cover-*-s pour
+   le téléphone, --cover-*-l pour l'ordinateur) : une seule source pour la
+   feuille et pour le test des lumières voisines. Ni lueur, ni ombre, ni dégradé.
+   Téléphone : 12 px de marge de chaque côté, 16:10 au plus, jusqu'à 16:9 si
+   l'écran est bas (le budget est au bloc du héros). Ordinateur : 1080 px au
+   plus, centrée, 16:8,5 au plus, plus basse si l'écran l'exige. */
+:root {
+  --cover-frame: #241a3a;
+}
+.cover {
+  --cover-gap: 6px;
+  display: grid;
+  grid-template-columns: var(--cover-cols-s);
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  grid-template-areas: var(--cover-areas-s);
+  gap: var(--cover-gap);
+  width: calc(100% - 24px);
+  height: calc((100vw - 24px) * 0.625);
+  margin: 0 auto;
+  padding: var(--cover-gap);
+  border-radius: 7px;
+  background: var(--cover-frame);
+}
+.cover-panel {
+  position: relative;
+  display: block;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  /* la teinte de la case tant que l'image se charge : rien ne bouge à l'arrivée */
+  background: var(--plum);
+  animation: cover-in 0.3s var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 40ms);
+}
+.cover-panel.is-wide {
+  display: none;
+}
+.cover-panel img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* un portrait peint : la tête est dans le haut de l'image (docs/brief-personnages.md §3) */
+.cover-suspect img {
+  object-position: 50% 22%;
+}
+/* la photo d'identité : la toise déborde du dessin, la case la rogne */
+.cover-mug {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.cover-mug svg {
+  width: 100%;
+  height: 100%;
+}
+a.cover-panel:focus-visible,
+button.cover-panel:focus-visible {
+  border-radius: 3px;
+}
+@keyframes cover-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@media (min-width: 900px) {
+  .cover {
+    --cover-gap: 10px;
+    grid-template-columns: var(--cover-cols-l);
+    grid-template-areas: var(--cover-areas-l);
+    width: min(1080px, 100% - 64px);
+    height: calc(min(1080px, 100vw - 64px) * 0.53125);
+    border-radius: 8px;
+  }
+  .cover-panel {
+    border-radius: 4px;
+  }
+  .cover-panel.is-wide {
+    display: block;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cover-panel {
+    animation: none;
+  }
+}
+
 /* --- mur des 13 profils (§18.28) : téléphone, un rail aimanté qui sort du bord
    droit (tuile de 260 px, la suivante dépasse de 100 px à 390, de 70 à 360) ;
    ordinateur, une grille pleine de 15 cases, « Et toi ? » sur deux. Le décor
