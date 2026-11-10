@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { resetBudgetForTests } from "./budget";
 import { CV_SYSTEM_PROMPT } from "./prompts/cv";
-import { CV_OUTPUT_SCHEMA, MAX_CV_CHARS, normMonth, readCv } from "./readCv";
+import { CV_OUTPUT_SCHEMA, MAX_CV_CHARS, normMonth, readCv, roleKind } from "./readCv";
 import { fakeClient, userText } from "./testing";
 
 const CV = `Camille Durand
@@ -89,6 +89,53 @@ describe("readCv", () => {
     const schema = CV_OUTPUT_SCHEMA as { required: string[]; properties: Record<string, { enum?: string[] }> };
     expect(schema.required).toEqual(expect.arrayContaining(["school_name", "school_tier"]));
     expect(schema.properties.school_tier.enum).toEqual(["S", "A", "B", "C", "none"]);
+  });
+
+  it("type d'employeur et nature du poste : listes fermées, exigées par le schéma", () => {
+    const schema = CV_OUTPUT_SCHEMA as { properties: { roles: { items: { required: string[]; properties: Record<string, { enum?: string[] }> } } } };
+    const role = schema.properties.roles.items;
+    expect(role.required).toEqual(expect.arrayContaining(["employer_type", "kind"]));
+    expect(role.properties.employer_type.enum).toEqual(["startup", "scaleup", "large_group", "consulting_agency", "public_research", "unknown"]);
+    expect(role.properties.kind.enum).toEqual(["job", "internship", "work_study", "student_association", "volunteer", "personal_project"]);
+    // L'IA ne peut pas dire « forte barre d'embauche » : la valeur n'existe pas.
+    expect(JSON.stringify(CV_OUTPUT_SCHEMA)).not.toMatch(/high.?bar|forte|prestig|selective_employer|tier_employer/i);
+  });
+
+  it("type d'employeur hors liste ramené à unknown ; nature hors liste retirée ; lecture d'avant sans les clés", async () => {
+    const roles = [
+      { ...VALID.roles[0], employer_type: "high_bar", kind: "job" },
+      { ...VALID.roles[1], employer_type: "large_group", kind: "boss" },
+    ];
+    const res = (await readCv(CV, { client: fakeClient([{ ...VALID, roles }]).client }))!;
+    expect(res.roles.map((r) => [r.employer_type, r.kind])).toEqual([
+      ["unknown", "job"],
+      ["large_group", undefined],
+    ]);
+    expect("kind" in res.roles[1]!).toBe(false);
+    // La sortie d'avant le §18.37 (sans ces champs) reste valide, sans clé ajoutée.
+    const old = (await readCv(CV, { client: fakeClient([VALID]).client }))!;
+    expect(Object.keys(old.roles[0]!).sort()).toEqual(["company", "end", "responsibilities", "start", "title"]);
+  });
+
+  it("un employeur qui porte le nom de l'école du profil est une association étudiante", async () => {
+    const text = CV + "\nTrésorier — Centrale Méditerranée Finance, 2023 – 2024\nStagiaire — Centrale Méditerranée, 2024";
+    const roles = [
+      { title: "Trésorier", company: "Centrale Méditerranée Finance", start: "2023", end: "2024", responsibilities: [], employer_type: "unknown", kind: "job" },
+      { title: "Stagiaire", company: "Centrale Méditerranée", start: "2024", end: "2024", responsibilities: [], employer_type: "public_research", kind: "internship" },
+      { ...VALID.roles[0], employer_type: "startup", kind: "job" },
+    ];
+    const res = (await readCv(text, { client: fakeClient([{ ...VALID, roles }]).client }))!;
+    expect(res.roles.map((r) => r.kind)).toEqual(["student_association", "internship", "job"]);
+    // Sans école retrouvée, la règle ne joue pas.
+    const noSchool = (await readCv(text, { client: fakeClient([{ ...VALID, roles, school_name: "" }]).client }))!;
+    expect(noSchool.roles[0]!.kind).toBe("job");
+    expect(roleKind("internship", "Centrale Méditerranée Finance", "Centrale Méditerranée")).toBe("internship");
+    expect(roleKind("work_study", "BDE Centrale Méditerranée", "Centrale Méditerranée")).toBe("work_study");
+    expect(roleKind("job", "BDE Centrale Méditerranée", "Centrale Méditerranée")).toBe("student_association");
+    expect(roleKind(undefined, "Centrale Méditerranée Finance", "Centrale Méditerranée")).toBe("student_association");
+    expect(roleKind("job", "Centrale Méditerranée", "Centrale Méditerranée")).toBe("job");
+    expect(roleKind("job", "Azerit", "Centrale Méditerranée")).toBe("job");
+    expect(roleKind("job", "INSA Lyon Group", "")).toBe("job");
   });
 
   it("encadre le CV dans le message utilisateur, système en cache", async () => {

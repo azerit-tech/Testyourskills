@@ -2,19 +2,30 @@
 // code. Le texte n'est ni loggué ni stocké ; seuls les constats sortent d'ici (§11).
 
 import { z } from "zod";
-import { SCHOOL_TIERS, type CvReading, type CvRole } from "../../../shared/readings";
+import { EMPLOYER_TYPES, ROLE_KINDS, SCHOOL_TIERS, type CvReading, type CvRole, type EmployerType, type RoleKind } from "../../../shared/readings";
 import { callStructured, DEFAULT_MODEL, fence, strictJsonSchema, type ChatClient, type Validation } from "./client";
 import { CV_POSITIONS, CV_SYSTEM_PROMPT, SENIORITIES } from "./prompts/cv";
 import { clip, locate, scrubContact } from "./text";
 
 export const MAX_CV_CHARS = 30_000;
-const MAX_OUTPUT_TOKENS = 6000;
+/** 6 000 avant le §18.37 ; les champs ajoutés (type d'employeur, nature du poste, signaux) en demandent environ 600 de plus au pire. */
+const MAX_OUTPUT_TOKENS = 7000;
 const MAX_ROLES = 15;
 const MAX_RESPONSIBILITIES = 6;
 const MAX_TECHNOS = 80;
 const MAX_MENTIONS = 10;
 
 const Level = z.literal([1, 2, 3, 4, 5]);
+
+const ApiRole = z.object({
+  title: z.string(),
+  company: z.string(),
+  start: z.string().nullable(),
+  end: z.string().nullable(),
+  responsibilities: z.array(z.string()),
+  employer_type: z.enum(EMPLOYER_TYPES),
+  kind: z.enum(ROLE_KINDS),
+});
 
 // Schéma envoyé à l'API (décodage contraint), dans l'ordre de CvReading.
 const ApiSchema = z.object({
@@ -23,15 +34,7 @@ const ApiSchema = z.object({
   full_name: z.string().nullable(),
   years_declared: z.number(),
   seniority_claimed: z.enum(SENIORITIES),
-  roles: z.array(
-    z.object({
-      title: z.string(),
-      company: z.string(),
-      start: z.string().nullable(),
-      end: z.string().nullable(),
-      responsibilities: z.array(z.string()),
-    }),
-  ),
+  roles: z.array(ApiRole),
   technos_listed: z.array(z.string()),
   technos_described: z.array(z.string()),
   tests_ci_review_mentions: z.array(z.object({ quote: z.string() })),
@@ -45,8 +48,11 @@ const ApiSchema = z.object({
 });
 export const CV_OUTPUT_SCHEMA = strictJsonSchema(ApiSchema);
 
-// Validation côté code : mêmes listes fermées, bornes vérifiées ici.
+// Validation côté code : mêmes listes fermées, bornes vérifiées ici. Les champs
+// du §18.37 sont tolérés absents ou hors liste (ramenés à « unknown », ou
+// retirés) : une étiquette ratée ne fait pas tomber toute la lecture.
 const RawSchema = ApiSchema.extend({
+  roles: z.array(ApiRole.extend({ employer_type: z.string().optional(), kind: z.string().optional() })),
   years_declared: z.number().min(0).max(60),
   projects_with_dated_outcome: z.number().int().min(0),
   writing_quality: z.number().int().min(1).max(5),
@@ -66,6 +72,22 @@ export function normMonth(v: string | null, edge: "start" | "end"): string | nul
 }
 
 const norm = (s: string) => s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9+#]/g, "");
+
+const inList = <T extends string>(list: readonly T[], v: string | undefined): T | undefined => (list as readonly string[]).includes(v ?? "") ? (v as T) : undefined;
+
+/**
+ * La nature d'un poste : celle de l'IA, sauf qu'un employeur qui porte le nom de
+ * l'école du profil, en plus long (« Centrale Méditerranée Finance »), est une
+ * association étudiante, si l'IA n'y a pas vu un stage ou une alternance.
+ * L'école elle-même (« McMaster University » pour un étudiant de McMaster)
+ * reste ce que l'IA a dit : on peut y être chercheur ou stagiaire.
+ */
+export function roleKind(aiKind: RoleKind | undefined, company: string, schoolName: string): RoleKind | undefined {
+  const c = norm(company);
+  const s = norm(schoolName);
+  if (s.length >= 4 && c.length > s.length && c.includes(s) && (aiKind === undefined || aiKind === "job" || aiKind === "volunteer")) return "student_association";
+  return aiKind;
+}
 
 /** La techno apparaît-elle dans le texte des responsabilités ? (comparaison tolérante) */
 export function mentionedIn(techno: string, haystack: string, haystackNorm: string): boolean {
@@ -101,7 +123,7 @@ export function validateCvOutput(raw: unknown, cvText: string): Validation<CvRea
   }
   const d = parsed.data;
 
-  const roles: CvRole[] = d.roles.slice(0, MAX_ROLES).map((r) => ({
+  const rawRoles = d.roles.slice(0, MAX_ROLES).map((r) => ({
     title: clip(scrubContact(r.title), 120),
     company: clip(scrubContact(r.company), 120),
     start: normMonth(r.start, "start"),
@@ -110,10 +132,13 @@ export function validateCvOutput(raw: unknown, cvText: string): Validation<CvRea
       .map((x) => clip(scrubContact(x), 200))
       .filter((x) => x.length > 0)
       .slice(0, MAX_RESPONSIBILITIES),
+    // L'IA ne peut rendre que la liste fermée : un « high_bar » ou autre devient « unknown ».
+    employer_type: r.employer_type === undefined ? undefined : (inList<EmployerType>(EMPLOYER_TYPES, r.employer_type) ?? "unknown"),
+    kind: inList<RoleKind>(ROLE_KINDS, r.kind),
   }));
 
   // Une techno n'est « décrite » que si elle figure dans une responsabilité extraite.
-  const respText = roles.flatMap((r) => r.responsibilities).join("\n");
+  const respText = rawRoles.flatMap((r) => r.responsibilities).join("\n");
   const respNorm = norm(respText);
   const described = dedupe(d.technos_described, MAX_TECHNOS).filter((t) => mentionedIn(t, respText, respNorm));
   const listed = dedupe([...d.technos_listed, ...described], MAX_TECHNOS);
@@ -133,6 +158,12 @@ export function validateCvOutput(raw: unknown, cvText: string): Validation<CvRea
   const school = clip(scrubContact(d.school_name), 80);
   const schoolKey = norm(school);
   const hasSchool = schoolKey.length > 0 && norm(cvText).includes(schoolKey);
+
+  // Les nouveaux champs ne sont posés que s'ils existent : une lecture sans eux reste celle d'avant.
+  const roles: CvRole[] = rawRoles.map(({ employer_type, kind, ...r }) => {
+    const k = roleKind(kind, r.company, hasSchool ? school : "");
+    return { ...r, ...(employer_type ? { employer_type } : {}), ...(k ? { kind: k } : {}) };
+  });
 
   return {
     ok: true,

@@ -54,12 +54,36 @@ export interface CodeReadingResult {
 
 export type Seniority = "junior" | "mid" | "senior" | "lead" | "staff";
 
+/**
+ * Type d'employeur d'un poste, liste fermée (§18.37, critère Parcours). Pas de
+ * « forte barre d'embauche » : seule la liste du serveur le donne
+ * (server/src/scoring/employers.ts), jamais l'IA.
+ */
+export const EMPLOYER_TYPES = ["startup", "scaleup", "large_group", "consulting_agency", "public_research", "unknown"] as const;
+export type EmployerType = (typeof EMPLOYER_TYPES)[number];
+
+/**
+ * Nature d'un poste (§18.37, critère Expérience) : un vrai poste (salarié,
+ * freelance, fondateur) compte en plein, stage et alternance pour moitié,
+ * association étudiante, bénévolat et projet personnel pour rien.
+ */
+export const ROLE_KINDS = ["job", "internship", "work_study", "student_association", "volunteer", "personal_project"] as const;
+export type RoleKind = (typeof ROLE_KINDS)[number];
+
 export interface CvRole {
   title: string;
   company: string;
   start: string | null; // "YYYY-MM"
   end: string | null;
   responsibilities: string[];
+  /** Type d'employeur lu par l'IA ; absent des lectures d'avant le §18.37. */
+  employer_type?: EmployerType;
+  /**
+   * Nature du poste lue par l'IA, corrigée par le code : un employeur qui porte
+   * le nom de l'école du profil est une association étudiante. Absent des
+   * lectures d'avant le §18.37.
+   */
+  kind?: RoleKind;
 }
 
 export interface CvReading {
