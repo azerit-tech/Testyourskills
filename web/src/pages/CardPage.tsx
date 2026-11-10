@@ -35,6 +35,9 @@ const Walkout3D = lazy(() => loadWalkout().then((m) => ({ default: m.Walkout3D }
 /** La poursuite 2D (§18.33) : quand elle joue, rien de la scène 3D ne se télécharge. */
 const loadChase = () => import("../components/Chase");
 const Chase = lazy(() => loadChase().then((m) => ({ default: m.Chase })));
+/** Le film (§18.36) : deux balises vidéo, ni Three.js ni WebGL. Les vidéos se chargent dès l'attente. */
+const loadFilm = () => import("../components/Film");
+const Film = lazy(() => loadFilm().then((m) => ({ default: m.Film })));
 
 const POLL_MS = 600;
 const CLIENT_TIMEOUT = 45_000;
@@ -172,10 +175,15 @@ export function CardPage({ id }: { id: string }) {
   // demandée, et s'y prépare pendant l'attente du scoring : shaders compilés,
   // textures sur le GPU. Jamais en mouvement réduit : il n'y aura pas de scène.
   // La poursuite (§18.33) n'a rien à préparer : son module seul, sans Three.js.
+  // Le film (§18.36) télécharge ses vidéos pendant l'attente, en basse priorité.
   useEffect(() => {
     const scene = revealToPlay(revealScene(), reduced);
     if (scene && (view.s === "pending" || (view.s === "loading" && fresh))) {
-      if (scene === "chase") loadChase().catch(() => undefined);
+      if (scene === "film")
+        loadFilm()
+          .then((m) => m.preloadFilm())
+          .catch(() => undefined);
+      else if (scene === "chase") loadChase().catch(() => undefined);
       else
         loadWalkout()
           .then((m) => m.warmWalkout(lang))
@@ -320,7 +328,9 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
   const { t, lang } = useT();
   const id = item.kind === "card" ? item.card.id : item.comparison.id;
   const main: CardData = item.kind === "card" ? item.card : item.comparison.github;
-  const { phase, open, skip, handoff, finish, animating, settled } = useReveal(animate, start);
+  const [scene] = useState(revealScene);
+  // Le film part dès que l'attente se lève : sa première image est déjà à l'écran.
+  const { phase, open, skip, handoff, finish, animating, settled } = useReveal(animate, start, scene === "film" ? 0 : undefined);
   // La scène ne viendra pas (délai dépassé, WebGL absent, animation passée) : l'attente n'a plus à la guetter.
   useEffect(() => {
     if (abort) skip();
@@ -332,7 +342,6 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
   const tracked = useRef(false);
   const stageRef = useRef<HTMLElement>(null);
   const walkoutCtl = useRef<WalkoutControl | null>(null);
-  const [scene] = useState(revealScene);
 
   useEffect(() => {
     if (fresh && !tracked.current) {
@@ -401,7 +410,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
   return (
     <main className={`page page-card page-result${animating ? " is-animating" : ""}${visitor ? " is-visitor" : ""}`} id="main">
       {/* Le ciel de la page (§18.29) : derrière la barre du haut, une fois la fiche posée. */}
-      <ProfileSky card={main} shown={settled} tall={item.kind === "comparison"} />
+      {/* Le film se pose sur ce ciel : il entre sous le flash, au passage de relais. */}
+      <ProfileSky card={main} shown={settled || (scene === "film" && phase === "handoff")} tall={item.kind === "comparison"} />
       {claimed && me?.hidden && (
         <p className="hidden-banner" role="status">
           {t.result.claim.hiddenBanner}
@@ -417,7 +427,9 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
           // Morceau 3D introuvable : même repli que sans WebGL, la fiche sort sans révélation.
           <ErrorBoundary fallback={null} onError={finish}>
             <Suspense fallback={null}>
-              {scene === "chase" ? (
+              {scene === "film" ? (
+                <Film card={main} lang={lang} double={item.kind === "comparison"} phase={phase} onReady={() => onScene("ready")} onGesture={() => onScene("gesture")} onHandoff={handoff} onDone={finish} onTap={onStageClick} />
+              ) : scene === "chase" ? (
                 <Chase card={main} lang={lang} double={item.kind === "comparison"} phase={phase} onReady={() => onScene("ready")} onHandoff={handoff} onDone={finish} onTap={onStageClick} />
               ) : (
                 <Walkout3D card={main} lang={lang} double={item.kind === "comparison"} declared={declaredOf(item.kind === "comparison" ? item.comparison : item.card)} phase={phase} anchorRef={stageRef} controlRef={walkoutCtl} onReady={() => onScene("ready")} onHandoff={handoff} onDone={finish} />

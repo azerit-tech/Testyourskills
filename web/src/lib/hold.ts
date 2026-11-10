@@ -1,19 +1,25 @@
 // Plus d'écran noir (§18.27). La fiche est prête : l'écran d'attente reste
 // par-dessus la page tant que les pièces du dossier ne sont pas lues (§18.26)
 // et que la scène 3D n'a pas rendu sa première image. Il se lève alors et la
-// révélation part seule ; si le son demande encore un geste, il montre d'abord
-// la pilule « Ouvrir mon dossier ». Au bout de 20 s sans scène, la fiche sort
-// sans révélation.
+// révélation part seule ; si le son demande encore un geste, ou si le film
+// (§18.36) ne peut pas se lancer sans geste (iPhone en économie d'énergie), il
+// montre d'abord la pilule « Ouvrir mon dossier ». Au bout de 20 s sans scène,
+// la fiche sort sans révélation.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { soundNeedsGesture, unlockAudio } from "./audio";
+import { unlockFilm } from "../film/unlock";
 
 /** Fiche prête : au plus ce temps sur l'attente, lecture des pièces et chargement de la scène compris. */
 export const SCENE_WAIT_MS = 20_000;
 /** Le fondu de l'écran d'attente qui se lève (styles.css, .loadscreen.is-leaving). */
 const LEAVE_MS = 260;
 
-/** La scène 3D : en chargement, première image rendue, ou abandonnée (pas de WebGL, assets en échec, animation passée). */
-export type SceneState = "loading" | "ready" | "off";
+/**
+ * La scène : en chargement, première image rendue, prête mais sa lecture
+ * demande un geste (« gesture », le film), ou abandonnée (pas de WebGL, assets
+ * en échec, animation passée).
+ */
+export type SceneState = "loading" | "ready" | "gesture" | "off";
 export type HoldStep = "wait" | "tap" | "lift";
 
 export interface HoldFacts {
@@ -31,6 +37,7 @@ export function holdStep(f: HoldFacts): HoldStep {
   if (!f.released) return "wait";
   if (!f.animate || f.scene === "off") return "lift";
   if (f.scene === "loading") return "wait";
+  if (f.scene === "gesture") return "tap";
   return f.needsGesture ? "tap" : "lift";
 }
 
@@ -72,7 +79,7 @@ export function useHold({ active, animate }: { active: boolean; animate: boolean
   useEffect(() => {
     if (!active || stage !== "wait" || !visible) return;
     const t = window.setTimeout(() => {
-      if (sceneRef.current !== "ready") setAbort(true);
+      if (sceneRef.current !== "ready" && sceneRef.current !== "gesture") setAbort(true);
       lift();
     }, SCENE_WAIT_MS);
     return () => window.clearTimeout(t);
@@ -86,9 +93,10 @@ export function useHold({ active, animate }: { active: boolean; animate: boolean
 
   const onRelease = useCallback(() => setReleased(true), []);
   const onScene = useCallback((s: SceneState) => setScene(s), []);
-  /** Le geste de la pilule : il débloque le son, puis l'écran se lève. */
+  /** Le geste de la pilule : il débloque le son et les balises du film, puis l'écran se lève. */
   const onOpen = useCallback(() => {
     unlockAudio();
+    unlockFilm();
     lift();
   }, [lift]);
 

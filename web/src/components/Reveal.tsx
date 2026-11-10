@@ -27,8 +27,9 @@ const AUTO_OPEN = 700;
 /**
  * Machine à états de la révélation, partagée par une carte seule ou une comparaison.
  * `start` : la scène est à l'écran (l'attente s'est levée) ; avant, rien ne part.
+ * `autoOpen` : le temps sur la première image avant le départ (le film, §18.36 : aucun).
  */
-export function useReveal(animate: boolean, start = true) {
+export function useReveal(animate: boolean, start = true, autoOpen = AUTO_OPEN) {
   const [phase, setPhase] = useState<Phase>(animate ? "ready" : "done");
   const opened = useRef(false);
 
@@ -48,9 +49,9 @@ export function useReveal(animate: boolean, start = true) {
     if (!animate || !start) return;
     // Mode démo : ?freeze=ready reste dans la cabine, pour la mise au point.
     if (isMock() && new URLSearchParams(window.location.search).get("freeze") === "ready") return;
-    const id = window.setTimeout(open, AUTO_OPEN);
+    const id = window.setTimeout(open, autoOpen);
     return () => window.clearTimeout(id);
-  }, [animate, start, open]);
+  }, [animate, start, open, autoOpen]);
 
   const animating = phase !== "done";
   /** Le contenu sous la carte apparaît une fois la scène éteinte. */

@@ -15,6 +15,7 @@ import { api, tokens } from "../lib/api";
 import { errorFact } from "../lib/errors";
 import { navigate } from "../lib/router";
 import { unlockAudio } from "../lib/audio";
+import { unlockFilm } from "../film/unlock";
 import { revealScene } from "../lib/revealScene";
 import { markFresh, rememberDoor, rememberInput, sessionDoor, setPrefill, takePrefill } from "../lib/session";
 import type { Mode, Tab } from "../lib/session";
@@ -44,8 +45,11 @@ function prefetchReveal() {
   if (prefetched) return;
   prefetched = true;
   if ((navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData) return;
+  // Le film (§18.36) : son module seul ; ses vidéos attendent l'attente de la fiche.
+  const scene = revealScene();
+  if (scene === "film") void import("./Film").catch(() => undefined);
   // La poursuite (§18.33) : son seul module, quelques Ko ; ni Three.js ni les assets 3D.
-  if (revealScene() === "chase") void import("./Chase").catch(() => undefined);
+  else if (scene === "chase") void import("./Chase").catch(() => undefined);
   else void import("./Walkout3D").then((m) => m.preloadWalkoutAssets()).catch(() => undefined);
 }
 
@@ -137,8 +141,10 @@ export function EntryForm({ inputRef, variant = "full", note }: Props) {
   const start = async (input: { login?: string; file?: File | null; linkedin?: string }) => {
     if (busyRef.current) return;
     busyRef.current = true;
-    // Le geste qui lance la fiche débloque le son de la révélation (§18.27) : avant tout await.
+    // Le geste qui lance la fiche débloque le son de la révélation (§18.27) et,
+    // pour le film (§18.36), ses deux balises vidéo : avant tout await.
     unlockAudio();
+    if (revealScene() === "film") unlockFilm();
     setError(null);
     setBusy(true);
     try {

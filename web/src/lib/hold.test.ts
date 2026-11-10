@@ -25,6 +25,12 @@ describe("l'écran d'attente, fiche prête", () => {
     expect(holdStep(facts({ needsGesture: true }))).toBe("tap");
   });
 
+  it("le film qui ne peut pas se lancer sans geste (§18.36) demande la pilule, son coupé ou non", () => {
+    expect(holdStep(facts({ scene: "gesture" }))).toBe("tap");
+    expect(holdStep(facts({ scene: "gesture", needsGesture: true }))).toBe("tap");
+    expect(holdStep(facts({ scene: "gesture", released: false }))).toBe("wait");
+  });
+
   it("sans révélation (mouvement réduit) ou sans scène (WebGL absent), la fiche sort dès les pièces lues, sans geste", () => {
     expect(holdStep(facts({ animate: false, scene: "loading", needsGesture: true }))).toBe("lift");
     expect(holdStep(facts({ scene: "off", needsGesture: true }))).toBe("lift");
