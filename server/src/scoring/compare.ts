@@ -12,13 +12,19 @@ import { fillTemplate } from "./statuses";
 
 export function compareCards(cv: CardData, github: CardData): Omit<ComparisonData, "id" | "createdAt"> {
   const value = (c: CardData, code: StatCode) => c.stats.find((s) => s.code === code)?.value ?? 0;
-  const deltas = Object.fromEntries(STAT_CODES.map((c) => [c, value(github, c) - value(cv, c)])) as Record<StatCode, number>;
+  // Les deux fiches décrivent la même personne : l'écart vaut pour l'une comme pour l'autre.
+  // Un GitHub vide (« dossier vide », note plancher) ne prouve rien : un GitHub vide n'est pas
+  // un mauvais code (§18.37). Son écart avec le CV ne fait pas un Faussaire, ne se chiffre pas
+  // dans le titre, et ne se lit pas comme une perte barre par barre : écarts à zéro (le contrat
+  // n'a pas de « non comparable », le front le lit sur `github.grid.rule`).
+  const githubEmpty = github.grid?.rule === "empty_file";
+  const deltas = Object.fromEntries(STAT_CODES.map((c) => [c, githubEmpty ? 0 : value(github, c) - value(cv, c)])) as Record<StatCode, number>;
   const n = cv.overall - github.overall;
   const tpl = n > 0 ? STATUSES.comparison.cvAhead : n < 0 ? STATUSES.comparison.codeAhead : STATUSES.comparison.even;
   const vars = { n: Math.abs(n) };
-  // Les deux fiches décrivent la même personne : l'écart vaut pour l'une comme pour l'autre.
-  // Un GitHub vide (« dossier vide », note plancher) ne prouve rien : son écart avec le CV ne fait pas un Faussaire.
-  const githubEmpty = github.grid?.rule === "empty_file";
+  const headline = githubEmpty
+    ? { ...STATUSES.comparison.codeUnproven }
+    : { fr: fillTemplate(tpl.fr, vars, "fr")!, en: fillTemplate(tpl.en, vars, "en")! };
   const comparison: ProfileCtx["comparison"] = { cvOverall: cv.overall, githubOverall: github.overall, cvBuzz: value(cv, "BUZZ"), ...(githubEmpty ? { githubEmpty } : {}) };
   const withProfile = (c: CardData): CardData => {
     const profile = profileWithComparison(c.profile, { stats: valuesOf(c.stats), comparison });
@@ -30,7 +36,7 @@ export function compareCards(cv: CardData, github: CardData): Omit<ComparisonDat
     cv: withProfile(cv),
     github: withProfile(github),
     deltas,
-    headline: { fr: fillTemplate(tpl.fr, vars, "fr")!, en: fillTemplate(tpl.en, vars, "en")! },
+    headline,
     ...(grid ? { grid } : {}),
   };
 }

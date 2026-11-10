@@ -187,6 +187,7 @@
   "comparison": {
     "cvAhead": { "fr": "Ton CV a volé {n} points à ton code", "en": "Your CV stole {n} points from your code" },
     "codeAhead": { "fr": "Ton code vaut {n} points de plus que ton CV. Change de CV.", "en": "Your code is worth {n} points more than your CV. Rewrite the CV." },
-    "even": { "fr": "CV et code à égalité. Rare, donc suspect.", "en": "CV and code are dead even. Rare, so suspicious." }
+    "even": { "fr": "CV et code à égalité. Rare, donc suspect.", "en": "CV and code are dead even. Rare, so suspicious." },
+    "codeUnproven": { "fr": "Code non prouvé : ton CV parle seul. Publie un vrai projet sur GitHub et on compare.", "en": "Code not proven: your CV does all the talking. Publish one real project on GitHub and we'll compare." }
   }
 }

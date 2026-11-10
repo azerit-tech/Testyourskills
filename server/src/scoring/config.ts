@@ -99,7 +99,8 @@ export interface StatusesConfig {
   maxPerCard: number;
   tonePriority: StatusTone[];
   statuses: StatusDef[];
-  comparison: { cvAhead: Fact; codeAhead: Fact; even: Fact };
+  /** codeUnproven : face à un GitHub « dossier vide », sans écart chiffré (un GitHub vide n'est pas un mauvais code, §18.37). */
+  comparison: { cvAhead: Fact; codeAhead: Fact; even: Fact; codeUnproven: Fact };
 }
 
 export interface BuzzwordsConfig {
