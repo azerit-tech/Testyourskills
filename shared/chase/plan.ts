@@ -24,6 +24,28 @@ export const UNITS_BY_STAR: Record<Stars, Unit[]> = {
   6: ["heli2", "heli3"],
 };
 
+/**
+ * Où regarder dans chaque décor (part de la largeur de l'image) : en hauteur,
+ * le téléphone n'en montre qu'un tiers, recadré sur ce qui dit le profil
+ * (la fenêtre allumée, le fauteuil, la valise…), pas sur le centre géométrique.
+ */
+export const SCENE_FOCUS: Record<string, number> = {
+  arsonist: 0.56,
+  forger: 0.5,
+  kingpin: 0.68,
+  mastermind: 0.6,
+  delivery_machine: 0.52,
+  night_owl: 0.7,
+  repeat_offender: 0.5,
+  hoarder: 0.62,
+  chameleon: 0.6,
+  fresh_blood: 0.62,
+  old_school: 0.45,
+  ghost: 0.62,
+  sleeper_agent: 0.5,
+  default: 0.68,
+};
+
 export interface ChaseBeat {
   /** L'étoile qui s'allume, 1 à 6. */
   star: Stars;
@@ -39,6 +61,8 @@ export interface ChasePlan {
   light: Light;
   /** Le décor peint de la fin (web/public/profiles/{scene}.jpg). */
   scene: string;
+  /** Le point du décor à garder dans le cadre (0 à 1 de sa largeur). */
+  focus: number;
   /** Durée totale (s) : la fiche se pose à cet instant. */
   duration: number;
   beats: ChaseBeat[];
@@ -88,6 +112,7 @@ export function chasePlan(card: ChaseCard): ChasePlan {
     level,
     light: SCENE_LIGHT[scene],
     scene,
+    focus: SCENE_FOCUS[scene] ?? 0.5,
     duration,
     beats,
     flicker: level < 6 ? { star: (level + 1) as Stars, at: brakeAt + 0.05 } : null,

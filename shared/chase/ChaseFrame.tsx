@@ -76,6 +76,13 @@ export interface Layout {
   gY: number;
   G: number;
   top: number;
+  /** Le HUD : taille d'une étoile, haut des étoiles, taille de la radio. */
+  star: number;
+  hudY: number;
+  radioSize: number;
+  /** La bande de ciel libre, sous le HUD et au-dessus des toits : hélicoptères, lune, feux d'artifice. */
+  sky0: number;
+  sky1: number;
 }
 
 export function layoutOf(W: number, H: number, insetTop = 0): Layout {
@@ -83,7 +90,11 @@ export function layoutOf(W: number, H: number, insetTop = 0): Layout {
   const hy = Math.round(H * 0.44);
   const carW = 0.38 * u;
   const gY = H * 0.935;
-  return { W, H, u, cx: W / 2, hy, carW, gY, G: gY - hy, top: insetTop };
+  const star = Math.round(Math.min(30, u * 0.074));
+  const hudY = Math.max(18, insetTop + 14);
+  const radioSize = Math.round(Math.min(13, u * 0.032));
+  const sky0 = hudY + star * 1.45 + Math.round(radioSize * 2.2) + H * 0.02;
+  return { W, H, u, cx: W / 2, hy, carW, gY, G: gY - hy, top: insetTop, star, hudY, radioSize, sky0, sky1: Math.max(sky0 + H * 0.06, hy - H * 0.06) };
 }
 
 /** Projection : X en largeurs de voiture, d en profondeur (1 = la voiture du suspect). */
@@ -120,7 +131,7 @@ interface City {
   windows: { x: number; y: number; w: number; h: number }[];
   /** Petits palmiers de l'horizon. */
   palms: { x: number; s: number }[];
-  /** Feux d'artifice : position et couleur. */
+  /** Feux d'artifice : x, y en part de la bande de ciel libre, rayon et couleur. */
   bursts: { x: number; y: number; r: number; color: string }[];
 }
 
@@ -204,7 +215,7 @@ function cityOf(seed: number, L: Layout): City {
   for (let i = 0; i < 4; i++) {
     bursts.push({
       x: r1(L.cx + u * (-0.36 + 0.72 * ((i * 0.37 + r() * 0.3) % 1))),
-      y: r1(H * (0.16 + 0.14 * r())),
+      y: 0.25 + 0.6 * r(),
       r: u * (0.08 + 0.05 * r()),
       color: colors[i % colors.length],
     });
@@ -247,9 +258,9 @@ const PALM = (() => {
       const l = Math.hypot(dx, dy) || 1;
       const nx = -dy / l;
       const ny = dx / l;
-      const w = 4.6 * Math.sin(Math.PI * Math.min(1, s * 1.08)) ** 0.6;
+      const w = 5 * Math.sin(Math.PI * Math.min(1, s * 1.08)) ** 0.6;
       up.push(`${r1(x + nx * w * 0.55)} ${r1(y + ny * w * 0.55)}`);
-      const notch = i % 2 === 0 ? 1.0 : 0.7;
+      const notch = i % 2 === 0 ? 1.0 : 0.8;
       down.push(`${r1(x - nx * w * notch)} ${r1(y - ny * w * notch)}`);
     }
     d += `M${up.join("L")}L${down.reverse().join("L")}Z`;
@@ -449,7 +460,8 @@ export function ChaseFrame({ t, plan, width, height, lang, insetTop = 0, backdro
   // --- le ciel et ce qui y vit ---
   const discs: ReactElement[] = [];
   if (plan.light === "gold" && pal.disc) discs.push(<circle key="sun" cx={r1(cx - u * 0.27)} cy={r1(hy - H * 0.075)} r={r1(u * 0.058)} fill={pal.disc} />);
-  if (plan.light === "night" && pal.disc) discs.push(<circle key="moon" cx={r1(cx - u * 0.3)} cy={r1(H * 0.215)} r={r1(u * 0.045)} fill={pal.disc} />);
+  const band = (k: number) => lerp(L.sky0, L.sky1, k);
+  if (plan.light === "night" && pal.disc) discs.push(<circle key="moon" cx={r1(cx - u * 0.3)} cy={r1(band(0.36))} r={r1(u * 0.045)} fill={pal.disc} />);
 
   // feux d'artifice (sixième étoile), derrière la ville
   const six = plan.beats[5]?.at;
@@ -468,7 +480,8 @@ export function ChaseFrame({ t, plan, width, height, lang, insetTop = 0, backdro
           const c = Math.cos(ang);
           const s = Math.sin(ang);
           const drop = tau * tau * u * 0.03;
-          d += `M${r1(b.x + c * R * 0.55)} ${r1(b.y + s * R * 0.55 + drop)}L${r1(b.x + c * R)} ${r1(b.y + s * R + drop)}`;
+          const by = band(b.y);
+          d += `M${r1(b.x + c * R * 0.55)} ${r1(by + s * R * 0.55 + drop)}L${r1(b.x + c * R)} ${r1(by + s * R + drop)}`;
         }
         fireworks.push(<path key={`fw${i}-${rep}`} d={d} stroke={b.color} strokeWidth={r1(Math.max(2, u * 0.008))} strokeLinecap="round" fill="none" opacity={r1(a * 100) / 100} />);
       }
@@ -483,11 +496,11 @@ export function ChaseFrame({ t, plan, width, height, lang, insetTop = 0, backdro
     const p = (t - at) / 1.1;
     const bob = Math.sin(1.7 * t + (unit === "heli2" ? 2 : unit === "heli3" ? 4 : 0)) * H * 0.006;
     if (unit === "heli1") {
-      helis.push({ x: cx + u * 0.21, y: lerp(hy + H * 0.02, H * 0.25, easeOut(p)) + bob, s: 0.88, flip: false, a: 1, phase: 0 });
+      helis.push({ x: cx + u * 0.21, y: lerp(hy + H * 0.02, band(0.66), easeOut(p)) + bob, s: 0.88, flip: false, a: 1, phase: 0 });
     } else if (unit === "heli2") {
-      helis.push({ x: lerp(cx - u * 0.75, cx - u * 0.25, easeOut(p)), y: lerp(H * 0.12, H * 0.205, easeOut(p)) + bob, s: 0.74, flip: true, a: 1, phase: 1.3 });
+      helis.push({ x: lerp(cx - u * 0.75, cx - u * 0.25, easeOut(p)), y: lerp(band(0), band(0.32), easeOut(p)) + bob, s: 0.74, flip: true, a: 1, phase: 1.3 });
     } else {
-      helis.push({ x: lerp(cx + u * 0.8, cx + u * 0.02, easeOut(p)), y: lerp(H * 0.1, H * 0.155, easeOut(p)) + bob, s: 0.5, flip: false, a: 1, phase: 2.1 });
+      helis.push({ x: lerp(cx + u * 0.8, cx + u * 0.02, easeOut(p)), y: lerp(band(0), band(0.08), easeOut(p)) + bob, s: 0.5, flip: false, a: 1, phase: 2.1 });
     }
   }
 
@@ -634,6 +647,8 @@ export function ChaseFrame({ t, plan, width, height, lang, insetTop = 0, backdro
   // la barrière qui vole (troisième étoile)
   let coral = "";
   let cream = "";
+  /** Les planches de la barrière, sous leurs bandes corail. */
+  let planks = "";
   if (t >= impact) {
     const tau = t - impact;
     for (const p of PIECES) {
@@ -661,7 +676,7 @@ export function ChaseFrame({ t, plan, width, height, lang, insetTop = 0, backdro
         coral += poly([[-0.5, 0.5], [0.5, 0.5], [0.12, -0.6], [-0.12, -0.6]]);
         cream += poly([[-0.34, 0.05], [0.34, 0.05], [0.26, -0.18], [-0.26, -0.18]]);
       } else if (p.kind === "plank") {
-        cream += poly([[-0.5, -0.09], [0.5, -0.09], [0.5, 0.09], [-0.5, 0.09]]);
+        planks += poly([[-0.5, -0.09], [0.5, -0.09], [0.5, 0.09], [-0.5, 0.09]]);
         coral += poly([[-0.3, -0.09], [-0.12, -0.09], [-0.12, 0.09], [-0.3, 0.09]]) + poly([[0.12, -0.09], [0.3, -0.09], [0.3, 0.09], [0.12, 0.09]]);
       } else {
         coral += poly([[-0.5, -0.4], [0.5, -0.2], [0.1, 0.5]]);
@@ -695,7 +710,7 @@ export function ChaseFrame({ t, plan, width, height, lang, insetTop = 0, backdro
     nodes.push(<path key="pools" d={pools} fill={CREAM} opacity={r1(beamIn * 12) / 100} />);
     nodes.push(<path key="beams" d={beams} fill={CREAM} opacity={r1(beamIn * 14) / 100} />);
   }
-  if (coral) nodes.push(<path key="coral" d={coral} fill={CORAL} />, <path key="cream" d={cream} fill={CREAM} />);
+  if (coral) nodes.push(<path key="planks" d={planks} fill={CREAM} />, <path key="coral" d={coral} fill={CORAL} />, <path key="cream" d={cream} fill={CREAM} />);
 
   // --- la fin : le lieu du crime glisse derrière la voiture arrêtée ---
   const slide = easeOut((t - plan.brakeAt - 0.4) / 0.75);
@@ -703,7 +718,7 @@ export function ChaseFrame({ t, plan, width, height, lang, insetTop = 0, backdro
     // l'image couvre le cadre (ratio 3:2), calée en bas : son aplat sombre sous la voiture
     const iw = Math.max(W, H * 1.5);
     const ih = iw / 1.5;
-    const ix = cx - iw / 2 + (1 - slide) * W;
+    const ix = clamp(cx - plan.focus * iw, W - iw, 0) + (1 - slide) * W;
     const iy = H - ih;
     nodes.push(
       <g key="scene">
@@ -753,11 +768,11 @@ function ellipsePath(x: number, y: number, rx: number, ry: number): string {
 // ---------- le HUD ----------
 
 function Hud({ plan, t, L, lang }: { plan: ChasePlan; t: number; L: Layout; lang: Lang }) {
-  const size = Math.round(Math.min(30, L.u * 0.074));
+  const size = L.star;
   const gap = Math.round(size * 0.3);
   const total = 6 * size + 5 * gap;
   const x0 = L.cx - total / 2;
-  const y0 = Math.max(18, L.top + 14);
+  const y0 = L.hudY;
   const stars: ReactElement[] = [];
   for (let k = 1; k <= 6; k++) {
     const beat = plan.beats[k - 1];
@@ -806,7 +821,7 @@ function Hud({ plan, t, L, lang }: { plan: ChasePlan; t: number; L: Layout; lang
   }
   let pill: ReactElement | null = null;
   if (line) {
-    const fsize = Math.round(Math.min(13, L.u * 0.032));
+    const fsize = L.radioSize;
     const maxW = Math.min(L.u - 40, 440);
     const f = fit(upper(line, lang), { font: "mono-500", size: fsize, minSize: Math.max(9, fsize - 3), maxWidth: maxW - fsize * 2.4, letterSpacing: 0.5, minLetterSpacing: 0 });
     const shown = [...f.text].slice(0, Math.ceil([...f.text].length * clamp(since / 0.4))).join("");
