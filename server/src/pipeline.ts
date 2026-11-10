@@ -48,10 +48,16 @@ export interface Deps {
   extractPdfText(buf: Uint8Array): Promise<{ text: string; pages: number }>;
   cvTextCounts(text: string, pages: number): CvTextCounts;
   readCv(text: string, opts?: { signal?: AbortSignal }): Promise<CvReading | null>;
+  /**
+   * `linkedin` : le profil LinkedIn rangé (`DeclaredLinkedin`), dont les postes datés
+   * comptent l'expérience de la grille (§18.37) ; il ne sert qu'à noter, rien n'en est
+   * gardé hors de la fiche. Typé `unknown` comme `github`, pour que deps.ts passe la
+   * vraie fonction. `now` : l'heure de la fiche, fin des postes en cours.
+   */
   scoreCv(
     reading: CvReading,
     counts: CvTextCounts,
-    opts: { lang: Lang; judgedInSeconds: number; github?: unknown },
+    opts: { lang: Lang; judgedInSeconds: number; github?: unknown; linkedin?: unknown; now?: string },
   ): CardBody;
   compareCards(cv: CardData, github: CardData): Omit<ComparisonData, "id" | "createdAt">;
   renderImage(input: RenderInput): Promise<Uint8Array>;
@@ -322,6 +328,14 @@ interface Ctx {
   deadline(): number;
   /** Repousse la fin du délai (lecture LinkedIn lente, §18.24). Jamais en arrière. */
   extendTo(at: number): void;
+}
+
+/** Ce que la grille lit du profil LinkedIn : postes datés, formation, compétences, adresse. */
+type DeclaredLinkedin = Pick<LinkedinProfile, "roles" | "education" | "skills" | "url">;
+
+/** Le profil réduit à ce que lit la grille : ni nom, ni titre, ni photo. */
+function declaredLinkedin(p: LinkedinProfile): DeclaredLinkedin {
+  return { roles: p.roles, education: p.education, skills: p.skills, url: p.url };
 }
 
 interface LinkedinResult {
@@ -638,7 +652,8 @@ export class Pipeline {
     // Entrée LinkedIn : sa lecture est la fiche, on l'attend. Entrée GitHub : la
     // comparaison est un bonus, on ne l'attend que jusqu'à la marge du délai.
     const li = entry ? await lk.p! : lk.p ? await settleBefore(lk.p, () => ctx.deadline() - LINKEDIN_MARGIN_MS) : null;
-    const declared: (CvResult & { linkedinUrl?: string }) | null = cv ?? (li ? { ...li.cv, linkedinUrl: li.profile.url } : null);
+    const declared: (CvResult & { linkedinUrl?: string; linkedin?: DeclaredLinkedin }) | null =
+      cv ?? (li ? { ...li.cv, linkedinUrl: li.profile.url, linkedin: declaredLinkedin(li.profile) } : null);
 
     const now = Date.now();
     const createdAt = new Date(now).toISOString();
@@ -674,6 +689,8 @@ export class Pipeline {
 
     const reading = declared.reading;
     const linkedinUrl = declared.linkedinUrl;
+    // Fiche LinkedIn : l'expérience se compte sur les postes datés du profil, à l'heure de la fiche.
+    const declaredOpts = { now: createdAt, ...(declared.linkedin ? { linkedin: declared.linkedin } : {}) };
     const asDeclared = (c: CardData): CardData => (linkedinUrl ? asLinkedinCard(c) : c);
     const cvRow = (card: CardData, parentId: string | null): NewCardRow => ({
       id: card.id,
@@ -694,7 +711,7 @@ export class Pipeline {
     if (!gh || (!reading.is_dev_profile && !linkedinUrl)) {
       const found = linkedinUrl ? strongest(ctx.findings()) : [];
       const card = asDeclared({
-        ...deps.scoreCv(reading, declared.counts, { lang, judgedInSeconds }),
+        ...deps.scoreCv(reading, declared.counts, { lang, judgedInSeconds, ...declaredOpts }),
         ...(found.length ? { findings: found } : {}),
         ...(linkedinUrl ? { linkedinUrl } : {}),
         id,
@@ -715,7 +732,7 @@ export class Pipeline {
     // Comparaison : trois lignes, la comparaison et ses deux cartes, chacune son id.
     ctx.emit("compare");
     const cvCard: CardData = {
-      ...deps.scoreCv(reading, declared.counts, { lang, judgedInSeconds, github: gh.facts }),
+      ...deps.scoreCv(reading, declared.counts, { lang, judgedInSeconds, github: gh.facts, ...declaredOpts }),
       id: newId(),
       createdAt,
     };
