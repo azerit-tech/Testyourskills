@@ -1,0 +1,245 @@
+/* Le film de la poursuite (§18.36, docs/cinematique-poursuite.md §2.2, §3, §5.3).
+   Plein écran sur téléphone (l'image remplit l'écran, object-fit: cover) ; sur
+   ordinateur, une colonne 9:16 centrée, haute comme la fenêtre (900 px au plus),
+   sur l'encre. Tout ce que le site pose dessus est mat : aplats d'encre, crème,
+   marine, prune ; ni halo ni ombre lumineuse. Les tailles des bandes suivent la
+   hauteur du film (unités cqh). Chargé avec le film seulement. */
+
+.page-result:has(.film-stage) {
+  --film-h: min(100vh, 900px);
+  --film-h: min(100dvh, 900px);
+  --film-w: min(100vw, calc(var(--film-h) * 9 / 16));
+  /* les marges d'encre autour de la colonne, nulles sur téléphone */
+  --film-x: max(0px, calc((100vw - var(--film-w)) / 2));
+  --film-y: max(0px, calc((100vh - var(--film-h)) / 2));
+  --film-y: max(0px, calc((100dvh - var(--film-h)) / 2));
+}
+
+.film-stage {
+  position: fixed;
+  inset: 0;
+  /* au-dessus de la fiche : le flash la découvre à sa place */
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: #0c0d1b;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+/* après le sommet du flash : la page est dessous, la fiche posée */
+.film-stage.is-landed {
+  background: transparent;
+  cursor: default;
+  pointer-events: none;
+}
+
+.film-frame {
+  position: relative;
+  width: var(--film-w);
+  height: var(--film-h);
+  overflow: hidden;
+  isolation: isolate;
+  container-type: size;
+  background: #0c0d1b;
+}
+.film-stage.is-landed .film-frame {
+  background: transparent;
+}
+
+.film-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* la secousse de chaque étoile, sans laisser voir le bord */
+  transform: translate3d(var(--sx, 0px), var(--sy, 0px), 0) scale(1.016);
+  pointer-events: none;
+}
+.film-stage.is-landed .film-video,
+.film-stage.is-landed .film-grain,
+.film-stage.is-landed .film-vignette {
+  visibility: hidden !important;
+}
+
+/* L'arrêt sur image en deux tons (le traitement des visages de la couverture) :
+   l'image en gris, multipliée par la teinte des lumières, ses ombres remontées
+   à la teinte d'ombre ; la toise par-dessus. Une seule composition, sur une image fixe. */
+.film-frame.is-frozen {
+  background: var(--film-light);
+}
+.film-frame.is-frozen .film-video {
+  filter: grayscale(1) contrast(1.3) brightness(1.08);
+  mix-blend-mode: multiply;
+}
+.film-shadow,
+.film-rule,
+.film-grain,
+.film-vignette,
+.film-ink,
+.film-cover {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.film-shadow {
+  background: var(--film-shadow);
+  mix-blend-mode: lighten;
+}
+.film-rule {
+  background: repeating-linear-gradient(to bottom, transparent 0 calc(7cqh - 1px), var(--film-shadow) calc(7cqh - 1px) 7cqh);
+  opacity: 0.28;
+}
+
+/* le grain : une tuile de 128 px, déplacée douze fois par seconde, à 7 % */
+.film-grain {
+  inset: -128px;
+  background-repeat: repeat;
+  opacity: 0.07;
+}
+.film-vignette {
+  background: radial-gradient(120% 90% at 50% 50%, transparent 55%, rgb(12 13 27 / 0.5) 100%);
+}
+/* les deux images d'encre de la coupe (HUD), et le cache du lecteur si la fin tarde */
+.film-ink,
+.film-cover {
+  background: #0c0d1b;
+}
+.film-cover {
+  opacity: 0;
+}
+
+/* la plaque « @pseudo » et le niveau, au-dessus de la bande du bas */
+.film-mug {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(12cqh + env(safe-area-inset-bottom, 0px) + 28px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+}
+.film-plate {
+  max-width: calc(100% - 48px);
+  padding: 7px 12px 8px;
+  border-radius: 3px;
+  background: #0c0d1b;
+  color: #fff9cb;
+  font: 600 22px/1 var(--f-name);
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transform: rotate(-1.2deg);
+}
+.film-level {
+  max-width: calc(100% - 40px);
+  padding: 6px 14px 8px;
+  background: var(--film-shadow);
+  color: #fff9cb;
+  font: 700 56px/0.92 var(--f-name);
+  letter-spacing: 0.01em;
+  text-align: center;
+  text-transform: uppercase;
+  transform-origin: 50% 60%;
+}
+
+/* les deux bandes d'encre, de la couleur exacte de la page */
+.film-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  box-sizing: border-box;
+  background: #0c0d1b;
+}
+.film-band-top {
+  top: 0;
+  height: calc(9cqh + env(safe-area-inset-top, 0px));
+  padding-top: env(safe-area-inset-top, 0px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.film-stars {
+  display: flex;
+  gap: 8px;
+}
+.film-star {
+  display: block;
+  fill: #243152;
+  transform-origin: 50% 55%;
+}
+.film-star.is-on {
+  fill: #fff9cb;
+}
+.film-band-bottom {
+  bottom: 0;
+  height: calc(12cqh + env(safe-area-inset-bottom, 0px));
+}
+/* la radio : une seule ligne, coupée au-delà de 350 px, au-dessus de « Passer » */
+.film-radio {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: max-content;
+  max-width: min(350px, calc(100% - 32px));
+  margin: 0;
+  transform: translateX(-50%);
+  font: 500 13px/16px var(--f-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fff9cb;
+  white-space: nowrap;
+}
+.film-radio span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.film-square {
+  flex: none;
+  width: 6px;
+  height: 6px;
+}
+.film-square.is-coral {
+  background: #ff6a3d;
+}
+.film-square.is-lilac {
+  background: #8d8cf0;
+}
+
+/* le flash crème, plein écran : la fiche se pose à son sommet */
+.film-flash {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  background: #fff9cb;
+  pointer-events: none;
+}
+
+/* « Passer » (CardPage) et le son, en bas à droite de la bande du bas, 44 px */
+.page-result:has(.film-stage) .skip-btn,
+.film-sound {
+  bottom: calc(var(--film-y) + env(safe-area-inset-bottom, 0px) + 6px);
+  background: #0c0d1b;
+  box-shadow: inset 0 0 0 1.5px #243152;
+  color: #fff9cb;
+}
+.page-result:has(.film-stage) .skip-btn {
+  left: auto;
+  right: calc(var(--film-x) + 16px + 44px + 8px);
+  height: 44px;
+  transform: none;
+}
+.film-sound {
+  right: calc(var(--film-x) + 16px);
+}
