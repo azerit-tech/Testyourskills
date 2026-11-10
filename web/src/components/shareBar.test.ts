@@ -62,6 +62,29 @@ describe("bloc de partage selon l'appareil (§18.27)", () => {
     expect(main(html)).toContain('rel="noopener"');
     expect(ghosts(html)).toHaveLength(3);
     expect(html).toMatch(/>X<\/button>.*Copier le lien.*<a[^>]*download="testyourskills-[^"]+\.png"/);
+    // Le dessin en cours dans l'adresse : le cache d'un an ne ressert pas l'ancienne image.
+    expect(html).toContain('href="/og/AbCdEf1234-portrait.png?v=2"');
+  });
+
+  it("« Format story » : un lien d'appoint après l'image, téléchargé comme elle", () => {
+    const html = render({ ua: DESKTOP, touch: false, share: false });
+    expect(html).toMatch(/Télécharger l&#x27;image<\/a><\/div><a class="link-quiet out-story" href="\/og\/AbCdEf1234-story\.png\?v=2" download="testyourskills-[^"]+-story\.png">Format story<\/a>/);
+    // Discret : pas une quatrième pilule.
+    expect(ghosts(html)).toHaveLength(3);
+  });
+
+  it("« Format story » sur téléphone et dans un navigateur intégré, comme l'image", () => {
+    const phone = render({ ua: IPHONE, touch: true, share: true });
+    expect(phone).toContain(">Format story</a>");
+    const inApp = render({ ua: LINKEDIN_ANDROID, touch: true, share: false });
+    expect(inApp).toMatch(/<button type="button" class="link-quiet out-story" aria-haspopup="dialog">Format story<\/button>/);
+  });
+
+  it("en anglais : « Story format »", () => {
+    const item = stub({ ua: DESKTOP, touch: false, share: false }, "AbCdEf1234");
+    vi.stubGlobal("navigator", { userAgent: DESKTOP, language: "en-US" });
+    const html = renderToStaticMarkup(createElement(LangProvider, null, createElement(ShareBar, { item, toast: () => undefined })));
+    expect(html).toContain(">Story format</a>");
   });
 
   it("téléphone : « Partager » devant, LinkedIn, le lien et l'image derrière, sans X", () => {

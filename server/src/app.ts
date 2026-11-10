@@ -155,8 +155,9 @@ function tokenMatches(given: string | undefined, expected: string): boolean {
 
 // --- Images OG en cache disque ----------------------------------------------
 
-const OG_FILE_RE = /^([A-Za-z0-9]{6,32})(-portrait|-card)?\.png$/;
-const OG_SUFFIXES = ["", "-portrait", "-card"];
+const OG_FILE_RE = /^([A-Za-z0-9]{6,32})(-portrait|-story|-card)?\.png$/;
+const OG_SUFFIXES = ["", "-portrait", "-story", "-card"];
+const OG_FORMATS: Record<string, RenderInput["format"]> = { "-portrait": "portrait", "-story": "story", "-card": "card" };
 /** Fichier sur disque d'une image qui porte la spéciale « Top 5 de la semaine » (§18.22) : une autre clé de cache. */
 const TOTW_TAG = "-totw";
 
@@ -559,13 +560,14 @@ export function createApp(opts: AppOptions) {
     return c.json({ ok: true });
   });
 
-  // Images : /og/:id.png (1200×630), /og/:id-portrait.png (1080×1350), /og/:id-card.png.
+  // Images : /og/:id.png (1200×630), /og/:id-portrait.png (1080×1350), /og/:id-story.png (1080×1920), /og/:id-card.png.
   app.get("/og/:file", async (c) => {
     if (`/og/${c.req.param("file")}` === HOME_IMAGE_PATH) return serveHomeImage(c);
     const m = OG_FILE_RE.exec(c.req.param("file"));
     if (!m) return c.notFound();
     const id = m[1]!;
-    const format: RenderInput["format"] = m[2] === "-portrait" ? "portrait" : m[2] === "-card" ? "card" : "og";
+    // Story d'une comparaison : celle de sa fiche GitHub (render/index.ts).
+    const format: RenderInput["format"] = OG_FORMATS[m[2] ?? ""] ?? "og";
     const row = store.getCard(id);
     // Fiche masquée : aucune image, pour personne (les robots n'ont pas de session).
     if (!row || store.isHidden(store.loginOf(row))) return c.notFound();

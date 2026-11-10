@@ -1,4 +1,4 @@
-// Le partage côté navigateur (§18.27) : l'image portrait préchargée en fichier,
+// Le partage côté navigateur (§18.27) : les images portrait et story préchargées en fichier,
 // la feuille de partage du système, et ce qu'on sait du navigateur intégré.
 import { useSyncExternalStore } from "react";
 import { images, isMock } from "./api";
@@ -18,7 +18,10 @@ export function inAppBrowser(ua: string): boolean {
 
 export const hasNativeShare = () => typeof navigator !== "undefined" && typeof navigator.share === "function";
 
-/* ---------- l'image portrait, en fichier ---------- */
+/* ---------- les images de partage, en fichier ---------- */
+
+/** `portrait` : 4:5, pour les fils ; `story` : 9:16, pour Instagram et TikTok. */
+export type ShareImage = "portrait" | "story";
 
 const files = new Map<string, File>();
 const loading = new Map<string, Promise<File | null>>();
@@ -32,32 +35,36 @@ async function fetchPng(src: string): Promise<Blob | null> {
 }
 
 /**
- * Charge l'image portrait d'une fiche et la garde en `File` : au clic, `navigator.share`
- * part dans le geste, sans rien attendre. Une seule requête par fiche ; un échec se retente.
+ * Charge une image de partage d'une fiche et la garde en `File` : au clic, `navigator.share`
+ * part dans le geste, sans rien attendre. Une seule requête par fiche et par format ; un échec se retente.
  */
-export function preloadPortrait(id: string, filename: string): Promise<File | null> {
-  const known = loading.get(id);
+export function preloadImage(id: string, kind: ShareImage, filename: string): Promise<File | null> {
+  const key = `${kind}:${id}`;
+  const known = loading.get(key);
   if (known) return known;
   const p = (async () => {
     try {
-      const blob = isMock() ? await mockApi.portrait() : await fetchPng(images.portrait(id));
+      const blob = isMock() ? await mockApi.portrait(kind) : await fetchPng(images[kind](id));
       if (!blob) return null;
       const file = new File([blob], filename, { type: "image/png" });
-      files.set(id, file);
+      files.set(key, file);
       return file;
     } catch {
       return null;
     }
   })();
-  loading.set(id, p);
+  loading.set(key, p);
   void p.then((f) => {
-    if (!f) loading.delete(id);
+    if (!f) loading.delete(key);
   });
   return p;
 }
 
 /** L'image déjà chargée, ou null : jamais d'attente. */
-export const portraitFile = (id: string): File | null => files.get(id) ?? null;
+export const imageFile = (id: string, kind: ShareImage): File | null => files.get(`${kind}:${id}`) ?? null;
+
+export const preloadPortrait = (id: string, filename: string) => preloadImage(id, "portrait", filename);
+export const portraitFile = (id: string): File | null => imageFile(id, "portrait");
 
 export function canShareFile(file: File | null): file is File {
   try {

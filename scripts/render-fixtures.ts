@@ -1,5 +1,5 @@
 // Rend chaque fixture en PNG dans var/renders/ (ou --out=dossier) : carte seule,
-// aperçu OG, portrait, plus la comparaison et une planche contact de toutes les cartes.
+// aperçu OG, portrait, story, plus la comparaison et une planche contact de toutes les cartes.
 // Usage : npx tsx scripts/render-fixtures.ts [clé…] [--sheet-only] [--lang=en] [--out=dossier]
 //   Clés en plus des fixtures, pour les images de partage : `noprofile` (fiche
 //   sans profil, décor `default`), `linkedin` (fiche LinkedIn seule), `nightowl`
@@ -114,7 +114,7 @@ async function main() {
   }
   await sheet(entries, langArg);
   if (sheetOnly) return;
-  const formats: ImageFormat[] = ["card", "og", "portrait"];
+  const formats: ImageFormat[] = ["card", "og", "portrait", "story"];
   for (const [key, card] of entries) {
     for (const format of formats) {
       const t = Date.now();

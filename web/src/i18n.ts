@@ -240,6 +240,8 @@ const fr = {
       x: "X",
       copy: "Copier le lien",
       download: "Télécharger l'image",
+      /** La même image en 9:16, pour Instagram et TikTok : une action discrète sous les boutons. */
+      story: "Format story",
       native: "Partager",
       /** Le libellé du bouton LinkedIn une fois le texte dans le presse-papier ; `copiedShort` dans la barre du pouce. */
       linkedinCopied: "Texte copié · colle-le dans ton post",
@@ -711,6 +713,7 @@ const en: Dict = {
       x: "X",
       copy: "Copy link",
       download: "Download image",
+      story: "Story format",
       native: "Share",
       linkedinCopied: "Text copied · paste it into your post",
       copiedShort: "Text copied",

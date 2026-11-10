@@ -2045,6 +2045,11 @@ a.dossier-item:hover {
 .out-more > :last-child:nth-child(odd) {
   grid-column: 1 / -1;
 }
+/* « Format story » : un lien d'appoint sous l'image, calé à droite comme elle ; pas une quatrième pilule */
+.out .out-story {
+  justify-self: end;
+  margin-top: -6px;
+}
 
 /* la barre du pouce (§18.27) : téléphone seulement (ShareDock ne la rend pas au-delà de 640 px), fond d'encre plat.
    Elle sort par le bas quand le bloc de partage est à l'écran ou qu'un champ a le focus. */

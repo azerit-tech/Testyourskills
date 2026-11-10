@@ -863,7 +863,9 @@ describe("suppression", () => {
     const ctx = setup();
     const { id, deleteToken } = await generate(ctx);
     await ctx.app.request(`/og/${id}.png`);
+    await ctx.app.request(`/og/${id}-story.png`);
     expect(existsSync(join(ctx.ogDir, `${id}.png`))).toBe(true);
+    expect(existsSync(join(ctx.ogDir, `${id}-story.png`))).toBe(true);
 
     expect((await ctx.app.request(`/api/card/${id}?token=nope`, { method: "DELETE" })).status).toBe(403);
     expect((await ctx.app.request(`/api/card/${id}`, { method: "DELETE" })).status).toBe(403);
@@ -873,6 +875,7 @@ describe("suppression", () => {
     expect(ok.status).toBe(200);
     expect(ctx.store.getCard(id)).toBeNull();
     expect(existsSync(join(ctx.ogDir, `${id}.png`))).toBe(false);
+    expect(existsSync(join(ctx.ogDir, `${id}-story.png`))).toBe(false);
     expect((await getState(ctx, id)).status).toBe(404);
   });
 
@@ -932,7 +935,9 @@ describe("page /c/:id et images", () => {
     expect(html).toContain(`/og/${json.id}.png`);
     const png = await ctx.app.request(`/og/${json.id}-portrait.png`);
     expect(png.status).toBe(200);
-    expect(ctx.calls.render).toEqual(["portrait:comparison"]);
+    // La story d'une comparaison : le rendu reçoit la comparaison et en pose la fiche GitHub.
+    expect((await ctx.app.request(`/og/${json.id}-story.png`)).status).toBe(200);
+    expect(ctx.calls.render).toEqual(["portrait:comparison", "story:comparison"]);
   });
 
   it("carte inconnue : 404 avec balises génériques", async () => {
@@ -953,7 +958,11 @@ describe("page /c/:id et images", () => {
     expect(new Uint8Array(await b.arrayBuffer())[0]).toBe(0x89);
     await ctx.app.request(`/og/${id}-portrait.png`);
     await ctx.app.request(`/og/${id}-card.png`);
-    expect(ctx.calls.render).toEqual(["og:card", "portrait:card", "card:card"]);
+    const story = await ctx.app.request(`/og/${id}-story.png`);
+    expect(story.status).toBe(200);
+    expect(story.headers.get("content-type")).toBe("image/png");
+    await ctx.app.request(`/og/${id}-story.png`);
+    expect(ctx.calls.render).toEqual(["og:card", "portrait:card", "card:card", "story:card"]);
     expect((await ctx.app.request(`/og/AAAAAAAAAA.png`)).status).toBe(404);
     expect((await ctx.app.request(`/og/${id}.jpg`)).status).toBe(404);
   });

@@ -6,14 +6,17 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { CardData, ComparisonData, Lang } from "../../../shared/types";
 import { fetchAvatar } from "./avatar";
 import {
-  CardOnly, ComparisonCard, ComparisonOg, ComparisonPortrait, HomeOg, OgImage, PortraitImage, type Avatars,
+  CardOnly, ComparisonCard, ComparisonOg, ComparisonPortrait, HomeOg, OgImage, PortraitImage, StoryImage, type Avatars,
 } from "./compositions";
 import { fontFiles } from "./fonts";
 import { encodeOpaquePng } from "./png";
 import { sceneFor } from "./scenes";
 
-/** `home` : l'aperçu de lien de l'accueil, la promesse et la fiche donnée (celle de la vitrine). */
-export type ImageFormat = "card" | "og" | "portrait" | "home";
+/**
+ * `home` : l'aperçu de lien de l'accueil, la promesse et la fiche donnée (celle de la vitrine).
+ * `story` : 9:16 pour Instagram et TikTok, une fiche seule ; pour une comparaison, sa fiche GitHub.
+ */
+export type ImageFormat = "card" | "og" | "portrait" | "story" | "home";
 
 export interface RenderInput {
   format: ImageFormat;
@@ -23,7 +26,7 @@ export interface RenderInput {
 }
 
 /** Largeur de sortie par format (la hauteur suit le viewBox). */
-const OUTPUT_WIDTH: Record<ImageFormat, number> = { card: 1080, og: 1200, portrait: 1080, home: 1200 };
+const OUTPUT_WIDTH: Record<ImageFormat, number> = { card: 1080, og: 1200, portrait: 1080, story: 1080, home: 1200 };
 
 async function avatarsFor(cards: CardData[]): Promise<Avatars> {
   const out: Avatars = {};
@@ -37,8 +40,10 @@ async function avatarsFor(cards: CardData[]): Promise<Avatars> {
 
 /** Construit l'élément SVG de la composition demandée. */
 export async function buildElement(input: RenderInput): Promise<ReactElement> {
-  const { format, card, comparison, lang } = input;
-  if (comparison) {
+  const { format, comparison, lang } = input;
+  // La story n'a qu'une fiche : celle qui prouve, la fiche GitHub d'une comparaison.
+  const card = format === "story" && comparison ? comparison.github : input.card;
+  if (comparison && format !== "story") {
     const avatars = await avatarsFor([comparison.cv, comparison.github]);
     const props = { cmp: comparison, lang, avatars };
     if (format === "og") return createElement(ComparisonOg, props);
@@ -52,7 +57,9 @@ export async function buildElement(input: RenderInput): Promise<ReactElement> {
   // Le lieu du crime du profil (§18.28) ; le petit fichier suffit au panneau de l'aperçu de lien.
   const profileId = card.profile?.id;
   if (format === "og") return createElement(OgImage, { ...props, scene: sceneFor(profileId, "small") });
-  if (format === "portrait") return createElement(PortraitImage, { ...props, scene: sceneFor(profileId, "large") });  return createElement(CardOnly, props);
+  if (format === "portrait") return createElement(PortraitImage, { ...props, scene: sceneFor(profileId, "large") });
+  if (format === "story") return createElement(StoryImage, { ...props, scene: sceneFor(profileId, "large") });
+  return createElement(CardOnly, props);
 }
 
 /** Le SVG brut (utile pour déboguer ou servir une version vectorielle). */

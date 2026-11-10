@@ -4,7 +4,7 @@
 //     (index.ts, pruneStaleImages) : aucune image de l'ancien dessin n'est resservie ;
 //   - les adresses des images portent `?v={n}` (balises OG, front) : elles partent
 //     avec un cache d'un an, `immutable`, que navigateurs et réseaux respectent.
-// v2 (10 novembre 2026) : les lieux du crime (§18.28) dans l'aperçu de lien et le portrait.
+// v2 (10 novembre 2026) : les lieux du crime (§18.28) dans l'aperçu de lien et le portrait, et la story.
 
 export const IMAGE_DESIGN = 2;
 

@@ -406,6 +406,8 @@ export const api = { createCard, getJob, getCase, vote, sendEmail, deleteCard, t
 export const images = {
   og: (id: string) => `/og/${id}.png?${IMAGE_QUERY}`,
   portrait: (id: string) => `/og/${id}-portrait.png?${IMAGE_QUERY}`,
+  /** 1080 × 1920, Instagram et TikTok ; d'une comparaison, la fiche GitHub. */
+  story: (id: string) => `/og/${id}-story.png?${IMAGE_QUERY}`,
   card: (id: string) => `/og/${id}-card.png`,
 };
 

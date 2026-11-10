@@ -383,25 +383,26 @@ export const mockApi = {
   },
 
   /**
-   * L'image portrait en démo : le serveur ne la rend pas. Un carton à sa taille
-   * (1080 × 1350) suffit pour essayer le partage de fichier sur un téléphone.
+   * Les images de partage en démo : le serveur ne les rend pas. Un carton à leur taille
+   * (portrait 1080 × 1350, story 1080 × 1920) suffit pour essayer le partage de fichier sur un téléphone.
    */
-  async portrait(): Promise<Blob | null> {
+  async portrait(kind: "portrait" | "story" = "portrait"): Promise<Blob | null> {
     try {
       const canvas = document.createElement("canvas");
       canvas.width = 1080;
-      canvas.height = 1350;
+      canvas.height = kind === "story" ? 1920 : 1350;
       const g = canvas.getContext("2d");
       if (!g) return null;
+      const mid = canvas.height / 2;
       g.fillStyle = "#0c0d1b";
       g.fillRect(0, 0, canvas.width, canvas.height);
       g.textAlign = "center";
       g.fillStyle = "#fff9cb";
       g.font = "700 104px 'Barlow Condensed', 'Arial Narrow', sans-serif";
-      g.fillText("TESTYOURSKILLS", 540, 660);
+      g.fillText("TESTYOURSKILLS", 540, mid - 15);
       g.fillStyle = "#ffb2c6";
       g.font = "500 44px Outfit, system-ui, sans-serif";
-      g.fillText("Mode démo · image fictive", 540, 740);
+      g.fillText("Mode démo · image fictive", 540, mid + 65);
       return await new Promise<Blob | null>((done) => canvas.toBlob(done, "image/png"));
     } catch {
       return null;

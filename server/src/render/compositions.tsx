@@ -1,5 +1,5 @@
 // Compositions des images partagées : carte seule, aperçu de lien 1200 × 630,
-// portrait 1080 × 1350, leurs variantes « comparaison », et
+// portrait 1080 × 1350, story 1080 × 1920, les variantes « comparaison », et
 // l'aperçu de lien de l'accueil (la promesse et la fiche de la vitrine). Tout est
 // en SVG, la carte y est imbriquée telle quelle (même composant qu'à l'écran).
 // Style mat (SPEC §18.18) dans la langue de la couverture de l'accueil (§18.31) :
@@ -362,6 +362,96 @@ export function PortraitImage({ card, lang, avatars, scene }: { card: CardData; 
       <Placed card={card} lang={lang} avatars={avatars} id="pt" x={cx} y={cy} w={cw} />
       <Host x={W / 2} y={1322} size={28} />
     </svg>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Story 1080 × 1920                                                    */
+/* ------------------------------------------------------------------ */
+
+/** Zones des applis (Instagram, TikTok) : rien d'important dans les 250 px du haut ni les 340 du bas. */
+export const STORY_SAFE = { top: 250, bottom: 340 };
+
+/** « Avis de recherche » sur une plaque d'encre, comme celle de la photo d'identité :
+ *  à mi-hauteur d'un ciel, le texte passe sur un immeuble clair (night_owl) ou un mur
+ *  de plans (mastermind), où ni l'encre ni le crème ne lisent partout. */
+function PosterPlate({ x, y, size, lang }: { x: number; y: number; size: number; lang: Lang }) {
+  const ls = size * 0.34;
+  const text = upper(t(lang).poster, lang);
+  const w = fit(text, { font: "sans-600", size, minSize: size, maxWidth: 4000, letterSpacing: ls }).width - ls;
+  const padX = size * 0.8;
+  const h = size * 1.9;
+  return (
+    <g>
+      <rect x={x - w / 2 - padX} y={y - size * 0.73 - (h - size * 0.73) / 2} width={w + 2 * padX} height={h} rx={6} fill={PALETTE.ink0} />
+      <Poster x={x} y={y} size={size} lang={lang} opacity={1} />
+    </g>
+  );
+}
+
+/** La story : le lieu du crime sur le haut, « Avis de recherche » sur sa plaque sous la
+ *  zone de l'appli, la fiche à cheval sur le bas de l'image, puis la peine en capitales
+ *  crème et la caution en rose (la page d'une fiche les donne aussi sous la fiche,
+ *  §18.29 ; le profil et sa phrase sont déjà sur la fiche), et l'adresse, au-dessus de
+ *  la zone du bas. */
+export function StoryImage({ card, lang, avatars, scene }: { card: CardData; lang: Lang; avatars: Avatars; scene?: SceneImage | null }) {
+  const W = 1080;
+  const H = 1920;
+  const skyH = 860;
+  const cw = 740;
+  const cx = (W - cw) / 2;
+  const cy = 338;
+  const bottom = cy + (cw * CARD_H) / CARD_W;
+  const maxW = W - 2 * 80;
+  const sentence = card.sentence;
+  const penalty = sentence ? fit(upper(sentence.label[lang] ?? sentence.label.fr, lang), { font: "display-700", size: 54, minSize: 36, maxWidth: maxW, letterSpacing: 0.6 }) : null;
+  const bail = sentence?.bail ? fit(sentence.bail[lang] ?? sentence.bail.fr, { font: "sans-600", size: 34, minSize: 24, maxWidth: maxW }) : null;
+  const penaltyY = bottom + 60;
+  const hostY = Math.min(H - STORY_SAFE.bottom - 8, penalty ? penaltyY + (bail ? 110 : 66) : bottom + 80);
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
+      <Ink w={W} h={H} />
+      <SceneFrame scene={scene} id="st" x={0} y={0} w={W} h={skyH} align="xMidYMin" />
+      <PosterPlate x={W / 2} y={298} size={36} lang={lang} />
+      <Placed card={card} lang={lang} avatars={avatars} id="st" x={cx} y={cy} w={cw} />
+      {penalty && (
+        <text x={W / 2} y={penaltyY} {...fontAttrs("display-700")} fontSize={penalty.size} letterSpacing={penalty.letterSpacing} textAnchor="middle" fill={PALETTE.cream}>
+          {penalty.text}
+        </text>
+      )}
+      {bail && (
+        <text x={W / 2} y={penaltyY + 46} {...fontAttrs("sans-600")} fontSize={bail.size} textAnchor="middle" fill={PALETTE.blush}>
+          {bail.text}
+        </text>
+      )}
+      <StoryCta x={W / 2} y={hostY} lang={lang} />
+    </svg>
+  );
+}
+
+/** « Fais la tienne : skills.azerit.tech », centré, la gemme devant. */
+function StoryCta({ x, y, lang }: { x: number; y: number; lang: Lang }) {
+  const s = t(lang);
+  const size = 30;
+  const cta = lang === "fr" ? `${s.cta}\u00a0:` : `${s.cta}:`;
+  const host = ctaHost();
+  const ctaW = fit(cta, { font: "sans-500", size, minSize: size, maxWidth: 4000 }).width;
+  const hostW = fit(host, { font: "sans-600", size, minSize: size, maxWidth: 4000 }).width;
+  const gemH = size * 1.15;
+  const gemW = gemH * (104 / 120);
+  const gap = size * 0.4;
+  const total = gemW + gap + ctaW + 10 + hostW;
+  const x0 = x - total / 2;
+  return (
+    <g>
+      <AzeritGem x={x0} y={y - gemH * 0.88} h={gemH} />
+      <text x={x0 + gemW + gap} y={y} {...fontAttrs("sans-500")} fontSize={size} fill={PALETTE.lilac} fillOpacity={0.8}>
+        {cta}
+      </text>
+      <text x={x0 + gemW + gap + ctaW + 10} y={y} {...fontAttrs("sans-600")} fontSize={size} fill={PALETTE.cream}>
+        {host}
+      </text>
+    </g>
   );
 }
 

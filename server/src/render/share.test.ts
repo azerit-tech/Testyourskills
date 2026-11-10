@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 import { FIXTURES } from "../../../shared/fixtures";
 import { SKY_TEXT, skyTone } from "../../../shared/scenes";
 import { pruneStaleImages } from "../app";
-import { OgImage, PortraitImage } from "./compositions";
+import { OgImage, PortraitImage, STORY_SAFE } from "./compositions";
 import { renderImage, renderSvg } from "./index";
 import { encodeOpaquePng } from "./png";
 import { sceneFor } from "./scenes";
@@ -81,6 +81,37 @@ describe("lieux du crime des images de partage", () => {
       expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([w, h]);
       expect(png[25]).toBe(2); // RVB, sans alpha
     }
+  }, 30_000);
+});
+
+describe("story 1080 × 1920", () => {
+  const yOf = (svg: string, text: string) => Number(new RegExp(`<text[^>]* y="([\\d.]+)"[^>]*>${text}`).exec(svg)?.[1]);
+
+  it("le décor en haut, le surtitre sur sa plaque, la peine et l'adresse hors des zones des applis", async () => {
+    const svg = await renderSvg({ format: "story", card: light, lang: "fr" });
+    expect(svg).toMatch(/^<svg[^>]*viewBox="0 0 1080 1920"/);
+    expect(svg).toMatch(/<image href="data:image\/jpeg;base64,[^"]+" x="0" y="0" width="1080" height="860" preserveAspectRatio="xMidYMin slice"/);
+    const poster = yOf(svg, "AVIS DE RECHERCHE");
+    expect(poster - 36).toBeGreaterThanOrEqual(STORY_SAFE.top);
+    expect(svg).toContain(light.sentence!.label.fr.toLocaleUpperCase("fr-FR"));
+    expect(svg).toContain(light.sentence!.bail!.fr);
+    expect(yOf(svg, "Fais la tienne")).toBeLessThanOrEqual(1920 - STORY_SAFE.bottom);
+  });
+
+  it("sans peine, l'adresse remonte ; une comparaison donne la story de sa fiche GitHub", async () => {
+    const { sentence: _s, ...free } = light;
+    const bare = await renderSvg({ format: "story", card: free, lang: "fr" });
+    expect(bare).not.toContain("PEINE");
+    const { FIXTURE_COMPARISON } = await import("../../../shared/fixtures");
+    const cmp = { ...FIXTURE_COMPARISON, cv: { ...FIXTURE_COMPARISON.cv, avatarUrl: undefined }, github: { ...FIXTURE_COMPARISON.github, avatarUrl: undefined } };
+    const svg = await renderSvg({ format: "story", comparison: cmp, lang: "fr" });
+    expect(svg).toMatch(/viewBox="0 0 1080 1920"/);
+    expect(svg).toContain(cmp.github.profile!.label.fr.toLocaleUpperCase("fr-FR"));
+  });
+
+  it("sort un PNG opaque de 1080 × 1920", async () => {
+    const png = await renderImage({ format: "story", card: blue, lang: "en" });
+    expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([1080, 1920]);
   }, 30_000);
 });
 

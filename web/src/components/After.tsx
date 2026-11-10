@@ -10,7 +10,7 @@ import { navigate } from "../lib/router";
 import { getPlea } from "../lib/plea";
 import { setPrefill } from "../lib/session";
 import { shareLead, shareText, shareTextX, type ShareInput } from "../lib/shareText";
-import { canShareFile, hasNativeShare, inAppBrowser, markTextCopied, portraitFile, preloadPortrait, shareFile, shareSheet, useTextCopied } from "../lib/sharing";
+import { canShareFile, hasNativeShare, imageFile, inAppBrowser, markTextCopied, portraitFile, preloadImage, preloadPortrait, shareFile, shareSheet, useTextCopied } from "../lib/sharing";
 import { copyText, isTouch, shareUrl } from "../lib/util";
 import { IconClose, IconDownload, IconLink, IconLinkedIn, IconShare, IconX } from "./Icons";
 import { ProveGithub } from "./ProveGithub";
@@ -300,8 +300,33 @@ export function ShareBar({ item, toast }: { item: Shareable; toast: (m: string) 
         </button>
         <SaveImage kit={kit} toast={toast} />
       </div>
+      <SaveStory kit={kit} toast={toast} />
     </section>
   );
+}
+
+/**
+ * « Format story » : la même image en 9:16 (Instagram, TikTok), une action discrète sous
+ * les boutons, qui part comme « Télécharger l'image ». Sur téléphone, le fichier se charge
+ * après le portrait, pour ne pas le retarder.
+ */
+function SaveStory({ kit, toast }: { kit: Sharing; toast: (m: string) => void }) {
+  const { t } = useT();
+  const ts = t.result.share;
+  const { id, native } = kit;
+  const filename = kit.filename.replace(/\.png$/, "-story.png");
+  const [file, setFile] = useState<File | null>(() => imageFile(id, "story"));
+  useEffect(() => {
+    if (!native && !isMock()) return;
+    let alive = true;
+    void preloadPortrait(id, kit.filename)
+      .then(() => preloadImage(id, "story", filename))
+      .then((f) => alive && setFile(f));
+    return () => {
+      alive = false;
+    };
+  }, [id, filename, kit.filename, native]);
+  return <ImageAction kit={kit} toast={toast} file={file} src={isMock() ? null : images.story(id)} filename={filename} label={ts.story} channel="story" className="link-quiet out-story" />;
 }
 
 /** Une adresse `blob:` pour un fichier, rendue à la mémoire quand il change ou que le bloc part. */
@@ -331,23 +356,43 @@ function useObjectUrl(file: File | null): string | null {
  */
 function SaveImage({ kit, toast }: { kit: Sharing; toast: (m: string) => void }) {
   const { t } = useT();
+  const label = (
+    <>
+      <IconDownload />
+      {t.result.share.download}
+    </>
+  );
+  return <ImageAction kit={kit} toast={toast} file={kit.file} src={isMock() ? null : images.portrait(kit.id)} filename={kit.filename} label={label} channel="download" className="pill pill-ghost" />;
+}
+
+interface ImageActionProps {
+  kit: Sharing;
+  toast: (m: string) => void;
+  /** L'image préchargée (téléphone, démo), ou null. */
+  file: File | null;
+  /** L'adresse de l'image sur le serveur ; null en démo, où le carton de mock.ts la remplace. */
+  src: string | null;
+  filename: string;
+  label: ReactNode;
+  /** Le canal de l'événement `card_shared`. */
+  channel: string;
+  className: string;
+}
+
+/** Une image de partage : en fichier dans la feuille de partage, en panneau dans un navigateur intégré, en téléchargement ailleurs. */
+function ImageAction({ kit, toast, file, src: server, filename, label, channel, className }: ImageActionProps) {
+  const { t } = useT();
   const ts = t.result.share;
-  const { file, track } = kit;
+  const { track } = kit;
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);
   // En démo, le serveur ne rend pas l'image : le carton de mock.ts, quand il est prêt.
   const demo = useObjectUrl(isMock() ? file : null);
-  const src = isMock() ? demo : images.portrait(kit.id);
-  const label = (
-    <>
-      <IconDownload />
-      {ts.download}
-    </>
-  );
+  const src = isMock() ? demo : server;
 
   if (kit.native && canShareFile(file))
     return (
-      <button type="button" className="pill pill-ghost" onClick={() => void shareFile(file).then((ok) => ok && track("download"))}>
+      <button type="button" className={className} onClick={() => void shareFile(file).then((ok) => ok && track(channel))}>
         {label}
       </button>
     );
@@ -357,12 +402,12 @@ function SaveImage({ kit, toast }: { kit: Sharing; toast: (m: string) => void })
       <>
         <button
           type="button"
-          className="pill pill-ghost"
+          className={className}
           aria-haspopup="dialog"
           onClick={() => {
             if (!src) return toast(ts.downloadDemo);
             setOpen(true);
-            track("download");
+            track(channel);
           }}
         >
           {label}
@@ -373,15 +418,15 @@ function SaveImage({ kit, toast }: { kit: Sharing; toast: (m: string) => void })
 
   return (
     <a
-      className="pill pill-ghost"
+      className={className}
       href={src ?? images.portrait(kit.id)}
-      download={kit.filename}
+      download={filename}
       onClick={(e) => {
         if (!src) {
           e.preventDefault();
           return toast(ts.downloadDemo);
         }
-        track("download");
+        track(channel);
       }}
     >
       {label}
