@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
+import type { CvReading } from "../../../shared/readings";
+import type { StatCode } from "../../../shared/types";
 import { cvCounts, cvReading, daysAgo, facts, repo } from "./__fixtures__/make";
+import { overallOf } from "./common";
 import { AI_BUZZ_KEY } from "./config";
 import { compareCards, cvTextCounts, scoreCv, scoreGithub } from "./index";
 
@@ -59,6 +62,41 @@ describe("barème CV §4.5", () => {
     const many = Array.from({ length: 20 }, (_, i) => `t${i}`);
     expect(stat(scoreCv(cvReading({ seniority_claimed: "lead", technos_described: many }), cvCounts(), opts), "TEC").value).toBe(99);
     expect(stat(scoreCv(cvReading(), cvCounts({ words: 1500 }), opts), "DOC").value).toBe(70);
+  });
+
+  it("école : bonus TEC selon le rang, fait affiché, la note globale suit", () => {
+    const base = cvReading({ seniority_claimed: "mid" }); // 65 + 3 × 2 = 71 : loin du plafond
+    const none = scoreCv(base, cvCounts(), opts);
+    const a = scoreCv({ ...base, school_name: "CentraleSupélec", school_tier: "A" }, cvCounts(), opts);
+    expect(stat(a, "TEC").value).toBe(stat(none, "TEC").value + 15);
+    const values = (c: ReturnType<typeof scoreCv>) => Object.fromEntries(c.stats.map((s) => [s.code, s.value])) as Record<StatCode, number>;
+    expect(a.overall).toBe(overallOf(values(a)));
+    expect(a.overall).toBe(overallOf({ ...values(none), TEC: stat(none, "TEC").value + 15 }));
+    expect(a.overall).toBeGreaterThan(none.overall);
+    expect(stat(a, "TEC").facts[1]).toEqual({ fr: "École : CentraleSupélec, rang A (+15)", en: "School: CentraleSupélec, tier A (+15)" });
+    expect(stat(none, "TEC").facts.map((f) => f.fr).join()).not.toMatch(/École/);
+
+    const tec = (school_name: string, school_tier: CvReading["school_tier"]) => stat(scoreCv({ ...base, school_name, school_tier }, cvCounts(), opts), "TEC").value;
+    expect(tec("École polytechnique", "S")).toBe(71 + 20);
+    expect(tec("Centrale Méditerranée", "B")).toBe(71 + 10);
+    expect(tec("IUT de Lannion", "C")).toBe(71 + 5);
+    // La liste prime sur l'IA ; hors liste, l'IA ne donne pas plus que B.
+    expect(tec("Centrale Marseille", "S")).toBe(71 + 10);
+    expect(tec("Université de Nulle Part", "S")).toBe(71 + 10);
+    // Jamais de pénalité : sans école ou hors tech, rien.
+    expect(tec("Le Wagon", "none")).toBe(71);
+    expect(tec("", "none")).toBe(71);
+    // Plafonné comme les autres bonus.
+    expect(stat(scoreCv(cvReading({ seniority_claimed: "lead", school_name: "Stanford", school_tier: "S" }), cvCounts(), opts), "TEC").value).toBe(99);
+    const fact = stat(scoreCv({ ...base, school_name: "Centrale Marseille", school_tier: "S" }, cvCounts(), opts), "TEC").facts[1];
+    expect(fact.en).toBe("School: Centrale Marseille, tier B (+10)");
+  });
+
+  it("lecture d'avant l'école (champs absents) : pas de plantage, pas de bonus", () => {
+    const { school_name: _n, school_tier: _t, ...old } = cvReading();
+    const card = scoreCv(old as CvReading, cvCounts(), opts);
+    expect(stat(card, "TEC").value).toBe(stat(scoreCv(cvReading(), cvCounts(), opts), "TEC").value);
+    expect(stat(card, "TEC").facts).toHaveLength(3);
   });
 
   it("BUZZ : mots creux pour 100 mots, IA retirée si un projet IA est décrit", () => {

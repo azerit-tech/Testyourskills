@@ -48,7 +48,7 @@ export interface ScoringConfig {
     TEC: {
       seniority: Record<string, number>;
       perDescribedTechno: number;
-      school: { aiMaxTier: SchoolTier; list: { school: string; tier: SchoolTier; pattern: string }[] };
+      school: { bonus: Record<Exclude<SchoolTier, "none">, number>; aiMaxTier: SchoolTier; list: { school: string; tier: SchoolTier; pattern: string }[] };
     };
     SHIP: { scale: Scale };
     ARCH: { scale: Scale };

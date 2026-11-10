@@ -10,6 +10,7 @@ import { deriveGithub } from "./derive";
 import { pickProfile, sentenceFor } from "./profiles";
 import { currentRole } from "./rules";
 import { clampScore, scoreOn } from "./scale";
+import { schoolTier } from "./school";
 import { composeStatuses, evaluateRules } from "./statuses";
 
 const C = SCORING.cv;
@@ -106,12 +107,18 @@ export function scoreCv(
   // TEC
   const seniorityBase = C.TEC.seniority[r.seniority_claimed] ?? C.TEC.seniority.mid;
   const tecBonus = C.TEC.perDescribedTechno * described.length;
+  // Lecture d'avant l'école (champs absents) : comme sans école.
+  const school = schoolTier(r.school_name, r.school_tier).tier;
+  const schoolBonus = school === "none" ? 0 : C.TEC.school.bonus[school];
   const TEC: Stat = {
     code: "TEC",
-    value: clampScore(seniorityBase + tecBonus),
+    value: clampScore(seniorityBase + tecBonus + schoolBonus),
     sufficient: r.roles.length > 0 || described.length > 0,
     facts: [
       fact(`Séniorité déclarée : ${SENIORITY_FR[r.seniority_claimed] ?? r.seniority_claimed} (${seniorityBase})`, `Claimed seniority: ${r.seniority_claimed} (${seniorityBase})`),
+      ...(school === "none"
+        ? []
+        : [fact(`École : ${r.school_name.trim()}, rang ${school} (+${schoolBonus})`, `School: ${r.school_name.trim()}, tier ${school} (+${schoolBonus})`)]),
       fact(
         `${described.length} techno${described.length > 1 ? "s" : ""} rattachée${described.length > 1 ? "s" : ""} à une responsabilité (+${tecBonus})`,
         `${described.length} technolog${described.length === 1 ? "y" : "ies"} tied to a responsibility (+${tecBonus})`,
