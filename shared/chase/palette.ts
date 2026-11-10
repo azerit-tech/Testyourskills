@@ -21,6 +21,8 @@ export interface ChasePalette {
   /** La route à l'horizon, plus claire (brume) : le dégradé doux de la route. */
   roadFar: string;
   verge: string;
+  /** Trottoirs, entre la bordure et les palmiers : un ton plus clair que la route. */
+  walk: string;
   curb: string;
   /** Palmiers et lampadaires du bord de l'avenue. */
   palm: string;
@@ -49,7 +51,8 @@ export const PALETTES: Record<Light, ChasePalette> = {
     windows: "#ffe7cf",
     road: "#5e3d66",
     roadFar: "#a17a9f",
-    verge: "#8a6288",
+    verge: "#7d5880",
+    walk: "#a37c9f",
     curb: "#c79bb6",
     palm: "#6a4268",
     lamp: "#ffe7cf",
@@ -70,7 +73,8 @@ export const PALETTES: Record<Light, ChasePalette> = {
     windows: "#fff0c4",
     road: "#5c3259",
     roadFar: "#9c637d",
-    verge: "#8e5372",
+    verge: "#82486a",
+    walk: "#b0727f",
     curb: "#d99a96",
     palm: "#6c3a5e",
     lamp: "#fff0c4",
@@ -89,15 +93,16 @@ export const PALETTES: Record<Light, ChasePalette> = {
     mid: "#4d4591",
     hedge: "#2e2b63",
     windows: "#ffc36b",
-    road: "#242350",
+    road: "#292758",
     roadFar: "#4a4384",
-    verge: "#34306a",
+    verge: "#2c295e",
+    walk: "#423d80",
     curb: "#5f58a0",
     palm: "#26244f",
     lamp: "#ffc36b",
     body: "#1c1c38",
-    top: "#3b3a6e",
-    glass: "#57549a",
+    top: "#4a4888",
+    glass: "#6a66b0",
     shadow: "#16162e",
     heli: "#2c2a5e",
     heliTop: "#45428a",
@@ -111,7 +116,8 @@ export const PALETTES: Record<Light, ChasePalette> = {
     windows: "#fffbe0",
     road: "#5f538f",
     roadFar: "#a093cc",
-    verge: "#8579b6",
+    verge: "#7a6eab",
+    walk: "#9d91c8",
     curb: "#c4b9e6",
     palm: "#73679f",
     lamp: "#fffbe0",

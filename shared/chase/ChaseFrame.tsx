@@ -155,8 +155,8 @@ function cityOf(seed: number, L: Layout): City {
   // Plan moyen : façades art déco plus basses, avec leurs fenêtres.
   let mid = "";
   const windows: (City["windows"][number] & { rank: number })[] = [];
-  const ww = Math.max(2, Math.round(u * 0.0095));
-  const wh = Math.max(3, Math.round(ww * 1.35));
+  const ww = Math.max(2, Math.round(u * 0.0075));
+  const wh = Math.max(3, Math.round(ww * 1.5));
   for (let x = left - u * 0.03; x < right; ) {
     const w = u * (0.055 + 0.075 * r());
     const h = H * (0.028 + 0.05 * r()) * (r() < 0.12 ? 1.6 : 1);
@@ -175,8 +175,8 @@ function cityOf(seed: number, L: Layout): City {
       mid += `M${r1(x + w - rr)} ${r1(top + 1)}V${r1(top - rr * 0.6)}A${r1(rr)} ${r1(rr)} 0 0 1 ${r1(x + w)} ${r1(top + rr * 0.4)}V${r1(top + 1)}Z`;
     }
     // fenêtres en grille
-    const gx = ww * 2.1;
-    const gy = wh * 1.9;
+    const gx = ww * 2.6;
+    const gy = wh * 2.1;
     const cols = Math.floor((w - ww * 1.6) / gx);
     const rows = Math.floor((h - wh * 2.4) / gy);
     const ox = x + (w - (cols - 1) * gx - ww) / 2;
@@ -221,21 +221,38 @@ function cityOf(seed: number, L: Layout): City {
 
 /** Palmier : tronc courbe et palmes tombantes, 100 de haut. */
 const PALM = (() => {
-  let d = "M-2.6 0C-1.6-38 1.2-70 6.4-97L9.4-96.2C5.2-69 2.4-38 2.6 0Z";
+  let d = "M-3.4 0C-2.2-38 1-70 6.2-97L9.6-96.4C5.4-69 2.6-38 3.4 0Z";
   const cx = 8;
   const cy = -98;
-  const fronds = [-172, -146, -122, -98, -76, -52, -28, -6, 16];
-  for (const a of fronds) {
+  // palmes : une nervure courbe, un bord supérieur lisse, un bord inférieur dentelé (les folioles)
+  const fronds: [number, number][] = [
+    [-178, 34], [-152, 38], [-128, 32], [-104, 24], [-80, 25], [-56, 32], [-30, 38], [-4, 34], [14, 28],
+  ];
+  for (const [a, len] of fronds) {
     const rad = (a * Math.PI) / 180;
-    const len = 30 + 6 * Math.cos(rad * 2);
-    const droop = 13 * Math.abs(Math.cos(rad)) + 4;
+    const droop = 16 * Math.abs(Math.cos(rad)) + 3;
     const tx = cx + Math.cos(rad) * len;
     const ty = cy + Math.sin(rad) * len + droop;
-    const mx = cx + Math.cos(rad) * len * 0.55;
-    const my = cy + Math.sin(rad) * len * 0.55 - 5;
-    const nx = -Math.sin(rad) * 4.2;
-    const ny = Math.cos(rad) * 4.2;
-    d += `M${r1(cx)} ${r1(cy)}Q${r1(mx + nx)} ${r1(my + ny)} ${r1(tx)} ${r1(ty)}Q${r1(mx - nx * 0.4)} ${r1(my - ny * 0.4)} ${r1(cx)} ${r1(cy)}Z`;
+    const qx = cx + Math.cos(rad) * len * 0.55;
+    const qy = cy + Math.sin(rad) * len * 0.55 - 7 * Math.abs(Math.cos(rad));
+    const N = 10;
+    const up: string[] = [];
+    const down: string[] = [];
+    for (let i = 0; i <= N; i++) {
+      const s = i / N;
+      const x = (1 - s) ** 2 * cx + 2 * (1 - s) * s * qx + s * s * tx;
+      const y = (1 - s) ** 2 * cy + 2 * (1 - s) * s * qy + s * s * ty;
+      const dx = 2 * (1 - s) * (qx - cx) + 2 * s * (tx - qx);
+      const dy = 2 * (1 - s) * (qy - cy) + 2 * s * (ty - qy);
+      const l = Math.hypot(dx, dy) || 1;
+      const nx = -dy / l;
+      const ny = dx / l;
+      const w = 4.6 * Math.sin(Math.PI * Math.min(1, s * 1.08)) ** 0.6;
+      up.push(`${r1(x + nx * w * 0.55)} ${r1(y + ny * w * 0.55)}`);
+      const notch = i % 2 === 0 ? 1.0 : 0.7;
+      down.push(`${r1(x - nx * w * notch)} ${r1(y - ny * w * notch)}`);
+    }
+    d += `M${up.join("L")}L${down.reverse().join("L")}Z`;
   }
   return d;
 })();
@@ -466,11 +483,11 @@ export function ChaseFrame({ t, plan, width, height, lang, insetTop = 0, backdro
     const p = (t - at) / 1.1;
     const bob = Math.sin(1.7 * t + (unit === "heli2" ? 2 : unit === "heli3" ? 4 : 0)) * H * 0.006;
     if (unit === "heli1") {
-      helis.push({ x: cx + u * 0.21, y: lerp(hy + H * 0.02, H * 0.25, easeOut(p)) + bob, s: 1, flip: false, a: 1, phase: 0 });
+      helis.push({ x: cx + u * 0.21, y: lerp(hy + H * 0.02, H * 0.25, easeOut(p)) + bob, s: 0.88, flip: false, a: 1, phase: 0 });
     } else if (unit === "heli2") {
-      helis.push({ x: lerp(cx - u * 0.75, cx - u * 0.27, easeOut(p)), y: lerp(H * 0.12, H * 0.205, easeOut(p)) + bob, s: 0.86, flip: true, a: 1, phase: 1.3 });
+      helis.push({ x: lerp(cx - u * 0.75, cx - u * 0.25, easeOut(p)), y: lerp(H * 0.12, H * 0.205, easeOut(p)) + bob, s: 0.74, flip: true, a: 1, phase: 1.3 });
     } else {
-      helis.push({ x: lerp(cx + u * 0.8, cx + u * 0.02, easeOut(p)), y: lerp(H * 0.1, H * 0.155, easeOut(p)) + bob, s: 0.62, flip: false, a: 1, phase: 2.1 });
+      helis.push({ x: lerp(cx + u * 0.8, cx + u * 0.02, easeOut(p)), y: lerp(H * 0.1, H * 0.155, easeOut(p)) + bob, s: 0.5, flip: false, a: 1, phase: 2.1 });
     }
   }
 
@@ -541,6 +558,7 @@ export function ChaseFrame({ t, plan, width, height, lang, insetTop = 0, backdro
   );
   const curb = (X0: number, X1: number) =>
     `M${r1(px(L, X0, dn, cam))} ${r1(py(L, dn))}L${r1(cx)} ${hy + 2}L${r1(px(L, X1, dn, cam))} ${r1(py(L, dn))}Z`;
+  nodes.push(<path key="walks" d={curb(-edge - 1.25, -edge) + curb(edge, edge + 1.25)} fill={pal.walk} />);
   nodes.push(<path key="curbs" d={curb(-edge - 0.12, -edge) + curb(edge, edge + 0.12)} fill={pal.curb} />);
 
   // pointillés : ils filent de la caméra vers l'horizon
@@ -660,7 +678,7 @@ export function ChaseFrame({ t, plan, width, height, lang, insetTop = 0, backdro
     const sy = h.y - 4 * s;
     const tx = carX + carW * 0.28 * Math.sin(1.25 * t + i * 2.2) * (1 - still);
     const ty = L.gY - carW * 0.05;
-    const half = carW * (0.62 + 0.08 * i);
+    const half = carW * (0.4 + 0.06 * i);
     const dx = tx - sx;
     const dy = ty - sy;
     const len = Math.hypot(dx, dy);
@@ -674,8 +692,8 @@ export function ChaseFrame({ t, plan, width, height, lang, insetTop = 0, backdro
   nodes.push(<path key="shadows" d={shadows} fill={pal.shadow} />);
   nodes.push(...veh);
   if (beams && beamIn > 0) {
-    nodes.push(<path key="pools" d={pools} fill={CREAM} opacity={r1(beamIn * 14) / 100} />);
-    nodes.push(<path key="beams" d={beams} fill={CREAM} opacity={r1(beamIn * 17) / 100} />);
+    nodes.push(<path key="pools" d={pools} fill={CREAM} opacity={r1(beamIn * 12) / 100} />);
+    nodes.push(<path key="beams" d={beams} fill={CREAM} opacity={r1(beamIn * 14) / 100} />);
   }
   if (coral) nodes.push(<path key="coral" d={coral} fill={CORAL} />, <path key="cream" d={cream} fill={CREAM} />);
 
@@ -704,7 +722,7 @@ export function ChaseFrame({ t, plan, width, height, lang, insetTop = 0, backdro
       d={`M${r1(carX - carW * 0.44)} ${r1(carY - carW * 0.2)}L${r1(carX - carW * 0.3)} ${r1(carY - carW * 0.2)}L${r1(carX - carW * 0.2)} ${H}L${r1(carX - carW * 0.95)} ${H}Z` +
         `M${r1(carX + carW * 0.44)} ${r1(carY - carW * 0.2)}L${r1(carX + carW * 0.3)} ${r1(carY - carW * 0.2)}L${r1(carX + carW * 0.2)} ${H}L${r1(carX + carW * 0.95)} ${H}Z`}
       fill={CREAM}
-      opacity={0.1}
+      opacity={0.08}
     />,
   );
   nodes.push(
