@@ -178,6 +178,45 @@ svg {
   text-transform: uppercase;
   text-align: center;
   color: var(--band-ink);
+  position: relative;
+  overflow: hidden;
+}
+/* les palmiers des deux bouts (§18.31) : l'encre du bandeau à 22 %, posés sur son bord
+   bas, hors du flux. À 360 px, le texte français (233 px) commence à 64 px du bord ;
+   les deux palmiers s'arrêtent à 50. Sous 360, le petit s'efface. */
+.season-text {
+  position: relative;
+}
+.season-palm {
+  position: absolute;
+  bottom: 0;
+  width: 30px;
+  height: 41px;
+  fill: currentColor;
+  opacity: 0.22;
+  pointer-events: none;
+}
+.season-palm.is-small {
+  width: 20px;
+  height: 28px;
+}
+.season-palm.is-l {
+  left: 6px;
+}
+.season-palm.is-l.is-small {
+  left: 30px;
+}
+.season-palm.is-r {
+  right: 6px;
+  transform: scaleX(-1);
+}
+.season-palm.is-r.is-small {
+  right: 30px;
+}
+@media (max-width: 359px) {
+  .season-palm.is-small {
+    display: none;
+  }
 }
 
 .topbar {
