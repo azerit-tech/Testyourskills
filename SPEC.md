@@ -1223,3 +1223,19 @@ La poursuite 2D du §18.33 n'a pas passé : Jacques veut « un effet film », «
 - **Butoir : lundi 16 novembre au soir**, six plans validés (fin, ouverture, étoiles 1 à 4). Tenue : le film est la révélation par défaut. Manquée : la poursuite 2D sort le 19, le film passe par défaut dès qu'il est prêt (`DEFAULT_SCENE`). L'ascenseur ne revient pas ; il est supprimé avec Three.js à la validation du film.
 - **Dépend de Jacques** : le tournage (trois références, neuf images clés, neuf plans, environ une heure par plan), déposé dans `Azerit/design/film/`.
 - **Pas vérifié** : la lecture automatique sur iPhone en économie d'énergie et dans le navigateur de LinkedIn, les réglages et le coût des outils vidéo, les conditions d'usage commercial de l'outil choisi.
+
+### 18.37 Le barème de recrutement (10 novembre 2026)
+
+Jacques : « c'est ça tout le jeu, avoir quelque chose qui se rapproche d'un vrai recrutement avec les vrais critères », et le jeu doit montrer la méthode d'Azerit : « qu'ils soient bluffés par leur façon de noter les gens, leur façon de trouver les infos ». La grille, ses niveaux, ses exemples et sa construction sont dans `docs/bareme-recrutement.md`.
+
+- **Huit critères, chacun une seule note sur 10**, lue dans une table de niveaux : école et sélection, expérience, parcours et employeurs, stack technique, niveau du code, activité, ownership et production, open source. **Aucun bonus ni malus additif** (« les scores en mode +15 +10, ça donne jamais rien de bon ») : le bonus d'école sur TEC du §18.35 est supprimé, l'école devient « École : n/10 ».
+- **La note sur 100 est la moyenne pondérée des critères**, coefficients affichés : code 2 ; stack, expérience, parcours 1,5 ; ownership, activité, école 1 ; open source 0,5. LinkedIn porte 40 %, GitHub 50 %, les deux 10 %.
+- **Quatre règles sur la note finale** : un critère non prouvé ou non renseigné sort de la moyenne (un GitHub vide n'est pas un mauvais code, se former seul ne coûte rien) ; l'école et l'open source ne peuvent pas faire baisser la note ; plafond à 85 sans code prouvé ; dossier vide : 20.
+- **Chaque note a sa pièce** : un fait précis et sourcé, affiché à côté (« LinkedIn, postes datés », « GitHub, sequence-mail », « recoupé »). Les recoupements LinkedIn et GitHub sont la démonstration : années recomptées poste par poste, poste confirmé par le code, techno déclarée sans trace.
+- **Ce que le code calcule, l'IA ne le calcule plus** : les années d'expérience se comptent sur les postes datés (stage à moitié, association étudiante à zéro), jamais sur l'âge ni l'année du diplôme.
+- **Les signaux d'alerte sont des chefs d'accusation**, sans effet sur la note.
+- **Avec les deux sources** : deux fiches comme aujourd'hui, et une note du dossier, chaque critère pris sur sa source de preuve.
+- **Avant le 19 novembre** : le dessin de la fiche ne change pas ; sa note devient celle du barème ; sous la fiche, le bloc « Voici comment un recruteur d'Azerit te lit » avec les huit lignes en n/10 et leurs pièces. La fiche à huit barres vient après le lancement.
+- **Sur les fondateurs** : Jacques, LinkedIn 41, GitHub 61, dossier 57 ; Lumine, LinkedIn 45, GitHub 20 (dossier vide), dossier 45 « code non prouvé ».
+- **Hors du dépôt** : la grille interne d'Azerit pour un poste donné, et la liste des employeurs à forte barre d'embauche (fichier du serveur, vide au départ).
+- **Limites** : données publiques, rien sur un trait protégé, aucun contact ; sur une page partagée, pas de nom d'ancien employeur.
