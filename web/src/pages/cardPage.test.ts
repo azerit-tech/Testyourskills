@@ -10,6 +10,7 @@ import { Fold, type Shareable } from "../components/After";
 import { skyOf } from "../components/ProfileTile";
 import { JuryLine } from "../components/Jury";
 import { tokens } from "../lib/api";
+import { githubGridMock } from "../lib/mockGrid";
 import { setPlea } from "../lib/plea";
 import { Result, type ResultProps } from "./CardPage";
 
@@ -237,6 +238,29 @@ describe("comparaison GitHub contre CV ou LinkedIn", () => {
     expect(html.match(/<h1/g)).toHaveLength(1);
     expect(textOf(html, /<h1 class="cmp-headline[^"]*">.*?<\/h1>/)).toBe(FIXTURE_COMPARISON.headline.fr);
     expect(html).toContain("Ce que ton CV déclare");
+  });
+});
+
+describe("la lecture du recruteur (§18.37)", () => {
+  const grid = githubGridMock("gold", FIXTURES.gold.login ?? "dev")!;
+
+  it("une fiche sans grille n'affiche pas le bloc, sans planter", () => {
+    for (const owner of [true, false]) expect(renderResult(card(), { owner, token: owner ? "tok" : undefined })).not.toContain('id="grille"');
+  });
+
+  it("avec sa grille : le titre, huit critères, une jauge lue « n sur 10 », la note, aucun « + n »", () => {
+    const html = renderResult(card({ grid, overall: grid.overall }), { owner: true, token: "tok" });
+    expect(html).toContain("Voici comment un recruteur d&#x27;Azerit te lit");
+    expect(html.match(/class="rg-row /g)).toHaveLength(8);
+    expect(html).toMatch(/aria-label="\d+ sur 10"/);
+    const block = /<section class="after-block rg".*?<\/section>/s.exec(html)![0].replace(/<[^>]+>/g, " ");
+    expect(block).not.toMatch(/(^|\s)[+−]\s?\d/);
+  });
+
+  it("vue par un visiteur : le titre à la troisième personne", () => {
+    const html = renderResult(card({ grid, overall: grid.overall }), { owner: false });
+    expect(html).toContain('id="grille"');
+    expect(html).not.toContain("te lit");
   });
 });
 

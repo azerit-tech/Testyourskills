@@ -5,6 +5,7 @@ import type { CSSProperties } from "react";
 import type { ComparisonData, StatCode } from "../../../shared/types";
 import { declaredOf, STAT_CODES } from "../../../shared/types";
 import { theirHeadline } from "../../../shared/compareText";
+import { usableGrid } from "../../../shared/gridText";
 import { pick, useT } from "../i18n";
 import { useMediaQuery } from "../lib/util";
 import { RevealCard } from "./Reveal";
@@ -53,6 +54,26 @@ function Deltas({ cmp, className = "" }: { cmp: ComparisonData; className?: stri
 }
 
 /**
+ * Comparaison notée par le barème de recrutement (§18.37) : à la place des écarts
+ * stat par stat (« +12 »), la note du dossier, chaque critère pris sur sa source
+ * de preuve, et le lien vers la lecture du recruteur, sous les fiches.
+ */
+function CaseRating({ overall, className = "" }: { overall: number; className?: string }) {
+  const { t } = useT();
+  return (
+    <a className={`case-rating ${className}`} href="#grille">
+      <span className="case-rating-k">{t.compare.caseRating}</span>
+      <b className="case-rating-v">{overall}</b>
+      <span className="case-rating-hint">{t.compare.caseHint}</span>
+      <span className="case-rating-link">
+        {t.compare.caseLink}
+        <span aria-hidden> ↓</span>
+      </span>
+    </a>
+  );
+}
+
+/**
  * Le chiffre du titre ressort en couleur ; le reste du titre reste blanc. `who` (le @login) reste
  * tel quel, même s'il porte des chiffres. Un h1 pour qui a fait la fiche ; un h2 pour le
  * visiteur, dont la page a déjà son h1 (« Avis de recherche : @x »).
@@ -95,6 +116,7 @@ export function ComparisonStage({ cmp, phase, who = null }: StageProps) {
   const overall = cmp.github.overall - cmp.cv.overall;
   const headTone = toneOf("overall", overall);
   const settled = phase === "done";
+  const graded = usableGrid(cmp.grid);
 
   // Carrousel mobile : la position de défilement pilote le sélecteur.
   useEffect(() => {
@@ -156,10 +178,10 @@ export function ComparisonStage({ cmp, phase, who = null }: StageProps) {
             </figure>
           ))}
         </div>
-        {desktop && <Deltas cmp={cmp} className="deltas-col" />}
+        {desktop && (graded ? <CaseRating overall={cmp.grid!.overall} className="deltas-col" /> : <Deltas cmp={cmp} className="deltas-col" />)}
       </div>
 
-      {!desktop && <Deltas cmp={cmp} className="deltas-row" />}
+      {!desktop && (graded ? <CaseRating overall={cmp.grid!.overall} className="deltas-row" /> : <Deltas cmp={cmp} className="deltas-row" />)}
     </div>
   );
 }

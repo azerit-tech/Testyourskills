@@ -4,6 +4,7 @@ import type { FormEvent, ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { CardData, ComparisonData, Lang, WeekRank } from "../../../shared/types";
 import { declaredOf, STAT_CODES, starsFor } from "../../../shared/types";
+import { usableGrid } from "../../../shared/gridText";
 import { pick, useT } from "../i18n";
 import { api, hasGithub, images, isMine, isMock, tokens, weekOf } from "../lib/api";
 import { navigate } from "../lib/router";
@@ -525,7 +526,7 @@ function WhyCard({ card, withSentence }: { card: CardData; withSentence: boolean
           </div>
         ))}
       </dl>
-      <p className="why-formula">{t.result.why.overallLine}</p>
+      <p className="why-formula">{usableGrid(card.grid) ? t.result.why.gridLine : t.result.why.overallLine}</p>
     </>
   );
 }
