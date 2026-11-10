@@ -319,14 +319,15 @@ describe("aggregate", () => {
     ...over,
   });
 
-  it("impute aux profils non lus l'écart médian réel − repli des profils lus", () => {
-    const read = [10, 20, 30].map((d) => line({ tecReal: true, stats: { TEC: 50 + d, SHIP: 50, ARCH: 50, DOC: 50, XP: 50, BUZZ: 10 } }));
-    const unread = line({ tecFallback: 54, stats: { TEC: 54, SHIP: 50, ARCH: 50, DOC: 50, XP: 50, BUZZ: 10 } });
+  it("la note de référence est celle de la fiche (grille), lue ou non ; l'écart TEC reste mesuré", () => {
+    const read = [10, 20, 30].map((d) => line({ tecReal: true, overall: 60 + d, stats: { TEC: 50 + d, SHIP: 50, ARCH: 50, DOC: 50, XP: 50, BUZZ: 10 } }));
+    const unread = line({ overall: 47, tecFallback: 54, stats: { TEC: 54, SHIP: 50, ARCH: 50, DOC: 50, XP: 50, BUZZ: 10 } });
     const t = aggregate([...read, unread], { minGroup: 1 })!;
     expect(t.tec).toEqual({ real: 3, imputedDelta: 20 });
-    expect(referenceOverall(unread, 20)).toBe(overallOf({ ...unread.stats, TEC: 74 }));
-    // Un profil lu garde sa note telle quelle.
-    expect(referenceOverall(read[0]!, 20)).toBe(read[0]!.overall);
+    // Pas d'imputation : un profil non lu est déjà « code non prouvé » dans sa note.
+    expect(referenceOverall(unread)).toBe(47);
+    expect(referenceOverall(read[0]!)).toBe(70);
+    expect(t.overall.all!.centiles[0]).toBe(47);
   });
 
   it("ignore les lignes d'un autre barème, et les groupes trop petits", () => {

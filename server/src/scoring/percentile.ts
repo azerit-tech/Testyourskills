@@ -49,9 +49,9 @@ export interface PercentileTable {
   /** Profils de référence notés. */
   profiles: number;
   /**
-   * Lecture IA du code (§4.3) : `real` profils ont leur TEC réel ; les autres
-   * ont le TEC de repli décalé de `imputedDelta` (médiane de l'écart réel −
-   * repli sur les profils lus), null si aucun profil n'a été lu.
+   * Lecture IA du code (§4.3) : `real` profils ont leur TEC réel. `imputedDelta` :
+   * médiane de l'écart réel − repli sur les profils lus (null si aucun), une mesure
+   * de la barre TEC ; depuis 0.4.0 elle ne touche plus la note de référence.
    */
   tec: { real: number; imputedDelta: number | null };
   /** Taille minimale des groupes écrits. */

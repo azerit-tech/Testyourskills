@@ -55,8 +55,8 @@
 // 0,002 $ par profil lu (15 000 tokens d'entrée), donc environ 0,60 $ pour 300
 // profils et 2 $ pour 1 000. Sans AI_MODEL_CODE, le code retombe sur Haiku 4.5,
 // dix fois plus cher : le plafond de 3 $ s'arrêterait vers 150 profils lus.
-// Les profils non lus gardent le TEC de repli décalé de l'écart médian mesuré
-// sur les profils lus (voir referenceOverall) ; la sortie dit combien ont le TEC réel.
+// Les profils non lus gardent la note de leur fiche, « code non prouvé » dans la
+// grille (voir referenceOverall) ; la sortie dit combien ont le TEC réel.
 
 import { execSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";

@@ -17,10 +17,8 @@ import type { StatCode } from "../../shared/types";
 import { parseLogin } from "./github/detect";
 import type { TokenPool } from "./github/tokens";
 import { CARD_GITHUB_NEED, isAiClosed, type Deps } from "./pipeline";
-import { overallOf } from "./scoring/common";
 import { SCORING, STATUSES } from "./scoring/config";
 import { centilesOf, MIN_GROUP, type CentileGroup, type PercentileTable } from "./scoring/percentile";
-import { clampScore } from "./scoring/scale";
 
 export type Engine = Pick<Deps, "collectGithub" | "pickFilesForReading" | "readCode" | "aiAvailable" | "scoreGithub">;
 
@@ -160,13 +158,13 @@ function median(xs: number[]): number | null {
 const round1 = (x: number) => Math.round(x * 10) / 10;
 
 /**
- * Note globale de référence d'un profil. Les profils sans lecture IA ont le TEC
- * de repli (50) : on le décale de la médiane de l'écart réel − repli mesurée sur
- * les profils lus, sinon 70 % de la référence aurait le même TEC.
+ * Note globale de référence d'un profil : celle de sa fiche, la note de la grille
+ * (barème 0.4.0). Un profil sans lecture IA y a déjà son sort, « code non prouvé »
+ * (critère Code hors moyenne, plafond 85) : lui imputer un TEC, qui n'entre plus
+ * dans la note, la fausserait.
  */
-export function referenceOverall(l: CardLine, imputedDelta: number | null): number {
-  if (l.tecReal || imputedDelta === null) return l.overall;
-  return overallOf({ ...l.stats, TEC: clampScore(l.tecFallback + imputedDelta) });
+export function referenceOverall(l: CardLine): number {
+  return l.overall;
 }
 
 /** La table de data/percentiles.json, ou null s'il y a moins de `minGroup` profils notés sur ce barème. */
@@ -176,8 +174,9 @@ export function aggregate(lines: CardLine[], opts: { minGroup?: number; now?: ()
   if (cards.length < minGroup || !cards.length) return null;
 
   const read = cards.filter((l) => l.tecReal);
+  // Mesuré pour la barre TEC, plus pour la note : voir referenceOverall.
   const imputedDelta = median(read.map((l) => l.stats.TEC - l.tecFallback));
-  const scored = cards.map((l) => ({ l, overall: referenceOverall(l, imputedDelta) }));
+  const scored = cards.map((l) => ({ l, overall: referenceOverall(l) }));
 
   const groupOf = (xs: number[]): CentileGroup | undefined =>
     xs.length >= minGroup && xs.length ? { n: xs.length, centiles: centilesOf(xs) } : undefined;
@@ -321,9 +320,8 @@ export async function runPercentiles(opts: RunOptions): Promise<RunResult> {
     log(
       `Écrit ${opts.outPath} : ${table.profiles} profils, dont ${table.tec.real} avec le TEC réel (lecture IA)` +
         (table.tec.real < table.profiles
-          ? table.tec.imputedDelta === null
-            ? ", les autres au TEC de repli faute de profil lu"
-            : `, les autres au TEC de repli ${table.tec.imputedDelta >= 0 ? "+" : ""}${table.tec.imputedDelta}`
+          ? `, les autres notés « code non prouvé »` +
+            (table.tec.imputedDelta === null ? "" : ` (écart médian du TEC réel au repli : ${table.tec.imputedDelta})`)
           : "") +
         ` · ${groups} groupe(s) langage ou poste d'au moins ${minGroup} profils · dépense IA ${usd(spent)}.`,
     );
