@@ -2,6 +2,7 @@
 // lisent les balises Open Graph et Twitter sans exécuter de JS, puis le
 // navigateur charge le front SPA qui affiche la carte.
 
+import { declaredLabel, theirHeadline } from "../../shared/compareText";
 import { IMAGE_QUERY } from "../../shared/images";
 import { starsLine } from "../../shared/stars";
 import type { CardData, ComparisonData, Lang, Special } from "../../shared/types";
@@ -49,17 +50,21 @@ export function metaFor(data: CardData | ComparisonData, baseUrl: string): PageM
   if (isComparison(data)) {
     const lang = data.cv.lang ?? data.github.lang ?? "fr";
     const name = data.github.name || data.cv.name;
-    const head = data.headline[lang];
     const fr = lang === "fr";
+    // L'aperçu est lu par qui n'a pas fait la fiche : à la troisième personne, avec le @login
+    // (shared/compareText.ts, comme le visiteur de la page). À égalité, le titre du catalogue
+    // ne s'adresse à personne, et le nom le suit.
+    const who = data.github.login ? `@${data.github.login}` : name;
+    const title = theirHeadline(data, lang, who) ?? `${data.headline[lang]} — ${who}`;
     // LinkedIn contre GitHub (§18.24) : « LinkedIn » partout où une comparaison dirait « CV ».
     const li = declaredOf(data) === "linkedin";
-    const src = li ? "LinkedIn" : "CV";
+    const src = declaredLabel(data);
     const the = li ? "LinkedIn" : fr ? "le CV" : "the CV";
     return {
       lang,
       url,
       image,
-      title: `${head} — ${name}`,
+      title,
       description: fr
         ? `${src} : ${cardLabel(data.cv, lang)}. GitHub : ${cardLabel(data.github, lang)}. Le butin : ce que ${the} déclare contre ce que le code prouve. Fais la tienne.`
         : `${src}: ${cardLabel(data.cv, lang)}. GitHub: ${cardLabel(data.github, lang)}. The loot: what ${the} claims vs what the code proves. Make yours.`,

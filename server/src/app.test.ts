@@ -929,8 +929,10 @@ describe("page /c/:id et images", () => {
     const { json } = await postCv(ctx, PDF.slice(), "leamd");
     await ctx.pipeline.wait(json.id);
     const html = await (await ctx.app.request(`/c/${json.id}`)).text();
-    // Demandée en anglais (postCv envoie lang=en).
-    expect(html).toContain("Your CV stole 7 points from your code — Léa Martin-Dubois");
+    // Demandée en anglais (postCv envoie lang=en). À la troisième personne, d'après les notes des deux fiches :
+    // l'aperçu est lu par qui n'a pas fait la fiche, jamais le « Your CV » du catalogue.
+    expect(html).toContain("<title>@leamd&#39;s code is worth 4 points more than their CV</title>");
+    expect(html).not.toContain("Your CV");
     expect(html).toContain('<meta property="og:locale" content="en_US">');
     expect(html).toContain(`/og/${json.id}.png`);
     const png = await ctx.app.request(`/og/${json.id}-portrait.png`);

@@ -380,10 +380,8 @@ const fr = {
     overall: "Globale",
     buzzHint: "BUZZ : plus bas, c'est mieux",
     switchLabel: "Fiche affichée",
-    /* Vu par un visiteur : on parle de @login à la troisième personne, sans accord. `src` : « CV » ou « LinkedIn ». */
+    /* Vu par un visiteur : on parle de @login à la troisième personne, sans accord. Le titre de l'écart est dans shared/compareText.ts. */
     them: {
-      declaredAhead: (who: string, src: string, n: number) => `Le ${src} de ${who} a volé ${n} ${n > 1 ? "points" : "point"} à son code`,
-      codeAhead: (who: string, src: string, n: number) => `Le code de ${who} vaut ${n} ${n > 1 ? "points" : "point"} de plus que son ${src}`,
       cvLabel: "Ce que son CV déclare",
       liLabel: "Ce que son LinkedIn déclare",
       ghLabel: "Ce que son GitHub prouve",
@@ -841,8 +839,6 @@ const en: Dict = {
     buzzHint: "BUZZ: lower is better",
     switchLabel: "Sheet shown",
     them: {
-      declaredAhead: (who, src, n) => `${who}'s ${src} stole ${n} ${n === 1 ? "point" : "points"} from their code`,
-      codeAhead: (who, src, n) => `${who}'s code is worth ${n} ${n === 1 ? "point" : "points"} more than their ${src}`,
       cvLabel: "What their CV claims",
       liLabel: "What their LinkedIn claims",
       ghLabel: "What their GitHub proves",

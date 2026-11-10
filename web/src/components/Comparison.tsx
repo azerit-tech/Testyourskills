@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { ComparisonData, StatCode } from "../../../shared/types";
 import { declaredOf, STAT_CODES } from "../../../shared/types";
+import { theirHeadline } from "../../../shared/compareText";
 import { pick, useT } from "../i18n";
 import { useMediaQuery } from "../lib/util";
 import { RevealCard } from "./Reveal";
@@ -74,12 +75,9 @@ function Headline({ text, tone, who }: { text: string; tone: Tone; who: string |
 }
 
 /** Le titre de l'écart : celui du serveur, qui tutoie ; pour un visiteur, à la troisième personne. */
-function headlineText(cmp: ComparisonData, who: string | null, t: ReturnType<typeof useT>["t"], lang: ReturnType<typeof useT>["lang"]): string {
-  const n = cmp.cv.overall - cmp.github.overall;
-  // À égalité, le titre ne s'adresse à personne : on garde celui du serveur.
-  if (!who || n === 0) return pick(cmp.headline, lang);
-  const src = declaredOf(cmp) === "linkedin" ? "LinkedIn" : "CV";
-  return n > 0 ? t.compare.them.declaredAhead(who, src, n) : t.compare.them.codeAhead(who, src, -n);
+function headlineText(cmp: ComparisonData, who: string | null, lang: ReturnType<typeof useT>["lang"]): string {
+  // À égalité, le titre ne s'adresse à personne : on garde celui du serveur. Même phrase que l'aperçu de lien.
+  return (who && theirHeadline(cmp, lang, who)) || pick(cmp.headline, lang);
 }
 
 interface StageProps {
@@ -132,7 +130,7 @@ export function ComparisonStage({ cmp, phase, who = null }: StageProps) {
     <div className={`cmp phase-${phase}${settled ? " is-settled" : ""}`}>
       <div className="cmp-head">
         <p className="cmp-loot">{t.compare.loot}</p>
-        <Headline text={headlineText(cmp, who, t, lang)} tone={headTone} who={who} />
+        <Headline text={headlineText(cmp, who, lang)} tone={headTone} who={who} />
       </div>
 
       {!desktop && (
