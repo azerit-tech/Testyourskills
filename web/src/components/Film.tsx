@@ -9,6 +9,7 @@
 // Sans Three.js ni WebGL. Muet : la bande-son (T3) se branche sur `FilmSound`.
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import { flushSync } from "react-dom";
 import type { CardData, Lang } from "../../../shared/types";
 import { filmPlan, hudAt, type FilmPlan } from "../../../shared/film";
 import { useT } from "../i18n";
@@ -124,7 +125,8 @@ function FilmView({ card, lang, phase, onReady, onGesture, onHandoff, onDone, on
       host,
       cover,
       onTime: (t) => {
-        setTime(t);
+        // rendu tout de suite, dans le rafraîchissement de l'image : le HUD ne retarde pas d'un cran
+        flushSync(() => setTime(t));
         cue.current(t);
       },
     });

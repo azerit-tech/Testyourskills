@@ -3,7 +3,7 @@
 // temps de la vidéo : le HUD ne peut pas se décaler de l'image. Sans DOM :
 // testé sans navigateur, et rendu tel quel côté serveur pour le clip (§18.8).
 import type { Lang } from "../types";
-import { BANDS_CLOSE, CUT_INK, FPS, GRAIN_STEP, SHAKE, SQUARE_STEP, STAR_POP, TITLE_POP, chaseShotAt, ENDINGS, type ShotId } from "./cut";
+import { BANDS_CLOSE, CUT_INK, FPS, GRAIN_STEP, SHAKE, SQUARE_STEP, STAR_POP, TITLE_FROM, TITLE_POP, chaseShotAt, ENDINGS, type ShotId } from "./cut";
 import type { FilmPlan } from "./plan";
 
 export type FilmPhase = "chase" | "ending" | "freeze" | "flash" | "over";
@@ -34,7 +34,7 @@ export interface Hud {
   bands: number;
   /** Les deux images d'encre de la bascule. */
   ink: boolean;
-  /** L'arrêt sur image : deux tons, plaque et titre (échelle du claquement). */
+  /** L'arrêt sur image : deux tons, plaque et titre (échelle du claquement, 1,2 à 1). */
   freeze: { titleScale: number } | null;
   /** Opacité du flash crème. */
   flash: number;
@@ -106,8 +106,8 @@ export function hudAt(plan: FilmPlan, t: number, lang: Lang): Hud {
     lit,
     radio,
     bands,
-    ink: frame >= cut && frame < cut + CUT_INK,
-    freeze: frozen ? { titleScale: frame - freeze < TITLE_POP ? 1.5 - (0.5 * (frame - freeze)) / TITLE_POP : 1 } : null,
+    ink: frame >= cut - 1 && frame < cut - 1 + CUT_INK,
+    freeze: frozen ? { titleScale: frame - freeze < TITLE_POP ? TITLE_FROM - ((TITLE_FROM - 1) * (frame - freeze)) / TITLE_POP : 1 } : null,
     flash: flashOpacity,
     shake,
     grain: grainAt(Math.floor(frame / GRAIN_STEP)),

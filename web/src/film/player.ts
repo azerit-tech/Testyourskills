@@ -5,8 +5,8 @@
 // vidéo : t = image présentée de A, puis coupe + image présentée de B, puis
 // l'horloge du navigateur pour le gel et le flash. Le HUD ne peut pas se
 // décaler de l'image. La coupe au niveau : quand A présente la dernière image
-// du dernier plan joué, B part et passe devant ; un cache d'encre couvre la
-// bascule jusqu'à la première image de B.
+// du dernier plan joué, l'encre la couvre, A s'arrête, B part et passe devant ;
+// l'encre reste jusqu'à la première image de B (deux images au plus).
 import { FPS, type EndingId, type FilmPlan } from "../../../shared/film";
 import { isMock } from "../lib/api";
 import { filmUnlocks, filmVideos } from "./unlock";
@@ -93,7 +93,9 @@ export interface FilmStats {
   decoded: number;
   /** Images sautées à l'affichage pendant la lecture (trous dans les images présentées). */
   skipped: number;
-  /** Bascule poursuite → fin : de la fin prévue de la dernière image de A à la première image de B (ms). */
+  /** Images de A au-delà de la coupe présentées avant l'encre (0 attendu). */
+  leaked: number;
+  /** Bascule poursuite → fin : de l'encre (à la dernière image de A) à la première image de B (ms). */
   switchMs: number | null;
   /** De l'ordre de lecture à la première image qui bouge (ms). */
   startMs: number | null;
@@ -138,8 +140,8 @@ type FrameVideo = HTMLVideoElement & {
 };
 
 const FRAME_MS = 1000 / FPS;
-/** On bascule un peu avant l'image suivante prévue : le cache d'encre doit être à l'écran avec elle. */
-const LEAD_MS = 20;
+/** Le gel part un peu avant la fin prévue de la dernière image de la fin : elle reste à l'écran. */
+const TAIL_LEAD_MS = 12;
 
 const once = (v: HTMLVideoElement, ok: string, ms = 8000) =>
   new Promise<void>((resolve, reject) => {
@@ -185,8 +187,9 @@ export function createFilmPlayer({ plan, host, cover, onTime }: Options): FilmPl
   let aLastK = -1;
   let bLastK = -1;
   let skipped = 0;
-  /** Horloge de l'écran (ms) : quand basculer sur la fin, quand geler. */
-  let switchAt = 0;
+  /** Images de A au-delà de la coupe présentées avant la bascule (doit rester 0). */
+  let leaked = 0;
+  /** Horloge de l'écran (ms) : quand geler. */
   let tailAt = 0;
   let tailBase = tailFromT;
   let tailSince = 0;
@@ -250,7 +253,17 @@ export function createFilmPlayer({ plan, host, cover, onTime }: Options): FilmPl
       if (running && mode === "chase") {
         if (aLastK >= 0 && k > aLastK + 1) skipped += k - aLastK - 1;
         if (startMs === null && playFrom && k > playK) startMs = Math.max(0, md.expectedDisplayTime - playFrom);
-        if (!switchAt && k >= plan.cut - 1) switchAt = md.expectedDisplayTime + FRAME_MS;
+        // La coupe dès que la dernière image du plan est présentée : l'encre est
+        // posée dans ce même rafraîchissement, avant que A n'ait pu présenter le
+        // plan suivant (A en garde une image d'avance, même en pause).
+        if (k >= plan.cut - 1) {
+          if (k >= plan.cut) leaked++;
+          aLastK = k;
+          aShown = (plan.cut - 1) / FPS;
+          toEnding(md.expectedDisplayTime);
+          watchA();
+          return;
+        }
       }
       aLastK = k;
       aShown = k / FPS;
@@ -283,14 +296,14 @@ export function createFilmPlayer({ plan, host, cover, onTime }: Options): FilmPl
     return tailBase + (now - tailSince) / 1000;
   }
 
-  const toEnding = (now: number) => {
-    // la coupe : l'encre d'abord, A s'arrête, B part et passe devant
+  /** La coupe (`from` : l'instant où l'encre paraît) : l'encre d'abord, A s'arrête, B part et passe devant. */
+  const toEnding = (from: number) => {
     coverOn(true);
     a.pause();
     mode = "ending";
     bShown = 0;
     bLastK = -1;
-    switchFrom = rvfc && switchAt ? switchAt : now;
+    switchFrom = from;
     show("ending");
     playVideo(b);
     if (!rvfc) {
@@ -315,10 +328,10 @@ export function createFilmPlayer({ plan, host, cover, onTime }: Options): FilmPl
     raf = 0;
     if (!running || disposed) return;
     if (mode === "chase") {
-      const due = rvfc ? switchAt > 0 && now >= switchAt - LEAD_MS : a.currentTime >= (plan.cut - 0.5) / FPS;
-      if (due || a.ended) toEnding(now);
+      // sans suivi image par image : au début de la dernière image du plan
+      if (a.ended || (!rvfc && a.currentTime >= (plan.cut - 1) / FPS)) toEnding(now);
     } else if (mode === "ending") {
-      const due = rvfc ? tailAt > 0 && now >= tailAt - LEAD_MS : b.currentTime >= (plan.endVideo - 0.5) / FPS;
+      const due = rvfc ? tailAt > 0 && now >= tailAt - TAIL_LEAD_MS : b.currentTime >= (plan.endVideo - 0.5) / FPS;
       if (due || b.ended) toTail(now);
     }
     const t = time(now);
@@ -398,7 +411,6 @@ export function createFilmPlayer({ plan, host, cover, onTime }: Options): FilmPl
     seek(t: number) {
       const T = Math.min(Math.max(0, t), plan.duration);
       const f = Math.floor(T * FPS + 1e-6);
-      switchAt = 0;
       tailAt = 0;
       over = false;
       coverOn(false);
@@ -448,7 +460,7 @@ export function createFilmPlayer({ plan, host, cover, onTime }: Options): FilmPl
         dropped += s?.droppedVideoFrames ?? 0;
         decoded += s?.totalVideoFrames ?? 0;
       }
-      return { dropped, decoded, skipped, switchMs, startMs, bytes, quality: q, frameCallbacks: rvfc, t: time() };
+      return { dropped, decoded, skipped, leaked, switchMs, startMs, bytes, quality: q, frameCallbacks: rvfc, t: time() };
     },
     dispose() {
       disposed = true;

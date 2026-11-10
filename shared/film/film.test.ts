@@ -168,14 +168,14 @@ describe("hudAt (§2.2, §5.2)", () => {
     expect(squares).toEqual(new Set(["coral", "lilac"]));
   });
 
-  it("la bascule : la poursuite jusqu'à la coupe, deux images d'encre, puis la fin ; aucune image du plan suivant", () => {
+  it("la bascule : la poursuite jusqu'à la coupe, deux images d'encre (la dernière de la poursuite, la première de la fin), puis la fin ; aucune image du plan suivant", () => {
     for (const n of LEVELS) {
       const p = filmPlan(cardAt(n));
-      const before = hudAt(p, at(p.cut - 1), "fr");
-      expect(before).toMatchObject({ phase: "chase", video: "chase", videoFrame: p.cut - 1, ink: false, shot: CHASE_SHOTS[n] });
+      expect(hudAt(p, at(p.cut - 2), "fr")).toMatchObject({ phase: "chase", video: "chase", videoFrame: p.cut - 2, ink: false, shot: CHASE_SHOTS[n] });
+      expect(hudAt(p, at(p.cut - 1), "fr")).toMatchObject({ phase: "chase", video: "chase", videoFrame: p.cut - 1, ink: true, shot: CHASE_SHOTS[n] });
       expect(hudAt(p, at(p.cut), "fr")).toMatchObject({ phase: "ending", video: "ending", videoFrame: 0, ink: true });
-      expect(hudAt(p, at(p.cut + 1), "fr").ink).toBe(true);
-      expect(hudAt(p, at(p.cut + 2), "fr")).toMatchObject({ ink: false, videoFrame: 2 });
+      expect(hudAt(p, at(p.cut + 1), "fr")).toMatchObject({ ink: false, videoFrame: 1 });
+      expect(Array.from({ length: p.frames }, (_, f) => hudAt(p, at(f), "fr").ink).filter(Boolean)).toHaveLength(2);
       for (let f = 0; f < p.frames; f++) {
         const h = hudAt(p, at(f), "fr");
         if (h.video === "chase") expect(h.videoFrame).toBeLessThan(p.cut);
@@ -184,11 +184,11 @@ describe("hudAt (§2.2, §5.2)", () => {
     }
   });
 
-  it("l'arrêt sur image : la dernière image de la fin, gelée ; le titre claque de 1,5 à 1", () => {
+  it("l'arrêt sur image : la dernière image de la fin, gelée ; le titre claque de 1,2 à 1", () => {
     const p = filmPlan(cardAt(3));
     expect(hudAt(p, at(p.freeze - 1), "fr").freeze).toBeNull();
     const h = hudAt(p, at(p.freeze), "fr");
-    expect(h).toMatchObject({ phase: "freeze", video: "ending", videoFrame: p.endVideo - 1, freeze: { titleScale: 1.5 } });
+    expect(h).toMatchObject({ phase: "freeze", video: "ending", videoFrame: p.endVideo - 1, freeze: { titleScale: 1.2 } });
     expect(hudAt(p, at(p.freeze + 4), "fr").freeze).toEqual({ titleScale: 1 });
     expect(hudAt(p, at(p.flash.from + 1), "fr").videoFrame).toBe(p.endVideo - 1);
   });
