@@ -6,7 +6,7 @@
 import type { CardData, ComparisonData, Finding, JobState, ProgressEvent, Stat, StatCode } from "../../../shared/types";
 import { FIXTURES, FIXTURE_COMPARISON } from "../../../shared/fixtures";
 import { asLinkedinCard, asLinkedinComparison } from "../../../shared/linkedinText";
-import type { CaseInfo, CreateInput, CreateResult, Jury, Verdict } from "./api";
+import type { CaseInfo, CreateInput, CreateResult, Jury, Showcase, Verdict } from "./api";
 import { ApiError } from "./errors";
 
 type FixtureKey = keyof typeof FIXTURES;
@@ -33,6 +33,8 @@ const juries = new Map<string, Jury>();
 /** Cartes dont la photo vient de LinkedIn (simulé). */
 const photos = new Set<string>();
 const MOCK_PHOTO = "/mock-linkedin.svg";
+/** La comparaison de la vitrine en démo : un id « licmp », LinkedIn contre GitHub. */
+export const MOCK_SHOWCASE_ID = "m-licmp-vitrine";
 
 const BY_LOGIN: Record<string, FixtureKey> = {
   "kevin-dev42": "bronze",
@@ -275,9 +277,12 @@ function kindFromId(id: string): Kind | null {
 }
 
 export const mockApi = {
-  /** En démo, l'accueil garde la maquette de la carte vitrine. */
-  async getShowcase(): Promise<CardData | null> {
-    return null;
+  /**
+   * En démo, la maquette de la carte vitrine, jugée avec son LinkedIn (§18.35) :
+   * les deux notes sous la carte, le lien vers une comparaison LinkedIn de démo.
+   */
+  async getShowcase(): Promise<Showcase> {
+    return { card: FIXTURES.jmougeot, href: `/c/${MOCK_SHOWCASE_ID}`, declared: { source: "linkedin", overall: 55 } };
   },
   async createCard(input: CreateInput): Promise<CreateResult> {
     await sleep(350);

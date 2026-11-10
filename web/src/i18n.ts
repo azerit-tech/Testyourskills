@@ -62,6 +62,8 @@ const fr = {
     inlineCv: "ou avec ton CV",
     exampleLabel: "Exemple de fiche",
     exampleCaption: "La vraie fiche de Jacques, fondateur d'Azerit",
+    /** Sous la fiche de Jacques, ses deux notes (§18.35), lues en entier. */
+    exampleScoresLabel: (linkedin: number, github: number) => `LinkedIn : ${linkedin} sur 100. GitHub : ${github} sur 100.`,
     /* La couverture (§18.31) : les plaques des photos d'identité, en capitales mono. */
     cover: {
       player: (login: string, rank: number) => `@${login}, n° ${rank} de la semaine`,
@@ -549,6 +551,7 @@ const en: Dict = {
     inlineCv: "or with your CV",
     exampleLabel: "Example sheet",
     exampleCaption: "The real sheet of Jacques, Azerit's founder",
+    exampleScoresLabel: (linkedin, github) => `LinkedIn: ${linkedin} out of 100. GitHub: ${github} out of 100.`,
     cover: {
       player: (login, rank) => `@${login}, #${rank} this week`,
       playerPlate: (rank, week) => `NO. ${rank} · WEEK ${week}`,

@@ -369,13 +369,25 @@ function track(event: AnalyticsEvent, cardId: string | null, meta: Record<string
   }
 }
 
-/** La vraie carte d'exemple de l'accueil (§6.1) ; null tant que le serveur ne l'a pas calculée. */
-async function getShowcase(): Promise<CardData | null> {
+/**
+ * Le vrai jugement de la vitrine (§6.1, §18.35) : sa carte GitHub, le lien vers sa
+ * fiche (la comparaison s'il y en a une) et la note de son LinkedIn, s'il est sorti.
+ */
+export interface Showcase {
+  card: CardData;
+  href: string;
+  declared?: { source: "linkedin"; overall: number };
+}
+
+/** La vitrine de l'accueil ; null tant que le serveur ne l'a pas calculée. */
+async function getShowcase(): Promise<Showcase | null> {
   if (isMock()) return mockApi.getShowcase();
   const res = await fetch("/api/showcase", { headers: { Accept: "application/json" } });
   if (!res.ok) return null;
-  const body = (await res.json()) as { card?: CardData | null };
-  return body.card ?? null;
+  const body = (await res.json()) as Partial<Showcase> & { card?: CardData | null };
+  if (!body.card) return null;
+  const declared = body.declared?.source === "linkedin" && Number.isFinite(body.declared.overall) ? body.declared : undefined;
+  return { card: body.card, href: body.href ?? `/c/${body.card.id}`, ...(declared ? { declared } : {}) };
 }
 
 /** La requête du top en cours : la couverture et le tableau de l'accueil la partagent. */

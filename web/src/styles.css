@@ -702,6 +702,26 @@ button.cover-panel:focus-visible {
 .showcase figcaption a:hover {
   color: var(--cream);
 }
+/* ses deux notes (§18.35) : sous la légende, mates, les chiffres en mono */
+.showcase figcaption {
+  display: grid;
+  justify-items: center;
+}
+.showcase figcaption .showcase-scores {
+  margin-top: -10px; /* les deux liens mènent au même endroit : leurs zones de 44 px peuvent se toucher */
+  gap: 0.35em;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.showcase-scores b {
+  font: 600 15px/1 var(--f-mono);
+}
+.showcase-scores .is-linkedin {
+  color: var(--blush);
+}
+.showcase-scores .is-github {
+  color: var(--cream);
+}
 
 @media (min-width: 900px) {
   .home-top .cover {

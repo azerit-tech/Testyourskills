@@ -5,7 +5,7 @@
 // s'affiche d'abord, la fiche calculée par le serveur la remplace dès qu'elle existe.
 // Aucun dégradé dans la page : seuls ceux de la fiche et des illustrations.
 import { useEffect, useRef, useState } from "react";
-import type { CardData, WeekTop } from "../../../shared/types";
+import type { WeekTop } from "../../../shared/types";
 import { LEVEL_LABELS, starsFor } from "../../../shared/types";
 import { FIXTURES } from "../../../shared/fixtures";
 import { CardView } from "../card/CardView";
@@ -14,25 +14,25 @@ import { EntryForm } from "../components/EntryForm";
 import { ProfileWall } from "../components/ProfileWall";
 import { WeekBoard } from "../components/WeekBoard";
 import { useT } from "../i18n";
-import { api } from "../lib/api";
+import { api, type Showcase } from "../lib/api";
 import { onLinkClick } from "../lib/router";
 
 /** Au-delà, le top est tenu pour absent : la couverture ne garde pas ses cases prunes. */
 const TOP_WAIT_MS = 3000;
 
+/** La maquette, tant que le serveur n'a pas jugé la vitrine. */
+const SHOWCASE_MOCKUP: Showcase = { card: FIXTURES.jmougeot, href: `/${FIXTURES.jmougeot.login ?? "jmougeot"}` };
+
 /** La fiche de Jacques : la maquette d'abord, la vraie dès que le serveur l'a. */
-function useShowcase(): { card: CardData; href: string } {
-  const [card, setCard] = useState<CardData>(FIXTURES.jmougeot);
-  const [real, setReal] = useState(false);
+function useShowcase(): Showcase {
+  const [showcase, setShowcase] = useState<Showcase>(SHOWCASE_MOCKUP);
 
   useEffect(() => {
     let alive = true;
     api
       .getShowcase()
-      .then((c) => {
-        if (!alive || !c) return;
-        setCard(c);
-        setReal(true);
+      .then((s) => {
+        if (alive && s) setShowcase(s);
       })
       .catch(() => undefined);
     return () => {
@@ -40,7 +40,7 @@ function useShowcase(): { card: CardData; href: string } {
     };
   }, []);
 
-  return { card, href: real ? `/c/${card.id}` : `/${card.login ?? "jmougeot"}` };
+  return showcase;
 }
 
 /** Le top de la semaine pour la couverture ; `undefined` tant qu'il n'a pas répondu. */
@@ -61,8 +61,11 @@ function useTop(): WeekTop | null | undefined {
   return top;
 }
 
-/** La fiche de Jacques : s'incline sous le pointeur, mène à sa page. */
-function ExampleCard({ card, href }: { card: CardData; href: string }) {
+/**
+ * La fiche de Jacques : s'incline sous le pointeur, mène à sa page. Jugée avec son
+ * LinkedIn (§18.35) : ses deux notes dessous, vers la comparaison.
+ */
+export function ExampleCard({ card, href, declared }: Showcase) {
   const { t, lang } = useT();
   return (
     <figure className="showcase" aria-label={`${t.home.exampleLabel} · ${t.tierCard(LEVEL_LABELS[starsFor(card.overall)][lang])}`}>
@@ -71,6 +74,11 @@ function ExampleCard({ card, href }: { card: CardData; href: string }) {
         <a href={href} onClick={(e) => onLinkClick(e, href)}>
           {t.home.exampleCaption}
         </a>
+        {declared && (
+          <a className="showcase-scores" href={href} onClick={(e) => onLinkClick(e, href)} aria-label={t.home.exampleScoresLabel(declared.overall, card.overall)}>
+            LinkedIn <b className="is-linkedin">{declared.overall}</b> · GitHub <b className="is-github">{card.overall}</b>
+          </a>
+        )}
       </figcaption>
     </figure>
   );
