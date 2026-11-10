@@ -108,6 +108,32 @@ export interface CvReading {
   school_name: string;
   /** Rang donné par l'IA ; le barème le remplace par celui de sa liste (server/src/scoring/school.ts). */
   school_tier: SchoolTier;
+  /**
+   * Sélections passées hors de l'école (§18.37, critère École et sélection),
+   * chacune avec son extrait retrouvé dans le texte lu, sinon jetée. Cinq au
+   * plus. Absent des lectures d'avant le §18.37.
+   */
+  selection_signals?: SelectionSignal[];
+  /**
+   * Un fait d'encadrement (équipe encadrée, recrutements), avec son extrait
+   * retrouvé dans le texte lu ; null sans fait, ou extrait introuvable. Absent
+   * des lectures d'avant le §18.37.
+   */
+  management_fact?: { quote: string } | null;
+}
+
+/**
+ * Sortes de sélection (§18.37, table École et sélection) : médaille
+ * internationale (10), classement cité dans un concours, prix de hackathon,
+ * programme sélectif (8), concours ou hackathon sans classement (4).
+ */
+export const SELECTION_KINDS = ["international_medal", "ranked_contest", "hackathon_prize", "selective_programme", "contest_entry"] as const;
+export type SelectionKind = (typeof SELECTION_KINDS)[number];
+
+export interface SelectionSignal {
+  kind: SelectionKind;
+  /** Extrait exact du texte lu, moins de 200 caractères. */
+  quote: string;
 }
 
 export const SCHOOL_TIERS = ["S", "A", "B", "C", "none"] as const;

@@ -2,7 +2,18 @@
 // code. Le texte n'est ni loggué ni stocké ; seuls les constats sortent d'ici (§11).
 
 import { z } from "zod";
-import { EMPLOYER_TYPES, ROLE_KINDS, SCHOOL_TIERS, type CvReading, type CvRole, type EmployerType, type RoleKind } from "../../../shared/readings";
+import {
+  EMPLOYER_TYPES,
+  ROLE_KINDS,
+  SCHOOL_TIERS,
+  SELECTION_KINDS,
+  type CvReading,
+  type CvRole,
+  type EmployerType,
+  type RoleKind,
+  type SelectionKind,
+  type SelectionSignal,
+} from "../../../shared/readings";
 import { callStructured, DEFAULT_MODEL, fence, strictJsonSchema, type ChatClient, type Validation } from "./client";
 import { CV_POSITIONS, CV_SYSTEM_PROMPT, SENIORITIES } from "./prompts/cv";
 import { clip, locate, scrubContact } from "./text";
@@ -14,6 +25,7 @@ const MAX_ROLES = 15;
 const MAX_RESPONSIBILITIES = 6;
 const MAX_TECHNOS = 80;
 const MAX_MENTIONS = 10;
+const MAX_SIGNALS = 5;
 
 const Level = z.literal([1, 2, 3, 4, 5]);
 
@@ -45,6 +57,8 @@ const ApiSchema = z.object({
   describes_ai_project: z.boolean(),
   school_name: z.string(),
   school_tier: z.enum(SCHOOL_TIERS),
+  selection_signals: z.array(z.object({ kind: z.enum(SELECTION_KINDS), quote: z.string() })),
+  management_quote: z.string(),
 });
 export const CV_OUTPUT_SCHEMA = strictJsonSchema(ApiSchema);
 
@@ -53,6 +67,8 @@ export const CV_OUTPUT_SCHEMA = strictJsonSchema(ApiSchema);
 // retirés) : une étiquette ratée ne fait pas tomber toute la lecture.
 const RawSchema = ApiSchema.extend({
   roles: z.array(ApiRole.extend({ employer_type: z.string().optional(), kind: z.string().optional() })),
+  selection_signals: z.array(z.object({ kind: z.string(), quote: z.string() })).optional(),
+  management_quote: z.string().optional(),
   years_declared: z.number().min(0).max(60),
   projects_with_dated_outcome: z.number().int().min(0),
   writing_quality: z.number().int().min(1).max(5),
@@ -151,6 +167,16 @@ export function validateCvOutput(raw: unknown, cvText: string): Validation<CvRea
     if (mentions.length >= MAX_MENTIONS) break;
   }
 
+  // Signaux de sélection et fait d'encadrement : un extrait retrouvé dans le texte, sinon rien.
+  const signals: SelectionSignal[] = [];
+  for (const s of d.selection_signals ?? []) {
+    const kind = inList<SelectionKind>(SELECTION_KINDS, s.kind);
+    const found = kind ? locate(cvText, s.quote, true) : null;
+    if (kind && found && !signals.some((x) => x.quote === clip(found))) signals.push({ kind, quote: clip(scrubContact(clip(found))) });
+    if (signals.length >= MAX_SIGNALS) break;
+  }
+  const managed = d.management_quote ? locate(cvText, d.management_quote, true) : null;
+
   const name = d.full_name ? clip(scrubContact(d.full_name), 80) : "";
 
   // L'école doit figurer dans le texte (espaces, accents et ponctuation ignorés) :
@@ -184,6 +210,8 @@ export function validateCvOutput(raw: unknown, cvText: string): Validation<CvRea
       describes_ai_project: d.describes_ai_project,
       school_name: hasSchool ? school : "",
       school_tier: hasSchool ? d.school_tier : "none",
+      ...(d.selection_signals !== undefined ? { selection_signals: signals } : {}),
+      ...(d.management_quote !== undefined ? { management_fact: managed ? { quote: clip(scrubContact(clip(managed))) } : null } : {}),
     },
   };
 }

@@ -138,6 +138,53 @@ describe("readCv", () => {
     expect(roleKind("job", "INSA Lyon Group", "")).toBe("job");
   });
 
+  it("signaux de sélection et fait d'encadrement : un extrait retrouvé dans le texte, sinon jeté", async () => {
+    const text =
+      CV +
+      "\nDistinctions : 1er prix du Hackathon Rhône Numérique 2018. Participation à Prologin 2016.\nEncadrement d'une équipe de 3 développeurs sur l'API.";
+    const res = (await readCv(text, {
+      client: fakeClient([
+        {
+          ...VALID,
+          selection_signals: [
+            { kind: "hackathon_prize", quote: "1er prix du Hackathon  Rhône Numérique 2018" }, // espaces tolérés
+            { kind: "contest_entry", quote: "participation à prologin 2016" }, // casse tolérée
+            { kind: "international_medal", quote: "Médaille d'or aux IOI 2015" }, // inventée : jetée
+            { kind: "high_bar_employer", quote: "Parcelio" }, // sorte hors liste : jetée
+            { kind: "hackathon_prize", quote: "1er prix du Hackathon Rhône Numérique 2018" }, // doublon
+          ],
+          management_quote: "Encadrement d'une équipe de 3 développeurs sur l'API.",
+        },
+      ]).client,
+    }))!;
+    expect(res.selection_signals).toEqual([
+      { kind: "hackathon_prize", quote: "1er prix du Hackathon Rhône Numérique 2018" },
+      { kind: "contest_entry", quote: "Participation à Prologin 2016" },
+    ]);
+    expect(res.management_fact).toEqual({ quote: "Encadrement d'une équipe de 3 développeurs sur l'API." });
+
+    const invented = (await readCv(text, { client: fakeClient([{ ...VALID, selection_signals: [], management_quote: "Managed a team of 40 engineers" }]).client }))!;
+    expect(invented.selection_signals).toEqual([]);
+    expect(invented.management_fact).toBeNull();
+    const none = (await readCv(text, { client: fakeClient([{ ...VALID, selection_signals: [], management_quote: "" }]).client }))!;
+    expect(none.management_fact).toBeNull();
+    // Une lecture d'avant le §18.37 : ni l'un ni l'autre.
+    const old = (await readCv(text, { client: fakeClient([VALID]).client }))!;
+    expect("selection_signals" in old || "management_fact" in old).toBe(false);
+  });
+
+  it("le schéma exige les signaux et l'encadrement, sans champ sensible", () => {
+    const schema = CV_OUTPUT_SCHEMA as { required: string[]; properties: Record<string, { items?: { properties: Record<string, { enum?: string[] }> } }> };
+    expect(schema.required).toEqual(expect.arrayContaining(["selection_signals", "management_quote"]));
+    expect(schema.properties.selection_signals.items!.properties.kind.enum).toEqual([
+      "international_medal",
+      "ranked_contest",
+      "hackathon_prize",
+      "selective_programme",
+      "contest_entry",
+    ]);
+  });
+
   it("encadre le CV dans le message utilisateur, système en cache", async () => {
     const { client, calls } = fakeClient([VALID]);
     await readCv(CV, { client });
