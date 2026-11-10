@@ -79,6 +79,7 @@ interface RestRepo {
   size: number;
   default_branch: string;
   owner: { login: string };
+  homepage?: string | null;
 }
 
 type Progress = (e: { key: string; n?: number }) => void;
@@ -343,6 +344,7 @@ function toRepo(r: RestRepo): GithubRepo {
     license: r.license?.spdx_id && r.license.spdx_id !== "NOASSERTION" ? r.license.spdx_id : null,
     sizeKb: r.size,
     defaultBranch: r.default_branch,
+    homepage: homepageOf(r.homepage),
     recentUserCommits: null,
     activity: 0,
     commitCount: null,
@@ -352,6 +354,25 @@ function toRepo(r: RestRepo): GithubRepo {
     readmeWords: null,
     releaseDates: null,
   };
+}
+
+/**
+ * Le site d'un dépôt (champ `homepage`), en adresse https ou http complète ;
+ * une adresse sans protocole reçoit https. Vide, illisible ou hors web : null.
+ */
+export function homepageOf(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const s = v.trim();
+  if (!s || s.length > 300 || /\s/.test(s)) return null;
+  const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(s) ? s : `https://${s}`;
+  try {
+    const u = new URL(withScheme);
+    if (u.protocol !== "https:" && u.protocol !== "http:") return null;
+    if (!u.hostname.includes(".") || u.username || u.password) return null;
+    return u.toString();
+  } catch {
+    return null;
+  }
 }
 
 /** Compte les commits des candidats, puis cherche le plus ancien commit de l'utilisateur dans ceux qui en ont 10 ou plus. */

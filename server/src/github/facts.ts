@@ -37,6 +37,11 @@ export interface GithubRepo {
   license: string | null;
   sizeKb: number;
   defaultBranch: string;
+  /**
+   * Site du dépôt (champ `homepage` de GitHub), adresse http(s) complète, null
+   * si vide (§18.37 : « publié, un site en ligne »). Absent des faits d'avant.
+   */
+  homepage?: string | null;
   /** Commits de l'utilisateur sur 12 mois (calendrier GitHub), null si inconnu. */
   recentUserCommits: number | null;
   /** Poids d'activité (commits récents + fraîcheur du dernier push), sert au classement et à TEC. */

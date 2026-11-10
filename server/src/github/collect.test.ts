@@ -2,7 +2,7 @@
 // compte les requêtes d'une fiche, et vérifie ce que la collecte garde.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { collectGithub, externalPRList } from "./collect";
+import { collectGithub, externalPRList, homepageOf } from "./collect";
 
 const LOGIN = "fictif-dev";
 const NOW = Date.now();
@@ -218,6 +218,29 @@ describe("arbres et dépôts", () => {
     const { facts } = await collect();
     expect(facts.trees.find((t) => t.repo === "atelier")?.agentFiles).toEqual([".cursor/rules/style.mdc", "CLAUDE.md"]);
     expect(facts.trees.find((t) => t.repo === "notes")?.agentFiles).toEqual([]);
+  });
+});
+
+describe("site d'un dépôt (homepage)", () => {
+  it("gardé depuis la liste des dépôts, déjà dans la réponse", async () => {
+    const { facts } = await collect();
+    const by = Object.fromEntries(facts.repos.map((r) => [r.name, r.homepage]));
+    expect(by).toEqual({ atelier: "https://atelier.example.dev/", notes: null, vieux: null });
+  });
+  it.each([
+    ["https://atelier.example.dev", "https://atelier.example.dev/"],
+    ["atelier.example.dev/docs", "https://atelier.example.dev/docs"],
+    ["http://x.example.org", "http://x.example.org/"],
+    ["", null],
+    ["   ", null],
+    [null, null],
+    ["javascript:void(0)", null],
+    ["ftp://files.example.org", null],
+    ["localhost", null],
+    ["pas une adresse", null],
+    ["https://user:pw@x.example.org", null],
+  ])("homepageOf(%j) = %j", (v, out) => {
+    expect(homepageOf(v)).toBe(out);
   });
 });
 
