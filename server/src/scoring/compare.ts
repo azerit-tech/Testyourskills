@@ -17,7 +17,9 @@ export function compareCards(cv: CardData, github: CardData): Omit<ComparisonDat
   const tpl = n > 0 ? STATUSES.comparison.cvAhead : n < 0 ? STATUSES.comparison.codeAhead : STATUSES.comparison.even;
   const vars = { n: Math.abs(n) };
   // Les deux fiches décrivent la même personne : l'écart vaut pour l'une comme pour l'autre.
-  const comparison: ProfileCtx["comparison"] = { cvOverall: cv.overall, githubOverall: github.overall, cvBuzz: value(cv, "BUZZ") };
+  // Un GitHub vide (« dossier vide », note plancher) ne prouve rien : son écart avec le CV ne fait pas un Faussaire.
+  const githubEmpty = github.grid?.rule === "empty_file";
+  const comparison: ProfileCtx["comparison"] = { cvOverall: cv.overall, githubOverall: github.overall, cvBuzz: value(cv, "BUZZ"), ...(githubEmpty ? { githubEmpty } : {}) };
   const withProfile = (c: CardData): CardData => {
     const profile = profileWithComparison(c.profile, { stats: valuesOf(c.stats), comparison });
     return profile === c.profile ? c : { ...c, profile };

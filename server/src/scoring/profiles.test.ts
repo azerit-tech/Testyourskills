@@ -90,6 +90,8 @@ describe("un profil par règle, dans l'ordre de priorité", () => {
   it("Faussaire : le CV vaut 15 points de plus que le code", () => {
     expect(pick({ comparison: { cvOverall: 75, githubOverall: 60, cvBuzz: 20 } })).toBe("forger");
     expect(pick({ comparison: { cvOverall: 74, githubOverall: 60, cvBuzz: 20 } })).toBe("sleeper_agent");
+    // Face à un GitHub vide (« dossier vide »), l'écart ne prouve rien.
+    expect(pick({ comparison: { cvOverall: 75, githubOverall: 20, cvBuzz: 20, githubEmpty: true } })).toBe("sleeper_agent");
   });
 
   it("Faussaire : BUZZ du CV à 85 ou plus, jamais le BUZZ d'une fiche GitHub", () => {

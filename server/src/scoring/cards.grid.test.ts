@@ -76,6 +76,24 @@ describe("les fiches prennent la note de la grille", () => {
     expect(cmp.github.grid?.overall).toBe(cmp.github.overall);
   });
 
+  it("Faussaire : seuil de 15 points sur les notes de grille, jamais face à un GitHub vide", () => {
+    // Jacques : le code passe devant le profil (41 contre 61), pas de Faussaire.
+    const j = jacques().cmp;
+    expect(j.cv.profile?.id).not.toBe("forger");
+    expect(j.github.profile?.id).not.toBe("forger");
+    // Lumine : 25 points d'écart, mais un GitHub vide ne prouve rien.
+    const l = lumine().cmp;
+    expect(l.cv.overall - l.github.overall).toBeGreaterThanOrEqual(15);
+    expect(l.cv.profile?.id).not.toBe("forger");
+    expect(l.github.profile?.id).not.toBe("forger");
+    // Le seuil reste 15 points dès que le GitHub prouve quelque chose.
+    const { github, linkedin } = jacques();
+    const forged = compareCards(card({ ...linkedin, overall: github.overall + 15 }, "li"), card(github, "gh"));
+    expect(forged.cv.profile?.id).toBe("forger");
+    const even = compareCards(card({ ...linkedin, overall: github.overall + 14 }, "li"), card(github, "gh"));
+    expect(even.cv.profile?.id).not.toBe("forger");
+  });
+
   it("une fiche d'avant 0.4.0 (sans grille) : pas de note du dossier, pas de plantage", () => {
     const { github, linkedin } = jacques();
     const { grid: _g, ...old } = github;

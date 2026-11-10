@@ -10,18 +10,18 @@ import { RULES, type RuleCtx, type Vars } from "./rules";
 import { fillTemplate } from "./statuses";
 
 export interface ProfileCtx extends RuleCtx {
-  /** Comparaison CV contre GitHub (§6.5) : notes globales et BUZZ du CV. */
-  comparison?: { cvOverall: number; githubOverall: number; cvBuzz: number };
+  /** Comparaison CV contre GitHub (§6.5) : notes globales et BUZZ du CV. `githubEmpty` : la fiche GitHub est un dossier vide. */
+  comparison?: { cvOverall: number; githubOverall: number; cvBuzz: number; githubEmpty?: boolean };
 }
 
 type ProfileRule = (ctx: ProfileCtx, p: Record<string, number>) => Vars | null;
 
 /** Règles propres aux profils, en plus de celles des statuts. */
 export const PROFILE_RULES: Record<string, ProfileRule> = {
-  /** Le CV vaut `atLeast` points de plus que le code : seulement en comparaison. */
+  /** Le CV vaut `atLeast` points de plus que le code : seulement en comparaison, et jamais face à un GitHub vide. */
   cv_ahead_of_code: (c, p) => {
     const x = c.comparison;
-    if (!x) return null;
+    if (!x || x.githubEmpty) return null;
     const n = x.cvOverall - x.githubOverall;
     return n >= p.atLeast ? { n, t: p.atLeast } : null;
   },
