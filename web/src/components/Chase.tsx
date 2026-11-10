@@ -14,6 +14,7 @@ import { isMock } from "../lib/api";
 import { readMuted, unlockAudio, writeMuted } from "../lib/audio";
 import { createChaseSound, type ChaseSound } from "../lib/chaseSound";
 import type { Phase } from "./Reveal";
+import "../card/fonts.css";
 
 /** Après le flash, le temps que la poursuite s'efface sur la fiche (styles.css, .chase-stage.is-fading). */
 const FADE = 0.55;
