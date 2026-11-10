@@ -35,6 +35,10 @@
         "caption": "2019 - 2021"
       }
     ],
+    "honorsAndAwards": [
+      { "title": "Bourse d'excellence Brumes", "subtitle": "Délivré par Fondation Brumes · sept. 2020" },
+      { "title": "Finaliste, concours national de data", "subtitle": "2019" }
+    ],
     "skills": [{ "title": "Python" }, { "title": "Apache Spark" }, { "title": "python" }],
     "contactInfo": { "websites": ["https://sacha.example.org"] }
   }

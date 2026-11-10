@@ -50,6 +50,15 @@
         "period": "2014 - 2019"
       }
     ],
+    "honorsAndAwards": [
+      {
+        "title": "1er prix, Hackathon Rhône Numérique 2018",
+        "issuedBy": "Association Rhône Numérique",
+        "issuedAt": "Nov 2018",
+        "description": "Application de covoiturage pour les étudiants, prototypée en 48 h."
+      },
+      { "title": "" }
+    ],
     "skills": [{ "name": "TypeScript", "endorsements": "12" }, { "name": "React" }, { "name": "Node.js" }],
     "topSkills": "TypeScript • React • Node.js"
   }

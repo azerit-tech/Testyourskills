@@ -13,7 +13,7 @@
 // aucun champ de contact n'est lu, hormis les liens vers un GitHub.
 
 import { normalizeLinkedinUrl } from "../../../shared/entry";
-import { buildProfile, clip, firstContract, withContract, yearOf, type ContractType, type LinkedinProfile, type LinkedinProvider, type LinkedinRole, type LinkedinSchool, type ProviderResult } from "./profile";
+import { buildProfile, clip, firstContract, honorOf, withContract, yearOf, type ContractType, type LinkedinProfile, type LinkedinProvider, type LinkedinRole, type LinkedinSchool, type ProviderResult } from "./profile";
 
 export const APIFY_API = "https://api.apify.com/v2";
 /** Acteur par défaut : sans cookies, sans email (4 $ les 1 000 profils au 9 novembre 2026). */
@@ -219,6 +219,27 @@ function skillsOf(item: Obj): unknown[] {
   return arr(raw).map((s) => (typeof s === "string" ? s : text(pick(obj(s), "name", "title", "skill"))));
 }
 
+/**
+ * La section « Honors & awards », quelle que soit sa forme : { title, issuedBy,
+ * issuedAt, description } (harvestapi), ou { title, subtitle: "Issued by X ·
+ * Jan 2024" } (dev_fusion). Forme exacte à vérifier sur un vrai profil.
+ */
+function honorsOf(item: Obj) {
+  return arr(pick(item, "honorsAndAwards", "honors", "awards", "honorsAwards", "honors_and_awards")).map((raw) => {
+    const o = obj(raw);
+    if (!o) return null;
+    const sub = text(pick(o, "subtitle", "caption")).replace(/^(issued by|awarded by|délivré par|décerné par|attribué par)\s+/i, "");
+    const [subIssuer, subDate] = sub.split("·").map((x) => x.trim());
+    const when = whenOf(pick(o, "issuedAt", "issueDate", "issued_date", "date", "issuedOn") ?? subDate ?? (whenOf(subIssuer) ? subIssuer : undefined));
+    return honorOf({
+      title: text(pick(o, "title", "name", "award")),
+      issuer: text(pick(o, "issuedBy", "issuer", "issuer_name", "organization")) || (subIssuer && !whenOf(subIssuer) ? subIssuer : ""),
+      date: when === "present" ? null : when,
+      description: prose(pick(o, "description", "summary")),
+    });
+  });
+}
+
 /** Un élément de jeu de données d'un acteur → profil réduit, ou null s'il est vide. */
 export function profileFromApifyItem(url: string, raw: unknown): LinkedinProfile | null {
   const item = obj(raw);
@@ -237,6 +258,7 @@ export function profileFromApifyItem(url: string, raw: unknown): LinkedinProfile
     roles,
     education: arr(pick(item, "education", "educations", "schools")).map(schoolOf),
     skills: skillsOf(item),
+    honors: honorsOf(item),
   });
 }
 

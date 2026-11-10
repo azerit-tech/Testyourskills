@@ -206,6 +206,40 @@ describe("forUrl (entrée LinkedIn)", () => {
   });
 });
 
+describe("profil gardé (§18.37)", () => {
+  it("type de contrat et distinctions passent la base ; un profil gardé avant se relit", () => {
+    const cache = new LinkedinCache(new Database(":memory:"));
+    const url = "https://www.linkedin.com/in/nouveau";
+    const p: LinkedinProfile = {
+      url,
+      name: "N",
+      headline: "Dev",
+      title: "Dev",
+      summary: "",
+      roles: [{ title: "Stagiaire", company: "Acme", start: "2025-02", end: "2025-11", description: "", contract: "internship" }],
+      education: [],
+      skills: [],
+      honors: [{ title: "Prix du jury", issuer: "Hackathon X", date: "2024-05", description: "" }],
+      photoUrl: "https://media.example.invalid/n.jpg",
+    };
+    cache.putProfile(url, p, null);
+    const got = cache.getProfile(url);
+    expect(got).toMatchObject({ found: true });
+    const kept = (got as { profile: LinkedinProfile }).profile;
+    expect(kept.roles[0]!.contract).toBe("internship");
+    expect(kept.honors).toEqual(p.honors);
+    expect(kept.photoUrl).toBeUndefined();
+    // Un profil gardé avant le §18.37 : ni contrat ni distinctions, il se relit et se met en texte.
+    const old = "https://www.linkedin.com/in/ancien";
+    const { honors: _h, photoUrl: _p, ...rest } = p;
+    cache.putProfile(old, { ...rest, url: old, roles: [{ title: "Dev", company: "Acme", start: "2020-01", end: null, description: "" }] }, null);
+    const oldKept = (cache.getProfile(old) as { profile: LinkedinProfile }).profile;
+    expect(oldKept.honors).toBeUndefined();
+    expect(oldKept.roles[0]!.contract).toBeUndefined();
+    expect(profileToText(oldKept)).toContain("Dev — Acme (2020-01 – present)");
+  });
+});
+
 describe("configuration", () => {
   it("apify par défaut, sans jeton : absente", () => {
     expect(linkedinEnv({})).toBeNull();

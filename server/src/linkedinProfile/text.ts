@@ -40,5 +40,12 @@ export function profileToText(p: LinkedinProfile): string {
     }
   }
   if (p.skills.length) out.push("", "Skills", p.skills.join(", "));
+  if (p.honors?.length) {
+    out.push("", "Honors and awards");
+    for (const h of p.honors) {
+      out.push(`${h.title}${h.issuer ? ` — ${h.issuer}` : ""}${h.date ? ` (${h.date})` : ""}`);
+      if (h.description) out.push(h.description);
+    }
+  }
   return out.join("\n").trim();
 }

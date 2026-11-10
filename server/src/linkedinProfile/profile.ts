@@ -1,6 +1,6 @@
 // Profil LinkedIn réduit à ce qui sert au jugement (SPEC §18.24) : titre,
 // résumé, postes (intitulé, entreprise, dates, description, type de contrat),
-// formation, compétences, adresse du profil. Ni âge, ni lieu, ni langue parlée,
+// formation, compétences, distinctions et prix, adresse du profil. Ni âge, ni lieu, ni langue parlée,
 // ni photo, ni contact : le reste de la réponse du fournisseur est jeté ici,
 // avant tout stockage.
 
@@ -31,6 +31,16 @@ export interface LinkedinSchool {
   end: number | null;
 }
 
+/** Une distinction ou un prix de la section « Honors & awards » (§18.37, critère École et sélection). */
+export interface LinkedinHonor {
+  title: string;
+  /** Qui l'a décerné ; "" s'il n'est pas dit. */
+  issuer: string;
+  /** "AAAA-MM" ou null. */
+  date: string | null;
+  description: string;
+}
+
 export interface LinkedinProfile {
   url: string;
   name: string;
@@ -40,6 +50,8 @@ export interface LinkedinProfile {
   roles: LinkedinRole[];
   education: LinkedinSchool[];
   skills: string[];
+  /** Distinctions et prix, dix au plus ; absent s'il n'y en a pas (et dans les profils gardés avant le §18.37). */
+  honors?: LinkedinHonor[];
   /** Photo, si le fournisseur la donne. Jamais gardée en cache (store.ts). */
   photoUrl?: string;
 }
@@ -66,6 +78,7 @@ export interface LinkedinProvider {
 export const MAX_ROLES = 15;
 export const MAX_SCHOOLS = 6;
 export const MAX_SKILLS = 50;
+export const MAX_HONORS = 10;
 
 export const clip = (v: unknown, n: number): string => (typeof v === "string" ? v.replace(/\s+\n/g, "\n").trim().slice(0, n) : "");
 
@@ -122,6 +135,14 @@ export interface ProfileParts {
   roles: (LinkedinRole | null)[];
   education: (LinkedinSchool | null)[];
   skills: unknown[];
+  honors?: (LinkedinHonor | null)[];
+}
+
+/** Une distinction lue, bornée ; null sans titre. */
+export function honorOf(h: { title?: unknown; issuer?: unknown; date?: unknown; description?: unknown }): LinkedinHonor | null {
+  const title = clip(h.title, 160);
+  if (!title) return null;
+  return { title, issuer: clip(h.issuer, 160), date: monthOf(h.date), description: clip(h.description, 400) };
 }
 
 /** Profil réduit, ou null s'il est vide (ni nom, ni titre, ni poste). */
@@ -138,6 +159,11 @@ export function buildProfile(p: ProfileParts): LinkedinProfile | null {
     .map((s) => clip(s, 40))
     .filter((s) => s && !seen.has(s.toLowerCase()) && seen.add(s.toLowerCase()))
     .slice(0, MAX_SKILLS);
+  const seenHonors = new Set<string>();
+  const honors = (p.honors ?? [])
+    .filter((h): h is LinkedinHonor => h !== null && !!h.title)
+    .filter((h) => !seenHonors.has(h.title.toLowerCase()) && !!seenHonors.add(h.title.toLowerCase()))
+    .slice(0, MAX_HONORS);
   const photo = clip(p.photoUrl, 500);
   const profile: LinkedinProfile = {
     url: p.url,
@@ -148,6 +174,7 @@ export function buildProfile(p: ProfileParts): LinkedinProfile | null {
     roles,
     education,
     skills,
+    ...(honors.length ? { honors } : {}),
     ...(/^https:\/\//.test(photo) ? { photoUrl: photo } : {}),
   };
   if (!profile.name && !profile.headline && !profile.title && !roles.length) return null;
@@ -193,5 +220,16 @@ export function profileFromPersonData(url: string, data: unknown): LinkedinProfi
       return { school: clip(o.school, 120), degree: clip(o.degree, 120), field: clip(o.field_of_study, 120), start: yearOf(o.start_year), end: yearOf(o.end_year) };
     }),
     skills: list(d.skills?.professional_network_skills),
+    // Forme non vérifiée sur un vrai profil : liste à plat, ou sous `honors.honors`.
+    honors: [...list(d.honors), ...list(d.honors?.honors)].map((raw) => {
+      const h = obj(raw);
+      if (!h) return null;
+      return honorOf({
+        title: h.title ?? h.name,
+        issuer: h.issuer ?? h.issued_by ?? h.issuer_name,
+        date: h.issued_date ?? h.issue_date ?? h.date ?? h.issued_on,
+        description: h.description,
+      });
+    }),
   });
 }

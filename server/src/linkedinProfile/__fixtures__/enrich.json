@@ -78,6 +78,14 @@
             ]
           },
           "skills": { "professional_network_skills": ["TypeScript", "React", "Node.js", "PostgreSQL", "Agile", "typescript"] },
+          "honors": [
+            {
+              "title": "1er prix, Hackathon Rhône Numérique 2018",
+              "issuer": "Association Rhône Numérique",
+              "issued_date": "2018-11-01T00:00:00+00:00",
+              "description": "Application de covoiturage pour les étudiants, prototypée en 48 h."
+            }
+          ],
           "social_handles": {
             "professional_network_identifier": { "profile_url": "https://www.linkedin.com/in/camille-ardent" },
             "dev_platform_identifier": { "profile_url": "https://github.com/camille-ardent" }

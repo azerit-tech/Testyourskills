@@ -45,7 +45,7 @@ describe("enrichissement (POST /person/enrich)", () => {
     expect(c.url).toBe("https://api.crustdata.com/person/enrich");
     expect(c.headers.authorization).toBe(`Bearer ${KEY}`);
     expect(c.headers["x-api-version"]).toBe(CRUSTDATA_VERSION);
-    expect(c.body).toEqual({ professional_network_profile_urls: [URL_], fields: ["basic_profile", "experience", "education", "skills"] });
+    expect(c.body).toEqual({ professional_network_profile_urls: [URL_], fields: ["basic_profile", "experience", "education", "skills", "honors"] });
     // Jamais de contact, jamais de temps réel.
     expect(JSON.stringify(c.body)).not.toMatch(/contact|email|phone|realtime|social_posts/);
     expect(r.credits).toBe(1);
@@ -61,8 +61,18 @@ describe("enrichissement (POST /person/enrich)", () => {
     expect(p.education[0]).toEqual({ school: "INSA Lyon", degree: "Diplôme d'ingénieur", field: "Informatique", start: 2014, end: 2019 });
     // Doublon de casse retiré.
     expect(p.skills).toEqual(["TypeScript", "React", "Node.js", "PostgreSQL", "Agile"]);
-    // Ni lieu, ni photo, ni identifiant Crustdata : rien qui ne serve au jugement.
-    expect(JSON.stringify(p)).not.toMatch(/Lyon, Auvergne|media\.example|9900001|location/);
+    expect(p.honors).toEqual([
+      {
+        title: "1er prix, Hackathon Rhône Numérique 2018",
+        issuer: "Association Rhône Numérique",
+        date: "2018-11",
+        description: "Application de covoiturage pour les étudiants, prototypée en 48 h.",
+      },
+    ]);
+    // Ni lieu, ni langue parlée, ni photo, ni identifiant Crustdata : rien qui ne serve au jugement.
+    expect(JSON.stringify(p)).not.toMatch(/Lyon, Auvergne|media\.example|9900001|location|languages|French|English|seniority/);
+    expect(Object.keys(p).sort()).toEqual(["education", "headline", "honors", "name", "roles", "skills", "summary", "title", "url"]);
+    for (const r of p.roles) for (const k of Object.keys(r)) expect(["title", "company", "start", "end", "description", "contract"]).toContain(k);
   });
 
   it("entrée LinkedIn : ajoute l'adresse GitHub seule (+1 crédit) et la lit", async () => {
@@ -73,6 +83,7 @@ describe("enrichissement (POST /person/enrich)", () => {
       "experience",
       "education",
       "skills",
+      "honors",
       "dev_platform_profiles.profile_url",
       "social_handles.dev_platform_identifier.profile_url",
     ]);
@@ -94,7 +105,7 @@ describe("enrichissement (POST /person/enrich)", () => {
     const denied = { error: { type: "permission_error", message: "Access denied to fields: skills", metadata: [{ denied_fields: ["skills"] }] } };
     const f = fakeFetch(json(denied, 403), json(enrichFixture));
     const r = await client(f.impl).enrich(URL_);
-    expect(f.calls[1]!.body.fields).toEqual(["basic_profile", "experience", "education"]);
+    expect(f.calls[1]!.body.fields).toEqual(["basic_profile", "experience", "education", "honors"]);
     expect(r.profile?.name).toBe("Camille Ardent");
   });
 

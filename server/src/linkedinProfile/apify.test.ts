@@ -87,6 +87,15 @@ describe("normaliseur tolérant : deux formes de sortie", () => {
     ]);
     expect(p.education).toEqual([{ school: "INSA Lyon", degree: "Diplôme d'ingénieur", field: "Informatique", start: 2014, end: 2019 }]);
     expect(p.skills).toEqual(["TypeScript", "React", "Node.js"]);
+    // Distinctions : la vide est écartée.
+    expect(p.honors).toEqual([
+      {
+        title: "1er prix, Hackathon Rhône Numérique 2018",
+        issuer: "Association Rhône Numérique",
+        date: "2018-11",
+        description: "Application de covoiturage pour les étudiants, prototypée en 48 h.",
+      },
+    ]);
     // Rien du lieu, rien des langues parlées.
     expect(JSON.stringify(p)).not.toMatch(/Auvergne|Français|Native|languages|location/);
   });
@@ -106,6 +115,15 @@ describe("normaliseur tolérant : deux formes de sortie", () => {
     expect(p.roles[0]!.description).toBe("Migration des pipelines vers Airflow.");
     expect(p.education).toEqual([{ school: "Université de Nantes", degree: "Master, Statistique", field: "", start: 2019, end: 2021 }]);
     expect(p.skills).toEqual(["Python", "Apache Spark"]);
+    // Distinctions en légende : « Délivré par X · date », ou la date seule.
+    expect(p.honors).toEqual([
+      { title: "Bourse d'excellence Brumes", issuer: "Fondation Brumes", date: "2020-09", description: "" },
+      { title: "Finaliste, concours national de data", issuer: "", date: "2019-01", description: "" },
+    ]);
+  });
+
+  it("sans distinction : pas de clé honors", () => {
+    expect("honors" in profileFromApifyItem(URL_, { fullName: "X", headline: "Dev" })!).toBe(false);
   });
 
   it("sans type de contrat lisible : pas de clé", () => {
@@ -165,10 +183,34 @@ describe("type de contrat d'un poste", () => {
     expect(contractOf(v)).toBe(out);
   });
 
+  it("distinctions dans le texte lu par l'IA", () => {
+    const t = profileToText(profileFromApifyItem(URL_, harvest[0])!);
+    expect(t).toContain("Honors and awards\n1er prix, Hackathon Rhône Numérique 2018 — Association Rhône Numérique (2018-11)\nApplication de covoiturage");
+  });
+
   it("passe dans le texte lu par l'IA, à côté du poste", () => {
     const t = profileToText(profileFromApifyItem(URL_, harvest[0])!);
     expect(t).toContain("Développement web en alternance — Imprimerie Lumen · Apprenticeship (work-study) (2017-09 – 2018-08)");
     expect(t).toContain("Senior Full-Stack Engineer — Paysolde · Full-time (2022-03 – present)");
+  });
+});
+
+describe("ce qui est gardé, et rien de plus", () => {
+  // Les seules clés d'un profil réduit : ni âge, ni lieu, ni langue parlée, ni contact.
+  const PROFILE_KEYS = ["url", "name", "headline", "title", "summary", "roles", "education", "skills", "honors", "photoUrl"];
+  const ROLE_KEYS = ["title", "company", "start", "end", "description", "contract"];
+  const SCHOOL_KEYS = ["school", "degree", "field", "start", "end"];
+  const HONOR_KEYS = ["title", "issuer", "date", "description"];
+  it.each([
+    ["harvestapi", harvest[0]],
+    ["dev_fusion", fusion[0]],
+  ])("%s : clés connues seulement", (_name, item) => {
+    const p = profileFromApifyItem(URL_, item)!;
+    for (const k of Object.keys(p)) expect(PROFILE_KEYS, k).toContain(k);
+    for (const r of p.roles) for (const k of Object.keys(r)) expect(ROLE_KEYS, k).toContain(k);
+    for (const s of p.education) for (const k of Object.keys(s)) expect(SCHOOL_KEYS, k).toContain(k);
+    for (const h of p.honors ?? []) for (const k of Object.keys(h)) expect(HONOR_KEYS, k).toContain(k);
+    expect(JSON.stringify(p)).not.toMatch(/location|languages|Lyon, |Français|sacha\.example|camille\.example|birth|age"/i);
   });
 });
 

@@ -29,8 +29,12 @@ export const ENRICH_CREDITS = 1;
 /** Profil de base + profils de plateformes dev (le GitHub de la personne). */
 export const ENRICH_DEV_CREDITS = 2;
 
-/** Champs demandés à l'enrichissement : ce qui sert au jugement, rien d'autre. */
-export const ENRICH_FIELDS = ["basic_profile", "experience", "education", "skills"] as const;
+/**
+ * Champs demandés à l'enrichissement : ce qui sert au jugement, rien d'autre.
+ * `honors` (distinctions et prix, §18.37) : groupe de la base, sans supplément
+ * d'après la doc ; refusé par le compte (403), il est retiré comme les autres.
+ */
+export const ENRICH_FIELDS = ["basic_profile", "experience", "education", "skills", "honors"] as const;
 /** En plus pour une entrée LinkedIn : la seule adresse du compte GitHub, pas son email. */
 export const DEV_FIELDS = ["dev_platform_profiles.profile_url", "social_handles.dev_platform_identifier.profile_url"] as const;
 
