@@ -2,7 +2,7 @@
 // sirène à deux tons qui monte avec le niveau, et un « clac » sec à chaque
 // étoile. Dans le contexte audio de la page (lib/audio.ts), débloqué par un
 // geste ; rien n'est créé tant que le son est coupé.
-import { sharedAudio } from "./audio";
+import { sharedAudio, soundNeedsGesture } from "./audio";
 
 export interface ChaseSound {
   /** La sirène démarre (première étoile) ; `level` 1 à 6 règle son volume. */
@@ -30,7 +30,8 @@ export function createChaseSound(muted: boolean): ChaseSound {
   let disposed = false;
 
   const start = (): boolean => {
-    if (disposed || isMuted) return false;
+    // pas de son avant le geste qui le débloque (l'envoi du formulaire, un toucher)
+    if (disposed || isMuted || soundNeedsGesture()) return false;
     if (ctx && master) return true;
     ctx = sharedAudio();
     if (!ctx) return false;
