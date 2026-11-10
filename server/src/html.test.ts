@@ -16,6 +16,11 @@ function cmp(cv: number, gh: number, over: Partial<ComparisonData> = {}): Compar
   };
 }
 
+/** La fiche GitHub en « dossier vide » (note plancher de la grille). */
+function emptyGh(c: ComparisonData): ComparisonData {
+  return { ...c, github: { ...c.github, grid: { criteria: [], overall: c.github.overall, rule: "empty_file" } } };
+}
+
 describe("aperçu de lien d'une comparaison", () => {
   it("LinkedIn devant : « Le LinkedIn de @lea a volé 21 points à son code »", () => {
     expect(metaFor(cmp(80, 59, { declaredSource: "linkedin" }), "https://s.test").title).toBe("Le LinkedIn de @lea a volé 21 points à son code");
@@ -39,6 +44,16 @@ describe("aperçu de lien d'une comparaison", () => {
   });
 
   it("ne tutoie jamais le lecteur", () => {
-    for (const c of [cmp(80, 59), cmp(60, 72), cmp(80, 59, { declaredSource: "linkedin" })]) expect(metaFor(c, "https://s.test").title).not.toMatch(/\bton\b|\bTon\b/);
+    for (const c of [cmp(80, 59), cmp(60, 72), cmp(80, 59, { declaredSource: "linkedin" }), emptyGh(cmp(45, 20, { declaredSource: "linkedin" }))])
+      expect(metaFor(c, "https://s.test").title).not.toMatch(/\bton\b|\bTon\b/);
+  });
+
+  it("face à un GitHub vide : le code reste à prouver, sans chiffre ni vol", () => {
+    const fr = metaFor(emptyGh(cmp(45, 20, { declaredSource: "linkedin" })), "https://s.test").title;
+    expect(fr).toBe("Le code de @lea reste à prouver : son LinkedIn parle seul");
+    const en = emptyGh(cmp(45, 20));
+    en.cv = { ...en.cv, lang: "en" };
+    expect(metaFor(en, "https://s.test").title).toBe("@lea's code is still unproven: their CV does all the talking");
+    for (const t of [fr, metaFor(en, "https://s.test").title]) expect(t).not.toMatch(/\d|\bvol|stole/);
   });
 });
