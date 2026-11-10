@@ -416,10 +416,18 @@ svg {
   color: var(--cream);
   overflow-wrap: anywhere;
 }
+/* deux phrases, chacune sur ses lignes : la déclaration en crème, la preuve en rose poudré */
+.hero-title > span {
+  display: block;
+}
+.hero-title-proof {
+  color: var(--blush);
+}
+/* la ligne d'appoint en lilas : le rose est pris par la seconde phrase du titre */
 .hero-hook {
   max-width: 22ch;
   font: 500 21px/1.25 var(--f-text);
-  color: var(--blush);
+  color: var(--lilac);
 }
 
 .showcase {
@@ -447,7 +455,13 @@ svg {
 /* ============ le ciel de l'accueil (§18.29) ============
    Les lieux du crime en fondu enchaîné (HomeSky.tsx) derrière la promesse.
    Téléphone : de bord à bord sous le bandeau de saison, derrière la barre du
-   haut, au 3:2 entier (260 px à 390). La première ligne du titre se pose sur
+   haut, au 3:2 entier (260 px à 390) quand l'écran est assez haut, plus bas
+   sinon, rogné par le haut : le champ et « Ouvrir mon dossier » restent au
+   premier écran jusqu'à 390 × 700 et 360 × 640 (navigateur intégré de
+   LinkedIn). Le budget, de haut en bas : bandeau 44, ciel, titre (4 lignes de
+   0,88 em, moins 0,84 em sur le ciel : 2,68 em), 12, accroche (2 lignes de
+   23,4), 16, portes 44, 10, champ 56, 10, pilule 52, soit 291 + 2,68 em ; le
+   ciel prend le reste moins 9 px. La première ligne du titre se pose sur
    l'aplat sombre du bas de l'image, sa ligne de base sur le bord : ses
    capitales (0,70 em) tiennent dans l'aplat même là où il est le plus mince
    (night_owl, 20 % de la hauteur), le reste du titre est sur l'encre.
@@ -475,13 +489,17 @@ svg {
 }
 .home-top {
   --home-bar: 64px;
+  /* la plus longue ligne, « YOUR LINKEDIN », fait 5,33 em : à 16vw elle tient
+     à 360 px (307 px pour 328) et à 320 px, avec 6 % de marge */
+  --hero-title: clamp(40px, 16vw, 64px);
   position: relative;
 }
 .home-sky {
   position: relative;
   z-index: 0;
   overflow: hidden;
-  aspect-ratio: 3 / 2;
+  height: clamp(150px, calc(100vh - 300px - 2.68 * var(--hero-title)), 66.667vw);
+  height: clamp(150px, calc(100svh - 300px - 2.68 * var(--hero-title)), 66.667vw);
   margin-top: calc(-1 * var(--home-bar));
   background: var(--ink-1);
 }
@@ -498,6 +516,8 @@ svg {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  /* rogné par le haut seulement : l'aplat sombre du bas reste entier sous le titre */
+  object-position: 50% 100%;
   opacity: 0;
   transform: scale(1.05);
   transform-origin: 50% 100%;
@@ -536,6 +556,17 @@ svg {
 }
 .home-top .hero-title {
   margin-top: -0.84em;
+  font-size: var(--hero-title);
+}
+.home-top .hero-copy {
+  gap: 12px;
+}
+.home-top .hero-hook {
+  font-size: 18px;
+  line-height: 1.3;
+}
+.home-top .entry {
+  margin-top: 4px;
 }
 @media (min-width: 900px) {
   .home-top {
@@ -560,9 +591,17 @@ svg {
   .home-top .hero {
     padding-top: 28px;
   }
+  /* chaque phrase sur une ligne si la largeur le permet, sinon coupée à son seul blanc sécable */
   .home-top .hero-title {
     margin-top: 0;
-    font-size: clamp(64px, 7.2vw, 104px);
+    font-size: clamp(56px, 6vw, 88px);
+  }
+  .home-top .hero-copy {
+    gap: 16px;
+  }
+  .home-top .hero-hook {
+    font-size: 24px;
+    line-height: 1.25;
   }
   /* 0,74 d'encre : crème, rose, lilas et alerte au-dessus de 4,5:1 sur le point le plus clair des cinq ciels */
   .home-top .hero-copy {

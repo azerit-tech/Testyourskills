@@ -54,10 +54,20 @@ export function Home() {
   const { t } = useT();
   const h = t.home;
   const inputRef = useRef<HTMLInputElement>(null);
+  // Sans entrée LinkedIn, la première phrase parle du CV. Optimiste, comme les portes du formulaire.
+  const [liOn, setLiOn] = useState(() => api.knownConfig()?.linkedinEntry ?? true);
 
   useEffect(() => {
     document.title = t.meta.title;
   }, [t]);
+
+  useEffect(() => {
+    let alive = true;
+    void api.getConfig().then((c) => alive && setLiOn(c.linkedinEntry));
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   /** Une place libre du top, « Découvre le tien » : retour au champ du pseudo,
    * prêt à taper. Le focus se donne dans le geste, sinon l'iPhone n'ouvre pas le clavier. */
@@ -78,7 +88,11 @@ export function Home() {
         <HomeSky />
         <section className="hero">
           <div className="hero-copy">
-            <h1 className="hero-title">{h.titleA}</h1>
+            {/* Deux phrases : ce que le profil déclare (crème), ce que le code dira (rose poudré). */}
+            <h1 className="hero-title">
+              <span className="hero-title-claim">{liOn ? h.titleClaim : h.titleClaimCv}</span>{" "}
+              <span className="hero-title-proof">{h.titleProof}</span>
+            </h1>
             <p className="hero-hook">{h.titleB}</p>
             <EntryForm inputRef={inputRef} />
           </div>

@@ -24,8 +24,12 @@ const fr = {
   home: {
     /** Fin de la saison 1 (§18.4, dates proposées) : à lire dans data/season.json quand les primes existeront. */
     season: "Saison 1 · jusqu'au 31 décembre",
-    /** Insécables : le titre se coupe en « Ton GitHub / remplace / ton CV. », jamais « CV. » seul. */
-    titleA: "Ton\u00a0GitHub remplace ton\u00a0CV.",
+    /** Le titre, deux phrases, chacune sur ses lignes. Insécables : une seule coupure possible
+     * par phrase, « TON LINKEDIN / DIT SENIOR. / TON GITHUB, / ON VA VOIR. », jamais un mot seul. */
+    titleClaim: "Ton\u00a0LinkedIn dit\u00a0senior.",
+    /** Sans entrée LinkedIn (le serveur ne sait pas le lire). */
+    titleClaimCv: "Ton\u00a0CV dit\u00a0senior.",
+    titleProof: "Ton\u00a0GitHub, on\u00a0va\u00a0voir.",
     titleB: "Le haut du classement décroche un entretien.",
     tabGithub: "Ton GitHub",
     loginLabel: "Pseudo GitHub ou URL du profil",
@@ -500,7 +504,9 @@ const en: Dict = {
   },
   home: {
     season: "Season 1 · until 31 December",
-    titleA: "Your\u00a0GitHub replaces your\u00a0CV.",
+    titleClaim: "Your\u00a0LinkedIn says\u00a0senior.",
+    titleClaimCv: "Your\u00a0CV says\u00a0senior.",
+    titleProof: "Your\u00a0GitHub? We'll\u00a0see.",
     titleB: "The top of the board lands an interview.",
     tabGithub: "Your GitHub",
     loginLabel: "GitHub username or profile URL",
