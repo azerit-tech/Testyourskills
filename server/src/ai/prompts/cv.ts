@@ -128,6 +128,7 @@ school_tier is the tier of that school for its engineering, computer science or 
 - "C": any other higher education in engineering, computer science or science.
 - "none": no higher education, or only studies unrelated to tech (business, law, arts, an MBA), or only a bootcamp or an online course.
 Judge the school, not the person. Polytech schools (Polytech Nantes, Polytech Lille...) are not École polytechnique. Certifications, MOOCs and trainings are not schools.
+Only the school where the person is or was enrolled for a degree counts. An exchange semester or year, Erasmus, a visiting or study-abroad period, a summer school, a MOOC or online course, a certificate, a bootcamp, continuing or executive education never give the school, even at a famous university: choose the school of the degree. Example: an engineering degree at CentraleSupélec and an exchange semester at ETH Zurich give school_name "CentraleSupélec", school_tier "A", not ETH Zurich.
 
 ## selection_signals
 Evidence that the person passed a selective filter other than the admission to their school, as written in the text. Each item is { "kind": "...", "quote": "..." } where quote is an exact excerpt copied from the text, at most 180 characters, that names the contest, prize or programme. At most 5 items, one per distinct fact. kind is one of:

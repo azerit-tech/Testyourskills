@@ -89,6 +89,24 @@ export function normMonth(v: string | null, edge: "start" | "end"): string | nul
 
 const norm = (s: string) => s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9+#]/g, "");
 
+/** Ce qui ne fait pas une école (§18.37) : échange, école d'été, MOOC, certificat, formation continue. */
+const NOT_A_SCHOOL_RE =
+  /\b(exchange|echange|erasmus|study abroad|semester abroad|visiting (student|scholar)|summer (school|program|programme|session)|ecole d'ete|universite d'ete|mooc|coursera|edx|udemy|openclassrooms|certificat|certificate|certification|formation continue|continuing education|executive education|bootcamp)\b/;
+
+/**
+ * L'école citée n'apparaît-elle que sur des lignes d'échange, d'école d'été, de
+ * MOOC ou de certificat ? Alors elle ne donne pas de rang : un semestre
+ * d'échange dans une école de rang S ne fait pas un rang S. Lecture ligne à
+ * ligne (le texte d'un profil LinkedIn met chaque formation sur sa ligne).
+ */
+export function onlyNonDegree(text: string, school: string): boolean {
+  const key = norm(school);
+  if (!key) return false;
+  const lines = text.split("\n").filter((l) => norm(l).includes(key));
+  const plain = (l: string) => l.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  return lines.length > 0 && lines.every((l) => NOT_A_SCHOOL_RE.test(plain(l)));
+}
+
 const inList = <T extends string>(list: readonly T[], v: string | undefined): T | undefined => (list as readonly string[]).includes(v ?? "") ? (v as T) : undefined;
 
 /**
@@ -180,10 +198,11 @@ export function validateCvOutput(raw: unknown, cvText: string): Validation<CvRea
   const name = d.full_name ? clip(scrubContact(d.full_name), 80) : "";
 
   // L'école doit figurer dans le texte (espaces, accents et ponctuation ignorés) :
-  // une école inventée par l'IA ne finit pas sur la carte.
+  // une école inventée par l'IA ne finit pas sur la carte. Une école vue
+  // seulement en échange, en école d'été, en MOOC ou en certificat non plus.
   const school = clip(scrubContact(d.school_name), 80);
   const schoolKey = norm(school);
-  const hasSchool = schoolKey.length > 0 && norm(cvText).includes(schoolKey);
+  const hasSchool = schoolKey.length > 0 && norm(cvText).includes(schoolKey) && !onlyNonDegree(cvText, school);
 
   // Les nouveaux champs ne sont posés que s'ils existent : une lecture sans eux reste celle d'avant.
   const roles: CvRole[] = rawRoles.map(({ employer_type, kind, ...r }) => {

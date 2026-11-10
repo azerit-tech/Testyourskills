@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { resetBudgetForTests } from "./budget";
 import { CV_SYSTEM_PROMPT } from "./prompts/cv";
-import { CV_OUTPUT_SCHEMA, MAX_CV_CHARS, normMonth, readCv, roleKind } from "./readCv";
+import { CV_OUTPUT_SCHEMA, MAX_CV_CHARS, normMonth, onlyNonDegree, readCv, roleKind } from "./readCv";
 import { fakeClient, userText } from "./testing";
 
 const CV = `Camille Durand
@@ -83,6 +83,35 @@ describe("readCv", () => {
     const bad = fakeClient([{ ...VALID, school_tier: "A+" }, VALID]);
     expect(await readCv(CV, { client: bad.client })).not.toBeNull();
     expect(userText(bad.calls[1])).toContain("school_tier");
+  });
+
+  it("échange, école d'été, MOOC, certificat : ne donnent pas l'école", async () => {
+    const text = `${CV}
+Semestre d'échange — ETH Zürich (2017 – 2017)
+Summer School in Machine Learning — Stanford University (2016 – 2016)
+Machine Learning (MOOC, Coursera) — Imperial College London
+Certificat — École polytechnique`;
+    const read = async (school_name: string, school_tier: string) =>
+      (await readCv(text, { client: fakeClient([{ ...VALID, school_name, school_tier }]).client }))!;
+    for (const [s, t] of [
+      ["ETH Zürich", "S"],
+      ["Stanford University", "S"],
+      ["Imperial College London", "A"],
+      ["École polytechnique", "S"],
+    ])
+      expect(await read(s, t), s).toMatchObject({ school_name: "", school_tier: "none" });
+    // L'école du diplôme, elle, reste.
+    expect(await read("Centrale Méditerranée", "B")).toMatchObject({ school_name: "Centrale Méditerranée", school_tier: "B" });
+    // Une école vue en échange et aussi pour un diplôme : gardée.
+    expect(onlyNonDegree("Exchange semester — KTH\nMSc, Computer Science — KTH (2020 – 2022)", "KTH")).toBe(false);
+    expect(onlyNonDegree("Erasmus — Politecnico di Milano", "Politecnico di Milano")).toBe(true);
+    expect(onlyNonDegree("Diplôme d'ingénieur — CentraleSupélec", "CentraleSupélec")).toBe(false);
+    expect(onlyNonDegree("rien", "")).toBe(false);
+  });
+
+  it("la consigne écarte échange, école d'été, MOOC et certificat de l'école", () => {
+    expect(CV_SYSTEM_PROMPT).toMatch(/exchange semester or year, Erasmus, a visiting or study-abroad period, a summer school, a MOOC/);
+    expect(CV_SYSTEM_PROMPT).toContain('give school_name "CentraleSupélec", school_tier "A", not ETH Zurich');
   });
 
   it("le schéma exige l'école et son rang", () => {
