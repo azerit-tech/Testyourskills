@@ -2,7 +2,11 @@
 // compte les requêtes d'une fiche, et vérifie ce que la collecte garde.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
+import gaearon from "../scoring/__fixtures__/gaearon.facts.json";
+import qwerty from "../scoring/__fixtures__/qwerty.facts.json";
+import { scoreGithub } from "../scoring/index";
 import { collectGithub, externalPRList, homepageOf } from "./collect";
+import type { GithubFacts } from "./facts";
 
 const LOGIN = "fictif-dev";
 const NOW = Date.now();
@@ -241,6 +245,25 @@ describe("site d'un dépôt (homepage)", () => {
     ["https://user:pw@x.example.org", null],
   ])("homepageOf(%j) = %j", (v, out) => {
     expect(homepageOf(v)).toBe(out);
+  });
+});
+
+describe("faits d'avant et faits d'après (§18.37)", () => {
+  it("les faits déjà en base, sans les nouveaux champs, se relisent et se notent", () => {
+    for (const f of [gaearon, qwerty] as unknown as GithubFacts[]) {
+      expect(f.externalMergedPRList).toBeUndefined();
+      expect(f.repos.every((r) => r.homepage === undefined)).toBe(true);
+      expect(f.trees.every((t) => t.agentFiles === undefined)).toBe(true);
+      const card = scoreGithub(f, null, { lang: "fr", judgedInSeconds: 10 });
+      expect(card.overall).toBeGreaterThan(0);
+    }
+  });
+
+  it("les faits collectés avec les nouveaux champs se notent aussi, passés en JSON comme en base", async () => {
+    const { facts } = await collect();
+    const stored = JSON.parse(JSON.stringify(facts)) as GithubFacts;
+    expect(stored.externalMergedPRList).toHaveLength(2);
+    expect(scoreGithub(stored, null, { lang: "fr", judgedInSeconds: 10 }).overall).toBeGreaterThan(0);
   });
 });
 
