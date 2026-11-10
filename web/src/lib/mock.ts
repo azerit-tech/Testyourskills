@@ -45,6 +45,8 @@ const BY_LOGIN: Record<string, FixtureKey> = {
   "nour-rs": "wonderkid",
   jplefevre: "flashback",
   "ghost-coder": "lowReliability",
+  // une étoile (26), pour la démo du film (§18.36) : 1, 3 (ghost-coder) et 6 étoiles (sindresorhus)
+  x: "unknownLang",
   bronze: "bronze",
   silver: "silver",
   gold: "gold",
