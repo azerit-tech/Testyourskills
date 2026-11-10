@@ -34,6 +34,7 @@ const PRICES: { match: RegExp; price: Price }[] = [
   { match: /sonnet-4/, price: { input: 3, output: 15 } },
   { match: /opus-5[.-]5/, price: { input: 4, output: 20 } },
   { match: /opus/, price: { input: 5, output: 25 } },
+  { match: /glm-5\.3-flash(?!x)/, price: { input: 0.04, output: 0.078 } },
 ];
 // Modèle inconnu : on compte au prix le plus cher pour rester prudent.
 const FALLBACK_PRICE: Price = { input: 10, output: 50 };
