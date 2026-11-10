@@ -22,11 +22,15 @@ describe("barème GitHub sur un profil synthétique", () => {
     expect(stat(card, "SHIP").value).toBe(85); // 40 semaines
     expect(stat(card, "ARCH").value).toBe(99); // tests, CI, outillage partout
     expect(stat(card, "DOC").value).toBe(99); // README longs, aucun commit paresseux
-    expect(stat(card, "XP").value).toBe(75); // 5 ans, un seul langage
+    // Barre XP = critère Expérience × 10 : estimée sur GitHub, 2 années actives, niveau 4.
+    expect(stat(card, "XP").value).toBe(40);
     expect(stat(card, "TEC").value).toBe(50); // repli sans IA
     expect(stat(card, "BUZZ").value).toBe(10);
-    expect(card.overall).toBe(78);
-    expect(card.tier).toBe("gold");
+    // La note globale est celle de la grille ; sans lecture IA, le code n'est pas prouvé (plafond 85).
+    expect(card.overall).toBe(card.grid?.overall);
+    expect(card.grid?.rule).toBe("capped_unproven");
+    expect(card.overall).toBe(58);
+    expect(card.tier).toBe("bronze");
   });
 
   it("sans IA : TEC au repli, non suffisant, fiabilité 76", () => {
@@ -50,7 +54,7 @@ describe("barème GitHub sur un profil synthétique", () => {
     expect(stat(scoreGithub(f, weighted, opts), "TEC").value).toBe(80);
   });
 
-  it("bonus : PR externes (TEC), releases (SHIP), largeur (XP)", () => {
+  it("bonus : PR externes (TEC), releases (SHIP) ; la largeur ne touche plus XP", () => {
     const f = facts({
       externalMergedPRs: 5,
       calendar: { available: true, weeksActive: 26, weeks: 52, totalContributions: 300 },
@@ -65,7 +69,7 @@ describe("barème GitHub sur un profil synthétique", () => {
     const card = scoreGithub(f, ai(3), opts);
     expect(stat(card, "TEC").value).toBe(65 + 4);
     expect(stat(card, "SHIP").value).toBe(70 + 5);
-    expect(stat(card, "XP").value).toBe(75 + 8);
+    expect(stat(card, "XP").value).toBe(40);
   });
 
   it("ARCH : 50 tests + 30 CI + 20 outillage, sur les repos actifs lus", () => {

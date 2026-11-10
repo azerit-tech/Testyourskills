@@ -1,4 +1,6 @@
-// Barème de la carte GitHub (SPEC §4.4) : faits → six stats, globale, tier, statuts.
+// Barème de la carte GitHub (SPEC §4.4) : faits → six stats, tier, statuts.
+// La note de la fiche est celle de la grille de recrutement (grid.ts, 0.4.0) ;
+// les six barres restent ses traits, et la barre XP lit le critère Expérience.
 
 import type { CodeReadingResult } from "../../../shared/readings";
 import type { CardData, Fact, Lang, Stat, StatCode } from "../../../shared/types";
@@ -11,17 +13,18 @@ import {
   initialsOf,
   nf,
   orderStats,
-  overallOf,
   pct,
   reliabilityOf,
   specialOf,
   valuesOf,
+  xpStatOf,
 } from "./common";
 import { SCORING } from "./config";
 import { deriveGithub, type GithubMetrics } from "./derive";
+import { githubGrid } from "./grid";
 import { githubPosition } from "./position";
 import { pickProfile, sentenceFor } from "./profiles";
-import { clampScore, interpolate, scoreOn, stepBonus } from "./scale";
+import { clampScore, interpolate, scoreOn } from "./scale";
 import { aiStatus, composeStatuses, evaluateRules } from "./statuses";
 
 const G = SCORING.github;
@@ -37,7 +40,7 @@ export function shipStat(m: GithubMetrics): Stat {
     fact(`${weeks} semaines actives sur 52`, `${weeks} active weeks out of 52`),
     fact(`${nf(m.totalContributions, "fr")} contributions sur 12 mois`, `${nf(m.totalContributions, "en")} contributions over 12 months`),
     bonus
-      ? fact(`${m.releasesLastYear} releases dans l'année (+${bonus})`, `${m.releasesLastYear} releases this year (+${bonus})`)
+      ? fact(`${m.releasesLastYear} releases dans l'année, bonus de régularité compris`, `${m.releasesLastYear} releases this year, steady-release bonus included`)
       : fact(
           `${m.releasesLastYear} release${m.releasesLastYear > 1 ? "s" : ""} dans l'année (bonus à partir de ${G.SHIP.releasesAtLeast})`,
           `${m.releasesLastYear} release${m.releasesLastYear === 1 ? "" : "s"} this year (bonus from ${G.SHIP.releasesAtLeast})`,
@@ -102,38 +105,11 @@ export function docStat(m: GithubMetrics): Stat {
   return { code: "DOC", value: scoreOn(G.DOC.scale, raw), sufficient: m.readableRepos >= G.DOC.sufficientRepos, facts };
 }
 
-export function xpStat(m: GithubMetrics): Stat {
-  const years = m.firstCommitYears ?? 0;
-  // Le pluriel suit le nombre affiché (une décimale) : 1,96 s'écrit « 2 ans ».
-  const shownYears = Math.round(years * 10) / 10;
-  const langs = m.languagesOverMin.length;
-  const bonus = stepBonus(G.XP.breadthBonus, langs);
-  const facts: Fact[] = [
-    m.firstCommitDate
-      ? fact(
-          `Premier vrai commit en ${m.firstCommitDate.slice(0, 4)} (il y a ${df(years, "fr")} an${shownYears >= 2 ? "s" : ""})`,
-          `First real commit in ${m.firstCommitDate.slice(0, 4)} (${df(years, "en")} year${shownYears === 1 ? "" : "s"} ago)`,
-        )
-      : fact(`Aucun repo avec ${G.XP.sufficientRepoCommits} commits ou plus`, `No repo with ${G.XP.sufficientRepoCommits}+ commits`),
-    fact(
-      `${langs} langage${langs > 1 ? "s" : ""} avec 10 Ko de code ou plus${bonus ? ` (+${bonus})` : ""}`,
-      `${langs} language${langs === 1 ? "" : "s"} with 10 KB of code or more${bonus ? ` (+${bonus})` : ""}`,
-    ),
-    fact(`Compte GitHub depuis ${Math.floor(m.accountYears)} ans`, `On GitHub for ${Math.floor(m.accountYears)} years`),
-  ];
-  return {
-    code: "XP",
-    value: scoreOn(G.XP.scale, years, bonus),
-    sufficient: (m.maxRepoCommits ?? 0) >= G.XP.sufficientRepoCommits,
-    facts,
-  };
-}
-
 export function tecStat(f: GithubFacts, m: GithubMetrics, ai: CodeReadingResult | null): Stat {
   const bonus = m.externalPRs >= G.TEC.externalPrsAtLeast ? G.TEC.externalPrBonus : 0;
   const prFact = fact(
-    `${nf(m.externalPRs, "fr")} PR fusionnées chez les autres${bonus ? ` (+${bonus})` : ""}`,
-    `${nf(m.externalPRs, "en")} PRs merged into other people's repos${bonus ? ` (+${bonus})` : ""}`,
+    `${nf(m.externalPRs, "fr")} PR fusionnées chez les autres${bonus ? ", bonus compris" : ""}`,
+    `${nf(m.externalPRs, "en")} PRs merged into other people's repos${bonus ? ", bonus included" : ""}`,
   );
   const enoughCommits = (m.maxRepoCommits ?? 0) >= G.TEC.sufficientRepoCommits;
   const readings = ai?.readings ?? [];
@@ -193,17 +169,18 @@ export function scoreGithub(
   opts: { lang: Lang; judgedInSeconds: number },
 ): Omit<CardData, "id" | "createdAt"> {
   const m = deriveGithub(facts);
+  const grid = githubGrid({ facts, m, ai });
   const byCode: Record<StatCode, Stat> = {
     TEC: tecStat(facts, m, ai),
     SHIP: shipStat(m),
     ARCH: archStat(m),
     DOC: docStat(m),
-    XP: xpStat(m),
+    XP: xpStatOf(grid.criteria.find((c) => c.code === "XP")!),
     BUZZ: buzzStat(m),
   };
   const stats = orderStats(byCode);
   const values = valuesOf(stats);
-  const overall = overallOf(values);
+  const overall = grid.overall;
 
   const candidates = evaluateRules(["github"], { stats: values, github: { facts, m } });
   const fromAI = aiStatus(ai?.ai_status);
@@ -232,5 +209,6 @@ export function scoreGithub(
     reliability: reliabilityOf(stats),
     judgedInSeconds: opts.judgedInSeconds,
     lang: opts.lang,
+    grid,
   };
 }

@@ -1,6 +1,6 @@
 {
-  "version": "0.3.0",
-  "_doc": "Barème versionné (SPEC §4.4, §4.5). Échelles : points [x, note], interpolation linéaire, arrondi, bornes 1..99. Changer un point = changer la version.",
+  "version": "0.4.0",
+  "_doc": "Barème versionné (SPEC §4.4, §4.5). Échelles : points [x, note], interpolation linéaire, arrondi, bornes 1..99. Changer un point = changer la version. Depuis 0.4.0, la note d'une fiche est celle de la grille de recrutement (data/grid.json) ; ces échelles font les six barres, sauf XP qui lit le critère Expérience × 10.",
   "bounds": { "min": 1, "max": 99 },
   "weights": { "TEC": 0.3, "SHIP": 0.2, "ARCH": 0.2, "DOC": 0.15, "XP": 0.15 },
   "reliability": { "perAxis": 19, "max": 95 },
@@ -75,8 +75,7 @@
       "seniority": { "junior": 50, "mid": 65, "senior": 80, "lead": 88, "staff": 88 },
       "perDescribedTechno": 2,
       "school": {
-        "_doc": "Rang d'école. Le nom rendu par l'IA est normalisé (minuscules, sans accents, toute ponctuation devient une espace) puis comparé aux motifs dans l'ordre : le premier qui correspond donne le rang, d'où les cas particuliers avant les familles. Hors liste, le rang de l'IA est plafonné à aiMaxTier. « none » de l'IA (pas d'études supérieures liées à la tech) reste « none ».",
-        "bonus": { "S": 20, "A": 15, "B": 10, "C": 5 },
+        "_doc": "Rang d'école, pour le critère EDU de la grille (data/grid.json) : il n'entre plus dans TEC (0.4.0). Le nom rendu par l'IA est normalisé (minuscules, sans accents, toute ponctuation devient une espace) puis comparé aux motifs dans l'ordre : le premier qui correspond donne le rang, d'où les cas particuliers avant les familles. Hors liste, le rang de l'IA est plafonné à aiMaxTier. « none » de l'IA (pas d'études supérieures liées à la tech) reste « none ».",
         "aiMaxTier": "B",
         "list": [
           { "school": "Polytech", "tier": "C", "pattern": "\\bpolytech\\b|polytechnique universitaire" },

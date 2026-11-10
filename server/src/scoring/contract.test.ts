@@ -47,9 +47,10 @@ describe("contrat sur faits réels figés", () => {
   it("gaearon sans lecture IA", () => {
     const card = scoreGithub(gaearon, null, opts);
     checkShape(card);
-    expect(values(card)).toEqual({ TEC: 54, SHIP: 80, ARCH: 72, DOC: 47, XP: 99, BUZZ: 37 });
-    expect(card.overall).toBe(69);
-    expect(card.tier).toBe("silver");
+    // XP = critère Expérience × 10 ; la note est celle de la grille (barème 0.4.0).
+    expect(values(card)).toEqual({ TEC: 54, SHIP: 80, ARCH: 72, DOC: 47, XP: 80, BUZZ: 37 });
+    expect(card.overall).toBe(78);
+    expect(card.tier).toBe("gold");
     expect(card.reliability).toBe(76);
     expect(card.position).toBe("FE");
     expect(card.mainLanguage).toBe("javascript"); // pas « lean », son plus gros repo
@@ -73,7 +74,7 @@ describe("contrat sur faits réels figés", () => {
     const card = scoreGithub(gaearon, ai, opts);
     checkShape(card);
     expect(values(card).TEC).toBe(84);
-    expect(card.overall).toBe(78);
+    expect(card.overall).toBe(79);
     expect(card.tier).toBe("gold");
     expect(card.reliability).toBe(95);
     expect(card.statuses.find((s) => s.byAI)?.id).toBe("ai_clean_arch");

@@ -49,7 +49,8 @@ export interface ScoringConfig {
     TEC: {
       seniority: Record<string, number>;
       perDescribedTechno: number;
-      school: { bonus: Record<Exclude<SchoolTier, "none">, number>; aiMaxTier: SchoolTier; list: { school: string; tier: SchoolTier; pattern: string }[] };
+      /** Rang d'école : la liste prime, hors liste l'IA est plafonnée. L'école n'entre plus dans TEC (0.4.0) : elle est le critère EDU de la grille. */
+      school: { aiMaxTier: SchoolTier; list: { school: string; tier: SchoolTier; pattern: string }[] };
     };
     SHIP: { scale: Scale };
     ARCH: { scale: Scale };

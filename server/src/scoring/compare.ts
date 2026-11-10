@@ -1,9 +1,11 @@
-// Comparaison CV contre GitHub (SPEC §6.5) : delta par stat, titre par règle, et
-// le profil criminel revu avec l'écart entre les deux fiches (§18.2, Faussaire).
+// Comparaison CV contre GitHub (SPEC §6.5) : delta par stat, titre par règle, le
+// profil criminel revu avec l'écart entre les deux fiches (§18.2, Faussaire), et la
+// note du dossier : chaque critère de la grille pris sur sa source de preuve (§18.37).
 
 import type { CardData, ComparisonData, StatCode } from "../../../shared/types";
 import { STAT_CODES } from "../../../shared/types";
 import { valuesOf } from "./common";
+import { caseGrid } from "./grid";
 import { STATUSES } from "./config";
 import { profileWithComparison, type ProfileCtx } from "./profiles";
 import { fillTemplate } from "./statuses";
@@ -20,10 +22,13 @@ export function compareCards(cv: CardData, github: CardData): Omit<ComparisonDat
     const profile = profileWithComparison(c.profile, { stats: valuesOf(c.stats), comparison });
     return profile === c.profile ? c : { ...c, profile };
   };
+  // Fiches d'avant 0.4.0 (cache de 24 h) : pas de grille, pas de note du dossier.
+  const grid = cv.grid && github.grid ? caseGrid(cv.grid, github.grid) : undefined;
   return {
     cv: withProfile(cv),
     github: withProfile(github),
     deltas,
     headline: { fr: fillTemplate(tpl.fr, vars, "fr")!, en: fillTemplate(tpl.en, vars, "en")! },
+    ...(grid ? { grid } : {}),
   };
 }

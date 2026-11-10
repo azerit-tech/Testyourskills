@@ -1,12 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { CvReading } from "../../../shared/readings";
-import type { StatCode } from "../../../shared/types";
-import { cvCounts, cvReading, daysAgo, facts, repo } from "./__fixtures__/make";
-import { overallOf } from "./common";
+import { NOW, cvCounts, cvReading, daysAgo, facts, repo } from "./__fixtures__/make";
 import { AI_BUZZ_KEY } from "./config";
 import { compareCards, cvTextCounts, scoreCv, scoreGithub } from "./index";
 
-const opts = { lang: "fr" as const, judgedInSeconds: 6 };
+// `now` figé : l'expérience se compte sur les postes datés, jusqu'à aujourd'hui.
+const opts = { lang: "fr" as const, judgedInSeconds: 6, now: NOW };
 const stat = (card: ReturnType<typeof scoreCv>, code: string) => card.stats.find((s) => s.code === code)!;
 const ids = (card: ReturnType<typeof scoreCv>) => card.statuses.map((s) => s.id);
 
@@ -48,7 +47,10 @@ describe("barème CV §4.5", () => {
     expect(stat(card, "SHIP").value).toBe(60); // 2 projets : entre 1 → 50 et 3 → 70
     expect(stat(card, "ARCH").value).toBe(60);
     expect(stat(card, "DOC").value).toBe(80);
-    expect(stat(card, "XP").value).toBe(Math.round(75 + (1 / 3) * 13));
+    // La barre XP est le critère Expérience × 10 : 2019-01 → 2026-10, 7,8 ans comptés, niveau 8.
+    expect(stat(card, "XP").value).toBe(80);
+    expect(card.grid?.criteria.find((c) => c.code === "XP")?.score).toBe(8);
+    expect(card.overall).toBe(card.grid?.overall);
     expect(stat(card, "BUZZ").value).toBe(10);
     expect(card.reliability).toBe(95);
     expect(card.club).toBe("Doctolib");
@@ -64,32 +66,32 @@ describe("barème CV §4.5", () => {
     expect(stat(scoreCv(cvReading(), cvCounts({ words: 1500 }), opts), "DOC").value).toBe(70);
   });
 
-  it("école : bonus TEC selon le rang, fait affiché, la note globale suit", () => {
-    const base = cvReading({ seniority_claimed: "mid" }); // 65 + 3 × 2 = 71 : loin du plafond
+  it("école : plus de bonus TEC, elle se lit dans le critère Formation de la grille", () => {
+    const base = cvReading({ seniority_claimed: "mid" });
     const none = scoreCv(base, cvCounts(), opts);
     const a = scoreCv({ ...base, school_name: "CentraleSupélec", school_tier: "A" }, cvCounts(), opts);
-    expect(stat(a, "TEC").value).toBe(stat(none, "TEC").value + 15);
-    const values = (c: ReturnType<typeof scoreCv>) => Object.fromEntries(c.stats.map((s) => [s.code, s.value])) as Record<StatCode, number>;
-    expect(a.overall).toBe(overallOf(values(a)));
-    expect(a.overall).toBe(overallOf({ ...values(none), TEC: stat(none, "TEC").value + 15 }));
-    expect(a.overall).toBeGreaterThan(none.overall);
-    expect(stat(a, "TEC").facts[1]).toEqual({ fr: "École : CentraleSupélec, rang A (+15)", en: "School: CentraleSupélec, tier A (+15)" });
-    expect(stat(none, "TEC").facts.map((f) => f.fr).join()).not.toMatch(/École/);
+    // TEC ne dépend plus de l'école, ni en valeur ni en faits.
+    expect(stat(a, "TEC").value).toBe(stat(none, "TEC").value);
+    expect(stat(a, "TEC").facts).toEqual(stat(none, "TEC").facts);
+    expect(stat(a, "TEC").facts.map((f) => f.fr).join()).not.toMatch(/École|CentraleSupélec/);
+    // L'école ne baisse jamais la note (§4, règle 2).
+    expect(a.overall).toBeGreaterThanOrEqual(none.overall);
+    const edu = (c: ReturnType<typeof scoreCv>) => c.grid!.criteria.find((x) => x.code === "EDU")!;
+    expect(edu(a).score).toBe(8);
+    expect(edu(a).reached.fr).toBe("CentraleSupélec, rang A.");
+    expect(edu(none).state).toBe("missing");
+    expect(edu(none).counted).toBe(false);
 
-    const tec = (school_name: string, school_tier: CvReading["school_tier"]) => stat(scoreCv({ ...base, school_name, school_tier }, cvCounts(), opts), "TEC").value;
-    expect(tec("École polytechnique", "S")).toBe(71 + 20);
-    expect(tec("Centrale Méditerranée", "B")).toBe(71 + 10);
-    expect(tec("IUT de Lannion", "C")).toBe(71 + 5);
+    const eduOf = (school_name: string, school_tier: CvReading["school_tier"]) => edu(scoreCv({ ...base, school_name, school_tier }, cvCounts(), opts)).score;
+    expect(eduOf("École polytechnique", "S")).toBe(10);
+    expect(eduOf("Centrale Méditerranée", "B")).toBe(6);
+    expect(eduOf("IUT de Lannion", "C")).toBe(4);
     // La liste prime sur l'IA ; hors liste, l'IA ne donne pas plus que B.
-    expect(tec("Centrale Marseille", "S")).toBe(71 + 10);
-    expect(tec("Université de Nulle Part", "S")).toBe(71 + 10);
-    // Jamais de pénalité : sans école ou hors tech, rien.
-    expect(tec("Le Wagon", "none")).toBe(71);
-    expect(tec("", "none")).toBe(71);
-    // Plafonné comme les autres bonus.
-    expect(stat(scoreCv(cvReading({ seniority_claimed: "lead", school_name: "Stanford", school_tier: "S" }), cvCounts(), opts), "TEC").value).toBe(99);
-    const fact = stat(scoreCv({ ...base, school_name: "Centrale Marseille", school_tier: "S" }, cvCounts(), opts), "TEC").facts[1];
-    expect(fact.en).toBe("School: Centrale Marseille, tier B (+10)");
+    expect(eduOf("Centrale Marseille", "S")).toBe(6);
+    expect(eduOf("Université de Nulle Part", "S")).toBe(6);
+    // Sans école de tech : sans objet, jamais une pénalité.
+    expect(eduOf("Le Wagon", "none")).toBeNull();
+    expect(eduOf("", "none")).toBeNull();
   });
 
   it("lecture d'avant l'école (champs absents) : pas de plantage, pas de bonus", () => {

@@ -1,6 +1,6 @@
 // Briques communes aux cartes GitHub et CV : faits lisibles, globale, fiabilité, nom.
 
-import type { Fact, Special, Stat, StatCode } from "../../../shared/types";
+import type { Fact, GridCriterion, Special, Stat, StatCode } from "../../../shared/types";
 import { STAT_CODES } from "../../../shared/types";
 import { SCORING } from "./config";
 import { clampScore } from "./scale";
@@ -21,9 +21,24 @@ export function df(n: number, lang: "fr" | "en"): string {
 
 export const pct = (x: number) => Math.round(x * 100);
 
+/**
+ * Moyenne pondérée des six barres (barème 0.3.0 et avant). Depuis 0.4.0, la
+ * note d'une fiche est celle de la grille (grid.ts) ; cette moyenne ne sert
+ * plus qu'à la référence des rangs d'avant (percentiles.ts).
+ */
 export function overallOf(values: Record<StatCode, number>): number {
   const w = SCORING.weights;
   return clampScore(values.TEC * w.TEC + values.SHIP * w.SHIP + values.ARCH * w.ARCH + values.DOC * w.DOC + values.XP * w.XP);
+}
+
+/**
+ * La barre XP (0.4.0) : le critère Expérience de la grille × 10, bornée à 1..99.
+ * Sans note (aucun poste daté, GitHub trop mince) : au plancher, non suffisante.
+ */
+export function xpStatOf(c: GridCriterion): Stat {
+  const facts: Fact[] = [c.reached, ...(c.evidence ? [c.evidence.text] : []), ...(c.next ? [c.next] : [])];
+  if (facts.length < 2) facts.push(fact("Expérience non renseignée", "Experience not on file"));
+  return { code: "XP", value: c.score === null ? SCORING.bounds.min : clampScore(c.score * 10), sufficient: c.score !== null, facts: facts.slice(0, 4) };
 }
 
 /** 19 points par axe suffisant (BUZZ exclue), plafonné à 95 (§3.5). */

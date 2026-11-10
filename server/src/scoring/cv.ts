@@ -1,16 +1,19 @@
 // Carte CV (SPEC §4.5) : comptages sur le texte (faits avant de jeter le texte) et barème.
+// La note de la fiche est celle de la grille de recrutement, côté déclaré (grid.ts,
+// 0.4.0) : école, expérience comptée sur les postes datés, parcours, stack et
+// ownership déclarés. L'école n'entre plus dans TEC : elle est le critère EDU.
 
 import type { CvReading, CvTextCounts } from "../../../shared/readings";
 import type { CardData, Fact, Lang, Position, Stat, StatCode } from "../../../shared/types";
 import { tierFor } from "../../../shared/types";
 import type { GithubFacts } from "../github/facts";
-import { df, fact, initialsOf, nf, orderStats, overallOf, reliabilityOf, specialOf, valuesOf } from "./common";
+import { df, fact, initialsOf, nf, orderStats, reliabilityOf, specialOf, valuesOf, xpStatOf } from "./common";
 import { AI_BUZZ_KEY, BUZZWORDS, SCORING } from "./config";
 import { deriveGithub } from "./derive";
+import { declaredGrid, declaredInput, type DeclaredProfile } from "./grid";
 import { pickProfile, sentenceFor } from "./profiles";
 import { currentRole } from "./rules";
 import { clampScore, scoreOn } from "./scale";
-import { schoolTier } from "./school";
 import { composeStatuses, evaluateRules } from "./statuses";
 
 const C = SCORING.cv;
@@ -96,32 +99,39 @@ function cvMainLanguage(r: CvReading): string | undefined {
 export function scoreCv(
   reading: CvReading,
   counts: CvTextCounts,
-  opts: { lang: Lang; judgedInSeconds: number; github?: GithubFacts },
+  opts: {
+    lang: Lang;
+    judgedInSeconds: number;
+    github?: GithubFacts;
+    /** Le profil LinkedIn rangé (postes datés, formation, compétences) : l'expérience se compte dessus. */
+    linkedin?: DeclaredProfile;
+    /** « Maintenant » (ISO) : la fin d'un poste en cours. Défaut : la collecte GitHub, sinon l'heure. */
+    now?: string;
+    /** Employeurs à forte barre d'embauche (tâche 1, facultatif). */
+    highBar?: string[];
+  },
 ): Omit<CardData, "id" | "createdAt"> {
   const r = reading;
   const described = uniq(r.technos_described);
   const listed = uniq(r.technos_listed);
   const enoughText = counts.words >= C.sufficiency.minWords;
-  const datedRoles = r.roles.filter((x) => x.start).map((x) => x.start!).sort();
+  const nowIso = opts.now ?? opts.github?.collectedAt;
+  const now = nowIso && !Number.isNaN(Date.parse(nowIso)) ? Date.parse(nowIso) : Date.now();
+  const gh = opts.github ? { facts: opts.github, m: deriveGithub(opts.github) } : undefined;
+  const grid = declaredGrid(declaredInput(r, { profile: opts.linkedin, now, ...(opts.highBar ? { highBar: opts.highBar } : {}) }), gh);
 
   // TEC
   const seniorityBase = C.TEC.seniority[r.seniority_claimed] ?? C.TEC.seniority.mid;
   const tecBonus = C.TEC.perDescribedTechno * described.length;
-  // Lecture d'avant l'école (champs absents) : comme sans école.
-  const school = schoolTier(r.school_name, r.school_tier).tier;
-  const schoolBonus = school === "none" ? 0 : C.TEC.school.bonus[school];
   const TEC: Stat = {
     code: "TEC",
-    value: clampScore(seniorityBase + tecBonus + schoolBonus),
+    value: clampScore(seniorityBase + tecBonus),
     sufficient: r.roles.length > 0 || described.length > 0,
     facts: [
       fact(`Séniorité déclarée : ${SENIORITY_FR[r.seniority_claimed] ?? r.seniority_claimed} (${seniorityBase})`, `Claimed seniority: ${r.seniority_claimed} (${seniorityBase})`),
-      ...(school === "none"
-        ? []
-        : [fact(`École : ${r.school_name.trim()}, rang ${school} (+${schoolBonus})`, `School: ${r.school_name.trim()}, tier ${school} (+${schoolBonus})`)]),
       fact(
-        `${described.length} techno${described.length > 1 ? "s" : ""} rattachée${described.length > 1 ? "s" : ""} à une responsabilité (+${tecBonus})`,
-        `${described.length} technolog${described.length === 1 ? "y" : "ies"} tied to a responsibility (+${tecBonus})`,
+        `${described.length} techno${described.length > 1 ? "s" : ""} rattachée${described.length > 1 ? "s" : ""} à une responsabilité (${C.TEC.perDescribedTechno} points chacune)`,
+        `${described.length} technolog${described.length === 1 ? "y" : "ies"} tied to a responsibility (${C.TEC.perDescribedTechno} points each)`,
       ),
       fact(`${listed.length} technos listées, non comptées`, `${listed.length} technologies listed, not counted`),
     ],
@@ -162,25 +172,14 @@ export function scoreCv(
     facts: [
       fact(`Structure et clarté du CV : ${r.writing_quality}/5`, `CV structure and clarity: ${r.writing_quality}/5`),
       fact(
-        `${nf(counts.words, "fr")} mots sur ${counts.pages} page${counts.pages > 1 ? "s" : ""}${long ? ` (−${C.DOC.longCvPenalty}, plus de ${nf(C.DOC.longCvWords, "fr")} mots)` : ""}`,
-        `${nf(counts.words, "en")} words over ${counts.pages} page${counts.pages === 1 ? "" : "s"}${long ? ` (−${C.DOC.longCvPenalty}, over ${nf(C.DOC.longCvWords, "en")} words)` : ""}`,
+        `${nf(counts.words, "fr")} mots sur ${counts.pages} page${counts.pages > 1 ? "s" : ""}${long ? `, au-delà de ${nf(C.DOC.longCvWords, "fr")} mots : note réduite` : ""}`,
+        `${nf(counts.words, "en")} words over ${counts.pages} page${counts.pages === 1 ? "" : "s"}${long ? `, over ${nf(C.DOC.longCvWords, "en")} words: score reduced` : ""}`,
       ),
     ],
   };
 
-  // XP
-  const y = r.years_declared;
-  const XP: Stat = {
-    code: "XP",
-    value: scoreOn(SCORING.github.XP.scale, y),
-    sufficient: y > 0 || datedRoles.length > 0,
-    facts: [
-      fact(`${df(y, "fr")} an${y >= 2 ? "s" : ""} d'expérience déclarée${y >= 2 ? "s" : ""}`, `${df(y, "en")} year${y === 1 ? "" : "s"} of experience claimed`),
-      datedRoles.length
-        ? fact(`Premier poste daté : ${datedRoles[0].slice(0, 4)}`, `First dated role: ${datedRoles[0].slice(0, 4)}`)
-        : fact("Aucun poste daté", "No dated role"),
-    ],
-  };
+  // XP : le critère Expérience de la grille × 10, compté sur les postes datés (jamais les années que l'IA lit).
+  const XP: Stat = xpStatOf(grid.criteria.find((c) => c.code === "XP")!);
 
   // BUZZ
   const per100 = buzzPer100(r, counts);
@@ -205,8 +204,7 @@ export function scoreCv(
 
   const stats = orderStats({ TEC, SHIP, ARCH, DOC, XP, BUZZ } as Record<StatCode, Stat>);
   const values = valuesOf(stats);
-  const overall = overallOf(values);
-  const gh = opts.github ? { facts: opts.github, m: deriveGithub(opts.github) } : undefined;
+  const overall = grid.overall;
   const cvCtx = { reading: r, counts, buzzPer100: per100 };
   const candidates = evaluateRules(["cv"], { stats: values, github: gh, cv: cvCtx });
   const statuses = composeStatuses(candidates);
@@ -236,5 +234,6 @@ export function scoreCv(
     reliability: reliabilityOf(stats),
     judgedInSeconds: opts.judgedInSeconds,
     lang: opts.lang,
+    grid,
   };
 }
