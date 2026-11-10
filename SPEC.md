@@ -1178,3 +1178,17 @@ Jacques n'aime plus la révélation en ascenseur. Il veut une course-poursuite :
 - **Fonction du temps** : `shared/chase/` rend une image SVG pour un instant donné, comme la fiche. Les images se rendent donc aussi côté serveur : c'est ce qui servira au clip vertical (§18.8).
 - **Ni marque, ni arme, ni accident** : véhicules génériques, pas de collision avec des personnes, pas de mot ni de tampon repris du jeu.
 - **L'ascenseur reste dans le dépôt** derrière un réglage, le temps de valider la poursuite ; il partira ensuite.
+
+### 18.34 Le partage avec les décors (10 novembre 2026)
+
+- **Aperçu de lien d'une fiche, 1200 × 630** : fond d'encre, la fiche à gauche, à droite le lieu du crime du profil dans une case (576 × 290), dessous le nom en crème, le chef d'accusation le plus drôle en rose, « Fais la tienne : skills.azerit.tech ». « AVIS DE RECHERCHE » est sur l'encre, au-dessus de la case. Un nom trop long passe sur deux lignes.
+- **Image portrait, 1080 × 1350** : le décor en haut de bord à bord, l'encre dessous, la fiche (780 px) à cheval sur la limite, comme sur la page d'une fiche.
+- **Format story, 1080 × 1920** (`/og/:id-story.png`) : même construction, « AVIS DE RECHERCHE » sur une plaque d'encre, la fiche, puis la peine en crème et la caution en rose, puis l'adresse. Rien d'important dans les 250 px du haut ni les 340 px du bas. Pour une comparaison : la story de sa fiche GitHub. Dans le bloc de partage, un lien discret « Format story » sous le bouton de l'image.
+- **Sans profil** : le décor `default`. Fichier absent : l'ancien ciel dessiné, jamais d'erreur.
+- **Les comparaisons** gardent le fond d'encre, sans décor.
+- **Texte posé sur un décor** : encre sur les dix ciels clairs, crème sur les quatre d'heure bleue ; la liste est dans `shared/scenes.ts`, pour le site et pour les images.
+- **Cache** : les PNG vivent dans `og/v2/`, les anciens sont supprimés au démarrage, et les adresses portent `?v=2` (elles étaient servies avec un cache d'un an). Prochain changement de dessin : `IMAGE_DESIGN` dans `shared/images.ts`.
+- **Poids** : aperçu 350 à 440 Ko, portrait et story 0,8 à 1,05 Mo, grâce à un encodeur PNG sans transparence (`server/src/render/png.ts`). Rendu en 0,2 à 0,7 s, une fois par image.
+- **Aperçu de lien d'une comparaison, à la troisième personne** : « Le LinkedIn de @lea a volé 21 points à son code », « Le code de @lea vaut 12 points de plus que son LinkedIn ». Le titre se calcule depuis les deux notes ; le site et l'aperçu partagent `shared/compareText.ts`.
+- **Pas vérifié** : le partage du fichier story sur un vrai téléphone, les aperçus réels de LinkedIn, X et WhatsApp, la lecture des décors dans l'image Docker.
+- **Pas fait** : le clip vidéo (§18.8), qui attend la poursuite (§18.33).
