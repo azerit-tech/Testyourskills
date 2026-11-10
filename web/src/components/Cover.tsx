@@ -5,6 +5,7 @@
 // toujours, en dernier, la place libre qui ramène au champ.
 // Les grilles et le choix des décors sont dans lib/cover.ts ; la feuille
 // (styles.css, « la couverture ») lit les grilles par variables.
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import type { CardData, WeekTop } from "../../../shared/types";
 import { useT } from "../i18n";
@@ -12,7 +13,7 @@ import { DESKTOP, PHONE, SLOTS, areasCss, bigAvatar, colsCss, coverPanels, first
 import type { Panel, Slot } from "../lib/cover";
 import { onLinkClick } from "../lib/router";
 import { SUSPECTS, suspectSrc } from "../lib/suspects";
-import { Mugshot } from "./Mugshot";
+import { upper } from "../../../shared/card/text";
 
 export interface CoverProps {
   /** La place libre : retour au champ, prêt à taper. */
@@ -58,6 +59,56 @@ function Picture({ slot, small, large, w, h }: { slot: Slot; small: string; larg
   );
 }
 
+/** Les murs des visages : lilas, pêche, rose, bleu pâle (les ciels des décors). */
+const TINTS = ["#ccc2f5", "#ffd9c2", "#f3b6cf", "#c9d4ff"];
+
+/**
+ * Un visage de la couverture : la photo en pleine case, en deux tons (prune
+ * dans les ombres, la teinte du mur dans les lumières), les traits de la toise
+ * par-dessus, la plaque en bas. Sans photo, ou si elle ne charge pas : une
+ * silhouette prune devant le mur.
+ */
+function Face({ src, name, sub, mark, tint }: { src?: string | null; name: string; sub: string; mark?: string; tint: string }) {
+  const { lang } = useT();
+  // « wait » : la silhouette tient la pose tant que la photo n'est pas là, et pour de bon si elle ne vient pas.
+  const [shot, setShot] = useState<"wait" | "ok" | "broken">("wait");
+  const img = useRef<HTMLImageElement>(null);
+  useEffect(() => {
+    // Une photo déjà en cache a pu finir avant que l'écouteur soit posé.
+    const el = img.current;
+    if (el?.complete) setShot(el.naturalWidth > 0 ? "ok" : "broken");
+  }, [src]);
+  const photo = src && shot !== "broken" ? src : null;
+  const shown = !!photo && shot === "ok";
+  return (
+    <span className="cover-face" style={{ "--tint": tint } as CSSProperties} aria-hidden>
+      {!shown && (
+        <svg className="cover-face-shape" viewBox="0 0 100 100" preserveAspectRatio="xMidYMax meet">
+          <circle cx="50" cy="42" r="19" />
+          <path d="M8 100c0-27 18-44 42-44s42 17 42 44z" />
+        </svg>
+      )}
+      {photo && (
+        <img
+          ref={img}
+          className={`cover-face-photo${shown ? " is-on" : ""}`}
+          src={photo}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          onLoad={() => setShot("ok")}
+          onError={() => setShot("broken")}
+        />
+      )}
+      {mark && !shown && <span className="cover-face-mark">{mark}</span>}
+      <span className="cover-plate">
+        <b>{upper(name, lang)}</b>
+        <i>{sub}</i>
+      </span>
+    </span>
+  );
+}
+
 export function Cover({ onPlay, top, founder, suspects = SUSPECTS }: CoverProps) {
   const { t } = useT();
   const c = t.home.cover;
@@ -69,7 +120,9 @@ export function Cover({ onPlay, top, founder, suspects = SUSPECTS }: CoverProps)
     "--cover-areas-l": areasCss(DESKTOP),
   } as CSSProperties;
 
+  let faces = 0;
   const render = (slot: Slot, p: Panel, i: number): ReactNode => {
+    const tint = p.kind === "player" || p.kind === "founder" || p.kind === "free" ? TINTS[faces++ % TINTS.length]! : "";
     const cls = `cover-panel cover-${p.kind}${ON_PHONE.has(slot.id) ? "" : " is-wide"}`;
     // Une case qui change de contenu (le top arrive) se remonte et rejoue son entrée.
     const key = `${slot.id}-${p.kind}`;
@@ -92,20 +145,20 @@ export function Cover({ onPlay, top, founder, suspects = SUSPECTS }: CoverProps)
         const href = `/c/${e.cardId}`;
         return (
           <a key={key} {...common} href={href} onClick={(ev) => onLinkClick(ev, href)} aria-label={c.player(e.login, e.rank)}>
-            <Mugshot fill cardId={e.cardId} login={e.login} src={bigAvatar(e.avatarUrl)} guess={false} sub={c.playerPlate(e.rank, top?.week ?? 0)} />
+            <Face src={bigAvatar(e.avatarUrl)} name={`@${e.login}`} sub={c.playerPlate(e.rank, top?.week ?? 0)} tint={tint} />
           </a>
         );
       }
       case "founder":
         return (
           <a key={key} {...common} href={p.href} onClick={(ev) => onLinkClick(ev, p.href)} aria-label={t.home.exampleCaption}>
-            <Mugshot fill cardId={p.card.id} login={p.card.login} src={p.card.avatarUrl} guess={false} sub={c.founderPlate} />
+            <Face src={p.card.avatarUrl} name={p.card.login ? `@${p.card.login}` : p.card.name} sub={c.founderPlate} tint={tint} />
           </a>
         );
       case "free":
         return (
           <button key={key} {...common} type="button" onClick={onPlay} aria-label={c.freeLabel}>
-            <Mugshot fill cardId="free" name={c.free} sub={c.freePlate} mark="?" />
+            <Face name={c.free} sub={c.freePlate} mark="?" tint="#ffb2c6" />
           </button>
         );
       case "wait":
