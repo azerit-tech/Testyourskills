@@ -1158,3 +1158,23 @@ Demande de Jacques : les 0,25 $ restants sur OpenRouter doivent suffire avec GLM
 - **Avec 0,23 $** : 100 à 200 fiches. Assez pour rouvrir et tester, pas pour le pic du 19.
 - **Une vraie fiche prend 24 s, pas dix** : la collecte GitHub prend 5 à 16 s selon les essais, le choix des fichiers 3 à 6 s, la lecture 5 s. Le délai de 30 s est trop juste. À reprendre avant le lancement.
 - **Pas vérifié** : la lecture d'un CV ou d'un LinkedIn par GLM, et la qualité des lectures sur plus d'un profil.
+
+### 18.33 La poursuite remplace l'ascenseur (10 novembre 2026)
+
+Jacques n'aime plus la révélation en ascenseur. Il veut une course-poursuite : ça avance, les étoiles s'ajoutent une à une, la ville se remplit, et à six étoiles les hélicoptères. C'est la mécanique que tout le monde connaît : plus d'étoiles, plus de monde aux trousses.
+
+- **En 2D peinte, pas en 3D.** Des aplats et des silhouettes ton sur ton devant le ciel du profil, comme nos décors : c'est le style du site, c'est léger (plus de scène 3D de plusieurs Mo à télécharger), ça tourne sur un téléphone moyen, et ça se construit avant le 19. Une poursuite en 3D demanderait des modèles de voitures, une ville et des semaines.
+- **Le cadrage** (téléphone d'abord, en hauteur) : la caméra recule devant la voiture du suspect et regarde l'avenue derrière elle. De haut en bas : le ciel et ses hélicoptères, la ville en silhouettes, la route et la meute, la voiture du suspect en bas au centre, phares crème. Six étoiles en haut de l'écran.
+- **Une étoile, un renfort**, cumulés :
+  1. une voiture de patrouille déboîte, gyrophare corail et lilas en aplats alternés (pas de lueur) ;
+  2. une deuxième, elles encadrent ;
+  3. une troisième, et un barrage de plots qui vole ;
+  4. un fourgon, plus haut que les voitures ;
+  5. un hélicoptère monte au-dessus des toits, son projecteur en cône crème translucide suit la voiture ;
+  6. deux hélicoptères de plus, les projecteurs se croisent, toutes les fenêtres de la ville s'allument, feux d'artifice.
+- **Elle s'arrête au niveau de la personne.** Après sa dernière étoile, la suivante clignote et ne s'allume pas. La voiture freine devant le lieu du crime de son profil (le décor peint, §18.28), flash blanc, et la fiche se pose (le passage de relais existant).
+- **La radio cite ses faits** (les textes de `hudTexts.ts`), une ligne par étoile.
+- **Durée** : 1,2 s d'ouverture, 1,4 s par étoile, 1,6 s de fin : 4 s pour une étoile, 11 s pour six. Un clic la passe. Rien en mouvement réduit.
+- **Fonction du temps** : `shared/chase/` rend une image SVG pour un instant donné, comme la fiche. Les images se rendent donc aussi côté serveur : c'est ce qui servira au clip vertical (§18.8).
+- **Ni marque, ni arme, ni accident** : véhicules génériques, pas de collision avec des personnes, pas de mot ni de tampon repris du jeu.
+- **L'ascenseur reste dans le dépôt** derrière un réglage, le temps de valider la poursuite ; il partira ensuite.
