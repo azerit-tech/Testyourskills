@@ -148,7 +148,10 @@ announce() {
       log "    ${SHA:0:12} est DÉJÀ en service : redéploiement à l'identique"
     else
       log "    en service : $deployed ; partent :"
-      git log --no-decorate --format='      %h %s' "$deployed..$SHA" | head -40
+      # -n plutôt que | head : sous pipefail, head qui ferme le tube tue le script (141)
+      git log --no-decorate -n 40 --format='      %h %s' "$deployed..$SHA"
+      local n; n="$(git rev-list --count "$deployed..$SHA")"
+      [ "$n" -le 40 ] || log "      … et $((n - 40)) de plus ($n en tout)"
     fi
   else
     log "    en service : $deployed (inconnu de ce clone)"
