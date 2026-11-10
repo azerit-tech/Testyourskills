@@ -1,17 +1,18 @@
-// La révélation qui joue (§18.33) : l'ascenseur 3D (« walkout », par défaut le
-// temps de valider la poursuite) ou la poursuite 2D (« chase »). `?scene=chase`
-// ou `?scene=walkout` dans l'adresse la choisit, et le choix colle à la session,
-// comme `?mock=1` : il survit à la navigation de l'accueil à la fiche. Avec la
-// poursuite, ni Three.js ni les assets 3D ne se téléchargent.
+// La révélation qui joue (§18.33, §18.36) : l'ascenseur 3D (« walkout », par
+// défaut le temps de valider le film), la poursuite 2D (« chase ») ou le film
+// (« film »). `?scene=film`, `?scene=chase` ou `?scene=walkout` dans l'adresse
+// la choisit, et le choix colle à la session, comme `?mock=1` : il survit à la
+// navigation de l'accueil à la fiche. Avec la poursuite ou le film, ni Three.js
+// ni les assets 3D ne se téléchargent.
 
-export type RevealScene = "walkout" | "chase";
+export type RevealScene = "walkout" | "chase" | "film";
 
 /** La scène par défaut, tant que la poursuite n'est pas validée. */
 export const DEFAULT_SCENE: RevealScene = "walkout";
 const KEY = "tys_scene";
 
 export function parseScene(v: string | null | undefined): RevealScene | null {
-  return v === "chase" || v === "walkout" ? v : null;
+  return v === "film" || v === "chase" || v === "walkout" ? v : null;
 }
 
 /** La scène de la page : celle de l'adresse, sinon celle gardée pour la session, sinon le défaut. */

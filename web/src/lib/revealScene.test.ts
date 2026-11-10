@@ -30,6 +30,16 @@ describe("la scène de la révélation (§18.33)", () => {
     expect(revealScene()).toBe("walkout");
   });
 
+  it("?scene=film choisit le film (§18.36), sans changer le défaut", () => {
+    const store = new Map<string, string>();
+    fakeWindow("?mock=1&scene=film", store);
+    expect(revealScene()).toBe("film");
+    fakeWindow("", store);
+    expect(revealScene()).toBe("film");
+    expect(parseScene("film")).toBe("film");
+    expect(DEFAULT_SCENE).toBe("walkout");
+  });
+
   it("une valeur inconnue ne change rien", () => {
     expect(parseScene("3d")).toBeNull();
     fakeWindow("?scene=3d", new Map());
@@ -40,5 +50,7 @@ describe("la scène de la révélation (§18.33)", () => {
     expect(revealToPlay("chase", true)).toBeNull();
     expect(revealToPlay("walkout", true)).toBeNull();
     expect(revealToPlay("chase", false)).toBe("chase");
+    expect(revealToPlay("film", true)).toBeNull();
+    expect(revealToPlay("film", false)).toBe("film");
   });
 });
