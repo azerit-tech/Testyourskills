@@ -89,6 +89,49 @@ export interface Finding {
   score: number;
 }
 
+/** Les huit critères du barème de recrutement (docs/bareme-recrutement.md §3, SPEC §18.37). */
+export type CriterionCode = "EDU" | "XP" | "EMP" | "STK" | "CODE" | "ACT" | "OWN" | "OSS";
+export const CRITERION_CODES: CriterionCode[] = ["EDU", "XP", "EMP", "STK", "CODE", "ACT", "OWN", "OSS"];
+
+/** D'où vient une note ou une pièce : ce qui déclare (LinkedIn ou CV), ce qui prouve (GitHub), ou les deux recoupés. */
+export type GridSource = "linkedin" | "github" | "both";
+
+/**
+ * Un critère : une seule note sur 10, lue dans sa table de niveaux (le niveau
+ * le plus haut dont toute la ligne est remplie). Rien n'y est ajouté ni retiré.
+ */
+export interface GridCriterion {
+  code: CriterionCode;
+  /** Entier de 0 à 10 ; null si non prouvé ou non renseigné. */
+  score: number | null;
+  /** scored : noté sur sa source de preuve ; declared : sur la source qui déclare (table arrêtée à 6) ; unproven : la source ne montre rien de jugeable ; missing : sans objet. */
+  state: "scored" | "declared" | "unproven" | "missing";
+  /** false : hors moyenne (état, ou école / open source sous la moyenne des autres). */
+  counted: boolean;
+  source: GridSource;
+  /** Comparaison : la note côté LinkedIn. */
+  declared?: number | null;
+  /** Comparaison : la note côté GitHub. */
+  proven?: number | null;
+  /** Le niveau atteint, en clair. */
+  reached: Fact;
+  /** Ce qui manque pour le niveau suivant, avec les chiffres de la personne. */
+  next?: Fact;
+  /** Chefs d'accusation liés, sans effet sur la note. */
+  flags: Fact[];
+  /** La pièce : un fait précis et sa provenance, avec le lien public quand il existe. */
+  evidence?: { text: Fact; source: GridSource; proof?: string };
+}
+
+/** La grille d'une fiche, ou d'une comparaison (la note du dossier). */
+export interface Grid {
+  criteria: GridCriterion[];
+  /** Moyenne pondérée des critères comptés, × 10, entier de 1 à 99. */
+  overall: number;
+  /** capped_unproven : aucun code prouvé (plafond 85) ; empty_file : moins d'un quart des coefficients noté (note 20). */
+  rule?: "capped_unproven" | "empty_file";
+}
+
 /** La peine (axe le plus faible) et la caution (le geste qui lèverait un chef d'accusation), §18.2. */
 export interface CardSentence {
   label: Fact;
@@ -143,6 +186,8 @@ export interface CardData {
   findings?: Finding[];
   /** « Plus recherché que `percent` % » des profils sourcés par Azerit, dans le groupe dit (§18.3). Absent sans table de référence. */
   rank?: { percent: number; group: { kind: "language" | "position" | "all"; key?: string } };
+  /** Le barème de recrutement (0.4.0) : huit critères sur 10, dont `overall` est la moyenne. Absent des fiches d'avant. */
+  grid?: Grid;
 }
 
 /** Comparaison CV contre GitHub (§6.5). */
@@ -157,6 +202,8 @@ export interface ComparisonData {
   deltas: Record<StatCode, number>;
   /** Titre généré par règle. */
   headline: Fact;
+  /** La note du dossier : chaque critère pris sur sa source de preuve. Absente des comparaisons d'avant 0.4.0. */
+  grid?: Grid;
 }
 
 /** Rang d'une fiche GitHub dans le top de sa semaine (§18.22). Absent : hors classement. */
