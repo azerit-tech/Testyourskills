@@ -2,7 +2,7 @@
 // compte les requêtes d'une fiche, et vérifie ce que la collecte garde.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { collectGithub } from "./collect";
+import { collectGithub, externalPRList } from "./collect";
 
 const LOGIN = "fictif-dev";
 const NOW = Date.now();
@@ -198,6 +198,47 @@ describe("collecte complète, faux GitHub", () => {
     expect(seen.graphql.filter((q) => q.includes("search("))).toHaveLength(1);
     // Référence prise avant l'ajout des destinations de PR, des fichiers d'agent et de `homepage`.
     expect({ rest: seen.rest.length, graphql: seen.graphql.length, raw: seen.raw.length, other: seen.other.length }).toEqual(BASELINE);
+  });
+
+  it("garde la destination des PR fusionnées : dépôt, étoiles, date, jamais un dépôt privé", async () => {
+    const { facts, seen } = await collect();
+    const search = seen.graphql.find((q) => q.includes("search("))!;
+    expect(search).toContain("first:100");
+    expect(search).toMatch(/nameWithOwner stargazerCount isPrivate/);
+    expect(facts.externalMergedPRs).toBe(3);
+    expect(facts.externalMergedPRList).toEqual([
+      { repo: "agda/agda-stdlib", stars: 640, mergedAt: "2025-10-02T10:00:00Z", number: 41 },
+      { repo: "vitejs/vite", stars: 70000, mergedAt: "2025-03-01T10:00:00Z", number: 12 },
+    ]);
+  });
+});
+
+describe("destinations des PR, nœuds bruts", () => {
+  it("ignore l'illisible, ses propres dépôts, le privé ; cent au plus, les plus récentes d'abord", () => {
+    const node = (repo: string, mergedAt: string, extra: object = {}) => ({ mergedAt, repository: { nameWithOwner: repo, stargazerCount: 5, isPrivate: false }, ...extra });
+    expect(
+      externalPRList(
+        [
+          null,
+          {},
+          { mergedAt: "2025-01-01T00:00:00Z" },
+          node("pas un dépôt", "2025-01-01T00:00:00Z"),
+          node("a/b", "pas une date"),
+          node(`${LOGIN.toUpperCase()}/perso`, "2025-01-01T00:00:00Z"),
+          { mergedAt: "2025-01-01T00:00:00Z", repository: { nameWithOwner: "x/y", stargazerCount: 1 } }, // isPrivate inconnu : écarté
+          node("old/one", "2024-01-01T00:00:00Z", { number: 7 }),
+          node("new/one", "2025-06-01T00:00:00Z"),
+        ],
+        LOGIN,
+      ),
+    ).toEqual([
+      { repo: "new/one", stars: 5, mergedAt: "2025-06-01T00:00:00Z" },
+      { repo: "old/one", stars: 5, mergedAt: "2024-01-01T00:00:00Z", number: 7 },
+    ]);
+    const many = Array.from({ length: 150 }, (_, i) => node(`o/r${i}`, new Date(Date.UTC(2020, 0, 1 + i)).toISOString()));
+    const kept = externalPRList(many, LOGIN);
+    expect(kept).toHaveLength(100);
+    expect(kept[0]!.repo).toBe("o/r149");
   });
 });
 

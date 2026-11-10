@@ -82,6 +82,18 @@ export interface CommitFact {
   date: string;
 }
 
+/** Une PR fusionnée dans le dépôt de quelqu'un d'autre (§18.37, critère Open source). */
+export interface ExternalMergedPR {
+  /** Dépôt de destination, « propriétaire/nom ». Jamais un dépôt privé. */
+  repo: string;
+  /** Étoiles du dépôt de destination, au moment de la collecte. */
+  stars: number;
+  /** Date de fusion, ISO UTC. */
+  mergedAt: string;
+  /** Numéro de la PR : la preuve est https://github.com/{repo}/pull/{number}. */
+  number?: number;
+}
+
 export interface GithubFacts {
   schema: 1;
   login: string;
@@ -117,6 +129,13 @@ export interface GithubFacts {
   utcOffsetMinutes: number | null;
   /** PR fusionnées chez les autres (`type:pr author:X is:merged -user:X`). */
   externalMergedPRs: number;
+  /**
+   * Destination des PR fusionnées chez les autres, cent au plus, de la plus
+   * récente à la plus ancienne, sans dépôt privé. Peut être plus courte que
+   * `externalMergedPRs` (au-delà de cent, ou dépôts privés écartés). Absent des
+   * faits collectés avant le §18.37, ou si la recherche n'a pas rendu ses nœuds.
+   */
+  externalMergedPRList?: ExternalMergedPR[];
   /** Plus ancien commit de l'utilisateur dans un repo qui en compte au moins 10. */
   firstRealCommit: {
     repo: string;

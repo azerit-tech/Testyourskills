@@ -16,11 +16,11 @@ import {
 } from "./detect";
 import { pickAccomplices, type RawContributor } from "./accomplices";
 import { isDefaultGithubAvatar } from "./avatar";
-import type { CommitFact, GithubFacts, GithubRepo, RepoTree } from "./facts";
+import type { CommitFact, ExternalMergedPR, GithubFacts, GithubRepo, RepoTree } from "./facts";
 import { EngineError, graphql, headOf, lastPageOf, makeCtx, rawFile, rest, soft, type Ctx, type GithubAuth } from "./http";
 
 export { EngineError } from "./http";
-export type { GithubFacts, GithubRepo, GithubProfile, RepoTree, CommitFact } from "./facts";
+export type { GithubFacts, GithubRepo, GithubProfile, RepoTree, CommitFact, ExternalMergedPR } from "./facts";
 export { pickFilesForReading } from "./pick";
 
 const DAY = 86_400_000;
@@ -44,6 +44,8 @@ const LIMITS = {
   hugeRepoKb: 300_000,
   /** Au-delà (commits), on ne filtre plus l'historique par auteur côté GitHub (trop lent). */
   hugeHistory: 50_000,
+  /** PR fusionnées chez les autres dont la destination est gardée. */
+  externalPRs: 100,
 };
 
 interface RestUser {
@@ -318,7 +320,8 @@ export async function collectGithub(
     activityByYear: years,
     commits: commitsRes.commits,
     utcOffsetMinutes: commitsRes.offset,
-    externalMergedPRs: externalPRs ?? 0,
+    externalMergedPRs: externalPRs?.count ?? 0,
+    ...(externalPRs?.list ? { externalMergedPRList: externalPRs.list } : {}),
     firstRealCommit,
     trees: trees.map((t) => t.tree),
     accomplices,
@@ -449,11 +452,44 @@ function dailyCounts(days: { contributionCount: number; date?: string }[]): Cale
   return { start, counts: days.map((d) => d.contributionCount) };
 }
 
-/** PR fusionnées dans les repos des autres. */
-async function fetchExternalPRs(ctx: Ctx, login: string): Promise<number | null> {
-  const q = `query($q:String!){ search(query:$q, type:ISSUE, first:0){ issueCount } }`;
-  const { data } = await graphql<{ search: { issueCount: number } }>(ctx, q, { q: `type:pr author:${login} is:merged -user:${login}` });
-  return data?.search.issueCount ?? null;
+/**
+ * PR fusionnées dans les repos des autres : le compte, et la destination des
+ * cent premières (dépôt, étoiles, date de fusion). Une seule requête, comme
+ * avant : la même recherche rend ses nœuds au lieu du seul compte. Coût
+ * GraphQL : 1 point (une connexion de 100 nœuds au plus), comme avec `first:0`.
+ */
+async function fetchExternalPRs(ctx: Ctx, login: string): Promise<{ count: number; list: ExternalMergedPR[] | null } | null> {
+  const q = `query($q:String!){ search(query:$q, type:ISSUE, first:${LIMITS.externalPRs}){ issueCount
+    nodes{ ... on PullRequest{ number mergedAt repository{ nameWithOwner stargazerCount isPrivate } } } } }`;
+  type D = { search: { issueCount: number; nodes?: unknown[] | null } };
+  const { data } = await graphql<D>(ctx, q, { q: `type:pr author:${login} is:merged -user:${login}` });
+  if (!data?.search) return null;
+  return { count: data.search.issueCount, list: Array.isArray(data.search.nodes) ? externalPRList(data.search.nodes, login) : null };
+}
+
+/**
+ * Les nœuds de la recherche → destinations gardées. Un dépôt privé (visible du
+ * seul jeton du serveur) ne sort jamais : son nom finirait sur une fiche publique.
+ * Triées de la plus récente à la plus ancienne.
+ */
+export function externalPRList(nodes: unknown[], login: string): ExternalMergedPR[] {
+  const out: ExternalMergedPR[] = [];
+  for (const raw of nodes) {
+    const n = raw as { number?: unknown; mergedAt?: unknown; repository?: { nameWithOwner?: unknown; stargazerCount?: unknown; isPrivate?: unknown } | null } | null;
+    const repo = n?.repository?.nameWithOwner;
+    const mergedAt = n?.mergedAt;
+    if (typeof repo !== "string" || !/^[\w.-]+\/[\w.-]+$/.test(repo) || typeof mergedAt !== "string" || Number.isNaN(Date.parse(mergedAt))) continue;
+    if (n?.repository?.isPrivate !== false) continue;
+    if (repo.split("/")[0]!.toLowerCase() === login.toLowerCase()) continue;
+    const stars = n?.repository?.stargazerCount;
+    out.push({
+      repo,
+      stars: typeof stars === "number" && stars >= 0 ? Math.floor(stars) : 0,
+      mergedAt,
+      ...(typeof n?.number === "number" ? { number: n.number } : {}),
+    });
+  }
+  return out.sort((a, b) => b.mergedAt.localeCompare(a.mergedAt) || a.repo.localeCompare(b.repo)).slice(0, LIMITS.externalPRs);
 }
 
 /** Contributions par fenêtre glissante d'un an, depuis la création du compte (une requête par fenêtre, en parallèle). */
