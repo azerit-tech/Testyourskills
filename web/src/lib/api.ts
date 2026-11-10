@@ -377,9 +377,19 @@ async function getShowcase(): Promise<CardData | null> {
   return body.card ?? null;
 }
 
+/** La requête du top en cours : la couverture et le tableau de l'accueil la partagent. */
+let topFlight: Promise<WeekTop | null> | null = null;
+
 /** Le haut du classement de la semaine (§18.22) ; null si le serveur ne répond pas. */
-async function getTop(): Promise<WeekTop | null> {
-  if (isMock()) return mockTop();
+function getTop(): Promise<WeekTop | null> {
+  if (isMock()) return Promise.resolve(mockTop());
+  topFlight ??= fetchTop().finally(() => {
+    topFlight = null;
+  });
+  return topFlight;
+}
+
+async function fetchTop(): Promise<WeekTop | null> {
   try {
     const res = await fetch("/api/top", { headers: { Accept: "application/json" } });
     if (!res.ok) return null;

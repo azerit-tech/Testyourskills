@@ -6,7 +6,7 @@
 // Raccourcis : coller une URL GitHub ou LinkedIn, ou déposer un PDF, n'importe où sur
 // la page lance la carte (et ouvre la bonne porte).
 import { useEffect, useId, useRef, useState } from "react";
-import type { FormEvent, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
+import type { FormEvent, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { detectEntry, linkedinSlug, parseGithubLogin, resolveDoor } from "../../../shared/entry";
 import type { Door } from "../../../shared/entry";
@@ -25,6 +25,8 @@ interface Props {
   inputRef?: React.RefObject<HTMLInputElement | null>;
   /** « inline » : sans onglets ni CV, pour le bandeau d'une carte partagée. */
   variant?: "full" | "inline";
+  /** Une ligne posée entre la pilule et les liens du pied (la promesse de l'accueil, sur téléphone). */
+  note?: ReactNode;
 }
 
 const DOORS: Door[] = ["linkedin", "github"];
@@ -69,7 +71,7 @@ function initialEntry(raw: string | undefined): { door: Door; login: string } {
   return { door: sessionDoor(), login: s };
 }
 
-export function EntryForm({ inputRef, variant = "full" }: Props) {
+export function EntryForm({ inputRef, variant = "full", note }: Props) {
   const inline = variant === "inline";
   const { t, lang } = useT();
   const h = t.home;
@@ -577,6 +579,7 @@ export function EntryForm({ inputRef, variant = "full" }: Props) {
       </button>
 
       {errorLine}
+      {note}
 
       <div className="entry-foot" id={`${uid}-hint`}>
         {showCv && <span className="entry-reassure">{h.reassure}</span>}

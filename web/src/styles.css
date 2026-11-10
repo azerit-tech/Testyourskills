@@ -398,230 +398,7 @@ svg {
 
 /* ============ accueil ============ */
 
-.hero {
-  display: grid;
-  gap: 32px;
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 12px var(--gutter) 48px;
-}
-.hero-copy {
-  display: grid;
-  gap: 16px;
-  min-width: 0;
-}
-.hero-title {
-  font: 700 clamp(56px, 18vw, 72px) / 0.88 var(--f-name);
-  text-transform: uppercase;
-  color: var(--cream);
-  overflow-wrap: anywhere;
-}
-/* deux phrases, chacune sur ses lignes : la déclaration en crème, la preuve en rose poudré */
-.hero-title > span {
-  display: block;
-}
-.hero-title-proof {
-  color: var(--blush);
-}
-/* la ligne d'appoint en lilas : le rose est pris par la seconde phrase du titre */
-.hero-hook {
-  max-width: 22ch;
-  font: 500 21px/1.25 var(--f-text);
-  color: var(--lilac);
-}
-
-.showcase {
-  display: grid;
-  justify-items: center;
-  gap: 4px;
-  min-width: 0;
-}
-.showcase figcaption a {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  padding: 0 4px;
-  font: 500 13px/1.3 var(--f-text);
-  color: var(--lilac-dim);
-  text-align: center;
-  text-decoration: underline;
-  text-decoration-color: var(--lilac-faint);
-  text-underline-offset: 4px;
-}
-.showcase figcaption a:hover {
-  color: var(--cream);
-}
-
-/* ============ le ciel de l'accueil (§18.29) ============
-   Les lieux du crime en fondu enchaîné (HomeSky.tsx) derrière la promesse.
-   Téléphone : de bord à bord sous le bandeau de saison, derrière la barre du
-   haut, au 3:2 entier (260 px à 390) quand l'écran est assez haut, plus bas
-   sinon, rogné par le haut : le champ et « Ouvrir mon dossier » restent au
-   premier écran jusqu'à 390 × 700 et 360 × 640 (navigateur intégré de
-   LinkedIn). Le budget, de haut en bas : bandeau 44, ciel, titre (4 lignes de
-   0,88 em, moins 0,84 em sur le ciel : 2,68 em), 12, accroche (2 lignes de
-   23,4), 16, portes 44, 10, champ 56, 10, pilule 52, soit 291 + 2,68 em ; le
-   ciel prend le reste moins 9 px. La première ligne du titre se pose sur
-   l'aplat sombre du bas de l'image, sa ligne de base sur le bord : ses
-   capitales (0,70 em) tiennent dans l'aplat même là où il est le plus mince
-   (night_owl, 20 % de la hauteur), le reste du titre est sur l'encre.
-   Ordinateur : un bandeau de toute la largeur (70 vh au plus) derrière le
-   premier écran ; le texte s'y lit sur une plaque d'encre, l'image n'est
-   assombrie que derrière lui. Le seul dégradé ajouté : le fondu vers l'encre.
-   Travelling 1,05 → 1,12 ancré en bas : l'aplat sombre ne fait que grandir. */
-.topbar.topbar-home {
-  position: relative;
-  z-index: 2;
-}
-/* la marque et la langue sur des pastilles d'encre : lisibles sur un ciel clair comme sur la nuit */
-.topbar-home .topbar-brand {
-  padding: 0 14px;
-  border-radius: 999px;
-  background: var(--ink-0);
-}
-.topbar-home .lang-toggle {
-  background: var(--ink-0);
-}
-.topbar-home .demo-pill {
-  padding: 8px 12px;
-  border-radius: 999px;
-  background: var(--ink-0);
-}
-.home-top {
-  --home-bar: 64px;
-  /* la plus longue ligne, « YOUR LINKEDIN », fait 5,33 em : à 16vw elle tient
-     à 360 px (307 px pour 328) et à 320 px, avec 6 % de marge */
-  --hero-title: clamp(40px, 16vw, 64px);
-  position: relative;
-}
-.home-sky {
-  position: relative;
-  z-index: 0;
-  overflow: hidden;
-  height: clamp(150px, calc(100vh - 300px - 2.68 * var(--hero-title)), 66.667vw);
-  height: clamp(150px, calc(100svh - 300px - 2.68 * var(--hero-title)), 66.667vw);
-  margin-top: calc(-1 * var(--home-bar));
-  background: var(--ink-1);
-}
-.home-sky::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 3;
-  background: linear-gradient(to bottom, rgba(12, 13, 27, 0) 78%, rgba(12, 13, 27, 0.3) 86%, rgba(12, 13, 27, 0.7) 93%, var(--ink-0) 100%);
-}
-.home-sky-img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  /* rogné par le haut seulement : l'aplat sombre du bas reste entier sous le titre */
-  object-position: 50% 100%;
-  opacity: 0;
-  transform: scale(1.05);
-  transform-origin: 50% 100%;
-}
-/* le nouveau ciel se fond par-dessus l'ancien, qui reste plein dessous */
-.home-sky-img.is-on {
-  z-index: 2;
-  opacity: 1;
-  transition: opacity 1.2s ease;
-}
-.home-sky-img.is-prev {
-  z-index: 1;
-  opacity: 1;
-}
-/* 6 s à l'écran plus 1,2 s de fondu ; la même animation continue quand il passe dessous */
-.home-sky-img.is-on,
-.home-sky-img.is-prev {
-  animation: home-sky-drift 7.2s linear both;
-  will-change: transform;
-}
-.home-sky.is-paused .home-sky-img {
-  animation-play-state: paused;
-}
-@keyframes home-sky-drift {
-  from {
-    transform: scale(1.05);
-  }
-  to {
-    transform: scale(1.12);
-  }
-}
-.home-top .hero {
-  position: relative;
-  z-index: 1;
-  padding-top: 0;
-}
-.home-top .hero-title {
-  margin-top: -0.84em;
-  font-size: var(--hero-title);
-}
-.home-top .hero-copy {
-  gap: 12px;
-}
-.home-top .hero-hook {
-  font-size: 18px;
-  line-height: 1.3;
-}
-.home-top .entry {
-  margin-top: 4px;
-}
-@media (min-width: 900px) {
-  .home-top {
-    --home-bar: 76px;
-  }
-  .home-sky {
-    position: absolute;
-    top: 0;
-    right: 0;
-    left: 0;
-    height: min(70vh, 66.667vw);
-    max-height: calc(100% + var(--home-bar));
-    aspect-ratio: auto;
-  }
-  .home-sky::after {
-    background: linear-gradient(to bottom, rgba(12, 13, 27, 0) 60%, rgba(12, 13, 27, 0.45) 80%, var(--ink-0) 100%);
-  }
-  /* le haut n'est que du ciel : on rogne surtout là */
-  .home-sky-img {
-    object-position: 50% 62%;
-  }
-  .home-top .hero {
-    padding-top: 28px;
-  }
-  /* chaque phrase sur une ligne si la largeur le permet, sinon coupée à son seul blanc sécable */
-  .home-top .hero-title {
-    margin-top: 0;
-    font-size: clamp(56px, 6vw, 88px);
-  }
-  .home-top .hero-copy {
-    gap: 16px;
-  }
-  .home-top .hero-hook {
-    font-size: 24px;
-    line-height: 1.25;
-  }
-  /* 0,74 d'encre : crème, rose, lilas et alerte au-dessus de 4,5:1 sur le point le plus clair des cinq ciels */
-  .home-top .hero-copy {
-    padding: clamp(24px, 2.8vw, 40px);
-    border-radius: var(--r-card);
-    background: rgba(12, 13, 27, 0.74);
-  }
-  .home-top .showcase figcaption a {
-    padding: 0 16px;
-    border-radius: 999px;
-    background: var(--ink-0);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .home-sky-img {
-    animation: none !important;
-  }
-}
-
-/* ============ la couverture de l'accueil (§18.31) ============
+/* --- la couverture (§18.31) ---
    Une mosaïque encadrée (Cover.tsx) : un cadre prune foncé plat, des cases
    séparées par des joints d'encre (le fond du cadre), autant de marge que de
    joint. Les grilles viennent de lib/cover.ts par variables (--cover-*-s pour
@@ -712,6 +489,164 @@ button.cover-panel:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .cover-panel {
     animation: none;
+  }
+}
+
+/* --- le héros, sous la couverture (§18.31) ---
+   Téléphone, de haut en bas, au premier écran jusqu'à 390 × 700 et 360 × 640
+   (navigateur intégré de LinkedIn) : bandeau 44, barre 64, couverture, 14,
+   titre (4 lignes de 0,92 em), 14, portes 44, 10, champ 56, 10, pilule 52,
+   soit 308 px plus 3,68 em de titre. La couverture prend le reste moins 8 px,
+   entre 16:9 et 16:10 de sa largeur : 229 px à 390 × 700 (16:10), 195 px à
+   360 × 640. La promesse et les liens du formulaire suivent, sous le pli s'il
+   le faut.
+   Ordinateur : la couverture, puis une rangée de trois colonnes sur sa largeur
+   (le titre, une phrase par ligne ; le formulaire ; la promesse en capitales),
+   la flèche dessous. Bandeau 44, barre 76, couverture, 24, rangée 164 (portes
+   44, 10, champ 56, 10, liens 44), 4, flèche 44 : 356 px hors couverture, qui
+   prend 100svh - 360 px, entre 380 px et 16:8,5 de sa largeur (452 px à
+   1440 × 812). */
+.home-top {
+  /* 38 px à 390, 35 à 360, jamais moins de 34 */
+  --hero-title: clamp(34px, 9.75vw, 40px);
+}
+.home-top .cover {
+  height: clamp(calc((100vw - 24px) * 0.5625), calc(100vh - 316px - 3.68 * var(--hero-title)), calc((100vw - 24px) * 0.625));
+  height: clamp(calc((100vw - 24px) * 0.5625), calc(100svh - 316px - 3.68 * var(--hero-title)), calc((100vw - 24px) * 0.625));
+}
+.hero {
+  display: grid;
+  gap: 14px;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 14px var(--gutter) 40px;
+}
+.hero-title {
+  font: 700 var(--hero-title, 38px) / 0.92 var(--f-name);
+  text-transform: uppercase;
+  color: var(--cream);
+  overflow-wrap: anywhere;
+}
+/* deux phrases, chacune sur deux lignes : à 6,4 em, chacune coupe à son seul blanc
+   sécable (la plus courte, « TON CV DIT SENIOR. », fait 6,97 em ; le plus long
+   morceau, « YOUR LINKEDIN », 5,42 em). La déclaration en crème, la preuve en rose poudré. */
+.hero-title > span {
+  display: block;
+  max-width: 6.4em;
+}
+.hero-title-proof {
+  color: var(--blush);
+}
+.hero .entry {
+  margin-top: 0;
+}
+/* la promesse : une ligne lilas sous la pilule (281 px en 14 à 360 px, pour 328) */
+.hero-hook {
+  font: 500 14px/1.4 var(--f-text);
+  color: var(--lilac-2);
+  text-align: center;
+}
+.hero-hook-l,
+.hero-next {
+  display: none;
+}
+
+/* la fiche de Jacques : sa propre section, centrée, sous le héros */
+.home-example {
+  display: grid;
+  justify-items: center;
+  padding: 8px var(--gutter) 56px;
+}
+.showcase {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.showcase figcaption a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 4px;
+  font: 500 13px/1.3 var(--f-text);
+  color: var(--lilac-dim);
+  text-align: center;
+  text-decoration: underline;
+  text-decoration-color: var(--lilac-faint);
+  text-underline-offset: 4px;
+}
+.showcase figcaption a:hover {
+  color: var(--cream);
+}
+
+@media (min-width: 900px) {
+  .home-top .cover {
+    height: clamp(380px, calc(100vh - 360px), calc(min(1080px, 100vw - 64px) * 0.53125));
+    height: clamp(380px, calc(100svh - 360px), calc(min(1080px, 100vw - 64px) * 0.53125));
+  }
+  /* sur la largeur de la couverture : à 1440, 364 · 440 · 228 px. Le titre anglais le
+     plus long, « YOUR LINKEDIN SAYS SENIOR. », fait 355 px en 34 ; « DÉCROCHE UN
+     ENTRETIEN. », 212 px en 17 avec son interlettrage. */
+  .hero {
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 440px) minmax(0, 1fr);
+    column-gap: 20px;
+    row-gap: 4px;
+    align-items: start;
+    width: min(1080px, 100% - 64px);
+    max-width: none;
+    padding: 24px 0 8px;
+  }
+  /* le titre et la promesse centrés sur les portes et le champ (110 px) */
+  .hero-title {
+    margin-top: 22px;
+    font-size: 34px;
+    line-height: 0.95;
+  }
+  .hero-title > span {
+    max-width: none;
+  }
+  .hero .entry {
+    max-width: none;
+  }
+  .hero-hook-s {
+    display: none;
+  }
+  .hero-hook-l {
+    display: block;
+    margin-top: 36px;
+    font: 700 17px/1.15 var(--f-name);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    text-align: right;
+    color: var(--lilac);
+  }
+  .hero-next {
+    grid-column: 1 / -1;
+    justify-self: center;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border: 0;
+    border-radius: 999px;
+    background: none;
+    color: var(--blush);
+    transition: transform 0.18s var(--ease-out);
+  }
+  .hero-next:hover {
+    transform: translateY(2px);
+  }
+  .hero-next svg {
+    width: 28px;
+    height: 28px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .home-example {
+    padding: 40px var(--gutter) 72px;
   }
 }
 
@@ -2660,19 +2595,6 @@ a.dossier-item:hover {
     height: 76px;
   }
 
-  .hero {
-    grid-template-columns: minmax(0, 1fr) 360px;
-    gap: 64px;
-    align-items: center;
-    padding-top: 28px;
-    padding-bottom: 72px;
-  }
-  .hero-title {
-    font-size: 104px;
-  }
-  .hero-hook {
-    font-size: 28px;
-  }
   .entry {
     grid-template-columns: minmax(0, 1fr) auto;
     max-width: 560px;

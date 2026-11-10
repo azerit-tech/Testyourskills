@@ -1,24 +1,27 @@
-// Entrée (§6.1, §18.5, maquette web/gta-accueil.html) : le ciel (§18.29), la promesse, le champ,
-// la fiche de Jacques, puis le mur des 13 profils (§18.28) et le top de la semaine (§18.22). Rien d'autre.
+// Entrée (§6.1, §18.5, §18.31) : la couverture, puis sous elle le titre, les
+// portes, le champ et la promesse ; la fiche de Jacques, le mur des 13 profils
+// (§18.28) et le top de la semaine (§18.22). Rien d'autre.
 // L'exemple est la vraie fiche de Jacques (fondateur d'Azerit) : la maquette
 // s'affiche d'abord, la fiche calculée par le serveur la remplace dès qu'elle existe.
-// Le ciel se fond dans l'encre par le bas : c'est le seul dégradé de la page, avec celui de la fiche.
+// Aucun dégradé dans la page : seuls ceux de la fiche et des illustrations.
 import { useEffect, useRef, useState } from "react";
-import type { CardData } from "../../../shared/types";
+import type { CardData, WeekTop } from "../../../shared/types";
 import { LEVEL_LABELS, starsFor } from "../../../shared/types";
 import { FIXTURES } from "../../../shared/fixtures";
 import { CardView } from "../card/CardView";
+import { Cover } from "../components/Cover";
 import { EntryForm } from "../components/EntryForm";
-import { HomeSky } from "../components/HomeSky";
 import { ProfileWall } from "../components/ProfileWall";
 import { WeekBoard } from "../components/WeekBoard";
 import { useT } from "../i18n";
 import { api } from "../lib/api";
 import { onLinkClick } from "../lib/router";
 
-/** La fiche de Jacques : s'incline sous le pointeur, mène à sa page. */
-function ExampleCard() {
-  const { t, lang } = useT();
+/** Au-delà, le top est tenu pour absent : la couverture ne garde pas ses cases prunes. */
+const TOP_WAIT_MS = 3000;
+
+/** La fiche de Jacques : la maquette d'abord, la vraie dès que le serveur l'a. */
+function useShowcase(): { card: CardData; href: string } {
   const [card, setCard] = useState<CardData>(FIXTURES.jmougeot);
   const [real, setReal] = useState(false);
 
@@ -37,7 +40,30 @@ function ExampleCard() {
     };
   }, []);
 
-  const href = real ? `/c/${card.id}` : `/${card.login ?? "jmougeot"}`;
+  return { card, href: real ? `/c/${card.id}` : `/${card.login ?? "jmougeot"}` };
+}
+
+/** Le top de la semaine pour la couverture ; `undefined` tant qu'il n'a pas répondu. */
+function useTop(): WeekTop | null | undefined {
+  const [top, setTop] = useState<WeekTop | null | undefined>(undefined);
+  useEffect(() => {
+    let alive = true;
+    const late = window.setTimeout(() => alive && setTop((t) => (t === undefined ? null : t)), TOP_WAIT_MS);
+    api
+      .getTop()
+      .then((t) => alive && setTop(t))
+      .catch(() => alive && setTop(null));
+    return () => {
+      alive = false;
+      window.clearTimeout(late);
+    };
+  }, []);
+  return top;
+}
+
+/** La fiche de Jacques : s'incline sous le pointeur, mène à sa page. */
+function ExampleCard({ card, href }: { card: CardData; href: string }) {
+  const { t, lang } = useT();
   return (
     <figure className="showcase" aria-label={`${t.home.exampleLabel} · ${t.tierCard(LEVEL_LABELS[starsFor(card.overall)][lang])}`}>
       <CardView card={card} lang={lang} interactive idPrefix="hero" />
@@ -50,10 +76,15 @@ function ExampleCard() {
   );
 }
 
+const reducedMotion = () => !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
 export function Home() {
   const { t } = useT();
   const h = t.home;
   const inputRef = useRef<HTMLInputElement>(null);
+  const nextRef = useRef<HTMLElement>(null);
+  const showcase = useShowcase();
+  const top = useTop();
   // Sans entrée LinkedIn, la première phrase parle du CV. Optimiste, comme les portes du formulaire.
   const [liOn, setLiOn] = useState(() => api.knownConfig()?.linkedinEntry ?? true);
 
@@ -69,10 +100,10 @@ export function Home() {
     };
   }, []);
 
-  /** Une place libre du top, « Découvre le tien » : retour au champ du pseudo,
+  /** Une place libre, « Découvre le tien » : retour au champ du pseudo,
    * prêt à taper. Le focus se donne dans le geste, sinon l'iPhone n'ouvre pas le clavier. */
   const play = () => {
-    const behavior: ScrollBehavior = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+    const behavior: ScrollBehavior = reducedMotion() ? "auto" : "smooth";
     const input = inputRef.current;
     if (!input) {
       window.scrollTo({ top: 0, behavior });
@@ -82,23 +113,33 @@ export function Home() {
     input.focus({ preventScroll: true });
   };
 
+  /** La flèche sous le héros : la section suivante. */
+  const next = () => nextRef.current?.scrollIntoView({ block: "start", behavior: reducedMotion() ? "auto" : "smooth" });
+
   return (
     <main className="page page-home" id="main">
       <div className="home-top">
-        <HomeSky />
+        <Cover onPlay={play} top={top} founder={showcase} />
         <section className="hero">
-          <div className="hero-copy">
-            {/* Deux phrases : ce que le profil déclare (crème), ce que le code dira (rose poudré). */}
-            <h1 className="hero-title">
-              <span className="hero-title-claim">{liOn ? h.titleClaim : h.titleClaimCv}</span>{" "}
-              <span className="hero-title-proof">{h.titleProof}</span>
-            </h1>
-            <p className="hero-hook">{h.titleB}</p>
-            <EntryForm inputRef={inputRef} />
-          </div>
-          <ExampleCard />
+          {/* Deux phrases : ce que le profil déclare (crème), ce que le code dira (rose poudré). */}
+          <h1 className="hero-title">
+            <span className="hero-title-claim">{liOn ? h.titleClaim : h.titleClaimCv}</span>{" "}
+            <span className="hero-title-proof">{h.titleProof}</span>
+          </h1>
+          {/* La promesse : sous la pilule sur téléphone, en colonne de droite sur ordinateur ;
+           * l'une des deux est toujours en display: none, donc lue une seule fois. */}
+          <EntryForm inputRef={inputRef} note={<p className="hero-hook hero-hook-s">{h.titleB}</p>} />
+          <p className="hero-hook hero-hook-l">{h.titleB}</p>
+          <button type="button" className="hero-next" onClick={next} aria-label={h.next}>
+            <svg viewBox="0 0 24 24" aria-hidden>
+              <path d="M6 9.5l6 6 6-6" />
+            </svg>
+          </button>
         </section>
       </div>
+      <section className="home-example" ref={nextRef}>
+        <ExampleCard {...showcase} />
+      </section>
       <ProfileWall onPlay={play} />
       <WeekBoard onPlay={play} />
     </main>
