@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { FIXTURES } from "../../shared/fixtures";
+import { FIXTURES, FIXTURE_COMPARISON } from "../../shared/fixtures";
 import type { CardData, ComparisonData, Fact, JobState, StatCode } from "../../shared/types";
 import type { CvReading, CvTextCounts } from "../../shared/readings";
 import { createApp, normalizeLogin, purge, type AppOptions } from "./app";
@@ -362,12 +362,54 @@ describe("carte vitrine de l'accueil (§6.1)", () => {
     expect(await first.json()).toEqual({ card: null });
     await ctx.pipeline.drain();
     const res = await ctx.app.request("/api/showcase");
-    const json = (await res.json()) as { card: CardData | null };
+    const json = (await res.json()) as { card: CardData | null; href?: string; declared?: unknown };
     expect(json.card?.login).toBe("jmougeot");
     expect(json.card?.deleteToken).toBeUndefined();
+    // Fiche GitHub seule : le lien mène à elle, pas de note déclarée.
+    expect(json.href).toBe(`/c/${json.card?.id}`);
+    expect(json.declared).toBeUndefined();
     expect(ctx.calls.collect).toBe(1);
     await ctx.app.request("/api/showcase");
     expect(ctx.calls.collect).toBe(1);
+  });
+
+  it("sans lecteur LinkedIn, la fiche GitHub seule tient la semaine", async () => {
+    const ctx = setup({}, { showcaseLogin: "jmougeot", showcaseLinkedin: "https://www.linkedin.com/in/jacquesmougeot" });
+    await ctx.app.request("/api/showcase");
+    await ctx.pipeline.drain();
+    ctx.store.db.prepare("UPDATE cards SET created_at = created_at - ?").run(2 * 3600 * 1000);
+    await ctx.app.request("/api/showcase");
+    expect(ctx.pipeline.load()).toEqual({ running: 0, queued: 0 });
+    expect(ctx.calls.collect).toBe(1);
+  });
+
+  it("le dernier jugement de la vitrine : une fiche GitHub seule ou une comparaison LinkedIn prouvée, jamais autre chose", () => {
+    const ctx = setup();
+    const row = (id: string, at: number, over: Partial<Parameters<Store["insertCards"]>[0][number]>) => ({
+      id,
+      createdAt: at,
+      source: "github" as const,
+      login: "jmougeot",
+      kind: "card" as const,
+      data: { ...FIXTURES.gold, id },
+      deleteToken: "t",
+      ...over,
+    });
+    const cmp = { ...FIXTURE_COMPARISON, id: "cmp" };
+    ctx.store.insertCards([row("ghA", 1000, {})]);
+    expect(ctx.store.findLatestShowcase("JMougeot")?.id).toBe("ghA");
+    // Plus récentes, mais pas des jugements de la vitrine : une comparaison non prouvée,
+    // une comparaison CV, une carte d'une comparaison, la fiche d'un autre pseudo.
+    ctx.store.insertCards([row("liNo", 2000, { kind: "comparison", source: "linkedin", data: cmp, facts: { linkedinUrl: "u", linkedinProven: false } })]);
+    ctx.store.insertCards([row("both", 3000, { kind: "comparison", source: "both", data: cmp })]);
+    ctx.store.insertCards([row("child", 4000, { parentId: "liNo" })]);
+    ctx.store.insertCards([row("autre", 5000, { login: "leamd" })]);
+    expect(ctx.store.findLatestShowcase("jmougeot")?.id).toBe("ghA");
+    ctx.store.insertCards([row("liYes", 6000, { kind: "comparison", source: "linkedin", data: cmp, facts: { linkedinUrl: "u", linkedinProven: true } })]);
+    expect(ctx.store.findLatestShowcase("jmougeot")?.id).toBe("liYes");
+    ctx.store.insertCards([row("ghB", 7000, {})]);
+    expect(ctx.store.findLatestShowcase("jmougeot")?.id).toBe("ghB");
+    expect(ctx.store.findLatestShowcase("personne")).toBeNull();
   });
 
   it("ne fait rien sans pseudo vitrine", async () => {

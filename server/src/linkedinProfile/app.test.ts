@@ -284,11 +284,57 @@ describe("la vitrine : le serveur se porte garant de son LinkedIn (§18.35)", ()
     expect(ctx.calls.collect).toHaveLength(0);
   });
 
-  it("lecture du LinkedIn en échec : la fiche GitHub sort seule", async () => {
-    const ctx = setup({ forGithub: async () => null }, {}, VITRINE);
-    await ctx.app.request("/api/showcase");
+  type Showcase = { card: CardData | null; href?: string; declared?: { source: string; overall: number } };
+  const showcase = async (ctx: Ctx) => (await (await ctx.app.request("/api/showcase")).json()) as Showcase;
+
+  it("l'accueil reçoit la carte GitHub de la comparaison, sa note LinkedIn et le lien vers la comparaison ; l'aperçu de lien suit", async () => {
+    const homes: CardData[] = [];
+    const ctx = setup(
+      { forGithub: reads },
+      {
+        async renderImage(input) {
+          if (input.format === "home") homes.push(input.card!);
+          return new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+        },
+      },
+      { ...VITRINE, showcasePhoto: "/jmougeot-linkedin.jpg" },
+    );
+    expect(await showcase(ctx)).toEqual({ card: null });
     await ctx.pipeline.drain();
-    expect(latest(ctx, "jmougeot")).toMatchObject({ kind: "card", source: "github" });
+    const root = latest(ctx, "jmougeot")!;
+    const cmp = root.data as ComparisonData;
+    const json = await showcase(ctx);
+    expect(json.href).toBe(`/c/${root.id}`);
+    expect(json.declared).toEqual({ source: "linkedin", overall: cmp.cv.overall });
+    expect(json.card).toMatchObject({ id: cmp.github.id, source: "github", overall: cmp.github.overall, avatarUrl: "/jmougeot-linkedin.jpg", photoSource: "linkedin" });
+    expect(json.card?.deleteToken).toBeUndefined();
+    // Comparaison sortie : rien n'est relancé avant la semaine.
+    await showcase(ctx);
+    expect(ctx.calls.collect).toEqual(["jmougeot"]);
+    await ctx.app.request("/og/home.png");
+    expect(homes.map((c) => c.id)).toEqual([cmp.github.id]);
+  });
+
+  it("le LinkedIn n'est pas sorti : la fiche GitHub seule, retentée au bout d'une heure", async () => {
+    let up = false;
+    const ctx = setup({ forGithub: async (f, o) => (up ? reads(f, o) : null) }, {}, VITRINE);
+    await showcase(ctx);
+    await ctx.pipeline.drain();
+    const alone = await showcase(ctx);
+    expect(alone.card).toMatchObject({ source: "github", login: "jmougeot" });
+    expect(alone.href).toBe(`/c/${alone.card!.id}`);
+    expect(alone.declared).toBeUndefined();
+    // Moins d'une heure : on attend.
+    await ctx.pipeline.drain();
+    expect(ctx.calls.collect).toHaveLength(1);
+    ctx.store.db.prepare("UPDATE cards SET created_at = created_at - ?").run(61 * 60 * 1000);
+    up = true;
+    await showcase(ctx);
+    await ctx.pipeline.drain();
+    expect(ctx.calls.collect).toHaveLength(2);
+    const json = await showcase(ctx);
+    expect(json.declared?.source).toBe("linkedin");
+    expect(json.href).toBe(`/c/${latest(ctx, "jmougeot")!.id}`);
   });
 });
 

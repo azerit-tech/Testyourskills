@@ -76,7 +76,8 @@ export interface AppOptions {
 
 /** La carte vitrine est recalculée au plus une fois par semaine. */
 const SHOWCASE_MS = 7 * 24 * 3600 * 1000;
-const SHOWCASE_DEGRADED_MS = 3600 * 1000;
+/** Vitrine sortie sans lecture IA, ou sans son LinkedIn : retentée au bout d'une heure. */
+const SHOWCASE_RETRY_MS = 3600 * 1000;
 
 export function defaultAvatarDir(ogDir: string): string {
   return join(dirname(ogDir), "avatars");
@@ -264,25 +265,36 @@ export function createApp(opts: AppOptions) {
   // linkedinEntry : le champ de l'accueil accepte une adresse LinkedIn (§18.24).
   app.get("/api/config", (c) => c.json({ linkedin: !!opts.linkedin, claim: !!opts.githubAuth, linkedinEntry: !!opts.linkedinProfiles }));
 
-  // GET /api/showcase : la vraie carte du pseudo vitrine, pour l'accueil (§6.1).
-  // Hors quota. Null tant qu'aucune n'existe ; on en lance une si la dernière
-  // date de plus d'une semaine.
+  // GET /api/showcase : le vrai jugement du pseudo vitrine, pour l'accueil (§6.1,
+  // §18.35) : sa carte GitHub, le lien vers sa fiche (la comparaison s'il y en a
+  // une) et la note de son LinkedIn. Hors quota. Null tant qu'aucun n'existe ; on
+  // en lance un si le dernier date de plus d'une semaine.
   app.get("/api/showcase", (c) => {
     c.header("Cache-Control", "public, max-age=300");
     const login = opts.showcaseLogin;
     if (!login || store.isHidden(login)) return c.json({ card: null });
-    const row = store.findLatestGithub(login);
-    // Vitrine sortie sans lecture IA : on la retente au bout d'une heure, pas d'une semaine.
-    const stale = !row || Date.now() - row.createdAt > (row.degraded ? SHOWCASE_DEGRADED_MS : SHOWCASE_MS);
+    const row = store.findLatestShowcase(login);
+    const cmp = row?.kind === "comparison" ? (row.data as ComparisonData) : null;
+    // Sortie sans lecture IA, ou sans son LinkedIn alors qu'on sait le lire (lecture
+    // en échec ou trop lente) : on la retente au bout d'une heure, pas d'une semaine.
+    const retry = !!row && (row.degraded || (!cmp && !!opts.linkedinProfiles && !!opts.showcaseLinkedin));
+    const stale = !row || Date.now() - row.createdAt > (retry ? SHOWCASE_RETRY_MS : SHOWCASE_MS);
     // Jetons GitHub épuisés : la vitrine attendra, elle ne prend pas la place d'une vraie fiche.
     if (stale && !pipeline.inflightFor(login) && !pipeline.githubBusy()) pipeline.start({ lang: "fr", login });
     if (!row) return c.json({ card: null });
-    return c.json({ card: showcaseCard(row.data as CardData) });
+    return c.json({
+      card: showcaseCard(row),
+      href: `/c/${row.id}`,
+      ...(cmp ? { declared: { source: "linkedin", overall: cmp.cv.overall } } : {}),
+    });
   });
 
-  /** La fiche de la vitrine telle que l'accueil la montre : sans jeton, avec la photo de la vitrine. */
-  const showcaseCard = (data: CardData): CardData => {
-    const card = stripToken(data);
+  /**
+   * La fiche de la vitrine telle que l'accueil la montre : la carte GitHub du
+   * jugement (celle de sa comparaison s'il y en a une), sans jeton, avec la photo de la vitrine.
+   */
+  const showcaseCard = (row: CardRow): CardData => {
+    const card = stripToken(row.kind === "comparison" ? (row.data as ComparisonData).github : (row.data as CardData));
     return opts.showcasePhoto ? { ...card, avatarUrl: opts.showcasePhoto, photoSource: "linkedin" } : card;
   };
 
@@ -303,11 +315,11 @@ export function createApp(opts: AppOptions) {
   // Adresse stable pour og:image ; l'image suit la vitrine, d'où le cache d'une heure.
   const serveHomeImage = async (c: Context) => {
     const login = opts.showcaseLogin;
-    const row = login && !store.isHidden(login) ? store.findLatestGithub(login) : null;
+    const row = login && !store.isHidden(login) ? store.findLatestShowcase(login) : null;
     const key = row?.id ?? "exemple";
     let entry = homeImage;
     if (entry?.key !== key) {
-      const card = row ? showcaseCard(row.data as CardData) : FIXTURES.jmougeot;
+      const card = row ? showcaseCard(row) : FIXTURES.jmougeot;
       const png = (async () => deps.renderImage({ format: "home", card: await inlineAvatar(await frontAvatar(card), baseUrl, avatarDir), lang: "fr" }))();
       const fresh = (entry = { key, png });
       // Un rendu raté ne reste pas en mémoire : la demande suivante réessaie.

@@ -305,12 +305,30 @@ export class Store {
     return r ? toRow(r) : null;
   }
 
-  /** Dernière carte GitHub seule d'un pseudo, quel que soit son âge (carte vitrine de l'accueil). */
+  /** Dernière carte GitHub seule d'un pseudo, quel que soit son âge (les faits d'une comparaison, denounce.ts). */
   findLatestGithub(login: string): CardRow | null {
     const r = this.db
       .prepare(
         `SELECT * FROM cards
          WHERE parent_id IS NULL AND kind = 'card' AND source = 'github' AND login = ?
+         ORDER BY created_at DESC LIMIT 1`,
+      )
+      .get(login.toLowerCase()) as RawRow | undefined;
+    return r ? toRow(r) : null;
+  }
+
+  /**
+   * Dernier jugement de la vitrine (§6.1, §18.35), quel que soit son âge : une
+   * fiche GitHub seule, ou une comparaison LinkedIn contre GitHub prouvée.
+   */
+  findLatestShowcase(login: string): CardRow | null {
+    const r = this.db
+      .prepare(
+        `SELECT * FROM cards
+         WHERE parent_id IS NULL AND login = ? AND (
+           (kind = 'card' AND source = 'github')
+           OR (kind = 'comparison' AND source = 'linkedin' AND json_extract(facts_json, '$.linkedinProven') = 1)
+         )
          ORDER BY created_at DESC LIMIT 1`,
       )
       .get(login.toLowerCase()) as RawRow | undefined;
