@@ -3,7 +3,8 @@
 // "slow" (attente longue puis timeout). Les pseudos des fixtures donnent leur carte.
 // LinkedIn contre GitHub (§18.24) : le pseudo "camille-ardent", ou n'importe quel
 // lien linkedin.com/in/… ; linkedin.com/in/sans-github donne la fiche LinkedIn seule.
-import type { CardData, ComparisonData, Finding, JobState, ProgressEvent, Stat, StatCode } from "../../../shared/types";
+import type { CardData, ComparisonData, Finding, Grid, JobState, ProgressEvent, Stat, StatCode } from "../../../shared/types";
+import { tierFor } from "../../../shared/types";
 import { FIXTURES, FIXTURE_COMPARISON } from "../../../shared/fixtures";
 import { asLinkedinCard, asLinkedinComparison } from "../../../shared/linkedinText";
 import type { CaseInfo, CreateInput, CreateResult, Jury, Showcase, Verdict } from "./api";
@@ -139,11 +140,11 @@ const GH_FACTS: Record<StatCode, { fr: string; en: string }[]> = {
   TEC: [
     { fr: "3 repos lus par l'IA, niveau moyen pondéré 3,6 sur 5.", en: "3 repos read by the AI, weighted average level 3.6/5." },
     { fr: "Preuve : src/api/router.ts, gestion d'erreurs typée.", en: "Evidence: src/api/router.ts, typed error handling." },
-    { fr: "7 PR fusionnées chez les autres (bonus +4).", en: "7 PRs merged in other people's repos (+4 bonus)." },
+    { fr: "7 PR fusionnées chez les autres.", en: "7 PRs merged in other people's repos." },
   ],
   SHIP: [
     { fr: "44 semaines actives sur 52.", en: "44 active weeks out of 52." },
-    { fr: "5 releases ou tags publiés cette année (bonus +5).", en: "5 releases or tags this year (+5 bonus)." },
+    { fr: "5 releases ou tags publiés cette année.", en: "5 releases or tags this year." },
   ],
   ARCH: [
     { fr: "Tests présents sur 4 des 5 repos actifs.", en: "Tests in 4 of 5 active repos." },
@@ -155,7 +156,7 @@ const GH_FACTS: Record<StatCode, { fr: string; en: string }[]> = {
   ],
   XP: [
     { fr: "Premier vrai commit : mars 2019, soit 7 ans.", en: "First real commit: March 2019, 7 years ago." },
-    { fr: "5 langages avec 10 Ko ou plus (bonus +4).", en: "5 languages with 10 KB or more (+4 bonus)." },
+    { fr: "5 langages avec 10 Ko ou plus.", en: "5 languages with 10 KB or more." },
   ],
   BUZZ: [
     { fr: "1 repo tutoriel sur 18.", en: "1 tutorial repo out of 18." },
@@ -165,14 +166,13 @@ const GH_FACTS: Record<StatCode, { fr: string; en: string }[]> = {
 const CV_FACTS: Record<StatCode, { fr: string; en: string }[]> = {
   TEC: [
     { fr: "Séniorité déclarée : lead (88).", en: "Claimed seniority: lead (88)." },
-    { fr: "École : INSA Lyon, rang B (+10).", en: "School: INSA Lyon, tier B (+10)." },
     { fr: "2 technos décrites avec une responsabilité concrète, 17 seulement listées.", en: "2 technologies described with a concrete responsibility, 17 merely listed." },
   ],
   SHIP: [{ fr: "3 projets avec un résultat daté.", en: "3 projects with a dated outcome." }],
   ARCH: [{ fr: "1 mention concrète de tests, CI ou revue de code.", en: "1 concrete mention of tests, CI or code review." }],
   DOC: [
     { fr: "Qualité d'écriture jugée 3 sur 5.", en: "Writing quality rated 3/5." },
-    { fr: "CV de 1 340 mots : au-delà de 1 200, moins 10.", en: "1,340-word CV: over 1,200, minus 10." },
+    { fr: "CV de 1 340 mots, au-delà des 1 200 qui se lisent.", en: "1,340-word CV, past the 1,200 that get read." },
   ],
   XP: [{ fr: "11 ans d'expérience déclarés.", en: "11 years of experience claimed." }],
   BUZZ: [
@@ -231,9 +231,18 @@ function initialsOf(login: string) {
   return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? parts[0]?.[1] ?? "")).toUpperCase() || "??";
 }
 
-function buildCard(key: FixtureKey, id: string, job: MockJob | null): CardData {
+/** Les grilles du barème en démo (§18.37), chargées à la demande : hors du bundle de l'accueil. */
+type MockGrids = typeof import("./mockGrid");
+const loadGrids = (): Promise<MockGrids> => import("./mockGrid");
+
+/** La note de la fiche devient celle de sa grille (§18.37, version (a)) ; les étoiles des fixtures ne bougent pas. */
+function graded(card: CardData, grid: Grid | undefined): CardData {
+  return grid ? { ...card, grid, overall: grid.overall, tier: tierFor(grid.overall) } : card;
+}
+
+function buildCard(key: FixtureKey, id: string, job: MockJob | null, mg: MockGrids): CardData {
   const base = withFacts(FIXTURES[key]);
-  const card: CardData = { ...base, id, lang: job?.lang ?? base.lang };
+  let card: CardData = { ...base, id, lang: job?.lang ?? base.lang };
   const login = job?.login;
   if (login && !BY_LOGIN[login.toLowerCase()]) {
     card.name = login;
@@ -243,17 +252,18 @@ function buildCard(key: FixtureKey, id: string, job: MockJob | null): CardData {
   }
   if (photos.has(id)) card.avatarUrl = MOCK_PHOTO;
   if (card.source === "github") card.findings = strongest3(mockFindings(card.login ?? "dev"));
+  card = graded(card, card.source === "github" ? mg.githubGridMock(key, card.login ?? "dev") : mg.declaredGridMock("CV"));
   return card;
 }
 
 /** Fiche LinkedIn seule : la fiche déclarative, réécrite comme le serveur le fait. */
-function buildLinkedinCard(id: string, job: MockJob | null): CardData {
+function buildLinkedinCard(id: string, job: MockJob | null, mg: MockGrids): CardData {
   const base = withFacts(FIXTURES.cv);
   const url = job?.linkedin ?? "https://www.linkedin.com/in/sans-github";
-  return asLinkedinCard({ ...base, id, lang: job?.lang ?? base.lang, linkedinUrl: url, findings: [mockLinkedinFinding(url)] });
+  return graded(asLinkedinCard({ ...base, id, lang: job?.lang ?? base.lang, linkedinUrl: url, findings: [mockLinkedinFinding(url)] }), mg.declaredGridMock("LinkedIn", url));
 }
 
-function buildComparison(id: string, job: MockJob | null, linkedin = false): ComparisonData {
+function buildComparison(id: string, job: MockJob | null, mg: MockGrids, linkedin = false): ComparisonData {
   const c = FIXTURE_COMPARISON;
   let cmp: ComparisonData = { ...c, id, cv: withFacts(c.cv), github: withFacts(c.github) };
   const login = job?.login;
@@ -263,6 +273,9 @@ function buildComparison(id: string, job: MockJob | null, linkedin = false): Com
   }
   const found = mockFindings(cmp.github.login ?? "dev");
   cmp.github = { ...cmp.github, findings: strongest3(linkedin ? [...found, mockLinkedinFinding(job?.linkedin)] : found) };
+  // Les notes des deux fiches sont déjà celles de leur grille (75 et 79) : le titre de l'écart ne change pas.
+  const grids = mg.comparisonGridsMock(linkedin ? "LinkedIn" : "CV", cmp.github.login ?? "dev", linkedin ? (job?.linkedin ?? MOCK_LINKEDIN) : undefined);
+  cmp = { ...cmp, cv: graded(cmp.cv, grids.cv), github: graded(cmp.github, grids.github), grid: grids.grid };
   if (linkedin) cmp = asLinkedinComparison(cmp);
   if (photos.has(id)) {
     cmp.cv = { ...cmp.cv, avatarUrl: MOCK_PHOTO };
@@ -349,9 +362,10 @@ export const mockApi = {
       };
     if (kind === "slow")
       return { state: "error", code: "timeout", message: { fr: "Trop long, on arrête là.", en: "Too long, stopping here." } };
-    if (kind === "cmp" || kind === "licmp") return { state: "done", kind: "comparison", comparison: buildComparison(id, job, kind === "licmp") };
-    if (kind === "li") return { state: "done", kind: "card", card: buildLinkedinCard(id, job) };
-    return { state: "done", kind: "card", card: buildCard(kind as FixtureKey, id, job) };
+    const mg = await loadGrids();
+    if (kind === "cmp" || kind === "licmp") return { state: "done", kind: "comparison", comparison: buildComparison(id, job, mg, kind === "licmp") };
+    if (kind === "li") return { state: "done", kind: "card", card: buildLinkedinCard(id, job, mg) };
+    return { state: "done", kind: "card", card: buildCard(kind as FixtureKey, id, job, mg) };
   },
 
   /**
