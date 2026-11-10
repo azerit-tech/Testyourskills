@@ -1,0 +1,25 @@
+{
+  "//": "Liste de montage du film. Mode d'emploi : tools/film/README.md. Les durées des plans ne se règlent pas ici (scripts/film-lib.ts, puis shared/film/cut.ts).",
+  "grade": {
+    "//": "Étalonnage commun aux prises, point de départ à régler sur les vrais plans : contraste doux, ombres vers la prune, lumières vers le crème.",
+    "contrast": 0.97,
+    "brightness": 0,
+    "saturation": 1.05,
+    "gamma": 1,
+    "shadows": [0.04, -0.03, 0.06],
+    "midtones": [0, 0, 0],
+    "highlights": [0.03, 0.02, -0.03],
+    "lut": null
+  },
+  "shots": {
+    "OUV": { "take": "OUV-1.mp4", "in": 0, "speed": 1, "crop": null },
+    "P1": { "take": "P1-1.mp4", "in": 0, "speed": 1, "crop": null },
+    "P2": { "take": "P2-1.mp4", "in": 0, "speed": 1, "crop": null },
+    "P3": { "take": "P3-1.mp4", "in": 0, "speed": 1, "crop": null },
+    "P4": { "take": "P4-1.mp4", "in": 0, "speed": 1, "crop": null },
+    "P5": { "take": "P5-1.mp4", "in": 0, "speed": 1, "crop": null },
+    "P6": { "take": "P6-1.mp4", "in": 0, "speed": 1, "crop": null },
+    "FIN": { "take": "FIN-1.mp4", "in": 0, "speed": 1, "crop": null },
+    "FIN6": { "take": "FIN6-1.mp4", "in": 0, "speed": 1, "crop": null }
+  }
+}
