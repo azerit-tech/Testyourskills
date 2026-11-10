@@ -58,6 +58,41 @@ const MARKERS: [RegExp, string][] = [
   [/\.ipynb$/, "notebook"],
 ];
 
+/**
+ * Fichiers de consignes pour agents d'IA (§18.37, « IA dans l'atelier ») :
+ * Claude Code, Codex et AGENTS.md, Gemini, Cursor, Copilot, Windsurf, Cline,
+ * Roo, Aider, Junie, Kiro, Continue, Amazon Q. Lus dans l'arbre déjà demandé :
+ * aucun appel de plus.
+ */
+const AGENT_FILE_RES = [
+  /(^|\/)CLAUDE(\.local)?\.md$/,
+  /(^|\/)AGENTS(\.override)?\.md$/,
+  /(^|\/)GEMINI\.md$/,
+  /^\.claude\//,
+  /(^|\/)\.cursorrules$/,
+  /^\.cursor\/rules\//,
+  /^\.github\/copilot-instructions\.md$/,
+  /^\.github\/instructions\/[^/]+\.instructions\.md$/,
+  /^\.github\/prompts\/[^/]+\.prompt\.md$/,
+  /(^|\/)\.windsurfrules$/,
+  /^\.windsurf\/rules\//,
+  /(^|\/)\.clinerules(\/|$)/,
+  /^\.roo\/rules/,
+  /^\.roomodes$/,
+  /^\.aider\.conf\.ya?ml$/,
+  /^\.junie\/guidelines\.md$/,
+  /^\.kiro\/steering\//,
+  /^\.continue\/(rules|prompts)\//,
+  /^\.amazonq\/rules\//,
+];
+/** Dossiers d'agent vus à la racine d'un arbre lu en surface (repo énorme). */
+const AGENT_DIRS = new Set([".claude", ".clinerules", ".kiro", ".roo", ".junie"]);
+const MAX_AGENT_FILES = 10;
+
+export function isAgentFile(path: string): boolean {
+  return AGENT_FILE_RES.some((re) => re.test(path));
+}
+
 const SOURCE_EXT =
   /\.(ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|kt|kts|swift|c|h|cc|cpp|hpp|cxx|m|mm|rb|php|cs|scala|ex|exs|erl|dart|vue|svelte|lua|sh|zig|hs|ml|clj|elm|jl|r|nim|cr|v|sol)$/i;
 const EXCLUDED_PATH =
@@ -94,6 +129,7 @@ export function analyzeTree(
   const tooling = new Set<string>();
   const markers = new Set<string>();
   const sources: { path: string; size: number }[] = [];
+  const agentFiles = new Set<string>();
 
   for (const e of entries) {
     const p = e.path;
@@ -101,7 +137,9 @@ export function analyzeTree(
       nodeModules = true;
       continue;
     }
+    if (e.type === "tree" && AGENT_DIRS.has(p)) agentFiles.add(`${p}/`);
     if (e.type !== "blob") continue;
+    if (isAgentFile(p) && !/(^|\/)(vendor|third_party)\//.test(p)) agentFiles.add(p);
     if (isTestPath(p) && !/(^|\/)(vendor|third_party)\//.test(p)) testFiles++;
     if (!hasCi && CI_RES.some((re) => re.test(p))) hasCi = true;
     for (const [re, name] of TOOLING_FILES) if (re.test(p)) tooling.add(name);
@@ -132,6 +170,7 @@ export function analyzeTree(
     nodeModules,
     markers: [...markers].sort(),
     sourceFiles: sources.slice(0, 60),
+    agentFiles: [...agentFiles].sort().slice(0, MAX_AGENT_FILES),
   };
 }
 

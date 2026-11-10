@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isLazyCommit, isTutorialRepo } from "../scoring/derive";
-import { analyzeTree, countReadmeWords, isSourceCandidate, isStrictTsconfig, parseLogin, parseManifest, parsePatchOffset } from "./detect";
+import { analyzeTree, countReadmeWords, isAgentFile, isSourceCandidate, isStrictTsconfig, parseLogin, parseManifest, parsePatchOffset } from "./detect";
 import { EngineError, lastPageOf } from "./http";
 import { truncateTo } from "./pick";
 
@@ -64,6 +64,41 @@ describe("arborescence", () => {
     expect(isSourceCandidate("proto/x.pb.go", 3000)).toBe(false);
     expect(isSourceCandidate("README.md", 3000)).toBe(false);
     expect(isSourceCandidate("src/huge.ts", 500_000)).toBe(false);
+  });
+  it("fichiers d'agent d'IA : chemins triés, hors node_modules et vendor, dossiers vus en surface", () => {
+    const t = analyzeTree(
+      "r",
+      [
+        blob("src/index.ts"),
+        blob("CLAUDE.md"),
+        blob("packages/api/AGENTS.md"),
+        blob(".cursor/rules/style.mdc"),
+        blob(".github/copilot-instructions.md"),
+        blob(".github/instructions/tests.instructions.md"),
+        blob(".windsurfrules"),
+        blob(".clinerules"),
+        blob("node_modules/x/CLAUDE.md"),
+        blob("vendor/lib/AGENTS.md"),
+        blob("docs/claude.md"), // pas le nom exact
+        blob("README.md"),
+        { path: ".claude", type: "tree" as const },
+      ],
+      { truncated: true },
+    );
+    expect(t.agentFiles).toEqual([
+      ".claude/",
+      ".clinerules",
+      ".cursor/rules/style.mdc",
+      ".github/copilot-instructions.md",
+      ".github/instructions/tests.instructions.md",
+      ".windsurfrules",
+      "CLAUDE.md",
+      "packages/api/AGENTS.md",
+    ]);
+    expect(analyzeTree("r", [blob("README.md"), blob("main.py")], { truncated: false }).agentFiles).toEqual([]);
+    for (const p of ["GEMINI.md", ".claude/commands/review.md", ".aider.conf.yml", ".roomodes", ".kiro/steering/product.md", "AGENTS.override.md", "CLAUDE.local.md"])
+      expect(isAgentFile(p), p).toBe(true);
+    for (const p of ["agents.md.bak", "src/CLAUDE.ts", ".github/workflows/ci.yml", "notes/AGENTS.txt"]) expect(isAgentFile(p), p).toBe(false);
   });
   it("tsconfig strict", () => {
     expect(isStrictTsconfig('{"compilerOptions":{"strict": true}}')).toBe(true);

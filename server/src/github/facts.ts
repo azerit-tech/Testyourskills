@@ -71,6 +71,13 @@ export interface RepoTree {
   markers: string[];
   /** Fichiers source candidats à la lecture IA (les plus gros, hors générés), max 60. */
   sourceFiles: { path: string; size: number }[];
+  /**
+   * Fichiers de consignes pour agents d'IA trouvés dans l'arbre (CLAUDE.md,
+   * AGENTS.md, .cursor/rules/…, .github/copilot-instructions.md…), chemins triés,
+   * dix au plus ; un dossier vu en surface finit par « / ». Vide : aucun. Absent
+   * des faits collectés avant le §18.37, et d'un arbre illisible.
+   */
+  agentFiles?: string[];
 }
 
 export interface CommitFact {

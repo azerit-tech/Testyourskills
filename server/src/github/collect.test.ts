@@ -213,6 +213,14 @@ describe("collecte complète, faux GitHub", () => {
   });
 });
 
+describe("arbres et dépôts", () => {
+  it("les fichiers d'agent d'IA d'un dépôt actif, lus dans l'arbre déjà demandé", async () => {
+    const { facts } = await collect();
+    expect(facts.trees.find((t) => t.repo === "atelier")?.agentFiles).toEqual([".cursor/rules/style.mdc", "CLAUDE.md"]);
+    expect(facts.trees.find((t) => t.repo === "notes")?.agentFiles).toEqual([]);
+  });
+});
+
 describe("destinations des PR, nœuds bruts", () => {
   it("ignore l'illisible, ses propres dépôts, le privé ; cent au plus, les plus récentes d'abord", () => {
     const node = (repo: string, mergedAt: string, extra: object = {}) => ({ mergedAt, repository: { nameWithOwner: repo, stargazerCount: 5, isPrivate: false }, ...extra });
