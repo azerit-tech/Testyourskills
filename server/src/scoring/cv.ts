@@ -10,6 +10,7 @@ import type { GithubFacts } from "../github/facts";
 import { df, fact, initialsOf, nf, orderStats, reliabilityOf, specialOf, valuesOf, xpStatOf } from "./common";
 import { AI_BUZZ_KEY, BUZZWORDS, SCORING } from "./config";
 import { deriveGithub } from "./derive";
+import type { HighBarList } from "./employers";
 import { declaredGrid, declaredInput, type DeclaredProfile } from "./grid";
 import { pickProfile, sentenceFor } from "./profiles";
 import { currentRole } from "./rules";
@@ -107,8 +108,8 @@ export function scoreCv(
     linkedin?: DeclaredProfile;
     /** « Maintenant » (ISO) : la fin d'un poste en cours. Défaut : la collecte GitHub, sinon l'heure. */
     now?: string;
-    /** Employeurs à forte barre d'embauche (tâche 1, facultatif). */
-    highBar?: string[];
+    /** Employeurs à forte barre d'embauche : la liste du serveur (employers.ts), passée par le pipeline. Absente : aucune. */
+    highBar?: HighBarList;
   },
 ): Omit<CardData, "id" | "createdAt"> {
   const r = reading;

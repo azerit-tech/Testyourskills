@@ -1,9 +1,10 @@
 // Barème 0.4.0 (§18.37) : le pipeline passe au scoreur le profil LinkedIn rangé
 // (postes datés, formation, compétences, adresse) et l'heure de la fiche, sur les
 // deux chemins LinkedIn : fiche LinkedIn seule et comparaison. Rien d'autre du
-// profil n'y va, et rien de neuf n'est gardé hors de la fiche.
+// profil n'y va, et rien de neuf n'est gardé hors de la fiche. Il y passe aussi la
+// liste des employeurs à forte barre du serveur (HIGH_BAR_EMPLOYERS_FILE).
 
-import { mkdtempSync } from "node:fs";
+import { copyFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -15,7 +16,8 @@ import { Store } from "./db";
 import type { LinkedinFinder, UrlLookup } from "./linkedinProfile/index";
 import type { LinkedinProfile } from "./linkedinProfile/profile";
 import type { CardBody, Deps } from "./pipeline";
-import { cvCounts } from "./scoring/__fixtures__/make";
+import { cvCounts, facts as githubFacts } from "./scoring/__fixtures__/make";
+import { EMPLOYERS_ENV, setHighBarEmployersForTests } from "./scoring/employers";
 import type { DeclaredProfile } from "./scoring/grid";
 import { scoreCv } from "./scoring/index";
 
@@ -67,13 +69,14 @@ afterEach(() => {
 
 type ScoreCvOpts = Parameters<Deps["scoreCv"]>[2];
 
-function setup(finder: { forGithub?: LinkedinFinder["forGithub"]; forUrl?: (url: string) => Promise<UrlLookup> }) {
+/** `realScore` : le vrai scoreur de fiche déclarée (et des faits GitHub de forme réelle), au lieu de la fiche figée. */
+function setup(finder: { forGithub?: LinkedinFinder["forGithub"]; forUrl?: (url: string) => Promise<UrlLookup> }, opt: { realScore?: boolean } = {}) {
   const store = new Store(":memory:");
   stores.push(store);
   const seen: ScoreCvOpts[] = [];
   const deps: Deps = {
     async collectGithub(login) {
-      return { login, readme: 300 };
+      return opt.realScore ? githubFacts({ login }) : { login, readme: 300 };
     },
     async pickFilesForReading() {
       return [];
@@ -92,8 +95,9 @@ function setup(finder: { forGithub?: LinkedinFinder["forGithub"]; forUrl?: (url:
     async readCv() {
       return READING;
     },
-    scoreCv(_r, _c, opts) {
+    scoreCv(r, c, opts) {
       seen.push(opts);
+      if (opt.realScore) return scoreCv(r, c, opts as Parameters<typeof scoreCv>[2]);
       return { ...body(FIXTURES.cv), lang: opts.lang, judgedInSeconds: opts.judgedInSeconds };
     },
     compareCards(cv, github) {
@@ -159,5 +163,58 @@ describe("le profil LinkedIn rangé va au scoreur (§18.37)", () => {
     // (un semestre d'échange n'y compte pas) : ici la lecture n'en retient aucune.
     expect(card.grid!.criteria.find((c) => c.code === "EDU")!.state).toBe("missing");
     expect(card.overall).toBe(card.grid!.overall);
+  });
+});
+
+describe("la liste des employeurs à forte barre, lue dans son fichier, va au scoreur (§18.37)", () => {
+  // Noms inventés : la liste d'exemple du dépôt, posée comme le serait celle du serveur.
+  const HIGH_BAR_PROFILE: LinkedinProfile = {
+    ...PROFILE,
+    roles: [
+      { title: "Staff engineer", company: "Fictiva Labs Paris", start: "2023-01", end: null, description: "Plateforme de paiement." },
+      { title: "Software engineer", company: "Fictiva Labs Paris", start: "2020-01", end: "2022-12", description: "Front React." },
+    ],
+  };
+  const emp = (card: CardData) => card.grid!.criteria.find((c) => c.code === "EMP")!;
+
+  function withListFile(): string {
+    const file = join(mkdtempSync(join(tmpdir(), "tys-employers-")), "employers.json");
+    copyFileSync(join(import.meta.dirname, "../../data/employers.example.json"), file);
+    process.env[EMPLOYERS_ENV] = file;
+    setHighBarEmployersForTests(null);
+    return file;
+  }
+  afterEach(() => {
+    delete process.env[EMPLOYERS_ENV];
+    setHighBarEmployersForTests(null);
+  });
+
+  it("fiche LinkedIn seule : deux ans chez un employeur de la liste, et une trajectoire qui monte, ouvrent le 10 du parcours", async () => {
+    const file = withListFile();
+    const ctx = setup({ forUrl: async (url) => ({ status: "found", profile: { ...HIGH_BAR_PROFILE, url }, githubLogin: null }) }, { realScore: true });
+    const s = await run(ctx, { linkedin: URL_ });
+    if (s.state !== "done" || s.kind !== "card") throw new Error(`pas une fiche : ${JSON.stringify(s)}`);
+    expect(ctx.seen[0]!.highBar?.source).toBe(file);
+    expect(ctx.seen[0]!.highBar?.employers.map((e) => e.name)).toEqual(["Fictiva Labs", "Orbe Quantique", "Nimbus Atelier"]);
+    expect(emp(s.card).score).toBe(10);
+    expect(emp(s.card).reached.fr).toMatch(/employeur à forte barre d'embauche, et une trajectoire qui monte\.$/);
+  });
+
+  it("comparaison : la même liste, sur la fiche déclarée", async () => {
+    withListFile();
+    const ctx = setup({ forGithub: async () => ({ profile: HIGH_BAR_PROFILE, proven: true }) }, { realScore: true });
+    const s = await run(ctx, { login: "camille-ardent" });
+    if (s.state !== "done" || s.kind !== "comparison") throw new Error(`pas une comparaison : ${JSON.stringify(s)}`);
+    expect(ctx.seen[0]!.github).toMatchObject({ login: "camille-ardent" });
+    expect(emp(s.comparison.cv).score).toBe(10);
+  });
+
+  it("sans fichier : liste vide, rien ne plante, le parcours s'arrête au poste tenu deux ans", async () => {
+    setHighBarEmployersForTests(null);
+    const ctx = setup({ forUrl: async (url) => ({ status: "found", profile: { ...HIGH_BAR_PROFILE, url }, githubLogin: null }) }, { realScore: true });
+    const s = await run(ctx, { linkedin: URL_ });
+    if (s.state !== "done" || s.kind !== "card") throw new Error(`pas une fiche : ${JSON.stringify(s)}`);
+    expect(ctx.seen[0]!.highBar).toEqual({ employers: [], source: null });
+    expect(emp(s.card).score).toBe(6);
   });
 });

@@ -30,8 +30,12 @@ import {
   stackFlags,
   type DatedRole,
 } from "./grid";
+import employersExample from "../../../data/employers.example.json";
+import { parseEmployers, type HighBarList } from "./employers";
 
 const NOW = Date.parse(FOUNDERS_NOW);
+/** La liste d'exemple aux noms inventés (data/employers.example.json), lue par le chargeur du serveur. */
+const EXAMPLE_HIGH_BAR: HighBarList = { employers: parseEmployers(employersExample), source: "data/employers.example.json" };
 const gh = (f: GithubFacts, ai: CodeReadingResult | null = null) => ({ facts: f, m: deriveGithub(f), ai });
 const decl = (r: CvReading, p?: FounderProfile, now = NOW) => declaredInput(r, { profile: p, now });
 const score = (g: Grid, code: CriterionCode) => g.criteria.find((c) => c.code === code)!.score;
@@ -79,8 +83,8 @@ const AI5: CodeReadingResult = {
 function seniorReading(p: Partial<CvReading> = {}): CvReading {
   return cvReading({
     roles: [
-      { title: "Staff engineer", company: "Doctolib", start: "2023-01", end: null, responsibilities: ["API TypeScript, PostgreSQL et React"], employer_type: "scaleup" },
-      { title: "Software engineer", company: "Doctolib", start: "2019-01", end: "2022-12", responsibilities: ["Front React"], employer_type: "scaleup" },
+      { title: "Staff engineer", company: "Fictiva Labs", start: "2023-01", end: null, responsibilities: ["API TypeScript, PostgreSQL et React"], employer_type: "scaleup" },
+      { title: "Software engineer", company: "Fictiva Labs", start: "2019-01", end: "2022-12", responsibilities: ["Front React"], employer_type: "scaleup" },
     ],
     technos_described: ["TypeScript", "React", "PostgreSQL", "Kafka", "Terraform"],
     projects_with_dated_outcome: 4,
@@ -89,10 +93,10 @@ function seniorReading(p: Partial<CvReading> = {}): CvReading {
     ...p,
   });
 }
-const doctolibProfile = (): FounderProfile => ({
+const fictivaProfile = (): FounderProfile => ({
   roles: [
-    { title: "Staff engineer", company: "Doctolib", start: "2023-01", end: null, description: "API TypeScript, PostgreSQL et React." },
-    { title: "Software engineer", company: "Doctolib", start: "2019-01", end: "2022-12", description: "Front React." },
+    { title: "Staff engineer", company: "Fictiva Labs", start: "2023-01", end: null, description: "API TypeScript, PostgreSQL et React." },
+    { title: "Software engineer", company: "Fictiva Labs", start: "2019-01", end: "2022-12", description: "Front React." },
   ],
   education: [],
   skills: ["TypeScript", "React"],
@@ -163,7 +167,7 @@ describe("aucune note par addition", () => {
     githubGrid(gh(jacquesFacts(), JACQUES_AI)),
     githubGrid(gh(strongFacts(), AI5)),
     githubGrid(gh(facts())),
-    declaredGrid(decl(seniorReading(), doctolibProfile())),
+    declaredGrid(decl(seniorReading(), fictivaProfile())),
     declaredGrid(decl(jacquesReading(), jacquesProfile())),
   ];
 
@@ -251,7 +255,7 @@ describe("l'école ne peut pas faire baisser la note (§4, règle 2)", () => {
   const bases: [string, CvReading, FounderProfile | undefined][] = [
     ["Jacques", jacquesReading(), jacquesProfile()],
     ["Lumine", lumineReading(), lumineProfile()],
-    ["senior", seniorReading(), doctolibProfile()],
+    ["senior", seniorReading(), fictivaProfile()],
   ];
 
   it.each(bases)("%s : ajouter une école, quel que soit son rang, ne baisse jamais la note ; la retirer non plus", (_n, r, p) => {
@@ -266,7 +270,7 @@ describe("l'école ne peut pas faire baisser la note (§4, règle 2)", () => {
   });
 
   it("une personne sans école a exactement la moyenne de ses autres critères", () => {
-    const g = declaredGrid(decl({ ...seniorReading(), school_name: "", school_tier: "none" }, doctolibProfile()));
+    const g = declaredGrid(decl({ ...seniorReading(), school_name: "", school_tier: "none" }, fictivaProfile()));
     expect(crit(g, "EDU").state).toBe("missing");
     const others = g.criteria.filter((c) => c.score !== null);
     const w = (c: GridCriterion) => GRID.weights[c.code];
@@ -330,11 +334,11 @@ describe("les plafonds (§4, règles 3 et 4)", () => {
           school_tier: "S",
           projects_with_dated_outcome: 9,
           roles: [
-            { title: "Head of engineering", company: "Doctolib", start: "2012-01", end: null, responsibilities: ["TypeScript React PostgreSQL Kafka Terraform"], employer_type: "scaleup" },
-            { title: "Engineer", company: "Doctolib", start: "2008-01", end: "2011-12", responsibilities: [] },
+            { title: "Head of engineering", company: "Fictiva Labs", start: "2012-01", end: null, responsibilities: ["TypeScript React PostgreSQL Kafka Terraform"], employer_type: "scaleup" },
+            { title: "Engineer", company: "Fictiva Labs", start: "2008-01", end: "2011-12", responsibilities: [] },
           ],
         }),
-        { ...doctolibProfile(), roles: [{ title: "Head of engineering", company: "Doctolib", start: "2012-01", end: null }, { title: "Engineer", company: "Doctolib", start: "2008-01", end: "2011-12" }] },
+        { ...fictivaProfile(), roles: [{ title: "Head of engineering", company: "Fictiva Labs", start: "2012-01", end: null }, { title: "Engineer", company: "Fictiva Labs", start: "2008-01", end: "2011-12" }] },
       ),
     );
     expect(best.overall).toBeLessThanOrEqual(85);
@@ -362,7 +366,7 @@ describe("les plafonds (§4, règles 3 et 4)", () => {
     expect([alone.overall, alone.rule]).toEqual([20, "empty_file"]);
     for (const [r, p] of [
       [jacquesReading(), jacquesProfile()],
-      [seniorReading(), doctolibProfile()],
+      [seniorReading(), fictivaProfile()],
     ] as const) {
       const d = declaredGrid(decl(r, p), gh(thin));
       expect(caseGrid(d, alone).overall).toBe(d.overall);
@@ -417,12 +421,12 @@ describe("données de la tâche 1, facultatives", () => {
     // Parcours : sans type d'employeur ni liste, deux ans d'un poste donnent 6 ; scale-up lue par l'IA, 8 ; liste et trajectoire, 10.
     const plain = cvReading({ roles: [] });
     const roles: DatedRole[] = [
-      { title: "Software engineer", company: "Doctolib", start: "2019-01", end: "2022-12" },
-      { title: "Staff engineer", company: "Doctolib", start: "2023-01", end: null },
+      { title: "Software engineer", company: "Fictiva Labs", start: "2019-01", end: "2022-12" },
+      { title: "Staff engineer", company: "Fictiva Labs", start: "2023-01", end: null },
     ];
     expect(score(declaredGrid(decl(plain, { roles, education: [], skills: [] })), "EMP")).toBe(6);
     expect(score(declaredGrid(decl(seniorReading(), { roles, education: [], skills: [] })), "EMP")).toBe(8);
-    expect(score(declaredGrid(declaredInput(seniorReading(), { profile: { roles }, now: NOW, highBar: ["Doctolib"] })), "EMP")).toBe(10);
+    expect(score(declaredGrid(declaredInput(seniorReading(), { profile: { roles }, now: NOW, highBar: EXAMPLE_HIGH_BAR })), "EMP")).toBe(10);
 
     // École : un signal de sélection avec son extrait ; sans extrait, rien.
     const sig = (quote: string): CvReading => ({ ...cvReading(), selection_signals: [{ kind: "international_medal", quote }] });

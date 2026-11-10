@@ -16,6 +16,7 @@ import type { GithubLookup, LinkedinFinder, LinkedinProfile } from "./linkedinPr
 import { githubShowsLinkedin } from "./linkedinProfile/url";
 import { asLinkedinCard, asLinkedinComparison, profileToText } from "./linkedinProfile/text";
 import { linkedinFindings } from "./linkedinProfile/findings";
+import { highBarEmployers, type HighBarList } from "./scoring/employers";
 
 export type CardBody = Omit<CardData, "id" | "createdAt">;
 
@@ -53,11 +54,13 @@ export interface Deps {
    * comptent l'expérience de la grille (§18.37) ; il ne sert qu'à noter, rien n'en est
    * gardé hors de la fiche. Typé `unknown` comme `github`, pour que deps.ts passe la
    * vraie fonction. `now` : l'heure de la fiche, fin des postes en cours.
+   * `highBar` : la liste des employeurs à forte barre du serveur
+   * (HIGH_BAR_EMPLOYERS_FILE), vide sans fichier.
    */
   scoreCv(
     reading: CvReading,
     counts: CvTextCounts,
-    opts: { lang: Lang; judgedInSeconds: number; github?: unknown; linkedin?: unknown; now?: string },
+    opts: { lang: Lang; judgedInSeconds: number; github?: unknown; linkedin?: unknown; now?: string; highBar?: HighBarList },
   ): CardBody;
   compareCards(cv: CardData, github: CardData): Omit<ComparisonData, "id" | "createdAt">;
   renderImage(input: RenderInput): Promise<Uint8Array>;
@@ -690,7 +693,8 @@ export class Pipeline {
     const reading = declared.reading;
     const linkedinUrl = declared.linkedinUrl;
     // Fiche LinkedIn : l'expérience se compte sur les postes datés du profil, à l'heure de la fiche.
-    const declaredOpts = { now: createdAt, ...(declared.linkedin ? { linkedin: declared.linkedin } : {}) };
+    // Le parcours lit la liste des employeurs à forte barre du serveur (vide sans fichier), CV comme LinkedIn.
+    const declaredOpts = { now: createdAt, highBar: highBarEmployers(), ...(declared.linkedin ? { linkedin: declared.linkedin } : {}) };
     const asDeclared = (c: CardData): CardData => (linkedinUrl ? asLinkedinCard(c) : c);
     const cvRow = (card: CardData, parentId: string | null): NewCardRow => ({
       id: card.id,

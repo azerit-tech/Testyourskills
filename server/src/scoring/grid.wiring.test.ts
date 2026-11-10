@@ -17,7 +17,9 @@ import { CONTRACT_TYPES, type LinkedinProfile } from "../linkedinProfile/profile
 import { profileToText } from "../linkedinProfile/text";
 import { cvCounts } from "./__fixtures__/make";
 import { FOUNDERS_NOW } from "./__fixtures__/founders";
+import employersExample from "../../../data/employers.example.json";
 import { GRID } from "./config";
+import { EMPLOYERS_ENV, loadHighBarEmployers } from "./employers";
 import { analyzeRoles, declaredGrid, declaredInput, type DeclaredInput } from "./grid";
 import { scoreCv } from "./index";
 
@@ -206,6 +208,41 @@ describe("CvReading.management_fact → Parcours", () => {
     const invented = read({ ...rawUn(), management_quote: "A dirigé cinquante personnes." }, text);
     expect(invented.management_fact).toBeNull();
     expect(crit(input(profile, invented), "EMP").flags).toEqual([]);
+  });
+});
+
+describe("la liste des employeurs à forte barre → Parcours, niveau 10", () => {
+  // La liste d'exemple aux noms inventés, lue par le chargeur du serveur.
+  const list = loadHighBarEmployers({ [EMPLOYERS_ENV]: "employers.json" }, () => JSON.stringify(employersExample));
+  const item = () => {
+    const it = itemUn();
+    it.experience.unshift({
+      position: "Engineering manager",
+      companyName: "Fictiva Labs Paris",
+      description: "Encadrement d'une équipe de six ingénieurs.",
+      startDate: { month: "Jan", year: 2019, text: "Jan 2019" },
+      endDate: { month: "Dec", year: 2022, text: "Dec 2022" },
+    });
+    return it;
+  };
+
+  it("deux ans chez un employeur de la liste et une équipe encadrée, fait cité : 10 ; sans la liste, 6", () => {
+    const { profile, text } = collected(item());
+    const reading = read({ ...rawUn(), management_quote: "Encadrement d'une équipe de six ingénieurs." }, text);
+    const withList = declaredGrid(declaredInput(reading, { profile: declaredLinkedin(profile), now: NOW, highBar: list })).criteria.find((c) => c.code === "EMP")!;
+    expect(list.employers.length).toBe(3);
+    expect(withList.score).toBe(10);
+    expect(withList.reached.fr).toBe("3,9 ans chez Fictiva Labs Paris, employeur à forte barre d'embauche, et une équipe encadrée.");
+    expect(crit(input(profile, reading), "EMP").score).toBe(6);
+  });
+
+  it("l'IA ne donne jamais ce rang : un « high_bar » lu devient « unknown »", () => {
+    const { profile, text } = collected(item());
+    const raw = rawUn();
+    raw.roles.unshift({ title: "Engineering manager", company: "Fictiva Labs Paris", start: "2019-01", end: "2022-12", responsibilities: [], employer_type: "high_bar", kind: "job" });
+    const reading = read({ ...raw, management_quote: "Encadrement d'une équipe de six ingénieurs." }, text);
+    expect(reading.roles[0]!.employer_type).toBe("unknown");
+    expect(crit(input(profile, reading), "EMP").score).toBe(6);
   });
 });
 

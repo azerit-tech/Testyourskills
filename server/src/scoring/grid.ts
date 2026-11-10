@@ -4,8 +4,8 @@
 // sans base, sans ajout, sans retrait — et la note générale, moyenne pondérée
 // des critères comptés, avec les quatre règles du §4 et rien d'autre.
 //
-// Pur et déterministe, sans réseau : « maintenant » est donné par l'appelant.
-// Les données ajoutées au §18.37
+// Pur et déterministe, sans réseau : « maintenant » et la liste des employeurs
+// à forte barre sont donnés par l'appelant. Les données ajoutées au §18.37
 // (destination des PR, type de contrat, nature et type d'employeur d'un poste,
 // signaux de sélection, fait d'encadrement, fichiers d'agent, site d'un dépôt)
 // sont lues sous leurs noms typés, et facultatives : les faits et lectures
@@ -19,6 +19,7 @@ import type { LinkedinRole } from "../linkedinProfile/profile";
 import { df, nf } from "./common";
 import { GRID, type GridRoleKind } from "./config";
 import { isTutorialRepo, type GithubMetrics } from "./derive";
+import { highBarEmployer, type HighBarList } from "./employers";
 import { normSchool, schoolListNames, schoolTier } from "./school";
 
 const DAY = 86_400_000;
@@ -123,9 +124,16 @@ export interface DeclaredInput {
   url?: string;
   /** « Maintenant », en ms : la fin d'un poste en cours. */
   now: number;
-  /** Employeurs à forte barre d'embauche (liste hors dépôt, tâche 1). Vide : les niveaux 8 et 10 du parcours ne s'ouvrent que par les startups. */
-  highBar?: string[];
+  /**
+   * Employeurs à forte barre d'embauche : la liste du serveur (employers.ts,
+   * HIGH_BAR_EMPLOYERS_FILE), donnée par l'appelant. Absente ou vide : les
+   * niveaux 8 et 10 du parcours ne s'ouvrent que par les startups.
+   */
+  highBar?: HighBarList;
 }
+
+/** Sans liste : aucun employeur à forte barre. La grille ne lit jamais l'environnement elle-même. */
+const NO_HIGH_BAR: HighBarList = { employers: [], source: null };
 
 /** Les champs rangés d'un profil LinkedIn qui servent au barème (ni lieu, ni photo, ni contact). */
 export interface DeclaredProfile {
@@ -158,7 +166,7 @@ function withReading(roles: DatedRole[], reading: CvReading): DatedRole[] {
  * L'entrée déclarative : les postes datés du profil LinkedIn quand il y en a
  * (ils arrivent rangés, sans passer par l'IA), sinon ceux relevés dans le CV.
  */
-export function declaredInput(reading: CvReading, opts: { profile?: DeclaredProfile; now: number; highBar?: string[] }): DeclaredInput {
+export function declaredInput(reading: CvReading, opts: { profile?: DeclaredProfile; now: number; highBar?: HighBarList }): DeclaredInput {
   const p = opts.profile;
   const roles: DatedRole[] = p?.roles?.length
     ? withReading(p.roles, reading)
@@ -519,14 +527,6 @@ function titleRank(title: string): number {
   return RANKS.find((r) => r.re.test(t))?.rank ?? GRID.EMP.defaultRank;
 }
 
-function isHighBar(company: string, list: string[]): boolean {
-  const c = norm(company);
-  return !!c && list.some((e) => {
-    const k = norm(e);
-    return k.length >= 2 && wordIn(k, c);
-  });
-}
-
 /** Le fait d'encadrement lu avec son extrait (`CvReading.management_fact`), "" sans fait. */
 function managementQuote(r: CvReading): string {
   return (r.management_fact?.quote ?? "").trim();
@@ -540,7 +540,7 @@ export function empDeclared(d: DeclaredInput): Draft {
   if (!infos.length) return missing("EMP", "linkedin", f("Aucun poste.", "No role."), f("Pour 2 : un premier poste ou un stage.", "For 2: a first job or internship."));
   const L = GRID.EMP.levels;
   const lv = (s: number) => L.find((x) => x.score === s)!;
-  const highBar = d.highBar ?? [];
+  const highBar = d.highBar ?? NO_HIGH_BAR;
   const product = new Set(GRID.EMP.productTypes);
 
   // Mois par employeur, postes hors stage réunis.
@@ -559,7 +559,7 @@ export function empDeclared(d: DeclaredInput): Draft {
   for (const r of fullRoles) byKey.set(r.companyKey, [...(byKey.get(r.companyKey) ?? []), r]);
   const emps: Emp[] = [...byKey.values()].map((rs) => {
     const type = rs.find((r) => r.employerType)?.employerType ?? "";
-    const hb = isHighBar(rs[0].role.company, highBar);
+    const hb = highBarEmployer(rs[0].role.company, highBar) !== null;
     return {
       name: rs[0].role.company || rs[0].role.title,
       months: unionMonths(rs),
