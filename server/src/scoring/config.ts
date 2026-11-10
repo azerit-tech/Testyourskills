@@ -5,8 +5,9 @@ import statusesJson from "../../../data/statuses.json";
 import buzzwordsJson from "../../../data/buzzwords.json";
 import profilesJson from "../../../data/profiles.json";
 import sentencesJson from "../../../data/sentences.json";
+import gridJson from "../../../data/grid.json";
 import type { SchoolTier } from "../../../shared/readings";
-import type { Fact, Position, StatCode, StatusTone } from "../../../shared/types";
+import type { CriterionCode, Fact, Position, StatCode, StatusTone } from "../../../shared/types";
 
 export type Scale = [number, number][];
 
@@ -145,7 +146,73 @@ export interface SentencesConfig {
   bail: Record<string, Fact>;
 }
 
+/** Barème de recrutement (data/grid.json) : tables de niveaux, coefficients, familles, traces. */
+export interface GridConfig {
+  weights: Record<CriterionCode, number>;
+  final: { neverLower: CriterionCode[]; capUnproven: number; emptyBelowShare: number; emptyScore: number; bounds: { min: number; max: number } };
+  thinGithub: { minRepos: number; repoCommits: number };
+  EDU: { tiers: Record<Exclude<SchoolTier, "none">, number>; selection: Record<string, number>; githubPattern: string; githubScore: number };
+  XP: {
+    share: { full: number; internship: number; association: number };
+    levels: { score: number; years: number }[];
+    githubCap: number;
+    githubActiveYearContributions: number;
+    claimedCap: number;
+    internshipPattern: string;
+    internshipContracts: string[];
+    associationPattern: string;
+    associationContracts: string[];
+    schoolRoleExceptPattern: string;
+    schoolAssociationWords: string;
+    seniorTitlePattern: string;
+    seniorOnPaperBelowYears: number;
+  };
+  EMP: {
+    founderPattern: string;
+    productTypes: string[];
+    levels: {
+      score: number;
+      highBarMonths?: number;
+      needsRiseOrTeam?: boolean;
+      productMonths?: number;
+      foundedMonths?: number;
+      roleMonths?: number;
+      productStartupMonths?: number;
+      anyRealRole?: boolean;
+      internships?: number;
+      anyInternship?: boolean;
+      anyRoleMonthsBelow?: number;
+    }[];
+    rankPatterns: { rank: number; pattern: string }[];
+    defaultRank: number;
+  };
+  STK: {
+    levels: { score: number; commits: number; years: number; otherFamilies: number; freshMonths: number | null }[];
+    familyRepoCommits: number;
+    dumped: { maxCommits: number; minSizeKb: number };
+    declared: { score: number; described: number; recent: number; recentMonths: number }[];
+    noTraceAtLeast: number;
+    noTraceShareBelow: number;
+    undersellMinBytes: number;
+    ignoredLanguages: string[];
+    families: Record<string, string[]>;
+  };
+  CODE: { multiplier: number; testsFrom: number; testsShare: number; capWithoutTests: number; commitsFrom: number; repoCommits: number; capWithoutCommits: number };
+  ACT: { levels: { score: number; weeks: number }[]; codeFrom: number; codeRepoCommits: number; capWithoutCode: number };
+  OWN: {
+    levels: { score: number; stars?: number; external?: number; releasesInYear?: number; months?: number; commits?: number; published?: boolean; deployable?: boolean; anyRepo?: boolean }[];
+    declared: { score: number; outcomes: number; founded?: boolean }[];
+  };
+  OSS: {
+    bigStars: number;
+    levels: { score: number; maintainerStars?: number; bigPrs?: number; ownStars?: number; external?: number; prs?: number }[];
+    friendsCap: number;
+  };
+  traces: { list: { name: string; aliases: string[]; languages?: string[]; deps?: string[]; topics?: string[]; markers?: string[] }[] };
+}
+
 export const SCORING = scoringJson as unknown as ScoringConfig;
+export const GRID = gridJson as unknown as GridConfig;
 export const STATUSES = statusesJson as unknown as StatusesConfig;
 export const BUZZWORDS = buzzwordsJson as unknown as BuzzwordsConfig;
 export const PROFILES = profilesJson as unknown as ProfilesConfig;

@@ -17,6 +17,11 @@ export function normSchool(name: string): string {
     .trim();
 }
 
+/** Les noms des écoles de la liste, tels qu'écrits (« Centrale Méditerranée »). */
+export function schoolListNames(): string[] {
+  return LIST.map((e) => e.school);
+}
+
 /** Plus petit = mieux classé (S avant A…). */
 const rank = (t: SchoolTier) => SCHOOL_TIERS.indexOf(t);
 

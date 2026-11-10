@@ -1,0 +1,230 @@
+{
+  "_doc": "Barème de recrutement (docs/bareme-recrutement.md §3 et §4, SPEC §18.37). Chaque critère est une note entière sur 10 lue dans sa table : le niveau le plus haut dont toute la ligne est remplie, sans base, sans ajout, sans retrait. Les lignes de chaque table vont du niveau le plus haut au plus bas. Changer un seuil ou un coefficient = une ligne ici, et la version de data/scoring.json.",
+
+  "weights": { "EDU": 1, "XP": 1.5, "EMP": 1.5, "STK": 1.5, "CODE": 2, "ACT": 1, "OWN": 1, "OSS": 0.5 },
+
+  "final": {
+    "_doc": "Quatre règles (§4) : non prouvé ou non renseigné sort de la moyenne ; neverLower n'entre que s'il est au-dessus de la moyenne des autres ; plafond sans code prouvé ; dossier vide sous emptyBelowShare des coefficients notés.",
+    "neverLower": ["EDU", "OSS"],
+    "capUnproven": 85,
+    "emptyBelowShare": 0.25,
+    "emptyScore": 20,
+    "bounds": { "min": 1, "max": 99 }
+  },
+
+  "thinGithub": {
+    "_doc": "GitHub trop mince pour juger : moins de minRepos dépôts publics et aucun de repoCommits commits.",
+    "minRepos": 3,
+    "repoCommits": 10
+  },
+
+  "EDU": {
+    "tiers": { "S": 10, "A": 8, "B": 6, "C": 4 },
+    "_selectionDoc": "Signaux de sélection lus avec leur extrait (tâche 1, facultatifs) : médaille internationale 10 ; classement, prix de hackathon, programme sélectif 8 ; participation sans classement 4.",
+    "selection": { "international_medal": 10, "ranked": 8, "hackathon_prize": 8, "selective_program": 8, "participation": 4 },
+    "_githubDoc": "Un dépôt dont le nom, les topics ou la description disent hackathon ou concours : une participation sans classement.",
+    "githubPattern": "\\bhack(a|e)thon|\\bhackaton|\\bgame ?jam\\b|\\bolympia(d|de)s?\\b|\\bicpc\\b|\\bconcours\\b|\\bcompetition\\b",
+    "githubScore": 4
+  },
+
+  "XP": {
+    "_doc": "Années comptées sur les postes datés, en code. Salarié, freelance, fondateur 100 % ; stage, alternance 50 % ; association étudiante, bénévolat 0 % ; deux postes en même temps comptent une fois (le plus fort du mois).",
+    "share": { "full": 1, "internship": 0.5, "association": 0 },
+    "levels": [
+      { "score": 10, "years": 10 },
+      { "score": 9, "years": 8 },
+      { "score": 8, "years": 6 },
+      { "score": 7, "years": 5 },
+      { "score": 6, "years": 4 },
+      { "score": 5, "years": 3 },
+      { "score": 4, "years": 2 },
+      { "score": 3, "years": 1 },
+      { "score": 2, "years": 0 }
+    ],
+    "githubCap": 8,
+    "githubActiveYearContributions": 50,
+    "claimedCap": 5,
+    "internshipPattern": "\\b(stage|stagiaire|intern|internship|alternan\\w*|apprenti\\w*|apprentice\\w*|work[ -]?study|co-?op|trainee|working student|werkstudent|praktik\\w*|summer analyst)\\b",
+    "internshipContracts": ["internship", "apprenticeship", "work_study", "alternance", "stage", "trainee"],
+    "associationPattern": "\\b(association|asso|bde|bds|bda|bureau des (eleves|etudiants|sports|arts)|student (association|union|society|club|chapter)|club etudiant|benevol\\w*|volunteer\\w*|non-?profit|junior[ -]?entreprise|junior[ -]?enterprise)\\b",
+    "associationContracts": ["volunteer", "association", "benevolat"],
+    "_schoolRoleDoc": "Un employeur qui porte le nom d'une école de la liste (data/scoring.json) et un mot d'association est une association étudiante, sauf un poste de recherche ou d'enseignement. La liste, pas la formation du profil : l'expérience ne dépend jamais de la formation.",
+    "schoolAssociationWords": "\\b(finance|entrepreneurs?|alumni|junior|forum|gala|club|sports?|racing|robotique|robotics|invest\\w*|trading|conseil|consulting|musique|music|theatre|humanitaire|solidarite|international|ambassad\\w*|cup|trophee|trophy|week ?end|hackathon)\\b",
+    "schoolRoleExceptPattern": "\\b(phd|doctorant\\w*|doctoral|postdoc\\w*|chercheu\\w*|researcher|research|recherche|enseignant\\w*|lecturer|professor|professeur\\w*|maitre de conferences|ater|teaching assistant)\\b",
+    "seniorTitlePattern": "\\b(senior|sr|lead|staff|head|principal)\\b",
+    "seniorOnPaperBelowYears": 4
+  },
+
+  "EMP": {
+    "_doc": "Parcours, sur LinkedIn ou le CV seulement. Mois par employeur (postes du même employeur réunis). Un « vrai poste » est un poste hors stage, alternance et association.",
+    "founderPattern": "\\b(co-?)?(founder|founding|fondat(eur|rice)|cofondat(eur|rice)|createur|creatrice|cofounder)\\b",
+    "productTypes": ["startup", "scaleup"],
+    "levels": [
+      { "score": 10, "highBarMonths": 24, "needsRiseOrTeam": true },
+      { "score": 8, "productMonths": 24, "foundedMonths": 36 },
+      { "score": 6, "roleMonths": 24, "productStartupMonths": 12, "foundedMonths": 12 },
+      { "score": 4, "anyRealRole": true, "internships": 2 },
+      { "score": 2, "anyInternship": true, "anyRoleMonthsBelow": 6 }
+    ],
+    "rankPatterns": [
+      { "rank": 5, "pattern": "\\b(head|director|directeur|directrice|vp|vice president|cto|ceo|chief|manager|responsable)\\b" },
+      { "rank": 4, "pattern": "\\b(lead|staff|principal|tech lead|architect|architecte)\\b" },
+      { "rank": 3, "pattern": "\\b(senior|sr|confirme|confirmee)\\b" },
+      { "rank": 1, "pattern": "\\b(junior|jr|debutant|debutante|graduate)\\b" }
+    ],
+    "defaultRank": 2
+  },
+
+  "STK": {
+    "_doc": "Prouvée par GitHub : langage principal (commits des dépôts dont c'est le langage principal, années depuis le premier), largeur (autres familles avec un dépôt de familyRepoCommits commits), fraîcheur (mois depuis le dernier push). Les dépôts tutoriels et les dépôts déposés d'un bloc ne comptent pas.",
+    "levels": [
+      { "score": 10, "commits": 1000, "years": 3, "otherFamilies": 2, "freshMonths": 6 },
+      { "score": 8, "commits": 500, "years": 2, "otherFamilies": 1, "freshMonths": 6 },
+      { "score": 6, "commits": 200, "years": 1, "otherFamilies": 0, "freshMonths": 12 },
+      { "score": 4, "commits": 50, "years": 0, "otherFamilies": 0, "freshMonths": 24 },
+      { "score": 2, "commits": 1, "years": 0, "otherFamilies": 0, "freshMonths": null }
+    ],
+    "familyRepoCommits": 10,
+    "dumped": { "maxCommits": 5, "minSizeKb": 1024 },
+    "declared": [
+      { "score": 6, "described": 5, "recent": 2, "recentMonths": 24 },
+      { "score": 4, "described": 2, "recent": 0, "recentMonths": 24 }
+    ],
+    "noTraceAtLeast": 5,
+    "noTraceShareBelow": 0.3333,
+    "undersellMinBytes": 10240,
+    "_ignoredDoc": "Ne font pas une famille : balisage, styles, scripts de build.",
+    "ignoredLanguages": ["HTML", "CSS", "SCSS", "Sass", "Less", "Stylus", "Makefile", "CMake", "Dockerfile", "Batchfile", "Shell", "PowerShell", "Nix", "TeX", "Roff", "Jinja", "Handlebars", "EJS", "Pug", "Mustache", "Twig", "Procfile", "Starlark", "M4", "Meson"],
+    "_familiesDoc": "Langages d'une même famille. Un langage absent de la liste fait sa propre famille.",
+    "families": {
+      "JavaScript": ["TypeScript", "JavaScript", "CoffeeScript", "Vue", "Svelte", "Astro", "MDX"],
+      "Python": ["Python", "Jupyter Notebook", "Cython"],
+      "C": ["C", "C++", "Objective-C", "Objective-C++", "Cuda"],
+      "JVM": ["Java", "Kotlin", "Groovy"],
+      "Swift": ["Swift"],
+      ".NET": ["C#", "F#", "Visual Basic .NET"],
+      "BEAM": ["Elixir", "Erlang", "Gleam"],
+      "Preuve": ["Agda", "Coq", "Rocq Prover", "Lean", "Idris", "Isabelle"],
+      "ML": ["OCaml", "Standard ML", "ReScript", "Reason"],
+      "Lisp": ["Clojure", "Common Lisp", "Emacs Lisp", "Racket", "Scheme"]
+    }
+  },
+
+  "CODE": {
+    "_doc": "Deux fois le niveau moyen lu (1 à 5), pondéré par l'activité, arrondi au supérieur à ,5. 9 et 10 demandent des tests dans la moitié des dépôts actifs ; 7 et plus un dépôt de 20 commits.",
+    "multiplier": 2,
+    "testsFrom": 9,
+    "testsShare": 0.5,
+    "capWithoutTests": 8,
+    "commitsFrom": 7,
+    "repoCommits": 20,
+    "capWithoutCommits": 6
+  },
+
+  "ACT": {
+    "levels": [
+      { "score": 10, "weeks": 48 },
+      { "score": 8, "weeks": 40 },
+      { "score": 6, "weeks": 26 },
+      { "score": 4, "weeks": 13 },
+      { "score": 2, "weeks": 4 },
+      { "score": 0, "weeks": 0 }
+    ],
+    "codeFrom": 8,
+    "codeRepoCommits": 20,
+    "capWithoutCode": 6
+  },
+
+  "OWN": {
+    "_doc": "Prouvé par GitHub : un projet porté (mois entre sa création et son dernier push, et ses commits), publié, utilisé. Déclaré : résultats datés et chiffrés, entreprise fondée (table arrêtée à 6). Avec les deux, la plus haute.",
+    "levels": [
+      { "score": 10, "stars": 1000, "external": 10, "releasesInYear": 3 },
+      { "score": 8, "months": 12, "commits": 100, "published": true, "stars": 100, "external": 3 },
+      { "score": 6, "months": 6, "commits": 50, "deployable": true },
+      { "score": 4, "months": 6, "commits": 50 },
+      { "score": 2, "anyRepo": true }
+    ],
+    "declared": [
+      { "score": 6, "outcomes": 3 },
+      { "score": 4, "outcomes": 1, "founded": true }
+    ]
+  },
+
+  "OSS": {
+    "_doc": "PR fusionnées chez les autres ; les niveaux 8 et 10 s'ouvrent aussi par les étoiles et les contributeurs externes. Destinations des PR (tâche 1) facultatives. PR entre proches : comptées jusqu'au niveau friendsCap.",
+    "bigStars": 1000,
+    "levels": [
+      { "score": 10, "maintainerStars": 1000, "bigPrs": 20 },
+      { "score": 8, "bigPrs": 1, "ownStars": 100, "external": 10 },
+      { "score": 6, "prs": 20 },
+      { "score": 4, "prs": 5 },
+      { "score": 2, "prs": 1 },
+      { "score": 0, "prs": 0 }
+    ],
+    "friendsCap": 4
+  },
+
+  "traces": {
+    "_doc": "Techno → trace attendue dans le code public : langages (linguist), dépendances, topics, marqueurs d'arbre. Une techno absente de cette table n'est jamais dite « sans trace ».",
+    "list": [
+      { "name": "TypeScript", "aliases": ["typescript", "ts"], "languages": ["TypeScript"], "deps": ["typescript"] },
+      { "name": "JavaScript", "aliases": ["javascript", "js", "es6", "ecmascript"], "languages": ["JavaScript", "TypeScript"] },
+      { "name": "Python", "aliases": ["python", "python3"], "languages": ["Python", "Jupyter Notebook"] },
+      { "name": "Java", "aliases": ["java"], "languages": ["Java"] },
+      { "name": "Kotlin", "aliases": ["kotlin"], "languages": ["Kotlin"] },
+      { "name": "Go", "aliases": ["go", "golang"], "languages": ["Go"] },
+      { "name": "Rust", "aliases": ["rust"], "languages": ["Rust"] },
+      { "name": "C", "aliases": ["c"], "languages": ["C"] },
+      { "name": "C++", "aliases": ["c++", "cpp"], "languages": ["C++"] },
+      { "name": "C#", "aliases": ["c#", "csharp", ".net", "dotnet"], "languages": ["C#"] },
+      { "name": "Swift", "aliases": ["swift"], "languages": ["Swift"] },
+      { "name": "Ruby", "aliases": ["ruby"], "languages": ["Ruby"] },
+      { "name": "PHP", "aliases": ["php"], "languages": ["PHP"] },
+      { "name": "Scala", "aliases": ["scala"], "languages": ["Scala"] },
+      { "name": "Elixir", "aliases": ["elixir"], "languages": ["Elixir"] },
+      { "name": "Haskell", "aliases": ["haskell"], "languages": ["Haskell"] },
+      { "name": "OCaml", "aliases": ["ocaml"], "languages": ["OCaml"] },
+      { "name": "Agda", "aliases": ["agda"], "languages": ["Agda"] },
+      { "name": "Lean", "aliases": ["lean", "lean4"], "languages": ["Lean"] },
+      { "name": "R", "aliases": ["r"], "languages": ["R"] },
+      { "name": "Julia", "aliases": ["julia"], "languages": ["Julia"] },
+      { "name": "Dart", "aliases": ["dart"], "languages": ["Dart"] },
+      { "name": "SQL", "aliases": ["sql", "plsql", "pl/sql"], "languages": ["PLpgSQL", "PLSQL", "TSQL", "SQL"], "deps": ["pg", "psycopg2", "psycopg2-binary", "psycopg", "asyncpg", "sqlalchemy", "prisma", "knex", "sequelize", "typeorm", "drizzle-orm", "mysql2", "sqlite3", "better-sqlite3"] },
+      { "name": "React", "aliases": ["react", "react.js", "reactjs"], "deps": ["react"], "topics": ["react"] },
+      { "name": "React Native", "aliases": ["react native", "react-native"], "deps": ["react-native"] },
+      { "name": "Vue", "aliases": ["vue", "vue.js", "vuejs"], "languages": ["Vue"], "deps": ["vue"] },
+      { "name": "Angular", "aliases": ["angular", "angularjs"], "deps": ["@angular/core", "angular"] },
+      { "name": "Svelte", "aliases": ["svelte", "sveltekit"], "languages": ["Svelte"], "deps": ["svelte"] },
+      { "name": "Next.js", "aliases": ["next.js", "nextjs", "next"], "deps": ["next"] },
+      { "name": "Node.js", "aliases": ["node.js", "nodejs", "node"], "deps": ["express", "fastify", "koa", "hono", "@nestjs/core", "@types/node", "tsx", "ts-node"] },
+      { "name": "Express", "aliases": ["express", "express.js", "expressjs"], "deps": ["express"] },
+      { "name": "NestJS", "aliases": ["nestjs", "nest.js"], "deps": ["@nestjs/core"] },
+      { "name": "Django", "aliases": ["django"], "deps": ["django"] },
+      { "name": "Flask", "aliases": ["flask"], "deps": ["flask"] },
+      { "name": "FastAPI", "aliases": ["fastapi"], "deps": ["fastapi"] },
+      { "name": "Spring", "aliases": ["spring", "spring boot", "springboot"], "deps": ["spring-boot-starter", "spring-boot-starter-web", "org.springframework.boot", "spring-core"] },
+      { "name": "Rails", "aliases": ["rails", "ruby on rails", "ror"], "deps": ["rails"] },
+      { "name": "Laravel", "aliases": ["laravel"], "deps": ["laravel/framework"] },
+      { "name": "Flutter", "aliases": ["flutter"], "deps": ["flutter"], "markers": ["flutter"] },
+      { "name": "Tailwind", "aliases": ["tailwind", "tailwindcss", "tailwind css"], "deps": ["tailwindcss"] },
+      { "name": "GraphQL", "aliases": ["graphql"], "deps": ["graphql", "@apollo/client", "apollo-server", "@apollo/server", "graphene", "strawberry-graphql"] },
+      { "name": "PostgreSQL", "aliases": ["postgresql", "postgres", "psql"], "deps": ["pg", "psycopg2", "psycopg2-binary", "psycopg", "asyncpg", "postgres"] },
+      { "name": "MongoDB", "aliases": ["mongodb", "mongo"], "deps": ["mongodb", "mongoose", "pymongo", "motor"] },
+      { "name": "Redis", "aliases": ["redis"], "deps": ["redis", "ioredis"] },
+      { "name": "Pandas", "aliases": ["pandas"], "deps": ["pandas"] },
+      { "name": "NumPy", "aliases": ["numpy"], "deps": ["numpy"] },
+      { "name": "scikit-learn", "aliases": ["scikit-learn", "sklearn", "scikit learn"], "deps": ["scikit-learn", "sklearn"] },
+      { "name": "PyTorch", "aliases": ["pytorch", "torch"], "deps": ["torch", "pytorch"] },
+      { "name": "TensorFlow", "aliases": ["tensorflow", "keras"], "deps": ["tensorflow", "keras", "tensorflow-cpu"] },
+      { "name": "Machine Learning", "aliases": ["machine learning", "apprentissage automatique", "ml", "deep learning"], "deps": ["scikit-learn", "sklearn", "xgboost", "lightgbm", "torch", "tensorflow", "keras", "transformers", "catboost"] },
+      { "name": "Docker", "aliases": ["docker", "docker compose", "docker-compose"], "markers": ["dockerfile"] },
+      { "name": "Kubernetes", "aliases": ["kubernetes", "k8s", "helm"], "markers": ["k8s"] },
+      { "name": "Terraform", "aliases": ["terraform"], "languages": ["HCL"], "markers": ["terraform"] },
+      { "name": "Jest", "aliases": ["jest"], "deps": ["jest"] },
+      { "name": "Vitest", "aliases": ["vitest"], "deps": ["vitest"] },
+      { "name": "Pytest", "aliases": ["pytest"], "deps": ["pytest"] },
+      { "name": "Playwright", "aliases": ["playwright"], "deps": ["playwright", "@playwright/test"] },
+      { "name": "Cypress", "aliases": ["cypress"], "deps": ["cypress"] }
+    ]
+  }
+}
