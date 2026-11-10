@@ -96,10 +96,10 @@ export function genericMeta(baseUrl: string, path: string, lang: Lang = "fr"): P
   return {
     lang,
     url: `${baseUrl}${path}`,
-    title: fr ? "Testyourskills · Ton GitHub remplace ton CV" : "Testyourskills · Your GitHub replaces your CV",
+    title: fr ? "Testyourskills · Ton LinkedIn dit senior. Ton GitHub, on va voir." : "Testyourskills · Your LinkedIn says senior. Your GitHub? We'll see.",
     description: fr
-      ? "Ton pseudo GitHub ou ton CV, et une IA t'interroge en dix secondes : étoiles de recherche et chefs d'accusation. Ce que ton CV déclare contre ce que ton code prouve."
-      : "Your GitHub username or your CV, and an AI interrogates you in ten seconds: wanted stars and charges. What your CV claims vs what your code proves.",
+      ? "Ton LinkedIn, puis ton GitHub : une IA t'interroge en dix secondes. Étoiles de recherche et chefs d'accusation. Ce que ton LinkedIn déclare contre ce que ton code prouve. Par Azerit."
+      : "Your LinkedIn, then your GitHub: an AI interrogates you in ten seconds. Wanted stars and charges. What your LinkedIn claims vs what your code proves. By Azerit.",
     imageAlt: "Testyourskills",
   };
 }
@@ -120,7 +120,7 @@ export function injectHomeImage(template: string, baseUrl: string): string {
     `<meta property="og:image:type" content="image/png">`,
     `<meta property="og:image:width" content="1200">`,
     `<meta property="og:image:height" content="630">`,
-    `<meta property="og:image:alt" content="${e("Testyourskills : ton GitHub remplace ton CV")}">`,
+    `<meta property="og:image:alt" content="${e("Testyourskills : ton LinkedIn dit senior, ton GitHub, on va voir")}">`,
     `<meta name="twitter:image" content="${e(image)}">`,
   ].join("\n    ");
   const cleaned = template.replace(/<meta\s+(?:property|name)=["'](?:og:image(?::[a-z_]+)?|twitter:image)["'][^>]*>\s*/gi, "");

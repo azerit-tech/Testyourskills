@@ -237,10 +237,17 @@ function CtaLine({ x, y, lang }: { x: number; y: number; lang: Lang }) {
 /* Aperçu de lien de l'accueil 1200 × 630                               */
 /* ------------------------------------------------------------------ */
 
-/** La promesse, une ligne par souffle ; la dernière, ce qu'on remplace, en rose. */
-const PROMISE: Record<Lang, string[]> = {
-  fr: ["Ton GitHub", "remplace", "ton CV."],
-  en: ["Your GitHub", "replaces", "your CV."],
+/** La promesse, le titre de l'accueil : deux phrases de deux lignes, ce que le
+ *  profil déclare en crème, puis ce que le code dira en rose. */
+const PROMISE: Record<Lang, [string[], string[]]> = {
+  fr: [
+    ["Ton LinkedIn", "dit senior."],
+    ["Ton GitHub,", "on va voir."],
+  ],
+  en: [
+    ["Your LinkedIn", "says senior."],
+    ["Your GitHub?", "We'll see."],
+  ],
 };
 
 /** Même mise en page que l'aperçu d'une fiche : la fiche de la vitrine à gauche,
@@ -254,8 +261,9 @@ export function HomeOg({ card, lang, avatars }: { card: CardData; lang: Lang; av
   const cy = 32;
   const tx = 560;
   const maxW = W - tx - 64;
-  const lines = PROMISE[lang].map((l) => upper(l, lang));
-  // Une seule taille pour les trois lignes : celle que la plus longue permet.
+  const [claim, proof] = PROMISE[lang];
+  const lines = [...claim, ...proof].map((l) => upper(l, lang));
+  // Une seule taille pour les quatre lignes : celle que la plus longue permet.
   const size = Math.min(...lines.map((l) => fit(l, { font: "display-700", size: 112, minSize: 60, maxWidth: maxW, letterSpacing: 0.5 }).size));
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
@@ -263,7 +271,7 @@ export function HomeOg({ card, lang, avatars }: { card: CardData; lang: Lang; av
       <Placed card={card} lang={lang} avatars={avatars} id="home" x={cx} y={cy} w={cw} />
       <Poster x={tx} y={118} size={22} lang={lang} anchor="start" />
       {lines.map((l, i) => (
-        <text key={i} x={tx - 2} y={136 + (i + 1) * size * 0.94} {...fontAttrs("display-700")} fontSize={size} letterSpacing={0.5} fill={i === lines.length - 1 ? PALETTE.blush : PALETTE.cream}>
+        <text key={i} x={tx - 2} y={136 + (i + 1) * size * 0.94} {...fontAttrs("display-700")} fontSize={size} letterSpacing={0.5} fill={i >= claim.length ? PALETTE.blush : PALETTE.cream}>
           {l}
         </text>
       ))}

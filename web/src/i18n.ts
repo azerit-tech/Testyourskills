@@ -7,7 +7,7 @@ import { showsTotal } from "../../shared/week";
 
 const fr = {
   meta: {
-    title: "Testyourskills · Ton GitHub remplace ton CV",
+    title: "Testyourskills · Ton LinkedIn dit senior. Ton GitHub, on va voir.",
     titleCard: (name: string, overall: number) => `${name} · ${overall} · Testyourskills`,
   },
   common: {
@@ -488,7 +488,7 @@ export type Dict = typeof fr;
 
 const en: Dict = {
   meta: {
-    title: "Testyourskills · Your GitHub replaces your CV",
+    title: "Testyourskills · Your LinkedIn says senior. Your GitHub? We'll see.",
     titleCard: (name, overall) => `${name} · ${overall} · Testyourskills`,
   },
   common: {
