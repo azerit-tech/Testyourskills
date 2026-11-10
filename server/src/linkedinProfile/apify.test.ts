@@ -5,6 +5,8 @@ import { describe, expect, it } from "vitest";
 import harvest from "./__fixtures__/apify-harvest.json";
 import fusion from "./__fixtures__/apify-fusion.json";
 import { ApifyError, ApifyProvider, apifyInput, DEFAULT_APIFY_ACTOR, githubFromApifyItem, profileFromApifyItem, whenOf } from "./apify";
+import { contractOf } from "./profile";
+import { profileToText } from "./text";
 
 const TOKEN = "apify_api_test_not_a_real_token";
 const URL_ = "https://www.linkedin.com/in/camille-ardent";
@@ -78,14 +80,15 @@ describe("normaliseur tolérant : deux formes de sortie", () => {
     expect(p.summary).toMatch(/^Full-stack depuis 7 ans/);
     expect(p.photoUrl).toBe("https://media.example.invalid/camille.jpg");
     // Le poste en cours d'abord.
-    expect(p.roles.map((r) => [r.title, r.company, r.start, r.end])).toEqual([
-      ["Senior Full-Stack Engineer", "Paysolde", "2022-03", null],
-      ["Développement web", "Studio Bleu", "2019-01", "2022-02"],
+    expect(p.roles.map((r) => [r.title, r.company, r.start, r.end, r.contract])).toEqual([
+      ["Senior Full-Stack Engineer", "Paysolde", "2022-03", null, "full_time"],
+      ["Développement web", "Studio Bleu", "2019-01", "2022-02", "full_time"],
+      ["Développement web en alternance", "Imprimerie Lumen", "2017-09", "2018-08", "work_study"],
     ]);
     expect(p.education).toEqual([{ school: "INSA Lyon", degree: "Diplôme d'ingénieur", field: "Informatique", start: 2014, end: 2019 }]);
     expect(p.skills).toEqual(["TypeScript", "React", "Node.js"]);
-    // Rien du lieu.
-    expect(JSON.stringify(p)).not.toContain("Auvergne");
+    // Rien du lieu, rien des langues parlées.
+    expect(JSON.stringify(p)).not.toMatch(/Auvergne|Français|Native|languages|location/);
   });
 
   it("forme B (dev_fusion) : postes groupés par entreprise, dates en légende française, morceaux de texte", () => {
@@ -94,14 +97,21 @@ describe("normaliseur tolérant : deux formes de sortie", () => {
     expect(p.name).toBe("Sacha Valdor");
     expect(p.title).toBe("Data engineer");
     expect(p.photoUrl).toBe("https://media.example.invalid/sacha.jpg");
-    expect(p.roles.map((r) => [r.title, r.company, r.start, r.end])).toEqual([
-      ["Data engineer", "Brumes", "2023-01", null],
-      ["Data analyst", "Brumes", "2021-09", "2022-12"],
-      ["Stagiaire data", "Nébuleuse", "2021-01", "2021-01"],
+    // Type de contrat : la légende du groupe (« CDI · 4 ans ») vaut pour ses postes, « Nébuleuse · Stage » pour le stage.
+    expect(p.roles.map((r) => [r.title, r.company, r.start, r.end, r.contract])).toEqual([
+      ["Data engineer", "Brumes", "2023-01", null, "full_time"],
+      ["Data analyst", "Brumes", "2021-09", "2022-12", "full_time"],
+      ["Stagiaire data", "Nébuleuse", "2021-01", "2021-01", "internship"],
     ]);
     expect(p.roles[0]!.description).toBe("Migration des pipelines vers Airflow.");
     expect(p.education).toEqual([{ school: "Université de Nantes", degree: "Master, Statistique", field: "", start: 2019, end: 2021 }]);
     expect(p.skills).toEqual(["Python", "Apache Spark"]);
+  });
+
+  it("sans type de contrat lisible : pas de clé", () => {
+    const p = profileFromApifyItem(URL_, { fullName: "X", experience: [{ position: "Dev", companyName: "Acme · 2 ans", employmentType: "Seasonal" }] })!;
+    expect(p.roles[0]).toEqual({ title: "Dev", company: "Acme", start: null, end: null, description: "" });
+    expect("contract" in p.roles[0]!).toBe(false);
   });
 
   it("vide : null", () => {
@@ -125,6 +135,40 @@ describe("normaliseur tolérant : deux formes de sortie", () => {
     ["bientôt", null],
   ])("whenOf(%j) = %j", (v, out) => {
     expect(whenOf(v)).toBe(out);
+  });
+});
+
+describe("type de contrat d'un poste", () => {
+  it.each([
+    ["Internship", "internship"],
+    ["Stage", "internship"],
+    ["Stagiaire", "internship"],
+    ["Apprenticeship", "work_study"],
+    ["Alternance", "work_study"],
+    ["Contrat d'apprentissage", "work_study"],
+    ["Freelance", "freelance"],
+    ["Self-employed", "freelance"],
+    ["Indépendant", "freelance"],
+    ["Full-time", "full_time"],
+    ["Temps plein", "full_time"],
+    ["CDI", "full_time"],
+    ["CDD", "full_time"],
+    ["Contract", "full_time"],
+    ["Part-time", "part_time"],
+    ["Temps partiel", "part_time"],
+    ["Seasonal", null],
+    ["Bénévolat", null],
+    ["4 ans", null],
+    ["", null],
+    [null, null],
+  ])("contractOf(%j) = %j", (v, out) => {
+    expect(contractOf(v)).toBe(out);
+  });
+
+  it("passe dans le texte lu par l'IA, à côté du poste", () => {
+    const t = profileToText(profileFromApifyItem(URL_, harvest[0])!);
+    expect(t).toContain("Développement web en alternance — Imprimerie Lumen · Apprenticeship (work-study) (2017-09 – 2018-08)");
+    expect(t).toContain("Senior Full-Stack Engineer — Paysolde · Full-time (2022-03 – present)");
   });
 });
 

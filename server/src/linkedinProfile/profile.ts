@@ -1,7 +1,15 @@
 // Profil LinkedIn réduit à ce qui sert au jugement (SPEC §18.24) : titre,
-// résumé, postes (intitulé, entreprise, dates, description), formation,
-// compétences, adresse du profil. Ni lieu, ni photo, ni contact : le reste de la
-// réponse Crustdata est jeté ici, avant tout stockage.
+// résumé, postes (intitulé, entreprise, dates, description, type de contrat),
+// formation, compétences, adresse du profil. Ni âge, ni lieu, ni langue parlée,
+// ni photo, ni contact : le reste de la réponse du fournisseur est jeté ici,
+// avant tout stockage.
+
+/**
+ * Type de contrat d'un poste, quand le fournisseur le donne (§18.37, critère
+ * Expérience : stage et alternance comptent pour moitié).
+ */
+export const CONTRACT_TYPES = ["full_time", "part_time", "internship", "work_study", "freelance"] as const;
+export type ContractType = (typeof CONTRACT_TYPES)[number];
 
 export interface LinkedinRole {
   title: string;
@@ -11,6 +19,8 @@ export interface LinkedinRole {
   /** "AAAA-MM", ou null pour un poste en cours. */
   end: string | null;
   description: string;
+  /** Type de contrat donné par le fournisseur ; absent s'il ne le donne pas (et dans les profils gardés avant le §18.37). */
+  contract?: ContractType;
 }
 
 export interface LinkedinSchool {
@@ -73,6 +83,34 @@ export const yearOf = (v: unknown): number | null => {
   return typeof n === "number" && n > 1900 && n < 2200 ? Math.floor(n) : null;
 };
 
+const plain = (s: string) => s.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+/**
+ * « Internship », « Stage », « Alternance », « Freelance », « Temps plein »,
+ * « CDI »… → le type de contrat ; null si le texte n'en est pas un. Saisonnier,
+ * bénévolat et l'inconnu ne donnent rien.
+ */
+export function contractOf(v: unknown): ContractType | null {
+  if (typeof v !== "string") return null;
+  const s = plain(v).trim();
+  if (!s || s.length > 60) return null;
+  if (/\b(apprenticeship|apprentice|alternance|alternant|apprentissage|apprenti|work[- ]?study|contrat pro(fessionnalisation)?)\b/.test(s)) return "work_study";
+  if (/\b(internship|intern|stage|stagiaire|trainee|traineeship|praktikum)\b/.test(s)) return "internship";
+  if (/\b(freelance|freelancer|self[- ]employed|independant|independante|auto[- ]?entrepreneur|micro[- ]?entrepreneur|consultant independant)\b/.test(s)) return "freelance";
+  if (/\b(part[- ]time|temps partiel|mi[- ]temps)\b/.test(s)) return "part_time";
+  if (/\b(full[- ]time|temps plein|cdi|cdd|permanent|contract|salarie|salariee)\b/.test(s)) return "full_time";
+  return null;
+}
+
+/** Le premier type de contrat lisible parmi des textes candidats. */
+export function firstContract(...vs: unknown[]): ContractType | null {
+  for (const v of vs) {
+    const c = contractOf(v);
+    if (c) return c;
+  }
+  return null;
+}
+
 /** Champs bruts d'un profil, avant le tri, les bornes et le dédoublonnage communs aux fournisseurs. */
 export interface ProfileParts {
   url: string;
@@ -91,6 +129,7 @@ export function buildProfile(p: ProfileParts): LinkedinProfile | null {
   // Postes en cours d'abord, puis le passé, du plus récent au plus ancien.
   const roles = p.roles
     .filter((r): r is LinkedinRole => r !== null && !!(r.title || r.company))
+    .map(({ contract, ...r }) => (contract && (CONTRACT_TYPES as readonly string[]).includes(contract) ? { ...r, contract } : r))
     .sort((a, b) => ((a.end === null) !== (b.end === null) ? (a.end === null ? -1 : 1) : (b.start ?? "").localeCompare(a.start ?? "")))
     .slice(0, MAX_ROLES);
   const education = p.education.filter((s): s is LinkedinSchool => s !== null && !!s.school).slice(0, MAX_SCHOOLS);
@@ -117,6 +156,9 @@ export function buildProfile(p: ProfileParts): LinkedinProfile | null {
 
 const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 
+/** `{ contract }` s'il est connu, sinon rien : un poste sans type n'a pas la clé. */
+export const withContract = (c: ContractType | null): { contract?: ContractType } => (c ? { contract: c } : {});
+
 /**
  * `person_data` d'une réponse Crustdata `POST /person/enrich` → profil réduit.
  * null si le profil est vide.
@@ -142,6 +184,7 @@ export function profileFromPersonData(url: string, data: unknown): LinkedinProfi
         start: monthOf(r.start_date),
         end: monthOf(r.end_date),
         description: clip(r.description, 600),
+        ...withContract(firstContract(r.employment_type, r.employmentType)),
       };
     }),
     education: list(d.education?.schools).map((raw) => {

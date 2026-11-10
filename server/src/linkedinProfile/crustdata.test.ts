@@ -53,9 +53,10 @@ describe("enrichissement (POST /person/enrich)", () => {
     const p = r.profile!;
     expect(p.name).toBe("Camille Ardent");
     expect(p.title).toBe("Senior Full-Stack Engineer");
-    expect(p.roles.map((x) => [x.company, x.start, x.end])).toEqual([
-      ["Paysolde", "2022-03", null],
-      ["Studio Bleu", "2019-01", "2022-02"],
+    expect(p.roles.map((x) => [x.company, x.start, x.end, x.contract])).toEqual([
+      ["Paysolde", "2022-03", null, "full_time"],
+      ["Studio Bleu", "2019-01", "2022-02", "full_time"],
+      ["Atelier Quartz", "2018-02", "2018-07", "internship"],
     ]);
     expect(p.education[0]).toEqual({ school: "INSA Lyon", degree: "Diplôme d'ingénieur", field: "Informatique", start: 2014, end: 2019 });
     // Doublon de casse retiré.

@@ -13,7 +13,7 @@
 // aucun champ de contact n'est lu, hormis les liens vers un GitHub.
 
 import { normalizeLinkedinUrl } from "../../../shared/entry";
-import { buildProfile, clip, yearOf, type LinkedinProfile, type LinkedinProvider, type LinkedinRole, type LinkedinSchool, type ProviderResult } from "./profile";
+import { buildProfile, clip, firstContract, withContract, yearOf, type ContractType, type LinkedinProfile, type LinkedinProvider, type LinkedinRole, type LinkedinSchool, type ProviderResult } from "./profile";
 
 export const APIFY_API = "https://api.apify.com/v2";
 /** Acteur par défaut : sans cookies, sans email (4 $ les 1 000 profils au 9 novembre 2026). */
@@ -152,7 +152,10 @@ function rangeOf(v: unknown): [unknown, unknown] {
   return [parts[0]?.trim(), parts[1]?.trim()];
 }
 
-function roleOf(raw: unknown, company?: string): LinkedinRole | null {
+/** Les morceaux d'une légende « Nébuleuse · Stage » ou « CDI · 4 ans ». */
+const parts = (v: unknown): string[] => (typeof v === "string" ? v.split("·").map((x) => x.trim()) : []);
+
+function roleOf(raw: unknown, company?: string, groupContract?: ContractType | null): LinkedinRole | null {
   const r = obj(raw);
   if (!r) return null;
   const range = rangeOf(pick(r, "caption", "dateRange", "period", "date"));
@@ -160,6 +163,12 @@ function roleOf(raw: unknown, company?: string): LinkedinRole | null {
   const endRaw = pick(r, "endDate", "end_date", "ends_at", "jobEndedOn", "end", "to") ?? range[1];
   const end = endRaw === undefined || r.jobStillWorking === true || r.isCurrent === true || r.current === true ? "present" : whenOf(endRaw);
   const companyRaw = text(pick(r, "companyName", "company_name", "company", "organization", "subtitle"));
+  // Le champ dédié d'abord, puis la légende (« Nébuleuse · Stage »), puis celui du groupe d'entreprise.
+  const contract =
+    firstContract(text(pick(r, "employmentType", "employment_type", "contractType", "contract_type", "jobType", "workType"))) ??
+    firstContract(...parts(companyRaw).slice(1), ...parts(text(r.subtitle)).slice(1)) ??
+    groupContract ??
+    null;
   return {
     title: clip(text(pick(r, "position", "title", "jobTitle", "role", "name")), 120),
     // « Paysolde · Full-time » : on ne garde que l'entreprise.
@@ -167,6 +176,7 @@ function roleOf(raw: unknown, company?: string): LinkedinRole | null {
     start: start === "present" ? null : start,
     end: end === "present" ? null : end,
     description: clip(prose(pick(r, "description", "jobDescription", "summary")), 600),
+    ...withContract(contract),
   };
 }
 
@@ -178,7 +188,9 @@ function rolesOf(item: Obj): (LinkedinRole | null)[] {
     const nested = arr(pick(o, "positions", "subComponents", "roles"));
     if (o && nested.some((n) => pick(obj(n), "position", "title", "jobTitle"))) {
       const company = text(pick(o, "companyName", "company", "title", "name"));
-      return nested.map((n) => roleOf(n, company));
+      // « CDI · 4 ans » sous le nom de l'entreprise : vaut pour chaque poste du groupe qui n'a pas le sien.
+      const groupContract = firstContract(text(pick(o, "employmentType", "employment_type")), ...parts(text(o!.subtitle)), ...parts(text(o!.caption)));
+      return nested.map((n) => roleOf(n, company, groupContract));
     }
     return [roleOf(x)];
   });

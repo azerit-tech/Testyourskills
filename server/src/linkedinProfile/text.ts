@@ -4,7 +4,15 @@
 // n'existe qu'en mémoire, le temps de la lecture, comme le texte d'un PDF.
 
 export { asLinkedinCard, asLinkedinComparison, linkedinFact } from "../../../shared/linkedinText";
-import type { LinkedinProfile } from "./profile";
+import type { ContractType, LinkedinProfile } from "./profile";
+
+const CONTRACT_LABEL: Record<ContractType, string> = {
+  full_time: "Full-time",
+  part_time: "Part-time",
+  internship: "Internship",
+  work_study: "Apprenticeship (work-study)",
+  freelance: "Freelance",
+};
 
 const range = (a: string | number | null, b: string | number | null, current: boolean) =>
   a || b ? ` (${a ?? "?"} – ${current ? "present" : (b ?? "?")})` : "";
@@ -19,7 +27,8 @@ export function profileToText(p: LinkedinProfile): string {
     out.push("", "Experience");
     for (const r of p.roles) {
       const head = [r.title, r.company].filter(Boolean).join(" — ");
-      out.push(`${head}${range(r.start, r.end, r.end === null)}`);
+      const kind = r.contract ? ` · ${CONTRACT_LABEL[r.contract]}` : "";
+      out.push(`${head}${kind}${range(r.start, r.end, r.end === null)}`);
       if (r.description) out.push(r.description);
     }
   }

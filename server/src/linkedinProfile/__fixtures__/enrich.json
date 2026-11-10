@@ -48,6 +48,17 @@
                   "location": { "raw": "Grenoble, France" },
                   "employment_type": "Full-time",
                   "seniority_level": "Entry Level"
+                },
+                {
+                  "name": "Atelier Quartz",
+                  "title": "Stagiaire développement",
+                  "crustdata_company_id": 4400123,
+                  "start_date": "2018-02-01T00:00:00+00:00",
+                  "end_date": "2018-07-01T00:00:00+00:00",
+                  "description": "Outil interne de suivi des commandes en PHP.",
+                  "location": { "raw": "Lyon, France" },
+                  "employment_type": "Internship",
+                  "seniority_level": "Entry Level"
                 }
               ]
             },

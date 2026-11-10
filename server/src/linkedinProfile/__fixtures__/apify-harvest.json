@@ -28,8 +28,18 @@
         "description": "Refonte du tunnel de paiement en React et Node.js, livrée en juin 2023.",
         "startDate": { "month": "Mar", "year": 2022, "text": "Mar 2022" },
         "endDate": { "text": "Present" }
+      },
+      {
+        "position": "Développement web en alternance",
+        "companyName": "Imprimerie Lumen",
+        "employmentType": "Apprenticeship",
+        "duration": "1 yr",
+        "description": "Site vitrine et boutique en ligne.",
+        "startDate": { "month": "Sep", "year": 2017, "text": "Sep 2017" },
+        "endDate": { "month": "Aug", "year": 2018, "text": "Aug 2018" }
       }
     ],
+    "languages": [{ "name": "Français", "proficiency": "Native" }, { "name": "English" }],
     "education": [
       {
         "schoolName": "INSA Lyon",
