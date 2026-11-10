@@ -189,7 +189,8 @@ let creditsExhaustedAt: number | null = null;
  */
 let creditBalanceUsd: number | null = null;
 
-/** Seuil de solde sous lequel l'IA est fermée (AI_MIN_CREDIT_USD, défaut 0,50 $). */
+/** Seuil de solde sous lequel l'IA est fermée (AI_MIN_CREDIT_USD, défaut 0,50 $).
+ * Une fiche coûte 0,001 à 0,003 $ : 0,05 $ suffit à couvrir le `max_tokens` d'un appel (.env.example). */
 export function minCreditUsd(): number {
   const raw = process.env.AI_MIN_CREDIT_USD;
   const n = Number(raw);

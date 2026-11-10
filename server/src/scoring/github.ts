@@ -104,13 +104,15 @@ export function docStat(m: GithubMetrics): Stat {
 
 export function xpStat(m: GithubMetrics): Stat {
   const years = m.firstCommitYears ?? 0;
+  // Le pluriel suit le nombre affiché (une décimale) : 1,96 s'écrit « 2 ans ».
+  const shownYears = Math.round(years * 10) / 10;
   const langs = m.languagesOverMin.length;
   const bonus = stepBonus(G.XP.breadthBonus, langs);
   const facts: Fact[] = [
     m.firstCommitDate
       ? fact(
-          `Premier vrai commit en ${m.firstCommitDate.slice(0, 4)} (il y a ${df(years, "fr")} an${years >= 2 ? "s" : ""})`,
-          `First real commit in ${m.firstCommitDate.slice(0, 4)} (${df(years, "en")} year${years >= 2 ? "s" : ""} ago)`,
+          `Premier vrai commit en ${m.firstCommitDate.slice(0, 4)} (il y a ${df(years, "fr")} an${shownYears >= 2 ? "s" : ""})`,
+          `First real commit in ${m.firstCommitDate.slice(0, 4)} (${df(years, "en")} year${shownYears === 1 ? "" : "s"} ago)`,
         )
       : fact(`Aucun repo avec ${G.XP.sufficientRepoCommits} commits ou plus`, `No repo with ${G.XP.sufficientRepoCommits}+ commits`),
     fact(

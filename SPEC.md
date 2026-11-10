@@ -1145,3 +1145,15 @@ Jacques, devant le site du jeu : « c'est quand même plus stylé ». L'écart t
 - **Le bandeau de saison** gagne des silhouettes de palmiers à ses deux bouts.
 - **Les suspects** : six portraits peints, un par profil (`arsonist`, `forger`, `kingpin`, `mastermind`, `night_owl`, `fresh_blood`), que Jacques génère d'après `docs/brief-personnages.md`. Ils lèvent, pour cette série seulement, l'interdit « aucune personne » du §18.28. La troupe est mélangée (trois femmes, deux hommes, une personne androgyne, de 22 à 55 ans) : un personnage est une figure de la ville, pas le portrait du joueur, dont la fiche garde la photo. Originaux déposés dans `Azerit/design/characters/`, versions web dans `web/public/characters/`.
 - **La couverture se construit d'abord sans eux**, avec les décors et les photos d'identité ; les suspects prennent leurs cases quand ils arrivent.
+
+### 18.32 Le modèle : GLM 5.3 Flash, raisonnement au minimum (10 novembre 2026)
+
+Demande de Jacques : les 0,25 $ restants sur OpenRouter doivent suffire avec GLM 5.3 Flash. Vérifié sur de vrais appels (une fiche complète de `jmougeot` et des lectures seules), pour 2 centimes en tout.
+
+- **Le site ne fermait pas faute de crédit, mais à cause du seuil** : `AI_MIN_CREDIT_USD` valait 0,50 $, au-dessus du solde. Une fiche coûte 0,001 à 0,003 $ : le seuil conseillé passe à 0,05 $ (`.env.example`). Le défaut du code reste 0,50 $ : la valeur se règle dans le `.env` du serveur.
+- **Les deux modèles raisonnent d'office**, et c'est ce qui faisait échouer les vraies fiches : Haiku 5.5 dépensait 2 313 tokens de raisonnement sur une lecture (14,5 s), atteignait le plafond de 3 000 tokens, relançait et dépassait le délai de 30 s. GLM 5.3 Flash rendait une réponse vide. Le client envoie maintenant `reasoning: { effort: "minimal" }` à ces deux familles (GLM refuse qu'on le coupe).
+- **Mesures, même profil, mêmes fichiers** (25 000 tokens d'entrée chez Haiku, 15 600 chez GLM) : Haiku 5.5 en 5,5 s pour 0,0030 $ ; GLM 5.3 Flash en 5,2 s pour 0,0009 à 0,0022 $ selon le fournisseur. Mêmes niveaux lus (4, 3, 3). Le prix réel de GLM est au-dessus du prix affiché (0,04 $ / 0,078 $ par million).
+- **Défaut** : `z-ai/glm-5.3-flash` pour le code et le CV (`DEFAULT_MODEL`, `.env.example`). Haiku 5.5 reste réglable par `AI_MODEL_CODE` et `AI_MODEL_CV`.
+- **Avec 0,23 $** : 100 à 200 fiches. Assez pour rouvrir et tester, pas pour le pic du 19.
+- **Une vraie fiche prend 24 s, pas dix** : la collecte GitHub prend 5 à 16 s selon les essais, le choix des fichiers 3 à 6 s, la lecture 5 s. Le délai de 30 s est trop juste. À reprendre avant le lancement.
+- **Pas vérifié** : la lecture d'un CV ou d'un LinkedIn par GLM, et la qualité des lectures sur plus d'un profil.

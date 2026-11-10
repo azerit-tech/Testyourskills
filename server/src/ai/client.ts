@@ -45,6 +45,7 @@ export interface ChatRequest {
   }[];
   tool_choice?: { type: "function"; function: { name: string } };
   provider?: { require_parameters?: boolean };
+  reasoning?: { effort: "minimal" | "low" };
 }
 
 export interface ChatResponse {
@@ -135,11 +136,23 @@ export function creditErrorIn(res: ChatResponse): boolean {
 // ---------------------------------------------------------------------------
 // Modèles
 
-export const DEFAULT_MODEL = "anthropic/claude-haiku-4.5";
+export const DEFAULT_MODEL = "z-ai/glm-5.3-flash";
 
 /** Température 0 seulement là où le modèle l'accepte (la génération 5 de Claude la refuse). */
 function supportsTemperature(model: string): boolean {
   return !/claude-(haiku|sonnet|opus)-5|claude-fable/.test(model);
+}
+
+/**
+ * Modèles qui raisonnent d'office avant de répondre (GLM 5.x, Haiku 5.x) : sans
+ * consigne, le raisonnement mange `max_tokens` (réponse vide ou tronquée,
+ * `finish_reason: length`) et fait dépasser le délai de la fiche. GLM refuse
+ * qu'on le coupe (« Reasoning is mandatory ») : on le réduit au minimum.
+ * Mesuré le 10 novembre 2026 sur une vraie lecture de code : Haiku 5.5 passe de
+ * 14,5 s (2 313 tokens de raisonnement) à 5,5 s, GLM 5.3 Flash répond en 5,2 s.
+ */
+function reasoningFor(model: string): ChatRequest["reasoning"] | undefined {
+  return /(^|\/)glm-5|claude-haiku-5/.test(model) ? { effort: "minimal" } : undefined;
 }
 
 /** Modèles pour lesquels aucun fournisseur n'accepte `response_format` : repli sur un outil forcé. */
@@ -190,6 +203,8 @@ function buildRequest(call: StructuredCall<unknown>, userParts: ChatContentPart[
     provider: { require_parameters: true },
   };
   if (supportsTemperature(call.model)) body.temperature = 0;
+  const reasoning = reasoningFor(call.model);
+  if (reasoning) body.reasoning = reasoning;
   if (toolMode) {
     body.tools = [
       {

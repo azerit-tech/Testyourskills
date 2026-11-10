@@ -66,7 +66,9 @@ describe("readCode", () => {
     const { client, calls } = fakeClient([VALID]);
     await readCode(REPOS, { client });
     const body = calls[0].body;
-    expect(body.model).toBe("anthropic/claude-haiku-4.5");
+    expect(body.model).toBe("z-ai/glm-5.3-flash");
+    // GLM raisonne d'office : on le réduit au minimum, sinon la réponse sort vide ou hors délai.
+    expect(body.reasoning).toEqual({ effort: "minimal" });
     expect(body.temperature).toBe(0);
     expect(body.max_tokens).toBeLessThanOrEqual(4000);
     expect(body.messages[0].content).toEqual([{ type: "text", text: CODE_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }]);
