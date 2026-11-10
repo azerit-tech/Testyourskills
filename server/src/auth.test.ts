@@ -291,7 +291,8 @@ describe("callback", () => {
     const noState = await callback(ctx, `code=${CODE}`, cookie);
     expect(noState.headers.get("location")).toBe(`${BASE}/c/CardAAAA01?claim=error`);
 
-    const wrong = await callback(ctx, `code=${CODE}&state=${state.slice(0, -1)}A`, cookie);
+    // Dernier caractère changé à coup sûr : un état tiré au hasard finit par « A » une fois sur 64.
+    const wrong = await callback(ctx, `code=${CODE}&state=${state.slice(0, -1)}${state.endsWith("A") ? "B" : "A"}`, cookie);
     expect(wrong.headers.get("location")).toBe(`${BASE}/c/CardAAAA01?claim=error`);
 
     const [payload, mac] = cookie.split(".");
