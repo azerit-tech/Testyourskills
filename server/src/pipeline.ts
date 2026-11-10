@@ -679,11 +679,10 @@ export class Pipeline {
       deleteToken,
     });
 
-    // Profil non dev face à un GitHub : la fiche GitHub seule ; un CV en PDF garde sa fiche CV (§4.7).
-    if (gh && !reading.is_dev_profile && !pdf) return [githubRow(githubCard(id), null)];
-
-    // Déclaratif seul (CV, ou LinkedIn sans GitHub), ou profil non dev : pas de carte GitHub (§4.7).
-    if (!gh || !reading.is_dev_profile) {
+    // Déclaratif seul (CV, ou LinkedIn sans GitHub), ou CV en PDF qui n'est pas celui
+    // d'un dev : pas de carte GitHub (§4.7). Un LinkedIn, lui, se compare toujours au
+    // GitHub, quel que soit le métier qu'il déclare (§18.35).
+    if (!gh || (!reading.is_dev_profile && !linkedinUrl)) {
       const found = linkedinUrl ? strongest(ctx.findings()) : [];
       const card = asDeclared({
         ...deps.scoreCv(reading, declared.counts, { lang, judgedInSeconds }),

@@ -195,10 +195,13 @@ describe("entrée GitHub : le LinkedIn trouvé devient une comparaison", () => {
     warn.mockRestore();
   });
 
-  it("profil LinkedIn non dev : la fiche GitHub seule", async () => {
+  it("profil LinkedIn non dev : la comparaison sort quand même (§18.35)", async () => {
     const ctx = setup({ forGithub: async () => FOUND }, { readCv: async () => ({ ...READING, is_dev_profile: false }) });
     const { json } = await post(ctx, { login: "camille-ardent" });
-    expect(await state(ctx, json.id)).toMatchObject({ state: "done", kind: "card", card: { source: "github" } });
+    const done = (await state(ctx, json.id)) as { state: string; kind: string; comparison: ComparisonData };
+    expect(done).toMatchObject({ state: "done", kind: "comparison" });
+    expect(done.comparison.cv).toMatchObject({ declaredSource: "linkedin" });
+    expect(done.comparison.github).toMatchObject({ source: "github", login: "camille-ardent" });
   });
 
   it("le lien collé par le joueur avec son pseudo est passé au chercheur", async () => {
