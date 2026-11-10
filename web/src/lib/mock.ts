@@ -163,6 +163,7 @@ const GH_FACTS: Record<StatCode, { fr: string; en: string }[]> = {
 const CV_FACTS: Record<StatCode, { fr: string; en: string }[]> = {
   TEC: [
     { fr: "Séniorité déclarée : lead (88).", en: "Claimed seniority: lead (88)." },
+    { fr: "École : INSA Lyon, rang B (+10).", en: "School: INSA Lyon, tier B (+10)." },
     { fr: "2 technos décrites avec une responsabilité concrète, 17 seulement listées.", en: "2 technologies described with a concrete responsibility, 17 merely listed." },
   ],
   SHIP: [{ fr: "3 projets avec un résultat daté.", en: "3 projects with a dated outcome." }],
