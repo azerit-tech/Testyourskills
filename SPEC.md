@@ -1206,3 +1206,18 @@ Demande de Jacques : son LinkedIn doit entrer dans son jugement, et Lumine Trent
 - **Lecture d'un LinkedIn par GLM 5.3 Flash** (question ouverte du §18.32), sur six lectures : 5 à 9 s quatre fois, plus de 25 s deux fois (appel coupé, la fiche GitHub sort seule et hors cache). Le métier lu est stable (PM, non dev), le nombre de postes relevés varie d'une lecture à l'autre (1 à 4 sur 4), donc la note LinkedIn aussi (51 à 55 pour Jacques).
 - **Dépend de Jacques et Lumine** : `APIFY_TOKEN` sur le serveur (sans lui, aucun LinkedIn n'est lu, vitrine comprise) ; ajouter son LinkedIn à son profil GitHub (Jacques) ; rendre publics des repos ou afficher les contributions privées (Lumine).
 - **Pas vérifié** : la lecture par Apify de ces deux profils (les tests locaux ont lu les profils relevés à la main, sans jeton).
+
+### 18.36 La poursuite devient un film (10 novembre 2026)
+
+La poursuite 2D du §18.33 n'a pas passé : Jacques veut « un effet film », « une super cinématique », « digne des plus grands studios ». La voie, le storyboard, les briefs de tournage et le plan de construction sont dans `docs/cinematique-poursuite.md`.
+
+- **La voie** : neuf plans vidéo générés par IA par Jacques d'après les briefs du document (§7), montés par ffmpeg, joués par deux balises vidéo. La 3D temps réel avec des modèles libres est écartée : sur un téléphone elle donne une image de jeu mobile, pas de film.
+- **Le film** : vertical, 24 images par seconde, 4,7 s à une étoile, 11,8 s à six. Un plan et une coupe par étoile, renforts cumulés comme au §18.33. Fin : dérapage au ralenti, arrêt sur image en deux tons à la lumière du profil avec le pseudo et le niveau, flash, la fiche se pose ; à six étoiles, une orbite à temps gelé.
+- **Ce qui est personnel** : le nombre d'étoiles donc la longueur, les lignes de radio (`shared/chase/radio.ts`), l'arrêt sur image, le lieu du crime où la fiche se pose. Le film lui-même est le même pour tous à niveau égal, à l'heure bleue ; gyrophares corail et lilas.
+- **Posé en direct par le site, mat** : les étoiles, la radio, deux bandes d'encre.
+- **Interdits** : aucune personne, aucune arme, aucun choc, aucun texte, aucune marque ; aucun nom du jeu dans les prompts, aucune image du jeu en référence.
+- **Fonction du temps de la vidéo** : `window.__film.seek/hold`.
+- **Replis** : rien en mouvement réduit ; la pilule de l'attente si la lecture demande un geste ; la poursuite 2D si le film ne se charge pas.
+- **Butoir : lundi 16 novembre au soir**, six plans validés (fin, ouverture, étoiles 1 à 4). Tenue : le film est la révélation par défaut. Manquée : la poursuite 2D sort le 19, le film passe par défaut dès qu'il est prêt (`DEFAULT_SCENE`). L'ascenseur ne revient pas ; il est supprimé avec Three.js à la validation du film.
+- **Dépend de Jacques** : le tournage (trois références, neuf images clés, neuf plans, environ une heure par plan), déposé dans `Azerit/design/film/`.
+- **Pas vérifié** : la lecture automatique sur iPhone en économie d'énergie et dans le navigateur de LinkedIn, les réglages et le coût des outils vidéo, les conditions d'usage commercial de l'outil choisi.
