@@ -1114,3 +1114,32 @@ Ce qui fait l'écart, vu côte à côte : chez eux l'image remplit l'écran et l
 - **Le ciel de l'accueil** : `kingpin`, `arsonist`, `delivery_machine`, `night_owl`, `default`, une image toutes les 6 s ; les quatre dernières ne se chargent qu'après la première. La première ligne du titre repose sur l'aplat sombre de l'image.
 - **Le mur « Lequel es-tu ? »** : rail aimanté jusqu'à 899 px, grille au-delà, la dernière case « Et toi ? » ramène au champ.
 
+
+### 18.30 LinkedIn devant (10 novembre 2026)
+
+Demande de Jacques : mettre en avant l'entrée par LinkedIn, sinon le jeu ne parle qu'aux gens qui ont un GitHub. La lecture d'un profil existe déjà (§18.24) ; ce paragraphe ne change que la porte d'entrée.
+
+- **Deux portes visibles** au-dessus du champ, dans cet ordre : **LinkedIn**, **GitHub**. Un sélecteur à deux segments, au dessin de la bascule FR/EN (segment actif crème, texte encre). LinkedIn est choisi d'office. Le choix tient le temps de la session. Le CV en PDF reste à un lien de là (« ou avec ton CV »).
+- **Porte LinkedIn** : le champ porte le préfixe fixe `linkedin.com/in/`. On colle le lien entier (il se réduit à ce qui suit `/in/`) ou on tape la fin. Un lien « Où est mon lien ? » déplie une ligne : « Dans l'app LinkedIn : ton profil, ⋯, puis copie le lien. »
+- **Porte GitHub** : le champ « @ ton-pseudo », comme avant.
+- **Une porte corrige l'autre** : un lien GitHub collé côté LinkedIn bascule sur GitHub et lance la fiche, et l'inverse.
+- **Un seul titre, qui dit les deux** (Jacques, 10 novembre : « Ton GitHub remplace ton CV » est faux, Azerit regarde toujours l'expérience puis le GitHub) : « Ton LinkedIn dit senior. Ton GitHub, on va voir. » (EN « Your LinkedIn says senior. Your GitHub? We'll see. »). Deux phrases dans le même `h1`, la première crème, la seconde rose, quatre lignes sur téléphone. Il ne change pas avec la porte. La ligne « Le haut du classement décroche un entretien. » reste dessous, en texte secondaire. Le champ et le bouton tiennent sans défiler dans 390 × 700.
+- **Même sélecteur sur la page d'une fiche partagée** (bloc « Et toi ? »), là où arrive presque tout le monde.
+- **Si le serveur ne sait pas lire LinkedIn** (`linkedinEntry` faux) : pas de sélecteur, le champ GitHub seul, et le titre dit « Ton CV dit senior. ». Tant que la réponse n'est pas connue, LinkedIn est supposé ouvert, pour que la page ne saute pas au chargement.
+- **Aperçu de lien de l'accueil** : le même titre, la description « Une IA lit ton LinkedIn, puis ton code. Ta fiche de police en dix secondes. », et l'image `/og/home.png` porte les deux phrases.
+- **« Ton GitHub remplace ton CV » disparaît partout** (titre, onglet, aperçus).
+- **La langue** suit celle du navigateur (français si elle commence par `fr`, anglais sinon) ; la bascule FR/EN ne sert qu'à la changer, et ce choix est gardé.
+- **Ce que reçoit quelqu'un sans GitHub** : une fiche LinkedIn seule, tampon « D'APRÈS LINKEDIN », jugée comme un CV (§18.24), avec un profil criminel et une peine. Elle n'entre pas au top de la semaine. Un profil non dev reçoit le poste PM ou DESIGN (§4.7).
+- **Pas fait** : la connexion « Se connecter avec LinkedIn » comme entrée (elle ne donne ni l'adresse du profil ni son contenu, seulement nom, photo et email) ; dénoncer un complice par son lien LinkedIn ; un barème propre aux métiers hors dev.
+- **Dépend de Jacques** : `APIFY_TOKEN` sur le serveur, et le plafond `LINKEDIN_DAILY_PROFILES` (300 par jour, 4 $ les 1 000 profils) à relever avant le 19 puisque LinkedIn devient la porte d'office.
+
+### 18.31 La couverture (10 novembre 2026)
+
+Jacques, devant le site du jeu : « c'est quand même plus stylé ». L'écart tient à trois choses : des personnages, une seule pièce maîtresse encadrée sur une page sombre, presque pas de texte. On prend la construction, rien d'autre : ni logo, ni personnages, ni motifs de la jaquette, et pas de bloc central dans la mosaïque.
+
+- **L'accueil s'ouvre sur une couverture** : une mosaïque encadrée de cases séparées par des joints d'encre, qui remplace le ciel en fondu du §18.29. Dans les cases : nos lieux du crime (§18.28), les suspects ci-dessous, et les photos d'identité des joueurs.
+- **Le top 5 de la semaine fait la couverture** : sa photo devant la toise, dans une case. Une place libre montre une silhouette « ? ». Sans top (moins de 20 fiches, §18.22), la fiche de Jacques et des silhouettes tiennent la place.
+- **Sous la couverture, trois éléments** : le titre (§18.30) à gauche, en plus petit qu'aujourd'hui ; les deux portes, le champ et le bouton au centre ; la promesse d'entretien à droite. Sur téléphone : la couverture de bord à bord, puis le titre, les portes, le champ, le bouton, visibles sans défiler dans 390 × 700.
+- **Le bandeau de saison** gagne des silhouettes de palmiers à ses deux bouts.
+- **Les suspects** : six portraits peints, un par profil (`arsonist`, `forger`, `kingpin`, `mastermind`, `night_owl`, `fresh_blood`), que Jacques génère d'après `docs/brief-personnages.md`. Ils lèvent, pour cette série seulement, l'interdit « aucune personne » du §18.28. La troupe est mélangée (trois femmes, deux hommes, une personne androgyne, de 22 à 55 ans) : un personnage est une figure de la ville, pas le portrait du joueur, dont la fiche garde la photo. Originaux déposés dans `Azerit/design/characters/`, versions web dans `web/public/characters/`.
+- **La couverture se construit d'abord sans eux**, avec les décors et les photos d'identité ; les suspects prennent leurs cases quand ils arrivent.
