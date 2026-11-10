@@ -6,7 +6,8 @@ import buzzwordsJson from "../../../data/buzzwords.json";
 import profilesJson from "../../../data/profiles.json";
 import sentencesJson from "../../../data/sentences.json";
 import gridJson from "../../../data/grid.json";
-import type { SchoolTier } from "../../../shared/readings";
+import type { RoleKind as CvRoleKind, SchoolTier, SelectionKind } from "../../../shared/readings";
+import type { ContractType } from "../linkedinProfile/profile";
 import type { CriterionCode, Fact, Position, StatCode, StatusTone } from "../../../shared/types";
 
 export type Scale = [number, number][];
@@ -147,22 +148,27 @@ export interface SentencesConfig {
   bail: Record<string, Fact>;
 }
 
+/** Comment un poste compte dans l'expérience (§3.2) : en plein, à moitié, pour rien (association, bénévolat), pour rien (projet personnel). */
+export type GridRoleKind = "full" | "internship" | "association" | "project";
+
 /** Barème de recrutement (data/grid.json) : tables de niveaux, coefficients, familles, traces. */
 export interface GridConfig {
   weights: Record<CriterionCode, number>;
   final: { neverLower: CriterionCode[]; capUnproven: number; emptyBelowShare: number; emptyScore: number; bounds: { min: number; max: number } };
   thinGithub: { minRepos: number; repoCommits: number };
-  EDU: { tiers: Record<Exclude<SchoolTier, "none">, number>; selection: Record<string, number>; githubPattern: string; githubScore: number };
+  EDU: { tiers: Record<Exclude<SchoolTier, "none">, number>; selection: Record<SelectionKind, number>; githubPattern: string; githubScore: number };
   XP: {
-    share: { full: number; internship: number; association: number };
+    share: Record<GridRoleKind, number>;
     levels: { score: number; years: number }[];
     githubCap: number;
     githubActiveYearContributions: number;
     claimedCap: number;
     internshipPattern: string;
-    internshipContracts: string[];
+    /** Le type de contrat du fournisseur (`LinkedinRole.contract`) → comment le poste compte. */
+    byContract: Record<ContractType, GridRoleKind>;
+    /** La nature lue par l'IA (`CvRole.kind`) → comment le poste compte. */
+    byAiKind: Record<CvRoleKind, GridRoleKind>;
     associationPattern: string;
-    associationContracts: string[];
     schoolRoleExceptPattern: string;
     schoolAssociationWords: string;
     seniorTitlePattern: string;

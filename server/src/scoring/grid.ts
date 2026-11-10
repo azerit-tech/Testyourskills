@@ -5,17 +5,19 @@
 // des critères comptés, avec les quatre règles du §4 et rien d'autre.
 //
 // Pur et déterministe, sans réseau : « maintenant » est donné par l'appelant.
-// Les données que la collecte ne donne pas encore (destination des PR, type de
-// contrat, type d'employeur, signaux de sélection, fait d'encadrement, liste des
-// employeurs à forte barre, fichiers d'agent, adresse du site d'un dépôt) sont
-// lues comme facultatives : tant qu'elles manquent, leur niveau reste fermé.
+// Les données ajoutées au §18.37
+// (destination des PR, type de contrat, nature et type d'employeur d'un poste,
+// signaux de sélection, fait d'encadrement, fichiers d'agent, site d'un dépôt)
+// sont lues sous leurs noms typés, et facultatives : les faits et lectures
+// d'avant ne les ont pas, leur niveau reste alors fermé.
 // Les chefs d'accusation (`flags`) ne touchent jamais une note.
 
-import type { CodeReadingResult, CvReading } from "../../../shared/readings";
+import type { CodeReadingResult, CvReading, EmployerType, RoleKind as CvRoleKind, SelectionKind } from "../../../shared/readings";
 import { CRITERION_CODES, type CriterionCode, type Fact, type Grid, type GridCriterion, type GridSource } from "../../../shared/types";
-import type { GithubFacts, GithubRepo } from "../github/facts";
+import type { ExternalMergedPR, GithubFacts, GithubRepo } from "../github/facts";
+import type { LinkedinRole } from "../linkedinProfile/profile";
 import { df, nf } from "./common";
-import { GRID } from "./config";
+import { GRID, type GridRoleKind } from "./config";
 import { isTutorialRepo, type GithubMetrics } from "./derive";
 import { normSchool, schoolListNames, schoolTier } from "./school";
 
@@ -35,10 +37,6 @@ const norm = (s: string) =>
 const rx = (p: string) => new RegExp(p, "iu");
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const wordIn = (needle: string, hay: string) => new RegExp(`(?<![\\p{L}\\p{N}])${esc(needle)}(?![\\p{L}\\p{N}])`, "u").test(hay);
-
-type Loose = Record<string, unknown>;
-const loose = (x: unknown): Loose => (x && typeof x === "object" ? (x as Loose) : {});
-const str = (v: unknown): string => (typeof v === "string" ? v : "");
 
 const INTERN_RE = rx(GRID.XP.internshipPattern);
 const ASSOC_RE = rx(GRID.XP.associationPattern);
@@ -100,18 +98,18 @@ const join = (parts: Fact[], sep = " "): Fact => f(parts.map((p) => p.fr).join(s
 
 // --- Entrées -------------------------------------------------------------------
 
-/** Un poste daté, tel que le profil LinkedIn le range ou tel que la lecture du CV le relève. */
-export interface DatedRole {
-  title: string;
-  company: string;
-  /** "AAAA-MM" ou null. */
-  start: string | null;
-  /** "AAAA-MM", ou null pour un poste en cours. */
-  end: string | null;
+/**
+ * Un poste daté, tel que le profil LinkedIn le range ou tel que la lecture du CV
+ * le relève. Les champs du profil sont ceux de `LinkedinRole`, sous les mêmes
+ * noms : un champ renommé côté collecte ne compile plus ici.
+ */
+export type DatedRole = Pick<LinkedinRole, "title" | "company" | "start" | "end" | "contract"> & {
   description?: string;
-  /** Type de contrat donné par le fournisseur (tâche 1, facultatif) : internship, apprenticeship, freelance… */
-  contractType?: string | null;
-}
+  /** Nature du poste lue par l'IA (`CvRole.kind`), rattachée au poste du profil par l'entreprise et la date de début. */
+  kind?: CvRoleKind;
+  /** Type d'employeur lu par l'IA (`CvRole.employer_type`). */
+  employerType?: EmployerType;
+};
 
 /** Ce qui déclare : la lecture du CV ou du LinkedIn, et les champs rangés du profil. */
 export interface DeclaredInput {
@@ -139,17 +137,40 @@ export interface DeclaredProfile {
 }
 
 /**
+ * Les postes du profil, avec ce que la lecture IA en dit : la nature du poste
+ * (`kind`) quand un poste lu a la même entreprise et la même date de début ; le
+ * type d'employeur sur la même règle, sinon celui d'un poste lu chez le même
+ * employeur (c'est un trait de l'employeur, pas du poste).
+ */
+function withReading(roles: DatedRole[], reading: CvReading): DatedRole[] {
+  const read = reading.roles.filter((r) => r.company);
+  return roles.map((role) => {
+    if (!role) return role;
+    const c = norm(role.company);
+    const same = read.find((r) => norm(r.company) === c && r.start === role.start && role.start !== null);
+    const kind = role.kind ?? same?.kind;
+    const employerType = role.employerType ?? same?.employer_type ?? read.find((r) => norm(r.company) === c && r.employer_type)?.employer_type;
+    return { ...role, ...(kind ? { kind } : {}), ...(employerType ? { employerType } : {}) };
+  });
+}
+
+/**
  * L'entrée déclarative : les postes datés du profil LinkedIn quand il y en a
  * (ils arrivent rangés, sans passer par l'IA), sinon ceux relevés dans le CV.
  */
 export function declaredInput(reading: CvReading, opts: { profile?: DeclaredProfile; now: number; highBar?: string[] }): DeclaredInput {
   const p = opts.profile;
   const roles: DatedRole[] = p?.roles?.length
-    ? p.roles
-    : reading.roles.map((r) => {
-        const contract = str(loose(r).contract_type);
-        return { title: r.title, company: r.company, start: r.start, end: r.end, description: r.responsibilities.join(" "), ...(contract ? { contractType: contract } : {}) };
-      });
+    ? withReading(p.roles, reading)
+    : reading.roles.map((r) => ({
+        title: r.title,
+        company: r.company,
+        start: r.start,
+        end: r.end,
+        description: r.responsibilities.join(" "),
+        ...(r.kind ? { kind: r.kind } : {}),
+        ...(r.employer_type ? { employerType: r.employer_type } : {}),
+      }));
   return {
     reading,
     roles,
@@ -189,7 +210,8 @@ export function thinGithub(m: GithubMetrics): boolean {
 
 // --- Les postes ------------------------------------------------------------------
 
-export type RoleKind = "full" | "internship" | "association";
+/** Comment un poste compte (§3.2) : en plein, à moitié (stage, alternance), pour rien (association, bénévolat, projet personnel). */
+export type RoleKind = GridRoleKind;
 
 export interface RoleInfo {
   role: DatedRole;
@@ -201,8 +223,7 @@ export interface RoleInfo {
   /** Mois tenus (fin − début), 0 si non daté. */
   months: number;
   companyKey: string;
-  /** Type d'employeur lu par l'IA (tâche 1, facultatif). */
-  employerType?: string;
+  employerType?: EmployerType;
 }
 
 /**
@@ -217,11 +238,20 @@ const SCHOOL_KEYS = schoolListNames()
   .filter((k) => k.replace(/\s/g, "").length >= 4);
 const SCHOOL_ASSOC_WORDS_RE = rx(GRID.XP.schoolAssociationWords);
 
-/** Stage, association étudiante ou vrai poste. Le type de contrat, quand il est donné, prime sur l'intitulé. */
+/**
+ * Stage, association, projet personnel ou vrai poste, dans cet ordre de preuve :
+ * 1. l'IA dit association étudiante ou bénévolat : rien, quel que soit le contrat ;
+ * 2. le contrat du fournisseur dit stage ou alternance : à moitié ;
+ * 3. le code reconnaît une association (mot d'association, ou nom d'une école de la liste) ;
+ * 4. l'intitulé dit stage ou alternance ;
+ * 5. le contrat dit salarié, temps partiel ou freelance : un vrai poste, même si l'IA dit autre chose ;
+ * 6. sinon, la nature lue par l'IA (stage, projet personnel, poste) ; sans elle, un vrai poste.
+ */
 export function roleKind(role: DatedRole): RoleKind {
-  const contract = norm(str(role.contractType ?? loose(role).contract_type)).replace(/[\s-]+/g, "_");
-  if (contract && GRID.XP.associationContracts.includes(contract)) return "association";
-  if (contract && GRID.XP.internshipContracts.includes(contract)) return "internship";
+  const ai: RoleKind | undefined = role.kind ? GRID.XP.byAiKind[role.kind] : undefined;
+  if (ai === "association") return "association";
+  const contract: RoleKind | undefined = role.contract ? GRID.XP.byContract[role.contract] : undefined;
+  if (contract === "internship") return "internship";
   const title = norm(role.title);
   const company = norm(role.company);
   if (ASSOC_RE.test(title) || ASSOC_RE.test(company)) return "association";
@@ -229,17 +259,11 @@ export function roleKind(role: DatedRole): RoleKind {
   if (companyKey && SCHOOL_ASSOC_WORDS_RE.test(companyKey) && !SCHOOL_ROLE_EXCEPT_RE.test(title) && SCHOOL_KEYS.some((k) => wordIn(k, companyKey)))
     return "association";
   if (INTERN_RE.test(title)) return "internship";
-  return "full";
+  return contract ?? ai ?? "full";
 }
 
-export function analyzeRoles(roles: DatedRole[], now: number, reading?: CvReading): RoleInfo[] {
+export function analyzeRoles(roles: DatedRole[], now: number): RoleInfo[] {
   const nowIdx = nowMonth(now);
-  // Type d'employeur : lu par l'IA sur les postes du CV (tâche 1), rattaché par le nom de l'entreprise.
-  const types = new Map<string, string>();
-  for (const r of reading?.roles ?? []) {
-    const t = str(loose(r).employer_type);
-    if (t && r.company) types.set(norm(r.company), t);
-  }
   const seen = new Set<string>();
   const out: RoleInfo[] = [];
   for (const role of roles) {
@@ -252,7 +276,6 @@ export function analyzeRoles(roles: DatedRole[], now: number, reading?: CvReadin
     if (end !== null && end > nowIdx) end = nowIdx;
     const dated = start !== null && end !== null && start <= nowIdx;
     const companyKey = norm(role.company);
-    const own = str(loose(role).employer_type ?? loose(role).employerType);
     out.push({
       role,
       kind: roleKind(role),
@@ -261,7 +284,7 @@ export function analyzeRoles(roles: DatedRole[], now: number, reading?: CvReadin
       end: dated ? end : null,
       months: dated && end! > start! ? end! - start! : 0,
       companyKey,
-      ...(own || types.get(companyKey) ? { employerType: own || types.get(companyKey) } : {}),
+      ...(role.employerType ? { employerType: role.employerType } : {}),
     });
   }
   return out;
@@ -294,25 +317,23 @@ const levelFor = (y: number) => GRID.XP.levels.find((l) => y >= l.years) ?? GRID
 // --- EDU : école et sélection ------------------------------------------------------
 
 interface Signal {
-  kind: string;
+  kind: SelectionKind;
   quote: string;
 }
 
-/** Signaux de sélection lus avec leur extrait (tâche 1, facultatifs) : sans extrait, rien. */
+/** Signaux de sélection lus avec leur extrait (`CvReading.selection_signals`) : sans extrait, rien. */
 function selectionSignals(reading: CvReading): Signal[] {
-  const raw = loose(reading).selection_signals;
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map((x) => ({ kind: str(loose(x).kind), quote: str(loose(x).quote).trim() }))
+  return (reading.selection_signals ?? [])
+    .map((s) => ({ kind: s.kind, quote: (s.quote ?? "").trim() }))
     .filter((s) => s.quote && GRID.EDU.selection[s.kind] !== undefined);
 }
 
-const SELECTION_TEXT: Record<string, Fact> = {
+const SELECTION_TEXT: Record<SelectionKind, Fact> = {
   international_medal: f("médaille internationale", "international medal"),
-  ranked: f("classement dans un concours", "ranking in a competition"),
+  ranked_contest: f("classement dans un concours", "ranking in a competition"),
   hackathon_prize: f("prix de hackathon", "hackathon prize"),
-  selective_program: f("programme sélectif", "selective programme"),
-  participation: f("hackathon ou concours, sans classement", "hackathon or competition, unranked"),
+  selective_programme: f("programme sélectif", "selective programme"),
+  contest_entry: f("hackathon ou concours, sans classement", "hackathon or competition, unranked"),
 };
 
 const EDU_NEXT: Record<number, Fact> = {
@@ -369,8 +390,14 @@ export function eduGithub(g: GithubInput): Draft {
 
 // --- XP : expérience ----------------------------------------------------------------
 
+/** « Atelier perso est un projet personnel : non compté. » */
+const projectFact = (r: RoleInfo): Fact => {
+  const name = r.role.company || r.role.title;
+  return f(`${name} est un projet personnel : non compté.`, `${name} is a personal project: not counted.`);
+};
+
 export function xpDeclared(d: DeclaredInput): Draft {
-  const infos = analyzeRoles(d.roles, d.now, d.reading);
+  const infos = analyzeRoles(d.roles, d.now);
   const dated = infos.filter((r) => r.start !== null);
   const total = countedMonths(infos);
   const proof = d.url ? { proof: d.url } : {};
@@ -405,12 +432,15 @@ export function xpDeclared(d: DeclaredInput): Draft {
   }
   if (total <= 0) {
     const a = infos.find((r) => r.kind === "association");
+    const p = infos.find((r) => r.kind === "project");
     return missing(
       "XP",
       "linkedin",
       a
         ? f(`Aucun mois compté : ${a.role.company} est une association, l'association et le bénévolat ne comptent pas.`, `No month counted: ${a.role.company} is an association; associations and volunteering do not count.`)
-        : f("Aucun mois compté sur les postes datés.", "No month counted on the dated roles."),
+        : p
+          ? f(`Aucun mois compté : ${projectFact(p).fr}`, `No month counted: ${projectFact(p).en}`)
+          : f("Aucun mois compté sur les postes datés.", "No month counted on the dated roles."),
       f("Pour 2 : un premier poste ou un stage daté.", "For 2: a first dated job or internship."),
     );
   }
@@ -433,6 +463,8 @@ export function xpDeclared(d: DeclaredInput): Draft {
   if (fulls.length > 2) parts.push(f(`${fulls.length - 2} autre${fulls.length > 3 ? "s" : ""} poste${fulls.length > 3 ? "s" : ""}.`, `${fulls.length - 2} more role${fulls.length > 3 ? "s" : ""}.`));
   const assoc = infos.find((r) => r.kind === "association");
   if (assoc) parts.push(f(`${assoc.role.company} est une association : non compté.`, `${assoc.role.company} is an association: not counted.`));
+  const project = infos.find((r) => r.kind === "project");
+  if (project) parts.push(projectFact(project));
   parts.push(f(`Total : ${years(y).fr}.`, `Total: ${years(y).en}.`));
 
   return crit("XP", {
@@ -495,16 +527,16 @@ function isHighBar(company: string, list: string[]): boolean {
   });
 }
 
-/** Le fait d'encadrement lu avec son extrait (tâche 1, facultatif). */
+/** Le fait d'encadrement lu avec son extrait (`CvReading.management_fact`), "" sans fait. */
 function managementQuote(r: CvReading): string {
-  const raw = loose(r).management_fact;
-  return (typeof raw === "string" ? raw : str(loose(raw).quote)).trim();
+  return (r.management_fact?.quote ?? "").trim();
 }
 
 export function empDeclared(d: DeclaredInput): Draft {
   const src = d.label;
   const proof = d.url ? { proof: d.url } : {};
-  const infos = analyzeRoles(d.roles, d.now, d.reading).filter((r) => r.kind !== "association");
+  // Une association, un bénévolat ou un projet personnel ne sont pas des postes.
+  const infos = analyzeRoles(d.roles, d.now).filter((r) => r.kind === "full" || r.kind === "internship");
   if (!infos.length) return missing("EMP", "linkedin", f("Aucun poste.", "No role."), f("Pour 2 : un premier poste ou un stage.", "For 2: a first job or internship."));
   const L = GRID.EMP.levels;
   const lv = (s: number) => L.find((x) => x.score === s)!;
@@ -693,8 +725,8 @@ export function stkGithub(g: GithubInput): Draft {
   const fams = familiesOf(facts);
   const main = fams[0];
   const flags: Fact[] = [];
-  // IA dans l'atelier : des fichiers d'agent dans un dépôt actif (tâche 1, facultatif).
-  const agent = facts.trees.find((t) => facts.activeRepos.includes(t.repo) && Array.isArray(loose(t).agentFiles) && (loose(t).agentFiles as unknown[]).length > 0);
+  // IA dans l'atelier : des fichiers d'agent (`RepoTree.agentFiles`) dans un dépôt actif.
+  const agent = facts.trees.find((t) => facts.activeRepos.includes(t.repo) && (t.agentFiles?.length ?? 0) > 0);
   if (agent) flags.push(f(`IA dans l'atelier : des fichiers d'agent dans ${agent.repo}.`, `AI in the workshop: agent files in ${agent.repo}.`));
   if (!main || main.commits <= 0)
     return unproven("STK", "github", f("Aucun dépôt public avec du code à compter.", "No public repo with code to count."), flags);
@@ -980,7 +1012,8 @@ export function ownGithub(g: GithubInput): Draft {
   const span = (r: GithubRepo) => Math.max(0, (Date.parse(r.pushedAt) - Date.parse(r.createdAt)) / MONTH);
   const commits = (r: GithubRepo) => r.commitCount ?? 0;
   const ext = (r: GithubRepo) => r.externalContributors ?? 0;
-  const published = (r: GithubRepo) => (r.releaseDates ?? []).length > 0 || !!str(loose(r).homepage).trim();
+  // Publié : une release, ou un site en ligne (`GithubRepo.homepage`).
+  const published = (r: GithubRepo) => (r.releaseDates ?? []).length > 0 || !!r.homepage?.trim();
   const repos = facts.repos.filter(countedRepo);
   const carried = (s: number) => repos.filter((r) => span(r) >= lv(s).months! && commits(r) >= lv(s).commits!);
 
@@ -1048,7 +1081,7 @@ export function ownGithub(g: GithubInput): Draft {
 
 export function ownDeclared(d: DeclaredInput): Draft {
   const outcomes = d.reading.projects_with_dated_outcome;
-  const infos = analyzeRoles(d.roles, d.now, d.reading);
+  const infos = analyzeRoles(d.roles, d.now);
   const founded = infos.find((r) => r.founder && r.kind === "full");
   const L = GRID.OWN.declared;
   const lvl = L.find((l) => outcomes >= l.outcomes || (l.founded && !!founded));
@@ -1080,19 +1113,13 @@ export function ownDeclared(d: DeclaredInput): Draft {
 
 // --- OSS : open source -------------------------------------------------------------------
 
-interface MergedPr {
-  repo: string;
-  stars: number;
-  mergedAt: string;
-}
+type MergedPr = ExternalMergedPR;
 
-/** Destination des PR fusionnées chez les autres (tâche 1, facultative) : dépôt « propriétaire/nom », étoiles, date. */
+/** Destination des PR fusionnées chez les autres (`GithubFacts.externalMergedPRList`) : dépôt « propriétaire/nom », étoiles, date. Null pour des faits d'avant. */
 function mergedPrs(facts: GithubFacts): MergedPr[] | null {
-  const raw = loose(facts).mergedPRs;
-  if (!Array.isArray(raw)) return null;
-  return raw
-    .map((x) => ({ repo: str(loose(x).repo), stars: Number(loose(x).stars) || 0, mergedAt: str(loose(x).mergedAt) }))
-    .filter((p) => p.repo.includes("/"));
+  const list = facts.externalMergedPRList;
+  if (!list) return null;
+  return list.filter((p) => typeof p.repo === "string" && p.repo.includes("/")).map((p) => ({ ...p, stars: Number(p.stars) || 0 }));
 }
 
 export function ossGithub(g: GithubInput): Draft {

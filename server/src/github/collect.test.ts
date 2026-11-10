@@ -296,4 +296,39 @@ describe("destinations des PR, nœuds bruts", () => {
   });
 });
 
+// Le barème lit ces champs sous leurs noms typés (scoring/grid.ts) : partis des
+// faits collectés sur le faux GitHub, chacun ouvre son niveau, et le retirer le
+// referme. Si la collecte ou la grille renomme le champ, ces tests tombent.
+describe("de la collecte à la grille (§18.37)", () => {
+  const crit = (f: GithubFacts, code: string) => scoreGithub(JSON.parse(JSON.stringify(f)) as GithubFacts, null, { lang: "fr", judgedInSeconds: 10 }).grid!.criteria.find((c) => c.code === code)!;
+
+  it("externalMergedPRList : une PR fusionnée dans un projet de 1 000 étoiles (vitejs/vite) ouvre le 8 de l'open source", async () => {
+    const { facts } = await collect();
+    expect(crit(facts, "OSS").score).toBe(8);
+    const { externalMergedPRList: _l, ...before } = facts;
+    // Sans la destination, les trois PR ne valent que leur nombre.
+    expect(crit(before, "OSS").score).toBe(2);
+  });
+
+  it("agentFiles : « IA dans l'atelier » sur la stack, sans toucher la note", async () => {
+    const { facts } = await collect();
+    const stk = crit(facts, "STK");
+    expect(stk.flags.map((x) => x.fr)).toContain("IA dans l'atelier : des fichiers d'agent dans atelier.");
+    const without = { ...facts, trees: facts.trees.map(({ agentFiles: _a, ...t }) => t) };
+    const bare = crit(without, "STK");
+    expect(bare.flags.map((x) => x.fr).filter((x) => x.startsWith("IA dans l'atelier"))).toEqual([]);
+    expect(bare.score).toBe(stk.score);
+  });
+
+  it("homepage : un site en ligne publie le projet et ouvre le 8 de l'ownership", async () => {
+    const { facts } = await collect();
+    // Un projet porté plus d'un an, 150 commits, 120 étoiles, aucune release : seul son site le dit publié.
+    const used = { ...facts, repos: facts.repos.map((r) => (r.name === "atelier" ? { ...r, commitCount: 150, stars: 120, releaseDates: [] } : r)) };
+    expect(used.repos.find((r) => r.name === "atelier")!.homepage).toBe("https://atelier.example.dev/");
+    expect(crit(used, "OWN").score).toBe(8);
+    const offline = { ...used, repos: used.repos.map((r) => (r.name === "atelier" ? { ...r, homepage: null } : r)) };
+    expect(crit(offline, "OWN").score).toBe(6);
+  });
+});
+
 const BASELINE = { rest: 18, graphql: 17, raw: 1, other: 4 };

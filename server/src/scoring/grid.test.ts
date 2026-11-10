@@ -79,8 +79,8 @@ const AI5: CodeReadingResult = {
 function seniorReading(p: Partial<CvReading> = {}): CvReading {
   return cvReading({
     roles: [
-      { title: "Staff engineer", company: "Doctolib", start: "2023-01", end: null, responsibilities: ["API TypeScript, PostgreSQL et React"], ...({ employer_type: "scaleup" } as object) },
-      { title: "Software engineer", company: "Doctolib", start: "2019-01", end: "2022-12", responsibilities: ["Front React"], ...({ employer_type: "scaleup" } as object) },
+      { title: "Staff engineer", company: "Doctolib", start: "2023-01", end: null, responsibilities: ["API TypeScript, PostgreSQL et React"], employer_type: "scaleup" },
+      { title: "Software engineer", company: "Doctolib", start: "2019-01", end: "2022-12", responsibilities: ["Front React"], employer_type: "scaleup" },
     ],
     technos_described: ["TypeScript", "React", "PostgreSQL", "Kafka", "Terraform"],
     projects_with_dated_outcome: 4,
@@ -223,8 +223,8 @@ describe("aucune note par addition", () => {
     const EN = ["he", "she", "his", "her", "him", "himself", "herself"];
     const withData = [
       ...grids,
-      githubGrid(gh({ ...strongFacts(), mergedPRs: [{ repo: "big/lib", stars: 5000, mergedAt: "2026-01-01T00:00:00Z" }] } as GithubFacts, AI5)),
-      githubGrid(gh({ ...jacquesFacts(), accomplices: [{ login: "pal", avatarUrl: "" }], mergedPRs: [{ repo: "pal/x", stars: 1, mergedAt: "2026-01-01T00:00:00Z" }] } as GithubFacts, JACQUES_AI)),
+      githubGrid(gh({ ...strongFacts(), externalMergedPRList: [{ repo: "big/lib", stars: 5000, mergedAt: "2026-01-01T00:00:00Z" }] }, AI5)),
+      githubGrid(gh({ ...jacquesFacts(), accomplices: [{ login: "pal", avatarUrl: "" }], externalMergedPRList: [{ repo: "pal/x", stars: 1, mergedAt: "2026-01-01T00:00:00Z" }] }, JACQUES_AI)),
     ];
     for (const g of withData)
       for (const t of allTexts(g)) {
@@ -299,7 +299,7 @@ describe("l'expérience se compte en code, poste par poste (§3.2)", () => {
     expect(months([role("Développeur", "A", "2025-01", "2025-07"), role("Freelance", "B", "2025-03", "2025-09")])).toBe(8);
     expect(months([role("Développeur", "A", "2025-01", "2025-07"), role("Stagiaire", "B", "2025-01", "2025-07")])).toBe(6);
     // Le type de contrat, quand le fournisseur le donne (tâche 1), prime sur l'intitulé.
-    expect(months([{ ...role("Développeur", "Acme", "2025-01", "2025-07"), contractType: "internship" }])).toBe(3);
+    expect(months([{ ...role("Développeur", "Acme", "2025-01", "2025-07"), contract: "internship" }])).toBe(3);
   });
 
   it("changer les années d'études ne change pas l'expérience ; changer l'ordre des postes non plus", () => {
@@ -330,7 +330,7 @@ describe("les plafonds (§4, règles 3 et 4)", () => {
           school_tier: "S",
           projects_with_dated_outcome: 9,
           roles: [
-            { title: "Head of engineering", company: "Doctolib", start: "2012-01", end: null, responsibilities: ["TypeScript React PostgreSQL Kafka Terraform"], ...({ employer_type: "scaleup" } as object) },
+            { title: "Head of engineering", company: "Doctolib", start: "2012-01", end: null, responsibilities: ["TypeScript React PostgreSQL Kafka Terraform"], employer_type: "scaleup" },
             { title: "Engineer", company: "Doctolib", start: "2008-01", end: "2011-12", responsibilities: [] },
           ],
         }),
@@ -404,12 +404,12 @@ describe("données de la tâche 1, facultatives", () => {
     // Open source : la destination des PR ouvre le niveau 8.
     const f0 = jacquesFacts();
     expect(score(githubGrid(gh(f0, JACQUES_AI)), "OSS")).toBe(6);
-    const withDest = { ...f0, mergedPRs: [{ repo: "agda/agda-stdlib", stars: 1100, mergedAt: "2025-11-03T10:00:00Z" }] } as GithubFacts;
+    const withDest = { ...f0, externalMergedPRList: [{ repo: "agda/agda-stdlib", stars: 1100, mergedAt: "2025-11-03T10:00:00Z" }] };
     const oss = crit(githubGrid(gh(withDest, JACQUES_AI)), "OSS");
     expect(oss.score).toBe(8);
     expect(oss.evidence?.text.fr).toBe("1 PR fusionnée dans agda/agda-stdlib, la dernière en novembre 2025.");
     // PR entre proches : comptées jusqu'au niveau 4.
-    const friends = { ...f0, accomplices: [{ login: "lumbuilds0", avatarUrl: "" }], mergedPRs: [{ repo: "LumBuilds0/app", stars: 3, mergedAt: "2026-01-01T00:00:00Z" }] } as GithubFacts;
+    const friends = { ...f0, accomplices: [{ login: "lumbuilds0", avatarUrl: "" }], externalMergedPRList: [{ repo: "LumBuilds0/app", stars: 3, mergedAt: "2026-01-01T00:00:00Z" }] };
     const fo = crit(githubGrid(gh(friends, JACQUES_AI)), "OSS");
     expect(fo.score).toBe(4);
     expect(fo.flags[0].fr).toMatch(/^PR entre proches/);
@@ -425,7 +425,7 @@ describe("données de la tâche 1, facultatives", () => {
     expect(score(declaredGrid(declaredInput(seniorReading(), { profile: { roles }, now: NOW, highBar: ["Doctolib"] })), "EMP")).toBe(10);
 
     // École : un signal de sélection avec son extrait ; sans extrait, rien.
-    const sig = (quote: string) => ({ ...cvReading(), selection_signals: [{ kind: "international_medal", quote }] }) as CvReading;
+    const sig = (quote: string): CvReading => ({ ...cvReading(), selection_signals: [{ kind: "international_medal", quote }] });
     expect(score(declaredGrid(decl(sig("Médaille d'or à l'IOI 2019"))), "EDU")).toBe(10);
     expect(score(declaredGrid(decl(sig(""))), "EDU")).toBeNull();
   });

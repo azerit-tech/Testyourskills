@@ -20,16 +20,16 @@
 
   "EDU": {
     "tiers": { "S": 10, "A": 8, "B": 6, "C": 4 },
-    "_selectionDoc": "Signaux de sélection lus avec leur extrait (tâche 1, facultatifs) : médaille internationale 10 ; classement, prix de hackathon, programme sélectif 8 ; participation sans classement 4.",
-    "selection": { "international_medal": 10, "ranked": 8, "hackathon_prize": 8, "selective_program": 8, "participation": 4 },
+    "_selectionDoc": "Signaux de sélection lus avec leur extrait (CvReading.selection_signals, une clé par sorte de SELECTION_KINDS) : médaille internationale 10 ; classement dans un concours, prix de hackathon, programme sélectif 8 ; concours ou hackathon sans classement 4.",
+    "selection": { "international_medal": 10, "ranked_contest": 8, "hackathon_prize": 8, "selective_programme": 8, "contest_entry": 4 },
     "_githubDoc": "Un dépôt dont le nom, les topics ou la description disent hackathon ou concours : une participation sans classement.",
     "githubPattern": "\\bhack(a|e)thon|\\bhackaton|\\bgame ?jam\\b|\\bolympia(d|de)s?\\b|\\bicpc\\b|\\bconcours\\b|\\bcompetition\\b",
     "githubScore": 4
   },
 
   "XP": {
-    "_doc": "Années comptées sur les postes datés, en code. Salarié, freelance, fondateur 100 % ; stage, alternance 50 % ; association étudiante, bénévolat 0 % ; deux postes en même temps comptent une fois (le plus fort du mois).",
-    "share": { "full": 1, "internship": 0.5, "association": 0 },
+    "_doc": "Années comptées sur les postes datés, en code. Salarié, freelance, fondateur 100 % ; stage, alternance 50 % ; association étudiante, bénévolat, projet personnel 0 % ; deux postes en même temps comptent une fois (le plus fort du mois).",
+    "share": { "full": 1, "internship": 0.5, "association": 0, "project": 0 },
     "levels": [
       { "score": 10, "years": 10 },
       { "score": 9, "years": 8 },
@@ -45,9 +45,10 @@
     "githubActiveYearContributions": 50,
     "claimedCap": 5,
     "internshipPattern": "\\b(stage|stagiaire|intern|internship|alternan\\w*|apprenti\\w*|apprentice\\w*|work[ -]?study|co-?op|trainee|working student|werkstudent|praktik\\w*|summer analyst)\\b",
-    "internshipContracts": ["internship", "apprenticeship", "work_study", "alternance", "stage", "trainee"],
+    "_kindDoc": "Le type de contrat du fournisseur (LinkedinRole.contract) et la nature lue par l'IA (CvRole.kind). Ordre de preuve (grid.ts, roleKind) : association ou bénévolat lus par l'IA, jamais comptés, quel que soit le contrat ; puis le contrat de stage ou d'alternance ; puis l'association reconnue par le code ; puis l'intitulé de stage ; puis le contrat de vrai poste, qui l'emporte sur l'IA ; puis la nature lue par l'IA.",
+    "byContract": { "full_time": "full", "part_time": "full", "freelance": "full", "internship": "internship", "work_study": "internship" },
+    "byAiKind": { "job": "full", "internship": "internship", "work_study": "internship", "student_association": "association", "volunteer": "association", "personal_project": "project" },
     "associationPattern": "\\b(association|asso|bde|bds|bda|bureau des (eleves|etudiants|sports|arts)|student (association|union|society|club|chapter)|club etudiant|benevol\\w*|volunteer\\w*|non-?profit|junior[ -]?entreprise|junior[ -]?enterprise)\\b",
-    "associationContracts": ["volunteer", "association", "benevolat"],
     "_schoolRoleDoc": "Un employeur qui porte le nom d'une école de la liste (data/scoring.json) et un mot d'association est une association étudiante, sauf un poste de recherche ou d'enseignement. La liste, pas la formation du profil : l'expérience ne dépend jamais de la formation.",
     "schoolAssociationWords": "\\b(finance|entrepreneurs?|alumni|junior|forum|gala|club|sports?|racing|robotique|robotics|invest\\w*|trading|conseil|consulting|musique|music|theatre|humanitaire|solidarite|international|ambassad\\w*|cup|trophee|trophy|week ?end|hackathon)\\b",
     "schoolRoleExceptPattern": "\\b(phd|doctorant\\w*|doctoral|postdoc\\w*|chercheu\\w*|researcher|research|recherche|enseignant\\w*|lecturer|professor|professeur\\w*|maitre de conferences|ater|teaching assistant)\\b",
@@ -151,7 +152,7 @@
   },
 
   "OSS": {
-    "_doc": "PR fusionnées chez les autres ; les niveaux 8 et 10 s'ouvrent aussi par les étoiles et les contributeurs externes. Destinations des PR (tâche 1) facultatives. PR entre proches : comptées jusqu'au niveau friendsCap.",
+    "_doc": "PR fusionnées chez les autres ; les niveaux 8 et 10 s'ouvrent aussi par les étoiles et les contributeurs externes. Destinations des PR (GithubFacts.externalMergedPRList) facultatives : absentes des faits d'avant. PR entre proches : comptées jusqu'au niveau friendsCap.",
     "bigStars": 1000,
     "levels": [
       { "score": 10, "maintainerStars": 1000, "bigPrs": 20 },
