@@ -1145,6 +1145,7 @@ Jacques, devant le site du jeu : « c'est quand même plus stylé ». L'écart t
 - **Le bandeau de saison** gagne des silhouettes de palmiers à ses deux bouts.
 - **Les suspects** : six portraits peints, un par profil (`arsonist`, `forger`, `kingpin`, `mastermind`, `night_owl`, `fresh_blood`), que Jacques génère d'après `docs/brief-personnages.md`. Ils lèvent, pour cette série seulement, l'interdit « aucune personne » du §18.28. La troupe est mélangée (trois femmes, deux hommes, une personne androgyne, de 22 à 55 ans) : un personnage est une figure de la ville, pas le portrait du joueur, dont la fiche garde la photo. Originaux déposés dans `Azerit/design/characters/`, versions web dans `web/public/characters/`.
 - **La couverture se construit d'abord sans eux**, avec les décors et les photos d'identité ; les suspects prennent leurs cases quand ils arrivent.
+- **Premier suspect posé le 10 novembre** : la Pyromane (`arsonist`), qui valide le style ; elle prend la grande case de gauche. Le décor d'un suspect affiché ne revient pas dans une autre case. Un suspect se déclare dans `web/src/lib/suspects.ts` ; un test vérifie que ses deux fichiers existent.
 
 ### 18.32 Le modèle : GLM 5.3 Flash, raisonnement au minimum (10 novembre 2026)
 

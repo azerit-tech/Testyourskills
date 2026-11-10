@@ -1,5 +1,6 @@
 // La couverture de l'accueil (§18.31) : rendu en chaîne, sans navigateur.
 import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -20,7 +21,7 @@ const week = (entries: TopEntry[]): WeekTop => ({ weekStart: 0, endsAt: 1, week:
 function render(props: { top: WeekTop | null | undefined; suspects?: string[] }, language = "fr-FR"): string {
   vi.stubGlobal("localStorage", { getItem: () => null, setItem: () => undefined });
   vi.stubGlobal("navigator", { language });
-  return renderToStaticMarkup(createElement(LangProvider, null, createElement(Cover, { onPlay: () => undefined, founder, ...props })));
+  return renderToStaticMarkup(createElement(LangProvider, null, createElement(Cover, { onPlay: () => undefined, founder, suspects: [], ...props })));
 }
 
 /** Les cases rendues, dans l'ordre du document : leur zone et leur balise ouvrante. */
@@ -107,10 +108,13 @@ describe("couverture (§18.31)", () => {
     expect(html).toContain('srcSet="/characters/arsonist-s.jpg 384w, /characters/arsonist.jpg 768w"');
   });
 
-  it("aucun suspect tant que les fichiers ne sont pas posés", () => {
-    expect(SUSPECTS).toEqual([]);
-    const html = render({ top: null });
-    expect(html).not.toContain("/characters/");
+  it("sans suspect, aucun portrait ; chaque suspect déclaré a ses deux fichiers", () => {
+    expect(render({ top: null })).not.toContain("/characters/");
+    const dir = fileURLToPath(new URL("../../public/characters/", import.meta.url));
+    for (const id of SUSPECTS) {
+      expect(existsSync(`${dir}${id}.jpg`), `${id}.jpg`).toBe(true);
+      expect(existsSync(`${dir}${id}-s.jpg`), `${id}-s.jpg`).toBe(true);
+    }
   });
 
   it("top en attente : les cases de visage restent prunes, la place libre est déjà là", () => {
@@ -153,6 +157,8 @@ describe("couverture (§18.31)", () => {
         const ps = coverPanels({ suspects, top: TOP5.slice(0, n), founder });
         const scenes = [...ps.values()].filter((p): p is Extract<Panel, { kind: "scene" }> => p.kind === "scene").map((p) => p.scene);
         expect(new Set(scenes).size).toBe(scenes.length);
+        // le décor d'un suspect affiché ne revient pas dans une autre case
+        for (const p of ps.values()) if (p.kind === "suspect") expect(scenes).not.toContain(p.id);
         check(PHONE, ps);
         check(DESKTOP, ps);
         // la dernière case de visage est la place libre

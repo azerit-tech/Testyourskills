@@ -162,7 +162,9 @@ export function coverPanels({ suspects, top, founder }: CoverInput): Map<string,
   }
 
   // Les décors, dans l'ordre du document : cases de décor et visages restés sans source.
+  // Le décor d'un suspect affiché est déjà derrière lui : il ne revient pas dans une case voisine.
   const used = new Set<string>();
+  for (const p of out.values()) if (p.kind === "suspect") used.add(p.id);
   for (const s of SLOTS) {
     if (out.has(s.id)) continue;
     const near = new Set<Light>();
