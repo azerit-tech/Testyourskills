@@ -2,6 +2,7 @@
 // lisent les balises Open Graph et Twitter sans exécuter de JS, puis le
 // navigateur charge le front SPA qui affiche la carte.
 
+import { IMAGE_QUERY } from "../../shared/images";
 import { starsLine } from "../../shared/stars";
 import type { CardData, ComparisonData, Lang, Special } from "../../shared/types";
 import { declaredOf, LEVEL_LABELS, starsFor } from "../../shared/types";
@@ -40,9 +41,10 @@ function isComparison(d: CardData | ComparisonData): d is ComparisonData {
 
 export function metaFor(data: CardData | ComparisonData, baseUrl: string): PageMeta {
   const url = `${baseUrl}/c/${data.id}`;
-  // Spéciale de la semaine (§18.22) : une autre adresse d'image, pour que les réseaux ne resservent pas l'ancienne.
+  // Spéciale de la semaine (§18.22), ou nouveau dessin (shared/images.ts) : une autre adresse
+  // d'image, pour que les réseaux ne resservent pas l'ancienne.
   const totw = (isComparison(data) ? data.github.special : data.special) === "totw";
-  const image = `${baseUrl}/og/${data.id}.png${totw ? "?s=totw" : ""}`;
+  const image = `${baseUrl}/og/${data.id}.png?${IMAGE_QUERY}${totw ? "&s=totw" : ""}`;
 
   if (isComparison(data)) {
     const lang = data.cv.lang ?? data.github.lang ?? "fr";

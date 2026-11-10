@@ -2,26 +2,9 @@
 // chaque décor, et ce que chaque case montre. Sans DOM : testé tel quel.
 import type { CardData, TopEntry } from "../../../shared/types";
 
-/** Les quatre lumières des décors (docs/brief-illustrations.md). */
-export type Light = "pink" | "gold" | "night" | "dawn";
-
-/** La lumière de chaque lieu du crime (web/public/profiles). */
-export const SCENE_LIGHT: Record<string, Light> = {
-  kingpin: "pink",
-  hoarder: "pink",
-  chameleon: "pink",
-  sleeper_agent: "pink",
-  forger: "gold",
-  delivery_machine: "gold",
-  arsonist: "gold",
-  repeat_offender: "gold",
-  old_school: "gold",
-  mastermind: "night",
-  night_owl: "night",
-  ghost: "night",
-  default: "night",
-  fresh_blood: "dawn",
-};
+/** Les quatre lumières des décors et celle de chaque lieu du crime : une seule liste, partagée avec le serveur. */
+import { SCENE_LIGHT, type Light } from "../../../shared/scenes";
+export { SCENE_LIGHT, type Light };
 
 /** L'ordre de préférence des décors : les lumières alternent déjà, le picker n'a qu'à sauter. */
 export const SCENE_POOL = [

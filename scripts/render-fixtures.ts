@@ -1,6 +1,9 @@
-// Rend chaque fixture en PNG dans var/renders/ : carte seule, aperçu OG,
-// portrait, plus la comparaison et une planche contact de toutes les cartes.
-// Usage : npx tsx scripts/render-fixtures.ts [clé…] [--sheet-only] [--lang=en]
+// Rend chaque fixture en PNG dans var/renders/ (ou --out=dossier) : carte seule,
+// aperçu OG, portrait, plus la comparaison et une planche contact de toutes les cartes.
+// Usage : npx tsx scripts/render-fixtures.ts [clé…] [--sheet-only] [--lang=en] [--out=dossier]
+//   Clés en plus des fixtures, pour les images de partage : `noprofile` (fiche
+//   sans profil, décor `default`), `linkedin` (fiche LinkedIn seule), `nightowl`
+//   (ciel de l'heure bleue avec un immeuble clair).
 //   --profiles : planche des 13 profils de data/profiles.json (noms et phrases),
 //   posés tour à tour sur les fiches de la maquette, plus une fiche sans profil.
 //   --back : planche des dos de fiche (§18.27), plus un dos aux faits très longs.
@@ -11,6 +14,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { Resvg } from "@resvg/resvg-js";
 import profilesJson from "../data/profiles.json";
 import { FIXTURES, FIXTURE_COMPARISON } from "../shared/fixtures";
+import { asLinkedinCard } from "../shared/linkedinText";
 import type { CardData, Lang } from "../shared/types";
 import { CardGraphic } from "../shared/card/Card";
 import { CardBackGraphic } from "../shared/card/CardBack";
@@ -19,17 +23,25 @@ import { renderImage, type ImageFormat } from "../server/src/render/index";
 import { fetchAvatar } from "../server/src/render/avatar";
 import { fontFiles } from "../server/src/render/fonts";
 
-const OUT = resolve(import.meta.dirname, "../var/renders");
+const args = process.argv.slice(2);
+const outArg = args.find((a) => a.startsWith("--out="))?.slice(6);
+const OUT = outArg ? resolve(outArg) : resolve(import.meta.dirname, "../var/renders");
 mkdirSync(OUT, { recursive: true });
 
-const args = process.argv.slice(2);
 const only = args.filter((a) => !a.startsWith("--"));
 const sheetOnly = args.includes("--sheet-only");
 const profilesSheet = args.includes("--profiles");
 const backSheet = args.includes("--back");
 const langArg = args.find((a) => a.startsWith("--lang="))?.slice(7) as Lang | undefined;
 
-const entries = Object.entries(FIXTURES).filter(([k]) => only.length === 0 || only.includes(k)) as [string, CardData][];
+const nightOwl = profilesJson.profiles.find((p) => p.id === "night_owl")!;
+const EXTRA: Record<string, CardData> = {
+  noprofile: { ...FIXTURES.silver, id: "noprofile", profile: undefined },
+  linkedin: { ...asLinkedinCard(FIXTURES.cv), id: "linkedin", name: "Camille Durand", initials: "CD" },
+  nightowl: { ...FIXTURES.bronze, id: "nightowl", profile: { id: nightOwl.id, label: nightOwl.label, tagline: nightOwl.tagline } },
+};
+
+const entries = Object.entries({ ...FIXTURES, ...EXTRA }).filter(([k]) => only.length === 0 || only.includes(k)) as [string, CardData][];
 
 /** Planche contact : toutes les cartes sur fond sombre, pour juger d'un coup d'œil. */
 async function sheet(cards: [string, CardData][], lang?: Lang, label = "sheet", back = false) {
@@ -114,9 +126,10 @@ async function main() {
   if (only.length === 0 || only.includes("comparison")) {
     for (const format of formats) {
       for (const lang of ["fr", "en"] as Lang[]) {
+        const t = Date.now();
         const png = await renderImage({ format, comparison: FIXTURE_COMPARISON, lang });
         writeFileSync(resolve(OUT, `comparison-${format}-${lang}.png`), png);
-        console.log(`→ comparison-${format}-${lang}.png`);
+        console.log(`→ comparison-${format}-${lang}.png  ${png.length >> 10} Ko  ${Date.now() - t} ms`);
       }
     }
   }

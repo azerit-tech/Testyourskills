@@ -1,4 +1,5 @@
 // Client de l'API. En mode démo (?mock=1 ou VITE_MOCK=1), tout passe par mock.ts.
+import { IMAGE_QUERY } from "../../../shared/images";
 import type { CardData, JobState, Lang, WeekRank, WeekTop } from "../../../shared/types";
 import { mockApi } from "./mock";
 import { mockTop, mockWeekRank } from "./mockTop";
@@ -401,10 +402,10 @@ async function fetchTop(): Promise<WeekTop | null> {
 
 export const api = { createCard, getJob, getCase, vote, sendEmail, deleteCard, track, getConfig, knownConfig, startLinkedInPhoto, getShowcase, getTop, getMe, startClaim, setHidden, logout };
 
-/** URLs des images rendues par le serveur (§7). */
+/** URLs des images rendues par le serveur (§7). `?v=` : le dessin en cours, servi avec un cache d'un an (shared/images.ts). */
 export const images = {
-  og: (id: string) => `/og/${id}.png`,
-  portrait: (id: string) => `/og/${id}-portrait.png`,
+  og: (id: string) => `/og/${id}.png?${IMAGE_QUERY}`,
+  portrait: (id: string) => `/og/${id}-portrait.png?${IMAGE_QUERY}`,
   card: (id: string) => `/og/${id}-card.png`,
 };
 

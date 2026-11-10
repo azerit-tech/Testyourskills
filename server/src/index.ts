@@ -7,7 +7,8 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createApp, purge } from "./app";
+import { IMAGE_DESIGN_DIR } from "../../shared/images";
+import { createApp, pruneStaleImages, purge } from "./app";
 import { useBudgetDb } from "./ai/budget";
 import { startCreditsWatch, stopCreditsWatch } from "./ai/credits";
 import { linkedinFromEnv } from "./linkedin";
@@ -28,7 +29,9 @@ const githubToken = githubTokens[0] ?? "";
 const maxConcurrentCards = Math.floor(Number(process.env.MAX_CONCURRENT_CARDS)) || undefined;
 const baseUrl = (process.env.BASE_URL ?? (prod ? "https://skills.azerit.tech" : "http://localhost:5180")).replace(/\/+$/, "");
 const dbPath = resolve(process.env.DB_PATH ?? join(projectRoot, "var/cards.db"));
-const ogDir = join(dirname(dbPath), "og");
+// Cache disque des images, un dossier par dessin (shared/images.ts) : og/v2/…
+const ogRoot = join(dirname(dbPath), "og");
+const ogDir = join(ogRoot, IMAGE_DESIGN_DIR);
 const devWebUrl = (process.env.DEV_WEB_URL ?? "http://localhost:5180").replace(/\/+$/, "");
 const webRoot = join(projectRoot, "dist/web");
 const avatarDir = join(dirname(dbPath), "avatars");
@@ -108,6 +111,10 @@ const runPurge = () =>
     .then((n) => n && console.log(`[purge] ${n} carte(s) expirée(s) supprimée(s)`))
     .catch((err) => console.error("[purge]", err));
 void runPurge();
+// Les images d'un ancien dessin ne sont plus jamais servies : on rend la place.
+void pruneStaleImages(ogRoot, IMAGE_DESIGN_DIR)
+  .then((n) => n && console.log(`[og] ${n} image(s) ou dossier(s) d'un ancien dessin supprimé(s)`))
+  .catch((err) => console.error("[og]", err));
 const purgeTimer = setInterval(runPurge, 3600_000);
 purgeTimer.unref();
 

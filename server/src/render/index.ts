@@ -9,6 +9,8 @@ import {
   CardOnly, ComparisonCard, ComparisonOg, ComparisonPortrait, HomeOg, OgImage, PortraitImage, type Avatars,
 } from "./compositions";
 import { fontFiles } from "./fonts";
+import { encodeOpaquePng } from "./png";
+import { sceneFor } from "./scenes";
 
 /** `home` : l'aperçu de lien de l'accueil, la promesse et la fiche donnée (celle de la vitrine). */
 export type ImageFormat = "card" | "og" | "portrait" | "home";
@@ -47,9 +49,10 @@ export async function buildElement(input: RenderInput): Promise<ReactElement> {
   const avatars = await avatarsFor([card]);
   const props = { card, lang, avatars };
   if (format === "home") return createElement(HomeOg, props);
-  if (format === "og") return createElement(OgImage, props);
-  if (format === "portrait") return createElement(PortraitImage, props);
-  return createElement(CardOnly, props);
+  // Le lieu du crime du profil (§18.28) ; le petit fichier suffit au panneau de l'aperçu de lien.
+  const profileId = card.profile?.id;
+  if (format === "og") return createElement(OgImage, { ...props, scene: sceneFor(profileId, "small") });
+  if (format === "portrait") return createElement(PortraitImage, { ...props, scene: sceneFor(profileId, "large") });  return createElement(CardOnly, props);
 }
 
 /** Le SVG brut (utile pour déboguer ou servir une version vectorielle). */
@@ -69,5 +72,8 @@ export async function renderImage(input: RenderInput): Promise<Buffer> {
     logLevel: "off",
   };
   const img = await renderAsync(svg, opts);
-  return img.asPng();
+  // La fiche seule garde sa transparence ; les autres formats sont posés sur l'encre :
+  // PNG opaque, plus léger (png.ts).
+  if (input.format === "card") return img.asPng();
+  return encodeOpaquePng(img.pixels, img.width, img.height);
 }

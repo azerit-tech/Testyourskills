@@ -5,7 +5,7 @@ import { Hono, type Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { timingSafeEqual } from "node:crypto";
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { z } from "zod";
 import { FIXTURES } from "../../shared/fixtures";
@@ -35,7 +35,7 @@ export interface AppOptions {
   githubPool?: TokenPool;
   /** URL publique sans / final, ex. https://skills.azerit.tech */
   baseUrl: string;
-  /** Cache disque des PNG (var/og en dev, /data/og en prod). */
+  /** Cache disque des PNG du dessin en cours (var/og/v2 en dev, /data/og/v2 en prod, shared/images.ts). */
   ogDir: string;
   leadsEndpoint?: string;
   timeoutMs?: number;
@@ -166,6 +166,18 @@ export async function removeImages(ogDir: string, ids: string[]) {
       OG_SUFFIXES.flatMap((s) => ["", TOTW_TAG].map((tag) => rm(join(ogDir, `${id}${tag}${s}.png`), { force: true }))),
     ),
   );
+}
+
+/**
+ * Les images d'un ancien dessin (shared/images.ts) : les PNG posés à la racine de
+ * `ogRoot` (avant les dossiers de version) et les dossiers `v{n}` autres que `keep`.
+ * Lancé au démarrage ; une erreur de lecture ne bloque rien.
+ */
+export async function pruneStaleImages(ogRoot: string, keep: string): Promise<number> {
+  const entries = await readdir(ogRoot, { withFileTypes: true }).catch(() => []);
+  const stale = entries.filter((e) => (e.isFile() && /\.(png|tmp)$/.test(e.name)) || (e.isDirectory() && /^v\d+$/.test(e.name) && e.name !== keep));
+  await Promise.all(stale.map((e) => rm(join(ogRoot, e.name), { recursive: true, force: true })));
+  return stale.length;
 }
 
 /** Purge §11 : cartes de plus de 90 jours sans email, leurs PNG et leurs photos. */

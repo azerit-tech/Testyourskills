@@ -1,11 +1,13 @@
 // Compositions des images partagées : carte seule, aperçu de lien 1200 × 630,
-// portrait 1080 × 1350, leurs variantes « comparaison », et l'aperçu de lien de
-// l'accueil (la promesse et la fiche de la vitrine). Tout est en SVG,
-// la carte y est imbriquée telle quelle (même composant qu'à l'écran).
-// Style mat (SPEC §18.18, maquette web/gta-image.html) : une illustration en
-// aplats superposés derrière la fiche, et AUCUN dégradé en plus de celui de
-// la fiche. Seule lumière : le halo de ★★★★★★, un rectangle flou derrière la
-// fiche (le drop-shadow CSS de l'écran ne passe pas dans le PNG).
+// portrait 1080 × 1350, leurs variantes « comparaison », et
+// l'aperçu de lien de l'accueil (la promesse et la fiche de la vitrine). Tout est
+// en SVG, la carte y est imbriquée telle quelle (même composant qu'à l'écran).
+// Style mat (SPEC §18.18) dans la langue de la couverture de l'accueil (§18.31) :
+// une page d'encre, le lieu du crime du profil (§18.28) en panneau ou en ciel
+// de bord à bord, et AUCUN dégradé en plus de celui de la fiche. Le texte posé
+// sur un ciel suit son heure (shared/scenes.ts). Sans fichier de décor, le front
+// de mer dessiné ci-dessous le remplace. Seule lumière : le halo de ★★★★★★, un
+// rectangle flou derrière la fiche (le drop-shadow CSS de l'écran ne passe pas dans le PNG).
 import type { ReactNode } from "react";
 import type { CardData, ComparisonData, Lang, StatCode } from "../../../shared/types";
 import { declaredOf, STAT_CODES } from "../../../shared/types";
@@ -14,8 +16,10 @@ import { AzeritGem } from "../../../shared/card/AzeritGem";
 import { fontAttrs } from "../../../shared/card/fonts";
 import { CARD_H, CARD_R, CARD_W } from "../../../shared/card/geometry";
 import { t } from "../../../shared/card/i18n";
-import { fit, upper, wrap } from "../../../shared/card/text";
+import { fit, fitLines, upper, wrap } from "../../../shared/card/text";
 import { PALETTE, themeOf } from "../../../shared/card/themes";
+import { SKY_TEXT } from "../../../shared/scenes";
+import type { SceneImage } from "./scenes";
 
 /** Aplats de l'illustration (maquette web/gta-image.html). */
 const SCENE = {
@@ -150,13 +154,55 @@ function Host({ x, y, size, anchor = "middle" }: { x: number; y: number; size: n
   );
 }
 
-/** Surtitre « AVIS DE RECHERCHE », crème plat. */
-function Poster({ x, y, size, lang, anchor = "middle" }: { x: number; y: number; size: number; lang: Lang; anchor?: "start" | "middle" }) {
+/** Surtitre « AVIS DE RECHERCHE » : crème atténué sur l'encre, plein dans la couleur du ciel quand il s'y pose. */
+function Poster({ x, y, size, lang, anchor = "middle", fill = PALETTE.cream, opacity = 0.6 }: { x: number; y: number; size: number; lang: Lang; anchor?: "start" | "middle"; fill?: string; opacity?: number }) {
   const ls = size * 0.34;
   return (
-    <text x={anchor === "middle" ? x + ls / 2 : x} y={y} {...fontAttrs("sans-600")} fontSize={size} letterSpacing={ls} textAnchor={anchor} fill={PALETTE.cream} fillOpacity={0.6}>
+    <text x={anchor === "middle" ? x + ls / 2 : x} y={y} {...fontAttrs("sans-600")} fontSize={size} letterSpacing={ls} textAnchor={anchor} fill={fill} fillOpacity={opacity}>
       {upper(t(lang).poster, lang)}
     </text>
+  );
+}
+
+/** La couleur d'un texte posé sur le haut d'un ciel ; le front de mer dessiné est sombre. */
+const skyInk = (scene: SceneImage | null | undefined) => SKY_TEXT[scene?.tone ?? "dark"];
+
+/**
+ * Le lieu du crime dans un cadre : l'image recadrée pour le remplir (`slice`), centrée
+ * (`xMidYMid`, le sujet est au centre de l'illustration) ou calée en haut (`xMidYMin`,
+ * le ciel reste). Sans fichier, le front de mer dessiné. `r` : coins du panneau.
+ */
+function SceneFrame({ scene, id, x, y, w, h, align, r = 0 }: { scene: SceneImage | null | undefined; id: string; x: number; y: number; w: number; h: number; align: "xMidYMid" | "xMidYMin"; r?: number }) {
+  const clip = `${id}-frame`;
+  const horizon = Math.round(h * 0.84);
+  const k = h / 300;
+  return (
+    <>
+      <defs>
+        <clipPath id={clip}>
+          <rect x={x} y={y} width={w} height={h} rx={r} />
+        </clipPath>
+      </defs>
+      <g clipPath={`url(#${clip})`}>
+        {scene ? (
+          <image href={scene.href} x={x} y={y} width={w} height={h} preserveAspectRatio={`${align} slice`} />
+        ) : (
+          <svg x={x} y={y} width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
+            <Scene
+              w={w}
+              h={h}
+              horizon={horizon}
+              sun={{ x: w / 2, y: horizon - h * 0.12, r: h * 0.34 }}
+              maxH={h * 0.22}
+              palms={[
+                { x: w * 0.04, y: horizon - 140 * k, k },
+                { x: w * 0.96, y: horizon - 130 * k, k: k * 0.93, flip: true },
+              ]}
+            />
+          </svg>
+        )}
+      </g>
+    </>
   );
 }
 
@@ -182,10 +228,13 @@ export function CardOnly({ card, lang, avatars }: { card: CardData; lang: Lang; 
 /* Aperçu de lien 1200 × 630                                            */
 /* ------------------------------------------------------------------ */
 
-/** La fiche à gauche ; à droite seulement ce qui ne s'y lit pas en vignette :
- *  le nom en grand et le chef d'accusation le plus drôle. La note, le niveau
- *  et le pied sont sur la fiche, ils ne sont pas répétés. */
-export function OgImage({ card, lang, avatars }: { card: CardData; lang: Lang; avatars: Avatars }) {
+/** La fiche à gauche, comme avant ; à droite, la colonne de la couverture : le
+ *  surtitre sur l'encre, calé sur le haut de la fiche, le lieu du crime en panneau,
+ *  puis seulement ce qui ne se lit pas sur la fiche en vignette : le nom en grand
+ *  et le chef d'accusation le plus drôle. La note, le niveau et le pied sont sur la
+ *  fiche. Le surtitre ne se pose pas sur le panneau : sur trois ciels clairs
+ *  (forger, repeat_offender, old_school), le coin haut n'atteint pas 3:1. */
+export function OgImage({ card, lang, avatars, scene }: { card: CardData; lang: Lang; avatars: Avatars; scene?: SceneImage | null }) {
   const W = 1200;
   const H = 630;
   const ch = 566;
@@ -194,20 +243,30 @@ export function OgImage({ card, lang, avatars }: { card: CardData; lang: Lang; a
   const cy = 32;
   const tx = 560;
   const maxW = W - tx - 64;
-  const name = fit(upper(card.name, lang), { font: "display-700", size: 84, minSize: 50, maxWidth: maxW, letterSpacing: 0.5 });
+  const panelY = cy + 34;
+  const panelH = 290;
+  // Le nom sur une ligne jusqu'en 56 ; plus long, sur deux lignes, et le chef d'accusation sur une.
+  const upperName = upper(card.name, lang);
+  const one = fit(upperName, { font: "display-700", size: 84, minSize: 56, maxWidth: maxW, letterSpacing: 0.5 });
+  const name = one.text === upperName ? { lines: [one.text], size: one.size } : fitLines(upperName, { font: "display-700", size: 64, minSize: 44, maxWidth: maxW, letterSpacing: 0.5 });
+  const nameY = panelY + panelH + 20 + Math.round(name.size * 0.74);
+  const lastNameY = nameY + (name.lines.length - 1) * Math.round(name.size * 0.98);
   const quote = mainStatus(card, lang);
-  const quoted = quote ? (lang === "fr" ? `« ${quote} »` : `“${quote}”`) : "";
-  const qLines = quote ? wrap(quoted, "sans-600", 36, maxW, 2) : [];
+  const quoted = quote ? (lang === "fr" ? `« ${quote} »` : `“${quote}”`) : "";
+  const qLines = quote ? wrap(quoted, "sans-600", 34, maxW, name.lines.length > 1 ? 1 : 2) : [];
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
-      <Scene w={W} h={H} horizon={556} sun={{ x: cx + cw / 2, y: 470, r: 300 }} maxH={120} palms={[{ x: W - 170, y: 300, k: 1.6, flip: true }]} />
+      <Ink w={W} h={H} />
+      <Poster x={tx} y={cy + 15} size={20} lang={lang} anchor="start" />
+      <SceneFrame scene={scene} id="og" x={tx} y={panelY} w={maxW} h={panelH} align="xMidYMid" r={8} />
       <Placed card={card} lang={lang} avatars={avatars} id="og" x={cx} y={cy} w={cw} />
-      <Poster x={tx} y={118} size={22} lang={lang} anchor="start" />
-      <text x={tx - 2} y={212} {...fontAttrs("display-700")} fontSize={name.size} letterSpacing={name.letterSpacing} fill={PALETTE.cream}>
-        {name.text}
-      </text>
+      {name.lines.map((l, i) => (
+        <text key={i} x={tx - 2} y={nameY + i * Math.round(name.size * 0.98)} {...fontAttrs("display-700")} fontSize={name.size} letterSpacing={0.5} fill={PALETTE.cream}>
+          {l}
+        </text>
+      ))}
       {qLines.map((l, i) => (
-        <text key={i} x={tx} y={286 + i * 46} {...fontAttrs("sans-600")} fontSize={36} fill={PALETTE.blush}>
+        <text key={i} x={tx} y={lastNameY + 52 + i * 42} {...fontAttrs("sans-600")} fontSize={34} fill={PALETTE.blush}>
           {l}
         </text>
       ))}
@@ -284,29 +343,22 @@ export function HomeOg({ card, lang, avatars }: { card: CardData; lang: Lang; av
 /* Portrait 1080 × 1350                                                 */
 /* ------------------------------------------------------------------ */
 
-/** La fiche en grand (76 % de la largeur, lisible en miniature dans un fil),
- *  le titre « Avis de recherche » au-dessus, l'adresse dessous. Le profil est
- *  déjà sur la fiche : il n'est pas répété. */
-export function PortraitImage({ card, lang, avatars }: { card: CardData; lang: Lang; avatars: Avatars }) {
+/** La page d'une fiche (§18.29) en 4:5 : le lieu du crime de bord à bord en haut,
+ *  calé sur son ciel, l'encre plate dessous, et la fiche en grand (72 % de la
+ *  largeur, lisible en miniature dans un fil) qui chevauche le bas de l'image.
+ *  « Avis de recherche » sur le ciel, l'adresse en pied. */
+export function PortraitImage({ card, lang, avatars, scene }: { card: CardData; lang: Lang; avatars: Avatars; scene?: SceneImage | null }) {
   const W = 1080;
   const H = 1350;
-  const cw = 820;
+  const skyH = 620;
+  const cw = 780;
   const cx = (W - cw) / 2;
-  const cy = 92;
+  const cy = 150;
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
-      <Scene
-        w={W}
-        h={H}
-        horizon={1180}
-        sun={{ x: W / 2, y: 900, r: 470 }}
-        maxH={170}
-        palms={[
-          { x: -150, y: 640, k: 3.6 },
-          { x: 1230, y: 740, k: 3, flip: true },
-        ]}
-      />
-      <Poster x={W / 2} y={64} size={40} lang={lang} />
+      <Ink w={W} h={H} />
+      <SceneFrame scene={scene} id="pt" x={0} y={0} w={W} h={skyH} align="xMidYMin" />
+      <Poster x={W / 2} y={98} size={40} lang={lang} fill={skyInk(scene)} opacity={1} />
       <Placed card={card} lang={lang} avatars={avatars} id="pt" x={cx} y={cy} w={cw} />
       <Host x={W / 2} y={1322} size={28} />
     </svg>

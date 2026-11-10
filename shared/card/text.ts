@@ -74,6 +74,12 @@ export function fit(text: string, o: FitOptions): Fitted {
   if (w > o.maxWidth) {
     size = Math.max(o.minSize, Math.floor(((o.size * o.maxWidth) / w) * 4) / 4);
     w = measure(text, o.font, size, ls);
+    // L'interlettrage ne rapetisse pas avec la taille : la règle de trois laisse un léger
+    // dépassement, qui tronquait un texte qui tenait un quart de point plus bas.
+    while (w > o.maxWidth && size > o.minSize) {
+      size = Math.max(o.minSize, size - 0.25);
+      w = measure(text, o.font, size, ls);
+    }
   }
   let out = text;
   if (w > o.maxWidth) {

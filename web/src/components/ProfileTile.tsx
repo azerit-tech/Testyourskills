@@ -4,24 +4,19 @@
 // sont sur la fiche : ils ne se répètent pas ici.
 import { useEffect, useRef, useState } from "react";
 import type { CardData } from "../../../shared/types";
+import { DEFAULT_SCENE, safeSceneId, skyTone, type SkyTone } from "../../../shared/scenes";
 import { pick, useT } from "../i18n";
 
-/** Les ciels de l'heure bleue (docs/brief-illustrations.md §4, lumière C) ; les autres sont à l'heure rose. */
-const BLUE_HOUR = new Set(["mastermind", "night_owl", "ghost", "default"]);
-
-/** Seuls les identifiants de data/profiles.json (minuscules, chiffres, `_`) deviennent une adresse. */
-const safeId = (id: string) => (/^[a-z0-9_]{1,40}$/.test(id) ? id : null);
-
-/** Ciel sombre (heure bleue) : le texte posé dessus est crème. Ciel clair (heure rose) : il est d'encre. */
-export type SkyTone = "dark" | "light";
+export type { SkyTone };
 
 /**
  * Le ciel de la page d'une fiche (§18.29) : l'illustration du profil, `default` sans profil.
  * Le ton suit l'heure de l'image : contraste AA mesuré sur les 14 dans la zone de la barre et de l'en-tête.
  */
 export function skyOf(profileId: string | undefined): { src: string; tone: SkyTone } {
-  const id = (profileId && safeId(profileId)) || "default";
-  return { src: `/profiles/${id}.jpg`, tone: BLUE_HOUR.has(id) ? "dark" : "light" };
+  const id = safeSceneId(profileId) ?? DEFAULT_SCENE;
+  // La liste des ciels de l'heure bleue est partagée avec les images de partage du serveur (shared/scenes.ts).
+  return { src: `/profiles/${id}.jpg`, tone: skyTone(id) };
 }
 
 /**
