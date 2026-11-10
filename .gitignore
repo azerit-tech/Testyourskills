@@ -9,3 +9,5 @@ tsconfig.tsbuildinfo
 tools/bake/.cache/
 .claude/worktrees/
 tools/bake/__pycache__/
+# La liste des employeurs à forte barre ne quitte jamais le serveur (§18.37) : seul l'exemple est versionné.
+data/employers.json

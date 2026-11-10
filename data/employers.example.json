@@ -1,0 +1,9 @@
+{
+  "$comment": "Exemple, noms inventés. La vraie liste des employeurs à forte barre d'embauche (SPEC §18.37, critère Parcours) vit hors du dépôt public, sur le serveur, au chemin donné par HIGH_BAR_EMPLOYERS_FILE. Même forme : un nom, et les autres façons de l'écrire. Un poste compte si le nom de son employeur commence par l'un d'eux (« Fictiva Labs Paris » pour « Fictiva Labs »).",
+  "version": 1,
+  "employers": [
+    { "name": "Fictiva Labs", "aliases": ["Fictiva"] },
+    { "name": "Orbe Quantique", "aliases": ["Orbe Quantique SAS", "Orbe Q"] },
+    { "name": "Nimbus Atelier" }
+  ]
+}
