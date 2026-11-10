@@ -18,8 +18,9 @@
 .film-stage {
   position: fixed;
   inset: 0;
-  /* au-dessus de la fiche : le flash la découvre à sa place */
-  z-index: 3;
+  /* sous la scène de la fiche (z 2), comme la poursuite : « Passer » reste devant, et la fiche,
+     invisible jusqu'au relais, paraît à sa place au sommet du flash */
+  z-index: 1;
   display: grid;
   place-items: center;
   overflow: hidden;
