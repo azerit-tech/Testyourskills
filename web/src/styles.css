@@ -498,6 +498,8 @@ svg {
 .cover-mug svg {
   width: 100%;
   height: 100%;
+  /* l'attribut suffit en principe ; la feuille l'emporte sur toute règle du navigateur */
+  overflow: visible;
 }
 a.cover-panel:focus-visible,
 button.cover-panel:focus-visible {
