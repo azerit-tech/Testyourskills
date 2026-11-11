@@ -1,9 +1,14 @@
-# Planches comparatives des gens du film 3D (laboratoire) : studio de face, contre-jour, conducteur dans le coupé.
+# Planches comparatives des gens du film 3D (laboratoire) : studio de face, contre-jour, conducteur dans le coupé,
+# finalistes, policiers en situation derrière la patrouille.
 #
-#   FILM3D_ASSETS=…/design/film/assets nice -n 19 taskpolicy -b Blender -b -t 2 --factory-startup \
-#       -P tools/film3d/lab/cast_people_render.py -- [--only front,back,interior] [--samples 64]
+#   FILM3D_ASSETS=…/design/film/assets nice -n 10 Blender -b -t 2 --factory-startup \
+#       -P tools/film3d/lab/cast_people_render.py -- [--only front,back,interior,final,situation] [--samples 128]
+#       [--cpu] [--wb --out DIR]
 #
-# Écrit ref/lab/cast-people-comparatif.png, …-contrejour.png, …-interieur.png et assets/cast/lab-people.blend.
+# Carte graphique (Metal) par défaut, --cpu pour s'en passer, --wb pour une vérification Workbench.
+# Écrit ref/lab/cast-people-comparatif.png, …-contrejour.png, …-interieur.png, finalistes-personnes.png,
+# personnes-en-situation.png et assets/cast/lab-people.blend.
+# NON TESTÉ (11 nov.) : sheet_interior repris de cast.py et sheet_situation (écrits sans pouvoir lancer Blender).
 # Ordre des candidats (de gauche à droite) : voir OFFICER_ORDER et DRIVER_ROW.
 import math
 import os
@@ -30,7 +35,7 @@ def opt(name, default):
     return args[args.index(name) + 1] if name in args else default
 
 
-ONLY = opt("--only", "front,back,interior,final").split(",")
+ONLY = opt("--only", "front,back,interior,final,situation").split(",")
 SAMPLES = int(opt("--samples", "128"))
 CPU = "--cpu" in args   # par défaut la carte graphique (Metal)
 WB = "--wb" in args   # contrôle rapide de la mise en place (Workbench), sans Cycles
@@ -175,14 +180,14 @@ def stack(paths, out):
 
 # ---------------------------------------------------------------- figurants
 
-def officers_row(pose, yaw_deg, entries=None, gap=GAP):
+def officers_row(pose, yaw_deg, entries=None, gap=GAP, styled=False):
     """Une rangée de policiers ; entries : liste de (variante, pose), sinon OFFICER_ORDER dans `pose`."""
     arms = []
     entries = entries or [(v, pose) for v in OFFICER_ORDER]
     n = len(entries)
     for i, (v, pose) in enumerate(entries):
         a = cp.load_officer(v)
-        cp.pose_officer(a, pose)
+        cp.pose_officer(a, pose, style=i % 3 if styled else 0)
         g = cp.load_handgun("service")
         cp.attach_handgun(a, g)
         x = (i - (n - 1) / 2) * gap
@@ -330,7 +335,7 @@ def sheet_finalists():
     new_scene()
     backlit_rig()
     gap = 1.12
-    officers_row(None, 180 - 20, FINAL_OFFICERS, gap)
+    officers_row(None, 180 - 20, FINAL_OFFICERS, gap, styled=True)
     for i, (v, pose) in enumerate(FINAL_OFFICERS):
         label(f"{v} {pose}", (i - (len(FINAL_OFFICERS) - 1) / 2) * gap, -0.9, glow=True)
     camera((0, -7.5, 0.6), (0, 0, 0.7), 35, 1800, 640)
@@ -378,57 +383,157 @@ def load_coupe():
     return [o for o in bpy.data.objects if o not in before]
 
 
+def _cast_module():
+    """Le décor de la session principale (tools/film3d/cast.py, importable : build() ne tourne que sous
+    __main__)."""
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")))
+    import cast
+    return cast
+
+
 def sheet_interior(variants):
+    """Le conducteur vu de la banquette arrière, dans l'habitacle de cast.py : écran central éteint,
+    rétroviseur intérieur avec la patrouille et sa rampe dedans, route mouillée ; caméra de cast.py
+    (24 mm, capteur vertical 24 mm, (0.18, 1.50, 1.20) → (0.15, -3.0, 0.92)). Lueur des cadrans et
+    passage d'un lampadaire ambre sur le côté. NON TESTÉ."""
+    cast = _cast_module()
     tiles = []
     for v in variants:
         new_scene()
-        objs = load_coupe()
+        col = cast.collection("cast_interior")
+        bpy.context.scene.world = cast.make_world("world_interieur", 0.6)
+        objs = cast.build_coupe(col)
+        cast.build_rearview_mirror(col)
+        chaser = cast.build_chaser(col, Vector((0.6, 24.0, 0.0)))
+        chaser.rotation_euler = (0, 0, -math.pi / 2)
+        bpy.ops.mesh.primitive_plane_add(size=1)
+        road = bpy.context.active_object
+        road.scale = (14, 400, 1)
+        road.data.materials.append(cp._principled("wet_road", (0.02, 0.02, 0.024, 1), 0.12))
         info = coupe_cabin(objs)
-        coupe_glass(objs)
-        sky = os.path.join(cp.ASSETS, "qwantani_dusk_2_puresky_2k.exr")
-        w = bpy.data.worlds.new("w")
-        bpy.context.scene.world = w
-        if hasattr(w, "use_nodes"):
-            w.use_nodes = True
-        nt = w.node_tree
-        env = nt.nodes.new("ShaderNodeTexEnvironment")
-        env.image = bpy.data.images.load(sky)
-        bg = nt.nodes["Background"]
-        nt.links.new(env.outputs[0], bg.inputs[0])
-        bg.inputs[1].default_value = 0.5
-        floor(cp.lin("#0b0c10"), 0.25)
-        a = cp.load_driver(v)
-        cp.place_driver(a, info["hip"], (0, -1, 0))
-        miss = cp.pose_driver_wheel(a, info["wheel_center"], info["wheel_radius"], info["wheel_normal"],
-                                    pedal=info.get("pedal"))
-        print("INTERIOR", v, "miss", miss, {k: tuple(round(x, 3) for x in val) if hasattr(val, "__len__") else val
-                                            for k, val in info.items()}, flush=True)
-        # un peu de lumière d'ambiance : lampadaire ambre au loin, lueur bleue par le pare-brise
-        area("street", (info["hip"].x + 2.5, info["hip"].y - 4, 4), info["wheel_center"], cp.lin("#ffc36b"), 1200, 2)
-        area("dash_glow", (info["wheel_center"].x, info["wheel_center"].y - 0.25, info["wheel_center"].z + 0.05),
-             (info["hip"].x, info["hip"].y, info["hip"].z + 0.4), cp.lin("#8d8cf0"), 1.5, 0.3)
-        # gyrophares de la poursuite par la lunette arrière : liseré corail sur la capuche et les épaules
-        area("rear_rim", info["hip"] + Vector((0.3, 3.2, 0.9)), info["hip"] + Vector((0, 0, 0.75)), cp.lin(CORAL), 500, 1.0)
-        # depuis l'arrière, au-dessus de l'épaule droite du conducteur (28 mm)
-        cam_loc = info["hip"] + Vector((-0.36, 0.62, 0.70))
-        look = info["wheel_center"] + Vector((-0.10, -0.6, 0.02))
-        camera(cam_loc, look, 28, 540, 960)
-        bpy.context.scene.camera.data.clip_start = 0.02
+        objs_d = cp.cast_driver_seated(info.get("wheel_center", cp.COUPE_WHEEL_CENTER),
+                                       info.get("hip", cp.COUPE_HIP), variant=v,
+                                       wheel_normal=info.get("wheel_normal", cp.COUPE_WHEEL_NORMAL),
+                                       wheel_radius=info.get("wheel_radius", cp.COUPE_WHEEL_RADIUS),
+                                       pedal=info.get("pedal", cp.COUPE_PEDAL))
+        print("INTERIOR", v, "miss", objs_d[0].get("wheel_miss"), flush=True)
+        wc = Vector(info.get("wheel_center", cp.COUPE_WHEEL_CENTER))
+        # cadrans : une lueur froide sous la casquette du tableau de bord, vers le volant et les gants
+        area("gauge_glow", wc + Vector((0.0, -0.32, 0.12)), wc + Vector((0, 0.25, -0.05)), cp.lin("#9fb4ff"), 6, 0.25)
+        # lampadaire qui passe : ambre, de côté, par la vitre conducteur
+        area("street_pass", wc + Vector((1.9, 0.2, 1.6)), wc, cp.lin("#ffc36b"), 260, 1.2)
+        # lueur de la rampe par la lunette arrière, sur la capuche
+        area("rear_rim", Vector((0.4, 3.0, 1.4)), Vector((0.44, 0.6, 1.2)), cp.lin(CORAL), 180, 1.0)
+        c = bpy.data.cameras.new("cam_interior")
+        c.lens = 24
+        c.sensor_fit = "VERTICAL"
+        c.sensor_height = 24
+        c.clip_start = 0.05
+        co = bpy.data.objects.new("cam_interior", c)
+        bpy.context.scene.collection.objects.link(co)
+        co.location = (0.18, 1.50, 1.20)
+        co.rotation_euler = (Vector((0.15, -3.0, 0.92)) - co.location).to_track_quat("-Z", "Y").to_euler()
+        sc = bpy.context.scene
+        sc.camera = co
+        sc.render.resolution_x, sc.render.resolution_y, sc.render.resolution_percentage = 540, 960, 100
+        sc.view_settings.exposure = 0.7
         p = os.path.join(TMP, f"interior_{v}.png")
         render(p)
         tiles.append(p)
         if not WB:
             bpy.ops.wm.save_as_mainfile(filepath=os.path.join(cp.CAST, f"lab-people-interior-{v}.blend"))
+    out = os.path.join(REF, "cast-people-comparatif-interieur.png")
     if len(tiles) > 1:
         a_ = ["ffmpeg", "-y", "-loglevel", "error"]
         for p in tiles:
             a_ += ["-i", p]
         a_ += ["-filter_complex", "".join(f"[{i}:v]" for i in range(len(tiles))) + f"hstack=inputs={len(tiles)}[o]",
-               "-map", "[o]", "-frames:v", "1", os.path.join(REF, "cast-people-comparatif-interieur.png")]
+               "-map", "[o]", "-frames:v", "1", out]
         subprocess.run(a_, check=True)
     else:
         import shutil
-        shutil.copy(tiles[0], os.path.join(REF, "cast-people-comparatif-interieur.png"))
+        shutil.copy(tiles[0], out)
+
+
+# ---------------------------------------------------------------- en situation
+
+def _patrol():
+    """La patrouille retenue (« Police car », jeandiz) : load_patrol() de cast_vehicles s'il existe, sinon le
+    glTF brut, carrosserie sombre. Tournée avant vers -Y, centre au sol à l'origine. Renvoie
+    (objets, demi-largeur, y de l'avant). NON TESTÉ."""
+    import cast_vehicles as cv
+    if hasattr(cv, "load_patrol"):
+        d = cv.load_patrol()
+        objs = [d["body"]] + [o for o in (d.get("lightbar"), d.get("lenses")) if o] + list(d.get("lights", []))
+    else:
+        objs = cv.import_model(os.path.join(cp.CAST, "patrol-jeandiz", "model.glb"))
+        dark = cp._principled("patrol_dark", cp.lin("#14161c"), 0.3, coat=1.0)
+        for o in objs:
+            if o.type != "MESH":
+                continue
+            n = o.name.lower()
+            if "light" in n and ("bar" in n or "roof" in n):
+                continue
+            if "glass" in n or "window" in n:
+                continue
+            o.data.materials.clear()
+            o.data.materials.append(dark)
+        cv.normalise([o for o in objs if o.type == "MESH"], length=5.0)
+    roots = [o for o in objs if o.parent is None]
+    # avant +x (repère des véhicules) → avant -Y (repère du film)
+    for o in roots:
+        o.matrix_world = Matrix.Rotation(-math.pi / 2, 4, "Z") @ o.matrix_world
+    bpy.context.view_layer.update()
+    mn, mx = cv.bbox([o for o in objs if o.type == "MESH"])
+    return objs, (mx.x - mn.x) / 2, mn.y
+
+
+def _fake_door(name, hinge, side, length=1.15, height=0.95, sill=0.32, open_deg=62):
+    """Une portière ouverte (le modèle n'a pas de portières séparées) : panneau sombre de 6 cm, charnière
+    au bord avant, ouverte de `open_deg` vers l'extérieur ; seul le bas plein (vitre baissée)."""
+    bpy.ops.mesh.primitive_cube_add(size=1)
+    d = bpy.context.active_object
+    d.name = name
+    d.data.transform(Matrix.Translation((0, 0.5, 0.5)))
+    d.data.transform(Matrix.Diagonal((0.06, length, height * 0.62, 1)))
+    d.data.materials.append(cp._principled("door_dark", cp.lin("#14161c"), 0.3, coat=1.0))
+    d.location = Vector((hinge.x, hinge.y, sill))
+    d.rotation_euler = (0, 0, math.radians(open_deg) * (-1 if side > 0 else 1))
+    return d
+
+
+def sheet_situation():
+    """Les policiers là où ils seront : derrière les portières ouvertes de la patrouille, rampe allumée
+    derrière eux, chaussée mouillée, caméra basse à 20 m (85 mm, 9:16). NON TESTÉ."""
+    new_scene()
+    backlit_rig(lights_y=14.0)
+    objs, half_w, front_y = _patrol()
+    hy = front_y + 1.25   # montant avant, ≈ 1,25 m derrière le pare-chocs
+    for side in (1, -1):
+        _fake_door(f"door_{side}", Vector((side * (half_w - 0.02), hy, 0)), side)
+    # côté conducteur (+X) : un genou au sol derrière la portière, un debout qui vise par-dessus ;
+    # côté passager : un debout qui vise ; à l'arrière de la voiture : un en garde
+    cast = [("spp", "crouch", Vector((half_w + 0.55, hy + 0.85, 0)), 0),
+            ("spp", "aim", Vector((half_w + 0.15, hy + 1.35, 0)), 1),
+            ("spp", "aim", Vector((-half_w - 0.45, hy + 1.0, 0)), 2),
+            ("tuzzy", "guard", Vector((-half_w - 0.9, hy + 3.2, 0)), 1)]
+    for v, pose, at, style in cast:
+        a = cp.load_officer(v)
+        cp.pose_officer(a, pose, style=style)
+        cp.attach_handgun(a, cp.load_handgun("service"))
+        a.location = at
+    # la rampe : corail côté conducteur, violet côté passager, au-dessus du toit
+    area("bar_coral", (0.4, front_y + 2.2, 1.75), (0.4, front_y - 6, 0.0), cp.lin(CORAL), 900, 0.5)
+    area("bar_violet", (-0.4, front_y + 2.2, 1.75), (-0.4, front_y - 6, 0.0), cp.lin(LILAC), 900, 0.5)
+    # les phares de la patrouille vers la caméra
+    for x in (0.62, -0.62):
+        spot(f"head_{x}", (x, front_y - 0.05, 0.75), (x * 2, front_y - 20, 0.4), cp.lin(CREAM), 1500, angle=50)
+    camera((2.0, front_y - 20.0, 1.0), (0.3, hy + 1.0, 1.0), 85, 1080, 1920)
+    p = os.path.join(REF, "personnes-en-situation.png")
+    render(p)
+    print("SHEET", p, flush=True)
+    if not WB:
+        bpy.ops.wm.save_as_mainfile(filepath=os.path.join(cp.CAST, "lab-people-situation.blend"))
 
 
 def coupe_cabin(objs):
@@ -501,3 +606,5 @@ if __name__ == "__main__":
         sheet_interior(opt("--drivers", "hooded,hoodie").split(","))
     if "final" in ONLY:
         sheet_finalists()
+    if "situation" in ONLY:
+        sheet_situation()
