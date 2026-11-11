@@ -204,9 +204,16 @@ def road_module():
     return P
 
 
+# La chaussée de la rue (style propre, l'avenue garde « sechage ») : vue à 55 cm du sol, une pellicule d'eau
+# rugueuse reflète tout l'horizon lumineux en le floutant et blanchit le sol. Ici l'enrobé plus noir, la pellicule
+# plus lisse et plus d'eau : un mouillé sombre qui renvoie net les enseignes, les phares et les lanternes.
+RUE_STYLE = dict(road.STYLES["sechage"], dark=0.45, wet=(0.30, 0.18), D_off=0.4, cr=(0.05, 0.10), track=0.03,
+                 walk_D=0.9, walk_cr=0.16)
+
+
 def build_street(hidden):
     road.S = road_module()
-    st = road.STYLES["sechage"]
+    st = RUE_STYLE
     # deux voies, double axe, ni tirets ni rives (road.lane_layout), la peinture usée et salie ; la place du
     # rond-point sans aucun marquage
     lay = dict(road.lane_layout(HALF, 2), grime=0.6)
@@ -559,7 +566,8 @@ def build_overhead(M, hidden):
         drop = 0.55
         C.tube([[tuple(mid), tuple(mid - Vector((0, 0, drop)))]], 0.006, cable, f"lantern_wire_{k}")
         A.instance(lantern, f"lantern_{k}", mid - Vector((0, 0, drop)), random.uniform(0, 1))
-        lo = A.add_light(f"lantern_{k}_down", "SPOT", mid - Vector((0, 0, drop + 0.2)), (0, 0, -1), lamp_col, 1400.0, spot=115)
+        lo = A.add_light(f"lantern_{k}_down", "SPOT", mid - Vector((0, 0, drop + 0.2)), (0, 0, -1), lamp_col, 500.0, spot=90)
+        # (500 W : à 1400 W, les lanternes au-dessus du premier plan éclairaient la chaussée en plein jour)
         lo.data.spot_blend = 0.8
         lo.data.shadow_soft_size = 0.12
         lo.visible_glossy = False
@@ -698,7 +706,7 @@ def build_foreground(hidden, plan):
         puddle(f"rue_puddle_{k}", cx + x, cy + y, r, sy, 70 + k, water)
     # une plaque d'égout près de la caméra, dans son carré d'enrobé refait
     src, dims = road.manhole_source(hidden)
-    st = road.STYLES["sechage"]
+    st = RUE_STYLE
     patch = road.mat_asphalt(st, "rue_asphalt_patch_near", force_patch=True, layout=dict(road.lane_layout(HALF, 2), grime=0.6))
     x, y = cx - 1.9, cy + 1.8
     z = road.road_z(x)
