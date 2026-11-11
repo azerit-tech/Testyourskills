@@ -35,7 +35,7 @@ REF = cv.REF
 lin = cv.lin
 
 LAMP = "#fff9cb"        # phares crème du film
-TAIL = "#ff2a1a"        # feux arrière
+TAIL = "#ff6a3d"        # feux arrière : le corail du film (lueur portée)
 AMBER = "#ffa21a"
 
 # l'usure des matières de la berline (0 = la voiture de catalogue, 1 = la voiture de tous les jours, jamais une
@@ -616,6 +616,55 @@ def mat_lens(name, tint=(1, 1, 1, 1), emit_color=None, strength=0.0, flutes=0.0,
     return m
 
 
+# le feu arrière allumé : émission du cœur du verre et son intensité, calées pour que l'image (AgX, exposition 0,5
+# du laboratoire) lise le corail du film et non un rose saumon (un rouge pur trop fort blanchit dans AgX)
+TAIL_GLOW = ("#ff4a1c", 1.3)
+TAIL_DEEP = "#9c0c06"   # le rouge profond du plastique vu en biais, là où la lumière traverse plus d'épaisseur
+
+
+def mat_tail_lens(name, on=True, glow=None, ribs=40.0):
+    """Cabochon de feu arrière d'époque : plastique rouge moulé épais (PMMA, IOR 1,49) à stries horizontales.
+    Éteint : un rouge profond presque noir où l'on devine le réflecteur, un reflet net qui casse sur les stries.
+    Allumé : un cœur corail qui fonce vers le rouge profond sur les bords vus en biais, une strie sur deux plus claire
+    (les prismes renvoient la lumière de l'ampoule)."""
+    color, strength = glow or TAIL_GLOW
+    m, nt, out = cv._mat(name)
+    tc = nt.nodes.new("ShaderNodeTexCoord")
+    wv = nt.nodes.new("ShaderNodeTexWave")
+    wv.wave_type = "BANDS"
+    wv.bands_direction = "Z"
+    wv.wave_profile = "SIN"
+    wv.inputs["Scale"].default_value = ribs
+    nt.links.new(tc.outputs["Object"], wv.inputs["Vector"])
+    bump = _node(nt, "ShaderNodeBump", Height=wv.outputs["Fac"], Strength=0.5, Distance=0.002)
+    fr = _node(nt, "ShaderNodeFresnel", IOR=1.49, Normal=bump.outputs[0])
+    tr = _node(nt, "ShaderNodeBsdfTransparent", Color=lin("#4a0302"))
+    gl = _glossy(nt)
+    gl.inputs["Roughness"].default_value = 0.04
+    nt.links.new(bump.outputs[0], gl.inputs["Normal"])
+    mix = nt.nodes.new("ShaderNodeMixShader")
+    nt.links.new(cv._math(nt, "ADD", fr.outputs[0], 0.05), mix.inputs[0])
+    nt.links.new(tr.outputs[0], mix.inputs[1])
+    nt.links.new(gl.outputs[0], mix.inputs[2])
+    sh = mix.outputs[0]
+    if on and strength > 0:
+        lw = _node(nt, "ShaderNodeLayerWeight", Blend=0.45)
+        edge = _ramp(nt, lw.outputs["Facing"], 0.15, 0.85)
+        col = _mix_rgb(nt, lin(color), lin(TAIL_DEEP), edge)
+        rib = cv._math(nt, "ADD", 0.72, cv._math(nt, "MULTIPLY", wv.outputs["Fac"], 0.28))
+        s = cv._math(nt, "MULTIPLY", cv._math(nt, "MULTIPLY", rib, strength),
+                     cv._math(nt, "SUBTRACT", 1.0, cv._math(nt, "MULTIPLY", edge, 0.5)))
+        em = nt.nodes.new("ShaderNodeEmission")
+        nt.links.new(col, em.inputs["Color"])
+        nt.links.new(s, em.inputs["Strength"])
+        add = nt.nodes.new("ShaderNodeAddShader")
+        nt.links.new(sh, add.inputs[0])
+        nt.links.new(em.outputs[0], add.inputs[1])
+        sh = add.outputs[0]
+    nt.links.new(sh, out.inputs[0])
+    return m
+
+
 def mat_reflector(name, emit_color=LAMP, strength=0.0):
     """Réflecteur parabolique : aluminium poli (métal 1, rugosité 0,12), une lueur quand le feu est allumé."""
     m, nt, out = cv._mat(name)
@@ -917,7 +966,7 @@ def _w111_materials(parts, lights_on, tag="hero_w111", paint_color=PAINT["w111"]
         "Material_38": None,
         "light_reflector": None,
         "front_light_glass": mat_lens(f"{tag}_head_lens", (0.97, 0.97, 0.95, 1), LAMP, 0.35 * on, flutes=60.0),
-        "back_light_glass": mat_lens(f"{tag}_tail_lens", lin("#5a0402"), "#ff1205", 0.9 * on, flutes=40.0, flute_axis="Z"),
+        "back_light_glass": mat_tail_lens(f"{tag}_tail_lens", lights_on),
         "reverse_light_glass": mat_lens(f"{tag}_reverse_lens", (0.95, 0.95, 0.95, 1)),
         "Acrylic_Transparent_Orange": mat_lens(f"{tag}_amber", lin("#ff8a1a"), AMBER, 0.0),
         "Walnut_Matte": mat_walnut(f"{tag}_walnut"),
@@ -932,11 +981,12 @@ def _w111_materials(parts, lights_on, tag="hero_w111", paint_color=PAINT["w111"]
     }
     # ampoules et réflecteurs : l'avant (x de fichier < 0 dans y, l'avant est vers -y) s'allume crème, l'arrière rouge
     head_ref = mat_reflector(f"{tag}_head_reflector", LAMP, 2.5 * on)
-    # réflecteur arrière teinté rouge (le chrome nu blanchissait le feu en rose)
-    tail_ref = mat_reflector(f"{tag}_tail_reflector", "#ff1205", 0.25 * on)
+    # réflecteur arrière teinté rouge (le chrome nu blanchissait le feu en rose) ; sa lueur et l'ampoule restent
+    # sous le cœur du verre, sinon le feu repasse au saumon
+    tail_ref = mat_reflector(f"{tag}_tail_reflector", TAIL_GLOW[0], 0.12 * on)
     tail_ref.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = lin("#a01008")
     head_bulb = mat_plain(f"{tag}_head_bulb", LAMP, rough=0.2, emit=30.0 * on)
-    tail_bulb = mat_plain(f"{tag}_tail_bulb", "#ff1a0a", rough=0.2, emit=3.0 * on)
+    tail_bulb = mat_plain(f"{tag}_tail_bulb", TAIL_GLOW[0], rough=0.2, emit=0.5 * on)
     _assign_by(parts, table)
     for o in [o for o in parts if o.name.startswith("w111_lights_assembly")]:
         base = o.data.materials[0].name.split(".")[0] if o.data.materials else ""
