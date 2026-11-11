@@ -364,11 +364,13 @@ Ce qui attache le film au site : la palette, les bandes de la couleur de la page
 |---|---|
 | Bandes d'encre, étoiles, radio | HTML, par-dessus la vidéo |
 | Étalonnage commun aux plans | ffmpeg, au montage (`grade` de `tools/film/montage.json`) |
+| Couleurs | ffmpeg, au montage : chaque plan converti en dernier vers la matrice bt709, et les fichiers étiquetés bt709 (§4.1), pour qu'aucun navigateur ne les lise avec la matrice du SD |
 | Grain | une tuile de bruit de 128 px, déplacée 12 fois par seconde, opacité 7 % |
 | Vignette | un dégradé radial fixe |
 | Secousse à chaque étoile | translation de l'image sur quatre images |
 | Deux tons de l'arrêt sur image | filtre CSS sur une image fixe |
-| Flash | un aplat crème en opacité |
+| Flash | un aplat crème en opacité ; il part aussi tout de suite sur une erreur de lecture (§5.5) |
+| Cache d'encre de la bascule | un aplat d'encre posé par le lecteur, sans attendre React, tant que la fin n'a pas peint sa première image |
 | Vibration | une impulsion par étoile (`web/src/lib/haptics.ts`, Android) |
 
 Le grain n'est pas gravé dans les fichiers : il gonflerait le débit pour rien.
@@ -381,7 +383,7 @@ Le grain n'est pas gravé dans les fichiers : il gonflerait le débit pour rien.
 
 **En entrée du montage**, hors du dépôt, dans `~/Desktop/Azerit/design/film/plans/` : une ou plusieurs prises par plan, nommées `PLAN-prise.mp4` (`OUV-1.mp4`, `P3-2.mp4`, `FIN6-1.mp4`). `tools/film/montage.json` dit quelle prise garder et quelle fenêtre en prendre (mode d'emploi : `tools/film/README.md`). Une prise absente est remplacée par un carton : le film se monte toujours.
 
-**En sortie**, dans `web/src/film/media/`, importés par Vite (`web/src/film/files.ts`) : au build, chaque nom reçoit l'empreinte de son contenu (`/assets/poursuite-720-XXXXXXXX.mp4`), servie avec un cache long immuable. Deux variantes : la haute en 720 × 1280, l'éco en 540 × 960.
+**En sortie**, dans `web/src/film/media/`, importés par Vite (`web/src/film/files.ts`) : au build, chaque nom reçoit l'empreinte de son contenu (`/assets/poursuite-720-XXXXXXXX.mp4`), servie avec un cache long immuable (`/assets/*`, `server/src/app.ts`) : un film remplacé change d'adresse, et un téléphone ne peut plus jouer une poursuite neuve avec une fin ancienne. `VITE_FILM_BASE`, au build, vide par défaut, sert le film depuis un autre hôte : on y copie les mp4 de `dist/web/assets/` sous leur nom à empreinte, et cet hôte doit répondre en CORS. Deux variantes : la haute en 720 × 1280, l'éco en 540 × 960.
 
 | Fichier | Contenu | Images | Plafond de poids |
 |---|---|---|---|
@@ -391,7 +393,7 @@ Le grain n'est pas gravé dans les fichiers : il gonflerait le débit pour rien.
 | `poursuite-540.mp4`, `fin-540.mp4`, `fin6-540.mp4` | les mêmes en 540 × 960 | les mêmes | 1,68 Mo, 0,34 Mo, 0,52 Mo |
 | `affiche.jpg` | la première image, 720 × 1280 (hors du site) | 1 | 60 Ko |
 
-Une personne ne charge que la poursuite et une seule fin : au plus 5,4 Mo en haute (5,9 Mo à six étoiles), 2,2 Mo en éco. Les plafonds de l'éco sont ceux de la haute ramenés à ce total. Encodage : H.264 profil Main, 24 images par seconde, une image clé sur chaque coupe entre plans (lues dans `shared/film/cut.ts`) et au plus toutes les 48 images, couleurs étiquetées bt709, `+faststart`, sans piste son. Les plafonds sont dans `shared/film/budget.ts`, lus par le montage et par le lecteur. Chaque fichier part du CRF 20 en haute, 22 en éco, et monte de 2 tant qu'il dépasse son plafond ; s'il faudrait passer le CRF 28 pour le tenir, **le montage échoue** (code de sortie 1) au lieu de livrer une image dégradée.
+Une personne ne charge que la poursuite et une seule fin : au plus 5,4 Mo en haute (5,9 Mo à six étoiles), 2,2 Mo en éco. Les plafonds de l'éco sont ceux de la haute ramenés à ce total. Encodage : H.264 profil Main, 24 images par seconde, une image clé sur chaque coupe entre plans (lues dans `shared/film/cut.ts`) et au plus toutes les 48 images, couleurs étiquetées bt709, `+faststart`, sans piste son. Les plafonds sont dans `shared/film/budget.ts`, lus par le montage et par le lecteur. Chaque fichier part du CRF 20 en haute, 22 en éco, et monte de 2 tant qu'il dépasse son plafond ; s'il fallait dépasser le CRF 28 pour le tenir, **le montage échoue** (code de sortie 1) au lieu de livrer une image dégradée.
 
 Les polices (Barlow Condensed, Outfit, JetBrains Mono) et les décors peints des profils (`web/public/profiles/`) sont déjà servis par le site.
 
@@ -407,12 +409,18 @@ shared/film/
   plan.ts         filmPlan(fiche) : niveau, étoiles, coupe, fin, arrêt sur image, flash, radio
   hud.ts          hudAt(plan, t) : l'état exact du HUD à l'instant t
 web/src/film/
-  player.ts       deux balises vidéo, chargement, bascule, horloge, seek et hold, mesures
+  player.ts       deux balises vidéo, bascule, horloge, chien de garde, seek et hold, mesures
+  loader.ts       le chargement en flux, un fichier à la fois, la variante, ce qui reste à charger
+  net.ts          la partie pure du réseau : variante, débit, délai d'abandon
+  watchdog.ts     le chien de garde de la lecture, pur
+  report.ts       l'événement `film`, pur
+  files.ts        les adresses à empreinte des six mp4
+  media/          les mp4 et l'affiche, écrits par le montage
   unlock.ts       les deux balises, débloquées par le geste qui lance la fiche
   FilmHud.tsx     bandes, étoiles, radio, arrêt sur image, flash, grain, vignette
   film.css
-web/src/components/Film.tsx     même contrat que Chase et Walkout3D envers la page d'une fiche
-web/public/film/                les mp4 et l'affiche
+shared/film/budget.ts           les plafonds de poids, lus par le montage et le lecteur
+web/src/components/Film.tsx     même contrat que Walkout3D envers la page d'une fiche ; délai d'abandon, événement
 tools/film/montage.json         la liste de montage
 scripts/film-assemble.ts        ffmpeg : découpe, étalonne, recadre, recolle, encode, vérifie
 scripts/film-contact.ts         planche-contact d'une prise, pour choisir sa fenêtre
@@ -430,16 +438,16 @@ tools/film3d/                   la scène Blender et son rendu
 
 - **Deux balises `<video muted playsinline>`.** La première joue `poursuite` (toujours le fichier complet à six étoiles). La seconde porte la fin, calée sur sa première image : `fin` de ★ à ★★★★★, `fin6` à ★★★★★★.
 - **La coupe au niveau de la fiche** : quand la première balise atteint la dernière image de son dernier plan joué, la seconde démarre et passe devant. Deux images d'encre couvrent la bascule : la dernière du plan et la première de la fin.
-- **Fichiers chargés en entier avant de jouer** (`fetch` puis `Blob`) : aucune mise en mémoire tampon pendant le film.
-- **Encodage** : celui du §4.1. **540p** si l'économiseur de données est mis ou si la connexion annoncée est lente.
+- **Fichiers chargés en entier avant de jouer** (`fetch` puis `Blob`, `loader.ts`) : aucune mise en mémoire tampon pendant le film. Un fichier à la fois, la poursuite d'abord ; chacun une fois pour la page.
+- **La variante, sur le débit mesuré.** La réponse se lit en flux (`ReadableStream`) : sur les 350 premiers Ko du premier fichier en haute, débit sous 5 Mbit/s (`ECO_BELOW_BPS`, `net.ts`) : ce fichier est abandonné et tout est repris en éco (540 × 960). Économiseur de données : éco d'emblée, rien n'est demandé en haute. Sans `ReadableStream` : pas de mesure, le repli d'avant (éco si la connexion annoncée est en 3G ou moins). Une fois tranchée, la variante ne change plus pour la page. Encodage : celui du §4.1.
 - **Ordinateur** : le film dans une colonne 9:16 centrée, haute comme la fenêtre (900 px au plus), sur l'encre.
 - **Cadrage** : l'image remplit l'écran. Un téléphone en 390 × 844 est plus étroit que le 9:16 : 9 % de l'image sont rognés de chaque côté. D'où les zones du §7.3.
 
 ### 5.4 Le chargement pendant l'attente
 
-1. Au geste qui lance la fiche, les deux balises sont créées et débloquées.
-2. Dès l'attente, `poursuite` puis `fin` se téléchargent.
-3. Fiche prête : à six étoiles, `fin6` se charge. La scène se dit prête quand la première image est peinte, et l'écran d'attente se lève.
+1. Au premier contact avec le formulaire (première saisie, premier toucher, `prefetchReveal`), le module du film se charge et le téléchargement part : `poursuite`, puis `fin`, la fin la plus probable, en basse priorité. Jamais dès l'ouverture de la page ; rien avec l'économiseur de données (tout attend l'envoi), rien en mouvement réduit.
+2. Au geste qui lance la fiche, les deux balises sont créées et débloquées ; pendant l'attente, le téléchargement continue (ou part, s'il n'était pas parti).
+3. Fiche prête, le niveau est connu : seule la fin utile se charge. À six étoiles, `fin` est abandonnée si elle est encore en cours ou en file, et `fin6` passe par la même file, la même variante et la même mesure que les autres. La scène se dit prête quand la première image est peinte, et l'écran d'attente se lève.
 
 ### 5.5 Les replis
 
@@ -447,8 +455,11 @@ tools/film3d/                   la scène Blender et son rendu
 |---|---|
 | Mouvement réduit | rien ne joue, la fiche sort |
 | Le navigateur refuse de lancer la vidéo sans geste | l'attente montre la pilule « Ouvrir mon dossier » ; le toucher lance le film |
-| Le film n'est pas prêt 4 s après la fiche, ou H.264 illisible | la fiche se pose sans révélation |
-| Erreur de lecture en cours de film | flash immédiat, la fiche se pose |
+| H.264 illisible, fichier absent ou qui n'est pas une vidéo | la fiche se pose sans révélation |
+| Fiche prête, film pas encore prêt | on attend au plus 4 s d'onglet visible (`READY_WAIT_MS`, le temps onglet caché ne compte pas) ; toutes les 100 ms, ce qui reste à charger est estimé sur le débit mesuré (avec 25 % de marge et 400 ms de décodage) : s'il ne peut pas arriver dans les 4 s, ou si plus rien n'arrive depuis 1,5 s, la fiche se pose tout de suite, sans révélation ; sans mesure possible, on attend les 4 s |
+| Erreur de la balise en cours de film | flash immédiat, la fiche se pose |
+| Horloge de la vidéo figée plus de 1,5 s, ou pause que le lecteur n'a pas demandée | une relance (la balise replacée sur son image et relancée) ; au second incident du film, flash immédiat et la fiche se pose (`watchdog.ts`). Jamais d'image figée ni d'écran noir |
+| `stalled` sur la balise active | une relance douce ; si l'horloge reste figée, la ligne du dessus tranche |
 
 Essais en développement : `?film=gesture`, `?film=missing`, `?film=nocodec`.
 
@@ -456,12 +467,14 @@ Essais en développement : `?film=gesture`, `?film=missing`, `?film=nocodec`.
 
 | Mesure | Cible sur un téléphone moyen |
 |---|---|
-| Téléchargement | 4 Mo au plus en 720p, 1,8 Mo en 540p |
+| Téléchargement d'une personne | 5,4 Mo au plus en haute (5,9 Mo à six étoiles), 2,2 Mo en éco |
 | Images vidéo perdues | 0 sur tout le film |
 | Bascule de la poursuite à la fin | 2 images au plus |
 | Délai entre la levée de l'attente et la première image qui bouge | 300 ms au plus |
 
-`__film.stats()` rend les images perdues, la durée de la bascule, le délai de départ et les octets chargés. À relever dans Chrome avec le processeur ralenti 4 fois, puis sur de vrais téléphones, dans le navigateur du système et dans le navigateur intégré de LinkedIn.
+`__film.stats()` rend les images perdues, la durée de la bascule, le délai de départ, les octets chargés, la variante et les relances du chien de garde, en développement et avec `?mock=1` seulement. À relever dans Chrome avec le processeur ralenti 4 fois, puis sur de vrais téléphones, dans le navigateur du système et dans le navigateur intégré de LinkedIn.
+
+**En production, l'événement `film`** (table `events`, `server/src/events.ts`) : une ligne par lecture, envoyée à son issue (`web/src/film/report.ts`). Dix clés fermées et bornées : `outcome` (`played` joué jusqu'au bout, `gesture` pilule montrée et jamais touchée, `timeout` abandon au délai, `nocodec` H.264 illisible, `error` chargement ou lecture en échec, `skipped` passé par la personne, `left` page quittée), `variant` (`720` ou `540`), `bytes`, `loadMs` (de la demande au dernier octet, fichier par fichier, les deux fichiers joués), `startMs`, `dropped`, `switchMs`, `kbps` (le débit mesuré), `inApp` (navigateur intégré d'une application) et `gesture` (la lecture a demandé la pilule). Ni identifiant de fiche, ni adresse, ni navigateur en clair : le serveur refuse l'événement s'il en porte.
 
 ### 5.7 Ce qui part à la validation du film
 
@@ -481,7 +494,7 @@ Construit le 10 novembre 2026 (SPEC §18.36) : le plan, le HUD pur, le lecteur �
 
 1. `npx tsx scripts/film-assemble.ts` produit les six mp4 et l'affiche en moins de deux minutes sur le Mac ; `ffprobe` confirme 204, 36 et 56 images, 24 i/s, 720 × 1280 et 540 × 960, aucune piste son.
 2. Un plan absent de `design/film/plans/` est remplacé par son carton, sans erreur.
-3. Les poids tiennent dans les plafonds du §4.1 ; sinon le script baisse la qualité et le dit.
+3. Les poids tiennent dans les plafonds du §4.1 ; sinon le script baisse la qualité et le dit, jusqu'au CRF 28, au-delà il échoue.
 4. À 390 px, dans le lecteur : aucun plan ne garde de bande noire, de filigrane ou de texte ; rien d'important sous les bandes ni dans les 9 % rognés de chaque côté.
 5. Côte à côte sur une planche, les neuf plans ont la même nuit : même ciel, mêmes ombres prune, gyrophares corail et lilas.
 6. Pour chaque prise, une planche-contact (`scripts/film-contact.ts`) et un avis écrit contre la grille du §7.10.
