@@ -56,6 +56,22 @@ describe("le point fort et le point à creuser", () => {
     const g = grid({ EDU: 2, XP: 7, EMP: 6, STK: 6, CODE: 8, ACT: 5, OWN: 3, OSS: 1 });
     expect(digPoint(g)).toEqual({ kind: "dig", code: "OWN", score: 3 });
   });
+
+  it("« À creuser » seulement pour une note de 6 ou moins, strictement sous le point fort", () => {
+    // 6 sous un 8 : à creuser.
+    expect(digPoint(grid({ XP: 8, EMP: 7, STK: 7, CODE: 8, ACT: 6, OWN: 7 }))).toEqual({ kind: "dig", code: "ACT", score: 6 });
+    // Rien sous 7 : un dossier régulier, « rien sous 7/10 ».
+    const even = grid({ XP: 8, EMP: 7, STK: 7, CODE: 9, ACT: 7, OWN: 8, OSS: 2, EDU: 3 });
+    expect(digPoint(even)).toEqual({ kind: "even", floor: 7 });
+    expect(recruiterRead(card, even, "fr")?.dig).toBe("Dossier régulier\u00a0: rien sous 7/10.");
+    expect(recruiterRead(card, even, "en")?.dig).toBe("Even file: nothing under 7/10.");
+    // Tout à égalité sous 7 : rien sous le point fort, la ligne s'arrête au point fort.
+    const flat = grid({ XP: 6, EMP: 6, STK: 6, CODE: 6, ACT: 6, OWN: 6 });
+    expect(digPoint(flat)).toBeNull();
+    expect(recruiterRead(card, flat, "fr")?.text).toBe("Full-stack TypeScript, 4\u00a0ans comptés. Point fort\u00a0: niveau du code, 6/10.");
+    // Sans point fort, la note basse reste à creuser.
+    expect(digPoint(grid({ XP: 4, EMP: 3, STK: 4, CODE: 4, ACT: 4, OWN: 4 }))).toEqual({ kind: "dig", code: "EMP", score: 3 });
+  });
 });
 
 describe("la ligne", () => {
