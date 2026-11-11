@@ -393,6 +393,7 @@ def aim_helis(helis, target, energy=400000.0):
         for o in r.children_recursive:
             if o.type == "LIGHT" and o.name.endswith("searchlight_spot"):
                 o.data.energy = energy
+                o.data.color = L.lin("#e2eaff")[:3]     # xénon, bleuté : la berline reste bordeaux sous le faisceau
     for r in helis:
         piv = next((o for o in r.children_recursive if o.name.endswith("searchlight_pivot")), None)
         if piv is None:
@@ -428,8 +429,14 @@ def plan_FIN(scene, hidden, palier="socle"):
     pat = L.patrol("patrol")
     L.put(pat, pp.x, pp.y, 0.0, heading=HERO_STOP)
     L.open_door(pat, side=1, angle=80.0)
-    L.bar_pools(pat, energy=1500.0)
-    L.bar_beams(pat, "patrol", yaws=((-40, L.CORAL), (140, L.LILAC)), energy=6000.0)
+    L.bar_pools(pat, energy=600.0)
+    # ses phares, droit sur l'objectif, voilaient le tiers bas dans la brume : baissés (veilleuses)
+    for o in pat.children_recursive:
+        if o.type == "LIGHT" and "_head_" in o.name:
+            o.data.energy = 90.0
+    # les faisceaux de sa rampe partent vers l'arrière, presque à l'horizontale : vers l'avant, le corail frappait
+    # le sol juste devant l'objectif et blanchissait tout le tiers bas
+    L.bar_beams(pat, "patrol", yaws=((125, L.CORAL), (-125, L.LILAC)), energy=3000.0, tilt=3.0)
     hinge = pp + f * 0.96 - r * 0.92
     door = (-f * math.cos(math.radians(80)) - r * math.sin(math.radians(80))).normalized()
     try:
@@ -445,12 +452,23 @@ def plan_FIN(scene, hidden, palier="socle"):
     L.smoke("fumee_trace", (CX + 1.5, CY - 11.0, 1.0), (3.5, 6.0, 1.6), density=0.28, seed=7.0)
     L.smoke("fumee_avant", (CX - 1.6, CY + 2.4, 0.5), (2.6, 2.0, 0.8), density=0.42, seed=1.0)
     # les lueurs : hors champ à droite et à gauche, et derrière l'agent (le contre-jour)
-    glows([((CX - 9.0, CY + 2.0, 1.4), L.LILAC, 7000.0), ((CX + 10.0, CY - 3.0, 1.5), L.CORAL, 7000.0),
-           ((CX + 6.5, CY - 6.0, 1.7), L.CORAL, 2500.0), ((CX - 12.0, CY - 14.0, 1.6), L.LILAC, 4000.0)])
+    glows([((CX - 9.0, CY + 2.0, 1.4), L.LILAC, 4000.0), ((CX + 10.0, CY - 3.0, 1.5), L.CORAL, 3500.0),
+           ((CX + 6.5, CY - 6.0, 1.7), L.CORAL, 1600.0), ((CX - 12.0, CY - 14.0, 1.6), L.LILAC, 3000.0)])
+    # le lampadaire de la pointe frappe la berline : ambre à 3,2 kW, il la sortait orange vif ; plus faible et
+    # plus blanc, elle reste bordeaux sombre
+    lp = bpy.data.objects.get("lamp_pointe_light")
+    if lp:
+        lp.data.energy = 1300.0
+        lp.data.color = L.lin("#ffe2c2")[:3]
+    # le haut du cadre : un hélicoptère au-dessus de la jetée, son projecteur sur la berline (sous la bande des 12 %)
+    heli, _ = L.helicopter("heli")
+    L.put(heli, CX + 6.0, CY - 42.0, 27.0, heading=170.0, pitch=-6.0, roll=-5.0)
+    aim_helis([heli], STOP + Vector((0, 0, 0.8)), energy=200000.0)
     # la brume est réelle depuis que lieux.haze tourne ses normales vers l'extérieur : 0,0005 sur 800 m laisse la
     # ville voilée mais lisible ; la nappe locale, plus dense, prend les faisceaux et les lueurs
     L.haze((CX - 80, CX + 80), (CY - 470, CY + 60), (L.WATER_Z, 50), 0.0005)
-    L.haze((CX - 35, CX + 35), (CY - 40, CY + 30), (L.WATER_Z, 22), 0.003, name="haze_pointe")
+    # la nappe locale s'arrête devant la patrouille : entre elle et l'objectif, plus de voile laiteux
+    L.haze((CX - 35, CX + 35), (CY - 45, CY + 4), (L.WATER_Z, 30), 0.0025, name="haze_pointe")
     cam_loc = Vector((CX + 0.7, CY + 8.97, 0.2))
     a = math.radians(-1.0)
     d = Vector((math.sin(a), -math.cos(a), math.tan(math.radians(14.0))))
