@@ -134,25 +134,68 @@ def lights_on(police):
             police.data.materials[i] = bpy.data.materials["lightbar_on"]
 
 
-def bar_lights(police, tag):
-    # dans le repère de la patrouille : l'avant vers +x, la rampe en (−0,26, 0, 1,45)
-    for side, col in ((1, CORAL), (-1, LILAC)):
-        for kind in ("SPOT",):
-            L = bpy.data.lights.new(f"bar_{tag}_{side}_{kind}", kind)
+def bar_lights(police, tag, strong=False):
+    """La rampe allumée : des faisceaux figés en plein balayage. Par défaut deux, vers l'avant et
+    de biais ; `strong` (le drone) : quatre, deux qui fauchent la chaussée, deux qui lèchent les
+    couronnes des palmiers, dans une brume locale qui les rend visibles."""
+    if strong:
+        beams = [(CORAL, (0.55, 0.55, -0.55), 30000, 34), (LILAC, (-0.6, 0.45, -0.55), 30000, 34),
+                 (CORAL, (1.0, 0.15, 0.8), 45000, 20), (LILAC, (-1.0, 0.25, 0.8), 45000, 20)]
+    else:
+        beams = None
+    if beams is None:
+        for side, col in ((1, CORAL), (-1, LILAC)):
+            L = bpy.data.lights.new(f"bar_{tag}_{side}", "SPOT")
             L.color = col
-            L.energy = 60 if kind == "POINT" else 9000
+            L.energy = 9000
             L.shadow_soft_size = 0.08
-            if kind == "SPOT":
-                L.spot_size = 1.2
-                L.spot_blend = 0.7
+            L.spot_size = 1.2
+            L.spot_blend = 0.7
             lo = bpy.data.objects.new(L.name, L)
             scene.collection.objects.link(lo)
             lo.parent = police
             lo.location = (-0.26, side * 0.3, 2.2)
-            if kind == "SPOT":
-                # deux balayages figés : l'un vers l'avant et le sol, l'autre de biais vers les palmiers
-                # l'axe du spot (−z) basculé de 72° vers l'horizontale, puis tourné vers l'avant (+x) de biais
-                lo.rotation_euler = (math.radians(72), 0, math.radians(-90 + side * 40))
+            # l'axe du spot (−z) basculé de 72° vers l'horizontale, puis tourné vers l'avant (+x) de biais
+            lo.rotation_euler = (math.radians(72), 0, math.radians(-90 + side * 40))
+        return
+    bpy.context.view_layer.update()
+    top = police.matrix_world @ Vector((-0.26, 0, 1.6))
+    for k, (col, d, energy, size) in enumerate(beams):
+        L = bpy.data.lights.new(f"bar_{tag}_{k}", "SPOT")
+        L.color = col
+        L.energy = energy
+        L.shadow_soft_size = 0.05
+        L.spot_size = math.radians(size)
+        L.spot_blend = 0.35
+        lo = bpy.data.objects.new(L.name, L)
+        scene.collection.objects.link(lo)
+        lo.location = top + Vector((0.3 if d[0] > 0 else -0.3, 0, 0))
+        lo.rotation_mode = "QUATERNION"
+        lo.rotation_quaternion = Vector(d).normalized().to_track_quat("-Z", "Y")
+        bpy.context.view_layer.update()
+        mw = lo.matrix_world.copy()
+        lo.parent = police
+        lo.matrix_world = mw
+
+
+def local_haze(c, half, density):
+    """Une brume plus dense autour de la poursuite : les faisceaux y prennent corps."""
+    m = bpy.data.materials.new("haze_local")
+    m.use_nodes = True
+    nt = m.node_tree
+    nt.nodes.clear()
+    out = nt.nodes.new("ShaderNodeOutputMaterial")
+    vol = nt.nodes.new("ShaderNodeVolumePrincipled")
+    vol.inputs["Color"].default_value = (0.75, 0.72, 0.85, 1)
+    vol.inputs["Density"].default_value = density
+    vol.inputs["Anisotropy"].default_value = 0.3
+    nt.links.new(vol.outputs[0], out.inputs["Volume"])
+    bpy.ops.mesh.primitive_cube_add(location=c)
+    ob = bpy.context.active_object
+    ob.name = "haze_local"
+    ob.scale = half
+    ob.data.materials.append(m)
+    ob.visible_shadow = False
 
 
 def patrol_copy(police, name):
@@ -186,8 +229,9 @@ if args.shot != "a":
         p2.rotation_euler = police.rotation_euler
         p2.location = (LANE_X + 0.2, Y0 - 16, 0)
         lights_on(police)
-        bar_lights(police, "1")
-        bar_lights(p2, "2")
+        bar_lights(police, "1", strong=True)
+        bar_lights(p2, "2", strong=True)
+        local_haze((0, Y0 - 8, 8), (16, 26, 8), 0.006)
         cam.data.lens = 26
         cam.data.dof.aperture_fstop = 8.0
         cam.location = (-3.0, Y0 - 30, 17)
