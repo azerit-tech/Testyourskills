@@ -9,7 +9,7 @@
 // exemple « https://media.example.net/film/ ». On y copie les mp4 de
 // dist/web/assets/ sous leur nom à empreinte ; l'hôte doit répondre en CORS.
 import type { EndingId } from "../../../shared/film";
-import { filmAssetUrl } from "./net";
+import { filmAssetUrl, type Quality } from "./net";
 import poursuite720 from "./media/poursuite-720.mp4";
 import fin720 from "./media/fin-720.mp4";
 import fin6720 from "./media/fin6-720.mp4";
@@ -17,8 +17,7 @@ import poursuite540 from "./media/poursuite-540.mp4";
 import fin540 from "./media/fin-540.mp4";
 import fin6540 from "./media/fin6-540.mp4";
 
-/** « 720 » : la variante haute ; « 540 » : la variante éco. */
-export type Quality = "720" | "540";
+export type { Quality } from "./net";
 export type FileId = "poursuite" | EndingId;
 
 const FILES: Record<Quality, Record<FileId, string>> = {

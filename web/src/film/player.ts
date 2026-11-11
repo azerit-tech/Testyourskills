@@ -1,90 +1,20 @@
 // Le lecteur du film (§18.36, docs/cinematique-poursuite.md §5.2 à §5.6) : deux
 // balises <video muted playsinline> (unlock.ts), A pour la poursuite (toujours
 // le fichier entier, six étoiles), B pour la fin (`fin` ou `fin6`), chargées en
-// entier avant de jouer (fetch puis Blob). L'horloge du film est celle de la
+// entier avant de jouer (fetch puis Blob, loader.ts, dans la variante que le
+// débit mesuré a choisie). L'horloge du film est celle de la
 // vidéo : t = image présentée de A, puis coupe + image présentée de B, puis
 // l'horloge du navigateur pour le gel et le flash. Le HUD ne peut pas se
 // décaler de l'image. La coupe au niveau : quand A présente la dernière image
 // du dernier plan joué, l'encre la couvre, A s'arrête, B part et passe devant ;
 // l'encre reste jusqu'à la première image de B (deux images au plus).
 import { FPS, type FilmPlan } from "../../../shared/film";
-import { isMock } from "../lib/api";
-import { filmFileUrl, type FileId, type Quality } from "./files";
+import type { Quality } from "./files";
+import { canPlayFilm, debugFlag, filmNet, filmVariant, loadFilmFiles } from "./loader";
 import { filmUnlocks, filmVideos } from "./unlock";
 
 export type { Quality } from "./files";
-
-interface NetInfo {
-  saveData?: boolean;
-  effectiveType?: string;
-}
-
-/** Réglages de mise au point (développement et `?mock=1`) : `?film=gesture|missing|nocodec`. */
-function debugFlag(): string | null {
-  if (!(import.meta.env.DEV || isMock())) return null;
-  try {
-    return new URLSearchParams(window.location.search).get("film");
-  } catch {
-    return null;
-  }
-}
-
-/** 540p si l'économiseur de données est mis, ou si la connexion annoncée est lente. */
-export function filmQuality(): Quality {
-  const c = (navigator as Navigator & { connection?: NetInfo }).connection;
-  if (c?.saveData) return "540";
-  if (c?.effectiveType && /^(slow-2g|2g|3g)$/.test(c.effectiveType)) return "540";
-  return "720";
-}
-
-export function filmUrl(id: FileId, q: Quality): string {
-  // `?film=missing` : un fichier absent (404), pour vérifier le repli (la fiche sans révélation).
-  return debugFlag() === "missing" ? `/film/absent-${id}-${q}.mp4` : filmFileUrl(id, q);
-}
-
-/** H.264 profil Main : sinon le film ne se lit pas et la fiche sort sans révélation. */
-export function canPlayFilm(): boolean {
-  if (debugFlag() === "nocodec") return false;
-  try {
-    return document.createElement("video").canPlayType('video/mp4; codecs="avc1.4D401F"') !== "";
-  } catch {
-    return false;
-  }
-}
-
-const blobs = new Map<string, Promise<string>>();
-let bytes = 0;
-
-/** Un fichier chargé en entier, une fois pour la page : son adresse blob. */
-function fetchBlob(url: string): Promise<string> {
-  let p = blobs.get(url);
-  if (!p) {
-    p = fetch(url, { priority: "low" } as RequestInit).then(async (r) => {
-      // une page HTML servie à la place (repli d'une application) n'est pas un film
-      const type = r.headers.get("content-type") ?? "";
-      if (!r.ok || /text\/html/i.test(type)) throw new Error(`film ${r.status} ${url}`);
-      const blob = await r.blob();
-      bytes += blob.size;
-      return URL.createObjectURL(blob.type.startsWith("video/") ? blob : new Blob([blob], { type: "video/mp4" }));
-    });
-    blobs.set(url, p);
-    // un échec se retente à la fiche suivante
-    p.catch(() => blobs.delete(url));
-  }
-  return p;
-}
-
-/**
- * Dès l'attente (§5.4) : la poursuite puis la fin, en basse priorité. Avec le
- * niveau (la fiche est prête) : la fin à six étoiles si elle en a six.
- */
-export function preloadFilm(level?: number): void {
-  if (!canPlayFilm()) return;
-  const q = filmQuality();
-  void fetchBlob(filmUrl("poursuite", q))
-    .then(() => fetchBlob(filmUrl(level === 6 ? "fin6" : "fin", q)))
-    .catch(() => undefined);
-}
+export { canPlayFilm, preloadFilm } from "./loader";
 
 export interface FilmStats {
   /** Images perdues par le décodeur (getVideoPlaybackQuality), les deux balises. */
@@ -167,7 +97,7 @@ const twoFrames = () => new Promise<void>((r) => requestAnimationFrame(() => req
 
 export function createFilmPlayer({ plan, host, cover, onTime }: Options): FilmPlayer {
   const [a, b] = filmVideos() as [FrameVideo, FrameVideo];
-  const q = filmQuality();
+  let q: Quality = filmVariant();
   const rvfc = typeof a.requestVideoFrameCallback === "function";
   const simulateRefusal = debugFlag() === "gesture";
   const unlocksAtStart = filmUnlocks();
@@ -376,7 +306,9 @@ export function createFilmPlayer({ plan, host, cover, onTime }: Options): FilmPl
   return {
     async prepare() {
       if (!canPlayFilm()) throw new Error("film: H.264 illisible");
-      const [srcA, srcB] = await Promise.all([fetchBlob(filmUrl("poursuite", q)), fetchBlob(filmUrl(plan.ending, q))]);
+      const loaded = await loadFilmFiles(["poursuite", plan.ending]);
+      const [srcA, srcB] = loaded.urls;
+      q = loaded.quality;
       if (disposed) throw new Error("film: abandonné");
       for (const [v, src] of [[a, srcA], [b, srcB]] as const) {
         if (v.getAttribute("src") !== src) {
@@ -460,7 +392,7 @@ export function createFilmPlayer({ plan, host, cover, onTime }: Options): FilmPl
         dropped += s?.droppedVideoFrames ?? 0;
         decoded += s?.totalVideoFrames ?? 0;
       }
-      return { dropped, decoded, skipped, leaked, switchMs, startMs, bytes, quality: q, frameCallbacks: rvfc, t: time() };
+      return { dropped, decoded, skipped, leaked, switchMs, startMs, bytes: filmNet().bytes, quality: q, frameCallbacks: rvfc, t: time() };
     },
     dispose() {
       disposed = true;
