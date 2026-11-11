@@ -10,13 +10,13 @@
 // une note que le code ne montre pas encore est « pas encore prouvée », jamais
 // « volée ». Épicène : « de @x », « son code » (le possessif s'accorde avec le nom).
 
+import { declaredLabel } from "./caseFile";
 import type { ComparisonData, Lang } from "./types";
-import { declaredOf } from "./types";
 
 type Cmp = Pick<ComparisonData, "cv" | "github" | "declaredSource">;
 
-/** « LinkedIn » ou « CV », selon ce que la fiche déclarative a lu (§18.24). */
-export const declaredLabel = (cmp: Pick<ComparisonData, "declaredSource">): string => (declaredOf(cmp) === "linkedin" ? "LinkedIn" : "CV");
+/** « LinkedIn » ou « CV » : défini avec la fiche du dossier (shared/caseFile.ts). */
+export { declaredLabel };
 
 const pts: Record<Lang, (n: number) => string> = {
   fr: (n) => `${n}\u00a0${n > 1 ? "points" : "point"}`,

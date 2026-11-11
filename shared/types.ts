@@ -22,6 +22,9 @@ export type Source = "github" | "cv";
 /** Ce qui déclare, face au GitHub qui prouve : un CV en PDF, ou le profil LinkedIn (§18.24). */
 export type DeclaredSource = "cv" | "linkedin";
 
+/** Une pièce d'un dossier (SPEC §18.36) : ce qui déclare le parcours, et GitHub. */
+export type Piece = DeclaredSource | "github";
+
 /** Source déclarative d'une carte ou d'une comparaison : « cv » si rien n'est dit. */
 export function declaredOf(x: { declaredSource?: DeclaredSource } | null | undefined): DeclaredSource {
   return x?.declaredSource === "linkedin" ? "linkedin" : "cv";
@@ -217,9 +220,18 @@ export interface CardData {
    * revendiqué. Sa note ne se dit pas dans l'aperçu de lien ni le texte de partage.
    */
   sealed?: boolean;
+  /**
+   * La fiche d'un dossier à deux pièces (shared/caseFile.ts) : ses pièces, la déclarative
+   * d'abord (« Pièces au dossier : LinkedIn · GitHub »). Absent d'une fiche à une seule pièce.
+   */
+  pieces?: Piece[];
 }
 
-/** Comparaison CV contre GitHub (§6.5). */
+/**
+ * Un dossier à deux pièces (§18.36) : la pièce déclarative (CV ou LinkedIn) et la pièce
+ * GitHub, une seule note. Le nom interne reste « comparaison ». Il s'affiche comme une
+ * fiche seule, la fiche du dossier (shared/caseFile.ts).
+ */
 export interface ComparisonData {
   id: string;
   createdAt: string;
@@ -233,6 +245,11 @@ export interface ComparisonData {
   headline: Fact;
   /** La note du dossier : chaque critère pris sur sa source de preuve. Absente des comparaisons d'avant 0.4.0. */
   grid?: Grid;
+  /**
+   * La fiche du dossier, attachée par la vue publique (shared/publicView.ts) avant que la
+   * grille ne parte : un dossier fait par un tiers garde sa note. Absente : `caseCard` la calcule.
+   */
+  file?: CardData;
 }
 
 /** Rang d'une fiche GitHub dans le top de sa semaine (§18.22). Absent : hors classement. */

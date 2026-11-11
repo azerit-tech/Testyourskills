@@ -13,8 +13,11 @@
 //   d'école ni d'employeur ; « ce qui manque » (il s'adresse à la personne) ne part pas.
 // - Une fiche faite par un tiers (dénoncée) et pas encore revendiquée : pas de
 //   grille du tout. Le jeu reste ; la grille s'ouvre quand la personne revendique.
+// - Un dossier à deux pièces part avec sa fiche (shared/caseFile.ts), faite avant
+//   que la grille du dossier ne parte : un dossier fait par un tiers garde sa note.
 // Idempotent : appliqué deux fois, le même résultat.
 
+import { caseCard } from "./caseFile";
 import type { CardData, ComparisonData, CriterionCode, Fact, Grid, GridCriterion } from "./types";
 
 const f = (fr: string, en: string): Fact => ({ fr, en });
@@ -112,7 +115,9 @@ export function publicView<T extends CardData | ComparisonData>(data: T, o: View
   if ("cv" in data && "github" in data) {
     const cmp = data as ComparisonData;
     const { grid, ...rest } = cmp;
-    const out: ComparisonData = { ...rest, cv: publicCard(cmp.cv, o), github: publicCard(cmp.github, o) };
+    // La fiche du dossier se fait sur la grille entière, puis passe comme une fiche.
+    const file = publicCard(cmp.file ?? caseCard(cmp), o);
+    const out: ComparisonData = { ...rest, cv: publicCard(cmp.cv, o), github: publicCard(cmp.github, o), file };
     if (grid && !o.thirdParty) out.grid = publicGrid(grid);
     return out as T;
   }
