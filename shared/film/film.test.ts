@@ -245,7 +245,7 @@ describe("radioLines", () => {
     expect(fr.beats).toHaveLength(6);
     expect(fr.beats[0]).toContain("Backend");
     expect(fr.beats[1]).toContain("Python");
-    expect(fr.beats[3]).toContain("Doctolib");
+    expect(fr.beats[3]).toContain("Pharelune Santé");
     expect(fr.beats[4]).toContain(FIXTURES.silver.profile!.label.fr);
     expect(radioLines({ ...FIXTURES.silver, club: null }, "en").beats[3]).toContain("Lone wolf");
     for (const l of [...fr.beats, fr.end]) expect(l.length).toBeGreaterThan(0);
