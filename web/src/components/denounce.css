@@ -135,18 +135,6 @@
   justify-self: start;
 }
 
-/* la phrase sous le nom : « est dans le viseur ★★★★ · Profil » */
-.wanted-verb {
-  font: 500 17px/1 var(--f-text);
-  color: var(--lilac);
-}
-.wanted-level {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 12px;
-}
-
 /* la ligne de comparaison, dans « Et toi ? » */
 .you .versus-line {
   font: 700 26px/1.05 var(--f-name);
@@ -161,9 +149,6 @@
 @media (min-width: 900px) {
   .denounced-title {
     font-size: 40px;
-  }
-  .wanted-verb {
-    font-size: 22px;
   }
   .you .versus-line {
     font-size: 32px;

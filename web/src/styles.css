@@ -333,9 +333,6 @@ svg {
 .pill-peach {
   background: var(--peach);
 }
-.pill-lime {
-  background: var(--lime);
-}
 .pill-ghost {
   background: transparent;
   color: var(--lilac);
