@@ -2071,7 +2071,9 @@ def build():
 
     # --- la brume d'après la pluie
     haze_m, HN, hout = material("haze")
-    vol = HN.new("ShaderNodeVolumePrincipled", Color=lin("#b8b4d8"), Density=0.0015, Anisotropy=0.45)
+    # (0,0006 : la brume est réelle depuis que les normales de sa boîte sortent, la caméra dedans ; à 0,0015 l'avenue
+    # sortirait noyée. Non vérifié à l'image depuis la correction des normales.)
+    vol = HN.new("ShaderNodeVolumePrincipled", Color=lin("#b8b4d8"), Density=0.0006, Anisotropy=0.45)
     HN.link(vol.outputs[0], hout.inputs["Volume"])
     haze = box("haze", -60, 60, -10, 480, -0.1, 40, haze_m)
     # box() tourne les faces vers l'intérieur : Cycles croirait la caméra hors de la brume (lieux.haze, même cure)
