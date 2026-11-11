@@ -294,6 +294,8 @@ function buildComparison(id: string, job: MockJob | null, mg: MockGrids, linkedi
   const grids = mg.comparisonGridsMock(linkedin ? "LinkedIn" : "CV", cmp.github.login ?? "dev", linkedin ? (job?.linkedin ?? MOCK_LINKEDIN) : undefined, emptyGithub);
   cmp = { ...cmp, cv: graded(cmp.cv, grids.cv), github: graded(cmp.github, grids.github), grid: grids.grid };
   if (linkedin) cmp = asLinkedinComparison(cmp);
+  // Un login tapé en démo, inconnu des fixtures : rien ne relie ce GitHub au LinkedIn (§18.24), comme le serveur le dirait.
+  if (linkedin && login && !BY_LOGIN[login.toLowerCase()]) cmp = { ...cmp, linkUnproven: true };
   if (photos.has(id)) {
     cmp.cv = { ...cmp.cv, avatarUrl: MOCK_PHOTO };
     cmp.github = { ...cmp.github, avatarUrl: MOCK_PHOTO };

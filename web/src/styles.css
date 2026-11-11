@@ -1645,6 +1645,44 @@ button.cover-panel:focus-visible {
   display: flex;
   justify-content: center;
 }
+/* Un dossier à deux pièces (§18.36) : une seule fiche, ses pièces dessous, en petites capitales. */
+.single-stage:has(.pieces) {
+  flex-direction: column;
+  align-items: center;
+}
+.pieces {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px;
+  text-align: center;
+  animation: pieces-in 0.5s ease both;
+}
+.pieces-line {
+  margin: 0;
+  font: 600 11px/1.3 var(--f-text);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--lilac-2);
+}
+.pieces-note {
+  margin: 0;
+  font: 500 11px/1.3 var(--f-text);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lilac-dim);
+}
+@keyframes pieces-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pieces {
+    animation: none;
+  }
+}
 
 /* la scène 3D : un canvas plein écran derrière la fiche */
 .walkout-canvas {

@@ -1,4 +1,5 @@
 // Client de l'API. En mode démo (?mock=1 ou VITE_MOCK=1), tout passe par mock.ts.
+import { fileOf } from "../../../shared/caseFile";
 import { IMAGE_QUERY } from "../../../shared/images";
 import type { CardData, JobState, Lang, WeekRank, WeekTop } from "../../../shared/types";
 import { mockApi } from "./mock";
@@ -270,7 +271,8 @@ export function isMine(id: string): boolean {
 async function getJob(id: string): Promise<JobState> {
   const job = await fetchJob(id);
   if (job.state === "done") {
-    const main = job.kind === "card" ? job.card : job.comparison.github;
+    // Un dossier à deux pièces : sa fiche, sa note (shared/caseFile.ts).
+    const main = job.kind === "card" ? job.card : fileOf(job.comparison);
     const week = isMock() ? mockWeekRank(main) : job.week;
     if (week) weeks.set(id, week);
     else weeks.delete(id);

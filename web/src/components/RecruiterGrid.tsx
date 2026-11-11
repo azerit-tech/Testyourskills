@@ -14,7 +14,7 @@ import type { DeclaredSource, Grid, GridCriterion } from "../../../shared/types"
 import { RECRUITER_ORDER } from "../../../shared/recruiterLine";
 import { declaredOf } from "../../../shared/types";
 import { pick, useT, type Dict } from "../i18n";
-import { crossChecks, finalLines, GRID_WEIGHTS, hasColumns, keptFrom, levelTable, reachedRow, rowText, stateTags } from "../lib/grid";
+import { finalLines, GRID_WEIGHTS, keptFrom, levelTable, reachedRow, rowText, stateTags } from "../lib/grid";
 import type { Shareable } from "./After";
 
 type G = Dict["grid"];
@@ -161,45 +161,6 @@ function Row({ c, grid, declared, shared, columns, skipFlags }: RowProps) {
   );
 }
 
-/** Les recoupements, en tête d'une comparaison : ce que les deux sources disent du même critère, et ce que le recoupement a relevé. */
-function CrossChecks({ grid, declared, shared }: { grid: Grid; declared: DeclaredSource; shared: boolean }) {
-  const { t, lang } = useT();
-  const g = t.grid;
-  const C = g.compare;
-  // Page partagée : seulement les recoupements qui jouent pour la personne.
-  const checks = crossChecks(grid, shared);
-  const flags = grid.criteria.find((c) => c.code === "STK")?.flags.map((f) => pick(f, lang)).filter(Boolean) ?? [];
-  if (!checks.length && !flags.length) return null;
-  const decl = declared === "cv" ? C.cols.cv : C.cols.linkedin;
-  return (
-    <div className="rg-cross">
-      <h3 className="rg-cross-title">{C.crossTitle}</h3>
-      <p className="rg-cross-lead">{C.crossLead}</p>
-      {checks.length > 0 && (
-        <ul className="rg-cross-list">
-          {checks.map((x) => (
-            <li key={x.code} className={`is-${x.verdict}`}>
-              <span className="rg-cross-name">{g.names[x.code]}</span>
-              <span className="rg-cross-pair">{C.pair(decl, String(x.declared), C.cols.github, String(x.proven))}</span>
-              <span className="rg-cross-verdict">{C.verdict[x.verdict]}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-      {flags.length > 0 && (
-        <>
-          <p className="rg-cross-sub">{C.flagsTitle}</p>
-          <ul className="rg-cross-flags">
-            {flags.map((f) => (
-              <li key={f}>{f}</li>
-            ))}
-          </ul>
-        </>
-      )}
-    </div>
-  );
-}
-
 /**
  * La note sur 100 : la formule, la moyenne, la règle qui a joué, ce qui sort de
  * la moyenne. `unproven` : la note du dossier face à un GitHub « dossier vide »,
@@ -252,7 +213,8 @@ export function RecruiterGrid({ item, shared, who }: Props) {
   const g = t.grid;
   // Une fiche GitHub seule parle de LinkedIn, la porte par défaut (§18.30) ; une fiche ou une comparaison déclarative, de sa source.
   const declared = item.kind === "card" && item.card.source === "github" ? "linkedin" : declaredOf(item.kind === "card" ? item.card : item.comparison);
-  const columns = item.kind === "comparison" && hasColumns(grid);
+  // Un dossier, une note (§18.36) : plus de colonnes « LinkedIn · GitHub · Retenu », une note par critère.
+  const columns = false;
   const byCode = new Map(grid.criteria.map((c) => [c.code, c]));
   const method = shared ? g.methodThem : g.method;
   // Ce que la fiche a lu : le parcours (LinkedIn ou CV) et le code (GitHub).
@@ -270,7 +232,6 @@ export function RecruiterGrid({ item, shared, who }: Props) {
         <li>{code ? method.code : method.noCode}</li>
         <li>{career && code ? method.check : method.piece}</li>
       </ol>
-      {columns && <CrossChecks grid={grid} declared={declared} shared={shared} />}
       <ol className={`rg-list${columns ? " has-cols" : ""}`} aria-label={g.criteriaLabel}>
         {RECRUITER_ORDER.map((code) => {
           const c = byCode.get(code);

@@ -4,6 +4,7 @@
 // révélation de l'autre. L'attente reste dans le bloc.
 import { useEffect, useId, useRef, useState } from "react";
 import type { FormEvent } from "react";
+import { fileOf } from "../../../shared/caseFile";
 import { starsLine } from "../../../shared/stars";
 import type { CardData, Lang } from "../../../shared/types";
 import { LEVEL_LABELS, starsFor } from "../../../shared/types";
@@ -45,7 +46,8 @@ async function waitCard(id: string): Promise<CardData> {
   while (Date.now() < end) {
     try {
       const job = await api.getJob(id);
-      if (job.state === "done") return job.kind === "card" ? job.card : job.comparison.github;
+      // Un dossier à deux pièces : sa fiche, son adresse, sa note (§18.36).
+      if (job.state === "done") return job.kind === "card" ? job.card : fileOf(job.comparison);
       if (job.state === "error") throw new ApiError(0, job.code, job.message);
     } catch (err) {
       // Réseau capricieux : on retente ; une vraie réponse d'erreur s'arrête là.

@@ -3,7 +3,8 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { CardData } from "../../../shared/types";
+import { fileOf } from "../../../shared/caseFile";
+import type { CardData, ComparisonData } from "../../../shared/types";
 import { FIXTURE_COMPARISON, FIXTURES } from "../../../shared/fixtures";
 import { tileOrder } from "../../../shared/recruiterLine";
 import { DICTS } from "../i18n";
@@ -177,9 +178,10 @@ describe("le ciel de la page (§18.29)", () => {
     expect(html).toContain('<div class="card-sky sky-dark" aria-hidden="true"><img src="/profiles/default.jpg"');
   });
 
-  it("comparaison : un ciel plus haut, sous son titre", () => {
+  it("dossier à deux pièces : le même ciel qu'une fiche seule", () => {
     const html = renderResult({ kind: "comparison", comparison: FIXTURE_COMPARISON }, { owner: true });
-    expect(html).toMatch(/<div class="card-sky sky-(light|dark) is-tall"/);
+    expect(html).toMatch(/<div class="card-sky sky-(light|dark)" aria-hidden="true">/);
+    expect(html).not.toContain("is-tall");
   });
 });
 
@@ -201,46 +203,46 @@ describe("bloc recruteur", () => {
   });
 });
 
-describe("comparaison GitHub contre CV ou LinkedIn", () => {
-  const cmp = (login = FIXTURES.gold.login, declaredSource?: "linkedin"): Shareable => ({
-    kind: "comparison",
-    comparison: { ...FIXTURE_COMPARISON, ...(declaredSource ? { declaredSource } : {}), github: { ...FIXTURE_COMPARISON.github, login } },
-  });
-  const n = Math.abs(FIXTURE_COMPARISON.cv.overall - FIXTURE_COMPARISON.github.overall);
-  const textOf = (html: string, re: RegExp) => (re.exec(html)?.[0] ?? "").replace(/<[^>]+>/g, "");
+describe("un dossier, une fiche, une note (§18.36)", () => {
+  const cmp = (over: Partial<ComparisonData> = {}): Shareable => ({ kind: "comparison", comparison: { ...FIXTURE_COMPARISON, ...over } });
+  const file = fileOf(FIXTURE_COMPARISON);
+  const textOf = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/&#x27;/g, "'").replace(/\s+/g, " ");
+  // Ce que la page ne dit plus : une pièce contre l'autre.
+  const VERSUS = /sous-vend|annonce \d|en montre plus|undersell|claims \d|shows more/i;
 
-  it("visiteur : un seul h1, le titre de l'écart parle de @login à la troisième personne", () => {
-    const html = renderResult(cmp(), { owner: false });
-    expect(html.match(/<h1/g)).toHaveLength(1);
-    const head = textOf(html, /<h2 class="cmp-headline[^"]*">.*?<\/h2>/);
-    expect(head).toContain(`@${FIXTURES.gold.login}`);
-    expect(head).toContain(String(n));
-    expect(head).not.toMatch(/\b(ton|ta|tes|toi)\b/i);
-    expect(html).toContain("Son parcours, lu sur son CV");
-    expect(html).toContain("Son code, lu sur GitHub");
-    expect(html).not.toMatch(/Ton (parcours|code), lu/);
-  });
-
-  it("visiteur, LinkedIn, en anglais : « their », jamais « your »", () => {
-    const html = renderResult(cmp(FIXTURES.gold.login, "linkedin"), { owner: false, lang: "en-US" });
-    const head = textOf(html, /<h2 class="cmp-headline[^"]*">.*?<\/h2>/);
-    expect(head.replace(/&#x27;/g, "'")).toMatch(new RegExp(`^@${FIXTURES.gold.login}'s (LinkedIn|code) .* their `));
-    expect(html).toContain("Their career, read on LinkedIn");
-    expect(html).not.toMatch(/Your (career|code), read/);
+  it("pour le visiteur comme pour qui l'a fait, en français comme en anglais : un h1, une fiche, une note, ses pièces dessous", () => {
+    for (const owner of [false, true])
+      for (const lang of ["fr-FR", "en-US"]) {
+        const html = renderResult(cmp({ id: `Dossier${owner ? 1 : 0}${lang.slice(0, 2)}`, declaredSource: "linkedin" }), { owner, lang });
+        expect(html.match(/<h1/g)).toHaveLength(1);
+        expect(html.match(/class="tys-card /g)).toHaveLength(1);
+        expect(html.match(new RegExp(`>${file.overall}<`, "g"))).toHaveLength(1);
+        expect(html).not.toContain(`>${FIXTURE_COMPARISON.cv.overall}<`);
+        expect(html).not.toMatch(/class="cmp[ -"]/);
+        expect(textOf(html)).not.toMatch(VERSUS);
+        // L'en-tête d'une fiche seule, au-dessus de la fiche ; les pièces dessous.
+        expect(html.indexOf('class="wanted"')).toBeLessThan(html.indexOf('class="result-stage"'));
+        const line = lang === "fr-FR" ? "Pièces au dossier\u00a0: LinkedIn · GitHub" : "Exhibits on file: LinkedIn · GitHub";
+        expect(html).toContain(`<p class="pieces-line">${line}</p>`);
+        expect(html.indexOf('class="pieces"')).toBeGreaterThan(html.indexOf('class="tys-card '));
+      }
   });
 
-  it("les chiffres d'un pseudo ne passent pas en couleur, seul l'écart", () => {
-    const html = renderResult(cmp("dev42"), { owner: false });
-    const head = /<h2 class="cmp-headline[^"]*">.*?<\/h2>/.exec(html)?.[0] ?? "";
-    expect(head.match(/<em>(\d+)<\/em>/g)).toEqual([`<em>${n}</em>`]);
-    expect(head).toContain("<span>@dev42</span>");
+  it("un CV au dossier : « CV · GitHub » ; le lien non prouvé et le code à prouver sur leur ligne", () => {
+    expect(renderResult(cmp({ id: "DossierCv01" }), { owner: true })).toContain("Pièces au dossier\u00a0: CV · GitHub");
+    const unproven = renderResult(cmp({ id: "DossierLi01", declaredSource: "linkedin", linkUnproven: true }), { owner: false });
+    expect(unproven).toContain('<p class="pieces-note">Lien entre les deux pièces\u00a0: à confirmer</p>');
+    expect(unproven).not.toContain("Code à prouver");
+    const empty = renderResult(cmp({ id: "DossierEm01", github: { ...FIXTURE_COMPARISON.github, sealed: true } }), { owner: false });
+    expect(empty).toContain('<p class="pieces-note">Code à prouver</p>');
   });
 
-  it("qui a fait la fiche : le titre du serveur, tutoyé, en h1", () => {
-    const html = renderResult(cmp(), { owner: true });
-    expect(html.match(/<h1/g)).toHaveLength(1);
-    expect(textOf(html, /<h1 class="cmp-headline[^"]*">.*?<\/h1>/)).toBe(FIXTURE_COMPARISON.headline.fr);
-    expect(html).toContain("Ton parcours, lu sur ton CV");
+  it("un dossier scellé ne dit sa note ni au lecteur d'écran, ni dans le duel", () => {
+    const sealed: CardData = { ...file, sealed: true };
+    const html = renderResult(cmp({ id: "DossierSeal1", file: sealed }), { owner: false });
+    expect(html).toContain("Dossier scellé\u00a0: le code reste à prouver.");
+    expect(html).not.toMatch(/note \d+\./);
+    expect(html).not.toContain('class="versus-line"');
   });
 });
 

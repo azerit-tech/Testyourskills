@@ -134,6 +134,27 @@ describe("texte de partage avec la grille de recrutement (§18.37)", () => {
   });
 });
 
+describe("un dossier à deux pièces se partage comme une fiche (§18.36)", () => {
+  const dossier: CardShare = { ...card, overall: 57, stars: 3, profile: "Oiseau de nuit", rank: null, finding: null, status: null, graded: true, strong: "Point fort : niveau du code, 8/10.", exhibits: "LinkedIn" };
+
+  it("une note, le point fort, puis ses deux pièces ; jamais l'une contre l'autre", () => {
+    expect(shareLead(fr, dossier)).toBe(
+      "Mon dossier, passé à la grille de recrutement d'Azerit : ★★★☆☆☆, 57 · Oiseau de nuit. Point fort : niveau du code, 8/10. Deux pièces au dossier : LinkedIn et GitHub. Fais la tienne :",
+    );
+    expect(shareLead(en, { ...dossier, profile: "Night owl", strong: "Strong point: code level, 8/10.", exhibits: "CV" })).toBe(
+      "My file, run through Azerit's hiring grid: ★★★☆☆☆, 57 · Night owl. Strong point: code level, 8/10. Two exhibits on file: CV and GitHub. Make yours:",
+    );
+    for (const w of [fr, en]) expect(shareLead(w, dossier)).not.toMatch(/sous-vend|annonce \d|en montre plus|undersell|claims \d|shows more/i);
+  });
+
+  it("une fiche seule ne dit pas de pièces ; pour X, les pièces partent en premier", () => {
+    expect(shareLead(fr, { ...dossier, exhibits: undefined })).not.toContain("pièces");
+    const long: CardShare = { ...dossier, profile: "Sous couverture", rank: "n° 1 cette semaine", finding: "x".repeat(150) };
+    expect(posted(shareTextX(fr, long))).toBeLessThanOrEqual(X_MAX);
+    expect(shareTextX(fr, long)).not.toContain("Deux pièces");
+  });
+});
+
 describe("dossier vide fait par un tiers, non revendiqué : le partage ne dit pas la note", () => {
   it("ni note, ni étoiles, ni pari, pour une fiche comme pour une comparaison", () => {
     const sealedCard: CardShare = { ...card, overall: 20, stars: 1, plea: 3, sealed: true };

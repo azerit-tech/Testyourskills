@@ -4,7 +4,7 @@ import type { FormEvent, ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { CardData, ComparisonData, Lang, WeekRank } from "../../../shared/types";
 import { declaredOf, STAT_CODES, starsFor } from "../../../shared/types";
-import { myVerdict } from "../../../shared/compareText";
+import { declaredLabel, fileOf } from "../../../shared/caseFile";
 import { usableGrid } from "../../../shared/gridText";
 import { recruiterRead } from "../../../shared/recruiterLine";
 import { pick, useT } from "../i18n";
@@ -127,43 +127,25 @@ function bestStatus(card: CardData, lang: Lang): string | null {
 /** Ce que le texte de partage dit d'une fiche (lib/shareText.ts) ; le pari vient de ce navigateur. */
 export function shareInput(item: Shareable, lang: Lang, rank: string | null): ShareInput {
   const plea = getPlea(idOf(item));
-  if (item.kind === "card") {
-    const c = item.card;
-    const graded = usableGrid(c.grid);
-    return {
-      kind: "card",
-      stars: starsFor(c.overall),
-      overall: c.overall,
-      sealed: !!c.sealed,
-      graded,
-      // « Point fort : niveau du code, 8/10. » : la ligne du recruteur, jamais l'école.
-      strong: graded ? (recruiterRead(c, c.grid, lang)?.strong ?? null) : null,
-      profile: c.profile ? pick(c.profile.label, lang) : null,
-      // La trouvaille la plus forte (§18.26) prend la place du chef d'accusation.
-      finding: c.findings?.[0] ? pick(c.findings[0].text, lang) : null,
-      status: bestStatus(c, lang),
-      secs: c.judgedInSeconds,
-      rank,
-      plea,
-    };
-  }
-  const cmp = item.comparison;
-  // Le profil de la fiche GitHub : après la comparaison, c'est lui qui porte l'écart (Sous couverture).
-  const profile = cmp.github.profile ?? cmp.cv.profile;
-  // La note du dossier et ses étoiles en tête (§18.37) ; une comparaison d'avant la grille garde celles de la fiche GitHub.
-  const kase = usableGrid(cmp.grid) ? cmp.grid.overall : null;
+  // Un dossier à deux pièces se partage comme une fiche : sa fiche, sa note, et ses pièces (§18.36).
+  const c = item.kind === "card" ? item.card : fileOf(item.comparison);
+  const graded = usableGrid(c.grid);
   return {
-    kind: "comparison",
-    sealed: !!cmp.github.sealed,
-    stars: starsFor(kase ?? cmp.github.overall),
-    src: declaredOf(cmp) === "linkedin" ? "LinkedIn" : "CV",
-    declared: cmp.cv.overall,
-    github: cmp.github.overall,
-    case: kase,
-    profile: profile ? pick(profile.label, lang) : null,
-    headline: myVerdict(cmp, lang),
+    kind: "card",
+    stars: starsFor(c.overall),
+    overall: c.overall,
+    sealed: !!c.sealed,
+    graded,
+    // « Point fort : niveau du code, 8/10. » : la ligne du recruteur, jamais l'école.
+    strong: graded ? (recruiterRead(c, c.grid, lang)?.strong ?? null) : null,
+    profile: c.profile ? pick(c.profile.label, lang) : null,
+    // La trouvaille la plus forte (§18.26) prend la place du chef d'accusation.
+    finding: c.findings?.[0] ? pick(c.findings[0].text, lang) : null,
+    status: bestStatus(c, lang),
+    secs: c.judgedInSeconds,
     rank,
     plea,
+    ...(item.kind === "comparison" ? { exhibits: declaredLabel(item.comparison) } : {}),
   };
 }
 
@@ -177,7 +159,8 @@ export function useSharing(item: Shareable, toast: (m: string) => void) {
   // Le rang n'entre dans le texte que pendant sa semaine : « 7e cette semaine ».
   const rank = week && !week.closed ? t.result.week.share(week.rank) : null;
   const input = shareInput(item, lang, rank);
-  const filename = `testyourskills-${item.kind === "card" ? item.card.login ?? item.card.initials : "comparaison"}.png`;
+  const named = item.kind === "card" ? item.card : fileOf(item.comparison);
+  const filename = `testyourskills-${named.login ?? named.initials}.png`;
   // Sur téléphone, « Partager » ouvre la feuille du système. Sans elle (ordinateur, WebView Android), LinkedIn reste devant.
   const native = isTouch() && hasNativeShare();
 

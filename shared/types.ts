@@ -250,6 +250,8 @@ export interface ComparisonData {
    * grille ne parte : un dossier fait par un tiers garde sa note. Absente : `caseCard` la calcule.
    */
   file?: CardData;
+  /** Dossier LinkedIn dont le lien avec le GitHub n'est pas prouvé (§18.24) : « Lien entre les deux pièces : à confirmer ». */
+  linkUnproven?: boolean;
 }
 
 /** Rang d'une fiche GitHub dans le top de sa semaine (§18.22). Absent : hors classement. */

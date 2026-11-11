@@ -11,6 +11,8 @@ const fr = {
     /** Le titre de l'accueil vient de shared/promise.ts, sa seule source. */
     title: homeTitle("fr"),
     titleCard: (name: string, overall: number) => `${name} · ${overall} · Testyourskills`,
+    /** Dossier scellé (shared/publicView.ts) : le titre de l'onglet ne dit pas la note. */
+    titleSealed: (name: string) => `${name} · Testyourskills`,
   },
   common: {
     by: "par",
@@ -165,6 +167,7 @@ const fr = {
     mute: "Couper le son",
     unmute: "Activer le son",
     revealed: (level: string, overall: number) => `Fiche ${level}, note ${overall}.`,
+    revealedSealed: "Dossier scellé\u00a0: le code reste à prouver.",
     fireworks: "Clique ou Espace : feux d'artifice",
     fireworksTouch: "Touche l'écran : feux d'artifice",
     statusLabel: "Statut",
@@ -227,6 +230,12 @@ const fr = {
   result: {
     makeYours: "Fais la tienne",
     yourTurn: "Et toi, sur ces huit critères\u00a0? Ton LinkedIn ou ton GitHub suffit.",
+    /** Sous la fiche d'un dossier à deux pièces (§18.36) : d'où vient la preuve, une seule note. */
+    pieces: {
+      line: (labels: string) => `Pièces au dossier\u00a0: ${labels}`,
+      unproven: "Code à prouver",
+      link: "Lien entre les deux pièces\u00a0: à confirmer",
+    },
     /* en tête d'une fiche partagée (§18.20) */
     wanted: "Avis de recherche",
     wantedStars: (n: number, level: string) => `${n} étoiles sur 6 · ${level}`,
@@ -267,6 +276,8 @@ const fr = {
         pieces: (src: string, declared: number, github: number) => `${src} ${declared}, GitHub ${github}.`,
         /** Dossier vide fait par un tiers : la note attend la personne fichée. */
         sealed: "Un dossier ouvert chez Azerit, le code reste à prouver",
+        /** Un dossier à deux pièces (§18.36) : `src` « LinkedIn » ou « CV ». */
+        exhibits: (src: string) => `Deux pièces au dossier\u00a0: ${src} et GitHub.`,
         cta: "Fais la tienne :",
       },
     },
@@ -782,6 +793,7 @@ const en: Dict = {
   meta: {
     title: homeTitle("en"),
     titleCard: (name, overall) => `${name} · ${overall} · Testyourskills`,
+    titleSealed: (name) => `${name} · Testyourskills`,
   },
   common: {
     by: "by",
@@ -917,6 +929,7 @@ const en: Dict = {
     mute: "Mute",
     unmute: "Unmute",
     revealed: (level, overall) => `${level} sheet, rated ${overall}.`,
+    revealedSealed: "Sealed file: code yet to prove.",
     fireworks: "Click or Space: fireworks",
     fireworksTouch: "Tap the screen: fireworks",
     statusLabel: "Status",
@@ -976,6 +989,11 @@ const en: Dict = {
   result: {
     makeYours: "Make yours",
     yourTurn: "And you, on these eight criteria? Your LinkedIn or your GitHub is enough.",
+    pieces: {
+      line: (labels) => `Exhibits on file: ${labels}`,
+      unproven: "Code yet to prove",
+      link: "Link between the two exhibits: to confirm",
+    },
     wanted: "Wanted",
     wantedStars: (n, level) => `${n} of 6 stars · ${level}`,
     wantedSep: ": ",
@@ -1003,6 +1021,7 @@ const en: Dict = {
         compare: (src, declared, github, stars) => `My ${src}: ${declared}. My GitHub: ${stars ? `${stars}, ` : ""}${github}`,
         pieces: (src, declared, github) => `${src} ${declared}, GitHub ${github}.`,
         sealed: "A file opened at Azerit, the code yet to prove",
+        exhibits: (src) => `Two exhibits on file: ${src} and GitHub.`,
         cta: "Make yours:",
       },
     },

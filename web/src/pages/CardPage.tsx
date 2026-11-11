@@ -1,11 +1,11 @@
 // Route /c/:id : attente, révélation puis résultat pour une carte fraîche ;
 // affichage direct (sans pack) pour un lien partagé.
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { fileOf } from "../../../shared/caseFile";
 import type { CardData, Fact, Finding, JobState, ProgressEvent } from "../../../shared/types";
 import { declaredOf, LEVEL_LABELS, starsFor } from "../../../shared/types";
-import { AddSource, Claim, Contest, DeleteCard, EmailForm, Hiring, LinkedInPhoto, ShareBar, Why, useMe, useToast } from "../components/After";
+import { AddSource, Claim, Contest, DeleteCard, EmailForm, Hiring, LinkedInPhoto, ShareBar, useMe, useToast } from "../components/After";
 import type { Shareable } from "../components/After";
-import { ComparisonStage } from "../components/Comparison";
 import { Denounce } from "../components/Denounce";
 import { EntryForm } from "../components/EntryForm";
 import { ErrorBoundary } from "../components/ErrorBoundary";
@@ -16,6 +16,7 @@ import { PleaVerdict } from "../components/Plea";
 import { RecruiterGrid } from "../components/RecruiterGrid";
 import { RecruiterRead } from "../components/RecruiterRead";
 import { AddLinkedin } from "../components/AddLinkedin";
+import { Pieces } from "../components/Pieces";
 import { Penalty, ProfileSky } from "../components/ProfileTile";
 import { CardViewOptions } from "../card/CardView";
 import { RevealCard, useReveal } from "../components/Reveal";
@@ -167,8 +168,9 @@ export function CardPage({ id }: { id: string }) {
       document.title = t.meta.title;
       return;
     }
-    const c = view.item.kind === "card" ? view.item.card : view.item.comparison.github;
-    document.title = t.meta.titleCard(c.name, c.overall);
+    // Un dossier à deux pièces : sa fiche, sa seule note (§18.36). Scellé : la note ne se dit pas.
+    const c = view.item.kind === "card" ? view.item.card : fileOf(view.item.comparison);
+    document.title = c.sealed ? t.meta.titleSealed(c.name) : t.meta.titleCard(c.name, c.overall);
   }, [view, t]);
 
   // La scène 3D (Three.js et ses assets) se charge dès que la fiche est
@@ -179,7 +181,7 @@ export function CardPage({ id }: { id: string }) {
   useEffect(() => {
     const scene = revealToPlay(revealScene(), reduced);
     if (scene === "film" && view.s === "done" && (fresh || sawPending)) {
-      const main = view.item.kind === "card" ? view.item.card : view.item.comparison.github;
+      const main = view.item.kind === "card" ? view.item.card : fileOf(view.item.comparison);
       loadFilm()
         .then((m) => m.preloadFilm(starsFor(main.overall)))
         .catch(() => undefined);
@@ -207,7 +209,7 @@ export function CardPage({ id }: { id: string }) {
 
   // La photo d'identité : l'avatar du pseudo tapé dès la première seconde ; sinon, fiche prête, sa photo.
   const typed = freshLogin(id);
-  const doneCard = view.s === "done" ? (view.item.kind === "card" ? view.item.card : view.item.comparison.github) : null;
+  const doneCard = view.s === "done" ? (view.item.kind === "card" ? view.item.card : fileOf(view.item.comparison)) : null;
   const w = view.s === "pending" ? view : lastPending.current;
   // L'attente garde la même instance de bout en bout (clé fixe) : la photo, le pari et les pièces restent en place.
   const waiting =
@@ -331,7 +333,8 @@ export interface ResultProps {
 export function Result({ item, animate, start, abort, onScene, owner, fresh, notice, me, onMe, onDeleted }: ResultProps) {
   const { t, lang } = useT();
   const id = item.kind === "card" ? item.card.id : item.comparison.id;
-  const main: CardData = item.kind === "card" ? item.card : item.comparison.github;
+  // Un dossier à deux pièces s'affiche comme une fiche seule : la fiche du dossier, sa note (§18.36).
+  const main: CardData = item.kind === "card" ? item.card : fileOf(item.comparison);
   const [scene] = useState(revealScene);
   // Le film part dès que l'attente se lève : sa première image est déjà à l'écran.
   const { phase, open, skip, handoff, finish, animating, settled } = useReveal(animate, start, scene === "film" ? 0 : undefined);
@@ -415,7 +418,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
     <main className={`page page-card page-result${animating ? " is-animating" : ""}${visitor ? " is-visitor" : ""}`} id="main">
       {/* Le ciel de la page (§18.29) : derrière la barre du haut, une fois la fiche posée. */}
       {/* Le film se pose sur ce ciel : il entre sous le flash, au passage de relais. */}
-      <ProfileSky card={main} shown={settled || (scene === "film" && phase === "handoff")} tall={item.kind === "comparison"} />
+      <ProfileSky card={main} shown={settled || (scene === "film" && phase === "handoff")} />
       {claimed && me?.hidden && (
         <p className="hidden-banner" role="status">
           {t.result.claim.hiddenBanner}
@@ -423,34 +426,30 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
       )}
 
       <div className="result-top">
-        {/* L'en-tête posé sur le ciel, puis la fiche entière au-dessus de la ligne de flottaison (§18.7, §18.29).
-            Comparaison de qui l'a faite : son titre tient déjà ce rôle. */}
-        {(visitor || item.kind === "card") && <WantedHead card={main} />}
+        {/* L'en-tête posé sur le ciel, puis la fiche entière au-dessus de la ligne de flottaison (§18.7, §18.29). */}
+        <WantedHead card={main} />
 
         {animating && (
           // Morceau 3D introuvable : même repli que sans WebGL, la fiche sort sans révélation.
           <ErrorBoundary fallback={null} onError={finish}>
             <Suspense fallback={null}>
               {scene === "film" ? (
-                <Film card={main} lang={lang} double={item.kind === "comparison"} phase={phase} onReady={() => onScene("ready")} onGesture={() => onScene("gesture")} onHandoff={handoff} onDone={finish} onTap={onStageClick} />
+                <Film card={main} lang={lang} double={false} phase={phase} onReady={() => onScene("ready")} onGesture={() => onScene("gesture")} onHandoff={handoff} onDone={finish} onTap={onStageClick} />
               ) : (
-                <Walkout3D card={main} lang={lang} double={item.kind === "comparison"} declared={declaredOf(item.kind === "comparison" ? item.comparison : item.card)} phase={phase} anchorRef={stageRef} controlRef={walkoutCtl} onReady={() => onScene("ready")} onHandoff={handoff} onDone={finish} />
+                <Walkout3D card={main} lang={lang} double={false} declared={declaredOf(item.kind === "comparison" ? item.comparison : item.card)} phase={phase} anchorRef={stageRef} controlRef={walkoutCtl} onReady={() => onScene("ready")} onHandoff={handoff} onDone={finish} />
               )}
             </Suspense>
           </ErrorBoundary>
         )}
         <section ref={stageRef} className="result-stage" onClick={animating ? onStageClick : undefined}>
-          {item.kind === "card" ? (
-            <div className="single-stage">
-              {/* La fiche se retourne (§18.27). Les étoiles ne s'allument ici que sans révélation 3D : sinon elles se rallumeraient sur la carte posée. */}
-              <CardViewOptions.Provider value={{ flippable: true, starsIntro: !animate }}>
-                <RevealCard card={item.card} lang={lang} phase={phase} idPrefix="result" />
-              </CardViewOptions.Provider>
-            </div>
-          ) : (
-            // Le visiteur n'est pas la personne fichée : la comparaison parle d'elle, pas à lui.
-            <ComparisonStage cmp={item.comparison} phase={phase} who={visitor ? (main.login ? `@${main.login}` : main.name) : null} />
-          )}
+          <div className="single-stage">
+            {/* La fiche se retourne (§18.27). Les étoiles ne s'allument ici que sans révélation 3D : sinon elles se rallumeraient sur la carte posée. */}
+            {/* Un dossier à deux pièces : une seule fiche, et ses pièces dessous (§18.36). */}
+            <CardViewOptions.Provider value={{ flippable: true, starsIntro: !animate }}>
+              <RevealCard card={main} lang={lang} phase={phase} idPrefix="result" />
+            </CardViewOptions.Provider>
+            {item.kind === "comparison" && settled && <Pieces cmp={item.comparison} />}
+          </div>
           {animating && phase !== "ready" && (
             <button
               type="button"
@@ -464,7 +463,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
             </button>
           )}
           <p className="sr-only" aria-live="polite">
-            {settled ? t.reveal.revealed(LEVEL_LABELS[starsFor(main.overall)][lang], main.overall) : ""}
+            {settled ? (main.sealed ? t.reveal.revealedSealed : t.reveal.revealed(LEVEL_LABELS[starsFor(main.overall)][lang], main.overall)) : ""}
           </p>
         </section>
 
@@ -486,7 +485,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
               <h2 id="you-title">{t.denounce.andYou}</h2>
               {other ? (
                 <>
-                  <p className="versus-line">{versusLine(t.denounce, other, main)}</p>
+                  {/* Dossier scellé : sa note ne se dit pas, même face à la sienne. */}
+                  {!main.sealed && <p className="versus-line">{versusLine(t.denounce, other, main)}</p>}
                   <a className="pill pill-peach" href={`/c/${other.id}`} onClick={(e) => onLinkClick(e, `/c/${other.id}`)}>
                     {t.denounce.mine}
                   </a>
@@ -527,8 +527,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
         {!visitor && item.kind === "card" && item.card.source === "github" && item.card.login && <AddLinkedin login={item.card.login} />}
         <div className="rest">
           {/* La peine est déjà sous la fiche. */}
-          {/* Fiche seule : ses pièces à conviction sont au dos (§18.27). La comparaison garde la ligne. */}
-          {!visitor && item.kind === "comparison" && <Why item={item} withSentence={false} />}
+          {/* Ses pièces à conviction sont au dos de la fiche (§18.27), dossier à deux pièces compris. */}
           {/* Fiche dénoncée : « Appeler mon avocat » est déjà sous la fiche. */}
           {!(wantedYou && claimOn) && <Claim cardId={id} login={cardLogin} lawyer={!owner} me={me} onMe={onMe} toast={toast.show} />}
           {!visitor && <LinkedInPhoto cardId={id} hasAvatar={item.kind === "card" ? !!item.card.avatarUrl : !!item.comparison.cv.avatarUrl} />}

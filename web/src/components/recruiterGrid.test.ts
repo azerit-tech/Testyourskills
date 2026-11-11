@@ -133,6 +133,18 @@ describe("« recoupé » : de la sortie du moteur à l'étiquette affichée", ()
     }
   }
 
+  it("un dossier, une note (§18.36) : ni colonnes « LinkedIn · GitHub · Retenu », ni bloc « Les recoupements »", () => {
+    for (const [lang, dict] of [["fr-FR", DICTS.fr.grid], ["en-US", DICTS.en.grid]] as const)
+      for (const shared of [false, true]) {
+        const html = render(item, shared, lang);
+        expect(html).toContain('<ol class="rg-list"');
+        expect(html).not.toContain("has-cols");
+        expect(html).not.toContain("rg-cross");
+        expect(html).not.toContain(dict.compare.crossTitle);
+        expect(html).not.toContain(`>${dict.compare.cols.kept}<`);
+      }
+  });
+
   it("la page partagée montre le recoupement sans nommer le poste", () => {
     const emp = textOf(rowsOf(render(item, true)).get("Parcours et employeurs")!);
     expect(emp).toContain("LinkedIn : stage ou alternance, février 2025 – novembre 2025. GitHub : un dépôt public de 25 commits, actif sur les mêmes mois. Poste confirmé par le code.");

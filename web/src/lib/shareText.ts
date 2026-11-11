@@ -31,6 +31,8 @@ export interface CardShare extends Common {
   /** Le chef d'accusation, à défaut de trouvaille. */
   status: string | null;
   secs: number;
+  /** Un dossier à deux pièces (§18.36) : « LinkedIn » ou « CV », pour « Deux pièces au dossier : LinkedIn et GitHub. » */
+  exhibits?: string;
 }
 
 export interface ComparisonShare extends Common {
@@ -88,7 +90,9 @@ function build(w: ShareWords, x: ShareInput, cut: Cut): string {
     const tail = `${cut < 5 && x.profile ? ` · ${x.profile}` : ""}${cut < 4 && x.rank ? ` · ${x.rank}` : ""}.`;
     // Fiche notée par la grille (§18.37) : « Mon dossier, passé à la grille de recrutement d'Azerit : ★★★★☆☆, 61. Point fort : … ».
     const head = x.graded ? w.file(stars, x.overall) : stars ? w.sheet(stars, x.overall) : w.score(x.overall);
-    parts.push(head + tail, cut < 3 && x.graded ? (x.strong ?? null) : null, detail, cut < 3 && !x.graded ? w.ai(x.secs) : null);
+    // Les pièces du dossier partent en premier quand la place manque.
+    const exhibits = cut === 0 && x.exhibits ? w.exhibits(x.exhibits) : null;
+    parts.push(head + tail, cut < 3 && x.graded ? (x.strong ?? null) : null, exhibits, detail, cut < 3 && !x.graded ? w.ai(x.secs) : null);
   } else {
     // Pas de trouvaille dans une comparaison (§18.26) : le rang part d'abord, puis le profil, puis le titre de l'écart.
     const tail = `${cut < 2 && x.profile ? ` · ${x.profile}` : ""}${cut < 1 && x.rank ? ` · ${x.rank}` : ""}.`;

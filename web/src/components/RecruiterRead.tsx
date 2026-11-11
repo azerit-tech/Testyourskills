@@ -6,6 +6,7 @@
 // montre sa pièce dessous ; le détail entier reste dans la grille (#grille).
 // Matte : aucun effet, aucune animation.
 import { useId, useState } from "react";
+import { fileOf } from "../../../shared/caseFile";
 import { usableGrid } from "../../../shared/gridText";
 import { publicGrid } from "../../../shared/publicView";
 import { recruiterRead, tileOrder } from "../../../shared/recruiterLine";
@@ -42,8 +43,8 @@ export function RecruiterRead({ item, shared, who }: Props) {
   if (!usableGrid(raw)) return null;
   const grid: Grid = shared ? publicGrid(raw) : raw;
   const R = t.read;
-  // Le métier et le langage viennent de la fiche GitHub d'une comparaison, la grille de son dossier.
-  const card = item.kind === "card" ? item.card : item.comparison.github;
+  // Le métier et le langage viennent de la fiche du dossier (shared/caseFile.ts), la grille aussi.
+  const card = item.kind === "card" ? item.card : fileOf(item.comparison);
   const read = recruiterRead(card, grid, lang);
   const { scored, pending } = tileOrder(grid);
   const declared = item.kind === "card" && item.card.source === "github" ? "linkedin" : declaredOf(item.kind === "card" ? item.card : item.comparison);
