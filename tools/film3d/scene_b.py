@@ -1045,6 +1045,13 @@ def haze(name, x0, x1, y0, y1, z0, z1, density, color="#b8b4d8", aniso=0.45, sof
         N.link(N.math("MULTIPLY", N.math("POWER", gr.outputs["Fac"], 1.5), density), vol.inputs["Density"])
     N.link(vol.outputs[0], out.inputs["Volume"])
     ob = A.box(name, x0, x1, y0, y1, z0, z1, m)
+    # la boîte de scene_a a ses faces tournées vers l'intérieur : Cycles croirait la caméra hors du volume et ne
+    # poserait la brume qu'au-delà de la boîte, jamais autour d'elle (comme lieux.haze)
+    bm = bmesh.new()
+    bm.from_mesh(ob.data)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(ob.data)
+    bm.free()
     ob.visible_shadow = False
     return ob
 
