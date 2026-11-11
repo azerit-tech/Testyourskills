@@ -433,76 +433,6 @@ def mat_concrete():
     return m
 
 
-def mat_stucco(tint, seed):
-    """Stuc pastel peint, avec coulures de pluie sous les corniches."""
-    m, N, out = material(f"stucco_{seed}")
-    xyz = N.sep(N.new("ShaderNodeTexCoord").outputs["Object"])
-    u = N.math("ADD", xyz[0], xyz[1])
-    vec = N.new("ShaderNodeCombineXYZ")
-    N.link(u, vec.inputs[0])
-    N.link(xyz[2], vec.inputs[1])
-    folder = os.path.join(ASSETS, "beige_wall_001")
-    uvm = N.new("ShaderNodeMapping", Scale=(0.35, 0.35, 0.35))
-    N.link(vec.outputs[0], uvm.inputs[0])
-    diff = image(N, os.path.join(folder, "diff_1k.jpg"), uvm.outputs[0])
-    nor = image(N, os.path.join(folder, "nor_gl_1k.jpg"), uvm.outputs[0], color=False)
-    nmap = N.new("ShaderNodeNormalMap", Strength=0.5)
-    N.link(nor.outputs["Color"], nmap.inputs["Color"])
-    bw = N.new("ShaderNodeRGBToBW")
-    N.link(diff.outputs["Color"], bw.inputs[0])
-    stucco = N.mix(1.0, lin(tint), N.math("MULTIPLY", bw.outputs[0], 1.5), "MULTIPLY")
-    streak = N.new("ShaderNodeTexNoise", Scale=1.0, Detail=4.0)
-    sm = N.new("ShaderNodeMapping", Scale=(3.0, 0.12, 1.0))
-    N.link(vec.outputs[0], sm.inputs[0])
-    N.link(sm.outputs[0], streak.inputs["Vector"])
-    stucco = N.mix(N.math("MULTIPLY", streak.outputs["Factor"], 0.6), stucco, N.mix(1.0, stucco, (0.55, 0.55, 0.6, 1), "MULTIPLY"))
-    p = principled(N, Roughness=0.8)
-    N.link(stucco, p.inputs["Base Color"])
-    N.link(nmap.outputs[0], p.inputs["Normal"])
-    N.link(p.outputs[0], out.inputs[0])
-    return m
-
-
-def mat_rooms(seed, ys, cw):
-    """Le fond des chambres, vu par les fenêtres : chacune sa lampe, sa chaleur, certaines éteintes.
-    Il éclaire pour de vrai l'embrasure (piliers, dalles) autour de lui."""
-    m, N, out = material(f"rooms_{seed}")
-    xyz = N.sep(N.new("ShaderNodeTexCoord").outputs["Object"])
-    y, z = xyz[1], xyz[2]
-    col_i = N.math("FLOOR", N.math("DIVIDE", N.math("SUBTRACT", y, ys), cw))
-    fl = N.math("FLOOR", N.math("DIVIDE", z, 3.2))
-    fy = N.math("FRACT", N.math("DIVIDE", N.math("SUBTRACT", y, ys), cw))
-    fz = N.math("FRACT", N.math("DIVIDE", z, 3.2))
-    cell = N.new("ShaderNodeCombineXYZ")
-    N.link(col_i, cell.inputs[0])
-    N.link(fl, cell.inputs[1])
-    N.set(cell.inputs[2], float(seed) * 1.37)
-    wn = N.new("ShaderNodeTexWhiteNoise", _noise_dimensions="3D")
-    N.link(cell.outputs[0], wn.inputs["Vector"])
-    r1 = wn.outputs["Value"]
-    rgb = N.sep(wn.outputs["Color"])
-    lobby = N.math("LESS_THAN", z, 3.2)
-    lit = N.math("MAXIMUM", N.math("GREATER_THAN", r1, 0.3), lobby)
-    # trois chaleurs de lampe et, rarement, la lueur froide d'un écran
-    warmth = N.ramp(rgb[0], [(0.0, lin("#ff9f45")), (0.45, lin("#ffc47a")), (0.85, lin("#ffe6c0")), (0.93, lin("#a9b8ff"))])
-    # rideau tiré d'un côté, lampe posée plus bas que le plafond
-    curtain = N.math("GREATER_THAN", N.math("ABSOLUTE", N.math("SUBTRACT", fy, rgb[1])), N.math("MULTIPLY", rgb[2], 0.45))
-    curtain = N.mixf(curtain, 0.25, 1.0)
-    lamp = N.math("ADD", 0.35, N.math("MULTIPLY", N.math("SUBTRACT", 1.0, fz), 0.9))
-    level = N.math("ADD", 0.4, N.math("MULTIPLY", N.math("POWER", rgb[1], 2.0), 2.2))
-    amt = N.math("MULTIPLY", N.math("MULTIPLY", N.math("MULTIPLY", lit, curtain), lamp), level)
-    amt = N.mixf(lobby, amt, 1.6)
-    e = N.new("ShaderNodeEmission")
-    N.link(warmth, e.inputs["Color"])
-    N.link(N.math("MULTIPLY", amt, 8.0), e.inputs["Strength"])
-    d = principled(N, **{"Base Color": (0.03, 0.025, 0.025, 1), "Roughness": 0.9})
-    add = N.new("ShaderNodeAddShader")
-    N.link(e.outputs[0], add.inputs[0])
-    N.link(d.outputs[0], add.inputs[1])
-    N.link(add.outputs[0], out.inputs[0])
-    return m
-
-
 def mat_window_glass():
     """Vitre : transparente de face, miroir en incidence rasante (Fresnel), sans réfraction."""
     m, N, out = material("window_glass")
@@ -646,65 +576,6 @@ def prism(name, pts, z0, z1, mat):
     return ob
 
 
-def hotel(i, y0, width, floors, tint, trim_mat, glass_mat):
-    """Hôtel Art déco bas : deux tours d'angle arrondies en stuc plein, entre elles une façade
-    profonde (piliers, dalles, chambres éclairées en retrait d'un mètre, vitres), balcons pleins
-    sur une façade sur deux, bandeaux, corniche, aileron, marquises rayées au rez-de-chaussée."""
-    depth = random.uniform(14, 20)
-    x1 = -ROAD_HALF - WALK
-    x0 = x1 - depth
-    y1 = y0 + width
-    h = floors * 3.2 + 1.4
-    r = random.uniform(2.5, 4.0)
-    cw_t = r + random.uniform(1.0, 2.5)
-    stucco = mat_stucco(tint, i)
-    prism(f"hotel_{i}_tower_a", rounded_footprint(x0, x1, y0, y0 + cw_t, r, far=False), 0, h, stucco)
-    prism(f"hotel_{i}_tower_b", rounded_footprint(x0, x1, y1 - cw_t, y1, r, near=False), 0, h, stucco)
-    gy0, gy1 = y0 + cw_t, y1 - cw_t
-    n = max(2, int((gy1 - gy0) / random.uniform(2.6, 3.4)))
-    cw = (gy1 - gy0) / n
-    D = 1.0
-    B = Boxes(f"hotel_{i}_facade")
-    rooms = mat_rooms(i, gy0, cw)
-    B.add(x0 + 1, x1 - D, gy0, gy1, 0, h, stucco, front_mat=rooms)
-    pier = 0.42
-    for k in range(n + 1):
-        yk = gy0 + k * cw
-        B.add(x1 - D, x1, yk - pier / 2, yk + pier / 2, 0, h, stucco)
-    B.add(x1 - D, x1, gy0, gy1, 0, 0.35, stucco)
-    for f in range(1, floors + 1):
-        zf = f * 3.2
-        B.add(x1 - D, x1, gy0, gy1, zf - 0.55, zf + 0.25, stucco)
-    B.add(x1 - D, x1, gy0, gy1, h - 1.2, h, stucco)
-    balconies = random.random() < 0.55
-    for f in range(1, floors):
-        zf = f * 3.2
-        for k in range(n):
-            if not balconies and not (k % 3 == 1 and f % 2 == 0):
-                continue
-            ya, yb = gy0 + k * cw + pier / 2, gy0 + (k + 1) * cw - pier / 2
-            B.add(x1, x1 + 1.05, ya, yb, zf - 0.2, zf, stucco)
-            B.add(x1 + 0.95, x1 + 1.05, ya, yb, zf, zf + 0.95, stucco)
-            B.add(x1, x1 + 1.05, ya - 0.05, ya + 0.05, zf, zf + 0.95, stucco)
-            B.add(x1, x1 + 1.05, yb - 0.05, yb + 0.05, zf, zf + 0.95, stucco)
-    awn = mat_awning(random.choice([CORAL, "#2f6f6a", "#3a4a8a", "#b84a62"]), f"awning_{i}")
-    for k in range(n):
-        if random.random() < 0.6:
-            ya, yb = gy0 + k * cw + pier / 2, gy0 + (k + 1) * cw - pier / 2
-            B.add(x1, x1 + 1.6, ya, yb, 2.55, 2.7, awn)
-            B.add(x1 + 1.55, x1 + 1.6, ya, yb, 2.2, 2.7, awn)
-    B.add(x1 - 0.5, x1 - 0.48, gy0, gy1, 0.35, h - 1.2, glass_mat)
-    body = B.done()
-    body["h"] = h
-    for f in range(1, floors + 1):
-        zf = f * 3.2 + 0.25
-        prism(f"hotel_{i}_band_{f}", rounded_footprint(x0, x1, y0, y1, r, grow=0.35), zf, zf + 0.12, trim_mat)
-    prism(f"hotel_{i}_cornice", rounded_footprint(x0, x1, y0, y1, r, grow=0.25), h, h + 0.5, trim_mat)
-    if random.random() < 0.6:
-        yc = y0 + cw_t / 2 if random.random() < 0.5 else (y0 + y1) / 2
-        box(f"hotel_{i}_fin", x1 - 0.3, x1 + 0.6, yc - 0.6, yc + 0.6, 3.2, h + random.uniform(3, 6), trim_mat)
-
-
 def instance(src, name, loc, rot_z=0.0, scale=1.0):
     ob = bpy.data.objects.new(name, src.data)
     bpy.context.collection.objects.link(ob)
@@ -729,6 +600,838 @@ def linear_keys(ob):
     for fc in curves:
         for kp in fc.keyframe_points:
             kp.interpolation = "LINEAR"
+
+
+# ---------------------------------------------------------------- la ville : matériaux
+
+FH = 3.2               # hauteur d'un étage courant
+RD = 4.0               # profondeur des chambres et des boutiques, derrière la façade
+FRONT_X = -ROAD_HALF - WALK
+
+
+def mat_stucco_obj():
+    """Stuc peint, la teinte vient de l'objet (une instance, une couleur) ; coulures sous les
+    corniches, pied du mur mouillé et plus sombre."""
+    m, N, out = material("stucco")
+    xyz = N.sep(N.new("ShaderNodeTexCoord").outputs["Object"])
+    vec = N.new("ShaderNodeCombineXYZ")
+    N.link(N.math("ADD", xyz[0], xyz[1]), vec.inputs[0])
+    N.link(xyz[2], vec.inputs[1])
+    folder = os.path.join(ASSETS, "beige_wall_001")
+    uvm = N.new("ShaderNodeMapping", Scale=(0.35, 0.35, 0.35))
+    N.link(vec.outputs[0], uvm.inputs[0])
+    diff = image(N, os.path.join(folder, "diff_1k.jpg"), uvm.outputs[0])
+    nor = image(N, os.path.join(folder, "nor_gl_1k.jpg"), uvm.outputs[0], color=False)
+    nmap = N.new("ShaderNodeNormalMap", Strength=0.5)
+    N.link(nor.outputs["Color"], nmap.inputs["Color"])
+    bw = N.new("ShaderNodeRGBToBW")
+    N.link(diff.outputs["Color"], bw.inputs[0])
+    info = N.new("ShaderNodeObjectInfo")
+    col = N.mix(1.0, info.outputs["Color"], N.math("MULTIPLY", bw.outputs[0], 1.5), "MULTIPLY")
+    streak = N.new("ShaderNodeTexNoise", Scale=1.0, Detail=4.0)
+    sm = N.new("ShaderNodeMapping", Scale=(3.0, 0.12, 1.0))
+    N.link(vec.outputs[0], sm.inputs[0])
+    N.link(sm.outputs[0], streak.inputs["Vector"])
+    col = N.mix(N.math("MULTIPLY", streak.outputs["Factor"], 0.55), col, N.mix(1.0, col, (0.55, 0.55, 0.6, 1), "MULTIPLY"))
+    # le pied du mur a bu la pluie : une lisière irrégulière, entre 0,4 et 1 m
+    edge = N.new("ShaderNodeTexNoise", Scale=2.5, Detail=3.0)
+    N.link(vec.outputs[0], edge.inputs["Vector"])
+    lim = N.math("ADD", 0.45, N.math("MULTIPLY", edge.outputs["Factor"], 0.6))
+    wet = N.math("SUBTRACT", 1.0, N.math("DIVIDE", N.math("SUBTRACT", xyz[2], lim), 0.25), clamp=True)
+    wet = N.math("MINIMUM", N.math("MAXIMUM", wet, 0.0), 1.0)
+    col = N.mix(N.math("MULTIPLY", wet, 0.9), col, N.mix(1.0, col, (0.42, 0.4, 0.45, 1), "MULTIPLY"))
+    p = principled(N)
+    N.link(col, p.inputs["Base Color"])
+    N.link(N.mixf(wet, 0.78, 0.28), p.inputs["Roughness"])
+    N.link(nmap.outputs[0], p.inputs["Normal"])
+    N.link(p.outputs[0], out.inputs[0])
+    return m
+
+
+def _cells(N, y, z, ys, cw, zbase, fh, salt):
+    xyz_cell = N.new("ShaderNodeCombineXYZ")
+    N.link(N.math("FLOOR", N.math("DIVIDE", N.math("SUBTRACT", y, ys), cw)), xyz_cell.inputs[0])
+    N.link(N.math("FLOOR", N.math("DIVIDE", N.math("SUBTRACT", z, zbase), fh)), xyz_cell.inputs[1])
+    info = N.new("ShaderNodeObjectInfo")
+    N.link(N.math("ADD", N.math("MULTIPLY", info.outputs["Random"], 97.0), salt), xyz_cell.inputs[2])
+    wn = N.new("ShaderNodeTexWhiteNoise", _noise_dimensions="3D")
+    N.link(xyz_cell.outputs[0], wn.inputs["Vector"])
+    fy = N.math("FRACT", N.math("DIVIDE", N.math("SUBTRACT", y, ys), cw))
+    fz = N.math("FRACT", N.math("DIVIDE", N.math("SUBTRACT", z, zbase), fh))
+    return wn.outputs["Value"], N.sep(wn.outputs["Color"]), fy, fz
+
+
+def mat_rooms(key, ys, cw, zbase, gf_h, shops, ys2, cw2):
+    """Le fond des chambres et des boutiques : chacune sa lampe, sa chaleur, certaines éteintes.
+    Il éclaire pour de vrai l'intérieur (cloisons, dalles) et le trottoir mouillé."""
+    m, N, out = material(f"rooms_{key}")
+    xyz = N.sep(N.new("ShaderNodeTexCoord").outputs["Object"])
+    y, z = xyz[1], xyz[2]
+    r1, rgb, fy, fz = _cells(N, y, z, ys, cw, zbase, FH, 1.0)
+    lit = N.math("GREATER_THAN", r1, 0.32)
+    warmth = N.ramp(rgb[0], [(0.0, lin("#ff9f45")), (0.45, lin("#ffc47a")), (0.85, lin("#ffe6c0")), (0.94, lin("#c9d2ff"))])
+    lamp = N.math("ADD", 0.35, N.math("MULTIPLY", N.math("SUBTRACT", 1.0, fz), 0.9))
+    level = N.math("ADD", 0.35, N.math("MULTIPLY", N.math("POWER", rgb[1], 2.0), 2.0))
+    room = N.math("MULTIPLY", N.math("MULTIPLY", N.math("MULTIPLY", lit, lamp), level), 7.0)
+    gf = N.math("LESS_THAN", z, gf_h)
+    if shops:
+        s1, srgb, sfy, sfz = _cells(N, y, N.math("MULTIPLY", z, 0.0), ys2, cw2, 0.0, 1.0, 5.0)
+        slit = N.math("GREATER_THAN", s1, 0.18)
+        scol = N.ramp(srgb[0], [(0.0, lin("#ffb066")), (0.4, lin("#ffd49a")), (0.8, lin("#fff1dc")), (0.93, lin("#dff7e8"))])
+        shop = N.math("MULTIPLY", slit, N.math("ADD", 9.0, N.math("MULTIPLY", srgb[1], 10.0)))
+        warmth = N.mix(gf, warmth, scol)
+        room = N.mixf(gf, room, shop)
+    e = N.new("ShaderNodeEmission")
+    N.link(warmth, e.inputs["Color"])
+    N.link(room, e.inputs["Strength"])
+    d = principled(N, **{"Base Color": (0.05, 0.04, 0.035, 1), "Roughness": 0.9})
+    add = N.new("ShaderNodeAddShader")
+    N.link(e.outputs[0], add.inputs[0])
+    N.link(d.outputs[0], add.inputs[1])
+    N.link(add.outputs[0], out.inputs[0])
+    return m
+
+
+def mat_curtain(key, ys, cw, zbase, gf_h):
+    """Rideaux translucides, tirés d'un côté, des deux, ou pas du tout."""
+    m, N, out = material(f"curtain_{key}")
+    xyz = N.sep(N.new("ShaderNodeTexCoord").outputs["Object"])
+    y, z = xyz[1], xyz[2]
+    r1, rgb, fy, fz = _cells(N, y, z, ys, cw, zbase, FH, 1.0)
+    left = N.math("LESS_THAN", fy, N.math("MULTIPLY", rgb[1], 0.55))
+    right = N.math("GREATER_THAN", fy, N.math("SUBTRACT", 1.0, N.math("MULTIPLY", rgb[2], 0.45)))
+    full = N.math("GREATER_THAN", r1, 0.86)
+    mask = N.math("MAXIMUM", N.math("MAXIMUM", left, right), full)
+    mask = N.math("MULTIPLY", mask, N.math("GREATER_THAN", r1, 0.1))
+    mask = N.math("MULTIPLY", mask, N.math("GREATER_THAN", z, gf_h))
+    tr = N.new("ShaderNodeBsdfTransparent")
+    tl = N.new("ShaderNodeBsdfTranslucent", Color=lin("#f0e2c6"))
+    df = N.new("ShaderNodeBsdfDiffuse", Color=lin("#d9c8aa"))
+    cloth = N.new("ShaderNodeMixShader")
+    N.set(cloth.inputs[0], 0.35)
+    N.link(tl.outputs[0], cloth.inputs[1])
+    N.link(df.outputs[0], cloth.inputs[2])
+    mx = N.new("ShaderNodeMixShader")
+    N.link(mask, mx.inputs[0])
+    N.link(tr.outputs[0], mx.inputs[1])
+    N.link(cloth.outputs[0], mx.inputs[2])
+    N.link(mx.outputs[0], out.inputs[0])
+    return m
+
+
+def mat_roof():
+    m, N, out = material("roof")
+    tc = N.new("ShaderNodeTexCoord").outputs["Object"]
+    n = N.new("ShaderNodeTexNoise", Scale=0.35, Detail=6.0)
+    N.link(tc, n.inputs["Vector"])
+    col = N.ramp(n.outputs["Factor"], [(0.3, lin("#3a3740")), (0.7, lin("#5c5761"))])
+    p = principled(N)
+    N.link(col, p.inputs["Base Color"])
+    N.link(N.ramp(n.outputs["Factor"], [(0.42, (0.12, 0.12, 0.12)), (0.55, (0.75, 0.75, 0.75))]), p.inputs["Roughness"])
+    N.link(p.outputs[0], out.inputs[0])
+    return m
+
+
+def mat_shutter():
+    m, N, out = material("shutter")
+    tc = N.new("ShaderNodeTexCoord").outputs["Object"]
+    w = N.new("ShaderNodeTexWave", _wave_type="BANDS", _bands_direction="Z", Scale=9.0, Distortion=0.0)
+    N.link(tc, w.inputs["Vector"])
+    b = N.new("ShaderNodeBump", Strength=0.6, Distance=0.01)
+    N.link(w.outputs["Fac"], b.inputs["Height"])
+    p = principled(N, **{"Base Color": lin("#8d8c92"), "Metallic": 0.6, "Roughness": 0.42})
+    N.link(b.outputs["Normal"], p.inputs["Normal"])
+    N.link(p.outputs[0], out.inputs[0])
+    return m
+
+
+def mat_parking():
+    m, N, out = material("parking")
+    tc = N.new("ShaderNodeTexCoord").outputs["Object"]
+    xyz = N.sep(tc)
+    uv = N.new("ShaderNodeMapping", Scale=(0.25, 0.25, 0.25))
+    N.link(tc, uv.inputs[0])
+    folder = os.path.join(ASSETS, "asphalt_02")
+    diff = image(N, os.path.join(folder, "diff_2k.jpg"), uv.outputs[0])
+    stripe = N.math("LESS_THAN", N.math("FRACT", N.math("DIVIDE", xyz[1], 2.7)), 0.045)
+    stripe = N.math("MULTIPLY", stripe, N.math("GREATER_THAN", xyz[0], -9.0))
+    col = N.mix(stripe, N.mix(1.0, diff.outputs["Color"], (0.35, 0.35, 0.38, 1), "MULTIPLY"), (0.55, 0.55, 0.52, 1))
+    p = principled(N)
+    N.link(col, p.inputs["Base Color"])
+    n = N.new("ShaderNodeTexNoise", Scale=0.3, Detail=4.0)
+    N.link(tc, n.inputs["Vector"])
+    N.link(N.ramp(n.outputs["Factor"], [(0.45, (0.06, 0.06, 0.06)), (0.6, (0.5, 0.5, 0.5))]), p.inputs["Roughness"])
+    N.link(p.outputs[0], out.inputs[0])
+    return m
+
+
+def mat_gutter():
+    """L'eau qui court le long de la bordure : un miroir sombre, à peine ridé."""
+    m, N, out = material("gutter_water")
+    tc = N.new("ShaderNodeTexCoord").outputs["Object"]
+    n = N.new("ShaderNodeTexNoise", Scale=6.0, Detail=4.0)
+    nm = N.new("ShaderNodeMapping", Scale=(1.0, 0.15, 1.0))
+    N.link(tc, nm.inputs[0])
+    N.link(nm.outputs[0], n.inputs["Vector"])
+    b = N.new("ShaderNodeBump", Strength=0.08, Distance=0.05)
+    N.link(n.outputs["Factor"], b.inputs["Height"])
+    p = principled(N, **{"Base Color": (0.01, 0.01, 0.012, 1), "Roughness": 0.02})
+    N.link(b.outputs["Normal"], p.inputs["Normal"])
+    N.link(p.outputs[0], out.inputs[0])
+    return m
+
+
+def city_mats():
+    return {
+        "stucco": mat_stucco_obj(),
+        "trim": mat_plain("trim_white", lin("#f3efe6"), 0.5),
+        "cream": mat_plain("trim_cream", lin("#efe2c4"), 0.5),
+        "frame_w": mat_plain("frame_white", lin("#e9e6df"), 0.35, 0.3),
+        "frame_b": mat_plain("frame_bronze", lin("#3b302c"), 0.35, 0.7),
+        "inside": mat_plain("room_inside", lin("#5a4c44"), 0.9),
+        "glass": mat_window_glass(),
+        "roof": mat_roof(),
+        "shutter": mat_shutter(),
+        "metal": mat_plain("street_metal", (0.035, 0.035, 0.04, 1), 0.4, 0.8),
+        "sign": mat_plain("sign_blank", lin("#e7e1d3"), 0.55),
+        "riser": mat_plain("stall_riser", lin("#2c2a30"), 0.4),
+        "glow": mat_emit("canopy_glow", lin("#ffe2b0"), 25.0),
+    }
+
+
+# ---------------------------------------------------------------- la ville : géométrie
+
+def add_hex(B, v8, mat):
+    """Un pavé quelconque (huit sommets, dessous puis dessus, dans l'ordre de Boxes.add)."""
+    idx = B._mi(mat)
+    vs = [B.bm.verts.new(v) for v in v8]
+    for f in [(0, 2, 3, 1), (4, 5, 7, 6), (0, 1, 5, 4), (2, 6, 7, 3), (0, 4, 6, 2), (1, 3, 7, 5)]:
+        B.bm.faces.new([vs[i] for i in f]).material_index = idx
+
+
+def balcony(B, M, xo, ya, yb, zf, depth, rail):
+    """Dalle et garde-corps marin à trois lisses, poteaux tous les mètres environ."""
+    B.add(xo, xo + depth, ya - 0.1, yb + 0.1, zf - 0.18, zf + 0.02, M["trim"])
+    xr = xo + depth - 0.07
+    for zr in (0.38, 0.68, 1.0):
+        B.add(xr - 0.025, xr + 0.025, ya - 0.06, yb + 0.06, zf + zr - 0.025, zf + zr + 0.025, rail)
+        for ye in (ya - 0.06, yb + 0.06):
+            B.add(xo, xr, ye - 0.02, ye + 0.02, zf + zr - 0.02, zf + zr + 0.02, rail)
+    n = max(1, int((yb - ya) / 1.1))
+    for k in range(n + 1):
+        yk = ya - 0.06 + (yb - ya + 0.12) * k / n
+        B.add(xr - 0.03, xr + 0.03, yk - 0.03, yk + 0.03, zf, zf + 1.02, rail)
+
+
+def window_row(B, M, S, xo, ya, yb, n, zf, balc, doors=()):
+    """Un étage : trumeaux et allèges en stuc, fenêtres en retrait de 30 cm dans leur cadre
+    (montants, meneau, imposte), vitre, rideau, et derrière, la pièce (dalle, cloisons)."""
+    cw = (yb - ya) / n
+    p = S["pier"]
+    st = M["stucco"]
+    fm = M[S["frame"]]
+    sill, wh = S["sill"], S["wh"]
+    top = zf + sill + wh
+    B.add(xo - RD, xo - 0.35, ya, yb, zf, zf + 0.22, M["inside"])
+    for k in range(n + 1):
+        yk = ya + k * cw
+        B.add(xo - RD, xo - 0.35, max(ya, yk - 0.08), min(yb, yk + 0.08), zf, zf + FH, M["inside"])
+        B.add(xo - 0.35, xo, max(ya, yk - p / 2), min(yb, yk + p / 2), zf, zf + FH, st)
+    B.add(xo - 0.35, xo, ya, yb, top, zf + FH, st)
+    for k in range(n):
+        y0, y1 = ya + k * cw + p / 2, ya + (k + 1) * cw - p / 2
+        door = k in balc or k in doors
+        sl = 0.06 if door else sill
+        if not door:
+            B.add(xo - 0.35, xo, y0, y1, zf, zf + sill, st)
+            B.add(xo, xo + 0.08, y0 - 0.06, y1 + 0.06, zf + sill - 0.08, zf + sill, M["trim"])
+        z0 = zf + sl
+        B.add(xo - 0.34, xo - 0.26, y0, y1, z0, z0 + 0.06, fm)
+        B.add(xo - 0.34, xo - 0.26, y0, y1, top - 0.06, top, fm)
+        B.add(xo - 0.34, xo - 0.26, y0, y0 + 0.06, z0, top, fm)
+        B.add(xo - 0.34, xo - 0.26, y1 - 0.06, y1, z0, top, fm)
+        if y1 - y0 > 1.3:
+            ym = (y0 + y1) / 2
+            B.add(xo - 0.34, xo - 0.26, ym - 0.03, ym + 0.03, z0, top, fm)
+        zt = top - 0.45
+        B.add(xo - 0.34, xo - 0.26, y0, y1, zt - 0.025, zt + 0.025, fm)
+        if k in balc:
+            balcony(B, M, xo, y0 - p / 2 + 0.1, y1 + p / 2 - 0.1, zf, S["balc_d"], M[S["rail"]])
+        elif S.get("ac") and random.random() < S["ac"]:
+            S["props"].append(("ac", (xo + 0.25, (y0 + y1) / 2 + random.uniform(-0.3, 0.3), zf + 0.15), math.pi / 2, 1.0))
+    B.add(xo - 0.305, xo - 0.295, ya, yb, zf + 0.05, top, M["glass"])
+    B.add(xo - 0.5, xo - 0.49, ya, yb, zf + 0.25, top, S["curtain"])
+    if S.get("eyebrow"):
+        B.add(xo, xo + 0.6, ya, yb, top + 0.06, top + 0.16, M["trim"])
+
+
+def shopfronts(B, M, S, xo, ya, yb, n, gf_h):
+    """Rez-de-chaussée de boutiques : vitrines sur soubassement, bandeau d'enseigne laissé vierge,
+    stores rayés penchés, rideaux de fer baissés sur quelques-unes, comptoirs en ombre chinoise."""
+    cw = (yb - ya) / n
+    st = M["stucco"]
+    fm = M[S["frame"]]
+    B.add(xo - RD, xo - 0.3, ya, yb, 0.0, 0.3, M["inside"])
+    B.add(xo - RD, xo - 0.3, ya, yb, gf_h - 0.35, gf_h, M["inside"])
+    lobby = S.get("lobby_bay")
+    for k in range(n):
+        B.add(xo - 0.3, xo, ya + k * cw, ya + (k + 1) * cw, gf_h - 0.15 if k == lobby else 3.15, gf_h, st)
+    for k in range(n + 1):
+        yk = ya + k * cw
+        B.add(xo - 0.3, xo, max(ya, yk - 0.3), min(yb, yk + 0.3), 0, 3.15, st)
+        B.add(xo - RD, xo - 0.3, max(ya, yk - 0.08), min(yb, yk + 0.08), 0, gf_h, M["inside"])
+    for k in range(n):
+        y0, y1 = ya + k * cw + 0.3, ya + (k + 1) * cw - 0.3
+        if k == lobby:
+            continue
+        B.add(xo - 0.28, xo - 0.02, y0, y1, 0, 0.55, M["riser"])
+        B.add(xo - 0.27, xo - 0.26, y0, y1, 0.55, 3.15, M["glass"])
+        for zz in (0.55, 3.09):
+            B.add(xo - 0.29, xo - 0.22, y0, y1, zz, zz + 0.06, fm)
+        B.add(xo - 0.29, xo - 0.22, y0 + 0.9, y0 + 0.96, 0.55, 3.15, fm)
+        B.add(xo - 0.29, xo - 0.22, y0 + 0.9, y1, 2.45, 2.5, fm)
+        if random.random() < 0.22:
+            B.add(xo - 0.2, xo - 0.13, y0, y1, 0.55, 3.15, M["shutter"])
+        else:
+            yc = random.uniform(y0 + 0.5, y1 - 1.5)
+            B.add(xo - 2.8, xo - 2.0, yc, yc + random.uniform(0.8, 1.8), 0.3, 1.25, M["inside"])
+            B.add(xo - RD + 0.05, xo - RD + 0.5, y0 + 0.2, y1 - 0.2, 0.3, random.uniform(1.6, 2.4), M["inside"])
+            S["lights"].append(("shop", (xo + 0.6, (y0 + y1) / 2, 1.8), y1 - y0))
+        if S.get("awning") and random.random() < 0.7:
+            am = S["awning"][k % len(S["awning"])]
+            lo, hi, dz = 3.2, 2.55, 0.05
+            add_hex(B, [(xo, y0 - 0.1, lo), (xo + 1.6, y0 - 0.1, hi), (xo, y1 + 0.1, lo), (xo + 1.6, y1 + 0.1, hi),
+                        (xo, y0 - 0.1, lo + dz), (xo + 1.6, y0 - 0.1, hi + dz), (xo, y1 + 0.1, lo + dz), (xo + 1.6, y1 + 0.1, hi + dz)], am)
+            B.add(xo + 1.58, xo + 1.62, y0 - 0.1, y1 + 0.1, hi - 0.28, hi + 0.03, am)
+        elif random.random() < 0.5:
+            B.add(xo, xo + 0.06, y0 + 0.2, y1 - 0.2, 3.35, 3.95, M["sign"])
+    if lobby is not None:
+        y0, y1 = ya + lobby * cw + 0.3, ya + (lobby + 1) * cw - 0.3
+        entrance(B, M, S, xo, y0, y1, gf_h)
+
+
+def entrance(B, M, S, xo, y0, y1, gf_h):
+    """L'entrée de l'hôtel, plus haute que les vitrines : verrière quadrillée jusqu'au plafond,
+    pilastres à gradins, marquise blanche éclairée par-dessous."""
+    fm = M[S["frame"]]
+    B.add(xo - 0.27, xo - 0.26, y0, y1, 0.3, gf_h - 0.15, M["glass"])
+    nv = max(2, int((y1 - y0) / 0.9))
+    for k in range(nv + 1):
+        yk = y0 + (y1 - y0) * k / nv
+        B.add(xo - 0.3, xo - 0.22, yk - 0.03, yk + 0.03, 0.3, gf_h - 0.15, fm)
+    for zz in (0.3, 2.4, gf_h - 0.21):
+        B.add(xo - 0.3, xo - 0.22, y0, y1, zz, zz + 0.06, fm)
+    for ys in (y0 - 0.45, y1):
+        B.add(xo, xo + 0.25, ys, ys + 0.45, 0.15, gf_h + 1.0, M["trim"])
+        B.add(xo, xo + 0.15, ys + 0.08, ys + 0.37, gf_h + 1.0, gf_h + 1.6, M["trim"])
+    B.add(xo, xo + 3.0, y0 - 0.2, y1 + 0.2, 3.35, 3.6, M["trim"])
+    B.add(xo + 2.9, xo + 3.0, y0 - 0.2, y1 + 0.2, 3.2, 3.6, M["trim"])
+    for k in range(3):
+        yk = y0 + (y1 - y0) * (k + 0.5) / 3
+        B.add(xo + 0.8, xo + 2.2, yk - 0.06, yk + 0.06, 3.33, 3.35, M["glow"])
+    S["lights"].append(("canopy", (xo + 1.6, (y0 + y1) / 2, 3.25), y1 - y0))
+
+
+def roof_props(B, M, S, x0, x1, ya, yb, top):
+    st = M["stucco"]
+    if S.get("stair"):
+        xs = x0 + 2.0
+        ys = ya + (yb - ya) * random.uniform(0.55, 0.75)
+        B.add(xs, xs + 3.2, ys, ys + 2.6, top, top + 2.7, st)
+        B.add(xs - 0.2, xs + 3.4, ys - 0.2, ys + 2.8, top + 2.7, top + 2.85, M["trim"])
+        B.add(xs + 3.2, xs + 3.25, ys + 0.8, ys + 1.8, top, top + 2.1, M["riser"])
+    for k in range(S.get("vents", 0)):
+        xv, yv = random.uniform(x0 + 1.5, x1 - 2.5), random.uniform(ya + 1, yb - 1)
+        B.add(xv, xv + 0.5, yv, yv + 0.5, top, top + random.uniform(0.6, 1.2), M["metal"])
+    for k in range(S.get("ac_roof", 0)):
+        S["props"].append(("ac", (random.uniform(x0 + 2.0, x1 - 3.0), random.uniform(ya + 1.5, yb - 1.5), top),
+                           random.choice((0, math.pi / 2, math.pi)), random.uniform(1.6, 2.0)))
+    if S.get("tank"):
+        S["props"].append(("tank", (x0 + 4.5, ya + (yb - ya) * random.uniform(0.2, 0.4), top), random.uniform(0, 6), 0.0065))
+    if S.get("roof_sign"):
+        # le cadre d'enseigne sur le toit, tourné vers l'avenue, panneau laissé vierge
+        L = min(10.0, (yb - ya) * 0.6)
+        yc = ya + (yb - ya) * random.uniform(0.35, 0.65)
+        sy0, sy1 = yc - L / 2, yc + L / 2
+        xs = x1 - 2.4
+        z0, z1 = top + 1.6, top + 1.6 + S["roof_sign"]
+        B.add(xs, xs + 0.12, sy0, sy1, z0, z1, M["sign"])
+        for zz in (z0 - 0.1, z1):
+            B.add(xs - 0.05, xs + 0.17, sy0 - 0.1, sy1 + 0.1, zz, zz + 0.1, M["metal"])
+        for ye in (sy0 - 0.1, sy1):
+            B.add(xs - 0.05, xs + 0.17, ye, ye + 0.1, z0, z1, M["metal"])
+        n = int(L / 2.0) + 1
+        for k in range(n):
+            yk = sy0 + (L - 0.12) * k / max(1, n - 1)
+            B.add(xs - 0.9, xs - 0.78, yk, yk + 0.12, top, z1, M["metal"])
+            B.add(xs - 0.9, xs, yk, yk + 0.08, top + 0.8, top + 0.88, M["metal"])
+        S["lights"].append(("wash", (xs + 1.5, yc, top + 0.3), L))
+
+
+def blade(B, M, S, yc, z0, z1):
+    """Enseigne verticale en drapeau, perpendiculaire à la façade, laissée vierge."""
+    B.add(0, 1.2, yc - 0.14, yc + 0.14, z0, z1, M["trim"])
+    B.add(0.15, 1.05, yc - 0.17, yc + 0.17, z0 + 0.35, z1 - 0.35, M["sign"])
+    B.add(0, 0.5, yc - 0.1, yc + 0.1, z1, z1 + 1.2, M["trim"])
+    S["lights"].append(("blade", (1.4, yc, z0 - 0.3), z1 - z0))
+
+
+def make_building(key, M, spec):
+    """Un immeuble, dans son repère : façade en x = 0 tournée vers +x (l'avenue), emprise
+    y de 0 à W, profondeur vers −x. Rend (objet, accessoires, lumières), à instancier."""
+    S = dict(pier=0.5, sill=0.9, wh=1.6, frame="frame_w", rail="trim", balc_d=1.3, gf_h=4.2, gf="shops",
+             nshops=4, floors=4, r=3.0, ct=4.5, round_near=False, round_far=False)
+    S.update(spec)
+    S["props"], S["lights"] = [], []
+    W, Dp, gf_h, nfl = S["W"], S["D"], S["gf_h"], S["floors"]
+    tops = gf_h + (nfl - 1) * FH
+    ya = S["ct"] if S["round_near"] else 0.3
+    yb = W - S["ct"] if S["round_far"] else W - 0.3
+    ncol = S.get("ncol") or max(2, round((yb - ya) / S.get("bay", 3.0)))
+    zbase = gf_h - FH
+    S["curtain"] = mat_curtain(key, ya, (yb - ya) / ncol, zbase, gf_h)
+    rooms = mat_rooms(key, ya, (yb - ya) / ncol, zbase, gf_h, S["gf"] == "shops", ya, (yb - ya) / S["nshops"])
+    B = Boxes(f"bld_{key}")
+    st = M["stucco"]
+    sb_n, sb = S.get("setback", (0, 0.0))
+    main_top = gf_h + (nfl - 1 - sb_n) * FH
+    # le corps, derrière les pièces ; sa face avant est le fond des pièces
+    B.add(-Dp, -RD, ya, yb, 0, main_top, st, front_mat=rooms)
+    if sb_n:
+        B.add(-Dp, -sb - RD, ya, yb, main_top, tops, st, front_mat=rooms)
+    if not S["round_near"]:
+        B.add(-Dp, 0, 0, 0.3, 0, main_top, st)
+    if not S["round_far"]:
+        B.add(-Dp, 0, W - 0.3, W, 0, main_top, st)
+    # rez-de-chaussée
+    if S["gf"] == "shops":
+        shopfronts(B, M, S, 0.0, ya, yb, S["nshops"], gf_h)
+    else:
+        if gf_h - FH > 0.05:
+            B.add(-0.35, 0, ya, yb, 0, gf_h - FH, st)
+        gS = dict(S, sill=S["sill"] + 0.25)
+        window_row(B, M, gS, 0.0, ya, yb, ncol, gf_h - FH, (), doors=S.get("doors", ()))
+    # étages
+    for f in range(1, nfl):
+        zf = gf_h + (f - 1) * FH
+        xo = -sb if f >= nfl - sb_n else 0.0
+        bal = S.get("balc", "none")
+        if bal == "all":
+            bays = set(range(ncol))
+        elif bal == "alt":
+            bays = set(range(f % 2, ncol, 2))
+        elif bal == "ends":
+            bays = {0, ncol - 1}
+        else:
+            bays = set()
+        if S.get("gallery") and f == 1:
+            bays = set()
+        window_row(B, M, S, xo, ya, yb, ncol, zf, bays, doors=S.get("doors", ()) if S.get("gallery") else ())
+        if S.get("bands"):
+            B.add(xo, xo + 0.12, ya, yb, zf - 0.12, zf + 0.0, M["trim"])
+    # coursive de motel : la galerie de l'étage, ses poteaux, l'avancée du toit
+    if S.get("gallery"):
+        zf = gf_h
+        B.add(0, 2.0, ya, yb, zf - 0.22, zf, M["trim"])
+        for zr in (0.45, 0.95):
+            B.add(1.92, 1.97, ya, yb, zf + zr - 0.03, zf + zr + 0.03, M[S["rail"]])
+        for k in range(int((yb - ya) / 1.2) + 1):
+            yk = ya + k * 1.2
+            B.add(1.92, 1.97, yk, yk + 0.04, zf, zf + 0.98, M[S["rail"]])
+        for k in range(int((yb - ya) / 4.0) + 1):
+            yk = ya + k * 4.0
+            B.add(1.82, 1.98, yk, yk + 0.16, 0, tops + 0.1, M[S["rail"]])
+        B.add(0, 2.4, ya - 0.2, yb + 0.2, tops, tops + 0.35, M["trim"])
+        add_hex(B, [(1.2, yb + 0.1, 0.15), (2.4, yb + 0.1, 0.15), (1.2, yb + 1.3, 0.15), (2.4, yb + 1.3, 0.15),
+                    (1.2, yb - 3.6, zf), (2.4, yb - 3.6, zf), (1.2, yb - 2.4, zf), (2.4, yb - 2.4, zf)], M["trim"])
+    # tours d'angle arrondies, en stuc plein, filets horizontaux qui en font le tour
+    tower_obs = []
+    for near in ([True] if S["round_near"] else []) + ([False] if S["round_far"] else []):
+        yy0, yy1 = (0, ya) if near else (yb, W)
+        fp = rounded_footprint(-Dp, 0, yy0, yy1, S["r"], near=near, far=not near)
+        tower_obs.append(prism(f"bld_{key}_tower{int(near)}", fp, 0, main_top + 0.9, st))
+        g = 0.6 if S.get("eyebrow") else 0.14
+        levels = [gf_h + (f - 1) * FH + S["sill"] + S["wh"] + 0.06 for f in range(1, nfl - sb_n)] + [3.25]
+        for j, zz in enumerate(levels):
+            fpb = rounded_footprint(-Dp, 0, yy0, yy1, S["r"], grow=g, near=near, far=not near)
+            tower_obs.append(prism(f"bld_{key}_band{int(near)}_{j}", fpb, zz, zz + 0.1, M["trim"]))
+    # toit : dalle, acrotère, gradins au milieu, corniche
+    B.add(-Dp, 0, 0, W, main_top - 0.2, main_top, M["roof"], front_mat=st)
+    B.add(-0.3, 0, ya, yb, main_top, main_top + 0.9, st)
+    B.add(-Dp, -Dp + 0.3, 0, W, main_top, main_top + 0.9, st)
+    B.add(-Dp, 0, 0, 0.3, main_top, main_top + 0.9, st)
+    B.add(-Dp, 0, W - 0.3, W, main_top, main_top + 0.9, st)
+    B.add(0, 0.22, ya, yb, main_top + 0.7, main_top + 0.9, M[S.get("cornice", "trim")])
+    if sb_n:
+        B.add(-Dp + 0.3, -sb, 0.3, W - 0.3, tops - 0.2, tops, M["roof"], front_mat=st)
+        B.add(-sb - 0.3, -sb, ya, yb, tops, tops + 0.9, st)
+        B.add(-sb, -sb + 0.2, ya, yb, tops + 0.7, tops + 0.9, M["trim"])
+        for zr in (0.5, 1.0):
+            B.add(-0.12, -0.06, ya, yb, main_top + 0.9 + zr - 0.03, main_top + 0.9 + zr + 0.03, M[S["rail"]])
+    if S.get("step"):
+        yc = W / 2
+        B.add(-0.4, 0, yc - 3.2, yc + 3.2, main_top + 0.9, main_top + 2.0, st)
+        B.add(-0.4, 0, yc - 1.6, yc + 1.6, main_top + 2.0, main_top + 3.0, st)
+        B.add(0, 0.2, yc - 3.2, yc + 3.2, main_top + 1.85, main_top + 2.0, M["trim"])
+    roof_props(B, M, S, -Dp, -sb if sb_n else 0.0, 0.3, W - 0.3, tops if sb_n else main_top)
+    if S.get("blade"):
+        blade(B, M, S, S["blade"] * W, gf_h + 0.6, main_top + 2.5)
+    ob = B.done()
+    if tower_obs:
+        ob = join([ob] + tower_obs, f"bld_{key}")
+    return ob, S["props"], S["lights"]
+
+
+
+# ---------------------------------------------------------------- la ville : la rue
+
+SIDE_STREETS = [(120.0, 134.0), (266.0, 280.0), (452.0, 466.0)]
+
+
+def in_street(y, m=2.0):
+    return any(a - m <= y <= b + m for a, b in SIDE_STREETS)
+
+
+def segments(y0, y1):
+    """Les tronçons de trottoir entre les rues transversales."""
+    out, y = [], y0
+    for a, b in SIDE_STREETS:
+        out.append((y, a))
+        y = b
+    out.append((y, y1))
+    return out
+
+
+def cyl(name, p0, p1, r, mat, seg=12):
+    p0, p1 = Vector(p0), Vector(p1)
+    me = bpy.data.meshes.new(name)
+    bm = bmesh.new()
+    bmesh.ops.create_cone(bm, cap_ends=True, segments=seg, radius1=r, radius2=r, depth=(p1 - p0).length)
+    bm.to_mesh(me)
+    bm.free()
+    for p in me.polygons:
+        p.use_smooth = True
+    ob = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(ob)
+    ob.data.materials.append(mat)
+    ob.location = (p0 + p1) / 2
+    ob.rotation_mode = "QUATERNION"
+    ob.rotation_quaternion = (p1 - p0).to_track_quat("Z", "Y")
+    return ob
+
+
+def add_light(name, kind, loc, direction, color, energy, size=(1.0, 1.0), spot=60.0):
+    L = bpy.data.lights.new(name, kind)
+    L.energy = energy
+    L.color = color[:3]
+    if kind == "AREA":
+        L.shape = "RECTANGLE"
+        L.size, L.size_y = size
+    elif kind == "SPOT":
+        L.spot_size = math.radians(spot)
+        L.spot_blend = 0.7
+        L.shadow_soft_size = 0.08
+    ob = bpy.data.objects.new(name, L)
+    bpy.context.scene.collection.objects.link(ob)
+    ob.location = loc
+    ob.rotation_mode = "QUATERNION"
+    ob.rotation_quaternion = Vector(direction).normalized().to_track_quat("-Z", "Y")
+    return ob
+
+
+def source(objs, name, hidden):
+    ob = join(objs, name)
+    recentre(ob)
+    for c in list(ob.users_collection):
+        c.objects.unlink(ob)
+    hidden.objects.link(ob)
+    return ob
+
+
+def wires(name, spans, mat, sag=0.6, r=0.012):
+    """Des fils qui pendent (chaînette approchée par une parabole), tous dans une courbe."""
+    cu = bpy.data.curves.new(name, "CURVE")
+    cu.dimensions = "3D"
+    cu.bevel_depth = r
+    cu.bevel_resolution = 1
+    for a, b in spans:
+        a, b = Vector(a), Vector(b)
+        sp = cu.splines.new("POLY")
+        n = 16
+        sp.points.add(n)
+        for i in range(n + 1):
+            t = i / n
+            p = a.lerp(b, t)
+            p.z -= sag * 4 * t * (1 - t) * max(0.3, (b - a).length / 30)
+            sp.points[i].co = (p.x, p.y, p.z, 1)
+    ob = bpy.data.objects.new(name, cu)
+    bpy.context.collection.objects.link(ob)
+    cu.materials.append(mat)
+    return ob
+
+
+def prototypes(M):
+    awn = [mat_awning(c, f"awning_{i}") for i, c in enumerate([CORAL, "#2f6f6a", "#3a4a8a", "#b84a62", "#c79a3a"])]
+    specs = {
+        # Art déco d'angle : tour arrondie, sourcils filants, drapeau vierge, gradins au faîte
+        "deco": dict(W=26, D=16, floors=4, nshops=4, round_near=True, eyebrow=True, balc="ends", blade=0.1,
+                     step=True, ac_roof=3, stair=True, vents=3, awning=[awn[0], awn[1]], uplight=True),
+        # petit hôtel : entrée haute à marquise, balcons alternés, climatiseurs aux fenêtres
+        "hotel": dict(W=22, D=15, floors=3, nshops=3, lobby_bay=1, step=True, eyebrow=True, balc="alt", bay=2.7,
+                      ac=0.25, ac_roof=2, tank=True, frame="frame_b", awning=[awn[3]], uplight=True, blade=0.86),
+        # boutique d'angle, deux niveaux, cadre d'enseigne sur le toit
+        "shop": dict(W=14, D=12, floors=2, nshops=3, round_far=True, r=2.5, ct=3.5, roof_sign=3.0, ac_roof=2,
+                     vents=2, awning=[awn[4], awn[2]], ac=0.3),
+        # paquebot : les deux angles arrondis, balcons filants à lisses marines
+        "liner": dict(W=30, D=16, floors=4, nshops=5, lobby_bay=2, round_near=True, round_far=True, eyebrow=True,
+                      balc="all", rail="frame_w", ac_roof=4, tank=True, awning=[awn[1]]),
+        # immeuble d'appartements, balcons empilés, soubassement
+        "flats": dict(W=22, D=14, floors=5, gf="rooms", balc="all", frame="frame_b", rail="frame_b", bay=2.75,
+                      ac=0.3, ac_roof=3, stair=True, bands=True),
+        # motel des années 50 : coursive, portes, climatiseurs de fenêtre, en retrait derrière son parking
+        "motel": dict(W=34, D=11, floors=2, gf="rooms", gf_h=FH, gallery=True, ncol=10, doors=set(range(0, 10, 2)),
+                      sill=1.0, wh=1.2, ac=0.5, vents=4, rail="frame_w"),
+        # la tour en gradins : deux étages en retrait, angle arrondi, réservoir
+        "tower": dict(W=28, D=18, floors=7, nshops=4, lobby_bay=1, setback=(2, 4.0), round_far=True, balc="alt",
+                      bands=True, tank=True, ac_roof=4, stair=True, awning=[awn[2]]),
+        # le bloc bas en longueur, fenêtres en bandeau, enseigne de toit
+        "block": dict(W=36, D=16, floors=4, nshops=6, round_near=True, round_far=True, bay=4.2, wh=1.5,
+                      eyebrow=True, roof_sign=3.5, ac_roof=5, vents=4, awning=[awn[0], awn[4]], uplight=True),
+    }
+    return {k: make_building(k, M, v) + (v,) for k, v in specs.items()}
+
+
+def build_city(hidden):
+    M = city_mats()
+    conc = mat_concrete()
+    road_m = mat_road()
+    kerb = mat_plain("kerb", lin("#9a948c"), 0.45)
+    paint = mat_plain("paint_white", lin("#d9d5cc"), 0.55)
+    green = mat_plain("sign_green", lin("#1f4a3a"), 0.45)
+    wood = mat_plain("pole_wood", lin("#3a2c24"), 0.8)
+    side_asphalt = mat_plain("side_asphalt", lin("#262428"), 0.25)
+
+    # --- la route, les trottoirs, la plage, la mer
+    box("road", -ROAD_HALF, ROAD_HALF, -30, 900, -0.05, 0.0, road_m)
+    for i, (a, b) in enumerate(segments(-30, 900)):
+        box(f"walk_left_{i}", FRONT_X, -ROAD_HALF - 0.2, a, b, -0.05, 0.15, conc)
+        box(f"kerb_left_{i}", -ROAD_HALF - 0.2, -ROAD_HALF, a, b, -0.05, 0.16, kerb)
+        box(f"block_left_{i}", -200, FRONT_X, a, b, -0.05, 0.15, conc)
+    for i, (a, b) in enumerate(SIDE_STREETS):
+        box(f"side_street_{i}", -200, -ROAD_HALF, a, b, -0.05, 0.0, side_asphalt)
+        for k in range(14):
+            x = -ROAD_HALF + 0.6 + k * 0.98
+            box(f"zebra_{i}_{k}", x, x + 0.5, a - 4.0, a - 0.8, 0.0, 0.004, paint)
+        box(f"stop_{i}", -ROAD_HALF, -0.2, b + 0.5, b + 0.9, 0.0, 0.004, paint)
+    box("walk_right", ROAD_HALF + 0.2, ROAD_HALF + WALK, -30, 900, -0.05, 0.15, conc)
+    box("kerb_right", ROAD_HALF, ROAD_HALF + 0.2, -30, 900, -0.05, 0.16, kerb)
+    gw = mat_gutter()
+    box("gutter_left", -ROAD_HALF, -ROAD_HALF + 0.5, -30, 900, -0.05, 0.003, gw)
+    box("gutter_right", ROAD_HALF - 0.5, ROAD_HALF, -30, 900, -0.05, 0.003, gw)
+    y = 8.0
+    while y < 600:
+        if not in_street(y):
+            box(f"drain_l_{int(y)}", -ROAD_HALF + 0.02, -ROAD_HALF + 0.45, y, y + 0.9, 0.0, 0.005, M["metal"])
+            box(f"drain_r_{int(y)}", ROAD_HALF - 0.45, ROAD_HALF - 0.02, y + 11, y + 11.9, 0.0, 0.005, M["metal"])
+        y += 24.0
+    wall = mat_plain("sea_wall", lin("#d9d2c4"), 0.6)
+    box("sea_wall", ROAD_HALF + WALK, ROAD_HALF + WALK + 0.35, -30, 900, 0.0, 0.85, wall)
+    box("sea_wall_cap", ROAD_HALF + WALK - 0.08, ROAD_HALF + WALK + 0.45, -30, 900, 0.85, 0.95, M["trim"])
+    sand = mat_plain("wet_sand", lin("#3a332d"), 0.3)
+    box("beach", ROAD_HALF + WALK, 34, -30, 1200, -1.6, -1.5, sand)
+    box("sea", 34, 3000, -400, 4000, -1.7, -1.6, mat_sea())
+    box("sea_far", -3000, 3000, 900, 4000, -1.75, -1.65, bpy.data.materials["sea"])
+
+    # --- les immeubles : huit dessins, instanciés, chacun sa couleur
+    P = prototypes(M)
+    protos = {}
+    for k, (ob, props, lights, spec) in P.items():
+        for c in list(ob.users_collection):
+            c.objects.unlink(ob)
+        hidden.objects.link(ob)
+        protos[k] = (ob, props, lights, spec)
+    ac_parts = import_glb("exterior_aircon_unit/exterior_aircon_unit.gltf")
+    ac_src = [source([o], f"ac_src_{i}", hidden) for i, o in enumerate(ac_parts)]
+    tank_src = source(import_glb("water-tank.glb"), "tank_src", hidden)
+    pastels = ["#f2c6cf", "#bfe3d6", "#f4e6b8", "#f6efe0", "#c8dcef", "#f6d2b0", "#d8cdf0", "#e3efd0", "#f7d9e6"]
+    count = [0]
+
+    def place(kind, x, y0, tint, lights=True, mirror=False, props=True):
+        ob, props, lts, spec = protos[kind]
+        n = count[0]
+        count[0] += 1
+        inst = instance(ob, f"{ob.name}_{n}", (x, y0, 0))
+        inst.color = (*lin(tint)[:3], 1)
+        sx = -1 if mirror else 1
+        if mirror:
+            inst.scale.x = -1
+            return
+        if not props:
+            return
+        for j, (pk, (px, py, pz), rot, s) in enumerate(props):
+            src = random.choice(ac_src) if pk == "ac" else tank_src
+            instance(src, f"{pk}_{n}_{j}", (x + sx * px, y0 + py, pz), rot, s)
+        if not lights:
+            return
+        warm = lin("#ffd9a8")
+        for j, (lk, (lx, ly, lz), w) in enumerate(lts):
+            loc = (x + lx, y0 + ly, lz)
+            if lk == "shop":
+                add_light(f"shop_{n}_{j}", "AREA", loc, (1, 0, -0.35), lin("#ffcf96"), 90.0 * w / 3, (w, 2.2))
+            elif lk == "canopy":
+                add_light(f"canopy_{n}_{j}", "AREA", loc, (0.2, 0, -1), warm, 260.0, (w, 2.2))
+            elif lk == "wash":
+                add_light(f"wash_{n}_{j}", "SPOT", loc, (-1.5, 0, 2.2), warm, 1800.0, spot=75)
+            elif lk == "blade":
+                add_light(f"blade_{n}_{j}", "SPOT", loc, (-0.35, 0, 1), warm, 900.0, spot=28)
+        # les façades éclairées du pied : toutes près de la caméra, plus fort sur quelques-unes
+        yy = 1.5
+        power = 700.0 if spec.get("uplight") else 380.0
+        zl = spec.get("gf_h", 4.2) + 0.1 if spec.get("gf", "shops") == "shops" else 0.2
+        while yy < spec["W"] - 1:
+            add_light(f"up_{n}_{int(yy)}", "SPOT", (x + 0.45, y0 + yy, zl), (-0.16, 0, 1), lin("#ffe2bf"), power, spot=60)
+            yy += 4.0
+
+    # côté ville, de près : chaque dessin une fois, puis une suite tirée au sort
+    seq = [("deco", 20), ("hotel", 48), ("shop", 72), ("liner", 88), ("flats", 136), ("motel", 160),
+           ("tower", 196), ("block", 226)]
+    for i, (k, y0) in enumerate(seq):
+        x = FRONT_X - (14.0 if k == "motel" else 0.0)
+        place(k, x, y0, pastels[i % len(pastels)])
+    box("motel_lot", FRONT_X - 14.0, FRONT_X, 158.0, 196.0, 0.0, 0.16, mat_parking())
+    # le mât d'enseigne du motel, panneau vierge, éclairé du pied
+    cyl("motel_mast", (FRONT_X - 1.5, 160.5, 0.15), (FRONT_X - 1.5, 160.5, 9.5), 0.18, M["metal"])
+    box("motel_sign", FRONT_X - 1.7, FRONT_X - 1.3, 158.2, 162.8, 6.0, 9.2, M["sign"])
+    box("motel_sign_rim", FRONT_X - 1.75, FRONT_X - 1.25, 158.1, 162.9, 9.2, 9.35, M["trim"])
+    add_light("motel_sign_up", "SPOT", (FRONT_X + 1.2, 160.5, 0.3), (-0.4, 0, 1), lin("#ffe2bf"), 1500.0, spot=30)
+    y = 282.0
+    keys = [kk for kk in protos if kk != "motel"]
+    i = len(seq)
+    while y < 640:
+        k = random.choice(keys)
+        W = protos[k][3]["W"]
+        nxt = next(((a, b) for a, b in SIDE_STREETS if a > y), None)
+        if nxt and y + W > nxt[0] - 1.0:
+            if nxt[0] - 1.0 - y >= 14.0:
+                place("shop", FRONT_X, y, pastels[i % len(pastels)], lights=y < 320)
+                i += 1
+            y = nxt[1] + 2.0
+            continue
+        place(k, FRONT_X, y, pastels[i % len(pastels)], lights=y < 320)
+        y += W + random.choice([0.0, 0.0, 2.0, 6.0])
+        i += 1
+    # la lumière de cinéma : de grands réflecteurs doux au-dessus de l'avenue, tournés vers les
+    # façades, invisibles à la caméra et dans les reflets ; le pastel des stucs se lit enfin
+    for k, yy in enumerate(range(30, 300, 34)):
+        f = add_light(f"fill_{k}", "AREA", (0.5, yy, 9.0), (-1, 0, -0.18), lin("#ffd2c0"), 2200.0, (32.0, 9.0))
+        f.visible_camera = False
+        f.visible_glossy = False
+        f.visible_transmission = False
+    # derrière, deux rangs d'immeubles de plus : la ville continue, vue du drone
+    for row, xr in enumerate((FRONT_X - 26.0, FRONT_X - 52.0)):
+        y = -20.0 + row * 9.0
+        while y < 420:
+            k = random.choice(keys)
+            W = protos[k][3]["W"]
+            nxt = next(((a, b) for a, b in SIDE_STREETS if a > y - 1), None)
+            if nxt and y + W > nxt[0] - 1.0:
+                y = nxt[1] + 2.0
+                continue
+            place(k, xr, y, random.choice(pastels), lights=False, props=row == 0)
+            y += W + random.choice([0.0, 3.0, 8.0])
+    # au loin, de l'autre côté, la pointe de la baie
+    for k in range(7):
+        kind = ["tower", "liner", "block", "tower", "flats", "liner", "tower"][k]
+        place(kind, 85.0, 650 + k * 38, pastels[(k * 2) % len(pastels)], mirror=True)
+
+    # --- feux, panneaux, fils, aux carrefours
+    tl = import_glb("traffic-light.glb")
+    amber = mat_emit("signal_amber", lin("#ffb347"), 30.0)
+    dark = mat_plain("signal_off", (0.02, 0.02, 0.02, 1), 0.2)
+    body = mat_plain("signal_body", lin("#2d3a2f"), 0.5, 0.4)
+    for o in tl:
+        n = o.name
+        o.data.materials.clear()
+        o.data.materials.append(amber if "light_yellow" in n else dark if "light_" in n else body)
+    head = source(tl, "signal_src", hidden)
+    spans = []
+    for i, (a, b) in enumerate(SIDE_STREETS):
+        if a > 400:
+            continue
+        for side, yy, face in ((-1, a - 1.2, math.pi), (1, b + 1.2, 0.0)):
+            xp = side * (ROAD_HALF + 0.7)
+            cyl(f"signal_pole_{i}_{side}", (xp, yy, 0.15), (xp, yy, 7.0), 0.13, body)
+            cyl(f"signal_arm_{i}_{side}", (xp, yy, 6.4), (side * 1.0, yy, 6.4), 0.07, body)
+            for hx in (side * 4.6, side * 2.0):
+                instance(head, f"signal_{i}_{side}_{hx}", (hx, yy, 5.45), face, 1.0)
+            instance(head, f"signal_{i}_{side}_pole", (xp - side * 0.3, yy, 2.6), face, 1.0)
+            box(f"arm_sign_{i}_{side}", side * 3.2 - 0.6, side * 3.2 + 0.6, yy - 0.03, yy + 0.03, 6.55, 6.95, green)
+        # le poteau de nom de rue, plaques vierges
+        cyl(f"name_post_{i}", (-ROAD_HALF - 1.0, a - 3.5, 0.15), (-ROAD_HALF - 1.0, a - 3.5, 3.4), 0.04, M["metal"])
+        box(f"name_plate_{i}a", -ROAD_HALF - 1.45, -ROAD_HALF - 0.55, a - 3.53, a - 3.47, 3.0, 3.22, green)
+        box(f"name_plate_{i}b", -ROAD_HALF - 1.03, -ROAD_HALF - 0.97, a - 3.95, a - 3.05, 3.24, 3.46, green)
+        spans.append(((-ROAD_HALF - 0.7, a - 1.2, 6.95), (ROAD_HALF + 0.7, b + 1.2, 6.95)))
+        spans.append(((-ROAD_HALF - 0.7, a - 1.2, 6.8), (ROAD_HALF + 0.7, a - 1.2, 6.8)))
+    # les poteaux de bois du côté ville, trois fils de l'un à l'autre, une descente vers les façades
+    poles = [y for y in range(30, 640, 42) if not in_street(y, 3)]
+    for y in poles:
+        cyl(f"upole_{y}", (FRONT_X + 0.5, y, 0.15), (FRONT_X + 0.5, y, 9.6), 0.14, wood)
+        box(f"upole_arm_{y}", FRONT_X - 0.4, FRONT_X + 1.4, y - 0.06, y + 0.06, 9.0, 9.12, wood)
+    for y0, y1 in zip(poles, poles[1:]):
+        for dx in (-0.3, 0.5, 1.3):
+            spans.append(((FRONT_X + dx, y0, 9.1), (FRONT_X + dx, y1, 9.1)))
+        spans.append(((FRONT_X + 1.3, y0, 9.0), (FRONT_X - 0.1, y0 + 6.0, 6.8)))
+    wires("wires", spans, M["metal"], sag=0.7)
+
+    # --- le mobilier : bancs, poubelles, jardinières, abribus, terrasse
+    keep = ("seat", "seat_back", "legs_single", "legs_double", "back_support_r", "back_support_l", "arm_rest_01", "arm_rest_02", "crossbar")
+    parts = import_glb("modular_street_seating/modular_street_seating.gltf")
+    mine = [o for o in parts if o.name.split(".")[0] in keep]
+    for o in [o for o in parts if o not in mine]:
+        bpy.data.objects.remove(o)
+    bench = source(mine, "bench_src", hidden)
+    parts = import_glb("metal_trash_can/metal_trash_can.gltf")
+    mine = [o for o in parts if "rust" not in o.name and "lid" not in o.name]
+    for o in [o for o in parts if o not in mine]:
+        bpy.data.objects.remove(o)
+    can = source(mine, "can_src", hidden)
+    terrace = source(import_glb("outdoor_table_chair_set_01/outdoor_table_chair_set_01.gltf"), "terrace_src", hidden)
+    hedge, HN, hout = material("hedge")
+    v = HN.new("ShaderNodeTexVoronoi", Scale=18.0)
+    HN.link(HN.new("ShaderNodeTexCoord").outputs["Object"], v.inputs["Vector"])
+    hb = HN.new("ShaderNodeBump", Strength=0.9, Distance=0.04)
+    HN.link(v.outputs["Distance"], hb.inputs["Height"])
+    hp = principled(HN, Roughness=0.55)
+    HN.link(HN.ramp(v.outputs["Distance"], [(0.0, lin("#1d3322")), (0.6, lin("#3d5e36"))]), hp.inputs["Base Color"])
+    HN.link(hb.outputs["Normal"], hp.inputs["Normal"])
+    HN.link(hp.outputs[0], hout.inputs[0])
+    for y in [20.5 + 34 * k for k in range(18)]:
+        if in_street(y, 4):
+            continue
+        box(f"planter_{y}", -ROAD_HALF - 2.6, -ROAD_HALF - 1.3, y - 1.2, y + 1.2, 0.15, 0.62, conc)
+        box(f"hedge_{y}", -ROAD_HALF - 2.5, -ROAD_HALF - 1.4, y - 1.1, y + 1.1, 0.62, 1.05, hedge)
+    for y in range(98, 620, 46):
+        if in_street(y, 4):
+            continue
+        instance(bench, f"bench_l_{y}", (FRONT_X + 1.3, y, 0.15), math.pi / 2)
+        instance(can, f"can_l_{y}", (-ROAD_HALF - 0.75, y + 3.0, 0.15), random.uniform(0, 6))
+    for y in range(20, 620, 26):
+        instance(bench, f"bench_r_{y}", (ROAD_HALF + WALK - 0.8, y, 0.15), math.pi / 2)
+        if y % 52 == 20:
+            instance(can, f"can_r_{y}", (ROAD_HALF + WALK - 0.7, y + 2.2, 0.15), random.uniform(0, 6))
+    for k, yy in enumerate((50.5, 58.0, 62.0)):
+        instance(terrace, f"terrace_{k}", (FRONT_X + 1.2, yy, 0.15), random.uniform(-0.3, 0.3))
+    # l'abribus : toit, vitres, panneau lumineux vierge
+    sy0, sy1 = 37.0, 42.0
+    xb, xf = FRONT_X + 0.5, FRONT_X + 2.2
+    for yy in (sy0, sy1):
+        for xx in (xb, xf):
+            box(f"shelter_post_{xx:.1f}_{yy}", xx - 0.05, xx + 0.05, yy - 0.05, yy + 0.05, 0.15, 2.6, M["metal"])
+    box("shelter_roof", xb - 0.2, xf + 0.3, sy0 - 0.2, sy1 + 0.2, 2.6, 2.72, M["metal"])
+    box("shelter_back", xb - 0.02, xb + 0.02, sy0, sy1, 0.35, 2.4, M["glass"])
+    box("shelter_ad", xb + 0.08, xf - 0.1, sy1 - 0.08, sy1 + 0.08, 0.5, 2.3, M["metal"])
+    box("shelter_ad_face", xb + 0.18, xf - 0.2, sy1 - 0.1, sy1 + 0.1, 0.6, 2.2, mat_emit("ad_blank", lin("#f4eee2"), 3.0))
+    box("shelter_seat", xb + 0.1, xb + 0.5, sy0 + 0.6, sy1 - 0.6, 0.55, 0.6, M["metal"])
 
 
 # ---------------------------------------------------------------- scène
@@ -864,37 +1567,8 @@ def build():
     police.rotation_mode = "XYZ"
     police.rotation_euler = (0, 0, -math.pi / 2)
 
-    # --- la route, les trottoirs, la plage, la mer
-    road = box("road", -ROAD_HALF, ROAD_HALF, -30, 900, -0.05, 0.0, mat_road())
-    conc = mat_concrete()
-    box("walk_left", -ROAD_HALF - WALK, -ROAD_HALF, -30, 900, -0.05, 0.15, conc)
-    box("walk_right", ROAD_HALF, ROAD_HALF + WALK, -30, 900, -0.05, 0.15, conc)
-    box("block_left", -200, -ROAD_HALF - WALK, -30, 900, -0.05, 0.15, conc)
-    wall = mat_plain("sea_wall", lin("#d9d2c4"), 0.6)
-    box("sea_wall", ROAD_HALF + WALK, ROAD_HALF + WALK + 0.35, -30, 900, 0.0, 0.85, wall)
-    sand = mat_plain("wet_sand", lin("#3a332d"), 0.3)
-    box("beach", ROAD_HALF + WALK, 34, -30, 1200, -1.6, -1.5, sand)
-    box("sea", 34, 3000, -400, 4000, -1.7, -1.6, mat_sea())
-    box("sea_far", -3000, 3000, 900, 4000, -1.75, -1.65, bpy.data.materials["sea"])
-
-    # --- les hôtels, côté ville
-    trims = [mat_plain("trim_white", lin("#f3efe6"), 0.55), mat_plain("trim_cream", lin("#efe2c4"), 0.55)]
-    wglass = mat_window_glass()
-    tints = ["#f2c6cf", "#bfe3d6", "#d8cdf0", "#f6d2b0", "#c8dcef", "#f4e6b8"]
-    y = 22.0
-    i = 0
-    while y < 620:
-        w = random.uniform(20, 34)
-        hotel(i, y, w, random.randint(3, 5), tints[i % len(tints)], trims[i % 2], wglass)
-        y += w + random.uniform(2, 7)
-        i += 1
-    # au loin, de l'autre côté, la pointe de la baie : quelques hôtels
-    for k in range(6):
-        yy = 650 + k * 40
-        hotel(100 + k, yy, 30, random.randint(4, 7), tints[k % len(tints)], trims[k % 2], wglass)
-        for o in [o for o in bpy.data.objects if o.name.startswith(f"hotel_{100 + k}")]:
-            o.location.x += 30 + ROAD_HALF * 2 + WALK * 2 + 20
-            o.scale.x = -1
+    # --- la ville : la route, les immeubles, la rue
+    build_city(hidden)
 
     # --- les palmiers
     parts = import_glb("palms.glb")
@@ -911,6 +1585,9 @@ def build():
     for side, x, start, step in ((1, ROAD_HALF + 2.4, 6.0, 13.0), (-1, -ROAD_HALF - 1.6, 12.0, 17.0)):
         yy = start
         while yy < 700:
+            if side < 0 and in_street(yy, 2.5):
+                yy += 6.0
+                continue
             instance(palms[k % 3], f"palm_{k}", (x + random.uniform(-0.4, 0.4), yy + random.uniform(-1.5, 1.5), 0.15),
                      random.uniform(0, math.tau), random.uniform(1.15, 1.45))
             yy += step + random.uniform(-2, 2)
@@ -935,6 +1612,9 @@ def build():
     for side in (-1, 1):
         yy = 14.0 if side < 0 else 28.0
         while yy < 700:
+            if in_street(yy, 3.0):
+                yy += 8.0
+                continue
             x = side * (ROAD_HALF + 0.6)
             rot = math.pi / 2 if side < 0 else -math.pi / 2  # le bras (−y du modèle) vers la route
             instance(lamp, f"lamp_{k}", (x, yy, 0.15), rot, S)
