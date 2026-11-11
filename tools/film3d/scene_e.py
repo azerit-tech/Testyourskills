@@ -58,7 +58,7 @@ COPING_W, COPING_H = 0.6, 0.22
 MASTS = [(-52.0, -12.0), (94.0, -12.0), (-52.0, 92.0), (94.0, 92.0),   # les quatre angles (§2.4)
          (32.0, 90.0)]                                                   # le mât derrière la caméra de P5
 KEY_MAST = (32.0, 90.0)
-TURN_AIM = (5.5, 62.5)                          # là où le projecteur du mât de derrière la caméra est pointé
+TURN_AIM = (6.8, 64.4)                      # là où le projecteur du mât de derrière la caméra est pointé
 MAST_H = 25.0
 
 PALIERS = ("socle", "conteneurs", "portique")
@@ -667,12 +667,12 @@ def build_port(hidden, lamp_src, far=False, palier=None):
 
 # ---------------------------------------------------------------- le plan
 
-CAM = Vector((12.0, 77.0, 0.4))      # sur le bord nord de la voie du quai (le §2.4 : x = 10, y = 77)
-CAM_YAW = 16.0                      # degrés, de -y vers -x (vers la droite du cadre)
+CAM = Vector((11.0, 77.0, 0.4))      # sur le bord nord de la voie du quai (le §2.4 : x = 10, y = 77)
+CAM_YAW = 12.0                     # degrés, de -y vers -x (vers la droite du cadre)
 CAM_PITCH = 6.0                      # le panoramique vers le haut, à l'instant de l'image fixe (25° à la fin) :
                                      # assez bas pour que les murs de cinq montent dans le tiers haut
-PHI = 30.0                           # où en est la berline dans le virage, en degrés (0 : entrée, 90 : sortie)
-DRIFT = 28.0                       # le travers : la caisse tournée de plus que sa trajectoire
+PHI = 39.0                           # où en est la berline dans le virage, en degrés (0 : entrée, 90 : sortie)
+DRIFT = 20.0                     # le travers : la caisse tournée de plus que sa trajectoire
 TURN_SPEED = 14.0                    # m/s au milieu du virage (60 km/h à l'entrée)
 
 
@@ -765,14 +765,14 @@ def plan_P5(scene, hidden, palier="socle"):
     """P5, le projecteur : la caméra à 40 cm derrière le bord nord de la voie du quai, 28 mm, tournée vers le pied
     de la rampe, en contre-plongée ; l'image fixe est l'instant fort, la berline au tiers du virage, à la sortie de
     la voie du pont, en travers, trois quarts avant gauche, roues en contre-braquage, caisse en roulis vers
-    l'extérieur, à 16 m ; deux patrouilles au pied de la rampe, le fourgon et une troisième sur la rampe, à gauche
-    d'elle ; les murs de conteneurs de part et d'autre de la voie du pont ; l'hélicoptère au-dessus de l'eau
-    derrière la fin du tablier, son projecteur posé sur elle.
+    l'extérieur, à 13 m, sur 45 % de la largeur ; deux patrouilles au pied de la rampe (cachées par elle), le
+    fourgon et une troisième sur la rampe, à sa gauche ; les murs de conteneurs de part et d'autre de la voie du
+    pont ; l'hélicoptère au-dessus de l'eau derrière la fin du tablier, son projecteur posé sur elle.
 
-    Écart au §2.4 : la caméra est en (12, 77) et non (10, 77). Le 28 mm vertical ne fait que 40° de large ; la
-    berline à 16 m en couvre 15°, et la caméra plus à gauche la pose devant le pied de la rampe, sur la meute.
-    Depuis (12, 77), elle tient la moitié droite du cadre et la meute la gauche (cotes cherchées par le calcul des
-    angles, vérifiées en Workbench)."""
+    Écart au §2.4 : la caméra est en (11, 77) et non (10, 77). Le 28 mm vertical ne fait que 40° de large ; la
+    berline à 13 m en couvre 19°, et la caméra plus à gauche la pose devant toute la meute. Depuis (11, 77), elle
+    tient la moitié droite du cadre et le fourgon et la patrouille de la rampe la gauche (cotes cherchées par le
+    calcul des angles, vérifiées en Workbench)."""
     import scene_c
     lamp_src = L.panorama(scene, hidden, bridge=None, port=None)
     scene_c.build_bridge(hidden, lamp_src)
@@ -781,8 +781,8 @@ def plan_P5(scene, hidden, palier="socle"):
     hero = L.hero()
     p = arc_point(PHI)
     vel = -PHI                                         # le cap de la trajectoire (convention de lieux.put)
-    # la caisse à 28° de sa trajectoire, en biais sur les deux jeux de lignes (58° de celles du pont, qui filent
-    # vers la rampe juste derrière elle, 32° de celles du quai), assise sur l'extérieur ; la trajectoire vient
+    # la caisse à 20° de sa trajectoire, en biais sur les deux jeux de lignes (59° de celles du pont, qui filent
+    # vers la rampe juste derrière elle, 31° de celles du quai), assise sur l'extérieur ; la trajectoire vient
     # vers l'objectif, le nez part à gauche : la glissade se lit sans fumée
     L.put(hero, p.x, p.y, 0.0, heading=vel - DRIFT, pitch=-1.5, roll=-5.0)
     wheels = L.hero_wheels(hero)
@@ -819,7 +819,7 @@ def plan_P5(scene, hidden, palier="socle"):
     heli, h = L.helicopter("heli")
     # à droite du cadre, à 79 m, le nez tourné à gauche de la berline : le projecteur (sous le nez, à droite) la voit
     # sans que la cellule le masque, et vient de côté (de derrière elle, sa tache s'étirait jusqu'à l'objectif)
-    L.put(heli, -22.0, 14.0, 36.0, heading=0.0, pitch=-6.0, roll=-5.0)
+    L.put(heli, -17.0, 14.0, 36.0, heading=0.0, pitch=-6.0, roll=-5.0)
     sl = h["searchlight"].data
     sl.energy = 1.6e6                                  # assez pour la brume, pas au point de blanchir le bordeaux
     sl.spot_size = math.radians(5.0)
