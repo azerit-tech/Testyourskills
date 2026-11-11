@@ -38,8 +38,8 @@ random.seed(27)
 #                   mix (étages en enduit photographique, rez-de-chaussée en boutiques de bibliothèque)
 #   FILM3D_ROUTE  : base (l'enrobé d'origine), pluie (juste après l'averse), sechage (en train de sécher)
 #   FILM3D_BLEND  : le nom du .blend écrit dans assets (scene-a.blend par défaut)
-FACADE = os.environ.get("FILM3D_FACADE", "base")
-ROUTE = os.environ.get("FILM3D_ROUTE", "base")
+FACADE = os.environ.get("FILM3D_FACADE", "mix")
+ROUTE = os.environ.get("FILM3D_ROUTE", "pluie")
 BLEND = os.environ.get("FILM3D_BLEND", "scene-a.blend")
 if HERE not in sys.path:
     sys.path.insert(0, HERE)
@@ -1928,7 +1928,7 @@ def build():
 
     # --- la ville : la route, les immeubles, la rue
     build_city(hidden)
-    if os.environ.get("FILM3D_PARKED", "0") != "0":
+    if os.environ.get("FILM3D_PARKED", "1") != "0":
         parked_cars(hidden)
 
     # --- les palmiers : vingt-cinq cocotiers distincts (troncs courbes) et un palmier royal droit,

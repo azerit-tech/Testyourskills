@@ -26,6 +26,9 @@ import bpy
 from mathutils import Vector
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# la référence du banc reste la façade et la chaussée d'origine, quels que soient les défauts du film
+os.environ.setdefault("FILM3D_FACADE", "base")
+os.environ.setdefault("FILM3D_ROUTE", "base")
 import scene_a as S  # noqa: E402  (ses fonctions : matériaux, import glb, ciel, rendu)
 
 ASSETS = S.ASSETS
