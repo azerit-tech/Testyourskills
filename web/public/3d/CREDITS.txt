@@ -96,13 +96,12 @@ Original work for Testyourskills: open-space set modelled and lit in Blender
 (tools/bake/office.py), lighting baked with Cycles. Contains the chair above
 and casts shadows from the plant below.
 
-city.webp, sky.webp
+city.webp
 South Beach (Miami Beach, Florida) at blue hour, modelled and rendered in
 Blender (tools/bake/city.py) from OpenStreetMap data: building footprints,
 heights and building parts, streets, beaches, parks; the towers of downtown
 Miami and Brickell in the distance. city.webp is the cylindrical panorama
-seen from the dev's window (100°, rendered with Cycles), sky.webp the
-equirectangular blue-hour sky (procedural, original work).
+seen from the dev's window (100°, rendered with Cycles).
 Map data © OpenStreetMap contributors, available under the Open Database
 License (ODbL) 1.0. https://www.openstreetmap.org/copyright
 https://opendatacommons.org/licenses/odbl/1-0/
