@@ -37,6 +37,16 @@ SKETCHFAB = {
     "traffic-light.glb": "bad8aa4988474919be8f48920dde7e3d",
     # réservoir d'eau sur pieds, pour les toits
     "water-tank.glb": "aff4e9fd3f7042d5855fade7411df4df",
+    # les rez-de-chaussée des façades « kit » et « mix » : lettres néon, intérieurs de boutique,
+    # fenêtres, portes vitrées, climatiseurs, garde-corps, néon OPEN, store
+    "A-neon-letters.glb": "a88035b37ba4498b8d7fe9cfbc0dccc8",
+    "A-storefront-interiors.glb": "348da01c195d46eca29e478e98aab16c",
+    "A-window-pack.glb": "e8a3914fb654483790abc0cd72fb7099",
+    "A-glass-doors.glb": "e0ff1a543cb34979999d2fd87843203e",
+    "A-ac-pack.glb": "3b930497c77f47269847e75b9ee85b20",
+    "A-railing-set.glb": "b5b629702e814263816769db0ee660cc",
+    "A-neon-open.glb": "9a924db296cf4a1eb12991702ab48da5",
+    "A-awning-cc0.glb": "47e5fd8a6b194b48aad20425869d15ba",
 }
 
 # Poly Haven : (asset, type, résolution)
@@ -56,10 +66,25 @@ POLYHAVEN = [
     ("asphalt_04", "tex", "2k"),
     ("brushed_concrete_04", "tex", "2k"),
     ("water_manhole_cover", "model", "1k"),
+    # les façades (facade_b.py, facade_kit.py, facade_mix.py)
+    ("coral_fort_wall_01", "tex", "2k"),
+    ("modular_metal_gutter", "model", "1k"),
+    ("utility_box_01", "model", "1k"),
+    ("security_light", "model", "1k"),
+    ("potted_plant_02", "model", "1k"),
+    ("rollershutter_door", "model", "1k"),
+    ("bar_chair_round_01", "model", "1k"),
 ]
 
 # ambientCG : (asset, résolution) ; archives zip dont on ne garde que les images
 AMBIENTCG = [
+    # l'enduit photographique des façades, ses reprises, et les coulures en décalcomanie
+    ("PaintedPlaster017", "2K"),
+    ("Plaster003", "2K"),
+    ("Leaking004", "2K"),
+    ("Leaking007", "2K"),
+    ("Leaking008", "2K"),
+    ("Leaking009", "2K"),
     # les grilles d'avaloir du caniveau
     ("Grate002", "1K"),
 ]

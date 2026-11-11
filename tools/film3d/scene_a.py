@@ -34,7 +34,8 @@ ASSETS = os.environ.get("FILM3D_ASSETS") or os.path.join(os.path.dirname(main_ch
 random.seed(27)
 
 # Les variantes à comparer, en attendant le choix de Jacques (une variable d'environnement chacune) :
-#   FILM3D_FACADE : base (les boîtes d'origine), kit (pièces assemblées), proc (tout en nœuds)
+#   FILM3D_FACADE : base (les boîtes d'origine), kit (pièces assemblées), proc (tout en nœuds),
+#                   mix (étages en enduit photographique, rez-de-chaussée en boutiques de bibliothèque)
 #   FILM3D_ROUTE  : base (l'enrobé d'origine), pluie (juste après l'averse), sechage (en train de sécher)
 #   FILM3D_BLEND  : le nom du .blend écrit dans assets (scene-a.blend par défaut)
 FACADE = os.environ.get("FILM3D_FACADE", "base")
@@ -49,7 +50,7 @@ def facade_module():
     if FACADE == "base":
         return None
     import importlib
-    return importlib.import_module({"kit": "facade_kit", "proc": "facade_proc"}[FACADE])
+    return importlib.import_module({"kit": "facade_kit", "proc": "facade_proc", "mix": "facade_mix"}[FACADE])
 
 # Palette (sRGB) du §3.1 de docs/cinematique-poursuite.md
 PLUM = "#4b2f54"
@@ -1363,7 +1364,10 @@ def build_city(hidden):
                 # lumière libre d'un module de façades : w = dict(kind, direction, color (sRGB), energy, size, spot)
                 L = dict(kind="POINT", direction=(0, 0, -1), color="#ffd9a8", energy=100.0, size=(0.2, 0.2), spot=60.0)
                 L.update(w)
-                add_light(f"fl_{n}_{j}", L["kind"], loc, L["direction"], lin(L["color"]), L["energy"], L["size"], L["spot"])
+                lo = add_light(f"fl_{n}_{j}", L["kind"], loc, L["direction"], lin(L["color"]), L["energy"], L["size"], L["spot"])
+                if L.get("hide"):
+                    # invisible à la caméra et dans les reflets : une source douce sans tache dans l'image
+                    lo.visible_camera = lo.visible_glossy = lo.visible_transmission = False
         if spec.get("own_uplights"):
             return
         # les façades éclairées du pied : toutes près de la caméra, plus fort sur quelques-unes
