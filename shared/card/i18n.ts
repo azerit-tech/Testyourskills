@@ -13,8 +13,6 @@ export const STRINGS = {
     ai: "IA",
     cvStamp: "D'APRÈS LE CV",
     linkedinStamp: "D'APRÈS LINKEDIN",
-    sourceGithub: "GitHub",
-    sourceCv: "CV",
     file: "Dossier",
     specialty: "Spécialité",
     weapon: "Arme",
@@ -32,10 +30,6 @@ export const STRINGS = {
     linkedinSide: "Ce que ton LinkedIn déclare",
     githubSide: "Ce que ton GitHub prouve",
     overall: "Note",
-    /** Alias de l'ancienne carte, encore lus par les compositions serveur. */
-    freeAgent: "Sans bande",
-    judged: (s: number) => `Interrogatoire par une IA${NBSP}: ${s}${NBSP}s`,
-    reliability: "preuves",
     positions: {
       FS: "Full-stack", BE: "Backend", FE: "Frontend", MOB: "Mobile", DATA: "Data", ML: "Machine learning",
       OPS: "Ops", SEC: "Sécurité", EMB: "Embarqué", PM: "Produit", DESIGN: "Design", CTO: "CTO sur parole",
@@ -67,8 +61,6 @@ export const STRINGS = {
     ai: "AI",
     cvStamp: "PER THE CV",
     linkedinStamp: "PER LINKEDIN",
-    sourceGithub: "GitHub",
-    sourceCv: "CV",
     file: "File",
     specialty: "Specialty",
     weapon: "Weapon",
@@ -85,9 +77,6 @@ export const STRINGS = {
     linkedinSide: "What your LinkedIn claims",
     githubSide: "What your GitHub proves",
     overall: "Rating",
-    freeAgent: "Lone wolf",
-    judged: (s: number) => `Questioned by an AI for ${s}${NBSP}s`,
-    reliability: "evidence",
     positions: {
       FS: "Full-stack", BE: "Backend", FE: "Frontend", MOB: "Mobile", DATA: "Data", ML: "Machine learning",
       OPS: "Ops", SEC: "Security", EMB: "Embedded", PM: "Product", DESIGN: "Design", CTO: "Self-styled CTO",

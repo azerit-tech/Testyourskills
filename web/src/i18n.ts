@@ -2,7 +2,7 @@
 // Les faits ({fr,en}) qui viennent de l'API ne passent pas par ici.
 import { createContext, createElement, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import type { CardStyle, CriterionCode, Lang, Position, StatCode } from "../../shared/types";
+import type { CriterionCode, Lang, Position, StatCode } from "../../shared/types";
 import { showsTotal } from "../../shared/week";
 
 const fr = {
@@ -16,7 +16,6 @@ const fr = {
     skip: "Passer",
     back: "Retour",
     close: "Fermer",
-    copied: "Copié",
     loading: "Chargement…",
     demo: "Mode démo · données fictives",
     skipToContent: "Aller au contenu",
@@ -109,19 +108,9 @@ const fr = {
     BUZZ: { name: "Buzzwords", what: "La densité de vent. Ne compte pas dans la note." },
   } satisfies Record<StatCode, { name: string; what: string }>,
   /* Niveaux de recherche (§18.18) : Bronze couvre ★ à ★★★, on garde le premier. */
-  tiers: {
-    bronze: "Petit délit",
-    silver: "Haute surveillance",
-    gold: "Menace publique",
-    icon: "Priorité absolue",
-    wonderkid: "Débarque en ville",
-    flashback: "Affaire classée",
-    totw: "Top 5 de la semaine",
-  } satisfies Record<CardStyle, string>,
   tierCard: (level: string) => `Fiche ${level}`,
   waiting: {
     title: "Chargement du dossier",
-    elapsed: "écoulé",
     /** L'enquête en direct (§18.26) : le numéro de la trouvaille versée au dossier. */
     piece: (n: number) => `Pièce ${String(n).padStart(2, "0")}`,
     /** Fiche en file d'attente : n fiches passent avant (rang dans la file). */
@@ -167,7 +156,6 @@ const fr = {
     skip: "Passer l'animation",
     mute: "Couper le son",
     unmute: "Activer le son",
-    opening: "Ouverture du dossier",
     revealed: (level: string, overall: number) => `Fiche ${level}, note ${overall}.`,
     fireworks: "Clique ou Espace : feux d'artifice",
     fireworksTouch: "Touche l'écran : feux d'artifice",
@@ -466,8 +454,6 @@ const fr = {
       OSS: "PR fusionnées",
     },
     proof: "Voir la preuve",
-    /** Le bouton qui déplie la table des niveaux. */
-    levelsShow: "Voir les niveaux",
     levelsTitle: (name: string) => `Les niveaux : ${name}`,
     reached: "Atteint",
     next: "Pour le suivant",
@@ -736,7 +722,6 @@ const en: Dict = {
     skip: "Skip",
     back: "Back",
     close: "Close",
-    copied: "Copied",
     loading: "Loading…",
     demo: "Demo mode · mock data",
     skipToContent: "Skip to content",
@@ -817,19 +802,9 @@ const en: Dict = {
     XP: { name: "Experience", what: "Real or claimed seniority." },
     BUZZ: { name: "Buzzwords", what: "Hot-air density. Doesn't count toward the rating." },
   },
-  tiers: {
-    bronze: "Petty crime",
-    silver: "High surveillance",
-    gold: "Public menace",
-    icon: "Top priority",
-    wonderkid: "New in town",
-    flashback: "Cold case",
-    totw: "This week's top 5",
-  },
   tierCard: (level) => `${level} sheet`,
   waiting: {
     title: "Loading your file",
-    elapsed: "elapsed",
     piece: (n) => `Exhibit ${String(n).padStart(2, "0")}`,
     queue: (n) => (n === 1 ? "1 suspect ahead of you at the station" : `${n} suspects ahead of you at the station`),
     scene: "Loading the scene",
@@ -870,7 +845,6 @@ const en: Dict = {
     skip: "Skip animation",
     mute: "Mute",
     unmute: "Unmute",
-    opening: "Opening the case file",
     revealed: (level, overall) => `${level} sheet, rated ${overall}.`,
     fireworks: "Click or Space: fireworks",
     fireworksTouch: "Tap the screen: fireworks",
@@ -1143,7 +1117,6 @@ const en: Dict = {
       OSS: "merged PRs",
     },
     proof: "See the proof",
-    levelsShow: "See the levels",
     levelsTitle: (name: string) => `The levels: ${name}`,
     reached: "Reached",
     next: "For the next one",
