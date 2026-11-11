@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { FIXTURES } from "../fixtures";
 import type { CardData, Stars } from "../types";
 import { CHASE_FRAMES, CHASE_SHOTS, ENDINGS, FPS, SHOT_FRAMES, SHOT_START, chaseShotAt, endingFrames, filmPlan, hudAt } from "./index";
+import { radioLines } from "./radio";
 
 const OVERALL: Record<Stars, number> = { 1: 12, 2: 33, 3: 50, 4: 66, 5: 80, 6: 93 };
 const cardAt = (n: Stars, extra: Partial<CardData> = {}): CardData => ({ ...FIXTURES.silver, id: `f${n}`, overall: OVERALL[n], ...extra });
@@ -235,5 +236,18 @@ describe("hudAt (§2.2, §5.2)", () => {
     expect(g(10)).toEqual(g(11));
     expect(g(10)).not.toEqual(g(12));
     for (let f = 0; f < 200; f++) for (const v of g(f)) expect(v >= 0 && v < 128).toBe(true);
+  });
+});
+
+describe("radioLines", () => {
+  it("la radio : une ligne par étoile, qui cite les faits, dans les deux langues", () => {
+    const fr = radioLines(FIXTURES.silver, "fr");
+    expect(fr.beats).toHaveLength(6);
+    expect(fr.beats[0]).toContain("Backend");
+    expect(fr.beats[1]).toContain("Python");
+    expect(fr.beats[3]).toContain("Doctolib");
+    expect(fr.beats[4]).toContain(FIXTURES.silver.profile!.label.fr);
+    expect(radioLines({ ...FIXTURES.silver, club: null }, "en").beats[3]).toContain("Lone wolf");
+    for (const l of [...fr.beats, fr.end]) expect(l.length).toBeGreaterThan(0);
   });
 });

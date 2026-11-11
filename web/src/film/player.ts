@@ -38,11 +38,11 @@ export function filmQuality(): Quality {
 }
 
 export function filmUrl(id: FileId, q: Quality): string {
-  // `?film=missing` : un fichier absent (404), pour vérifier le repli sur la poursuite 2D.
+  // `?film=missing` : un fichier absent (404), pour vérifier le repli (la fiche sans révélation).
   return debugFlag() === "missing" ? `/film/absent-${id}-${q}.mp4` : `/film/${id}-${q}.mp4`;
 }
 
-/** H.264 profil Main : sinon le film ne se lit pas et la poursuite 2D joue. */
+/** H.264 profil Main : sinon le film ne se lit pas et la fiche sort sans révélation. */
 export function canPlayFilm(): boolean {
   if (debugFlag() === "nocodec") return false;
   try {

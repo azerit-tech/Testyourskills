@@ -1,11 +1,11 @@
 // Le plan du film d'une fiche (§18.36, docs/cinematique-poursuite.md §2) :
 // niveau, étoiles et leurs instants, point de coupe, fin à jouer, arrêt sur
 // image, flash, durée, lignes de radio. Tout est compté en images (cut.ts) ;
-// les secondes s'en déduisent. Même structure que shared/chase/plan.ts.
+// les secondes s'en déduisent.
 import type { CardData, Fact, Lang, Stars } from "../types";
 import { LEVEL_LABELS, starsFor } from "../types";
 import { SCENE_LIGHT, sceneOf, type Light } from "../scenes";
-import { radioLines, type Radio, type RadioCard } from "../chase/radio";
+import { radioLines, type Radio, type RadioCard } from "./radio";
 import { ENDINGS, FLICKER_ON, FPS, SHOT_START, CHASE_FRAMES, CHASE_SHOTS, type EndingId } from "./cut";
 
 /** Les deux tons de l'arrêt sur image, selon la lumière du profil (§3.1). */

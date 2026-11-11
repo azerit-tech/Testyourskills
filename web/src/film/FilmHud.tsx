@@ -5,7 +5,18 @@
 // qui dériverait de l'image. Mat : aplats, ni halo ni ombre lumineuse.
 import type { Lang } from "../../../shared/types";
 import type { FilmPlan, Hud } from "../../../shared/film";
-import { rng } from "../../../shared/chase/plan";
+
+/** Tirage pseudo-aléatoire déterministe (mulberry32). */
+function rng(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
 
 const STAR = "M12 1.6l3.05 6.55 7.15.85-5.28 4.92 1.4 7.08L12 17.48 5.68 21l1.4-7.08L1.8 9l7.15-.85z";
 

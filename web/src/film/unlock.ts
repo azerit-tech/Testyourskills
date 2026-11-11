@@ -40,7 +40,7 @@ export function unlockFilm(): void {
       // sans source, ou interrompue par pause() : sans importance, la permission est donnée
       void p?.catch(() => undefined);
     } catch {
-      /* navigateur sans vidéo : le film ne jouera pas, la poursuite 2D prendra le relais */
+      /* navigateur sans vidéo : le film ne jouera pas, la fiche sortira sans révélation */
     }
   }
 }

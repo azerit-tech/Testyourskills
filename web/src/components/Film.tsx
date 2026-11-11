@@ -1,13 +1,14 @@
-// Le film de la poursuite (§18.36), joué : même contrat que Chase et Walkout3D
+// Le film de la poursuite (§18.36), joué : même contrat que Walkout3D
 // envers CardPage. « ready » : les deux balises sont chargées et posées sur
 // leur première image (l'attente peut se lever, onReady) ; si la lecture
 // demande un geste, onGesture (l'attente montre la pilule). « playing » : la
 // vidéo joue, le HUD suit son horloge. Au sommet du flash, la fiche se pose
 // (onHandoff) ; à la fin du flash, la scène s'efface (onDone). Onglet caché :
 // tout s'arrête. Replis (§5.5) : film absent, illisible ou pas prêt 4 s après
-// la fiche, la poursuite 2D joue à sa place ; erreur en cours, flash immédiat.
+// la fiche, la fiche sort sans révélation, comme sans WebGL ; erreur en cours,
+// flash immédiat.
 // Sans Three.js ni WebGL. Muet : la bande-son (T3) se branche sur `FilmSound`.
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { flushSync } from "react-dom";
 import type { CardData, Lang } from "../../../shared/types";
@@ -24,10 +25,7 @@ import "../film/film.css";
 
 export { preloadFilm } from "../film/player";
 
-/** La poursuite 2D, repli du film : son module seul, chargé seulement s'il le faut. */
-const Chase = lazy(() => import("./Chase").then((m) => ({ default: m.Chase })));
-
-/** Le film n'est pas prêt ce temps-là après la fiche : la poursuite 2D joue à sa place (§5.5). */
+/** Le film n'est pas prêt ce temps-là après la fiche : elle sort sans révélation (§5.5). */
 const READY_WAIT_MS = 4000;
 
 /**
@@ -63,16 +61,7 @@ declare global {
 }
 
 export function Film(props: Props) {
-  const [fallback, setFallback] = useState(false);
-  if (fallback) {
-    const { onGesture: _g, ...rest } = props;
-    return (
-      <Suspense fallback={null}>
-        <Chase {...rest} />
-      </Suspense>
-    );
-  }
-  return <FilmView {...props} onFail={() => setFallback(true)} />;
+  return <FilmView {...props} onFail={props.onDone} />;
 }
 
 function FilmView({ card, lang, phase, onReady, onGesture, onHandoff, onDone, onTap, onFail }: Props & { onFail: () => void }) {

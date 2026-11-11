@@ -20,16 +20,6 @@ describe("la scène de la révélation (§18.33)", () => {
     expect(revealScene()).toBe("walkout");
   });
 
-  it("?scene=chase choisit la poursuite, et le choix tient pour la session", () => {
-    const store = new Map<string, string>();
-    fakeWindow("?mock=1&scene=chase", store);
-    expect(revealScene()).toBe("chase");
-    fakeWindow("", store);
-    expect(revealScene()).toBe("chase");
-    fakeWindow("?scene=walkout", store);
-    expect(revealScene()).toBe("walkout");
-  });
-
   it("?scene=film choisit le film (§18.36), sans changer le défaut", () => {
     const store = new Map<string, string>();
     fakeWindow("?mock=1&scene=film", store);
@@ -46,10 +36,8 @@ describe("la scène de la révélation (§18.33)", () => {
     expect(revealScene()).toBe("walkout");
   });
 
-  it("mouvement réduit : rien ne joue, ni poursuite ni ascenseur", () => {
-    expect(revealToPlay("chase", true)).toBeNull();
+  it("mouvement réduit : rien ne joue, ni film ni ascenseur", () => {
     expect(revealToPlay("walkout", true)).toBeNull();
-    expect(revealToPlay("chase", false)).toBe("chase");
     expect(revealToPlay("film", true)).toBeNull();
     expect(revealToPlay("film", false)).toBe("film");
   });

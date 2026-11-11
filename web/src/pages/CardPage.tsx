@@ -33,9 +33,6 @@ import { verdict } from "../lib/versus";
 /** La révélation 3D et Three.js, hors du bundle de l'accueil. */
 const loadWalkout = () => import("../components/Walkout3D");
 const Walkout3D = lazy(() => loadWalkout().then((m) => ({ default: m.Walkout3D })));
-/** La poursuite 2D (§18.33) : quand elle joue, rien de la scène 3D ne se télécharge. */
-const loadChase = () => import("../components/Chase");
-const Chase = lazy(() => loadChase().then((m) => ({ default: m.Chase })));
 /** Le film (§18.36) : deux balises vidéo, ni Three.js ni WebGL. Les vidéos se chargent dès l'attente. */
 const loadFilm = () => import("../components/Film");
 const Film = lazy(() => loadFilm().then((m) => ({ default: m.Film })));
@@ -175,7 +172,6 @@ export function CardPage({ id }: { id: string }) {
   // La scène 3D (Three.js et ses assets) se charge dès que la fiche est
   // demandée, et s'y prépare pendant l'attente du scoring : shaders compilés,
   // textures sur le GPU. Jamais en mouvement réduit : il n'y aura pas de scène.
-  // La poursuite (§18.33) n'a rien à préparer : son module seul, sans Three.js.
   // Le film (§18.36) télécharge ses vidéos pendant l'attente, en basse priorité.
   useEffect(() => {
     const scene = revealToPlay(revealScene(), reduced);
@@ -184,7 +180,6 @@ export function CardPage({ id }: { id: string }) {
         loadFilm()
           .then((m) => m.preloadFilm())
           .catch(() => undefined);
-      else if (scene === "chase") loadChase().catch(() => undefined);
       else
         loadWalkout()
           .then((m) => m.warmWalkout(lang))
@@ -430,8 +425,6 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
             <Suspense fallback={null}>
               {scene === "film" ? (
                 <Film card={main} lang={lang} double={item.kind === "comparison"} phase={phase} onReady={() => onScene("ready")} onGesture={() => onScene("gesture")} onHandoff={handoff} onDone={finish} onTap={onStageClick} />
-              ) : scene === "chase" ? (
-                <Chase card={main} lang={lang} double={item.kind === "comparison"} phase={phase} onReady={() => onScene("ready")} onHandoff={handoff} onDone={finish} onTap={onStageClick} />
               ) : (
                 <Walkout3D card={main} lang={lang} double={item.kind === "comparison"} declared={declaredOf(item.kind === "comparison" ? item.comparison : item.card)} phase={phase} anchorRef={stageRef} controlRef={walkoutCtl} onReady={() => onScene("ready")} onHandoff={handoff} onDone={finish} />
               )}

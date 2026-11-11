@@ -48,8 +48,6 @@ function prefetchReveal() {
   // Le film (§18.36) : son module seul ; ses vidéos attendent l'attente de la fiche.
   const scene = revealScene();
   if (scene === "film") void import("./Film").catch(() => undefined);
-  // La poursuite (§18.33) : son seul module, quelques Ko ; ni Three.js ni les assets 3D.
-  else if (scene === "chase") void import("./Chase").catch(() => undefined);
   else void import("./Walkout3D").then((m) => m.preloadWalkoutAssets()).catch(() => undefined);
 }
 
