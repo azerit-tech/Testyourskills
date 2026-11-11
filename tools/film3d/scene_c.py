@@ -19,8 +19,8 @@
 #
 # Le profil en travers est celui de lieux.roadway : chaussée de 14 m bombée, trottoirs de 2 m, glissière en W,
 # parapet en béton et garde-corps à 1,1 m, poutre de rive et caisson ; lampadaires des deux côtés tous les 30 m.
-# Paliers : « socle » ; « haubans » ajoutera le pylône en H à la crête et ses deux nappes de câbles sans rien
-# changer au tablier (build_bridge(haubans=True)).
+# Paliers : « socle » ; « haubans », le pylône en H à la crête et ses quatre éventails de câbles, sans rien
+# changer au tablier (build_bridge(haubans=True), build_haubans).
 import math
 import os
 import sys
@@ -131,10 +131,90 @@ def build_bridge(hidden, lamp_src, far=False, haubans=False):
             L.box_bm(bm, (-HALF + 0.5, yj - 0.12, z + road.road_z(0) - 0.005), (HALF - 0.5, yj + 0.12, z + 0.004))
         L.mesh_object("pont_joints", bm, [joint])
     if haubans:
-        print("[pont] haubans : palier pas encore écrit", flush=True)
+        build_haubans(out)
     print(f"[pont] tablier {Y_START:.0f}..{Y_PORT:.0f} m, crête {deck_z(Y_CREST):.2f} m en y {Y_CREST:.0f}, "
           f"{len(out['lamps'])} lampadaires, {'vu de loin' if far else 'complet'}", flush=True)
     return out
+
+
+# ---------------------------------------------------------------- le pylône et les haubans
+
+PY_X = 11.0           # les deux jambes de part et d'autre du tablier (entraxe 22 m), 3 × 2 m
+PY_H = 45.0           # hauteur au-dessus de la chaussée de crête
+PY_BEAMS = (28.0, PY_H)                                   # les traverses
+STAY_D = [16.0 + 12.0 * k for k in range(8)]              # les ancrages sur le tablier, 16 .. 100 m du pylône
+STAY_R = 0.1
+
+
+def build_haubans(out):
+    """Le palier « haubans » : le pylône en H à la crête (deux jambes de 3 × 2 m qui montent de l'eau à 45 m
+    au-dessus de la chaussée, une traverse sous le caisson, une à 28 m, une au sommet), deux nappes de huit
+    haubans de chaque côté (Ø 0,2 m, ancrés tous les 12 m de 16 à 100 m du pylône, en éventail serré en tête de
+    jambe), quatre projecteurs ambre au pied qui lèchent les jambes, un feu corail fixe au sommet. Le tablier
+    ne change pas : les haubans tiennent la poutre de rive, juste au-dehors du parapet."""
+    z0 = deck_z(Y_CREST)
+    z_top = z0 + PY_H
+    concrete = L.mat_concrete("pylone", tint=(0.66, 0.64, 0.61), streaks=1.4, scale=0.3)
+    bm = L.bmesh.new()
+    for sx in (-1, 1):
+        x = sx * PY_X
+        L.box_bm(bm, (x - 1.5, Y_CREST - 1.0, L.WATER_Z - 4.0), (x + 1.5, Y_CREST + 1.0, z_top))
+        # le chapiteau : la tête de jambe un peu plus large, où s'ancrent les haubans
+        L.box_bm(bm, (x - 1.7, Y_CREST - 1.2, z_top - 14.0), (x + 1.7, Y_CREST + 1.2, z_top + 0.6))
+    # la traverse basse porte le caisson ; les deux autres raidissent le portique
+    L.box_bm(bm, (-PY_X - 1.5, Y_CREST - 1.4, z0 - 4.2), (PY_X + 1.5, Y_CREST + 1.4, z0 - 1.9))
+    for h in PY_BEAMS:
+        L.box_bm(bm, (-PY_X + 1.5, Y_CREST - 0.9, z0 + h - 2.2), (PY_X - 1.5, Y_CREST + 0.9, z0 + h))
+    L.mesh_object("pont_pylone", bm, [concrete])
+    # les haubans : quatre éventails de huit, le plus long ancré le plus haut
+    steel = L.mat_steel("hauban", color=(0.8, 0.81, 0.82), rough=0.28, rust=0.04, paint=True)
+    xd = out["edge"] + 0.2
+    bm = L.bmesh.new()
+    n = len(STAY_D)
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            for k, d in enumerate(STAY_D):
+                zt = z_top - 1.6 - 1.5 * (n - 1 - k)
+                y = Y_CREST + sy * d
+                L.tube_bm(bm, (sx * PY_X, Y_CREST + sy * 1.25, zt), (sx * xd, y, deck_z(y) + 0.05), STAY_R, seg=8)
+                # le culot d'ancrage sur la poutre de rive
+                L.box_bm(bm, (sx * xd - 0.25, y - 0.4, deck_z(y) - 0.5), (sx * xd + 0.25, y + 0.4, deck_z(y) + 0.15))
+    L.mesh_object("pont_haubans", bm, [steel], smooth=True)
+    # quatre projecteurs ambre au pied, de part et d'autre de chaque jambe, le faisceau rasant la face
+    housing = S.mat_plain("projecteur_boitier", (0.05, 0.05, 0.055, 1), 0.4, 0.6)
+    bm = L.bmesh.new()
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            p = Vector((sx * PY_X, Y_CREST + sy * 1.9, z0 + 0.25))
+            L.box_bm(bm, (p.x - 0.35, p.y - 0.3, p.z - 0.25), (p.x + 0.35, p.y + 0.3, p.z + 0.15))
+            Ld = bpy.data.lights.new(f"pylone_projecteur_{sx}_{sy}", "SPOT")
+            Ld.color = L.lin(L.AMBER)[:3]
+            Ld.energy = 25000.0
+            Ld.spot_size = math.radians(22.0)
+            Ld.spot_blend = 0.35
+            Ld.shadow_soft_size = 0.2
+            o = bpy.data.objects.new(Ld.name, Ld)
+            bpy.context.scene.collection.objects.link(o)
+            o.location = p + Vector((0, 0, 0.2))
+            up = Vector((sx * PY_X, Y_CREST + sy * 1.0, z_top)) - o.location
+            o.rotation_euler = up.to_track_quat("-Z", "Y").to_euler()
+            o.visible_camera = False
+    L.mesh_object("pont_projecteurs", bm, [housing])
+    # le feu corail fixe au sommet, au milieu de la traverse haute
+    bm = L.bmesh.new()
+    L.bmesh.ops.create_uvsphere(bm, u_segments=12, v_segments=8, radius=0.35,
+                                matrix=L.Matrix.Translation((0.0, Y_CREST, z_top + 0.35)))
+    L.mesh_object("pont_feu_sommet", bm, [L.emit_mat("feu_sommet", L.lin(L.CORAL), 60.0)]).visible_shadow = False
+    Ld = bpy.data.lights.new("pont_feu_sommet_light", "POINT")
+    Ld.color = L.lin(L.CORAL)[:3]
+    Ld.energy = 400.0
+    Ld.shadow_soft_size = 0.35
+    o = bpy.data.objects.new(Ld.name, Ld)
+    bpy.context.scene.collection.objects.link(o)
+    o.location = (0.0, Y_CREST, z_top + 1.0)
+    o.visible_camera = False
+    print(f"[pont] haubans : pylône en H à {z_top:.1f} m, {4 * n} haubans de {STAY_D[0]:.0f} à {STAY_D[-1]:.0f} m",
+          flush=True)
 
 
 def road_point(x, y, lift=0.0):

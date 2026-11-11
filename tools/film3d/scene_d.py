@@ -551,7 +551,7 @@ def plan_P6(scene, hidden, palier="socle"):
     sur la jetée, la voie du quai et la rampe du pont ; trois hélicoptères aux faisceaux croisés, deux avions bas
     dans l'axe de la jetée. Rien dans les 12 % du haut : le ciel."""
     import scene_c
-    lamp_src = L.panorama(scene, hidden, all_lit=True, bridge="loin", port="loin")
+    lamp_src = L.panorama(scene, hidden, all_lit=True, bridge="loin", port="loin", haubans=(palier == "haubans"))
     build_jetty(hidden, lamp_src)
     build_pointe(hidden, lamp_src, far=True)
     s = 180.0

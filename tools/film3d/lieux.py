@@ -838,11 +838,13 @@ def port_placeholder(lamp_src, far=True, name="port"):
     print("[lieux] port provisoire (terre-plein, voie du quai, quatre mâts)", flush=True)
 
 
-def panorama(scene, hidden, yaw=math.pi, all_lit=False, bridge="loin", port="loin", jetty=None, water_kind="lagune"):
+def panorama(scene, hidden, yaw=math.pi, all_lit=False, bridge="loin", port="loin", jetty=None, water_kind="lagune",
+             haubans=False):
     """Tout ce qu'on voit de loin par-dessus l'eau, commun aux scènes C, D et E : le ciel tourné de `yaw` (la bande
     corail derrière la ville), la lagune, la ville lointaine (`all_lit` : toutes fenêtres allumées), l'autre rive.
     `bridge`, `port`, `jetty` : None, « loin » (grandes formes et lumières) ou « près » (le lieu entier) ; le port
-    vient de scene_e.build_port s'il existe, sinon du terre-plein provisoire. Renvoie la source des lampadaires."""
+    vient de scene_e.build_port s'il existe, sinon du terre-plein provisoire. `haubans` : le pont avec son pylône
+    (palier « haubans » de scene_c). Renvoie la source des lampadaires."""
     sky(scene, yaw)
     water("lagune", (-7000, 7000), (-7000, 7000), WATER_Z, kind=water_kind)
     distant_city(all_lit=all_lit)
@@ -850,7 +852,7 @@ def panorama(scene, hidden, yaw=math.pi, all_lit=False, bridge="loin", port="loi
     lamp_src = lamp_source(hidden)
     if bridge:
         import scene_c
-        scene_c.build_bridge(hidden, lamp_src, far=(bridge == "loin"))
+        scene_c.build_bridge(hidden, lamp_src, far=(bridge == "loin"), haubans=haubans)
     if port:
         try:
             import scene_e
