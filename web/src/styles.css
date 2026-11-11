@@ -2815,6 +2815,20 @@ a.dossier-item:hover {
     grid-column: 1;
     grid-row: 2;
   }
+  /* une comparaison vue par un visiteur : les deux fiches ne tiennent pas dans la colonne de 360 px.
+     Une seule colonne : l'en-tête, la note du dossier et les deux pièces sur toute la largeur,
+     puis la colonne du texte (la ligne de la grille, les tuiles, le jury…) centrée dessous. */
+  .is-visitor .result-top:has(.cmp) {
+    display: block;
+  }
+  .is-visitor .result-top:has(.cmp) .wanted-head {
+    justify-items: center;
+    text-align: center;
+  }
+  .is-visitor .result-top:has(.cmp) .visitor-col {
+    max-width: 660px;
+    margin: 0 auto;
+  }
   .is-visitor .jury {
     padding: 24px 28px;
   }
@@ -2832,6 +2846,10 @@ a.dossier-item:hover {
     max-width: 1180px;
     padding-top: 40px;
     padding-right: calc(var(--gutter) + 360px + 72px);
+  }
+  .page-result.is-visitor:has(.cmp) .after {
+    max-width: 660px;
+    padding-right: var(--gutter);
   }
 
   .result-stage {
