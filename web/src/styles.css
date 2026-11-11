@@ -488,6 +488,15 @@ svg {
 .cover-suspect img {
   object-position: 50% 12%;
 }
+/* l'objet tenu plus bas (le diplôme, les bras croisés) : dans s2 sur ordinateur, la case
+   descend un peu pour le garder, quitte à rogner le haut des cheveux. Sans effet ailleurs :
+   les autres cases montrent presque toute la hauteur. */
+.cover-suspect[data-suspect="forger"] img {
+  object-position: 50% 22%;
+}
+.cover-suspect[data-suspect="kingpin"] img {
+  object-position: 50% 20%;
+}
 /* un visage (joueur du top, Jacques, place libre) : la photo en pleine case et
    en deux tons, prune dans les ombres et la teinte du mur dans les lumières ;
    les traits de la toise par-dessus ; la plaque en bas. Les tailles suivent la
