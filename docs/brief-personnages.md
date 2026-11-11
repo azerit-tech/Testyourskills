@@ -1,6 +1,6 @@
 # Brief des illustrations à générer : les suspects
 
-Six portraits de personnages, un par profil criminel choisi. Ils donnent des visages à la couverture de l'accueil (SPEC §18.31). Jacques les génère, Claude les découpe et les pose. Ce brief complète `docs/brief-illustrations.md` (les décors) : même ville, même peinture, mêmes lumières.
+Six portraits de personnages, un par profil criminel choisi. Ils donnent des visages à la couverture de l'accueil (SPEC §18.31). Jacques les génère, Claude les découpe et les pose. Il prolonge le brief des quatorze décors, livrés et posés le 9 novembre 2026 (SPEC §18.28 ; ce brief est retiré du dépôt, il reste dans l'historique git) : même ville, même peinture, mêmes lumières.
 
 ## 1. À quoi ils servent
 
@@ -62,7 +62,7 @@ Zones, sur une image de 1024 × 1536 :
 - **Même peinture que les décors** : gouache ou sérigraphie, grandes formes nettes, un dégradé doux dans chaque forme, un trait fin plus sombre, un léger grain de papier.
 - **Proportions réalistes stylisées** : ni caricature, ni dessin animé à grosse tête, ni photo. Le visage est simplifié en plans : deux ou trois valeurs par teinte, pas de pores, pas de rides détaillées.
 - **Aucune ombre noire, y compris sur la peau.** Les ombres du visage sont violettes ou prune ; un liseré de la couleur du ciel éclaire le côté du visage tourné vers l'horizon.
-- **La lumière est celle du décor du profil** (lettres A à D du brief des décors, rappelées au §7).
+- **La lumière est celle du décor du profil** (lettres A à D, au §7 ; la lumière de chaque profil est dans `shared/scenes.ts`).
 - **Vêtements en aplats pastel**, coupés simplement : chemise à manches courtes, veste de lin, sweat à capuche, polo. Un motif au plus (rayure ou palmes ton sur ton).
 - **Mat** : pas de lueur, pas de halo, pas de reflet chromé, pas de peau brillante.
 - **Ton** : sûr de soi et un peu ironique. Ce sont des devs qui se prennent pour des hors-la-loi. Leur arme est un ordinateur, un tampon, un café.

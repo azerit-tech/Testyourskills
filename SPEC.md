@@ -1078,7 +1078,7 @@ Après chaque fusion, on vérifie la grille suivante. On corrige ce qui manque, 
 
 *Tranché par Claude, à la demande de Jacques qui génère les images.*
 
-Chaque profil criminel a son « lieu du crime » : une illustration peinte en aplats, sans personne ni texte, au ratio 3:2. Une quatorzième sert aux fiches sans profil. Le brief complet (format, zones, style, quatre lumières, prompts, grille de tri) est dans `docs/brief-illustrations.md`.
+Chaque profil criminel a son « lieu du crime » : une illustration peinte en aplats, sans personne ni texte, au ratio 3:2. Une quatorzième sert aux fiches sans profil. Les quatorze images sont livrées et posées : leur brief (format, zones, style, prompts, grille de tri) est retiré du dépôt depuis le 11 novembre 2026 et reste dans l'historique git. Les quatre lumières (heure rose, heure dorée, heure bleue, aube) et celle de chaque profil sont dans `shared/scenes.ts` ; leurs teintes sont rappelées au §7 de `docs/brief-personnages.md`.
 
 - **Où elles vont** : la tuile de profil sous la fiche et sur la page partagée (le nom en capitales crème et la phrase, en bas à gauche, sur un voile) ; le mur des 13 profils de l'accueil ; le fond des images de partage ; le carton de fin.
 - **Pas dans la fiche** : la photo d'identité et la note couvriraient le sujet, et la fiche reste un SVG léger (texture 3D, PNG).
