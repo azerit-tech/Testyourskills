@@ -100,15 +100,16 @@ async function download(j: Job): Promise<string> {
   const len = Number(r.headers.get("content-length"));
   j.total = Number.isFinite(len) && len > 0 && !r.headers.get("content-encoding") ? len : null;
   const t0 = performance.now();
-  meter.begin(t0);
+  const reader = r.body?.getReader?.();
+  // sans lecture en flux, rien n'arrive par morceaux : le fichier compte une fois fini
+  if (reader) meter.begin(t0);
   try {
-    const reader = r.body?.getReader?.();
     let blob: Blob;
     if (!reader) {
-      // sans lecture en flux : en un bloc, sans mesure
+      // sans lecture en flux : en un bloc, sans mesure de la variante
       blob = await r.blob();
       j.loaded = blob.size;
-      meter.add(blob.size, performance.now());
+      meter.record(blob.size, performance.now() - t0);
     } else {
       const chunks: Uint8Array[] = [];
       for (;;) {

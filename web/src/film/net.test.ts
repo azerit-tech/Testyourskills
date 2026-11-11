@@ -82,6 +82,12 @@ describe("le compteur de débit", () => {
     expect(m.bps(300 + STALL_MS - 1)).toBeGreaterThan(0);
     expect(m.bps(300 + STALL_MS)).toBe(0);
   });
+
+  it("un fichier reçu d'un bloc (sans flux) compte une fois fini, jamais comme un réseau coupé", () => {
+    const m = new RateMeter();
+    m.record(1_000_000, 2000);
+    expect(m.bps(60_000)).toBe(4_000_000);
+  });
 });
 
 /** Une réponse lue en flux : `chunks` morceaux de `size` octets, un toutes les `every` ms. */
@@ -177,6 +183,21 @@ describe("le chargement en flux (loader.ts)", () => {
     const { loadFilmFiles } = await import("./loader");
     expect((await loadFilmFiles(["poursuite", "fin"])).quality).toBe("540");
     expect(asked.some((u) => /-720/.test(u))).toBe(false);
+  });
+
+  it("sans lecture en flux : le fichier arrive d'un bloc, la variante ne se mesure pas", async () => {
+    vi.stubGlobal("navigator", { connection: { effectiveType: "4g" } });
+    vi.stubGlobal("fetch", async () => ({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "video/mp4", "content-length": "500000" }),
+      body: null,
+      blob: async () => new Blob([new Uint8Array(500_000)], { type: "video/mp4" }),
+    }));
+    const { loadFilmFiles, filmNet } = await import("./loader");
+    const r = await loadFilmFiles(["poursuite", "fin"]);
+    expect(r.quality).toBe("720");
+    expect(filmNet().bytes).toBe(1_000_000);
   });
 
   it("une page HTML servie à la place n'est pas un film", async () => {

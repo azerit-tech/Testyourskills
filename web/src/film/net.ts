@@ -97,6 +97,15 @@ export class RateMeter {
   }
 
   /**
+   * Un fichier reçu d'un bloc, sans lecture en flux : compté une fois fini.
+   * Pendant son chargement rien n'arrive par morceaux, ce n'est pas un réseau coupé.
+   */
+  record(n: number, ms: number): void {
+    this.bytes += n;
+    this.activeMs += Math.max(0, ms);
+  }
+
+  /**
    * Le débit moyen, en bits par seconde ; 0 si un téléchargement en cours ne
    * reçoit plus rien depuis STALL_MS ; null tant qu'il n'y a pas de quoi mesurer.
    */
