@@ -38,11 +38,24 @@ LAMP = "#fff9cb"        # phares crème du film
 TAIL = "#ff2a1a"        # feux arrière
 AMBER = "#ffa21a"
 
+# l'usure des matières de la berline (0 = la voiture de catalogue, 1 = la voiture de tous les jours, jamais une
+# épave) : chromes voilés, vernis rayé dans les reflets, poussière de route en bas de caisse, gouttes qui sèchent
+USURE = 0.5
+
+
+def usure():
+    """Dose d'usure, FILM3D_USURE=0..1 dans l'environnement, USURE sinon."""
+    try:
+        return max(0.0, min(1.0, float(os.environ.get("FILM3D_USURE", USURE))))
+    except ValueError:
+        return USURE
+
 # couleurs d'époque, choisies sur les nuanciers des photographies : foncées, lisibles à l'heure bleue,
 # distinctes de la patrouille (marine presque noir) et du coupé actuel (prune)
 PAINT = {
-    "w111": "#2c0614",  # bordeaux profond (rouge rubis foncé du catalogue des années 60), tiré vers le pourpre
-                        # pour ne pas virer à la brique sous les lampadaires ambre
+    "w111": "#330516",  # bordeaux profond (rouge rubis foncé du catalogue des années 60), tiré vers le pourpre
+                        # pour ne pas virer à la brique sous les lampadaires ambre ; éclairci et saturé à teinte égale
+                        # (#2c0614 d'abord, brun-noir de profil et violet de trois quarts arrière à l'heure bleue)
     "slc": "#0c2a24",   # vert sapin foncé, teinte courante du coupé dans les années 70, tiré vers le bleu
                         # pour ne pas virer à l'olive sous les lampadaires ambre
 }
@@ -103,12 +116,210 @@ def _rib_mask(nt, sep, ribs):
     return h
 
 
-def mat_paint(name, color, metal=0.45, rough=0.3, flake=0.1, peel=0.012, gaps=(), ribs=(), inside=None):
+# ---------------------------------------------------------------- l'usure
+#
+# Tout se lit sur la position de repos des sommets (attribut « rest », posé par _finish dans le repère de la voiture,
+# l'avant vers +x, le sol à z = 0) : la poussière et les gouttes restent collées à la caisse quand la voiture roule,
+# portes et roues comprises (leur origine a bougé, pas leurs sommets). Les cartes d'imperfections sont des niveaux de
+# gris CC0 d'ambientCG (fetch.py) : traces d'essuyage (SurfaceImperfections003), taches d'eau séchée (013), grain de
+# poussière (017) ; sans elles, un bruit de même échelle les remplace.
+
+REST = "rest"           # position de repos, repère de la voiture
+REST_N = "rest_n"       # normale de repos, même repère
+REST_WHEEL = "rest_wheel"   # position dans le repère de la roue (origine sur l'axe, axe selon y), pour le pneu
+DUST = "#5f564e"        # poussière de route sèche, grise et chaude
+
+
+def _rest(nt):
+    a = nt.nodes.new("ShaderNodeAttribute")
+    a.attribute_type = "GEOMETRY"
+    a.attribute_name = REST
+    return a.outputs["Vector"]
+
+
+def _xyz(nt, vec):
+    s = nt.nodes.new("ShaderNodeSeparateXYZ")
+    nt.links.new(vec, s.inputs[0])
+    return s.outputs
+
+
+def _scaled(nt, vec, s):
+    vm = nt.nodes.new("ShaderNodeVectorMath")
+    vm.operation = "MULTIPLY"
+    nt.links.new(vec, vm.inputs[0])
+    vm.inputs[1].default_value = s if isinstance(s, (tuple, list)) else (s, s, s)
+    return vm.outputs[0]
+
+
+def _ramp(nt, x, a, b):
+    """Rampe douce de 0 (en a) à 1 (en b) ; a > b donne une rampe descendante."""
+    n = nt.nodes.new("ShaderNodeMapRange")
+    n.interpolation_type = "SMOOTHSTEP"
+    lo, hi = (a, b) if a < b else (b, a)
+    n.inputs["From Min"].default_value = lo
+    n.inputs["From Max"].default_value = hi
+    n.inputs["To Min"].default_value = 0.0 if a < b else 1.0
+    n.inputs["To Max"].default_value = 1.0 if a < b else 0.0
+    nt.links.new(x, n.inputs["Value"])
+    return n.outputs[0]
+
+
+def _mix(nt, a, b, f):
+    """a + (b - a) × f, en nombres."""
+    return cv._math(nt, "ADD", a, cv._math(nt, "MULTIPLY", cv._math(nt, "SUBTRACT", b, a), f))
+
+
+def _mix_rgb(nt, a, b, f, blend="MIX"):
+    n = nt.nodes.new("ShaderNodeMix")
+    n.data_type = "RGBA"
+    n.blend_type = blend
+    for sock, v in ((n.inputs["Factor"], f), (n.inputs[6], a), (n.inputs[7], b)):
+        if isinstance(v, bpy.types.NodeSocket):
+            nt.links.new(v, sock)
+        else:
+            sock.default_value = v
+    return n.outputs[2]
+
+
+def _rest_n(nt):
+    a = nt.nodes.new("ShaderNodeAttribute")
+    a.attribute_type = "GEOMETRY"
+    a.attribute_name = REST_N
+    return a.outputs["Vector"]
+
+
+def _imperfection(nt, coord, asset, size, lo=0.0, hi=1.0):
+    """Carte d'imperfection ambientCG (niveaux de gris), une tuile pour `size` mètres, ramenée de [lo, hi] à [0, 1].
+    Projection sur trois plans pondérés par la normale de repos (« rest_n ») et non la projection en boîte de Blender :
+    la rue tourne les maillages d'un quart de tour, la normale de l'objet ne serait plus dans le repère de « rest ».
+    Sans le fichier, un bruit de même échelle."""
+    path = os.path.join(cv.ASSETS, asset, f"{asset}_2K-JPG_Color.jpg")
+    v = _scaled(nt, coord, 1.0 / size)
+    if os.path.exists(path):
+        img = bpy.data.images.load(path, check_existing=True)
+        img.colorspace_settings.name = "Non-Color"
+        px, py, pz = _xyz(nt, v)
+        nx, ny, nz = _xyz(nt, _rest_n(nt))
+        acc = wsum = None
+        for (a, b), n in (((py, pz), nx), ((px, pz), ny), ((px, py), nz)):
+            uv = nt.nodes.new("ShaderNodeCombineXYZ")
+            nt.links.new(a, uv.inputs[0])
+            nt.links.new(b, uv.inputs[1])
+            t = nt.nodes.new("ShaderNodeTexImage")
+            t.image = img
+            nt.links.new(uv.outputs[0], t.inputs["Vector"])
+            w = cv._math(nt, "POWER", cv._math(nt, "ABSOLUTE", n), 4.0)
+            term = cv._math(nt, "MULTIPLY", t.outputs["Color"], w)
+            acc = term if acc is None else cv._math(nt, "ADD", acc, term)
+            wsum = w if wsum is None else cv._math(nt, "ADD", wsum, w)
+        src = cv._math(nt, "DIVIDE", acc, cv._math(nt, "MAXIMUM", wsum, 1e-4))
+    else:
+        src = _node(nt, "ShaderNodeTexNoise", Vector=v, Scale=6.0, Detail=4.0).outputs["Fac"]
+        lo, hi = 0.45, 0.75
+    r = nt.nodes.new("ShaderNodeMapRange")
+    r.inputs["From Min"].default_value = lo
+    r.inputs["From Max"].default_value = hi
+    nt.links.new(src, r.inputs["Value"])
+    return r.outputs[0]
+
+
+def _noise(nt, coord, scale, detail=2.0, lo=0.3, hi=0.7):
+    """Bruit doux ramené à [0, 1]."""
+    n = _node(nt, "ShaderNodeTexNoise", Vector=coord, Scale=scale, Detail=detail)
+    return _ramp(nt, n.outputs["Fac"], lo, hi)
+
+
+def _up(nt, a=0.55, b=0.85):
+    """1 sur les surfaces tournées vers le ciel (capot, toit, coffre), 0 sur les flancs : normale de repos."""
+    return _ramp(nt, _xyz(nt, _rest_n(nt))[2], a, b)
+
+
+def _drops(nt, coord, scale, size, density):
+    """Gouttes posées : un dôme par cellule de Voronoï (cellule de 1/scale m) tirée au sort avec la probabilité
+    `density`, rayon de 0,45 à 1 × size cellule. Renvoie (hauteur 0..1, masque 0/1)."""
+    vo = nt.nodes.new("ShaderNodeTexVoronoi")
+    vo.inputs["Scale"].default_value = scale
+    nt.links.new(coord, vo.inputs["Vector"])
+    sc = nt.nodes.new("ShaderNodeSeparateColor")
+    nt.links.new(vo.outputs["Color"], sc.inputs[0])
+    r = cv._math(nt, "MULTIPLY", cv._math(nt, "ADD", cv._math(nt, "MULTIPLY", sc.outputs[0], 0.55), 0.45), size)
+    q = cv._math(nt, "SUBTRACT", 1.0, cv._math(nt, "POWER", cv._math(nt, "DIVIDE", vo.outputs["Distance"], r), 2.0))
+    keep = cv._math(nt, "LESS_THAN", sc.outputs[1], density)
+    h = cv._math(nt, "MULTIPLY", cv._math(nt, "SQRT", cv._math(nt, "MAXIMUM", q, 0.0)), keep)
+    return h, cv._math(nt, "MULTIPLY", cv._math(nt, "GREATER_THAN", q, 0.0), keep)
+
+
+def _hairlines(nt, coord, along=(6.0, 6.0, 900.0), thresh=0.72):
+    """Traces fines et longues (essuyage, micro-rayures) : un bruit étiré, fin selon un axe et long selon les
+    deux autres, seuillé en filaments clairsemés ; renvoie 0..1."""
+    n = _node(nt, "ShaderNodeTexNoise", Vector=_scaled(nt, coord, along), Scale=1.0, Detail=3.0, Roughness=0.6)
+    return _ramp(nt, n.outputs["Fac"], thresh, thresh + 0.06)
+
+
+def _swirls(nt, coord, scale=5.0, pitch=0.006):
+    """Micro-rayures circulaires du lustrage : des cercles concentriques fins (un tous les `pitch` m) autour de centres
+    tirés au sort (Voronoï, cellule de 1/scale m), coupés en arcs par un bruit ; ne se voient que dans les reflets."""
+    out = None
+    for k, (s, seed) in enumerate(((scale, 0.0), (scale * 1.7, 13.7))):
+        # deux réseaux décalés : les cercles se chevauchent comme les passes d'un vrai lustrage
+        off = nt.nodes.new("ShaderNodeVectorMath")
+        off.operation = "ADD"
+        nt.links.new(coord, off.inputs[0])
+        off.inputs[1].default_value = (seed, -seed, seed * 0.5)
+        vo = nt.nodes.new("ShaderNodeTexVoronoi")
+        vo.inputs["Scale"].default_value = s
+        nt.links.new(off.outputs[0], vo.inputs["Vector"])
+        sc = nt.nodes.new("ShaderNodeSeparateColor")
+        nt.links.new(vo.outputs["Color"], sc.inputs[0])
+        # distance en mètres au centre, phase tirée par cellule
+        d = cv._math(nt, "DIVIDE", vo.outputs["Distance"], s)
+        ph = cv._math(nt, "ADD", cv._math(nt, "MULTIPLY", d, 2 * math.pi / pitch), cv._math(nt, "MULTIPLY", sc.outputs[2], 40.0))
+        ring = _ramp(nt, cv._math(nt, "SINE", ph), 0.85, 0.97)
+        # des arcs, pas des cercles entiers, et pas trop près du centre (le tampon ne laisse rien au milieu)
+        arcs = _noise(nt, coord, 60.0 + 25.0 * k, 1.0, 0.5, 0.62)
+        ring = cv._math(nt, "MULTIPLY", cv._math(nt, "MULTIPLY", ring, arcs), _ramp(nt, d, 0.01, 0.04))
+        out = ring if out is None else cv._math(nt, "MAXIMUM", out, ring)
+    return out
+
+
+def _grime(nt, rest, axles=None, top=0.6):
+    """Voile de route sur le bas de caisse et en gerbe derrière chaque roue (projections) ; renvoie 0..1 avant la dose.
+    axles : (x de l'essieu avant, x de l'essieu arrière), des nœuds Valeur nommés « axle_front », « axle_rear »
+    que load_hero recale sur la voiture."""
+    x, _, z = _xyz(nt, rest)
+    low = _ramp(nt, z, top, 0.10)
+    mask = cv._math(nt, "MULTIPLY", low, 0.75)
+    if axles:
+        for key, ax in zip(("axle_front", "axle_rear"), axles):
+            v = nt.nodes.new("ShaderNodeValue")
+            v.name = key
+            v.outputs[0].default_value = ax
+            # la gerbe part vers l'arrière de la roue (-x) et monte peu
+            dx = cv._math(nt, "DIVIDE", cv._math(nt, "SUBTRACT", x, cv._math(nt, "SUBTRACT", v.outputs[0], 0.50)), 0.62)
+            dz = cv._math(nt, "DIVIDE", cv._math(nt, "SUBTRACT", z, 0.22), 0.36)
+            d = cv._math(nt, "SQRT", cv._math(nt, "ADD", cv._math(nt, "MULTIPLY", dx, dx), cv._math(nt, "MULTIPLY", dz, dz)))
+            mask = cv._math(nt, "MAXIMUM", mask, _ramp(nt, d, 1.0, 0.25))
+    # le grain : poussière fine (017) et mouchetures de projections
+    grain = _imperfection(nt, rest, "SurfaceImperfections017", 0.6, 0.15, 0.55)
+    spk, _ = _drops(nt, rest, 420.0, 0.5, 0.35)
+    pat = cv._math(nt, "MAXIMUM", cv._math(nt, "ADD", cv._math(nt, "MULTIPLY", grain, 0.7), 0.3),
+                   cv._math(nt, "MULTIPLY", cv._math(nt, "GREATER_THAN", spk, 0.0), 1.0))
+    return cv._math(nt, "MULTIPLY", mask, pat)
+
+
+def mat_paint(name, color, metal=0.45, rough=0.3, flake=0.1, peel=0.012, gaps=(), ribs=(), inside=None, wear=0.0,
+              axles=(1.40, -1.40)):
     """Peinture vernie : base pigmentée à paillettes fines (bruit très serré sur la rugosité et le métal),
     vernis brillant à peau d'orange légère (bruit doux sur la normale du vernis).
 
     gaps : joints de panneaux dessinés en coordonnées objet (creux sombre et relief), pour une caisse dont le maillage
-    n'a pas de vraies découpes ; ribs : bandes nervurées."""
+    n'a pas de vraies découpes ; ribs : bandes nervurées.
+
+    wear (0..1, la berline) : le vernis garde son brillant mais n'est plus parfait : rugosité qui varie par zones,
+    micro-rayures circulaires du lustrage visibles dans les reflets, taches d'eau séchée et gouttes qui perlent encore
+    sur le dessus, ondulation légère des panneaux, voile de route sur le bas de caisse et derrière les roues."""
+    if wear > 0:
+        return _mat_paint_worn(name, color, metal, rough, flake, peel, wear, axles)
     m, nt, out = cv._mat(name)
     tc = nt.nodes.new("ShaderNodeTexCoord")
     if gaps or ribs:
@@ -166,6 +377,96 @@ def mat_paint(name, color, metal=0.45, rough=0.3, flake=0.1, peel=0.012, gaps=()
     return m
 
 
+def _mat_paint_worn(name, color, metal, rough, flake, peel, w, axles):
+    """La peinture de la berline, usée de `w` (voir mat_paint)."""
+    m, nt, out = cv._mat(name)
+    rest = _rest(nt)
+    up = _up(nt)
+    # la base : paillettes comme la peinture neuve
+    fl = _node(nt, "ShaderNodeTexNoise", Vector=rest, Scale=2600.0, Detail=0.0)
+    base_r = _node(nt, "ShaderNodeMapRange", Value=fl.outputs["Fac"], **{"To Min": rough - flake, "To Max": rough + flake})
+    mm = _node(nt, "ShaderNodeMapRange", Value=fl.outputs["Fac"], **{"To Min": metal - 0.25, "To Max": metal + 0.25})
+    # le vernis : rugosité qui varie par zones (lustré ici, un peu terne là), micro-rayures circulaires, taches d'eau
+    # séchée sur le dessus
+    zones = _noise(nt, rest, 1.3, 2.0)
+    swirl = _swirls(nt, rest)
+    spots = _imperfection(nt, rest, "SurfaceImperfections013", 0.45, 0.08, 0.6)
+    coat_r = cv._math(nt, "ADD", 0.022, cv._math(nt, "MULTIPLY", w, cv._math(
+        nt, "ADD", cv._math(nt, "MULTIPLY", zones, 0.09),
+        cv._math(nt, "ADD", cv._math(nt, "MULTIPLY", swirl, 0.25),
+                 cv._math(nt, "MULTIPLY", cv._math(nt, "MULTIPLY", spots, up), 0.12)))))
+    # le voile de route en bas de caisse : la poussière ternit le vernis et éclaircit la teinte
+    g = cv._math(nt, "MINIMUM", cv._math(nt, "MULTIPLY", _grime(nt, rest, axles), 2.0 * w), 0.8)
+    coat_r = _mix(nt, coat_r, 0.42, g)
+    base_col = _mix_rgb(nt, lin(color), lin(DUST), cv._math(nt, "MULTIPLY", g, 0.8))
+    # les gouttes : grosses perles sur le dessus, fines gouttelettes, quelques-unes sur les flancs ; un dôme d'eau
+    # lisse dans le vernis, et une auréole de calcaire autour des grosses
+    dens = min(1.0, 1.4 * w)
+    h1, m1 = _drops(nt, rest, 70.0, 0.36, cv._math(nt, "MULTIPLY", up, 0.32 * dens))
+    h2, m2 = _drops(nt, rest, 210.0, 0.33,
+                    cv._math(nt, "ADD", cv._math(nt, "MULTIPLY", up, 0.5 * dens), 0.05 * dens))
+    h = cv._math(nt, "MAXIMUM", h1, h2)
+    wet = cv._math(nt, "MAXIMUM", m1, m2)
+    coat_r = _mix(nt, coat_r, 0.0, wet)
+    # le relief du vernis : ondulation des panneaux (tôle emboutie), peau d'orange, gouttes
+    rip = _node(nt, "ShaderNodeTexNoise", Vector=rest, Scale=3.5, Detail=1.0)
+    b0 = _node(nt, "ShaderNodeBump", Height=rip.outputs["Fac"], Strength=0.5 * w, Distance=0.01)
+    op = _node(nt, "ShaderNodeTexNoise", Vector=rest, Scale=90.0, Detail=2.0)
+    op2 = _node(nt, "ShaderNodeTexNoise", Vector=rest, Scale=320.0, Detail=1.0)
+    peel_h = cv._math(nt, "ADD", op.outputs["Fac"], cv._math(nt, "MULTIPLY", op2.outputs["Fac"], 0.5))
+    b1 = _node(nt, "ShaderNodeBump", Height=peel_h, Strength=peel * (1.0 + 0.8 * w), Distance=0.002, Normal=b0.outputs[0])
+    b2 = _node(nt, "ShaderNodeBump", Height=h, Strength=1.0, Distance=0.0022, Normal=b1.outputs[0])
+    p = cv._principled(nt, **{"Coat IOR": 1.5})
+    nt.links.new(base_col, p.inputs["Base Color"])
+    nt.links.new(cv._math(nt, "ADD", base_r.outputs[0], cv._math(nt, "MULTIPLY", g, 0.4)), p.inputs["Roughness"])
+    nt.links.new(mm.outputs[0], p.inputs["Metallic"])
+    nt.links.new(coat_r, p.inputs["Coat Roughness"])
+    nt.links.new(cv._math(nt, "SUBTRACT", 1.0, cv._math(nt, "MULTIPLY", g, 0.55)), p.inputs["Coat Weight"])
+    nt.links.new(b0.outputs[0], p.inputs["Normal"])
+    nt.links.new(b2.outputs[0], p.inputs["Coat Normal"])
+    nt.links.new(p.outputs[0], out.inputs[0])
+    return m
+
+
+def mat_chrome(name, color=(0.92, 0.92, 0.93, 1), rough=0.05, wear=0.0):
+    """Chrome poli d'époque. Avec wear : jamais un miroir parfait sur les grandes surfaces : rugosité qui varie par
+    zones, traces d'essuyage (003) et micro-rayures fines le long des pièces, léger ternissement dans les creux
+    (occlusion locale), ondulation du placage, voile de route sur ce qui est bas (pare-chocs, enjoliveurs)."""
+    if wear <= 0:
+        return mat_metal(name, color, rough)
+    m, nt, out = cv._mat(name)
+    rest = _rest(nt)
+    zones = _noise(nt, rest, 2.2, 2.0)
+    wipe = _imperfection(nt, rest, "SurfaceImperfections003", 0.7, 0.12, 0.38)
+    hair = cv._math(nt, "MAXIMUM", _hairlines(nt, rest, (5.0, 5.0, 700.0)), _hairlines(nt, rest, (500.0, 7.0, 7.0), 0.75))
+    ao = nt.nodes.new("ShaderNodeAmbientOcclusion")
+    ao.only_local = True
+    ao.samples = 8
+    ao.inputs["Distance"].default_value = 0.035
+    tarnish = _ramp(nt, ao.outputs["AO"], 0.95, 0.45)
+    x, _, z = _xyz(nt, rest)
+    low = cv._math(nt, "MULTIPLY", _ramp(nt, z, 0.42, 0.12),
+                   _imperfection(nt, rest, "SurfaceImperfections017", 0.6, 0.1, 0.55))
+    r = cv._math(nt, "ADD", rough, cv._math(nt, "MULTIPLY", wear, cv._math(
+        nt, "ADD", cv._math(nt, "ADD", cv._math(nt, "MULTIPLY", zones, 0.16), cv._math(nt, "MULTIPLY", wipe, 0.30)),
+        cv._math(nt, "ADD", cv._math(nt, "MULTIPLY", hair, 0.16),
+                 cv._math(nt, "ADD", cv._math(nt, "MULTIPLY", tarnish, 0.35), cv._math(nt, "MULTIPLY", low, 0.6))))))
+    # le chrome terni tire vers un gris chaud, plus sombre ; le placage n'est pas tout à fait uniforme
+    dull = cv._math(nt, "MINIMUM", cv._math(nt, "MULTIPLY", cv._math(nt, "ADD", tarnish, low), 1.0 * wear), 0.7)
+    col = _mix_rgb(nt, color, (0.50, 0.47, 0.43, 1), dull)
+    col = _mix_rgb(nt, col, cv._math(nt, "ADD", 0.82, cv._math(nt, "MULTIPLY", zones, 0.18)), 1.0, "MULTIPLY")
+    rip = _node(nt, "ShaderNodeTexNoise", Vector=rest, Scale=4.0, Detail=2.0)
+    bump = _node(nt, "ShaderNodeBump", Height=rip.outputs["Fac"], Strength=0.9 * wear, Distance=0.03)
+    hb = _node(nt, "ShaderNodeBump", Height=hair, Strength=0.15 * wear, Distance=0.0003, Normal=bump.outputs[0])
+    p = cv._principled(nt, **{"Metallic": 1.0})
+    nt.links.new(col, p.inputs["Base Color"])
+    nt.links.new(r, p.inputs["Roughness"])
+    nt.links.new(hb.outputs[0], p.inputs["Normal"])
+    nt.links.new(hb.outputs[0], ao.inputs["Normal"])
+    nt.links.new(p.outputs[0], out.inputs[0])
+    return m
+
+
 def mat_metal(name, color=(0.9, 0.9, 0.92, 1), rough=0.06, aniso=0.0):
     m, nt, out = cv._mat(name)
     p = cv._principled(nt, **{"Base Color": color, "Metallic": 1.0, "Roughness": rough})
@@ -189,14 +490,20 @@ def mat_rubber(name, color=(0.018, 0.018, 0.02, 1), rough=0.62, grain=0.15):
     return m
 
 
-def mat_tyre(name, r_rim=0.19, r_out=0.31):
-    """Pneu, en coordonnées de l'objet roue (origine sur l'axe, axe selon y local) : gomme noire, flanc à fines
+def mat_tyre(name, r_rim=0.19, r_out=0.31, wear=0.0):
+    """Pneu, dans le repère de la roue (attribut « rest_wheel » : origine sur l'axe, axe selon y ; il reste juste quand
+    la rue tourne les maillages d'un quart de tour) : gomme noire, flanc à fines
     stries concentriques, un bandeau de marquages moulés illisibles (relief seul, aucun texte) et le liseré du talon ;
-    la bande de roulement reste mate."""
+    la bande de roulement reste mate.
+
+    wear : gomme vieillie, flancs mats (le satin du neuf part), poussière grise dans les stries et sur la bande."""
     m, nt, out = cv._mat(name)
-    tc = nt.nodes.new("ShaderNodeTexCoord")
+    at = nt.nodes.new("ShaderNodeAttribute")
+    at.attribute_type = "GEOMETRY"
+    at.attribute_name = REST_WHEEL
+    pos = at.outputs["Vector"]
     sep = nt.nodes.new("ShaderNodeSeparateXYZ")
-    nt.links.new(tc.outputs["Object"], sep.inputs[0])
+    nt.links.new(pos, sep.inputs[0])
     x, z = sep.outputs[0], sep.outputs[2]
     r = cv._math(nt, "SQRT", cv._math(nt, "ADD", cv._math(nt, "MULTIPLY", x, x), cv._math(nt, "MULTIPLY", z, z)))
     ang = cv._math(nt, "ARCTAN2", z, x)
@@ -217,21 +524,33 @@ def mat_tyre(name, r_rim=0.19, r_out=0.31):
     h = cv._math(nt, "ADD", cv._math(nt, "MULTIPLY", rings, cv._math(nt, "SUBTRACT", side, band)),
                  cv._math(nt, "ADD", marks, bead))
     nz = _node(nt, "ShaderNodeTexNoise", Scale=700.0, Detail=1.0)
-    nt.links.new(tc.outputs["Object"], nz.inputs["Vector"])
+    nt.links.new(pos, nz.inputs["Vector"])
     h = cv._math(nt, "ADD", h, cv._math(nt, "MULTIPLY", nz.outputs["Fac"], 0.3))
     bump = _node(nt, "ShaderNodeBump", Strength=0.5, Distance=0.0008)
     nt.links.new(h, bump.inputs["Height"])
-    rough = cv._math(nt, "SUBTRACT", 0.78, cv._math(nt, "MULTIPLY", cv._math(nt, "ADD", side, marks), 0.08))
-    p = cv._principled(nt, **{"Base Color": (0.018, 0.018, 0.02, 1), "Specular IOR Level": 0.35})
+    rough = cv._math(nt, "SUBTRACT", 0.78 + 0.1 * wear, cv._math(nt, "MULTIPLY", cv._math(nt, "ADD", side, marks),
+                                                                   0.08 * (1.0 - wear)))
+    p = cv._principled(nt, **{"Base Color": (0.018, 0.018, 0.02, 1), "Specular IOR Level": 0.35 - 0.12 * wear})
+    if wear > 0:
+        # la poussière se loge dans les creux (stries, marquages) et couvre la bande de roulement
+        dust = _imperfection(nt, pos, "SurfaceImperfections017", 0.5, 0.1, 0.55)
+        tread = cv._math(nt, "GREATER_THAN", r, r_out - 0.03)
+        f = cv._math(nt, "MULTIPLY", cv._math(nt, "ADD", cv._math(nt, "MULTIPLY", dust, 0.6),
+                                              cv._math(nt, "MULTIPLY", tread, 0.35)), 0.55 * wear)
+        nt.links.new(_mix_rgb(nt, (0.018, 0.018, 0.02, 1), lin("#4a443d"), cv._math(nt, "MINIMUM", f, 0.5)),
+                     p.inputs["Base Color"])
     nt.links.new(rough, p.inputs["Roughness"])
     nt.links.new(bump.outputs[0], p.inputs["Normal"])
     nt.links.new(p.outputs[0], out.inputs[0])
     return m
 
 
-def mat_window(name, tint=(0.80, 0.86, 0.84, 1), dark=0.0):
+def mat_window(name, tint=(0.80, 0.86, 0.84, 1), dark=0.0, wear=0.0):
     """Verre de vitre : sans réfraction (les vitres du modèle sont des feuilles minces), reflet de Fresnel
-    du verre réel (IOR 1,52) sur une transparence à peine verte, comme le verre trempé d'époque."""
+    du verre réel (IOR 1,52) sur une transparence à peine verte, comme le verre trempé d'époque.
+
+    wear : un voile d'essuyage (003) qui ternit le reflet par endroits, des taches d'eau séchée (013), et des
+    gouttes, nombreuses sur les vitres couchées (pare-brise, lunette), rares sur les vitres de côté."""
     m, nt, out = cv._mat(name)
     fr = _node(nt, "ShaderNodeFresnel", IOR=1.52)
     tr = _node(nt, "ShaderNodeBsdfTransparent", Color=tuple(c * (1 - dark) for c in tint[:3]) + (1,))
@@ -239,7 +558,22 @@ def mat_window(name, tint=(0.80, 0.86, 0.84, 1), dark=0.0):
     gl.inputs["Roughness"].default_value = 0.0
     mix = nt.nodes.new("ShaderNodeMixShader")
     # un plancher de reflet : la vitre reste lisible de face
-    f = cv._math(nt, "ADD", cv._math(nt, "MULTIPLY", fr.outputs[0], 0.9), 0.04)
+    floor = 0.04
+    if wear > 0:
+        rest = _rest(nt)
+        haze = _imperfection(nt, rest, "SurfaceImperfections003", 0.8, 0.04, 0.4)
+        spots = _imperfection(nt, rest, "SurfaceImperfections013", 0.4, 0.08, 0.6)
+        veil = cv._math(nt, "MAXIMUM", haze, spots)
+        nt.links.new(cv._math(nt, "MULTIPLY", veil, 0.10 * wear), gl.inputs["Roughness"])
+        floor = cv._math(nt, "ADD", 0.04, cv._math(nt, "MULTIPLY", veil, 0.07 * wear))
+        up = _up(nt, 0.25, 0.65)
+        dens = min(1.0, 1.4 * wear)
+        h1, m1 = _drops(nt, rest, 80.0, 0.34, cv._math(nt, "ADD", cv._math(nt, "MULTIPLY", up, 0.35 * dens), 0.03 * dens))
+        h2, m2 = _drops(nt, rest, 230.0, 0.3, cv._math(nt, "ADD", cv._math(nt, "MULTIPLY", up, 0.3 * dens), 0.04 * dens))
+        b = _node(nt, "ShaderNodeBump", Height=cv._math(nt, "MAXIMUM", h1, h2), Strength=1.0, Distance=0.0025)
+        nt.links.new(b.outputs[0], gl.inputs["Normal"])
+        nt.links.new(b.outputs[0], fr.inputs["Normal"])
+    f = cv._math(nt, "ADD", cv._math(nt, "MULTIPLY", fr.outputs[0], 0.9), floor)
     nt.links.new(f, mix.inputs[0])
     nt.links.new(tr.outputs[0], mix.inputs[1])
     nt.links.new(gl.outputs[0], mix.inputs[2])
@@ -560,22 +894,25 @@ def _w111_clean(parts):
 
 
 def _w111_materials(parts, lights_on, tag="hero_w111", paint_color=PAINT["w111"], leather=LEATHER["w111"],
-                    wheel_rim="#e6dcc2"):
-    """Les matières de la berline ; reprises par le coupé pour l'habitacle emprunté (tag, peinture, cuir, jante)."""
+                    wheel_rim="#e6dcc2", wear=0.0):
+    """Les matières de la berline ; reprises par le coupé pour l'habitacle emprunté (tag, peinture, cuir, jante).
+    wear : l'usure (0..1, voir usure()), la berline seule."""
     on = 1.0 if lights_on else 0.0
-    paint = mat_paint(f"{tag}_paint", paint_color)
-    chrome = mat_metal(f"{tag}_chrome", (0.92, 0.92, 0.93, 1), 0.05)
+    # moins de métal dans la base que la peinture par défaut : la part diffuse garde le rouge lisible quand le reflet
+    # (le ciel bleu de l'heure bleue) l'emporte
+    paint = mat_paint(f"{tag}_paint", paint_color, metal=0.38, wear=wear)
+    chrome = mat_chrome(f"{tag}_chrome", (0.92, 0.92, 0.93, 1), 0.05, wear=wear)
     table = {
         "Carpaint_Simple_Ruby0": paint,
         "chrome": chrome,
-        "Silver_Clean": mat_metal(f"{tag}_grille", (0.86, 0.86, 0.87, 1), 0.14),
+        "Silver_Clean": mat_chrome(f"{tag}_grille", (0.86, 0.86, 0.87, 1), 0.12, wear=wear),
         "metal": mat_metal(f"{tag}_steel", (0.10, 0.10, 0.105, 1), 0.5),
-        "Rubber": mat_rubber(f"{tag}_seal", rough=0.5, grain=0.05),
-        "Rubber0": mat_tyre(f"{tag}_tyre"),
+        "Rubber": mat_rubber(f"{tag}_seal", rough=0.5 + 0.15 * wear, grain=0.05),
+        "Rubber0": mat_tyre(f"{tag}_tyre", wear=wear),
         "PVC_Black_Matte": mat_rubber(f"{tag}_black", (0.012, 0.012, 0.013, 1), 0.55, 0.05),
         "PVC_Black_Matte0": mat_rubber(f"{tag}_black0", (0.012, 0.012, 0.013, 1), 0.6, 0.05),
         "PVC_Black_Matte1": mat_rubber(f"{tag}_black1", (0.015, 0.014, 0.014, 1), 0.5, 0.05),
-        "Material_26": mat_window(f"{tag}_glass"),
+        "Material_26": mat_window(f"{tag}_glass", wear=wear),
         # les ampoules (dans l'assemblage des feux) : allumées à l'avant, sombres à l'arrière sauf le feu de position
         "Material_38": None,
         "light_reflector": None,
@@ -619,7 +956,8 @@ def _load_w111(collection, lights_on, raw):
     report = {}
     if not raw:
         parts, report = _w111_clean(parts)
-        _w111_materials(parts, lights_on)
+        _w111_materials(parts, lights_on, wear=usure())
+        report["usure"] = usure()
     # le fichier pose l'avant vers -y : un quart de tour met l'avant vers +x
     cv.normalise(parts, rot_z=90)
     return parts, report
@@ -631,8 +969,49 @@ def _group(parts, key):
     return [o for o in parts if key in o.name]
 
 
+def _stamp_rest(parts):
+    """Position et normale de repos de chaque sommet (repère de la voiture) dans les attributs « rest » et « rest_n »,
+    lus par les matières usées : ils suivent les sommets quand la rue tourne ou déplace les maillages."""
+    for o in parts:
+        me = o.data
+        if REST in me.attributes:
+            continue
+        mw = o.matrix_world
+        rot = mw.to_3x3()
+        a = me.attributes.new(REST, "FLOAT_VECTOR", "POINT")
+        a.data.foreach_set("vector", [c for v in me.vertices for c in (mw @ v.co)])
+        a = me.attributes.new(REST_N, "FLOAT_VECTOR", "POINT")
+        a.data.foreach_set("vector", [c for v in me.vertices for c in (rot @ v.normal).normalized()])
+
+
+def _stamp_wheel(w):
+    """Position dans le repère de la roue (« rest_wheel »), pour le pneu : à poser une fois l'origine sur l'axe."""
+    me = w.data
+    if REST_WHEEL in me.attributes:
+        me.attributes.remove(me.attributes[REST_WHEEL])
+    a = me.attributes.new(REST_WHEEL, "FLOAT_VECTOR", "POINT")
+    a.data.foreach_set("vector", [c for v in me.vertices for c in v.co])
+
+
+def _set_axles(car):
+    """Recale les gerbes de route de la peinture usée sur les essieux réels (nœuds « axle_front », « axle_rear »)."""
+    xs = sorted({round(p[0], 3) for p in car["axles"].values()})
+    if len(xs) < 2:
+        return
+    for m in {s.material for o in [car["body"]] + list(car["doors"].values()) + list(car["wheels"].values())
+              for s in o.material_slots if s.material}:
+        if not m.node_tree:
+            continue
+        for key, x in (("axle_front", xs[-1]), ("axle_rear", xs[0])):
+            n = m.node_tree.nodes.get(key)
+            if n:
+                n.outputs[0].default_value = x
+
+
 def _finish(variant, parts, collection, lights_on, raw, wheel_keys, door_keys, report):
     tag = f"hero_{variant}" + ("_raw" if raw else "")
+    if not raw:
+        _stamp_rest(parts)
     # les groupes d'abord, par nom (une jonction invalide les objets qu'elle absorbe)
     names = {o.name: o for o in parts}
     taken = set()
@@ -651,6 +1030,8 @@ def _finish(variant, parts, collection, lights_on, raw, wheel_keys, door_keys, r
         w = cv.join([names[n] for n in ns], f"{tag}_wheel_{k}")
         a, b = cv.bbox([w])
         cv.set_origin(w, (a + b) / 2)
+        if not raw:
+            _stamp_wheel(w)
         wheels[k] = w
     doors = {}
     for k, ns in dgroups.items():
@@ -721,6 +1102,7 @@ def load_hero(variant="w111", collection=None, lights_on=True, raw=False):
                       {k: (f"_door_{k}",) for k in ("FL", "FR", "BL", "BR")}, report)
         if not raw:
             body = car["body"]
+            _set_axles(car)
             mn, mx = cv.bbox([body])
             # plaque vierge à l'arrière seulement (format américain 30,5 x 15,2 cm, pas de plaque avant dans l'État
             # du film), dans le logement entre les feux
@@ -1110,6 +1492,8 @@ def _args():
     ap.add_argument("--only", default="", help="vues : avant,profil,arriere,interieur,debug")
     ap.add_argument("--reuse", action="store_true")
     ap.add_argument("--no-raw", action="store_true", help="ne refait pas le côté « livré »")
+    ap.add_argument("--usure", type=float, default=None, help="dose d'usure 0..1 (sinon FILM3D_USURE, puis USURE)")
+    ap.add_argument("--usure-avant", type=float, default=0.0, help="planche usure : la dose de la colonne de gauche")
     return ap.parse_args(argv)
 
 
@@ -1150,6 +1534,7 @@ def _view_camera(cvr, car, view, res):
     close = {
         "gros-phare": ((mx.x + 1.1, -0.75 * W, 1.0), (mx.x - 0.05, -0.33 * W, 0.68), 50.0, "phare"),
         "gros-capot": ((mx.x + 1.6, -0.25, 1.45), (mx.x - 0.2, 0.0, 0.85), 50.0, "calandre et capot"),
+        "gros-calandre": ((mx.x + 1.55, -0.62, 0.78), (mx.x - 0.1, -0.05, 0.55), 40.0, "calandre et pare-chocs"),
         "gros-coffre": ((mn.x - 1.5, -0.6, 1.3), (mn.x + 0.1, 0.0, 0.7), 40.0, "coffre"),
         "gros-roue": None,
     }
@@ -1169,7 +1554,7 @@ def _view_camera(cvr, car, view, res):
     return cvr.camera((c.x + d * math.cos(a), c.y - d * math.sin(a), z), (c.x, c.y, mn.z + 0.42 * H), lens=lens), label
 
 
-def render_views(car_name, raw, views, out_dir, res, samples, reuse=False, tag=None):
+def render_views(car_name, raw, views, out_dir, res, samples, reuse=False, tag=None, state=None):
     import cast_vehicles_render as cvr
     paths = []
     tag = tag or (f"{car_name}-{'livre' if raw else 'apres'}")
@@ -1189,8 +1574,8 @@ def render_views(car_name, raw, views, out_dir, res, samples, reuse=False, tag=N
             continue
         cam, label = _view_camera(cvr, car, v, res)
         bpy.context.scene.camera = cam
-        state = "" if car_name == "coupe" else (" livrée" if raw else " retravaillée")
-        cap = cvr.cam_label(cv, cam, f"{name}{state}  ·  {label}", res)
+        st = state if state is not None else ("" if car_name == "coupe" else (" livrée" if raw else " retravaillée"))
+        cap = cvr.cam_label(cv, cam, f"{name}{st}  ·  {label}", res)
         cvr.setup_render(res[0], res[1], samples)
         bpy.context.scene.view_settings.exposure = 0.5 if v != "interieur" else 1.6
         bpy.context.scene.render.filepath = p
@@ -1210,7 +1595,23 @@ def main():
     shots = os.path.join(lab, "plans")
     os.makedirs(shots, exist_ok=True)
     import cast_vehicles_render as cvr
-    if a.sheet == "avant-apres":
+    if a.usure is not None:
+        os.environ["FILM3D_USURE"] = str(a.usure)
+    if a.sheet == "usure":
+        # le métal et la peinture : à gauche la dose --usure-avant (0 par défaut), à droite la dose retenue ;
+        # --reuse garde les vues déjà rendues (<car>-usure0-<vue>.png à gauche)
+        views = a.only.split(",") if a.only else ["avant", "arriere", "gros-calandre"]
+        after_w = usure()
+        os.environ["FILM3D_USURE"] = str(a.usure_avant)
+        before = render_views(a.car, False, views, shots, res, a.samples, reuse=a.reuse, tag=f"{a.car}-usure0",
+                              state=f", usure {a.usure_avant:g}".replace(".", ","))
+        os.environ["FILM3D_USURE"] = str(after_w)
+        after = render_views(a.car, False, views, shots, res, a.samples, tag=f"{a.car}-usure",
+                             state=f", usure {after_w:g}".replace(".", ","))
+        paths = [p for pair in zip(before, after) for p in pair]
+        if all(os.path.exists(p) for p in paths):
+            cvr.compose(paths, 2, os.path.join(lab, "mercedes-metal-avant-apres.png"), res)
+    elif a.sheet == "avant-apres":
         views = a.only.split(",") if a.only else ["avant", "profil", "arriere", "interieur"]
         before = [os.path.join(shots, f"{a.car}-livre-{v}.png") for v in views] if a.no_raw else \
             render_views(a.car, True, views, shots, res, a.samples, reuse=a.reuse)

@@ -118,6 +118,10 @@ AMBIENTCG = [
     ("Leaking009", "2K"),
     # les grilles d'avaloir du caniveau
     ("Grate002", "1K"),
+    # l'usure de la voiture poursuivie : traces d'essuyage, taches d'eau séchée, grain de poussière
+    ("SurfaceImperfections003", "2K"),
+    ("SurfaceImperfections013", "2K"),
+    ("SurfaceImperfections017", "2K"),
 ]
 
 TEX_MAPS = {"Diffuse": "diff", "nor_gl": "nor_gl", "Rough": "rough", "Displacement": "disp"}
