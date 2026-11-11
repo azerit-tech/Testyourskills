@@ -17,6 +17,16 @@ import {
   lumineReading,
 } from "../../../server/src/scoring/__fixtures__/founders";
 import { compareCards, scoreCv, scoreGithub } from "../../../server/src/scoring/index";
+import lectureUn from "../../../server/src/ai/__fixtures__/reading-exemple-un.json";
+import lectureDeux from "../../../server/src/ai/__fixtures__/reading-exemple-deux.json";
+import { validateCvOutput } from "../../../server/src/ai/readCv";
+import exempleUn from "../../../server/src/linkedinProfile/__fixtures__/apify-exemple-un.json";
+import exempleDeux from "../../../server/src/linkedinProfile/__fixtures__/apify-exemple-deux.json";
+import { profileFromApifyItem } from "../../../server/src/linkedinProfile/apify";
+import { profileToText } from "../../../server/src/linkedinProfile/text";
+import type { GithubFacts } from "../../../server/src/github/facts";
+import type { CodeReadingResult } from "../../../shared/readings";
+import { GRID_CAP_UNPROVEN, GRID_EMPTY_SCORE } from "../../../shared/gridText";
 import { asLinkedinCard, asLinkedinComparison } from "../../../shared/linkedinText";
 import { DICTS, LangProvider } from "../i18n";
 import { comparisonGridsMock } from "../lib/mockGrid";
@@ -206,5 +216,104 @@ describe("face à un GitHub vide : le code n'est pas prouvé, rien ne se compare
     expect(g.github.rule).toBe("empty_file");
     expect(g.grid.rule).toBe("capped_unproven");
     expect(g.grid.criteria.filter((c) => c.evidence?.source === "both")).toEqual([]);
+  });
+});
+
+describe("une vraie grille du serveur, à travers le bloc : les deux profils d'exemple, du fournisseur à l'écran", () => {
+  // Le chemin du pipeline, sans aucun appel : sortie Apify → profil gardé → texte → lecture IA vérifiée par le code → scoreurs → comparaison.
+  type Raw = Record<string, unknown>;
+  function pipeline(item: Raw, rawReading: unknown, facts: GithubFacts, ai: CodeReadingResult | null) {
+    const profile = profileFromApifyItem(String(item.linkedinUrl), item)!;
+    const v = validateCvOutput(structuredClone(rawReading), profileToText(profile));
+    if (!v.ok) throw new Error(v.issues.join("; "));
+    const linkedin = { roles: profile.roles, education: profile.education, skills: profile.skills, url: profile.url };
+    const li = asCard(asLinkedinCard(scoreCv(v.value, cvCounts(), { ...opts, linkedin, now: FOUNDERS_NOW, github: facts })), "li");
+    const gh = asCard(scoreGithub(facts, ai, opts), "gh");
+    const cmp = { ...asLinkedinComparison(compareCards(li, gh)), id: "cmp", createdAt: FOUNDERS_NOW };
+    const names = [...profile.roles.map((r) => r.company), ...profile.education.map((e) => e.school)].filter((n) => n && n !== "Azerit");
+    return { li, gh, cmp, names };
+  }
+  const exemples = [
+    ["exemple un, face au GitHub de Jacques", pipeline(structuredClone(exempleUn[0]) as Raw, lectureUn, jacquesFacts(), JACQUES_AI)],
+    ["exemple deux, face au GitHub vide de Lumine", pipeline(structuredClone(exempleDeux[0]) as Raw, lectureDeux, lumineFacts(), null)],
+  ] as const;
+
+  /** Recalcule la note depuis le texte rendu : les termes « score × coef », le diviseur, l'arrondi à ,5 au supérieur, le plafond. */
+  function checkFinal(html: string, grid: NonNullable<CardData["grid"]>) {
+    const final = textOf(html.slice(html.indexOf('class="rg-final"')));
+    const big = Number(/class="rg-big"><b>(\d+)<\/b>/.exec(html)?.[1]);
+    expect(big).toBe(grid.overall);
+    if (grid.rule === "empty_file") {
+      expect(big).toBe(GRID_EMPTY_SCORE);
+      expect(html).not.toContain('class="rg-formula"');
+      return;
+    }
+    const formula = textOf(/<p class="rg-formula">([^<]+)<\/p>/.exec(html)![1]);
+    const num = (s: string) => Number(s.replace(",", "."));
+    const terms = [...formula.matchAll(/(\d+)\s×\s(\d+(?:[,.]\d+)?)/g)].map((m) => [Number(m[1]), num(m[2])] as const);
+    expect(terms.length).toBe(grid.criteria.filter((c) => c.counted && c.score !== null).length);
+    const den2 = terms.reduce((s, [, w]) => s + Math.round(w * 2), 0);
+    expect(num(/÷\s(\d+(?:[,.]\d+)?)/.exec(formula)![1]) * 2).toBe(den2);
+    const num2 = terms.reduce((s, [x, w]) => s + x * Math.round(w * 2), 0);
+    const mean = /=\s(\d+(?:[,.]\d+)?)\s(?:sur|out of)\s10/.exec(final)![1];
+    expect(num(mean)).toBeCloseTo(num2 / den2, 2);
+    const raw = Math.floor((20 * num2 + den2) / (2 * den2));
+    expect(grid.rule === "capped_unproven" ? Math.min(raw, GRID_CAP_UNPROVEN) : raw).toBe(grid.overall);
+  }
+
+  for (const [label, { li, gh, cmp, names }] of exemples) {
+    const items: [string, Shareable, CardData["grid"]][] = [
+      ["la fiche LinkedIn", { kind: "card", card: li }, li.grid],
+      ["la fiche GitHub", { kind: "card", card: gh }, gh.grid],
+      ["la comparaison", { kind: "comparison", comparison: cmp }, cmp.grid],
+    ];
+    for (const [what, item, grid] of items) {
+      for (const lang of ["fr-FR", "en-US"]) {
+        for (const shared of [false, true]) {
+          it(`${label} : ${what}, ${lang}${shared ? ", page partagée" : ""}`, () => {
+            expect(grid).toBeDefined();
+            const html = render(item, shared, lang);
+            const dict = lang === "fr-FR" ? DICTS.fr.grid : DICTS.en.grid;
+            const rows = rowsOf(html);
+            // Chaque critère a sa ligne, nommée.
+            expect([...rows.keys()].sort()).toEqual(grid!.criteria.map((c) => dict.names[c.code]).sort());
+            expect(rows.size).toBe(8);
+            expect(textOf(html)).not.toMatch(/undefined|null|NaN|\[object/);
+            for (const c of grid!.criteria) {
+              const row = rows.get(dict.names[c.code])!;
+              // Jamais de bonus ni de malus en points sur un critère.
+              expect(textOf(row), c.code).not.toMatch(/(^|[\s(])[+−]\s?\d/);
+              if (c.state === "scored" && c.score !== null) {
+                const piece = /<p class="rg-piece">([\s\S]*?)<\/p>/.exec(row)?.[1];
+                expect(piece && textOf(piece).trim(), `${c.code} sans pièce`).toBeTruthy();
+              }
+            }
+            checkFinal(html, grid!);
+            // La page partagée ne nomme ni employeur ni école de la personne.
+            if (shared) for (const n of names) expect(textOf(html), n).not.toContain(n);
+          });
+        }
+      }
+    }
+  }
+
+  it("l'expérience lue sur GitHub porte « estimée » sur la fiche GitHub, pas sur LinkedIn", () => {
+    const [, { li, gh }] = exemples[0];
+    const ghXp = gh.grid!.criteria.find((c) => c.code === "XP")!;
+    expect(ghXp.source).toBe("github");
+    expect(ghXp.state).toBe("scored");
+    for (const lang of ["fr-FR", "en-US"]) {
+      const dict = lang === "fr-FR" ? DICTS.fr.grid : DICTS.en.grid;
+      const ghRow = rowsOf(render({ kind: "card", card: gh }, false, lang)).get(dict.names.XP)!;
+      expect(ghRow).toContain(`class="rg-tag tag-estimated">${dict.tags.estimated}<`);
+      const liRow = rowsOf(render({ kind: "card", card: li }, false, lang)).get(dict.names.XP)!;
+      expect(liRow).not.toContain("tag-estimated");
+    }
+  });
+
+  it("la personne fichée lit les noms que la page partagée tait", () => {
+    const [, { li, names }] = exemples[0];
+    const own = textOf(render({ kind: "card", card: li }, false));
+    expect(names.some((n) => own.includes(n))).toBe(true);
   });
 });
