@@ -277,7 +277,7 @@ describe("la lecture du recruteur (§18.37)", () => {
     expect(rr).toBeGreaterThan(html.indexOf('class="result-stage"'));
     expect(rr).toBeLessThan(html.indexOf('class="after-head"'));
     expect(html.match(/class="rr-tile /g)).toHaveLength(8);
-    expect(html).toMatch(/<p class="rr-line">[^<]+, [^<]+\. Point fort : [^<]+, \d+\/10\./);
+    expect(html).toMatch(/<p class="rr-line">[^<]+, [^<]+\. Point fort\u00a0: [^<]+, \d+\/10\./);
     // Les tuiles dans l'ordre du recruteur, les critères sans note en bas.
     const names = [...html.matchAll(/<span class="rr-name">([^<]+)<\/span>/g)].map((m) => m[1]);
     const { scored, pending } = tileOrder(grid);

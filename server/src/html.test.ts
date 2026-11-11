@@ -27,11 +27,11 @@ function emptyGh(c: ComparisonData): ComparisonData {
 
 describe("aperçu de lien d'une comparaison", () => {
   it("LinkedIn devant : « Le LinkedIn de @lea annonce 21 points que son code public ne montre pas encore »", () => {
-    expect(metaFor(cmp(80, 59, { declaredSource: "linkedin" }), "https://s.test").title).toBe("Le LinkedIn de @lea annonce 21 points que son code public ne montre pas encore");
+    expect(metaFor(cmp(80, 59, { declaredSource: "linkedin" }), "https://s.test").title).toBe("Le LinkedIn de @lea annonce 21\u00a0points que son code public ne montre pas encore");
   });
 
   it("le code devant : « Le code de @lea en montre plus que son CV : 12 points »", () => {
-    expect(metaFor(cmp(60, 72), "https://s.test").title).toBe("Le code de @lea en montre plus que son CV : 12 points");
+    expect(metaFor(cmp(60, 72), "https://s.test").title).toBe("Le code de @lea en montre plus que son CV\u00a0: 12\u00a0points");
   });
 
   it("en anglais, et au singulier", () => {
@@ -43,7 +43,7 @@ describe("aperçu de lien d'une comparaison", () => {
   it("sans pseudo, le nom ; à égalité, les deux pièces d'accord ; jamais le titre rangé", () => {
     const anon = cmp(60, 72);
     anon.github = { ...anon.github, login: undefined };
-    expect(metaFor(anon, "https://s.test").title).toBe(`Le code de ${anon.github.name} en montre plus que son CV : 12 points`);
+    expect(metaFor(anon, "https://s.test").title).toBe(`Le code de ${anon.github.name} en montre plus que son CV\u00a0: 12\u00a0points`);
     expect(metaFor(cmp(70, 70), "https://s.test").title).toBe("Le CV et le code de @lea sont d'accord");
   });
 
@@ -62,7 +62,7 @@ describe("aperçu de lien d'une comparaison", () => {
 
   it("face à un GitHub vide : le code reste à prouver, sans chiffre ni vol", () => {
     const fr = metaFor(emptyGh(cmp(45, 20, { declaredSource: "linkedin" })), "https://s.test").title;
-    expect(fr).toBe("Le code de @lea reste à prouver : son LinkedIn parle seul");
+    expect(fr).toBe("Le code de @lea reste à prouver\u00a0: son LinkedIn parle seul");
     const en = emptyGh(cmp(45, 20));
     en.cv = { ...en.cv, lang: "en" };
     expect(metaFor(en, "https://s.test").title).toBe("@lea's code is still unproven: their CV does all the talking");
@@ -90,9 +90,9 @@ describe("dossier vide fait par un tiers, non revendiqué : l'aperçu ne dit pas
     const c = cmp(45, 20, { declaredSource: "linkedin" });
     c.github = { ...c.github, grid: empty };
     const m = metaFor(publicView(c, { thirdParty: true }), "https://s.test");
-    expect(m.title).toBe("Le code de @lea reste à prouver : son LinkedIn parle seul");
-    expect(m.description).toContain("GitHub : code à prouver.");
-    expect(m.description).not.toMatch(/GitHub : Fiche|\b20\b/);
+    expect(m.title).toBe("Le code de @lea reste à prouver\u00a0: son LinkedIn parle seul");
+    expect(m.description).toContain("GitHub\u00a0: code à prouver.");
+    expect(m.description).not.toMatch(/GitHub\u00a0: Fiche|\b20\b/);
     expect(m.image).toBeUndefined();
   });
 });
@@ -102,15 +102,15 @@ describe("aperçu de lien d'une comparaison notée (§18.37)", () => {
 
   it("la note du dossier et ses étoiles en titre, la phrase en tête de la description", () => {
     const m = metaFor(graded(cmp(60, 72)), "https://s.test");
-    expect(m.title).toBe("Le dossier de @lea : ★★★☆☆☆, 57");
-    expect(m.description.startsWith("Le code de @lea en montre plus que son CV : 12 points. CV : Fiche")).toBe(true);
+    expect(m.title).toBe("Le dossier de @lea\u00a0: ★★★☆☆☆, 57");
+    expect(m.description.startsWith("Le code de @lea en montre plus que son CV\u00a0: 12\u00a0points. CV\u00a0: Fiche")).toBe(true);
     const en = graded(cmp(60, 72));
     en.cv = { ...en.cv, lang: "en" };
     expect(metaFor(en, "https://s.test").title).toBe("@lea's file: ★★★☆☆☆, 57");
   });
 
   it("sans grille (comparaison d'avant, ou fiche dénoncée non revendiquée) : la phrase en titre", () => {
-    expect(metaFor(cmp(60, 72), "https://s.test").title).toBe("Le code de @lea en montre plus que son CV : 12 points");
+    expect(metaFor(cmp(60, 72), "https://s.test").title).toBe("Le code de @lea en montre plus que son CV\u00a0: 12\u00a0points");
   });
 });
 

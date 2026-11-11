@@ -165,7 +165,7 @@ describe("entrée GitHub : le LinkedIn trouvé devient une comparaison", () => {
     expect(cmp.github.findings?.find((f) => f.source === "linkedin")).toMatchObject({ kind: "linkedin_found", proof: URL_ });
     // L'aperçu de lien dit « LinkedIn », jamais « CV ».
     const page = await (await ctx.app.request(`/c/${json.id}`)).text();
-    expect(page).toContain("LinkedIn : Fiche");
+    expect(page).toContain("LinkedIn\u00a0: Fiche");
     expect(page).toContain("Deux pièces au même dossier");
     expect(page).not.toMatch(/butin|déclare contre/);
     expect(page).not.toMatch(/\bCV\b/);

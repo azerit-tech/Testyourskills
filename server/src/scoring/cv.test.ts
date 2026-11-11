@@ -171,7 +171,7 @@ describe("compareCards §6.5", () => {
     const cmp = compareCards(cv, gh);
     for (const s of gh.stats) expect(cmp.deltas[s.code]).toBe(s.value - cv.stats.find((x) => x.code === s.code)!.value);
     const n = cv.overall - gh.overall;
-    const pts = (k: number) => `${k} ${k > 1 ? "points" : "point"}`;
+    const pts = (k: number) => `${k}\u00a0${k > 1 ? "points" : "point"}`;
     if (n > 0) expect(cmp.headline.fr).toBe(`Ton CV annonce ${pts(n)} que ton code public ne montre pas encore.`);
     else if (n < 0) expect(cmp.headline.fr).toBe(`Ton CV te sous-vend de ${pts(-n)}. Ton code le prouve.`);
     expect(cmp.cv).toBe(cv);
@@ -181,7 +181,7 @@ describe("compareCards §6.5", () => {
   it("les trois cas de titre", () => {
     const gh = { ...scoreGithub(facts(), null, opts), id: "gh1", createdAt: "x" };
     const up = compareCards({ ...gh, overall: gh.overall + 7 }, gh);
-    expect(up.headline.fr).toBe("Ton CV annonce 7 points que ton code public ne montre pas encore.");
+    expect(up.headline.fr).toBe("Ton CV annonce 7\u00a0points que ton code public ne montre pas encore.");
     const down = compareCards({ ...gh, overall: gh.overall - 4 }, gh);
     expect(down.headline.en).toBe("Your CV undersells you by 4 points. Your code proves it.");
     expect(compareCards(gh, gh).headline.fr).toBe("CV et code d'accord. Dossier solide.");

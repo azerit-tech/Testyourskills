@@ -61,19 +61,19 @@ describe("le point fort et le point à creuser", () => {
 describe("la ligne", () => {
   it("le métier, le langage, les années comptées, le point fort, le point à creuser", () => {
     const g = grid({ XP: 7, EMP: 6, STK: 6, CODE: 8, ACT: 5, OWN: 3 });
-    expect(recruiterRead(card, g, "fr")?.text).toBe("Full-stack TypeScript, 5 ans comptés. Point fort : niveau du code, 8/10. À creuser : ownership.");
+    expect(recruiterRead(card, g, "fr")?.text).toBe("Full-stack TypeScript, 5\u00a0ans comptés. Point fort\u00a0: niveau du code, 8/10. À creuser\u00a0: ownership.");
     expect(recruiterRead(card, g, "en")?.text).toBe("Full-stack TypeScript, 5 years counted. Strong point: code level, 8/10. To dig into: ownership.");
   });
 
   it("une fiche LinkedIn seule : « À prouver : le code. »", () => {
     const g = grid({ EDU: 8, XP: 9, EMP: 8, STK: 6, OWN: 6 }, { STK: { state: "declared", source: "linkedin" }, OWN: { state: "declared", source: "linkedin" } });
-    expect(recruiterRead(card, g, "fr")?.text).toBe("Full-stack TypeScript, 8 ou 9 ans comptés. Point fort : expérience, 9/10. À prouver : le code.");
+    expect(recruiterRead(card, g, "fr")?.text).toBe("Full-stack TypeScript, 8 ou 9\u00a0ans comptés. Point fort\u00a0: expérience, 9/10. À prouver\u00a0: le code.");
   });
 
   it("les années : comptées, estimées sur GitHub, ou affirmées", () => {
-    expect(yearsText(grid({ XP: 3 }), "fr")).toBe("1 an compté");
-    expect(yearsText(grid({ XP: 6 }, { XP: { source: "github" } }), "fr")).toBe("4 ans estimés sur GitHub");
-    expect(yearsText(grid({ XP: 5 }, { XP: { state: "declared" } }), "fr")).toBe("3 ans affirmés");
+    expect(yearsText(grid({ XP: 3 }), "fr")).toBe("1\u00a0an compté");
+    expect(yearsText(grid({ XP: 6 }, { XP: { source: "github" } }), "fr")).toBe("4\u00a0ans estimés sur GitHub");
+    expect(yearsText(grid({ XP: 5 }, { XP: { state: "declared" } }), "fr")).toBe("3\u00a0ans affirmés");
     expect(yearsText(grid({}), "fr")).toBeNull();
   });
 

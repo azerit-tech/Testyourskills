@@ -101,25 +101,25 @@ describe("texte de partage d'une comparaison", () => {
 });
 
 describe("texte de partage avec la grille de recrutement (§18.37)", () => {
-  const graded: CardShare = { ...card, overall: 61, profile: "Oiseau de nuit", rank: null, finding: null, status: null, graded: true, strong: "Point fort : niveau du code, 8/10." };
+  const graded: CardShare = { ...card, overall: 61, profile: "Oiseau de nuit", rank: null, finding: null, status: null, graded: true, strong: "Point fort\u00a0: niveau du code, 8/10." };
 
   it("une fiche : la grille d'Azerit dès la première ligne, puis le point fort", () => {
     expect(shareLead(fr, graded)).toBe(
-      "Mon dossier, passé à la grille de recrutement d'Azerit : ★★★★☆☆, 61 · Oiseau de nuit. Point fort : niveau du code, 8/10. Fais la tienne :",
+      "Mon dossier, passé à la grille de recrutement d'Azerit\u00a0: ★★★★☆☆, 61 · Oiseau de nuit. Point fort\u00a0: niveau du code, 8/10. Fais la tienne :",
     );
     expect(shareLead(en, { ...graded, profile: "Night owl", strong: "Strong point: code level, 8/10." })).toBe(
       "My file, run through Azerit's hiring grid: ★★★★☆☆, 61 · Night owl. Strong point: code level, 8/10. Make yours:",
     );
     // Avec le pari, les étoiles ne se répètent pas.
     expect(shareLead(fr, { ...graded, plea: 3 })).toBe(
-      "Je plaidais ★★★☆☆☆. Verdict : ★★★★☆☆.\nMon dossier, passé à la grille de recrutement d'Azerit : 61 · Oiseau de nuit. Point fort : niveau du code, 8/10. Fais la tienne :",
+      "Je plaidais ★★★☆☆☆. Verdict : ★★★★☆☆.\nMon dossier, passé à la grille de recrutement d'Azerit\u00a0: 61 · Oiseau de nuit. Point fort\u00a0: niveau du code, 8/10. Fais la tienne :",
     );
   });
 
   it("une comparaison : la note du dossier en tête, ses deux pièces, le verdict à la première personne", () => {
     const x: ComparisonShare = { ...cmp, stars: 3, declared: 41, github: 61, case: 57, profile: null, headline: "Mon LinkedIn me sous-vend de 20 points." };
     expect(shareLead(fr, x)).toBe(
-      "Mon dossier, passé à la grille de recrutement d'Azerit : ★★★☆☆☆, 57. LinkedIn 41, GitHub 61. Mon LinkedIn me sous-vend de 20 points. Fais la tienne :",
+      "Mon dossier, passé à la grille de recrutement d'Azerit\u00a0: ★★★☆☆☆, 57. LinkedIn 41, GitHub 61. Mon LinkedIn me sous-vend de 20 points. Fais la tienne :",
     );
     expect(shareLead(en, { ...x, headline: "My LinkedIn undersells me by 20 points." })).toBe(
       "My file, run through Azerit's hiring grid: ★★★☆☆☆, 57. LinkedIn 41, GitHub 61. My LinkedIn undersells me by 20 points. Make yours:",

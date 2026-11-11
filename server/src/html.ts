@@ -61,7 +61,7 @@ export function metaFor(data: CardData | ComparisonData, baseUrl: string): PageM
     // Notée (§18.37) : la note du dossier en titre, la phrase en tête de la description.
     const kase = usableGrid(data.grid) ? data.grid.overall : null;
     const title =
-      kase === null ? sentence : fr ? `Le dossier de ${who} : ${starsLine(starsFor(kase))}, ${kase}` : `${who}'s file: ${starsLine(starsFor(kase))}, ${kase}`;
+      kase === null ? sentence : fr ? `Le dossier de ${who}\u00a0: ${starsLine(starsFor(kase))}, ${kase}` : `${who}'s file: ${starsLine(starsFor(kase))}, ${kase}`;
     const lead = kase === null ? "" : `${sentence}. `;
     // LinkedIn et GitHub (§18.24) : « LinkedIn » partout où une comparaison dirait « CV ». Deux pièces d'un même dossier.
     const src = declaredLabel(data);
@@ -74,7 +74,7 @@ export function metaFor(data: CardData | ComparisonData, baseUrl: string): PageM
       ...(sealed ? {} : { image }),
       title,
       description: fr
-        ? `${lead}${src} : ${cardLabel(data.cv, lang)}. GitHub : ${gh}. Deux pièces au même dossier, lues sur huit critères de recrutement. Fais la tienne.`
+        ? `${lead}${src}\u00a0: ${cardLabel(data.cv, lang)}. GitHub\u00a0: ${gh}. Deux pièces au même dossier, lues sur huit critères de recrutement. Fais la tienne.`
         : `${lead}${src}: ${cardLabel(data.cv, lang)}. GitHub: ${gh}. Two exhibits in one file, read on eight hiring criteria. Make yours.`,
       imageAlt: fr ? `Fiche ${src} et fiche GitHub de ${name}` : `${name}'s ${src} sheet and GitHub sheet`,
     };
@@ -93,7 +93,7 @@ export function metaFor(data: CardData | ComparisonData, baseUrl: string): PageM
   const status = data.statuses[0]?.label[lang];
   // Ce qu'est la note : une grille de recrutement (§18.37) ; une fiche d'avant la grille dit son temps de lecture.
   const parts = [
-    status ? (fr ? `Chef d'accusation : « ${status} ».` : `Charge: "${status}".`) : "",
+    status ? (fr ? `Chef d'accusation\u00a0: «\u00a0${status}\u00a0».` : `Charge: "${status}".`) : "",
     usableGrid(data.grid)
       ? fr
         ? "Dossier lu sur huit critères de recrutement, chacun avec sa preuve. Fais la tienne."
@@ -123,8 +123,8 @@ function sealedMeta(data: CardData, lang: Lang, url: string): PageMeta {
   const tag = data.profile ? ` · ${data.profile.label[lang]}` : "";
   const status = data.statuses[0]?.label[lang];
   const parts = [
-    status ? (fr ? `Chef d'accusation : « ${status} ».` : `Charge: "${status}".`) : "",
-    fr ? "Le code reste à prouver : la note attend la personne fichée. Fais la tienne." : "The code is yet to prove: the rating waits for the person on file. Make yours.",
+    status ? (fr ? `Chef d'accusation\u00a0: «\u00a0${status}\u00a0».` : `Charge: "${status}".`) : "",
+    fr ? "Le code reste à prouver\u00a0: la note attend la personne fichée. Fais la tienne." : "The code is yet to prove: the rating waits for the person on file. Make yours.",
   ].filter(Boolean);
   return {
     lang,
@@ -147,7 +147,7 @@ export function genericMeta(baseUrl: string, path: string, lang: Lang = "fr"): P
 }
 
 /** Le texte de l'image de l'accueil : « Testyourskills : Azerit ouvre ton dossier. Tu plaides quoi ? » */
-export const homeImageAlt = (lang: Lang = "fr"): string => `Testyourskills : ${promiseTitle(lang)}`;
+export const homeImageAlt = (lang: Lang = "fr"): string => `Testyourskills${lang === "fr" ? "\u00a0: " : ": "}${promiseTitle(lang)}`;
 
 /** L'image de l'accueil (la promesse et la fiche de la vitrine), à cette adresse stable. */
 export const HOME_IMAGE_PATH = "/og/home.png";

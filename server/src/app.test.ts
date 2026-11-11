@@ -955,7 +955,7 @@ describe("page /c/:id et images", () => {
     expect(html).toContain(`<meta property="og:image:width" content="1200">`);
     expect(html).toContain(`<meta name="twitter:card" content="summary_large_image">`);
     // Une fiche sans grille dit son temps de lecture, par Azerit ; jamais « une IA t'interroge ».
-    expect(html).toMatch(/og:description" content="Chef d&#39;accusation : « Typage jusqu&#39;au bout »\. Dossier lu par Azerit en \d+ s\. Fais la tienne\./);
+    expect(html).toMatch(/og:description" content="Chef d&#39;accusation\u00a0: «\u00a0Typage jusqu&#39;au bout\u00a0»\. Dossier lu par Azerit en \d+ s\. Fais la tienne\./);
     expect(html).not.toMatch(/Interrogatoire|une IA/);
   });
 

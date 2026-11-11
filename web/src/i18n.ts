@@ -48,7 +48,7 @@ const fr = {
     submitBoth: "Lire les deux",
     submitting: "Ouverture…",
     bothLink: "ou les deux, au même dossier",
-    bothActive: "Deux pièces au dossier : ton CV et ton GitHub",
+    bothActive: "Deux pièces au dossier\u00a0: ton CV et ton GitHub",
     bothBack: "une seule source",
     dropTitle: "Glisse ton CV ici",
     dropOr: "ou",
@@ -63,7 +63,7 @@ const fr = {
     exampleCaption: "La vraie fiche de Jacques, fondateur d'Azerit",
     /** Sous la fiche de Jacques, la note du dossier puis ses deux pièces (§18.35, §18.37), lues en entier. */
     exampleScoresLabel: (kase: number | null, linkedin: number, github: number) =>
-      `${kase !== null ? `Dossier : ${kase} sur 100. ` : ""}LinkedIn : ${linkedin} sur 100. GitHub : ${github} sur 100.`,
+      `${kase !== null ? `Dossier\u00a0: ${kase} sur 100. ` : ""}LinkedIn\u00a0: ${linkedin} sur 100. GitHub\u00a0: ${github} sur 100.`,
     exampleCase: "Dossier",
     /* La couverture (§18.31) : les plaques des photos d'identité, en capitales mono. */
     cover: {
@@ -100,7 +100,7 @@ const fr = {
     errEmptyCv: "Dépose un CV au format PDF.",
     errNotPdf: "Ce fichier n'est pas un PDF.",
     errTooLarge: (mb: string) => `Fichier de ${mb} Mo : la limite est 5 Mo. Un CV, pas une thèse.`,
-    errTooManyPages: (n: number) => `${n} pages : la limite est 10. Un CV tient en une ou deux.`,
+    errTooManyPages: (n: number) => `${n}\u00a0pages\u00a0: la limite est 10. Un CV tient en une ou deux.`,
     errNetwork: "Le serveur ne répond pas. Réessaie dans un instant.",
   },
   stats: {
@@ -128,7 +128,7 @@ const fr = {
       readme: () => "Vérification que le README dit autre chose que « TODO »…",
       recruiter: () => "Une lecture pressée prend 30 secondes. Ici, on lit tout.",
       /** Émis quand les deux pièces se rejoignent (pipeline.ts, comparaison LinkedIn ou CV avec GitHub). */
-      compare: () => "Les deux pièces au même dossier : parcours et code, critère par critère…",
+      compare: () => "Les deux pièces au même dossier\u00a0: parcours et code, critère par critère…",
       profile: () => "Profil trouvé. Il existe, c'est un début.",
       linkedin_wait: () => "Lecture du profil LinkedIn public…",
       linkedin: () => "LinkedIn retrouvé. On recompte tes années, poste par poste.",
@@ -226,7 +226,7 @@ const fr = {
   } satisfies Record<Position, string>,
   result: {
     makeYours: "Fais la tienne",
-    yourTurn: "Et toi, sur ces huit critères ? Ton LinkedIn ou ton GitHub suffit.",
+    yourTurn: "Et toi, sur ces huit critères\u00a0? Ton LinkedIn ou ton GitHub suffit.",
     /* en tête d'une fiche partagée (§18.20) */
     wanted: "Avis de recherche",
     wantedStars: (n: number, level: string) => `${n} étoiles sur 6 · ${level}`,
@@ -256,7 +256,7 @@ const fr = {
         /** Après la ligne du pari : le verdict porte déjà les étoiles. */
         score: (overall: number) => `Note ${overall}`,
         /** Fiche notée par la grille (§18.37) : ce qu'est la note, dès la première ligne. `stars` null après le pari. */
-        file: (stars: string | null, overall: number) => `Mon dossier, passé à la grille de recrutement d'Azerit : ${stars ? `${stars}, ` : ""}${overall}`,
+        file: (stars: string | null, overall: number) => `Mon dossier, passé à la grille de recrutement d'Azerit\u00a0: ${stars ? `${stars}, ` : ""}${overall}`,
         charge: (status: string) => `Chef d'accusation : « ${status} ».`,
         /** Fiche d'avant la grille : le temps de lecture. */
         ai: (secs: number) => `Dossier lu par Azerit en ${secs} s.`,
@@ -323,16 +323,16 @@ const fr = {
     },
     addCv: {
       title: "Ajoute ton CV au dossier",
-      text: "Ton GitHub porte le code. Ton CV porte le parcours : école, expérience et employeurs entrent au dossier.",
+      text: "Ton GitHub porte le code. Ton CV porte le parcours\u00a0: école, expérience et employeurs entrent au dossier.",
       btn: "Ajouter mon CV",
     },
-    addGithub: { title: "Ajoute ton GitHub au dossier", text: "Ton CV porte le parcours. Ton GitHub porte le code : trois critères s'ouvrent.", btn: "Ajouter mon GitHub" },
+    addGithub: { title: "Ajoute ton GitHub au dossier", text: "Ton CV porte le parcours. Ton GitHub porte le code\u00a0: trois critères s'ouvrent.", btn: "Ajouter mon GitHub" },
     /** Fiche LinkedIn seule (§18.24) : un seul appel, relancé en comparaison. */
-    prove: { title: "Ajoute ton GitHub : trois critères s'ouvrent", label: "Pseudo GitHub", btn: "Ajouter au dossier" },
+    prove: { title: "Ajoute ton GitHub\u00a0: trois critères s'ouvrent", label: "Pseudo GitHub", btn: "Ajouter au dossier" },
     /** Sous une fiche GitHub seule, en miroir : LinkedIn porte le parcours. */
     addLinkedin: {
       title: "Ajoute ton LinkedIn au dossier",
-      text: "Ton GitHub porte le code. Ton LinkedIn porte le parcours : expérience, employeurs et école entrent au dossier.",
+      text: "Ton GitHub porte le code. Ton LinkedIn porte le parcours\u00a0: expérience, employeurs et école entrent au dossier.",
       label: "Lien de ton profil LinkedIn",
       btn: "Ajouter au dossier",
     },
@@ -411,7 +411,7 @@ const fr = {
     caseHint: "Chaque critère pris sur sa source de preuve",
     caseLink: "Voir la lecture du recruteur",
     /** La note du dossier en tête, lue en entier : « Note du dossier : 57 sur 100, 4 étoiles sur 6. » */
-    caseSr: (n: number, stars: number) => `Note du dossier : ${n} sur 100, ${stars} étoile${stars > 1 ? "s" : ""} sur 6.`,
+    caseSr: (n: number, stars: number) => `Note du dossier\u00a0: ${n} sur 100, ${stars} étoile${stars > 1 ? "s" : ""} sur 6.`,
     /** Les deux fiches, les deux pièces du dossier. */
     exhibit: (n: number) => `Pièce ${n}`,
     /* Face à un GitHub « dossier vide » (§18.37) : rien ne se compare, ni gain ni perte. */
@@ -428,11 +428,11 @@ const fr = {
     title: "Ce que la grille retient",
     titleThem: (who: string) => `Ce que la grille retient de ${who}`,
     pending: "Pas encore au dossier",
-    hint: "Touche un critère : sa pièce s'affiche.",
+    hint: "Touche un critère\u00a0: sa pièce s'affiche.",
     more: "Tout le détail de la grille",
-    tile: (name: string, n: number) => `${name} : ${n} sur 10`,
-    tileNone: (name: string) => `${name} : pas encore de note`,
-    tileKept: (name: string) => `${name} : gardée pour la personne`,
+    tile: (name: string, n: number) => `${name}\u00a0: ${n} sur 10`,
+    tileNone: (name: string) => `${name}\u00a0: pas encore de note`,
+    tileKept: (name: string) => `${name}\u00a0: gardée pour la personne`,
     none: "—",
     short: { XP: "Expérience", EMP: "Parcours", STK: "Stack", CODE: "Code", OWN: "Ownership", ACT: "Activité", EDU: "École", OSS: "Open source" } as Record<CriterionCode, string>,
   },
@@ -443,26 +443,26 @@ const fr = {
     titleThem: (who: string) => `Voici comment un recruteur d'Azerit lit ${who}`,
     /** Les pièces lues : une ligne par source, « pas encore au dossier » pour celle qui manque. */
     method: {
-      linkedin: "Ton parcours : LinkedIn fait foi.",
-      cv: "Ton parcours : ton CV fait foi.",
-      noCareer: "Ton parcours : pas encore au dossier.",
-      code: "Ton code : GitHub fait foi.",
-      noCode: "Ton code : pas encore au dossier.",
+      linkedin: "Ton parcours\u00a0: LinkedIn fait foi.",
+      cv: "Ton parcours\u00a0: ton CV fait foi.",
+      noCareer: "Ton parcours\u00a0: pas encore au dossier.",
+      code: "Ton code\u00a0: GitHub fait foi.",
+      noCode: "Ton code\u00a0: pas encore au dossier.",
       check: "On recoupe. Chaque note a sa pièce.",
       piece: "Chaque note a sa pièce.",
     },
     methodThem: {
-      linkedin: "Son parcours : LinkedIn fait foi.",
-      cv: "Son parcours : son CV fait foi.",
-      noCareer: "Son parcours : pas encore au dossier.",
-      code: "Son code : GitHub fait foi.",
-      noCode: "Son code : pas encore au dossier.",
+      linkedin: "Son parcours\u00a0: LinkedIn fait foi.",
+      cv: "Son parcours\u00a0: son CV fait foi.",
+      noCareer: "Son parcours\u00a0: pas encore au dossier.",
+      code: "Son code\u00a0: GitHub fait foi.",
+      noCode: "Son code\u00a0: pas encore au dossier.",
       check: "On recoupe. Chaque note a sa pièce.",
       piece: "Chaque note a sa pièce.",
     },
     foot: "C'est la lecture qu'Azerit fait pour les équipes qui recrutent.",
     /** Sous la grille, surtout en vue partagée : un jeu, pas un verdict d'embauche. */
-    game: "Un jeu, fait avec une vraie grille. Pas une décision d'embauche : aucun poste, aucun entretien, données publiques seulement.",
+    game: "Un jeu, fait avec une vraie grille. Pas une décision d'embauche\u00a0: aucun poste, aucun entretien, données publiques seulement.",
     criteriaLabel: "Les huit critères",
     names: {
       EDU: "École et sélection",
@@ -602,7 +602,7 @@ const fr = {
     } as Partial<Record<CriterionCode, [number, string][]>>,
     /** Sous la table : comment elle se lit. */
     levelNotes: {
-      EDU: "Sans école de tech, pas de note d'école : le critère sort de la moyenne, et se former seul ne coûte rien. Liste française d'abord : une école absente s'arrête à B pour l'instant. Une école ne fait jamais baisser la note.",
+      EDU: "Sans école de tech, pas de note d'école : le critère sort de la moyenne, et se former seul ne coûte rien. Liste française d'abord\u00a0: une école absente s'arrête à B pour l'instant. Une école ne fait jamais baisser la note.",
       XP: "Compté poste par poste : stage et alternance pour moitié, association étudiante et bénévolat pour zéro, deux postes en même temps une seule fois. Sans LinkedIn : estimée sur les années actives de GitHub, arrêtée à 8.",
       EMP: "Lu sur LinkedIn ou le CV seulement.",
       STK: "GitHub prouve, LinkedIn déclare. Déclarée seulement, la table s'arrête à 6.",

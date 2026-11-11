@@ -34,10 +34,10 @@ describe("comparaison face à un GitHub vide", () => {
       expect(s).not.toMatch(/\d/);
       expect(s).not.toMatch(/\bvol|\b(stole|ment|mens|menti|lies?|lying|faussaire|forger)\b/i);
     }
-    expect(cmp.headline.fr).toBe("Code non prouvé : ton LinkedIn parle seul. Publie un vrai projet sur GitHub et on compare.");
+    expect(cmp.headline.fr).toBe("Code non prouvé\u00a0: ton LinkedIn parle seul. Publie un vrai projet sur GitHub et on compare.");
     expect(cmp.headline.en).toBe("Code not proven: your LinkedIn does all the talking. Publish one real project on GitHub and we'll compare.");
     // Sur un CV en PDF, le même titre parle du CV.
-    expect(compareCards(linkedin, github).headline.fr).toMatch(/^Code non prouvé : ton CV parle seul\./);
+    expect(compareCards(linkedin, github).headline.fr).toMatch(/^Code non prouvé\u00a0: ton CV parle seul\./);
   });
 
   it("aucun écart ne se lit comme une perte : toutes les barres à zéro", () => {
@@ -62,8 +62,8 @@ describe("comparaison avec un GitHub qui prouve quelque chose", () => {
     const { github, linkedin } = jacques();
     expect(github.grid!.rule).not.toBe("empty_file");
     const cmp = compareCards({ ...linkedin, overall: github.overall + 15 }, github);
-    expect(cmp.headline).toEqual({ fr: "Ton CV annonce 15 points que ton code public ne montre pas encore.", en: "Your CV claims 15 points your public code doesn't show yet." });
-    expect(asLinkedinComparison(cmp).headline.fr).toBe("Ton LinkedIn annonce 15 points que ton code public ne montre pas encore.");
+    expect(cmp.headline).toEqual({ fr: "Ton CV annonce 15\u00a0points que ton code public ne montre pas encore.", en: "Your CV claims 15 points your public code doesn't show yet." });
+    expect(asLinkedinComparison(cmp).headline.fr).toBe("Ton LinkedIn annonce 15\u00a0points que ton code public ne montre pas encore.");
     expect(asLinkedinComparison(cmp).headline.en).toBe("Your LinkedIn claims 15 points your public code doesn't show yet.");
     const xp = (c: CardData) => c.stats.find((s) => s.code === "XP")!.value;
     expect(cmp.deltas.XP).toBe(xp(github) - xp(linkedin));
@@ -74,14 +74,14 @@ describe("comparaison avec un GitHub qui prouve quelque chose", () => {
     const n = github.overall - linkedin.overall;
     expect(n).toBeGreaterThanOrEqual(15);
     const cmp = compareCards(linkedin, github);
-    expect(cmp.headline.fr).toBe(`Ton CV te sous-vend de ${n} points. Ton code le prouve.`);
-    expect(asLinkedinComparison(cmp).headline.fr).toBe(`Ton LinkedIn te sous-vend de ${n} points. Ton code le prouve.`);
+    expect(cmp.headline.fr).toBe(`Ton CV te sous-vend de ${n}\u00a0points. Ton code le prouve.`);
+    expect(asLinkedinComparison(cmp).headline.fr).toBe(`Ton LinkedIn te sous-vend de ${n}\u00a0points. Ton code le prouve.`);
     expect(asLinkedinComparison(cmp).headline.en).toBe(`Your LinkedIn undersells you by ${n} points. Your code proves it.`);
   });
 
   it("un seul point : au singulier ; à égalité, les deux pièces d'accord", () => {
     const { github, linkedin } = jacques();
-    expect(compareCards({ ...linkedin, overall: github.overall + 1 }, github).headline.fr).toBe("Ton CV annonce 1 point que ton code public ne montre pas encore.");
+    expect(compareCards({ ...linkedin, overall: github.overall + 1 }, github).headline.fr).toBe("Ton CV annonce 1\u00a0point que ton code public ne montre pas encore.");
     expect(compareCards({ ...linkedin, overall: github.overall - 1 }, github).headline.en).toBe("Your CV undersells you by 1 point. Your code proves it.");
     expect(asLinkedinComparison(compareCards({ ...linkedin, overall: github.overall }, github)).headline).toEqual({ fr: "LinkedIn et code d'accord. Dossier solide.", en: "LinkedIn and code agree. Solid file." });
   });
@@ -91,7 +91,7 @@ describe("comparaison avec un GitHub qui prouve quelque chose", () => {
     const empty = card(scoreCv(cvReading({ roles: [], technos_listed: [], technos_described: [], tests_ci_review_mentions: [], projects_with_dated_outcome: 0, years_declared: null as never }), cvCounts({ words: 0, pages: 1 }), opts), "cv");
     expect(empty.grid!.rule).toBe("empty_file");
     const cmp = compareCards(empty, github);
-    expect(cmp.headline.fr).toMatch(/^Ton CV te sous-vend de \d+ points\. Ton code le prouve\.$/);
+    expect(cmp.headline.fr).toMatch(/^Ton CV te sous-vend de \d+\u00a0points\. Ton code le prouve\.$/);
     expect(STAT_CODES.some((c) => cmp.deltas[c] !== 0)).toBe(true);
   });
 });

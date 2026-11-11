@@ -367,7 +367,7 @@ export function eduDeclared(d: DeclaredInput): Draft {
     return missing(
       "EDU",
       "linkedin",
-      f("Ni école de tech, ni sélection citée : le critère ne fait pas baisser la note.", "No tech school, no selection on file: the criterion doesn't lower the rating."),
+      f("Ni école de tech, ni sélection citée\u00a0: le critère ne fait pas baisser la note.", "No tech school, no selection on file: the criterion doesn't lower the rating."),
     );
   const name = r.school_name.trim();
   const schoolFact = schoolScore !== null ? f(`${name}, rang ${school.tier}.`, `${name}, tier ${school.tier}.`) : null;
@@ -391,7 +391,7 @@ export function eduDeclared(d: DeclaredInput): Draft {
 export function eduGithub(g: GithubInput): Draft {
   const hit = g.facts.repos.find((r) => EDU_GITHUB_RE.test(norm([r.name.replace(/[-_]/g, " "), r.description ?? "", ...r.topics].join(" "))));
   if (!hit)
-    return missing("EDU", "github", f("L'école se lit sur LinkedIn ou le CV : pas encore au dossier.", "School is read on LinkedIn or the CV: not on file yet."));
+    return missing("EDU", "github", f("L'école se lit sur LinkedIn ou le CV\u00a0: pas encore au dossier.", "School is read on LinkedIn or the CV: not on file yet."));
   return crit("EDU", {
     score: GRID.EDU.githubScore,
     state: "scored",
@@ -423,7 +423,7 @@ export function xpDeclared(d: DeclaredInput): Draft {
     const latest = [...infos].filter((r) => r.kind === "full").sort((a, b) => (b.start ?? -1) - (a.start ?? -1))[0];
     const titled = [...current, ...(latest ? [latest] : [])].find((r) => SENIOR_RE.test(norm(r.role.title)));
     return titled && y < GRID.XP.seniorOnPaperBelowYears
-      ? [f(`Senior à confirmer : « ${titled.role.title} », ${years(y).fr} ${counted(y)}.`, `Senior, to confirm: "${titled.role.title}", ${years(y).en} counted.`)]
+      ? [f(`Senior à confirmer\u00a0: «\u00a0${titled.role.title}\u00a0», ${years(y).fr} ${counted(y)}.`, `Senior, to confirm: "${titled.role.title}", ${years(y).en} counted.`)]
       : [];
   };
 
@@ -1454,7 +1454,7 @@ export function githubGrid(g: GithubInput): Grid {
   return finalize([
     eduGithub(g),
     xpGithub(g),
-    missing("EMP", "github", f("Le parcours se lit sur LinkedIn ou le CV : pas encore au dossier.", "Career path is read on LinkedIn or the CV: not on file yet.")),
+    missing("EMP", "github", f("Le parcours se lit sur LinkedIn ou le CV\u00a0: pas encore au dossier.", "Career path is read on LinkedIn or the CV: not on file yet.")),
     stkGithub(g),
     codeGithub(g),
     actGithub(g),

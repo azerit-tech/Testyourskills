@@ -30,7 +30,7 @@ describe("la fiche de Jacques sous le titre", () => {
     for (const l of links) expect(l.attrs).toContain('href="/c/Cmp1234567"');
     const scores = links[1]!;
     expect(scores.attrs).toContain('class="showcase-scores"');
-    expect(scores.attrs).toContain('aria-label="LinkedIn : 55 sur 100. GitHub : 71 sur 100."');
+    expect(scores.attrs).toContain('aria-label="LinkedIn\u00a0: 55 sur 100. GitHub\u00a0: 71 sur 100."');
     expect(scores.inner.replace(/<[^>]+>/g, "")).toBe("LinkedIn 55 · GitHub 71");
     expect(scores.inner).toContain('<b class="is-linkedin">55</b>');
     expect(scores.inner).toContain('<b class="is-github">71</b>');

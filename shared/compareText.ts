@@ -19,7 +19,7 @@ type Cmp = Pick<ComparisonData, "cv" | "github" | "declaredSource">;
 export const declaredLabel = (cmp: Pick<ComparisonData, "declaredSource">): string => (declaredOf(cmp) === "linkedin" ? "LinkedIn" : "CV");
 
 const pts: Record<Lang, (n: number) => string> = {
-  fr: (n) => `${n} ${n > 1 ? "points" : "point"}`,
+  fr: (n) => `${n}\u00a0${n > 1 ? "points" : "point"}`,
   en: (n) => `${n} ${n === 1 ? "point" : "points"}`,
 };
 
@@ -45,7 +45,7 @@ const OWN: Record<Lang, Voice> = {
     declaredAhead: (src, n) => `Ton ${src} annonce ${n} que ton code public ne montre pas encore.`,
     codeAhead: (src, n) => `Ton ${src} te sous-vend de ${n}. Ton code le prouve.`,
     even: (src) => `${src} et code d'accord. Dossier solide.`,
-    unproven: (src) => `Code non prouvé : ton ${src} parle seul. Publie un vrai projet sur GitHub et on compare.`,
+    unproven: (src) => `Code non prouvé\u00a0: ton ${src} parle seul. Publie un vrai projet sur GitHub et on compare.`,
   },
   en: {
     declaredAhead: (src, n) => `Your ${src} claims ${n} your public code doesn't show yet.`,
@@ -61,7 +61,7 @@ const MINE: Record<Lang, Voice> = {
     declaredAhead: (src, n) => `Mon ${src} annonce ${n} que mon code public ne montre pas encore.`,
     codeAhead: (src, n) => `Mon ${src} me sous-vend de ${n}.`,
     even: (src) => `${src} et code d'accord.`,
-    unproven: (src) => `Code pas encore prouvé : mon ${src} parle seul.`,
+    unproven: (src) => `Code pas encore prouvé\u00a0: mon ${src} parle seul.`,
   },
   en: {
     declaredAhead: (src, n) => `My ${src} claims ${n} my public code doesn't show yet.`,
@@ -89,9 +89,9 @@ export const myVerdict = (cmp: Cmp, lang: Lang): string => speak(MINE[lang], cmp
 const THEIRS: Record<Lang, (who: string) => Voice> = {
   fr: (who) => ({
     declaredAhead: (src, n) => `Le ${src} de ${who} annonce ${n} que son code public ne montre pas encore`,
-    codeAhead: (src, n) => `Le code de ${who} en montre plus que son ${src} : ${n}`,
+    codeAhead: (src, n) => `Le code de ${who} en montre plus que son ${src}\u00a0: ${n}`,
     even: (src) => `Le ${src} et le code de ${who} sont d'accord`,
-    unproven: (src) => `Le code de ${who} reste à prouver : son ${src} parle seul`,
+    unproven: (src) => `Le code de ${who} reste à prouver\u00a0: son ${src} parle seul`,
   }),
   en: (who) => ({
     declaredAhead: (src, n) => `${who}'s ${src} claims ${n} their public code doesn't show yet`,

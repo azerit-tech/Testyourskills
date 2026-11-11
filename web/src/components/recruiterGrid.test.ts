@@ -158,7 +158,7 @@ describe("face à un GitHub vide : le code n'est pas prouvé, rien ne se compare
 
   it("le serveur : GitHub en dossier vide, titre neutre, écarts à zéro", () => {
     expect(comparison.github.grid!.rule).toBe("empty_file");
-    expect(comparison.headline.fr).toMatch(/^Code non prouvé : ton LinkedIn parle seul\./);
+    expect(comparison.headline.fr).toMatch(/^Code non prouvé\u00a0: ton LinkedIn parle seul\./);
     expect(Object.values(comparison.deltas).every((d) => d === 0)).toBe(true);
   });
 
