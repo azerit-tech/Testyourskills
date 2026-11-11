@@ -41,11 +41,6 @@ const MAX_TILT = 12;
 /** Au-delà (px), le doigt a glissé : ce n'est plus un toucher, la fiche ne se retourne pas. */
 const TAP_SLOP = 8;
 
-/** Silhouette de la carte, pour réutiliser le masque ailleurs (pack, comparaison). */
-export function useCardShape() {
-  return { path: CARD_PATH, maskUrl: CARD_MASK_URL, viewBox: "0 0 360 520", aspectRatio: 360 / 520 };
-}
-
 /**
  * Mouvement réduit : préférence système, ou forcé par <html data-motion="reduce">
  * (bascule de la galerie, tests).

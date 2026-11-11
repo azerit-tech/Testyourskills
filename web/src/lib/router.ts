@@ -26,11 +26,6 @@ export function usePath(): string {
   );
 }
 
-/** État attaché à l'entrée d'historique courante (ex. pré-remplissage). */
-export function historyState<T>(): T | null {
-  return (window.history.state as T) ?? null;
-}
-
 export function navigate(to: string, opts: { replace?: boolean; state?: unknown; keepScroll?: boolean } = {}) {
   // On garde la query (?mock=1) pour ne pas perdre le mode démo en route.
   const url = to.includes("?") ? to : to + window.location.search;

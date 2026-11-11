@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { tierFor } from "../../../shared/types";
 import { overallOf, reliabilityOf, specialOf, initialsOf, cleanCompany } from "./common";
 import { SCORING } from "./config";
-import { clampScore, interpolate, scoreOn, stepBonus } from "./scale";
+import { clampScore, interpolate, scoreOn } from "./scale";
 
 describe("échelles linéaires par morceaux", () => {
   const ship = SCORING.github.SHIP.scale;
@@ -28,14 +28,6 @@ describe("échelles linéaires par morceaux", () => {
     expect(clampScore(-3)).toBe(1);
     expect(clampScore(54.5)).toBe(55);
     expect(scoreOn(ship, 52, SCORING.github.SHIP.releaseBonus)).toBe(99);
-  });
-
-  it("paliers de bonus", () => {
-    const b = SCORING.github.XP.breadthBonus;
-    expect(stepBonus(b, 3)).toBe(0);
-    expect(stepBonus(b, 4)).toBe(4);
-    expect(stepBonus(b, 5)).toBe(4);
-    expect(stepBonus(b, 9)).toBe(8);
   });
 
   it("XP : échelle du §4.4", () => {

@@ -25,10 +25,3 @@ export function clampScore(v: number): number {
 export function scoreOn(scale: Scale, x: number, bonus = 0): number {
   return clampScore(interpolate(scale, x) + bonus);
 }
-
-/** Bonus en paliers : [[seuil, bonus], …], le plus haut palier atteint. */
-export function stepBonus(steps: [number, number][], x: number): number {
-  let b = 0;
-  for (const [t, v] of steps) if (x >= t) b = Math.max(b, v);
-  return b;
-}

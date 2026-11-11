@@ -2,7 +2,7 @@
 // trois spéciales. Style mat : fonds plats teintés, UN seul dégradé par fiche
 // (le fond, la note ou le ciel), palmiers ton sur ton, aucune lueur sauf le
 // contour éclairé de ★★★★★★. Valeurs reprises de la maquette web/gta.css.
-import type { CardData, CardStyle, Fact, Stars, StatusTone } from "../types";
+import type { CardData, Fact, Stars, StatusTone } from "../types";
 import { starsFor } from "../types";
 
 /** Palette mate (docs/inspiration-gta6.md §2), source unique pour le SVG et le CSS. */
@@ -176,19 +176,6 @@ export const THEMES: Record<ThemeKey, CardTheme> = {
 /** Thème d'une fiche : la spéciale si elle s'applique, sinon le niveau d'étoiles. */
 export function themeOf(card: Pick<CardData, "overall" | "special">): CardTheme {
   return card.special ? THEMES[card.special] : THEMES[`s${starsFor(card.overall)}`];
-}
-
-/** Compatibilité : les compositions serveur passent encore le style (tier ou spéciale).
- *  Les tiers ne distinguent pas ★ à ★★★ : bronze donne ★. Préférer themeOf(card). */
-export function themeFor(style: CardStyle | Stars): CardTheme {
-  if (typeof style === "number") return THEMES[`s${style}`];
-  switch (style) {
-    case "bronze": return THEMES.s1;
-    case "silver": return THEMES.s4;
-    case "gold": return THEMES.s5;
-    case "icon": return THEMES.s6;
-    default: return THEMES[style];
-  }
 }
 
 /** Variables CSS dérivées du thème, pour les calques du web (grain, contour de ★★★★★★). */
