@@ -10,7 +10,8 @@ import type { CSSProperties, ReactNode } from "react";
 import type { CardData, WeekTop } from "../../../shared/types";
 import profilesJson from "../../../data/profiles.json";
 import { pick, useT } from "../i18n";
-import { DESKTOP, PHONE, SLOTS, areasCss, bigAvatar, colsCss, coverPanels, firstRow, slotsIn, widthShare } from "../lib/cover";
+import { isMock } from "../lib/api";
+import { DESKTOP, PHONE, SLOTS, areasCss, bigAvatar, colsCss, coverPanels, firstRow, pickSeed, slotsIn, widthShare } from "../lib/cover";
 import type { Panel, Slot } from "../lib/cover";
 import { onLinkClick } from "../lib/router";
 import { SUSPECTS, suspectSrc } from "../lib/suspects";
@@ -25,6 +26,17 @@ export interface CoverProps {
   founder: { card: CardData; href: string };
   /** Les portraits peints ; par défaut ceux de lib/suspects.ts. */
   suspects?: string[];
+  /** La graine de la distribution ; par défaut celle de la visite. */
+  seed?: number;
+}
+
+/** La graine de la visite, tirée une fois au chargement de la page : la couverture ne se
+ * rebat ni au rendu suivant, ni au changement de langue, ni en revenant à l'accueil.
+ * `?cover=<n>` la fixe en développement et en démo (tests, captures). */
+let visitSeed: number | undefined;
+function seedOfVisit(): number {
+  if (visitSeed === undefined) visitSeed = typeof window === "undefined" ? 0 : pickSeed(window.location.search, import.meta.env.DEV || isMock());
+  return visitSeed;
 }
 
 const ON_PHONE = slotsIn(PHONE);
@@ -113,10 +125,12 @@ function Face({ src, name, sub, mark, tint }: { src?: string | null; name: strin
   );
 }
 
-export function Cover({ onPlay, top, founder, suspects = SUSPECTS }: CoverProps) {
+export function Cover({ onPlay, top, founder, suspects = SUSPECTS, seed = seedOfVisit() }: CoverProps) {
   const { t, lang } = useT();
   const c = t.home.cover;
-  const panels = coverPanels({ suspects, top: top === undefined ? undefined : (top?.entries ?? null), founder });
+  // tirée pendant le rendu, avant la première image : pas de saut, et les deux images
+  // immédiates (f1, s2) sont celles de la distribution tirée
+  const panels = coverPanels({ suspects, top: top === undefined ? undefined : (top?.entries ?? null), founder, seed });
   const style = {
     "--cover-cols-s": colsCss(PHONE),
     "--cover-areas-s": areasCss(PHONE),
