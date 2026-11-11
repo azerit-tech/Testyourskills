@@ -49,6 +49,9 @@ SKETCHFAB = {
     "A-railing-set.glb": "b5b629702e814263816769db0ee660cc",
     "A-neon-open.glb": "9a924db296cf4a1eb12991702ab48da5",
     "A-awning-cc0.glb": "47e5fd8a6b194b48aad20425869d15ba",
+    # la distribution (cast.py) : chaque modèle dans son dossier
+    # rétroviseur intérieur du coupé
+    "cast/rearview-mirror/model.glb": "72f3ac9e3ff5423f823841b3c801d0c1",
 }
 
 # Poly Haven : (asset, type, résolution)
@@ -159,10 +162,12 @@ def _unzip(data, folder, keep=r"\.(jpg|jpeg|png|exr|bin|gltf|glb)$"):
 
 
 def fetch_sketchfab(name, uid):
-    """Un modèle Sketchfab téléchargeable en glb (ou, à défaut, en glTF zippé dans un dossier)."""
+    """Un modèle Sketchfab téléchargeable en glb (ou, à défaut, en glTF zippé dans un dossier).
+    Le nom peut descendre dans un sous-dossier (cast/<rôle>/model.glb), créé au besoin."""
     path = os.path.join(ASSETS, name)
     if os.path.exists(path):
         return path
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     links = get(f"https://api.sketchfab.com/v3/models/{uid}/download", headers={"Authorization": f"Token {env_key()}"})
     if "glb" in links:
         get(links["glb"]["url"], path)
