@@ -1445,6 +1445,127 @@ def build_city(hidden):
     box("shelter_seat", xb + 0.1, xb + 0.5, sy0 + 0.6, sy1 - 0.6, 0.55, 0.6, M["metal"])
 
 
+# ---------------------------------------------------------------- les palmiers
+
+def translucent_leaves(mat, amount=0.4, tint=(1.0, 0.95, 0.7)):
+    """La palme reste découpée par son alpha ; une part de sa lumière passe au travers (contre-jour)."""
+    nt = mat.node_tree
+    if any(n.name == "tys_translucent" for n in nt.nodes):
+        return
+    bsdf = next((n for n in nt.nodes if n.type == "BSDF_PRINCIPLED"), None)
+    out = next((n for n in nt.nodes if n.type == "OUTPUT_MATERIAL"), None)
+    if bsdf is None or out is None:
+        return
+    alpha_link = bsdf.inputs["Alpha"].links[0].from_socket if bsdf.inputs["Alpha"].links else None
+    col_link = bsdf.inputs["Base Color"].links[0].from_socket if bsdf.inputs["Base Color"].links else None
+    bsdf.inputs["Alpha"].default_value = 1.0
+    if alpha_link:
+        nt.links.remove(bsdf.inputs["Alpha"].links[0])
+    bsdf.inputs["Roughness"].default_value = 0.55
+    tl = nt.nodes.new("ShaderNodeBsdfTranslucent")
+    tl.name = "tys_translucent"
+    if col_link:
+        mul = nt.nodes.new("ShaderNodeMix")
+        mul.data_type = "RGBA"
+        mul.blend_type = "MULTIPLY"
+        mul.inputs["Factor"].default_value = 1.0
+        nt.links.new(col_link, mul.inputs[6])
+        mul.inputs[7].default_value = (*tint, 1)
+        nt.links.new(mul.outputs[2], tl.inputs["Color"])
+    mix = nt.nodes.new("ShaderNodeMixShader")
+    mix.inputs[0].default_value = amount
+    nt.links.new(bsdf.outputs[0], mix.inputs[1])
+    nt.links.new(tl.outputs[0], mix.inputs[2])
+    cut = nt.nodes.new("ShaderNodeMixShader")
+    tr = nt.nodes.new("ShaderNodeBsdfTransparent")
+    if alpha_link:
+        nt.links.new(alpha_link, cut.inputs[0])
+    else:
+        cut.inputs[0].default_value = 1.0
+    nt.links.new(tr.outputs[0], cut.inputs[1])
+    nt.links.new(mix.outputs[0], cut.inputs[2])
+    nt.links.new(cut.outputs[0], out.inputs["Surface"])
+
+
+def to_base(ob, trunk_pts):
+    """Origine au pied du tronc (le point le plus bas du tronc)."""
+    low = min(trunk_pts, key=lambda p: p.z)
+    ob.data.transform(__import__('mathutils').Matrix.Translation(-low))
+    ob.location = (0, 0, 0)
+
+
+def coconut_sources(hidden, scale=0.55):
+    """Les 25 cocotiers du « Realistic Palm Tree 2 Free », chacun joint (palmes + tronc), au pied."""
+    before = set(bpy.data.objects)
+    bpy.ops.import_scene.gltf(filepath=os.path.join(ASSETS, "palm-coconut-group.glb"))
+    new = [o for o in bpy.data.objects if o not in before]
+    meshes = [o for o in new if o.type == "MESH"]
+    for o in meshes:
+        mw = o.matrix_world.copy()
+        o.parent = None
+        o.matrix_world = mw
+    for o in new:
+        if o.type != "MESH":
+            bpy.data.objects.remove(o)
+    meshes = [o for o in meshes if "Palm_P2_" in o.name]
+    groups = {}
+    for o in meshes:
+        key = o.name.split("Palm_P2_")[1].split("_")[0]
+        groups.setdefault(key, []).append(o)
+    out = []
+    for key, objs in sorted(groups.items(), key=lambda kv: int(kv[0])):
+        bpy.ops.object.select_all(action="DESELECT")
+        for o in objs:
+            o.select_set(True)
+        bpy.context.view_layer.objects.active = objs[0]
+        bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+        trunk = next((o for o in objs if "Trunk" in o.name), None)
+        if trunk is None:
+            continue
+        pts = [Vector(v.co) for v in trunk.data.vertices]
+        ob = join(objs, f"coco_src_{key}")
+        to_base(ob, pts)
+        ob.data.transform(__import__('mathutils').Matrix.Scale(scale, 4))
+        for c in list(ob.users_collection):
+            c.objects.unlink(ob)
+        hidden.objects.link(ob)
+        top = max(v.co.z for v in ob.data.vertices)
+        hi = [v.co for v in ob.data.vertices if v.co.z > top * 0.7]
+        cx, cy = sum(v.x for v in hi) / len(hi), sum(v.y for v in hi) / len(hi)
+        out.append((ob, top, math.atan2(cy, cx), math.hypot(cx, cy)))
+    for m in bpy.data.materials:
+        if m.name.startswith("Leaf"):
+            translucent_leaves(m)
+    return out
+
+
+def royal_source(hidden, name="palm-royal.glb"):
+    parts = import_glb(name)
+    trunk = next(o for o in parts if "trunk" in o.name)
+    pts = [Vector(v.co) for v in trunk.data.vertices]
+    ob = join(parts, "royal_src")
+    to_base(ob, pts)
+    for c in list(ob.users_collection):
+        c.objects.unlink(ob)
+    hidden.objects.link(ob)
+    for m in ob.data.materials:
+        if m and "leaflet" in m.name:
+            translucent_leaves(m, 0.45)
+    return ob
+
+
+def tree_grate(name, x, y, size=1.3):
+    """Grille d'arbre en fonte au ras du trottoir, terre sombre dessous."""
+    soil = bpy.data.materials.get("grate_soil") or mat_plain("grate_soil", lin("#1c1612"), 0.9)
+    iron = bpy.data.materials.get("grate_iron") or mat_plain("grate_iron", (0.03, 0.03, 0.032, 1), 0.45, 0.85)
+    h = size / 2
+    box(f"{name}_soil", x - h, x + h, y - h, y + h, 0.10, 0.151, soil)
+    box(f"{name}_frame", x - h, x + h, y - h, y + h, 0.152, 0.158, iron)
+    # le cadre évidé : les barreaux d'une grille rayonnante, simplifiée en lames parallèles
+    box(f"{name}_hole", x - 0.18, x + 0.18, y - 0.18, y + 0.18, 0.152, 0.159, soil)
+
+
+
 # ---------------------------------------------------------------- scène
 
 def make_world(scene):
@@ -1685,28 +1806,34 @@ def build():
     # --- la ville : la route, les immeubles, la rue
     build_city(hidden)
 
-    # --- les palmiers
-    parts = import_glb("palms.glb")
-    groups = {tag: [o for o in parts if o.name.startswith(tag)] for tag in ("PALMLOW_", "PALMLOW2_", "PALMLOW3_")}
-    palms = []
-    for tag, grp in groups.items():
-        p = join(grp, f"palm_src_{len(palms)}")
-        recentre(p)
-        for c in list(p.users_collection):
-            c.objects.unlink(p)
-        hidden.objects.link(p)
-        palms.append(p)
+    # --- les palmiers : vingt-cinq cocotiers distincts (troncs courbes) et un palmier royal droit,
+    # palmes translucides, une grille d'arbre au pied de chacun
+    cocos = coconut_sources(hidden)
+    royal = royal_source(hidden)
+    city = [(ob, ang) for ob, top, ang, off in cocos if 8.0 < top < 13.5 and off < 3.5]
+    sea = [(ob, ang) for ob, top, ang, off in cocos if 8.0 < top < 15.5 and off < 6.0]
     k = 0
     for side, x, start, step in ((1, ROAD_HALF + 2.4, 6.0, 13.0), (-1, -ROAD_HALF - 1.6, 12.0, 17.0)):
         yy = start
+        n = 0
         while yy < 700:
             if side < 0 and in_street(yy, 2.5):
                 yy += 6.0
                 continue
-            instance(palms[k % 3], f"palm_{k}", (x + random.uniform(-0.4, 0.4), yy + random.uniform(-1.5, 1.5), 0.15),
-                     random.uniform(0, math.tau), random.uniform(1.15, 1.45))
+            px, py = x + random.uniform(-0.3, 0.3), yy + random.uniform(-1.5, 1.5)
+            if side < 0 and n % 3 != 1:
+                # côté ville : surtout des palmiers royaux, droits, à peine penchés
+                ob = instance(royal, f"palm_{k}", (px, py, 0.15), random.uniform(0, math.tau), random.uniform(0.85, 1.12))
+                ob.rotation_euler = (math.radians(random.uniform(-2, 2)), math.radians(random.uniform(-2, 2)), ob.rotation_euler.z)
+            else:
+                # la couronne des cocotiers penche vers la chaussée côté ville, vers la mer côté promenade
+                src, ang = random.choice(city if side < 0 else sea)
+                instance(src, f"palm_{k}", (px, py, 0.15), -ang + random.uniform(-0.6, 0.6), random.uniform(0.9, 1.1))
+            if py < 330:
+                tree_grate(f"palm_{k}_grate", px, py)
             yy += step + random.uniform(-2, 2)
             k += 1
+            n += 1
 
     # --- les lampadaires
     parts = import_glb("streetlights.glb")

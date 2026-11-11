@@ -25,8 +25,12 @@ SKETCHFAB = {
     "coupe-hd.glb": "820a13c4831c41959ce75e6c2014e882",
     # berline de patrouille des années 80, dessin de l'auteur
     "police.glb": "61766c1e6e1e4b2b803c174f33433a74",
-    # trois palmiers hauts, base scannée
+    # trois palmiers hauts, base scannée (la v1, gardée pour la référence du banc d'essai)
     "palms.glb": "fd439b0f82c34497aabb21c68ad2fb34",
+    # vingt-cinq cocotiers distincts, troncs courbes ou droits
+    "palm-coconut-group.glb": "d05c8ffb6ec64a7184c4b673e21f7224",
+    # palmier royal (Roystonea regia) haute définition
+    "palm-royal.glb": "3113aadb615e432f934ec5d3407d11ce",
     # lampadaires
     "streetlights.glb": "1173b0c4d9b0400bbeaafbee0e94ca59",
     # feu tricolore new-yorkais des années 80, aux carrefours
