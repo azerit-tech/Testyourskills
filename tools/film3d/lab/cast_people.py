@@ -1576,6 +1576,92 @@ def cast_driver_seated(wheel_center=COUPE_WHEEL_CENTER, seat_point=COUPE_HIP, va
     return _objects(arm)
 
 
+def _ray(origin, direction, dist=2.0):
+    """Premier point touché dans la scène (monde), ou None."""
+    dg = bpy.context.evaluated_depsgraph_get()
+    hit, loc, *_ = bpy.context.scene.ray_cast(dg, Vector(origin), Vector(direction).normalized(), distance=dist)
+    return loc if hit else None
+
+
+def measure_rim(body, rim_prefix, hint, near=0.45):
+    """Le volant d'une voiture jointe : faces de matière `rim_prefix…` à moins de `near` de `hint` (monde).
+    Renvoie (centre, normale, rayon) en monde, par ACP des sommets, ou None."""
+    import numpy as np
+    me, mw = body.data, body.matrix_world
+    idx = {i for i, m in enumerate(me.materials) if m and m.name.startswith(rim_prefix)}
+    vs = set()
+    for p in me.polygons:
+        if p.material_index in idx:
+            vs.update(p.vertices)
+    P = [mw @ me.vertices[i].co for i in vs]
+    P = np.array([tuple(v) for v in P if (v - Vector(hint)).length < near])
+    if len(P) < 30:
+        return None
+    c = P.mean(axis=0)
+    _, ev = np.linalg.eigh(np.cov((P - c).T))
+    n = ev[:, 0]
+    d = (P - c) - np.outer((P - c) @ n, n)
+    r = np.linalg.norm(d, axis=1)
+    return Vector(c), Vector(n).normalized(), float(np.median(r[r > 0.75 * r.max()]))
+
+
+def cast_driver_in_car(body, rim_prefix, wheel_hint, variant="hooded", clench=0.0, log=print):
+    """Le conducteur assis dans une voiture d'époque (lab/hero_cars.py), la voiture à l'origine, l'avant vers -y,
+    conduite à gauche (côté +x). Le volant est mesuré sur sa matière ; l'assise, le dossier et le plancher sont
+    trouvés par lancers de rayons sous le volant ; le bassin est posé 10 cm devant le dossier, 5 cm sous le haut de
+    l'assise (le coussin s'enfonce ; le coupé : 8,5 cm sous ses bourrelets), puis avancé (le siège coulisse) tant que les mains n'atteignent pas la jante,
+    et baissé si la capuche touche le pavillon. Renvoie la liste des objets (armature d'abord) ou [] si la mesure
+    échoue."""
+    rim = measure_rim(body, rim_prefix, wheel_hint)
+    if rim is None:
+        log("[conducteur] volant introuvable : voiture vide")
+        return []
+    C, N, rad = rim
+    if not (0.15 < rad < 0.26 and 0.6 < C.z < 1.1):
+        log(f"[conducteur] volant douteux (centre {tuple(round(v, 3) for v in C)}, rayon {rad:.3f}) : voiture vide")
+        return []
+    # l'assise : rayons verticaux de 35 à 60 cm derrière le volant
+    zs = []
+    for k in range(6):
+        h = _ray((C.x, C.y + 0.35 + 0.05 * k, C.z + 0.15), (0, 0, -1))
+        if h is not None and 0.3 < h.z < C.z - 0.05:
+            zs.append(h.z)
+    if not zs:
+        log("[conducteur] assise introuvable : voiture vide")
+        return []
+    seat_z = sorted(zs)[len(zs) // 2]
+    back = _ray((C.x, C.y + 0.2, seat_z + 0.3), (0, 1, 0), 1.2)
+    back_y = back.y if back is not None and back.y - C.y > 0.3 else C.y + 0.75
+    floor = _ray((C.x, C.y - 0.45, C.z - 0.25), (0, 0, -1), 1.0)
+    floor_z = floor.z if floor is not None and 0.05 < floor.z < seat_z - 0.1 else seat_z - 0.3
+    pedal = Vector((C.x, C.y - 0.45, floor_z + 0.08))
+    # le pavillon au-dessus de la tête, mesuré avant que le conducteur ne soit là (un rayon le toucherait)
+    roof = _ray((C.x, back_y - 0.2, seat_z + 0.4), (0, 0, 1), 1.0)
+    arm = load_driver(variant)
+    hip = Vector((C.x, back_y - 0.10, seat_z - 0.05))
+    for step in range(8):
+        place_driver(arm, hip, (0, -1, 0))
+        miss = pose_driver_wheel(arm, C, rad, N, pedal=pedal, clench=clench)
+        if max(miss.values()) < 0.01:
+            break
+        hip.y -= 0.03
+    _upd()
+    # le haut de la capuche : 25 cm au-dessus de la base du crâne (la queue de l'os de la tête, posée par
+    # l'import glTF, ne dit rien de la taille de la tête)
+    top = arm.matrix_world @ pb(arm, "Head").head + Vector((0, 0, 0.25))
+    if roof is not None and top.z + 0.05 > roof.z:
+        hip.z -= min(0.08, top.z + 0.05 - roof.z)
+        place_driver(arm, hip, (0, -1, 0))
+        miss = pose_driver_wheel(arm, C, rad, N, pedal=pedal, clench=clench)
+        _upd()
+        top = arm.matrix_world @ pb(arm, "Head").head + Vector((0, 0, 0.25))
+    arm["wheel_miss"] = str({k: round(v, 3) for k, v in miss.items()})
+    log(f"[conducteur] volant {tuple(round(v, 3) for v in C)} r {rad:.3f} n {tuple(round(v, 2) for v in N)}, "
+        f"assise {seat_z:.3f}, dossier {back_y:.3f}, plancher {floor_z:.3f}, bassin {tuple(round(v, 3) for v in hip)}, "
+        f"tête {top.z:.3f} (pavillon {roof.z if roof is not None else float('nan'):.3f}), écart des mains {arm['wheel_miss']}")
+    return _objects(arm)
+
+
 def cast_lineup(driver="hooded", officer="spp", gun="service", gap=1.4):
     """La planche des gens : le conducteur mains levées, puis un policier dans chacune des trois poses,
     arme en main ; côte à côte autour de l'origine, tous face à -Y. Renvoie la liste des objets."""

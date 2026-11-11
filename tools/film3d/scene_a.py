@@ -38,7 +38,7 @@ random.seed(27)
 #                   mix (étages en enduit photographique, rez-de-chaussée en boutiques de bibliothèque)
 #   FILM3D_ROUTE  : base (l'enrobé d'origine), pluie (juste après l'averse), sechage (en train de sécher)
 #   FILM3D_HERO   : la voiture poursuivie, w111 (berline des années 60, par défaut), slc (coupé des années 70),
-#                   chargées par lab/hero_cars.py, ou coupe (le coupé d'origine)
+#                   chargées par lab/hero_cars.py, ou coupe (le coupé d'origine) ; FILM3D_DRIVER=0 la laisse vide
 #   FILM3D_BLEND  : le nom du .blend écrit dans assets (scene-a.blend par défaut)
 FACADE = os.environ.get("FILM3D_FACADE", "mix")
 ROUTE = os.environ.get("FILM3D_ROUTE", "pluie")
@@ -1802,7 +1802,8 @@ def street_hero(scene):
     """La voiture poursuivie d'époque (lab/hero_cars.py), mise au repère de la rue comme le coupé : l'avant vers -y,
     au sol, à sa place sur la voie. Le quart de tour est appliqué aux maillages (les roues tournent ensuite autour de
     leur x local, comme celles du coupé). L'objet s'appelle `coupe` et ses roues `wheel_*` : render.py et
-    lab/A_pres.py la cherchent sous ces noms. Phares ramenés à ceux du coupé (90 W, 60°)."""
+    lab/A_pres.py la cherchent sous ces noms. Phares ramenés à ceux du coupé (90 W, 60°), le conducteur assis
+    (lab/cast_people.py) parenté à la caisse."""
     lab = os.path.join(HERE, "lab")
     if lab not in sys.path:
         sys.path.insert(0, lab)
@@ -1835,6 +1836,17 @@ def street_hero(scene):
     body["length"] = car["length"]
     body["half_track"] = max((abs(a[1]) for a in car["axles"].values()), default=0.75)
     bpy.context.view_layer.update()
+    if os.environ.get("FILM3D_DRIVER", "1") != "0":
+        try:
+            import cast_people
+            # le repère du volant donné par hero_cars (avant vers +x) passé dans celui de la rue (avant vers -y)
+            w = car["cockpit"]["wheel"]
+            objs = cast_people.cast_driver_in_car(body, f"hero_{HERO}_wheel_rim", Vector((w.y, -w.x, w.z)))
+            if objs:
+                objs[0].parent = body
+                objs[0].matrix_parent_inverse = Matrix.Identity(4)
+        except Exception as e:  # le conducteur n'est qu'une silhouette : sans lui, la voiture roule vide
+            print(f"[scene_a] conducteur non posé : {e!r}", flush=True)
     print(f"[scene_a] voiture poursuivie {HERO} : {car['length']:.2f} × {car['width']:.2f} × {car['height']:.2f} m, "
           f"roues r {body['wheel_r']:.3f}, demi-voie {body['half_track']:.3f}, {car['tris']} triangles", flush=True)
     body.location = (LANE_X, COUPE_Y, 0)
