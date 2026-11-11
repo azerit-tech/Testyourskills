@@ -3580,13 +3580,25 @@ a.rg-src.is-both {
 .rr-tile[aria-expanded="true"] {
   box-shadow: inset 0 0 0 1.5px var(--blush);
 }
+/* Le nom du critère se lit en entier, jamais « Open sou… » : il passe sur deux
+   lignes plutôt que d'être coupé (entre les mots, pas dedans), un cran plus petit
+   sur les écrans les plus étroits. */
 .rr-name {
   grid-area: name;
   min-width: 0;
-  overflow: hidden;
   font: 600 14px/1.2 var(--f-text);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  text-wrap: balance;
+  overflow-wrap: normal;
+  hyphens: none;
+}
+@media (max-width: 380px) {
+  .rr-tile {
+    column-gap: 4px;
+    padding-inline: 10px;
+  }
+  .rr-name {
+    font-size: 13px;
+  }
 }
 .rr-score {
   grid-area: score;
