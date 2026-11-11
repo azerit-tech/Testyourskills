@@ -548,6 +548,9 @@ def _w111_clean(parts):
                 ((0.36, 0.75), (2.29, 2.34), (0.70, 0.80)),      # lettrage du modèle à droite du coffre
                 ((-0.75, -0.36), (2.29, 2.34), (0.70, 0.80)),    # lettrage éventuel à gauche
             ], max_size=0.16)
+            # la barrette du lettrage de modèle sur le coffre (trois lames de 23 cm, d'un seul côté, à la place du
+            # nom du modèle) : trop longue pour la boîte du lettrage ci-dessus, retirée à part
+            n += delete_islands(o, [((0.36, 0.75), (2.29, 2.34), (0.73, 0.78))], max_size=0.25, max_verts=40)
             report[o.name] = f"{n} morceaux supprimés"
         elif "_rim_" in o.name and "chrome" in o.name:
             # l'étoile au centre de l'enjoliveur (72 sommets, 10 cm) ; le disque nu reste
