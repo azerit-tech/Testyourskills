@@ -3,6 +3,9 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   CEILINGS,
+  CeilingError,
+  MAX_CRF,
+  MAX_GOP,
   NEUTRAL_GRADE,
   SHOTS,
   TOTAL_CEILINGS,
@@ -11,8 +14,12 @@ import {
   cropFilters,
   encodeArgs,
   filmFrames,
+  fitCeilings,
+  forceKeyframesExpr,
   gradeFilters,
   keyframeErrors,
+  keyframePlan,
+  personBytes,
   nextCrf,
   parseMontage,
   parseRate,
@@ -103,45 +110,112 @@ describe("les arguments de ffmpeg", () => {
     expect(gradeFilters(NEUTRAL_GRADE)).toEqual([]);
   });
 
-  it("encode en H.264 Main, 24 i/s, une image clé toutes les 12, +faststart, sans son", () => {
-    const a = encodeArgs({ list: "l.txt", out: "o.mp4", size: 540, crf: 25, frames: 204 }).join(" ");
-    for (const part of ["-profile:v main", "-r 24", "-frames:v 204", "-g 12", "-keyint_min 12", "-sc_threshold 0", "-movflags +faststart", "-an", "-crf 25", "scale=540:960"])
+  it("encode en H.264 Main, 24 i/s, images clés sur les coupes, couleurs bt709, +faststart, sans son", () => {
+    const keys = keyframePlan("poursuite");
+    const a = encodeArgs({ list: "l.txt", out: "o.mp4", size: 540, crf: 25, frames: 204, keys }).join(" ");
+    for (const part of ["-profile:v main", "-r 24", "-frames:v 204", "-g 48", "-sc_threshold 0", "-forced-idr 1", "-movflags +faststart", "-an", "-crf 25", "scale=540:960"])
       expect(a).toContain(part);
-    expect(encodeArgs({ list: "l.txt", out: "o.mp4", size: 720, crf: 23, frames: 36 }).join(" ")).not.toContain("scale=");
+    expect(a).toContain("-force_key_frames expr:eq(n,0)+eq(n,24)+eq(n,52)+eq(n,80)+eq(n,108)+eq(n,136)+eq(n,164)");
+    for (const tag of ["-colorspace bt709", "-color_primaries bt709", "-color_trc bt709", "-color_range tv"]) expect(a).toContain(tag);
+    expect(a).not.toContain("-g 12");
+    expect(encodeArgs({ list: "l.txt", out: "o.mp4", size: 720, crf: 23, frames: 36, keys: [0] }).join(" ")).not.toContain("scale=");
+    // les intermédiaires passent aussi en bt709, cartons compris (RVB vers la matrice du HD, pas celle du SD)
+    const tagged = "scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,setparams=range=tv:color_primaries=bt709:color_trc=bt709:colorspace=bt709";
+    expect(slateSegmentArgs("s.mkv", 24).join(" ")).toContain(tagged);
+    expect(takeFilter({ take: "a.mp4", in: 0, speed: 1, crop: null }, 28, NEUTRAL_GRADE).endsWith(tagged)).toBe(true);
+    expect(a).toContain("format=yuv420p,setparams=range=tv:color_primaries=bt709:color_trc=bt709:colorspace=bt709");
     expect(slateSegmentArgs("s.mkv", 24).join(" ")).toContain("-f rawvideo -pix_fmt rgba -s 720x1280 -r 24 -i -");
     expect(concatList(["/a/b.mkv", "/a/it's.mkv"])).toBe("file '/a/b.mkv'\nfile '/a/it'\\''s.mkv'\n");
   });
 
-  it("baisse la qualité par pas de 2, jusqu'à 36", () => {
-    expect(nextCrf(23)).toBe(25);
-    expect(nextCrf(35)).toBeNull();
+  it("baisse la qualité par pas de 2, jusqu'au CRF 28 et pas au-delà", () => {
+    expect(MAX_CRF).toBe(28);
+    expect(nextCrf(20)).toBe(22);
+    expect(nextCrf(27)).toBe(28);
+    expect(nextCrf(28)).toBeNull();
   });
 
-  it("tient les plafonds du §4.1", () => {
-    expect(CEILINGS[720]).toEqual({ poursuite: 2_800_000, fin: 600_000, fin6: 1_000_000 });
-    const s540 = Object.values(CEILINGS[540]).reduce((a, b) => a + b, 0);
-    expect(s540).toBeLessThanOrEqual(TOTAL_CEILINGS[540]);
+  it("tient les plafonds du §4.1 : 4,5 / 0,9 / 1,4 Mo en 720p, 2,2 Mo pour une personne en 540p", () => {
+    expect(CEILINGS[720]).toEqual({ poursuite: 4_500_000, fin: 900_000, fin6: 1_400_000 });
+    expect(TOTAL_CEILINGS[720]).toBe(5_900_000);
+    expect(TOTAL_CEILINGS[540]).toBe(2_200_000);
+    // une personne charge la poursuite et une seule fin
+    expect(personBytes(CEILINGS[720])).toBe(TOTAL_CEILINGS[720]);
+    expect(personBytes(CEILINGS[540])).toBeLessThanOrEqual(TOTAL_CEILINGS[540]);
+    expect(personBytes(CEILINGS[540])).toBeGreaterThan(TOTAL_CEILINGS[540] - 10);
+    for (const f of ["poursuite", "fin", "fin6"] as const) expect(CEILINGS[540][f]).toBeLessThan(CEILINGS[720][f]);
+  });
+});
+
+describe("les images clés", () => {
+  it("sur chaque coupe entre plans, plus une toutes les 48 images au plus", () => {
+    expect(MAX_GOP).toBe(48);
+    expect(keyframePlan("poursuite")).toEqual([0, 24, 52, 80, 108, 136, 164]);
+    expect(keyframePlan("fin")).toEqual([0]);
+    expect(keyframePlan("fin6")).toEqual([0, 48]);
+    for (const film of ["poursuite", "fin", "fin6"] as const) {
+      const k = [...keyframePlan(film), filmFrames(film)];
+      for (let i = 1; i < k.length; i++) expect(k[i] - k[i - 1]).toBeLessThanOrEqual(MAX_GOP);
+    }
+    expect(forceKeyframesExpr([0, 48])).toBe("expr:eq(n,0)+eq(n,48)");
+  });
+});
+
+describe("tenir les plafonds", () => {
+  /** Un encodeur factice : le poids de chaque fichier baisse de 15 % par point de CRF. */
+  const fake = (at20: Record<string, number>, seen: string[] = []) => (film: string, crf: number) => {
+    seen.push(`${film}@${crf}`);
+    return Math.round(at20[film] * 0.85 ** (crf - 20));
+  };
+
+  it("chaque fichier sous son plafond, au meilleur CRF qui y tient", () => {
+    const seen: string[] = [];
+    const r = fitCeilings(720, fake({ poursuite: 5_000_000, fin: 500_000, fin6: 800_000 }, seen));
+    expect(r.crf).toEqual({ poursuite: 22, fin: 20, fin6: 20 });
+    expect(seen).toEqual(["poursuite@20", "poursuite@22", "fin@20", "fin6@20"]);
+  });
+
+  it("le total compte la poursuite et une seule fin, pas les trois fichiers : rien ne baisse pour rien", () => {
+    // 4,4 + 0,88 + 1,39 = 6,67 Mo à trois, mais 5,79 Mo pour une personne : sous les 5,9 Mo
+    const r = fitCeilings(720, fake({ poursuite: 4_400_000, fin: 880_000, fin6: 1_390_000 }));
+    expect(r.crf).toEqual({ poursuite: 20, fin: 20, fin6: 20 });
+    expect(personBytes(r.bytes)).toBeLessThanOrEqual(TOTAL_CEILINGS[720]);
+  });
+
+  it("il faudrait dépasser le CRF 28 : le montage échoue au lieu d'avertir", () => {
+    const log: string[] = [];
+    expect(() => fitCeilings(720, fake({ poursuite: 20_000_000, fin: 500_000, fin6: 800_000 }), (m) => log.push(m))).toThrow(CeilingError);
+    expect(() => fitCeilings(720, fake({ poursuite: 20_000_000, fin: 500_000, fin6: 800_000 }))).toThrow(/dépasser le CRF 28/);
+    // il est passé par 22, 24, 26 et 28 avant d'échouer
+    expect(log.map((m) => m.match(/CRF (\d+)$/)?.[1])).toEqual(["22", "24", "26", "28"]);
   });
 });
 
 describe("la vérification", () => {
-  const ok: ProbeStream = { codec_type: "video", codec_name: "h264", profile: "Main", width: 720, height: 1280, r_frame_rate: "24/1", avg_frame_rate: "24/1", nb_read_frames: "36" };
-  const keys = Array.from({ length: 36 }, (_, i) => i % 12 === 0);
+  const ok: ProbeStream = {
+    codec_type: "video", codec_name: "h264", profile: "Main", width: 720, height: 1280, r_frame_rate: "24/1", avg_frame_rate: "24/1", nb_read_frames: "56",
+    color_space: "bt709", color_primaries: "bt709", color_transfer: "bt709",
+  };
+  const exp = { frames: 56, width: 720, height: 1280, keys: keyframePlan("fin6") };
+  const keys = Array.from({ length: 56 }, (_, i) => i === 0 || i === 48);
 
   it("accepte un fichier conforme", () => {
-    expect(checkProbe([ok], keys, { frames: 36, width: 720, height: 1280 })).toEqual([]);
+    expect(checkProbe([ok], keys, exp)).toEqual([]);
   });
 
-  it("refuse le son, une image de trop, la mauvaise cadence", () => {
-    const errs = checkProbe([{ ...ok, nb_read_frames: "37", r_frame_rate: "25/1" }, { codec_type: "audio" }], keys, { frames: 36, width: 720, height: 1280 });
-    expect(errs.join(" | ")).toMatch(/piste son.*cadence.*37 images/);
+  it("refuse le son, une image de trop, la mauvaise cadence, des couleurs sans étiquette bt709", () => {
+    const errs = checkProbe([{ ...ok, nb_read_frames: "57", r_frame_rate: "25/1", color_space: undefined }, { codec_type: "audio" }], keys, exp);
+    expect(errs.join(" | ")).toMatch(/piste son.*cadence.*57 images.*couleurs \?\/bt709\/bt709/);
   });
 
-  it("repère une image clé mal placée", () => {
-    expect(keyframeErrors(keys, 12)).toBeNull();
-    const k = [...keys];
-    k[5] = true;
-    expect(keyframeErrors(k, 12)).toContain("5");
+  it("repère une image clé mal placée ou manquante", () => {
+    expect(keyframeErrors(keys, exp.keys)).toBeNull();
+    const extra = [...keys];
+    extra[12] = true;
+    expect(keyframeErrors(extra, exp.keys)).toContain("12");
+    const missing = [...keys];
+    missing[48] = false;
+    expect(keyframeErrors(missing, exp.keys)).toContain("48");
   });
 });
 

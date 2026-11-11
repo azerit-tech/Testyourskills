@@ -2,6 +2,7 @@
 // Liste de montage, arithmétique des images, arguments de ffmpeg, cartons en SVG,
 // lecture des sondes ffprobe. Rien ici ne lance de processus : scripts/film-assemble.ts
 // et scripts/film-contact.ts s'en chargent, et film-lib.test.ts teste ce fichier.
+import { FILE_CEILINGS, PERSON_CEILINGS, personBytes } from "../shared/film/budget";
 import { ENDINGS, SHOT_FRAMES as CHASE_SHOT_FRAMES } from "../shared/film/cut";
 
 export const FPS = 24;
@@ -34,17 +35,15 @@ export type FilmId = keyof typeof FILMS;
 export const SIZES = { 720: [720, 1280], 540: [540, 960] } as const;
 export type SizeId = keyof typeof SIZES;
 
-const MB = 1_000_000;
 /**
- * Plafonds de poids (§4.1), en octets (1 Mo = 10^6 octets, lecture stricte).
- * Le 540p : « 1,8 Mo en tout au plus » ; on répartit ce total au prorata des
- * plafonds 720p (1,8 / 4,4 = 0,409), plus sévère que « 45 % » pris fichier par fichier.
+ * Plafonds de poids (§4.1), en octets (1 Mo = 10^6 octets, lecture stricte),
+ * lus dans shared/film/budget.ts : le lecteur s'en sert aussi. Par fichier, et
+ * pour une personne (la poursuite et la plus lourde des deux fins, car on ne
+ * charge que la fin utile) : 5,9 Mo en 720p, 2,2 Mo en 540p.
  */
-export const CEILINGS: Record<SizeId, Record<FilmId, number>> = {
-  720: { poursuite: 2.8 * MB, fin: 0.6 * MB, fin6: 1.0 * MB },
-  540: { poursuite: Math.floor((2.8 * 1.8 * MB) / 4.4), fin: Math.floor((0.6 * 1.8 * MB) / 4.4), fin6: Math.floor((1.0 * 1.8 * MB) / 4.4) },
-};
-export const TOTAL_CEILINGS: Record<SizeId, number> = { 720: 4 * MB, 540: 1.8 * MB };
+export const CEILINGS: Record<SizeId, Record<FilmId, number>> = { 720: FILE_CEILINGS["720"], 540: FILE_CEILINGS["540"] };
+export const TOTAL_CEILINGS: Record<SizeId, number> = { 720: PERSON_CEILINGS["720"], 540: PERSON_CEILINGS["540"] };
+export { personBytes };
 export const POSTER_CEILING = 60_000;
 
 /** Les zones du §7.3, en fraction du cadre 9:16. */
@@ -276,12 +275,21 @@ export function takeFilter(edit: ShotEdit, frames: number, grade: Grade, lutPath
     "tpad=stop_mode=clone:stop=-1",
     `trim=end_frame=${frames}`,
     `setpts=N/${FPS}/TB`,
+    TO_BT709,
     "format=yuv420p",
+    BT709_PARAMS,
   ].join(",");
 }
 
+/** La dernière conversion d'un plan : la matrice bt709, en plage vidéo, celle qu'annoncent les fichiers. */
+const TO_BT709 = "scale=out_color_matrix=bt709:out_range=tv";
+/** L'étiquette posée sur les images elles-mêmes : ffmpeg 8 prend celle des images, pas seulement les options de sortie. */
+const BT709_PARAMS = "setparams=range=tv:color_primaries=bt709:color_trc=bt709:colorspace=bt709";
+/** Les couleurs étiquetées bt709 (§4.1) : sans étiquette, un navigateur peut lire la matrice du SD et ternir les couleurs. */
+const BT709_TAGS = ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv"];
+
 /** Intermédiaire sans perte : un plan, 720 × 1280, exactement `frames` images. */
-const LOSSLESS = ["-c:v", "libx264", "-preset", "ultrafast", "-qp", "0", "-pix_fmt", "yuv420p", "-an"];
+const LOSSLESS = ["-c:v", "libx264", "-preset", "ultrafast", "-qp", "0", "-pix_fmt", "yuv420p", ...BT709_TAGS, "-an"];
 
 export function takeSegmentArgs(input: string, out: string, edit: ShotEdit, frames: number, grade: Grade, lutPath?: string): string[] {
   return ["-y", "-v", "error", "-i", input, "-vf", takeFilter(edit, frames, grade, lutPath), "-frames:v", String(frames), ...LOSSLESS, out];
@@ -293,21 +301,54 @@ export function slateSegmentArgs(out: string, frames: number): string[] {
   return [
     "-y", "-v", "error",
     "-f", "rawvideo", "-pix_fmt", "rgba", "-s", `${w}x${h}`, "-r", String(FPS), "-i", "-",
-    "-vf", "format=yuv420p", "-frames:v", String(frames), ...LOSSLESS, out,
+    "-vf", `${TO_BT709},format=yuv420p,${BT709_PARAMS}`, "-frames:v", String(frames), ...LOSSLESS, out,
   ];
 }
 
-/** L'encodage final (§5.3) : H.264 Main, 24 i/s, une image clé toutes les 12, +faststart, sans son. */
-export function encodeArgs(opts: { list: string; out: string; size: SizeId; crf: number; frames: number }): string[] {
+/** Au plus tant d'images entre deux images clés (deux secondes). */
+export const MAX_GOP = 48;
+
+/**
+ * Les images clés d'un fichier (§4.1) : la première image de chaque plan (les
+ * coupes, lues dans shared/film/cut.ts), plus une dès que MAX_GOP images ont
+ * passé sans image clé. Le débit va aux images, pas à des images clés inutiles.
+ */
+export function keyframePlan(film: FilmId): number[] {
+  const cuts = new Set(Object.values(shotStarts(film)));
+  const keys: number[] = [];
+  let last = -Infinity;
+  for (let i = 0; i < filmFrames(film); i++) {
+    if (cuts.has(i) || i - last >= MAX_GOP) {
+      keys.push(i);
+      last = i;
+    }
+  }
+  return keys;
+}
+
+/** L'expression de ffmpeg qui force ces images clés, comptées par numéro d'image. */
+export function forceKeyframesExpr(keys: number[]): string {
+  return "expr:" + keys.map((k) => `eq(n,${k})`).join("+");
+}
+
+/**
+ * L'encodage final (§4.1) : H.264 Main, 24 i/s, images clés sur les coupes
+ * (keyframePlan) et toutes les 48 images au plus, couleurs bt709, +faststart, sans son.
+ */
+export function encodeArgs(opts: { list: string; out: string; size: SizeId; crf: number; frames: number; keys: number[] }): string[] {
   const [w, h] = SIZES[opts.size];
-  const vf = opts.size === 720 ? "setsar=1,format=yuv420p" : `scale=${w}:${h}:flags=lanczos,setsar=1,format=yuv420p`;
+  const vf =
+    opts.size === 720
+      ? `setsar=1,format=yuv420p,${BT709_PARAMS}`
+      : `scale=${w}:${h}:flags=lanczos:in_color_matrix=bt709:out_color_matrix=bt709:in_range=tv:out_range=tv,setsar=1,format=yuv420p,${BT709_PARAMS}`;
   return [
     "-y", "-v", "error",
     "-f", "concat", "-safe", "0", "-i", opts.list,
     "-vf", vf,
     "-r", String(FPS), "-frames:v", String(opts.frames),
     "-c:v", "libx264", "-profile:v", "main", "-level:v", "3.1", "-preset", "slow", "-crf", String(opts.crf),
-    "-g", "12", "-keyint_min", "12", "-sc_threshold", "0",
+    "-g", String(MAX_GOP), "-sc_threshold", "0", "-force_key_frames", forceKeyframesExpr(opts.keys), "-forced-idr", "1",
+    ...BT709_TAGS,
     "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-an", "-map_metadata", "-1",
     opts.out,
   ];
@@ -323,9 +364,54 @@ export function posterArgs(input: string, out: string, q: number): string[] {
   return ["-y", "-v", "error", "-i", input, "-frames:v", "1", "-q:v", String(q), out];
 }
 
-/** La qualité suivante quand un plafond est dépassé : CRF +2, jusqu'à 36. */
+/** Le CRF de départ : la meilleure qualité tentée, que le montage baisse pour tenir les plafonds. */
+export const START_CRF: Record<SizeId, number> = { 720: 20, 540: 22 };
+/** Au-delà, l'image se dégrade trop : le montage échoue plutôt que de livrer pire (§4.1). */
+export const MAX_CRF = 28;
+
+/** La qualité suivante quand un plafond est dépassé : CRF +2, jusqu'à MAX_CRF ; null au-delà. */
 export function nextCrf(crf: number): number | null {
-  return crf + 2 <= 36 ? crf + 2 : null;
+  return crf >= MAX_CRF ? null : Math.min(crf + 2, MAX_CRF);
+}
+
+/** Il faudrait dépasser MAX_CRF pour tenir un plafond : le montage échoue. */
+export class CeilingError extends Error {}
+
+export interface Fit {
+  crf: Record<FilmId, number>;
+  bytes: Record<FilmId, number>;
+}
+
+/**
+ * Les trois fichiers d'une taille sous leurs plafonds : chacun part de
+ * START_CRF et monte de 2 tant qu'il dépasse le sien ; puis, tant que la
+ * personne charge trop (poursuite et plus lourde des fins), le plus lourd des
+ * deux monte encore. Il faudrait passer CRF 28 : CeilingError, le montage échoue.
+ * `encodeAt` encode un fichier à un CRF et rend son poids en octets.
+ */
+export function fitCeilings(size: SizeId, encodeAt: (film: FilmId, crf: number) => number, log: (m: string) => void = () => undefined): Fit {
+  const films = Object.keys(FILMS) as FilmId[];
+  const crf = {} as Record<FilmId, number>;
+  const bytes = {} as Record<FilmId, number>;
+  const raise = (film: FilmId, why: string) => {
+    const next = nextCrf(crf[film]);
+    if (next === null)
+      throw new CeilingError(`${film}-${size}.mp4 : ${why} même au CRF ${crf[film]} ; il faudrait dépasser le CRF ${MAX_CRF}. Allégez le plan (moins de grain, moins de détail) ou relevez le plafond dans shared/film/budget.ts.`);
+    log(`${film}-${size}.mp4 : ${why} au CRF ${crf[film]}, qualité baissée au CRF ${next}`);
+    crf[film] = next;
+    bytes[film] = encodeAt(film, next);
+  };
+  for (const film of films) {
+    crf[film] = START_CRF[size];
+    bytes[film] = encodeAt(film, crf[film]);
+    while (bytes[film] > CEILINGS[size][film]) raise(film, `${bytes[film]} octets, au-dessus du plafond de ${CEILINGS[size][film]}`);
+  }
+  while (personBytes(bytes) > TOTAL_CEILINGS[size]) {
+    const ending: FilmId = bytes.fin6 >= bytes.fin ? "fin6" : "fin";
+    const heavy: FilmId = bytes.poursuite >= bytes[ending] ? "poursuite" : ending;
+    raise(heavy, `${personBytes(bytes)} octets pour une personne, au-dessus de ${TOTAL_CEILINGS[size]}`);
+  }
+  return { crf, bytes };
 }
 
 // ---------------------------------------------------------------------------
@@ -340,12 +426,17 @@ export interface ProbeStream {
   r_frame_rate?: string;
   avg_frame_rate?: string;
   nb_read_frames?: string;
+  color_space?: string;
+  color_primaries?: string;
+  color_transfer?: string;
 }
 
 export interface Expected {
   frames: number;
   width: number;
   height: number;
+  /** Les images clés attendues (keyframePlan). */
+  keys: number[];
 }
 
 /** Les écarts entre une sonde et l'attendu ; vide si tout va bien. */
@@ -362,14 +453,17 @@ export function checkProbe(streams: ProbeStream[], keyframes: boolean[], exp: Ex
   if (Math.abs(parseRate(s.r_frame_rate) - FPS) > 1e-6 || Math.abs(parseRate(s.avg_frame_rate) - FPS) > 1e-3)
     errs.push(`cadence ${s.r_frame_rate} (moyenne ${s.avg_frame_rate})`);
   if (Number(s.nb_read_frames) !== exp.frames) errs.push(`${s.nb_read_frames} images au lieu de ${exp.frames}`);
-  const bad = keyframeErrors(keyframes, 12);
+  const tags = [s.color_space, s.color_primaries, s.color_transfer];
+  if (tags.some((t) => t !== "bt709")) errs.push(`couleurs ${tags.map((t) => t ?? "?").join("/")} au lieu de bt709`);
+  const bad = keyframeErrors(keyframes, exp.keys);
   if (bad) errs.push(bad);
   return errs;
 }
 
-/** Une image clé exactement toutes les `gop` images, à partir de la première. */
-export function keyframeErrors(keys: boolean[], gop: number): string | null {
-  const wrong = keys.map((k, i) => (k !== (i % gop === 0) ? i : -1)).filter((i) => i >= 0);
+/** Les images clés exactement aux images attendues (keyframePlan), aucune autre. */
+export function keyframeErrors(keys: boolean[], expected: number[]): string | null {
+  const want = new Set(expected);
+  const wrong = keys.map((k, i) => (k !== want.has(i) ? i : -1)).filter((i) => i >= 0);
   return wrong.length ? `images clés mal placées (images ${wrong.slice(0, 6).join(", ")}${wrong.length > 6 ? "…" : ""})` : null;
 }
 

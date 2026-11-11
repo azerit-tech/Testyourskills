@@ -381,17 +381,17 @@ Le grain n'est pas gravé dans les fichiers : il gonflerait le débit pour rien.
 
 **En entrée du montage**, hors du dépôt, dans `~/Desktop/Azerit/design/film/plans/` : une ou plusieurs prises par plan, nommées `PLAN-prise.mp4` (`OUV-1.mp4`, `P3-2.mp4`, `FIN6-1.mp4`). `tools/film/montage.json` dit quelle prise garder et quelle fenêtre en prendre (mode d'emploi : `tools/film/README.md`). Une prise absente est remplacée par un carton : le film se monte toujours.
 
-**En sortie**, dans `web/public/film/` :
+**En sortie**, dans `web/src/film/media/`, importés par Vite (`web/src/film/files.ts`) : au build, chaque nom reçoit l'empreinte de son contenu (`/assets/poursuite-720-XXXXXXXX.mp4`), servie avec un cache long immuable. Deux variantes : la haute en 720 × 1280, l'éco en 540 × 960.
 
 | Fichier | Contenu | Images | Plafond de poids |
 |---|---|---|---|
-| `poursuite-720.mp4` | OUV puis P1 à P6 | 204 | 2,8 Mo |
-| `fin-720.mp4` | FIN | 36 | 0,6 Mo |
-| `fin6-720.mp4` | FIN6 | 56 | 1,0 Mo |
-| `poursuite-540.mp4`, `fin-540.mp4`, `fin6-540.mp4` | les mêmes en 540 × 960 | les mêmes | 1,8 Mo en tout |
-| `affiche.jpg` | la première image, 720 × 1280 | 1 | 60 Ko |
+| `poursuite-720.mp4` | OUV puis P1 à P6 | 204 | 4,5 Mo |
+| `fin-720.mp4` | FIN | 36 | 0,9 Mo |
+| `fin6-720.mp4` | FIN6 | 56 | 1,4 Mo |
+| `poursuite-540.mp4`, `fin-540.mp4`, `fin6-540.mp4` | les mêmes en 540 × 960 | les mêmes | 1,68 Mo, 0,34 Mo, 0,52 Mo |
+| `affiche.jpg` | la première image, 720 × 1280 (hors du site) | 1 | 60 Ko |
 
-Les trois fichiers en 720p pèsent 4 Mo en tout au plus. Encodage : H.264 profil Main, 720 × 1280, 24 images par seconde, une image clé toutes les 12 images, `+faststart`, sans piste son. Les plafonds sont dans `scripts/film-lib.ts` ; si un fichier en dépasse un, le montage baisse la qualité et le dit.
+Une personne ne charge que la poursuite et une seule fin : au plus 5,4 Mo en haute (5,9 Mo à six étoiles), 2,2 Mo en éco. Les plafonds de l'éco sont ceux de la haute ramenés à ce total. Encodage : H.264 profil Main, 24 images par seconde, une image clé sur chaque coupe entre plans (lues dans `shared/film/cut.ts`) et au plus toutes les 48 images, couleurs étiquetées bt709, `+faststart`, sans piste son. Les plafonds sont dans `shared/film/budget.ts`, lus par le montage et par le lecteur. Chaque fichier part du CRF 20 en haute, 22 en éco, et monte de 2 tant qu'il dépasse son plafond ; s'il faudrait passer le CRF 28 pour le tenir, **le montage échoue** (code de sortie 1) au lieu de livrer une image dégradée.
 
 Les polices (Barlow Condensed, Outfit, JetBrains Mono) et les décors peints des profils (`web/public/profiles/`) sont déjà servis par le site.
 

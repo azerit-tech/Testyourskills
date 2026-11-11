@@ -3,7 +3,8 @@
 // recollés et encodés en poursuite / fin / fin6, en 720p et 540p, avec l'affiche.
 // Une prise absente est remplacée par son carton (aplat, nom du plan, numéro d'image,
 // zones du §7.3), sans erreur. Le script vérifie ensuite chaque fichier par ffprobe
-// et tient les plafonds de poids du §4.1 en baissant la qualité s'il le faut.
+// et tient les plafonds de poids du §4.1 en baissant la qualité s'il le faut ;
+// s'il faudrait passer le CRF 28 pour en tenir un, il échoue (code de sortie 1).
 //
 // Usage : npx tsx scripts/film-assemble.ts [--plans=dossier] [--slates] [--out=dossier]
 //   --plans  : les prises (défaut ~/Desktop/Azerit/design/film/plans, hors du dépôt)
@@ -15,6 +16,7 @@ import { homedir } from "node:os";
 import { basename, resolve } from "node:path";
 import {
   CEILINGS,
+  CeilingError,
   FILMS,
   POSTER_CEILING,
   SHOTS,
@@ -25,8 +27,10 @@ import {
   concatList,
   encodeArgs,
   filmFrames,
-  nextCrf,
+  fitCeilings,
+  keyframePlan,
   parseMontage,
+  personBytes,
   posterArgs,
   sheetSvg,
   shotStarts,
@@ -100,49 +104,28 @@ for (const shot of SHOTS) {
   console.log(`  ${shot.padEnd(4)} ${String(n).padStart(2)} images  ${source[shot]}`);
 }
 
-// 2. Les six films, sous leurs plafonds.
-const START_CRF: Record<SizeId, number> = { 720: 23, 540: 24 };
+// 2. Les six films, sous leurs plafonds : au-delà du CRF 28, le montage échoue.
 const crf: Record<string, number> = {};
 const sizes: Record<string, number> = {};
 const outName = (film: FilmId, size: SizeId) => `${film}-${size}.mp4`;
 
-function encode(film: FilmId, size: SizeId) {
+function encode(film: FilmId, size: SizeId, at: number): number {
   const list = resolve(WORK, `${film}.txt`);
   writeFileSync(list, concatList(FILMS[film].map((s) => resolve(SEG, `${s}.mkv`))));
   const out = resolve(OUT, outName(film, size));
-  run(FFMPEG, encodeArgs({ list, out, size, crf: crf[out], frames: filmFrames(film) }));
+  run(FFMPEG, encodeArgs({ list, out, size, crf: at, frames: filmFrames(film), keys: keyframePlan(film) }));
+  crf[out] = at;
   sizes[out] = statSync(out).size;
-  return out;
+  return sizes[out];
 }
 
 for (const size of [720, 540] as SizeId[]) {
-  for (const film of Object.keys(FILMS) as FilmId[]) {
-    const out = resolve(OUT, outName(film, size));
-    crf[out] = START_CRF[size];
-    encode(film, size);
-    while (sizes[out] > CEILINGS[size][film]) {
-      const next = nextCrf(crf[out]);
-      if (next === null) {
-        warn(`${basename(out)} : ${kb(sizes[out])} au CRF ${crf[out]}, toujours au-dessus du plafond de ${kb(CEILINGS[size][film])}`);
-        break;
-      }
-      warn(`${basename(out)} : ${kb(sizes[out])} au CRF ${crf[out]} dépasse ${kb(CEILINGS[size][film])}, qualité baissée au CRF ${next}`);
-      crf[out] = next;
-      encode(film, size);
-    }
-  }
-  // Le total d'un joueur : on baisse le plus lourd tant qu'il dépasse.
-  const files = (Object.keys(FILMS) as FilmId[]).map((f) => resolve(OUT, outName(f, size)));
-  for (let total = sum(files); total > TOTAL_CEILINGS[size]; total = sum(files)) {
-    const heavy = files.reduce((a, b) => (sizes[a] >= sizes[b] ? a : b));
-    const next = nextCrf(crf[heavy]);
-    if (next === null) {
-      warn(`${size}p : ${kb(total)} en tout, au-dessus de ${kb(TOTAL_CEILINGS[size])}, qualité au plus bas`);
-      break;
-    }
-    warn(`${size}p : ${kb(total)} en tout dépasse ${kb(TOTAL_CEILINGS[size])}, ${basename(heavy)} passe au CRF ${next}`);
-    crf[heavy] = next;
-    encode(basename(heavy).split("-")[0] as FilmId, size);
+  try {
+    fitCeilings(size, (film, at) => encode(film, size, at), warn);
+  } catch (e) {
+    if (!(e instanceof CeilingError)) throw e;
+    console.error(`\nÉCHEC du montage : ${e.message}`);
+    process.exit(1);
   }
 }
 
@@ -164,7 +147,7 @@ for (const size of [720, 540] as SizeId[]) {
   for (const film of Object.keys(FILMS) as FilmId[]) {
     const out = resolve(OUT, outName(film, size));
     const p = probeOutput(out);
-    const errs = checkProbe(p.streams, p.keyframes, { frames: filmFrames(film), width: SIZES[size][0], height: SIZES[size][1] });
+    const errs = checkProbe(p.streams, p.keyframes, { frames: filmFrames(film), width: SIZES[size][0], height: SIZES[size][1], keys: keyframePlan(film) });
     if (sizes[out] > CEILINGS[size][film]) errs.push(`au-dessus du plafond de ${kb(CEILINGS[size][film])}`);
     failed ||= errs.length > 0;
     const v = p.streams.find((s) => s.codec_type === "video");
@@ -172,8 +155,10 @@ for (const size of [720, 540] as SizeId[]) {
       `  ${basename(out).padEnd(18)} ${v?.nb_read_frames} images  ${v?.width} × ${v?.height}  ${v?.r_frame_rate}  ${kb(sizes[out]).padStart(8)} / ${kb(CEILINGS[size][film])}  CRF ${crf[out]}  ${errs.length ? "ÉCHEC : " + errs.join(" ; ") : "ok"}`,
     );
   }
-  const files = (Object.keys(FILMS) as FilmId[]).map((f) => resolve(OUT, outName(f, size)));
-  console.log(`  ${`total ${size}p`.padEnd(18)} ${kb(sum(files))} / ${kb(TOTAL_CEILINGS[size])}`);
+  const person = personBytes({ poursuite: sizes[resolve(OUT, outName("poursuite", size))], fin: sizes[resolve(OUT, outName("fin", size))], fin6: sizes[resolve(OUT, outName("fin6", size))] });
+  const personOk = person <= TOTAL_CEILINGS[size];
+  failed ||= !personOk;
+  console.log(`  ${`personne ${size}p`.padEnd(18)} ${kb(person)} / ${kb(TOTAL_CEILINGS[size])}  ${personOk ? "ok" : "ÉCHEC"}`);
 }
 const posterProbe = probeOutput(poster).streams[0];
 const posterOk = posterProbe?.width === 720 && posterProbe?.height === 1280 && sizes[poster] <= POSTER_CEILING;
@@ -188,9 +173,6 @@ console.log(`\nPlanche des plans : ${resolve(WORK, "planche-plans.png")}`);
 console.log(`Montage en ${((Date.now() - t0) / 1000).toFixed(1)} s${warnings.length ? `, ${warnings.length} avertissement(s)` : ""}.`);
 if (failed) process.exit(1);
 
-function sum(files: string[]) {
-  return files.reduce((n, f) => n + sizes[f], 0);
-}
 function kb(n: number) {
   return n >= 1_000_000 ? `${(n / 1_000_000).toFixed(2)} Mo` : `${(n / 1000).toFixed(1)} Ko`;
 }

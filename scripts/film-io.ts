@@ -68,7 +68,7 @@ export function probeTake(file: string): { fps: number; frames: number; width: n
 /** Toutes les pistes, images comptées, et l'indicateur d'image clé de chaque image. */
 export function probeOutput(file: string): { streams: ProbeStream[]; keyframes: boolean[] } {
   const j = JSON.parse(
-    run(FFPROBE, ["-v", "error", "-count_frames", "-show_entries", "stream=codec_type,codec_name,profile,width,height,r_frame_rate,avg_frame_rate,nb_read_frames", "-of", "json", file]),
+    run(FFPROBE, ["-v", "error", "-count_frames", "-show_entries", "stream=codec_type,codec_name,profile,width,height,r_frame_rate,avg_frame_rate,nb_read_frames,color_space,color_primaries,color_transfer", "-of", "json", file]),
   );
   const keys = run(FFPROBE, ["-v", "error", "-select_streams", "v:0", "-show_entries", "frame=key_frame", "-of", "csv=p=0", file])
     .trim()
