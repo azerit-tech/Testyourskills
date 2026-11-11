@@ -2,6 +2,7 @@
 // Liste de montage, arithmétique des images, arguments de ffmpeg, cartons en SVG,
 // lecture des sondes ffprobe. Rien ici ne lance de processus : scripts/film-assemble.ts
 // et scripts/film-contact.ts s'en chargent, et film-lib.test.ts teste ce fichier.
+import { ENDINGS, SHOT_FRAMES as CHASE_SHOT_FRAMES } from "../shared/film/cut";
 
 export const FPS = 24;
 
@@ -14,18 +15,12 @@ export type ShotId = (typeof SHOTS)[number];
  * FIN dure 60 images au film, mais seules les 36 du dérapage sont dans le fichier :
  * l'arrêt sur image (14) et le flash (10) sont dessinés par le site. De même FIN6 :
  * 56 images d'orbite en vidéo, puis 12 d'arrêt et 12 de flash dessinées en direct.
- * À REMPLACER à la fusion par un import de shared/film/cut.ts (créé par T1).
+ * Lues dans shared/film/cut.ts, la seule source des durées.
  */
 export const SHOT_FRAMES: Record<ShotId, number> = {
-  OUV: 24,
-  P1: 28,
-  P2: 28,
-  P3: 28,
-  P4: 28,
-  P5: 28,
-  P6: 40,
-  FIN: 36,
-  FIN6: 56,
+  ...CHASE_SHOT_FRAMES,
+  FIN: ENDINGS.fin.video,
+  FIN6: ENDINGS.fin6.video,
 };
 
 /** Les trois films et leurs plans, dans l'ordre. */
@@ -485,16 +480,22 @@ ${items}
 /** La grille du §7.10, à remplir pour chaque prise reçue. */
 export function checklist(take: string, info: string): string {
   const lines = [
-    "une personne, un visage, un conducteur ou une silhouette se voit",
-    "du texte, des lettres ou des chiffres, même illisibles (carrosserie, toit, enseigne, plaque)",
-    "la voiture du suspect change de forme ou de couleur, ou ne ressemble plus à R1",
-    "elle rappelle un modèle réel, ou un écusson apparaît",
+    "ça ne fait pas film : image de jeu, de dessin animé, voitures-jouets",
+    "un visage est lisible, ou on voit la peau, les cheveux ou les yeux de la personne au volant (rétroviseur compris)",
+    "un visage ou une silhouette rappelle une personne réelle ou un personnage existant",
+    "il y a du sang, une personne blessée, un corps au sol, quelqu'un est touché ou renversé",
+    "un missile part, quelque chose explose ou brûle, il y a un feu d'artifice",
+    "une personne qui passe apparaît",
+    "il y a du texte, des lettres ou des chiffres, même illisibles (carrosserie, toit, uniforme, enseigne, plaque, cadran)",
+    "la voiture en fuite change de forme ou de couleur d'un plan à l'autre",
+    "un véhicule ou un avion rappelle un modèle réel, ou porte un écusson, une cocarde, un numéro",
     "les gyrophares sont rouge et bleu",
     "une roue se déforme, une voiture en traverse une autre, glisse sans tourner ou roule à l'envers",
     "deux véhicules se percutent",
+    "OUV n'est pas calme, ou un plan est moins agité que celui d'avant",
+    "dans FIN, plus d'une patrouille ou plus d'une silhouette est visible (la fin doit rester vraie à une étoile)",
     "le ciel n'est plus à l'heure bleue, ou le sol est sec",
     "l'action sort de la zone centrale, ou quelque chose d'essentiel est dans les bandes",
-    "l'image a l'air d'un jeu vidéo, d'un dessin animé ou d'une publicité de voiture en plein jour",
     "un filigrane, une bande noire ou un sous-titre est incrusté",
   ];
   return [
@@ -504,7 +505,7 @@ export function checklist(take: string, info: string): string {
     "",
     "Fenêtre retenue (images de la prise, voir la planche) : de ___ à ___",
     "",
-    "## On jette si, dans la meilleure seconde, l'une de ces lignes est vraie (§7.10)",
+    "## On jette si, dans la fenêtre gardée, l'une de ces lignes est vraie (§7.10)",
     "",
     ...lines.map((l) => `- [ ] ${l}`),
     "",
