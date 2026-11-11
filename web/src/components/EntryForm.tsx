@@ -451,7 +451,7 @@ export function EntryForm({ inputRef, variant = "full", note }: Props) {
   );
 
 
-  /** Le champ, en pilule (maquette web/gta-accueil.html) : « @ » devant un pseudo GitHub,
+  /** Le champ, en pilule (maquette validée de l'accueil) : « @ » devant un pseudo GitHub,
    * « linkedin.com/in/ » devant un profil, sauf quand on y tape une adresse entière. */
   const loginField = (
     <div

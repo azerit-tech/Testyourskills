@@ -1,5 +1,5 @@
 // La révélation en 3D (Three.js), SPEC §17.4 : l'ascenseur qui monte jusqu'à
-// l'étage du dev, transposé dans l'univers de GTA 6. Un seul plan-séquence.
+// l'étage du dev, transposé dans l'univers du polar au néon. Un seul plan-séquence.
 // 1. le pack flotte dans la cabine d'un ascenseur de nuit ; il éclate ;
 // 2. l'ascenseur monte : l'étage (la note) défile sur l'afficheur à droite des
 //    portes, la lumière des paliers passe dans le jour entre les portes ; en

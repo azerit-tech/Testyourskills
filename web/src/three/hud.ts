@@ -88,7 +88,7 @@ export function createHud(
   const g = canvas?.getContext("2d") ?? null;
 
   /** Chaque ligne du mot prend toute la largeur, comme un titre d'affiche
-   *  (maquette web/gta-carton.html) ; l'ensemble tient dans 30 % de la hauteur. */
+   *  (maquette validée du carton) ; l'ensemble tient dans 30 % de la hauteur. */
   const fitTitle = () => {
     const titleLines = Array.from(root.querySelectorAll<HTMLElement>(".dive-hud__title span"));
     const pad = Math.max(16, Math.min(40, window.innerWidth * 0.04));

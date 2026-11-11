@@ -21,7 +21,7 @@ import { PALETTE, themeOf } from "../../../shared/card/themes";
 import { SKY_TEXT } from "../../../shared/scenes";
 import type { SceneImage } from "./scenes";
 
-/** Aplats de l'illustration (maquette web/gta-image.html). */
+/** Aplats de l'illustration (maquette validée du 9 novembre 2026, dans l'historique git). */
 const SCENE = {
   sky: "#2d2a66",
   sun: "#e98a98",

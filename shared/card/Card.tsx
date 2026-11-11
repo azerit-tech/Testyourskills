@@ -1,6 +1,6 @@
 // La fiche de dev (SPEC §18.18) : un seul composant SVG React pur, rendu à
 // l'identique dans le navigateur et côté serveur (renderToStaticMarkup → resvg).
-// Calquée sur la maquette validée web/gta-card.js : style mat, six étoiles,
+// Calquée sur la maquette validée du 9 novembre 2026 : style mat, six étoiles,
 // UN seul dégradé par fiche (fond, note ou ciel), aplats partout ailleurs,
 // aucune lueur sauf le contour éclairé par l'arrière de ★★★★★★.
 // Uniquement ce que resvg sait rendre : aplats, un dégradé linéaire, texte,

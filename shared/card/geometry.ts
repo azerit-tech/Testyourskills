@@ -1,5 +1,5 @@
 // Silhouette de la fiche (SPEC §17.3) : un rectangle 360 × 520 aux coins
-// arrondis de 16, comme la maquette web/gta.html. Le contour exact sert de
+// arrondis de 16, comme la maquette validée. Le contour exact sert de
 // masque (web) et d'extrusion (scène 3D) ; les contours intérieurs sont le
 // même rectangle rentré de `inset`, rayon réduit d'autant.
 

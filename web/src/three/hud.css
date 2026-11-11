@@ -1,7 +1,7 @@
 /* Le HUD de la révélation (SPEC §17.4, §18.18, hud.ts) : étoiles de recherche,
    lignes du dossier, mini-carte (en option), carton de fin. Posé
    par-dessus le canvas, sous la carte HTML et les boutons. Tout en DOM, rien
-   dans la scène. Style mat (maquette web/gta-carton.html) : aucune lueur, aucun
+   dans la scène. Style mat (maquette validée du carton) : aucune lueur, aucun
    néon ; un seul dégradé, --dusk, sur le mot du carton. */
 .dive-hud {
   --ink: #0c0d1b;

@@ -9,7 +9,7 @@ export function AzeritMark({ size = 18, className }: { size?: number; className?
   );
 }
 
-/** La gemme et « AZERIT », en haut à gauche de chaque page (maquette web/gta-accueil.html). */
+/** La gemme et « AZERIT », en haut à gauche de chaque page (maquette validée de l'accueil). */
 export function Brand() {
   return (
     <span className="brand">

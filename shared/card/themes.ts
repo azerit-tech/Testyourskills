@@ -1,7 +1,7 @@
 // Thèmes de rendu de la fiche (SPEC §18.18) : un par nombre d'étoiles, plus les
 // trois spéciales. Style mat : fonds plats teintés, UN seul dégradé par fiche
 // (le fond, la note ou le ciel), palmiers ton sur ton, aucune lueur sauf le
-// contour éclairé de ★★★★★★. Valeurs reprises de la maquette web/gta.css.
+// contour éclairé de ★★★★★★. Valeurs reprises de la maquette validée.
 import type { CardData, Fact, Stars, StatusTone } from "../types";
 import { starsFor } from "../types";
 

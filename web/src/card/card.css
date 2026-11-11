@@ -69,7 +69,7 @@
   background: rgba(0, 0, 0, 0.8);
 }
 /* ★★★★★★ : le contour éclairé par l'arrière déborde de la fiche à l'écran,
-   comme dans la maquette (web/gta.css, .fiche-wrap.rim). Le seul halo du site. */
+   comme dans la maquette validée. Le seul halo du site. */
 .tys-card[data-level="s6"] .tys-card__svg {
   filter: drop-shadow(0 0 1px var(--tys-rim-core)) drop-shadow(0 0 10px rgba(255, 138, 92, 0.55));
 }
