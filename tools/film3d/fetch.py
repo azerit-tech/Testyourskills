@@ -74,6 +74,43 @@ SKETCHFAB = {
     # la voiture poursuivie (lab/hero_cars.py) : la berline des années 60, le coupé des années 70
     "cast/hero-mercedes-w111/model.glb": "b1bb1e82fe394153932ba1c2a341dded",
     "cast/hero-mercedes-slc/model.glb": "79612cb9ee714df9967c6d6c4fc967b1",
+    # l'avion de chasse de près (types réels, cocardes et numéros repeints) et le barrage complété
+    "cast/jet-mig23/model.glb": "7a13c91f07e042a685b4d265644fdc06",
+    "cast/jet-tu148/model.glb": "b9e7a67cf726485da1493545fccce557",
+    "cast/barricade-set/model.glb": "e03b1d2dfdc0416bb8324d15573ea60c",
+    "cast/barrier-crowd/model.glb": "438c36d48ab04ec4b5178c6989d3ab3b",
+    # les lieux du parcours (lab/lieux_sheet.py) : chaque modèle dans lieux/<lieu>/<nom>/
+    # le port : conteneurs, portiques, grues, navires, bord de quai
+    "lieux/port/container-sizes/model.glb": "ac9356745e9a43d6b5cb7d53d8f26008",
+    "lieux/port/container-20-red/model.glb": "f555ce5532d84cac8ad963dec5833934",
+    "lieux/port/container-20-webster/model.glb": "772f4be391a245f699c54e6cf157c58d",
+    "lieux/port/crane-rmg/model.glb": "ae2b1da54f6a4e28ba5f7daa1c6dc5b8",
+    "lieux/port/crane-harbor/model.glb": "d4d582ebd707426f93f1f5a9cdd0ce03",
+    "lieux/port/crane-portal/model.glb": "965188af6132410189a2eb1210f9095c",
+    "lieux/port/ship-container/model.glb": "aaa41cca946b4a08bc08cf692b7757be",
+    "lieux/port/ship-cargo/model.glb": "b7c97df584824ca682d26daabf401f87",
+    "lieux/port/trawler/model.glb": "fd28c35b76754c9386b32aa281a0e238",
+    "lieux/port/forklift/model.glb": "060f3f8bc7de4e6ca2f348d414702e9d",
+    "lieux/port/bollard-double/model.glb": "d62977f75f2d49688fd0094fbf5b1d41",
+    "lieux/port/pallets/model.glb": "18fbfb830f294b44aa8dff530cc2ea12",
+    # le pont : lampadaires de voie rapide, glissière
+    "lieux/pont/lamp-long-arm/model.glb": "e72cababe3094faa93544727b77ff2cf",
+    "lieux/pont/lamp-freeway-double/model.glb": "c4471f470a56422d804b279cfddb4b27",
+    "lieux/pont/lamp-cobra/model.glb": "d0f6ca0318c044d6a99ac5e376b8ceca",
+    "lieux/pont/guardrail-wbeam/model.glb": "693dee3dc6a1495f90ab0ba1f8237cb4",
+    # la marina : voilier, bateaux à moteur, yacht du fond
+    "lieux/marina/sailboat/model.glb": "d59913994a44444b8d054f4de5f519bc",
+    "lieux/marina/sport-cruiser/model.glb": "09a9fc4a0061464fba1bc3ba76848869",
+    "lieux/marina/trawler-yacht/model.glb": "14564c5ec6ee4f11a3ea8e213b981cb1",
+    "lieux/marina/yacht-far/model.glb": "0dd451f295d049cea20c17d3ffa87ee3",
+    # le rond-point : panneaux (flèches et chevrons seulement, les autres portent du texte)
+    "lieux/rond-point/road-signs/model.glb": "c39bf97110494b5db3de84165211f592",
+    # la rue des enseignes : néons, mobilier de trottoir
+    "lieux/rue/neon-motel/model.glb": "794708f56b4e454caec677701781bca0",
+    "lieux/rue/neon-cherry/model.glb": "ba11464601794316a2351d150774f10d",
+    "lieux/rue/parking-meter/model.glb": "c0f5e3e1c8a64ab3b64d4b077bd09210",
+    "lieux/rue/newspaper-box/model.glb": "29cca5a8e99e438c8fb644d1aea3587e",
+    "lieux/rue/street-pack/model.glb": "9752f598cc5541acb3de07150d1a4ae4",
 }
 
 # Poly Haven : (asset, type, résolution), ou (asset, type, résolution, dossier)
@@ -105,6 +142,10 @@ POLYHAVEN = [
     ("concrete_road_barrier", "model", "1k", "cast/barrier-ph01"),
     ("concrete_road_barrier_02", "model", "1k", "cast/barrier-ph02"),
     ("service_pistol", "model", "1k", "cast/gun-service"),
+    # les lieux du parcours : pneu de défense du quai, bouée de la passe, borne d'incendie
+    ("old_tyre", "model", "1k", "lieux/port/old-tyre"),
+    ("ocean_buoy", "model", "1k", "lieux/marina/ocean-buoy"),
+    ("fire_hydrant", "model", "1k", "lieux/rue/fire-hydrant"),
 ]
 
 # ambientCG : (asset, résolution) ; archives zip dont on ne garde que les images
