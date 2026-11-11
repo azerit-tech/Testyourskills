@@ -1,5 +1,7 @@
 # Brief des illustrations à générer : les suspects
 
+> **Statut : livré.** Les six portraits sont livrés et posés sur la couverture : `arsonist` le 10 novembre 2026, `forger`, `fresh_blood`, `kingpin`, `mastermind` et `night_owl` le 11 novembre 2026, tous gardés d'après la grille du §10. Ce brief reste le modèle des prochains.
+
 Six portraits de personnages, un par profil criminel choisi. Ils donnent des visages à la couverture de l'accueil (SPEC §18.31). Jacques les génère, Claude les découpe et les pose. Il prolonge le brief des quatorze décors, livrés et posés le 9 novembre 2026 (SPEC §18.28 ; ce brief est retiré du dépôt, il reste dans l'historique git) : même ville, même peinture, mêmes lumières.
 
 ## 1. À quoi ils servent
