@@ -16,7 +16,7 @@ import { errorFact } from "../lib/errors";
 import { navigate } from "../lib/router";
 import { unlockAudio } from "../lib/audio";
 import { unlockFilm } from "../film/unlock";
-import { revealScene } from "../lib/revealScene";
+import { prefetchScene, revealScene } from "../lib/revealScene";
 import { markFresh, rememberDoor, rememberInput, sessionDoor, setPrefill, takePrefill } from "../lib/session";
 import type { Mode, Tab } from "../lib/session";
 import { checkPdf, isTouch, parseLogin } from "../lib/util";
@@ -39,16 +39,23 @@ const LINKEDIN_URL_RE = /linkedin\.com\/in\//i;
 
 /** Dès que le visiteur commence à saisir, la scène 3D de la révélation se
  * télécharge (quelques Mo) ; l'attente du scoring sert ensuite à la préparer
- * (§6.2). Pas avec l'économiseur de données : elle attendra l'envoi. */
+ * (§6.2). Le film (§18.36) : son module et sa poursuite, à ce même premier
+ * contact (jamais dès l'ouverture de la page). Pas avec l'économiseur de
+ * données : la révélation attendra l'envoi. Rien en mouvement réduit : il n'y
+ * aura pas de révélation. */
 let prefetched = false;
 function prefetchReveal() {
   if (prefetched) return;
   prefetched = true;
-  if ((navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData) return;
-  // Le film (§18.36) : son module seul ; ses vidéos attendent l'attente de la fiche.
-  const scene = revealScene();
-  if (scene === "film") void import("./Film").catch(() => undefined);
-  else void import("./Walkout3D").then((m) => m.preloadWalkoutAssets()).catch(() => undefined);
+  const scene = prefetchScene(revealScene(), {
+    saveData: !!(navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData,
+    reduced: typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches,
+  });
+  if (scene === "film")
+    void import("./Film")
+      .then((m) => m.preloadFilm())
+      .catch(() => undefined);
+  else if (scene) void import("./Walkout3D").then((m) => m.preloadWalkoutAssets()).catch(() => undefined);
 }
 
 function isEditable(el: EventTarget | null): boolean {

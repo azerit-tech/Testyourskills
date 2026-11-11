@@ -30,3 +30,12 @@ export function revealScene(): RevealScene {
 export function revealToPlay(scene: RevealScene, reducedMotion: boolean): RevealScene | null {
   return reducedMotion ? null : scene;
 }
+
+/**
+ * Ce que le premier contact avec le formulaire précharge (EntryForm) : la
+ * scène qui jouera, vidéos du film comprises ; rien avec l'économiseur de
+ * données (tout attendra l'envoi) ni en mouvement réduit (rien ne jouera).
+ */
+export function prefetchScene(scene: RevealScene, o: { saveData: boolean; reduced: boolean }): RevealScene | null {
+  return o.saveData ? null : revealToPlay(scene, o.reduced);
+}

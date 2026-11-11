@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_SCENE, parseScene, revealScene, revealToPlay } from "./revealScene";
+import { DEFAULT_SCENE, parseScene, prefetchScene, revealScene, revealToPlay } from "./revealScene";
 
 function fakeWindow(search: string, store: Map<string, string>) {
   vi.stubGlobal("window", {
@@ -40,5 +40,12 @@ describe("la scène de la révélation (§18.33)", () => {
     expect(revealToPlay("walkout", true)).toBeNull();
     expect(revealToPlay("film", true)).toBeNull();
     expect(revealToPlay("film", false)).toBe("film");
+  });
+
+  it("le premier contact avec le formulaire précharge le film, vidéos comprises, sauf économiseur de données ou mouvement réduit", () => {
+    expect(prefetchScene("film", { saveData: false, reduced: false })).toBe("film");
+    expect(prefetchScene("film", { saveData: true, reduced: false })).toBeNull();
+    expect(prefetchScene("film", { saveData: false, reduced: true })).toBeNull();
+    expect(prefetchScene("walkout", { saveData: false, reduced: false })).toBe("walkout");
   });
 });
