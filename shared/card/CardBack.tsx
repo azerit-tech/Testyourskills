@@ -130,6 +130,8 @@ export function CardBackGraphic({ card, lang: langProp, idPrefix, className, x, 
   const flat = sky ? sky.ground : th.bg[0];
   const F = BACK_LAYOUT.formula;
 
+  // Dossier scellé (shared/publicView.ts) : ni étoiles, ni formule, ni note ; deux mots mats à la place.
+  const sealed = !!card.sealed;
   const resultW = measure(`= ${card.overall}`, "display-800", F.result, -1) + 12;
   const grid = gridFormula(card, lang);
   const formula = grid ? packTerms(grid.terms, F.size, FW - resultW, grid.tail) : packTerms(formulaTerms(card, lang), F.size, FW - resultW);
@@ -179,7 +181,7 @@ export function CardBackGraphic({ card, lang: langProp, idPrefix, className, x, 
         <Txt x={LEFT + 17} y={29.5} font="sans-600" size={10} ls={2.2} fill={th.inkSoft} opacity={0.85}>
           AZERIT
         </Txt>
-        <Stars n={n} onSky={false} />
+        {!sealed && <Stars n={n} onSky={false} />}
 
         <Txt x={LEFT} y={BACK_LAYOUT.title.y - 27} font="mono-400" size={8} ls={0.6} fill={th.inkSoft} opacity={0.6}>
           {sub}
@@ -203,17 +205,30 @@ export function CardBackGraphic({ card, lang: langProp, idPrefix, className, x, 
 
         {/* La formule : les critères notés du barème et leurs coefficients (avant 0.4.0 : les cinq axes et leurs poids), et la note */}
         <rect x={LEFT} y={F.labelY - 16} width={FW} height={1} fill="#fff" fillOpacity={0.22} />
-        <Txt x={LEFT} y={F.labelY} font="sans-600" size={7.5} ls={1.1} fill={th.inkSoft} opacity={0.62}>
-          {upper(grid ? s.back.gridRating : s.back.rating, lang)}
-        </Txt>
-        {formula.lines.map((line, i) => (
-          <Txt key={i} x={LEFT} y={F.y + i * F.lineH} font="sans-500" size={formula.size} fill={th.inkSoft}>
-            {line}
-          </Txt>
-        ))}
-        <Txt x={RIGHT} y={F.y + F.resultLine * F.lineH + 2} font="display-800" size={F.result} anchor="end" ls={-1} fill={th.ink}>
-          {`= ${card.overall}`}
-        </Txt>
+        {sealed ? (
+          <g data-sealed-mark="">
+            <Txt x={LEFT} y={F.labelY} font="sans-600" size={7.5} ls={1.1} fill={th.inkSoft} opacity={0.62}>
+              {upper(s.sealed, lang)}
+            </Txt>
+            <Txt x={LEFT} y={F.y} font="sans-500" size={F.size} fill={th.inkSoft}>
+              {s.sealedSub}
+            </Txt>
+          </g>
+        ) : (
+          <>
+            <Txt x={LEFT} y={F.labelY} font="sans-600" size={7.5} ls={1.1} fill={th.inkSoft} opacity={0.62}>
+              {upper(grid ? s.back.gridRating : s.back.rating, lang)}
+            </Txt>
+            {formula.lines.map((line, i) => (
+              <Txt key={i} x={LEFT} y={F.y + i * F.lineH} font="sans-500" size={formula.size} fill={th.inkSoft}>
+                {line}
+              </Txt>
+            ))}
+            <Txt x={RIGHT} y={F.y + F.resultLine * F.lineH + 2} font="display-800" size={F.result} anchor="end" ls={-1} fill={th.ink}>
+              {`= ${card.overall}`}
+            </Txt>
+          </>
+        )}
 
         {th.rim ? (
           <>

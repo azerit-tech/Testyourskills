@@ -74,6 +74,7 @@ function setup(finder: { forGithub?: LinkedinFinder["forGithub"]; forUrl?: (url:
   const store = new Store(":memory:");
   stores.push(store);
   const seen: ScoreCvOpts[] = [];
+  const rendered: Parameters<Deps["renderImage"]>[0][] = [];
   const deps: Deps = {
     async collectGithub(login) {
       return opt.realScore ? githubFacts({ login }) : { login, readme: 300 };
@@ -105,7 +106,8 @@ function setup(finder: { forGithub?: LinkedinFinder["forGithub"]; forUrl?: (url:
       const deltas = Object.fromEntries(cv.stats.map((s) => [s.code, github.stats.find((g) => g.code === s.code)!.value - s.value])) as Record<StatCode, number>;
       return { cv, github, deltas, headline: { fr: "Ton CV annonce 7 points que ton code public ne montre pas encore.", en: "Your CV claims 7 points your public code doesn't show yet." } };
     },
-    async renderImage() {
+    async renderImage(input) {
+      rendered.push(input);
       return new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
     },
   };
@@ -118,7 +120,7 @@ function setup(finder: { forGithub?: LinkedinFinder["forGithub"]; forUrl?: (url:
     },
   };
   const { app, pipeline } = createApp({ store, deps, githubToken: "t", baseUrl: "https://skills.test", ogDir: mkdtempSync(join(tmpdir(), "tys-grid-")), linkedinProfiles });
-  return { app, pipeline, store, seen };
+  return { app, pipeline, store, seen, rendered };
 }
 
 /** La fiche telle que la personne fichée la relit : avec le jeton de la fiche (`as: "visitor"` : sans). */
@@ -295,5 +297,45 @@ describe("la page partagée : le serveur ne rend la grille entière qu'à la per
       // La version publique : jamais « ce qui manque », même avec le jeton du dénonciateur.
       expect(card.grid!.criteria.some((c) => c.next)).toBe(false);
     }
+  });
+
+  it("dossier vide fait par un tiers : l'image est scellée, en cache court ; revendiquée, une autre image, la note revient", async () => {
+    const githubGrid: Grid = {
+      criteria: [{ code: "CODE", score: null, state: "unproven", counted: false, source: "github", reached: { fr: "", en: "" }, flags: [] }],
+      overall: 20,
+      rule: "empty_file",
+    };
+    const ctx = setup({}, { githubGrid });
+    const post = async (payload: Record<string, unknown>) => {
+      const res = await ctx.app.request("/api/card", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ lang: "fr", ...payload }) });
+      const json = (await res.json()) as { id: string };
+      await ctx.pipeline.wait(json.id);
+      return json.id;
+    };
+    const by = await post({ login: "leamd" });
+    const target = await post({ login: "camroux", denouncedBy: by });
+    const og = () => ctx.app.request(`/og/${target}.png`);
+
+    const sealed = await og();
+    expect(sealed.status).toBe(200);
+    expect(sealed.headers.get("cache-control")).toBe("public, max-age=300");
+    expect(ctx.rendered).toHaveLength(1);
+    const first = ctx.rendered[0]!.card!;
+    expect(first.sealed).toBe(true);
+    expect(first.grid).toBeUndefined();
+    // Servie du cache : pas de second rendu.
+    await og();
+    expect(ctx.rendered).toHaveLength(1);
+
+    // Revendiquée : un autre fichier de cache, la fiche entière, le cache long.
+    ctx.store.claimOwner("camroux", 7);
+    const claimed = await og();
+    expect(claimed.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+    expect(ctx.rendered).toHaveLength(2);
+    expect(ctx.rendered[1]!.card!.sealed).toBeUndefined();
+
+    // La fiche de qui a dénoncé n'est jamais scellée.
+    await ctx.app.request(`/og/${by}.png`);
+    expect(ctx.rendered[2]!.card!.sealed).toBeUndefined();
   });
 });

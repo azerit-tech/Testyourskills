@@ -299,6 +299,36 @@ function LowHorizon({ color, scale, palms }: NonNullable<CardTheme["horizon"]>) 
   );
 }
 
+/** Dossier scellé : « DOSSIER / SCELLÉ » en grand, « LE CODE RESTE À PROUVER » dessous, à la place de la note. */
+export function sealedFace(lang: Lang, maxWidth: number): { title: FittedLines; sub: FittedLines } {
+  const s = t(lang);
+  return {
+    title: fitLines(upper(s.sealed, lang), { font: "display-700", size: 36, minSize: 22, maxWidth, letterSpacing: 0.4 }),
+    sub: fitLines(upper(s.sealedSub, lang), { font: "sans-600", size: 11, minSize: 9, maxWidth, letterSpacing: 1.2 }),
+  };
+}
+
+/** Le bloc mat de la note scellée, sous la marque, à gauche de la photo. */
+function SealedMark({ sealed, ink, inkSoft }: { sealed: { title: FittedLines; sub: FittedLines }; ink: string; inkSoft: string }) {
+  const { title, sub } = sealed;
+  // Deux lignes de titre au plus, calées pour que la dernière tombe sur la ligne de base de la note (134).
+  const top = 134 - (title.lines.length - 1) * title.size * 0.98;
+  return (
+    <g data-sealed-mark="">
+      {title.lines.map((line, i) => (
+        <Txt key={i} x={LEFT - 1} y={+(top + i * title.size * 0.98).toFixed(2)} font="display-700" size={title.size} ls={0.4} fill={ink}>
+          {line}
+        </Txt>
+      ))}
+      {sub.lines.map((line, i) => (
+        <Txt key={`s${i}`} x={LEFT} y={157 + i * 14} font="sans-600" size={sub.size} ls={1.2} fill={inkSoft}>
+          {line}
+        </Txt>
+      ))}
+    </g>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /* Fiche                                                                */
 /* ------------------------------------------------------------------ */
@@ -348,7 +378,9 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
   const footerFit = fit(`${s.questioned(card.judgedInSeconds)} · ${s.evidence} ${s.percent(card.reliability)}`, { font: "mono-400", size: LAYOUT.footer.size, minSize: LAYOUT.footer.minSize, maxWidth: FW - 30, letterSpacing: 0, minLetterSpacing: 0 });
 
   const stats = STAT_ORDER.map((code) => card.stats.find((st) => st.code === code)).filter((st): st is Stat => !!st);
-  const ariaLabel = `${s.card} ${levelLabel} ${card.overall}, ${s.stars(n)} — ${card.name}`;
+  // Dossier scellé (shared/publicView.ts) : à la place de la note, du niveau et des étoiles, deux mots mats.
+  const sealed = card.sealed ? sealedFace(lang, M.x - LEFT - 8) : null;
+  const ariaLabel = sealed ? `${s.card} — ${s.sealed}, ${s.sealedSub} — ${card.name}` : `${s.card} ${levelLabel} ${card.overall}, ${s.stars(n)} — ${card.name}`;
 
   return (
     <svg
@@ -361,7 +393,8 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
       className={className}
       role="img"
       aria-label={ariaLabel}
-      data-stars={n}
+      data-stars={sealed ? undefined : n}
+      data-sealed={sealed ? "" : undefined}
       style={width === undefined ? { display: "block", width: "100%", height: "auto" } : undefined}
     >
       <defs>
@@ -451,13 +484,17 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
         <Txt x={LEFT + 17} y={29.5} font="sans-600" size={10} ls={2.2} fill={th.inkSoft} opacity={0.85}>
           AZERIT
         </Txt>
-        <Stars n={n} onSky={!!sky} />
+        {!sealed && <Stars n={n} onSky={!!sky} />}
 
         {/* La note : crème plat, ou le seul dégradé de la fiche */}
-        <text x={16} y={134} {...fontAttrs("display-800")} fontSize={overallSize} letterSpacing={-2.4} fill={th.grad === "num" ? u("g") : th.ink}>
-          {card.overall}
-        </text>
-        {bigLevel ? (
+        {sealed ? (
+          <SealedMark sealed={sealed} ink={th.ink} inkSoft={th.inkSoft} />
+        ) : (
+          <text x={16} y={134} {...fontAttrs("display-800")} fontSize={overallSize} letterSpacing={-2.4} fill={th.grad === "num" ? u("g") : th.ink}>
+            {card.overall}
+          </text>
+        )}
+        {sealed ? null : bigLevel ? (
           bigLevel.lines.map((line, i, all) => (
             <Txt key={i} x={LEFT - 1} y={+(BIG_LEVEL.bottom - (all.length - 1 - i) * bigLevel.size * 0.98).toFixed(2)} font="display-700" size={bigLevel.size} ls={0.4} fill={th.ink}>
               {line}

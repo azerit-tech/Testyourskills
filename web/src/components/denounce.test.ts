@@ -21,11 +21,26 @@ describe("Dénoncer : la fiche du complice", () => {
       createElement(LangProvider, null, createElement(Wanted, { card, x: null, toast: () => undefined, onAgain: () => undefined })),
     );
     expect(html).toContain(`>${six}</span>`);
+    // Dossier vide, pas encore revendiqué : aucune étoile.
+    const sealed = renderToStaticMarkup(
+      createElement(LangProvider, null, createElement(Wanted, { card: { ...card, sealed: true }, x: null, toast: () => undefined, onAgain: () => undefined })),
+    );
+    expect(sealed).not.toMatch(/[★☆]/);
+    expect(sealed).not.toContain("denounce-stars");
   });
 
   it("le texte partagé porte les six étoiles", () => {
     expect(DICTS.fr.denounce.shareText("@leamd", starsLine(5), "Sous couverture", null, "https://x.test")).toBe(
       "@leamd est dans le viseur ★★★★★☆ · Sous couverture. Droit de faire appel : https://x.test",
+    );
+  });
+
+  it("dossier scellé : ni étoiles dans le titre, ni dans le texte partagé", () => {
+    expect(DICTS.fr.denounce.shareText("@camroux", "", "Sous couverture", null, "https://x.test")).toBe(
+      "@camroux est dans le viseur · Sous couverture. Droit de faire appel : https://x.test",
+    );
+    expect(DICTS.en.denounce.shareText("@camroux", "", "Undercover", null, "https://x.test")).toBe(
+      "@camroux is in the crosshairs · Undercover. Right to appeal: https://x.test",
     );
   });
 });

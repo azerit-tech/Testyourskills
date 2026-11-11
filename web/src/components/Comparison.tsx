@@ -198,7 +198,7 @@ export function ComparisonStage({ cmp, phase, who = null }: StageProps) {
           <span className="seg-thumb" data-pos={active} aria-hidden />
           {cards.map((c, i) => (
             <button key={c.prefix} type="button" role="tab" aria-selected={active === i} onClick={() => goTo(i as 0 | 1)}>
-              {c.short} <b>{c.card.overall}</b>
+              {c.short} {!c.card.sealed && <b>{c.card.overall}</b>}
             </button>
           ))}
         </div>

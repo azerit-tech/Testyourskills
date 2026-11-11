@@ -33,6 +33,9 @@ export const STRINGS = {
     /** Entre les deux pièces, dans l'image d'une comparaison notée : la note du dossier (§18.37). */
     caseLabel: "Le dossier",
     overall: "Note",
+    /** Dossier vide fait par un tiers, pas encore revendiqué (shared/publicView.ts) : ni note ni étoiles. */
+    sealed: "Dossier scellé",
+    sealedSub: "Le code reste à prouver",
     positions: {
       FS: "Full-stack", BE: "Backend", FE: "Frontend", MOB: "Mobile", DATA: "Data", ML: "Machine learning",
       OPS: "Ops", SEC: "Sécurité", EMB: "Embarqué", PM: "Produit", DESIGN: "Design", CTO: "CTO",
@@ -81,6 +84,8 @@ export const STRINGS = {
     githubSide: "Your code, read on GitHub",
     caseLabel: "The file",
     overall: "Rating",
+    sealed: "Sealed file",
+    sealedSub: "Code yet to prove",
     positions: {
       FS: "Full-stack", BE: "Backend", FE: "Frontend", MOB: "Mobile", DATA: "Data", ML: "Machine learning",
       OPS: "Ops", SEC: "Security", EMB: "Embedded", PM: "Product", DESIGN: "Design", CTO: "CTO",

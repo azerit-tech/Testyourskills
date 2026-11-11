@@ -207,8 +207,10 @@ export function Wanted({ card, x, toast, onAgain }: { card: CardData; x: string 
   const d = t.denounce;
   const login = card.login ?? card.name;
   const n = starsFor(card.overall);
+  // Dossier vide, pas encore revendiqué (shared/publicView.ts) : ni étoiles ni note, ni ici ni dans le partage.
+  const sealed = !!card.sealed;
   // Les six, pleines puis vides (§18.27).
-  const stars = starsLine(n);
+  const stars = sealed ? "" : starsLine(n);
   const tag = tagOf(card, lang);
   const status = bestStatus(card, lang);
   const url = shareUrl(card.id);
@@ -243,9 +245,13 @@ export function Wanted({ card, x, toast, onAgain }: { card: CardData; x: string 
     <section className="after-block denounce is-done" aria-live="polite">
       <h2 className="denounce-head">
         <span className="denounce-who-name">@{login}</span> {d.inSights}{" "}
-        <span className="denounce-stars" role="img" aria-label={t.result.wantedStars(n, pick(LEVEL_LABELS[n], lang))}>
-          {stars}
-        </span>{" "}
+        {!sealed && (
+          <>
+            <span className="denounce-stars" role="img" aria-label={t.result.wantedStars(n, pick(LEVEL_LABELS[n], lang))}>
+              {stars}
+            </span>{" "}
+          </>
+        )}
         · {tag}
       </h2>
       {status && <p>{d.charge(status)}</p>}

@@ -681,7 +681,7 @@ const fr = {
     inSights: "est dans le viseur",
     charge: (status: string) => `Chef d'accusation : ${status}`,
     shareText: (who: string, stars: string, tag: string, status: string | null, url: string) =>
-      `${who} est dans le viseur ${stars} · ${tag}.${status ? ` Chef d'accusation : ${status}.` : ""} Droit de faire appel : ${url}`,
+      `${who} est dans le viseur${stars ? ` ${stars}` : ""} · ${tag}.${status ? ` Chef d'accusation : ${status}.` : ""} Droit de faire appel : ${url}`,
     native: "Partager",
     x: "Poster sur X",
     linkedin: "LinkedIn",
@@ -1384,7 +1384,7 @@ const en: Dict = {
     inSights: "is in the crosshairs",
     charge: (status) => `Charge: ${status}`,
     shareText: (who, stars, tag, status, url) =>
-      `${who} is in the crosshairs ${stars} · ${tag}.${status ? ` Charge: ${status}.` : ""} Right to appeal: ${url}`,
+      `${who} is in the crosshairs${stars ? ` ${stars}` : ""} · ${tag}.${status ? ` Charge: ${status}.` : ""} Right to appeal: ${url}`,
     native: "Share",
     x: "Post on X",
     linkedin: "LinkedIn",

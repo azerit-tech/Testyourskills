@@ -167,11 +167,16 @@ const OG_SUFFIXES = ["", "-portrait", "-story", "-card"];
 const OG_FORMATS: Record<string, RenderInput["format"]> = { "-portrait": "portrait", "-story": "story", "-card": "card" };
 /** Fichier sur disque d'une image qui porte la spéciale « Top 5 de la semaine » (§18.22) : une autre clé de cache. */
 const TOTW_TAG = "-totw";
+/** Fiche faite par un tiers, pas encore revendiquée : son image (sans grille, scellée si le dossier
+ *  est vide) a son propre fichier de cache ; revendiquée, la fiche lit l'autre et l'ancien ne sert plus. */
+const THIRD_PARTY_TAG = "-tp";
 
 export async function removeImages(ogDir: string, ids: string[]) {
   await Promise.all(
     ids.flatMap((id) =>
-      OG_SUFFIXES.flatMap((s) => ["", TOTW_TAG].map((tag) => rm(join(ogDir, `${id}${tag}${s}.png`), { force: true }))),
+      OG_SUFFIXES.flatMap((s) =>
+        ["", TOTW_TAG].flatMap((tag) => ["", THIRD_PARTY_TAG].map((tp) => rm(join(ogDir, `${id}${tag}${tp}${s}.png`), { force: true }))),
+      ),
     ),
   );
 }
@@ -611,10 +616,13 @@ export function createApp(opts: AppOptions) {
     // La spéciale de la semaine change l'image : elle entre dans la clé du cache disque (§18.22).
     const week = withWeekSpecial(store.db, row.data);
     const tag = week.totw ? TOTW_TAG : "";
-    const path = join(ogDir, `${id}${tag}${m[2] ?? ""}.png`);
+    // Faite par un tiers, non revendiquée : la vue publique, dans un fichier à part (shared/publicView.ts).
+    const tp = thirdParty(row);
+    const state = tp ? THIRD_PARTY_TAG : "";
+    const path = join(ogDir, `${id}${tag}${state}${m[2] ?? ""}.png`);
     let png: Uint8Array | null = await readFile(path).catch(() => null);
     if (!png) {
-      const key = `${id}${tag}:${format}`;
+      const key = `${id}${tag}${state}:${format}`;
       let p = rendering.get(key);
       if (!p) {
         p = (async () => {
@@ -623,10 +631,11 @@ export function createApp(opts: AppOptions) {
           let input: RenderInput;
           if (row.kind === "comparison") {
             // Fiche dénoncée non revendiquée : l'image ne porte pas la note du dossier (shared/publicView.ts).
-            const cmp = publicView(week.data as ComparisonData, { thirdParty: thirdParty(row) });
+            const cmp = publicView(week.data as ComparisonData, { thirdParty: tp });
             input = { format, comparison: { ...cmp, cv: await inline(cmp.cv), github: await inline(cmp.github) }, lang: cmp.cv.lang };
           } else {
-            const card = week.data as CardData;
+            // Dossier vide fait par un tiers : la fiche scellée, sans note ni étoiles.
+            const card = publicView(week.data as CardData, { thirdParty: tp });
             input = { format, card: await inline(card), lang: card.lang };
           }
           const buf = await deps.renderImage(input);
@@ -644,7 +653,8 @@ export function createApp(opts: AppOptions) {
       "Content-Type": "image/png",
       // Spéciale portée pendant la semaine en cours : elle peut encore partir, cache court.
       // Sinon cache long ; si elle arrive plus tard, og:image change d'adresse (?s=totw).
-      "Cache-Control": week.totw && week.live ? "public, max-age=300" : "public, max-age=31536000, immutable",
+      // Faite par un tiers : l'image change à la revendication, cache court aussi.
+      "Cache-Control": (week.totw && week.live) || tp ? "public, max-age=300" : "public, max-age=31536000, immutable",
     });
   });
 
