@@ -2074,6 +2074,12 @@ def build():
     vol = HN.new("ShaderNodeVolumePrincipled", Color=lin("#b8b4d8"), Density=0.0015, Anisotropy=0.45)
     HN.link(vol.outputs[0], hout.inputs["Volume"])
     haze = box("haze", -60, 60, -10, 480, -0.1, 40, haze_m)
+    # box() tourne les faces vers l'intérieur : Cycles croirait la caméra hors de la brume (lieux.haze, même cure)
+    bm = bmesh.new()
+    bm.from_mesh(haze.data)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(haze.data)
+    bm.free()
     haze.visible_shadow = False
 
     # --- la caméra
