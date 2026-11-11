@@ -102,7 +102,9 @@ export interface ViewOpts {
 function publicCard(card: CardData, o: ViewOpts): CardData {
   if (!card.grid) return card;
   const { grid, ...rest } = card;
-  return o.thirdParty ? rest : { ...rest, grid: publicGrid(grid) };
+  if (!o.thirdParty) return { ...rest, grid: publicGrid(grid) };
+  // Un dossier vide fait par un tiers : la note plancher (20) ne se dit pas, elle jugerait sans pièce.
+  return grid.rule === "empty_file" ? { ...rest, sealed: true } : rest;
 }
 
 /** Ce que reçoit quelqu'un qui n'est pas la personne fichée. */

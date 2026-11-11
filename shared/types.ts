@@ -212,6 +212,11 @@ export interface CardData {
   rank?: { percent: number; group: { kind: "language" | "position" | "all"; key?: string } };
   /** Le barème de recrutement (0.4.0) : huit critères sur 10, dont `overall` est la moyenne. Absent des fiches d'avant. */
   grid?: Grid;
+  /**
+   * Vue publique (shared/publicView.ts) : un dossier vide fait par un tiers et pas encore
+   * revendiqué. Sa note ne se dit pas dans l'aperçu de lien ni le texte de partage.
+   */
+  sealed?: boolean;
 }
 
 /** Comparaison CV contre GitHub (§6.5). */

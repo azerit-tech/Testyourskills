@@ -25,7 +25,8 @@ const pts: Record<Lang, (n: number) => string> = {
 
 /** L'écart : `n` > 0, la pièce déclarée annonce plus que le code ; < 0, le code en montre plus ; null, le code n'est pas prouvé (GitHub « dossier vide », §18.37). */
 export function caseGap(cmp: Pick<ComparisonData, "cv" | "github">): number | null {
-  if (cmp.github.grid?.rule === "empty_file") return null;
+  // Dossier vide, ou dossier vide d'un tiers dont la grille ne part pas (shared/publicView.ts).
+  if (cmp.github.grid?.rule === "empty_file" || cmp.github.sealed) return null;
   return cmp.cv.overall - cmp.github.overall;
 }
 

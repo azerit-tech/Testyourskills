@@ -265,6 +265,8 @@ const fr = {
           `Mon ${src} : ${declared}. Mon GitHub : ${stars ? `${stars}, ` : ""}${github}`,
         /** Les deux pièces, sous la note du dossier. */
         pieces: (src: string, declared: number, github: number) => `${src} ${declared}, GitHub ${github}.`,
+        /** Dossier vide fait par un tiers : la note attend la personne fichée. */
+        sealed: "Un dossier ouvert chez Azerit, le code reste à prouver",
         cta: "Fais la tienne :",
       },
     },
@@ -1000,6 +1002,7 @@ const en: Dict = {
         ai: (secs) => `File read by Azerit in ${secs}s.`,
         compare: (src, declared, github, stars) => `My ${src}: ${declared}. My GitHub: ${stars ? `${stars}, ` : ""}${github}`,
         pieces: (src, declared, github) => `${src} ${declared}, GitHub ${github}.`,
+        sealed: "A file opened at Azerit, the code yet to prove",
         cta: "Make yours:",
       },
     },

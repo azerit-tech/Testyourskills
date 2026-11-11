@@ -3,9 +3,10 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { FIXTURE_COMPARISON } from "../../shared/fixtures";
+import { FIXTURE_COMPARISON, FIXTURES } from "../../shared/fixtures";
+import { publicView } from "../../shared/publicView";
 import { HOME_PROMISE, homeTitle, promiseTitle } from "../../shared/promise";
-import type { ComparisonData } from "../../shared/types";
+import type { CardData, ComparisonData, Grid } from "../../shared/types";
 import { genericMeta, homeImageAlt, injectHomeImage, metaFor } from "./html";
 
 /** Une comparaison où la fiche déclarative a `cv` points et la fiche GitHub `gh`. */
@@ -66,6 +67,33 @@ describe("aperçu de lien d'une comparaison", () => {
     en.cv = { ...en.cv, lang: "en" };
     expect(metaFor(en, "https://s.test").title).toBe("@lea's code is still unproven: their CV does all the talking");
     for (const t of [fr, metaFor(en, "https://s.test").title]) expect(t).not.toMatch(/\d|\bvol|stole/);
+  });
+});
+
+describe("dossier vide fait par un tiers, non revendiqué : l'aperçu ne dit pas la note", () => {
+  const empty: Grid = { criteria: [{ code: "CODE", score: null, state: "unproven", counted: false, source: "github", reached: { fr: "", en: "" }, flags: [] }], overall: 20, rule: "empty_file" };
+  const card: CardData = { ...FIXTURES.gold, login: "camroux", overall: 20, grid: empty };
+  const NOTE = /\b20\b|★|☆/;
+
+  it("une fiche : ni la note, ni les étoiles, ni l'image ; le profil reste", () => {
+    for (const lang of ["fr", "en"] as const) {
+      const m = metaFor(publicView({ ...card, lang }, { thirdParty: true }), "https://s.test");
+      expect(`${m.title} ${m.description} ${m.imageAlt}`).not.toMatch(NOTE);
+      expect(m.image).toBeUndefined();
+      expect(m.title).toContain("@camroux");
+    }
+    // Revendiquée, ou faite par la personne : la note revient.
+    expect(metaFor(publicView(card, { thirdParty: false }), "https://s.test").title).toMatch(/★/);
+  });
+
+  it("une comparaison face à ce dossier vide : le code reste à prouver, aucun chiffre côté GitHub", () => {
+    const c = cmp(45, 20, { declaredSource: "linkedin" });
+    c.github = { ...c.github, grid: empty };
+    const m = metaFor(publicView(c, { thirdParty: true }), "https://s.test");
+    expect(m.title).toBe("Le code de @lea reste à prouver : son LinkedIn parle seul");
+    expect(m.description).toContain("GitHub : code à prouver.");
+    expect(m.description).not.toMatch(/GitHub : Fiche|\b20\b/);
+    expect(m.image).toBeUndefined();
   });
 });
 

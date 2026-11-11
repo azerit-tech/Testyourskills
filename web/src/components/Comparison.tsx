@@ -44,7 +44,7 @@ function DeltaPill({ code, d, index, label }: { code: StatCode | "overall"; d: n
 }
 
 /** Le code n'est pas prouvé : un GitHub « dossier vide » ne se compare pas à ce que le CV ou LinkedIn déclare (§18.37). */
-export const unprovenCode = (cmp: Pick<ComparisonData, "github">) => cmp.github.grid?.rule === "empty_file";
+export const unprovenCode = (cmp: Pick<ComparisonData, "github">) => cmp.github.grid?.rule === "empty_file" || !!cmp.github.sealed;
 
 export function Deltas({ cmp, className = "" }: { cmp: ComparisonData; className?: string }) {
   const { t } = useT();

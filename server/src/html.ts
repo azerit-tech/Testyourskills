@@ -65,20 +65,24 @@ export function metaFor(data: CardData | ComparisonData, baseUrl: string): PageM
     const lead = kase === null ? "" : `${sentence}. `;
     // LinkedIn et GitHub (§18.24) : « LinkedIn » partout où une comparaison dirait « CV ». Deux pièces d'un même dossier.
     const src = declaredLabel(data);
+    // Dossier vide fait par un tiers (shared/publicView.ts) : ni la note de la fiche GitHub, ni l'image qui la porte.
+    const sealed = !!data.github.sealed;
+    const gh = sealed ? (fr ? "code à prouver" : "code yet to prove") : cardLabel(data.github, lang);
     return {
       lang,
       url,
-      image,
+      ...(sealed ? {} : { image }),
       title,
       description: fr
-        ? `${lead}${src} : ${cardLabel(data.cv, lang)}. GitHub : ${cardLabel(data.github, lang)}. Deux pièces au même dossier, lues sur huit critères de recrutement. Fais la tienne.`
-        : `${lead}${src}: ${cardLabel(data.cv, lang)}. GitHub: ${cardLabel(data.github, lang)}. Two exhibits in one file, read on eight hiring criteria. Make yours.`,
+        ? `${lead}${src} : ${cardLabel(data.cv, lang)}. GitHub : ${gh}. Deux pièces au même dossier, lues sur huit critères de recrutement. Fais la tienne.`
+        : `${lead}${src}: ${cardLabel(data.cv, lang)}. GitHub: ${gh}. Two exhibits in one file, read on eight hiring criteria. Make yours.`,
       imageAlt: fr ? `Fiche ${src} et fiche GitHub de ${name}` : `${name}'s ${src} sheet and GitHub sheet`,
     };
   }
 
   const lang = data.lang ?? "fr";
   const fr = lang === "fr";
+  if (data.sealed) return sealedMeta(data, lang, url);
   const label = cardLabel(data, lang);
   // §18.7 : « @X est dans le viseur ★★★★☆☆ · Oiseau de nuit » (épicène, §18.18 ;
   // les six étoiles, §18.27) ; sans profil (fiche d'avant le barème 0.2.0), le niveau.
@@ -105,6 +109,29 @@ export function metaFor(data: CardData | ComparisonData, baseUrl: string): PageM
     title,
     description: parts.join(" "),
     imageAlt: fr ? `${label}, fiche de dev de ${data.name}` : `${label}, ${data.name}'s dev rap sheet`,
+  };
+}
+
+/**
+ * Un dossier vide fait par un tiers et pas encore revendiqué (shared/publicView.ts) :
+ * l'aperçu ne dit pas la note (la note plancher jugerait sans pièce), ni ses étoiles,
+ * et ne montre pas l'image de la fiche, qui la porte. Le profil et le chef d'accusation restent.
+ */
+function sealedMeta(data: CardData, lang: Lang, url: string): PageMeta {
+  const fr = lang === "fr";
+  const who = data.login ? `@${data.login}` : data.name;
+  const tag = data.profile ? ` · ${data.profile.label[lang]}` : "";
+  const status = data.statuses[0]?.label[lang];
+  const parts = [
+    status ? (fr ? `Chef d'accusation : « ${status} ».` : `Charge: "${status}".`) : "",
+    fr ? "Le code reste à prouver : la note attend la personne fichée. Fais la tienne." : "The code is yet to prove: the rating waits for the person on file. Make yours.",
+  ].filter(Boolean);
+  return {
+    lang,
+    url,
+    title: `${who} ${fr ? "est dans le viseur" : "is in the crosshairs"}${tag}`,
+    description: parts.join(" "),
+    imageAlt: fr ? `Fiche de dev de ${data.name}` : `${data.name}'s dev rap sheet`,
   };
 }
 

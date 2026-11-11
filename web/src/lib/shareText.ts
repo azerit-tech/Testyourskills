@@ -11,6 +11,8 @@ interface Common {
   stars: number;
   /** Profil criminel, déjà dans la langue. */
   profile: string | null;
+  /** Dossier vide fait par un tiers, pas encore revendiqué (shared/publicView.ts) : ni note, ni étoiles, ni pari. */
+  sealed?: boolean;
   /** « 7e cette semaine », seulement pendant la semaine en cours. */
   rank: string | null;
   /** Étoiles plaidées pendant l'attente (lib/plea.ts), ou null. */
@@ -72,6 +74,10 @@ type Cut = 0 | 1 | 2 | 3 | 4 | 5;
 const CUTS: Cut[] = [0, 1, 2, 3, 4, 5];
 
 function build(w: ShareWords, x: ShareInput, cut: Cut): string {
+  if (x.sealed) {
+    // La note plancher d'un dossier vide jugerait sans pièce : le texte ne la dit pas.
+    return [`${w.sealed}${cut < 5 && x.profile ? ` · ${x.profile}` : ""}.`, w.cta].join(" ");
+  }
   const plea = x.plea ? w.plea(starsLine(x.plea), starsLine(x.stars)) : null;
   // Avec le pari, le verdict porte déjà les étoiles : on ne les répète pas.
   const stars = plea ? null : starsLine(x.stars);

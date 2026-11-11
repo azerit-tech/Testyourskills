@@ -102,6 +102,15 @@ describe("la fiche faite par un tiers", () => {
   it("revendiquée, ou faite par la personne : la grille publique", () => {
     const seen = publicView(card, { thirdParty: false });
     expect(seen.grid).toEqual(publicGrid(card.grid!));
+    expect(seen.sealed).toBeUndefined();
+  });
+
+  it("un dossier vide fait par un tiers est scellé : sa note ne se dit pas", () => {
+    const empty = githubGridMock("unknownLang", "x")!;
+    expect(empty.rule).toBe("empty_file");
+    expect(publicView({ ...card, grid: empty }, { thirdParty: true }).sealed).toBe(true);
+    expect(publicView({ ...card, grid: empty }, { thirdParty: false }).sealed).toBeUndefined();
+    expect(publicView(card, { thirdParty: true }).sealed).toBeUndefined();
   });
 });
 

@@ -134,6 +134,21 @@ describe("texte de partage avec la grille de recrutement (§18.37)", () => {
   });
 });
 
+describe("dossier vide fait par un tiers, non revendiqué : le partage ne dit pas la note", () => {
+  it("ni note, ni étoiles, ni pari, pour une fiche comme pour une comparaison", () => {
+    const sealedCard: CardShare = { ...card, overall: 20, stars: 1, plea: 3, sealed: true };
+    expect(shareLead(fr, sealedCard)).toBe("Un dossier ouvert chez Azerit, le code reste à prouver · Faussaire. Fais la tienne :");
+    expect(shareLead(en, sealedCard)).toBe("A file opened at Azerit, the code yet to prove · Faussaire. Make yours:");
+    const sealedCmp: ComparisonShare = { ...cmp, github: 20, stars: 1, sealed: true };
+    for (const w of [fr, en]) {
+      for (const x of [sealedCard, sealedCmp]) {
+        expect(shareLead(w, x)).not.toMatch(/\b20\b|★|☆/);
+        expect(shareTextX(w, x)).not.toMatch(/\b20\b|★|☆/);
+      }
+    }
+  });
+});
+
 describe("longueur comptée par X", () => {
   it("une étoile, une espace fine insécable ou des points de suspension valent deux", () => {
     expect(xLength("abc é « » ·")).toBe(11);

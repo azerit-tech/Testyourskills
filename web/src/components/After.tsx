@@ -134,6 +134,7 @@ export function shareInput(item: Shareable, lang: Lang, rank: string | null): Sh
       kind: "card",
       stars: starsFor(c.overall),
       overall: c.overall,
+      sealed: !!c.sealed,
       graded,
       // « Point fort : niveau du code, 8/10. » : la ligne du recruteur, jamais l'école.
       strong: graded ? (recruiterRead(c, c.grid, lang)?.strong ?? null) : null,
@@ -153,6 +154,7 @@ export function shareInput(item: Shareable, lang: Lang, rank: string | null): Sh
   const kase = usableGrid(cmp.grid) ? cmp.grid.overall : null;
   return {
     kind: "comparison",
+    sealed: !!cmp.github.sealed,
     stars: starsFor(kase ?? cmp.github.overall),
     src: declaredOf(cmp) === "linkedin" ? "LinkedIn" : "CV",
     declared: cmp.cv.overall,
