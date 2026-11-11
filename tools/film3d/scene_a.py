@@ -1171,6 +1171,17 @@ def wires(name, spans, mat, sag=0.6, r=0.012):
 
 
 def prototypes(M):
+    specs = building_specs()
+    return {k: make_building(k, M, v) + (v,) for k, v in specs.items()}
+
+
+def prototypes_one(M, key):
+    """Un seul des huit dessins (le banc d'essai) : (objet, accessoires, lumières, spec)."""
+    v = building_specs()[key]
+    return make_building(key, M, v) + (v,)
+
+
+def building_specs():
     awn = [mat_awning(c, f"awning_{i}") for i, c in enumerate([CORAL, "#2f6f6a", "#3a4a8a", "#b84a62", "#c79a3a"])]
     specs = {
         # Art déco d'angle : tour arrondie, sourcils filants, drapeau vierge, gradins au faîte
@@ -1198,7 +1209,7 @@ def prototypes(M):
         "block": dict(W=36, D=16, floors=4, nshops=6, round_near=True, round_far=True, bay=4.2, wh=1.5,
                       eyebrow=True, roof_sign=3.5, ac_roof=5, vents=4, awning=[awn[0], awn[4]], uplight=True),
     }
-    return {k: make_building(k, M, v) + (v,) for k, v in specs.items()}
+    return specs
 
 
 def build_city(hidden):
@@ -1436,6 +1447,110 @@ def build_city(hidden):
 
 # ---------------------------------------------------------------- scène
 
+def make_world(scene):
+    """Le ciel : HDRI réel, ramené à la palette par l'élévation."""
+    world = bpy.data.worlds.new("blue_hour")
+    scene.world = world
+    if hasattr(world, "use_nodes"):
+        world.use_nodes = True
+    nt = world.node_tree
+    for n in list(nt.nodes):
+        nt.nodes.remove(n)
+    N = Nodes(nt)
+    tc = N.new("ShaderNodeTexCoord")
+    # la lueur du soleil couché au bout de l'avenue (+y), le ciel plus sombre derrière la caméra
+    mp = N.new("ShaderNodeMapping", Rotation=(0, 0, math.radians(-90)))
+    N.link(tc.outputs["Generated"], mp.inputs[0])
+    env = N.new("ShaderNodeTexEnvironment")
+    env.image = bpy.data.images.load(os.path.join(ASSETS, "qwantani_dusk_2_puresky_2k.exr"))
+    N.link(mp.outputs[0], env.inputs[0])
+    dxyz = N.sep(tc.outputs["Generated"])
+    elev = N.math("MAXIMUM", dxyz[2], 0.0)
+    # la bande corail n'existe que du côté du couchant, au bout de l'avenue
+    toward = N.math("POWER", N.math("MAXIMUM", dxyz[1], 0.0), 3.0)
+    dusk = N.ramp(elev, [(0.0, lin(CORAL)), (0.03, lin("#b9586f")), (0.08, lin(INDIGO)), (0.3, lin("#303c80")), (0.7, lin(NAVY))])
+    night = N.ramp(elev, [(0.0, lin("#3c3f86")), (0.1, lin("#2f3a78")), (0.5, lin(NAVY))])
+    tint = N.mix(toward, night, dusk)
+    bw = N.new("ShaderNodeRGBToBW")
+    N.link(env.outputs["Color"], bw.inputs[0])
+    # la luminance de l'HDRI, comprimée : on garde ses nuages, pas son exposition
+    lum = N.math("MULTIPLY", N.math("POWER", bw.outputs[0], 0.5), 0.9)
+    skycol = N.mix(1.0, tint, N.new("ShaderNodeCombineColor").outputs[0], "MULTIPLY")
+    graded = N.new("ShaderNodeMix", _data_type="RGBA", _blend_type="MULTIPLY")
+    N.set(graded.inputs["Factor"], 1.0)
+    N.link(tint, graded.inputs[6])
+    N.link(lum, graded.inputs[7])
+    # 30 % de la couleur d'origine de l'HDRI, pour garder ses nuances
+    final = N.mix(0.05, graded.outputs[2], env.outputs["Color"])
+    bg = N.new("ShaderNodeBackground", Strength=0.55)
+    N.link(final, bg.inputs["Color"])
+    wo = N.new("ShaderNodeOutputWorld")
+    N.link(bg.outputs[0], wo.inputs["Surface"])
+    del skycol
+
+
+def render_settings(scene):
+    """Cycles sur CPU, deux fils, AgX ; halo des lumières et dispersion au compositing."""
+    r = scene.render
+    r.engine = "CYCLES"
+    r.resolution_x, r.resolution_y = 720, 1280
+    r.resolution_percentage = 100
+    r.threads_mode = "FIXED"
+    r.threads = 2
+    c = scene.cycles
+    c.device = "CPU"
+    c.samples = 256
+    c.use_adaptive_sampling = True
+    c.adaptive_threshold = 0.02
+    c.use_denoising = True
+    c.denoiser = "OPENIMAGEDENOISE"
+    c.max_bounces = 8
+    c.diffuse_bounces = 3
+    c.glossy_bounces = 4
+    c.transmission_bounces = 6
+    c.volume_bounces = 0
+    c.transparent_max_bounces = 8
+    c.caustics_reflective = False
+    c.caustics_refractive = False
+    c.sample_clamp_indirect = 8.0
+    c.blur_glossy = 1.0
+    c.film_exposure = 1.0
+    vs = scene.view_settings
+    vs.view_transform = "AgX"
+    for look in ("AgX - Medium High Contrast", "Medium High Contrast"):
+        try:
+            vs.look = look
+            break
+        except TypeError:
+            pass
+    vs.exposure = 0.0
+    r.image_settings.file_format = "PNG"
+    r.image_settings.color_depth = "8"
+
+    # --- compositing : halo des lumières, dispersion légère de l'objectif
+    ng = bpy.data.node_groups.new("comp_a", "CompositorNodeTree")
+    ng.interface.new_socket(name="Image", in_out="OUTPUT", socket_type="NodeSocketColor")
+    rl = ng.nodes.new("CompositorNodeRLayers")
+    gl = ng.nodes.new("CompositorNodeGlare")
+    for k, v in (("Type", "Bloom"), ("Quality", "High"), ("Threshold", 1.2), ("Strength", 0.12), ("Size", 0.6), ("Saturation", 1.0)):
+        try:
+            gl.inputs[k].default_value = v
+        except Exception as e:
+            print("[scene_a] glare", k, e)
+    ld = ng.nodes.new("CompositorNodeLensdist")
+    try:
+        ld.inputs["Dispersion"].default_value = 0.012
+        ld.inputs["Distortion"].default_value = -0.01
+    except Exception as e:
+        print("[scene_a] lens", e)
+    go = ng.nodes.new("NodeGroupOutput")
+    ng.links.new(rl.outputs["Image"], gl.inputs["Image"])
+    ng.links.new(gl.outputs["Image"], ld.inputs["Image"])
+    ng.links.new(ld.outputs["Image"], go.inputs[0])
+    scene.compositing_node_group = ng
+
+
+
 def build():
     bpy.ops.wm.read_factory_settings(use_empty=True)
     scene = bpy.context.scene
@@ -1634,45 +1749,7 @@ def build():
     hidden.hide_render = True
     hidden.hide_viewport = True
 
-    # --- le ciel : HDRI réel, ramené à la palette par l'élévation
-    world = bpy.data.worlds.new("blue_hour")
-    scene.world = world
-    if hasattr(world, "use_nodes"):
-        world.use_nodes = True
-    nt = world.node_tree
-    for n in list(nt.nodes):
-        nt.nodes.remove(n)
-    N = Nodes(nt)
-    tc = N.new("ShaderNodeTexCoord")
-    # la lueur du soleil couché au bout de l'avenue (+y), le ciel plus sombre derrière la caméra
-    mp = N.new("ShaderNodeMapping", Rotation=(0, 0, math.radians(-90)))
-    N.link(tc.outputs["Generated"], mp.inputs[0])
-    env = N.new("ShaderNodeTexEnvironment")
-    env.image = bpy.data.images.load(os.path.join(ASSETS, "qwantani_dusk_2_puresky_2k.exr"))
-    N.link(mp.outputs[0], env.inputs[0])
-    dxyz = N.sep(tc.outputs["Generated"])
-    elev = N.math("MAXIMUM", dxyz[2], 0.0)
-    # la bande corail n'existe que du côté du couchant, au bout de l'avenue
-    toward = N.math("POWER", N.math("MAXIMUM", dxyz[1], 0.0), 3.0)
-    dusk = N.ramp(elev, [(0.0, lin(CORAL)), (0.03, lin("#b9586f")), (0.08, lin(INDIGO)), (0.3, lin("#303c80")), (0.7, lin(NAVY))])
-    night = N.ramp(elev, [(0.0, lin("#3c3f86")), (0.1, lin("#2f3a78")), (0.5, lin(NAVY))])
-    tint = N.mix(toward, night, dusk)
-    bw = N.new("ShaderNodeRGBToBW")
-    N.link(env.outputs["Color"], bw.inputs[0])
-    # la luminance de l'HDRI, comprimée : on garde ses nuages, pas son exposition
-    lum = N.math("MULTIPLY", N.math("POWER", bw.outputs[0], 0.5), 0.9)
-    skycol = N.mix(1.0, tint, N.new("ShaderNodeCombineColor").outputs[0], "MULTIPLY")
-    graded = N.new("ShaderNodeMix", _data_type="RGBA", _blend_type="MULTIPLY")
-    N.set(graded.inputs["Factor"], 1.0)
-    N.link(tint, graded.inputs[6])
-    N.link(lum, graded.inputs[7])
-    # 30 % de la couleur d'origine de l'HDRI, pour garder ses nuances
-    final = N.mix(0.05, graded.outputs[2], env.outputs["Color"])
-    bg = N.new("ShaderNodeBackground", Strength=0.55)
-    N.link(final, bg.inputs["Color"])
-    wo = N.new("ShaderNodeOutputWorld")
-    N.link(bg.outputs[0], wo.inputs["Surface"])
-    del skycol
+    make_world(scene)
 
     # --- la brume d'après la pluie
     haze_m, HN, hout = material("haze")
@@ -1701,64 +1778,8 @@ def build():
     cam.dof.focus_object = focus
     scene.camera = co
 
-    # --- rendu
+    render_settings(scene)
     r = scene.render
-    r.engine = "CYCLES"
-    r.resolution_x, r.resolution_y = 720, 1280
-    r.resolution_percentage = 100
-    r.threads_mode = "FIXED"
-    r.threads = 2
-    c = scene.cycles
-    c.device = "CPU"
-    c.samples = 256
-    c.use_adaptive_sampling = True
-    c.adaptive_threshold = 0.02
-    c.use_denoising = True
-    c.denoiser = "OPENIMAGEDENOISE"
-    c.max_bounces = 8
-    c.diffuse_bounces = 3
-    c.glossy_bounces = 4
-    c.transmission_bounces = 6
-    c.volume_bounces = 0
-    c.transparent_max_bounces = 8
-    c.caustics_reflective = False
-    c.caustics_refractive = False
-    c.sample_clamp_indirect = 8.0
-    c.blur_glossy = 1.0
-    c.film_exposure = 1.0
-    vs = scene.view_settings
-    vs.view_transform = "AgX"
-    for look in ("AgX - Medium High Contrast", "Medium High Contrast"):
-        try:
-            vs.look = look
-            break
-        except TypeError:
-            pass
-    vs.exposure = 0.0
-    r.image_settings.file_format = "PNG"
-    r.image_settings.color_depth = "8"
-
-    # --- compositing : halo des lumières, dispersion légère de l'objectif
-    ng = bpy.data.node_groups.new("comp_a", "CompositorNodeTree")
-    ng.interface.new_socket(name="Image", in_out="OUTPUT", socket_type="NodeSocketColor")
-    rl = ng.nodes.new("CompositorNodeRLayers")
-    gl = ng.nodes.new("CompositorNodeGlare")
-    for k, v in (("Type", "Bloom"), ("Quality", "High"), ("Threshold", 1.2), ("Strength", 0.12), ("Size", 0.6), ("Saturation", 1.0)):
-        try:
-            gl.inputs[k].default_value = v
-        except Exception as e:
-            print("[scene_a] glare", k, e)
-    ld = ng.nodes.new("CompositorNodeLensdist")
-    try:
-        ld.inputs["Dispersion"].default_value = 0.012
-        ld.inputs["Distortion"].default_value = -0.01
-    except Exception as e:
-        print("[scene_a] lens", e)
-    go = ng.nodes.new("NodeGroupOutput")
-    ng.links.new(rl.outputs["Image"], gl.inputs["Image"])
-    ng.links.new(gl.outputs["Image"], ld.inputs["Image"])
-    ng.links.new(ld.outputs["Image"], go.inputs[0])
-    scene.compositing_node_group = ng
 
     # --- le mouvement, pour le flou de bougé : tout roule à 50 km/h vers la caméra (−y),
     # la caméra recule à la même vitesse (travelling avant). Image 2 = la pose ci-dessus.
@@ -1786,4 +1807,5 @@ def build():
     print(f"[scene_a] écrit {out}", flush=True)
 
 
-build()
+if __name__ == "__main__":
+    build()

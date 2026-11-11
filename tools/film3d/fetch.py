@@ -1,15 +1,19 @@
 # Télécharge les assets tiers du film 3D, hors du dépôt.
 #
-#   python3 tools/film3d/fetch.py
+#   python3 -I tools/film3d/fetch.py
 #
 # Sketchfab (CC BY, clé SKETCHFAB_API_KEY prise dans l'environnement ou dans
-# le .env du dépôt, comme tools/bake/prepare.py) et Poly Haven (CC0, sans clé).
-# Tout va dans Azerit/design/film/assets/ ; un fichier déjà là n'est pas
-# retéléchargé. Les crédits sont dans tools/film3d/CREDITS.md.
+# le .env du dépôt, comme tools/bake/prepare.py), Poly Haven et ambientCG (CC0,
+# sans clé). Tout va dans Azerit/design/film/assets/ ; un fichier déjà là n'est
+# pas retéléchargé. Les crédits sont dans tools/film3d/CREDITS.md.
+# Les fonctions fetch_* servent aussi aux essais (tools/film3d/lab/labfetch.py).
+import io
 import json
 import os
+import re
 import subprocess
 import urllib.request
+import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
@@ -43,6 +47,11 @@ POLYHAVEN = [
     ("metal_trash_can", "model", "1k"),
     ("outdoor_table_chair_set_01", "model", "1k"),
 ]
+
+# ambientCG : (asset, résolution) ; archives zip dont on ne garde que les images
+AMBIENTCG = [
+]
+
 TEX_MAPS = {"Diffuse": "diff", "nor_gl": "nor_gl", "Rough": "rough", "Displacement": "disp"}
 
 
@@ -84,46 +93,106 @@ def get(url, path=None, headers=None):
         f.write(data)
 
 
+SAFE = re.compile(r"^[A-Za-z0-9_.\-]+$")
+
+
+def _unzip(data, folder, keep=r"\.(jpg|jpeg|png|exr|bin|gltf|glb)$"):
+    """Extrait une archive téléchargée (donnée non fiable) : seulement des noms simples, à plat,
+    des extensions attendues, jamais de chemin qui sorte du dossier."""
+    os.makedirs(folder, exist_ok=True)
+    out = []
+    with zipfile.ZipFile(io.BytesIO(data)) as z:
+        for info in z.infolist():
+            if info.is_dir():
+                continue
+            parts = info.filename.replace("\\", "/").split("/")
+            if any(p in ("", "..") or not SAFE.match(p) for p in parts) or not re.search(keep, parts[-1], re.I):
+                continue
+            rel = os.path.join(*parts)
+            dst = os.path.join(folder, rel)
+            if not os.path.abspath(dst).startswith(os.path.abspath(folder) + os.sep):
+                continue
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            with z.open(info) as src, open(dst, "wb") as f:
+                f.write(src.read())
+            out.append(rel)
+    return out
+
+
+def fetch_sketchfab(name, uid):
+    """Un modèle Sketchfab téléchargeable en glb (ou, à défaut, en glTF zippé dans un dossier)."""
+    path = os.path.join(ASSETS, name)
+    if os.path.exists(path):
+        return path
+    links = get(f"https://api.sketchfab.com/v3/models/{uid}/download", headers={"Authorization": f"Token {env_key()}"})
+    if "glb" in links:
+        get(links["glb"]["url"], path)
+    else:
+        req = urllib.request.Request(links["gltf"]["url"], headers={"User-Agent": "testyourskills-film3d"})
+        with urllib.request.urlopen(req) as r:
+            _unzip(r.read(), path)
+    meta = get(f"https://api.sketchfab.com/v3/models/{uid}")
+    print(f"[fetch] {name} : « {meta['name']} », {meta['user']['displayName']}, {meta['license']['label']}", flush=True)
+    return path
+
+
+def fetch_polyhaven(asset, kind, res):
+    files = get(f"https://api.polyhaven.com/files/{asset}")
+    if kind == "hdri":
+        path = os.path.join(ASSETS, f"{asset}_{res}.exr")
+        if not os.path.exists(path):
+            get(files["hdri"][res]["exr"]["url"], path)
+            print(f"[fetch] {asset} (HDRI {res})", flush=True)
+        return path
+    folder = os.path.join(ASSETS, asset)
+    os.makedirs(folder, exist_ok=True)
+    if kind == "model":
+        gl = files["gltf"][res]["gltf"]
+        path = os.path.join(folder, f"{asset}.gltf")
+        if not os.path.exists(path):
+            for rel, inc in gl.get("include", {}).items():
+                dst = os.path.join(folder, rel)
+                if not os.path.abspath(dst).startswith(os.path.abspath(folder) + os.sep):
+                    continue
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
+                get(inc["url"], dst)
+            get(gl["url"], path)
+            print(f"[fetch] {asset} (modèle {res})", flush=True)
+        return path
+    for key, short in TEX_MAPS.items():
+        if key not in files or res not in files[key]:
+            continue
+        path = os.path.join(folder, f"{short}_{res}.jpg" if key != "Displacement" else f"{short}_{res}.png")
+        if os.path.exists(path):
+            continue
+        fmt = "png" if key == "Displacement" and "png" in files[key][res] else "jpg"
+        get(files[key][res][fmt]["url"], path)
+    print(f"[fetch] {asset} (textures {res})", flush=True)
+    return folder
+
+
+def fetch_ambientcg(asset, res="2K"):
+    """Une matière ou une décalcomanie ambientCG (CC0) : Color, NormalGL, Roughness, Displacement,
+    Opacity... dans assets/<asset>/, noms d'origine (<asset>_<res>-JPG_<Carte>.jpg)."""
+    folder = os.path.join(ASSETS, asset)
+    if os.path.isdir(folder) and os.listdir(folder):
+        return folder
+    url = f"https://ambientcg.com/get?file={asset}_{res}-JPG.zip"
+    req = urllib.request.Request(url, headers={"User-Agent": "testyourskills-film3d"})
+    with urllib.request.urlopen(req) as r:
+        got = _unzip(r.read(), folder, keep=r"\.(jpg|jpeg|png)$")
+    print(f"[fetch] {asset} (ambientCG {res}) : {', '.join(got)}", flush=True)
+    return folder
+
+
 def main():
     os.makedirs(ASSETS, exist_ok=True)
     for name, uid in SKETCHFAB.items():
-        path = os.path.join(ASSETS, name)
-        if os.path.exists(path):
-            continue
-        links = get(f"https://api.sketchfab.com/v3/models/{uid}/download", headers={"Authorization": f"Token {env_key()}"})
-        get(links["glb"]["url"], path)
-        meta = get(f"https://api.sketchfab.com/v3/models/{uid}")
-        print(f"[fetch] {name} : « {meta['name']} », {meta['user']['displayName']}, {meta['license']['label']}", flush=True)
+        fetch_sketchfab(name, uid)
     for asset, kind, res in POLYHAVEN:
-        files = get(f"https://api.polyhaven.com/files/{asset}")
-        if kind == "hdri":
-            path = os.path.join(ASSETS, f"{asset}_{res}.exr")
-            if not os.path.exists(path):
-                get(files["hdri"][res]["exr"]["url"], path)
-                print(f"[fetch] {asset} (HDRI {res})", flush=True)
-            continue
-        folder = os.path.join(ASSETS, asset)
-        os.makedirs(folder, exist_ok=True)
-        if kind == "model":
-            gl = files["gltf"][res]["gltf"]
-            path = os.path.join(folder, f"{asset}.gltf")
-            if not os.path.exists(path):
-                for rel, inc in gl.get("include", {}).items():
-                    dst = os.path.join(folder, rel)
-                    os.makedirs(os.path.dirname(dst), exist_ok=True)
-                    get(inc["url"], dst)
-                get(gl["url"], path)
-                print(f"[fetch] {asset} (modèle {res})", flush=True)
-            continue
-        for key, short in TEX_MAPS.items():
-            if key not in files:
-                continue
-            path = os.path.join(folder, f"{short}_{res}.jpg" if key != "Displacement" else f"{short}_{res}.png")
-            if os.path.exists(path):
-                continue
-            fmt = "png" if key == "Displacement" and "png" in files[key][res] else "jpg"
-            get(files[key][res][fmt]["url"], path)
-        print(f"[fetch] {asset} (textures {res})", flush=True)
+        fetch_polyhaven(asset, kind, res)
+    for asset, res in AMBIENTCG:
+        fetch_ambientcg(asset, res)
 
 
 if __name__ == "__main__":
