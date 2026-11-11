@@ -3,7 +3,7 @@
 // {id}-s.jpg (576 × 384). Une seule liste pour le site (ciel de la page d'une
 // fiche, couverture) et pour les images de partage du serveur.
 
-/** Les quatre lumières des décors (docs/brief-illustrations.md). */
+/** Les quatre lumières des décors (docs/brief-personnages.md §7). */
 export type Light = "pink" | "gold" | "night" | "dawn";
 
 /** La lumière de chaque lieu du crime. */
