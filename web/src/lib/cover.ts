@@ -51,6 +51,11 @@ export const SLOTS: Slot[] = [
   { id: "fr", kind: "face" },
 ];
 
+/** Les cases de décor qui prennent un suspect peint, dans l'ordre : assez hautes pour un
+ * portrait 2:3 (s2 : 90 × 105 px à 390 sur téléphone ; s4 : 200 × 255 px sur ordinateur),
+ * hors de la grande case du premier rang. Les visages restent au top de la semaine. */
+export const SUSPECT_SLOTS = ["s2", "s4"];
+
 /** Téléphone (jusqu'à 899 px) : cinq cases en appareil de briques. Un visage haut à
  * gauche, la place libre en haut à droite, trois décors dont les joints ne s'alignent pas. */
 export const PHONE: Layout = {
@@ -118,30 +123,47 @@ export interface CoverInput {
   founder: { card: CardData; href: string };
 }
 
+/** La lumière d'une case : celle de son décor, ou celle du décor peint derrière un suspect. */
+export function lightOf(p: Panel | undefined): Light | undefined {
+  if (p?.kind === "scene") return SCENE_LIGHT[p.scene];
+  if (p?.kind === "suspect") return SCENE_LIGHT[p.id];
+  return undefined;
+}
+
 /**
- * Remplit les cases : les visages dans l'ordre suspects, top de la semaine par rang,
- * fiche de Jacques ; la dernière case de visage est toujours la place libre ; une case
- * de visage sans source devient un décor. Les décors sont choisis dans SCENE_POOL, sans
- * doublon, chacun d'une autre lumière que ses voisins déjà posés.
+ * Remplit les cases. Le premier suspect tient la grande case de gauche ; les suivants
+ * prennent SUSPECT_SLOTS. Les autres visages : le top de la semaine par rang, puis la
+ * fiche de Jacques, puis, s'il en reste, les suspects suivants ; la dernière case de
+ * visage est toujours la place libre ; une case de visage sans source devient un décor.
+ * Les décors sont choisis dans SCENE_POOL, sans doublon, chacun d'une autre lumière que
+ * ses voisins déjà posés, suspects compris.
  */
 export function coverPanels({ suspects, top, founder }: CoverInput): Map<string, Panel> {
   const faces = SLOTS.filter((s) => s.kind === "face");
   const free = faces[faces.length - 1];
-  const queue: Panel[] = suspects.map((id) => ({ kind: "suspect", id }));
+  const cast: Panel[] = suspects.map((id) => ({ kind: "suspect", id }));
+  const people: Panel[] = [];
   const pending = top === undefined;
   if (!pending) {
-    for (const entry of [...(top ?? [])].sort((a, b) => a.rank - b.rank)) queue.push({ kind: "player", entry });
-    queue.push({ kind: "founder", ...founder });
+    for (const entry of [...(top ?? [])].sort((a, b) => a.rank - b.rank)) people.push({ kind: "player", entry });
+    people.push({ kind: "founder", ...founder });
   }
 
   const out = new Map<string, Panel>();
-  for (const s of faces) {
-    if (s === free) out.set(s.id, { kind: "free" });
-    else {
-      const next = queue.shift();
-      if (next) out.set(s.id, next);
-      else if (pending) out.set(s.id, { kind: "wait" });
-    }
+  const [lead, ...others] = faces.filter((s) => s !== free);
+  out.set(free.id, { kind: "free" });
+  const first = cast.shift() ?? people.shift();
+  if (first) out.set(lead.id, first);
+  else if (pending) out.set(lead.id, { kind: "wait" });
+  // Les cases de suspect d'abord : elles ne changent pas quand le top arrive.
+  for (const id of SUSPECT_SLOTS) {
+    const next = cast.shift();
+    if (next) out.set(id, next);
+  }
+  for (const s of others) {
+    const next = people.shift() ?? (pending ? undefined : cast.shift());
+    if (next) out.set(s.id, next);
+    else if (pending) out.set(s.id, { kind: "wait" });
   }
 
   // Les décors, dans l'ordre du document : cases de décor et visages restés sans source.
@@ -152,8 +174,8 @@ export function coverPanels({ suspects, top, founder }: CoverInput): Map<string,
     if (out.has(s.id)) continue;
     const near = new Set<Light>();
     for (const n of NEIGHBOURS.get(s.id) ?? []) {
-      const p = out.get(n);
-      if (p?.kind === "scene") near.add(SCENE_LIGHT[p.scene]);
+      const l = lightOf(out.get(n));
+      if (l) near.add(l);
     }
     const scene = SCENE_POOL.find((id) => !used.has(id) && !near.has(SCENE_LIGHT[id])) ?? SCENE_POOL.find((id) => !used.has(id)) ?? "default";
     used.add(scene);

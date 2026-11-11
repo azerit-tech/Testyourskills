@@ -482,9 +482,11 @@ svg {
   height: 100%;
   object-fit: cover;
 }
-/* un portrait peint : la tête est dans le haut de l'image (docs/brief-personnages.md §3) */
+/* un portrait peint : la tête est dans le haut de l'image (docs/brief-personnages.md §3).
+   Assez haut pour que la tête ne touche pas le bord dans une case plus large que haute
+   (s2 sur ordinateur, 310 × 255 px) ; le bas coupé est l'ombre prune, sans détail. */
 .cover-suspect img {
-  object-position: 50% 22%;
+  object-position: 50% 12%;
 }
 /* un visage (joueur du top, Jacques, place libre) : la photo en pleine case et
    en deux tons, prune dans les ombres et la teinte du mur dans les lumières ;

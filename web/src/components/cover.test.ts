@@ -1,5 +1,5 @@
 // La couverture de l'accueil (§18.31) : rendu en chaîne, sans navigateur.
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { FIXTURES } from "../../../shared/fixtures";
 import type { TopEntry, WeekTop } from "../../../shared/types";
 import { LangProvider } from "../i18n";
-import { DESKTOP, PHONE, SCENE_LIGHT, SCENE_POOL, SLOTS, bigAvatar, coverPanels, neighbours, slotsIn } from "../lib/cover";
+import { DESKTOP, PHONE, SCENE_LIGHT, SCENE_POOL, SLOTS, bigAvatar, coverPanels, lightOf, neighbours, slotsIn } from "../lib/cover";
 import type { Layout, Panel } from "../lib/cover";
 import { SUSPECTS } from "../lib/suspects";
 import { Cover } from "./Cover";
@@ -26,6 +26,18 @@ function render(props: { top: WeekTop | null | undefined; suspects?: string[] },
 
 /** Les cases rendues, dans l'ordre du document : leur zone et leur balise ouvrante. */
 const panels = (html: string) => [...html.matchAll(/<(div|a|button)[^>]*class="cover-panel[^"]*"[^>]*>/g)].map((m) => ({ tag: m[1], html: m[0], area: /grid-area:([a-z0-9]+)/.exec(m[0])?.[1] }));
+
+/** Largeur et hauteur d'un JPEG, lues dans son en-tête de trame (SOF). */
+function jpegSize(path: string): [number, number] {
+  const b = readFileSync(path);
+  for (let i = 2; i + 9 < b.length; ) {
+    if (b[i] !== 0xff) throw new Error(`${path} : marqueur attendu`);
+    const m = b[i + 1];
+    if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) return [b.readUInt16BE(i + 7), b.readUInt16BE(i + 5)];
+    i += 2 + b.readUInt16BE(i + 2);
+  }
+  throw new Error(`${path} : pas de trame`);
+}
 
 const faceSlots = SLOTS.filter((s) => s.kind === "face").map((s) => s.id);
 const isFace = (p: Panel) => p.kind !== "scene";
@@ -97,23 +109,55 @@ describe("couverture (§18.31)", () => {
     expect(html).toContain('aria-label="The real sheet of Jacques, Azerit&#x27;s founder"');
   });
 
-  it("suspects d'abord, puis le top, la place libre toujours en dernier", () => {
-    const html = render({ top: week(TOP5), suspects: ["arsonist", "forger"] });
+  it("le premier suspect tient la grande case, les suivants s2 et s4 ; les visages restent au top", () => {
+    const html = render({ top: week(TOP5), suspects: ["arsonist", "night_owl", "kingpin", "forger"] });
     const ps = panels(html);
     const byArea = new Map(ps.map((p) => [p.area, p]));
     expect(byArea.get("f1")?.html).toContain('data-suspect="arsonist"');
-    expect(byArea.get("f2")?.html).toContain('data-suspect="forger"');
-    expect(byArea.get("f3")?.html).toContain('href="/c/c-alice"');
+    expect(byArea.get("s2")?.html).toContain('data-suspect="night_owl"');
+    expect(byArea.get("s4")?.html).toContain('data-suspect="kingpin"');
+    expect(byArea.get("f2")?.html).toContain('href="/c/c-alice"');
+    expect(byArea.get("f3")?.html).toContain('href="/c/c-bob"');
     expect(byArea.get("fr")?.tag).toBe("button");
+    expect(html).not.toContain('data-suspect="forger"');
     expect(html).toContain('srcSet="/characters/arsonist-s.jpg 384w, /characters/arsonist.jpg 768w"');
   });
 
-  it("sans suspect, aucun portrait ; chaque suspect déclaré a ses deux fichiers", () => {
+  it("sans top : la fiche de Jacques, puis le suspect suivant dans le visage qui reste", () => {
+    const ps = coverPanels({ suspects: SUSPECTS, top: null, founder });
+    expect(ps.get("f1")).toEqual({ kind: "suspect", id: SUSPECTS[0] });
+    expect(ps.get("f2")?.kind).toBe("founder");
+    expect(ps.get("f3")).toEqual({ kind: "suspect", id: SUSPECTS[3] });
+    // top en attente : les cases de suspect sont déjà posées, elles ne bougent pas à son arrivée
+    const wait = coverPanels({ suspects: SUSPECTS, top: undefined, founder });
+    for (const id of ["f1", "s2", "s4"]) expect(wait.get(id)).toEqual(ps.get(id));
+    expect([wait.get("f2")?.kind, wait.get("f3")?.kind]).toEqual(["wait", "wait"]);
+  });
+
+  it("un portrait : son rôle en texte de remplacement, en français et en anglais, sans genre", () => {
+    const fr = render({ top: week(TOP5), suspects: SUSPECTS });
+    expect(fr).toContain('alt="Portrait peint du profil Pyromane"');
+    expect(fr).toContain('alt="Portrait peint du profil Oiseau de nuit"');
+    expect(fr).toContain('alt="Portrait peint du profil Légende du milieu"');
+    const en = render({ top: null, suspects: SUSPECTS }, "en-US");
+    expect(en).toContain('alt="Painted portrait of the Arsonist profile"');
+    expect(en).toContain('alt="Painted portrait of the Forger profile"');
+    // la case d'un portrait n'est plus cachée aux lecteurs d'écran, celle d'un décor l'est
+    for (const p of panels(en)) if (p.html.includes("data-suspect")) expect(p.html).not.toContain("aria-hidden");
+    for (const p of panels(en)) if (p.html.includes("data-scene")) expect(p.html).toContain("aria-hidden");
+  });
+
+  it("sans suspect, aucun portrait ; les six suspects déclarés ont leurs deux fichiers, au bon poids", () => {
     expect(render({ top: null })).not.toContain("/characters/");
+    expect([...SUSPECTS].sort()).toEqual(["arsonist", "forger", "fresh_blood", "kingpin", "mastermind", "night_owl"]);
     const dir = fileURLToPath(new URL("../../public/characters/", import.meta.url));
     for (const id of SUSPECTS) {
       expect(existsSync(`${dir}${id}.jpg`), `${id}.jpg`).toBe(true);
       expect(existsSync(`${dir}${id}-s.jpg`), `${id}-s.jpg`).toBe(true);
+      expect(jpegSize(`${dir}${id}.jpg`), `${id}.jpg`).toEqual([768, 1152]);
+      expect(jpegSize(`${dir}${id}-s.jpg`), `${id}-s.jpg`).toEqual([384, 576]);
+      expect(statSync(`${dir}${id}.jpg`).size, `${id}.jpg`).toBeLessThan(200_000);
+      expect(statSync(`${dir}${id}-s.jpg`).size, `${id}-s.jpg`).toBeLessThan(65_000);
     }
   });
 
@@ -143,6 +187,43 @@ describe("couverture (§18.31)", () => {
     expect(img("s1")).toMatch(/sizes="\(min-width: 900px\) \d+px, \d+vw"/);
   });
 
+  it("portraits : la grande case et s2 tout de suite, ceux de l'ordinateur seul paresseux", () => {
+    // sans top, ou un top vide : f2 à la fiche de Jacques, f3 au quatrième suspect
+    for (const top of [null, week([])]) {
+      const html = render({ top, suspects: SUSPECTS });
+      const img = (id: string) => {
+        const i = html.indexOf(`data-suspect="${id}"`);
+        expect(i, id).toBeGreaterThan(-1);
+        return /<img[^>]*>/.exec(html.slice(i))![0];
+      };
+      expect(img("arsonist")).not.toContain("loading=");
+      expect(img("night_owl")).not.toContain("loading=");
+      expect(img("kingpin")).toContain('loading="lazy"');
+      expect(img("forger")).toContain('loading="lazy"');
+      for (const id of SUSPECTS.slice(0, 4)) {
+        expect(img(id)).toContain(`srcSet="/characters/${id}-s.jpg 384w, /characters/${id}.jpg 768w"`);
+        expect(img(id)).toContain('width="768" height="1152"');
+      }
+    }
+  });
+
+  it("les suspects déclarés et les décors : deux cases voisines n'ont jamais la même lumière", () => {
+    // l'ordre de lib/suspects.ts, et chacun de ses débuts : la série a pu arriver en plusieurs fois
+    for (let k = 0; k <= SUSPECTS.length; k++)
+      for (const top of [undefined, null, ...[0, 1, 2, 3, 5].map((n) => TOP5.slice(0, n))]) {
+        const ps = coverPanels({ suspects: SUSPECTS.slice(0, k), top, founder });
+        for (const l of [PHONE, DESKTOP])
+          for (const [a, ns] of neighbours(l))
+            for (const b of ns) {
+              const la = lightOf(ps.get(a));
+              if (la) expect(la, `${SUSPECTS.slice(0, k).join(",")} ${a}/${b}`).not.toBe(lightOf(ps.get(b)));
+            }
+        // un portrait n'a jamais son propre décor à côté, ni ailleurs
+        const scenes = [...ps.values()].flatMap((p) => (p.kind === "scene" ? [p.scene] : []));
+        for (const p of ps.values()) if (p.kind === "suspect") expect(scenes).not.toContain(p.id);
+      }
+  });
+
   it("deux décors voisins n'ont jamais la même lumière, sur téléphone comme sur ordinateur", () => {
     const check = (l: Layout, ps: Map<string, Panel>) => {
       for (const [a, ns] of neighbours(l))
@@ -153,7 +234,7 @@ describe("couverture (§18.31)", () => {
         }
     };
     for (let n = 0; n <= 5; n++)
-      for (const suspects of [[], ["arsonist"], ["arsonist", "forger", "kingpin"]]) {
+      for (const suspects of [[], ["arsonist"], ["arsonist", "forger", "kingpin"], SUSPECTS]) {
         const ps = coverPanels({ suspects, top: TOP5.slice(0, n), founder });
         const scenes = [...ps.values()].filter((p): p is Extract<Panel, { kind: "scene" }> => p.kind === "scene").map((p) => p.scene);
         expect(new Set(scenes).size).toBe(scenes.length);

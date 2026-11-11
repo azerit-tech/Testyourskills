@@ -71,6 +71,8 @@ const fr = {
       free: "Ta place",
       freeLabel: "Ta place : ouvre ton dossier",
       freePlate: "DOSSIER À OUVRIR",
+      /** Un portrait peint : le rôle, jamais un genre, un âge ou une origine. */
+      suspect: (profile: string) => `Portrait peint du profil ${profile}`,
     },
     /** La flèche sous le héros, sur ordinateur. */
     next: "Voir la suite",
@@ -770,6 +772,7 @@ const en: Dict = {
       free: "Your spot",
       freeLabel: "Your spot: open your file",
       freePlate: "FILE TO OPEN",
+      suspect: (profile) => `Painted portrait of the ${profile} profile`,
     },
     next: "See more",
     wall: {

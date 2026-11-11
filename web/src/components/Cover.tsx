@@ -8,7 +8,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import type { CardData, WeekTop } from "../../../shared/types";
-import { useT } from "../i18n";
+import profilesJson from "../../../data/profiles.json";
+import { pick, useT } from "../i18n";
 import { DESKTOP, PHONE, SLOTS, areasCss, bigAvatar, colsCss, coverPanels, firstRow, slotsIn, widthShare } from "../lib/cover";
 import type { Panel, Slot } from "../lib/cover";
 import { onLinkClick } from "../lib/router";
@@ -42,14 +43,17 @@ function sizes(id: string): string {
   return `(min-width: 900px) ${wide}px, ${Math.ceil((phone || widthShare(DESKTOP, id)) * 92)}vw`;
 }
 
-function Picture({ slot, small, large, w, h }: { slot: Slot; small: string; large: string; w: number; h: number }) {
+/** Le nom de chaque profil, pour le texte de remplacement d'un portrait. */
+const PROFILE_LABEL = new Map(profilesJson.profiles.map((p) => [p.id, p.label]));
+
+function Picture({ slot, small, large, w, h, alt = "" }: { slot: Slot; small: string; large: string; w: number; h: number; alt?: string }) {
   const eager = EAGER.has(slot.id);
   return (
     <img
       src={small}
       srcSet={`${small} ${w / 2}w, ${large} ${w}w`}
       sizes={sizes(slot.id)}
-      alt=""
+      alt={alt}
       width={w}
       height={h}
       loading={eager ? undefined : "lazy"}
@@ -110,7 +114,7 @@ function Face({ src, name, sub, mark, tint }: { src?: string | null; name: strin
 }
 
 export function Cover({ onPlay, top, founder, suspects = SUSPECTS }: CoverProps) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const c = t.home.cover;
   const panels = coverPanels({ suspects, top: top === undefined ? undefined : (top?.entries ?? null), founder });
   const style = {
@@ -136,8 +140,8 @@ export function Cover({ onPlay, top, founder, suspects = SUSPECTS }: CoverProps)
         );
       case "suspect":
         return (
-          <div key={key} {...common} aria-hidden data-suspect={p.id}>
-            <Picture slot={slot} small={suspectSrc(p.id, true)} large={suspectSrc(p.id)} w={768} h={1152} />
+          <div key={key} {...common} data-suspect={p.id}>
+            <Picture slot={slot} small={suspectSrc(p.id, true)} large={suspectSrc(p.id)} w={768} h={1152} alt={c.suspect(pick(PROFILE_LABEL.get(p.id) ?? { fr: p.id, en: p.id }, lang))} />
           </div>
         );
       case "player": {
