@@ -639,8 +639,12 @@ def two_lane_asphalt(name, half=4.0):
     0,5 m) : double axe et rives gardés, tirets de voie et joint longitudinal retirés, traces de roues au milieu de
     chaque voie, bord mouillé ramené au bord de cette chaussée."""
     with road_half(half, lanes=(half / 2 - 0.25, half / 2 - 0.25), edge=half - 0.8):
-        m = road.mat_asphalt(ST, name)
-    _retune(m, {3.5: 99.0, 3.74: 99.0, 5.4: half - 1.6})
+        if hasattr(road, "lane_layout"):        # le plan des voies de road.py (depuis le 12 novembre)
+            m = road.mat_asphalt(ST, name, layout=road.lane_layout(half, 2, edge=True))
+            _retune(m, {5.4: half - 1.6})
+        else:
+            m = road.mat_asphalt(ST, name)
+            _retune(m, {3.5: 99.0, 3.74: 99.0, 5.4: half - 1.6})
     return m
 
 
