@@ -29,7 +29,7 @@ Trois entrées : l'accueil (`/`), la page d'une fiche partagée (`/c/<id>`, qui 
 Vite proxifie `/api`, `/og`, `/c/`, `/auth` et `/avatar` vers l'API. La page `/c/:id` est rendue par l'API : en dev elle demande le `index.html` transformé au serveur Vite (`DEV_WEB_URL`) et y injecte les balises Open Graph ; si Vite ne tourne pas, elle sert une page autonome. On ouvre donc toujours `http://localhost:5180/c/<id>`.
 
 - `?mock=1` : données de démonstration, sans API.
-- `?scene=walkout`, `?scene=chase` ou `?scene=film` : la révélation jouée (l'ascenseur 3D, par défaut ; la poursuite 2D ; le film). Le choix tient le temps de la session.
+- `?scene=walkout` ou `?scene=film` : la révélation jouée (l'ascenseur 3D, par défaut ; le film). Le choix tient le temps de la session.
 - Tests : `npm test`. Types : `npm run typecheck`.
 
 Sans jeton GitHub, l'API démarre en dev avec un avertissement (GitHub limite alors à 60 requêtes par heure) et refuse de démarrer en production. Sans `OPENROUTER_API_KEY`, aucune lecture par l'IA n'est possible.
@@ -84,7 +84,7 @@ La base et les PNG sont dans le volume monté sur `/data`. Les fiches de plus de
   - `web/src/three/`, `web/public/3d/` : la révélation par défaut, un ascenseur en 3D (Three.js) ; crédits des modèles dans `web/public/3d/CREDITS.txt`. Elle part quand le film est validé (SPEC §18.36).
   - `web/src/film/`, `web/public/film/` : le lecteur du film et ses fichiers.
   - `web/public/profiles/`, `web/public/characters/` : les décors peints des profils et les portraits de suspects.
-- `shared/` : types, composant SVG de la fiche (`card/`), poursuite 2D (`chase/`), découpage et HUD du film (`film/`), textes et routes communs au front et au serveur.
+- `shared/` : types, composant SVG de la fiche (`card/`), découpage et HUD du film (`film/`), textes et routes communs au front et au serveur.
 - `data/` : barème, grille de recrutement, profils, peines, statuts, mots creux. Des données, séparées de la logique.
 - `server/src/` : l'API Hono.
   - `app.ts` : les routes ; `pipeline.ts` : file d'attente et traitement d'une fiche en tâche de fond.

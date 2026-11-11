@@ -6,7 +6,7 @@
 
 Les décisions, les dates et l'état d'avancement sont au SPEC §18.36, qui fait foi. Ce document est la direction du film : ce qu'on doit voir, plan par plan, et ce que le montage et le lecteur attendent. Il vaut quelle que soit la technique de rendu.
 
-Le film remplace comme révélation visée l'ascenseur (SPEC §6.3) et la poursuite 2D (SPEC §18.33). Tant qu'il n'est pas validé, l'ascenseur reste la révélation par défaut et le film se joue avec `?scene=film`.
+Le film remplace comme révélation visée l'ascenseur (SPEC §6.3). La poursuite 2D (SPEC §18.33), refusée, est retirée du code depuis le 11 novembre 2026. Tant qu'il n'est pas validé, l'ascenseur reste la révélation par défaut et le film se joue avec `?scene=film`.
 
 *Numérotation : le code cite les sections §2.1, §2.2, §3.1, §4.1, §5.1 à §5.6, §6 T2, §7.3 et §7.10 de ce document. Leurs numéros sont gardés, d'où quelques trous.*
 
@@ -101,7 +101,7 @@ Deux bandes d'encre `#0c0d1b` encadrent l'image, de la couleur exacte de la page
 - Les bandes se ferment en 8 images à l'ouverture et s'ouvrent au flash.
 - À chaque étoile, l'image tremble de 3 px sur quatre images.
 
-Les lignes de radio viennent de `shared/chase/radio.ts`, une par étoile : « Véhicule en fuite · {poste} », « Arme signalée : {langage} », « Motif : {chef d'accusation} », « Affiliation : {affiliation} », « Profil identifié : {profil} », « Toutes les unités · {niveau} », et à la fin « Fin de course · {niveau} ».
+Les lignes de radio viennent de `shared/film/radio.ts`, une par étoile : « Véhicule en fuite · {poste} », « Arme signalée : {langage} », « Motif : {chef d'accusation} », « Affiliation : {affiliation} », « Profil identifié : {profil} », « Toutes les unités · {niveau} », et à la fin « Fin de course · {niveau} ».
 
 ### 2.3 Plan par plan
 
@@ -278,7 +278,7 @@ tools/film3d/                   la scène Blender et son rendu
 |---|---|
 | Mouvement réduit | rien ne joue, la fiche sort |
 | Le navigateur refuse de lancer la vidéo sans geste | l'attente montre la pilule « Ouvrir mon dossier » ; le toucher lance le film |
-| Le film n'est pas prêt 4 s après la fiche, ou H.264 illisible | la poursuite 2D joue à sa place |
+| Le film n'est pas prêt 4 s après la fiche, ou H.264 illisible | la fiche se pose sans révélation |
 | Erreur de lecture en cours de film | flash immédiat, la fiche se pose |
 
 Essais en développement : `?film=gesture`, `?film=missing`, `?film=nocodec`.
@@ -296,7 +296,7 @@ Essais en développement : `?film=gesture`, `?film=missing`, `?film=nocodec`.
 
 ### 5.7 Ce qui part à la validation du film
 
-L'ascenseur est supprimé avec Three.js quand le film est validé (SPEC §18.36). La poursuite 2D reste le repli du film.
+L'ascenseur est supprimé avec Three.js quand le film est validé (SPEC §18.36). La poursuite 2D n'est plus le repli du film : elle est retirée du code, et si le film ne se charge pas la fiche se pose sans révélation.
 
 ---
 
