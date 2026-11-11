@@ -52,9 +52,28 @@ SKETCHFAB = {
     # la distribution (cast.py) : chaque modèle dans son dossier
     # rétroviseur intérieur du coupé
     "cast/rearview-mirror/model.glb": "72f3ac9e3ff5423f823841b3c801d0c1",
+    # la patrouille retenue (pare-buffle, cloison), et l'autre finaliste
+    "cast/patrol-jeandiz/model.glb": "9166b13b6ae341f4bfc093edb71d74f4",
+    "cast/patrol-crownvic/model.glb": "b1615ed43a5443a2876c8020a734cf6e",
+    # le fourgon, l'hélicoptère, l'avion (dessin inventé)
+    "cast/van-vandura/model.glb": "40cf97bc0f7d4bdb8135c4e9d2264923",
+    "cast/heli-solid/model.glb": "02373bff3f7f48bf8649805455fe4260",
+    "cast/jet-concept/model.glb": "69012312f3ab4f13b637b6a188aa3d4c",
+    # les plots du barrage
+    "cast/barrier-fence/model.glb": "2a09091d4e7b4539abe03f6a50762409",
+    "cast/cone-worn/model.glb": "1cbffb4169684e5a84ba186882bd55d7",
+    "cast/test-spike-strip/model.glb": "2c8370fccfbf4a7f9b9d9729112b8e61",
+    "cast/light-tower/model.glb": "9addea6a4129438b83a1fc3ed4a784ec",
+    # les gens : conducteur (sweat capuche, capuche nouée), policiers, casquette, arme
+    "cast/drv-hoodie-lp/model.glb": "0e95ddfd01ed4d23aeb1d9b7fe79ea26",
+    "cast/hood-scarf/model.glb": "5c037f1a66634c5ea25ad8e87a4c3923",
+    "cast/cop-tuzzy/model.glb": "98f6136cc24f41f1bb1b1f3262bde2ff",
+    "cast/cop-spp/model.glb": "d47bb1f61fa340588b5801cdb63812c8",
+    "cast/cap-aramuor/model.glb": "9697ef10105a4e02a6074bc9bca464bd",
+    "cast/gun-t77/model.glb": "7e6a5ffc9deb4994a4092ccdba85c965",
 }
 
-# Poly Haven : (asset, type, résolution)
+# Poly Haven : (asset, type, résolution), ou (asset, type, résolution, dossier)
 POLYHAVEN = [
     ("qwantani_dusk_2_puresky", "hdri", "2k"),
     ("asphalt_02", "tex", "2k"),
@@ -79,6 +98,10 @@ POLYHAVEN = [
     ("potted_plant_02", "model", "1k"),
     ("rollershutter_door", "model", "1k"),
     ("bar_chair_round_01", "model", "1k"),
+    # la distribution (cast.py) : (asset, type, résolution, dossier)
+    ("concrete_road_barrier", "model", "1k", "cast/barrier-ph01"),
+    ("concrete_road_barrier_02", "model", "1k", "cast/barrier-ph02"),
+    ("service_pistol", "model", "1k", "cast/gun-service"),
 ]
 
 # ambientCG : (asset, résolution) ; archives zip dont on ne garde que les images
@@ -180,7 +203,9 @@ def fetch_sketchfab(name, uid):
     return path
 
 
-def fetch_polyhaven(asset, kind, res):
+def fetch_polyhaven(asset, kind, res, dest=None):
+    """Un HDRI, une matière ou un modèle Poly Haven, dans assets/<asset>/ ou, avec dest,
+    dans assets/<dest>/ (la distribution : cast/<rôle>)."""
     files = get(f"https://api.polyhaven.com/files/{asset}")
     if kind == "hdri":
         path = os.path.join(ASSETS, f"{asset}_{res}.exr")
@@ -188,7 +213,7 @@ def fetch_polyhaven(asset, kind, res):
             get(files["hdri"][res]["exr"]["url"], path)
             print(f"[fetch] {asset} (HDRI {res})", flush=True)
         return path
-    folder = os.path.join(ASSETS, asset)
+    folder = os.path.join(ASSETS, dest or asset)
     os.makedirs(folder, exist_ok=True)
     if kind == "model":
         gl = files["gltf"][res]["gltf"]
@@ -233,8 +258,8 @@ def main():
     os.makedirs(ASSETS, exist_ok=True)
     for name, uid in SKETCHFAB.items():
         fetch_sketchfab(name, uid)
-    for asset, kind, res in POLYHAVEN:
-        fetch_polyhaven(asset, kind, res)
+    for asset, kind, res, *dest in POLYHAVEN:
+        fetch_polyhaven(asset, kind, res, *dest)
     for asset, res in AMBIENTCG:
         fetch_ambientcg(asset, res)
 
