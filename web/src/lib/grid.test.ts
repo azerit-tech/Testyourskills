@@ -151,13 +151,24 @@ describe("la page partagée : ni école ni ancien employeur", () => {
     });
   }
 
-  it("ce qui reste : le rang de l'école, les années comptées, le niveau atteint, le nom du chef d'accusation", () => {
+  it("ce qui reste : la version publique de la pièce, écrite par le moteur, et le nom du chef d'accusation", () => {
     const [edu, xp, emp] = rows(declaredGridMock("LinkedIn"), true);
     expect(edu.line).toBe("École de rang A.");
     expect(xp.line).toContain("8,4 ans");
-    expect(emp.line).toBe(FR.levels.EMP.find(([n]) => n <= 8)![1]);
+    expect(xp.line).toContain("41 mois à la tête d'une entreprise fondée");
+    expect(emp.line).toBe("Entreprise fondée : depuis juin 2023, 41 mois. Poste : janvier 2019 – août 2023, 4,6 ans.");
     expect(emp.flags).toEqual(["Équipe encadrée"]);
     expect(edu.redacted && xp.redacted && emp.redacted).toBe(true);
+  });
+
+  it("une fiche d'avant, sans version publique : le rang de l'école, les années comptées, le niveau atteint", () => {
+    const old: Grid = { ...declaredGridMock("LinkedIn") };
+    old.criteria = old.criteria.map((c) => (c.evidence ? { ...c, evidence: { text: c.evidence.text, source: c.evidence.source } } : c));
+    const [edu, xp, emp] = rows(old, true);
+    expect(edu.line).toBe("École de rang A.");
+    expect(xp.line).toContain("8,4 ans");
+    expect(emp.line).toBe(FR.levels.EMP.find(([n]) => n <= 8)![1]);
+    for (const r of rows(old, true)) expect(text(r)).not.toMatch(NAMES);
   });
 
   it("les pièces GitHub restent entières", () => {

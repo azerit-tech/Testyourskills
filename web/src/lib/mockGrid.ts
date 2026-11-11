@@ -295,7 +295,7 @@ function declaredDrafts(src: "LinkedIn" | "CV", proof?: string, ghRepos?: number
         "Pour 10 : une école de rang S, ou une médaille internationale (olympiade, finale mondiale d'un concours de programmation).",
         "For 10: a tier S school, or an international medal (olympiad, world final of a programming contest).",
       ),
-      evidence: { text: f("Télécom Paris, rang A.", "Télécom Paris, tier A."), source: "linkedin", ...p },
+      evidence: { text: f("Télécom Paris, rang A.", "Télécom Paris, tier A."), publicText: f("École de rang A.", "Tier A school."), source: "linkedin", ...p },
     }),
     c("XP", 9, "scored", "linkedin", f("8,4 ans comptés sur les postes datés : le palier « 8 ans ».", `8.4 years counted on the dated roles: the "8 years" step.`), {
       next: f("Pour 10 : 10 ans comptés. Tu en as 8,4.", "For 10: 10 years counted. You have 8.4."),
@@ -303,6 +303,10 @@ function declaredDrafts(src: "LinkedIn" | "CV", proof?: string, ghRepos?: number
         text: f(
           "14 mois de stage ou d'alternance comptés pour moitié. 41 mois à la tête de Stealth Startup. 55 mois chez Banque Orsay. Junior Télécom est une association : non compté. Total : 8,4 ans.",
           "14 months of internship or work-study counted at half. 41 months running Stealth Startup. 55 months at Banque Orsay. Junior Télécom is an association: not counted. Total: 8.4 years.",
+        ),
+        publicText: f(
+          "14 mois de stage ou d'alternance comptés pour moitié. 41 mois à la tête d'une entreprise fondée. 55 mois dans un poste. Un poste d'association : non compté. Total : 8,4 ans.",
+          "14 months of internship or work-study counted at half. 41 months running a company they founded. 55 months in a role. An association role: not counted. Total: 8.4 years.",
         ),
         source: "linkedin",
         ...p,
@@ -316,6 +320,7 @@ function declaredDrafts(src: "LinkedIn" | "CV", proof?: string, ghRepos?: number
           "CTO et cofondation, Stealth Startup : depuis juin 2023, 41 mois. Lead developer, Banque Orsay : janvier 2019 – août 2023, 4,6 ans.",
           "CTO and co-founder, Stealth Startup: since June 2023, 41 months. Lead developer, Banque Orsay: January 2019 – August 2023, 4.6 years.",
         ),
+        publicText: f("Entreprise fondée : depuis juin 2023, 41 mois. Poste : janvier 2019 – août 2023, 4,6 ans.", "Company founded: since June 2023, 41 months. Role: January 2019 – August 2023, 4.6 years."),
         source: "linkedin",
         ...p,
       },
@@ -328,13 +333,13 @@ function declaredDrafts(src: "LinkedIn" | "CV", proof?: string, ghRepos?: number
             f(fr("{src} en dessous de la vérité : Rust prouvé par le code, absent ") + (src === "CV" ? "du CV." : "de LinkedIn."), `${src} undersells the code: Rust proven by the code, missing from ${src === "CV" ? "the CV" : "LinkedIn"}.`),
           ]
         : [],
-      evidence: { text: f("Kubernetes, Kafka, React, Node.js.", "Kubernetes, Kafka, React, Node.js."), source: "linkedin", ...p },
+      evidence: { text: f("Kubernetes, Kafka, React, Node.js.", "Kubernetes, Kafka, React, Node.js."), publicText: f("Kubernetes, Kafka, React, Node.js.", "Kubernetes, Kafka, React, Node.js."), source: "linkedin", ...p },
     }),
     c("CODE", null, "unproven", "linkedin", f(fr("Le code ne se prouve pas sur {src}."), `Code cannot be proven on ${src}.`)),
     c("ACT", null, "unproven", "linkedin", f(fr("L'activité ne se lit pas sur {src}."), `Activity cannot be read on ${src}.`)),
     c("OWN", 6, "declared", "linkedin", f("4 résultats datés et chiffrés.", "4 dated and quantified outcomes."), {
       next: f("Au-delà de 6 : un projet porté et utilisé, sur GitHub.", "Beyond 6: a project carried and used, on GitHub."),
-      evidence: { text: f(fr("{src}, postes et réalisations."), `${src}, roles and achievements.`), source: "linkedin", ...p },
+      evidence: { text: f(fr("{src}, postes et réalisations."), `${src}, roles and achievements.`), publicText: f(fr("{src}, postes et réalisations."), `${src}, roles and achievements.`), source: "linkedin", ...p },
     }),
     c("OSS", null, "unproven", "linkedin", f(fr("Une mention « open source » sur {src} ne donne rien sans trace."), `An "open source" mention on ${src} gives nothing without a trace.`)),
   ];

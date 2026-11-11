@@ -117,13 +117,15 @@ export interface RowText {
 /**
  * Le texte d'une ligne du bloc. `shared` : la page est vue par quelqu'un
  * d'autre que la personne fichée (question 5 du barème, par défaut) — pas de
- * nom d'école ni d'ancien employeur. Pour les critères lus sur LinkedIn ou le
- * CV (école, expérience, parcours, ownership déclaré), la pièce est remplacée
- * par ce qui ne nomme personne : le rang de l'école, les années comptées (des
- * chiffres seulement), le niveau atteint dans la table ; les chefs
- * d'accusation de ces critères gardent leur nom, sans l'extrait ; pas de lien
- * vers LinkedIn ; pas de « ce qui manque » (il s'adresse à la personne fichée).
- * Les pièces GitHub (dépôts publics, calendrier, PR) restent entières.
+ * nom d'école ni d'ancien employeur. Une pièce lue sur LinkedIn ou le CV, ou
+ * recoupée, se montre dans sa version publique (`evidence.publicText`), que le
+ * moteur écrit sans aucun nom : rien n'est masqué au mot près ici, donc rien ne
+ * fuit quand la tournure du moteur change. Sur ces lignes : pas le niveau
+ * atteint en clair (il peut nommer), les chefs d'accusation réduits à leur nom,
+ * pas de lien vers LinkedIn, pas de « ce qui manque » (il s'adresse à la
+ * personne fichée). Les pièces GitHub (dépôts publics, calendrier, PR) restent
+ * entières. Une fiche d'avant, sans version publique, retombe sur ce qui ne
+ * nomme personne : le rang de l'école, les années comptées, le niveau atteint.
  */
 export function rowText(c: GridCriterion, opts: { g: G; pick: PickFn; declared: DeclaredSource; shared: boolean }): RowText {
   const { g, pick, declared, shared } = opts;
@@ -134,6 +136,18 @@ export function rowText(c: GridCriterion, opts: { g: G; pick: PickFn; declared: 
   const line = evidence || reachedText;
   const href = safeHref(c.evidence?.proof);
   const flags = c.flags.map((f) => pick(f)).filter(Boolean);
+  const publicText = c.evidence?.publicText ? pick(c.evidence.publicText) : "";
+  if (shared && evSource !== "github" && publicText) {
+    return {
+      line: publicText,
+      label,
+      href: href && href.startsWith("https://github.com/") ? href : null,
+      reached: null,
+      next: null,
+      flags: flags.map(flagName),
+      redacted: publicText !== evidence,
+    };
+  }
   if (!shared || evSource === "github" || !NAMED.includes(c.code)) {
     return {
       line,

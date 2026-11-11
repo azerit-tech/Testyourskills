@@ -375,9 +375,15 @@ export function eduDeclared(d: DeclaredInput): Draft {
   const useSchool = schoolScore !== null && (signalScore === null || schoolScore >= signalScore);
   const score = useSchool ? schoolScore! : signalScore!;
   const reached = useSchool ? schoolFact! : signalFact!;
+  // Page partagée : le rang, jamais le nom ; la sorte de sélection, jamais l'extrait.
   const evidence = useSchool
-    ? { text: schoolFact!, source: "linkedin" as const, ...(d.url ? { proof: d.url } : {}) }
-    : { text: f(`« ${best!.quote.slice(0, 120)} »`, `"${best!.quote.slice(0, 120)}"`), source: "linkedin" as const, ...(d.url ? { proof: d.url } : {}) };
+    ? { text: schoolFact!, publicText: f(`École de rang ${school.tier}.`, `Tier ${school.tier} school.`), source: "linkedin" as const, ...(d.url ? { proof: d.url } : {}) }
+    : {
+        text: f(`« ${best!.quote.slice(0, 120)} »`, `"${best!.quote.slice(0, 120)}"`),
+        publicText: signalFact!,
+        source: "linkedin" as const,
+        ...(d.url ? { proof: d.url } : {}),
+      };
   return crit("EDU", { score, state: "scored", source: "linkedin", reached, ...(EDU_NEXT[score] ? { next: EDU_NEXT[score] } : {}), evidence });
 }
 
@@ -433,7 +439,7 @@ export function xpDeclared(d: DeclaredInput): Draft {
         reached: f(`${years(claimed).fr} affirmés, sans aucun poste daté : table arrêtée à ${GRID.XP.claimedCap}.`, `${years(claimed).en} claimed, no dated role: table stops at ${GRID.XP.claimedCap}.`),
         next: f(`Pour aller plus haut : des postes datés sur ${src}.`, `To go higher: dated roles on ${src}.`),
         flags: flagsFor(claimed),
-        evidence: { text: f(`${src}, années affirmées.`, `${src}, years claimed.`), source: "linkedin", ...proof },
+        evidence: { text: f(`${src}, années affirmées.`, `${src}, years claimed.`), publicText: f(`${src}, années affirmées.`, `${src}, years claimed.`), source: "linkedin", ...proof },
       });
     }
     return missing("XP", "linkedin", f("Aucun poste daté.", "No dated role."), f(`Pour 2 : un premier poste daté sur ${src}.`, `For 2: a first dated role on ${src}.`));
@@ -456,24 +462,29 @@ export function xpDeclared(d: DeclaredInput): Draft {
   const y = total / 12;
   const lvl = levelFor(y);
   const nextLvl = [...GRID.XP.levels].reverse().find((l) => l.score > lvl.score);
-  // La pièce : stages à moitié, postes, associations non comptées, total.
+  // La pièce : stages à moitié, postes, associations non comptées, total. Chaque
+  // morceau a sa version sans nom, pour la page partagée (même ordre, mêmes chiffres).
   const parts: Fact[] = [];
+  const publicParts: Fact[] = [];
+  const both = (x: Fact, pub: Fact = x) => {
+    parts.push(x);
+    publicParts.push(pub);
+  };
   const interns = infos.filter((r) => r.kind === "internship");
   const im = unionMonths(interns);
-  if (im) parts.push(f(`${im} mois de stage ou d'alternance comptés pour moitié.`, `${im} month${im === 1 ? "" : "s"} of internship or work-study counted at half.`));
+  if (im) both(f(`${im} mois de stage ou d'alternance comptés pour moitié.`, `${im} month${im === 1 ? "" : "s"} of internship or work-study counted at half.`));
   const fulls = infos.filter((r) => r.kind === "full" && r.months > 0).sort((a, b) => (b.start ?? 0) - (a.start ?? 0));
-  for (const r of fulls.slice(0, 2))
-    parts.push(
-      r.founder
-        ? f(`${r.months} mois à la tête ${de(r.role.company)}.`, `${r.months} month${r.months === 1 ? "" : "s"} running ${r.role.company}.`)
-        : f(`${r.months} mois chez ${r.role.company}.`, `${r.months} month${r.months === 1 ? "" : "s"} at ${r.role.company}.`),
-    );
-  if (fulls.length > 2) parts.push(f(`${fulls.length - 2} autre${fulls.length > 3 ? "s" : ""} poste${fulls.length > 3 ? "s" : ""}.`, `${fulls.length - 2} more role${fulls.length > 3 ? "s" : ""}.`));
+  for (const r of fulls.slice(0, 2)) {
+    const mo = `${r.months} month${r.months === 1 ? "" : "s"}`;
+    if (r.founder) both(f(`${r.months} mois à la tête ${de(r.role.company)}.`, `${mo} running ${r.role.company}.`), f(`${r.months} mois à la tête d'une entreprise fondée.`, `${mo} running a company they founded.`));
+    else both(f(`${r.months} mois chez ${r.role.company}.`, `${mo} at ${r.role.company}.`), f(`${r.months} mois dans un poste.`, `${mo} in a role.`));
+  }
+  if (fulls.length > 2) both(f(`${fulls.length - 2} autre${fulls.length > 3 ? "s" : ""} poste${fulls.length > 3 ? "s" : ""}.`, `${fulls.length - 2} more role${fulls.length > 3 ? "s" : ""}.`));
   const assoc = infos.find((r) => r.kind === "association");
-  if (assoc) parts.push(f(`${assoc.role.company} est une association : non compté.`, `${assoc.role.company} is an association: not counted.`));
+  if (assoc) both(f(`${assoc.role.company} est une association : non compté.`, `${assoc.role.company} is an association: not counted.`), f("Un poste d'association : non compté.", "An association role: not counted."));
   const project = infos.find((r) => r.kind === "project");
-  if (project) parts.push(projectFact(project));
-  parts.push(f(`Total : ${years(y).fr}.`, `Total: ${years(y).en}.`));
+  if (project) both(projectFact(project), f("Un projet personnel : non compté.", "A personal project: not counted."));
+  both(f(`Total : ${years(y).fr}.`, `Total: ${years(y).en}.`));
 
   return crit("XP", {
     score: lvl.score,
@@ -484,7 +495,7 @@ export function xpDeclared(d: DeclaredInput): Draft {
       ? { next: f(`Pour ${nextLvl.score} : ${years(nextLvl.years).fr} ${counted(nextLvl.years)}. Tu en as ${df(y, "fr")}.`, `For ${nextLvl.score}: ${years(nextLvl.years).en} counted. You have ${df(y, "en")}.`) }
       : {}),
     flags: flagsFor(y),
-    evidence: { text: join(parts), source: "linkedin", ...proof },
+    evidence: { text: join(parts), publicText: join(publicParts), source: "linkedin", ...proof },
   });
 }
 
@@ -655,7 +666,18 @@ export function empDeclared(d: DeclaredInput): Draft {
         : f(`${monthName(r.start!).fr} – ${monthName(r.end!).fr}`, `${monthName(r.start!).en} – ${monthName(r.end!).en}`);
     return f(`${head} : ${when.fr}, ${duration(r.months).fr}.`, `${head}: ${when.en}, ${duration(r.months).en}.`);
   };
-  const evidenceText = recent.length ? join(recent.map(line)) : f(`${src}, postes sans dates.`, `${src}, undated roles.`);
+  // Sans nom ni intitulé, pour la page partagée : la nature du poste et ses dates.
+  const publicLine = (r: RoleInfo): Fact => {
+    const what = r.kind === "internship" ? f("Stage ou alternance", "Internship or work-study") : r.founder ? f("Entreprise fondée", "Company founded") : f("Poste", "Role");
+    const when =
+      r.role.end === null
+        ? f(`depuis ${monthName(r.start!).fr}`, `since ${monthName(r.start!).en}`)
+        : f(`${monthName(r.start!).fr} – ${monthName(r.end!).fr}`, `${monthName(r.start!).en} – ${monthName(r.end!).en}`);
+    return f(`${what.fr} : ${when.fr}, ${duration(r.months).fr}.`, `${what.en}: ${when.en}, ${duration(r.months).en}.`);
+  };
+  const undated = f(`${src}, postes sans dates.`, `${src}, undated roles.`);
+  const evidenceText = recent.length ? join(recent.map(line)) : undated;
+  const evidencePublic = recent.length ? join(recent.map(publicLine)) : undated;
   return crit("EMP", {
     score,
     state: "scored",
@@ -663,7 +685,7 @@ export function empDeclared(d: DeclaredInput): Draft {
     reached,
     ...(next ? { next } : {}),
     flags: team ? [f(`Équipe encadrée : « ${team.slice(0, 100)} »`, `Team led: "${team.slice(0, 100)}"`)] : [],
-    evidence: { text: evidenceText, source: "linkedin", ...proof },
+    evidence: { text: evidenceText, publicText: evidencePublic, source: "linkedin", ...proof },
   });
 }
 
@@ -822,7 +844,8 @@ export function stkDeclared(d: DeclaredInput, gh?: Pick<GithubInput, "facts" | "
         )
       : f("Au-delà de 6 : la stack se prouve sur GitHub.", "Beyond 6: the stack is proven on GitHub."),
     flags,
-    evidence: { text: f(`${shown}.`, `${shown}.`), source: "linkedin", ...(d.url ? { proof: d.url } : {}) },
+    // Des noms de technos, pas d'employeurs : la même pièce sur la page partagée.
+    evidence: { text: f(`${shown}.`, `${shown}.`), publicText: f(`${shown}.`, `${shown}.`), source: "linkedin", ...(d.url ? { proof: d.url } : {}) },
   });
 }
 
@@ -1107,7 +1130,12 @@ export function ownDeclared(d: DeclaredInput): Draft {
       lvl.score < 6
         ? f(`Pour 6 : trois résultats datés et chiffrés (tu en as ${outcomes}). Au-delà, un projet sur GitHub.`, `For 6: three dated and quantified outcomes (you have ${outcomes}). Beyond that, a project on GitHub.`)
         : f("Au-delà de 6 : un projet porté et utilisé, sur GitHub.", "Beyond 6: a project carried and used, on GitHub."),
-    evidence: { text: f(`${d.label}, postes et réalisations.`, `${d.label}, roles and achievements.`), source: "linkedin", ...(d.url ? { proof: d.url } : {}) },
+    evidence: {
+      text: f(`${d.label}, postes et réalisations.`, `${d.label}, roles and achievements.`),
+      publicText: f(`${d.label}, postes et réalisations.`, `${d.label}, roles and achievements.`),
+      source: "linkedin",
+      ...(d.url ? { proof: d.url } : {}),
+    },
   });
 }
 

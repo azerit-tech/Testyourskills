@@ -97,6 +97,28 @@ export const CRITERION_CODES: CriterionCode[] = ["EDU", "XP", "EMP", "STK", "COD
 export type GridSource = "linkedin" | "github" | "both";
 
 /**
+ * La pièce d'un critère : un fait précis, d'où il vient, et le lien public qui
+ * le prouve. `source` est la vérité de l'étiquette : « both » (« recoupé ») dit
+ * que la pièce met les deux sources face à face, quelle que soit la source où la
+ * note a été prise (`GridCriterion.source`).
+ */
+export interface GridEvidence {
+  text: Fact;
+  source: GridSource;
+  proof?: string;
+  /**
+   * La même pièce pour une page vue par quelqu'un d'autre : écrite par le moteur
+   * sans aucun nom d'école ni d'employeur, ni texte libre de la personne
+   * (intitulés, descriptions, extraits), seulement des comptes, des dates et des
+   * rangs. Présente sur toute pièce lue sur LinkedIn ou le CV (source
+   * « linkedin » ou « both ») ; absente d'une pièce GitHub, qui se montre telle
+   * quelle. Les fiches d'avant ne l'ont pas : le front retombe alors sur le rang
+   * d'école ou le niveau atteint.
+   */
+  publicText?: Fact;
+}
+
+/**
  * Un critère : une seule note sur 10, lue dans sa table de niveaux (le niveau
  * le plus haut dont toute la ligne est remplie). Rien n'y est ajouté ni retiré.
  */
@@ -120,7 +142,7 @@ export interface GridCriterion {
   /** Chefs d'accusation liés, sans effet sur la note. */
   flags: Fact[];
   /** La pièce : un fait précis et sa provenance, avec le lien public quand il existe. */
-  evidence?: { text: Fact; source: GridSource; proof?: string };
+  evidence?: GridEvidence;
 }
 
 /** La grille d'une fiche, ou d'une comparaison (la note du dossier). */
