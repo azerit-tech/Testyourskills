@@ -383,7 +383,8 @@ def distant_city(name="ville", shore_y=CITY_SHORE_Y, xs=(-950.0, 1050.0), depth=
     pour que la silhouette ait de la profondeur. Des enseignes sans texte (lames verticales, bandeaux de toit)
     sur les premiers rangs, que la distance et le flou rendent illisibles. Le rivage se courbe en baie vers les
     bords (il revient vers +y). `gap` : l'ouverture laissée à la route du pont.
-    `all_lit` : bien plus de fenêtres allumées (P6, FIN6), mais une ville quand même."""
+    `all_lit` : bien plus de fenêtres allumées (P6, FIN6), mais une ville quand même. L'ouverture `gap` traverse
+    toute la profondeur : c'est l'avenue dans l'axe du pont (scene_c la pave et l'éclaire)."""
     rng = random.Random(seed)
     xs0, xs1 = xs
 
@@ -404,7 +405,10 @@ def distant_city(name="ville", shore_y=CITY_SHORE_Y, xs=(-950.0, 1050.0), depth=
         x = xs0 + rng.uniform(0, 20)
         while x < xs1:
             w = rng.uniform(14, 42)
-            if rng.random() < fill and not (gap[0] - 6 < x + w / 2 and x - w / 2 < gap[1] + 6 and ri < 2):
+            # l'ouverture du pont se prolonge en avenue sur toute la profondeur (au 200 mm de P4, un immeuble dans
+            # l'axe bouchait tout le fond de la crête)
+            mg = 6.0 if ri < 2 else 10.0
+            if rng.random() < fill and not (gap[0] - mg < x + w / 2 and x - w / 2 < gap[1] + mg):
                 d = rng.uniform(12, 30)
                 y = shore(x) - off - d / 2 + rng.uniform(-12, 12 if ri else 4)
                 h = rng.uniform(h0, h1)
@@ -584,7 +588,7 @@ def lamp(src, loc, arm=(1.0, 0.0), energy=2600.0, name=None, scale=LAMP_S):
     L.color = lin(AMBER)[:3]
     L.spot_size = math.radians(130)
     L.spot_blend = 0.5
-    L.shadow_soft_size = 0.25
+    L.shadow_soft_size = 0.5          # dans la brume, une source plus large n'étoile pas la tête du lampadaire
     lo = bpy.data.objects.new(L.name, L)
     bpy.context.scene.collection.objects.link(lo)
     lo.location = Vector(loc) + headp - Vector((0, 0, 0.12))
