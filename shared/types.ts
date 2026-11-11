@@ -143,6 +143,8 @@ export interface GridCriterion {
   flags: Fact[];
   /** La pièce : un fait précis et sa provenance, avec le lien public quand il existe. */
   evidence?: GridEvidence;
+  /** Page partagée (shared/publicView.ts) : la note est gardée pour la personne fichée (l'école hors moyenne). */
+  private?: boolean;
 }
 
 /** La grille d'une fiche, ou d'une comparaison (la note du dossier). */

@@ -5,7 +5,7 @@
 import { describe, expect, it } from "vitest";
 import type { CriterionCode, Grid, GridCriterion, Lang } from "../../../shared/types";
 import { DICTS, pick } from "../i18n";
-import { crossChecks, finalLines, flagName, repoOf, rowText, safeHref, schoolRank, sourceLabel, stateTags } from "./grid";
+import { crossChecks, finalLines, flagName, repoOf, rowText, safeHref, sourceLabel, stateTags } from "./grid";
 import { comparisonGridsMock, declaredGridMock, githubGridMock } from "./mockGrid";
 
 const crit = (code: CriterionCode, score: number | null, over: Partial<GridCriterion> = {}): GridCriterion => ({
@@ -159,7 +159,8 @@ describe("la page partagée : ni école ni ancien employeur", () => {
 
   it("ce qui reste : la version publique de la pièce, écrite par le moteur, et le nom du chef d'accusation", () => {
     const [edu, xp, emp] = rows(declaredGridMock("LinkedIn"), true);
-    expect(edu.line).toBe("École de rang A.");
+    // L'école, ni rang ni nom : gardée pour la personne fichée.
+    expect(edu.line).toBe("École gardée pour la personne fichée.");
     expect(xp.line).toContain("8,4 ans");
     expect(xp.line).toContain("41 mois à la tête d'une entreprise fondée");
     expect(emp.line).toBe("Entreprise fondée : depuis juin 2023, 41 mois. Poste : janvier 2019 – août 2023, 4,6 ans.");
@@ -167,11 +168,11 @@ describe("la page partagée : ni école ni ancien employeur", () => {
     expect(edu.redacted && xp.redacted && emp.redacted).toBe(true);
   });
 
-  it("une fiche d'avant, sans version publique : le rang de l'école, les années comptées, le niveau atteint", () => {
+  it("une fiche d'avant, sans version publique : l'école gardée, les années comptées, le niveau atteint", () => {
     const old: Grid = { ...declaredGridMock("LinkedIn") };
     old.criteria = old.criteria.map((c) => (c.evidence ? { ...c, evidence: { text: c.evidence.text, source: c.evidence.source } } : c));
     const [edu, xp, emp] = rows(old, true);
-    expect(edu.line).toBe("École de rang A.");
+    expect(edu.line).toBe("École gardée pour la personne fichée.");
     expect(xp.line).toContain("8,4 ans");
     expect(emp.line).toBe(FR.levels.EMP.find(([n]) => n <= 8)![1]);
     for (const r of rows(old, true)) expect(text(r)).not.toMatch(NAMES);
@@ -184,10 +185,7 @@ describe("la page partagée : ni école ni ancien employeur", () => {
     expect(seen.every((r) => !r.redacted)).toBe(true);
   });
 
-  it("rang d'école et nom de chef d'accusation", () => {
-    expect(schoolRank("Centrale Méditerranée, rang B.")).toBe("B");
-    expect(schoolRank("Centrale, tier S.")).toBe("S");
-    expect(schoolRank("Hackathon gagné.")).toBeNull();
+  it("nom de chef d'accusation", () => {
     expect(flagName("Senior sur parole : « Lead dev », 1,1 an")).toBe("Senior sur parole");
     expect(flagName("Activité sans code visible")).toBe("Activité sans code visible");
   });
@@ -201,6 +199,11 @@ describe("les recoupements d'une comparaison", () => {
       ["STK", 6, 8, "more"],
       ["OWN", 6, 8, "more"],
     ]);
+  });
+
+  it("page partagée : seulement les recoupements qui jouent pour la personne", () => {
+    const checks = crossChecks(comparisonGridsMock("LinkedIn", "camille-ardent").grid, true);
+    expect(checks.map((x) => x.code)).toEqual(["STK", "OWN"]);
   });
 
   it("la démo montre « recoupé » là où le moteur le pose : expérience, parcours, stack, ownership", () => {

@@ -3503,6 +3503,12 @@ a.rg-src.is-both {
   font: 500 14px/1.4 var(--f-text);
   color: var(--lilac-2);
 }
+/* un jeu, pas un verdict d'embauche : la dernière ligne, la plus discrète */
+.rg .rg-game {
+  font: 500 13px/1.45 var(--f-text);
+  color: var(--lilac-2);
+  opacity: 0.85;
+}
 
 /* comparaison notée : la note du dossier à la place des écarts stat par stat */
 .case-rating {

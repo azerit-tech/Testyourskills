@@ -9,6 +9,7 @@ import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promise
 import { dirname, join } from "node:path";
 import { z } from "zod";
 import { FIXTURES } from "../../shared/fixtures";
+import { publicView } from "../../shared/publicView";
 import { isUpcomingPath } from "../../shared/routes";
 import type { CardData, ComparisonData, ErrorCode, Fact, JobState, Lang } from "../../shared/types";
 import { stripToken, type CardRow, type Store } from "./db";
@@ -254,6 +255,20 @@ export function createApp(opts: AppOptions) {
     return !!owner && owner.login === login!.toLowerCase() && sameOrigin(c, baseUrl);
   };
 
+  /**
+   * La personne fichée : propriétaire revendiquée du login, ou qui tient le jeton
+   * de la fiche (en-tête X-Card-Token) quand elle n'a pas été dénoncée ; le jeton
+   * d'une fiche dénoncée est celui du dénonciateur.
+   */
+  const personOf = (c: Context, row: CardRow, mine: boolean): boolean =>
+    mine || (!row.denouncedBy && tokenMatches(c.req.header("x-card-token"), row.deleteToken));
+
+  /** Fiche faite par un tiers (dénoncée) que personne n'a encore revendiquée : pas de grille (§18.37). */
+  const thirdParty = (row: CardRow): boolean => {
+    const login = store.loginOf(row);
+    return !!row.denouncedBy && !(login && store.getOwner(login));
+  };
+
   // Public : jamais de montant. ai = ok | budget (plafond du jour atteint) |
   // credits (solde sous AI_MIN_CREDIT_USD, ou 402 vu dans les 10 dernières
   // minutes sans solde suffisant lu depuis) | off (pas de clé).
@@ -294,7 +309,7 @@ export function createApp(opts: AppOptions) {
    * jugement (celle de sa comparaison s'il y en a une), sans jeton, avec la photo de la vitrine.
    */
   const showcaseCard = (row: CardRow): CardData => {
-    const card = stripToken(row.kind === "comparison" ? (row.data as ComparisonData).github : (row.data as CardData));
+    const card = publicView(stripToken(row.kind === "comparison" ? (row.data as ComparisonData).github : (row.data as CardData)), { thirdParty: false });
     return opts.showcasePhoto ? { ...card, avatarUrl: opts.showcasePhoto, photoSource: "linkedin" } : card;
   };
 
@@ -496,11 +511,14 @@ export function createApp(opts: AppOptions) {
     const { data, week } = withWeekSpecial(store.db, stripToken(row.data));
     const rank = week ? { week } : {};
     // `mine` : la session est propriétaire du login de la fiche ; le front lui ouvre l'email, la photo et la suppression sans jeton.
-    const extra = { ...rank, ...(ownedBy(c, row) ? { mine: true } : {}) };
+    const mine = ownedBy(c, row);
+    const extra = { ...rank, ...(mine ? { mine: true } : {}) };
+    // La page partagée (shared/publicView.ts) : rien de privé ne part vers qui n'est pas la personne fichée.
+    const shown = personOf(c, row, mine) ? data : publicView(data, { thirdParty: thirdParty(row) });
     const state: JobState =
       row.kind === "comparison"
-        ? { state: "done", kind: "comparison", comparison: data as ComparisonData, ...extra }
-        : { state: "done", kind: "card", card: data as CardData, ...extra };
+        ? { state: "done", kind: "comparison", comparison: shown as ComparisonData, ...extra }
+        : { state: "done", kind: "card", card: shown as CardData, ...extra };
     return c.json(state);
   });
 

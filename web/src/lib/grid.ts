@@ -20,6 +20,8 @@ export type Tag = keyof G["tags"];
  * autres). Un critère noté sur sa source de preuve n'en a aucune (§3).
  */
 export function stateTags(c: GridCriterion, grid?: Pick<Grid, "rule">): Tag[] {
+  // Page partagée : l'école hors moyenne est gardée pour la personne fichée (shared/publicView.ts).
+  if (c.private) return ["private"];
   const tags: Tag[] = [];
   if (c.state === "declared") tags.push("declared");
   if (c.state === "unproven" || (c.score === null && c.state !== "missing")) tags.push("unproven");
@@ -87,11 +89,6 @@ export function reachedRow(c: GridCriterion, table: [number, string][]): number 
 /** Les critères dont la pièce, lue sur LinkedIn ou le CV, peut citer une école ou un employeur. */
 const NAMED: CriterionCode[] = ["EDU", "XP", "EMP", "OWN"];
 
-/** Le rang d'école dans un texte du barème : « Centrale Méditerranée, rang B. », « …, tier B. ». */
-export function schoolRank(text: string): string | null {
-  return /\b(?:rang|tier) ([SABC])\b/.exec(text)?.[1] ?? null;
-}
-
 /** Un chef d'accusation réduit à son nom (« Senior à confirmer : « Lead dev », 1,1 an » → « Senior à confirmer »). */
 export function flagName(text: string): string {
   const i = text.search(/\s?:\s/);
@@ -137,6 +134,10 @@ export function rowText(c: GridCriterion, opts: { g: G; pick: PickFn; declared: 
   const href = safeHref(c.evidence?.proof);
   const flags = c.flags.map((f) => pick(f)).filter(Boolean);
   const publicText = c.evidence?.publicText ? pick(c.evidence.publicText) : "";
+  // L'école, ni son rang ni son nom : gardée pour la personne fichée (rapport du recruteur, §6).
+  if (shared && c.code === "EDU" && evSource !== "github") {
+    return { line: g.shared.school, label: null, href: null, reached: null, next: null, flags: [], redacted: true };
+  }
   if (shared && evSource !== "github" && publicText) {
     return {
       line: publicText,
@@ -164,10 +165,7 @@ export function rowText(c: GridCriterion, opts: { g: G; pick: PickFn; declared: 
   const row = reachedRow(c, table);
   const level = row >= 0 ? table[row][1] : "";
   let safe: string;
-  if (c.code === "EDU") {
-    const rank = schoolRank(`${c.evidence?.text.fr ?? ""} ${c.reached.fr}`);
-    safe = rank ? g.shared.school(rank) : c.score === null ? reachedText : level;
-  } else if (c.code === "XP") {
+  if (c.code === "XP") {
     // Le palier atteint, en années comptées : des chiffres, jamais un nom.
     safe = c.score === null ? g.shared.xpNone : reachedText;
   } else {
@@ -232,16 +230,21 @@ export interface CrossCheck {
   verdict: "more" | "less" | "same";
 }
 
-/** Les critères où les deux sources ont parlé (comparaison) : ce que LinkedIn déclare, ce que GitHub prouve. */
-export function crossChecks(grid: Grid): CrossCheck[] {
+/**
+ * Les critères où les deux sources ont parlé (comparaison) : ce que LinkedIn
+ * déclare, ce que GitHub prouve. `shared` : la page partagée ne montre que les
+ * recoupements qui jouent pour la personne (le code en montre autant ou plus).
+ */
+export function crossChecks(grid: Grid, shared = false): CrossCheck[] {
   return grid.criteria
     .filter((c) => typeof c.declared === "number" && typeof c.proven === "number")
-    .map((c) => ({
+    .map((c): CrossCheck => ({
       code: c.code,
       declared: c.declared!,
       proven: c.proven!,
       verdict: c.proven! > c.declared! ? "more" : c.proven! < c.declared! ? "less" : "same",
-    }));
+    }))
+    .filter((x) => !shared || x.verdict !== "less");
 }
 
 /** La comparaison a-t-elle des colonnes à montrer : au moins un critère porte ses deux notes. */

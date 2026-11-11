@@ -287,7 +287,9 @@ async function fetchJob(id: string): Promise<JobState> {
   if (isMock()) return mockApi.getJob(id);
   let res: Response;
   try {
-    res = await fetch(`/api/card/${encodeURIComponent(id)}`, { headers: { Accept: "application/json" } });
+    // Le jeton de la fiche, s'il est sur cet appareil : le serveur rend alors la grille entière, sinon la version publique.
+    const token = tokens.get(id);
+    res = await fetch(`/api/card/${encodeURIComponent(id)}`, { headers: { Accept: "application/json", ...(token ? { "X-Card-Token": token } : {}) } });
   } catch {
     throw new ApiError(0, "network", null);
   }

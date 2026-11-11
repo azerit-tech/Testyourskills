@@ -120,11 +120,13 @@ function setup(finder: { forGithub?: LinkedinFinder["forGithub"]; forUrl?: (url:
   return { app, pipeline, store, seen };
 }
 
-async function run(ctx: ReturnType<typeof setup>, payload: Record<string, unknown>) {
+/** La fiche telle que la personne fichée la relit : avec le jeton de la fiche (`as: "visitor"` : sans). */
+async function run(ctx: ReturnType<typeof setup>, payload: Record<string, unknown>, as: "person" | "visitor" = "person") {
   const res = await ctx.app.request("/api/card", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ lang: "fr", ...payload }) });
-  const json = (await res.json()) as { id: string };
+  const json = (await res.json()) as { id: string; deleteToken?: string };
   if (res.status === 202) await ctx.pipeline.wait(json.id);
-  return (await (await ctx.app.request(`/api/card/${json.id}`)).json()) as JobState;
+  const headers: Record<string, string> = as === "person" && json.deleteToken ? { "x-card-token": json.deleteToken } : {};
+  return (await (await ctx.app.request(`/api/card/${json.id}`, { headers })).json()) as JobState;
 }
 
 /** Ce que la grille lit du profil, et rien d'autre. */
@@ -216,5 +218,40 @@ describe("la liste des employeurs à forte barre, lue dans son fichier, va au sc
     if (s.state !== "done" || s.kind !== "card") throw new Error(`pas une fiche : ${JSON.stringify(s)}`);
     expect(ctx.seen[0]!.highBar).toEqual({ employers: [], source: null });
     expect(emp(s.card).score).toBe(6);
+  });
+});
+
+describe("la page partagée : le serveur ne rend la grille entière qu'à la personne fichée (§18.37)", () => {
+  it("sans le jeton : la grille publique, sans « ce qui manque » ; la note ne bouge pas", async () => {
+    const ctx = setup({ forUrl: async (url) => ({ status: "found", profile: { ...PROFILE, url }, githubLogin: null }) }, { realScore: true });
+    const own = await run(ctx, { linkedin: URL_ });
+    if (own.state !== "done" || own.kind !== "card") throw new Error("pas une fiche");
+    const seen = (await (await ctx.app.request(`/api/card/${own.card.id}`)).json()) as JobState;
+    if (seen.state !== "done" || seen.kind !== "card") throw new Error("pas une fiche");
+    expect(own.card.grid!.criteria.some((c) => c.next)).toBe(true);
+    expect(seen.card.grid!.criteria.some((c) => c.next)).toBe(false);
+    expect(seen.card.grid!.overall).toBe(own.card.grid!.overall);
+    expect(seen.card.overall).toBe(own.card.overall);
+  });
+
+  it("fiche dénoncée, non revendiquée : pas de grille, même pour qui tient le jeton ; revendiquée : la grille publique", async () => {
+    const ctx = setup(
+      { forUrl: async (url) => ({ status: "found", profile: { ...PROFILE, url }, githubLogin: null }), forGithub: async () => ({ profile: PROFILE, proven: true }) },
+      { realScore: true },
+    );
+    const by = await run(ctx, { linkedin: URL_ });
+    if (by.state !== "done" || by.kind !== "card") throw new Error("pas une fiche");
+    const s = await run(ctx, { login: "camille-ardent", denouncedBy: by.card.id });
+    if (s.state !== "done" || s.kind !== "comparison") throw new Error(`pas une comparaison : ${JSON.stringify(s)}`);
+    expect(ctx.store.getCard(s.comparison.id)!.denouncedBy).toBe(by.card.id);
+    expect(s.comparison.cv.grid).toBeUndefined();
+    expect(s.comparison.grid).toBeUndefined();
+    // Le jeu reste : la note de la fiche.
+    expect(s.comparison.github.overall).toBeGreaterThan(0);
+    ctx.store.claimOwner("camille-ardent", 42);
+    const after = (await (await ctx.app.request(`/api/card/${s.comparison.id}`)).json()) as JobState;
+    if (after.state !== "done" || after.kind !== "comparison") throw new Error("pas une comparaison");
+    expect(after.comparison.cv.grid).toBeDefined();
+    expect(after.comparison.cv.grid!.criteria.some((c) => c.next)).toBe(false);
   });
 });

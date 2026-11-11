@@ -433,6 +433,8 @@ const fr = {
       piece: "Chaque note a sa pièce.",
     },
     foot: "C'est la lecture qu'Azerit fait pour les équipes qui recrutent.",
+    /** Sous la grille, surtout en vue partagée : un jeu, pas un verdict d'embauche. */
+    game: "Un jeu, fait avec une vraie grille. Pas une décision d'embauche : aucun poste, aucun entretien, données publiques seulement.",
     criteriaLabel: "Les huit critères",
     names: {
       EDU: "École et sélection",
@@ -455,6 +457,7 @@ const fr = {
       estimated: "estimée",
       below: "ne compte pas contre toi",
       out: "ne compte pas contre toi",
+      private: "gardée pour toi",
     },
     /** Vue par quelqu'un d'autre : rien ne s'adresse à la personne fichée. */
     tagsThem: {
@@ -464,6 +467,7 @@ const fr = {
       estimated: "estimée",
       below: "ne fait pas baisser la note",
       out: "ne fait pas baisser la note",
+      private: "gardée pour la personne",
     },
     source: { linkedin: "LinkedIn", cv: "CV", github: "GitHub", both: "recoupé" },
     /** L'étiquette de la pièce : « LinkedIn, postes datés », « GitHub, sequence-mail ». */
@@ -570,7 +574,7 @@ const fr = {
     } as Partial<Record<CriterionCode, [number, string][]>>,
     /** Sous la table : comment elle se lit. */
     levelNotes: {
-      EDU: "Sans école de tech, pas de note d'école : le critère sort de la moyenne, et se former seul ne coûte rien.",
+      EDU: "Sans école de tech, pas de note d'école : le critère sort de la moyenne, et se former seul ne coûte rien. Liste française d'abord : une école absente s'arrête à B pour l'instant. Une école ne fait jamais baisser la note.",
       XP: "Compté poste par poste : stage et alternance pour moitié, association étudiante et bénévolat pour zéro, deux postes en même temps une seule fois. Sans LinkedIn : estimée sur les années actives de GitHub, arrêtée à 8.",
       EMP: "Lu sur LinkedIn ou le CV seulement.",
       STK: "GitHub prouve, LinkedIn déclare. Déclarée seulement, la table s'arrête à 6.",
@@ -581,9 +585,9 @@ const fr = {
     } as Record<CriterionCode, string>,
     /** Page partagée, vue par quelqu'un d'autre (question 5 du barème) : ni nom d'école, ni nom d'ancien employeur. */
     shared: {
-      school: (rank: string) => `École de rang ${rank}.`,
+      school: "École gardée pour la personne fichée.",
       xpNone: "Aucun mois compté sur les postes datés.",
-      hidden: "Noms d'écoles et d'employeurs gardés pour la personne fichée.",
+      hidden: "L'école, les noms d'employeurs et les recoupements à vérifier sont gardés pour la personne fichée.",
     },
     final: {
       title: "La note sur 100",
@@ -1123,6 +1127,7 @@ const en: Dict = {
       piece: "Every score has its exhibit.",
     },
     foot: "This is how Azerit reads engineers for hiring teams.",
+    game: "A game built on a real grid. Not a hiring decision: no job, no interview, public data only.",
     criteriaLabel: "The eight criteria",
     names: {
       EDU: "School and selection",
@@ -1144,6 +1149,7 @@ const en: Dict = {
       estimated: "estimated",
       below: "doesn't count against you",
       out: "doesn't count against you",
+      private: "kept for you",
     },
     tagsThem: {
       declared: "declared, to confirm",
@@ -1152,6 +1158,7 @@ const en: Dict = {
       estimated: "estimated",
       below: "doesn't lower the rating",
       out: "doesn't lower the rating",
+      private: "kept for the person",
     },
     source: { linkedin: "LinkedIn", cv: "CV", github: "GitHub", both: "cross-checked" },
     sourceWith: (src: string, what: string) => `${src}, ${what}`,
@@ -1254,7 +1261,7 @@ const en: Dict = {
       ],
     } as Partial<Record<CriterionCode, [number, string][]>>,
     levelNotes: {
-      EDU: "No tech school, no school score: the criterion leaves the average, and being self-taught costs nothing.",
+      EDU: "No tech school, no school score: the criterion leaves the average, and being self-taught costs nothing. French schools first for now: a school missing from the list stops at B. A school never lowers the rating.",
       XP: "Counted role by role: internships and work-study at half, student associations and volunteering at zero, overlapping roles once. Without LinkedIn: estimated from active years on GitHub, capped at 8.",
       EMP: "Read on LinkedIn or the CV only.",
       STK: "GitHub proves, LinkedIn claims. Claimed only, the table stops at 6.",
@@ -1264,9 +1271,9 @@ const en: Dict = {
       OSS: "Never lowers the rating: most good engineers have no open source.",
     } as Record<CriterionCode, string>,
     shared: {
-      school: (rank: string) => `A tier ${rank} school.`,
+      school: "School kept for the person on file.",
       xpNone: "No month counted on the dated roles.",
-      hidden: "School and employer names are kept for the person on file.",
+      hidden: "The school, employer names and cross-checks still to verify are kept for the person on file.",
     },
     final: {
       title: "The rating out of 100",

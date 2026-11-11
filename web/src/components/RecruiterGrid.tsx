@@ -9,6 +9,7 @@
 // Fiche sans grille (d'avant 0.4.0) : rien.
 import { useId, useState } from "react";
 import { dec, usableGrid } from "../../../shared/gridText";
+import { publicGrid } from "../../../shared/publicView";
 import type { DeclaredSource, Grid, GridCriterion } from "../../../shared/types";
 import { CRITERION_CODES, declaredOf } from "../../../shared/types";
 import { pick, useT, type Dict } from "../i18n";
@@ -160,11 +161,12 @@ function Row({ c, grid, declared, shared, columns, skipFlags }: RowProps) {
 }
 
 /** Les recoupements, en tête d'une comparaison : ce que les deux sources disent du même critère, et ce que le recoupement a relevé. */
-function CrossChecks({ grid, declared }: { grid: Grid; declared: DeclaredSource }) {
+function CrossChecks({ grid, declared, shared }: { grid: Grid; declared: DeclaredSource; shared: boolean }) {
   const { t, lang } = useT();
   const g = t.grid;
   const C = g.compare;
-  const checks = crossChecks(grid);
+  // Page partagée : seulement les recoupements qui jouent pour la personne.
+  const checks = crossChecks(grid, shared);
   const flags = grid.criteria.find((c) => c.code === "STK")?.flags.map((f) => pick(f, lang)).filter(Boolean) ?? [];
   if (!checks.length && !flags.length) return null;
   const decl = declared === "cv" ? C.cols.cv : C.cols.linkedin;
@@ -242,8 +244,10 @@ interface Props {
 
 export function RecruiterGrid({ item, shared, who }: Props) {
   const { t, lang } = useT();
-  const grid = item.kind === "card" ? item.card.grid : item.comparison.grid;
-  if (!usableGrid(grid)) return null;
+  const raw = item.kind === "card" ? item.card.grid : item.comparison.grid;
+  if (!usableGrid(raw)) return null;
+  // Vue partagée : la grille publique (shared/publicView.ts), déjà appliquée par le serveur ; ici pour la démo.
+  const grid = shared ? publicGrid(raw) : raw;
   const g = t.grid;
   // Une fiche GitHub seule parle de LinkedIn, la porte par défaut (§18.30) ; une fiche ou une comparaison déclarative, de sa source.
   const declared = item.kind === "card" && item.card.source === "github" ? "linkedin" : declaredOf(item.kind === "card" ? item.card : item.comparison);
@@ -266,7 +270,7 @@ export function RecruiterGrid({ item, shared, who }: Props) {
         <li>{code ? method.code : method.noCode}</li>
         <li>{career && code ? method.check : method.piece}</li>
       </ol>
-      {columns && <CrossChecks grid={grid} declared={declared} />}
+      {columns && <CrossChecks grid={grid} declared={declared} shared={shared} />}
       <ol className={`rg-list${columns ? " has-cols" : ""}`} aria-label={g.criteriaLabel}>
         {CRITERION_CODES.map((code) => {
           const c = byCode.get(code);
@@ -276,6 +280,7 @@ export function RecruiterGrid({ item, shared, who }: Props) {
       <Final grid={grid} isCase={item.kind === "comparison"} unproven={unproven} />
       {redacted && <p className="rg-hidden">{g.shared.hidden}</p>}
       <p className="rg-foot">{g.foot}</p>
+      <p className="rg-game">{g.game}</p>
     </section>
   );
 }

@@ -47,6 +47,8 @@ export interface GridMath {
 
 /** Hors moyenne : par son état (non prouvé, non renseigné), ou noté mais sous la moyenne des autres. */
 export function excludedWhy(c: GridCriterion): ExcludedWhy | null {
+  // Gardée pour la personne fichée (page partagée) : hors moyenne, sans dire pourquoi.
+  if (c.private) return null;
   if (c.score === null || c.state === "unproven" || c.state === "missing") return c.state === "missing" ? "missing" : "unproven";
   return c.counted ? null : "below";
 }
