@@ -6,7 +6,8 @@
 # Lit les assets de Azerit/design/film/assets (python3 tools/film3d/fetch.py), écrit
 # Azerit/design/film/assets/cast.blend. Chaque famille est dans sa collection, posée à sa
 # place sur un plateau (repère : z en haut, l'avant des véhicules vers -y) :
-#   cast_interior  le coupé, son rétroviseur intérieur, le conducteur assis mains au volant,
+#   cast_interior  le coupé (ou FILM3D_HERO=w111|slc, voir lab/hero_cars.py), son rétroviseur intérieur,
+#                  le conducteur assis mains au volant,
 #                  une patrouille gyrophare allumé à 22 m derrière (vue dans le rétroviseur)
 #   cast_people    le conducteur mains levées, les agents (visée debout, accroupi derrière une
 #                  portière ouverte, garde), arme de poing en main
@@ -47,6 +48,10 @@ CREAM = "#fff9cb"
 INTERIOR_AT = Vector((0.0, 0.0, 0.0))
 PEOPLE_AT = Vector((-40.0, 0.0, 0.0))
 VEHICLES_AT = Vector((60.0, 0.0, 0.0))
+
+# La voiture poursuivie : FILM3D_HERO=coupe (défaut, le coupé actuel), w111 (berline des années 60) ou slc
+# (coupé des années 70), ces deux-là chargés par lab/hero_cars.py
+HERO = os.environ.get("FILM3D_HERO", "coupe")
 
 # Repères du coupé, dans le repère d'origine du modèle (avant vers -y, conduite à gauche, +x)
 WHEEL_CENTER = Vector((0.44, 0.275, 0.83))   # centre de la jante du volant
@@ -278,11 +283,25 @@ def grab(fn, col, name, at=(0, 0, 0), yaw=0.0):
     return root
 
 
+def _nose_minus_y(v):
+    """Un point du repère des chargeurs (nez vers +x) dans celui du plateau (nez vers -y)."""
+    return Vector((v.y, -v.x, v.z))
+
+
 def build_interior(people, vehicles=None):
     col = collection("cast_interior")
     bpy.context.scene.world = make_world("world_interieur", 0.6)
-    build_coupe(col)
-    build_rearview_mirror(col)
+    wheel, eye = WHEEL_CENTER, None
+    if HERO == "coupe":
+        build_coupe(col)
+        build_rearview_mirror(col)
+    else:
+        # une des deux voitures d'époque, son habitacle et son rétroviseur d'origine
+        import hero_cars
+        box = {}
+        grab(lambda: box.update(car=hero_cars.load_hero(HERO, lights_on=True)), col, "interior_hero", (0, 0, 0), -90)
+        ck = box["car"]["cockpit"]
+        wheel, eye = _nose_minus_y(ck["wheel"]), _nose_minus_y(ck["eye"])
     # la patrouille derrière, dans l'axe du rétroviseur ; son avant vers -y comme le coupé
     if vehicles is not None and hasattr(vehicles, "load_patrol"):
         grab(lambda: vehicles.load_patrol(lights_on=True), col, "interior_chaser", (0.6, 24.0, 0.0), -90)
@@ -296,8 +315,9 @@ def build_interior(people, vehicles=None):
     road.scale = (14, 400, 1)
     road.data.materials.append(material("cast_wet_road", (0.02, 0.02, 0.024, 1), 0.12))
     move_to([road], col)
-    if people is not None and hasattr(people, "cast_driver_seated"):
-        # ses propres repères du coupé (volant, bassin, pédale), en coordonnées glTF brutes comme ici
+    if HERO == "coupe" and people is not None and hasattr(people, "cast_driver_seated"):
+        # ses propres repères du coupé (volant, bassin, pédale), en coordonnées glTF brutes comme ici ; pour les
+        # voitures d'époque le conducteur reste à recaler sur leur volant (pas encore fait)
         move_to(people.cast_driver_seated(), col)
     # caméra : depuis l'arrière de l'habitacle, par-dessus l'épaule droite, 24 mm (à 28 mm le volant sort du cadre)
     cam = bpy.data.cameras.new("cam_interior")
@@ -307,10 +327,15 @@ def build_interior(people, vehicles=None):
     co = bpy.data.objects.new("cam_interior", cam)
     col.objects.link(co)
     cam.clip_start = 0.05
-    co.location = (0.18, 1.50, 1.20)
-    look_at(co, (0.15, -3.0, 0.92))
+    if eye is None:
+        co.location = (0.18, 1.50, 1.20)
+        look_at(co, (0.15, -3.0, 0.92))
+    else:
+        # derrière le siège du conducteur, vers la route par le pare-brise
+        co.location = eye + Vector((-0.15, 0.25, 0.0))
+        look_at(co, wheel + Vector((-0.1, -3.4, 0.1)))
     # un peu de lumière de la rue sur le volant et la capuche
-    add_light("interior_street", "AREA", (1.6, 0.6, 2.6), "#ffc36b", 120, target=WHEEL_CENTER, size=1.5, col=col)
+    add_light("interior_street", "AREA", (1.6, 0.6, 2.6), "#ffc36b", 120, target=wheel, size=1.5, col=col)
     add_light("interior_bounce", "AREA", (0.0, 0.9, 1.25), "#8d8cf0", 3, target=(0.4, 0.3, 0.8), size=0.6, col=col)
     return col
 
