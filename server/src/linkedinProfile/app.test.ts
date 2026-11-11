@@ -97,7 +97,7 @@ function setup(finder: FinderImpl | null, over: Partial<Deps> = {}, appOver: Par
     },
     compareCards(cv, github) {
       const deltas = Object.fromEntries(cv.stats.map((s) => [s.code, github.stats.find((g) => g.code === s.code)!.value - s.value])) as Record<StatCode, number>;
-      return { cv, github, deltas, headline: { fr: "Ton CV a volé 7 points à ton code", en: "Your CV stole 7 points from your code" } };
+      return { cv, github, deltas, headline: { fr: "Ton CV annonce 7 points que ton code public ne montre pas encore.", en: "Your CV claims 7 points your public code doesn't show yet." } };
     },
     async renderImage() {
       return new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
@@ -151,8 +151,8 @@ describe("entrée GitHub : le LinkedIn trouvé devient une comparaison", () => {
     const cmp = s.comparison;
     expect(cmp.declaredSource).toBe("linkedin");
     expect(cmp.cv.declaredSource).toBe("linkedin");
-    expect(cmp.headline.fr).toBe("Ton LinkedIn a volé 7 points à ton code");
-    expect(cmp.headline.en).toBe("Your LinkedIn stole 7 points from your code");
+    expect(cmp.headline.fr).toBe("Ton LinkedIn annonce 7 points que ton code public ne montre pas encore.");
+    expect(cmp.headline.en).toBe("Your LinkedIn claims 7 points your public code doesn't show yet.");
     // L'IA a lu le texte du profil, jamais stocké.
     expect(ctx.calls.readCv[0]).toContain("Senior Full-Stack Engineer — Paysolde (2022-03 – present)");
     expect(JSON.stringify(ctx.store.getCard(json.id))).not.toContain("Refonte du paiement");
@@ -166,7 +166,8 @@ describe("entrée GitHub : le LinkedIn trouvé devient une comparaison", () => {
     // L'aperçu de lien dit « LinkedIn », jamais « CV ».
     const page = await (await ctx.app.request(`/c/${json.id}`)).text();
     expect(page).toContain("LinkedIn : Fiche");
-    expect(page).toContain("ce que LinkedIn déclare");
+    expect(page).toContain("Deux pièces au même dossier");
+    expect(page).not.toMatch(/butin|déclare contre/);
     expect(page).not.toMatch(/\bCV\b/);
   });
 

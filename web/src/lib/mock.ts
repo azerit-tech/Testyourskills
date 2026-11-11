@@ -264,7 +264,7 @@ function buildLinkedinCard(id: string, job: MockJob | null, mg: MockGrids): Card
   return graded(asLinkedinCard({ ...base, id, lang: job?.lang ?? base.lang, linkedinUrl: url, findings: [mockLinkedinFinding(url)] }), mg.declaredGridMock("LinkedIn", url));
 }
 
-/** Le titre du serveur face à un GitHub « dossier vide » (data/statuses.json, comparison.codeUnproven) ; « CV » devient « LinkedIn » plus bas. */
+/** Le titre du serveur face à un GitHub « dossier vide » (shared/compareText.ts, ownHeadline) ; « CV » devient « LinkedIn » plus bas. */
 const CODE_UNPROVEN = {
   fr: "Code non prouvé : ton CV parle seul. Publie un vrai projet sur GitHub et on compare.",
   en: "Code not proven: your CV does all the talking. Publish one real project on GitHub and we'll compare.",
@@ -314,7 +314,7 @@ export const mockApi = {
    * les deux notes sous la carte, le lien vers une comparaison LinkedIn de démo.
    */
   async getShowcase(): Promise<Showcase> {
-    return { card: FIXTURES.jmougeot, href: `/c/${MOCK_SHOWCASE_ID}`, declared: { source: "linkedin", overall: 55 } };
+    return { card: FIXTURES.jmougeot, href: `/c/${MOCK_SHOWCASE_ID}`, declared: { source: "linkedin", overall: 55, case: 57 } };
   },
   async createCard(input: CreateInput): Promise<CreateResult> {
     await sleep(350);

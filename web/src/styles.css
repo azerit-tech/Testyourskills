@@ -730,6 +730,9 @@ button.cover-panel:focus-visible {
 .showcase-scores .is-github {
   color: var(--cream);
 }
+.showcase-scores .is-case {
+  color: var(--peach);
+}
 
 @media (min-width: 900px) {
   .home-top .cover {

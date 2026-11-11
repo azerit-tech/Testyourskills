@@ -74,8 +74,14 @@ export function ExampleCard({ card, href, declared }: Showcase) {
         <a href={href} onClick={(e) => onLinkClick(e, href)}>
           {t.home.exampleCaption}
         </a>
+        {/* La note du dossier d'abord, puis ses deux pièces (§18.37) : « Dossier 57 · LinkedIn 41 · GitHub 61 ». */}
         {declared && (
-          <a className="showcase-scores" href={href} onClick={(e) => onLinkClick(e, href)} aria-label={t.home.exampleScoresLabel(declared.overall, card.overall)}>
+          <a className="showcase-scores" href={href} onClick={(e) => onLinkClick(e, href)} aria-label={t.home.exampleScoresLabel(declared.case ?? null, declared.overall, card.overall)}>
+            {declared.case !== undefined && (
+              <>
+                {t.home.exampleCase} <b className="is-case">{declared.case}</b> ·{" "}
+              </>
+            )}
             LinkedIn <b className="is-linkedin">{declared.overall}</b> · GitHub <b className="is-github">{card.overall}</b>
           </a>
         )}
@@ -93,20 +99,10 @@ export function Home() {
   const nextRef = useRef<HTMLElement>(null);
   const showcase = useShowcase();
   const top = useTop();
-  // Sans entrée LinkedIn, la première phrase parle du CV. Optimiste, comme les portes du formulaire.
-  const [liOn, setLiOn] = useState(() => api.knownConfig()?.linkedinEntry ?? true);
 
   useEffect(() => {
     document.title = t.meta.title;
   }, [t]);
-
-  useEffect(() => {
-    let alive = true;
-    void api.getConfig().then((c) => alive && setLiOn(c.linkedinEntry));
-    return () => {
-      alive = false;
-    };
-  }, []);
 
   /** Une place libre, « Découvre le tien » : retour au champ du pseudo,
    * prêt à taper. Le focus se donne dans le geste, sinon l'iPhone n'ouvre pas le clavier. */
@@ -129,9 +125,9 @@ export function Home() {
       <div className="home-top">
         <Cover onPlay={play} top={top} founder={showcase} />
         <section className="hero">
-          {/* Deux phrases : ce que le profil déclare (crème), ce que le code dira (rose poudré). */}
+          {/* Deux phrases (shared/promise.ts) : la première en crème, la seconde en rose poudré. */}
           <h1 className="hero-title">
-            <span className="hero-title-claim">{liOn ? h.titleClaim : h.titleClaimCv}</span>{" "}
+            <span className="hero-title-claim">{h.titleClaim}</span>{" "}
             <span className="hero-title-proof">{h.titleProof}</span>
           </h1>
           {/* La promesse : sous la pilule sur téléphone, en colonne de droite sur ordinateur ;

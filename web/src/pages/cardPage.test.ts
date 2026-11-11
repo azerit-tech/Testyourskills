@@ -117,7 +117,7 @@ describe("après-fiche, vue par qui a fait la fiche (§18.27)", () => {
     const rows = [...rest.matchAll(/<details class="fold ([a-z- ]+)"( open="")?><summary class="fold-row"><span>([^<]+)<\/span><svg class="fold-chevron"/g)];
     // Fiche seule : « Pourquoi cette note » est au dos de la fiche, plus dans les lignes.
     expect(rows.map((r) => r[1])).toEqual(["add-source", "email", "contest"]);
-    expect(rows.map((r) => r[3])).toEqual(["Ajoute ton CV pour voir l&#x27;écart", "Recevoir ma fiche par email", "Contester"]);
+    expect(rows.map((r) => r[3])).toEqual(["Ajoute ton CV au dossier", "Recevoir ma fiche par email", "Contester"]);
     // toutes fermées au départ
     expect(rows.every((r) => !r[2])).toBe(true);
     // le contenu reste monté, fermé : le formulaire d'email est là
@@ -213,17 +213,17 @@ describe("comparaison GitHub contre CV ou LinkedIn", () => {
     expect(head).toContain(`@${FIXTURES.gold.login}`);
     expect(head).toContain(String(n));
     expect(head).not.toMatch(/\b(ton|ta|tes|toi)\b/i);
-    expect(html).toContain("Ce que son CV déclare");
-    expect(html).toContain("Ce que son GitHub prouve");
-    expect(html).not.toMatch(/Ce que ton (CV|GitHub|LinkedIn)/);
+    expect(html).toContain("Son parcours, lu sur son CV");
+    expect(html).toContain("Son code, lu sur GitHub");
+    expect(html).not.toMatch(/Ton (parcours|code), lu/);
   });
 
   it("visiteur, LinkedIn, en anglais : « their », jamais « your »", () => {
     const html = renderResult(cmp(FIXTURES.gold.login, "linkedin"), { owner: false, lang: "en-US" });
     const head = textOf(html, /<h2 class="cmp-headline[^"]*">.*?<\/h2>/);
     expect(head.replace(/&#x27;/g, "'")).toMatch(new RegExp(`^@${FIXTURES.gold.login}'s (LinkedIn|code) .* their `));
-    expect(html).toContain("What their LinkedIn claims");
-    expect(html).not.toMatch(/What your (CV|GitHub|LinkedIn)/);
+    expect(html).toContain("Their career, read on LinkedIn");
+    expect(html).not.toMatch(/Your (career|code), read/);
   });
 
   it("les chiffres d'un pseudo ne passent pas en couleur, seul l'écart", () => {
@@ -237,7 +237,7 @@ describe("comparaison GitHub contre CV ou LinkedIn", () => {
     const html = renderResult(cmp(), { owner: true });
     expect(html.match(/<h1/g)).toHaveLength(1);
     expect(textOf(html, /<h1 class="cmp-headline[^"]*">.*?<\/h1>/)).toBe(FIXTURE_COMPARISON.headline.fr);
-    expect(html).toContain("Ce que ton CV déclare");
+    expect(html).toContain("Ton parcours, lu sur ton CV");
   });
 });
 

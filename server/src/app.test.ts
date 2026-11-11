@@ -103,7 +103,7 @@ function setup(over: Partial<Deps> = {}, appOver: Partial<AppOptions> = {}) {
       const deltas = Object.fromEntries(
         cv.stats.map((s) => [s.code, github.stats.find((g) => g.code === s.code)!.value - s.value]),
       ) as Record<StatCode, number>;
-      return { cv, github, deltas, headline: { fr: "Ton CV a volé 7 points à ton code", en: "Your CV stole 7 points from your code" } };
+      return { cv, github, deltas, headline: { fr: "Ton CV annonce 7 points que ton code public ne montre pas encore.", en: "Your CV claims 7 points your public code doesn't show yet." } };
     },
     async renderImage(input) {
       calls.render.push(input.format + ":" + (input.card ? "card" : "comparison"));
@@ -466,7 +466,7 @@ describe("image d'aperçu de l'accueil (/og/home.png)", () => {
     const ctx = setup({}, { indexHtml: async () => INDEX });
     const { id } = await generate(ctx);
     const html = await (await ctx.app.request(`/c/${id}`)).text();
-    expect(html).toContain(`<meta property="og:image" content="https://skills.test/og/${id}.png?v=2">`);
+    expect(html).toContain(`<meta property="og:image" content="https://skills.test/og/${id}.png?v=3">`);
     expect(html).not.toContain("home.png");
     expect(count(html, /property="og:image"/g)).toBe(1);
   });
@@ -950,11 +950,13 @@ describe("page /c/:id et images", () => {
     expect(overall).toBeGreaterThanOrEqual(75);
     expect(html).toContain(`<meta property="og:title" content="@leamd est dans le viseur ★★★★★☆ · ${FIXTURES.gold.profile!.label.fr}">`);
     expect(html).toContain(`content="Fiche ★★★★★☆, ${overall}, fiche de dev de`);
-    expect(html).toContain(`<meta property="og:image" content="https://skills.test/og/${id}.png?v=2">`);
+    expect(html).toContain(`<meta property="og:image" content="https://skills.test/og/${id}.png?v=3">`);
     expect(html).toContain(`<meta property="og:url" content="https://skills.test/c/${id}">`);
     expect(html).toContain(`<meta property="og:image:width" content="1200">`);
     expect(html).toContain(`<meta name="twitter:card" content="summary_large_image">`);
-    expect(html).toMatch(/og:description" content="Chef d&#39;accusation : « Typage jusqu&#39;au bout »\. Interrogatoire par une IA : \d+ s\./);
+    // Une fiche sans grille dit son temps de lecture, par Azerit ; jamais « une IA t'interroge ».
+    expect(html).toMatch(/og:description" content="Chef d&#39;accusation : « Typage jusqu&#39;au bout »\. Dossier lu par Azerit en \d+ s\. Fais la tienne\./);
+    expect(html).not.toMatch(/Interrogatoire|une IA/);
   });
 
   it("injecte les balises dans le index.html du front", async () => {
@@ -975,7 +977,7 @@ describe("page /c/:id et images", () => {
     const html = await (await ctx.app.request(`/c/${json.id}`)).text();
     // Demandée en anglais (postCv envoie lang=en). À la troisième personne, d'après les notes des deux fiches :
     // l'aperçu est lu par qui n'a pas fait la fiche, jamais le « Your CV » du catalogue.
-    expect(html).toContain("<title>@leamd&#39;s code is worth 4 points more than their CV</title>");
+    expect(html).toContain("<title>@leamd&#39;s code shows more than their CV: 4 points</title>");
     expect(html).not.toContain("Your CV");
     expect(html).toContain('<meta property="og:locale" content="en_US">');
     expect(html).toContain(`/og/${json.id}.png`);

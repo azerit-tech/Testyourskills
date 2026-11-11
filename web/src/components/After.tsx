@@ -4,7 +4,9 @@ import type { FormEvent, ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { CardData, ComparisonData, Lang, WeekRank } from "../../../shared/types";
 import { declaredOf, STAT_CODES, starsFor } from "../../../shared/types";
+import { myVerdict } from "../../../shared/compareText";
 import { usableGrid } from "../../../shared/gridText";
+import { recruiterRead } from "../../../shared/recruiterLine";
 import { pick, useT } from "../i18n";
 import { api, hasGithub, images, isMine, isMock, tokens, weekOf } from "../lib/api";
 import { navigate } from "../lib/router";
@@ -127,10 +129,14 @@ export function shareInput(item: Shareable, lang: Lang, rank: string | null): Sh
   const plea = getPlea(idOf(item));
   if (item.kind === "card") {
     const c = item.card;
+    const graded = usableGrid(c.grid);
     return {
       kind: "card",
       stars: starsFor(c.overall),
       overall: c.overall,
+      graded,
+      // « Point fort : niveau du code, 8/10. » : la ligne du recruteur, jamais l'école.
+      strong: graded ? (recruiterRead(c, c.grid, lang)?.strong ?? null) : null,
       profile: c.profile ? pick(c.profile.label, lang) : null,
       // La trouvaille la plus forte (§18.26) prend la place du chef d'accusation.
       finding: c.findings?.[0] ? pick(c.findings[0].text, lang) : null,
@@ -143,14 +149,17 @@ export function shareInput(item: Shareable, lang: Lang, rank: string | null): Sh
   const cmp = item.comparison;
   // Le profil de la fiche GitHub : après la comparaison, c'est lui qui porte l'écart (Faussaire).
   const profile = cmp.github.profile ?? cmp.cv.profile;
+  // La note du dossier et ses étoiles en tête (§18.37) ; une comparaison d'avant la grille garde celles de la fiche GitHub.
+  const kase = usableGrid(cmp.grid) ? cmp.grid.overall : null;
   return {
     kind: "comparison",
-    stars: starsFor(cmp.github.overall),
+    stars: starsFor(kase ?? cmp.github.overall),
     src: declaredOf(cmp) === "linkedin" ? "LinkedIn" : "CV",
     declared: cmp.cv.overall,
     github: cmp.github.overall,
+    case: kase,
     profile: profile ? pick(profile.label, lang) : null,
-    headline: pick(cmp.headline, lang),
+    headline: myVerdict(cmp, lang),
     rank,
     plea,
   };

@@ -280,10 +280,10 @@ describe("aucune note par addition", () => {
     const g = githubGrid(gh(jacquesFacts(), JACQUES_AI));
     const flagged: Grid = { ...g, criteria: g.criteria.map((c) => ({ ...c, flags: [...c.flags, { fr: "Chef", en: "Charge" }] })) };
     expect(finalize(flagged.criteria).overall).toBe(g.overall);
-    // Senior sur parole : le chef sort, l'expérience reste celle des postes.
+    // Senior à confirmer : le chef sort, l'expérience reste celle des postes.
     const r = cvReading({ roles: [{ title: "Senior developer", company: "Acme", start: "2025-01", end: null, responsibilities: [] }] });
     const p = declaredGrid(decl(r));
-    expect(crit(p, "XP").flags[0].fr).toMatch(/^Senior sur parole/);
+    expect(crit(p, "XP").flags[0].fr).toMatch(/^Senior à confirmer/);
     expect(score(p, "XP")).toBe(3);
   });
 

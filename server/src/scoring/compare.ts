@@ -6,9 +6,8 @@ import type { CardData, ComparisonData, StatCode } from "../../../shared/types";
 import { STAT_CODES } from "../../../shared/types";
 import { valuesOf } from "./common";
 import { caseGrid } from "./grid";
-import { STATUSES } from "./config";
+import { ownHeadline } from "../../../shared/compareText";
 import { profileWithComparison, type ProfileCtx } from "./profiles";
-import { fillTemplate } from "./statuses";
 
 export function compareCards(cv: CardData, github: CardData): Omit<ComparisonData, "id" | "createdAt"> {
   const value = (c: CardData, code: StatCode) => c.stats.find((s) => s.code === code)?.value ?? 0;
@@ -19,12 +18,9 @@ export function compareCards(cv: CardData, github: CardData): Omit<ComparisonDat
   // n'a pas de « non comparable », le front le lit sur `github.grid.rule`).
   const githubEmpty = github.grid?.rule === "empty_file";
   const deltas = Object.fromEntries(STAT_CODES.map((c) => [c, githubEmpty ? 0 : value(github, c) - value(cv, c)])) as Record<StatCode, number>;
-  const n = cv.overall - github.overall;
-  const tpl = n > 0 ? STATUSES.comparison.cvAhead : n < 0 ? STATUSES.comparison.codeAhead : STATUSES.comparison.even;
-  const vars = { n: Math.abs(n) };
-  const headline = githubEmpty
-    ? { ...STATUSES.comparison.codeUnproven }
-    : { fr: fillTemplate(tpl.fr, vars, "fr")!, en: fillTemplate(tpl.en, vars, "en")! };
+  // Le titre de l'écart : la formulation du site (shared/compareText.ts), écrite pour un CV ;
+  // une comparaison LinkedIn le réécrit à la sortie (shared/linkedinText.ts). Le front le recalcule.
+  const headline = { fr: ownHeadline({ cv, github }, "fr"), en: ownHeadline({ cv, github }, "en") };
   const comparison: ProfileCtx["comparison"] = { cvOverall: cv.overall, githubOverall: github.overall, cvBuzz: value(cv, "BUZZ"), ...(githubEmpty ? { githubEmpty } : {}) };
   const withProfile = (c: CardData): CardData => {
     const profile = profileWithComparison(c.profile, { stats: valuesOf(c.stats), comparison });

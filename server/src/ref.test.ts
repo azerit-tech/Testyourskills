@@ -73,7 +73,7 @@ function setup() {
     },
     compareCards(cv, github) {
       const deltas = Object.fromEntries(cv.stats.map((s) => [s.code, 0])) as Record<StatCode, number>;
-      return { cv, github, deltas, headline: { fr: "Ton CV a volé 7 points à ton code", en: "Your CV stole 7 points from your code" } };
+      return { cv, github, deltas, headline: { fr: "Ton CV annonce 7 points que ton code public ne montre pas encore.", en: "Your CV claims 7 points your public code doesn't show yet." } };
     },
     async renderImage() {
       return new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
@@ -108,7 +108,7 @@ describe("page /c/:id avec ?r=", () => {
     expect(html).toBe(await plain.text());
     expect(html).toContain(`<meta property="og:url" content="https://skills.test/c/${id}">`);
     expect(html).toContain(`<link rel="canonical" href="https://skills.test/c/${id}">`);
-    expect(html).toContain(`<meta property="og:image" content="https://skills.test/og/${id}.png?v=2">`);
+    expect(html).toContain(`<meta property="og:image" content="https://skills.test/og/${id}.png?v=3">`);
     expect(html).not.toContain("?r=");
     expect(withRef.headers.get("cache-control")).toBe(plain.headers.get("cache-control"));
   });

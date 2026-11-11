@@ -20,6 +20,10 @@ interface Common {
 export interface CardShare extends Common {
   kind: "card";
   overall: number;
+  /** La note vient de la grille de recrutement (§18.37) : le texte le dit dès la première ligne. */
+  graded?: boolean;
+  /** « Point fort : niveau du code, 8/10. » (shared/recruiterLine.ts), ou null. */
+  strong?: string | null;
   /** La trouvaille la plus forte (§18.26) : elle prend la place du chef d'accusation. */
   finding: string | null;
   /** Le chef d'accusation, à défaut de trouvaille. */
@@ -33,8 +37,10 @@ export interface ComparisonShare extends Common {
   src: string;
   declared: number;
   github: number;
-  /** Le titre de l'écart. */
+  /** Le titre de l'écart, à la première personne (shared/compareText.ts, myVerdict). */
   headline: string;
+  /** La note du dossier (§18.37) ; null pour une comparaison d'avant la grille, qui s'ouvre sur ses deux notes. */
+  case?: number | null;
 }
 
 export type ShareInput = CardShare | ComparisonShare;
@@ -74,11 +80,16 @@ function build(w: ShareWords, x: ShareInput, cut: Cut): string {
     // La trouvaille part d'abord : remplacée par le chef d'accusation, plus court, puis retirée.
     const detail = cut === 0 ? (x.finding ?? (x.status ? w.charge(x.status) : null)) : cut === 1 && x.finding && x.status ? w.charge(x.status) : null;
     const tail = `${cut < 5 && x.profile ? ` · ${x.profile}` : ""}${cut < 4 && x.rank ? ` · ${x.rank}` : ""}.`;
-    parts.push((stars ? w.sheet(stars, x.overall) : w.score(x.overall)) + tail, detail, cut < 3 ? w.ai(x.secs) : null);
+    // Fiche notée par la grille (§18.37) : « Mon dossier, passé à la grille de recrutement d'Azerit : ★★★★☆☆, 61. Point fort : … ».
+    const head = x.graded ? w.file(stars, x.overall) : stars ? w.sheet(stars, x.overall) : w.score(x.overall);
+    parts.push(head + tail, cut < 3 && x.graded ? (x.strong ?? null) : null, detail, cut < 3 && !x.graded ? w.ai(x.secs) : null);
   } else {
     // Pas de trouvaille dans une comparaison (§18.26) : le rang part d'abord, puis le profil, puis le titre de l'écart.
     const tail = `${cut < 2 && x.profile ? ` · ${x.profile}` : ""}${cut < 1 && x.rank ? ` · ${x.rank}` : ""}.`;
-    parts.push(w.compare(x.src, x.declared, x.github, stars) + tail, cut < 3 ? `${x.headline}.` : null);
+    const verdict = cut < 3 ? `${x.headline.replace(/\.$/, "")}.` : null;
+    // La note du dossier en tête, puis ses deux pièces ; une comparaison d'avant la grille garde ses deux notes.
+    if (x.case != null) parts.push(w.file(stars, x.case) + tail, w.pieces(x.src, x.declared, x.github), verdict);
+    else parts.push(w.compare(x.src, x.declared, x.github, stars) + tail, verdict);
   }
   parts.push(w.cta);
   const body = parts.filter(Boolean).join(" ");

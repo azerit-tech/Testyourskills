@@ -3,10 +3,12 @@
 // navigateur charge le front SPA qui affiche la carte.
 
 import { declaredLabel, theirHeadline } from "../../shared/compareText";
+import { usableGrid } from "../../shared/gridText";
 import { IMAGE_QUERY } from "../../shared/images";
+import { HOME_PROMISE, homeTitle, promiseTitle } from "../../shared/promise";
 import { starsLine } from "../../shared/stars";
 import type { CardData, ComparisonData, Lang, Special } from "../../shared/types";
-import { declaredOf, LEVEL_LABELS, starsFor } from "../../shared/types";
+import { LEVEL_LABELS, starsFor } from "../../shared/types";
 
 export interface PageMeta {
   lang: Lang;
@@ -55,20 +57,18 @@ export function metaFor(data: CardData | ComparisonData, baseUrl: string): PageM
     // (shared/compareText.ts, comme le visiteur de la page). À égalité, le titre du catalogue
     // ne s'adresse à personne, et le nom le suit.
     const who = data.github.login ? `@${data.github.login}` : name;
-    const title = theirHeadline(data, lang, who) ?? `${data.headline[lang]} — ${who}`;
-    // LinkedIn contre GitHub (§18.24) : « LinkedIn » partout où une comparaison dirait « CV ».
-    const li = declaredOf(data) === "linkedin";
+    const title = theirHeadline(data, lang, who);
+    // LinkedIn et GitHub (§18.24) : « LinkedIn » partout où une comparaison dirait « CV ». Deux pièces d'un même dossier.
     const src = declaredLabel(data);
-    const the = li ? "LinkedIn" : fr ? "le CV" : "the CV";
     return {
       lang,
       url,
       image,
       title,
       description: fr
-        ? `${src} : ${cardLabel(data.cv, lang)}. GitHub : ${cardLabel(data.github, lang)}. Le butin : ce que ${the} déclare contre ce que le code prouve. Fais la tienne.`
-        : `${src}: ${cardLabel(data.cv, lang)}. GitHub: ${cardLabel(data.github, lang)}. The loot: what ${the} claims vs what the code proves. Make yours.`,
-      imageAlt: fr ? `Fiche ${src} contre fiche GitHub de ${name}` : `${name}'s ${src} sheet vs GitHub sheet`,
+        ? `${src} : ${cardLabel(data.cv, lang)}. GitHub : ${cardLabel(data.github, lang)}. Deux pièces au même dossier, lues sur huit critères de recrutement. Fais la tienne.`
+        : `${src}: ${cardLabel(data.cv, lang)}. GitHub: ${cardLabel(data.github, lang)}. Two exhibits in one file, read on eight hiring criteria. Make yours.`,
+      imageAlt: fr ? `Fiche ${src} et fiche GitHub de ${name}` : `${name}'s ${src} sheet and GitHub sheet`,
     };
   }
 
@@ -82,11 +82,16 @@ export function metaFor(data: CardData | ComparisonData, baseUrl: string): PageM
   const tag = data.profile ? data.profile.label[lang] : LEVEL_LABELS[n][lang];
   const title = `${who} ${fr ? "est dans le viseur" : "is in the crosshairs"} ${starsLine(n)} · ${tag}`;
   const status = data.statuses[0]?.label[lang];
+  // Ce qu'est la note : une grille de recrutement (§18.37) ; une fiche d'avant la grille dit son temps de lecture.
   const parts = [
     status ? (fr ? `Chef d'accusation : « ${status} ».` : `Charge: "${status}".`) : "",
-    // Épicène (§2.4) : « interrogé » s'accordait avec la personne.
-    fr ? `Interrogatoire par une IA : ${data.judgedInSeconds} s.` : `Interrogated by an AI for ${data.judgedInSeconds}s.`,
-    fr ? "Fais la tienne." : "Make yours.",
+    usableGrid(data.grid)
+      ? fr
+        ? "Dossier lu sur huit critères de recrutement, chacun avec sa preuve. Fais la tienne."
+        : "File read on eight hiring criteria, each with its proof. Make yours."
+      : fr
+        ? `Dossier lu par Azerit en ${data.judgedInSeconds} s. Fais la tienne.`
+        : `File read by Azerit in ${data.judgedInSeconds}s. Make yours.`,
   ].filter(Boolean);
   return {
     lang,
@@ -98,18 +103,19 @@ export function metaFor(data: CardData | ComparisonData, baseUrl: string): PageM
   };
 }
 
+/** Les balises de l'accueil et des pages sans fiche : le titre et la description de shared/promise.ts. */
 export function genericMeta(baseUrl: string, path: string, lang: Lang = "fr"): PageMeta {
-  const fr = lang === "fr";
   return {
     lang,
     url: `${baseUrl}${path}`,
-    title: fr ? "Testyourskills · Ton LinkedIn dit senior. Ton GitHub, on va voir." : "Testyourskills · Your LinkedIn says senior. Your GitHub? We'll see.",
-    description: fr
-      ? "Ton LinkedIn, puis ton GitHub : une IA t'interroge en dix secondes. Étoiles de recherche et chefs d'accusation. Ce que ton LinkedIn déclare contre ce que ton code prouve. Par Azerit."
-      : "Your LinkedIn, then your GitHub: an AI interrogates you in ten seconds. Wanted stars and charges. What your LinkedIn claims vs what your code proves. By Azerit.",
-    imageAlt: "Testyourskills",
+    title: homeTitle(lang),
+    description: HOME_PROMISE[lang].description,
+    imageAlt: homeImageAlt(lang),
   };
 }
+
+/** Le texte de l'image de l'accueil : « Testyourskills : Azerit ouvre ton dossier. Tu plaides quoi ? » */
+export const homeImageAlt = (lang: Lang = "fr"): string => `Testyourskills : ${promiseTitle(lang)}`;
 
 /** L'image de l'accueil (la promesse et la fiche de la vitrine), à cette adresse stable. */
 export const HOME_IMAGE_PATH = "/og/home.png";
@@ -127,7 +133,7 @@ export function injectHomeImage(template: string, baseUrl: string): string {
     `<meta property="og:image:type" content="image/png">`,
     `<meta property="og:image:width" content="1200">`,
     `<meta property="og:image:height" content="630">`,
-    `<meta property="og:image:alt" content="${e("Testyourskills : ton LinkedIn dit senior, ton GitHub, on va voir")}">`,
+    `<meta property="og:image:alt" content="${e(homeImageAlt())}">`,
     `<meta name="twitter:image" content="${e(image)}">`,
   ].join("\n    ");
   const cleaned = template.replace(/<meta\s+(?:property|name)=["'](?:og:image(?::[a-z_]+)?|twitter:image)["'][^>]*>\s*/gi, "");

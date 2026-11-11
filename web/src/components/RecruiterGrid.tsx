@@ -99,7 +99,7 @@ function Row({ c, grid, declared, shared, columns, skipFlags }: RowProps) {
             {columns && <span className="rg-kept">{c.score === null ? g.compare.noneLabel : keptFrom(c, g, declared)}</span>}
             {tags.map((tag) => (
               <span key={tag} className={`rg-tag tag-${tag}`}>
-                {g.tags[tag]}
+                {(shared ? g.tagsThem : g.tags)[tag]}
               </span>
             ))}
           </span>
@@ -250,6 +250,9 @@ export function RecruiterGrid({ item, shared, who }: Props) {
   const columns = item.kind === "comparison" && hasColumns(grid);
   const byCode = new Map(grid.criteria.map((c) => [c.code, c]));
   const method = shared ? g.methodThem : g.method;
+  // Ce que la fiche a lu : le parcours (LinkedIn ou CV) et le code (GitHub).
+  const career = item.kind === "comparison" ? declaredOf(item.comparison) : item.card.source === "github" ? null : declaredOf(item.card);
+  const code = item.kind === "comparison" || item.card.source === "github";
   // La note du dossier face à un GitHub « dossier vide » : le code n'est pas prouvé (§18.37).
   const unproven =
     item.kind === "comparison" && item.comparison.github.grid?.rule === "empty_file" ? { src: declared === "cv" ? g.source.cv : g.source.linkedin, shared } : undefined;
@@ -257,10 +260,11 @@ export function RecruiterGrid({ item, shared, who }: Props) {
   return (
     <section className="after-block rg" id="grille" aria-labelledby="rg-title">
       <h2 id="rg-title">{shared ? g.titleThem(who) : g.title}</h2>
+      {/* Les pièces lues : une fiche GitHub seule n'a pas lu de LinkedIn, une fiche LinkedIn seule pas de code. */}
       <ol className="rg-method">
-        <li>{declared === "cv" ? method.cv : method.linkedin}</li>
-        <li>{method.code}</li>
-        <li>{method.check}</li>
+        <li>{career ? method[career] : method.noCareer}</li>
+        <li>{code ? method.code : method.noCode}</li>
+        <li>{career && code ? method.check : method.piece}</li>
       </ol>
       {columns && <CrossChecks grid={grid} declared={declared} />}
       <ol className={`rg-list${columns ? " has-cols" : ""}`} aria-label={g.criteriaLabel}>

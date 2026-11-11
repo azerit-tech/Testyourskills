@@ -3,6 +3,7 @@ import profilesJson from "../data/profiles.json";
 import sentencesJson from "../data/sentences.json";
 import type { CardData, CardProfile, CardSentence, ComparisonData, Fact, Stat, StatCode, StatusInstance } from "./types";
 import { STAT_CODES, tierFor } from "./types";
+import { ownHeadline } from "./compareText";
 
 /** Profil du catalogue (data/profiles.json), choisi à la main pour la maquette. */
 function profile(id: string): CardProfile {
@@ -120,16 +121,12 @@ export const FIXTURE_COMPARISON: ComparisonData = (() => {
   const deltas = Object.fromEntries(
     STAT_CODES.map((c) => [c, github.stats.find((s) => s.code === c)!.value - cv.stats.find((s) => s.code === c)!.value]),
   ) as Record<StatCode, number>;
-  const n = cv.overall - github.overall;
   return {
     id: "cmp-demo",
     createdAt: "2026-10-14T12:00:00Z",
     cv,
     github,
     deltas,
-    headline:
-      n > 0
-        ? { fr: `Ton CV a volé ${n} points à ton code`, en: `Your CV stole ${n} points from your code` }
-        : { fr: `Ton code vaut ${-n} points de plus que ton CV. Change de CV.`, en: `Your code is worth ${-n} points more than your CV. Rewrite the CV.` },
+    headline: { fr: ownHeadline({ cv, github }, "fr"), en: ownHeadline({ cv, github }, "en") },
   };
 })();

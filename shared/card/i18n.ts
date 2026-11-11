@@ -6,8 +6,8 @@ const NBSP = " ";
 export const STRINGS = {
   fr: {
     loneWolf: "Sans bande",
-    /** Pied : « Interrogatoire par une IA : 9 s · preuves 34 % ». Épicène (§2.4) : rien ne s'accorde avec la personne. */
-    questioned: (s: number) => `Interrogatoire par une IA${NBSP}: ${s}${NBSP}s`,
+    /** Pied : « Dossier lu par Azerit en 9 s · preuves 34 % ». Épicène (§2.4) : rien ne s'accorde avec la personne. */
+    questioned: (s: number) => `Dossier lu par Azerit en ${s}${NBSP}s`,
     evidence: "preuves",
     percent: (n: number) => `${n}${NBSP}%`,
     ai: "IA",
@@ -26,13 +26,14 @@ export const STRINGS = {
     poster: "Avis de recherche",
     card: "Fiche",
     stars: (n: number) => `${n} étoile${n > 1 ? "s" : ""} sur 6`,
-    cvSide: "Ce que ton CV déclare",
-    linkedinSide: "Ce que ton LinkedIn déclare",
-    githubSide: "Ce que ton GitHub prouve",
+    /** Les deux pièces d'un même dossier (comparaison) : jamais l'une « contre » l'autre. */
+    cvSide: "Ton parcours, lu sur ton CV",
+    linkedinSide: "Ton parcours, lu sur LinkedIn",
+    githubSide: "Ton code, lu sur GitHub",
     overall: "Note",
     positions: {
       FS: "Full-stack", BE: "Backend", FE: "Frontend", MOB: "Mobile", DATA: "Data", ML: "Machine learning",
-      OPS: "Ops", SEC: "Sécurité", EMB: "Embarqué", PM: "Produit", DESIGN: "Design", CTO: "CTO sur parole",
+      OPS: "Ops", SEC: "Sécurité", EMB: "Embarqué", PM: "Produit", DESIGN: "Design", CTO: "CTO",
     } as Record<string, string>,
     /** Dos de la fiche (§18.27) : chaque axe, son fait le plus fort, puis la formule. */
     back: {
@@ -55,7 +56,7 @@ export const STRINGS = {
   },
   en: {
     loneWolf: "Lone wolf",
-    questioned: (s: number) => `Questioned by an AI for ${s}${NBSP}s`,
+    questioned: (s: number) => `File read by Azerit in ${s}${NBSP}s`,
     evidence: "evidence",
     percent: (n: number) => `${n}%`,
     ai: "AI",
@@ -73,13 +74,13 @@ export const STRINGS = {
     poster: "Wanted",
     card: "Sheet",
     stars: (n: number) => `${n} star${n > 1 ? "s" : ""} out of 6`,
-    cvSide: "What your CV claims",
-    linkedinSide: "What your LinkedIn claims",
-    githubSide: "What your GitHub proves",
+    cvSide: "Your career, read on your CV",
+    linkedinSide: "Your career, read on LinkedIn",
+    githubSide: "Your code, read on GitHub",
     overall: "Rating",
     positions: {
       FS: "Full-stack", BE: "Backend", FE: "Frontend", MOB: "Mobile", DATA: "Data", ML: "Machine learning",
-      OPS: "Ops", SEC: "Security", EMB: "Embedded", PM: "Product", DESIGN: "Design", CTO: "Self-styled CTO",
+      OPS: "Ops", SEC: "Security", EMB: "Embedded", PM: "Product", DESIGN: "Design", CTO: "CTO",
     } as Record<string, string>,
     back: {
       title: "Exhibits",

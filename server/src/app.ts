@@ -285,7 +285,7 @@ export function createApp(opts: AppOptions) {
     return c.json({
       card: showcaseCard(row),
       href: `/c/${row.id}`,
-      ...(cmp ? { declared: { source: "linkedin", overall: cmp.cv.overall } } : {}),
+      ...(cmp ? { declared: { source: "linkedin", overall: cmp.cv.overall, ...(cmp.grid ? { case: cmp.grid.overall } : {}) } } : {}),
     });
   });
 

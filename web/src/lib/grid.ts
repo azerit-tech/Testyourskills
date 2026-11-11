@@ -92,7 +92,7 @@ export function schoolRank(text: string): string | null {
   return /\b(?:rang|tier) ([SABC])\b/.exec(text)?.[1] ?? null;
 }
 
-/** Un chef d'accusation réduit à son nom (« Senior sur parole : « Lead dev », 1,1 an » → « Senior sur parole »). */
+/** Un chef d'accusation réduit à son nom (« Senior à confirmer : « Lead dev », 1,1 an » → « Senior à confirmer »). */
 export function flagName(text: string): string {
   const i = text.search(/\s?:\s/);
   return (i > 0 ? text.slice(0, i) : text).trim();

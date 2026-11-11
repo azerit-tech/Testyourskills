@@ -367,7 +367,7 @@ export function eduDeclared(d: DeclaredInput): Draft {
     return missing(
       "EDU",
       "linkedin",
-      f("Ni école de tech, ni sélection citée : sans objet, hors moyenne.", "No tech school, no selection on file: not applicable, left out of the average."),
+      f("Ni école de tech, ni sélection citée : le critère ne fait pas baisser la note.", "No tech school, no selection on file: the criterion doesn't lower the rating."),
     );
   const name = r.school_name.trim();
   const schoolFact = schoolScore !== null ? f(`${name}, rang ${school.tier}.`, `${name}, tier ${school.tier}.`) : null;
@@ -391,7 +391,7 @@ export function eduDeclared(d: DeclaredInput): Draft {
 export function eduGithub(g: GithubInput): Draft {
   const hit = g.facts.repos.find((r) => EDU_GITHUB_RE.test(norm([r.name.replace(/[-_]/g, " "), r.description ?? "", ...r.topics].join(" "))));
   if (!hit)
-    return missing("EDU", "github", f("L'école se lit sur LinkedIn ou le CV : sans objet ici.", "School is read on LinkedIn or the CV: not applicable here."));
+    return missing("EDU", "github", f("L'école se lit sur LinkedIn ou le CV : pas encore au dossier.", "School is read on LinkedIn or the CV: not on file yet."));
   return crit("EDU", {
     score: GRID.EDU.githubScore,
     state: "scored",
@@ -417,13 +417,13 @@ export function xpDeclared(d: DeclaredInput): Draft {
   const proof = d.url ? { proof: d.url } : {};
   const src = d.label;
 
-  // Senior sur parole : l'intitulé d'un poste en cours (ou du plus récent) dit senior, lead, staff ou head, avec moins de 4 ans comptés.
+  // Senior à confirmer : l'intitulé d'un poste en cours (ou du plus récent) dit senior, lead, staff ou head, avec moins de 4 ans comptés.
   const flagsFor = (y: number): Fact[] => {
     const current = infos.filter((r) => r.kind === "full" && r.role.end === null);
     const latest = [...infos].filter((r) => r.kind === "full").sort((a, b) => (b.start ?? -1) - (a.start ?? -1))[0];
     const titled = [...current, ...(latest ? [latest] : [])].find((r) => SENIOR_RE.test(norm(r.role.title)));
     return titled && y < GRID.XP.seniorOnPaperBelowYears
-      ? [f(`Senior sur parole : « ${titled.role.title} », ${years(y).fr} ${counted(y)}.`, `Senior on paper: "${titled.role.title}", ${years(y).en} counted.`)]
+      ? [f(`Senior à confirmer : « ${titled.role.title} », ${years(y).fr} ${counted(y)}.`, `Senior, to confirm: "${titled.role.title}", ${years(y).en} counted.`)]
       : [];
   };
 
@@ -1454,7 +1454,7 @@ export function githubGrid(g: GithubInput): Grid {
   return finalize([
     eduGithub(g),
     xpGithub(g),
-    missing("EMP", "github", f("Le parcours se lit sur LinkedIn ou le CV : sans objet ici.", "Career path is read on LinkedIn or the CV: not applicable here.")),
+    missing("EMP", "github", f("Le parcours se lit sur LinkedIn ou le CV : pas encore au dossier.", "Career path is read on LinkedIn or the CV: not on file yet.")),
     stkGithub(g),
     codeGithub(g),
     actGithub(g),

@@ -377,7 +377,8 @@ function track(event: AnalyticsEvent, cardId: string | null, meta: Record<string
 export interface Showcase {
   card: CardData;
   href: string;
-  declared?: { source: "linkedin"; overall: number };
+  /** `case` : la note du dossier (§18.37), absente d'une comparaison d'avant la grille. */
+  declared?: { source: "linkedin"; overall: number; case?: number };
 }
 
 /** La vitrine de l'accueil ; null tant que le serveur ne l'a pas calculée. */
@@ -387,7 +388,11 @@ async function getShowcase(): Promise<Showcase | null> {
   if (!res.ok) return null;
   const body = (await res.json()) as Partial<Showcase> & { card?: CardData | null };
   if (!body.card) return null;
-  const declared = body.declared?.source === "linkedin" && Number.isFinite(body.declared.overall) ? body.declared : undefined;
+  const d = body.declared;
+  const declared =
+    d?.source === "linkedin" && Number.isFinite(d.overall)
+      ? { source: d.source, overall: d.overall, ...(Number.isFinite(d.case) ? { case: d.case } : {}) }
+      : undefined;
   return { card: body.card, href: body.href ?? `/c/${body.card.id}`, ...(declared ? { declared } : {}) };
 }
 

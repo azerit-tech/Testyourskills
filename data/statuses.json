@@ -102,7 +102,7 @@
 
     {
       "id": "cv_senior_from_cv", "source": "cv", "tone": "gap", "rule": "senior_from_cv", "params": { "minGapYears": 3 },
-      "label": { "fr": "Senior depuis le CV", "en": "Senior since the CV" },
+      "label": { "fr": "Senior, à prouver", "en": "Senior, yet to prove" },
       "ruleText": { "fr": "{n} ans déclarés, {m} sur GitHub (écart de {t} ans ou plus).", "en": "{n} years claimed, {m} on GitHub (gap of {t}+ years)." }
     },
     {
@@ -122,7 +122,7 @@
     },
     {
       "id": "cv_expert_frameworks", "source": "cv", "tone": "negative", "rule": "many_technos_listed", "params": { "atLeast": 12 },
-      "label": { "fr": "{n} frameworks maîtrisés (d'après le CV)", "en": "Expert in {n} frameworks (per the CV)" },
+      "label": { "fr": "{n} technos listées, à prouver", "en": "{n} technologies listed, yet to prove" },
       "ruleText": { "fr": "{n} technos listées (seuil {t}).", "en": "{n} technologies listed (threshold {t})." }
     },
     {
@@ -181,13 +181,7 @@
     {
       "id": "fallback_clean_record", "source": "fallback", "tone": "positive", "rule": "fallback", "params": {},
       "label": { "fr": "Casier vierge", "en": "Clean record" },
-      "ruleText": { "fr": "Aucune règle ne s'est déclenchée. Suspect.", "en": "No rule fired. Suspicious." }
+      "ruleText": { "fr": "Aucune règle ne s'est déclenchée.", "en": "No rule fired." }
     }
-  ],
-  "comparison": {
-    "cvAhead": { "fr": "Ton CV a volé {n} points à ton code", "en": "Your CV stole {n} points from your code" },
-    "codeAhead": { "fr": "Ton code vaut {n} points de plus que ton CV. Change de CV.", "en": "Your code is worth {n} points more than your CV. Rewrite the CV." },
-    "even": { "fr": "CV et code à égalité. Rare, donc suspect.", "en": "CV and code are dead even. Rare, so suspicious." },
-    "codeUnproven": { "fr": "Code non prouvé : ton CV parle seul. Publie un vrai projet sur GitHub et on compare.", "en": "Code not proven: your CV does all the talking. Publish one real project on GitHub and we'll compare." }
-  }
+  ]
 }

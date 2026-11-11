@@ -1,9 +1,12 @@
 // Aperçus de lien d'une comparaison : lus par qui n'a pas fait la fiche, donc à la troisième personne.
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { FIXTURE_COMPARISON } from "../../shared/fixtures";
+import { HOME_PROMISE, homeTitle, promiseTitle } from "../../shared/promise";
 import type { ComparisonData } from "../../shared/types";
-import { metaFor } from "./html";
+import { genericMeta, homeImageAlt, injectHomeImage, metaFor } from "./html";
 
 /** Une comparaison où la fiche déclarative a `cv` points et la fiche GitHub `gh`. */
 function cmp(cv: number, gh: number, over: Partial<ComparisonData> = {}): ComparisonData {
@@ -11,7 +14,7 @@ function cmp(cv: number, gh: number, over: Partial<ComparisonData> = {}): Compar
     ...FIXTURE_COMPARISON,
     cv: { ...FIXTURE_COMPARISON.cv, overall: cv, lang: "fr" },
     github: { ...FIXTURE_COMPARISON.github, overall: gh, login: "lea" },
-    headline: { fr: "CV et code à égalité. Rare, donc suspect.", en: "CV and code are dead even. Rare, so suspicious." },
+    headline: { fr: "(titre rangé, jamais relu)", en: "(stored headline, never read)" },
     ...over,
   };
 }
@@ -22,25 +25,33 @@ function emptyGh(c: ComparisonData): ComparisonData {
 }
 
 describe("aperçu de lien d'une comparaison", () => {
-  it("LinkedIn devant : « Le LinkedIn de @lea a volé 21 points à son code »", () => {
-    expect(metaFor(cmp(80, 59, { declaredSource: "linkedin" }), "https://s.test").title).toBe("Le LinkedIn de @lea a volé 21 points à son code");
+  it("LinkedIn devant : « Le LinkedIn de @lea annonce 21 points que son code public ne montre pas encore »", () => {
+    expect(metaFor(cmp(80, 59, { declaredSource: "linkedin" }), "https://s.test").title).toBe("Le LinkedIn de @lea annonce 21 points que son code public ne montre pas encore");
   });
 
-  it("le code devant : « Le code de @lea vaut 12 points de plus que son CV »", () => {
-    expect(metaFor(cmp(60, 72), "https://s.test").title).toBe("Le code de @lea vaut 12 points de plus que son CV");
+  it("le code devant : « Le code de @lea en montre plus que son CV : 12 points »", () => {
+    expect(metaFor(cmp(60, 72), "https://s.test").title).toBe("Le code de @lea en montre plus que son CV : 12 points");
   });
 
   it("en anglais, et au singulier", () => {
     const en = (c: ComparisonData) => ({ ...c, cv: { ...c.cv, lang: "en" as const } });
-    expect(metaFor(en(cmp(80, 59, { declaredSource: "linkedin" })), "https://s.test").title).toBe("@lea's LinkedIn stole 21 points from their code");
-    expect(metaFor(en(cmp(60, 61)), "https://s.test").title).toBe("@lea's code is worth 1 point more than their CV");
+    expect(metaFor(en(cmp(80, 59, { declaredSource: "linkedin" })), "https://s.test").title).toBe("@lea's LinkedIn claims 21 points their public code doesn't show yet");
+    expect(metaFor(en(cmp(60, 61)), "https://s.test").title).toBe("@lea's code shows more than their CV: 1 point");
   });
 
-  it("sans pseudo, le nom ; à égalité, le titre du catalogue et qui il concerne", () => {
+  it("sans pseudo, le nom ; à égalité, les deux pièces d'accord ; jamais le titre rangé", () => {
     const anon = cmp(60, 72);
     anon.github = { ...anon.github, login: undefined };
-    expect(metaFor(anon, "https://s.test").title).toBe(`Le code de ${anon.github.name} vaut 12 points de plus que son CV`);
-    expect(metaFor(cmp(70, 70), "https://s.test").title).toBe("CV et code à égalité. Rare, donc suspect. — @lea");
+    expect(metaFor(anon, "https://s.test").title).toBe(`Le code de ${anon.github.name} en montre plus que son CV : 12 points`);
+    expect(metaFor(cmp(70, 70), "https://s.test").title).toBe("Le CV et le code de @lea sont d'accord");
+  });
+
+  it("jamais un mot qui accuse : ni vol, ni suspect, ni « contre »", () => {
+    for (const c of [cmp(80, 59), cmp(60, 72), cmp(70, 70), cmp(80, 59, { declaredSource: "linkedin" })])
+      for (const lang of ["fr", "en"] as const) {
+        const m = metaFor({ ...c, cv: { ...c.cv, lang } }, "https://s.test");
+        expect(`${m.title} ${m.description}`).not.toMatch(/\bvol|stole|suspect|butin|loot|\bcontre\b|\bvs\b|against/i);
+      }
   });
 
   it("ne tutoie jamais le lecteur", () => {
@@ -55,5 +66,31 @@ describe("aperçu de lien d'une comparaison", () => {
     en.cv = { ...en.cv, lang: "en" };
     expect(metaFor(en, "https://s.test").title).toBe("@lea's code is still unproven: their CV does all the talking");
     for (const t of [fr, metaFor(en, "https://s.test").title]) expect(t).not.toMatch(/\d|\bvol|stole/);
+  });
+});
+
+describe("le titre de l'accueil, en un seul endroit (shared/promise.ts)", () => {
+  const INDEX = readFileSync(join(__dirname, "../../web/index.html"), "utf8");
+
+  it("web/index.html, la seule copie à la main, porte le même titre, la même description et le même texte d'image", () => {
+    expect(INDEX).toContain(`<title>${homeTitle("fr")}</title>`);
+    expect(INDEX).toContain(`<meta property="og:title" content="${homeTitle("fr")}" />`);
+    expect(INDEX.match(new RegExp(`content="${HOME_PROMISE.fr.description}"`, "g"))).toHaveLength(2);
+    expect(INDEX).toContain(`<meta property="og:image:alt" content="${homeImageAlt("fr")}" />`);
+  });
+
+  it("les balises des pages sans fiche et le texte de l'image de l'accueil viennent de la même source", () => {
+    for (const lang of ["fr", "en"] as const) {
+      const m = genericMeta("https://s.test", "/", lang);
+      expect(m.title).toBe(`Testyourskills · ${promiseTitle(lang)}`);
+      expect(m.description).toBe(HOME_PROMISE[lang].description);
+    }
+    expect(promiseTitle("fr")).toBe("Azerit ouvre ton dossier. Tu plaides quoi ?");
+    expect(promiseTitle("en")).toBe("Azerit opens your file. How do you plead?");
+    expect(injectHomeImage("<html><head></head></html>", "https://s.test")).toContain(`content="${homeImageAlt()}"`);
+  });
+
+  it("la description dit la méthode, sans opposer le profil et le code", () => {
+    for (const lang of ["fr", "en"] as const) expect(`${promiseTitle(lang)} ${HOME_PROMISE[lang].description}`).not.toMatch(/\bcontre\b|\bvs\b|against|IA t'interroge|\bAI\b/i);
   });
 });

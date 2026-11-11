@@ -28,17 +28,23 @@ describe("l'état d'un critère, en étiquettes lisibles sans la couleur", () =>
     expect(stateTags(crit("CODE", 7))).toEqual([]);
   });
 
-  it("déclaré, non prouvé", () => {
+  it("déclaré, à confirmer", () => {
     const tags = stateTags(crit("STK", 6, { state: "declared", source: "linkedin" }));
     expect(tags).toEqual(["declared"]);
-    expect(FR.tags.declared).toBe("déclaré, non prouvé");
+    expect(FR.tags.declared).toBe("déclaré, à confirmer");
+    expect(EN.tags.declared).toBe("declared, to confirm");
   });
 
   it("non prouvé et non renseigné sortent de la moyenne", () => {
     expect(stateTags(crit("CODE", null))).toEqual(["unproven", "out"]);
     expect(stateTags(crit("EMP", null, { state: "missing", source: "linkedin" }))).toEqual(["missing", "out"]);
-    expect(FR.tags.unproven).toBe("non prouvé");
-    expect(FR.tags.missing).toBe("non renseigné");
+    expect(FR.tags.unproven).toBe("à prouver");
+    expect(FR.tags.missing).toBe("pas au dossier");
+    expect(FR.tags.out).toBe("ne compte pas contre toi");
+    // Vue par quelqu'un d'autre : rien ne s'adresse à la personne fichée.
+    expect(FR.tagsThem.out).toBe("ne fait pas baisser la note");
+    expect(EN.tagsThem.below).toBe("doesn't lower the rating");
+    for (const g of [FR.tagsThem, EN.tagsThem]) for (const v of Object.values(g)) expect(v).not.toMatch(/\btoi\b|\byou\b/);
   });
 
   it("l'expérience lue sur GitHub est estimée", () => {

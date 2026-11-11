@@ -50,32 +50,32 @@ describe("étoiles du texte de partage (§18.27)", () => {
 describe("texte de partage d'une fiche", () => {
   it("sans pari : étoiles, note, profil, rang, trouvaille, lien", () => {
     expect(shareText(fr, card, URL)).toBe(
-      `Fiche ★★★★☆☆, 71 · Faussaire · 7e cette semaine. 61 % des derniers commits partent entre 22 h et 5 h. Interrogatoire par une IA : 12 s. Fais la tienne : ${URL}`,
+      `Fiche ★★★★☆☆, 71 · Faussaire · 7e cette semaine. 61 % des derniers commits partent entre 22 h et 5 h. Dossier lu par Azerit en 12 s. Fais la tienne : ${URL}`,
     );
   });
 
   it("avec pari : une ligne courte d'abord, et les étoiles ne se répètent pas", () => {
     expect(shareText(fr, { ...card, plea: 5 }, URL)).toBe(
-      `Je plaidais ★★★★★☆. Verdict : ★★★★☆☆.\nNote 71 · Faussaire · 7e cette semaine. 61 % des derniers commits partent entre 22 h et 5 h. Interrogatoire par une IA : 12 s. Fais la tienne : ${URL}`,
+      `Je plaidais ★★★★★☆. Verdict : ★★★★☆☆.\nNote 71 · Faussaire · 7e cette semaine. 61 % des derniers commits partent entre 22 h et 5 h. Dossier lu par Azerit en 12 s. Fais la tienne : ${URL}`,
     );
   });
 
   it("sans trouvaille, le chef d'accusation ; sans rien, ni l'un ni l'autre", () => {
     expect(shareLead(fr, { ...card, finding: null, rank: null })).toBe(
-      "Fiche ★★★★☆☆, 71 · Faussaire. Chef d'accusation : « Commits de 3 h du matin ». Interrogatoire par une IA : 12 s. Fais la tienne :",
+      "Fiche ★★★★☆☆, 71 · Faussaire. Chef d'accusation : « Commits de 3 h du matin ». Dossier lu par Azerit en 12 s. Fais la tienne :",
     );
     expect(shareLead(fr, { ...card, finding: null, status: null, profile: null, rank: null })).toBe(
-      "Fiche ★★★★☆☆, 71. Interrogatoire par une IA : 12 s. Fais la tienne :",
+      "Fiche ★★★★☆☆, 71. Dossier lu par Azerit en 12 s. Fais la tienne :",
     );
   });
 
   it("en anglais", () => {
     const x: CardShare = { ...card, plea: 6, profile: "Forger", rank: "#7 this week", finding: "61% of recent commits go out between 10 p.m. and 5 a.m." };
     expect(shareText(en, x, URL)).toBe(
-      `I pleaded ★★★★★★. Verdict: ★★★★☆☆.\nScore 71 · Forger · #7 this week. 61% of recent commits go out between 10 p.m. and 5 a.m. Interrogated by an AI for 12s. Make yours: ${URL}`,
+      `I pleaded ★★★★★★. Verdict: ★★★★☆☆.\nScore 71 · Forger · #7 this week. 61% of recent commits go out between 10 p.m. and 5 a.m. File read by Azerit in 12s. Make yours: ${URL}`,
     );
     expect(shareLead(en, { ...x, plea: null, finding: null })).toBe(
-      "★★★★☆☆ sheet, 71 · Forger · #7 this week. Charge: “Commits de 3 h du matin”. Interrogated by an AI for 12s. Make yours:",
+      "★★★★☆☆ sheet, 71 · Forger · #7 this week. Charge: “Commits de 3 h du matin”. File read by Azerit in 12s. Make yours:",
     );
   });
 });
@@ -97,6 +97,40 @@ describe("texte de partage d'une comparaison", () => {
     expect(shareLead(en, { ...cmp, profile: "Forger", headline: "17 points between the profile and the code" })).toBe(
       "My LinkedIn: 88. My GitHub: ★★★★☆☆, 71 · Forger. 17 points between the profile and the code. Make yours:",
     );
+  });
+});
+
+describe("texte de partage avec la grille de recrutement (§18.37)", () => {
+  const graded: CardShare = { ...card, overall: 61, profile: "Oiseau de nuit", rank: null, finding: null, status: null, graded: true, strong: "Point fort : niveau du code, 8/10." };
+
+  it("une fiche : la grille d'Azerit dès la première ligne, puis le point fort", () => {
+    expect(shareLead(fr, graded)).toBe(
+      "Mon dossier, passé à la grille de recrutement d'Azerit : ★★★★☆☆, 61 · Oiseau de nuit. Point fort : niveau du code, 8/10. Fais la tienne :",
+    );
+    expect(shareLead(en, { ...graded, profile: "Night owl", strong: "Strong point: code level, 8/10." })).toBe(
+      "My file, run through Azerit's hiring grid: ★★★★☆☆, 61 · Night owl. Strong point: code level, 8/10. Make yours:",
+    );
+    // Avec le pari, les étoiles ne se répètent pas.
+    expect(shareLead(fr, { ...graded, plea: 3 })).toBe(
+      "Je plaidais ★★★☆☆☆. Verdict : ★★★★☆☆.\nMon dossier, passé à la grille de recrutement d'Azerit : 61 · Oiseau de nuit. Point fort : niveau du code, 8/10. Fais la tienne :",
+    );
+  });
+
+  it("une comparaison : la note du dossier en tête, ses deux pièces, le verdict à la première personne", () => {
+    const x: ComparisonShare = { ...cmp, stars: 3, declared: 41, github: 61, case: 57, profile: null, headline: "Mon LinkedIn me sous-vend de 20 points." };
+    expect(shareLead(fr, x)).toBe(
+      "Mon dossier, passé à la grille de recrutement d'Azerit : ★★★☆☆☆, 57. LinkedIn 41, GitHub 61. Mon LinkedIn me sous-vend de 20 points. Fais la tienne :",
+    );
+    expect(shareLead(en, { ...x, headline: "My LinkedIn undersells me by 20 points." })).toBe(
+      "My file, run through Azerit's hiring grid: ★★★☆☆☆, 57. LinkedIn 41, GitHub 61. My LinkedIn undersells me by 20 points. Make yours:",
+    );
+  });
+
+  it("aucun mot qui accuse ni « une IA » dans les mots du partage", () => {
+    for (const w of [fr, en]) {
+      const all = [w.file("★", 1), w.ai(9), w.pieces("LinkedIn", 1, 2), w.compare("LinkedIn", 1, 2, null)].join(" ");
+      expect(all).not.toMatch(/\bvol|stole|suspect|une IA|an AI|contre|against/i);
+    }
   });
 });
 
@@ -128,17 +162,17 @@ describe("texte pour X : jamais plus de 280 avec le lien", () => {
   it("trop long : la trouvaille laisse la place au chef d'accusation", () => {
     const text = shareTextX(fr, { ...card, plea: 5, finding: long(200) });
     expect(text).toBe(
-      "Je plaidais ★★★★★☆. Verdict : ★★★★☆☆.\nNote 71 · Faussaire · 7e cette semaine. Chef d'accusation : « Commits de 3 h du matin ». Interrogatoire par une IA : 12 s. Fais la tienne :",
+      "Je plaidais ★★★★★☆. Verdict : ★★★★☆☆.\nNote 71 · Faussaire · 7e cette semaine. Chef d'accusation : « Commits de 3 h du matin ». Dossier lu par Azerit en 12 s. Fais la tienne :",
     );
   });
 
   it("toujours trop long : la trouvaille part, puis le reste dans l'ordre", () => {
     const base: CardShare = { ...card, plea: 5, finding: long(200), status: long(190) };
     expect(shareTextX(fr, base)).toBe(
-      "Je plaidais ★★★★★☆. Verdict : ★★★★☆☆.\nNote 71 · Faussaire · 7e cette semaine. Interrogatoire par une IA : 12 s. Fais la tienne :",
+      "Je plaidais ★★★★★☆. Verdict : ★★★★☆☆.\nNote 71 · Faussaire · 7e cette semaine. Dossier lu par Azerit en 12 s. Fais la tienne :",
     );
     const noAi = shareTextX(fr, { ...base, profile: long(140) });
-    expect(noAi).not.toContain("Interrogatoire");
+    expect(noAi).not.toContain("Dossier lu par Azerit");
     expect(noAi).toContain("7e cette semaine");
     const bare = shareTextX(fr, { ...base, profile: long(240) });
     expect(bare).toBe("Je plaidais ★★★★★☆. Verdict : ★★★★☆☆.\nNote 71. Fais la tienne :");

@@ -4,9 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { ComparisonData, StatCode } from "../../../shared/types";
 import { declaredOf, STAT_CODES } from "../../../shared/types";
-import { theirHeadline } from "../../../shared/compareText";
+import { ownHeadline, theirHeadline } from "../../../shared/compareText";
 import { usableGrid } from "../../../shared/gridText";
-import { pick, useT } from "../i18n";
+import { useT } from "../i18n";
 import { useMediaQuery } from "../lib/util";
 import { RevealCard } from "./Reveal";
 import type { Phase } from "./Reveal";
@@ -116,10 +116,9 @@ function Headline({ text, tone, who }: { text: string; tone: Tone; who: string |
   );
 }
 
-/** Le titre de l'écart : celui du serveur, qui tutoie ; pour un visiteur, à la troisième personne. */
+/** Le titre de l'écart (shared/compareText.ts) : tutoyé pour qui a fait la fiche ; pour un visiteur, à la troisième personne, comme l'aperçu de lien. */
 function headlineText(cmp: ComparisonData, who: string | null, lang: ReturnType<typeof useT>["lang"]): string {
-  // À égalité, le titre ne s'adresse à personne : on garde celui du serveur. Même phrase que l'aperçu de lien.
-  return (who && theirHeadline(cmp, lang, who)) || pick(cmp.headline, lang);
+  return who ? theirHeadline(cmp, lang, who) : ownHeadline(cmp, lang);
 }
 
 interface StageProps {

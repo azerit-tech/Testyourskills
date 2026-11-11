@@ -171,8 +171,9 @@ describe("compareCards §6.5", () => {
     const cmp = compareCards(cv, gh);
     for (const s of gh.stats) expect(cmp.deltas[s.code]).toBe(s.value - cv.stats.find((x) => x.code === s.code)!.value);
     const n = cv.overall - gh.overall;
-    if (n > 0) expect(cmp.headline.fr).toBe(`Ton CV a volé ${n} points à ton code`);
-    else if (n < 0) expect(cmp.headline.fr).toBe(`Ton code vaut ${-n} points de plus que ton CV. Change de CV.`);
+    const pts = (k: number) => `${k} ${k > 1 ? "points" : "point"}`;
+    if (n > 0) expect(cmp.headline.fr).toBe(`Ton CV annonce ${pts(n)} que ton code public ne montre pas encore.`);
+    else if (n < 0) expect(cmp.headline.fr).toBe(`Ton CV te sous-vend de ${pts(-n)}. Ton code le prouve.`);
     expect(cmp.cv).toBe(cv);
     expect(cmp.github).toBe(gh);
   });
@@ -180,9 +181,11 @@ describe("compareCards §6.5", () => {
   it("les trois cas de titre", () => {
     const gh = { ...scoreGithub(facts(), null, opts), id: "gh1", createdAt: "x" };
     const up = compareCards({ ...gh, overall: gh.overall + 7 }, gh);
-    expect(up.headline.fr).toBe("Ton CV a volé 7 points à ton code");
+    expect(up.headline.fr).toBe("Ton CV annonce 7 points que ton code public ne montre pas encore.");
     const down = compareCards({ ...gh, overall: gh.overall - 4 }, gh);
-    expect(down.headline.en).toBe("Your code is worth 4 points more than your CV. Rewrite the CV.");
-    expect(compareCards(gh, gh).headline.fr).toMatch(/égalité/);
+    expect(down.headline.en).toBe("Your CV undersells you by 4 points. Your code proves it.");
+    expect(compareCards(gh, gh).headline.fr).toBe("CV et code d'accord. Dossier solide.");
+    // Jamais un mot qui accuse (rapport « jugé comme par un recruteur ») : pas encore prouvé, jamais volé.
+    for (const c of [up, down, compareCards(gh, gh)]) for (const s of [c.headline.fr, c.headline.en]) expect(s).not.toMatch(/\bvol|stole|suspect|contre|against/i);
   });
 });

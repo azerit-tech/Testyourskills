@@ -58,7 +58,7 @@ describe("la fiche de Jacques sous le titre", () => {
 describe("démo (?mock=1)", () => {
   it("la vitrine montre ses deux notes et mène à une comparaison LinkedIn de démo", async () => {
     const s = await mockApi.getShowcase();
-    expect(s).toEqual({ card: FIXTURES.jmougeot, href: `/c/${MOCK_SHOWCASE_ID}`, declared: { source: "linkedin", overall: 55 } });
+    expect(s).toEqual({ card: FIXTURES.jmougeot, href: `/c/${MOCK_SHOWCASE_ID}`, declared: { source: "linkedin", overall: 55, case: 57 } });
     const job = await mockApi.getJob(MOCK_SHOWCASE_ID);
     expect(job).toMatchObject({ state: "done", kind: "comparison", comparison: { declaredSource: "linkedin" } });
   });

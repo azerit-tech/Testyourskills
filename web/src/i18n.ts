@@ -4,10 +4,12 @@ import { createContext, createElement, useCallback, useContext, useEffect, useMe
 import type { ReactNode } from "react";
 import type { CriterionCode, Lang, Position, StatCode } from "../../shared/types";
 import { showsTotal } from "../../shared/week";
+import { HOME_PROMISE, heroSentence, homeTitle } from "../../shared/promise";
 
 const fr = {
   meta: {
-    title: "Testyourskills · Ton LinkedIn dit senior. Ton GitHub, on va voir.",
+    /** Le titre de l'accueil vient de shared/promise.ts, sa seule source. */
+    title: homeTitle("fr"),
     titleCard: (name: string, overall: number) => `${name} · ${overall} · Testyourskills`,
   },
   common: {
@@ -23,12 +25,10 @@ const fr = {
   home: {
     /** Fin de la saison 1 (§18.4, dates proposées) : à lire dans data/season.json quand les primes existeront. */
     season: "Saison 1 · jusqu'au 31 décembre",
-    /** Le titre, deux phrases, chacune sur ses lignes. Insécables : une seule coupure possible
-     * par phrase, « TON LINKEDIN / DIT SENIOR. / TON GITHUB, / ON VA VOIR. », jamais un mot seul. */
-    titleClaim: "Ton\u00a0LinkedIn dit\u00a0senior.",
-    /** Sans entrée LinkedIn (le serveur ne sait pas le lire). */
-    titleClaimCv: "Ton\u00a0CV dit\u00a0senior.",
-    titleProof: "Ton\u00a0GitHub, on\u00a0va\u00a0voir.",
+    /** Le titre, deux phrases de deux lignes chacune (shared/promise.ts, sa seule source).
+     * Insécables : une seule coupure possible par phrase, jamais un mot seul. */
+    titleClaim: heroSentence(HOME_PROMISE.fr.claim),
+    titleProof: heroSentence(HOME_PROMISE.fr.proof),
     titleB: "Le haut du classement décroche un entretien.",
     tabGithub: "Ton GitHub",
     loginLabel: "Pseudo GitHub ou URL du profil",
@@ -45,10 +45,10 @@ const fr = {
     errLinkedinOff: "Entrée LinkedIn indisponible, tape ton pseudo GitHub.",
     errLinkedinCv: "Avec un CV, donne ton pseudo GitHub.",
     submit: "Ouvrir mon dossier",
-    submitBoth: "Comparer les deux",
+    submitBoth: "Lire les deux",
     submitting: "Ouverture…",
-    bothLink: "ou les deux, pour voir l'écart",
-    bothActive: "Mode comparaison : ton CV contre ton GitHub",
+    bothLink: "ou les deux, au même dossier",
+    bothActive: "Deux pièces au dossier : ton CV et ton GitHub",
     bothBack: "une seule source",
     dropTitle: "Glisse ton CV ici",
     dropOr: "ou",
@@ -61,8 +61,10 @@ const fr = {
     inlineCv: "ou avec ton CV",
     exampleLabel: "Exemple de fiche",
     exampleCaption: "La vraie fiche de Jacques, fondateur d'Azerit",
-    /** Sous la fiche de Jacques, ses deux notes (§18.35), lues en entier. */
-    exampleScoresLabel: (linkedin: number, github: number) => `LinkedIn : ${linkedin} sur 100. GitHub : ${github} sur 100.`,
+    /** Sous la fiche de Jacques, la note du dossier puis ses deux pièces (§18.35, §18.37), lues en entier. */
+    exampleScoresLabel: (kase: number | null, linkedin: number, github: number) =>
+      `${kase !== null ? `Dossier : ${kase} sur 100. ` : ""}LinkedIn : ${linkedin} sur 100. GitHub : ${github} sur 100.`,
+    exampleCase: "Dossier",
     /* La couverture (§18.31) : les plaques des photos d'identité, en capitales mono. */
     cover: {
       player: (login: string, rank: number) => `@${login}, n° ${rank} de la semaine`,
@@ -98,7 +100,7 @@ const fr = {
     errEmptyCv: "Dépose un CV au format PDF.",
     errNotPdf: "Ce fichier n'est pas un PDF.",
     errTooLarge: (mb: string) => `Fichier de ${mb} Mo : la limite est 5 Mo. Un CV, pas une thèse.`,
-    errTooManyPages: (n: number) => `${n} pages : la limite est 10. Les recruteurs s'arrêtent à la première.`,
+    errTooManyPages: (n: number) => `${n} pages : la limite est 10. Un CV tient en une ou deux.`,
     errNetwork: "Le serveur ne répond pas. Réessaie dans un instant.",
   },
   stats: {
@@ -124,21 +126,22 @@ const fr = {
       buzzwords: (n?: number) => `Comptage des buzzwords… ${n ?? 0} pour l'instant`,
       tests: () => "Recherche des tests… toujours en cours",
       readme: () => "Vérification que le README dit autre chose que « TODO »…",
-      recruiter: () => "Un recruteur aurait déjà fini. On prend le temps.",
-      compare: (n?: number) => `Comparaison avec ${n ? n.toLocaleString("fr-FR") : "des milliers de"} devs sourcés par Azerit…`,
+      recruiter: () => "Une lecture pressée prend 30 secondes. Ici, on lit tout.",
+      /** Émis quand les deux pièces se rejoignent (pipeline.ts, comparaison LinkedIn ou CV avec GitHub). */
+      compare: () => "Les deux pièces au même dossier : parcours et code, critère par critère…",
       profile: () => "Profil trouvé. Il existe, c'est un début.",
       linkedin_wait: () => "Lecture du profil LinkedIn public…",
-      linkedin: () => "LinkedIn retrouvé. Comparaison des déclarations…",
+      linkedin: () => "LinkedIn retrouvé. On recompte tes années, poste par poste.",
       repos: (n?: number) => `${n ?? "Quelques"} repos publics repérés, forks exclus…`,
       calendar: () => "Lecture du calendrier de contributions sur 52 semaines…",
       commits: (n?: number) => `Lecture de ${n ?? 100} messages de commit…`,
       code: () => "L'IA lit ton code. Elle ne note pas. Elle prend des notes.",
       cv: () => "Lecture du PDF, en mémoire. Il sera oublié juste après.",
       pdf: () => "Extraction du texte du PDF…",
-      scoring: () => "Application du barème. Aucune IA ne touche aux chiffres.",
+      scoring: () => "Huit critères, une note sur 10 chacun. Aucune IA ne touche aux chiffres.",
       statuses: () => "Choix des statuts dans la liste fermée…",
       render: () => "Impression de la fiche…",
-      start: () => "Ouverture du dossier. Pas de café, pas de pause.",
+      start: () => "Un dossier s'ouvre chez Azerit. Le tien.",
     } as Record<string, (n?: number) => string>,
     fillers: [
       "Le barème est écrit en dur dans un fichier JSON. Pas de favoritisme.",
@@ -148,6 +151,9 @@ const fr = {
       "On ne lit pas tes repos privés. Promis.",
       "Calibrage du tampon…",
       "Vérification que node_modules n'est pas commité…",
+      "Un stage compte pour moitié. Une asso étudiante, pour zéro.",
+      "Sans école de tech, pas de note d'école. Ça ne coûte rien.",
+      "Un GitHub vide n'est pas un mauvais code.",
     ],
   },
   reveal: {
@@ -170,7 +176,7 @@ const fr = {
       { min: 35, label: "Ctrl+C Ctrl+V" },
       { min: 45, label: "Padawan" },
       { min: 60, label: "Fait le taf" },
-      { min: 67, label: "Senior (sur LinkedIn)" },
+      { min: 67, label: "Confirmé" },
       { min: 75, label: "Crack" },
       { min: 80, label: "Monstre" },
       { min: 85, label: "Machine" },
@@ -202,7 +208,7 @@ const fr = {
     pleading: "Tu plaides",
     pleaded: "Tu plaidais",
     verdict: "Verdict :",
-    gap: { over: "Excès de confiance", exact: "Lucide", under: "Modestie suspecte" },
+    gap: { over: "Excès de confiance", exact: "Lucide", under: "Trop modeste" },
   },
   positions: {
     FS: "Full-stack",
@@ -216,11 +222,11 @@ const fr = {
     EMB: "Embarqué",
     PM: "Product",
     DESIGN: "Design",
-    CTO: "CTO sur parole",
+    CTO: "CTO",
   } satisfies Record<Position, string>,
   result: {
     makeYours: "Fais la tienne",
-    yourTurn: "À toi : ton pseudo suffit.",
+    yourTurn: "Et toi, sur ces huit critères ? Ton LinkedIn ou ton GitHub suffit.",
     /* en tête d'une fiche partagée (§18.20) */
     wanted: "Avis de recherche",
     wantedStars: (n: number, level: string) => `${n} étoiles sur 6 · ${level}`,
@@ -249,11 +255,16 @@ const fr = {
         sheet: (stars: string, overall: number) => `Fiche ${stars}, ${overall}`,
         /** Après la ligne du pari : le verdict porte déjà les étoiles. */
         score: (overall: number) => `Note ${overall}`,
+        /** Fiche notée par la grille (§18.37) : ce qu'est la note, dès la première ligne. `stars` null après le pari. */
+        file: (stars: string | null, overall: number) => `Mon dossier, passé à la grille de recrutement d'Azerit : ${stars ? `${stars}, ` : ""}${overall}`,
         charge: (status: string) => `Chef d'accusation : « ${status} ».`,
-        ai: (secs: number) => `Interrogatoire par une IA : ${secs} s.`,
-        /** `src` : « CV » ou « LinkedIn » (§18.24). */
+        /** Fiche d'avant la grille : le temps de lecture. */
+        ai: (secs: number) => `Dossier lu par Azerit en ${secs} s.`,
+        /** `src` : « CV » ou « LinkedIn » (§18.24) ; la comparaison sans grille (d'avant 0.4.0). */
         compare: (src: string, declared: number, github: number, stars: string | null) =>
           `Mon ${src} : ${declared}. Mon GitHub : ${stars ? `${stars}, ` : ""}${github}`,
+        /** Les deux pièces, sous la note du dossier. */
+        pieces: (src: string, declared: number, github: number) => `${src} ${declared}, GitHub ${github}.`,
         cta: "Fais la tienne :",
       },
     },
@@ -274,7 +285,8 @@ const fr = {
     },
     /* L'enquête en direct (§18.26) : les trois trouvailles les plus fortes, chacune vers sa preuve. */
     dossier: {
-      title: "Le dossier",
+      /** « Aussi au dossier » : à ne pas confondre avec les pièces qui justifient une note. */
+      title: "Aussi au dossier",
       proof: "Preuve",
     },
     /* « Le reste » sous la fiche (§18.27) : une ligne repliée par bloc. */
@@ -307,10 +319,14 @@ const fr = {
       ],
       lowest: (code: string, v: number) => `Indice : ta stat la plus basse est ${code} à ${v}. Un commit vaut mieux qu'un recours.`,
     },
-    addCv: { title: "Ajoute ton CV pour voir l'écart", text: "Ce que ton CV déclare contre ce que ton GitHub prouve. Deux fiches, le butin entre les deux.", btn: "Ajouter mon CV" },
-    addGithub: { title: "Ajoute ton GitHub pour voir l'écart", text: "Ton CV a parlé. Voyons si ton code est d'accord.", btn: "Ajouter mon GitHub" },
+    addCv: {
+      title: "Ajoute ton CV au dossier",
+      text: "Ton GitHub porte le code. Ton CV porte le parcours : école, expérience et employeurs entrent au dossier.",
+      btn: "Ajouter mon CV",
+    },
+    addGithub: { title: "Ajoute ton GitHub au dossier", text: "Ton CV porte le parcours. Ton GitHub porte le code : trois critères s'ouvrent.", btn: "Ajouter mon GitHub" },
     /** Fiche LinkedIn seule (§18.24) : un seul appel, relancé en comparaison. */
-    prove: { title: "Ajoute ton GitHub pour prouver", label: "Pseudo GitHub", btn: "Prouver" },
+    prove: { title: "Ajoute ton GitHub : trois critères s'ouvrent", label: "Pseudo GitHub", btn: "Ajouter au dossier" },
     claim: {
       kicker: "C'est ta fiche ?",
       kickerLawyer: "Avis de recherche à ton nom ?",
@@ -348,7 +364,7 @@ const fr = {
       note: "Optionnel. Garde aussi ta fiche au-delà de 90 jours.",
     },
     /* le bloc recruteur, en fin de page : on vouvoie qui recrute */
-    cta: { title: "Vous recrutez ?", text: "Azerit vous présente des devs sur preuves : leur code, pas leur CV.", link: "azerit.tech" },
+    cta: { title: "Vous recrutez ?", text: "Azerit vous présente des devs lus comme ici : l'expérience d'abord, le code en preuve.", link: "azerit.tech" },
     del: {
       link: "Supprimer ma fiche",
       confirm: "Supprimer définitivement ?",
@@ -359,26 +375,27 @@ const fr = {
     },
     again: "Faire une autre fiche",
   },
+  /* Un seul dossier, deux pièces : LinkedIn ou le CV porte le parcours, GitHub porte le code. Jamais « contre ». */
   compare: {
-    cvLabel: "Ce que ton CV déclare",
-    ghLabel: "Ce que ton GitHub prouve",
+    cvLabel: "Ton parcours, lu sur ton CV",
+    ghLabel: "Ton code, lu sur GitHub",
     cvShort: "CV",
     ghShort: "GitHub",
-    liLabel: "Ce que ton LinkedIn déclare",
+    liLabel: "Ton parcours, lu sur LinkedIn",
     liShort: "LinkedIn",
-    loot: "Le butin",
-    deltaTitle: "Le butin, stat par stat",
-    legendUp: "le code vaut plus",
-    legendDown: "le CV a volé",
-    legendDownLi: "LinkedIn a volé",
+    loot: "Le dossier",
+    deltaTitle: "Les barres, une par une",
+    legendUp: "le code en montre plus",
+    legendDown: "le CV en montre plus",
+    legendDownLi: "LinkedIn en montre plus",
     overall: "Globale",
     buzzHint: "BUZZ : plus bas, c'est mieux",
     switchLabel: "Fiche affichée",
     /* Vu par un visiteur : on parle de @login à la troisième personne, sans accord. Le titre de l'écart est dans shared/compareText.ts. */
     them: {
-      cvLabel: "Ce que son CV déclare",
-      liLabel: "Ce que son LinkedIn déclare",
-      ghLabel: "Ce que son GitHub prouve",
+      cvLabel: "Son parcours, lu sur son CV",
+      liLabel: "Son parcours, lu sur LinkedIn",
+      ghLabel: "Son code, lu sur GitHub",
     },
     /** À la place des écarts stat par stat, quand la comparaison a sa grille (§18.37) : la note du dossier. */
     caseRating: "Note du dossier",
@@ -396,17 +413,24 @@ const fr = {
   grid: {
     title: "Voici comment un recruteur d'Azerit te lit",
     titleThem: (who: string) => `Voici comment un recruteur d'Azerit lit ${who}`,
+    /** Les pièces lues : une ligne par source, « pas encore au dossier » pour celle qui manque. */
     method: {
-      linkedin: "Ce que ton LinkedIn déclare.",
-      cv: "Ce que ton CV déclare.",
-      code: "Ce que ton code prouve.",
+      linkedin: "Ton parcours : LinkedIn fait foi.",
+      cv: "Ton parcours : ton CV fait foi.",
+      noCareer: "Ton parcours : pas encore au dossier.",
+      code: "Ton code : GitHub fait foi.",
+      noCode: "Ton code : pas encore au dossier.",
       check: "On recoupe. Chaque note a sa pièce.",
+      piece: "Chaque note a sa pièce.",
     },
     methodThem: {
-      linkedin: "Ce que son LinkedIn déclare.",
-      cv: "Ce que son CV déclare.",
-      code: "Ce que son code prouve.",
+      linkedin: "Son parcours : LinkedIn fait foi.",
+      cv: "Son parcours : son CV fait foi.",
+      noCareer: "Son parcours : pas encore au dossier.",
+      code: "Son code : GitHub fait foi.",
+      noCode: "Son code : pas encore au dossier.",
       check: "On recoupe. Chaque note a sa pièce.",
+      piece: "Chaque note a sa pièce.",
     },
     foot: "C'est la lecture qu'Azerit fait pour les équipes qui recrutent.",
     criteriaLabel: "Les huit critères",
@@ -425,12 +449,21 @@ const fr = {
     gauge: (n: number) => `${n} sur 10`,
     gaugeNone: "Pas de note",
     tags: {
-      declared: "déclaré, non prouvé",
-      unproven: "non prouvé",
-      missing: "non renseigné",
+      declared: "déclaré, à confirmer",
+      unproven: "à prouver",
+      missing: "pas au dossier",
       estimated: "estimée",
-      below: "hors moyenne",
-      out: "hors moyenne",
+      below: "ne compte pas contre toi",
+      out: "ne compte pas contre toi",
+    },
+    /** Vue par quelqu'un d'autre : rien ne s'adresse à la personne fichée. */
+    tagsThem: {
+      declared: "déclaré, à confirmer",
+      unproven: "à prouver",
+      missing: "pas au dossier",
+      estimated: "estimée",
+      below: "ne fait pas baisser la note",
+      out: "ne fait pas baisser la note",
     },
     source: { linkedin: "LinkedIn", cv: "CV", github: "GitHub", both: "recoupé" },
     /** L'étiquette de la pièce : « LinkedIn, postes datés », « GitHub, sequence-mail ». */
@@ -715,7 +748,7 @@ export type Dict = typeof fr;
 
 const en: Dict = {
   meta: {
-    title: "Testyourskills · Your LinkedIn says senior. Your GitHub? We'll see.",
+    title: homeTitle("en"),
     titleCard: (name, overall) => `${name} · ${overall} · Testyourskills`,
   },
   common: {
@@ -730,9 +763,8 @@ const en: Dict = {
   },
   home: {
     season: "Season 1 · until 31 December",
-    titleClaim: "Your\u00a0LinkedIn says\u00a0senior.",
-    titleClaimCv: "Your\u00a0CV says\u00a0senior.",
-    titleProof: "Your\u00a0GitHub? We'll\u00a0see.",
+    titleClaim: heroSentence(HOME_PROMISE.en.claim),
+    titleProof: heroSentence(HOME_PROMISE.en.proof),
     titleB: "The top of the board lands an interview.",
     tabGithub: "Your GitHub",
     loginLabel: "GitHub username or profile URL",
@@ -748,10 +780,10 @@ const en: Dict = {
     errLinkedinOff: "LinkedIn entry unavailable, type your GitHub username.",
     errLinkedinCv: "With a CV, give your GitHub username.",
     submit: "Open my file",
-    submitBoth: "Compare both",
+    submitBoth: "Read both",
     submitting: "Opening…",
-    bothLink: "or both, to see the gap",
-    bothActive: "Comparison mode: your CV against your GitHub",
+    bothLink: "or both, in one file",
+    bothActive: "Two exhibits on file: your CV and your GitHub",
     bothBack: "just one source",
     dropTitle: "Drop your CV here",
     dropOr: "or",
@@ -764,7 +796,8 @@ const en: Dict = {
     inlineCv: "or with your CV",
     exampleLabel: "Example sheet",
     exampleCaption: "The real sheet of Jacques, Azerit's founder",
-    exampleScoresLabel: (linkedin, github) => `LinkedIn: ${linkedin} out of 100. GitHub: ${github} out of 100.`,
+    exampleScoresLabel: (kase, linkedin, github) => `${kase !== null ? `File: ${kase} out of 100. ` : ""}LinkedIn: ${linkedin} out of 100. GitHub: ${github} out of 100.`,
+    exampleCase: "File",
     cover: {
       player: (login, rank) => `@${login}, #${rank} this week`,
       playerPlate: (rank, week) => `NO. ${rank} · WEEK ${week}`,
@@ -794,7 +827,7 @@ const en: Dict = {
     errEmptyCv: "Drop a CV as a PDF.",
     errNotPdf: "That file isn't a PDF.",
     errTooLarge: (mb) => `${mb} MB file: the limit is 5 MB. A CV, not a thesis.`,
-    errTooManyPages: (n) => `${n} pages: the limit is 10. Recruiters stop at page one.`,
+    errTooManyPages: (n) => `${n} pages: the limit is 10. A CV fits on one or two.`,
     errNetwork: "The server isn't answering. Try again in a moment.",
   },
   stats: {
@@ -809,28 +842,28 @@ const en: Dict = {
   waiting: {
     title: "Loading your file",
     piece: (n) => `Exhibit ${String(n).padStart(2, "0")}`,
-    queue: (n) => (n === 1 ? "1 suspect ahead of you at the station" : `${n} suspects ahead of you at the station`),
+    queue: (n) => (n === 1 ? "1 file ahead of you at the station" : `${n} files ahead of you at the station`),
     scene: "Loading the scene",
     progress: {
       lazy_commits: (n) => `Reading your ${n ?? "many"} “wip” commits…`,
       buzzwords: (n) => `Counting buzzwords… ${n ?? 0} so far`,
       tests: () => "Looking for tests… still looking",
       readme: () => "Checking the README says more than “TODO”…",
-      recruiter: () => "A recruiter would be done by now. We're taking our time.",
-      compare: (n) => `Comparing with ${n ? n.toLocaleString("en-US") : "thousands of"} devs sourced by Azerit…`,
+      recruiter: () => "A rushed read takes 30 seconds. We read everything.",
+      compare: () => "Both exhibits in one file: career and code, criterion by criterion…",
       profile: () => "Profile found. It exists, that's a start.",
       linkedin_wait: () => "Reading the public LinkedIn profile…",
-      linkedin: () => "LinkedIn found. Comparing the claims…",
+      linkedin: () => "LinkedIn found. Recounting your years, role by role.",
       repos: (n) => `${n ?? "A few"} public repos spotted, forks excluded…`,
       calendar: () => "Reading 52 weeks of contribution calendar…",
       commits: (n) => `Reading ${n ?? 100} commit messages…`,
       code: () => "The AI is reading your code. It doesn't score. It takes notes.",
       cv: () => "Reading the PDF, in memory. It'll be forgotten right after.",
       pdf: () => "Extracting text from the PDF…",
-      scoring: () => "Applying the rubric. No AI touches the numbers.",
+      scoring: () => "Eight criteria, one score out of 10 each. No AI touches the numbers.",
       statuses: () => "Picking statuses from the closed list…",
       render: () => "Printing the sheet…",
-      start: () => "Opening the file. No coffee, no break.",
+      start: () => "A file just opened at Azerit. Yours.",
     },
     fillers: [
       "The rubric is hard-coded in a JSON file. No favoritism.",
@@ -840,6 +873,9 @@ const en: Dict = {
       "We don't read your private repos. Promise.",
       "Calibrating the stamp…",
       "Checking node_modules isn't committed…",
+      "An internship counts for half. A student club, for zero.",
+      "No tech school, no school score. It costs nothing.",
+      "An empty GitHub is not bad code.",
     ],
   },
   reveal: {
@@ -859,7 +895,7 @@ const en: Dict = {
       { min: 35, label: "Ctrl+C Ctrl+V" },
       { min: 45, label: "Padawan" },
       { min: 60, label: "Gets it done" },
-      { min: 67, label: "Senior (on LinkedIn)" },
+      { min: 67, label: "Seasoned" },
       { min: 75, label: "Cracked" },
       { min: 80, label: "Monster" },
       { min: 85, label: "Machine" },
@@ -889,7 +925,7 @@ const en: Dict = {
     pleading: "You plead",
     pleaded: "You pleaded",
     verdict: "Verdict:",
-    gap: { over: "Overconfidence", exact: "Clear-eyed", under: "Suspicious modesty" },
+    gap: { over: "Overconfidence", exact: "Clear-eyed", under: "Too modest" },
   },
   positions: {
     FS: "Full-stack",
@@ -903,11 +939,11 @@ const en: Dict = {
     EMB: "Embedded",
     PM: "Product",
     DESIGN: "Design",
-    CTO: "Self-proclaimed CTO",
+    CTO: "CTO",
   },
   result: {
     makeYours: "Make yours",
-    yourTurn: "Your turn: a username is enough.",
+    yourTurn: "And you, on these eight criteria? Your LinkedIn or your GitHub is enough.",
     wanted: "Wanted",
     wantedStars: (n, level) => `${n} of 6 stars · ${level}`,
     wantedSep: ": ",
@@ -929,9 +965,11 @@ const en: Dict = {
         plea: (pleaded, verdict) => `I pleaded ${pleaded}. Verdict: ${verdict}.`,
         sheet: (stars, overall) => `${stars} sheet, ${overall}`,
         score: (overall) => `Score ${overall}`,
+        file: (stars, overall) => `My file, run through Azerit's hiring grid: ${stars ? `${stars}, ` : ""}${overall}`,
         charge: (status) => `Charge: “${status}”.`,
-        ai: (secs) => `Interrogated by an AI for ${secs}s.`,
+        ai: (secs) => `File read by Azerit in ${secs}s.`,
         compare: (src, declared, github, stars) => `My ${src}: ${declared}. My GitHub: ${stars ? `${stars}, ` : ""}${github}`,
+        pieces: (src, declared, github) => `${src} ${declared}, GitHub ${github}.`,
         cta: "Make yours:",
       },
     },
@@ -949,7 +987,7 @@ const en: Dict = {
       error: "LinkedIn said no. Try again.",
     },
     dossier: {
-      title: "The file",
+      title: "Also on file",
       proof: "Proof",
     },
     rest: {
@@ -980,9 +1018,13 @@ const en: Dict = {
       ],
       lowest: (code, v) => `Hint: your lowest stat is ${code} at ${v}. A commit beats an appeal.`,
     },
-    addCv: { title: "Add your CV to see the gap", text: "What your CV claims against what your GitHub proves. Two sheets, the loot in between.", btn: "Add my CV" },
-    addGithub: { title: "Add your GitHub to see the gap", text: "Your CV has spoken. Let's see if your code agrees.", btn: "Add my GitHub" },
-    prove: { title: "Add your GitHub to prove it", label: "GitHub username", btn: "Prove it" },
+    addCv: {
+      title: "Add your CV to the file",
+      text: "Your GitHub carries the code. Your CV carries the career: school, experience and employers go on file.",
+      btn: "Add my CV",
+    },
+    addGithub: { title: "Add your GitHub to the file", text: "Your CV carries the career. Your GitHub carries the code: three more criteria open.", btn: "Add my GitHub" },
+    prove: { title: "Add your GitHub: three more criteria open", label: "GitHub username", btn: "Add to my file" },
     claim: {
       kicker: "Is this your sheet?",
       kickerLawyer: "Wanted under your name?",
@@ -1019,7 +1061,7 @@ const en: Dict = {
       error: "Sending failed. Try again later.",
       note: "Optional. Also keeps your sheet beyond 90 days.",
     },
-    cta: { title: "Hiring?", text: "Azerit introduces you to devs on evidence: their code, not their CV.", link: "azerit.tech" },
+    cta: { title: "Hiring?", text: "Azerit introduces you to developers read like this: experience first, code as proof.", link: "azerit.tech" },
     del: {
       link: "Delete my sheet",
       confirm: "Delete for good?",
@@ -1031,24 +1073,24 @@ const en: Dict = {
     again: "Make another sheet",
   },
   compare: {
-    cvLabel: "What your CV claims",
-    ghLabel: "What your GitHub proves",
+    cvLabel: "Your career, read on your CV",
+    ghLabel: "Your code, read on GitHub",
     cvShort: "CV",
     ghShort: "GitHub",
-    liLabel: "What your LinkedIn claims",
+    liLabel: "Your career, read on LinkedIn",
     liShort: "LinkedIn",
-    loot: "The loot",
-    deltaTitle: "The loot, stat by stat",
-    legendUp: "code is worth more",
-    legendDown: "the CV stole",
-    legendDownLi: "LinkedIn stole",
+    loot: "The file",
+    deltaTitle: "The bars, one by one",
+    legendUp: "code shows more",
+    legendDown: "the CV shows more",
+    legendDownLi: "LinkedIn shows more",
     overall: "Overall",
     buzzHint: "BUZZ: lower is better",
     switchLabel: "Sheet shown",
     them: {
-      cvLabel: "What their CV claims",
-      liLabel: "What their LinkedIn claims",
-      ghLabel: "What their GitHub proves",
+      cvLabel: "Their career, read on their CV",
+      liLabel: "Their career, read on LinkedIn",
+      ghLabel: "Their code, read on GitHub",
     },
     caseRating: "Case rating",
     caseHint: "Each criterion taken from its source of proof",
@@ -1063,16 +1105,22 @@ const en: Dict = {
     title: "Here is how an Azerit recruiter reads you",
     titleThem: (who: string) => `Here is how an Azerit recruiter reads ${who}`,
     method: {
-      linkedin: "What your LinkedIn claims.",
-      cv: "What your CV claims.",
-      code: "What your code proves.",
+      linkedin: "Your career: LinkedIn is the reference.",
+      cv: "Your career: your CV is the reference.",
+      noCareer: "Your career: not on file yet.",
+      code: "Your code: GitHub is the reference.",
+      noCode: "Your code: not on file yet.",
       check: "We cross-check. Every score has its exhibit.",
+      piece: "Every score has its exhibit.",
     },
     methodThem: {
-      linkedin: "What their LinkedIn claims.",
-      cv: "What their CV claims.",
-      code: "What their code proves.",
+      linkedin: "Their career: LinkedIn is the reference.",
+      cv: "Their career: their CV is the reference.",
+      noCareer: "Their career: not on file yet.",
+      code: "Their code: GitHub is the reference.",
+      noCode: "Their code: not on file yet.",
       check: "We cross-check. Every score has its exhibit.",
+      piece: "Every score has its exhibit.",
     },
     foot: "This is how Azerit reads engineers for hiring teams.",
     criteriaLabel: "The eight criteria",
@@ -1090,12 +1138,20 @@ const en: Dict = {
     gauge: (n: number) => `${n} out of 10`,
     gaugeNone: "No score",
     tags: {
-      declared: "declared, not proven",
-      unproven: "not proven",
+      declared: "declared, to confirm",
+      unproven: "yet to prove",
       missing: "not on file",
       estimated: "estimated",
-      below: "left out of the average",
-      out: "left out of the average",
+      below: "doesn't count against you",
+      out: "doesn't count against you",
+    },
+    tagsThem: {
+      declared: "declared, to confirm",
+      unproven: "yet to prove",
+      missing: "not on file",
+      estimated: "estimated",
+      below: "doesn't lower the rating",
+      out: "doesn't lower the rating",
     },
     source: { linkedin: "LinkedIn", cv: "CV", github: "GitHub", both: "cross-checked" },
     sourceWith: (src: string, what: string) => `${src}, ${what}`,

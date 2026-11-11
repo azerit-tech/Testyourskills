@@ -19,6 +19,8 @@ import { t } from "../../../shared/card/i18n";
 import { fit, fitLines, upper, wrap } from "../../../shared/card/text";
 import { PALETTE, themeOf } from "../../../shared/card/themes";
 import { SKY_TEXT } from "../../../shared/scenes";
+import { ownHeadline } from "../../../shared/compareText";
+import { HOME_PROMISE } from "../../../shared/promise";
 import type { SceneImage } from "./scenes";
 
 /** Aplats de l'illustration (maquette validée du 9 novembre 2026, dans l'historique git). */
@@ -296,18 +298,9 @@ function CtaLine({ x, y, lang }: { x: number; y: number; lang: Lang }) {
 /* Aperçu de lien de l'accueil 1200 × 630                               */
 /* ------------------------------------------------------------------ */
 
-/** La promesse, le titre de l'accueil : deux phrases de deux lignes, ce que le
- *  profil déclare en crème, puis ce que le code dira en rose. */
-const PROMISE: Record<Lang, [string[], string[]]> = {
-  fr: [
-    ["Ton LinkedIn", "dit senior."],
-    ["Ton GitHub,", "on va voir."],
-  ],
-  en: [
-    ["Your LinkedIn", "says senior."],
-    ["Your GitHub?", "We'll see."],
-  ],
-};
+/** La promesse, le titre de l'accueil (shared/promise.ts, sa seule source) : deux
+ *  phrases de deux lignes, la première en crème, la seconde en rose. */
+const PROMISE = (lang: Lang): [string[], string[]] => [HOME_PROMISE[lang].claim, HOME_PROMISE[lang].proof];
 
 /** Même mise en page que l'aperçu d'une fiche : la fiche de la vitrine à gauche,
  *  et à droite la promesse en grand à la place du nom. */
@@ -320,7 +313,7 @@ export function HomeOg({ card, lang, avatars }: { card: CardData; lang: Lang; av
   const cy = 32;
   const tx = 560;
   const maxW = W - tx - 64;
-  const [claim, proof] = PROMISE[lang];
+  const [claim, proof] = PROMISE(lang);
   const lines = [...claim, ...proof].map((l) => upper(l, lang));
   // Une seule taille pour les quatre lignes : celle que la plus longue permet.
   const size = Math.min(...lines.map((l) => fit(l, { font: "display-700", size: 112, minSize: 60, maxWidth: maxW, letterSpacing: 0.5 }).size));
@@ -513,7 +506,7 @@ export function ComparisonOg({ cmp, lang, avatars }: { cmp: ComparisonData; lang
   const lx = 150;
   const rx = W - 150 - cw;
   const s = t(lang);
-  const head = fit(upper(cmp.headline[lang], lang), { font: "display-700", size: 46, minSize: 30, maxWidth: 1080, letterSpacing: 0.4 });
+  const head = fit(upper(ownHeadline(cmp, lang), lang), { font: "display-700", size: 46, minSize: 30, maxWidth: 1080, letterSpacing: 0.4 });
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
       <Ink w={W} h={H} />
@@ -541,7 +534,7 @@ export function ComparisonPortrait({ cmp, lang, avatars }: { cmp: ComparisonData
   const cy = 352;
   const s = t(lang);
   // le titre doit tenir en deux lignes : on réduit avant de tronquer
-  const head = upper(cmp.headline[lang], lang);
+  const head = upper(ownHeadline(cmp, lang), lang);
   let hs = 70;
   let lines = wrap(head, "display-700", hs, 960, 2, 0.4);
   while (hs > 48 && lines[lines.length - 1].endsWith("…")) {

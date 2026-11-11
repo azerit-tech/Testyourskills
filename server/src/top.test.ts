@@ -395,7 +395,7 @@ describe("routes", () => {
     expect(readdirSync(ogDir).sort()).toEqual([`${mine.id}-totw.png`, `${mine.id}.png`].sort());
     // Page /c/:id : l'image de partage d'une fiche du top 5 a sa propre adresse.
     const html = await (await app.request(`/c/${store.getCard(weekTop(store.db).entries[0]!.cardId)!.id}`)).text();
-    expect(html).toContain("?v=2&amp;s=totw");
+    expect(html).toContain("?v=3&amp;s=totw");
     expect(html).toContain("Top 5 de la semaine");
   });
 
