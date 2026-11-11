@@ -50,6 +50,7 @@ POLYHAVEN = [
     ("modular_street_seating", "model", "1k"),
     ("metal_trash_can", "model", "1k"),
     ("outdoor_table_chair_set_01", "model", "1k"),
+    ("shrub_01", "model", "1k"),
 ]
 
 # ambientCG : (asset, résolution) ; archives zip dont on ne garde que les images

@@ -1148,6 +1148,31 @@ def source(objs, name, hidden):
     return ob
 
 
+def parasol(name, x, y, canvas, metal, light=True, r=1.35):
+    """Un parasol de terrasse : mât, toile à huit pans un peu creusée, lampe chaude dessous."""
+    cyl(f"{name}_pole", (x, y, 0.15), (x, y, 2.55), 0.025, metal, seg=8)
+    me = bpy.data.meshes.new(name)
+    bm = bmesh.new()
+    apex = bm.verts.new((0, 0, 0.42))
+    rim = [bm.verts.new((r * math.cos(a), r * math.sin(a), 0.0)) for a in (i * math.tau / 8 for i in range(8))]
+    mid = [bm.verts.new((0.55 * r * math.cos(a), 0.55 * r * math.sin(a), 0.26)) for a in ((i + 0.5) * math.tau / 8 for i in range(8))]
+    for i in range(8):
+        j = (i + 1) % 8
+        bm.faces.new((apex, rim[i], mid[i]))
+        bm.faces.new((apex, mid[i], rim[j]))
+        bm.faces.new((mid[i], rim[i], rim[j]))
+    bm.to_mesh(me)
+    bm.free()
+    ob = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(ob)
+    ob.data.materials.append(canvas)
+    ob.location = (x, y, 2.2)
+    ob.rotation_euler = (0, 0, random.uniform(0, 1))
+    if light:
+        add_light(f"{name}_lamp", "POINT", (x, y, 2.05), (0, 0, -1), lin("#ffc890"), 60.0)
+    return ob
+
+
 def wires(name, spans, mat, sag=0.6, r=0.012):
     """Des fils qui pendent (chaînette approchée par une parabole), tous dans une courbe."""
     cu = bpy.data.curves.new(name, "CURVE")
@@ -1407,20 +1432,20 @@ def build_city(hidden):
         bpy.data.objects.remove(o)
     can = source(mine, "can_src", hidden)
     terrace = source(import_glb("outdoor_table_chair_set_01/outdoor_table_chair_set_01.gltf"), "terrace_src", hidden)
-    hedge, HN, hout = material("hedge")
-    v = HN.new("ShaderNodeTexVoronoi", Scale=18.0)
-    HN.link(HN.new("ShaderNodeTexCoord").outputs["Object"], v.inputs["Vector"])
-    hb = HN.new("ShaderNodeBump", Strength=0.9, Distance=0.04)
-    HN.link(v.outputs["Distance"], hb.inputs["Height"])
-    hp = principled(HN, Roughness=0.55)
-    HN.link(HN.ramp(v.outputs["Distance"], [(0.0, lin("#1d3322")), (0.6, lin("#3d5e36"))]), hp.inputs["Base Color"])
-    HN.link(hb.outputs["Normal"], hp.inputs["Normal"])
-    HN.link(hp.outputs[0], hout.inputs[0])
+    # les jardinières : terre sombre et deux ou trois arbustes de bibliothèque (vus du drone, une
+    # haie en pavé faisait une dalle verte)
+    shrub = source(import_glb("shrub_01/shrub_01.gltf"), "shrub_src", hidden)
+    sd = shrub.dimensions
+    shrub_s = 1.0 / max(sd.x, sd.y, 0.01)
+    soil = mat_plain("planter_soil", lin("#1c1612"), 0.9)
     for y in [20.5 + 34 * k for k in range(18)]:
         if in_street(y, 4):
             continue
         box(f"planter_{y}", -ROAD_HALF - 2.6, -ROAD_HALF - 1.3, y - 1.2, y + 1.2, 0.15, 0.62, conc)
-        box(f"hedge_{y}", -ROAD_HALF - 2.5, -ROAD_HALF - 1.4, y - 1.1, y + 1.1, 0.62, 1.05, hedge)
+        box(f"planter_soil_{y}", -ROAD_HALF - 2.5, -ROAD_HALF - 1.4, y - 1.1, y + 1.1, 0.62, 0.58 + 0.06, soil)
+        for j, dy in enumerate((-0.6, 0.15, 0.75)[: random.choice((2, 3))]):
+            instance(shrub, f"shrub_{y}_{j}", (-ROAD_HALF - 1.95 + random.uniform(-0.1, 0.1), y + dy, 0.6),
+                     random.uniform(0, math.tau), shrub_s * random.uniform(0.9, 1.25))
     for y in range(98, 620, 46):
         if in_street(y, 4):
             continue
@@ -1430,8 +1455,12 @@ def build_city(hidden):
         instance(bench, f"bench_r_{y}", (ROAD_HALF + WALK - 0.8, y, 0.15), math.pi / 2)
         if y % 52 == 20:
             instance(can, f"can_r_{y}", (ROAD_HALF + WALK - 0.7, y + 2.2, 0.15), random.uniform(0, 6))
-    for k, yy in enumerate((50.5, 58.0, 62.0)):
-        instance(terrace, f"terrace_{k}", (FRONT_X + 1.2, yy, 0.15), random.uniform(-0.3, 0.3))
+    # les terrasses : tables de bibliothèque sous des parasols de toile, une lampe chaude dessous
+    canvas = [mat_plain("parasol_cream", lin("#efe4cf"), 0.85), mat_plain("parasol_coral", lin("#e0704f"), 0.85)]
+    terraces = [(50.5, 0), (55.5, 0), (60.5, 0), (94.0, 1), (99.0, 1), (231.0, 0), (236.0, 0), (241.0, 0)]
+    for k, (yy, c) in enumerate(terraces):
+        instance(terrace, f"terrace_{k}", (FRONT_X + 1.6, yy, 0.15), random.uniform(-0.3, 0.3))
+        parasol(f"parasol_{k}", FRONT_X + 1.6, yy, canvas[c], M["metal"], light=yy < 120)
     # l'abribus : toit, vitres, panneau lumineux vierge
     sy0, sy1 = 37.0, 42.0
     xb, xf = FRONT_X + 0.5, FRONT_X + 2.2
