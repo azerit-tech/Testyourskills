@@ -159,6 +159,126 @@ Le cadre serré de FIN règle le nombre de poursuivants sans rendre cinq fins : 
 2. *L'arrêt sur image* (12 images) : deux tons, le niveau, les six étoiles.
 3. *Le flash* (12 images) : la fiche se pose avec son contour éclairé par l'arrière, réservé à ce niveau (SPEC §18.18).
 
+### 2.4 Le parcours
+
+*Proposé le 11 novembre 2026, à valider par Jacques sur le plan vu du dessus (`Azerit/design/film/parcours.svg` et `parcours.png`, hors du dépôt). Tant qu'il n'est pas validé, le §2.3 vaut seul.*
+
+Jacques : « une rue c'est un peu fade, j'en aimerais plusieurs ». La fuite traverse donc une ville. Le parcours change les lieux, pas l'action : chaque plan garde ce que le §2.3 lui fait faire et gagne une image à lui.
+
+**La ville.** Une bande de ville entre l'océan et une lagune. L'avenue des hôtels longe l'océan. Des rues la coupent et traversent la ville jusqu'à la lagune. Un pont franchit la lagune et finit sur une pointe, sans autre issue. La voiture en fuite quitte la carte postale, s'enfonce dans la ville, sort au-dessus de l'eau et arrive au bout de la route : l'arrestation a une raison.
+
+**Les règles du parcours.**
+
+- **Une scène Blender par lieu**, jamais la ville entière : la rue pèse déjà 3,6 à 4 Go sur un Mac de 8 Go. Quatre scènes : A, l'avenue et son carrefour (`scene_a.py`, elle existe) ; B, la rue des enseignes ; C, le pont ; D, la pointe.
+- **Plus il y a de véhicules, moins il y a d'immeubles.** La meute, les hélicoptères et les avions jouent sur le pont et la pointe : de la route, de l'eau, une ville lointaine. Les plans les plus chargés en distribution sont dans les scènes les plus légères.
+- **À chaque coupe, le lieu ou le regard change.** Jamais deux plans de suite au même endroit dans le même axe.
+- **Le ciel se règle par scène.** Sur l'avenue, la bande corail est au bout de la route. Sur le pont et la pointe, le ciel est tourné pour qu'elle passe derrière la ville. À une seconde le plan, personne ne refait la carte.
+- **Les palmiers restent sur l'avenue.** Après le carrefour il n'y en a plus : on a quitté le front de mer.
+
+| Plan | Lieu | Scène | La voiture en fuite | La caméra | Décor à construire |
+|---|---|---|---|---|---|
+| OUV | l'avenue des hôtels | A | ligne droite, vers la bande corail | rail, trois quarts dos | rien |
+| P1 ★ | l'avenue, avant le carrefour | A | ligne droite, puis elle bondit | dans l'habitacle | rien |
+| P2 ★★ | le carrefour | A | virage à gauche, l'arrière glisse | drone à la verticale | petit |
+| P3 ★★★ | la rue des enseignes | B | ligne droite, dans l'axe de la rue | fixe, au ras du sol | moyen |
+| P4 ★★★★ | le pont, la descente | C | descend la rampe vers nous | 200 mm, face à la rampe | petit à moyen |
+| P5 ★★★★★ | le pont, au pied de la rampe | C | passe au ras de l'objectif | à l'épaule, vers le ciel | rien de plus |
+| P6 ★★★★★★ | le pont, le dernier tronçon | C | en tête de la colonne | grue qui monte et recule | rien de plus |
+| FIN, FIN6 | la pointe | D | freine et s'immobilise | fixe ; orbite | petit |
+
+Effort : petit, quelques heures d'un agent ; moyen, une journée ; gros, deux jours ou plus. Les poids de scène donnés plus bas sont des cibles, pas des mesures.
+
+**L'avenue des hôtels (scène A, elle existe) : OUV et P1**
+
+- *OUV* : rien ne change. La voiture roule vers la bande corail, l'océan à sa droite, devant le premier pâté d'immeubles.
+- *P1* : le même lieu, cent mètres plus loin, vu de l'habitacle. Le parcours ajoute une chose : par le pare-brise, flous, les feux orange suspendus du carrefour qui approche. La voiture bondit vers eux.
+- *Pourquoi deux plans ici* : le calme tient en un seul lieu. La rupture vient avec le virage.
+
+**Le carrefour (scène A, il existe) : P2**
+
+- *Le lieu* : le premier carrefour de l'avenue (la rue transversale de `scene_a.py`, y 120 à 134). Passages piétons, ligne d'arrêt, feux suspendus, fils, toits équipés : tout y est.
+- *Pourquoi* : vue du ciel, une ligne droite est un trait ; un virage est un dessin. Et c'est ici que la voiture quitte l'avenue : la fuite commence.
+- *La voiture en fuite* : elle arrive par l'avenue, freine, vire à gauche dans la rue transversale. L'arrière glisse, les roues braquées en contre, la gerbe d'eau suit l'arc. Elle ressort en accélérant. Environ 50 km/h dans le virage, pas de tête-à-queue.
+- *Les poursuivants* : la première patrouille entre dans le virage à la fin du plan, la seconde est encore sur l'avenue. Aucune tôle ne se touche.
+- *La caméra* : drone à 30 m, à la verticale du carrefour, 35 mm. Le cadre est tourné de 45° par rapport aux rues : la voiture entre en bas, vire au centre, sort en haut. Elle monte dans l'image du début à la fin. Rotation lente de 10°, comme prévu.
+- *Ce qui change au §2.3* : l'avenue n'est plus verticale dans le cadre ; le drone reste au-dessus du carrefour au lieu d'avancer ; la voiture vire au lieu d'accélérer tout droit.
+- *À faire* : habiller les trottoirs et régler les faisceaux des gyrophares, les deux défauts connus de la vue de drone (SPEC §18.36). Le vrai travail est l'animation du virage.
+
+**La rue des enseignes (scène B, à construire, effort moyen) : P3**
+
+- *Le lieu* : la rue où la voiture vient de tourner, plus loin dans la ville. Étroite : chaussée de 8 m, trottoirs de 3 m, façades face à face à 14 m, deux à quatre étages. Enseignes en potence des deux côtés, vitrines allumées, fils et guirlandes en travers, voitures garées d'un seul côté, flaques le long des bordures. 120 m suffisent.
+- *Pourquoi* : un barrage ferme un passage étroit. Sur l'avenue, deux patrouilles ne barrent rien, et un côté du cadre est vide : la plage. Ici les façades font deux murs, les enseignes s'empilent vers le fond et se reflètent au sol, les éclairs de tir claquent sur les vitrines. C'est le plan le plus fermé et le plus sombre du film : pas de bande corail, une fente de ciel marine. Le pont, juste après, rouvre le ciel.
+- *La voiture en fuite* : pleine vitesse dans l'axe de la rue, un léger écart pour viser le passage de 3 m entre les deux pare-chocs, elle traverse les plots et frôle l'objectif.
+- *Les poursuivants* : deux patrouilles à l'arrêt en barrage, une roue sur le trottoir ; la troisième loin derrière la voiture en fuite, gyrophares au fond de la rue.
+- *La caméra* : celle du §2.3 (30 cm du sol, 24 mm, fixe puis la première secousse), dans l'axe de la rue.
+- *Ce qui change au §2.3* : le décor seul.
+- *Les enseignes* : mots génériques (SPEC §18.36), en ambre, crème et corail, un peu de menthe et de lilas. Jamais le duo magenta et cyan (§3.2). Aucune dans les bandes du HUD.
+- *Réutilisé* : quatre dessins de façade de `facade_mix.py` (la boutique d'angle, le petit hôtel, l'Art déco d'angle, le bloc bas), la chaussée qui sèche, les voitures garées, les lampadaires, les fils.
+- *À écrire* : une rue à deux voies (la largeur et les marquages de `road.py` sont ceux de l'avenue) ; des immeubles posés des deux côtés avec leurs accessoires et leurs lumières (`place()` ne connaît que le côté ville) ; les potences. Poids visé : moins de 3 Go (quatre dessins au lieu de huit, ni rangs arrière, ni plage).
+
+**Le pont (scène C, à construire, effort petit à moyen) : P4, P5 et P6**
+
+- *Le lieu* : au bout de la rue, un pont routier franchit la lagune. 420 m, quatre voies, deux rampes droites à 6 %, une crête à 7 m, puis un dernier tronçon plat de 100 m. Garde-corps bas, lampadaires des deux côtés tous les 30 m, l'eau dessous, la ville derrière. Aucun immeuble proche.
+- *Trois plans, trois regards* : dans l'axe au ras du tablier (P4), de côté vers le ciel (P5), d'en haut vers la ville (P6). La voiture avance : la descente, le pied de la rampe, le dernier tronçon.
+- *Réutilisé* : la chaussée, les lampadaires, le muret de la promenade comme garde-corps, la mer, la brume, le ciel.
+- *À écrire* : un tablier en pente (`road.py` n'extrude que du plat) et le lointain.
+- *Le lointain* : la ville vue de la lagune, à 300 m et plus. Les boîtes à fenêtres allumées des premières façades (`FILM3D_FACADE=base`), sans rez-de-chaussée ni accessoires. Il sert au pont et à la pointe. Poids visé de la scène, distribution comprise : moins de 1,5 Go.
+
+*P4, la meute.*
+- *Pourquoi* : à 200 mm sur une route plate, les poursuivants se cachent les uns derrière les autres. Sur une rampe qui descend vers la caméra, chaque véhicule est plus haut dans l'image que celui qui le précède : la meute s'étage toute seule, dans un cadre vertical. La focale écrase les lampadaires en deux colonnades ambre. Au-dessus de la crête, le ciel rose puis indigo, et le haut des tours de la ville en disques ambre flous.
+- *La voiture en fuite* : elle vient de passer la crête et descend la rampe en ligne droite, vers la caméra.
+- *Les poursuivants* : ils surgissent de la crête pendant le plan. Les patrouilles d'abord, puis le fourgon, plus haut qu'elles, qui force au milieu.
+- *La caméra* : sur le tronçon plat, 50 m après le pied de la rampe, à 1,5 m, 200 mm. Zoom avant lent, tremblé continu, brume.
+- *Ce qui change au §2.3* : la meute n'est plus déjà dans le cadre, elle déborde de la crête. Le reste tient.
+
+*P5, le projecteur.*
+- *Pourquoi* : un hélicoptère qui monte le long d'un pont, de sous le tablier, est une image de film. Rien ne le cache, ni toit ni palme : son projecteur traverse toute la brume de la lagune avant de trouver la voiture.
+- *La voiture en fuite* : ligne droite, pleine vitesse, elle passe au ras de l'objectif, la meute derrière elle.
+- *L'hélicoptère* : il monte derrière le garde-corps d'en face, au-dessus de l'eau, et vient sur le tablier.
+- *La caméra* : sur le trottoir du pont, à 40 cm du sol, entre un fût de lampadaire et le garde-corps, 28 mm. À l'épaule, panoramique vers le haut, secouée par le rotor.
+- *Ce qui change au §2.3* : le trottoir est celui du pont ; les deux troncs de palmiers deviennent un fût et un garde-corps ; l'hélicoptère monte de sous le tablier, plus de derrière les toits.
+
+*P6, toute la ville.*
+- *Pourquoi* : on ne voit toute une ville que de l'extérieur. Du bout du pont elle tient entière dans le cadre : une bande de fenêtres allumées d'un bord à l'autre, la bande corail derrière elle, et le pont en ruban vertical de gyrophares, doublé par son reflet dans la lagune.
+- *La voiture en fuite* : en tête, sur le dernier tronçon, vers la pointe.
+- *Les poursuivants* : la colonne couvre le pont jusqu'à la ville. Les trois hélicoptères en formation au-dessus du tablier. Les deux avions arrivent de derrière la ville, très bas, dans l'axe du pont.
+- *La caméra* : la grue part à 4 m au-dessus du tablier, devant la voiture, et monte à 35 m en reculant vers la pointe, 24 mm.
+- *Ce qui change au §2.3* : l'avenue devient le pont ; la ville n'est plus vue de côté, elle est de face et entière.
+
+**La pointe (scène D, à construire, effort petit) : FIN et FIN6**
+
+- *Le lieu* : l'esplanade du §2.3 a une adresse, le bout de la route après le pont. Un terre-plein rond de 60 m, dallé, entouré d'eau, un garde-corps bas, un seul lampadaire, des flaques.
+- *Pourquoi* : un cul-de-sac explique l'arrêt. L'eau tout autour porte la brume et les lueurs hors champ de FIN. Le rond donne sa forme à l'anneau de FIN6.
+- *FIN* : la voiture arrive du pont, freine en ligne, finit en léger travers. La caméra du §2.3 est tournée vers le pont : derrière la voiture, la file de ses lampadaires, floue.
+- *FIN6* : inchangé. L'orbite montre tour à tour le pont couvert de gyrophares, la ville allumée et l'eau.
+- *Ce n'est pas un lieu de plus* : le §2.3 demandait déjà cette esplanade.
+
+**L'ordre de construction.** Le butoir demande six plans : FIN, OUV, P1 à P4 (SPEC §18.36). Trois scènes neuves, environ deux jours d'agent en tout, à mener en parallèle ; les images d'essai passent par l'unique file de rendu du Mac.
+
+1. La pointe et le lointain : FIN est la fin de tous les niveaux, et la scène est la plus légère.
+2. Le pont : P4, puis P5 et P6 sans décor de plus.
+3. Le carrefour : P2.
+4. La rue des enseignes : P3.
+
+OUV et P1 s'animent pendant ce temps sur l'avenue, qui existe.
+
+**Ce qu'on coupe si le temps manque, dans cet ordre.**
+
+1. La rue des enseignes, le seul lieu neuf qui coûte. P3 se replie dans la rue transversale de la scène A, à la sortie du carrefour, caméra tournée vers l'avenue et l'océan : aucun décor à construire.
+2. Le virage de P2, si son animation ne tient pas. P2 redevient la ligne droite du §2.3.
+3. Les rampes du pont. Tablier plat, et la caméra de P4 monte à 5 m pour étager la meute.
+
+On ne coupe ni le pont ni la pointe : deux scènes sans immeuble pour cinq plans. Le plancher du parcours est donc trois décors : l'avenue, le pont, la pointe.
+
+**La version ambitieuse.** La même carte et le même ordre, avec des lieux plus riches. Elle ajoute :
+
+- **Le rond-point** à la place du carrefour (P2) : la voiture le prend à contresens autour d'un îlot de palmiers. Gros : `road.py` ne sait pas courber une chaussée.
+- **Le pont à haubans** (P4, P5, P6) : un pylône et des câbles, qui rayent le cadre à 200 mm et que le projecteur traverse. Moyen.
+- **Le port** (P5) : le plan quitte le pont pour un quai, entre des piles de conteneurs aux couleurs du film ; l'hélicoptère monte derrière un portique. P5 gagne son lieu. Gros : portiques à trouver en bibliothèque libre ou à écrire.
+- **La marina** (FIN, FIN6) : la pointe reçoit des pontons et des mâts ; l'orbite de FIN6 passe derrière eux. Gros : bateaux de bibliothèque, scène plus lourde.
+
+Trois gros et un moyen : six à huit jours d'agent, des modèles à trouver et à nettoyer, des scènes de 3 Go. Pas avant le gel du 16 novembre. Mais le lecteur lit des mp4 : un plan se remplace après le 19 sans toucher au code. La version ambitieuse est la suite de la version recommandée, pas une autre voie.
+
 ---
 
 ## 3. Le look
