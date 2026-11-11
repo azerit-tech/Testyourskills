@@ -172,10 +172,16 @@ export function CardPage({ id }: { id: string }) {
   // La scène 3D (Three.js et ses assets) se charge dès que la fiche est
   // demandée, et s'y prépare pendant l'attente du scoring : shaders compilés,
   // textures sur le GPU. Jamais en mouvement réduit : il n'y aura pas de scène.
-  // Le film (§18.36) télécharge ses vidéos pendant l'attente, en basse priorité.
+  // Le film (§18.36) télécharge ses vidéos pendant l'attente, en basse priorité ;
+  // fiche prête, le niveau est connu : seule la fin utile se charge (fin6 à six étoiles).
   useEffect(() => {
     const scene = revealToPlay(revealScene(), reduced);
-    if (scene && (view.s === "pending" || (view.s === "loading" && fresh))) {
+    if (scene === "film" && view.s === "done" && (fresh || sawPending)) {
+      const main = view.item.kind === "card" ? view.item.card : view.item.comparison.github;
+      loadFilm()
+        .then((m) => m.preloadFilm(starsFor(main.overall)))
+        .catch(() => undefined);
+    } else if (scene && (view.s === "pending" || (view.s === "loading" && fresh))) {
       if (scene === "film")
         loadFilm()
           .then((m) => m.preloadFilm())

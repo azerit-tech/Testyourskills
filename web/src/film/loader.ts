@@ -8,7 +8,7 @@
 // change plus pour la page.
 import { isMock } from "../lib/api";
 import { filmFileUrl, type FileId, type Quality } from "./files";
-import { initialVariant, probeVerdict, RateMeter } from "./net";
+import { endingToLoad, initialVariant, probeVerdict, RateMeter } from "./net";
 
 interface NetInfo {
   saveData?: boolean;
@@ -108,6 +108,11 @@ async function download(j: Job): Promise<string> {
       const chunks: Uint8Array[] = [];
       for (;;) {
         const { done, value } = await reader.read();
+        // abandonné (la fin qui ne jouera pas) : la file passe au suivant sans attendre la fin du flux
+        if (j.ctrl.signal.aborted) {
+          void reader.cancel().catch(() => undefined);
+          throw new DOMException("film: abandonné", "AbortError");
+        }
         const now = performance.now();
         if (value) {
           chunks.push(value);
@@ -190,9 +195,12 @@ export function filmNet(): { bytes: number; bps: number | null; firstStart: numb
 
 /**
  * Dès le premier contact avec le formulaire, puis pendant l'attente (§5.4) :
- * la poursuite, puis la fin, en basse priorité.
+ * la poursuite, puis la fin la plus probable, en basse priorité. Avec le
+ * niveau (la fiche est prête) : seule la fin utile, l'autre est abandonnée.
  */
-export function preloadFilm(): void {
+export function preloadFilm(level?: number): void {
   if (!canPlayFilm()) return;
-  void loadFilmFiles(["poursuite", "fin"]).catch(() => undefined);
+  const { load, drop } = endingToLoad(level);
+  if (drop) dropFilmFile(drop);
+  void loadFilmFiles(["poursuite", load]).catch(() => undefined);
 }

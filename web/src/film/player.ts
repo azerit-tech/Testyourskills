@@ -10,7 +10,8 @@
 // l'encre reste jusqu'à la première image de B (deux images au plus).
 import { FPS, type FilmPlan } from "../../../shared/film";
 import type { Quality } from "./files";
-import { canPlayFilm, debugFlag, filmNet, filmVariant, loadFilmFiles } from "./loader";
+import { canPlayFilm, debugFlag, dropFilmFile, filmNet, filmVariant, loadFilmFiles } from "./loader";
+import { endingToLoad } from "./net";
 import { filmUnlocks, filmVideos } from "./unlock";
 
 export type { Quality } from "./files";
@@ -306,6 +307,9 @@ export function createFilmPlayer({ plan, host, cover, onTime }: Options): FilmPl
   return {
     async prepare() {
       if (!canPlayFilm()) throw new Error("film: H.264 illisible");
+      // la fin qui ne jouera pas cède la place, même chargée en avance pendant l'attente
+      const { drop } = endingToLoad(plan.level);
+      if (drop) dropFilmFile(drop);
       const loaded = await loadFilmFiles(["poursuite", plan.ending]);
       const [srcA, srcB] = loaded.urls;
       q = loaded.quality;

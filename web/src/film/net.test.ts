@@ -1,6 +1,6 @@
 // Le film et le réseau (docs/cinematique-poursuite.md §5.3, §5.4).
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ECO_BELOW_BPS, filmAssetUrl, initialVariant, PROBE_BYTES, probeVerdict, RateMeter, STALL_MS } from "./net";
+import { ECO_BELOW_BPS, endingToLoad, filmAssetUrl, initialVariant, PROBE_BYTES, probeVerdict, RateMeter, STALL_MS } from "./net";
 
 describe("les adresses du film", () => {
   it("sans base : l'adresse à empreinte donnée par Vite", () => {
@@ -47,6 +47,14 @@ describe("le choix de la variante", () => {
   it("un fichier fini trop court ne dit rien : la haute reste ; assez long, il tranche", () => {
     expect(probeVerdict(100_000, 5000, true)).toBe("keep");
     expect(probeVerdict(320_000, 1000, true)).toBe("eco");
+  });
+});
+
+describe("la fin à charger (six étoiles)", () => {
+  it("niveau inconnu : la fin la plus probable ; niveau connu : la seule fin utile, l'autre abandonnée", () => {
+    expect(endingToLoad()).toEqual({ load: "fin", drop: null });
+    expect(endingToLoad(6)).toEqual({ load: "fin6", drop: "fin" });
+    for (const l of [1, 2, 3, 4, 5]) expect(endingToLoad(l)).toEqual({ load: "fin", drop: "fin6" });
   });
 });
 
@@ -136,5 +144,27 @@ describe("le chargement en flux (loader.ts)", () => {
     vi.stubGlobal("fetch", async () => new Response("<!doctype html>", { headers: { "content-type": "text/html" } }));
     const { loadFilmFiles } = await import("./loader");
     await expect(loadFilmFiles(["poursuite"])).rejects.toThrow(/film/);
+  });
+
+  it("six étoiles connues pendant le chargement de `fin` : elle est abandonnée, `fin6` se charge dans la même variante", async () => {
+    const asked: string[] = [];
+    const aborted: string[] = [];
+    vi.stubGlobal("navigator", {});
+    vi.stubGlobal("document", { createElement: () => ({ canPlayType: () => "probably" }) });
+    vi.stubGlobal("fetch", async (url: string, init: RequestInit) => {
+      const name = url.replace(/^.*\/(\w+-\d+).*$/, "$1");
+      asked.push(name);
+      init.signal?.addEventListener("abort", () => aborted.push(name));
+      // la poursuite vite (la haute reste), la fin lentement
+      return name.startsWith("fin-") ? slowResponse(40, 50_000, 50) : slowResponse(8, 50_000, 0);
+    });
+    const { loadFilmFiles, preloadFilm } = await import("./loader");
+    preloadFilm();
+    await new Promise((r) => setTimeout(r, 120));
+    preloadFilm(6);
+    const r = await loadFilmFiles(["poursuite", "fin6"]);
+    expect(r.quality).toBe("720");
+    expect(asked).toEqual(["poursuite-720", "fin-720", "fin6-720"]);
+    expect(aborted).toEqual(["fin-720"]);
   });
 });

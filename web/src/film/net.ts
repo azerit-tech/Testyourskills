@@ -2,6 +2,7 @@
 // pure, sans DOM, testée par net.test.ts. Les adresses des fichiers, le choix
 // de la variante (haute ou éco) sur le débit mesuré, et le compteur de débit.
 // Le chargement lui-même est dans loader.ts.
+import type { EndingId } from "../../../shared/film/cut";
 
 /** « 720 » : la variante haute ; « 540 » : la variante éco. */
 export type Quality = "720" | "540";
@@ -105,4 +106,14 @@ export class RateMeter {
     if (this.bytes < 32_000 || ms < 50) return null;
     return bitsPerSecond(this.bytes, ms);
   }
+}
+
+/**
+ * La fin à charger. Niveau inconnu (l'attente) : `fin`, la plus probable,
+ * après la poursuite. Niveau connu : seule la fin utile ; l'autre, si elle est
+ * en cours ou en file, est abandonnée (`drop`).
+ */
+export function endingToLoad(level?: number): { load: EndingId; drop: EndingId | null } {
+  if (level === undefined) return { load: "fin", drop: null };
+  return level === 6 ? { load: "fin6", drop: "fin" } : { load: "fin", drop: "fin6" };
 }
