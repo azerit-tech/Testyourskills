@@ -8,10 +8,14 @@
 // décaler de l'image. La coupe au niveau : quand A présente la dernière image
 // du dernier plan joué, l'encre la couvre, A s'arrête, B part et passe devant ;
 // l'encre reste jusqu'à la première image de B (deux images au plus).
+// Le chien de garde (watchdog.ts, §5.5) : une erreur de balise, une pause non
+// demandée ou une horloge figée plus de 1,5 s pendant la lecture : une
+// relance, puis le flash et la fiche. Jamais d'image figée ni d'écran noir.
 import { FPS, type FilmPlan } from "../../../shared/film";
 import type { Quality } from "./files";
 import { canPlayFilm, debugFlag, dropFilmFile, filmNet, filmVariant, loadFilmFiles } from "./loader";
 import { endingToLoad } from "./net";
+import { PlaybackWatchdog } from "./watchdog";
 import { filmUnlocks, filmVideos } from "./unlock";
 
 export type { Quality } from "./files";
@@ -35,6 +39,8 @@ export interface FilmStats {
   quality: Quality;
   /** requestVideoFrameCallback disponible (suivi image par image). */
   frameCallbacks: boolean;
+  /** Relances du chien de garde (horloge figée, pause non demandée). */
+  retries: number;
   /** L'instant du film. */
   t: number;
 }
@@ -132,6 +138,12 @@ export function createFilmPlayer({ plan, host, cover, onTime }: Options): FilmPl
   let playFrom = 0;
   let playK = 0;
   let startMs: number | null = null;
+  /** Le chien de garde, armé tant qu'une balise doit avancer. */
+  const dog = new PlaybackWatchdog();
+  /** Les balises que le lecteur a lui-même mises en pause (leur événement « pause » est attendu). */
+  const asked = new Set<HTMLVideoElement>();
+  /** Les deux balises sont chargées et posées : leurs erreurs sont désormais des erreurs de lecture. */
+  let prepared = false;
 
   for (const v of [a, b]) {
     v.className = "film-video";
@@ -150,6 +162,13 @@ export function createFilmPlayer({ plan, host, cover, onTime }: Options): FilmPl
   const coverOn = (on: boolean) => {
     cover.style.opacity = on ? "1" : "0";
   };
+  /** Une pause demandée par le lecteur : le chien de garde ne la prend pas pour un incident. */
+  const halt = (v: HTMLVideoElement) => {
+    if (!v.paused) asked.add(v);
+    v.pause();
+  };
+  /** La balise qui doit avancer, ou aucune (gel et flash). */
+  const active = (): HTMLVideoElement | null => (mode === "chase" ? a : mode === "ending" ? b : null);
 
   const tryPlay = (v: HTMLVideoElement): Promise<void> => {
     if (simulateRefusal && filmUnlocks() === unlocksAtStart) {
@@ -161,9 +180,10 @@ export function createFilmPlayer({ plan, host, cover, onTime }: Options): FilmPl
   /** Erreur de lecture en cours de film (§5.5) : flash immédiat, la fiche se pose. */
   const flashNow = () => {
     if (disposed || over || mode === "tail") return;
+    dog.disarm();
     mode = "tail";
-    a.pause();
-    b.pause();
+    halt(a);
+    halt(b);
     coverOn(false);
     tailBase = Math.max(time(), plan.flash.from / FPS);
     tailSince = performance.now();
@@ -174,6 +194,15 @@ export function createFilmPlayer({ plan, host, cover, onTime }: Options): FilmPl
       if (disposed || (e as { name?: string })?.name === "AbortError") return;
       flashNow();
     });
+  };
+  /** La relance : la balise est replacée sur son image et relancée. */
+  const retry = (v: HTMLVideoElement) => {
+    place(v, Math.floor(v.currentTime * FPS));
+    playVideo(v);
+  };
+  const react = (action: "ok" | "retry" | "fail", v: HTMLVideoElement) => {
+    if (action === "retry") retry(v);
+    else if (action === "fail") flashNow();
   };
 
   const watchA = () => {
@@ -230,13 +259,14 @@ export function createFilmPlayer({ plan, host, cover, onTime }: Options): FilmPl
   /** La coupe (`from` : l'instant où l'encre paraît) : l'encre d'abord, A s'arrête, B part et passe devant. */
   const toEnding = (from: number) => {
     coverOn(true);
-    a.pause();
+    halt(a);
     mode = "ending";
     bShown = 0;
     bLastK = -1;
     switchFrom = from;
     show("ending");
     playVideo(b);
+    dog.arm(performance.now(), b.currentTime);
     if (!rvfc) {
       const onPlaying = () =>
         requestAnimationFrame(() => {
@@ -247,8 +277,9 @@ export function createFilmPlayer({ plan, host, cover, onTime }: Options): FilmPl
     }
   };
   const toTail = (now: number) => {
+    dog.disarm();
     mode = "tail";
-    b.pause();
+    halt(b);
     if (b.currentTime > (plan.endVideo - 0.5) / FPS) place(b, plan.endVideo - 1);
     tailBase = tailFromT;
     tailSince = rvfc && tailAt ? Math.min(now, tailAt) : now;
@@ -265,6 +296,9 @@ export function createFilmPlayer({ plan, host, cover, onTime }: Options): FilmPl
       const due = rvfc ? tailAt > 0 && now >= tailAt - TAIL_LEAD_MS : b.currentTime >= (plan.endVideo - 0.5) / FPS;
       if (due || b.ended) toTail(now);
     }
+    // l'horloge de la balise active doit avancer
+    const v = active();
+    if (v && dog.watching) react(dog.check(now, v.currentTime), v);
     const t = time(now);
     if (t >= plan.duration) {
       over = true;
@@ -281,8 +315,9 @@ export function createFilmPlayer({ plan, host, cover, onTime }: Options): FilmPl
     if (!running) return;
     pinned = time();
     running = false;
-    a.pause();
-    b.pause();
+    dog.disarm();
+    halt(a);
+    halt(b);
     if (mode === "tail") tailBase = pinned;
     if (raf) cancelAnimationFrame(raf);
     raf = 0;
@@ -301,7 +336,32 @@ export function createFilmPlayer({ plan, host, cover, onTime }: Options): FilmPl
       playVideo(a);
     } else if (mode === "ending") playVideo(b);
     else tailSince = now;
+    const v = active();
+    if (v) dog.arm(now, v.currentTime);
     if (!raf) raf = requestAnimationFrame(tick);
+  }
+
+  // Les incidents signalés par les balises, une fois le film prêt (§5.5).
+  const onError = () => {
+    if (prepared && !disposed) flashNow();
+  };
+  const onPause = (e: Event) => {
+    const v = e.currentTarget as HTMLVideoElement;
+    if (asked.delete(v)) return;
+    // la fin du fichier, l'onglet caché (le lecteur s'arrête de lui-même), ou déjà repartie : rien à faire
+    const atEnd = v.ended || (Number.isFinite(v.duration) && v.currentTime >= v.duration - 0.05);
+    if (!prepared || disposed || !running || document.hidden || v !== active() || !v.paused || atEnd) return;
+    react(dog.incident(performance.now()), v);
+  };
+  const onStalled = (e: Event) => {
+    const v = e.currentTarget as HTMLVideoElement;
+    // une relance douce ; si l'horloge reste figée, le chien de garde tranche
+    if (prepared && !disposed && running && v === active()) playVideo(v);
+  };
+  for (const v of [a, b]) {
+    v.addEventListener("error", onError);
+    v.addEventListener("pause", onPause);
+    v.addEventListener("stalled", onStalled);
   }
 
   return {
@@ -330,7 +390,7 @@ export function createFilmPlayer({ plan, host, cover, onTime }: Options): FilmPl
           if ((e as { name?: string })?.name !== "NotAllowedError") throw e;
           gesture = true;
         }
-        v.pause();
+        halt(v);
       }
       if (disposed) throw new Error("film: abandonné");
       place(a, 0);
@@ -340,6 +400,7 @@ export function createFilmPlayer({ plan, host, cover, onTime }: Options): FilmPl
       watchA();
       watchB();
       await twoFrames();
+      prepared = true;
       return gesture ? "gesture" : "ready";
     },
     play,
@@ -352,7 +413,7 @@ export function createFilmPlayer({ plan, host, cover, onTime }: Options): FilmPl
       coverOn(false);
       if (f < plan.cut) {
         mode = "chase";
-        b.pause();
+        halt(b);
         place(b, 0);
         place(a, f);
         aShown = f / FPS;
@@ -360,24 +421,27 @@ export function createFilmPlayer({ plan, host, cover, onTime }: Options): FilmPl
         show("chase");
       } else if (f < plan.cut + plan.endVideo) {
         mode = "ending";
-        a.pause();
+        halt(a);
         place(b, f - plan.cut);
         bShown = (f - plan.cut) / FPS;
         bLastK = -1;
         show("ending");
       } else {
         mode = "tail";
-        a.pause();
-        b.pause();
+        halt(a);
+        halt(b);
         place(b, plan.endVideo - 1);
         tailBase = T;
         tailSince = performance.now();
         show("ending");
       }
       pinned = T;
+      dog.disarm();
       if (running) {
         if (mode === "chase") playVideo(a);
         else if (mode === "ending") playVideo(b);
+        const v = active();
+        if (v) dog.arm(performance.now(), v.currentTime);
         if (!raf) raf = requestAnimationFrame(tick);
       }
       onTime(running ? time() : T);
@@ -396,17 +460,21 @@ export function createFilmPlayer({ plan, host, cover, onTime }: Options): FilmPl
         dropped += s?.droppedVideoFrames ?? 0;
         decoded += s?.totalVideoFrames ?? 0;
       }
-      return { dropped, decoded, skipped, leaked, switchMs, startMs, bytes: filmNet().bytes, quality: q, frameCallbacks: rvfc, t: time() };
+      return { dropped, decoded, skipped, leaked, switchMs, startMs, bytes: filmNet().bytes, quality: q, frameCallbacks: rvfc, retries: dog.retries, t: time() };
     },
     dispose() {
       disposed = true;
       running = false;
+      dog.disarm();
       if (raf) cancelAnimationFrame(raf);
       if (rvfc) {
         a.cancelVideoFrameCallback(aCb);
         b.cancelVideoFrameCallback(bCb);
       }
       for (const v of [a, b]) {
+        v.removeEventListener("error", onError);
+        v.removeEventListener("pause", onPause);
+        v.removeEventListener("stalled", onStalled);
         v.pause();
         v.remove();
         // libère le décodeur ; les blobs restent pour une autre fiche de la page
