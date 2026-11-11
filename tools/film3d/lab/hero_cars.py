@@ -730,7 +730,19 @@ def load_hero(variant="w111", collection=None, lights_on=True, raw=False):
         car["cockpit"] = dict(eye=Vector((-0.55, 0.36, 1.22)), wheel=Vector((0.55, 0.42, 0.87)))
         return car
     if variant == "slc":
-        return _load_slc(collection, lights_on, raw)
+        parts, report = _load_slc(collection, lights_on, raw)
+        car = _finish("slc", parts, collection, lights_on, raw,
+                      {k: (f"slc_wheel_{k}|",) for k in ("FL", "FR", "BL", "BR")}, {}, report)
+        if not raw:
+            body = car["body"]
+            rear = ray_x([body], 0.0, 0.67, False)
+            if rear is not None:
+                pl = add_plate(f"{body.name}_plate_rear", rear, -1, size=(0.305, 0.152), coll=body.users_collection[0])
+                cv.parent_keep(pl, body)
+            car["lights"] = _lights(car, lights_on, ("hero_slc_head_lens",), ("hero_slc_tail_lens",))
+        # repères de l'habitacle repris de la berline, recalés comme lui
+        car["cockpit"] = dict(eye=Vector((-0.90, 0.33, 1.12)), wheel=Vector((0.23, 0.38, 0.81)))
+        return car
     if variant == "coupe":
         return _load_coupe(collection, lights_on)
     raise SystemExit(f"variante inconnue {variant}")
@@ -753,8 +765,333 @@ def _load_coupe(collection, lights_on):
     return car
 
 
+# ---------------------------------------------------------------- le coupé des années 70
+#
+# Le modèle livré est une maquette basse (caisse de 1 500 triangles), aux proportions étirées : empattement 3,37 m
+# pour 2,82 m réels, largeur 2,51 m pour 1,79 m, pneus de 90 cm. On le remet aux cotes de la voiture (empattement,
+# largeur, hauteur 1,33 m), on rend des roues de 205/70 R14 (64 cm), puis on lisse la caisse (biseaux sur les arêtes
+# vives et normales pondérées, la recette des caisses de jeu), on dessine les joints, et l'on écrit ici ce qui manque :
+# réflecteurs et ampoules des phares, barrettes de calandre, plaque vierge ; l'habitacle vient de la berline.
+
+SLC_SCALE = (0.837, 0.713, 0.754)    # x : empattement 2,82 m ; y : largeur 1,79 m ; z : hauteur 1,33 m
+SLC_TYRE_D = 0.643                   # 205/70 R14
+SLC_TRACK_Y = 0.735                  # demi-voie (1,45 m réels)
+SLC_WHEELS = {"FL": ("Ronald R10.002", "mp.004"), "FR": ("Ronald R10.004", "mp.003"),
+              "BL": ("Ronald R10.001", "mp.001"), "BR": ("Ronald R10.003", "mp.002")}
+
+# joints de panneaux, en coordonnées de la caisse remise à l'échelle (l'avant vers +x)
+SLC_GAPS = [
+    (0, -0.716, ((-2, 2), (-1.2, 1.2), (0.27, 0.90))),    # arrière des portes
+    (0, 0.805, ((-2, 2), (-1.2, 1.2), (0.27, 0.86))),     # avant des portes (pied de pare-brise)
+    (0, 0.640, ((-2, 2), (-0.62, 0.62), (0.80, 1.20))),   # arrière du capot, devant la grille d'auvent
+    (1, 0.640, ((0.64, 2.30), (-2, 2), (0.78, 1.20))),    # flancs du capot, sur les ailes
+    (1, -0.640, ((0.64, 2.30), (-2, 2), (0.78, 1.20))),
+    (0, -1.585, ((-2, 2), (-0.60, 0.60), (0.80, 1.20))),  # avant du coffre, sous la lunette
+    (1, 0.600, ((-2.36, -1.585), (-2, 2), (0.80, 1.20))), # flancs du coffre
+    (1, -0.600, ((-2.36, -1.585), (-2, 2), (0.80, 1.20))),
+]
+# le bas de caisse strié entre les roues
+SLC_RIBS = [(2, 0.022, ((-0.98, 1.18), (-1.2, 1.2), (0.265, 0.395)))]
+
+
+def _xf(ob, m):
+    ob.data.transform(m)
+    ob.data.update()
+
+
+def _smooth_shell(ob, angle=38.0, bevel=0.005):
+    """Caisse basse : sommets soudés, lissage par angle, biseau de deux segments sur les arêtes vives (l'arête
+    accroche le reflet au lieu de casser la normale), normales pondérées par l'aire des faces (les panneaux
+    plats restent plats)."""
+    bpy.ops.object.select_all(action="DESELECT")
+    ob.select_set(True)
+    bpy.context.view_layer.objects.active = ob
+    bm = bmesh.new()
+    bm.from_mesh(ob.data)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.0006)
+    bmesh.ops.join_triangles(bm, faces=bm.faces, angle_face_threshold=math.radians(30),
+                             angle_shape_threshold=math.radians(40))
+    bm.to_mesh(ob.data)
+    bm.free()
+    bpy.ops.object.shade_smooth_by_angle(angle=math.radians(angle))
+    bv = ob.modifiers.new("bevel", "BEVEL")
+    bv.limit_method = "ANGLE"
+    bv.angle_limit = math.radians(angle)
+    bv.width = bevel
+    bv.segments = 2
+    bv.harden_normals = True
+    wn = ob.modifiers.new("weighted", "WEIGHTED_NORMAL")
+    wn.keep_sharp = True
+    wn.weight = 50
+    for m in list(ob.modifiers):
+        bpy.ops.object.modifier_apply(modifier=m.name)
+
+
+def _slc_rename_wheels(parts):
+    for k, (rim, tyre) in SLC_WHEELS.items():
+        for o in parts:
+            if o.name.startswith(rim + "_") or o.name.startswith(tyre + "_"):
+                o.name = f"slc_wheel_{k}|{o.name}"
+
+
+def _slc_wheels(parts, report):
+    """Roues à 64 cm, posées aux essieux de la caisse remise à l'échelle ; l'enjoliveur central (marqué)
+    remplacé par un disque lisse."""
+    sx = SLC_SCALE[0]
+    for k in SLC_WHEELS:
+        grp = [o for o in parts if o.name.startswith(f"slc_wheel_{k}|")]
+        tyre = [o for o in grp if "Tire" in o.name and cv.tris([o]) > 20000]
+        a, b = cv.bbox(tyre)
+        c = (a + b) / 2
+        s = SLC_TYRE_D / (b.z - a.z)
+        side = 1 if c.y > 0 else -1
+        target = Vector((c.x * sx, side * SLC_TRACK_Y, SLC_TYRE_D / 2))
+        m = Matrix.Translation(target) @ Matrix.Scale(s, 4) @ Matrix.Translation(-c)
+        for o in grp:
+            _xf(o, m)
+        report[f"roue {k}"] = f"échelle {s:.3f}"
+    return s
+
+
+def _slc_clean(parts, report):
+    """Marques : l'étoile de calandre et son fond, les deux plaques (texte réel), l'enjoliveur central des jantes.
+    Les ampoules et boîtiers de phare livrés (blocs orange) laissent la place à ceux écrits ici."""
+    drop = ("Circle.002_", "Plane.001_", "Licence plate PL", "_Black_0", "Cube_Bulb")
+    keep = []
+    for o in parts:
+        if any(p in o.name for p in drop):
+            report[o.name.split("|")[-1][:32]] = "supprimé"
+            me = o.data
+            bpy.data.objects.remove(o)
+            if me.users == 0:
+                bpy.data.meshes.remove(me)
+        else:
+            keep.append(o)
+    return keep
+
+
+def _slc_lamps(parts, tag, lights_on, coll):
+    """Phares : le modèle livré ne garde que le coin enveloppant (devenu le clignotant ambre strié) et laisse
+    l'ouverture du phare vide (on voit l'intérieur de la caisse) ; on y pose le bloc d'époque : verre strié épais, deux réflecteurs paraboliques
+    superposés (route en haut, antibrouillard en bas) et leurs ampoules, fond noir. Feux arrière : le bloc
+    nervuré livré devient verre rouge, ambre et blanc, avec un fond réflecteur."""
+    on = 1.0 if lights_on else 0.0
+    head_lens = mat_lens(f"{tag}_head_lens", (0.97, 0.97, 0.95, 1), LAMP, 0.35 * on, flutes=70.0)
+    amber = mat_lens(f"{tag}_amber", lin("#ff8a1a"), AMBER, 0.0, flutes=50.0)
+    head_ref = mat_reflector(f"{tag}_head_reflector", LAMP, 2.5 * on)
+    head_bulb = mat_plain(f"{tag}_head_bulb", LAMP, rough=0.2, emit=30.0 * on)
+    chrome = bpy.data.materials.get(f"{tag}_chrome")
+    black = mat_rubber(f"{tag}_lamp_black", (0.01, 0.01, 0.011, 1), 0.5, 0.02)
+    corner = next(o for o in parts if "Glass Orange" in o.name)
+    frame = next(o for o in parts if "Orange Car Paint" in o.name)
+    corner.data.materials[0] = amber
+    frame.data.materials[0] = chrome
+    slats = [o for o in parts if o.name.startswith("Cube.002_") or o.name.startswith("Cube.003_")]
+    ca, cb = cv.bbox([corner])
+    ga, gb = cv.bbox(slats)
+    # l'ouverture : de la calandre au coin enveloppant
+    y_in = gb.y + 0.018
+    y_out = min(v.co.y for v in corner.data.vertices if v.co.y > 0) - 0.004
+    z0, z1 = ca.z - 0.006, cb.z + 0.002
+    bm = bmesh.new()
+    for s in (1, -1):
+        # le verre au ras du coin enveloppant, en retrait du cadre chromé
+        xf = cb.x - 0.004
+        ya, yb = sorted((s * y_in, s * y_out))
+        _box(bm, (xf - 0.006, ya, z0), (xf, yb, z1), mat=3)                      # verre strié de 6 mm
+        zm = z0 + 0.42 * (z1 - z0)
+        for (za, zb), depth in (((zm + 0.004, z1 - 0.008), 0.07), ((z0 + 0.008, zm - 0.004), 0.05)):
+            _dish(bm, xf - 0.012 - depth, ya + 0.008, yb - 0.008, za, zb, depth, n=16, mat=0, sign=1)
+            r = bmesh.ops.create_uvsphere(bm, u_segments=12, v_segments=8, radius=0.012,
+                                          matrix=Matrix.Translation((xf - 0.012 - depth + 0.028, (ya + yb) / 2,
+                                                                     (za + zb) / 2)))
+            for f in {f for v in r["verts"] for f in v.link_faces}:
+                f.material_index = 1
+                f.smooth = True
+        _box(bm, (xf - 0.11, ya + 0.004, zm - 0.004), (xf - 0.007, yb - 0.004, zm + 0.004), mat=2)  # séparation
+        _box(bm, (xf - 0.11, ya - 0.004, z0 - 0.004), (xf - 0.09, yb + 0.004, z1 + 0.004), mat=2)   # fond
+    head = _mesh_object(f"{tag}_headlamps", bm, [head_ref, head_bulb, black, head_lens], coll)
+    out = [head]
+    # feux arrière
+    tail_lens = mat_lens(f"{tag}_tail_lens", lin("#6a0503"), "#ff1205", 0.9 * on, flutes=0.0)
+    rear_amber = mat_lens(f"{tag}_rear_amber", lin("#c05a10"), AMBER, 0.0)
+    reverse = mat_lens(f"{tag}_reverse_lens", (0.95, 0.95, 0.95, 1))
+    tail_ref = mat_reflector(f"{tag}_tail_reflector", "#ff1205", 0.25 * on)
+    tail_ref.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = lin("#a01008")
+    for o in parts:
+        n = o.name
+        if "Cube.004_Procedural vehicle paint" in n:
+            o.data.materials[0] = tail_lens
+        elif "Cube.004_Procedural amber" in n:
+            o.data.materials[0] = rear_amber
+        elif "Cube.004_White Marble" in n:
+            o.data.materials[0] = reverse
+    tl = next(o for o in parts if "Cube.004_Procedural vehicle paint" in o.name)
+    a, b = cv.bbox([tl])
+    ys = [abs(v.co.y) for v in tl.data.vertices]
+    bm = bmesh.new()
+    for s in (1, -1):
+        # un fond rouge derrière le seul verre rouge, à 3,5 cm du verre
+        ya, yb = sorted((s * (min(ys) + 0.01), s * (max(ys) - 0.02)))
+        _box(bm, (a.x + 0.035, ya, a.z + 0.006), (a.x + 0.042, yb, b.z - 0.006), mat=0)
+    out.append(_mesh_object(f"{tag}_tail_reflectors", bm, [tail_ref], coll))
+    return out
+
+
+def _slc_grille(parts, tag, coll):
+    """Calandre sans étoile : les lames livrées (vrillées, lisibles en croix dans les reflets) cèdent la place à un
+    fond noir et à huit lames horizontales minces ; devant, deux barrettes chromées pleine largeur et un cadre."""
+    chrome = bpy.data.materials.get(f"{tag}_chrome")
+    black = mat_rubber(f"{tag}_grille_black", (0.012, 0.012, 0.013, 1), 0.35, 0.02)
+    slats = [o for o in parts if o.name.startswith("Cube.002_") or o.name.startswith("Cube.003_")]
+    a, b = cv.bbox(slats)
+    for o in slats:
+        parts.remove(o)
+        bpy.data.objects.remove(o)
+    bm = bmesh.new()
+    x = b.x + 0.004
+    _box(bm, (x - 0.075, a.y, a.z), (x - 0.065, b.y, b.z), mat=1)
+    n = 8
+    for i in range(n):
+        zc = a.z + (b.z - a.z) * (i + 0.5) / n
+        _box(bm, (x - 0.065, a.y + 0.004, zc - 0.004), (x - 0.02, b.y - 0.004, zc + 0.004), mat=1)
+    for zc in (a.z + 0.36 * (b.z - a.z), a.z + 0.64 * (b.z - a.z)):
+        _box(bm, (x - 0.012, a.y + 0.01, zc - 0.007), (x + 0.006, b.y - 0.01, zc + 0.007))
+    t = 0.012
+    _box(bm, (x - 0.07, a.y - t, b.z), (x + 0.004, b.y + t, b.z + t))
+    _box(bm, (x - 0.07, a.y - t, a.z - t), (x + 0.004, b.y + t, a.z))
+    _box(bm, (x - 0.07, a.y - t, a.z), (x + 0.004, a.y, b.z))
+    _box(bm, (x - 0.07, b.y, a.z), (x + 0.004, b.y + t, b.z))
+    ob = _mesh_object(f"{tag}_grille", bm, [chrome, black], coll)
+    bv = ob.modifiers.new("bevel", "BEVEL")
+    bv.width = 0.002
+    bv.segments = 2
+    return ob
+
+
+def _slc_interior(tag, coll, lights_on, report, roof=()):
+    """L'habitacle de la berline (Elements Creative Studio, CC BY 4.0) recalé dans le coupé : planche, volant,
+    sièges, tapis et contre-portes avant, avancés sous le pare-brise du coupé et ramenés à sa hauteur."""
+    parts = cv.import_model(os.path.join(CAST, "hero-mercedes-w111", "model.glb"), coll)
+    cv.normalise(parts, rot_z=90)
+    want = ("w111_interior_", "w111_steering_")
+    doors = tuple(f"w111_door_{k}_{m}" for k in ("FL", "FR")
+                  for m in ("Leather Top Grain Beige", "PVC Black Matte1", "Walnut Matte", "PVC Black Matte_0"))
+    keep, door_parts = [], []
+    for o in parts:
+        if o.name.startswith(want):
+            keep.append(o)
+        elif o.name.startswith(doors):
+            door_parts.append(o)
+        else:
+            me = o.data
+            bpy.data.objects.remove(o)
+            if me.users == 0:
+                bpy.data.meshes.remove(me)
+    _w111_materials(keep + door_parts, lights_on, tag=f"{tag}_int", paint_color=PAINT["slc"],
+                    leather=LEATHER["slc"], wheel_rim="#0d0d0e")
+    dx = 0.674 - 1.018      # le pied du pare-brise du coupé contre celui de la berline
+    z0, z0n, kz = 0.29, 0.262, 0.92
+    cabin = Matrix.Translation((dx, 0, z0n - z0 * kz)) @ Matrix.Diagonal((1.0, 0.90, kz, 1))
+    # le pavillon et les montants de la berline dépassent du toit plus bas du coupé : on ne garde que ce qui est
+    # sous la ceinture de caisse, ou, à l'arrière, sous le toit et les vitres du coupé (un rayon vers le haut les touche)
+    from mathutils.bvhtree import BVHTree
+    dg = bpy.context.evaluated_depsgraph_get()
+    trees = [BVHTree.FromObject(o, dg) for o in roof]
+
+    def covered(c):
+        return any(t.ray_cast(c + Vector((0, 0, 0.005)), Vector((0, 0, 1)), 1.0)[0] is not None for t in trees)
+
+    for o in keep:
+        _xf(o, cabin)
+        bm = bmesh.new()
+        bm.from_mesh(o.data)
+        kill = [f for f in bm.faces if (c := f.calc_center_median()).z > 1.17 or (abs(c.y) > 0.64 and c.z > 0.93)
+                or (c.z > 0.90 and c.x < -1.05 and trees and not covered(c))]
+        bmesh.ops.delete(bm, geom=kill, context="FACES")
+        bm.to_mesh(o.data)
+        bm.free()
+    # contre-portes : allongées à la porte du coupé (1,5 m au lieu de 0,95 m), restées contre le flanc
+    for o in door_parts:
+        a, b = cv.bbox([o])
+        s = 1 if a.y > 0 else -1
+        m = (Matrix.Translation((-0.70 + 0.066 * 1.37, -s * 0.02, z0n - z0 * kz))
+             @ Matrix.Diagonal((1.37, 1.0, kz, 1)))
+        _xf(o, m)
+    # garnitures latérales des places arrière
+    leather = bpy.data.materials.get(f"{tag}_int_leather")
+    bm = bmesh.new()
+    for s in (1, -1):
+        y = s * 0.765
+        _box(bm, (-1.48, y - 0.012, 0.30), (-0.73, y + 0.012, 0.87))
+    keep.append(_mesh_object(f"{tag}_quarter_trim", bm, [leather], coll))
+    report["habitacle"] = f"repris de la berline, {cv.tris(keep + door_parts)} triangles"
+    for o in keep + door_parts:
+        o.name = f"{tag}_cabin|{o.name}"
+    return keep + door_parts
+
+
 def _load_slc(collection, lights_on, raw):
-    raise SystemExit("slc : pas encore écrit")
+    coll = collection or bpy.context.scene.collection
+    parts = cv.import_model(os.path.join(CAST, "hero-mercedes-slc", "model.glb"), coll)
+    # le fichier pose l'avant vers -y
+    cv.normalise(parts, rot_z=90)
+    _slc_rename_wheels(parts)
+    report = {}
+    if raw:
+        # tel que livré, seulement ramené à la longueur de la voiture remise en forme (même cadrage)
+        cv.transform_all(parts, Matrix.Scale(SLC_SCALE[0], 4))
+        return parts, report
+    tag = "hero_slc"
+    parts = _slc_clean(parts, report)
+    wheels = [o for o in parts if o.name.startswith("slc_wheel_")]
+    body_parts = [o for o in parts if o not in wheels]
+    for o in body_parts:
+        _xf(o, Matrix.Diagonal((*SLC_SCALE, 1)))
+    _slc_wheels(wheels, report)
+    on = 1.0 if lights_on else 0.0
+    paint = mat_paint(f"{tag}_paint", PAINT["slc"], gaps=SLC_GAPS, ribs=SLC_RIBS, inside="#2b2620")
+    chrome = mat_metal(f"{tag}_chrome", (0.92, 0.92, 0.93, 1), 0.05)
+    alloy = mat_metal(f"{tag}_alloy", (0.80, 0.80, 0.81, 1), 0.2)
+    seal = mat_rubber(f"{tag}_seal", rough=0.5, grain=0.05)
+    glass = mat_window(f"{tag}_glass")
+    tyre = mat_tyre(f"{tag}_tyre", r_rim=0.224, r_out=SLC_TYRE_D / 2)
+    shell = next(o for o in body_parts if o.name.startswith("Cube_Car Paint"))
+    shell.data.materials.clear()
+    shell.data.materials.append(paint)
+    _smooth_shell(shell)
+    for o in body_parts:
+        n = o.name
+        if n.startswith("Cube_Alum") or n.startswith("Cylinder_Alum"):
+            o.data.materials[0] = chrome
+        elif "Old rubber" in n:
+            o.data.materials[0] = seal
+        elif n.startswith("Cube_Glass"):
+            o.data.materials[0] = glass
+            solidify(o, 0.005)
+    for o in wheels:
+        o.data.materials.clear()
+        o.data.materials.append(tyre if "Tire" in o.name else alloy)
+    # le centre des jantes : un disque lisse à la place de l'enjoliveur marqué
+    caps = []
+    for k in SLC_WHEELS:
+        grp = [o for o in wheels if o.name.startswith(f"slc_wheel_{k}|")]
+        a, b = cv.bbox(grp)
+        c = (a + b) / 2
+        side = 1 if c.y > 0 else -1
+        y = (b.y - 0.042) if side > 0 else (a.y + 0.042)
+        bm = bmesh.new()
+        bmesh.ops.create_cone(bm, cap_ends=True, segments=32, radius1=0.032, radius2=0.028, depth=0.008,
+                              matrix=Matrix.Translation((c.x, y, c.z)) @ Matrix.Rotation(-side * math.pi / 2, 4, "X"))
+        caps.append(_mesh_object(f"slc_wheel_{k}|cap", bm, [chrome], coll, smooth=True))
+    wheels += caps
+    built = _slc_lamps(body_parts, tag, lights_on, coll)
+    built.append(_slc_grille(body_parts, tag, coll))
+    roof = [o for o in body_parts if o.name.startswith("Cube_Car Paint") or o.name.startswith("Cube_Glass")]
+    cabin = _slc_interior(tag, coll, lights_on, report, roof)
+    for o in built + cabin:
+        o.name = f"{tag}_built|{o.name}"
+    return body_parts + built + cabin + wheels, report
 
 
 # ---------------------------------------------------------------- planches

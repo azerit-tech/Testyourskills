@@ -71,8 +71,9 @@ SKETCHFAB = {
     "cast/cop-spp/model.glb": "d47bb1f61fa340588b5801cdb63812c8",
     "cast/cap-aramuor/model.glb": "9697ef10105a4e02a6074bc9bca464bd",
     "cast/gun-t77/model.glb": "7e6a5ffc9deb4994a4092ccdba85c965",
-    # la voiture poursuivie (lab/hero_cars.py) : la berline des années 60
+    # la voiture poursuivie (lab/hero_cars.py) : la berline des années 60, le coupé des années 70
     "cast/hero-mercedes-w111/model.glb": "b1bb1e82fe394153932ba1c2a341dded",
+    "cast/hero-mercedes-slc/model.glb": "79612cb9ee714df9967c6d6c4fc967b1",
 }
 
 # Poly Haven : (asset, type, résolution), ou (asset, type, résolution, dossier)
