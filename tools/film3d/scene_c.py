@@ -37,7 +37,7 @@ S, road = L.S, L.road
 
 # ---------------------------------------------------------------- le tracé
 
-Y_CITY_END = -420.0   # la rue continue un peu dans la ville
+Y_CITY_END = -1000.0  # l'avenue continue dans la ville, dans l'axe du pont (le fond de P4)
 Y_START = -320.0      # le tablier quitte le quai de la ville
 Y_FOOT_CITY = -255.0
 Y_CREST = -130.0
@@ -104,10 +104,16 @@ def build_bridge(hidden, lamp_src, far=False, haubans=False):
     M = out["M"]
     edge = out["edge"]
     # la rue de la ville et le plat du port : la même chaussée, sans bord (posée sur la promenade, sur le terre-plein)
-    L.roadway("pont_ville", [Y_CITY_END, Y_START], half=HALF, walk=WALK, rail=None, M=M, far=far)
-    L.roadway("pont_port", [Y_PORT, Y_END], half=HALF, walk=WALK, rail=None, M=M, far=far)
+    # l'avenue de la ville éclairée tous les 30 m (au 200 mm, la file de lampadaires au fond de la crête) ; le plat
+    # du port suit le tablier : la rampe ne touche le niveau du terre-plein qu'en y = 1 (en y = -20 elle est encore à
+    # 0,7 m ; plate, la chaussée du port y montrait la tranche du tablier en travers de P4)
+    ave = [Y_START - 15.0 - 30.0 * k for k in range(int((Y_START - Y_CITY_END) / 30.0))]
+    L.roadway("pont_ville", [Y_CITY_END, Y_START], half=HALF, walk=WALK, rail=None, M=M, far=far,
+              lamp_src=None if far else lamp_src, lamp_ys=ave)
+    L.roadway("pont_port", samples(Y_PORT, Y_END), deck_z, half=HALF, walk=WALK, rail=None, M=M, far=far)
     bm = L.bmesh.new()
-    L.box_bm(bm, (-12.5, Y_CITY_END, L.WATER_Z - 1.5), (12.5, Y_START, -0.01))      # la culée de la ville
+    L.box_bm(bm, (-12.5, Y_START - 45.0, L.WATER_Z - 1.5), (12.5, Y_START, -0.01))  # la culée de la ville
+    L.box_bm(bm, (-40.0, Y_CITY_END, -0.4), (40.0, Y_START - 45.0, -0.02))         # le sol de l'avenue
     L.mesh_object("pont_culee_ville", bm, [M["concrete"]])
     # les piles tous les 35 m : un chevêtre sous le caisson, deux fûts dans l'eau
     bm = L.bmesh.new()
@@ -179,10 +185,12 @@ def plan_P4(scene, hidden, haubans=False):
     y_hero = cam_y - 70.0
     place_on_deck(hero, 1.8, y_hero)
     L.drive(hero, SPEED, L.hero_wheels(hero), hero["wheel_r"])
-    pack([("patrol", -1.8, y_hero - 25.0, 0.0), ("patrol", 5.2, y_hero - 38.0, 1.0), ("patrol", -5.2, y_hero - 60.0, -1.0),
+    pack([("patrol", -1.8, y_hero - 25.0, 0.0), ("patrol", 4.2, y_hero - 38.0, 1.0), ("patrol", -4.2, y_hero - 60.0, -1.0),
           ("van", 1.8, Y_CREST + 6.0, 0.0)])
-    L.haze((-260, 260), (-420, 120), (L.WATER_Z, 70), 0.0006)
-    cam = L.camera("cam_P4", (-1.2, cam_y, 1.5), (-1.2, cam_y - 100.0, 1.5), lens=200, fstop=4.0,
+    # une brume légère et basse : au 200 mm, l'objectif regarde à travers 300 m d'air (à 0,0006 sur 70 m de haut,
+    # les patrouilles du fond se voilaient)
+    L.haze((-260, 260), (-420, 120), (L.WATER_Z, 30), 0.0002)
+    cam = L.camera("cam_P4", (0.6, cam_y, 1.5), (0.6, cam_y - 100.0, 1.5), lens=200, fstop=4.0,
                    focus=road_point(1.8, y_hero, 0.8), shift=(0.0, 0.1))
     scene.render.use_motion_blur = True
     return cam
