@@ -33,6 +33,24 @@ def main_checkout():
 ASSETS = os.environ.get("FILM3D_ASSETS") or os.path.join(os.path.dirname(main_checkout()), "design", "film", "assets")
 random.seed(27)
 
+# Les variantes à comparer, en attendant le choix de Jacques (une variable d'environnement chacune) :
+#   FILM3D_FACADE : base (les boîtes d'origine), kit (pièces assemblées), proc (tout en nœuds)
+#   FILM3D_ROUTE  : base (l'enrobé d'origine), pluie (juste après l'averse), sechage (en train de sécher)
+#   FILM3D_BLEND  : le nom du .blend écrit dans assets (scene-a.blend par défaut)
+FACADE = os.environ.get("FILM3D_FACADE", "base")
+ROUTE = os.environ.get("FILM3D_ROUTE", "base")
+BLEND = os.environ.get("FILM3D_BLEND", "scene-a.blend")
+if HERE not in sys.path:
+    sys.path.insert(0, HERE)
+
+
+def facade_module():
+    """Le module qui dessine les huit immeubles, selon FILM3D_FACADE (None : make_building d'ici)."""
+    if FACADE == "base":
+        return None
+    import importlib
+    return importlib.import_module({"kit": "facade_kit", "proc": "facade_proc"}[FACADE])
+
 # Palette (sRGB) du §3.1 de docs/cinematique-poursuite.md
 PLUM = "#4b2f54"
 CREAM = "#fff9cb"
@@ -1195,15 +1213,24 @@ def wires(name, spans, mat, sag=0.6, r=0.012):
     return ob
 
 
+def _maker():
+    mod = facade_module()
+    if mod is None:
+        return make_building
+    me = sys.modules[__name__]
+    return lambda key, M, spec: mod.make_building(me, key, M, spec)
+
+
 def prototypes(M):
     specs = building_specs()
-    return {k: make_building(k, M, v) + (v,) for k, v in specs.items()}
+    make = _maker()
+    return {k: make(k, M, v) + (v,) for k, v in specs.items()}
 
 
 def prototypes_one(M, key):
     """Un seul des huit dessins (le banc d'essai) : (objet, accessoires, lumières, spec)."""
     v = building_specs()[key]
-    return make_building(key, M, v) + (v,)
+    return _maker()(key, M, v) + (v,)
 
 
 def building_specs():
@@ -1237,17 +1264,8 @@ def building_specs():
     return specs
 
 
-def build_city(hidden):
-    M = city_mats()
-    conc = mat_concrete()
-    road_m = mat_road()
-    kerb = mat_plain("kerb", lin("#9a948c"), 0.45)
-    paint = mat_plain("paint_white", lin("#d9d5cc"), 0.55)
-    green = mat_plain("sign_green", lin("#1f4a3a"), 0.45)
-    wood = mat_plain("pole_wood", lin("#3a2c24"), 0.8)
-    side_asphalt = mat_plain("side_asphalt", lin("#262428"), 0.25)
-
-    # --- la route, les trottoirs, la plage, la mer
+def base_street(M, conc, road_m, kerb, paint, side_asphalt):
+    """La rue d'origine : des boîtes, un enrobé unique (FILM3D_ROUTE=base)."""
     box("road", -ROAD_HALF, ROAD_HALF, -30, 900, -0.05, 0.0, road_m)
     for i, (a, b) in enumerate(segments(-30, 900)):
         box(f"walk_left_{i}", FRONT_X, -ROAD_HALF - 0.2, a, b, -0.05, 0.15, conc)
@@ -1270,7 +1288,27 @@ def build_city(hidden):
             box(f"drain_l_{int(y)}", -ROAD_HALF + 0.02, -ROAD_HALF + 0.45, y, y + 0.9, 0.0, 0.005, M["metal"])
             box(f"drain_r_{int(y)}", ROAD_HALF - 0.45, ROAD_HALF - 0.02, y + 11, y + 11.9, 0.0, 0.005, M["metal"])
         y += 24.0
+
+
+def build_city(hidden):
+    M = city_mats()
+    conc = mat_concrete()
+    road_m = mat_road()
+    kerb = mat_plain("kerb", lin("#9a948c"), 0.45)
+    paint = mat_plain("paint_white", lin("#d9d5cc"), 0.55)
+    green = mat_plain("sign_green", lin("#1f4a3a"), 0.45)
+    wood = mat_plain("pole_wood", lin("#3a2c24"), 0.8)
+    side_asphalt = mat_plain("side_asphalt", lin("#262428"), 0.25)
+
+    # --- la route, les trottoirs, la plage, la mer
+    if ROUTE != "base":
+        # la chaussée bombée, le caniveau, la bordure, les dalles, les regards (tools/film3d/road.py)
+        import road
+        road.build_street(sys.modules[__name__], M, ROUTE)
+    else:
+        base_street(M, conc, road_m, kerb, paint, side_asphalt)
     wall = mat_plain("sea_wall", lin("#d9d2c4"), 0.6)
+
     box("sea_wall", ROAD_HALF + WALK, ROAD_HALF + WALK + 0.35, -30, 900, 0.0, 0.85, wall)
     box("sea_wall_cap", ROAD_HALF + WALK - 0.08, ROAD_HALF + WALK + 0.45, -30, 900, 0.85, 0.95, M["trim"])
     sand = mat_plain("wet_sand", lin("#3a332d"), 0.3)
@@ -1305,7 +1343,8 @@ def build_city(hidden):
         if not props:
             return
         for j, (pk, (px, py, pz), rot, s) in enumerate(props):
-            src = random.choice(ac_src) if pk == "ac" else tank_src
+            # ac, tank, ou le nom d'un objet source caché fourni par le module de façades
+            src = random.choice(ac_src) if pk == "ac" else tank_src if pk == "tank" else bpy.data.objects[pk]
             instance(src, f"{pk}_{n}_{j}", (x + sx * px, y0 + py, pz), rot, s)
         if not lights:
             return
@@ -1320,6 +1359,13 @@ def build_city(hidden):
                 add_light(f"wash_{n}_{j}", "SPOT", loc, (-1.5, 0, 2.2), warm, 1800.0, spot=75)
             elif lk == "blade":
                 add_light(f"blade_{n}_{j}", "SPOT", loc, (-0.35, 0, 1), warm, 900.0, spot=28)
+            elif lk == "light":
+                # lumière libre d'un module de façades : w = dict(kind, direction, color (sRGB), energy, size, spot)
+                L = dict(kind="POINT", direction=(0, 0, -1), color="#ffd9a8", energy=100.0, size=(0.2, 0.2), spot=60.0)
+                L.update(w)
+                add_light(f"fl_{n}_{j}", L["kind"], loc, L["direction"], lin(L["color"]), L["energy"], L["size"], L["spot"])
+        if spec.get("own_uplights"):
+            return
         # les façades éclairées du pied : toutes près de la caméra, plus fort sur quelques-unes
         yy = 1.5
         power = 700.0 if spec.get("uplight") else 380.0
@@ -1958,7 +2004,7 @@ def build():
     r.motion_blur_shutter = 0.5
     r.use_motion_blur = False
 
-    out = os.path.join(ASSETS, "scene-a.blend")
+    out = os.path.join(ASSETS, BLEND)
     bpy.ops.wm.save_as_mainfile(filepath=out, compress=True)
     print(f"[scene_a] écrit {out}", flush=True)
 
