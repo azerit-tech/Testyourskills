@@ -38,6 +38,7 @@ lockf -k <verrou> nice -n 19 taskpolicy -b /Applications/Blender.app/Contents/Ma
 - `FILM3D_ROUTE=base|pluie|sechage` : l'enrobé d'origine, la rue juste après l'averse (par défaut) ou la rue qui sèche (`road.py`).
 - `FILM3D_RDC=terrasse|sobre` (façades `mix`) : stores et guirlandes (par défaut) ou devantures nues, avec moins d'objets.
 - `FILM3D_PARKED` : les voitures garées sont là par défaut, `FILM3D_PARKED=0` les retire.
+- `FILM3D_HERO=w111|slc|coupe` : la voiture poursuivie, la berline des années 60 par défaut, le coupé des années 70 (les deux par `lab/hero_cars.py`) ou le coupé d'origine. Elle garde le nom d'objet `coupe` et ses roues `wheel_*` (`render.py` la cherche ainsi), phares crème et feux arrière allumés, roues qui tournent dans les plans en flou de bougé.
 - `FILM3D_BLEND` : le nom du `.blend` écrit dans `assets/` (`scene-a.blend` par défaut).
 
 ```sh

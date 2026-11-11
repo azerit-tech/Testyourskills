@@ -16,7 +16,7 @@ import sys
 
 import bmesh
 import bpy
-from mathutils import Vector
+from mathutils import Matrix, Vector
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
@@ -37,9 +37,12 @@ random.seed(27)
 #   FILM3D_FACADE : base (les boîtes d'origine), kit (pièces assemblées), proc (tout en nœuds),
 #                   mix (étages en enduit photographique, rez-de-chaussée en boutiques de bibliothèque)
 #   FILM3D_ROUTE  : base (l'enrobé d'origine), pluie (juste après l'averse), sechage (en train de sécher)
+#   FILM3D_HERO   : la voiture poursuivie, w111 (berline des années 60, par défaut), slc (coupé des années 70),
+#                   chargées par lab/hero_cars.py, ou coupe (le coupé d'origine)
 #   FILM3D_BLEND  : le nom du .blend écrit dans assets (scene-a.blend par défaut)
 FACADE = os.environ.get("FILM3D_FACADE", "mix")
 ROUTE = os.environ.get("FILM3D_ROUTE", "pluie")
+HERO = os.environ.get("FILM3D_HERO", "w111")
 BLEND = os.environ.get("FILM3D_BLEND", "scene-a.blend")
 if HERE not in sys.path:
     sys.path.insert(0, HERE)
@@ -1795,14 +1798,57 @@ def render_settings(scene):
 
 
 
+def street_hero(scene):
+    """La voiture poursuivie d'époque (lab/hero_cars.py), mise au repère de la rue comme le coupé : l'avant vers -y,
+    au sol, à sa place sur la voie. Le quart de tour est appliqué aux maillages (les roues tournent ensuite autour de
+    leur x local, comme celles du coupé). L'objet s'appelle `coupe` et ses roues `wheel_*` : render.py et
+    lab/A_pres.py la cherchent sous ces noms. Phares ramenés à ceux du coupé (90 W, 60°)."""
+    lab = os.path.join(HERE, "lab")
+    if lab not in sys.path:
+        sys.path.insert(0, lab)
+    import hero_cars
+    car = hero_cars.load_hero(HERO, lights_on=True)
+    body = car["body"]
+    bpy.context.view_layer.update()
+    R = Matrix.Rotation(-math.pi / 2, 4, "Z")     # l'avant de +x (repère des chargeurs) vers -y (la rue)
+    kids = {c: c.matrix_world.copy() for c in body.children}
+    body.data.transform(R @ body.matrix_world)
+    body.matrix_world = Matrix.Identity(4)
+    for c, W in kids.items():
+        W = R @ W
+        if c.type == "MESH":
+            loc, rot, sca = W.decompose()
+            c.data.transform(Matrix.LocRotScale(None, rot, sca))
+            W = Matrix.Translation(loc)
+        c.matrix_parent_inverse = Matrix.Identity(4)
+        c.matrix_world = W
+        c.rotation_mode = "XYZ"
+    for k, w in car["wheels"].items():
+        w.name = f"wheel_{k}"
+    for lo in car["lights"]:
+        if lo.data.type == "SPOT":
+            lo.data.energy = 90
+            lo.data.spot_size = math.radians(60)
+    body.name = "coupe"
+    body.rotation_mode = "XYZ"
+    body["wheel_r"] = car["wheel_radius"] or WHEEL_R
+    body["length"] = car["length"]
+    body["half_track"] = max((abs(a[1]) for a in car["axles"].values()), default=0.75)
+    bpy.context.view_layer.update()
+    print(f"[scene_a] voiture poursuivie {HERO} : {car['length']:.2f} × {car['width']:.2f} × {car['height']:.2f} m, "
+          f"roues r {body['wheel_r']:.3f}, demi-voie {body['half_track']:.3f}, {car['tris']} triangles", flush=True)
+    body.location = (LANE_X, COUPE_Y, 0)
+    body.rotation_euler = (0, 0, math.radians(COUPE_YAW))
+    return body
+
+
 def build():
     bpy.ops.wm.read_factory_settings(use_empty=True)
     scene = bpy.context.scene
     hidden = bpy.data.collections.new("sources")
     scene.collection.children.link(hidden)
 
-    # --- le coupé : modèle générique haute définition, l'avant vers -y d'origine
-    parts = import_glb("coupe-hd.glb")
+    # --- la voiture poursuivie (FILM3D_HERO) ; le coupé : modèle générique haute définition, l'avant vers -y d'origine
     paint = mat_paint()[0]
     side_glass = mat_tinted_glass()
     windscreen = mat_windscreen()
@@ -1812,65 +1858,72 @@ def build():
     lamp_glass = mat_clear_glass()
     housing = mat_plain("headlight_housing", (0.02, 0.02, 0.022, 1), 0.15, 1.0)
     plate = mat_plain("blank_plate", (0.55, 0.55, 0.52, 1), 0.5)
-    keep = []
-    for o in parts:
-        n = o.name
-        if n.startswith("Icosphere") or re.search(r"badge|logo|emblem", n, re.I):
-            bpy.data.objects.remove(o)
-            continue
-        if n.startswith("headlights.") and "car-body" in n:
-            o.data.materials[0] = head_emit
-        elif n.startswith("headlight-drl"):
-            o.data.materials[0] = drl_emit
-        elif n.startswith("headlight-base"):
-            o.data.materials[0] = housing
-        elif n.startswith(("headlight-lens", "headlights.")):
-            o.data.materials[0] = lamp_glass
-        elif n.startswith("glass-windshield"):
-            o.data.materials[0] = windscreen
-        elif "Glass ext" in n:
-            o.data.materials[0] = side_glass
-        elif "car-body" in n:
-            o.data.materials[0] = paint
-        elif n.startswith("taillight"):
-            o.data.materials[0] = tail_emit
-        keep.append(o)
-    # les roues à part (jante, pneu, disque), origine au moyeu, pour qu'elles tournent
-    wheel_parts = {}
-    for o in list(keep):
-        if o.name.startswith(("wheel-full", "tire-low", "brake-disc")):
-            keep.remove(o)
-            c = sum((o.matrix_world @ Vector(v) for v in o.bound_box), Vector()) / 8
-            wheel_parts.setdefault((c.x > 0, c.y > 0), []).append(o)
-    coupe = join(keep, "coupe")
-    pts = [Vector(v) for v in coupe.bound_box]
-    mn, mx = Vector(map(min, *pts)), Vector(map(max, *pts))
-    origin = Vector(((mn.x + mx.x) / 2, (mn.y + mx.y) / 2, mn.z))
-    recentre(coupe)
-    for (px, py), objs in wheel_parts.items():
-        w = join(objs, f"wheel_{'l' if px else 'r'}{'r' if py else 'f'}")
-        pts = [Vector(v) for v in w.bound_box]
-        hub = (Vector(map(min, *pts)) + Vector(map(max, *pts))) / 2
-        w.data.transform(__import__("mathutils").Matrix.Translation(-hub))
-        w.rotation_mode = "XYZ"
-        w.parent = coupe
-        w.location = hub - origin
-    coupe.rotation_mode = "XYZ"
-    coupe.location = (LANE_X, COUPE_Y, 0)
-    # quelques degrés de lacet : le capot ne renvoie plus l'horizon en plein
-    coupe.rotation_euler = (0, 0, math.radians(COUPE_YAW))
-    for side in (-1, 1):
-        L = bpy.data.lights.new(f"headlight_{side}", "SPOT")
-        L.energy = 90
-        L.color = lin(CREAM)[:3]
-        L.spot_size = math.radians(60)
-        L.spot_blend = 0.6
-        L.shadow_soft_size = 0.04
-        lo = bpy.data.objects.new(f"headlight_{side}", L)
-        scene.collection.objects.link(lo)
-        lo.parent = coupe
-        lo.location = (side * 0.77, -2.15, 0.70)
-        lo.rotation_euler = (math.radians(95), 0, math.radians(180))
+    if HERO == "coupe":
+        parts = import_glb("coupe-hd.glb")
+        keep = []
+        for o in parts:
+            n = o.name
+            if n.startswith("Icosphere") or re.search(r"badge|logo|emblem", n, re.I):
+                bpy.data.objects.remove(o)
+                continue
+            if n.startswith("headlights.") and "car-body" in n:
+                o.data.materials[0] = head_emit
+            elif n.startswith("headlight-drl"):
+                o.data.materials[0] = drl_emit
+            elif n.startswith("headlight-base"):
+                o.data.materials[0] = housing
+            elif n.startswith(("headlight-lens", "headlights.")):
+                o.data.materials[0] = lamp_glass
+            elif n.startswith("glass-windshield"):
+                o.data.materials[0] = windscreen
+            elif "Glass ext" in n:
+                o.data.materials[0] = side_glass
+            elif "car-body" in n:
+                o.data.materials[0] = paint
+            elif n.startswith("taillight"):
+                o.data.materials[0] = tail_emit
+            keep.append(o)
+        # les roues à part (jante, pneu, disque), origine au moyeu, pour qu'elles tournent
+        wheel_parts = {}
+        for o in list(keep):
+            if o.name.startswith(("wheel-full", "tire-low", "brake-disc")):
+                keep.remove(o)
+                c = sum((o.matrix_world @ Vector(v) for v in o.bound_box), Vector()) / 8
+                wheel_parts.setdefault((c.x > 0, c.y > 0), []).append(o)
+        coupe = join(keep, "coupe")
+        pts = [Vector(v) for v in coupe.bound_box]
+        mn, mx = Vector(map(min, *pts)), Vector(map(max, *pts))
+        origin = Vector(((mn.x + mx.x) / 2, (mn.y + mx.y) / 2, mn.z))
+        recentre(coupe)
+        for (px, py), objs in wheel_parts.items():
+            w = join(objs, f"wheel_{'l' if px else 'r'}{'r' if py else 'f'}")
+            pts = [Vector(v) for v in w.bound_box]
+            hub = (Vector(map(min, *pts)) + Vector(map(max, *pts))) / 2
+            w.data.transform(__import__("mathutils").Matrix.Translation(-hub))
+            w.rotation_mode = "XYZ"
+            w.parent = coupe
+            w.location = hub - origin
+        coupe.rotation_mode = "XYZ"
+        coupe.location = (LANE_X, COUPE_Y, 0)
+        # quelques degrés de lacet : le capot ne renvoie plus l'horizon en plein
+        coupe.rotation_euler = (0, 0, math.radians(COUPE_YAW))
+        for side in (-1, 1):
+            L = bpy.data.lights.new(f"headlight_{side}", "SPOT")
+            L.energy = 90
+            L.color = lin(CREAM)[:3]
+            L.spot_size = math.radians(60)
+            L.spot_blend = 0.6
+            L.shadow_soft_size = 0.04
+            lo = bpy.data.objects.new(f"headlight_{side}", L)
+            scene.collection.objects.link(lo)
+            lo.parent = coupe
+            lo.location = (side * 0.77, -2.15, 0.70)
+            lo.rotation_euler = (math.radians(95), 0, math.radians(180))
+        wheel_r, spray_x, spray_y = WHEEL_R, 0.95, 2.9
+    else:
+        coupe = street_hero(scene)
+        wheel_r = coupe["wheel_r"]
+        spray_x, spray_y = coupe["half_track"] + 0.2, coupe["length"] / 2 + 0.45
     # les gerbes d'eau derrière les roues arrière
     spray_m, SN, sout = material("spray")
     sco = SN.new("ShaderNodeTexCoord").outputs["Object"]
@@ -1891,7 +1944,7 @@ def build():
         sp.name = f"spray_{side}"
         sp.data.materials.append(spray_m)
         sp.parent = coupe
-        sp.location = (side * 0.95, 2.9, 0.28)
+        sp.location = (side * spray_x, spray_y, 0.28)
         sp.scale = (0.45, 1.3, 0.35)
         sp.visible_shadow = False
 
@@ -2043,7 +2096,7 @@ def build():
             ob.keyframe_insert("location", index=1, frame=f)
         ob.location.y = y
         linear_keys(ob)
-    spin = SPEED / WHEEL_R / 24
+    spin = SPEED / wheel_r / 24
     for w in [o for o in coupe.children if o.name.startswith("wheel_")]:
         for f in (1, 3):
             w.rotation_euler.x = spin * (f - 2)

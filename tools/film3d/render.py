@@ -109,14 +109,14 @@ def keys(ob, path, values):
             kp.interpolation = "LINEAR"
 
 
-def drive(objs, speed, wheels=()):
-    """Tout avance vers +y à `speed` m/s autour de l'image 2 ; les roues roulent."""
+def drive(objs, speed, wheels=(), radius=0.38):
+    """Tout avance vers +y à `speed` m/s autour de l'image 2 ; les roues (de rayon `radius`) roulent."""
     for ob in objs:
         y = ob.location.y
         keys(ob, "location", {1: (1, y - speed / 24), 3: (1, y + speed / 24)})
         ob.location.y = y
     for w in wheels:
-        a = speed / 0.38 / 24
+        a = speed / radius / 24
         keys(w, "rotation_euler", {1: (0, -a), 3: (0, a)})
         w.rotation_euler.x = 0
 
@@ -227,7 +227,9 @@ if args.shot != "a":
     police = bpy.data.objects["police"]
     cam = scene.camera
     focus = bpy.data.objects["focus"]
+    # la voiture poursuivie garde le nom « coupe » quelle que soit FILM3D_HERO (scene_a.py) ; son rayon de roue y est noté
     wheels = [o for o in coupe.children if o.name.startswith("wheel_")]
+    wheel_r = coupe.get("wheel_r", 0.38)
     for ob in [coupe, police, cam, focus, *wheels]:
         ob.animation_data_clear()
     coupe.rotation_euler = (0, 0, math.pi)
@@ -253,7 +255,7 @@ if args.shot != "a":
         cam.location = (-3.0, Y0 - 30, 17)
         look_at(cam, (-2.4, Y0 + 13, 0))
         focus.location = (LANE_X, Y0, 0.5)
-        drive([coupe, police, p2, cam, focus], 70 / 3.6, wheels)
+        drive([coupe, police, p2, cam, focus], 70 / 3.6, wheels, wheel_r)
     elif args.shot == "c":
         Y0 = 40.0
         coupe.rotation_euler = (0, 0, math.pi + math.radians(7))
@@ -269,7 +271,7 @@ if args.shot != "a":
         cam.location = (LANE_X + 3.0, Y0 - 12.5, 0.5)
         look_at(cam, (LANE_X - 0.4, Y0 - 2.5, 0.95))
         focus.location = (LANE_X + 0.6, Y0 - 2.2, 0.7)
-        drive([coupe, police, cam, focus], 90 / 3.6, wheels)
+        drive([coupe, police, cam, focus], 90 / 3.6, wheels, wheel_r)
     else:
         Y0 = 60.0
         coupe.location = (LANE_X, Y0, 0)
@@ -280,7 +282,7 @@ if args.shot != "a":
         cam.rotation_euler = (math.radians(90), 0, math.radians(90))
         cam.data.shift_y = 0.03
         focus.location = (LANE_X + 1.0, Y0, 0.6)
-        drive([coupe, cam, focus], 90 / 3.6, wheels)
+        drive([coupe, cam, focus], 90 / 3.6, wheels, wheel_r)
     scene.frame_set(2)
 
 if args.blur:
