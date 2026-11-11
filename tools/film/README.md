@@ -1,6 +1,6 @@
 # Le montage du film
 
-`montage.json` dit, pour chacun des neuf plans, quelle prise prendre et quelle fenêtre en garder. `scripts/film-assemble.ts` en tire `web/public/film/` (§4.1 et §6 T2 de `docs/cinematique-poursuite.md`).
+`montage.json` dit, pour chacun des neuf plans, quelle prise prendre et quelle fenêtre en garder. `scripts/film-assemble.ts` en tire `web/src/film/media/`, importé par Vite avec une empreinte dans chaque nom (§4.1 et §6 T2 de `docs/cinematique-poursuite.md`).
 
 ## Déposer une prise
 

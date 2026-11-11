@@ -8,7 +8,7 @@
 // Usage : npx tsx scripts/film-assemble.ts [--plans=dossier] [--slates] [--out=dossier]
 //   --plans  : les prises (défaut ~/Desktop/Azerit/design/film/plans, hors du dépôt)
 //   --slates : ignore les prises, tout en cartons
-//   --out    : les fichiers du site (défaut web/public/film)
+//   --out    : les fichiers du site (défaut web/src/film/media, importés par Vite)
 // Intermédiaires et planche des neuf plans dans var/film/ (ignoré par git).
 import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -44,7 +44,7 @@ const t0 = Date.now();
 const args = process.argv.slice(2);
 const opt = (k: string) => args.find((a) => a.startsWith(`--${k}=`))?.slice(k.length + 3);
 const PLANS = resolve(opt("plans") ?? resolve(homedir(), "Desktop/Azerit/design/film/plans"));
-const OUT = resolve(opt("out") ?? resolve(ROOT, "web/public/film"));
+const OUT = resolve(opt("out") ?? resolve(ROOT, "web/src/film/media"));
 const WORK = resolve(ROOT, "var/film");
 const SEG = resolve(WORK, "seg");
 const ONLY_SLATES = args.includes("--slates");

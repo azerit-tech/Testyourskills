@@ -1180,6 +1180,23 @@ describe("divers", () => {
     expect((await ctx.app.request("/api/nope")).status).toBe(404);
     expect((await ctx.app.request("/og/nope")).status).toBe(404);
   });
+
+  it("prod : le film à empreinte part avec un cache long immuable ; une ancienne adresse n'est pas une vidéo", async () => {
+    const root = mkdtempSync(join(tmpdir(), "tys-web-"));
+    mkdirSync(join(root, "assets"));
+    const index = "<!doctype html><html><head><title>T</title></head><body>SPA</body></html>";
+    writeFileSync(join(root, "index.html"), index);
+    writeFileSync(join(root, "assets", "poursuite-720-AbC123xy.mp4"), Buffer.alloc(2048, 1));
+    const ctx = setup({}, { staticRoot: root, indexHtml: async () => index });
+    const mp4 = await ctx.app.request("/assets/poursuite-720-AbC123xy.mp4");
+    expect(mp4.status).toBe(200);
+    expect(mp4.headers.get("content-type")).toContain("video/mp4");
+    expect(mp4.headers.get("content-length")).toBe("2048");
+    expect(mp4.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+    // l'adresse d'avant les empreintes : la page HTML du repli, que le lecteur refuse (player.ts)
+    const old = await ctx.app.request("/film/poursuite-720.mp4");
+    expect(old.headers.get("content-type") ?? "").toMatch(/text\/html/);
+  });
 });
 
 describe("file d'attente (MAX_CONCURRENT_CARDS)", () => {

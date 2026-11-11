@@ -696,7 +696,9 @@ export function createApp(opts: AppOptions) {
       if (page) return page;
       await next();
     });
-    // Fichiers fingerprintés par Vite : cache long.
+    // Fichiers fingerprintés par Vite : cache long. Le film en fait partie
+    // (web/src/film/files.ts) : une poursuite remplacée change d'adresse, et ne
+    // se mélange jamais à une fin ancienne gardée par un téléphone.
     app.use("/assets/*", async (c, next) => {
       await next();
       if (c.res.status === 200) c.res.headers.set("Cache-Control", "public, max-age=31536000, immutable");

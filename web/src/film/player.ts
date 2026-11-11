@@ -7,12 +7,12 @@
 // décaler de l'image. La coupe au niveau : quand A présente la dernière image
 // du dernier plan joué, l'encre la couvre, A s'arrête, B part et passe devant ;
 // l'encre reste jusqu'à la première image de B (deux images au plus).
-import { FPS, type EndingId, type FilmPlan } from "../../../shared/film";
+import { FPS, type FilmPlan } from "../../../shared/film";
 import { isMock } from "../lib/api";
+import { filmFileUrl, type FileId, type Quality } from "./files";
 import { filmUnlocks, filmVideos } from "./unlock";
 
-export type Quality = "720" | "540";
-type FileId = "poursuite" | EndingId;
+export type { Quality } from "./files";
 
 interface NetInfo {
   saveData?: boolean;
@@ -39,7 +39,7 @@ export function filmQuality(): Quality {
 
 export function filmUrl(id: FileId, q: Quality): string {
   // `?film=missing` : un fichier absent (404), pour vérifier le repli (la fiche sans révélation).
-  return debugFlag() === "missing" ? `/film/absent-${id}-${q}.mp4` : `/film/${id}-${q}.mp4`;
+  return debugFlag() === "missing" ? `/film/absent-${id}-${q}.mp4` : filmFileUrl(id, q);
 }
 
 /** H.264 profil Main : sinon le film ne se lit pas et la fiche sort sans révélation. */

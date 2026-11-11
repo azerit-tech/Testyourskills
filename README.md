@@ -82,7 +82,7 @@ La base et les PNG sont dans le volume monté sur `/data`. Les fiches de plus de
 
 - `web/` : front Vite et React 19 (accueil, attente, révélation, fiche, partage).
   - `web/src/three/`, `web/public/3d/` : la révélation par défaut, un ascenseur en 3D (Three.js) ; crédits des modèles dans `web/public/3d/CREDITS.txt`. Elle part quand le film est validé (SPEC §18.36).
-  - `web/src/film/`, `web/public/film/` : le lecteur du film et ses fichiers.
+  - `web/src/film/`, `web/src/film/media/` : le lecteur du film et ses fichiers (importés par Vite, à empreinte).
   - `web/public/profiles/`, `web/public/characters/` : les décors peints des profils et les portraits de suspects.
 - `shared/` : types, composant SVG de la fiche (`card/`), découpage et HUD du film (`film/`), textes et routes communs au front et au serveur.
 - `data/` : barème, grille de recrutement, profils, peines, statuts, mots creux. Des données, séparées de la logique.
