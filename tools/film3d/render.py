@@ -3,6 +3,7 @@
 #   nice -n 19 taskpolicy -b /Applications/Blender.app/Contents/MacOS/Blender -b -t 2 \
 #     -P tools/film3d/render.py -- [--preview] [--samples N] [--threads 2] [--gpu] [--scene scene-a.blend] [--out test-a.png]
 #
+# --shot    : a (ouverture), b (drone), c (trois quarts arrière), d (profil) ; b à d ont le flou de bougé.
 # --blur    : flou de bougé (obturateur 180°) sur l'image 2 de la scène animée.
 # --preview : demi-taille (360 × 640), 64 échantillons, pour itérer.
 # --threads : 2 par défaut (le Mac reste utilisable) ; 0 = tous les cœurs.
@@ -17,6 +18,15 @@ import sys
 import time
 
 import bpy
+from mathutils import Vector
+
+# Les plans du storyboard tirés de la même scène (docs/cinematique-poursuite.md §2.3).
+# a : l'ouverture (la scène telle qu'enregistrée). b : vue de drone, deux patrouilles,
+# gyrophares allumés. c : trois quarts arrière bas, une patrouille collée, flou de bougé.
+# d : travelling latéral à hauteur de roue, le décor file en flou de bougé.
+SHOT_NAMES = {"a": "test-a", "b": "test-b-drone", "c": "test-c-arriere", "d": "test-d-profil"}
+LANE_X = -1.75
+CORAL, LILAC = (1.0, 0.144, 0.047), (0.266, 0.262, 0.871)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
@@ -41,6 +51,7 @@ ap.add_argument("--samples", type=int, default=None)
 ap.add_argument("--threads", type=int, default=2)
 ap.add_argument("--gpu", action="store_true")
 ap.add_argument("--blur", action="store_true", help="flou de bougé, obturateur à 180°, écrit test-?-blur.png")
+ap.add_argument("--shot", default="a", choices="abcd", help="a ouverture, b drone, c arrière, d profil")
 ap.add_argument("--grain", type=float, default=7.0, help="intensité du grain ffmpeg (0 = aucun)")
 args = ap.parse_args(sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else [])
 
@@ -74,6 +85,144 @@ if args.gpu:
     else:
         print("[render] aucun GPU trouvé, rendu sur CPU", flush=True)
 
+def look_at(ob, target):
+    d = Vector(target) - ob.location
+    ob.rotation_mode = "XYZ"
+    ob.rotation_euler = d.to_track_quat("-Z", "Y").to_euler()
+
+
+def keys(ob, path, values):
+    """values : {image: valeur} sur un seul axe ; interpolation linéaire."""
+    for f, (idx, v) in values.items():
+        getattr(ob, path)[idx] = v
+        ob.keyframe_insert(path, index=idx, frame=f)
+    act = ob.animation_data.action
+    curves = list(getattr(act, "fcurves", []) or [])
+    if not curves:
+        for layer in act.layers:
+            for strip in layer.strips:
+                for bag in strip.channelbags:
+                    curves += list(bag.fcurves)
+    for fc in curves:
+        for kp in fc.keyframe_points:
+            kp.interpolation = "LINEAR"
+
+
+def drive(objs, speed, wheels=()):
+    """Tout avance vers +y à `speed` m/s autour de l'image 2 ; les roues roulent."""
+    for ob in objs:
+        y = ob.location.y
+        keys(ob, "location", {1: (1, y - speed / 24), 3: (1, y + speed / 24)})
+        ob.location.y = y
+    for w in wheels:
+        a = speed / 0.38 / 24
+        keys(w, "rotation_euler", {1: (0, -a), 3: (0, a)})
+        w.rotation_euler.x = 0
+
+
+def lights_on(police):
+    """Rampe allumée, corail d'un côté, violette de l'autre, et la lumière qu'elle jette."""
+    for i, m in enumerate(police.data.materials):
+        if m and m.name.startswith("lightbar_lenses") and "lightbar_on" not in bpy.data.materials:
+            on = m.copy()
+            on.name = "lightbar_on"
+            nt = on.node_tree
+            bsdf = next(n for n in nt.nodes if n.type == "BSDF_PRINCIPLED")
+            nt.links.new(bsdf.inputs["Base Color"].links[0].from_socket, bsdf.inputs["Emission Color"])
+            bsdf.inputs["Emission Strength"].default_value = 14.0  # au-delà, AgX le blanchit
+        if m and m.name.startswith("lightbar_lenses"):
+            police.data.materials[i] = bpy.data.materials["lightbar_on"]
+
+
+def bar_lights(police, tag):
+    # dans le repère de la patrouille : l'avant vers +x, la rampe en (−0,26, 0, 1,45)
+    for side, col in ((1, CORAL), (-1, LILAC)):
+        for kind in ("SPOT",):
+            L = bpy.data.lights.new(f"bar_{tag}_{side}_{kind}", kind)
+            L.color = col
+            L.energy = 60 if kind == "POINT" else 9000
+            L.shadow_soft_size = 0.08
+            if kind == "SPOT":
+                L.spot_size = 1.2
+                L.spot_blend = 0.7
+            lo = bpy.data.objects.new(L.name, L)
+            scene.collection.objects.link(lo)
+            lo.parent = police
+            lo.location = (-0.26, side * 0.3, 2.2)
+            if kind == "SPOT":
+                # deux balayages figés : l'un vers l'avant et le sol, l'autre de biais vers les palmiers
+                # l'axe du spot (−z) basculé de 72° vers l'horizontale, puis tourné vers l'avant (+x) de biais
+                lo.rotation_euler = (math.radians(72), 0, math.radians(-90 + side * 40))
+
+
+def patrol_copy(police, name):
+    ob = bpy.data.objects.new(name, police.data)
+    scene.collection.objects.link(ob)
+    ob.rotation_mode = "XYZ"
+    return ob
+
+
+if args.shot != "a":
+    import math
+    coupe = bpy.data.objects["coupe"]
+    police = bpy.data.objects["police"]
+    cam = scene.camera
+    focus = bpy.data.objects["focus"]
+    wheels = [o for o in coupe.children if o.name.startswith("wheel_")]
+    for ob in [coupe, police, cam, focus, *wheels]:
+        ob.animation_data_clear()
+    coupe.rotation_euler = (0, 0, math.pi)
+    for w in wheels:
+        w.rotation_euler = (0, 0, 0)
+    police.rotation_euler = (0, 0, math.pi / 2)
+    cam.data.shift_y = 0
+    r.use_motion_blur = True
+    r.motion_blur_shutter = 0.5
+    if args.shot == "b":
+        Y0 = 70.0
+        coupe.location = (LANE_X, Y0, 0)
+        police.location = (-5.0, Y0 - 9, 0)
+        p2 = patrol_copy(police, "police_2")
+        p2.rotation_euler = police.rotation_euler
+        p2.location = (LANE_X + 0.2, Y0 - 16, 0)
+        lights_on(police)
+        bar_lights(police, "1")
+        bar_lights(p2, "2")
+        cam.data.lens = 26
+        cam.data.dof.aperture_fstop = 8.0
+        cam.location = (-3.0, Y0 - 30, 17)
+        look_at(cam, (-2.4, Y0 + 13, 0))
+        focus.location = (LANE_X, Y0, 0.5)
+        drive([coupe, police, p2, cam, focus], 70 / 3.6, wheels)
+    elif args.shot == "c":
+        Y0 = 40.0
+        coupe.rotation_euler = (0, 0, math.pi + math.radians(7))
+        coupe.location = (LANE_X, Y0, 0)
+        police.location = (LANE_X - 1.0, Y0 - 6.0, 0)
+        lights_on(police)
+        bar_lights(police, "1")
+        for sp in [o for o in coupe.children if o.name.startswith("spray_")]:
+            sp.scale = (0.6, 2.0, 0.5)
+            sp.location.y = 3.4
+        cam.data.lens = 40
+        cam.data.dof.aperture_fstop = 2.8
+        cam.location = (LANE_X + 3.0, Y0 - 12.5, 0.5)
+        look_at(cam, (LANE_X - 0.4, Y0 - 2.5, 0.95))
+        focus.location = (LANE_X + 0.6, Y0 - 2.2, 0.7)
+        drive([coupe, police, cam, focus], 90 / 3.6, wheels)
+    else:
+        Y0 = 60.0
+        coupe.location = (LANE_X, Y0, 0)
+        cam.data.lens = 24
+        cam.data.dof.aperture_fstop = 2.8
+        cam.location = (LANE_X + 8.0, Y0, 0.45)  # sur la chaussée, voie d'en face
+        cam.rotation_mode = "XYZ"
+        cam.rotation_euler = (math.radians(90), 0, math.radians(90))
+        cam.data.shift_y = 0.03
+        focus.location = (LANE_X + 1.0, Y0, 0.6)
+        drive([coupe, cam, focus], 90 / 3.6, wheels)
+    scene.frame_set(2)
+
 if args.blur:
     r.use_motion_blur = True
     r.motion_blur_shutter = 0.5
@@ -83,7 +232,7 @@ if args.preview:
 if args.samples:
     c.samples = args.samples
 
-base = os.path.splitext(args.scene)[0].replace("scene-", "test-")
+base = SHOT_NAMES[args.shot] if args.scene == "scene-a.blend" else os.path.splitext(args.scene)[0].replace("scene-", "test-")
 out = args.out or os.path.join(FILM, "ref", base + ("-blur" if args.blur else "") + ("-preview" if args.preview else "") + ".png")
 raw = os.path.splitext(out)[0] + "-raw.png"
 r.filepath = raw

@@ -51,6 +51,7 @@ COUPE_YAW = 4.0        # degrés
 POLICE_X = -5.6        # la voie extérieure, loin derrière
 POLICE_Y = 95.0
 SPEED = 50 / 3.6       # m/s, pour le flou de bougé
+WHEEL_R = 0.38         # rayon des roues du coupé (m)
 ROAD_HALF = 7.0
 WALK = 4.5
 
@@ -715,6 +716,21 @@ def instance(src, name, loc, rot_z=0.0, scale=1.0):
     return ob
 
 
+def linear_keys(ob):
+    """Interpolation linéaire : la vitesse est constante sur l'obturateur."""
+    act = ob.animation_data.action
+    curves = list(getattr(act, "fcurves", []) or [])
+    if not curves:
+        # Blender 5 : les courbes vivent dans les tranches de l'action
+        for layer in act.layers:
+            for strip in layer.strips:
+                for bag in strip.channelbags:
+                    curves += list(bag.fcurves)
+    for fc in curves:
+        for kp in fc.keyframe_points:
+            kp.interpolation = "LINEAR"
+
+
 # ---------------------------------------------------------------- scène
 
 def build():
@@ -730,6 +746,7 @@ def build():
     windscreen = mat_windscreen()
     head_emit = mat_emit("coupe_headlight", lin(CREAM), 40.0)
     drl_emit = mat_emit("coupe_drl", lin(CREAM), 12.0)
+    tail_emit = mat_emit("coupe_taillight", lin("#ff2a1a"), 9.0)
     lamp_glass = mat_clear_glass()
     housing = mat_plain("headlight_housing", (0.02, 0.02, 0.022, 1), 0.15, 1.0)
     plate = mat_plain("blank_plate", (0.55, 0.55, 0.52, 1), 0.5)
@@ -753,9 +770,29 @@ def build():
             o.data.materials[0] = side_glass
         elif "car-body" in n:
             o.data.materials[0] = paint
+        elif n.startswith("taillight"):
+            o.data.materials[0] = tail_emit
         keep.append(o)
+    # les roues à part (jante, pneu, disque), origine au moyeu, pour qu'elles tournent
+    wheel_parts = {}
+    for o in list(keep):
+        if o.name.startswith(("wheel-full", "tire-low", "brake-disc")):
+            keep.remove(o)
+            c = sum((o.matrix_world @ Vector(v) for v in o.bound_box), Vector()) / 8
+            wheel_parts.setdefault((c.x > 0, c.y > 0), []).append(o)
     coupe = join(keep, "coupe")
+    pts = [Vector(v) for v in coupe.bound_box]
+    mn, mx = Vector(map(min, *pts)), Vector(map(max, *pts))
+    origin = Vector(((mn.x + mx.x) / 2, (mn.y + mx.y) / 2, mn.z))
     recentre(coupe)
+    for (px, py), objs in wheel_parts.items():
+        w = join(objs, f"wheel_{'l' if px else 'r'}{'r' if py else 'f'}")
+        pts = [Vector(v) for v in w.bound_box]
+        hub = (Vector(map(min, *pts)) + Vector(map(max, *pts))) / 2
+        w.data.transform(__import__("mathutils").Matrix.Translation(-hub))
+        w.rotation_mode = "XYZ"
+        w.parent = coupe
+        w.location = hub - origin
     coupe.rotation_mode = "XYZ"
     coupe.location = (LANE_X, COUPE_Y, 0)
     # quelques degrés de lacet : le capot ne renvoie plus l'horizon en plein
@@ -835,9 +872,9 @@ def build():
     box("block_left", -200, -ROAD_HALF - WALK, -30, 900, -0.05, 0.15, conc)
     wall = mat_plain("sea_wall", lin("#d9d2c4"), 0.6)
     box("sea_wall", ROAD_HALF + WALK, ROAD_HALF + WALK + 0.35, -30, 900, 0.0, 0.85, wall)
-    sand = mat_plain("wet_sand", lin("#5d5247"), 0.35)
-    box("beach", ROAD_HALF + WALK, 80, -30, 1200, -1.6, -1.5, sand)
-    box("sea", 80, 3000, -400, 4000, -1.7, -1.6, mat_sea())
+    sand = mat_plain("wet_sand", lin("#3a332d"), 0.3)
+    box("beach", ROAD_HALF + WALK, 34, -30, 1200, -1.6, -1.5, sand)
+    box("sea", 34, 3000, -400, 4000, -1.7, -1.6, mat_sea())
     box("sea_far", -3000, 3000, 900, 4000, -1.75, -1.65, bpy.data.materials["sea"])
 
     # --- les hôtels, côté ville
@@ -1052,18 +1089,14 @@ def build():
             ob.location.y = y - SPEED * (f - 2) / 24
             ob.keyframe_insert("location", index=1, frame=f)
         ob.location.y = y
-        try:
-            for fc in ob.animation_data.action.fcurves:
-                for kp in fc.keyframe_points:
-                    kp.interpolation = "LINEAR"
-        except AttributeError:
-            # Blender 5 : les courbes vivent dans les tranches de l'action
-            for layer in ob.animation_data.action.layers:
-                for strip in layer.strips:
-                    for bag in strip.channelbags:
-                        for fc in bag.fcurves:
-                            for kp in fc.keyframe_points:
-                                kp.interpolation = "LINEAR"
+        linear_keys(ob)
+    spin = SPEED / WHEEL_R / 24
+    for w in [o for o in coupe.children if o.name.startswith("wheel_")]:
+        for f in (1, 3):
+            w.rotation_euler.x = spin * (f - 2)
+            w.keyframe_insert("rotation_euler", index=0, frame=f)
+        w.rotation_euler.x = 0
+        linear_keys(w)
     scene.frame_set(2)
     r.motion_blur_shutter = 0.5
     r.use_motion_blur = False
