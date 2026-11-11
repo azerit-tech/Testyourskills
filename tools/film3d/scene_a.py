@@ -36,12 +36,13 @@ random.seed(27)
 # Les variantes à comparer, en attendant le choix de Jacques (une variable d'environnement chacune) :
 #   FILM3D_FACADE : base (les boîtes d'origine), kit (pièces assemblées), proc (tout en nœuds),
 #                   mix (étages en enduit photographique, rez-de-chaussée en boutiques de bibliothèque)
-#   FILM3D_ROUTE  : base (l'enrobé d'origine), pluie (juste après l'averse), sechage (en train de sécher)
+#   FILM3D_ROUTE  : base (l'enrobé d'origine), pluie (juste après l'averse), sechage (en train de sécher, par défaut :
+#                   le choix de Jacques du 11 novembre)
 #   FILM3D_HERO   : la voiture poursuivie, w111 (berline des années 60, par défaut), slc (coupé des années 70),
 #                   chargées par lab/hero_cars.py, ou coupe (le coupé d'origine) ; FILM3D_DRIVER=0 la laisse vide
 #   FILM3D_BLEND  : le nom du .blend écrit dans assets (scene-a.blend par défaut)
 FACADE = os.environ.get("FILM3D_FACADE", "mix")
-ROUTE = os.environ.get("FILM3D_ROUTE", "pluie")
+ROUTE = os.environ.get("FILM3D_ROUTE", "sechage")
 HERO = os.environ.get("FILM3D_HERO", "w111")
 BLEND = os.environ.get("FILM3D_BLEND", "scene-a.blend")
 if HERE not in sys.path:

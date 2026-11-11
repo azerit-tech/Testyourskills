@@ -35,7 +35,7 @@ lockf -k <verrou> nice -n 19 taskpolicy -b /Applications/Blender.app/Contents/Ma
 **Les variantes de la rue** se choisissent au moment de construire la scène, par des variables d'environnement lues par `scene_a.py` :
 
 - `FILM3D_FACADE=base|kit|proc|mix` : les boîtes d'origine, les pièces assemblées (`facade_kit.py`), tout en nœuds (`facade_proc.py`), ou le mélange, par défaut (`facade_mix.py` : étages en enduit photographique, rez-de-chaussée en boutiques de bibliothèque).
-- `FILM3D_ROUTE=base|pluie|sechage` : l'enrobé d'origine, la rue juste après l'averse (par défaut) ou la rue qui sèche (`road.py`).
+- `FILM3D_ROUTE=base|pluie|sechage` : l'enrobé d'origine, la rue juste après l'averse ou la rue qui sèche (`road.py`), par défaut depuis le choix de Jacques du 11 novembre.
 - `FILM3D_RDC=terrasse|sobre` (façades `mix`) : stores et guirlandes (par défaut) ou devantures nues, avec moins d'objets.
 - `FILM3D_PARKED` : les voitures garées sont là par défaut, `FILM3D_PARKED=0` les retire.
 - `FILM3D_HERO=w111|slc|coupe` : la voiture poursuivie, la berline des années 60 par défaut, le coupé des années 70 (les deux par `lab/hero_cars.py`) ou le coupé d'origine. Elle garde le nom d'objet `coupe` et ses roues `wheel_*` (`render.py` la cherche ainsi), phares crème et feux arrière allumés, roues qui tournent dans les plans en flou de bougé.
