@@ -156,6 +156,7 @@ def pack(entries, speed=SPEED, beams=True, on=None):
         if kind not in src:
             src[kind] = L.patrol("patrol") if kind == "patrol" else L.van("van")
             r = src[kind]
+            L.bar_pools(r, energy=1500.0)      # les flaques corail et lilas sur la chaussée mouillée
         else:
             r = L.clone(src[kind], f"{kind}_{i}")
         on(r, x, y, heading)
