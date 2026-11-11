@@ -51,10 +51,17 @@ POLYHAVEN = [
     ("metal_trash_can", "model", "1k"),
     ("outdoor_table_chair_set_01", "model", "1k"),
     ("shrub_01", "model", "1k"),
+    # la rue mouillée (road.py)
+    ("aerial_asphalt_01", "tex", "2k"),
+    ("asphalt_04", "tex", "2k"),
+    ("brushed_concrete_04", "tex", "2k"),
+    ("water_manhole_cover", "model", "1k"),
 ]
 
 # ambientCG : (asset, résolution) ; archives zip dont on ne garde que les images
 AMBIENTCG = [
+    # les grilles d'avaloir du caniveau
+    ("Grate002", "1K"),
 ]
 
 TEX_MAPS = {"Diffuse": "diff", "nor_gl": "nor_gl", "Rough": "rough", "Displacement": "disp"}
