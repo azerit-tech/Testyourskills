@@ -24,11 +24,16 @@ const STRONG_MIN = 5;
 
 const noted = (c: GridCriterion | undefined): c is GridCriterion & { score: number } => !!c && c.score !== null;
 
-/** Les tuiles : les critères notés dans l'ordre du recruteur, puis ceux sans note (« Pas encore au dossier »). */
+/**
+ * Les tuiles : les critères notés dans l'ordre du recruteur, puis ceux sans note
+ * (« Pas encore au dossier »). L'école gardée pour la personne (page partagée)
+ * reste à sa place parmi les notés : elle est au dossier, elle ne se montre pas.
+ */
 export function tileOrder(grid: Grid): { scored: GridCriterion[]; pending: GridCriterion[] } {
   const byCode = new Map(grid.criteria.map((c) => [c.code, c]));
   const all = RECRUITER_ORDER.map((code) => byCode.get(code)).filter((c): c is GridCriterion => !!c);
-  return { scored: all.filter((c) => c.score !== null), pending: all.filter((c) => c.score === null) };
+  const on = (c: GridCriterion) => c.score !== null || !!c.private;
+  return { scored: all.filter(on), pending: all.filter((c) => !on(c)) };
 }
 
 /** La note la plus haute (5 et plus), jamais l'école ; à égalité, le plus lourd coefficient, puis l'ordre du recruteur. */

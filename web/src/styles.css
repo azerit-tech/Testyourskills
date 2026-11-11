@@ -3503,6 +3503,134 @@ a.rg-src.is-both {
   font: 500 14px/1.4 var(--f-text);
   color: var(--lilac-2);
 }
+/* vue partagée : le détail de la grille replié sous son titre */
+.rg-fold {
+  display: grid;
+  gap: 16px;
+}
+.rg-fold-sum {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  font: 600 16px/1.3 var(--f-text);
+  color: var(--cream);
+  cursor: pointer;
+  list-style: none;
+}
+.rg-fold-sum::-webkit-details-marker {
+  display: none;
+}
+.rg-fold[open] > .rg-fold-sum .rg-chevron {
+  transform: rotate(180deg);
+}
+
+/* sous la fiche, avant le pari : la ligne du recruteur et les huit tuiles, deux colonnes dès 360 px */
+.rr {
+  gap: 14px;
+}
+.rr .rr-line {
+  font: 600 17px/1.4 var(--f-text);
+  color: var(--cream);
+  text-wrap: pretty;
+}
+.rr-tiles {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.rr-tile {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "name score"
+    "gauge gauge";
+  align-items: baseline;
+  gap: 8px 6px;
+  width: 100%;
+  min-height: 64px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--ink-1);
+  color: var(--cream);
+  text-align: left;
+  cursor: pointer;
+}
+.rr-tile[aria-expanded="true"] {
+  box-shadow: inset 0 0 0 1.5px var(--blush);
+}
+.rr-name {
+  grid-area: name;
+  min-width: 0;
+  overflow: hidden;
+  font: 600 14px/1.2 var(--f-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rr-score {
+  grid-area: score;
+  font: 700 22px/1 var(--f-name);
+  font-variant-numeric: tabular-nums;
+}
+.rr-score small {
+  margin-left: 1px;
+  font: 500 11px/1 var(--f-text);
+  color: var(--lilac-2);
+}
+.rr-tile.is-none .rr-score,
+.rr-tile.is-private .rr-score {
+  color: var(--lilac-2);
+}
+.rr-gauge {
+  grid-area: gauge;
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 2px;
+  height: 6px;
+}
+.rr-gauge > span {
+  border-radius: 2px;
+  background: var(--lilac-faint);
+}
+.rr-gauge > span.on {
+  background: var(--cream);
+}
+.rr-gauge.is-declared > span.on {
+  background: var(--peach);
+}
+.rr-gauge.is-none > span {
+  background: none;
+  border: 1px dotted rgba(229, 221, 255, 0.3);
+}
+.rr .rr-pending {
+  margin-top: 2px;
+  font: 600 11px/1.2 var(--f-text);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--lilac-dim);
+}
+.rr .rr-detail {
+  min-height: 2.8em;
+  font: 400 14.5px/1.4 var(--f-text);
+  color: var(--lilac-2);
+}
+.rr-detail b {
+  color: var(--cream);
+}
+.rr-more {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font: 500 12px/1.2 var(--f-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--blush);
+}
+
 /* un jeu, pas un verdict d'embauche : la dernière ligne, la plus discrète */
 .rg .rg-game {
   font: 500 13px/1.45 var(--f-text);

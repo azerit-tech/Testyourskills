@@ -11,7 +11,8 @@ import { useId, useState } from "react";
 import { dec, usableGrid } from "../../../shared/gridText";
 import { publicGrid } from "../../../shared/publicView";
 import type { DeclaredSource, Grid, GridCriterion } from "../../../shared/types";
-import { CRITERION_CODES, declaredOf } from "../../../shared/types";
+import { RECRUITER_ORDER } from "../../../shared/recruiterLine";
+import { declaredOf } from "../../../shared/types";
 import { pick, useT, type Dict } from "../i18n";
 import { crossChecks, finalLines, GRID_WEIGHTS, hasColumns, keptFrom, levelTable, reachedRow, rowText, stateTags } from "../lib/grid";
 import type { Shareable } from "./After";
@@ -261,9 +262,8 @@ export function RecruiterGrid({ item, shared, who }: Props) {
   const unproven =
     item.kind === "comparison" && item.comparison.github.grid?.rule === "empty_file" ? { src: declared === "cv" ? g.source.cv : g.source.linkedin, shared } : undefined;
   const redacted = shared && grid.criteria.some((c) => rowText(c, { g, pick: (f) => pick(f, lang), declared, shared }).redacted);
-  return (
-    <section className="after-block rg" id="grille" aria-labelledby="rg-title">
-      <h2 id="rg-title">{shared ? g.titleThem(who) : g.title}</h2>
+  const detail = (
+    <>
       {/* Les pièces lues : une fiche GitHub seule n'a pas lu de LinkedIn, une fiche LinkedIn seule pas de code. */}
       <ol className="rg-method">
         <li>{career ? method[career] : method.noCareer}</li>
@@ -272,13 +272,30 @@ export function RecruiterGrid({ item, shared, who }: Props) {
       </ol>
       {columns && <CrossChecks grid={grid} declared={declared} shared={shared} />}
       <ol className={`rg-list${columns ? " has-cols" : ""}`} aria-label={g.criteriaLabel}>
-        {CRITERION_CODES.map((code) => {
+        {RECRUITER_ORDER.map((code) => {
           const c = byCode.get(code);
           return c ? <Row key={code} c={c} grid={grid} declared={declared} shared={shared} columns={columns} skipFlags={columns && code === "STK"} /> : null;
         })}
       </ol>
       <Final grid={grid} isCase={item.kind === "comparison"} unproven={unproven} />
       {redacted && <p className="rg-hidden">{g.shared.hidden}</p>}
+    </>
+  );
+  return (
+    <section className="after-block rg" id="grille" aria-labelledby="rg-title">
+      <h2 id="rg-title">{shared ? g.titleThem(who) : g.title}</h2>
+      {/* Vue partagée : les tuiles disent l'essentiel, le détail se replie (rapport du recruteur, §6). */}
+      {shared ? (
+        <details className="rg-fold">
+          <summary className="rg-fold-sum">
+            <span>{g.fold}</span>
+            <Chevron />
+          </summary>
+          {detail}
+        </details>
+      ) : (
+        detail
+      )}
       <p className="rg-foot">{g.foot}</p>
       <p className="rg-game">{g.game}</p>
     </section>

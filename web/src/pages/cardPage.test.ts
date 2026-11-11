@@ -5,6 +5,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CardData } from "../../../shared/types";
 import { FIXTURE_COMPARISON, FIXTURES } from "../../../shared/fixtures";
+import { tileOrder } from "../../../shared/recruiterLine";
+import { DICTS } from "../i18n";
 import { LangProvider } from "../i18n";
 import { Fold, type Shareable } from "../components/After";
 import { skyOf } from "../components/ProfileTile";
@@ -261,6 +263,33 @@ describe("la lecture du recruteur (§18.37)", () => {
     const html = renderResult(card({ grid, overall: grid.overall }), { owner: false });
     expect(html).toContain('id="grille"');
     expect(html).not.toContain("te lit");
+  });
+
+  it("la ligne du recruteur et les huit tuiles : sous la fiche, avant le pari", () => {
+    const html = renderResult(card({ grid, overall: grid.overall }), { owner: true, token: "tok", plea: 4 });
+    const rr = html.indexOf('class="after-block rr"');
+    expect(rr).toBeGreaterThan(html.indexOf('class="result-stage"'));
+    expect(rr).toBeLessThan(html.indexOf('class="after-head"'));
+    expect(html.match(/class="rr-tile /g)).toHaveLength(8);
+    expect(html).toMatch(/<p class="rr-line">[^<]+, [^<]+\. Point fort : [^<]+, \d+\/10\./);
+    // Les tuiles dans l'ordre du recruteur, les critères sans note en bas.
+    const names = [...html.matchAll(/<span class="rr-name">([^<]+)<\/span>/g)].map((m) => m[1]);
+    const { scored, pending } = tileOrder(grid);
+    expect(names).toEqual([...scored, ...pending].map((c) => DICTS.fr.read.short[c.code]));
+    expect(names[0]).toBe("Expérience");
+    if (pending.length) expect(html).toContain('<p class="rr-pending">Pas encore au dossier</p>');
+    // La personne fichée voit le détail de la grille ouvert.
+    expect(html).not.toContain('class="rg-fold"');
+  });
+
+  it("vue par un visiteur : les tuiles juste sous la fiche, le détail de la grille replié, le jeu dit", () => {
+    const html = renderResult(card({ grid, overall: grid.overall }), { owner: false });
+    const col = html.slice(html.indexOf('class="visitor-col"'));
+    expect(col.indexOf('class="after-block rr"')).toBeGreaterThan(-1);
+    expect(col.indexOf('class="after-block rr"')).toBeLessThan(col.indexOf('class="after-block rg"'));
+    expect(html).toMatch(/<details class="rg-fold"><summary class="rg-fold-sum"><span>Le détail, critère par critère<\/span>/);
+    expect(html).toContain("Pas une décision d&#x27;embauche");
+    expect(html).toContain("Ce que la grille retient de @");
   });
 });
 

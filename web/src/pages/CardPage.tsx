@@ -14,6 +14,7 @@ import { Jury, JuryLine } from "../components/Jury";
 import { MakeYours } from "../components/MakeYours";
 import { PleaVerdict } from "../components/Plea";
 import { RecruiterGrid } from "../components/RecruiterGrid";
+import { RecruiterRead } from "../components/RecruiterRead";
 import { Penalty, ProfileSky } from "../components/ProfileTile";
 import { CardViewOptions } from "../card/CardView";
 import { RevealCard, useReveal } from "../components/Reveal";
@@ -471,6 +472,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
           <div className="visitor-col">
             {/* Fiche dénoncée (§18.6) : « Avis de recherche à ton nom », juste sous la fiche. */}
             {wantedYou && <Denounced by={kase?.by ?? null} onLawyer={claimOn && cardLogin ? () => api.startClaim(id, cardLogin) : null} />}
+            {/* La ligne du recruteur et les huit tuiles (§18.37), juste sous la fiche. */}
+            <RecruiterRead item={item} shared who={main.login ? `@${main.login}` : main.name} />
             {/* Le jury (§18.27) : un geste à un toucher, avant « Et toi ? ». */}
             <Jury cardId={id} card={main} jury={kase?.jury ?? null} toast={toast.show} />
             <Penalty card={main} />
@@ -500,6 +503,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
 
       <div className={`after${settled ? " is-in" : ""}`} aria-hidden={!settled} inert={!settled ? true : undefined}>
         {/* L'après-fiche raccourci (§18.27) : le pari et le jury, la peine, le partage, la dénonciation, le dossier, puis le reste en lignes. */}
+        {/* La ligne du recruteur et les huit tuiles (§18.37) : sous la fiche, avant le pari. */}
+        {!visitor && <RecruiterRead item={item} shared={false} who={main.login ? `@${main.login}` : main.name} />}
         {!visitor && (
           <div className="after-head">
             <PleaVerdict cardId={id} overall={main.overall} shown={settled} />

@@ -414,8 +414,23 @@ const fr = {
   },
   /* Le barème de recrutement (docs/bareme-recrutement.md §3, §4, §6 ; SPEC §18.37) : huit critères,
      une note sur 10 chacun, une moyenne pondérée. Jamais un « +n ». Épicène : « tu », « son », sans accord. */
+  /** Sous la fiche, avant le pari (§18.37) : la ligne écrite par gabarit (shared/recruiterLine.ts) et les huit tuiles. */
+  read: {
+    title: "Ce que la grille retient",
+    titleThem: (who: string) => `Ce que la grille retient de ${who}`,
+    pending: "Pas encore au dossier",
+    hint: "Touche un critère : sa pièce s'affiche.",
+    more: "Tout le détail de la grille",
+    tile: (name: string, n: number) => `${name} : ${n} sur 10`,
+    tileNone: (name: string) => `${name} : pas encore de note`,
+    tileKept: (name: string) => `${name} : gardée pour la personne`,
+    none: "—",
+    short: { XP: "Expérience", EMP: "Parcours", STK: "Stack", CODE: "Code", OWN: "Ownership", ACT: "Activité", EDU: "École", OSS: "Open source" } as Record<CriterionCode, string>,
+  },
   grid: {
     title: "Voici comment un recruteur d'Azerit te lit",
+    /** Vue partagée : le détail replié sous les tuiles. */
+    fold: "Le détail, critère par critère",
     titleThem: (who: string) => `Voici comment un recruteur d'Azerit lit ${who}`,
     /** Les pièces lues : une ligne par source, « pas encore au dossier » pour celle qui manque. */
     method: {
@@ -1111,8 +1126,21 @@ const en: Dict = {
     ncLegend: "Code not proven: the CV does all the talking, nothing compares stat by stat.",
     ncLegendLi: "Code not proven: LinkedIn does all the talking, nothing compares stat by stat.",
   },
+  read: {
+    title: "What the grid keeps",
+    titleThem: (who: string) => `What the grid keeps of ${who}`,
+    pending: "Not on file yet",
+    hint: "Tap a criterion to see its proof.",
+    more: "The grid in full",
+    tile: (name: string, n: number) => `${name}: ${n} out of 10`,
+    tileNone: (name: string) => `${name}: no score yet`,
+    tileKept: (name: string) => `${name}: kept for the person`,
+    none: "—",
+    short: { XP: "Experience", EMP: "Career", STK: "Stack", CODE: "Code", OWN: "Ownership", ACT: "Activity", EDU: "School", OSS: "Open source" },
+  },
   grid: {
     title: "Here is how an Azerit recruiter reads you",
+    fold: "The detail, criterion by criterion",
     titleThem: (who: string) => `Here is how an Azerit recruiter reads ${who}`,
     method: {
       linkedin: "Your career: LinkedIn is the reference.",
