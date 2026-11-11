@@ -31,6 +31,8 @@ SKETCHFAB = {
     "palm-coconut-group.glb": "d05c8ffb6ec64a7184c4b673e21f7224",
     # palmier royal (Roystonea regia) haute définition
     "palm-royal.glb": "3113aadb615e432f934ec5d3407d11ce",
+    # fourgonnette des années 70, sans logo, garée le long des trottoirs
+    "parked-wagon.glb": "2b734bf738dc405998c2074953965cc6",
     # lampadaires
     "streetlights.glb": "1173b0c4d9b0400bbeaafbee0e94ca59",
     # feu tricolore new-yorkais des années 80, aux carrefours

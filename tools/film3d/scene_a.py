@@ -1192,6 +1192,50 @@ def parasol(name, x, y, canvas, metal, light=True, r=1.35):
     return ob
 
 
+def parked_wagon_source(hidden, length=4.9):
+    """La fourgonnette garée (modèle de bibliothèque, sans logo) : l'axe long sur y, 4,9 m, phares
+    éteints, plaque vierge, la caisse prend la couleur de chaque instance (Object Info)."""
+    ob = source(import_glb("parked-wagon.glb"), "wagon_src", hidden)
+    d = ob.dimensions.copy()
+    if d.x > d.y:
+        ob.data.transform(__import__("mathutils").Matrix.Rotation(math.pi / 2, 4, "Z"))
+    s = length / max(d.x, d.y)
+    ob.data.transform(__import__("mathutils").Matrix.Scale(s, 4))
+    recentre(ob)
+    plate = mat_plain("plate_blank", lin("#d8d4c8"), 0.5)
+    for i, m in enumerate(ob.data.materials):
+        if m is None:
+            continue
+        if m.name.startswith("LicensePlate"):
+            ob.data.materials[i] = plate
+            continue
+        if not m.use_nodes:
+            continue
+        nt = m.node_tree
+        for n in nt.nodes:
+            if n.type == "BSDF_PRINCIPLED":
+                if m.name.startswith("Emission"):
+                    n.inputs["Emission Strength"].default_value = 0.0
+                if m.name.startswith("Car_paint"):
+                    info = nt.nodes.new("ShaderNodeObjectInfo")
+                    nt.links.new(info.outputs["Color"], n.inputs["Base Color"])
+                    n.inputs["Coat Weight"].default_value = 0.6
+                    n.inputs["Coat Roughness"].default_value = 0.03
+    return ob
+
+
+def parked_cars(hidden):
+    """Quelques voitures garées : contre le trottoir de la promenade (hors du plan de profil, y 45 à 80)
+    et sur le parking du motel. Une seule source, instanciée, teintes sourdes des années 80."""
+    src = parked_wagon_source(hidden)
+    tints = ["#5a2633", "#2b4756", "#b9a47c", "#34343a", "#7b6a58", "#3f5a3e"]
+    spots = [(ROAD_HALF - 1.15, 33.0, 0.0), (ROAD_HALF - 1.15, 104.0, 0.0), (ROAD_HALF - 1.15, 131.0, math.pi),
+             (ROAD_HALF - 1.15, 210.0, 0.0), (FRONT_X - 4.0, 166.0, math.pi / 2), (FRONT_X - 4.0, 172.5, math.pi / 2 + 0.05)]
+    for k, (x, y, rz) in enumerate(spots):
+        inst = instance(src, f"parked_{k}", (x, y, 0.16 if x < 0 else 0.0), rz)
+        inst.color = (*lin(tints[k % len(tints)])[:3], 1)
+
+
 def wires(name, spans, mat, sag=0.6, r=0.012):
     """Des fils qui pendent (chaînette approchée par une parabole), tous dans une courbe."""
     cu = bpy.data.curves.new(name, "CURVE")
@@ -1884,6 +1928,8 @@ def build():
 
     # --- la ville : la route, les immeubles, la rue
     build_city(hidden)
+    if os.environ.get("FILM3D_PARKED", "0") != "0":
+        parked_cars(hidden)
 
     # --- les palmiers : vingt-cinq cocotiers distincts (troncs courbes) et un palmier royal droit,
     # palmes translucides, une grille d'arbre au pied de chacun

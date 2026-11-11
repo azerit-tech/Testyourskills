@@ -22,6 +22,7 @@ Rien de tout cela n'est dans le dépôt : `fetch.py` le télécharge dans `Azeri
 | Modular Street Seating | Poly Haven | https://polyhaven.com/a/modular_street_seating | CC0 | 1K ; un seul banc à dossier gardé, face à l'avenue côté ville, face à la mer côté promenade. |
 | Metal Trash Can | Poly Haven | https://polyhaven.com/a/metal_trash_can | CC0 | 1K ; la poubelle propre sans son couvercle. |
 | Outdoor Table Chair Set 01 | Poly Haven | https://polyhaven.com/a/outdoor_table_chair_set_01 | CC0 | 1K ; trois tables de terrasse devant le petit hôtel. |
+| Roadjack Wagon | Martin Trafas (TinoD2) | https://sketchfab.com/3d-models/2b734bf738dc405998c2074953965cc6 | CC BY 4.0 | Fourgonnette des années 70 au nom inventé, sans badge ; ramenée à 4,9 m, plaque remplacée par une plaque vierge, feux éteints, caisse teintée par instance (bordeaux, bleu pétrole, sable, anthracite...) sous un vernis mouillé ; six instances garées (promenade hors du plan de profil, parking du motel), `FILM3D_PARKED=1`. |
 | Aerial Asphalt 01 | Poly Haven (Rob Tuytel) | https://polyhaven.com/a/aerial_asphalt_01 | CC0 | 2K ; le ton à grande échelle (30 m) de la chaussée, sous l'asphalte de près. |
 | Asphalt 04 | Poly Haven (Jenelle van Heerden, Sergej Majboroda) | https://polyhaven.com/a/asphalt_04 | CC0 | 2K ; seule sa carte de hauteur sert, pour placer les flaques dans les creux. |
 | Brushed Concrete 04 | Poly Haven (Amal Kumar) | https://polyhaven.com/a/brushed_concrete_04 | CC0 | 2K ; les dalles des trottoirs, quatre variantes et une teinte par dalle, taches et flaques aux coins bas. |
