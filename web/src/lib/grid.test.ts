@@ -196,4 +196,10 @@ describe("les recoupements d'une comparaison", () => {
       ["OWN", 6, 8, "more"],
     ]);
   });
+
+  it("la démo montre « recoupé » là où le moteur le pose : expérience, parcours, stack, ownership", () => {
+    const grid = comparisonGridsMock("LinkedIn", "camille-ardent").grid;
+    const crossed = grid.criteria.filter((c) => sourceLabel(c, FR, "linkedin") === FR.source.both).map((c) => c.code);
+    expect(crossed).toEqual(["XP", "EMP", "STK", "OWN"]);
+  });
 });

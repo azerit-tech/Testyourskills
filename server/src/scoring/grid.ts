@@ -543,6 +543,17 @@ function managementQuote(r: CvReading): string {
   return (r.management_fact?.quote ?? "").trim();
 }
 
+/** « Research Intern, McMaster University » : l'intitulé et l'employeur, tels que la personne les écrit. */
+const roleHead = (r: RoleInfo) => [r.role.title, r.role.company].filter(Boolean).join(", ");
+/** La nature d'un poste, sans nom ni intitulé : ce qu'une page partagée peut dire. */
+const roleWhat = (r: RoleInfo): Fact =>
+  r.kind === "internship" ? f("Stage ou alternance", "Internship or work-study") : r.founder ? f("Entreprise fondée", "Company founded") : f("Poste", "Role");
+/** « depuis avril 2026 », « février 2025 – novembre 2025 » (poste daté). */
+const roleWhen = (r: RoleInfo): Fact =>
+  r.role.end === null
+    ? f(`depuis ${monthName(r.start!).fr}`, `since ${monthName(r.start!).en}`)
+    : f(`${monthName(r.start!).fr} – ${monthName(r.end!).fr}`, `${monthName(r.start!).en} – ${monthName(r.end!).en}`);
+
 export function empDeclared(d: DeclaredInput): Draft {
   const src = d.label;
   const proof = d.url ? { proof: d.url } : {};
@@ -656,23 +667,16 @@ export function empDeclared(d: DeclaredInput): Draft {
       "For 10: two years at a high-bar employer, and a rising path or a team led.",
     );
 
-  // La pièce : les deux postes les plus récents, datés.
+  // La pièce : les deux postes les plus récents, datés ; sans nom ni intitulé pour la page partagée.
   const recent = infos.filter((r) => r.start !== null).sort((a, b) => b.start! - a.start!).slice(0, 2);
   const line = (r: RoleInfo): Fact => {
-    const head = [r.role.title, r.role.company].filter(Boolean).join(", ");
-    const when =
-      r.role.end === null
-        ? f(`depuis ${monthName(r.start!).fr}`, `since ${monthName(r.start!).en}`)
-        : f(`${monthName(r.start!).fr} – ${monthName(r.end!).fr}`, `${monthName(r.start!).en} – ${monthName(r.end!).en}`);
+    const head = roleHead(r);
+    const when = roleWhen(r);
     return f(`${head} : ${when.fr}, ${duration(r.months).fr}.`, `${head}: ${when.en}, ${duration(r.months).en}.`);
   };
-  // Sans nom ni intitulé, pour la page partagée : la nature du poste et ses dates.
   const publicLine = (r: RoleInfo): Fact => {
-    const what = r.kind === "internship" ? f("Stage ou alternance", "Internship or work-study") : r.founder ? f("Entreprise fondée", "Company founded") : f("Poste", "Role");
-    const when =
-      r.role.end === null
-        ? f(`depuis ${monthName(r.start!).fr}`, `since ${monthName(r.start!).en}`)
-        : f(`${monthName(r.start!).fr} – ${monthName(r.end!).fr}`, `${monthName(r.start!).en} – ${monthName(r.end!).en}`);
+    const what = roleWhat(r);
+    const when = roleWhen(r);
     return f(`${what.fr} : ${when.fr}, ${duration(r.months).fr}.`, `${what.en}: ${when.en}, ${duration(r.months).en}.`);
   };
   const undated = f(`${src}, postes sans dates.`, `${src}, undated roles.`);
@@ -1115,12 +1119,12 @@ export function ownDeclared(d: DeclaredInput): Draft {
       f("Ni entreprise fondée, ni résultat daté et chiffré.", "No company founded, no dated and quantified outcome."),
       f("Pour 4 : une entreprise fondée, ou un résultat daté et chiffré (mise en ligne, migration, usage).", "For 4: a company founded, or a dated and quantified outcome (launch, migration, usage)."),
     );
-  const reached =
-    lvl.score === 6
-      ? f(`${outcomes} résultats datés et chiffrés.`, `${outcomes} dated and quantified outcomes.`)
-      : founded && outcomes < 1
-        ? f(`Une entreprise fondée (${founded.role.company}). Aucun résultat daté et chiffré.`, `A company founded (${founded.role.company}). No dated and quantified outcome.`)
-        : f(`${outcomes} résultat${outcomes > 1 ? "s" : ""} daté${outcomes > 1 ? "s" : ""} et chiffré${outcomes > 1 ? "s" : ""}.`, `${outcomes} dated and quantified outcome${outcomes === 1 ? "" : "s"}.`);
+  const counts = f(`${outcomes} résultat${outcomes > 1 ? "s" : ""} daté${outcomes > 1 ? "s" : ""} et chiffré${outcomes > 1 ? "s" : ""}.`, `${outcomes} dated and quantified outcome${outcomes === 1 ? "" : "s"}.`);
+  const foundedOnly = founded && outcomes < 1 && lvl.score < 6;
+  const reached = foundedOnly
+    ? f(`Une entreprise fondée (${founded.role.company}). Aucun résultat daté et chiffré.`, `A company founded (${founded.role.company}). No dated and quantified outcome.`)
+    : counts;
+  const publicReached = foundedOnly ? f("Une entreprise fondée. Aucun résultat daté et chiffré.", "A company founded. No dated and quantified outcome.") : counts;
   return crit("OWN", {
     score: lvl.score,
     state: "declared",
@@ -1130,12 +1134,7 @@ export function ownDeclared(d: DeclaredInput): Draft {
       lvl.score < 6
         ? f(`Pour 6 : trois résultats datés et chiffrés (tu en as ${outcomes}). Au-delà, un projet sur GitHub.`, `For 6: three dated and quantified outcomes (you have ${outcomes}). Beyond that, a project on GitHub.`)
         : f("Au-delà de 6 : un projet porté et utilisé, sur GitHub.", "Beyond 6: a project carried and used, on GitHub."),
-    evidence: {
-      text: f(`${d.label}, postes et réalisations.`, `${d.label}, roles and achievements.`),
-      publicText: f(`${d.label}, postes et réalisations.`, `${d.label}, roles and achievements.`),
-      source: "linkedin",
-      ...(d.url ? { proof: d.url } : {}),
-    },
+    evidence: { text: reached, publicText: publicReached, source: "linkedin", ...(d.url ? { proof: d.url } : {}) },
   });
 }
 
@@ -1235,6 +1234,177 @@ export function ossGithub(g: GithubInput): Draft {
   });
 }
 
+// --- Les recoupements LinkedIn × GitHub (§3, §5) ------------------------------------------
+//
+// « Recoupé » est l'étiquette d'une pièce, pas d'une note : `evidence.source`
+// vaut « both » quand la pièce met les deux sources face à face. La note, elle,
+// reste prise sur sa source de preuve (`GridCriterion.source`). Trois
+// recoupements se calculent sur la fiche déclarative d'une comparaison, qui
+// reçoit les faits GitHub : les années recomptées face aux années actives (XP),
+// le poste confirmé par le code ou le même employeur des deux côtés (EMP), les
+// technos déclarées retrouvées ou sans trace (STK). L'ownership lu des deux
+// côtés se recoupe dans la note du dossier (caseGrid).
+
+type Evidence = NonNullable<GridCriterion["evidence"]>;
+type GithubSide = Pick<GithubInput, "facts" | "m">;
+
+/** XP : les années recomptées poste par poste, face aux années actives de GitHub (douze mois à 50 contributions ou plus). */
+export function xpCrossCheck(draft: Draft, d: DeclaredInput, gh: GithubSide): Draft {
+  const ev = draft.evidence;
+  const byYear = gh.facts.activityByYear;
+  if (draft.state !== "scored" || !ev?.publicText || !byYear || thinGithub(gh.m)) return draft;
+  const min = GRID.XP.githubActiveYearContributions;
+  const active = byYear.filter((x) => x.contributions >= min).length;
+  const y = countedMonths(analyzeRoles(d.roles, d.now)) / 12;
+  const gap = active - y;
+  const verdict =
+    Math.abs(gap) <= 1
+      ? f("Les deux se tiennent.", "The two line up.")
+      : gap > 0
+        ? f("Du code public sur plus d'années que le métier compté.", "Public code over more years than the counted work.")
+        : f("Moins d'années de code public que de métier compté.", "Fewer years of public code than counted work.");
+  const github = active
+    ? f(
+        `GitHub : ${active} année${active > 1 ? "s" : ""} active${active > 1 ? "s" : ""} (${min} contributions ou plus sur douze mois).`,
+        `GitHub: ${active} active year${active > 1 ? "s" : ""} (${min}+ contributions over twelve months).`,
+      )
+    : f(`GitHub : aucune année active (${min} contributions ou plus sur douze mois).`, `GitHub: no active year (${min}+ contributions over twelve months).`);
+  return {
+    ...draft,
+    evidence: { text: join([ev.text, github, verdict]), publicText: join([ev.publicText, github, verdict]), source: "both", proof: profileUrl(gh.facts.login) },
+  };
+}
+
+/** Des mots trop communs pour relier un poste à un dépôt (intitulés, types d'employeur, mots de liaison). */
+const CROSS_STOP = new Set(
+  (
+    "intern internship stage stagiaire alternance alternant apprenti research researcher recherche chercheur engineer engineering ingenieur ingenieurs " +
+    "developer developpeur developpeuse software logiciel university universite school ecole institute institut company entreprise group groupe " +
+    "france paris london labs team equipe with pour dans avec from that this then plus tres sans " +
+    "senior junior lead head manager director directeur directrice founder cofounder fondateur fondatrice cofondateur cofondatrice chief officer " +
+    "data full stack fullstack backend frontend mobile project projet projects projets github code tech technology technologies " +
+    "solutions services consulting conseil digital work travail standard models modeles notes test tests demo main master"
+  ).split(" "),
+);
+const crossTokens = (s: string): string[] => norm(s).split(/[^\p{L}\p{N}]+/u).filter((t) => t.length >= 4 && !CROSS_STOP.has(t));
+const repoTokens = (r: { name: string; topics?: string[] }) => new Set(crossTokens([r.name.replace(/([a-z])([A-Z])/g, "$1 $2"), ...(r.topics ?? [])].join(" ")));
+
+/**
+ * EMP : le poste confirmé par le code — un poste daté du LinkedIn, retrouvé sur
+ * GitHub dans les mêmes mois (des PR fusionnées, ou un de ses dépôts actif,
+ * dont le nom reprend un mot du poste) ; à défaut, le même employeur des deux
+ * côtés (la société ou le site du profil GitHub, pour le poste en cours). La
+ * version publique ne nomme ni le poste, ni l'employeur, ni le dépôt.
+ */
+export function empCrossCheck(draft: Draft, d: DeclaredInput, gh: GithubSide): Draft {
+  if (draft.state !== "scored") return draft;
+  const { facts } = gh;
+  const roles = analyzeRoles(d.roles, d.now)
+    .filter((r) => (r.kind === "full" || r.kind === "internship") && r.start !== null && r.end !== null)
+    .sort((a, b) => b.start! - a.start!);
+  const src = d.label;
+  const proof = d.url ? { proof: d.url } : {};
+  const head = (r: RoleInfo): Fact => f(`${src} : ${roleHead(r)}, ${roleWhen(r).fr}.`, `${src}: ${roleHead(r)}, ${roleWhen(r).en}.`);
+  const headPublic = (r: RoleInfo): Fact => {
+    const what = roleWhat(r);
+    return f(`${src} : ${what.fr.toLowerCase()}, ${roleWhen(r).fr}.`, `${src}: ${what.en.toLowerCase()}, ${roleWhen(r).en}.`);
+  };
+  const confirmed = f("Poste confirmé par le code.", "Role confirmed by the code.");
+  const prs = mergedPrs(facts) ?? [];
+  for (const r of roles) {
+    const words = new Set(crossTokens([r.role.company, r.role.title, r.role.description ?? ""].join(" ")));
+    if (!words.size) continue;
+    const hits = (tokens: Set<string>) => [...tokens].some((t) => words.has(t));
+    const inRole = (m: number) => m >= r.start! && m <= r.end!;
+    // Des PR fusionnées pendant le poste, dans un dépôt qui porte un mot du poste.
+    const byRepo = new Map<string, number>();
+    for (const p of prs) {
+      if (!p.mergedAt || Number.isNaN(Date.parse(p.mergedAt)) || !inRole(isoMonth(p.mergedAt))) continue;
+      const [owner, name] = p.repo.split("/");
+      if (hits(repoTokens({ name: `${owner} ${name}` }))) byRepo.set(p.repo, (byRepo.get(p.repo) ?? 0) + 1);
+    }
+    const prHit = [...byRepo.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
+    if (prHit) {
+      const [repo, k] = prHit;
+      const n = `${k} PR fusionnée${k > 1 ? "s" : ""}`;
+      const nEn = `${k} merged PR${k > 1 ? "s" : ""}`;
+      return {
+        ...draft,
+        evidence: {
+          text: join([head(r), f(`GitHub : ${n} dans ${repo} sur ces mois.`, `GitHub: ${nEn} into ${repo} over those months.`), confirmed]),
+          publicText: join([headPublic(r), f(`GitHub : ${n} dans un dépôt public sur ces mois.`, `GitHub: ${nEn} into a public repo over those months.`), confirmed]),
+          source: "both",
+          ...proof,
+        },
+      };
+    }
+    // Un de ses dépôts, actif pendant le poste, qui porte un mot du poste.
+    const own = facts.repos
+      .filter((x) => countedRepo(x) && (x.commitCount ?? 0) > 0 && hits(repoTokens(x)))
+      .filter((x) => isoMonth(x.createdAt) <= r.end! && isoMonth(x.pushedAt) >= r.start!)
+      .sort((a, b) => (b.commitCount ?? 0) - (a.commitCount ?? 0))[0];
+    if (own) {
+      const c = own.commitCount ?? 0;
+      return {
+        ...draft,
+        evidence: {
+          text: join([head(r), f(`GitHub : ${own.name}, ${nf(c, "fr")} commits, actif sur les mêmes mois.`, `GitHub: ${own.name}, ${nf(c, "en")} commits, active over the same months.`), confirmed]),
+          publicText: join([headPublic(r), f(`GitHub : un dépôt public de ${nf(c, "fr")} commits, actif sur les mêmes mois.`, `GitHub: a public repo with ${nf(c, "en")} commits, active over the same months.`), confirmed]),
+          source: "both",
+          ...proof,
+        },
+      };
+    }
+  }
+  // Le même employeur des deux côtés : la société ou le site du profil GitHub, face au poste en cours.
+  const compact = (s: string) => norm(s).replace(/[^\p{L}\p{N}]/gu, "");
+  const ghCompany = (facts.profile.company ?? "").replace(/^@/, "").trim();
+  const site = (facts.profile.blog ?? "").trim();
+  const siteKey = /^(?:https?:\/\/)?(?:www\.)?([^./]+)\./i.exec(site)?.[1] ?? "";
+  for (const r of roles.filter((x) => x.role.end === null)) {
+    const key = compact(r.role.company);
+    if (key.length < 3) continue;
+    const byCompany = !!ghCompany && compact(ghCompany) === key;
+    const bySite = !byCompany && !!siteKey && compact(siteKey) === key;
+    if (!byCompany && !bySite) continue;
+    const shown = byCompany ? ghCompany : site.replace(/^https?:\/\//, "").replace(/\/$/, "");
+    const what = byCompany ? f("société", "company") : f("site", "website");
+    return {
+      ...draft,
+      evidence: {
+        text: join([head(r), f(`Profil GitHub, ${what.fr} : ${shown}.`, `GitHub profile, ${what.en}: ${shown}.`), f("Même employeur des deux côtés.", "Same employer on both sides.")]),
+        publicText: join([headPublic(r), f(`Profil GitHub : le même employeur, en ${what.fr}.`, `GitHub profile: the same employer, as ${what.en}.`), f("Identité recoupée.", "Identity cross-checked.")]),
+        source: "both",
+        ...proof,
+      },
+    };
+  }
+  return draft;
+}
+
+/**
+ * STK : chaque techno déclarée qu'on sait chercher (la table « techno → trace »)
+ * est cherchée dans les langages, les dépendances, les topics et les fichiers.
+ * « Sans trace publique » ne s'écrit que pour ces technos-là.
+ */
+export function stkCrossCheck(draft: Draft, d: DeclaredInput, gh: GithubSide): Draft {
+  const r = d.reading;
+  const verifiable = tracesNamed(uniqNames([...d.skills, ...r.technos_listed, ...r.technos_described]));
+  if (!verifiable.length) return draft;
+  const found = verifiable.filter((t) => traceFound(t, gh.facts, gh.m)).map((t) => t.name);
+  const absent = verifiable.map((t) => t.name).filter((n) => !found.includes(n));
+  const list = (xs: string[]) => xs.slice(0, 5).join(", ") + (xs.length > 5 ? "…" : "");
+  const parts: Fact[] = [f(`${d.label} : ${list(verifiable.map((t) => t.name))}.`, `${d.label}: ${list(verifiable.map((t) => t.name))}.`)];
+  if (!absent.length) parts.push(f("Toutes retrouvées dans le code.", "All found in the code."));
+  else {
+    parts.push(found.length ? f(`Dans le code : ${list(found)}.`, `In the code: ${list(found)}.`) : f("Aucune retrouvée dans le code.", "None found in the code."));
+    parts.push(f(`Sans trace publique : ${list(absent)}.`, `No public trace: ${list(absent)}.`));
+  }
+  // Des noms de technos, pas d'employeurs : la même pièce sur la page partagée.
+  const text = join(parts);
+  return { ...draft, evidence: { text, publicText: text, source: "both", proof: profileUrl(gh.facts.login) } };
+}
+
 // --- La note générale (§4) ------------------------------------------------------------
 
 /**
@@ -1300,11 +1470,13 @@ export function githubGrid(g: GithubInput): Grid {
  */
 export function declaredGrid(d: DeclaredInput, gh?: Pick<GithubInput, "facts" | "m">): Grid {
   const src = d.label;
+  // Avec les faits GitHub d'une comparaison, les pièces recoupées (notes inchangées).
+  const check = (draft: Draft, fn: (x: Draft, d: DeclaredInput, gh: GithubSide) => Draft) => (gh ? fn(draft, d, gh) : draft);
   return finalize([
     eduDeclared(d),
-    xpDeclared(d),
-    empDeclared(d),
-    stkDeclared(d, gh),
+    check(xpDeclared(d), xpCrossCheck),
+    check(empDeclared(d), empCrossCheck),
+    check(stkDeclared(d, gh), stkCrossCheck),
     unproven("CODE", "linkedin", f(`Le code ne se prouve pas sur ${src}.`, `Code cannot be proven on ${src}.`)),
     unproven("ACT", "linkedin", f(`L'activité ne se lit pas sur ${src}.`, `Activity cannot be read on ${src}.`)),
     ownDeclared(d),
@@ -1358,7 +1530,41 @@ export function caseGrid(declared: Grid, proven: Grid): Grid {
         source = chosen.source;
     }
     const flags = mergeFlags(d.flags, p.flags);
-    return { ...strip(chosen), source, ...both, flags };
+    const evidence = caseEvidence(code, chosen === p, d, p);
+    const { evidence: _e, ...rest } = strip(chosen);
+    return { ...rest, source, ...both, flags, ...(evidence ? { evidence } : {}) };
   });
   return finalize(drafts);
+}
+
+/** « Déclaré : une entreprise fondée. » : la pièce du côté déclaratif, après celle de GitHub. */
+const declaredSide = (x: Fact): Fact => {
+  const low = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
+  return f(`Déclaré : ${low(x.fr)}`, `Declared: ${low(x.en)}`);
+};
+
+/**
+ * La pièce du critère retenu, et le recoupement quand les deux sources parlent :
+ * la stack prouvée suivie des technos déclarées retrouvées ou sans trace ;
+ * l'ownership noté des deux côtés, les deux pièces face à face. XP et EMP
+ * gardent la pièce déclarative, déjà recoupée sur la fiche de la comparaison.
+ */
+function caseEvidence(code: CriterionCode, tookProven: boolean, d: GridCriterion, p: GridCriterion): Evidence | undefined {
+  const de = d.evidence;
+  const pe = p.evidence;
+  const chosen = tookProven ? pe : de;
+  if (!pe || !de) return chosen;
+  const pub = (x: Evidence) => x.publicText ?? (x.source === "github" ? x.text : undefined);
+  const pair = (second: Fact, secondPublic: Fact | undefined): Evidence => {
+    const pp = pub(pe);
+    return {
+      text: join([pe.text, second]),
+      ...(pp && secondPublic ? { publicText: join([pp, secondPublic]) } : {}),
+      source: "both",
+      ...(pe.proof ? { proof: pe.proof } : {}),
+    };
+  };
+  if (code === "STK" && tookProven && p.score !== null && de.source === "both") return pair(de.text, de.publicText);
+  if (code === "OWN" && p.score !== null && d.score !== null) return pair(declaredSide(de.text), de.publicText ? declaredSide(de.publicText) : undefined);
+  return chosen;
 }

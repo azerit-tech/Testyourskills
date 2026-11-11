@@ -3239,6 +3239,11 @@ a.rg-src {
 a.rg-src:hover {
   text-decoration: underline;
 }
+/* « recoupé » : LinkedIn et GitHub se confirment, la pièce la plus forte du bloc */
+.rg-src.is-both,
+a.rg-src.is-both {
+  color: var(--lime);
+}
 .rg-flags,
 .rg-cross-flags {
   list-style: none;

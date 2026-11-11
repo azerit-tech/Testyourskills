@@ -6,10 +6,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CardData } from "../../../shared/types";
 import { cvCounts, cvReading } from "../../../server/src/scoring/__fixtures__/make";
-import { FOUNDERS_NOW } from "../../../server/src/scoring/__fixtures__/founders";
-import { scoreCv } from "../../../server/src/scoring/index";
+import { FOUNDERS_NOW, JACQUES_AI, jacquesFacts, jacquesProfile, jacquesReading } from "../../../server/src/scoring/__fixtures__/founders";
+import { compareCards, scoreCv, scoreGithub } from "../../../server/src/scoring/index";
 import { asLinkedinCard } from "../../../shared/linkedinText";
-import { LangProvider } from "../i18n";
+import { DICTS, LangProvider } from "../i18n";
 import type { Shareable } from "./After";
 import { RecruiterGrid } from "./RecruiterGrid";
 
@@ -72,4 +72,46 @@ describe("la page partagée : aucun nom d'école ni d'ancien employeur, au mot p
       expect(textOf(html)).toContain(lang === "fr-FR" ? "Un poste d'association : non compté." : "An association role: not counted.");
     });
   }
+});
+
+/** Les lignes du bloc, par nom de critère. */
+function rowsOf(html: string): Map<string, string> {
+  const rows = new Map<string, string>();
+  for (const chunk of html.split('<li class="rg-row').slice(1)) {
+    const name = /<span class="rg-name">([^<]+)<\/span>/.exec(chunk)?.[1];
+    if (name) rows.set(name.replace(/&#x27;/g, "'"), chunk);
+  }
+  return rows;
+}
+
+describe("« recoupé » : de la sortie du moteur à l'étiquette affichée", () => {
+  const github = asCard(scoreGithub(jacquesFacts(), JACQUES_AI, opts), "gh");
+  const linkedin = asCard(asLinkedinCard(scoreCv(jacquesReading(), cvCounts(), { ...opts, linkedin: jacquesProfile(), now: FOUNDERS_NOW, github: jacquesFacts() })), "li");
+  const comparison = { ...compareCards(linkedin, github), id: "cmp", createdAt: FOUNDERS_NOW, declaredSource: "linkedin" as const };
+  const item: Shareable = { kind: "comparison", comparison };
+
+  it("le moteur pose la source « both » sur la pièce de l'expérience, du parcours, de la stack et de l'ownership", () => {
+    const crossed = comparison.grid!.criteria.filter((c) => c.evidence?.source === "both").map((c) => c.code);
+    expect(crossed).toEqual(["XP", "EMP", "STK", "OWN"]);
+  });
+
+  for (const [lang, dict] of [["fr-FR", DICTS.fr.grid], ["en-US", DICTS.en.grid]] as const) {
+    for (const shared of [false, true]) {
+      it(`ces quatre lignes portent l'étiquette « ${dict.source.both} », les autres leur source (${lang}${shared ? ", page partagée" : ""})`, () => {
+        const rows = rowsOf(render(item, shared, lang));
+        // Une étiquette, ou un lien quand la pièce mène à une page publique.
+        const label = new RegExp(`class="rg-src is-both"[^>]*>${dict.source.both}<`);
+        for (const code of ["XP", "EMP", "STK", "OWN"] as const) expect(rows.get(dict.names[code]), code).toMatch(label);
+        for (const code of ["EDU", "CODE", "ACT", "OSS"] as const) expect(rows.get(dict.names[code]), code).not.toContain("is-both");
+      });
+    }
+  }
+
+  it("la page partagée montre le recoupement sans nommer le poste", () => {
+    const emp = textOf(rowsOf(render(item, true)).get("Parcours et employeurs")!);
+    expect(emp).toContain("LinkedIn : stage ou alternance, février 2025 – novembre 2025. GitHub : un dépôt public de 25 commits, actif sur les mêmes mois. Poste confirmé par le code.");
+    expect(emp).not.toMatch(/McMaster|Research Intern|agda-notes/);
+    const own = textOf(rowsOf(render(item, false)).get("Parcours et employeurs")!);
+    expect(own).toContain("Research Intern, McMaster University");
+  });
 });

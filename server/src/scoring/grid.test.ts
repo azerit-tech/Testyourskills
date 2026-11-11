@@ -138,7 +138,7 @@ describe("les deux fondateurs (§7), à un point près", () => {
   });
 
   it("les pièces se lisent poste par poste, avec les chiffres de la personne", () => {
-    expect(crit(jLinkedin, "XP").evidence?.text.fr).toBe(
+    expect(crit(declaredGrid(decl(jacquesReading(), jacquesProfile())), "XP").evidence?.text.fr).toBe(
       "13 mois de stage ou d'alternance comptés pour moitié. 7 mois à la tête d'Azerit. Centrale Méditerranée Finance est une association : non compté. Total : 1,1 an.",
     );
     expect(crit(jLinkedin, "EMP").next?.fr).toBe("Pour 6 : tenir Azerit un an (7 mois aujourd'hui), ou un poste tenu deux ans.");
@@ -159,6 +159,82 @@ describe("les deux fondateurs (§7), à un point près", () => {
     expect([stk.declared, stk.proven, stk.score, stk.source]).toEqual([null, 6, 6, "github"]);
     const xp = crit(jCase, "XP");
     expect([xp.declared, xp.proven, xp.score, xp.source]).toEqual([3, 4, 3, "linkedin"]);
+  });
+});
+
+describe("les recoupements LinkedIn × GitHub : la pièce « recoupé » (§3, §5)", () => {
+  const jGithub = githubGrid(gh(jacquesFacts(), JACQUES_AI));
+  const jDeclared = (f = jacquesFacts()) => declaredGrid(decl(jacquesReading(), jacquesProfile()), gh(f));
+  const jCase = (f = jacquesFacts()) => caseGrid(jDeclared(f), githubGrid(gh(f, JACQUES_AI)));
+  const NAMES = /Azerit|McMaster|Hedge Fund|Centrale|Méditerranée|Research Intern|Co-founder|agda-notes|agda-stdlib/;
+  const both = (g: Grid) => g.criteria.filter((c) => c.evidence?.source === "both").map((c) => c.code);
+
+  it("Jacques : expérience, parcours, stack et ownership recoupés ; école, code, activité, open source sur leur source", () => {
+    const g = jCase();
+    expect(both(g)).toEqual(["XP", "EMP", "STK", "OWN"]);
+    expect(crit(g, "XP").evidence!.text.fr).toBe(
+      "13 mois de stage ou d'alternance comptés pour moitié. 7 mois à la tête d'Azerit. Centrale Méditerranée Finance est une association : non compté. Total : 1,1 an. GitHub : 2 années actives (50 contributions ou plus sur douze mois). Les deux se tiennent.",
+    );
+    expect(crit(g, "EMP").evidence!.text.fr).toBe(
+      "LinkedIn : Research Intern, McMaster University, février 2025 – novembre 2025. GitHub : agda-notes, 25 commits, actif sur les mêmes mois. Poste confirmé par le code.",
+    );
+    expect(crit(g, "STK").evidence!.text.fr).toMatch(/\(sequence-mail\)\. Agda aussi dans le code\. LinkedIn : Python, Agda, TypeScript, Kubernetes\. Dans le code : Agda, TypeScript\. Sans trace publique : Python, Kubernetes\.$/);
+    expect(crit(g, "OWN").evidence!.text.fr).toBe("sequence-mail : 120 commits sur 17 mois. Déclaré : une entreprise fondée (Azerit). Aucun résultat daté et chiffré.");
+  });
+
+  it("un recoupement ne change aucune note, ni la note du dossier", () => {
+    const alone = declaredGrid(decl(jacquesReading(), jacquesProfile()));
+    expect(scores(jDeclared())).toEqual(scores(alone));
+    expect(jDeclared().overall).toBe(alone.overall);
+    expect(caseGrid(alone, jGithub).overall).toBe(jCase().overall);
+    expect(scores(caseGrid(alone, jGithub))).toEqual(scores(jCase()));
+  });
+
+  it("chaque pièce recoupée a sa version publique, sans nom d'employeur, d'école, d'intitulé ni de dépôt du poste", () => {
+    for (const g of [jCase(), jDeclared()])
+      for (const c of g.criteria.filter((x) => x.evidence?.source === "both"))
+        for (const lang of ["fr", "en"] as const) {
+          const pub = c.evidence!.publicText?.[lang];
+          expect(pub, `${c.code} ${lang}`).toBeTruthy();
+          // La stack et l'ownership gardent les noms de technos et de dépôts publics de la pièce GitHub : jamais ceux du poste.
+          expect(pub!.replace(/sequence-mail/g, ""), `${c.code} ${lang}`).not.toMatch(NAMES);
+        }
+  });
+
+  it("le poste confirmé par des PR fusionnées pendant le poste, dans un dépôt qui porte un mot du poste", () => {
+    const f = { ...jacquesFacts(), externalMergedPRList: [
+      { repo: "agda/agda-stdlib", stars: 700, mergedAt: "2025-04-02T10:00:00Z" },
+      { repo: "agda/agda-stdlib", stars: 700, mergedAt: "2025-09-12T10:00:00Z" },
+      // hors des mois du poste : pas compté
+      { repo: "agda/agda-stdlib", stars: 700, mergedAt: "2024-01-12T10:00:00Z" },
+    ] };
+    const emp = crit(jCase(f), "EMP").evidence!;
+    expect(emp.source).toBe("both");
+    expect(emp.text.fr).toContain("GitHub : 2 PR fusionnées dans agda/agda-stdlib sur ces mois. Poste confirmé par le code.");
+    expect(emp.publicText!.fr).toBe("LinkedIn : stage ou alternance, février 2025 – novembre 2025. GitHub : 2 PR fusionnées dans un dépôt public sur ces mois. Poste confirmé par le code.");
+  });
+
+  it("sans dépôt du poste : le même employeur sur le profil GitHub, pour le poste en cours", () => {
+    const f = jacquesFacts();
+    f.repos = f.repos.filter((r) => r.name !== "agda-notes");
+    const emp = crit(jCase(f), "EMP").evidence!;
+    expect(emp.source).toBe("both");
+    expect(emp.text.fr).toBe("LinkedIn : Co-founder, Azerit, depuis avril 2026. Profil GitHub, société : Azerit. Même employeur des deux côtés.");
+    expect(emp.publicText!.fr).not.toMatch(NAMES);
+    // Ni dépôt, ni société, ni site : la pièce reste celle de LinkedIn.
+    f.profile = { ...f.profile, company: null, blog: null };
+    expect(crit(jCase(f), "EMP").evidence!.source).toBe("linkedin");
+  });
+
+  it("« sans trace publique » ne vise que les technos qu'on sait chercher", () => {
+    const r = { ...jacquesReading(), technos_listed: ["Python", "Agda", "TypeScript", "Kubernetes", "Salesforce CPQ"] };
+    const stk = crit(declaredGrid(decl(r, jacquesProfile()), gh(jacquesFacts())), "STK").evidence!;
+    expect(stk.text.fr).not.toContain("Salesforce");
+  });
+
+  it("un GitHub vide ne recoupe rien : les pièces restent celles de LinkedIn", () => {
+    const g = caseGrid(declaredGrid(decl(lumineReading(), lumineProfile()), gh(lumineFacts())), githubGrid(gh(lumineFacts())));
+    expect(both(g)).toEqual([]);
   });
 });
 

@@ -62,6 +62,7 @@ function Row({ c, grid, declared, shared, columns, skipFlags }: RowProps) {
   const takenD = c.source === "linkedin" || c.source === "both";
   const takenP = c.source === "github" || c.source === "both";
   const flags = skipFlags ? [] : text.flags;
+  const cross = c.evidence?.source === "both";
 
   return (
     <li className={`rg-row is-${c.score === null ? "none" : c.state}${c.counted ? "" : " is-out"}`}>
@@ -111,15 +112,16 @@ function Row({ c, grid, declared, shared, columns, skipFlags }: RowProps) {
           {text.line.split("`").map((part, i) => (i % 2 ? <code key={i}>{part}</code> : part))}
         </p>
       )}
+      {/* « recoupé » : la pièce met LinkedIn et GitHub face à face (evidence.source « both »), la démonstration de la méthode. */}
       {text.label &&
         (text.href ? (
-          <a className="rg-src" href={text.href} target="_blank" rel="noopener noreferrer">
+          <a className={`rg-src${cross ? " is-both" : ""}`} href={text.href} target="_blank" rel="noopener noreferrer">
             {text.label}
             <span aria-hidden> ↗</span>
             <span className="sr-only"> · {g.proof}</span>
           </a>
         ) : (
-          <span className="rg-src">{text.label}</span>
+          <span className={`rg-src${cross ? " is-both" : ""}`}>{text.label}</span>
         ))}
       {flags.length > 0 && (
         <ul className="rg-flags">
