@@ -74,6 +74,22 @@ describe("lieux du crime des images de partage", () => {
     for (const format of ["og", "portrait"] as const) expect(await renderSvg({ format, comparison: cmp, lang: "fr" })).not.toContain("data:image/jpeg");
   });
 
+  it("une comparaison notée : la note du dossier entre les deux pièces, plus de colonne d'écarts (§18.37)", async () => {
+    const { FIXTURE_COMPARISON } = await import("../../../shared/fixtures");
+    const base = { ...FIXTURE_COMPARISON, cv: { ...FIXTURE_COMPARISON.cv, avatarUrl: undefined }, github: { ...FIXTURE_COMPARISON.github, avatarUrl: undefined } };
+    const graded = { ...base, grid: { criteria: [{ code: "CODE" as const, score: 6, state: "scored" as const, counted: true, source: "github" as const, reached: { fr: "", en: "" }, flags: [] }], overall: 57 } };
+    for (const format of ["og", "portrait", "card"] as const) {
+      const svg = await renderSvg({ format, comparison: graded, lang: "fr" });
+      expect(svg).toContain("LE DOSSIER");
+      expect(svg).toContain(">57<");
+      // Les écarts stat par stat (« +12 », « −8 ») ne sont plus dessinés.
+      expect(svg).not.toMatch(/>[+−]\d+</);
+      const old = await renderSvg({ format, comparison: base, lang: "fr" });
+      expect(old).not.toContain("LE DOSSIER");
+    }
+    expect(await renderSvg({ format: "og", comparison: graded, lang: "en" })).toContain("THE FILE");
+  });
+
   it("sort des PNG opaques aux bonnes tailles", async () => {
     for (const [format, w, h] of [["og", 1200, 630], ["portrait", 1080, 1350]] as const) {
       const png = await renderImage({ format, card: light, lang: "fr" });

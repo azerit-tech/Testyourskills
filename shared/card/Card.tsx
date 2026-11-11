@@ -74,7 +74,7 @@ export const LAYOUT = {
   footer: { y: 510, size: 8, minSize: 7 },
 } as const;
 
-const STAR = "M12 2.6l2.9 6.1 6.7.8-4.9 4.6 1.3 6.6L12 17.4l-6 3.3 1.3-6.6L2.4 9.5l6.7-.8z";
+export const STAR = "M12 2.6l2.9 6.1 6.7.8-4.9 4.6 1.3 6.6L12 17.4l-6 3.3 1.3-6.6L2.4 9.5l6.7-.8z";
 const PALM = [
   "M46 140c2-34 5-62 12-86l4 1c-8 24-11 52-12 85z",
   "M60 54C40 38 20 38 4 50c18-4 36 0 56 7z",

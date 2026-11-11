@@ -186,7 +186,9 @@ describe("face à un GitHub vide : le code n'est pas prouvé, rien ne se compare
   for (const who of [null, "@LumBuilds0"]) {
     it(`le titre est neutre, ni gain ni perte, et la note du dossier dit « code non prouvé » (${who ?? "la personne fichée"})`, () => {
       const html = renderNode(createElement(ComparisonStage, { cmp: comparison, phase: "done", who }));
-      expect(html).toMatch(/class="cmp-headline tone-neutral"/);
+      expect(html).toMatch(/class="cmp-headline tone-neutral is-sub"/);
+      // La note du dossier en tête, au-dessus de la phrase (§18.37).
+      expect(html.indexOf('class="cmp-case"')).toBeLessThan(html.indexOf('class="cmp-headline'));
       expect(html).not.toMatch(/tone-(down|up)/);
       expect(textOf(html)).toContain("Code non prouvé : rien n'est comparé");
       expect(html).not.toContain("delta-overall");

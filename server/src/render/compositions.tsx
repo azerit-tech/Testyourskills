@@ -10,8 +10,8 @@
 // rectangle flou derrière la fiche (le drop-shadow CSS de l'écran ne passe pas dans le PNG).
 import type { ReactNode } from "react";
 import type { CardData, ComparisonData, Lang, StatCode } from "../../../shared/types";
-import { declaredOf, STAT_CODES } from "../../../shared/types";
-import { CardGraphic } from "../../../shared/card/Card";
+import { declaredOf, STAT_CODES, starsFor } from "../../../shared/types";
+import { CardGraphic, STAR } from "../../../shared/card/Card";
 import { AzeritGem } from "../../../shared/card/AzeritGem";
 import { fontAttrs } from "../../../shared/card/fonts";
 import { CARD_H, CARD_R, CARD_W } from "../../../shared/card/geometry";
@@ -20,6 +20,7 @@ import { fit, fitLines, upper, wrap } from "../../../shared/card/text";
 import { PALETTE, themeOf } from "../../../shared/card/themes";
 import { SKY_TEXT } from "../../../shared/scenes";
 import { ownHeadline } from "../../../shared/compareText";
+import { usableGrid } from "../../../shared/gridText";
 import { HOME_PROMISE } from "../../../shared/promise";
 import type { SceneImage } from "./scenes";
 
@@ -489,6 +490,44 @@ function DeltaColumn({ cmp, x, y, rowH, w }: { cmp: ComparisonData; x: number; y
   );
 }
 
+/**
+ * La note du dossier entre les deux pièces (§18.37), à la place des écarts stat par
+ * stat : « LE DOSSIER », la note, ses six étoiles. `scale` : 1 pour l'image 1200 × 630.
+ */
+function CaseBlock({ overall, lang, x, y, scale = 1 }: { overall: number; lang: Lang; x: number; y: number; scale?: number }) {
+  const w = 170 * scale;
+  const h = 210 * scale;
+  return (
+    <g>
+      <rect x={x - w / 2} y={y - h / 2} width={w} height={h} rx={24 * scale} fill={PALETTE.ink1} />
+      <text x={x} y={y - 58 * scale} {...fontAttrs("sans-600")} fontSize={14 * scale} letterSpacing={2.4 * scale} textAnchor="middle" fill={MUTED}>
+        {upper(t(lang).caseLabel, lang)}
+      </text>
+      <text x={x} y={y + 30 * scale} {...fontAttrs("display-800")} fontSize={86 * scale} letterSpacing={-2} textAnchor="middle" fill={PALETTE.cream}>
+        {overall}
+      </text>
+      <StarRow n={starsFor(overall)} cx={x} y={y + 58 * scale} size={20 * scale} />
+    </g>
+  );
+}
+
+/** Six étoiles centrées sur `cx`, les allumées en pêche, les éteintes sombres (le dessin de la fiche). */
+function StarRow({ n, cx, y, size }: { n: number; cx: number; y: number; size: number }) {
+  const gap = size * 0.08;
+  const k = size / 24;
+  const x0 = cx - (6 * size + 5 * gap) / 2;
+  return (
+    <g>
+      {[0, 1, 2, 3, 4, 5].map((i) => (
+        <path key={i} d={STAR} transform={`translate(${+(x0 + i * (size + gap)).toFixed(2)} ${+y.toFixed(2)}) scale(${+k.toFixed(3)})`} fill={i < n ? PALETTE.peach : "#fff"} fillOpacity={i < n ? 1 : 0.13} />
+      ))}
+    </g>
+  );
+}
+
+/** Une comparaison notée montre la note du dossier ; une comparaison d'avant la grille, ses écarts. */
+const caseOf = (cmp: ComparisonData): number | null => (usableGrid(cmp.grid) ? cmp.grid.overall : null);
+
 function SideLabel({ x, y, text, color, size = 14 }: { x: number; y: number; text: string; color: string; size?: number }) {
   return (
     <text x={x} y={y} {...fontAttrs("sans-600")} fontSize={size} letterSpacing={size * 0.18} textAnchor="middle" fill={color}>
@@ -517,7 +556,7 @@ export function ComparisonOg({ cmp, lang, avatars }: { cmp: ComparisonData; lang
       <SideLabel x={rx + cw / 2} y={120} text={upper(s.githubSide, lang)} color={PALETTE.lime} size={12} />
       <Placed card={cmp.cv} lang={lang} avatars={avatars} id="cogcv" x={lx} y={cy} w={cw} />
       <Placed card={cmp.github} lang={lang} avatars={avatars} id="coggh" x={rx} y={cy} w={cw} />
-      <DeltaColumn cmp={cmp} x={W / 2} y={cy + 52} rowH={64} w={150} />
+      {caseOf(cmp) !== null ? <CaseBlock overall={caseOf(cmp)!} lang={lang} x={W / 2} y={cy + ch / 2} /> : <DeltaColumn cmp={cmp} x={W / 2} y={cy + 52} rowH={64} w={150} />}
       <Host x={W / 2} y={606} size={18} />
     </svg>
   );
@@ -553,9 +592,26 @@ export function ComparisonPortrait({ cmp, lang, avatars }: { cmp: ComparisonData
       <SideLabel x={rx + cw / 2} y={cy - 22} text={upper(s.githubSide, lang)} color={PALETTE.lime} size={15} />
       <Placed card={cmp.cv} lang={lang} avatars={avatars} id="cptcv" x={lx} y={cy} w={cw} />
       <Placed card={cmp.github} lang={lang} avatars={avatars} id="cptgh" x={rx} y={cy} w={cw} />
-      <DeltaRow cmp={cmp} y={cy + ch + 70} W={W} />
+      {caseOf(cmp) !== null ? <CaseRow overall={caseOf(cmp)!} lang={lang} y={cy + ch + 70} W={W} /> : <DeltaRow cmp={cmp} y={cy + ch + 70} W={W} />}
       <Host x={W / 2} y={1296} size={26} />
     </svg>
+  );
+}
+
+/** Sous les deux pièces du portrait : « LE DOSSIER  57  ★★★★☆☆ » sur une ligne. */
+function CaseRow({ overall, lang, y, W }: { overall: number; lang: Lang; y: number; W: number }) {
+  const w = 560;
+  return (
+    <g>
+      <rect x={(W - w) / 2} y={y - 40} width={w} height={80} rx={18} fill={PALETTE.ink1} />
+      <text x={(W - w) / 2 + 30} y={y + 7} {...fontAttrs("sans-600")} fontSize={18} letterSpacing={3} fill={MUTED}>
+        {upper(t(lang).caseLabel, lang)}
+      </text>
+      <text x={W / 2 + 40} y={y + 20} {...fontAttrs("display-800")} fontSize={56} letterSpacing={-1.5} textAnchor="middle" fill={PALETTE.cream}>
+        {overall}
+      </text>
+      <StarRow n={starsFor(overall)} cx={(W + w) / 2 - 30 - 3 * 26} y={y - 12} size={24} />
+    </g>
   );
 }
 
@@ -594,7 +650,7 @@ export function ComparisonCard({ cmp, lang, avatars }: { cmp: ComparisonData; la
     <svg xmlns="http://www.w3.org/2000/svg" width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
       <CardGraphic card={cmp.cv} lang={lang} avatarHref={av(avatars, cmp.cv.id)} idPrefix="cccv" x={0} y={0} width={CARD_W} height={CARD_H} />
       <CardGraphic card={cmp.github} lang={lang} avatarHref={av(avatars, cmp.github.id)} idPrefix="ccgh" x={W - CARD_W} y={0} width={CARD_W} height={CARD_H} />
-      <DeltaColumn cmp={cmp} x={W / 2} y={110} rowH={62} w={150} />
+      {caseOf(cmp) !== null ? <CaseBlock overall={caseOf(cmp)!} lang={lang} x={W / 2} y={CARD_H / 2} /> : <DeltaColumn cmp={cmp} x={W / 2} y={110} rowH={62} w={150} />}
     </svg>
   );
 }

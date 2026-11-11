@@ -30,6 +30,8 @@ export const STRINGS = {
     cvSide: "Ton parcours, lu sur ton CV",
     linkedinSide: "Ton parcours, lu sur LinkedIn",
     githubSide: "Ton code, lu sur GitHub",
+    /** Entre les deux pièces, dans l'image d'une comparaison notée : la note du dossier (§18.37). */
+    caseLabel: "Le dossier",
     overall: "Note",
     positions: {
       FS: "Full-stack", BE: "Backend", FE: "Frontend", MOB: "Mobile", DATA: "Data", ML: "Machine learning",
@@ -77,6 +79,7 @@ export const STRINGS = {
     cvSide: "Your career, read on your CV",
     linkedinSide: "Your career, read on LinkedIn",
     githubSide: "Your code, read on GitHub",
+    caseLabel: "The file",
     overall: "Rating",
     positions: {
       FS: "Full-stack", BE: "Backend", FE: "Frontend", MOB: "Mobile", DATA: "Data", ML: "Machine learning",

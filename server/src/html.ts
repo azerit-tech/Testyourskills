@@ -57,7 +57,12 @@ export function metaFor(data: CardData | ComparisonData, baseUrl: string): PageM
     // (shared/compareText.ts, comme le visiteur de la page). À égalité, le titre du catalogue
     // ne s'adresse à personne, et le nom le suit.
     const who = data.github.login ? `@${data.github.login}` : name;
-    const title = theirHeadline(data, lang, who);
+    const sentence = theirHeadline(data, lang, who);
+    // Notée (§18.37) : la note du dossier en titre, la phrase en tête de la description.
+    const kase = usableGrid(data.grid) ? data.grid.overall : null;
+    const title =
+      kase === null ? sentence : fr ? `Le dossier de ${who} : ${starsLine(starsFor(kase))}, ${kase}` : `${who}'s file: ${starsLine(starsFor(kase))}, ${kase}`;
+    const lead = kase === null ? "" : `${sentence}. `;
     // LinkedIn et GitHub (§18.24) : « LinkedIn » partout où une comparaison dirait « CV ». Deux pièces d'un même dossier.
     const src = declaredLabel(data);
     return {
@@ -66,8 +71,8 @@ export function metaFor(data: CardData | ComparisonData, baseUrl: string): PageM
       image,
       title,
       description: fr
-        ? `${src} : ${cardLabel(data.cv, lang)}. GitHub : ${cardLabel(data.github, lang)}. Deux pièces au même dossier, lues sur huit critères de recrutement. Fais la tienne.`
-        : `${src}: ${cardLabel(data.cv, lang)}. GitHub: ${cardLabel(data.github, lang)}. Two exhibits in one file, read on eight hiring criteria. Make yours.`,
+        ? `${lead}${src} : ${cardLabel(data.cv, lang)}. GitHub : ${cardLabel(data.github, lang)}. Deux pièces au même dossier, lues sur huit critères de recrutement. Fais la tienne.`
+        : `${lead}${src}: ${cardLabel(data.cv, lang)}. GitHub: ${cardLabel(data.github, lang)}. Two exhibits in one file, read on eight hiring criteria. Make yours.`,
       imageAlt: fr ? `Fiche ${src} et fiche GitHub de ${name}` : `${name}'s ${src} sheet and GitHub sheet`,
     };
   }

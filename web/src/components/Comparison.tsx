@@ -2,8 +2,9 @@
 // entre les deux ; sur mobile, cartes en carrousel (swipe) et deltas en grille.
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import { starsLine } from "../../../shared/stars";
 import type { ComparisonData, StatCode } from "../../../shared/types";
-import { declaredOf, STAT_CODES } from "../../../shared/types";
+import { declaredOf, STAT_CODES, starsFor } from "../../../shared/types";
 import { ownHeadline, theirHeadline } from "../../../shared/compareText";
 import { usableGrid } from "../../../shared/gridText";
 import { useT } from "../i18n";
@@ -75,16 +76,30 @@ export function Deltas({ cmp, className = "" }: { cmp: ComparisonData; className
 }
 
 /**
- * Comparaison notée par le barème de recrutement (§18.37) : à la place des écarts
- * stat par stat (« +12 »), la note du dossier, chaque critère pris sur sa source
- * de preuve, et le lien vers la lecture du recruteur, sous les fiches.
+ * Comparaison notée par le barème de recrutement (§18.37) : la note du dossier
+ * en tête, avec ses étoiles, au-dessus de la phrase (rapport du recruteur, §5).
  */
-function CaseRating({ overall, unproven, className = "" }: { overall: number; unproven: boolean; className?: string }) {
+function CaseTop({ overall }: { overall: number }) {
+  const { t } = useT();
+  const n = starsFor(overall);
+  return (
+    <p className="cmp-case">
+      <span className="cmp-case-stars" aria-hidden>
+        {starsLine(n)}
+      </span>
+      <b className="cmp-case-v" aria-hidden>
+        {overall}
+      </b>
+      <span className="sr-only">{t.compare.caseSr(overall, n)}</span>
+    </p>
+  );
+}
+
+/** Sous les deux pièces : d'où vient la note du dossier, et le lien vers la lecture du recruteur. */
+function CaseRating({ unproven, className = "" }: { unproven: boolean; className?: string }) {
   const { t } = useT();
   return (
     <a className={`case-rating ${className}`} href="#grille">
-      <span className="case-rating-k">{t.compare.caseRating}</span>
-      <b className="case-rating-v">{overall}</b>
       <span className="case-rating-hint">{unproven ? t.compare.caseHintNc : t.compare.caseHint}</span>
       <span className="case-rating-link">
         {t.compare.caseLink}
@@ -99,12 +114,12 @@ function CaseRating({ overall, unproven, className = "" }: { overall: number; un
  * tel quel, même s'il porte des chiffres. Un h1 pour qui a fait la fiche ; un h2 pour le
  * visiteur, dont la page a déjà son h1 (« Avis de recherche : @x »).
  */
-function Headline({ text, tone, who }: { text: string; tone: Tone; who: string | null }) {
+function Headline({ text, tone, who, sub = false }: { text: string; tone: Tone; who: string | null; sub?: boolean }) {
   const chunks = who ? text.split(who).flatMap((c, i) => (i === 0 ? [c] : [who, c])) : [text];
   const Tag = who ? "h2" : "h1";
   let k = 0;
   return (
-    <Tag className={`cmp-headline tone-${tone}`}>
+    <Tag className={`cmp-headline tone-${tone}${sub ? " is-sub" : ""}`}>
       {chunks.map((c, j) =>
         who && j % 2 === 1 ? (
           <span key={k++}>{c}</span>
@@ -173,7 +188,9 @@ export function ComparisonStage({ cmp, phase, who = null }: StageProps) {
     <div className={`cmp phase-${phase}${settled ? " is-settled" : ""}`}>
       <div className="cmp-head">
         <p className="cmp-loot">{t.compare.loot}</p>
-        <Headline text={headlineText(cmp, who, lang)} tone={headTone} who={who} />
+        {/* Notée : la note du dossier d'abord, la phrase dessous. */}
+        {graded && <CaseTop overall={cmp.grid!.overall} />}
+        <Headline text={headlineText(cmp, who, lang)} tone={headTone} who={who} sub={graded} />
       </div>
 
       {!desktop && (
@@ -193,16 +210,16 @@ export function ComparisonStage({ cmp, phase, who = null }: StageProps) {
             <figure key={c.prefix} className={`cmp-card cmp-card-${i === 0 ? "cv" : "gh"}`} aria-label={c.label}>
               <figcaption>
                 <span className="cmp-src">{c.short}</span>
-                {c.label}
+                {graded ? `${t.compare.exhibit(i + 1)} · ${c.label}` : c.label}
               </figcaption>
               <RevealCard card={c.card} lang={lang} phase={phase} idPrefix={c.prefix} primary={false} anchor={c.anchor} />
             </figure>
           ))}
         </div>
-        {desktop && (graded ? <CaseRating overall={cmp.grid!.overall} unproven={unprovenCode(cmp)} className="deltas-col" /> : <Deltas cmp={cmp} className="deltas-col" />)}
+        {desktop && (graded ? <CaseRating unproven={unprovenCode(cmp)} className="deltas-col" /> : <Deltas cmp={cmp} className="deltas-col" />)}
       </div>
 
-      {!desktop && (graded ? <CaseRating overall={cmp.grid!.overall} unproven={unprovenCode(cmp)} className="deltas-row" /> : <Deltas cmp={cmp} className="deltas-row" />)}
+      {!desktop && (graded ? <CaseRating unproven={unprovenCode(cmp)} className="deltas-row" /> : <Deltas cmp={cmp} className="deltas-row" />)}
     </div>
   );
 }

@@ -622,7 +622,8 @@ export function createApp(opts: AppOptions) {
           const inline = (card: CardData) => inlineAvatar(card, baseUrl, avatarDir);
           let input: RenderInput;
           if (row.kind === "comparison") {
-            const cmp = week.data as ComparisonData;
+            // Fiche dénoncée non revendiquée : l'image ne porte pas la note du dossier (shared/publicView.ts).
+            const cmp = publicView(week.data as ComparisonData, { thirdParty: thirdParty(row) });
             input = { format, comparison: { ...cmp, cv: await inline(cmp.cv), github: await inline(cmp.github) }, lang: cmp.cv.lang };
           } else {
             const card = week.data as CardData;
@@ -662,7 +663,8 @@ export function createApp(opts: AppOptions) {
       c.header("Cache-Control", "private, no-store");
       return c.html(injectMeta(page, generic), mine ? 200 : 410);
     }
-    const meta = row ? metaFor(withWeekSpecial(store.db, row.data).data, baseUrl) : genericMeta(baseUrl, `/c/${id}`);
+    // L'aperçu est lu par tout le monde : la version publique (shared/publicView.ts).
+    const meta = row ? metaFor(publicView(withWeekSpecial(store.db, row.data).data, { thirdParty: thirdParty(row) }), baseUrl) : genericMeta(baseUrl, `/c/${id}`);
     const html = template ? injectMeta(template, meta) : standalonePage(meta);
     c.header("Cache-Control", "public, max-age=300");
     return c.html(html, row ? 200 : 404);

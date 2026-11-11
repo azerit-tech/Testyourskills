@@ -401,6 +401,10 @@ const fr = {
     caseRating: "Note du dossier",
     caseHint: "Chaque critère pris sur sa source de preuve",
     caseLink: "Voir la lecture du recruteur",
+    /** La note du dossier en tête, lue en entier : « Note du dossier : 57 sur 100, 4 étoiles sur 6. » */
+    caseSr: (n: number, stars: number) => `Note du dossier : ${n} sur 100, ${stars} étoile${stars > 1 ? "s" : ""} sur 6.`,
+    /** Les deux fiches, les deux pièces du dossier. */
+    exhibit: (n: number) => `Pièce ${n}`,
     /* Face à un GitHub « dossier vide » (§18.37) : rien ne se compare, ni gain ni perte. */
     caseHintNc: "Code non prouvé : rien n'est comparé",
     nc: "n/c",
@@ -1096,9 +1100,11 @@ const en: Dict = {
       liLabel: "Their career, read on LinkedIn",
       ghLabel: "Their code, read on GitHub",
     },
-    caseRating: "Case rating",
+    caseRating: "File rating",
     caseHint: "Each criterion taken from its source of proof",
     caseLink: "See the recruiter's reading",
+    caseSr: (n: number, stars: number) => `File rating: ${n} out of 100, ${stars} star${stars > 1 ? "s" : ""} out of 6.`,
+    exhibit: (n: number) => `Exhibit ${n}`,
     caseHintNc: "Code not proven: nothing is compared",
     nc: "n/c",
     ncLong: "not comparable: the code is not proven",

@@ -69,6 +69,23 @@ describe("aperçu de lien d'une comparaison", () => {
   });
 });
 
+describe("aperçu de lien d'une comparaison notée (§18.37)", () => {
+  const graded = (c: ComparisonData): ComparisonData => ({ ...c, grid: { criteria: [{ code: "CODE", score: 6, state: "scored", counted: true, source: "github", reached: { fr: "", en: "" }, flags: [] }], overall: 57 } });
+
+  it("la note du dossier et ses étoiles en titre, la phrase en tête de la description", () => {
+    const m = metaFor(graded(cmp(60, 72)), "https://s.test");
+    expect(m.title).toBe("Le dossier de @lea : ★★★☆☆☆, 57");
+    expect(m.description.startsWith("Le code de @lea en montre plus que son CV : 12 points. CV : Fiche")).toBe(true);
+    const en = graded(cmp(60, 72));
+    en.cv = { ...en.cv, lang: "en" };
+    expect(metaFor(en, "https://s.test").title).toBe("@lea's file: ★★★☆☆☆, 57");
+  });
+
+  it("sans grille (comparaison d'avant, ou fiche dénoncée non revendiquée) : la phrase en titre", () => {
+    expect(metaFor(cmp(60, 72), "https://s.test").title).toBe("Le code de @lea en montre plus que son CV : 12 points");
+  });
+});
+
 describe("le titre de l'accueil, en un seul endroit (shared/promise.ts)", () => {
   const INDEX = readFileSync(join(__dirname, "../../web/index.html"), "utf8");
 
