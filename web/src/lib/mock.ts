@@ -2,7 +2,8 @@
 // Pseudos spéciaux : "unknown" (inconnu), "org" (organisation), "ratelimit" (429),
 // "slow" (attente longue puis timeout). Les pseudos des fixtures donnent leur carte.
 // LinkedIn contre GitHub (§18.24) : le pseudo "camille-ardent", ou n'importe quel
-// lien linkedin.com/in/… ; linkedin.com/in/sans-github donne la fiche LinkedIn seule.
+// lien linkedin.com/in/… ; linkedin.com/in/sans-github donne la fiche LinkedIn seule ;
+// un lien LinkedIn avec le pseudo "x" : face à un GitHub vide, code non prouvé (§18.37).
 import type { CardData, ComparisonData, Finding, Grid, JobState, ProgressEvent, Stat, StatCode } from "../../../shared/types";
 import { tierFor } from "../../../shared/types";
 import { FIXTURES, FIXTURE_COMPARISON } from "../../../shared/fixtures";
@@ -11,8 +12,8 @@ import type { CaseInfo, CreateInput, CreateResult, Jury, Showcase, Verdict } fro
 import { ApiError } from "./errors";
 
 type FixtureKey = keyof typeof FIXTURES;
-/** licmp : LinkedIn contre GitHub ; li : fiche LinkedIn seule. */
-type Kind = FixtureKey | "cmp" | "licmp" | "li" | "unknown" | "org" | "slow";
+/** licmp : LinkedIn contre GitHub ; liempty : LinkedIn contre un GitHub vide (code non prouvé) ; li : fiche LinkedIn seule. */
+type Kind = FixtureKey | "cmp" | "licmp" | "liempty" | "li" | "unknown" | "org" | "slow";
 
 interface MockJob {
   kind: Kind;
@@ -123,7 +124,7 @@ function baseTimeline(kind: Kind): { timeline: ProgressEvent[]; doneAt: number }
     const tl = [...mk(CV_TIMELINE.slice(0, 4)), ...mk(GH_TIMELINE.slice(1), 2800)].sort((a, b) => a.at - b.at);
     return { timeline: tl, doneAt: 10800 };
   }
-  if (kind === "licmp") {
+  if (kind === "licmp" || kind === "liempty") {
     const tl = [...mk(GH_TIMELINE), ...mk([["linkedin_wait", 1300], ["linkedin", 3000]])].sort((a, b) => a.at - b.at);
     return { timeline: tl, doneAt: 9200 };
   }
@@ -263,9 +264,24 @@ function buildLinkedinCard(id: string, job: MockJob | null, mg: MockGrids): Card
   return graded(asLinkedinCard({ ...base, id, lang: job?.lang ?? base.lang, linkedinUrl: url, findings: [mockLinkedinFinding(url)] }), mg.declaredGridMock("LinkedIn", url));
 }
 
-function buildComparison(id: string, job: MockJob | null, mg: MockGrids, linkedin = false): ComparisonData {
+/** Le titre du serveur face à un GitHub « dossier vide » (data/statuses.json, comparison.codeUnproven) ; « CV » devient « LinkedIn » plus bas. */
+const CODE_UNPROVEN = {
+  fr: "Code non prouvé : ton CV parle seul. Publie un vrai projet sur GitHub et on compare.",
+  en: "Code not proven: your CV does all the talking. Publish one real project on GitHub and we'll compare.",
+};
+
+function buildComparison(id: string, job: MockJob | null, mg: MockGrids, linkedin = false, emptyGithub = false): ComparisonData {
   const c = FIXTURE_COMPARISON;
   let cmp: ComparisonData = { ...c, id, cv: withFacts(c.cv), github: withFacts(c.github) };
+  // Face à un GitHub vide, comme le serveur (compare.ts) : la fiche de x, le titre neutre, écarts à zéro.
+  if (emptyGithub)
+    cmp = {
+      ...cmp,
+      cv: { ...cmp.cv, name: FIXTURES.unknownLang.name, initials: FIXTURES.unknownLang.initials },
+      github: withFacts(FIXTURES.unknownLang),
+      headline: { ...CODE_UNPROVEN },
+      deltas: Object.fromEntries(Object.keys(c.deltas).map((k) => [k, 0])) as ComparisonData["deltas"],
+    };
   const login = job?.login;
   if (login && !BY_LOGIN[login.toLowerCase()]) {
     cmp.github = { ...cmp.github, name: login, login, initials: initialsOf(login), avatarUrl: `https://github.com/${login}.png?size=256` };
@@ -274,7 +290,7 @@ function buildComparison(id: string, job: MockJob | null, mg: MockGrids, linkedi
   const found = mockFindings(cmp.github.login ?? "dev");
   cmp.github = { ...cmp.github, findings: strongest3(linkedin ? [...found, mockLinkedinFinding(job?.linkedin)] : found) };
   // Les notes des deux fiches sont déjà celles de leur grille (75 et 79) : le titre de l'écart ne change pas.
-  const grids = mg.comparisonGridsMock(linkedin ? "LinkedIn" : "CV", cmp.github.login ?? "dev", linkedin ? (job?.linkedin ?? MOCK_LINKEDIN) : undefined);
+  const grids = mg.comparisonGridsMock(linkedin ? "LinkedIn" : "CV", cmp.github.login ?? "dev", linkedin ? (job?.linkedin ?? MOCK_LINKEDIN) : undefined, emptyGithub);
   cmp = { ...cmp, cv: graded(cmp.cv, grids.cv), github: graded(cmp.github, grids.github), grid: grids.grid };
   if (linkedin) cmp = asLinkedinComparison(cmp);
   if (photos.has(id)) {
@@ -288,7 +304,7 @@ function kindFromId(id: string): Kind | null {
   const m = /^m-([a-zA-Z]+)-/.exec(id);
   if (!m) return null;
   const k = m[1] as Kind;
-  if (k === "cmp" || k === "licmp" || k === "li" || k in FIXTURES) return k;
+  if (k === "cmp" || k === "licmp" || k === "liempty" || k === "li" || k in FIXTURES) return k;
   return null;
 }
 
@@ -319,7 +335,8 @@ export const mockApi = {
     // « queue » : trois fiches avant, une toutes les 1,5 s, puis la fiche normale.
     const queueMs = lower === "queue" ? 4500 : 0;
     let kind: Kind;
-    if (input.linkedin) kind = login || !/\/in\/sans-github$/.test(input.linkedin) ? "licmp" : "li";
+    if (input.linkedin && lower === "x") kind = "liempty";
+    else if (input.linkedin) kind = login || !/\/in\/sans-github$/.test(input.linkedin) ? "licmp" : "li";
     else if (lower === "camille-ardent") kind = "licmp";
     else if (input.cv && login) kind = "cmp";
     else if (input.cv) kind = "cv";
@@ -363,7 +380,8 @@ export const mockApi = {
     if (kind === "slow")
       return { state: "error", code: "timeout", message: { fr: "Trop long, on arrête là.", en: "Too long, stopping here." } };
     const mg = await loadGrids();
-    if (kind === "cmp" || kind === "licmp") return { state: "done", kind: "comparison", comparison: buildComparison(id, job, mg, kind === "licmp") };
+    if (kind === "cmp" || kind === "licmp" || kind === "liempty")
+      return { state: "done", kind: "comparison", comparison: buildComparison(id, job, mg, kind !== "cmp", kind === "liempty") };
     if (kind === "li") return { state: "done", kind: "card", card: buildLinkedinCard(id, job, mg) };
     return { state: "done", kind: "card", card: buildCard(kind as FixtureKey, id, job, mg) };
   },

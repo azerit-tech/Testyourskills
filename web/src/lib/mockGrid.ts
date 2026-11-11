@@ -14,6 +14,7 @@
 //   x            dossier vide, 20
 //   linkedin.com/in/sans-github  LinkedIn seul, 75 : déclaré, non prouvé, plafond 85
 //   camille-ardent (ou un LinkedIn et un pseudo)  la comparaison et la note du dossier, 83
+//   un LinkedIn et le pseudo x  face à un GitHub vide : code non prouvé, dossier 75
 
 import { GRID_WEIGHTS } from "../../../shared/gridText";
 import type { CriterionCode, Fact, Grid, GridCriterion, GridSource } from "../../../shared/types";
@@ -453,8 +454,17 @@ function caseOf(declared: Grid, proven: Grid): Grid {
   );
 }
 
-/** Les trois grilles d'une comparaison de démo : la fiche déclarée, la fiche GitHub (celle de leamd), et la note du dossier. */
-export function comparisonGridsMock(src: "LinkedIn" | "CV", login: string, proof?: string): { cv: Grid; github: Grid; grid: Grid } {
+/**
+ * Les trois grilles d'une comparaison de démo : la fiche déclarée, la fiche GitHub
+ * (celle de leamd), et la note du dossier. `emptyGithub` : face à un GitHub
+ * « dossier vide » (celui de x) — rien à recouper, le code n'est pas prouvé.
+ */
+export function comparisonGridsMock(src: "LinkedIn" | "CV", login: string, proof?: string, emptyGithub = false): { cv: Grid; github: Grid; grid: Grid } {
+  if (emptyGithub) {
+    const cv = finalizeMock(declaredDrafts(src, proof));
+    const github = GITHUB.unknownLang(login);
+    return { cv, github, grid: caseOf(cv, github) };
+  }
   const cv = finalizeMock(crossChecked(declaredDrafts(src, proof, 31), src, login));
   const github = GITHUB.gold(login);
   return { cv, github, grid: caseOf(cv, github) };

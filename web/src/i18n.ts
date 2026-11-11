@@ -394,6 +394,12 @@ const fr = {
     caseRating: "Note du dossier",
     caseHint: "Chaque critère pris sur sa source de preuve",
     caseLink: "Voir la lecture du recruteur",
+    /* Face à un GitHub « dossier vide » (§18.37) : rien ne se compare, ni gain ni perte. */
+    caseHintNc: "Code non prouvé : rien n'est comparé",
+    nc: "n/c",
+    ncLong: "non comparable : le code n'est pas prouvé",
+    ncLegend: "Code non prouvé : le CV parle seul, rien ne se compare barre par barre.",
+    ncLegendLi: "Code non prouvé : LinkedIn parle seul, rien ne se compare barre par barre.",
   },
   /* Le barème de recrutement (docs/bareme-recrutement.md §3, §4, §6 ; SPEC §18.37) : huit critères,
      une note sur 10 chacun, une moyenne pondérée. Jamais un « +n ». Épicène : « tu », « son », sans accord. */
@@ -579,6 +585,13 @@ const fr = {
       emptyWhy: "Non prouvé ne veut pas dire mauvais : le jour où le code est public, les critères s'ouvrent.",
       score: (n: number) => `${n}`,
       outOf: "sur 100",
+      /** La note du dossier face à un GitHub « dossier vide » : le code n'est pas prouvé, et ce qui changerait la note. */
+      caseUnproven: (src: string, opens: string) =>
+        `Code non prouvé : ton GitHub public ne montre encore rien de jugeable. La note du dossier se fait sur ton ${src}, sans dépasser 85. Ce qui la changerait : un vrai projet public sur GitHub${opens ? `, qui ouvre ${opens}` : ""}.`,
+      caseUnprovenThem: (src: string, opens: string) =>
+        `Code non prouvé : son GitHub public ne montre encore rien de jugeable. La note du dossier se fait sur son ${src}, sans dépasser 85. Ce qui la changerait : un vrai projet public sur GitHub${opens ? `, qui ouvre ${opens}` : ""}.`,
+      /** « stack technique, niveau du code et activité ». */
+      opensList: (names: string[]) => names.map((n) => n.toLowerCase()).join(", ").replace(/, ([^,]*)$/, " et $1"),
     },
     /** Avec les deux sources : trois colonnes, et les recoupements. */
     compare: {
@@ -1063,6 +1076,11 @@ const en: Dict = {
     caseRating: "Case rating",
     caseHint: "Each criterion taken from its source of proof",
     caseLink: "See the recruiter's reading",
+    caseHintNc: "Code not proven: nothing is compared",
+    nc: "n/c",
+    ncLong: "not comparable: the code is not proven",
+    ncLegend: "Code not proven: the CV does all the talking, nothing compares stat by stat.",
+    ncLegendLi: "Code not proven: LinkedIn does all the talking, nothing compares stat by stat.",
   },
   grid: {
     title: "Here is how an Azerit recruiter reads you",
@@ -1238,6 +1256,11 @@ const en: Dict = {
       emptyWhy: "Not proven does not mean bad: the day the code goes public, the criteria open up.",
       score: (n: number) => `${n}`,
       outOf: "out of 100",
+      caseUnproven: (src: string, opens: string) =>
+        `Code not proven: your public GitHub shows nothing to judge yet. The case rating rests on your ${src}, capped at 85. What would change it: one real public project on GitHub${opens ? `, which opens ${opens}` : ""}.`,
+      caseUnprovenThem: (src: string, opens: string) =>
+        `Code not proven: their public GitHub shows nothing to judge yet. The case rating rests on their ${src}, capped at 85. What would change it: one real public project on GitHub${opens ? `, which opens ${opens}` : ""}.`,
+      opensList: (names: string[]) => names.map((n) => n.toLowerCase()).join(", ").replace(/, ([^,]*)$/, " and $1"),
     },
     compare: {
       cols: { linkedin: "LinkedIn", cv: "CV", github: "GitHub", kept: "Kept" },

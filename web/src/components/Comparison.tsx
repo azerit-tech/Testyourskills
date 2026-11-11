@@ -11,7 +11,8 @@ import { useMediaQuery } from "../lib/util";
 import { RevealCard } from "./Reveal";
 import type { Phase } from "./Reveal";
 
-type Tone = "up" | "down" | "flat";
+/** neutral : face à un GitHub « dossier vide », rien ne se compare (§18.37) : ni gain, ni perte. */
+type Tone = "up" | "down" | "flat" | "neutral";
 
 /** Vert si le code vaut plus, orange si le CV gonfle. BUZZ : plus bas vaut mieux. */
 function toneOf(code: StatCode | "overall", d: number): Tone {
@@ -22,33 +23,53 @@ function toneOf(code: StatCode | "overall", d: number): Tone {
 
 const fmt = (d: number) => (d > 0 ? `+${d}` : d < 0 ? `−${Math.abs(d)}` : "±0");
 
-function DeltaPill({ code, d, index, label }: { code: StatCode | "overall"; d: number; index: number; label: string }) {
-  const tone = toneOf(code, d);
+/** `d` null : non comparable, « n/c », lu en entier par un lecteur d'écran. */
+function DeltaPill({ code, d, index, label }: { code: StatCode | "overall"; d: number | null; index: number; label: string }) {
+  const { t } = useT();
+  const tone: Tone = d === null ? "neutral" : toneOf(code, d);
   return (
     <li className={`delta delta-${tone}${code === "overall" ? " delta-overall" : ""}`} style={{ ["--i" as string]: index } as CSSProperties}>
       <span className="delta-code">{label}</span>
-      <span className="delta-val">{fmt(d)}</span>
+      {d === null ? (
+        <span className="delta-val">
+          <span aria-hidden>{t.compare.nc}</span>
+          <span className="sr-only">{t.compare.ncLong}</span>
+        </span>
+      ) : (
+        <span className="delta-val">{fmt(d)}</span>
+      )}
     </li>
   );
 }
 
-function Deltas({ cmp, className = "" }: { cmp: ComparisonData; className?: string }) {
+/** Le code n'est pas prouvé : un GitHub « dossier vide » ne se compare pas à ce que le CV ou LinkedIn déclare (§18.37). */
+export const unprovenCode = (cmp: Pick<ComparisonData, "github">) => cmp.github.grid?.rule === "empty_file";
+
+export function Deltas({ cmp, className = "" }: { cmp: ComparisonData; className?: string }) {
   const { t } = useT();
   const overall = cmp.github.overall - cmp.cv.overall;
+  // Face à un GitHub vide : ni écart global, ni barre chiffrée, ni légende gain / perte.
+  const nc = unprovenCode(cmp);
   return (
-    <div className={`deltas ${className}`}>
+    <div className={`deltas ${className}${nc ? " is-nc" : ""}`}>
       <p className="deltas-title">{t.compare.deltaTitle}</p>
       <ol className="deltas-list">
-        <DeltaPill code="overall" d={overall} index={0} label={t.compare.overall} />
+        {!nc && <DeltaPill code="overall" d={overall} index={0} label={t.compare.overall} />}
         {STAT_CODES.map((c, i) => (
-          <DeltaPill key={c} code={c} d={cmp.deltas[c]} index={i + 1} label={c} />
+          <DeltaPill key={c} code={c} d={nc ? null : cmp.deltas[c]} index={i + 1} label={c} />
         ))}
       </ol>
-      <p className="deltas-legend">
-        <span className="lg lg-up">{t.compare.legendUp}</span>
-        <span className="lg lg-down">{declaredOf(cmp) === "linkedin" ? t.compare.legendDownLi : t.compare.legendDown}</span>
-      </p>
-      <p className="deltas-buzz">{t.compare.buzzHint}</p>
+      {nc ? (
+        <p className="deltas-nc">{declaredOf(cmp) === "linkedin" ? t.compare.ncLegendLi : t.compare.ncLegend}</p>
+      ) : (
+        <>
+          <p className="deltas-legend">
+            <span className="lg lg-up">{t.compare.legendUp}</span>
+            <span className="lg lg-down">{declaredOf(cmp) === "linkedin" ? t.compare.legendDownLi : t.compare.legendDown}</span>
+          </p>
+          <p className="deltas-buzz">{t.compare.buzzHint}</p>
+        </>
+      )}
     </div>
   );
 }
@@ -58,13 +79,13 @@ function Deltas({ cmp, className = "" }: { cmp: ComparisonData; className?: stri
  * stat par stat (« +12 »), la note du dossier, chaque critère pris sur sa source
  * de preuve, et le lien vers la lecture du recruteur, sous les fiches.
  */
-function CaseRating({ overall, className = "" }: { overall: number; className?: string }) {
+function CaseRating({ overall, unproven, className = "" }: { overall: number; unproven: boolean; className?: string }) {
   const { t } = useT();
   return (
     <a className={`case-rating ${className}`} href="#grille">
       <span className="case-rating-k">{t.compare.caseRating}</span>
       <b className="case-rating-v">{overall}</b>
-      <span className="case-rating-hint">{t.compare.caseHint}</span>
+      <span className="case-rating-hint">{unproven ? t.compare.caseHintNc : t.compare.caseHint}</span>
       <span className="case-rating-link">
         {t.compare.caseLink}
         <span aria-hidden> ↓</span>
@@ -114,7 +135,8 @@ export function ComparisonStage({ cmp, phase, who = null }: StageProps) {
   const [active, setActive] = useState<0 | 1>(1);
   const track = useRef<HTMLDivElement>(null);
   const overall = cmp.github.overall - cmp.cv.overall;
-  const headTone = toneOf("overall", overall);
+  // GitHub vide : le titre ne dit ni gain ni perte, le code n'est pas prouvé.
+  const headTone: Tone = unprovenCode(cmp) ? "neutral" : toneOf("overall", overall);
   const settled = phase === "done";
   const graded = usableGrid(cmp.grid);
 
@@ -178,10 +200,10 @@ export function ComparisonStage({ cmp, phase, who = null }: StageProps) {
             </figure>
           ))}
         </div>
-        {desktop && (graded ? <CaseRating overall={cmp.grid!.overall} className="deltas-col" /> : <Deltas cmp={cmp} className="deltas-col" />)}
+        {desktop && (graded ? <CaseRating overall={cmp.grid!.overall} unproven={unprovenCode(cmp)} className="deltas-col" /> : <Deltas cmp={cmp} className="deltas-col" />)}
       </div>
 
-      {!desktop && (graded ? <CaseRating overall={cmp.grid!.overall} className="deltas-row" /> : <Deltas cmp={cmp} className="deltas-row" />)}
+      {!desktop && (graded ? <CaseRating overall={cmp.grid!.overall} unproven={unprovenCode(cmp)} className="deltas-row" /> : <Deltas cmp={cmp} className="deltas-row" />)}
     </div>
   );
 }

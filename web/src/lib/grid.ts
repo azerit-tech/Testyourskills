@@ -190,8 +190,13 @@ export interface FinalLines {
   overall: number;
 }
 
-/** La ligne finale : la note sur 100 tirée des huit critères, et la règle qui a joué. Aucun « + n ». */
-export function finalLines(grid: Grid, g: G, lang: Lang): FinalLines {
+/**
+ * La ligne finale : la note sur 100 tirée des huit critères, et la règle qui a
+ * joué. Aucun « + n ». `unprovenCase` : la note du dossier face à un GitHub
+ * « dossier vide » — la règle dit que le code n'est pas prouvé, sur quoi la
+ * note se fait, et ce qui la changerait (les critères qu'un projet public ouvre).
+ */
+export function finalLines(grid: Grid, g: G, lang: Lang, unprovenCase?: { src: string; shared: boolean }): FinalLines {
   const m = gridMath(grid);
   const F = g.final;
   if (m.rule === "empty_file" || m.mean === null) {
@@ -204,7 +209,11 @@ export function finalLines(grid: Grid, g: G, lang: Lang): FinalLines {
     if (!names.length) continue;
     out.push(F.outList(F.out[why], names.join(", ")) + (why === "below" ? ` ${F.belowWhy}` : ""));
   }
-  const rule = m.rule === "capped_unproven" ? (m.capHit ? F.cappedHit(m.raw!) : F.capped) : null;
+  let rule = m.rule === "capped_unproven" ? (m.capHit ? F.cappedHit(m.raw!) : F.capped) : null;
+  if (unprovenCase && m.rule === "capped_unproven") {
+    const opens = F.opensList(m.excluded.filter((x) => x.why === "unproven").map((x) => g.names[x.code]));
+    rule = (unprovenCase.shared ? F.caseUnprovenThem : F.caseUnproven)(unprovenCase.src, opens);
+  }
   return {
     formula: F.formula(terms, dec(m.den, lang)),
     result: F.result(dec(m.mean, lang, 2)),

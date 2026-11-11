@@ -197,12 +197,16 @@ function CrossChecks({ grid, declared }: { grid: Grid; declared: DeclaredSource 
   );
 }
 
-/** La note sur 100 : la formule, la moyenne, la règle qui a joué, ce qui sort de la moyenne. */
-function Final({ grid, isCase }: { grid: Grid; isCase: boolean }) {
+/**
+ * La note sur 100 : la formule, la moyenne, la règle qui a joué, ce qui sort de
+ * la moyenne. `unproven` : la note du dossier face à un GitHub « dossier vide »,
+ * la dernière ligne dit que le code n'est pas prouvé et ce qui changerait la note.
+ */
+function Final({ grid, isCase, unproven }: { grid: Grid; isCase: boolean; unproven: { src: string; shared: boolean } | undefined }) {
   const { t, lang } = useT();
   const g = t.grid;
   const F = g.final;
-  const f = finalLines(grid, g, lang);
+  const f = finalLines(grid, g, lang, unproven);
   const empty = grid.rule === "empty_file";
   return (
     <div className="rg-final">
@@ -215,13 +219,15 @@ function Final({ grid, isCase }: { grid: Grid; isCase: boolean }) {
           <b>{f.overall}</b> {F.outOf}
         </span>
       </p>
-      {f.rule && <p className={`rg-rule${empty ? " is-empty" : ""}`}>{f.rule}</p>}
+      {f.rule && !unproven && <p className={`rg-rule${empty ? " is-empty" : ""}`}>{f.rule}</p>}
       {empty && <p className="rg-out">{F.emptyWhy}</p>}
       {f.out.map((o) => (
         <p key={o} className="rg-out">
           {o}
         </p>
       ))}
+      {/* Code non prouvé : la dernière ligne, ce qui changerait la note. */}
+      {f.rule && unproven && <p className="rg-rule is-unproven">{f.rule}</p>}
     </div>
   );
 }
@@ -244,6 +250,9 @@ export function RecruiterGrid({ item, shared, who }: Props) {
   const columns = item.kind === "comparison" && hasColumns(grid);
   const byCode = new Map(grid.criteria.map((c) => [c.code, c]));
   const method = shared ? g.methodThem : g.method;
+  // La note du dossier face à un GitHub « dossier vide » : le code n'est pas prouvé (§18.37).
+  const unproven =
+    item.kind === "comparison" && item.comparison.github.grid?.rule === "empty_file" ? { src: declared === "cv" ? g.source.cv : g.source.linkedin, shared } : undefined;
   const redacted = shared && grid.criteria.some((c) => rowText(c, { g, pick: (f) => pick(f, lang), declared, shared }).redacted);
   return (
     <section className="after-block rg" id="grille" aria-labelledby="rg-title">
@@ -260,7 +269,7 @@ export function RecruiterGrid({ item, shared, who }: Props) {
           return c ? <Row key={code} c={c} grid={grid} declared={declared} shared={shared} columns={columns} skipFlags={columns && code === "STK"} /> : null;
         })}
       </ol>
-      <Final grid={grid} isCase={item.kind === "comparison"} />
+      <Final grid={grid} isCase={item.kind === "comparison"} unproven={unproven} />
       {redacted && <p className="rg-hidden">{g.shared.hidden}</p>}
       <p className="rg-foot">{g.foot}</p>
     </section>

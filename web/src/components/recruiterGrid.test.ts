@@ -6,19 +6,35 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CardData } from "../../../shared/types";
 import { cvCounts, cvReading } from "../../../server/src/scoring/__fixtures__/make";
-import { FOUNDERS_NOW, JACQUES_AI, jacquesFacts, jacquesProfile, jacquesReading } from "../../../server/src/scoring/__fixtures__/founders";
+import {
+  FOUNDERS_NOW,
+  JACQUES_AI,
+  jacquesFacts,
+  jacquesProfile,
+  jacquesReading,
+  lumineFacts,
+  lumineProfile,
+  lumineReading,
+} from "../../../server/src/scoring/__fixtures__/founders";
 import { compareCards, scoreCv, scoreGithub } from "../../../server/src/scoring/index";
-import { asLinkedinCard } from "../../../shared/linkedinText";
+import { asLinkedinCard, asLinkedinComparison } from "../../../shared/linkedinText";
 import { DICTS, LangProvider } from "../i18n";
+import { comparisonGridsMock } from "../lib/mockGrid";
 import type { Shareable } from "./After";
+import { ComparisonStage, Deltas } from "./Comparison";
 import { RecruiterGrid } from "./RecruiterGrid";
 
-function render(item: Shareable, shared: boolean, lang = "fr-FR"): string {
-  vi.stubGlobal("window", { location: { origin: "https://skills.test", pathname: "/c/x", search: "" }, matchMedia: () => ({ matches: false }) });
+function renderNode(node: ReturnType<typeof createElement>, lang = "fr-FR"): string {
+  vi.stubGlobal("window", {
+    location: { origin: "https://skills.test", pathname: "/c/x", search: "" },
+    matchMedia: () => ({ matches: false, addEventListener: () => undefined, removeEventListener: () => undefined }),
+  });
   vi.stubGlobal("localStorage", { getItem: () => null, setItem: () => undefined });
   vi.stubGlobal("navigator", { userAgent: "test", language: lang });
-  return renderToStaticMarkup(createElement(LangProvider, null, createElement(RecruiterGrid, { item, shared, who: "@dev" })));
+  vi.stubGlobal("document", { documentElement: { dataset: {}, classList: { add: () => undefined, remove: () => undefined } }, querySelector: () => null, getElementById: () => null });
+  return renderToStaticMarkup(createElement(LangProvider, null, node));
 }
+const render = (item: Shareable, shared: boolean, lang = "fr-FR") => renderNode(createElement(RecruiterGrid, { item, shared, who: "@dev" }), lang);
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -113,5 +129,82 @@ describe("« recoupé » : de la sortie du moteur à l'étiquette affichée", ()
     expect(emp).not.toMatch(/McMaster|Research Intern|agda-notes/);
     const own = textOf(rowsOf(render(item, false)).get("Parcours et employeurs")!);
     expect(own).toContain("Research Intern, McMaster University");
+  });
+});
+
+describe("face à un GitHub vide : le code n'est pas prouvé, rien ne se compare", () => {
+  // Lumine (§7) : LinkedIn 45, GitHub « dossier vide » 20, dossier 45. Le serveur envoie un titre neutre et six écarts à zéro.
+  const github = asCard(scoreGithub(lumineFacts(), null, opts), "gh");
+  const linkedin = asCard(scoreCv(lumineReading(), cvCounts(), { ...opts, linkedin: lumineProfile(), now: FOUNDERS_NOW, github: lumineFacts() }), "li");
+  const comparison = { ...asLinkedinComparison(compareCards(linkedin, github)), id: "cmp", createdAt: FOUNDERS_NOW };
+  const item: Shareable = { kind: "comparison", comparison };
+  /** La dernière ligne du bloc de la note finale. */
+  const lastFinalLine = (html: string) => {
+    const start = html.indexOf('<div class="rg-final">');
+    const div = html.slice(start, html.indexOf("</div>", start));
+    return div.slice(div.lastIndexOf("<p"));
+  };
+  const lastRule = (html: string) => [...html.matchAll(/<p class="rg-rule[^"]*">([^<]+)<\/p>/g)].map((m) => m[1].replace(/&#x27;/g, "'")).pop();
+
+  it("le serveur : GitHub en dossier vide, titre neutre, écarts à zéro", () => {
+    expect(comparison.github.grid!.rule).toBe("empty_file");
+    expect(comparison.headline.fr).toMatch(/^Code non prouvé : ton LinkedIn parle seul\./);
+    expect(Object.values(comparison.deltas).every((d) => d === 0)).toBe(true);
+  });
+
+  it("les barres lisent « n/c », avec leur texte entier ; ni écart global, ni ±0, ni légende gain / perte", () => {
+    const html = renderNode(createElement(Deltas, { cmp: comparison }));
+    expect(count(html, '<span aria-hidden="true">n/c</span>')).toBe(6);
+    expect(count(html, '<span class="sr-only">non comparable : le code n&#x27;est pas prouvé</span>')).toBe(6);
+    expect(html).not.toContain("delta-overall");
+    expect(html).not.toMatch(/±0|−\d|\+\d/);
+    expect(html).not.toContain("delta-down");
+    expect(html).not.toContain("lg-down");
+    expect(textOf(html)).toContain("Code non prouvé : LinkedIn parle seul, rien ne se compare barre par barre.");
+    const en = renderNode(createElement(Deltas, { cmp: comparison }), "en-US");
+    expect(count(en, '<span class="sr-only">not comparable: the code is not proven</span>')).toBe(6);
+  });
+
+  it("une comparaison où le code est prouvé garde ses écarts chiffrés", () => {
+    const proven = { ...comparison, github: { ...comparison.github, grid: undefined }, deltas: { ...comparison.deltas, TEC: 12 } };
+    const html = renderNode(createElement(Deltas, { cmp: proven }));
+    expect(html).toContain("delta-overall");
+    expect(html).toContain("+12");
+    expect(html).not.toContain("n/c");
+  });
+
+  for (const who of [null, "@LumBuilds0"]) {
+    it(`le titre est neutre, ni gain ni perte, et la note du dossier dit « code non prouvé » (${who ?? "la personne fichée"})`, () => {
+      const html = renderNode(createElement(ComparisonStage, { cmp: comparison, phase: "done", who }));
+      expect(html).toMatch(/class="cmp-headline tone-neutral"/);
+      expect(html).not.toMatch(/tone-(down|up)/);
+      expect(textOf(html)).toContain("Code non prouvé : rien n'est comparé");
+      expect(html).not.toContain("delta-overall");
+    });
+  }
+
+  it("la dernière ligne de la note du dossier : code non prouvé, et ce qui changerait la note", () => {
+    const html = render(item, false);
+    expect(lastRule(html)).toBe(
+      "Code non prouvé : ton GitHub public ne montre encore rien de jugeable. La note du dossier se fait sur ton LinkedIn, sans dépasser 85. Ce qui la changerait : un vrai projet public sur GitHub, qui ouvre niveau du code, stack technique, activité et open source.",
+    );
+    expect(lastFinalLine(html)).toMatch(/^<p class="rg-rule is-unproven">Code non prouvé/);
+    // Une seule règle : pas le plafond générique en plus.
+    expect(count(html, 'class="rg-rule')).toBe(1);
+    expect(lastRule(render(item, true))).toMatch(/^Code non prouvé : son GitHub public .* La note du dossier se fait sur son LinkedIn/);
+    expect(lastRule(render(item, false, "en-US"))).toMatch(/^Code not proven: your public GitHub shows nothing to judge yet\. .* which opens code level, tech stack, activity and open source\.$/);
+    expect(lastRule(render(item, true, "en-US"))).toMatch(/^Code not proven: their public GitHub/);
+  });
+
+  it("une comparaison où le code est prouvé garde la ligne du plafond générique, s'il joue", () => {
+    const cmp = { ...comparison, github: { ...comparison.github, grid: { ...comparison.github.grid!, rule: undefined } } };
+    expect(lastRule(render({ kind: "comparison", comparison: cmp }, false))).toBe(DICTS.fr.grid.final.capped);
+  });
+
+  it("la démo a son cas : un LinkedIn face au GitHub vide de x", () => {
+    const g = comparisonGridsMock("LinkedIn", "x", undefined, true);
+    expect(g.github.rule).toBe("empty_file");
+    expect(g.grid.rule).toBe("capped_unproven");
+    expect(g.grid.criteria.filter((c) => c.evidence?.source === "both")).toEqual([]);
   });
 });

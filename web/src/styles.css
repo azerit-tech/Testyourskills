@@ -2611,10 +2611,15 @@ a.dossier-item:hover {
 .lg-down::before {
   background: var(--siren-ink);
 }
-.deltas-buzz {
+.deltas-buzz,
+.deltas-nc {
   font-size: 12px;
   text-align: center;
   color: var(--lilac-dim);
+}
+/* non comparable (GitHub vide) : « n/c », ni vert ni orange */
+.delta-neutral {
+  --tc: var(--lilac-2);
 }
 
 /* ============ pages simples ============ */
@@ -3498,6 +3503,10 @@ a.rg-src.is-both {
 .rg .rg-rule {
   font: 600 14.5px/1.4 var(--f-text);
   color: var(--peach);
+}
+/* code non prouvé face à un GitHub vide : ni perte ni alerte, ce qui changerait la note */
+.rg .rg-rule.is-unproven {
+  color: var(--cream);
 }
 .rg .rg-foot {
   font: 500 14px/1.4 var(--f-text);
