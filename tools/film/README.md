@@ -4,7 +4,7 @@
 
 ## Déposer une prise
 
-Dans `~/Desktop/Azerit/design/film/plans/`, hors du dépôt, sous le nom `PLAN-prise.mp4` : `OUV-1.mp4`, `P3-2.mp4`, `FIN6-1.mp4`. Une prise absente est remplacée par son carton, sans erreur : le film se monte toujours.
+Une prise est un fichier vidéo d'un plan, sorti du rendu 3D du film (`tools/film3d/`, SPEC §18.36). Elle se dépose dans `~/Desktop/Azerit/design/film/plans/`, hors du dépôt, sous le nom `PLAN-prise.mp4` : `OUV-1.mp4`, `P3-2.mp4`, `FIN6-1.mp4`. Une prise absente est remplacée par son carton, sans erreur : le film se monte toujours.
 
 ## Choisir sa fenêtre
 
