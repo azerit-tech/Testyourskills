@@ -284,7 +284,7 @@ async function getJob(id: string): Promise<JobState> {
 }
 
 async function fetchJob(id: string): Promise<JobState> {
-  if (isMock()) return mockApi.getJob(id);
+  if (isMock()) return mockApi.getJob(id, mockMe?.login ?? null);
   let res: Response;
   try {
     // Le jeton de la fiche, s'il est sur cet appareil : le serveur rend alors la grille entière, sinon la version publique.

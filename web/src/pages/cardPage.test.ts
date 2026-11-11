@@ -247,8 +247,13 @@ describe("comparaison GitHub contre CV ou LinkedIn", () => {
 describe("la lecture du recruteur (§18.37)", () => {
   const grid = githubGridMock("gold", FIXTURES.gold.login ?? "dev")!;
 
-  it("une fiche sans grille n'affiche pas le bloc, sans planter", () => {
-    for (const owner of [true, false]) expect(renderResult(card(), { owner, token: owner ? "tok" : undefined })).not.toContain('id="grille"');
+  it("une fiche sans grille (d'avant, ou dénoncée et non revendiquée) n'affiche ni la grille, ni la ligne, ni les tuiles", () => {
+    for (const owner of [true, false]) {
+      const html = renderResult(card(), { owner, token: owner ? "tok" : undefined });
+      expect(html).not.toContain('id="grille"');
+      expect(html).not.toContain('class="after-block rr"');
+      expect(html).not.toContain("Ce que la grille retient");
+    }
   });
 
   it("avec sa grille : le titre, huit critères, une jauge lue « n sur 10 », la note, aucun « + n »", () => {

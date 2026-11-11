@@ -7,6 +7,7 @@ import { gridMath } from "../../../shared/gridText";
 import { publicGrid, publicView, SCHOOL_KEPT } from "../../../shared/publicView";
 import type { CardData, ComparisonData, Grid, GridCriterion } from "../../../shared/types";
 import { comparisonGridsMock, declaredGridMock, githubGridMock } from "./mockGrid";
+import { mockApi } from "./mock";
 
 const byCode = (g: Grid, code: GridCriterion["code"]) => g.criteria.find((c) => c.code === code)!;
 const all = (g: Grid) => JSON.stringify(g);
@@ -101,5 +102,26 @@ describe("la fiche faite par un tiers", () => {
   it("revendiquée, ou faite par la personne : la grille publique", () => {
     const seen = publicView(card, { thirdParty: false });
     expect(seen.grid).toEqual(publicGrid(card.grid!));
+  });
+});
+
+describe("la démo applique la même vue que le serveur", () => {
+  const gridOf = (s: Awaited<ReturnType<typeof mockApi.getJob>>) => {
+    if (s.state !== "done") throw new Error("pas finie");
+    return s.kind === "card" ? s.card.grid : (s.comparison.grid ?? s.comparison.cv.grid ?? s.comparison.github.grid);
+  };
+
+  it("dénoncée anonymement ou par un nom, non revendiquée : pas de grille, ni ligne ni tuiles", async () => {
+    expect(gridOf(await mockApi.getJob("m-silver-Dabcd"))).toBeUndefined();
+    expect(gridOf(await mockApi.getJob("m-silver-Nabcd"))).toBeUndefined();
+    expect(gridOf(await mockApi.getJob("m-licmp-Dabcd"))).toBeUndefined();
+    // Quelqu'un d'autre connecté ne change rien.
+    expect(gridOf(await mockApi.getJob("m-silver-Dabcd", "leamd"))).toBeUndefined();
+  });
+
+  it("revendiquée (« C'est moi » en démo, ou /c/m-…-C…) : la grille revient", async () => {
+    expect(gridOf(await mockApi.getJob("m-silver-Dabcd", "camroux"))).toBeDefined();
+    expect(gridOf(await mockApi.getJob("m-silver-Cabcd"))).toBeDefined();
+    expect(gridOf(await mockApi.getJob("m-silver-abcd"))).toBeDefined();
   });
 });

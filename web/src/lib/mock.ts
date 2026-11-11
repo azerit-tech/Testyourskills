@@ -8,6 +8,7 @@ import type { CardData, ComparisonData, Finding, Grid, JobState, ProgressEvent, 
 import { tierFor } from "../../../shared/types";
 import { FIXTURES, FIXTURE_COMPARISON } from "../../../shared/fixtures";
 import { asLinkedinCard, asLinkedinComparison } from "../../../shared/linkedinText";
+import { publicView } from "../../../shared/publicView";
 import type { CaseInfo, CreateInput, CreateResult, Jury, Showcase, Verdict } from "./api";
 import { ApiError } from "./errors";
 
@@ -351,7 +352,26 @@ export const mockApi = {
     return { id, deleteToken: `tok-${rand()}`, cached: false };
   },
 
-  async getJob(id: string): Promise<JobState> {
+  /**
+   * `me` : le login connecté en démo (« C'est moi »). Comme le serveur (shared/publicView.ts),
+   * une fiche dénoncée (/c/m-…-D…, /c/m-…-N…, ou faite ici avec un dénonciateur) part sans
+   * grille tant que la personne fichée ne l'a pas revendiquée ; /c/m-…-C… est dénoncée et revendiquée.
+   */
+  async getJob(id: string, me: string | null = null): Promise<JobState> {
+    const state = await mockApi.engineJob(id);
+    if (state.state !== "done") return state;
+    const main = state.kind === "card" ? state.card : state.comparison.github;
+    const marker = /^m-[a-zA-Z]+-([DNC])/.exec(id)?.[1];
+    const denounced = !!jobs.get(id)?.denouncedBy || !!marker;
+    const claimed = marker === "C" || (!!me && me === main.login?.toLowerCase());
+    if (!denounced || claimed) return state;
+    return state.kind === "card"
+      ? { ...state, card: publicView(state.card, { thirdParty: true }) }
+      : { ...state, comparison: publicView(state.comparison, { thirdParty: true }) };
+  },
+
+  /** La fiche de démo telle que le moteur la sort, avant la vue publique. */
+  async engineJob(id: string): Promise<JobState> {
     await sleep(60);
     const job = jobs.get(id) ?? null;
     const kind = job?.kind ?? kindFromId(id);
@@ -388,16 +408,17 @@ export const mockApi = {
 
   /**
    * Dénonciation en démo : /c/m-silver-Dxxxx est une fiche dénoncée anonymement,
-   * /c/m-silver-Nxxxx une fiche dénoncée par @leamd (revendiquée). @nour-rs a un compte X.
+   * /c/m-silver-Nxxxx une fiche dénoncée par @leamd (le dénonciateur nommé), /c/m-silver-Cxxxx
+   * une fiche dénoncée que la personne fichée a revendiquée. @nour-rs a un compte X.
    */
   async getCase(id: string): Promise<CaseInfo> {
     await sleep(80);
     const job = jobs.get(id) ?? null;
-    const marker = /^m-[a-zA-Z]+-([DN])/.exec(id)?.[1];
+    const marker = /^m-[a-zA-Z]+-([DNC])/.exec(id)?.[1];
     const kind = job?.kind ?? kindFromId(id);
     const login = (job?.login ?? (kind && kind in FIXTURES ? FIXTURES[kind as FixtureKey].login : undefined))?.toLowerCase();
     return {
-      denounced: !!marker,
+      denounced: !!marker || !!job?.denouncedBy,
       by: marker === "N" ? "leamd" : null,
       x: login === "nour-rs" ? "nour_codes" : null,
       accomplices: MOCK_ACCOMPLICES.filter((a) => a.login !== login),

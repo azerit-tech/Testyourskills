@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { FIXTURES } from "../../shared/fixtures";
 import type { CvReading } from "../../shared/readings";
-import type { CardData, JobState, StatCode } from "../../shared/types";
+import type { CardData, Grid, JobState, StatCode } from "../../shared/types";
 import { createApp } from "./app";
 import { Store } from "./db";
 import type { LinkedinFinder, UrlLookup } from "./linkedinProfile/index";
@@ -70,7 +70,7 @@ afterEach(() => {
 type ScoreCvOpts = Parameters<Deps["scoreCv"]>[2];
 
 /** `realScore` : le vrai scoreur de fiche déclarée (et des faits GitHub de forme réelle), au lieu de la fiche figée. */
-function setup(finder: { forGithub?: LinkedinFinder["forGithub"]; forUrl?: (url: string) => Promise<UrlLookup> }, opt: { realScore?: boolean } = {}) {
+function setup(finder: { forGithub?: LinkedinFinder["forGithub"]; forUrl?: (url: string) => Promise<UrlLookup> }, opt: { realScore?: boolean; githubGrid?: Grid } = {}) {
   const store = new Store(":memory:");
   stores.push(store);
   const seen: ScoreCvOpts[] = [];
@@ -86,7 +86,8 @@ function setup(finder: { forGithub?: LinkedinFinder["forGithub"]; forUrl?: (url:
     },
     aiAvailable: () => true,
     scoreGithub(facts, _ai, { lang, judgedInSeconds }) {
-      return { ...body(FIXTURES.gold), login: (facts as { login: string }).login, lang, judgedInSeconds };
+      const grid = opt.githubGrid ? { grid: opt.githubGrid, overall: opt.githubGrid.overall } : {};
+      return { ...body(FIXTURES.gold), login: (facts as { login: string }).login, lang, judgedInSeconds, ...grid };
     },
     async extractPdfText() {
       return { text: "", pages: 1 };
@@ -253,5 +254,46 @@ describe("la page partagée : le serveur ne rend la grille entière qu'à la per
     if (after.state !== "done" || after.kind !== "comparison") throw new Error("pas une comparaison");
     expect(after.comparison.cv.grid).toBeDefined();
     expect(after.comparison.cv.grid!.criteria.some((c) => c.next)).toBe(false);
+  });
+
+  it("fiche GitHub dénoncée, non revendiquée : aucune grille, ni au visiteur, ni au dénonciateur ; revendiquée : la grille revient", async () => {
+    const githubGrid: Grid = {
+      criteria: [
+        { code: "CODE", score: 7, state: "scored", counted: true, source: "github", reached: { fr: "Niveau 3,5 sur 5.", en: "Level 3.5 out of 5." }, next: { fr: "Pour 8 : …", en: "For 8: …" }, flags: [] },
+        { code: "ACT", score: 6, state: "scored", counted: true, source: "github", reached: { fr: "30 semaines.", en: "30 weeks." }, flags: [] },
+      ],
+      overall: 66,
+    };
+    const ctx = setup({}, { githubGrid });
+    const post = async (payload: Record<string, unknown>) => {
+      const res = await ctx.app.request("/api/card", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ lang: "fr", ...payload }) });
+      const json = (await res.json()) as { id: string; deleteToken: string };
+      await ctx.pipeline.wait(json.id);
+      return json;
+    };
+    const get = async (id: string, token?: string) => {
+      const s = (await (await ctx.app.request(`/api/card/${id}`, { headers: token ? { "x-card-token": token } : {} })).json()) as JobState;
+      if (s.state !== "done" || s.kind !== "card") throw new Error(`pas une fiche : ${JSON.stringify(s)}`);
+      return s.card;
+    };
+    const by = await post({ login: "leamd" });
+    const target = await post({ login: "camroux", denouncedBy: by.id });
+    expect(ctx.store.getCard(target.id)!.denouncedBy).toBe(by.id);
+    // Le dénonciateur tient le jeton de la fiche : il n'est pas la personne fichée.
+    for (const token of [undefined, target.deleteToken]) {
+      const card = await get(target.id, token);
+      expect(card.grid).toBeUndefined();
+      expect(JSON.stringify(card)).not.toContain('"criteria"');
+      expect(card.overall).toBeGreaterThan(0);
+    }
+    // La fiche de qui a dénoncé, faite pour soi, garde sa grille entière.
+    expect((await get(by.id, by.deleteToken)).grid!.criteria.some((c) => c.next)).toBe(true);
+    ctx.store.claimOwner("camroux", 7);
+    for (const token of [undefined, target.deleteToken]) {
+      const card = await get(target.id, token);
+      expect(card.grid?.overall).toBe(66);
+      // La version publique : jamais « ce qui manque », même avec le jeton du dénonciateur.
+      expect(card.grid!.criteria.some((c) => c.next)).toBe(false);
+    }
   });
 });
