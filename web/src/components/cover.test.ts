@@ -167,7 +167,7 @@ describe("couverture (§18.31)", () => {
       for (const p of panels(en)) if (p.html.includes("data-scene")) expect(p.html).toContain("aria-hidden");
     }
     const fr = render({ top: null, suspects: SUSPECTS, seed: 0 });
-    expect(fr).toMatch(/alt="Portrait peint du profil (Pyromane|Faussaire|Légende du milieu|Cerveau|Oiseau de nuit|Jeune pousse)"/);
+    expect(fr).toMatch(/alt="Portrait peint du profil (Pyromane|Sous couverture|Légende du milieu|Cerveau|Oiseau de nuit|Jeune pousse)"/);
   });
 
   it("sans suspect, aucun portrait ; les six suspects déclarés ont leurs deux fichiers, au bon poids", () => {

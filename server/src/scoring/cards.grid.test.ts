@@ -76,8 +76,8 @@ describe("les fiches prennent la note de la grille", () => {
     expect(cmp.github.grid?.overall).toBe(cmp.github.overall);
   });
 
-  it("Faussaire : seuil de 15 points sur les notes de grille, jamais face à un GitHub vide", () => {
-    // Jacques : le code passe devant le profil (41 contre 61), pas de Faussaire.
+  it("Sous couverture : seuil de 15 points sur les notes de grille, jamais face à un GitHub vide", () => {
+    // Jacques : le code passe devant le profil (41 contre 61), pas de « Sous couverture ».
     const j = jacques().cmp;
     expect(j.cv.profile?.id).not.toBe("forger");
     expect(j.github.profile?.id).not.toBe("forger");

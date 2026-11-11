@@ -1,5 +1,5 @@
 // Comparaison CV contre GitHub (SPEC §6.5) : delta par stat, titre par règle, le
-// profil criminel revu avec l'écart entre les deux fiches (§18.2, Faussaire), et la
+// profil criminel revu avec l'écart entre les deux fiches (§18.2, Sous couverture), et la
 // note du dossier : chaque critère de la grille pris sur sa source de preuve (§18.37).
 
 import type { CardData, ComparisonData, StatCode } from "../../../shared/types";
@@ -13,7 +13,7 @@ export function compareCards(cv: CardData, github: CardData): Omit<ComparisonDat
   const value = (c: CardData, code: StatCode) => c.stats.find((s) => s.code === code)?.value ?? 0;
   // Les deux fiches décrivent la même personne : l'écart vaut pour l'une comme pour l'autre.
   // Un GitHub vide (« dossier vide », note plancher) ne prouve rien : un GitHub vide n'est pas
-  // un mauvais code (§18.37). Son écart avec le CV ne fait pas un Faussaire, ne se chiffre pas
+  // un mauvais code (§18.37). Son écart avec le CV ne range pas la fiche « Sous couverture », ne se chiffre pas
   // dans le titre, et ne se lit pas comme une perte barre par barre : écarts à zéro (le contrat
   // n'a pas de « non comparable », le front le lit sur `github.grid.rule`).
   const githubEmpty = github.grid?.rule === "empty_file";

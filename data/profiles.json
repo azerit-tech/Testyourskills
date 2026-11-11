@@ -8,8 +8,8 @@
         { "rule": "cv_ahead_of_code", "params": { "atLeast": 15 } },
         { "rule": "cv_stat_at_least", "params": { "BUZZ": 85 } }
       ],
-      "label": { "fr": "Faussaire", "en": "Forger" },
-      "tagline": { "fr": "Le CV le plus convaincant de la ville", "en": "The most convincing CV in town" }
+      "label": { "fr": "Sous couverture", "en": "Undercover" },
+      "tagline": { "fr": "Le gros du travail se fait hors caméra", "en": "Most of the work happens off camera" }
     },
     {
       "id": "kingpin",

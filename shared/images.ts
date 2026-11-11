@@ -7,8 +7,10 @@
 // v2 (10 novembre 2026) : les lieux du crime (§18.28) dans l'aperçu de lien et le portrait, et la story.
 // v3 (11 novembre 2026) : l'angle du recruteur. Pied « Dossier lu par Azerit », « CTO », titre de
 // l'accueil, comparaison menée par la note du dossier, côtés « parcours » et « code ».
+// v4 (12 novembre 2026) : « Faussaire » devient « Sous couverture » (data/profiles.json), relu au
+// catalogue pour les fiches déjà stockées (shared/profileCatalog.ts) : leurs images se redessinent.
 
-export const IMAGE_DESIGN = 3;
+export const IMAGE_DESIGN = 4;
 
 /** Dossier du cache disque, sous og/. */
 export const IMAGE_DESIGN_DIR = `v${IMAGE_DESIGN}`;

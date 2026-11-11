@@ -13,6 +13,7 @@
 // (db.ts) l'oublie dès qu'une fiche naît, part, ou qu'un login est masqué.
 
 import type Database from "better-sqlite3";
+import { catalogProfile } from "../../shared/profileCatalog";
 import type { CardData, ComparisonData, Fact, TopEntry, WeekRank, WeekTop } from "../../shared/types";
 import { starsFor } from "../../shared/types";
 import { isoWeekLabel, weekStart } from "./weekly";
@@ -107,7 +108,7 @@ export function weekTop(db: Database.Database, opts: { now?: number; limit?: num
   const entries: TopEntry[] = ranked.slice(0, limit).map((r, i) => {
     const raw = get.get(r.id) as { json: string } | undefined;
     const card = (raw ? JSON.parse(raw.json) : {}) as Partial<CardData>;
-    const profile: Fact | undefined = card.profile?.label;
+    const profile: Fact | undefined = card.profile ? catalogProfile(card.profile).label : undefined;
     return {
       rank: i + 1,
       cardId: r.id,

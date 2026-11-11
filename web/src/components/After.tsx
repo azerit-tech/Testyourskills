@@ -148,7 +148,7 @@ export function shareInput(item: Shareable, lang: Lang, rank: string | null): Sh
     };
   }
   const cmp = item.comparison;
-  // Le profil de la fiche GitHub : après la comparaison, c'est lui qui porte l'écart (Faussaire).
+  // Le profil de la fiche GitHub : après la comparaison, c'est lui qui porte l'écart (Sous couverture).
   const profile = cmp.github.profile ?? cmp.cv.profile;
   // La note du dossier et ses étoiles en tête (§18.37) ; une comparaison d'avant la grille garde celles de la fiche GitHub.
   const kase = usableGrid(cmp.grid) ? cmp.grid.overall : null;

@@ -97,7 +97,7 @@ Chaque prompt se compose ainsi : **bloc STYLE** + **bloc LUMIÈRE** de la lettre
 | # | `id` | Profil | Sa phrase | Lumière | Qui | L'objet | Ce qu'on doit lire en une seconde |
 |---|---|---|---|---|---|---|---|
 | 1 | `arsonist` | Pyromane | Déploie le vendredi soir. Sans peur, sans rollback | B | une femme de 30 ans, cheveux courts décolorés | un gobelet de café | elle boit son café, tout fume derrière elle |
-| 2 | `forger` | Faussaire | Le CV le plus convaincant de la ville | B | un homme de 45 ans, costume de lin, lunettes de lecture | un diplôme vierge à ruban rouge | un charmeur qui vous tend un faux diplôme |
+| 2 | `forger` | Sous couverture (ex-Faussaire, 12 nov. 2026 ; portrait peint pour l'ancien nom) | Le gros du travail se fait hors caméra | B | un homme de 45 ans, costume de lin, lunettes de lecture | un diplôme vierge à ruban rouge | un charmeur qui vous tend un faux diplôme |
 | 3 | `kingpin` | Légende du milieu | Ses PR font la loi dans tous les quartiers | A | une femme de 55 ans, cheveux argent, tailleur pastel | aucun : les bras croisés | la patronne, la ville à ses pieds |
 | 4 | `mastermind` | Cerveau | Chaque casse commence par un schéma d'architecture | C | un homme de 35 ans, chemise à manches courtes, crayon sur l'oreille | des plans roulés sous le bras | il réfléchit déjà au coup suivant |
 | 5 | `night_owl` | Oiseau de nuit | Les meilleurs coups partent à 3 h du matin | C | une personne androgyne de 25 ans, capuche, casque audio autour du cou | un ordinateur portable ouvert | un visage éclairé par un écran, la lune derrière |

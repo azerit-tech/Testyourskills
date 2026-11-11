@@ -24,8 +24,8 @@ describe("Dénoncer : la fiche du complice", () => {
   });
 
   it("le texte partagé porte les six étoiles", () => {
-    expect(DICTS.fr.denounce.shareText("@leamd", starsLine(5), "Faussaire", null, "https://x.test")).toBe(
-      "@leamd est dans le viseur ★★★★★☆ · Faussaire. Droit de faire appel : https://x.test",
+    expect(DICTS.fr.denounce.shareText("@leamd", starsLine(5), "Sous couverture", null, "https://x.test")).toBe(
+      "@leamd est dans le viseur ★★★★★☆ · Sous couverture. Droit de faire appel : https://x.test",
     );
   });
 });

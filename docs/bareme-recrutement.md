@@ -391,7 +391,7 @@ Ce qui est montré, c'est la grille du jeu : huit critères, leurs niveaux, leur
 **Ce qui casse**
 - Les notes bougent. La vitrine passe de « LinkedIn 57 · GitHub 71 » à environ « 41 · 61 ».
 - La fiche GitHub de la vitrine devient « Nouveau en ville » (XP sous 45, TEC à 70 ou plus) : c'est juste, et ça change son habillage.
-- Les tests qui fixent des notes (barème, fixtures, démo) sont à reprendre. Le seuil du profil « Faussaire » (15 points d'écart) est à revérifier sur les fixtures.
+- Les tests qui fixent des notes (barème, fixtures, démo) sont à reprendre. Le seuil du profil « Sous couverture » (`forger`, 15 points d'écart) est à revérifier sur les fixtures.
 - La référence des rangs (SPEC §18.3) doit être calculée avec ce barème : elle ne l'est pas encore, rien n'est perdu.
 - Les fiches déjà en base gardent leur ancienne note jusqu'à leur prochain jugement ; avant le lancement, on vide la base.
 - Ne casse pas : le dessin de la fiche, les images de partage, les étoiles et leurs seuils, le top de la semaine (il reste sur la note de la fiche GitHub), les types (`CardData.grid` est facultatif).

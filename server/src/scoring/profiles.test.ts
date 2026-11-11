@@ -87,14 +87,14 @@ describe("aucun mot genré dans les noms, accroches, peines et cautions", () => 
 });
 
 describe("un profil par règle, dans l'ordre de priorité", () => {
-  it("Faussaire : le CV vaut 15 points de plus que le code", () => {
+  it("Sous couverture : le CV vaut 15 points de plus que le code", () => {
     expect(pick({ comparison: { cvOverall: 75, githubOverall: 60, cvBuzz: 20 } })).toBe("forger");
     expect(pick({ comparison: { cvOverall: 74, githubOverall: 60, cvBuzz: 20 } })).toBe("sleeper_agent");
     // Face à un GitHub vide (« dossier vide »), l'écart ne prouve rien.
     expect(pick({ comparison: { cvOverall: 75, githubOverall: 20, cvBuzz: 20, githubEmpty: true } })).toBe("sleeper_agent");
   });
 
-  it("Faussaire : BUZZ du CV à 85 ou plus, jamais le BUZZ d'une fiche GitHub", () => {
+  it("Sous couverture : BUZZ du CV à 85 ou plus, jamais le BUZZ d'une fiche GitHub", () => {
     const cv = { reading: cvReading(), counts: cvCounts(), buzzPer100: 6 };
     expect(pickProfile({ stats: { ...N, BUZZ: 85 }, cv }).id).toBe("forger");
     expect(pickProfile({ stats: { ...N, BUZZ: 84 }, cv }).id).toBe("sleeper_agent");
@@ -189,7 +189,7 @@ describe("la fiche porte son profil et sa peine", () => {
     expect(card.sentence).toBeDefined();
   });
 
-  it("comparaison : l'écart de 15 points fait un Faussaire des deux côtés", () => {
+  it("comparaison : l'écart de 15 points range les deux fiches « Sous couverture »", () => {
     const gcard = { ...scoreGithub(nightFacts(), null, opts), id: "g", createdAt: "" } as CardData;
     const ccard = { ...scoreCv(cvReading(), cvCounts(), opts), id: "c", createdAt: "" } as CardData;
     const even = compareCards({ ...ccard, overall: gcard.overall + 14 }, gcard);
