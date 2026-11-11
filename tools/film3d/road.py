@@ -36,6 +36,25 @@ LANES = (1.83, 5.0)       # milieux des voies (|x|)
 EDGE_X = 6.2              # ligne de rive (|x|), juste avant la cunette
 SLAB = (1.4333, 1.5)      # dalles de trottoir : trois sur la largeur, 1,5 m de long
 
+# Le plan des voies d'une chaussée droite (|x| depuis l'axe), lu par mat_asphalt : milieux des voies (ornières,
+# bande d'huile), tirets entre voies de même sens, ligne de rive, joint longitudinal, double axe (None : absent).
+# AVENUE est celui de l'avenue, par défaut ; lane_layout() en écrit un pour une autre largeur, un autre nombre de voies.
+AVENUE = dict(lanes=LANES, dashes=(3.5,), edge=EDGE_X, joint=3.74, centre=0.15, film_split=3.5)
+
+
+def lane_layout(half_width, n_lanes=2, centre=True, edge=False):
+    """Le plan des voies d'une chaussée droite de demi-largeur `half_width` (bordure à bordure) à `n_lanes` voies en
+    tout, la moitié dans chaque sens : voies égales sur l'enrobé (cunette de PAN exclue), tirets entre voies de même
+    sens, joint le long du premier tiret (ou au milieu de la voie extérieure s'il n'y en a pas). Exemple, une rue de
+    8 m à deux voies : lane_layout(4.0, 2). Se passe à mat_asphalt(..., layout=...)."""
+    a = half_width - PAN
+    k = max(1, n_lanes // 2)
+    w = a / k
+    dashes = tuple(w * i for i in range(1, k))
+    return dict(lanes=tuple(w * (i + 0.5) for i in range(k)), dashes=dashes, edge=(a - 0.3) if edge else None,
+                joint=(dashes[0] + 0.24) if dashes else None, centre=0.15 if centre else None,
+                film_split=dashes[0] if dashes else a / 2)
+
 STYLES = {
     # la rue qui sèche : le réglage gagnant du banc, flaques adoucies
     "sechage": dict(dark=0.75, wet=(0.44, 0.27), D_off=0.0, rut=2.0, film=0.0, edge=0.9, puddle=(0.45, 1.0),
@@ -233,8 +252,10 @@ def paint_colour(N, P):
     return N.mix(1.0, (0.50, 0.49, 0.45, 1), grey(N, dirt), "MULTIPLY")
 
 
-def mat_asphalt(st, name, force_patch=False):
-    """L'enrobé mouillé. force_patch : le carré refait autour d'une plaque, lu dans le monde."""
+def mat_asphalt(st, name, force_patch=False, layout=None):
+    """L'enrobé mouillé. force_patch : le carré refait autour d'une plaque, lu dans le monde. layout : le plan des
+    voies (AVENUE par défaut, sinon lane_layout())."""
+    lay = dict(AVENUE, **(layout or {}))
     m, N, out = S.material(name)
     P, O = coords(N)
     ox, oy, _ = N.sep(O)
@@ -248,17 +269,21 @@ def mat_asphalt(st, name, force_patch=False):
     macro = N.math("DIVIDE", aer_bw.outputs[0], 0.125)
     region = noise(N, P, 0.03, 2.0)
     # --- les voies : traces de roues (lustrées, en ornière), bande d'huile au milieu
-    dl1 = N.math("ABSOLUTE", N.math("SUBTRACT", ax, LANES[0]))
-    dl2 = N.math("ABSOLUTE", N.math("SUBTRACT", ax, LANES[1]))
-    dw = N.math("MINIMUM", N.math("ABSOLUTE", N.math("SUBTRACT", dl1, 0.8)), N.math("ABSOLUTE", N.math("SUBTRACT", dl2, 0.8)))
-    dc = N.math("MINIMUM", dl1, dl2)
+    dls = [N.math("ABSOLUTE", N.math("SUBTRACT", ax, c)) for c in lay["lanes"]]
+    dw, dc = None, None
+    for dl in dls:
+        t = N.math("ABSOLUTE", N.math("SUBTRACT", dl, 0.8))
+        dw = t if dw is None else N.math("MINIMUM", dw, t)
+        dc = dl if dc is None else N.math("MINIMUM", dc, dl)
     rutvar = smooth(N, noise(N, P, 0.6, 2.0, stretch=(1.0, 0.12, 1.0)), 0.38, 0.62)
     rut = N.math("MULTIPLY", inv(N, smooth(N, dw, 0.06, 0.45)), rutvar)
     track = inv(N, smooth(N, dw, 0.1, 0.32))
     oil = N.math("MULTIPLY", inv(N, smooth(N, dc, 0.12, 0.42)), smooth(N, noise(N, P, 1.1, 3.0, stretch=(1.0, 0.3, 1.0)), 0.47, 0.66))
     # la moitié basse de chaque voie (côté caniveau) : 0 en haut de la voie, 1 en bas
-    lane_lo = N.math("GREATER_THAN", ax, 3.5)
-    lp = N.mixf(lane_lo, N.math("DIVIDE", N.math("SUBTRACT", ax, 0.2), 3.3), N.math("DIVIDE", N.math("SUBTRACT", ax, 3.5), 3.0))
+    fs = lay["film_split"]
+    lane_lo = N.math("GREATER_THAN", ax, fs)
+    lp = N.mixf(lane_lo, N.math("DIVIDE", N.math("SUBTRACT", ax, 0.2), fs - 0.2),
+                N.math("DIVIDE", N.math("SUBTRACT", ax, fs), max(0.5, asph() - fs)))
     lowhalf = smooth(N, N.math("ADD", lp, N.math("MULTIPLY", N.math("SUBTRACT", noise(N, P, 0.5, 3.0, stretch=(1.0, 0.25, 1.0)), 0.5), 0.6)), 0.42, 0.62)
     # --- rapiéçages : une case de 14 m sur deux porte un rectangle d'enrobé refait
     if force_patch:
@@ -284,19 +309,28 @@ def mat_asphalt(st, name, force_patch=False):
     snake = N.math("MULTIPLY", inv(N, smooth(N, N.math("ABSOLUTE", N.math("SUBTRACT", n1, 0.5)), 0.004, 0.011)),
                    smooth(N, noise(N, P, 0.045, 2.0), 0.53, 0.6))
     jw = N.math("MULTIPLY", N.math("SUBTRACT", noise(N, P, 1.0, 2.0, stretch=(0.0, 0.35, 0.0)), 0.5), 0.12)
-    joint = N.math("MULTIPLY", inv(N, smooth(N, N.math("ABSOLUTE", N.math("SUBTRACT", ax, N.math("ADD", 3.74, jw))), 0.01, 0.02)),
-                   smooth(N, noise(N, P, 0.5, 2.0, stretch=(0.2, 1.0, 0.2)), 0.36, 0.44))
-    seal = N.math("MAXIMUM", N.math("MAXIMUM", snake, joint), seal_p)
+    if lay["joint"] is not None:
+        joint = N.math("MULTIPLY", inv(N, smooth(N, N.math("ABSOLUTE", N.math("SUBTRACT", ax, N.math("ADD", lay["joint"], jw))), 0.01, 0.02)),
+                       smooth(N, noise(N, P, 0.5, 2.0, stretch=(0.2, 1.0, 0.2)), 0.36, 0.44))
+        seal = N.math("MAXIMUM", N.math("MAXIMUM", snake, joint), seal_p)
+    else:
+        seal = N.math("MAXIMUM", snake, seal_p)
     seal = N.math("MAXIMUM", seal, smooth(N, ax, asph() - 0.03, asph() - 0.005))
     # --- marquages : double axe de 15 cm (écart 15 cm), tirets, rives ; ébréchés et usés
     xw = N.math("ADD", ax, N.math("MULTIPLY", N.math("SUBTRACT", noise(N, P, 7.0, 3.0), 0.5), 0.018))
     yj = N.math("ADD", ly, N.math("MULTIPLY", N.math("SUBTRACT", noise(N, P, 5.0, 2.0), 0.5), 0.05))
-    centre = inv(N, smooth(N, N.math("ABSOLUTE", N.math("SUBTRACT", xw, 0.15)), 0.07, 0.08))
     dm = N.math("FLOORED_MODULO", N.math("ADD", yj, 1.3), 12.0)
     dash = N.math("MULTIPLY", smooth(N, dm, 0.0, 0.03), inv(N, smooth(N, dm, 3.0, 3.03)))
-    lane = N.math("MULTIPLY", inv(N, smooth(N, N.math("ABSOLUTE", N.math("SUBTRACT", xw, 3.5)), 0.058, 0.068)), dash)
-    edge = inv(N, smooth(N, N.math("ABSOLUTE", N.math("SUBTRACT", xw, EDGE_X)), 0.07, 0.08))
-    paint = N.math("MAXIMUM", N.math("MAXIMUM", centre, lane), edge)
+    marks = []
+    if lay["centre"] is not None:
+        marks.append(inv(N, smooth(N, N.math("ABSOLUTE", N.math("SUBTRACT", xw, lay["centre"])), 0.07, 0.08)))
+    for dx in lay["dashes"]:
+        marks.append(N.math("MULTIPLY", inv(N, smooth(N, N.math("ABSOLUTE", N.math("SUBTRACT", xw, dx)), 0.058, 0.068)), dash))
+    if lay["edge"] is not None:
+        marks.append(inv(N, smooth(N, N.math("ABSOLUTE", N.math("SUBTRACT", xw, lay["edge"])), 0.07, 0.08)))
+    paint = marks[0] if marks else 0.0
+    for mk in marks[1:]:
+        paint = N.math("MAXIMUM", paint, mk)
     paint = N.math("MULTIPLY", paint, paint_wear(N, P, d2, track, ax))
     # --- le champ de « creux » (en écarts-types), d'où l'eau
     meso = noise(N, P, 0.42, 3.0, 0.55, stretch=(1.0, 0.5, 1.0))
