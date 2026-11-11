@@ -447,8 +447,10 @@ def plan_FIN(scene, hidden, palier="socle"):
     # les lueurs : hors champ à droite et à gauche, et derrière l'agent (le contre-jour)
     glows([((CX - 9.0, CY + 2.0, 1.4), L.LILAC, 7000.0), ((CX + 10.0, CY - 3.0, 1.5), L.CORAL, 7000.0),
            ((CX + 6.5, CY - 6.0, 1.7), L.CORAL, 2500.0), ((CX - 12.0, CY - 14.0, 1.6), L.LILAC, 4000.0)])
-    L.haze((CX - 80, CX + 80), (CY - 470, CY + 60), (L.WATER_Z, 50), 0.0018)
-    L.haze((CX - 35, CX + 35), (CY - 40, CY + 30), (L.WATER_Z, 22), 0.0035, name="haze_pointe")
+    # la brume est réelle depuis que lieux.haze tourne ses normales vers l'extérieur : 0,0005 sur 800 m laisse la
+    # ville voilée mais lisible ; la nappe locale, plus dense, prend les faisceaux et les lueurs
+    L.haze((CX - 80, CX + 80), (CY - 470, CY + 60), (L.WATER_Z, 50), 0.0005)
+    L.haze((CX - 35, CX + 35), (CY - 40, CY + 30), (L.WATER_Z, 22), 0.003, name="haze_pointe")
     cam_loc = Vector((CX + 0.7, CY + 8.97, 0.2))
     a = math.radians(-1.0)
     d = Vector((math.sin(a), -math.cos(a), math.tan(math.radians(14.0))))
@@ -513,8 +515,8 @@ def plan_FIN6(scene, hidden, palier="socle"):
     except Exception as e:
         print(f"[pointe] avions non chargés : {e!r}", flush=True)
     L.smoke("fumee_gelee", (CX + 0.8, CY - 2.6, 0.5), (3.0, 3.5, 0.8), density=0.16, seed=2.0)
-    L.haze((CX - 90, CX + 90), (CY - 470, CY + 90), (L.WATER_Z, 60), 0.0018)
-    L.haze((CX - 35, CX + 35), (CY - 35, CY + 35), (L.WATER_Z, 40), 0.006, name="haze_pointe")
+    L.haze((CX - 90, CX + 90), (CY - 470, CY + 90), (L.WATER_Z, 60), 0.0005)
+    L.haze((CX - 35, CX + 35), (CY - 35, CY + 35), (L.WATER_Z, 40), 0.004, name="haze_pointe")
     a = 95.0                                          # le milieu de l'arc de 150° (de 20° à 170°)
     cam_loc = (*_polar(a, 7.0), 0.25)
     cam = L.camera("cam_FIN6", cam_loc, (STOP.x, STOP.y, 1.6), lens=18, fstop=2.8,
@@ -589,7 +591,7 @@ def plan_P6(scene, hidden, palier="socle"):
         print(f"[P6] avions non chargés : {e!r}", flush=True)
     # la brume seulement en couloir sur la jetée, sous la caméra : sur toute la lagune, vue de 35 m, elle diffusait
     # le ciel en un voile rose qui noyait l'eau noire et ses reflets (rendus du 12 novembre)
-    L.haze((JX - 30, JX + 30), (JY0 - 20, JY1), (L.WATER_Z, 28), 0.0018)
+    L.haze((JX - 30, JX + 30), (JY0 - 20, JY1), (L.WATER_Z, 28), 0.0012)
     # la caméra au haut de la grue : la berline au tiers bas, la ville aux deux tiers (tangente 0,25 au-dessus du
     # centre au 24 mm vertical, soit 14° de plongée ; la berline 28° sous l'horizontale, donc à 65 m devant)
     cam_y = y_hero + 65.0

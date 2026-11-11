@@ -181,7 +181,7 @@ def plan_P4(scene, hidden, haubans=False):
     L.drive(hero, SPEED, L.hero_wheels(hero), hero["wheel_r"])
     pack([("patrol", -1.8, y_hero - 25.0, 0.0), ("patrol", 5.2, y_hero - 38.0, 1.0), ("patrol", -5.2, y_hero - 60.0, -1.0),
           ("van", 1.8, Y_CREST + 6.0, 0.0)])
-    L.haze((-260, 260), (-420, 120), (L.WATER_Z, 70), 0.0016)
+    L.haze((-260, 260), (-420, 120), (L.WATER_Z, 70), 0.0006)
     cam = L.camera("cam_P4", (-1.2, cam_y, 1.5), (-1.2, cam_y - 100.0, 1.5), lens=200, fstop=4.0,
                    focus=road_point(1.8, y_hero, 0.8), shift=(0.0, 0.1))
     scene.render.use_motion_blur = True
