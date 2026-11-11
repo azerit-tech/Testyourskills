@@ -1043,6 +1043,38 @@ def _stamp_wheel(w):
     a.data.foreach_set("vector", [c for v in me.vertices for c in v.co])
 
 
+def _add_valve(w, side, r=0.178, angle=35.0):
+    """La valve de gonflage, qui sort par une fente de l'enjoliveur côté extérieur : le seul détail qui n'est pas
+    répété autour de la roue, il laisse voir qu'elle tourne. Tige de caoutchouc noir et capuchon chromé, 3 cm,
+    penchée vers le bord de la roue comme une vraie valve. side : +1 si l'extérieur de la roue est vers +y."""
+    mats = [m.name.split(".")[0] if m else "" for m in w.data.materials]
+    try:
+        black = next(i for i, n in enumerate(mats) if n.endswith("_steel"))
+        chrome = next(i for i, n in enumerate(mats) if n.endswith("_chrome"))
+    except StopIteration:
+        return False
+    a = math.radians(angle)
+    radial = Vector((math.cos(a), 0.0, math.sin(a)))
+    hit, loc, _, _ = w.ray_cast(radial * r + Vector((0, side * 1.0, 0)), Vector((0, -side, 0)), distance=2.0)
+    if not hit:
+        return False
+    axis = (Vector((0, side, 0)) * 0.9 + radial * 0.42).normalized()
+    rot = axis.to_track_quat("Z", "Y").to_matrix().to_4x4()
+    bm = bmesh.new()
+    bm.from_mesh(w.data)
+    for d0, d1, rad, mi in ((-0.004, 0.022, 0.0045, black), (0.022, 0.032, 0.0042, chrome)):
+        c = loc + axis * ((d0 + d1) / 2)
+        res = bmesh.ops.create_cone(bm, cap_ends=True, segments=10, radius1=rad, radius2=rad, depth=d1 - d0,
+                                    matrix=Matrix.Translation(c) @ rot)
+        for f in {f for v in res["verts"] for f in v.link_faces}:
+            f.material_index = mi
+            f.smooth = True
+    bm.to_mesh(w.data)
+    bm.free()
+    w.data.update()
+    return True
+
+
 def _set_axles(car):
     """Recale les gerbes de route de la peinture usée sur les essieux réels (nœuds « axle_front », « axle_rear »)."""
     xs = sorted({round(p[0], 3) for p in car["axles"].values()})
@@ -1081,6 +1113,8 @@ def _finish(variant, parts, collection, lights_on, raw, wheel_keys, door_keys, r
         a, b = cv.bbox([w])
         cv.set_origin(w, (a + b) / 2)
         if not raw:
+            if variant == "w111":
+                report[f"valve {k}"] = "posée" if _add_valve(w, 1 if (a.y + b.y) > 0 else -1) else "manquée"
             _stamp_wheel(w)
         wheels[k] = w
     doors = {}
