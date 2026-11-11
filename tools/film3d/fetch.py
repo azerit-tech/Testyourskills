@@ -25,6 +25,10 @@ SKETCHFAB = {
     "palms.glb": "fd439b0f82c34497aabb21c68ad2fb34",
     # lampadaires
     "streetlights.glb": "1173b0c4d9b0400bbeaafbee0e94ca59",
+    # feu tricolore new-yorkais des années 80, aux carrefours
+    "traffic-light.glb": "bad8aa4988474919be8f48920dde7e3d",
+    # réservoir d'eau sur pieds, pour les toits
+    "water-tank.glb": "aff4e9fd3f7042d5855fade7411df4df",
 }
 
 # Poly Haven : (asset, type, résolution)
@@ -33,6 +37,11 @@ POLYHAVEN = [
     ("asphalt_02", "tex", "2k"),
     ("beige_wall_001", "tex", "1k"),
     ("concrete_floor_01", "tex", "1k"),
+    # le mobilier de rue et des toits (modèles glTF)
+    ("exterior_aircon_unit", "model", "1k"),
+    ("modular_street_seating", "model", "1k"),
+    ("metal_trash_can", "model", "1k"),
+    ("outdoor_table_chair_set_01", "model", "1k"),
 ]
 TEX_MAPS = {"Diffuse": "diff", "nor_gl": "nor_gl", "Rough": "rough", "Displacement": "disp"}
 
@@ -95,6 +104,17 @@ def main():
             continue
         folder = os.path.join(ASSETS, asset)
         os.makedirs(folder, exist_ok=True)
+        if kind == "model":
+            gl = files["gltf"][res]["gltf"]
+            path = os.path.join(folder, f"{asset}.gltf")
+            if not os.path.exists(path):
+                for rel, inc in gl.get("include", {}).items():
+                    dst = os.path.join(folder, rel)
+                    os.makedirs(os.path.dirname(dst), exist_ok=True)
+                    get(inc["url"], dst)
+                get(gl["url"], path)
+                print(f"[fetch] {asset} (modèle {res})", flush=True)
+            continue
         for key, short in TEX_MAPS.items():
             if key not in files:
                 continue
