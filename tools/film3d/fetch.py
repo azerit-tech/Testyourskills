@@ -15,8 +15,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 
 SKETCHFAB = {
-    # coupé à coin des années 80, dessin de l'auteur (« collective image »)
+    # coupé à coin des années 80, dessin de l'auteur (« collective image ») : la v1, en basse définition
     "coupe.glb": "c967ab4abbc54ae4b7933fd81a86c99c",
+    # coupé sport générique, dessin de l'auteur, 114 k faces, intérieur : la v2
+    "coupe-hd.glb": "820a13c4831c41959ce75e6c2014e882",
     # berline de patrouille des années 80, dessin de l'auteur
     "police.glb": "61766c1e6e1e4b2b803c174f33433a74",
     # trois palmiers hauts, base scannée

@@ -3,6 +3,7 @@
 #   nice -n 19 taskpolicy -b /Applications/Blender.app/Contents/MacOS/Blender -b -t 2 \
 #     -P tools/film3d/render.py -- [--preview] [--samples N] [--threads 2] [--gpu] [--scene scene-a.blend] [--out test-a.png]
 #
+# --blur    : flou de bougé (obturateur 180°) sur l'image 2 de la scène animée.
 # --preview : demi-taille (360 × 640), 64 échantillons, pour itérer.
 # --threads : 2 par défaut (le Mac reste utilisable) ; 0 = tous les cœurs.
 # --gpu     : Metal (ou CUDA/OptiX sur une machine louée) ; CPU par défaut.
@@ -39,6 +40,7 @@ ap.add_argument("--preview", action="store_true")
 ap.add_argument("--samples", type=int, default=None)
 ap.add_argument("--threads", type=int, default=2)
 ap.add_argument("--gpu", action="store_true")
+ap.add_argument("--blur", action="store_true", help="flou de bougé, obturateur à 180°, écrit test-?-blur.png")
 ap.add_argument("--grain", type=float, default=7.0, help="intensité du grain ffmpeg (0 = aucun)")
 args = ap.parse_args(sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else [])
 
@@ -72,6 +74,9 @@ if args.gpu:
     else:
         print("[render] aucun GPU trouvé, rendu sur CPU", flush=True)
 
+if args.blur:
+    r.use_motion_blur = True
+    r.motion_blur_shutter = 0.5
 if args.preview:
     r.resolution_percentage = 50
     c.samples = 64
@@ -79,7 +84,7 @@ if args.samples:
     c.samples = args.samples
 
 base = os.path.splitext(args.scene)[0].replace("scene-", "test-")
-out = args.out or os.path.join(FILM, "ref", base + ("-preview" if args.preview else "") + ".png")
+out = args.out or os.path.join(FILM, "ref", base + ("-blur" if args.blur else "") + ("-preview" if args.preview else "") + ".png")
 raw = os.path.splitext(out)[0] + "-raw.png"
 r.filepath = raw
 t0 = time.time()
