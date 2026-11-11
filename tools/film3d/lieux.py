@@ -288,16 +288,21 @@ def haze(xs, ys, zs, density=0.0012, name="haze", color="#b8b4d8", anisotropy=0.
 # ---------------------------------------------------------------- la ville lointaine
 
 def mat_city(name="city_far", haze_color="#4a4b8e", fade=1700.0, lit_frac=None):
-    """Les immeubles vus de l'eau : enduit sombre, fenêtres en grille (une sur deux environ allumée, ambre
-    surtout, quelques blanches et bleutées), pied des façades éclairé par la rue, et la perspective aérienne
-    peinte dans la matière (la brume de 300 m à 1,5 km coûterait trop cher en volume) : plus c'est loin, plus
-    c'est fondu dans la couleur de l'horizon."""
+    """Les immeubles vus de l'eau, la nuit : enduit sombre, fenêtres en grille dont la plupart sont noires.
+    L'allumage se décide par immeuble (un sur cinq presque éteint), par étage (des étages entiers allumés ou
+    noirs) et par fenêtre ; les fenêtres allumées varient en teinte (ambre surtout, quelques blanches, de rares
+    froides ou d'un vert de néon) et en intensité (rideaux, lampes de bureau). Le pied des façades est lavé par
+    la rue. La perspective aérienne est peinte dans la matière (la brume de 300 m à 1,5 km coûterait trop cher en
+    volume) : plus c'est loin, plus c'est fondu dans la couleur de l'horizon.
+    `lit_frac` : la part moyenne de fenêtres allumées (par défaut 6 à 32 % selon l'immeuble ; 0,5 pour la ville
+    « toutes fenêtres allumées » de P6 et FIN6, qui reste une ville et pas un aplat)."""
     m, N, out = S.material(name)
     geo = N.new("ShaderNodeNewGeometry")
     P, Nn = geo.outputs["Position"], geo.outputs["Normal"]
     px, py, pz = N.sep(P)
     nx, ny, nz = N.sep(Nn)
     oi = N.new("ShaderNodeObjectInfo")
+    rnd = oi.outputs["Random"]
     # la coordonnée horizontale le long de la façade
     face_y = N.math("GREATER_THAN", N.math("ABSOLUTE", ny), N.math("ABSOLUTE", nx))
     u = N.mixf(face_y, py, px)
@@ -309,39 +314,48 @@ def mat_city(name="city_far", haze_color="#4a4b8e", fade=1700.0, lit_frac=None):
     wall = N.math("LESS_THAN", N.math("ABSOLUTE", nz), 0.5)
     win = N.math("MULTIPLY", win, wall)
     win = N.math("MULTIPLY", win, N.math("GREATER_THAN", pz, 3.0))
-    cell = road.combine(N, N.math("FLOOR", N.math("DIVIDE", u, cw)), N.math("FLOOR", N.math("DIVIDE", pz, ch)),
-                        N.math("ADD", N.math("MULTIPLY", oi.outputs["Random"], 97.0), N.math("MULTIPLY", face_y, 13.0)))
+    seed = N.math("ADD", N.math("MULTIPLY", rnd, 97.0), N.math("MULTIPLY", face_y, 13.0))
+    floor_i = N.math("FLOOR", N.math("DIVIDE", pz, ch))
+    cell = road.combine(N, N.math("FLOOR", N.math("DIVIDE", u, cw)), floor_i, seed)
     w1 = N.new("ShaderNodeTexWhiteNoise", _noise_dimensions="3D")
     N.link(cell, w1.inputs["Vector"])
     rgb = N.new("ShaderNodeSeparateColor")
     N.link(w1.outputs["Color"], rgb.inputs[0])
     r_on, r_hue, r_bri = w1.outputs["Value"], rgb.outputs[0], rgb.outputs[1]
-    # une part allumée propre à chaque immeuble (35 à 75 %), ou la même pour tous (`lit_frac`)
-    frac = N.math("ADD", 0.35, N.math("MULTIPLY", oi.outputs["Random"], 0.4)) if lit_frac is None else lit_frac
-    lit = N.math("MULTIPLY", win, N.math("LESS_THAN", r_on, frac))
-    wcol = N.ramp(r_hue, [(0.0, lin("#ffc36b")), (0.55, lin("#ffb257")), (0.78, lin("#ffe2b0")), (0.9, lin("#fff4dc")),
-                          (0.96, lin("#b9c6ff"))])
-    bri = N.math("ADD", 0.35, N.math("MULTIPLY", r_bri, 1.0))
-    # l'enduit : sombre et un peu pastel, la teinte de l'immeuble vient de son hasard
-    tint = N.ramp(oi.outputs["Random"], [(0.0, lin("#8f8a96")), (0.3, lin("#a59a8c")), (0.55, lin("#9aa3a8")),
-                                         (0.8, lin("#b0a3a8")), (1.0, lin("#8d8fa0"))])
-    base = N.mix(1.0, tint, (0.35, 0.35, 0.36, 1), "MULTIPLY")
-    glass = N.mix(win, base, (0.01, 0.012, 0.018, 1))
+    w2 = N.new("ShaderNodeTexWhiteNoise", _noise_dimensions="3D")       # le hasard de l'étage
+    N.link(road.combine(N, floor_i, seed, 4.7), w2.inputs["Vector"])
+    r_floor = w2.outputs["Value"]
+    # la part allumée de l'immeuble, presque nulle pour un sur cinq
+    if lit_frac is None:
+        frac = N.math("ADD", 0.06, N.math("MULTIPLY", N.math("FRACT", N.math("MULTIPLY", rnd, 7.31)), 0.26))
+    else:
+        frac = N.math("ADD", lit_frac - 0.15, N.math("MULTIPLY", N.math("FRACT", N.math("MULTIPLY", rnd, 7.31)), 0.3))
+    frac = N.math("MULTIPLY", frac, N.mixf(N.math("LESS_THAN", N.math("FRACT", N.math("MULTIPLY", rnd, 3.77)), 0.2), 1.0, 0.12))
+    score = N.mixf(0.45, r_on, r_floor)
+    lit = N.math("MULTIPLY", win, N.math("LESS_THAN", score, frac))
+    wcol = N.ramp(r_hue, [(0.0, lin("#ffc36b")), (0.5, lin("#ffb257")), (0.66, lin("#ffd497")), (0.8, lin("#fff0d6")),
+                          (0.87, lin("#cfdcff")), (0.94, lin("#aebcff")), (0.985, lin("#c4ffd8"))])
+    bri = N.mixf(N.math("POWER", r_bri, 1.6), 0.5, 3.6)
+    # l'enduit : très sombre, un peu pastel, la teinte de l'immeuble vient de son hasard
+    tint = N.ramp(rnd, [(0.0, lin("#8f8a96")), (0.3, lin("#a59a8c")), (0.55, lin("#9aa3a8")),
+                        (0.8, lin("#b0a3a8")), (1.0, lin("#8d8fa0"))])
+    base = N.mix(1.0, tint, (0.16, 0.16, 0.17, 1), "MULTIPLY")
+    glass = N.mix(win, base, (0.008, 0.01, 0.014, 1))
     p = S.principled(N)
     N.link(glass, p.inputs["Base Color"])
     N.link(N.mixf(win, 0.85, 0.12), p.inputs["Roughness"])
-    # le pied des façades lavé d'ambre par l'éclairage de la rue, jusqu'à 10 m
-    foot = N.math("MULTIPLY", road.inv(N, road.smooth(N, pz, 0.0, 11.0)), N.math("MULTIPLY", wall, 0.35))
+    # le pied des façades lavé d'ambre par l'éclairage de la rue, jusqu'à 8 m
+    foot = N.math("MULTIPLY", road.inv(N, road.smooth(N, pz, 0.0, 8.0)), N.math("MULTIPLY", wall, 0.22))
     e_col = N.mix(lit, N.mix(1.0, lin("#ffb46a"), road.grey(N, foot), "MULTIPLY"),
-                  N.mix(1.0, wcol, road.grey(N, N.math("MULTIPLY", bri, 7.0)), "MULTIPLY"))
+                  N.mix(1.0, wcol, road.grey(N, bri), "MULTIPLY"))
     N.link(e_col, p.inputs["Emission Color"])
     p.inputs["Emission Strength"].default_value = 1.0
     # la perspective aérienne
     cam = N.new("ShaderNodeCameraData")
     d = cam.outputs["View Distance"]
     f = N.math("SUBTRACT", 1.0, N.math("EXPONENT", N.math("DIVIDE", N.math("MULTIPLY", d, -1.0), fade)))
-    f = N.math("MULTIPLY", f, 0.9)
-    hz = N.new("ShaderNodeEmission", Color=lin(haze_color), Strength=0.32)
+    f = N.math("MULTIPLY", f, 0.85)
+    hz = N.new("ShaderNodeEmission", Color=lin(haze_color), Strength=0.22)
     mx = N.new("ShaderNodeMixShader")
     N.link(f, mx.inputs[0])
     N.link(p.outputs[0], mx.inputs[1])
@@ -350,40 +364,48 @@ def mat_city(name="city_far", haze_color="#4a4b8e", fade=1700.0, lit_frac=None):
     return m
 
 
+SIGN_COLORS = ("#ff4a3a", "#ff7ab0", "#4ad8ff", "#6dff9a", "#ffb03a", "#b07aff", "#ff6a3d")
+
+
 def distant_city(name="ville", shore_y=CITY_SHORE_Y, xs=(-950.0, 1050.0), depth=900.0, gap=(-12.0, 12.0), seed=5,
                  bay=0.00012, all_lit=False):
     """La ville vue par-dessus la lagune, vers -y (la bande de 1,2 km du §2.4, élargie pour l'orbite de FIN6) :
     le quai et la promenade avec ses lampadaires (sources dans le cadre, reflétées par l'eau), une première rangée
-    basse (deux à quatre étages), puis des rangs de trois à sept étages, et de rares tours au fond (le haut des
-    tours de P4, au-dessus de la crête). Le rivage se courbe en baie vers les bords (il revient vers +y) pour que
-    les vues de côté voient aussi des lumières. `gap` : l'ouverture laissée à la route du pont.
-    `all_lit` : presque toutes les fenêtres allumées (P6, FIN6)."""
+    basse (deux à quatre étages), puis des rangs de trois à sept étages mêlés d'immeubles de dix étages, et des
+    tours au fond (le haut des tours de P4, au-dessus de la crête). Les rangs se chevauchent (reculs au hasard)
+    pour que la silhouette ait de la profondeur. Des enseignes sans texte (lames verticales, bandeaux de toit)
+    sur les premiers rangs, que la distance et le flou rendent illisibles. Le rivage se courbe en baie vers les
+    bords (il revient vers +y). `gap` : l'ouverture laissée à la route du pont.
+    `all_lit` : bien plus de fenêtres allumées (P6, FIN6), mais une ville quand même."""
     rng = random.Random(seed)
     xs0, xs1 = xs
 
     def shore(x):
         return shore_y + bay * x * x + 14.0 * math.sin(x / 190.0)
 
-    mats = [mat_city(f"{name}_mat", lit_frac=0.93 if all_lit else None)]
+    mats = [mat_city(f"{name}_mat", lit_frac=0.5 if all_lit else None)]
     beacons = []
-    n_bld = 0
+    signs = {c: bmesh.new() for c in SIGN_COLORS}
+    n_bld = n_sign = 0
     # (recul depuis le quai, hauteurs, remplissage) ; un étage fait 3,15 m
-    rows = [(16.0, (7, 14), 0.9), (52.0, (9, 22), 0.88), (100.0, (10, 23), 0.85), (165.0, (12, 26), 0.8),
-            (245.0, (12, 30), 0.75), (340.0, (12, 34), 0.7), (460.0, (14, 34), 0.65), (600.0, (14, 30), 0.6)]
+    rows = [(16.0, (7, 14), 0.9), (52.0, (9, 22), 0.88), (100.0, (10, 26), 0.85), (165.0, (12, 30), 0.8),
+            (245.0, (12, 34), 0.75), (340.0, (12, 38), 0.7), (460.0, (14, 38), 0.65), (600.0, (14, 34), 0.6)]
     objs = []
     for ri, (off, (h0, h1), fill) in enumerate(rows):
         if off > depth:
             break
         x = xs0 + rng.uniform(0, 20)
         while x < xs1:
-            w = rng.uniform(16, 42)
+            w = rng.uniform(14, 42)
             if rng.random() < fill and not (gap[0] - 6 < x + w / 2 and x - w / 2 < gap[1] + 6 and ri < 2):
-                d = rng.uniform(12, 28)
-                y = shore(x) - off - d / 2 + rng.uniform(-5, 5)
+                d = rng.uniform(12, 30)
+                y = shore(x) - off - d / 2 + rng.uniform(-12, 12 if ri else 4)
                 h = rng.uniform(h0, h1)
-                if ri >= 3 and rng.random() < 0.045:
-                    h = rng.uniform(55, 95)          # une tour, rare
-                    w, d = rng.uniform(20, 28), rng.uniform(20, 28)
+                if ri >= 1 and rng.random() < 0.14:
+                    h = rng.uniform(26, 44)          # un immeuble de huit à quatorze étages
+                if ri >= 2 and rng.random() < 0.06:
+                    h = rng.uniform(50, 95)          # une tour
+                    w, d = rng.uniform(18, 28), rng.uniform(18, 28)
                 ob_bm = bmesh.new()
                 box_bm(ob_bm, (-w / 2, -d / 2, -1.0), (w / 2, d / 2, h))
                 if h > 15 and rng.random() < 0.45:
@@ -393,13 +415,35 @@ def distant_city(name="ville", shore_y=CITY_SHORE_Y, xs=(-950.0, 1050.0), depth=
                     box_bm(ob_bm, (w * 0.1, -d * 0.2, h), (w * 0.1 + 3, -d * 0.2 + 2.5, h + 2.2))
                 ob = mesh_object(f"{name}_b{n_bld}", ob_bm, mats)
                 ob.location = (x, y, 0.0)
-                ob.rotation_euler = (0, 0, math.radians(rng.choice([0, 0, 0, rng.uniform(-8, 8)])))
+                rot = math.radians(rng.choice([0, 0, 0, rng.uniform(-8, 8)]))
+                ob.rotation_euler = (0, 0, rot)
                 ob.visible_shadow = False
                 objs.append(ob)
                 n_bld += 1
                 if h > 50:
                     beacons.append((x, y, h + 1.0))   # feu d'obstacle sur les tours
+                # les enseignes, sans texte : une lame verticale sur la façade côté eau, ou un bandeau de toit
+                if ri < 3 and rng.random() < 0.2:
+                    sb = signs[rng.choice(SIGN_COLORS)]
+                    M = Matrix.Translation((x, y, 0.0)) @ Matrix.Rotation(rot, 4, "Z")
+                    if rng.random() < 0.6:
+                        sx = rng.uniform(-w / 2 + 2, w / 2 - 2)
+                        z0 = rng.uniform(4.0, min(10.0, h - 5.0)) if h > 10 else 3.5
+                        lo, hi = (sx - 0.15, d / 2 + 0.1, z0), (sx + 0.15, d / 2 + 0.9, z0 + rng.uniform(3, 6))
+                    else:
+                        sw = rng.uniform(5, min(14, w - 2))
+                        sx = rng.uniform(-w / 2 + sw / 2, w / 2 - sw / 2)
+                        lo, hi = (sx - sw / 2, d / 2 - 0.4, h + 0.3), (sx + sw / 2, d / 2 - 0.2, h + rng.uniform(1.2, 2.2))
+                    vs = [sb.verts.new(M @ Vector((a, b, c))) for c in (lo[2], hi[2]) for b in (lo[1], hi[1]) for a in (lo[0], hi[0])]
+                    for f in [(0, 2, 3, 1), (4, 5, 7, 6), (0, 1, 5, 4), (2, 6, 7, 3), (0, 4, 6, 2), (1, 3, 7, 5)]:
+                        sb.faces.new([vs[i] for i in f])
+                    n_sign += 1
             x += w + rng.uniform(3, 14)
+    for c, sb in signs.items():
+        if sb.verts:
+            mesh_object(f"{name}_enseignes_{c[1:]}", sb, [emit_mat(f"{name}_enseigne_{c[1:]}", lin(c), 9.0)]).visible_shadow = False
+        else:
+            sb.free()
     # le quai et la promenade (le sol de la ville est à z = 0, 1,5 m au-dessus de l'eau)
     wall = mat_quay(f"{name}_quai_pierre")
     walk = mat_concrete(f"{name}_promenade", tint=(0.5, 0.48, 0.46))
@@ -434,8 +478,8 @@ def distant_city(name="ville", shore_y=CITY_SHORE_Y, xs=(-950.0, 1050.0), depth=
         mesh_object(f"{name}_balises", rb, [red]).visible_shadow = False
     else:
         rb.free()
-    print(f"[lieux] ville lointaine : {n_bld} immeubles, {len(beacons)} balises, fenêtres "
-          f"{'toutes allumées' if all_lit else 'en partie allumées'}", flush=True)
+    print(f"[lieux] ville lointaine : {n_bld} immeubles, {len(beacons)} balises, {n_sign} enseignes, fenêtres "
+          f"{'très allumées' if all_lit else 'éparses'}", flush=True)
     return objs
 
 
@@ -718,6 +762,14 @@ def roadway(name, ys, zfun=None, x0=0.0, half=7.0, walk=2.0, rail="parapet", gli
             for side in (-1, 1):
                 lamps.append(lamp(lamp_src, (side * lx, y, zfun(y) + WALK_Z), arm=(-side, 0.0),
                                   name=f"lamp_{name}_{k}_{'g' if side < 0 else 'd'}"))
+        if far and lamps:
+            # vue de loin, la tête du lampadaire fait moins d'un pixel : un halo émissif la rend lisible (la file
+            # de lumières qui dessine le pont ou la jetée sur l'eau)
+            hb = bmesh.new()
+            for _, _, h in lamps:
+                bmesh.ops.create_uvsphere(hb, u_segments=8, v_segments=5, radius=0.55,
+                                          matrix=Matrix.Translation(h - Vector((0, 0, 0.15))))
+            mesh_object(f"{name}_halos", hb, [emit_mat(f"{name}_halo", lin("#ffbf69"), 60.0)]).visible_shadow = False
     # tout est bâti autour de x = 0 (l'enrobé lit ses marquages en coordonnées objet), puis glissé en x0
     for ob in set(bpy.data.objects) - before:
         if ob.parent is None:
@@ -868,6 +920,8 @@ def clone(root, name):
     made = {}
 
     def rec(ob, parent):
+        if parent is not None and "_beam_" in ob.name:
+            return None                         # les faisceaux figés sont propres à chaque véhicule (bar_beams)
         c = ob.copy()
         if c.animation_data:
             c.animation_data.action = None      # les pilotes (rotors) restent, les clés de flou se reposent
@@ -1005,6 +1059,120 @@ def bar_beams(root, tag, yaws=((35, CORAL), (-150, LILAC)), energy=9000.0, size=
         lo.matrix_world = mw
         out.append(lo)
     return out
+
+
+def _bar_of(root):
+    bn = root.get("bar", "")
+    return next((o for o in root.children_recursive if bn and (o.name == bn or o.name.endswith(":" + bn))), None)
+
+
+def bar_pools(root, energy=2000.0, out=0.9, radius=0.25):
+    """Les flaques de couleur de la rampe sur la chaussée mouillée : un point corail à gauche, un lilas à droite,
+    à 0,9 m hors de la caisse, au niveau de la rampe. Leur reflet sur l'eau dessine le ruban de gyrophares vu de
+    haut (P6) ; la rampe et ses lentilles ne les reçoivent pas (même liaison que cast_vehicles.lightbar_lights).
+    À poser sur le premier véhicule avant de le cloner : les copies en héritent."""
+    bpy.context.view_layer.update()
+    bar = _bar_of(root)
+    if bar is None:
+        return []
+    shell = bpy.data.collections.get(f"{bar.name}_glow_exclude")
+    lights = []
+    for side, col in ((1, CORAL), (-1, LILAC)):
+        d = bpy.data.lights.new(f"{bar.name}_pool_{'L' if side > 0 else 'R'}", "POINT")
+        d.energy = energy
+        d.color = lin(col)[:3]
+        d.shadow_soft_size = radius
+        ob = bpy.data.objects.new(d.name, d)
+        cols = [c for c in bar.users_collection if not c.name.endswith("_glow_exclude")]
+        (cols[0] if cols else bpy.context.scene.collection).objects.link(ob)
+        ob.parent = bar
+        ob.location = (0.0, side * (0.36 + out), 0.25)
+        ob.visible_camera = False               # la boule de lumière ne se voit pas, son reflet sur l'eau oui
+        ob.visible_volume_scatter = False       # ni dans la brume : vingt rampes la teintaient de rose sur 300 m
+        if shell:
+            ob.light_linking.receiver_collection = shell
+        lights.append(ob)
+    return lights
+
+
+def bar_boost(root, factor):
+    """Multiplie l'émission des lentilles de la rampe (matières partagées : toutes les copies suivent). Pour les
+    plans vus de loin, où la rampe fait quelques pixels ; de près, AgX la blanchirait."""
+    bar = _bar_of(root)
+    done = set()
+    for o in ([bar] + list(bar.children_recursive)) if bar else []:
+        for m in getattr(o.data, "materials", []) or []:
+            if m is None or m.name in done or not m.node_tree:
+                continue
+            done.add(m.name)
+            # la lentille plus forte se voit, mais n'éclaire plus : vingt rampes échantillonnées comme lumières
+            # teintaient toute la brume de rose au-dessus de l'eau (P6 du 12 novembre)
+            m.cycles.emission_sampling = "NONE"
+            for nd in m.node_tree.nodes:
+                for key in ("Emission Strength", "Strength"):
+                    s = nd.inputs.get(key)
+                    if s is not None and not s.is_linked and isinstance(s.default_value, float) and s.default_value > 0:
+                        s.default_value *= factor
+    return done
+
+
+def open_door(root, side=-1, angle=75.0, door_x=(-0.32, 0.99), door_z=(0.18, 1.42), inner=0.55, hinge=(0.96, 0.92)):
+    """Ouvre la portière avant d'une patrouille (cast_vehicles « jeandiz » : caisse jointe, l'avant vers +x
+    local, la gauche vers +y). La portière, sa vitre, sa poignée et son rétroviseur sont des îlots du maillage :
+    on prend ceux dont la boîte tient dans la zone de la portière, et on les fait tourner autour de la charnière.
+    `side` : +1 la portière du conducteur (gauche), -1 celle du passager. Le maillage est modifié : à faire sur une
+    patrouille qu'on ne clone pas."""
+    body = bpy.data.objects[root["body"]]
+    me = body.data
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bm.verts.ensure_lookup_table()
+    seen, moved = set(), 0
+    hx, hy = hinge[0], side * hinge[1]
+    a = math.radians(-angle * side)
+    ca, sa = math.cos(a), math.sin(a)
+    for v in bm.verts:
+        if v.index in seen:
+            continue
+        comp, stack = [], [v]
+        seen.add(v.index)
+        while stack:
+            p = stack.pop()
+            comp.append(p)
+            for e in p.link_edges:
+                q = e.other_vert(p)
+                if q.index not in seen:
+                    seen.add(q.index)
+                    stack.append(q)
+        xs = [c.co.x for c in comp]
+        ys = [c.co.y * side for c in comp]
+        zs = [c.co.z for c in comp]
+        if (min(xs) >= door_x[0] and max(xs) <= door_x[1] and min(ys) >= inner and min(zs) >= door_z[0]
+                and max(zs) <= door_z[1]):
+            for c in comp:
+                dx, dy = c.co.x - hx, c.co.y - hy
+                c.co.x, c.co.y = hx + dx * ca - dy * sa, hy + dx * sa + dy * ca
+            moved += len(comp)
+    bm.to_mesh(me)
+    bm.free()
+    me.update()
+    print(f"[lieux] portière ouverte ({'gauche' if side > 0 else 'droite'}, {angle:.0f}°) : {moved} sommets", flush=True)
+    return moved
+
+
+def cabin_light(root, energy=6.0, color="#ffcf9a"):
+    """Un peu de lumière dans l'habitacle de la berline (le tableau de bord, une lampe de lecture) : les mains
+    levées se lisent derrière le pare-brise. Repère du corps de scene_a.street_hero : l'avant vers -y local."""
+    body = bpy.data.objects[root["body"]]
+    d = bpy.data.lights.new("hero_habitacle", "POINT")
+    d.energy = energy
+    d.color = lin(color)[:3]
+    d.shadow_soft_size = 0.12
+    ob = bpy.data.objects.new(d.name, d)
+    bpy.context.scene.collection.objects.link(ob)
+    ob.parent = body
+    ob.location = (0.15, -0.72, 1.08)
+    return ob
 
 
 def jet(name="jet"):
