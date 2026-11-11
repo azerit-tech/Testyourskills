@@ -74,7 +74,7 @@ PLANS = {
     # 3,5 m derrière l'agent de droite et un peu sur sa gauche, 26 mm, tournée de 4° vers l'axe : l'agent et sa
     # portière en grand premier plan sombre au bord droit, la berline au centre dans la brèche, les plots.
     # yaw : lacet de la caméra en degrés (positif : vers -x de vue).
-    "P3": dict(cam=(1.3, 4.0, 0.55), lens=26.0, shift_y=0.13, yaw=4.0, fstop=5.6, focus=(0.9, 7.0, 0.9),
+    "P3": dict(cam=(1.3, 4.0, 0.55), lens=26.0, shift_y=0.19, yaw=4.0, fstop=5.6, focus=(0.9, 7.0, 0.9),
                hero=(0.35, 14.4, 4.0), chase=(-1.2, 74.4), barrage=8.0, fire=True),
 }
 
@@ -844,7 +844,20 @@ def heading_rot(hx, hy):
     return math.atan2(hy, hx)
 
 
-def officer_light(officers, plan):
+def only_on(light, objs, tag):
+    """Liaison de lumière : `light` n'éclaire que `objs` (et leurs enfants). Les sources d'appoint posées près du sol
+    (liserés, éclairs, nappe sur la berline) blanchissaient la chaussée autour d'elles : le sol devant la caméra doit
+    rester un mouillé sombre, éclairé par la rue seulement."""
+    col = bpy.data.collections.new(f"{tag}_receivers")
+    for o in objs:
+        for x in [o] + list(o.children_recursive):
+            if x.name not in col.objects:
+                col.objects.link(x)
+    light.light_linking.receiver_collection = col
+    return col
+
+
+def officer_light(officers, plan, receivers=()):
     """Les deux agents découpés par les phares : un liseré (un spot chaud derrière chacun, côté berline, à hauteur
     des phares relevée, qui accroche épaules et casquette) ; et, quand le plan ouvre le feu, l'éclair de chaque
     pistolet : une flamme blanche émissive dans l'axe du canon et une lumière ponctuelle forte, brève à l'image.
@@ -857,7 +870,7 @@ def officer_light(officers, plan):
         bmesh.ops.create_icosphere(bm, subdivisions=2, radius=1.0)
         bm.to_mesh(me)
         bm.free()
-        me.materials.append(A.mat_emit("muzzle_flash", lin("#fff4e2"), 400.0))
+        me.materials.append(A.mat_emit("muzzle_flash", lin("#fff4e2"), 600.0))
         flash = me
     for k, a in enumerate(officers):
         o = a.matrix_world.translation.copy()
@@ -868,6 +881,7 @@ def officer_light(officers, plan):
         lo.data.spot_blend = 0.6
         lo.data.shadow_soft_size = 0.15
         lo.visible_glossy = False
+        only_on(lo, [a], f"rim_{k}")
         if flash is None:
             continue
         gun = bpy.data.objects.get(a.get("gun", ""))
@@ -877,8 +891,9 @@ def officer_light(officers, plan):
         else:
             d = Vector((0.0, 1.0, 0.0))
             m = o + Vector((0.0, 0.55, 1.05))
-        # (vu de dos, le corps cache le canon : la flamme est assez longue et large pour déborder de la silhouette)
-        for j, (sc, off) in enumerate((((0.36, 0.08, 0.08), 0.3), ((0.07, 0.2, 0.2), 0.08), ((0.14, 0.13, 0.04), 0.2))):
+        # (vu de dos, le corps cache le canon : la flamme est assez longue pour déborder de la silhouette vers le
+        # centre du cadre, où fuit l'axe du canon)
+        for j, (sc, off) in enumerate((((0.62, 0.09, 0.09), 0.55), ((0.07, 0.2, 0.2), 0.08), ((0.14, 0.13, 0.04), 0.2))):
             f = bpy.data.objects.new(f"muzzle_flash_{k}_{j}", flash)
             bpy.context.scene.collection.objects.link(f)
             f.location = m + d * off
@@ -887,9 +902,11 @@ def officer_light(officers, plan):
             f.scale = sc
             f.visible_shadow = False
         # (assez pour découper l'agent, pas pour brûler le flanc blanc de la patrouille à côté)
-        lf = A.add_light(f"muzzle_{k}", "POINT", m + d * 0.15 + Vector((0, 0, 0.1)), (0, 0, -1), lin("#fff3e0"), 2200.0)
+        lf = A.add_light(f"muzzle_{k}", "POINT", m + d * 0.15 + Vector((0, 0, 0.1)), (0, 0, -1), lin("#fff3e0"), 1500.0)
         lf.data.shadow_soft_size = 0.04
         lf.visible_camera = False
+        # (l'éclair n'allume que les agents, leurs armes, les portières et les patrouilles : pas la chaussée)
+        only_on(lf, list(officers) + list(receivers), f"muzzle_{k}")
     log(f"agents : liseré des phares{', éclairs de tir' if flash is not None else ''}")
 
 
@@ -987,7 +1004,7 @@ def build_barrage(scene, hidden, plan):
     if S.get("panel_src"):
         for side in (-1, 1):
             A.instance(S["panel_src"], f"panel_{side}", (side * 2.8, yb + 3.7, road.road_z(2.8)), side * 0.25)
-    officer_light(officers, plan)
+    officer_light(officers, plan, cars[:2])
     crowd = lib_parts("cast/barrier-crowd/model.glb", {"crowd_src": lambda o, c: True}, hidden).get("crowd_src")
     if crowd:
         for side in (-1, 1):
@@ -1077,8 +1094,9 @@ def place_hero(scene, plan):
         lo.data.spot_blend = 0.45
     # la carrosserie bordeaux lisible malgré le contre-jour : une nappe douce au-dessus du capot, côté barrage
     # (la lueur des vitrines et des rampes), invisible à la caméra ; son reflet dessine le capot et les ailes
-    fill = A.add_light("hero_fill", "AREA", (x, y - 4.5, 4.0), (0.0, 4.5, -3.2), lin("#ffe2cc"), 500.0, (2.4, 1.4))
+    fill = A.add_light("hero_fill", "AREA", (x, y - 4.5, 4.0), (0.0, 4.5, -3.2), lin("#ffe2cc"), 1100.0, (2.4, 1.4))
     fill.visible_camera = False
+    only_on(fill, [car], "hero_fill")
     # le cœur des phares, vu de face à 20 m : une petite sphère émissive à la place de chaque lampe (le verre du
     # modèle reste trop sage pour découper les agents en contre-jour)
     bpy.context.view_layer.update()
@@ -1135,14 +1153,17 @@ def build():
             c.hide_render = True
     make_world(scene)
     # la brume d'après la pluie, plus dense au barrage : les phares et les gyrophares y prennent corps
-    haze("haze", -14, 14, Y0, 128.0, -0.1, 30, 0.002)
-    haze("haze_end", -60, 60, 128.0, Y_FAR + 2, -0.1, 30, 0.002)
+    # (les boîtes sont de vraies brumes depuis que leurs normales sortent : quelques millièmes suffisent, la caméra
+    # est dedans ; le sol devant elle reste un mouillé sombre, la brume ne se lit que dans la profondeur)
+    haze("haze", -14, 14, Y0, 128.0, -0.1, 30, 0.0006)
+    haze("haze_end", -60, 60, 128.0, Y_FAR + 2, -0.1, 30, 0.001)
     # (jusqu'au haut de la brume générale : un bord de boîte dans le cadre se lirait comme une ligne)
-    haze("haze_barrage", -6.5, 6.5, 1.0, 34.0, -0.05, 30.0, 0.004, aniso=0.55)
+    # (au-delà des agents seulement : rien entre la caméra et eux)
+    haze("haze_barrage", -6.5, 6.5, 9.0, 34.0, -0.05, 30.0, 0.0015, aniso=0.55)
     # devant la berline, au ras du sol, une nappe plus dense qui diffuse vers l'avant : le halo des phares
     hx, hy = plan["hero"][:2]
     # (seulement autour des phares, pas jusqu'à la caméra : le sol devant reste un sol mouillé sombre)
-    haze("haze_lamps", hx - 2.5, hx + 2.5, 10.0, hy + 0.5, -0.05, 2.6, 0.035, aniso=0.65, soft=True)
+    haze("haze_lamps", hx - 2.5, hx + 2.5, 10.0, hy + 0.5, -0.05, 2.6, 0.02, aniso=0.65, soft=True)
 
     # la caméra du plan
     cam = bpy.data.cameras.new("cam")
