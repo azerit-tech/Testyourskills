@@ -68,9 +68,10 @@ Y_FAR = 176.0              # la place du rond-point s'arrête au muret de la pro
 # shift_y : décentrement (l'horizon descend, les enseignes montent) ; hero : (x, y, lacet en degrés), l'avant vers -y
 # de vue ; chase : la troisième patrouille (x, y) ; barrage : y de vue du milieu des deux patrouilles.
 PLANS = {
-    # P3, le barrage : 30 cm du sol, 24 mm, 4 m derrière le barrage, dans l'axe ; la berline à 110 km/h arrive
+    # P3, le barrage : 30 cm du sol, 24 mm, dans l'axe, les patrouilles à 5 m ; l'instant fort : la berline à
+    # 110 km/h juste avant les plots, phares en plein contre-jour, les deux agents ouvrent le feu (fire : éclairs)
     "P3": dict(cam=(0.1, 0.0, 0.30), lens=24.0, shift_y=0.2, fstop=4.0, focus=(0.3, 7.5, 0.8),
-               hero=(0.3, 22.0, 3.0), chase=(-1.2, 82.0), barrage=8.0),
+               hero=(0.35, 14.4, 4.0), chase=(-1.2, 74.4), barrage=8.0, fire=True),
 }
 
 # Les quatre dessins de la rue (§2.4 : la boutique d'angle, le petit hôtel, l'Art déco d'angle, le bloc bas), ceux
@@ -202,8 +203,9 @@ def road_module():
 def build_street(hidden):
     road.S = road_module()
     st = road.STYLES["sechage"]
-    # deux voies, double axe, ni tirets ni rives (road.lane_layout) ; la place du rond-point sans aucun marquage
-    lay = road.lane_layout(HALF, 2)
+    # deux voies, double axe, ni tirets ni rives (road.lane_layout), la peinture usée et salie ; la place du
+    # rond-point sans aucun marquage
+    lay = dict(road.lane_layout(HALF, 2), grime=0.8)
     asphalt = road.mat_asphalt(st, "rue_asphalt", layout=lay)
     plaza = road.mat_asphalt(st, "rue_plaza_asphalt",
                              layout=dict(road.lane_layout(HALF, 2, centre=False), lanes=(60.0,)))
@@ -637,6 +639,97 @@ def build_furniture(M, hidden):
             inst.color = (*lin(tints[k % len(tints)])[:3], 1)
 
 
+# ---------------------------------------------------------------- le premier plan, au ras du sol
+
+def puddle(name, cx, cy, r, sy, seed, mat):
+    """Une flaque au contour irrégulier qui épouse le bombé de la chaussée (anneaux en éventail), 2,5 mm au-dessus."""
+    R = random.Random(seed)
+    seg, rings = 40, 4
+    ph = [R.uniform(0, math.tau) for _ in range(3)]
+    def rad(a):
+        return r * (1.0 + 0.22 * math.sin(2 * a + ph[0]) + 0.14 * math.sin(3 * a + ph[1]) + 0.08 * math.sin(5 * a + ph[2]))
+    me = bpy.data.meshes.new(name)
+    bm = bmesh.new()
+    def vert(x, y):
+        return bm.verts.new((x, y, road.road_z(x) + 0.0025))
+    c = vert(cx, cy)
+    ring = []
+    for j in range(1, rings + 1):
+        t = j / rings
+        ring.append([vert(cx + t * rad(a) * math.cos(a), cy + t * rad(a) * sy * math.sin(a))
+                     for a in (i * math.tau / seg for i in range(seg))])
+    for i in range(seg):
+        bm.faces.new((c, ring[0][i], ring[0][(i + 1) % seg]))
+    for j in range(rings - 1):
+        for i in range(seg):
+            bm.faces.new((ring[j][i], ring[j + 1][i], ring[j + 1][(i + 1) % seg], ring[j][(i + 1) % seg]))
+    bm.normal_update()
+    bm.to_mesh(me)
+    bm.free()
+    if sum(p.normal.z for p in me.polygons) < 0:
+        me.flip_normals()
+    for p in me.polygons:
+        p.use_smooth = True
+    ob = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(ob)
+    me.materials.append(mat)
+    return ob
+
+
+def build_foreground(hidden):
+    """Le bas du cadre, de 0,7 à 6 m de la caméra : des flaques irrégulières qui noient la double ligne, des
+    gravillons, une plaque d'égout dans son carré refait. Sans eux, une surface vide sous les agents."""
+    water, N, out = A.material("rue_puddle")
+    bsdf = N.new("ShaderNodeBsdfPrincipled")
+    bsdf.inputs["Base Color"].default_value = (0.006, 0.006, 0.007, 1)
+    bsdf.inputs["Roughness"].default_value = 0.02
+    bsdf.inputs["IOR"].default_value = 1.33
+    N.link(bsdf.outputs[0], out.inputs["Surface"])
+    # (à 30 cm du sol, une flaque de 50 cm à 2 m remplit le bas du cadre : petites et éclatées près de la caméra)
+    for k, (x, y, r, sy) in enumerate(((0.25, 3.2, 0.32, 1.6), (-1.5, 4.6, 0.3, 1.8), (1.3, 2.4, 0.2, 1.4),
+                                       (0.0, 6.4, 0.42, 2.0), (2.3, 5.2, 0.3, 2.2), (-0.6, 1.9, 0.16, 1.3))):
+        puddle(f"rue_puddle_{k}", x, y, r, sy, 70 + k, water)
+    # une plaque d'égout près de la caméra, dans son carré d'enrobé refait
+    src, dims = road.manhole_source(hidden)
+    st = road.STYLES["sechage"]
+    patch = road.mat_asphalt(st, "rue_asphalt_patch_near", force_patch=True, layout=dict(road.lane_layout(HALF, 2), grime=0.8))
+    x, y = -1.25, 4.6
+    z = road.road_z(x)
+    road.plane("rue_mh_patch_near", x, y, z + 0.0015, 1.4, 1.4, patch, 0.06)
+    A.instance(src, "rue_manhole_near", (x, y, z + 0.003 - dims.z), 0.7)
+    # les gravillons : quatre cailloux sources, quelques centaines d'instances, plus serrés le long des lignes
+    stone = A.mat_plain("rue_gravel", lin("#3a3733"), 0.35)
+    srcs = []
+    for i in range(4):
+        me = bpy.data.meshes.new(f"gravel_src_{i}")
+        bm = bmesh.new()
+        bmesh.ops.create_icosphere(bm, subdivisions=1, radius=1.0)
+        R = random.Random(300 + i)
+        for v in bm.verts:
+            v.co *= R.uniform(0.75, 1.15)
+        bm.to_mesh(me)
+        bm.free()
+        me.materials.append(stone)
+        ob = bpy.data.objects.new(f"gravel_src_{i}", me)
+        hidden.objects.link(ob)
+        srcs.append(ob)
+    R = random.Random(9)
+    n = 0
+    while n < 320:
+        x = R.uniform(-2.8, 2.8)
+        y = R.uniform(1.2, 6.5)
+        if abs(abs(x) - 0.15) > 0.35 and R.random() < 0.5:
+            continue
+        s = R.uniform(0.003, 0.008)
+        ob = bpy.data.objects.new(f"gravel_{n}", srcs[n % 4].data)
+        bpy.context.scene.collection.objects.link(ob)
+        ob.location = (x, y, road.road_z(x) + s * 0.4)
+        ob.rotation_euler = (R.uniform(0, 3), R.uniform(0, 3), R.uniform(0, 6))
+        ob.scale = (s * R.uniform(1.0, 1.6), s, s * R.uniform(0.5, 0.8))
+        n += 1
+    log(f"premier plan : 6 flaques, 1 plaque, {n} gravillons")
+
+
 # ---------------------------------------------------------------- la patrouille, portières ouvertes
 
 def cut_doors(body):
@@ -724,6 +817,11 @@ def patrol_beams(body, tag, aims):
         L.spot_size = math.radians(size)
         L.spot_blend = 0.85
         L.shadow_soft_size = 0.05
+        # leur puissance est faite pour les façades lointaines : dans la brume, un faisceau, pas un mur de lait
+        try:
+            L.volume_factor = 0.12
+        except AttributeError:
+            pass
         lo = bpy.data.objects.new(L.name, L)
         bpy.context.scene.collection.objects.link(lo)
         lo.location = top
@@ -737,6 +835,64 @@ def patrol_beams(body, tag, aims):
 def heading_rot(hx, hy):
     """Lacet d'un véhicule (avant vers +x dans son repère) pour qu'il pointe vers (hx, hy)."""
     return math.atan2(hy, hx)
+
+
+def officer_light(officers, plan):
+    """Les deux agents découpés par les phares : un liseré (un spot chaud derrière chacun, côté berline, à hauteur
+    des phares relevée, qui accroche épaules et casquette) ; et, quand le plan ouvre le feu, l'éclair de chaque
+    pistolet : une flamme blanche émissive dans l'axe du canon et une lumière ponctuelle forte, brève à l'image.
+    Rien n'atteint personne : pas d'impact, pas d'étincelle."""
+    bpy.context.view_layer.update()
+    flash = None
+    if plan.get("fire"):
+        me = bpy.data.meshes.new("muzzle_flash")
+        bm = bmesh.new()
+        bmesh.ops.create_icosphere(bm, subdivisions=2, radius=1.0)
+        bm.to_mesh(me)
+        bm.free()
+        me.materials.append(A.mat_emit("muzzle_flash", lin("#fff4e2"), 400.0))
+        flash = me
+    for k, a in enumerate(officers):
+        o = a.matrix_world.translation.copy()
+        out = 1.0 if o.x > 0 else -1.0
+        tgt = o + Vector((0.0, 0.0, 1.0))
+        p = o + Vector((out * 0.5, 2.6, 1.7))
+        lo = A.add_light(f"rim_{k}", "SPOT", p, tgt - p, lin("#fff1dc"), 450.0, spot=35)
+        lo.data.spot_blend = 0.6
+        lo.data.shadow_soft_size = 0.15
+        lo.visible_glossy = False
+        if flash is None:
+            continue
+        gun = bpy.data.objects.get(a.get("gun", ""))
+        if gun is not None and "muzzle" in gun:
+            m = gun.matrix_world @ Vector(tuple(gun["muzzle"]))
+            d = (gun.matrix_world.to_3x3() @ Vector((1.0, 0.0, 0.0))).normalized()
+        else:
+            d = Vector((0.0, 1.0, 0.0))
+            m = o + Vector((0.0, 0.55, 1.05))
+        # (vu de dos, le corps cache le canon : la flamme est assez longue et large pour déborder de la silhouette)
+        for j, (sc, off) in enumerate((((0.36, 0.08, 0.08), 0.3), ((0.07, 0.2, 0.2), 0.08), ((0.14, 0.13, 0.04), 0.2))):
+            f = bpy.data.objects.new(f"muzzle_flash_{k}_{j}", flash)
+            bpy.context.scene.collection.objects.link(f)
+            f.location = m + d * off
+            f.rotation_mode = "QUATERNION"
+            f.rotation_quaternion = d.to_track_quat("X", "Z")
+            f.scale = sc
+            f.visible_shadow = False
+        lf = A.add_light(f"muzzle_{k}", "POINT", m + d * 0.15 + Vector((0, 0, 0.1)), (0, 0, -1), lin("#fff3e0"), 6000.0)
+        lf.data.shadow_soft_size = 0.04
+        lf.visible_camera = False
+    log(f"agents : liseré des phares{', éclairs de tir' if flash is not None else ''}")
+
+
+def bar_glow(car, tag):
+    """La lueur des deux couleurs de la rampe sur la chaussée mouillée, les portières et la brume autour."""
+    bpy.context.view_layer.update()
+    for side, col in ((1, CORAL), (-1, LILAC)):
+        lo = A.add_light(f"bar_glow_{tag}_{side}", "POINT", car.matrix_world @ Vector((-0.12, side * 0.5, 2.0)),
+                         (0, 0, -1), lin(col), 500.0)
+        lo.data.shadow_soft_size = 0.12
+        lo.visible_camera = lo.visible_glossy = False
 
 
 def build_barrage(scene, hidden, plan):
@@ -770,10 +926,13 @@ def build_barrage(scene, hidden, plan):
         # l'agent accroupi derrière la portière ouverte, de dos, tourné vers la berline
         a = cp.load_officer("spp")
         cp.pose_officer(a, "crouch", style=len(officers))
+        gun = None
         try:
-            cp.attach_handgun(a, cp.load_handgun("service"))
+            gun = cp.load_handgun("service")
+            cp.attach_handgun(a, gun)
         except Exception as e:
             log(f"arme non posée : {e!r}")
+        a["gun"] = gun.name if gun else ""
         bpy.context.view_layer.update()
         p = car.matrix_world @ Vector((front_axle - 1.42, open_side * (hw + 0.6), 0.0))
         a.location = (p.x, p.y, road.road_z(abs(p.x)))
@@ -792,10 +951,13 @@ def build_barrage(scene, hidden, plan):
         if "_door_" in ch.name:
             ch.rotation_euler = (0, 0, 0)
     # les faisceaux : corail #ff6a3d et lilas #8d8cf0, qui balaient façades et chaussée
-    # (les taches sur les façades à 25-35 m : plus près, elles tomberaient hors du cadre vertical)
-    patrol_beams(cars[0], "a", [(CORAL, (-7.0, yb + 22.0, 6.0), 30000, 20), (LILAC, (2.0, yb + 30.0, 0.0), 20000, 18)])
-    patrol_beams(cars[1], "b", [(LILAC, (7.0, yb + 18.0, 6.5), 30000, 20), (CORAL, (-2.0, yb + 34.0, 0.0), 20000, 18)])
+    # (les taches sur les façades à 25-35 m : plus près, elles tomberaient hors du cadre vertical ; à cette
+    # distance, il faut cette puissance pour passer au-dessus des vitrines)
+    patrol_beams(cars[0], "a", [(CORAL, (-7.0, yb + 22.0, 6.0), 150000, 18), (LILAC, (2.0, yb + 30.0, 0.0), 60000, 18)])
+    patrol_beams(cars[1], "b", [(LILAC, (7.0, yb + 18.0, 6.5), 150000, 18), (CORAL, (-2.0, yb + 34.0, 0.0), 60000, 18)])
     patrol_beams(cars[2], "c", [(CORAL, (-7.0, cy - 6.0, 6.0), 40000, 30), (LILAC, (7.0, cy + 7.0, 5.0), 40000, 30)])
+    bar_glow(cars[0], "a")
+    bar_glow(cars[1], "b")
 
     # la ligne de plots en travers de la brèche, deux panneaux rayés à feu aux bouts, barrières de foule sur les
     # trottoirs (modèles libres, déjà à l'échelle) ; un plot sur deux porte sa balise
@@ -804,18 +966,20 @@ def build_barrage(scene, hidden, plan):
         "cone_src": lambda o, c: o.name.startswith("Traffic_Cone_2_2.002"),
         "panel_src": lambda o, c: o.name.startswith(("Vertical_Panel_1.001", "Collar_1.002")),
     }, hidden)
+    # (dans la brèche, juste devant les nez des patrouilles ; les deux du bout un peu en avant des nez)
     rng = random.Random(5)
-    yc = yb + 3.6
     n = 0
-    for k, x in enumerate((-2.25, -1.45, -0.65, 0.15, 0.95, 1.75)):
+    for k, (x, y) in enumerate(((-2.0, yb + 3.2), (-1.2, yb + 2.6), (-0.4, yb + 2.6), (0.4, yb + 2.6), (1.2, yb + 2.6),
+                                (2.0, yb + 3.2))):
         src = S.get("cone_lamp_src" if k % 2 else "cone_src")
         if src:
-            A.instance(src, f"cone_{k}", (x + rng.uniform(-0.08, 0.08), yc + rng.uniform(-0.15, 0.15), road.road_z(abs(x))),
+            A.instance(src, f"cone_{k}", (x + rng.uniform(-0.06, 0.06), y + rng.uniform(-0.12, 0.12), road.road_z(abs(x))),
                        rng.uniform(0, math.tau))
             n += 1
     if S.get("panel_src"):
         for side in (-1, 1):
-            A.instance(S["panel_src"], f"panel_{side}", (side * 2.95, yc - 0.3, road.road_z(2.95)), side * 0.25)
+            A.instance(S["panel_src"], f"panel_{side}", (side * 2.8, yb + 3.7, road.road_z(2.8)), side * 0.25)
+    officer_light(officers, plan)
     crowd = lib_parts("cast/barrier-crowd/model.glb", {"crowd_src": lambda o, c: True}, hidden).get("crowd_src")
     if crowd:
         for side in (-1, 1):
@@ -859,9 +1023,18 @@ def make_world(scene):
     N.link(bg.outputs[0], wo.inputs["Surface"])
 
 
-def haze(name, x0, x1, y0, y1, z0, z1, density, color="#b8b4d8", aniso=0.45):
+def haze(name, x0, x1, y0, y1, z0, z1, density, color="#b8b4d8", aniso=0.45, soft=False):
+    """Une boîte de brume. soft : la densité s'éteint du centre du sol vers les bords et le haut (une nappe sans
+    arête visible dans le cadre)."""
     m, N, out = A.material(name)
     vol = N.new("ShaderNodeVolumePrincipled", Color=lin(color), Density=density, Anisotropy=aniso)
+    if soft:
+        tc = N.new("ShaderNodeTexCoord")
+        mp = N.new("ShaderNodeMapping", Location=(-1.0, -1.0, 0.0), Scale=(2.0, 2.0, 1.0))
+        N.link(tc.outputs["Generated"], mp.inputs[0])
+        gr = N.new("ShaderNodeTexGradient", _gradient_type="SPHERICAL")
+        N.link(mp.outputs[0], gr.inputs["Vector"])
+        N.link(N.math("MULTIPLY", N.math("POWER", gr.outputs["Fac"], 1.5), density), vol.inputs["Density"])
     N.link(vol.outputs[0], out.inputs["Volume"])
     ob = A.box(name, x0, x1, y0, y1, z0, z1, m)
     ob.visible_shadow = False
@@ -877,19 +1050,20 @@ def place_hero(scene, plan):
     car.rotation_euler = (0, 0, math.radians(yaw))
     # des phares de route : plus forts et plus serrés que ceux de l'avenue, ils découpent les agents dans la brume
     spots = [c for c in car.children_recursive if c.type == "LIGHT" and c.data.type == "SPOT"]
+    # les phares sont la source principale du plan : pleins phares dans la brume du barrage, vers la caméra
     for lo in spots:
-        lo.data.energy = 1500.0
-        lo.data.spot_size = math.radians(42)
-        lo.data.spot_blend = 0.5
+        lo.data.energy = 4000.0
+        lo.data.spot_size = math.radians(55)
+        lo.data.spot_blend = 0.45
     # le cœur des phares, vu de face à 20 m : une petite sphère émissive à la place de chaque lampe (le verre du
     # modèle reste trop sage pour découper les agents en contre-jour)
     bpy.context.view_layer.update()
     me = bpy.data.meshes.new("hero_lamp_core")
     bm = bmesh.new()
-    bmesh.ops.create_icosphere(bm, subdivisions=2, radius=0.055)
+    bmesh.ops.create_icosphere(bm, subdivisions=2, radius=0.075)
     bm.to_mesh(me)
     bm.free()
-    me.materials.append(A.mat_emit("hero_lamp_core", lin("#fff2dc"), 80.0))
+    me.materials.append(A.mat_emit("hero_lamp_core", lin("#fff2dc"), 500.0))
     for k, lo in enumerate(spots):
         core = bpy.data.objects.new(f"hero_lamp_core_{k}", me)
         scene.collection.objects.link(core)
@@ -928,6 +1102,7 @@ def build():
     build_overhead(M, hidden)
     build_lamps(hidden)
     build_furniture(M, hidden)
+    build_foreground(hidden)
     build_barrage(scene, hidden, plan)
     hidden.hide_render = True
     hidden.hide_viewport = True
@@ -938,7 +1113,11 @@ def build():
     # la brume d'après la pluie, plus dense au barrage : les phares et les gyrophares y prennent corps
     haze("haze", -14, 14, Y0, 128.0, -0.1, 30, 0.002)
     haze("haze_end", -60, 60, 128.0, Y_FAR + 2, -0.1, 30, 0.002)
-    haze("haze_barrage", -6.5, 6.5, 1.0, 34.0, -0.05, 9.0, 0.008, aniso=0.55)
+    # (jusqu'au haut de la brume générale : un bord de boîte dans le cadre se lirait comme une ligne)
+    haze("haze_barrage", -6.5, 6.5, 1.0, 34.0, -0.05, 30.0, 0.007, aniso=0.55)
+    # devant la berline, au ras du sol, une nappe plus dense qui diffuse vers l'avant : le halo des phares
+    hx, hy = plan["hero"][:2]
+    haze("haze_lamps", hx - 3.5, hx + 3.5, 7.6, hy + 0.5, -0.05, 3.5, 0.05, aniso=0.7, soft=True)
 
     # la caméra du plan
     cam = bpy.data.cameras.new("cam")
@@ -962,6 +1141,15 @@ def build():
     scene.camera = co
     to_world(scene)
     A.render_settings(scene)
+    # le halo des phares plus large que sur l'avenue : ils flarent dans la brume du barrage
+    for ng in bpy.data.node_groups:
+        for nd in ng.nodes:
+            if nd.type == "GLARE":
+                try:
+                    nd.inputs["Strength"].default_value = 0.22
+                    nd.inputs["Size"].default_value = 0.75
+                except Exception as e:
+                    log(f"halo : {e!r}")
     scene.render.use_motion_blur = False
 
     out = os.path.join(ASSETS, BLEND)
