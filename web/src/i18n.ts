@@ -327,6 +327,13 @@ const fr = {
     addGithub: { title: "Ajoute ton GitHub au dossier", text: "Ton CV porte le parcours. Ton GitHub porte le code : trois critères s'ouvrent.", btn: "Ajouter mon GitHub" },
     /** Fiche LinkedIn seule (§18.24) : un seul appel, relancé en comparaison. */
     prove: { title: "Ajoute ton GitHub : trois critères s'ouvrent", label: "Pseudo GitHub", btn: "Ajouter au dossier" },
+    /** Sous une fiche GitHub seule, en miroir : LinkedIn porte le parcours. */
+    addLinkedin: {
+      title: "Ajoute ton LinkedIn au dossier",
+      text: "Ton GitHub porte le code. Ton LinkedIn porte le parcours : expérience, employeurs et école entrent au dossier.",
+      label: "Lien de ton profil LinkedIn",
+      btn: "Ajouter au dossier",
+    },
     claim: {
       kicker: "C'est ta fiche ?",
       kickerLawyer: "Avis de recherche à ton nom ?",
@@ -1048,6 +1055,12 @@ const en: Dict = {
     },
     addGithub: { title: "Add your GitHub to the file", text: "Your CV carries the career. Your GitHub carries the code: three more criteria open.", btn: "Add my GitHub" },
     prove: { title: "Add your GitHub: three more criteria open", label: "GitHub username", btn: "Add to my file" },
+    addLinkedin: {
+      title: "Add your LinkedIn to your file",
+      text: "Your GitHub carries the code. Your LinkedIn carries the career: experience, employers and school go on file.",
+      label: "Your LinkedIn profile link",
+      btn: "Add to my file",
+    },
     claim: {
       kicker: "Is this your sheet?",
       kickerLawyer: "Wanted under your name?",

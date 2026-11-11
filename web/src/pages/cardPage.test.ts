@@ -9,6 +9,7 @@ import { tileOrder } from "../../../shared/recruiterLine";
 import { DICTS } from "../i18n";
 import { LangProvider } from "../i18n";
 import { Fold, type Shareable } from "../components/After";
+import { linkedinFromField } from "../components/AddLinkedin";
 import { skyOf } from "../components/ProfileTile";
 import { JuryLine } from "../components/Jury";
 import { tokens } from "../lib/api";
@@ -280,6 +281,20 @@ describe("la lecture du recruteur (§18.37)", () => {
     if (pending.length) expect(html).toContain('<p class="rr-pending">Pas encore au dossier</p>');
     // La personne fichée voit le détail de la grille ouvert.
     expect(html).not.toContain('class="rg-fold"');
+  });
+
+  it("fiche GitHub seule : « Ajoute ton LinkedIn au dossier », en miroir de l'ajout du GitHub ; jamais pour un visiteur", () => {
+    const own = renderResult(card({ grid, overall: grid.overall }), { owner: true, token: "tok" });
+    expect(own).toMatch(/<section class="after-block add-source add-linkedin"[^>]*><h2[^>]*>Ajoute ton LinkedIn au dossier<\/h2>/);
+    expect(own.indexOf("add-linkedin")).toBeLessThan(own.indexOf('class="rest"'));
+    expect(renderResult(card({ grid, overall: grid.overall }), { owner: false })).not.toContain("add-linkedin");
+  });
+
+  it("le champ LinkedIn : le lien entier, ou ce qui suit linkedin.com/in/", () => {
+    expect(linkedinFromField("camille-ardent")).toBe("https://www.linkedin.com/in/camille-ardent");
+    expect(linkedinFromField("https://www.linkedin.com/in/camille-ardent/")).toBe("https://www.linkedin.com/in/camille-ardent");
+    expect(linkedinFromField("  ")).toBeNull();
+    expect(linkedinFromField("https://github.com/x")).toBeNull();
   });
 
   it("vue par un visiteur : les tuiles juste sous la fiche, le détail de la grille replié, le jeu dit", () => {

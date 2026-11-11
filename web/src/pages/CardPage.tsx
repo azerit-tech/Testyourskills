@@ -15,6 +15,7 @@ import { MakeYours } from "../components/MakeYours";
 import { PleaVerdict } from "../components/Plea";
 import { RecruiterGrid } from "../components/RecruiterGrid";
 import { RecruiterRead } from "../components/RecruiterRead";
+import { AddLinkedin } from "../components/AddLinkedin";
 import { Penalty, ProfileSky } from "../components/ProfileTile";
 import { CardViewOptions } from "../card/CardView";
 import { RevealCard, useReveal } from "../components/Reveal";
@@ -522,6 +523,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
         {!visitor && <Dossier card={main} />}
         {/* Fiche LinkedIn seule (§18.24) : « Ajoute ton GitHub pour prouver » est l'appel principal, pas une ligne repliée. */}
         {!visitor && proveFirst && <AddSource card={main} />}
+        {/* Fiche GitHub seule, en miroir : « Ajoute ton LinkedIn au dossier » (§18.37). */}
+        {!visitor && item.kind === "card" && item.card.source === "github" && item.card.login && <AddLinkedin login={item.card.login} />}
         <div className="rest">
           {/* La peine est déjà sous la fiche. */}
           {/* Fiche seule : ses pièces à conviction sont au dos (§18.27). La comparaison garde la ligne. */}
