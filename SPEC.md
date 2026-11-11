@@ -246,6 +246,8 @@ L'IA peut poser un seul statut par carte, choisi ici d'après ce qu'elle a lu da
 
 ### 6.1 Entrée
 
+*Depuis, l'accueil a changé : style mat (§18.20), deux portes LinkedIn et GitHub (§18.30), couverture (§18.31). En cas d'écart avec ce paragraphe, ces sections l'emportent.*
+
 Une page, un champ, deux onglets : « Ton GitHub » (pseudo ou URL) et « Ton CV » (dépôt de PDF, 5 Mo et 10 pages maximum). Un lien discret « les deux » pour la comparaison. Au-dessus du champ, la promesse en gros : « Ta carte de dev. Les 5 meilleurs ont un entretien. », et une ligne qui la précise. En face, **une seule carte d'exemple : la vraie carte de Jacques** (`jmougeot`, fondateur d'Azerit), rendue par `GET /api/showcase` et recalculée au plus une fois par semaine, avec sa photo LinkedIn (`web/public/jmougeot-linkedin.jpg`, réglable par `SHOWCASE_PHOTO`) à la place de l'avatar GitHub ; tant que le serveur ne l'a pas calculée, une maquette aux faits publics réels (nom, photo, langage, club) tient la place. Un lien sous la carte mène à sa carte complète.
 
 **Pas un mot de plus que nécessaire.** Sur l'accueil, chaque texte doit attirer ou aider à comprendre, sinon il saute : pas de sous-titre qui répète le titre, pas de ligne de réassurance sur l'onglet GitHub (elle ne s'affiche que sur l'onglet CV, où elle rassure sur le fichier), pas de slogan en pied de page, un seul sélecteur de langue (en haut). Sous la carte, une seule ligne, cliquable : « La vraie carte de Jacques, fondateur d'Azerit ».
@@ -722,7 +724,7 @@ Remplace « les cinq meilleures cartes de la semaine » du §1. Ce n'est pas une
 
 ### 18.5 L'accueil et « Tu es en course »
 
-- **L'accueil** : la promesse devient « Ton GitHub remplace ton CV. Le haut du classement décroche un entretien. », puis le champ, puis la rangée des logos partenaires. Sous le champ (sous la fiche de Jacques sur mobile), les primes ouvertes défilent à l'horizontale : logo, poste, contrat, places, « J-12 ». La règle « pas un mot de plus » du §6.1 tient : ce sont des cartes, pas des paragraphes.
+- **L'accueil** : la promesse est le titre du §18.30, avec sa ligne « Le haut du classement décroche un entretien. » (la formule du 9 novembre 2026, qui faisait remplacer le CV par le GitHub, a disparu partout le 10), puis le champ, puis la rangée des logos partenaires. Sous le champ (sous la fiche de Jacques sur mobile), les primes ouvertes défilent à l'horizontale : logo, poste, contrat, places, « J-12 ». La règle « pas un mot de plus » du §6.1 tient : ce sont des cartes, pas des paragraphes.
 - **« Tu es en course »**, en tête de l'après-fiche (`After.tsx`), avant même de s'inscrire : « Tu serais 7e sur 143 pour Stagiaire backend chez X ». Le rang hypothétique donne envie de concourir. Un bouton « Concourir » mène à la revendication puis au consentement.
 
 ### 18.6 « Dénonce un complice »
@@ -833,14 +835,7 @@ Chaque tâche confiée à un agent, relue, testée (229 tests, typecheck) puis f
 - **Le solde fait foi** : sous `AI_MIN_CREDIT_USD` (0,50 $), OpenRouter ne répond pas 402, il rabote `max_tokens`. Le solde est donc lu au démarrage, toutes les 5 minutes et après chaque sortie suspecte ; sous le seuil, aucun appel IA ne part et `POST /api/card` répond `closed`. Une réponse tronquée ne ferme le site que si le solde relu est sous le seuil ; sinon elle est relancée une fois, puis traitée comme une sortie invalide (§18.27). **Cela remplace « un 402 n'est pas anticipé »** : après un 402 ou une troncature, le site reste fermé jusqu'à 10 minutes, sauf si une relecture du solde le dément. Une fiche sortie sans lecture IA est marquée `cards.degraded` : le cache 24 h ne la ressert pas.
 - **Recette** : le pack devient « DOSSIER · 1 FICHE · JUGÉE PAR BARÈME » ; l'invite des feux d'artifice a sa version tactile et passe en bas sur téléphone ; les zones à toucher font au moins 44 px ; le pied de fiche dit « Interrogatoire par une IA : 9 s » ; le carton dit « Profil identifié : ».
 - La fiche de test octocat (`VrEL7kMgtX`), sortie dégradée, est supprimée de la base de production avec son événement et son image.
-- **Textes encore genrés**, relevés par la recette, à reprendre avec la maquette du §18.18 :
-  - « Les 5 plus recherchés » ;
-  - « Jugé par une IA » sur l'accueil ;
-  - « 1 suspect avant toi » ;
-  - « Si tu es arrivé » ;
-  - « CTO autoproclamé » ;
-  - « Loup solitaire » ;
-  - dans `data/statuses.json` : « Accepté chez les autres », « Contributeur fantôme », « Mainteneur », « Passionné », « Dit ce qu'il fait », « Stars : sa mère et lui ».
+- **Textes encore genrés**, relevés par la recette : réécrits en tournure épicène avec la maquette du §18.18.
 
 ### 18.18 Virage du 9 novembre 2026 : le style mat du jeu, et six étoiles
 
@@ -927,7 +922,7 @@ Après chaque fusion, on vérifie la grille suivante. On corrige ce qui manque, 
 
 - **Partout** : fond d'encre plat, titres crème en Barlow Condensed 700, texte en Outfit, actions en pilules (rose poudré pour la principale, pêche pour la secondaire, contour lilas pour le reste). Plus de halos d'ambiance, de grain, de lignes de terrain ni de palmiers flottants dans les pages : le seul dégradé d'un écran est celui de la fiche. Les polices sont servies par le site (`server/fonts`), plus par Google Fonts ; Inter n'est plus servi (§18.21).
 - **Accueil** : bandeau pêche « Saison 1 · jusqu'au 31 décembre » (date proposée au §18.4, à lire dans `data/season.json` avec les primes), la promesse en crème, l'accroche en rose, le champ « @ » et la pilule, puis « ou avec ton CV ». Les onglets GitHub / CV deviennent ce lien ; « les deux » est proposé depuis le mode CV. Ni surtitre, ni tableau des primes tant que le §18.4 n'est pas construit.
-- **Titre de l'onglet** : la promesse de l'accueil, « Testyourskills · Ton GitHub remplace ton CV » (« Testyourskills · Your GitHub replaces your CV » en anglais), dans le front comme dans les pages servies sans fiche. Les balises OG des fiches ne changent pas.
+- **Titre de l'onglet** : la promesse de l'accueil, dans le front comme dans les pages servies sans fiche. La formule du 9 novembre 2026, qui faisait remplacer le CV par le GitHub, a disparu de l'onglet comme du reste le 10 (§18.30). Les balises OG des fiches ne changent pas.
 - **Fiche partagée** (visiteur) : « Avis de recherche », @pseudo en grand, les six étoiles et le profil, l'accroche, la peine, puis la fiche et « Fais la tienne » sur une carte marine. Le visiteur n'a plus la barre de partage ni le second « Fais la tienne » en bas de page.
 - **Sous la fiche** : « Pièces à conviction » ne répète plus les valeurs et les barres de la fiche ; elle donne la peine, le sens de chaque sigle et la formule. Retirés : la garde à vue verrouillée (« Bientôt »), l'aperçu du texte de partage, les mini-cartes « CV vs GH », le lien « Voir les faits » de l'avocat, les gros codes « 404 », « 410 » et « VAR » des pages d'erreur.
 - **Attente** : le texte se lit sur un aplat d'encre, barre rose poudré sans lueur ; les illustrations de secours, néon, sont désaturées en attendant les illustrations peintes.
@@ -1064,7 +1059,7 @@ Chaque profil criminel a son « lieu du crime » : une illustration peinte en ap
 Ce qui fait l'écart, vu côte à côte : chez eux l'image remplit l'écran et l'interface flotte dessus ; chez nous, des boîtes prune sur un fond d'encre, et les images en vignettes sous un voile. Le fond d'encre du §18.18 reste celui des sections de lecture, mais **chaque page s'ouvre sur un ciel**.
 
 - **La page d'une fiche** (partagée ou non) : l'illustration du profil en fond de page, de bord à bord, derrière la barre du haut, sur la moitié haute de l'écran ; elle se fond dans l'encre par le bas. « AVIS DE RECHERCHE » et « @login » se posent sur le ciel, la fiche chevauche le bas de l'image. Sans profil : l'image `default`. La tuile de profil sous la fiche n'a plus d'image : la peine et la caution restent, en texte.
-- **L'accueil** : le premier écran est un ciel, les lieux du crime qui se succèdent en fondu lent derrière la promesse. Plus bas, le mur des 13 profils.
+- **L'accueil** : le ciel en fondu du premier écran est remplacé par la couverture (§18.31). Plus bas, le mur des 13 profils.
 - **Aucun voile sur une image au-delà de ce que le texte exige** : les illustrations ont leur aplat sombre en bas, le texte s'y pose.
 - **La voix qui annonce** (`docs/inspiration-gta6.md` §1.3) : les surtitres et titres posés sur un ciel sont en Outfit 600, capitales, très espacées (0,15 em). Barlow Condensed garde les noms.
 - **Mouvement** : un lent travelling sur les ciels (échelle 1,05 à 1,12), rien avec `prefers-reduced-motion`.
@@ -1083,7 +1078,7 @@ Ce qui fait l'écart, vu côte à côte : chez eux l'image remplit l'écran et l
 - **Page partagée** : un seul `<h1>`, « AVIS DE RECHERCHE » et « @login ». Ordre : la fiche, le jury, la peine et la caution, le dossier, « Et toi ? », « C'est ta fiche ? » en ligne repliée, « Vous recrutez ? ». Le visiteur d'une comparaison lit « le CV de @x », jamais « ton CV » (les titres d'aperçu du serveur disent encore « ton » : à reprendre).
 - **Après-fiche du propriétaire** : le pari et le jury en une bande, la peine, le partage, la dénonciation, le dossier, puis les lignes repliées (photo LinkedIn, ajout d'une source, email, contester), « Vous recrutez ? ». Une ligne s'ouvre seule quand elle demande l'attention.
 - **Le ciel de la page d'une fiche** : le texte posé dessus passe en encre sur les dix ciels clairs et reste crème sur les quatre ciels d'heure bleue. Sur téléphone, le cadre montre surtout le ciel : la fiche couvre le sujet. Bandeau de 46 vh sur ordinateur.
-- **Le ciel de l'accueil** : `kingpin`, `arsonist`, `delivery_machine`, `night_owl`, `default`, une image toutes les 6 s ; les quatre dernières ne se chargent qu'après la première. La première ligne du titre repose sur l'aplat sombre de l'image.
+- **Le ciel de l'accueil** : remplacé par la couverture (§18.31).
 - **Le mur « Lequel es-tu ? »** : rail aimanté jusqu'à 899 px, grille au-delà, la dernière case « Et toi ? » ramène au champ.
 
 
@@ -1133,9 +1128,11 @@ Demande de Jacques : les 0,25 $ restants sur OpenRouter doivent suffire avec GLM
 
 ### 18.33 La poursuite remplace l'ascenseur (10 novembre 2026)
 
+*Refusée comme révélation le soir même : Jacques veut un film (§18.36). Elle est construite et reste le repli du film quand il ne se charge pas ; ce paragraphe décrit ce repli.*
+
 Jacques n'aime plus la révélation en ascenseur. Il veut une course-poursuite : ça avance, les étoiles s'ajoutent une à une, la ville se remplit, et à six étoiles les hélicoptères. C'est la mécanique que tout le monde connaît : plus d'étoiles, plus de monde aux trousses.
 
-- **En 2D peinte, pas en 3D.** Des aplats et des silhouettes ton sur ton devant le ciel du profil, comme nos décors : c'est le style du site, c'est léger (plus de scène 3D de plusieurs Mo à télécharger), ça tourne sur un téléphone moyen, et ça se construit avant le 19. Une poursuite en 3D demanderait des modèles de voitures, une ville et des semaines.
+- **En 2D peinte.** Des aplats et des silhouettes ton sur ton devant le ciel du profil, comme nos décors : c'est le style du site, c'est léger, et ça tourne sur un téléphone moyen.
 - **Le cadrage** (téléphone d'abord, en hauteur) : la caméra recule devant la voiture du suspect et regarde l'avenue derrière elle. De haut en bas : le ciel et ses hélicoptères, la ville en silhouettes, la route et la meute, la voiture du suspect en bas au centre, phares crème. Six étoiles en haut de l'écran.
 - **Une étoile, un renfort**, cumulés :
   1. une voiture de patrouille déboîte, gyrophare corail et lilas en aplats alternés (pas de lueur) ;
@@ -1149,7 +1146,7 @@ Jacques n'aime plus la révélation en ascenseur. Il veut une course-poursuite :
 - **Durée** : 1,2 s d'ouverture, 1,4 s par étoile, 1,6 s de fin : 4 s pour une étoile, 11 s pour six. Un clic la passe. Rien en mouvement réduit.
 - **Fonction du temps** : `shared/chase/` rend une image SVG pour un instant donné, comme la fiche. Les images se rendent donc aussi côté serveur : c'est ce qui servira au clip vertical (§18.8).
 - **Ni marque, ni arme, ni accident** : véhicules génériques, pas de collision avec des personnes, pas de mot ni de tampon repris du jeu.
-- **L'ascenseur reste dans le dépôt** derrière un réglage, le temps de valider la poursuite ; il partira ensuite.
+- **L'ascenseur** : il reste la révélation par défaut jusqu'à la validation du film, puis il part (§18.36).
 
 ### 18.34 Le partage avec les décors (10 novembre 2026)
 
