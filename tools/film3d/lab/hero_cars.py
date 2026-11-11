@@ -18,6 +18,11 @@
 #   blender -b -t 2 -P tools/film3d/lab/hero_cars.py -- --sheet avant-apres --car w111
 #   blender -b -t 2 -P tools/film3d/lab/hero_cars.py -- --sheet finalistes
 # écrit Azerit/design/film/ref/lab/mercedes-<car>-avant-apres.png, voiture-heros-finalistes.png.
+#
+# Réglages lus dans l'environnement (la berline w111) :
+#   FILM3D_USURE=0..1        l'usure des matières (USURE par défaut)
+#   FILM3D_PAINT=<hex>       la teinte de la peinture (PAINT["w111"] par défaut)
+#   FILM3D_PAINT_METAL=0..1  la part métallique de sa base (PAINT_METAL["w111"] par défaut)
 import math
 import os
 import sys
@@ -59,6 +64,21 @@ PAINT = {
     "slc": "#0c2a24",   # vert sapin foncé, teinte courante du coupé dans les années 70, tiré vers le bleu
                         # pour ne pas virer à l'olive sous les lampadaires ambre
 }
+# la part métallique de la base de la berline (moins que la peinture par défaut : la part diffuse garde le rouge)
+PAINT_METAL = {"w111": 0.38}
+
+
+def w111_paint():
+    """La teinte et le métal de la peinture de la berline : FILM3D_PAINT=<hex> et FILM3D_PAINT_METAL=0..1 dans
+    l'environnement (pour essayer une teinte sur un plan sans toucher au défaut), PAINT et PAINT_METAL sinon."""
+    col = os.environ.get("FILM3D_PAINT", "").strip() or PAINT["w111"]
+    if not col.startswith("#"):
+        col = "#" + col
+    try:
+        metal = max(0.0, min(1.0, float(os.environ.get("FILM3D_PAINT_METAL", PAINT_METAL["w111"]))))
+    except ValueError:
+        metal = PAINT_METAL["w111"]
+    return col, metal
 LEATHER = {
     "w111": "#7a4a2c",  # cuir cognac
     "slc": "#6b4a32",   # cuir tabac
@@ -942,14 +962,18 @@ def _w111_clean(parts):
     return keep, report
 
 
-def _w111_materials(parts, lights_on, tag="hero_w111", paint_color=PAINT["w111"], leather=LEATHER["w111"],
+def _w111_materials(parts, lights_on, tag="hero_w111", paint_color=None, leather=LEATHER["w111"],
                     wheel_rim="#e6dcc2", wear=0.0):
     """Les matières de la berline ; reprises par le coupé pour l'habitacle emprunté (tag, peinture, cuir, jante).
-    wear : l'usure (0..1, voir usure()), la berline seule."""
+    wear : l'usure (0..1, voir usure()), la berline seule. Sans paint_color : la peinture de w111_paint()."""
     on = 1.0 if lights_on else 0.0
     # moins de métal dans la base que la peinture par défaut : la part diffuse garde le rouge lisible quand le reflet
     # (le ciel bleu de l'heure bleue) l'emporte
-    paint = mat_paint(f"{tag}_paint", paint_color, metal=0.38, wear=wear)
+    if paint_color is None:
+        paint_color, metal = w111_paint()
+    else:
+        metal = PAINT_METAL["w111"]
+    paint = mat_paint(f"{tag}_paint", paint_color, metal=metal, wear=wear)
     chrome = mat_chrome(f"{tag}_chrome", (0.92, 0.92, 0.93, 1), 0.05, wear=wear)
     table = {
         "Carpaint_Simple_Ruby0": paint,
