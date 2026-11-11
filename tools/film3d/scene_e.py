@@ -493,18 +493,6 @@ def drift_keys(root, vel_heading, speed, yaw_rate, wheels=(), wheel_r=0.33):
         S.linear_keys(w)
 
 
-def outward(ob):
-    """Remet les normales d'un volume vers l'extérieur. La boîte de lieux.haze (scene_a.box) a ses six faces
-    tournées vers l'intérieur : Cycles croit alors la caméra hors du volume et pose la brume au-delà de la boîte,
-    jamais autour de la caméra (le faisceau du projecteur ne s'y voyait pas)."""
-    bm = L.bmesh.new()
-    bm.from_mesh(ob.data)
-    L.bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-    bm.to_mesh(ob.data)
-    bm.free()
-    return ob
-
-
 def boost_bars(strength=8.0, glow=8000.0):
     """Les rampes vues à 90 m et plus : lentilles plus fortes (la lueur de BAR_GLOW se perd à cette distance) et,
     au-dessus de chaque rampe, deux lueurs corail et lilas qui allument la brume et la rampe mouillée."""
@@ -617,7 +605,7 @@ def plan_P5(scene, hidden, palier="socle"):
         bpy.context.scene.collection.objects.link(lo)
         lo.parent = heli
         lo.location = (0.0, -0.5, 2.6 + dz)
-    outward(L.haze((-140, 160), (-280, 115), (L.WATER_Z, 70), 0.0022))
+    L.haze((-140, 160), (-280, 115), (L.WATER_Z, 70), 0.0022)    # lieux.haze tourne ses normales vers l'extérieur
     # --- la caméra
     a, t = math.radians(CAM_YAW), math.radians(CAM_PITCH)
     d = Vector((-math.sin(a) * math.cos(t), -math.cos(a) * math.cos(t), math.sin(t)))

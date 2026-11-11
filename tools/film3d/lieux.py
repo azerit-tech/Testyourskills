@@ -281,6 +281,13 @@ def haze(xs, ys, zs, density=0.0012, name="haze", color="#b8b4d8", anisotropy=0.
     vol = N.new("ShaderNodeVolumePrincipled", Color=lin(color), Density=density, Anisotropy=anisotropy)
     N.link(vol.outputs[0], out.inputs["Volume"])
     ob = S.box(name, xs[0], xs[1], ys[0], ys[1], zs[0], zs[1], m)
+    # la boîte de scene_a a ses faces tournées vers l'intérieur : Cycles croirait la caméra hors du volume et ne
+    # poserait la brume qu'au-delà de la boîte, jamais autour d'elle (les faisceaux ne s'y voyaient pas)
+    bm = bmesh.new()
+    bm.from_mesh(ob.data)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(ob.data)
+    bm.free()
     ob.visible_shadow = False
     return ob
 
