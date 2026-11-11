@@ -1,6 +1,6 @@
 # Brief des illustrations à générer : les suspects
 
-> **Statut : livré.** Les six portraits sont livrés et posés sur la couverture : `arsonist` le 10 novembre 2026, `forger`, `fresh_blood`, `kingpin`, `mastermind` et `night_owl` le 11 novembre 2026, tous gardés d'après la grille du §10. Ce brief reste le modèle des prochains.
+> **Statut : livré, un portrait à refaire.** Les six portraits sont livrés et posés sur la couverture : `arsonist` le 10 novembre 2026, `forger`, `fresh_blood`, `kingpin`, `mastermind` et `night_owl` le 11 novembre 2026, tous gardés d'après la grille du §10. Le 12 novembre 2026, `forger` change de nom (« Faussaire » devient « Sous couverture ») : son portrait est à refaire d'après le brief n° 2 réécrit (§6 et §7). Ce brief reste le modèle des prochains.
 
 Six portraits de personnages, un par profil criminel choisi. Ils donnent des visages à la couverture de l'accueil (SPEC §18.31). Jacques les génère, Claude les découpe et les pose. Il prolonge le brief des quatorze décors, livrés et posés le 9 novembre 2026 (SPEC §18.28 ; ce brief est retiré du dépôt, il reste dans l'historique git) : même ville, même peinture, mêmes lumières.
 
@@ -69,7 +69,7 @@ Zones, sur une image de 1024 × 1536 :
 - **Mat** : pas de lueur, pas de halo, pas de reflet chromé, pas de peau brillante.
 - **Ton** : sûr de soi et un peu ironique. Ce sont des devs qui se prennent pour des hors-la-loi. Leur arme est un ordinateur, un tampon, un café.
 
-**La troupe doit être mélangée** : trois femmes, deux hommes, une personne androgyne ; des âges de 22 à 55 ans ; des couleurs de peau et des cheveux différents d'un portrait à l'autre. C'est écrit dans chaque scène : ne pas le changer, sinon l'outil rend six fois la même personne.
+**La troupe doit être mélangée** : trois femmes, un homme, deux personnes androgynes (depuis le brief n° 2 réécrit) ; des âges de 22 à 55 ans ; des couleurs de peau et des cheveux différents d'un portrait à l'autre. C'est écrit dans chaque scène : ne pas le changer, sinon l'outil rend six fois la même personne.
 
 ## 5. Inspirations
 
@@ -97,7 +97,7 @@ Chaque prompt se compose ainsi : **bloc STYLE** + **bloc LUMIÈRE** de la lettre
 | # | `id` | Profil | Sa phrase | Lumière | Qui | L'objet | Ce qu'on doit lire en une seconde |
 |---|---|---|---|---|---|---|---|
 | 1 | `arsonist` | Pyromane | Déploie le vendredi soir. Sans peur, sans rollback | B | une femme de 30 ans, cheveux courts décolorés | un gobelet de café | elle boit son café, tout fume derrière elle |
-| 2 | `forger` | Sous couverture (ex-Faussaire, 12 nov. 2026 ; portrait peint pour l'ancien nom) | Le gros du travail se fait hors caméra | B | un homme de 45 ans, costume de lin, lunettes de lecture | un diplôme vierge à ruban rouge | un charmeur qui vous tend un faux diplôme |
+| 2 | `forger` | Sous couverture (ex-Faussaire, 12 nov. 2026 : portrait à refaire) | Le gros du travail se fait hors caméra | B | une personne androgyne, âge indécis, bonnet et veste ample | un ordinateur portable fermé, serré contre la poitrine | à côté de la caméra, hors du cadre, un demi-sourire : le travail se fait ici |
 | 3 | `kingpin` | Légende du milieu | Ses PR font la loi dans tous les quartiers | A | une femme de 55 ans, cheveux argent, tailleur pastel | aucun : les bras croisés | la patronne, la ville à ses pieds |
 | 4 | `mastermind` | Cerveau | Chaque casse commence par un schéma d'architecture | C | un homme de 35 ans, chemise à manches courtes, crayon sur l'oreille | des plans roulés sous le bras | il réfléchit déjà au coup suivant |
 | 5 | `night_owl` | Oiseau de nuit | Les meilleurs coups partent à 3 h du matin | C | une personne androgyne de 25 ans, capuche, casque audio autour du cou | un ordinateur portable ouvert | un visage éclairé par un écran, la lune derrière |
@@ -140,9 +140,22 @@ D. Dawn: sky graded from light lilac (#e5ddff) at the top through peach (#ffd4a8
 Character: a woman of about thirty with light brown skin and short bleached-blonde hair, wearing a pale mint short-sleeved shirt over a white t-shirt, a laptop tucked under her left arm. She calmly lifts a plain paper coffee cup to her lips with her right hand and looks straight at the viewer with a relaxed half-smile, completely unbothered. Behind her, the open door of a small server room at the back of a pastel office building pours thick smoke into the sunset sky, the smoke turning pink and peach; a red fire extinguisher stands untouched by the door. No flames, only smoke.
 ```
 
-**2. `forger`** (B)
+**2. `forger`** (B) : « Sous couverture », réécrit le 12 novembre 2026
+
+L'ancien portrait (un homme de 45 ans en costume de lin qui tend un diplôme vierge à ruban rouge, devant des tampons et des diplômes) disait « faussaire » : il accusait la personne de truquer son CV. Le profil dit maintenant l'inverse : **le gros du travail se fait hors caméra.** Quelqu'un qui livre beaucoup plus que ce qui se voit. On ne lit ni triche, ni mensonge : une discrétion fière.
+
+- **Usage** : case haute de la couverture de l'accueil (120 × 180 px sur téléphone, 240 × 360 px sur ordinateur), à côté du décor du même profil ; peut-être le mur « Lequel es-tu ? » plus tard. Rien n'est posé dessus, sauf le nom du profil en petit, en bas.
+- **Taille** : 1024 × 1536 au minimum, mieux 2048 × 3072 ; ratio 2:3 ; PNG ou JPG qualité 90, sRGB ; image nue. Déposer `design/characters/forger.png` : Claude en tire `web/public/characters/forger.jpg` (768 × 1152) et `forger-s.jpg` (384 × 576), qui remplacent les fichiers actuels.
+- **Zones** : celles du §3. Tête et épaules entre y = 8 et 42 %, x = 22 à 78 % ; l'ordinateur fermé à hauteur de poitrine entre y = 42 et 72 % ; la caméra du décor dans le tiers opposé au regard, plus petite que la tête, jamais devant le visage ; bas du corps dans l'ombre prune. La tête, les épaules et l'objet tiennent dans le carré du haut.
+- **Qui** : une personne adulte, **épicène et d'âge indécis** : ni barbe ni maquillage marqué, ni rides ni visage poupin ; cheveux mi-longs qui dépassent d'un bonnet de laine pastel ; veste de travail ample couleur sable sur un col roulé lilas. Peau mate, différente des cinq autres portraits.
+- **L'objet** : un ordinateur portable **fermé**, tenu à plat contre la poitrine par une seule main, comme un dossier qu'on garde pour soi. Fermé, il ne se confond pas avec `night_owl`, qui tient le sien ouvert.
+- **Ce qu'on lit en une seconde** : à côté d'une caméra de tournage sur trépied, braquée sur un rond de lumière vide, la personne se tient juste hors du faisceau, dans la lumière dorée, et regarde l'objectif avec un demi-sourire tranquille. Le spectacle est vide ; le travail, c'est elle.
+- **Style et lumière** : bloc STYLE du §7 et lumière **B** (heure dorée), comme le décor `forger`. La lumière orange rase vient du côté de la caméra ; le visage est dans une demi-ombre chaude, jamais noire.
+- **Inspirations** : les portraits de techniciens de plateau sur les affiches de cinéma sérigraphiées ; les « making of » peints des années 1960 ; nos décors (`design/profiles/`) en référence de style, comme pour les autres portraits.
+- **Interdits propres à ce portrait** (en plus du §5) : aucun diplôme, papier, sceau, ruban, tampon, encreur, loupe ni imprimante ; rien qui évoque la copie, la fausse signature ou la triche ; pas de masque, pas de cagoule, pas de lunettes noires, pas de trench-coat d'espion (ce n'est ni un voleur ni un espion) ; pas de clap de cinéma (il porte des lettres) ; l'ordinateur ne montre ni écran, ni logo, ni autocollant ; la caméra n'a ni marque ni chiffre.
+
 ```
-Character: a man of about forty-five with olive skin, neatly combed dark hair greying at the temples and a trimmed moustache, wearing a cream linen suit with a pale pink shirt and no tie, reading glasses low on his nose. He holds up a blank diploma certificate with a red ribbon and a round wax seal between two fingers of his right hand, offering it to the viewer with a charming, knowing smile, eyes looking over his glasses. Behind him, a desk by a large window with a row of wooden rubber stamps and a stack of blank certificates, golden light through window blinds laying striped shadows. All papers are completely blank.
+Character: an adult of indeterminate age and androgynous appearance, with warm olive-tan skin and shoulder-length dark brown hair coming out from under a plain soft knitted beanie in pale peach, wearing a loose sand-coloured canvas work jacket over a lilac roll-neck sweater. No beard, no visible make-up, no marked wrinkles. They hold a closed plain laptop flat against their chest with one hand, like a file they keep to themselves, and look straight at the viewer with a calm, quietly proud half-smile. They stand just outside the beam of a film camera on a tripod placed beside them, a little behind; the camera points away from them toward an empty, brightly lit round spot on the floor of an open-air film set by the sea. Behind, two or three large flat shapes: a pastel art deco building used as a film set facade, one tall palm silhouette, the low golden sun as a plain disc. The character stands in warm half-shadow, the empty spot is in full light. The laptop is closed, with no logo and no sticker; the camera has no brand and no numbers. No papers, no stamps, no seal, no ribbon, no clapperboard, no mask, no sunglasses.
 ```
 
 **3. `kingpin`** (A)
