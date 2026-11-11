@@ -39,6 +39,7 @@ SLAB = (1.4333, 1.5)      # dalles de trottoir : trois sur la largeur, 1,5 m de 
 # Le plan des voies d'une chaussée droite (|x| depuis l'axe), lu par mat_asphalt : milieux des voies (ornières,
 # bande d'huile), tirets entre voies de même sens, ligne de rive, joint longitudinal, double axe (None : absent).
 # AVENUE est celui de l'avenue, par défaut ; lane_layout() en écrit un pour une autre largeur, un autre nombre de voies.
+# Clé facultative grime (0 à 1) : la peinture salie, effacée par plaques, noyée sous les flaques.
 AVENUE = dict(lanes=LANES, dashes=(3.5,), edge=EDGE_X, joint=3.74, centre=0.15, film_split=3.5)
 
 
@@ -348,6 +349,14 @@ def mat_asphalt(st, name, force_patch=False, layout=None):
     w = smooth(N, D, p0, p1)                              # 0 : humide, 1 : flaque ; bord adouci
     deep = smooth(N, D, p1, p1 + 0.9)                     # les flaques profondes : miroir plat
     tipdry = smooth(N, d2, 0.62, 0.85)
+    # --- la peinture salie, si le plan des voies le demande (layout["grime"], de 0 à 1 ; absent, comme pour
+    # l'avenue : rien ne change) : des plaques effacées, noyée sous les flaques, plus terne
+    gr = lay.get("grime")
+    if gr:
+        gone = inv(N, smooth(N, noise(N, P, 0.8, 3.0, stretch=(1.0, 0.3, 1.0)), 0.40, 0.56))
+        paint = N.math("MULTIPLY", paint, N.math("SUBTRACT", 1.0, N.math("MULTIPLY", gone, gr)))
+        paint = N.math("MULTIPLY", paint, N.math("SUBTRACT", 1.0, N.math("MULTIPLY", w, min(1.0, 1.2 * gr))))
+        paint = N.math("MULTIPLY", paint, 1.0 - 0.45 * gr)
     # --- couleur
     dk = st["dark"]
     col = N.mix(1.0, sc["diff"], (dk, dk, dk * 1.03, 1), "MULTIPLY")
