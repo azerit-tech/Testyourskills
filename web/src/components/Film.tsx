@@ -4,8 +4,9 @@
 // demande un geste, onGesture (l'attente montre la pilule). « playing » : la
 // vidéo joue, le HUD suit son horloge. Au sommet du flash, la fiche se pose
 // (onHandoff) ; à la fin du flash, la scène s'efface (onDone). Onglet caché :
-// tout s'arrête. Replis (§5.5) : film absent, illisible ou pas prêt 4 s après
-// la fiche, la fiche sort sans révélation, comme sans WebGL ; erreur en cours,
+// tout s'arrête. Replis (§5.5) : film absent, illisible, ou qui ne peut pas
+// être prêt dans les 4 s d'onglet visible après la fiche (estimé sur le débit
+// mesuré), la fiche sort sans révélation, comme sans WebGL ; erreur en cours,
 // flash immédiat.
 // Sans Three.js ni WebGL. Muet : la bande-son (T3) se branche sur `FilmSound`.
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -19,14 +20,17 @@ import { readMuted, unlockAudio, writeMuted } from "../lib/audio";
 import { buzz } from "../lib/haptics";
 import { createFilmPlayer, type FilmPlayer, type FilmStats } from "../film/player";
 import { FilmHud } from "../film/FilmHud";
+import type { FileId } from "../film/files";
+import { filmNet, filmRemaining } from "../film/loader";
+import { readyVerdict, VisibleClock } from "../film/net";
 import type { Phase } from "./Reveal";
 import "../card/fonts.css";
 import "../film/film.css";
 
 export { preloadFilm } from "../film/player";
 
-/** Le film n'est pas prêt ce temps-là après la fiche : elle sort sans révélation (§5.5). */
-const READY_WAIT_MS = 4000;
+/** Fiche prête, film pas encore prêt : l'avancement du chargement est relu à ce rythme (§5.5, net.ts readyVerdict). */
+const READY_CHECK_MS = 100;
 
 /**
  * La bande-son du film (T3, web/src/lib/filmSound.ts), branchée sur l'horloge
@@ -121,24 +125,41 @@ function FilmView({ card, lang, phase, onReady, onGesture, onHandoff, onDone, on
     });
     player.current = p;
     let settled = false;
+    // Le délai d'abandon (§5.5) : en temps d'onglet visible seulement, et sur
+    // l'avancement réel du chargement. Le reste arrive à temps : on attend ;
+    // sinon la fiche se pose tout de suite, sans attendre le délai pour rien.
+    const clock = new VisibleClock(performance.now(), !document.hidden);
+    const needed: FileId[] = ["poursuite", plan.ending];
+    const stop = () => {
+      settled = true;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVis);
+    };
     const fail = () => {
       if (settled) return;
-      settled = true;
-      window.clearTimeout(timer);
+      stop();
       cb.current.onFail();
     };
-    const timer = window.setTimeout(fail, READY_WAIT_MS);
+    const check = () => {
+      if (settled) return;
+      const visibleMs = clock.at(performance.now(), !document.hidden);
+      // onglet caché : rien ne se décide dans le dos de la personne
+      if (document.hidden) return;
+      if (readyVerdict({ visibleMs, remainingBytes: filmRemaining(needed), bps: filmNet().bps }) === "give-up") fail();
+    };
+    const onVis = () => check();
+    const timer = window.setInterval(check, READY_CHECK_MS);
+    document.addEventListener("visibilitychange", onVis);
+    check();
     p.prepare().then((r) => {
       if (settled) return;
-      settled = true;
-      window.clearTimeout(timer);
+      stop();
       if (r === "gesture" && cb.current.onGesture) cb.current.onGesture();
       else cb.current.onReady?.();
     }, fail);
     if (import.meta.env.DEV || isMock()) window.__film = { plan, seek: p.seek, hold: p.hold, stats: p.stats };
     return () => {
-      settled = true;
-      window.clearTimeout(timer);
+      stop();
       p.dispose();
       player.current = null;
       if (window.__film?.plan === plan) delete window.__film;

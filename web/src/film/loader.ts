@@ -6,6 +6,7 @@
 // Économiseur de données : éco d'emblée. Sans lecture en flux : le repli sur
 // la connexion annoncée, sans mesure. La variante, une fois tranchée, ne
 // change plus pour la page.
+import { FILE_CEILINGS } from "../../../shared/film/budget";
 import { isMock } from "../lib/api";
 import { filmFileUrl, type FileId, type Quality } from "./files";
 import { endingToLoad, initialVariant, probeVerdict, RateMeter } from "./net";
@@ -186,6 +187,22 @@ export function dropFilmFile(id: FileId): void {
     j.ctrl.abort();
     jobs.delete(keyOf(id, q));
   }
+}
+
+/**
+ * Les octets qui manquent aux fichiers donnés, dans la variante de la page :
+ * Content-Length moins le reçu, ou le plafond du fichier (§4.1) tant qu'il
+ * n'a pas donné sa taille ou pas commencé.
+ */
+export function filmRemaining(ids: FileId[]): number {
+  const q = startVariant();
+  let n = 0;
+  for (const id of ids) {
+    const j = jobs.get(keyOf(id, q));
+    if (j?.done) continue;
+    n += Math.max(0, (j?.total ?? FILE_CEILINGS[q][id]) - (j?.loaded ?? 0));
+  }
+  return n;
 }
 
 /** Les octets reçus par le film sur cette page, et le débit mesuré (bits par seconde). */

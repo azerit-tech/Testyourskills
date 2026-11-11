@@ -1,6 +1,7 @@
 // Le film et le réseau (docs/cinematique-poursuite.md §5.3, §5.4).
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ECO_BELOW_BPS, endingToLoad, filmAssetUrl, initialVariant, PROBE_BYTES, probeVerdict, RateMeter, STALL_MS } from "./net";
+import { FILE_CEILINGS } from "../../../shared/film/budget";
+import { ECO_BELOW_BPS, endingToLoad, filmAssetUrl, initialVariant, PROBE_BYTES, probeVerdict, RateMeter, READY_WAIT_MS, readyVerdict, STALL_MS, VisibleClock } from "./net";
 
 describe("les adresses du film", () => {
   it("sans base : l'adresse à empreinte donnée par Vite", () => {
@@ -97,6 +98,45 @@ function slowResponse(chunks: number, size: number, every: number): Response {
   return new Response(body, { headers: { "content-type": "video/mp4", "content-length": String(chunks * size) } });
 }
 
+describe("le délai d'abandon, fiche prête", () => {
+  const MBIT = 1_000_000;
+
+  it("le reste arrive à temps : on attend", () => {
+    // 1 Mo à 10 Mbit/s : 0,8 s, 1,4 s avec la marge et le décodage
+    expect(readyVerdict({ visibleMs: 0, remainingBytes: 1_000_000, bps: 10 * MBIT })).toBe("wait");
+    expect(readyVerdict({ visibleMs: 2500, remainingBytes: 1_000_000, bps: 10 * MBIT })).toBe("wait");
+  });
+
+  it("le reste ne peut pas arriver : la fiche se pose tout de suite, sans attendre 4 s pour rien", () => {
+    // 3 Mo à 2 Mbit/s : 12 s
+    expect(readyVerdict({ visibleMs: 0, remainingBytes: 3_000_000, bps: 2 * MBIT })).toBe("give-up");
+    expect(readyVerdict({ visibleMs: 3000, remainingBytes: 1_000_000, bps: 10 * MBIT })).toBe("give-up");
+  });
+
+  it("réseau coupé (débit nul) : tout de suite ; sans mesure : à l'aveugle jusqu'au délai", () => {
+    expect(readyVerdict({ visibleMs: 100, remainingBytes: 500_000, bps: 0 })).toBe("give-up");
+    expect(readyVerdict({ visibleMs: 100, remainingBytes: 500_000, bps: null })).toBe("wait");
+    expect(readyVerdict({ visibleMs: READY_WAIT_MS - 1, remainingBytes: 500_000, bps: null })).toBe("wait");
+    expect(readyVerdict({ visibleMs: READY_WAIT_MS, remainingBytes: 500_000, bps: null })).toBe("give-up");
+  });
+
+  it("tout est chargé : on attend le décodage, jusqu'au délai", () => {
+    expect(readyVerdict({ visibleMs: 3900, remainingBytes: 0, bps: 0 })).toBe("wait");
+    expect(readyVerdict({ visibleMs: READY_WAIT_MS, remainingBytes: 0, bps: 10 * MBIT })).toBe("give-up");
+  });
+
+  it("le délai ne compte que le temps d'onglet visible", () => {
+    const c = new VisibleClock(0, true);
+    expect(c.at(1000, false)).toBe(1000);
+    // dix secondes onglet caché : rien ne compte
+    expect(c.at(11_000, true)).toBe(1000);
+    expect(c.at(12_500, true)).toBe(2500);
+    const hidden = new VisibleClock(0, false);
+    expect(hidden.at(60_000, true)).toBe(0);
+    expect(hidden.at(60_400, true)).toBe(400);
+  });
+});
+
 describe("le chargement en flux (loader.ts)", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -166,5 +206,15 @@ describe("le chargement en flux (loader.ts)", () => {
     expect(r.quality).toBe("720");
     expect(asked).toEqual(["poursuite-720", "fin-720", "fin6-720"]);
     expect(aborted).toEqual(["fin-720"]);
+  });
+
+  it("ce qui reste à charger : la taille annoncée moins le reçu, sinon le plafond du fichier", async () => {
+    vi.stubGlobal("navigator", {});
+    vi.stubGlobal("fetch", async () => slowResponse(8, 50_000, 0));
+    const { loadFilmFiles, filmRemaining } = await import("./loader");
+    expect(filmRemaining(["poursuite", "fin"])).toBe(FILE_CEILINGS["720"].poursuite + FILE_CEILINGS["720"].fin);
+    await loadFilmFiles(["poursuite"]);
+    expect(filmRemaining(["poursuite", "fin"])).toBe(FILE_CEILINGS["720"].fin);
+    expect(filmRemaining(["poursuite"])).toBe(0);
   });
 });
