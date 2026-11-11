@@ -4,7 +4,8 @@
 #     --factory-startup -P tools/film3d/render_lieux.py -- --lieu pont|pointe --plan P4 [--palier socle] \
 #     [--engine workbench|cycles] [--percent 50] [--samples 32] [--gpu] [--no-save] [--grain 7] [--no-render]
 #
-# Les lieux et leurs plans : pont (scene_c.py) P4 ; pointe, la jetée et la pointe (scene_d.py) P6, FIN, FIN6.
+# Les lieux et leurs plans : pont (scene_c.py) P4 ; pointe, la jetée et la pointe (scene_d.py) P6, FIN, FIN6 ;
+# port (scene_e.py) P5.
 # Écrit Azerit/design/film/ref/lieux/<lieu>-<plan>-<palier>.png (et -raw.png sans grain ni vignette ; en Workbench
 # <lieu>-<plan>-<palier>-cadrage.png), et la scène assets/scene-<c|d>-<plan>.blend (sauf --no-save).
 #
@@ -26,7 +27,7 @@ if HERE not in sys.path:
     sys.path.insert(0, HERE)
 import lieux as L  # noqa: E402
 
-LIEUX = {"pont": ("scene_c", "c"), "pointe": ("scene_d", "d")}
+LIEUX = {"pont": ("scene_c", "c"), "pointe": ("scene_d", "d"), "port": ("scene_e", "e")}
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--lieu", required=True, choices=sorted(LIEUX))
