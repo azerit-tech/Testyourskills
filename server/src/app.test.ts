@@ -1089,6 +1089,24 @@ describe("email et événements", () => {
     expect(res.status).toBe(202);
     expect(ctx.store.listEvents("plea")).toMatchObject([{ cardId: "AbCdEf1234", meta: { stars: 5, gap: 1 } }]);
   });
+
+  it("enregistre le film (§18.36), une ligne par lecture, sans fiche ni donnée libre", async () => {
+    const ctx = setup();
+    const post = (b: unknown) =>
+      ctx.app.request("/api/event", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) });
+    const meta = { outcome: "played", variant: "540", bytes: 2_100_000, loadMs: 3400, startMs: 160, dropped: 2, switchMs: 40, kbps: 4200, inApp: true, gesture: false };
+    expect((await post({ event: "film", meta })).status).toBe(202);
+    expect(ctx.store.listEvents("film")).toMatchObject([{ cardId: null, meta }]);
+    // refusés : un identifiant de fiche, une clé de plus, une issue inconnue, une valeur hors bornes, du texte libre
+    expect((await post({ event: "film", cardId: "AbCdEf1234", meta })).status).toBe(400);
+    expect((await post({ event: "film", meta: { ...meta, ua: "Mozilla/5.0" } })).status).toBe(400);
+    expect((await post({ event: "film", meta: { ...meta, outcome: "crash" } })).status).toBe(400);
+    expect((await post({ event: "film", meta: { ...meta, startMs: -1 } })).status).toBe(400);
+    expect((await post({ event: "film", meta: { ...meta, bytes: 1.5 } })).status).toBe(400);
+    expect((await post({ event: "film", meta: { ...meta, variant: "1080" } })).status).toBe(400);
+    expect((await post({ event: "film" })).status).toBe(400);
+    expect(ctx.store.listEvents("film")).toHaveLength(1);
+  });
 });
 
 describe("purge 90 jours", () => {

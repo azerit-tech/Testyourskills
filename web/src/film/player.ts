@@ -41,6 +41,8 @@ export interface FilmStats {
   frameCallbacks: boolean;
   /** Relances du chien de garde (horloge figée, pause non demandée). */
   retries: number;
+  /** Le film a sauté au flash sur une erreur de lecture (§5.5). */
+  aborted: boolean;
   /** L'instant du film. */
   t: number;
 }
@@ -144,6 +146,8 @@ export function createFilmPlayer({ plan, host, cover, onTime }: Options): FilmPl
   const asked = new Set<HTMLVideoElement>();
   /** Les deux balises sont chargées et posées : leurs erreurs sont désormais des erreurs de lecture. */
   let prepared = false;
+  /** Le flash est parti sur une erreur. */
+  let aborted = false;
 
   for (const v of [a, b]) {
     v.className = "film-video";
@@ -181,6 +185,7 @@ export function createFilmPlayer({ plan, host, cover, onTime }: Options): FilmPl
   const flashNow = () => {
     if (disposed || over || mode === "tail") return;
     dog.disarm();
+    aborted = true;
     mode = "tail";
     halt(a);
     halt(b);
@@ -460,7 +465,7 @@ export function createFilmPlayer({ plan, host, cover, onTime }: Options): FilmPl
         dropped += s?.droppedVideoFrames ?? 0;
         decoded += s?.totalVideoFrames ?? 0;
       }
-      return { dropped, decoded, skipped, leaked, switchMs, startMs, bytes: filmNet().bytes, quality: q, frameCallbacks: rvfc, retries: dog.retries, t: time() };
+      return { dropped, decoded, skipped, leaked, switchMs, startMs, bytes: filmNet().bytes, quality: q, frameCallbacks: rvfc, retries: dog.retries, aborted, t: time() };
     },
     dispose() {
       disposed = true;

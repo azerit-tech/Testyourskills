@@ -8,7 +8,7 @@ import { currentRef } from "./session";
 
 export { ApiError };
 
-export type AnalyticsEvent = "card_generated" | "card_shared" | "card_email" | "cta_azerit_clicked" | "shared_visit" | "denounce_landed" | "plea";
+export type AnalyticsEvent = "card_generated" | "card_shared" | "card_email" | "cta_azerit_clicked" | "shared_visit" | "denounce_landed" | "plea" | "film";
 
 export interface CreateInput {
   login?: string;
@@ -361,7 +361,8 @@ function track(event: AnalyticsEvent, cardId: string | null, meta: Record<string
     void fetch("/api/event", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ event, cardId, meta }),
+      // sans fiche (le film) : pas de clé cardId, que le serveur refuserait
+      body: JSON.stringify(cardId ? { event, cardId, meta } : { event, meta }),
       keepalive: true,
     }).catch(() => {});
   } catch {

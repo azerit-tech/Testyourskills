@@ -15,14 +15,16 @@ import { flushSync } from "react-dom";
 import type { CardData, Lang } from "../../../shared/types";
 import { filmPlan, hudAt, type FilmPlan } from "../../../shared/film";
 import { useT } from "../i18n";
-import { isMock } from "../lib/api";
+import { api, isMock } from "../lib/api";
 import { readMuted, unlockAudio, writeMuted } from "../lib/audio";
 import { buzz } from "../lib/haptics";
-import { createFilmPlayer, type FilmPlayer, type FilmStats } from "../film/player";
+import { inAppBrowser } from "../lib/sharing";
+import { canPlayFilm, createFilmPlayer, type FilmPlayer, type FilmStats } from "../film/player";
 import { FilmHud } from "../film/FilmHud";
 import type { FileId } from "../film/files";
-import { filmNet, filmRemaining } from "../film/loader";
+import { filmLoadMs, filmNet, filmRemaining } from "../film/loader";
 import { readyVerdict, VisibleClock } from "../film/net";
+import { filmReport, interruptedOutcome, type FilmOutcome } from "../film/report";
 import type { Phase } from "./Reveal";
 import "../card/fonts.css";
 import "../film/film.css";
@@ -64,6 +66,14 @@ declare global {
   }
 }
 
+/** Une lecture du film, pour son événement : la pilule montrée, la lecture commencée, l'événement parti. */
+interface Reading {
+  gesture: boolean;
+  started: boolean;
+  sent: boolean;
+  send(outcome: FilmOutcome): void;
+}
+
 export function Film(props: Props) {
   return <FilmView {...props} onFail={props.onDone} />;
 }
@@ -82,6 +92,8 @@ function FilmView({ card, lang, phase, onReady, onGesture, onHandoff, onDone, on
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
   const cues = useRef({ star: 0, handed: false, done: false });
+  /** L'événement `film` (§5.6), une fois par lecture : la pilule a-t-elle été montrée, la lecture a-t-elle commencé. */
+  const reading = useRef<Reading>({ gesture: false, started: false, sent: false, send: () => undefined });
 
   // Les repères : une vibration par étoile, une longue au flash ; le relais au sommet, la fin après.
   const cue = useRef<(t: number) => void>(() => undefined);
@@ -103,6 +115,7 @@ function FilmView({ card, lang, phase, onReady, onGesture, onHandoff, onDone, on
     }
     if (!c.done && t >= plan.duration - 1e-6) {
       c.done = true;
+      reading.current.send(player.current?.stats().aborted ? "error" : "played");
       cb.current.onDone();
     }
   };
@@ -125,19 +138,46 @@ function FilmView({ card, lang, phase, onReady, onGesture, onHandoff, onDone, on
     });
     player.current = p;
     let settled = false;
+    const needed: FileId[] = ["poursuite", plan.ending];
+    // L'événement `film` : ce qu'il est advenu de cette lecture, une seule fois, sans rien de personnel.
+    const r: Reading = { gesture: false, started: false, sent: false, send: () => undefined };
+    r.send = (outcome) => {
+      if (r.sent) return;
+      r.sent = true;
+      const s = p.stats();
+      const net = filmNet();
+      api.track("film", null, {
+        ...filmReport({
+          outcome,
+          variant: s.quality,
+          bytes: net.bytes,
+          loadMs: filmLoadMs(needed),
+          startMs: s.startMs,
+          dropped: r.started ? s.dropped : null,
+          switchMs: s.switchMs,
+          bps: net.bps,
+          inApp: inAppBrowser(navigator.userAgent),
+          gesture: r.gesture,
+        }),
+      });
+    };
+    reading.current = r;
+    // la page fermée ou quittée en cours de route : React ne démonte rien, on le dit ici
+    const onHide = () => r.send(interruptedOutcome({ closed: false, started: r.started, gesture: r.gesture }));
+    window.addEventListener("pagehide", onHide);
     // Le délai d'abandon (§5.5) : en temps d'onglet visible seulement, et sur
     // l'avancement réel du chargement. Le reste arrive à temps : on attend ;
     // sinon la fiche se pose tout de suite, sans attendre le délai pour rien.
     const clock = new VisibleClock(performance.now(), !document.hidden);
-    const needed: FileId[] = ["poursuite", plan.ending];
     const stop = () => {
       settled = true;
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", onVis);
     };
-    const fail = () => {
+    const fail = (outcome: FilmOutcome) => {
       if (settled) return;
       stop();
+      r.send(outcome);
       cb.current.onFail();
     };
     const check = () => {
@@ -145,21 +185,29 @@ function FilmView({ card, lang, phase, onReady, onGesture, onHandoff, onDone, on
       const visibleMs = clock.at(performance.now(), !document.hidden);
       // onglet caché : rien ne se décide dans le dos de la personne
       if (document.hidden) return;
-      if (readyVerdict({ visibleMs, remainingBytes: filmRemaining(needed), bps: filmNet().bps }) === "give-up") fail();
+      if (readyVerdict({ visibleMs, remainingBytes: filmRemaining(needed), bps: filmNet().bps }) === "give-up") fail("timeout");
     };
     const onVis = () => check();
     const timer = window.setInterval(check, READY_CHECK_MS);
     document.addEventListener("visibilitychange", onVis);
     check();
-    p.prepare().then((r) => {
-      if (settled) return;
-      stop();
-      if (r === "gesture" && cb.current.onGesture) cb.current.onGesture();
-      else cb.current.onReady?.();
-    }, fail);
+    p.prepare().then(
+      (ready) => {
+        if (settled) return;
+        stop();
+        if (ready === "gesture" && cb.current.onGesture) {
+          r.gesture = true;
+          cb.current.onGesture();
+        } else cb.current.onReady?.();
+      },
+      () => fail(canPlayFilm() ? "error" : "nocodec"),
+    );
     if (import.meta.env.DEV || isMock()) window.__film = { plan, seek: p.seek, hold: p.hold, stats: p.stats };
     return () => {
       stop();
+      window.removeEventListener("pagehide", onHide);
+      // démontée avant la fin : passée (la révélation close), pilule jamais touchée, ou page quittée
+      r.send(interruptedOutcome({ closed: phaseRef.current === "done", started: r.started, gesture: r.gesture }));
       p.dispose();
       player.current = null;
       if (window.__film?.plan === plan) delete window.__film;
@@ -170,6 +218,7 @@ function FilmView({ card, lang, phase, onReady, onGesture, onHandoff, onDone, on
   useEffect(() => {
     const p = player.current;
     if (!p || (phase !== "playing" && phase !== "handoff")) return;
+    reading.current.started = true;
     p.play();
     const onVis = () => {
       if (document.hidden) {

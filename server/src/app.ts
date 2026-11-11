@@ -546,8 +546,8 @@ export function createApp(opts: AppOptions) {
     const parsed = clientEventSchema.safeParse(raw);
     if (!parsed.success) return c.json({ ok: false }, 400);
     if (!limiter.take("event", clientIp(c), 500)) return c.json({ ok: false }, 429);
-    const { event, cardId, meta } = parsed.data;
-    store.recordEvent(event, cardId ?? null, meta);
+    const d = parsed.data;
+    store.recordEvent(d.event, "cardId" in d ? (d.cardId ?? null) : null, d.meta);
     return c.json({ ok: true }, 202);
   });
 

@@ -69,6 +69,9 @@ interface Job {
   /** Content-Length, s'il est donné. */
   total: number | null;
   done: boolean;
+  /** Demandé, puis entièrement reçu (horloge de la page, ms). */
+  startedAt: number | null;
+  doneAt: number | null;
   ctrl: AbortController;
   promise: Promise<string>;
 }
@@ -88,6 +91,7 @@ async function download(j: Job): Promise<string> {
   // la variante a été tranchée pendant l'attente dans la file : un fichier de l'autre ne sert plus
   if (decided && j.q !== variant) throw new VariantSwitch();
   firstStart ??= performance.now();
+  j.startedAt = performance.now();
   const url = filmUrl(j.id, j.q);
   const r = await fetch(url, { priority: "low", signal: j.ctrl.signal } as RequestInit);
   // une page HTML servie à la place (repli d'une application) n'est pas un film
@@ -137,6 +141,7 @@ async function download(j: Job): Promise<string> {
       blob = new Blob(chunks as BlobPart[], { type: "video/mp4" });
     }
     j.done = true;
+    j.doneAt = performance.now();
     return URL.createObjectURL(blob.type.startsWith("video/") ? blob : new Blob([blob], { type: "video/mp4" }));
   } finally {
     meter.end(performance.now());
@@ -148,7 +153,7 @@ function fetchOne(id: FileId, q: Quality): Promise<string> {
   const key = keyOf(id, q);
   const had = jobs.get(key);
   if (had) return had.promise;
-  const j: Job = { id, q, loaded: 0, total: null, done: false, ctrl: new AbortController(), promise: Promise.resolve("") };
+  const j: Job = { id, q, loaded: 0, total: null, done: false, startedAt: null, doneAt: null, ctrl: new AbortController(), promise: Promise.resolve("") };
   // un à la fois : la poursuite d'abord, elle a toute la bande
   const run = queue.then(() => download(j));
   queue = run.catch(() => undefined);
@@ -203,6 +208,23 @@ export function filmRemaining(ids: FileId[]): number {
     n += Math.max(0, (j?.total ?? FILE_CEILINGS[q][id]) - (j?.loaded ?? 0));
   }
   return n;
+}
+
+/**
+ * La durée de chargement des fichiers donnés, dans la variante de la page :
+ * la somme, fichier par fichier, de la demande au dernier octet (le temps
+ * passé à attendre la fiche entre deux fichiers n'en est pas). Null tant
+ * qu'un des fichiers n'est pas entièrement là.
+ */
+export function filmLoadMs(ids: FileId[]): number | null {
+  const q = startVariant();
+  let ms = 0;
+  for (const id of ids) {
+    const j = jobs.get(keyOf(id, q));
+    if (!j?.done || j.startedAt === null || j.doneAt === null) return null;
+    ms += j.doneAt - j.startedAt;
+  }
+  return ms;
 }
 
 /** Les octets reçus par le film sur cette page, et le débit mesuré (bits par seconde). */
