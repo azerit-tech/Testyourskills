@@ -1,6 +1,6 @@
 # Inspiration : le design du jeu de Rockstar sorti le 19 novembre 2026
 
-*Écrit le 9 novembre 2026 pour Testyourskills. Document de travail, à relire par Jacques avant d'en reporter quoi que ce soit dans `SPEC.md`.*
+*Écrit le 9 novembre 2026 pour Testyourskills. Étude de référence : le SPEC la cite pour la palette (§2), la typographie (§1.3) et les interdits (§4). Condensée le 11 novembre 2026 : la comparaison avec l'ancien site et les propositions déjà tranchées sont retirées.*
 
 **Ce qu'on a regardé.** Le site officiel, vu dans Chrome le 9 novembre 2026 : l'accueil, la page des personnages et des lieux, la page médias. Le trailer 1, le trailer 2 et « An Extended Look » (27 août 2026), image par image. Plus des analyses écrites (liste à la fin). **Le jeu sort dans dix jours** : rien de ce qui suit ne vient du jeu fini. Les cartons de fin de mission, le menu du téléphone et les écrans de chargement n'ont jamais été montrés officiellement.
 
@@ -137,39 +137,11 @@ Pricedown : non, même avec une licence web. Le lettrage du logo est **le** marq
 
 ---
 
-## 2. Notre état actuel, comparé
+## 2. La palette mate
 
-Sources : `web/gta.html`, les couleurs du §17.2, et `web/src/three/hud.css`, qui reprend les mêmes variables.
+*La comparaison avec l'état du site au 9 novembre 2026 (néon rose et cyan, lueurs, dégradé sur plusieurs éléments, palmiers noirs, holographique) est retirée : le passage au style mat a tout corrigé (SPEC §18.18, §18.20, §18.21).*
 
-### Ce qui est juste
-
-- **Le fond de nuit** `#0a0a1f` est à deux pas du `#0c0d1b` du site. On garde, et on ajoute le dégradé vertical vers `#1f1f38` en haut.
-- **Barlow Condensed** est la bonne famille pour les noms et les titres.
-- **La photo d'identité judiciaire** (mur gradué, écriteau noir), le numéro de dossier et la date : c'est notre motif à nous, il colle au trailer 1 (combinaison, interrogatoire, caméra-piéton). À garder tel quel.
-- **Les barres segmentées**, la ligne de pied en mono façon procès-verbal (« Interrogé par une IA pendant 9 s »), le ton taquin des chefs d'accusation : c'est le registre pince-sans-rire du site.
-- **Les étoiles en haut à droite du HUD** et le carton de fin plein écran.
-
-### Ce qui sonne faux ou daté
-
-| Chez nous | Pourquoi ça date | Époque que ça évoque |
-|---|---|---|
-| Rose néon `#ff3fa4` + cyan `#3fd8ff` saturés, en `text-shadow` et `drop-shadow` lumineux partout (niveau, puces, barres, étoiles) | Le jeu n'éclaire jamais son interface. Le duo magenta-cyan lumineux, c'est la synthwave des années 2010 et le jeu de 2002 | Vice City 2002, outrun |
-| Halos radiaux rose et cyan dans le fond de la fiche | Le site met des fonds plats teintés, et c'est l'illustration qui porte la couleur | Synthwave |
-| Dégradé diagonal jaune → orange → rose → violet sur la note **et** le titre **et** le carton | Le site n'a qu'**un** élément en dégradé par écran, et son dégradé va du froid en haut au chaud en bas | Affiche rétro générique |
-| Palmier **noir** `#05050f` en ombre chinoise | Le jeu fait des palmiers ton sur ton (prune sur pêche, lavande sur rose) | Outrun, t-shirt « Miami » |
-| Balayage holographique du niveau 5 | Vestige de FIFA, rien de tel dans le jeu | FIFA Ultimate Team |
-| Étoiles éteintes en contour fin, allumées avec une lueur rose | Dans le jeu, les éteintes sont pleines et sombres, les allumées blanches et mates, calées à droite | Le jeu de 2013 |
-| Vert d'argent `#8ce06b` | C'est le vert du compteur du jeu de 2013. Le compteur de 2026 existe mais on ne l'a pas vu de près | Le jeu de 2013 |
-| Texte en JetBrains Mono pour les étiquettes de la fiche (Spécialité, Arme…) | Sonne terminal de dev plutôt que dossier de police. Le site espace une géométrique | Neutre, mais hors univers |
-| Inter pour le texte | Propre mais sans caractère. La voix « raconter » du site est une géométrique ronde | Neutre |
-| Posterisation de la photo | Les illustrations officielles sont **peintes** (aplats doux, ombres violettes, trait discret). Une posterisation à 8 niveaux se lit comme un filtre Photoshop | Filtre « poster » des années 2000 |
-| Badge de carte spéciale jaune incliné de −2° avec une ombre jaune | Effet autocollant, absent du site, qui utilise des pilules plates | Carte à collectionner |
-
-En résumé, on a fait **la version néon nocturne**, alors que le jeu se présente surtout en **pastel au crépuscule sur fond d'encre**, avec une interface **mate**. Il faut retirer les lueurs, ne garder qu'un dégradé par écran et passer les titres en crème plat.
-
-### Une palette corrigée à proposer pour le §17.2
-
-À faire valider avant toute modification du code. Les valeurs *CSS* sont celles du site. On ne reprend aucun fichier, on prend des valeurs proches, et une couleur ne se protège pas.
+Proposée ici, retenue par le SPEC §18.18. Dans le code, sa source unique est `shared/card/themes.ts`, qui fait foi en cas d'écart. Les valeurs *CSS* du §1.1 sont celles du site étudié ; on ne reprend aucun fichier, on prend des valeurs proches, et une couleur ne se protège pas.
 
 ```
 --ink-0:   #0c0d1b   nuit d'encre (fond)
@@ -189,117 +161,35 @@ En résumé, on a fait **la version néon nocturne**, alors que le jeu se prése
 --story:   linear-gradient(180deg, #ff6f8e 0%, #ffc480 100%)   phrase en dégradé
 ```
 
-Les couleurs de niveau (§17.3) deviennent la **teinte du fond de la fiche**, et non plus un halo : ★ ardoise, ★★ marine, ★★★ prune, ★★★★ prune avec le dégradé `--dusk` sur la note, ★★★★★ fond illustré au crépuscule.
+Les fonds de la fiche par niveau, à six étoiles, sont au SPEC §18.18.
 
 ---
 
-## 3. Propositions, écran par écran, téléphone d'abord (390 px)
+## 3. Propositions, écran par écran
 
-Pour chaque écran : **ce qu'on emprunte**, **comment on le refait**, puis **pourquoi ça aide le partage**.
+*Écrites le 9 novembre 2026, téléphone d'abord (390 px). Ce qui a été tranché est au SPEC, qui fait foi : ces propositions-là sont retirées d'ici et restent dans l'historique git. Seules restent en entier celles qui ne sont pas construites.*
 
-### 3.1 L'accueil
+| § | Écran | Où c'est tranché |
+|---|---|---|
+| 3.1 | L'accueil | SPEC §18.20, §18.30, §18.31 |
+| 3.2 | L'attente | SPEC §18.26, §18.27 ; deux idées non construites, ci-dessous |
+| 3.3 | La révélation dans l'ascenseur et son HUD | les étoiles : SPEC §18.18 ; les pastilles d'indices et le compteur ne sont pas construits, et l'ascenseur part à la validation du film (SPEC §18.36) |
+| 3.4 | La fiche | SPEC §18.18, §18.27 |
+| 3.5 | Le carton de fin de mission | SPEC §18.18 : le carton est mat |
+| 3.6 | La page partagée | SPEC §18.23, §18.29 |
+| 3.7 | L'image de partage | SPEC §18.34 |
+| 3.8 | Le clip vertical | pas construit, ci-dessous |
+| 3.9 | Le tableau des primes | pas construit, ci-dessous |
 
-- **On emprunte** le bandeau du haut du site, la phrase-promesse en dégradé, les cartes pilules et l'en-tête collant.
-- **On refait** :
-  - Un bandeau fin de 44 px en dégradé pêche → rose (`#fcbf96` au centre, `#ec8fa0` aux bords), avec deux feuilles de palmier **prune** `#7a4f6e` qui débordent des coins. Le texte est en Outfit 600 capitales, `letter-spacing: .15em`, prune `#583660` : « SAISON 1 · PRIMES OUVERTES · J-42 ».
-  - L'en-tête : le losange Azerit à gauche et une pilule `--blush` « Ma fiche » à droite.
-  - La promesse du §18.5 en **Outfit 700, 34 px, casse normale, interligne 1,1**, remplie de `--story` du haut vers le bas : « Ton GitHub remplace ton CV. Les plus recherchés passent un entretien. » Rien d'autre en dégradé sur l'écran.
-  - Le champ, et un bouton pilule `--blush` pleine largeur, texte `#0c0d1b` en Outfit 600.
-  - La fiche de Jacques dessous, puis les primes en cartes de 25 px d'arrondi, défilables à l'horizontale.
-  - Les deux palmiers du §17.6 restent, mais ton sur ton (`#2c2546` sur `#0c0d1b`) et non plus noirs.
-- **Pourquoi** : la capture d'écran de l'accueil, la première chose qu'un curieux poste, se lit au premier coup d'œil comme « l'univers du jeu du moment » grâce au bandeau pêche et à la phrase en dégradé, sans un seul élément de marque.
+### 3.2 L'attente : deux idées non construites
 
-### 3.2 L'attente : l'interrogatoire (§18.13)
-
-- **On emprunte** l'ouverture du trailer 1 (l'interrogatoire, la combinaison orange en pochoir) et la caméra-piéton.
-- **On refait**, en plein écran sur téléphone, en trois temps.
-  1. **La caméra-piéton** pendant les 2 à 3 premières secondes. Fond désaturé gris-bleu (`filter: saturate(.35) contrast(.85) brightness(.8)` sur la scène 2D). Vignettage fort en `radial-gradient`, et un léger bombé via un `feDisplacementMap` SVG, ou rien si c'est trop cher. En haut à droite, en JetBrains Mono 11 px blanc : `11-09 23:58:46 +0100` et dessous `AZR 3 · X{ID}`. À côté, **notre propre pictogramme** (le losange Azerit dans un rond rouge, jamais un diaphragme jaune). La phrase d'ouverture, en sous-titre blanc centré, en Outfit 500 : « Tu sais pourquoi tu es là ? ». La tournure est banale en français ; elle évoque l'ouverture du trailer sans la citer.
-  2. **La toise et le flash** (§18.13, inchangé), puis l'avatar qui passe en photo d'identité.
-  3. **Les scellés** : les trois repos qui tombent dans des sachets, et la radio qui lit le pire commit.
-  - **La barre jaune** devient le compteur d'activité du jeu, en bas à droite : « PREUVES 3/6 » en petites capitales blanches, la valeur dans une boîte `rgba(12,13,27,.7)` avec un filet `--blush` de 3 px à gauche, et dessous un chrono **« 00:07.42 »** en Barlow Semi Condensed 700 de 28 px, chiffres tabulaires. Le chrono monte en vrai : le « 9 s » du pied de fiche devient visible. Le rang en file (« 3 suspects avant toi au commissariat ») prend la même boîte.
+- **La caméra-piéton** pendant les 2 à 3 premières secondes. Fond désaturé gris-bleu (`filter: saturate(.35) contrast(.85) brightness(.8)` sur la scène 2D). Vignettage fort en `radial-gradient`, et un léger bombé via un `feDisplacementMap` SVG, ou rien si c'est trop cher. En haut à droite, en JetBrains Mono 11 px blanc : `11-09 23:58:46 +0100` et dessous `AZR 3 · X{ID}`. À côté, **notre propre pictogramme** (le losange Azerit dans un rond rouge, jamais un diaphragme jaune). La phrase d'ouverture, en sous-titre blanc centré, en Outfit 500 : « Tu sais pourquoi tu es là ? ». La tournure est banale en français ; elle évoque l'ouverture du trailer sans la citer.
+- **La barre** devient le compteur d'activité du jeu, en bas à droite : « PREUVES 3/6 » en petites capitales blanches, la valeur dans une boîte `rgba(12,13,27,.7)` avec un filet `--blush` de 3 px à gauche, et dessous un chrono **« 00:07.42 »** en Barlow Semi Condensed 700 de 28 px, chiffres tabulaires. Le chrono monte en vrai : le « 9 s » du pied de fiche devient visible. Le rang en file (« 3 suspects avant toi au commissariat ») prend la même boîte.
 - **Pourquoi** : l'attente devient filmable. La caméra-piéton avec horodatage est le cadre le plus « vrai » du trailer, et c'est exactement le format qu'on enregistre à l'écran pour une story. Le chrono rend concret l'argument « jugé en 9 s ».
 
-### 3.3 La révélation dans l'ascenseur et son HUD
-
-- **On emprunte** les étoiles du jeu (pleines, mates, calées à droite, avec leurs états), les pastilles d'indices rouges, le compteur d'activité et la mini-carte en rectangle arrondi.
-- **On refait** (`hud.css`, `hud.ts`) :
-  - **Les étoiles** :
-    - éteintes : `fill: rgba(20,20,30,.55); stroke: none` ;
-    - allumées : `fill: #fff`, **sans `drop-shadow` colorée** ; une ombre portée neutre `drop-shadow(0 1px 1px rgba(0,0,0,.6))` suffit pour la lisibilité ;
-    - les allumées se rangent à droite, `flex-direction: row-reverse` ;
-    - l'animation « pop » est gardée, mais en blanc.
-  - **Les états, qui racontent la montée** :
-    - au départ, cinq étoiles **creuses** (contour blanc 1,5 px) : « dossier ouvert, suspect inconnu » ;
-    - à chaque palier, une étoile devient blanche ;
-    - à **la panne** (§18.13), les étoiles allumées **clignotent** à 2 Hz : c'est « contact perdu » dans le jeu, la bonne métaphore pour une coupure de courant, et ça ne demande aucune secousse de caméra ;
-    - à la fin, aucun passage au rouge : le rouge veut dire « tu as échappé », ce qui contredit la révélation.
-  - **Les pastilles d'indices** : une rangée de ronds de 18 px `--siren` à pictogramme blanc, sous les étoiles. Chacune s'allume quand le fait correspondant est lu, ce qui remplace en partie les lignes du dossier en haut à gauche, trop bavardes sur téléphone. Pictogrammes dessinés par nous : chevrons de code (= l'arme, le langage), silhouette (= l'avatar trouvé), lune (= commits de nuit), cadenas ouvert (= fichier `.env` ou secret), dossier (= les repos), caméra (= « GitHub a tout filmé »). Un appui long sur une pastille affiche sa ligne en clair.
-  - **Le message radio**, en bas : Outfit 500 en casse normale, blanc sur un bandeau `rgba(12,13,27,.7)`. Le JetBrains Mono passe à la seule étiquette « RADIO · CANAL 3 ».
-  - **Le compteur d'activité**, en bas à droite, reprend l'afficheur d'étage : « ÉTAGE 4/6 » puis le chrono de la séquence. Une boîte unique réutilisée de l'attente à l'ascenseur : continuité.
-  - **Sur téléphone** : les étoiles font 20 px à 12 px du bord, `env(safe-area-inset-*)` gardé. Rien en haut au centre, à cause de l'encoche.
-- **Pourquoi** : le HUD est ce que les gens capturent en vidéo. Des étoiles au rendu exact du jeu de l'année se reconnaissent en une image sur un fil LinkedIn, et les pastilles rouges racontent « l'IA a trouvé ça » sans un mot.
-
-### 3.4 La fiche
-
-- **On emprunte** la page personnage (nom, accroche rose, réplique) et les cartes mates du site.
-- **On refait** (maquette `web/gta.html` d'abord, §17.7), sur 360 × 520 (et donc 342 px de large sur un téléphone de 390 px) :
-  - **Le fond** : la teinte du niveau en aplat (§2, palette corrigée), un dégradé vertical vers `#0c0d1b` en bas, plus le grain existant. On retire les deux halos radiaux.
-  - **La note** : Barlow Condensed 800, 118 px. Remplie de `--dusk` (du froid au chaud, verticale) **seulement pour ★★★★ et ★★★★★**, crème plat `#fff9cb` sinon. C'est le seul dégradé de la fiche.
-  - **Le niveau** (« RECHERCHÉ ») : Outfit 600 en capitales, `letter-spacing: .15em`, 11 px, lilas `#e5ddff`, sans `text-shadow`.
-  - **Le profil (§18.2), placé comme le nom d'une page personnage** : sous l'écriteau, le **profil en Barlow Condensed 700 de 30 px en capitales crème** (« OISEAU DE NUIT »), et dessous **l'accroche en Outfit 500 de 13 px en rose poudré `#ffb2c6`, casse normale** (« Livre plus vite que la police ne lit »). Exactement la pile « JASON DUVAL / phrase rose » du site.
-  - **Les étoiles** : celles du HUD (§3.3), mates, calées à droite dans leur rangée, en haut à gauche de la fiche. Ou bien on les déplace en haut à droite comme dans le jeu, et le losange Azerit passe en bas.
-  - **Les étiquettes** (Spécialité, Arme, Affiliation) : Outfit 600 en capitales, 8,5 px, `.15em`, lilas à 60 %. Les valeurs en Outfit 600 de 12,5 px en crème.
-  - **Les barres** : remplissage plat `--blush` (ou `--peach` pour ★★★★ et plus), sans `box-shadow`. BUZZ en `--siren` plutôt qu'en orange, puisque c'est un indice à charge.
-  - **Les chefs d'accusation** : la puce ronde lumineuse devient **la pastille rouge à pictogramme** du HUD (12 px, `--siren`, pictogramme blanc) pour les négatifs, crème pour les positifs, lilas pour les spéciaux. Même langage que l'ascenseur.
-  - **Le niveau 5** : on retire le balayage holographique, et on met à la place un **contour éclairé par l'arrière** (§3.5) de 1 px rose vers orange qui irradie de 12 px vers l'extérieur. C'est la seule lumière de la fiche.
-  - **Le portrait** : on garde la posterisation à court terme, mais on la teinte vers le violet dans les ombres (`feColorMatrix` qui pousse les basses lumières vers `#3a2a5a`) pour se rapprocher des illustrations peintes. La vraie cible reste la génération d'un portrait peint (§17.10, en attente de crédit).
-- **Pourquoi** : la fiche est l'image qui circule. Mate, crème et rose poudré sur encre, elle ressemble au site du jeu dont tout le monde parle, et pas à une affiche synthwave de 2015. Le profil en gros devient l'identité qu'on a envie d'afficher (§18.2).
-
-### 3.5 Le carton de fin de mission
-
-- **On emprunte** la fin du trailer 1 (silhouette éclairée par l'arrière, puis le plein) et le générique en capitales très espacées.
-- **On refait** sur fond noir `#000`, en 1,5 s :
-  1. 0 à 0,4 s : le mot du niveau (« RECHERCHÉ ») en Barlow Condensed 800 de 22 vw, rempli de `#0c0d1b` presque invisible, avec un contour éclairé par l'arrière : `text-shadow` empilées de `--blush` vers `#ffb366`, de 0 à 18 px. **C'est le seul endroit de l'application où la lumière est permise.**
-  2. 0,4 à 0,9 s : le remplissage monte de bas en haut en `--dusk` (masque animé).
-  3. 0,9 s : dessous, en Outfit 600 en capitales, `.2em`, crème à 80 % : « SUSPECT IDENTIFIÉ · OISEAU DE NUIT ». Puis la note.
-  - Le roulement de batterie reste. Ce carton est unique pour tous les niveaux (décision du §17.10).
-- **Pourquoi** : c'est la vignette naturelle d'une vidéo enregistrée à l'écran et la dernière image avant la fiche. Le contour éclairé par l'arrière est reconnu comme « la fin du trailer » sans reprendre ni le logo ni ses lettres.
-
-### 3.6 La page partagée (§18.7)
-
-- **On emprunte** la page personnage, de haut en bas.
-- **On refait**, en colonne unique de 390 px :
-  1. Le fond en haut : **une capture de la scène de l'ascenseur à l'arrivée** (notre rendu, pas celui du jeu), assombrie à 45 % avec un voile `#0c0d1b` qui descend.
-  2. Un surtitre en Outfit 600 capitales `.15em` lilas : « AVIS DE RECHERCHE ».
-  3. **« @LOGIN »** en Barlow Condensed 700 de 56 px, crème, interligne 1.
-  4. Les étoiles du HUD.
-  5. **L'accroche du profil** en Outfit 500 de 22 px, rose `#ffb2c6`, sur 3 ou 4 lignes courtes.
-  6. **La peine** en blanc, sur trois lignes.
-  7. **Une réplique entre guillemets**, ironique, tirée d'un fait : son pire commit (« "final fix 2" », 3 h 12 du matin). C'est l'équivalent de la réplique du site.
-  8. La fiche.
-  9. Une **mosaïque décalée de pièces à conviction**, sans cadre, en deux colonnes inégales qui débordent à droite : le graphe de contributions, l'extrait de code cité par l'IA, le terminal « 0 tests found ».
-  10. Puis « Et toi ? » avec le champ et le bouton `--blush`.
-  - Le bouton « Voir l'arrestation » est une pilule citron `--lime` avec ▶.
-- **Pourquoi** : le visiteur venu de LinkedIn arrive sur une page qui a la grammaire exacte des pages personnages du jeu (on le reconnaît en une seconde), avec un ami à la place du héros. C'est flatteur pour la cible et drôle pour le dénonciateur (§18.6), et ça donne envie de répondre.
-
-### 3.7 L'image de partage (1200 × 630 et 1080 × 1350)
-
-- **On emprunte** la composition des illustrations officielles (le personnage au tiers, le titre espacé dans le ciel) et, pour l'hebdomadaire, le **principe** du collage.
-- **On refait** :
-  - **1200 × 630** (aperçu de lien) :
-    - fond : le crépuscule peint par nous (`city.webp` à l'heure bleue, ou une illustration du jeu fixe du §17.5), recadré, voile `#0c0d1b` à 40 % à droite ;
-    - à gauche, la fiche (480 px de haut) ;
-    - à droite, de haut en bas : surtitre « AVIS DE RECHERCHE · SKILLS.AZERIT.TECH », « @LOGIN EST RECHERCHÉ » en Barlow Condensed 700 de 84 px crème, les étoiles du HUD, l'accroche du profil en Outfit 500 de 30 px rose ;
-    - tout le texte tient dans la zone centrale de 1080 × 560, à cause du rognage de LinkedIn et de X.
-  - **1080 × 1350** (fil LinkedIn, Instagram) :
-    - le ciel en haut, avec « AVIS DE RECHERCHE » très espacé et translucide **par-dessus le ciel**, comme le titre de la vidéo de lancement ;
-    - la fiche au centre (60 % de la hauteur) ;
-    - dessous, le profil en crème, l'accroche en rose et l'adresse ;
-    - deux palmiers ton sur ton qui débordent des coins.
-  - **« Les 5 plus recherchés de la semaine »** (1080 × 1350) : un **collage de cinq vignettes de tailles inégales** séparées par des gouttières `#2a1530`, chacune un portrait de fiche avec son pseudo en écriteau. **Au centre, aucun bloc logo** : un bandeau horizontal crème « SEMAINE 47 » et c'est tout (§4).
-- **Pourquoi** : sur un fil, l'image doit dire « c'est l'univers du jeu » en un quart de seconde. Le ciel au crépuscule, le titre espacé et le crème sur encre le font. Le collage hebdomadaire est l'image la plus repostable : chaque personne citée la partage.
-
 ### 3.8 Le clip vertical (§18.8)
+
+*Écrit pour l'ascenseur. Le clip attend désormais le film de la poursuite (SPEC §18.34, §18.36).*
 
 - **On emprunte** les vidéos de réseau social du trailer 1 et son rythme en rafale.
 - **On refait** en 1080 × 1920, en 8 s, dans Remotion :
