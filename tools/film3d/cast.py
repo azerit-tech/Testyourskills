@@ -11,7 +11,9 @@
 #   cast_people    le conducteur mains levées, les agents (visée debout, accroupi derrière une
 #                  portière ouverte, garde), arme de poing en main
 #   cast_vehicles  la patrouille (échelle), le fourgon, l'hélicoptère, l'avion, les plots
-# Les rendus des planches : cast_render.py.
+# Les rendus des planches : cast_render.py. Les personnes et les véhicules viennent des modules
+# du laboratoire (lab/cast_people.py, lab/cast_vehicles.py) ; leur assemblage ici n'a pas encore été
+# rendu (rendus suspendus le 11 novembre, machine trop chargée) : à vérifier au premier passage.
 import importlib
 import math
 import os
@@ -48,7 +50,6 @@ VEHICLES_AT = Vector((60.0, 0.0, 0.0))
 
 # Repères du coupé, dans le repère d'origine du modèle (avant vers -y, conduite à gauche, +x)
 WHEEL_CENTER = Vector((0.44, 0.275, 0.83))   # centre de la jante du volant
-SEAT_H_POINT = Vector((0.44, 0.62, 0.50))    # bassin du conducteur sur l'assise
 MIRROR_AT = Vector((0.0, 0.33, 1.17))        # rétroviseur intérieur, sous le haut du pare-brise
 
 
@@ -258,14 +259,36 @@ def make_world(name, strength=1.0, flat=None):
     return w
 
 
-def build_interior(people):
+def grab(fn, col, name, at=(0, 0, 0), yaw=0.0):
+    """Appelle un chargeur des modules du laboratoire et range tout ce qu'il crée sous un vide `name`,
+    posé en `at` et tourné de `yaw` degrés (les chargeurs posent le nez des véhicules vers +x)."""
+    before = set(bpy.data.objects)
+    fn()
+    new = [o for o in bpy.data.objects if o not in before]
+    move_to(new, col)
+    root = bpy.data.objects.new(name, None)
+    col.objects.link(root)
+    for o in new:
+        if o.parent is None:
+            mw = o.matrix_world.copy()
+            o.parent = root
+            o.matrix_world = mw
+    root.location = at
+    root.rotation_euler = (0, 0, math.radians(yaw))
+    return root
+
+
+def build_interior(people, vehicles=None):
     col = collection("cast_interior")
     bpy.context.scene.world = make_world("world_interieur", 0.6)
-    coupe = build_coupe(col)
+    build_coupe(col)
     build_rearview_mirror(col)
     # la patrouille derrière, dans l'axe du rétroviseur ; son avant vers -y comme le coupé
-    chaser = build_chaser(col, Vector((0.6, 24.0, 0.0)))
-    chaser.rotation_euler = (0, 0, -math.pi / 2)
+    if vehicles is not None and hasattr(vehicles, "load_patrol"):
+        grab(lambda: vehicles.load_patrol(lights_on=True), col, "interior_chaser", (0.6, 24.0, 0.0), -90)
+    else:
+        chaser = build_chaser(col, Vector((0.6, 24.0, 0.0)))
+        chaser.rotation_euler = (0, 0, -math.pi / 2)
     # la route, mouillée
     bpy.ops.mesh.primitive_plane_add(size=1)
     road = bpy.context.active_object
@@ -273,11 +296,9 @@ def build_interior(people):
     road.scale = (14, 400, 1)
     road.data.materials.append(material("cast_wet_road", (0.02, 0.02, 0.024, 1), 0.12))
     move_to([road], col)
-    drv = None
     if people is not None and hasattr(people, "cast_driver_seated"):
-        drv = people.cast_driver_seated(WHEEL_CENTER, SEAT_H_POINT)
-        if drv:
-            move_to(drv, col)
+        # ses propres repères du coupé (volant, bassin, pédale), en coordonnées glTF brutes comme ici
+        move_to(people.cast_driver_seated(), col)
     # caméra : depuis l'arrière de l'habitacle, par-dessus l'épaule droite, 24 mm (à 28 mm le volant sort du cadre)
     cam = bpy.data.cameras.new("cam_interior")
     cam.lens = 24
@@ -306,26 +327,65 @@ def lab(name):
         return None
 
 
+def camera(col, name, loc, target, lens):
+    cam = bpy.data.cameras.new(name)
+    cam.lens = lens
+    ob = bpy.data.objects.new(name, cam)
+    col.objects.link(ob)
+    ob.location = loc
+    look_at(ob, target)
+    return ob
+
+
+def build_people(people):
+    """Le conducteur mains levées et un policier dans chacune des trois poses, arme en main ;
+    éclairés de face (lumières front_) ou à contre-jour (back_), cast_render.py choisit."""
+    col = collection("cast_people")
+    grab(people.cast_lineup, col, "people_lineup", PEOPLE_AT)
+    c = PEOPLE_AT
+    camera(col, "cam_people_front", c + Vector((0, -9.0, 1.1)), c + Vector((0, 0, 0.95)), 50)
+    camera(col, "cam_people_back", c + Vector((0, -11.0, 0.45)), c + Vector((0, 0, 1.0)), 50)
+    add_light("front_key", "AREA", c + Vector((-3.0, -6.0, 4.0)), (1, 1, 1), 2500, target=c + Vector((0, 0, 1)), size=4.0, col=col)
+    add_light("front_fill", "AREA", c + Vector((4.0, -5.0, 2.0)), (1, 1, 1), 600, target=c + Vector((0, 0, 1)), size=4.0, col=col)
+    # les phares du suspect derrière eux, bas, et un liseré corail / violet des rampes
+    add_light("back_headlights", "AREA", c + Vector((0, 7.0, 0.7)), CREAM, 9000, target=c + Vector((0, -6, 1)), size=2.0, col=col)
+    add_light("back_rim_coral", "AREA", c + Vector((-6.0, 5.0, 2.0)), CORAL, 1500, target=c + Vector((0, 0, 1.2)), size=1.0, col=col)
+    add_light("back_rim_lilac", "AREA", c + Vector((6.0, 5.0, 2.0)), LILAC, 1500, target=c + Vector((0, 0, 1.2)), size=1.0, col=col)
+    bpy.ops.mesh.primitive_plane_add(size=1, location=c)
+    floor = bpy.context.active_object
+    floor.name = "people_floor"
+    floor.scale = (40, 40, 1)
+    floor.data.materials.append(material("cast_floor", (0.03, 0.03, 0.035, 1), 0.2))
+    move_to([floor], col)
+    make_world("world_personnes", 1.0, flat=(0.18, 0.18, 0.19, 1))
+    make_world("world_contrejour", 0.08)
+
+
+def build_vehicles(vehicles):
+    """La patrouille, le fourgon, l'hélicoptère, l'avion et les plots, côte à côte, nez vers -y."""
+    col = collection("cast_vehicles")
+    v = VEHICLES_AT
+    grab(lambda: vehicles.load_patrol(lights_on=True), col, "lineup_patrol", v + Vector((-9.0, 0, 0)), -90)
+    grab(lambda: vehicles.load_van(lights_on=True), col, "lineup_van", v + Vector((-3.0, 0, 0)), -90)
+    grab(lambda: vehicles.load_helicopter(searchlight_on=False), col, "lineup_helicopter", v + Vector((6.0, 2.0, 0)), -90)
+    grab(lambda: vehicles.load_jet(), col, "lineup_jet", v + Vector((22.0, 4.0, 0)), -90)
+    grab(lambda: vehicles.load_props(), col, "lineup_props", v + Vector((-3.0, -9.0, 0)), 0)
+    camera(col, "cam_vehicles", v + Vector((4.0, -42.0, 9.0)), v + Vector((5.0, 0, 1.5)), 35)
+    add_light("vehicles_key", "SUN", v + Vector((0, -20, 30)), (1, 1, 1), 3.0, target=v, col=col)
+    make_world("world_vehicules", 0.6)
+
+
 def build():
     bpy.ops.wm.read_factory_settings(use_empty=True)
     scene = bpy.context.scene
     people = lab("cast_people")
     vehicles = lab("cast_vehicles")
-    build_interior(people)
+    build_interior(people, vehicles)
     if people is not None and hasattr(people, "cast_lineup"):
-        col = collection("cast_people")
-        objs = people.cast_lineup()
-        move_to(objs, col)
-        for o in objs:
-            if o.parent is None:
-                o.location += PEOPLE_AT
-    if vehicles is not None and hasattr(vehicles, "cast_lineup"):
-        col = collection("cast_vehicles")
-        objs = vehicles.cast_lineup()
-        move_to(objs, col)
-        for o in objs:
-            if o.parent is None:
-                o.location += VEHICLES_AT
+        build_people(people)
+    if vehicles is not None and hasattr(vehicles, "load_patrol"):
+        build_vehicles(vehicles)
+    scene.world = bpy.data.worlds["world_interieur"]
     scene.render.engine = "CYCLES"
     scene.cycles.device = "CPU"
     out = os.path.join(ASSETS, "cast.blend")

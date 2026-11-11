@@ -1,10 +1,10 @@
 # Rend les planches de la distribution depuis cast.blend (cast.py).
 #
-#   lockf -k <verrou> nice -n 19 taskpolicy -b /Applications/Blender.app/Contents/MacOS/Blender -b -t 2 \
-#     -P tools/film3d/cast_render.py -- --sheet interieur|personnes|contrejour|vehicules [--samples 96]
+#   lockf -k <verrou> nice -n 10 /Applications/Blender.app/Contents/MacOS/Blender -b -t 2 \
+#     -P tools/film3d/cast_render.py -- --sheet interieur|personnes|contrejour|vehicules [--samples 128] [--cpu]
 #
 # Écrit Azerit/design/film/ref/cast-interieur.png, cast-personnes.png,
-# cast-personnes-contrejour.png, cast-vehicules.png. CPU, 2 fils par défaut.
+# cast-personnes-contrejour.png, cast-vehicules.png. GPU Metal par défaut (--cpu sinon), 2 fils.
 import argparse
 import math
 import os
@@ -40,7 +40,8 @@ SHEETS = {
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--sheet", default="interieur", choices=sorted(SHEETS))
-ap.add_argument("--samples", type=int, default=96)
+ap.add_argument("--samples", type=int, default=128)
+ap.add_argument("--cpu", action="store_true", help="processeur au lieu du GPU Metal")
 ap.add_argument("--threads", type=int, default=2)
 ap.add_argument("--scale", type=int, default=100, help="pourcentage de la résolution")
 args = ap.parse_args(sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else [])
@@ -66,6 +67,18 @@ r = scene.render
 r.engine = "CYCLES"
 c = scene.cycles
 c.device = "CPU"
+if not args.cpu:
+    prefs = bpy.context.preferences.addons["cycles"].preferences
+    prefs.compute_device_type = "METAL"
+    prefs.get_devices()
+    metal = [d for d in prefs.devices if d.type == "METAL"]
+    for d in prefs.devices:
+        d.use = d.type == "METAL"
+    if metal:
+        c.device = "GPU"
+        print(f"[cast_render] GPU Metal : {', '.join(d.name for d in metal)}", flush=True)
+    else:
+        raise SystemExit("[cast_render] pas de GPU Metal (--cpu pour forcer le processeur)")
 r.threads_mode = "FIXED"
 r.threads = args.threads
 c.samples = args.samples
