@@ -225,6 +225,14 @@ def render(name, which=("large", "pres"), save_blend=False):
     r.threads_mode = "FIXED"
     r.threads = 2
     c.device = "CPU"
+    if os.environ.get("BENCH_GPU"):
+        # BENCH_GPU=1 : Metal, toutes les cartes de la machine
+        prefs = bpy.context.preferences.addons["cycles"].preferences
+        prefs.compute_device_type = "METAL"
+        prefs.get_devices()
+        for d in prefs.devices:
+            d.use = d.type == "METAL"
+        c.device = "GPU"
     c.samples = SAMPLES
     c.use_denoising = True
     os.makedirs(LAB, exist_ok=True)

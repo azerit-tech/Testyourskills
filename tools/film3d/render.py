@@ -48,6 +48,7 @@ ap.add_argument("--scene", default="scene-a.blend")
 ap.add_argument("--out", default=None)
 ap.add_argument("--preview", action="store_true")
 ap.add_argument("--samples", type=int, default=None)
+ap.add_argument("--percent", type=int, default=None, help="taille en % de 720 × 1280 (75 : 540 × 960)")
 ap.add_argument("--threads", type=int, default=2)
 ap.add_argument("--gpu", action="store_true")
 ap.add_argument("--blur", action="store_true", help="flou de bougé, obturateur à 180°, écrit test-?-blur.png")
@@ -139,8 +140,12 @@ def bar_lights(police, tag, strong=False):
     de biais ; `strong` (le drone) : quatre, deux qui fauchent la chaussée, deux qui lèchent les
     couronnes des palmiers, dans une brume locale qui les rend visibles."""
     if strong:
-        beams = [(CORAL, (0.55, 0.55, -0.55), 30000, 34), (LILAC, (-0.6, 0.45, -0.55), 30000, 34),
-                 (CORAL, (1.0, 0.15, 0.8), 45000, 20), (LILAC, (-1.0, 0.25, 0.8), 45000, 20)]
+        # vu d'en haut, un faisceau qui tape la chaussée de haut fait une tache ; presque à
+        # l'horizontale, il s'étire en traînée sur le bitume mouillé et s'éteint au loin, comme un
+        # gyrophare qui balaie. Deux traînées par couleur, deux faisceaux hauts dans les palmes.
+        beams = [(CORAL, (0.75, 0.62, -0.14), 34000, 16, 1.0), (CORAL, (0.95, -0.3, -0.10), 22000, 14, 1.0),
+                 (LILAC, (-0.8, 0.55, -0.14), 34000, 16, 1.0), (LILAC, (-0.9, -0.35, -0.10), 22000, 14, 1.0),
+                 (CORAL, (1.0, 0.15, 0.8), 30000, 18, 0.9), (LILAC, (-1.0, 0.25, 0.8), 30000, 18, 0.9)]
     else:
         beams = None
     if beams is None:
@@ -160,13 +165,24 @@ def bar_lights(police, tag, strong=False):
         return
     bpy.context.view_layer.update()
     top = police.matrix_world @ Vector((-0.26, 0, 1.6))
-    for k, (col, d, energy, size) in enumerate(beams):
+    for side, col in ((1, CORAL), (-1, LILAC)):
+        # la lueur colorée que la rampe jette autour de la voiture, sur le bitume et les carrosseries
+        L = bpy.data.lights.new(f"bar_{tag}_glow_{side}", "POINT")
+        L.color = col
+        L.energy = 1500
+        L.shadow_soft_size = 0.4
+        lo = bpy.data.objects.new(L.name, L)
+        scene.collection.objects.link(lo)
+        lo.location = top + Vector((side * 0.35, 0, 0.15))
+        lo.parent = police
+        lo.matrix_parent_inverse = police.matrix_world.inverted()
+    for k, (col, d, energy, size, blend) in enumerate(beams):
         L = bpy.data.lights.new(f"bar_{tag}_{k}", "SPOT")
         L.color = col
         L.energy = energy
         L.shadow_soft_size = 0.05
         L.spot_size = math.radians(size)
-        L.spot_blend = 0.35
+        L.spot_blend = blend
         lo = bpy.data.objects.new(L.name, L)
         scene.collection.objects.link(lo)
         lo.location = top + Vector((0.3 if d[0] > 0 else -0.3, 0, 0))
@@ -275,6 +291,8 @@ if args.preview:
     c.samples = 64
 if args.samples:
     c.samples = args.samples
+if args.percent:
+    r.resolution_percentage = args.percent
 
 base = SHOT_NAMES[args.shot] if args.scene == "scene-a.blend" else os.path.splitext(args.scene)[0].replace("scene-", "test-")
 out = args.out or os.path.join(FILM, "ref", base + ("-blur" if args.blur else "") + ("-preview" if args.preview else "") + ".png")
