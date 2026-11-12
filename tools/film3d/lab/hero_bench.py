@@ -51,6 +51,7 @@ def _args():
     ap.add_argument("--res", default="720x1280")
     ap.add_argument("--marks", action="store_true", help="repères de rotation sur les roues (contrôle)")
     ap.add_argument("--no-driver", action="store_true")
+    ap.add_argument("--stop", type=float, default=0.0, help="les feux stop (propriété « stop » de la caisse, 0 à 1)")
     ap.add_argument("--fill", default="", help="la source de face de lieux.car_fill (P4) : on, ou noglossy "
                                                "(invisible aux reflets)")
     ap.add_argument("--compose", default="", help="planche : chemin de sortie, puis les images")
@@ -288,6 +289,12 @@ def camera(car, parts, view):
         return cam
     # les cadres du film : P4 de face au 200 mm à 45 m, 1,2 m de haut ; P1 de trois quarts avant droit, 12 m devant,
     # 2,8 m à droite, 0,5 m, 50 mm
+    # l'arrière, la vue principale du film v3 : de dos à 6 m et 1,4 m au 28 mm (le cadre des poursuites), le bas de
+    # caisse vu de derrière à hauteur de pare-chocs (échappement, dessous, passages de roue), l'aile arrière de trois
+    # quarts au ras du sol
+    shots["dos-6m"] = ((0.0, mx.y + 6.0, 1.4), (0.0, mx.y - 1.2, 0.80), 28.0)
+    shots["dos-bas"] = ((0.35, mx.y + 2.6, 0.30), (0.0, mx.y - 0.6, 0.30), 35.0)
+    shots["arche"] = ((1.75, mx.y + 0.9, 0.45), (0.80, mx.y - 1.0, 0.40), 35.0)
     shots["p4"] = ((0.0, mn.y - 45.0, 1.2), (0.0, mn.y, 0.70), 200.0)
     shots["p1"] = ((-2.8, mn.y - 12.0, 0.5), (0.0, c.y, 0.75), 50.0)
     loc, tgt, lens = shots[view]
@@ -316,6 +323,11 @@ def build(a):
     car = A.street_hero(scene)
     car.location = (0, 0, 0)
     car.rotation_euler = (0, 0, 0)
+    if a.stop:
+        # par les clés, comme dans le film (hero_cars.stop_lamps) : allumés des images 10 à 12, rendu à l'image 11
+        import hero_cars
+        hero_cars.stop_lamps(car, 10, 12, a.stop)
+        scene.frame_set(11)
     bpy.context.view_layer.update()
     if a.marks:
         import motion as M
