@@ -24,8 +24,8 @@ PATROL_ACCEL = 3.0
 PATROL_R = 5.5                      # rayon du braquage de la patrouille (vers +x : vers l'avenue)
 
 # la caméra dans la caisse (repère de la caisse de scene_a.street_hero : l'avant vers -y, le conducteur à +x)
-CAM_LOCAL = (0.15, 0.65, 1.15)
-CAM_PITCH = -10.0
+CAM_LOCAL = (0.15, 0.65, 1.25)   # 13 cm sous le pavillon : le dossier avant ne prend que le bas du cadre
+CAM_PITCH = -12.0                  # le rétroviseur au tiers haut, hors de la bande du HUD
 LENS = 28.0
 MIRROR = (0.0, -0.63, 1.225)         # le centre du rétroviseur intérieur (sonde du 12 novembre)
 
