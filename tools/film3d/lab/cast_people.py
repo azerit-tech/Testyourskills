@@ -17,7 +17,7 @@
 # _skin_to_bone (vérifiée en chiffres seulement, suit la tête dans les trois poses), les styles 1 et 2 de
 # pose_officer, le buste à 20° du « crouch », la coupe des faces étirées du sweat (_cut_stretched, vue en
 # Workbench), et dans cast_people_render.py : l'habitacle repris de cast.py et la planche « situation ».
-# Au 12 nov. : matières, visages et conducteur vérifiés au banc (lab/people_bench.py, 256 éch.) :
+# Au 12 nov. : matières, visages, variantes et conducteur vérifiés au banc (lab/people_bench.py, 256 éch.) :
 # agents de face, de trois quarts et de dos, en joue, accroupis et en garde, sous des phares puis des néons ;
 # conducteur au volant et mains levées, seul et derrière le pare-brise de la berline.
 #
@@ -1279,11 +1279,17 @@ def _texture_classes(ob, small=400):
     return out
 
 
-# l'allure de l'agent (load_officer, `look`) : teinte de peau (décalage de teinte, saturation, valeur de la
-# texture), barbe et moustache, teinte du drap, teinte des cheveux
+# les variantes bon marché des agents (load_officer, `look`) : teinte de peau (décalage de teinte, saturation,
+# valeur de la texture), barbe et moustache, teinte du drap, carrure (largeur des épaules et du torse, la taille
+# ne change pas), teinte des cheveux, port de tête (lacet, inclinaison, en degrés : pose_officer)
 LOOKS = [
     dict(tone=(0.0, 1.0, 0.92), beard=True, moustache=True, cloth="#1b2233", width=1.0, hair="#2a2420"),
+    dict(tone=(-0.005, 1.08, 0.5), beard=True, moustache=False, cloth="#191d29", width=1.06, hair="#121010",
+         head_yaw=7.0, head_tilt=3.0),
+    dict(tone=(0.012, 0.85, 0.8), beard=False, moustache=False, cloth="#1e2536", width=0.95, hair="#3b2c21",
+         head_yaw=-6.0, head_tilt=-4.0),
 ]
+_LOOK_COUNT = [0]
 
 
 def _paint_spp(arm, meshes, look):
@@ -1336,6 +1342,14 @@ def _paint_spp(arm, meshes, look):
             _assign_by_faces(ob, ["glove" if p.index in hands else "skin" for p in ob.data.polygons],
                              {"skin": skin, "glove": mat_leather()})
     return kept
+
+
+def _widen(arm, meshes, k):
+    """La carrure : maillages et squelette élargis de `k` en x (épaules, torse, hanches), un peu en y ; la
+    hauteur, l'origine et les pieds au sol ne bougent pas."""
+    if abs(k - 1.0) < 1e-3:
+        return
+    _transform_all(arm, meshes, Matrix.Diagonal((k, 1.0 + (k - 1.0) * 0.6, 1.0, 1.0)))
 
 
 def _paint_officer(arm, meshes, variant, look=0):
@@ -1565,11 +1579,15 @@ def _smooth_mesh(ob, weld=True, subsurf=0):
         md.uv_smooth = "PRESERVE_BOUNDARIES"
 
 
-def load_officer(variant="spp", name=None, look=0):
+def load_officer(variant="spp", name=None, look=None):
     """Un policier riggé, 1,78 m, uniforme marine uni sans insigne, ceinture noire, casquette, gants noirs.
-    `look` (agent SPP) : l'allure de LOOKS (peau, barbe, drap).
+    `look` (agent SPP) : la variante de LOOKS (peau, barbe, carrure, drap) ; par défaut chaque agent chargé prend
+    la suivante (0, 1, 2, 0…), pour que deux agents d'une même scène ne soient pas des clones.
     Renvoie l'objet armature (les maillages en sont les enfants)."""
     spec = OFFICERS[variant]
+    if look is None:
+        look = _LOOK_COUNT[0]
+        _LOOK_COUNT[0] += 1
     arm, meshes = _import(spec["path"])
     if spec["route"] == "R":
         arm, meshes = _rig_static(meshes, spec["donor"], spec.get("joints"))
@@ -1577,6 +1595,7 @@ def load_officer(variant="spp", name=None, look=0):
     if variant == "spp":
         for o in meshes:
             o.data.name = _spp_part(o).capitalize() + "_" + o.data.name
+        _widen(arm, meshes, LOOKS[look % len(LOOKS)]["width"])
     _calibrate_palms(arm)
     meshes = _paint_officer(arm, meshes, variant, look)
     if spec.get("cap"):
@@ -1587,6 +1606,7 @@ def load_officer(variant="spp", name=None, look=0):
                 _smooth_mesh(o, weld=False, subsurf=1)
     arm.name = name or f"officer_{variant}"
     arm["variant"] = variant
+    arm["look"] = look % len(LOOKS)
     arm["route"] = spec["route"]
     arm["tris"] = sum(sum(len(p.vertices) - 2 for p in o.data.polygons) for o in meshes)
     return arm
@@ -1892,6 +1912,13 @@ def pose_officer(arm, pose="aim", style=0):
         _head_look(arm, (F + D * 0.05).normalized())
     else:
         raise ValueError(pose)
+    # le port de tête de la variante (LOOKS) : quelques degrés de lacet et d'inclinaison, moitié moins en visée
+    look = LOOKS[int(arm.get("look", 0)) % len(LOOKS)]
+    k = 0.5 if pose in ("aim", "crouch") else 1.0
+    if look.get("head_yaw"):
+        _rot(arm, "Head", U, look["head_yaw"] * k)
+    if look.get("head_tilt"):
+        _rot(arm, "Head", F, look["head_tilt"] * k)
 
 
 def place_driver(arm, hip_point, forward=(0, -1, 0)):
