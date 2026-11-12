@@ -87,6 +87,7 @@ ap.add_argument("--groups", default=None, help="JSON {groupe: [préfixes de noms
 ap.add_argument("--split", action="store_true", help="groupes fins et composantes diffus / brillant / volume")
 ap.add_argument("--bands", default="0,0.15,0.15,0.3", help="bandes du sol mesurées (bas0,haut0,bas1,haut1)")
 ap.add_argument("--from-exr", action="store_true", help="réécrire les PNG depuis le multicouche, sans rendu")
+ap.add_argument("--measure", action="store_true", help="mesurer seulement <name>-split.exr, sans rien rendre")
 ap.add_argument("--dry", action="store_true", help="tout préparer, vérifier les passes, ne pas rendre")
 args = ap.parse_args(sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else [])
 name = args.name or os.path.splitext(args.scene)[0]
@@ -176,20 +177,27 @@ def measure(path):
     except ImportError as e:
         log(f"mesure impossible : {e}")
         return
-    buf = oiio.ImageBuf(path)
-    px = buf.get_pixels(oiio.FLOAT)
-    chans = list(buf.spec().channelnames)
-    h = px.shape[0]
     b = [float(x) for x in args.bands.split(",")]
     bands = [(b[i], b[i + 1]) for i in range(0, len(b) - 1, 2)]
     rows = []
-    for item in dict.fromkeys(c.rsplit(".", 1)[0] for c in chans):
-        idx = [chans.index(f"{item}.{c}") for c in "RGB" if f"{item}.{c}" in chans]
-        if len(idx) < 3:
-            continue
-        y = 0.2126 * px[..., idx[0]] + 0.7152 * px[..., idx[1]] + 0.0722 * px[..., idx[2]]
-        vals = [float(np.mean(y[int(h * (1 - hi)):int(h * (1 - lo)) or h])) for lo, hi in bands]
-        rows.append((vals, item))
+    # (le multicouche de la sortie fichier range chaque entrée dans sa propre sous-image)
+    inp = oiio.ImageInput.open(path)
+    k = 0
+    while True:
+        chans = list(inp.spec().channelnames)
+        px = inp.read_image(oiio.FLOAT)
+        h = px.shape[0]
+        for item in dict.fromkeys(c.rsplit(".", 1)[0] for c in chans):
+            idx = [chans.index(f"{item}.{c}") for c in "RGB" if f"{item}.{c}" in chans]
+            if len(idx) < 3:
+                continue
+            y = 0.2126 * px[..., idx[0]] + 0.7152 * px[..., idx[1]] + 0.0722 * px[..., idx[2]]
+            vals = [float(np.mean(y[int(h * (1 - hi)):int(h * (1 - lo)) or h])) for lo, hi in bands]
+            rows.append((vals, item))
+        k += 1
+        if not inp.seek_subimage(k, 0):
+            break
+    inp.close()
     for k, (lo, hi) in enumerate(bands):
         tot = next((v[k] for v, i in rows if i.endswith("total")), None)
         log(f"sol, bande {lo:.2f}–{hi:.2f} depuis le bas (luminance linéaire moyenne"
@@ -200,6 +208,9 @@ def measure(path):
 
 
 sc = None
+if args.measure:
+    measure(os.path.join(REF, f"{name}-split.exr"))
+    sys.exit(0)
 if args.from_exr:
     # le multicouche relu : chaque passe Combined_<groupe> passe par la transformée de vue de la scène
     bpy.ops.wm.open_mainfile(filepath=os.path.join(ASSETS, args.scene))
