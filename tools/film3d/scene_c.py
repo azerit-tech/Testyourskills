@@ -319,9 +319,11 @@ def plan_P4(scene, hidden, haubans=False):
 PLANS = {"P4": plan_P4}
 
 
-def build(plan, palier="socle"):
+def build(plan, palier="complet"):
+    """« complet » (par défaut, celui du film : render_film.py n'en passe pas) prend tous les paliers validés, ici
+    le pylône et ses haubans ; « socle » le pont nu (render_lieux.py --palier)."""
     scene, hidden = L.new_scene()
-    cam = PLANS[plan](scene, hidden, haubans=(palier == "haubans"))
+    cam = PLANS[plan](scene, hidden, haubans=(palier in ("haubans", "complet")))
     scene.camera = cam
     import p4_pont as P4
     scene.frame_set(P4.STILL_FRAME if plan == "P4" else 2)

@@ -670,7 +670,7 @@ def plan_FIN(scene, hidden, palier="socle"):
     pose validée."""
     import motion as M
     import fin_pointe as F
-    decor(scene, hidden, marina=(palier == "marina"))
+    decor(scene, hidden, marina=(palier in ("marina", "complet")))
     scene.frame_start, scene.frame_end = F.F0, F.F0 + F.FRAMES - 1
     frames = range(F.F0 - 1, F.F0 + F.FRAMES + 1)
     skid_marks()
@@ -761,7 +761,7 @@ def plan_FIN6(scene, hidden, palier="socle"):
     l'enrobé mouillé."""
     import motion as M
     import fin6_orbite as F6
-    decor(scene, hidden, all_lit=True, marina=(palier == "marina"))
+    decor(scene, hidden, all_lit=True, marina=(palier in ("marina", "complet")))
     scene.frame_start, scene.frame_end = F6.F0, F6.F0 + F6.FRAMES - 1
     frames = range(F6.F0 - 1, F6.F0 + F6.FRAMES + 1)
     rnd = random.Random(6)
@@ -860,9 +860,9 @@ def plan_P6(scene, hidden, palier="socle"):
     la berline (ils ne tirent rien) ; la grue tremble à leur approche. Rien dans les 12 % du haut : le ciel."""
     import motion as M
     import p6_jetee as P6
-    lamp_src = L.panorama(scene, hidden, all_lit=True, bridge="loin", port="loin", haubans=(palier == "haubans"))
+    lamp_src = L.panorama(scene, hidden, all_lit=True, bridge="loin", port="loin", haubans=(palier in ("haubans", "complet")))
     build_jetty(hidden, lamp_src)
-    build_pointe(hidden, lamp_src, far=True, marina=(palier == "marina"))
+    build_pointe(hidden, lamp_src, far=True, marina=(palier in ("marina", "complet")))
     scene.frame_start, scene.frame_end = P6.F0, P6.F0 + P6.FRAMES - 1
     frames = range(P6.F0 - 1, P6.F0 + P6.FRAMES + 1)      # une image de part et d'autre : l'obturateur du flou
     hero = L.hero()
@@ -931,7 +931,9 @@ STILL = {"P6": 21, "FIN6": 56, "FIN": 36}                        # l'image fixe 
 PLANS = {"FIN": plan_FIN, "FIN6": plan_FIN6, "P6": plan_P6}
 
 
-def build(plan, palier="socle"):
+def build(plan, palier="complet"):
+    """« complet » (par défaut, celui du film : render_film.py n'en passe pas) prend tous les paliers validés : la
+    marina (P6, FIN, FIN6) et le pylône du pont (P6) ; « socle », « marina », « haubans » un seul (render_lieux.py)."""
     scene, hidden = L.new_scene()
     cam = PLANS[plan](scene, hidden, palier=palier)
     scene.camera = cam
