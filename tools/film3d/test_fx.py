@@ -61,9 +61,14 @@ def test_track():
 
 
 def test_spray():
-    slow, _ = fx.wheel_spray(line_track(8.0), None, R, seed=2)
-    fast, mist = fx.wheel_spray(line_track(30.0), None, R, seed=2)
-    drift, mist_d = fx.wheel_spray(line_track(30.0, slip_deg=20.0), None, R, seed=2)
+    slow, _ = fx.wheel_spray(line_track(8.0), None, R, seed=2, veil="haut")
+    fast, mist = fx.wheel_spray(line_track(30.0), None, R, seed=2, veil="haut")
+    drift, mist_d = fx.wheel_spray(line_track(30.0, slip_deg=20.0), None, R, seed=2, veil="haut")
+    # de dos, l'intensité plafonne à celle de 70 km/h : autant de gouttes et de voile en l'air à 100 qu'à 70
+    for L70, L100 in zip(fx.wheel_spray(line_track(19.4), None, R, seed=2),
+                         fx.wheel_spray(line_track(27.8), None, R, seed=2)):
+        a70, a100 = sum(q.life for q in L70), sum(q.life for q in L100)
+        assert 0.8 < a100 / a70 < 1.2, (a70, a100)
     assert len(fast) > 2.5 * len(slow) > 0, (len(slow), len(fast))
     assert len(drift) > 1.5 * len(fast) and len(mist_d) > len(mist) > 0
     dry, dmist = fx.wheel_spray(line_track(30.0), None, R, wet=0.0, seed=2)
@@ -159,6 +164,16 @@ def test_lisible():
     for q in sheet:
         b, _ = rel(q, q.life * 0.5)
         assert b > -0.8, b                                          # jamais devant la berline
+    # de dos à 100 km/h : la gerbe retombe 3 à 5 m derrière les roues, pas plus loin qu'à 70
+    e9 = {}
+    for spd in (19.4, 27.8):
+        dd, mm = fx.wheel_spray(line_track(spd, n=40), None, R, seed=5)
+        for i, L in enumerate((dd, mm)):
+            e = sorted(spd * (q.birth / fx.FPS + q.life) - fx.ballistic(q.p, q.v, q.life, q.drag, q.grav)[1] - 1.4
+                       for q in L if 8 < q.birth < 20 and q.p[1] < spd * q.birth / fx.FPS)
+            assert 3.0 < e[len(e) // 2] < 5.0 and e[int(len(e) * 0.9)] < 5.8, (spd, e[len(e) // 2], e[int(len(e) * 0.9)])
+            e9.setdefault(i, []).append(e[int(len(e) * 0.9)])
+    assert all(abs(a - b) < 0.4 for a, b in e9.values()), e9
     # de dos : la lame de flaque 20 à 30 cm au-dessus de la traînée, le haut sous le bas du coffre (0,8 m)
     _, sheet = fx.puddle_splash(trs, cr[0], R, seed=4)
     peak = sorted(max(rel(q, t / 48)[1] for t in range(int(q.life * 48))) for q in sheet)
