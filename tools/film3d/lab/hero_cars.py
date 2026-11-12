@@ -23,6 +23,9 @@
 #   FILM3D_USURE=0..1        l'usure des matières (USURE par défaut)
 #   FILM3D_PAINT=<hex>       la teinte de la peinture (PAINT["w111"] par défaut)
 #   FILM3D_PAINT_METAL=0..1  la part métallique de sa base (PAINT_METAL["w111"] par défaut)
+#   FILM3D_PAINT_COAT=0..1   le poids du vernis, en facteur (1 par défaut : inchangé)
+#   FILM3D_PAINT_COAT_ROUGH=0..1  rugosité ajoutée au vernis (0 par défaut : inchangé)
+#   (lus à la construction : un plan rendu dans son propre Blender les prend pour lui seul, render_film.py --essai)
 import math
 import os
 import sys
@@ -82,6 +85,17 @@ def w111_paint():
     except ValueError:
         metal = PAINT_METAL["w111"]
     return col, metal
+
+
+def w111_coat():
+    """Le vernis de la berline, pour un essai par plan : FILM3D_PAINT_COAT (facteur du poids, 1 = inchangé) et
+    FILM3D_PAINT_COAT_ROUGH (rugosité ajoutée, 0 = inchangé). Sans ces variables, la matière ne change pas."""
+    def num(key, default):
+        try:
+            return max(0.0, min(1.0, float(os.environ.get(key, default))))
+        except ValueError:
+            return default
+    return num("FILM3D_PAINT_COAT", 1.0), num("FILM3D_PAINT_COAT_ROUGH", 0.0)
 LEATHER = {
     "w111": "#7a4a2c",  # cuir cognac
     "slc": "#6b4a32",   # cuir tabac
@@ -331,18 +345,19 @@ def _grime(nt, rest, axles=None, top=0.6):
 
 
 def mat_paint(name, color, metal=0.45, rough=0.3, flake=0.1, peel=0.012, gaps=(), ribs=(), inside=None, wear=0.0,
-              axles=(1.40, -1.40)):
+              axles=(1.40, -1.40), coat=(1.0, 0.0)):
     """Peinture vernie : base pigmentée à paillettes fines (bruit très serré sur la rugosité et le métal),
     vernis brillant à peau d'orange légère (bruit doux sur la normale du vernis).
 
     gaps : joints de panneaux dessinés en coordonnées objet (creux sombre et relief), pour une caisse dont le maillage
-    n'a pas de vraies découpes ; ribs : bandes nervurées.
+    n'a pas de vraies découpes ; ribs : bandes nervurées ; coat : (facteur du poids du vernis, rugosité ajoutée),
+    (1, 0) par défaut, sans aucun nœud de plus.
 
     wear (0..1, la berline) : le vernis garde son brillant mais n'est plus parfait : rugosité qui varie par zones,
     micro-rayures circulaires du lustrage visibles dans les reflets, taches d'eau séchée et gouttes qui perlent encore
     sur le dessus, ondulation légère des panneaux, voile de route sur le bas de caisse et derrière les roues."""
     if wear > 0:
-        return _mat_paint_worn(name, color, metal, rough, flake, peel, wear, axles)
+        return _mat_paint_worn(name, color, metal, rough, flake, peel, wear, axles, coat)
     m, nt, out = cv._mat(name)
     tc = nt.nodes.new("ShaderNodeTexCoord")
     if gaps or ribs:
@@ -360,7 +375,8 @@ def mat_paint(name, color, metal=0.45, rough=0.3, flake=0.1, peel=0.012, gaps=()
     nt.links.new(tc.outputs["Object"], op.inputs["Vector"])
     bump = _node(nt, "ShaderNodeBump", Strength=peel, Distance=0.002)
     nt.links.new(op.outputs["Fac"], bump.inputs["Height"])
-    p = cv._principled(nt, **{"Base Color": lin(color), "Coat Weight": 1.0, "Coat Roughness": 0.025, "Coat IOR": 1.5})
+    p = cv._principled(nt, **{"Base Color": lin(color), "Coat Weight": coat[0], "Coat Roughness": 0.025 + coat[1],
+                              "Coat IOR": 1.5})
     nt.links.new(r.outputs[0], p.inputs["Roughness"])
     nt.links.new(mm.outputs[0], p.inputs["Metallic"])
     nt.links.new(bump.outputs[0], p.inputs["Coat Normal"])
@@ -378,7 +394,8 @@ def mat_paint(name, color, metal=0.45, rough=0.3, flake=0.1, peel=0.012, gaps=()
             col.inputs[6].default_value = lin(color)
             col.inputs[7].default_value = (0.002, 0.002, 0.002, 1)
             nt.links.new(col.outputs[2], p.inputs["Base Color"])
-            nt.links.new(cv._math(nt, "SUBTRACT", 1.0, gm), p.inputs["Coat Weight"])
+            cw = cv._math(nt, "SUBTRACT", 1.0, gm)
+            nt.links.new(cw if coat[0] == 1.0 else cv._math(nt, "MULTIPLY", cw, coat[0]), p.inputs["Coat Weight"])
         gb = _node(nt, "ShaderNodeBump", Strength=0.6, Distance=0.002)
         nt.links.new(h, gb.inputs["Height"])
         nt.links.new(gb.outputs[0], p.inputs["Normal"])
@@ -400,7 +417,7 @@ def mat_paint(name, color, metal=0.45, rough=0.3, flake=0.1, peel=0.012, gaps=()
     return m
 
 
-def _mat_paint_worn(name, color, metal, rough, flake, peel, w, axles):
+def _mat_paint_worn(name, color, metal, rough, flake, peel, w, axles, coat=(1.0, 0.0)):
     """La peinture de la berline, usée de `w` (voir mat_paint)."""
     m, nt, out = cv._mat(name)
     rest = _rest(nt)
@@ -443,8 +460,11 @@ def _mat_paint_worn(name, color, metal, rough, flake, peel, w, axles):
     nt.links.new(base_col, p.inputs["Base Color"])
     nt.links.new(cv._math(nt, "ADD", base_r.outputs[0], cv._math(nt, "MULTIPLY", g, 0.4)), p.inputs["Roughness"])
     nt.links.new(mm.outputs[0], p.inputs["Metallic"])
+    if coat[1] > 0.0:
+        coat_r = cv._math(nt, "ADD", coat_r, coat[1])
     nt.links.new(coat_r, p.inputs["Coat Roughness"])
-    nt.links.new(cv._math(nt, "SUBTRACT", 1.0, cv._math(nt, "MULTIPLY", g, 0.55)), p.inputs["Coat Weight"])
+    cw = cv._math(nt, "SUBTRACT", 1.0, cv._math(nt, "MULTIPLY", g, 0.55))
+    nt.links.new(cw if coat[0] == 1.0 else cv._math(nt, "MULTIPLY", cw, coat[0]), p.inputs["Coat Weight"])
     nt.links.new(b0.outputs[0], p.inputs["Normal"])
     nt.links.new(b2.outputs[0], p.inputs["Coat Normal"])
     nt.links.new(p.outputs[0], out.inputs[0])
@@ -972,11 +992,13 @@ def _w111_materials(parts, lights_on, tag="hero_w111", paint_color=None, leather
     on = 1.0 if lights_on else 0.0
     # moins de métal dans la base que la peinture par défaut : la part diffuse garde le rouge lisible quand le reflet
     # (le ciel bleu de l'heure bleue) l'emporte
+    coat = (1.0, 0.0)
     if paint_color is None:
         paint_color, metal = w111_paint()
+        coat = w111_coat()
     else:
         metal = PAINT_METAL["w111"]
-    paint = mat_paint(f"{tag}_paint", paint_color, metal=metal, wear=wear)
+    paint = mat_paint(f"{tag}_paint", paint_color, metal=metal, wear=wear, coat=coat)
     chrome = mat_chrome(f"{tag}_chrome", (0.92, 0.92, 0.93, 1), 0.05, wear=wear)
     table = {
         "Carpaint_Simple_Ruby0": paint,
