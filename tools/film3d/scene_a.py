@@ -31,6 +31,7 @@ def main_checkout():
 
 
 ASSETS = os.environ.get("FILM3D_ASSETS") or os.path.join(os.path.dirname(main_checkout()), "design", "film", "assets")
+os.environ.setdefault("FILM3D_ASSETS", ASSETS)  # (lab/cast_people compte ses dossiers depuis son fichier : faux en worktree)
 random.seed(27)
 
 # Les variantes à comparer, en attendant le choix de Jacques (une variable d'environnement chacune) :
