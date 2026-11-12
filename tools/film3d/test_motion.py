@@ -324,7 +324,7 @@ def test_p3():
     cut = []
     for f in (P.F0, P.F0 + P.FRAMES - 1):
         (u0, u1, v0, v1), (uc, vc) = P.hero_frame(M.t_of(f), P.camera(M.t_of(f)))
-        cut.append((50 * (uc + 1), 100 * (1 - vc), 50 * (u1 - u0)))
+        cut.append((50 * ((u0 + u1) / 2 + 1), 100 * (1 - (v0 + v1) / 2), 50 * (u1 - u0)))   # la boîte, comme mesure
     check("P3 : le point de coupe à la première et à la dernière image",
           all(abs(x - 50) <= 6 and abs(y - 55) <= 6 and abs(w - 42) <= 8 for x, y, w in cut),
           " ; ".join(f"x {x:.0f} y {y:.0f} l {w:.0f}" for x, y, w in cut))

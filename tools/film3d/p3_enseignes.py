@@ -199,9 +199,10 @@ def firing(k, frame):
 # deux patrouilles, à 0,7 m du sol, dans l'axe du trou des plots. Elle descend de 1,9 à 0,7 m des images 8 à 46
 # (grue au plus 1,4 m/s, amortie sur 16 images : la grue plafonnée à 1,5 m/s et 3 m/s² ne fait pas 1,2 m en moins
 # de 38 images) et son site suit sa hauteur, de -5,5° à +1,5° : le barrage au fond de la rue à mi-hauteur au
-# début, la berline un peu sous le milieu du cadre tout du long. Le lacet vise la berline (décalé de BIAS0 vers le
-# barrage au début) ; elle rejoint l'axe du trou des plots des images 26 à 42 (la fiche : 30 à 36, mais 0,35 m
-# en 6 images, c'est 30 m/s² de côté) ; à la dernière image, devant, le quai, le pont qui monte et le pylône.
+# début, la berline un peu sous le milieu du cadre tout du long. Le lacet vise la berline (décalé de BIAS0 au
+# début : vue de sa gauche, sa boîte déborde à droite de son centre) ; elle rejoint sa trace, celle du trou des
+# plots, des images 14 à 46 (la fiche : 30 à 36, mais 0,35 m en 6 images, c'est 30 m/s² de côté) ; à la dernière
+# image, devant, le quai, le pont qui monte et le pylône.
 LENS = 21.0
 D0, R0 = 7.0, 0.6                  # derrière le centre de la berline à l'image 1 ; vitesse de rapprochement (m/s)
 T_HOLD = (M.t_of(20), M.t_of(27))  # la caméra cesse presque d'accélérer : la berline s'éloigne
@@ -212,7 +213,7 @@ T_AXIS = (M.t_of(14), M.t_of(46))  # elle rejoint l'axe du trou des plots (x -0,
 Z0, Z1 = 1.9, 0.7
 T_DOWN, T_RAMP = (M.t_of(8), M.t_of(46)), 16.0 / M.FPS
 PITCH0, PITCH1 = -5.5, 1.5         # le site à 1,9 m et à 0,7 m (entre les deux, selon la hauteur)
-BIAS0 = -1.5                       # degrés : le lacet un peu vers le barrage au début (rien à la fin)
+BIAS0 = 1.2                        # degrés : le lacet un peu à droite au début (la boîte de la berline, vue de sa gauche, centrée)
 _DT = 1.0 / 960.0
 
 
