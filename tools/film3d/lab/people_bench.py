@@ -11,7 +11,8 @@
 #       [--pb-poses volant,mains] [--hands "up,fwd,out,door_out,écart;…"] [--cabin 25] [--dash 60] [--pb-z 1.5]
 #       [--sky [--sky-strength 1]] ; vues « fin », « finmi », « fin86 », « fin60 », « finface » (les caméras de
 #       FIN), éclairage « fin » (contre-jour) ; pose « dehors » (lieux.hands_out)
-#   distance : [--dist-poses crouch,aim,guard] [--dist-phares 1200]
+#   distance : [--dist-poses crouch,aim,guard] [--dist-phares 1200] [--dist-cams "10:1.4,20:1.4,30:1.4"]
+#       [--dist-lens 35]
 #
 # Une image par case (720 × 1280, `<perso>-<pose>-<lumière>-<vue>-<cadre>.png`) et une planche par personnage et
 # par pose (`planche-<perso>-<pose>.png` : une ligne par lumière ; face, trois quarts, dos en pied puis en taille).
@@ -575,7 +576,7 @@ def bench_distance():
               float(opt("--dist-phares", "1200")), spot_size=math.radians(30), spot_blend=0.35,
               shadow_soft_size=0.06)
     cam = camera()
-    cam.data.lens = 35.0
+    cam.data.lens = float(opt("--dist-lens", "35"))
     for g, vest in ((-1, False), (1, True)):
         if hasattr(cp, "_LOOK_COUNT"):
             cp._LOOK_COUNT[0] = 0
@@ -593,10 +594,13 @@ def bench_distance():
             a.rotation_euler.z = math.radians(yaw * g)
     bpy.context.view_layer.update()
     paths = []
-    for d in (10, 20, 30):
-        cam.location = Vector((0.0, -float(d), 1.4))
+    # --dist-cams "d:h,…" : la caméra à d m devant eux, à h m de haut (10, 20, 30 m à 1,4 m par défaut ; le cadre
+    # de poursuite de FIN : "5.75:2.0,7.5:2.4" avec --dist-lens 24)
+    for c in opt("--dist-cams", "10:1.4,20:1.4,30:1.4").split(","):
+        d, h = (float(x) for x in c.split(":"))
+        cam.location = Vector((0.0, -d, h))
         _aim(cam, Vector((0.0, 0.0, 1.0)))
-        paths.append(render(os.path.join(OUT, f"distance-{d}m.png")))
+        paths.append(render(os.path.join(OUT, f"distance-{d:g}m.png")))
     sheet([paths], os.path.join(OUT, "planche-distance.png"))
 
 
