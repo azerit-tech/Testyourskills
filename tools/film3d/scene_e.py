@@ -1308,8 +1308,9 @@ def plan_P5(scene, hidden, palier="conteneurs"):
     f0, f1 = skid_p5(scene)
     print(f"[P5] traces de gomme des roues arrière, images {f0} à {f1}", flush=True)
     # la fumée des pneus arrière : une bouffée toutes les quatre images de glisse, née à l'essieu arrière, qui reste
-    # où elle est née (derrière la voiture), gonfle, monte et dérive vers l'extérieur de l'arc
-    puffs = M.smoke_puffs(poses, wb)
+    # où elle est née (derrière la voiture), gonfle, monte et dérive vers l'extérieur de l'arc ; sans celles que la
+    # caméra traverse en suivant la route (p5_virage.smoke_keep : elles voilaient le bas du cadre)
+    puffs = P5.smoke_keep(M.smoke_puffs(poses, wb))
     for k, (f, x, y, s) in enumerate(puffs):
         ob = L.smoke(f"fumee_pneus_{k}", (x, y, 0.4), (2.4, 2.0, 0.8), density=0.45 * s, seed=3.0 + k)
         out = (Vector((x, y, 0.0)) - Vector((P5.TURN_C[0], P5.TURN_C[1], 0.0))).normalized()

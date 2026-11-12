@@ -171,10 +171,42 @@ def pack_pos(i):
 
 
 # --- ce que la berline frôle (posé par scene_e.build_east, contrôlé par test_motion) : la chaîne pendue sur l'axe
-# de la voie du pont, que l'arrière en glisse longe ; la flaque que les roues arrière traversent au plus fort de la
-# glisse ; les caisses, rangées au bord sud du quai (la caméra passait où le nez les frôlait en v2).
+# de la voie du pont, que l'arrière en glisse longe ; la flaque que la roue arrière gauche traverse en sortie de
+# glisse (images 31 à 34), assez loin pour que la caméra, qui suit sa route, ne la voie jamais dans les 15 % du bas
+# (en (4 ; 65,8), sous l'objectif aux images 22 à 30, elle renvoyait le ciel noir et un lampadaire : un disque sombre
+# et une boule claire au premier plan) ; les caisses, rangées au bord sud du quai.
 CHAIN_POSTS = [(0.6, 52.0), (0.6, 54.7), (0.6, 57.4), (0.6, 60.1)]
-PUDDLE_AT, PUDDLE_SIZE, PUDDLE_YAW = (4.0, 65.8), (4.4, 2.8), 38.0
+PUDDLE_AT, PUDDLE_SIZE, PUDDLE_YAW = (11.5, 73.9), (3.0, 1.8), 13.0
+PUDDLE_MARGIN = 0.4           # le fondu du bord (scene_e.build_east : la plaque déborde de 0,4 m)
+FLOOR_BAND = 15.0             # le bas du cadre (%) où rien ne doit se poser au sol
+SMOKE_CLEAR = 2.0             # m : une bouffée que la caméra frôlerait de plus près (elle suit la route) est omise
+
+
+def puddle_pts(n=4):
+    """Des points de la plaque de la flaque, bord fondu compris (x, y, 0)."""
+    c, s = math.cos(math.radians(PUDDLE_YAW)), math.sin(math.radians(PUDDLE_YAW))
+    hx, hy = PUDDLE_SIZE[0] / 2 + PUDDLE_MARGIN, PUDDLE_SIZE[1] / 2 + PUDDLE_MARGIN
+    return [(PUDDLE_AT[0] + u * c - v * s, PUDDLE_AT[1] + u * s + v * c, 0.0)
+            for u in (hx * (2 * i / n - 1) for i in range(n + 1)) for v in (hy * (2 * j / n - 1) for j in range(n + 1))]
+
+
+def smoke_keep(puffs, drift=1.2, grow=10):
+    """Les bouffées de motion.smoke_puffs que la caméra ne traverse pas : elle suit la route de la berline, 1 à 2 m
+    plus à gauche ; à moins de SMOKE_CLEAR m, la bouffée voilait le bas du cadre (images 15 à 26)."""
+    out = []
+    for f, x, y, s in puffs:
+        ox, oy = x - TURN_C[0], y - TURN_C[1]
+        n = math.hypot(ox, oy) or 1.0
+        near = float("inf")
+        for g in range(f, F0 + FRAMES):
+            e = 1 - (1 - min(1.0, (g - f) / grow)) ** 2
+            cx, cy, _ = cam_pos(M.t_of(g))
+            near = min(near, math.hypot(x + ox / n * drift * e - cx, y + oy / n * drift * e - cy))
+        if near >= SMOKE_CLEAR:
+            out.append((f, x, y, s))
+    return out
+
+
 CRATES_AT = (19.5, 64.8)
 CRATES_BOX = (18.45, 20.6, 63.8, 65.45)     # l'emprise des caisses et des palettes (x0, x1, y0, y1)
 BARRIER_Y, BARRIER_X = 80.6, (-7.6, 7.6)    # la file de séparateurs (scene_e.build_barrier)

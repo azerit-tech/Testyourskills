@@ -188,7 +188,7 @@ def test_right_turn():
 
 def test_gaps():
     """P5 (découpage v3) : ce que les contrôles v3 ne voient pas : la meute loin derrière, les conteneurs, ce que
-    la berline frôle sans le toucher, la caméra loin des séparateurs, la patrouille 1 dans le cadre,
+    la berline frôle sans le toucher, la caméra loin des séparateurs, la patrouille 1 dans le cadre, le premier plan,
     l'hélicoptère au-dessus des piles et dans le cadre final (écarts, cadre et vitesses : test_v3)."""
     import p5_virage as P
     check("M.min_gap voit un croisement", M.min_gap({"a": lambda t: (0.0, 10 * t), "b": lambda t: (0.0, 10 - 10 * t)},
@@ -231,6 +231,18 @@ def test_gaps():
     check("P5 : caméra loin des séparateurs, des poteaux et des caisses", d_bar >= 2.0 and d_box >= 0.8,
           f"{d_bar:.1f} m des séparateurs, {d_box:.1f} m des poteaux et des caisses")
     check("P5 : horizon à plat", all(c[5] == 0.0 for c in cams))
+    # le premier plan : la flaque jamais dans les 15 % du bas du cadre, la roue arrière gauche dedans en glisse ;
+    # aucune bouffée de fumée gardée à moins de 2 m de la caméra
+    low = min((q[1], f) for f in frames for q in (P.project(p, M.t_of(f)) for p in P.puddle_pts())
+              if q and -5.0 <= q[0] <= 105.0)
+    pud = M._rect(P.PUDDLE_AT, P.PUDDLE_YAW - 90.0, P.PUDDLE_SIZE)
+    wet = [round(t * M.FPS + P.F0) for t, x, y in P.wheel_track(-1, frames=(24, 40), n=32)
+           if M._point_gap((x, y), pud) == 0.0]
+    check("P5 : la flaque hors du bas du cadre, sous la roue arrière gauche", low[0] >= P.FLOOR_BAND and wet,
+          f"au plus bas à {low[0]:.1f} % (image {low[1]}) ; roue dedans aux images {wet[:1] + wet[-1:]}")
+    kept = P.smoke_keep(M.smoke_puffs(poses))
+    check("P5 : la fumée gardée loin de l'objectif", len(kept) >= 4, f"{len(kept)} bouffées, dès l'image {kept[0][0]}"
+          if kept else "aucune")
     # la patrouille 1 entière dans le cadre, à gauche de la berline, 12 images de suite au moins (PATROL_SEEN) ; elle
     # s'arrête avant les séparateurs, en travers, et ne recule jamais
     seen = [f for f in range(P.F0, P.F0 + P.FRAMES) if P.patrol_seen(f)]
