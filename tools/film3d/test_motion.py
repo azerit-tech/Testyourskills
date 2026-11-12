@@ -425,8 +425,9 @@ def test_p3():
 
 def test_p6():
     """P6 (découpage v3) : aucune distance sous 6 m au sol (la patrouille 1 à part, 1,5 m d'air de flanc à flanc
-    avec la berline) ; la colonne derrière la berline ; la caméra de dos, 7 m derrière à 1,6 m à l'image 1, 8 m
-    derrière à 3,6 m à la fin, grue sous 2,5 m/s ; la patrouille 1 à gauche, de 6,5 m derrière à 3,3 m devant, au
+    avec la berline) ; la colonne derrière la berline ; la caméra de dos au cadre commun v3.1 (7,5 m derrière à
+    2,4 m) jusqu'à l'image 30, puis 8 m derrière à 3,6 m à la fin, grue sous 2,5 m/s, la berline à y 58 % depuis le
+    haut (± 4) ; la patrouille 1 à gauche, de 6,5 m derrière à 3,3 m devant, au
     bord gauche du cadre de l'image 20 à la fin, à 0,8 m au moins de la caméra ; les appareils s'évitent ; rien ne
     frôle la caméra ; les hélicoptères sous 88 % du cadre, les avions aussi, sauf à leur entrée par le haut
     (air_entry images au plus) ; les avions au-dessus de la pointe vers l'image 44 (JET_TURN) ; personne ne tire."""
@@ -441,10 +442,16 @@ def test_p6():
     check("P6 : la colonne ne rattrape pas la berline", gap >= 15.0, f"{gap:.1f} m au plus près")
     c0, c1 = P.camera_rail(0.0), P.camera_rail(P.T_END)
     h0, h1 = P.hero_pos(0.0), P.hero_pos(P.T_END)
-    ok = (abs(h0[1] - c0[1] - 7.0) < 0.01 and abs(c0[2] - 1.6) < 0.01 and abs(h1[1] - c1[1] - 8.0) < 0.01
-          and abs(c1[2] - 3.6) < 0.01 and all(P.hero_pos(M.t_of(g))[1] > P.camera_rail(M.t_of(g))[1] for g in frames))
-    check("P6 : de dos, 7 m derrière à 1,6 m, puis 8 m derrière à 3,6 m", ok,
+    cm = P.camera_rail(M.t_of(30))
+    hm = P.hero_pos(M.t_of(30))
+    ok = (abs(h0[1] - c0[1] - 7.5) < 0.01 and abs(c0[2] - 2.4) < 0.01 and abs(hm[1] - cm[1] - 7.5) < 0.01
+          and abs(cm[2] - 2.4) < 0.01 and abs(h1[1] - c1[1] - 8.0) < 0.01 and c1[2] <= 3.6 + 1e-6
+          and all(P.hero_pos(M.t_of(g))[1] > P.camera_rail(M.t_of(g))[1] for g in frames))
+    check("P6 : de dos, 7,5 m derrière à 2,4 m jusqu'à l'image 30, puis 8 m derrière à 3,6 m au plus", ok,
           f"début {h0[1] - c0[1]:.2f} m à {c0[2]:.2f} m, fin {h1[1] - c1[1]:.2f} m à {c1[2]:.2f} m")
+    vs = [M.hero_screen(P.camera_rail(M.t_of(g)), *P.hero_pos(M.t_of(g)), 0.0, 0.0)["v"] for g in frames]
+    check("P6 : la berline à y 58 % depuis le haut (± 4)", all(abs(v - 0.58) <= 0.04 for v in vs),
+          f"{min(vs) * 100:.1f} à {max(vs) * 100:.1f} %")
     vz = max(abs(P.camera_rail(M.t_of(g + 1))[2] - P.camera_rail(M.t_of(g - 1))[2]) * M.FPS / 2 for g in frames)
     check("P6 : la grue sous 2,5 m/s", vz <= 2.5, f"{vz:.2f} m/s")
     p1 = [P.hero_pos(M.t_of(g))[1] - P.patrol1_pos(M.t_of(g))[1] for g in (P.F0, P.F0 + P.FRAMES - 1)]

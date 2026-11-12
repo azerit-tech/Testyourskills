@@ -1,9 +1,9 @@
 # Le plan P6 écrit une fois, sans Blender (docs/cinematique-poursuite.md §2.3 et §2.4, « la jetée ») : la berline
-# en tête sur la jetée à 120 km/h, la colonne de gyrophares derrière elle en Z (la rampe du pont, la voie du quai,
-# la jetée), trois hélicoptères en formation au-dessus d'elle, faisceaux croisés sur elle ; deux avions de chasse
+# en tête sur la jetée à 120 km/h, la colonne de gyrophares derrière elle (v2 : en Z sur la rampe du pont, la voie
+# du quai et la jetée ; v3.1 : sur la jetée seule), trois hélicoptères en formation au-dessus d'elle, faisceaux croisés sur elle ; deux avions de chasse
 # qui arrivent du fond, très bas dans l'axe de la jetée, et passent au-dessus de tout (ils ne tirent rien).
-# Découpage v3 (docs/cinematique-decoupage-v3.md, P6) : de dos, la caméra roule 7 m derrière la berline à 1,6 m,
-# puis monte lentement à 3,6 m ; trois hélicoptères devant elle, la patrouille 1 qui remonte par la voie de gauche,
+# Découpage v3.1 (docs/cinematique-decoupage-v3.md, P6 et v3.1) : de dos au cadre commun, 7,5 m derrière la
+# berline à 2,4 m, puis la caméra monte à la fin à 3,6 m ; trois hélicoptères devant elle, la patrouille 1 qui remonte par la voie de gauche,
 # deux avions qui arrivent de derrière nous, passent au-dessus de tout et s'écartent au-dessus de la pointe.
 # scene_d.py n'en lit que les fonctions du temps ; motion.py en tire roues, roulis et tangage.
 #
@@ -16,6 +16,7 @@ import motion as M
 
 FRAMES = 60
 V3 = True
+V31 = True
 F0 = 1
 T_END = (FRAMES - 1) / M.FPS
 STILL_FRAME = 30
@@ -67,53 +68,20 @@ def hero_pos(t):
     return route(S_HERO_START + SPEED * t)
 
 
-# --- la colonne : 120 km/h en ligne droite, 45 km/h dans les virages de 15 m (près de 1 g), freinage et reprise
-# sur 45 m (près de 1 g aussi) : elle se resserre en accordéon dans les virages et s'étire en sortie.
-V_TURN = 12.5
-RAMP = 45.0
-
-
-def col_speed(s):
-    """La vitesse de la colonne à l'abscisse s de la route (m/s)."""
-    d = min(max(0.0, _S[1] - s, s - _S[2]), max(0.0, _S[3] - s, s - _S[4]))     # au plus proche des virages
-    return V_TURN + (SPEED - V_TURN) * M.smoothstep(0.0, RAMP, d)
-
-
-# (genre, retard sur la berline en m sur la route, à l'image fixe ; voie : 0 à droite, 1 à gauche) ; le
-# fourgon en troisième ; les plus lointaines sur la rampe du pont. La deuxième est la patrouille 1 (patrol1_pos :
-# son retard n'est pas fixe, ce 40 n'est pas lu)
+# --- la colonne, v3.1 (une voiture qui roule vrai) : derrière la berline sur la jetée, à sa vitesse, en ligne droite,
+# sans accélération ni à-coup. La caméra regarde vers la pointe : la colonne n'entre jamais dans le cadre (seule la
+# patrouille 1, qui la double, s'y voit), seules les flaques de lumière des premières rampes sur l'enrobé mouillé y
+# arrivent. Les véhicules qui étaient encore dans les virages de 15 m du quai (160 à 390 m derrière : 10 m/s² en
+# virage, 17 m/s² en sortie, au-delà des limites v3.1) sont retirés plutôt que freinés hors champ.
+# (genre, retard sur la berline en m sur la route ; voie : 0 à droite, 1 à gauche) ; le fourgon en troisième. La
+# deuxième est la patrouille 1 (patrol1_pos : son retard n'est pas fixe, ce 40 n'est pas lu)
 COLUMN = [("patrol", 22.0, 0), ("patrol", 40.0, 1), ("van", 63.0, 0), ("patrol", 91.0, 1), ("patrol", 109.0, 0),
-          ("patrol", 132.0, 1), ("patrol", 160.0, 0), ("patrol", 178.0, 1), ("patrol", 214.0, 0),
-          ("patrol", 236.0, 1), ("patrol", 268.0, 0), ("patrol", 296.0, 1), ("patrol", 330.0, 0),
-          ("patrol", 358.0, 1), ("patrol", 392.0, 0)]
-_DT = 1.0 / 240.0
-_TABLES = {}
-
-
-def _s_table(s0):
-    """s(t) d'un véhicule de la colonne, à l'abscisse s0 à l'image fixe : ds/dt = col_speed(s), intégré (pas de
-    1/240 s) de -0,25 s à T_END + 0,25 s."""
-    n_back, n_fwd = int((T_STILL + 0.25) / _DT) + 1, int((T_END - T_STILL + 0.25) / _DT) + 1
-    back, s = [], s0
-    for _ in range(n_back):
-        s -= col_speed(s) * _DT
-        back.append(s)
-    fwd, s = [], s0
-    for _ in range(n_fwd):
-        s += col_speed(s) * _DT
-        fwd.append(s)
-    return back[::-1] + [s0] + fwd, T_STILL - n_back * _DT
+          ("patrol", 132.0, 1)]
 
 
 def column_s(i, t):
-    _, gap, _ = COLUMN[i]
-    if i not in _TABLES:
-        _TABLES[i] = _s_table(S_HERO_STILL - gap)
-    tab, t0 = _TABLES[i]
-    k = (t - t0) / _DT
-    k0 = max(0, min(len(tab) - 2, int(math.floor(k))))
-    u = k - k0
-    return tab[k0] * (1 - u) + tab[k0 + 1] * u
+    """L'abscisse sur la route d'un véhicule de la colonne : la berline moins son retard, à vitesse constante."""
+    return S_HERO_START + SPEED * t - COLUMN[i][1]
 
 
 def column_pos(i):
@@ -157,7 +125,7 @@ def heli(i):
     def fn(t):
         _, y = hero_pos(t)
         bob = 0.35 * math.sin(2 * math.pi * 0.6 * t + 1.7 * i)
-        z = z0 - HELI_DROP[i] * M.smoothstep(M.t_of(CRANE_F0), T_END, t)
+        z = z0 - HELI_DROP[i] * M.smoothstep(M.t_of(CRANE_F0 - 10), T_END, t)
         return x0, y + ahead, z + bob, (x0 - JX) * 0.4, -7.0, 2.0 * math.sin(2 * math.pi * 0.4 * t + i)
     return fn
 
@@ -210,78 +178,67 @@ def jet(i):
     return fn
 
 
-# --- la caméra v3 : de dos, dans l'axe de la berline (x 81,75), 24 mm : la lanterne du phare juste au-dessus de
-# son toit, un peu à gauche du centre, tout le plan ; elle fonce dessus. Image 1 : 7,0 m derrière,
-# 1,6 m (au ras du toit : le phare reste au-dessus de lui), site -8°. Puis la grue lente : 3,6 m et 8,0 m derrière à
-# l'image 60, site -21°. Écarts à la fiche (grue de 28 à 60, site -16°) : 2 m de grue en 32 images demandent
-# 4,5 m/s² au moins (plafond 3) ; la grue part donc à l'image 10 (rampe en cosinus sur 50 images : 2,0 m/s et
-# 3,0 m/s² au plus), le recul de 1 m avec elle (1,0 m/s). Le site va de -8° à -21° sur tout le plan, en trapèze
-# (6,6°/s au plus, fiche 7) : à -16° la caméra montée laissait la berline à 58 % de la hauteur depuis le haut,
-# ici 53 % puis 52 % (fiche 52 puis 50). Écart à la fiche (1 m à gauche) : de là, le phare (75 ; 458,3) tombait à
-# x 22-30 % de la largeur, loin du toit ; dans l'axe, il est à x 44-46 %
+# --- la caméra v3.1 (docs/cinematique-decoupage-v3.md, v3.1 A : le cadre de poursuite commun) : de dos, dans l'axe
+# de la berline (x 81,75), 24 mm, 7,5 m derrière elle à 2,4 m, son centre à x 50 % et y 57 % depuis le haut ; la
+# lanterne du phare au-dessus de son toit, un peu à gauche du centre. Elle tient cette place jusqu'à l'image 30
+# (l'image fixe, la coupe depuis P5 à hauteur et distance égales), puis monte seule, à la fin, pour découvrir la
+# pointe : 3,6 m et 8,0 m derrière à l'image 60 (la seule grue permise avec FIN). La montée part de l'image 30 en
+# douceur (vitesse en demi-cosinus : nulle au départ, 1,9 m/s et 2,4 m/s² au plus) et file encore à la coupe. Le
+# site n'est pas écrit à la main : il garde la berline à y 57 % depuis le haut (58 ± 4 ; un point au-dessus de la
+# visée tant que P5 sort à 51 %, la coupe v3 tolère 6), puis la laisse glisser à 61 % pendant la montée, ce qui
+# ouvre le fond et tient la bascule à 6°/s
 CAM_DX = 0.0
-CAM_BACK0, CAM_BACK1 = 7.0, 8.0
-CAM_Z0, CAM_Z1 = 1.6, 3.6
-SITE0, SITE1 = -8.0, -21.0
-CRANE_F0 = 10
+CAM_BACK0, CAM_BACK1 = 7.5, 8.0
+CAM_Z0, CAM_Z1 = 2.4, 3.6
+HERO_V0, HERO_V1 = 0.57, 0.61       # le centre de la berline, depuis le haut du cadre
+CRANE_F0 = 30
 LENS = 24.0
-SHAKE_BASE = 0.12                   # degrés, à 24 mm
-SHAKE_JETS = 0.30                   # au passage des avions, images 13 à 25
 
 
-def ramp_cos(t, t0, t1):
-    """0 avant t0, 1 après t1 ; vitesse en cosinus surélevé (nulle aux deux bouts, accélération continue)."""
+def ramp_in(t, t0, t1):
+    """0 avant t0, 1 à t1 ; vitesse en demi-cosinus : nulle à t0, à son plus haut à t1 (le mouvement continue
+    au-delà du plan) ; accélération continue, nulle au départ."""
     if t <= t0:
         return 0.0
-    if t >= t1:
-        return 1.0
     u = (t - t0) / (t1 - t0)
-    return u - math.sin(2 * math.pi * u) / (2 * math.pi)
+    return u - math.sin(math.pi * u) / math.pi
 
 
-def ease_trap(t, t0, t1, r):
-    """0 avant t0, 1 après t1 ; vitesse en trapèze aux rampes en cosinus de r secondes : le mouvement le plus
-    lent qui tienne dans [t0, t1] avec des départs et des arrivées amortis."""
-    T = t1 - t0
-    tau = min(max(t - t0, 0.0), T)
+def crane(t):
+    """La part de la montée faite à t (0 jusqu'à l'image CRANE_F0, 1 à la dernière)."""
+    return ramp_in(t, M.t_of(CRANE_F0), T_END)
 
-    def up(x):
-        return x / 2.0 - r / (2 * math.pi) * math.sin(math.pi * x / r)
-    if tau < r:
-        pos = up(tau)
-    elif tau <= T - r:
-        pos = r / 2.0 + tau - r
-    else:
-        pos = (T - r) - up(T - tau)
-    return pos / (T - r)
+
+def _site_for(cam, hx, hy, v):
+    """Le site qui pose le centre de la boîte de la berline à v (depuis le haut du cadre), par dichotomie."""
+    lo, hi = -40.0, 10.0
+    for _ in range(40):
+        mid = (lo + hi) / 2
+        q = M.hero_screen(cam[:4] + (mid,) + cam[5:], hx, hy, 0.0, 0.0)
+        if q["v"] < v:          # trop haut dans le cadre : la caméra se relève
+            lo = mid
+        else:
+            hi = mid
+    return (lo + hi) / 2
 
 
 def camera_rail(t):
     """La caméra sans tremblé : (x, y, z, lacet, site, roulis, focale)."""
     hx, hy = hero_pos(t)
-    c = ramp_cos(t, M.t_of(CRANE_F0), T_END)
+    c = crane(t)
     back = CAM_BACK0 + (CAM_BACK1 - CAM_BACK0) * c
     z = CAM_Z0 + (CAM_Z1 - CAM_Z0) * c
     x, y = hx + CAM_DX, hy - back
-    site = SITE0 + (SITE1 - SITE0) * ease_trap(t, 0.0, T_END, 0.5)
-    # le lacet qui garde la berline au centre du cadre (visée sur elle)
+    # le lacet qui garde la berline au centre du cadre (visée sur elle ; dans l'axe de sa vitesse sur la jetée)
     yaw = math.degrees(math.atan2(-(hx - x), -(hy - y)))
+    site = _site_for((x, y, z, yaw, 0.0, 0.0, LENS), hx, hy, HERO_V0 + (HERO_V1 - HERO_V0) * c)
     return x, y, z, yaw, site, 0.0, LENS
 
 
-def jet_noise(t):
-    """Le souffle des avions, qui passent au-dessus de la caméra à l'image 15 : une bosse sur les images 13 à 25
-    (0 à 1), à plein de 17 à 21."""
-    return M.smoothstep(M.t_of(13), M.t_of(17), t) * (1.0 - M.smoothstep(M.t_of(21), M.t_of(25), t))
-
-
 def camera(t):
-    """La caméra rendue : camera_rail plus le tremblé (0,12°, 0,3° au passage des avions)."""
-    x, y, z, yaw, site, roll, lens = camera_rail(t)
-    n = jet_noise(t)
-    amp = SHAKE_BASE + (SHAKE_JETS - SHAKE_BASE) * n
-    dyaw, dpitch, droll, dx, dy, dz = M.handheld(t, amp=amp, rotor=0.02 + 0.15 * n, seed=6.1)
-    return x + dx * 0.3, y + dy * 0.3, z + dz * 0.3, yaw + dyaw, site + dpitch, roll + droll, lens
+    """La caméra rendue : camera_rail, sans tremblé écrit (v3.1 : le tremblé de motion.handheld faisait à lui seul
+    le pire à-coup du film à l'écran ; ne reste que l'opérateur commun de motion.py)."""
+    return camera_rail(t)
 
 
 def tracks():
