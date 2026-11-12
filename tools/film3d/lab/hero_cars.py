@@ -611,13 +611,21 @@ def mat_tyre(name, r_rim=0.19, r_out=0.31, wear=0.0):
 
 
 def mat_window(name, tint=(0.80, 0.86, 0.84, 1), dark=0.0, wear=0.0):
-    """Verre de vitre : sans réfraction (les vitres du modèle sont des feuilles minces), reflet de Fresnel
+    """Verre de vitre : sans réfraction (les vitres du modèle sont des lames minces à deux faces), reflet de Fresnel
     du verre réel (IOR 1,52) sur une transparence à peine verte, comme le verre trempé d'époque.
+
+    La face vue de dos (la face intérieure d'une lame vue du dehors, une vitre vue de l'habitacle) garde le reflet du
+    verre vu de l'air : le nœud Fresnel y prendrait 1/1,52 et passerait en réflexion totale au-delà de 41°, les
+    vitres du côté opposé devenaient des miroirs noirs à travers l'habitacle. Le rayon ne réfracte pas : il arrive sur
+    la face intérieure sous l'angle extérieur, et une lame à faces parallèles y renvoie ce que renvoie sa face
+    extérieure. L'IOR passe donc à 1/1,52 sur la face de dos (le nœud l'inverse), un peu moins fort que la face
+    avant (0,06 de face, environ 0,1 sous 60°).
 
     wear : un voile d'essuyage (003) qui ternit le reflet par endroits, des taches d'eau séchée (013), et des
     gouttes, nombreuses sur les vitres couchées (pare-brise, lunette), rares sur les vitres de côté."""
     m, nt, out = cv._mat(name)
-    fr = _node(nt, "ShaderNodeFresnel", IOR=1.52)
+    bf = nt.nodes.new("ShaderNodeNewGeometry").outputs["Backfacing"]
+    fr = _node(nt, "ShaderNodeFresnel", IOR=_mix(nt, 1.52, 1.0 / 1.52, bf))
     tr = _node(nt, "ShaderNodeBsdfTransparent", Color=tuple(c * (1 - dark) for c in tint[:3]) + (1,))
     gl = _glossy(nt)
     gl.inputs["Roughness"].default_value = 0.0
@@ -638,7 +646,9 @@ def mat_window(name, tint=(0.80, 0.86, 0.84, 1), dark=0.0, wear=0.0):
         b = _node(nt, "ShaderNodeBump", Height=cv._math(nt, "MAXIMUM", h1, h2), Strength=1.0, Distance=0.0025)
         nt.links.new(b.outputs[0], gl.inputs["Normal"])
         nt.links.new(b.outputs[0], fr.inputs["Normal"])
-    f = cv._math(nt, "ADD", cv._math(nt, "MULTIPLY", fr.outputs[0], 0.9), floor)
+    # la face de dos : la moitié du plancher (la lame a déjà reçu celui de sa face avant)
+    f = cv._math(nt, "ADD", cv._math(nt, "MULTIPLY", fr.outputs[0], 0.9),
+                 cv._math(nt, "MULTIPLY", floor, cv._math(nt, "SUBTRACT", 1.0, cv._math(nt, "MULTIPLY", bf, 0.5))))
     nt.links.new(f, mix.inputs[0])
     nt.links.new(tr.outputs[0], mix.inputs[1])
     nt.links.new(gl.outputs[0], mix.inputs[2])
