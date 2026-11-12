@@ -873,7 +873,7 @@ def _raw_tex(sock):
 # Les cœurs des modules, plus saturés que la palette : AgX désature une émission forte vers le blanc, un corail
 # pur à 8 sortait saumon. Le diffuseur reste à la couleur de la palette.
 CORAL_CORE = (1.0, 0.075, 0.018, 1.0)
-LILAC_CORE = (0.16, 0.07, 1.0, 1.0)
+LILAC_CORE = (0.10, 0.04, 0.62, 1.0)   # plus bas que le corail : à force égale le lilas sortait blanc bleuté
 BAR_CORE = 2.2        # cœur d'un module allumé : × la force de la rampe (BAR_GLOW 2 -> 4,4)
 BAR_DIFFUSE = 0.09    # le reste du diffuseur allumé, relatif au cœur
 BAR_REST = 0.03       # une moitié éteinte garde un reste de lueur (le diffuseur chauffé)
