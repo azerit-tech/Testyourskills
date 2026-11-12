@@ -246,17 +246,27 @@ def test_p2():
 
 
 def test_p4():
-    """P4 : aucune distance sous 6 m ; la meute 25 m derrière la berline au moins ; la pose validée à l'image fixe."""
+    """P4 (découpage v3) : aucune distance sous 6 m ; la meute 25 m derrière la berline au moins ; la berline de
+    y -101 à -35,7 (111 à 46 m de l'objectif) ; six rampes au-dessus de la crête à l'image 1, dix à la fin, les
+    quatre nouvelles qui se découvrent aux images 8, 18, 28 et 38."""
     import p4_pont as P
     frames = range(P.F0 - 1, P.F0 + P.FRAMES + 1)
     d, f, a, b = M.min_gap(P.tracks(), frames)
     check("P4 : distances gardées", d >= 6.0, f"{d:.1f} m entre {a} et {b} à l'image {f}")
     gap = min(math.dist(P.hero_pos(M.t_of(f)), P.pack_pos(i)(M.t_of(f))) for f in frames for i in range(len(P.PACK)))
     check("P4 : la meute ne rattrape pas la berline", gap >= 25.0, f"{gap:.1f} m au plus près")
-    dist = P.Y_REF - P.hero_pos(P.T_STILL)[1]
-    check("P4 : la trajectoire inchangée (70 m de Y_REF à l'image fixe)", abs(dist - 70.0) < 1.0, f"{dist:.1f} m")
+    y0, y1 = P.hero_pos(0.0)[1], P.hero_pos(P.T_END)[1]
+    check("P4 : la berline de y -101 à -35,7", abs(y0 + 101.0) < 0.1 and abs(y1 + 35.7) < 0.3, f"{y0:.1f} à {y1:.1f}")
     near = min(P.CAM[1] - P.hero_pos(M.t_of(f))[1] for f in frames)
     check("P4 : la berline reste à 40 m de l'objectif au moins", near >= 40.0, f"{near:.1f} m")
+
+    def bars(f):
+        t = M.t_of(f)
+        return sum(P.bar_visible(P.pack_pos(i)(t)[1]) for i in range(len(P.PACK))) + P.bar_visible(P.van_pos(t)[1])
+    seen = [bars(f) for f in range(P.F0, P.F0 + P.FRAMES)]
+    rise = [f for f, (a_, b_) in enumerate(zip(seen, seen[1:]), start=P.F0 + 1) if b_ > a_]
+    check("P4 : six rampes au début, dix à la fin, une de plus aux images 8, 18, 28, 38",
+          seen[0] == 6 and seen[-1] == 10 and rise == [8, 18, 28, 38], f"{seen[0]} puis {seen[-1]}, aux images {rise}")
 
 
 def test_p3():

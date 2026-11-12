@@ -331,17 +331,18 @@ def p4_sky_veil(scene):
 
 
 def plan_P4(scene, hidden, haubans=False):
-    """P4, la meute (découpage v2) : 200 mm, sur le plat 32 m après le pied de la rampe, à 1,2 m, face à la ville,
-    un léger suivi qui garde la berline au centre. Elle descend vers nous de 80 à 42 m (de 24 à 46 % de large) ;
-    derrière elle trois patrouilles en V empilées par la longue focale, le fourgon qui passe la crête, le pylône
-    et ses haubans au fond."""
+    """P4, la meute (découpage v3) : fixe en (1,2 ; 10 ; 1,2), face à la ville, 200 mm puis 212 mm, un léger suivi
+    qui garde la berline au centre, à 54 % de la hauteur depuis le haut. Elle descend vers nous de 111 à 46 m (de 16
+    à 44 % de large) ; derrière elle la meute empilée par la longue focale, quatre patrouilles de plus qui passent la
+    crête (y -130) aux images 8, 18, 28 et 38 : six rampes au début, dix à la fin. Le tablier court jusqu'à y -320,
+    l'avenue de la ville au-delà."""
     # la bande corail du ciel tournée à 70° de l'axe, vers la droite du cadre : dans l'axe, la chaussée mouillée,
     # vue en rasant à 1,5 m, la reflétait en un voile rose-blanc sur toute la moitié basse
     lamp_src = L.panorama(scene, hidden, yaw=math.pi - math.radians(70.0), bridge=None, port="loin")
     build_bridge(hidden, lamp_src, haubans=haubans)
     p4_deck_puddles()
     p4_sky_veil(scene)
-    # --- animé (28 images, p4_pont.py, clés de motion.py) ; l'image fixe (STILL_FRAME) garde la pose validée
+    # --- animé (48 images, p4_pont.py, clés de motion.py)
     import motion as M
     import p4_pont as P4
     frames = range(P4.F0 - 1, P4.F0 + P4.FRAMES + 1)
@@ -379,7 +380,7 @@ def plan_P4(scene, hidden, haubans=False):
     # les patrouilles du fond se voilaient)
     L.haze((-260, 260), (-420, 120), (L.WATER_Z, 30), 0.0002)
     cam = L.camera("cam_P4", P4.CAM, (P4.CAM[0], cam_y - 100.0, P4.CAM[2]), lens=P4.LENS, fstop=4.0,
-                   focus=road_point(P4.HERO_X, y_hero, 0.8), shift=(0.0, 0.1))
+                   focus=road_point(P4.HERO_X, y_hero, 0.8))     # sans décentrement : le site cadre la berline
     M.key_camera(cam, frames, P4.camera)
     cam.data.dof.focus_object = hero
     scene.render.use_motion_blur = True
