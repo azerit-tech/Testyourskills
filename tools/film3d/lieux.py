@@ -1548,6 +1548,14 @@ def cap_images(px=1024, keep_objects=()):
     return n
 
 
+def car_parts(car, glass=False):
+    """Les maillages de la voiture pour une liaison de lumière : l'objet passé compris (la caisse de la berline,
+    ailes, capot et coffre, est cet objet ; portes et roues sont ses enfants), sans les vitres (propriété « vitre »,
+    hero_cars.split_glass) sauf glass=True. Une lumière qui n'éclaire que la voiture les écarte : elles la
+    renverraient en miroir (la lunette en aplat blanc de P3) ; une lumière qui l'exclut la prend entière."""
+    return [o for o in [car] + list(car.children_recursive) if o.type == "MESH" and (glass or not o.get("vitre"))]
+
+
 def car_fill(car, loc=(0.4, 8.0, 2.2), energy=500.0, color="#f2e4d4", size=4.0):
     """Une source douce de face qui n'éclaire que la voiture (liaison de lumière, mêmes collections que
     scene_d.split_for_car) : une lumière de surface accrochée au rig, en `loc` dans son repère (+y vers l'avant),
@@ -1558,8 +1566,8 @@ def car_fill(car, loc=(0.4, 8.0, 2.2), energy=500.0, color="#f2e4d4", size=4.0):
     # lui-même, portes et roues sont ses enfants ; sans elle, l'appoint n'éclairait que les portes. Complétée même
     # si la collection existe déjà (scene_d._car_collections la crée avec les enfants seuls). Les vitres (propriété
     # « vitre », hero_cars.split_glass) n'en sont pas : elles renverraient l'appoint en miroir
-    for o in [car] + list(car.children_recursive):
-        if o.type == "MESH" and not o.get("vitre") and o.name not in in_c.objects:
+    for o in car_parts(car):
+        if o.name not in in_c.objects:
             in_c.objects.link(o)
     for o in [o for o in in_c.objects if o.get("vitre")]:
         in_c.objects.unlink(o)

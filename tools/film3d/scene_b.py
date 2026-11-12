@@ -1198,7 +1198,7 @@ def only_on(light, objs, tag):
     col = bpy.data.collections.new(f"{tag}_receivers")
     for o in objs:
         for x in [o] + list(o.children_recursive):
-            if x.name not in col.objects:
+            if x.name not in col.objects and not x.get("vitre"):    # les vitres de la berline : lieux.car_parts
                 col.objects.link(x)
     light.light_linking.receiver_collection = col
     return col

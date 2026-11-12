@@ -1184,7 +1184,7 @@ def beam_lights(main, hero, ground, ground_w, car_w):
     blanc chaud pour la seule berline (`car_w`), pour que la tache se pose sur elle quand le faisceau la rattrape
     (sans elle, la caisse ne changeait pas sous le faisceau). Blanc chaud et pas xénon : sous un bleuté le
     bordeaux tourne au lilas."""
-    body = [o for o in hero.children_recursive if o.type == "MESH"]
+    body = L.car_parts(hero, glass=True)
     sans = bpy.data.collections.new("faisceau_sans_sol_berline")
     for o in body + list(ground):
         sans.objects.link(o)
@@ -1213,9 +1213,8 @@ def car_side(hero, at=(-10.0, 62.0, 4.5), aim=(6.0, 67.0, 0.8), energy=2600.0, s
     lo.rotation_quaternion = (Vector(aim) - Vector(at)).to_track_quat("-Z", "Y")
     lo.visible_camera = lo.visible_volume_scatter = False
     col = bpy.data.collections.new("berline_ambre_seule")
-    for o in hero.children_recursive:
-        if o.type == "MESH":
-            col.objects.link(o)
+    for o in L.car_parts(hero):
+        col.objects.link(o)
     lo.light_linking.receiver_collection = col
     return lo
 
@@ -1279,9 +1278,8 @@ def car_fill(cam, hero, energy=1400.0, size=4.0):
     lo.location = (0.0, 1.5, 0.0)                 # repère de la caméra : -z vers l'avant, y vers le haut
     lo.visible_camera = lo.visible_volume_scatter = False
     col = bpy.data.collections.new("berline_face_seule")
-    for o in hero.children_recursive:
-        if o.type == "MESH":
-            col.objects.link(o)
+    for o in L.car_parts(hero):
+        col.objects.link(o)
     lo.light_linking.receiver_collection = col
     return lo
 
@@ -1336,9 +1334,8 @@ def plan_P5(scene, hidden, palier="conteneurs"):
     # (sol mouillé, brume). FILM3D_P5_GLOW_CAR=1 rend l'état d'avant.
     if os.environ.get("FILM3D_P5_GLOW_CAR", "0") != "1":
         sans = bpy.data.collections.new("lueurs_sans_berline")
-        for o in hero.children_recursive:
-            if o.type == "MESH":
-                sans.objects.link(o)
+        for o in L.car_parts(hero, glass=True):
+            sans.objects.link(o)
         # ni les caisses de la sortie : corail et lilas à 30 m, elles en sortaient roses (essai e)
         for o in bpy.data.objects:
             if o.type == "MESH" and o.name.startswith(("caisse_", "palettes_sortie")):
@@ -1362,9 +1359,8 @@ def plan_P5(scene, hidden, palier="conteneurs"):
     for o in bpy.data.objects:
         if o.type == "MESH" and o.name.startswith(("caisse_", "palettes_sortie")):
             exclus.objects.link(o)
-    for o in hero.children_recursive:
-        if o.type == "MESH":
-            exclus.objects.link(o)
+    for o in L.car_parts(hero, glass=True):
+        exclus.objects.link(o)
     for o in boxes:
         exclus.objects.link(o)
     for co in exclus.collection_objects:

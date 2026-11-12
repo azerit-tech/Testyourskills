@@ -596,12 +596,13 @@ def _car_collections(car):
     (ses maillages seuls)."""
     out_c = bpy.data.collections.get(f"{car.name}_lumiere_sans")
     if out_c is None:
-        body = [o for o in car.children_recursive if o.type == "MESH"]
+        body = L.car_parts(car, glass=True)
         out_c = bpy.data.collections.new(f"{car.name}_lumiere_sans")
         in_c = bpy.data.collections.new(f"{car.name}_lumiere_avec")
         for o in body:
             out_c.objects.link(o)
-            in_c.objects.link(o)
+            if not o.get("vitre"):                 # une lumière qui n'éclaire que la voiture : sans les vitres
+                in_c.objects.link(o)
         for co in out_c.collection_objects:
             co.light_linking.link_state = "EXCLUDE"
     return out_c, bpy.data.collections[f"{car.name}_lumiere_avec"]

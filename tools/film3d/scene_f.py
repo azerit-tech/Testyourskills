@@ -590,7 +590,8 @@ def keep_paint():
     avec = bpy.data.collections.new(f"{car.name}_lumiere_avec")
     for o in whole:
         sans.objects.link(o)
-        avec.objects.link(o)
+        if not o.get("vitre"):                     # les vitres hors de l'appoint : lieux.car_parts
+            avec.objects.link(o)
     n = 0
     for lo in bpy.data.objects:
         if lo.type == "LIGHT" and lo.name.startswith(("lamp_", "island_low_", "island_up_", "se_up_")):
