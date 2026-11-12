@@ -725,8 +725,8 @@ def plan_FIN(scene, hidden, palier="socle"):
     # le sol juste devant l'objectif et blanchissait tout le tiers bas
     L.bar_beams(pat, "patrol", yaws=((125, L.CORAL), (-125, L.LILAC)), energy=3000.0, tilt=3.0)
     M.flash_bars([pat], frames)
-    # comme dans FIN6 : les lueurs de sa rampe, à 4 m, n'excluaient que la rampe et teintaient la berline
-    car_out_of_rigs([pat], hero)
+    # les lueurs de sa rampe éclairent la berline, à la différence de FIN6 : exclue d'elles, son flanc passait de
+    # (41, 18, 27) à (19, 12, 23), presque noir ; FIN reste la référence de teinte (12 nov.)
     # l'agent garde son armature : accroupi derrière la portière, il se redresse en joue (fin_pointe.OFFICER_KEYS)
     try:
         cop = L.officer_rig(F.OFFICER_KEYS, style=0, name="officer_fin")
