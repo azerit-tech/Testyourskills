@@ -591,20 +591,23 @@ def _car_collections(car):
     return out_c, bpy.data.collections[f"{car.name}_lumiere_avec"]
 
 
-def split_for_car(lights, car, energy, color, tag="lumiere"):
+def split_for_car(lights, car, energy=None, color=None, tag="lumiere", fraction=None):
     """Sépare la lumière que reçoit une voiture de celle du décor : chaque lumière de `lights` exclut la voiture
     (liaison de lumière) et reçoit une jumelle au même endroit, de puissance `energy` et de teinte `color`, qui
     n'éclaire qu'elle, invisible à la caméra et à la brume. La brume et le sol gardent la pleine puissance, la
-    peinture reçoit ce qu'elle supporte. Renvoie les jumelles."""
+    peinture reçoit ce qu'elle supporte. `fraction` : la jumelle à cette part de la source, de sa couleur (une
+    jumelle de données par source). Renvoie les jumelles."""
     out_c, in_c = _car_collections(car)
-    d, twins = None, []
+    made, twins = {}, []
     for o in lights:
         o.light_linking.receiver_collection = out_c
+        d = made.get(o.data.name)
         if d is None:
-            d = o.data.copy()
+            d = made[o.data.name] = o.data.copy()
             d.name = f"{tag}_{car.name}"
-            d.energy = energy
-            d.color = L.lin(color)[:3]
+            d.energy = o.data.energy * fraction if fraction is not None else energy
+            if color:
+                d.color = L.lin(color)[:3]
         c = bpy.data.objects.new(f"{o.name}_{car.name}", d)
         for coll in o.users_collection:
             coll.objects.link(c)
@@ -754,8 +757,11 @@ def plan_FIN6(scene, hidden, palier="socle"):
             r = L.clone(r, f"{kind}_{i}")
         h = L.heading_to((STOP.x - x, STOP.y - y)) + rnd.uniform(-28, 28)
         L.put(r, x, y, 0.0, heading=h)
-        L.bar_beams(r, f"{kind}_{i}", yaws=((rnd.uniform(-60, 60), L.CORAL), (rnd.uniform(120, 240), L.LILAC)),
-                    energy=5000.0)
+        beams = L.bar_beams(r, f"{kind}_{i}", yaws=((rnd.uniform(-60, 60), L.CORAL),
+                                                     (rnd.uniform(120, 240), L.LILAC)), energy=5000.0)
+        # vingt-deux faisceaux corail et lilas croisés sur la berline la passaient au rose : elle n'en reçoit que
+        # le dixième, de leur couleur (un liseré), l'anneau et la brume gardent tout
+        split_for_car(beams, hero, tag="rampe", fraction=0.1)
     try:
         cops = [L.officer(pz, style=st, name=f"officer_{pz}") for pz, st in (("aim", 0), ("crouch", 1), ("guard", 2))]
         for i, (a, kind) in enumerate(ring):
