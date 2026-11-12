@@ -1097,8 +1097,10 @@ def mat_bar_retint(src, name, strength=0.0, zc=0.06, zh=0.12):
     base.data_type = "RGBA"
     nt.links.new(_math(nt, "MAXIMUM", refl, _math(nt, "MULTIPLY", core, 0.6)), base.inputs["Factor"])
     nt.links.new(tint.outputs[2], base.inputs[6])
-    base.inputs[7].default_value = (0.55, 0.55, 0.58, 1.0)
-    lens = _principled(nt, **{"Roughness": 0.18, "Coat Weight": 1.0, "Coat Roughness": 0.02, "Coat IOR": 1.55})
+    base.inputs[7].default_value = (0.4, 0.4, 0.42, 1.0)
+    # (des réflecteurs brossés : polis à 0,18, celui du bout de la rampe renvoyait la tête d'un lampadaire en point
+    # blanc, à 30 en linéaire, rampe éteinte comprise ; P1, trois quarts arrière)
+    lens = _principled(nt, **{"Roughness": 0.4, "Coat Weight": 0.5, "Coat Roughness": 0.12, "Coat IOR": 1.55})
     nt.links.new(base.outputs[2], lens.inputs["Base Color"])
     nt.links.new(_math(nt, "MAXIMUM", refl, _math(nt, "MULTIPLY", core, 0.6)), lens.inputs["Metallic"])
     shader = lens.outputs[0]
