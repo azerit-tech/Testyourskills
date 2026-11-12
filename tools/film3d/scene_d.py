@@ -575,6 +575,51 @@ def glows(points):
         o.visible_camera = False
 
 
+def _car_collections(car):
+    """Les deux collections de liaison d'une voiture (créées une fois) : « sans » (ses maillages exclus) et « avec »
+    (ses maillages seuls)."""
+    out_c = bpy.data.collections.get(f"{car.name}_lumiere_sans")
+    if out_c is None:
+        body = [o for o in car.children_recursive if o.type == "MESH"]
+        out_c = bpy.data.collections.new(f"{car.name}_lumiere_sans")
+        in_c = bpy.data.collections.new(f"{car.name}_lumiere_avec")
+        for o in body:
+            out_c.objects.link(o)
+            in_c.objects.link(o)
+        for co in out_c.collection_objects:
+            co.light_linking.link_state = "EXCLUDE"
+    return out_c, bpy.data.collections[f"{car.name}_lumiere_avec"]
+
+
+def split_for_car(lights, car, energy, color, tag="lumiere"):
+    """Sépare la lumière que reçoit une voiture de celle du décor : chaque lumière de `lights` exclut la voiture
+    (liaison de lumière) et reçoit une jumelle au même endroit, de puissance `energy` et de teinte `color`, qui
+    n'éclaire qu'elle, invisible à la caméra et à la brume. La brume et le sol gardent la pleine puissance, la
+    peinture reçoit ce qu'elle supporte. Renvoie les jumelles."""
+    out_c, in_c = _car_collections(car)
+    d, twins = None, []
+    for o in lights:
+        o.light_linking.receiver_collection = out_c
+        if d is None:
+            d = o.data.copy()
+            d.name = f"{tag}_{car.name}"
+            d.energy = energy
+            d.color = L.lin(color)[:3]
+        c = bpy.data.objects.new(f"{o.name}_{car.name}", d)
+        for coll in o.users_collection:
+            coll.objects.link(c)
+        c.parent = o.parent
+        c.matrix_parent_inverse = o.matrix_parent_inverse.copy()
+        c.rotation_mode = o.rotation_mode
+        c.location, c.rotation_euler = o.location.copy(), o.rotation_euler.copy()
+        c.rotation_quaternion = o.rotation_quaternion.copy()
+        c.visible_camera = False
+        c.visible_volume_scatter = False
+        c.light_linking.receiver_collection = in_c
+        twins.append(c)
+    return twins
+
+
 def aim_helis(helis, target, energy=400000.0, car=None, car_energy=None, cone=None):
     """Les projecteurs des hélicoptères sur la cible. À 30-40 m, les 30 kW du projecteur de cast_vehicles
     éclairent la voiture vingt fois moins que le lampadaire : on les pousse (la lumière est partagée par les
@@ -593,29 +638,7 @@ def aim_helis(helis, target, energy=400000.0, car=None, car_energy=None, cone=No
                     o.data.spot_size = math.radians(cone)
                 spots.append(o)
     if car is not None and car_energy:
-        body = [o for o in car.children_recursive if o.type == "MESH"]
-        out_c, in_c = bpy.data.collections.new("faisceau_sans_berline"), bpy.data.collections.new("faisceau_berline")
-        for o in body:
-            out_c.objects.link(o)
-            in_c.objects.link(o)
-        for co in out_c.collection_objects:
-            co.light_linking.link_state = "EXCLUDE"
-        d = None
-        for i, o in enumerate(spots):
-            o.light_linking.receiver_collection = out_c
-            if d is None:
-                d = o.data.copy()
-                d.name = "searchlight_berline"
-                d.energy = car_energy
-                d.color = L.lin("#fff0d8")[:3]     # crème : des reflets chauds sur la caisse, pas de blanc bleuté
-            c = bpy.data.objects.new(f"{o.name}_berline", d)
-            for coll in o.users_collection:
-                coll.objects.link(c)
-            c.parent = o.parent
-            c.matrix_parent_inverse = o.matrix_parent_inverse.copy()
-            c.location, c.rotation_euler = o.location.copy(), o.rotation_euler.copy()
-            c.visible_volume_scatter = False                # la brume ne voit que le faisceau principal
-            c.light_linking.receiver_collection = in_c
+        split_for_car(spots, car, car_energy, "#fff0d8", tag="faisceau")   # crème : des reflets chauds, pas bleutés
     for r in helis:
         piv = next((o for o in r.children_recursive if o.name.endswith("searchlight_pivot")), None)
         if piv is None:
@@ -753,6 +776,9 @@ def plan_FIN6(scene, hidden, palier="socle"):
     # sur la berline, trois projecteurs à 40 m : 15 kW chacun lui donnent la même lumière que les 60 kW du seul
     # projecteur de FIN, à 49 m, sous lequel elle reste bordeaux (à 50 kW chacun, elle sortait encore rose)
     aim_helis(hs, STOP + Vector((0, 0, 0.8)), car=hero, car_energy=15000.0)
+    # le lampadaire de la pointe, ambre à 3,2 kW à 8 m de la berline, la sortait rose avec le faisceau : il garde sa
+    # pleine puissance pour le sol et la brume, la berline n'en reçoit que la part de FIN (1300 W, crème)
+    split_for_car([bpy.data.objects["lamp_pointe_light"]], hero, 1300.0, "#ffe2c2", tag="lampadaire")
     try:
         j = L.jet("jet")
         L.put(j, CX + 40.0, CY - 160.0, 55.0, heading=-8.0, pitch=-3.0, roll=18.0)
