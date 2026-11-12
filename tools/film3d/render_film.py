@@ -389,6 +389,9 @@ def setup_render(bpy, scene, a):
         c.samples = a.samples
     elif a.draft:
         c.samples = 32
+    if a.adaptive is not None:                        # le seuil de l'échantillonnage adaptatif (0,02 dans les scènes)
+        c.adaptive_threshold = a.adaptive
+        log(f"seuil adaptatif {a.adaptive} (au lieu de celui de la scène)")
     r.use_persistent_data = not a.no_persistent      # les textures et la scène gardées d'une image à l'autre
     return res, "cycles", device, c.samples
 
@@ -523,7 +526,7 @@ def run_worker(a, plan, blender):
     args = [blender, "-b", "--factory-startup", "--python-exit-code", "1", "-t", str(a.threads), "-P",
             os.path.abspath(__file__), "--", "--worker", "--mode", a.mode, "--plan", plan, "--out", a.out,
             "--threads", str(a.threads)]
-    for k in ("frames", "samples", "res"):
+    for k in ("frames", "samples", "res", "adaptive"):
         if getattr(a, k):
             args += [f"--{k}", str(getattr(a, k))]
     for k in ("draft", "dry", "cpu", "no_persistent"):
@@ -681,6 +684,7 @@ def main():
     ap.add_argument("--plan", default=",".join(ORDER), help="OUV,P1,… (tous par défaut, dans l'ordre du montage)")
     ap.add_argument("--frames", default=None, help="a-b, comptées dans le plan (1 à sa longueur)")
     ap.add_argument("--samples", type=int, default=None)
+    ap.add_argument("--adaptive", type=float, default=None, help="seuil adaptatif (sinon celui de la scène, 0,02)")
     ap.add_argument("--res", default=None, help="720x1280 par défaut (360x640 en --draft et --dry)")
     ap.add_argument("--draft", action="store_true", help="360 × 640, 32 échantillons")
     ap.add_argument("--dry", action="store_true", help="essai à blanc en Workbench, 360 × 640")
