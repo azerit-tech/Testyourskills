@@ -292,8 +292,9 @@ def patrol1_pos(t):
 
 
 # --- l'hélicoptère, devant la berline, bas (8 m), à 22 m de son centre, un peu à droite de la route (sinon il
-# passait devant la tour du phare), le nez vers elle ; son faisceau la cherche pendant la glissade (en retard sur
-# elle, un peu de balancement) et se pose sur elle à l'image 30
+# passait devant la tour du phare), le nez vers elle ; son faisceau la cherche pendant la glissade (devant elle,
+# un peu de balancement : en retard, sa tache tombait derrière elle, sur le sol blanc du tiers bas) et se pose sur
+# elle à l'image 30
 HELI_AZ = -15.0                    # cap du point d'arrêt vers l'hélicoptère
 HELI_D, HELI_Z = 22.0, 8.0
 HELI = (CX - math.sin(math.radians(HELI_AZ)) * HELI_D, CY + math.cos(math.radians(HELI_AZ)) * HELI_D, HELI_Z)
@@ -304,9 +305,8 @@ F_BEAM = 30
 def beam_target(t):
     x, y = hero_pos(t)
     w = 1.0 - M.smoothstep(0.0, M.t_of(F_BEAM), t)
-    lx, ly = hero_pos(t - 0.3)
     sway = 1.1 * w * math.sin(2.0 * math.pi * 1.3 * t + 0.4)
-    return x + (lx - x) * w + sway, y + (ly - y) * w, 0.8
+    return x + sway, y + 3.5 * w, 0.8
 
 
 def aircraft():
