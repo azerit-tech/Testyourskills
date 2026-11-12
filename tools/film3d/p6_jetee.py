@@ -117,7 +117,8 @@ def column_pos(i):
 
 
 # --- les hélicoptères : en formation au-dessus de la berline, qui la suivent ; (dx, dy, z) depuis la jetée
-HELIS = [(-22.0, 12.0, 17.0), (20.0, -6.0, 20.0), (-6.0, -30.0, 24.0)]
+# (à dx = 20, le second sortait du cadre à droite quand la grue monte)
+HELIS = [(-22.0, 12.0, 17.0), (14.0, -6.0, 20.0), (-6.0, -30.0, 24.0)]
 
 
 def heli(i):
