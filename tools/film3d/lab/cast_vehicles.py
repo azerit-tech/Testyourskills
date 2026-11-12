@@ -406,9 +406,9 @@ def mat_lenses(name="lightbar_lenses", strength=0.0, split_axis=1):
     return m
 
 
-def mat_glass(name="cast_glass", tint="#20242c"):
+def mat_glass(name="cast_glass", tint="#20242c", transmission=0.85):
     m, nt, out = _mat(name)
-    p = _principled(nt, **{"Base Color": lin(tint), "Roughness": 0.03, "Transmission Weight": 0.85, "IOR": 1.45})
+    p = _principled(nt, **{"Base Color": lin(tint), "Roughness": 0.03, "Transmission Weight": transmission, "IOR": 1.45})
     nt.links.new(p.outputs[0], out.inputs[0])
     return m
 
@@ -491,6 +491,31 @@ def rubber_over(src, name, dark=0.1, keep_uv=()):
             nt.links.new(k, comb.inputs[i])
     nt.links.new(comb.outputs[0], mul.inputs[7])
     nt.links.new(mul.outputs[2], p.inputs["Base Color"])
+    return m
+
+
+def chrome_over(src, name, color=(0.62, 0.62, 0.64, 1.0), rough=0.16):
+    """Un matériau d'origine en chrome un peu voilé : sa carte de relief reste, couleur et rugosité remplacées."""
+    m = src.copy()
+    m.name = name
+    nt = m.node_tree
+    p = next(n for n in nt.nodes if n.type == "BSDF_PRINCIPLED")
+    for key in ("Base Color", "Metallic", "Roughness"):
+        for l in list(p.inputs[key].links):
+            nt.links.remove(l)
+    p.inputs["Base Color"].default_value = color
+    p.inputs["Metallic"].default_value = 1.0
+    # de légères variations de voile, pour que le reflet ne soit pas un miroir parfait
+    nz = nt.nodes.new("ShaderNodeTexNoise")
+    nz.inputs["Scale"].default_value = 40.0
+    nz.inputs["Detail"].default_value = 4.0
+    tc = nt.nodes.new("ShaderNodeTexCoord")
+    nt.links.new(tc.outputs["Object"], nz.inputs["Vector"])
+    r = nt.nodes.new("ShaderNodeMapRange")
+    r.inputs["To Min"].default_value = rough * 0.6
+    r.inputs["To Max"].default_value = rough * 1.6
+    nt.links.new(nz.outputs["Fac"], r.inputs["Value"])
+    nt.links.new(r.outputs[0], p.inputs["Roughness"])
     return m
 
 
@@ -1037,7 +1062,8 @@ VANS = {
     # caisse repeinte en gardant relief et rugosité ; un filet crème sous les vitres
     "vandura": dict(file="van-vandura/model.glb", rot=90, hq=True, paint=("Body",), lamps=("Lights",), glass=("Windows",),
                     bands=((-3.0, 1.45, 1.04, 1.16),), bar_x=0.55, bar_w=1.3,
-                    tyres=("Wheels",), rim_uv=((0.635, 0.825, 0.615, 0.805),)),
+                    tyres=("Wheels",), rim_uv=((0.635, 0.825, 0.615, 0.805),),
+                    chrome=("Metal",), head_uv=(0.30, 0.78, 0.02, 0.34)),
 }
 
 
@@ -1046,23 +1072,37 @@ def _load_van_hq(variant, spec, collection, lights_on, strength):
     parts = import_model(os.path.join(CAST, spec["file"]), collection)
     normalise(parts, rot_z=spec["rot"], length=spec.get("length"))
     downscale_images(parts, 2048)
-    _replace_mats(parts, spec["paint"], lambda m: livery_over(m, f"{tag}_paint", spec["bands"]))
+    # la même peinture satinée que la patrouille (le relief et la rugosité des tôles d'origine restent)
+    _replace_mats(parts, spec["paint"], lambda m: livery_over(m, f"{tag}_paint", spec["bands"], base=PATROL_BODY,
+                                                              metal=0.45, coat=0.8, coat_rough=0.09))
+    # phares ronds : où l'atlas des feux les peint (mesuré sur les UV, à l'avant)
+    hp = [q for o, _i, _m in mats_named(parts, *spec["lamps"]) for q in atlas_points(o, spec["head_uv"]) if q.x > 0]
 
     def lamp(m):
-        # les feux peints dans leur texture : la même texture sert d'émission quand ils sont allumés
+        # les feux peints dans leur texture : la même texture sert d'émission quand ils sont allumés ; leur niveau
+        # (« lamp_head ») suit les spots des phares (une scène qui les éteint les éteint aussi)
         c = m.copy()
         c.name = f"{tag}_lamps"
-        p = next(n for n in c.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
+        nt = c.node_tree
+        p = next(n for n in nt.nodes if n.type == "BSDF_PRINCIPLED")
         if p.inputs["Base Color"].links:
-            c.node_tree.links.new(p.inputs["Base Color"].links[0].from_socket, p.inputs["Emission Color"])
-        p.inputs["Emission Strength"].default_value = 6.0 if lights_on else 0.0
+            nt.links.new(p.inputs["Base Color"].links[0].from_socket, p.inputs["Emission Color"])
+        v = nt.nodes.new("ShaderNodeValue")
+        v.name = v.label = "lamp_head"
+        v.outputs[0].default_value = 1.0
+        nt.links.new(_math(nt, "MULTIPLY", v.outputs[0], 6.0 if lights_on else 0.0), p.inputs["Emission Strength"])
         return c
     _replace_mats(parts, spec["lamps"], lamp)
+    if spec.get("chrome"):
+        # pare-chocs et calandre : un gris clair mat dans le fichier (ils sortaient beige sous les lampadaires) ;
+        # un chrome un peu voilé, ses cartes de relief gardées
+        _replace_mats(parts, spec["chrome"], lambda m: chrome_over(m, f"{tag}_chrome"))
     if spec.get("tyres"):
         # l'atlas des roues est gris clair (flanc presque blanc) : pneus noircis, lettrage du flanc avec ; le moyeu acier gardé
         _replace_mats(parts, spec["tyres"], lambda m: rubber_over(m, f"{tag}_tyres", 0.12, spec.get("rim_uv", ())))
-    # vitres d'origine opaques (gris plat) : verre teinté, la caisse n'a pas d'aménagement intérieur
-    _replace_mats(parts, spec.get("glass", ()), mat_glass(f"{tag}_tint", tint="#0d0f12"))
+    # vitres d'origine opaques (gris plat) : verre teinté. La caisse n'a pas d'aménagement intérieur : un verre
+    # trop clair laissait voir, par le pare-brise, la rampe allumée à travers le toit ; fumé presque opaque
+    _replace_mats(parts, spec.get("glass", ()), mat_glass(f"{tag}_tint", tint="#0d0f12", transmission=0.3))
     # les roues (une pièce par roue, matière des roues) : à part, pour tourner
     # (la matière des roues vient d'être remplacée par rubber_over : elle s'appelle maintenant <tag>_tyres)
     tyres = tuple(spec.get("tyres", ())) + (f"{tag}_tyres",)
@@ -1076,7 +1116,17 @@ def _load_van_hq(variant, spec, collection, lights_on, strength):
     bar.location = (spec["bar_x"], 0, z - 0.015)
     parent_keep(bar, body)
     lights = lightbar_lights(bar) if lights_on else []
-    lights += headlight_spots(body, [(mx.x - 0.1, 0.62, mn.z + 0.8), (mx.x - 0.1, -0.62, mn.z + 0.8)], on=lights_on)
+    if hp:
+        hy = sum(abs(q.y) for q in hp) / len(hp)
+        hz = sum(q.z for q in hp) / len(hp)
+        hx = max(q.x for q in hp) + 0.04
+    else:
+        hx, hy, hz = mx.x - 0.1, 0.62, mn.z + 0.8
+    heads = headlight_spots(body, [(hx, hy, hz), (hx, -hy, hz)], on=lights_on, energy=350.0, angle=40.0, blend=0.45)
+    lights += heads
+    if heads:
+        for m in {m for m in body.data.materials if m and m.name.startswith(f"{tag}_lamps")}:
+            lamp_drivers(m, heads[0].data)
     return dict(body=body, lightbar=bar, lenses=lens, lights=lights, length=mx.x - mn.x, height=mx.z - mn.z + 0.17,
                 tris=tris([body, bar, lens] + wheels), wheels=wheels)
 
