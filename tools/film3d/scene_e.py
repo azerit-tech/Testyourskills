@@ -775,40 +775,25 @@ def build_port(hidden, lamp_src, far=False, palier=None):
 
 # ---------------------------------------------------------------- le plan
 
-CAM = Vector((11.0, 77.0, 0.4))      # sur le bord nord de la voie du quai (le §2.4 : x = 10, y = 77)
-CAM_YAW = 12.0                     # degrés, de -y vers -x (vers la droite du cadre)
-CAM_PITCH = 6.0                      # le panoramique vers le haut, à l'instant de l'image fixe (25° à la fin) :
-                                     # assez bas pour que les murs de cinq montent dans le tiers haut
-PHI = 39.0                           # où en est la berline dans le virage, en degrés (0 : entrée, 90 : sortie)
-DRIFT = 20.0                     # le travers : la caisse tournée de plus que sa trajectoire
-TURN_SPEED = 14.0                    # m/s au milieu du virage (60 km/h à l'entrée)
+import motion as M          # noqa: E402  (le mouvement calculé, pur Python)
+import p5_virage as P5      # noqa: E402  (la trajectoire de P5, écrite une fois)
+
+CAM = Vector(P5.CAM)                 # sur le bord nord de la voie du quai (le §2.4 : x = 10, y = 77)
+STILL_FRAME = 24                     # l'image fixe d'essai (rendu d'une seule image) : la berline en pleine glisse
+FRAMES = range(P5.F0 - 1, P5.F0 + P5.FRAMES + 1)   # une image de part et d'autre : l'obturateur du flou
 
 
-def arc_point(phi):
-    a = math.radians(phi)
-    return Vector((TURN_C[0] - TURN_R * math.cos(a), TURN_C[1] + TURN_R * math.sin(a), 0.0))
+def wheelbase(wheels, fwd=Vector((0.0, -1.0, 0.0))):
+    """L'empattement d'un véhicule à roues séparées (positions de repos dans la caisse, avant vers `fwd`)."""
+    d = [Vector(w.location).dot(fwd) for w in wheels]
+    return (max(d) - min(d)) if d else 2.9
 
 
-def drift_keys(root, vel_heading, speed, yaw_rate, wheels=(), wheel_r=0.33):
-    """Le flou de bougé d'une voiture en travers : elle avance selon sa trajectoire (`vel_heading`, pas son
-    avant), sa caisse tourne de `yaw_rate` rad/s, ses roues roulent (images 1 et 3 autour de l'image 2)."""
-    h = math.radians(vel_heading)
-    d = Vector((-math.sin(h), math.cos(h), 0.0)) * speed / 24.0
-    p, rz = root.location.copy(), root.rotation_euler.z
-    for f, s in ((1, -1), (3, 1)):
-        root.location = p + d * s
-        root.rotation_euler.z = rz - s * yaw_rate / 24.0       # virage à droite : le cap décroît
-        root.keyframe_insert("location", frame=f)
-        root.keyframe_insert("rotation_euler", index=2, frame=f)
-    root.location, root.rotation_euler.z = p, rz
-    S.linear_keys(root)
-    a = speed / wheel_r / 24.0
-    for w in wheels:
-        for f, s in ((1, -1), (3, 1)):
-            w.rotation_euler.x = a * s
-            w.keyframe_insert("rotation_euler", index=0, frame=f)
-        w.rotation_euler.x = 0
-        S.linear_keys(w)
+def deck_ground(x, y):
+    """Le sol sous un véhicule de la meute : le tablier et sa pente sur la rampe, le terre-plein plat ensuite."""
+    import scene_c
+    z = scene_c.deck_z(y) + (road.road_z(x) if y < -20.0 else 0.0)
+    return z, math.degrees(math.atan(scene_c.deck_slope(y)))
 
 
 def boost_bars(strength=8.0, glow=8000.0):
@@ -870,43 +855,41 @@ def light_tower(at, target, energy=50000.0, along_x=False):
 
 
 def plan_P5(scene, hidden, palier="socle"):
-    """P5, le projecteur : la caméra à 40 cm derrière le bord nord de la voie du quai, 28 mm, tournée vers le pied
-    de la rampe, en contre-plongée ; l'image fixe est l'instant fort, la berline au tiers du virage, à la sortie de
-    la voie du pont, en travers, trois quarts avant gauche, roues en contre-braquage, caisse en roulis vers
-    l'extérieur, à 13 m, sur 45 % de la largeur ; deux patrouilles au pied de la rampe (cachées par elle), le
-    fourgon et une troisième sur la rampe, à sa gauche ; les murs de conteneurs de part et d'autre de la voie du
-    pont ; l'hélicoptère au-dessus de l'eau derrière la fin du tablier, son projecteur posé sur elle.
+    """P5, le projecteur, animé (28 images, p5_virage.py) : la caméra à l'épaule à 40 cm du sol sur le bord nord
+    de la voie du quai, 28 mm, tournée vers le pied de la rampe, puis panoramique vers le haut. La berline arrive de
+    face en plein freinage (l'avant plongé), entre dans l'arc de 15 m et part en glisse à droite (contre-braquage,
+    roulis vers l'extérieur), reprend à la fin ; deux patrouilles au pied de la rampe, le fourgon et une troisième
+    sur la rampe la suivent sans la rattraper, rampes clignotantes ; l'hélicoptère monte de derrière le portique,
+    son faisceau balaie la brume, croise l'objectif vers l'image 14 et se pose sur elle vers l'image 20. Toutes les
+    clés viennent des trajectoires (motion.py) ; le flou de mouvement les suit.
 
-    Écart au §2.4 : la caméra est en (11, 77) et non (10, 77). Le 28 mm vertical ne fait que 40° de large ; la
-    berline à 13 m en couvre 19°, et la caméra plus à gauche la pose devant toute la meute. Depuis (11, 77), elle
-    tient la moitié droite du cadre et le fourgon et la patrouille de la rampe la gauche (cotes cherchées par le
-    calcul des angles, vérifiées en Workbench)."""
+    Écart au §2.4 : la caméra est en (11, 77) et non (10, 77) (la berline de l'image fixe tient la moitié droite
+    du cadre, la meute la gauche) ; le panoramique monte de 14° et non de 25° (au-delà, la berline passe sous la
+    bande du bas) ; le plan ne couvre que la fin du freinage, la glisse et le début de la reprise (p5_virage.py)."""
     import scene_c
     lamp_src = L.panorama(scene, hidden, bridge=None, port=None)
     scene_c.build_bridge(hidden, lamp_src)
     build_port(hidden, lamp_src, far=False, palier=palier)
-    # --- la berline au milieu du virage
+    scene.frame_start, scene.frame_end = P5.F0, P5.F0 + P5.FRAMES - 1
+    # --- la berline : freinage, glisse, reprise
     hero = L.hero()
-    p = arc_point(PHI)
-    vel = -PHI                                         # le cap de la trajectoire (convention de lieux.put)
-    # la caisse à 20° de sa trajectoire, en biais sur les deux jeux de lignes (59° de celles du pont, qui filent
-    # vers la rampe juste derrière elle, 31° de celles du quai), assise sur l'extérieur ; la trajectoire vient
-    # vers l'objectif, le nez part à gauche : la glissade se lit sans fumée
-    L.put(hero, p.x, p.y, 0.0, heading=vel - DRIFT, pitch=-1.5, roll=-5.0)
     wheels = L.hero_wheels(hero)
-    drift_keys(hero, vel, TURN_SPEED, TURN_SPEED / TURN_R, wheels, hero["wheel_r"])
-    for w in wheels:                                   # contre-braquage : les roues avant vers la gauche
-        if w.name.endswith(("FL", "FR")):
-            w.rotation_euler.z = math.radians(18.0)
-    # la fumée des pneus arrière, qui traîne sur l'extérieur du virage
-    hd = math.radians(vel - DRIFT)
-    fwd, left = Vector((-math.sin(hd), math.cos(hd), 0)), Vector((-math.cos(hd), -math.sin(hd), 0))
-    rear = p - fwd * 1.6 + left * 0.5
-    L.smoke("fumee_pneus", (rear.x, rear.y, 0.5), (2.4, 2.0, 0.6), density=0.14, seed=3.0)
-    # --- la meute : deux patrouilles au pied de la rampe, une troisième et le fourgon sur la rampe
-    scene_c.pack([("patrol", -1.9, -4.0, 0.0), ("patrol", -5.2, -16.0, 1.5), ("van", -1.9, -36.0, 0.0),
-                  ("patrol", 1.9, -55.0, -1.0)], speed=31.0)
+    poses = M.sample(P5.hero_pos, FRAMES, slip=P5.hero_slip, wheel_r=hero["wheel_r"], wheelbase=wheelbase(wheels))
+    M.key_vehicle(hero, poses, wheels=wheels)
+    # la fumée des pneus arrière, là où la glisse s'installe, sur l'extérieur de l'arc
+    a = math.radians(18.0)
+    out = Vector((-math.cos(a), math.sin(a), 0.0))
+    smoke_at = Vector((TURN_C[0], TURN_C[1], 0.0)) + out * (TURN_R + 0.8)
+    L.smoke("fumee_pneus", (smoke_at.x, smoke_at.y, 0.5), (3.0, 2.4, 0.7), density=0.12, seed=3.0)
+    p = Vector((*P5.hero_pos(M.t_of(STILL_FRAME)), 0.0))
+    # --- la meute : elle descend la rampe et freine, sans rattraper la berline
+    rigs = scene_c.pack([(k, x, y, 0.0) for k, x, y in P5.PACK_START], speed=P5.PACK_V)
+    for i, r in enumerate(rigs):
+        ps = M.sample(P5.pack_pos(i), FRAMES, wheel_r=0.36, seed=float(i))
+        M.key_vehicle(r, ps, ground=deck_ground, pivot=(0.0, 0.0, 0.36))   # roues jointes à la caisse : pas de roues
     boost_bars(glow=20000.0)
+    n = M.flash_bars(rigs, FRAMES)
+    print(f"[P5] {n} lueurs de rampe clignotantes", flush=True)
     # la tour devant le mur qui ferme l'axe, derrière la caméra
     light_tower((24.0, 81.4), Vector((*TURN_AIM, 0.6)), energy=80000.0, along_x=True)
     # le liseré corail, du côté de la meute (la lueur des rampes) : il détache la caisse bordeaux du fond et
@@ -923,16 +906,15 @@ def plan_P5(scene, hidden, palier="socle"):
     rim.location = p + to_pack * 7.0 + Vector((0.0, 0.0, 1.4))
     rim.rotation_mode = "QUATERNION"
     rim.rotation_quaternion = (p + Vector((0.0, 0.0, 0.7)) - rim.location).to_track_quat("-Z", "Y")
-    # --- l'hélicoptère au-dessus de l'eau, derrière la fin du tablier, projecteur sur la berline
+    # --- l'hélicoptère : il monte de derrière le portique, au-dessus de l'eau, à droite du cadre ; son faisceau
+    # balaie la brume, croise l'objectif, se pose sur la berline (p5_virage.beam_target)
     heli, h = L.helicopter("heli")
-    # à droite du cadre, à 79 m, le nez tourné à gauche de la berline : le projecteur (sous le nez, à droite) la voit
-    # sans que la cellule le masque, et vient de côté (de derrière elle, sa tache s'étirait jusqu'à l'objectif)
-    L.put(heli, -17.0, 14.0, 36.0, heading=0.0, pitch=-6.0, roll=-5.0)
+    M.key_object(heli, FRAMES, P5.heli)
     sl = h["searchlight"].data
     sl.energy = 1.6e6                                  # assez pour la brume, pas au point de blanchir le bordeaux
     sl.spot_size = math.radians(5.0)
     sl.spot_blend = 0.25
-    L.aim(h, p + Vector((0.0, 0.0, 0.7)))
+    M.key_searchlight(h, FRAMES, P5.beam_target)
     for i, (dz, col, e) in enumerate(((0.2, L.CORAL, 0.4), (-1.2, L.CREAM, 0.25))):
         Ld = bpy.data.lights.new(f"heli_feu_{i}", "POINT")      # feu anticollision corail, feu blanc sous la cellule
         Ld.energy = 40.0 * e * 10
@@ -943,14 +925,17 @@ def plan_P5(scene, hidden, palier="socle"):
         lo.parent = heli
         lo.location = (0.0, -0.5, 2.6 + dz)
     L.haze((-140, 160), (-280, 115), (L.WATER_Z, 70), 0.0022)    # lieux.haze tourne ses normales vers l'extérieur
-    # --- la caméra
-    a, t = math.radians(CAM_YAW), math.radians(CAM_PITCH)
-    d = Vector((-math.sin(a) * math.cos(t), -math.cos(a) * math.cos(t), math.sin(t)))
-    cam = L.camera("cam_P5", tuple(CAM), tuple(CAM + d * 50.0), lens=28, fstop=2.8, focus=p + Vector((0, 0, 0.7)),
-                   roll=-2.0)
+    # --- la caméra à l'épaule, mise au point sur la berline (elle vient de 31 à 13 m)
+    cam = L.camera("cam_P5", tuple(CAM), (CAM.x, CAM.y - 50.0, CAM.z), lens=28, fstop=2.8, roll=-2.0)
+    M.key_camera(cam, FRAMES, P5.camera)
+    cam.data.dof.focus_object = hero
     scene.render.use_motion_blur = True
-    print(f"[P5] berline en ({p.x:.1f}, {p.y:.1f}), à {(p - Vector((CAM.x, CAM.y, 0))).length:.1f} m de l'objectif, "
-          f"cap {vel - DRIFT:.0f}° (trajectoire {vel:.0f}°)", flush=True)
+    scene.render.motion_blur_shutter = 0.5
+    last = poses[-2]
+    print(f"[P5] {len(FRAMES)} images de clés ; berline de ({poses[1]['x']:.1f}, {poses[1]['y']:.1f}) à "
+          f"({last['x']:.1f}, {last['y']:.1f}), {poses[1]['speed'] * 3.6:.0f} puis {last['speed'] * 3.6:.0f} km/h ; "
+          f"tangage mini {min(q['pitch'] for q in poses):.1f}°, roulis mini {min(q['roll'] for q in poses):.1f}°, "
+          f"braquage maxi {max(q['steer'] for q in poses):.1f}°", flush=True)
     return cam
 
 
@@ -961,5 +946,5 @@ def build(plan, palier="socle"):
     scene, hidden = L.new_scene()
     cam = PLANS[plan](scene, hidden, palier=palier)
     scene.camera = cam
-    scene.frame_set(2)
+    scene.frame_set(STILL_FRAME)
     return scene

@@ -270,9 +270,11 @@ def key_vehicle(root, poses, wheels=(), ground=None, pivot=(0.0, 0.0, 0.5), body
     braquage. Les roues avant sont celles qui sont du côté de l'avant de la caisse. Un véhicule sans roues
     séparées (patrouilles, fourgon) penche tout entier : ses roues bougent avec la caisse. Remplace toutes les clés
     déjà posées (les clés de flou faites à la main) : le flou de mouvement vient de ces clés."""
-    import bpy
     from mathutils import Matrix, Vector
-    body = body or bpy.data.objects[root["body"]]
+    if body is None:
+        # une copie de lieux.clone garde la propriété « body » de sa source : sa caisse est l'enfant « copie:nom »
+        name = root["body"]
+        body = next(c for c in root.children if c.name == name or c.name.endswith(":" + name))
     for ob in (root, body, *wheels):
         _clear(ob)
     root.rotation_mode = body.rotation_mode = "XYZ"
