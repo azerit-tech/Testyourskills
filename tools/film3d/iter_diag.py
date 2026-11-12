@@ -20,7 +20,7 @@ if HERE not in sys.path:
     sys.path.insert(0, HERE)
 import lieux as L  # noqa: E402
 
-SOURCES = {"P4": "scene_c", "P6": "scene_d", "FIN": "scene_d", "FIN6": "scene_d"}
+SOURCES = {"OUV": "scene_a", "P1": "scene_a", "P4": "scene_c", "P6": "scene_d", "FIN": "scene_d", "FIN6": "scene_d"}
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--plan", required=True)
