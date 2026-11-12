@@ -820,6 +820,8 @@ def wheel_marks(wheels, radius=0.33, axis="X"):
         ob.parent = w
         ob.color = (1.0, 0.85, 0.0, 1.0)
         ob.hide_render = True
+        # par sécurité, si un rendu le rallume : invisible pour Cycles (caméra, reflets, diffus, ombres)
+        ob.visible_camera = ob.visible_glossy = ob.visible_diffuse = ob.visible_shadow = False
         out.append(ob)
     return out
 
