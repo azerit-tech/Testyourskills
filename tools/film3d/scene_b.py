@@ -29,7 +29,8 @@
 # du barrage (CREDITS.md : enseigne MOTEL, néon cerise, distributeur de journaux, borne d'incendie, plots et
 # panneaux, barrière de foule), remis à leur taille réelle ici. Écrit ici : les dessins d'immeubles propres à la
 # rue, la pose des deux rangs, les enseignes en potence, les câbles, lanternes et guirlandes en travers, les
-# portières ouvertes, l'îlot du rond-point au fond.
+# portières ouvertes, l'îlot du rond-point au fond ; le bout de la rue (boulevard, quai, pont, pylône, autre rive),
+# les trottoirs à hauteur de voiture (bornes, étals, vélos, livraison), le sol que la caméra rase.
 import math
 import os
 import random
@@ -121,12 +122,13 @@ UP_STYLE = {
 TINTS = ["#d98a6e", "#e2b56a", "#93c2ab", "#dc9ea2", "#a3bcdc", "#efe0c0", "#bba9d9", "#d9b85c", "#e7a98a",
          "#9fcfc4"]
 
-# les deux rangs d'immeubles, en repère de vue : (dessin, y du bout proche de la caméra), bout à bout jusqu'à 128.
+# les deux rangs d'immeubles, en repère de vue : (dessin, y du bout côté rond-point), bout à bout de -28 à 128 (les
+# deux premiers font l'angle du boulevard du quai, au bout de la rue).
 # L'hôtel et son pylône lumineux jamais à moins de 45 m de la caméra : ses lettres tomberaient dans la bande du haut.
 # Près de la caméra, les dessins à quatre niveaux : le ciel n'est plus qu'une fente.
-LEFT = [("rue_deco", -16.0), ("rue_corner", 2.0), ("rue_deco", 14.0), ("rue_corner", 32.0), ("rue_hotel", 44.0),
+LEFT = [("rue_corner", -28.0), ("rue_deco", -16.0), ("rue_corner", 2.0), ("rue_deco", 14.0), ("rue_corner", 32.0), ("rue_hotel", 44.0),
         ("rue_low", 60.0), ("rue_deco", 80.0), ("rue_hotel", 98.0), ("rue_corner", 114.0)]
-RIGHT = [("rue_low", -16.0), ("rue_deco", 4.0), ("rue_corner", 22.0), ("rue_deco", 34.0), ("rue_hotel", 52.0),
+RIGHT = [("rue_corner", -28.0), ("rue_low", -16.0), ("rue_deco", 4.0), ("rue_corner", 22.0), ("rue_deco", 34.0), ("rue_hotel", 52.0),
          ("rue_low", 68.0), ("rue_hotel", 88.0), ("rue_corner", 104.0), ("rue_corner", 116.0)]
 
 # les enseignes en potence : une tous les 8 à 12 m de chaque côté, entre 4 et 8 m de haut (blade_table()) ;
@@ -138,11 +140,11 @@ NEON_LIGHT = {"amber": "#ffc36b", "cream": "#fff1d6", "coral": "#ff6a3d", "mint"
 MOTEL = (-1, 72.0)     # l'enseigne MOTEL sur mât (modèle de bibliothèque) : côté, y de vue
 
 # câbles en travers : y de vue des portées ; une lanterne au milieu de chacune, des guirlandes entre elles
-SPANS = [13.0, 20.5, 28.0, 36.5, 46.0, 57.0, 70.0, 84.0, 100.0, 116.0]
+SPANS = [-24.0, -13.0, 2.5, 13.0, 20.5, 28.0, 36.5, 46.0, 57.0, 70.0, 84.0, 100.0, 116.0]
 # lampadaires tous les 30 m en quinconce : (côté, y de vue)
-LAMPS = [(-1, 16.0), (1, 46.0), (-1, 76.0), (1, 106.0)]
-# les voitures garées, d'un seul côté (x > 0 en vue), aucune dans les 40 derniers mètres avant le barrage
-PARKED = [32.0, 45.5, 59.0, 86.0, 99.5, 113.0]
+LAMPS = [(1, -14.0), (-1, 16.0), (1, 46.0), (-1, 76.0), (1, 106.0)]
+# les voitures garées, d'un seul côté (x > 0 en vue), la dernière à 15 m du barrage : la caméra la longe à 1,4 m
+PARKED = [23.0, 32.0, 45.5, 59.0, 86.0, 99.5, 113.0]
 
 
 def log(*a):
@@ -422,7 +424,8 @@ def blade_table():
     rng = random.Random(23)
     out = []
     w = 0
-    for side, y in ((-1, 11.0), (1, 16.0)):
+    # (depuis l'angle du boulevard du quai, au bout de la rue, que la caméra regarde maintenant)
+    for side, y in ((-1, -25.0), (1, -20.0)):
         while y < 125.0:
             if not (side == MOTEL[0] and abs(y - MOTEL[1]) < 3.5):
                 text, col = WORDS[w % len(WORDS)]
@@ -685,6 +688,301 @@ def build_furniture(M, hidden):
             inst.color = (*lin(tints[k % len(tints)])[:3], 1)
 
 
+# ---------------------------------------------------------------- le bout de la rue : le boulevard du quai, le pont
+
+# en s (repère monde, y = s) : la rue finit à 162 ; le boulevard du quai de 162 à 178 ; le quai à 181 ; le pont
+# part dans l'axe de la rue et monte à 6 % jusqu'à sa crête (7,2 m), le pylône en H à 330 (52 m au-dessus du
+# tablier, feu corail au sommet) : le lieu du plan suivant, vu au loin par la fente de la rue
+S_STREET, S_QUAY, S_BRIDGE, S_CREST, S_PYLON, S_FAR = 162.0, 178.0, 181.0, 301.0, 330.0, 600.0
+BRIDGE_HALF = 8.5
+
+
+def deck_z(s):
+    """La hauteur du tablier du pont à l'abscisse s : rampe à 6 %, crête de 7,2 m, redescente côté port."""
+    if s <= S_BRIDGE:
+        return 0.0
+    if s <= S_CREST:
+        return 0.06 * (s - S_BRIDGE)
+    if s <= 440.0:
+        return 7.2
+    return max(0.0, 7.2 - 0.06 * (s - 440.0))
+
+
+def deck_sweep(name, x0, x1, dz0, dz1, mat, ss):
+    """Un profilé rectangulaire (x0..x1, dz0..dz1 au-dessus du tablier) le long du pont, aux abscisses ss."""
+    me = bpy.data.meshes.new(name)
+    bm = bmesh.new()
+    rings = []
+    for s in ss:
+        _, y = vw(0.0, s)
+        z = deck_z(s)
+        rings.append([bm.verts.new((x, y, z + dz)) for x, dz in ((x0, dz0), (x1, dz0), (x1, dz1), (x0, dz1))])
+    for a, b in zip(rings, rings[1:]):
+        for i in range(4):
+            bm.faces.new((a[i], a[(i + 1) % 4], b[(i + 1) % 4], b[i]))
+    bm.faces.new(rings[0])
+    bm.faces.new(list(reversed(rings[-1])))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(me)
+    bm.free()
+    ob = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(ob)
+    me.materials.append(mat)
+    return ob
+
+
+def build_street_end(hidden):
+    """Ce que la caméra regarde au-delà du barrage (de 40 à 500 m) : le boulevard du quai en travers et ses
+    trottoirs, le quai et son garde-corps, l'eau, le pont qui part dans l'axe de la rue et monte, ses lampadaires
+    en file, son pylône en H éclairé au pied, le feu corail au sommet, ses haubans ; au loin le port et l'autre
+    rive en points de lumière. Trois plans : le barrage, le carrefour, le pont et le ciel."""
+    keep = road.S
+    import lieux
+    road.S = keep
+    walk = bpy.data.materials["rue_walk"]
+    kerb = bpy.data.materials["rue_kerb"]
+    plaza = bpy.data.materials["rue_plaza_asphalt"]
+    paint = bpy.data.materials["rue_paint"]
+    ya, yb = vw(0.0, S_STREET)[1], vw(0.0, S_QUAY)[1]
+    # le boulevard (son enrobé sans marquage, au niveau du bord de la rue) et le passage piéton dans l'axe
+    road.plane("bd_asphalt", 0.0, (ya + yb) / 2, -road.CROWN - 0.002, 200.0, ya - yb, plaza)
+    for k in range(8):
+        x = -HALF + 0.55 + k * 0.98
+        road.decal_strip(f"bd_zebra_{k}", x, x + 0.5, ya - 3.4, ya - 0.6, paint)
+    # les trottoirs du boulevard : devant les immeubles d'angle (le côté de la rue) et le long du quai
+    for side in (-1, 1):
+        x0, x1 = sorted((side * (HALF + road.KERB), side * 100.0))
+        A.box(f"bd_walk_near_{side}", x0, x1, ya - 3.0, ya + 0.01, -0.05, road.WALK_Z, walk)
+        A.box(f"bd_kerb_near_{side}", x0, x1, ya - 3.2, ya - 3.0, -0.05, road.WALK_Z, kerb)
+        x0, x1 = sorted((side * BRIDGE_HALF, side * 100.0))
+        A.box(f"bd_walk_quay_{side}", x0, x1, yb - 3.0, yb, -0.05, road.WALK_Z, walk)
+        A.box(f"bd_kerb_quay_{side}", x0, x1, yb - 0.2, yb, -0.05, road.WALK_Z, kerb)
+    # le quai : son mur, son garde-corps (main courante et montants), hors du départ du pont
+    quay = lieux.mat_quay("rue_quai")
+    rail = lieux.mat_steel("rue_garde_corps", color=(0.32, 0.36, 0.36), rough=0.35, rust=0.3, paint=True)
+    yq = yb - 3.0
+    for side in (-1, 1):
+        x0, x1 = sorted((side * BRIDGE_HALF, side * 100.0))
+        A.box(f"bd_quay_wall_{side}", x0, x1, yq - 0.5, yq, lieux.WATER_Z - 1.0, road.WALK_Z, quay)
+        A.box(f"bd_rail_{side}", x0, x1, yq - 0.06, yq + 0.0, 1.05, 1.1, rail)
+        A.box(f"bd_rail_low_{side}", x0, x1, yq - 0.05, yq - 0.01, 0.55, 0.58, rail)
+        x = x0
+        while x < x1:
+            A.box(f"bd_post_{side}_{x:.0f}", x, x + 0.05, yq - 0.06, yq, road.WALK_Z, 1.1, rail)
+            x += 1.6
+    # l'eau, de part et d'autre du pont, jusqu'à l'autre rive
+    water = lieux.mat_water("rue_lagune")
+    yw = vw(0.0, 2400.0)[1]
+    lieux.water("rue_eau", (-2500.0, 2500.0), (yw, yq - 0.4), lieux.WATER_Z, mat=water)
+    # le pont : tablier (enrobé sombre sur caisson de béton), bordures, parapets, piles
+    ss = [S_BRIDGE + k * 4.0 for k in range(int((S_FAR - S_BRIDGE) / 4.0) + 1)]
+    conc = lieux.mat_concrete("rue_pont_beton", tint=(0.6, 0.58, 0.55), wet_foot=lieux.WATER_Z + 0.5)
+    deck = A.mat_plain("rue_pont_enrobe", lin("#141316"), 0.32)
+    deck_sweep("pont_tablier", -BRIDGE_HALF + 0.5, BRIDGE_HALF - 0.5, -0.02, 0.0, deck, ss)
+    deck_sweep("pont_caisson", -BRIDGE_HALF, BRIDGE_HALF, -1.8, -0.05, conc, ss)
+    for side in (-1, 1):
+        x0, x1 = sorted((side * (BRIDGE_HALF - 0.5), side * (BRIDGE_HALF - 2.4)))
+        deck_sweep(f"pont_trottoir_{side}", x0, x1, -0.05, 0.15, walk, ss)
+        x0, x1 = sorted((side * (BRIDGE_HALF - 0.45), side * BRIDGE_HALF))
+        deck_sweep(f"pont_parapet_{side}", x0, x1, -0.05, 1.1, conc, ss)
+    for s in range(int(S_BRIDGE + 40), int(S_FAR), 40):
+        y = vw(0.0, s)[1]
+        for side in (-1, 1):
+            A.box(f"pont_pile_{s}_{side}", side * 5.0 - 1.0, side * 5.0 + 1.0, y - 1.2, y + 1.2, lieux.WATER_Z - 1.0,
+                  deck_z(s) - 1.8, conc)
+    # les lampadaires du pont : ceux de la rue, plus grands ; les quatre premières paires éclairent vraiment, les
+    # suivantes ne sont que leur tête lumineuse (une file de points qui monte vers la crête) ; à 2600 W, les
+    # parapets montant vers la crête faisaient deux arcs blancs derrière le barrage, plus vifs que lui
+    lamp = bpy.data.objects.get("rue_lamp_src")
+    halo = lieux.emit_mat("pont_halo", lin("#ffbf69"), 25.0)
+    hb = bmesh.new()
+    S = 1.75
+    n_real = 0
+    for k, s in enumerate(range(int(S_BRIDGE + 8), int(S_FAR - 20), 26)):
+        x0, y = vw(0.0, s)
+        z = deck_z(s) + 0.15
+        for side in (-1, 1):
+            x = side * (BRIDGE_HALF - 0.9)
+            rot = math.pi / 2 if side < 0 else -math.pi / 2
+            if lamp is not None:
+                A.instance(lamp, f"pont_lamp_{k}_{side}", (x, y, z), rot, S)
+            hd = Vector((0, -1.68 * S, 4.68 * S))
+            hd.rotate(Matrix.Rotation(rot, 3, "Z"))
+            head = Vector((x, y, z)) + hd
+            bmesh.ops.create_uvsphere(hb, u_segments=8, v_segments=5, radius=0.45, matrix=Matrix.Translation(head))
+            if k < 4:
+                lo = A.add_light(f"pont_lamp_light_{k}_{side}", "SPOT", head - Vector((0, 0, 0.15)), (0, 0, -1),
+                                 lin(AMBER), 1300.0, spot=130)
+                lo.data.spot_blend = 0.5
+                lo.data.shadow_soft_size = 0.5
+                n_real += 1
+    lieux.mesh_object("pont_halos", hb, [halo]).visible_shadow = False
+    # le pylône en H, à cheval sur le tablier : deux jambes, deux traverses, projecteurs ambre au pied, feu corail
+    yp = vw(0.0, S_PYLON)[1]
+    zt = deck_z(S_PYLON) + 52.0
+    for side in (-1, 1):
+        A.box(f"pylone_jambe_{side}", side * 11.0 - 1.5, side * 11.0 + 1.5, yp - 1.0, yp + 1.0, lieux.WATER_Z - 1.0, zt,
+              conc)
+        for j in range(2):
+            p = Vector((side * 9.0, yp + 2.5 * (j - 0.5) * 2, deck_z(S_PYLON) + 0.3))
+            lo = A.add_light(f"pylone_proj_{side}_{j}", "SPOT", p, (side * 2.0, 0.0, 20.0), lin(AMBER), 30000.0, spot=14)
+            lo.data.spot_blend = 0.3
+            lo.data.shadow_soft_size = 0.3
+    for z0 in (deck_z(S_PYLON) + 24.0, zt - 4.0):
+        A.box(f"pylone_traverse_{z0:.0f}", -11.0, 11.0, yp - 0.8, yp + 0.8, z0, z0 + 2.2, conc)
+    beacon = lieux.emit_mat("pylone_feu", lin(CORAL), 80.0)
+    bb = bmesh.new()
+    for side in (-1, 1):
+        bmesh.ops.create_uvsphere(bb, u_segments=10, v_segments=6, radius=0.6,
+                                  matrix=Matrix.Translation((side * 11.0, yp, zt + 0.6)))
+        lo = A.add_light(f"pylone_feu_{side}", "POINT", (side * 11.0, yp, zt + 1.6), (0, 0, -1), lin(CORAL), 4000.0)
+        lo.data.shadow_soft_size = 0.5
+    lieux.mesh_object("pylone_feux", bb, [beacon]).visible_shadow = False
+    # les haubans : de chaque jambe, en éventail vers les bords du tablier, de part et d'autre du pylône
+    cable = lieux.mat_steel("rue_haubans", color=(0.7, 0.7, 0.72), rough=0.3, rust=0.0)
+    paths = []
+    for side in (-1, 1):
+        for ds in (-95, -70, -45, 45, 70, 95):
+            s = S_PYLON + ds
+            _, y = vw(0.0, s)
+            paths.append([(side * 11.0, yp, zt - 2.0), (side * (BRIDGE_HALF - 0.2), y, deck_z(s) + 1.1)])
+    import facade_proc as C
+    C.tube(paths, 0.12, cable, "pont_haubans")
+    # au loin : l'autre rive (le port, ses mâts) en relief sombre et points de lumière
+    land = A.mat_plain("rue_rive", lin("#0c0c16"), 0.9)
+    rng = random.Random(17)
+    rb = bmesh.new()
+    y0 = vw(0.0, 900.0)[1]
+    lieux.box_bm(rb, (-2500.0, y0 - 400.0, lieux.WATER_Z - 1.0), (2500.0, y0, 5.0))
+    for _ in range(30):
+        x = rng.uniform(-900, 900)
+        w, h = rng.uniform(30, 160), rng.uniform(8, 36)
+        lieux.box_bm(rb, (x, y0 - 300, 0.0), (x + w, y0 - 10, h))
+    lieux.mesh_object("rue_rive_relief", rb, [land]).visible_shadow = False
+    warm = lieux.emit_mat("rue_rive_feux", lin("#ffb866"), 60.0)
+    lb = bmesh.new()
+    for _ in range(160):
+        x = rng.uniform(-900, 900)
+        bmesh.ops.create_uvsphere(lb, u_segments=6, v_segments=4, radius=rng.uniform(0.8, 1.8),
+                                  matrix=Matrix.Translation((x, y0 - rng.uniform(5, 40), rng.uniform(1, 22))))
+    for x in (-60.0, -20.0, 25.0, 70.0):          # les mâts d'éclairage du port, au pied de la descente du pont
+        bmesh.ops.create_uvsphere(lb, u_segments=8, v_segments=5, radius=2.2,
+                                  matrix=Matrix.Translation((x, vw(0.0, 620.0)[1], 25.0)))
+    lieux.mesh_object("rue_rive_lampes", lb, [warm]).visible_shadow = False
+    # les lampadaires du quai, de part et d'autre du départ du pont
+    if lamp is not None:
+        for k, x in enumerate((-34.0, -16.0, 16.0, 34.0)):
+            A.instance(lamp, f"bd_lamp_{k}", (x, yq + 0.6, road.WALK_Z), 0.0, 1.3)
+            lo = A.add_light(f"bd_lamp_light_{k}", "SPOT", (x, yq + 0.6 + 1.68 * 1.3, road.WALK_Z + 4.68 * 1.3 - 0.1),
+                             (0, 0, -1), lin(AMBER), 1800.0, spot=130)
+            lo.data.spot_blend = 0.5
+    log(f"bout de rue : boulevard, quai, pont de {S_FAR - S_BRIDGE:.0f} m ({n_real} lampadaires allumés), pylône à "
+        f"s = {S_PYLON:.0f}, autre rive")
+
+
+# ---------------------------------------------------------------- le trottoir à hauteur de voiture
+
+def bike(name, x, y, z, rot, frame_mat, tyre, metal):
+    """Un vélo de ville en code (deux roues, cadre, guidon, selle), 1,75 m, appuyé à 8° ; repère : l'avant vers
+    +x avant la rotation `rot`."""
+    import facade_proc as C
+    R = Matrix.Translation((x, y, z)) @ Matrix.Rotation(rot, 4, "Z") @ Matrix.Rotation(math.radians(8), 4, "X")
+    r = 0.33
+    wheels = []
+    for cx in (-0.55, 0.55):
+        wheels.append([tuple(R @ Vector((cx + r * math.cos(a), 0.0, r + r * math.sin(a))))
+                       for a in (i * math.tau / 24 for i in range(25))])
+    C.tube(wheels, 0.02, tyre, f"{name}_roues")
+    P = {k: Vector(v) for k, v in dict(ar=(-0.55, 0, r), av=(0.55, 0, r), pedalier=(-0.05, 0, 0.3),
+                                         selle=(-0.22, 0, 0.88), direction=(0.42, 0, 0.86), guidon=(0.38, 0, 1.0)).items()}
+    segs = [("ar", "pedalier"), ("pedalier", "selle"), ("selle", "direction"), ("pedalier", "direction"),
+            ("ar", "selle"), ("direction", "av"), ("direction", "guidon")]
+    C.tube([[tuple(R @ P[a]), tuple(R @ P[b])] for a, b in segs], 0.017, frame_mat, f"{name}_cadre")
+    g = P["guidon"]
+    C.tube([[tuple(R @ (g + Vector((0, -0.28, 0)))), tuple(R @ (g + Vector((0, 0.28, 0))))]], 0.012, metal, f"{name}_guidon")
+    s = P["selle"]
+    ob = A.box(f"{name}_selle", -0.12, 0.08, -0.07, 0.07, 0.0, 0.05, tyre)
+    ob.matrix_world = R @ Matrix.Translation(s)
+
+
+def stall(name, x0, x1, y0, y1, wood, tarp, metal):
+    """Un étal fermé : comptoir de bois sur pieds, bâché pour la nuit, la bâche nouée, une caisse dessous."""
+    A.box(f"{name}_comptoir", x0, x1, y0, y1, 0.72 + road.WALK_Z, 0.95 + road.WALK_Z, wood)
+    A.box(f"{name}_bache", x0 - 0.05, x1 + 0.05, y0 - 0.05, y1 + 0.05, 0.95 + road.WALK_Z, 1.25 + road.WALK_Z, tarp)
+    A.box(f"{name}_jupe", x0 - 0.05, x1 + 0.05, y0 - 0.05, y1 + 0.05, 0.42 + road.WALK_Z, 0.95 + road.WALK_Z, tarp)
+    for xx in (x0 + 0.06, x1 - 0.1):
+        for yy in (y0 + 0.06, y1 - 0.1):
+            A.box(f"{name}_pied_{xx:.1f}_{yy:.1f}", xx, xx + 0.04, yy, yy + 0.04, road.WALK_Z, 0.42 + road.WALK_Z, metal)
+    A.box(f"{name}_caisse", x0 + 0.2, x0 + 0.75, y0 + 0.1, y0 + 0.5, road.WALK_Z, road.WALK_Z + 0.32, wood)
+
+
+def build_sidewalk(hidden):
+    """À hauteur de voiture, là où la caméra regarde : bornes le long des bordures avant le barrage, étals fermés
+    et vélos sur les trottoirs, une pile de palettes et de cageots de livraison au bord de la voie de droite (la
+    berline la frôle dans sa feinte : p3_enseignes.CRATES), deux chevalets de café."""
+    import facade_proc as C
+    P = lib_parts("lieux/rue/street-pack/model.glb", {
+        "borne_src": lambda o, c: o.name.startswith("Bollard_lp"),
+        "poubelle_src": lambda o, c: o.name.startswith("Bin_lp"),
+    }, hidden, 6.0)
+    n = 0
+    if P.get("borne_src"):
+        for side in (-1, 1):
+            for yw in [100.0 + 1.9 * k for k in range(12)]:
+                if side < 0 and 99.0 < yw < 114.0:     # (le long des voitures garées, du côté gauche, pas de bornes)
+                    continue
+                x, y = vw(side * (HALF + road.KERB + 0.35), yw)
+                A.instance(P["borne_src"], f"borne_{side}_{n}", (x, y, road.WALK_Z), 0.0)
+                n += 1
+    if P.get("poubelle_src"):
+        for k, (xw, yw) in enumerate(((5.0, 109.4), (-5.1, 118.6), (4.9, 136.0))):
+            x, y = vw(xw, yw)
+            A.instance(P["poubelle_src"], f"poubelle_{k}", (x, y, road.WALK_Z), k * 1.3)
+    wood = C.mat_pbr("rue_bois_etal", "#5a4330", 0.75, 0.0, noise_amt=0.3)
+    tarp = C.mat_pbr("rue_bache", "#1f3a33", 0.6, 0.0, noise_amt=0.25, coat=0.3)
+    tarp2 = C.mat_pbr("rue_bache_rayee", "#6b2a2a", 0.6, 0.0, noise_amt=0.25, coat=0.3)
+    metal = C.mat_pbr("rue_metal_sombre", "#2a2a2e", 0.45, 0.8, noise_amt=0.2)
+    for k, (xw, yw, t) in enumerate(((5.2, 96.0, tarp), (5.3, 113.5, tarp2), (-5.4, 92.0, tarp2))):
+        x, y = vw(xw, yw)
+        stall(f"etal_{k}", x - 0.55, x + 0.55, y - 1.3, y + 1.3, wood, t, metal)
+    # des vélos appuyés le long des façades, côté droit, et deux près du barrage
+    frames = [C.mat_pbr(f"rue_velo_{i}", c, 0.4, 0.3, coat=0.5) for i, c in enumerate(("#1f4e5a", "#7a2f25", "#d8cfb8"))]
+    tyre = A.mat_plain("rue_pneu_velo", lin("#0b0b0b"), 0.7)
+    for k, (xw, yw) in enumerate(((6.4, 100.6), (6.4, 101.5), (6.35, 102.5), (-6.4, 116.2), (-6.4, 117.0))):
+        x, y = vw(xw, yw)
+        bike(f"velo_{k}", x, y, road.WALK_Z, math.pi / 2, frames[k % 3], tyre, metal)
+    # la livraison au bord de la voie de droite : palettes du modèle et cageots de plastique empilés
+    pal = lib_parts("lieux/port/pallets/model.glb", {
+        "palette_pile_src": lambda o, c: o.name.startswith("Pallet_04"),
+        "palette_src": lambda o, c: o.name.startswith("Pallet_01"),
+    }, hidden)
+    x0, x1, y0, y1 = P3.CRATES
+    cx, cy = vw((x0 + x1) / 2, (y0 + y1) / 2)
+    if pal.get("palette_pile_src"):
+        A.instance(pal["palette_pile_src"], "livraison_pile", (cx, cy + 0.6, road.road_z(abs(cx))), 0.05)
+    if pal.get("palette_src"):
+        A.instance(pal["palette_src"], "livraison_palette", (cx + 0.05, cy - 0.7, road.road_z(abs(cx))), -0.08)
+    crate_cols = ["#2f6b3a", "#c8662a", "#2d4f8a", "#2f6b3a"]
+    for k in range(7):
+        col = C.mat_pbr(f"rue_cageot_{k % 4}", crate_cols[k % 4], 0.5, 0.0, noise_amt=0.2) \
+            if f"rue_cageot_{k % 4}" not in bpy.data.materials else bpy.data.materials[f"rue_cageot_{k % 4}"]
+        lvl, j = divmod(k, 3)
+        xx = cx - 0.45 + 0.3 * j
+        yy = cy - 0.75
+        z = road.road_z(abs(cx)) + 0.16 + 0.3 * lvl
+        A.box(f"cageot_{k}", xx - 0.14, xx + 0.14, yy - 0.2, yy + 0.2, z, z + 0.28, col)
+    # deux chevalets de café (ardoise sombre, cadre de bois) sur le trottoir de gauche
+    slate = A.mat_plain("rue_ardoise", lin("#1c1d1f"), 0.6)
+    for k, (xw, yw) in enumerate(((-5.0, 104.0), (5.0, 121.0))):
+        x, y = vw(xw, yw)
+        for f in (-1, 1):
+            ob = A.box(f"chevalet_{k}_{f}", -0.3, 0.3, -0.02, 0.02, 0.0, 0.9, slate)
+            ob.matrix_world = (Matrix.Translation((x, y + f * 0.17, road.WALK_Z)) @
+                               Matrix.Rotation(math.radians(-f * 11), 4, "X"))
+            A.box(f"chevalet_cadre_{k}_{f}", -0.32, 0.32, -0.025, 0.025, 0.86, 0.9, wood).matrix_world = ob.matrix_world
+    log(f"trottoirs : {n} bornes, 3 étals, 5 vélos, une livraison (palettes, cageots), 2 chevalets")
+
+
 # ---------------------------------------------------------------- le premier plan, au ras du sol
 
 def puddle(name, cx, cy, r, sy, seed, mat):
@@ -723,33 +1021,34 @@ def puddle(name, cx, cy, r, sy, seed, mat):
     return ob
 
 
-def build_foreground(hidden, plan):
-    """Le bas du cadre, de 1 à 6 m de la caméra (posé par rapport à elle) : des flaques irrégulières qui noient la
-    double ligne et renvoient l'agent et les phares, des gravillons, une plaque d'égout dans son carré refait."""
-    cx, cy = plan["cam"][:2]
+def puddle_mat():
     water, N, out = A.material("rue_puddle")
     bsdf = N.new("ShaderNodeBsdfPrincipled")
-    # (un miroir parfait au ras du sol ne renvoie que le ciel noir au-dessus des agents : des trous. Une ride fine
-    # et un peu de flou étirent dans l'eau les guirlandes, les enseignes et les phares ; le fond, l'enrobé noyé)
+    # (un miroir parfait au ras du sol ne renvoie que le ciel noir : des trous. Une ride fine et un peu de flou
+    # étirent dans l'eau les guirlandes, les enseignes et les feux ; le fond, l'enrobé noyé)
     bsdf.inputs["Base Color"].default_value = (0.018, 0.017, 0.018, 1)
     bsdf.inputs["Roughness"].default_value = 0.05
     bsdf.inputs["IOR"].default_value = 1.33
     N.set(bsdf.inputs["Normal"], road.ripples(N, road.coords(N)[0], scale=22.0, strength=0.12))
     N.link(bsdf.outputs[0], out.inputs["Surface"])
-    # (au ras du sol, une flaque de 50 cm à 2 m remplit le bas du cadre : petites et éclatées près de la caméra ;
-    # positions relatives à la caméra)
-    for k, (x, y, r, sy) in enumerate(((-0.3, 2.6, 0.3, 1.6), (-1.6, 3.4, 0.28, 1.8), (0.35, 1.7, 0.18, 1.4),
-                                       (-1.2, 5.0, 0.4, 2.0))):
-        puddle(f"rue_puddle_{k}", cx + x, cy + y, r, sy, 70 + k, water)
-    # une plaque d'égout près de la caméra, dans son carré d'enrobé refait
-    src, dims = road.manhole_source(hidden)
-    st = RUE_STYLE
-    patch = road.mat_asphalt(st, "rue_asphalt_patch_near", force_patch=True, layout=dict(road.lane_layout(HALF, 2), grime=0.6))
-    x, y = cx - 1.9, cy + 1.8
-    z = road.road_z(x)
-    road.plane("rue_mh_patch_near", x, y, z + 0.0015, 1.4, 1.4, patch, 0.06)
-    A.instance(src, "rue_manhole_near", (x, y, z + 0.003 - dims.z), 0.7)
-    # les gravillons : quatre cailloux sources, quelques centaines d'instances, plus serrés le long des lignes
+    return water
+
+
+def build_foreground(hidden, plan):
+    """Le sol que la caméra rase (p3_enseignes.PUDDLES, repère monde) : des flaques sur la ligne de la berline,
+    sous la caméra quand elle descend et devant elle à l'arrêt, où le barrage et ses rampes se reflètent ; une
+    reprise d'enrobé et des gravillons le long de la double ligne, là où la caméra passe au plus bas."""
+    water = puddle_mat()
+    for k, (name, xw, yw, r, sy) in enumerate(P3.PUDDLES):
+        x, y = vw(xw, yw)
+        puddle(f"rue_{name}", x, y, r, sy, 70 + k, water)
+    # une reprise d'enrobé en travers de la voie, sous la caméra au plus bas (son joint défile sous l'objectif)
+    patch = road.mat_asphalt(RUE_STYLE, "rue_asphalt_patch_near", force_patch=True,
+                             layout=dict(road.lane_layout(HALF, 2), grime=0.6))
+    for k, (xw, yw, w, h) in enumerate(((-1.2, 111.0, 2.6, 1.3), (0.9, 116.6, 1.8, 2.2))):
+        x, y = vw(xw, yw)
+        road.plane(f"rue_patch_near_{k}", x, y, road.road_z(x) + 0.0015, w, h, patch, 0.03 * (k - 0.5))
+    # les gravillons, plus serrés le long de la double ligne, du milieu de la rue aux plots
     stone = A.mat_plain("rue_gravel", lin("#3a3733"), 0.35)
     srcs = []
     for i in range(4):
@@ -767,10 +1066,10 @@ def build_foreground(hidden, plan):
         srcs.append(ob)
     R = random.Random(9)
     n = 0
-    while n < 320:
-        x = R.uniform(-2.8, 2.8) + (cx - 0.1) * 0.5
-        y = cy + R.uniform(1.0, 6.0)
-        if abs(abs(x) - 0.15) > 0.35 and R.random() < 0.5:
+    while n < 260:
+        x = R.uniform(-2.6, 2.6)
+        y = vw(0.0, R.uniform(108.0, 122.5))[1]
+        if abs(abs(x) - 0.15) > 0.35 and R.random() < 0.6:
             continue
         s = R.uniform(0.003, 0.008)
         ob = bpy.data.objects.new(f"gravel_{n}", srcs[n % 4].data)
@@ -779,7 +1078,7 @@ def build_foreground(hidden, plan):
         ob.rotation_euler = (R.uniform(0, 3), R.uniform(0, 3), R.uniform(0, 6))
         ob.scale = (s * R.uniform(1.0, 1.6), s, s * R.uniform(0.5, 0.8))
         n += 1
-    log(f"premier plan : 6 flaques, 1 plaque, {n} gravillons")
+    log(f"sol : {len(P3.PUDDLES)} flaques, 2 reprises, {n} gravillons")
 
 
 # ---------------------------------------------------------------- la patrouille, portières ouvertes
@@ -1319,7 +1618,9 @@ def build():
     build_signs(M, hidden)
     build_overhead(M, hidden)
     build_lamps(hidden)
+    build_street_end(hidden)
     build_furniture(M, hidden)
+    build_sidewalk(hidden)
     build_foreground(hidden, plan)
     build_barrage(scene, hidden, plan)
     road_gloss()
@@ -1334,6 +1635,9 @@ def build():
     # est dedans ; le sol devant elle reste un mouillé sombre, la brume ne se lit que dans la profondeur)
     haze("haze", -14, 14, Y0, 128.0, -0.1, 30, 0.0006)
     haze("haze_end", -60, 60, 128.0, Y_FAR + 2, -0.1, 30, 0.001)
+    # au-delà du bout de la rue, sur l'eau et le pont : une brume légère qui étage les plans (le pylône plus pâle
+    # que le carrefour) ; le fond de la boîte au-dessus de l'eau (lieux.haze)
+    haze("haze_quai", -200, 200, vw(0.0, 1000.0)[1], Y0 - 0.5, -1.2, 90, 0.0005)
     # (jusqu'au haut de la brume générale : un bord de boîte dans le cadre se lirait comme une ligne)
     # (au-delà des agents seulement : rien entre la caméra et eux)
     haze("haze_barrage", -6.5, 6.5, 9.0, 34.0, -0.05, 30.0, 0.0015, aniso=0.55)
