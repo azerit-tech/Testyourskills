@@ -494,13 +494,17 @@ def rubber_over(src, name, dark=0.1, keep_uv=()):
 
 
 def livery_over(src, name, light_boxes=(), base=NAVY, light=CREAM, keep_uv=(), rough=0.3, metal=0.35, coat=1.0,
-                lamp_strength=0.0, flake=False, keep_out=()):
+                lamp_strength=0.0, flake=False, keep_out=(), lamp_zones=None):
     """Repeint un matériau d'origine (ses cartes de normales et de rugosité restent) : caisse base,
     boîtes (x0, x1, z0, z1) en coordonnées objet peintes en light (portières, filet).
 
     keep_uv : boîtes (u0, u1, v0, v1) d'UV où la texture couleur d'origine reste (feux peints dans l'atlas).
     keep_out : boîtes (x0, x1, z0, z1) en coordonnées objet où l'atlas n'est jamais gardé, même dans keep_uv
-    (le lettrage d'origine des portières partage ces UV avec les feux)."""
+    (le lettrage d'origine des portières partage ces UV avec les feux).
+    lamp_zones : dict(v_split, core=(y, z, x0), core_r, core_gain) : les feux de l'atlas au-dessus de v_split sont
+    les phares, en dessous les feux arrière ; leurs niveaux sont deux nœuds Valeur, « lamp_head » et « lamp_tail »
+    (1 par défaut, à piloter par l'énergie des lampes : lamp_drivers) ; chaque phare a un cœur chaud, un disque de
+    rayon core_r centré en (±y, z) à l'avant de x0 (coordonnées objet), core_gain fois plus fort que son verre."""
     if src is not None and src.node_tree:
         m = src.copy()
         m.name = name
@@ -557,7 +561,35 @@ def livery_over(src, name, light_boxes=(), base=NAVY, light=CREAM, keep_uv=(), r
             lit.inputs["From Min"].default_value = 0.45
             lit.inputs["From Max"].default_value = 0.8
             nt.links.new(hsv.outputs[2], lit.inputs["Value"])
-            nt.links.new(_math(nt, "MULTIPLY", _math(nt, "MULTIPLY", km, lit.outputs[0]), lamp_strength),
+            level = lit.outputs[0]
+            if lamp_zones:
+                head = _math(nt, "GREATER_THAN", su.outputs[1], lamp_zones["v_split"])
+                vals = {}
+                for key in ("lamp_head", "lamp_tail"):
+                    v = nt.nodes.new("ShaderNodeValue")
+                    v.name = v.label = key
+                    v.outputs[0].default_value = 1.0
+                    vals[key] = v.outputs[0]
+                lvl = _math(nt, "ADD", _math(nt, "MULTIPLY", head, vals["lamp_head"]),
+                            _math(nt, "MULTIPLY", _math(nt, "SUBTRACT", 1.0, head), vals["lamp_tail"]))
+                level = _math(nt, "MULTIPLY", level, lvl)
+                cy, cz, x0 = lamp_zones["core"]
+                r = lamp_zones.get("core_r", 0.05)
+                dy = _math(nt, "SUBTRACT", _math(nt, "ABSOLUTE", sep.outputs[1]), cy)
+                dz = _math(nt, "SUBTRACT", sep.outputs[2], cz)
+                d = _math(nt, "SQRT", _math(nt, "ADD", _math(nt, "MULTIPLY", dy, dy), _math(nt, "MULTIPLY", dz, dz)))
+                fall = nt.nodes.new("ShaderNodeMapRange")
+                fall.clamp = True
+                fall.inputs["From Min"].default_value = 0.35 * r
+                fall.inputs["From Max"].default_value = r
+                fall.inputs["To Min"].default_value = 1.0
+                fall.inputs["To Max"].default_value = 0.0
+                nt.links.new(d, fall.inputs["Value"])
+                core = _math(nt, "MULTIPLY", _math(nt, "MULTIPLY", fall.outputs[0], head),
+                             _math(nt, "GREATER_THAN", sep.outputs[0], x0))
+                level = _math(nt, "ADD", level, _math(nt, "MULTIPLY", _math(nt, "MULTIPLY", core, vals["lamp_head"]),
+                                                      lamp_zones.get("core_gain", 5.0)))
+            nt.links.new(_math(nt, "MULTIPLY", _math(nt, "MULTIPLY", km, level), lamp_strength),
                          p.inputs["Emission Strength"])
     nt.links.new(col, p.inputs["Base Color"])
     if flake:
@@ -588,6 +620,47 @@ def livery_over(src, name, light_boxes=(), base=NAVY, light=CREAM, keep_uv=(), r
     p.inputs["Coat Weight"].default_value = coat
     p.inputs["Coat Roughness"].default_value = 0.02 if flake else 0.03
     return m
+
+
+def lamp_drivers(mat, head=None, tail=None):
+    """Les niveaux « lamp_head » et « lamp_tail » d'une livrée (livery_over, lamp_zones) suivent l'énergie d'une
+    lampe : phares éteints par une scène (énergie 0), leur verre et leur cœur s'éteignent ; en veilleuse (120 W au
+    lieu de 450), ils baissent d'autant. Pilotes à expression simple."""
+    for key, d in (("lamp_head", head), ("lamp_tail", tail)):
+        n = mat.node_tree.nodes.get(key) if mat and mat.node_tree else None
+        if n is None or d is None:
+            continue
+        fc = n.outputs[0].driver_add("default_value")
+        drv = fc.driver
+        drv.type = "SCRIPTED"
+        v = drv.variables.new()
+        v.name = "e"
+        v.type = "SINGLE_PROP"
+        v.targets[0].id_type = "LIGHT"
+        v.targets[0].id = d
+        v.targets[0].data_path = "energy"
+        drv.expression = f"min(1.5, e / {max(d.energy, 1e-3):.3f})"
+
+
+def atlas_points(ob, uv_box):
+    """Les centres (coordonnées objet) des faces d'un maillage dont le centre en UV tombe dans uv_box
+    (u0, u1, v0, v1) : où un atlas a peint ses feux."""
+    me = ob.data
+    uv = me.uv_layers.active
+    out = []
+    if uv is None:
+        return out
+    u0, u1, v0, v1 = uv_box
+    for poly in me.polygons:
+        su = sv = 0.0
+        for li in poly.loop_indices:
+            a, b = uv.data[li].uv
+            su += a
+            sv += b
+        n = len(poly.loop_indices)
+        if u0 < su / n < u1 and v0 < sv / n < v1:
+            out.append(poly.center.copy())
+    return out
 
 
 def mats_named(objs, *names):
@@ -629,7 +702,7 @@ def mat_lamp(name, color=LAMP, strength=0.0, glass=False):
     return m
 
 
-def headlight_spots(body, points, on=True, energy=350.0, color=LAMP, angle=55.0, collection=None):
+def headlight_spots(body, points, on=True, energy=350.0, color=LAMP, angle=55.0, collection=None, blend=0.6):
     """Deux spots vers l'avant (+x), légèrement plongeants, aux points donnés (repère du véhicule)."""
     out = []
     if not on:
@@ -639,7 +712,7 @@ def headlight_spots(body, points, on=True, energy=350.0, color=LAMP, angle=55.0,
         d.energy = energy
         d.color = lin(color)[:3]
         d.spot_size = math.radians(angle)
-        d.spot_blend = 0.6
+        d.spot_blend = blend
         d.shadow_soft_size = 0.05
         ob = bpy.data.objects.new(d.name, d)
         (collection or body.users_collection[0]).objects.link(ob)
@@ -1411,6 +1484,13 @@ def _patrol_boxes(livery, front_axle, door_z=(0.30, 0.96), stripe_z=(0.70, 0.78)
     return ((front_axle - 2.68, front_axle - 0.52) + door_z,)
 
 
+# l'atlas de la patrouille jeandiz : ses phares (verre clair, en haut à gauche) et ses feux arrière (dessous)
+PATROL_HEAD_UV = (0.012, 0.335, 0.905, 0.998)
+PATROL_TAIL_UV = (0.008, 0.18, 0.785, 0.905)
+PATROL_HEAD_GLASS = 5.0     # le verre des phares allumés (émission de l'atlas)
+PATROL_HEAD_CORE = 5.0      # leur cœur, en multiple du verre : deux sources vives, pas un aplat blanc
+
+
 PATROLS = {
     # berline de patrouille 1992-2011, 304k, maillage fin sans texture de caisse (peinture unie), feux modélisés,
     # vitres teintées ; ses logos (calandre, coffre, cache-moyeux) sont supprimés
@@ -1448,9 +1528,23 @@ def load_patrol(variant="jeandiz", collection=None, lights_on=False, livery="doo
     wmn, wmx = bbox(wheels) if wheels else bbox(parts)
     front_axle = wmx.x - 0.36
     on = 1.0 if lights_on else 0.0
+    # les feux peints dans l'atlas (jeandiz) : où tombent ses phares et ses feux arrière, mesuré sur les UV
+    atlas = {}
+    if spec.get("keep_uv"):
+        src = [o for o, _i, _m in mats_named(parts, *spec["paint"])]
+        for key, box in (("head", PATROL_HEAD_UV), ("tail", PATROL_TAIL_UV)):
+            pts = [q for o in src for q in atlas_points(o, box)]
+            if pts:
+                atlas[key] = pts
+    zones = None
+    hp = [q for q in atlas.get("head", []) if q.x > 0]
+    if hp:
+        zones = dict(v_split=PATROL_HEAD_UV[2], core_r=0.055, core_gain=PATROL_HEAD_CORE,
+                     core=(sum(abs(q.y) for q in hp) / len(hp), sum(q.z for q in hp) / len(hp), front_axle + 0.3))
     _replace_mats(parts, spec["paint"], lambda m: livery_over(
         m, f"{tag}_paint", _patrol_boxes(livery, front_axle), keep_uv=spec.get("keep_uv", ()),
-        base=PATROL_BODY, rough=0.28, metal=0.5, flake=True, lamp_strength=8.0 * on,
+        base=PATROL_BODY, rough=0.28, metal=0.5, flake=True,
+        lamp_strength=PATROL_HEAD_GLASS * on, lamp_zones=zones,
         # les flancs, des portières avant aux portières arrière, sous les vitres : loin des feux (aux deux bouts)
         keep_out=((front_axle - 2.9, front_axle - 0.3, 0.0, 1.05),)))
     if spec["glass"]:
@@ -1474,15 +1568,31 @@ def load_patrol(variant="jeandiz", collection=None, lights_on=False, livery="doo
     bar.location = (bar_x, 0, z - 0.015)
     parent_keep(bar, body)
     lights = lightbar_lights(bar) if lights_on else []
+    tail_pts = [(mn.x - 0.06, 0.6, mn.z + 0.86), (mn.x - 0.06, -0.6, mn.z + 0.86)]
     if heads:
         hz = (hmn.z + hmx.z) / 2
         hx = hmx.x + 0.05
         hy = 0.5 * max(abs(hmn.y), abs(hmx.y))
+    elif zones:
+        # phares peints dans l'atlas : le spot part de leur centre, juste devant le verre
+        hy, hz, _x0 = zones["core"]
+        hx = max(q.x for q in hp) + 0.04
+        tp = [q for q in atlas.get("tail", []) if q.x < 0]
+        if tp:
+            ty = sum(abs(q.y) for q in tp) / len(tp)
+            tz = sum(q.z for q in tp) / len(tp)
+            tx = min(q.x for q in tp) - 0.06
+            tail_pts = [(tx, ty, tz), (tx, -ty, tz)]
     else:
-        # phares peints dans l'atlas : à 1 m devant l'essieu, 0,72 m du sol (devant le pare-buffle il n'y a rien)
+        # à 1 m devant l'essieu, 0,72 m du sol (devant le pare-buffle il n'y a rien)
         hz, hx, hy = mn.z + 0.72, front_axle + 1.0, 0.6
-    lights += headlight_spots(body, [(hx, hy, hz), (hx, -hy, hz)], on=lights_on, energy=450.0)
-    lights += tail_lights(body, [(mn.x - 0.06, 0.6, mn.z + 0.86), (mn.x - 0.06, -0.6, mn.z + 0.86)], on=lights_on, energy=30.0)
+    heads_l = headlight_spots(body, [(hx, hy, hz), (hx, -hy, hz)], on=lights_on, energy=450.0, angle=40.0, blend=0.45)
+    tails_l = tail_lights(body, tail_pts, on=lights_on, energy=30.0)
+    lights += heads_l + tails_l
+    if zones and lights_on:
+        # le verre et le cœur des phares suivent leurs spots (une scène qui les éteint ou les met en veilleuse)
+        for m in {m for m in body.data.materials if m and m.name.startswith(f"{tag}_paint")}:
+            lamp_drivers(m, heads_l[0].data, tails_l[0].data)
     return dict(body=body, lightbar=bar, lenses=lens, lights=lights, length=mx.x - mn.x, height=mx.z - mn.z + 0.1,
                 tris=tris([body, bar, lens] + wheels), wheels=wheels)
 
