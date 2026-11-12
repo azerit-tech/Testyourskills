@@ -660,14 +660,15 @@ def hidden_collection():
 
 # ---------------------------------------------------------------- la rue entière
 
-def build_street(scene_a, M, style):
+def build_street(scene_a, M, style, grime=None):
+    """grime (0 à 1, facultatif) : la peinture des voies de l'avenue salie et écaillée (layout["grime"])."""
     global S
     S = scene_a
     st = STYLES[style]
     rng = random.Random(23)
     H = half()
     Y0, Y1 = -30.0, 900.0
-    asphalt = mat_asphalt(st, f"asphalt_{style}")
+    asphalt = mat_asphalt(st, f"asphalt_{style}", layout=dict(grime=grime) if grime else None)
     pan, kerb, walk = mat_gutter_pan(st), mat_kerb(st), mat_pavement(st)
     paint = mat_paint_decal(st)
 

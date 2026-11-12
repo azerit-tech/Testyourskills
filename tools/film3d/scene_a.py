@@ -44,6 +44,10 @@ random.seed(27)
 #   FILM3D_BLEND  : le nom du .blend écrit dans assets (scene-a.blend par défaut)
 FACADE = os.environ.get("FILM3D_FACADE", "mix")
 ROUTE = os.environ.get("FILM3D_ROUTE", "sechage")
+# la peinture des voies de l'avenue usée (road.mat_asphalt, layout["grime"]) : neuve, la double ligne de l'axe prenait
+# tout le premier plan d'OUV, caméra au ras de la chaussée ; salie, écaillée par plaques, éteinte sous l'eau, ~45 %
+# moins claire, elle file sous l'objectif sans voler l'œil
+PAINT_GRIME = 0.75
 HERO = os.environ.get("FILM3D_HERO", "w111")
 BLEND = os.environ.get("FILM3D_BLEND", "scene-a.blend")
 if HERE not in sys.path:
@@ -1328,7 +1332,7 @@ def build_city(hidden):
     if ROUTE != "base":
         # la chaussée bombée, le caniveau, la bordure, les dalles, les regards (tools/film3d/road.py)
         import road
-        road.build_street(sys.modules[__name__], M, ROUTE)
+        road.build_street(sys.modules[__name__], M, ROUTE, grime=PAINT_GRIME)
     else:
         base_street(M, conc, road_m, kerb, paint, side_asphalt)
     wall = mat_plain("sea_wall", lin("#d9d2c4"), 0.6)
