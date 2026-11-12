@@ -3,7 +3,7 @@
 # suit de trois quarts dos, à 1,5 m, 10 m derrière et 1,8 m à sa gauche (sur l'axe de l'avenue), 35 mm, comme sur un
 # rail (aucune secousse). La patrouille est garée gyrophare éteint à l'angle de la rue transversale de y 120, devant
 # à gauche, côté ville, le long de la bordure, l'avant vers la berline : elle glisse du milieu gauche du cadre vers
-# son bord gauche et en sort vers l'image 20 ; la berline la dépasse juste après (vers l'image 44 ; c'est elle qui
+# son bord gauche et en sort vers l'image 17 ; la berline la dépasse juste après (vers l'image 44 ; c'est elle qui
 # s'allume dans le rétroviseur de P1). Caméra à gauche de la berline : à sa droite, la caisse cachait la patrouille
 # (même direction, 15° à gauche, à l'aperçu du 12 novembre).
 # scene_a.py n'en lit que les fonctions du temps ; motion.py en tire roues, braquage et transfert de masse.
@@ -19,8 +19,8 @@ T_END = (FRAMES - 1) / M.FPS
 SPEED = 50 / 3.6              # m/s, la conduite calme
 HERO_X = 1.75                 # la voie intérieure de la chaussée qui monte vers +y
 CAM_BACK, CAM_SIDE, CAM_Z = 10.0, -1.8, 1.5   # CAM_SIDE : vers +x (la droite de la berline) ; négatif, à sa gauche
-CAM_YAW = 182.0               # lacet de motion.key_camera (180 : vers +y) : 2° vers la droite, la berline à droite
-CAM_PITCH = -2.0              # du centre, la patrouille au milieu gauche à la première image
+CAM_YAW = 183.0               # lacet de motion.key_camera (180 : vers +y) : 3° vers la droite, la berline à droite
+CAM_PITCH = -2.0              # du centre sans toucher le bord (à 182° elle le touchait), la patrouille au milieu gauche
 LENS = 35.0
 PATROL = (-5.9, 118.0, 180.0)  # x, y, cap (lieux : 0 vers +y) : garée le long de la bordure côté ville, avant vers -y
 Y0 = PATROL[1] - 35.0 + CAM_BACK   # la berline à la première image : la caméra à 35 m de la patrouille
