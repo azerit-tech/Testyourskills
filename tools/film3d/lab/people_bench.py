@@ -9,7 +9,8 @@
 #       [--classes] [--wb] [--exposure 1.0]
 #   pare-brise : [--pb-lights phares,neons,projecteur] [--pb-views face,tq,dos,tqdos] [--pb-shots large,serre,loin]
 #       [--pb-poses volant,mains] [--hands "up,fwd,out,door_out,écart;…"] [--cabin 25] [--dash 60] [--pb-z 1.5]
-#       [--sky [--sky-strength 1]] ; vues « fin », « finmi » (la caméra de FIN), éclairage « fin » (contre-jour)
+#       [--sky [--sky-strength 1]] ; vues « fin », « finmi », « fin86 », « fin60 », « finface » (les caméras de
+#       FIN), éclairage « fin » (contre-jour) ; pose « dehors » (lieux.hands_out)
 #   distance : [--dist-poses crouch,aim,guard] [--dist-phares 1200]
 #
 # Une image par case (720 × 1280, `<perso>-<pose>-<lumière>-<vue>-<cadre>.png`) et une planche par personnage et
@@ -474,11 +475,22 @@ def bench_windshield():
     # --hands "up,fwd,out,door_out,écart;…" : des réglages d'essai de lieux.hands_up (l'écart s'ajoute à celui des
     # doigts), une pose « mains1 », « mains2 »… chacun
     tries = [t for t in opt("--hands", "").split(";") if t]
+    # --dehors "lean,twist,sortie g,sortie d,recul,écart[,hauteur g,hauteur d];…" : des essais de lieux.hands_out, une pose
+    # « dehors1 », « dehors2 »… chacun
+    outs = [t for t in opt("--dehors", "").split(";") if t]
     poses = [p_ for p_ in opt("--pb-poses", "volant,mains").split(",") if p_] + \
-        [f"mains{i + 1}" for i in range(len(tries))]
+        [f"mains{i + 1}" for i in range(len(tries))] + [f"dehors{i + 1}" for i in range(len(outs))]
     for pose in poses:
         if pose == "mains":
             L.hands_up(root)
+        elif pose == "dehors":      # la reddition par la vitre baissée (lieux.hands_out)
+            print(f"[banc] dehors : écart de portée {L.hands_out(root)}", flush=True)
+        elif pose.startswith("dehors"):
+            v_ = [float(x) for x in outs[int(pose[6:]) - 1].split(",")]
+            kw_ = dict(lean=v_[0], twist=v_[1], reach=(v_[2], v_[3]), back=v_[4], gap=v_[5])
+            if len(v_) > 7:
+                kw_["rise"] = (v_[6], v_[7])
+            print(f"[banc] {pose} : écart de portée {L.hands_out(root, **kw_)}", flush=True)
         elif pose.startswith("mains"):
             v_ = [float(x) for x in tries[int(pose[5:]) - 1].split(",")]
             L.hands_up(root, up=v_[0], fwd=v_[1], out=v_[2], door_out=v_[3])
@@ -486,7 +498,7 @@ def bench_windshield():
                 for s_ in ("Left", "Right"):
                     cp.curl(arm, s_, angles=(0, 0, 0), thumb=(0, 0, 0), spread=v_[4])
         bpy.context.view_layer.update()
-        if pose != "volant":
+        if pose != "volant" and arm is not None:
             for s_ in ("Left", "Right"):
                 h_ = arm.matrix_world @ cp.pb(arm, s_ + "Hand").head
                 t_ = arm.matrix_world @ cp.pb(arm, s_ + "HandMiddle1").tail
@@ -505,6 +517,37 @@ def bench_windshield():
                 cam.location = Vector((cx, -5.0, cz))
                 hz = Vector((-cx, 5.0, 0.0)).normalized()
                 _aim(cam, cam.location + (hz + Vector((0, 0, math.tan(math.radians(site))))) * 5.0)
+                row.append(render(os.path.join(OUT, f"parebrise-{pose}-{lt}-{v}.png")))
+            # la caméra de FIN v3 à son arrêt (fin_pointe : 1,5 m à gauche de la route, 1,3 m, 24 mm, site 0), à
+            # 8,6 et 6 m derrière ; la berline arrêtée a tourné de 25° (le nez à gauche) : dans son repère, la caméra
+            # est à 25° + atan(1,5 / d) de son axe arrière, côté conducteur ; « finface » : le repli de face
+            # (FILM3D_FIN_FACE : 9 m devant, 0,2 m, site 14°), à 25° de son axe avant, côté passager
+            # « fin75h » / « fin58h » : le point de vue relevé (verdict « plan filmé trop bas ») : à l'arrivée 7,5 m
+            # derrière, 1,2 m à gauche, 2,4 m de haut ; à la fin 5,75 m derrière, 1,5 m à gauche, 2,0 m ; plongée 12°
+            for v, d, side, z in (("fin75h", 7.5, 1.2, 2.4), ("fin58h", 5.75, 1.5, 2.0)):
+                if v not in opt("--pb-views", "face,tq").split(","):
+                    continue
+                cam.data.lens = 24.0
+                a = math.radians(25.0) + math.atan(side / d)
+                r = math.hypot(d, side)
+                cam.location = Vector((-math.sin(a) * r, -math.cos(a) * r, z))
+                hz = Vector((-cam.location.x, -cam.location.y, 0.0)).normalized()
+                _aim(cam, cam.location + (hz - Vector((0, 0, math.tan(math.radians(12.0))))) * 5.0)
+                row.append(render(os.path.join(OUT, f"parebrise-{pose}-{lt}-{v}.png")))
+            for v, d in (("fin86", 8.6), ("fin60", 6.0), ("finface", 9.0)):
+                if v not in opt("--pb-views", "face,tq").split(","):
+                    continue
+                cam.data.lens = 24.0
+                if v == "finface":
+                    a = math.radians(25.0)
+                    cam.location = Vector((math.sin(a) * d, math.cos(a) * d, 0.2))
+                    hz = Vector((-cam.location.x, -cam.location.y, 0.0)).normalized()
+                    _aim(cam, cam.location + (hz + Vector((0, 0, math.tan(math.radians(14.0))))) * 5.0)
+                else:
+                    a = math.radians(25.0) + math.atan(1.5 / d)
+                    r = math.hypot(d, 1.5)
+                    cam.location = Vector((-math.sin(a) * r, -math.cos(a) * r, 1.3))
+                    _aim(cam, Vector((0.0, 0.0, 1.3)))
                 row.append(render(os.path.join(OUT, f"parebrise-{pose}-{lt}-{v}.png")))
             for v, az in [x for x in (("face", 0.0), ("tq", 32.0), ("dos", 180.0), ("tqdos", 150.0))
                          if x[0] in opt("--pb-views", "face,tq").split(",")]:
