@@ -108,6 +108,15 @@ def test_p2():
     ps = M.sample(P.hero_pos, range(0, 30), slip=P.hero_slip, noise=0.0)
     check("P2 : virage à gauche, roulis vers la droite", ps[-1]["roll"] > 2.0, f"{ps[-1]['roll']:.2f}°")
     check("P2 : glisse à gauche, contre-braquage (roues à droite)", ps[-1]["steer"] < 0.0, f"{ps[-1]['steer']:.2f}°")
+    check("P2 : roulis ≤ 6°", max(abs(p["roll"]) for p in ps) <= 6.0, f"{max(abs(p['roll']) for p in ps):.2f}°")
+    check("P2 : glisse de 22 à 25°", 22.0 <= P.DRIFT <= 25.0, f"{P.DRIFT:.1f}°")
+    # la caméra basse du découpage v2 : jamais à moins de 6 m d'un véhicule, la berline la double
+    cam = lambda t: P.low_cam_pos(t)[:2]                            # noqa: E731
+    d, f, a, b = M.min_gap(dict(P.tracks(), camera=cam), range(P.F0 - 1, P.F0 + P.FRAMES + 1))
+    check("P2 : la caméra à 6 m au moins des véhicules", d >= 6.0, f"{d:.1f} m entre {a} et {b} à l'image {f}")
+    ang = lambda p: math.degrees(math.atan2(p[1], p[0] + P.R))      # noqa: E731
+    check("P2 : la berline double la caméra", ang(cam(0.0)) > ang(P.hero_pos(0.0)) and
+          ang(cam(P.T_END)) < ang(P.hero_pos(P.T_END)))
 
 
 def test_p4():

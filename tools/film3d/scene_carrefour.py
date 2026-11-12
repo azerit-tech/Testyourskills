@@ -400,6 +400,35 @@ def animate(scene, car, fill, patrols, pose=POSE):
         f"{b['roll']:.1f}°, braquage {a['steer']:.1f} à {b['steer']:.1f}°, {n} lumières de rampe clignotantes")
 
 
+def low_camera(scene, pose=POSE):
+    """La caméra du découpage v2 (p2_arc.low_cam_pos) : un travelling bas à l'intérieur de l'arc, visée sur la
+    berline, un tremblé faible de voiture travelling (motion.handheld)."""
+    import motion as M
+    cam = bpy.data.cameras.new("cam")
+    cam.lens = P.LOW_LENS
+    cam.sensor_fit = "AUTO"
+    cam.sensor_width = 36
+    cam.clip_start = 0.05
+    cam.clip_end = 2000
+    co = bpy.data.objects.new("cam", cam)
+    scene.collection.objects.link(co)
+    scene.camera = co
+
+    def at(t):
+        x, y, z = P.low_cam_pos(t)
+        ax, ay, az = P.low_cam_aim(t)
+        x, y, _ = P.to_scene(pose, x, y)
+        ax, ay, _ = P.to_scene(pose, ax, ay)
+        dx, dy, dz = ax - x, ay - y, az - z
+        yaw = math.degrees(math.atan2(-dx, -dy))       # motion.key_camera : 0 regarde -y, positif vers -x
+        pitch = math.degrees(math.atan2(dz, math.hypot(dx, dy)))
+        dyaw, dpitch, droll, ddx, ddy, ddz = M.handheld(t, amp=0.25, rotor=0.15, seed=2.7)
+        return x + ddx, y + ddy, z + ddz, yaw + dyaw, pitch + dpitch, droll, P.LOW_LENS
+    M.key_camera(co, range(P.F0 - 1, P.F0 + P.FRAMES + 1), at)
+    scene.frame_set(scene.frame_current)
+    return co
+
+
 def drone(scene, pose=POSE, anim=False):
     """Le drone de p2_arc : à la verticale, le haut du cadre tourné vers le cap de la voiture ; anim : il tourne
     de CAM_TURN degrés pendant le plan (clés de motion.py)."""

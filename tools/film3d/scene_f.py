@@ -178,10 +178,12 @@ def build_branches(kerb):
         y_road = math.sqrt((R_OUT - 0.5) ** 2 - a ** 2) - 0.3
         y_pan = math.sqrt((R_OUT - 0.25) ** 2 - h ** 2)
         y_kerb = math.sqrt((R_OUT + 0.1) ** 2 - (h + 0.1) ** 2)
-        road.strip(f"{name}_road", road.road_profile(), y_road, L, asphalt, rot=rot)
+        # (l'avenue nord jusqu'au bout du fond de la caméra basse, build_backdrop)
+        end = NORTH_END if name == "avenue_nord" else L
+        road.strip(f"{name}_road", road.road_profile(), y_road, end, asphalt, rot=rot)
         for side in (-1, 1):
-            road.strip(f"{name}_gutter_{side}", road.pan_profile(side), y_pan, L, pan, rot=rot)
-            road.strip(f"{name}_kerb_{side}", road.kerb_profile(side), y_kerb, L, kerb, smooth_faces=True, rot=rot)
+            road.strip(f"{name}_gutter_{side}", road.pan_profile(side), y_pan, end, pan, rot=rot)
+            road.strip(f"{name}_kerb_{side}", road.kerb_profile(side), y_kerb, end, kerb, smooth_faces=True, rot=rot)
         # le passage piéton, bandes parallèles à la circulation, 3,2 m de long
         y0 = y_kerb + 2.6
         k, x = 0, -a + 0.45
@@ -242,7 +244,10 @@ def build_walks():
         bpy.context.collection.objects.link(ob)
         me.materials.append(walk)
     # sous tout, au-delà du décor : un sol sombre (les coins du cadre tourné ne tombent jamais dans le vide)
-    A.box("ground", -160, 160, -160, 160, -0.6, -0.25, A.mat_plain("ground_dark", lin("#121214"), 0.8))
+    # (en deux pièces : il s'arrête au mur de promenade, la plage et la mer sont plus bas, build_backdrop)
+    ground = A.mat_plain("ground_dark", lin("#121214"), 0.8)
+    A.box("ground", -160, 7.2 + AV_WALK, -160, NORTH_END, -0.6, -0.25, ground)
+    A.box("ground_e", 7.2 + AV_WALK, SEA_X + 0.35, -160, L + 0.35, -0.6, -0.25, ground)
 
 
 # ---------------------------------------------------------------- l'îlot, les palmiers, la rue
@@ -253,15 +258,16 @@ def build_island(hidden):
     sc = 12.0 / max(royal.dimensions.z, 0.1)
     A.instance(royal, "island_royal", (0, 0, ISLAND_H), 0.4, sc)
     cocos = A.coconut_sources(hidden)
-    lean = sorted([c for c in cocos if 7.0 < c[1] < 13.0], key=lambda c: -c[3])[:4]
+    lean = sorted([c for c in cocos if 7.0 < c[1] < 13.0], key=lambda c: -c[3])[:5]
     for o, *_ in cocos:
         if all(o is not s for s, *_ in lean):
             bpy.data.objects.remove(o)
     ups = []
-    # (aucune couronne au-dessus de l'arc, qui longe l'îlot entre 180° et 270° : vue du drone, une couronne à 30 m
-    # de l'objectif couvrirait la berline)
+    # (vue du drone, aucune couronne au-dessus de l'arc, qui longe l'îlot entre 180° et 270° ; vue de la caméra basse
+    # du découpage v2, un cinquième cocotier penché à 222° passe sa couronne au-dessus de la voie intérieure : la
+    # berline glisse dessous, et ses palmes traversent le haut du cadre)
     for k, (src, top, ang, off) in enumerate(lean):
-        phi = math.radians((0.0, 70.0, 130.0, 310.0)[k])
+        phi = math.radians((0.0, 70.0, 130.0, 310.0, 222.0)[k])
         x, y = 3.6 * math.cos(phi), 3.6 * math.sin(phi)
         A.instance(src, f"island_coco_{k}", (x, y, ISLAND_H), phi - ang, 0.9)
         ups.append((x, y, phi, 3.6 + off))
@@ -284,7 +290,46 @@ def build_island(hidden):
         a, r = rng.uniform(0, math.tau), rng.uniform(1.4, R_ISLAND - 0.9)
         A.instance(shrub, f"island_shrub_{k}", (r * math.cos(a), r * math.sin(a), ISLAND_H), rng.uniform(0, math.tau),
                    ss * rng.uniform(0.8, 1.3))
-    log(f"îlot : palmier royal de 12 m, {len(lean)} cocotiers penchés, {len(ups)} projecteurs")
+    # le massif et la bordure du côté de l'arc, vus à hauteur de voiture : deux projecteurs bas, tournés vers
+    # l'extérieur (les projecteurs du pied n'éclairent que les couronnes)
+    for k, deg in enumerate((212.0, 244.0)):
+        t = math.radians(deg)
+        p = Vector((2.4 * math.cos(t), 2.4 * math.sin(t), 2.6))
+        q = Vector(((R_ISLAND - 0.4) * math.cos(t), (R_ISLAND - 0.4) * math.sin(t), ISLAND_H))
+        lo = A.add_light(f"island_low_{k}", "SPOT", p, q - p, lin("#ffd9a8"), 700.0, spot=75)
+        lo.data.spot_blend = 0.7
+        lo.visible_glossy = False
+    log(f"îlot : palmier royal de 12 m, {len(lean)} cocotiers penchés, {len(ups)} projecteurs, 2 au ras du massif")
+
+
+def build_edges(water):
+    """Ce que la berline frôle et ce qui passe entre elle et la caméra basse, dans le quart sud-ouest (la glisse) :
+    des balises blanches à bande rétroréfléchissante sur la bordure de l'îlot (la caisse passe à un mètre), et
+    trois flaques sur la voie extérieure, entre la caméra et la berline, qui la renvoient sous elle. (Des bornes
+    sur la bordure extérieure ne passaient jamais dans le cadre : la caméra regarde vers l'îlot, elles restaient
+    sur ses côtés.)"""
+    import scene_b as B
+    white = A.mat_plain("balise_white", lin("#e8e4dc"), 0.45)
+    band = A.mat_emit("balise_band", lin("#ffb46a"), 4.0)
+    n = 0
+    for deg in range(196, 260, 12):
+        t = math.radians(deg)
+        r = R_ISLAND - 0.18
+        x, y = r * math.cos(t), r * math.sin(t)
+        A.cyl(f"balise_{n}", (x, y, ISLAND_H), (x, y, ISLAND_H + 0.75), 0.05, white)
+        A.cyl(f"balise_band_{n}", (x, y, ISLAND_H + 0.55), (x, y, ISLAND_H + 0.68), 0.052, band)
+        n += 1
+    # (degré, rayon, taille, allongement) : sur la voie extérieure, hors de la route de la berline (r 8 à 11 ici)
+    for j, (deg, r, rad, sy) in enumerate(((240, 13.4, 1.2, 2.0), (228, 14.0, 0.9, 1.7), (216, 13.2, 1.3, 2.2))):
+        t = math.radians(deg)
+        ob = B.puddle(f"ring_puddle_out_{j}", 0.0, 0.0, rad, sy, 140 + j, water)
+        for v in ob.data.vertices:
+            lx, ly = v.co.x, v.co.y
+            v.co.x = (r + lx) * math.cos(t) - ly * math.sin(t)
+            v.co.y = (r + lx) * math.sin(t) + ly * math.cos(t)
+            v.co.z = ring_z(math.hypot(v.co.x, v.co.y)) + 0.0025
+        ob.data.update()
+    log(f"bords : {n} balises sur l'îlot, 3 flaques sur la voie extérieure")
 
 
 def build_street_life(hidden, branches):
@@ -311,9 +356,13 @@ def build_street_life(hidden, branches):
     # les flaques : sur la voie intérieure, le long de l'îlot, là où la berline passe à contresens
     water, N, out = A.material("ring_puddle")
     bsdf = N.new("ShaderNodeBsdfPrincipled")
-    bsdf.inputs["Base Color"].default_value = (0.006, 0.006, 0.007, 1)
-    bsdf.inputs["Roughness"].default_value = 0.02
+    # (les « taches noires » près de l'îlot vues du drone : ces flaques, un miroir presque noir qui ne renvoyait
+    # que le zénith sombre. Comme en P3 : une ride fine, un peu de flou, le fond d'enrobé noyé ; à hauteur de
+    # voiture elles renvoient les palmiers éclairés et les lampadaires)
+    bsdf.inputs["Base Color"].default_value = (0.018, 0.017, 0.018, 1)
+    bsdf.inputs["Roughness"].default_value = 0.05
     bsdf.inputs["IOR"].default_value = 1.33
+    N.set(bsdf.inputs["Normal"], road.ripples(N, road.coords(N)[0], scale=22.0, strength=0.12))
     N.link(bsdf.outputs[0], out.inputs["Surface"])
     import scene_b as B
     for j, (deg, r, rad, sy) in enumerate(((196, 7.4, 0.9, 1.6), (214, 7.0, 0.6, 1.3), (232, 7.8, 1.1, 1.8),
@@ -345,6 +394,127 @@ def ring_pools():
         lo.data.spot_blend = 0.9
 
 
+# ---------------------------------------------------------------- le fond, à hauteur de voiture (découpage v2)
+#
+# La caméra basse du découpage v2 (p2_arc.low_cam_pos) regarde d'abord l'est (la branche de la plage), puis
+# pivote vers le nord-nord-est (l'avenue nord). Le décor fait pour le drone s'arrêtait à 46 m du centre : au-delà,
+# un sol sombre sous un ciel vide. Ici : la mer et le mur de promenade à l'est (le mur de l'avenue de la scène A),
+# l'avenue nord prolongée jusqu'à NORTH_END, ses immeubles à boutiques côté ville (les dessins de la scène A), des
+# palmiers et des lampadaires des deux côtés, la mer derrière le mur côté est. Tout est de la bibliothèque déjà
+# chargée par les autres scènes.
+NORTH_END = 400.0            # l'avenue nord, du rond-point jusque-là
+SEA_X = 46.0                 # le mur de promenade, au bout de la branche de la plage
+AV_WALK = 4.0                # les trottoirs de l'avenue nord prolongée
+
+
+def place_building(protos, kind, x, y0, tint, n, srcs):
+    """Un dessin de la scène A (façade vers +x au pied x, de y0 à y0 + W), ses accessoires et ses lumières de
+    boutique : la recette de scene_a.build_city, réduite à ce que la caméra basse voit."""
+    ob, props, lts, spec = protos[kind]
+    inst = A.instance(ob, f"{ob.name}_n{n}", (x, y0, 0))
+    inst.color = (*lin(tint)[:3], 1)
+    for j, (pk, (px, py, pz), rot, s) in enumerate(props):
+        src = random.choice(srcs["ac"]) if pk == "ac" else srcs["tank"] if pk == "tank" else bpy.data.objects.get(pk)
+        if src is not None:
+            A.instance(src, f"{pk}_n{n}_{j}", (x + px, y0 + py, pz), rot, s)
+    warm = lin("#ffd9a8")
+    for j, (lk, (lx, ly, lz), w) in enumerate(lts):
+        loc = (x + lx, y0 + ly, lz)
+        if lk == "shop":
+            A.add_light(f"shop_n{n}_{j}", "AREA", loc, (1, 0, -0.35), lin("#ffcf96"), 90.0 * w / 3, (w, 2.2))
+        elif lk == "canopy":
+            A.add_light(f"canopy_n{n}_{j}", "AREA", loc, (0.2, 0, -1), warm, 260.0, (w, 2.2))
+        elif lk == "wash":
+            A.add_light(f"wash_n{n}_{j}", "SPOT", loc, (-1.5, 0, 2.2), warm, 1800.0, spot=75)
+        elif lk == "blade":
+            A.add_light(f"blade_n{n}_{j}", "SPOT", loc, (-0.35, 0, 1), warm, 900.0, spot=28)
+        elif lk == "light":
+            Ld = dict(kind="POINT", direction=(0, 0, -1), color="#ffd9a8", energy=100.0, size=(0.2, 0.2), spot=60.0)
+            Ld.update(w)
+            lo = A.add_light(f"fl_n{n}_{j}", Ld["kind"], loc, Ld["direction"], lin(Ld["color"]), Ld["energy"],
+                             Ld["size"], Ld["spot"])
+            if Ld.get("hide"):
+                lo.visible_camera = lo.visible_glossy = lo.visible_transmission = False
+    if not spec.get("own_uplights"):
+        # les façades éclairées du pied (comme sur l'avenue) : sans elles, des blocs noirs au fond du cadre
+        yy, zl = 1.5, (spec.get("gf_h", 4.2) + 0.1 if spec.get("gf", "shops") == "shops" else 0.2)
+        while yy < spec["W"] - 1:
+            A.add_light(f"up_n{n}_{int(yy)}", "SPOT", (x + 0.45, y0 + yy, zl), (-0.16, 0, 1), lin("#ffe2bf"),
+                        700.0 if spec.get("uplight") else 380.0, spot=60)
+            yy += 4.0
+    return spec["W"]
+
+
+def build_backdrop(hidden):
+    import lieux
+    M = A.city_mats()
+    with_half(7.0)
+    walk = road.mat_pavement(ST, "pavement_avenue_nord")
+    kx = 7.0 + road.KERB
+    # --- l'avenue nord au-delà du décor du drone : ses deux trottoirs (la chaussée, build_branches)
+    A.box("av_walk_w", -kx - AV_WALK, -kx, L, NORTH_END, -0.05, road.WALK_Z, walk)
+    A.box("av_walk_e", kx, kx + AV_WALK, L, NORTH_END, -0.05, road.WALK_Z, walk)
+    A.box("av_block_w", -200.0, -kx - AV_WALK, L, NORTH_END, -0.05, road.WALK_Z, walk)
+    # --- le mur de promenade (celui de l'avenue de la scène A) : au bout de la branche de la plage, le long du bord
+    # nord de la place, puis le long de l'avenue nord côté mer ; la plage et la mer derrière
+    wall = A.mat_plain("sea_wall", lin("#d9d2c4"), 0.6)
+    xe = kx + AV_WALK
+    for name, (x0, x1, y0, y1) in (("e", (SEA_X, SEA_X + 0.35, -L, L + 0.35)), ("n", (xe, SEA_X + 0.35, L, L + 0.35)),
+                                   ("av", (xe, xe + 0.35, L, NORTH_END))):
+        A.box(f"sea_wall_{name}", x0, x1, y0, y1, 0.0, 0.85, wall)
+        A.box(f"sea_wall_cap_{name}", x0 - 0.08, x1 + 0.1, y0, y1, 0.85, 0.95, M["trim"])
+    sand = A.mat_plain("wet_sand", lin("#3a332d"), 0.3)
+    A.box("beach_e", SEA_X + 0.35, 120.0, -200.0, L + 0.35, -1.6, -1.5, sand)
+    A.box("beach_n", xe + 0.35, 120.0, L + 0.35, 900.0, -1.6, -1.5, sand)
+    A.box("sea", 120.0, 4000.0, -1200.0, 4000.0, -1.7, -1.6, A.mat_sea())
+    # --- les immeubles côté ville de l'avenue nord, façades vers la chaussée, boutiques allumées
+    P = A.prototypes(M)
+    protos = {}
+    for k, (ob, props, lights, spec) in P.items():
+        for c in list(ob.users_collection):
+            c.objects.unlink(ob)
+        hidden.objects.link(ob)
+        protos[k] = (ob, props, lights, spec)
+    srcs = dict(ac=[A.source([o], f"ac_src_n{i}", hidden) for i, o in
+                    enumerate(A.import_glb("exterior_aircon_unit/exterior_aircon_unit.gltf"))],
+                tank=A.source(A.import_glb("water-tank.glb"), "tank_src_n", hidden))
+    pastels = ["#f2c6cf", "#bfe3d6", "#f4e6b8", "#f6efe0", "#c8dcef", "#f6d2b0", "#d8cdf0", "#e3efd0"]
+    rng = random.Random(23)
+    seq = ["deco", "shop", "hotel", "block", "liner", "flats", "tower"]
+    y, n = 24.0, 0
+    while y < NORTH_END - 10.0:
+        k = seq[n] if n < len(seq) else rng.choice([kk for kk in protos if kk != "motel"])
+        y += place_building(protos, k, -kx - AV_WALK, y, pastels[n % len(pastels)], n, srcs) + rng.choice((0.0, 2.0, 5.0))
+        n += 1
+    # --- palmiers royaux côté mer et le long de la promenade, lampadaires des deux côtés
+    royal = A.royal_source(hidden)
+    sc = 12.0 / max(royal.dimensions.z, 0.1)
+    palms = 0
+    for yy in range(52, int(NORTH_END), 16):
+        A.instance(royal, f"av_royal_{palms}", (kx + 1.6, yy, road.WALK_Z), rng.uniform(0, math.tau),
+                   sc * rng.uniform(0.85, 1.1))
+        palms += 1
+    for yy in range(-38, int(L), 13):
+        if abs(yy) < 6:                                   # la bouche de la branche de la plage
+            continue
+        A.instance(royal, f"prom_royal_{palms}", (SEA_X - 2.0, yy, road.WALK_Z), rng.uniform(0, math.tau),
+                   sc * rng.uniform(0.8, 1.05))
+        palms += 1
+    src = lieux.lamp_source(hidden)
+    lamps = 0
+    for yy in range(60, int(NORTH_END), 30):
+        for side in (-1, 1):
+            lieux.lamp(src, (side * (kx + 0.5), yy + (15 if side < 0 else 0), road.WALK_Z), arm=(-side, 0),
+                       name=f"lamp_av_{lamps}")
+            lamps += 1
+    for yy in range(-30, int(L), 20):
+        lieux.lamp(src, (SEA_X - 0.8, yy, road.WALK_Z), arm=(-1, 0), name=f"lamp_prom_{lamps}")
+        lamps += 1
+    road.S = PX
+    log(f"fond : avenue nord jusqu'à {NORTH_END:.0f} m, {n} immeubles, mer et mur de promenade, {palms} palmiers, "
+        f"{lamps} lampadaires")
+
+
 def build(plan=None, palier=None):
     """Écrit scene-f.blend (en ligne de commande), ou rend la scène à render_lieux.py (--lieu rond-point --plan
     P2), sans l'écrire. Le plan P2 est animé (28 images, motion.py), posé à l'image de l'image fixe."""
@@ -358,6 +528,8 @@ def build(plan=None, palier=None):
     build_walks()
     build_island(hidden)
     build_street_life(hidden, branches)
+    build_backdrop(hidden)
+    build_edges(bpy.data.materials["ring_puddle"])
     C.place_cars(scene, POSE, anim=True)
     ring_pools()
     for c in bpy.data.collections:
@@ -365,7 +537,8 @@ def build(plan=None, palier=None):
             c.hide_render = True
             c.hide_viewport = True
     A.make_world(scene)
-    co = C.drone(scene, POSE, anim=True)
+    # (découpage v2 : le travelling bas à l'intérieur de l'arc remplace le drone, C.drone garde l'ancien cadre)
+    co = C.low_camera(scene, POSE)
     A.render_settings(scene)
     scene.render.use_motion_blur = True             # le flou de bougé suit les clés (obturateur 0,5)
     scene.render.motion_blur_shutter = 0.5
