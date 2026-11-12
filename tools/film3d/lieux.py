@@ -1524,14 +1524,18 @@ def cap_images(px=1024, keep_objects=()):
 def car_fill(car, loc=(0.4, 8.0, 2.2), energy=500.0, color="#f2e4d4", size=4.0):
     """Une source douce de face qui n'éclaire que la voiture (liaison de lumière, mêmes collections que
     scene_d.split_for_car) : une lumière de surface accrochée au rig, en `loc` dans son repère (+y vers l'avant),
-    tournée vers le milieu de la caisse, invisible à la caméra, à la brume et aux reflets du sol (le sol ne la
+    tournée vers le milieu de la caisse, invisible à la caméra, à la brume et dans les reflets (le sol ne la
     reçoit pas). À contre-jour, la peinture se lit sans que le sol se rallume."""
-    in_c = bpy.data.collections.get(f"{car.name}_lumiere_avec")
-    if in_c is None:
-        in_c = bpy.data.collections.new(f"{car.name}_lumiere_avec")
-        for o in car.children_recursive:
-            if o.type == "MESH":
-                in_c.objects.link(o)
+    in_c = bpy.data.collections.get(f"{car.name}_lumiere_avec") or bpy.data.collections.new(f"{car.name}_lumiere_avec")
+    # la voiture entière, l'objet passé compris : la caisse de la berline (ailes, capot, coffre) est l'objet
+    # lui-même, portes et roues sont ses enfants ; sans elle, l'appoint n'éclairait que les portes. Complétée même
+    # si la collection existe déjà (scene_d._car_collections la crée avec les enfants seuls). Les vitres (propriété
+    # « vitre », hero_cars.split_glass) n'en sont pas : elles renverraient l'appoint en miroir
+    for o in [car] + list(car.children_recursive):
+        if o.type == "MESH" and not o.get("vitre") and o.name not in in_c.objects:
+            in_c.objects.link(o)
+    for o in [o for o in in_c.objects if o.get("vitre")]:
+        in_c.objects.unlink(o)
     d = bpy.data.lights.new(f"{car.name}_face", "AREA")
     d.shape = "DISK"
     d.size = size
@@ -1545,6 +1549,9 @@ def car_fill(car, loc=(0.4, 8.0, 2.2), energy=500.0, color="#f2e4d4", size=4.0):
     lo.rotation_quaternion = (Vector((0.0, 0.0, 0.8)) - Vector(loc)).to_track_quat("-Z", "Y")
     lo.visible_camera = False
     lo.visible_volume_scatter = False
+    # ni dans les reflets : la tôle plate de l'avant et l'auvent renvoyaient le disque en deux plaques gris rosé et une
+    # bande claire au 200 mm (P4), les vitres en aplat ; l'appoint n'apporte que sa lumière diffuse
+    lo.visible_glossy = False
     lo.light_linking.receiver_collection = in_c
     return lo
 
