@@ -9,7 +9,8 @@
 #       [--classes] [--wb] [--exposure 1.0]
 #   pare-brise : [--pb-lights phares,neons,projecteur] [--pb-views face,tq,dos,tqdos] [--pb-shots large,serre,loin]
 #       [--pb-poses volant,mains] [--hands "up,fwd,out,door_out,écart;…"] [--cabin 25] [--dash 60] [--pb-z 1.5]
-#       [--sky [--sky-strength 1]]
+#       [--sky [--sky-strength 1]] ; vues « fin », « finmi » (la caméra de FIN), éclairage « fin » (contre-jour)
+#   distance : [--dist-poses crouch,aim,guard] [--dist-phares 1200]
 #
 # Une image par case (720 × 1280, `<perso>-<pose>-<lumière>-<vue>-<cadre>.png`) et une planche par personnage et
 # par pose (`planche-<perso>-<pose>.png` : une ligne par lumière ; face, trois quarts, dos en pied puis en taille).
@@ -456,6 +457,19 @@ def bench_windshield():
     # les phares d'une patrouille arrêtée face à la berline, à 6 m : à 0,7 m le capot cache l'habitacle ; à 1,1 m
     # (une patrouille haute, ou sur une bosse) ils entrent par le pare-brise
     lights = rig_lights(center=Vector((head.x, head.y, 0)), front=front, head_z=1.1, head_d=6.0)
+    # « fin » : le contre-jour de FIN (découpage v3) : l'hélicoptère bas devant (8 m de haut, 22 m devant, face à
+    # la berline), les phares de la patrouille de droite, un peu en avant, braqués sur elle, et ceux des
+    # poursuivants derrière la caméra, qui projettent l'ombre de la berline vers l'avant
+    car_c = Vector((0.0, 0.0, 0.8))
+    lights["fin"] = [light("fin_helico", "SPOT", Vector((0.0, 22.0, 8.0)), car_c, "#e8eeff",
+                           float(opt("--fin-heli", "60000")), spot_size=math.radians(14), spot_blend=0.3,
+                           shadow_soft_size=0.15)]
+    for k in (-1, 1):
+        lights["fin"].append(light(f"fin_patrouille_{k}", "SPOT", Vector((3.6 + 0.7 * k, 5.5, 0.7)), car_c, HEAD,
+                                   450.0, spot_size=math.radians(36), spot_blend=0.35, shadow_soft_size=0.06))
+        lights["fin"].append(light(f"fin_poursuite_{k}", "SPOT", Vector((-0.5 + 0.7 * k, -16.0, 0.7)), car_c,
+                                   HEAD, float(opt("--fin-back", "600")), spot_size=math.radians(30),
+                                   spot_blend=0.35, shadow_soft_size=0.06))
     cam = camera()
     # --hands "up,fwd,out,door_out,écart;…" : des réglages d'essai de lieux.hands_up (l'écart s'ajoute à celui des
     # doigts), une pose « mains1 », « mains2 »… chacun
@@ -482,6 +496,16 @@ def bench_windshield():
         for lt in opt("--pb-lights", "phares,neons,projecteur").split(","):
             use_lights(lights, lt)
             row = []
+            # « fin » : la caméra de FIN à son arrêt (5 m derrière le centre, 2,4 m à gauche, 1,3 m, 24 mm, site
+            # -2°) ; « finmi » : à mi-chemin de son contournement (1,8 m à gauche, 0,95 m, site +1°)
+            for v, cx, cz, site in (("fin", -2.4, 1.3, -2.0), ("finmi", -1.8, 0.95, 1.0)):
+                if v not in opt("--pb-views", "face,tq").split(","):
+                    continue
+                cam.data.lens = 24.0
+                cam.location = Vector((cx, -5.0, cz))
+                hz = Vector((-cx, 5.0, 0.0)).normalized()
+                _aim(cam, cam.location + (hz + Vector((0, 0, math.tan(math.radians(site))))) * 5.0)
+                row.append(render(os.path.join(OUT, f"parebrise-{pose}-{lt}-{v}.png")))
             for v, az in [x for x in (("face", 0.0), ("tq", 32.0), ("dos", 180.0), ("tqdos", 150.0))
                          if x[0] in opt("--pb-views", "face,tq").split(",")]:
                 # hors de la voiture (l'avant à 2,45 m du centre), un peu au-dessus du capot, visée sur le buste
@@ -512,7 +536,9 @@ def bench_distance():
     for g, vest in ((-1, False), (1, True)):
         if hasattr(cp, "_LOOK_COUNT"):
             cp._LOOK_COUNT[0] = 0
-        for i, (pose, yaw) in enumerate((("crouch", 15.0), ("aim", 20.0), ("guard", -10.0))):
+        yaws = {"crouch": 15.0, "aim": 20.0, "guard": -10.0, "stop": 5.0}
+        for i, pose in enumerate(opt("--dist-poses", "crouch,aim,guard").split(",")):
+            yaw = yaws.get(pose, 0.0)
             kw = {"vest": vest} if vest is not None else {}
             try:
                 a = cp.load_officer("spp", name=f"officer_d{g}{i}", **kw)
