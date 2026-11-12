@@ -1933,6 +1933,36 @@ def far_lighthouse(P):
     return root
 
 
+def patrol_rim(police, energy=400.0, color="#f3dcc4"):
+    """P1 : une lumière de contour sur le flanc droit de la patrouille (celui que voit la caméra, de trois quarts
+    arrière), qui n'éclaire qu'elle : une bande de surface en avant et à droite de la caisse, rasante vers l'arrière,
+    dont la tôle renvoie le reflet en filet le long du flanc. Ni la berline ni la chaussée ne la reçoivent ; elle ne
+    porte pas d'ombre de la berline (liaison d'ombres limitée à la patrouille). Invisible à la caméra et à la brume."""
+    import lieux as L
+    in_c = bpy.data.collections.get("police_contour") or bpy.data.collections.new("police_contour")
+    for o in L.car_parts(police, glass=True):
+        if o.name not in in_c.objects:
+            in_c.objects.link(o)
+    d = bpy.data.lights.new("police_contour", "AREA")
+    d.shape = "RECTANGLE"
+    d.size, d.size_y = 3.0, 0.5
+    d.energy = energy
+    d.color = lin(color)[:3]
+    lo = bpy.data.objects.new(d.name, d)
+    bpy.context.scene.collection.objects.link(lo)
+    lo.parent = police
+    # repère de la patrouille : l'avant vers +x, sa droite vers -y ; 3 m devant son centre, 2,2 m à sa droite, 1,6 m
+    loc = Vector((3.0, -2.2, 1.6))
+    lo.location = loc
+    lo.rotation_mode = "QUATERNION"
+    lo.rotation_quaternion = (Vector((-0.8, -0.95, 0.75)) - loc).to_track_quat("-Z", "Y")
+    lo.visible_camera = False
+    lo.visible_volume_scatter = False
+    lo.light_linking.receiver_collection = in_c
+    lo.light_linking.blocker_collection = in_c
+    return lo
+
+
 def ouv_motion(scene, coupe, police, cam, focus):
     """Le plan OUV animé (ouv_avenue.py) : la berline remonte l'avenue vers +y à 50 km/h, mise sur un rig
     (motion.rig_up) et clée par motion.key_vehicle (roues, suspension) ; la caméra la suit sur un rail
@@ -2063,6 +2093,8 @@ def p1_motion(scene, coupe, police, cam, focus):
             for n in m.node_tree.nodes:
                 if n.type == "BSDF_PRINCIPLED" and n.inputs["Emission Strength"].default_value > 0.0:
                     n.inputs["Emission Strength"].default_value *= P.PATROL_HEAD_LENS
+    # le contour de son flanc droit (lié à elle seule)
+    patrol_rim(police)
     # la rampe : clignote à partir de l'image `on`, éteinte avant (lumières et matières émissives de la patrouille)
     M.flash_bars([prig], range(on, frames[-1] + 1))
     lit = []
