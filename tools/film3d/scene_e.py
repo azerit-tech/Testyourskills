@@ -968,8 +968,12 @@ def plan_P5(scene, hidden, palier="socle"):
     # --- la meute : elle descend la rampe et freine, sans rattraper la berline
     rigs = scene_c.pack([(k, x, y, 0.0) for k, x, y in P5.PACK_START], speed=P5.PACK_V)
     for i, r in enumerate(rigs):
-        ps = M.sample(P5.pack_pos(i), FRAMES, wheel_r=0.36, seed=float(i))
-        M.key_vehicle(r, ps, ground=deck_ground, pivot=(0.0, 0.0, 0.36))   # roues jointes à la caisse : pas de roues
+        body = M.body_of(r)
+        wh, wr = M.wheels_of(body), body.get("wheel_r", 0.36)
+        ps = M.sample(P5.pack_pos(i), FRAMES, wheel_r=wr, seed=float(i),
+                      wheelbase=body.get("wheelbase", 2.9), front=body.get("front_axle"))
+        M.key_vehicle(r, ps, wheels=wh, ground=deck_ground, pivot=(0.0, 0.0, 0.36))
+        M.wheel_marks(wh, wr, axis="Y")
     boost_bars(glow=20000.0)
     n = M.flash_bars(rigs, FRAMES)
     print(f"[P5] {n} lueurs de rampe clignotantes", flush=True)
