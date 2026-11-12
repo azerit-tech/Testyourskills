@@ -1,49 +1,49 @@
-# Le plan P3 écrit une fois, sans Blender (docs/cinematique-decoupage-v2.md, « P3 — Le barrage, de dos ») : la
+# Le plan P3 écrit une fois, sans Blender (docs/cinematique-decoupage-v3.md, « P3 — Le barrage, de dos ») : la
 # berline fonce dans la rue des enseignes vers le barrage, deux patrouilles nez à nez, les plots, deux agents qui
 # tirent puis se mettent à couvert ; elle feinte à droite, revient viser le trou des plots, remet les gaz et passe
-# de justesse. La caméra la suit de dos dans l'axe, au 21 mm : 7 m puis 5,8 m derrière elle, 1,9 m de haut, puis
-# elle se tasse au sol (0,6 m) quand la berline accélère, freine et s'arrête avant les plots ; la berline passe
-# seule. scene_b.plan_P3 n'en lit que les fonctions du temps et les positions ; motion.py en tire roues, braquage
-# et transfert de masse.
+# de justesse. La caméra la suit de dos, au 21 mm, 7 m derrière, de 1,9 m de haut à 0,7 m, et passe le barrage à
+# sa suite entre les deux patrouilles, sans freiner. scene_b.plan_P3 n'en lit que les fonctions du temps et les
+# positions ; motion.py en tire roues, braquage et transfert de masse.
 #
 # Repère : celui de scene-b.blend après scene_b.to_world (la berline roule vers +y, y = s, x positif à sa droite ;
-# le barrage à y = 126). t = 0 à la première image ; 28 images, 24 par seconde (shared/film/cut.ts).
+# le barrage à y = 126). t = 0 à la première image ; 48 images, 24 par seconde (shared/film/cut.ts).
 #
-# L'émotion visée : le piège. Image 1 à 12 : la rue se resserre, le barrage grossit plein centre au-dessus du
-# toit, la berline feinte vers la patrouille de droite. Images 12 à 20 : elle revient dans l'axe, les agents
-# tirent, la caméra descend ; à l'image 20 (STILL_FRAME, l'image fixe du banc) elle est à 3 m des plots et rien ne
-# dit encore qu'elle passe. Images 20 à 28 : elle remet les gaz, les agents plongent derrière leurs portières, le
-# trou des plots se lit à ses deux flancs, la caméra s'arrête, elle passe : à la dernière image elle est entre les
-# deux patrouilles, les plots derrière elle.
+# L'émotion visée : le piège. Image 1 : le raccord de P2, la patrouille 1 au bord gauche, la berline au centre, le
+# barrage au fond de la rue au-dessus du toit. Images 1 à 20 : la rue se resserre, la patrouille 1 lâche, la
+# berline feinte vers la patrouille de droite, la caméra commence à descendre. Images 20 à 34 : elle revient dans
+# l'axe, les agents tirent ; à l'image 34 (STILL_FRAME, l'image fixe du banc) elle est à 6 m des plots et rien ne
+# dit encore qu'elle passe. Images 34 à 48 : elle remet les gaz, les agents plongent derrière leurs portières, elle
+# passe le trou des plots, la caméra à 0,7 m derrière elle entre les deux patrouilles ; à la dernière image, le
+# quai, le pont qui monte et son pylône devant elle.
 #
-# Écarts à la fiche v2, assumés : la caméra suit la berline en x (à 80 %, avec 0,08 s de retard) au lieu d'une
-# ligne droite, pour que la feinte se lise sans que la berline sorte du tiers central ; elle se tient 0,6 m à
-# gauche de la berline et vise 0,9 m à droite de l'axe (CAM_SIDE, AIM_RIGHT) : dans l'axe pile, le toit cachait
-# les deux agents de l'image 1 à 24 ; elle se rapproche à 5,8 m (et non 5,5 : à 5,5 la caisse sortait du cadre à
-# droite, images 14-20) ; elle s'arrête à 6 m des plots (y 116,6) et non à 1,4 m : arrivée à 5,8 m derrière la
-# berline qui accélère, elle ne peut pas être à la fois si près d'elle et des plots ; la berline finit plus loin
-# (y 128,4 au lieu de 127,3) : son arrière a passé les plots.
+# Écarts à la fiche v3, assumés : la grue descend des images 8 à 46 et non 16 à 38 (1,2 m en 22 images dépasse
+# 1,5 m/s et 3 m/s²) ; l'écart caméra-berline varie de 2,2 m/s au plus et non 1 (la berline remet les gaz à
+# 3,4 m/s² pendant que la caméra garde sa vitesse : à 1 m/s, la caméra devrait accélérer avec elle) ; le site
+# n'est pas -1,5° puis +5° : il découle du cadre (centre de la berline à 48 puis 55 % depuis le haut) ; la patrouille 1 roule à x -3,05 et non -2,4 (voir plus bas).
 import math
 
 import motion as M
 
-FRAMES = 28
+SENSOR_H, ASPECT = 36.0, 9.0 / 16.0   # capteur de 36 mm sur la hauteur, cadre 9:16
+
+FRAMES = 48
+V3 = True                          # découpage v3 : les plafonds de caméra des tests s'appliquent
 F0 = 1
 T_END = (FRAMES - 1) / M.FPS
-STILL_FRAME = 20
+STILL_FRAME = 34                   # les deux agents tirent ensemble : l'image où l'on retient son souffle
 T_STILL = M.t_of(STILL_FRAME)
 
 # --- la berline (caisse : 4,89 × 1,88 m, le centre au milieu, 1,45 m de haut)
 HALF_L, HALF_W, HEIGHT = 2.44, 0.94, 1.45
 V0 = 29.5                          # m/s à la première image (106 km/h)
 ACCEL0, ACCEL1 = 1.6, 3.4          # m/s² : elle tient, puis remet les gaz (rétrogradage) en entrant dans la brèche
-T_KICK = (M.t_of(14), M.t_of(21))  # la remise des gaz, progressive
-Y_LAST = 128.4                     # le centre de la caisse à la dernière image : l'arrière a passé les plots
+T_KICK = (M.t_of(30), M.t_of(38))  # la remise des gaz, progressive
+Y_LAST = 134.0                     # le centre de la caisse à la dernière image : 8 m au-delà des patrouilles
 # la feinte : sa route en x selon y (trois paliers raccordés en S) ; elle part un peu à gauche de l'axe, va vers la
 # patrouille de droite, puis revient viser le milieu du trou des plots
 X_START, X_FEINT, X_GAP = -0.45, 0.3, -0.25
-Y_FEINT = (92.0, 107.0)            # de X_START à X_FEINT
-Y_AIM = (107.0, 119.5)             # de X_FEINT à X_GAP, droite avant les plots
+Y_FEINT = (80.0, 100.0)            # de X_START à X_FEINT
+Y_AIM = (100.0, 119.5)             # de X_FEINT à X_GAP, droite avant les plots
 OVERSTEER = 0.35                   # la caisse tourne un peu plus que sa route (le train arrière qui suit en retard)
 
 
@@ -114,9 +114,8 @@ CONES = [(2.35, 123.1), (1.85, 123.3), (1.35, 123.4), (-1.85, 123.4), (-2.35, 12
 GAP = (-0.25, 123.3)               # le milieu du trou des plots
 CONE_LINE = min(y for _, y in CONES) - CONE_R
 
-# les voitures garées du côté gauche (x < 0 : la scène les pose à x = -2,95, caisse de 1,8 m) et les caisses de
-# livraison au bord du trottoir de droite, que la berline frôle dans sa feinte (scene_b les pose)
-PARKED_X = (-3.85, -2.05)
+# les caisses de livraison au bord du trottoir de droite, que la berline frôle dans sa feinte (scene_b les pose ;
+# les voitures garées de gauche sont retirées de la voie de la patrouille 1)
 CRATES = (2.05, 3.05, 104.5, 107.1)        # x0, x1, y0, y1 (piles de palettes et cageots)
 
 # les flaques (x, y monde, demi-largeur en x, allongement en y) : sur la ligne de la berline (la gerbe de la
@@ -140,17 +139,30 @@ POOL_LOW, POOL_FADE = 0.25, (14, 22)
 # normaux à l'image 20 (la berline cache le barrage au début : ce sont les murs qui battent)
 BEAM_GAIN, BEAM_FADE = 2.5, (10, 20)
 
-# --- la troisième patrouille : derrière la caméra, hors champ ; ses rampes battent dans la rue (elle suit)
-CHASE = (0.9, -34.0, 0.0)          # x, retard sur la berline à t = 0 (m), cap
-CHASE_V = 29.0
+# --- la patrouille 1 (celle de P2) : son avant au bord gauche du cadre à l'image 1, 6,3 m derrière la berline,
+# presque à la vitesse de la caméra, dans la voie de gauche (x -3,05, la roue gauche au ras de la bordure) ; elle
+# lâche à partir de l'image 10 (freine à 7 m/s²), sort du cadre par la gauche et reste dans sa voie : à la dernière
+# image, son avant est à 3 m du panneau du barrage. Pas à -2,4 (la fiche) : son flanc passait à 0,4 m de
+# l'objectif et à 0,2 m de la berline (1,5 m au moins entre deux caisses) ; pas de rabattement dans l'axe : elle
+# n'est jamais assez loin derrière la caméra avant le barrage. Les voitures garées de sa voie, devant elle, sont
+# retirées (scene_b.PARKED)
+CHASE_X, CHASE_BACK = -3.05, 6.3   # x ; m derrière le centre de la berline à l'image 1
+CHASE_BRAKE, CHASE_LET = 7.0, (M.t_of(10), M.t_of(16))
+CHASE_V = V0 + 0.6 - 0.8           # m/s à l'image 1 : 0,8 m/s de moins que la caméra
+CHASE = (CHASE_X, -CHASE_BACK, 0.0)    # (x, retard sur la berline, cap) à l'image 1, pour scene_b
+_CHASE = M.Profile(CHASE_V, lambda t: -CHASE_BRAKE * M.smoothstep(CHASE_LET[0], CHASE_LET[1], t))
 
 
 def chase_pos(t):
-    return CHASE[0], Y_START + CHASE[1] + CHASE_V * t
+    return CHASE_X, Y_START - CHASE_BACK + _CHASE.s(t)
+
+
+def _centroid(poly):
+    return sum(p[0] for p in poly) / len(poly), sum(p[1] for p in poly) / len(poly)
 
 
 def parked(name):
-    x, y, _ = PATROLS[name]
+    x, y = _centroid(OBSTACLES[name])      # le milieu de la caisse (PATROLS donne l'origine du modèle)
     return lambda t: (x, y)
 
 
@@ -159,9 +171,19 @@ def tracks():
     return {"hero": hero_pos, "patrol_a": parked("patrol_a"), "patrol_b": parked("patrol_b"), "patrol_c": chase_pos}
 
 
-# --- les tirs : un éclair d'une image ; chaque agent tire en visée debout, puis tous deux ensemble à l'image 20
+def tracks_heading():
+    """{nom: cap(t)} des véhicules arrêtés ou sans vitesse lisible : les deux patrouilles du barrage, nez à nez,
+    leur grand axe à 24° de la rue (relevé sur _PATROL), et la patrouille 1, droite dans sa voie."""
+    return {"patrol_a": lambda t: -24.0, "patrol_b": lambda t: 24.0, "patrol_c": lambda t: CHASE[2]}
+
+
+# les plots et les panneaux du barrage, pour motion.py mesure --v3 : (x, y, rayon)
+POSTS = [(x, y, CONE_R) for x, y in CONES] + [(2.8, 122.3, 0.5), (-2.8, 122.3, 0.5)]
+
+
+# --- les tirs : un éclair d'une image ; chaque agent tire en visée debout, puis tous deux ensemble à l'image 34
 # (l'image où l'on retient son souffle), puis ils plongent derrière leur portière
-SHOTS = {0: (13, STILL_FRAME), 1: (9, 16, STILL_FRAME)}
+SHOTS = {0: (22, STILL_FRAME), 1: (16, 28, STILL_FRAME)}
 # les poses des agents (lieux.officer_rig) : (image, pose) ; la visée debout, puis à couvert
 COVER = {0: ((1, "aim"), (STILL_FRAME + 1, "aim"), (STILL_FRAME + 4, "crouch")),
          1: ((1, "aim"), (STILL_FRAME + 2, "aim"), (STILL_FRAME + 5, "crouch"))}
@@ -171,99 +193,88 @@ def firing(k, frame):
     return frame in SHOTS[k]
 
 
-# --- la caméra : travelling suiveur qui se rapproche (7 → 5,8 m), grue qui descend sans palier (1,9 → 0,6 m),
-# puis freinage jusqu'à l'arrêt, amorti, avant les plots ; la berline continue
+# --- la caméra (découpage v3) : elle suit la berline de dos, 7 m derrière, au 21 mm, et ne freine plus. Elle part
+# un peu plus vite qu'elle (0,6 m/s) et la rattrape jusqu'à 6,3 m ; à partir des images 20-27 elle garde sa vitesse
+# pendant que la berline remet les gaz : l'écart remonte à 7 m, la caméra passe le barrage à sa suite, entre les
+# deux patrouilles, à 0,7 m du sol, dans l'axe du trou des plots. Elle descend de 1,9 à 0,7 m des images 8 à 46
+# (grue au plus 1,4 m/s, amortie sur 16 images : la grue plafonnée à 1,5 m/s et 3 m/s² ne fait pas 1,2 m en moins
+# de 38 images) et son site suit sa hauteur, de -5,5° à +1,5° : le barrage au fond de la rue à mi-hauteur au
+# début, la berline un peu sous le milieu du cadre tout du long. Le lacet vise la berline (décalé de BIAS0 vers le
+# barrage au début) ; elle rejoint l'axe du trou des plots des images 26 à 42 (la fiche : 30 à 36, mais 0,35 m
+# en 6 images, c'est 30 m/s² de côté) ; à la dernière image, devant, le quai, le pont qui monte et le pylône.
 LENS = 21.0
-CAM_SIDE = -0.6                    # à gauche de l'axe de la berline : l'agent de gauche se lit à côté du toit
-FOLLOW, FOLLOW_LAG = 0.8, 0.08    # la part de l'écart latéral de la berline que la caméra reprend, et son retard
-D0, D1 = 7.0, 5.8                  # derrière le centre de la berline
-AIM_RIGHT = 0.9                    # la visée décalée à droite : la berline (à droite de la caméra) reste entière
-T_CLOSE = M.t_of(19)               # fin du rapprochement : début du freinage
-T_STOP = M.t_of(28)                # arrêt
-Z0, Z1 = 1.9, 0.6
-T_LOW = M.t_of(26)                 # au sol
-PITCH0, PITCH1 = -1.5, 5.0         # site : un peu plongé au début (la berline et le barrage), relevé au sol
+D0, R0 = 7.0, 0.6                  # derrière le centre de la berline à l'image 1 ; vitesse de rapprochement (m/s)
+T_HOLD = (M.t_of(20), M.t_of(27))  # la caméra cesse presque d'accélérer : la berline s'éloigne
+HOLD_KEEP = 0.3                    # la part de l'accélération de la berline qu'elle garde (écart relatif ≤ 4 m/s²)
+CAM_SIDE = -0.6                    # à gauche de la route de la berline, jusqu'à l'image 26
+FOLLOW, FOLLOW_LAG = 0.85, 0.0    # la part de l'écart latéral de la berline que la caméra reprend, et son retard
+T_AXIS = (M.t_of(14), M.t_of(46))  # elle rejoint l'axe du trou des plots (x -0,25) et y reste
+Z0, Z1 = 1.9, 0.7
+T_DOWN, T_RAMP = (M.t_of(8), M.t_of(46)), 16.0 / M.FPS
+PITCH0, PITCH1 = -5.5, 1.5         # le site à 1,9 m et à 0,7 m (entre les deux, selon la hauteur)
+BIAS0 = -1.5                       # degrés : le lacet un peu vers le barrage au début (rien à la fin)
 _DT = 1.0 / 960.0
 
 
-def _track_y(t):
-    d = D0 - (D0 - D1) * M.smoothstep(0.0, T_CLOSE, t)
-    return Y_START + HERO.s(t) - d
+def _cam_accel(t):
+    return _accel(t) * (1.0 - (1.0 - HOLD_KEEP) * M.smoothstep(T_HOLD[0], T_HOLD[1], t))
 
 
-def _build_cam():
-    """La caméra en y par intégration : la vitesse du suiveur, puis la même multipliée par (1 - smoothstep) du
-    freinage (vitesse nulle à T_STOP, sans à-coup) ; et la plongée de la caméra au freinage (un ressort)."""
-    n = int(round((T_END + 0.2) / _DT)) + 2
-    ys, nod = [_track_y(0.0)], [0.0]
-    spring = M._Spring(2.2, 0.45)
-    v_prev = None
-    for k in range(1, n):
-        t = k * _DT
-        v = (_track_y(t) - _track_y(t - _DT)) / _DT
-        v *= 1.0 - M.smoothstep(T_CLOSE, T_STOP, t)
-        ys.append(ys[-1] + v * _DT)
-        a = 0.0 if v_prev is None else (v - v_prev) / _DT
-        v_prev = v
-        # la décélération (m/s², positive au freinage) fait piquer la caméra : -1,6° au plus fort, puis rebond
-        spring.step(-1.6 * min(1.0, max(0.0, -a) / 70.0), _DT)
-        nod.append(spring.x)
-    return ys, nod
-
-
-_CAM_Y, _CAM_NOD = _build_cam()
-
-
-def _lerp(arr, t):
-    u = max(0.0, t) / _DT
-    k = min(len(arr) - 2, int(u))
-    f = min(1.0, u - k)
-    return arr[k] * (1 - f) + arr[k + 1] * f
+_CAM = M.Profile(V0 + R0, _cam_accel)
 
 
 def cam_y(t):
-    if t < 0.0:                    # (l'image d'avant le plan, pour l'obturateur : la caméra roule déjà)
-        return _CAM_Y[0] + t * (_CAM_Y[1] - _CAM_Y[0]) / _DT
-    return _lerp(_CAM_Y, t)
+    return Y_START - D0 + _CAM.s(t)
+
+
+def _z_rate(t):
+    a, b = T_DOWN
+    return min(M.smoothstep(a, a + T_RAMP, t), 1.0 - M.smoothstep(b - T_RAMP, b, t))
+
+
+def _build_z():
+    n = int(round((T_DOWN[1] + 0.05) / _DT)) + 2
+    acc = [0.0]
+    for k in range(1, n):
+        acc.append(acc[-1] + _z_rate((k - 0.5) * _DT) * _DT)
+    return acc
+
+
+_Z = _build_z()
 
 
 def cam_z(t):
-    """1,9 m → 0,6 m sans palier : la descente commence dès la première image (lente), s'accélère quand la
-    berline remet les gaz, finit à vitesse nulle à l'image 26."""
-    # (une part linéaire, pour qu'elle bouge dès la première image, et une courbe lente au début : tant que la
-    # caméra est au-dessus du toit, le barrage se lit par-dessus ; à hauteur du toit, le toit le cacherait au loin)
-    u = min(1.0, max(0.0, t / T_LOW))
-    s = 0.1 * (2.0 * u - u * u) + 0.9 * M.smoothstep(0.0, 1.0, u ** 1.8)
-    return Z0 - (Z0 - Z1) * s
+    u = min(len(_Z) - 1.0, max(0.0, t / _DT))
+    k = min(len(_Z) - 2, int(u))
+    w = _Z[k] + (_Z[k + 1] - _Z[k]) * (u - k)
+    return Z0 - (Z0 - Z1) * w / _Z[-1]
 
 
 def cam_x(t):
-    return CAM_SIDE + X_START + FOLLOW * (lateral(Y_START + HERO.s(max(0.0, t - FOLLOW_LAG))) - X_START)
+    """Derrière la berline, avec FOLLOW_LAG de retard : à CAM_SIDE à sa gauche, et ne reprenant que FOLLOW de son
+    écart latéral au début ; dans sa trace (celle du trou des plots) à la fin."""
+    lat = lateral(Y_START + HERO.s(max(0.0, t - FOLLOW_LAG)))
+    return lat + (1.0 - M.smoothstep(T_AXIS[0], T_AXIS[1], t)) * (CAM_SIDE + (1.0 - FOLLOW) * (X_START - lat))
 
 
-def cam_aim(t):
-    """Le point visé : entre la berline et le trou des plots (le barrage reste plein centre, la berline dans le
-    tiers central)."""
-    x, y = hero_pos(t)
-    return 0.6 * x + 0.4 * GAP[0] + AIM_RIGHT, max(y, GAP[1]) + 20.0
+def camera_rail(t):
+    """La caméra sans tremblé : (x, y, z, lacet, site, roulis, focale)."""
+    x, y, z = cam_x(t), cam_y(t), cam_z(t)
+    hx, hy = hero_pos(t)
+    yaw = 180.0 + math.degrees(math.atan2(hx - x, hy - y)) + BIAS0 * (1.0 - M.smoothstep(T_AXIS[0], T_AXIS[1], t))
+    pitch = PITCH1 + (PITCH0 - PITCH1) * (z - Z1) / (Z0 - Z1)
+    return (x, y, z, yaw, pitch, 0.0, LENS)
 
 
 def camera(t):
-    x, y, z = cam_x(t), cam_y(t), cam_z(t)
-    ax, ay = cam_aim(t)
-    yaw = 180.0 + math.degrees(math.atan2(ax - x, ay - y))
-    pitch = PITCH0 + (PITCH1 - PITCH0) * M.smoothstep(0.0, T_LOW, t)
-    # la caméra roule : une vibration de route qui s'éteint avec sa vitesse ; la plongée du freinage
-    v = (cam_y(t + 0.01) - cam_y(t - 0.01)) / 0.02
-    k = min(1.0, v / 30.0)
-    dyaw, dpitch, droll, dx, dy, dz = M.handheld(t, amp=0.14, rotor=0.05, seed=3.1)
-    return (x + k * dx, y, z + k * dz * 0.5, yaw + k * dyaw, pitch + k * dpitch + _lerp(_CAM_NOD, t),
-            k * droll, LENS)
+    x, y, z, yaw, pitch, roll, lens = camera_rail(t)
+    # la caméra roule : une vibration de route (0,12° à 24 mm, × 24/focale)
+    dyaw, dpitch, droll, dx, dy, dz = M.handheld(t, amp=0.12 * 24.0 / LENS, rotor=0.03, seed=3.1)
+    return (x + dx, y, z + dz * 0.5, yaw + dyaw, pitch + dpitch, droll, lens)
 
 
 # --- le cadre, sans Blender : la projection d'un point (repère de render : capteur de 36 mm sur la hauteur, le
-# format 9:16), pour les contrôles de cadrage
-SENSOR_H, ASPECT = 36.0, 9.0 / 16.0
+# format 9:16), pour les contrôles de cadrage (SENSOR_H, ASPECT : plus haut, la caméra s'en sert)
 
 
 def project(cam, p):
@@ -339,7 +350,6 @@ def clearances(frames=None, sub=4):
     frames = frames or range(F0 - 1, F0 + FRAMES + 1)
     fixed = dict(OBSTACLES)
     fixed["caisses"] = _rect(*CRATES)
-    fixed["garees"] = _rect(PARKED_X[0], PARKED_X[1], 90.0, 126.0)
     out = {}
     for f in frames:
         for k in range(sub):
@@ -351,6 +361,36 @@ def clearances(frames=None, sub=4):
             cam = camera(t)[:2]
             items.append(("camera", 0.0 if _inside(cam, car) else
                           min(_seg_dist(cam, car[j], car[(j + 1) % 4]) for j in range(4))))
+            for n, d in items:
+                if n not in out or d < out[n][0]:
+                    out[n] = (d, f + k / sub)
+    return out
+
+
+def _car_box(x, y, h_deg, half_l=HALF_L, half_w=HALF_W):
+    h = math.radians(h_deg)
+    fx, fy = -math.sin(h), math.cos(h)
+    return [(x + fx * a * half_l + fy * b * half_w, y + fy * a * half_l - fx * b * half_w)
+            for a, b in ((1, 1), (1, -1), (-1, -1), (-1, 1))]
+
+
+def cam_clearances(frames=None, sub=4):
+    """La plus petite distance au sol (m) entre la caméra et chaque véhicule ou obstacle (la caisse de la
+    berline, la patrouille 1, le décor du barrage, les plots) : {nom: (distance, image)}."""
+    frames = frames or range(F0, F0 + FRAMES)
+    fixed = dict(OBSTACLES)
+    fixed["caisses"] = _rect(*CRATES)
+    out = {}
+    for f in frames:
+        for k in range(sub):
+            t = M.t_of(f + k / sub)
+            c = camera(t)[:2]
+            polys = dict(fixed)
+            polys["berline"] = hero_box(t)
+            polys["patrouille_1"] = _car_box(*chase_pos(t), CHASE[2], 2.5, 1.0)
+            items = [(n, 0.0 if _inside(c, P) else min(_seg_dist(c, P[j], P[(j + 1) % len(P)]) for j in range(len(P))))
+                     for n, P in polys.items()]
+            items += [(f"plot_{i}", max(0.0, math.hypot(c[0] - q[0], c[1] - q[1]) - CONE_R)) for i, q in enumerate(CONES)]
             for n, d in items:
                 if n not in out or d < out[n][0]:
                     out[n] = (d, f + k / sub)
@@ -379,16 +419,18 @@ def wheel_hits(spots=None, frames=None, sub=8):
 
 
 if __name__ == "__main__":
-    for f in (1, 5, 9, 13, 17, 20, 22, 24, 26, 28):
+    for f in (1, 8, 12, 16, 20, 24, 28, 30, 34, 38, 42, 46, 48):
         t = M.t_of(f)
         x, y = hero_pos(t)
         c = camera(t)
         (u0, u1, v0, v1), (uc, vc) = hero_frame(t, c)
-        g = project(c, (GAP[0], GAP[1], 0.9))
+        g = project(c, (GAP[0], GAP[1], 0.9)) or (float("nan"), float("nan"))
         print(f"image {f:2d} : berline ({x:5.2f}, {y:6.1f}) {HERO.v(t) * 3.6:4.0f} km/h cap {hero_heading(t):5.1f}° | "
               f"caméra ({c[0]:5.2f}, {c[1]:6.1f}, {c[2]:4.2f}) lacet {c[3]:6.1f} site {c[4]:4.1f} à {y - c[1]:4.1f} m | "
               f"cadre x {50 * (u0 + 1):3.0f}–{50 * (u1 + 1):3.0f} % y {100 * v0:3.0f}–{100 * v1:3.0f} % centre "
               f"({50 * (uc + 1):3.0f}, {100 * vc:3.0f}) | trou ({50 * (g[0] + 1):3.0f}, {100 * g[1]:3.0f})")
     for n, (d, f) in sorted(clearances().items(), key=lambda kv: kv[1][0]):
         print(f"  {n:10s} {d:5.2f} m (image {f:.2f})")
+    for n, (d, f) in sorted(cam_clearances().items(), key=lambda kv: kv[1][0])[:4]:
+        print(f"  caméra–{n:10s} {d:5.2f} m (image {f:.2f})")
     print("écart minimal :", M.min_gap(tracks(), range(F0 - 1, F0 + FRAMES + 1)))

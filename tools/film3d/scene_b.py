@@ -77,14 +77,14 @@ def vw(x, y):
 
 # Les plans de la scène (docs/cinematique-decoupage-v2.md), en repère de vue. cam : position de départ (les clés
 # de plan_P3 la remplacent) ; lens ; shift_y : décentrement ; hero : (x, y, lacet en degrés) à l'image fixe, l'avant
-# vers -y de vue ; chase : la troisième patrouille (x, y) à l'image fixe ; barrage : y de vue du milieu des deux
+# vers -y de vue ; chase : la patrouille 1 (x, y) à l'image fixe ; barrage : y de vue du milieu des deux
 # patrouilles.
 _H = P3.hero_pos(P3.T_STILL)
 _C = P3.camera(0.0)
 _K = P3.chase_pos(P3.T_STILL)
 PLANS = {
-    # P3, le barrage, de dos (découpage v2) : la caméra suit la berline au 21 mm, 7 m puis 5,8 m derrière elle,
-    # de 1,9 m à 0,6 m de haut, et s'arrête avant les plots ; la berline passe le barrage, les agents tirent puis
+    # P3, le barrage, de dos (découpage v3) : la caméra suit la berline au 21 mm, 6,3 à 7 m derrière elle, de
+    # 1,9 m à 0,7 m de haut, et passe le barrage à sa suite ; la berline passe le barrage, les agents tirent puis
     # se mettent à couvert (fire : éclairs). yaw : lacet de départ en degrés (positif : vers -x de vue).
     "P3": dict(cam=(*vw(_C[0], _C[1]), _C[2]), lens=P3.LENS, shift_y=0.0, yaw=180.0, fstop=4.0,
                focus=(*vw(*_H), 0.8), hero=(*vw(*_H), P3.hero_heading(P3.T_STILL)), chase=vw(*_K), barrage=8.0,
@@ -143,8 +143,9 @@ MOTEL = (-1, 72.0)     # l'enseigne MOTEL sur mât (modèle de bibliothèque) : 
 SPANS = [-24.0, -13.0, 2.5, 13.0, 20.5, 28.0, 36.5, 46.0, 57.0, 70.0, 84.0, 100.0, 116.0]
 # lampadaires tous les 30 m en quinconce : (côté, y de vue)
 LAMPS = [(1, -14.0), (-1, 16.0), (1, 46.0), (-1, 76.0), (1, 106.0)]
-# les voitures garées, d'un seul côté (x > 0 en vue), la dernière à 15 m du barrage : la caméra la longe à 1,4 m
-PARKED = [23.0, 32.0, 45.5, 59.0, 86.0, 99.5, 113.0]
+# les voitures garées, d'un seul côté (x > 0 en vue), derrière le départ de P3 : celles d'y de vue 59, 45,5, 32
+# et 23 (y monde 75 à 111) sont retirées, la patrouille 1 roule dans leur voie jusqu'au barrage
+PARKED = [86.0, 99.5, 113.0]
 
 
 def log(*a):
@@ -1158,6 +1159,7 @@ def dup_tree(ob, parent, tag):
     return c
 
 
+
 def patrol_beams(body, tag, aims):
     """Les gyrophares figés en plein balayage : un faisceau corail et un violet par rampe, vers les points donnés
     (repère de vue), qui lèchent les façades et le mouillé ; la brume les rend visibles."""
@@ -1386,7 +1388,7 @@ def build_barrage(scene, hidden, plan):
         for lo in car.children_recursive:
             if lo.type == "LIGHT" and "_head_" in lo.name:
                 lo.data.energy = 120.0
-    # la troisième, 60 m derrière la berline, gyrophares au fond de la rue
+    # la troisième, la patrouille 1 (p3_enseignes.chase_pos : au bord gauche du cadre à l'image 1)
     far = cars[2]
     cx, cy = plan["chase"]
     far.location = (cx, cy, road.road_z(abs(cx)))
@@ -1399,7 +1401,7 @@ def build_barrage(scene, hidden, plan):
     # distance, il faut cette puissance pour passer au-dessus des vitrines)
     beams = patrol_beams(cars[0], "a", [(CORAL, (-7.0, yb + 22.0, 6.0), 150000, 18), (LILAC, (2.0, yb + 30.0, 0.0), 60000, 18)])
     beams += patrol_beams(cars[1], "b", [(LILAC, (7.0, yb + 18.0, 6.5), 150000, 18), (CORAL, (-2.0, yb + 34.0, 0.0), 60000, 18)])
-    # (la troisième suit derrière la caméra, hors champ : ses faisceaux balaient devant elle les façades autour de la
+    # (la patrouille 1, sortie du cadre par la gauche : ses faisceaux balaient devant elle les façades autour de la
     # berline et du barrage, la meute qui pousse se lit sur les murs)
     beams += patrol_beams(cars[2], "c", [(CORAL, (-7.0, cy - 30.0, 5.5), 50000, 16), (LILAC, (7.0, cy - 40.0, 5.0), 50000, 16)])
     exclude_hero(beams, "faisceaux")
@@ -1587,12 +1589,12 @@ def keep_world_parent(objs, parent):
 
 
 def plan_P3(scene):
-    """P3, le barrage, de dos (28 images, p3_enseignes.py), en repère monde après to_world : la berline arrive à
-    106 km/h, feinte vers la patrouille de droite, revient viser le trou des plots, remet les gaz et passe entre
-    les deux agents ; la caméra la suit au 21 mm, se rapproche, descend de 1,9 à 0,6 m et s'arrête avant les plots ;
-    la troisième patrouille suit derrière la caméra, hors champ ; les rampes clignotent ; les agents tirent (un
-    éclair d'une image) puis plongent derrière leurs portières. L'image fixe (P3.STILL_FRAME, la 20) : la berline à
-    3 m des plots, le souffle retenu."""
+    """P3, le barrage, de dos (48 images, p3_enseignes.py, découpage v3), en repère monde après to_world : la
+    berline arrive à 106 km/h, feinte vers la patrouille de droite, revient viser le trou des plots, remet les gaz
+    et passe entre les deux agents ; la caméra la suit au 21 mm, descend de 1,9 à 0,7 m et passe le barrage à sa
+    suite, sans freiner ; la patrouille 1 part au bord gauche du cadre, lâche et reste dans sa voie ; les rampes
+    clignotent ; les agents tirent (un éclair d'une image) puis plongent derrière leurs portières. L'image fixe
+    (P3.STILL_FRAME, la 34) : la berline à 6 m des plots, le souffle retenu."""
     frames = range(P3.F0 - 1, P3.F0 + P3.FRAMES + 1)        # une image de plus de chaque côté, pour l'obturateur
     scene.frame_start, scene.frame_end = P3.F0, P3.F0 + P3.FRAMES - 1
     ob = bpy.data.objects

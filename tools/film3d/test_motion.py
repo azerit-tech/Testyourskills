@@ -23,6 +23,8 @@ CAM_LIMITS_PLAN = {
     # 21 mm, le virage de 30 m. accel : la berline y tire 12,6 m/s² (70 km/h sur 30 m) ; une caméra qui la suit à
     # 4 m/s² près (arel) en tire donc au moins 8,6 : le plafond commun de 8 ne peut pas tenir avec celui d'arel
     "P2": {"pan": 41.0, "behind": 0.67, "accel": 13.5},
+    "P3": {"gap": 0.05},     # la fiche fait passer la berline à 0,33 m du barrage (boîtes : 0,10 m) ; la patrouille 1
+                             # à 1,5 m au moins de la berline : test_p3
     "P4": {"pan": 4.6, "vrel": None, "arel": None, "behind": 0.0,   # fixe, 200 mm, de face
            "zoom": True, "low_center": (0.52, 0.56), "low_all": True, "width_min": 0.17},
     "P5": {"pan": 75.0, "pan_frames": 16, "pan_acc": 3.0, "behind": 0.67,   # le seul mouvement vif du film
@@ -263,48 +265,79 @@ def test_p4():
 
 
 def test_p3():
-    """P3 (découpage v2, de dos) : aucun choc (centres à plus de 3 m, caisse à 15 cm au moins des patrouilles, des
-    agents, des plots, des voitures garées et des caisses, caméra à 2 m au moins de la caisse) ; roulis et tangage
-    bornés ; la berline commence 5 images plus tôt (y 93,5 à 95) et finit au-delà des plots, entre les patrouilles ;
-    la caméra s'arrête avant les plots, à vitesse nulle, et descend de 1,9 à 0,6 m sans palier ; la berline dans le
-    tiers central (son centre), son centre entre 50 et 62 % de la hauteur depuis le haut (la règle des plans bas : la
-    chaussée n'a pas la moitié du cadre), entière hors des bandes du HUD (15 % du bas, 12 % du haut), le trou des plots
-    dans le cadre à chaque image ; éclairs d'une ou deux images."""
+    """P3 (découpage v3, de dos, 48 images) : aucun choc (la caisse à 15 cm au moins des patrouilles du barrage, des
+    agents, des plots et des caisses : elle passe de justesse, la fiche le veut ; la patrouille 1 à 1,5 m au moins
+    de la berline ; la caméra à 2 m au moins de la caisse et à 0,8 m au moins de tout le reste) ; roulis et tangage
+    bornés ; la berline de y 71,5–73,5 à 134 ; la caméra passe le barrage à sa suite sans jamais ralentir, et
+    descend de 1,9 à 0,7 m sans palier ; la berline dans le tiers central (son centre), son centre entre 50 et 62 %
+    de la hauteur depuis le haut quand la caméra est à 1 m ou moins (la règle des plans bas), entière hors des bandes
+    du HUD (15 % du bas, 12 % du haut), le trou des plots dans le cadre tant qu'il est devant ; le point de coupe à
+    la première et à la dernière image (x 50 ± 6 %, y 55 ± 6 % depuis le haut, largeur 42 ± 8 %) ; la patrouille 1
+    au bord gauche à l'image 1 (x 0–15 %), sortie du cadre avant l'image 14 ; éclairs d'une ou deux images."""
     import p3_enseignes as P
     frames = range(P.F0 - 1, P.F0 + P.FRAMES + 1)
-    d, f, a, b = M.min_gap(P.tracks(), frames)
-    check("P3 : distances gardées", d >= 3.0, f"{d:.1f} m entre {a} et {b} à l'image {f}")
+    tr = P.tracks()
+    d, f, a, b = M.min_gap({k: tr[k] for k in ("hero", "patrol_c")}, frames)
+    check("P3 : la patrouille 1 loin de la berline (centres)", d >= 5.0, f"{d:.1f} m à l'image {f}")
+    body = min((P._poly_dist(P.hero_box(M.t_of(f)), P._car_box(*P.chase_pos(M.t_of(f)), P.CHASE[2], 2.5, 1.0)), f)
+               for f in frames)
+    check("P3 : 1,5 m au moins entre la berline et la patrouille 1", body[0] >= 1.5,
+          f"{body[0]:.2f} m à l'image {body[1]}")
     cl = P.clearances(frames)
     cam = cl.pop("camera")
     n, (dm, fm) = min(cl.items(), key=lambda kv: kv[1][0])
     check("P3 : la caisse ne touche rien", dm >= 0.15, f"{dm:.2f} m de {n} à l'image {fm:.2f}")
     check("P3 : la caméra à 2 m au moins de la caisse", cam[0] >= 2.0, f"{cam[0]:.2f} m à l'image {cam[1]:.2f}")
+    cc = P.cam_clearances()
+    cc.pop("berline")
+    n, (dm, fm) = min(cc.items(), key=lambda kv: kv[1][0])
+    check("P3 : la caméra à 0,8 m au moins de tout", dm >= 0.8, f"{dm:.2f} m de {n} à l'image {fm:.2f}")
     ps = M.sample(P.hero_pos, frames, heading=P.hero_heading, wheel_r=0.31, wheelbase=2.77)
     rmax, pmax = ((M.CHASSIS["hero"]["roll_max"] + 0.5, M.CHASSIS["hero"]["pitch_max"] + 0.5) if M.dyn_on()
                   else (6.0, 3.0))
     check("P3 : roulis borné", max(abs(p["roll"]) for p in ps) <= rmax, f"{max(abs(p['roll']) for p in ps):.2f}°")
     check("P3 : tangage borné", max(abs(p["pitch"]) for p in ps) <= pmax, f"{max(abs(p['pitch']) for p in ps):.2f}°")
     y0, y1 = P.hero_pos(0.0)[1], P.hero_pos(P.T_END)[1]
-    check("P3 : de y 93,5–95 au-delà des plots", 93.5 <= y0 <= 95.0 and y1 - P.HALF_L > P.CONE_LINE + 0.5
-          and y1 < P.PATROLS["patrol_a"][1] + 3.0, f"y {y0:.1f} → {y1:.1f}")
-    v_end = M.t_of(P.F0 + P.FRAMES - 1)
-    cys = [P.camera(M.t_of(f))[1] for f in range(P.F0, P.F0 + P.FRAMES)]
-    check("P3 : la caméra s'arrête avant les plots", max(cys) < P.CONE_LINE - 1.0
-          and abs(P.cam_y(v_end) - P.cam_y(v_end - 1 / 24)) < 0.02, f"y {max(cys):.1f} (plots à {P.CONE_LINE:.1f})")
-    zs = [P.cam_z(M.t_of(f)) for f in range(P.F0, P.F0 + P.FRAMES)]
+    check("P3 : de y 71,5–73,5 à 134", 71.5 <= y0 <= 73.5 and abs(y1 - 134.0) < 0.05, f"y {y0:.1f} → {y1:.1f}")
+    shown = range(P.F0, P.F0 + P.FRAMES)
+    cys = [P.cam_y(M.t_of(f)) for f in shown]
+    vs = [(cys[i + 1] - cys[i]) * M.FPS for i in range(len(cys) - 1)]
+    check("P3 : la caméra passe le barrage sans ralentir", cys[-1] > P.PATROLS["patrol_a"][1]
+          and all(vs[i + 1] >= vs[i] - 1e-6 for i in range(len(vs) - 1)),
+          f"y {cys[0]:.1f} → {cys[-1]:.1f}, {min(vs):.1f} à {max(vs):.1f} m/s")
+    zs = [P.cam_z(M.t_of(f)) for f in shown]
     low = next(i for i, z in enumerate(zs) if z <= P.Z1 + 1e-6)
-    check("P3 : descente de 1,9 à 0,6 m sans palier", abs(zs[0] - 1.9) < 0.01 and abs(zs[-1] - 0.6) < 1e-6
-          and all(zs[i + 1] < zs[i] - 0.005 for i in range(low - 1)), f"au sol à l'image {low + P.F0}")
+    top = max(i for i, z in enumerate(zs) if z >= P.Z0 - 1e-6)
+    check("P3 : descente de 1,9 à 0,7 m sans palier", abs(zs[0] - 1.9) < 1e-6 and abs(zs[-1] - 0.7) < 1e-6
+          and all(zs[i + 1] < zs[i] - 1e-4 for i in range(top + 2, low - 1)),
+          f"de l'image {top + P.F0} à l'image {low + P.F0}")
     bad = []
-    for f in range(P.F0, P.F0 + P.FRAMES):
+    for f in shown:
         t = M.t_of(f)
         c = P.camera(t)
         (u0, u1, v0, v1), (uc, vc) = P.hero_frame(t, c)
-        g = P.project(c, (P.GAP[0], P.GAP[1], 0.9))
-        if not (abs(uc) <= 1 / 3 and u0 > -1.0 and u1 < 1.0 and v0 >= 0.15 and v1 <= 0.88 and 0.38 <= vc <= 0.50
-                and g and abs(g[0]) < 0.6 and 0.15 < g[1] < 0.88):
+        g = P.project(c, (P.GAP[0], P.GAP[1], 0.9)) if c[1] < P.GAP[1] - 1.0 else (0.0, 0.5)
+        if not (abs(uc) <= 1 / 3 and u0 > -1.0 and u1 < 1.0 and v0 >= 0.15 and v1 <= 0.88
+                and (c[2] > 1.0 or 0.38 <= vc <= 0.50) and g and abs(g[0]) < 0.6 and 0.15 < g[1] < 0.88):
             bad.append(f)
     check("P3 : la berline au tiers central, hors du HUD, le barrage dans le cadre", not bad, f"images {bad[:6]}")
+    cut = []
+    for f in (P.F0, P.F0 + P.FRAMES - 1):
+        (u0, u1, v0, v1), (uc, vc) = P.hero_frame(M.t_of(f), P.camera(M.t_of(f)))
+        cut.append((50 * (uc + 1), 100 * (1 - vc), 50 * (u1 - u0)))
+    check("P3 : le point de coupe à la première et à la dernière image",
+          all(abs(x - 50) <= 6 and abs(y - 55) <= 6 and abs(w - 42) <= 8 for x, y, w in cut),
+          " ; ".join(f"x {x:.0f} y {y:.0f} l {w:.0f}" for x, y, w in cut))
+    edge = []
+    for f in (P.F0, P.F0 + 13):
+        t = M.t_of(f)
+        c = P.camera(t)
+        kx, ky = P.chase_pos(t)
+        us = [q[0] for q in (P.project(c, (kx + dx, ky + dy, z)) for dx in (-1, 1) for dy in (-2.5, 2.5)
+                             for z in (0.3, 1.6)) if q]
+        edge.append(max(us) if us else -9.0)
+    check("P3 : la patrouille 1 au bord gauche à l'image 1, sortie avant l'image 14",
+          -0.95 <= edge[0] <= -0.7 and edge[1] < -1.0, f"bord droit à x {50 * (edge[0] + 1):.0f} %, puis {50 * (edge[1] + 1):.0f} %")
     runs = []
     for k in P.SHOTS:
         n = 0
