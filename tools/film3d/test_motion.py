@@ -127,11 +127,21 @@ def test_gaps():
           f"y de {min(b[2] for b in boxes_f):.0f} à {max(b[3] for b in boxes_f):.0f} %")
     check("P5 : la berline passe près", min(b[4] for b in boxes_f) <= 9.0 and max(b[1] - b[0] for b in boxes_f) >= 50.0,
           f"{min(b[4] for b in boxes_f):.1f} m, {max(b[1] - b[0] for b in boxes_f):.0f} % de la largeur")
+    # les plans bas : pendant le passage (à moins de 12 m), le centre de la berline entre 50 et 62 % de la hauteur
+    # depuis le haut ; le cadre final : l'hélicoptère entre 18 et 30 % depuis le haut, la berline entre 55 et 70 %,
+    # le faisceau entre les deux
+    near = [100.0 - (b[2] + b[3]) / 2 for b in boxes_f if b[4] <= 12.0]
+    check("P5 : la berline au milieu de la hauteur pendant le passage", near and all(50.0 <= c <= 62.0 for c in near),
+          f"centre de {min(near):.0f} à {max(near):.0f} % du haut")
     t1 = M.t_of(P.F0 + P.FRAMES - 1)
-    hx = P.project(P.heli(t1)[:3], t1)
-    hero_top = boxes_f[-1][3]
-    check("P5 : l'hélicoptère au-dessus d'elle à la fin", hx and 30.0 <= hx[0] <= 70.0 and hero_top + 15.0 <= hx[1] <= 82.0,
-          f"x {hx[0]:.0f} %, y {hx[1]:.0f} %" if hx else "derrière")
+    hh = P.heli(t1)
+    hx = P.project((hh[0], hh[1], hh[2] + P.HELI_BODY), t1)
+    car_end = 100.0 - (boxes_f[-1][2] + boxes_f[-1][3]) / 2
+    check("P5 : le cadre final, l'hélicoptère au-dessus d'elle", hx and 30.0 <= hx[0] <= 70.0
+          and 18.0 <= 100.0 - hx[1] <= 30.0 and 55.0 <= car_end <= 70.0,
+          f"hélicoptère x {hx[0]:.0f} %, à {100 - hx[1]:.0f} % du haut ; berline à {car_end:.0f} %" if hx else "derrière")
+    cams = [P.camera(M.t_of(f)) for f in frames]
+    check("P5 : caméra sur pied, horizon à plat", all(c[5] == 0.0 and c[:3] == tuple(P.CAM) for c in cams))
     pk = [P.project((*P.pack_pos(0)(M.t_of(f)), 0.8), M.t_of(f)) for f in range(P.F0, P.F0 + 6)]
     check("P5 : la meute dans le champ au début", all(q and 0.0 <= q[0] <= 100.0 for q in pk),
           f"x {', '.join(f'{q[0]:.0f}' for q in pk if q)} %")
@@ -139,7 +149,11 @@ def test_gaps():
     steps = [b - a for a, b in zip(yaws, yaws[1:])]
     check("P5 : panoramique amorti au départ et à l'arrivée", abs(steps[0]) < 1.0 and abs(steps[-1]) < 1.0
           and max(abs(s) for s in steps) < 6.0, f"{steps[0]:.2f}°, {steps[-1]:.2f}° par image, {max(abs(s) for s in steps):.1f} au plus")
-    check("P5 : l'hélicoptère au-dessus des piles", min(P.heli(M.t_of(f))[2] for f in frames) >= 19.0)
+    # au-dessus des piles du côté est (13 m au plus, 6 m de marge autour) avec 4 m d'air ; jamais sous 10 m ailleurs
+    over = [P.heli(M.t_of(f)) for f in frames]
+    low = [h[2] - 13.0 for h in over if 24.9 - 6.0 <= h[0] <= 70.0 + 6.0 and 45.7 - 6.0 <= h[1] <= 57.9 + 6.0]
+    check("P5 : l'hélicoptère au-dessus des piles", (not low or min(low) >= 4.0) and min(h[2] for h in over) >= 10.0,
+          f"{min(low) if low else 0:.1f} m d'air au-dessus des piles, {min(h[2] for h in over):.1f} m au plus bas")
 
 
 def test_p2():

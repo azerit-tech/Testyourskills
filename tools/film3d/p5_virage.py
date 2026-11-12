@@ -134,10 +134,12 @@ def tracks():
     return out
 
 
-# --- l'hélicoptère : il arrive de l'est, au ras des piles de conteneurs, en vol d'avance (nez bas), et vire sur
-# la gauche vers la berline (incliné) en montant ; à la fin il ralentit sans s'arrêter, nez qui se relève, et
-# dérive encore vers le quai.
-HELI_PATH = ((64.0, 36.0, 21.0), (53.0, 49.0, 21.0), (40.0, 63.0, 20.5), (34.0, 68.0, 20.0))
+# --- l'hélicoptère : il arrive de l'est au-dessus des piles de conteneurs, en vol d'avance (nez bas), vire sur
+# la gauche vers la berline (incliné) et plonge sur le quai ; à la fin il ralentit sans s'arrêter, nez qui se
+# relève, à 10 m au-dessus de la voie du quai (la cellule vers 11,5 m), 11 m derrière elle : le faisceau tombe en biais sur elle et relie
+# les deux dans le cadre final (en (34 ; 68 ; 20) il finissait dans les 20 % du haut, loin d'elle).
+HELI_PATH = ((64.0, 36.0, 22.0), (50.0, 52.0, 21.0), (30.0, 70.0, 18.5), (24.5, 70.0, 10.0))
+HELI_BODY = 1.5               # le milieu de la cellule au-dessus de l'origine du modèle (mesuré à l'image)
 
 
 def _bez(pts, u):
@@ -178,7 +180,8 @@ LENS = 32.0
 TAN_V = 18.0 / LENS           # demi-champ vertical (capteur de 36 mm sur la hauteur, cadre 9:16)
 TAN_H = TAN_V * 9.0 / 16.0
 YAW_END = -76.0               # le cadre final (la fiche : -68 ; la berline finit plus à gauche, voir l'en-tête)
-PITCH0, PITCH1 = 3.0, 13.0
+CAR_Y = 44.0                  # le centre de la berline à 44 % du bas (56 % du haut) tant que le cadre la suit
+PITCH_END = 8.8               # le cadre final : la berline vers 62 % du haut, l'hélicoptère vers 26 %
 CAR_LEAD = 1.5                # degrés d'air devant le capot (elle file vers la gauche du cadre)
 
 
@@ -228,14 +231,21 @@ def camera_aim(t):
     u = t / T_END
     yaw = _follow(t)
     yaw = yaw + (YAW_END - yaw) * M.smoothstep(0.80, 1.0, u)
-    pitch = PITCH0 + (PITCH1 - PITCH0) * M.smoothstep(0.42, 1.0, u)
+    # le site suit la berline (son centre à CAR_Y % du bas : plus de 45 % de chaussée vide sous elle), puis se lève
+    # sur le cadre final une fois le gros du panoramique passé (lever pendant le lacet le plus vite couchait le flou)
+    x, y = hero_pos(t)
+    elev = math.degrees(math.atan2(CAR_DIMS[2] / 2 - CAM[2], math.hypot(x - CAM[0], y - CAM[1])))
+    follow = elev - math.degrees(math.atan((CAR_Y - 50.0) / 50.0 * TAN_V))
+    pitch = follow + (PITCH_END - follow) * M.smoothstep(0.68, 1.0, u)
     return yaw, pitch
 
 
 def camera(t):
-    dyaw, dpitch, droll, dx, dy, dz = M.handheld(t, amp=0.10, rotor=0.03 * M.smoothstep(0.3, 1.1, t), seed=0.7)
+    """Sur pied : ni roulis ni déplacement (l'horizon reste à plat tout le plan) ; seul le souffle du rotor fait
+    vibrer la tête de quelques centièmes de degré en lacet et en site à la fin."""
+    dyaw, dpitch, _, _, _, _ = M.handheld(t, amp=0.04, rotor=0.03 * M.smoothstep(0.3, 1.1, t), seed=0.7)
     yaw, pitch = camera_aim(t)
-    return CAM[0] + dx * 0.2, CAM[1] + dy * 0.2, CAM[2] + dz * 0.2, yaw + dyaw, pitch + dpitch, droll * 0.5, LENS
+    return CAM[0], CAM[1], CAM[2], yaw + dyaw, pitch + dpitch, 0.0, LENS
 
 
 def project(p, t):
