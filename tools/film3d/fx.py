@@ -267,20 +267,24 @@ def wheel_spray(track, wheels, wheel_r, rate_drops=2400.0, rate_mist=190.0, wet=
                     v = (V[0] * carry + right[0] * lat, V[1] * carry + right[1] * lat, up)
                     drag = rng.uniform(0.8, 2.2)
                     life = land_time(p, v, drag, ground, 0.42 if bas else 0.9)
-                    drops.append(Particle(f, p, v, life, drag, 1.0, rng.uniform(0.003, 0.007), seed=rng.random()))
+                    drops.append(Particle(f, p, v, life, drag, 1.0,
+                                          rng.uniform(0.006, 0.014) if bas else rng.uniform(0.003, 0.007),
+                                          seed=rng.random()))
                 # le voile : continu au-delà de 50 km/h (le débit suit la vitesse), haut de 0,6 à 1 m, long de 4 à
                 # 6 m derrière la roue (vie × vitesse relative), né à l'arrière du pneu sans fondu d'entrée
                 hi_speed = 0.35 + 0.65 * smoothstep(8.0, 14.0, speed)
-                for _ in range(_poisson(rng, rate_mist * k * gs * hi_speed)):
+                for _ in range(_poisson(rng, rate_mist * k * gs * hi_speed * (2.2 if bas else 1.0))):
                     p = (c[0] - fwd[0] * wheel_r * 1.1 + right[0] * side * rng.uniform(-0.1, 0.25),
                          c[1] - fwd[1] * wheel_r * 1.1 + right[1] * side * rng.uniform(-0.1, 0.25),
                          ground + (rng.uniform(0.06, 0.2) if bas else rng.uniform(0.15, 0.4)))
                     carry = rng.uniform(0.4, 0.65) if bas else rng.uniform(0.25, 0.5)
                     if bas:
-                        out, up = rng.uniform(0.4, 1.8), rng.uniform(0.1, 0.45)
-                        sz = mist_size * (0.22 + 0.3 * min(1.0, speed / 25.0))
-                        s0, s1, life = sz * rng.uniform(0.6, 0.9), sz * rng.uniform(1.1, 1.5), rng.uniform(0.28, 0.45)
-                        al = 0.7
+                        # deux traînées qui s'ouvrent en V sur 3 à 5 m : de petits sprites vifs (de la pulvérisation,
+                        # pas une bouffée), écartés vers l'extérieur, le haut sous le bas du coffre
+                        out, up = speed * rng.uniform(0.05, 0.14), rng.uniform(0.2, 0.8)
+                        sz = mist_size * (0.16 + 0.2 * min(1.0, speed / 28.0))
+                        s0, s1, life = sz * rng.uniform(0.5, 0.8), sz * rng.uniform(1.5, 2.1), rng.uniform(0.26, 0.42)
+                        al = 1.0
                     else:
                         out, up = rng.uniform(0.0, 1.2), rng.uniform(0.5, 1.5)
                         sz = mist_size * (0.35 + 0.6 * min(1.0, speed / 25.0))
@@ -331,7 +335,7 @@ def puddle_crossings(track, puddles, wheels=None, substeps=6):
     return keep
 
 
-def puddle_splash(track, crossing, wheel_r, depth=1.0, seed=3, n_burst=900, n_sheet=40):
+def puddle_splash(track, crossing, wheel_r, depth=1.0, seed=3, n_burst=900, n_sheet=40, veil="bas"):
     """La gerbe d'une roue qui entre dans une flaque : un éventail latéral bref (des deux côtés du pneu, surtout
     vers l'extérieur), qui monte de 20 à 50° et retombe ; plus une nappe de sprites, l'eau en lame, très brève ;
     et, tant que la roue est dans l'eau, une projection continue derrière elle. Renvoie (gouttes, nappe)."""
@@ -373,17 +377,24 @@ def puddle_splash(track, crossing, wheel_r, depth=1.0, seed=3, n_burst=900, n_sh
         side = 1.0 if name.endswith("R") else -1.0
         p = (c[0] + right[0] * side * 0.3 - fwd[0] * rng.uniform(0.0, 0.3),
              c[1] + right[1] * side * 0.3 - fwd[1] * rng.uniform(0.0, 0.3), c[2] - wheel_r + 0.1)
-        out = speed * rng.uniform(0.12, 0.28)
-        vz = min(6.0, max(3.5, speed * 0.3)) * rng.uniform(0.85, 1.1)
+        if veil == "bas":
+            # de dos : une lame qui s'ouvre vers l'extérieur et monte à 0,4-0,5 m (le haut du sprite sous le bas
+            # du coffre), 20 à 30 cm au-dessus de la traînée ordinaire
+            out = speed * rng.uniform(0.15, 0.32)
+            vz = min(3.0, max(2.2, speed * 0.13)) * rng.uniform(0.9, 1.05)
+            sz0, sz1, al = rng.uniform(0.2, 0.3), rng.uniform(0.4, 0.6), 0.9
+        else:
+            out = speed * rng.uniform(0.12, 0.28)
+            vz = min(6.0, max(3.5, speed * 0.3)) * rng.uniform(0.85, 1.1)
+            sz0, sz1, al = rng.uniform(0.3, 0.5), rng.uniform(0.8, 1.2), 0.7
         v = (right[0] * side * out + vel[0] * 0.2, right[1] * side * out + vel[1] * 0.2, vz)
-        sheet.append(Particle(f, p, v, rng.uniform(0.3, 0.45), 2.5, 0.6, rng.uniform(0.3, 0.5),
-                              rng.uniform(0.8, 1.2), 0.7 * depth, rng.random()))
+        sheet.append(Particle(f, p, v, rng.uniform(0.3, 0.45), 2.5, 0.6, sz0, sz1, al * depth, rng.random()))
     return drops, sheet
 
 
 # ---------------------------------------------------------------- la gomme
 
-def tyre_smoke(track, wheel_r, slip_min=6.0, rate=100.0, brake=0.0, seed=5, substeps=3, size=1.0, alpha=0.5,
+def tyre_smoke(track, wheel_r, slip_min=6.0, rate=100.0, brake=0.0, seed=5, substeps=3, size=1.0, alpha=0.65,
                carry=0.18, drag=1.3, life=(1.2, 1.8)):
     """La fumée des pneus arrière : une intensité qui monte avec la glisse (de slip_min à 25°) et, si `brake`, avec
     la décélération (au-delà de 4 m/s²) ; des sprites nés au contact, emportés à `carry` de la vitesse de la roue
@@ -415,7 +426,7 @@ def tyre_smoke(track, wheel_r, slip_min=6.0, rate=100.0, brake=0.0, seed=5, subs
                     k = carry * rng.uniform(0.7, 1.3)
                     # chassée vers l'extérieur du virage : le sens où glisse l'arrière (la part de la vitesse
                     # perpendiculaire au cap)
-                    push = rng.uniform(0.6, 1.8)
+                    push = rng.uniform(1.6, 3.6)
                     # elle monte à hauteur de toit (0,7 à 1,3 m au centre en une seconde), gonfle à 2-3 m
                     v = (V[0] * k + right[0] * lat + slide[0] * push, V[1] * k + right[1] * lat + slide[1] * push,
                          rng.uniform(0.6, 1.5))
@@ -745,7 +756,7 @@ def _lin(hexs):
 
 
 def mat_sprite(name, color="#cfd3de", noise_scale=1.6, lo=0.32, hi=0.78, translucent=0.65, occlude=0.3, detail=5.0,
-               power=1.6):
+               power=1.6, glow=0.0):
     """Un sprite de brume ou de fumée : disque fondu (attribut fx_uv) découpé par un bruit 4D pris en coordonnées
     monde (les sprites voisins lisent le même champ : ça se lit comme un volume), opacité fx_a, mélange de
     translucide (le contre-jour) et de diffus (les lampes de face)."""
@@ -804,6 +815,21 @@ def mat_sprite(name, color="#cfd3de", noise_scale=1.6, lo=0.32, hi=0.78, translu
     add1 = N.new("ShaderNodeAddShader")
     nt.links.new(tl.outputs[0], add1.inputs[0])
     nt.links.new(df.outputs[0], add1.inputs[1])
+    if glow > 0:
+        # la diffusion multiple d'une fumée épaisse (elle reste claire dans la nuit) : une émission faible, à
+        # l'opacité ; l'objet n'est vu que de la caméra et l'émission n'est pas échantillonnée, elle n'éclaire et ne
+        # teinte rien
+        em = N.new("ShaderNodeEmission")
+        nt.links.new(tint(1.0), em.inputs["Color"])
+        em.inputs["Strength"].default_value = glow
+        add0 = N.new("ShaderNodeAddShader")
+        nt.links.new(add1.outputs[0], add0.inputs[0])
+        nt.links.new(em.outputs[0], add0.inputs[1])
+        add1 = add0
+        try:
+            m.emission_sampling = "NONE"
+        except (AttributeError, TypeError):
+            pass
     add2 = N.new("ShaderNodeAddShader")
     nt.links.new(tr.outputs[0], add2.inputs[0])
     nt.links.new(add1.outputs[0], add2.inputs[1])
@@ -811,10 +837,19 @@ def mat_sprite(name, color="#cfd3de", noise_scale=1.6, lo=0.32, hi=0.78, translu
     return m
 
 
+def mat_spray(veil="bas"):
+    """L'eau pulvérisée : de dos (« bas »), une matière vive et très translucide, peu découpée par le bruit (la
+    traînée se lit en ruban qui prend le rouge des feux, l'ambre des lampes, le corail et le lilas des rampes) ;
+    de côté (« haut »), le voile de brume."""
+    if veil == "bas":
+        return mat_sprite("fx_gerbe", "#e2e6ee", 3.2, 0.08, 0.62, translucent=0.8, occlude=0.12, detail=2.0, power=1.4)
+    return mat_sprite("fx_brume_eau", "#c8cedc", 1.8, 0.2, 0.75, detail=3.0, power=2.0)
+
+
 def mat_smoke(color="#d6d4da"):
     """La fumée de gomme : un bruit large et peu détaillé, un bord très fondu (aucune silhouette de sprite), une
     absorption faible (empilée sur vingt couches, elle ne devient pas un mur gris)."""
-    return mat_sprite("fx_fumee", color, 0.7, 0.16, 0.85, 0.55, occlude=0.12, detail=2.0, power=2.6)
+    return mat_sprite("fx_fumee", color, 0.7, 0.16, 0.85, 0.55, occlude=0.12, detail=2.0, power=2.6, glow=0.12)
 
 
 def mat_drop(name="fx_goutte"):
@@ -932,7 +967,7 @@ def _gn_maprange(ng, v, a, b, lo=0.0, hi=1.0):
     return n.outputs["Result"]
 
 
-def _gn_particles(name, kind, mat, cam=None, hero=None, mask=0.0, near=0.0):
+def _gn_particles(name, kind, mat, cam=None, hero=None, mask=0.0, near=0.0, edge=0.4):
     """Le groupe de nœuds qui évalue les particules à l'image (temps de la scène, sous-images comprises : le flou
     de bougé est juste). Chaque point du maillage porte b (naissance), l (vie), p, v, k (traînée), g (pesanteur),
     s0, s1 (taille), a (opacité), r (graine). kind « drops » : un nuage de points (sphères) ; « sprites » : un carré
@@ -1007,10 +1042,19 @@ def _gn_particles(name, kind, mat, cam=None, hero=None, mask=0.0, near=0.0):
                 # distance `along` de l'objectif, un rayon de 2,4 × along / dist ; le sprite y entre dès que son
                 # bord (la moitié de sa taille) y touche. Les gros sprites proches de l'objectif, qui masquaient la
                 # caisse sans être sur l'axe, sont pris.
+                # la demi-largeur apparente de la caisse suit l'angle de vue : 2,4 m de profil, 1 m de dos ou de
+                # face (le cap de la caisse : son -y local) ; de trois quarts arrière la fumée qui sort sur le côté
+                # n'est plus prise pour de la caisse
+                rv = N.new("FunctionNodeRotateVector")
+                rv.inputs["Vector"].default_value = (0.0, -1.0, 0.0)
+                Lk(hi.outputs["Rotation"], rv.inputs["Rotation"])
+                cth = _gn_math(ng, "ABSOLUTE", _gn_vec(ng, "DOT_PRODUCT", rv.outputs[0], axn))
+                sth = _gn_math(ng, "SQRT", _gn_math(ng, "MAXIMUM", _gn_math(ng, "SUBTRACT", 1.0, _gn_math(ng, "MULTIPLY", cth, cth)), 0.0))
+                half = _gn_math(ng, "ADD", _gn_math(ng, "MULTIPLY", sth, 2.4), _gn_math(ng, "MULTIPLY", cth, 1.0))
                 persp = _gn_math(ng, "DIVIDE", _gn_math(ng, "MAXIMUM", along, 0.0), _gn_math(ng, "MAXIMUM", dist, 0.5))
-                r_in = _gn_math(ng, "ADD", _gn_math(ng, "MULTIPLY", persp, 2.0), _gn_math(ng, "MULTIPLY", size, 0.45))
-                r_out = _gn_math(ng, "ADD", _gn_math(ng, "MULTIPLY", persp, 2.9),
-                                 _gn_math(ng, "ADD", _gn_math(ng, "MULTIPLY", size, 0.7), 0.3))
+                r_in = _gn_math(ng, "ADD", _gn_math(ng, "MULTIPLY", persp, half), _gn_math(ng, "MULTIPLY", size, edge))
+                r_out = _gn_math(ng, "ADD", _gn_math(ng, "MULTIPLY", persp, _gn_math(ng, "ADD", half, 0.8)),
+                                 _gn_math(ng, "ADD", _gn_math(ng, "MULTIPLY", size, edge * 1.5), 0.2))
                 # en profondeur : dès le milieu de la caisse (vue de dos, les roues arrière et leur gerbe sont
                 # devant elle)
                 inside = _gn_math(ng, "MULTIPLY", _gn_maprange(ng, lat, r_in, r_out, 1.0, 0.0),
@@ -1055,7 +1099,7 @@ def _gn_particles(name, kind, mat, cam=None, hero=None, mask=0.0, near=0.0):
     return ng
 
 
-def emit(ctx, name, parts, kind, mat, mask=0.0, near=0.0, glossy=False):
+def emit(ctx, name, parts, kind, mat, mask=0.0, near=0.0, glossy=False, edge=0.4):
     """Pose une liste de Particle dans la scène : un maillage de points (un par particule, ses attributs de
     naissance) et le groupe de nœuds qui les fait vivre. Renvoie l'objet (ou None si la liste est vide)."""
     if not parts:
@@ -1080,7 +1124,8 @@ def emit(ctx, name, parts, kind, mat, mask=0.0, near=0.0, glossy=False):
     ob = bpy.data.objects.new(name, me)
     ctx.coll.objects.link(ob)
     mod = ob.modifiers.new("fx", "NODES")
-    mod.node_group = _gn_particles(name + "_nodes", kind, mat, cam=ctx.cam, hero=ctx.body, mask=mask, near=near)
+    mod.node_group = _gn_particles(name + "_nodes", kind, mat, cam=ctx.cam, hero=ctx.body, mask=mask, near=near,
+                                   edge=edge)
     camera_only(ob, glossy=glossy)
     try:
         ob.cycles.use_motion_blur = True
@@ -1331,7 +1376,7 @@ def water(ctx, wet=1.0, puddles=(), drops=1.0, mist=1.0, mask=0.85, near=1.2, hi
     if ells:
         cross = puddle_crossings(ctx.track, [e for e, _, _ in ells])
         for k, c in enumerate(cross):
-            dd, ss = puddle_splash(ctx.track, c, ctx.wheel_r, depth=splash, seed=seed * 31 + k)
+            dd, ss = puddle_splash(ctx.track, c, ctx.wheel_r, depth=splash, seed=seed * 31 + k, veil=veil)
             d_all += dd
             sheets += ss
             e, ob, mine = ells[c[3]]
@@ -1340,7 +1385,7 @@ def water(ctx, wet=1.0, puddles=(), drops=1.0, mist=1.0, mask=0.85, near=1.2, hi
             key_ripples(target, c[0], wh[c[2]], fwd, ctx.frames)
             n_cross += 1
     od = emit(ctx, f"fx_gouttes_{ctx.plan}", d_all, "drops", mat_drop(), glossy=True)
-    om = emit(ctx, f"fx_embruns_{ctx.plan}", m_all + sheets, "sprites", mat_sprite("fx_brume_eau", "#c8cedc", 1.8, 0.2, 0.75, detail=3.0, power=2.0),
+    om = emit(ctx, f"fx_embruns_{ctx.plan}", m_all + sheets, "sprites", mat_spray(veil),
               mask=mask, near=near)
     log(f"eau : {len(d_all)} gouttes, {len(m_all)} sprites d'embruns, {len(sheets)} de nappe, {n_cross} traversées "
         f"de flaque sur {len(ells)} flaques")
@@ -1383,13 +1428,13 @@ def pack_spray(ctx, prefixes=("patrol", "van"), drops=0.2, mist=0.4, wet=0.8, ma
         m_all += m
     emit(ctx, f"fx_gouttes_meute_{ctx.plan}", d_all, "drops", mat_drop(), glossy=True)
     ob = emit(ctx, f"fx_embruns_meute_{ctx.plan}", m_all, "sprites",
-              mat_sprite("fx_brume_eau", "#c8cedc", 1.8, 0.2, 0.75, detail=3.0, power=2.0), mask=mask, near=near)
+              mat_spray(), mask=mask, near=near)
     log(f"eau de la meute : {len(rigs)} véhicules, {len(d_all)} gouttes, {len(m_all)} sprites")
     return ob
 
 
-def gomme(ctx, slip_min=6.0, rate=100.0, brake=0.0, size=1.0, alpha=0.5, mask=0.9, near=1.0, hide=("fumee_pneus_",),
-          carry=0.18, drag=1.3, life=(1.2, 1.8), color="#d6d4da", seed=5):
+def gomme(ctx, slip_min=6.0, rate=100.0, brake=0.0, size=1.0, alpha=0.65, mask=0.9, near=1.0, hide=("fumee_pneus_",),
+          carry=0.18, drag=1.3, life=(1.2, 1.8), color="#e6e4e8", seed=5):
     """La fumée des pneus en glisse (et au freinage si `brake`), en sprites : claire, prise par les lampes, qui
     reste derrière et se dissipe ; creusée dans le cône caméra-berline (mask). Les anciennes bouffées en volume
     (`hide`) sont retirées."""
@@ -1398,8 +1443,9 @@ def gomme(ctx, slip_min=6.0, rate=100.0, brake=0.0, size=1.0, alpha=0.5, mask=0.
             ob.hide_render = True
     parts = tyre_smoke(ctx.track, ctx.wheel_r, slip_min, rate, brake, seed, size=size, alpha=alpha, carry=carry,
                        drag=drag, life=life)
+    # le bord fondu d'un grand sprite de fumée ne voile pas : seul son cœur compte pour le cône (edge 0,15)
     ob = emit(ctx, f"fx_fumee_{ctx.plan}", parts, "sprites", mat_smoke(color),
-              mask=mask, near=near)
+              mask=mask, near=near, edge=0.15)
     log(f"gomme : {len(parts)} sprites de fumée")
     return ob
 

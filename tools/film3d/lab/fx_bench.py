@@ -106,7 +106,7 @@ def build(cam_kind):
             left = Vector((-fwd.y, fwd.x, 0.0))
             c = Vector((p["x"], p["y"], 0.0))
             eye = c - fwd * back + left * side + Vector((0, 0, high))
-            look(cam, eye, c + fwd * 2.0 + Vector((0, 0, aim)))
+            look(cam, eye, c + fwd * (2.0 if cam_kind == "suite" else 0.6) + Vector((0, 0, aim)))
             cam.keyframe_insert("location", frame=f)
             cam.keyframe_insert("rotation_quaternion", frame=f)
         cd.dof.focus_distance = math.hypot(back, side)
@@ -125,7 +125,10 @@ def main():
     ap.add_argument("--res", default="360x640")
     ap.add_argument("--out", default=os.path.expanduser("~/film/iter-fx/banc"))
     ap.add_argument("--tag", default="apres")
+    ap.add_argument("--kmh", type=float, default=60.0, help="la vitesse de la berline (la patrouille la suit)")
     a = ap.parse_args(argv)
+    global V
+    V = a.kmh / 3.6
     t0 = time.time()
     scene = build(a.cam)
     fx.dress("BANC", scene, puddle_t=PUDDLE_T)

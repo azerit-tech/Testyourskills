@@ -152,13 +152,19 @@ def test_lisible():
     assert ends[int(len(ends) * 0.95)] < 7.0 and ends[-1] < 8.0, (ends[int(len(ends) * 0.95)], ends[-1])
     trs = line_track(V, n=40)
     cr = fx.puddle_crossings(trs, [(0.77, 15.0, 0.75, 1.3, 0.0)])
-    _, sheet = fx.puddle_splash(trs, cr[0], R, seed=4)
+    _, sheet = fx.puddle_splash(trs, cr[0], R, seed=4, veil="haut")
     peak = [max(fx.ballistic(q.p, q.v, t / 48, q.drag, q.grav)[2] for t in range(int(q.life * 48))) for q in sheet]
     assert 0.8 < sorted(peak)[len(peak) // 2] < 1.4, sorted(peak)[len(peak) // 2]
     assert min(q.life for q in sheet) * fx.FPS >= 7                # lisible cinq à six images (fondu compris)
     for q in sheet:
         b, _ = rel(q, q.life * 0.5)
         assert b > -0.8, b                                          # jamais devant la berline
+    # de dos : la lame de flaque 20 à 30 cm au-dessus de la traînée, le haut sous le bas du coffre (0,8 m)
+    _, sheet = fx.puddle_splash(trs, cr[0], R, seed=4)
+    peak = sorted(max(rel(q, t / 48)[1] for t in range(int(q.life * 48))) for q in sheet)
+    trail = sorted(rel(q, 0.4 * q.life)[1] for q in rear)
+    lift = peak[len(peak) // 2] - trail[len(trail) // 2]
+    assert 0.15 < lift < 0.4 and peak[int(len(peak) * 0.9)] < 0.8, (lift, peak[int(len(peak) * 0.9)])
 
 
 def test_debris():
