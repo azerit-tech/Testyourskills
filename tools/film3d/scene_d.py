@@ -356,10 +356,201 @@ def build_pointe(hidden, lamp_src, far=False, marina=False):
     d = Vector((STOP.x - LAMP_AT[0], STOP.y - LAMP_AT[1]))
     out = L.lamp(lamp_src, (LAMP_AT[0], LAMP_AT[1], 0.0), arm=(d.x, d.y), energy=3200.0, name="lamp_pointe")
     if marina:
-        print("[pointe] marina : palier pas encore écrit", flush=True)
+        build_marina(hidden, far=far)
     print(f"[pointe] r {R:.0f} m en ({CX:.0f}, {CY:.0f}), {k} bornes, ouvertures à "
           f"{', '.join(f'{o:.0f}°' for o in OPENINGS)}", flush=True)
     return out
+
+
+# ---------------------------------------------------------------- la marina
+
+PONTOON_L, PONTOON_W, GANGWAY = 40.0, 2.5, 6.0
+DECK_Z = L.WATER_Z + 0.45            # le platelage flottant, 45 cm au-dessus de l'eau
+# les places : (ponton, côté, distance depuis la tête du ponton, genre, échelle)
+# le cap de chaque ponton (degrés depuis +x) : la passerelle part dans l'axe de son ouverture, le ponton tourne
+# vers le sud, parallèle à la jetée pour le dernier ; toutes les caméras regardent vers -y, la marina passe ainsi
+# derrière l'anneau de FIN6 et au bord gauche de FIN au lieu de fuir hors du cadre
+PONTOON_DIRS = (-30.0, -60.0, -90.0)
+# côté +1 : à gauche en marchant vers le large ; les pontons les plus vus portent le plus de mâts
+BERTHS = [(2, -1, 7.0, "voile", 1.0), (2, -1, 20.0, "voile", 1.1), (2, -1, 33.0, "voile", 0.9),
+          (2, 1, 9.0, "voile", 0.95), (2, 1, 22.0, "vedette", 1.0), (2, 1, 35.0, "voile", 1.05),
+          (1, -1, 8.0, "voile", 1.05), (1, -1, 21.0, "voile", 0.9), (1, -1, 34.0, "vedette", 1.0),
+          (1, 1, 10.0, "voile", 1.0), (1, 1, 24.0, "voile", 1.1),
+          (0, -1, 9.0, "vedette", 1.0), (0, -1, 22.0, "voile", 0.95), (0, 1, 15.0, "vedette", 1.0)]
+SAIL_L, CRUISER_L = 11.0, 7.0        # les longueurs visées (voiliers de 9,9 à 12 m, mâts de 12 à 15 m)
+
+
+def _placed(bm, mat, build):
+    """Construit une pièce dans `bm` (la fonction `build`), puis la pose par la matrice `mat`."""
+    before = set(bm.verts)
+    build(bm)
+    L.bmesh.ops.transform(bm, matrix=mat, verts=[v for v in bm.verts if v not in before])
+
+
+def _boat_source(rel, name, hidden, length):
+    """Un bateau de bibliothèque ($FILM3D_ASSETS/rel) joint en un objet, mis à `length` m de long, la longueur
+    le long de +y, origine sous la quille, rangé dans les sources. Renvoie (objet, emprise, tête de mât locale).
+    Les noms d'images sont imprimés : aucune ne doit porter de nom de bateau ni de marque."""
+    parts = S.import_glb(rel)
+    ob = S.join(parts, name)
+
+    def recentre():
+        # lu sur les sommets : la boîte englobante de l'objet ne suit pas data.transform avant une mise à jour
+        cs = [v.co for v in ob.data.vertices]
+        mn = Vector((min(c.x for c in cs), min(c.y for c in cs), min(c.z for c in cs)))
+        mx = Vector((max(c.x for c in cs), max(c.y for c in cs), max(c.z for c in cs)))
+        ob.data.transform(Matrix.Translation(-Vector(((mn.x + mx.x) / 2, (mn.y + mx.y) / 2, mn.z))))
+        ob.location = (0, 0, 0)
+        return mx - mn
+    size = recentre()
+    if size.x > size.y:
+        ob.data.transform(Matrix.Rotation(math.pi / 2, 4, "Z"))
+        size = recentre()
+    ob.data.transform(Matrix.Scale(length / size.y, 4))
+    size = recentre()
+    top = max(ob.data.vertices, key=lambda v: v.co.z).co.copy()
+    # à 25 m et plus, de nuit, la silhouette suffit : 30 000 faces au plus, images à 512 px (la scène de FIN6
+    # est déjà à 1,8 Go)
+    nf = len(ob.data.polygons)
+    if nf > 30000:
+        mod = ob.modifiers.new("allege", "DECIMATE")
+        mod.ratio = 30000.0 / nf
+        bpy.context.view_layer.objects.active = ob
+        bpy.ops.object.modifier_apply(modifier=mod.name)
+    for m in ob.data.materials:
+        for n in (m.node_tree.nodes if m and m.node_tree else []):
+            if n.type == "TEX_IMAGE" and n.image and max(n.image.size) > 512:
+                w, h = n.image.size
+                f = 512.0 / max(w, h)
+                n.image.scale(max(1, int(w * f)), max(1, int(h * f)))
+    for c in list(ob.users_collection):
+        c.objects.unlink(ob)
+    hidden.objects.link(ob)
+    imgs = sorted({n.image.name for m in ob.data.materials if m and m.node_tree for n in m.node_tree.nodes
+                   if n.type == "TEX_IMAGE" and n.image})
+    print(f"[marina] source {name} : {size.x:.2f} × {size.y:.2f} × {size.z:.2f} m, "
+          f"{len(ob.data.polygons)} faces, images {imgs}", flush=True)
+    return ob, size, top
+
+
+def _proxy(name, hidden, length, beam, mast):
+    """La version vue de loin : une coque sombre en caisson et un mât (quelques dizaines de faces)."""
+    bm = L.bmesh.new()
+    L.box_bm(bm, (-beam / 2, -length / 2, 0.0), (beam / 2, length / 2, 1.6))
+    top = Vector((0.0, 0.0, 1.6))
+    if mast:
+        top = Vector((0.0, length * 0.06, mast))
+        L.tube_bm(bm, (0.0, top.y, 1.6), top, 0.08, seg=6)
+    hull = bpy.data.materials.get("coque_loin") or S.mat_plain("coque_loin", (0.03, 0.035, 0.045, 1), 0.4)
+    ob = L.mesh_object(name, bm, [hull], coll=hidden)
+    return ob, Vector((beam, length, top.z)), top
+
+
+def build_marina(hidden, far=False):
+    """Le palier « marina » de la pointe : trois pontons flottants de 40 × 2,5 m au départ des trois ouvertures du
+    garde-corps, chacun relié au couronnement par une passerelle de 6 m dans l'axe de l'ouverture, puis tourné vers
+    le sud (PONTOON_DIRS) ; quatorze bateaux amarrés le long des
+    pontons, dix voiliers (9,9 à 12 m, mâts nus) et quatre vedettes de 7 m, en copies liées d'un modèle par
+    genre ; un feu crème en tête de chaque mât, des bornes basses à lueur crème sur les pontons, une bouée
+    lumineuse à l'entrée. `far` : coques et mâts en caissons (la vue lointaine). Ni nom, ni pavillon, ni numéro,
+    ni marque. Aucune lampe : des émissions seules (la scène reste légère)."""
+    wood = bpy.data.materials.get("platelage") or L.mat_concrete("platelage", tint=(0.34, 0.3, 0.26), streaks=0.6,
+                                                                   scale=0.8)
+    float_m = bpy.data.materials.get("flotteur") or S.mat_plain("flotteur", (0.05, 0.05, 0.055, 1), 0.5)
+    rail = bpy.data.materials.get("garde_corps") or float_m
+    cream = L.emit_mat("feu_mat", L.lin("#ffe9c8"), 45.0)
+    bm, fb, gb, lb = L.bmesh.new(), L.bmesh.new(), L.bmesh.new(), L.bmesh.new()
+    frames = []
+    centre = Vector((CX, CY, 0.0))
+    for o, od in zip(OPENINGS, PONTOON_DIRS):
+        t, td = math.radians(o), math.radians(od)
+        u = Vector((math.cos(t), math.sin(t), 0.0))           # l'axe de l'ouverture : la passerelle
+        d = Vector((math.cos(td), math.sin(td), 0.0))         # le ponton, vers le large
+        v = Vector((-d.y, d.x, 0.0))                          # en travers du ponton
+        r0 = R + GANGWAY
+        head = centre + u * r0                                # la tête du ponton, au pied de la passerelle
+        frames.append((head, d, v))
+        rot = Matrix.Rotation(td - math.pi / 2, 4, "Z")       # le +y local le long du ponton
+        c = head + d * (PONTOON_L / 2 - 0.6)
+        at = Matrix.Translation((c.x, c.y, DECK_Z)) @ rot
+        # le platelage, ses deux flotteurs
+        _placed(bm, at, lambda b: L.box_bm(b, (-PONTOON_W / 2, -PONTOON_L / 2, -0.06),
+                                            (PONTOON_W / 2, PONTOON_L / 2, 0.06)))
+
+        def floats(b):
+            for sd in (-1, 1):
+                x = sd * (PONTOON_W / 2 - 0.45)
+                L.box_bm(b, (x - 0.3, -PONTOON_L / 2 + 0.4, -0.55), (x + 0.3, PONTOON_L / 2 - 0.4, -0.06))
+        _placed(fb, at, floats)
+        # la passerelle : du couronnement (0,27 m) au platelage, en pente douce, deux mains courantes
+        a0 = centre + u * (R - 0.2)
+        ln = r0 + 0.3 - (R - 0.2)
+        z0, z1 = 0.27, DECK_Z + 0.06
+        gat = (Matrix.Translation((a0.x, a0.y, z0)) @ Matrix.Rotation(t - math.pi / 2, 4, "Z")
+               @ Matrix.Rotation(math.atan2(z1 - z0, ln), 4, "X"))
+        dl = math.hypot(ln, z1 - z0)
+
+        def gangway(b):
+            L.box_bm(b, (-0.6, 0.0, -0.05), (0.6, dl, 0.0))
+            for sd in (-1, 1):
+                L.tube_bm(b, (sd * 0.6, 0.0, 0.9), (sd * 0.6, dl, 0.9), 0.025, seg=6)
+                for k in range(4):
+                    L.tube_bm(b, (sd * 0.6, dl * k / 3, 0.0), (sd * 0.6, dl * k / 3, 0.9), 0.02, seg=6)
+        _placed(gb, gat, gangway)
+        # des bornes basses tous les 10 m, en quinconce, une lueur crème à 50 cm
+        for k in range(4):
+            p = c + d * (-PONTOON_L / 2 + 5.0 + 10.0 * k) + v * (PONTOON_W / 2 - 0.25) * (1 if k % 2 else -1)
+            L.tube_bm(fb, (p.x, p.y, DECK_Z + 0.06), (p.x, p.y, DECK_Z + 0.5), 0.07, seg=8)
+            L.bmesh.ops.create_uvsphere(lb, u_segments=8, v_segments=5, radius=0.09,
+                                        matrix=Matrix.Translation((p.x, p.y, DECK_Z + 0.56)))
+    L.mesh_object("marina_pontons", bm, [wood])
+    L.mesh_object("marina_flotteurs", fb, [float_m])
+    L.mesh_object("marina_passerelles", gb, [rail])
+    # les bateaux : une source par genre, des copies liées
+    if far:
+        src = {"voile": _proxy("src_voilier_loin", hidden, SAIL_L, 3.4, 14.0),
+               "vedette": _proxy("src_vedette_loin", hidden, CRUISER_L, 2.5, 0.0)}
+    else:
+        src = {"voile": _boat_source(os.path.join("lieux", "marina", "sailboat", "model.glb"), "src_voilier", hidden,
+                                     SAIL_L),
+               "vedette": _boat_source(os.path.join("lieux", "marina", "sport-cruiser", "model.glb"), "src_vedette",
+                                       hidden, CRUISER_L)}
+    rng = random.Random(14)
+    n_sail = 0
+    for i, (pi, side, s, kind, k) in enumerate(BERTHS):
+        head, d, v = frames[pi]
+        ob, size, top = src[kind]
+        p = head + d * s + v * side * (PONTOON_W / 2 + size.x * k / 2 + 0.5)
+        # la flottaison : la quille du voilier plonge d'environ 11 % de sa hauteur hors tout, la vedette de 25 cm
+        sink = 0.11 * size.z * k if (kind == "voile" and not far) else (0.6 if far else 0.25)
+        heading = math.atan2(d.y, d.x) - math.pi / 2 + (math.pi if rng.random() < 0.5 else 0.0)
+        z = L.WATER_Z - sink
+        S.instance(ob, f"marina_{kind}_{i}", (p.x, p.y, z), rot_z=heading, scale=k)
+        if kind == "voile":
+            n_sail += 1
+            m = (Matrix.Rotation(heading, 3, "Z") @ top) * k
+            L.bmesh.ops.create_uvsphere(lb, u_segments=8, v_segments=5, radius=0.11,
+                                        matrix=Matrix.Translation((p.x + m.x, p.y + m.y, z + m.z + 0.12)))
+    L.mesh_object("marina_feux", lb, [cream]).visible_shadow = False
+    # la bouée lumineuse de l'entrée, au large de la marina
+    if not far:
+        try:
+            parts = S.import_glb(os.path.join("lieux", "marina", "ocean-buoy", "ocean_buoy.gltf"))
+            buoy = S.join(parts, "marina_bouee")
+            size = S.recentre(buoy)
+            buoy.data.transform(Matrix.Scale(4.2 / size.z, 4))
+            S.recentre(buoy)
+            bx, by = _polar(-40.0, R + GANGWAY + PONTOON_L + 22.0)
+            buoy.location = (bx, by, L.WATER_Z - 1.2)
+            bb = L.bmesh.new()
+            L.bmesh.ops.create_uvsphere(bb, u_segments=10, v_segments=6, radius=0.18,
+                                        matrix=Matrix.Translation((bx, by, L.WATER_Z + 3.05)))
+            L.mesh_object("marina_bouee_feu", bb,
+                          [L.emit_mat("feu_bouee", L.lin(L.CORAL), 60.0)]).visible_shadow = False
+        except Exception as e:
+            print(f"[marina] bouée non posée : {e!r}", flush=True)
+    print(f"[marina] {len(OPENINGS)} pontons de {PONTOON_L:.0f} m, {len(BERTHS)} bateaux ({n_sail} voiliers), "
+          f"{'vue lointaine' if far else 'complète'}", flush=True)
 
 
 # ---------------------------------------------------------------- le décor et les plans
@@ -553,7 +744,7 @@ def plan_P6(scene, hidden, palier="socle"):
     import scene_c
     lamp_src = L.panorama(scene, hidden, all_lit=True, bridge="loin", port="loin", haubans=(palier == "haubans"))
     build_jetty(hidden, lamp_src)
-    build_pointe(hidden, lamp_src, far=True)
+    build_pointe(hidden, lamp_src, far=True, marina=(palier == "marina"))
     s = 180.0
     y_hero = JY0 + s
     hero = L.hero()
