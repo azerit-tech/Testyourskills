@@ -184,27 +184,6 @@ def build_street_life(M, hidden):
     log("palmiers, feux, 5 lampadaires, 5 terrasses, 3 jardinières")
 
 
-def spray_material(name="spray", density=6.0, glow=0.0):
-    """La gerbe d'eau (celle de la scène A) : un volume bruité qui s'éteint vers le bord de sa sphère. Vue du ciel,
-    loin des lampes, elle ne prend presque aucune lumière : glow lui donne une faible lueur propre (l'eau
-    pulvérisée qui renvoie le ciel), assez pour qu'elle se lise sur la chaussée sombre."""
-    m, N, out = A.material(name)
-    co = N.new("ShaderNodeTexCoord").outputs["Object"]
-    no = N.new("ShaderNodeTexNoise", Scale=4.0, Detail=6.0)
-    N.link(co, no.inputs["Vector"])
-    vl = N.new("ShaderNodeVectorMath", _operation="LENGTH")
-    N.link(co, vl.inputs[0])
-    fall = N.math("POWER", N.math("MAXIMUM", N.math("SUBTRACT", 1.0, vl.outputs["Value"]), 0.0), 1.5)
-    dens = N.math("MULTIPLY", N.math("MULTIPLY", N.math("MAXIMUM", N.math("SUBTRACT", no.outputs["Factor"], 0.45), 0.0), fall), density)
-    sv = N.new("ShaderNodeVolumePrincipled", Color=lin("#d8d4ea"), Anisotropy=0.5)
-    N.link(dens, sv.inputs["Density"])
-    if glow:
-        sv.inputs["Emission Color"].default_value = lin("#cfd2ee")
-        N.link(N.math("MULTIPLY", dens, glow), sv.inputs["Emission Strength"])
-    N.link(sv.outputs[0], out.inputs["Volume"])
-    return m
-
-
 def mat_wake():
     """La trace des pneus dans l'eau : la gomme déposée sur l'enrobé chassé de sa pellicule d'eau, mate et plus
     sombre que la chaussée mouillée, effilochée par un bruit et fondue à son départ (u de 0 au début de la trace à 1
@@ -228,11 +207,10 @@ def mat_wake():
     return m
 
 
-def wake(scene, wheels, spray_m, pose=POSE, anim=False):
+def wake(scene, wheels, pose=POSE, anim=False):
     """Le sillage de la glissade, écrit depuis p2_arc.wheel_track : quatre traces de pneus posées sur la chaussée
-    (lancer de rayon vers le bas, la bordure et le bombé suivis), et derrière la roue arrière extérieure une traîne
-    de gerbes qui retombent. anim : les traces vont jusqu'au bout du plan et se dévoilent sous les roues
-    (modificateur Construction, une face après l'autre, à la vitesse de la berline) ; la traîne suit la roue."""
+    (lancer de rayon vers le bas, la bordure et le bombé suivis). anim : les traces vont jusqu'au bout du plan et se
+    dévoilent sous les roues (modificateur Construction, une face après l'autre, à la vitesse de la berline)."""
     dg = bpy.context.evaluated_depsgraph_get()
     mat = mat_wake()
     t_end = 1.0 + 1.0 / (P.FRAMES - 1) if anim else P.STILL
@@ -274,25 +252,6 @@ def wake(scene, wheels, spray_m, pose=POSE, anim=False):
             b = ob.modifiers.new("devoile", "BUILD")
             b.frame_start = P.frame_of_s(s0)
             b.frame_duration = max(1.0, P.frame_of_s(s1) - P.frame_of_s(s0))
-    # la traîne : la roue arrière extérieure (à droite, -x dans le repère de la caisse) laisse retomber l'eau
-    lx, ly, _ = wheels.get("wheel_BR", wheels.get("wheel_BL"))
-    lx = -abs(lx)
-    pts = [P.to_scene(pose, x, y)[:2] for x, y in P.wheel_track(lx - 0.4, ly)]
-    for k, back in enumerate((5, 9, 14, 20)):
-        x, y = pts[max(0, len(pts) - 1 - back)]
-        bpy.ops.mesh.primitive_uv_sphere_add(segments=12, ring_count=6, radius=1.0, location=(x, y, 0.25))
-        sp = bpy.context.active_object
-        sp.name = f"spray_trail_{k}"
-        sp.data.materials.append(spray_m)
-        sc = 1.0 - 0.18 * k
-        sp.scale = (0.9 * sc, 0.9 * sc, 0.35 * sc)
-        sp.visible_shadow = False
-        if anim:
-            # la gerbe suit la roue à `back` pas de 0,5 m derrière elle, image par image (clés simples)
-            for f in range(P.F0 - 1, P.F0 + P.FRAMES + 1):
-                q = P.wheel_track(lx - 0.4, ly, t=(f - P.F0) / (P.FRAMES - 1))
-                sp.location = (*P.to_scene(pose, *q[max(0, len(q) - 1 - back)])[:2], 0.25)
-                sp.keyframe_insert("location", frame=f)
 
 
 def place_cars(scene, pose=POSE, anim=False):
@@ -313,20 +272,10 @@ def place_cars(scene, pose=POSE, anim=False):
     for lo in [c for c in car.children_recursive if c.type == "LIGHT" and c.data.type == "SPOT"]:
         lo.data.energy = 1400.0
         lo.data.spot_size = math.radians(50)
-    sm = spray_material("spray", 14.0, 0.08)
-    sx, sy = car["half_track"] + 0.25, car["length"] / 2 + 0.9
-    for side in (-1, 1):
-        bpy.ops.mesh.primitive_uv_sphere_add(segments=16, ring_count=8, radius=1.0)
-        sp = bpy.context.active_object
-        sp.name = f"spray_{side}"
-        sp.data.materials.append(sm)
-        sp.parent = car
-        # la gerbe extérieure (à droite dans le virage à gauche) plus large : l'arrière glisse de ce côté
-        sp.location = (side * sx + (0.35 if side < 0 else 0.0), sy, 0.3)
-        sp.scale = (1.0 if side < 0 else 0.6, 2.6, 0.55)
-        sp.visible_shadow = False
+    # (plus de gerbes d'eau dessinées derrière les roues, règle F de la lumière v3.1 : ces volumes gris couvraient le
+    # tiers bas du cadre et se lisaient en taches de lumière ; les effets reviendront par fx)
     wheels = {w.name: Vector(w.location) for w in car.children if w.name.startswith("wheel_")}
-    wake(scene, wheels, sm, pose, anim=anim)
+    wake(scene, wheels, pose, anim=anim)
     # une lumière douce au-dessus de la berline, invisible à la caméra et dans les reflets : le bordeaux de la
     # caisse se lit du ciel (la rue n'y pose que des taches ambre)
     f = A.add_light("hero_fill", "AREA", (x, y, 7.0), (0, 0, -1), lin("#ffd8c8"), 260.0, (3.0, 5.0))
