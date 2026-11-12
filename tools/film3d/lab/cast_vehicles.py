@@ -487,11 +487,13 @@ def rubber_over(src, name, dark=0.1, keep_uv=()):
 
 
 def livery_over(src, name, light_boxes=(), base=NAVY, light=CREAM, keep_uv=(), rough=0.3, metal=0.35, coat=1.0,
-                lamp_strength=0.0, flake=False):
+                lamp_strength=0.0, flake=False, keep_out=()):
     """Repeint un matériau d'origine (ses cartes de normales et de rugosité restent) : caisse base,
     boîtes (x0, x1, z0, z1) en coordonnées objet peintes en light (portières, filet).
 
-    keep_uv : boîtes (u0, u1, v0, v1) d'UV où la texture couleur d'origine reste (feux peints dans l'atlas)."""
+    keep_uv : boîtes (u0, u1, v0, v1) d'UV où la texture couleur d'origine reste (feux peints dans l'atlas).
+    keep_out : boîtes (x0, x1, z0, z1) en coordonnées objet où l'atlas n'est jamais gardé, même dans keep_uv
+    (le lettrage d'origine des portières partage ces UV avec les feux)."""
     if src is not None and src.node_tree:
         m = src.copy()
         m.name = name
@@ -523,6 +525,10 @@ def livery_over(src, name, light_boxes=(), base=NAVY, light=CREAM, keep_uv=(), r
         su = nt.nodes.new("ShaderNodeSeparateXYZ")
         nt.links.new(uv.outputs[0], su.inputs[0])
         km = _mask_boxes(nt, su, keep_uv, axes=(0, 1))
+        if keep_out:
+            # le bas des portières de « jeandiz » tombe dans la zone d'atlas des feux : gardé, son lettrage
+            # d'origine s'y lisait (et s'allumait avec les feux) sur la portière ouverte de FIN
+            km = _math(nt, "MULTIPLY", km, _math(nt, "SUBTRACT", 1.0, _mask_boxes(nt, sep, keep_out)))
         k = nt.nodes.new("ShaderNodeMix")
         k.data_type = "RGBA"
         nt.links.new(km, k.inputs["Factor"])
@@ -1333,7 +1339,9 @@ def load_patrol(variant="jeandiz", collection=None, lights_on=False, livery="doo
     on = 1.0 if lights_on else 0.0
     _replace_mats(parts, spec["paint"], lambda m: livery_over(
         m, f"{tag}_paint", _patrol_boxes(livery, front_axle), keep_uv=spec.get("keep_uv", ()),
-        base=PATROL_BODY, rough=0.28, metal=0.5, flake=True, lamp_strength=8.0 * on))
+        base=PATROL_BODY, rough=0.28, metal=0.5, flake=True, lamp_strength=8.0 * on,
+        # les flancs, des portières avant aux portières arrière, sous les vitres : loin des feux (aux deux bouts)
+        keep_out=((front_axle - 2.9, front_axle - 0.3, 0.0, 1.05),)))
     if spec["glass"]:
         _replace_mats(parts, spec["glass"], mat_glass(f"{tag}_tint", tint="#0d0f12"))
     heads = pick(parts, *spec["head"]) if spec["head"] else []
