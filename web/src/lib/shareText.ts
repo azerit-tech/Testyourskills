@@ -35,19 +35,8 @@ export interface CardShare extends Common {
   exhibits?: string;
 }
 
-export interface ComparisonShare extends Common {
-  kind: "comparison";
-  /** « CV » ou « LinkedIn » (§18.24). */
-  src: string;
-  declared: number;
-  github: number;
-  /** Le titre de l'écart, à la première personne (shared/compareText.ts, myVerdict). */
-  headline: string;
-  /** La note du dossier (§18.37) ; null pour une comparaison d'avant la grille, qui s'ouvre sur ses deux notes. */
-  case?: number | null;
-}
-
-export type ShareInput = CardShare | ComparisonShare;
+/** Un dossier à deux pièces se partage comme une fiche, la sienne (§18.36) : un seul texte. */
+export type ShareInput = CardShare;
 
 export { starsLine };
 
@@ -83,25 +72,14 @@ function build(w: ShareWords, x: ShareInput, cut: Cut): string {
   const plea = x.plea ? w.plea(starsLine(x.plea), starsLine(x.stars)) : null;
   // Avec le pari, le verdict porte déjà les étoiles : on ne les répète pas.
   const stars = plea ? null : starsLine(x.stars);
-  const parts: (string | null)[] = [];
-  if (x.kind === "card") {
-    // La trouvaille part d'abord : remplacée par le chef d'accusation, plus court, puis retirée.
-    const detail = cut === 0 ? (x.finding ?? (x.status ? w.charge(x.status) : null)) : cut === 1 && x.finding && x.status ? w.charge(x.status) : null;
-    const tail = `${cut < 5 && x.profile ? ` · ${x.profile}` : ""}${cut < 4 && x.rank ? ` · ${x.rank}` : ""}.`;
-    // Fiche notée par la grille (§18.37) : « Mon dossier, passé à la grille de recrutement d'Azerit : ★★★★☆☆, 61. Point fort : … ».
-    const head = x.graded ? w.file(stars, x.overall) : stars ? w.sheet(stars, x.overall) : w.score(x.overall);
-    // Les pièces du dossier partent en premier quand la place manque.
-    const exhibits = cut === 0 && x.exhibits ? w.exhibits(x.exhibits) : null;
-    parts.push(head + tail, cut < 3 && x.graded ? (x.strong ?? null) : null, exhibits, detail, cut < 3 && !x.graded ? w.ai(x.secs) : null);
-  } else {
-    // Pas de trouvaille dans une comparaison (§18.26) : le rang part d'abord, puis le profil, puis le titre de l'écart.
-    const tail = `${cut < 2 && x.profile ? ` · ${x.profile}` : ""}${cut < 1 && x.rank ? ` · ${x.rank}` : ""}.`;
-    const verdict = cut < 3 ? `${x.headline.replace(/\.$/, "")}.` : null;
-    // La note du dossier en tête, puis ses deux pièces ; une comparaison d'avant la grille garde ses deux notes.
-    if (x.case != null) parts.push(w.file(stars, x.case) + tail, w.pieces(x.src, x.declared, x.github), verdict);
-    else parts.push(w.compare(x.src, x.declared, x.github, stars) + tail, verdict);
-  }
-  parts.push(w.cta);
+  // La trouvaille part d'abord : remplacée par le chef d'accusation, plus court, puis retirée.
+  const detail = cut === 0 ? (x.finding ?? (x.status ? w.charge(x.status) : null)) : cut === 1 && x.finding && x.status ? w.charge(x.status) : null;
+  const tail = `${cut < 5 && x.profile ? ` · ${x.profile}` : ""}${cut < 4 && x.rank ? ` · ${x.rank}` : ""}.`;
+  // Fiche notée par la grille (§18.37) : « Mon dossier, passé à la grille de recrutement d'Azerit : ★★★★☆☆, 61. Point fort : … ».
+  const head = x.graded ? w.file(stars, x.overall) : stars ? w.sheet(stars, x.overall) : w.score(x.overall);
+  // Les pièces du dossier partent en premier quand la place manque.
+  const exhibits = cut === 0 && x.exhibits ? w.exhibits(x.exhibits) : null;
+  const parts: (string | null)[] = [head + tail, cut < 3 && x.graded ? (x.strong ?? null) : null, exhibits, detail, cut < 3 && !x.graded ? w.ai(x.secs) : null, w.cta];
   const body = parts.filter(Boolean).join(" ");
   return plea ? `${plea}\n${body}` : body;
 }

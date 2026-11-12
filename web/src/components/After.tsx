@@ -525,22 +525,12 @@ function WhyCard({ card, withSentence }: { card: CardData; withSentence: boolean
   );
 }
 
+/** Un dossier à deux pièces s'explique comme une fiche : celle du dossier (§18.36), sans onglet par pièce. */
 export function Why({ item, withSentence = true }: { item: Shareable; withSentence?: boolean }) {
   const { t } = useT();
-  const [side, setSide] = useState<"cv" | "github">("github");
   return (
     <Fold name="why" title={t.result.rest.why}>
-      {item.kind === "comparison" && (
-        <div className="seg" role="tablist" aria-label={t.compare.switchLabel}>
-          <button type="button" role="tab" aria-selected={side === "cv"} onClick={() => setSide("cv")}>
-            {declaredOf(item.comparison) === "linkedin" ? t.result.why.tabLinkedin : t.result.why.tabCv}
-          </button>
-          <button type="button" role="tab" aria-selected={side === "github"} onClick={() => setSide("github")}>
-            {t.result.why.tabGithub}
-          </button>
-        </div>
-      )}
-      <WhyCard card={item.kind === "card" ? item.card : side === "cv" ? item.comparison.cv : item.comparison.github} withSentence={withSentence} />
+      <WhyCard card={item.kind === "card" ? item.card : fileOf(item.comparison)} withSentence={withSentence} />
     </Fold>
   );
 }

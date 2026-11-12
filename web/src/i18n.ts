@@ -266,11 +266,6 @@ const fr = {
         charge: (status: string) => `Chef d'accusation : « ${status} ».`,
         /** Fiche d'avant la grille : le temps de lecture. */
         ai: (secs: number) => `Dossier lu par Azerit en ${secs} s.`,
-        /** `src` : « CV » ou « LinkedIn » (§18.24) ; la comparaison sans grille (d'avant 0.4.0). */
-        compare: (src: string, declared: number, github: number, stars: string | null) =>
-          `Mon ${src} : ${declared}. Mon GitHub : ${stars ? `${stars}, ` : ""}${github}`,
-        /** Les deux pièces, sous la note du dossier. */
-        pieces: (src: string, declared: number, github: number) => `${src} ${declared}, GitHub ${github}.`,
         /** Dossier vide fait par un tiers : la note attend la personne fichée. */
         sealed: "Un dossier ouvert chez Azerit, le code reste à prouver",
         /** Un dossier à deux pièces (§18.36) : `src` « LinkedIn » ou « CV ». */
@@ -310,9 +305,6 @@ const fr = {
       overallLine: "Note globale = TEC 30 % · SHIP 20 % · ARCH 20 % · DOC 15 % · XP 15 %.",
       /** Fiche notée par le barème de recrutement (§18.37) : la note vient des huit critères, pas des barres. */
       gridLine: "La note est la moyenne pondérée des huit critères du barème, détaillés plus haut. Les barres restent les traits de la fiche.",
-      tabCv: "Fiche CV",
-      tabLinkedin: "Fiche LinkedIn",
-      tabGithub: "Fiche GitHub",
     },
     contest: {
       button: "Appeler mon avocat",
@@ -1007,8 +999,6 @@ const en: Dict = {
         file: (stars, overall) => `My file, run through Azerit's hiring grid: ${stars ? `${stars}, ` : ""}${overall}`,
         charge: (status) => `Charge: “${status}”.`,
         ai: (secs) => `File read by Azerit in ${secs}s.`,
-        compare: (src, declared, github, stars) => `My ${src}: ${declared}. My GitHub: ${stars ? `${stars}, ` : ""}${github}`,
-        pieces: (src, declared, github) => `${src} ${declared}, GitHub ${github}.`,
         sealed: "A file opened at Azerit, the code yet to prove",
         exhibits: (src) => `Two exhibits on file: ${src} and GitHub.`,
         cta: "Make yours:",
@@ -1040,9 +1030,6 @@ const en: Dict = {
     why: {
       overallLine: "Overall = TEC 30% · SHIP 20% · ARCH 20% · DOC 15% · XP 15%.",
       gridLine: "The rating is the weighted mean of the eight criteria, detailed above. The bars remain the sheet's traits.",
-      tabCv: "CV sheet",
-      tabLinkedin: "LinkedIn sheet",
-      tabGithub: "GitHub sheet",
     },
     contest: {
       button: "Call my lawyer",

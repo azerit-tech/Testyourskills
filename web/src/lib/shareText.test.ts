@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DICTS } from "../i18n";
-import { shareLead, shareText, shareTextX, starsLine, xLength, X_LINK, X_MAX, type CardShare, type ComparisonShare } from "./shareText";
+import { shareLead, shareText, shareTextX, starsLine, xLength, X_LINK, X_MAX, type CardShare } from "./shareText";
 
 const fr = DICTS.fr.result.share.words;
 const en = DICTS.en.result.share.words;
@@ -15,18 +15,6 @@ const card: CardShare = {
   status: "Commits de 3 h du matin",
   secs: 12,
   rank: "7e cette semaine",
-  plea: null,
-};
-
-const cmp: ComparisonShare = {
-  kind: "comparison",
-  stars: 4,
-  src: "LinkedIn",
-  declared: 88,
-  github: 71,
-  profile: "Sous couverture",
-  headline: "17 points d'écart entre le profil et le code",
-  rank: null,
   plea: null,
 };
 
@@ -80,26 +68,6 @@ describe("texte de partage d'une fiche", () => {
   });
 });
 
-describe("texte de partage d'une comparaison", () => {
-  it("sans pari : les étoiles devant la note GitHub", () => {
-    expect(shareText(fr, cmp, URL)).toBe(
-      `Mon LinkedIn : 88. Mon GitHub : ★★★★☆☆, 71 · Sous couverture. 17 points d'écart entre le profil et le code. Fais la tienne : ${URL}`,
-    );
-  });
-
-  it("avec pari et rang", () => {
-    expect(shareLead(fr, { ...cmp, src: "CV", plea: 6, rank: "n° 1 cette semaine" })).toBe(
-      "Je plaidais ★★★★★★. Verdict : ★★★★☆☆.\nMon CV : 88. Mon GitHub : 71 · Sous couverture · n° 1 cette semaine. 17 points d'écart entre le profil et le code. Fais la tienne :",
-    );
-  });
-
-  it("en anglais", () => {
-    expect(shareLead(en, { ...cmp, profile: "Undercover", headline: "17 points between the profile and the code" })).toBe(
-      "My LinkedIn: 88. My GitHub: ★★★★☆☆, 71 · Undercover. 17 points between the profile and the code. Make yours:",
-    );
-  });
-});
-
 describe("texte de partage avec la grille de recrutement (§18.37)", () => {
   const graded: CardShare = { ...card, overall: 61, profile: "Oiseau de nuit", rank: null, finding: null, status: null, graded: true, strong: "Point fort\u00a0: niveau du code, 8/10." };
 
@@ -116,19 +84,9 @@ describe("texte de partage avec la grille de recrutement (§18.37)", () => {
     );
   });
 
-  it("une comparaison : la note du dossier en tête, ses deux pièces, le verdict à la première personne", () => {
-    const x: ComparisonShare = { ...cmp, stars: 3, declared: 41, github: 61, case: 57, profile: null, headline: "Mon LinkedIn me sous-vend de 20 points." };
-    expect(shareLead(fr, x)).toBe(
-      "Mon dossier, passé à la grille de recrutement d'Azerit\u00a0: ★★★☆☆☆, 57. LinkedIn 41, GitHub 61. Mon LinkedIn me sous-vend de 20 points. Fais la tienne :",
-    );
-    expect(shareLead(en, { ...x, headline: "My LinkedIn undersells me by 20 points." })).toBe(
-      "My file, run through Azerit's hiring grid: ★★★☆☆☆, 57. LinkedIn 41, GitHub 61. My LinkedIn undersells me by 20 points. Make yours:",
-    );
-  });
-
   it("aucun mot qui accuse ni « une IA » dans les mots du partage", () => {
     for (const w of [fr, en]) {
-      const all = [w.file("★", 1), w.ai(9), w.pieces("LinkedIn", 1, 2), w.compare("LinkedIn", 1, 2, null)].join(" ");
+      const all = [w.file("★", 1), w.ai(9), w.exhibits("LinkedIn")].join(" ");
       expect(all).not.toMatch(/\bvol|stole|suspect|une IA|an AI|contre|against/i);
     }
   });
@@ -156,11 +114,11 @@ describe("un dossier à deux pièces se partage comme une fiche (§18.36)", () =
 });
 
 describe("dossier vide fait par un tiers, non revendiqué : le partage ne dit pas la note", () => {
-  it("ni note, ni étoiles, ni pari, pour une fiche comme pour une comparaison", () => {
+  it("ni note, ni étoiles, ni pari, pour une fiche comme pour un dossier à deux pièces", () => {
     const sealedCard: CardShare = { ...card, overall: 20, stars: 1, plea: 3, sealed: true };
     expect(shareLead(fr, sealedCard)).toBe("Un dossier ouvert chez Azerit, le code reste à prouver · Sous couverture. Fais la tienne :");
     expect(shareLead(en, sealedCard)).toBe("A file opened at Azerit, the code yet to prove · Sous couverture. Make yours:");
-    const sealedCmp: ComparisonShare = { ...cmp, github: 20, stars: 1, sealed: true };
+    const sealedCmp: CardShare = { ...sealedCard, graded: true, exhibits: "LinkedIn" };
     for (const w of [fr, en]) {
       for (const x of [sealedCard, sealedCmp]) {
         expect(shareLead(w, x)).not.toMatch(/\b20\b|★|☆/);
@@ -220,17 +178,8 @@ describe("texte pour X : jamais plus de 280 avec le lien", () => {
         for (const n of [0, 40, 120, 190, 230, 400]) {
           const c: CardShare = { ...card, plea, finding: n ? long(n) : null, status: n ? long(Math.max(8, n - 60)) : null, profile: n > 200 ? long(n) : card.profile };
           expect(posted(shareTextX(w, c))).toBeLessThanOrEqual(X_MAX);
-          const k: ComparisonShare = { ...cmp, plea, rank: "7e cette semaine", headline: n ? long(n) : cmp.headline, profile: n > 200 ? long(n) : cmp.profile };
-          expect(posted(shareTextX(w, k))).toBeLessThanOrEqual(X_MAX);
         }
       }
     }
-  });
-
-  it("une comparaison trop longue perd le rang, puis le profil, puis le titre", () => {
-    const k: ComparisonShare = { ...cmp, rank: "7e cette semaine", headline: long(170) };
-    expect(shareTextX(fr, k)).not.toContain("7e cette semaine");
-    expect(shareTextX(fr, k)).toContain("Sous couverture");
-    expect(shareTextX(fr, { ...k, headline: long(400) })).toBe("Mon LinkedIn : 88. Mon GitHub : ★★★★☆☆, 71. Fais la tienne :");
   });
 });
