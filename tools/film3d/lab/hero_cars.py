@@ -1023,6 +1023,14 @@ def _w111_clean(parts):
     return keep, report
 
 
+# le chrome de la berline : la réflectance mesurée du chrome (0,55 à 0,65), pas celle de l'argent ou de l'aluminium
+# poli (0,92) ; il reflète le décor sans le rendre plus clair qu'il n'est. À 0,92, la calandre (lames serrées qui se
+# renvoient la lumière de l'une à l'autre) et les pare-chocs brûlaient en blanc dès qu'un phare ou le projecteur les
+# touchait. La calandre, plus sombre et un peu satinée : des lames d'acier chromé, pas un miroir.
+CHROME = (0.64, 0.64, 0.65, 1)
+GRILLE = (0.56, 0.56, 0.57, 1)
+
+
 def _w111_materials(parts, lights_on, tag="hero_w111", paint_color=None, leather=LEATHER["w111"],
                     wheel_rim="#e6dcc2", wear=0.0):
     """Les matières de la berline ; reprises par le coupé pour l'habitacle emprunté (tag, peinture, cuir, jante).
@@ -1037,11 +1045,11 @@ def _w111_materials(parts, lights_on, tag="hero_w111", paint_color=None, leather
     else:
         metal = PAINT_METAL["w111"]
     paint = mat_paint(f"{tag}_paint", paint_color, metal=metal, wear=wear, coat=coat, tint=tint)
-    chrome = mat_chrome(f"{tag}_chrome", (0.92, 0.92, 0.93, 1), 0.05, wear=wear)
+    chrome = mat_chrome(f"{tag}_chrome", CHROME, 0.05, wear=wear)
     table = {
         "Carpaint_Simple_Ruby0": paint,
         "chrome": chrome,
-        "Silver_Clean": mat_chrome(f"{tag}_grille", (0.86, 0.86, 0.87, 1), 0.12, wear=wear),
+        "Silver_Clean": mat_chrome(f"{tag}_grille", GRILLE, 0.16, wear=wear),
         "metal": mat_metal(f"{tag}_steel", (0.10, 0.10, 0.105, 1), 0.5),
         "Rubber": mat_rubber(f"{tag}_seal", rough=0.5 + 0.15 * wear, grain=0.05),
         "Rubber0": mat_tyre(f"{tag}_tyre", wear=wear),
