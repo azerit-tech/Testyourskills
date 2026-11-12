@@ -56,7 +56,10 @@ ASSETS = A.ASSETS
 BLEND = os.environ.get("FILM3D_BLEND", "scene-b.blend")
 PLAN = os.environ.get("FILM3D_PLAN", "P3")
 lin = A.lin
-CORAL, LILAC, AMBER, CREAM, NAVY = A.CORAL, A.LILAC, A.AMBER, A.CREAM, A.NAVY
+AMBER, CREAM, NAVY = A.AMBER, A.CREAM, A.NAVY
+# (corail et violet rose sont réservés aux rampes, lumière v3.1 : aucune enseigne, aucun feu de décor de ces teintes
+# dans la rue ; les enseignes sont ambre, blanc chaud, vert d'eau ou d'un rouge sourd)
+RED = "#c8302a"        # le rouge sourd des enseignes : plus profond et moins vif que le corail des rampes
 
 # la rue. La scène est construite dans le repère de la caméra (« repère de vue » : caméra à y = 0, regard vers +y),
 # puis tournée d'un demi-tour et posée à S_CAM : dans la scène enregistrée, la voiture en fuite roule vers +y comme
@@ -106,18 +109,23 @@ SPECS = {
 GF_PLAN = {
     "rue_hotel": dict(bays=["bar", "lobby"], words={0: ("BAR", "amber")}, awn={0: 3}, vacancy=True, wash="#ffe2c4"),
     "rue_corner": dict(bays=["cafe", "store"], words={0: ("CAFE", "cream")}, open=1, awn={0: 4}, wash="#ffe2bf"),
-    "rue_deco": dict(bays=["store", "bar", "cafe"], words={1: ("BAR", "coral")}, open=2, awn={2: 1}, wash="#ffe6c6",
+    "rue_deco": dict(bays=["store", "bar", "cafe"], words={1: ("BAR", "red")}, open=2, awn={2: 1}, wash="#ffe6c6",
                      service=True),
-    "rue_low": dict(bays=["bar", "store", "cafe", "store"], words={0: ("BAR", "amber"), 2: ("CAFE", "coral")}, open=1,
+    "rue_low": dict(bays=["bar", "store", "cafe", "store"], words={0: ("BAR", "amber"), 2: ("CAFE", "mint")}, open=1,
                     awn={1: 0, 3: 2}, wash="#ffe2bf"),
 }
 # ce que facade_b ajoute aux étages (facade_b.STYLE) : néons de couronnement, pylône de l'hôtel
 UP_STYLE = {
-    "rue_hotel": dict(pylon=True, coping="coral", letters="HOTEL", brow="window", ac=0.18),
+    "rue_hotel": dict(pylon=True, coping="amber", pylon_tube="mint", pylon_light="#7fe0c4", letters="HOTEL",
+                      brow="window", ac=0.18),
     "rue_corner": dict(ac=0.25),
-    "rue_deco": dict(coping="lilac", speed=True, ac=0.0),
-    "rue_low": dict(coping="coral", speed=True, ac=0.0),
+    "rue_deco": dict(coping="mint", speed=True, ac=0.0),
+    "rue_low": dict(coping="red", speed=True, ac=0.0),
 }
+# les néons d'étage de la rue (facade_b.NEON n'a que ceux de l'avenue)
+UP_NEON = {"amber": AMBER, "mint": "#7fe0c4", "red": RED}
+# le rouge sourd des lettres de boutique (facade_mix.NEON : teinte, émission)
+GF_NEON = {"red": (RED, 3.5)}
 # des enduits plus profonds que les pastels de l'avenue : terre cuite, ocre, vert d'eau, rose passé, bleu
 TINTS = ["#d98a6e", "#e2b56a", "#93c2ab", "#dc9ea2", "#a3bcdc", "#efe0c0", "#bba9d9", "#d9b85c", "#e7a98a",
          "#9fcfc4"]
@@ -132,11 +140,11 @@ RIGHT = [("rue_corner", -28.0), ("rue_low", -16.0), ("rue_deco", 4.0), ("rue_cor
          ("rue_low", 68.0), ("rue_hotel", 88.0), ("rue_corner", 104.0), ("rue_corner", 116.0)]
 
 # les enseignes en potence : une tous les 8 à 12 m de chaque côté, entre 4 et 8 m de haut (blade_table()) ;
-# beaucoup d'ambre, de crème et de corail, un peu de menthe et de lilas
-WORDS = [("HOTEL", "amber"), ("BAR", "coral"), ("CAFE", "cream"), ("VACANCY", "cream"), ("OPEN", "coral"),
-         ("BAR", "lilac"), ("HOTEL", "coral"), ("CAFE", "mint"), ("OPEN", "amber"), ("HOTEL", "cream"),
-         ("BAR", "amber"), ("CAFE", "amber"), ("VACANCY", "coral"), ("OPEN", "cream")]
-NEON_LIGHT = {"amber": "#ffc36b", "cream": "#fff1d6", "coral": "#ff6a3d", "mint": "#7fe0c4", "lilac": "#8d8cf0"}
+# beaucoup d'ambre et de crème, un peu de vert d'eau et de rouge sourd
+WORDS = [("HOTEL", "amber"), ("BAR", "red"), ("CAFE", "cream"), ("VACANCY", "cream"), ("OPEN", "mint"),
+         ("BAR", "mint"), ("HOTEL", "red"), ("CAFE", "mint"), ("OPEN", "amber"), ("HOTEL", "cream"),
+         ("BAR", "amber"), ("CAFE", "amber"), ("VACANCY", "red"), ("OPEN", "cream")]
+NEON_LIGHT = {"amber": "#ffc36b", "cream": "#fff1d6", "mint": "#7fe0c4", "red": RED}
 MOTEL = (-1, 72.0)     # l'enseigne MOTEL sur mât (modèle de bibliothèque) : côté, y de vue
 
 # câbles en travers : y de vue des portées ; une lanterne au milieu de chacune, des guirlandes entre elles
@@ -309,7 +317,9 @@ def prototypes(M, hidden):
     import facade_b
     import facade_mix
     facade_mix.PLAN.update(GF_PLAN)
+    facade_mix.NEON.update(GF_NEON)
     facade_b.STYLE.update(UP_STYLE)
+    facade_b.NEON.update(UP_NEON)
     make = A._maker()
     out = {}
     for key, spec in SPECS.items():
@@ -346,7 +356,7 @@ def place(protos, kind, loc, rot, tint, srcs, lights=True):
         elif lk == "canopy":
             A.add_light(f"canopy_{inst.name}_{j}", "AREA", at, R @ Vector((0.2, 0, -1)), warm, 260.0, (w, 2.2))
         elif lk == "wash":
-            A.add_light(f"wash_{inst.name}_{j}", "SPOT", at, R @ Vector((-1.5, 0, 2.2)), warm, 1800.0, spot=75)
+            A.add_light(f"wash_{inst.name}_{j}", "SPOT", at, R @ Vector((-1.5, 0, 2.2)), warm, 600.0, spot=75)
         elif lk == "light":
             L = dict(kind="POINT", direction=(0, 0, -1), color="#ffd9a8", energy=100.0, size=(0.2, 0.2), spot=60.0)
             L.update(w)
@@ -495,7 +505,7 @@ def build_signs(M, hidden):
         A.instance(src, "motel_pole", (side * (FRONT - 1.3), y, road.WALK_Z), math.pi / 2)
         for f in (-1, 1):
             lo = A.add_light(f"motel_glow_{f}", "POINT", (side * (FRONT - 1.3), y + f * 0.6, 4.6), (0, 0, -1),
-                             lin(CORAL), 160.0)
+                             lin(RED), 160.0)
             lo.data.shadow_soft_size = 0.6
             lo.visible_camera = lo.visible_glossy = lo.visible_transmission = False
     # le néon cerise d'un bar, en drapeau sous sa potence (livré à 20 cm, ramené à 1 m)
@@ -504,7 +514,7 @@ def build_signs(M, hidden):
         x, y = FRONT - 0.75, 29.5
         A.instance(cherry, "cherry_sign", (x, y, 3.0), 0.0)
         A.box("cherry_arm", x, FRONT, y - 0.02, y + 0.02, 4.12, 4.16, mats["iron"])
-        lo = A.add_light("cherry_glow", "POINT", (x, y - 0.5, 3.5), (0, 0, -1), lin("#ff5a4a"), 45.0)
+        lo = A.add_light("cherry_glow", "POINT", (x, y - 0.5, 3.5), (0, 0, -1), lin(RED), 45.0)
         lo.visible_camera = lo.visible_glossy = lo.visible_transmission = False
     log(f"{len(blades)} enseignes en potence, l'enseigne MOTEL sur mât, le néon cerise")
 
@@ -520,7 +530,7 @@ def lantern_source(hidden, M):
     seg = 24
     outer = C.mat_pbr("lantern_enamel", "#24382f", 0.3, 0.1, noise_amt=0.2, coat=0.6)
     inner = A.mat_emit("lantern_inside", lin("#ffe2b0"), 3.0)
-    glow = A.mat_emit("lantern_bulb", lin("#ffcf8a"), 40.0)
+    glow = A.mat_emit("lantern_bulb", lin("#ffcf8a"), 8.0)          # (40 : écrêtée)
     me.materials.append(outer)
     me.materials.append(inner)
     me.materials.append(glow)
@@ -557,7 +567,8 @@ def bulb_source(hidden):
     bmesh.ops.create_icosphere(bm, subdivisions=1, radius=0.038)
     bm.to_mesh(me)
     bm.free()
-    me.materials.append(A.mat_emit("festoon_bulb", lin("#ffcf8a"), 28.0))
+    # (28 : les ampoules écrêtaient 0,5 à 1 % du cadre ; lumière v3.1, guirlandes à 6)
+    me.materials.append(A.mat_emit("festoon_bulb", lin("#ffcf8a"), 6.0))
     ob = bpy.data.objects.new("bulb_src", me)
     hidden.objects.link(ob)
     return ob
@@ -580,8 +591,9 @@ def build_overhead(M, hidden):
         drop = 0.55
         C.tube([[tuple(mid), tuple(mid - Vector((0, 0, drop)))]], 0.006, cable, f"lantern_wire_{k}")
         A.instance(lantern, f"lantern_{k}", mid - Vector((0, 0, drop)), random.uniform(0, 1))
-        lo = A.add_light(f"lantern_{k}_down", "SPOT", mid - Vector((0, 0, drop + 0.2)), (0, 0, -1), lamp_col, 500.0, spot=90)
-        # (500 W : à 1400 W, les lanternes au-dessus du premier plan éclairaient la chaussée en plein jour)
+        lo = A.add_light(f"lantern_{k}_down", "SPOT", mid - Vector((0, 0, drop + 0.2)), (0, 0, -1), lamp_col, 250.0, spot=90)
+        # (250 W : à 1400 W, les lanternes au-dessus du premier plan éclairaient la chaussée en plein jour ; à 500,
+        # la caisse de la berline sortait à 21 %, lumière v3.1)
         lo.data.spot_blend = 0.8
         lo.data.shadow_soft_size = 0.12
         lo.visible_glossy = False
@@ -795,7 +807,7 @@ def build_street_end(hidden):
                 lo.data.shadow_soft_size = 0.5
                 n_real += 1
     lieux.mesh_object("pont_halos", hb, [halo]).visible_shadow = False
-    # le pylône en H, à cheval sur le tablier : deux jambes, deux traverses, projecteurs ambre au pied, feu corail
+    # le pylône en H, à cheval sur le tablier : deux jambes, deux traverses, projecteurs ambre au pied, feux ambre
     yp = vw(0.0, S_PYLON)[1]
     zt = deck_z(S_PYLON) + 52.0
     for side in (-1, 1):
@@ -808,12 +820,13 @@ def build_street_end(hidden):
             lo.data.shadow_soft_size = 0.3
     for z0 in (deck_z(S_PYLON) + 24.0, zt - 4.0):
         A.box(f"pylone_traverse_{z0:.0f}", -11.0, 11.0, yp - 0.8, yp + 0.8, z0, z0 + 2.2, conc)
-    beacon = lieux.emit_mat("pylone_feu", lin(CORAL), 80.0)
+    # (feux fixes ambre, 400 W : corail à 4000 W, on les prenait pour une rampe au bout de la rue, lumière v3.1)
+    beacon = lieux.emit_mat("pylone_feu", lin(AMBER), 20.0)
     bb = bmesh.new()
     for side in (-1, 1):
         bmesh.ops.create_uvsphere(bb, u_segments=10, v_segments=6, radius=0.6,
                                   matrix=Matrix.Translation((side * 11.0, yp, zt + 0.6)))
-        lo = A.add_light(f"pylone_feu_{side}", "POINT", (side * 11.0, yp, zt + 1.6), (0, 0, -1), lin(CORAL), 4000.0)
+        lo = A.add_light(f"pylone_feu_{side}", "POINT", (side * 11.0, yp, zt + 1.6), (0, 0, -1), lin(AMBER), 400.0)
         lo.data.shadow_soft_size = 0.5
     lieux.mesh_object("pylone_feux", bb, [beacon]).visible_shadow = False
     # les haubans : de chaque jambe, en éventail vers les bords du tablier, de part et d'autre du pylône
@@ -1220,9 +1233,10 @@ def officer_light(officers, plan, receivers=()):
         tgt = o + Vector((0.0, 0.0, 1.3))
         # (derrière lui pour la caméra : -y de vue ; devant, ce serait un aplat de face ; 1500 W et non 380 : sur la
         # portière claire, sous les guirlandes, l'agent ne se détachait pas, il lui faut un vrai contre-jour qui
-        # dessine casquette et épaules ; il n'éclaire que lui)
+        # dessine casquette et épaules ; il n'éclaire que lui. 400 W blanc chaud, lumière v3.1 : la lueur du
+        # boulevard derrière lui, pas un contre-jour froid, le froid est aux hélicoptères)
         p = o + Vector((out * 0.7, -2.6, 2.3))
-        lo = A.add_light(f"rim_{k}", "SPOT", p, tgt - p, lin("#e6ecff"), 1500.0, spot=40)
+        lo = A.add_light(f"rim_{k}", "SPOT", p, tgt - p, lin("#fff1dc"), 400.0, spot=40)
         lo.data.spot_blend = 0.6
         lo.data.shadow_soft_size = 0.15
         lo.visible_glossy = False
@@ -1423,27 +1437,11 @@ def place_hero(scene, plan):
     x, y, yaw = plan["hero"]
     car.location = (x, y, 0.0)
     car.rotation_euler = (0, 0, math.radians(yaw))
-    # des phares de route, vus de dos : ils portent vers le barrage, découpent les patrouilles et les agents de plus
-    # en plus fort à mesure qu'elle approche, et prennent corps dans la brume devant elle
-    # (avant le découpage v2, face à la caméra, ils étaient à 400 W : leur reflet sur l'enrobé mouillé voilait le sol)
-    # (0,05 de volume : à 0,35, vue d'en haut, la brume qu'ils allumaient devant le capot remplissait la lunette
-    # arrière d'un aplat blanc, images 1 à 14 ; à 0,15, leurs deux cônes faisaient au fond de l'axe deux arcs
-    # blancs plus vifs que les rampes du barrage)
+    # ses phares : les codes communs (cast_vehicles.headlight_spots, lumière v3.1 règle D), sans retouche ici ; vus de
+    # dos, ils éclairent la chaussée devant elle, puis les flancs des patrouilles et les agents quand elle arrive.
+    # (Plus de nappe d'appoint propre à la rue, hero_fill : l'appoint de poursuite commun, lieux.car_fill, est posé
+    # sur son rig par plan_P3)
     spots = [c for c in car.children_recursive if c.type == "LIGHT" and c.data.type == "SPOT"]
-    for lo in spots:
-        lo.data.energy = 900.0
-        lo.data.spot_size = math.radians(40)
-        try:
-            lo.data.volume_factor = 0.05
-        except AttributeError:
-            pass
-        lo.data.spot_blend = 0.4
-    # la carrosserie bordeaux lisible de dos : une nappe douce au-dessus et en arrière du coffre (la lueur des
-    # guirlandes), invisible à la caméra, liée à la berline seule ; son reflet dessine le toit, la lunette et le coffre
-    # (150 W d'un blanc à peine chaud : plus fort ou rosé, le bordeaux virait au saumon)
-    fill = A.add_light("hero_fill", "AREA", (x, y + 2.2, 3.6), (0.0, -2.2, -3.6), lin("#fff0e6"), 150.0, (2.4, 1.4))
-    fill.visible_camera = False
-    only_on(fill, [car], "hero_fill")
     # l'habitacle allumé (lieux.cabin_light, 25 W comme scene_d) : de dos, par la lunette, la capuche et les épaules
     # du conducteur se découpent sur un habitacle chaud au lieu d'un trou noir
     keep = road.S
@@ -1501,11 +1499,20 @@ def plan_P3(scene):
     frames = range(P3.F0 - 1, P3.F0 + P3.FRAMES + 1)        # une image de plus de chaque côté, pour l'obturateur
     scene.frame_start, scene.frame_end = P3.F0, P3.F0 + P3.FRAMES - 1
     ob = bpy.data.objects
-    # --- la berline : son rig au sol sous la caisse, tourné de son cap à l'image fixe ; la nappe d'appoint, la
-    # brume des phares et le point de netteté la suivent
+    # --- la berline : son rig au sol sous la caisse, tourné de son cap à l'image fixe ; la brume des phares et le
+    # point de netteté la suivent
     body = ob["coupe"]
-    extras = [o for o in (ob.get("hero_fill"), ob.get("haze_lamps"), ob.get("focus")) if o is not None]
+    extras = [o for o in (ob.get("haze_lamps"), ob.get("focus")) if o is not None]
     rig = MO.rig_up(body, P3.hero_heading(P3.T_STILL), name="rig_berline", extras=extras)
+    # l'appoint de poursuite commun (lumière v3.1, 2.5), le seul appoint lié à la berline : 4 m derrière, 6 m
+    # au-dessus, dans le repère du rig (+y vers l'avant) ; la brume des phares, enfant du rig, n'en est pas
+    keep = road.S
+    import lieux
+    road.S = keep
+    lieux.car_fill(rig, loc=(0.0, -4.0, 6.0), energy=900.0, color="#ffd4b4", size=6.0)
+    recv = bpy.data.collections.get(f"{rig.name}_lumiere_avec")
+    for o in [o for o in recv.objects if o.name.startswith("haze")]:
+        recv.objects.unlink(o)
     wheels = [c for c in body.children if c.name.startswith("wheel_")]
     ys = [Vector(w.location).y for w in wheels]
     wb, front = (max(ys) - min(ys)), -min(ys)                 # l'avant vers -y dans la caisse

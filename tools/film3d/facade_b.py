@@ -39,7 +39,8 @@ PL = "Plaster003/Plaster003_2K-JPG_"
 CORAL = "coral_fort_wall_01/"
 
 # ce que chaque dessin ajoute à sa spec : néons, filets « vitesse », pylône, sourcils par fenêtre,
-# et la règle des climatiseurs de façade (Jacques : « deux clims par étage c'est beaucoup »)
+# et la règle des climatiseurs de façade (Jacques : « deux clims par étage c'est beaucoup ») ; pylon_tube et
+# pylon_light : le néon et la lumière du pylône (lilas sinon ; la rue des enseignes les veut sans lilas)
 STYLE = {
     "deco": dict(coping="coral", speed=True, tower_tube="lilac", ac=0.0),
     "hotel": dict(pylon=True, coping="coral", speed=True, brow="window", letters="HOTEL", ac=0.28),
@@ -845,7 +846,8 @@ def upper(S_module, key, M, spec, gf_h):
     if pylon:
         p0, p1 = pylon
         for yy in (p0 + 0.15, p1 - 0.15):
-            objs.append(tube(f"fb_{key}_neon_fin_{yy:.1f}", (PYX + 0.18, yy, gf_h + 0.1), (PYX + 0.18, yy, top_par + 0.3), M["neon_lilac"]))
+            objs.append(tube(f"fb_{key}_neon_fin_{yy:.1f}", (PYX + 0.18, yy, gf_h + 0.1), (PYX + 0.18, yy, top_par + 0.3),
+                             M["neon_" + st_.get("pylon_tube", "lilac")]))
         word = st_.get("letters", "")
         if word:
             # les lettres tiennent toutes entre le larmier et le haut du pylône : pas et taille ajustés
@@ -879,7 +881,8 @@ def upper(S_module, key, M, spec, gf_h):
         lights.append(("light", (0.32, yy, gf_h + 0.1), dict(kind="SPOT", direction=(-0.13, 0, 1), color=WARM, energy=420.0, spot=62.0)))
     if pylon:
         for yy in (W / 2 - 0.8, W / 2 + 0.8):
-            lights.append(("light", (1.4, yy, gf_h - 0.35), dict(kind="SPOT", direction=(-0.17, 0, 1), color=NEON["lilac"], energy=2600.0, spot=22.0)))
+            lights.append(("light", (1.4, yy, gf_h - 0.35), dict(kind="SPOT", direction=(-0.17, 0, 1),
+                                                                 color=st_.get("pylon_light", NEON["lilac"]), energy=2600.0, spot=22.0)))
         lights.append(("light", (PYX + 0.6, W / 2, main_top - 3.9), dict(kind="AREA", direction=(-1, 0, 0), color=NEON["cream"], energy=60.0, size=(0.8, 6.0))))
     for near in ([True] if P["round_near"] else []) + ([False] if P["round_far"] else []):
         yy = ya * 0.45 if near else W - (W - yb) * 0.45
