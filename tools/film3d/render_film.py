@@ -20,6 +20,8 @@
 # <out>/journal.tsv (une ligne par image, temps compris) et <out>/<PLAN>/blender.log. Un plan sans mouvement (la
 # plage d'images de sa scène plus courte que le plan) rend son image fixe une fois et la recopie, et le dit.
 # Un plan qu'aucune scène ne sait encore construire est sauté, et dit : le montage posera son carton.
+# Un plan dont le module de trajectoire (TRAJ) a encore un FRAMES autre que cut.ts (pas encore migré au découpage) se
+# rend à la longueur de son module, et le dit (« P3 : 28 images, cut.ts en attend 48 ») ; le montage tiendra la dernière.
 #
 # Les essais de lumière (--essai, éteints par défaut : sans eux les cadres validés ne changent pas ; les images d'un
 # essai vont dans <out>/<PLAN>+<essai>/ et ne deviennent jamais une prise du montage) :
@@ -49,8 +51,12 @@ SOURCES = {
     "P4": ("scene_c", "P4"), "P5": ("scene_e", "P5"), "P6": ("scene_d", "P6"), "FIN": ("scene_d", "FIN"),
     "FIN6": ("scene_d", "FIN6"),
 }
-# (repli seulement si shared/film/cut.ts manque : il reste la seule source des durées)
-FALLBACK_FRAMES = {"OUV": 24, "P1": 28, "P2": 28, "P3": 28, "P4": 28, "P5": 28, "P6": 40, "FIN": 36, "FIN6": 56}
+# (repli seulement si shared/film/cut.ts manque : il reste la seule source des durées ; découpage v3)
+FALLBACK_FRAMES = {"OUV": 40, "P1": 48, "P2": 48, "P3": 48, "P4": 48, "P5": 48, "P6": 60, "FIN": 52, "FIN6": 80}
+# Le module de trajectoire de chaque plan (sans Blender) : son FRAMES est la longueur que sa scène sait animer. Un
+# plan pas encore migré au découpage de cut.ts se rend à la longueur de son module, et le journal le dit.
+TRAJ = {"OUV": "ouv_avenue", "P1": "p1_avenue", "P2": "p2_arc", "P3": "p3_enseignes", "P4": "p4_pont",
+        "P5": "p5_virage", "P6": "p6_jetee", "FIN": "fin_pointe", "FIN6": "fin6_orbite"}
 FULL = (720, 1280)
 DRAFT = (360, 640)
 ESSAIS = {"rugosite": 0.5, "brume": 1.0, "peinture": None, "metal": None, "vernis": None, "vernis_rugosite": None}
@@ -92,6 +98,32 @@ def read_cut(root=ROOT):
     except (OSError, AttributeError) as e:
         log(f"! {path} illisible ({e}), durées de repli")
     return dict(FALLBACK_FRAMES)
+
+
+def module_frames(plan):
+    """Le FRAMES du module de trajectoire du plan, ou None s'il n'en a pas (ou ne s'importe pas)."""
+    import importlib
+    if HERE not in sys.path:
+        sys.path.insert(0, HERE)
+    try:
+        n = getattr(importlib.import_module(TRAJ[plan]), "FRAMES", None)
+    except Exception as e:                       # un module en chantier : cut.ts fait foi
+        log(f"! {plan} : {TRAJ[plan]} ne s'importe pas ({e}), durée de cut.ts")
+        return None
+    return n if isinstance(n, int) and n > 0 else None
+
+
+def plan_frames(cut, plans=ORDER, frames_of=module_frames):
+    """Les images à rendre par plan : celles de cut.ts, sauf pour un plan dont le module a encore un autre FRAMES (pas
+    encore migré) : il garde le sien, dit dans le journal ; le montage tiendra sa dernière image."""
+    out = {}
+    for plan in plans:
+        n, m = cut[plan], frames_of(plan)
+        if m is not None and m != n:
+            log(f"! {plan} : {m} images, cut.ts en attend {n}, plan pas encore migré ({TRAJ[plan]}.FRAMES = {m})")
+            n = m
+        out[plan] = n
+    return out
 
 
 def parse_frames(spec, n):
@@ -178,12 +210,13 @@ def worker(a):
     if HERE not in sys.path:
         sys.path.insert(0, HERE)
     plan = a.plan
-    n = read_cut()[plan]
+    cut_n = read_cut()[plan]
+    n = plan_frames({plan: cut_n}, (plan,))[plan]     # un plan pas encore migré garde le FRAMES de son module
     essais = parse_essais(a.essai)
     out_dir = os.path.join(a.out, plan_dirname(plan, essais))
     os.makedirs(out_dir, exist_ok=True)
     ASSETS = os.path.realpath(assets_dir())
-    info = dict(plan=plan, frames=n, essais=essais, mode=a.mode)
+    info = dict(plan=plan, frames=n, cut_frames=cut_n, migrated=n == cut_n, essais=essais, mode=a.mode)
 
     def write_info(**kw):
         info.update(kw)
@@ -653,7 +686,14 @@ def assemble(a, plans, cut):
 def selftest():
     import tempfile
     cut = read_cut()
-    assert sum(cut.values()) == 296 and cut["P6"] == 40 and cut["FIN6"] == 56, cut
+    assert cut == FALLBACK_FRAMES and sum(cut.values()) == 472, cut          # cut.ts et le repli : le découpage v3
+    # un plan pas encore migré (son module a encore FRAMES = 28) garde sa longueur ; les autres suivent cut.ts
+    old = {"P3": 28, "FIN": 36}
+    eff = plan_frames(cut, ORDER, frames_of=lambda p: old.get(p, cut[p]))
+    assert eff == dict(cut, P3=28, FIN=36), eff
+    assert plan_frames(cut, ("P4",), frames_of=lambda p: None) == {"P4": 48}  # pas de module lisible : cut.ts
+    real = plan_frames(cut)                                                    # les vrais modules, sans Blender
+    assert set(real) == set(ORDER) and all(n > 0 for n in real.values()), real
     assert parse_frames("3-5", 28) == [3, 4, 5] and parse_frames("17", 28) == [17] and parse_frames(None, 3) == [1, 2, 3]
     assert parse_frames("20-40", 24) == [20, 21, 22, 23, 24]
     assert parse_frames("26,9,13,21-23", 28) == [9, 13, 21, 22, 23, 26] and parse_frames("1,40", 28) == [1]
@@ -680,7 +720,8 @@ def selftest():
         open(frame_path(d, 5), "wb").write(png(18, 32))              # autre taille
         assert png_size(frame_path(d, 1)) == (36, 64) and png_size(frame_path(d, 3)) is None
         assert todo(d, range(1, 7), (36, 64)) == [3, 5, 6], todo(d, range(1, 7), (36, 64))
-    print("[film] selftest : durées (296 images), --frames, essais, reprise (absente, tronquée, autre taille) : ok")
+    print("[film] selftest : durées (472 images, plans pas encore migrés compris), --frames, essais, reprise "
+          "(absente, tronquée, autre taille) : ok")
 
 
 def main():
@@ -726,7 +767,7 @@ def main():
         if p not in SOURCES:
             sys.exit(f"[film] plan inconnu : {p} ({', '.join(ORDER)})")
     plans = [p for p in ORDER if p in plans]
-    cut = read_cut()
+    cut = plan_frames(read_cut(), plans)
     os.makedirs(a.out, exist_ok=True)
     if a.assemble:
         assemble(a, plans, cut)
