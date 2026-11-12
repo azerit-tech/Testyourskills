@@ -194,7 +194,7 @@ Règles de comptage :
 - Ne comptent pas : les dépôts tutoriels (nom de tutoriel, moins de 5 commits) et les dépôts déposés d'un bloc (moins de 5 commits pour plus d'un Mo).
 
 Signaux du critère, sans effet sur la note :
-- **« À confirmer »** (EN "To confirm") : au moins cinq technos vérifiables nommées sur LinkedIn, moins d'un tiers retrouvées dans le code. « À confirmer : Kafka, Kubernetes. Déclarées sur LinkedIn, pas encore visibles dans 12 dépôts publics. » Vu de la personne seule. Une techno que le code public ne peut pas montrer (un outil interne, une base propriétaire) n'est jamais « à confirmer ». Pas encore visible ne veut pas dire inventé.
+- **« À confirmer »** (EN "To confirm") : chaque techno vérifiable nommée sur LinkedIn et pas encore retrouvée dans le code, dès la première, sans seuil (trois citées au plus ; rien sans dépôt public). « À confirmer : Python, Kubernetes. Déclarées sur LinkedIn, pas encore visibles dans 8 dépôts publics. » Vu de la personne seule. Une techno que le code public ne peut pas montrer (un outil interne, une base propriétaire) n'est jamais « à confirmer ». Pas encore visible ne veut pas dire inventé.
 - **« Stack prouvée au-delà du profil »** (EN "Stack proven beyond the profile") : le code prouve une techno que le LinkedIn ne nomme pas. Vu de tous.
 - **« IA dans l'atelier »** (EN "AI in the workshop") : des fichiers d'agent dans un dépôt actif.
 

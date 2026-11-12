@@ -483,7 +483,7 @@ describe("les traces dans le code (§3.4)", () => {
     for (const n of named) expect(flag.fr).not.toContain(n);
   });
 
-  it("cinq technos vérifiables, moins d'un tiers retrouvées : « À confirmer » ; la note ne bouge pas", () => {
+  it("des technos vérifiables absentes du code : « À confirmer », dès la première ; la note ne bouge pas", () => {
     const r = cvReading({ technos_listed: ["Kubernetes", "Terraform", "Redis", "MongoDB", "TypeScript"], technos_described: ["TypeScript", "React"] });
     const flags = stackFlags(decl(r), gh(facts()));
     expect(flags[0].fr).toMatch(/^À confirmer\u00a0: Kubernetes, Terraform, Redis\. Déclarées sur le CV/);
@@ -491,6 +491,29 @@ describe("les traces dans le code (§3.4)", () => {
     const without = declaredGrid(decl(r));
     expect(crit(withGh, "STK").score).toBe(crit(without, "STK").score);
     expect(withGh.overall).toBe(without.overall);
+    // Sans seuil : une techno sur deux absente suffit, la retrouvée n'est pas citée
+    const few = cvReading({ technos_listed: ["Kubernetes", "TypeScript"], technos_described: [] });
+    expect(stackFlags(decl(few), gh(facts())).filter((x) => /^À confirmer/.test(x.fr)).map((x) => [x.fr, x.en])).toEqual([
+      ["À confirmer\u00a0: Kubernetes. Déclarées sur le CV, pas encore visibles dans 5 dépôts publics.", "To confirm: Kubernetes. Listed on the CV, not visible yet in 5 public repos."],
+    ]);
+    // Aucun dépôt public : pas où chercher, rien à confirmer (pas de « 0 dépôt public »)
+    expect(stackFlags(decl(few), gh(facts({ repos: [] }))).filter((x) => /^À confirmer/.test(x.fr))).toEqual([]);
+    // Tout retrouvé : rien à confirmer
+    const all = cvReading({ technos_listed: ["TypeScript"], technos_described: [] });
+    expect(stackFlags(decl(all), gh(facts())).filter((x) => /^À confirmer|^To confirm/.test(x.fr))).toEqual([]);
+  });
+
+  it("au dossier, sur LinkedIn, deux technos dont une absente : le signal suit la stack, pour la personne seule, et aucune note ne bouge", () => {
+    const d = decl(seniorReading({ technos_listed: [], technos_described: ["TypeScript", "Kubernetes"] }), { ...fictivaProfile(), skills: ["TypeScript"] });
+    const proven = githubGrid(gh(jacquesFacts(), JACQUES_AI));
+    const file = caseGrid(declaredGrid(d, gh(jacquesFacts())), proven);
+    const flag = crit(file, "STK").flags.find((x) => /^À confirmer/.test(x.fr))!;
+    expect(flag.fr).toMatch(/^À confirmer\u00a0: Kubernetes\. Déclarées sur LinkedIn, pas encore visibles dans \d+ dépôts? publics?\.$/);
+    expect(flag.fr).not.toContain("TypeScript");
+    expect(scores(file)).toEqual(scores(caseGrid(declaredGrid(d), proven)));
+    expect(file.overall).toBe(caseGrid(declaredGrid(d), proven).overall);
+    const pub = publicGrid(file).criteria.find((c) => c.code === "STK")!;
+    expect(JSON.stringify(pub)).not.toMatch(/À confirmer|To confirm/);
   });
 
   it("le code prouve une techno que le LinkedIn ne nomme pas : « Stack prouvée au-delà du profil »", () => {

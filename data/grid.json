@@ -91,8 +91,6 @@
       { "score": 6, "described": 5, "recent": 2, "recentMonths": 24 },
       { "score": 4, "described": 2, "recent": 0, "recentMonths": 24 }
     ],
-    "noTraceAtLeast": 5,
-    "noTraceShareBelow": 0.3333,
     "undersellMinBytes": 10240,
     "_ignoredDoc": "Ne font pas une famille : balisage, styles, scripts de build.",
     "ignoredLanguages": ["HTML", "CSS", "SCSS", "Sass", "Less", "Stylus", "Makefile", "CMake", "Dockerfile", "Batchfile", "Shell", "PowerShell", "Nix", "TeX", "Roff", "Jinja", "Handlebars", "EJS", "Pug", "Mustache", "Twig", "Procfile", "Starlark", "M4", "Meson"],

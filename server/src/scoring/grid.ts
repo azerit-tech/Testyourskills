@@ -884,9 +884,10 @@ export function traceFound(t: Trace, facts: GithubFacts, m: GithubMetrics): bool
 const declaredOn = (label: string): Fact => (label === "CV" ? f("sur le CV", "on the CV") : f(`sur ${label}`, `on ${label}`));
 
 /**
- * Les signaux de la stack, jamais une note : « À confirmer » (des technos
- * déclarées qu'on ne voit pas encore dans le code public, pour la personne
- * seule) et « Stack prouvée au-delà du profil » (le code en montre davantage).
+ * Les signaux de la stack, jamais une note : « À confirmer » (les technos
+ * déclarées qu'on ne voit pas encore dans le code public, dès la première et
+ * sans seuil, pour la personne seule ; rien sans dépôt public, il n'y a pas où
+ * chercher) et « Stack prouvée au-delà du profil » (le code en montre davantage).
  */
 export function stackFlags(d: DeclaredInput, gh: Pick<GithubInput, "facts" | "m">): Fact[] {
   const { facts, m } = gh;
@@ -895,20 +896,17 @@ export function stackFlags(d: DeclaredInput, gh: Pick<GithubInput, "facts" | "m"
   const verifiable = tracesNamed(named);
   const out: Fact[] = [];
   const S = GRID.STK;
-  if (verifiable.length >= S.noTraceAtLeast) {
-    const notFound = verifiable.filter((t) => !traceFound(t, facts, m));
-    const share = (verifiable.length - notFound.length) / verifiable.length;
-    if (share < S.noTraceShareBelow) {
-      const list = notFound.slice(0, 3).map((t) => t.name).join(", ");
-      const n = facts.repos.length;
-      const on = declaredOn(d.label);
-      out.push(
-        f(
-          `À confirmer\u00a0: ${list}. Déclarées ${on.fr}, pas encore visibles dans ${n} dépôt${n > 1 ? "s" : ""} public${n > 1 ? "s" : ""}.`,
-          `To confirm: ${list}. Listed ${on.en}, not visible yet in ${n} public repo${n === 1 ? "" : "s"}.`,
-        ),
-      );
-    }
+  const notFound = verifiable.filter((t) => !traceFound(t, facts, m));
+  if (notFound.length && facts.repos.length) {
+    const list = notFound.slice(0, 3).map((t) => t.name).join(", ");
+    const n = facts.repos.length;
+    const on = declaredOn(d.label);
+    out.push(
+      f(
+        `À confirmer\u00a0: ${list}. Déclarées ${on.fr}, pas encore visibles dans ${n} dépôt${n > 1 ? "s" : ""} public${n > 1 ? "s" : ""}.`,
+        `To confirm: ${list}. Listed ${on.en}, not visible yet in ${n} public repo${n === 1 ? "" : "s"}.`,
+      ),
+    );
   }
   const namedSet = new Set(verifiable.map((t) => t.name));
   const proven = GRID.traces.list.filter((t) => {

@@ -202,8 +202,6 @@ export interface GridConfig {
     familyRepoCommits: number;
     dumped: { maxCommits: number; minSizeKb: number };
     declared: { score: number; described: number; recent: number; recentMonths: number }[];
-    noTraceAtLeast: number;
-    noTraceShareBelow: number;
     undersellMinBytes: number;
     ignoredLanguages: string[];
     families: Record<string, string[]>;
