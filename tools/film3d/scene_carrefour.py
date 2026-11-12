@@ -226,7 +226,7 @@ def mat_wake():
     return m
 
 
-def wake(scene, wheels, spray_m):
+def wake(scene, wheels, spray_m, pose=POSE):
     """Le sillage de la glissade, écrit depuis p2_arc.wheel_track : quatre traces de pneus posées sur la chaussée
     (lancer de rayon vers le bas, la bordure et le bombé suivis), et derrière la roue arrière extérieure une traîne
     de gerbes qui retombent."""
@@ -239,7 +239,7 @@ def wake(scene, wheels, spray_m):
 
     for name, (lx, ly, _) in wheels.items():
         rear = name.endswith(("BL", "BR"))
-        pts = [P.to_scene(POSE, x, y)[:2] for x, y in P.wheel_track(lx, ly)]
+        pts = [P.to_scene(pose, x, y)[:2] for x, y in P.wheel_track(lx, ly)]
         if not rear:
             pts = pts[len(pts) // 3:]          # les roues avant ne marquent qu'une fois la caisse en travers
         w = 0.24 if rear else 0.2
@@ -266,7 +266,7 @@ def wake(scene, wheels, spray_m):
     # la traîne : la roue arrière extérieure (à droite, -x dans le repère de la caisse) laisse retomber l'eau
     lx, ly, _ = wheels.get("wheel_BR", wheels.get("wheel_BL"))
     lx = -abs(lx)
-    pts = [P.to_scene(POSE, x, y)[:2] for x, y in P.wheel_track(lx - 0.4, ly)]
+    pts = [P.to_scene(pose, x, y)[:2] for x, y in P.wheel_track(lx - 0.4, ly)]
     for k, back in enumerate((5, 9, 14, 20)):
         x, y = pts[max(0, len(pts) - 1 - back)]
         bpy.ops.mesh.primitive_uv_sphere_add(segments=12, ring_count=6, radius=1.0, location=(x, y, 0.25))
@@ -278,10 +278,11 @@ def wake(scene, wheels, spray_m):
         sp.visible_shadow = False
 
 
-def place_cars(scene):
+def place_cars(scene, pose=POSE):
+    """La berline et les deux patrouilles de p2_arc posées sur le décor (pose : voir p2_arc.to_scene)."""
     import cast_vehicles as cv
     import scene_b as B
-    poses = {k: P.to_scene(POSE, x, y, h) + (yb + POSE[2],) for k, (x, y, h, yb) in P.cars().items()}
+    poses = {k: P.to_scene(pose, x, y, h) + (yb + pose[2],) for k, (x, y, h, yb) in P.cars().items()}
     # la berline : l'avant vers -y dans son repère, la caisse tournée du contre-braquage, roues avant braquées
     # vers l'extérieur, gerbes d'eau des roues arrière qui s'étirent le long de l'arc
     car = A.street_hero(scene)
@@ -307,7 +308,7 @@ def place_cars(scene):
         sp.scale = (1.0 if side < 0 else 0.6, 2.6, 0.55)
         sp.visible_shadow = False
     wheels = {w.name: Vector(w.location) for w in car.children if w.name.startswith("wheel_")}
-    wake(scene, wheels, sm)
+    wake(scene, wheels, sm, pose)
     # une lumière douce au-dessus de la berline, invisible à la caméra et dans les reflets : le bordeaux de la
     # caisse se lit du ciel (la rue n'y pose que des taches ambre)
     f = A.add_light("hero_fill", "AREA", (x, y, 7.0), (0, 0, -1), lin("#ffd8c8"), 260.0, (3.0, 5.0))
@@ -335,6 +336,24 @@ def place_cars(scene):
     return car
 
 
+def drone(scene, pose=POSE):
+    """Le drone de p2_arc : à la verticale, le haut du cadre tourné vers le cap de la voiture."""
+    cx, cy, cz, yaw, lens = P.camera()
+    x, y, a = P.to_scene(pose, cx, cy, yaw)
+    cam = bpy.data.cameras.new("cam")
+    cam.lens = lens
+    cam.sensor_fit = "AUTO"
+    cam.sensor_width = 36
+    cam.clip_start = 0.5
+    cam.clip_end = 2000
+    co = bpy.data.objects.new("cam", cam)
+    scene.collection.objects.link(co)
+    co.location = (x, y, cz)
+    co.rotation_euler = (0, 0, math.radians(a))
+    scene.camera = co
+    return co
+
+
 def build():
     bpy.ops.wm.read_factory_settings(use_empty=True)
     scene = bpy.context.scene
@@ -352,20 +371,9 @@ def build():
             c.hide_viewport = True
     A.make_world(scene)
 
-    # le drone : à la verticale, le haut du cadre tourné vers le cap de la voiture
-    cx, cy, cz, yaw, lens = P.camera()
-    x, y, a = P.to_scene(POSE, cx, cy, yaw)
-    cam = bpy.data.cameras.new("cam")
-    cam.lens = lens
-    cam.sensor_fit = "AUTO"
-    cam.sensor_width = 36
-    cam.clip_start = 0.5
-    cam.clip_end = 2000
-    co = bpy.data.objects.new("cam", cam)
-    scene.collection.objects.link(co)
-    co.location = (x, y, cz)
-    co.rotation_euler = (0, 0, math.radians(a))
-    scene.camera = co
+    co = drone(scene)
+    x, y, cz = co.location
+    a, lens = math.degrees(co.rotation_euler.z), co.data.lens
     A.render_settings(scene)
     scene.render.use_motion_blur = False
     out = os.path.join(ASSETS, BLEND)
