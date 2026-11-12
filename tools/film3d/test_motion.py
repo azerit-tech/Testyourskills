@@ -9,6 +9,16 @@ import motion as M  # noqa: E402
 FRAMES = range(0, 30)
 FAIL = []
 
+# Les plafonds des caméras, plan par plan (motion.shot_metrics, colonne « finale » : les clés, tremblés et
+# opérateur compris). None : pas de contrôle. Un nombre vaut pour les neuf
+# plans ; CAM_LIMITS_PLAN les remplace plan par plan, par exemple {"P5": dict(pan=60.0, behind=0.5)}.
+CAM_PAN_MAX = None       # °/s : le lacet, d'une image à la suivante
+CAM_TILT_MAX = None      # °/s : le site
+CAM_VREL_MAX = None      # m/s : la caméra par rapport à la berline
+CAM_AREL_MAX = None      # m/s² : son accélération par rapport à la berline
+CAM_BEHIND_MIN = None    # part des images (0 à 1) où la caméra est derrière la berline (demi-espace arrière du cap)
+CAM_LIMITS_PLAN = {}
+
 
 def check(name, ok, detail=""):
     print(f"{'ok  ' if ok else 'ÉCHEC'} {name}{' : ' + detail if detail else ''}")
@@ -787,6 +797,25 @@ def test_operator():
     check("opérateur FIN6 : la pose validée tient à la dernière image", d < 0.05, f"{d:.3f}°")
 
 
+
+def test_camera_measure():
+    """La mesure des caméras des neuf plans (sans Blender) : chaque plan mesuré ; les plafonds de tête de
+    fichier, plan par plan."""
+    res = M.measure_shots()
+    check("caméras : les neuf plans mesurés", list(res) == list(M.PLANS)
+          and all(m["debut"] and m["fin"] for m in res.values()), ", ".join(res))
+    lim = dict(pan=CAM_PAN_MAX, tilt=CAM_TILT_MAX, v_rel=CAM_VREL_MAX, a_rel=CAM_AREL_MAX, behind=CAM_BEHIND_MIN)
+    for p, m in res.items():
+        L = dict(lim, **CAM_LIMITS_PLAN.get(p, {}))
+        for k, unit in (("pan", "°/s"), ("tilt", "°/s"), ("v_rel", "m/s"), ("a_rel", "m/s²")):
+            if L[k] is not None:
+                v = m["finale"][k]
+                check(f"caméra {p} : {k} ≤ {L[k]} {unit}", v <= L[k], f"{v:.1f} {unit} à l'image {m['finale'][k + '_at']}")
+        if L["behind"] is not None:
+            check(f"caméra {p} : derrière la berline ≥ {L['behind'] * 100:.0f} %", m["derriere"] >= L["behind"],
+                  f"{m['derriere'] * 100:.0f} % des images")
+
+
 if __name__ == "__main__":
     test_straight()
     test_braking()
@@ -810,5 +839,6 @@ if __name__ == "__main__":
     test_steer_dyn()
     test_aircraft()
     test_operator()
+    test_camera_measure()
     print(f"\n{'tout passe' if not FAIL else str(len(FAIL)) + ' échec(s)'}")
     sys.exit(1 if FAIL else 0)

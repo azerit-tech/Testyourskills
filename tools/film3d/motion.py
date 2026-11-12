@@ -1125,6 +1125,239 @@ def key_camera(cam, frames, fn, f0=F0, fps=FPS, operator=True):
         cam.data.keyframe_insert("lens", frame=f)
 
 
+# ---------------------------------------------------------------- la mesure des caméras, sans Blender
+#
+# Sur les clés calculées, plan par plan : la vitesse angulaire du panoramique (lacet) et de la bascule (site), la
+# vitesse et l'accélération de la caméra par rapport à la berline, la part des images où la caméra est derrière
+# elle (dans le demi-espace arrière de son cap), la place et la largeur de la berline à l'écran à la première et à
+# la dernière image. Deux colonnes : la trajectoire lissée (la caméra écrite, tremblés motion.handheld coupés) et
+# la trajectoire finale (ce que key_camera clé : l'écrite, tremblés compris, plus l'opérateur). Les vitesses se
+# lisent d'une image rendue à la suivante, comme à l'écran.
+#   python3 tools/film3d/motion.py mesure [PLAN…]
+
+HERO_BOX = (4.9, 1.8, 1.45)      # la berline : longueur, largeur, hauteur (m)
+
+
+class handheld_off:
+    """Le temps d'un bloc, motion.handheld rend zéro : la trajectoire écrite sans ses tremblés (la « lissée »)."""
+
+    def __enter__(self):
+        g = globals()
+        self.old = g["handheld"]
+        g["handheld"] = lambda t, amp=0.6, rotor=0.12, seed=0.0: (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        return self
+
+    def __exit__(self, *exc):
+        globals()["handheld"] = self.old
+        return False
+
+
+def screen_point(cam, p):
+    """(u, v) d'un point du monde dans l'image de la caméra cam = (x, y, z, lacet, site, roulis, focale), comme
+    key_camera la pose (cadre 9:16, capteur de 36 mm sur la hauteur) : u depuis la gauche, v depuis le haut, de 0 à
+    1 dans le cadre ; None derrière l'objectif."""
+    x, y, z, yaw, pitch, roll, lens = cam
+    a, b, c = math.radians(yaw), math.radians(pitch), math.radians(roll)
+    f = (-math.sin(a) * math.cos(b), -math.cos(a) * math.cos(b), math.sin(b))
+    r = (-math.cos(a), math.sin(a), 0.0)
+    u = (r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0])
+    r, u = ([math.cos(c) * r[i] + math.sin(c) * u[i] for i in range(3)],
+            [-math.sin(c) * r[i] + math.cos(c) * u[i] for i in range(3)])
+    d = (p[0] - x, p[1] - y, p[2] - z)
+    depth = sum(d[i] * f[i] for i in range(3))
+    if depth <= 0.01:
+        return None
+    return (0.5 + 0.5 * sum(d[i] * r[i] for i in range(3)) / depth / (10.125 / lens),
+            0.5 - 0.5 * sum(d[i] * u[i] for i in range(3)) / depth / (18.0 / lens))
+
+
+def hero_screen(cam, x, y, z, heading, box=HERO_BOX):
+    """La boîte de la berline à l'écran : dict(u, v (son centre, depuis la gauche et le haut), w (sa largeur),
+    u0, u1, v0, v1), en fractions du cadre ; None si elle est entière derrière l'objectif."""
+    h = math.radians(heading)
+    fx, fy = -math.sin(h), math.cos(h)
+    l, w, ht = box
+    pts = [screen_point(cam, (x + fx * l * a + fy * w * b, y + fy * l * a - fx * w * b, z + zz))
+           for a in (-0.5, 0.5) for b in (-0.5, 0.5) for zz in (0.0, ht)]
+    pts = [p for p in pts if p]
+    if not pts:
+        return None
+    u0, u1 = min(p[0] for p in pts), max(p[0] for p in pts)
+    v0, v1 = min(p[1] for p in pts), max(p[1] for p in pts)
+    return dict(u=(u0 + u1) / 2, v=(v0 + v1) / 2, w=u1 - u0, u0=u0, u1=u1, v0=v0, v1=v1)
+
+
+def shot_metrics(cam, hero, frames, heading=None, slip=None, ground=None, tracks=(), seed=0.0, rest=0.0,
+                 box=HERO_BOX, f0=F0, fps=FPS, op=None):
+    """Les mesures d'un plan (voir plus haut). cam(t) -> (x, y, z, lacet, site, roulis, focale) comme la scène la
+    passe à key_camera ; hero(t) -> (x, y) ; son cap : heading(t), sinon celui de sa marche plus slip(t) (rest à
+    l'arrêt) ; ground(x, y) -> (z, …) le sol sous elle ; tracks : les pos(t) des véhicules (secousses de passage).
+    frames : les images rendues ; op : des réglages de l'opérateur (OPERATOR) à changer pour la mesure.
+    Rend {"lissee": {...}, "finale": {...}, "kind": ..., "derriere": ..., "debut": ..., "fin": ...}."""
+    frames = list(frames)
+    keyed = list(range(frames[0] - 1, frames[-1] + 2))
+
+    def head(t):
+        if heading is not None:
+            return heading(t)
+        (vx, vy), _ = kinematics(hero, t)
+        base = heading_of(vx, vy) if math.hypot(vx, vy) > 0.3 else rest
+        return base + (slip(t) if slip else 0.0)
+
+    hp, hh = {}, {}
+    for f in keyed:
+        t = t_of(f, f0, fps)
+        x, y = hero(t)[:2]
+        hp[f] = (x, y, ground(x, y)[0] if ground else 0.0)
+        hh[f] = head(t)
+    with handheld_off():
+        smooth = {f: tuple(cam(t_of(f, f0, fps))) for f in keyed}
+    if dyn_on():
+        trs = []
+        for fn in tracks:
+            tr = {}
+            for f in keyed:
+                x, y = fn(t_of(f, f0, fps))[:2]
+                tr[f] = (x, y, ground(x, y)[0] if ground else 0.0)
+            trs.append(tr)
+        final = camera_operator(cam, keyed, f0, fps, tracks=trs, seed=seed, op=op)
+        kind = final.pop("kind")
+    else:
+        final = {f: tuple(cam(t_of(f, f0, fps))) for f in keyed}
+        kind = camera_kind(cam, keyed, f0, fps)
+
+    def rates(vals):
+        out = {}
+        ang = vals
+        for key, i in (("pan", 3), ("tilt", 4)):
+            best, at = 0.0, frames[0]
+            for fa, fb in zip(frames, frames[1:]):
+                r = abs(_unwrap(ang[fa][i], ang[fb][i]) - ang[fa][i]) * fps
+                if r > best:
+                    best, at = r, fa
+            out[key], out[key + "_at"] = best, at
+        # d'une image rendue à la suivante (les clés hors du plan, souvent figées, ne comptent pas)
+        rel = {f: [vals[f][k] - hp[f][k] for k in range(3)] for f in frames}
+        v = [math.dist(rel[f + 1], rel[f]) * fps for f in frames[:-1]]
+        a = [math.sqrt(sum((rel[f + 1][k] - 2 * rel[f][k] + rel[f - 1][k]) ** 2 for k in range(3))) * fps * fps
+             for f in frames[1:-1]]
+        out["v_rel"], out["a_rel"] = max(v), max(a)
+        out["v_rel_at"], out["a_rel_at"] = frames[v.index(max(v))], frames[1 + a.index(max(a))]
+        return out
+
+    behind = 0
+    for f in frames:
+        h = math.radians(hh[f])
+        dx, dy = final[f][0] - hp[f][0], final[f][1] - hp[f][1]
+        behind += (dx * -math.sin(h) + dy * math.cos(h)) < 0.0
+    first, last = frames[0], frames[-1]
+    return dict(lissee=rates(smooth), finale=rates(final), kind=kind,
+                derriere=behind / len(frames),
+                debut=hero_screen(final[first], *hp[first], hh[first], box),
+                fin=hero_screen(final[last], *hp[last], hh[last], box))
+
+
+def _bridge_z(y, _cache={}):
+    """La hauteur du tablier de P4 (scene_c.deck_z, recopiée sans Blender) : crête en -130, pied en -5, 6 %."""
+    k = round(y * 4)
+    if k not in _cache:
+        def ramp(y, a, t):
+            return min(1.0, max(0.0, (y - (a - t / 2)) / t))
+        z, yy, step = 0.0, -1010.0, 0.25
+        while yy < k / 4:
+            z += 0.06 * (ramp(yy + step / 2, -255.0, 12.0) - 2 * ramp(yy + step / 2, -130.0, 20.0)
+                         + ramp(yy + step / 2, -5.0, 12.0)) * step
+            yy += step
+        _cache[k] = max(0.0, z)
+    return _cache[k]
+
+
+def shot_specs():
+    """Les neuf plans comme leurs scènes les clés : {plan: arguments de shot_metrics} (les modules des plans, sans
+    Blender ; la caméra de P2 recopie scene_carrefour.low_camera, en repère de l'arc)."""
+    import fin6_orbite as F6
+    import fin_pointe as F
+    import ouv_avenue as OUV
+    import p1_avenue as P1
+    import p2_arc as P2
+    import p3_enseignes as P3
+    import p4_pont as P4
+    import p5_virage as P5
+    import p6_jetee as P6
+
+    def seed(name):
+        return sum(map(ord, name)) % 97
+
+    def rng(mod):
+        return range(mod.F0, mod.F0 + mod.FRAMES)
+
+    def p2_cam(t):
+        x, y, z = P2.low_cam_pos(t)
+        ax, ay, az = P2.low_cam_aim(t)
+        dx, dy, dz = ax - x, ay - y, az - z
+        yaw = math.degrees(math.atan2(-dx, -dy))
+        pitch = math.degrees(math.atan2(dz, math.hypot(dx, dy)))
+        dyaw, dpitch, droll, ddx, ddy, ddz = handheld(t, amp=0.25, rotor=0.15, seed=2.7)
+        return x + ddx, y + ddy, z + ddz, yaw + dyaw, pitch + dpitch, droll, P2.LOW_LENS
+
+    return {
+        "OUV": dict(cam=OUV.camera, hero=OUV.hero_pos, frames=rng(OUV), tracks=OUV.tracks().values(), seed=seed("cam")),
+        "P1": dict(cam=P1.camera, hero=P1.hero_pos, frames=rng(P1), tracks=P1.tracks().values(), seed=seed("cam")),
+        "P2": dict(cam=p2_cam, hero=P2.hero_pos, slip=P2.hero_slip, frames=rng(P2), tracks=P2.tracks().values(),
+                   seed=seed("cam")),
+        "P3": dict(cam=P3.camera, hero=P3.hero_pos, heading=P3.hero_heading, frames=rng(P3),
+                   tracks=P3.tracks().values(), seed=seed("cam")),
+        "P4": dict(cam=P4.camera, hero=P4.hero_pos, ground=lambda x, y: (_bridge_z(y),), frames=rng(P4),
+                   tracks=P4.tracks().values(), seed=seed("cam_P4")),
+        "P5": dict(cam=P5.camera, hero=P5.hero_pos, slip=P5.hero_slip, frames=rng(P5), tracks=P5.tracks().values(),
+                   seed=seed("cam_P5")),
+        "P6": dict(cam=P6.camera, hero=P6.hero_pos, frames=rng(P6), tracks=P6.tracks().values(), seed=seed("cam_P6")),
+        "FIN": dict(cam=F.camera, hero=F.hero_pos, heading=F.hero_heading, frames=rng(F), tracks=F.tracks().values(),
+                    seed=seed("cam_FIN")),
+        "FIN6": dict(cam=F6.camera, hero=lambda t: (F6.CX, F6.CY), heading=lambda t: F6.HERO_STOP, frames=rng(F6),
+                     seed=seed("cam_FIN6")),
+    }
+
+
+PLANS = ("OUV", "P1", "P2", "P3", "P4", "P5", "P6", "FIN", "FIN6")
+
+
+def measure_shots(plans=PLANS, op=None):
+    """{plan: shot_metrics} des plans demandés."""
+    specs = shot_specs()
+    return {p: shot_metrics(**specs[p], op=op) for p in plans}
+
+
+def measure_table(res):
+    """Le tableau des mesures, une ligne par plan (lissée / finale)."""
+    def scr(s):
+        return "      hors champ     " if not s else f"{s['u'] * 100:3.0f} {s['v'] * 100:3.0f} {s['w'] * 100:3.0f}"
+    lines = ["plan  type   panoramique °/s (image)   bascule °/s (image)   v rel m/s       a rel m/s²    "
+             "derrière  début u v l %  fin u v l %",
+             "             lissée finale             lissée finale         lissée finale  lissée finale"]
+    for p, m in res.items():
+        k = m["kind"]
+        typ = ("tele" if k.get("tele") else "pan" if k.get("pan_active", k.get("pan", 0) >= OPERATOR["pan_min"])
+               else "trav" if k.get("travel", 0) > 1.5 else "fixe") + ("/air" if k.get("air") else "")
+        a, b = m["lissee"], m["finale"]
+        lines.append(f"{p:5s} {typ:6s} {a['pan']:6.1f} {b['pan']:6.1f} ({a['pan_at']:2d})           "
+                     f"{a['tilt']:6.1f} {b['tilt']:6.1f} ({a['tilt_at']:2d})       "
+                     f"{a['v_rel']:6.1f} {b['v_rel']:6.1f}  {a['a_rel']:6.1f} {b['a_rel']:6.1f}   "
+                     f"{m['derriere'] * 100:4.0f} %   {scr(m['debut'])}    {scr(m['fin'])}")
+    lines.append("lissée : la caméra écrite sans ses tremblés ; finale : les clés, tremblés et opérateur compris, "
+                 "image à image. u, v : centre de la berline depuis la gauche et le haut, l : sa largeur, en % du cadre.")
+    return "\n".join(lines)
+
+
+def _main(argv):
+    if argv and argv[0] == "mesure":
+        plans = [p.upper() for p in argv[1:]] or list(PLANS)
+        print(measure_table(measure_shots(plans)))
+        return 0
+    print("usage : python3 tools/film3d/motion.py mesure [PLAN…]")
+    return 2
+
+
 def key_searchlight(heli_dict, frames, target_fn, f0=F0, fps=FPS):
     """Le projecteur d'hélicoptère (cast_vehicles.load_helicopter) qui vise target_fn(t) -> (x, y, z) monde à
     chaque image ; l'hélicoptère doit déjà avoir ses clés (son pivot suit sa cellule)."""
@@ -1207,3 +1440,10 @@ def spin_rotors(heli_dict, rpm_main=380.0, rpm_tail=2200.0):
     """Les rotors d'un hélicoptère de cast_vehicles, en tours par minute (pilotes sur l'image)."""
     import cast_vehicles as cv
     cv.spin_rotors(heli_dict, rpm_main=rpm_main, rpm_tail=rpm_tail)
+
+
+if __name__ == "__main__":
+    import sys
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import motion as _M          # le module que les plans importent (handheld_off doit agir sur lui)
+    sys.exit(_M._main(sys.argv[1:]))
