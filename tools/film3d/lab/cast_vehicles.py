@@ -393,7 +393,14 @@ def mat_lenses(name="lightbar_lenses", strength=0.0, split_axis=1):
     nt.links.new(side, mix.inputs["Factor"])
     p = _principled(nt, **{"Roughness": 0.08, "Transmission Weight": 0.6, "IOR": 1.5, "Emission Strength": strength})
     nt.links.new(mix.outputs[2], p.inputs["Base Color"])
-    nt.links.new(mix.outputs[2], p.inputs["Emission Color"])
+    # la moitié éteinte du clignotement (motion.flash_bars, via lightbar_lights) s'éteint aussi ici
+    on = _bar_on(nt, side)
+    ecol = nt.nodes.new("ShaderNodeMix")
+    ecol.data_type = "RGBA"
+    nt.links.new(_math(nt, "ADD", BAR_REST, _math(nt, "MULTIPLY", on, 1.0 - BAR_REST)), ecol.inputs["Factor"])
+    ecol.inputs[6].default_value = (0, 0, 0, 1)
+    nt.links.new(mix.outputs[2], ecol.inputs[7])
+    nt.links.new(ecol.outputs[2], p.inputs["Emission Color"])
     nt.links.new(p.outputs[0], out.inputs[0])
     return m
 
@@ -707,7 +714,29 @@ def lightbar_lights(bar, energy=600.0):
             ob.location = loc
             ob.light_linking.receiver_collection = shell
             out.append(ob)
+    bar_drive_lenses(bar, {"corail": out[0].data, "lilas": out[2].data})
     return out
+
+
+def bar_drive_lenses(bar, lights):
+    """Les optiques de la rampe suivent ses lueurs : sur chaque maillage de la rampe, bar_off_corail et
+    bar_off_lilas (lus par les matières, _bar_on) valent 0 quand la lueur de ce côté est à sa pleine énergie et 1
+    quand motion.flash_bars l'a baissée (6 %). Pilotes à expression simple (sans Python), lus à chaque image ;
+    les copies liées (lieux.clone) gardent ces pilotes et leurs lumières partagées."""
+    for o in [bar] + [c for c in bar.children_recursive if c.type == "MESH"]:
+        for tone, d in lights.items():
+            key = f"bar_off_{tone}"
+            o[key] = 0.0
+            fc = o.driver_add(f'["{key}"]')
+            drv = fc.driver
+            drv.type = "SCRIPTED"
+            v = drv.variables.new()
+            v.name = "e"
+            v.type = "SINGLE_PROP"
+            v.targets[0].id_type = "LIGHT"
+            v.targets[0].id = d
+            v.targets[0].data_path = "energy"
+            drv.expression = f"max(0.0, min(1.0, 1.25 - 1.25 * e / {max(d.energy, 1e-3):.3f}))"
 
 
 def tail_lights(body, points, on=True, energy=6.0):
@@ -741,71 +770,152 @@ def _raw_tex(sock):
     return sock
 
 
-def mat_bar_retint(src, name, strength=0.0):
-    """Rampe détaillée : ses caches colorés (rouge / bleu dans la texture d'origine) deviennent corail (+y)
-    et violet (-y) et s'allument ; le boîtier et les caches clairs gardent la texture."""
+# Les cœurs des modules, plus saturés que la palette : AgX désature une émission forte vers le blanc, un corail
+# pur à 8 sortait saumon. Le diffuseur reste à la couleur de la palette.
+CORAL_CORE = (1.0, 0.075, 0.018, 1.0)
+LILAC_CORE = (0.16, 0.07, 1.0, 1.0)
+BAR_CORE = 2.2        # cœur d'un module allumé : × la force de la rampe (BAR_GLOW 2 -> 4,4)
+BAR_DIFFUSE = 0.09    # le reste du diffuseur allumé, relatif au cœur
+BAR_REST = 0.03       # une moitié éteinte garde un reste de lueur (le diffuseur chauffé)
+
+
+def _bar_side(nt, sep):
+    """1 côté corail (+y objet), 0 côté lilas."""
+    return _math(nt, "GREATER_THAN", sep.outputs[1], 0.0)
+
+
+def _bar_on(nt, side):
+    """1 quand la moitié de la rampe de ce côté est allumée. Les objets de la rampe portent bar_off_corail et
+    bar_off_lilas (0 allumé, 1 éteint), pilotés par l'énergie de leurs lueurs (lightbar_lights) : le
+    clignotement que motion.flash_bars pose sur les lumières passe aux lentilles. Sans ces propriétés (rampe
+    sans lueurs), l'attribut vaut 0 : allumée."""
+    offs = []
+    for key in ("bar_off_corail", "bar_off_lilas"):
+        a = nt.nodes.new("ShaderNodeAttribute")
+        a.attribute_type = "OBJECT"
+        a.attribute_name = key
+        offs.append(a.outputs["Fac"])
+    off = _math(nt, "ADD", _math(nt, "MULTIPLY", side, offs[0]),
+                _math(nt, "MULTIPLY", _math(nt, "SUBTRACT", 1.0, side), offs[1]))
+    return _math(nt, "SUBTRACT", 1.0, off)
+
+
+def _bar_modules(nt, sep, zc, zh, per_m=8.5):
+    """Les modules de la rampe, en coordonnées objet : un cœur par cellule le long de la rampe (y), dans la bande
+    du milieu de sa hauteur ; renvoie (cœur 0..1, réflecteur 0..1 : l'anneau autour du cœur)."""
+    cell = _math(nt, "ABSOLUTE", _math(nt, "SUBTRACT", _math(nt, "FRACT", _math(nt, "MULTIPLY", sep.outputs[1], per_m)), 0.5))
+    dz = _math(nt, "ABSOLUTE", _math(nt, "SUBTRACT", sep.outputs[2], zc))
+
+    def ramp(v, a, b):
+        r = nt.nodes.new("ShaderNodeMapRange")
+        r.clamp = True
+        r.inputs["From Min"].default_value = a
+        r.inputs["From Max"].default_value = b
+        r.inputs["To Min"].default_value = 1.0
+        r.inputs["To Max"].default_value = 0.0
+        nt.links.new(v, r.inputs["Value"])
+        return r.outputs[0]
+    # distance au centre du module, en largeurs de cellule : des coupelles rondes, pas des cadres
+    dzc = _math(nt, "MULTIPLY", dz, per_m)
+    d = _math(nt, "SQRT", _math(nt, "ADD", _math(nt, "MULTIPLY", cell, cell), _math(nt, "MULTIPLY", dzc, dzc)))
+    core = ramp(d, 0.07, 0.17)
+    dish = ramp(d, 0.30, 0.44)
+    # le cœur ne déborde pas de la hauteur de la rampe
+    core = _math(nt, "MULTIPLY", core, ramp(dz, 0.30 * zh, 0.40 * zh))
+    return core, _math(nt, "MAXIMUM", _math(nt, "SUBTRACT", dish, core), 0.0)
+
+
+def mat_bar_retint(src, name, strength=0.0, zc=0.06, zh=0.12):
+    """Rampe détaillée : le boîtier garde sa texture (sombre) ; toutes ses optiques (caches clairs et caches
+    rouges / bleus de la texture d'origine) deviennent des diffuseurs clairs, fumés, sur des réflecteurs chromés :
+    une rangée de modules par moitié, corail (+y) et lilas (-y). Allumée, chaque module a un cœur saturé et le
+    diffuseur une lueur douce de sa couleur ; la moitié éteinte du clignotement laisse voir ses réflecteurs.
+    zc, zh : hauteur du milieu et hauteur de la rampe (repère de la rampe)."""
     m = src.copy()
     m.name = name
     nt = m.node_tree
     p = next(n for n in nt.nodes if n.type == "BSDF_PRINCIPLED")
     orig = p.inputs["Base Color"].links[0].from_socket if p.inputs["Base Color"].links else None
+    outn = next(n for n in nt.nodes if n.type == "OUTPUT_MATERIAL")
     tc = nt.nodes.new("ShaderNodeTexCoord")
     sep = nt.nodes.new("ShaderNodeSeparateXYZ")
     nt.links.new(tc.outputs["Object"], sep.inputs[0])
-    side = _math(nt, "GREATER_THAN", sep.outputs[1], 0.0)
-    lens = nt.nodes.new("ShaderNodeMix")
-    lens.data_type = "RGBA"
-    lens.inputs[6].default_value = lin(LILAC)
-    lens.inputs[7].default_value = lin(CORAL)
-    nt.links.new(side, lens.inputs["Factor"])
-    if orig is not None:
-        hsv = nt.nodes.new("ShaderNodeSeparateColor")
-        hsv.mode = "HSV"
-        # sur l'image brute : le facteur de couleur du glTF (0,16) éteignait le masque de luminosité
-        nt.links.new(_raw_tex(orig), hsv.inputs[0])
-        fac = nt.nodes.new("ShaderNodeMapRange")
-        fac.inputs["From Min"].default_value = 0.25
-        fac.inputs["From Max"].default_value = 0.5
-        nt.links.new(hsv.outputs[1], fac.inputs["Value"])
-        fac = fac.outputs[0]
-        lit = nt.nodes.new("ShaderNodeMapRange")
-        lit.inputs["From Min"].default_value = 0.35
-        lit.inputs["From Max"].default_value = 0.7
-        nt.links.new(hsv.outputs[2], lit.inputs["Value"])
-        if strength > 0:
-            # allumée, les caches clairs prennent aussi la couleur de leur côté (sinon leur blanc domine la lueur)
-            fac = _math(nt, "MAXIMUM", fac, lit.outputs[0])
-        col = nt.nodes.new("ShaderNodeMix")
-        col.data_type = "RGBA"
-        nt.links.new(fac, col.inputs["Factor"])
-        nt.links.new(orig, col.inputs[6])
-        nt.links.new(lens.outputs[2], col.inputs[7])
-        for l in list(p.inputs["Base Color"].links):
-            nt.links.remove(l)
-        nt.links.new(col.outputs[2], p.inputs["Base Color"])
-        # allumée, toute l'optique (caches clairs compris, la texture y est claire) brille de la couleur de son côté ;
-        # le boîtier (sombre dans la texture) reste éteint. Optique allumée en émission pure : sans vernis ni
-        # reflet du ciel par-dessus, la couleur reste celle de la lentille (le Principled l'éclaircissait en pastel)
-        p.inputs["Emission Strength"].default_value = 0.0
-        if strength > 0:
-            outn = next(n for n in nt.nodes if n.type == "OUTPUT_MATERIAL")
-            em = nt.nodes.new("ShaderNodeEmission")
-            nt.links.new(lens.outputs[2], em.inputs["Color"])
-            em.inputs["Strength"].default_value = strength
-            mixs = nt.nodes.new("ShaderNodeMixShader")
-            nt.links.new(lit.outputs[0], mixs.inputs[0])
-            nt.links.new(p.outputs[0], mixs.inputs[1])
-            nt.links.new(em.outputs[0], mixs.inputs[2])
-            nt.links.new(mixs.outputs[0], outn.inputs["Surface"])
-    else:
-        p.inputs["Emission Strength"].default_value = strength
-    nt.links.new(lens.outputs[2], p.inputs["Emission Color"])
-    # caches pleins (la texture les rendait à demi transparents, ce qui éteignait la couleur)
+    side = _bar_side(nt, sep)
     for key in ("Alpha", "Transmission Weight"):
         for l in list(p.inputs[key].links):
             nt.links.remove(l)
     p.inputs["Alpha"].default_value = 1.0
     p.inputs["Transmission Weight"].default_value = 0.0
+    p.inputs["Emission Strength"].default_value = 0.0
+    if orig is None:
+        p.inputs["Base Color"].default_value = (0.02, 0.02, 0.022, 1.0)
+        return m
+    hsv = nt.nodes.new("ShaderNodeSeparateColor")
+    hsv.mode = "HSV"
+    # sur l'image brute : le facteur de couleur du glTF (0,16) éteignait le masque de luminosité
+    nt.links.new(_raw_tex(orig), hsv.inputs[0])
+    lit = nt.nodes.new("ShaderNodeMapRange")
+    lit.inputs["From Min"].default_value = 0.35
+    lit.inputs["From Max"].default_value = 0.6
+    nt.links.new(hsv.outputs[2], lit.inputs["Value"])
+    optic = lit.outputs[0]
+    # le boîtier : la texture d'origine, assombrie (plastique noir satiné)
+    for l in list(p.inputs["Base Color"].links):
+        nt.links.remove(l)
+    p.inputs["Base Color"].default_value = (0.012, 0.012, 0.014, 1.0)
+    for l in list(p.inputs["Roughness"].links):
+        nt.links.remove(l)
+    p.inputs["Roughness"].default_value = 0.42
+    for l in list(p.inputs["Metallic"].links):
+        nt.links.remove(l)
+    p.inputs["Metallic"].default_value = 0.0
+    core, refl = _bar_modules(nt, sep, zc, zh)
+    # l'optique : un diffuseur fumé verni sur des réflecteurs chromés (visibles éteinte), à peine teinté de sa couleur
+    tint = nt.nodes.new("ShaderNodeMix")
+    tint.data_type = "RGBA"
+    nt.links.new(side, tint.inputs["Factor"])
+    tint.inputs[6].default_value = (0.05, 0.05, 0.075, 1.0)
+    tint.inputs[7].default_value = (0.08, 0.04, 0.035, 1.0)
+    base = nt.nodes.new("ShaderNodeMix")
+    base.data_type = "RGBA"
+    nt.links.new(_math(nt, "MAXIMUM", refl, _math(nt, "MULTIPLY", core, 0.6)), base.inputs["Factor"])
+    nt.links.new(tint.outputs[2], base.inputs[6])
+    base.inputs[7].default_value = (0.55, 0.55, 0.58, 1.0)
+    lens = _principled(nt, **{"Roughness": 0.18, "Coat Weight": 1.0, "Coat Roughness": 0.02, "Coat IOR": 1.55})
+    nt.links.new(base.outputs[2], lens.inputs["Base Color"])
+    nt.links.new(_math(nt, "MAXIMUM", refl, _math(nt, "MULTIPLY", core, 0.6)), lens.inputs["Metallic"])
+    shader = lens.outputs[0]
+    if strength > 0:
+        on = _bar_on(nt, side)
+        col = nt.nodes.new("ShaderNodeMix")
+        col.data_type = "RGBA"
+        nt.links.new(side, col.inputs["Factor"])
+        col.inputs[6].default_value = LILAC_CORE
+        col.inputs[7].default_value = CORAL_CORE
+        level = _math(nt, "MULTIPLY", _math(nt, "ADD", core, BAR_DIFFUSE),
+                      _math(nt, "ADD", BAR_REST, _math(nt, "MULTIPLY", on, 1.0 - BAR_REST)))
+        ecol = nt.nodes.new("ShaderNodeMix")
+        ecol.data_type = "RGBA"
+        ecol.blend_type = "MULTIPLY"
+        ecol.inputs["Factor"].default_value = 1.0
+        nt.links.new(col.outputs[2], ecol.inputs[6])
+        comb = nt.nodes.new("ShaderNodeCombineXYZ")
+        for i in range(3):
+            nt.links.new(level, comb.inputs[i])
+        nt.links.new(comb.outputs[0], ecol.inputs[7])
+        em = nt.nodes.new("ShaderNodeEmission")
+        nt.links.new(ecol.outputs[2], em.inputs["Color"])
+        # la force reste un nombre (lieux.bar_boost la multiplie pour les plans lointains)
+        em.inputs["Strength"].default_value = strength * BAR_CORE
+        add = nt.nodes.new("ShaderNodeAddShader")
+        nt.links.new(lens.outputs[0], add.inputs[0])
+        nt.links.new(em.outputs[0], add.inputs[1])
+        shader = add.outputs[0]
+    mixs = nt.nodes.new("ShaderNodeMixShader")
+    nt.links.new(optic, mixs.inputs[0])
+    nt.links.new(p.outputs[0], mixs.inputs[1])
+    nt.links.new(shader, mixs.inputs[2])
+    nt.links.new(mixs.outputs[0], outn.inputs["Surface"])
     if hasattr(m, "surface_render_method"):
         m.surface_render_method = "DITHERED"
     return m
@@ -827,9 +937,10 @@ def hq_lightbar(collection=None, strength=0.0, width=1.2):
     lens = pick(keep, "roof lights")[0]
     base.name = base.data.name = "hq_lightbar"
     lens.name = lens.data.name = "hq_lightbar_lenses"
+    zh = (mx.z - mn.z) * s
     for i, m in enumerate(base.data.materials):
         if m is not None:
-            base.data.materials[i] = mat_bar_retint(m, "hq_lightbar_shell", strength)
+            base.data.materials[i] = mat_bar_retint(m, "hq_lightbar_shell", strength, zc=0.5 * zh, zh=zh)
     _assign([lens], mat_lenses("hq_lightbar_lenses", strength))
     parent_keep(lens, base)
     return base, lens
