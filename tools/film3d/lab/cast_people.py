@@ -1973,7 +1973,8 @@ STYLES = [
 
 def pose_officer(arm, pose="aim", style=0):
     """« aim » : debout, visée à deux mains ; « crouch » : un genou au sol, derrière une portière, buste
-    penché sur le haut de la portière ; « guard » : debout, arme basse à deux mains. `style` (0, 1, 2…)
+    penché sur le haut de la portière ; « guard » : debout, arme basse à deux mains ; « stop » : debout, bras
+    gauche tendu paume ouverte, arme basse dans la main droite. `style` (0, 1, 2…)
     varie l'attitude d'un policier à l'autre (voir STYLES ; 1 et 2 non testés en rendu)."""
     st = STYLES[style % len(STYLES)]
     reset_pose(arm)
@@ -1987,6 +1988,26 @@ def pose_officer(arm, pose="aim", style=0):
         _spine_bend(arm, 4 + st["fwd"], deg_side=st["lean"] * 1.2, deg_twist=st["twist"])
         _arms_aim(arm, low_ready=True)
         _head_look(arm, (F + D * 0.08 + L * 0.1 * style).normalized())
+    elif pose == "stop":
+        # debout, le bras gauche tendu devant, paume ouverte vers l'avant, doigts écartés (« halte ») ; l'arme
+        # basse dans la main droite, canon vers le sol devant le pied : une silhouette qui se lit à 20 m, et rien
+        # ne vise l'objectif
+        _stand(arm, crouch=-0.015, stagger=0.12 + st["stagger"], width=1.8 + st["width"], shift=st["shift"])
+        _spine_bend(arm, 3 + st["fwd"], deg_side=st["lean"], deg_twist=6 + st["twist"])
+        shl = pb(arm, "LeftArm").head
+        # le bras presque tendu, à hauteur d'épaule (jamais au-dessus : levé en diagonale, il évoquait un salut),
+        # entre l'avant et le côté, la main relevée à angle droit : de face, à 20 m, un bras plié droit devant ne
+        # faisait qu'une bosse sur l'épaule
+        two_bone(arm, "LeftArm", "LeftForeArm", "LeftHand", shl + F * 0.38 + L * 0.36 + U * 0.0,
+                 L * 0.3 + D * 1.0 + B * 0.3)
+        set_hand(arm, "L", (U + F * 0.12).normalized(), F)
+        curl(arm, "L", angles=(3, 4, 2), thumb=(-12, 5, 5), spread=14)
+        shr = pb(arm, "RightArm").head
+        two_bone(arm, "RightArm", "RightForeArm", "RightHand", shr + D * 0.48 + F * 0.16 + R * 0.07,
+                 R * 0.5 + B * 1.0)
+        set_hand(arm, "R", (D + F * 0.6).normalized(), L)
+        curl(arm, "R", angles=(75, 85, 55), thumb=(10, 20, 15))
+        _head_look(arm, (F + D * 0.04).normalized())
     elif pose == "crouch":
         hp0 = pb(arm, "Hips").head.copy()
         ah = _ankle_h(arm)
