@@ -37,10 +37,12 @@ ap.add_argument("--no-denoise", action="store_true")
 ap.add_argument("--probe", default="", help="image@u,v;… : l'objet et la matière sous ces points du cadre")
 a = ap.parse_args(sys.argv[sys.argv.index("--") + 1:])
 
-t0 = time.time()
+import debit  # noqa: E402
+
 mod = __import__(SOURCES[a.plan])
-scene = mod.build(a.plan)
-print(f"[diag] {a.plan} construit en {time.time() - t0:.0f} s", flush=True)
+# la scène en cache (debit.py) : reconstruite seulement si un fichier qu'elle a lu, ou une variable FILM3D_*, a changé
+scene, how, t_build, _ = debit.cached_build(a.plan, a.plan, lambda: mod.build(a.plan), L.ASSETS)
+print(f"[diag] {a.plan} {'repris du cache' if how == 'cache' else 'construit'} en {t_build:.0f} s", flush=True)
 for pre in [p for p in a.hide.split(",") if p]:
     n = 0
     for ob in scene.objects:

@@ -250,16 +250,18 @@ def worker(a):
             f"carton (à reprendre quand {mod_name} le construira)")
         write_info(skipped=f"{mod_name} ne construit pas {plan}")
         return
-    t0 = time.time()
-    scene = (mod.build(arg) if arg and inspect.signature(mod.build).parameters else mod.build()) or bpy.context.scene
-    t_build = time.time() - t0
+    import debit
+    scene, how, t_build, read = debit.cached_build(
+        plan, arg, lambda: mod.build(arg) if arg and inspect.signature(mod.build).parameters else mod.build(),
+        ASSETS, blend_out=os.environ["FILM3D_BLEND"], use=False if a.mode == "list" else None)
+    seen.update(read)
     still = scene.frame_current
     span = scene.frame_end - scene.frame_start + 1
     animated = span > 3
     if animated and span < n:
         log(f"! {plan} : la scène n'a que {span} images pour un plan de {n} ; le montage tiendra la dernière")
     first = scene.frame_start
-    log(f"{plan} construit par {mod_name} en {hms(t_build)} : " + (
+    log(f"{plan} {'repris du cache' if how == 'cache' else 'construit par ' + mod_name} en {hms(t_build)} : " + (
         f"animé, images {first} à {first + min(span, n) - 1} de la scène" if animated else
         f"PAS ANIMÉ (plage {scene.frame_start}-{scene.frame_end}) : son image fixe {still} sera répétée {n} fois"))
 
@@ -294,7 +296,7 @@ def worker(a):
     apply_essais(bpy, scene, essais)
     res, engine, device, samples = setup_render(bpy, scene, a)
     write_info(module=mod_name, animated=animated, scene_frames=[scene.frame_start, scene.frame_end], still=still,
-               res=list(res), engine=engine, device=device, samples=samples, build_s=round(t_build, 1))
+               res=list(res), engine=engine, device=device, samples=samples, build_s=round(t_build, 1), scene_src=how)
     if a.mode == "list":
         return
 
@@ -588,7 +590,7 @@ def run_worker(a, plan, blender):
                 lines = (buf + rf.read()).split("\n")
                 buf = "" if done else lines.pop()          # une ligne pas encore finie attend le tour suivant
                 for line in lines:
-                    if line.startswith("[film]") or "Error" in line or "Traceback" in line:
+                    if line.startswith(("[film]", "[debit]")) or "Error" in line or "Traceback" in line:
                         print(line.rstrip(), flush=True)
                 v = vram_used()
                 if v is not None:
@@ -720,8 +722,23 @@ def selftest():
         open(frame_path(d, 5), "wb").write(png(18, 32))              # autre taille
         assert png_size(frame_path(d, 1)) == (36, 64) and png_size(frame_path(d, 3)) is None
         assert todo(d, range(1, 7), (36, 64)) == [3, 5, 6], todo(d, range(1, 7), (36, 64))
+    # la clé du cache de scène (debit.py) : les variables de rendu n'y entrent pas, un fichier lu qui change l'invalide
+    if HERE not in sys.path:
+        sys.path.insert(0, HERE)
+    import debit
+    env = {"FILM3D_HERO": "w111", "FILM3D_BLEND": "/x/scene.blend", "FILM3D_DRAFT": "1", "HOME": "/h"}
+    assert debit.env_key(env) == {"FILM3D_HERO": "w111"}, debit.env_key(env)
+    h1 = debit.head_hash(debit.head_key("P3", None, "5.2.2", env))
+    assert h1 == debit.head_hash(debit.head_key("P3", None, "5.2.2", dict(env, FILM3D_BLEND="/y")))
+    assert h1 != debit.head_hash(debit.head_key("P3", None, "5.2.2", dict(env, FILM3D_HERO="slc")))
+    with tempfile.TemporaryDirectory() as d:
+        open(os.path.join(d, "m.py"), "w").write("A = 1\n")
+        deps = {"code": {"m.py": debit.sha1(os.path.join(d, "m.py"))}, "assets": {}}
+        assert debit.deps_match(deps, root=d)
+        open(os.path.join(d, "m.py"), "w").write("A = 2\n")
+        assert not debit.deps_match(deps, root=d)
     print("[film] selftest : durées (508 images, plans pas encore migrés compris), --frames, essais, reprise "
-          "(absente, tronquée, autre taille) : ok")
+          "(absente, tronquée, autre taille), clé du cache de scène : ok")
 
 
 def main():
