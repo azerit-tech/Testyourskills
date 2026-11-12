@@ -1070,8 +1070,8 @@ def build_port(hidden, lamp_src, far=False, palier=None):
 import motion as M          # noqa: E402  (le mouvement calculé, pur Python)
 import p5_virage as P5      # noqa: E402  (la trajectoire de P5, écrite une fois)
 
-CAM = Vector(P5.CAM)                 # au sol, à l'extérieur du virage (découpage v2 : (0 ; 76 ; 0,45))
-STILL_FRAME = 16                     # l'image fixe d'essai (rendu d'une seule image) : la berline passe, en glisse
+CAM = Vector(P5.CAM)                 # la caméra à la première image, 8 m derrière la berline (découpage v3)
+STILL_FRAME = 24                     # l'image fixe d'essai (rendu d'une seule image) : au plus fort de la glisse
 FRAMES = range(P5.F0 - 1, P5.F0 + P5.FRAMES + 1)   # une image de part et d'autre : l'obturateur du flou
 
 
@@ -1285,13 +1285,12 @@ def car_fill(cam, hero, energy=1400.0, size=4.0):
 
 
 def plan_P5(scene, hidden, palier="conteneurs"):
-    """P5, la baïonnette du port (découpage v2), animé (28 images, p5_virage.py) : la caméra fixe au sol, à
-    l'extérieur du virage, dans le prolongement de la ligne d'arrivée, 32 mm. La berline sort du pont déjà en
-    travers, tourne tard, glisse à droite (contre-braquage, roulis vers l'extérieur) et passe à 10 m de l'objectif,
-    l'arrière chassant vers lui ; la meute dévale la voie du pont derrière elle (dans le champ au début) ; le
-    faisceau de l'hélicoptère court sur la voie derrière elle et la rattrape ; le panoramique la suit (65°), puis
-    se lève sur l'hélicoptère qui arrive de l'est, grand, incliné. Toutes les clés viennent des trajectoires
-    (motion.py) ; le flou de mouvement les suit."""
+    """P5, l'hélicoptère fond sur le quai (découpage v3), animé (48 images, p5_virage.py) : la caméra suit la
+    berline, 8 m derrière, puis prend le virage plus large et panoramique pour la garder pendant la glisse, 21 mm.
+    La berline freine au bout du pont, vire à droite en glisse (contre-braquage, roulis vers l'extérieur) et file
+    sur la voie du quai ; la patrouille 1 double la caméra par la gauche et sort large ; la meute reste sur la
+    voie du pont, derrière ; l'hélicoptère plonge sur le quai devant elle, faisceau sur elle. Toutes les clés
+    viennent des trajectoires (motion.py) ; le flou de mouvement les suit."""
     import scene_c
     lamp_src = L.panorama(scene, hidden, bridge=None, port=None)
     # le pont avec son pylône et ses haubans (P4 les montre : au début de P5 ils sont dans l'axe, au fond)
@@ -1398,8 +1397,8 @@ def plan_P5(scene, hidden, palier="conteneurs"):
         if ob.type == "LIGHT" and ob != h["searchlight"]:
             ob.visible_volume_scatter = False
     L.haze((-140, 160), (-280, 115), (L.WATER_Z, 70), 0.0016)    # lieux.haze tourne ses normales vers l'extérieur
-    # --- la caméra fixe au sol, 32 mm, mise au point sur la berline (de 19 à 10 m, puis 11)
-    cam = L.camera("cam_P5", tuple(CAM), (CAM.x + 3.5, CAM.y - 19.0, 0.7), lens=P5.LENS, fstop=4.0)
+    # --- la caméra qui suit la berline (de 8 à 10,3 m), 21 mm, mise au point sur elle
+    cam = L.camera("cam_P5", tuple(CAM), (CAM.x + 1.0, CAM.y + 8.0, 0.7), lens=P5.LENS, fstop=4.0)
     M.key_camera(cam, FRAMES, P5.camera)
     cam.data.dof.focus_object = hero
     car_fill(cam, hero)
