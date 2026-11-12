@@ -46,7 +46,7 @@ Ce qui reste du v2 : les principes 1 (bas, près, grand-angle), 2 (la longue foc
 
 ### 2.1 Conventions
 
-- Cadre : `x` depuis la gauche, `y` depuis le bas, en % ; zone utile y 15–88 %.
+- Cadre : `x` depuis la gauche, en %. Le `y` du **centre de la berline** (fiches et tableau des coupes) se compte **depuis le haut** du cadre, comme la règle des plans bas (centre entre 50 et 62 % de la hauteur) : y 55 % la met un peu sous le milieu. Tous les autres `y` (phare, hélicoptères, avions, pylône, rampes) et la zone utile y 15–88 % se comptent **depuis le bas**. `motion.py mesure --v3` suit cette lecture (`CAM_Y_FROM_TOP = True`).
 - « Largeur » : la largeur de la boîte de la berline projetée, en % de la largeur du cadre.
 - Position de la caméra « par rapport à la berline » : « derrière d » = d mètres derrière son centre, **le long de sa vitesse** (pas de sa caisse : en glisse, la caisse tourne, la caméra reste derrière la route) ; « à gauche » = à gauche de sa route ; hauteur au-dessus du sol.
 - Capteur 36 mm sur la hauteur, cadre 9:16 (comme `p5_virage.project`). Demi-champ horizontal : 21 mm 25,7°, 24 mm 22,9°, 200 mm 2,9°.
