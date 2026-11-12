@@ -76,6 +76,51 @@ def v3_limits():
     return base, CAM_LIMITS_PLAN
 
 
+# Le découpage v3.1 (verdict du bout-à-bout v3 : caméra trop basse, cadre qui change, voiture pas fluide) : un seul
+# cadre de poursuite pour les plans de dos (motion.V31_BACK), une berline lourde sur le mouillé, rien qui saute à
+# l'écran. Seuls les plans qui portent V31 = True sont contrôlés (motion.py mesure --v3 les montre tous).
+CAM31_H = (2.1, 2.7)          # m, caméra sans tremblé au-dessus de la chaussée sous l'objectif (visée 2,4)
+CAM31_H_FLOOR = 1.8           # m, jamais dessous
+CAM31_DIST = (6.5, 8.5)       # m, distance horizontale au centre de la berline (visée 7,5)
+CAM31_DH, CAM31_DD = 0.4, 1.0         # m, variation dans le plan (hauteur, distance)
+CAM31_SIDE = (-0.3, 1.5)      # m, décalage à gauche de la route de la berline (0 à 1,5 ; 0,3 de tolérance à droite)
+CAM31_LENS = 24.0             # mm, partout
+CAM31_CENTER_X, CAM31_CENTER_Y = (50.0, 6.0), (58.0, 4.0)   # % (y depuis le haut) : visée, tolérance
+CAM31_WIDTH_VAR = 0.15        # largeur de la berline à ±15 % de sa médiane dans le plan
+CAM31_CUT_DH, CAM31_CUT_DD = 0.3, 0.8                     # m, aux coupes entre deux plans de dos
+# la voiture, au centre de la caisse, aux images rendues (m/s², m/s³, °/s²)
+CAR31_HERO = dict(lat=6.5, brake=7.0, acc=3.0, circle=7.5, jerk=12.0, yaw_acc=120.0)
+CAR31_PATROL = dict(lat=7.0, brake=7.0, acc=4.0, circle=7.5, jerk=12.0, yaw_acc=120.0)
+CAR31_STOP_LAMP = 2.0         # m/s² de freinage : fenêtres des feux stop (hero_cars.stop_lamps)
+# la glisse (cap de la caisse moins cap de la vitesse)
+SLIP31_MAX = 18.0             # °
+SLIP31_ON, SLIP31_OFF = 40.0, 30.0    # °/s, installation et retour
+SLIP31_ACC = 5.5              # m/s² d'accélération combinée : dessous, elle ne naît pas
+SLIP31_LOSS = 0.10            # la vitesse perd au moins 10 % pendant une glisse de plus de 5°
+SLIP31_BACK = 4.0             # ° au plus de retour de l'autre côté, une fois
+# la fluidité à l'écran (le centre de la berline vu par les clés finales, % de la largeur du cadre par image² et
+# image³) et la caisse (roulis et tangage bornés, Δ² du roulis par image², écart au seul transfert de masse)
+SCREEN31_D2, SCREEN31_D3 = 0.25, 0.35
+BODY31_ROLL, BODY31_PITCH = 4.0, 2.0
+BODY31_ROLL_D2, BODY31_NOISE = 0.10, 0.15
+CAM31_LIMITS_PLAN = {
+    "P6": {"rise_after": 0.5, "rise_h_max": 3.6},           # monte à la fin pour découvrir la pointe
+    "FIN": {"stop_h_min": 2.0, "stop_dist_min": 5.5},       # plus bas et plus près une fois la berline arrêtée
+}
+
+
+def v31_limits():
+    """(plafonds communs, plafonds par plan) pour motion.plan_checks31."""
+    base = dict(cam_h=CAM31_H, cam_h_floor=CAM31_H_FLOOR, cam_dist=CAM31_DIST, cam_dh=CAM31_DH, cam_dd=CAM31_DD,
+                cam_side=CAM31_SIDE, cam_lens=CAM31_LENS, cam_center_x=CAM31_CENTER_X, cam_center_y=CAM31_CENTER_Y,
+                cam_width_var=CAM31_WIDTH_VAR, cut_dh=CAM31_CUT_DH, cut_dd=CAM31_CUT_DD,
+                car=dict(hero=CAR31_HERO, patrol=CAR31_PATROL), stop_lamp=CAR31_STOP_LAMP, slip_max=SLIP31_MAX,
+                slip_on=SLIP31_ON, slip_off=SLIP31_OFF, slip_acc=SLIP31_ACC, slip_loss=SLIP31_LOSS,
+                slip_back=SLIP31_BACK, screen_d2=SCREEN31_D2, screen_d3=SCREEN31_D3, body_roll=BODY31_ROLL,
+                body_pitch=BODY31_PITCH, body_roll_d2=BODY31_ROLL_D2, body_noise=BODY31_NOISE)
+    return base, CAM31_LIMITS_PLAN
+
+
 def check(name, ok, detail=""):
     print(f"{'ok  ' if ok else 'ÉCHEC'} {name}{' : ' + detail if detail else ''}")
     if not ok:
@@ -1036,7 +1081,7 @@ def test_v3():
     écarts, hauts de cadre, raccords du tableau 5 entre deux plans migrés, films entiers. Les plans v2 ne sont que
     mesurés (python3 tools/film3d/motion.py mesure --v3)."""
     base, per_plan = v3_limits()
-    rep = M.v3_report(base, per_plan)
+    rep = M.v3_report(base, per_plan, v31=v31_limits())
     v3 = [p for p, (on, _) in rep["plans"].items() if on]
     check("v3 : plans migrés", True, ", ".join(v3) if v3 else "aucun encore")
     for p, (on, checks) in rep["plans"].items():
@@ -1049,6 +1094,17 @@ def test_v3():
                   + ("" if (a, b) in M.CUT_XY_ONLY else ", largeurs ×0,75 à ×1,33"), chk[0], chk[1])
     for name, ok, detail in rep["films"]:
         check(f"v3 {name}", ok, detail)
+    # v3.1 : seulement les plans qui portent V31 = True
+    v31 = [p for p, (on, _) in rep["v31"].items() if on]
+    check("v3.1 : plans migrés", True, ", ".join(v31) if v31 else "aucun encore")
+    for p, (on, checks) in rep["v31"].items():
+        if on:
+            for name, ok, detail in checks:
+                check(f"v3.1 {p} : {name}", ok, detail)
+    for a, b, ga, gb, chk in rep["cuts31"]:
+        if chk is not None:
+            check(f"v3.1 coupe {a} → {b} : |Δhauteur| ≤ {CAM31_CUT_DH:g} m, |Δdistance| ≤ {CAM31_CUT_DD:g} m, "
+                  "même focale", chk[0], chk[1])
 
 
 if __name__ == "__main__":

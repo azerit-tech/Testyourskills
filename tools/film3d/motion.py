@@ -1325,9 +1325,10 @@ def shot_specs():
         return x + ddx, y + ddy, z + ddz, yaw + dyaw, pitch + dpitch, droll, P2.LOW_LENS
 
     def plan(mod, cam, name, **kw):
-        v3 = bool(getattr(mod, "V3", False))
+        v31 = bool(getattr(mod, "V31", False))
+        v3 = bool(getattr(mod, "V3", False)) or v31
         named = dict(mod.tracks()) if hasattr(mod, "tracks") else {}
-        return dict(cam=mod.camera if v3 else cam, rail=getattr(mod, "camera_rail", None), module=mod, v3=v3,
+        return dict(cam=mod.camera if v3 else cam, rail=getattr(mod, "camera_rail", None), module=mod, v3=v3, v31=v31,
                     frames=rng(mod), tracks=list(named.values()), named=named, seed=seed(name), **kw)
 
     return {
@@ -1549,7 +1550,8 @@ def plan_data(plan, spec, f0=F0, fps=FPS):
     else:
         final = {f: tuple(cam(t_of(f, f0, fps))) for f in keyed}
     return dict(plan=plan, frames=frames, keyed=keyed, poses=poses, rail=rail, final=final, spec=spec,
-                module=spec.get("module"), v3=spec.get("v3", False), ground=ground, fps=fps, f0=f0)
+                module=spec.get("module"), v3=spec.get("v3", False),
+                v31=spec.get("v31", False), ground=ground, fps=fps, f0=f0)
 
 
 def rail_rates(d):
@@ -1863,12 +1865,19 @@ def film_checks(datas, lim):
     return out
 
 
-def v3_report(base, per_plan, plans=PLANS):
-    """Tout le contrôle v3 : dict(plans={plan: (v3, [(nom, tient, détail)])}, cuts=cut_rows, films=film_checks)."""
+def v3_report(base, per_plan, plans=PLANS, v31=None):
+    """Tout le contrôle v3 : dict(plans={plan: (v3, [(nom, tient, détail)])}, cuts=cut_rows, films=film_checks) ;
+    avec v31 = (plafonds, plafonds par plan) de test_motion.v31_limits, aussi v31={plan: (V31, [(nom, tient,
+    détail)])} et cuts31 (cut_rows31)."""
     specs = shot_specs()
     datas = {p: plan_data(p, specs[p]) for p in plans}
     res = {p: (datas[p]["v3"], plan_checks(datas[p], base, per_plan.get(p, {}))) for p in plans}
-    return dict(plans=res, cuts=cut_rows(datas, base), films=film_checks(datas, base), datas=datas)
+    out = dict(plans=res, cuts=cut_rows(datas, base), films=film_checks(datas, base), datas=datas)
+    if v31 is not None:
+        lim31, own31 = v31
+        out["v31"] = {p: (datas[p]["v31"], plan_checks31(datas[p], lim31, own31.get(p, {}))) for p in plans}
+        out["cuts31"] = cut_rows31(datas, lim31)
+    return out
 
 
 def v3_text(rep):
@@ -1894,13 +1903,417 @@ def v3_text(rep):
     return "\n".join(lines)
 
 
+# ---------------------------------------------------------------- découpage v3.1 : le cadre commun, la voiture
+#
+# Verdict du bout-à-bout v3 (« plan filmé trop bas », « qui change bizarre », « pas fluide, les dérapages pas
+# naturels ») : un seul cadre de poursuite pour les plans de dos, une voiture qui roule vrai sur le mouillé, rien
+# qui saute à l'écran. Plafonds en tête de test_motion.py (v31_limits) ; contrôlés seulement sur les plans qui
+# portent V31 = True, mesurés pour information sur les autres. Tout se lit aux images rendues, en différences
+# finies à 24 images par seconde (ce que voit le spectateur), sur les images intérieures du plan.
+
+V31_BACK = ("OUV", "P1", "P2", "P3", "P5", "P6", "FIN")      # les plans de dos (P4 de face, FIN6 en orbite)
+SCREEN_W = 16.0 / 9.0                                        # la hauteur du cadre en largeurs
+
+
+def _road(d, x, y):
+    g = d["ground"]
+    return g(x, y)[0] if g else 0.0
+
+
+def chase_geom(d, f, cams=None):
+    """La caméra sans tremblé à l'image f par rapport à la berline : (hauteur au-dessus de la chaussée sous
+    l'objectif, distance horizontale au centre de la berline, décalage à gauche de sa route, focale), en m et mm."""
+    c, p = (cams or d["rail"])[f], d["poses"][f]
+    h = math.radians(_ref_heading(p))
+    dx, dy = c[0] - p["x"], c[1] - p["y"]
+    return c[2] - _road(d, c[0], c[1]), math.hypot(dx, dy), -dx * math.cos(h) - dy * math.sin(h), c[6]
+
+
+def car_series(fn, frames, f0=F0, fps=FPS, heading=None, heads=None):
+    """La conduite d'un véhicule pos(t) aux images rendues : {grandeur: {image: valeur}}. speed (m/s), along
+    (accélération longitudinale, négative au freinage), alat (latérale, positive à gauche), acc (la norme), travel
+    (cap de la vitesse) aux images intérieures ; jerk (m/s³, norme de la variation du vecteur accélération entre
+    deux images intérieures, rangée à la première) ; head (cap de la caisse : heading(t), sinon celui de la
+    vitesse au-dessus de 1 m/s ; heads : {image: cap} tout fait) et yaw_acc (°/s², sa dérivée seconde)."""
+    frames = list(frames)
+    P = {f: tuple(fn(t_of(f, f0, fps)))[:2] for f in range(frames[0] - 1, frames[-1] + 2)}
+    out = {k: {} for k in ("speed", "along", "alat", "acc", "travel", "jerk", "head", "yaw_acc", "avec")}
+    ux, uy = None, None
+    for f in frames[1:-1]:
+        vx, vy = (P[f + 1][0] - P[f - 1][0]) * fps / 2, (P[f + 1][1] - P[f - 1][1]) * fps / 2
+        ax = (P[f + 1][0] - 2 * P[f][0] + P[f - 1][0]) * fps * fps
+        ay = (P[f + 1][1] - 2 * P[f][1] + P[f - 1][1]) * fps * fps
+        sp = math.hypot(vx, vy)
+        if sp > 0.3:
+            ux, uy = vx / sp, vy / sp
+            out["travel"][f] = heading_of(vx, vy)
+        if ux is None:
+            al, at = 0.0, 0.0
+        else:
+            al, at = ax * ux + ay * uy, ux * ay - uy * ax
+        out["speed"][f], out["along"][f], out["alat"][f] = sp, al, at
+        out["acc"][f], out["avec"][f] = math.hypot(ax, ay), (ax, ay)
+    for f in frames[1:-2]:
+        a, b = out["avec"][f], out["avec"][f + 1]
+        out["jerk"][f] = math.hypot(b[0] - a[0], b[1] - a[1]) * fps
+    prev = None
+    for f in frames:
+        if heads is not None:
+            h = heads[f]
+        elif heading is not None:
+            h = heading(t_of(f, f0, fps))
+        elif f in out["travel"] and out["speed"][f] > 1.0:
+            h = out["travel"][f]
+        else:
+            prev = None
+            continue
+        h = h if prev is None else _unwrap(prev, h)
+        out["head"][f], prev = h, h
+    H = out["head"]
+    for f in frames[1:-1]:
+        if f - 1 in H and f in H and f + 1 in H:
+            out["yaw_acc"][f] = (H[f + 1] - 2 * H[f] + H[f - 1]) * fps * fps
+    return out
+
+
+def _slip_series(d):
+    """L'angle de glisse de la berline (cap de la caisse moins cap de sa vitesse, °, positif : l'arrière part à
+    droite, l'avant pointe à gauche de sa route) aux images où elle roule à plus de 2 m/s, et sa vitesse (°/s)."""
+    P, fps = d["poses"], d["fps"]
+    s = {}
+    for f in d["frames"]:
+        p = P[f]
+        if p.get("travel") is not None and p["speed"] > 2.0:
+            s[f] = _unwrap(0.0, p["heading"] - p["travel"])
+    rate = {f: (s[f + 1] - s[f - 1]) * fps / 2 for f in s if f - 1 in s and f + 1 in s}
+    return s, rate
+
+
+def _runs_signed(s, thr):
+    """Les fenêtres où |s| dépasse thr, d'un même signe : [(signe, [images])]."""
+    runs, cur, sg = [], [], 0
+    for f in sorted(s):
+        v = s[f]
+        g = (v > thr) - (v < -thr)
+        if g and cur and g == sg and f == cur[-1] + 1:
+            cur.append(f)
+            continue
+        if cur:
+            runs.append((sg, cur))
+        cur, sg = ([f], g) if g else ([], 0)
+    if cur:
+        runs.append((sg, cur))
+    return runs
+
+
+def hero_body(d):
+    """La caisse de la berline comme sample() la donne (graine 0, sol du plan, sans ressauts) : {image: (roulis,
+    tangage, braquage)} pour le réglage complet, et le roulis et le tangage du seul transfert de masse (grain de
+    route et corrections du conducteur coupés) : (full, pure). pure est None sans la dynamique."""
+    spec, frames = d["spec"], d["keyed"]
+    kw = dict(frames=frames, f0=d["f0"], fps=d["fps"])
+    if spec.get("heading") is not None:
+        kw["heading"] = spec["heading"]
+    elif spec.get("slip") is not None:
+        kw["slip"] = spec["slip"]
+    ps = sample(lambda t: tuple(spec["hero"](t))[:2], **kw)
+    steer_fn = getattr(d["module"], "hero_steer", None)
+    if dyn_on():
+        ps = rebody(ps, "hero", ground=d["ground"])
+    full = {p["frame"]: (p["roll"], p["pitch"], steer_fn(p["t"]) if steer_fn else p["steer"]) for p in ps}
+    pure = None
+    if dyn_on():
+        ps = rebody(ps, dict(CHASSIS["hero"], road=0.0, driver=0.0), ground=d["ground"])
+        pure = {p["frame"]: (p["roll"], p["pitch"]) for p in ps}
+    return full, pure
+
+
+def screen_track(d, cams):
+    """Le centre de la berline à l'écran, image par image, en % de la largeur du cadre (x depuis la gauche, y depuis
+    le haut, la hauteur comptée en largeurs : un même pas vaut la même chose dans les deux sens)."""
+    out = {}
+    for f in d["keyed"]:
+        p = d["poses"][f]
+        q = screen_point(cams[f], (p["x"], p["y"], p["z"] + HERO_BOX[2] / 2))
+        out[f] = None if q is None else (100.0 * q[0], 100.0 * q[1] * SCREEN_W)
+    return out
+
+
+def jumps(s, frames):
+    """Les dérivées seconde et troisième d'une suite image par image (nombres ou points du plan), aux images rendues :
+    ({image: |Δ²|}, {image: |Δ³|}), en unités par image² et par image³."""
+    def sub(*terms):
+        vals = [s.get(f) for f, _ in terms]
+        if any(v is None for v in vals):
+            return None
+        if isinstance(vals[0], tuple):
+            return math.hypot(*[sum(c * v[k] for (_, c), v in zip(terms, vals)) for k in range(2)])
+        return abs(sum(c * v for (_, c), v in zip(terms, vals)))
+    d2, d3 = {}, {}
+    frames = list(frames)
+    for f in frames[1:-1]:
+        v = sub((f + 1, 1), (f, -2), (f - 1, 1))
+        if v is not None:
+            d2[f] = v
+    for f in frames[1:-2]:
+        v = sub((f + 2, 1), (f + 1, -3), (f, 3), (f - 1, -1))
+        if v is not None:
+            d3[f] = v
+    return d2, d3
+
+
+def _cam_written(d):
+    spec = d["spec"]
+    return {f: tuple(spec["cam"](t_of(f, d["f0"], d["fps"]))) for f in d["keyed"]}
+
+
+def _angles(cams, frames):
+    """{image: (lacet déroulé, site)} d'une suite de caméras."""
+    out, prev = {}, None
+    for f in frames:
+        y = cams[f][3] if prev is None else _unwrap(prev, cams[f][3])
+        out[f], prev = (y, cams[f][4]), y
+    return out
+
+
+def fluidity(d):
+    """Le diagnostic « pas fluide » d'un plan, chiffré : d'où viennent les à-coups à l'écran. Rend un dict :
+    screen : {rail|ecrite|finale: (Δ² crête, image, Δ³ crête, image)} du centre de la berline à l'écran (% de
+    largeur par image² et image³) vu par la caméra sans tremblé, la caméra écrite (tremblé du plan compris) et
+    les clés finales (opérateur compris) ; view : {rail|finale: Δ² crête de la visée (°/image²)} ; body : roulis et
+    tangage de la caisse (crêtes, Δ² crête du roulis, bruit : l'écart au seul transfert de masse)."""
+    frames = d["frames"]
+    out = dict(screen={}, view={})
+    for key, cams in (("rail", d["rail"]), ("ecrite", _cam_written(d)), ("finale", d["final"])):
+        d2, d3 = jumps(screen_track(d, cams), frames)
+        a2 = _peak(d2) if d2 else (0.0, frames[0])
+        a3 = _peak(d3) if d3 else (0.0, frames[0])
+        out["screen"][key] = (a2[0], a2[1], a3[0], a3[1])
+        if key != "ecrite":
+            ang = _angles(cams, d["keyed"])
+            v2 = {}
+            for f in frames[1:-1]:
+                v2[f] = math.hypot(*[ang[f + 1][k] - 2 * ang[f][k] + ang[f - 1][k] for k in range(2)])
+            out["view"][key] = _peak(v2)
+    full, pure = hero_body(d)
+    roll = {f: full[f][0] for f in frames}
+    r2, _ = jumps(roll, frames)
+    out["body"] = dict(roll=_peak({f: abs(v) for f, v in roll.items()}),
+                       pitch=_peak({f: abs(full[f][1]) for f in frames}), roll_d2=_peak(r2),
+                       noise=_peak({f: max(abs(full[f][0] - pure[f][0]), abs(full[f][1] - pure[f][1]))
+                                    for f in frames}) if pure else (0.0, frames[0]))
+    out["steer"] = {f: full[f][2] for f in frames}
+    return out
+
+
+def plan_checks31(d, lim, own):
+    """Les contrôles v3.1 d'un plan : [(nom, tient, détail)] (cadre commun, voiture, glisse, fluidité) ; d["fluid"]
+    reçoit le diagnostic (fluidity)."""
+    lim = dict(lim, **own)
+    plan, frames, P, fps = d["plan"], d["frames"], d["poses"], d["fps"]
+    out = []
+
+    def add(name, ok, detail):
+        out.append((name, bool(ok), detail))
+
+    # A. le cadre de poursuite commun (plans de dos)
+    hero = car_series(d["spec"]["hero"], frames, d["f0"], fps, heads={f: P[f]["heading"] for f in frames})
+    if plan in V31_BACK:
+        geo = {f: chase_geom(d, f) for f in frames}
+        stop = [f for f in frames if P[f]["speed"] < 0.5] if own.get("stop_h_min") is not None else []
+        rise = frames[int(len(frames) * own["rise_after"]):] if own.get("rise_after") is not None else []
+        steady = [f for f in frames if f not in stop and f not in rise] or list(frames)
+        h_lo, h_hi = lim["cam_h"]
+        bad = [f for f in frames
+               if not ((own["stop_h_min"] if f in stop else h_lo) - 1e-9 <= geo[f][0]
+                       <= (own["rise_h_max"] if f in rise else h_hi) + 1e-9)]
+        hs = [geo[f][0] for f in frames]
+        add(f"hauteur de la caméra {h_lo:g}–{h_hi:g} m (jamais sous {lim['cam_h_floor']:g})"
+            + (f", jusqu'à {own['rise_h_max']:g} m à la fin" if rise else "")
+            + (f", {own['stop_h_min']:g} m berline arrêtée" if stop else ""),
+            not bad and min(hs) >= lim["cam_h_floor"] - 1e-9,
+            f"{hs[0]:.2f} → {hs[-1]:.2f} m (de {min(hs):.2f} à {max(hs):.2f})"
+            + (f" ; hors : images {bad[0]}–{bad[-1]} ({len(bad)})" if bad else ""))
+        d_lo, d_hi = lim["cam_dist"]
+        bad = [f for f in frames if not ((own["stop_dist_min"] if f in stop else d_lo) - 1e-9 <= geo[f][1]
+                                         <= d_hi + 1e-9)]
+        ds = [geo[f][1] for f in frames]
+        add(f"distance au centre de la berline {d_lo:g}–{d_hi:g} m"
+            + (f" ({own['stop_dist_min']:g} m berline arrêtée)" if stop else ""), not bad,
+            f"{ds[0]:.2f} → {ds[-1]:.2f} m (de {min(ds):.2f} à {max(ds):.2f})"
+            + (f" ; hors : images {bad[0]}–{bad[-1]} ({len(bad)})" if bad else ""))
+        sv = [geo[f][1] for f in steady]
+        hv = [geo[f][0] for f in steady]
+        add(f"dans le plan : hauteur ±{lim['cam_dh']:g} m, distance ±{lim['cam_dd']:g} m"
+            + (" (hors montée de fin et arrêt)" if rise or stop else ""),
+            max(hv) - min(hv) <= lim["cam_dh"] + 1e-9 and max(sv) - min(sv) <= lim["cam_dd"] + 1e-9,
+            f"hauteur {max(hv) - min(hv):.2f} m, distance {max(sv) - min(sv):.2f} m")
+        side = [geo[f][2] for f in frames]
+        s_lo, s_hi = lim["cam_side"]
+        add(f"décalage à gauche {s_lo:g}–{s_hi:g} m", s_lo - 1e-9 <= min(side) and max(side) <= s_hi + 1e-9,
+            f"de {min(side):+.2f} à {max(side):+.2f} m")
+        lens = [geo[f][3] for f in frames]
+        add(f"focale {lim['cam_lens']:g} mm", all(abs(v - lim["cam_lens"]) <= 0.05 for v in lens),
+            f"{min(lens):.1f} à {max(lens):.1f} mm")
+        boxes = d.get("boxes") or {f: frame_box(d["final"][f], P[f]) for f in frames}
+        cs = {f: box_center(boxes[f], dict(y_from_top=True)) for f in frames if boxes[f]}
+        (cx, tx), (cy, ty) = lim["cam_center_x"], lim["cam_center_y"]
+        bad = [f for f in frames if f not in cs or abs(cs[f][0] - cx) > tx or abs(cs[f][1] - cy) > ty]
+        xs, ys = [c[0] for c in cs.values()], [c[1] for c in cs.values()]
+        add(f"centre de la berline x {cx:g} ± {tx:g}, y {cy:g} ± {ty:g} % depuis le haut", not bad,
+            f"x {min(xs):.0f}–{max(xs):.0f}, y {min(ys):.0f}–{max(ys):.0f}"
+            + (f" ; hors : {len(bad)} images, de {bad[0]} à {bad[-1]}" if bad else ""))
+        ws = sorted(cs[f][2] for f in steady if f in cs)
+        med = ws[len(ws) // 2]
+        add(f"largeur de la berline ±{lim['cam_width_var'] * 100:.0f} % dans le plan",
+            ws[0] >= med * (1 - lim["cam_width_var"]) - 1e-9 and ws[-1] <= med * (1 + lim["cam_width_var"]) + 1e-9,
+            f"{ws[0]:.0f} à {ws[-1]:.0f} % (médiane {med:.0f})")
+        d["geo"] = geo
+    # B. la voiture : la berline et chaque véhicule du plan
+    heads = d["module"].tracks_heading() if hasattr(d["module"], "tracks_heading") else {}
+    cars = [("berline", "hero", hero)]
+    for n, fn in sorted((d["spec"].get("named") or {}).items()):
+        if n in ("hero", "berline"):
+            continue
+        cars.append((n, "van" if "van" in n else "patrol", car_series(fn, frames, d["f0"], fps, heads.get(n))))
+    rows = []
+    for n, kind, s in cars:
+        L = lim["car"]["hero" if kind == "hero" else "patrol"]
+        lat = _peak({f: abs(v) for f, v in s["alat"].items()})
+        brk = _peak({f: max(0.0, -v) for f, v in s["along"].items()})
+        acc = _peak({f: max(0.0, v) for f, v in s["along"].items()})
+        circ = _peak({f: math.hypot(s["alat"][f], s["along"][f]) for f in s["alat"]})
+        jerk = _peak(s["jerk"]) if s["jerk"] else (0.0, frames[0])
+        yaw = _peak({f: abs(v) for f, v in s["yaw_acc"].items()}) if s["yaw_acc"] else (0.0, frames[0])
+        vals = dict(lat=lat, brake=brk, acc=acc, circle=circ, jerk=jerk, yaw_acc=yaw)
+        bad = [k for k in vals if vals[k][0] > L[k] + 1e-9]
+        rows.append((n, vals, bad))
+        add(f"conduite {n} : latérale ≤ {L['lat']:g}, freinage ≤ {L['brake']:g}, accélération ≤ {L['acc']:g}, "
+            f"cercle ≤ {L['circle']:g} m/s², à-coup ≤ {L['jerk']:g} m/s³, lacet ≤ {L['yaw_acc']:g} °/s²", not bad,
+            ", ".join(f"{k} {vals[k][0]:.1f} ({vals[k][1]})" for k in vals))
+    d["cars"] = rows
+    brake = [f for f, v in hero["along"].items() if -v > lim["stop_lamp"]]
+    wins = _windows(brake)
+    add(f"feux stop : fenêtres où la berline freine à plus de {lim['stop_lamp']:g} m/s² (information)", True,
+        ", ".join(f"{w[0]}–{w[-1]}" for w in wins) if wins else "aucune")
+    # la fluidité (et le braquage de la caisse, pour le contre-braquage)
+    fl = fluidity(d)
+    d["fluid"] = fl
+    d["steer"] = fl["steer"]
+    # la glisse
+    s, rate = _slip_series(d)
+    if s:
+        pk = _peak({f: abs(v) for f, v in s.items()})
+        add(f"glisse ≤ {lim['slip_max']:g}°", pk[0] <= lim["slip_max"] + 1e-9, f"crête {pk[0]:.1f}° à l'image {pk[1]}")
+        grow = {f: r * (1 if s[f] >= 0 else -1) for f, r in rate.items()}
+        on = _peak({f: v for f, v in grow.items()}) if grow else (0.0, frames[0])
+        off = _peak({f: -v for f, v in grow.items()}) if grow else (0.0, frames[0])
+        add(f"glisse : s'installe ≤ {lim['slip_on']:g}°/s, se résorbe ≤ {lim['slip_off']:g}°/s",
+            on[0] <= lim["slip_on"] + 1e-9 and off[0] <= lim["slip_off"] + 1e-9,
+            f"installation {max(0.0, on[0]):.0f}°/s ({on[1]}), retour {max(0.0, off[0]):.0f}°/s ({off[1]})")
+        early = [f for f, v in grow.items() if v > 2.0 and abs(s[f]) > 1.0
+                 and max(hero["acc"].get(g, 0.0) for g in range(f - 6, f + 1)) < lim["slip_acc"]]
+        add(f"glisse nulle sous {lim['slip_acc']:g} m/s² d'accélération combinée", not early,
+            f"elle croît sans adhérence dépassée : images {early[:8]}" if early else "tient")
+        runs = _runs_signed(s, 1.0)
+        msgs, ok = [], True
+        for i, (sg, fr) in enumerate(runs):
+            peak = max(abs(s[f]) for f in fr)
+            if peak < 5.0:
+                continue
+            v0, v1 = P[fr[0]]["speed"], P[fr[-1]]["speed"]
+            loss = (v0 - v1) / max(v0, 1e-6)
+            nxt = [r for r in runs[i + 1:] if r[1][0] - fr[-1] <= 12]
+            back = max(abs(s[f]) for f in nxt[0][1]) if nxt and nxt[0][0] == -sg else 0.0
+            more = len(nxt) > 1 and max(abs(s[f]) for f in nxt[1][1]) > 1.0
+            st = [f for f in fr if abs(s[f]) >= 5.0 and f in d["steer"]]
+            counter = sum(d["steer"][f] * s[f] < 0 for f in st) / max(1, len(st))
+            good = loss >= lim["slip_loss"] - 1e-9 and back <= lim["slip_back"] + 1e-9 and not more
+            ok = ok and good
+            msgs.append(f"images {fr[0]}–{fr[-1]} : crête {peak:.0f}°, vitesse {-loss * 100:+.0f} %, retour {back:.1f}°"
+                        f"{', puis encore' if more else ''}, contre-braquage {counter * 100:.0f} % des images")
+        add(f"glisse : vitesse −{lim['slip_loss'] * 100:.0f} % au moins, un seul retour ≤ {lim['slip_back']:g}°, "
+            f"contre-braquage", ok, " ; ".join(msgs) if msgs else "aucune glisse de plus de 5°")
+    sc = fl["screen"]["finale"]
+    add(f"à l'écran, centre de la berline : Δ² ≤ {lim['screen_d2']:g}, Δ³ ≤ {lim['screen_d3']:g} % de largeur "
+        f"par image² et image³", sc[0] <= lim["screen_d2"] + 1e-9 and sc[2] <= lim["screen_d3"] + 1e-9,
+        f"Δ² {sc[0]:.2f} ({sc[1]}), Δ³ {sc[2]:.2f} ({sc[3]}) ; sans tremblé {fl['screen']['rail'][0]:.2f} / "
+        f"{fl['screen']['rail'][2]:.2f}")
+    b = fl["body"]
+    add(f"caisse : roulis ≤ {lim['body_roll']:g}°, tangage ≤ {lim['body_pitch']:g}°, Δ² du roulis ≤ "
+        f"{lim['body_roll_d2']:g}°/image², rien hors transfert de masse (≤ {lim['body_noise']:g}°)",
+        b["roll"][0] <= lim["body_roll"] + 1e-9 and b["pitch"][0] <= lim["body_pitch"] + 1e-9
+        and b["roll_d2"][0] <= lim["body_roll_d2"] + 1e-9 and b["noise"][0] <= lim["body_noise"] + 1e-9,
+        f"roulis {b['roll'][0]:.1f}° ({b['roll'][1]}), tangage {b['pitch'][0]:.1f}° ({b['pitch'][1]}), Δ² "
+        f"{b['roll_d2'][0]:.3f} ({b['roll_d2'][1]}), hors transfert {b['noise'][0]:.2f}° ({b['noise'][1]})")
+    return out
+
+
+def cut_rows31(datas, lim):
+    """Les coupes entre deux plans de dos : [(sortant, entrant, (h, d, focale) à la sortie, à l'entrée, contrôle)] ;
+    contrôle None si l'un des deux n'est pas V31."""
+    rows = []
+    for a, b, _, _ in CUTS:
+        if a not in datas or b not in datas or a not in V31_BACK or b not in V31_BACK:
+            continue
+        da, db = datas[a], datas[b]
+        fa = da["frames"][-2] if b == "FIN" else da["frames"][-1]
+        fb = db["frames"][1] if b == "FIN" else db["frames"][0]
+        ga, gb = chase_geom(da, fa)[:2] + (chase_geom(da, fa)[3],), chase_geom(db, fb)[:2] + (chase_geom(db, fb)[3],)
+        chk = None
+        if da.get("v31") and db.get("v31"):
+            dh, dd = gb[0] - ga[0], gb[1] - ga[1]
+            ok = abs(dh) <= lim["cut_dh"] + 1e-9 and abs(dd) <= lim["cut_dd"] + 1e-9 and abs(gb[2] - ga[2]) <= 0.05
+            chk = (ok, f"Δhauteur {dh:+.2f} m, Δdistance {dd:+.2f} m, focales {ga[2]:.0f}/{gb[2]:.0f} mm")
+        rows.append((a, b, ga, gb, chk))
+    return rows
+
+
+def v31_text(rep):
+    """Le rapport v3.1 : les contrôles par plan, les coupes en hauteur et distance, le diagnostic de fluidité."""
+    lines = []
+    for p, (on, checks) in rep["v31"].items():
+        lines.append(f"== {p} v3.1 " + ("(contrôlé)" if on else "(information : V31 absent)"))
+        for name, ok, detail in checks:
+            lines.append(f"   {'tient  ' if ok else 'DÉPASSE'} {name}{' : ' + detail if detail else ''}")
+    if rep["cuts31"]:
+        lines.append("== coupes v3.1 (caméra sans tremblé : hauteur m / distance m / focale mm)")
+        for a, b, ga, gb, chk in rep["cuts31"]:
+            c = "information" if chk is None else ("tient   " if chk[0] else "DÉPASSE ") + chk[1]
+            lines.append(f"   {a + ' → ' + b:13s}  {ga[0]:4.2f}/{ga[1]:4.1f}/{ga[2]:2.0f}  →  "
+                         f"{gb[0]:4.2f}/{gb[1]:4.1f}/{gb[2]:2.0f}   Δh {gb[0] - ga[0]:+.2f}  Δd {gb[1] - ga[1]:+.2f}   {c}")
+    lines.append("== fluidité, diagnostic (crête et image) : écran = centre de la berline, % de largeur par image² "
+                 "(Δ²) et image³ (Δ³), sans tremblé / caméra écrite / clés finales ; visée = Δ² du lacet et du site "
+                 "en °/image² ; caisse : roulis Δ² °/image², hors transfert de masse ° ; voiture : à-coup m/s³, "
+                 "lacet °/s²")
+    lines.append("   plan  écran Δ² rail/écrite/finale   Δ³ finale    visée rail/finale   roulis Δ²  hors transfert"
+                 "   à-coup berline   lacet berline   pire véhicule (à-coup)")
+    for p, d in rep["datas"].items():
+        fl = d.get("fluid")
+        if not fl:
+            continue
+        sc, v, b = fl["screen"], fl["view"], fl["body"]
+        cars = d.get("cars") or []
+        hero = next((c for c in cars if c[0] == "berline"), None)
+        other = max((c for c in cars if c[0] != "berline"), key=lambda c: c[1]["jerk"][0], default=None)
+        lines.append(f"   {p:5s} {sc['rail'][0]:5.2f} {sc['ecrite'][0]:5.2f} {sc['finale'][0]:5.2f} ({sc['finale'][1]:2d})"
+                     f"   {sc['finale'][2]:5.2f} ({sc['finale'][3]:2d})   {v['rail'][0]:5.2f} {v['finale'][0]:5.2f} "
+                     f"({v['finale'][1]:2d})   {b['roll_d2'][0]:6.3f}    {b['noise'][0]:5.2f}°"
+                     + (f"      {hero[1]['jerk'][0]:6.1f} ({hero[1]['jerk'][1]:2d})  {hero[1]['yaw_acc'][0]:6.0f} "
+                        f"({hero[1]['yaw_acc'][1]:2d})" if hero else "")
+                     + (f"   {other[0]} {other[1]['jerk'][0]:.0f} ({other[1]['jerk'][1]})" if other else ""))
+    return "\n".join(lines)
+
+
 def _main(argv):
     if argv and argv[0] == "mesure":
         if "--v3" in argv:
             import test_motion as T
             base, per_plan = T.v3_limits()
             plans = [p.upper() for p in argv[1:] if p != "--v3"] or list(PLANS)
-            print(v3_text(v3_report(base, per_plan, plans)))
+            rep = v3_report(base, per_plan, plans, v31=T.v31_limits())
+            print(v3_text(rep))
+            print(v31_text(rep))
             return 0
         plans = [p.upper() for p in argv[1:]] or list(PLANS)
         print(measure_table(measure_shots(plans)))
