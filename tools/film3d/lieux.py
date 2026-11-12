@@ -1356,9 +1356,17 @@ def officer_rig(keys, style=0, name="officer", gun=True):
     return arm
 
 
-def cabin_light(root, energy=6.0, color="#ffcf9a"):
-    """Un peu de lumière dans l'habitacle de la berline (le tableau de bord, une lampe de lecture) : les mains
-    levées se lisent derrière le pare-brise. Repère du corps de scene_a.street_hero : l'avant vers -y local."""
+def cabin_light(root, energy=6.0, color="#ffcf9a", dash=60.0, dash_color="#ffb070", dash_loc=(0.3, -0.8, 0.98),
+                dash_tilt=35.0):
+    """Un peu de lumière dans l'habitacle de la berline : les mains levées se lisent derrière le pare-brise, et
+    de dos, à travers la lunette, la capuche et les épaules du conducteur se découpent en sombre sur un habitacle
+    chaud. Repère du corps de scene_a.street_hero : l'avant vers -y local.
+    Deux sources, invisibles à la caméra, aux reflets et à travers les vitres (une lampe vue derrière le
+    pare-brise faisait un disque blanc) : la lampe de lecture (`energy`, un point devant le conducteur) et la
+    planche de bord (`dash` W, une bande de surface au pied du pare-brise, tournée vers l'arrière et relevée de
+    `dash_tilt` degrés) qui éclaire le pavillon, les montants et le haut des sièges : le fond sur lequel se lit
+    la silhouette, le dos du conducteur restant dans l'ombre. Renvoie la lampe de lecture (la planche de bord est
+    sa fille, `hero_planche`)."""
     body = bpy.data.objects[root["body"]]
     d = bpy.data.lights.new("hero_habitacle", "POINT")
     d.energy = energy
@@ -1368,6 +1376,22 @@ def cabin_light(root, energy=6.0, color="#ffcf9a"):
     bpy.context.scene.collection.objects.link(ob)
     ob.parent = body
     ob.location = (0.15, -0.72, 1.08)
+    ob.visible_camera = ob.visible_glossy = ob.visible_transmission = False
+    if dash:
+        a = bpy.data.lights.new("hero_planche", "AREA")
+        a.shape = "RECTANGLE"
+        a.size, a.size_y = 1.1, 0.12
+        a.energy = dash
+        a.color = lin(dash_color)[:3]
+        lo = bpy.data.objects.new(a.name, a)
+        bpy.context.scene.collection.objects.link(lo)
+        lo.parent = body
+        lo.location = dash_loc
+        # une lampe de surface éclaire vers son -Z local : tournée vers +y local (l'arrière), relevée de dash_tilt
+        lo.rotation_euler = (math.radians(90.0 + dash_tilt), 0.0, 0.0)
+        lo.visible_camera = lo.visible_glossy = lo.visible_transmission = False
+        lo.visible_volume_scatter = False
+        ob["planche"] = lo.name
     return ob
 
 
