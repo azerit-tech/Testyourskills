@@ -934,6 +934,41 @@ def add_antenna(body, chrome, at=(1.30, -0.80), height=0.78, rake=9.0):
     return ob
 
 
+# la propriété d'objet des vitres : une lumière d'appoint de scène (lieux.car_fill, les nappes liées à la voiture)
+# ne doit pas les compter parmi ses receveurs, sinon elles la renvoient en miroir
+GLASS_TAG = "vitre"
+
+
+def split_glass(body, mat_names):
+    """Sort de la caisse jointe les faces aux matières de vitre `mat_names` (pare-brise, lunette, verres des feux) en un
+    objet enfant « <caisse>_vitres », marqué GLASS_TAG. Une nappe d'appoint liée à la voiture, invisible à la caméra,
+    se reflétait en aplat blanc dans la lunette vue de dos (P3, images 1 à 13) : la tôle doit la recevoir et la
+    refléter, les vitres non. Renvoie l'objet, ou None s'il n'y a aucune face de vitre."""
+    me = body.data
+    idx = {i for i, m in enumerate(me.materials) if m and m.name in mat_names}
+    if not idx or not any(f.material_index in idx for f in me.polygons):
+        return None
+    gm = me.copy()
+    gm.name = f"{body.name}_vitres"
+    for mesh, keep_glass in ((gm, True), (me, False)):
+        bm = bmesh.new()
+        bm.from_mesh(mesh)
+        kill = [f for f in bm.faces if (f.material_index in idx) != keep_glass]
+        bmesh.ops.delete(bm, geom=kill, context="FACES")
+        loose = [v for v in bm.verts if not v.link_faces]
+        bmesh.ops.delete(bm, geom=loose, context="VERTS")
+        bm.to_mesh(mesh)
+        bm.free()
+        mesh.update()
+    ob = bpy.data.objects.new(gm.name, gm)
+    for c in body.users_collection:
+        c.objects.link(ob)
+    ob.matrix_world = body.matrix_world.copy()
+    cv.parent_keep(ob, body)
+    ob[GLASS_TAG] = True
+    return ob
+
+
 def _mesh_object(name, bm, mats, coll=None, smooth=False):
     me = bpy.data.meshes.new(name)
     bm.to_mesh(me)
@@ -1335,6 +1370,8 @@ def load_hero(variant="w111", collection=None, lights_on=True, raw=False):
                 cv.parent_keep(pl, body)
             ant = add_antenna(body, bpy.data.materials["hero_w111_chrome"])
             car["report"]["antenne"] = "posée" if ant else "aile introuvable"
+            car["glass"] = split_glass(body, {"hero_w111_glass"})
+            car["report"]["vitres"] = "à part" if car["glass"] else "introuvables"
             car["lights"] = _lights(car, lights_on, ("hero_w111_head_lens",), ("hero_w111_tail_lens",))
         # repères de l'habitacle (conduite à gauche) : œil du conducteur, centre du volant
         car["cockpit"] = dict(eye=Vector((-0.55, 0.36, 1.22)), wheel=Vector((0.55, 0.42, 0.87)))
