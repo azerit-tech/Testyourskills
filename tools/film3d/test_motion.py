@@ -936,6 +936,12 @@ def test_bars():
     seq = [M.bar_phase(f) for f in range(24)]
     check("rampes : 2 Hz, alternance corail / lilas", seq[:6] == ["corail"] * 6 and seq[6:12] == ["lilas"] * 6
           and seq.count("corail") == 12)
+    lv = [(M.bar_level(f, "corail"), M.bar_level(f, "lilas")) for f in range(24)]
+    sums = [c + l for c, l in lv]
+    check("rampes : éclat 2 Hz, creux à 10 %, jamais les deux côtés pleins, somme constante (pas de pompage)",
+          max(sums) - min(sums) < 1e-6 and not any(c >= 1 and l >= 1 for c, l in lv) and min(min(p) for p in lv) == 0.1
+          and lv[1] == (1.0, 0.1) and lv[7] == (0.1, 1.0) and M.bar_level(3, "corail", offset=5) == M.bar_level(8, "corail"),
+          f"sommes {min(sums):.2f} à {max(sums):.2f}")
 
 
 # ---------------------------------------------------------------- la dynamique (FILM3D_DYN)

@@ -974,6 +974,20 @@ def bar_phase(frame, period=12, offset=0):
     return "corail" if ((frame + offset) % period) < period // 2 else "lilas"
 
 
+# un éclat d'un côté de la rampe sur une période de 12 images (2 Hz) : montée, palier de quatre images, descente,
+# creux à 10 % (une vraie rampe ne s'éteint jamais tout à fait). L'autre côté a le même profil décalé d'une
+# demi-période : la somme des deux reste à 1,1 à chaque image (pas de pompage de l'image), jamais les deux pleins.
+BAR_FLASH = (0.75, 1.0, 1.0, 1.0, 1.0, 0.75, 0.35, 0.1, 0.1, 0.1, 0.1, 0.35)
+
+
+def bar_level(frame, tone, period=12, offset=0):
+    """La force (0,1 à 1) du côté `tone` (« corail » ou « lilas ») d'une rampe à l'image `frame`."""
+    k = ((frame + offset) % period) * len(BAR_FLASH) // period
+    if tone == "lilas":
+        k = (k + len(BAR_FLASH) // 2) % len(BAR_FLASH)
+    return BAR_FLASH[k]
+
+
 # ---------------------------------------------------------------- la couche Blender (bpy importé à l'appel)
 
 def _clear(ob):
@@ -3048,10 +3062,10 @@ def _tone(color):
     return None
 
 
-def flash_bars(roots, frames, period=12, low=0.06):
+def flash_bars(roots, frames, period=12):
     """Le clignotement des rampes de la meute : chaque lumière corail ou lilas d'un véhicule (descendance du rig :
-    lueurs de rampe, faisceaux, flaques) s'allume la moitié de la période, en alternance corail / lilas, clés
-    constantes ; chaque véhicule est décalé de quelques images. Les lentilles émissives restent allumées."""
+    les lueurs de rampe) suit le profil BAR_FLASH, corail et lilas en alternance, clés constantes ; chaque véhicule
+    est décalé de cinq images. Les lentilles suivent leurs lueurs (cast_vehicles.bar_drive_lenses)."""
     n = 0
     for i, root in enumerate(roots):
         offset = (i * 5) % period
@@ -3067,7 +3081,7 @@ def flash_bars(roots, frames, period=12, low=0.06):
             full = d.get("motion_energy", d.energy)
             d["motion_energy"] = full
             for f in frames:
-                d.energy = full if bar_phase(f, period, offset) == tone else full * low
+                d.energy = full * bar_level(f, tone, period, offset)
                 d.keyframe_insert("energy", frame=f)
             for fc in fcurves(d):
                 for kp in fc.keyframe_points:

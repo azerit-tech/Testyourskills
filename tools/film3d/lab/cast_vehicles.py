@@ -871,8 +871,9 @@ def lightbar_lights(bar, energy=BAR_LIGHT):
 def bar_drive_lenses(bar, lights):
     """Les optiques de la rampe suivent ses lueurs : sur chaque maillage de la rampe, bar_off_corail et
     bar_off_lilas (lus par les matières, _bar_on) valent 0 quand la lueur de ce côté est à sa pleine énergie et 1
-    quand motion.flash_bars l'a baissée (6 %). Pilotes à expression simple (sans Python), lus à chaque image ;
-    les copies liées (lieux.clone) gardent ces pilotes et leurs lumières partagées."""
+    quand elle est éteinte, en proportion de son énergie entre les deux : la lentille suit le profil de
+    motion.flash_bars (montée, palier, descente, creux à 10 %). Pilotes à expression simple (sans Python), lus à
+    chaque image ; les copies liées (lieux.clone) gardent ces pilotes et leurs lumières partagées."""
     for o in [bar] + [c for c in bar.children_recursive if c.type == "MESH"]:
         for tone, d in lights.items():
             key = f"bar_off_{tone}"
@@ -886,7 +887,7 @@ def bar_drive_lenses(bar, lights):
             v.targets[0].id_type = "LIGHT"
             v.targets[0].id = d
             v.targets[0].data_path = "energy"
-            drv.expression = f"max(0.0, min(1.0, 1.25 - 1.25 * e / {max(d.energy, 1e-3):.3f}))"
+            drv.expression = f"max(0.0, min(1.0, 1.0 - e / {max(d.energy, 1e-3):.3f}))"
 
 
 def tail_lights(body, points, on=True, energy=6.0):
