@@ -180,21 +180,45 @@ def test_p4():
 
 
 def test_p3():
-    """P3 : aucun choc (centres à plus de 3 m, caisse à 15 cm au moins des patrouilles, des agents, des plots et de
-    la caméra) ; roulis et tangage bornés ; le cadre validé à l'image fixe ; éclairs d'une ou deux images."""
+    """P3 (découpage v2, de dos) : aucun choc (centres à plus de 3 m, caisse à 15 cm au moins des patrouilles, des
+    agents, des plots, des voitures garées et des caisses, caméra à 2 m au moins de la caisse) ; roulis et tangage
+    bornés ; la berline commence 5 images plus tôt (y 93,5 à 95) et finit au-delà des plots, entre les patrouilles ;
+    la caméra s'arrête avant les plots, à vitesse nulle, et descend de 1,9 à 0,6 m sans palier ; la berline dans le
+    tiers central (son centre), entière hors des bandes du HUD (15 % du bas, 12 % du haut), le trou des plots dans le
+    cadre à chaque image ; éclairs d'une ou deux images."""
     import p3_enseignes as P
     frames = range(P.F0 - 1, P.F0 + P.FRAMES + 1)
     d, f, a, b = M.min_gap(P.tracks(), frames)
     check("P3 : distances gardées", d >= 3.0, f"{d:.1f} m entre {a} et {b} à l'image {f}")
     cl = P.clearances(frames)
+    cam = cl.pop("camera")
     n, (dm, fm) = min(cl.items(), key=lambda kv: kv[1][0])
     check("P3 : la caisse ne touche rien", dm >= 0.15, f"{dm:.2f} m de {n} à l'image {fm:.2f}")
+    check("P3 : la caméra à 2 m au moins de la caisse", cam[0] >= 2.0, f"{cam[0]:.2f} m à l'image {cam[1]:.2f}")
     ps = M.sample(P.hero_pos, frames, heading=P.hero_heading, wheel_r=0.31, wheelbase=2.77)
     check("P3 : roulis ≤ 6°", max(abs(p["roll"]) for p in ps) <= 6.0, f"{max(abs(p['roll']) for p in ps):.2f}°")
     check("P3 : tangage ≤ 3°", max(abs(p["pitch"]) for p in ps) <= 3.0, f"{max(abs(p['pitch']) for p in ps):.2f}°")
-    x, y = P.hero_pos(P.T_STILL)
-    ok = abs(x - P.STILL[0]) < 1e-6 and abs(y - P.STILL[1]) < 1e-6 and abs(P.hero_heading(P.T_STILL) - P.STILL[2]) < 1e-9
-    check("P3 : la pose validée à l'image fixe", ok, f"({x:.3f}, {y:.3f}), {P.hero_heading(P.T_STILL):.2f}°")
+    y0, y1 = P.hero_pos(0.0)[1], P.hero_pos(P.T_END)[1]
+    check("P3 : de y 93,5–95 au-delà des plots", 93.5 <= y0 <= 95.0 and y1 - P.HALF_L > P.CONE_LINE + 0.5
+          and y1 < P.PATROLS["patrol_a"][1] + 3.0, f"y {y0:.1f} → {y1:.1f}")
+    v_end = M.t_of(P.F0 + P.FRAMES - 1)
+    cys = [P.camera(M.t_of(f))[1] for f in range(P.F0, P.F0 + P.FRAMES)]
+    check("P3 : la caméra s'arrête avant les plots", max(cys) < P.CONE_LINE - 1.0
+          and abs(P.cam_y(v_end) - P.cam_y(v_end - 1 / 24)) < 0.02, f"y {max(cys):.1f} (plots à {P.CONE_LINE:.1f})")
+    zs = [P.cam_z(M.t_of(f)) for f in range(P.F0, P.F0 + P.FRAMES)]
+    low = next(i for i, z in enumerate(zs) if z <= P.Z1 + 1e-6)
+    check("P3 : descente de 1,9 à 0,6 m sans palier", abs(zs[0] - 1.9) < 0.01 and abs(zs[-1] - 0.6) < 1e-6
+          and all(zs[i + 1] < zs[i] - 0.005 for i in range(low - 1)), f"au sol à l'image {low + P.F0}")
+    bad = []
+    for f in range(P.F0, P.F0 + P.FRAMES):
+        t = M.t_of(f)
+        c = P.camera(t)
+        (u0, u1, v0, v1), (uc, vc) = P.hero_frame(t, c)
+        g = P.project(c, (P.GAP[0], P.GAP[1], 0.9))
+        if not (abs(uc) <= 1 / 3 and u0 > -1.0 and u1 < 1.0 and v0 >= 0.15 and v1 <= 0.88 and 0.3 <= vc <= 0.6
+                and g and abs(g[0]) < 0.6 and 0.15 < g[1] < 0.88):
+            bad.append(f)
+    check("P3 : la berline au tiers central, hors du HUD, le barrage dans le cadre", not bad, f"images {bad[:6]}")
     runs = []
     for k in P.SHOTS:
         n = 0

@@ -16,9 +16,11 @@
 #   FILM3D_HERO, FILM3D_DRIVER, FILM3D_USURE : la voiture poursuivie, comme dans scene_a.py
 #
 # Repère de la scène enregistrée : z en haut, la voiture en fuite roule vers +y, y vaut s (le chemin parcouru
-# dans la rue, §2.4). La rue fait 150 m (s de 1 à 150), chaussée de 8 m à deux voies, trottoirs de 3 m, façades
-# face à face à 14 m ; le barrage à s = 130, la caméra à s = 134 ; au bout (s < 0), l'entrée du rond-point.
-# Tout est construit dans le repère de la caméra (voir S_CAM) puis tourné d'un bloc à la fin (to_world).
+# dans la rue, §2.4). La rue fait 162 m (s de 1 à 162), chaussée de 8 m à deux voies, trottoirs de 3 m, façades
+# face à face à 14 m ; le barrage à s = 126 (les deux patrouilles) ; la caméra suit la berline de s = 87 à 117 ;
+# au bout, le boulevard du quai et le pont qui monte (s > 162) ; derrière (s < 0), l'entrée du rond-point.
+# Tout est construit dans un « repère de vue » (celui de l'ancienne caméra fixe, voir S_CAM et vw) puis tourné d'un
+# bloc à la fin (to_world).
 #
 # Ce qui vient d'ailleurs, sans y toucher : la chaussée qui sèche, ses bordures et ses trottoirs (road.py, sur une
 # largeur à elle), les immeubles (facade_mix.py : étages en enduit photographique de facade_b.py, boutiques de
@@ -61,23 +63,31 @@ CORAL, LILAC, AMBER, CREAM, NAVY = A.CORAL, A.LILAC, A.AMBER, A.CREAM, A.NAVY
 HALF = 4.0             # demi-chaussée : 8 m à deux voies
 WALK = 3.0             # trottoir
 FRONT = HALF + WALK    # façades à x = ±7, face à face à 14 m
-S_CAM = 134.0          # la caméra, 4 m derrière le barrage (s = 130)
-Y0, Y_END = -16.0, 133.0   # la rue en repère de vue : s de 150 à 1 ; au-delà, l'entrée du rond-point
+S_CAM = 134.0          # le repère de vue est posé à s = 134 (4 m au-delà du barrage, s = 130)
+Y0, Y_END = -28.0, 133.0   # la rue en repère de vue : s de 162 à 1 ; au-delà, l'entrée du rond-point
 RING = (0.0, 150.0)        # le centre du rond-point en repère de vue (s = -16) : îlot de 12 m, anneau de 15 m de rayon
 Y_FAR = 176.0              # la place du rond-point s'arrête au muret de la promenade
 
-# Les plans de la scène (docs/cinematique-poursuite.md §2.3 et §2.4), en repère de vue. cam : position ; lens ;
-# shift_y : décentrement (l'horizon descend, les enseignes montent) ; hero : (x, y, lacet en degrés), l'avant vers -y
-# de vue ; chase : la troisième patrouille (x, y) ; barrage : y de vue du milieu des deux patrouilles.
+
+def vw(x, y):
+    """Du repère monde (après to_world) au repère de vue, où la scène se construit."""
+    return -x, S_CAM - y
+
+
+# Les plans de la scène (docs/cinematique-decoupage-v2.md), en repère de vue. cam : position de départ (les clés
+# de plan_P3 la remplacent) ; lens ; shift_y : décentrement ; hero : (x, y, lacet en degrés) à l'image fixe, l'avant
+# vers -y de vue ; chase : la troisième patrouille (x, y) à l'image fixe ; barrage : y de vue du milieu des deux
+# patrouilles.
+_H = P3.hero_pos(P3.T_STILL)
+_C = P3.camera(0.0)
+_K = P3.chase_pos(P3.T_STILL)
 PLANS = {
-    # P3, le barrage : 30 cm du sol, 24 mm, dans l'axe, les patrouilles à 5 m ; l'instant fort : la berline à
-    # 110 km/h juste avant les plots, phares en plein contre-jour, les deux agents ouvrent le feu (fire : éclairs)
-    # Cadre retenu parmi les variantes (design/film/ref/lieux/enseignes-P3-cadre-*.png, la 11) : la caméra à 55 cm,
-    # 3,5 m derrière l'agent de droite et un peu sur sa gauche, 26 mm, tournée de 4° vers l'axe : l'agent et sa
-    # portière en grand premier plan sombre au bord droit, la berline au centre dans la brèche, les plots.
-    # yaw : lacet de la caméra en degrés (positif : vers -x de vue).
-    "P3": dict(cam=(1.3, 4.0, 0.55), lens=26.0, shift_y=0.19, yaw=4.0, fstop=5.6, focus=(0.9, 7.0, 0.9),
-               hero=(0.35, 14.4, 4.0), chase=(-1.2, 74.4), barrage=8.0, fire=True),
+    # P3, le barrage, de dos (découpage v2) : la caméra suit la berline au 21 mm, 7 m puis 5,8 m derrière elle,
+    # de 1,9 m à 0,6 m de haut, et s'arrête avant les plots ; la berline passe le barrage, les agents tirent puis
+    # se mettent à couvert (fire : éclairs). yaw : lacet de départ en degrés (positif : vers -x de vue).
+    "P3": dict(cam=(*vw(_C[0], _C[1]), _C[2]), lens=P3.LENS, shift_y=0.0, yaw=180.0, fstop=4.0,
+               focus=(*vw(*_H), 0.8), hero=(*vw(*_H), P3.hero_heading(P3.T_STILL)), chase=vw(*_K), barrage=8.0,
+               fire=True),
 }
 
 # Les quatre dessins de la rue (§2.4 : la boutique d'angle, le petit hôtel, l'Art déco d'angle, le bloc bas), ceux
@@ -895,11 +905,40 @@ def only_on(light, objs, tag):
     return col
 
 
+def officer_rig(keys, style, name):
+    """lieux.officer_rig (l'agent qui garde son armature, ses poses en clés). lieux branche road.S sur la scène A à
+    l'import : la rue garde le sien."""
+    keep = road.S
+    import lieux
+    road.S = keep
+    return lieux.officer_rig(list(keys), style=style, name=name)
+
+
+def hero_objects():
+    car = bpy.data.objects.get("coupe")
+    return [car] + list(car.children_recursive) if car else []
+
+
+def exclude_hero(lights, tag):
+    """Liaison de lumière : ces lumières éclairent tout sauf la berline. Les faisceaux colorés des rampes, faits
+    pour les façades, la teintaient de corail et de lilas au passage (le bordeaux doit rester bordeaux)."""
+    col = bpy.data.collections.new(f"{tag}_sans_berline")
+    for o in hero_objects():
+        if o.name not in col.objects:
+            col.objects.link(o)
+    for co in col.collection_objects:
+        co.light_linking.link_state = "EXCLUDE"
+    for lo in lights:
+        lo.light_linking.receiver_collection = col
+    return col
+
+
 def officer_light(officers, plan, receivers=()):
-    """Les deux agents découpés par les phares : un liseré (un spot chaud derrière chacun, côté berline, à hauteur
-    des phares relevée, qui accroche épaules et casquette) ; et, quand le plan ouvre le feu, l'éclair de chaque
-    pistolet : une flamme blanche émissive dans l'axe du canon et une lumière ponctuelle forte, brève à l'image.
-    Rien n'atteint personne : pas d'impact, pas d'étincelle."""
+    """Les deux agents, vus de face : les phares de la berline les éclairent de plus en plus fort ; un liseré (un
+    spot froid derrière chacun, côté boulevard, qui accroche épaules et casquette) les détache du fond ; et, quand
+    le plan ouvre le feu, l'éclair de chaque pistolet : une flamme blanche émissive dans l'axe du canon et une
+    lumière ponctuelle, brève à l'image, attachées à l'arme (l'agent bouge). Rien n'atteint personne : pas
+    d'impact, pas d'étincelle."""
     bpy.context.view_layer.update()
     flash = None
     if plan.get("fire"):
@@ -924,14 +963,15 @@ def officer_light(officers, plan, receivers=()):
         if flash is None:
             continue
         gun = bpy.data.objects.get(a.get("gun", ""))
+        # (l'arme à sa place au premier tir de l'agent)
+        bpy.context.scene.frame_set(min(P3.SHOTS[k]))
+        bpy.context.view_layer.update()
         if gun is not None and "muzzle" in gun:
             m = gun.matrix_world @ Vector(tuple(gun["muzzle"]))
             d = (gun.matrix_world.to_3x3() @ Vector((1.0, 0.0, 0.0))).normalized()
         else:
             d = Vector((0.0, 1.0, 0.0))
             m = o + Vector((0.0, 0.55, 1.05))
-        # (vu de dos, le corps cache le canon : la flamme est assez longue pour déborder de la silhouette vers le
-        # centre du cadre, où fuit l'axe du canon)
         flames = []
         for j, (sc, off) in enumerate((((0.62, 0.09, 0.09), 0.55), ((0.07, 0.2, 0.2), 0.08), ((0.14, 0.13, 0.04), 0.2))):
             f = bpy.data.objects.new(f"muzzle_flash_{k}_{j}", flash)
@@ -942,10 +982,14 @@ def officer_light(officers, plan, receivers=()):
             f.scale = sc
             f.visible_shadow = False
             flames.append(f)
+            if gun is not None:
+                keep_world_parent([f], gun)
         # (assez pour découper l'agent, pas pour brûler le flanc blanc de la patrouille à côté)
         lf = A.add_light(f"muzzle_{k}", "POINT", m + d * 0.15 + Vector((0, 0, 0.1)), (0, 0, -1), lin("#fff3e0"), 250.0)
         lf.data.shadow_soft_size = 0.04
         lf.visible_camera = False
+        if gun is not None:
+            keep_world_parent([lf], gun)
         # (l'éclair n'allume que les agents, leurs armes, les portières et les patrouilles : pas la chaussée)
         col = only_on(lf, list(officers) + list(receivers), f"muzzle_{k}")
         # les flammes aussi, mêmes receveurs : à 600 de force, sans liaison, elles faisaient près des trois quarts de
@@ -994,15 +1038,11 @@ def build_barrage(scene, hidden, plan):
                 side = -1 if "_door_-1" in ch.name else 1
                 # la portière tourne sur sa charnière avant, son bord arrière s'écarte de la caisse
                 ch.rotation_euler = (0, 0, -side * math.radians(58 if side == open_side else 50))
-        # l'agent accroupi derrière la portière ouverte, de dos, tourné vers la berline
-        a = cp.load_officer("spp")
-        cp.pose_officer(a, "crouch", style=len(officers))
-        gun = None
-        try:
-            gun = cp.load_handgun("service")
-            cp.attach_handgun(a, gun)
-        except Exception as e:
-            log(f"arme non posée : {e!r}")
+        # l'agent derrière la portière ouverte, face à la berline (donc à la caméra) : il vise debout, puis plonge
+        # à couvert quand elle arrive (lieux.officer_rig, ses poses clés : p3_enseignes.COVER)
+        k = len(officers)
+        a = officer_rig(P3.COVER[k], style=k, name=f"agent_{k}")
+        gun = next((c for c in a.children_recursive if "muzzle" in c), None)
         a["gun"] = gun.name if gun else ""
         bpy.context.view_layer.update()
         p = car.matrix_world @ Vector((front_axle - 1.42, open_side * (hw + 0.6), 0.0))
@@ -1205,19 +1245,20 @@ def keep_world_parent(objs, parent):
 
 
 def plan_P3(scene):
-    """P3, le barrage, animé (28 images, p3_enseignes.py), en repère monde après to_world : la berline arrive à
-    110 km/h, se tortille en passant la brèche (le nez à 4° vers la caméra à l'image fixe), passe le trou des plots
-    entre les deux agents et frôle l'objectif ; la troisième patrouille suit à 60 m ; les rampes clignotent ; chaque
-    agent tire deux fois, un éclair d'une image (la flamme et sa lumière, liées en lumière comme avant) ; la caméra
-    fixe prend la secousse du passage. L'image fixe (P3.STILL_FRAME) garde le cadre validé."""
+    """P3, le barrage, de dos (28 images, p3_enseignes.py), en repère monde après to_world : la berline arrive à
+    106 km/h, feinte vers la patrouille de droite, revient viser le trou des plots, remet les gaz et passe entre
+    les deux agents ; la caméra la suit au 21 mm, se rapproche, descend de 1,9 à 0,6 m et s'arrête avant les plots ;
+    la troisième patrouille suit derrière la caméra, hors champ ; les rampes clignotent ; les agents tirent (un
+    éclair d'une image) puis plongent derrière leurs portières. L'image fixe (P3.STILL_FRAME, la 20) : la berline à
+    3 m des plots, le souffle retenu."""
     frames = range(P3.F0 - 1, P3.F0 + P3.FRAMES + 1)        # une image de plus de chaque côté, pour l'obturateur
     scene.frame_start, scene.frame_end = P3.F0, P3.F0 + P3.FRAMES - 1
     ob = bpy.data.objects
-    # --- la berline : son rig au sol sous la caisse, tourné de son cap actuel ; la nappe d'appoint et la brume des
-    # phares la suivent
+    # --- la berline : son rig au sol sous la caisse, tourné de son cap à l'image fixe ; la nappe d'appoint, la
+    # brume des phares et le point de netteté la suivent
     body = ob["coupe"]
-    extras = [o for o in (ob.get("hero_fill"), ob.get("haze_lamps")) if o is not None]
-    rig = MO.rig_up(body, P3.STILL[2], name="rig_berline", extras=extras)
+    extras = [o for o in (ob.get("hero_fill"), ob.get("haze_lamps"), ob.get("focus")) if o is not None]
+    rig = MO.rig_up(body, P3.hero_heading(P3.T_STILL), name="rig_berline", extras=extras)
     wheels = [c for c in body.children if c.name.startswith("wheel_")]
     ys = [Vector(w.location).y for w in wheels]
     wb, front = (max(ys) - min(ys)), -min(ys)                 # l'avant vers -y dans la caisse
@@ -1246,7 +1287,7 @@ def plan_P3(scene):
                 o.hide_render = o.hide_viewport = not P3.firing(k, f)
                 o.keyframe_insert("hide_render", frame=f)
                 o.keyframe_insert("hide_viewport", frame=f)
-    # --- la caméra : fixe, puis la secousse
+    # --- la caméra : travelling suiveur, grue qui descend, freinage
     MO.key_camera(ob["cam"], frames, P3.camera)
     scene.render.use_motion_blur = True
     scene.render.motion_blur_shutter = 0.5
