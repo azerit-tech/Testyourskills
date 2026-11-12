@@ -156,11 +156,12 @@ HIGH_AHEAD, HIGH_Z, HIGH_SITE = 13.0, 5.0, -14.0
 LIFT_FRAME = 24
 LENS = 21.0
 
-# --- les avions : de derrière la ville (-y) vers la caméra, très bas (30 et 34 m), de part et d'autre de l'axe de
-# la jetée, nez vers +y ; ils grossissent au milieu du cadre, passent au-dessus de la colonne, de la berline et
-# de la caméra, et sortent par le haut entre les images 34 et 40 (x, y et z à la dernière image, vitesse en m/s).
-# Écartés de 22 et 20 m de l'axe : les hélicoptères, plus bas, sont sur l'axe
-JETS = [(JX - 22.0, Y_HERO_STILL + 60.0, 30.0, 185.0), (JX + 20.0, Y_HERO_STILL + 44.0, 34.0, 185.0)]
+# --- les avions : de derrière la ville (-y) vers la caméra, en rase-mottes au-dessus de la lagune (16 et 19 m), de
+# part et d'autre de la jetée, nez vers +y, à 120 m/s (x, y et z à la dernière image). À 30-34 m et 185 m/s, ils
+# n'étaient que deux points à l'horizon puis sortaient par le haut : ici ils grossissent pendant l'envol, à un
+# cinquième du cadre en largeur vers l'image 34, et sortent par les côtés vers l'image 37, sous les 12 % du haut.
+# À 27 et 28 m de l'axe : 15 m au moins des hélicoptères (sur l'axe, à 9 et 10 m de part et d'autre de la berline)
+JETS = [(JX - 27.0, Y_HERO_STILL + 50.0, 16.0, 120.0), (JX + 28.0, Y_HERO_STILL + 42.0, 19.0, 120.0)]
 
 
 def jet(i):

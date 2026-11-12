@@ -249,8 +249,8 @@ def test_p3():
 
 def test_p6():
     """P6 (découpage v2) : aucune distance sous 6 m au sol ; la colonne derrière la berline ; la caméra devant elle,
-    au ras du sol jusqu'à l'image 24, à 5 m et 13 m devant à la fin ; les appareils s'évitent, les avions au-dessus
-    des hélicoptères ; rien ne frôle la caméra ; personne ne tire (il n'y a rien à tirer)."""
+    au ras du sol jusqu'à l'image 24, à 5 m et 13 m devant à la fin ; les appareils s'évitent, les avions au large
+    de la jetée ; rien ne frôle la caméra ; personne ne tire (il n'y a rien à tirer)."""
     import p6_jetee as P
     frames = range(P.F0 - 1, P.F0 + P.FRAMES + 1)
     d, f, a, b = M.min_gap(P.tracks(), frames)
@@ -269,9 +269,8 @@ def test_p6():
     worst = min((math.dist(air[p](M.t_of(f))[:3], air[q](M.t_of(f))[:3]), p, q, f)
                 for f in frames for p in air for q in air if p < q)
     check("P6 : les appareils s'évitent (15 m)", worst[0] >= 15.0, f"{worst[0]:.1f} m entre {worst[1]} et {worst[2]}")
-    low = min(P.jet(i)(M.t_of(f))[2] - max(P.heli(k)(M.t_of(f))[2] for k in range(len(P.HELIS)))
-              for f in frames for i in range(len(P.JETS)))
-    check("P6 : les avions au-dessus des hélicoptères", low >= 5.0, f"{low:.1f} m au plus bas")
+    side = min(abs(P.jet(i)(M.t_of(f))[0] - P.JX) for f in frames for i in range(len(P.JETS)))
+    check("P6 : les avions passent au large de la jetée (20 m)", side >= 20.0, f"{side:.1f} m de l'axe")
     for name, fn in (("caméra", P.camera), ("caméra V1", P.camera_v1)):
         cam = min(math.dist(fn(M.t_of(f))[:3], air[k](M.t_of(f))[:3]) for f in frames for k in air)
         check(f"P6 : rien ne frôle la {name} (20 m)", cam >= 20.0, f"{cam:.1f} m au plus près")
