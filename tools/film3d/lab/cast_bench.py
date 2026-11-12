@@ -160,6 +160,8 @@ def lighting(kind, air=False):
     """« ambre » : deux lampadaires de rue (spots ambre de 2600 W à 5,4 m, comme lieux.lamp), un devant à droite,
     un derrière à gauche. « neon » : deux enseignes, corail à gauche et lilas à droite (tubes à 3 m), plus un
     lampadaire lointain. Pour un aéronef, la même chose renvoyée par le sol (lumière vers le haut, faible)."""
+    if kind == "soir":
+        return
     if air:
         if kind == "ambre":
             _light("rebond_ambre", "AREA", (0, 0, 0.3), (0, 0, 30), AMBER, 4000.0, size=30.0)
@@ -194,44 +196,15 @@ def ground():
 MEUTE = []
 
 
-def clone_split(root, name):
-    """lieux.clone, plus deux lignes : chaque copie a ses propres lumières (un bloc de données par lumière), et les
-    pilotes de ses optiques (cast_vehicles.bar_drive_lenses) sont repointés sur ces lumières-là. motion.flash_bars
-    peut alors décaler chaque véhicule ; avec des lumières partagées, le dernier décalage posé valait pour tous."""
-    made = {}
-
-    def rec(ob, parent):
-        if parent is not None and "_beam_" in ob.name:
-            return None
-        c = ob.copy()
-        if c.type == "LIGHT":
-            c.data = ob.data.copy()
-        if c.animation_data:
-            c.animation_data.action = None
-        c.name = f"{name}:{ob.name}" if parent else name
-        for col in ob.users_collection:
-            col.objects.link(c)
-        if parent is not None:
-            c.parent = parent
-            c.matrix_parent_inverse = ob.matrix_parent_inverse.copy()
-        made[ob] = c
-        for ch in ob.children:
-            rec(ch, c)
-        return c
-
-    r = rec(root, None)
-    remap = {o.data: c.data for o, c in made.items() if o.type == "LIGHT"}
-    for c in made.values():
-        for fc in (c.animation_data.drivers if c.animation_data else []):
-            for v in fc.driver.variables:
-                for t in v.targets:
-                    if t.id in remap:
-                        t.id = remap[t.id]
-    for col in bpy.data.collections:
-        if col.name.endswith("_glow_exclude"):
-            for co in col.collection_objects:
-                co.light_linking.link_state = "EXCLUDE"
-    return r
+def clone_partage(root, name):
+    """lieux.clone sans lieux.own_lights : des copies aux lumières partagées, le témoin de la meute qui clignotait
+    d'un bloc (motion.flash_bars posait le décalage du dernier véhicule sur tous)."""
+    import lieux as L
+    own, L.own_lights = L.own_lights, (lambda r: r)
+    try:
+        return L.clone(root, name)
+    finally:
+        L.own_lights = own
 
 
 def load(veh, bar_on=True):
@@ -247,22 +220,35 @@ def load(veh, bar_on=True):
     elif veh == "van":
         root = L.van("van", lights_on=bar_on)
         L.put(root, 0, 0, 0, 0)
-    elif veh == "heli":
+    elif veh in ("heli", "heli_bas"):
         root, h = L.helicopter("heli", searchlight=True)
-        L.put(root, 0, 0, 16.0, 0)
+        L.put(root, 0, 0, 16.0 if veh == "heli" else 8.0, 0)
         bpy.context.view_layer.update()
         L.aim(h, (0.0, 9.0, 0.0))
     elif veh == "jet":
         root = L.jet("jet")
         L.put(root, 0, 0, 30.0, 0)
+    elif veh == "violets":
+        # les deux violets côte à côte : à gauche la palette des scènes (LILAC, faisceaux et flaques), à droite
+        # celui des rampes (cast_vehicles.BAR_LILAC) ; chacun un tube émissif et sa lumière sur le mouillé
+        root = bpy.data.objects.new("violets", None)
+        bpy.context.scene.collection.objects.link(root)
+        for name, x, col in (("palette", -1.3, cv.LILAC), ("rampes", 1.3, cv.BAR_LILAC)):
+            ob = _light(f"violet_{name}", "AREA", (x, 2.0, 2.2), (x, 2.0, 0.0), col, 600.0, size=1.6, size_y=0.2)
+            ob.data.spread = math.radians(120)
+            bpy.ops.mesh.primitive_cylinder_add(radius=0.045, depth=1.6, location=(x, 2.0, 2.25),
+                                                rotation=(0, math.radians(90), 0))
+            tube = bpy.context.active_object
+            tube.name = f"violet_{name}_tube"
+            tube.data.materials.append(cv.mat_emit(f"violet_{name}_tube", col, 8.0))
     elif veh in ("meute", "meute_partage"):
-        # trois patrouilles de front : meute_partage par lieux.clone tel qu'il est (lumières partagées),
-        # meute par clone_split (la correction proposée pour lieux.clone)
+        # trois patrouilles de front : meute par lieux.clone (chacune ses lumières, elles battent en désordre),
+        # meute_partage par clone_partage (lumières partagées, elles battent ensemble)
         root = L.patrol("patrol", lights_on=bar_on)
         L.put(root, 0, 0, 0, 0)
         MEUTE[:] = [root]
         for i, x in ((1, -3.4), (2, 3.4)):
-            c = (clone_split if veh == "meute" else L.clone)(root, f"patrol{i}")
+            c = (L.clone if veh == "meute" else clone_partage)(root, f"patrol{i}")
             L.put(c, x, -1.5 * i, 0, 0)
             MEUTE.append(c)
     else:
@@ -296,10 +282,12 @@ def views(veh, root):
     mn, mx = extent(root)
     c = (mn + mx) / 2
     L, W, H = mx.y - mn.y, mx.x - mn.x, mx.z - mn.z
+    if veh == "violets":
+        return {"cote_a_cote": ((0.0, -3.0, 0.6), Vector((0.0, 2.0, 1.4)), 24.0)}
     if veh in ("meute", "meute_partage"):
         t = Vector((0.0, -1.5, 1.2))
         return {"meute": ((2.0, mx.y + 12.0, 1.6), t, 40.0), "meute_haut": ((4.0, mx.y + 9.0, 4.5), t, 32.0)}
-    if veh in ("heli", "jet"):
+    if veh in ("heli", "heli_bas", "jet"):
         z = c.z
         d = 16.0 if veh == "heli" else 24.0
         lens = 35.0 if veh == "heli" else 40.0
@@ -310,13 +298,22 @@ def views(veh, root):
             "dessous_face": ((-1.5, d, 0.5), c, lens),
             "dessous_g": ((-d * 0.6, d * 0.3, 0.5), c, lens),
         }
+        if veh == "heli_bas":
+            # de dessous et de derrière, à 9 m (P5, P6, FIN)
+            return {"arriere9": ((1.2, -4.0, 0.6), c, 24.0), "arriere9_g": ((-2.5, -3.5, 0.6), c, 24.0)}
         if veh == "heli":
+            # de dessous et de derrière, à 16 et 25 m
+            out["arriere16"] = ((1.5, -4.0, 0.6), c, 24.0)
+            out["arriere25"] = ((3.0, -19.0, 0.6), c, 35.0)
             sl = find(root, "searchlight_lens")
             p = sl.matrix_world.translation if sl else c
             out["projecteur"] = ((3.0, 11.0, 0.5), p, 135.0)
             out["dessous_aplomb"] = ((0.5, 3.0, 0.5), c, 24.0)
         else:
             out["tuyeres"] = ((3.0, -d * 0.9, 0.5), Vector((c.x, mn.y + 1.5, z)), 85.0)
+            # de derrière quand il dépasse la caméra (P6)
+            out["depasse"] = ((3.0, -8.0, 0.6), c, 24.0)
+            out["depasse_loin"] = ((4.0, -30.0, 0.6), c, 35.0)
             out["dessous_aplomb"] = ((0.5, -4.0, 0.5), c, 24.0)
         return out
     t = Vector((c.x, c.y, H * 0.42))
@@ -337,6 +334,17 @@ def views(veh, root):
         "calandre": ((0.3, mx.y + 1.6, 0.75), Vector((0, mx.y - 0.3, H * 0.36)), 35.0),
         "coffre": ((0.3, mn.y - 1.8, H * 0.95), Vector((0, mn.y + 0.5, H * 0.55)), 35.0),
     }
+    for dd in (1, 3, 6):
+        # trois quarts arrière : son flanc droit, côté arrière, à dd m devant à gauche (25°), caméra tournée de 12°
+        q = Vector((mx.x, mn.y + 0.25 * L, 0.6))
+        cpos = q + dd * Vector((math.sin(math.radians(25)), -math.cos(math.radians(25)), 0.0))
+        yaw = math.radians(12)
+        out[f"amorce{dd}"] = (tuple(cpos), cpos + 10 * Vector((-math.sin(yaw), math.cos(yaw), 0.08)), 24.0)
+        # de flanc, plus en arrière : la roue arrière à 37° sur la gauche, caméra tournée de 30°
+        q = Vector((mx.x, mn.y + 0.2 * L, 0.6))
+        cpos = q + dd * Vector((math.sin(math.radians(37)), -math.cos(math.radians(37)), 0.0))
+        yaw = math.radians(30)
+        out[f"flanc{dd}"] = (tuple(cpos), cpos + 10 * Vector((-math.sin(yaw), math.cos(yaw), 0.08)), 24.0)
     bar = find(root, "hq_lightbar")
     if bar is not None:
         bmn, bmx = extent_obj(bar)
@@ -372,7 +380,7 @@ def run(a):
     import motion as M
     scene, _hidden = L.new_scene()
     L.sky(scene)
-    air = a.veh in ("heli", "jet")
+    air = a.veh in ("heli", "heli_bas", "jet")
     ground()
     lighting(a.light, air=air)
     root = load(a.veh, bar_on=(a.bar == "on"))
@@ -380,7 +388,7 @@ def run(a):
         M.flash_bars([root], range(1, 25))
     if a.veh in ("meute", "meute_partage") and a.bar == "on":
         M.flash_bars(MEUTE, range(1, 25))
-    if a.veh == "heli":
+    if a.veh in ("heli", "heli_bas"):
         scene.render.use_motion_blur = True        # le disque des rotors (pilotes sur l'image)
     w, h = (int(v) for v in a.res.split("x"))
     scene.render.resolution_x, scene.render.resolution_y = w, h

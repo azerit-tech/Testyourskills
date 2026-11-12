@@ -982,7 +982,7 @@ def drive(root, speed, wheels=(), wheel_r=0.33):
 
 
 def clone(root, name):
-    """Copie un rig et toute sa descendance, maillages et lumières partagés (copies liées). Les objets exclus de
+    """Copie un rig et toute sa descendance, maillages partagés (copies liées), lumières propres. Les objets exclus de
     la lueur de la rampe (liaison de lumière de cast_vehicles.lightbar_lights) le sont aussi dans la copie."""
     made = {}
 
@@ -1004,11 +1004,33 @@ def clone(root, name):
         return c
 
     r = rec(root, None)
+    own_lights(r)
     for col in bpy.data.collections:
         if col.name.endswith("_glow_exclude"):
             for co in col.collection_objects:
                 co.light_linking.link_state = "EXCLUDE"
     return r
+
+
+def own_lights(root):
+    """Une copie de véhicule prend ses propres lumières : chaque lumière partagée de sa descendance reçoit son bloc
+    de données, et les pilotes de la copie qui visaient l'ancien bloc (les optiques de la rampe,
+    cast_vehicles.bar_drive_lenses) visent le nouveau. Avec des lumières partagées, motion.flash_bars posait le
+    décalage du dernier véhicule sur tous : la meute clignotait d'un bloc."""
+    obs = [root, *root.children_recursive]
+    remap = {}
+    for o in obs:
+        if o.type == "LIGHT" and o.data.users > 1:
+            d = o.data.copy()
+            remap[o.data] = d
+            o.data = d
+    for o in obs:
+        for fc in (o.animation_data.drivers if o.animation_data else []):
+            for v in fc.driver.variables:
+                for t in v.targets:
+                    if t.id in remap:
+                        t.id = remap[t.id]
+    return root
 
 
 def hero(lights_on=True):
