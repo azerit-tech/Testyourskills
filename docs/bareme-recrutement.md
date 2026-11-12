@@ -193,12 +193,12 @@ Règles de comptage :
 - Les commits comptés sont ceux des dépôts dont c'est le langage principal. Une « autre famille » demande un dépôt de 10 commits ou plus. TypeScript et JavaScript font une seule famille ; HTML, CSS et les scripts de build ne comptent pas.
 - Ne comptent pas : les dépôts tutoriels (nom de tutoriel, moins de 5 commits) et les dépôts déposés d'un bloc (moins de 5 commits pour plus d'un Mo).
 
-Chefs d'accusation, sans effet sur la note :
-- **« Stack déclarée, sans trace publique »** (EN "Declared stack, no public trace") : au moins cinq technos vérifiables nommées sur LinkedIn, moins d'un tiers retrouvées dans le code. Une techno que le code public ne peut pas montrer (un outil interne, une base propriétaire) n'est jamais comptée « sans trace ». Le ton reste taquin : sans trace publique ne veut pas dire inventé.
-- **« LinkedIn en dessous de la vérité »** (EN "LinkedIn undersells the code") : le code prouve une techno que le LinkedIn ne nomme pas.
+Signaux du critère, sans effet sur la note :
+- **« À confirmer »** (EN "To confirm") : au moins cinq technos vérifiables nommées sur LinkedIn, moins d'un tiers retrouvées dans le code. « À confirmer : Kafka, Kubernetes. Déclarées sur LinkedIn, pas encore visibles dans 12 dépôts publics. » Vu de la personne seule. Une techno que le code public ne peut pas montrer (un outil interne, une base propriétaire) n'est jamais « à confirmer ». Pas encore visible ne veut pas dire inventé.
+- **« Stack prouvée au-delà du profil »** (EN "Stack proven beyond the profile") : le code prouve une techno que le LinkedIn ne nomme pas. Vu de tous.
 - **« IA dans l'atelier »** (EN "AI in the workshop") : des fichiers d'agent dans un dépôt actif.
 
-**La pièce affichée** : « TypeScript : 329 commits dans 7 dépôts depuis novembre 2024, dernier push hier (sequence-mail). Agda retrouvé dans le code. » — GitHub. Ou : « Kubernetes déclaré : aucun manifeste, aucune dépendance dans 18 dépôts. » — recoupé.
+**La pièce affichée** : « TypeScript : 329 commits dans 7 dépôts depuis novembre 2024, dernier push hier (sequence-mail). Agda retrouvé dans le code. » — GitHub. Avec LinkedIn : « Déclarées sur LinkedIn : Python, Agda, TypeScript. Retrouvées dans le code : Agda, TypeScript. » — recoupé.
 
 **Données** : langages, commits par dépôt, dates, dépendances, topics existent. À ajouter : la table des familles de langages, la table « techno → trace attendue », les fichiers d'agent d'IA dans l'arbre.
 
@@ -330,12 +330,12 @@ LinkedIn porte 40 % de la note (école, expérience, parcours), GitHub 50 % (sta
 |---|---|
 | **LinkedIn seul** | La note déclarée. École, expérience, parcours notés ; stack et ownership « déclarés » (tables arrêtées à 6) ; code, activité, open source « non prouvés », hors moyenne. |
 | **GitHub seul** | La note prouvée. Stack, code, activité, ownership, open source notés ; expérience « estimée » sur les années actives (arrêtée à 8) ; école et parcours « non renseignés », hors moyenne. Une légende de l'open source atteint six étoiles sans LinkedIn. |
-| **Les deux** | Deux fiches comme aujourd'hui (ce que LinkedIn déclare, ce que GitHub prouve), et la **note du dossier** (EN "case rating") : chaque critère pris sur sa source de preuve. Un GitHub trop mince ne tire pas le dossier vers le bas : ses critères sont « non prouvés ». |
+| **Les deux** | **Un dossier, une fiche, une note** (SPEC §18.36) : la **note du dossier** (EN "case rating"), chaque critère pris sur sa source de preuve. Les deux pièces restent rangées au dossier, sans note à l'écran. Un GitHub trop mince ne tire pas le dossier vers le bas : ses critères sont « non prouvés ». |
 
-**Où entre l'écart entre le déclaré et le prouvé** :
-1. Dans les deux fiches et leur titre, comme aujourd'hui : « Ton code vaut 20 points de plus que ton LinkedIn ».
-2. Critère par critère : le bloc montre « déclaré 4 · prouvé 6 » pour la stack et l'ownership, les deux critères où les deux sources parlent.
-3. Dans les chefs d'accusation (« Stack déclarée, sans trace publique », « Senior sur parole », « LinkedIn en dessous de la vérité »). La note du dossier, elle, retient toujours le prouvé.
+**Ce que disent les deux sources**, sans jamais les mettre en écart :
+1. Critère par critère, la pièce où la note a été lue : « lu sur LinkedIn », « lu sur GitHub », « lu sur les deux pièces ». Aucune note par pièce, aucun titre d'écart.
+2. Quand le code confirme : « Recoupé : le code public couvre la même période. »
+3. Quand le code ne montre pas encore ce que LinkedIn déclare : un signal du critère, « À confirmer en entretien » ou « À confirmer : Kafka », vu de la personne seule. Il ne change aucune note.
 
 **Arrondi** : les notes sont des entiers et les coefficients des demis, le calcul se fait donc en entiers, arrondi au supérieur à ,5. Bornes 1 à 99, comme aujourd'hui.
 
@@ -349,7 +349,7 @@ La grille est aussi une démonstration : la personne doit voir qu'on a lu son do
 |---|---|---|---|
 | 1 | **Les années recomptées.** On recompte l'expérience poste par poste : stages à moitié, association étudiante repérée parce que l'employeur porte le nom de l'école. | « LinkedIn laisse lire 3 ans. On en compte 1,1 : deux stages, et un poste qui est une association de ton école. » | Existent (postes datés, formation). Calcul en code. |
 | 2 | **Le poste confirmé par le code.** Un poste daté du LinkedIn, retrouvé dans GitHub sur les mêmes mois. | « LinkedIn : recherche sur la bibliothèque standard d'Agda, février–novembre 2025. GitHub : 41 PR fusionnées dans ce dépôt sur ces dix mois. Poste confirmé. » | À ajouter : destination et date des PR. Les dates de poste existent. |
-| 3 | **La techno déclarée sans trace, la techno prouvée jamais déclarée.** Chaque techno du LinkedIn cherchée dans les langages, les dépendances et les fichiers. | « « Machine Learning » déclaré : scikit-learn et xgboost retrouvés dans HSMM_DUAL_SCALE. » ou « Kubernetes déclaré, aucune trace dans 18 dépôts. » ou « Agda, 5 Mo de code, absent de tes compétences LinkedIn. » | Existent (compétences, technos lues, langages, dépendances). À ajouter : la table « techno → trace attendue ». |
+| 3 | **La techno déclarée sans trace, la techno prouvée jamais déclarée.** Chaque techno du LinkedIn cherchée dans les langages, les dépendances et les fichiers. | « « Machine Learning » déclaré : scikit-learn et xgboost retrouvés dans HSMM_DUAL_SCALE. » ou « À confirmer : Kubernetes. Déclarées sur LinkedIn, pas encore visibles dans 18 dépôts publics. » ou « Stack prouvée au-delà du profil : Agda. » | Existent (compétences, technos lues, langages, dépendances). À ajouter : la table « techno → trace attendue ». |
 | 4 | **Le changement de poste qui se voit dans le code.** Les contributions par année, mises en face des dates de poste. | « Passage à un poste d'encadrement en 2023 : 800 contributions par an avant, 60 depuis. » ou « Premier vrai commit trois mois avant le premier stage. » | Existent (contributions par année, premier commit, postes datés). |
 | 5 | **La même société des deux côtés.** L'employeur du LinkedIn retrouvé sur le profil GitHub (site, société affichée), sans que la personne ait rien relié. | « LinkedIn : Azerit. Site du profil GitHub : azerit.tech. Identité recoupée. » | Existent (site, société et comptes sociaux du profil GitHub). |
 | 6 | **Le fichier, la ligne.** Le niveau du code n'est pas une impression : on cite le dépôt, le fichier et l'extrait qui le justifient. Et, pour l'open source, le projet connu où une PR a été acceptée. | « sequence-mail, `outreach.test.ts`, niveau 4 : les erreurs d'envoi sont testées une à une. » | Existe (lecture IA). À ajouter pour le projet connu : destination des PR. |
@@ -358,7 +358,7 @@ Règles de ces trouvailles :
 - **Données publiques seulement**, avec un lien vers la page publique qui prouve.
 - **Jamais** d'âge, de genre, d'origine, de nationalité, de lieu, de photo, de contact, ni rien qui s'en approche. Les langues parlées ne sont ni lues ni gardées.
 - **Aucun tiers exposé** : un complice n'apparaît que par son pseudo public, comme aujourd'hui. On ne lit jamais le LinkedIn de quelqu'un d'autre pour recouper.
-- **Prudence sur l'absence** : « sans trace publique » ne s'écrit que pour ce que le code public peut montrer.
+- **Prudence sur l'absence** : « à confirmer » ne s'écrit que pour ce que le code public peut montrer, et ne se montre qu'à la personne.
 - La meilleure trouvaille de recoupement entre dans l'enquête en direct (SPEC §18.26) et dans le texte de partage.
 
 ## 6. Sur la fiche
@@ -384,17 +384,17 @@ Ce qui est montré, c'est la grille du jeu : huit critères, leurs niveaux, leur
 **Ce qui change à l'écran**
 - La **note de la fiche** devient la note du barème. Une seule note à l'écran, celle d'un recruteur.
 - Sous la fiche, le **bloc « Voici comment un recruteur d'Azerit te lit »** : les huit critères en n/10, leurs pièces, la moyenne.
-- Sur une comparaison : les deux fiches gardent chacune leur note (déclarée, prouvée) et leur titre d'écart. Le bloc montre trois colonnes, « LinkedIn · GitHub · retenu », et la **note du dossier**.
+- Sur un dossier à deux pièces : **un dossier, une fiche, une note** (SPEC §18.36). Une seule fiche, notée par la **note du dossier**, et sous elle la ligne des pièces (« Pièces au dossier : LinkedIn · GitHub »). Chaque critère dit la pièce où il a été lu. Ni deux fiches, ni titre d'écart, ni colonnes.
 - Au dos de la fiche, la ligne de formule devient celle du barème : « Code 7 × 2 + Stack 6 × 1,5 + … = 57 ».
 - Les **six barres ne bougent pas** (TEC, SHIP, ARCH, DOC, XP, BUZZ) : elles restent les traits de la fiche, et continuent de décider le profil, la peine et les chefs d'accusation. Deux retouches pour ne pas se contredire : **le bonus d'école sort de TEC** (l'école est maintenant « École : n/10 », un critère à part), et la barre XP prend la note du critère Expérience (× 10).
 
 **Ce qui casse**
 - Les notes bougent. La vitrine passe de « LinkedIn 57 · GitHub 71 » à environ « 41 · 61 ».
 - La fiche GitHub de la vitrine devient « Nouveau en ville » (XP sous 45, TEC à 70 ou plus) : c'est juste, et ça change son habillage.
-- Les tests qui fixent des notes (barème, fixtures, démo) sont à reprendre. Le seuil du profil « Sous couverture » (`forger`, 15 points d'écart) est à revérifier sur les fixtures.
+- Les tests qui fixent des notes (barème, fixtures, démo) sont à reprendre. Le profil « Sous couverture » (`forger`) ne naît plus d'un écart : il ne tient qu'aux mots creux d'une fiche déclarative (BUZZ du CV à 85 ou plus).
 - La référence des rangs (SPEC §18.3) doit être calculée avec ce barème : elle ne l'est pas encore, rien n'est perdu.
 - Les fiches déjà en base gardent leur ancienne note jusqu'à leur prochain jugement ; avant le lancement, on vide la base.
-- Ne casse pas : le dessin de la fiche, les images de partage, les étoiles et leurs seuils, le top de la semaine (il reste sur la note de la fiche GitHub), les types (`CardData.grid` est facultatif).
+- Ne casse pas : le dessin de la fiche, les images de partage, les étoiles et leurs seuils, le top de la semaine (question 7), les types (`CardData.grid` est facultatif).
 
 **Coût** : trois tâches (§8), environ trois jours d'agents et une demi-journée de vérification à 390 px.
 
@@ -402,12 +402,12 @@ Ce qui est montré, c'est la grille du jeu : huit critères, leurs niveaux, leur
 
 **Ce qui change à l'écran**
 - La fiche montre **les huit critères en huit barres de dix segments** (deux colonnes de quatre) : la note sur 10 se lit directement. BUZZ quitte les barres et reste un chef d'accusation.
-- Sur une comparaison, la **note du dossier** devient le grand chiffre, les deux fiches ses deux faces, et l'image de partage porte « déclaré 41 · prouvé 61 · dossier 57 ».
+- Fait avant le lancement : un dossier à deux pièces est une fiche, et l'image de partage porte la note du dossier.
 - L'indice « preuves » devient la part des coefficients notés sur leur source de preuve.
 - Profils, peines et chefs d'accusation se règlent sur les critères (la peine vient du plus faible parmi code, stack, activité, ownership).
-- Le top de la semaine prend la note du dossier quand le lien entre le LinkedIn et le GitHub est prouvé.
+- Le top de la semaine : voir la question 7.
 
-**Ce qui casse** : la mise en page de la fiche (une quatrième rangée de barres bute sur les chefs d'accusation, tout le bas est à recaler), le dos (six lignes deviennent huit), les six codes dans les types, les règles de `data/profiles.json`, `data/sentences.json` et `data/statuses.json`, les écarts de la comparaison (huit), les textes du site, la démo, toutes les fixtures, toutes les images déjà rendues, et la référence des rangs à recalculer (environ 2 $).
+**Ce qui casse** : la mise en page de la fiche (une quatrième rangée de barres bute sur les chefs d'accusation, tout le bas est à recaler), le dos (six lignes deviennent huit), les six codes dans les types, les règles de `data/profiles.json`, `data/sentences.json` et `data/statuses.json`, les textes du site, la démo, toutes les fixtures, toutes les images déjà rendues, et la référence des rangs à recalculer (environ 2 $).
 
 **Coût** : trois à quatre jours d'agents et une revue visuelle complète. Trop pour tenir avant le 19 sans risque.
 
@@ -431,7 +431,7 @@ Données réelles du 10 novembre 2026 (profils LinkedIn tels que lus, faits GitH
 - **Note du dossier** : sans l'école ni l'open source, (7 × 2 + 6 × 1,5 + 3 × 1,5 + 4 × 1,5 + 6 + 8) ÷ 8,5 = 5,6. L'école (6) et l'open source (6) sont au-dessus : ils entrent. 56,5 ÷ 10 = 5,65. **57 sur 100**, trois étoiles.
 - **Fiche GitHub** (expérience estimée à 4 sur deux années actives ; l'open source, 6, n'est pas au-dessus de 6,1 et n'entre pas) : **61**, quatre étoiles.
 - **Fiche LinkedIn** (école 6, expérience 3, parcours 4, ownership déclaré 4) : **41**.
-- Titre : « Ton code vaut 20 points de plus que ton LinkedIn ». Aujourd'hui : 57 et 71.
+- À l'écran, une seule fiche et une seule note, celle du dossier : 57 (SPEC §18.36). Avant le barème : 57 et 71.
 
 ### Lumine (`@LumBuilds0`)
 
@@ -509,17 +509,17 @@ interface Grid { criteria: GridCriterion[]; overall: number; rule?: "capped_unpr
   - Changer les années d'études ne change pas l'expérience. Changer l'ordre des postes non plus.
   - Un stage compte pour moitié, une association étudiante pour zéro, deux postes simultanés une fois.
   - LinkedIn seul ne dépasse jamais 85. GitHub seul peut dépasser 90.
-  - Une techno absente de la table n'est jamais dite « sans trace ». Un chef d'accusation ne change aucune note.
+  - Une techno absente de la table n'est jamais dite « à confirmer ». Un signal ne change aucune note.
   - Un GitHub de moins de 3 dépôts sans commit donne 20 seul, et ne baisse pas la note d'un dossier.
   - Même entrée, même sortie. Les suites existantes passent, notes mises à jour.
 
 ### Tâche 3 — L'affichage
 
-- **Fichiers** : `shared/types.ts` (le contrat) ; `web/src/components/` (un bloc `RecruiterGrid`, monté dans la page de résultat et dans `Comparison.tsx`) ; `web/src/i18n.ts` (tous les libellés des §3 et §6, français et anglais) ; `shared/card/CardBack.tsx` et `shared/card/i18n.ts` (la ligne de formule) ; `web/src/lib/mock.ts` (une grille de démo).
+- **Fichiers** : `shared/types.ts` (le contrat) ; `web/src/components/` (un bloc `RecruiterGrid`, monté dans la page de résultat) ; `web/src/i18n.ts` (tous les libellés des §3 et §6, français et anglais) ; `shared/card/CardBack.tsx` et `shared/card/i18n.ts` (la ligne de formule) ; `web/src/lib/mock.ts` (une grille de démo).
 - **Tests d'acceptation** :
   - À 390 px, le bloc tient sans défilement horizontal ; chaque ligne montre « n/10 », l'étiquette de source et la pièce ; un appui déplie la table des niveaux et ce qui manque pour le suivant.
   - Aucun « +n » ni « −n » n'apparaît nulle part, ni dans le bloc ni sur la fiche.
-  - Une comparaison montre les trois colonnes et la note du dossier.
+  - Un dossier à deux pièces montre une note par critère, la pièce où elle a été lue, et la note du dossier.
   - Une fiche sans grille (ancienne) s'affiche comme avant.
   - La formule du dos tient en trois lignes pour huit critères.
   - Tous les textes existent dans les deux langues, sans accord au masculin ni au féminin avec la personne.
@@ -535,4 +535,4 @@ Seulement celles où son jugement de recruteur est nécessaire. Chacune a une va
 4. **L'école et l'open source ne peuvent pas faire baisser la note** (règle 2 du §4). L'autre choix, plus simple : une moyenne pure, où une école de rang C pèse comme n'importe quelle note. *Par défaut* : la règle, pour qu'une école modeste ne coûte jamais plus qu'une absence d'école.
 5. **Les noms sur une page partagée.** Les pièces citent l'école et d'anciens employeurs, et une fiche peut être faite sur quelqu'un d'autre. *Par défaut* : pièces complètes pour la personne qui a lancé la fiche ou qui l'a revendiquée ; sur la page partagée, le rang de l'école et les comptes (« deux stages, une entreprise fondée »), sans nom d'ancien employeur.
 6. **Les coefficients, et le poids des stages** : 40 % LinkedIn, 50 % GitHub, 10 % les deux ; stage et alternance à 50 %, entreprise fondée à 100 %, association à 0 %. *Par défaut* : ces valeurs, à recaler quand la référence des rangs aura tourné.
-7. **Le top de la semaine** : note de la fiche GitHub, ou note du dossier ? *Par défaut* : la fiche GitHub, tant que le LinkedIn reste une déclaration que personne ne vérifie.
+7. **Le top de la semaine** : note de la fiche GitHub, ou note du dossier ? Depuis « un dossier, une fiche, une note » (SPEC §18.36), la page d'un dossier ne montre qu'une note, celle du dossier ; le top, lui, classe encore sur la note de la fiche GitHub, et peut donc afficher une autre note que la page. *En attente de Jacques* : rien n'est tranché ; d'ici là, le top garde la note de la fiche GitHub.
