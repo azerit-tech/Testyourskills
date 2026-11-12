@@ -733,20 +733,26 @@ def plan_FIN(scene, hidden, palier="socle"):
 def plan_FIN6(scene, hidden, palier="socle"):
     """FIN6, l'encerclement, temps gelé : la berline au centre, un anneau de dix patrouilles et du fourgon à
     14 m tournés vers elle, une silhouette devant chacun, trois projecteurs d'hélicoptère croisés sur elle, les
-    avions saisis dans le ciel. L'orbite : rayon 7 m, à 25 cm, sur 150° ; l'image d'essai au milieu de l'arc,
-    trois quarts face, les mains levées et la ville derrière. Vu à 25 cm, la berline cache tout ce qui est derrière
+    avions saisis dans le ciel. L'orbite, animée (56 images, fin6_orbite.py) : rayon 7 m, à 25 cm, sur 150°, de
+    l'azimut 245° (trois quarts arrière gauche) à 95° ; elle finit sur l'image d'essai validée, trois quarts face,
+    les mains levées et la ville derrière. Le temps est gelé : seuls tournent les rotors et battent les rampes et
+    leurs faisceaux (2 Hz). Vu à 25 cm, la berline cache tout ce qui est derrière
     elle : l'anneau est calé pour que deux véhicules l'encadrent (le fourgon à droite, une patrouille à gauche), et
     le 18 mm prend les autres sur les bords ; les rampes de tout l'anneau posent leurs flaques de couleur sur
     l'enrobé mouillé."""
+    import motion as M
+    import fin6_orbite as F6
     decor(scene, hidden, all_lit=True, marina=(palier == "marina"))
+    scene.frame_start, scene.frame_end = F6.F0, F6.F0 + F6.FRAMES - 1
+    frames = range(F6.F0 - 1, F6.F0 + F6.FRAMES + 1)
     rnd = random.Random(6)
     hero = L.hero()
     L.put(hero, STOP.x, STOP.y, 0.0, heading=HERO_STOP)
     L.hands_up(hero)
     L.cabin_light(hero, energy=25.0)
     skid_marks()
-    ring = [(-122.7 + 360.0 / 11 * i, "van" if i == 0 else "patrol") for i in range(11)]
-    first = {}
+    ring = [(a, "van" if i == 0 else "patrol") for i, a in enumerate(F6.RING)]
+    first, rigs = {}, []
     for i, (a, kind) in enumerate(ring):
         x, y = _polar(a, 14.0)
         r = first.get(kind)
@@ -762,6 +768,10 @@ def plan_FIN6(scene, hidden, palier="socle"):
         # vingt-deux faisceaux corail et lilas croisés sur la berline la passaient au rose : elle n'en reçoit que
         # le dixième, de leur couleur (un liseré), l'anneau et la brume gardent tout
         split_for_car(beams, hero, tag="rampe", fraction=0.1)
+        rigs.append(r)
+    # le temps est gelé, pas les gyrophares : rampes, faisceaux et flaques battent à 2 Hz (corail, lilas)
+    n = M.flash_bars(rigs, frames)
+    print(f"[FIN6] {n} lumières de rampe clignotantes", flush=True)
     try:
         cops = [L.officer(pz, style=st, name=f"officer_{pz}") for pz, st in (("aim", 0), ("crouch", 1), ("guard", 2))]
         for i, (a, kind) in enumerate(ring):
@@ -804,6 +814,11 @@ def plan_FIN6(scene, hidden, palier="socle"):
     L.cap_images(1024, keep_objects=[hero, bpy.data.objects["pointe_sol"]])
     cam = L.camera("cam_FIN6", cam_loc, (STOP.x, STOP.y, 1.6), lens=18, fstop=2.8,
                    focus=(STOP.x, STOP.y, 1.1))
+    # l'orbite : la dernière image retrouve la pose ci-dessus (azimut 95°, visée à 1,6 m)
+    M.key_camera(cam, frames, F6.camera)
+    cam.data.dof.focus_object = hero
+    scene.render.use_motion_blur = True
+    scene.render.motion_blur_shutter = 0.5
     return cam
 
 
@@ -891,7 +906,7 @@ def plan_P6(scene, hidden, palier="socle"):
     return cam
 
 
-STILL = {"P6": 21}                                    # l'image fixe d'essai des plans animés (p6_jetee.STILL_FRAME)
+STILL = {"P6": 21, "FIN6": 56}                        # l'image fixe d'essai des plans animés (STILL_FRAME)
 
 
 PLANS = {"FIN": plan_FIN, "FIN6": plan_FIN6, "P6": plan_P6}

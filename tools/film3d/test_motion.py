@@ -190,6 +190,29 @@ def test_ouv():
           f"{a0:.0f}° à gauche, le cadre de {180 - P.CAM_YAW - half:.0f} à {180 - P.CAM_YAW + half:.0f}°")
 
 
+def test_fin6():
+    """FIN6 : la caméra ne passe à moins de 1 m d'aucun véhicule, agent ni mât ; la berline entière dans le cadre,
+    hors des bandes du HUD (12 % du haut, 15 % du bas), son milieu entre 35 et 60 % de la hauteur ; l'orbite de
+    150° finit sur la pose validée (azimut 95°, immobile)."""
+    import fin6_orbite as P
+    frames = range(P.F0, P.F0 + P.FRAMES)
+    near = min((d(P.camera(M.t_of(f))[:2]), n, f) for f in frames for n, d in P.obstacles())
+    check("FIN6 : rien à moins de 1 m de la caméra", near[0] >= 1.0, f"{near[0]:.2f} m de {near[1]} à l'image {near[2]}")
+    worst = []
+    for f in frames:
+        c = P.camera(M.t_of(f))
+        pts = [P.project(c, p) for p in P.hero_corners()]
+        mid = P.project(c, (P.CX, P.CY, P.HERO_BOX[2] / 2))
+        ok = all(q is not None and abs(q[0]) <= 1.0 and 0.15 <= q[1] <= 0.88 for q in pts) and 0.35 <= mid[1] <= 0.60
+        if not ok:
+            worst.append(f)
+    check("FIN6 : la berline dans le cadre, hors du HUD, au milieu de la hauteur", not worst, f"images {worst[:5]}")
+    check("FIN6 : 150° d'orbite", abs(abs(P.azimuth(P.T_END) - P.azimuth(0.0)) - 150.0) < 0.01)
+    a, b = P.camera(P.T_STILL), P.camera(M.t_of(P.STILL_FRAME - 1))
+    check("FIN6 : la pose validée à la fin", abs(P.azimuth(P.T_STILL) - 95.0) < 0.01 and math.dist(a[:3], b[:3]) < 0.05,
+          f"{math.dist(a[:3], b[:3]) * 100:.1f} cm entre les deux dernières images")
+
+
 def test_bars():
     seq = [M.bar_phase(f) for f in range(24)]
     check("rampes : 2 Hz, alternance corail / lilas", seq[:6] == ["corail"] * 6 and seq[6:12] == ["lilas"] * 6
@@ -206,6 +229,7 @@ if __name__ == "__main__":
     test_p3()
     test_p6()
     test_ouv()
+    test_fin6()
     test_bars()
     print(f"\n{'tout passe' if not FAIL else str(len(FAIL)) + ' échec(s)'}")
     sys.exit(1 if FAIL else 0)
