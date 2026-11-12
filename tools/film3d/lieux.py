@@ -1283,6 +1283,30 @@ def door_object(root, side=-1, door_x=(-0.32, 0.99), door_z=(0.18, 1.42), inner=
     bmesh.ops.translate(db, vec=(-hx, -hy, 0.0), verts=db.verts)
     db.to_mesh(dm)
     db.free()
+    # la livrée est peinte en coordonnées objet : ramenée à la charnière, la portière les décalait de (hx, hy) et
+    # ses boîtes (le crème des portières, la zone sans atlas) glissaient ; ses matières, copiées, les reprennent
+    # comme sur la caisse fermée, et tournent avec elle
+    for i, mat in enumerate(dm.materials):
+        if mat is None or not mat.node_tree:
+            continue
+        if not any(n.type == "TEX_COORD" and n.outputs["Object"].links for n in mat.node_tree.nodes):
+            continue
+        mc = mat.copy()
+        mc.name = f"{mat.name}_portiere"
+        nt = mc.node_tree
+        for tc in [n for n in nt.nodes if n.type == "TEX_COORD"]:
+            links = list(tc.outputs["Object"].links)
+            if not links:
+                continue
+            add = nt.nodes.new("ShaderNodeVectorMath")
+            add.operation = "ADD"
+            add.inputs[1].default_value = (hx, hy, 0.0)
+            nt.links.new(tc.outputs["Object"], add.inputs[0])
+            for l in links:
+                to = l.to_socket
+                nt.links.remove(l)
+                nt.links.new(add.outputs[0], to)
+        dm.materials[i] = mc
     # la caisse : sans la portière
     bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.index in door], context="VERTS")
     bm.to_mesh(me)
