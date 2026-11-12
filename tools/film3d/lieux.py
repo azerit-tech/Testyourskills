@@ -1220,6 +1220,75 @@ def open_door(root, side=-1, angle=75.0, door_x=(-0.32, 0.99), door_z=(0.18, 1.4
     return moved
 
 
+def door_object(root, side=-1, door_x=(-0.32, 0.99), door_z=(0.18, 1.42), inner=0.55, hinge=(0.96, 0.92)):
+    """La portière avant d'une patrouille détachée en objet à part, pour l'animer (open_door, lui, tord le
+    maillage d'un plan fixe) : les mêmes îlots (portière, vitre, poignée, rétroviseur) passent dans un maillage
+    neuf, enfant de la caisse, origine sur la charnière ; sa rotation en z ouvre la portière (`door_angle(ob, deg)`,
+    positif : elle s'ouvre). Le maillage de la caisse perd ces îlots : à faire sur une patrouille qu'on ne clone
+    pas. Renvoie l'objet."""
+    body = bpy.data.objects[root["body"]]
+    me = body.data
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bm.verts.ensure_lookup_table()
+    seen, door = set(), set()
+    for v in bm.verts:
+        if v.index in seen:
+            continue
+        comp, stack = [], [v]
+        seen.add(v.index)
+        while stack:
+            p = stack.pop()
+            comp.append(p)
+            for e in p.link_edges:
+                q = e.other_vert(p)
+                if q.index not in seen:
+                    seen.add(q.index)
+                    stack.append(q)
+        xs = [c.co.x for c in comp]
+        ys = [c.co.y * side for c in comp]
+        zs = [c.co.z for c in comp]
+        if (min(xs) >= door_x[0] and max(xs) <= door_x[1] and min(ys) >= inner and min(zs) >= door_z[0]
+                and max(zs) <= door_z[1]):
+            door.update(c.index for c in comp)
+    hx, hy = hinge[0], side * hinge[1]
+    # la portière : une copie du maillage, sans ce qui n'est pas elle, ramenée à la charnière
+    dm = me.copy()
+    dm.name = f"{me.name}_portiere"
+    db = bmesh.new()
+    db.from_mesh(dm)
+    db.verts.ensure_lookup_table()
+    bmesh.ops.delete(db, geom=[v for v in db.verts if v.index not in door], context="VERTS")
+    bmesh.ops.translate(db, vec=(-hx, -hy, 0.0), verts=db.verts)
+    db.to_mesh(dm)
+    db.free()
+    # la caisse : sans la portière
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.index in door], context="VERTS")
+    bm.to_mesh(me)
+    bm.free()
+    me.update()
+    ob = bpy.data.objects.new(f"{body.name}_portiere", dm)
+    for col in body.users_collection:
+        col.objects.link(ob)
+    for col in bpy.data.collections:                  # les collections de liaison de lumière de la caisse
+        if body.name in col.objects and ob.name not in col.objects:
+            col.objects.link(ob)
+    ob.parent = body
+    ob.matrix_parent_inverse = Matrix.Identity(4)
+    ob.location = (hx, hy, 0.0)
+    ob.rotation_mode = "XYZ"
+    ob["door_side"] = side
+    print(f"[lieux] portière détachée ({'gauche' if side > 0 else 'droite'}) : {len(door)} sommets", flush=True)
+    return ob
+
+
+def door_angle(ob, deg, frame=None):
+    """Ouvre la portière de door_object de `deg` degrés (le sens d'open_door) ; une clé si `frame`."""
+    ob.rotation_euler.z = math.radians(-deg * ob["door_side"])
+    if frame is not None:
+        ob.keyframe_insert("rotation_euler", index=2, frame=frame)
+
+
 def cabin_light(root, energy=6.0, color="#ffcf9a"):
     """Un peu de lumière dans l'habitacle de la berline (le tableau de bord, une lampe de lecture) : les mains
     levées se lisent derrière le pare-brise. Repère du corps de scene_a.street_hero : l'avant vers -y local."""
