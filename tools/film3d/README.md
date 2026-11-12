@@ -2,6 +2,8 @@
 
 Les assets et les rendus restent hors du dépôt, dans `Azerit/design/film/` (`assets/`, `ref/`). Crédits : `CREDITS.md`.
 
+**La règle machine** (en vigueur, elle remplace celles plus bas) : un seul Blender à la fois sur le Mac, toujours sous le verrou commun (`lockf -k <verrou> nice -n 19 … -b -t 2`), jamais deux, jamais sans le verrou. Le cadrage se fait en Workbench (quelques secondes, sans noyaux). La lumière se vérifie en Cycles sur le processeur seulement : deux fils, 360 × 640, 32 échantillons, débruiteur ; un rendu qui dépasse 4 minutes ou 2 Go s'arrête, et la scène s'allège. La carte graphique ne sert que sur la machine louée, où les mêmes scènes se rendent telles quelles (`--engine cycles --gpu --percent 100 --samples 256`).
+
 **Télécharger les assets** (Sketchfab CC BY avec la clé du `.env`, Poly Haven CC0) :
 
 ```sh
@@ -30,7 +32,7 @@ Le premier rendu Metal d'une session compile ses noyaux pendant environ deux min
 lockf -k <verrou> nice -n 19 taskpolicy -b /Applications/Blender.app/Contents/MacOS/Blender -b -t 2 --factory-startup -P tools/film3d/lab/baseline.py
 ```
 
-**La règle des rendus** : un seul Blender à la fois sur le Mac, derrière le verrou commun (`lockf -k <verrou>`), toujours avec `-t 2`. La carte graphique (Metal) est permise.
+**La règle des rendus** : voir la règle machine en tête (un seul Blender sous le verrou, `-t 2`, Cycles processeur bridé ; plus de carte graphique sur le Mac).
 
 **Les variantes de la rue** se choisissent au moment de construire la scène, par des variables d'environnement lues par `scene_a.py` :
 
@@ -65,3 +67,22 @@ lockf -k <verrou> nice -n 10 /Applications/Blender.app/Contents/MacOS/Blender -b
 - `lab/lieux_sheet.py -- --sheet port,pont,marina,rue,distribution` : les modèles de bibliothèque des lieux du parcours (`assets/lieux/<lieu>/<nom>/`) et les pièces ajoutées à la distribution, une vignette Workbench 480 × 360 par modèle tel que livré, chargé seul, avec triangles, emprise et plus grande texture en légende (`ref/lab/lieux-<planche>.png`). Une quinzaine de secondes et moins de 0,7 Go pour trois planches, sans Cycles.
 
 Les planches comparatives citent aussi des candidats écartés que `fetch.py` ne télécharge pas ; un candidat s'essaie avec `lab/labfetch.py`, et `fetch.py` reçoit ensuite ce qui est retenu.
+
+**Les lieux du parcours** (docs/cinematique-poursuite.md §2.4) : chaque lieu est un script qui écrit sa scène dans `assets/`, et deux scripts de rendu.
+
+- `lieux.py` : le commun des lieux au bord de l'eau (scènes C, D, E) — panorama (ciel tourné, lagune, brume, ville lointaine, autre rive), chaussée sur pilotis ou sur quai (`roadway`), quais de pierre, lampadaires, voiture poursuivie et poursuivants en rigs, agents, caméras. Ne construit aucun lieu.
+- `scene_c.py` : le pont (320 m de la ville au port, quatre voies, crête à 7,2 m) et son plan P4, la meute.
+- `scene_d.py` : la jetée (300 m) et la pointe (terre-plein rond de 60 m), et ses plans P6, FIN, FIN6.
+- `scene_e.py` : le port, le terre-plein au pied du pont, le virage sur la voie du quai, et son plan P5, le projecteur de l'hélicoptère.
+- `render_lieux.py` : construit un plan d'un lieu au bord de l'eau et le rend (`--lieu pont|pointe|port --plan P4 [--palier socle]`), ou rend une scène déjà écrite (`--scene scene-b.blend`). Workbench par défaut (cadrage), `--engine cycles --samples 32` pour la lumière, `--gpu` sur la machine louée seulement ; grain ffmpeg 7 par défaut pour un lieu, 0 pour une scène (`--grain N` pour fixer).
+- `scene_b.py` : la rue des enseignes (8 m, deux voies, enseignes en potence, guirlandes, au fond l'îlot du rond-point) et son plan P3, le barrage ; écrit `scene-b.blend`.
+- `render_b.py` : l'ancienne commande de rendu de la ville, devenue une enveloppe de `render_lieux.py --scene` (mêmes arguments, `scene-b.blend` et grain 0 par défaut).
+- `p2_arc.py` : le plan P2 écrit une fois (virage de 30 m à 70 km/h, contre-braquage, deux patrouilles, drone à 40 m et 35 mm) ; chaque décor ne donne qu'une pose.
+- `scene_carrefour.py` : le socle de P2, le premier carrefour de la scène A et ses quatre angles seuls ; écrit `scene-carrefour.blend`.
+- `scene_f.py` : le rond-point de P2 (îlot et palmiers, anneau à deux voies tourné avec UV, quatre branches, terrasses), le même arc pris à contresens au ras de l'îlot ; écrit `scene-f.blend`.
+
+```sh
+lockf -k <verrou> nice -n 19 /Applications/Blender.app/Contents/MacOS/Blender -b -t 2 --factory-startup -P tools/film3d/scene_f.py
+lockf -k <verrou> nice -n 19 /Applications/Blender.app/Contents/MacOS/Blender -b -t 2 -P tools/film3d/render_lieux.py -- --scene scene-f.blend --engine cycles --samples 32
+lockf -k <verrou> nice -n 19 /Applications/Blender.app/Contents/MacOS/Blender -b -t 2 --factory-startup -P tools/film3d/render_lieux.py -- --lieu pont --plan P4
+```
