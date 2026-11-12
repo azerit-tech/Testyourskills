@@ -4,17 +4,17 @@
 // sont sur la fiche : ils ne se répètent pas ici.
 import { useEffect, useRef, useState } from "react";
 import type { CardData } from "../../../shared/types";
-import { DEFAULT_SCENE, safeSceneId, skyTone, type SkyTone } from "../../../shared/scenes";
+import { sceneOf, skyTone, type SkyTone } from "../../../shared/scenes";
 import { pick, useT } from "../i18n";
 
 export type { SkyTone };
 
 /**
- * Le ciel de la page d'une fiche (§18.29) : l'illustration du profil, `default` sans profil.
+ * Le ciel de la page d'une fiche (§18.29) : l'illustration du profil, `default` sans profil ou sans décor (sceneOf).
  * Le ton suit l'heure de l'image : contraste AA mesuré sur les 14 dans la zone de la barre et de l'en-tête.
  */
 export function skyOf(profileId: string | undefined): { src: string; tone: SkyTone } {
-  const id = safeSceneId(profileId) ?? DEFAULT_SCENE;
+  const id = sceneOf(profileId);
   // La liste des ciels de l'heure bleue est partagée avec les images de partage du serveur (shared/scenes.ts).
   return { src: `/profiles/${id}.jpg`, tone: skyTone(id) };
 }

@@ -6,7 +6,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { DEFAULT_SCENE, safeSceneId, skyTone, type SkyTone } from "../../../shared/scenes";
+import { DEFAULT_SCENE, sceneOf, skyTone, type SkyTone } from "../../../shared/scenes";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const DIRS = [resolve(root, "web/public/profiles"), resolve(root, "dist/web/profiles")];
@@ -39,10 +39,9 @@ function load(id: string, size: SceneSize): string | null {
   return href;
 }
 
-/** Le décor d'une fiche : celui de son profil, `default` sans profil ou si le fichier manque, null si rien n'est lisible. */
+/** Le décor d'une fiche : celui de son profil (sceneOf), `default` sans profil ou si le fichier manque, null si rien n'est lisible. */
 export function sceneFor(profileId: string | undefined, size: SceneSize): SceneImage | null {
-  for (const id of [safeSceneId(profileId), DEFAULT_SCENE]) {
-    if (!id) continue;
+  for (const id of new Set([sceneOf(profileId), DEFAULT_SCENE])) {
     const href = load(id, size);
     if (href) return { id, href, tone: skyTone(id) };
   }

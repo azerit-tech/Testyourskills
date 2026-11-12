@@ -4,7 +4,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import profilesJson from "../../../data/profiles.json";
 import { LangProvider } from "../i18n";
-import { ProfileWall } from "./ProfileWall";
+import { sceneOf } from "../../../shared/scenes";
+import { ProfileWall, WALL_PROFILES } from "./ProfileWall";
 
 function render(language: string): string {
   vi.stubGlobal("localStorage", { getItem: () => null, setItem: () => undefined });
@@ -21,11 +22,18 @@ describe("mur des profils (§18.28)", () => {
   const catalog = profilesJson.profiles;
 
   it("13 tuiles, les plus parlants d'abord, la vieille école vers la fin", () => {
-    const ids = srcs(render("fr-FR"));
+    const ids = WALL_PROFILES.map((p) => p.id);
     expect(ids).toHaveLength(13);
     expect(new Set(ids)).toEqual(new Set(catalog.map((p) => p.id)));
     expect(ids.slice(0, 6)).toEqual(["arsonist", "night_owl", "repeat_offender", "forger", "delivery_machine", "mastermind"]);
     expect(ids.indexOf("old_school")).toBeGreaterThanOrEqual(10);
+    // chaque tuile sur le décor de son profil ; « Sous couverture » (forger) sur le décor par
+    // défaut : l'atelier de faux diplômes n'est plus affiché
+    const html = render("fr-FR");
+    expect(srcs(html)).toEqual(ids.map((id) => sceneOf(id)));
+    expect(srcs(html)[3]).toBe("default");
+    expect(names(html)[3]).toBe("Sous couverture");
+    expect(html).not.toContain("forger");
   });
 
   it("images en -s.jpg, paresseuses, dimensionnées, sans texte de remplacement", () => {
@@ -44,7 +52,8 @@ describe("mur des profils (§18.28)", () => {
   it("français : titre, noms et phrases du catalogue, puis « Et toi ? »", () => {
     const html = render("fr-FR");
     expect(html).toContain('<h2 id="wall-title">Lequel es-tu ?</h2>');
-    const ids = srcs(html);
+    const ids = WALL_PROFILES.map((p) => p.id);
+    expect(srcs(html)).toEqual(ids.map((id) => sceneOf(id)));
     const byId = new Map(catalog.map((p) => [p.id, p]));
     expect(names(html)).toEqual([...ids.map((id) => byId.get(id)!.label.fr), "Et toi ?"]);
     for (const id of ids) expect(html).toContain(byId.get(id)!.tagline.fr.replace(/'/g, "&#x27;"));
@@ -54,7 +63,8 @@ describe("mur des profils (§18.28)", () => {
   it("anglais : mêmes tuiles, textes anglais", () => {
     const html = render("en-US");
     expect(html).toContain("Which one are you?");
-    const ids = srcs(html);
+    const ids = WALL_PROFILES.map((p) => p.id);
+    expect(srcs(html)).toEqual(ids.map((id) => sceneOf(id)));
     const byId = new Map(catalog.map((p) => [p.id, p]));
     expect(names(html)).toEqual([...ids.map((id) => byId.get(id)!.label.en), "And you?"]);
     for (const id of ids) expect(html).toContain(byId.get(id)!.tagline.en.replace(/'/g, "&#x27;"));

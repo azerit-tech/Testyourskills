@@ -11,8 +11,10 @@
 // catalogue pour les fiches déjà stockées (shared/profileCatalog.ts) : leurs images se redessinent.
 // v5 (12 novembre 2026) : un dossier, une fiche, une note (§18.36). Un dossier à deux pièces prend
 // les compositions d'une fiche seule, celle du dossier (shared/caseFile.ts) ; les fiches seules ne changent pas.
+// v6 (12 novembre 2026) : le profil « Sous couverture » (forger) perd le décor de l'atelier de faux
+// diplômes et prend `default` (shared/scenes.ts) : ses images se redessinent, ciel de l'heure bleue.
 
-export const IMAGE_DESIGN = 5;
+export const IMAGE_DESIGN = 6;
 
 /** Dossier du cache disque, sous og/. */
 export const IMAGE_DESIGN_DIR = `v${IMAGE_DESIGN}`;

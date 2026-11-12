@@ -56,10 +56,14 @@ describe("le ciel de page (§18.29)", () => {
     expect(skyOf(card.profile.id)).toEqual({ src: "/profiles/default.jpg", tone: "dark" });
   });
 
-  it("les quatre ciels de l'heure bleue sont sombres, les dix autres profils clairs", () => {
+  it("les quatre ciels de l'heure bleue sont sombres, les neuf autres profils clairs", () => {
     const dark = ["mastermind", "night_owl", "ghost", "default"];
-    const light = ["forger", "kingpin", "delivery_machine", "arsonist", "repeat_offender", "hoarder", "chameleon", "fresh_blood", "old_school", "sleeper_agent"];
+    const light = ["kingpin", "delivery_machine", "arsonist", "repeat_offender", "hoarder", "chameleon", "fresh_blood", "old_school", "sleeper_agent"];
     expect(dark.every((id) => skyOf(id).tone === "dark")).toBe(true);
     expect(light.every((id) => skyOf(id).tone === "light")).toBe(true);
+  });
+
+  it("« Sous couverture » n'a plus l'atelier de faux diplômes : le ciel par défaut", () => {
+    expect(skyOf("forger")).toEqual({ src: "/profiles/default.jpg", tone: "dark" });
   });
 });

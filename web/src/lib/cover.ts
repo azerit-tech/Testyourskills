@@ -13,7 +13,6 @@ export const SCENE_POOL = [
   "night_owl",
   "fresh_blood",
   "mastermind",
-  "forger",
   "chameleon",
   "delivery_machine",
   "ghost",
@@ -145,7 +144,6 @@ const ANY_SLOT = [...CAST_SLOTS, "f3"];
  */
 export const SUSPECT_FIT: Record<string, readonly string[]> = {
   arsonist: ANY_SLOT,
-  forger: ANY_SLOT,
   kingpin: ANY_SLOT,
   mastermind: ANY_SLOT,
   night_owl: ANY_SLOT,

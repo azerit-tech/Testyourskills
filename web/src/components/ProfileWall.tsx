@@ -1,10 +1,11 @@
 // Le mur des 13 profils sur l'accueil (§18.28) : chaque profil criminel sur son
-// décor peint, le nom et la phrase en bas à gauche. Téléphone : un rail aimanté
+// décor peint (`default` pour un profil sans décor à l'affiche, shared/scenes.ts), le nom et la phrase en bas à gauche. Téléphone : un rail aimanté
 // qui déborde à droite ; ordinateur : une grille pleine. La dernière tuile,
 // « Et toi ? », ramène au champ du pseudo. Textes lus dans data/profiles.json
 // (déjà dans le paquet de l'accueil par les fixtures), sans appel au serveur.
 import profilesJson from "../../../data/profiles.json";
 import type { CardProfile } from "../../../shared/types";
+import { sceneOf } from "../../../shared/scenes";
 import { pick, useT } from "../i18n";
 
 /** Les plus parlants d'abord ; un profil absent de la liste passe à la fin. */
@@ -45,7 +46,7 @@ export function ProfileWall({ onPlay }: { onPlay: () => void }) {
       <ul className="wall-list" role="list" aria-labelledby="wall-title" tabIndex={0}>
         {WALL_PROFILES.map((p) => (
           <li key={p.id} className="wall-tile">
-            <img className="wall-img" src={`/profiles/${p.id}-s.jpg`} alt="" width={576} height={384} loading="lazy" decoding="async" />
+            <img className="wall-img" src={`/profiles/${sceneOf(p.id)}-s.jpg`} alt="" width={576} height={384} loading="lazy" decoding="async" />
             <div className="wall-text">
               <h3 className="wall-name">{pick(p.label, lang)}</h3>
               <p className="wall-tagline">{pick(p.tagline, lang)}</p>

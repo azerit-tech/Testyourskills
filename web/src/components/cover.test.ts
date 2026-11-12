@@ -167,12 +167,13 @@ describe("couverture (§18.31)", () => {
       for (const p of panels(en)) if (p.html.includes("data-scene")) expect(p.html).toContain("aria-hidden");
     }
     const fr = render({ top: null, suspects: SUSPECTS, seed: 0 });
-    expect(fr).toMatch(/alt="Portrait peint du profil (Pyromane|Sous couverture|Légende du milieu|Cerveau|Oiseau de nuit|Jeune pousse)"/);
+    expect(fr).toMatch(/alt="Portrait peint du profil (Pyromane|Légende du milieu|Cerveau|Oiseau de nuit|Jeune pousse)"/);
   });
 
-  it("sans suspect, aucun portrait ; les six suspects déclarés ont leurs deux fichiers, au bon poids", () => {
+  it("sans suspect, aucun portrait ; les cinq suspects déclarés ont leurs deux fichiers, au bon poids", () => {
     expect(render({ top: null })).not.toContain("/characters/");
-    expect([...SUSPECTS].sort()).toEqual(["arsonist", "forger", "fresh_blood", "kingpin", "mastermind", "night_owl"]);
+    // « Sous couverture » (forger) retiré : son portrait tendait un diplôme
+    expect([...SUSPECTS].sort()).toEqual(["arsonist", "fresh_blood", "kingpin", "mastermind", "night_owl"]);
     const dir = fileURLToPath(new URL("../../public/characters/", import.meta.url));
     for (const id of SUSPECTS) {
       expect(existsSync(`${dir}${id}.jpg`), `${id}.jpg`).toBe(true);
@@ -272,9 +273,10 @@ describe("couverture (§18.31)", () => {
         if (slotsIn(PHONE).has(slot)) phone.set(p.id, (phone.get(p.id) ?? 0) + 1);
       }
     for (const id of SUSPECTS) {
-      // chacun sur au moins 30 % des visites au téléphone, entre 35 et 55 % sur ordinateur
-      expect(phone.get(id) ?? 0, `${id} téléphone`).toBeGreaterThanOrEqual(0.3 * ROTATION_LENGTH);
-      expect(phone.get(id) ?? 0, `${id} téléphone`).toBeLessThanOrEqual(0.4 * ROTATION_LENGTH);
+      // deux cases au téléphone pour cinq portraits, 40 % chacun : entre 35 et 45 % des visites ;
+      // entre 35 et 55 % sur ordinateur
+      expect(phone.get(id) ?? 0, `${id} téléphone`).toBeGreaterThanOrEqual(0.35 * ROTATION_LENGTH);
+      expect(phone.get(id) ?? 0, `${id} téléphone`).toBeLessThanOrEqual(0.45 * ROTATION_LENGTH);
       expect(desk.get(id) ?? 0, `${id} ordinateur`).toBeGreaterThanOrEqual(0.35 * ROTATION_LENGTH);
       expect(desk.get(id) ?? 0, `${id} ordinateur`).toBeLessThanOrEqual(0.55 * ROTATION_LENGTH);
       // chacun passe par la grande case
@@ -282,15 +284,16 @@ describe("couverture (§18.31)", () => {
     }
     // et dans chaque case où il tient, sauf quand la lumière l'interdit (la seule aube part avec la Jeune pousse)
     for (const id of SUSPECTS) for (const slot of CAST_SLOTS) if (fits(id, slot) && id !== "fresh_blood") expect(tiles.has(`${id}|${slot}`), `${id} dans ${slot}`).toBe(true);
-    // sans top, f3 voit passer un suspect de plus. Jamais la Jeune pousse ni la Légende du
-    // milieu : f3 touche s1 et s3, qui prennent déjà les deux lumières que f1 et s2 laissent ;
-    // l'aube et le rose n'ont chacune qu'un portrait, il ne peut pas être déjà en f1 ou s2
+    // sans top, f3 voit passer un suspect de plus. Jamais la Jeune pousse, la Légende du
+    // milieu ni la Pyromane : f3 touche s1 et s3, qui prennent déjà les deux lumières que f1
+    // et s2 laissent ; l'aube, le rose et l'or n'ont chacun qu'un portrait (depuis le retrait
+    // de « Sous couverture »), il ne peut pas être déjà en f1 ou s2. Restent les deux de la nuit
     const f3 = new Set<string>();
     for (let seed = 0; seed < 6 * ROTATION_LENGTH; seed++) {
       const p = coverPanels({ suspects: SUSPECTS, top: null, founder, seed }).get("f3");
       if (p?.kind === "suspect") f3.add(p.id);
     }
-    expect([...f3].sort()).toEqual(["arsonist", "forger", "mastermind", "night_owl"]);
+    expect([...f3].sort()).toEqual(["mastermind", "night_owl"]);
   });
 
   it("deux décors voisins n'ont jamais la même lumière, sur téléphone comme sur ordinateur", () => {
@@ -303,7 +306,7 @@ describe("couverture (§18.31)", () => {
         }
     };
     for (let n = 0; n <= 5; n++)
-      for (const suspects of [[], ["arsonist"], ["arsonist", "forger", "kingpin"], SUSPECTS]) {
+      for (const suspects of [[], ["arsonist"], ["arsonist", "night_owl", "kingpin"], SUSPECTS]) {
         const ps = coverPanels({ suspects, top: TOP5.slice(0, n), founder });
         const scenes = [...ps.values()].filter((p): p is Extract<Panel, { kind: "scene" }> => p.kind === "scene").map((p) => p.scene);
         expect(new Set(scenes).size).toBe(scenes.length);

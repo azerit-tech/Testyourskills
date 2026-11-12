@@ -29,9 +29,14 @@ describe("lieux du crime des images de partage", () => {
     expect(sceneFor("night_owl", "small")?.href.startsWith("data:image/jpeg;base64,")).toBe(true);
   });
 
+  it("« Sous couverture » n'a plus l'atelier de faux diplômes : le décor par défaut", () => {
+    expect(sceneFor("forger", "large")?.id).toBe("default");
+    expect(sceneFor("forger", "small")?.id).toBe("default");
+  });
+
   it("l'heure du ciel : quatre ciels sombres, texte crème ; les autres, texte d'encre", () => {
     expect(["mastermind", "night_owl", "ghost", "default"].map(skyTone)).toEqual(["dark", "dark", "dark", "dark"]);
-    expect(["kingpin", "forger", "fresh_blood"].map(skyTone)).toEqual(["light", "light", "light"]);
+    expect(["kingpin", "delivery_machine", "fresh_blood"].map(skyTone)).toEqual(["light", "light", "light"]);
     expect(SKY_TEXT).toEqual({ dark: "#fff9cb", light: "#0c0d1b" });
   });
 

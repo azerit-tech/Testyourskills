@@ -232,8 +232,8 @@ export function CardOnly({ card, lang, avatars }: { card: CardData; lang: Lang; 
  *  surtitre sur l'encre, calé sur le haut de la fiche, le lieu du crime en panneau,
  *  puis seulement ce qui ne se lit pas sur la fiche en vignette : le nom en grand
  *  et le chef d'accusation le plus drôle. La note, le niveau et le pied sont sur la
- *  fiche. Le surtitre ne se pose pas sur le panneau : sur trois ciels clairs
- *  (forger, repeat_offender, old_school), le coin haut n'atteint pas 3:1. */
+ *  fiche. Le surtitre ne se pose pas sur le panneau : sur deux ciels clairs
+ *  (repeat_offender, old_school), le coin haut n'atteint pas 3:1. */
 export function OgImage({ card, lang, avatars, scene }: { card: CardData; lang: Lang; avatars: Avatars; scene?: SceneImage | null }) {
   const W = 1200;
   const H = 630;
