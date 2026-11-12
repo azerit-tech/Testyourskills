@@ -1572,12 +1572,14 @@ def place_hero(scene, plan):
     # des phares de route, vus de dos : ils portent vers le barrage, découpent les patrouilles et les agents de plus
     # en plus fort à mesure qu'elle approche, et prennent corps dans la brume devant elle
     # (avant le découpage v2, face à la caméra, ils étaient à 400 W : leur reflet sur l'enrobé mouillé voilait le sol)
+    # (0,15 de volume : à 0,35, vue d'en haut, la brume qu'ils allumaient devant le capot remplissait la lunette
+    # arrière d'un aplat blanc, images 1 à 14)
     spots = [c for c in car.children_recursive if c.type == "LIGHT" and c.data.type == "SPOT"]
     for lo in spots:
         lo.data.energy = 900.0
         lo.data.spot_size = math.radians(40)
         try:
-            lo.data.volume_factor = 0.35
+            lo.data.volume_factor = 0.15
         except AttributeError:
             pass
         lo.data.spot_blend = 0.4
