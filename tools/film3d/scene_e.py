@@ -1351,16 +1351,26 @@ def plan_P5(scene, hidden, palier="conteneurs"):
     n = M.flash_bars(rigs, FRAMES)
     print(f"[P5] {n} lueurs de rampe clignotantes", flush=True)
     # la tour devant le mur qui ferme l'axe, derrière la caméra, pointée sur le milieu de la glisse
-    tour = light_tower((24.0, 81.4), Vector((6.0, 66.5, 0.6)), energy=80000.0, along_x=True)
-    # les caisses de la sortie, à 10 m sous la tour, en sortaient saumon et plates (essai à 256 échantillons) :
-    # elles n'ont que le faisceau et la nuit
-    sans_caisses = bpy.data.collections.new("tour_sans_caisses")
+    tour = light_tower((24.0, 81.4), Vector((6.0, 66.5, 0.6)), energy=50000.0, along_x=True)
+    # la tour n'éclaire que le sol et le mobilier du virage. Exclus : les caisses de la sortie (à 10 m sous elle,
+    # saumon et plates), la berline (~25 W/m² de crème à 16 m, six fois car_fill : elle rosissait aux images 9 à 17,
+    # le bordeaux de l'image 1 est celui de car_fill et de l'ambre de côté) et les conteneurs, qui ont leur jumelle
+    # à 10 % (dorés et vifs à droite en fin de plan, ils concurrençaient le faisceau). 50 kW au lieu de 80 : le sol
+    # du virage, très éclairé, se reflétait dans le vernis du flanc et le rosissait
+    boxes = [o for o in bpy.data.objects if o.type == "MESH" and o.name.startswith("conteneur_")]
+    exclus = bpy.data.collections.new("tour_exclus")
     for o in bpy.data.objects:
         if o.type == "MESH" and o.name.startswith(("caisse_", "palettes_sortie")):
-            sans_caisses.objects.link(o)
-    for co in sans_caisses.collection_objects:
+            exclus.objects.link(o)
+    for o in hero.children_recursive:
+        if o.type == "MESH":
+            exclus.objects.link(o)
+    for o in boxes:
+        exclus.objects.link(o)
+    for co in exclus.collection_objects:
         co.light_linking.link_state = "EXCLUDE"
-    tour.light_linking.receiver_collection = sans_caisses
+    tour.light_linking.receiver_collection = exclus
+    _twin(tour, "tour_conteneurs", 0.10 * tour.data.energy, "#fff2d6", boxes)
     # --- l'hélicoptère : il arrive de l'est au ras des piles, vire sur la berline ; son faisceau court sur la voie
     # du pont derrière elle et la rattrape (p5_virage.beam_target)
     heli, h = L.helicopter("heli")
