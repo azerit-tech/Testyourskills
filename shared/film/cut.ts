@@ -1,5 +1,5 @@
-// Le découpage du film de la poursuite (§18.36, docs/cinematique-poursuite.md
-// §2) : 24 images par seconde, toutes les durées en images, l'ordre des plans.
+// Le découpage du film de la poursuite (§18.36, docs/cinematique-decoupage-v3.md
+// §7) : 24 images par seconde, toutes les durées en images, l'ordre des plans.
 // La seule source des durées : le lecteur, le HUD, les tests et le montage
 // (scripts/film-assemble.ts) lisent ce fichier. Pur, sans DOM.
 
@@ -13,7 +13,7 @@ export type EndingId = "fin" | "fin6";
 export type ShotId = ChaseShot | "FIN" | "FIN6";
 
 /** Durée de chaque plan de la poursuite, en images. */
-export const SHOT_FRAMES: Record<ChaseShot, number> = { OUV: 24, P1: 28, P2: 28, P3: 28, P4: 28, P5: 28, P6: 40 };
+export const SHOT_FRAMES: Record<ChaseShot, number> = { OUV: 40, P1: 48, P2: 48, P3: 48, P4: 48, P5: 48, P6: 60 };
 
 /** Une fin : la vidéo (dérapage ou orbite), l'arrêt sur image sur sa dernière image, puis le flash. */
 export interface EndingCut {
@@ -29,11 +29,11 @@ export interface EndingCut {
 }
 
 export const ENDINGS: Record<EndingId, EndingCut> = {
-  fin: { shot: "FIN", video: 36, freeze: 14, flash: 10, rise: 4 },
-  fin6: { shot: "FIN6", video: 56, freeze: 12, flash: 12, rise: 4 },
+  fin: { shot: "FIN", video: 52, freeze: 14, flash: 10, rise: 4 },
+  fin6: { shot: "FIN6", video: 80, freeze: 12, flash: 12, rise: 4 },
 };
 
-/** Total d'une fin, en images : 60 pour FIN, 80 pour FIN6. */
+/** Total d'une fin, en images : 76 pour FIN, 104 pour FIN6. */
 export const endingFrames = (e: EndingId): number => ENDINGS[e].video + ENDINGS[e].freeze + ENDINGS[e].flash;
 
 /** Première image de chaque plan dans le fichier `poursuite`. */
@@ -47,7 +47,7 @@ export const SHOT_START: Record<ChaseShot, number> = (() => {
   return out;
 })();
 
-/** Le fichier `poursuite` entier (toujours les six étoiles) : 204 images. */
+/** Le fichier `poursuite` entier (toujours les six étoiles) : 340 images. */
 export const CHASE_FRAMES = CHASE_SHOTS.reduce((n, s) => n + SHOT_FRAMES[s], 0);
 
 /** Les bandes d'encre se ferment en tant d'images, à l'ouverture. */

@@ -13,16 +13,15 @@ const LEVELS: Stars[] = [1, 2, 3, 4, 5, 6];
 /** Milieu d'une image : l'instant que `seek` vise. */
 const at = (frame: number) => (frame + 0.5) / FPS;
 
-describe("le découpage (docs/cinematique-poursuite.md §2.1)", () => {
-  it("OUV 24, P1 à P5 28, P6 40 : la poursuite fait 204 images ; FIN 60 (36 de vidéo), FIN6 80 (56 de vidéo)", () => {
-    expect(SHOT_FRAMES).toEqual({ OUV: 24, P1: 28, P2: 28, P3: 28, P4: 28, P5: 28, P6: 40 });
-    expect(CHASE_FRAMES).toBe(204);
-    expect(endingFrames("fin")).toBe(60);
-    expect(endingFrames("fin6")).toBe(80);
-    expect(ENDINGS.fin.video).toBe(36);
-    expect(ENDINGS.fin6.video).toBe(56);
-    expect(SHOT_START.P1).toBe(24);
-    expect(SHOT_START.P6).toBe(164);
+describe("le découpage (docs/cinematique-decoupage-v3.md §7)", () => {
+  it("OUV 40, P1 à P5 48, P6 60 : la poursuite fait 340 images ; FIN 76 (52 de vidéo), FIN6 104 (80 de vidéo)", () => {
+    expect(SHOT_FRAMES).toEqual({ OUV: 40, P1: 48, P2: 48, P3: 48, P4: 48, P5: 48, P6: 60 });
+    expect(CHASE_FRAMES).toBe(340);
+    expect(endingFrames("fin")).toBe(76);
+    expect(endingFrames("fin6")).toBe(104);
+    expect(ENDINGS.fin.video).toBe(52);
+    expect(ENDINGS.fin6.video).toBe(80);
+    expect(SHOT_START).toEqual({ OUV: 0, P1: 40, P2: 88, P3: 136, P4: 184, P5: 232, P6: 280 });
   });
 
   it("chaque image de la poursuite appartient à un seul plan, dans l'ordre", () => {
@@ -39,23 +38,28 @@ describe("le découpage (docs/cinematique-poursuite.md §2.1)", () => {
 });
 
 describe("filmPlan (§2.1)", () => {
-  it("les durées du tableau : 112, 140, 168, 196, 224 et 284 images ; 4,7 s, 7,0 s et 11,8 s à une, trois et six étoiles", () => {
+  it("les durées du tableau (v3 §7) : 164, 212, 260, 308, 356 et 444 images ; 6,8 s, 10,8 s et 18,5 s à une, trois et six étoiles", () => {
     const frames = LEVELS.map((n) => filmPlan(cardAt(n)).frames);
-    expect(frames).toEqual([112, 140, 168, 196, 224, 284]);
-    expect(filmPlan(cardAt(1)).duration).toBeCloseTo(4.7, 1);
-    expect(filmPlan(cardAt(3)).duration).toBeCloseTo(7.0, 1);
-    expect(filmPlan(cardAt(6)).duration).toBeCloseTo(11.8, 1);
+    expect(frames).toEqual([164, 212, 260, 308, 356, 444]);
+    // chaque niveau : la poursuite jusqu'à la fin de son dernier plan, puis sa fin entière
+    for (const n of LEVELS) {
+      const last = CHASE_SHOTS[n];
+      expect(frames[n - 1]).toBe(SHOT_START[last] + SHOT_FRAMES[last] + endingFrames(n === 6 ? "fin6" : "fin"));
+    }
+    expect(filmPlan(cardAt(1)).duration).toBeCloseTo(6.8, 1);
+    expect(filmPlan(cardAt(3)).duration).toBeCloseTo(10.8, 1);
+    expect(filmPlan(cardAt(6)).duration).toBeCloseTo(18.5, 1);
     for (const n of LEVELS) {
       const p = filmPlan(cardAt(n));
       expect(Math.abs(p.duration - p.frames / FPS)).toBeLessThan(1e-9);
     }
   });
 
-  it("une étoile par plan, sur sa coupe : 24, 52, 80, 108, 136, 164", () => {
+  it("une étoile par plan, sur sa coupe : la première image de P1 à P6", () => {
     const p = filmPlan(cardAt(6));
-    expect(p.stars.map((s) => s.frame)).toEqual([24, 52, 80, 108, 136, 164]);
+    expect(p.stars.map((s) => s.frame)).toEqual(CHASE_SHOTS.slice(1).map((s) => SHOT_START[s]));
     expect(p.stars.map((s) => s.star)).toEqual(LEVELS);
-    for (const s of p.stars) expect(s.at).toBeCloseTo(s.frame / 24, 9);
+    for (const s of p.stars) expect(s.at).toBeCloseTo(s.frame / FPS, 9);
     for (const n of LEVELS) expect(filmPlan(cardAt(n)).stars).toHaveLength(n);
   });
 
@@ -68,19 +72,25 @@ describe("filmPlan (§2.1)", () => {
       expect(p.ending).toBe(n === 6 ? "fin6" : "fin");
       expect(p.endVideo).toBe(ENDINGS[p.ending].video);
     }
-    expect(filmPlan(cardAt(1)).cut).toBe(52);
-    expect(filmPlan(cardAt(3)).cut).toBe(108);
-    expect(filmPlan(cardAt(6)).cut).toBe(204);
+    expect(filmPlan(cardAt(1)).cut).toBe(SHOT_START.P2);
+    expect(filmPlan(cardAt(3)).cut).toBe(SHOT_START.P4);
+    expect(filmPlan(cardAt(6)).cut).toBe(CHASE_FRAMES);
   });
 
-  it("le gel, puis le flash : FIN 36 + 14 + 10, FIN6 56 + 12 + 12 ; la fiche se pose au sommet, 4 images après le début du flash", () => {
+  it("le gel, puis le flash : FIN 52 + 14 + 10, FIN6 80 + 12 + 12 ; la fiche se pose au sommet, 4 images après le début du flash", () => {
+    for (const n of LEVELS) {
+      const p = filmPlan(cardAt(n));
+      const e = ENDINGS[p.ending];
+      expect(p.freeze).toBe(p.cut + e.video);
+      expect(p.flash).toEqual({ from: p.freeze + e.freeze, peak: p.freeze + e.freeze + e.rise, to: p.freeze + e.freeze + e.flash });
+      expect(p.handoffAt).toBeCloseTo(p.flash.peak / FPS, 9);
+    }
     const p1 = filmPlan(cardAt(1));
-    expect(p1.freeze).toBe(52 + 36);
-    expect(p1.flash).toEqual({ from: 88 + 14, peak: 102 + 4, to: 112 });
-    expect(p1.handoffAt).toBeCloseTo(106 / 24, 9);
+    expect(p1.freeze).toBe(88 + 52);
+    expect(p1.flash).toEqual({ from: 140 + 14, peak: 154 + 4, to: 164 });
     const p6 = filmPlan(cardAt(6));
-    expect(p6.freeze).toBe(204 + 56);
-    expect(p6.flash).toEqual({ from: 272, peak: 276, to: 284 });
+    expect(p6.freeze).toBe(340 + 80);
+    expect(p6.flash).toEqual({ from: 432, peak: 436, to: 444 });
   });
 
   it("l'étoile suivante clignote deux fois pendant le gel ; à six étoiles, rien ne clignote", () => {
@@ -154,18 +164,18 @@ describe("hudAt (§2.2, §5.2)", () => {
       expect(hudAt(p, at(s.frame + 5), "fr").stars[s.star - 1]).toEqual({ on: true, scale: 1 });
     }
     expect(hudAt(p, at(0), "fr").radio).toBeNull();
-    expect(hudAt(p, at(23), "fr").radio).toBeNull();
-    expect(hudAt(p, at(24), "en").radio?.text).toBe(p.radio.en.beats[0]);
+    expect(hudAt(p, at(SHOT_START.P1 - 1), "fr").radio).toBeNull();
+    expect(hudAt(p, at(SHOT_START.P1), "en").radio?.text).toBe(p.radio.en.beats[0]);
   });
 
   it("la radio cite la fiche : « Véhicule en fuite · Backend », puis la fin de course au gel", () => {
     const p = filmPlan(cardAt(4));
-    expect(hudAt(p, at(30), "fr").radio?.text).toBe("Véhicule en fuite · Backend");
-    expect(hudAt(p, at(60), "fr").radio?.text).toBe("Arme signalée : Python");
+    expect(hudAt(p, at(SHOT_START.P1 + 6), "fr").radio?.text).toBe("Véhicule en fuite · Backend");
+    expect(hudAt(p, at(SHOT_START.P2 + 8), "fr").radio?.text).toBe("Arme signalée : Python");
     expect(hudAt(p, at(p.cut + 3), "fr").radio?.text).toBe(p.radio.fr.beats[3]);
     expect(hudAt(p, at(p.freeze), "fr").radio?.text).toBe("Fin de course · Haute surveillance");
     expect(hudAt(p, at(p.freeze), "en").radio?.text).toBe("End of the line · High surveillance");
-    const squares = new Set(Array.from({ length: 24 }, (_, i) => hudAt(p, at(30 + i), "fr").radio?.square));
+    const squares = new Set(Array.from({ length: FPS }, (_, i) => hudAt(p, at(SHOT_START.P1 + 6 + i), "fr").radio?.square));
     expect(squares).toEqual(new Set(["coral", "lilac"]));
   });
 

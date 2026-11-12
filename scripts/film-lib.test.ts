@@ -8,6 +8,7 @@ import {
   MAX_GOP,
   NEUTRAL_GRADE,
   SHOTS,
+  SHOT_FRAMES,
   TOTAL_CEILINGS,
   checkProbe,
   concatList,
@@ -32,6 +33,7 @@ import {
   windowFits,
   type ProbeStream,
 } from "./film-lib";
+import { CHASE_FRAMES, ENDINGS, SHOT_START } from "../shared/film/cut";
 
 const shots = Object.fromEntries(SHOTS.map((s) => [s, { take: null, in: 0, speed: 1, crop: null }]));
 
@@ -62,14 +64,12 @@ describe("la liste de montage", () => {
 });
 
 describe("l'arithmétique des images", () => {
-  it("donne 204, 36 et 56 images", () => {
-    expect(filmFrames("poursuite")).toBe(204);
-    expect(filmFrames("fin")).toBe(36);
-    expect(filmFrames("fin6")).toBe(56);
-    // Les durées du tableau du §2.1, fin dessinée comprise (24 et 24 images d'arrêt et de flash).
-    expect(shotStarts("poursuite")).toEqual({ OUV: 0, P1: 24, P2: 52, P3: 80, P4: 108, P5: 136, P6: 164 });
-    expect(shotStarts("poursuite").P2 + 36 + 24).toBe(112);
-    expect(204 + 56 + 24).toBe(284);
+  it("lit les durées de shared/film/cut.ts : la poursuite, les vidéos des deux fins, les premières images", () => {
+    expect(filmFrames("poursuite")).toBe(CHASE_FRAMES);
+    expect(filmFrames("fin")).toBe(ENDINGS.fin.video);
+    expect(filmFrames("fin6")).toBe(ENDINGS.fin6.video);
+    expect(shotStarts("poursuite")).toEqual(SHOT_START);
+    expect(shotStarts("fin")).toEqual({ FIN: 0 });
   });
 
   it("compte les images de prise à consommer", () => {
@@ -112,10 +112,11 @@ describe("les arguments de ffmpeg", () => {
 
   it("encode en H.264 Main, 24 i/s, images clés sur les coupes, couleurs bt709, +faststart, sans son", () => {
     const keys = keyframePlan("poursuite");
-    const a = encodeArgs({ list: "l.txt", out: "o.mp4", size: 540, crf: 25, frames: 204, keys }).join(" ");
-    for (const part of ["-profile:v main", "-r 24", "-frames:v 204", "-g 48", "-sc_threshold 0", "-forced-idr 1", "-movflags +faststart", "-an", "-crf 25", "scale=540:960"])
+    const a = encodeArgs({ list: "l.txt", out: "o.mp4", size: 540, crf: 25, frames: CHASE_FRAMES, keys }).join(" ");
+    for (const part of ["-profile:v main", "-r 24", `-frames:v ${CHASE_FRAMES}`, "-g 48", "-sc_threshold 0", "-forced-idr 1", "-movflags +faststart", "-an", "-crf 25", "scale=540:960"])
       expect(a).toContain(part);
-    expect(a).toContain("-force_key_frames expr:eq(n,0)+eq(n,24)+eq(n,52)+eq(n,80)+eq(n,108)+eq(n,136)+eq(n,164)");
+    expect(a).toContain(`-force_key_frames ${forceKeyframesExpr(keys)}`);
+    expect(a).toContain("-force_key_frames expr:eq(n,0)+eq(n,40)+eq(n,88)+eq(n,136)+eq(n,184)+eq(n,232)+eq(n,280)+eq(n,328)");
     for (const tag of ["-colorspace bt709", "-color_primaries bt709", "-color_trc bt709", "-color_range tv"]) expect(a).toContain(tag);
     expect(a).not.toContain("-g 12");
     expect(encodeArgs({ list: "l.txt", out: "o.mp4", size: 720, crf: 23, frames: 36, keys: [0] }).join(" ")).not.toContain("scale=");
@@ -150,8 +151,10 @@ describe("les arguments de ffmpeg", () => {
 describe("les images clés", () => {
   it("sur chaque coupe entre plans, plus une toutes les 48 images au plus", () => {
     expect(MAX_GOP).toBe(48);
-    expect(keyframePlan("poursuite")).toEqual([0, 24, 52, 80, 108, 136, 164]);
-    expect(keyframePlan("fin")).toEqual([0]);
+    // les coupes de cut.ts ; P6 (60 images), FIN (52) et FIN6 (80) en reçoivent une de plus, 48 images après la leur
+    for (const k of Object.values(SHOT_START)) expect(keyframePlan("poursuite")).toContain(k);
+    expect(keyframePlan("poursuite")).toEqual([0, 40, 88, 136, 184, 232, 280, 328]);
+    expect(keyframePlan("fin")).toEqual([0, 48]);
     expect(keyframePlan("fin6")).toEqual([0, 48]);
     for (const film of ["poursuite", "fin", "fin6"] as const) {
       const k = [...keyframePlan(film), filmFrames(film)];
@@ -193,19 +196,20 @@ describe("tenir les plafonds", () => {
 
 describe("la vérification", () => {
   const ok: ProbeStream = {
-    codec_type: "video", codec_name: "h264", profile: "Main", width: 720, height: 1280, r_frame_rate: "24/1", avg_frame_rate: "24/1", nb_read_frames: "56",
+    codec_type: "video", codec_name: "h264", profile: "Main", width: 720, height: 1280, r_frame_rate: "24/1", avg_frame_rate: "24/1", nb_read_frames: String(ENDINGS.fin6.video),
     color_space: "bt709", color_primaries: "bt709", color_transfer: "bt709",
   };
-  const exp = { frames: 56, width: 720, height: 1280, keys: keyframePlan("fin6") };
-  const keys = Array.from({ length: 56 }, (_, i) => i === 0 || i === 48);
+  const exp = { frames: ENDINGS.fin6.video, width: 720, height: 1280, keys: keyframePlan("fin6") };
+  const keys = Array.from({ length: ENDINGS.fin6.video }, (_, i) => i === 0 || i === 48);
 
   it("accepte un fichier conforme", () => {
     expect(checkProbe([ok], keys, exp)).toEqual([]);
   });
 
   it("refuse le son, une image de trop, la mauvaise cadence, des couleurs sans étiquette bt709", () => {
-    const errs = checkProbe([{ ...ok, nb_read_frames: "57", r_frame_rate: "25/1", color_space: undefined }, { codec_type: "audio" }], keys, exp);
-    expect(errs.join(" | ")).toMatch(/piste son.*cadence.*57 images.*couleurs \?\/bt709\/bt709/);
+    const one = ENDINGS.fin6.video + 1;
+    const errs = checkProbe([{ ...ok, nb_read_frames: String(one), r_frame_rate: "25/1", color_space: undefined }, { codec_type: "audio" }], keys, exp);
+    expect(errs.join(" | ")).toMatch(new RegExp(`piste son.*cadence.*${one} images.*couleurs \\?/bt709/bt709`));
   });
 
   it("repère une image clé mal placée ou manquante", () => {
@@ -221,10 +225,10 @@ describe("la vérification", () => {
 
 describe("les cartons", () => {
   it("portent le nom du plan et le numéro d'image", () => {
-    const svg = slateSvg({ shot: "P2", local: 3, fileFrame: 55, fileFrames: 204 });
+    const svg = slateSvg({ shot: "P2", local: 3, fileFrame: 55, fileFrames: CHASE_FRAMES });
     expect(svg).toContain(">P2<");
     expect(svg).toContain(">055<");
-    expect(svg).toContain("PLAN 4 / 28");
+    expect(svg).toContain(`PLAN 4 / ${SHOT_FRAMES.P2}`);
     expect(svg).toContain('fill="#4b4fb8"');
   });
 });

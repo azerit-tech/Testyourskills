@@ -23,7 +23,7 @@ donne dans `var/film/contact/` une planche (une image sur quatre, numérotée da
 | `speed` | 1 = vitesse de la prise ; 0,5 = deux fois plus lent ; 2 = deux fois plus vite |
 | `crop` | `null` = image entière ; sinon `{ "x", "y", "w", "h" }` en fractions de la source (0 à 1). Le script recadre ensuite toujours au centre en 9:16 |
 
-La longueur de chaque plan (24, 28 ou 40 images, 36 pour FIN, 56 pour FIN6) est fixée par le film, pas par cette liste : le plan prend `longueur × speed` secondes à 24 i/s à partir de `in`. Si la prise est trop courte, la dernière image est tenue et le script le dit.
+La longueur de chaque plan (40, 48 ou 60 images, 52 pour FIN, 80 pour FIN6 : `shared/film/cut.ts`) est fixée par le film, pas par cette liste : le plan prend `longueur × speed` secondes à 24 i/s à partir de `in`. Si la prise est trop courte, la dernière image est tenue et le script le dit.
 
 `grade` est l'étalonnage commun, appliqué aux prises seulement : `eq` de ffmpeg (`contrast`, `brightness`, `saturation`, `gamma`), `colorbalance` (`shadows`, `midtones`, `highlights`, trois nombres r, v, b de -1 à 1), et en option une LUT `.cube` posée dans ce dossier (`lut`). Les clés qui commencent par `//` sont des commentaires.
 

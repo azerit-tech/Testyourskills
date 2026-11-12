@@ -63,22 +63,24 @@ Ce qui tient et ce qui reste à faire après les premières images : SPEC §18.3
 
 | Niveau | Plans joués | Images | Durée |
 |---|---|---|---|
-| ★ | OUV, P1, FIN | 112 | 4,7 s |
-| ★★ | OUV, P1, P2, FIN | 140 | 5,8 s |
-| ★★★ | OUV, P1 à P3, FIN | 168 | 7,0 s |
-| ★★★★ | OUV, P1 à P4, FIN | 196 | 8,2 s |
-| ★★★★★ | OUV, P1 à P5, FIN | 224 | 9,3 s |
-| ★★★★★★ | OUV, P1 à P6, FIN6 | 284 | 11,8 s |
+| ★ | OUV, P1, FIN | 164 | 6,8 s |
+| ★★ | OUV, P1, P2, FIN | 212 | 8,8 s |
+| ★★★ | OUV, P1 à P3, FIN | 260 | 10,8 s |
+| ★★★★ | OUV, P1 à P4, FIN | 308 | 12,8 s |
+| ★★★★★ | OUV, P1 à P5, FIN | 356 | 14,8 s |
+| ★★★★★★ | OUV, P1 à P6, FIN6 | 444 | 18,5 s |
+
+Les durées du découpage v3 (`docs/cinematique-decoupage-v3.md` §7) :
 
 | Plan | Images de vidéo | Dessiné ensuite par le site |
 |---|---|---|
-| OUV | 24 | |
-| P1 à P5 | 28 chacun | |
-| P6 | 40 | |
-| FIN | 36 | arrêt sur image 14, flash 10 (60 en tout) |
-| FIN6 | 56 | arrêt sur image 12, flash 12 (80 en tout) |
+| OUV | 40 | |
+| P1 à P5 | 48 chacun | |
+| P6 | 60 | |
+| FIN | 52 | arrêt sur image 14, flash 10 (76 en tout) |
+| FIN6 | 80 | arrêt sur image 12, flash 12 (104 en tout) |
 
-La poursuite entière (OUV et P1 à P6) fait 204 images. Une fin propre aux cinq étoiles (`fin5`, 36 images de vidéo) reste en option (SPEC §18.36) ; `shared/film/cut.ts` ne connaît aujourd'hui que `fin` et `fin6`, et cinq étoiles jouent `fin`.
+La poursuite entière (OUV et P1 à P6) fait 340 images. Une fin propre aux cinq étoiles (`fin5`, 52 images de vidéo) reste en option (SPEC §18.36) ; `shared/film/cut.ts` ne connaît aujourd'hui que `fin` et `fin6`, et cinq étoiles jouent `fin`.
 
 **La courbe.** Chaque ligne doit être plus forte que la précédente.
 
@@ -105,57 +107,57 @@ Les lignes de radio viennent de `shared/film/radio.ts`, une par étoile : « Vé
 
 ### 2.3 Plan par plan
 
-**OUV : la conduite calme** (24 images)
+**OUV : la conduite calme** (40 images)
 - *Cadre* : on suit la voiture en fuite de trois quarts dos, à 1,5 m du sol et quelques longueurs derrière elle, 35 mm. L'avenue vide file vers l'horizon corail, palmiers et hôtels Art déco des deux côtés. Une seule patrouille, garée gyrophare éteint à l'angle d'une rue transversale, devant à gauche, côté ville : elle glisse vers le bord gauche du cadre et la voiture la dépasse juste après la coupe (`tools/film3d/ouv_avenue.py`).
 - *Caméra* : comme sur un rail, aucune secousse.
 - *Action* : rien. Les reflets des lampadaires glissent sur la carrosserie et sur le bitume mouillé.
 - *HUD* : les bandes se ferment, six étoiles éteintes, radio muette.
 
-**P1 ★ : le rétroviseur** (28 images)
+**P1 ★ : le rétroviseur** (48 images)
 - *Cadre* : dans l'habitacle, par-dessus l'épaule droite de la personne au volant, depuis la banquette arrière, 28 mm. Au premier plan, flous, sa capuche de dos et ses mains gantées sur le volant. En haut au milieu, le rétroviseur.
 - *Caméra* : fixe dans la voiture.
 - *Action* : une ellipse de 2,5 s après OUV : la patrouille a quitté son angle de rue et roule derrière, dans la même voie, à une trentaine de mètres. Dans le rétroviseur, la rampe de gyrophares s'allume, corail et lilas ; ses couleurs battent sur le plafond et sur la capuche. La tête se tourne d'un coup, les mains gantées se crispent sur le volant, la voiture bondit.
 - *HUD* : étoile 1.
 
-**P2 ★★ : vue du ciel** (28 images)
+**P2 ★★ : vue du ciel** (48 images)
 - *Cadre* : plongée totale, drone à 30 m, 35 mm. L'avenue est verticale dans le cadre, les couronnes des palmiers passent sous la caméra.
 - *Caméra* : avance avec les voitures et tourne lentement de 10°.
 - *Action* : la voiture en fuite accélère, une gerbe d'eau derrière elle. Deux patrouilles la suivent ; leurs gyrophares posent des flaques corail et lilas sur le bitume mouillé.
 - *HUD* : étoile 2.
 
-**P3 ★★★ : le barrage** (28 images)
+**P3 ★★★ : le barrage** (48 images)
 - *Cadre* : caméra à 30 cm du sol, 24 mm, derrière le barrage, tournée vers la voiture en fuite qui arrive. À gauche et à droite, deux patrouilles garées en biais, portières ouvertes ; entre elles, une ligne de plots. Derrière chaque portière, une silhouette accroupie, de dos, découpée par les phares.
 - *Caméra* : fixe, puis la première secousse du film.
 - *Action* : la police ouvre le feu : des éclairs blancs éclairent les silhouettes, des étincelles éclatent sur le capot. La voiture en fuite ne ralentit pas, traverse les plots, frôle l'objectif. Personne n'est touché, aucune tôle ne se touche.
 - *HUD* : étoile 3.
 
-**P4 ★★★★ : la meute** (28 images)
+**P4 ★★★★ : la meute** (48 images)
 - *Cadre* : très longue focale (200 mm), caméra loin devant, à 1,5 m. La compression empile tout : la voiture en fuite en bas, et derrière elle, serrés, les patrouilles et un fourgon plus haut qu'elles.
 - *Caméra* : zoom avant lent, tremblé continu de longue focale, brume.
 - *Action* : le fourgon force le passage au milieu. Des éclairs de tir clignotent aux fenêtres des poursuivants, des étincelles ricochent sur le bitume, un rétroviseur de la voiture en fuite s'arrache.
 - *HUD* : étoile 4.
 
-**P5 ★★★★★ : le projecteur** (28 images)
+**P5 ★★★★★ : le projecteur** (48 images)
 - *Cadre* : contre-plongée depuis le trottoir, entre deux troncs de palmiers, 28 mm.
 - *Caméra* : à l'épaule, panoramique vers le haut, secouée par le souffle du rotor.
 - *Action* : un hélicoptère monte au-dessus des toits ; son projecteur balaie la brume, croise l'objectif et se pose sur la voiture en fuite qui passe.
 - *HUD* : étoile 5.
 
-**P6 ★★★★★★ : toute la ville** (40 images)
+**P6 ★★★★★★ : toute la ville** (60 images)
 - *Cadre* : grand plan aérien, 24 mm.
 - *Caméra* : grue qui monte et recule au-dessus de l'avenue ; elle tremble au passage des avions.
 - *Action* : la voiture en fuite en tête d'une colonne de gyrophares jusqu'à l'horizon ; trois hélicoptères en formation, trois faisceaux croisés sur elle ; toutes les fenêtres de la ville allumées. Deux avions de chasse arrivent du fond, très bas dans l'axe de l'avenue, et passent au-dessus de tout. Ils ne tirent rien.
 - *HUD* : étoile 6.
 
 **FIN : l'arrestation** (niveaux ★ à ★★★★★)
-1. *L'arrêt* (36 images de vidéo, la vitesse passe du normal au ralenti). Cadre serré : caméra fixe à 20 cm du sol, 35 mm, sur une esplanade vide sous un seul lampadaire. La voiture en fuite finit de freiner vers nous, la fumée de pneus la dépasse. Au premier plan, l'avant d'une patrouille, portière ouverte ; derrière la portière, une silhouette se redresse. Tout autour, hors champ, des lueurs corail et lilas battent dans la brume. Derrière le pare-brise plein de reflets, deux mains gantées se lèvent. Personne ne tire.
+1. *L'arrêt* (52 images de vidéo, la vitesse passe du normal au ralenti). Cadre serré : caméra fixe à 20 cm du sol, 35 mm, sur une esplanade vide sous un seul lampadaire. La voiture en fuite finit de freiner vers nous, la fumée de pneus la dépasse. Au premier plan, l'avant d'une patrouille, portière ouverte ; derrière la portière, une silhouette se redresse. Tout autour, hors champ, des lueurs corail et lilas battent dans la brume. Derrière le pare-brise plein de reflets, deux mains gantées se lèvent. Personne ne tire.
 2. *L'arrêt sur image* (14 images). La dernière image gèle et passe en deux tons (§3.1), les traits de la toise passent par-dessus, une plaque d'encre porte « @pseudo », et le niveau claque en Barlow Condensed 700, crème. L'image gelée est la photo d'identité. Dans la bande du haut, l'étoile suivante clignote deux fois et reste éteinte.
 3. *Le flash* (10 images). Crème `#fff9cb` plein écran, les bandes s'ouvrent. Au sommet du flash, la fiche est posée sur le ciel peint de son lieu du crime (SPEC §18.29).
 
 Le cadre serré de FIN règle le nombre de poursuivants sans rendre cinq fins : une seule patrouille et une seule silhouette sont visibles, ce qui est exact à une étoile ; au-dessus, les autres sont suggérées par les lueurs hors champ, et le niveau est porté par le HUD.
 
 **FIN6 : l'encerclement** (niveau ★★★★★★ seulement)
-1. *Le temps s'arrête* (56 images de vidéo). La voiture en fuite vient de s'immobiliser au centre de l'esplanade, encerclée : un anneau de patrouilles et le fourgon, portières ouvertes, une silhouette derrière chacune ; trois faisceaux d'hélicoptère croisés sur elle ; dans le ciel, les deux avions de chasse saisis en plein passage ; toutes les fenêtres allumées. Le temps est gelé : fumée et gouttes suspendues, gyrophares figés. La caméra, elle, continue : elle tourne autour de la voiture au ras du sol et finit de trois quarts face, sur les deux mains gantées levées derrière le pare-brise.
+1. *Le temps s'arrête* (80 images de vidéo). La voiture en fuite vient de s'immobiliser au centre de l'esplanade, encerclée : un anneau de patrouilles et le fourgon, portières ouvertes, une silhouette derrière chacune ; trois faisceaux d'hélicoptère croisés sur elle ; dans le ciel, les deux avions de chasse saisis en plein passage ; toutes les fenêtres allumées. Le temps est gelé : fumée et gouttes suspendues, gyrophares figés. La caméra, elle, continue : elle tourne autour de la voiture au ras du sol et finit de trois quarts face, sur les deux mains gantées levées derrière le pare-brise.
 2. *L'arrêt sur image* (12 images) : deux tons, le niveau, les six étoiles.
 3. *Le flash* (12 images) : la fiche se pose avec son contour éclairé par l'arrière, réservé à ce niveau (SPEC §18.18).
 
@@ -387,9 +389,9 @@ Le grain n'est pas gravé dans les fichiers : il gonflerait le débit pour rien.
 
 | Fichier | Contenu | Images | Plafond de poids |
 |---|---|---|---|
-| `poursuite-720.mp4` | OUV puis P1 à P6 | 204 | 4,5 Mo |
-| `fin-720.mp4` | FIN | 36 | 0,9 Mo |
-| `fin6-720.mp4` | FIN6 | 56 | 1,4 Mo |
+| `poursuite-720.mp4` | OUV puis P1 à P6 | 340 | 4,5 Mo |
+| `fin-720.mp4` | FIN | 52 | 0,9 Mo |
+| `fin6-720.mp4` | FIN6 | 80 | 1,4 Mo |
 | `poursuite-540.mp4`, `fin-540.mp4`, `fin6-540.mp4` | les mêmes en 540 × 960 | les mêmes | 1,68 Mo, 0,34 Mo, 0,52 Mo |
 | `affiche.jpg` | la première image, 720 × 1280 (hors du site) | 1 | 60 Ko |
 
@@ -492,7 +494,7 @@ Construit le 10 novembre 2026 (SPEC §18.36) : le plan, le HUD pur, le lecteur �
 
 `scripts/film-assemble.ts` transforme les prises en fichiers du site ; tant qu'une prise manque, son carton la remplace. Critères :
 
-1. `npx tsx scripts/film-assemble.ts` produit les six mp4 et l'affiche en moins de deux minutes sur le Mac ; `ffprobe` confirme 204, 36 et 56 images, 24 i/s, 720 × 1280 et 540 × 960, aucune piste son.
+1. `npx tsx scripts/film-assemble.ts` produit les six mp4 et l'affiche en moins de deux minutes sur le Mac ; `ffprobe` confirme 340, 52 et 80 images (`shared/film/cut.ts`), 24 i/s, 720 × 1280 et 540 × 960, aucune piste son.
 2. Un plan absent de `design/film/plans/` est remplacé par son carton, sans erreur.
 3. Les poids tiennent dans les plafonds du §4.1 ; sinon le script baisse la qualité et le dit, jusqu'au CRF 28, au-delà il échoue.
 4. À 390 px, dans le lecteur : aucun plan ne garde de bande noire, de filigrane ou de texte ; rien d'important sous les bandes ni dans les 9 % rognés de chaque côté.
@@ -511,7 +513,7 @@ Le son (le film est muet aujourd'hui), la vérification sur de vrais téléphone
 ### 7.1 Format d'une prise
 
 - **Vertical 9:16**, 720 × 1280 au moins, 24 images par seconde, mp4.
-- **Plus longue que le plan** : le montage n'en garde que la fenêtre choisie (24 à 56 images selon le plan, §2.1).
+- **Plus longue que le plan** : le montage n'en garde que la fenêtre choisie (40 à 80 images selon le plan, §2.1).
 - **Image nue** : pas de bandes noires, pas de texte, pas de filigrane, pas d'interface. C'est le site qui pose le HUD.
 - **Dépôt** : `Azerit/design/film/plans/`, hors du dépôt Git (§4.1).
 

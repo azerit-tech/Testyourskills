@@ -13,9 +13,9 @@ export type ShotId = (typeof SHOTS)[number];
 
 /**
  * Les images de VIDÉO de chaque plan (§2.1, §6 T2 critère 1).
- * FIN dure 60 images au film, mais seules les 36 du dérapage sont dans le fichier :
+ * FIN dure 76 images au film, mais seules les 52 du dérapage sont dans le fichier :
  * l'arrêt sur image (14) et le flash (10) sont dessinés par le site. De même FIN6 :
- * 56 images d'orbite en vidéo, puis 12 d'arrêt et 12 de flash dessinées en direct.
+ * 80 images d'orbite en vidéo, puis 12 d'arrêt et 12 de flash dessinées en direct.
  * Lues dans shared/film/cut.ts, la seule source des durées.
  */
 export const SHOT_FRAMES: Record<ShotId, number> = {
