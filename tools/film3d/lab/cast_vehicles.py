@@ -1498,7 +1498,7 @@ def _split_irs(parts, tag):
 
 JETS = {
     # concept d'avion de chasse imaginaire, gris, sans aucun marquage : le choix
-    "concept": dict(file="jet-concept/model.glb", length=16.5, repaint=False, remove=(), glow=dict(nozzle=3.5, strips=1.5)),
+    "concept": dict(file="jet-concept/model.glb", length=16.5, repaint=False, remove=(), glow=dict(nozzle=2.0, strips=1.5)),
     # concept imaginaire noir de sixième génération
     "h900": dict(file="jet-h900/model.glb", length=17.5, repaint=False, remove=()),
 }
@@ -1507,7 +1507,7 @@ JETS = {
 JET_NOZZLE = (1.0, 0.30, 0.06, 1.0)   # la lueur des tuyères : orangé chaud (l'atlas la peignait bleu glacier)
 
 
-def jet_glow_over(src, name, nozzle=3.5, strips=1.5):
+def jet_glow_over(src, name, nozzle=2.0, strips=1.5):
     """L'avion fictif : son atlas d'émission peint l'intérieur des tuyères en bleu et des filets ambrés sur la
     cellule. Le bleu devient un orangé chaud (nozzle : sa force), les filets restent ambrés mais faibles
     (strips) : des feux de formation, pas des néons."""
@@ -1540,6 +1540,11 @@ def jet_glow_over(src, name, nozzle=3.5, strips=1.5):
     for l in list(p.inputs["Emission Strength"].links):
         nt.links.remove(l)
     lvl = _math(nt, "ADD", _math(nt, "MULTIPLY", blue, nozzle), _math(nt, "MULTIPLY", _math(nt, "SUBTRACT", 1.0, blue), strips))
+    # le jet de la tuyère est un seul cône transparent (32 faces, alpha 0,45, le seul îlot émissif du maillage) :
+    # vu de derrière, sa paroi avant et sa paroi arrière s'additionnaient en un cœur rose pâle ; seule la face
+    # tournée vers la caméra s'allume
+    geo = nt.nodes.new("ShaderNodeNewGeometry")
+    lvl = _math(nt, "MULTIPLY", lvl, _math(nt, "SUBTRACT", 1.0, geo.outputs["Backfacing"]))
     nt.links.new(lvl, p.inputs["Emission Strength"])
     return m
 
