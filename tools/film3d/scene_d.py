@@ -355,6 +355,10 @@ def build_pointe(hidden, lamp_src, far=False, marina=False):
     # --- le lampadaire, bras vers le point d'arrêt
     d = Vector((STOP.x - LAMP_AT[0], STOP.y - LAMP_AT[1]))
     out = L.lamp(lamp_src, (LAMP_AT[0], LAMP_AT[1], 0.0), arm=(d.x, d.y), energy=3200.0, name="lamp_pointe")
+    # son spot n'éclaire pas la brume : il y semait un nuage de grains autour de la tête (FIN, FIN6), qui
+    # papillotait en mouvement ; ni l'équiangle, ni le clamp indirect, ni la tête non échantillonnée ne l'ôtaient,
+    # le clamp direct si, mais il blanchit la tête et toutes les hautes lumières. La tête garde son halo
+    out[1].visible_volume_scatter = False
     if marina:
         build_marina(hidden, far=far)
     print(f"[pointe] r {R:.0f} m en ({CX:.0f}, {CY:.0f}), {k} bornes, ouvertures à "
