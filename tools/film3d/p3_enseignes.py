@@ -196,12 +196,14 @@ def tracks_heading():
 POSTS = [(x, y, CONE_R) for x, y in CONES] + [(x, y, 0.5) for x, y in PANELS]
 
 
-# --- les tirs : un éclair d'une image ; chaque agent tire en visée debout, puis tous deux ensemble à l'image 34
-# (l'image où l'on retient son souffle), puis ils plongent derrière leur portière
-SHOTS = {0: (22, STILL_FRAME), 1: (16, 28, STILL_FRAME)}
-# les poses des agents (lieux.officer_rig) : (image, pose) ; la visée debout, puis à couvert
+# --- les agents : deux attitudes, pour qu'ils ne soient plus deux copies, et aucun ne vise l'objectif. L'agent 0
+# (à droite de la berline, du côté de sa feinte) vise debout et tire (un éclair d'une image), la dernière fois à
+# l'image 34 (l'image où l'on retient son souffle) ; l'agent 1 (à gauche) fait « stop », le bras tendu paume
+# ouverte, l'arme basse, et ne tire pas. Puis tous deux plongent derrière leur portière
+SHOTS = {0: (16, 22, 28, STILL_FRAME)}
+# les poses des agents (lieux.officer_rig, lab/cast_people.pose_officer) : (image, pose), puis à couvert
 COVER = {0: ((1, "aim"), (STILL_FRAME + 1, "aim"), (STILL_FRAME + 4, "crouch")),
-         1: ((1, "aim"), (STILL_FRAME + 2, "aim"), (STILL_FRAME + 5, "crouch"))}
+         1: ((1, "stop"), (STILL_FRAME + 2, "stop"), (STILL_FRAME + 5, "crouch"))}
 
 
 def firing(k, frame):

@@ -1285,7 +1285,7 @@ def officer_light(officers, plan, receivers=()):
         lo.data.shadow_soft_size = 0.15
         lo.visible_glossy = False
         only_on(lo, [a], f"rim_{k}")
-        if flash is None:
+        if flash is None or k not in P3.SHOTS:      # (l'agent qui fait « stop » ne tire pas)
             continue
         gun = bpy.data.objects.get(a.get("gun", ""))
         # (l'arme à sa place au premier tir de l'agent)
@@ -1388,8 +1388,9 @@ def build_barrage(scene, hidden, plan):
                 side = -1 if "_door_-1" in ch.name else 1
                 # la portière tourne sur sa charnière avant, son bord arrière s'écarte de la caisse
                 ch.rotation_euler = (0, 0, -side * math.radians(58 if side == open_side else 50))
-        # l'agent derrière la portière ouverte, face à la berline (donc à la caméra) : il vise debout, puis plonge
-        # à couvert quand elle arrive (lieux.officer_rig, ses poses clés : p3_enseignes.COVER)
+        # l'agent derrière la portière ouverte, face à la berline (donc à la caméra) : l'un vise debout, l'autre fait
+        # « stop », puis ils plongent à couvert quand elle arrive (lieux.officer_rig, ses poses clés :
+        # p3_enseignes.COVER)
         k = len(officers)
         a = officer_rig(P3.COVER[k], style=k, name=f"agent_{k}")
         gun = next((c for c in a.children_recursive if "muzzle" in c), None)
