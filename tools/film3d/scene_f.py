@@ -37,6 +37,7 @@ for p in (HERE, LAB):
 
 import scene_a as A          # noqa: E402
 import road                  # noqa: E402
+import lieux                 # noqa: E402  (avant le faux module de road.py : son import y remet scene_a)
 import p2_arc as P           # noqa: E402
 import scene_carrefour as C  # noqa: E402
 
@@ -69,6 +70,47 @@ POSE = (5.0, -math.sqrt(_D ** 2 - _CX ** 2), 0.0)
 OUTER_PUDDLES = ()           # v2 : ((240, 13.4, 1.2, 2.0), (228, 14.0, 0.9, 1.7), (216, 13.2, 1.3, 2.2))
 CAR_FILL_W = 800.0           # W, l'appoint lié à la berline (keep_paint) : à 260, la porte à (55, 16, 30) puis
                              # (57, 6, 17) à l'image 28, le bon bordeaux mais plus sombre qu'OUV (73, 29, 26)
+
+# La ville (SPEC §18.36, docs/cinematique-plan-de-ville.md §4, « Rond-point rogné ») : FILM3D_VILLE = « 1 » (défaut),
+# le rond-point rogné à ses deux jonctions, ses bords ouverts sur le vide là où se posent ses voisins ; « 0 »,
+# l'ancien lieu autonome, inchangé. Au sud (y < SUD_Y) commence l'avenue (scène A, rognée à son y 340,7, le bord du
+# trottoir de l'anneau) ; à l'ouest (x < OUEST_X), la rue des enseignes (scène B, s 91, 8 m). Rien du rond-point ne
+# passe ces deux droites : branches, places, terrasses, lampadaires, promenade, plage et mer s'y arrêtent.
+VILLE = lieux.ville_on()     # (relu par build, à l'appel)
+SUD_Y = -19.0                # la jonction avec l'avenue
+OUEST_X = -18.2              # la jonction avec la rue des enseignes
+DALLE_X = -89.0              # la dalle du rang de l'avenue nord s'arrête là (au-delà : le boulevard du quai)
+
+
+ROW_Y = 24.0                 # à l'ouest de la jonction, le rond-point ne garde que le rang de l'avenue nord (y ≥ 24)
+
+
+def in_lieu(x, y, m=0.0):
+    """Le point (x, y), à m près, est-il dans l'emprise du rond-point ? (toujours, hors de la ville)"""
+    return not VILLE or (y >= SUD_Y + m and (x >= OUEST_X + m or y >= ROW_Y + m))
+
+
+def _half(pts, k, lim, sgn):
+    """Sutherland-Hodgman sur un demi-plan : garde sgn · (p[k] − lim) ≥ 0."""
+    out = []
+    for i, p in enumerate(pts):
+        q = pts[i - 1]
+        pin, qin = sgn * (p[k] - lim) >= 0, sgn * (q[k] - lim) >= 0
+        if pin != qin:
+            out.append(q + (p - q) * ((lim - q[k]) / (p[k] - q[k])))
+        if pin:
+            out.append(p)
+    return out
+
+
+def clip_lieu(pts):
+    """Un polygone (liste de Vector) coupé aux deux jonctions : [polygones], un ou deux (au nord-ouest, la place et
+    le pied du rang de l'avenue nord au-delà de x OUEST_X)."""
+    if not VILLE:
+        return [pts]
+    pts = _half(pts, 1, SUD_Y, 1)
+    out = [_half(pts, 0, OUEST_X, 1), _half(_half(pts, 0, OUEST_X, -1), 1, ROW_Y, 1)]
+    return [p for p in out if len(p) >= 3]
 
 
 def log(*a):
@@ -165,6 +207,17 @@ def ring_z(r):
 
 # ---------------------------------------------------------------- les branches, les trottoirs
 
+def branch_end(name):
+    """Où s'arrête une branche, en m du centre de l'îlot."""
+    if name == "avenue_nord":
+        return NORTH_END
+    if VILLE and name == "avenue_sud":
+        return -SUD_Y
+    if VILLE and name == "enseignes":
+        return -OUEST_X
+    return L
+
+
 def build_branches(kerb):
     """Les quatre branches : la bande de road.py, tournée, qui commence sous le bord de l'anneau ; cunettes et
     bordures depuis la bordure de l'anneau ; passage piéton à 3 m de l'anneau ; cédez-le-passage sur la moitié
@@ -183,16 +236,18 @@ def build_branches(kerb):
         y_road = math.sqrt((R_OUT - 0.5) ** 2 - a ** 2) - 0.3
         y_pan = math.sqrt((R_OUT - 0.25) ** 2 - h ** 2)
         y_kerb = math.sqrt((R_OUT + 0.1) ** 2 - (h + 0.1) ** 2)
-        # (l'avenue nord jusqu'au bout du fond de la caméra basse, build_backdrop)
-        end = NORTH_END if name == "avenue_nord" else L
+        # (l'avenue nord jusqu'au bout du fond de la caméra basse, build_backdrop ; en ville, les branches sud et
+        # ouest s'arrêtent à leur jonction)
+        end = branch_end(name)
         road.strip(f"{name}_road", road.road_profile(), y_road, end, asphalt, rot=rot)
         for side in (-1, 1):
             road.strip(f"{name}_gutter_{side}", road.pan_profile(side), y_pan, end, pan, rot=rot)
             road.strip(f"{name}_kerb_{side}", road.kerb_profile(side), y_kerb, end, kerb, smooth_faces=True, rot=rot)
-        # le passage piéton, bandes parallèles à la circulation, 3,2 m de long
-        y0 = y_kerb + 2.6
+        # le passage piéton, bandes parallèles à la circulation, 3,2 m de long ; en ville, reculé vers l'anneau pour
+        # finir avant la jonction, et pas de passage s'il n'y tient pas à 1,5 m de l'anneau (la branche ouest)
+        y0 = min(y_kerb + 2.6, end - 3.3)
         k, x = 0, -a + 0.45
-        while x + 0.5 < a - 0.3:
+        while x + 0.5 < a - 0.3 and y0 >= y_kerb + 1.5:
             road.decal_strip(f"{name}_zebra_{k}", x, x + 0.5, y0, y0 + 3.2, paint).rotation_euler.z = rot
             x += 0.98
             k += 1
@@ -237,8 +292,9 @@ def build_walks():
         pts.append(u1 * (L / max(abs(u1.x), abs(u1.y))) + nn1 * (h1 + road.KERB))
         me = bpy.data.meshes.new(f"walk_{n1}_{n2}")
         bm = bmesh.new()
-        vs = [bm.verts.new((p.x, p.y, road.WALK_Z)) for p in pts]
-        bm.faces.new(vs)
+        for poly in clip_lieu(pts):              # (en ville, coupé aux jonctions : une ou deux pièces)
+            poly = [p for j, p in enumerate(poly) if (p - poly[j - 1]).length > 1e-4]
+            bm.faces.new([bm.verts.new((p.x, p.y, road.WALK_Z)) for p in poly])
         bmesh.ops.triangulate(bm, faces=bm.faces[:])
         bm.normal_update()
         bm.to_mesh(me)
@@ -249,7 +305,10 @@ def build_walks():
         bpy.context.collection.objects.link(ob)
         me.materials.append(walk)
     # sous tout, au-delà du décor : un sol sombre (les coins du cadre tourné ne tombent jamais dans le vide)
-    # (en deux pièces : il s'arrête au mur de promenade, la plage et la mer sont plus bas, build_backdrop)
+    # (en deux pièces : il s'arrête au mur de promenade, la plage et la mer sont plus bas, build_backdrop ; en ville,
+    # aucun : c'est un faux lointain, les voisins posent leur sol)
+    if VILLE:
+        return
     ground = A.mat_plain("ground_dark", lin("#121214"), 0.8)
     A.box("ground", -160, 7.2 + AV_WALK, -160, NORTH_END, -0.6, -0.25, ground)
     A.box("ground_e", 7.2 + AV_WALK, SEA_X + 0.35, -160, L + 0.35, -0.6, -0.25, ground)
@@ -344,6 +403,8 @@ def build_street_life(hidden, branches):
     for name, phi, h, y_kerb in branches:
         u, n = unit(phi)
         p = u * (y_kerb + 5.5) + n * (h + 0.6)
+        if not in_lieu(p.x, p.y, 0.5):            # (en ville, celui de la branche ouest tombe dans la rue)
+            continue
         lieux.lamp(src, (p.x, p.y, road.WALK_Z), arm=(-n.x, -n.y), name=f"lamp_{name}")
     terrace = A.source(A.import_glb("outdoor_table_chair_set_01/outdoor_table_chair_set_01.gltf"), "terrace_src", hidden)
     metal = A.mat_plain("street_metal", (0.035, 0.035, 0.04, 1), 0.4, 0.8)
@@ -355,6 +416,8 @@ def build_street_life(hidden, branches):
         mid = math.radians(45.0 + 90.0 * q)
         for dr, da in ((22.0, 0.0), (25.5, -0.12), (25.5, 0.12), (29.0, 0.0)):
             x, y = dr * math.cos(mid + da), dr * math.sin(mid + da)
+            if not in_lieu(x, y, 1.6):            # (le parasol fait 1,35 m de rayon)
+                continue
             A.instance(terrace, f"terrace_{k}", (x, y, road.WALK_Z), rng.uniform(0, math.tau))
             A.parasol(f"parasol_{k}", x, y, canvas[(q + k) % 3], metal, light=True)
             k += 1
@@ -437,19 +500,21 @@ def build_backdrop(hidden):
     # --- l'avenue nord au-delà du décor du drone : ses deux trottoirs (la chaussée, build_branches)
     A.box("av_walk_w", -kx - AV_WALK, -kx, L, NORTH_END, -0.05, road.WALK_Z, walk)
     A.box("av_walk_e", kx, kx + AV_WALK, L, NORTH_END, -0.05, road.WALK_Z, walk)
-    A.box("av_block_w", -200.0, -kx - AV_WALK, L, NORTH_END, -0.05, road.WALK_Z, walk)
+    A.box("av_block_w", DALLE_X if VILLE else -200.0, -kx - AV_WALK, L, NORTH_END, -0.05, road.WALK_Z, walk)
     # --- le mur de promenade (celui de l'avenue de la scène A) : au bout de la branche de la plage, le long du bord
-    # nord de la place, puis le long de l'avenue nord côté mer ; la plage et la mer derrière
+    # nord de la place, puis le long de l'avenue nord côté mer ; la plage et la mer derrière (en ville, au nord de la
+    # jonction de l'avenue seulement : au sud, ce sont les siennes)
     wall = A.mat_plain("sea_wall", lin("#d9d2c4"), 0.6)
     xe = kx + AV_WALK
-    for name, (x0, x1, y0, y1) in (("e", (SEA_X, SEA_X + 0.35, -L, L + 0.35)), ("n", (xe, SEA_X + 0.35, L, L + 0.35)),
-                                   ("av", (xe, xe + 0.35, L, NORTH_END))):
+    ys = SUD_Y if VILLE else None
+    for name, (x0, x1, y0, y1) in (("e", (SEA_X, SEA_X + 0.35, ys or -L, L + 0.35)),
+                                   ("n", (xe, SEA_X + 0.35, L, L + 0.35)), ("av", (xe, xe + 0.35, L, NORTH_END))):
         A.box(f"sea_wall_{name}", x0, x1, y0, y1, 0.0, 0.85, wall)
         A.box(f"sea_wall_cap_{name}", x0 - 0.08, x1 + 0.1, y0, y1, 0.85, 0.95, M["trim"])
     sand = A.mat_plain("wet_sand", lin("#3a332d"), 0.3)
-    A.box("beach_e", SEA_X + 0.35, 120.0, -200.0, L + 0.35, -1.6, -1.5, sand)
+    A.box("beach_e", SEA_X + 0.35, 120.0, ys or -200.0, L + 0.35, -1.6, -1.5, sand)
     A.box("beach_n", xe + 0.35, 120.0, L + 0.35, 900.0, -1.6, -1.5, sand)
-    A.box("sea", 120.0, 4000.0, -1200.0, 4000.0, -1.7, -1.6, A.mat_sea())
+    A.box("sea", 120.0, 4000.0, ys or -1200.0, 4000.0, -1.7, -1.6, A.mat_sea())
     # --- les immeubles côté ville de l'avenue nord, façades vers la chaussée, boutiques allumées
     P = A.prototypes(M)
     protos = {}
@@ -478,7 +543,7 @@ def build_backdrop(hidden):
                    sc * rng.uniform(0.85, 1.1))
         palms += 1
     for yy in range(-38, int(L), 13):
-        if abs(yy) < 6:                                   # la bouche de la branche de la plage
+        if abs(yy) < 6 or not in_lieu(SEA_X - 2.0, yy, 4.0):   # la bouche de la plage ; l'avenue, en ville
             continue
         A.instance(royal, f"prom_royal_{palms}", (SEA_X - 2.0, yy, road.WALK_Z), rng.uniform(0, math.tau),
                    sc * rng.uniform(0.8, 1.05))
@@ -491,6 +556,8 @@ def build_backdrop(hidden):
                        name=f"lamp_av_{lamps}")
             lamps += 1
     for yy in range(-30, int(L), 20):
+        if not in_lieu(SEA_X - 0.8, yy, 0.5):
+            continue
         lieux.lamp(src, (SEA_X - 0.8, yy, road.WALK_Z), arm=(-1, 0), name=f"lamp_prom_{lamps}")
         lamps += 1
     road.S = PX
@@ -541,6 +608,8 @@ def keep_paint():
 def build(plan=None, palier=None):
     """Écrit scene-f.blend (en ligne de commande), ou rend la scène à render_lieux.py (--lieu rond-point --plan
     P2), sans l'écrire. Le plan P2 est animé (28 images, motion.py), posé à l'image de l'image fixe."""
+    global VILLE
+    VILLE = lieux.ville_on()
     bpy.ops.wm.read_factory_settings(use_empty=True)
     scene = bpy.context.scene
     random.seed(17)
@@ -561,7 +630,8 @@ def build(plan=None, palier=None):
         if c.name == "sources" or c.name.startswith("sources."):
             c.hide_render = True
             c.hide_viewport = True
-    A.make_world(scene, math.radians(35.0))        # le ciel commun, la bande 35° à gauche, vers la sortie
+    # le ciel commun ; en ville, la bande à l'azimut de la mer de la ville (§3.3, +20° ici), seul, 35° à gauche
+    A.make_world(scene, lieux.mer_lieu("rond-point") if VILLE else math.radians(35.0))
     # (découpage v2 : le travelling bas à l'intérieur de l'arc remplace le drone, C.drone garde l'ancien cadre)
     co = C.chase_camera(scene, POSE)
     A.render_settings(scene)
