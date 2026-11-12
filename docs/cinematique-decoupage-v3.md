@@ -246,6 +246,11 @@ Vitesses gardées : avenue 50 km/h (le bond de P1 jusqu'à 62), rond-point 70, r
 - **Travaux** :
   - `fin_pointe.py` : `FRAMES = 52` ; caméra nouvelle (suiveur arrière, arrêt, grue) ; `SLIDE_D = 7.8`, `F_STOP = 30`, vitesse d'entrée 12,5 m/s ; `DRIVER_KEYS = (35, 46)` ; `OFFICER_KEYS = [(20, "crouch"), (32, "aim")]` ; trajectoire de la patrouille 1 ; `focus_point` sur la lunette arrière.
   - `scene_d.py` `plan_FIN` : `lieux.phare` ; la vue vers +y (le côté mer de la pointe, l'horizon, l'autre rive) ; l'hélicoptère déplacé devant ; habitacle éteint, gants et manches sombres pour la silhouette (`lieux.hands_up`, `lab/cast_people.py`) ; la lunette arrière sans la tache blanche (chez l'agent de la berline, `lab/hero_cars.py`) ; phares des poursuivants derrière la caméra, liés.
+- **Corrections du 12 novembre au soir, après le premier brouillon** (elles priment sur les lignes ci-dessus) :
+  - *Une seule patrouille à l'image, et c'est la patrouille 1.* Dans le film à une étoile il n'en a existé qu'une : la patrouille de la v2, à droite, est retirée. La patrouille 1 double la caméra par la gauche pendant le freinage et s'arrête devant à gauche de la berline, vers le pied du phare, de trois quarts et en travers ; caisse entière et rampe allumée dans le cadre de l'image 30 à la 52. Le reste de la meute n'est que de la lumière : phares hors champ, derrière la caméra, des images 36 à 52.
+  - *Les mains sortent par la vitre.* À 6–8 m derrière, les mains levées dans l'habitacle ne se lisent pas à 390 px. Le conducteur sort les deux avant-bras par sa vitre baissée, paumes ouvertes, dans le faisceau de l'hélicoptère (`lieux.hands_out`). Le repli de face reste derrière `FILM3D_FIN_FACE`.
+  - *Le raccord de lumière.* Une bande de crépuscule reste à l'horizon derrière le phare, pour que la coupe depuis l'avenue ne se lise pas comme un saut d'heure.
+  - *Écarts acceptés* : glisse de 6,9 m (freinage à 1,1 g relâché sur quatre images), glissement latéral de la caméra jusqu'à 1,5 m seulement (à 2,4 m le phare sort du cadre).
 - **Risque** : les mains illisibles à travers la lunette. **Repli** : le cadre de face validé en v2, avec le nouveau minutage sur 52 images (FIN n'est jamais dans le film à six étoiles, la règle des plans de face n'en souffre pas).
 
 ### FIN6 — Le temps gelé, toute la ville autour d'elle (80 images, six étoiles)
