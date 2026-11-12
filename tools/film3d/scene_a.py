@@ -1981,6 +1981,9 @@ def ouv_motion(scene, coupe, police, cam, focus):
     poses = M.sample(OUV.hero_pos, frames, wheel_r=coupe["wheel_r"], wheelbase=wb)
     M.key_vehicle(rig, poses, wheels=wheels)
     M.wheel_marks(wheels, coupe["wheel_r"])
+    # les feux stop de la berline (lab/hero_cars : propriété « stop » de la caisse), après la trajectoire
+    import hero_cars
+    hero_cars.stop_lamps(coupe, *OUV.BRAKE)
     cam.data.shift_y = 0.0
     M.key_camera(cam, frames, OUV.camera)
     cam.data.dof.focus_object = coupe
