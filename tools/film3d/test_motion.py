@@ -723,6 +723,70 @@ def test_aircraft():
     check("P6 : en poursuite à vitesse tenue, presque rien ajouté", d6 < 1.5, f"{d6:.2f}°")
 
 
+def _cam_dev(fn, fr, out):
+    yaw = max(abs(out[f][3] - fn(M.t_of(f))[3]) for f in fr)
+    pit = max(abs(out[f][4] - fn(M.t_of(f))[4]) for f in fr)
+    return yaw, pit
+
+
+def test_operator():
+    """L'opérateur caméra : une caméra fixe sans passage reste immobile ; un véhicule qui la frôle la secoue,
+    brièvement ; la voiture-travelling vibre selon sa vitesse ; le panoramique dépasse un peu à l'arrêt ; tout reste
+    sous 2 % de la largeur et 1,2 % de la hauteur du cadre ; les fins de plan restent en place."""
+    fr = list(range(0, 36))
+    fixed = lambda t: (0.0, 0.0, 0.4, 0.0, 2.0, 0.0, 28.0)  # noqa: E731
+    out = M.camera_operator(fixed, fr)
+    check("opérateur : caméra fixe immobile", all(out[f] == fixed(M.t_of(f)) for f in fr), str(out["kind"]))
+    near = [{f: (2.5, -20.0 + 25.0 * M.t_of(f), 0.7) for f in fr}]
+    far = [{f: (6.0, -20.0 + 25.0 * M.t_of(f), 0.7) for f in fr}]
+    sh = M.camera_operator(fixed, fr, tracks=near)
+    nf = M.camera_operator(fixed, fr, tracks=far)
+    pk = max(range(len(fr)), key=lambda i: abs(sh[fr[i]][4] - 2.0))
+    a = abs(sh[fr[pk]][4] - 2.0)
+    tail = max(abs(sh[f][4] - 2.0) for f in fr[pk + 14:])
+    check("opérateur : un véhicule à 1,5 m la secoue, brièvement", a > 0.08 and tail < 0.25 * a,
+          f"{a:.2f}° puis {tail:.3f}° une demi-seconde après")
+    check("opérateur : à 5 m, rien", all(nf[f] == fixed(M.t_of(f)) for f in fr))
+
+    def travel(v):
+        return lambda t: (0.0, v * t, 0.5, 180.0, 3.0, 0.0, 24.0)
+    sd = {}
+    for v in (10.0, 20.0):
+        o = M.camera_operator(travel(v), fr, seed=1.0, op=dict(jolt_deg=0.0))
+        d = [o[f][4] - 3.0 for f in fr]
+        sd[v] = math.sqrt(sum(x * x for x in d) / len(d))
+    check("opérateur : la vibration suit la vitesse", 1.6 < sd[20.0] / sd[10.0] < 2.4 and sd[20.0] < 0.15,
+          f"{sd[10.0]:.3f}° à 36 km/h, {sd[20.0]:.3f}° à 72 km/h")
+
+    def pan(t):
+        u = M.smoothstep(0.0, 0.7, t)
+        return 0.0, 0.0, 0.5, -60.0 * min(1.0, t / 0.7) if t > 0 else 0.0, 2.0, 0.0, 32.0
+    po = M.camera_operator(pan, fr)
+    over = min(po[f][3] for f in fr) - (-60.0)
+    check("opérateur : le panoramique dépasse un peu à l'arrêt", -1.2 < over < -0.05, f"{over:.2f}°")
+    hf, vf = M.fov_deg(32.0)
+    yd, pd = _cam_dev(pan, fr, po)
+    check("opérateur : panoramique dans ses bornes", yd <= 0.02 * hf + 1e-6, f"{yd:.2f}° pour {hf:.1f}° de large")
+    import fin6_orbite as F6
+    import ouv_avenue as O
+    import p4_pont as P4
+    import p5_virage as P5
+    import p6_jetee as P6
+    for name, mod in (("OUV", O), ("P4", P4), ("P5", P5), ("P6", P6), ("FIN6", F6)):
+        n = getattr(mod, "FRAMES", 24)
+        frs = list(range(mod.F0 - 1, mod.F0 + n + 1))
+        o = M.camera_operator(mod.camera, frs, seed=3.0)
+        lens = o["kind"]["lens"]
+        hf, vf = M.fov_deg(lens)
+        yd, pd = _cam_dev(mod.camera, frs, o)
+        check(f"opérateur {name} : sous 2 % de la largeur, 1,2 % de la hauteur", yd <= 0.02 * hf + 1e-6
+              and pd <= 0.012 * vf + 1e-6, f"lacet {yd:.3f}°, site {pd:.3f}° ({lens:.0f} mm), {o['kind']}")
+    o = M.camera_operator(F6.camera, list(range(F6.F0, F6.F0 + F6.FRAMES)), seed=3.0)
+    lf = F6.F0 + F6.FRAMES - 1
+    d = max(abs(o[lf][k] - F6.camera(M.t_of(lf))[k]) for k in (3, 4, 5))
+    check("opérateur FIN6 : la pose validée tient à la dernière image", d < 0.05, f"{d:.3f}°")
+
+
 if __name__ == "__main__":
     test_straight()
     test_braking()
@@ -745,5 +809,6 @@ if __name__ == "__main__":
     test_pack()
     test_steer_dyn()
     test_aircraft()
+    test_operator()
     print(f"\n{'tout passe' if not FAIL else str(len(FAIL)) + ' échec(s)'}")
     sys.exit(1 if FAIL else 0)

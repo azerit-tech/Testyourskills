@@ -921,17 +921,194 @@ def key_object(ob, frames, fn, f0=F0, fps=FPS):
         ob.keyframe_insert("rotation_euler", frame=f)
 
 
-def key_camera(cam, frames, fn, f0=F0, fps=FPS):
+# ---------------------------------------------------------------- l'opérateur caméra
+#
+# Ce qu'un opérateur ajoute à la trajectoire écrite d'une caméra, selon son type, jamais gratuit : la voiture-
+# travelling vibre finement selon sa vitesse et sursaute sur les ressauts ; la caméra posée au sol ne bouge pas,
+# sauf une secousse brève quand un véhicule la frôle (moins de 3 m) ; la longue focale flotte lentement et recadre
+# avec un léger retard ; le panoramique démarre et s'arrête en douceur, avec un léger dépassement (une tête
+# fluide : un second ordre, en avance de son retard pour suivre sans traîner). Les écarts sont bornés en fraction
+# du cadre (le sujet reste dans le tiers central, rien n'entre dans les bandes de l'habillage).
+OPERATOR = dict(
+    vib_deg=0.0032,          # degrés de vibration par m/s de la caméra (voiture-travelling)
+    vib_z=0.00010,           # m de vibration verticale par m/s
+    vib_air=0.5,             # caméra en l'air (plus de 3 m) : la moitié, et pas de ressauts
+    jolt_every=(7.0, 15.0),  # m entre deux ressauts sous la voiture-caméra
+    jolt_deg=0.16, jolt_z=0.006, jolt_hz=7.5, jolt_tau=0.12,
+    pan_min=12.0,            # degrés de lacet sur le plan : au-delà, c'est un panoramique
+    pan_hz=2.0, pan_zeta=0.6,
+    tele_lens=100.0,         # mm : au-delà, longue focale
+    tele_float=0.009,        # fraction de la hauteur du cadre
+    tele_lag=0.12,           # s
+    pass_dist=3.0,           # m entre l'objectif et le flanc d'un véhicule (demi-largeur 1 m)
+    pass_deg=0.55, pass_hz=6.0, pass_tau=0.17,
+    max_yaw=0.02, max_pitch=0.012,   # fractions de la largeur et de la hauteur du cadre
+    max_roll=0.6,            # degrés
+)
+
+
+def fov_deg(lens):
+    """(largeur, hauteur) du champ en degrés, cadre vertical 9:16, capteur de 36 mm sur la hauteur."""
+    return 2 * math.degrees(math.atan(10.125 / lens)), 2 * math.degrees(math.atan(18.0 / lens))
+
+
+def camera_kind(fn, frames, f0=F0, fps=FPS):
+    """Ce que fait une caméra sur le plan : dict(travel (m/s au plus), pan (degrés de lacet), tele (focale ≥ 100),
+    air (au-dessus de 3 m))."""
+    ts = [t_of(f, f0, fps) for f in frames]
+    vals = [fn(t) for t in ts]
+    sp = [math.dist(vals[i + 1][:3], vals[i][:3]) * fps for i in range(len(vals) - 1)] or [0.0]
+    yaws, prev = [], None
+    for v in vals:
+        y = v[3] if prev is None else _unwrap(prev, v[3])
+        yaws.append(y)
+        prev = y
+    lens = sorted(v[6] for v in vals)[len(vals) // 2]
+    return dict(travel=max(sp), pan=max(yaws) - min(yaws), tele=lens >= OPERATOR["tele_lens"],
+                air=min(v[2] for v in vals) > 3.0, lens=lens)
+
+
+def _decay(t, t0, amp, hz, tau, phase=0.0):
+    if t < t0:
+        return 0.0
+    u = t - t0
+    return amp * math.exp(-u / tau) * math.sin(2 * math.pi * hz * u + phase)
+
+
+def camera_operator(fn, frames, f0=F0, fps=FPS, tracks=(), seed=0.0, warmup=0.5, op=None):
+    """L'opérateur appliqué à fn(t) -> (x, y, z, lacet, site, roulis, focale) : renvoie {image: (x, y, z, lacet,
+    site, roulis, focale)} et, dans « kind », ce qu'il a reconnu. tracks : les véhicules de la scène, [{image: (x,
+    y, z)}] (secousse d'un passage proche)."""
+    o = dict(OPERATOR, **(op or {}))
+    frames = list(frames)
+    kind = camera_kind(fn, frames, f0, fps)
+    hfov, vfov = fov_deg(kind["lens"])
+    rng = random.Random(f"op:{float(seed):.3f}")
+    ph = [rng.uniform(0, 2 * math.pi) for _ in range(12)]
+    dt = 1.0 / (fps * 10)
+    t0, t1 = t_of(frames[0], f0, fps), t_of(frames[-1], f0, fps)
+    want = {round(t_of(f, f0, fps) / dt): f for f in frames}
+    pan = kind["pan"] >= o["pan_min"] and not kind["tele"]
+    w = 2 * math.pi * o["pan_hz"]
+    lead = 2 * o["pan_zeta"] / w
+    moving = kind["travel"] > 1.5
+
+    def aim(t, prev=None):
+        v = fn(t)
+        y = v[3] if prev is None else _unwrap(prev, v[3])
+        return y, v[4]
+
+    # les passages proches : (instant, amplitude) pour chaque véhicule qui frôle l'objectif
+    events = []
+    if tracks:
+        for tr in tracks:
+            best = None
+            for f in frames:
+                if f not in tr:
+                    continue
+                c = fn(t_of(f, f0, fps))
+                d = math.dist(c[:3], tr[f]) - 1.0
+                if best is None or d < best[0]:
+                    best = (d, f)
+            if best and best[0] < o["pass_dist"]:
+                f = best[1]
+                fa, fb = (f - 1 if f - 1 in tr else f), (f + 1 if f + 1 in tr else f)
+                v_rel = math.dist(tr[fb], tr[fa]) * fps / max(1, fb - fa)
+                amp = o["pass_deg"] * (1.0 - max(0.0, best[0]) / o["pass_dist"]) * min(1.0, v_rel / 15.0)
+                events.append((t_of(f, f0, fps) - 0.04, amp))
+    # les ressauts sous la voiture-caméra, le long de sa distance parcourue
+    jolts, next_s, s_cam, prev_c = [], rng.uniform(*o["jolt_every"]) * 0.5, 0.0, None
+    yaw_x = yaw_v = pit_x = pit_v = None
+    lp_y = lp_p = None
+    prev_y = None
+    out = {}
+    # une caméra qui se pose à la fin du plan (la pose validée) : les écarts s'éteignent sur ses 0,3 dernières s
+    e1, e0 = fn(t1), fn(t1 - 1.0 / fps)
+    land = ((moving or pan) and math.dist(e1[:3], e0[:3]) * fps < 0.6
+            and abs(_unwrap(e0[3], e1[3]) - e0[3]) * fps < 3.0)
+    k0 = round((t0 - warmup) / dt)
+    for k in range(k0, round(t1 / dt) + 1):
+        t = k * dt
+        base = fn(t)
+        y, p = aim(t, prev_y)
+        prev_y = y
+        if prev_c is not None:
+            step = math.dist(base[:3], prev_c)
+            s_cam += step
+        speed = math.dist(base[:3], prev_c) / dt if prev_c is not None else 0.0
+        prev_c = base[:3]
+        if moving and not kind["air"] and s_cam >= next_s:
+            jolts.append((t, min(1.0, speed / 20.0)))
+            next_s = s_cam + rng.uniform(*o["jolt_every"])
+        dy = dp = dr = dz = 0.0
+        if pan:
+            yl, pl = aim(t + lead, y)
+            if yaw_x is None:
+                ya, pa = aim(t + 1e-3, y)
+                yaw_x, yaw_v, pit_x, pit_v = y, (ya - y) / 1e-3, p, (pa - p) / 1e-3
+            yaw_v += (w * w * (yl - yaw_x) - 2 * o["pan_zeta"] * w * yaw_v) * dt
+            yaw_x += yaw_v * dt
+            pit_v += (w * w * (pl - pit_x) - 2 * o["pan_zeta"] * w * pit_v) * dt
+            pit_x += pit_v * dt
+            dy += yaw_x - y
+            dp += pit_x - p
+        if kind["tele"]:
+            if lp_y is None:
+                lp_y, lp_p = y, p
+            a = min(1.0, dt / o["tele_lag"])
+            lp_y += (y - lp_y) * a
+            lp_p += (p - lp_p) * a
+            fl = o["tele_float"] * vfov
+            dy += (lp_y - y) + fl * (0.6 * math.sin(2 * math.pi * 0.13 * t + ph[0]) + 0.4 * math.sin(2 * math.pi * 0.31 * t + ph[1]))
+            dp += (lp_p - p) + fl * 0.8 * (0.6 * math.sin(2 * math.pi * 0.17 * t + ph[2]) + 0.4 * math.sin(2 * math.pi * 0.47 * t + ph[3]))
+        if moving:
+            g = o["vib_air"] if kind["air"] else 1.0
+            a = o["vib_deg"] * speed * g
+            hf = lambda i: (0.5 * math.sin(2 * math.pi * 7.3 * t + ph[i]) + 0.3 * math.sin(2 * math.pi * 11.1 * t + ph[i + 1])  # noqa: E731
+                            + 0.2 * math.sin(2 * math.pi * 13.7 * t + ph[i + 2]))
+            dy += 0.5 * a * hf(4)
+            dp += a * hf(5)
+            dr += 0.6 * a * hf(6)
+            dz += o["vib_z"] * speed * g * hf(7)
+            for tj, s in jolts:
+                dp += _decay(t, tj, o["jolt_deg"] * s, o["jolt_hz"], o["jolt_tau"])
+                dr += _decay(t, tj, 0.5 * o["jolt_deg"] * s, o["jolt_hz"] * 0.8, o["jolt_tau"], 1.0)
+                dz += _decay(t, tj, -o["jolt_z"] * s, o["jolt_hz"], o["jolt_tau"])
+        for te, amp in events:
+            dp += _decay(t, te, amp, o["pass_hz"], o["pass_tau"])
+            dr += _decay(t, te, 0.7 * amp, o["pass_hz"] * 0.85, o["pass_tau"], 0.8)
+            dy += _decay(t, te, 0.4 * amp, o["pass_hz"] * 1.2, o["pass_tau"], 2.0)
+        if k in want:
+            base = fn(t_of(want[k], f0, fps))
+            if land:
+                e = smoothstep(t1, t1 - 0.3, t)
+                dy, dp, dr, dz = dy * e, dp * e, dr * e, dz * e
+            dy = soft_clamp(dy, o["max_yaw"] * hfov) if dy else 0.0
+            dp = soft_clamp(dp, o["max_pitch"] * vfov) if dp else 0.0
+            dr = soft_clamp(dr, o["max_roll"]) if dr else 0.0
+            x, yy, z, yaw, pitch, roll, lens = base
+            out[want[k]] = (x, yy, z + dz, yaw + dy, pitch + dp, roll + dr, lens)
+    out["kind"] = dict(kind, pan_active=pan, moving=moving, passes=len(events), jolts=len(jolts), lands=land)
+    return out
+
+
+def key_camera(cam, frames, fn, f0=F0, fps=FPS, operator=True):
     """Clés d'une caméra : fn(t) -> (x, y, z, lacet, tangage, roulis en degrés, focale en mm). Lacet compté de -y
-    vers -x (comme les plans des lieux), tangage positif vers le haut, roulis autour de l'axe de visée."""
+    vers -x (comme les plans des lieux), tangage positif vers le haut, roulis autour de l'axe de visée.
+    Dynamique active : l'opérateur (camera_operator) s'ajoute selon le type de caméra ; operator=False l'enlève."""
     from mathutils import Matrix, Vector
     _clear(cam)
     if cam.data.animation_data:
         cam.data.animation_data.action = None
     cam.rotation_mode = "QUATERNION"
     prev = None
+    frames = list(frames)
+    vals = None
+    if operator and dyn_on():
+        vals = camera_operator(fn, frames, f0, fps, tracks=scene_tracks(), seed=sum(map(ord, cam.name)) % 97)
+        print(f"[motion] {cam.name} : opérateur {vals['kind']}", flush=True)
     for f in frames:
-        x, y, z, yaw, pitch, roll, lens = fn(t_of(f, f0, fps))
+        x, y, z, yaw, pitch, roll, lens = vals[f] if vals else fn(t_of(f, f0, fps))
         a, b = math.radians(yaw), math.radians(pitch)
         d = Vector((-math.sin(a) * math.cos(b), -math.cos(a) * math.cos(b), math.sin(b)))
         q = d.to_track_quat("-Z", "Y") @ Matrix.Rotation(math.radians(roll), 4, "Z").to_quaternion()
