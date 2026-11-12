@@ -1782,7 +1782,7 @@ def street_hero(scene):
     """La voiture poursuivie d'époque (lab/hero_cars.py), mise au repère de la rue comme le coupé : l'avant vers -y,
     au sol, à sa place sur la voie. Le quart de tour est appliqué aux maillages (les roues tournent ensuite autour de
     leur x local, comme celles du coupé). L'objet s'appelle `coupe` et ses roues `wheel_*` : render.py et
-    lab/A_pres.py la cherchent sous ces noms. Phares ramenés à ceux du coupé (90 W, 60°), le conducteur assis
+    lab/A_pres.py la cherchent sous ces noms. Phares en codes (cast_vehicles.headlight_spots), le conducteur assis
     (lab/cast_people.py) parenté à la caisse."""
     lab = os.path.join(HERE, "lab")
     if lab not in sys.path:
@@ -1806,10 +1806,6 @@ def street_hero(scene):
         c.rotation_mode = "XYZ"
     for k, w in car["wheels"].items():
         w.name = f"wheel_{k}"
-    for lo in car["lights"]:
-        if lo.data.type == "SPOT":
-            lo.data.energy = 90
-            lo.data.spot_size = math.radians(60)
     body.name = "coupe"
     body.rotation_mode = "XYZ"
     body["wheel_r"] = car["wheel_radius"] or WHEEL_R

@@ -1034,6 +1034,7 @@ def add_trunk_handle(body, chrome, z=0.727, width=0.135, height=0.024, depth=0.0
 # la propriété d'objet des vitres : une lumière d'appoint de scène (lieux.car_fill, les nappes liées à la voiture)
 # ne doit pas les compter parmi ses receveurs, sinon elles la renvoient en miroir
 GLASS_TAG = "vitre"
+HEAD_HERO = "#ffe6b8"     # les phares de la berline, plus chauds que ceux des poursuivants (cv.HEAD_CODES)
 
 
 def split_glass(body, mat_names):
@@ -1471,7 +1472,7 @@ def _lights(car, lights_on, head_mats, tail_mats):
     tails = _lamp_centres(tail_mats, body)
     inv = body.matrix_world.inverted()
     pts = [inv @ (Vector((mx.x + 0.05, h.y, h.z))) for h in heads]
-    out += cv.headlight_spots(body, pts, on=True, energy=550.0, angle=50.0)
+    out += cv.headlight_spots(body, pts, on=True, color=HEAD_HERO)          # en codes, le réglage commun
     # une petite lueur derrière chaque verre, dans le boîtier (le réflecteur en reçoit, le verre la diffuse), 1,5 W :
     # le réflecteur la concentre, à 4 W le verre virait au blanc plein et ses stries ne se lisaient plus de près. Elle
     # était posée 12 cm devant le verre et éclairait de près la tôle voisine. Les deux plaques gris rosé entre phare
@@ -1632,7 +1633,7 @@ def _load_coupe(collection, lights_on):
     car = dict(body=body, wheels={}, doors={}, lights=[], length=mx.x - mn.x, width=mx.y - mn.y, height=mx.z - mn.z,
                wheel_radius=0.0, axles={}, tris=cv.tris([body]), report={})
     if lights_on:
-        car["lights"] = cv.headlight_spots(body, [(mx.x + 0.05, 0.6, 0.62), (mx.x + 0.05, -0.6, 0.62)], energy=550.0)
+        car["lights"] = cv.headlight_spots(body, [(mx.x + 0.05, 0.6, 0.62), (mx.x + 0.05, -0.6, 0.62)], color=HEAD_HERO)
     car["cockpit"] = dict(eye=Vector((-0.5, 0.35, 1.05)), wheel=Vector((0.3, 0.44, 0.83)))
     return car
 

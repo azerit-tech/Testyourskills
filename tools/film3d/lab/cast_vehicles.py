@@ -753,8 +753,18 @@ def mat_lamp(name, color=LAMP, strength=0.0, glass=False):
     return m
 
 
-def headlight_spots(body, points, on=True, energy=350.0, color=LAMP, angle=55.0, collection=None, blend=0.6):
-    """Deux spots vers l'avant (+x), légèrement plongeants, aux points donnés (repère du véhicule)."""
+HEAD_CODES = "#fff1dc"   # phares des poursuivants, en codes (la berline : #ffe6b8, hero_cars)
+HEAD_W = 150.0           # un phare en codes (W) : un seul réglage pour toutes les voitures, aucune retouche par plan
+HEAD_CONE = 24.0         # ouverture du cône (degrés), bord adouci de moitié
+HEAD_TILT = 11.0         # plongée sous l'horizon (degrés) : le cône tombe sur la chaussée de 2 à 40 m
+
+
+def headlight_spots(body, points, on=True, energy=HEAD_W, color=HEAD_CODES, angle=HEAD_CONE, collection=None,
+                    blend=0.5):
+    """Deux phares en codes vers l'avant (+x), plongeant de HEAD_TILT, aux points donnés (repère du véhicule) : le
+    cône blanc chaud sur la chaussée devant la voiture, qui s'éteint avec la distance. Sans reflet propre
+    (visible_glossy) : sur le mouillé et les carrosseries, c'est le verre du phare qui se reflète ; le reflet du spot
+    faisait une nappe écrêtée sur la chaussée. Sans diffusion dans les volumes (la brume ne fait pas de cône blanc)."""
     out = []
     if not on:
         return out
@@ -769,8 +779,10 @@ def headlight_spots(body, points, on=True, energy=350.0, color=LAMP, angle=55.0,
         (collection or body.users_collection[0]).objects.link(ob)
         ob.parent = body
         ob.location = p
-        # le spot éclaire selon -z local ; rotation de -84 degrés autour de y : -z vers +x, 6 degrés vers le bas
-        ob.rotation_euler = (0.0, math.radians(-84), 0.0)
+        # le spot éclaire selon -z local ; rotation de -(90 - HEAD_TILT) degrés autour de y : -z vers +x, plongeant
+        ob.rotation_euler = (0.0, math.radians(-(90.0 - HEAD_TILT)), 0.0)
+        ob.visible_glossy = False
+        ob.visible_volume_scatter = False
         out.append(ob)
     return out
 
@@ -891,7 +903,7 @@ def bar_drive_lenses(bar, lights):
 
 
 def tail_lights(body, points, on=True, energy=6.0):
-    """Lueur rouge des feux arrière (points derrière la caisse)."""
+    """Lueur rouge des feux arrière (points derrière la caisse), sans reflet propre comme les phares."""
     out = []
     if not on:
         return out
@@ -904,6 +916,8 @@ def tail_lights(body, points, on=True, energy=6.0):
         body.users_collection[0].objects.link(ob)
         ob.parent = body
         ob.location = p
+        ob.visible_glossy = False
+        ob.visible_volume_scatter = False
         out.append(ob)
     return out
 
@@ -1140,6 +1154,9 @@ VANS = {
 }
 
 
+VAN_LAMP_GLASS = 2.0   # le verre des phares du fourgon (à 6, de face au long foyer, deux pavés blancs)
+
+
 def _load_van_hq(variant, spec, collection, lights_on, strength):
     tag = f"van_{variant}"
     parts = import_model(os.path.join(CAST, spec["file"]), collection)
@@ -1163,7 +1180,7 @@ def _load_van_hq(variant, spec, collection, lights_on, strength):
         v = nt.nodes.new("ShaderNodeValue")
         v.name = v.label = "lamp_head"
         v.outputs[0].default_value = 1.0
-        nt.links.new(_math(nt, "MULTIPLY", v.outputs[0], 6.0 if lights_on else 0.0), p.inputs["Emission Strength"])
+        nt.links.new(_math(nt, "MULTIPLY", v.outputs[0], VAN_LAMP_GLASS if lights_on else 0.0), p.inputs["Emission Strength"])
         return c
     _replace_mats(parts, spec["lamps"], lamp)
     if spec.get("chrome"):
@@ -1195,7 +1212,7 @@ def _load_van_hq(variant, spec, collection, lights_on, strength):
         hx = max(q.x for q in hp) + 0.04
     else:
         hx, hy, hz = mx.x - 0.1, 0.62, mn.z + 0.8
-    heads = headlight_spots(body, [(hx, hy, hz), (hx, -hy, hz)], on=lights_on, energy=350.0, angle=40.0, blend=0.45)
+    heads = headlight_spots(body, [(hx, hy, hz), (hx, -hy, hz)], on=lights_on)
     lights += heads
     if heads:
         for m in {m for m in body.data.materials if m and m.name.startswith(f"{tag}_lamps")}:
@@ -1773,8 +1790,8 @@ def _patrol_boxes(livery, front_axle, door_z=(0.30, 0.96), stripe_z=(0.70, 0.78)
 # l'atlas de la patrouille jeandiz : ses phares (verre clair, en haut à gauche) et ses feux arrière (dessous)
 PATROL_HEAD_UV = (0.012, 0.335, 0.905, 0.998)
 PATROL_TAIL_UV = (0.008, 0.18, 0.785, 0.905)
-PATROL_HEAD_GLASS = 5.0     # le verre des phares allumés (émission de l'atlas)
-PATROL_HEAD_CORE = 5.0      # leur cœur, en multiple du verre : deux sources vives, pas un aplat blanc
+PATROL_HEAD_GLASS = 1.6     # le verre des phares allumés (émission de l'atlas ; à 5, de face, des pavés blancs)
+PATROL_HEAD_CORE = 4.0      # leur cœur, en multiple du verre : deux sources vives, pas un aplat blanc
 
 
 def _patrol_trim(parts, tag):
@@ -1911,8 +1928,8 @@ def load_patrol(variant="jeandiz", collection=None, lights_on=False, livery="doo
     else:
         # à 1 m devant l'essieu, 0,72 m du sol (devant le pare-buffle il n'y a rien)
         hz, hx, hy = mn.z + 0.72, front_axle + 1.0, 0.6
-    heads_l = headlight_spots(body, [(hx, hy, hz), (hx, -hy, hz)], on=lights_on, energy=450.0, angle=40.0, blend=0.45)
-    tails_l = tail_lights(body, tail_pts, on=lights_on, energy=30.0)
+    heads_l = headlight_spots(body, [(hx, hy, hz), (hx, -hy, hz)], on=lights_on)
+    tails_l = tail_lights(body, tail_pts, on=lights_on, energy=8.0)
     lights += heads_l + tails_l
     if zones and lights_on:
         # le verre et le cœur des phares suivent leurs spots (une scène qui les éteint ou les met en veilleuse)

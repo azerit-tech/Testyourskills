@@ -879,7 +879,7 @@ def plan_FIN(scene, hidden, palier="socle"):
     return cam
 
 
-PACK_HEAD_W = 260.0   # un phare de la meute (W) ; les phares d'une patrouille : 350 W, 55°
+PACK_HEAD_W = 150.0   # un phare de la meute (W), en codes comme cast_vehicles.HEAD_W
 
 
 def fin_pack_lights(frames, hero):

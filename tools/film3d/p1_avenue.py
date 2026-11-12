@@ -57,8 +57,8 @@ STILL = 30                          # l'image fixe (banc) : la patrouille calée
 # ce que la berline frôle (fx.py en tire les effets) : trois feuilles de papier à plat 1,4 m à droite de sa ligne,
 # 20 m devant elle au départ, que son passage soulève (images 36 à 44)
 PAPERS = ((3.15, 309.4, 20.0), (3.55, 310.1, -35.0), (2.95, 310.9, 70.0))   # x, y, rotation (degrés)
-# les phares de la patrouille pleins (plus de veilleuse)
-PATROL_HEAD_W = 450.0
+# les phares de la patrouille en codes, le réglage commun (cast_vehicles.HEAD_W)
+PATROL_HEAD_W = 150.0
 PATROL_HEAD_LENS = 1.0
 
 
