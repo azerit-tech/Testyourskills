@@ -878,10 +878,7 @@ def mat_puddle(name="flaque_p5"):
     N.link(road.combine(N, N.math("DIVIDE", ox, P5.PUDDLE_SIZE[0] / 2), N.math("DIVIDE", oy, P5.PUDDLE_SIZE[1] / 2)), r.inputs[0])
     edge = N.math("ADD", r.outputs["Value"], N.math("MULTIPLY", N.math("SUBTRACT", road.noise(N, P, 0.9, 3.0, 0.6), 0.5), 0.7))
     alpha = road.inv(N, road.smooth(N, edge, 0.72, 0.95))
-    p = S.principled(N, **{"Base Color": (0.012, 0.012, 0.014, 1), "Roughness": 0.02, "IOR": 1.33})
-    N.link(alpha, p.inputs["Alpha"])
-    N.link(road.ripples(N, P, scale=26.0, strength=0.04), p.inputs["Normal"])
-    N.link(p.outputs[0], out.inputs[0])
+    road.puddle_shader(N, out, alpha=alpha, scale=26.0, strength=0.04)     # la flaque commune (road.HUMIDITE)
     return m
 
 

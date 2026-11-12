@@ -219,33 +219,9 @@ def road_module():
     return P
 
 
-# La chaussée de la rue (style propre, l'avenue garde « sechage ») : l'enrobé plus noir, une pellicule d'eau un peu
-# plus lisse. Le vernis d'eau garde son poids plein : le sol pâle de P3 n'était pas un reflet (les passes par groupe
-# l'ont mis sur les flammes des tirs, non liées), et le plafonner n'éteignait que les traînées des enseignes.
-RUE_STYLE = dict(road.STYLES["sechage"], dark=0.45, wet=(0.36, 0.22), cr=(0.14, 0.24))
-# la rugosité de l'enrobé et du caniveau sous la pellicule, × 0,5 (l'essai « rugosite » de render_film.py, retenu) :
-# les reflets des phares se resserrent en traînées au lieu de s'étaler en voile
-ROAD_ROUGH = 0.5
-
-
-def road_gloss(k=ROAD_ROUGH):
-    n = 0
-    for m in bpy.data.materials:
-        if not (m.node_tree and m.name.startswith(("rue_asphalt", "rue_gutter"))):
-            continue
-        nt = m.node_tree
-        for p in [nd for nd in nt.nodes if nd.type == "BSDF_PRINCIPLED"]:
-            inp = p.inputs["Roughness"]
-            if inp.links:
-                mul = nt.nodes.new("ShaderNodeMath")
-                mul.operation = "MULTIPLY"
-                mul.inputs[1].default_value = k
-                nt.links.new(inp.links[0].from_socket, mul.inputs[0])
-                nt.links.new(mul.outputs[0], inp)
-            else:
-                inp.default_value *= k
-            n += 1
-    log(f"chaussée : rugosité × {k} sur {n} matières")
+# La chaussée de la rue : l'enrobé un peu plus noir que celui de l'avenue ; l'eau, celle de tout le film
+# (road.HUMIDITE : plus de pellicule plus lisse ni de rugosité × 0,5 propres à la rue, lumière v3.1 règle B)
+RUE_STYLE = dict(road.STYLES["sechage"], dark=0.45)
 
 
 def build_street(hidden):
@@ -1024,15 +1000,9 @@ def puddle(name, cx, cy, r, sy, seed, mat):
 
 
 def puddle_mat():
+    # la flaque commune (road.puddle_shader, l'humidité de road.HUMIDITE) : l'enrobé noyé, une ride fine
     water, N, out = A.material("rue_puddle")
-    bsdf = N.new("ShaderNodeBsdfPrincipled")
-    # (un miroir parfait au ras du sol ne renvoie que le ciel noir : des trous. Une ride fine et un peu de flou
-    # étirent dans l'eau les guirlandes, les enseignes et les feux ; le fond, l'enrobé noyé)
-    bsdf.inputs["Base Color"].default_value = (0.018, 0.017, 0.018, 1)
-    bsdf.inputs["Roughness"].default_value = 0.05
-    bsdf.inputs["IOR"].default_value = 1.33
-    N.set(bsdf.inputs["Normal"], road.ripples(N, road.coords(N)[0], scale=22.0, strength=0.12))
-    N.link(bsdf.outputs[0], out.inputs["Surface"])
+    road.puddle_shader(N, out)
     return water
 
 
@@ -1625,7 +1595,6 @@ def build():
     build_sidewalk(hidden)
     build_foreground(hidden, plan)
     build_barrage(scene, hidden, plan)
-    road_gloss()
     hidden.hide_render = True
     hidden.hide_viewport = True
     for c in bpy.data.collections:

@@ -360,16 +360,9 @@ def build_street_life(hidden, branches):
             A.parasol(f"parasol_{k}", x, y, canvas[(q + k) % 3], metal, light=True)
             k += 1
     # les flaques : sur la voie intérieure, le long de l'îlot, là où la berline passe à contresens
+    # la flaque commune (road.puddle_shader, l'humidité de road.HUMIDITE)
     water, N, out = A.material("ring_puddle")
-    bsdf = N.new("ShaderNodeBsdfPrincipled")
-    # (les « taches noires » près de l'îlot vues du drone : ces flaques, un miroir presque noir qui ne renvoyait
-    # que le zénith sombre. Comme en P3 : une ride fine, un peu de flou, le fond d'enrobé noyé ; à hauteur de
-    # voiture elles renvoient les palmiers éclairés et les lampadaires)
-    bsdf.inputs["Base Color"].default_value = (0.018, 0.017, 0.018, 1)
-    bsdf.inputs["Roughness"].default_value = 0.05
-    bsdf.inputs["IOR"].default_value = 1.33
-    N.set(bsdf.inputs["Normal"], road.ripples(N, road.coords(N)[0], scale=22.0, strength=0.12))
-    N.link(bsdf.outputs[0], out.inputs["Surface"])
+    road.puddle_shader(N, out)
     import scene_b as B
     for j, (deg, r, rad, sy) in enumerate(((196, 7.4, 0.9, 1.6), (214, 7.0, 0.6, 1.3), (232, 7.8, 1.1, 1.8),
                                           (252, 7.2, 0.7, 1.5), (270, 8.0, 0.8, 1.2), (160, 7.6, 0.6, 1.4))):

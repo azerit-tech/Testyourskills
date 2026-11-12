@@ -2003,14 +2003,11 @@ def street_puddle(name, x, y, w, l, seed=21):
     """Une flaque que la berline traverse (fx.py en tire la gerbe) : une eau sombre posée sur l'enrobé, au bord
     irrégulier, `w` × `l` m autour de (x, y)."""
     import road
-    # la recette des flaques de P3 et P2 : un miroir parfait au ras du sol ne renvoie que le ciel noir au-dessus de
-    # la berline (une tache noire, vue en P1) ; une ride fine et un peu de flou y étirent les phares et les façades
+    # la flaque commune (road.puddle_shader, l'humidité de road.HUMIDITE)
     water = bpy.data.materials.get("rue_flaque")
     if water is None:
         water, N, out = material("rue_flaque")
-        p = principled(N, **{"Base Color": (0.018, 0.017, 0.018, 1), "Roughness": 0.05, "IOR": 1.33})
-        N.set(p.inputs["Normal"], road.ripples(N, road.coords(N)[0], scale=22.0, strength=0.12))
-        N.link(p.outputs[0], out.inputs["Surface"])
+        road.puddle_shader(N, out)
     bm = bmesh.new()
     rnd = random.Random(seed)
     n = 28

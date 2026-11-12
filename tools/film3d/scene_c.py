@@ -103,12 +103,7 @@ def build_bridge(hidden, lamp_src, far=False, haubans=False):
                     lamp_src=lamp_src, lamp_ys=LAMP_YS, far=far)
     M = out["M"]
     edge = out["edge"]
-    # le tablier, exposé au vent, sèche plus vite que l'avenue : un film d'eau plus mince (vernis à 0,3). À 1,5 m
-    # au-dessus, l'enrobé tout mouillé étalait phares, lampadaires et flaques en un voile laiteux (P4)
-    for m in (M["asphalt"], M["pan"]):
-        for n in m.node_tree.nodes:
-            if n.type == "BSDF_PRINCIPLED" and not n.inputs["Coat Weight"].is_linked:
-                n.inputs["Coat Weight"].default_value = min(n.inputs["Coat Weight"].default_value, 0.3)
+    # (le tablier a l'humidité de tout le film, road.HUMIDITE : plus de vernis propre au pont, lumière v3.1 règle B)
     # la rue de la ville et le plat du port : la même chaussée, sans bord (posée sur la promenade, sur le terre-plein)
     # l'avenue de la ville éclairée tous les 30 m (au 200 mm, la file de lampadaires au fond de la crête) ; le plat
     # du port suit le tablier : la rampe ne touche le niveau du terre-plein qu'en y = 1 (en y = -20 elle est encore à
@@ -262,70 +257,6 @@ def pack(entries, speed=SPEED, beams=True, on=None):
     return out
 
 
-def p4_deck_puddles():
-    """Les flaques du tablier pour P4 : sous le vernis plafonné à 0,3 du tablier (build_bridge), elles faisaient
-    des taches noires dans le tiers bas, un miroir sombre qui ne renvoyait que le ciel. La recette de P2 et P3, dans
-    les seules flaques de l'enrobé (le facteur de flaque de road.mat_asphalt) : fond 0,018, vernis plein, rugosité
-    0,05, une ride fine ; elles renvoient les phares et les rampes. Le reste du tablier ne change pas."""
-    done = []
-    for m in bpy.data.materials:
-        if not m.node_tree or not m.name.startswith("asphalt"):
-            continue
-        nt = m.node_tree
-        mix = next((n for n in nt.nodes if n.type == "MIX" and n.data_type == "FLOAT" and not n.inputs[3].is_linked
-                    and abs(n.inputs[3].default_value - 0.035) < 1e-6 and n.inputs["Factor"].is_linked), None)
-        p = next((n for n in nt.nodes if n.type == "BSDF_PRINCIPLED" and n.inputs["Coat Normal"].is_linked), None)
-        if mix is None or p is None:
-            continue
-        N = S.Nodes(nt)
-        w = mix.inputs["Factor"].links[0].from_socket          # la flaque, de 0 (humide) à 1
-        mix.inputs[3].default_value = 0.05
-        N.link(N.mixf(w, p.inputs["Coat Weight"].default_value, 1.0), p.inputs["Coat Weight"])
-        col = p.inputs["Base Color"].links[0].from_socket
-        N.link(N.mix(w, col, (0.018, 0.017, 0.018, 1)), p.inputs["Base Color"])
-        cn = p.inputs["Coat Normal"].links[0].from_socket
-        N.link(road.vmix(N, w, cn, road.ripples(N, road.coords(N)[0], scale=22.0, strength=0.12)), p.inputs["Coat Normal"])
-        done.append(m.name)
-    print(f"[P4] flaques du tablier à la recette de P3 : {done}", flush=True)
-
-
-def p4_sky_veil(scene):
-    """Le ciel de P4 : au 200 mm, l'objectif n'en voit que 10°, un aplat bleu sur le tiers haut. Un voile de nuages
-    bas, étirés, éclairés par-dessous par la ville (mauve chaud), entre la crête du pont (site 2°) et 4,5° ; il
-    s'efface avant les 12 % du haut (site 5°), qui restent calmes. Une lueur d'horizon sous le voile. Dans le ciel du
-    monde, il passe aussi dans les reflets de la chaussée : pour eux (rayons réfléchis), voile et lueur montent
-    jusqu'à 15°, car la rampe du pont incline les flaques vers le haut du ciel, le noir au-dessus du cadre."""
-    nt = scene.world.node_tree
-    bg = next(n for n in nt.nodes if n.type == "BACKGROUND")
-    sky = bg.inputs["Color"].links[0].from_socket
-    N = S.Nodes(nt)
-    tc = next(n for n in nt.nodes if n.type == "TEX_COORD")
-    d = tc.outputs["Generated"]
-    z = N.sep(d)[2]
-
-    def ramp(a, b, v=z):
-        r = N.new("ShaderNodeMapRange", _interpolation_type="SMOOTHSTEP")
-        N.set(r.inputs["Value"], v)
-        r.inputs["From Min"].default_value, r.inputs["From Max"].default_value = a, b
-        return r.outputs[0]
-    cam = N.new("ShaderNodeLightPath").outputs["Is Camera Ray"]
-    band = N.math("MULTIPLY", ramp(0.028, 0.045), N.mixf(cam, ramp(0.30, 0.20), ramp(0.082, 0.062)))
-    st = N.new("ShaderNodeMapping", Scale=(1.0, 1.0, 6.0))
-    N.link(d, st.inputs[0])
-    nz = N.new("ShaderNodeTexNoise", Scale=45.0, Detail=6.0, Roughness=0.6)
-    N.link(st.outputs[0], nz.inputs["Vector"])
-    fac = N.math("MULTIPLY", band, ramp(0.45, 0.72, nz.outputs["Fac"]))
-    # le dessous des nuages pris par la ville : plus chaud et plus clair en bas du voile
-    col = N.mix(ramp(0.07, 0.035), (0.16, 0.14, 0.30, 1), (0.42, 0.22, 0.32, 1))
-    out = N.mix(N.math("MULTIPLY", fac, 0.9), sky, col)
-    # la lueur d'horizon : une bande douce au-dessus de la crête, éteinte avant les 12 % du haut. Les flaques du
-    # tablier, vues en rasant sur la rampe, renvoient ce ciel-là (site 2 à 15°) : mauves au lieu de noires
-    glow = N.mixf(cam, N.math("MULTIPLY", ramp(0.30, 0.03), 0.45), N.math("MULTIPLY", ramp(0.085, 0.03), 0.6))
-    out = N.mix(glow, out, (0.22, 0.13, 0.22, 1), "ADD")
-    N.link(out, bg.inputs["Color"])
-    print("[P4] voile de nuages bas et lueur d'horizon dans le ciel", flush=True)
-
-
 def plan_P4(scene, hidden, haubans=False):
     """P4, la meute (découpage v3) : fixe en (1,2 ; 10 ; 1,2), face à la ville, 200 mm puis 212 mm, un léger suivi
     qui garde la berline au centre, à 54 % de la hauteur depuis le haut. Elle descend vers nous de 111 à 46 m (de 16
@@ -336,8 +267,8 @@ def plan_P4(scene, hidden, haubans=False):
     # vue en rasant à 1,5 m, la reflétait en un voile rose-blanc sur toute la moitié basse
     lamp_src = L.panorama(scene, hidden, yaw=math.pi - math.radians(70.0), bridge=None, port="loin")
     build_bridge(hidden, lamp_src, haubans=haubans)
-    p4_deck_puddles()
-    p4_sky_veil(scene)
+    # (plus de voile ni de lueur propres à P4 : le ciel commun, lieux.ciel ; la lueur que le voile envoyait aux
+    # rayons réfléchis jusqu'à 15° faisait du tablier une nappe mauve et beige, lumière v3.1 règles A et B)
     # --- animé (48 images, p4_pont.py, clés de motion.py)
     import motion as M
     import p4_pont as P4

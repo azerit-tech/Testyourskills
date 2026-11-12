@@ -56,9 +56,21 @@ def lane_layout(half_width, n_lanes=2, centre=True, edge=False):
                 joint=(dashes[0] + 0.24) if dashes else None, centre=0.15 if centre else None,
                 film_split=dashes[0] if dashes else a / 2)
 
+# L'humidité, une seule pour toutes les chaussées du film (lumière v3.1, règle B : humide, pas un miroir). Toutes les
+# matières mouillées passent par wet_shader (enrobé de l'avenue, des lieux au bord de l'eau, de la rue des enseignes,
+# du rond-point ; cunettes, bordures, trottoirs), toutes les flaques posées par puddle_shader : on règle ici, jamais
+# dans une scène.
+#   coat        le poids du vernis d'eau. À 1, une pellicule continue : au ras du sol (téléobjectif de P4, caméra
+#               basse) la chaussée devenait un miroir qui renvoyait rampes et phares jusqu'au bas du cadre
+#   coat_rough  la rugosité du vernis : décalage ajouté à celle que calcule la matière, puis plancher. Le mouillé
+#               devient satiné (un reflet court et flou sous chaque source), les flaques gardent un reflet plus net
+#   puddle      le seuil des flaques sur le champ de « creux » de mat_asphalt (en écarts-types) : 10 % de la
+#               chaussée au plus, le reste en asphalte humide
+HUMIDITE = dict(coat=0.35, coat_rough=(0.18, 0.22), puddle=(1.1, 1.6))
+
 STYLES = {
-    # la rue qui sèche : le réglage gagnant du banc, flaques adoucies
-    "sechage": dict(dark=0.75, wet=(0.44, 0.27), D_off=0.0, rut=2.0, film=0.0, edge=0.9, puddle=(0.45, 1.0),
+    # la rue qui sèche : le réglage gagnant du banc ; ses flaques, celles de l'humidité commune
+    "sechage": dict(dark=0.75, wet=(0.44, 0.27), D_off=0.0, rut=2.0, film=0.0, edge=0.9, puddle=HUMIDITE["puddle"],
                     cr=(0.2, 0.34), track=0.06, stream=(0.07, 0.14), walk_D=0.0, walk_cr=0.28, film_grain=0.0),
     # juste après l'averse : beaucoup plus d'eau, une pellicule continue au bas de chaque voie
     "pluie": dict(dark=0.62, wet=(0.34, 0.2), D_off=0.6, rut=3.0, film=2.4, edge=1.8, puddle=(0.3, 0.85),
@@ -211,20 +223,36 @@ def scan2(N, P, folder, size, rot=0.63, res="2k", maps=("diff", "rough", "nor_gl
     return out
 
 
+def wet_coat_rough(N, coat_r):
+    """La rugosité du vernis d'eau après l'humidité commune (HUMIDITE["coat_rough"] : décalage, plancher)."""
+    off, floor = HUMIDITE["coat_rough"]
+    return N.math("MAXIMUM", N.math("ADD", coat_r, off), floor)
+
+
 def wet_shader(N, out, col, base_rough, base_n, coat_r, coat_n, alpha=None):
-    """L'eau : une couche de vernis d'indice 1,33 sur la matière."""
+    """L'eau : une couche de vernis d'indice 1,33 sur la matière, au poids et à la rugosité de l'humidité commune
+    (HUMIDITE) ; `coat_r`, la rugosité que la matière demande (0,03 dans ses flaques, 0,2 à 0,35 sur le mouillé)."""
     p = S.principled(N)
     N.set(p.inputs["Base Color"], col)
     N.set(p.inputs["Roughness"], base_rough)
     N.set(p.inputs["Normal"], base_n)
-    p.inputs["Coat Weight"].default_value = 1.0
+    p.inputs["Coat Weight"].default_value = HUMIDITE["coat"]
     p.inputs["Coat IOR"].default_value = 1.33
-    N.set(p.inputs["Coat Roughness"], coat_r)
+    N.set(p.inputs["Coat Roughness"], wet_coat_rough(N, coat_r))
     N.set(p.inputs["Coat Normal"], coat_n)
     if alpha is not None:
         N.set(p.inputs["Alpha"], alpha)
     N.link(p.outputs[0], out.inputs[0])
     return p
+
+
+def puddle_shader(N, out, alpha=None, scale=22.0, strength=0.12):
+    """Une flaque posée (P2, P3, P5, P6, le rond-point) : l'enrobé noyé sous le même vernis d'eau que les flaques de
+    la chaussée (wet_shader, rugosité demandée 0,03 : le plancher de l'humidité commune s'applique), une ride
+    fine. Renvoie le nœud Principled."""
+    P, _ = coords(N)
+    rip = ripples(N, P, scale=scale, strength=strength)
+    return wet_shader(N, out, (0.018, 0.017, 0.018, 1), 0.5, rip, 0.03, rip, alpha=alpha)
 
 
 def ripples(N, P, scale=38.0, strength=0.06):
