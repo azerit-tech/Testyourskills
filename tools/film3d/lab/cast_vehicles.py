@@ -797,6 +797,12 @@ def _dark_plate():
 
 # ---------------------------------------------------------------- la rampe de gyrophares
 
+def bars_on():
+    """FILM3D_BARS=0 : toutes les rampes éteintes, lentilles et lueurs (le contrôle « rampes allumées / éteintes »
+    sur la même image) ; phares et feux restent ce que la scène en fait."""
+    return os.environ.get("FILM3D_BARS", "1") != "0"
+
+
 def lightbar(collection=None, strength=0.0, width=None):
     """La rampe de la patrouille (géométrie de police.glb), lentilles corail / violet.
 
@@ -806,6 +812,7 @@ def lightbar(collection=None, strength=0.0, width=None):
     remove([o for o in parts if o not in keep], "")
     base = pick(keep, "Lightbar_UCB")[0]
     lens = pick(keep, "Lightbar_Glass")[0]
+    strength = strength if bars_on() else 0.0
     mn, mx = bbox([base, lens])
     c = Vector(((mn.x + mx.x) / 2, (mn.y + mx.y) / 2, mn.z))
     s = (width / (mx.y - mn.y)) if width else 1.0
@@ -819,7 +826,10 @@ def lightbar(collection=None, strength=0.0, width=None):
 
 def lightbar_lights(bar, energy=600.0):
     """La lueur de la rampe sur le toit, le capot et la chaussée mouillée : de chaque côté (corail +y, violet -y)
-    un point juste au-dessus du cache et un point juste devant, hors du boîtier (sinon il le masque)."""
+    un point juste au-dessus du cache et un point juste devant, hors du boîtier (sinon il le masque). Aucune avec
+    FILM3D_BARS=0."""
+    if not bars_on():
+        return []
     bpy.context.view_layer.update()
     mn, mx = bbox([bar] + list(bar.children))
     inv = bar.matrix_world.inverted()
@@ -1078,6 +1088,7 @@ def hq_lightbar(collection=None, strength=0.0, width=1.2):
     """La rampe détaillée (16k triangles, boîtier, caches, optiques) prise sur le modèle patrol-jeandiz.
 
     Renvoie (rampe, lentilles) comme lightbar() : origine au centre et au bas, rampe en travers (y)."""
+    strength = strength if bars_on() else 0.0
     parts = import_model(os.path.join(CAST, "patrol-jeandiz/model.glb"), collection)
     keep = pick(parts, "Roof light bar", "roof lights")
     remove([o for o in parts if o not in keep], "")
@@ -1911,9 +1922,9 @@ def _load_patrol_classic(collection=None, lights_on=False):
     normalise(parts)
     _assign(pick(parts, "Bodymat"), paint)
     _assign(pick(parts, "Numberplate"), _blank_plate())
-    _assign(pick(parts, "Lightbar_Glass"), mat_lenses("patrol_lenses", BAR_GLOW if lights_on else 0.0))
+    _assign(pick(parts, "Lightbar_Glass"), mat_lenses("patrol_lenses", BAR_GLOW if lights_on and bars_on() else 0.0))
     body = join(parts, "patrol_ref")
-    if lights_on:
+    if lights_on and bars_on():
         # deux points corail / violet au-dessus de la rampe (x -0,26, z 1,5 dans le repère du fichier)
         for side, col in ((1, CORAL), (-1, LILAC)):
             d = bpy.data.lights.new(f"patrol_glow_{side}", "POINT")
