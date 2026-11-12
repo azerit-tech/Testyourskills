@@ -4,6 +4,7 @@
 #   rase   fixe, 3 m à gauche de la trace, devant la flaque : la berline vient vers elle et passe (gerbe, embruns,
 #          papiers, rides)
 #   suite  derrière la berline, 7 m en arrière et 1,2 m à gauche, qui la suit dans la courbe (fumée, embruns)
+#   arriere  trois quarts arrière à 7,5 m, 1,4 m de haut, 28 mm (le découpage v3) : le sillage dans l'axe
 #
 # Sur la machine louée seulement (OptiX) :
 #   FILM3D_ASSETS=~/film/assets ~/blender-5.2.2-linux-x64/blender -b --factory-startup -P tools/film3d/lab/fx_bench.py -- \
@@ -91,6 +92,12 @@ def build(cam_kind):
         look(cam, (X0 - 2.6, yp + 4.5, 0.45), (X0 - 0.3, yp - 6.0, 0.6))
         cd.dof.focus_distance = 5.0
     else:
+        # suite : 7 m derrière, 1,2 m à gauche, à 0,45 m ; arriere (le découpage v3) : trois quarts arrière gauche,
+        # 7,5 m derrière, 2,2 m à gauche, à 1,4 m, 28 mm, la berline vers 35 % de la largeur ; le sillage est dans
+        # l'axe, entre elle et l'objectif
+        back, side, high, aim = (7.0, 1.2, 0.45, 0.7) if cam_kind == "suite" else (7.5, 2.2, 1.4, 0.55)
+        if cam_kind == "arriere":
+            cd.lens = 28.0
         cam.rotation_mode = "QUATERNION"
         for f in frames:
             p = poses[f - frames[0]]
@@ -98,11 +105,11 @@ def build(cam_kind):
             fwd = Vector((-math.sin(h), math.cos(h), 0.0))
             left = Vector((-fwd.y, fwd.x, 0.0))
             c = Vector((p["x"], p["y"], 0.0))
-            eye = c - fwd * 7.0 + left * 1.2 + Vector((0, 0, 0.45))
-            look(cam, eye, c + fwd * 2.0 + Vector((0, 0, 0.7)))
+            eye = c - fwd * back + left * side + Vector((0, 0, high))
+            look(cam, eye, c + fwd * 2.0 + Vector((0, 0, aim)))
             cam.keyframe_insert("location", frame=f)
             cam.keyframe_insert("rotation_quaternion", frame=f)
-        cd.dof.focus_distance = 7.0
+        cd.dof.focus_distance = math.hypot(back, side)
     scene.frame_start, scene.frame_end = 1, FRAMES
     scene.render.use_motion_blur = True
     scene.render.motion_blur_shutter = 0.5
@@ -112,7 +119,7 @@ def build(cam_kind):
 def main():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     ap = argparse.ArgumentParser()
-    ap.add_argument("--cam", default="rase", choices=("rase", "suite"))
+    ap.add_argument("--cam", default="arriere", choices=("rase", "suite", "arriere"))
     ap.add_argument("--frames", default="18,22")
     ap.add_argument("--samples", type=int, default=64)
     ap.add_argument("--res", default="360x640")

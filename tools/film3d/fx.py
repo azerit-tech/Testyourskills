@@ -220,12 +220,15 @@ def _poisson(rng, lam):
     return n
 
 
-def wheel_spray(track, wheels, wheel_r, rate_drops=2400.0, rate_mist=110.0, wet=1.0, slip_gain=1.6, seed=1,
-                substeps=4, wet_fn=None, mist_size=1.0, mist_alpha=0.45, frames=None):
+def wheel_spray(track, wheels, wheel_r, rate_drops=2400.0, rate_mist=190.0, wet=1.0, slip_gain=1.6, seed=1,
+                substeps=4, wet_fn=None, mist_size=1.0, mist_alpha=0.8, frames=None, veil="bas"):
     """Le voile d'embruns derrière les roues : à chaque sous-image, pour chaque roue, des gouttes (Poisson de
     moyenne rate × vitesse/30 m/s × mouillé × (1 + glisse)) lancées de l'arrière du pneu, emportées à une fraction
     de la vitesse de la roue, un peu vers le haut ; et des sprites de brume, plus lents, qui gonflent et restent
-    derrière. Renvoie (gouttes, brume) : deux listes de Particle."""
+    derrière. veil « bas » (la caméra derrière, le découpage v3) : des gerbes fines sous le pare-chocs qui s'ouvrent
+    en V derrière les roues et retombent avant l'objectif ; « haut » (de côté ou de face) : un voile de 0,6 à 1 m.
+    Renvoie (gouttes, brume) : deux listes de Particle."""
+    bas = veil == "bas"
     rng = random.Random(seed)
     drops, mist = [], []
     f0, f1 = track[0].frame, track[-1].frame
@@ -254,24 +257,38 @@ def wheel_spray(track, wheels, wheel_r, rate_drops=2400.0, rate_mist=110.0, wet=
                     p = (c[0] - fwd[0] * wheel_r * math.sin(a) * 1.02 + right[0] * side * rng.uniform(-0.05, 0.12),
                          c[1] - fwd[1] * wheel_r * math.sin(a) * 1.02 + right[1] * side * rng.uniform(-0.05, 0.12),
                          ground + wheel_r * (1 - math.cos(a)) * rng.uniform(0.3, 1.0) + 0.02)
-                    carry = rng.uniform(0.15, 0.55)
-                    up = speed * rng.uniform(0.04, 0.16)
-                    lat = speed * rng.uniform(-0.04, 0.10) * side
+                    carry = rng.uniform(0.35, 0.65) if bas else rng.uniform(0.15, 0.55)
+                    if bas:                                             # le V, sous le pare-chocs
+                        up = min(1.8, speed * rng.uniform(0.03, 0.1))
+                        lat = speed * rng.uniform(0.02, 0.16) * side
+                    else:
+                        up = speed * rng.uniform(0.04, 0.16)
+                        lat = speed * rng.uniform(-0.04, 0.10) * side
                     v = (V[0] * carry + right[0] * lat, V[1] * carry + right[1] * lat, up)
                     drag = rng.uniform(0.8, 2.2)
-                    life = land_time(p, v, drag, ground, 0.9)
+                    life = land_time(p, v, drag, ground, 0.42 if bas else 0.9)
                     drops.append(Particle(f, p, v, life, drag, 1.0, rng.uniform(0.003, 0.007), seed=rng.random()))
-                for _ in range(_poisson(rng, rate_mist * k * gs)):
+                # le voile : continu au-delà de 50 km/h (le débit suit la vitesse), haut de 0,6 à 1 m, long de 4 à
+                # 6 m derrière la roue (vie × vitesse relative), né à l'arrière du pneu sans fondu d'entrée
+                hi_speed = 0.35 + 0.65 * smoothstep(8.0, 14.0, speed)
+                for _ in range(_poisson(rng, rate_mist * k * gs * hi_speed)):
                     p = (c[0] - fwd[0] * wheel_r * 1.1 + right[0] * side * rng.uniform(-0.1, 0.25),
                          c[1] - fwd[1] * wheel_r * 1.1 + right[1] * side * rng.uniform(-0.1, 0.25),
-                         ground + rng.uniform(0.12, 0.35))
-                    carry = rng.uniform(0.25, 0.5)
-                    v = (V[0] * carry + right[0] * side * rng.uniform(0.0, 1.2),
-                         V[1] * carry + right[1] * side * rng.uniform(0.0, 1.2), rng.uniform(0.3, 1.1))
-                    sz = mist_size * (0.25 + 0.5 * min(1.0, speed / 30.0))
-                    mist.append(Particle(f, p, v, rng.uniform(0.6, 1.1), rng.uniform(2.0, 3.2), 0.03,
-                                         sz * rng.uniform(0.5, 0.8), sz * rng.uniform(1.4, 2.0),
-                                         mist_alpha * min(1.0, w) * rng.uniform(0.6, 1.0) * min(1.25, gs),
+                         ground + (rng.uniform(0.06, 0.2) if bas else rng.uniform(0.15, 0.4)))
+                    carry = rng.uniform(0.4, 0.65) if bas else rng.uniform(0.25, 0.5)
+                    if bas:
+                        out, up = rng.uniform(0.4, 1.8), rng.uniform(0.1, 0.45)
+                        sz = mist_size * (0.22 + 0.3 * min(1.0, speed / 25.0))
+                        s0, s1, life = sz * rng.uniform(0.6, 0.9), sz * rng.uniform(1.1, 1.5), rng.uniform(0.28, 0.45)
+                        al = 0.7
+                    else:
+                        out, up = rng.uniform(0.0, 1.2), rng.uniform(0.5, 1.5)
+                        sz = mist_size * (0.35 + 0.6 * min(1.0, speed / 25.0))
+                        s0, s1, life = sz * rng.uniform(0.6, 0.9), sz * rng.uniform(1.5, 2.1), rng.uniform(0.55, 0.9)
+                        al = 1.0
+                    v = (V[0] * carry + right[0] * side * out, V[1] * carry + right[1] * side * out, up)
+                    mist.append(Particle(f, p, v, life, rng.uniform(2.0, 3.2), 0.03, s0, s1,
+                                         al * mist_alpha * min(1.0, w) * rng.uniform(0.7, 1.0) * min(1.25, gs),
                                          rng.random()))
     return drops, mist
 
@@ -314,7 +331,7 @@ def puddle_crossings(track, puddles, wheels=None, substeps=6):
     return keep
 
 
-def puddle_splash(track, crossing, wheel_r, depth=1.0, seed=3, n_burst=900, n_sheet=14):
+def puddle_splash(track, crossing, wheel_r, depth=1.0, seed=3, n_burst=900, n_sheet=40):
     """La gerbe d'une roue qui entre dans une flaque : un éventail latéral bref (des deux côtés du pneu, surtout
     vers l'extérieur), qui monte de 20 à 50° et retombe ; plus une nappe de sprites, l'eau en lame, très brève ;
     et, tant que la roue est dans l'eau, une projection continue derrière elle. Renvoie (gouttes, nappe)."""
@@ -343,25 +360,31 @@ def puddle_splash(track, crossing, wheel_r, depth=1.0, seed=3, n_burst=900, n_sh
         v = (d[0] * sp * math.cos(el) + V[0] * carry, d[1] * sp * math.cos(el) + V[1] * carry, sp * math.sin(el))
         drag = rng.uniform(0.4, 1.2)
         life = land_time(p, v, drag, ground, 1.2)
-        drops.append(Particle(f, p, v, life, drag, 1.0, rng.uniform(0.004, 0.010), seed=rng.random()))
+        drops.append(Particle(f, p, v, life, drag, 1.0, rng.uniform(0.005, 0.012), seed=rng.random()))
+    # la lame : des sprites lancés vers l'extérieur et vers le haut, qui montent à hauteur de vitre (0,8 à 1,1 m au
+    # centre, le haut du sprite plus haut) en 0,2 s et se lisent cinq à six images
     for k in range(int(n_sheet * depth)):
-        f = f_in + span * 0.6 * rng.random()
+        f = f_in + span * 0.8 * rng.random()
         _, fwd, vel, wh, wv, slip, speed = pose_at(track, f)
+        if speed < 1.0:
+            continue
         c = wh[name]
         right = (fwd[1], -fwd[0], 0.0)
         side = 1.0 if name.endswith("R") else -1.0
-        p = (c[0] + right[0] * side * 0.35, c[1] + right[1] * side * 0.35, c[2] - wheel_r + 0.12)
-        v = (right[0] * side * speed * 0.22 + vel[0] * 0.2, right[1] * side * speed * 0.22 + vel[1] * 0.2,
-             speed * rng.uniform(0.08, 0.16))
-        sheet.append(Particle(f, p, v, rng.uniform(0.25, 0.45), 2.5, 0.6, rng.uniform(0.25, 0.4),
-                              rng.uniform(0.7, 1.1), 0.6 * depth, rng.random()))
+        p = (c[0] + right[0] * side * 0.3 - fwd[0] * rng.uniform(0.0, 0.3),
+             c[1] + right[1] * side * 0.3 - fwd[1] * rng.uniform(0.0, 0.3), c[2] - wheel_r + 0.1)
+        out = speed * rng.uniform(0.12, 0.28)
+        vz = min(6.0, max(3.5, speed * 0.3)) * rng.uniform(0.85, 1.1)
+        v = (right[0] * side * out + vel[0] * 0.2, right[1] * side * out + vel[1] * 0.2, vz)
+        sheet.append(Particle(f, p, v, rng.uniform(0.3, 0.45), 2.5, 0.6, rng.uniform(0.3, 0.5),
+                              rng.uniform(0.8, 1.2), 0.7 * depth, rng.random()))
     return drops, sheet
 
 
 # ---------------------------------------------------------------- la gomme
 
-def tyre_smoke(track, wheel_r, slip_min=6.0, rate=34.0, brake=0.0, seed=5, substeps=3, size=1.0, alpha=0.2,
-               carry=0.18, drag=1.3, life=(2.2, 3.2)):
+def tyre_smoke(track, wheel_r, slip_min=6.0, rate=100.0, brake=0.0, seed=5, substeps=3, size=1.0, alpha=0.5,
+               carry=0.18, drag=1.3, life=(1.2, 1.8)):
     """La fumée des pneus arrière : une intensité qui monte avec la glisse (de slip_min à 25°) et, si `brake`, avec
     la décélération (au-delà de 4 m/s²) ; des sprites nés au contact, emportés à `carry` de la vitesse de la roue
     (ils restent derrière), qui montent doucement et gonflent de 0,5 à 2,5 m, puis se dissipent."""
@@ -378,6 +401,8 @@ def tyre_smoke(track, wheel_r, slip_min=6.0, rate=34.0, brake=0.0, seed=5, subst
             if g <= 0.01:
                 continue
             right = (fwd[1], -fwd[0], 0.0)
+            vl = _dot(vel, right)
+            slide = _mul(right, 1.0 if vl >= 0 else -1.0) if abs(vl) > 0.3 else (0.0, 0.0, 0.0)
             for name, c in wh.items():
                 if not name.endswith(("BL", "BR")):
                     continue
@@ -386,12 +411,17 @@ def tyre_smoke(track, wheel_r, slip_min=6.0, rate=34.0, brake=0.0, seed=5, subst
                 for _ in range(_poisson(rng, rate * g / (FPS * substeps))):
                     p = (c[0] - fwd[0] * 0.25 + right[0] * side * 0.1, c[1] - fwd[1] * 0.25 + right[1] * side * 0.1,
                          c[2] - wheel_r + rng.uniform(0.1, 0.3))
-                    lat = rng.uniform(0.2, 1.4) * side
+                    lat = rng.uniform(0.1, 0.6) * side
                     k = carry * rng.uniform(0.7, 1.3)
-                    v = (V[0] * k + right[0] * lat, V[1] * k + right[1] * lat, rng.uniform(0.15, 0.55))
-                    s0 = size * rng.uniform(0.35, 0.6)
+                    # chassée vers l'extérieur du virage : le sens où glisse l'arrière (la part de la vitesse
+                    # perpendiculaire au cap)
+                    push = rng.uniform(0.6, 1.8)
+                    # elle monte à hauteur de toit (0,7 à 1,3 m au centre en une seconde), gonfle à 2-3 m
+                    v = (V[0] * k + right[0] * lat + slide[0] * push, V[1] * k + right[1] * lat + slide[1] * push,
+                         rng.uniform(0.6, 1.5))
+                    s0 = size * rng.uniform(0.45, 0.8)
                     out.append(Particle(f, p, v, rng.uniform(*life), drag * rng.uniform(0.8, 1.2), -0.012,
-                                        s0, size * rng.uniform(1.8, 2.8), alpha * (0.5 + 0.5 * g) * rng.uniform(0.7, 1.0),
+                                        s0, size * rng.uniform(2.2, 3.2), alpha * (0.5 + 0.5 * g) * rng.uniform(0.7, 1.0),
                                         rng.random()))
     return out
 
@@ -714,7 +744,8 @@ def _lin(hexs):
     return tuple((x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4) for x in c) + (1.0,)
 
 
-def mat_sprite(name, color="#cfd3de", noise_scale=1.6, lo=0.32, hi=0.78, translucent=0.65, occlude=0.3):
+def mat_sprite(name, color="#cfd3de", noise_scale=1.6, lo=0.32, hi=0.78, translucent=0.65, occlude=0.3, detail=5.0,
+               power=1.6):
     """Un sprite de brume ou de fumée : disque fondu (attribut fx_uv) découpé par un bruit 4D pris en coordonnées
     monde (les sprites voisins lisent le même champ : ça se lit comme un volume), opacité fx_a, mélange de
     translucide (le contre-jour) et de diffus (les lampes de face)."""
@@ -733,12 +764,12 @@ def mat_sprite(name, color="#cfd3de", noise_scale=1.6, lo=0.32, hi=0.78, translu
     ln.operation = "LENGTH"
     nt.links.new(sub.outputs[0], ln.inputs[0])
     d = _math(nt, "MULTIPLY", ln.outputs["Value"], 2.0)
-    fall = _math(nt, "POWER", _math(nt, "SUBTRACT", 1.0, _math(nt, "MULTIPLY", d, d), clamp=True), 1.6)
+    fall = _math(nt, "POWER", _math(nt, "SUBTRACT", 1.0, _math(nt, "MULTIPLY", d, d), clamp=True), power)
     geo = N.new("ShaderNodeNewGeometry")
     nz = N.new("ShaderNodeTexNoise")
     nz.noise_dimensions = "4D"
     nz.inputs["Scale"].default_value = noise_scale
-    nz.inputs["Detail"].default_value = 5.0
+    nz.inputs["Detail"].default_value = detail
     nz.inputs["Roughness"].default_value = 0.6
     nt.links.new(geo.outputs["Position"], nz.inputs["Vector"])
     w = _math(nt, "ADD", _math(nt, "MULTIPLY", _attr(nt, "fx_r").outputs["Fac"], 7.0),
@@ -778,6 +809,12 @@ def mat_sprite(name, color="#cfd3de", noise_scale=1.6, lo=0.32, hi=0.78, translu
     nt.links.new(add1.outputs[0], add2.inputs[1])
     nt.links.new(add2.outputs[0], out.inputs["Surface"])
     return m
+
+
+def mat_smoke(color="#d6d4da"):
+    """La fumée de gomme : un bruit large et peu détaillé, un bord très fondu (aucune silhouette de sprite), une
+    absorption faible (empilée sur vingt couches, elle ne devient pas un mur gris)."""
+    return mat_sprite("fx_fumee", color, 0.7, 0.16, 0.85, 0.55, occlude=0.12, detail=2.0, power=2.6)
 
 
 def mat_drop(name="fx_goutte"):
@@ -941,7 +978,8 @@ def _gn_particles(name, kind, mat, cam=None, hero=None, mask=0.0, near=0.0):
         Lk(size, rad.inputs["Radius"])
         final = rad.outputs["Points"]
     else:
-        fade = _gn_math(ng, "MULTIPLY", _gn_maprange(ng, u, 0.0, 0.15),
+        # un fondu d'entrée de 50 ms (en temps, pas en fraction de vie : le voile naît au pneu, sans trou)
+        fade = _gn_math(ng, "MULTIPLY", _gn_maprange(ng, ta, 0.0, 0.05),
                         _gn_math(ng, "POWER", _gn_math(ng, "SUBTRACT", 1.0, u), 1.4))
         alpha = _gn_math(ng, "MULTIPLY", _gn_math(ng, "MULTIPLY", _gn_attr(ng, "a"), fade), alive)
         P = N.new("GeometryNodeInputPosition").outputs[0]
@@ -965,16 +1003,25 @@ def _gn_particles(name, kind, mat, cam=None, hero=None, mask=0.0, near=0.0):
                 rel = _gn_vec(ng, "SUBTRACT", P, C)
                 along = _gn_vec(ng, "DOT_PRODUCT", rel, axn)
                 lat = _gn_vec(ng, "LENGTH", _gn_vec(ng, "SUBTRACT", rel, _gn_vec(ng, "SCALE", axn, scale=along)))
-                r_in = _gn_math(ng, "ADD", 1.1, _gn_math(ng, "MULTIPLY", size, 0.25))
-                r_out = _gn_math(ng, "ADD", 2.3, _gn_math(ng, "MULTIPLY", size, 0.5))
+                # un vrai cône de vue : la berline (2,4 m de demi-longueur au plus) vue à `dist` couvre, à la
+                # distance `along` de l'objectif, un rayon de 2,4 × along / dist ; le sprite y entre dès que son
+                # bord (la moitié de sa taille) y touche. Les gros sprites proches de l'objectif, qui masquaient la
+                # caisse sans être sur l'axe, sont pris.
+                persp = _gn_math(ng, "DIVIDE", _gn_math(ng, "MAXIMUM", along, 0.0), _gn_math(ng, "MAXIMUM", dist, 0.5))
+                r_in = _gn_math(ng, "ADD", _gn_math(ng, "MULTIPLY", persp, 2.0), _gn_math(ng, "MULTIPLY", size, 0.45))
+                r_out = _gn_math(ng, "ADD", _gn_math(ng, "MULTIPLY", persp, 2.9),
+                                 _gn_math(ng, "ADD", _gn_math(ng, "MULTIPLY", size, 0.7), 0.3))
+                # en profondeur : dès le milieu de la caisse (vue de dos, les roues arrière et leur gerbe sont
+                # devant elle)
                 inside = _gn_math(ng, "MULTIPLY", _gn_maprange(ng, lat, r_in, r_out, 1.0, 0.0),
-                                  _gn_maprange(ng, along, _gn_math(ng, "SUBTRACT", dist, 0.6),
-                                               _gn_math(ng, "SUBTRACT", dist, 2.2), 0.0, 1.0))
-                # au ras du sol (sous le bas de caisse) le voile reste : c'est l'eau derrière les roues ; plus haut,
-                # devant la caisse, il se creuse
+                                  _gn_maprange(ng, along, _gn_math(ng, "ADD", dist, 0.3),
+                                               _gn_math(ng, "SUBTRACT", dist, 1.2), 0.0, 1.0))
+                # au ras du sol (sous le bas de caisse) le voile reste à moitié : c'est l'eau derrière les roues ;
+                # plus haut, devant la caisse, il se creuse
                 hz = N.new("ShaderNodeSeparateXYZ")
                 Lk(_gn_vec(ng, "SUBTRACT", P, hi.outputs["Location"]), hz.inputs[0])
-                inside = _gn_math(ng, "MULTIPLY", inside, _gn_maprange(ng, hz.outputs["Z"], 0.15, 0.5))
+                inside = _gn_math(ng, "MULTIPLY", inside,
+                                  _gn_math(ng, "ADD", 0.45, _gn_math(ng, "MULTIPLY", _gn_maprange(ng, hz.outputs["Z"], 0.1, 0.45), 0.55)))
                 alpha = _gn_math(ng, "MULTIPLY", alpha, _gn_math(ng, "SUBTRACT", 1.0, _gn_math(ng, "MULTIPLY", inside, mask)))
             rot = N.new("FunctionNodeAlignRotationToVector")
             rot.axis = "Z"
@@ -994,7 +1041,10 @@ def _gn_particles(name, kind, mat, cam=None, hero=None, mask=0.0, near=0.0):
         Lk(guv, inst.inputs["Instance"])
         if rot_out is not None:
             Lk(rot_out, inst.inputs["Rotation"])
-        Lk(size, inst.inputs["Scale"])
+        # un sprite éteint (masqué, trop près, en fin de vie) est ramené à zéro : un carré transparent compte quand
+        # même un rebond de transparence, et au-delà du plafond Cycles rend du noir (les grands pavés noirs du banc,
+        # vus dans l'axe de la traîne)
+        Lk(_gn_math(ng, "MULTIPLY", size, _gn_math(ng, "GREATER_THAN", alpha, 0.006)), inst.inputs["Scale"])
         real = N.new("GeometryNodeRealizeInstances")
         Lk(inst.outputs["Instances"], real.inputs["Geometry"])
         final = real.outputs["Geometry"]
@@ -1214,13 +1264,14 @@ def inside_fn(ob):
 
 
 def scene_puddles(ctx):
-    """Les flaques posées par les scènes (objets « *puddle* », « fx_flaque* ») : leur test de dedans, en monde."""
+    """Les flaques posées par les scènes (objets « *puddle* », « fx_flaque* », « flaque_* ») : leur test de dedans,
+    en monde."""
     out = []
     mine = set(o.name for o in ctx.coll.objects)
     for ob in ctx.scene.objects:
         if ob.type != "MESH" or ob.name in mine:
             continue
-        if "puddle" in ob.name or ob.name.startswith("fx_flaque"):
+        if "puddle" in ob.name or ob.name.startswith(("fx_flaque", "flaque_")):
             out.append((inside_fn(ob), ob))
     return out
 
@@ -1256,7 +1307,7 @@ def ripple_layer(ctx, src):
 # ---------------------------------------------------------------- les effets
 
 def water(ctx, wet=1.0, puddles=(), drops=1.0, mist=1.0, mask=0.85, near=1.2, hide_old=True, splash=1.0,
-          frames=None, seed=1):
+          frames=None, seed=1, veil="bas"):
     """L'eau : voile d'embruns (gouttes + brume) derrière les quatre roues, proportionnel à la vitesse, plus dense
     en glisse ; gerbes aux flaques traversées (celles de la scène et celles de `puddles` : [(roue, image, rx, ry,
     décalage)] posées ici sous la roue) ; rides après le passage. hide_old : les anciennes gerbes en volume
@@ -1273,8 +1324,8 @@ def water(ctx, wet=1.0, puddles=(), drops=1.0, mist=1.0, mask=0.85, near=1.2, hi
         w, f, rx, ry, along = tuple(spec) + (0.9, 0.55, 0.0)[len(spec) - 2:]
         e, ob = add_puddle(ctx, w, f, rx, ry, along, seed=len(ells))
         ells.append((e, ob, True))
-    d_all, m_all = wheel_spray(ctx.track, None, ctx.wheel_r, rate_drops=2400.0 * drops, rate_mist=110.0 * mist,
-                               wet=wet, seed=seed, frames=frames)
+    d_all, m_all = wheel_spray(ctx.track, None, ctx.wheel_r, rate_drops=2400.0 * drops, rate_mist=190.0 * mist,
+                               wet=wet, seed=seed, frames=frames, veil=veil)
     n_cross = 0
     sheets = []
     if ells:
@@ -1289,14 +1340,14 @@ def water(ctx, wet=1.0, puddles=(), drops=1.0, mist=1.0, mask=0.85, near=1.2, hi
             key_ripples(target, c[0], wh[c[2]], fwd, ctx.frames)
             n_cross += 1
     od = emit(ctx, f"fx_gouttes_{ctx.plan}", d_all, "drops", mat_drop(), glossy=True)
-    om = emit(ctx, f"fx_embruns_{ctx.plan}", m_all + sheets, "sprites", mat_sprite("fx_brume_eau", "#c8cedc", 2.2, 0.3, 0.75),
+    om = emit(ctx, f"fx_embruns_{ctx.plan}", m_all + sheets, "sprites", mat_sprite("fx_brume_eau", "#c8cedc", 1.8, 0.2, 0.75, detail=3.0, power=2.0),
               mask=mask, near=near)
     log(f"eau : {len(d_all)} gouttes, {len(m_all)} sprites d'embruns, {len(sheets)} de nappe, {n_cross} traversées "
         f"de flaque sur {len(ells)} flaques")
     return od, om
 
 
-def pack_spray(ctx, prefixes=("patrol", "van"), drops=0.25, mist=0.8, wet=0.8, mask=0.85, near=3.0, seed=61,
+def pack_spray(ctx, prefixes=("patrol", "van"), drops=0.2, mist=0.4, wet=0.8, mask=0.85, near=3.0, seed=61,
                max_rigs=8):
     """Les embruns des poursuivants : chaque rig (vide sans parent, l'avant vers +y local, celui de lieux.rig) qui
     roule reçoit quatre roues fictives (±0,8 m, ±1,45 m) et le même voile que la berline, plus léger. C'est la
@@ -1327,18 +1378,18 @@ def pack_spray(ctx, prefixes=("patrol", "van"), drops=0.25, mist=0.8, wet=0.8, m
         tr = build_track(samples[r.name])
         if max(p.speed for p in tr) < 3.0:
             continue
-        d, m = wheel_spray(tr, None, 0.36, rate_drops=2400.0 * drops, rate_mist=110.0 * mist, wet=wet, seed=seed + k)
+        d, m = wheel_spray(tr, None, 0.36, rate_drops=2400.0 * drops, rate_mist=140.0 * mist, wet=wet, seed=seed + k)
         d_all += d
         m_all += m
     emit(ctx, f"fx_gouttes_meute_{ctx.plan}", d_all, "drops", mat_drop(), glossy=True)
     ob = emit(ctx, f"fx_embruns_meute_{ctx.plan}", m_all, "sprites",
-              mat_sprite("fx_brume_eau", "#c8cedc", 2.2, 0.3, 0.75), mask=mask, near=near)
+              mat_sprite("fx_brume_eau", "#c8cedc", 1.8, 0.2, 0.75, detail=3.0, power=2.0), mask=mask, near=near)
     log(f"eau de la meute : {len(rigs)} véhicules, {len(d_all)} gouttes, {len(m_all)} sprites")
     return ob
 
 
-def gomme(ctx, slip_min=6.0, rate=34.0, brake=0.0, size=1.0, alpha=0.2, mask=0.9, near=1.0, hide=("fumee_pneus_",),
-          carry=0.18, drag=1.3, life=(2.2, 3.2), color="#d6d4da", seed=5):
+def gomme(ctx, slip_min=6.0, rate=100.0, brake=0.0, size=1.0, alpha=0.5, mask=0.9, near=1.0, hide=("fumee_pneus_",),
+          carry=0.18, drag=1.3, life=(1.2, 1.8), color="#d6d4da", seed=5):
     """La fumée des pneus en glisse (et au freinage si `brake`), en sprites : claire, prise par les lampes, qui
     reste derrière et se dissipe ; creusée dans le cône caméra-berline (mask). Les anciennes bouffées en volume
     (`hide`) sont retirées."""
@@ -1347,7 +1398,7 @@ def gomme(ctx, slip_min=6.0, rate=34.0, brake=0.0, size=1.0, alpha=0.2, mask=0.9
             ob.hide_render = True
     parts = tyre_smoke(ctx.track, ctx.wheel_r, slip_min, rate, brake, seed, size=size, alpha=alpha, carry=carry,
                        drag=drag, life=life)
-    ob = emit(ctx, f"fx_fumee_{ctx.plan}", parts, "sprites", mat_sprite("fx_fumee", color, 0.9, 0.28, 0.8, 0.55),
+    ob = emit(ctx, f"fx_fumee_{ctx.plan}", parts, "sprites", mat_smoke(color),
               mask=mask, near=near)
     log(f"gomme : {len(parts)} sprites de fumée")
     return ob
@@ -1444,6 +1495,10 @@ def pick_near_lens(ctx, n=3, dist=(1.6, 5.0), lateral=(0.6, 2.2), seed=23, groun
         dc = math.dist(q[:2], cp[:2])
         if not (dist[0] <= dc <= dist[1]):
             continue
+        # une caméra qui suit la berline roule ensuite vers l'objet levé : il ne doit jamais passer à moins de
+        # 2,5 m de l'objectif (flou, plein cadre, il masquait la caisse)
+        if min(math.dist(q, c[0]) for fr, c in ctx.cam_pos.items() if fr >= p.frame) < max(2.5, dist[0]):
+            continue
         x, y, zz = ctx.view((q[0], q[1], q[2] + 0.6), p.frame)
         if not (0.1 < x < 0.9 and 0.15 < y < 0.88 and zz > 0):
             continue
@@ -1504,7 +1559,7 @@ def plots(ctx, pattern="cone_", radius=3.0, seed=29, companion=None, topple=True
             continue
         if companion and ob.name.startswith(companion_skip(pattern)):
             continue
-        mates = [ob] + [o for o in [ctx.scene.objects.get(companion(ob.name))] if companion and o is not None]
+        mates = [ob] + ([o for o in [ctx.scene.objects.get(companion(ob.name))] if o is not None] if companion else [])
         base = ob.matrix_world.copy()
         p = tuple(base.translation)
         f, d = nearest_pass(ctx.track, p)
@@ -1585,19 +1640,26 @@ def swing_groups(ctx, groups, amp, freq=1.2, reach=7.0, seed=31, label="objets")
 
 
 def tremble(ctx, specs, seed=31):
-    """Ce qui bouge au passage, par motif de nom : specs [(motif, amplitude °, fréquence Hz, « pendule » (autour
-    d'un axe horizontal au sommet de l'objet, perpendiculaire à la trace) ou « torsion » (autour de z), rayon m)]."""
+    """Ce qui bouge au passage, par motif de nom (préfixe ; « nom$ » : ce nom exact) : specs [(motif, amplitude °,
+    fréquence Hz, mode, rayon m)] ; mode « pendule » (autour d'un axe horizontal au sommet de l'objet,
+    perpendiculaire à la trace), « pied » (au pied), « corde » (une chaîne entre des poteaux : autour de la ligne de
+    ses attaches, sa plus grande longueur au sommet) ou « torsion » (autour de z)."""
     n = 0
     tr = ctx.track
     for (pat, amp, freq, mode, reach) in specs:
         groups = []
-        for ob in [o for o in ctx.scene.objects if o.name.startswith(pat) and o.type == "MESH"]:
+        match = (lambda n: n == pat[:-1]) if pat.endswith("$") else (lambda n: n.startswith(pat))
+        for ob in [o for o in ctx.scene.objects if match(o.name) and o.type == "MESH"]:
             pts = [ob.matrix_world @ _V(c) for c in ob.bound_box]
             cx, cy = sum(p.x for p in pts) / 8, sum(p.y for p in pts) / 8
             f, _ = nearest_pass(tr, (cx, cy))
             fwd = pose_at(tr, f)[1]
             if mode == "pendule":
                 groups.append(([ob], (cx, cy, max(p.z for p in pts)), (fwd[1], -fwd[0], 0.0)))
+            elif mode == "corde":
+                dx = max(p.x for p in pts) - min(p.x for p in pts)
+                dy = max(p.y for p in pts) - min(p.y for p in pts)
+                groups.append(([ob], (cx, cy, max(p.z for p in pts)), (1.0, 0.0, 0.0) if dx > dy else (0.0, 1.0, 0.0)))
             elif mode == "pied":
                 o0 = ob.matrix_world.translation
                 groups.append(([ob], (o0.x, o0.y, min(p.z for p in pts)), (fwd[1], -fwd[0], 0.0)))
@@ -1729,10 +1791,10 @@ def arret(ctx, stop_frame=None, drip=True, smoke=True, mask=0.55):
         stop_frame = next((p.frame for p in tr if p.speed < 0.3 and p.frame > tr[0].frame + 2), tr[-1].frame)
     out = []
     if smoke:
-        parts = tyre_smoke(tr, ctx.wheel_r, slip_min=4.0, rate=26.0, brake=1.0, seed=41, size=1.1, alpha=0.16,
+        parts = tyre_smoke(tr, ctx.wheel_r, slip_min=4.0, rate=70.0, brake=1.0, seed=41, size=1.1, alpha=0.45,
                            carry=0.75, drag=0.75, life=(3.0, 4.2))
         out.append(emit(ctx, f"fx_fumee_arret_{ctx.plan}", parts, "sprites",
-                        mat_sprite("fx_fumee", "#d6d4da", 0.9, 0.28, 0.8, 0.55), mask=mask, near=0.9))
+                        mat_smoke(), mask=mask, near=0.9))
         log(f"arrêt : {len(parts)} sprites de fumée de freinage (arrêt à l'image {stop_frame})")
     if drip:
         p = tr[-1]
@@ -1753,7 +1815,7 @@ def arret(ctx, stop_frame=None, drip=True, smoke=True, mask=0.55):
 def _budget(scene):
     """Les sprites se superposent : assez de rebonds transparents pour qu'aucun ne s'arrête en noir."""
     c = scene.cycles
-    c.transparent_max_bounces = max(getattr(c, "transparent_max_bounces", 8), 48)
+    c.transparent_max_bounces = max(getattr(c, "transparent_max_bounces", 8), 96)
 
 
 def hooked(build, plans):
@@ -1800,9 +1862,11 @@ def _t(ctx, u):
 
 
 def r_ouv(ctx, **o):
-    # la menace qui monte : la berline file, l'eau derrière elle file vers nous ; une flaque à la roue côté caméra
+    # la menace qui monte : la berline file devant nous, l'eau derrière ses roues
     if enabled("eau"):
-        water(ctx, wet=0.8, puddles=[("BL", _t(ctx, 0.35), 1.0, 0.6, 0.6)], mask=0.85, near=1.4)
+        # de dos à 8 m : le voile est entre l'objectif et elle, il reste bas et léger ; l'ornière de la scène
+        # (fx_flaque) sous les roues gauches
+        water(ctx, wet=0.7, drops=0.7, mist=0.45, mask=0.95, near=2.0)
 
 
 def r_p1(ctx, **o):
@@ -1810,7 +1874,7 @@ def r_p1(ctx, **o):
     # caméra ; les embruns derrière la berline à contre-jour des phares de la patrouille ; les feuilles de papier
     # (fx_papier_*) levées quand elle les frôle
     if enabled("eau"):
-        water(ctx, wet=0.8, mask=0.85, near=1.4, splash=1.7)
+        water(ctx, wet=0.8, mask=0.85, near=1.4, splash=1.3)
 
 
 def r_p2(ctx, **o):

@@ -106,6 +106,61 @@ def test_smoke():
     assert max(ends) > stop_y + 1.0, (max(ends), stop_y)
 
 
+def test_lisible():
+    """Les cibles de lecture à la taille d'un téléphone : un panache de gomme de 6 à 8 m au moins derrière les roues
+    arrière en glisse, qui monte à hauteur de toit ; un voile d'embruns continu à 67 km/h, long de 4 m au moins et
+    haut de 0,6 à 1 m ; une lame de flaque qui monte à hauteur de vitre et dure cinq images au moins. Tout derrière
+    la berline ou à côté, jamais devant."""
+    V = 18.6
+    tr = line_track(V, n=40, slip_deg=22.0)
+    def rel(q, age):                                  # (en arrière de la berline, hauteur du haut du sprite)
+        p = fx.ballistic(q.p, q.v, age, q.drag, q.grav)
+        car_y = V * (q.birth / fx.FPS + age)
+        u = min(1.0, age / q.life)
+        size = q.size0 + (q.size1 - q.size0) * (1 - (1 - u) ** 2)
+        return car_y - p[1], p[2] + 0.5 * size
+    sm = fx.tyre_smoke(tr, R)
+    late = [q for q in sm if 8 < q.birth < 20]
+    assert len(late) > 70, len(late)                                 # dense : ~100 par seconde et par roue
+    back = [rel(q, 0.4) for q in late]
+    assert max(b for b, _ in back) > 6.0 and min(b for b, _ in back) > 0.0, back[:3]
+    assert sorted(h for _, h in back)[len(back) // 2] > 1.3          # le haut du panache à hauteur de toit
+    # le nez rentre à gauche (virage à gauche) : la fumée part vers l'extérieur, +x
+    assert sum(q.v[0] for q in late) / len(late) > 0.4, sum(q.v[0] for q in late) / len(late)
+    # de côté ou de face (veil « haut ») : un voile de 0,6 à 1 m, long de 4 m au moins
+    drops, mist = fx.wheel_spray(line_track(V, n=40), None, R, seed=5, veil="haut")
+    rear = [q for q in mist if 8 < q.birth < 20]
+    per_s = len(rear) / (12 / fx.FPS)
+    assert per_s > 4 * 30, per_s                                     # continu : > 30 sprites/s par roue
+    trail = [rel(q, 0.4 * q.life)[0] for q in rear]
+    assert max(trail) > 4.0 and min(trail) > -0.5, (min(trail), max(trail))
+    tops = sorted(rel(q, 0.3 * q.life)[1] for q in rear)
+    assert 0.6 < tops[len(tops) // 2] < 1.2, tops[len(tops) // 2]
+    # de dos (veil « bas », le découpage v3) : sous le pare-chocs, en V vers l'extérieur, retombé avant la caméra
+    # (5 à 8 m derrière)
+    drops, mist = fx.wheel_spray(line_track(V, n=40), None, R, seed=5)
+    rear = [q for q in mist if 8 < q.birth < 20]
+    tops = sorted(rel(q, 0.3 * q.life)[1] for q in rear)
+    assert tops[len(tops) // 2] < 0.55 and tops[int(len(tops) * 0.9)] < 0.7, tops[len(tops) // 2]
+    ends = sorted(rel(q, q.life)[0] for q in rear)                  # à sa fin le sprite est éteint
+    assert ends[int(len(ends) * 0.9)] < 7.5, ends[int(len(ends) * 0.9)]
+    outward = [q.v[0] * (1 if q.p[0] > 0 else -1) for q in drops]
+    assert sum(1 for o in outward if o > 0) > 0.9 * len(outward)
+    assert max(fx.ballistic(q.p, q.v, t / 48, q.drag)[2] for q in drops[::7] for t in range(int(q.life * 48))) < 0.5
+    # retombées (ou éteintes) avant l'objectif, 7,5 m derrière le milieu de la caisse et 1,4 m plus haut
+    ends = sorted(rel(q, q.life)[0] for q in drops if 8 < q.birth < 20)
+    assert ends[int(len(ends) * 0.95)] < 7.0 and ends[-1] < 8.0, (ends[int(len(ends) * 0.95)], ends[-1])
+    trs = line_track(V, n=40)
+    cr = fx.puddle_crossings(trs, [(0.77, 15.0, 0.75, 1.3, 0.0)])
+    _, sheet = fx.puddle_splash(trs, cr[0], R, seed=4)
+    peak = [max(fx.ballistic(q.p, q.v, t / 48, q.drag, q.grav)[2] for t in range(int(q.life * 48))) for q in sheet]
+    assert 0.8 < sorted(peak)[len(peak) // 2] < 1.4, sorted(peak)[len(peak) // 2]
+    assert min(q.life for q in sheet) * fx.FPS >= 7                # lisible cinq à six images (fondu compris)
+    for q in sheet:
+        b, _ = rel(q, q.life * 0.5)
+        assert b > -0.8, b                                          # jamais devant la berline
+
+
 def test_debris():
     frames = range(0, 60)
     k = fx.debris_keys((1.5, 10.0, 0.0), frames, 20.0, 1.2, (0.0, 25.0, 0.0), seed=3)
