@@ -1029,11 +1029,13 @@ def hero_driver(root):
     return None
 
 
-def hands_up(root, up=0.10, fwd=0.22, out=0.2):
+def hands_up(root, up=0.10, fwd=0.22, out=0.2, door_out=0.04):
     """Le conducteur lève les mains gantées derrière le pare-brise. La pose de cast_people.pose_driver_hands_up
     met les poignets 36 cm au-dessus des épaules : dans la berline, les doigts traversent le pavillon (vu au
     cadrage du 11 novembre). Ici les poignets restent sous le pavillon et avancent vers le pare-brise : coudes
-    écartés, avant-bras dressés, paumes vers l'avant, mains à hauteur du visage."""
+    écartés, avant-bras dressés, paumes vers l'avant, mains à hauteur du visage. Le bras gauche, côté portière,
+    reste près du corps (`door_out`, coude vers le bas) : écarté comme le droit, l'avant-bras sortait par la
+    portière (vu de profil le 12 novembre, invisible de trois quarts face)."""
     import cast_people as cp
     arm = hero_driver(root)
     if arm is None:
@@ -1045,8 +1047,10 @@ def hands_up(root, up=0.10, fwd=0.22, out=0.2):
         cp._rot(arm, s + "Shoulder", cp.F, 6 * sg)
         sh = cp.pb(arm, s + "Arm").head
         side = cp.L if sg > 0 else cp.R
-        wrist = sh + side * out + cp.U * up + cp.F * fwd
-        cp.two_bone(arm, s + "Arm", s + "ForeArm", s + "Hand", wrist, side * 1.0 + cp.D * 0.8 + cp.B * 0.1)
+        door = sg > 0                                   # la conduite à gauche : le bras gauche longe la portière
+        wrist = sh + side * (door_out if door else out) + cp.U * up + cp.F * fwd
+        pole = side * 0.3 + cp.D * 1.0 + cp.B * 0.1 if door else side * 1.0 + cp.D * 0.8 + cp.B * 0.1
+        cp.two_bone(arm, s + "Arm", s + "ForeArm", s + "Hand", wrist, pole)
         cp.set_hand(arm, s, (cp.U + side * 0.1 + cp.F * 0.08).normalized(), cp.F)
         cp.curl(arm, s, angles=(8, 10, 6), thumb=(-5, 5, 5), spread=6)
     cp._head_look(arm, (cp.F + cp.D * 0.05).normalized())
