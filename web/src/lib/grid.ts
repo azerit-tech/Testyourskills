@@ -1,7 +1,7 @@
 // Ce que le bloc « Voici comment un recruteur d'Azerit te lit » montre de
 // chaque critère (docs/bareme-recrutement.md §3, §4, §6 ; SPEC §18.37) : ses
-// étiquettes d'état, l'étiquette de sa pièce, la ligne de la note finale, les
-// recoupements, et la version de la page partagée, sans nom d'école ni
+// étiquettes d'état, l'étiquette de sa pièce, la ligne de la note finale, la
+// pièce où la note a été lue, et la version de la page partagée, sans nom d'école ni
 // d'ancien employeur (question 5 du barème). Pur : testé sans navigateur.
 
 import { dec, excludedWhy, gridMath, GRID_WEIGHTS } from "../../../shared/gridText";
@@ -63,7 +63,7 @@ export function sourceLabel(c: GridCriterion, g: G, declared: DeclaredSource): s
   return g.sourceWith(g.source.github, repo ?? g.detailGithub[c.code]);
 }
 
-/** D'où la note retenue a été prise, dans une comparaison. */
+/** Dans un dossier à deux pièces (§18.36), la pièce où la note du critère a été lue : « lu sur LinkedIn ». */
 export function keptFrom(c: GridCriterion, g: G, declared: DeclaredSource): string {
   const k = g.compare.keptFrom;
   if (c.source === "both") return k.both;
@@ -219,37 +219,6 @@ export function finalLines(grid: Grid, g: G, lang: Lang, unprovenCase?: { src: s
     rule,
     overall: grid.overall,
   };
-}
-
-// --- Les recoupements ------------------------------------------------------------------
-
-export interface CrossCheck {
-  code: CriterionCode;
-  declared: number;
-  proven: number;
-  verdict: "more" | "less" | "same";
-}
-
-/**
- * Les critères où les deux sources ont parlé (comparaison) : ce que LinkedIn
- * déclare, ce que GitHub prouve. `shared` : la page partagée ne montre que les
- * recoupements qui jouent pour la personne (le code en montre autant ou plus).
- */
-export function crossChecks(grid: Grid, shared = false): CrossCheck[] {
-  return grid.criteria
-    .filter((c) => typeof c.declared === "number" && typeof c.proven === "number")
-    .map((c): CrossCheck => ({
-      code: c.code,
-      declared: c.declared!,
-      proven: c.proven!,
-      verdict: c.proven! > c.declared! ? "more" : c.proven! < c.declared! ? "less" : "same",
-    }))
-    .filter((x) => !shared || x.verdict !== "less");
-}
-
-/** La comparaison a-t-elle des colonnes à montrer : au moins un critère porte ses deux notes. */
-export function hasColumns(grid: Grid): boolean {
-  return grid.criteria.some((c) => c.declared !== undefined || c.proven !== undefined);
 }
 
 export { GRID_WEIGHTS };

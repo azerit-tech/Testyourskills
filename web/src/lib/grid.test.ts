@@ -5,7 +5,7 @@
 import { describe, expect, it } from "vitest";
 import type { CriterionCode, Grid, GridCriterion, Lang } from "../../../shared/types";
 import { DICTS, pick } from "../i18n";
-import { crossChecks, finalLines, flagName, repoOf, rowText, safeHref, sourceLabel, stateTags } from "./grid";
+import { finalLines, flagName, keptFrom, repoOf, rowText, safeHref, sourceLabel, stateTags } from "./grid";
 import { comparisonGridsMock, declaredGridMock, githubGridMock } from "./mockGrid";
 
 const crit = (code: CriterionCode, score: number | null, over: Partial<GridCriterion> = {}): GridCriterion => ({
@@ -191,19 +191,22 @@ describe("la page partagée : ni école ni ancien employeur", () => {
   });
 });
 
-describe("les recoupements d'une comparaison", () => {
-  it("ce que LinkedIn déclare face à ce que GitHub prouve", () => {
-    const checks = crossChecks(comparisonGridsMock("LinkedIn", "camille-ardent").grid);
-    expect(checks.map((x) => [x.code, x.declared, x.proven, x.verdict])).toEqual([
-      ["XP", 9, 7, "less"],
-      ["STK", 6, 8, "more"],
-      ["OWN", 6, 8, "more"],
-    ]);
+describe("la pièce où chaque note d'un dossier a été lue (§18.36)", () => {
+  it("« lu sur LinkedIn », « lu sur le CV », « lu sur GitHub », « lu sur les deux pièces »", () => {
+    const grid = comparisonGridsMock("LinkedIn", "camille-ardent").grid;
+    const by = (code: CriterionCode) => grid.criteria.find((c) => c.code === code)!;
+    const EN = DICTS.en.grid;
+    for (const c of grid.criteria) {
+      const want = c.source === "both" ? FR.compare.keptFrom.both : c.source === "github" ? FR.compare.keptFrom.github : FR.compare.keptFrom.linkedin;
+      expect(keptFrom(c, FR, "linkedin"), c.code).toBe(want);
+    }
+    expect(keptFrom({ ...by("EDU"), source: "linkedin" }, FR, "cv")).toBe("lu sur le CV");
+    expect(keptFrom({ ...by("CODE"), source: "github" }, EN, "linkedin")).toBe("read on GitHub");
+    expect(keptFrom({ ...by("OWN"), source: "both" }, EN, "cv")).toBe("read on both exhibits");
   });
 
-  it("page partagée : seulement les recoupements qui jouent pour la personne", () => {
-    const checks = crossChecks(comparisonGridsMock("LinkedIn", "camille-ardent").grid, true);
-    expect(checks.map((x) => x.code)).toEqual(["STK", "OWN"]);
+  it("aucun mot de duel dans ces libellés", () => {
+    for (const k of [FR.compare.keptFrom, DICTS.en.grid.compare.keptFrom]) expect(Object.values(k).join(" ")).not.toMatch(/plus haute|higher|contre|against|retenu|kept/i);
   });
 
   it("la démo montre « recoupé » là où le moteur le pose : expérience, parcours, stack, ownership", () => {

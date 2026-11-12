@@ -3,8 +3,8 @@
 // une note sur 10 en dix segments, son coefficient, sa pièce et sa source ; un
 // appui déplie la table des niveaux, le niveau atteint surligné, et ce qui
 // manque pour le suivant. Puis la note sur 100, moyenne pondérée, et la règle
-// qui a joué. Avec les deux sources : trois colonnes (LinkedIn · GitHub ·
-// retenu), les recoupements en tête, et la note du dossier.
+// qui a joué. Un dossier à deux pièces (§18.36) : une note par critère, la pièce
+// où elle a été lue (« lu sur LinkedIn »), et la note du dossier.
 // Hors de la révélation : le bloc se pose avec l'après-fiche, sans animation.
 // Fiche sans grille (d'avant 0.4.0) : rien.
 import { useId, useState } from "react";
@@ -43,12 +43,11 @@ interface RowProps {
   grid: Grid;
   declared: DeclaredSource;
   shared: boolean;
-  columns: boolean;
-  /** Comparaison : les chefs d'accusation de la stack sont déjà dans les recoupements. */
-  skipFlags: boolean;
+  /** Un dossier à deux pièces : la pièce où la note a été lue. */
+  isCase: boolean;
 }
 
-function Row({ c, grid, declared, shared, columns, skipFlags }: RowProps) {
+function Row({ c, grid, declared, shared, isCase }: RowProps) {
   const { t, lang } = useT();
   const g = t.grid;
   const [open, setOpen] = useState(false);
@@ -59,11 +58,8 @@ function Row({ c, grid, declared, shared, columns, skipFlags }: RowProps) {
   const row = reachedRow(c, table);
   const name = g.names[c.code];
   const coef = g.coef(dec(GRID_WEIGHTS[c.code], lang));
-  const col = g.compare.cols;
   const none = g.compare.none;
-  const takenD = c.source === "linkedin" || c.source === "both";
-  const takenP = c.source === "github" || c.source === "both";
-  const flags = skipFlags ? [] : text.flags;
+  const flags = text.flags;
   const cross = c.evidence?.source === "both";
 
   return (
@@ -71,34 +67,14 @@ function Row({ c, grid, declared, shared, columns, skipFlags }: RowProps) {
       <h3 className="rg-head">
         <button type="button" className="rg-toggle" aria-expanded={open} aria-controls={panel} onClick={() => setOpen((o) => !o)}>
           <span className="rg-name">{name}</span>
-          {columns ? (
-            <span className="rg-cols">
-              <span className={`rg-col${takenD ? " is-taken" : ""}`}>
-                <span className="rg-col-k">{declared === "cv" ? col.cv : col.linkedin}</span>
-                <span className="rg-col-v">{c.declared ?? none}</span>
-              </span>
-              <span className={`rg-col${takenP ? " is-taken" : ""}`}>
-                <span className="rg-col-k">{col.github}</span>
-                <span className="rg-col-v">{c.proven ?? none}</span>
-              </span>
-              <span className="rg-col is-kept">
-                <span className="rg-col-k">{col.kept}</span>
-                <span className="rg-col-v" aria-hidden>
-                  {c.score ?? none}
-                  <small>/10</small>
-                </span>
-              </span>
-            </span>
-          ) : (
-            <span className="rg-score" aria-hidden>
-              {c.score ?? none}
-              <small>/10</small>
-            </span>
-          )}
+          <span className="rg-score" aria-hidden>
+            {c.score ?? none}
+            <small>/10</small>
+          </span>
           <Gauge c={c} g={g} />
           <span className="rg-meta">
             <span className="rg-coef">{coef}</span>
-            {columns && <span className="rg-kept">{c.score === null ? g.compare.noneLabel : keptFrom(c, g, declared)}</span>}
+            {isCase && c.score !== null && !c.private && <span className="rg-kept">{keptFrom(c, g, declared)}</span>}
             {tags.map((tag) => (
               <span key={tag} className={`rg-tag tag-${tag}`}>
                 {(shared ? g.tagsThem : g.tags)[tag]}
@@ -213,8 +189,6 @@ export function RecruiterGrid({ item, shared, who }: Props) {
   const g = t.grid;
   // Une fiche GitHub seule parle de LinkedIn, la porte par défaut (§18.30) ; une fiche ou une comparaison déclarative, de sa source.
   const declared = item.kind === "card" && item.card.source === "github" ? "linkedin" : declaredOf(item.kind === "card" ? item.card : item.comparison);
-  // Un dossier, une note (§18.36) : plus de colonnes « LinkedIn · GitHub · Retenu », une note par critère.
-  const columns = false;
   const byCode = new Map(grid.criteria.map((c) => [c.code, c]));
   const method = shared ? g.methodThem : g.method;
   // Ce que la fiche a lu : le parcours (LinkedIn ou CV) et le code (GitHub).
@@ -232,10 +206,10 @@ export function RecruiterGrid({ item, shared, who }: Props) {
         <li>{code ? method.code : method.noCode}</li>
         <li>{career && code ? method.check : method.piece}</li>
       </ol>
-      <ol className={`rg-list${columns ? " has-cols" : ""}`} aria-label={g.criteriaLabel}>
+      <ol className="rg-list" aria-label={g.criteriaLabel}>
         {RECRUITER_ORDER.map((code) => {
           const c = byCode.get(code);
-          return c ? <Row key={code} c={c} grid={grid} declared={declared} shared={shared} columns={columns} skipFlags={columns && code === "STK"} /> : null;
+          return c ? <Row key={code} c={c} grid={grid} declared={declared} shared={shared} isCase={item.kind === "comparison"} /> : null;
         })}
       </ol>
       <Final grid={grid} isCase={item.kind === "comparison"} unproven={unproven} />

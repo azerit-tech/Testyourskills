@@ -3171,8 +3171,7 @@ a.dossier-item:hover {
   color: var(--cream);
   white-space: nowrap;
 }
-.rg-score small,
-.rg-col-v small {
+.rg-score small {
   margin-left: 1px;
   font-size: 15px;
   color: var(--lilac-dim);
@@ -3296,8 +3295,7 @@ a.rg-src:hover {
 a.rg-src.is-both {
   color: var(--lime);
 }
-.rg-flags,
-.rg-cross-flags {
+.rg-flags {
   list-style: none;
   display: grid;
   gap: 4px;
@@ -3309,8 +3307,7 @@ a.rg-src.is-both {
   color: var(--siren-ink);
   overflow-wrap: anywhere;
 }
-.rg-flags li::before,
-.rg-cross-flags li::before {
+.rg-flags li::before {
   content: "";
   position: absolute;
   left: 1px;
@@ -3389,125 +3386,10 @@ a.rg-src.is-both {
   color: var(--lilac-dim);
 }
 
-/* comparaison : trois colonnes, LinkedIn · GitHub · retenu ; la source prise est cerclée */
-.rg-list.has-cols .rg-toggle {
-  grid-template-columns: minmax(0, 1fr) 20px;
-  grid-template-areas:
-    "name chev"
-    "cols cols"
-    "gauge gauge"
-    "meta meta";
-}
-.rg-cols {
-  grid-area: cols;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.25fr);
-  gap: 6px;
-}
-.rg-col {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-  padding: 7px 9px;
-  border: 1px solid var(--lilac-faint);
-  border-radius: 12px;
-}
-.rg-col.is-taken {
-  border-color: var(--lilac-2);
-}
-.rg-col.is-kept {
-  border-color: transparent;
-  background: var(--ink-0);
-}
-.rg-col-k {
-  font: 500 10.5px/1.1 var(--f-mono);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--lilac-dim);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.rg-col-v {
-  font: 700 24px/1 var(--f-name);
-  color: var(--lilac-2);
-}
-.rg-col.is-kept .rg-col-v {
-  color: var(--cream);
-}
-
-/* les recoupements : la démonstration, en tête de la comparaison */
-.rg-cross {
-  display: grid;
-  gap: 10px;
-  padding: 18px 16px;
-  border-radius: 20px;
-  background: var(--navy);
-}
-.rg-cross-title,
 .rg-final-title {
   font: 700 26px/0.95 var(--f-name);
   text-transform: uppercase;
   color: var(--cream);
-}
-.rg .rg-cross-lead {
-  font: 400 14px/1.4 var(--f-text);
-  color: var(--lilac-2);
-}
-.rg-cross-list {
-  list-style: none;
-  display: grid;
-}
-.rg-cross-list li {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas:
-    "name pair"
-    "verdict verdict";
-  align-items: baseline;
-  gap: 4px 12px;
-  padding: 10px 0;
-  border-top: 1px solid var(--lilac-faint);
-}
-.rg-cross-name {
-  grid-area: name;
-  min-width: 0;
-  font: 600 15px/1.3 var(--f-text);
-  color: var(--cream);
-}
-.rg-cross-pair {
-  grid-area: pair;
-  font: 700 20px/1 var(--f-name);
-  color: var(--cream);
-  white-space: nowrap;
-}
-.rg-cross-verdict {
-  grid-area: verdict;
-  font: 500 11.5px/1.2 var(--f-mono);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--lilac-2);
-}
-.rg-cross-list li.is-more .rg-cross-verdict {
-  color: var(--lime);
-}
-.rg-cross-list li.is-less .rg-cross-verdict {
-  color: var(--peach);
-}
-.rg .rg-cross-sub {
-  padding-top: 12px;
-  border-top: 1px solid var(--lilac-faint);
-  font: 600 11px/1.2 var(--f-text);
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--lilac-dim);
-}
-.rg-cross-flags li {
-  position: relative;
-  padding-left: 16px;
-  font: 600 15.5px/1.35 var(--f-text);
-  color: var(--siren-ink);
-  overflow-wrap: anywhere;
 }
 
 /* la note sur 100 : la formule, puis le chiffre */
@@ -3617,6 +3499,22 @@ a.rg-src.is-both {
 }
 .rr-tile[aria-expanded="true"] {
   box-shadow: inset 0 0 0 1.5px var(--blush);
+}
+/* Un dossier à deux pièces (§18.36) : la pièce où la note a été lue, sous le nom
+   et sur toute la largeur de la tuile, pour ne serrer ni le nom ni la note. */
+.rr-tile.has-from {
+  grid-template-areas:
+    "name score"
+    "from from"
+    "gauge gauge";
+}
+.rr-from {
+  grid-area: from;
+  min-width: 0;
+  margin-top: -4px;
+  font: 600 11px/1.2 var(--f-text);
+  letter-spacing: 0.01em;
+  color: var(--lilac-2);
 }
 /* Le nom du critère se lit en entier, jamais « Open sou… » : il passe sur deux
    lignes plutôt que d'être coupé (entre les mots, pas dedans), un cran plus petit

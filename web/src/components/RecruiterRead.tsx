@@ -4,16 +4,19 @@
 // 390 px : nom court, note sur 10, mini-jauge. L'ordre du recruteur ; les
 // critères sans note en bas, sous « Pas encore au dossier ». Une tuile touchée
 // montre sa pièce dessous ; le détail entier reste dans la grille (#grille).
+// Un dossier à deux pièces (§18.36) : chaque tuile notée dit sous son nom où la
+// note a été lue (« LinkedIn », « GitHub », « LinkedIn et GitHub ») ; une fiche
+// seule n'en dit rien, la provenance y serait partout la même.
 // Matte : aucun effet, aucune animation.
 import { useId, useState } from "react";
-import { fileOf } from "../../../shared/caseFile";
+import { fileOf, pieceLabel } from "../../../shared/caseFile";
 import { usableGrid } from "../../../shared/gridText";
 import { publicGrid } from "../../../shared/publicView";
 import { recruiterRead, tileOrder } from "../../../shared/recruiterLine";
 import type { CriterionCode, Grid, GridCriterion } from "../../../shared/types";
 import { declaredOf } from "../../../shared/types";
 import { pick, useT } from "../i18n";
-import { rowText } from "../lib/grid";
+import { keptFrom, rowText } from "../lib/grid";
 import type { Shareable } from "./After";
 
 /** Dix segments, lus par la tuile elle-même : la jauge est décorative. */
@@ -51,20 +54,38 @@ export function RecruiterRead({ item, shared, who }: Props) {
   const chosen = open ? grid.criteria.find((c) => c.code === open) : undefined;
   const detail = chosen ? rowText(chosen, { g: t.grid, pick: (f) => pick(f, lang), declared, shared }).line : "";
 
+  const isCase = item.kind === "comparison";
+  const src = pieceLabel(declared);
+  /** La provenance d'une tuile notée d'un dossier, null sinon. */
+  const fromOf = (c: GridCriterion): string | null =>
+    !isCase || c.private || c.score === null ? null : c.source === "both" ? R.fromBoth(src) : c.source === "github" ? pieceLabel("github") : src;
+
   const tile = (c: GridCriterion) => {
     const name = R.short[c.code];
-    const label = c.private ? R.tileKept(name) : c.score === null ? R.tileNone(name) : R.tile(name, c.score);
+    const from = fromOf(c);
+    const label = c.private
+      ? R.tileKept(name)
+      : c.score === null
+        ? R.tileNone(name)
+        : from
+          ? R.tileFrom(name, c.score, keptFrom(c, t.grid, declared))
+          : R.tile(name, c.score);
     return (
       <li key={c.code}>
         <button
           type="button"
-          className={`rr-tile is-${c.private ? "private" : c.score === null ? "none" : c.state}`}
+          className={`rr-tile is-${c.private ? "private" : c.score === null ? "none" : c.state}${from ? " has-from" : ""}`}
           aria-expanded={open === c.code}
           aria-controls={panel}
           aria-label={label}
           onClick={() => setOpen((o) => (o === c.code ? null : c.code))}
         >
           <span className="rr-name">{name}</span>
+          {from && (
+            <span className="rr-from" aria-hidden>
+              {from}
+            </span>
+          )}
           <span className="rr-score">
             {c.score ?? R.none}
             {c.score !== null && <small>/10</small>}

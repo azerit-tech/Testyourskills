@@ -32,6 +32,8 @@ import { DICTS, LangProvider } from "../i18n";
 import { comparisonGridsMock } from "../lib/mockGrid";
 import type { Shareable } from "./After";
 import { RecruiterGrid } from "./RecruiterGrid";
+import { RecruiterRead } from "./RecruiterRead";
+import { keptFrom } from "../lib/grid";
 
 function renderNode(node: ReturnType<typeof createElement>, lang = "fr-FR"): string {
   vi.stubGlobal("window", {
@@ -139,9 +141,43 @@ describe("« recoupé » : de la sortie du moteur à l'étiquette affichée", ()
         expect(html).toContain('<ol class="rg-list"');
         expect(html).not.toContain("has-cols");
         expect(html).not.toContain("rg-cross");
-        expect(html).not.toContain(dict.compare.crossTitle);
-        expect(html).not.toContain(`>${dict.compare.cols.kept}<`);
+        expect(html).not.toMatch(/Les recoupements|The cross-checks|>Retenu<|>Kept<|la plus haute|the higher one/);
+        // Chaque critère noté dit la pièce où sa note a été lue.
+        const rows = rowsOf(html);
+        for (const c of comparison.grid!.criteria) {
+          if (c.score === null || c.private) continue;
+          expect(rows.get(dict.names[c.code]), c.code).toContain(`<span class="rg-kept">${keptFrom(c, dict, "linkedin")}</span>`);
+        }
       }
+  });
+
+  it("les tuiles d'un dossier : la provenance sous le nom, lue en entier par le lecteur d'écran", () => {
+    const html = renderNode(createElement(RecruiterRead, { item, shared: false, who: "@dev" }));
+    const tiles = [...html.matchAll(/<button type="button" class="rr-tile ([^"]*)"[^>]*aria-label="([^"]+)"[^>]*><span class="rr-name">([^<]+)<\/span>(<span class="rr-from" aria-hidden="true">([^<]+)<\/span>)?/g)];
+    expect(tiles.length).toBeGreaterThan(0);
+    const R = DICTS.fr.read;
+    const allowed = ["LinkedIn", "GitHub", R.fromBoth("LinkedIn")];
+    for (const [, cls, aria, name, , from] of tiles) {
+      const c = comparison.grid!.criteria.find((x) => R.short[x.code] === name)!;
+      if (c.score === null || c.private) {
+        expect(from, name).toBeUndefined();
+        continue;
+      }
+      expect(cls).toContain("has-from");
+      expect(allowed).toContain(from);
+      expect(from).toBe(c.source === "both" ? "LinkedIn et GitHub" : c.source === "github" ? "GitHub" : "LinkedIn");
+      expect(aria.replace(/&#x27;/g, "'")).toBe(`${name}\u00a0: ${c.score} sur 10, ${keptFrom(c, DICTS.fr.grid, "linkedin")}`);
+    }
+    // En anglais : « LinkedIn and GitHub », « read on … ».
+    const en = renderNode(createElement(RecruiterRead, { item, shared: false, who: "@dev" }), "en-US");
+    if (comparison.grid!.criteria.some((c) => c.source === "both" && c.score !== null)) expect(en).toContain('<span class="rr-from" aria-hidden="true">LinkedIn and GitHub</span>');
+    expect(en).toMatch(/aria-label="[^"]+: \d+ out of 10, read on (LinkedIn|GitHub|both exhibits)"/);
+  });
+
+  it("une fiche seule : ni provenance par tuile, ni « lu sur » dans la grille", () => {
+    const one: Shareable = { kind: "card", card: github };
+    expect(renderNode(createElement(RecruiterRead, { item: one, shared: false, who: "@dev" }))).not.toContain("rr-from");
+    expect(render(one, false)).not.toContain("rg-kept");
   });
 
   it("la page partagée montre le recoupement sans nommer le poste", () => {
