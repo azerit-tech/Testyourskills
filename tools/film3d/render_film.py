@@ -10,7 +10,7 @@
 #   python3 tools/film3d/render_film.py --list            # construit sans rendre : la liste des assets chargés
 #   python3 tools/film3d/render_film.py --selftest        # la reprise, les cadences, les noms : sans Blender
 #
-# Options : --plan P3,P4 ; --frames a-b (comptées dans le plan, de 1 à sa longueur) ; --samples N (sinon ceux de la
+# Options : --plan P3,P4 ; --frames a-b ou 9,13,17-19 (comptées dans le plan, de 1 à sa longueur) ; --samples N (sinon ceux de la
 # scène, 256 et débruiteur) ; --res 720x1280 ; --draft (360 × 640, 32 échantillons) ; --dry (Workbench 360 × 640,
 # l'essai à blanc du Mac) ; --cpu ; --threads N (0 : tous) ; --out DIR (les images, FILM3D_RENDER ou
 # design/film/rendu) ; --plans DIR (les prises du montage, design/film/plans) ; --take N ; --force ; --blender PATH.
@@ -95,14 +95,18 @@ def read_cut(root=ROOT):
 
 
 def parse_frames(spec, n):
-    """« a-b » ou « a » (comptées dans le plan, 1 à n) -> liste d'indices ; None -> tout le plan."""
+    """« a-b », « a » ou une liste « 9,13,17-19 » (comptées dans le plan, 1 à n) -> liste d'indices triée ; None ->
+    tout le plan."""
     if not spec:
         return list(range(1, n + 1))
-    m = re.fullmatch(r"(\d+)(?:-(\d+))?", spec.strip())
-    if not m:
-        raise ValueError(f"--frames {spec} : attendu a-b")
-    a, b = int(m.group(1)), int(m.group(2) or m.group(1))
-    return [i for i in range(max(1, a), min(n, b) + 1)]
+    out = set()
+    for part in spec.split(","):
+        m = re.fullmatch(r"(\d+)(?:-(\d+))?", part.strip())
+        if not m:
+            raise ValueError(f"--frames {spec} : attendu a-b ou a,b,c-d")
+        a, b = int(m.group(1)), int(m.group(2) or m.group(1))
+        out.update(range(max(1, a), min(n, b) + 1))
+    return sorted(out)
 
 
 def parse_essais(items):
@@ -652,6 +656,7 @@ def selftest():
     assert sum(cut.values()) == 296 and cut["P6"] == 40 and cut["FIN6"] == 56, cut
     assert parse_frames("3-5", 28) == [3, 4, 5] and parse_frames("17", 28) == [17] and parse_frames(None, 3) == [1, 2, 3]
     assert parse_frames("20-40", 24) == [20, 21, 22, 23, 24]
+    assert parse_frames("26,9,13,21-23", 28) == [9, 13, 21, 22, 23, 26] and parse_frames("1,40", 28) == [1]
     assert plan_dirname("P3", {"rugosite": "0.5"}) == "P3+rugosite0.5" and plan_dirname("P3", {}) == "P3"
     assert parse_essais(["rugosite"]) == {"rugosite": "0.5"} and parse_essais(["peinture=#4e0a28"])["peinture"]
     for bad in (["peinture"], ["inconnu=1"]):
@@ -682,7 +687,7 @@ def main():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:]
     ap = argparse.ArgumentParser(description="Rend le film plan par plan (voir l'en-tête du fichier).")
     ap.add_argument("--plan", default=",".join(ORDER), help="OUV,P1,… (tous par défaut, dans l'ordre du montage)")
-    ap.add_argument("--frames", default=None, help="a-b, comptées dans le plan (1 à sa longueur)")
+    ap.add_argument("--frames", default=None, help="a-b ou a,b,c-d, comptées dans le plan (1 à sa longueur)")
     ap.add_argument("--samples", type=int, default=None)
     ap.add_argument("--adaptive", type=float, default=None, help="seuil adaptatif (sinon celui de la scène, 0,02)")
     ap.add_argument("--res", default=None, help="720x1280 par défaut (360x640 en --draft et --dry)")
