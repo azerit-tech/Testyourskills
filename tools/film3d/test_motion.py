@@ -151,6 +151,31 @@ def test_p3():
     check("P3 : éclairs sur l'image fixe", all(P.firing(k, P.STILL_FRAME) for k in P.SHOTS))
 
 
+def test_p6():
+    """P6 : aucune distance sous 6 m au sol ; la colonne derrière la berline ; la pose validée à l'image fixe ; les
+    avions au-dessus de tout, loin des hélicoptères et de la grue ; personne ne tire (il n'y a rien à tirer)."""
+    import p6_jetee as P
+    frames = range(P.F0 - 1, P.F0 + P.FRAMES + 1)
+    d, f, a, b = M.min_gap(P.tracks(), frames)
+    check("P6 : distances gardées", d >= 6.0, f"{d:.1f} m entre {a} et {b} à l'image {f}")
+    gap = min(math.dist(P.hero_pos(M.t_of(f)), P.column_pos(i)(M.t_of(f))) for f in frames for i in range(len(P.COLUMN)))
+    check("P6 : la colonne ne rattrape pas la berline", gap >= 15.0, f"{gap:.1f} m au plus près")
+    x, y = P.hero_pos(P.T_STILL)
+    c = P.camera(P.T_STILL)
+    check("P6 : la pose validée à l'image fixe", abs(y - P.Y_HERO_STILL) < 0.01 and abs(c[1] - y - 65.0) < 0.5
+          and abs(c[2] - 35.0) < 0.5, f"berline y {y:.1f}, grue {c[1] - y:.1f} m devant, {c[2]:.1f} m")
+    air = {f"heli_{i}": P.heli(i) for i in range(len(P.HELIS))}
+    air.update({f"jet_{i}": P.jet(i) for i in range(len(P.JETS))})
+    worst = min((math.dist(air[p](M.t_of(f))[:3], air[q](M.t_of(f))[:3]), p, q, f)
+                for f in frames for p in air for q in air if p < q)
+    check("P6 : les appareils s'évitent (30 m)", worst[0] >= 30.0, f"{worst[0]:.1f} m entre {worst[1]} et {worst[2]}")
+    low = min(P.jet(i)(M.t_of(f))[2] - max(P.heli(k)(M.t_of(f))[2] for k in range(len(P.HELIS)))
+              for f in frames for i in range(len(P.JETS)))
+    check("P6 : les avions au-dessus des hélicoptères", low >= 20.0, f"{low:.1f} m au plus bas")
+    cam = min(math.dist(P.camera(M.t_of(f))[:3], air[k](M.t_of(f))[:3]) for f in frames for k in air)
+    check("P6 : rien ne frôle la grue", cam >= 25.0, f"{cam:.1f} m au plus près")
+
+
 def test_bars():
     seq = [M.bar_phase(f) for f in range(24)]
     check("rampes : 2 Hz, alternance corail / lilas", seq[:6] == ["corail"] * 6 and seq[6:12] == ["lilas"] * 6
@@ -165,6 +190,7 @@ if __name__ == "__main__":
     test_p2()
     test_p4()
     test_p3()
+    test_p6()
     test_bars()
     print(f"\n{'tout passe' if not FAIL else str(len(FAIL)) + ' échec(s)'}")
     sys.exit(1 if FAIL else 0)

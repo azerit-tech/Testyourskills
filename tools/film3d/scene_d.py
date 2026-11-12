@@ -807,82 +807,86 @@ def plan_FIN6(scene, hidden, palier="socle"):
     return cam
 
 
-P6_SPEED = 120 / 3.6   # 33 m/s
+def p6_ground(x, y):
+    """Le sol sous un véhicule de la colonne : la chaussée bombée de la jetée, le terre-plein plat, la rampe du
+    pont et sa pente (scene_e.deck_ground)."""
+    if y >= JY0 - 2.0 and abs(x - JX) < 6.0:
+        return jetty_point(x, y).z, 0.0
+    import scene_e
+    return scene_e.deck_ground(x, y)
 
 
 def plan_P6(scene, hidden, palier="socle"):
-    """P6, toute la ville : la grue en haut de sa montée (4 m → 35 m), 24 mm, à 65 m devant la berline, tournée
-    vers la ville. La berline en tête sur la jetée (s = 180, à 120 km/h), la colonne de gyrophares derrière elle
-    sur la jetée, la voie du quai et la rampe du pont ; trois hélicoptères aux faisceaux croisés, deux avions bas
-    dans l'axe de la jetée. Rien dans les 12 % du haut : le ciel."""
-    import scene_c
+    """P6, toute la ville, animé (40 images, p6_jetee.py) : la grue monte de 14 à 35 m en reculant, 24 mm, dans
+    l'axe de la jetée, tournée vers la ville ; à l'image fixe (21) la pose validée : 35 m, 65 m devant la berline,
+    14° de plongée. La berline en tête sur la jetée à 120 km/h ; derrière elle quinze véhicules en colonne, rampes
+    clignotantes, de la rampe du pont à la jetée par la voie du quai (ils ralentissent dans les deux virages) ;
+    trois hélicoptères en formation qui la suivent, faisceaux croisés sur elle ; deux avions qui arrivent de
+    derrière la ville, très bas dans l'axe de la jetée, passent au-dessus de la colonne et finissent au-dessus de
+    la berline (ils ne tirent rien) ; la grue tremble à leur approche. Rien dans les 12 % du haut : le ciel."""
+    import motion as M
+    import p6_jetee as P6
     lamp_src = L.panorama(scene, hidden, all_lit=True, bridge="loin", port="loin", haubans=(palier == "haubans"))
     build_jetty(hidden, lamp_src)
     build_pointe(hidden, lamp_src, far=True, marina=(palier == "marina"))
-    s = 180.0
-    y_hero = JY0 + s
+    scene.frame_start, scene.frame_end = P6.F0, P6.F0 + P6.FRAMES - 1
+    frames = range(P6.F0 - 1, P6.F0 + P6.FRAMES + 1)      # une image de part et d'autre : l'obturateur du flou
     hero = L.hero()
-    place_on_jetty(hero, JX + 1.75, y_hero)
-    L.drive(hero, P6_SPEED, L.hero_wheels(hero), hero["wheel_r"])
-    col = []
-    y, k = y_hero - 22.0, 0
-    while y > JY0 + 4.0:                               # la jetée : deux voies, en quinconce
-        col.append(("jetee", JX + (1.75 if k % 2 == 0 else -1.75), y, 0.0))
-        y -= 18.0 + 5.0 * ((k * 7) % 3)
-        k += 1
-    for x in (60.0, 35.0, 12.0):                       # la voie du quai, vers la jetée (+x)
-        col.append(("quai", x, L.QUAY_Y + (1.75 if x > 30 else -1.75), -90.0))
-    for y in (-14.0, -40.0, -68.0):                    # la rampe du pont
-        col.append(("pont", 1.8 if y > -30 else -1.8, y, 0.0))
-    col[2] = ("van",) + col[2][1:]                    # le fourgon, troisième derrière la berline
+    wheels = L.hero_wheels(hero)
+    poses = M.sample(P6.hero_pos, frames, wheel_r=hero["wheel_r"])
+    M.key_vehicle(hero, poses, wheels=wheels, ground=p6_ground)
+    M.wheel_marks(wheels, hero["wheel_r"])
 
-    src = {}
-    for i, (where, x, y, heading) in enumerate(col):
-        kind = "van" if where == "van" else "patrol"
+    src, rigs = {}, []
+    for i, (kind, _, _) in enumerate(P6.COLUMN):
         if kind not in src:
             r = src[kind] = L.patrol("patrol") if kind == "patrol" else L.van("van")
             L.bar_pools(r, energy=2500.0)        # le ruban de gyrophares sur la chaussée mouillée, vu de 35 m
             L.bar_boost(r, 4.0)
         else:
             r = L.clone(src[kind], f"{kind}_{i}")
-        if where in ("jetee", "van"):
-            place_on_jetty(r, x, y, heading)
-        elif where == "pont":
-            scene_c.place_on_deck(r, x, y, heading)
-        else:
-            L.put(r, x, y, 0.0, heading)
+        x, y = P6.column_pos(i)(P6.T_STILL)
+        L.put(r, x, y, p6_ground(x, y)[0])
         yaw = 25 + 70 * ((i * 37) % 5) / 4
         L.bar_beams(r, f"{kind}_{i}", yaws=((yaw, L.CORAL), (yaw - 180 + 25 * (i % 3), L.LILAC)))
-        L.drive(r, P6_SPEED * 0.95)
-    print(f"[P6] colonne de {len(col)} véhicules", flush=True)
+        ps = M.sample(P6.column_pos(i), frames, wheel_r=0.36, seed=float(i))
+        M.key_vehicle(r, ps, ground=p6_ground, pivot=(0.0, 0.0, 0.36))   # roues jointes à la caisse
+        rigs.append(r)
+    n = M.flash_bars(rigs, frames)
+    print(f"[P6] colonne de {len(rigs)} véhicules, {n} lumières de rampe clignotantes", flush=True)
+
     first, _ = L.helicopter("heli")
-    hs = []
-    for i, (dx, dy, z) in enumerate(((-22.0, 12.0, 17.0), (20.0, -6.0, 20.0), (-6.0, -30.0, 24.0))):
-        r = first if i == 0 else L.clone(first, f"heli_{i}")
-        L.put(r, JX + dx, y_hero + dy, z, heading=-dx * 1.5, pitch=-7.0)
-        hs.append(r)
-    aim_helis(hs, jetty_point(JX + 1.75, y_hero, 0.6))
+    hs = [first] + [L.clone(first, f"heli_{i}") for i in range(1, len(P6.HELIS))]
+    for i, r in enumerate(hs):
+        M.key_object(r, frames, P6.heli(i))
+    scene.frame_set(P6.STILL_FRAME)
+    aim_helis(hs, P6.beam_target(P6.T_STILL))
+    for r in hs:
+        piv = next(o for o in r.children_recursive if o.name.endswith("searchlight_pivot"))
+        M.key_searchlight({"searchlight_pivot": piv}, frames, P6.beam_target)
     try:
         j = L.jet("jet")
-        # au-dessus de la berline, vers la ville, inclinés : deux silhouettes nettes sur le ciel
-        L.put(j, JX - 20.0, y_hero - 90.0, 52.0, heading=188.0, pitch=-2.0, roll=-28.0)
-        j2 = L.clone(j, "jet_2")
-        L.put(j2, JX + 10.0, y_hero - 65.0, 57.0, heading=188.0, pitch=-2.0, roll=-24.0)
-        L.drive(j, 110.0)
-        L.drive(j2, 110.0)
+        jets = [j, L.clone(j, "jet_2")]
+        for i, r in enumerate(jets):
+            M.key_object(r, frames, P6.jet(i))
     except Exception as e:  # l'avion n'est qu'une silhouette au fond : sans lui le plan tient
         print(f"[P6] avions non chargés : {e!r}", flush=True)
     # la brume seulement en couloir sur la jetée, sous la caméra : sur toute la lagune, vue de 35 m, elle diffusait
     # le ciel en un voile rose qui noyait l'eau noire et ses reflets (rendus du 12 novembre)
     L.haze((JX - 30, JX + 30), (JY0 - 20, JY1), (L.WATER_Z, 28), 0.0012)
-    # la caméra au haut de la grue : la berline au tiers bas, la ville aux deux tiers (tangente 0,25 au-dessus du
-    # centre au 24 mm vertical, soit 14° de plongée ; la berline 28° sous l'horizontale, donc à 65 m devant)
-    cam_y = y_hero + 65.0
     L.cap_images(1024)                                # tout est à 60 m et plus
-    cam = L.camera("cam_P6", (JX + 1.0, cam_y, 35.0), (JX + 1.0, cam_y - 100.0, 35.0 - 100.0 * math.tan(math.radians(14))),
-                   lens=24, fstop=0.0)
+    c = P6.camera(P6.T_STILL)
+    cam = L.camera("cam_P6", c[:3], (c[0], c[1] - 100.0, c[2] - 100.0 * math.tan(math.radians(14))),
+                   lens=P6.LENS, fstop=0.0)
+    M.key_camera(cam, frames, P6.camera)
     scene.render.use_motion_blur = True
+    scene.render.motion_blur_shutter = 0.5
+    print(f"[P6] berline de y {poses[1]['y']:.0f} à {poses[-2]['y']:.0f} ; grue de {P6.camera(0.0)[2]:.0f} à "
+          f"{P6.camera(P6.T_END)[2]:.0f} m", flush=True)
     return cam
+
+
+STILL = {"P6": 21}                                    # l'image fixe d'essai des plans animés (p6_jetee.STILL_FRAME)
 
 
 PLANS = {"FIN": plan_FIN, "FIN6": plan_FIN6, "P6": plan_P6}
@@ -892,5 +896,5 @@ def build(plan, palier="socle"):
     scene, hidden = L.new_scene()
     cam = PLANS[plan](scene, hidden, palier=palier)
     scene.camera = cam
-    scene.frame_set(2)
+    scene.frame_set(STILL.get(plan, 2))
     return scene
