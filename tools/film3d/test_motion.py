@@ -359,6 +359,17 @@ def test_p3():
     check("P3 : la caméra passe le barrage sans ralentir", cys[-1] > P.PATROLS["patrol_a"][1]
           and all(vs[i + 1] >= vs[i] - 1e-6 for i in range(len(vs) - 1)),
           f"y {cys[0]:.1f} → {cys[-1]:.1f}, {min(vs):.1f} à {max(vs):.1f} m/s")
+    wet = []
+    for name, px, py, r, sy in P.PUDDLES:
+        for f4 in range(4 * P.F0, 4 * (P.F0 + P.FRAMES)):
+            t = M.t_of(f4 / 4)
+            cy = P.cam_y(t)
+            if (P.PUDDLE_FREE[0] <= cy <= P.PUDDLE_FREE[1] and abs(cy - py) <= 1.36 * r * sy
+                    and abs(P.cam_x(t) - px) - 1.36 * r < 1.0):
+                wet.append(name)
+                break
+    check("P3 : pas de flaque sur la route de la caméra entre y 116 et 130 (1 m de part et d'autre)", not wet,
+          f"{wet}")
     zs = [P.cam_z(M.t_of(f)) for f in shown]
     low = next(i for i, z in enumerate(zs) if z <= P.Z1 + 1e-6)
     top = max(i for i, z in enumerate(zs) if z >= P.Z0 - 1e-6)

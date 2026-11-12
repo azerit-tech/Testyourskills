@@ -132,11 +132,13 @@ CRATES = (2.05, 3.05, 104.5, 107.1)        # x0, x1, y0, y1 (piles de palettes e
 # les flaques (x, y monde, demi-largeur en x, allongement en y) : sur la ligne de la berline (la gerbe de la
 # feinte, celle d'avant les plots) et sous la caméra quand elle rase le sol ; jamais une large dans l'axe de la
 # caméra devant la berline (en miroir sous le ciel noir, elle ouvrait un trou au bas du cadre) : près de l'axe,
-# 35 cm au plus ; celle de la brèche sous les roues droites, celle de l'arrêt à gauche de l'objectif ;
-# scene_b les pose, wheel_hits() dit quand une roue y passe
+# 35 cm au plus ; aucune entre y PUDDLE_FREE à moins de 1 m de la route de la caméra (au ras du sol, elle y
+# reflétait rampes et phares en taches blanches sous la berline) : celle de l'arrêt à gauche de l'objectif, celle
+# du trottoir à droite ; scene_b les pose, wheel_hits() dit quand une roue y passe
+PUDDLE_FREE = (116.0, 130.0)
 PUDDLES = [("flaque_entree", -1.05, 97.5, 0.55, 2.4), ("flaque_feinte", 1.15, 103.6, 0.55, 2.2),
            ("flaque_axe", -0.75, 109.5, 0.35, 2.0), ("flaque_basse_0", -1.05, 112.8, 0.35, 1.9),
-           ("flaque_basse_1", 0.35, 115.4, 0.35, 1.7), ("flaque_breche", 0.6, 121.0, 0.45, 1.6),
+           ("flaque_basse_1", 0.35, 114.9, 0.35, 1.7),
            ("flaque_arret", -2.3, 118.9, 0.4, 1.4), ("flaque_trottoir", 3.2, 117.0, 0.5, 2.6)]
 
 # --- les rampes du barrage, vues de loin (55 m à l'image 1) : leur émission × BAR_GAIN jusqu'à l'image 22,
