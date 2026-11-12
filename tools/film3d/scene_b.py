@@ -1159,6 +1159,26 @@ def dup_tree(ob, parent, tag):
     return c
 
 
+def unshare_lights(root):
+    """Les lumières d'une copie de dup_tree (ob.copy() partage leurs données) prennent leurs propres données, et
+    les pilotes de ses optiques de rampe (cast_vehicles.bar_drive_lenses) les suivent : chaque patrouille clignote
+    à sa phase (motion.flash_bars) au lieu des trois ensemble à celle de la dernière."""
+    tree = [root] + list(root.children_recursive)
+    new = {}
+    for o in tree:
+        if o.type == "LIGHT":
+            d = o.data.copy()
+            new[o.data.name] = d
+            o.data = d
+    for o in tree:
+        ad = o.animation_data
+        for fc in (ad.drivers if ad else ()):
+            for v in fc.driver.variables:
+                for tg in v.targets:
+                    if tg.id_type == "LIGHT" and tg.id is not None and tg.id.name in new:
+                        tg.id = new[tg.id.name]
+    return root
+
 
 def patrol_beams(body, tag, aims):
     """Les gyrophares figés en plein balayage : un faisceau corail et un violet par rampe, vers les points donnés
@@ -1346,7 +1366,7 @@ def build_barrage(scene, hidden, plan):
     lieux.bar_pools(body, energy=2000.0)
     doors, front_axle, hw = cut_doors(body)
     shells = [c for c in bpy.data.collections if c.name.endswith("_glow_exclude")]
-    cars = [body] + [dup_tree(body, None, tag) for tag in ("b", "c")]
+    cars = [body] + [unshare_lights(dup_tree(body, None, tag)) for tag in ("b", "c")]
     # les lueurs de rampe excluent la rampe (liaison de lumière) : les copies y sont entrées aussi
     for sh in shells:
         for co in sh.collection_objects:
@@ -1377,8 +1397,9 @@ def build_barrage(scene, hidden, plan):
         p = car.matrix_world @ Vector((front_axle - 1.42, open_side * (hw + 0.6), 0.0))
         a.location = (p.x, p.y, road.road_z(abs(p.x)))
         # l'armature regarde -y au repos, en quaternion : un lacet θ (en Euler) la tourne vers (sin θ, -cos θ) ;
-        # l'agent vise la berline (+y de vue), un peu vers l'axe, de dos pour la caméra
-        fx, fy = (-0.12 if x > 0 else 0.12), 1.0
+        # l'agent vise le pneu avant de la berline (+y de vue), à 17° de l'axe : la caméra, qui arrive 6 m derrière
+        # elle, le voit de face, et il ne la vise jamais (à 6° vers l'axe, il visait l'objectif)
+        fx, fy = (-0.3 if x > 0 else 0.3), 1.0
         a.rotation_mode = "XYZ"
         a.rotation_euler = (0, 0, math.atan2(fx, -fy))
         officers.append(a)
@@ -1623,8 +1644,8 @@ def plan_P3(scene):
     for tag, car in (("a", ob["patrol_a"]), ("b", ob["patrol_a_b"])):
         keep_world_parent([o for o in ob if o.name.startswith(f"beam_{tag}_")], car)
     n_bars = MO.flash_bars([ob["patrol_a"], ob["patrol_a_b"], rig_c], frames)
-    # (les flaques de couleur des rampes, lieux.bar_pools : pleine force de loin, POOL_LOW de près ; leurs données
-    # sont partagées par les trois patrouilles, une fois chacune)
+    # (les flaques de couleur des rampes, lieux.bar_pools : pleine force de loin, POOL_LOW de près ; chaque
+    # patrouille a ses données, unshare_lights ; chaque bloc une fois)
     # et les faisceaux du barrage sur les façades devant lui, × BEAM_GAIN de loin : dès l'image 1, les murs battent
     # corail et lilas autour de la berline, avant que le barrage lui-même se lise au-dessus du toit
     gains = (("_pool_", lambda f: 1.0 - (1.0 - P3.POOL_LOW) * MO.smoothstep(*P3.POOL_FADE, f)),
