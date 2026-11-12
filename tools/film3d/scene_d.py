@@ -1166,8 +1166,12 @@ def plan_P6(scene, hidden, palier="socle"):
     scene.frame_set(P6.STILL_FRAME)
     # vus de face au ras du sol : à 150 kW et 6°, leur nappe sur l'enrobé mouillé faisait un aplat blanc brûlé
     # autour et devant la berline (rendu e4, images 30 et 60) ; à 50 kW et 4°, une tache contenue devant elle. Une
-    # source de 1,5 m adoucit les ombres de la berline jetées vers la caméra (bords déchiquetés par les flaques)
-    aim_helis(hs, P6.beam_target(P6.T_STILL), energy=50000.0, cone=4.0)
+    # source de 1,5 m adoucit les ombres de la berline jetées vers la caméra (bords déchiquetés par les flaques).
+    # Lumière v3.1 (règles B, D et F) : cette tache, coupée en deux par l'ombre de la berline, faisait deux bouffées
+    # blanches à ses flancs, à hauteur des roues (rendu h1 ; elles disparaissent hélicoptères cachés, pas brume
+    # cachée). Le sol n'en reçoit plus que 8 kW, une lueur ; la berline garde ses 50 kW par une jumelle qui
+    # n'éclaire qu'elle (split_for_car, crème comme en FIN)
+    aim_helis(hs, P6.beam_target(P6.T_STILL), energy=8000.0, car=hero, car_energy=50000.0, cone=4.0)
     for r in hs:
         for o in r.children_recursive:
             if o.type == "LIGHT" and o.name.endswith("searchlight_spot"):
