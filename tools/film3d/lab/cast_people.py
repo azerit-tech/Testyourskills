@@ -1297,7 +1297,7 @@ def _paint_spp(arm, meshes, look):
     mais jamais sa couleur (écussons, insigne de casquette, plaque de poitrine, mots) ; les pièces rapportées
     dorées ou argentées deviennent des plaques unies sans relief ; ceinturon, étuis, chaussures et visière en
     cuir noir ; la peau, les yeux, les cheveux, la barbe et les cils prennent leurs textures, teintées selon
-    `look` ; gants de cuir noir ; les lunettes de soleil sont retirées."""
+    `look` ; gants de cuir noir ; les lunettes de soleil et les cils sont retirés."""
     L_ = LOOKS[look % len(LOOKS)]
     tag = f"spp{look % len(LOOKS)}"
     kept = []
@@ -1305,7 +1305,9 @@ def _paint_spp(arm, meshes, look):
         part = _spp_part(ob)
         mat0 = ob.data.materials[0] if ob.data.materials else None
         im = _orig_images(mat0)
-        if part in ("eyewear",) or (part == "beards" and not L_["beard"]) or \
+        # les cils aussi : sans opacité utilisable (l'image du modèle est un reflet), leurs cartes faisaient un trait
+        # noir épais autour des yeux sous un ciel clair
+        if part in ("eyewear", "eyelashes") or (part == "beards" and not L_["beard"]) or \
                 (part == "moustaches" and not L_["moustache"]):
             bpy.data.objects.remove(ob)
             continue
