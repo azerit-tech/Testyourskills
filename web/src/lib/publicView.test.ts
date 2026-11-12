@@ -41,14 +41,14 @@ describe("la grille vue par un visiteur", () => {
     expect(m.excluded.map((x) => x.code)).not.toContain("EDU");
   });
 
-  it("les recoupements négatifs restent privés, les positifs se montrent", () => {
+  it("les points « à confirmer » restent privés, les recoupements positifs se montrent", () => {
     for (const grid of [cmp.cv, cmp.grid]) {
       const g = publicGrid(grid);
-      expect(all(g)).not.toMatch(/Moins d'années de code public|Fewer years of public code|Sans trace publique|No public trace|Kubernetes, Kafka, aucune/);
+      expect(all(g)).not.toMatch(/À confirmer|To confirm|Kubernetes, Kafka\./);
       const stk = byCode(g, "STK");
-      if (stk.evidence?.source === "both") expect(stk.evidence.text.fr).toContain("Dans le code : React, Node.js.");
+      if (stk.evidence?.source === "both") expect(stk.evidence.text.fr).toContain("Retrouvées dans le code\u00a0: React, Node.js.");
     }
-    // L'expérience recoupée « en dessous » redevient la pièce de LinkedIn, sans face-à-face.
+    // L'expérience aux années de code public moins nombreuses : la pièce de LinkedIn, sans la ligne GitHub.
     const xp = byCode(publicGrid(cmp.cv), "XP");
     expect(xp.evidence?.source).toBe("linkedin");
     expect(xp.evidence?.text.fr).not.toContain("GitHub");
@@ -60,8 +60,37 @@ describe("la grille vue par un visiteur", () => {
     const g = publicGrid(cmp.cv);
     const flags = g.criteria.flatMap((c) => c.flags.map((x) => x.fr));
     expect(flags.some((x) => x.startsWith("Équipe encadrée"))).toBe(true);
-    expect(flags.some((x) => x.includes("en dessous de la vérité"))).toBe(true);
-    expect(flags.some((x) => /sans trace publique|Senior à confirmer|PR entre proches|Activité sans code/i.test(x))).toBe(false);
+    expect(flags).toContain("Stack prouvée au-delà du profil");
+    expect(flags.some((x) => /à confirmer|Senior à confirmer|PR entre proches|Activité sans code/i.test(x))).toBe(false);
+  });
+
+  it("un dossier rangé avant (§18.36) : ses anciennes tournures d'écart restent privées", () => {
+    type F = { fr: string; en: string };
+    const old = (code: "XP" | "STK", t: F, flags: F[] = []) => {
+      const c = byCode(cmp.grid, code);
+      return { ...c, flags, evidence: { text: t, publicText: t, source: "both" as const, proof: "https://github.com/x" } };
+    };
+    const grid = {
+      ...cmp.grid,
+      criteria: cmp.grid.criteria.map((c) =>
+        c.code === "XP"
+          ? old("XP", {
+              fr: "Total : 8,4 ans. GitHub : 5 années actives (50 contributions ou plus sur douze mois). Moins d'années de code public que de métier compté.",
+              en: "Total: 8.4 years. GitHub: 5 active years (50+ contributions over twelve months). Fewer years of public code than counted work.",
+            })
+          : c.code === "STK"
+            ? old("STK", { fr: "LinkedIn : Kubernetes, React. Dans le code : React. Sans trace publique : Kubernetes.", en: "LinkedIn: Kubernetes, React. In the code: React. No public trace: Kubernetes." }, [
+                { fr: "Stack déclarée, sans trace publique : Kubernetes, Kafka, aucune trace dans 31 dépôts.", en: "Declared stack, no public trace: Kubernetes, Kafka, no trace in 31 repos." },
+                { fr: "LinkedIn en dessous de la vérité : Rust prouvé par le code, absent de LinkedIn.", en: "LinkedIn undersells the code: Rust proven by the code, missing from LinkedIn." },
+              ])
+            : c,
+      ),
+    };
+    const g = publicGrid(grid);
+    expect(all(g)).not.toMatch(/Moins d'années|Fewer years|Sans trace publique|sans trace publique|No public trace|no public trace/);
+    expect(byCode(g, "XP").evidence).toMatchObject({ text: { fr: "Total : 8,4 ans.", en: "Total: 8.4 years." }, source: "linkedin" });
+    expect(byCode(g, "STK").evidence?.text.fr).toBe("LinkedIn : Kubernetes, React. Dans le code : React.");
+    expect(byCode(g, "STK").flags.map((x) => x.fr)).toEqual(["LinkedIn en dessous de la vérité"]);
   });
 
   it("ni « ce qui manque » ni texte qui nomme ; idempotent", () => {

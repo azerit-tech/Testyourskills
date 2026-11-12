@@ -209,9 +209,13 @@ describe("la pièce où chaque note d'un dossier a été lue (§18.36)", () => {
     for (const k of [FR.compare.keptFrom, DICTS.en.grid.compare.keptFrom]) expect(Object.values(k).join(" ")).not.toMatch(/plus haute|higher|contre|against|retenu|kept/i);
   });
 
-  it("la démo montre « recoupé » là où le moteur le pose : expérience, parcours, stack, ownership", () => {
+  it("la démo montre « recoupé » là où le moteur le pose : parcours, stack, ownership", () => {
     const grid = comparisonGridsMock("LinkedIn", "camille-ardent").grid;
     const crossed = grid.criteria.filter((c) => sourceLabel(c, FR, "linkedin") === FR.source.both).map((c) => c.code);
-    expect(crossed).toEqual(["XP", "EMP", "STK", "OWN"]);
+    // L'expérience de la démo compte moins d'années de code public : sa pièce reste celle de LinkedIn, le point passe « à confirmer ».
+    expect(crossed).toEqual(["EMP", "STK", "OWN"]);
+    expect(grid.criteria.find((c) => c.code === "XP")!.flags.map((x) => x.fr)).toContain(
+      "À confirmer en entretien\u00a0: une partie de ces années ne se voit pas en code public. C'est courant, le code d'entreprise est privé.",
+    );
   });
 });

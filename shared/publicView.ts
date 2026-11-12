@@ -5,10 +5,14 @@
 //
 // - L'école est gardée pour la personne : sa note ne se montre que si elle a
 //   fait monter la note (comptée dans la moyenne), jamais son rang ni son nom.
-// - Les recoupements ne se montrent que positifs : « moins d'années de code
-//   public », « sans trace publique », « aucune retrouvée » restent privés, comme
-//   les chefs d'accusation de la grille (« Senior à confirmer », « PR entre
-//   proches »…). Restent « Équipe encadrée » et « LinkedIn en dessous de la vérité ».
+// - Les recoupements ne se montrent que positifs. Les points « à confirmer »
+//   (signaux du critère depuis le §18.36 : « À confirmer en entretien », « À
+//   confirmer : Kafka… ») restent privés, comme les chefs d'accusation de la
+//   grille (« Senior à confirmer », « PR entre proches »…). Les dossiers rangés
+//   avant gardent leurs anciennes tournures en fin de pièce (« moins d'années de
+//   code public », « sans trace publique », « aucune retrouvée ») : retirées ici
+//   aussi. Restent « Équipe encadrée » et « Stack prouvée au-delà du profil »
+//   (avant : « LinkedIn en dessous de la vérité »).
 // - Une pièce lue sur LinkedIn ou le CV part dans sa version publique, sans nom
 //   d'école ni d'employeur ; « ce qui manque » (il s'adresse à la personne) ne part pas.
 // - Une fiche faite par un tiers (dénoncée) et pas encore revendiquée : pas de
@@ -29,9 +33,13 @@ export const SCHOOL_KEPT: Fact = f("Gardée pour la personne fichée.", "Kept fo
 const NAMED: CriterionCode[] = ["EDU", "XP", "EMP", "OWN"];
 
 /** Les chefs d'accusation qui jouent pour la personne : les seuls montrés en public. */
-const POSITIVE_FLAG = /^(?:Équipe encadrée|Team led)|en dessous de la vérité|undersells the code/;
+const POSITIVE_FLAG = /^(?:Équipe encadrée|Team led|Stack prouvée au-delà du profil|Stack proven beyond the profile)|en dessous de la vérité|undersells the code/;
 
-/** Les recoupements négatifs, en fin de pièce (server/src/scoring/grid.ts, xpCrossCheck et stkCrossCheck). */
+/**
+ * Les recoupements négatifs des dossiers rangés avant le §18.36, en fin de pièce.
+ * Le moteur ne les écrit plus : ils sont devenus des signaux « à confirmer »,
+ * hors de la pièce publique (server/src/scoring/grid.ts, xpCrossCheck et stackFlags).
+ */
 const XP_LESS = { fr: "Moins d'années de code public que de métier compté.", en: "Fewer years of public code than counted work." };
 const STK_NONE = { fr: "Aucune retrouvée dans le code.", en: "None found in the code." };
 const STK_ABSENT = { fr: /\s*Sans trace publique\s?:\s.*$/, en: /\s*No public trace:\s.*$/ };

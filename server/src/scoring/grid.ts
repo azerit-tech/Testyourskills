@@ -880,7 +880,14 @@ export function traceFound(t: Trace, facts: GithubFacts, m: GithubMetrics): bool
   return markers.size > 0 && facts.trees.some((tr) => tr.markers.some((x) => markers.has(x)));
 }
 
-/** « Stack déclarée, sans trace publique » et « LinkedIn en dessous de la vérité » : des chefs d'accusation, jamais une note. */
+/** « Sur LinkedIn », « sur le CV » : où la pièce déclarative a été lue. */
+const declaredOn = (label: string): Fact => (label === "CV" ? f("sur le CV", "on the CV") : f(`sur ${label}`, `on ${label}`));
+
+/**
+ * Les signaux de la stack, jamais une note : « À confirmer » (des technos
+ * déclarées qu'on ne voit pas encore dans le code public, pour la personne
+ * seule) et « Stack prouvée au-delà du profil » (le code en montre davantage).
+ */
 export function stackFlags(d: DeclaredInput, gh: Pick<GithubInput, "facts" | "m">): Fact[] {
   const { facts, m } = gh;
   const r = d.reading;
@@ -894,10 +901,11 @@ export function stackFlags(d: DeclaredInput, gh: Pick<GithubInput, "facts" | "m"
     if (share < S.noTraceShareBelow) {
       const list = notFound.slice(0, 3).map((t) => t.name).join(", ");
       const n = facts.repos.length;
+      const on = declaredOn(d.label);
       out.push(
         f(
-          `Stack déclarée, sans trace publique : ${list}, aucune trace dans ${n} dépôt${n > 1 ? "s" : ""}.`,
-          `Declared stack, no public trace: ${list}, no trace in ${n} repo${n === 1 ? "" : "s"}.`,
+          `À confirmer\u00a0: ${list}. Déclarées ${on.fr}, pas encore visibles dans ${n} dépôt${n > 1 ? "s" : ""} public${n > 1 ? "s" : ""}.`,
+          `To confirm: ${list}. Listed ${on.en}, not visible yet in ${n} public repo${n === 1 ? "" : "s"}.`,
         ),
       );
     }
@@ -909,12 +917,7 @@ export function stackFlags(d: DeclaredInput, gh: Pick<GithubInput, "facts" | "m"
   });
   if (proven.length) {
     const list = proven.slice(0, 3).map((t) => t.name).join(", ");
-    out.push(
-      f(
-        `${d.label} en dessous de la vérité : ${list} prouvé${proven.length > 1 ? "s" : ""} par le code, absent${proven.length > 1 ? "s" : ""} ${d.label === "CV" ? "du CV" : "de LinkedIn"}.`,
-        `${d.label} undersells the code: ${list} proven by the code, missing from ${d.label === "CV" ? "the CV" : "LinkedIn"}.`,
-      ),
-    );
+    out.push(f(`Stack prouvée au-delà du profil\u00a0: ${list}.`, `Stack proven beyond the profile: ${list}.`));
   }
   return out;
 }
@@ -1242,8 +1245,11 @@ export function ossGithub(g: GithubInput): Draft {
 // recoupements se calculent sur la fiche déclarative d'une comparaison, qui
 // reçoit les faits GitHub : les années recomptées face aux années actives (XP),
 // le poste confirmé par le code ou le même employeur des deux côtés (EMP), les
-// technos déclarées retrouvées ou sans trace (STK). L'ownership lu des deux
-// côtés se recoupe dans la note du dossier (caseGrid).
+// technos déclarées retrouvées dans le code (STK). L'ownership lu des deux
+// côtés se recoupe dans la note du dossier (caseGrid). Un dossier, une fiche,
+// une note (§18.36) : rien ne s'y dit en écart. Ce qui ne se voit pas encore
+// dans le code public devient un signal du critère, « À confirmer », pour la
+// personne seule, sans toucher la note.
 
 type Evidence = NonNullable<GridCriterion["evidence"]>;
 type GithubSide = Pick<GithubInput, "facts" | "m">;
@@ -1257,18 +1263,29 @@ export function xpCrossCheck(draft: Draft, d: DeclaredInput, gh: GithubSide): Dr
   const active = byYear.filter((x) => x.contributions >= min).length;
   const y = countedMonths(analyzeRoles(d.roles, d.now)) / 12;
   const gap = active - y;
-  const verdict =
-    Math.abs(gap) <= 1
-      ? f("Les deux se tiennent.", "The two line up.")
-      : gap > 0
-        ? f("Du code public sur plus d'années que le métier compté.", "Public code over more years than the counted work.")
-        : f("Moins d'années de code public que de métier compté.", "Fewer years of public code than counted work.");
   const github = active
     ? f(
         `GitHub : ${active} année${active > 1 ? "s" : ""} active${active > 1 ? "s" : ""} (${min} contributions ou plus sur douze mois).`,
         `GitHub: ${active} active year${active > 1 ? "s" : ""} (${min}+ contributions over twelve months).`,
       )
     : f(`GitHub : aucune année active (${min} contributions ou plus sur douze mois).`, `GitHub: no active year (${min}+ contributions over twelve months).`);
+  if (gap < -1)
+    // Moins d'années de code public : la pièce reste celle de LinkedIn (en public, sans la ligne GitHub) ; le point passe en signal, pour la personne seule.
+    return {
+      ...draft,
+      flags: [
+        ...draft.flags,
+        f(
+          "À confirmer en entretien\u00a0: une partie de ces années ne se voit pas en code public. C'est courant, le code d'entreprise est privé.",
+          "To confirm in interview: part of these years doesn't show in public code. That's common, company code is private.",
+        ),
+      ],
+      evidence: { ...ev, text: join([ev.text, github]) },
+    };
+  const verdict =
+    gap > 1
+      ? f("Recoupé\u00a0: le code public remonte plus loin que les postes comptés.", "Cross-checked: public code goes back further than the counted roles.")
+      : f("Recoupé\u00a0: le code public couvre la même période.", "Cross-checked: public code covers the same period.");
   return {
     ...draft,
     evidence: { text: join([ev.text, github, verdict]), publicText: join([ev.publicText, github, verdict]), source: "both", proof: profileUrl(gh.facts.login) },
@@ -1385,7 +1402,8 @@ export function empCrossCheck(draft: Draft, d: DeclaredInput, gh: GithubSide): D
 /**
  * STK : chaque techno déclarée qu'on sait chercher (la table « techno → trace »)
  * est cherchée dans les langages, les dépendances, les topics et les fichiers.
- * « Sans trace publique » ne s'écrit que pour ces technos-là.
+ * La pièce dit celles qui sont retrouvées ; celles qu'on ne voit pas encore
+ * passent en signal « À confirmer » (stackFlags), pour la personne seule.
  */
 export function stkCrossCheck(draft: Draft, d: DeclaredInput, gh: GithubSide): Draft {
   const r = d.reading;
@@ -1394,12 +1412,11 @@ export function stkCrossCheck(draft: Draft, d: DeclaredInput, gh: GithubSide): D
   const found = verifiable.filter((t) => traceFound(t, gh.facts, gh.m)).map((t) => t.name);
   const absent = verifiable.map((t) => t.name).filter((n) => !found.includes(n));
   const list = (xs: string[]) => xs.slice(0, 5).join(", ") + (xs.length > 5 ? "…" : "");
-  const parts: Fact[] = [f(`${d.label} : ${list(verifiable.map((t) => t.name))}.`, `${d.label}: ${list(verifiable.map((t) => t.name))}.`)];
+  const on = declaredOn(d.label);
+  const named = list(verifiable.map((t) => t.name));
+  const parts: Fact[] = [f(`Déclarées ${on.fr}\u00a0: ${named}.`, `Listed ${on.en}: ${named}.`)];
   if (!absent.length) parts.push(f("Toutes retrouvées dans le code.", "All found in the code."));
-  else {
-    parts.push(found.length ? f(`Dans le code : ${list(found)}.`, `In the code: ${list(found)}.`) : f("Aucune retrouvée dans le code.", "None found in the code."));
-    parts.push(f(`Sans trace publique : ${list(absent)}.`, `No public trace: ${list(absent)}.`));
-  }
+  else if (found.length) parts.push(f(`Retrouvées dans le code\u00a0: ${list(found)}.`, `Found in the code: ${list(found)}.`));
   // Des noms de technos, pas d'employeurs : la même pièce sur la page partagée.
   const text = join(parts);
   return { ...draft, evidence: { text, publicText: text, source: "both", proof: profileUrl(gh.facts.login) } };
@@ -1497,8 +1514,9 @@ const mergeFlags = (a: Fact[], b: Fact[]) => {
  * l'activité et l'open source ; la plus haute des deux pour l'ownership.
  * Un GitHub trop mince ne tire pas le dossier vers le bas : ses critères sont
  * non prouvés. Chaque critère garde ses deux notes (`declared`, `proven`).
+ * `label` : la pièce déclarative, « LinkedIn » ou « CV », pour sa pièce d'ownership.
  */
-export function caseGrid(declared: Grid, proven: Grid): Grid {
+export function caseGrid(declared: Grid, proven: Grid, label: "LinkedIn" | "CV" = "LinkedIn"): Grid {
   const pick = (code: CriterionCode) => ({
     d: declared.criteria.find((c) => c.code === code)!,
     p: proven.criteria.find((c) => c.code === code)!,
@@ -1530,17 +1548,19 @@ export function caseGrid(declared: Grid, proven: Grid): Grid {
         source = chosen.source;
     }
     const flags = mergeFlags(d.flags, p.flags);
-    const evidence = caseEvidence(code, chosen === p, d, p);
+    const evidence = caseEvidence(code, chosen === p, d, p, label);
     const { evidence: _e, ...rest } = strip(chosen);
     return { ...rest, source, ...both, flags, ...(evidence ? { evidence } : {}) };
   });
   return finalize(drafts);
 }
 
-/** « Déclaré : une entreprise fondée. » : la pièce du côté déclaratif, après celle de GitHub. */
-const declaredSide = (x: Fact): Fact => {
+/** « Sur LinkedIn : une entreprise fondée. » : la pièce du côté déclaratif, après celle de GitHub. */
+const declaredSide = (x: Fact, label: string): Fact => {
   const low = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
-  return f(`Déclaré : ${low(x.fr)}`, `Declared: ${low(x.en)}`);
+  const on = declaredOn(label);
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  return f(`${cap(on.fr)}\u00a0: ${low(x.fr)}`, `${cap(on.en)}: ${low(x.en)}`);
 };
 
 /**
@@ -1549,7 +1569,7 @@ const declaredSide = (x: Fact): Fact => {
  * l'ownership noté des deux côtés, les deux pièces face à face. XP et EMP
  * gardent la pièce déclarative, déjà recoupée sur la fiche de la comparaison.
  */
-function caseEvidence(code: CriterionCode, tookProven: boolean, d: GridCriterion, p: GridCriterion): Evidence | undefined {
+function caseEvidence(code: CriterionCode, tookProven: boolean, d: GridCriterion, p: GridCriterion, label: string): Evidence | undefined {
   const de = d.evidence;
   const pe = p.evidence;
   const chosen = tookProven ? pe : de;
@@ -1565,6 +1585,6 @@ function caseEvidence(code: CriterionCode, tookProven: boolean, d: GridCriterion
     };
   };
   if (code === "STK" && tookProven && p.score !== null && de.source === "both") return pair(de.text, de.publicText);
-  if (code === "OWN" && p.score !== null && d.score !== null) return pair(declaredSide(de.text), de.publicText ? declaredSide(de.publicText) : undefined);
+  if (code === "OWN" && p.score !== null && d.score !== null) return pair(declaredSide(de.text, label), de.publicText ? declaredSide(de.publicText, label) : undefined);
   return chosen;
 }

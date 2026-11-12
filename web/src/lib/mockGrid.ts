@@ -286,6 +286,9 @@ const GITHUB: Record<string, (login: string) => Grid> = {
 
 // --- La fiche déclarative (LinkedIn ou CV) ---------------------------------------------------
 
+/** « sur LinkedIn », « sur le CV » : où la pièce déclarative a été lue (comme le moteur). */
+const on = (src: "LinkedIn" | "CV"): Fact => (src === "CV" ? f("sur le CV", "on the CV") : f("sur LinkedIn", "on LinkedIn"));
+
 /** Ce que déclare le profil de démo : 8,4 ans comptés, une entreprise fondée tenue 3,4 ans, une école de rang A. */
 function declaredDrafts(src: "LinkedIn" | "CV", proof?: string, ghRepos?: number): Draft[] {
   const p = proof ? { proof } : {};
@@ -330,8 +333,11 @@ function declaredDrafts(src: "LinkedIn" | "CV", proof?: string, ghRepos?: number
       next: f("Au-delà de 6 : la stack se prouve sur GitHub.", "Beyond 6: the stack is proven on GitHub."),
       flags: ghRepos
         ? [
-            f(`Stack déclarée, sans trace publique : Kubernetes, Kafka, aucune trace dans ${ghRepos} dépôts.`, `Declared stack, no public trace: Kubernetes, Kafka, no trace in ${ghRepos} repos.`),
-            f(fr("{src} en dessous de la vérité : Rust prouvé par le code, absent ") + (src === "CV" ? "du CV." : "de LinkedIn."), `${src} undersells the code: Rust proven by the code, missing from ${src === "CV" ? "the CV" : "LinkedIn"}.`),
+            f(
+              `À confirmer\u00a0: Kubernetes, Kafka. Déclarées ${on(src).fr}, pas encore visibles dans ${ghRepos} dépôts publics.`,
+              `To confirm: Kubernetes, Kafka. Listed ${on(src).en}, not visible yet in ${ghRepos} public repos.`,
+            ),
+            f("Stack prouvée au-delà du profil\u00a0: Rust.", "Stack proven beyond the profile: Rust."),
           ]
         : [],
       evidence: { text: f("Kubernetes, Kafka, React, Node.js.", "Kubernetes, Kafka, React, Node.js."), publicText: f("Kubernetes, Kafka, React, Node.js.", "Kubernetes, Kafka, React, Node.js."), source: "linkedin", ...p },
@@ -354,34 +360,29 @@ export function declaredGridMock(src: "LinkedIn" | "CV", proof?: string): Grid {
 /**
  * Les recoupements de la fiche déclarative d'une comparaison, comme le moteur
  * (xpCrossCheck, empCrossCheck, stkCrossCheck) : les années face aux années
- * actives de GitHub, le même employeur sur le profil GitHub, les technos
- * déclarées retrouvées ou sans trace. Les notes ne bougent pas.
+ * actives de GitHub (ici moins d'années de code public : la pièce reste celle
+ * de LinkedIn et le point passe « à confirmer »), le même employeur sur le
+ * profil GitHub, les technos déclarées retrouvées. Les notes ne bougent pas.
  */
 function crossChecked(drafts: Draft[], src: "LinkedIn" | "CV", login: string): Draft[] {
-  const add = (d: Draft, more: Fact, morePublic: Fact = more, proof?: string): Draft => {
-    const ev = d.evidence!;
-    const pub = ev.publicText ?? ev.text;
-    return {
-      ...d,
-      evidence: {
-        text: f(`${ev.text.fr} ${more.fr}`, `${ev.text.en} ${more.en}`),
-        publicText: f(`${pub.fr} ${morePublic.fr}`, `${pub.en} ${morePublic.en}`),
-        source: "both",
-        ...(proof ? { proof } : ev.proof ? { proof: ev.proof } : {}),
-      },
-    };
-  };
   return drafts.map((d): Draft => {
-    if (d.code === "XP")
-      return add(
-        d,
-        f(
-          "GitHub : 5 années actives (50 contributions ou plus sur douze mois). Moins d'années de code public que de métier compté.",
-          "GitHub: 5 active years (50+ contributions over twelve months). Fewer years of public code than counted work.",
-        ),
-        undefined,
-        gh(login),
-      );
+    if (d.code === "XP") {
+      const ev = d.evidence!;
+      return {
+        ...d,
+        flags: [
+          ...d.flags,
+          f(
+            "À confirmer en entretien\u00a0: une partie de ces années ne se voit pas en code public. C'est courant, le code d'entreprise est privé.",
+            "To confirm in interview: part of these years doesn't show in public code. That's common, company code is private.",
+          ),
+        ],
+        evidence: {
+          ...ev,
+          text: f(`${ev.text.fr} GitHub : 5 années actives (50 contributions ou plus sur douze mois).`, `${ev.text.en} GitHub: 5 active years (50+ contributions over twelve months).`),
+        },
+      };
+    }
     if (d.code === "EMP")
       return {
         ...d,
@@ -400,8 +401,8 @@ function crossChecked(drafts: Draft[], src: "LinkedIn" | "CV", login: string): D
       };
     if (d.code === "STK") {
       const text = f(
-        `${src} : Kubernetes, React, Node.js, Rust. Dans le code : React, Node.js. Sans trace publique : Kubernetes.`,
-        `${src}: Kubernetes, React, Node.js, Rust. In the code: React, Node.js. No public trace: Kubernetes.`,
+        `Déclarées ${on(src).fr}\u00a0: Kubernetes, Kafka, React, Node.js. Retrouvées dans le code\u00a0: React, Node.js.`,
+        `Listed ${on(src).en}: Kubernetes, Kafka, React, Node.js. Found in the code: React, Node.js.`,
       );
       return { ...d, evidence: { text, publicText: text, source: "both", proof: gh(login) } };
     }
@@ -409,11 +410,15 @@ function crossChecked(drafts: Draft[], src: "LinkedIn" | "CV", login: string): D
   });
 }
 
-/** « Déclaré : une entreprise fondée. » : la pièce du côté déclaratif, après celle de GitHub (comme le moteur). */
-const declaredSide = (x: Fact): Fact => f(`Déclaré : ${x.fr.charAt(0).toLowerCase()}${x.fr.slice(1)}`, `Declared: ${x.en.charAt(0).toLowerCase()}${x.en.slice(1)}`);
+/** « Sur LinkedIn : une entreprise fondée. » : la pièce du côté déclaratif, après celle de GitHub (comme le moteur). */
+const declaredSide = (x: Fact, src: "LinkedIn" | "CV"): Fact => {
+  const low = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  return f(`${cap(on(src).fr)}\u00a0: ${low(x.fr)}`, `${cap(on(src).en)}: ${low(x.en)}`);
+};
 
 /** La pièce retenue au dossier, comme caseEvidence : la stack prouvée puis le recoupement déclaré ; l'ownership noté des deux côtés, face à face. */
-function caseEvidence(code: CriterionCode, tookProven: boolean, d: GridCriterion, p: GridCriterion): GridCriterion["evidence"] {
+function caseEvidence(code: CriterionCode, tookProven: boolean, d: GridCriterion, p: GridCriterion, src: "LinkedIn" | "CV"): GridCriterion["evidence"] {
   const de = d.evidence;
   const pe = p.evidence;
   const chosen = tookProven ? pe : de;
@@ -425,12 +430,12 @@ function caseEvidence(code: CriterionCode, tookProven: boolean, d: GridCriterion
     ...(pe.proof ? { proof: pe.proof } : {}),
   });
   if (code === "STK" && tookProven && p.score !== null && de.source === "both") return pair(de.text, de.publicText);
-  if (code === "OWN" && p.score !== null && d.score !== null) return pair(declaredSide(de.text), de.publicText ? declaredSide(de.publicText) : undefined);
+  if (code === "OWN" && p.score !== null && d.score !== null) return pair(declaredSide(de.text, src), de.publicText ? declaredSide(de.publicText, src) : undefined);
   return chosen;
 }
 
 /** La note du dossier, comme caseGrid : LinkedIn pour l'école, l'expérience et le parcours ; GitHub pour le reste ; la plus haute pour l'ownership. */
-function caseOf(declared: Grid, proven: Grid): Grid {
+function caseOf(declared: Grid, proven: Grid, src: "LinkedIn" | "CV"): Grid {
   const pick = (code: CriterionCode) => ({ d: declared.criteria.find((x) => x.code === code)!, p: proven.criteria.find((x) => x.code === code)! });
   const strip = ({ counted: _c, ...rest }: GridCriterion): Draft => rest;
   return finalizeMock(
@@ -447,7 +452,7 @@ function caseOf(declared: Grid, proven: Grid): Grid {
       else source = chosen.source;
       const seen = new Set<string>();
       const flags = [...d.flags, ...p.flags].filter((x) => !seen.has(x.fr) && seen.add(x.fr));
-      const evidence = caseEvidence(code, chosen === p, d, p);
+      const evidence = caseEvidence(code, chosen === p, d, p, src);
       const { evidence: _e, ...rest } = strip(chosen);
       return { ...rest, source, declared: d.score, proven: p.score, flags, ...(evidence ? { evidence } : {}) };
     }),
@@ -463,11 +468,11 @@ export function comparisonGridsMock(src: "LinkedIn" | "CV", login: string, proof
   if (emptyGithub) {
     const cv = finalizeMock(declaredDrafts(src, proof));
     const github = GITHUB.unknownLang(login);
-    return { cv, github, grid: caseOf(cv, github) };
+    return { cv, github, grid: caseOf(cv, github, src) };
   }
   const cv = finalizeMock(crossChecked(declaredDrafts(src, proof, 31), src, login));
   const github = GITHUB.gold(login);
-  return { cv, github, grid: caseOf(cv, github) };
+  return { cv, github, grid: caseOf(cv, github, src) };
 }
 
 /** La grille d'une fiche GitHub de démo, par clé de fixture ; aucune pour les fiches de personnes réelles. */

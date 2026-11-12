@@ -30,6 +30,7 @@ import {
   stackFlags,
   type DatedRole,
 } from "./grid";
+import { publicGrid } from "../../../shared/publicView";
 import employersExample from "../../../data/employers.example.json";
 import { parseEmployers, type HighBarList } from "./employers";
 
@@ -173,13 +174,15 @@ describe("les recoupements LinkedIn × GitHub : la pièce « recoupé » (§3, �
     const g = jCase();
     expect(both(g)).toEqual(["XP", "EMP", "STK", "OWN"]);
     expect(crit(g, "XP").evidence!.text.fr).toBe(
-      "13 mois de stage ou d'alternance comptés pour moitié. 7 mois à la tête d'Azerit. Centrale Méditerranée Finance est une association : non compté. Total : 1,1 an. GitHub : 2 années actives (50 contributions ou plus sur douze mois). Les deux se tiennent.",
+      "13 mois de stage ou d'alternance comptés pour moitié. 7 mois à la tête d'Azerit. Centrale Méditerranée Finance est une association : non compté. Total : 1,1 an. GitHub : 2 années actives (50 contributions ou plus sur douze mois). Recoupé\u00a0: le code public couvre la même période.",
     );
     expect(crit(g, "EMP").evidence!.text.fr).toBe(
       "LinkedIn : Research Intern, McMaster University, février 2025 – novembre 2025. GitHub : agda-notes, 25 commits, actif sur les mêmes mois. Poste confirmé par le code.",
     );
-    expect(crit(g, "STK").evidence!.text.fr).toMatch(/\(sequence-mail\)\. Agda aussi dans le code\. LinkedIn : Python, Agda, TypeScript, Kubernetes\. Dans le code : Agda, TypeScript\. Sans trace publique : Python, Kubernetes\.$/);
-    expect(crit(g, "OWN").evidence!.text.fr).toBe("sequence-mail : 120 commits sur 17 mois. Déclaré : une entreprise fondée (Azerit). Aucun résultat daté et chiffré.");
+    expect(crit(g, "STK").evidence!.text.fr).toMatch(/\(sequence-mail\)\. Agda aussi dans le code\. Déclarées sur LinkedIn\u00a0: Python, Agda, TypeScript, Kubernetes\. Retrouvées dans le code\u00a0: Agda, TypeScript\.$/);
+    expect(crit(g, "OWN").evidence!.text.fr).toBe("sequence-mail : 120 commits sur 17 mois. Sur LinkedIn\u00a0: une entreprise fondée (Azerit). Aucun résultat daté et chiffré.");
+    // Un dossier, une fiche, une note (§18.36) : aucune tournure d'écart dans les pièces.
+    for (const c of g.criteria) expect(JSON.stringify([c.evidence, c.flags]), c.code).not.toMatch(/Sans trace publique|Moins d'années|Du code public sur plus|en dessous de la vérité|Déclaré :/);
   });
 
   it("un recoupement ne change aucune note, ni la note du dossier", () => {
@@ -188,6 +191,23 @@ describe("les recoupements LinkedIn × GitHub : la pièce « recoupé » (§3, �
     expect(jDeclared().overall).toBe(alone.overall);
     expect(caseGrid(alone, jGithub).overall).toBe(jCase().overall);
     expect(scores(caseGrid(alone, jGithub))).toEqual(scores(jCase()));
+  });
+
+  it("moins d'années de code public que de métier compté : la pièce reste celle de LinkedIn, le point passe « à confirmer », pour la personne seule", () => {
+    const d = decl(seniorReading(), fictivaProfile());
+    const withGh = declaredGrid(d, gh(jacquesFacts()));
+    const xp = crit(withGh, "XP");
+    expect(xp.score).toBe(crit(declaredGrid(d), "XP").score);
+    expect(withGh.overall).toBe(declaredGrid(d).overall);
+    expect(xp.evidence!.source).toBe("linkedin");
+    expect(xp.evidence!.text.fr).toMatch(/ GitHub : 2 années actives \(50 contributions ou plus sur douze mois\)\.$/);
+    expect(xp.evidence!.publicText!.fr).not.toMatch(/GitHub/);
+    const flag = "À confirmer en entretien : une partie de ces années ne se voit pas en code public. C'est courant, le code d'entreprise est privé.";
+    expect(xp.flags.map((x) => x.fr)).toContain(flag);
+    expect(xp.flags.map((x) => x.en)).toContain("To confirm in interview: part of these years doesn't show in public code. That's common, company code is private.");
+    const pub = publicGrid(withGh).criteria.find((c) => c.code === "XP")!;
+    expect(pub.flags).toEqual([]);
+    expect(JSON.stringify(pub)).not.toMatch(/À confirmer|To confirm/);
   });
 
   it("chaque pièce recoupée a sa version publique, sans nom d'employeur, d'école, d'intitulé ni de dépôt du poste", () => {
@@ -451,31 +471,33 @@ describe("les plafonds (§4, règles 3 et 4)", () => {
 });
 
 describe("les traces dans le code (§3.4)", () => {
-  it("une techno absente de la table n'est jamais dite « sans trace »", () => {
+  it("une techno absente de la table n'est jamais dite « à confirmer »", () => {
     const named = ["Zorglub", "Frobnicator", "Quux DB", "InternalTool", "Proprio", "Kafka-like"];
     const r = cvReading({ technos_listed: named, technos_described: [] });
-    expect(stackFlags(decl(r), gh(facts())).filter((x) => /sans trace/.test(x.fr))).toEqual([]);
+    expect(stackFlags(decl(r), gh(facts())).filter((x) => /^À confirmer/.test(x.fr))).toEqual([]);
     // Cinq technos de la table, dont quatre absentes du code, plus six hors table : seules les cinq comptent, et seules les absentes sont citées.
     const mixed = cvReading({ technos_listed: [...named, "Kubernetes", "Redis", "MongoDB", "Terraform", "TypeScript"], technos_described: [] });
-    const flag = stackFlags(decl(mixed), gh(facts())).find((x) => /sans trace/.test(x.fr))!;
-    expect(flag.fr).toBe("Stack déclarée, sans trace publique : Kubernetes, Redis, MongoDB, aucune trace dans 5 dépôts.");
+    const flag = stackFlags(decl(mixed), gh(facts())).find((x) => /^À confirmer/.test(x.fr))!;
+    expect(flag.fr).toBe("À confirmer\u00a0: Kubernetes, Redis, MongoDB. Déclarées sur le CV, pas encore visibles dans 5 dépôts publics.");
+    expect(flag.en).toBe("To confirm: Kubernetes, Redis, MongoDB. Listed on the CV, not visible yet in 5 public repos.");
     for (const n of named) expect(flag.fr).not.toContain(n);
   });
 
-  it("cinq technos vérifiables, moins d'un tiers retrouvées : « Stack déclarée, sans trace publique » ; la note ne bouge pas", () => {
+  it("cinq technos vérifiables, moins d'un tiers retrouvées : « À confirmer » ; la note ne bouge pas", () => {
     const r = cvReading({ technos_listed: ["Kubernetes", "Terraform", "Redis", "MongoDB", "TypeScript"], technos_described: ["TypeScript", "React"] });
     const flags = stackFlags(decl(r), gh(facts()));
-    expect(flags[0].fr).toMatch(/^Stack déclarée, sans trace publique : Kubernetes, Terraform, Redis/);
+    expect(flags[0].fr).toMatch(/^À confirmer\u00a0: Kubernetes, Terraform, Redis\. Déclarées sur le CV/);
     const withGh = declaredGrid(decl(r), gh(facts()));
     const without = declaredGrid(decl(r));
     expect(crit(withGh, "STK").score).toBe(crit(without, "STK").score);
     expect(withGh.overall).toBe(without.overall);
   });
 
-  it("le code prouve une techno que le LinkedIn ne nomme pas : « LinkedIn en dessous de la vérité »", () => {
+  it("le code prouve une techno que le LinkedIn ne nomme pas : « Stack prouvée au-delà du profil »", () => {
     const r = jacquesReading();
     const flags = stackFlags(decl({ ...r, technos_listed: ["TypeScript"], technos_described: [] }, { ...jacquesProfile(), skills: [] }), gh(jacquesFacts()));
-    expect(flags.map((x) => x.fr)).toContain("LinkedIn en dessous de la vérité : Agda prouvé par le code, absent de LinkedIn.");
+    expect(flags.map((x) => x.fr)).toContain("Stack prouvée au-delà du profil\u00a0: Agda.");
+    expect(flags.map((x) => x.en)).toContain("Stack proven beyond the profile: Agda.");
   });
 });
 
