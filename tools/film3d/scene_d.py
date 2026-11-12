@@ -750,7 +750,9 @@ def plan_FIN6(scene, hidden, palier="socle"):
         x, y = _polar(a, 26.0)
         L.put(r, x, y, z, heading=a + 90, pitch=-5.0, roll=8.0)
         hs.append(r)
-    aim_helis(hs, STOP + Vector((0, 0, 0.8)), car=hero, car_energy=50000.0)
+    # sur la berline, trois projecteurs à 40 m : 15 kW chacun lui donnent la même lumière que les 60 kW du seul
+    # projecteur de FIN, à 49 m, sous lequel elle reste bordeaux (à 50 kW chacun, elle sortait encore rose)
+    aim_helis(hs, STOP + Vector((0, 0, 0.8)), car=hero, car_energy=15000.0)
     try:
         j = L.jet("jet")
         L.put(j, CX + 40.0, CY - 160.0, 55.0, heading=-8.0, pitch=-3.0, roll=18.0)
