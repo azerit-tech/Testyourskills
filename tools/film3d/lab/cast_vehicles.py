@@ -1279,6 +1279,25 @@ HELIS = {
 }
 
 
+BLADE = (0.030, 0.031, 0.034, 1.0)
+
+
+def blade_over(src, name):
+    """Les pales du rotor : une copie du matériau d'origine en gris sombre uni (couleur de base débranchée), ses
+    cartes de relief et de rugosité gardées. Partagé avec la cellule dans le fichier : on copie."""
+    m = src.copy()
+    m.name = name
+    if not m.node_tree:
+        return m
+    for p in [n for n in m.node_tree.nodes if n.type == "BSDF_PRINCIPLED"]:
+        for key in ("Base Color", "Emission Color"):
+            for l in list(p.inputs[key].links):
+                m.node_tree.links.remove(l)
+        p.inputs["Base Color"].default_value = BLADE
+        p.inputs["Emission Strength"].default_value = 0.0
+    return m
+
+
 def _heli_materials(variant, parts, paint, dark, glass):
     if variant == "pranav":
         # le fichier n'a que des matériaux unis aux noms génériques (« Material.004 ») : on trie par objet
@@ -1340,6 +1359,12 @@ def load_helicopter(variant="solid", collection=None, searchlight_on=False, name
         main = join(mains, f"{tag}_rotor_main")
         tail = join(tails, f"{tag}_rotor_tail")
         body = join(rest, tag)
+        # les pales : gris sombre uni, la couleur de la texture ignorée (ses bouts jaunes traçaient des anneaux
+        # orangés en tournant) ; relief et rugosité gardés
+        for rotor in (main, tail):
+            for i, m in enumerate(rotor.data.materials):
+                if m is not None:
+                    rotor.data.materials[i] = blade_over(m, f"{tag}_blades")
     # livrée : marine, crème au-dessus de la ligne des vitres (le toit et la poutre de queue restent marine)
     mn, mx = bbox([body])
     h = mx.z - mn.z
