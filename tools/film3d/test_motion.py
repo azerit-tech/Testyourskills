@@ -238,6 +238,24 @@ def test_fin():
           f"{min(p['pitch'] for p in ps):.2f}°")
 
 
+def test_spin_steps():
+    """Les roues à pleine vitesse : sample() cumule bien la distance sur le rayon ; key_vehicle ajoute assez de clés
+    pour qu'aucun pas ne dépasse 0,8 demi-tour (au-delà, l'Euler « compatible » tourne à rebours : vu en P6, 75 rad
+    de clés pour 150 rad parcourus)."""
+    import p6_jetee as P
+    fr = range(P.F0 - 1, P.F0 + P.FRAMES + 1)
+    ps = M.sample(P.column_pos(0), fr, wheel_r=0.33, seed=0.0)
+    d = sum(math.dist((ps[k]["x"], ps[k]["y"]), (ps[k + 1]["x"], ps[k + 1]["y"])) for k in range(len(ps) - 1))
+    spin = ps[-1]["spin"] - ps[0]["spin"]
+    check("roues : angle cumulé = distance / rayon", abs(spin - d / 0.33) < 0.01 * d / 0.33,
+          f"{spin:.1f} rad pour {d / 0.33:.1f}")
+    worst = max(abs(ps[k + 1]["spin"] - ps[k]["spin"]) / M.spin_steps(ps[k + 1]["spin"] - ps[k]["spin"])
+                for k in range(len(ps) - 1))
+    raw = max(abs(ps[k + 1]["spin"] - ps[k]["spin"]) for k in range(len(ps) - 1))
+    check("roues : pas de clé sous le demi-tour", worst < math.pi and raw > math.pi,
+          f"{raw:.2f} rad par image, {worst:.2f} par clé")
+
+
 def test_bars():
     seq = [M.bar_phase(f) for f in range(24)]
     check("rampes : 2 Hz, alternance corail / lilas", seq[:6] == ["corail"] * 6 and seq[6:12] == ["lilas"] * 6
@@ -256,6 +274,7 @@ if __name__ == "__main__":
     test_ouv()
     test_fin6()
     test_fin()
+    test_spin_steps()
     test_bars()
     print(f"\n{'tout passe' if not FAIL else str(len(FAIL)) + ' échec(s)'}")
     sys.exit(1 if FAIL else 0)

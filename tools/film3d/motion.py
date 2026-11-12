@@ -291,6 +291,17 @@ def body_of(root):
     return next(c for c in root.children if c.name == name or c.name.endswith(":" + name))
 
 
+SPIN_STEP = 0.8 * math.pi
+
+
+def spin_steps(d_spin, limit=SPIN_STEP):
+    """Le nombre de pas de clé d'une roue entre deux images : une rotation d'Euler « compatible » ne peut avancer
+    de plus d'un demi-tour d'une clé à l'autre (au-delà, elle prend l'angle équivalent le plus proche, à rebours :
+    à 120 km/h, 3,9 rad par image, les roues tournaient à l'envers à 2,4 rad par image). Au-delà de `limit`, on
+    ajoute des clés entre les images."""
+    return max(1, math.ceil(abs(d_spin) / limit))
+
+
 def key_vehicle(root, poses, wheels=(), ground=None, pivot=(0.0, 0.0, 0.5), body=None):
     """Pose les clés d'un véhicule déjà construit (un rig de lieux : root, son enfant body["body"]).
 
@@ -324,7 +335,7 @@ def key_vehicle(root, poses, wheels=(), ground=None, pivot=(0.0, 0.0, 0.5), body
         info.append((w, p_b, p_b.dot(fwd_b) > 0.0))
         w.rotation_mode = "XYZ"
     c = Vector(pivot)
-    prev_b, prev_w = None, {}
+    prev_b, prev_w, prev_ps = None, {}, None
     for ps in poses:
         f = ps["frame"]
         z, slope = ground(ps["x"], ps["y"]) if ground else (0.0, 0.0)
@@ -341,18 +352,27 @@ def key_vehicle(root, poses, wheels=(), ground=None, pivot=(0.0, 0.0, 0.5), body
         body.keyframe_insert("location", frame=f)
         body.keyframe_insert("rotation_euler", frame=f)
         Mb_inv = Mb.inverted()
+        n = spin_steps(ps["spin"] - prev_ps["spin"]) if prev_ps else 1
         for w, p_b, is_front in info:
-            R = Matrix.Rotation(ps["spin"], 4, axle)
-            if is_front:
-                R = Matrix.Rotation(math.radians(ps["steer"]), 4, "Z") @ R
-            Mw = Mb_inv @ B0 @ Matrix.Translation(p_b) @ R
-            wl, wr, _ = Mw.decompose()
-            pe = prev_w.get(w.name)
-            we = wr.to_euler("XYZ", pe) if pe else wr.to_euler("XYZ")
-            prev_w[w.name] = we
-            w.location, w.rotation_euler = wl, we
+            for k in range(1, n + 1):
+                # les pas intermédiaires (n > 1) : la rotation seule, sur la caisse de l'image (écart de l'ordre du mm)
+                u = k / n
+                q = ps if k == n else {key: prev_ps[key] + (ps[key] - prev_ps[key]) * u for key in ("spin", "steer")}
+                R = Matrix.Rotation(q["spin"], 4, axle)
+                if is_front:
+                    R = Matrix.Rotation(math.radians(q["steer"]), 4, "Z") @ R
+                Mw = Mb_inv @ B0 @ Matrix.Translation(p_b) @ R
+                wl, wr, _ = Mw.decompose()
+                pe = prev_w.get(w.name)
+                we = wr.to_euler("XYZ", pe) if pe else wr.to_euler("XYZ")
+                prev_w[w.name] = we
+                w.rotation_euler = we
+                if k < n:
+                    w.keyframe_insert("rotation_euler", frame=prev_ps["frame"] + (f - prev_ps["frame"]) * u)
+            w.location = wl
             w.keyframe_insert("location", frame=f)
             w.keyframe_insert("rotation_euler", frame=f)
+        prev_ps = ps
     return root
 
 
