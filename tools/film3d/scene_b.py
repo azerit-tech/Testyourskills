@@ -1570,6 +1570,12 @@ def place_hero(scene, plan):
     fill = A.add_light("hero_fill", "AREA", (x, y + 2.2, 3.6), (0.0, -2.2, -3.6), lin("#fff0e6"), 150.0, (2.4, 1.4))
     fill.visible_camera = False
     only_on(fill, [car], "hero_fill")
+    # l'habitacle allumé (lieux.cabin_light, 25 W comme scene_d) : de dos, par la lunette, la capuche et les épaules
+    # du conducteur se découpent sur un habitacle chaud au lieu d'un trou noir
+    keep = road.S
+    import lieux
+    road.S = keep
+    lieux.cabin_light({"body": car.name}, energy=25.0)
     # le cœur des phares, vu de face à 20 m : une petite sphère émissive à la place de chaque lampe (le verre du
     # modèle reste trop sage pour découper les agents en contre-jour)
     bpy.context.view_layer.update()
