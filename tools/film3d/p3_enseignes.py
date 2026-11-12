@@ -120,12 +120,14 @@ PARKED_X = (-3.85, -2.05)
 CRATES = (2.05, 3.05, 104.5, 107.1)        # x0, x1, y0, y1 (piles de palettes et cageots)
 
 # les flaques (x, y monde, demi-largeur en x, allongement en y) : sur la ligne de la berline (la gerbe de la
-# feinte, celle d'avant les plots), sous la caméra quand elle rase le sol, et devant elle à l'arrêt (le barrage s'y
-# reflète) ; scene_b les pose, wheel_hits() dit quand une roue y passe
+# feinte, celle d'avant les plots) et sous la caméra quand elle rase le sol ; jamais une large dans l'axe de la
+# caméra devant la berline (en miroir sous le ciel noir, elle ouvrait un trou au bas du cadre) : près de l'axe,
+# 35 cm au plus ; celle de la brèche sous les roues droites, celle de l'arrêt à gauche de l'objectif ;
+# scene_b les pose, wheel_hits() dit quand une roue y passe
 PUDDLES = [("flaque_entree", -1.05, 97.5, 0.55, 2.4), ("flaque_feinte", 1.15, 103.6, 0.55, 2.2),
-           ("flaque_axe", -0.55, 109.5, 0.45, 2.0), ("flaque_basse_0", -1.0, 112.8, 0.5, 1.9),
-           ("flaque_basse_1", 0.15, 115.4, 0.4, 1.7), ("flaque_breche", -0.15, 120.6, 1.0, 1.5),
-           ("flaque_arret", -0.95, 118.7, 0.55, 1.4), ("flaque_trottoir", 3.2, 117.0, 0.5, 2.6)]
+           ("flaque_axe", -0.75, 109.5, 0.35, 2.0), ("flaque_basse_0", -1.05, 112.8, 0.35, 1.9),
+           ("flaque_basse_1", 0.35, 115.4, 0.35, 1.7), ("flaque_breche", 0.6, 121.0, 0.45, 1.6),
+           ("flaque_arret", -2.3, 118.9, 0.4, 1.4), ("flaque_trottoir", 3.2, 117.0, 0.5, 2.6)]
 
 # --- la troisième patrouille : derrière la caméra, hors champ ; ses rampes battent dans la rue (elle suit)
 CHASE = (0.9, -34.0, 0.0)          # x, retard sur la berline à t = 0 (m), cap

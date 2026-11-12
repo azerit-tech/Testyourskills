@@ -184,8 +184,9 @@ def test_p3():
     agents, des plots, des voitures garées et des caisses, caméra à 2 m au moins de la caisse) ; roulis et tangage
     bornés ; la berline commence 5 images plus tôt (y 93,5 à 95) et finit au-delà des plots, entre les patrouilles ;
     la caméra s'arrête avant les plots, à vitesse nulle, et descend de 1,9 à 0,6 m sans palier ; la berline dans le
-    tiers central (son centre), entière hors des bandes du HUD (15 % du bas, 12 % du haut), le trou des plots dans le
-    cadre à chaque image ; éclairs d'une ou deux images."""
+    tiers central (son centre), son centre entre 50 et 62 % de la hauteur depuis le haut (la règle des plans bas : la
+    chaussée n'a pas la moitié du cadre), entière hors des bandes du HUD (15 % du bas, 12 % du haut), le trou des plots
+    dans le cadre à chaque image ; éclairs d'une ou deux images."""
     import p3_enseignes as P
     frames = range(P.F0 - 1, P.F0 + P.FRAMES + 1)
     d, f, a, b = M.min_gap(P.tracks(), frames)
@@ -215,7 +216,7 @@ def test_p3():
         c = P.camera(t)
         (u0, u1, v0, v1), (uc, vc) = P.hero_frame(t, c)
         g = P.project(c, (P.GAP[0], P.GAP[1], 0.9))
-        if not (abs(uc) <= 1 / 3 and u0 > -1.0 and u1 < 1.0 and v0 >= 0.15 and v1 <= 0.88 and 0.3 <= vc <= 0.6
+        if not (abs(uc) <= 1 / 3 and u0 > -1.0 and u1 < 1.0 and v0 >= 0.15 and v1 <= 0.88 and 0.38 <= vc <= 0.50
                 and g and abs(g[0]) < 0.6 and 0.15 < g[1] < 0.88):
             bad.append(f)
     check("P3 : la berline au tiers central, hors du HUD, le barrage dans le cadre", not bad, f"images {bad[:6]}")
