@@ -1926,26 +1926,7 @@ def p1_props(P):
         bpy.context.scene.collection.objects.link(ob)
         ob.location = (px, py, road.road_z(px) + 0.006)
         ob.rotation_euler = (0.0, 0.0, math.radians(rot))
-    # les plots réfléchissants du tiret entre les voies : la seule chose que la caméra frôle (à 1 m d'elle), ils filent
-    # en traits ambre au bas du cadre ; corps blanc, catadioptre ambre tourné vers la berline et vers nous
-    body = mat_plain("p1_plot", (0.7, 0.7, 0.66, 1), 0.4)
-    eye = mat_emit("p1_plot_catadioptre", lin(AMBER), P.STUD_GLOW)
-    bm, gb = bmesh.new(), bmesh.new()
-    for yy in P.STUDS:
-        z = road.road_z(P.STUD_X)
-        bmesh.ops.create_cube(bm, size=1.0, matrix=Matrix.LocRotScale((P.STUD_X, yy, z + 0.012), None, (0.1, 0.1, 0.024)))
-        for side in (-1, 1):
-            bmesh.ops.create_cube(gb, size=1.0, matrix=Matrix.LocRotScale((P.STUD_X, yy + side * 0.051, z + 0.014), None,
-                                                                            (0.07, 0.004, 0.012)))
-    for name, b, m in (("p1_plots", bm, body), ("p1_plots_catadioptres", gb, eye)):
-        ob = bpy.data.objects.new(name, bpy.data.meshes.new(name))
-        b.to_mesh(ob.data)
-        b.free()
-        ob.data.materials.append(m)
-        bpy.context.scene.collection.objects.link(ob)
-        ob.visible_shadow = False
-    print(f"[scene_a] P1 : flaque en ({x:.2f}, {y:.1f}), {len(P.PAPERS)} feuilles de papier, {len(P.STUDS)} plots",
-          flush=True)
+    print(f"[scene_a] P1 : ornière d'eau en ({x:.2f}, {y:.1f}), {len(P.PAPERS)} feuilles de papier", flush=True)
 
 
 def p1_motion(scene, coupe, police, cam, focus):
