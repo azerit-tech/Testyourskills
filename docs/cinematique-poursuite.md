@@ -28,7 +28,7 @@ Une image passe si les quatre réponses sont oui :
 
 1. **Le réalisme** : on croit à une image de film. Non si elle a l'air d'un jeu mobile, d'un dessin ou d'un jouet.
 2. **La couleur** : ciel indigo, bande corail à l'horizon, ombres prune, gyrophares corail et lilas, phares crème. Non si c'est noir, gris, ou rouge et bleu.
-3. **La lecture sur un téléphone** : à 390 px de large, le début se comprend en une seconde (une voiture tranquille, une seule patrouille loin derrière) ; au sommet on distingue la voiture en fuite, l'encerclement, les hélicoptères et les avions, et la voiture en fuite reste le sujet.
+3. **La lecture sur un téléphone** : à 390 px de large, le début se comprend en une seconde (une voiture tranquille, une seule patrouille garée, rampe éteinte, que la voiture dépasse) ; au sommet on distingue la voiture en fuite, l'encerclement, les hélicoptères et les avions, et la voiture en fuite reste le sujet.
 4. **La place du HUD** : rien d'important dans les 12 % du haut ni les 15 % du bas (§7.3).
 
 Ce qui tient et ce qui reste à faire après les premières images : SPEC §18.36.
@@ -50,7 +50,7 @@ Ce qui tient et ce qui reste à faire après les premières images : SPEC §18.3
 
 - **Format** : vertical 9:16, 24 images par seconde. Toutes les durées se comptent en images ; la seule source est `shared/film/cut.ts`.
 - **Très réaliste.** Une image de film de braquage : la personne au volant prend peur, la police descend et tire, la montée devient dangereuse.
-- **Le début est le même pour toutes les fiches, et il est calme.** Une conduite de nuit, une seule patrouille loin derrière, gyrophare éteint. Ensuite chaque étoile ajoute des poursuivants, du danger, de la vitesse, du tremblé de caméra et du bruit. La montée doit se lire son coupé : c'est le contraste entre le début et le sommet qui fait le film.
+- **Le début est le même pour toutes les fiches, et il est calme.** Une conduite de nuit ; une seule patrouille, garée rampe éteinte à l'angle de la rue de y 120 côté ville, que la voiture dépasse juste après OUV : c'est elle qui s'allume dans le rétroviseur de P1. Ensuite chaque étoile ajoute des poursuivants, du danger, de la vitesse, du tremblé de caméra et du bruit. La montée doit se lire son coupé : c'est le contraste entre le début et le sommet qui fait le film.
 - **Un plan par étoile, une coupe franche à chaque étoile.** L'étoile claque sur la coupe.
 - **Le film s'arrête au niveau de la fiche, par l'arrestation** : la voiture en fuite est cernée et s'immobilise, deux mains gantées se lèvent derrière le pare-brise, l'image gèle, et cette image devient la fiche.
 - **Sens de l'action** : l'ouverture suit la voiture en fuite de dos ; ensuite elle vient vers nous ou descend dans le cadre, et on voit ce qui arrive derrière elle.
@@ -84,7 +84,7 @@ La poursuite entière (OUV et P1 à P6) fait 204 images. Une fin propre aux cinq
 
 | Plan | Aux trousses | Danger | Vitesse | Caméra |
 |---|---|---|---|---|
-| OUV | une patrouille, loin, gyrophare éteint | aucun | conduite calme | sur rail, stable |
+| OUV | une patrouille garée devant à gauche, rampe éteinte | aucun | conduite calme | sur rail, stable |
 | P1 ★ | la même, gyrophare allumé dans le rétroviseur | la peur : les mains se crispent | la voiture bondit à la fin du plan | stable, dans l'habitacle |
 | P2 ★★ | deux patrouilles | la fuite | elle accélère franchement | drone fluide |
 | P3 ★★★ | trois patrouilles, un barrage | la police tire | pleine vitesse | fixe, puis la première secousse |
