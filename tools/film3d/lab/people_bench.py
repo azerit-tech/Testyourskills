@@ -4,11 +4,12 @@
 # Machine louée seulement (Cycles, OptiX).
 #
 #   FILM3D_ASSETS=~/film/assets blender -b --factory-startup -P tools/film3d/lab/people_bench.py -- \
-#       --out ~/film/iter-gens/<essai> [--samples 64] [--only agent,conducteur,parebrise,variantes]
+#       --out ~/film/iter-gens/<essai> [--samples 64] [--only agent,conducteur,parebrise,variantes,distance]
 #       [--poses crouch,aim,guard] [--lights phares,neons] [--views face,tq,dos] [--shots pied,taille] [--inspect]
 #       [--classes] [--wb] [--exposure 1.0]
-#   pare-brise : [--pb-lights phares,neons,projecteur] [--pb-views face,tq,dos,tqdos] [--pb-shots large,serre]
-#       [--pb-poses volant,mains] [--hands "up,fwd,out,door_out,écart;…"] [--cabin 25] [--sky [--sky-strength 1]]
+#   pare-brise : [--pb-lights phares,neons,projecteur] [--pb-views face,tq,dos,tqdos] [--pb-shots large,serre,loin]
+#       [--pb-poses volant,mains] [--hands "up,fwd,out,door_out,écart;…"] [--cabin 25] [--dash 60] [--pb-z 1.5]
+#       [--sky [--sky-strength 1]]
 #
 # Une image par case (720 × 1280, `<perso>-<pose>-<lumière>-<vue>-<cadre>.png`) et une planche par personnage et
 # par pose (`planche-<perso>-<pose>.png` : une ligne par lumière ; face, trois quarts, dos en pied puis en taille).
@@ -132,7 +133,7 @@ def new_scene():
 def wet_ground():
     """Enrobé mouillé sombre : rugosité tachée (flaques presque miroir, enrobé humide), grain fin."""
     me = bpy.data.meshes.new("sol")
-    s = 30.0
+    s = 60.0
     me.from_pydata([(-s, -s, 0), (s, -s, 0), (s, s, 0), (-s, s, 0)], [], [(0, 1, 2, 3)])
     ob = bpy.data.objects.new("sol", me)
     bpy.context.scene.collection.objects.link(ob)
@@ -436,11 +437,12 @@ def bench_windshield():
     wet_ground()
     root = L.hero()
     L.put(root, 0, 0, 0, heading=0.0)        # l'avant vers +y
-    cab = L.cabin_light(root, energy=float(opt("--cabin", "25")))
-    # la lampe de l'habitacle est une sphère de 12 cm visible à la caméra (un disque blanc derrière le pare-brise) :
-    # cachée ici, signalée au compte rendu
-    cab.visible_camera = cab.visible_glossy = cab.visible_transmission = False
+    # les deux lampes de l'habitacle (lieux.cabin_light : lecture et planche de bord, invisibles à la caméra)
+    cab = L.cabin_light(root, energy=float(opt("--cabin", "25")), dash=float(opt("--dash", "60")))
     bpy.context.view_layer.update()
+    for o_ in [cab] + ([bpy.data.objects[cab["planche"]]] if "planche" in cab else []):
+        print(f"[banc] lampe {o_.name} : {tuple(round(c, 2) for c in o_.matrix_world.translation)}, "
+              f"vers {tuple(round(c, 2) for c in (o_.matrix_world.to_3x3() @ Vector((0, 0, -1))))}", flush=True)
     arm = L.hero_driver(root)
     if arm is None:
         print("[banc] pas de conducteur dans la berline", flush=True)
@@ -483,16 +485,50 @@ def bench_windshield():
             for v, az in [x for x in (("face", 0.0), ("tq", 32.0), ("dos", 180.0), ("tqdos", 150.0))
                          if x[0] in opt("--pb-views", "face,tq").split(",")]:
                 # hors de la voiture (l'avant à 2,45 m du centre), un peu au-dessus du capot, visée sur le buste
-                for sh, dist, lens in [x for x in (("large", 6.0, 35.0), ("serre", 4.0, 70.0))
+                for sh, dist, lens in [x for x in (("large", 6.0, 35.0), ("serre", 4.0, 70.0), ("loin", 8.0, 28.0))
                                        if x[0] in opt("--pb-shots", "large,serre").split(",")]:
                     a = math.radians(az)
                     dirv = Vector((math.sin(a), math.cos(a), 0))
                     cam.data.lens = lens
-                    cam.location = Vector((head.x, head.y, 0)) + dirv * dist + Vector((0, 0, 1.5))
+                    cam.location = Vector((head.x, head.y, 0)) + dirv * dist + Vector((0, 0, float(opt("--pb-z", "1.5"))))
                     _aim(cam, head + Vector((0, 0, -0.08)))
                     row.append(render(os.path.join(OUT, f"parebrise-{pose}-{lt}-{v}-{sh}.png")))
             rows.append(row)
         sheet(rows, os.path.join(OUT, f"planche-parebrise-{pose}.png"))
+
+
+def bench_distance():
+    """Les agents à 10, 20 et 30 m (le barrage vu de derrière la berline, l'anneau final) : six agents, les
+    trois variantes sans gilet à gauche, avec gilet à droite, accroupi, en joue (tourné de 20°, jamais vers
+    l'objectif) et en garde ; les phares de la berline à 12 m devant eux ; caméra à 1,4 m, 35 mm."""
+    new_scene()
+    wet_ground()
+    for k in (-1, 1):
+        light(f"phare_{k}", "SPOT", Vector((0.7 * k, -12.0, 0.7)), Vector((0, 0, 1.0)), HEAD,
+              float(opt("--dist-phares", "1200")), spot_size=math.radians(30), spot_blend=0.35,
+              shadow_soft_size=0.06)
+    cam = camera()
+    cam.data.lens = 35.0
+    for g, vest in ((-1, False), (1, True)):
+        if hasattr(cp, "_LOOK_COUNT"):
+            cp._LOOK_COUNT[0] = 0
+        for i, (pose, yaw) in enumerate((("crouch", 15.0), ("aim", 20.0), ("guard", -10.0))):
+            kw = {"vest": vest} if vest is not None else {}
+            try:
+                a = cp.load_officer("spp", name=f"officer_d{g}{i}", **kw)
+            except TypeError:           # le code d'origine : pas de gilet
+                a = cp.load_officer("spp", name=f"officer_d{g}{i}")
+            cp.pose_officer(a, pose, style=i)
+            cp.attach_handgun(a, cp.load_handgun("service"))
+            a.location.x = g * (0.8 + 0.8 * i)
+            a.rotation_euler.z = math.radians(yaw * g)
+    bpy.context.view_layer.update()
+    paths = []
+    for d in (10, 20, 30):
+        cam.location = Vector((0.0, -float(d), 1.4))
+        _aim(cam, Vector((0.0, 0.0, 1.0)))
+        paths.append(render(os.path.join(OUT, f"distance-{d}m.png")))
+    sheet([paths], os.path.join(OUT, "planche-distance.png"))
 
 
 if __name__ == "__main__":
@@ -501,6 +537,6 @@ if __name__ == "__main__":
         sys.exit(0)
     os.makedirs(OUT, exist_ok=True)
     for part, fn in (("agent", bench_officer), ("variantes", bench_variants), ("conducteur", bench_driver),
-                     ("parebrise", bench_windshield)):
+                     ("parebrise", bench_windshield), ("distance", bench_distance)):
         if part in ONLY:
             fn()
