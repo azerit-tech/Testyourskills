@@ -1885,7 +1885,7 @@ def key_hands(coupe, frames, steer_fn):
 
 
 def p1_cabin(scene, coupe, frames, on):
-    """L'habitacle de P1 lisible : le rétroviseur réglé sur la voie derrière, le pare-brise moins teinté, une
+    """L'habitacle de P1 lisible : le rétroviseur réglé sur la voie derrière, le pare-brise sans réflexion totale vu de dos, une
     source froide douce et deux lueurs corail et lilas derrière la lunette, liées aux seuls objets de la berline et
     du conducteur (liaison de lumière, comme lieux.car_fill) ; invisibles à la caméra et aux reflets."""
     import motion as M
@@ -1901,13 +1901,31 @@ def p1_cabin(scene, coupe, frames, on):
         for v in vs:
             me.vertices[v].co = c + R @ (me.vertices[v].co - c)
         me.update()
-    # le pare-brise et les vitres : la feuille du modèle est doublée (deux faces confondues, sonde du 12 novembre),
-    # la teinte de 0,8 passait deux fois ; ici à peine teintée
+    # le pare-brise vu de l'intérieur : le nœud Fresnel de hero_cars.mat_window prend 1/1,52 sur une face vue de dos
+    # et passe en réflexion totale au-delà de 41° ; le pare-brise couché, vu de la banquette sous ~60°, devenait un
+    # miroir de l'habitacle noir (l'avenue 7 fois plus sombre qu'en OUV au premier rendu). Une vitre est une
+    # feuille mince : vue de dos, le reflet reste celui du verre de face (~0,1)
     for m in bpy.data.materials:
-        if m.name.endswith("_glass") and m.name.startswith("hero_") and m.node_tree:
-            for n in m.node_tree.nodes:
-                if n.type == "BSDF_TRANSPARENT":
-                    n.inputs["Color"].default_value = (0.96, 0.98, 0.97, 1.0)
+        if not (m.name.endswith("_glass") and m.name.startswith("hero_") and m.node_tree):
+            continue
+        nt = m.node_tree
+        for mix in [n for n in nt.nodes if n.type == "MIX_SHADER" and n.inputs[0].is_linked]:
+            src = mix.inputs[0].links[0].from_socket
+            bf = nt.nodes.new("ShaderNodeNewGeometry").outputs["Backfacing"]
+            keep = nt.nodes.new("ShaderNodeMath")
+            keep.operation = "SUBTRACT"
+            keep.inputs[0].default_value = 1.0
+            nt.links.new(bf, keep.inputs[1])
+            front = nt.nodes.new("ShaderNodeMath")
+            front.operation = "MULTIPLY"
+            nt.links.new(src, front.inputs[0])
+            nt.links.new(keep.outputs[0], front.inputs[1])
+            back = nt.nodes.new("ShaderNodeMath")
+            back.operation = "MULTIPLY_ADD"
+            nt.links.new(bf, back.inputs[0])
+            back.inputs[1].default_value = 0.1
+            nt.links.new(front.outputs[0], back.inputs[2])
+            nt.links.new(back.outputs[0], mix.inputs[0])
     # les receveurs : la caisse, ses portes, le conducteur
     col = bpy.data.collections.new("habitacle_seul")
     for o in [coupe, *coupe.children_recursive]:
@@ -1927,7 +1945,7 @@ def p1_cabin(scene, coupe, frames, on):
         lo.light_linking.receiver_collection = col
         return lo
     # la source froide : du pavillon au-dessus de la banquette vers le tableau de bord (le noyer, le volant ivoire)
-    lamp("habitacle", "#b4bce6", 25.0, 0.5, (0.1, 0.75, 1.33), (0.2, -0.75, 0.85))
+    lamp("habitacle", "#b4bce6", 45.0, 0.5, (0.1, 0.75, 1.33), (0.2, -0.75, 0.85))   # 25 W : le noyer restait noir
     # les lueurs de la rampe, derrière la lunette (repère de la caisse : l'arrière vers +y) : elles battent avec
     # elle (M.bar_phase, décalage 0 comme la patrouille dans flash_bars) et teintent le pavillon et l'épaule
     for name, color, tone, x in (("lueur_corail", CORAL, "corail", 0.35), ("lueur_lilas", LILAC, "lilas", -0.35)):
