@@ -1368,6 +1368,37 @@ def test_camera_measure():
               f"au plus {worst[0]:.2f}°/s ({worst[1]}, {worst[2]}) ; image à image, sans moyenne : {worst[3]:+.2f}°/s")
 
 
+def test_parcours():
+    """Le parcours unique (tools/film3d/parcours.py, docs/cinematique-feuille-de-route.md) : au niveau du module,
+    indépendamment des plans, l'état de la berline et du bras à la sortie de chaque plan de la poursuite tient dans
+    les plafonds CUT_* contre l'entrée du suivant ; les feux stop sont dans le même état ; tout le parcours tient les
+    limites de la voiture (CAR31_HERO, glisse) image par image."""
+    import parcours as PC
+    check("parcours : sept plans, 388 images", [n for n, _ in PC.SHOTS] == ["OUV", "P1", "P2", "P3", "P4", "P5", "P6"]
+          and PC.TOTAL == sum(n for _, n in PC.SHOTS), f"{PC.TOTAL} images")
+    lims = dict(along=CUT_ALONG, alat=CUT_ALAT, yaw=CUT_YAW, slip=CUT_SLIP, steer=CUT_STEER, roll=CUT_ROLL,
+                pitch=CUT_PITCH, pan=CUT_PAN)
+    for a, b, sa, sb in PC.cut_states():
+        dv = (sb["speed"] - sa["speed"]) / sa["speed"]
+        bad = [f"vitesse {dv * 100:+.1f} %"] if abs(dv) > CUT_SPEED else []
+        for k, lim in lims.items():
+            if sa[k] is not None and sb[k] is not None and abs(sb[k] - sa[k]) > lim:
+                bad.append(f"{k} {sa[k]:+.2f} → {sb[k]:+.2f}")
+        if sa["lamps"] != sb["lamps"]:
+            bad.append("feux stop")
+        worst = max((abs(sb[k] - sa[k]) / lim, k) for k, lim in lims.items() if sa[k] is not None and sb[k] is not None)
+        check(f"parcours, coupe {a} → {b} : l'état de la berline et du bras dans les plafonds CUT_*", not bad,
+              ", ".join(bad) or f"v {sa['speed']:.2f} → {sb['speed']:.2f} m/s, pire {worst[1]} à "
+              f"{worst[0] * 100:.0f} % du plafond")
+    n = _drive_numbers(PC.DRIVE, list(range(1, PC.TOTAL + 1)))
+    keys = ("lat", "brake", "acc", "circle", "jerk") + (("yaw_acc",) if PC.YAW_ACC_STRICT else ())
+    bad = [k for k in keys if n[k] > CAR31_HERO[k] + 1e-9]
+    check("parcours : les limites de la voiture sur les 388 images", not bad and n["slip"] <= SLIP31_MAX
+          and n["on"] <= SLIP31_ON and n["off"] <= SLIP31_OFF,
+          ", ".join(f"{k} {n[k]:.2f}" for k in ("lat", "brake", "acc", "circle", "jerk", "yaw_acc", "slip"))
+          + ("" if PC.YAW_ACC_STRICT else " (yaw_acc en information)"))
+
+
 def test_v3():
     """Le découpage v3 (section 6) sur les plans qui portent V3 = True : durées, derrière, vitesses, cadre, phare,
     écarts, hauts de cadre, raccords du tableau 5 entre deux plans migrés, films entiers. Les plans v2 ne sont que
@@ -1435,6 +1466,7 @@ if __name__ == "__main__":
     test_aircraft()
     test_operator()
     test_drive()
+    test_parcours()
     test_camera_measure()
     test_v3()
     print(f"\n{'tout passe' if not FAIL else str(len(FAIL)) + ' échec(s)'}")
