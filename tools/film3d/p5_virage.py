@@ -103,7 +103,7 @@ def tracks():
 # --- l'hélicoptère : il monte de derrière la file de conteneurs qui ferme l'axe, à l'ouest, et glisse vers le
 # nord ; la caméra, qui tourne avec la berline, le trouve dans le haut du cadre à la seconde moitié du plan
 HELI_A = (-44.0, 72.0, 10.0)
-HELI_B = (-46.0, 85.0, 44.0)   # à gauche du portique (derrière sa salle des machines, il disparaissait)
+HELI_B = (-30.0, 65.0, 42.0)   # au-dessus du mur de conteneurs, à gauche du portique : dans le ciel aux images 10 à 24
 
 
 def heli(t):

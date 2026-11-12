@@ -875,35 +875,58 @@ def light_tower(at, target, energy=50000.0, along_x=False):
     return lo
 
 
-def three_beams(main, hero, ground_w, car_w):
-    """Le faisceau de l'hélicoptère en trois lampes coaxiales. La principale (1,6 MW) n'est plus vue que par la
-    diffusion en volume : elle dessine le cône dans la brume et n'éclaire rien (à pleine puissance, son empreinte
-    brûlait le sol en blanc). La deuxième, invisible à la brume, éclaire le sol sauf la berline (`ground_w` : ~2,5
-    W/m² à 66 m, 4π d² × 2,5) ; la troisième, crème, n'éclaire que la berline (`car_w` : ~1 W/m²), qui garde son
-    bordeaux profond."""
-    main.visible_diffuse = main.visible_glossy = main.visible_transmission = False
+def beam_lights(main, hero, ground, ground_w):
+    """Le faisceau de l'hélicoptère, comme sur la pointe : la lampe principale (1,6 MW) garde toutes ses
+    visibilités (le cône dans la brume) mais exclut, par liaison de lumière, le sol et la berline (à pleine
+    puissance, son empreinte brûlait le sol en blanc et sortait la caisse framboise). Une jumelle coaxiale crème,
+    invisible à la caméra et à la brume, n'éclaire que le sol (`ground_w` : ~2,5 W/m² à 56 m, 4π d² × 2,5). La
+    berline reçoit sa lumière de car_fill."""
     body = [o for o in hero.children_recursive if o.type == "MESH"]
-    out_c, in_c = bpy.data.collections.new("faisceau_sans_berline"), bpy.data.collections.new("faisceau_berline")
-    for o in body:
-        out_c.objects.link(o)
-        in_c.objects.link(o)
-    for co in out_c.collection_objects:
+    sans, sol = bpy.data.collections.new("faisceau_sans_sol_berline"), bpy.data.collections.new("faisceau_sol")
+    for o in body + list(ground):
+        sans.objects.link(o)
+    for o in ground:
+        sol.objects.link(o)
+    for co in sans.collection_objects:
         co.light_linking.link_state = "EXCLUDE"
-    for name, energy, color, coll in (("sol", ground_w, "#e2eaff", out_c), ("berline", car_w, "#fff0d8", in_c)):
-        d = main.data.copy()
-        d.name = f"faisceau_{name}"
-        d.energy = energy
-        d.color = L.lin(color)[:3]
-        c = bpy.data.objects.new(d.name, d)
-        for coll_u in main.users_collection:
-            coll_u.objects.link(c)
-        c.parent = main.parent
-        c.matrix_parent_inverse = main.matrix_parent_inverse.copy()
-        c.location, c.rotation_euler = main.location.copy(), main.rotation_euler.copy()
-        c.rotation_mode = main.rotation_mode
-        c.rotation_quaternion = main.rotation_quaternion.copy()
-        c.visible_volume_scatter = False
-        c.light_linking.receiver_collection = coll
+    main.light_linking.receiver_collection = sans
+    d = main.data.copy()
+    d.name = "faisceau_sol"
+    d.energy = ground_w
+    d.color = L.lin("#fff2d6")[:3]
+    c = bpy.data.objects.new(d.name, d)
+    for coll_u in main.users_collection:
+        coll_u.objects.link(c)
+    c.parent = main.parent
+    c.matrix_parent_inverse = main.matrix_parent_inverse.copy()
+    c.rotation_mode = main.rotation_mode
+    c.location, c.rotation_euler = main.location.copy(), main.rotation_euler.copy()
+    c.rotation_quaternion = main.rotation_quaternion.copy()
+    c.visible_camera = False
+    c.visible_volume_scatter = False
+    c.light_linking.receiver_collection = sol
+
+
+def car_fill(cam, hero, energy=350.0, size=2.5):
+    """La lumière de la berline, comme sur le pont : un disque doux et crème de face, porté par la caméra (1,5 m
+    au-dessus de l'objectif, dans l'axe), qui n'éclaire qu'elle (~1 W/m² à 10 m : P ≈ π d²). Invisible à la
+    caméra et à la brume ; son reflet doux sur le vernis dessine la caisse."""
+    d = bpy.data.lights.new("berline_face", "AREA")
+    d.shape = "DISK"
+    d.size = size
+    d.energy = energy
+    d.color = L.lin("#fff0d8")[:3]
+    lo = bpy.data.objects.new(d.name, d)
+    bpy.context.scene.collection.objects.link(lo)
+    lo.parent = cam
+    lo.location = (0.0, 1.5, 0.0)                 # repère de la caméra : -z vers l'avant, y vers le haut
+    lo.visible_camera = lo.visible_volume_scatter = False
+    col = bpy.data.collections.new("berline_face_seule")
+    for o in hero.children_recursive:
+        if o.type == "MESH":
+            col.objects.link(o)
+    lo.light_linking.receiver_collection = col
+    return lo
 
 
 def plan_P5(scene, hidden, palier="socle"):
@@ -959,7 +982,7 @@ def plan_P5(scene, hidden, palier="socle"):
     sl.spot_blend = 0.25
     import scene_d
     scene_d.aim_helis([heli], P5.beam_target(M.t_of(20)), energy=1.6e6, cone=5.0)
-    three_beams(h["searchlight"], hero, ground_w=1.4e5, car_w=5.5e4)
+    beam_lights(h["searchlight"], hero, [bpy.data.objects["port_terre_plein"]], ground_w=1.0e5)
     M.key_searchlight(h, FRAMES, P5.beam_target)
     for i, (dz, col, e) in enumerate(((0.2, L.CORAL, 0.4), (-1.2, L.CREAM, 0.25))):
         Ld = bpy.data.lights.new(f"heli_feu_{i}", "POINT")      # feu anticollision corail, feu blanc sous la cellule
@@ -975,6 +998,7 @@ def plan_P5(scene, hidden, palier="socle"):
     cam = L.camera("cam_P5", tuple(CAM), (CAM.x - 30.0, CAM.y - 40.0, CAM.z), lens=P5.LENS, fstop=2.8, roll=-2.0)
     M.key_camera(cam, FRAMES, P5.camera)
     cam.data.dof.focus_object = hero
+    car_fill(cam, hero)
     scene.render.use_motion_blur = True
     scene.render.motion_blur_shutter = 0.5
     last = poses[-2]
