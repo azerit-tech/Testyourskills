@@ -338,9 +338,12 @@ def mat_leather():
 
 
 def mat_glove_driver():
-    """Les gants du conducteur : cuir fauve clair (albédo vers 0,3), satiné. Noirs, ils disparaissaient derrière le
-    reflet du ciel dans le pare-brise : les mains levées sont le sens du plan final, elles doivent se lire."""
-    return mat_leather_tex("ppl_glove_tan", lin("#b39575"), rough=0.6, coat=0.05)
+    """Les gants du conducteur : cuir écru, presque blanc (albédo vers 0,85), mat. Noirs, ils disparaissaient
+    derrière le reflet du ciel dans le pare-brise ; fauves (albédo 0,3), sortis par la vitre dans FIN, ils
+    restaient sombres à 7,5 m (8 px) sous les phares de la meute : les mains levées sont le sens du plan final,
+    seule leur valeur les fait lire sur la nuit (plan de lumière v3.1, fiche FIN : la chose la plus claire près
+    de la berline)."""
+    return mat_leather_tex("ppl_glove_pale", lin("#f3ece0"), rough=0.7, coat=0.0)
 
 
 def mat_navy():
@@ -1811,7 +1814,7 @@ def _cut_stretched(arm, meshes, ratio=2.2, min_len=0.05):
 
 
 def load_driver(variant="hooded", name=None):
-    """Le conducteur : capuche relevée, tout en coton noir mat, gants de cuir fauve clair, aucune peau.
+    """Le conducteur : capuche relevée, tout en coton noir mat, gants de cuir écru, aucune peau.
     Renvoie l'objet armature."""
     spec = DRIVERS[variant]
     arm, meshes = _import(spec["path"])
