@@ -1859,142 +1859,66 @@ def ouv_motion(scene, coupe, cam, focus):
           f"empattement {wb:.2f} m", flush=True)
 
 
-def key_hands(coupe, frames, steer_fn):
-    """Les mains gantées sur la jante, clés d'os : à chaque image clé, pose_driver_wheel reposée deux fois (la
-    main gauche à grip + braquage, la droite à grip - braquage, en degrés de volant) ; la jante ne tourne pas."""
-    from mathutils import Vector
-    import cast_people as CP
-    arm = next((o for o in coupe.children_recursive if o.type == "ARMATURE" and "wheel_fit" in o), None)
-    if arm is None:
-        print("[scene_a] P1 : pas de conducteur, mains non animées", flush=True)
-        return
-    bpy.context.view_layer.update()
-    fit = list(arm["wheel_fit"])
-    W = coupe.matrix_world
-    C, N, rad, pedal = W @ Vector(fit[0:3]), (W.to_3x3() @ Vector(fit[3:6])).normalized(), fit[6], W @ Vector(fit[7:10])
-    for f in frames:
-        a = steer_fn(f)
-        CP.pose_driver_wheel(arm, C, rad, N, grip_deg=62.0 + a, pedal=pedal)
-        left = {b.name: (b.location.copy(), b.rotation_quaternion.copy()) for b in arm.pose.bones if "Left" in b.name}
-        CP.pose_driver_wheel(arm, C, rad, N, grip_deg=62.0 - a, pedal=pedal)
-        for b in arm.pose.bones:
-            if b.name in left:
-                b.location, b.rotation_quaternion = left[b.name]
-            b.keyframe_insert("location", frame=f)
-            b.keyframe_insert("rotation_quaternion", frame=f)
+def street_puddle(name, x, y, w, l, seed=21):
+    """Une flaque que la berline traverse (fx.py en tire la gerbe) : une eau sombre posée sur l'enrobé, au bord
+    irrégulier, `w` × `l` m autour de (x, y)."""
+    import road
+    # (lisse à 0,02, elle renvoyait le ciel noir au-dessus de la berline : un trou ; à 0,1 elle garde les phares)
+    water = bpy.data.materials.get("rue_flaque") or mat_plain("rue_flaque", (0.02, 0.02, 0.024, 1), 0.1)
+    p = next(n for n in water.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
+    p.inputs["IOR"].default_value = 1.33
+    bm = bmesh.new()
+    rnd = random.Random(seed)
+    n = 28
+    ring = []
+    for i in range(n):
+        a = math.tau * i / n
+        k = 1.0 + 0.16 * math.sin(3 * a + 0.7) + 0.08 * math.sin(7 * a) + rnd.uniform(-0.05, 0.05)
+        px, py = x + 0.5 * w * k * math.cos(a), y + 0.5 * l * k * math.sin(a)
+        ring.append(bm.verts.new((px, py, road.road_z(px) + 0.004)))
+    bm.faces.new(ring)
+    ob = bpy.data.objects.new(name, bpy.data.meshes.new(name))
+    bm.to_mesh(ob.data)
+    bm.free()
+    ob.data.materials.append(water)
+    bpy.context.scene.collection.objects.link(ob)
+    ob.visible_shadow = False
+    return ob
 
 
-def p1_cabin(scene, coupe, frames, on):
-    """L'habitacle de P1 lisible : le rétroviseur réglé sur la voie derrière, le pare-brise sans réflexion totale vu de dos, une
-    source froide douce et deux lueurs corail et lilas derrière la lunette, liées aux seuls objets de la berline et
-    du conducteur (liaison de lumière, comme lieux.car_fill) ; invisibles à la caméra et aux reflets."""
-    import motion as M
-    import p1_habitacle as P
-    # le rétroviseur (faces de hero_w111_mirror, sans sommet partagé) tourné autour de son centre : un conducteur le
-    # règle ; la normale (0, 1, 0) passe à (lacet vers +x, bascule vers le haut) de p1_habitacle
-    me = coupe.data
-    mi = {i for i, m in enumerate(me.materials) if m and m.name.endswith("_mirror")}
-    vs = sorted({v for p in me.polygons if p.material_index in mi for v in p.vertices})
-    # le miroir se détache du pare-brise : tout le rétroviseur du modèle est en chrome poli (boîtier compris), il
-    # reflétait l'avenue jusque sur ses bords. Seule la glace (faces tournées vers l'arrière, la caméra) reste miroir ;
-    # le boîtier, son bord arrondi (le liseré qui accroche la source froide), la tige et son pied prennent l'ivoire
-    # satiné du volant (hero_w111_wheel_rim)
-    ivory = bpy.data.materials.get(f"hero_{HERO}_wheel_rim")
-    if vs and ivory is not None:
-        if ivory.name not in me.materials:
-            me.materials.append(ivory)
-        k = list(me.materials).index(ivory)
-        glass = sorted({v for p in me.polygons if p.material_index in mi and p.normal.y > 0.9 for v in p.vertices})
-        n_case = n_stem = 0
-        for p in me.polygons:
-            if p.material_index in mi and p.normal.y <= 0.9:
-                p.material_index = k
-                n_case += 1
-            elif p.material_index not in mi and p.material_index != k:
-                c = p.center
-                mat = me.materials[p.material_index]
-                if (abs(c.x) < 0.04 and -0.75 < c.y < -0.55 and 1.25 < c.z < 1.42 and mat
-                        and not mat.name.endswith("_glass")):
-                    p.material_index = k
-                    n_stem += 1
-        print(f"[scene_a] P1 : rétroviseur, {len(glass)} sommets de glace, {n_case} faces de boîtier et "
-              f"{n_stem} de tige passées en ivoire", flush=True)
-    if vs:
-        c = sum((me.vertices[v].co for v in vs), Vector()) / len(vs)
-        R = Matrix.Rotation(-math.radians(P.MIRROR_YAW), 3, "Z") @ Matrix.Rotation(math.radians(P.MIRROR_TILT), 3, "X")
-        for v in vs:
-            me.vertices[v].co = c + R @ (me.vertices[v].co - c)
-        me.update()
-    # le pare-brise vu de l'intérieur : le nœud Fresnel de hero_cars.mat_window prend 1/1,52 sur une face vue de dos
-    # et passe en réflexion totale au-delà de 41° ; le pare-brise couché, vu de la banquette sous ~60°, devenait un
-    # miroir de l'habitacle noir (l'avenue 7 fois plus sombre qu'en OUV au premier rendu). Une vitre est une
-    # feuille mince : vue de dos, le reflet reste celui du verre de face (~0,1)
-    for m in bpy.data.materials:
-        if not (m.name.endswith("_glass") and m.name.startswith("hero_") and m.node_tree):
-            continue
-        nt = m.node_tree
-        for mix in [n for n in nt.nodes if n.type == "MIX_SHADER" and n.inputs[0].is_linked]:
-            src = mix.inputs[0].links[0].from_socket
-            bf = nt.nodes.new("ShaderNodeNewGeometry").outputs["Backfacing"]
-            keep = nt.nodes.new("ShaderNodeMath")
-            keep.operation = "SUBTRACT"
-            keep.inputs[0].default_value = 1.0
-            nt.links.new(bf, keep.inputs[1])
-            front = nt.nodes.new("ShaderNodeMath")
-            front.operation = "MULTIPLY"
-            nt.links.new(src, front.inputs[0])
-            nt.links.new(keep.outputs[0], front.inputs[1])
-            back = nt.nodes.new("ShaderNodeMath")
-            back.operation = "MULTIPLY_ADD"
-            nt.links.new(bf, back.inputs[0])
-            back.inputs[1].default_value = 0.1
-            nt.links.new(front.outputs[0], back.inputs[2])
-            nt.links.new(back.outputs[0], mix.inputs[0])
-    # les receveurs : la caisse, ses portes, le conducteur
-    col = bpy.data.collections.new("habitacle_seul")
-    for o in [coupe, *coupe.children_recursive]:
-        if o.type == "MESH" and not o.name.startswith("wheel_"):
-            col.objects.link(o)
-
-    def lamp(name, color, energy, size, loc, aim):
-        d = bpy.data.lights.new(name, "AREA")
-        d.shape, d.size, d.energy, d.color = "DISK", size, energy, lin(color)[:3]
-        lo = bpy.data.objects.new(name, d)
-        scene.collection.objects.link(lo)
-        lo.parent = coupe
-        lo.location = loc
-        lo.rotation_mode = "QUATERNION"
-        lo.rotation_quaternion = (Vector(aim) - Vector(loc)).to_track_quat("-Z", "Y")
-        lo.visible_camera = lo.visible_glossy = lo.visible_transmission = lo.visible_volume_scatter = False
-        lo.light_linking.receiver_collection = col
-        return lo
-    # la source froide : du pavillon au-dessus de la banquette vers le tableau de bord (le noyer, le volant ivoire)
-    lamp("habitacle", "#b4bce6", 45.0, 0.5, (0.1, 0.75, 1.33), (0.2, -0.75, 0.85))   # 25 W : le noyer restait noir
-    # les lueurs de la rampe, derrière la lunette (repère de la caisse : l'arrière vers +y) : elles battent avec
-    # elle (M.bar_phase, décalage 0 comme la patrouille dans flash_bars) et teintent le pavillon et l'épaule
-    for name, color, tone, x, watts in (("lueur_corail", CORAL, "corail", 0.35, 40.0), ("lueur_lilas", LILAC, "lilas", -0.35, 60.0)):
-        d = lamp(name, color, watts, 0.25, (x, 2.0, 1.15), (0.3, 0.0, 1.25)).data   # corail à 60 W : pavillon et dossier trop roses
-        for f in frames:
-            d.energy = watts if f >= on and M.bar_phase(f) == tone else 0.0
-            d.keyframe_insert("energy", frame=f)
-        for fc in M.fcurves(d):
-            for kp in fc.keyframe_points:
-                kp.interpolation = "CONSTANT"
+def p1_props(P):
+    """Ce que la berline frôle en P1 : la flaque (street_puddle) et les feuilles de papier (blanc cassé, à peine
+    gondolées). Nommées fx_flaque et fx_papier_* pour fx.py."""
+    import road
+    x, y, w, l = P.PUDDLE
+    street_puddle("fx_flaque", x, y, w, l)
+    paper = mat_plain("p1_papier", (0.78, 0.76, 0.70, 1), 0.85)
+    for i, (px, py, rot) in enumerate(P.PAPERS):
+        bm = bmesh.new()
+        bmesh.ops.create_grid(bm, x_segments=4, y_segments=5, size=0.5)
+        for v in bm.verts:
+            v.co.x *= 0.21
+            v.co.y *= 0.297
+            v.co.z = 0.012 * math.sin(v.co.x * 14.0 + i) + 0.008 * (v.co.y / 0.15) ** 2
+        ob = bpy.data.objects.new(f"fx_papier_{i}", bpy.data.meshes.new(f"fx_papier_{i}"))
+        bm.to_mesh(ob.data)
+        bm.free()
+        ob.data.materials.append(paper)
+        bpy.context.scene.collection.objects.link(ob)
+        ob.location = (px, py, road.road_z(px) + 0.006)
+        ob.rotation_euler = (0.0, 0.0, math.radians(rot))
+    print(f"[scene_a] P1 : flaque en ({x:.2f}, {y:.1f}), {len(P.PAPERS)} feuilles de papier", flush=True)
 
 
 def p1_motion(scene, coupe, police, cam, focus):
-    """Le plan P1 animé (p1_habitacle.py), 2,5 s après OUV : la berline et la patrouille sur leurs rigs (roues,
-    suspension), la rampe éteinte puis allumée (corail et lilas, 2 Hz, motion.flash_bars) ; la caméra fixe dans
-    l'habitacle, parentée à la caisse, mise au point sur le rétroviseur intérieur (le vrai, celui du modèle) ;
-    les mains bougent à peine sur la jante ; une faible lumière froide sous le pavillon."""
+    """Le plan P1 animé (p1_avenue.py), 2,5 s après OUV : la berline et la patrouille sur leurs rigs (roues,
+    suspension), la rampe éteinte puis allumée (corail et lilas, 2 Hz, motion.flash_bars) ; la caméra la précède
+    de trois quarts avant droit, au ras de la chaussée, en travelling avant (p1_avenue.camera)."""
     import motion as M
-    import p1_habitacle as P
+    import p1_avenue as P
     frames = range(P.F0, P.F0 + P.FRAMES)
     scene.frame_start, scene.frame_end = frames[0], frames[-1]
     on = min(f for f in frames if P.bars_on(f))
-    # les mains d'abord, la caisse encore immobile : deux degrés et demi de volant, une correction lente
-    key_hands(coupe, list(range(P.F0, P.F0 + P.FRAMES, 4)) + [P.F0 + P.FRAMES - 1],
-              lambda f: 2.5 * math.sin(math.pi * (f - P.F0) / (P.FRAMES - 1)))
     # la berline
     wheels = [o for o in coupe.children if o.name.startswith("wheel_")]
     ys = [w.location.y for w in wheels]
@@ -2046,27 +1970,16 @@ def p1_motion(scene, coupe, police, cam, focus):
         for fc in M.fcurves(idb):
             for kp in fc.keyframe_points:
                 kp.interpolation = "CONSTANT"
-    # la caméra : fixe dans la caisse (repère de street_hero : l'avant vers -y), regard vers l'avant, un peu plongé
-    from mathutils import Vector
-    cam.animation_data_clear()
-    cam.parent = coupe
-    cam.matrix_parent_inverse = Matrix.Identity(4)
-    cam.location = P.CAM_LOCAL
-    cam.rotation_mode = "QUATERNION"
-    b = math.radians(P.CAM_PITCH)
-    cam.rotation_quaternion = Vector((0.0, -math.cos(b), math.sin(b))).to_track_quat("-Z", "Y")
-    cam.data.lens = P.LENS
+    # la caméra : devant elle, de trois quarts avant droit, sur un rail ; point à 20 m, la berline et la patrouille
+    # nettes toutes les deux
     cam.data.shift_y = 0.0
-    cam.data.clip_start = 0.05
+    M.key_camera(cam, frames, P.camera)
     cam.data.dof.focus_object = None
-    # la mise au point : sur la glace du rétroviseur (1,3 m), le reflet de la patrouille (à 30 m de plus) sortait
-    # flou en trois points ; à 5 m et f/4, la glace et son cadre restent nets à 4 px près, le reflet et l'avenue
-    # nets, la capuche au premier plan floue
     cam.data.dof.focus_distance = P.FOCUS
     cam.data.dof.aperture_fstop = P.FSTOP
     bpy.data.objects.remove(focus)
-    p1_cabin(scene, coupe, frames, on)
-    scene.frame_set(P.STILL)          # l'image fixe du banc : la rampe allumée dans le rétroviseur
+    p1_props(P)
+    scene.frame_set(P.STILL)          # l'image fixe du banc : la rampe allumée
     scene.render.motion_blur_shutter = 0.5
     scene.render.use_motion_blur = True
     print(f"[scene_a] P1 : {len(poses)} images, berline de y {poses[0]['y']:.1f} à {poses[-1]['y']:.1f}, rampe "
@@ -2075,8 +1988,8 @@ def p1_motion(scene, coupe, police, cam, focus):
 
 def build(plan=None, palier=None):
     """La scène A (l'avenue du front de mer). Sans plan : l'ancienne image fixe, écrite dans assets/scene-a.blend.
-    plan « OUV » ou « P1 » (render_lieux --lieu avenue) : le plan animé (l'ouverture, puis le rétroviseur dans
-    l'habitacle), rendu sans écrire la scène ; palier ignoré."""
+    plan « OUV » ou « P1 » (render_lieux --lieu avenue) : le plan animé (l'ouverture, puis la patrouille qui démarre
+    derrière la berline), rendu sans écrire la scène ; palier ignoré."""
     bpy.ops.wm.read_factory_settings(use_empty=True)
     scene = bpy.context.scene
     hidden = bpy.data.collections.new("sources")
@@ -2195,7 +2108,7 @@ def build(plan=None, palier=None):
     police.rotation_mode = "XYZ"
     police.rotation_euler = (0, 0, -math.pi / 2)        # l'avant vers -y
     if plan in ("OUV", "P1"):
-        # garée à l'angle de la rue transversale de y 120, côté ville (ouv_avenue.PATROL, cap des lieux)
+        # garée à l'angle de la rue transversale de y 266, côté ville (ouv_avenue.PATROL, cap des lieux)
         police.location = (OUV.PATROL[0], OUV.PATROL[1], 0)
         police.rotation_euler = (0, 0, math.radians(OUV.PATROL[2] + 90.0))
 

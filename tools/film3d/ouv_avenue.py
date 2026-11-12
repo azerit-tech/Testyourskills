@@ -1,7 +1,7 @@
 # Le plan OUV écrit une fois, sans Blender (docs/cinematique-poursuite.md §2.3, « la conduite calme ») : la
 # berline remonte l'avenue vers l'horizon corail à 50 km/h, sur la voie intérieure de sa chaussée ; la caméra la
 # suit de trois quarts dos, à 1,5 m, 10 m derrière et 1,8 m à sa gauche (sur l'axe de l'avenue), 35 mm, comme sur un
-# rail (aucune secousse). La patrouille est garée gyrophare éteint à l'angle de la rue transversale de y 120, devant
+# rail (aucune secousse). La patrouille est garée gyrophare éteint à l'angle de la rue transversale de y 266, devant
 # à gauche, côté ville, le long de la bordure, l'avant vers la berline : elle glisse du milieu gauche du cadre vers
 # son bord gauche et en sort vers l'image 17 ; la berline la dépasse juste après (vers l'image 44 ; c'est elle qui
 # s'allume dans le rétroviseur de P1). Caméra à gauche de la berline : à sa droite, la caisse cachait la patrouille
@@ -22,7 +22,11 @@ CAM_BACK, CAM_SIDE, CAM_Z = 10.0, -1.8, 1.5   # CAM_SIDE : vers +x (la droite de
 CAM_YAW = 183.0               # lacet de motion.key_camera (180 : vers +y) : 3° vers la droite, la berline à droite
 CAM_PITCH = -2.0              # du centre sans toucher le bord (à 182° elle le touchait), la patrouille au milieu gauche
 LENS = 35.0
-PATROL = (-5.9, 118.0, 180.0)  # x, y, cap (lieux : 0 vers +y) : garée le long de la bordure côté ville, avant vers -y
+# la rue transversale de la patrouille : celle de y 266 (découpage v2, P1 option A, 12 novembre) ; à celle de y 120,
+# P1 regardait en arrière au-delà de y 20, là où la ville s'arrête (l'horizon nu à gauche du cadre) ; ici il a
+# 250 m d'avenue construite derrière la berline, et OUV en a 400 devant
+STREET = 266.0
+PATROL = (-5.9, STREET - 2.0, 180.0)  # x, y, cap (lieux : 0 vers +y) : garée le long de la bordure côté ville, avant vers -y
 Y0 = PATROL[1] - 35.0 + CAM_BACK   # la berline à la première image : la caméra à 35 m de la patrouille
 
 
