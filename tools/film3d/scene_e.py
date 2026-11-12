@@ -1171,30 +1171,6 @@ def beam_lights(main, hero, ground, ground_w, car_w):
     return _twin(main, "faisceau_berline", car_w, "#fff1e2", body)
 
 
-def car_side(hero, at=(-10.0, 62.0, 4.5), aim=(6.0, 67.0, 0.8), energy=2600.0, size=3.0, color=None):
-    """L'ambre de côté sur la berline : la lumière d'une lampe au sodium du bord de la voie du pont, à gauche de
-    la caméra, qui prend son flanc gauche en écharpe par l'arrière et pose un liseré chaud sur le pavillon et les
-    ailes (le faisceau, froid, vient d'en face et d'en haut). Un disque doux lié à la seule berline (aucune autre
-    surface ne le voit, ni la brume ni la caméra : pas de grain). Avant, l'ambre des mâts tombait de haut et de
-    face et rosissait le capot sans dessiner la caisse."""
-    d = bpy.data.lights.new("berline_ambre_cote", "AREA")
-    d.shape = "DISK"
-    d.size = size
-    d.energy = energy
-    d.color = L.lin(color or L.AMBER)[:3]
-    lo = bpy.data.objects.new(d.name, d)
-    bpy.context.scene.collection.objects.link(lo)
-    lo.location = at
-    lo.rotation_mode = "QUATERNION"
-    lo.rotation_quaternion = (Vector(aim) - Vector(at)).to_track_quat("-Z", "Y")
-    lo.visible_camera = lo.visible_volume_scatter = False
-    col = bpy.data.collections.new("berline_ambre_seule")
-    for o in L.car_parts(hero):
-        col.objects.link(o)
-    lo.light_linking.receiver_collection = col
-    return lo
-
-
 def skid_p5(scene, width=0.24):
     """Les deux traces de gomme des roues arrière dans la glisse (p5_virage.wheel_track), posées sur la dalle et
     dévoilées sous les roues (modificateur Construction, une face par pas de temps). La matière est celle de P2 :
@@ -1235,29 +1211,6 @@ def skid_p5(scene, width=0.24):
         b.frame_start = f0
         b.frame_duration = max(1, f1 - f0)
     return f0, f1
-
-
-def car_fill(cam, hero, energy=1400.0, size=4.0):
-    """La lumière de la berline, comme sur le pont : un disque doux et crème de face, porté par la caméra (1,5 m
-    au-dessus de l'objectif, dans l'axe), qui n'éclaire qu'elle (~4 W/m² à 10 m : P ≈ π d²). Invisible à la
-    caméra et à la brume ; son reflet doux sur le vernis dessine la caisse. À 350 W la caisse sortait lilas
-    (moyenne 93, 52, 79 : bleu sur rouge 0,85 quand le bordeaux seul en donne 0,5) : le vernis renvoie le ciel
-    et la brume derrière la caméra, une couche bleutée qui s'ajoute ; le diffus crème doit la dominer."""
-    d = bpy.data.lights.new("berline_face", "AREA")
-    d.shape = "DISK"
-    d.size = size
-    d.energy = energy
-    d.color = L.lin("#fff0d8")[:3]
-    lo = bpy.data.objects.new(d.name, d)
-    bpy.context.scene.collection.objects.link(lo)
-    lo.parent = cam
-    lo.location = (0.0, 1.5, 0.0)                 # repère de la caméra : -z vers l'avant, y vers le haut
-    lo.visible_camera = lo.visible_volume_scatter = False
-    col = bpy.data.collections.new("berline_face_seule")
-    for o in L.car_parts(hero):
-        col.objects.link(o)
-    lo.light_linking.receiver_collection = col
-    return lo
 
 
 def plan_P5(scene, hidden, palier="conteneurs"):
@@ -1340,10 +1293,10 @@ def plan_P5(scene, hidden, palier="conteneurs"):
     cam = L.camera("cam_P5", tuple(CAM), (CAM.x + 1.0, CAM.y + 8.0, 0.7), lens=P5.LENS, fstop=4.0)
     M.key_camera(cam, FRAMES, P5.camera)
     cam.data.dof.focus_object = hero
-    car_fill(cam, hero)
-    # l'ambre rase le flanc gauche (celui que voit la caméra) depuis l'arrière-gauche, au ras du capot : un
-    # liseré le long de la ceinture chromée ; posé plus loin à l'ouest (-10 ; 62), il n'éclairait que l'arrière
-    car_side(hero, at=(-9.0, 71.0, 2.2), aim=(6.0, 67.5, 0.7), energy=3000.0, size=2.5)
+    # l'appoint de poursuite commun (lumière v3.1, 2.5), le seul appoint lié à la berline : 4 m derrière, 6 m
+    # au-dessus, dans le repère de son rig. (Plus d'appoint porté par la caméra, 1400 W, ni d'ambre de flanc,
+    # 3000 W : le faisceau et les mâts du port la posent dans le lieu)
+    L.car_fill(hero, loc=(0.0, -4.0, 6.0), energy=900.0, color="#ffd4b4", size=6.0)
     scene.render.use_motion_blur = True
     scene.render.motion_blur_shutter = 0.5
     last = poses[-2]
