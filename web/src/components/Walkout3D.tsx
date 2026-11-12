@@ -42,7 +42,6 @@ export async function warmWalkout(lang: Lang): Promise<void> {
   const h = createWalkout({
     warm: true,
     lang,
-    double: false,
     accent: levelAccent({ overall: 80 }),
     texts: {
       langName: "·",
@@ -89,8 +88,6 @@ export interface WalkoutControl {
 interface Props {
   card: CardData;
   lang: Lang;
-  /** Ancien « double walkout » des comparaisons, toujours faux depuis le dossier à une fiche (§18.36). */
-  double: boolean;
   /** Ce que la fiche déclarative a lu : un CV ou un profil LinkedIn (§18.24). */
   declared?: DeclaredSource;
   phase: Phase;
@@ -103,7 +100,7 @@ interface Props {
   onDone: () => void;
 }
 
-export function Walkout3D({ card, lang, double, declared = "cv", phase, anchorRef, controlRef, onReady, onHandoff, onDone }: Props) {
+export function Walkout3D({ card, lang, declared = "cv", phase, anchorRef, controlRef, onReady, onHandoff, onDone }: Props) {
   const { t } = useT();
   const hostRef = useRef<HTMLDivElement>(null);
   const hudRef = useRef<HTMLDivElement>(null);
@@ -132,7 +129,7 @@ export function Walkout3D({ card, lang, double, declared = "cv", phase, anchorRe
     const icon = langIcon(card.mainLanguage);
     const tells = t.reveal.tells;
     // Un dossier à deux pièces (shared/caseFile.ts) : son dossier se lit « LinkedIn · GitHub ».
-    const both = double || (card.pieces?.length ?? 0) > 1;
+    const both = (card.pieces?.length ?? 0) > 1;
     const texts = {
       langName: icon ? langTitle(card.mainLanguage) : tells.noLanguage,
       langLabel: tells.language,
@@ -167,7 +164,6 @@ export function Walkout3D({ card, lang, double, declared = "cv", phase, anchorRe
       try {
         const h = createWalkout({
           lang,
-          double,
           accent: levelAccent(card),
           texts,
           logoPath: icon?.path ?? CODE_PATH,

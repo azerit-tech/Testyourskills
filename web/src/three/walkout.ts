@@ -16,8 +16,8 @@
 //    la ville au clic ou à Espace), sa chaise pivote, le carton de fin de
 //    mission (le niveau, la note, roulement de batterie), puis la carte se
 //    forme devant lui, tourne, la note claque et la carte se pose au pixel
-//    près sur la carte HTML. Une flèche pour une carte seule, deux pour une
-//    comparaison GitHub × CV (le « double »). Assets : web/src/three/assets.ts ;
+//    près sur la carte HTML. Un dossier à deux pièces joue sa fiche, comme
+//    une fiche seule (§18.36). Assets : web/src/three/assets.ts ;
 //    HUD : hud.ts ; sons : elevatorSound.ts et radioSound.ts.
 import * as THREE from "three";
 import { EffectComposer, EffectPass, NoiseEffect, RenderPass, ToneMappingEffect, ToneMappingMode, VignetteEffect, BlendFunction } from "postprocessing";
@@ -79,8 +79,6 @@ export interface WalkoutOptions {
    * textures envoyées au GPU, sans jamais être jouée ni affichée. */
   warm?: boolean;
   lang: "fr" | "en";
-  /** Comparaison GitHub × CV : deux flèches au lieu d'une. */
-  double: boolean;
   accent: { a: string; b: string; ink: string };
   texts: WalkoutTexts;
   /** Clé du langage principal (code sur l'écran du dev) et pseudo affiché. */
@@ -685,7 +683,6 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
           title: o.texts.levelLabel,
           profile: o.texts.profileLabel,
           overall: o.overall,
-          double: o.double,
           accent: accent.a,
           // pas de mini-carte : dans une cabine, on ne va nulle part
           map: false,
@@ -920,7 +917,7 @@ export function createWalkout(o: WalkoutOptions): WalkoutHandle {
     sound.update(t, speed);
     const moving = t >= plan.ascent[0] && t < plan.arrive;
     const level = Math.round(climb * SCORE);
-    screen.floor(level, o.double ? 2 : 1, moving);
+    screen.floor(level, 1, moving);
     const crossed = (at: number) => prevT < at && t >= at;
     /* les étoiles de recherche : une de plus à chaque seuil, avec la radio */
     const stars = t >= plan.depart ? starsAt(level) : 0;

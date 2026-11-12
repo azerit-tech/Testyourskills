@@ -29,7 +29,7 @@ export interface WallScreen {
     uTint: { value: THREE.Color };
   };
   readonly material: THREE.ShaderMaterial;
-  /** L'étage : numéro et flèches (une, ou deux pour un « double »). */
+  /** L'étage : numéro et flèches (une seule depuis le dossier à une fiche, §18.36). */
   floor(n: number, arrows: number, moving: boolean): void;
   /** La partie droite : un libellé et sa valeur. */
   caption(label: string, value: string): void;

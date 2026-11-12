@@ -24,7 +24,7 @@ async function start() {
   const [assets] = await Promise.all([preloadWalkoutAssets(), loadSceneFonts()]);
   const card = FIXTURES.gold;
   const scene = createWalkout({
-    lang: "fr", double: false, accent: levelAccent(card), assets,
+    lang: "fr", accent: levelAccent(card), assets,
     login: card.login ?? card.name, overall: card.overall, langKey: card.mainLanguage,
     logoPath: siTypescript.path, leaguePath: siGithub.path,
     cardTexture: loadCardTexture(card, "fr"), muted: true,

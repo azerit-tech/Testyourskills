@@ -44,7 +44,6 @@ export function createHud(
     lines: HudLines;
     title: string;
     overall: number;
-    double: boolean;
     accent: string;
     map?: boolean;
     profile?: string;
@@ -154,7 +153,7 @@ export function createHud(
       g.fillStyle = "rgba(36, 49, 82, 0.9)";
       g.fillRect(0, seaY, S, S - seaY);
     }
-    // le point du dev, devant ; deux points pour une comparaison
+    // le point du dev, devant
     const dy = Math.max(c - (c - 18), Math.min(c - 18, c - distance * scale));
     const blip = (x: number, y: number, color: string) => {
       g.fillStyle = color;
@@ -163,10 +162,7 @@ export function createHud(
       g.fill();
     };
     const dyClamped = Math.max(22, Math.min(c - 6, dy));
-    if (o.double) {
-      blip(c - 7, dyClamped, o.accent);
-      blip(c + 7, dyClamped, "#ffffff");
-    } else blip(c, dyClamped, o.accent);
+    blip(c, dyClamped, o.accent);
     // nous, au centre
     g.fillStyle = "#ffffff";
     g.beginPath();

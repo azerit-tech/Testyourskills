@@ -48,8 +48,6 @@ export interface FilmSound {
 interface Props {
   card: CardData;
   lang: Lang;
-  /** Comparaison : le film joue celui de la carte principale. */
-  double: boolean;
   phase: Phase;
   onReady?: () => void;
   /** La lecture demande un geste : l'attente montre la pilule « Ouvrir mon dossier ». */

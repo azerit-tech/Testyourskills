@@ -434,9 +434,9 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
           <ErrorBoundary fallback={null} onError={finish}>
             <Suspense fallback={null}>
               {scene === "film" ? (
-                <Film card={main} lang={lang} double={false} phase={phase} onReady={() => onScene("ready")} onGesture={() => onScene("gesture")} onHandoff={handoff} onDone={finish} onTap={onStageClick} />
+                <Film card={main} lang={lang} phase={phase} onReady={() => onScene("ready")} onGesture={() => onScene("gesture")} onHandoff={handoff} onDone={finish} onTap={onStageClick} />
               ) : (
-                <Walkout3D card={main} lang={lang} double={false} declared={declaredOf(item.kind === "comparison" ? item.comparison : item.card)} phase={phase} anchorRef={stageRef} controlRef={walkoutCtl} onReady={() => onScene("ready")} onHandoff={handoff} onDone={finish} />
+                <Walkout3D card={main} lang={lang} declared={declaredOf(item.kind === "comparison" ? item.comparison : item.card)} phase={phase} anchorRef={stageRef} controlRef={walkoutCtl} onReady={() => onScene("ready")} onHandoff={handoff} onDone={finish} />
               )}
             </Suspense>
           </ErrorBoundary>
