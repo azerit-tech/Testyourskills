@@ -1,7 +1,8 @@
 // Profil criminel et peine (SPEC §18.2), pilotés par data/profiles.json et
 // data/sentences.json. Pur et déterministe : même entrée, même profil, même peine.
-// Les conditions réutilisent les règles des statuts (rules.ts) ; seules les trois
-// qui n'existent pas encore sont écrites ici.
+// Les conditions réutilisent les règles des statuts (rules.ts) ; seules les deux
+// qui n'existent pas encore sont écrites ici. Aucun profil ne naît d'un écart entre
+// les deux pièces d'un dossier (§18.36) : chaque pièce garde le sien.
 
 import type { CardProfile, CardSentence, Fact, StatCode, StatusInstance } from "../../../shared/types";
 import { specialOf } from "./common";
@@ -9,26 +10,16 @@ import { PROFILES, SENTENCES, type ProfileCondition, type ProfileDef } from "./c
 import { RULES, type RuleCtx, type Vars } from "./rules";
 import { fillTemplate } from "./statuses";
 
-export interface ProfileCtx extends RuleCtx {
-  /** Comparaison CV contre GitHub (§6.5) : notes globales et BUZZ du CV. `githubEmpty` : la fiche GitHub est un dossier vide. */
-  comparison?: { cvOverall: number; githubOverall: number; cvBuzz: number; githubEmpty?: boolean };
-}
+export type ProfileCtx = RuleCtx;
 
 type ProfileRule = (ctx: ProfileCtx, p: Record<string, number>) => Vars | null;
 
 /** Règles propres aux profils, en plus de celles des statuts. */
 export const PROFILE_RULES: Record<string, ProfileRule> = {
-  /** Le CV vaut `atLeast` points de plus que le code : seulement en comparaison, et jamais face à un GitHub vide. */
-  cv_ahead_of_code: (c, p) => {
-    const x = c.comparison;
-    if (!x || x.githubEmpty) return null;
-    const n = x.cvOverall - x.githubOverall;
-    return n >= p.atLeast ? { n, t: p.atLeast } : null;
-  },
-  /** Seuil sur une stat du CV : la fiche CV elle-même, ou le CV de la comparaison. */
+  /** Seuil sur une stat d'une fiche déclarative (CV ou LinkedIn), lue sur elle seule. */
   cv_stat_at_least: (c, p) => {
     const [code, t] = Object.entries(p)[0] as [StatCode, number];
-    const v = c.cv ? c.stats[code] : code === "BUZZ" ? c.comparison?.cvBuzz : undefined;
+    const v = c.cv ? c.stats[code] : undefined;
     return v !== undefined && v >= t ? { n: v, t } : null;
   },
   /** La règle de la carte « Débarque en ville » (common.ts, specialOf). */
@@ -64,23 +55,6 @@ function fallbackDef(): ProfileDef {
 /** Le profil de la fiche : la première règle vraie dans l'ordre de priorité, sinon le repli. */
 export function pickProfile(ctx: ProfileCtx): CardProfile {
   return toProfile(PROFILES.profiles.find((d) => matches(d, ctx)) ?? fallbackDef());
-}
-
-/**
- * Après la comparaison : seuls les profils classés avant le profil actuel peuvent
- * le remplacer, évalués avec la comparaison en plus. Les autres conditions de
- * ces profils, déjà fausses sur la fiche, le restent sans les faits ; le
- * résultat est donc celui d'une évaluation complète. Une fiche sans profil
- * (produite avant le barème 0.2.0) reste telle quelle.
- */
-export function profileWithComparison(
-  current: CardProfile | undefined,
-  ctx: Pick<ProfileCtx, "stats" | "comparison">,
-): CardProfile | undefined {
-  if (!current) return current;
-  const rank = PROFILES.profiles.findIndex((d) => d.id === current.id);
-  const better = PROFILES.profiles.slice(0, rank < 0 ? 0 : rank).find((d) => matches(d, ctx));
-  return better ? toProfile(better) : current;
 }
 
 function fill(f: Fact, n: number): Fact {

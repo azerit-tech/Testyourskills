@@ -21,10 +21,20 @@ describe("catalogue data/statuses.json", () => {
     const ids = STATUSES.statuses.map((d) => d.id);
     expect(new Set(ids).size).toBe(ids.length);
     for (const d of STATUSES.statuses) {
-      expect(RULES[d.rule], d.id).toBeTypeOf("function");
+      // Une entrée retirée garde son id (fiches rangées) ; sa règle n'existe plus.
+      if (!d.retired) expect(RULES[d.rule], d.id).toBeTypeOf("function");
       expect(d.label.fr && d.label.en && d.ruleText.fr && d.ruleText.en, d.id).toBeTruthy();
       expect(["negative", "positive", "special", "gap"]).toContain(d.tone);
     }
+  });
+
+  it("les statuts d'écart entre deux pièces sont retirés, pas supprimés (§18.36) : ids gardés, plus de règle, plus de caution", () => {
+    for (const id of ["cv_senior_from_cv", "cv_longer_than_readmes"]) {
+      const d = STATUSES.statuses.find((x) => x.id === id);
+      expect(d?.retired, id).toBe(true);
+      expect(RULES[d!.rule], id).toBeUndefined();
+    }
+    expect(STATUSES.statuses.filter((d) => d.tone === "gap" && !d.retired)).toEqual([]);
   });
 
   it("la liste fermée IA (§5.3) est au catalogue, source ai", () => {

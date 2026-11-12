@@ -3,8 +3,9 @@
 // présents dans var/renders (npx tsx scripts/render-fixtures.ts).
 import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { fileOf } from "../../shared/caseFile";
 import { FIXTURES, FIXTURE_COMPARISON } from "../../shared/fixtures";
-import { STAT_CODES, type Lang } from "../../shared/types";
+import type { Lang } from "../../shared/types";
 import { CardView } from "./card/CardView";
 
 const renders = import.meta.glob("../../var/renders/*.png", { eager: true, query: "?url", import: "default" }) as Record<string, string>;
@@ -30,13 +31,6 @@ const css = `
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr)); gap: 56px 32px; justify-items: center; }
   figure { margin: 0; display: grid; gap: 14px; justify-items: center; width: 100%; }
   figcaption { font: 500 11px/1 "JetBrains Mono", monospace; letter-spacing: .16em; color: #8494a5; text-transform: uppercase; }
-  .cmp { display: flex; flex-wrap: wrap; gap: 24px; align-items: center; justify-content: center; }
-  .cmp > div { width: min(360px, 100%); }
-  .deltas { display: grid; gap: 8px; min-width: 140px; }
-  .delta { display: flex; justify-content: space-between; gap: 18px; padding: 8px 14px; border-radius: 999px; border: 1px solid;
-    font: 500 13px/1 "JetBrains Mono", monospace; }
-  .delta b { font: 800 20px/1 "Barlow Condensed", sans-serif; }
-  .headline { text-align: center; font: 700 clamp(26px, 4vw, 40px)/1.05 "Barlow Condensed", sans-serif; text-transform: uppercase; margin: 0 0 28px; }
   .pngs { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(420px, 100%), 1fr)); gap: 20px; }
   .pngs a { display: block; border: 1px solid #223040; border-radius: 10px; overflow: hidden; background: #101722; }
   .pngs img { display: block; width: 100%; height: auto; }
@@ -98,27 +92,13 @@ function Gallery() {
           ))}
         </div>
 
-        <h2>Comparaison</h2>
-        <p className="headline">{FIXTURE_COMPARISON.headline[cmpLang]}</p>
-        <div className="cmp">
-          <div>
-            <CardView card={FIXTURE_COMPARISON.cv} lang={cmpLang} idPrefix="cmp-cv" />
-          </div>
-          <div className="deltas">
-            {STAT_CODES.map((c) => {
-              const d = FIXTURE_COMPARISON.deltas[c];
-              const col = c === "BUZZ" ? "#ffd23f" : d > 0 ? "#8ce06b" : d < 0 ? "#ff5c7a" : "#7d7a9c";
-              return (
-                <div key={c} className="delta" style={{ borderColor: col + "66", background: col + "1a" }}>
-                  <span style={{ color: "#8494a5" }}>{c}</span>
-                  <b style={{ color: col }}>{d > 0 ? `+${d}` : d < 0 ? `−${-d}` : "0"}</b>
-                </div>
-              );
-            })}
-          </div>
-          <div>
-            <CardView card={FIXTURE_COMPARISON.github} lang={cmpLang} idPrefix="cmp-gh" />
-          </div>
+        <h2>Dossier à deux pièces</h2>
+        {/* Une fiche, celle du dossier (shared/caseFile.ts) : plus d'écart stat par stat (§18.36). */}
+        <div className="grid">
+          <figure>
+            <CardView card={fileOf(FIXTURE_COMPARISON)} lang={cmpLang} idPrefix="cmp-file" />
+            <figcaption>CV · GitHub</figcaption>
+          </figure>
         </div>
 
         <h2>Statique (interactive = false)</h2>

@@ -9,7 +9,7 @@ import { fileOf } from "../../../shared/caseFile";
 import { FIXTURES } from "../../../shared/fixtures";
 import { publicView } from "../../../shared/publicView";
 import type { CvReading } from "../../../shared/readings";
-import type { CardData, ComparisonData, JobState, StatCode } from "../../../shared/types";
+import type { CardData, ComparisonData, JobState } from "../../../shared/types";
 import { createApp, type AppOptions } from "../app";
 import { Store } from "../db";
 import type { CardBody, Deps } from "../pipeline";
@@ -97,9 +97,9 @@ function setup(finder: FinderImpl | null, over: Partial<Deps> = {}, appOver: Par
     scoreCv(_r, _c, { lang, judgedInSeconds }) {
       return { ...body(FIXTURES.cv), lang, judgedInSeconds };
     },
+    // Comme le moteur (scoring/compare.ts) : les deux pièces, sans écart ni titre.
     compareCards(cv, github) {
-      const deltas = Object.fromEntries(cv.stats.map((s) => [s.code, github.stats.find((g) => g.code === s.code)!.value - s.value])) as Record<StatCode, number>;
-      return { cv, github, deltas, headline: { fr: "Ton CV annonce 7 points que ton code public ne montre pas encore.", en: "Your CV claims 7 points your public code doesn't show yet." } };
+      return { cv, github };
     },
     async renderImage() {
       return new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
@@ -155,8 +155,9 @@ describe("entrée GitHub : le LinkedIn trouvé devient une comparaison", () => {
     expect(cmp.cv.declaredSource).toBe("linkedin");
     // Le lien est prouvé : pas de « Lien entre les deux pièces : à confirmer » sous la fiche.
     expect(cmp.linkUnproven).toBeUndefined();
-    expect(cmp.headline.fr).toBe("Ton LinkedIn annonce 7 points que ton code public ne montre pas encore.");
-    expect(cmp.headline.en).toBe("Your LinkedIn claims 7 points your public code doesn't show yet.");
+    // Un dossier, une note (§18.36) : plus de titre d'écart.
+    expect(cmp).not.toHaveProperty("headline");
+    expect(cmp).not.toHaveProperty("deltas");
     // L'IA a lu le texte du profil, jamais stocké.
     expect(ctx.calls.readCv[0]).toContain("Senior Full-Stack Engineer — Paysolde (2022-03 – present)");
     expect(JSON.stringify(ctx.store.getCard(json.id))).not.toContain("Refonte du paiement");

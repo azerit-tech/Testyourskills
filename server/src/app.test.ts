@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FIXTURES, FIXTURE_COMPARISON } from "../../shared/fixtures";
-import type { CardData, ComparisonData, Fact, JobState, StatCode } from "../../shared/types";
+import type { CardData, ComparisonData, Fact, JobState } from "../../shared/types";
 import type { CvReading, CvTextCounts } from "../../shared/readings";
 import { createApp, normalizeLogin, purge, type AppOptions } from "./app";
 import { RETENTION_MS, Store } from "./db";
@@ -99,11 +99,9 @@ function setup(over: Partial<Deps> = {}, appOver: Partial<AppOptions> = {}) {
       calls.scoreCvGithub.push(github);
       return { ...body(FIXTURES.cv), lang, judgedInSeconds };
     },
+    // Comme le moteur (scoring/compare.ts) : les deux pièces, sans écart ni titre.
     compareCards(cv, github) {
-      const deltas = Object.fromEntries(
-        cv.stats.map((s) => [s.code, github.stats.find((g) => g.code === s.code)!.value - s.value]),
-      ) as Record<StatCode, number>;
-      return { cv, github, deltas, headline: { fr: "Ton CV annonce 7 points que ton code public ne montre pas encore.", en: "Your CV claims 7 points your public code doesn't show yet." } };
+      return { cv, github };
     },
     async renderImage(input) {
       calls.render.push(input.format + ":" + (input.card ? "card" : "comparison"));

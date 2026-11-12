@@ -125,17 +125,6 @@ export const RULES: Record<string, Rule> = {
   },
 
   // --- CV ---
-  senior_from_cv: (c, p) => {
-    if (!c.cv || !c.github) return null;
-    const ghYears = Math.floor(c.github.m.firstCommitYears ?? 0);
-    const declared = c.cv.reading.years_declared;
-    return declared - ghYears >= p.minGapYears ? { n: declared, m: ghYears, t: p.minGapYears } : null;
-  },
-  cv_longer_than_readmes: (c) => {
-    if (!c.cv || !c.github) return null;
-    const readme = c.github.m.readmeWordsActive;
-    return c.cv.counts.words > readme ? { n: c.cv.counts.words, m: readme } : null;
-  },
   buzz_density: (c, p) => {
     if (!c.cv) return null;
     const v = c.cv.buzzPer100;

@@ -471,7 +471,7 @@ function DeltaColumn({ cmp, x, y, rowH, w }: { cmp: ComparisonData; x: number; y
   return (
     <g>
       {STAT_CODES.map((code, i) => {
-        const d = cmp.deltas[code];
+        const d = cmp.deltas?.[code] ?? 0;
         const c = deltaColor(code, d);
         const cy = y + i * rowH;
         return (
@@ -623,7 +623,7 @@ function DeltaRow({ cmp, y, W }: { cmp: ComparisonData; y: number; W: number }) 
   return (
     <g>
       {STAT_CODES.map((code, i) => {
-        const d = cmp.deltas[code];
+        const d = cmp.deltas?.[code] ?? 0;
         const c = deltaColor(code, d);
         const x = x0 + i * (w + gap);
         return (

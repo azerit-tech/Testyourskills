@@ -38,8 +38,6 @@
     "gh_stars_mom": { "fr": "Caution : un README qui donne envie", "en": "Bail: a README worth a star" },
     "gh_polyglot": { "fr": "Caution : choisir un langage", "en": "Bail: pick one language" },
     "gh_node_modules": { "fr": "Caution : un .gitignore", "en": "Bail: one .gitignore" },
-    "cv_senior_from_cv": { "fr": "Caution : des dates exactes sur le CV", "en": "Bail: exact dates on the CV" },
-    "cv_longer_than_readmes": { "fr": "Caution : un README plus long que le CV", "en": "Bail: one README longer than the CV" },
     "cv_buzzwords": { "fr": "Caution : rayer « synergie » du CV", "en": "Bail: strike “synergy” from the CV" },
     "cv_passion": { "fr": "Caution : une « passion » de moins", "en": "Bail: one “passion” fewer" },
     "cv_expert_frameworks": { "fr": "Caution : un CV à cinq technos", "en": "Bail: a five-tech CV" },

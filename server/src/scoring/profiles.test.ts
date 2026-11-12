@@ -4,7 +4,7 @@ import { cvCounts, cvReading, daysAgo, facts, repo } from "./__fixtures__/make";
 import { PROFILES, SENTENCES, STATUSES } from "./config";
 import { deriveGithub } from "./derive";
 import { compareCards, scoreCv, scoreGithub } from "./index";
-import { PROFILE_RULES, pickProfile, profileWithComparison, sentenceFor, type ProfileCtx } from "./profiles";
+import { PROFILE_RULES, pickProfile, sentenceFor, type ProfileCtx } from "./profiles";
 import { RULES } from "./rules";
 
 /** Stats neutres : aucune règle de stat ne se déclenche. */
@@ -87,11 +87,10 @@ describe("aucun mot genré dans les noms, accroches, peines et cautions", () => 
 });
 
 describe("un profil par règle, dans l'ordre de priorité", () => {
-  it("Sous couverture : le CV vaut 15 points de plus que le code", () => {
-    expect(pick({ comparison: { cvOverall: 75, githubOverall: 60, cvBuzz: 20 } })).toBe("forger");
-    expect(pick({ comparison: { cvOverall: 74, githubOverall: 60, cvBuzz: 20 } })).toBe("sleeper_agent");
-    // Face à un GitHub vide (« dossier vide »), l'écart ne prouve rien.
-    expect(pick({ comparison: { cvOverall: 75, githubOverall: 20, cvBuzz: 20, githubEmpty: true } })).toBe("sleeper_agent");
+  it("Sous couverture ne naît plus d'un écart entre deux pièces (§18.36) : une seule condition, le BUZZ du CV", () => {
+    const forger = PROFILES.profiles.find((d) => d.id === "forger")!;
+    expect([...(forger.any ?? []), ...(forger.all ?? [])]).toEqual([{ rule: "cv_stat_at_least", params: { BUZZ: 85 } }]);
+    expect(PROFILE_RULES).not.toHaveProperty("cv_ahead_of_code");
   });
 
   it("Sous couverture : BUZZ du CV à 85 ou plus, jamais le BUZZ d'une fiche GitHub", () => {
@@ -189,19 +188,17 @@ describe("la fiche porte son profil et sa peine", () => {
     expect(card.sentence).toBeDefined();
   });
 
-  it("comparaison : l'écart de 15 points range les deux fiches « Sous couverture »", () => {
+  it("dossier à deux pièces : chaque pièce garde son profil, quel que soit l'écart (§18.36)", () => {
     const gcard = { ...scoreGithub(nightFacts(), null, opts), id: "g", createdAt: "" } as CardData;
     const ccard = { ...scoreCv(cvReading(), cvCounts(), opts), id: "c", createdAt: "" } as CardData;
-    const even = compareCards({ ...ccard, overall: gcard.overall + 14 }, gcard);
-    expect(even.github.profile?.id).toBe("night_owl");
-    expect(even.cv.profile?.id).toBe(ccard.profile?.id);
-    const forged = compareCards({ ...ccard, overall: gcard.overall + 15 }, gcard);
-    expect(forged.github.profile?.id).toBe("forger");
-    expect(forged.cv.profile?.id).toBe("forger");
-  });
-
-  it("comparaison : une fiche sans profil (avant 0.2.0) reste sans profil", () => {
-    expect(profileWithComparison(undefined, { stats: N, comparison: { cvOverall: 90, githubOverall: 40, cvBuzz: 90 } })).toBeUndefined();
+    for (const n of [14, 15, 40]) {
+      const cmp = compareCards({ ...ccard, overall: gcard.overall + n }, gcard);
+      expect(cmp.github.profile?.id).toBe("night_owl");
+      expect(cmp.cv.profile?.id).toBe(ccard.profile?.id);
+    }
+    // Le BUZZ du CV ne passe plus à la pièce GitHub.
+    const buzzy = { ...ccard, stats: ccard.stats.map((s) => (s.code === "BUZZ" ? { ...s, value: 95 } : s)) };
+    expect(compareCards(buzzy, gcard).github.profile?.id).toBe("night_owl");
   });
 });
 
@@ -247,6 +244,6 @@ describe("la peine et la caution §18.2", () => {
   });
 
   it("chaque chef d'accusation négatif ou d'écart a sa caution", () => {
-    for (const d of STATUSES.statuses) if (d.tone === "negative" || d.tone === "gap") expect(SENTENCES.bail[d.id], d.id).toBeDefined();
+    for (const d of STATUSES.statuses) if (!d.retired && (d.tone === "negative" || d.tone === "gap")) expect(SENTENCES.bail[d.id], d.id).toBeDefined();
   });
 });

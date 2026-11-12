@@ -91,6 +91,29 @@ describe("la fiche du dossier", () => {
     expect(caseCard(jacques()).statuses.every((s) => s.tone !== "gap")).toBe(true);
   });
 
+  it("une caution qui citait un statut d'écart retiré passe à la suivante, ou part", () => {
+    const gap = { id: "cv_senior_from_cv", tone: "gap" as const, label: { fr: "Senior, à prouver", en: "Senior, yet to prove" }, rule: { fr: "", en: "" } };
+    const neg = (id: string) => ({ id, tone: "negative" as const, label: { fr: id, en: id }, rule: { fr: "", en: "" } });
+    const oldBail = { fr: "Caution : des dates exactes sur le profil LinkedIn", en: "Bail: exact dates on the LinkedIn profile" };
+    const sentence = { label: { fr: "Peine : 4 mois de tests unitaires", en: "Sentence: 4 months of unit tests" }, bail: oldBail };
+    const withCv = (statuses: CardData["statuses"]): ComparisonData => ({ ...lumine(), cv: { ...lumine().cv, statuses, sentence } });
+    // La suivante : celle des mots creux, réécrite pour LinkedIn.
+    const next = caseCard(withCv([gap, neg("cv_buzzwords")]));
+    expect(next.sentence?.label).toEqual(sentence.label);
+    expect(next.sentence?.bail).toEqual({ fr: "Caution : rayer « synergie » du profil LinkedIn", en: "Bail: strike “synergy” from LinkedIn" });
+    // Aucune autre caution : la peine reste, sans caution.
+    const none = caseCard(withCv([gap, { ...neg("fallback_clean_record"), tone: "positive" }]));
+    expect(none.sentence).toEqual({ label: sentence.label });
+    // Sans statut d'écart, la caution rangée ne bouge pas.
+    expect(caseCard(withCv([neg("cv_buzzwords")])).sentence).toEqual(sentence);
+  });
+
+  it("plus aucun chef d'accusation après le retrait : « Casier vierge », comme le moteur, jamais un bloc vide", () => {
+    const gap = { id: "cv_longer_than_readmes", tone: "gap" as const, label: { fr: "x", en: "x" }, rule: { fr: "", en: "" } };
+    const f = caseCard({ ...lumine(), cv: { ...lumine().cv, statuses: [gap] } });
+    expect(f.statuses.map((s) => [s.id, s.label.fr, s.label.en])).toEqual([["fallback_clean_record", "Casier vierge", "Clean record"]]);
+  });
+
   it("sans grille rangée (dossier d'avant 0.4.0) : la note de la fiche de base", () => {
     const { grid: _g, ...old } = jacques();
     const f = caseCard({ ...old, github: { ...old.github, grid: undefined } });

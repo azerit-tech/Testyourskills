@@ -1,6 +1,6 @@
 {
   "version": "0.1.0",
-  "_doc": "Catalogue des statuts (SPEC §5.2, §5.3). Ids stables : on ajoute, on ne supprime pas. `rule` = clé de règle implémentée dans server/src/scoring/rules.ts, `params` = seuils. Placeholders remplis par le code : {n}, {m}, {year}, {t} (seuil). Mode taquin uniquement. Jamais de statut sur la sécurité.",
+  "_doc": "Catalogue des statuts (SPEC §5.2, §5.3). Ids stables : on ajoute, on ne supprime pas ; une entrée qui ne doit plus sortir prend `retired: true` (plus produite, sa règle peut disparaître de rules.ts, l'id reste pour les fiches rangées qui la citent). `rule` = clé de règle implémentée dans server/src/scoring/rules.ts, `params` = seuils. Placeholders remplis par le code : {n}, {m}, {year}, {t} (seuil). Mode taquin uniquement. Jamais de statut sur la sécurité.",
   "maxPerCard": 3,
   "tonePriority": ["special", "gap", "negative", "positive"],
   "statuses": [
@@ -101,12 +101,12 @@
     },
 
     {
-      "id": "cv_senior_from_cv", "source": "cv", "tone": "gap", "rule": "senior_from_cv", "params": { "minGapYears": 3 },
+      "id": "cv_senior_from_cv", "source": "cv", "tone": "gap", "rule": "senior_from_cv", "params": { "minGapYears": 3 }, "retired": true,
       "label": { "fr": "Senior, à prouver", "en": "Senior, yet to prove" },
       "ruleText": { "fr": "{n} ans déclarés, {m} sur GitHub (écart de {t} ans ou plus).", "en": "{n} years claimed, {m} on GitHub (gap of {t}+ years)." }
     },
     {
-      "id": "cv_longer_than_readmes", "source": "cv", "tone": "gap", "rule": "cv_longer_than_readmes", "params": {},
+      "id": "cv_longer_than_readmes", "source": "cv", "tone": "gap", "rule": "cv_longer_than_readmes", "params": {}, "retired": true,
       "label": { "fr": "CV plus long que ses README", "en": "CV longer than their READMEs" },
       "ruleText": { "fr": "{n} mots de CV contre {m} mots de README sur les repos actifs.", "en": "{n} words of CV against {m} words of README across active repos." }
     },

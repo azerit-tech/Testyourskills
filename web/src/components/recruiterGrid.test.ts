@@ -31,7 +31,6 @@ import { asLinkedinCard, asLinkedinComparison } from "../../../shared/linkedinTe
 import { DICTS, LangProvider } from "../i18n";
 import { comparisonGridsMock } from "../lib/mockGrid";
 import type { Shareable } from "./After";
-import { ComparisonStage, Deltas } from "./Comparison";
 import { RecruiterGrid } from "./RecruiterGrid";
 
 function renderNode(node: ReturnType<typeof createElement>, lang = "fr-FR"): string {
@@ -155,7 +154,7 @@ describe("« recoupé » : de la sortie du moteur à l'étiquette affichée", ()
 });
 
 describe("face à un GitHub vide : le code n'est pas prouvé, rien ne se compare", () => {
-  // Lumine (§7) : LinkedIn 45, GitHub « dossier vide » 20, dossier 45. Le serveur envoie un titre neutre et six écarts à zéro.
+  // Lumine (§7) : LinkedIn 45, GitHub « dossier vide » 20, dossier 45.
   const github = asCard(scoreGithub(lumineFacts(), null, opts), "gh");
   const linkedin = asCard(scoreCv(lumineReading(), cvCounts(), { ...opts, linkedin: lumineProfile(), now: FOUNDERS_NOW, github: lumineFacts() }), "li");
   const comparison = { ...asLinkedinComparison(compareCards(linkedin, github)), id: "cmp", createdAt: FOUNDERS_NOW };
@@ -168,44 +167,11 @@ describe("face à un GitHub vide : le code n'est pas prouvé, rien ne se compare
   };
   const lastRule = (html: string) => [...html.matchAll(/<p class="rg-rule[^"]*">([^<]+)<\/p>/g)].map((m) => m[1].replace(/&#x27;/g, "'")).pop();
 
-  it("le serveur : GitHub en dossier vide, titre neutre, écarts à zéro", () => {
+  it("le serveur : GitHub en dossier vide, ni titre ni écarts (§18.36)", () => {
     expect(comparison.github.grid!.rule).toBe("empty_file");
-    expect(comparison.headline.fr).toMatch(/^Code non prouvé\u00a0: ton LinkedIn parle seul\./);
-    expect(Object.values(comparison.deltas).every((d) => d === 0)).toBe(true);
+    expect(comparison).not.toHaveProperty("headline");
+    expect(comparison).not.toHaveProperty("deltas");
   });
-
-  it("les barres lisent « n/c », avec leur texte entier ; ni écart global, ni ±0, ni légende gain / perte", () => {
-    const html = renderNode(createElement(Deltas, { cmp: comparison }));
-    expect(count(html, '<span aria-hidden="true">n/c</span>')).toBe(6);
-    expect(count(html, '<span class="sr-only">non comparable : le code n&#x27;est pas prouvé</span>')).toBe(6);
-    expect(html).not.toContain("delta-overall");
-    expect(html).not.toMatch(/±0|−\d|\+\d/);
-    expect(html).not.toContain("delta-down");
-    expect(html).not.toContain("lg-down");
-    expect(textOf(html)).toContain("Code non prouvé : LinkedIn parle seul, rien ne se compare barre par barre.");
-    const en = renderNode(createElement(Deltas, { cmp: comparison }), "en-US");
-    expect(count(en, '<span class="sr-only">not comparable: the code is not proven</span>')).toBe(6);
-  });
-
-  it("une comparaison où le code est prouvé garde ses écarts chiffrés", () => {
-    const proven = { ...comparison, github: { ...comparison.github, grid: undefined }, deltas: { ...comparison.deltas, TEC: 12 } };
-    const html = renderNode(createElement(Deltas, { cmp: proven }));
-    expect(html).toContain("delta-overall");
-    expect(html).toContain("+12");
-    expect(html).not.toContain("n/c");
-  });
-
-  for (const who of [null, "@LumBuilds0"]) {
-    it(`le titre est neutre, ni gain ni perte, et la note du dossier dit « code non prouvé » (${who ?? "la personne fichée"})`, () => {
-      const html = renderNode(createElement(ComparisonStage, { cmp: comparison, phase: "done", who }));
-      expect(html).toMatch(/class="cmp-headline tone-neutral is-sub"/);
-      // La note du dossier en tête, au-dessus de la phrase (§18.37).
-      expect(html.indexOf('class="cmp-case"')).toBeLessThan(html.indexOf('class="cmp-headline'));
-      expect(html).not.toMatch(/tone-(down|up)/);
-      expect(textOf(html)).toContain("Code non prouvé : rien n'est comparé");
-      expect(html).not.toContain("delta-overall");
-    });
-  }
 
   it("la dernière ligne de la note du dossier : code non prouvé, et ce qui changerait la note", () => {
     const html = render(item, false);

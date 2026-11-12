@@ -92,6 +92,11 @@ export interface StatusDef {
   labelAlt?: Fact;
   ruleText: Fact;
   ruleTextAlt?: Fact;
+  /**
+   * Retiré : plus jamais produit, et sa règle n'existe plus. L'entrée reste au
+   * catalogue (ids stables) parce que des fiches rangées la citent encore.
+   */
+  retired?: boolean;
 }
 
 export interface StatusesConfig {

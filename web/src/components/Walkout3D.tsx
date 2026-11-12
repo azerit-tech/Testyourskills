@@ -89,7 +89,7 @@ export interface WalkoutControl {
 interface Props {
   card: CardData;
   lang: Lang;
-  /** Comparaison GitHub × CV : le « double walkout ». */
+  /** Ancien « double walkout » des comparaisons, toujours faux depuis le dossier à une fiche (§18.36). */
   double: boolean;
   /** Ce que la fiche déclarative a lu : un CV ou un profil LinkedIn (§18.24). */
   declared?: DeclaredSource;
@@ -131,10 +131,12 @@ export function Walkout3D({ card, lang, double, declared = "cv", phase, anchorRe
     staged++;
     const icon = langIcon(card.mainLanguage);
     const tells = t.reveal.tells;
+    // Un dossier à deux pièces (shared/caseFile.ts) : son dossier se lit « LinkedIn · GitHub ».
+    const both = double || (card.pieces?.length ?? 0) > 1;
     const texts = {
       langName: icon ? langTitle(card.mainLanguage) : tells.noLanguage,
       langLabel: tells.language,
-      leagueName: double
+      leagueName: both
         ? declared === "linkedin" ? tells.leagueBothLinkedin : tells.leagueBoth
         : card.source === "cv" ? (declared === "linkedin" ? tells.leagueLinkedin : tells.leagueCv) : tells.leagueGithub,
       leagueLabel: tells.league,
@@ -169,7 +171,7 @@ export function Walkout3D({ card, lang, double, declared = "cv", phase, anchorRe
           accent: levelAccent(card),
           texts,
           logoPath: icon?.path ?? CODE_PATH,
-          leaguePath: card.source === "cv" && !double ? DOC_PATH : siGithub.path,
+          leaguePath: card.source === "cv" && !both ? DOC_PATH : siGithub.path,
           langKey: card.mainLanguage,
           login: card.login ?? card.name,
           overall: card.overall,

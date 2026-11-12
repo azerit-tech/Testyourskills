@@ -265,23 +265,15 @@ function buildLinkedinCard(id: string, job: MockJob | null, mg: MockGrids): Card
   return graded(asLinkedinCard({ ...base, id, lang: job?.lang ?? base.lang, linkedinUrl: url, findings: [mockLinkedinFinding(url)] }), mg.declaredGridMock("LinkedIn", url));
 }
 
-/** Le titre du serveur face à un GitHub « dossier vide » (shared/compareText.ts, ownHeadline) ; « CV » devient « LinkedIn » plus bas. */
-const CODE_UNPROVEN = {
-  fr: "Code non prouvé : ton CV parle seul. Publie un vrai projet sur GitHub et on compare.",
-  en: "Code not proven: your CV does all the talking. Publish one real project on GitHub and we'll compare.",
-};
-
 function buildComparison(id: string, job: MockJob | null, mg: MockGrids, linkedin = false, emptyGithub = false): ComparisonData {
   const c = FIXTURE_COMPARISON;
   let cmp: ComparisonData = { ...c, id, cv: withFacts(c.cv), github: withFacts(c.github) };
-  // Face à un GitHub vide, comme le serveur (compare.ts) : la fiche de x, le titre neutre, écarts à zéro.
+  // Face à un GitHub vide : la fiche de x.
   if (emptyGithub)
     cmp = {
       ...cmp,
       cv: { ...cmp.cv, name: FIXTURES.unknownLang.name, initials: FIXTURES.unknownLang.initials },
       github: withFacts(FIXTURES.unknownLang),
-      headline: { ...CODE_UNPROVEN },
-      deltas: Object.fromEntries(Object.keys(c.deltas).map((k) => [k, 0])) as ComparisonData["deltas"],
     };
   const login = job?.login;
   if (login && !BY_LOGIN[login.toLowerCase()]) {

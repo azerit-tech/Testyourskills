@@ -5,7 +5,6 @@
     {
       "id": "forger",
       "any": [
-        { "rule": "cv_ahead_of_code", "params": { "atLeast": 15 } },
         { "rule": "cv_stat_at_least", "params": { "BUZZ": 85 } }
       ],
       "label": { "fr": "Sous couverture", "en": "Undercover" },

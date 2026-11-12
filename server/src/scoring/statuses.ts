@@ -46,7 +46,7 @@ export function instantiate(def: StatusDef, vars: Vars, byAI = false): StatusIns
 export function evaluateRules(sources: StatusSource[], ctx: RuleCtx): StatusInstance[] {
   const out: StatusInstance[] = [];
   for (const def of STATUSES.statuses) {
-    if (!sources.includes(def.source)) continue;
+    if (def.retired || !sources.includes(def.source)) continue;
     const rule = RULES[def.rule];
     if (!rule) throw new Error(`règle inconnue : ${def.rule} (${def.id})`);
     const vars = rule(ctx, def.params ?? {});

@@ -11,11 +11,24 @@
 //   ceux de la pièce GitHub (une façon de travailler vue en public).
 // - Barre XP : celle de la pièce où la grille a pris l'expérience.
 // - Employeur : la pièce déclarative d'abord, sinon GitHub.
-// - Chefs d'accusation : ceux de la base, sans ton `gap` (ils étaient nés de l'écart).
+// - Chefs d'accusation : ceux de la base, sans ton `gap` (ils étaient nés de l'écart) ;
+//   s'il n'en reste aucun, « Casier vierge ». Une caution qui citait un chef retiré passe à la suivante.
 // - Rang en centiles : retiré, il a été calculé pour une autre note.
 
-import type { CardData, ComparisonData, Piece, Special, Stat } from "./types";
+import sentencesJson from "../data/sentences.json";
+import statusesJson from "../data/statuses.json";
+import { linkedinFact } from "./linkedinText";
+import type { CardData, CardSentence, ComparisonData, Fact, Piece, Special, Stat, StatusInstance } from "./types";
 import { declaredOf, tierFor } from "./types";
+
+/** Les cautions par statut (data/sentences.json) : celles des statuts d'écart sont retirées. */
+const BAIL = sentencesJson.bail as Record<string, Fact>;
+
+/** « Casier vierge », le statut de repli du moteur (data/statuses.json) : une fiche n'a jamais zéro chef d'accusation. */
+const CLEAN_RECORD: StatusInstance = (() => {
+  const d = statusesJson.statuses.find((s) => s.source === "fallback")!;
+  return { id: d.id, tone: "positive", label: { ...d.label }, rule: { ...d.ruleText } };
+})();
 
 export type { Piece };
 
@@ -49,7 +62,18 @@ export function caseCard(cmp: ComparisonData): CardData {
   const fromDeclared = !!grid && xpFrom !== "github";
   const special: Special | undefined = gh.special === "wonderkid" && fromDeclared ? undefined : (gh.special ?? base.special);
 
-  const { rank: _rank, deleteToken: _token, special: _special, grid: _grid, sealed: _sealed, ...rest } = base;
+  // Chefs d'accusation sans ton `gap` ; s'il n'en reste aucun, « Casier vierge », comme le moteur.
+  const kept = base.statuses.filter((s) => s.tone !== "gap");
+  const statuses = kept.length ? kept : [CLEAN_RECORD];
+  // La caution citait le premier chef qui en a une : si c'était un statut d'écart retiré, la suivante, ou aucune.
+  let sentence: CardSentence | undefined = base.sentence;
+  if (sentence && kept.length !== base.statuses.length) {
+    const charge = statuses.find((s) => BAIL[s.id]);
+    const bail = charge ? (base.declaredSource === "linkedin" ? linkedinFact(BAIL[charge.id]) : { ...BAIL[charge.id] }) : undefined;
+    sentence = { label: sentence.label, ...(bail ? { bail } : {}) };
+  }
+
+  const { rank: _rank, deleteToken: _token, special: _special, grid: _grid, sealed: _sealed, sentence: _sentence, ...rest } = base;
   const avatar = gh.avatarUrl ? gh : declared;
   return {
     ...rest,
@@ -65,7 +89,8 @@ export function caseCard(cmp: ComparisonData): CardData {
     ...(special ? { special } : {}),
     club: declared.club ?? gh.club ?? null,
     stats,
-    statuses: base.statuses.filter((s) => s.tone !== "gap"),
+    statuses,
+    ...(sentence ? { sentence } : {}),
     ...(gh.profile ? { profile: gh.profile } : {}),
     ...(gh.findings?.length ? { findings: gh.findings } : base.findings?.length ? { findings: base.findings } : {}),
     ...(grid ? { grid } : {}),

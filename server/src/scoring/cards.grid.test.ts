@@ -76,7 +76,7 @@ describe("les fiches prennent la note de la grille", () => {
     expect(cmp.github.grid?.overall).toBe(cmp.github.overall);
   });
 
-  it("Sous couverture : seuil de 15 points sur les notes de grille, jamais face à un GitHub vide", () => {
+  it("Sous couverture ne naît plus d'un écart entre les deux pièces (§18.36)", () => {
     // Jacques : le code passe devant le profil (41 contre 61), pas de « Sous couverture ».
     const j = jacques().cmp;
     expect(j.cv.profile?.id).not.toBe("forger");
@@ -86,12 +86,13 @@ describe("les fiches prennent la note de la grille", () => {
     expect(l.cv.overall - l.github.overall).toBeGreaterThanOrEqual(15);
     expect(l.cv.profile?.id).not.toBe("forger");
     expect(l.github.profile?.id).not.toBe("forger");
-    // Le seuil reste 15 points dès que le GitHub prouve quelque chose.
+    // Même à 15 points ou plus d'écart, chaque pièce garde son profil.
     const { github, linkedin } = jacques();
-    const forged = compareCards(card({ ...linkedin, overall: github.overall + 15 }, "li"), card(github, "gh"));
-    expect(forged.cv.profile?.id).toBe("forger");
-    const even = compareCards(card({ ...linkedin, overall: github.overall + 14 }, "li"), card(github, "gh"));
-    expect(even.cv.profile?.id).not.toBe("forger");
+    for (const n of [14, 15, 40]) {
+      const cmp = compareCards(card({ ...linkedin, overall: github.overall + n }, "li"), card(github, "gh"));
+      expect(cmp.cv.profile?.id).toBe(linkedin.profile?.id);
+      expect(cmp.github.profile?.id).toBe(github.profile?.id);
+    }
   });
 
   it("une fiche d'avant 0.4.0 (sans grille) : pas de note du dossier, pas de plantage", () => {

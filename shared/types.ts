@@ -239,10 +239,10 @@ export interface ComparisonData {
   declaredSource?: DeclaredSource;
   cv: CardData;
   github: CardData;
-  /** github - cv par stat (positif = le code vaut plus que le CV). */
-  deltas: Record<StatCode, number>;
-  /** Titre généré par règle. */
-  headline: Fact;
+  /** Écarts stat par stat : rangés par les dossiers d'avant le 13 novembre 2026, plus produits ni lus (§18.36). */
+  deltas?: Record<StatCode, number>;
+  /** Titre de l'écart : rangé par les dossiers d'avant le 13 novembre 2026, plus produit ni lu (§18.36). */
+  headline?: Fact;
   /** La note du dossier : chaque critère pris sur sa source de preuve. Absente des comparaisons d'avant 0.4.0. */
   grid?: Grid;
   /**

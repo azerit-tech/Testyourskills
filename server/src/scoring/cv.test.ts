@@ -141,17 +141,16 @@ describe("barème CV §4.5", () => {
     expect(passion?.label.fr).toBe("Passion citée 3 fois");
   });
 
-  it("écarts avec GitHub : Senior depuis le CV, CV plus long que ses README", () => {
+  it("avec GitHub au dossier : plus de statut d'écart (§18.36), ni « Senior depuis le CV », ni « CV plus long que ses README »", () => {
     const gh = facts({
       firstRealCommit: { repo: "a", date: daysAgo(365.25 * 2) },
       repos: ["a", "b", "c", "d", "e"].map((n) => repo(n, { readmeWords: 40 })),
     });
     const card = scoreCv(cvReading({ years_declared: 8 }), cvCounts({ words: 700 }), { ...opts, github: gh });
-    expect(card.statuses.slice(0, 2).map((x) => x.id)).toEqual(["cv_senior_from_cv", "cv_longer_than_readmes"]);
-    expect(card.statuses[0].rule.fr).toBe("8 ans déclarés, 2 sur GitHub (écart de 3 ans ou plus).");
+    expect(ids(card)).not.toContain("cv_senior_from_cv");
+    expect(ids(card)).not.toContain("cv_longer_than_readmes");
+    expect(card.statuses.filter((x) => x.tone === "gap")).toEqual([]);
     expect(card.login).toBe("dev");
-    // Sans GitHub, pas d'écart.
-    expect(ids(scoreCv(cvReading({ years_declared: 8 }), cvCounts({ words: 700 }), opts))).not.toContain("cv_senior_from_cv");
   });
 
   it("faits 2 à 4 par stat, sans placeholder résiduel", () => {
@@ -165,27 +164,14 @@ describe("barème CV §4.5", () => {
 });
 
 describe("compareCards §6.5", () => {
-  it("deltas github − cv et titre selon le signe", () => {
+  it("les deux pièces telles quelles, sans écart ni titre (§18.36)", () => {
     const cv = { ...scoreCv(cvReading({ seniority_claimed: "lead" }), cvCounts(), opts), id: "cv1", createdAt: "x" };
     const gh = { ...scoreGithub(facts(), null, opts), id: "gh1", createdAt: "x" };
     const cmp = compareCards(cv, gh);
-    for (const s of gh.stats) expect(cmp.deltas[s.code]).toBe(s.value - cv.stats.find((x) => x.code === s.code)!.value);
-    const n = cv.overall - gh.overall;
-    const pts = (k: number) => `${k}\u00a0${k > 1 ? "points" : "point"}`;
-    if (n > 0) expect(cmp.headline.fr).toBe(`Ton CV annonce ${pts(n)} que ton code public ne montre pas encore.`);
-    else if (n < 0) expect(cmp.headline.fr).toBe(`Ton CV te sous-vend de ${pts(-n)}. Ton code le prouve.`);
     expect(cmp.cv).toBe(cv);
     expect(cmp.github).toBe(gh);
-  });
-
-  it("les trois cas de titre", () => {
-    const gh = { ...scoreGithub(facts(), null, opts), id: "gh1", createdAt: "x" };
-    const up = compareCards({ ...gh, overall: gh.overall + 7 }, gh);
-    expect(up.headline.fr).toBe("Ton CV annonce 7\u00a0points que ton code public ne montre pas encore.");
-    const down = compareCards({ ...gh, overall: gh.overall - 4 }, gh);
-    expect(down.headline.en).toBe("Your CV undersells you by 4 points. Your code proves it.");
-    expect(compareCards(gh, gh).headline.fr).toBe("CV et code d'accord. Dossier solide.");
-    // Jamais un mot qui accuse (rapport « jugé comme par un recruteur ») : pas encore prouvé, jamais volé.
-    for (const c of [up, down, compareCards(gh, gh)]) for (const s of [c.headline.fr, c.headline.en]) expect(s).not.toMatch(/\bvol|stole|suspect|contre|against/i);
+    expect(cmp).not.toHaveProperty("deltas");
+    expect(cmp).not.toHaveProperty("headline");
   });
 });
+

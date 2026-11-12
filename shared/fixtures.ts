@@ -3,7 +3,6 @@ import profilesJson from "../data/profiles.json";
 import sentencesJson from "../data/sentences.json";
 import type { CardData, CardProfile, CardSentence, ComparisonData, Fact, Stat, StatCode, StatusInstance } from "./types";
 import { STAT_CODES, tierFor } from "./types";
-import { ownHeadline } from "./compareText";
 
 /** Profil du catalogue (data/profiles.json), choisi à la main pour la maquette. */
 function profile(id: string): CardProfile {
@@ -115,18 +114,10 @@ export const FIXTURES = {
   unknownLang: card({ id: "unknown", profile: profile("ghost"), sentence: sentence("DOC", 12, "gh_private_talent"), name: "x", login: "x", initials: "X", position: "SEC", mainLanguage: "brainfuck", v: { TEC: 30, SHIP: 22, ARCH: 25, DOC: 20, XP: 28, BUZZ: 99 }, insufficient: ["TEC", "SHIP", "ARCH", "DOC", "XP"], statuses: [S.privateTalent, S.tutorial], judgedInSeconds: 3 }),
 };
 
-export const FIXTURE_COMPARISON: ComparisonData = (() => {
-  const cv = { ...FIXTURES.cv, name: "Léa Martin-Dubois", initials: "LM" };
-  const github = FIXTURES.gold;
-  const deltas = Object.fromEntries(
-    STAT_CODES.map((c) => [c, github.stats.find((s) => s.code === c)!.value - cv.stats.find((s) => s.code === c)!.value]),
-  ) as Record<StatCode, number>;
-  return {
-    id: "cmp-demo",
-    createdAt: "2026-10-14T12:00:00Z",
-    cv,
-    github,
-    deltas,
-    headline: { fr: ownHeadline({ cv, github }, "fr"), en: ownHeadline({ cv, github }, "en") },
-  };
-})();
+/** Un dossier à deux pièces (§18.36) : la pièce déclarative et la pièce GitHub, sans écart. */
+export const FIXTURE_COMPARISON: ComparisonData = {
+  id: "cmp-demo",
+  createdAt: "2026-10-14T12:00:00Z",
+  cv: { ...FIXTURES.cv, name: "Léa Martin-Dubois", initials: "LM" },
+  github: FIXTURES.gold,
+};

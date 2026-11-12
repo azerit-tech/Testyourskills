@@ -57,7 +57,7 @@ export function Deltas({ cmp, className = "" }: { cmp: ComparisonData; className
       <ol className="deltas-list">
         {!nc && <DeltaPill code="overall" d={overall} index={0} label={t.compare.overall} />}
         {STAT_CODES.map((c, i) => (
-          <DeltaPill key={c} code={c} d={nc ? null : cmp.deltas[c]} index={i + 1} label={c} />
+          <DeltaPill key={c} code={c} d={nc ? null : (cmp.deltas?.[c] ?? 0)} index={i + 1} label={c} />
         ))}
       </ol>
       {nc ? (

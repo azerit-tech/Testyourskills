@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { FIXTURES } from "../../shared/fixtures";
 import type { CvReading } from "../../shared/readings";
-import type { CardData, Grid, JobState, StatCode } from "../../shared/types";
+import type { CardData, Grid, JobState } from "../../shared/types";
 import { createApp } from "./app";
 import { Store } from "./db";
 import type { LinkedinFinder, UrlLookup } from "./linkedinProfile/index";
@@ -102,9 +102,9 @@ function setup(finder: { forGithub?: LinkedinFinder["forGithub"]; forUrl?: (url:
       if (opt.realScore) return scoreCv(r, c, opts as Parameters<typeof scoreCv>[2]);
       return { ...body(FIXTURES.cv), lang: opts.lang, judgedInSeconds: opts.judgedInSeconds };
     },
+    // Comme le moteur (scoring/compare.ts) : les deux pièces, sans écart ni titre.
     compareCards(cv, github) {
-      const deltas = Object.fromEntries(cv.stats.map((s) => [s.code, github.stats.find((g) => g.code === s.code)!.value - s.value])) as Record<StatCode, number>;
-      return { cv, github, deltas, headline: { fr: "Ton CV annonce 7 points que ton code public ne montre pas encore.", en: "Your CV claims 7 points your public code doesn't show yet." } };
+      return { cv, github };
     },
     async renderImage(input) {
       rendered.push(input);
