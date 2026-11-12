@@ -417,6 +417,7 @@ def setup_render(bpy, scene, a):
         sh.light, sh.color_type, sh.show_shadows, sh.show_cavity = "STUDIO", "RANDOM", False, False
         scene.compositing_node_group = None
         r.use_motion_blur = False
+        r.use_simplify, r.simplify_subdivision_render = True, 0     # (les personnages lissés : 48 s sur P3, mesuré)
         return res, "workbench", "-", 0
     r.engine = "CYCLES"
     c.device = "CPU"
@@ -648,7 +649,7 @@ def assemble(a, plans, cut):
     if not ffmpeg:
         sys.exit("[film] ffmpeg introuvable")
     essais = parse_essais(a.essai)
-    made = []
+    made, drafts = [], []
     for plan in plans:
         d = os.path.join(a.out, plan_dirname(plan, essais))
         n = cut[plan]
@@ -692,8 +693,23 @@ def assemble(a, plans, cut):
             cmd[1:1] = ["-threads", str(a.threads)]
         subprocess.run(cmd, check=True)
         made.append(dest)
+        if not full:
+            drafts.append((dest, n - last, (w, h)))
         log(f"{plan} : {last} images {w}×{h} -> {dest}" + ("" if full else " (BROUILLON : pas une prise du montage)")
             + ("" if info.get("animated", True) else " — image fixe répétée, plan pas encore animé"))
+    if len(drafts) > 1 and len({s for _, _, s in drafts}) == 1:
+        # le bout-à-bout des brouillons (--dry : le cadrage gris de tout le film), chaque plan tenu sur sa dernière
+        # image jusqu'à sa durée du montage
+        dest = os.path.join(a.out, "bout-a-bout-brouillon.mp4")
+        cmd = [ffmpeg, "-y", "-v", "error"]
+        for p, _, _ in drafts:
+            cmd += ["-i", p]
+        fc = "".join(f"[{i}:v]tpad=stop_mode=clone:stop={k}[v{i}];" for i, (_, k, _) in enumerate(drafts))
+        fc += "".join(f"[v{i}]" for i in range(len(drafts))) + f"concat=n={len(drafts)}:v=1:a=0[v]"
+        cmd += ["-filter_complex", fc, "-map", "[v]", "-c:v", "libx264", "-crf", "18", "-pix_fmt", "yuv420p", "-r", "24",
+                "-an", dest]
+        subprocess.run(cmd, check=True)
+        log(f"bout-à-bout des brouillons ({len(drafts)} plans) -> {dest}")
     if made:
         log("ensuite, sur le Mac : npx tsx scripts/film-contact.ts <prise> (planche-contact), puis "
             "npx tsx scripts/film-assemble.ts (les six mp4 du site et l'affiche)")
