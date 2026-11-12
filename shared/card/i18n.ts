@@ -26,12 +26,6 @@ export const STRINGS = {
     poster: "Avis de recherche",
     card: "Fiche",
     stars: (n: number) => `${n} étoile${n > 1 ? "s" : ""} sur 6`,
-    /** Les deux pièces d'un même dossier (comparaison) : jamais l'une « contre » l'autre. */
-    cvSide: "Ton parcours, lu sur ton CV",
-    linkedinSide: "Ton parcours, lu sur LinkedIn",
-    githubSide: "Ton code, lu sur GitHub",
-    /** Entre les deux pièces, dans l'image d'une comparaison notée : la note du dossier (§18.37). */
-    caseLabel: "Le dossier",
     overall: "Note",
     /** Dossier vide fait par un tiers, pas encore revendiqué (shared/publicView.ts) : ni note ni étoiles. */
     sealed: "Dossier scellé",
@@ -79,10 +73,6 @@ export const STRINGS = {
     poster: "Wanted",
     card: "Sheet",
     stars: (n: number) => `${n} star${n > 1 ? "s" : ""} out of 6`,
-    cvSide: "Your career, read on your CV",
-    linkedinSide: "Your career, read on LinkedIn",
-    githubSide: "Your code, read on GitHub",
-    caseLabel: "The file",
     overall: "Rating",
     sealed: "Sealed file",
     sealedSub: "Code yet to prove",

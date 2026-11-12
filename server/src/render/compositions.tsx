@@ -1,7 +1,7 @@
 // Compositions des images partagées : carte seule, aperçu de lien 1200 × 630,
-// portrait 1080 × 1350, story 1080 × 1920, les variantes « comparaison », et
-// l'aperçu de lien de l'accueil (la promesse et la fiche de la vitrine). Tout est
-// en SVG, la carte y est imbriquée telle quelle (même composant qu'à l'écran).
+// portrait 1080 × 1350, story 1080 × 1920, et l'aperçu de lien de l'accueil
+// (la promesse et la fiche de la vitrine). Un dossier à deux pièces prend celles
+// d'une fiche (§18.36). Tout est en SVG, la carte y est imbriquée telle quelle (même composant qu'à l'écran).
 // Style mat (SPEC §18.18) dans la langue de la couverture de l'accueil (§18.31) :
 // une page d'encre, le lieu du crime du profil (§18.28) en panneau ou en ciel
 // de bord à bord, et AUCUN dégradé en plus de celui de la fiche. Le texte posé
@@ -9,9 +9,8 @@
 // de mer dessiné ci-dessous le remplace. Seule lumière : le halo de ★★★★★★, un
 // rectangle flou derrière la fiche (le drop-shadow CSS de l'écran ne passe pas dans le PNG).
 import type { ReactNode } from "react";
-import type { CardData, ComparisonData, Lang, StatCode } from "../../../shared/types";
-import { declaredOf, STAT_CODES, starsFor } from "../../../shared/types";
-import { CardGraphic, STAR } from "../../../shared/card/Card";
+import type { CardData, Lang } from "../../../shared/types";
+import { CardGraphic } from "../../../shared/card/Card";
 import { AzeritGem } from "../../../shared/card/AzeritGem";
 import { fontAttrs } from "../../../shared/card/fonts";
 import { CARD_H, CARD_R, CARD_W } from "../../../shared/card/geometry";
@@ -19,8 +18,6 @@ import { t } from "../../../shared/card/i18n";
 import { fit, fitLines, upper, wrap } from "../../../shared/card/text";
 import { PALETTE, themeOf } from "../../../shared/card/themes";
 import { SKY_TEXT } from "../../../shared/scenes";
-import { ownHeadline } from "../../../shared/compareText";
-import { usableGrid } from "../../../shared/gridText";
 import { HOME_PROMISE } from "../../../shared/promise";
 import type { SceneImage } from "./scenes";
 
@@ -103,7 +100,7 @@ function Scene({ w, h, horizon, sun, maxH, palms }: { w: number; h: number; hori
   );
 }
 
-/** Fond d'encre plat, pour les comparaisons (deux fiches, déjà chargées). */
+/** Fond d'encre plat. */
 function Ink({ w, h }: { w: number; h: number }) {
   return <rect width={w} height={h} fill={PALETTE.ink0} />;
 }
@@ -446,211 +443,5 @@ function StoryCta({ x, y, lang }: { x: number; y: number; lang: Lang }) {
         {host}
       </text>
     </g>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Comparaison                                                          */
-/* ------------------------------------------------------------------ */
-
-const MUTED = "rgba(229,221,255,0.62)";
-
-function deltaColor(code: StatCode, d: number): string {
-  if (code === "BUZZ") return PALETTE.peach;
-  if (d > 0) return PALETTE.lime;
-  if (d < 0) return PALETTE.blush;
-  return MUTED;
-}
-
-function signed(d: number): string {
-  return d > 0 ? `+${d}` : d < 0 ? `−${-d}` : "0";
-}
-
-/** Colonne verticale des écarts par stat. */
-function DeltaColumn({ cmp, x, y, rowH, w }: { cmp: ComparisonData; x: number; y: number; rowH: number; w: number }) {
-  return (
-    <g>
-      {STAT_CODES.map((code, i) => {
-        const d = cmp.deltas?.[code] ?? 0;
-        const c = deltaColor(code, d);
-        const cy = y + i * rowH;
-        return (
-          <g key={code}>
-            <rect x={x - w / 2} y={cy - 17} width={w} height={34} rx={17} fill={PALETTE.ink1} />
-            <text x={x - w / 2 + 18} y={cy + 6} {...fontAttrs("sans-600")} fontSize={15} letterSpacing={1} fill={MUTED}>
-              {code}
-            </text>
-            <text x={x + w / 2 - 18} y={cy + 8} {...fontAttrs("display-800")} fontSize={24} textAnchor="end" fill={c}>
-              {signed(d)}
-            </text>
-          </g>
-        );
-      })}
-    </g>
-  );
-}
-
-/**
- * La note du dossier entre les deux pièces (§18.37), à la place des écarts stat par
- * stat : « LE DOSSIER », la note, ses six étoiles. `scale` : 1 pour l'image 1200 × 630.
- */
-function CaseBlock({ overall, lang, x, y, scale = 1 }: { overall: number; lang: Lang; x: number; y: number; scale?: number }) {
-  const w = 170 * scale;
-  const h = 210 * scale;
-  return (
-    <g>
-      <rect x={x - w / 2} y={y - h / 2} width={w} height={h} rx={24 * scale} fill={PALETTE.ink1} />
-      <text x={x} y={y - 58 * scale} {...fontAttrs("sans-600")} fontSize={14 * scale} letterSpacing={2.4 * scale} textAnchor="middle" fill={MUTED}>
-        {upper(t(lang).caseLabel, lang)}
-      </text>
-      <text x={x} y={y + 30 * scale} {...fontAttrs("display-800")} fontSize={86 * scale} letterSpacing={-2} textAnchor="middle" fill={PALETTE.cream}>
-        {overall}
-      </text>
-      <StarRow n={starsFor(overall)} cx={x} y={y + 58 * scale} size={20 * scale} />
-    </g>
-  );
-}
-
-/** Six étoiles centrées sur `cx`, les allumées en pêche, les éteintes sombres (le dessin de la fiche). */
-function StarRow({ n, cx, y, size }: { n: number; cx: number; y: number; size: number }) {
-  const gap = size * 0.08;
-  const k = size / 24;
-  const x0 = cx - (6 * size + 5 * gap) / 2;
-  return (
-    <g>
-      {[0, 1, 2, 3, 4, 5].map((i) => (
-        <path key={i} d={STAR} transform={`translate(${+(x0 + i * (size + gap)).toFixed(2)} ${+y.toFixed(2)}) scale(${+k.toFixed(3)})`} fill={i < n ? PALETTE.peach : "#fff"} fillOpacity={i < n ? 1 : 0.13} />
-      ))}
-    </g>
-  );
-}
-
-/** Une comparaison notée montre la note du dossier ; une comparaison d'avant la grille, ses écarts. */
-const caseOf = (cmp: ComparisonData): number | null => (usableGrid(cmp.grid) ? cmp.grid.overall : null);
-
-function SideLabel({ x, y, text, color, size = 14 }: { x: number; y: number; text: string; color: string; size?: number }) {
-  return (
-    <text x={x} y={y} {...fontAttrs("sans-600")} fontSize={size} letterSpacing={size * 0.18} textAnchor="middle" fill={color}>
-      {text}
-    </text>
-  );
-}
-
-export function ComparisonOg({ cmp, lang, avatars }: { cmp: ComparisonData; lang: Lang; avatars: Avatars }) {
-  const W = 1200;
-  const H = 630;
-  const ch = 432;
-  const cw = (ch * CARD_W) / CARD_H;
-  const cy = 136;
-  const lx = 150;
-  const rx = W - 150 - cw;
-  const s = t(lang);
-  const head = fit(upper(ownHeadline(cmp, lang), lang), { font: "display-700", size: 46, minSize: 30, maxWidth: 1080, letterSpacing: 0.4 });
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
-      <Ink w={W} h={H} />
-      <text x={W / 2} y={70} {...fontAttrs("display-700")} fontSize={head.size} letterSpacing={head.letterSpacing} textAnchor="middle" fill={PALETTE.cream}>
-        {head.text}
-      </text>
-      <SideLabel x={lx + cw / 2} y={120} text={upper(declaredOf(cmp) === "linkedin" ? s.linkedinSide : s.cvSide, lang)} color={MUTED} size={12} />
-      <SideLabel x={rx + cw / 2} y={120} text={upper(s.githubSide, lang)} color={PALETTE.lime} size={12} />
-      <Placed card={cmp.cv} lang={lang} avatars={avatars} id="cogcv" x={lx} y={cy} w={cw} />
-      <Placed card={cmp.github} lang={lang} avatars={avatars} id="coggh" x={rx} y={cy} w={cw} />
-      {caseOf(cmp) !== null ? <CaseBlock overall={caseOf(cmp)!} lang={lang} x={W / 2} y={cy + ch / 2} /> : <DeltaColumn cmp={cmp} x={W / 2} y={cy + 52} rowH={64} w={150} />}
-      <Host x={W / 2} y={606} size={18} />
-    </svg>
-  );
-}
-
-export function ComparisonPortrait({ cmp, lang, avatars }: { cmp: ComparisonData; lang: Lang; avatars: Avatars }) {
-  const W = 1080;
-  const H = 1350;
-  const cw = 478;
-  const ch = (cw * CARD_H) / CARD_W;
-  const gap = 44;
-  const lx = (W - 2 * cw - gap) / 2;
-  const rx = lx + cw + gap;
-  const cy = 352;
-  const s = t(lang);
-  // le titre doit tenir en deux lignes : on réduit avant de tronquer
-  const head = upper(ownHeadline(cmp, lang), lang);
-  let hs = 70;
-  let lines = wrap(head, "display-700", hs, 960, 2, 0.4);
-  while (hs > 48 && lines[lines.length - 1].endsWith("…")) {
-    hs -= 4;
-    lines = wrap(head, "display-700", hs, 960, 2, 0.4);
-  }
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
-      <Ink w={W} h={H} />
-      {lines.map((l, i) => (
-        <text key={i} x={W / 2} y={(lines.length === 1 ? 225 : 190) + i * hs * 1.03} {...fontAttrs("display-700")} fontSize={hs} letterSpacing={0.4} textAnchor="middle" fill={PALETTE.cream}>
-          {l}
-        </text>
-      ))}
-      <SideLabel x={lx + cw / 2} y={cy - 22} text={upper(declaredOf(cmp) === "linkedin" ? s.linkedinSide : s.cvSide, lang)} color={MUTED} size={15} />
-      <SideLabel x={rx + cw / 2} y={cy - 22} text={upper(s.githubSide, lang)} color={PALETTE.lime} size={15} />
-      <Placed card={cmp.cv} lang={lang} avatars={avatars} id="cptcv" x={lx} y={cy} w={cw} />
-      <Placed card={cmp.github} lang={lang} avatars={avatars} id="cptgh" x={rx} y={cy} w={cw} />
-      {caseOf(cmp) !== null ? <CaseRow overall={caseOf(cmp)!} lang={lang} y={cy + ch + 70} W={W} /> : <DeltaRow cmp={cmp} y={cy + ch + 70} W={W} />}
-      <Host x={W / 2} y={1296} size={26} />
-    </svg>
-  );
-}
-
-/** Sous les deux pièces du portrait : « LE DOSSIER  57  ★★★★☆☆ » sur une ligne. */
-function CaseRow({ overall, lang, y, W }: { overall: number; lang: Lang; y: number; W: number }) {
-  const w = 560;
-  return (
-    <g>
-      <rect x={(W - w) / 2} y={y - 40} width={w} height={80} rx={18} fill={PALETTE.ink1} />
-      <text x={(W - w) / 2 + 30} y={y + 7} {...fontAttrs("sans-600")} fontSize={18} letterSpacing={3} fill={MUTED}>
-        {upper(t(lang).caseLabel, lang)}
-      </text>
-      <text x={W / 2 + 40} y={y + 20} {...fontAttrs("display-800")} fontSize={56} letterSpacing={-1.5} textAnchor="middle" fill={PALETTE.cream}>
-        {overall}
-      </text>
-      <StarRow n={starsFor(overall)} cx={(W + w) / 2 - 30 - 3 * 26} y={y - 12} size={24} />
-    </g>
-  );
-}
-
-function DeltaRow({ cmp, y, W }: { cmp: ComparisonData; y: number; W: number }) {
-  const w = 148;
-  const gap = 14;
-  const total = STAT_CODES.length * w + (STAT_CODES.length - 1) * gap;
-  const x0 = (W - total) / 2;
-  return (
-    <g>
-      {STAT_CODES.map((code, i) => {
-        const d = cmp.deltas?.[code] ?? 0;
-        const c = deltaColor(code, d);
-        const x = x0 + i * (w + gap);
-        return (
-          <g key={code}>
-            <rect x={x} y={y - 30} width={w} height={60} rx={14} fill={PALETTE.ink1} />
-            <text x={x + 18} y={y + 7} {...fontAttrs("sans-600")} fontSize={17} letterSpacing={1} fill={MUTED}>
-              {code}
-            </text>
-            <text x={x + w - 18} y={y + 12} {...fontAttrs("display-800")} fontSize={34} textAnchor="end" fill={c}>
-              {signed(d)}
-            </text>
-          </g>
-        );
-      })}
-    </g>
-  );
-}
-
-/** Les deux cartes côte à côte et les écarts, fond transparent. */
-export function ComparisonCard({ cmp, lang, avatars }: { cmp: ComparisonData; lang: Lang; avatars: Avatars }) {
-  const W = CARD_W * 2 + 220;
-  const H = CARD_H;
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
-      <CardGraphic card={cmp.cv} lang={lang} avatarHref={av(avatars, cmp.cv.id)} idPrefix="cccv" x={0} y={0} width={CARD_W} height={CARD_H} />
-      <CardGraphic card={cmp.github} lang={lang} avatarHref={av(avatars, cmp.github.id)} idPrefix="ccgh" x={W - CARD_W} y={0} width={CARD_W} height={CARD_H} />
-      {caseOf(cmp) !== null ? <CaseBlock overall={caseOf(cmp)!} lang={lang} x={W / 2} y={CARD_H / 2} /> : <DeltaColumn cmp={cmp} x={W / 2} y={110} rowH={62} w={150} />}
-    </svg>
   );
 }
