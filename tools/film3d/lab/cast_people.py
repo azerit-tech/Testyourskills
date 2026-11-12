@@ -357,13 +357,26 @@ def mat_hair(base=None, alpha=None, nrm=None, tint="#2a2420", name="ppl_hair_dar
 
 
 def mat_gun():
-    return _principled("ppl_gun_black", lin("#131416"), 0.4, spec=0.6, coat=0.0)
+    """Carcasse de l'arme : polymère noir mat, un grain fin."""
+    m = _cached("ppl_gun_black")
+    if m:
+        return m
+    N = _Nodes("ppl_gun_black")
+    _set(N.p, base=lin("#111113"), spec=0.45)
+    N.link(N.noise(60.0, 2.0, 0.5, 0.62), N.p.inputs["Roughness"])
+    N.normal(None, bumps=((3000.0, 0.1, 0.0001),))
+    return N.done("ppl_gun_black", lin("#111113"))
 
 
 def mat_gun_metal():
-    m = _principled("ppl_gun_metal", lin("#2a2b2e"), 0.33, spec=0.5)
-    m.node_tree.nodes["Principled BSDF"].inputs["Metallic"].default_value = 1.0
-    return m
+    """Culasse et pièces d'acier : métal bronzé mat, une rugosité tachée (l'usure)."""
+    m = _cached("ppl_gun_metal")
+    if m:
+        return m
+    N = _Nodes("ppl_gun_metal")
+    _set(N.p, base=lin("#2c2d30"), metal=1.0)
+    N.link(N.noise(80.0, 3.0, 0.38, 0.55), N.p.inputs["Roughness"])
+    return N.done("ppl_gun_metal", lin("#2c2d30"))
 
 
 def _set_all(ob, mat):
@@ -1682,8 +1695,10 @@ def load_handgun(variant="service"):
             bpy.data.objects.remove(arm)
     for o in meshes:
         o.parent = None
+        # la culasse, le chien et la détente en acier mat, la carcasse en polymère ; aucune carte de normales (le
+        # modèle y grave des marquages)
+        _set_all(o, mat_gun_metal() if re.search(r"(slide|hammer|trigger)", o.name) else mat_gun())
     gun = _join(meshes, f"handgun_{variant}")
-    _set_all(gun, mat_gun())
     # longueur canon : axe le plus long ; poignée : les sommets les plus bas
     mn, mx = _bbox([gun])
     size = mx - mn
