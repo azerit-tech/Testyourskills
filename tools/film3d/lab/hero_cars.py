@@ -810,8 +810,20 @@ def mat_plain(name, color, rough=0.5, metal=0.0, coat=0.0, emit=0.0):
 
 
 def mat_plate(name="hero_plate"):
-    """Plaque vierge : tôle émaillée crème, bord embouti (aucun texte)."""
-    return mat_plain(name, "#dcd8c6", rough=0.38, coat=0.3)
+    """Plaque vierge : tôle peinte crème passée sous la crasse de la route, mate, aucun caractère. En crème émaillée
+    claire (#dcd8c6, vernis 0,3), c'était le point le plus clair de la voiture de dos : un rectangle blanc entre les
+    feux (OUV), qui éblouissait sous le projecteur de l'hélicoptère (P5). Sombre à présent (albédo 0,03 à 0,10, sous
+    la carrosserie éclairée et loin sous les feux), une crasse en nuages, plus épaisse vers le bas où l'eau la dépose."""
+    m, nt, out = cv._mat(name)
+    tc = nt.nodes.new("ShaderNodeTexCoord").outputs["Object"]
+    dirt = _noise(nt, tc, 28.0, detail=4.0, lo=0.35, hi=0.65)
+    low = _ramp(nt, _xyz(nt, tc)[2], 0.02, -0.07)            # 1 au bas de la plaque (hauteur 15 cm, centre 0)
+    f = cv._math(nt, "MAXIMUM", cv._math(nt, "MULTIPLY", dirt, 0.6), low)
+    col = _mix_rgb(nt, lin("#5a5548"), lin("#35312b"), f)
+    p = cv._principled(nt, **{"Roughness": 0.78})
+    nt.links.new(col, p.inputs["Base Color"])
+    nt.links.new(p.outputs[0], out.inputs[0])
+    return m
 
 
 # ---------------------------------------------------------------- géométrie
