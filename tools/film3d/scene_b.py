@@ -83,7 +83,7 @@ _H = P3.hero_pos(P3.T_STILL)
 _C = P3.camera(0.0)
 _K = P3.chase_pos(P3.T_STILL)
 PLANS = {
-    # P3, le barrage, de dos (découpage v3) : la caméra suit la berline au 21 mm, 6,3 à 7 m derrière elle, de
+    # P3, le barrage, de dos (découpage v3) : la caméra suit la berline au 21 mm, 6,8 à 7,5 m derrière elle, de
     # 1,9 m à 0,7 m de haut, et passe le barrage à sa suite ; la berline passe le barrage, les agents tirent puis
     # se mettent à couvert (fire : éclairs). yaw : lacet de départ en degrés (positif : vers -x de vue).
     "P3": dict(cam=(*vw(_C[0], _C[1]), _C[2]), lens=P3.LENS, shift_y=0.0, yaw=180.0, fstop=4.0,

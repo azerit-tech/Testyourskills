@@ -1,7 +1,7 @@
 # Le plan P3 écrit une fois, sans Blender (docs/cinematique-decoupage-v3.md, « P3 — Le barrage, de dos ») : la
 # berline fonce dans la rue des enseignes vers le barrage, deux patrouilles nez à nez, les plots, deux agents qui
 # tirent puis se mettent à couvert ; elle feinte à droite, revient viser le trou des plots, remet les gaz et passe
-# de justesse. La caméra la suit de dos, au 21 mm, 7 m derrière, de 1,9 m de haut à 0,7 m, et passe le barrage à
+# de justesse. La caméra la suit de dos, au 21 mm, 7,5 m derrière, de 1,9 m de haut à 0,7 m, et passe le barrage à
 # sa suite entre les deux patrouilles, sans freiner. scene_b.plan_P3 n'en lit que les fonctions du temps et les
 # positions ; motion.py en tire roues, braquage et transfert de masse.
 #
@@ -193,9 +193,9 @@ def firing(k, frame):
     return frame in SHOTS[k]
 
 
-# --- la caméra (découpage v3) : elle suit la berline de dos, 7 m derrière, au 21 mm, et ne freine plus. Elle part
-# un peu plus vite qu'elle (0,6 m/s) et la rattrape jusqu'à 6,3 m ; à partir des images 20-27 elle garde sa vitesse
-# pendant que la berline remet les gaz : l'écart remonte à 7 m, la caméra passe le barrage à sa suite, entre les
+# --- la caméra (découpage v3) : elle suit la berline de dos, 7,5 m derrière, au 21 mm, et ne freine plus. Elle part
+# un peu plus vite qu'elle (0,6 m/s) et la rattrape jusqu'à 6,8 m ; à partir des images 20-27 elle garde sa vitesse
+# pendant que la berline remet les gaz : l'écart remonte à 7,1 m, la caméra passe le barrage à sa suite, entre les
 # deux patrouilles, à 0,7 m du sol, dans l'axe du trou des plots. Elle descend de 1,9 à 0,7 m des images 8 à 46
 # (grue au plus 1,4 m/s, amortie sur 16 images : la grue plafonnée à 1,5 m/s et 3 m/s² ne fait pas 1,2 m en moins
 # de 38 images) et son site suit sa hauteur, de -5,5° à +1,5° : le barrage au fond de la rue à mi-hauteur au
@@ -204,7 +204,8 @@ def firing(k, frame):
 # plots, des images 14 à 46 (la fiche : 30 à 36, mais 0,35 m en 6 images, c'est 30 m/s² de côté) ; à la dernière
 # image, devant, le quai, le pont qui monte et le pylône.
 LENS = 21.0
-D0, R0 = 7.0, 0.6                  # derrière le centre de la berline à l'image 1 ; vitesse de rapprochement (m/s)
+D0, R0 = 7.5, 0.6                  # derrière le centre de la berline à l'image 1 (à 7 m, l'avant de la patrouille 1
+#                                    restait hors du cadre ; largeur 38 %) ; vitesse de rapprochement (m/s)
 T_HOLD = (M.t_of(20), M.t_of(27))  # la caméra cesse presque d'accélérer : la berline s'éloigne
 HOLD_KEEP = 0.3                    # la part de l'accélération de la berline qu'elle garde (écart relatif ≤ 4 m/s²)
 CAM_SIDE = -0.6                    # à gauche de la route de la berline, jusqu'à l'image 26
