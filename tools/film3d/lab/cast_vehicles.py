@@ -389,7 +389,7 @@ def mat_lenses(name="lightbar_lenses", strength=0.0, split_axis=1):
     side = _math(nt, "GREATER_THAN", sep.outputs[split_axis], 0.0)
     mix = nt.nodes.new("ShaderNodeMix")
     mix.data_type = "RGBA"
-    mix.inputs[6].default_value = lin(LILAC)
+    mix.inputs[6].default_value = lin(BAR_LILAC)
     mix.inputs[7].default_value = lin(CORAL)
     nt.links.new(side, mix.inputs["Factor"])
     p = _principled(nt, **{"Roughness": 0.08, "Transmission Weight": 0.6, "IOR": 1.5, "Emission Strength": strength})
@@ -801,7 +801,7 @@ def lightbar_lights(bar, energy=600.0):
     for co in shell.collection_objects:
         co.light_linking.link_state = "EXCLUDE"
     out = []
-    for side, col in ((1, CORAL), (-1, LILAC)):
+    for side, col in ((1, CORAL), (-1, BAR_LILAC)):
         for tag, loc, e in (("top", (0.0, side * 0.36, top + 0.06), 1.0),
                             ("front", (front + 0.08, side * 0.36, top * 0.5), 0.8)):
             d = bpy.data.lights.new(f"{bar.name}_glow_{tag}_{'L' if side > 0 else 'R'}", "POINT")
@@ -873,7 +873,10 @@ def _raw_tex(sock):
 # Les cœurs des modules, plus saturés que la palette : AgX désature une émission forte vers le blanc, un corail
 # pur à 8 sortait saumon. Le diffuseur reste à la couleur de la palette.
 CORAL_CORE = (1.0, 0.075, 0.018, 1.0)
-LILAC_CORE = (0.10, 0.04, 0.62, 1.0)   # plus bas que le corail : à force égale le lilas sortait blanc bleuté
+# le lilas des cœurs : un violet rosé (le rouge à 0,65 du bleu) qu'on ne prend pas pour un bleu de police, à la
+# luminance du corail (0,265 contre 0,267, Rec. 709 linéaire)
+LILAC_CORE = (0.62, 0.09, 0.95, 1.0)
+BAR_LILAC = "#c27af2"   # la lueur lilas de la rampe, du même violet rosé (motion._tone la lit toujours « lilas »)
 BAR_CORE = 2.2        # cœur d'un module allumé : × la force de la rampe (BAR_GLOW 2 -> 4,4)
 BAR_DIFFUSE = 0.09    # le reste du diffuseur allumé, relatif au cœur
 BAR_REST = 0.03       # une moitié éteinte garde un reste de lueur (le diffuseur chauffé)
