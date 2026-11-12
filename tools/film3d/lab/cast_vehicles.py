@@ -734,7 +734,8 @@ def _assign(objs, mat):
 
 
 def _blank_plate():
-    return mat_plain("cast_plate", "#d9d6c8", rough=0.4)
+    # neutre, sans aucun signe ; plus sombre que le blanc : sous un lampadaire, un rectangle blanc sautait aux yeux
+    return mat_plain("cast_plate", "#9f9c90", rough=0.5)
 
 
 # ---------------------------------------------------------------- la rampe de gyrophares
@@ -1492,6 +1493,44 @@ PATROL_HEAD_GLASS = 5.0     # le verre des phares allumés (émission de l'atlas
 PATROL_HEAD_CORE = 5.0      # leur cœur, en multiple du verre : deux sources vives, pas un aplat blanc
 
 
+def _patrol_trim(parts, tag):
+    """L'habitacle : les cadrans et l'écran de l'atlas intérieur s'éclairaient à pleine force (chiffres lisibles par
+    le pare-brise ouvert) : une veilleuse."""
+    for _o, _i, m in mats_named(parts, "interior"):
+        p = next((n for n in m.node_tree.nodes if n.type == "BSDF_PRINCIPLED"), None) if m.node_tree else None
+        if p is not None:
+            p.inputs["Emission Strength"].default_value = min(p.inputs["Emission Strength"].default_value, 0.25)
+
+
+def rear_plate(body, tail_pts, tag, size=(0.31, 0.155)):
+    """Une plaque arrière vierge (aucun caractère), sur le coffre entre les feux, à leur hauteur : trouvée par un
+    rayon tiré de l'arrière dans l'axe."""
+    tx, _ty, tz = tail_pts[0]
+    bpy.context.view_layer.update()
+    inv = body.matrix_world.inverted()
+    hit, loc, nrm, _i = body.ray_cast(inv @ Vector((tx - 2.0, 0.0, tz)), Vector((1, 0, 0)))
+    if not hit:
+        return None
+    bm = bmesh.new()
+    bmesh.ops.create_cube(bm, size=1.0, matrix=Matrix.Diagonal((0.008, size[0], size[1], 1)))
+    me = bpy.data.meshes.new(f"{tag}_plate")
+    bm.to_mesh(me)
+    bm.free()
+    me.materials.append(_blank_plate())
+    ob = bpy.data.objects.new(me.name, me)
+    body.users_collection[0].objects.link(ob)
+    ob.parent = body
+    n = Vector(nrm).normalized()
+    if n.x > 0:                       # la normale vers l'arrière, d'où vient le rayon
+        n = -n
+    n.y = 0.0                         # d'aplomb en travers, quelle que soit la courbure du coffre
+    n.normalize()
+    ob.rotation_mode = "QUATERNION"
+    ob.rotation_quaternion = n.to_track_quat("X", "Z")
+    ob.location = Vector(loc) + n * 0.012
+    return ob
+
+
 PATROLS = {
     # berline de patrouille 1992-2011, 304k, maillage fin sans texture de caisse (peinture unie), feux modélisés,
     # vitres teintées ; ses logos (calandre, coffre, cache-moyeux) sont supprimés
@@ -1550,6 +1589,7 @@ def load_patrol(variant="jeandiz", collection=None, lights_on=False, livery="doo
         keep_out=((front_axle - 2.9, front_axle - 0.3, 0.0, 1.05),)))
     if spec["glass"]:
         _replace_mats(parts, spec["glass"], mat_glass(f"{tag}_tint", tint="#0d0f12"))
+    _patrol_trim(parts, tag)
     heads = pick(parts, *spec["head"]) if spec["head"] else []
     _assign(heads, mat_lamp(f"{tag}_head", LAMP, 25.0 * on))
     _assign(pick(parts, *spec["tail"]) if spec["tail"] else [], mat_lamp(f"{tag}_tail", "#ff2a1a", 3.0 * on, glass=True))
@@ -1594,6 +1634,7 @@ def load_patrol(variant="jeandiz", collection=None, lights_on=False, livery="doo
         # le verre et le cœur des phares suivent leurs spots (une scène qui les éteint ou les met en veilleuse)
         for m in {m for m in body.data.materials if m and m.name.startswith(f"{tag}_paint")}:
             lamp_drivers(m, heads_l[0].data, tails_l[0].data)
+    rear_plate(body, tail_pts, tag)
     return dict(body=body, lightbar=bar, lenses=lens, lights=lights, length=mx.x - mn.x, height=mx.z - mn.z + 0.1,
                 tris=tris([body, bar, lens] + wheels), wheels=wheels)
 
