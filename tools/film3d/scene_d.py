@@ -1062,14 +1062,29 @@ def p6_ground(x, y):
     return scene_e.deck_ground(x, y)
 
 
+def p6_clean_haze(scene, hero):
+    """P6 au ras du sol (découpage v2) : les lampadaires de la jetée passent tout près de l'objectif ; leurs spots
+    n'éclairent plus la brume (le nuage de grains qu'ils y semaient, comme celui de la pointe) ; le rendu des
+    volumes « biaisé » de Cycles lisse les faisceaux des hélicoptères (granuleux à 64 échantillons, encore un
+    peu à 256) ; une source douce de face, qui n'éclaire que la berline, sort sa calandre du contre-jour."""
+    n = 0
+    for o in scene.objects:
+        if o.type == "LIGHT" and o.name.startswith("lamp") and o.name.endswith("_light"):
+            o.visible_volume_scatter = False
+            n += 1
+    scene.cycles.volume_biased = True
+    L.car_fill(hero, loc=(0.4, 7.0, 1.4), energy=250.0)
+    print(f"[P6] {n} lampadaires hors brume, volumes biaisés", flush=True)
+
+
 def plan_P6(scene, hidden, palier="socle"):
-    """P6, toute la ville, animé (40 images, p6_jetee.py) : la grue monte de 14 à 35 m en reculant, 24 mm, dans
-    l'axe de la jetée, tournée vers la ville ; à l'image fixe (21) la pose validée : 35 m, 65 m devant la berline,
-    14° de plongée. La berline en tête sur la jetée à 120 km/h ; derrière elle quinze véhicules en colonne, rampes
-    clignotantes, de la rampe du pont à la jetée par la voie du quai (ils ralentissent dans les deux virages) ;
-    trois hélicoptères en formation qui la suivent, faisceaux croisés sur elle ; deux avions qui arrivent de
-    derrière la ville, très bas dans l'axe de la jetée, passent au-dessus de la colonne et finissent au-dessus de
-    la berline (ils ne tirent rien) ; la grue tremble à leur approche. Rien dans les 12 % du haut : le ciel."""
+    """P6, toute la ville, animé (40 images, p6_jetee.py ; découpage v2) : la caméra devant la berline, 0,75 m à
+    sa gauche, 7 m devant, à 0,55 m, 21 mm, site +8°, qui la précède jusqu'à l'image 24 ; puis elle s'envole en
+    reculant jusqu'à 5 m de haut et 13 m devant (site -8°). La berline en tête sur la jetée à 120 km/h ; derrière
+    elle quinze véhicules en colonne, rampes clignotantes, de la rampe du pont à la jetée par la voie du quai
+    (ils ralentissent dans les deux virages) ; trois hélicoptères serrés derrière elle, faisceaux croisés sur
+    elle ; deux avions à 30-34 m qui arrivent de derrière la ville, passent au-dessus de tout et sortent par le
+    haut (ils ne tirent rien) ; la caméra tremble à leur passage. Variante V1 : diag/p6_v1.py."""
     import motion as M
     import p6_jetee as P6
     lamp_src = L.panorama(scene, hidden, all_lit=True, bridge="loin", port="loin", haubans=(palier in ("haubans", "complet")))
@@ -1111,7 +1126,9 @@ def plan_P6(scene, hidden, palier="socle"):
     for i, r in enumerate(hs):
         M.key_object(r, frames, P6.heli(i))
     scene.frame_set(P6.STILL_FRAME)
-    aim_helis(hs, P6.beam_target(P6.T_STILL))
+    # vus de face au ras du sol : 150 kW et 6° (400 kW et 9° pour la grue à 35 m), sinon leur nappe sur l'enrobé
+    # mouillé blanchissait toute la moitié basse ; ils restent lisibles dans la brume
+    aim_helis(hs, P6.beam_target(P6.T_STILL), energy=150000.0, cone=6.0)
     for r in hs:
         piv = next(o for o in r.children_recursive if o.name.endswith("searchlight_pivot"))
         M.key_searchlight({"searchlight_pivot": piv}, frames, P6.beam_target)
@@ -1125,15 +1142,16 @@ def plan_P6(scene, hidden, palier="socle"):
     # la brume seulement en couloir sur la jetée, sous la caméra : sur toute la lagune, vue de 35 m, elle diffusait
     # le ciel en un voile rose qui noyait l'eau noire et ses reflets (rendus du 12 novembre)
     L.haze((JX - 30, JX + 30), (JY0 - 20, JY1), (L.WATER_Z, 28), 0.0012)
-    L.cap_images(1024)                                # tout est à 60 m et plus
+    p6_clean_haze(scene, hero)
+    # la berline à 7 m de l'objectif : ses textures gardent leur pleine définition, le reste est loin
+    L.cap_images(1024, keep_objects=[hero])
     c = P6.camera(P6.T_STILL)
-    cam = L.camera("cam_P6", c[:3], (c[0], c[1] - 100.0, c[2] - 100.0 * math.tan(math.radians(14))),
-                   lens=P6.LENS, fstop=0.0)
+    cam = L.camera("cam_P6", c[:3], (c[0], c[1] - 100.0, c[2]), lens=P6.LENS, fstop=0.0)
     M.key_camera(cam, frames, P6.camera)
     scene.render.use_motion_blur = True
     scene.render.motion_blur_shutter = 0.5
-    print(f"[P6] berline de y {poses[1]['y']:.0f} à {poses[-2]['y']:.0f} ; grue de {P6.camera(0.0)[2]:.0f} à "
-          f"{P6.camera(P6.T_END)[2]:.0f} m", flush=True)
+    print(f"[P6] berline de y {poses[1]['y']:.0f} à {poses[-2]['y']:.0f} ; caméra de {P6.camera(0.0)[2]:.2f} à "
+          f"{P6.camera(P6.T_END)[2]:.1f} m", flush=True)
     return cam
 
 

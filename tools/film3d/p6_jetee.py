@@ -1,14 +1,16 @@
 # Le plan P6 écrit une fois, sans Blender (docs/cinematique-poursuite.md §2.3 et §2.4, « la jetée ») : la berline
 # en tête sur la jetée à 120 km/h, la colonne de gyrophares derrière elle en Z (la rampe du pont, la voie du quai,
 # la jetée), trois hélicoptères en formation au-dessus d'elle, faisceaux croisés sur elle ; deux avions de chasse
-# qui arrivent du fond, très bas dans l'axe de la jetée, et passent au-dessus de tout (ils ne tirent rien) ; la
-# grue qui monte et recule, et tremble au passage des avions. scene_d.py n'en lit que les fonctions du temps ;
-# motion.py en tire roues, roulis et tangage.
+# qui arrivent du fond, très bas dans l'axe de la jetée, et passent au-dessus de tout (ils ne tirent rien).
+# Découpage v2 (docs/cinematique-decoupage-v2.md, P6) : la caméra devant la berline, au ras du sol, qui la
+# précède en travelling avant jusqu'à l'image 24, puis s'envole en reculant ; elle tremble au passage des avions.
+# L'ancienne grue reste (camera_grue) pour la variante V1 : 22 images au ras du sol, 18 images hautes.
+# scene_d.py n'en lit que les fonctions du temps ; motion.py en tire roues, roulis et tangage.
 #
 # Repère de l'eau (lieux.py) : la jetée sur x = 80 de y = 100 à 400, la voie du quai en y = 70, le pont sur x = 0
 # (il touche le terre-plein en y = 1). La poursuite roule vers +y. t = 0 à la première image ; 40 images à 24 par
-# seconde (shared/film/cut.ts), 1,625 s. L'image fixe (STILL_FRAME, 21) garde la pose validée : la berline en
-# y = 280 (s = 180 sur la jetée), la grue à 35 m, 65 m devant elle, plongée de 14°.
+# seconde (shared/film/cut.ts), 1,625 s. À l'image fixe (STILL_FRAME, 21) la berline est en y = 280 (s = 180
+# sur la jetée).
 import math
 
 import motion as M
@@ -116,10 +118,11 @@ def column_pos(i):
     return lambda t: route(column_s(i, t), 2 * LANE * lane)
 
 
-# --- les hélicoptères : en formation au-dessus de la berline, qui la suivent ; (dx, dy, z) depuis la jetée
-# (à 20 m de l'axe, les deux premiers sortaient du cadre sur les côtés quand la grue monte ; la grue regarde
-# vers -y, -x est à droite de l'image)
-HELIS = [(-15.0, 12.0, 17.0), (14.0, -6.0, 20.0), (-6.0, -30.0, 24.0)]
+# --- les hélicoptères : en formation serrée derrière la berline, qui la suivent ; (dx, dy, z) depuis la jetée
+# (la caméra regarde vers -y : -x est à droite de l'image). Découpage v2 : derrière elle et non plus autour,
+# pour qu'ils tiennent au-dessus d'elle dans le cadre de face au ras du sol ; à 12, 15 et 20 m (14, 18 et 24 les
+# mettaient dans les 12 % du haut, une fois la caméra tournée vers le bas pour remonter la berline)
+HELIS = [(-9.0, -20.0, 12.0), (10.0, -30.0, 15.0), (1.0, -50.0, 20.0)]
 
 
 def heli(i):
@@ -133,19 +136,31 @@ def heli(i):
 
 
 def beam_target(t):
+    """Les faisceaux visent 3 m derrière la berline : venus de derrière elle, visés sur elle, ils posaient leur
+    nappe devant, sur l'enrobé entre elle et la caméra (la moitié basse du cadre blanche)."""
     x, y = hero_pos(t)
-    return x, y, 0.6
+    return x, y - 3.0, 0.6
 
 
-# --- la grue : 24 mm, dans l'axe de la jetée, tournée vers la ville (-y) ; à l'image fixe à 35 m, 65 m devant
-# la berline, 14° de plongée (la pose validée)
+# --- la grue du brouillon (variante V1) : 24 mm, dans l'axe de la jetée, tournée vers la ville (-y) ; à
+# l'image fixe à 35 m, 65 m devant la berline, 14° de plongée
 CAM_X, CAM_Y_STILL = JX + 1.0, Y_HERO_STILL + 65.0
-LENS = 24.0
+LENS_GRUE = 24.0
 
-# --- les avions : de derrière la ville (-y) vers la grue, très bas, dans l'axe de la jetée, nez vers +y ; ils
-# passent au-dessus de la colonne et finissent au-dessus de la berline, sous les 12 % du haut du cadre
-# (x, y et z à la dernière image, vitesse en m/s)
-JETS = [(JX - 20.0, Y_HERO_STILL + 12.0, 52.0, 185.0), (JX + 9.0, Y_HERO_STILL - 14.0, 56.0, 185.0)]
+# --- la caméra v2 : 0,75 m à gauche de la berline (x = 81,0), 7 m devant elle, 0,55 m de haut, 21 mm, jusqu'à
+# l'image 24 ; puis elle s'envole en reculant : 5 m de haut et 13 m devant à l'image 40. Site -4° au sol (le
+# découpage disait +8° : la berline tombait à 42 % de la hauteur et la chaussée prenait la moitié du cadre ; la
+# règle des plans bas met son centre entre 50 et 62 %, ici 55 %), -14° en haut (-8° la laissait à 39 %, ici 45 %)
+LOW_X, LOW_AHEAD, LOW_Z, LOW_SITE = 81.0, 7.0, 0.55, -4.0
+HIGH_AHEAD, HIGH_Z, HIGH_SITE = 13.0, 5.0, -14.0
+LIFT_FRAME = 24
+LENS = 21.0
+
+# --- les avions : de derrière la ville (-y) vers la caméra, très bas (30 et 34 m), de part et d'autre de l'axe de
+# la jetée, nez vers +y ; ils grossissent au milieu du cadre, passent au-dessus de la colonne, de la berline et
+# de la caméra, et sortent par le haut entre les images 34 et 40 (x, y et z à la dernière image, vitesse en m/s).
+# Écartés de 22 et 20 m de l'axe : les hélicoptères, plus bas, sont sur l'axe
+JETS = [(JX - 22.0, Y_HERO_STILL + 60.0, 30.0, 185.0), (JX + 20.0, Y_HERO_STILL + 44.0, 34.0, 185.0)]
 
 
 def jet(i):
@@ -153,22 +168,43 @@ def jet(i):
 
     def fn(t):
         y = y1 - v * (T_END - t)
-        z = z1 + 0.05 * (y1 - y)                                   # ils descendent vers la grue
+        z = z1 + 0.01 * (y1 - y)                                   # ils descendent un peu vers la caméra
         bank = (-6.0 if i == 0 else 5.0) + 2.0 * math.sin(3.0 * t + i)
         return x1, y, z, 1.0 - 2.0 * i, -2.8, bank
     return fn
 
 
-def jet_noise(t):
-    """Le souffle des avions sur la grue : il monte quand ils approchent (distance au plus proche)."""
-    cy = CAM_Y_STILL + 18.0 * (t - T_STILL)
-    d = min(math.dist((CAM_X, cy), jet(i)(t)[:2]) for i in range(len(JETS)))
+def jet_noise(t, cam=None):
+    """Le souffle des avions sur la caméra : il monte quand ils approchent (distance au plus proche)."""
+    cx, cy = (cam or camera_path)(t)[:2]
+    d = min(math.dist((cx, cy), jet(i)(t)[:2]) for i in range(len(JETS)))
     return M.smoothstep(260.0, 70.0, d)
 
 
+def camera_path(t):
+    """(x, y, z, site) de la caméra v2, sans tremblé : au ras du sol à 7 m devant la berline jusqu'à l'image 24,
+    puis l'envol, accéléré puis amorti, jusqu'à 5 m de haut et 13 m devant à l'image 40."""
+    hx, hy = hero_pos(t)
+    v = M.smoothstep(M.t_of(LIFT_FRAME), T_END, t)
+    v = v * v * (2.0 - v)                       # part lentement, accélère, se pose doucement sur la dernière image
+    ahead = LOW_AHEAD + (HIGH_AHEAD - LOW_AHEAD) * v
+    return LOW_X, hy + ahead, LOW_Z + (HIGH_Z - LOW_Z) * v, LOW_SITE + (HIGH_SITE - LOW_SITE) * v
+
+
 def camera(t):
-    """(x, y, z, lacet, site, roulis, focale) : la grue monte de 14 à 35 m en reculant (35 m, 14° de plongée à
-    l'image fixe), finit sa montée plus lentement ; elle tremble au passage des avions."""
+    """(x, y, z, lacet, site, roulis, focale) : de face, devant la berline ; le lacet suit la berline (elle roule
+    0,75 m à droite de l'objectif, à 7 m : 6° environ) ; tremblé de travelling, secousse au passage des avions."""
+    x, y, z, site = camera_path(t)
+    hx, hy = hero_pos(t)
+    follow = math.degrees(math.atan2(-(hx - x), y - hy))
+    n = jet_noise(t)
+    dyaw, dpitch, droll, dx, dy, dz = M.handheld(t, amp=0.10 + 0.25 * n, rotor=0.03 + 0.4 * n, seed=6.1)
+    return x + dx * 0.05, y + dy * 0.05, z + dz * 0.05, follow + dyaw, site + dpitch, droll, LENS
+
+
+def camera_grue(t):
+    """La grue du brouillon : elle monte de 14 à 35 m en reculant (35 m, 14° de plongée à l'image fixe), finit
+    sa montée plus lentement ; elle tremble au passage des avions."""
     if t <= T_STILL:
         u = M.smoothstep(-T_STILL, T_STILL, t) * 2.0 - 1.0          # la montée lancée dès la première image
         z = 14.0 + 21.0 * u
@@ -178,9 +214,30 @@ def camera(t):
         z = 35.0 + 3.0 * v * (2.0 - v)
         pitch = -14.0 - 1.0 * v
     y = CAM_Y_STILL + 18.0 * (t - T_STILL)
-    n = jet_noise(t)                    # la dérive lente de la grue, et la vibration (8 à 11 Hz) au passage
+    n = jet_noise(t, cam=lambda t_: (CAM_X, CAM_Y_STILL + 18.0 * (t_ - T_STILL)))
     dyaw, dpitch, droll, dx, dy, dz = M.handheld(t, amp=0.08 + 0.15 * n, rotor=0.02 + 0.3 * n, seed=6.1)
-    return CAM_X + dx * 0.3, y + dy * 0.3, z + dz * 0.3, dyaw, pitch + dpitch, droll, LENS
+    return CAM_X + dx * 0.3, y + dy * 0.3, z + dz * 0.3, dyaw, pitch + dpitch, droll, LENS_GRUE
+
+
+V1_CUT = 22                   # la variante V1 : au ras du sol jusqu'à l'image 22, la grue ensuite
+
+
+def camera_v1(t):
+    """La variante V1 : la caméra v2 au ras du sol (images 1 à 22), puis la grue haute sur toute la colonne (23 à 40)."""
+    return camera(t) if t < M.t_of(V1_CUT + 0.5) else camera_grue(t)
+
+
+def key_camera_v1(cam, frames):
+    """Les clés de la variante V1, coupe franche : avec des clés aux seules images entières, la caméra glissait du
+    sol à la grue entre 22 et 23 et le flou de bougé (obturateur 0,5) étalait les deux images de la coupe ; deux clés
+    de plus en 22,49 (sol, tenue constante) et 22,51 (grue) font le saut hors de la fenêtre de l'obturateur."""
+    cut = V1_CUT + 0.5
+    M.key_camera(cam, sorted(list(frames) + [cut - 0.01, cut + 0.01]), camera_v1)
+    for idb in (cam, cam.data):
+        for fc in M.fcurves(idb):
+            for k in fc.keyframe_points:
+                if abs(k.co.x - (cut - 0.01)) < 1e-3:
+                    k.interpolation = "CONSTANT"
 
 
 def tracks():
@@ -192,11 +249,13 @@ def tracks():
 
 
 if __name__ == "__main__":
-    for f in (1, 11, STILL_FRAME, 31, 40):
+    for f in (1, 12, STILL_FRAME, 24, 31, 34, 37, 40):
         t = M.t_of(f)
         c = camera(t)
-        print(f"image {f:2d} : berline ({hero_pos(t)[0]:.1f}, {hero_pos(t)[1]:.1f}), grue y {c[1]:.0f} z {c[2]:.1f} "
-              f"site {c[4]:.1f}°, avion 0 en y {jet(0)(t)[1]:.0f}")
+        hx, hy = hero_pos(t)
+        print(f"image {f:2d} : berline ({hx:.1f}, {hy:.1f}), caméra {c[1] - hy:4.1f} m devant, z {c[2]:.2f}, "
+              f"site {c[4]:+.1f}°, lacet {c[3]:+.1f}° ; avions en y {jet(0)(t)[1] - c[1]:+.0f}, "
+              f"{jet(1)(t)[1] - c[1]:+.0f} m de la caméra")
     print("écart minimal au sol :", M.min_gap(tracks(), range(F0 - 1, F0 + FRAMES + 1)))
     for i in range(len(COLUMN)):
         a, b = route(column_s(i, 0.0)), route(column_s(i, T_END))
