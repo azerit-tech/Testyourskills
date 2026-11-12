@@ -114,7 +114,7 @@ Les lignes de radio viennent de `shared/film/radio.ts`, une par étoile : « Vé
 **P1 ★ : le rétroviseur** (28 images)
 - *Cadre* : dans l'habitacle, par-dessus l'épaule droite de la personne au volant, depuis la banquette arrière, 28 mm. Au premier plan, flous, sa capuche de dos et ses mains gantées sur le volant. En haut au milieu, le rétroviseur.
 - *Caméra* : fixe dans la voiture.
-- *Action* : dans le rétroviseur, loin, la rampe de gyrophares s'allume, corail et lilas ; ses couleurs battent sur le plafond et sur la capuche. La tête se tourne d'un coup, les mains gantées se crispent sur le volant, la voiture bondit.
+- *Action* : une ellipse de 2,5 s après OUV : la patrouille a quitté son angle de rue et roule derrière, dans la même voie, à une trentaine de mètres. Dans le rétroviseur, la rampe de gyrophares s'allume, corail et lilas ; ses couleurs battent sur le plafond et sur la capuche. La tête se tourne d'un coup, les mains gantées se crispent sur le volant, la voiture bondit.
 - *HUD* : étoile 1.
 
 **P2 ★★ : vue du ciel** (28 images)
@@ -204,7 +204,7 @@ Effort : petit, quelques heures d'un agent ; moyen, une journée ; gros, deux jo
 
 - *Dimensions* : chaussée de 14 m à quatre voies, trottoir de 4,5 m côté ville, promenade de 4,5 m et muret côté océan, façades de deux à sept étages d'un seul côté.
 - *OUV* : le décor ne change pas. La voiture roule à 50 km/h vers la bande corail, sur la voie de droite, l'océan à sa droite, de y 93 à y 106. La patrouille est garée gyrophare éteint à l'angle de la rue transversale de y 120, devant à gauche, côté ville. Caméra sur rail, à 1,5 m, 35 mm, trois quarts dos.
-- *P1* : la suite exacte d'OUV (même voie, même vitesse, `tools/film3d/p1_habitacle.py`), vue de l'habitacle (28 mm) : la voiture dépasse la patrouille garée, dont la rampe s'allume derrière elle. Par le pare-brise, flous, les feux orange du carrefour qui approche. La voiture bondit vers eux.
+- *P1* : 2,5 s après OUV (ellipse, même voie, même vitesse, `tools/film3d/p1_habitacle.py`), vue de l'habitacle (28 mm) : la patrouille roule derrière dans la même voie, à 32 m, et sa rampe s'allume dans le rétroviseur à l'image 8. Par le pare-brise, flous, les feux orange du carrefour qui approche. La voiture bondit vers eux (image 20).
 - *Le carrefour de la scène A ne change pas* quand le rond-point arrive : à cent mètres et flou, ses feux passent pour ceux du rond-point.
 - *Pourquoi deux plans ici* : le calme tient en un seul lieu. La rupture vient avec le virage.
 

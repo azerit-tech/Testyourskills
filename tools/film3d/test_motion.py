@@ -257,24 +257,27 @@ def test_spin_steps():
 
 
 def test_p1():
-    """P1 : la suite exacte d'OUV (position et vitesse à la coupe, le pas d'une image) ; la berline passe à plus
-    de 2 m de la patrouille, de flanc à flanc ; la rampe ne s'allume qu'une fois la patrouille dépassée."""
+    """P1, après l'ellipse (§18.36) : la position d'OUV prolongée de 2,5 s à vitesse constante, la même vitesse au
+    début ; la patrouille derrière, dans la même voie, à plus de 15 m ; la rampe s'allume dans le plan ; elle fait
+    au moins 10 px de large dans le rétroviseur."""
     import ouv_avenue as O
     import p1_habitacle as P
     h = 1.0 / 240.0
-    gap = math.dist(P.hero_pos(0.0), O.hero_pos(P.T_CUT))
-    check("P1 : même position à la coupe", gap < 1e-6, f"{gap:.2e} m")
-    step = P.hero_pos(0.0)[1] - O.hero_pos(M.t_of(O.F0 + O.FRAMES - 1))[1]
-    check("P1 : le pas d'une image à la coupe", abs(step - O.SPEED / M.FPS) < 1e-6, f"{step:.4f} m")
+    last = O.hero_pos(M.t_of(O.F0 + O.FRAMES - 1))
+    want = last[1] + O.SPEED * (P.ELLIPSIS + 1.0 / M.FPS)
+    gap = abs(P.hero_pos(0.0)[1] - want) + abs(P.hero_pos(0.0)[0] - last[0])
+    check("P1 : OUV prolongé de 2,5 s à vitesse constante", gap < 1e-6, f"{gap:.2e} m")
     v1 = (P.hero_pos(h)[1] - P.hero_pos(0.0)[1]) / h
-    check("P1 : même vitesse à la coupe", abs(v1 - O.SPEED) < 0.01, f"{v1 * 3.6:.2f} km/h")
+    check("P1 : même vitesse au début", abs(v1 - O.SPEED) < 0.01, f"{v1 * 3.6:.2f} km/h")
     frames = range(P.F0, P.F0 + P.FRAMES)
-    d, f, a, b = M.min_gap(P.tracks(), frames)
-    check("P1 : la berline passe à plus de 2 m de la patrouille", d - 2 * 0.95 > 2.0,
-          f"{d - 1.9:.1f} m de flanc à flanc à l'image {f}")
-    first = min(f for f in frames if P.bars_on(f))
-    passed = P.hero_pos(M.t_of(first))[1] > P.patrol_pos(M.t_of(first))[1]
-    check("P1 : la rampe s'allume une fois la patrouille dépassée", passed, f"image {first}")
+    behind = min(P.hero_pos(M.t_of(f))[1] - P.patrol_pos(M.t_of(f))[1] for f in frames)
+    lane = max(abs(P.patrol_pos(M.t_of(f))[0] - P.hero_pos(M.t_of(f))[0]) for f in frames)
+    check("P1 : la patrouille derrière, à plus de 15 m, dans la voie", behind > 15.0 and lane < 0.5,
+          f"{behind:.1f} m au plus près, {lane:.2f} m d'écart latéral")
+    on = [f for f in frames if P.bars_on(f)]
+    check("P1 : la rampe s'allume dans le plan", on and on[0] > frames[0], f"image {on[0] if on else None}")
+    px = min(P.bar_pixels(M.t_of(f)) for f in on)
+    check("P1 : la rampe lisible dans le rétroviseur", px >= 10.0, f"{px:.0f} px au moins")
 
 
 def test_bars():

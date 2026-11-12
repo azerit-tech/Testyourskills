@@ -1884,8 +1884,64 @@ def key_hands(coupe, frames, steer_fn):
             b.keyframe_insert("rotation_quaternion", frame=f)
 
 
+def p1_cabin(scene, coupe, frames, on):
+    """L'habitacle de P1 lisible : le rétroviseur réglé sur la voie derrière, le pare-brise moins teinté, une
+    source froide douce et deux lueurs corail et lilas derrière la lunette, liées aux seuls objets de la berline et
+    du conducteur (liaison de lumière, comme lieux.car_fill) ; invisibles à la caméra et aux reflets."""
+    import motion as M
+    import p1_habitacle as P
+    # le rétroviseur (faces de hero_w111_mirror, sans sommet partagé) tourné autour de son centre : un conducteur le
+    # règle ; la normale (0, 1, 0) passe à (lacet vers +x, bascule vers le haut) de p1_habitacle
+    me = coupe.data
+    mi = {i for i, m in enumerate(me.materials) if m and m.name.endswith("_mirror")}
+    vs = sorted({v for p in me.polygons if p.material_index in mi for v in p.vertices})
+    if vs:
+        c = sum((me.vertices[v].co for v in vs), Vector()) / len(vs)
+        R = Matrix.Rotation(-math.radians(P.MIRROR_YAW), 3, "Z") @ Matrix.Rotation(math.radians(P.MIRROR_TILT), 3, "X")
+        for v in vs:
+            me.vertices[v].co = c + R @ (me.vertices[v].co - c)
+        me.update()
+    # le pare-brise et les vitres : la feuille du modèle est doublée (deux faces confondues, sonde du 12 novembre),
+    # la teinte de 0,8 passait deux fois ; ici à peine teintée
+    for m in bpy.data.materials:
+        if m.name.endswith("_glass") and m.name.startswith("hero_") and m.node_tree:
+            for n in m.node_tree.nodes:
+                if n.type == "BSDF_TRANSPARENT":
+                    n.inputs["Color"].default_value = (0.96, 0.98, 0.97, 1.0)
+    # les receveurs : la caisse, ses portes, le conducteur
+    col = bpy.data.collections.new("habitacle_seul")
+    for o in [coupe, *coupe.children_recursive]:
+        if o.type == "MESH" and not o.name.startswith("wheel_"):
+            col.objects.link(o)
+
+    def lamp(name, color, energy, size, loc, aim):
+        d = bpy.data.lights.new(name, "AREA")
+        d.shape, d.size, d.energy, d.color = "DISK", size, energy, lin(color)[:3]
+        lo = bpy.data.objects.new(name, d)
+        scene.collection.objects.link(lo)
+        lo.parent = coupe
+        lo.location = loc
+        lo.rotation_mode = "QUATERNION"
+        lo.rotation_quaternion = (Vector(aim) - Vector(loc)).to_track_quat("-Z", "Y")
+        lo.visible_camera = lo.visible_glossy = lo.visible_transmission = lo.visible_volume_scatter = False
+        lo.light_linking.receiver_collection = col
+        return lo
+    # la source froide : du pavillon au-dessus de la banquette vers le tableau de bord (le noyer, le volant ivoire)
+    lamp("habitacle", "#b4bce6", 25.0, 0.5, (0.1, 0.75, 1.33), (0.2, -0.75, 0.85))
+    # les lueurs de la rampe, derrière la lunette (repère de la caisse : l'arrière vers +y) : elles battent avec
+    # elle (M.bar_phase, décalage 0 comme la patrouille dans flash_bars) et teintent le pavillon et l'épaule
+    for name, color, tone, x in (("lueur_corail", CORAL, "corail", 0.35), ("lueur_lilas", LILAC, "lilas", -0.35)):
+        d = lamp(name, color, 60.0, 0.25, (x, 2.0, 1.15), (0.3, 0.0, 1.25)).data
+        for f in frames:
+            d.energy = 60.0 if f >= on and M.bar_phase(f) == tone else 0.0
+            d.keyframe_insert("energy", frame=f)
+        for fc in M.fcurves(d):
+            for kp in fc.keyframe_points:
+                kp.interpolation = "CONSTANT"
+
+
 def p1_motion(scene, coupe, police, cam, focus):
-    """Le plan P1 animé (p1_habitacle.py), la suite d'OUV : la berline et la patrouille sur leurs rigs (roues,
+    """Le plan P1 animé (p1_habitacle.py), 2,5 s après OUV : la berline et la patrouille sur leurs rigs (roues,
     suspension), la rampe éteinte puis allumée (corail et lilas, 2 Hz, motion.flash_bars) ; la caméra fixe dans
     l'habitacle, parentée à la caisse, mise au point sur le rétroviseur intérieur (le vrai, celui du modèle) ;
     les mains bougent à peine sur la jante ; une faible lumière froide sous le pavillon."""
@@ -1908,8 +1964,11 @@ def p1_motion(scene, coupe, police, cam, focus):
     poses = M.sample(P.hero_pos, frames, wheel_r=coupe["wheel_r"], wheelbase=wb)
     M.key_vehicle(rig, poses, wheels=wheels)
     M.wheel_marks(wheels, coupe["wheel_r"])
-    # la patrouille : garée, puis elle démarre en braquant vers l'avenue
-    prig = M.rig_up(police, OUV.PATROL[2], "rig_police")
+    # la patrouille : après l'ellipse, dans la voie de la berline, derrière elle (l'avant de son modèle vers +x)
+    px, py = P.patrol_pos(M.t_of(P.F0))
+    police.location = (px, py, 0)
+    police.rotation_euler = (0, 0, math.radians(P.patrol_heading(0.0) + 90.0))
+    prig = M.rig_up(police, P.patrol_heading(0.0), "rig_police")
     wh, wr = M.wheels_of(police), police.get("wheel_r", 0.36)
     pp = M.sample(P.patrol_pos, frames, heading=P.patrol_heading, wheel_r=wr, wheelbase=police.get("wheelbase", 2.9),
                   front=police.get("front_axle"))
@@ -1961,14 +2020,7 @@ def p1_motion(scene, coupe, police, cam, focus):
     cam.data.dof.focus_distance = (Vector(P.MIRROR) - Vector(P.CAM_LOCAL)).length
     cam.data.dof.aperture_fstop = 2.8
     bpy.data.objects.remove(focus)
-    # une faible lumière froide sous le pavillon (le reflet du ciel et des lampadaires), invisible à la caméra
-    d = bpy.data.lights.new("habitacle", "AREA")
-    d.size, d.energy, d.color = 0.6, 6.0, lin("#aab0e0")[:3]
-    lo = bpy.data.objects.new("habitacle", d)
-    scene.collection.objects.link(lo)
-    lo.parent = coupe
-    lo.location = (0.1, 0.1, 1.3)
-    lo.visible_camera = lo.visible_glossy = False
+    p1_cabin(scene, coupe, frames, on)
     scene.frame_set(frames[0])
     scene.render.motion_blur_shutter = 0.5
     scene.render.use_motion_blur = True
