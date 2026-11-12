@@ -43,12 +43,18 @@ ap.add_argument("--samples", type=int, default=32)
 ap.add_argument("--percent", type=int, default=50)
 ap.add_argument("--groups", default=None, help="JSON {groupe: [préfixes de noms]}")
 ap.add_argument("--from-exr", action="store_true", help="réécrire les PNG depuis le multicouche, sans rendu")
+ap.add_argument("--dry", action="store_true", help="tout préparer, vérifier les passes, ne pas rendre")
 args = ap.parse_args(sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else [])
 name = args.name or os.path.splitext(args.scene)[0]
 groups = json.loads(args.groups) if args.groups else GROUPS
 order = list(groups) + [DEFAULT, SKY]
 exr = os.path.join(REF, f"{name}-groupes.exr")
 tmp = os.path.join(REF, f".{name}-groupes")
+
+
+def out_of(node, name):
+    """La sortie d'un nœud par son nom affiché (get() lit l'identifiant, qui diffère pour les passes de groupe)."""
+    return next((o for o in node.outputs if o.name == name), None)
 
 
 def log(*a):
@@ -81,21 +87,29 @@ if args.from_exr:
     node.image = img
     fo = ng.nodes.new("CompositorNodeOutputFile")
     fo.directory, fo.file_name, fo.save_as_render = tmp + "/", "", True
+    fo.format.media_type = "IMAGE"         # (Blender 5 : une image par entrée, pas le multicouche)
     fo.format.file_format = "PNG"
     for g in order:
-        sock = node.outputs.get(f"Combined_{g}")
+        sock = out_of(node, f"Combined_{g}")
         if sock:
             fo.file_output_items.new("RGBA", g)
             ng.links.new(sock, fo.inputs[g])
     go = ng.nodes.new("NodeGroupOutput")
     ng.interface.new_socket("Image", in_out="OUTPUT", socket_type="NodeSocketColor")
-    ng.links.new(node.outputs["Image"], go.inputs[0])
+    log("passes du multicouche : " + ", ".join(o.name for o in node.outputs))
+    ng.links.new(node.outputs[0], go.inputs[0])
     sc.compositing_node_group = ng
+    # (le compositing ne tourne qu'après un rendu : un Workbench sans aucun objet, une seconde, rien de Cycles)
+    sc.render.engine = "BLENDER_WORKBENCH"
+    for o in bpy.data.objects:
+        o.hide_render = True
+    sc.render.resolution_percentage = args.percent
     sc.render.filepath = os.path.join(tmp, "relu.png")
-    bpy.ops.render.render(write_still=True, use_viewport=False)
+    bpy.ops.render.render(write_still=True)
 else:
     bpy.ops.wm.open_mainfile(filepath=os.path.join(ASSETS, args.scene))
     sc = bpy.context.scene
+    sc.render.engine = "CYCLES"          # (avant les groupes : le nœud des couches n'offre leurs passes qu'en Cycles)
     vl = sc.view_layers[0]
     for g in order:
         vl.lightgroups.add(name=g)
@@ -126,17 +140,29 @@ else:
     for f in glob.glob(os.path.join(tmp, "*")):
         os.remove(f)
     fo.directory, fo.file_name, fo.save_as_render = tmp + "/", "", True
+    fo.format.media_type = "IMAGE"         # (Blender 5 : une image par entrée, pas le multicouche)
     fo.format.file_format = "PNG"
+    # (les entrées et le lien de l'image finale d'abord : un lien remet l'arbre à jour, et c'est alors seulement
+    # que le nœud des couches montre les sorties des groupes ajoutés plus haut)
+    for g in order + ["total"]:
+        fo.file_output_items.new("RGBA", g)
+    if final.inputs[0].links:
+        ng.links.new(final.inputs[0].links[0].from_socket, fo.inputs["total"])
     for g in order:
-        sock = rl.outputs.get(f"Combined_{g}")
+        sock = out_of(rl, f"Combined_{g}")
         if sock is None:
             log(f"passe absente : Combined_{g}")
             continue
-        fo.file_output_items.new("RGBA", g)
         ng.links.new(sock, fo.inputs[g])
-    if final.inputs[0].links:
-        fo.file_output_items.new("RGBA", "total")
-        ng.links.new(final.inputs[0].links[0].from_socket, fo.inputs["total"])
+    missing = [g for g in order if out_of(rl, f"Combined_{g}") is None]
+    if missing:
+        # sans les passes au compositing, le multicouche les garde toutes si le compositing est coupé (sinon il
+        # n'écrit que l'image composée) : --from-exr les relira
+        sc.render.use_compositing = False
+        log(f"passes absentes du compositing ({', '.join(missing)}) : compositing coupé, tout part dans le multicouche")
+    if args.dry:
+        log("sorties des couches : " + ", ".join(o.name for o in rl.outputs if o.enabled))
+        sys.exit(0)
 
     r = sc.render
     r.engine = "CYCLES"
@@ -148,6 +174,10 @@ else:
     c.use_denoising = True
     c.device = "CPU"
     # l'image écrite par le rendu : le multicouche, toutes les passes (le recours si la sortie PNG manque)
+    try:
+        r.image_settings.media_type = "MULTI_LAYER_IMAGE"
+    except TypeError as e:
+        log(f"media_type : {e}")
     r.image_settings.file_format = "OPEN_EXR_MULTILAYER"
     r.image_settings.color_depth = "16"
     r.filepath = exr
