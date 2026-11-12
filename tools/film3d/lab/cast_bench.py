@@ -43,6 +43,7 @@ def args():
     ap.add_argument("--tag", default="essai")
     ap.add_argument("--frame", type=int, default=1)
     ap.add_argument("--inspect", action="store_true")
+    ap.add_argument("--probe", action="store_true", help="les îlots du maillage du jet (couches du jet des tuyères)")
     ap.add_argument("--jobs", default="", help="patrol:ambre:face+rampe,van:neon,... (une session)")
     return ap.parse_args(argv)
 
@@ -190,6 +191,49 @@ def ground():
 
 # ---------------------------------------------------------------- les véhicules
 
+MEUTE = []
+
+
+def clone_split(root, name):
+    """lieux.clone, plus deux lignes : chaque copie a ses propres lumières (un bloc de données par lumière), et les
+    pilotes de ses optiques (cast_vehicles.bar_drive_lenses) sont repointés sur ces lumières-là. motion.flash_bars
+    peut alors décaler chaque véhicule ; avec des lumières partagées, le dernier décalage posé valait pour tous."""
+    made = {}
+
+    def rec(ob, parent):
+        if parent is not None and "_beam_" in ob.name:
+            return None
+        c = ob.copy()
+        if c.type == "LIGHT":
+            c.data = ob.data.copy()
+        if c.animation_data:
+            c.animation_data.action = None
+        c.name = f"{name}:{ob.name}" if parent else name
+        for col in ob.users_collection:
+            col.objects.link(c)
+        if parent is not None:
+            c.parent = parent
+            c.matrix_parent_inverse = ob.matrix_parent_inverse.copy()
+        made[ob] = c
+        for ch in ob.children:
+            rec(ch, c)
+        return c
+
+    r = rec(root, None)
+    remap = {o.data: c.data for o, c in made.items() if o.type == "LIGHT"}
+    for c in made.values():
+        for fc in (c.animation_data.drivers if c.animation_data else []):
+            for v in fc.driver.variables:
+                for t in v.targets:
+                    if t.id in remap:
+                        t.id = remap[t.id]
+    for col in bpy.data.collections:
+        if col.name.endswith("_glow_exclude"):
+            for co in col.collection_objects:
+                co.light_linking.link_state = "EXCLUDE"
+    return r
+
+
 def load(veh, bar_on=True):
     """Le rig du véhicule tel que les scènes le chargent (lieux), l'avant vers +y, posé à l'origine ; pour un
     aéronef, en l'air."""
@@ -211,6 +255,16 @@ def load(veh, bar_on=True):
     elif veh == "jet":
         root = L.jet("jet")
         L.put(root, 0, 0, 30.0, 0)
+    elif veh in ("meute", "meute_partage"):
+        # trois patrouilles de front : meute_partage par lieux.clone tel qu'il est (lumières partagées),
+        # meute par clone_split (la correction proposée pour lieux.clone)
+        root = L.patrol("patrol", lights_on=bar_on)
+        L.put(root, 0, 0, 0, 0)
+        MEUTE[:] = [root]
+        for i, x in ((1, -3.4), (2, 3.4)):
+            c = (clone_split if veh == "meute" else L.clone)(root, f"patrol{i}")
+            L.put(c, x, -1.5 * i, 0, 0)
+            MEUTE.append(c)
     else:
         raise SystemExit(f"véhicule inconnu : {veh}")
     bpy.context.view_layer.update()
@@ -242,6 +296,9 @@ def views(veh, root):
     mn, mx = extent(root)
     c = (mn + mx) / 2
     L, W, H = mx.y - mn.y, mx.x - mn.x, mx.z - mn.z
+    if veh in ("meute", "meute_partage"):
+        t = Vector((0.0, -1.5, 1.2))
+        return {"meute": ((2.0, mx.y + 12.0, 1.6), t, 40.0), "meute_haut": ((4.0, mx.y + 9.0, 4.5), t, 32.0)}
     if veh in ("heli", "jet"):
         z = c.z
         d = 16.0 if veh == "heli" else 24.0
@@ -321,6 +378,8 @@ def run(a):
     root = load(a.veh, bar_on=(a.bar == "on"))
     if a.veh in ("patrol", "patrol_open", "van") and a.bar == "on":
         M.flash_bars([root], range(1, 25))
+    if a.veh in ("meute", "meute_partage") and a.bar == "on":
+        M.flash_bars(MEUTE, range(1, 25))
     if a.veh == "heli":
         scene.render.use_motion_blur = True        # le disque des rotors (pilotes sur l'image)
     w, h = (int(v) for v in a.res.split("x"))
@@ -344,10 +403,75 @@ def run(a):
         print(f"[banc] écrit {scene.render.filepath}", flush=True)
 
 
+def probe_jet():
+    """Les îlots du maillage du jet tel que livré : nombre de faces, emprise, alpha et émission moyens (lus sur
+    les images aux UV des faces) ; pour trouver les couches transparentes du jet des tuyères."""
+    import bmesh
+    import numpy as np
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    parts = cv.import_model(os.path.join(cv.CAST, cv.JETS["concept"]["file"]))
+    ob = next(o for o in parts if o.type == "MESH")
+    m = ob.data.materials[0]
+    p = next(n for n in m.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
+
+    def img(key):
+        l = p.inputs[key].links
+        n = l[0].from_node if l else None
+        while n is not None and n.type != "TEX_IMAGE":
+            n = n.inputs[0].links[0].from_node if n.inputs and n.inputs[0].links else None
+        if n is None:
+            return None
+        im = n.image
+        w, h = im.size
+        px = np.empty(w * h * 4, dtype=np.float32)
+        im.pixels.foreach_get(px)
+        return px.reshape(h, w, 4)
+    alpha, emit = img("Alpha"), img("Emission Color")
+
+    def at(a, uv):
+        h, w = a.shape[:2]
+        return a[min(h - 1, max(0, int(uv.y * h))), min(w - 1, max(0, int(uv.x * w)))]
+    bm = bmesh.new()
+    bm.from_mesh(ob.data)
+    uvl = bm.loops.layers.uv.active
+    bm.faces.ensure_lookup_table()
+    seen, isl = set(), []
+    for f in bm.faces:
+        if f.index in seen:
+            continue
+        stack, cur = [f], []
+        seen.add(f.index)
+        while stack:
+            g = stack.pop()
+            cur.append(g)
+            for e in g.edges:
+                for h2 in e.link_faces:
+                    if h2.index not in seen:
+                        seen.add(h2.index)
+                        stack.append(h2)
+        isl.append(cur)
+    mw = ob.matrix_world
+    print(f"[sonde] {ob.name} : {len(bm.faces)} faces, {len(isl)} îlots", flush=True)
+    rows = []
+    for k, fs in enumerate(isl):
+        pts = [mw @ v.co for f in fs for v in f.verts]
+        mn = Vector(map(min, *pts)) if len(pts) > 1 else pts[0]
+        mx = Vector(map(max, *pts)) if len(pts) > 1 else pts[0]
+        uvs = [sum((l[uvl].uv for l in f.loops), Vector((0, 0))) / len(f.loops) for f in fs]
+        al = float(np.mean([at(alpha, u)[3] for u in uvs])) if alpha is not None else 1.0
+        em = float(np.mean([at(emit, u)[:3].max() for u in uvs])) if emit is not None else 0.0
+        rows.append((em * (1 - al), k, len(fs), mn, mx, al, em))
+    for score, k, n, mn, mx, al, em in sorted(rows, reverse=True)[:40]:
+        print(f"[sonde] îlot {k:4d} faces {n:5d} alpha {al:.2f} émission {em:.2f} "
+              f"min {tuple(round(c, 2) for c in mn)} max {tuple(round(c, 2) for c in mx)}", flush=True)
+
+
 if __name__ == "__main__":
     a = args()
     if a.inspect:
         inspect(a.out)
+    elif a.probe:
+        probe_jet()
     elif a.jobs:
         # plusieurs essais dans la même session : veh:lumière[:vue+vue[:barre]], séparés par des virgules
         import copy
