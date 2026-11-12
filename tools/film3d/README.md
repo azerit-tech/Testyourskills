@@ -101,3 +101,16 @@ lockf -k <verrou> nice -n 19 /Applications/Blender.app/Contents/MacOS/Blender -b
 8. La caméra : `M.key_camera(cam, images, fn)`, `fn(t) -> (x, y, z, lacet, site, roulis, focale)` ; l'épaule par `M.handheld(t, amp, rotor, seed)`.
 9. L'hélicoptère : `M.key_object`, `M.key_searchlight(h, images, cible_fn)`, `M.spin_rotors(h)` ; les rampes : `M.flash_bars(rigs, images)` (corail / lilas à 2 Hz).
 10. L'aperçu : `render_lieux.py -- --lieu … --plan … --anim` (ou `--scene … --anim`), Workbench sous le verrou ; le flou de bougé vient des clés (obturateur 0,5), plus de clés de flou à la main.
+
+**Rendre le film sur la machine louée** (`render_film.py`, `pack_assets.sh`). À louer au minimum : Linux, une carte NVIDIA RTX à 8 Go de mémoire vidéo (12 à 24 Go confortables ; les scènes pèsent 1,2 à 1,8 Go en mémoire sur le Mac, le banc mesure la vraie mémoire vidéo), 16 Go de mémoire vive (la construction de l'avenue a dépassé 4 Go), 4 cœurs, 30 Go de disque ; Blender 5.2.2 pour Linux, ffmpeg, git, python3. Dans l'ordre :
+
+1. Sur le Mac : `sh tools/film3d/pack_assets.sh` (écrit `design/film/film3d-assets.tar`, environ 1,3 Go, sans `.env` ni scènes construites), puis copier l'archive sur la machine (`scp`).
+2. Là-bas : `git clone` du dépôt, `mkdir -p ~/film/assets && tar -xf film3d-assets.tar -C ~/film/assets`, `export FILM3D_ASSETS=~/film/assets BLENDER=~/blender-5.2.2-linux-x64/blender`.
+3. Vérifier : `nvidia-smi`, `$BLENDER -b --factory-startup --python-expr "import bpy; print(bpy.app.version_string)"`, `python3 tools/film3d/render_film.py --selftest`.
+4. Le banc : `python3 tools/film3d/render_film.py --bench` (une image fixe par plan dans `~/film/rendu/banc/`, durée du film estimée et mémoire vidéo dans `banc.txt`).
+5. Les essais de lumière, une commande chacun, sur l'image fixe du plan (à comparer à `banc/<PLAN>.png`) : `--bench --plan P3 --essai rugosite` ; `--bench --plan FIN6 --essai brume` ; `--bench --plan P5 --essai vernis=0.5` (aussi `vernis_rugosite=0.15`, `metal=0.1`, `peinture=4e0a28`). Un essai retenu se reporte dans le code, jamais par défaut ici.
+6. Le rendu : `nohup python3 tools/film3d/render_film.py > ~/film/rendu.log 2>&1 &` (les neuf plans, 296 images ; la même commande relancée reprend où elle s'est arrêtée ; `--plan P4` ou `--frames 1-12` pour une partie ; `--draft` pour un passage rapide en 360 × 640). P1 est sauté tant qu'aucune scène ne le construit ; un plan pas encore animé rend son image fixe répétée, et le journal le dit.
+7. L'assemblage : `python3 tools/film3d/render_film.py --assemble` (une prise par plan, `~/film/plans/<PLAN>-1.mp4`, H.264 quasi sans perte en bt709 ; `--take 2` pour une seconde prise).
+8. Rapatrier : `scp machine:~/film/plans/*.mp4 ~/Desktop/Azerit/design/film/plans/`, puis sur le Mac `npx tsx scripts/film-contact.ts <prise>` et `npx tsx scripts/film-assemble.ts` (les six mp4 du site, à leurs plafonds de poids).
+
+Sur le Mac, seulement l'essai à blanc, sous le verrou : `lockf -k <verrou> nice -n 19 python3 tools/film3d/render_film.py --dry --plan P3 --threads 2 --out <dossier>`, puis `--assemble` (un brouillon, jamais une prise).
