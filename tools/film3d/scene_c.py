@@ -268,19 +268,42 @@ def plan_P4(scene, hidden, haubans=False):
     # vue en rasant à 1,5 m, la reflétait en un voile rose-blanc sur toute la moitié basse
     lamp_src = L.panorama(scene, hidden, yaw=math.pi - math.radians(70.0), bridge=None, port="loin")
     build_bridge(hidden, lamp_src, haubans=haubans)
-    cam_y = Y_FOOT + 50.0
+    # --- animé (28 images, p4_pont.py, clés de motion.py) ; l'image fixe (STILL_FRAME) garde la pose validée
+    import motion as M
+    import p4_pont as P4
+    frames = range(P4.F0 - 1, P4.F0 + P4.FRAMES + 1)
+    scene.frame_start, scene.frame_end = P4.F0, P4.F0 + P4.FRAMES - 1
+    cam_y = P4.CAM[1]
+
+    def ground(x, y):
+        return deck_z(y) + road.road_z(x), math.degrees(math.atan(deck_slope(y)))
+
     hero = L.hero()
-    y_hero = cam_y - 70.0
-    place_on_deck(hero, 1.8, y_hero)
-    L.drive(hero, SPEED, L.hero_wheels(hero), hero["wheel_r"])
-    pack([("patrol", -1.8, y_hero - 25.0, 0.0), ("patrol", 4.2, y_hero - 38.0, 1.0), ("patrol", -4.2, y_hero - 60.0, -1.0),
-          ("van", 1.8, Y_CREST + 6.0, 0.0)])
+    wheels = L.hero_wheels(hero)
+    d = [Vector(w.location).y for w in wheels]
+    poses = M.sample(P4.hero_pos, frames, wheel_r=hero["wheel_r"], wheelbase=(max(d) - min(d)) if d else 2.9)
+    M.key_vehicle(hero, poses, wheels=wheels, ground=ground)
+    M.wheel_marks(wheels, hero["wheel_r"])
+    y_hero = P4.hero_pos(P4.T_STILL)[1]
+    entries = [(k, x, y_hero - gap, 0.0) for k, x, gap in P4.PACK] + [("van", *P4.van_pos(P4.T_STILL), 0.0)]
+    rigs = pack(entries)
+    fns = [P4.pack_pos(i) for i in range(len(P4.PACK))] + [P4.van_pos]
+    for i, (r, fn) in enumerate(zip(rigs, fns)):
+        ps = M.sample(fn, frames, wheel_r=0.36, seed=float(i + 1))
+        M.key_vehicle(r, ps, ground=ground, pivot=(0.0, 0.0, 0.36))   # roues fondues dans la caisse
+    n = M.flash_bars(rigs, frames)
     # une brume légère et basse : au 200 mm, l'objectif regarde à travers 300 m d'air (à 0,0006 sur 70 m de haut,
     # les patrouilles du fond se voilaient)
     L.haze((-260, 260), (-420, 120), (L.WATER_Z, 30), 0.0002)
-    cam = L.camera("cam_P4", (0.6, cam_y, 1.5), (0.6, cam_y - 100.0, 1.5), lens=200, fstop=4.0,
-                   focus=road_point(1.8, y_hero, 0.8), shift=(0.0, 0.1))
+    cam = L.camera("cam_P4", P4.CAM, (P4.CAM[0], cam_y - 100.0, P4.CAM[2]), lens=P4.LENS, fstop=4.0,
+                   focus=road_point(P4.HERO_X, y_hero, 0.8), shift=(0.0, 0.1))
+    M.key_camera(cam, frames, P4.camera)
+    cam.data.dof.focus_object = hero
     scene.render.use_motion_blur = True
+    scene.render.motion_blur_shutter = 0.5
+    print(f"[P4] {len(frames)} images de clés ; berline de {cam_y - poses[1]['y']:.0f} à {cam_y - poses[-2]['y']:.0f} m "
+          f"à {poses[1]['speed'] * 3.6:.0f} km/h, tangage {poses[1]['pitch']:.1f}° ; {n} lumières de rampe "
+          f"clignotantes", flush=True)
     return cam
 
 
@@ -291,5 +314,6 @@ def build(plan, palier="socle"):
     scene, hidden = L.new_scene()
     cam = PLANS[plan](scene, hidden, haubans=(palier == "haubans"))
     scene.camera = cam
-    scene.frame_set(2)
+    import p4_pont as P4
+    scene.frame_set(P4.STILL_FRAME if plan == "P4" else 2)
     return scene

@@ -71,7 +71,7 @@ Les planches comparatives citent aussi des candidats écartés que `fetch.py` ne
 **Les lieux du parcours** (docs/cinematique-poursuite.md §2.4) : chaque lieu est un script qui écrit sa scène dans `assets/`, et deux scripts de rendu.
 
 - `lieux.py` : le commun des lieux au bord de l'eau (scènes C, D, E) — panorama (ciel tourné, lagune, brume, ville lointaine, autre rive), chaussée sur pilotis ou sur quai (`roadway`), quais de pierre, lampadaires, voiture poursuivie et poursuivants en rigs, agents, caméras. Ne construit aucun lieu.
-- `scene_c.py` : le pont (320 m de la ville au port, quatre voies, crête à 7,2 m) et son plan P4, la meute.
+- `scene_c.py` : le pont (320 m de la ville au port, quatre voies, crête à 7,2 m) et son plan P4, la meute, animé depuis `p4_pont.py` (la berline de 98 à 60 m à 120 km/h, le V des patrouilles, le fourgon qui déborde de la crête et force au milieu, zoom avant lent et tremblé au 200 mm).
 - `scene_d.py` : la jetée (300 m) et la pointe (terre-plein rond de 60 m), et ses plans P6, FIN, FIN6.
 - `scene_e.py` : le port, le terre-plein au pied du pont, le virage sur la voie du quai, et son plan P5, le projecteur de l'hélicoptère.
 - `render_lieux.py` : construit un plan d'un lieu au bord de l'eau et le rend (`--lieu pont|pointe|port|rond-point --plan P4 [--palier socle]`), ou rend une scène déjà écrite (`--scene scene-b.blend`). Workbench par défaut (cadrage), `--engine cycles --samples 32` pour la lumière, `--gpu` sur la machine louée seulement ; grain ffmpeg 7 par défaut pour un lieu, 0 pour une scène (`--grain N` pour fixer).

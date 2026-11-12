@@ -101,6 +101,18 @@ def test_p2():
     check("P2 : glisse à gauche, contre-braquage (roues à droite)", ps[-1]["steer"] < 0.0, f"{ps[-1]['steer']:.2f}°")
 
 
+def test_p4():
+    """P4 : aucune distance sous 6 m ; la meute 25 m derrière la berline au moins ; la pose validée à l'image fixe."""
+    import p4_pont as P
+    frames = range(P.F0 - 1, P.F0 + P.FRAMES + 1)
+    d, f, a, b = M.min_gap(P.tracks(), frames)
+    check("P4 : distances gardées", d >= 6.0, f"{d:.1f} m entre {a} et {b} à l'image {f}")
+    gap = min(math.dist(P.hero_pos(M.t_of(f)), P.pack_pos(i)(M.t_of(f))) for f in frames for i in range(len(P.PACK)))
+    check("P4 : la meute ne rattrape pas la berline", gap >= 25.0, f"{gap:.1f} m au plus près")
+    dist = P.CAM[1] - P.hero_pos(P.T_STILL)[1]
+    check("P4 : la berline à 70 m à l'image fixe", abs(dist - 70.0) < 1.0, f"{dist:.1f} m")
+
+
 def test_bars():
     seq = [M.bar_phase(f) for f in range(24)]
     check("rampes : 2 Hz, alternance corail / lilas", seq[:6] == ["corail"] * 6 and seq[6:12] == ["lilas"] * 6
@@ -113,6 +125,7 @@ if __name__ == "__main__":
     test_right_turn()
     test_gaps()
     test_p2()
+    test_p4()
     test_bars()
     print(f"\n{'tout passe' if not FAIL else str(len(FAIL)) + ' échec(s)'}")
     sys.exit(1 if FAIL else 0)
