@@ -1932,6 +1932,8 @@ def r_p2(ctx, **o):
         for ob in ctx.scene.objects:
             if ob.name.startswith("spray_trail_"):
                 ob.hide_render = True
+    if enabled("gomme"):
+        gomme(ctx, slip_min=5.0, size=1.0, mask=1.0, near=2.5)
 
 
 def r_p3(ctx, **o):
@@ -1952,6 +1954,8 @@ def r_p5(ctx, **o):
     # l'escalade, le ciel s'en mêle : la fumée de la glisse qui se voit, l'eau, le souffle du rotor sur le quai
     if enabled("eau"):
         water(ctx, wet=0.8, mask=0.85, near=1.2)
+    if enabled("gomme"):
+        gomme(ctx, slip_min=5.0, size=1.1)
 
 
 def r_p6(ctx, **o):
@@ -1977,6 +1981,8 @@ def r_banc(ctx, puddle_t=0.85, **o):
     # le banc : une flaque sous la roue avant gauche (côté caméra rase), la glisse de la courbe
     if enabled("eau"):
         water(ctx, wet=1.0, puddles=[("FL", ctx.frames[0] + puddle_t * FPS, 1.1, 0.6, 0.3)], mask=0.85, near=1.2)
+    if enabled("gomme"):
+        gomme(ctx, slip_min=5.0)
 
 
 RECIPES = {"OUV": r_ouv, "P1": r_p1, "P2": r_p2, "P3": r_p3, "P4": r_p4, "P5": r_p5, "P6": r_p6, "FIN": r_fin,
