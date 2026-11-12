@@ -1863,10 +1863,14 @@ def street_puddle(name, x, y, w, l, seed=21):
     """Une flaque que la berline traverse (fx.py en tire la gerbe) : une eau sombre posée sur l'enrobé, au bord
     irrégulier, `w` × `l` m autour de (x, y)."""
     import road
-    # (lisse à 0,02, elle renvoyait le ciel noir au-dessus de la berline : un trou ; à 0,1 elle garde les phares)
-    water = bpy.data.materials.get("rue_flaque") or mat_plain("rue_flaque", (0.02, 0.02, 0.024, 1), 0.1)
-    p = next(n for n in water.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
-    p.inputs["IOR"].default_value = 1.33
+    # la recette des flaques de P3 et P2 : un miroir parfait au ras du sol ne renvoie que le ciel noir au-dessus de
+    # la berline (une tache noire, vue en P1) ; une ride fine et un peu de flou y étirent les phares et les façades
+    water = bpy.data.materials.get("rue_flaque")
+    if water is None:
+        water, N, out = material("rue_flaque")
+        p = principled(N, **{"Base Color": (0.018, 0.017, 0.018, 1), "Roughness": 0.05, "IOR": 1.33})
+        N.set(p.inputs["Normal"], road.ripples(N, road.coords(N)[0], scale=22.0, strength=0.12))
+        N.link(p.outputs[0], out.inputs["Surface"])
     bm = bmesh.new()
     rnd = random.Random(seed)
     n = 28
@@ -1907,7 +1911,26 @@ def p1_props(P):
         bpy.context.scene.collection.objects.link(ob)
         ob.location = (px, py, road.road_z(px) + 0.006)
         ob.rotation_euler = (0.0, 0.0, math.radians(rot))
-    print(f"[scene_a] P1 : flaque en ({x:.2f}, {y:.1f}), {len(P.PAPERS)} feuilles de papier", flush=True)
+    # les plots réfléchissants du tiret entre les voies : la seule chose que la caméra frôle (à 1 m d'elle), ils filent
+    # en traits ambre au bas du cadre ; corps blanc, catadioptre ambre tourné vers la berline et vers nous
+    body = mat_plain("p1_plot", (0.7, 0.7, 0.66, 1), 0.4)
+    eye = mat_emit("p1_plot_catadioptre", lin(AMBER), P.STUD_GLOW)
+    bm, gb = bmesh.new(), bmesh.new()
+    for yy in P.STUDS:
+        z = road.road_z(P.STUD_X)
+        bmesh.ops.create_cube(bm, size=1.0, matrix=Matrix.LocRotScale((P.STUD_X, yy, z + 0.012), None, (0.1, 0.1, 0.024)))
+        for side in (-1, 1):
+            bmesh.ops.create_cube(gb, size=1.0, matrix=Matrix.LocRotScale((P.STUD_X, yy + side * 0.051, z + 0.014), None,
+                                                                            (0.07, 0.004, 0.012)))
+    for name, b, m in (("p1_plots", bm, body), ("p1_plots_catadioptres", gb, eye)):
+        ob = bpy.data.objects.new(name, bpy.data.meshes.new(name))
+        b.to_mesh(ob.data)
+        b.free()
+        ob.data.materials.append(m)
+        bpy.context.scene.collection.objects.link(ob)
+        ob.visible_shadow = False
+    print(f"[scene_a] P1 : flaque en ({x:.2f}, {y:.1f}), {len(P.PAPERS)} feuilles de papier, {len(P.STUDS)} plots",
+          flush=True)
 
 
 def p1_motion(scene, coupe, police, cam, focus):
@@ -1940,6 +1963,16 @@ def p1_motion(scene, coupe, police, cam, focus):
                   front=police.get("front_axle"))
     M.key_vehicle(prig, pp, wheels=wh, pivot=(0.0, 0.0, 0.36))
     M.wheel_marks(wh, wr, axis="Y")
+    # ses phares en veilleuse : à 450 W et 25 de force, leur reflet sur la chaussée mouillée brûlait plus fort que la
+    # berline (images 14 et 28 du premier rendu à 256) ; on regardait lui, pas elle
+    for ob in police.children_recursive:
+        if ob.type == "LIGHT" and "_head_" in ob.name:
+            ob.data.energy = P.PATROL_HEAD_W
+    for m in {m for ob in [police, *police.children_recursive] if ob.type == "MESH" for m in ob.data.materials if m}:
+        if m.name.endswith("_head") and m.node_tree:
+            for n in m.node_tree.nodes:
+                if n.type == "BSDF_PRINCIPLED" and n.inputs["Emission Strength"].default_value > 0.0:
+                    n.inputs["Emission Strength"].default_value *= P.PATROL_HEAD_LENS
     # la rampe : clignote à partir de l'image `on`, éteinte avant (lumières et matières émissives de la patrouille)
     M.flash_bars([prig], range(on, frames[-1] + 1))
     lit = []

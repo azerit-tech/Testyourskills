@@ -34,7 +34,7 @@ CAM_CAUGHT = 10.5                   # m à la fin : elle s'est laissé rattraper
 CAM_SIDE = 2.8                      # m à sa droite (+x)
 CAM_Z = 0.5
 YAW0, YAW1 = 12.5, 14.0             # lacet (motion.key_camera : 0 vers -y, positif vers -x), du début à la fin
-PITCH = 0.0                         # à +2,5° (découpage) la berline descendait à 62 % de la hauteur
+PITCH = 1.5                         # le centre de la berline vers 52 % de la hauteur (règle des plans bas : 50 à 62 %)
 LENS = 50.0
 FOCUS, FSTOP = 20.0, 5.6            # la berline et la patrouille nettes toutes les deux
 STILL = 14                          # l'image fixe (banc) : la rampe allumée, la berline encore à 12 m
@@ -44,6 +44,13 @@ STILL = 14                          # l'image fixe (banc) : la rampe allumée, l
 # à 8 m de l'objectif à la fin, que son passage soulève (images 26 à 28)
 PUDDLE = (2.45, 300.6, 1.5, 2.6)     # centre x, y, largeur, longueur (m)
 PAPERS = ((3.15, 304.6, 20.0), (3.55, 305.3, -35.0), (2.95, 306.1, 70.0))   # x, y, rotation (degrés)
+# les plots du tiret entre les voies (x 3,5, à 1 m de la caméra), tous les 6 m sur ce que la caméra parcourt
+STUD_X = 3.5
+STUDS = tuple(282.0 + 6.0 * k for k in range(7))
+STUD_GLOW = 3.0
+# les phares de la patrouille en veilleuse (lumières de 450 à 120 W, verres à 30 % de leur force)
+PATROL_HEAD_W = 120.0
+PATROL_HEAD_LENS = 0.3
 
 
 def _accel(t):
