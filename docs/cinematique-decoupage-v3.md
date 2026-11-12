@@ -351,3 +351,55 @@ Trois images fixes par plan (première, milieu, dernière), basse qualité, jug�
 6. FIN6.
 
 Critère de passage d'un plan : la berline reconnue en moins d'une demi-seconde, l'événement compris sans le son, et le lieu suivant visible devant elle à la dernière image.
+
+## v3.1 — Caméra haute, un seul cadre de poursuite, une voiture qui roule vrai (12 novembre, 21 h 30)
+
+Verdict de Jacques sur le bout-à-bout v3 : « plan filmé trop bas », « qui change bizarre », « mvt de la voiture pas fluide, les dérapages c'est pas naturel ». **Cette section prime sur les hauteurs, distances, focales, grues, vitesses et glisses des fiches ci-dessus** ; le parcours, les événements, les durées, le phare et le point de coupe en x restent.
+
+### A. Le cadre de poursuite commun (tous les plans de dos : OUV, P1, P2, P3, P5, P6, FIN)
+
+| | valeur | tolérance |
+|---|---|---|
+| hauteur de la caméra au-dessus de la chaussée | **2,4 m** | 2,1 à 2,7 m ; jamais sous 1,8 m |
+| distance derrière le centre de la berline | **7,5 m** | 6,5 à 8,5 m |
+| focale | **24 mm** | fixe, la même partout |
+| décalage latéral | 0 à 1,5 m à gauche | pour garder la patrouille 1 dans le cadre |
+| centre de la berline à l'écran | x 50 %, **y 58 % depuis le haut** | x ± 6, y ± 4 |
+| largeur de la berline | ce que donnent 7,5 m et 24 mm | ± 15 % dans le plan |
+
+- **Dans le plan** : la hauteur ne varie pas de plus de 0,4 m, la distance de plus de 1 m. Pas de grue, pas de descente au ras du sol. Deux exceptions : **P6** monte à la fin (jusqu'à 3,6 m, pour découvrir la pointe) et **FIN** peut finir à 2,0 m, plus près (jusqu'à 5,5 m) une fois la berline arrêtée.
+- **À chaque coupe** entre deux plans de dos : hauteur à ± 0,3 m, distance à ± 0,8 m, même focale, en plus du point de coupe (x, y, largeur).
+- La caméra suit la berline comme une caméra de poursuite : son cap suit celui de la **vitesse** de la berline (pas celui de sa caisse) avec un retard doux ; dans un virage elle passe un peu à l'extérieur. Aucun tremblé au-dessus de 4 Hz ; amplitude du tremblé divisée par deux.
+- Les plafonds v3 restent (panoramique 40°/s, bascule 12°/s, écart 3 m/s, etc.).
+- **P4** reste pour l'instant le seul plan de face (200 mm, la meute derrière elle).
+- Conséquence : la patrouille 1 se lit mieux (on la voit de haut, caisse et rampe), les événements devant la berline aussi (barrage, hélicoptères, phare). Le critère tient toujours : patrouille 1 dans le cadre, rampe allumée, 12 images de suite au moins, à gauche.
+
+### B. La voiture roule vrai (berline et patrouilles)
+
+Route mouillée, berline lourde des années 60. Limites, pour le centre de la caisse :
+
+| | limite |
+|---|---|
+| accélération latérale | ≤ 6,5 m/s² (patrouilles ≤ 7) |
+| freinage | ≤ 7 m/s² |
+| accélération | ≤ 3 m/s² (patrouilles ≤ 4) |
+| les deux ensemble (cercle d'adhérence) | √(lat² + long²) ≤ 7,5 m/s² |
+| à-coup (variation d'accélération) | ≤ 12 m/s³ : une accélération s'installe en 12 images au moins |
+| accélération de lacet de la caisse | ≤ 120 °/s² |
+
+- **Donc on ralentit avant de tourner.** Un arc de 28 m se prend à 13,5 m/s (49 km/h) au plus, pas à 19. Freinage visible avant l'entrée (le nez plonge, **feux stop allumés** : `hero_cars.stop_lamps(car, début, fin)` sur chaque fenêtre où le freinage dépasse 2 m/s², à poser après la mise en clés), puis on remet les gaz en sortie.
+- **La glisse** (angle entre le cap de la caisse et sa vitesse) :
+  - nulle tant que l'accélération combinée est sous 5,5 m/s² ;
+  - elle **s'installe** en 10 images au moins (≤ 40 °/s), l'arrière part vers l'extérieur du virage ;
+  - 18° au plus ;
+  - les roues avant **contre-braquent** (braquées vers l'extérieur du virage, d'un angle voisin de la glisse) tant qu'elle dure ;
+  - la vitesse baisse pendant la glisse (10 % au moins) ;
+  - elle **se résorbe** en 12 images au moins (≤ 30 °/s), avec au plus un petit retour de l'autre côté (≤ 4°), puis plus rien.
+- Trajectoires à courbure continue : pas de raccord droite/arc sec, une entrée et une sortie progressives (clothoïde ou équivalent).
+- La caisse prend du roulis vers l'extérieur (≤ 4°) et plonge au freinage (≤ 2°), en proportion des accélérations ; rien d'autre ne la secoue (pas de sursaut gratuit).
+- Un arrêt d'urgence à 7 m/s² depuis 44 km/h prend 10,7 m et 42 images : c'est la vitesse d'entrée ou l'image de l'arrêt qui s'adapte, pas la physique.
+
+### C. Vérification
+
+`python3 tools/film3d/motion.py mesure --v3 <PLAN>` contrôle le cadre commun, les coupes en hauteur et distance, les limites de la voiture, la glisse et les à-coups à l'écran ; une fonction commune de `motion.py` calcule la conduite (route et vitesse voulue → poses, braquage, fenêtres de freinage). Les plans migrés portent `V31 = True`.
+
