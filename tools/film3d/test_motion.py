@@ -28,8 +28,9 @@ def test_straight():
     check("droite : roues dans le sens de la marche", rate > 0)
     check("droite : cap constant", max(abs(p["heading"]) for p in ps) < 1e-6)
     noisy = M.sample(M.straight(3.0, 0.0, v), FRAMES, wheel_r=r)
-    check("droite : bruit de suspension faible", max(abs(p["roll"]) for p in noisy) < 0.3
-          and max(abs(p["heave"]) for p in noisy) < 0.01)
+    check("droite : bruit de suspension faible", max(abs(p["roll"]) for p in noisy) < 0.4
+          and max(abs(p["heave"]) for p in noisy) < 0.012,
+          f"roulis {max(abs(p['roll']) for p in noisy):.2f}°, pompage {max(abs(p['heave']) for p in noisy) * 100:.1f} cm")
 
 
 def test_braking():
@@ -38,7 +39,8 @@ def test_braking():
     ps = M.sample(pos, FRAMES, noise=0.0)
     lo = min(p["pitch"] for p in ps)
     check("freinage : l'avant plonge", lo < -1.5, f"{lo:.2f}°")
-    check("freinage : plongée bornée à 3°", lo >= -M.PITCH_MAX - 1e-9)
+    bound = (M.CHASSIS["hero"]["pitch_max"] + 0.5) if M.dyn_on() else M.PITCH_MAX
+    check("freinage : plongée bornée", lo >= -bound - 1e-9, f"{lo:.2f}° pour {bound:.1f}")
     before = [p for p in ps if p["t"] < 0.15]
     check("freinage : rien avant le freinage", max(abs(p["pitch"]) for p in before) < 0.05)
     # la caisse suit avec du retard : à 0,05 s du coup de frein elle n'a pas encore plongé de moitié
@@ -211,8 +213,10 @@ def test_p3():
     check("P3 : la caisse ne touche rien", dm >= 0.15, f"{dm:.2f} m de {n} à l'image {fm:.2f}")
     check("P3 : la caméra à 2 m au moins de la caisse", cam[0] >= 2.0, f"{cam[0]:.2f} m à l'image {cam[1]:.2f}")
     ps = M.sample(P.hero_pos, frames, heading=P.hero_heading, wheel_r=0.31, wheelbase=2.77)
-    check("P3 : roulis ≤ 6°", max(abs(p["roll"]) for p in ps) <= 6.0, f"{max(abs(p['roll']) for p in ps):.2f}°")
-    check("P3 : tangage ≤ 3°", max(abs(p["pitch"]) for p in ps) <= 3.0, f"{max(abs(p['pitch']) for p in ps):.2f}°")
+    rmax, pmax = ((M.CHASSIS["hero"]["roll_max"] + 0.5, M.CHASSIS["hero"]["pitch_max"] + 0.5) if M.dyn_on()
+                  else (6.0, 3.0))
+    check("P3 : roulis borné", max(abs(p["roll"]) for p in ps) <= rmax, f"{max(abs(p['roll']) for p in ps):.2f}°")
+    check("P3 : tangage borné", max(abs(p["pitch"]) for p in ps) <= pmax, f"{max(abs(p['pitch']) for p in ps):.2f}°")
     y0, y1 = P.hero_pos(0.0)[1], P.hero_pos(P.T_END)[1]
     check("P3 : de y 93,5–95 au-delà des plots", 93.5 <= y0 <= 95.0 and y1 - P.HALF_L > P.CONE_LINE + 0.5
           and y1 < P.PATROLS["patrol_a"][1] + 3.0, f"y {y0:.1f} → {y1:.1f}")
@@ -441,6 +445,249 @@ def test_bars():
           and seq.count("corail") == 12)
 
 
+# ---------------------------------------------------------------- la dynamique (FILM3D_DYN)
+
+class dyn:
+    """Le temps d'un bloc, FILM3D_DYN à la valeur donnée."""
+
+    def __init__(self, on):
+        self.on = on
+
+    def __enter__(self):
+        self.old = os.environ.get("FILM3D_DYN")
+        os.environ["FILM3D_DYN"] = "1" if self.on else "0"
+
+    def __exit__(self, *a):
+        if self.old is None:
+            os.environ.pop("FILM3D_DYN", None)
+        else:
+            os.environ["FILM3D_DYN"] = self.old
+
+
+REF_COMMIT = "bcc8b32"      # le motion.py d'avant la dynamique
+
+
+def _old_motion():
+    """Le motion.py d'avant la dynamique (git show), pour vérifier que FILM3D_DYN=0 le rend à l'identique ; None si
+    le dépôt n'a pas ce commit."""
+    import subprocess
+    import types
+    here = os.path.dirname(os.path.abspath(__file__))
+    try:
+        src = subprocess.run(["git", "-C", here, "show", f"{REF_COMMIT}:tools/film3d/motion.py"], capture_output=True,
+                             text=True, check=True).stdout
+    except Exception:
+        return None
+    mod = types.ModuleType("motion_avant")
+    exec(compile(src, "motion_avant.py", "exec"), mod.__dict__)
+    return mod
+
+
+def _plan_tracks():
+    """(nom, pos, kwargs de sample, images) des véhicules des plans, sans Blender."""
+    import fin_pointe as F
+    import p2_arc as P2
+    import p3_enseignes as P3
+    import p4_pont as P4
+    import p5_virage as P5
+    import p6_jetee as P6
+    out = [("P2 berline", P2.hero_pos, dict(slip=P2.hero_slip), range(P2.F0 - 1, P2.F0 + P2.FRAMES + 1)),
+           ("P2 patrouille", P2.patrol_pos(0), dict(slip=P2.patrol_slip(0), seed=1.0), range(0, 30)),
+           ("P3 berline", P3.hero_pos, dict(heading=P3.hero_heading, wheel_r=0.31, wheelbase=2.77),
+            range(P3.F0 - 1, P3.F0 + P3.FRAMES + 1)),
+           ("P4 berline", P4.hero_pos, {}, range(P4.F0 - 1, P4.F0 + P4.FRAMES + 1)),
+           ("P4 fourgon", P4.van_pos, dict(seed=4.0), range(P4.F0 - 1, P4.F0 + P4.FRAMES + 1)),
+           ("P5 berline", P5.hero_pos, dict(slip=P5.hero_slip), range(P5.F0 - 1, P5.F0 + P5.FRAMES + 1)),
+           ("P5 meute", P5.pack_pos(0), dict(seed=0.0), range(P5.F0 - 1, P5.F0 + P5.FRAMES + 1)),
+           ("P6 berline", P6.hero_pos, {}, range(P6.F0 - 1, P6.F0 + P6.FRAMES + 1)),
+           ("P6 colonne", P6.column_pos(3), dict(seed=3.0), range(P6.F0 - 1, P6.F0 + P6.FRAMES + 1)),
+           ("FIN berline", F.hero_pos, dict(heading=F.hero_heading), range(F.F0 - 1, F.F0 + F.FRAMES + 1))]
+    return out
+
+
+def test_dyn_switch():
+    """FILM3D_DYN=0 : sample() rend exactement les poses d'avant (le motion.py du commit de référence) ; dynamique
+    active, la position au sol, le cap, la vitesse et la rotation des roues ne bougent pas d'un iota."""
+    old = _old_motion()
+    tracks = _plan_tracks()
+    if old is None:
+        print(f"     (commit {REF_COMMIT} absent : comparaison au motion.py d'avant sautée)")
+    else:
+        bad = []
+        with dyn(False):
+            for name, pos, kw, fr in tracks:
+                if [dict(p) for p in M.sample(pos, fr, **kw)] != old.sample(pos, fr, **kw):
+                    bad.append(name)
+        check("interrupteur : FILM3D_DYN=0 rend les poses d'avant à l'identique", not bad, ", ".join(bad))
+    keys = ("frame", "t", "x", "y", "heading", "travel", "speed", "dist", "spin")
+    worst = []
+    for name, pos, kw, fr in tracks:
+        with dyn(False):
+            a = M.sample(pos, fr, **kw)
+        with dyn(True):
+            b = M.sample(pos, fr, **kw)
+        if any(p[k] != q[k] for p, q in zip(a, b) for k in keys) or len(a) != len(b):
+            worst.append(name)
+    check("dynamique : position au sol, cap, vitesse et roues inchangés", not worst, ", ".join(worst))
+    import fin_pointe as F
+    with dyn(True):
+        ps = M.sample(F.hero_pos, range(0, 38), heading=F.hero_heading)
+    p22 = next(p for p in ps if p["frame"] == 22)
+    check("FIN : la position au sol de l'image 22 inchangée", (p22["x"], p22["y"]) == F.hero_pos(M.t_of(22))
+          and p22["heading"] == F.hero_heading(M.t_of(22)))
+
+
+def _steady(ps, key, t_from):
+    v = [p[key] for p in ps if p["t"] >= t_from]
+    return sum(v) / len(v)
+
+
+def test_hero_body():
+    """La berline : roulis de 4 à 6° vers l'extérieur à 0,8 g, plongée de 1,5 à 3° à 0,8 g de freinage, la caisse qui
+    suit avec retard et dépasse (elle a une masse)."""
+    g = 0.8 * M.G
+    v = 20.0
+    r = v * v / g
+    with dyn(True):
+        ps = M.sample(_circle(r, v), range(0, 60), noise=0.0, warmup=1.5)
+        roll = _steady(ps, "roll", 1.2)
+        check("berline : roulis à 0,8 g de 4 à 6°, vers l'extérieur", -6.0 <= roll <= -4.0, f"{roll:.2f}°")
+        brk = M.sample(M.straight(0.0, 0.0, 30.0, accel=lambda t: -g if t >= 0.2 else 0.0), range(0, 40), noise=0.0)
+        lo = min(p["pitch"] for p in brk)
+        mid = _steady([p for p in brk if p["t"] < 1.4], "pitch", 1.0)
+        check("berline : plongée à 0,8 g de 1,5 à 3°", -3.0 <= mid <= -1.5 and lo >= -3.4, f"{mid:.2f}°, {lo:.2f}° au plus")
+        # la réponse à un coup de frein : 63 % de la plongée entre 0,08 et 0,3 s après, un dépassement
+        t63 = next(p["t"] for p in brk if p["pitch"] <= 0.63 * mid) - 0.2
+        check("berline : la caisse suit avec retard", 0.08 <= t63 <= 0.3, f"{t63 * 1000:.0f} ms")
+        check("berline : la caisse dépasse (la masse)", lo < mid * 1.08, f"{lo:.2f} pour {mid:.2f}°")
+        acc = M.sample(M.straight(0.0, 0.0, 5.0, accel=lambda t: 0.45 * M.G if t >= 0.2 else 0.0), range(0, 40),
+                       noise=0.0)
+        up = _steady([p for p in acc if p["t"] < 1.4], "pitch", 1.0)
+        hv = _steady([p for p in acc if p["t"] < 1.4], "heave", 1.0)
+        check("berline : cabrage à l'accélération, la caisse se tasse", up > 0.8 and hv < -0.003,
+              f"{up:.2f}°, {hv * 100:.1f} cm")
+
+
+def test_fin_stop():
+    """FIN : la berline freine, plonge, s'arrête ; la caisse revient en arrière, repart, se pose (deux oscillations
+    amorties) ; les roues restent braquées à l'arrêt."""
+    import fin_pointe as F
+    with dyn(True):
+        ps = M.sample(F.hero_pos, range(F.F0 - 1, F.F0 + F.FRAMES + 1), heading=F.hero_heading)
+    stop = F.F0 + F.T_STOP * M.FPS
+    before = [p for p in ps if p["frame"] < stop]
+    after = [p for p in ps if p["frame"] > stop]
+    dive = min(p["pitch"] for p in before)
+    check("FIN : la plongée au freinage", dive <= -1.5, f"{dive:.2f}°")
+    pk = max(after, key=lambda p: p["pitch"])
+    check("FIN : la caisse revient en arrière après l'arrêt", pk["pitch"] >= 0.25 * -dive,
+          f"{pk['pitch']:+.2f}° à l'image {pk['frame']}")
+    later = [p for p in after if p["frame"] > pk["frame"]]
+    lo = min(later, key=lambda p: p["pitch"]) if later else None
+    check("FIN : la seconde oscillation, plus petite", lo is not None and lo["pitch"] < 0.0
+          and -lo["pitch"] < pk["pitch"], f"{lo['pitch']:+.2f}° à l'image {lo['frame']}" if lo else "")
+    last = next(p for p in ps if p["frame"] == F.STILL_FRAME)
+    check("FIN : la caisse posée à l'image validée", abs(last["pitch"]) < 0.3 and abs(last["roll"]) < 0.3,
+          f"tangage {last['pitch']:+.2f}°, roulis {last['roll']:+.2f}°")
+    st = [p["steer"] for p in after]
+    check("FIN : les roues restent où elles sont à l'arrêt", max(st) - min(st) < 1.0, f"{min(st):.1f} à {max(st):.1f}°")
+    rate = max(abs(ps[i + 1]["steer"] - ps[i]["steer"]) for i in range(len(ps) - 1)) * M.FPS
+    check("FIN : la vitesse de braquage bornée", rate <= M.STEER_RATE + 1e-6, f"{rate:.0f}°/s")
+
+
+def test_arches():
+    """Les roues dans leurs passages : sur tous les plans, la caisse ne descend jamais au-dessus d'un pneu de plus
+    de 80 % du jeu mesuré (diag/dyn_arches.py), réglage par réglage."""
+    worst = []
+    with dyn(True):
+        for name, pos, kw, fr in _plan_tracks():
+            for kind in M.CHASSIS:
+                ps = M.rebody(M.sample(pos, fr, **kw), kind)
+                cs = ps.meta["corners"]
+                gaps = M.arch_of(M.CHASSIS[kind], cs)
+                r, cm = max((-d / g, -d) for p in ps for d, g in zip(M.corner_dz(p, cs), gaps))
+                worst.append((r, name, kind, cm))
+    w = max(worst)
+    check("roues dans les ailes : jamais plus de 80 % du jeu", w[0] <= 0.8 + 1e-9,
+          f"{w[3] * 100:.1f} cm ({w[0] * 100:.0f} % du jeu) : {w[1]}, {w[2]}")
+
+
+def _deck(y):
+    """Le profil du pont (scene_c.py, recopié sans Blender) : crête en -130, raccords paraboliques."""
+    def ramp(y, a, t):
+        return min(1.0, max(0.0, (y - (a - t / 2)) / t))
+    z, yy, step = 0.0, -1010.0, 0.25
+    while yy < y:
+        z += 0.06 * (ramp(yy + step / 2, -255.0, 12.0) - 2 * ramp(yy + step / 2, -130.0, 20.0)
+                     + ramp(yy + step / 2, -5.0, 12.0)) * step
+        yy += step
+    return max(0.0, z)
+
+
+_DECK = {}
+
+
+def deck_ground(x, y):
+    k = round(y * 4)
+    if k not in _DECK:
+        _DECK[k] = _deck(k / 4)
+    z0 = _DECK[k]
+    return z0, 0.0
+
+
+def test_pack():
+    """La meute : chaque véhicule à son rythme (deux patrouilles ne tanguent pas ensemble), reproductible ; le
+    fourgon roule plus qu'une patrouille ; il s'allège au passage de la crête de P4 puis retombe."""
+    import p4_pont as P
+    fr = range(P.F0 - 1, P.F0 + P.FRAMES + 1)
+    with dyn(True):
+        a = M.rebody(M.sample(P.pack_pos(0), fr, seed=1.0), "patrol")
+        b = M.rebody(M.sample(P.pack_pos(1), fr, seed=2.0), "patrol")
+        a2 = M.rebody(M.sample(P.pack_pos(0), fr, seed=1.0), "patrol")
+
+        def corr(u, v):
+            mu, mv = sum(u) / len(u), sum(v) / len(v)
+            su = math.sqrt(sum((x - mu) ** 2 for x in u))
+            sv = math.sqrt(sum((x - mv) ** 2 for x in v))
+            return sum((x - mu) * (y - mv) for x, y in zip(u, v)) / (su * sv)
+        cp = corr([p["pitch"] for p in a], [p["pitch"] for p in b])
+        cr = corr([p["roll"] for p in a], [p["roll"] for p in b])
+        amp = max(abs(p["pitch"]) for p in a)
+        check("meute : deux patrouilles à leur rythme", abs(cp) < 0.8 and abs(cr) < 0.8 and amp > 0.08,
+              f"corrélations {cp:.2f} (tangage), {cr:.2f} (roulis), {amp:.2f}° au plus")
+        check("meute : reproductible (graine)", [dict(p) for p in a] == [dict(p) for p in a2])
+        circ = _circle(40.0, 15.0)
+        rv = _steady(M.rebody(M.sample(circ, range(0, 40), noise=0.0, warmup=1.5), "van"), "roll", 1.0)
+        rp = _steady(M.rebody(M.sample(circ, range(0, 40), noise=0.0, warmup=1.5), "patrol"), "roll", 1.0)
+        check("meute : le fourgon roule plus qu'une patrouille", abs(rv) > 1.4 * abs(rp), f"{rv:.2f} contre {rp:.2f}°")
+        van = M.rebody(M.sample(P.van_pos, fr, seed=4.0, noise=0.0), "van", ground=deck_ground)
+        flat = M.rebody(M.sample(P.van_pos, fr, seed=4.0, noise=0.0), "van")
+        up = max(p["heave"] - q["heave"] for p, q in zip(van, flat) if abs(p["y"] + 130.0) < 10.0)
+        check("P4 : le fourgon s'allège sur la crête", up > 0.01, f"{up * 100:.1f} cm de plus qu'à plat")
+        # un ressaut en travers : la caisse pompe, puis se repose
+        j = M.rebody(M.sample(M.straight(0.0, 0.0, 25.0), range(0, 40), noise=0.0), "hero",
+                     joints=[((-5.0, 12.0), (5.0, 12.0), 0.03)])
+        hj = [abs(p["heave"]) + abs(p["pitch"]) * 0.01 for p in j]
+        check("ressaut : la caisse pompe puis se repose", max(hj) > 0.004 and hj[-1] < 0.3 * max(hj),
+              f"{max(hj) * 100:.1f}, puis {hj[-1] * 100:.2f}")
+
+
+def test_steer_dyn():
+    """Les roues avant, dynamique active : contre-braquage net en glisse (P2, P5), vitesse de braquage bornée."""
+    import p2_arc as P2
+    import p5_virage as P5
+    with dyn(True):
+        p2 = M.sample(P2.hero_pos, range(P2.F0 - 1, P2.F0 + P2.FRAMES + 1), slip=P2.hero_slip)
+        p5 = M.sample(P5.hero_pos, range(P5.F0 - 1, P5.F0 + P5.FRAMES + 1), slip=P5.hero_slip)
+    s2 = p2[-2]["steer"]
+    check("P2 : contre-braquage (glisse à gauche, roues à droite)", s2 < -2.0, f"{s2:.1f}°")
+    drift = [p for p in p5 if p["heading"] - p["travel"] < -8.0]
+    s5 = max(p["steer"] for p in drift) if drift else 0.0
+    check("P5 : contre-braquage en glisse (glisse à droite, roues à gauche)", s5 > 2.0, f"{s5:.1f}° au plus")
+    rate = max(abs(p[i + 1]["steer"] - p[i]["steer"]) * M.FPS for p in (p2, p5) for i in range(len(p) - 1))
+    check("roues : vitesse de braquage bornée", rate <= M.STEER_RATE + 1e-6, f"{rate:.0f}°/s")
+
+
 if __name__ == "__main__":
     test_straight()
     test_braking()
@@ -456,5 +703,11 @@ if __name__ == "__main__":
     test_spin_steps()
     test_p1()
     test_bars()
+    test_dyn_switch()
+    test_hero_body()
+    test_fin_stop()
+    test_arches()
+    test_pack()
+    test_steer_dyn()
     print(f"\n{'tout passe' if not FAIL else str(len(FAIL)) + ' échec(s)'}")
     sys.exit(1 if FAIL else 0)

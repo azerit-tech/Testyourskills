@@ -15,7 +15,16 @@
 # avant (géométrie d'Ackermann plus la dérive : contre-braquage en glisse), le transfert de masse (roulis selon
 # l'accélération latérale, tangage selon la longitudinale, bornés, en réponse du second ordre : la caisse suit
 # avec ~0,15 s de retard et dépasse un peu, elle « s'assoit »), et un petit bruit de suspension lié à la vitesse.
+#
+# La dynamique (FILM3D_DYN, active par défaut ; FILM3D_DYN=0 rend exactement les clés d'avant) : chaque véhicule a
+# son réglage (CHASSIS : la berline souple, la patrouille ferme, le fourgon haut), retrouvé par key_vehicle sur le
+# nom du rig ; la caisse répond au transfert de masse et, par quatre coins sur ressorts, au relief (le sol passé à
+# key_vehicle, ses ressauts, un grain de route), avec un léger désordre d'un véhicule à l'autre (graine de sample) ;
+# les roues restent dans leurs passages (jeu mesuré, CHASSIS[...]["arch"]). key_object penche les aéronefs selon
+# leur accélération (aircraft_attitude) ; key_camera ajoute l'opérateur (camera_operator) selon le type de caméra.
 import math
+import os
+import random
 
 FPS = 24.0
 F0 = 1                      # l'image Blender du temps 0
@@ -26,6 +35,7 @@ ROLL_MAX, PITCH_MAX = 6.0, 3.0
 SUSP_HZ, SUSP_ZETA = 1.6, 0.55   # la caisse sur ses ressorts : ~0,15 s pour 63 %, ~12 % de dépassement
 STEER_LAG = 0.06            # s : les mains au volant
 STEER_MAX = 35.0
+STEER_RATE = 60.0           # degrés par seconde aux roues (dynamique) : un contre-braquage vif, pas un claquement
 G = 9.81
 
 
@@ -42,6 +52,14 @@ def smoothstep(a, b, x):
 
 def soft_clamp(x, bound):
     return bound * math.tanh(x / bound)
+
+
+def soft_limit(x, bound, knee=0.7):
+    """Linéaire jusqu'à knee × bound, puis une épaule douce (tanh) qui ne dépasse jamais bound."""
+    k = knee * bound
+    if abs(x) <= k:
+        return x
+    return math.copysign(k + (bound - k) * math.tanh((abs(x) - k) / (bound - k)), x)
 
 
 def _sub(a, b):
@@ -99,9 +117,317 @@ class _Spring:
         return self.x
 
 
+def dyn_on():
+    """La dynamique est-elle active ? (FILM3D_DYN=0 : les clés d'avant, à l'identique)"""
+    return os.environ.get("FILM3D_DYN", "1").strip().lower() not in ("0", "off", "non", "false", "no")
+
+
+# ---------------------------------------------------------------- la caisse sur ses ressorts, par véhicule
+#
+# roll_per_g, pitch_per_g : degrés par g (transfert de masse) ; *_max : bornes douces ; *_hz, *_zeta : la caisse
+# sur ses ressorts (fréquence propre, amortissement : 0,3 dépasse de 37 % puis de 14 %, deux rebonds) ; corner_* :
+# chaque coin sur son ressort, qui suit le sol avec un amortisseur (vitesse relative) ; road : le grain de route
+# (m, longues ondes que la caisse suit) ; driver : les corrections du conducteur (g, gaz et volant), qui font que
+# deux véhicules d'une meute ne bougent pas ensemble ; squat : la caisse qui se tasse sous le transfert (m par
+# degré de tangage) ; heave_up/down : bornes du pompage (m) ; arch : le jeu vertical mesuré entre le haut du pneu
+# et le passage de roue (diag/dyn_arches.py), que la caisse ne mange jamais ; ext : la détente d'un ressort (m) ; track : la voie (m) ; jitter : le
+# désordre d'un exemplaire à l'autre (fraction, tirée de la graine).
+CHASSIS = {
+    # une grosse berline des années 60 : souple, lente, elle s'assoit et flotte
+    "hero": dict(roll_per_g=6.4, roll_max=6.5, pitch_per_g=2.7, pitch_max=3.2, roll_hz=1.1, roll_zeta=0.32,
+                 pitch_hz=1.6, pitch_zeta=0.35, corner_hz=1.25, corner_zeta=0.35, road=0.007, driver=0.025,
+                 squat=0.006, heave_up=0.05, heave_down=0.03, arch=(0.055, 0.06), ext=0.12, track=1.55, jitter=0.0, steer_lag=0.07),
+    # la patrouille : plus ferme, plus vive
+    "patrol": dict(roll_per_g=4.6, roll_max=5.0, pitch_per_g=2.1, pitch_max=2.6, roll_hz=1.45, roll_zeta=0.42,
+                   pitch_hz=1.5, pitch_zeta=0.40, corner_hz=1.55, corner_zeta=0.42, road=0.006, driver=0.04,
+                   squat=0.004, heave_up=0.045, heave_down=0.03, arch=0.03, ext=0.09, track=1.51, jitter=0.12, steer_lag=0.05),
+    # le fourgon : haut, lourd, il roule beaucoup et tangue lentement
+    "van": dict(roll_per_g=8.0, roll_max=7.5, pitch_per_g=2.6, pitch_max=3.0, roll_hz=1.0, roll_zeta=0.30,
+                pitch_hz=1.1, pitch_zeta=0.32, corner_hz=1.15, corner_zeta=0.32, road=0.009, driver=0.04,
+                squat=0.006, heave_up=0.07, heave_down=0.035, arch=0.075, ext=0.12, track=1.68, jitter=0.12, steer_lag=0.08),
+}
+
+
+class Poses(list):
+    """La liste des poses de sample() (des dict, comme avant) ; elle garde l'historique cinématique fin (pas de
+    1/240 s) pour que key_vehicle refasse la caisse avec le réglage du véhicule et le relief du sol (rebody)."""
+    hist = None
+    meta = None
+
+
 def sample(pos, frames=range(0, 30), slip=None, heading=None, wheel_r=0.33, wheelbase=2.9, front=None, f0=F0,
-           fps=FPS, noise=1.0, seed=0.0, warmup=0.6, roll_per_g=ROLL_PER_G, pitch_per_g=PITCH_PER_G):
+           fps=FPS, noise=1.0, seed=0.0, warmup=0.6, roll_per_g=ROLL_PER_G, pitch_per_g=PITCH_PER_G, chassis=None):
     """Les poses d'un véhicule image par image.
+
+    Dynamique active (dyn_on) : la caisse selon le réglage `chassis` (CHASSIS, la berline par défaut ;
+    key_vehicle le refait selon le véhicule) ; x, y, cap, vitesse, roues et braquage sont ceux d'avant.
+    roll_per_g et pitch_per_g ne servent qu'aux clés d'avant (FILM3D_DYN=0)."""
+    if not dyn_on():
+        return _sample_legacy(pos, frames, slip, heading, wheel_r, wheelbase, front, f0, fps, noise, seed, warmup,
+                              roll_per_g, pitch_per_g)
+    front = wheelbase / 2 if front is None else front
+    frames = list(frames)
+    t_first, t_last = t_of(frames[0], f0, fps), t_of(frames[-1], f0, fps)
+    dt = 1.0 / (fps * 10)
+    t = t_first - warmup
+    n_steps = int(round((t_last - t) / dt))
+    dist, prev_p, prev_travel, prev_head = 0.0, pos(t), None, None
+    want = {round(t_of(f, f0, fps) / dt): f for f in frames}
+    base_step = round(t / dt)
+    hist = []
+    for i in range(n_steps + 1):
+        t = (base_step + i) * dt
+        p = pos(t)
+        dist += math.hypot(*_sub(p, prev_p)) if i else 0.0
+        prev_p = p
+        (vx, vy), (ax, ay) = kinematics(pos, t)
+        speed = math.hypot(vx, vy)
+        if speed > 1e-6:
+            ux, uy = vx / speed, vy / speed
+            travel = heading_of(vx, vy)
+        else:
+            ux, uy = 0.0, 1.0
+            travel = prev_travel if prev_travel is not None else 0.0
+        if prev_travel is not None:
+            travel = _unwrap(prev_travel, travel)
+        prev_travel = travel
+        a_long = ax * ux + ay * uy
+        a_lat = ux * ay - uy * ax
+        curv = a_lat / (speed * speed) if speed > 0.5 else 0.0
+        if heading is not None:
+            head = heading(t)
+            if prev_head is not None:
+                head = _unwrap(prev_head, head)
+        else:
+            head = travel + (slip(t) if slip else 0.0)
+        prev_head = head
+        beta = math.radians(travel - head)
+        yaw_rate = speed * curv
+        if heading is not None or slip:
+            h2 = (heading(t + dt) if heading is not None else heading_of(*kinematics(pos, t + dt)[0])
+                  + (slip(t + dt) if slip else 0.0))
+            yaw_rate = math.radians(_unwrap(head, h2) - head) / dt
+        vxb, vyb = speed * math.cos(beta), speed * math.sin(beta) + yaw_rate * front
+        steer_t = math.degrees(math.atan2(vyb, vxb)) if speed > 0.5 else 0.0
+        steer_t = max(-STEER_MAX, min(STEER_MAX, steer_t))
+        hist.append((base_step + i, t, p[0], p[1], head, travel, speed, a_long, a_lat, curv, dist, steer_t))
+    out = Poses()
+    out.hist = hist
+    out.meta = dict(want=want, dt=dt, seed=seed, wheel_r=wheel_r, wheelbase=wheelbase, front=front, noise=noise)
+    for (k, t, x, y, head, travel, speed, a_long, a_lat, curv, dist, steer) in hist:
+        if k in want:
+            out.append(dict(frame=want[k], t=t, x=x, y=y, heading=head, travel=travel, speed=speed, a_long=a_long,
+                            a_lat=a_lat, curvature=curv, dist=dist, spin=dist / wheel_r, steer=steer, roll=0.0,
+                            pitch=0.0, heave=0.0))
+    return rebody(out, chassis or "hero")
+
+
+def _jit(rng, j):
+    return 1.0 + j * (2.0 * rng.random() - 1.0)
+
+
+def _road_waves(rng, amp):
+    """Le grain de route d'une trace de roues : des ondes longues (13 à 37 m : la caisse les suit) et courtes (2 à
+    6 m : à peine filtrées à faible vitesse), phases tirées."""
+    waves = [(37.0, 0.45), (23.0, 0.35), (13.0, 0.25), (5.9, 0.12), (2.7, 0.06)]
+    return [(lam, amp * a, rng.uniform(0, 2 * math.pi)) for lam, a in waves]
+
+
+def _wave(ws, s):
+    return sum(a * math.sin(2 * math.pi * s / lam + ph) for lam, a, ph in ws)
+
+
+def _seg_dist(p, a, b):
+    """(distance signée le long de la normale, position le long du segment 0..1) d'un point à une ligne."""
+    ex, ey = b[0] - a[0], b[1] - a[1]
+    n2 = ex * ex + ey * ey
+    u = ((p[0] - a[0]) * ex + (p[1] - a[1]) * ey) / n2
+    return ((p[0] - a[0]) * ey - (p[1] - a[1]) * ex) / math.sqrt(n2), u
+
+
+def joint_height(p, joints, half=1.5):
+    """La hauteur ajoutée par les ressauts sous le point p : joints = [((x0, y0), (x1, y1), h[, demi-longueur])],
+    une bosse en cosinus de `h` m (négatif : un creux) sur 2 × demi-longueur m (1,5 par défaut : un raccord de
+    dalle, un dos d'âne ; un joint vif de quelques centimètres ne se voit pas dans la caisse, elle le filtre),
+    en travers de la route, de (x0, y0) à (x1, y1)."""
+    z = 0.0
+    for j in joints or ():
+        a, b, h = j[:3]
+        w = j[3] if len(j) > 3 else half
+        d, u = _seg_dist(p, a, b)
+        if -0.05 <= u <= 1.05 and abs(d) < w:
+            z += h * 0.5 * (1.0 + math.cos(math.pi * d / w))
+    return z
+
+
+def default_corners(wheelbase=2.9, front=None, track=1.5):
+    """Les quatre coins (x à droite, y vers l'avant, depuis le centre du rig) d'un véhicule sans roues connues."""
+    front = wheelbase / 2 if front is None else front
+    return [(-track / 2, front), (track / 2, front), (-track / 2, front - wheelbase), (track / 2, front - wheelbase)]
+
+
+def corner_dz(pose, corners):
+    """La descente (m, négative : la caisse s'approche du pneu) de la caisse au-dessus de chaque coin, pour une pose
+    (roulis positif : la droite descend ; tangage positif : l'avant monte)."""
+    tr, tp = math.tan(math.radians(pose["roll"])), math.tan(math.radians(pose["pitch"]))
+    return [pose["heave"] + y * tp - x * tr for x, y in corners]
+
+
+def rebody(poses, chassis="hero", ground=None, corners=None, joints=None, seed=None):
+    """Refait la caisse (roulis, tangage, pompage) des poses de sample() pour un réglage (CHASSIS ou un dict), un
+    sol `ground(x, y) -> (z, pente)` et ses ressauts `joints` ; `corners` : les coins des roues (x à droite, y vers
+    l'avant, m, depuis le centre du rig). Position, cap, roues et braquage ne changent pas. Sans historique (des
+    poses faites à la main), rend les poses telles quelles."""
+    hist = getattr(poses, "hist", None)
+    if not hist:
+        return poses
+    meta = poses.meta
+    base = CHASSIS.get(chassis, CHASSIS["hero"]) if isinstance(chassis, str) else dict(chassis)
+    kind = chassis if isinstance(chassis, str) else "custom"
+    seed = meta["seed"] if seed is None else seed
+    rng = random.Random(f"{kind}:{float(seed):.3f}")
+    j = base["jitter"]
+    c = dict(base)
+    for k in ("roll_per_g", "pitch_per_g", "roll_hz", "pitch_hz", "corner_hz"):
+        c[k] = base[k] * _jit(rng, j)
+    for k in ("roll_zeta", "pitch_zeta", "corner_zeta"):
+        c[k] = base[k] * _jit(rng, j * 1.2)
+    if corners is None:
+        corners = default_corners(meta["wheelbase"], meta["front"], c["track"])
+    corners = [tuple(q) for q in corners]
+    left = [i for i, q in enumerate(corners) if q[0] < 0]
+    right = [i for i, q in enumerate(corners) if q[0] >= 0]
+    fy = max(q[1] for q in corners)
+    frt = [i for i, q in enumerate(corners) if q[1] > fy - 0.5]
+    rear = [i for i, q in enumerate(corners) if i not in frt]
+    xs = [q[0] for q in corners]
+    track = (max(xs) - min(xs)) or c["track"]
+    wb = (fy - min(q[1] for q in corners)) or meta["wheelbase"]
+    noise = meta["noise"]
+    # le grain de route : la trace de droite reprend celle de gauche, un peu décalée (une route n'a pas deux reliefs
+    # indépendants à 1,5 m l'un de l'autre)
+    wl = _road_waves(rng, c["road"] * noise)
+    waves = {"L": wl, "R": [(lam, a, ph + rng.uniform(-0.6, 0.6)) for lam, a, ph in wl]}
+    # les corrections du conducteur : deux sinus lents chacun (gaz, volant), en g
+    drv = [(rng.uniform(0.5, 0.9), rng.uniform(1.1, 1.7), rng.uniform(0, 6.3), rng.uniform(0, 6.3)) for _ in range(2)]
+
+    def driver(k, t, speed):
+        f1, f2, p1, p2 = drv[k]
+        return c["driver"] * noise * min(1.0, speed / 15.0) * (0.65 * math.sin(2 * math.pi * f1 * t + p1)
+                                                              + 0.35 * math.sin(2 * math.pi * f2 * t + p2))
+
+    dt = meta["dt"]
+    want = meta["want"]
+    wr, ww = 2 * math.pi * c["roll_hz"], 2 * math.pi * c["pitch_hz"]
+    wc = 2 * math.pi * c["corner_hz"]
+    # le sol sous chaque coin, d'abord pour tout l'historique (l'amortisseur lit sa vitesse)
+    grounds, inputs = [], []
+    for (k, t, x, y, head, travel, speed, a_long, a_lat, curv, dist, steer) in hist:
+        h = math.radians(head)
+        fx, fy_ = -math.sin(h), math.cos(h)
+        rx, ry = fy_, -fx
+        g, u = [], []
+        for (cx, cy) in corners:
+            px, py = x + rx * cx + fx * cy, y + ry * cx + fy_ * cy
+            z = ground(px, py)[0] if ground else 0.0
+            g.append(z)
+            u.append(z + (joint_height((px, py), joints) if joints else 0.0)
+                     + _wave(waves["L" if cx < 0 else "R"], dist + cy))
+        grounds.append(g)
+        inputs.append(u)
+    roll = pitch = steer_s = None
+    vr = vp = 0.0
+    zc = list(inputs[0])
+    vc = [(inputs[1][i] - inputs[0][i]) / dt if len(inputs) > 1 else 0.0 for i in range(len(corners))]
+    by_k = {}
+    for n, (k, t, x, y, head, travel, speed, a_long, a_lat, curv, dist, steer) in enumerate(hist):
+        # au-delà de 2 g, ce n'est pas une voiture qui freine mais une trajectoire qui part lancée (l'arrêt avant
+        # la première image, la vitesse pleine ensuite) : la caisse n'en voit rien
+        if math.hypot(a_long, a_lat) > 2.0 * G:
+            a_long = a_lat = 0.0
+        roll_t = soft_limit(c["roll_per_g"] * (a_lat / G + driver(1, t, speed)), c["roll_max"])
+        pitch_t = soft_limit(c["pitch_per_g"] * (a_long / G + driver(0, t, speed)), c["pitch_max"])
+        if roll is None:
+            roll, pitch = roll_t, pitch_t
+        # les mains au volant : un premier ordre (le retard du conducteur), la vitesse de braquage bornée (STEER_RATE)
+        # et, presque à l'arrêt, les roues qui restent où elles sont (une voiture arrêtée ne redresse pas ses roues)
+        if steer_s is None:
+            steer_s = steer
+        else:
+            grip = smoothstep(0.3, 2.5, speed)
+            d = (steer - steer_s) * min(1.0, dt / c["steer_lag"]) * grip
+            steer_s += max(-STEER_RATE * dt, min(STEER_RATE * dt, d))
+        # la caisse sur ses ressorts : l'accélération rappelle vers la cible, l'amortisseur freine sa vitesse
+        vr += (wr * wr * (roll_t - roll) - 2 * c["roll_zeta"] * wr * vr) * dt
+        roll += vr * dt
+        vp += (ww * ww * (pitch_t - pitch) - 2 * c["pitch_zeta"] * ww * vp) * dt
+        pitch += vp * dt
+        # les coins : chacun suit son sol (relief, ressauts, grain), l'amortisseur sur la vitesse relative ; les
+        # roues, elles, restent sur le sol vrai : ce qui compte est l'écart de la caisse à ce sol
+        u, g = inputs[n], grounds[n]
+        if n:
+            for i in range(len(u)):
+                du = (u[i] - inputs[n - 1][i]) / dt
+                vc[i] += (wc * wc * (u[i] - zc[i]) + 2 * c["corner_zeta"] * wc * (du - vc[i])) * dt
+                zc[i] += vc[i] * dt
+        if k in want:
+            by_k[k] = (roll, pitch, [zc[i] - g[i] for i in range(len(u))], steer_s)
+    for ps in poses:
+        k = round(ps["t"] / dt)
+        roll_i, pitch_i, rel, ps["steer"] = by_k[k]
+        mean = lambda idx: sum(rel[i] for i in idx) / max(1, len(idx))  # noqa: E731
+        roll_c = math.degrees(math.atan2(mean(left) - mean(right), track)) if left and right else 0.0
+        pitch_c = math.degrees(math.atan2(mean(frt) - mean(rear), wb)) if frt and rear else 0.0
+        # à l'accélération, l'arrière s'écrase et la caisse se tasse ; au freinage l'avant plonge, l'arrière se lève
+        heave = sum(rel) / len(rel) - c["squat"] * max(0.0, pitch_i)
+        ps["roll"] = soft_limit(roll_i + roll_c, c["roll_max"] + 0.5, 0.85)
+        ps["pitch"] = soft_limit(pitch_i + pitch_c, c["pitch_max"] + 0.5, 0.85)
+        ps["heave"] = max(-c["heave_down"], min(c["heave_up"], heave))
+        # les roues dans leurs passages : la caisse ne descend jamais sur un pneu de plus que 80 % de son jeu. Elle se
+        # soulève d'abord (le centre de tangage avance vers la roue chargée, la caisse se lève sur ses roues
+        # délestées : l'anti-plongée et le cabrage d'un essieu arrière brisé), sans détendre aucun ressort de plus
+        # que `ext` ; ce qui reste au-delà est réduit en douceur.
+        fit_arches(ps, corners, [0.8 * a for a in arch_of(c, corners)], c["ext"])
+    poses.meta = dict(meta, chassis=kind, corners=corners)
+    return poses
+
+
+def arch_of(c, corners):
+    """Le jeu de chaque coin (m) : c["arch"], un nombre ou (avant, arrière)."""
+    a = c["arch"]
+    if not isinstance(a, (tuple, list)):
+        return [a] * len(corners)
+    fy = max(q[1] for q in corners)
+    return [a[0] if q[1] > fy - 0.5 else a[1] for q in corners]
+
+
+def fit_arches(ps, corners, lims, ext):
+    """Garde chaque coin au-dessus de son pneu : la descente d'un coin (corner_dz) ne passe jamais `lims` (m), par
+    une épaule douce à partir de 70 %. La caisse se soulève d'abord (sans détendre un ressort de plus que `ext`),
+    puis roulis et tangage se réduisent s'il le faut. Modifie la pose."""
+    def soft(comp, lim):
+        k0 = 0.7 * lim
+        return comp if comp <= k0 else k0 + (lim - k0) * math.tanh((comp - k0) / (lim - k0))
+    dz = corner_dz(ps, corners)
+    bound = [soft(-d, lim) for d, lim in zip(dz, lims)]
+    need = max(-d - b for d, b in zip(dz, bound))
+    if need <= 1e-12:
+        return
+    ps["heave"] += min(need, max(0.0, ext - max(dz)))
+    dz = corner_dz(ps, corners)
+    keep = 1.0
+    for d, b in zip(dz, bound):
+        tilt = d - ps["heave"]
+        if -d > b + 1e-12 and tilt < 0.0:
+            keep = min(keep, max(0.0, (-b - ps["heave"]) / tilt))
+    if keep < 1.0:
+        ps["roll"] *= keep
+        ps["pitch"] *= keep
+
+
+def _sample_legacy(pos, frames=range(0, 30), slip=None, heading=None, wheel_r=0.33, wheelbase=2.9, front=None,
+                   f0=F0, fps=FPS, noise=1.0, seed=0.0, warmup=0.6, roll_per_g=ROLL_PER_G, pitch_per_g=PITCH_PER_G):
+    """Les poses d'un véhicule image par image (les clés d'avant la dynamique, FILM3D_DYN=0).
 
     pos(t) -> (x, y) : la trajectoire du centre de la caisse, au sol.
     slip(t) -> degrés : la caisse par rapport à sa route (cap de la caisse - cap de la route ; une glisse à droite
@@ -302,8 +628,54 @@ def spin_steps(d_spin, limit=SPIN_STEP):
     return max(1, math.ceil(abs(d_spin) / limit))
 
 
-def key_vehicle(root, poses, wheels=(), ground=None, pivot=(0.0, 0.0, 0.5), body=None):
+def chassis_kind(root, body):
+    """Le réglage de caisse d'un véhicule (CHASSIS) : la propriété « chassis » du rig ou de la caisse si elle est
+    posée, sinon son nom (fourgon, patrouille, sinon la berline), sinon sa hauteur."""
+    for ob in (root, body):
+        k = ob.get("chassis") if ob is not None else None
+        if k in CHASSIS:
+            return k
+    names = " ".join(str(n).lower() for n in (root.name, getattr(body, "name", ""), root.get("body", "")))
+    if any(k in names for k in ("van", "fourgon")):
+        return "van"
+    if any(k in names for k in ("patrol", "police", "patrouille")):
+        return "patrol"
+    if root.get("height", 0.0) > 1.9:
+        return "van"
+    return "hero"
+
+
+# les véhicules clés de la scène en cours, pour la caméra (camera_operator : la secousse d'un passage proche) :
+# {(scène, rig): {image: (x, y, z)}}
+TRACKS = {}
+
+
+def _register(root, poses, ground):
+    try:
+        import bpy
+        sc = bpy.context.scene.name
+    except Exception:
+        sc = ""
+    TRACKS[(sc, root.name)] = {ps["frame"]: (ps["x"], ps["y"], (ground(ps["x"], ps["y"])[0] if ground else 0.0) + 0.7)
+                               for ps in poses}
+
+
+def scene_tracks():
+    """Les trajectoires des véhicules clés dans la scène en cours : [{image: (x, y, z)}]."""
+    try:
+        import bpy
+        sc = bpy.context.scene.name
+    except Exception:
+        sc = ""
+    return [v for (s, _n), v in TRACKS.items() if s == sc]
+
+
+def key_vehicle(root, poses, wheels=(), ground=None, pivot=(0.0, 0.0, 0.5), body=None, joints=None, chassis=None):
     """Pose les clés d'un véhicule déjà construit (un rig de lieux : root, son enfant body["body"]).
+
+    Dynamique active (dyn_on) : la caisse est refaite (rebody) avec le réglage du véhicule (`chassis`, sinon
+    chassis_kind), le relief de `ground` sous ses quatre roues et les ressauts `joints` ([((x0, y0), (x1, y1), h)],
+    en travers de la route, repère du monde) ; position, cap, roues et braquage inchangés.
 
     Le rig porte la position, le cap et la pente du sol (`ground(x, y)` -> (z, pente en degrés), plat par défaut) ;
     la caisse (body) porte le roulis, le tangage et le pompage autour de `pivot` (repère du rig, m) ; les roues
@@ -335,6 +707,19 @@ def key_vehicle(root, poses, wheels=(), ground=None, pivot=(0.0, 0.0, 0.5), body
         info.append((w, p_b, p_b.dot(fwd_b) > 0.0))
         w.rotation_mode = "XYZ"
     c = Vector(pivot)
+    if dyn_on() and getattr(poses, "hist", None):
+        kind = chassis or chassis_kind(root, body)
+        corners = None
+        if len(info) >= 4:
+            # les roues dans le repère du rig (x à droite, y vers l'avant), depuis le pivot
+            corners = [((B0 @ p_b).x - c.x, (B0 @ p_b).y - c.y) for _w, p_b, _f in info]
+        poses = rebody(poses, kind, ground=ground, corners=corners, joints=joints)
+        r = [abs(p["roll"]) for p in poses]
+        q = [p["pitch"] for p in poses]
+        print(f"[motion] {root.name} ({kind}) : roulis jusqu'à {max(r):.1f}°, tangage {min(q):+.1f} à {max(q):+.1f}°, "
+              f"pompage {min(p['heave'] for p in poses) * 100:+.1f} à {max(p['heave'] for p in poses) * 100:+.1f} cm, "
+              f"braquage {min(p['steer'] for p in poses):+.1f} à {max(p['steer'] for p in poses):+.1f}°", flush=True)
+    _register(root, poses, ground)
     prev_b, prev_w, prev_ps = None, {}, None
     for ps in poses:
         f = ps["frame"]
