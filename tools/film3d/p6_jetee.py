@@ -123,15 +123,17 @@ def column_pos(i):
     return lambda t: route(column_s(i, t), 2 * LANE * lane)
 
 
-# --- la patrouille 1 (celle d'OUV, toujours à gauche de la berline) : voie de gauche, de 14 m derrière elle à
-# l'image 1 à 6 m à l'image 30 (rampe en cosinus : 8 m/s de plus qu'elle au plus), puis tenue ; au bord gauche du
-# cadre à partir de l'image 20, rampe en amorce
-P1_GAP0, P1_GAP1, P1_FRAME = 14.0, 6.0, 30
+# --- la patrouille 1 (celle d'OUV, toujours à gauche de la berline) : voie de gauche, 1,6 m d'air entre les
+# flancs ; elle roule 4 m/s plus vite qu'elle tout le plan (134 km/h, sans à-coup), de 6,5 m derrière (centre à
+# centre, son nez au coffre de la berline) à 3,3 m devant. Écart à la fiche (le nez au coffre vers l'image 30) : à
+# 24 mm, la caméra 7 à 8 m derrière la berline dans son axe ne voit la voie de gauche qu'à 6 m devant elle au moins
+# (22,9° de demi-champ, 2,55 m jusqu'à son flanc) ; son nez entre au bord gauche à l'image 20, la rampe vers 40
+P1_GAP0, P1_DV = 6.5, 4.0
 
 
 def p1_gap(t):
-    u = M.smoothstep(0.0, M.t_of(P1_FRAME), t)
-    return P1_GAP0 + (P1_GAP1 - P1_GAP0) * u
+    """Le retard de la patrouille 1 sur la berline (centre à centre, m) ; négatif : elle est devant."""
+    return P1_GAP0 - P1_DV * t
 
 
 def patrol1_pos(t):
@@ -141,9 +143,10 @@ def patrol1_pos(t):
 # --- les hélicoptères : devant la berline, faisceaux tournés vers l'arrière et le bas, sur elle ; (x monde, y
 # devant elle, hauteur) à l'image 1. Plus loin devant que la fiche (+16, +24, +38 m) : à +16 m, le premier sort du
 # cadre par la gauche, et la caméra montée reportait les autres vers 85 % de la hauteur ; à +30, +40 et +55 m, 71 à
-# 83 %. En x, ils s'étagent dans le cadre (14, 35 et 56 % de la largeur : la caméra regarde à droite de l'axe de la
-# jetée). Ils descendent de 2 à 2,5 m pendant la montée de la caméra (vers la pointe, où FIN en pose un à 8 m)
-HELIS = [(77.5, 30.0, 8.0), (92.0, 40.0, 9.5), (85.0, 55.0, 12.0)]
+# 83 %. En x, ils s'étagent à 33, 77 et 58 % de la largeur, à 12 points au moins du phare (46 %), et laissent passer
+# les avions à 15 m au moins. Ils descendent de 2 à 2,5 m
+# pendant la montée de la caméra (vers la pointe, où FIN en pose un à 8 m)
+HELIS = [(77.0, 30.0, 8.0), (92.0, 40.0, 9.5), (86.0, 55.0, 12.0)]
 HELI_DROP = [2.0, 2.0, 2.5]
 
 
@@ -165,15 +168,19 @@ def beam_target(t):
     return x, y + 2.0, 0.6
 
 
-# --- les avions : de derrière la caméra (venus du port), au-dessus de la caméra vers l'image 24, au-dessus de la
-# pointe vers 44 (210 m/s) ; puis ils s'écartent (cap ±25°) et montent de 6 m au-dessus de la mer. (x, z, cap de
-# sortie.) Écart à la fiche (24 et 28 m, x 70 et 90, « entrent par le haut du cadre ») : par le haut, ils passaient
-# à 120-140 % de la hauteur, et rien ne doit dépasser 88 % ; plus bas et plus écartés, ils rasent l'eau de part et
-# d'autre de la jetée et entrent par les bords, le droit à l'image 30 (85 %), le gauche à 36 (85 %)
-JETS = [(64.75, 20.0, 25.0), (106.75, 14.0, -25.0)]
+# --- les avions, l'événement du plan (la fiche) : de derrière la caméra (venus du port), au-dessus d'elle à
+# l'image 18 ; ils entrent grands par le haut du cadre vers l'image 25 (au-dessus de 88 % pendant 6 et 5 images,
+# AIR_ENTRY au plus : la tolérance de P6 dans test_motion.CAM_LIMITS_PLAN), puis filent vers la pointe en
+# rapetissant, sous 88 % ; au-dessus d'elle à l'image 42 (210 m/s), ils s'écartent (cap ±25°) et montent de 6 m
+# au-dessus de la mer. (x, z, cap de sortie.) Écarts à la fiche : au-dessus de la caméra à l'image 18 et non 24 :
+# à 24 mm et site -8°, un avion à 22 m de haut n'entre dans le cadre que 25 m devant elle, 0,2 s après l'avoir
+# passée (à l'image 25, on ne les voyait qu'à 30) ; un peu plus bas et plus écartés (24 et 28 m, x 70 et 90 dans la
+# fiche) : à 28 m, le second restait 12 images en haut du cadre ; ils passent à 15 m au moins des hélicoptères
+JETS = [(72.0, 22.0, 25.0), (95.0, 24.0, -25.0)]
 JET_V = 210.0
-JET_OVER_CAM, JET_TURN = 24, 44
+JET_OVER_CAM, JET_TURN = 18, 42
 JET_CLIMB = 6.0
+AIR_ENTRY = 8
 
 
 def jet(i):
@@ -199,23 +206,23 @@ def jet(i):
     return fn
 
 
-# --- la caméra v3 : de dos, sur sa voie, 1,0 m à gauche de la berline (x 80,75), 24 mm. Image 1 : 7,0 m derrière,
+# --- la caméra v3 : de dos, dans l'axe de la berline (x 81,75), 24 mm : la lanterne du phare juste au-dessus de
+# son toit, un peu à gauche du centre, tout le plan ; elle fonce dessus. Image 1 : 7,0 m derrière,
 # 1,6 m (au ras du toit : le phare reste au-dessus de lui), site -8°. Puis la grue lente : 3,6 m et 8,0 m derrière à
 # l'image 60, site -21°. Écarts à la fiche (grue de 28 à 60, site -16°) : 2 m de grue en 32 images demandent
 # 4,5 m/s² au moins (plafond 3) ; la grue part donc à l'image 10 (rampe en cosinus sur 50 images : 2,0 m/s et
 # 3,0 m/s² au plus), le recul de 1 m avec elle (1,0 m/s). Le site va de -8° à -21° sur tout le plan, en trapèze
 # (6,6°/s au plus, fiche 7) : à -16° la caméra montée laissait la berline à 58 % de la hauteur depuis le haut,
-# ici 53 % puis 52 % (fiche 52 puis 50). Le phare (75 ; 458,3) tombe à x 22-30 %, y 64 % depuis le bas à l'image 1 :
-# la caméra 1 m à gauche de la berline ne le met pas au-dessus de son toit (il y faudrait x 82)
-CAM_DX = -1.0
+# ici 53 % puis 52 % (fiche 52 puis 50). Écart à la fiche (1 m à gauche) : de là, le phare (75 ; 458,3) tombait à
+# x 22-30 % de la largeur, loin du toit ; dans l'axe, il est à x 44-46 %
+CAM_DX = 0.0
 CAM_BACK0, CAM_BACK1 = 7.0, 8.0
 CAM_Z0, CAM_Z1 = 1.6, 3.6
 SITE0, SITE1 = -8.0, -21.0
-YAW_TRIM = 3.0                      # (visée sur son centre, sa boîte tombait à 57 % : on la voit de trois quarts)
 CRANE_F0 = 10
 LENS = 24.0
 SHAKE_BASE = 0.12                   # degrés, à 24 mm
-SHAKE_JETS = 0.30                   # au passage des avions, images 26 à 34
+SHAKE_JETS = 0.30                   # au passage des avions, images 16 à 28
 
 
 def ramp_cos(t, t0, t1):
@@ -253,14 +260,15 @@ def camera_rail(t):
     z = CAM_Z0 + (CAM_Z1 - CAM_Z0) * c
     x, y = hx + CAM_DX, hy - back
     site = SITE0 + (SITE1 - SITE0) * ease_trap(t, 0.0, T_END, 0.5)
-    # le lacet qui garde la boîte de la berline au centre du cadre (visée sur elle, plus YAW_TRIM)
-    yaw = math.degrees(math.atan2(-(hx - x), -(hy - y))) + YAW_TRIM
+    # le lacet qui garde la berline au centre du cadre (visée sur elle)
+    yaw = math.degrees(math.atan2(-(hx - x), -(hy - y)))
     return x, y, z, yaw, site, 0.0, LENS
 
 
 def jet_noise(t):
-    """Le souffle des avions : une bosse sur les images 26 à 34 (0 à 1)."""
-    return M.smoothstep(M.t_of(24), M.t_of(28), t) * (1.0 - M.smoothstep(M.t_of(32), M.t_of(36), t))
+    """Le souffle des avions, qui passent au-dessus de la caméra à l'image 18 : une bosse sur les images 16 à 28
+    (0 à 1), à plein de 20 à 24."""
+    return M.smoothstep(M.t_of(16), M.t_of(20), t) * (1.0 - M.smoothstep(M.t_of(24), M.t_of(28), t))
 
 
 def camera(t):

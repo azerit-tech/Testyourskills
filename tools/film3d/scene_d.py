@@ -1071,7 +1071,9 @@ def p6_foreground(hidden):
 # la lanterne de y 325 à 385, celle de droite à 3° ; les trois derniers de gauche sont retirés, les trois derniers de
 # droite et celui de la pointe baissés (tête à 8 au lieu de 40, sous la lanterne à 30 ; spot à moitié)
 P6_LAMPS_FAR = (7, 8, 9)                 # J_LAMPS[7:] : y 325, 355, 385
-P6_PHARE_PHASE, P6_PHARE_VITESSE = 113.0, 6.0
+# les pinceaux du phare, gelés en travers de l'axe : vue du phare, la caméra est à 271,7° (image 1) puis 272,7°
+# depuis +x ; à 90° de là, ils restent à 220 m d'elle au plus près, deux traits fins de part et d'autre de la lanterne
+P6_PHARE_PHASE, P6_PHARE_VITESSE = 272.2 + 90.0, 0.0
 
 
 def p6_phare_clear(scene):
@@ -1110,8 +1112,9 @@ def p6_phare_clear(scene):
 
 def plan_P6(scene, hidden, palier="socle"):
     """P6, toute la ville, animé (60 images, p6_jetee.py ; découpage v3) : de dos, la caméra roule 7 m derrière la
-    berline, 1 m à sa gauche, à 1,6 m, 24 mm, puis monte lentement à 3,6 m et 8 m derrière. La berline sur la
-    jetée à 120 km/h, la pointe et le phare droit devant ; la patrouille 1 qui remonte par la voie de gauche ;
+    berline, dans son axe, à 1,6 m, 24 mm, puis monte lentement à 3,6 m et 8 m derrière. La berline sur la jetée à
+    120 km/h, droit sur la pointe et le phare, juste au-dessus de son toit ; la patrouille 1 qui remonte à sa
+    hauteur par la voie de gauche ;
     derrière, la colonne, rampes clignotantes ; trois hélicoptères devant elle, faisceaux tournés vers l'arrière et
     le bas sur elle ; deux avions qui arrivent de derrière nous, passent au-dessus de tout et s'écartent au-dessus
     de la pointe (ils ne tirent rien) ; la caméra tremble à leur passage."""
@@ -1120,11 +1123,10 @@ def plan_P6(scene, hidden, palier="socle"):
     lamp_src = L.panorama(scene, hidden, all_lit=True, bridge="loin", port="loin", haubans=(palier in ("haubans", "complet")))
     build_jetty(hidden, lamp_src)
     build_pointe(hidden, lamp_src, far=True, marina=(palier in ("marina", "complet")))
-    # le phare (lieux.panorama) : ses pinceaux, relevés de 1° seulement, vus de la jetée sous la lanterne, barrent
-    # toujours le cadre d'un bord à l'autre en passant par elle ; près de l'axe de la jetée, la barre penche (de 64 à
-    # 72 % de la hauteur, puis de 83 à 89 %) ; de travers, elle s'aplatissait sur l'horizon (à 20°/s, image 60). Donc
-    # lents, 6°/s : de 113° à 128° depuis +x sur le plan, l'autre de 293° à 308°, à 22° puis 36° de l'objectif (vu
-    # du phare, la caméra est à 272°)
+    # le phare (lieux.panorama) : ses pinceaux, relevés de 1° seulement et vus de la jetée sous la lanterne, barrent
+    # toujours le cadre en passant par elle. Ceux qui tournent passent tôt ou tard près de l'objectif, et l'un deux
+    # devient une large bande blanche en travers du cadre (rendus e3 et e4) ; aucune phase ne l'évite de la jetée.
+    # Ils sont donc gelés en travers de l'axe, au plus loin de la caméra (P6_PHARE_PHASE)
     L.phare_tourne(bpy.data.objects["phare"], phase=P6_PHARE_PHASE, vitesse=P6_PHARE_VITESSE)
     scene.frame_start, scene.frame_end = P6.F0, P6.F0 + P6.FRAMES - 1
     frames = range(P6.F0 - 1, P6.F0 + P6.FRAMES + 1)      # une image de part et d'autre : l'obturateur du flou
@@ -1162,9 +1164,14 @@ def plan_P6(scene, hidden, palier="socle"):
     for i, r in enumerate(hs):
         M.key_object(r, frames, P6.heli(i))
     scene.frame_set(P6.STILL_FRAME)
-    # vus de face au ras du sol : 150 kW et 6° (400 kW et 9° pour la grue à 35 m), sinon leur nappe sur l'enrobé
-    # mouillé blanchissait toute la moitié basse ; ils restent lisibles dans la brume
-    aim_helis(hs, P6.beam_target(P6.T_STILL), energy=150000.0, cone=6.0)
+    # vus de face au ras du sol : à 150 kW et 6°, leur nappe sur l'enrobé mouillé faisait un aplat blanc brûlé
+    # autour et devant la berline (rendu e4, images 30 et 60) ; à 50 kW et 4°, une tache contenue devant elle. Une
+    # source de 1,5 m adoucit les ombres de la berline jetées vers la caméra (bords déchiquetés par les flaques)
+    aim_helis(hs, P6.beam_target(P6.T_STILL), energy=50000.0, cone=4.0)
+    for r in hs:
+        for o in r.children_recursive:
+            if o.type == "LIGHT" and o.name.endswith("searchlight_spot"):
+                o.data.shadow_soft_size = 1.5
     for r in hs:
         piv = next(o for o in r.children_recursive if o.name.endswith("searchlight_pivot"))
         M.key_searchlight({"searchlight_pivot": piv}, frames, P6.beam_target)
