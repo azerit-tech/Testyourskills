@@ -9,17 +9,62 @@ import motion as M  # noqa: E402
 FRAMES = range(0, 30)
 FAIL = []
 
-# Les plafonds des caméras, plan par plan (motion.shot_metrics, colonne « finale » : les clés, tremblés et
-# opérateur compris, lacet et site moyennés sur cinq images). None : pas de contrôle. Un nombre vaut pour les neuf
-# plans ; CAM_LIMITS_PLAN les remplace plan par plan, par exemple {"P5": dict(pan=60.0, behind=0.5)}.
-CAM_PAN_MAX = None       # °/s : le lacet, d'une image à la suivante
-CAM_TILT_MAX = None      # °/s : le site
-CAM_VREL_MAX = None      # m/s : la caméra par rapport à la berline
-CAM_AREL_MAX = None      # m/s² : son accélération par rapport à la berline
-CAM_BEHIND_MIN = None    # part des images (0 à 1) où la caméra est derrière la berline (demi-espace arrière du cap)
-CAM_LIMITS_PLAN = {}
+# Les plafonds des caméras du découpage v3 (docs/cinematique-decoupage-v3.md, 2.4 et 6), mesurés par
+# python3 tools/film3d/motion.py mesure --v3 sur la caméra sans tremblé (camera_rail), en différences centrées
+# sur trois images. Ils ne s'appliquent qu'aux plans qui portent V3 = True. None : pas de contrôle.
+CAM_PAN_MAX = 40.0      # °/s, panoramique, focales de 28 mm et moins (0,8 largeur de cadre par seconde)
+CAM_TILT_MAX = 12.0     # °/s, bascule
+CAM_VREL_MAX = 3.0      # m/s, variation de l'écart caméra-berline (caméras qui roulent avec elle)
+CAM_AREL_MAX = 4.0      # m/s², accélération de la caméra par rapport à la berline
+CAM_BEHIND_MIN = 0.80   # part des images derrière (60° ou moins de l'arrière de sa route)
+CAM_ORBIT_MAX, CAM_ORBIT_ACC_MAX = 30.0, 40.0   # °/s, °/s² d'azimut autour de la berline (plans à orbite)
+CAM_LIMITS_PLAN = {
+    "P1": {"front_max": 0.0},                                 # jamais de face (2.2)
+    "P2": {"pan": 41.0, "behind": 0.67},                     # 21 mm, le virage de 30 m
+    "P4": {"pan": 4.6, "vrel": None, "arel": None, "behind": 0.0,   # fixe, 200 mm, de face
+           "zoom": True, "low_center": (0.52, 0.56), "low_all": True, "width_min": 0.17},
+    "P5": {"pan": 75.0, "pan_frames": 16, "pan_acc": 3.0, "behind": 0.67},   # le seul mouvement vif du film
+    "FIN6": {"behind": 0.0, "orbit": CAM_ORBIT_MAX},         # orbite, berline arrêtée (30°/s)
+}
+# les autres plafonds de 2.4
+CAM_PAN_LENS = 28.0          # mm : au-delà, CAM_PAN_MAX × 24 / focale
+CAM_PAN_ACC_MAX = 1.2        # largeurs de cadre par s² (55°/s² à 24 mm)
+CAM_TILT_ACC_MAX = 25.0      # °/s²
+CAM_ROLL_MAX, CAM_ROLL_RATE_MAX = 3.0, 6.0      # °, °/s
+CAM_ACCEL_MAX = 8.0          # m/s², accélération propre de la caméra
+CAM_CRANE_MAX, CAM_CRANE_ACC_MAX = 2.5, 3.0     # m/s, m/s² (vitesse verticale)
+CAM_ZOOM_RATE_MAX, CAM_ZOOM_TOTAL_MAX = 0.04, 0.10   # par seconde, sur le plan (seul P4 zoome)
+# le cadre (section 6, points 5 et 8) : les bandes de l'habillage en % depuis le bas ; les centres (règle des
+# plans bas, coupes) dans la convention des fiches, depuis le haut (CAM_Y_FROM_TOP)
+CAM_BAND = (15.0, 88.0)      # % depuis le bas : la boîte de la berline dedans…
+CAM_BAND_SHARE = 0.90        # … sur cette part des images
+CAM_LOW_Z = 1.0              # m : caméra basse
+CAM_LOW_CENTER = (0.50, 0.62)        # centre de la berline en hauteur, caméra basse
+CAM_Y_FROM_TOP = True
+CAM_WIDTH_MIN, CAM_WIDTH_SHARE = 0.30, 2.0 / 3.0
+CAM_AIR_TOP = 88.0           # % depuis le bas : hélicoptères et avions dessous
+CAM_PHARE_X, CAM_PHARE_Y = (5.0, 95.0), (15.0, 88.0)
+CAM_GAP_MIN, CAM_CAM_GAP_MIN = 1.5, 0.8          # m entre caisses ; m de la caméra aux véhicules et poteaux
+CAM_CUT_DX, CAM_CUT_DY, CAM_CUT_RATIO = 8.0, 6.0, (0.75, 1.33)
+CAM_FILM_SIX = (0.60, 0.25)  # film à six étoiles : derrière au moins, de face au plus
+CAM_FILM_ONE = 0.85          # film à une étoile : derrière au moins
 CAM_VIB_TOL = 1.0        # °/s : ce que la vibration, les ressauts et les secousses de passage de l'opérateur
-                         # ajoutent au plus aux vitesses de la colonne « finale »
+                         # ajoutent au plus aux vitesses de la colonne « finale » de motion.py mesure
+
+
+def v3_limits():
+    """(plafonds communs, plafonds par plan) pour motion.v3_report."""
+    base = dict(pan=CAM_PAN_MAX, pan_lens=CAM_PAN_LENS, pan_acc=CAM_PAN_ACC_MAX, tilt=CAM_TILT_MAX,
+                tilt_acc=CAM_TILT_ACC_MAX, roll=CAM_ROLL_MAX, roll_rate=CAM_ROLL_RATE_MAX, vrel=CAM_VREL_MAX,
+                arel=CAM_AREL_MAX, accel=CAM_ACCEL_MAX, crane=CAM_CRANE_MAX, crane_acc=CAM_CRANE_ACC_MAX,
+                orbit=None, orbit_acc=CAM_ORBIT_ACC_MAX, zoom=False, zoom_rate=CAM_ZOOM_RATE_MAX,
+                zoom_total=CAM_ZOOM_TOTAL_MAX, behind=CAM_BEHIND_MIN, front_max=None, band=CAM_BAND,
+                band_share=CAM_BAND_SHARE, low_z=CAM_LOW_Z, low_center=CAM_LOW_CENTER, low_all=False,
+                y_from_top=CAM_Y_FROM_TOP, width_min=CAM_WIDTH_MIN, width_share=CAM_WIDTH_SHARE,
+                air_top=CAM_AIR_TOP, phare_x=CAM_PHARE_X, phare_y=CAM_PHARE_Y, gap=CAM_GAP_MIN,
+                cam_gap=CAM_CAM_GAP_MIN, cut_dx=CAM_CUT_DX, cut_dy=CAM_CUT_DY, cut_ratio=CAM_CUT_RATIO,
+                film_six=CAM_FILM_SIX, film_one=CAM_FILM_ONE)
+    return base, CAM_LIMITS_PLAN
 
 
 def check(name, ok, detail=""):
@@ -803,7 +848,7 @@ def test_operator():
 def test_camera_measure():
     """La mesure des caméras des neuf plans (sans Blender) : chaque plan mesuré ; la vibration de l'opérateur ne
     compte pas comme un mouvement (avec et sans vibration, ressauts ni secousses, les vitesses de la colonne
-    « finale » diffèrent de moins de CAM_VIB_TOL) ; les plafonds de tête de fichier, plan par plan."""
+    « finale » diffèrent de moins de CAM_VIB_TOL)."""
     res = M.measure_shots()
     check("caméras : les neuf plans mesurés", list(res) == list(M.PLANS)
           and all(m["debut"] and m["fin"] for m in res.values()), ", ".join(res))
@@ -813,16 +858,26 @@ def test_camera_measure():
                      for p in res for k in ("pan", "tilt")))
         check("caméras : la vibration ne compte pas dans les vitesses", worst[0] <= CAM_VIB_TOL,
               f"au plus {worst[0]:.2f}°/s ({worst[1]}, {worst[2]}) ; image à image, sans moyenne : {worst[3]:+.2f}°/s")
-    lim = dict(pan=CAM_PAN_MAX, tilt=CAM_TILT_MAX, v_rel=CAM_VREL_MAX, a_rel=CAM_AREL_MAX, behind=CAM_BEHIND_MIN)
-    for p, m in res.items():
-        L = dict(lim, **CAM_LIMITS_PLAN.get(p, {}))
-        for k, unit in (("pan", "°/s"), ("tilt", "°/s"), ("v_rel", "m/s"), ("a_rel", "m/s²")):
-            if L[k] is not None:
-                v = m["finale"][k]
-                check(f"caméra {p} : {k} ≤ {L[k]} {unit}", v <= L[k], f"{v:.1f} {unit} à l'image {m['finale'][k + '_at']}")
-        if L["behind"] is not None:
-            check(f"caméra {p} : derrière la berline ≥ {L['behind'] * 100:.0f} %", m["derriere"] >= L["behind"],
-                  f"{m['derriere'] * 100:.0f} % des images")
+
+
+def test_v3():
+    """Le découpage v3 (section 6) sur les plans qui portent V3 = True : durées, derrière, vitesses, cadre, phare,
+    écarts, hauts de cadre, raccords du tableau 5 entre deux plans migrés, films entiers. Les plans v2 ne sont que
+    mesurés (python3 tools/film3d/motion.py mesure --v3)."""
+    base, per_plan = v3_limits()
+    rep = M.v3_report(base, per_plan)
+    v3 = [p for p, (on, _) in rep["plans"].items() if on]
+    check("v3 : plans migrés", True, ", ".join(v3) if v3 else "aucun encore")
+    for p, (on, checks) in rep["plans"].items():
+        if on:
+            for name, ok, detail in checks:
+                check(f"v3 {p} : {name}", ok, detail)
+    for a, b, fa, fb, ma, mb, ta, tb, chk in rep["cuts"]:
+        if chk is not None:
+            check(f"v3 coupe {a} → {b} : |Δx| ≤ {CAM_CUT_DX:g}, |Δy| ≤ {CAM_CUT_DY:g}"
+                  + ("" if (a, b) in M.CUT_XY_ONLY else ", largeurs ×0,75 à ×1,33"), chk[0], chk[1])
+    for name, ok, detail in rep["films"]:
+        check(f"v3 {name}", ok, detail)
 
 
 if __name__ == "__main__":
@@ -849,5 +904,6 @@ if __name__ == "__main__":
     test_aircraft()
     test_operator()
     test_camera_measure()
+    test_v3()
     print(f"\n{'tout passe' if not FAIL else str(len(FAIL)) + ' échec(s)'}")
     sys.exit(1 if FAIL else 0)

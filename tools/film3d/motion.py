@@ -1189,11 +1189,12 @@ def hero_screen(cam, x, y, z, heading, box=HERO_BOX):
 
 
 def shot_metrics(cam, hero, frames, heading=None, slip=None, ground=None, tracks=(), seed=0.0, rest=0.0,
-                 box=HERO_BOX, f0=F0, fps=FPS, op=None):
+                 box=HERO_BOX, f0=F0, fps=FPS, op=None, rail=None, **_):
     """Les mesures d'un plan (voir plus haut). cam(t) -> (x, y, z, lacet, site, roulis, focale) comme la scène la
     passe à key_camera ; hero(t) -> (x, y) ; son cap : heading(t), sinon celui de sa marche plus slip(t) (rest à
     l'arrêt) ; ground(x, y) -> (z, …) le sol sous elle ; tracks : les pos(t) des véhicules (secousses de passage).
-    frames : les images rendues ; op : des réglages de l'opérateur (OPERATOR) à changer pour la mesure.
+    frames : les images rendues ; op : des réglages de l'opérateur (OPERATOR) à changer pour la mesure ; rail : la
+    caméra sans tremblé du plan (camera_rail), la colonne « lissée » (sinon cam, motion.handheld coupé).
     Rend {"lissee": {...}, "finale": {...}, "brute": {...}, "kind": ..., "derriere": ..., "debut": ..., "fin": ...}."""
     frames = list(frames)
     keyed = list(range(frames[0] - 1, frames[-1] + 2))
@@ -1211,8 +1212,11 @@ def shot_metrics(cam, hero, frames, heading=None, slip=None, ground=None, tracks
         x, y = hero(t)[:2]
         hp[f] = (x, y, ground(x, y)[0] if ground else 0.0)
         hh[f] = head(t)
-    with handheld_off():
-        smooth = {f: tuple(cam(t_of(f, f0, fps))) for f in keyed}
+    if rail is not None:
+        smooth = {f: tuple(rail(t_of(f, f0, fps))) for f in keyed}
+    else:
+        with handheld_off():
+            smooth = {f: tuple(cam(t_of(f, f0, fps))) for f in keyed}
     if dyn_on():
         trs = []
         for fn in tracks:
@@ -1292,7 +1296,9 @@ def _bridge_z(y, _cache={}):
 
 def shot_specs():
     """Les neuf plans comme leurs scènes les clés : {plan: arguments de shot_metrics} (les modules des plans, sans
-    Blender ; la caméra de P2 recopie scene_carrefour.low_camera, en repère de l'arc)."""
+    Blender). Un plan migré au découpage v3 porte V3 = True : sa caméra est camera(t), sa caméra sans tremblé
+    camera_rail(t) ; un plan v2 garde la caméra que sa scène clé (celle de P2 recopie scene_carrefour.low_camera,
+    en repère de l'arc). Chaque spec porte aussi module, v3 et named ({nom: pos(t)} des véhicules)."""
     import fin6_orbite as F6
     import fin_pointe as F
     import ouv_avenue as OUV
@@ -1318,22 +1324,23 @@ def shot_specs():
         dyaw, dpitch, droll, ddx, ddy, ddz = handheld(t, amp=0.25, rotor=0.15, seed=2.7)
         return x + ddx, y + ddy, z + ddz, yaw + dyaw, pitch + dpitch, droll, P2.LOW_LENS
 
+    def plan(mod, cam, name, **kw):
+        v3 = bool(getattr(mod, "V3", False))
+        named = dict(mod.tracks()) if hasattr(mod, "tracks") else {}
+        return dict(cam=mod.camera if v3 else cam, rail=getattr(mod, "camera_rail", None), module=mod, v3=v3,
+                    frames=rng(mod), tracks=list(named.values()), named=named, seed=seed(name), **kw)
+
     return {
-        "OUV": dict(cam=OUV.camera, hero=OUV.hero_pos, frames=rng(OUV), tracks=OUV.tracks().values(), seed=seed("cam")),
-        "P1": dict(cam=P1.camera, hero=P1.hero_pos, frames=rng(P1), tracks=P1.tracks().values(), seed=seed("cam")),
-        "P2": dict(cam=p2_cam, hero=P2.hero_pos, slip=P2.hero_slip, frames=rng(P2), tracks=P2.tracks().values(),
-                   seed=seed("cam")),
-        "P3": dict(cam=P3.camera, hero=P3.hero_pos, heading=P3.hero_heading, frames=rng(P3),
-                   tracks=P3.tracks().values(), seed=seed("cam")),
-        "P4": dict(cam=P4.camera, hero=P4.hero_pos, ground=lambda x, y: (_bridge_z(y),), frames=rng(P4),
-                   tracks=P4.tracks().values(), seed=seed("cam_P4")),
-        "P5": dict(cam=P5.camera, hero=P5.hero_pos, slip=P5.hero_slip, frames=rng(P5), tracks=P5.tracks().values(),
-                   seed=seed("cam_P5")),
-        "P6": dict(cam=P6.camera, hero=P6.hero_pos, frames=rng(P6), tracks=P6.tracks().values(), seed=seed("cam_P6")),
-        "FIN": dict(cam=F.camera, hero=F.hero_pos, heading=F.hero_heading, frames=rng(F), tracks=F.tracks().values(),
-                    seed=seed("cam_FIN")),
-        "FIN6": dict(cam=F6.camera, hero=lambda t: (F6.CX, F6.CY), heading=lambda t: F6.HERO_STOP, frames=rng(F6),
-                     seed=seed("cam_FIN6")),
+        "OUV": plan(OUV, OUV.camera, "cam", hero=OUV.hero_pos),
+        "P1": plan(P1, P1.camera, "cam", hero=P1.hero_pos),
+        "P2": plan(P2, p2_cam, "cam", hero=P2.hero_pos, slip=P2.hero_slip),
+        "P3": plan(P3, P3.camera, "cam", hero=P3.hero_pos, heading=P3.hero_heading),
+        "P4": plan(P4, P4.camera, "cam_P4", hero=P4.hero_pos, ground=lambda x, y: (_bridge_z(y),)),
+        "P5": plan(P5, P5.camera, "cam_P5", hero=P5.hero_pos, slip=P5.hero_slip),
+        "P6": plan(P6, P6.camera, "cam_P6", hero=P6.hero_pos),
+        "FIN": plan(F, F.camera, "cam_FIN", hero=F.hero_pos, heading=F.hero_heading),
+        "FIN6": plan(F6, F6.camera, "cam_FIN6", hero=getattr(F6, "hero_pos", lambda t: (F6.CX, F6.CY)),
+                     heading=getattr(F6, "hero_heading", lambda t: F6.HERO_STOP)),
     }
 
 
@@ -1368,12 +1375,537 @@ def measure_table(res):
     return "\n".join(lines)
 
 
+# ---------------------------------------------------------------- découpage v3 : les contrôles
+#
+# docs/cinematique-decoupage-v3.md, section 6 (règles en 2.2 à 2.4, coupes au tableau 5). Les plafonds sont en
+# tête de test_motion.py (v3_limits) ; seuls les plans qui portent V3 = True sont contrôlés, les autres sont
+# mesurés pour information. Vitesses sur la caméra sans tremblé (camera_rail), en différences centrées sur trois
+# images ; cadre, derrière et raccords sur les clés finales (tremblés et opérateur compris).
+#   python3 tools/film3d/motion.py mesure --v3 [PLAN…]
+
+PHARE_AT = (75.0, 458.3, 16.8)       # la lanterne du phare de la pointe (lieux.phare : 16,2 à 17,4 m)
+PHARE_WORLD = ("P4", "P5", "P6", "FIN", "FIN6")     # les scènes où il est à sa vraie place (C, D, E)
+# le tableau 3 : les images où il doit se voir (None : toutes ; () : absent du plan)
+PHARE_FRAMES = {"OUV": None, "P1": None, "P2": (30, 48), "P3": None, "P4": (), "P5": (1, 20), "P6": None,
+                "FIN": None, "FIN6": (1, 15)}
+# le tableau 5 : (sortant, entrant, berline visée à la sortie, à l'entrée : centre x, centre y, largeur en %)
+CUTS = [("OUV", "P1", (50, 54, 34), (52, 54, 44)), ("P1", "P2", (58, 54, 38), (50, 55, 40)),
+        ("P2", "P3", (52, 55, 44), (50, 48, 38)), ("P3", "P4", (50, 55, 40), (50, 56, 17)),
+        ("P4", "P5", (50, 52, 44), (50, 54, 40)), ("P5", "P6", (56, 52, 36), (50, 52, 42)),
+        ("P6", "FIN6", (50, 50, 37), (50, 54, 44)), ("P1", "FIN", (58, 54, 38), (50, 55, 44)),
+        ("P2", "FIN", (52, 55, 44), (50, 55, 44)), ("P3", "FIN", (50, 55, 40), (50, 55, 44)),
+        ("P4", "FIN", (50, 52, 44), (50, 55, 44)), ("P5", "FIN", (56, 52, 36), (50, 55, 44))]
+CUT_XY_ONLY = {("P3", "P4")}         # l'entrée de P4 à 17 % : seule entorse de taille
+FILM_SIX = ("OUV", "P1", "P2", "P3", "P4", "P5", "P6", "FIN6")
+FILM_ONE = ("OUV", "P1", "FIN")
+CAR_DIMS = {"hero": HERO_BOX, "van": (5.4, 2.0, 2.1), "patrol": (5.0, 1.95, 1.5)}
+
+
+def frame_box(cam, pose, dims=HERO_BOX):
+    """La boîte de la berline dans le cadre de cam = (x, y, z, lacet, site, roulis, focale) : (x0, x1, y0, y1, d),
+    x depuis la gauche et y depuis le bas en % (comme p5_virage.frame_box, généralisée), d la distance de
+    l'objectif au coin le plus proche ; pose : dict(x, y, heading[, z]) ; None si elle est entière derrière."""
+    h = math.radians(pose["heading"])
+    fx, fy = -math.sin(h), math.cos(h)
+    rx, ry = fy, -fx
+    l2, w2, ht = dims[0] / 2, dims[1] / 2, dims[2]
+    z0 = pose.get("z", 0.0)
+    pts = []
+    for a in (-l2, l2):
+        for b in (-w2, w2):
+            for z in (0.1, ht):
+                p = (pose["x"] + fx * a + rx * b, pose["y"] + fy * a + ry * b, z0 + z)
+                q = screen_point(cam, p)
+                if q:
+                    pts.append((100.0 * q[0], 100.0 * (1.0 - q[1]), math.dist(cam[:3], p)))
+    if not pts:
+        return None
+    return (min(q[0] for q in pts), max(q[0] for q in pts), min(q[1] for q in pts), max(q[1] for q in pts),
+            min(q[2] for q in pts))
+
+
+def _ref_heading(pose):
+    """L'axe de référence de la berline : sa vitesse ; à l'arrêt l'axe de sa caisse (mélange de 0,5 à 2 m/s)."""
+    w = smoothstep(0.5, 2.0, pose.get("speed", 0.0))
+    tr = pose.get("travel")
+    if tr is None:
+        return pose["heading"]
+    return pose["heading"] + w * (_unwrap(pose["heading"], tr) - pose["heading"])
+
+
+def behind_angle(cam, pose):
+    """L'angle en degrés entre (berline → caméra) et l'arrière de sa route (l'opposé de sa vitesse, l'axe de sa
+    caisse à l'arrêt) : 0 pile derrière, 180 pile devant. « Derrière » : 60 au plus ; « de face » : 120 au moins."""
+    h = math.radians(_ref_heading(pose))
+    dx, dy = cam[0] - pose["x"], cam[1] - pose["y"]
+    n = math.hypot(dx, dy)
+    if n < 1e-6:
+        return 0.0
+    c = (dx * math.sin(h) - dy * math.cos(h)) / n
+    return math.degrees(math.acos(max(-1.0, min(1.0, c))))
+
+
+def _rect(c, heading, dims):
+    h = math.radians(heading)
+    fx, fy = -math.sin(h), math.cos(h)
+    rx, ry = fy, -fx
+    l2, w2 = dims[0] / 2, dims[1] / 2
+    return [(c[0] + fx * a + rx * b, c[1] + fy * a + ry * b) for a, b in ((l2, w2), (l2, -w2), (-l2, -w2), (-l2, w2))]
+
+
+def _pt_seg(p, a, b):
+    ax, ay = b[0] - a[0], b[1] - a[1]
+    n = ax * ax + ay * ay
+    u = 0.0 if n < 1e-12 else max(0.0, min(1.0, ((p[0] - a[0]) * ax + (p[1] - a[1]) * ay) / n))
+    return math.hypot(p[0] - a[0] - u * ax, p[1] - a[1] - u * ay)
+
+
+def _inside(p, poly):
+    s = [((b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0])) for a, b in zip(poly, poly[1:] + poly[:1])]
+    return all(v >= 0 for v in s) or all(v <= 0 for v in s)
+
+
+def _poly_gap(A, B):
+    """L'écart entre deux rectangles au sol (négatif ou nul s'ils se touchent)."""
+    if any(_inside(p, B) for p in A) or any(_inside(p, A) for p in B):
+        return 0.0
+    return min(min(_pt_seg(p, a, b) for a, b in zip(Q, Q[1:] + Q[:1])) for P, Q in ((A, B), (B, A)) for p in P)
+
+
+def _point_gap(p, poly):
+    return 0.0 if _inside(p, poly) else min(_pt_seg(p, a, b) for a, b in zip(poly, poly[1:] + poly[:1]))
+
+
+def _dims_of(name):
+    n = name.lower()
+    return CAR_DIMS["hero"] if n in ("hero", "berline") else CAR_DIMS["van"] if ("van" in n or "fourgon" in n) \
+        else CAR_DIMS["patrol"]
+
+
+def _aircraft(mod):
+    """{nom: pos(t) -> (x, y, z)} des aéronefs du plan : mod.aircraft() si le fichier l'expose, sinon ce que
+    les plans v2 en ont (P5 : heli, P6 : heli(i), jet(i), FIN : HELI)."""
+    if hasattr(mod, "aircraft"):
+        return {k: (lambda fn: lambda t: tuple(fn(t))[:3])(fn) for k, fn in mod.aircraft().items()}
+    out = {}
+    name = mod.__name__
+    if name == "p5_virage" and hasattr(mod, "heli"):
+        out["heli"] = lambda t: (mod.heli(t)[0], mod.heli(t)[1], mod.heli(t)[2] + getattr(mod, "HELI_BODY", 0.0))
+    if name == "p6_jetee":
+        for i in range(len(getattr(mod, "HELIS", ()))):
+            out[f"heli_{i}"] = (lambda fn: lambda t: tuple(fn(t))[:3])(mod.heli(i))
+        for i in range(len(getattr(mod, "JETS", ()))):
+            out[f"jet_{i}"] = (lambda fn: lambda t: tuple(fn(t))[:3])(mod.jet(i))
+    if name == "fin_pointe" and hasattr(mod, "HELI"):
+        out["heli"] = lambda t: tuple(mod.HELI)[:3]
+    return out
+
+
+def _phare_ready():
+    """Vrai quand lieux.phare existe (lu dans lieux.py, sans Blender)."""
+    import re
+    try:
+        src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "lieux.py"), encoding="utf-8").read()
+    except OSError:
+        return False
+    return re.search(r"^def phare\(", src, re.M) is not None
+
+
+def plan_data(plan, spec, f0=F0, fps=FPS):
+    """Ce qu'un plan donne image par image : poses de la berline, caméra sans tremblé (rail) et clés finales."""
+    frames = list(spec["frames"])
+    keyed = list(range(frames[0] - 1, frames[-1] + 2))
+    hero, heading, slip, ground = spec["hero"], spec.get("heading"), spec.get("slip"), spec.get("ground")
+    poses, prev = {}, spec.get("rest", 0.0)
+    for f in keyed:
+        t = t_of(f, f0, fps)
+        x, y = hero(t)[:2]
+        (vx, vy), _ = kinematics(hero, t)
+        sp = math.hypot(vx, vy)
+        travel = heading_of(vx, vy) if sp > 1e-3 else None
+        if heading is not None:
+            body = heading(t)
+        else:
+            body = (travel if travel is not None else prev) + (slip(t) if slip else 0.0)
+        prev = body - (slip(t) if slip and heading is None else 0.0)
+        poses[f] = dict(frame=f, t=t, x=x, y=y, z=ground(x, y)[0] if ground else 0.0, heading=body,
+                        travel=travel, speed=sp)
+    cam = spec["cam"]
+    if spec.get("rail") is not None:
+        rail = {f: tuple(spec["rail"](t_of(f, f0, fps))) for f in keyed}
+    else:
+        with handheld_off():
+            rail = {f: tuple(cam(t_of(f, f0, fps))) for f in keyed}
+    if dyn_on():
+        trs = []
+        for fn in spec.get("tracks", ()):
+            tr = {}
+            for f in keyed:
+                x, y = fn(t_of(f, f0, fps))[:2]
+                tr[f] = (x, y, ground(x, y)[0] if ground else 0.0)
+            trs.append(tr)
+        final = camera_operator(cam, keyed, f0, fps, tracks=trs, seed=spec.get("seed", 0.0))
+        final.pop("kind")
+    else:
+        final = {f: tuple(cam(t_of(f, f0, fps))) for f in keyed}
+    return dict(plan=plan, frames=frames, keyed=keyed, poses=poses, rail=rail, final=final, spec=spec,
+                module=spec.get("module"), v3=spec.get("v3", False), ground=ground, fps=fps, f0=f0)
+
+
+def rail_rates(d):
+    """Les vitesses de la caméra sans tremblé, image par image (différences centrées sur trois images rendues :
+    de la deuxième à l'avant-dernière, les clés hors du plan, souvent figées, ne comptent pas) : {grandeur:
+    {image: valeur}} ; angles en °/s et °/s², distances en m/s et m/s², focale en fraction par s ; « lens » : la
+    focale de chaque image rendue."""
+    R, P, fps = d["rail"], d["poses"], d["fps"]
+    out = {k: {} for k in ("pan", "pan_acc", "tilt", "tilt_acc", "roll", "roll_rate", "vrel", "arel", "accel",
+                           "crane", "crane_acc", "orbit", "orbit_acc", "zoom_rate", "lens")}
+    yaw, az, prev_y, prev_a = {}, {}, None, None
+    for f in d["keyed"]:
+        y = R[f][3] if prev_y is None else _unwrap(prev_y, R[f][3])
+        yaw[f], prev_y = y, y
+        p = P[f]
+        a = math.degrees(math.atan2(R[f][0] - p["x"], R[f][1] - p["y"])) + _ref_heading(p)
+        a = a if prev_a is None else _unwrap(prev_a, a)
+        az[f], prev_a = a, a
+
+    def rel(f):
+        p = P[f]
+        return (R[f][0] - p["x"], R[f][1] - p["y"], R[f][2] - (p["z"] + 0.7))
+
+    for f in d["frames"]:
+        out["lens"][f] = R[f][6]
+    for f in d["frames"][1:-1]:
+        a, b = f - 1, f + 1
+        out["pan"][f] = abs(yaw[b] - yaw[a]) * fps / 2
+        out["pan_acc"][f] = abs(yaw[b] - 2 * yaw[f] + yaw[a]) * fps * fps
+        out["tilt"][f] = abs(R[b][4] - R[a][4]) * fps / 2
+        out["tilt_acc"][f] = abs(R[b][4] - 2 * R[f][4] + R[a][4]) * fps * fps
+        out["roll"][f] = abs(R[f][5])
+        out["roll_rate"][f] = abs(R[b][5] - R[a][5]) * fps / 2
+        ra, rf, rb = rel(a), rel(f), rel(b)
+        out["vrel"][f] = abs(math.hypot(*rb) - math.hypot(*ra)) * fps / 2
+        out["arel"][f] = math.sqrt(sum((rb[k] - 2 * rf[k] + ra[k]) ** 2 for k in range(3))) * fps * fps
+        out["accel"][f] = math.sqrt(sum((R[b][k] - 2 * R[f][k] + R[a][k]) ** 2 for k in range(3))) * fps * fps
+        out["crane"][f] = abs(R[b][2] - R[a][2]) * fps / 2
+        out["crane_acc"][f] = abs(R[b][2] - 2 * R[f][2] + R[a][2]) * fps * fps
+        out["orbit"][f] = abs(az[b] - az[a]) * fps / 2
+        out["orbit_acc"][f] = abs(az[b] - 2 * az[f] + az[a]) * fps * fps
+        out["zoom_rate"][f] = abs(R[b][6] - R[a][6]) * fps / 2 / R[f][6]
+    return out
+
+
+def _peak(series):
+    f = max(series, key=lambda k: series[k])
+    return series[f], f
+
+
+def _windows(frames_over):
+    runs, cur = [], []
+    for f in sorted(frames_over):
+        if cur and f != cur[-1] + 1:
+            runs.append(cur)
+            cur = []
+        cur.append(f)
+    if cur:
+        runs.append(cur)
+    return runs
+
+
+def screen_y(y_bottom, lim):
+    """Le centre en hauteur dans la convention des fiches (lim["y_from_top"] : depuis le haut, sinon le bas)."""
+    return 100.0 - y_bottom if lim.get("y_from_top", True) else y_bottom
+
+
+def box_center(b, lim):
+    """(x, y, largeur) en % d'une boîte de frame_box, y dans la convention des fiches."""
+    return (b[0] + b[1]) / 2, screen_y((b[2] + b[3]) / 2, lim), b[1] - b[0]
+
+
+def plan_checks(d, base, own):
+    """Les contrôles de la section 6 sur un plan : [(nom, tient, détail)]. base : les plafonds communs ; own :
+    ceux du plan (CAM_LIMITS_PLAN), qui remplacent les communs (None : pas de contrôle)."""
+    lim = dict(base, **own)
+    plan, frames, P, F = d["plan"], d["frames"], d["poses"], d["final"]
+    mod = d["module"]
+    out = []
+
+    def add(name, ok, detail):
+        out.append((name, bool(ok), detail))
+
+    # 1. durées
+    try:
+        import render_film as RF
+        cut, fb = RF.read_cut().get(plan), RF.FALLBACK_FRAMES.get(plan)
+        n = getattr(mod, "FRAMES", len(frames))
+        add(f"durée {n} images = cut.ts ({cut}) = FALLBACK_FRAMES ({fb})", n == cut == fb, "")
+    except ImportError as e:
+        add("durée contre cut.ts", False, f"render_film illisible ({e})")
+    # 2. derrière, de face
+    ang = {f: behind_angle(F[f], P[f]) for f in frames}
+    back = sum(a <= 60.0 for a in ang.values()) / len(frames)
+    front = sum(a >= 120.0 for a in ang.values()) / len(frames)
+    if lim.get("behind") is not None:
+        add(f"derrière ≥ {lim['behind'] * 100:.0f} % des images", back >= lim["behind"] - 1e-9,
+            f"{back * 100:.0f} % (de face {front * 100:.0f} %)")
+    if lim.get("front_max") is not None:
+        add(f"de face ≤ {lim['front_max'] * 100:.0f} % des images", front <= lim["front_max"] + 1e-9,
+            f"{front * 100:.0f} %")
+    # 3. vitesses, sur la caméra sans tremblé
+    r = rail_rates(d)
+    if lim.get("pan") is not None:
+        inner = list(r["pan"])
+        if "pan" in own:
+            ceil = {f: own["pan"] for f in inner}
+        else:
+            ceil = {f: lim["pan"] * (1.0 if r["lens"][f] <= lim["pan_lens"] else 24.0 / r["lens"][f]) for f in inner}
+        if lim.get("pan_frames"):
+            basec = {f: base["pan"] * (1.0 if r["lens"][f] <= base["pan_lens"] else 24.0 / r["lens"][f])
+                     for f in inner}
+            over = [f for f in inner if r["pan"][f] > basec[f] + 1e-9]
+            runs = _windows(over)
+            v, f = _peak(r["pan"])
+            add(f"panoramique vif : une fenêtre de {lim['pan_frames']} images au plus au-delà de "
+                f"{min(basec.values()):.0f}°/s, crête ≤ {own['pan']:.0f}°/s",
+                len(runs) <= 1 and all(len(w) <= lim["pan_frames"] for w in runs) and v <= own["pan"] + 1e-9,
+                f"{len(runs)} fenêtre(s) {[f'{w[0]}-{w[-1]}' for w in runs]}, crête {v:.1f}°/s à l'image {f}")
+        else:
+            bad = {f: r["pan"][f] for f in inner if r["pan"][f] > ceil[f] + 1e-9}
+            v, f = _peak(r["pan"])
+            add(f"panoramique ≤ {min(ceil.values()):.1f}°/s", not bad,
+                f"{max(bad.values()):.1f}°/s à l'image {max(bad, key=bad.get)}" if bad else f"crête {v:.1f}°/s ({f})")
+    if lim.get("pan_acc") is not None:
+        bad = {f: r["pan_acc"][f] / fov_deg(r["lens"][f])[0] for f in r["pan_acc"]}
+        v, f = _peak(bad)
+        add(f"accélération de panoramique ≤ {lim['pan_acc']} largeur/s²", v <= lim["pan_acc"] + 1e-9,
+            f"{v:.2f} largeur/s² ({r['pan_acc'][f]:.0f}°/s²) à l'image {f}")
+    for key, label, unit in (("tilt", "bascule", "°/s"), ("tilt_acc", "accélération de bascule", "°/s²"),
+                             ("roll", "roulis de la caméra", "°"), ("roll_rate", "vitesse de roulis", "°/s"),
+                             ("vrel", "variation de l'écart caméra–berline", "m/s"),
+                             ("arel", "accélération par rapport à la berline", "m/s²"),
+                             ("accel", "accélération propre", "m/s²"), ("crane", "grue", "m/s"),
+                             ("crane_acc", "accélération de grue", "m/s²"), ("orbit", "orbite (azimut)", "°/s"),
+                             ("orbit_acc", "accélération d'orbite", "°/s²")):
+        # l'orbite ne vaut que pour les plans qui en ont une (CAM_LIMITS_PLAN : FIN6) : une caméra qui roule
+        # derrière la berline ou un pied qu'elle frôle changent vite d'azimut sans tourner autour d'elle
+        if key == "orbit_acc" and lim.get("orbit") is None:
+            continue
+        if lim.get(key) is not None:
+            v, f = _peak(r[key])
+            add(f"{label} ≤ {lim[key]:g} {unit}", v <= lim[key] + 1e-9, f"{v:.2f} {unit} à l'image {f}")
+    lens = [r["lens"][f] for f in frames]
+    zoom = (max(lens) - min(lens)) / min(lens)
+    if lim.get("zoom"):
+        v, f = _peak(r["zoom_rate"])
+        add(f"focale ≤ {lim['zoom_rate'] * 100:.0f} %/s, ≤ {lim['zoom_total'] * 100:.0f} % sur le plan",
+            v <= lim["zoom_rate"] + 1e-9 and zoom <= lim["zoom_total"] + 1e-9,
+            f"{v * 100:.1f} %/s à l'image {f}, {zoom * 100:.1f} % sur le plan")
+    else:
+        add("focale fixe (seul P4 zoome)", zoom <= 1e-3, f"{min(lens):.1f} à {max(lens):.1f} mm")
+    # 5. cadre
+    boxes = {f: frame_box(F[f], P[f]) for f in frames}
+    y0, y1 = lim["band"]
+    inband = [f for f in frames if boxes[f] and boxes[f][2] >= y0 and boxes[f][3] <= y1]
+    add(f"berline dans y {y0:.0f}–{y1:.0f} % sur {lim['band_share'] * 100:.0f} % des images",
+        len(inband) >= lim["band_share"] * len(frames) - 1e-9,
+        f"{len(inband)}/{len(frames)} (hors : {[f for f in frames if f not in inband][:8]})")
+    g = d["ground"]
+    low = [f for f in frames if F[f][2] - (g(F[f][0], F[f][1])[0] if g else 0.0) <= lim["low_z"] + 1e-9]
+    lo, hi = lim["low_center"]
+    if lim.get("low_all"):
+        low = list(frames)
+    if low:
+        bad = [f for f in low if not (boxes[f] and lo * 100 <= box_center(boxes[f], lim)[1] <= hi * 100)]
+        ys = [box_center(boxes[f], lim)[1] for f in low if boxes[f]]
+        add(f"centre entre {lo * 100:.0f} et {hi * 100:.0f} % de la hauteur"
+            f"{'' if lim.get('low_all') else ' (caméra à 1 m ou moins)'}", not bad,
+            f"{min(ys):.0f} à {max(ys):.0f} %{' ; images ' + str(bad[:8]) if bad else ''}")
+    wide = [f for f in frames if boxes[f] and boxes[f][1] - boxes[f][0] >= lim["width_min"] * 100]
+    ws = [boxes[f][1] - boxes[f][0] for f in frames if boxes[f]]
+    add(f"largeur ≥ {lim['width_min'] * 100:.0f} % sur {lim['width_share'] * 100:.0f} % des images",
+        len(wide) >= lim["width_share"] * len(frames) - 1e-9,
+        f"{len(wide)}/{len(frames)} images, largeur {min(ws):.0f} à {max(ws):.0f} %")
+    # 6. le phare
+    rng = PHARE_FRAMES.get(plan)
+    at = getattr(mod, "PHARE_AT", None) or (PHARE_AT if plan in PHARE_WORLD and _phare_ready() else None)
+    if rng != () and at is not None:
+        fr = [f for f in frames if rng is None or rng[0] <= f <= rng[1]]
+        bad = []
+        for f in fr:
+            q = screen_point(F[f], at)
+            b = boxes[f]
+            ok = q is not None
+            if ok:
+                x, y = 100 * q[0], 100 * (1 - q[1])
+                ok = (lim["phare_x"][0] <= x <= lim["phare_x"][1] and lim["phare_y"][0] <= y <= lim["phare_y"][1]
+                      and not (b and b[0] <= x <= b[1] and b[2] <= y <= b[3]))
+            if not ok:
+                bad.append(f)
+        add("le phare dans x 5–95 %, y 15–88 %, hors de la berline", not bad, f"images {bad[:8]}" if bad else
+            f"{len(fr)} images")
+    elif rng != ():
+        add("le phare (en attente de lieux.phare ou de PHARE_AT)", True, "non contrôlé")
+    # 7. écarts entre caisses, caméra–véhicules et poteaux
+    named = d["spec"].get("named") or {}
+    heads = mod.tracks_heading() if hasattr(mod, "tracks_heading") else {}
+    best, cam_best, last_h, blind = (float("inf"), None, ""), (float("inf"), None, ""), {}, set()
+    for f in frames:
+        t = P[f]["t"]
+        shapes = {}
+        for n, fn in named.items():
+            x, y = fn(t)[:2]
+            dims = _dims_of(n)
+            if n in ("hero", "berline"):
+                h = P[f]["heading"]
+            elif n in heads:
+                h = heads[n](t)
+            else:
+                (vx, vy), _ = kinematics(fn, t)
+                h = heading_of(vx, vy) if math.hypot(vx, vy) > 0.3 else last_h.get(n)
+            if h is not None:
+                last_h[n] = h
+            else:
+                blind.add(n)
+            shapes[n] = ((x, y), h, dims)
+        names = sorted(shapes)
+        for i, a in enumerate(names):
+            for b in names[i + 1:]:
+                (ca, ha, da), (cb, hb, db) = shapes[a], shapes[b]
+                if ha is not None and hb is not None:
+                    gap = _poly_gap(_rect(ca, ha, da), _rect(cb, hb, db))
+                elif ha is not None:
+                    gap = _point_gap(cb, _rect(ca, ha, da)) - math.hypot(*db[:2]) / 2
+                elif hb is not None:
+                    gap = _point_gap(ca, _rect(cb, hb, db)) - math.hypot(*da[:2]) / 2
+                else:
+                    gap = math.dist(ca, cb) - math.hypot(*da[:2]) / 2 - math.hypot(*db[:2]) / 2
+                if gap < best[0]:
+                    best = (gap, f, f"{a} et {b}")
+        c = d["rail"][f]
+        for n, (cc, h, dims) in shapes.items():
+            flat = _point_gap(c[:2], _rect(cc, h, dims)) if h is not None else max(
+                0.0, math.dist(c[:2], cc) - math.hypot(*dims[:2]) / 2)
+            above = c[2] - ((g(*cc)[0] if g else 0.0) + dims[2])
+            dist = math.hypot(flat, max(0.0, above))
+            if dist < cam_best[0]:
+                cam_best = (dist, f, n)
+        for k, post in enumerate(getattr(mod, "POSTS", ())):
+            dist = math.dist(c[:2], post[:2]) - (post[2] if len(post) > 2 else 0.1)
+            if dist < cam_best[0]:
+                cam_best = (dist, f, f"poteau {k}")
+    if len(named) > 1:
+        add(f"écarts entre caisses ≥ {lim['gap']} m", best[0] >= lim["gap"],
+            f"{best[0]:.2f} m entre {best[2]} à l'image {best[1]}"
+            + (f" ; cap inconnu (arrêtés, comptés en cercle, à donner par tracks_heading()) : {sorted(blind)}"
+               if blind else ""))
+    if named:
+        add(f"caméra à {lim['cam_gap']} m au moins des véhicules et des poteaux", cam_best[0] >= lim["cam_gap"],
+            f"{cam_best[0]:.2f} m de {cam_best[2]} à l'image {cam_best[1]}")
+    # 8. hauts de cadre des aéronefs
+    air = _aircraft(mod)
+    if air:
+        worst = None
+        for f in frames:
+            for n, fn in air.items():
+                q = screen_point(F[f], fn(P[f]["t"]))
+                if q and 0.0 <= q[0] <= 1.0:
+                    y = 100 * (1 - q[1])
+                    if worst is None or y > worst[0]:
+                        worst = (y, f, n)
+        add(f"aéronefs sous y {lim['air_top']:.0f} % dans le cadre", worst is None or worst[0] <= lim["air_top"],
+            "aucun dans le cadre" if worst is None else f"au plus haut {worst[0]:.0f} % ({worst[2]}, image {worst[1]})")
+    d["angles"], d["boxes"] = ang, boxes
+    return out
+
+
+def cut_rows(datas, lim):
+    """Le tableau 5, mesuré : [(sortant, entrant, (x, y, l) mesurés à la sortie, à l'entrée, visés, contrôle)] ;
+    contrôle None si l'un des deux plans n'est pas v3, sinon (tient, détail)."""
+    rows = []
+    for a, b, ta, tb in CUTS:
+        if a not in datas or b not in datas:
+            continue
+        da, db = datas[a], datas[b]
+        fa = da["frames"][-2] if b == "FIN" else da["frames"][-1]     # l'encre couvre la dernière avant FIN
+        fb = db["frames"][1] if b == "FIN" else db["frames"][0]
+        ba, bb = frame_box(da["final"][fa], da["poses"][fa]), frame_box(db["final"][fb], db["poses"][fb])
+        ma = box_center(ba, lim) if ba else None
+        mb = box_center(bb, lim) if bb else None
+        chk = None
+        if da["v3"] and db["v3"]:
+            if not (ma and mb):
+                chk = (False, "berline hors champ")
+            else:
+                dx, dy, k = mb[0] - ma[0], mb[1] - ma[1], mb[2] / max(1e-6, ma[2])
+                ok = abs(dx) <= lim["cut_dx"] and abs(dy) <= lim["cut_dy"]
+                if (a, b) not in CUT_XY_ONLY:
+                    ok = ok and lim["cut_ratio"][0] <= k <= lim["cut_ratio"][1]
+                chk = (ok, f"Δx {dx:+.0f}, Δy {dy:+.0f}, largeurs ×{k:.2f}")
+        rows.append((a, b, fa, fb, ma, mb, ta, tb, chk))
+    return rows
+
+
+def film_checks(datas, lim):
+    """Les films entiers (2.2) : six étoiles ≥ 60 % derrière et ≤ 25 % de face ; une étoile ≥ 85 % derrière.
+    Seulement quand tous leurs plans sont v3."""
+    out = []
+    for name, plans, back_min, front_max in (("six étoiles", FILM_SIX, lim["film_six"][0], lim["film_six"][1]),
+                                              ("une étoile", FILM_ONE, lim["film_one"], None)):
+        if not all(p in datas and datas[p]["v3"] for p in plans):
+            continue
+        ang = [a for p in plans for a in datas[p]["angles"].values()]
+        back = sum(a <= 60.0 for a in ang) / len(ang)
+        front = sum(a >= 120.0 for a in ang) / len(ang)
+        ok = back >= back_min and (front_max is None or front <= front_max)
+        out.append((f"film à {name} : derrière ≥ {back_min * 100:.0f} %"
+                    + (f", de face ≤ {front_max * 100:.0f} %" if front_max is not None else ""), ok,
+                    f"derrière {back * 100:.0f} %, de face {front * 100:.0f} % ({len(ang)} images)"))
+    return out
+
+
+def v3_report(base, per_plan, plans=PLANS):
+    """Tout le contrôle v3 : dict(plans={plan: (v3, [(nom, tient, détail)])}, cuts=cut_rows, films=film_checks)."""
+    specs = shot_specs()
+    datas = {p: plan_data(p, specs[p]) for p in plans}
+    res = {p: (datas[p]["v3"], plan_checks(datas[p], base, per_plan.get(p, {}))) for p in plans}
+    return dict(plans=res, cuts=cut_rows(datas, base), films=film_checks(datas, base), datas=datas)
+
+
+def v3_text(rep):
+    """Le rapport v3 lisible : plan par plan, chaque plafond « tient » ou la valeur qui dépasse ; les coupes."""
+    lines = []
+    for p, (v3, checks) in rep["plans"].items():
+        lines.append(f"== {p} " + ("(v3, contrôlé)" if v3 else "(v2 : mesuré pour information, non contrôlé)"))
+        for name, ok, detail in checks:
+            lines.append(f"   {'tient  ' if ok else 'DÉPASSE'} {name}{' : ' + detail if detail else ''}")
+    if rep["films"]:
+        lines.append("== films")
+        for name, ok, detail in rep["films"]:
+            lines.append(f"   {'tient  ' if ok else 'DÉPASSE'} {name} : {detail}")
+    lines.append("== coupes (x, y, largeur en % ; y comme les fiches ; sortie à la dernière image, à l'avant-dernière"
+                 " vers FIN ; entrée à la première, à l'image 2 de FIN)")
+    lines.append("   coupe          sortie mesurée (visée)       entrée mesurée (visée)       contrôle")
+
+    def fmt(m, t):
+        return ("hors champ" if not m else f"{m[0]:3.0f}/{m[1]:3.0f}/{m[2]:3.0f}") + f" ({t[0]}/{t[1]}/{t[2]})"
+    for a, b, fa, fb, ma, mb, ta, tb, chk in rep["cuts"]:
+        c = "v2, non contrôlé" if chk is None else ("tient   " if chk[0] else "DÉPASSE ") + chk[1]
+        lines.append(f"   {a + ' → ' + b:13s}  {fmt(ma, ta):27s}  {fmt(mb, tb):27s}  {c}")
+    return "\n".join(lines)
+
+
 def _main(argv):
     if argv and argv[0] == "mesure":
+        if "--v3" in argv:
+            import test_motion as T
+            base, per_plan = T.v3_limits()
+            plans = [p.upper() for p in argv[1:] if p != "--v3"] or list(PLANS)
+            print(v3_text(v3_report(base, per_plan, plans)))
+            return 0
         plans = [p.upper() for p in argv[1:]] or list(PLANS)
         print(measure_table(measure_shots(plans)))
         return 0
-    print("usage : python3 tools/film3d/motion.py mesure [PLAN…]")
+    print("usage : python3 tools/film3d/motion.py mesure [--v3] [PLAN…]")
     return 2
 
 
