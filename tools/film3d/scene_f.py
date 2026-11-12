@@ -264,16 +264,16 @@ def build_island(hidden):
     sc = 12.0 / max(royal.dimensions.z, 0.1)
     A.instance(royal, "island_royal", (0, 0, ISLAND_H), 0.4, sc)
     cocos = A.coconut_sources(hidden)
-    lean = sorted([c for c in cocos if 7.0 < c[1] < 13.0], key=lambda c: -c[3])[:5]
+    lean = sorted([c for c in cocos if 7.0 < c[1] < 13.0], key=lambda c: -c[3])[:4]
     for o, *_ in cocos:
         if all(o is not s for s, *_ in lean):
             bpy.data.objects.remove(o)
     ups = []
-    # (vue du drone, aucune couronne au-dessus de l'arc, qui longe l'îlot entre 180° et 270° ; vue de la caméra basse
-    # du découpage v2, un cinquième cocotier penché à 222° passe sa couronne au-dessus de la voie intérieure : la
-    # berline glisse dessous, et ses palmes traversent le haut du cadre)
+    # (vue du drone, aucune couronne au-dessus de l'arc, qui longe l'îlot entre 180° et 270° ; le cinquième cocotier
+    # de la v2, penché à 222° au-dessus de la voie intérieure, est retiré : la caméra de poursuite v3, à 2,6 m,
+    # passait à 3 m de son pied, dans ses palmes)
     for k, (src, top, ang, off) in enumerate(lean):
-        phi = math.radians((0.0, 70.0, 130.0, 310.0, 222.0)[k])
+        phi = math.radians((0.0, 70.0, 130.0, 310.0)[k])
         x, y = 3.6 * math.cos(phi), 3.6 * math.sin(phi)
         A.instance(src, f"island_coco_{k}", (x, y, ISLAND_H), phi - ang, 0.9)
         ups.append((x, y, phi, 3.6 + off))

@@ -5,7 +5,9 @@
 #
 # Repère de l'arc : la berline arrive sur l'axe x = 0 en roulant vers +y ; à l'origine, elle entre dans un grand
 # virage à gauche de 30 m de rayon (centre en (-30, 0)). Un point de l'arc à l'angle θ : (-30 + 30 cos θ, 30 sin θ),
-# cap (-sin θ, cos θ). Le plan v3 : 48 images à 70 km/h, de s = -4 m (4 m avant l'arc) à s = +34 m (65° d'arc).
+# cap (-sin θ, cos θ). Au-delà de 90°, la sortie : la droite y = 30 vers -x, la voie de la rue des enseignes qui
+# s'éloigne du rond-point. Le plan v3 : 48 images à 70 km/h, de s = +11,9 m (23° d'arc) à s = +50 m (2,9 m dans la
+# rue) : la fin dans l'axe de la rue, pour le lien vers P3.
 # Dans la scène F, l'îlot du rond-point est en (-5 ; 27,95) de ce repère, la bouche de l'avenue nord en y ≈ 43-47.
 import math
 
@@ -16,8 +18,8 @@ F0 = 1
 FPS = 24.0
 T_END = (FRAMES - 1) / FPS
 V3 = True                   # les plafonds v3 des tests (test_motion, motion.py mesure) s'appliquent à ce plan
-S_START = -4.0              # m : l'abscisse de la berline à la première image
-S_END = S_START + SPEED * T_END     # 34,1 m, 65° d'arc
+S_END = 50.0                # m : l'abscisse de la berline à la dernière image, 2,9 m après la fin de l'arc
+S_START = S_END - SPEED * T_END     # 11,9 m, 23° d'arc
 DRIFT = 25.0                # degrés : l'arrière glisse vers l'extérieur, la caisse pointe plus à gauche que sa route
 STILL = 0.5                 # l'instant de l'image fixe, de 0 (début du plan) à 1 (fin) : la glisse tenue
 
@@ -85,15 +87,15 @@ def hero_slip(t):
     return slip_of_frame(F0 + t * FPS)
 
 
-# --- la patrouille 1 (celle d'OUV et de P1), toujours à gauche de la berline. Elle roule sur une route intérieure
-# de P1_R (4,2 m à l'intérieur de la ligne de la berline : à 2 m, comme au découpage, sa caisse passait sur
-# l'objectif, 1,5 m à gauche ; plus près, le nez de la berline, qui glisse vers la gauche, venait à moins de
-# 1,5 m). Au bord gauche à l'image 1 (0–8 % du cadre), elle freine à l'entrée du virage et tient le bord (la caméra
-# tourne avec la berline : elle ne sort pas du cadre), puis remet les gaz : elle grandit par la gauche de 38 à 48.
+# --- la patrouille 1 (celle d'OUV et de P1), à gauche de la berline. Elle roule sur une route intérieure de P1_R
+# (4,2 m à l'intérieur de la ligne de la berline : plus près, le nez de la berline, qui glisse vers la gauche,
+# venait à moins de 1,5 m), le nez un peu devant le sien, à la même vitesse : sur l'arc plus court, elle tient
+# l'intérieur et reste entière au bord gauche du cadre (6–26 % à l'image 1, 0–15 % vers 34), puis remet un
+# peu les gaz à la sortie de l'arc.
 P1_R = 25.8
-P1_S0 = -5.5                # m : son abscisse à la première image
-P1_BRAKE = (t_of(2), 0.6, 9.0)      # début, durée (s), décélération (m/s²)
-P1_PUSH = (t_of(22), 0.9, 10.0)     # la remise des gaz : début, durée, accélération
+P1_S0 = 16.5                # m : son abscisse à la première image, sur sa route
+P1_BRAKE = (0.0, 0.0, 0.0)          # début, durée (s), décélération (m/s²) : pas de freinage
+P1_PUSH = (t_of(20), 0.4, 4.0)      # la remise des gaz : début, durée, accélération
 
 
 def _ramp_int(t, t0, d):
@@ -111,41 +113,67 @@ def p1_s(t):
     return P1_S0 + SPEED * t - ba * _ramp_int(t, b0, bd) + pa * _ramp_int(t, p0, pd)
 
 
-# --- la patrouille 2 : elle descend l'avenue nord, débouche derrière les palmiers de l'îlot, freine en travers et
-# s'arrête dans la bouche nord, puis repart vers l'ouest. Repère de l'arc (la bouche nord de la scène F en
-# x -12 à 2, y ≥ 43) ; la voie qui descend : x = P2_X. La caméra tourne avec la berline : la bouche nord passe
-# derrière la berline à l'écran de l'image 14 à 26 et n'est à sa droite que de 26 à 40 ; la glisse en travers y
-# est donc mise (l'arrêt à 36), et non de 14 à 22 comme à la fiche, où la berline la cachait.
+# --- la patrouille 2 : elle descend l'avenue nord (x = P2_X) et, juste avant la première image, débouche de la
+# bouche nord en glissant : sa route s'incurve vers le sud-ouest (une courbe de Bézier de P2_PATH, tangente à
+# l'avenue), sa caisse se met en travers, elle s'arrête sur l'anneau, à l'ouest de l'îlot (hors de ses palmiers
+# vus de la caméra), à 8,5 m de la route de la berline ; elle repart vers l'ouest à P2_T_GO. Sous la caméra haute, de l'image 1 à 14, elle glisse
+# en travers devant à droite pendant que la berline arrive sur elle, puis sort du cadre par la droite : la berline
+# passe à l'intérieur, la patrouille l'a ratée.
 P2_X = -8.5
-P2_STOP = (-8.5, 45.5)      # l'arrêt, dans la bouche nord
-P2_V0 = 7.0                 # m/s quand la caisse commence à se mettre en travers (image 17)
-P2_DECEL = 9.0              # m/s² : elle glisse jusqu'à l'arrêt (47 km/h à l'image 1)
-P2_T_STOP = t_of(36)        # l'arrêt
+P2_PATH = ((P2_X, 48.0), (P2_X, 41.0), (-15.0, 35.5))     # le début de la glisse, le point de contrôle, l'arrêt
+P2_DECEL = 8.0              # m/s² en glissant
+P2_T_SKID = t_of(-8)        # le début de la glisse (avant le plan)
+P2_TURN = (t_of(-4), t_of(12), 95.0)    # la caisse tourne de la descente (cap 180) à presque en travers (85)
 P2_T_GO, P2_GO = t_of(44), 3.0              # le départ, vers l'ouest (-x)
-P2_TURN = 95.0              # degrés : la caisse tourne de la descente (cap 180) à presque en travers (cap 85)
 
 
-def _p2_dist(t):
-    """La distance qui reste à faire jusqu'à l'arrêt (m), négative au-delà (le départ)."""
-    if t < P2_T_STOP:
-        tr = P2_T_STOP - t
-        return P2_DECEL * tr * tr / 2
-    return 0.0
+def _bezier(u):
+    (ax, ay), (bx, by), (cx, cy) = P2_PATH
+    v = 1.0 - u
+    return v * v * ax + 2 * u * v * bx + u * u * cx, v * v * ay + 2 * u * v * by + u * u * cy
+
+
+def _p2_table(n=200):
+    pts = [_bezier(i / n) for i in range(n + 1)]
+    acc = [0.0]
+    for a, b in zip(pts, pts[1:]):
+        acc.append(acc[-1] + math.dist(a, b))
+    return acc
+
+
+_P2_ACC = _p2_table()
+P2_LEN = _P2_ACC[-1]                            # 14,4 m de glisse
+P2_V0 = math.sqrt(2 * P2_DECEL * P2_LEN)        # 15,2 m/s (55 km/h) dans l'avenue
+P2_T_STOP = P2_T_SKID + P2_V0 / P2_DECEL        # l'arrêt, à l'image 37
+P2_STOP = P2_PATH[2]
+
+
+def _p2_d(t):
+    """La distance faite depuis le début de la glisse (m), négative avant (dans l'avenue)."""
+    if t <= P2_T_SKID:
+        return P2_V0 * (t - P2_T_SKID)
+    tt = min(t, P2_T_STOP) - P2_T_SKID
+    return P2_V0 * tt - P2_DECEL * tt * tt / 2
 
 
 def patrol2_pos(t):
-    x, y = P2_STOP
-    if t < P2_T_STOP:
-        return x, y + _p2_dist(t)
+    d = _p2_d(t)
+    if d <= 0:
+        return P2_X, P2_PATH[0][1] - d
+    n = len(_P2_ACC) - 1
+    d = min(d, P2_LEN)
+    i = min(n - 1, max(0, next((k for k in range(n) if _P2_ACC[k + 1] >= d), n - 1)))
+    u = (i + (d - _P2_ACC[i]) / max(1e-9, _P2_ACC[i + 1] - _P2_ACC[i])) / n
+    x, y = _bezier(u)
     if t > P2_T_GO:
-        return x - P2_GO * (t - P2_T_GO) ** 2 / 2, y
+        x -= P2_GO * (t - P2_T_GO) ** 2 / 2
     return x, y
 
 
 def patrol2_heading(t):
-    """Le cap de sa caisse : la descente (180°) tournée vers l'ouest en freinant, en travers à l'arrêt."""
-    u = 1.0 - min(1.0, max(0.0, _p2_dist(t) / (P2_V0 * P2_V0 / (2 * P2_DECEL))))
-    return 180.0 - P2_TURN * u * u * (3 - 2 * u)
+    """Le cap de sa caisse : la descente (180°), mise en travers en glissant (85°)."""
+    t0, t1, turn = P2_TURN
+    return 180.0 - turn * _smooth(t0, t1, t)
 
 
 def patrol_pos(i):
@@ -176,7 +204,7 @@ def patrol1_heading(t):
 
 
 def tracks_heading():
-    """{nom: cap(t)} des caisses des patrouilles (la 2 s'arrête de l'image 33 à 44)."""
+    """{nom: cap(t)} des caisses des patrouilles (la 2 s'arrête de l'image 34 à 44)."""
     return {"patrol_1": patrol1_heading, "patrol_2": patrol2_heading}
 
 
@@ -216,11 +244,15 @@ def wheel_track(lx, ly, t=STILL, step=0.5):
 # prenait le virage 0,5 s après elle : 13 m/s² d'accélération par rapport à la berline à l'entrée de l'arc ; le bras
 # n'en garde que la rotation lente (L ω², 3 m/s²). Lacet et site posent le centre de la boîte de la berline à
 # CHASE_U (depuis la gauche) et CHASE_FRAME_Y (depuis le haut, comme les fiches), lissés par une gaussienne
-# d'écart CHASE_TAU.
-CHASE_BACK = (8.3, 8.3)     # m derrière le centre de la berline, à la première et à la dernière image
-CHASE_LEFT = (1.5, 1.2)     # m à sa gauche
-CHASE_PHI = (0.0, 62.0)     # degrés : le cap du bras (0 = la droite d'arrivée, +y ; positif vers la gauche)
-CHASE_Z = 0.5
+# d'écart CHASE_TAU. À CHASE_Z, en plongée légère (site -13 à -14°, calculé pour le centre à y 55 %) : le toit et le capot donnent l'angle de glisse,
+# la trace des pneus se lit en arc, les patrouilles passent par-dessus la berline. À la dernière image, le bras
+# est dans l'axe de la rue des enseignes (cap 90°, à 0 m de côté) : la bouche de la rue au centre.
+CHASE_BACK = (7.0, 7.0)     # m derrière le centre de la berline, à la première et à la dernière image
+CHASE_LEFT = (-1.5, 0.0)    # m à sa gauche : 1,5 m à droite au début (la patrouille 1, à gauche, entre dans
+                            # le cadre), dans l'axe de la berline à la fin
+CHASE_PHI = (18.0, 90.0)    # degrés : le cap du bras (0 = +y ; positif vers la gauche ; 90 : l'axe de la rue)
+CHASE_Z = 2.6               # m : à l'essai de 1,8, 2,2 et 2,6 (image 24), c'est d'ici que la glisse se lit le
+                            # mieux à 390 px (le toit, l'angle de la caisse, la trace des pneus)
 CHASE_LENS = 21.0
 CHASE_TAU = 0.25            # s
 CHASE_FRAME_Y = 0.55
@@ -255,7 +287,7 @@ def chase_pos(t):
     return hx - back * fx - left * fy, hy - back * fy + left * fx, CHASE_Z
 
 
-CHASE_U = ((1, 0.50), (24, 0.52), (48, 0.52))   # le centre de la boîte de la berline, depuis la gauche
+CHASE_U = ((1, 0.51), (24, 0.51), (48, 0.52))   # le centre de la boîte de la berline, depuis la gauche
 
 
 def _u_target(t):
@@ -298,10 +330,28 @@ def chase_aim(t, n=12):
     return y0 + ay / wsum, p0 + ap / wsum
 
 
+_YAW_ENDS = {}
+CHASE_YAW_MIX = 0.5         # la part de la visée image par image ajoutée au panoramique constant
+
+
+def chase_yaw(t):
+    """Le lacet : un panoramique à vitesse constante, de la visée de la première image à celle de la dernière (le
+    centre de la berline flotte de quelques % entre les deux ; la visée image par image, elle, accélérait de 39 à
+    47°/s quand la glisse se rattrape)."""
+    key = (CHASE_PHI, CHASE_BACK, CHASE_LEFT, CHASE_Z, S_START)
+    if key not in _YAW_ENDS:
+        _YAW_ENDS.clear()
+        _YAW_ENDS[key] = (_aim(0.0)[0], _aim(T_END)[0])
+    a, b = _YAW_ENDS[key]
+    return a + ((b - a + 180.0) % 360.0 - 180.0) * t / T_END
+
+
 def camera_rail(t):
     """La caméra sans tremblé : (x, y, z, lacet, site, roulis, focale), en repère de l'arc (motion.key_camera)."""
     x, y, z = chase_pos(t)
-    yaw, pitch = chase_aim(t)
+    ya, pitch = chase_aim(t)
+    yl = chase_yaw(t)
+    yaw = yl + CHASE_YAW_MIX * ((ya - yl + 180.0) % 360.0 - 180.0)
     return x, y, z, yaw, pitch, 0.0, CHASE_LENS
 
 
