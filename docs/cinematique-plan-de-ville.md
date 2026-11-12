@@ -2,47 +2,49 @@
 
 Plan d'exécution de la décision du 13 novembre (`SPEC.md` §18.36, « une seule ville, une seule route, un monde continu »). Étude sans rendu : les cotes viennent du code des scènes, les calculs de `parcours.py` et `motion.py` (Python pur), par des scripts tenus hors du dépôt. Se lit avec `docs/cinematique-feuille-de-route.md` (la conduite unique), `docs/cinematique-decoupage-v3.md` et `docs/cinematique-lumiere-v3-1.md`.
 
-Conventions. Repère de ville : celui du pont (`scene_c.py`, `lieux.py`), z = 0 sur la chaussée, eau à −1,5 m, caps selon `lieux.put` (0 vers +y, positif vers −x). Une pose de lieu s'écrit `rot, t` : p_ville = R(rot) · p_lieu + t. Les images se notent `plan/image`.
+Conventions. Repère de ville : celui du pont (`scene_c.py`, `lieux.py`), z = 0 sur la chaussée, eau à −1,5 m, caps selon `lieux.put` (0 vers +y, positif vers −x). Une pose de lieu s'écrit `rot, t` : p_ville = R(rot) · p_lieu + t, et cap_ville = cap_lieu + rot. Les images se notent `plan/image`.
+
+**`FILM3D_VILLE`** (variable d'environnement, défaut « 1 ») : à « 1 », chaque lieu se construit rogné pour la ville, comme décrit en 2.5 ; à « 0 », l'ancien lieu autonome, avec ses faux lointains.
 
 ## 0. En bref
 
-- **La route du module fait 281 m, la vraie chaussée des lieux construits environ 1 200.** Un monde continu ne s'obtient donc pas en posant les lieux tels quels : on rogne les lieux à leurs jonctions et on les rapproche.
-- **Quatre jonctions sur cinq se ferment.** Avenue et rond-point, rond-point et rue, pont et port sans toucher au décor de fond ; port et jetée en redécoupant le nord-est du terre-plein.
-- **Une ne se ferme pas : la rue et le pont.** Entre P3/48 et P4/1 il y a 331 m de vraie route. Les parcourir à 108 km/h au plus coûte 276 images. La coupe y reste, dans la même ville et sur la même route : c'est le repli prévu par la SPEC, et la seule ellipse que l'histoire exige (la meute de dix ne se forme pas en un vingt-quatrième de seconde).
+- **La route du module fait 295 m, la vraie chaussée des lieux construits environ 1 200.** Un monde continu ne s'obtient donc pas en posant les lieux tels quels : on rogne les lieux à leurs jonctions et on les rapproche.
+- **Le monde n'a plus de trou : la route existe en entier**, de l'avenue à la pointe. Avenue et rond-point, rond-point et rue, rue et pont, pont et port se touchent en rognant ; port et jetée en redécoupant le nord-est du terre-plein.
+- **Une seule coupe saute de la route : de la rue au pont**, 331 m, soit 11,5 s de conduite que le film ne montre pas. C'est une ellipse de temps dans un monde sans trou. Elle se lit si le vrai pont est dans l'axe à la fin de P3, et si la rive quittée est derrière la meute au début de P4 (2.5, rue : deux immeubles de 30 à 33 m au quai).
 - **Le film gagne 26 images**, toutes dans P2 : le rond-point construit tourne de 90°, la route du module de 64°. Poursuite 414 images, film à six étoiles 518.
-- **Trois prises au lieu de sept plans** : OUV ; P1, P2 et P3 d'un seul tenant (206 images) ; P4 ; P5 et P6 d'un seul tenant (120 images). P4 reste un changement de caméra dans un temps continu du côté du port.
-- **La bande corail a un seul azimut : −70°**, la bissectrice de l'avenue et de la jetée. Elle est devant à l'ouverture et à la fin, absente de la rue et du pont, et revient quand la berline tourne vers le large.
+- **Trois conduites** : OUV, P1, P2 et P3 d'un seul tenant (246 images, 10,25 s) ; P4 ; P5 et P6 d'un seul tenant (120 images). P4 vers P5 est un changement de caméra dans un temps et un espace continus.
+- **La bande corail a un seul azimut : −70°**, la bissectrice de l'avenue et de la jetée.
 
 ```
         y (nord)
   +123        * phare
   +101       ( ) pointe, rayon 30
              /
-            /  jetée, cap -50°, 100 m
-  +26      /
-   +7   .-'   virage du port, rayon 22          PORT   x -60..100, y -66..54
+            /  jetée, cap -50°, 71 m
+  +36      /
+  +26   .-'   virage du port, rayon 22          PORT   x -60..100, y -66..54
    -5   ||    pied de la rampe (fin de P4, début de P5)
         ||
  -130   ++    crête 7,2 m, pylône 52 m          LAGUNE, 256 m de quai à quai
         ||
  -320   ||    début du tablier
- -325 ==++==  quai de la ville, deux immeubles hauts aux angles
+ -325 ==++==  quai de la ville, deux immeubles de 30 à 33 m aux angles de la rue
  -344 --||--  boulevard du quai
-        ||    rue des enseignes, 73 m ; barrage en y -380      <-- trou de 331 m entre P3 et P4
+        ||    rue des enseignes, 71 m ; barrage en y -380      <-- ellipse de temps, 331 m, de P3 à P4
  -415   ||
  -433  ( o )  rond-point ------ l'avenue continue vers l'est
  -435 ========================>  avenue, cap -90° (vers +x)
-        OUV x -116..-93      P1 x -72..-42
+        OUV x -95..-72      P1 x -72..-42
  -445 ........ mur de promenade, plage, océan au sud
 ```
 
-## 1. L'emprise de chaque lieu, dans son repère
+## 1. L'emprise de chaque lieu, dans son repère (état actuel, `FILM3D_VILLE=0`)
 
 | Lieu | Chaussée | Bâti | Eau, relief | Faux lointains | Filmé |
 |---|---|---|---|---|---|
-| Avenue (`scene_a`) | axe x 0, vers +y, 14 m (demi 7), de y −30 à 900 ; trottoirs 4,5 m | côté ville : façades en x −11,5, de y 20 à 640 (lumières jusqu'à 320), deux rangs derrière (x −37,5 et −63,5, y −20 à 420) ; rues transversales en y 120, 266, 452 ; dalles jusqu'à x −200 | mur de promenade x 11,5, plage jusqu'à x 34 (z −1,5), océan au-delà ; plat | « pointe de la baie » (7 immeubles, x 85, y 650 à 916), `sea_far`, phare lointain 14° à droite | OUV y 244 à 266,6 ; P1 y 288 à 317,6 ; caméra 7,5 m derrière. Libre : 236 m avant, 582 m après |
+| Avenue (`scene_a`) | axe x 0, vers +y, 14 m (demi 7), de y −30 à 900 ; trottoirs 4,5 m | côté ville : façades en x −11,5, de y 20 à 640 (lumières jusqu'à 320), deux rangs derrière (x −37,5 et −63,5, y −20 à 420) ; rues transversales en y 120, 266, 452 ; dalles jusqu'à x −200 | mur de promenade x 11,5, plage jusqu'à x 34 (z −1,5), océan au-delà ; plat | « pointe de la baie » (7 immeubles, x 85, y 650 à 916), `sea_far`, phare lointain 14° à droite | OUV y 244 à 266,6 ; P1 y 288 à 317,6 ; caméra 7,5 m derrière |
 | Rond-point (`scene_f`) | îlot rayon 6, anneau 6 à 15, trottoir jusqu'à 19,2 ; branches à 0° (plage, 8 m), 90° (avenue nord, 14 m, jusqu'à y 400), 180° (enseignes, 8 m, jusqu'à x −46), 270° (avenue sud, 14 m, jusqu'à y −46) | aucun aux angles (terrasses à 22 à 29 m) ; un rang côté ville le long de l'avenue nord, de y 24 à 400 | mur de promenade x 46, plage jusqu'à x 120, océan ; plat | sol sombre jusqu'à −160, dalle jusqu'à x −200 | P2 : de (4,84 ; −39,8) à (−12,7 ; −0,9) |
-| Rue des enseignes (`scene_b`) | axe x 0, s de 1 à 162, 8 m, trottoirs 3 m | façades à ±7, 2 à 4 niveaux (7 à 14 m), dix immeubles par côté ; barrage s 126, plots s 123,3 | boulevard du quai s 162 à 178, mur du quai s 181 ; plat | îlot en s −16 et sa place ; pont de s 181 à 600 (plateau à 7,2 m de s 301 à 440, pylône en s 330) ; eau, autre rive, mâts du port | P3 : s 101,7 à 132,0. Libre : 100 m avant, 30 m après |
+| Rue des enseignes (`scene_b`) | axe x 0, s de 1 à 162, 8 m, trottoirs 3 m | façades à ±7, 2 à 4 niveaux (7 à 14 m), dix immeubles par côté ; barrage s 126, plots s 123,3 | boulevard du quai s 162 à 178, mur du quai s 181 ; plat | îlot en s −16 et sa place ; pont de s 181 à 600 (plateau à 7,2 m de s 301 à 440, pylône en s 330) ; eau, autre rive, mâts du port | P3 : s 101,7 à 132,0 |
 | Pont (`scene_c`) | axe x 0, 14 m, trottoirs 2 m, bord extérieur ±9,7 ; tablier de y −320 à −20 | pylône en H à la crête (jambes x ±11, sommet 52 m), piles tous les 35 m, lampadaires tous les 30 m | plat de −320 à −255, rampe à 6 %, crête 7,2 m en −130, pied en −5 | avenue de la ville de 14 m, de y −1000 à −320 ; ville lointaine de 900 m de profondeur (`lieux.distant_city`) | P4 : y −74,8 à −35,7, caméra fixe y 10 |
 | Port (`scene_e`) | voie du pont x ±7 jusqu'aux séparateurs (y 80,6) ; voie du quai, axe y 70, de x 0 à 80 | terre-plein x −60 à 100, y −20 à 100 ; murs de conteneurs le long de la voie du pont, mur en y 84,2 (x −30 à 30), piles au nord-est (38 ; 88), files à l'est ; mâts de 25 m aux angles et en (32 ; 90) ; portique, grues, cargo | quai sur tout le pourtour ; plat | pont, jetée et pointe par `lieux.panorama` | P5 : de (5,25 ; 43,6) à (13,6 ; 72,2) |
 | Jetée, pointe (`scene_d`) | axe x 80, de y 100 à 400, 8 m, bord ±6,7 ; lampadaires tous les 20 m | pointe centrée en (80 ; 430), rayon 30 ; phare en (75,0 ; 458,3), 17,9 m | eau des deux côtés ; plat | pont et port lointains, ville lointaine, autre rive | P6 : y 313,2 à 344,4 ; FIN, FIN6 sur la pointe |
@@ -51,63 +53,142 @@ Tout est à z = 0, sauf le tablier. Les largeurs se raccordent déjà : l'avenue
 
 ## 2. Le plan de ville
 
-### 2.1 Ce qui change dans `parcours.py`
+### 2.1 Ce qui change dans `parcours.py` (décidé le 13 novembre)
 
-| | Aujourd'hui | Ville | Pourquoi |
+| | Aujourd'hui | Ville | Formule, raison |
 |---|---|---|---|
-| `A2` | 64° | **90°** | les branches du rond-point sont à angle droit ; à 64° la berline atteint l'angle nord-ouest 2 m après la sortie |
-| `G2` | 24,0 | 37,6 | la remise des gaz reste 9,5 m avant la fin de l'arc |
-| `S_ARC5` | 182,0 | 195,61 | l'arc du rond-point s'allonge de 13,61 m |
-| P2 | 84 images | **110** | même état à la coupe (13,15 m/s, 2,4° de courbe restants) |
-| `CAP_B` | lu sur la route (89,95°) | `A2` exact | 0,05° de lissage font 6 cm sur 73 m de rue |
-| Ancre de P2 | (4,84 ; −48,156) | **(1,75 ; −49,84)** | la voie de l'avenue (x 1,75) ; sortie sur y_F 0,35, la voie de P3 |
-| Ancre de P4 | (1,80 ; −35,69) | **(5,25 ; −5,69)** | fenêtre glissée de 30 m : sa dernière image au pied de la rampe ; la voie de P5 |
-| Autres ancres | | inchangées | |
+| `A2` | 64° | **90°** | les branches du rond-point sont à angle droit |
+| `R2` | 30 m | 30 m | gardé : le creux reste à 41 km/h |
+| `G2` | 24,0 | 37,62 | `R2 · rad(A2) − 9,5` : la remise des gaz reste 9,5 m avant la fin de l'arc |
+| `S_ARC5` | 182,0 | 195,61 | `182 + R2 · (rad(90) − rad(64))` |
+| P2 | 84 images | **110** | même état à la coupe (13,15 m/s, 2,4° de courbe restants) ; total 414 |
+| `CAP_B` | lu sur la route | `A2`, exact | 0,05° de lissage feraient 6 cm sur 71 m de rue et 28 cm sur l'avenue |
+| Ancre d'OUV | (1,75 ; 244,0) | **(1,75 ; 264,85)** | `288 − (y_route(P1/1) − y_route(OUV/1))` = 288 − 23,15 : le placement de P1 |
+| Ancre de P2 | (4,84 ; −48,156) | **(1,75 ; −49,84)** | la voie de l'avenue ; y = `0,35 − (y_sortie − (S_ARC2 − 20))`, y_sortie = 95,19, l'ordonnée de la droite de sortie sur la route |
+| Ancre de P4 | (1,80 ; −35,69) | **(5,25 ; −5,69)** | fenêtre glissée de 30 m, voie de P5 ; caméra fixe (4,65 ; 40,0 ; 1,2) |
+| Ancres de P1, P3, P5, P6 | | inchangées | |
 
-Profil de vitesse : rien ne change hors du rond-point. Dans le rond-point : creux à 11,5 m/s (11,8), glisse 12,2°, lacet 24,9 °/s, latérale 5,86 : dans les plafonds. Le cercle nominal passe à 5,1 m de la bordure de l'îlot (1,97 aujourd'hui). Levier si 26 images sont de trop : `R2` = 24 m, +18 images seulement, le cercle à 2,6 m de l'îlot, mais 36 km/h au creux et 15,6° de glisse.
+- Profil de vitesse : rien ne change hors du rond-point. Dans le rond-point : creux à 11,5 m/s (11,8), glisse 12,2°, lacet 24,9 °/s, latérale 5,86, dans les plafonds. Le cercle nominal passe à 5,1 m de la bordure de l'îlot (1,97 aujourd'hui).
+- OUV : avancer son ancre vaut mieux que reculer P1, qui déplacerait l'avenue de 20,85 m par rapport au rond-point, donc l'îlot, le rognage et le décor réglé de P1. La patrouille garée passe à y_A 284,85, soit 4,85 m après l'angle de la rue transversale (y_A 266 à 280) : à P1/1 elle est à 52° à gauche de la caméra, hors champ, 3,15 m derrière la berline.
+- Durées : poursuite 414 images (17,25 s), film à six étoiles 518, total à rendre 546 avec FIN.
 
-Durées : poursuite 414 images (17,25 s), film à six étoiles 518, total à rendre 546 avec FIN.
+### 2.2 (a) Les poses
 
-### 2.2 Les poses
+| Lieu | rot | t | Du lieu à la ville | Repères en ville |
+|---|---|---|---|---|
+| Pont (C) | 0 | (0 ; 0) | identité | crête (0 ; −130), pied (0 ; −5) |
+| Port (E) | 0 | (0 ; −46,40) | (x_E ; y_E − 46,40) | terre-plein de y −66,4 à 53,6 |
+| Jetée, pointe (D) | −50° | (−280,16 ; −113,76) | (0,6428 x_D + 0,7660 y_D − 280,16 ; −0,7660 x_D + 0,6428 y_D − 113,76) | joint avec le port (23,1 ; 36,3) ; pointe (100,67 ; 101,33) ; phare (119,14 ; 123,35) |
+| Rue (B) | 0 | (0 ; −506,0) | (x_B ; s − 506,0) | début de rue y −415 ; barrage y −380 ; mur du quai y −325 |
+| Rond-point (F) | −90° | (0 ; −433,20) | (y_F ; −x_F − 433,20) | îlot (0 ; −433,20) |
+| Avenue (A) | −90° | (−359,69 ; −433,20) | (y_A − 359,69 ; −x_A − 433,20) | l'îlot en (0 ; 359,69) de A |
 
-| Lieu | rot | t | Repères |
-|---|---|---|---|
-| Pont (C) | 0 | (0 ; 0) | crête (0 ; −130), pied (0 ; −5) |
-| Port (E) | 0 | (0 ; −46,40) | terre-plein de y −66,4 à 53,6 |
-| Jetée, pointe (D) | −50° | (−280,16 ; −113,76) | racine (13,35 ; 25,59), soit y_D 314,4 ; pointe (100,67 ; 101,33) ; phare (119,14 ; 123,35) |
-| Rue (B) | 0 | (0 ; −506,0) | y = s − 506 ; barrage y −380 ; mur du quai y −325 |
-| Rond-point (F) | −90° | (0 ; −433,2) | îlot (0 ; −433,2) |
-| Avenue (A) | −90° | (−359,66 ; −433,48) | (x_A ; y_A) → (y_A − 359,66 ; −x_A − 433,48) ; l'îlot en y_A 359,69 |
-
-Les lieux de la ville se déduisent des ancres de P1, P2 et P3 ; ceux de l'eau de celles de P4, P5 et P6. Les deux moitiés sont posées l'une par rapport à l'autre par le réel : l'axe de la rue sur l'axe du pont, le mur du quai sur la rive.
+- Une pose se recalcule des ancres : pose(lieu) = pose(pont) ∘ placer(plan du pont) ∘ placer(plan du lieu)⁻¹, de proche en proche (P4, P5, P6 pour l'eau ; P3, P2, P1 pour la ville). `ville.py` le fait ; les nombres ci-dessus sont à 5 cm près.
+- Les deux moitiés sont posées l'une par rapport à l'autre par le réel : l'axe de la rue sur l'axe du pont, le mur du quai de la rue (s 181) sur la rive (y −325).
+- Correction sur l'envoi précédent : t de l'avenue en y vaut −433,20 et non −433,48 (le résidu de 0,05° de cap, supprimé par `CAP_B = A2`).
 
 ### 2.3 Les jonctions, une par une
 
 | Jonction | Écart aujourd'hui | Décision | Images | Repli |
 |---|---|---|---|---|
-| OUV → P1 | 20,85 m, même avenue | **coupe gardée** : ellipse de temps d'une dizaine de secondes, la patrouille fait demi-tour | 0 | |
-| P1 → P2, avenue et rond-point | 82,7 m d'avenue | **rapprocher** : l'îlot en y_A 359,7 au lieu de 440 ; l'avenue rognée à y_A 340,7, la branche sud du rond-point retirée | 0 | |
-| P2 → P3, rond-point et rue | 100 m de rue et 26° d'angle | **rogner et allonger** : la rue perd ses 90 premiers mètres (il en reste 73), la route tourne de 90° | +26 | `R2` = 24 m : +18 |
-| P3 → P4, rue et pont | 330,6 m, 4,9 m en travers | **coupe gardée** : fin de rue 30 m, boulevard 16 m, plat et montée 195 m, crête, 86 m de descente | 0 | parcourue : +276 images, hors de portée |
+| OUV → P1 | 20,85 m, même avenue | **fermée** : l'ancre d'OUV avance de 20,85 m | 0 | |
+| P1 → P2, avenue et rond-point | 82,7 m d'avenue | **rapprocher** : l'îlot en y_A 359,69 au lieu de 440 ; joint en y_A 340,69 | 0 | |
+| P2 → P3, rond-point et rue | 100 m de rue et 26° d'angle | **rogner et allonger** : la rue perd ses 90 premiers mètres (il en reste 71), la route tourne de 90° | +26 | |
+| P3 → P4, rue et pont | 330,6 m, 4,9 m en travers | **ellipse de temps, la seule** : la route existe (fin de rue 30 m, boulevard 16 m, plat et montée 195 m, crête, 86 m de descente), le film saute 11,5 s | 0 | |
 | P4 → P5, pont et port | 76 m de tablier, 3,45 m en travers | **rapprocher** : le port avancé de 46,4 m, P4 glissé de 30 m, berline dans la voie x 5,25 | 0 | P4 à sa place, saut de 76 m caché par l'inversion d'axe |
-| P5 → P6, port et jetée | 60 m de quai, un virage à gauche, 213 m de jetée | **rapprocher et rogner** : la jetée part de la sortie du virage, à 50° à droite ; il en reste 100 m ; le nord-est du terre-plein redécoupé | 0 | coupe gardée, quai et jetée réels |
-| P6 → FIN6 | 93 m | **l'encre**, inchangée : elle freine sous les deux images | 0 | |
+| P5 → P6, port et jetée | 60 m de quai, un virage à gauche, 213 m de jetée | **rapprocher et rogner** : la jetée part de la sortie du virage, à 50° à droite ; il en reste 71 m ; le nord-est du terre-plein redécoupé | 0 | si l'agent du port échoue : coupe gardée, quai et jetée réels |
+| P6 → FIN6 | 86 m | **l'encre**, inchangée : elle freine sous les deux images | 0 | |
 
-Pourquoi le trou de P3 à P4 ne se ferme pas. Le raccourcir : même sans plat côté ville et avec la rue coupée après le barrage, il reste 240 m. Le parcourir : la berline sort de P3 à 17,3 m/s, atteint 30 m/s en 109 m, et met 11,5 s. Un pont plus court (crête à 4,5 m) ramène le coût à 132 images mais retire à P4 quarante pour cent de son étagement, alors que c'est le plan que le client cite en modèle. La coupe tombe sur l'inversion d'axe, et le spectateur a vu le pont devant lui à la fin de P3.
+Pourquoi l'ellipse de P3 à P4 reste. La raccourcir : même sans plat côté ville et avec la rue coupée après le barrage, il reste 240 m. La parcourir : la berline sort de P3 à 17,3 m/s, atteint 30 m/s en 109 m, et met 11,5 s, soit 276 images. C'est aussi la seule que l'histoire exige : la meute de dix ne se forme pas en un vingt-quatrième de seconde.
 
-### 2.4 Les conflits, par gravité
+### 2.4 (b) Les conflits, par gravité
 
-1. **Rue et pont** : le trou ci-dessus.
-2. **Jetée contre port.** Posée sur la sortie du virage, la jetée traverse le nord-est du terre-plein : le mât clé (32 ; 90) est à 9 cm de son axe, le bout du mur de conteneurs (x 17 à 30, y 84,2) et les piles (38 ; 88) sont dessus, le mât (94 ; 92) et le coin du quai à 36 m à droite. Sans découpe, toute la fenêtre de P6 roule sur le béton du port.
-3. **Le 200 mm de P4 contre le port.** P4 raccordé à P5, son objectif tombe en y_E 86,4 : 5,8 m derrière les séparateurs et 1 m derrière le mur de conteneurs.
+1. **Jetée contre port.** Posée sur la sortie du virage, la jetée traverse le nord-est du terre-plein : le mât clé (32 ; 90) est à 9 cm de son axe, le bout du mur de conteneurs (x 17 à 30, y 84,2) et les piles (38 ; 88) sont dessus. Sans découpe, toute la fenêtre de P6 roule sur le béton du port. Réglé par le polygone de 2.5 (port).
+2. **Le 200 mm de P4 contre le port.** Son objectif tombe en (4,65 ; 86,4) du port : 5,8 m derrière les séparateurs, 1 m derrière le mur de conteneurs. Réglé en reculant ce mur à y_E 89,0.
+3. **Rue et pont** : 331 m que le film ne parcourt pas. Ellipse de temps ; le décor doit la rendre lisible (immeubles du quai).
 4. **Rond-point** : 64° contre 90°, voie x 4,84 contre 1,75. Réglé en 2.1.
 5. **Avenue trop longue** : construite jusqu'à y_A 900, elle recouvre le rond-point, la rue et le quai.
 6. **Rue trop longue**, avec son faux îlot et son faux pont (pylône en s 330, le vrai en s 376).
 7. **Le pont côté ville** : son avenue de 14 m sur 680 m et son sol de 80 m de large traversent la rue, le rond-point et l'océan. La ville lointaine a 900 m de profondeur ; la vraie fait 150 m du quai à la promenade.
 8. **La rampe sur le terre-plein** : le port avancé passe sous les 61 derniers mètres de la rampe (tablier à 3,7 m au mur sud).
 9. **Dalles** de A et de F jusqu'à 200 m côté ville : 90 m dans la lagune.
-10. **Petits raccords** : trottoirs de 4,5 m (A) contre 4,0 (F) ; 8 m sans enrobé entre le boulevard et le tablier ; ouverture du quai ±8,5 contre tablier ±9,7.
-11. **Mer et phare** : section 3.3.
+10. **Angles du rond-point** : les terrasses des deux angles ouest sont là où arrivent le rang de l'avenue et les premiers immeubles de la rue.
+11. **Petits raccords** : trottoirs de 4,5 m (A) contre 4,0 (F) ; 8 m sans enrobé entre le boulevard et le tablier ; ouverture du quai ±8,5 contre tablier ±9,7 ; une paire de lampadaires de jetée (y_D 315) dont la droite tombe dans la voie du quai.
+12. **Mer et phare** : chaque scène a son azimut de mer et, de l'avenue à la rue, un faux phare. Un seul azimut (−70°), un seul phare.
+
+### 2.5 (c) Lieu par lieu : quoi retirer, quoi ajouter, à quel raccord arriver
+
+Règles communes, sous `FILM3D_VILLE=1` :
+
+- Un lieu ne construit rien au-delà de ses joints : ni route, ni sol, ni bâti, ni faux lointain. Le ciel, l'eau (un seul plan à z −1,5), l'autre rive et les voisins viennent de `ville.py`.
+- Chaque lieu garde son repère ; `ville.py` applique la pose. Tous les joints sont à z = 0, chaussée contre chaussée, sans marche.
+- L'azimut de la mer de chaque scène vaut −70° − rot : +20° pour A et F, −70° pour B, C et E, −20° pour D.
+- Critère commun : sur la carte de `ville.py`, aucune emprise ne recouvre celle d'un voisin ; en gris (`render_film.py --dry`), le cadre du plan porté ne change pas de plus de 2 % hors des zones nommées ci-dessous.
+
+#### Avenue, `scene_a.py` (OUV, P1)
+
+Sens de marche +y_A, mer à +x_A. Du lieu à la ville : (y_A − 359,69 ; −x_A − 433,20).
+
+- **Joint avec le rond-point : la droite y_A = 340,69** (y_F −19,00), 19 m avant le centre de l'îlot. Chaussée 14 m (bordures x_A ±7,0), trottoirs 4,5 m (façades x_A −11,5, mur de promenade x_A +11,5), axe x_A 0 sur l'axe x_F 0. Voie de la berline x_A +1,75.
+- **Garder** : y_A de 200 à 340,69 (en deçà de 200, facultatif : la caméra d'OUV part de y_A 257 et regarde devant).
+- **Retirer** : tout ce qui dépasse y_A 340,69 (chaussée, trottoirs, mur, plage, lampadaires, palmiers, voitures) ; le rang de façades s'arrête à y_A ≤ 338, les deux rangs arrière aussi ; la « pointe de la baie », `sea_far`, `far_lighthouse` ; dalles et rangs arrière limités à x_A ≥ −89 (au-delà : le boulevard du quai, puis la lagune).
+- **Ajouter** : un retour du mur de promenade le long de y_A 340,69, de x_A 11,5 à 46 (le mur du rond-point est en x_F 46) ; la plage s'arrête à ce retour.
+- **Plans** : OUV, ancre (1,75 ; 264,85), berline de y_A 264,85 à 287,42, patrouille garée en y_A 284,85 ; P1 inchangé (y_A 288,0 à 317,55). Les 22 premiers mètres de P2 sont aussi sur l'avenue (y_A 318,2 à 340,7).
+- **Devant la caméra** : l'îlot dans l'axe, de 102 m (OUV/1) à 50 m (P1/48) ; la bouche de la rue à gauche, de 104 à 53 m (x 30 % puis 8 %) ; au-delà de l'îlot, l'avenue nord du rond-point tient le point de fuite.
+
+#### Rond-point, `scene_f.py` (P2)
+
+La berline arrive par la branche sud (270°, vers +y_F), sort par la branche des enseignes (180°, vers −x_F). Du lieu à la ville : (y_F ; −x_F − 433,20).
+
+- **Joint sud, avec l'avenue : y_F = −19,00.** Chaussée 14 m (x_F ±7,0), trottoirs à porter de 4,0 à 4,5 m entre y_F −15 et −19 (façades x_F −11,5, mur +11,5). Rien au sud : branche sud, places, terrasses et sol retirés pour y_F < −19.
+- **Joint ouest, avec la rue : x_F = −18,20** (s 91,0 de la rue). Chaussée 8 m (y_F ±4,0), trottoirs 3 m, façades y_F ±7,0. Rien à l'ouest pour y_F < 24 : branche des enseignes, sol, terrasses retirés pour x_F < −18,2.
+- **Garder** : l'anneau, l'îlot, la branche de la plage, l'avenue nord jusqu'à y_F 400 avec son rang (y_F ≥ 24), son mur (x_F 46), sa plage ; la dalle de ce rang limitée à x_F ≥ −89.
+- **Retirer aussi** : les terrasses des deux angles ouest si elles touchent le bâti de la rue ou de l'avenue (carte) ; le sol sombre et la dalle au-delà des limites ci-dessus ; le faux phare.
+- **Plan** : P2, 110 images, ancre `(("s", S_ARC2 - 20), (1.75, -49.84), 0)`. Cercle nominal de centre (−28,25 ; −29,84), rayon 30 : il passe à 11,1 m du centre de l'îlot. P2/1 en (1,75 ; −41,45), sur l'avenue ; P2/110 en (−29,15 ; 0,25), 11 m dans la rue. P2 filme donc l'avenue, le rond-point et la rue : les trois sont dans sa scène.
+- **Devant la caméra à P2/110** : le barrage à 31 m, le quai à 86 m, le pylône du vrai pont à 281 m (10,5° de haut).
+
+#### Rue des enseignes, `scene_b.py` (P3)
+
+Du lieu à la ville : (x_B ; s − 506,0). Repère de vue du fichier : y_vue = 134 − s.
+
+- **Joint avec le rond-point : s = 91,0** (y_vue 43). Chaussée 8 m (x_B ±4,0), trottoirs 3 m, façades ±7,0. Le centre de l'îlot est en s 72,8 (y_vue 61,2), x_B 0.
+- **Joint avec le pont : s = 178** (y −328), fin du boulevard du quai. Le pont apporte la chaussée de 14 m de s 178 à 186 (début du tablier) ; la rue garde le boulevard (s 162 à 178), le mur du quai (s 181) et son garde-corps, avec une ouverture de ±9,7 m au lieu de ±8,5.
+- **Retirer** : tout ce qui est à y_vue > 43. `Y_END` 133 → 43 ; `LEFT` garde les dessins de y_vue −28, −16, 2, 14, 32 ; `RIGHT` ceux de −28, −16, 4, 22 et celui de 34 raccourci à 9 m ; `SPANS` de 46 et plus, `LAMPS` de 46, 76 et 106, les trois `PARKED` ; l'enseigne sur mât (y_vue 72) ramenée à y_vue 38 ou retirée ; `build_ring_end` entier ; dans `build_street_end`, le faux pont (s 181 à 600) et son pylône, `rue_eau`, l'autre rive, les mâts du port ; le faux phare.
+- **Ajouter : les deux immeubles du quai.** Le dernier dessin de chaque côté (y_vue −28, s 150 à 162) passe à 9 ou 10 niveaux (30 à 33 m), fenêtres éclairées, un bandeau lumineux sans texte en couronne. Raison : depuis le 200 mm de P4, la crête du pont cache tout ce qui est plus bas que 1,2 + 0,0353 × d (d = distance à l'objectif), soit 14,8 à 15,2 m à ces immeubles (d = 384 à 396 m) ; toute la rue actuelle (7 à 14 m) est cachée. À 32 m, on en voit 17 m : 2,5°, un quart de la hauteur du cadre. Chaque niveau en plus ou en moins vaut 0,5°. Le cadre de P4 ne fait que 37 m de large à cette distance (x de −14 à 23) : ce sont ces deux immeubles ou rien. Une version lointaine (boîtes à fenêtres procédurales, bandeau) pour la scène de P4.
+- **Plan** : P3, ancre inchangée. P3/1 en s 102,5, sa caméra en s 95,0, 4 m après le début de la rue ; barrage s 126.
+- **Devant la caméra** : le vrai pont dans l'axe, pylône à 281 puis 252 m (10,5 puis 11,7° de haut), encadré par les deux immeubles du quai. Le phare (7 à 13° à droite, 520 à 550 m) reste caché par le côté droit de la rue.
+
+#### Pont, `scene_c.py` (P4)
+
+Pose : identité.
+
+- **Joint avec la rue : y = −328.** `pont_ville` ramené à y de −328 à −320 : 14 m (x ±7,0), trottoirs 2 m, sans lampadaire. La culée limitée à y de −325 à −320 ; le sol de l'avenue retiré.
+- **Joint avec le port : le pied de la rampe, y = −5** (z nul à partir de y +1). Parapets, trottoirs et garde-corps continuent jusqu'à y −5 (ils s'arrêtent à −20). Le mur sud du port est en y −66,4 : de là au pied, la rampe passe sur le terre-plein (tablier à 3,7 m au mur) ; des murs de soutènement sous ses rives (x ±9,7) remplacent les piles de −55 et −20.
+- **Retirer** : l'avenue de la ville (y −1000 à −328) et ses lampadaires ; dans `plan_P4`, le port, la jetée et le phare de `L.panorama` (ils viennent de la ville, à leur pose) ; la ville lointaine ramenée à `depth=100, gap=(-8, 8)`.
+- **Plan** : P4, ancre `(48, (5.25, -5.69), CAP_B)`, caméra fixe (4,65 ; 40,0 ; 1,2). La berline dans la voie x 5,25 (1,80 aujourd'hui), de y −43,84 à −5,69 ; la meute décalée d'autant, dans x ±6. La crête est à 170 m de l'objectif (140 aujourd'hui) : étagement −18 %, à juger en gris sur les six rampes de P4/1.
+- **Derrière la meute** : la crête et le pylône à 170 m, puis les deux immeubles du quai à 384 à 396 m, la fente de la rue entre eux, la ville lointaine de part et d'autre. Flou de 7 pixels sur 1 080 à cette distance (200 mm, f/4, point à 46 à 84 m) : des boîtes suffisent.
+
+#### Port, `scene_e.py` (P5)
+
+Du lieu à la ville : (x_E ; y_E − 46,40).
+
+- **Joint avec le pont : le pied de la rampe en y_E = 41,4**, z nul à partir de y_E 47,4. De y_E −20 à 41,4 la rampe passe au-dessus du terre-plein : hauteur `scene_c.deck_z(y_E - 46.4)`, à rendre par `deck_ground` pour |x_E| ≤ 9,7. La voie plate du pont, ses marquages et les murs de conteneurs qui la bordent ne commencent qu'à y_E 41,4. Voie de la berline x_E 5,25.
+- **Joint avec la jetée : le segment de (27,5 ; 77,6) à (18,85 ; 87,86)**, perpendiculaire à l'axe de la jetée (y_D 328,8), 13,4 m. L'axe de la jetée passe en (12,13 ; 73,47), cap −50°, direction (0,766 ; 0,643) ; il coupe le joint en (23,1 ; 82,7). Chaussée de 8 m centrée sur l'axe.
+- **Le terre-plein devient le polygone** (−60 ; −20), (100 ; −20), (100 ; 77,6), (27,5 ; 77,6), (18,85 ; 87,86), (10 ; 80,43), (10 ; 100), (−60 ; 100). L'eau entre donc au nord de la voie du quai à droite de la jetée, et dans une encoche de 50° à sa gauche, dès y_D 317,3.
+- **Retirer** : le terre-plein hors du polygone ; les piles de conteneurs du nord-est ((38 ; 88) et suivantes) ; le mât (94 ; 92) ; l'ouverture de la jetée en x_E 80 dans `_edges`.
+- **Déplacer** : le mur de conteneurs de y_E 84,2 à **89,0**, de x_E −30 à 8 : l'objectif de P4 est en (4,65 ; 86,4 ; 1,2) et regarde vers −y ; rien de plus haut que 0,9 m devant lui entre x_E 3 et 6,5 (les séparateurs de y_E 80,6 à vérifier). Le mât clé de (32 ; 90), à 9 cm de l'axe de la jetée, à **(38,4 ; 82,3)**, sur un épaulement de 5 × 5 m accolé au flanc droit de la jetée ; son faisceau vers le virage tourne de 16°, à reprendre par la lumière de P5.
+- **Ajouter** : quai, couronnement et garde-corps le long de y_E 77,6 (de x_E 27,5 à 100) et le long de l'encoche ((18,85 ; 87,86), (10 ; 80,43), (10 ; 100)) ; les deux rives d'une voie de 8 m peintes sur le terre-plein, de la sortie du virage (13,1 ; 71,9) au joint.
+- **Plan** : P5, ancre inchangée. P5/1 en (5,25 ; 41,50), sur le raccord du pied (z 9 cm, nul à l'image 9) ; sa caméra est sur la rampe, en y_E 34,0, tablier à 0,44 m. P5/60 en (12,79 ; 71,43), cap −46,6°.
+- **Devant la caméra à P5/60** : la jetée, la pointe à 124 m, le phare à 152 m (6,7° de haut).
+
+#### Jetée et pointe, `scene_d.py` (P6, FIN, FIN6)
+
+Du lieu à la ville : (0,6428 x_D + 0,7660 y_D − 280,16 ; −0,7660 x_D + 0,6428 y_D − 113,76).
+
+- **Joint avec le port : la droite y_D = 328,8**, perpendiculaire à l'axe x_D 80. Chaussée 8 m (x_D 80 ± 4,0), trottoirs 2 m, couronnement à ±6,7. Avant, c'est le terre-plein du port.
+- **Retirer** : la jetée pour y_D < 328,8 (`JY0` 100 → 328,8), ses lampadaires avant y_D 315, le lampadaire droit de y_D 315 (il tomberait dans la voie du quai ; le gauche reste, sur le terre-plein) ; le pont et le port lointains de `L.panorama`.
+- **Garder** : la jetée de 328,8 à 400, la pointe, le phare ; garde-corps à partir du joint.
+- **Plans** : P6, ancre inchangée : P6/1 en (81,86 ; 313,18), sur le terre-plein ; l'eau à gauche à partir de y_D 317,3 (image 10), à droite à partir de 328,8 (image 33, le passage du joint). FIN et FIN6 inchangés sur la pointe ; leur fond change : le coin du port est à 40 m du bord de la pointe (330 aujourd'hui), à juger en gris.
 
 ## 3. Ce que chaque caméra voit
 
@@ -173,24 +254,18 @@ L'avenue va à −90°, la rue et le pont à 0°, la jetée à −50°. Force de
 
 Ce que cela raconte : le couchant à l'ouverture, la ville qui le cache, le large qui le rend. À juger sur deux images, P1/30 et P6/30, à ±10° près. Dans chaque lieu, `mer` = −70° − rot du lieu : +20° pour A et F, −70° pour B, C et E, −20° pour D.
 
-## 4. Les raccords à construire
+## 4. Les raccords transversaux
 
-| Raccord | Quoi | Réemploi | Fichier | Effort |
-|---|---|---|---|---|
-| Avenue rognée | plus rien après y_A 340,7 (rang arrêté à 338) ; « pointe de la baie », `sea_far`, `far_lighthouse` retirés ; dalles à x_A ≥ −108 | bornes en paramètres | `scene_a.py` | 1 h |
-| Promenade | retour du mur de x_A 11,5 au mur du rond-point (x_F 46) | `box` du mur | `scene_a.py` | 0,5 h |
-| Rond-point rogné | branche sud au-delà de y_F −19 et branche ouest au-delà de x_F −18,2 retirées ; `ground` ; dalle à x_F ≥ −108 | `BRANCHES`, `end` | `scene_f.py` | 1 h |
-| Rue rognée | `Y_END` 133 → 43, `RING` (0 ; 150) → (0 ; 61,2) ; LEFT garde 5 dessins, RIGHT 4 et un cinquième de 9 m ; listes filtrées ; faux îlot et place retirés | constantes en tête de fichier | `scene_b.py` | 2 h |
-| Bout de rue | faux pont, eau, autre rive retirés de `build_street_end` ; boulevard, quai et garde-corps gardés ; ouverture du quai à ±9,7 | le vrai pont, `scene_c.build_bridge(far=True, haubans=True)` | `scene_b.py` | 1 h |
-| Immeubles du quai | deux dessins de 9 à 10 niveaux aux angles du boulevard | un dessin de la rue, plus haut ; boîtes pour P4 | `scene_b.py`, `lieux.py` | 2 h |
-| Tête de pont | `pont_ville` ramené à 8 m (y −328 à −320), son sol retiré | `L.roadway` | `scene_c.py` | 0,5 h |
-| Pied de pont | parapets jusqu'à y −5 (`Y_PORT`) ; voie plate du port retirée sous la rampe (y_E < 41) | `_remove_bridge_flat` | `scene_c.py`, `scene_e.py` | 1 h |
-| Terre-plein découpé | polygone au lieu du rectangle : l'eau au nord de y_E 77 à droite de la jetée ; quai le long de la voie du quai | `build_quay`, `_edges` | `scene_e.py` | 3 h |
-| Port dégagé | piles du nord-est retirées ; mur de y 84,2 arrêté à x 17 ; mât (94 ; 92) retiré ; mât clé de (32 ; 90) à (22 ; 92) | listes | `scene_e.py` | 1 h |
-| Racine de jetée | jetée de y_D 300 à 400 ; garde-corps à partir de y_D 330 à droite, 350 à gauche | `rail_ys` de `L.roadway` | `scene_d.py` | 1,5 h |
-| Lointains vrais | `L.panorama` ne pose plus pont, port ni jetée : ils viennent de la ville, à leur pose ; `distant_city(depth=100, gap=(-8, 8))`, jamais avec A, F ou B | versions « loin » existantes de C, D, E | `lieux.py`, `ville.py` | 2 h |
-| Vue lointaine de la rue | façades et guirlandes émissives, sans mobilier ni lumières, pour OUV et P1 | `build_city`, `build_overhead` | `scene_b.py` | 1,5 h |
-| Mer | `MER_VILLE` = −70° ; `PHARE_AT` suit la pose de D ; `phare_lointain` plus appelé | `lieux.ciel(mer=)` | `lieux.py`, scènes | 1 h |
+Les raccords de chaque lieu sont en 2.5. Restent ceux qui n'appartiennent à aucun lieu :
+
+| Raccord | Quoi | Fichier | Effort |
+|---|---|---|---|
+| Lointains vrais | `L.panorama` ne pose plus pont, port ni jetée : ils viennent de la ville, à leur pose, dans leur version « loin » ou « près » selon la scène ; `distant_city(depth=100, gap=(-8, 8))`, jamais avec A, F ou B | `lieux.py`, `ville.py` | 2 h |
+| Eau | un seul plan (z −1,5) pour la lagune et l'océan ; A, F et B ne posent plus le leur | `ville.py` | 0,5 h |
+| Mer | `MER_VILLE` = −70° ; chaque scène reçoit −70° − rot ; `phare_lointain` plus appelé | `lieux.py`, scènes | 1 h |
+| Immeubles du quai, version lointaine | boîtes à fenêtres et bandeau, aux cotes de 2.5 (rue) | `scene_b.py` ou `lieux.py` | 1 h |
+
+Effort des lieux (2.5) : avenue 1,5 h, rond-point 1,5 h, rue 4 h, pont 1,5 h, port 5 h, jetée 1,5 h.
 
 ## 5. Le poids
 
