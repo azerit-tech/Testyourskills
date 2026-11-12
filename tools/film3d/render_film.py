@@ -270,16 +270,27 @@ def worker(a):
         t1 = time.time()
         bpy.ops.render.render(write_still=True)
         dt = time.time() - t1
+        # une seconde image, l'image voisine (scène gardée en mémoire) : la première paie la synchronisation de la
+        # scène et le chargement des textures, les suivantes beaucoup moins ; sans essai seulement
+        dt2 = None
+        if animated and not essais:
+            f2 = still + 1 if still + 1 <= first + min(span, n) - 1 else still - 1
+            scene.frame_set(f2)
+            r.filepath = os.path.join(bench_dir, f"{plan}-suivante.png")
+            t1 = time.time()
+            bpy.ops.render.render(write_still=True)
+            dt2 = time.time() - t1
         import resource
         rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / (1e6 if sys.platform == "darwin" else 1e3)
         to_render = min(span, n) if animated else 1
         rep = dict(plan=plan, animated=animated, build_s=round(t_build, 1), frame_s=round(dt, 1),
-                   frames_to_render=to_render, frames=n, rss_mb=round(rss), res=list(res), samples=samples,
-                   device=device, engine=engine)
+                   next_s=round(dt2, 1) if dt2 else None, frames_to_render=to_render, frames=n, rss_mb=round(rss),
+                   res=list(res), samples=samples, device=device, engine=engine)
         with open(os.path.join(bench_dir, f"{plan_dirname(plan, essais)}.json"), "w", encoding="utf-8") as f:
             json.dump(rep, f)
-        log(f"banc {plan} : construction {hms(t_build)}, une image {dt:.1f} s ({engine} {device}, {samples} éch., "
-            f"{res[0]}×{res[1]}), mémoire {rss:.0f} Mo ; {to_render} image(s) à rendre")
+        log(f"banc {plan} : construction {hms(t_build)}, première image {dt:.1f} s"
+            + (f", suivante {dt2:.1f} s" if dt2 else "") + f" ({engine} {device}, {samples} éch., {res[0]}×{res[1]}), "
+            f"mémoire {rss:.0f} Mo ; {to_render} image(s) à rendre")
         return
 
     idxs = parse_frames(a.frames, n)
@@ -559,14 +570,16 @@ def bench_summary(a, plans, peaks):
             rows.append(f"  {plan:5} pas mesuré (plan sauté ou en échec)")
             continue
         b = json.load(open(path, encoding="utf-8"))
-        est = b["build_s"] + b["frame_s"] * b["frames_to_render"]
+        nxt = b.get("next_s") or b["frame_s"]
+        est = b["build_s"] + b["frame_s"] + nxt * (b["frames_to_render"] - 1)
         total += est
         rows.append(f"  {plan:5} {'animé' if b['animated'] else 'FIXE '} construction {hms(b['build_s']):>10}  "
-                    f"image {b['frame_s']:7.1f} s × {b['frames_to_render']:2}  = {hms(est):>10}  mémoire {b['rss_mb']} Mo"
+                    f"première image {b['frame_s']:6.1f} s, puis {nxt:6.1f} s × {b['frames_to_render'] - 1:2}  "
+                    f"= {hms(est):>10}  mémoire {b['rss_mb']} Mo"
                     + (f", vidéo {peaks.get(plan)} Mo" if peaks.get(plan) else ""))
     txt = "\n".join([f"banc d'essai ({time.strftime('%Y-%m-%d %H:%M')}) :"] + rows +
-                    [f"  film entier estimé : {hms(total)} (la première image d'un plan compte la compilation et "
-                     f"le chargement : estimation haute)"])
+                    [f"  film entier estimé : {hms(total)} (la première image d'un plan paie la synchronisation de la "
+                     f"scène ; les suivantes sont mesurées sur l'image voisine, scène gardée en mémoire)"])
     print(txt, flush=True)
     with open(os.path.join(a.out, "banc", "banc.txt"), "w", encoding="utf-8") as f:
         f.write(txt + "\n")
