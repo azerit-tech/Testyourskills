@@ -1875,6 +1875,14 @@ def patrol_wake(police, frames):
     print(f"[scene_a] OUV : la patrouille allume ses phares à l'image {OUV.WAKE} ({len(keyed)} sources clées)", flush=True)
 
 
+def hero_cabin(coupe):
+    """L'habitacle de la berline allumé (lieux.cabin_light, la force des règles v3 pour un conducteur vu de dos) :
+    par la lunette, sa tête et ses épaules se découpent sur un habitacle chaud. Lampes invisibles à la caméra et dans
+    les vitres."""
+    import lieux as L
+    return L.cabin_light({"body": coupe.name}, energy=25.0)
+
+
 def ouv_motion(scene, coupe, police, cam, focus):
     """Le plan OUV animé (ouv_avenue.py) : la berline remonte l'avenue vers +y à 50 km/h, mise sur un rig
     (motion.rig_up) et clée par motion.key_vehicle (roues, suspension) ; la caméra la suit sur un rail
@@ -1898,6 +1906,7 @@ def ouv_motion(scene, coupe, police, cam, focus):
     cam.data.dof.focus_object = coupe
     cam.data.dof.aperture_fstop = OUV.FOCUS_F
     patrol_wake(police, frames)
+    hero_cabin(coupe)
     bpy.data.objects.remove(focus)
     scene.frame_set(frames[0])
     scene.render.motion_blur_shutter = 0.5
@@ -2041,6 +2050,7 @@ def p1_motion(scene, coupe, police, cam, focus):
     cam.data.dof.aperture_fstop = P.FSTOP
     bpy.data.objects.remove(focus)
     p1_props(P)
+    hero_cabin(coupe)
     scene.frame_set(P.STILL)          # l'image fixe du banc : la rampe allumée
     scene.render.motion_blur_shutter = 0.5
     scene.render.use_motion_blur = True
