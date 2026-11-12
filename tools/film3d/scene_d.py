@@ -849,8 +849,13 @@ def plan_P6(scene, hidden, palier="socle"):
         L.put(r, x, y, p6_ground(x, y)[0])
         yaw = 25 + 70 * ((i * 37) % 5) / 4
         L.bar_beams(r, f"{kind}_{i}", yaws=((yaw, L.CORAL), (yaw - 180 + 25 * (i % 3), L.LILAC)))
-        ps = M.sample(P6.column_pos(i), frames, wheel_r=0.36, seed=float(i))
-        M.key_vehicle(r, ps, ground=p6_ground, pivot=(0.0, 0.0, 0.36))   # roues jointes à la caisse
+        # les roues séparées (cast_vehicles.split_wheels) : elles tournent et braquent, la caisse penche seule
+        body = M.body_of(r)
+        wh, wr = M.wheels_of(body), body.get("wheel_r", 0.36)
+        ps = M.sample(P6.column_pos(i), frames, wheel_r=wr, seed=float(i),
+                      wheelbase=body.get("wheelbase", 2.9), front=body.get("front_axle"))
+        M.key_vehicle(r, ps, wheels=wh, ground=p6_ground, pivot=(0.0, 0.0, 0.36))
+        M.wheel_marks(wh, wr, axis="Y")
         rigs.append(r)
     n = M.flash_bars(rigs, frames)
     print(f"[P6] colonne de {len(rigs)} véhicules, {n} lumières de rampe clignotantes", flush=True)
