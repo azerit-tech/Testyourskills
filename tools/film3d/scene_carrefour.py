@@ -333,7 +333,10 @@ def place_cars(scene, pose=POSE, anim=False):
     f.visible_camera = f.visible_glossy = f.visible_transmission = False
     # les deux patrouilles (l'avant vers +x dans leur repère), rampes allumées, leurs flaques de couleur
     pat = cv.load_patrol("jeandiz", lights_on=True, name="patrol_1")
-    cars = [pat["body"], B.dup_tree(pat["body"], None, "2")]
+    # (la copie prend ses propres lumières, lieux.own_lights : les deux rampes clignotent chacune à sa phase ; les
+    # lueurs de rampe sont celles du modèle, scene_b.bar_glow n'existe plus)
+    import lieux
+    cars = [pat["body"], lieux.own_lights(B.dup_tree(pat["body"], None, "2"))]
     for sh in [c for c in bpy.data.collections if c.name.endswith("_glow_exclude")]:
         for co in sh.collection_objects:
             co.light_linking.link_state = "EXCLUDE"
@@ -341,7 +344,6 @@ def place_cars(scene, pose=POSE, anim=False):
         x, y, h, yb = poses[key]
         body.location = (x, y, 0.0)
         body.rotation_euler = (0, 0, math.radians(yb + 90.0))
-        B.bar_glow(body, key)
         # vues du ciel, les rampes posent sur le mouillé une flaque corail d'un côté, lilas de l'autre
         bpy.context.view_layer.update()
         for side, col in ((1, CORAL), (-1, LILAC)):
@@ -383,7 +385,7 @@ def animate(scene, car, fill, patrols, pose=POSE):
         hero_cars.stop_lamps(car, a, b)
     rigs = []
     for i, (body, key) in enumerate(zip(patrols, ("patrol_1", "patrol_2"))):
-        lights = [o for o in bpy.data.objects if o.name.startswith((f"bar_glow_{key}_", f"pool_{key}_"))]
+        lights = [o for o in bpy.data.objects if o.name.startswith(f"pool_{key}_")]
         r = M.rig_up(body, P.to_scene(pose, 0.0, 0.0, P.cars(P.STILL)[key][3])[2], f"rig_{key}", extras=lights)
         # (ses roues sont séparées, cast_vehicles.split_wheels : elles tournent et l'avant braque ; la trajectoire,
         # le roulis et le tangage ne dépendent pas du rayon ni de l'empattement)
