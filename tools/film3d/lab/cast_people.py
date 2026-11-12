@@ -268,29 +268,31 @@ def mat_leather_tex(name, color=None, nrm=None, rough=0.42, coat=0.35, nstrength
 
 
 def mat_vest():
-    """Le gilet des agents : un panneau clair et mat (gris perle), qui se lit à 30 m sur l'uniforme marine."""
+    """Le gilet des agents : un panneau gris perle mat, un ton sous les bandes, qui se lit à 30 m sur l'uniforme
+    marine sans devenir une plaque blanche."""
     m = _cached("ppl_vest")
     if m:
         return m
     N = _Nodes("ppl_vest")
-    N.tinted(lin("#a7abb0"), 0.9, 1.05, scale=8.0)
+    N.tinted(lin("#8a8e93"), 0.9, 1.05, scale=8.0)
     N.link(N.noise(30.0, 2.0, 0.82, 0.95), N.p.inputs["Roughness"])
     _set(N.p, spec=0.3, sheen=0.2, sheen_rough=0.5)
     N.normal(None, bumps=((1800.0, 0.25, 0.0003),))
-    return N.done("ppl_vest", lin("#a7abb0"))
+    return N.done("ppl_vest", lin("#8a8e93"))
 
 
 def mat_vest_band():
-    """Les deux bandes du gilet : un blanc mat, un vernis léger, et une lueur qui tient lieu de la rétroréflexion
-    (Cycles ne renvoie pas la lumière vers sa source) : sous les phares, deux traits clairs."""
+    """Les deux bandes du gilet : un blanc cassé mat, un vernis léger, sans lueur : au plus aussi claires qu'une
+    chemise blanche sous les phares, et elles prennent la couleur des rampes (corail, violet) qui clignotent à
+    côté. (Avec une lueur qui tenait lieu de rétroréflexion, les gilets devenaient des plaques blanches que le sol
+    mouillé reflétait comme des lampes.)"""
     m = _cached("ppl_vest_band")
     if m:
         return m
     N = _Nodes("ppl_vest_band")
     # lisse et métallisée, elle renvoyait le ciel sombre : deux traits noirs sur le gilet (FIN, image 34)
-    _set(N.p, base=lin("#eeeee8"), rough=0.45, spec=0.5, coat=0.3, coat_rough=0.15,
-         emit=lin("#fff3e2"), emit_str=1.2)
-    return N.done("ppl_vest_band", lin("#dcdcd6"))
+    _set(N.p, base=lin("#c9c9c4"), rough=0.55, spec=0.45, coat=0.15, coat_rough=0.2)
+    return N.done("ppl_vest_band", lin("#c9c9c4"))
 
 
 def mat_plate():
