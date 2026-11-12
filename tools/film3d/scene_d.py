@@ -662,21 +662,34 @@ def plan_FIN(scene, hidden, palier="socle"):
     Au premier plan à gauche, la patrouille arrêtée à côté d'elle, l'avant vers nous, la portière du conducteur
     grande ouverte ; derrière la portière un agent se redresse, l'arme tendue, à contre-jour du lampadaire et d'une
     lueur corail. Hors champ, des lueurs corail et lilas battent dans la brume et sur le sol mouillé.
-    (Au 35 mm du cahier des charges, la berline seule remplit la largeur à 9 m : le 24 mm fait entrer la patrouille.)"""
+    (Au 35 mm du cahier des charges, la berline seule remplit la largeur à 9 m : le 24 mm fait entrer la patrouille.)
+
+    Animé (36 images, fin_pointe.py) : la berline finit les 4,5 derniers mètres de sa glissade et s'arrête à l'image
+    22 ; la portière, déjà ouverte, est poussée à fond ; l'agent passe d'accroupi à en joue (clés d'os, images 18
+    à 28) ; le conducteur lève les mains (images 22 à 31) ; la fumée dépasse la berline. La dernière image est la
+    pose validée."""
+    import motion as M
+    import fin_pointe as F
     decor(scene, hidden, marina=(palier == "marina"))
+    scene.frame_start, scene.frame_end = F.F0, F.F0 + F.FRAMES - 1
+    frames = range(F.F0 - 1, F.F0 + F.FRAMES + 1)
     skid_marks()
     hero = L.hero()
-    L.put(hero, STOP.x, STOP.y, 0.0, heading=HERO_STOP)
-    L.hands_up(hero)
+    wheels = L.hero_wheels(hero)
+    poses = M.sample(F.hero_pos, frames, heading=F.hero_heading, wheel_r=hero["wheel_r"])
+    M.key_vehicle(hero, poses, wheels=wheels)
+    M.wheel_marks(wheels, hero["wheel_r"])
+    L.hands_up_keys(hero, *F.DRIVER_KEYS)
     L.cabin_light(hero, energy=25.0)
-    L.drive(hero, 1.2, L.hero_wheels(hero), hero["wheel_r"])
     # la patrouille, parallèle à la berline, à sa droite et un peu en avant : sa portière gauche s'ouvre vers elle
     f = Vector((-math.sin(math.radians(HERO_STOP)), math.cos(math.radians(HERO_STOP)), 0.0))
     r = Vector((f.y, -f.x, 0.0))
     pp = STOP + r * 4.0 + f * 1.5
     pat = L.patrol("patrol")
     L.put(pat, pp.x, pp.y, 0.0, heading=HERO_STOP)
-    L.open_door(pat, side=1, angle=80.0)
+    door_ob = L.door_object(pat, side=1)
+    for f_, a_ in F.DOOR_KEYS:
+        L.door_angle(door_ob, a_, frame=f_)
     # ni flaques ni phares : à 2-6 m du sol vu par l'objectif, ses flaques de rampe et ses phares (tournés vers
     # nous) éclairaient tout le tiers bas ; restent la rampe, ses faisceaux et ses lueurs sur la carrosserie
     for o in pat.children_recursive:
@@ -685,21 +698,27 @@ def plan_FIN(scene, hidden, palier="socle"):
     # les faisceaux de sa rampe partent vers l'arrière, presque à l'horizontale : vers l'avant, le corail frappait
     # le sol juste devant l'objectif et blanchissait tout le tiers bas
     L.bar_beams(pat, "patrol", yaws=((125, L.CORAL), (-125, L.LILAC)), energy=3000.0, tilt=3.0)
-    hinge = pp + f * 0.96 - r * 0.92
-    door = (-f * math.cos(math.radians(80)) - r * math.sin(math.radians(80))).normalized()
+    M.flash_bars([pat], frames)
+    # l'agent garde son armature : accroupi derrière la portière, il se redresse en joue (fin_pointe.OFFICER_KEYS)
     try:
-        cop = L.officer("aim", style=0, name="officer_fin")
-        bis = (door + (-f)).normalized()
-        cp_ = hinge + bis * 0.75
-        cop.location = (cp_.x, cp_.y, 0.0)
-        L.face(cop, (STOP.x - 0.3, STOP.y + 0.6))
+        cop = L.officer_rig(F.OFFICER_KEYS, style=0, name="officer_fin")
+        cop.location = (*F.OFFICER, 0.0)
+        L.face(cop, F.OFFICER_LOOK)
     except Exception as e:
         print(f"[pointe] agent non posé : {e!r}", flush=True)
     # la fumée des pneus : sur la trace de la glissade, derrière la berline, aussi légère que dans FIN6. Une nappe
     # devant la voiture (0,42, de 0,1 à 0,9 m, à 6 m de l'objectif) remplissait toute la moitié basse : éclairée
     # par les lueurs, elle faisait le gris pâle et plat
-    L.smoke("fumee_arriere", (CX + 1.6, CY - 3.2, 0.8), (3.6, 4.4, 1.4), density=0.18, seed=4.0)
-    L.smoke("fumee_trace", (CX + 1.5, CY - 11.0, 1.0), (3.5, 6.0, 1.6), density=0.12, seed=7.0)
+    for ob in (L.smoke("fumee_arriere", (CX + 1.6, CY - 3.2, 0.8), (3.6, 4.4, 1.4), density=0.18, seed=4.0),
+               L.smoke("fumee_trace", (CX + 1.5, CY - 11.0, 1.0), (3.5, 6.0, 1.6), density=0.12, seed=7.0)):
+        # sur sa lancée, la fumée dépasse la berline vers l'objectif et gonfle (pose validée à la dernière image)
+        loc, sc = ob.location.copy(), ob.scale.copy()
+        for f_ in frames:
+            e = 1.0 - (1.0 - min(1.0, (f_ - F.F0) / (F.FRAMES - 1))) ** 2
+            ob.location = loc + Vector((0.0, F.SMOKE_DRIFT * (e - 1.0), -0.15 * (1.0 - e)))
+            ob.scale = sc * (0.8 + 0.2 * e)
+            ob.keyframe_insert("location", frame=f_)
+            ob.keyframe_insert("scale", frame=f_)
     # plus de lueurs hors champ (FIN6 n'en a pas et son sol reste sombre) : le contre-jour de l'agent, c'est le
     # lampadaire de la pointe, derrière lui
     # le lampadaire de la pointe frappe la berline : ambre à 3,2 kW, il la sortait orange vif ; plus faible et
@@ -906,7 +925,7 @@ def plan_P6(scene, hidden, palier="socle"):
     return cam
 
 
-STILL = {"P6": 21, "FIN6": 56}                        # l'image fixe d'essai des plans animés (STILL_FRAME)
+STILL = {"P6": 21, "FIN6": 56, "FIN": 36}                        # l'image fixe d'essai des plans animés (STILL_FRAME)
 
 
 PLANS = {"FIN": plan_FIN, "FIN6": plan_FIN6, "P6": plan_P6}

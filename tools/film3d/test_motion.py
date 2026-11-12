@@ -213,6 +213,31 @@ def test_fin6():
           f"{math.dist(a[:3], b[:3]) * 100:.1f} cm entre les deux dernières images")
 
 
+def test_fin():
+    """FIN : la berline et la patrouille ne se touchent pas (0,5 m d'air au moins, caisses en rectangles) ; la
+    portière ne traverse pas l'agent ; rien ne frôle la caméra ; la berline arrêtée sur la pose validée."""
+    import fin_pointe as P
+    frames = range(P.F0, P.F0 + P.FRAMES)
+    g = min(P.rect_gap(P.hero_pos(M.t_of(f)), P.hero_heading(M.t_of(f)), P.HERO_BOX, P.PATROL, P.HERO_STOP,
+                       P.PATROL_BOX) for f in frames)
+    check("FIN : la berline ne touche pas la patrouille", g >= 0.5, f"{g:.2f} m au plus près")
+    d = min(P.seg_point(P.HINGE, tuple(P.HINGE[k] + P.door_dir(P.door_deg(M.t_of(f)))[k] * P.DOOR_LEN for k in (0, 1)),
+                        P.OFFICER) - P.OFFICER_R for f in frames)
+    check("FIN : la portière ne traverse pas l'agent", d >= 0.05, f"{d:.2f} m au plus près")
+    o = min(P.rect_gap(P.hero_pos(M.t_of(f)), P.hero_heading(M.t_of(f)), P.HERO_BOX, P.OFFICER, 0.0,
+                       (2 * P.OFFICER_R, 2 * P.OFFICER_R)) for f in frames)
+    check("FIN : la berline ne touche pas l'agent", o >= 0.5, f"{o:.2f} m au plus près")
+    c = min(P.rect_gap(P.hero_pos(M.t_of(f)), P.hero_heading(M.t_of(f)), P.HERO_BOX, P.CAM[:2], 0.0, (0.2, 0.2))
+            for f in frames)
+    check("FIN : rien ne frôle la caméra", c >= 1.0, f"{c:.2f} m au plus près")
+    x, y = P.hero_pos(P.T_STILL)
+    check("FIN : la pose validée à la fin", math.dist((x, y), (P.CX, P.CY)) < 1e-6
+          and abs(P.hero_heading(P.T_STILL) - P.HERO_STOP) < 1e-6)
+    ps = M.sample(P.hero_pos, range(0, 40), heading=P.hero_heading, noise=0.0)
+    check("FIN : la caisse plonge au freinage", min(p["pitch"] for p in ps) < -1.0,
+          f"{min(p['pitch'] for p in ps):.2f}°")
+
+
 def test_bars():
     seq = [M.bar_phase(f) for f in range(24)]
     check("rampes : 2 Hz, alternance corail / lilas", seq[:6] == ["corail"] * 6 and seq[6:12] == ["lilas"] * 6
@@ -230,6 +255,7 @@ if __name__ == "__main__":
     test_p6()
     test_ouv()
     test_fin6()
+    test_fin()
     test_bars()
     print(f"\n{'tout passe' if not FAIL else str(len(FAIL)) + ' échec(s)'}")
     sys.exit(1 if FAIL else 0)
