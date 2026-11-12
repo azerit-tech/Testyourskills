@@ -41,7 +41,9 @@ JY0, JY1 = L.JETTY_YS           # 100 .. 400
 J_HALF = 4.0                    # la chaussée à deux voies, cunettes comprises
 J_WALK = 2.0
 J_EDGE = J_HALF + 0.2 + J_WALK + 0.5      # 6,7 : le bord du couronnement
-J_LAMPS = [JY0 + 15.0 + 30.0 * k for k in range(10)]   # 115 .. 385
+# un lampadaire de chaque côté tous les 20 m (lumière v3.1, P6) : à 30 m, entre deux plages la chaussée n'avait que
+# le ciel (médiane 5 % au bas du cadre de P6) ; à 20 m les plages se touchent presque et défilent avec la vitesse
+J_LAMPS = [JY0 + 15.0 + 20.0 * k for k in range(15)]   # 115 .. 395
 
 CX, CY = L.POINTE               # (80, 430)
 R = L.POINTE_R                  # 30
@@ -1083,9 +1085,9 @@ def p6_foreground(hidden):
 
 # les lampadaires de la jetée qui noient le phare (découpage v3 §3 : la lanterne, le repère du film, doit être le point
 # le plus vif de l'horizon) : vue de la caméra de P6, la file de gauche (x 76 pour les têtes) passe à 1,5° au plus de
-# la lanterne de y 325 à 385, celle de droite à 3° ; les trois derniers de gauche sont retirés, les trois derniers de
+# la lanterne de y 315 à 395, celle de droite à 3° ; les cinq derniers de gauche sont retirés, les cinq derniers de
 # droite et celui de la pointe baissés (tête à 8 au lieu de 40, sous la lanterne à 30 ; spot à moitié)
-P6_LAMPS_FAR = (7, 8, 9)                 # J_LAMPS[7:] : y 325, 355, 385
+P6_LAMPS_FAR = (10, 11, 12, 13, 14)     # J_LAMPS[10:] : y 315 à 395, tous les 20 m
 # les pinceaux du phare, gelés : vue du phare, la caméra est à 271,7° (image 1) puis 272,7° depuis +x. Tout
 # pinceau qui s'écarte de l'axe de la jetée part de la lanterne (au centre) et sort par un bord du cadre : en travers,
 # deux traits d'un bord à l'autre (rendus f1 et f2), près de l'axe, l'un fuit derrière le phare (court), l'autre
