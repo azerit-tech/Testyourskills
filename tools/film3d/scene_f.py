@@ -385,21 +385,6 @@ def build_street_life(hidden, branches):
     log(f"4 lampadaires, {k} terrasses, 6 flaques le long de l'îlot")
 
 
-def ring_pools():
-    """Les gyrophares de la première patrouille jusque sur l'anneau : deux faisceaux serrés, corail à gauche, lilas
-    à droite, qui posent leurs taches sur la chaussée mouillée 10 à 14 m devant elle."""
-    x, y, h, _ = P.cars()["patrol_1"]
-    x, y, h = P.to_scene(POSE, x, y, h)
-    f = Vector((-math.sin(math.radians(h)), math.cos(math.radians(h)), 0.0))
-    side = Vector((f.y, -f.x, 0.0))
-    p0 = Vector((x, y, 2.1))
-    for s, col, ahead in ((-1, CORAL, 11.0), (1, LILAC, 13.5)):
-        t = Vector((x, y, 0.0)) + f * ahead + side * (s * 3.0)
-        # (visibles dans les reflets : sur l'enrobé mouillé, presque tout passe par le reflet)
-        lo = A.add_light(f"ring_pool_{s}", "SPOT", p0 + side * (s * 0.4), t - p0, lin(col), 30000.0, spot=22)
-        lo.data.spot_blend = 0.9
-
-
 # ---------------------------------------------------------------- le fond, à hauteur de voiture (découpage v2)
 #
 # La caméra basse du découpage v2 (p2_arc.low_cam_pos) regarde d'abord l'est (la branche de la plage), puis
@@ -630,9 +615,6 @@ def build(plan=None, palier=None):
     build_dusk(hidden)
     build_edges(bpy.data.materials["ring_puddle"])
     C.place_cars(scene, POSE, anim=True)
-    # (ring_pools, les deux faisceaux de 30 kW posés pour le drone devant la patrouille de l'image fixe, ne sont
-    # plus appelés : fixes dans un plan animé, ils tombaient sur la ligne de la berline des images 1 à 10 et la
-    # sortaient rouge orangé)
     keep_paint()
     for c in bpy.data.collections:
         if c.name == "sources" or c.name.startswith("sources."):

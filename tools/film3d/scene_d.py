@@ -797,8 +797,6 @@ def plan_FIN(scene, hidden, palier="socle"):
     door_ob = L.door_object(pat, side=1)
     for f_, a_ in F.DOOR_KEYS:
         L.door_angle(door_ob, a_, frame=f_)
-    # les faisceaux de sa rampe partent vers l'avant et sur les côtés, jamais vers la caméra (derrière à gauche)
-    L.bar_beams(pat, "patrol", yaws=((55, L.CORAL), (-70, L.LILAC)), energy=3000.0, tilt=3.0)
     # la patrouille 1, qui nous dépasse par la gauche et s'arrête à gauche de la berline
     p1 = L.patrol("patrol_1")
     for o in p1.children_recursive:
@@ -811,8 +809,6 @@ def plan_FIN(scene, hidden, palier="socle"):
                   wheelbase=body.get("wheelbase", 2.9), front=body.get("front_axle"))
     M.key_vehicle(p1, ps, wheels=wh, pivot=(0.0, 0.0, 0.36))
     M.wheel_marks(wh, wr, axis="Y")
-    # ses faisceaux de rampe : l'un traverse la brume devant la berline, l'autre part à l'arrière gauche
-    L.bar_beams(p1, "patrol_1", yaws=((-35, L.CORAL), (145, L.LILAC)), energy=3000.0, tilt=3.0)
     pursuers = fin_pursuers(frames)
     # les deux patrouilles du cadre battent, la v2 en tête de liste (sa phase) ; les poursuivants n'ont plus de
     # rampe allumée. Les lueurs des rampes éclairent la berline (FIN reste la référence de teinte, 12 nov.)
@@ -940,11 +936,6 @@ def plan_FIN6(scene, hidden, palier="socle"):
             r = L.clone(r, f"{kind}_{i}")
         h = L.heading_to((STOP.x - x, STOP.y - y)) + rnd.uniform(-28, 28)
         L.put(r, x, y, 0.0, heading=h)
-        beams = L.bar_beams(r, f"{kind}_{i}", yaws=((rnd.uniform(-60, 60), L.CORAL),
-                                                     (rnd.uniform(120, 240), L.LILAC)), energy=5000.0)
-        # vingt-deux faisceaux corail et lilas croisés sur la berline la passaient au rose : elle n'en reçoit que
-        # le dixième, de leur couleur (un liseré), l'anneau et la brume gardent tout
-        split_for_car(beams, hero, tag="rampe", fraction=0.1)
         rigs.append(r)
     # le temps est gelé, pas les gyrophares : rampes, faisceaux et flaques battent à 2 Hz (corail, lilas)
     n = M.flash_bars(rigs, frames)
@@ -1145,8 +1136,6 @@ def plan_P6(scene, hidden, palier="socle"):
             r = L.clone(src[kind], f"{kind}_{i}")
         x, y = P6.column_pos(i)(P6.T_STILL)
         L.put(r, x, y, p6_ground(x, y)[0])
-        yaw = 25 + 70 * ((i * 37) % 5) / 4
-        L.bar_beams(r, f"{kind}_{i}", yaws=((yaw, L.CORAL), (yaw - 180 + 25 * (i % 3), L.LILAC)))
         # les roues séparées (cast_vehicles.split_wheels) : elles tournent et braquent, la caisse penche seule
         body = M.body_of(r)
         wh, wr = M.wheels_of(body), body.get("wheel_r", 0.36)

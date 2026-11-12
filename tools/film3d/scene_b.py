@@ -1180,34 +1180,6 @@ def unshare_lights(root):
     return root
 
 
-def patrol_beams(body, tag, aims):
-    """Les gyrophares figés en plein balayage : un faisceau corail et un violet par rampe, vers les points donnés
-    (repère de vue), qui lèchent les façades et le mouillé ; la brume les rend visibles."""
-    bpy.context.view_layer.update()
-    # au-dessus de la rampe : dedans, sa coque arrêterait le faisceau
-    top = body.matrix_world @ Vector((-0.12, 0, 2.02))
-    out = []
-    for k, (col, target, energy, size) in enumerate(aims):
-        L = bpy.data.lights.new(f"beam_{tag}_{k}", "SPOT")
-        L.color = lin(col)[:3]
-        L.energy = energy
-        L.spot_size = math.radians(size)
-        L.spot_blend = 0.85
-        L.shadow_soft_size = 0.05
-        # leur puissance est faite pour les façades lointaines : dans la brume, un faisceau, pas un mur de lait
-        try:
-            L.volume_factor = 0.12
-        except AttributeError:
-            pass
-        lo = bpy.data.objects.new(L.name, L)
-        bpy.context.scene.collection.objects.link(lo)
-        lo.location = top
-        lo.rotation_mode = "QUATERNION"
-        lo.rotation_quaternion = (Vector(target) - lo.location).normalized().to_track_quat("-Z", "Y")
-        lo.visible_glossy = False
-        out.append(lo)
-    return out
-
 
 def heading_rot(hx, hy):
     """Lacet d'un véhicule (avant vers +x dans son repère) pour qu'il pointe vers (hx, hy)."""
@@ -1385,17 +1357,7 @@ def build_barrage(scene, hidden, plan):
     for ch in far.children:
         if "_door_" in ch.name:
             ch.rotation_euler = (0, 0, 0)
-    # les faisceaux : corail #ff6a3d et lilas #8d8cf0, qui balaient façades et chaussée
-    # (les taches sur les façades à 25-35 m : plus près, elles tomberaient hors du cadre vertical ; à cette
-    # distance, il faut cette puissance pour passer au-dessus des vitrines)
-    beams = patrol_beams(cars[0], "a", [(CORAL, (-7.0, yb + 22.0, 6.0), 150000, 18), (LILAC, (2.0, yb + 30.0, 0.0), 60000, 18)])
-    beams += patrol_beams(cars[1], "b", [(LILAC, (7.0, yb + 18.0, 6.5), 150000, 18), (CORAL, (-2.0, yb + 34.0, 0.0), 60000, 18)])
-    # (la patrouille 1, sortie du cadre par la gauche : ses faisceaux balaient devant elle les façades autour de la
-    # berline et du barrage, la meute qui pousse se lit sur les murs)
-    beams += patrol_beams(cars[2], "c", [(CORAL, (-7.0, cy - 30.0, 5.5), 50000, 16), (LILAC, (7.0, cy - 40.0, 5.0), 50000, 16)])
-    exclude_hero(beams, "faisceaux")
-    # les lueurs colorées des rampes (celles du modèle, 600 W à 0,4 m de la rampe) : la berline passe à 1,5 m, elles la teintaient de corail puis de lilas ; la liaison l'en retire comme
-    # des faisceaux. (Plus de lueurs à part, bar_glow : copiées des rampes, les lumières des trois patrouilles
+    # les lueurs colorées des rampes (celles du modèle, 600 W à 0,4 m de la rampe) : la berline passe à 1,5 m, elles la teintaient de corail puis de lilas ; la liaison l'en retire. (Plus de lueurs à part, bar_glow : copiées des rampes, les lumières des trois patrouilles
     # partagent leurs données et clignotent ensemble ; les lueurs à part battaient à contretemps de leurs optiques.)
     glows = [o for car in cars[:2] for o in car.children_recursive if o.type == "LIGHT" and "_glow_" in o.name]
     for sh in shells:
@@ -1608,32 +1570,16 @@ def plan_P3(scene):
     import hero_cars
     for first, last in P3.brake_windows():
         hero_cars.stop_lamps(body, first, last)
-    # --- la troisième patrouille, ses deux faisceaux avec elle
+    # --- la troisième patrouille
     far = ob["patrol_a_c"]
-    rig_c = MO.rig_up(far, P3.CHASE[2], name="rig_patrol_c",
-                      extras=[o for o in ob if o.name.startswith("beam_c_")])
+    rig_c = MO.rig_up(far, P3.CHASE[2], name="rig_patrol_c")
     wh, wr = MO.wheels_of(far), far.get("wheel_r", 0.36)
     MO.key_vehicle(rig_c, MO.sample(P3.chase_pos, frames, heading=lambda t: P3.CHASE[2], wheel_r=wr, seed=2.0,
                                     wheelbase=far.get("wheelbase", 2.9), front=far.get("front_axle")),
                    wheels=wh, pivot=(0.0, 0.0, 0.36))
     MO.wheel_marks(wh, wr, axis="Y")
-    # --- les rampes : lueurs et faisceaux des deux voitures garées rangés sous elles, puis 2 Hz corail / lilas
-    for tag, car in (("a", ob["patrol_a"]), ("b", ob["patrol_a_b"])):
-        keep_world_parent([o for o in ob if o.name.startswith(f"beam_{tag}_")], car)
+    # --- les rampes : 2 Hz corail / lilas
     n_bars = MO.flash_bars([ob["patrol_a"], ob["patrol_a_b"], rig_c], frames)
-    # les faisceaux du barrage sur les façades devant lui, × BEAM_GAIN de loin : dès l'image 1, les murs battent
-    # corail et lilas autour de la berline, avant que le barrage lui-même se lise au-dessus du toit
-    gains = (("beam_a_", lambda f: 1.0 + (P3.BEAM_GAIN - 1.0) * (1.0 - MO.smoothstep(*P3.BEAM_FADE, f))),
-             ("beam_b_", lambda f: 1.0 + (P3.BEAM_GAIN - 1.0) * (1.0 - MO.smoothstep(*P3.BEAM_FADE, f))))
-    seen = set()
-    for key, gain in gains:
-        for o in [o for o in ob if o.type == "LIGHT" and key in o.name]:
-            if o.data.name in seen:
-                continue
-            seen.add(o.data.name)
-            for fc in MO.fcurves(o.data):
-                for kp in fc.keyframe_points:
-                    kp.co[1] *= gain(kp.co[0])
     # --- les tirs : flamme (trois maillages) et éclair ponctuel allumés une image, cachés sinon
     for k in P3.SHOTS:
         parts = [o for o in ob if o.name.startswith(f"muzzle_flash_{k}_")] + [ob[f"muzzle_{k}"]]

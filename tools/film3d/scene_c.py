@@ -257,9 +257,6 @@ def pack(entries, speed=SPEED, beams=True, on=None):
         else:
             r = L.clone(src[kind], f"{kind}_{i}")
         on(r, x, y, heading)
-        if beams:
-            yaw = 25 + 70 * ((i * 37) % 5) / 4
-            L.bar_beams(r, f"{kind}_{i}", yaws=((yaw, L.CORAL), (yaw - 180 + 25 * (i % 3), L.LILAC)))
         L.drive(r, speed)
         out.append(r)
     return out

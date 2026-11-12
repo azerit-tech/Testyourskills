@@ -14,7 +14,7 @@
 #   L.haze((-300, 300), (-400, 470), (L.WATER_Z, 60), 0.0012)
 #   hero = L.hero()                                    # la berline (FILM3D_HERO), conducteur assis : un rig
 #   pat = L.patrol(); van = L.van(); heli, h = L.helicopter(); jet = L.jet()
-#   L.put(rig, x, y, z, heading, pitch); L.drive(rig, speed); L.clone(rig, "patrol_2"); L.bar_beams(rig, "tag")
+#   L.put(rig, x, y, z, heading, pitch); L.drive(rig, speed); L.clone(rig, "patrol_2")
 #   cop = L.officer("guard"); L.face(cop, cible)
 #   L.camera("cam_P4", loc, target, lens=200, fstop=2.8, focus=...)
 #
@@ -1300,39 +1300,6 @@ def helicopter(name="heli", searchlight=True):
 def aim(h, target):
     import cast_vehicles as cv
     cv.aim_searchlight(h, target)
-
-
-def bar_beams(root, tag, yaws=((35, CORAL), (-150, LILAC)), energy=9000.0, size=26.0, tilt=10.0):
-    """Les faisceaux de la rampe figés en plein balayage : un spot par couleur, presque à l'horizontale (`tilt`
-    degrés sous l'horizon), tourné de `yaw` degrés par rapport à l'avant. Ils se lisent dans la brume."""
-    bpy.context.view_layer.update()
-    body = bpy.data.objects[root["body"]]
-    bn = root.get("bar", "")
-    bar = next((o for o in root.children_recursive if bn and (o.name == bn or o.name.endswith(":" + bn))), None)
-    top = (bar.matrix_world.translation if bar else body.matrix_world @ Vector((0, 0, 1.6))) + Vector((0, 0, 0.18))
-    fwd = forward(root)
-    out = []
-    for k, (yaw, col) in enumerate(yaws):
-        d = fwd.copy()
-        d.rotate(Matrix.Rotation(math.radians(yaw), 3, "Z"))
-        d.z = -math.tan(math.radians(tilt))
-        L = bpy.data.lights.new(f"{tag}_beam_{k}", "SPOT")
-        L.color = lin(col)[:3]
-        L.energy = energy
-        L.spot_size = math.radians(size)
-        L.spot_blend = 0.8
-        L.shadow_soft_size = 0.06
-        lo = bpy.data.objects.new(L.name, L)
-        bpy.context.scene.collection.objects.link(lo)
-        lo.location = top + Vector((d.x, d.y, 0)).normalized() * 0.25
-        lo.rotation_mode = "QUATERNION"
-        lo.rotation_quaternion = d.normalized().to_track_quat("-Z", "Y")
-        bpy.context.view_layer.update()
-        mw = lo.matrix_world.copy()
-        lo.parent = root
-        lo.matrix_world = mw
-        out.append(lo)
-    return out
 
 
 def open_door(root, side=-1, angle=75.0, door_x=(-0.32, 0.99), door_z=(0.18, 1.42), inner=0.55, hinge=(0.96, 0.92)):

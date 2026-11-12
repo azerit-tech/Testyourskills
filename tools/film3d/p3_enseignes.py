@@ -160,9 +160,6 @@ PUDDLES = [("flaque_entree", -1.05, 97.5, 0.55, 2.4), ("flaque_feinte", 1.15, 10
            ("flaque_basse_1", 0.35, 114.9, 0.35, 1.7),
            ("flaque_arret", -2.3, 118.9, 0.4, 1.4), ("flaque_trottoir", 3.2, 117.0, 0.5, 2.6)]
 
-# les faisceaux des deux patrouilles du barrage sur les façades devant lui : × BEAM_GAIN jusqu'à l'image 22,
-# normaux à l'image 36 (la berline cache le barrage au début : ce sont les murs qui battent)
-BEAM_GAIN, BEAM_FADE = 2.5, (22, 36)
 
 # --- la patrouille 1 (celle de P2) : dans la voie de gauche (CHASE_X), son centre CHASE_AHEAD devant celui de la
 # berline à l'image 1, CHASE_DV moins vite qu'elle : elle a déjà levé le pied à la fin de P2. Elle freine ensuite
