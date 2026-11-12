@@ -115,3 +115,14 @@ lockf -k <verrou> nice -n 19 /Applications/Blender.app/Contents/MacOS/Blender -b
 8. Rapatrier : `scp machine:~/film/plans/*.mp4 ~/Desktop/Azerit/design/film/plans/`, puis sur le Mac `npx tsx scripts/film-contact.ts <prise>` et `npx tsx scripts/film-assemble.ts` (les six mp4 du site, à leurs plafonds de poids).
 
 Sur le Mac, seulement l'essai à blanc, sous le verrou : `lockf -k <verrou> nice -n 19 python3 tools/film3d/render_film.py --dry --plan P3 --threads 2 --out <dossier>`, puis `--assemble` (un brouillon, jamais une prise).
+
+**Itérer vite sur la machine louée** (`debit.py`, mesures du 12 novembre sur P3 et P6 : le goulot est le processeur, pas la carte). Le mode d'emploi :
+
+1. Toujours : `cd ~/wt/<nom> && export FILM3D_ASSETS=$HOME/film/assets FILM3D_HERO=w111 FILM3D_FX=0 BLENDER=~/blender-5.2.2-linux-x64/blender` ; chaque Blender prend une place de la file (quatre), un seul à la fois par agent.
+2. Image fixe : `python3 tools/film3d/render_film.py --plan P3 --frames 24 --res 360x640 --samples 64 --out ~/film/iter-<nom>/<essai>`.
+3. Brouillon fidèle d'un plan (lumière, reflets) : `FILM3D_DRAFT=1 python3 tools/film3d/render_film.py --plan P3 --draft --out ~/film/iter-<nom>/<essai>`, puis la même commande avec `--assemble` (même `FILM3D_DRAFT`) ; subdivisions de rendu à 0, le reste identique (écart 0,03 / 255) ; P3 : 12 s puis 7 s par image au lieu de 60 s puis 12 s.
+4. Brouillon de mouvement (caméra, conduite) : `FILM3D_DRAFT=2` (en plus, l'arbre des lumières éteint : les reflets des petites sources sur la chaussée pâlissent) ; P3 : 12 s puis 3 à 4,5 s par image.
+5. Cadrage gris (Workbench, sans lumière) : `--dry` ; 0,2 à 0,6 s par image ; le film entier : `--dry --out <dossier>` sans `--plan`, puis `--assemble --out <dossier>`, qui écrit aussi `bout-a-bout-brouillon.mp4` (chaque plan tenu à sa durée du montage).
+6. La scène de chaque plan est en cache (`~/film/cache`, partagé par toutes les copies) : la construction (40 à 107 s de Python sur un cœur) n'a lieu qu'une fois par état du code ; ensuite « repris du cache en 1 s ». Retoucher un module ne reconstruit que les plans qui l'importent ; `iter_diag.py` s'en sert aussi.
+7. `FILM3D_PHASES=1` ajoute à chaque image le temps de chaque phase de Cycles (synchro, lumières, échantillons…) : savoir où part le temps.
+8. À ne pas faire : lancer `blender.real` hors de la file ; effacer `~/film/cache` pendant les rendus des autres ; modifier un asset sur place (le cache ne voit que taille et date des fichiers lus par Python) ; poser `FILM3D_DRAFT` pour une prise (ses images vont dans `<PLAN>+brouillon/` et ne deviennent jamais une prise) ; `FILM3D_CACHE=0` sans raison (il force la reconstruction).
