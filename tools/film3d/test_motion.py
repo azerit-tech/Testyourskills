@@ -587,34 +587,139 @@ def _common_frame(name, P):
 
 
 def test_fin6():
-    """FIN6 : la caméra ne passe à moins de 1 m d'aucun véhicule, agent ni mât ; la berline entière dans le cadre,
-    hors des bandes du HUD (12 % du haut, 15 % du bas), son milieu entre 35 et 60 % de la hauteur ; l'orbite de
-    150° finit sur la pose validée (azimut 95°, immobile)."""
+    """FIN6 (découpage v3.1, la fin à six étoiles, après P6) : la coupe depuis P6 tient (hauteur à ± 0,3 m,
+    distance à ± 0,8 m, 24 mm, la berline au même point du cadre) ; la berline arrive et s'arrête comme dans FIN
+    (freinage sous 7 m/s², feux stop dès l'image 1, arrêt à l'image 36, la patrouille 1 en travers devant à gauche,
+    à gauche du cadre 12 images de suite au moins) ; l'orbite tourne de 40 à 60° par la gauche, 30 °/s et 40 °/s² au
+    plus, redescend sans retour au cadre commun (7,5 m, 2,4 m) et se pose immobile au trois quarts arrière gauche,
+    la berline au milieu ; rien à moins de 1 m de la caméra ; la berline entière dans le cadre hors des bandes du
+    HUD ; six agents, six modèles, tous dans l'image posée ; 1,5 m entre caisses, 1 m entre un agent et une caisse ;
+    le lampadaire ne laisse pas de reflet sans sa tête ; l'hélicoptère hors des bandes du HUD."""
     import fin6_orbite as P
+    import fin_pointe as F
+    import p6_jetee as P6
     frames = range(P.F0, P.F0 + P.FRAMES)
-    near = min((d(P.camera(M.t_of(f))[:2]), n, f) for f in frames for n, d in P.obstacles())
+    keyed = range(P.F0 - 1, P.F0 + P.FRAMES + 1)
+    cams = {f: P.camera(M.t_of(f)) for f in keyed}
+    near = min((d(cams[f][:2]), n, f) for f in keyed for n, d in P.obstacles(M.t_of(f)))
     check("FIN6 : rien à moins de 1 m de la caméra", near[0] >= 1.0, f"{near[0]:.2f} m de {near[1]} à l'image {near[2]}")
-    worst = []
+    # la coupe depuis P6
+    t6 = M.t_of(P6.F0 + P6.FRAMES - 1)
+    c6, h6 = P6.camera_rail(t6), P6.hero_pos(t6)
+    q6 = M.screen_point(c6, (h6[0], h6[1], P.AIM_Z))
+    c1, h1 = cams[P.F0], P.hero_pos(M.t_of(P.F0))
+    q1 = M.screen_point(c1, (h1[0], h1[1], P.AIM_Z))
+    dz, dd = c1[2] - c6[2], math.dist(c1[:2], h1) - math.dist(c6[:2], h6[:2])
+    check("FIN6 : la coupe depuis P6 (hauteur ± 0,3 m, distance ± 0,8 m, 24 mm, la berline à 2 % près)",
+          abs(dz) <= 0.3 and abs(dd) <= 0.8 and c1[6] == c6[6] == 24.0 and abs(q1[0] - q6[0]) <= 0.02
+          and abs(q1[1] - q6[1]) <= 0.02, f"{dz:+.2f} m, {dd:+.2f} m, x {100 * (q1[0] - q6[0]):+.1f}, "
+          f"y {100 * (q1[1] - q6[1]):+.1f}")
+    # l'arrivée de FIN : la patrouille 1 de FIN ; la berline prise en plein freinage (20 à 30 km/h, 4 m/s² au moins
+    # à l'image 1, 7 au plus), feux stop dès l'image 1, arrêtée à l'image 36 au point d'arrêt et au cap de FIN (± 1°),
+    # sans glisse ni pivot à l'arrêt
+    check("FIN6 : la patrouille 1 de FIN, seule à rouler avec la berline", P.patrol1_pos is F.patrol1_pos
+          and set(P.tracks()) == {"hero", "patrol_1"})
+    v0, a0 = P.HERO.speed(M.t_of(P.F0)), P.HERO.along(M.t_of(P.F0))
+    brake = min(P.HERO.along(M.t_of(f)) for f in frames)
+    wins = P.HERO.brake_windows(frames=keyed)
+    check("FIN6 : prise en plein freinage (20 à 30 km/h, 4 à 7 m/s²), feux stop dès l'image 1",
+          20.0 <= v0 * 3.6 <= 30.0 and a0 <= -4.0 and brake >= -7.0 and wins and wins[0][0] <= P.F0,
+          f"{v0 * 3.6:.0f} km/h, {a0:.1f} m/s², crête {brake:.1f} m/s², {wins}")
+    f_stop = P.F0 + P.T_STOP * M.FPS
+    turn = max(abs(P.hero_heading(M.t_of(f)) - P.HERO_STOP) for f in range(P.F_STOP - 6, P.F0 + P.FRAMES + 1))
+    slip = max(abs(P.hero_slip(M.t_of(f))) for f in keyed)
+    check("FIN6 : arrêtée à l'image 36 au point d'arrêt et au cap de FIN, sans glisse ni pivot",
+          P.F_STOP == F.F_STOP == 36 and abs(f_stop - P.F_STOP) < 0.5
+          and math.dist(P.hero_pos(P.T_STILL), (P.CX, P.CY)) < 0.01 and (P.CX, P.CY) == (F.SX, F.SY)
+          and abs(P.HERO_STOP - F.HERO_STOP) <= 1.0 and turn < 1.0 and slip < 0.01,
+          f"image {f_stop:.1f}, cap {P.HERO_STOP:.1f}°, {turn:.2f}° en 6 images, glisse {slip:.2f}°")
+    check("FIN6 : les mains dehors après l'arrêt, tenues jusqu'à la fin",
+          P.DRIVER_KEYS[0] - P.F_STOP >= 5 and P.DRIVER_KEYS[0] + P.DRIVER_OUT <= P.STILL_FRAME - 10)
+    # l'orbite
+    def geo(f):
+        hx, hy = P.hero_pos(M.t_of(f))
+        return (math.degrees(math.atan2(cams[f][1] - hy, cams[f][0] - hx)), math.dist(cams[f][:2], (hx, hy)),
+                cams[f][2])
+    gs = [geo(f) for f in frames]
+    az = [g[0] % 360.0 for g in gs]
+    v = [(az[i + 1] - az[i]) * M.FPS for i in range(len(az) - 1)]
+    acc = [(v[i + 1] - v[i]) * M.FPS for i in range(len(v) - 1)]
+    sweep = az[-1] - az[0]
+    check("FIN6 : 40 à 60° d'orbite par la gauche de la berline, sans retour", -60.0 <= sweep <= -40.0
+          and max(v) <= 1e-6, f"{sweep:.1f}°")
+    check("FIN6 : 30 °/s et 40 °/s² au plus", max(map(abs, v)) <= 30.0 and max(map(abs, acc)) <= 40.0,
+          f"{max(map(abs, v)):.1f} °/s, {max(map(abs, acc)):.1f} °/s²")
+    rs, zs = [g[1] for g in gs], [g[2] for g in gs]
+    mono = all(b <= a + 1e-6 for a, b in zip(rs, rs[1:])) and all(b <= a + 1e-6 for a, b in zip(zs, zs[1:]))
+    check("FIN6 : elle redescend sans retour au cadre commun (7,5 m, 2,4 m)",
+          mono and abs(rs[-1] - 7.5) < 0.02 and abs(zs[-1] - 2.4) < 0.02,
+          f"{rs[0]:.2f} à {rs[-1]:.2f} m, {zs[0]:.2f} à {zs[-1]:.2f} m")
+    a, b = cams[P.STILL_FRAME], cams[P.STILL_FRAME - 1]
+    check("FIN6 : posée à la fin (moins de 1 mm et 0,01° entre les deux dernières images)",
+          math.dist(a[:3], b[:3]) < 1e-3 and abs(a[3] - b[3]) < 0.01, f"{math.dist(a[:3], b[:3]) * 1000:.2f} mm")
+    rear = (270.0 + P.HERO_STOP) % 360.0
+    left = (rear - az[-1]) % 360.0
+    check("FIN6 : l'image posée au trois quarts arrière gauche (45 à 75° de l'arrière, vers sa gauche)",
+          45.0 <= left <= 75.0, f"{left:.1f}°")
+    # la berline entière dans le cadre, hors des bandes du HUD ; au milieu à la fin
+    bad = [f for f in frames if not all(q is not None and 0.0 <= q[0] <= 1.0 and 0.12 <= q[1] <= 0.85
+                                        for q in (M.screen_point(cams[f], p) for p in P.hero_corners(M.t_of(f))))]
+    check("FIN6 : la berline entière dans le cadre, hors du HUD (12 % du haut, 15 % du bas)", not bad,
+          f"images {bad[:5]}")
+    q = M.screen_point(cams[P.STILL_FRAME], (P.CX, P.CY, P.AIM_Z))
+    check("FIN6 : la berline au milieu de l'image posée (x 50, y 58, à 2 près)",
+          abs(q[0] - 0.50) <= 0.02 and abs(q[1] - 0.58) <= 0.02, f"x {100 * q[0]:.0f}, y {100 * q[1]:.0f}")
+    # la patrouille 1 : entière dans le cadre, à gauche, visible, 12 images de suite au moins (comme dans FIN)
+    run, best = 0, 0
     for f in frames:
-        c = P.camera(M.t_of(f))
-        pts = [P.project(c, p) for p in P.hero_corners()]
-        mid = P.project(c, (P.CX, P.CY, P.HERO_BOX[2] / 2))
-        ok = all(q is not None and abs(q[0]) <= 1.0 and 0.15 <= q[1] <= 0.88 for q in pts) and 0.35 <= mid[1] <= 0.60
-        if not ok:
-            worst.append(f)
-    check("FIN6 : la berline dans le cadre, hors du HUD, au milieu de la hauteur", not worst, f"images {worst[:5]}")
-    off = max(abs(P.project(P.camera(M.t_of(f)), (P.CX, P.CY, P.HERO_BOX[2] / 2))[0]) / 2 for f in frames)
-    check("FIN6 : le milieu de la berline dans le tiers central de la largeur", off <= 1 / 6, f"{off:.0%} du centre")
-    hs = [1.0 - P.project(P.camera(M.t_of(f)), (P.CX, P.CY, P.HERO_BOX[2] / 2))[1] for f in frames]
-    check("FIN6 : plan bas, le milieu de la berline entre 50 et 62 % de la hauteur", 0.50 <= min(hs) and max(hs) <= 0.62,
-          f"de {min(hs):.1%} à {max(hs):.1%}")
-    w = [abs(P.azimuth(M.t_of(f + 1)) - P.azimuth(M.t_of(f))) for f in frames]
-    check("FIN6 : départ et arrêt amortis", w[0] < 0.6 * max(w) and w[-2] < 0.05 * max(w),
-          f"{w[0]:.2f}° puis {max(w):.2f}° au plus vite, {w[-2]:.3f}° à la fin")
-    check("FIN6 : 150° d'orbite", abs(abs(P.azimuth(P.T_END) - P.azimuth(0.0)) - 150.0) < 0.01)
-    a, b = P.camera(P.T_STILL), P.camera(M.t_of(P.STILL_FRAME - 1))
-    check("FIN6 : la pose validée à la fin", abs(P.azimuth(P.T_STILL) - 95.0) < 0.01 and math.dist(a[:3], b[:3]) < 0.05,
-          f"{math.dist(a[:3], b[:3]) * 100:.1f} cm entre les deux dernières images")
+        t = M.t_of(f)
+        px, py = P.patrol1_pos(t)
+        bx = M.frame_box(cams[f], dict(x=px, y=py, heading=P.patrol1_heading(t)), (5.0, 1.95, 1.75))
+        hb = M.frame_box(cams[f], dict(x=P.hero_pos(t)[0], y=P.hero_pos(t)[1], heading=P.hero_heading(t)))
+        hid = (max(0.0, min(bx[1], hb[1]) - max(bx[0], hb[0])) * max(0.0, min(bx[3], hb[3]) - max(bx[2], hb[2]))
+               / ((bx[1] - bx[0]) * (bx[3] - bx[2]))) if bx else 1.0
+        ok = bx and bx[0] >= 2.0 and bx[1] <= 98.0 and 12.0 <= bx[2] <= bx[3] <= 85.0 and (bx[0] + bx[1]) / 2 < 50.0 \
+            and hid <= 0.1
+        run = run + 1 if ok else 0
+        best = max(best, run)
+    check("FIN6 : la patrouille 1 entière dans le cadre, à gauche, visible, 12 images de suite au moins", best >= 12,
+          f"{best} images")
+    # six agents, six modèles, l'agent « stop » compris, tous dans l'image posée
+    models = {(pz, st) for _, _, pz, st in P.COPS}
+    check("FIN6 : six agents, six modèles, l'agent qui fait stop compris",
+          len(P.COPS) == 6 and len(models) == 6 and any(pz == "stop" for pz, _ in models), f"{sorted(models)}")
+    out = [k for k, (a_, r_, _, _) in enumerate(P.COPS)
+           if not (lambda q: q is not None and 0.05 <= q[0] <= 0.95 and 0.12 <= q[1] <= 0.85)(
+               M.screen_point(cams[P.STILL_FRAME], (*P.polar(a_, r_), 1.0)))]
+    check("FIN6 : les six agents dans l'image posée", not out, f"hors champ : {out}")
+    # les écarts : 1,5 m entre caisses, 1 m entre un agent et une caisse, à toutes les images et pendant les 3 s
+    # avant la coupe (l'anneau et les agents attendaient là : la berline et la patrouille 1 n'ont pas pu les
+    # traverser)
+    ring = [P.polar(P.RING[i], P.RING_R) for i in P.RING_KEEP]
+    cops = [P.polar(a_, r_) for a_, r_, _, _ in P.COPS]
+    gv, ga = 99.0, 99.0
+    for f in range(P.F0 - 72, P.F0 + P.FRAMES + 1):
+        t = M.t_of(f)
+        cars = [(P.hero_pos(t), P.hero_heading(t), P.HERO_BOX[0], P.HERO_BOX[1]),
+                (P.patrol1_pos(t), P.patrol1_heading(t), 5.0, 2.0)]
+        for c, h, l, w in cars:
+            gv = min([gv] + [P.rect_dist(r, c, h, l, w) - 2.5 for r in ring])
+            ga = min([ga] + [P.rect_dist(o, c, h, l, w) for o in cops])
+    ga = min([ga] + [math.dist(o, r) - 2.5 for o in cops for r in ring])
+    check("FIN6 : 1,5 m entre caisses, 1 m entre un agent et une caisse, à toutes les images", gv >= 1.5 and ga >= 1.0,
+          f"caisses {gv:.1f} m, agents {ga:.1f} m")
+    # le lampadaire : son reflet sur l'enrobé jamais sans sa tête dans le cadre (règle E)
+    def seen(pts, c, lo, hi):
+        return any(q is not None and lo <= q[0] <= hi and -0.05 <= q[1] <= 1.05
+                   for q in (M.screen_point(c, p_) for p_ in pts))
+    hx, hy, hz = P.LAMP_HEAD
+    lone = [f for f in frames if seen([(hx, hy, -hz), (hx, hy, 0.0)], cams[f], -0.15, 1.15)
+            and not seen([(hx, hy, hz)], cams[f], 0.02, 0.98)]
+    check("FIN6 : pas de reflet du lampadaire sans sa tête dans le cadre", not lone, f"images {lone[:6]}")
+    # l'hélicoptère de FIN, jamais dans les bandes du HUD
+    hv = [(f, round(q[1], 2)) for f in frames for q in [M.screen_point(cams[f], P.HELI)]
+          if q is not None and 0.0 <= q[0] <= 1.0 and not 0.12 <= q[1] <= 0.85]
+    check("FIN6 : l'hélicoptère de FIN, hors des bandes du HUD", P.HELI == F.HELI and not hv, f"{hv[:4]}")
 
 
 def test_fin():

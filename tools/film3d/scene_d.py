@@ -921,103 +921,120 @@ def fin_pack_lights(frames, hero):
 
 
 def plan_FIN6(scene, hidden, palier="socle"):
-    """FIN6, l'encerclement, temps gelé : la berline au centre, un anneau de dix patrouilles et du fourgon à
-    14 m tournés vers elle, une silhouette devant chacun, trois projecteurs d'hélicoptère croisés sur elle, les
-    avions saisis dans le ciel. L'orbite, animée (56 images, fin6_orbite.py) : rayon 7 m, à 25 cm, sur 150°, de
-    l'azimut 245° (trois quarts arrière gauche) à 95° ; elle finit sur l'image d'essai validée, trois quarts face,
-    les mains levées et la ville derrière. Le temps est gelé : seuls tournent les rotors et battent les rampes et
-    leurs faisceaux (2 Hz). Vu à 25 cm, la berline cache tout ce qui est derrière
-    elle : l'anneau est calé pour que deux véhicules l'encadrent (le fourgon à droite, une patrouille à gauche), et
-    le 18 mm prend les autres sur les bords ; les rampes de tout l'anneau posent leurs flaques de couleur sur
-    l'enrobé mouillé."""
+    """FIN6, la fin à six étoiles (découpage v3.1, 80 images, fin6_orbite.py) : elle suit P6 et raconte l'arrivée
+    et l'arrêt à la pointe comme FIN, puis l'encerclement. La berline entre à 24 km/h en plein freinage (feux stop),
+    sans glisse, et s'arrête à l'image 36 au point d'arrêt de FIN ; la patrouille 1 de FIN double par la gauche et
+    s'arrête en travers devant à gauche ; les mains sortent par la vitre (42 à 49). La caméra part du cadre où P6
+    finit (3,6 m, 8,0 m derrière, 24 mm), tourne déjà par la gauche de la berline en redescendant au cadre commun
+    (2,4 m, 7,5 m), 60° autour d'elle, et se pose au trois quarts arrière gauche : le flanc du conducteur, ses
+    mains, la patrouille 1, l'anneau (trois patrouilles et le fourgon qui l'attendaient) et six agents. Le phare,
+    l'hélicoptère, la meute derrière la caméra, le lampadaire et la brume sont ceux de FIN (plan_FIN). Personne ne
+    tire. Lumière : celle de FIN, à reprendre à la passe de lumière."""
     import motion as M
+    import fin_pointe as F
     import fin6_orbite as F6
-    decor(scene, hidden, all_lit=True, marina=(palier in ("marina", "complet")))
+    decor(scene, hidden, marina=(palier in ("marina", "complet")))
     scene.frame_start, scene.frame_end = F6.F0, F6.F0 + F6.FRAMES - 1
     frames = range(F6.F0 - 1, F6.F0 + F6.FRAMES + 1)
-    # le phare de la pointe (lieux.panorama, découpage v3 §3) remplace le feu de musoir : le temps est gelé, ses
-    # pinceaux aussi, l'un au-dessus de la berline
-    L.phare_tourne(bpy.data.objects["phare"], vitesse=0.0,
-                   phase=math.degrees(math.atan2(STOP.y - L.PHARE_AT[1], STOP.x - L.PHARE_AT[0])))
-    rnd = random.Random(6)
+    stop = Vector((F6.CX, F6.CY, 0.0))
+    # le ciel et le phare de FIN : la bande de crépuscule derrière le phare, un pinceau qui balaie
+    for n in scene.world.node_tree.nodes:
+        if n.type == "VECT_ROTATE":
+            n.inputs["Angle"].default_value = 0.0
+    ph = bpy.data.objects.get("phare")
+    if ph is not None:
+        L.phare_tourne(ph, phase=-25.0, vitesse=45.0)
+        L.phare_pinceaux(ph, releve=8.0, portee=9.0)
+    # la berline : freinage sans glisse jusqu'au point d'arrêt (fin6_orbite.HERO) ; pas de traces de gomme, elle ne
+    # glisse pas
     hero = L.hero()
-    L.put(hero, STOP.x, STOP.y, 0.0, heading=HERO_STOP)
-    L.hands_up(hero)
-    L.cabin_light(hero, energy=25.0)
-    skid_marks()
-    ring = [(a, "van" if i == 0 else "patrol") for i, a in enumerate(F6.RING)]
+    wheels = L.hero_wheels(hero)
+    poses = M.sample(F6.hero_pos, frames, heading=F6.hero_heading, steer=F6.hero_steer, wheel_r=hero["wheel_r"])
+    M.key_vehicle(hero, poses, wheels=wheels)
+    M.wheel_marks(wheels, hero["wheel_r"])
+    if F.FACE:
+        L.hands_up_keys(hero, *F6.DRIVER_KEYS)
+    else:
+        L.hands_out_keys(hero, F6.DRIVER_KEYS[0], F6.DRIVER_KEYS[0] + F6.DRIVER_OUT)
+    try:
+        import hero_cars
+        b = M.body_of(hero)
+        wins = F6.HERO.brake_windows(frames=frames)
+        if "stop" in b and wins:
+            hero_cars.stop_lamps(b, wins[0][0], frames[-1])
+    except Exception as e:
+        print(f"[FIN6] feux stop non posés : {e!r}", flush=True)
+    L.cabin_light(hero, energy=70.0 if F.FACE else 25.0)
+    # la patrouille 1 de FIN (plan_FIN), image pour image
+    p1 = L.patrol("patrol_1")
+    for o in p1.children_recursive:
+        if o.type == "LIGHT" and "_head_" in o.name:
+            o.data.energy *= 0.3
+    L.put(p1, *F6.P1_AT, 0.0, heading=F6.P1_HEAD)
+    body = M.body_of(p1)
+    wh, wr = M.wheels_of(body), body.get("wheel_r", 0.36)
+    ps = M.sample(F6.patrol1_pos, frames, heading=F6.patrol1_heading, steer=F6.patrol1_steer, wheel_r=wr, seed=2.0,
+                  wheelbase=body.get("wheelbase", 2.9), front=body.get("front_axle"))
+    M.key_vehicle(p1, ps, wheels=wh, pivot=(0.0, 0.0, 0.36))
+    M.wheel_marks(wh, wr, axis="Y")
+    M.flash_bars([p1], frames)
+    # l'anneau qui l'attendait (fin6_orbite.RING_KEEP), tourné vers le point d'arrêt, rampes battantes ; la berline
+    # ne reçoit pas leurs lumières (à 14 m, elles la passaient au rose)
+    rnd = random.Random(6)
     first, rigs = {}, []
-    for i, (a, kind) in enumerate(ring):
-        x, y = _polar(a, 14.0)
+    for i in F6.RING_KEEP:
+        x, y = F6.polar(F6.RING[i], F6.RING_R)
+        kind = "van" if i == F6.RING_VAN else "patrol"
         r = first.get(kind)
         if r is None:
             r = first[kind] = L.patrol("patrol") if kind == "patrol" else L.van("van")
         else:
             r = L.clone(r, f"{kind}_{i}")
-        h = L.heading_to((STOP.x - x, STOP.y - y)) + rnd.uniform(-28, 28)
+        h = L.heading_to((stop.x - x, stop.y - y)) + rnd.uniform(-28, 28)
         L.put(r, x, y, 0.0, heading=h)
         rigs.append(r)
-    # le temps est gelé, pas les gyrophares : rampes, faisceaux et flaques battent à 2 Hz (corail, lilas)
     n = M.flash_bars(rigs, frames)
     print(f"[FIN6] {n} lumières de rampe clignotantes", flush=True)
-    # la vraie cause du rose et de la calandre brûlée : l'anneau gardait 42 lumières sans liaison (22 phares
-    # tournés vers la berline, 20 feux) et 66 lueurs et flaques de rampe qui n'excluaient que leur rampe ; à 14 m,
-    # toutes l'éclairaient en plein (calandre (187, 184, 209) au banc). Elle n'en reçoit plus que ses jumelles
     print(f"[FIN6] berline exclue de {car_out_of_rigs(rigs, hero)} lumières de l'anneau", flush=True)
+    # six agents, six modèles (fin6_orbite.COPS), face au point d'arrêt
     try:
-        cops = [L.officer(pz, style=st, name=f"officer_{pz}") for pz, st in (("aim", 0), ("crouch", 1), ("guard", 2))]
-        for i, (a, kind) in enumerate(ring):
-            src = cops[i % 3]
-            o = src if i < 3 else S.instance(src, f"officer_{i}", (0, 0, 0))
-            x, y = _polar(a + 8.0, 10.6)
+        for k, (a, r, pz, st) in enumerate(F6.COPS):
+            o = L.officer(pz, style=st, name=f"officer_{k}_{pz}")
+            x, y = F6.polar(a, r)
             o.location = (x, y, 0.0)
-            L.face(o, (STOP.x, STOP.y))
+            L.face(o, (stop.x, stop.y))
     except Exception as e:
-        print(f"[pointe] agents non posés : {e!r}", flush=True)
-    first_h, _ = L.helicopter("heli")
-    hs = []
-    # le deuxième, à 34 m, entrait dans le bandeau du haut (9 % de la hauteur) sur les vingt premières images de
-    # l'orbite : à 27 m, il passe à 18-23 % du haut ; il est derrière la caméra sur la pose validée
-    for i, (a, z) in enumerate(((150, 30.0), (30, 27.0), (-100, 28.0))):
-        r = first_h if i == 0 else L.clone(first_h, f"heli_{i}")
-        x, y = _polar(a, 26.0)
-        L.put(r, x, y, z, heading=a + 90, pitch=-5.0, roll=8.0)
-        hs.append(r)
-    # sur la berline, trois projecteurs à 40 m : 15 kW chacun lui donnent la même lumière que les 60 kW du seul
-    # projecteur de FIN, à 49 m, sous lequel elle reste bordeaux (à 50 kW chacun, elle sortait encore rose)
-    # des cônes de 6° comme dans FIN : à 9°, les trois faisceaux emplissaient la brume autour de la berline d'un
-    # voile clair qui la passait au rose (la brume n'obéit pas à la liaison de lumière)
-    aim_helis(hs, STOP + Vector((0, 0, 0.8)), car=hero, car_energy=15000.0, cone=6.0)
-    # le faisceau visible en géométrie émissive : le spot dans la brume sortait en grain marbré à 256 échantillons
-    # (720 × 1280, image 56 : 80 s par image avec le spot, 79 s avec le cône, net) ; le spot éclaire toujours
-    beam_cones(hs, STOP + Vector((0, 0, 0.8)))
-    # le lampadaire de la pointe, ambre à 3,2 kW à 8 m de la berline, la sortait rose avec le faisceau : il garde sa
-    # pleine puissance pour le sol et la brume, la berline n'en reçoit que la part de FIN (1300 W, crème)
-    split_for_car([bpy.data.objects["lamp_pointe_light"]], hero, 1300.0, "#ffe2c2", tag="lampadaire")
-    try:
-        j = L.jet("jet")
-        L.put(j, CX + 40.0, CY - 160.0, 55.0, heading=-8.0, pitch=-3.0, roll=18.0)
-        j2 = L.clone(j, "jet_2")
-        L.put(j2, CX + 12.0, CY - 190.0, 62.0, heading=-8.0, pitch=-3.0, roll=18.0)
-    except Exception as e:
-        print(f"[pointe] avions non chargés : {e!r}", flush=True)
-    # plus de fumée gelée derrière la berline : prise dans les faisceaux, elle sortait en nuage de grains au départ
-    # de l'orbite (256 échantillons, 12 nov.) ; la vapeur des pneus est l'affaire de fx.py
-    hz = [L.haze((CX - 90, CX + 90), (CY - 470, CY + 90), (L.WATER_Z, 60), 0.0005)]
-    # la nappe de la pointe à 0,0025 comme dans FIN : à 0,004, prise par les trois faisceaux, elle voilait la
-    # berline de rose depuis l'objectif
-    hz.append(L.haze((CX - 35, CX + 35), (CY - 35, CY + 35), (L.WATER_Z, 40), 0.0025, name="haze_pointe"))
-    # la brume ne se reflète plus dans la peinture : vue de trois quarts arrière (image 1), le flanc renvoyait la
-    # brume éclairée par les faisceaux derrière la caméra, gris mauve (84, 72, 90) au lieu de bordeaux (43, 21, 32
-    # sans), et ce reflet sortait en marbrure ; la brume vue de face ne change pas
-    for h in hz:
-        h.visible_glossy = False
-    a = 95.0                                          # le milieu de l'arc de 150° (de 20° à 170°)
-    cam_loc = (*_polar(a, 7.0), 0.25)
+        print(f"[FIN6] agents non posés : {e!r}", flush=True)
+    # la meute de FIN : rien que ses phares, derrière la caméra
+    fin_pack_lights(frames, hero)
+    # le lampadaire de la pointe, comme dans FIN (1300 W crème), rangé à fin6_orbite.LAMP_AT : sa tête et son reflet
+    # hors du cadre à toutes les images (règle E)
+    lp = bpy.data.objects.get("lamp_pointe_light")
+    if lp:
+        lp.data.energy = 1300.0
+        lp.data.color = L.lin("#ffe2c2")[:3]
+    shift = Vector((F6.LAMP_AT[0] - LAMP_AT[0], F6.LAMP_AT[1] - LAMP_AT[1], 0.0))
+    for ob in (bpy.data.objects.get("lamp_pointe"), lp):
+        if ob is not None:
+            ob.location += shift
+    # l'hélicoptère de FIN, son projecteur qui la cherche puis se pose sur elle à l'arrêt
+    heli, _ = L.helicopter("heli")
+    L.put(heli, *F6.HELI, heading=F6.HELI_HEADING, pitch=-6.0, roll=0.0)
+    aim = Vector((F6.CX, F6.CY, 0.8))
+    aim_helis([heli], aim, energy=28000.0, car=hero, car_energy=60000.0, cone=5.0)
+    beam_cones([heli], aim, strength=0.8)
+    piv = next(o for o in heli.children_recursive if o.name.endswith("searchlight_pivot"))
+    M.key_searchlight({"searchlight_pivot": piv}, frames, F6.beam_target)
+    # la brume de FIN
+    L.haze((CX - 80, CX + 80), (CY - 470, CY + 60), (L.WATER_Z, 50), 0.0005)
+    L.haze((CX - 35, CX + 35), (F.SY - 3, CY + 40), (L.WATER_Z, 30), 0.0025, name="haze_pointe")
+    c0 = F6.camera(M.t_of(F6.F0))
+    cam_loc = Vector(c0[:3])
+    yaw, pitch = math.radians(c0[3]), math.radians(c0[4])
+    d = Vector((-math.sin(yaw), -math.cos(yaw), math.tan(pitch)))
     L.cap_images(1024, keep_objects=[hero, bpy.data.objects["pointe_sol"]])
-    cam = L.camera("cam_FIN6", cam_loc, (STOP.x, STOP.y, 1.6), lens=18, fstop=2.8,
-                   focus=(STOP.x, STOP.y, 1.1))
-    # l'orbite : la dernière image retrouve la pose ci-dessus (azimut 95°, visée à 1,6 m)
+    cam = L.camera("cam_FIN6", cam_loc, cam_loc + d * 40.0, lens=F6.LENS, fstop=2.2,
+                   focus=(c0[0] + d.x * 7.5, c0[1] + d.y * 7.5, 0.7))
     M.key_camera(cam, frames, F6.camera)
     cam.data.dof.focus_object = hero
     scene.render.use_motion_blur = True
@@ -1215,7 +1232,7 @@ def plan_P6(scene, hidden, palier="socle"):
     return cam
 
 
-STILL = {"P6": 21, "FIN6": 56, "FIN": 36}                        # l'image fixe d'essai des plans animés (STILL_FRAME)
+STILL = {"P6": 21, "FIN6": 80, "FIN": 36}                        # l'image fixe d'essai des plans animés (STILL_FRAME)
 
 
 PLANS = {"FIN": plan_FIN, "FIN6": plan_FIN6, "P6": plan_P6}
