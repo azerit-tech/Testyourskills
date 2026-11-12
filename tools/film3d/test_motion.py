@@ -20,7 +20,9 @@ CAM_BEHIND_MIN = 0.80   # part des images derrière (60° ou moins de l'arrière
 CAM_ORBIT_MAX, CAM_ORBIT_ACC_MAX = 30.0, 40.0   # °/s, °/s² d'azimut autour de la berline (plans à orbite)
 CAM_LIMITS_PLAN = {
     "P1": {"front_max": 0.0},                                 # jamais de face (2.2)
-    "P2": {"pan": 41.0, "behind": 0.67},                     # 21 mm, le virage de 30 m
+    # 21 mm, le virage de 30 m. accel : la berline y tire 12,6 m/s² (70 km/h sur 30 m) ; une caméra qui la suit à
+    # 4 m/s² près (arel) en tire donc au moins 8,6 : le plafond commun de 8 ne peut pas tenir avec celui d'arel
+    "P2": {"pan": 41.0, "behind": 0.67, "accel": 13.5},
     "P4": {"pan": 4.6, "vrel": None, "arel": None, "behind": 0.0,   # fixe, 200 mm, de face
            "zoom": True, "low_center": (0.52, 0.56), "low_all": True, "width_min": 0.17},
     "P5": {"pan": 75.0, "pan_frames": 16, "pan_acc": 3.0, "behind": 0.67},   # le seul mouvement vif du film
@@ -216,26 +218,31 @@ def test_gaps():
 
 
 def test_p2():
-    """P2 : la trajectoire validée (cars) retrouvée par le plan animé à l'instant STILL ; aucune distance sous 6 m."""
+    """P2 (découpage v3) : la pose de l'image fixe retrouvée par le plan animé ; la glisse et la dynamique ; la
+    caméra sans tremblé ; la berline au point de coupe (y depuis le haut). Écarts et plafonds : test_v3."""
     import p2_arc as P
-    d, f, a, b = M.min_gap(P.tracks(), range(P.F0 - 1, P.F0 + P.FRAMES + 1))
-    check("P2 : distances gardées", d >= 6.0, f"{d:.1f} m entre {a} et {b} à l'image {f}")
     t = P.STILL * P.T_END
     ref = P.cars(P.STILL)
     ok = all(math.dist(ref[k][:2], P.tracks()[k](t)) < 1e-6 for k in ref)
-    check("P2 : la trajectoire validée inchangée", ok and abs(P.hero_slip(t) - P.DRIFT) < 1e-9)
+    check("P2 : la pose de l'image fixe", ok and abs(P.hero_slip(t) - P.DRIFT) < 1e-9)
+    check("P2 : 48 images, V3", P.FRAMES == 48 and P.V3)
     ps = M.sample(P.hero_pos, range(0, 30), slip=P.hero_slip, noise=0.0)
     check("P2 : virage à gauche, roulis vers la droite", ps[-1]["roll"] > 2.0, f"{ps[-1]['roll']:.2f}°")
     check("P2 : glisse à gauche, contre-braquage (roues à droite)", ps[-1]["steer"] < 0.0, f"{ps[-1]['steer']:.2f}°")
     check("P2 : roulis ≤ 6°", max(abs(p["roll"]) for p in ps) <= 6.0, f"{max(abs(p['roll']) for p in ps):.2f}°")
-    check("P2 : glisse de 22 à 25°", 22.0 <= P.DRIFT <= 25.0, f"{P.DRIFT:.1f}°")
-    # la caméra basse du découpage v2 : jamais à moins de 6 m d'un véhicule, la berline la double
-    cam = lambda t: P.low_cam_pos(t)[:2]                            # noqa: E731
-    d, f, a, b = M.min_gap(dict(P.tracks(), camera=cam), range(P.F0 - 1, P.F0 + P.FRAMES + 1))
-    check("P2 : la caméra à 6 m au moins des véhicules", d >= 6.0, f"{d:.1f} m entre {a} et {b} à l'image {f}")
-    ang = lambda p: math.degrees(math.atan2(p[1], p[0] + P.R))      # noqa: E731
-    check("P2 : la berline double la caméra", ang(cam(0.0)) > ang(P.hero_pos(0.0)) and
-          ang(cam(P.T_END)) < ang(P.hero_pos(P.T_END)))
+    check("P2 : glisse à 25°", P.DRIFT == 25.0, f"{P.DRIFT:.1f}°")
+    tt = M.t_of(20)
+    c, r = P.camera(tt), P.camera_rail(tt)
+    check("P2 : camera_rail, la caméra sans tremblé", c[6] == r[6] and math.dist(c[:3], r[:3]) < 0.2
+          and abs(c[3] - r[3]) < 1.0 and abs(c[4] - r[4]) < 1.0)
+    # la caméra de poursuite : la berline au point de coupe à la première et à la dernière image
+    for f in (P.F0, P.F0 + P.FRAMES - 1):
+        tt = M.t_of(f)
+        hx, hy = P.hero_pos(tt)
+        bx = M.hero_screen(P.camera_rail(tt), hx, hy, 0.0, P.hero_heading(tt))
+        u, y, w = bx["u"] * 100, bx["v"] * 100, bx["w"] * 100
+        check(f"P2 : point de coupe à l'image {f}", abs(u - 50) <= 6 and abs(y - 55) <= 5 and abs(w - 42) <= 8,
+              f"x {u:.0f}, y {y:.0f}, largeur {w:.0f} %")
 
 
 def test_p4():

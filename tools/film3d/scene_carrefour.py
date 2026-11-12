@@ -244,7 +244,7 @@ def wake(scene, wheels, spray_m, pose=POSE, anim=False):
     for name, (lx, ly, _) in wheels.items():
         rear = name.endswith(("BL", "BR"))
         pts = [P.to_scene(pose, x, y)[:2] for x, y in P.wheel_track(lx, ly, t=t_end)]
-        s0, s1 = P.S0, P.s_of(P.THETA0) + t_end * (P.s_of(P.THETA1) - P.s_of(P.THETA0))
+        s0, s1 = P.S_START - 6.0, P.s_hero(t_end * P.T_END)          # comme p2_arc.wheel_track
         if not rear:
             s0 += (s1 - s0) * (len(pts) // 3) / (len(pts) - 1)
             pts = pts[len(pts) // 3:]          # les roues avant ne marquent qu'une fois la caisse en travers
@@ -379,14 +379,14 @@ def animate(scene, car, fill, patrols, pose=POSE):
     M.wheel_marks(wheels, car["wheel_r"])
     rigs = []
     for i, (body, key) in enumerate(zip(patrols, ("patrol_1", "patrol_2"))):
-        s = P.s_hero(t0) - P.patrol_gap(i)
         lights = [o for o in bpy.data.objects if o.name.startswith((f"bar_glow_{key}_", f"pool_{key}_"))]
-        r = M.rig_up(body, P.to_scene(pose, 0.0, 0.0, P.point(s)[2] + P.patrol_slip(i)(t0))[2], f"rig_{key}",
-                     extras=lights)
+        r = M.rig_up(body, P.to_scene(pose, 0.0, 0.0, P.cars(P.STILL)[key][3])[2], f"rig_{key}", extras=lights)
         # (ses roues sont séparées, cast_vehicles.split_wheels : elles tournent et l'avant braque ; la trajectoire,
         # le roulis et le tangage ne dépendent pas du rayon ni de l'empattement)
         wh, wr = M.wheels_of(body), body.get("wheel_r", 0.36)
+        hd = P.patrol_heading(i)
         ps = M.sample(in_scene(P.patrol_pos(i)), frames, slip=P.patrol_slip(i), wheel_r=wr, seed=float(i + 1),
+                      heading=(lambda t, hd=hd: P.to_scene(pose, 0.0, 0.0, hd(t))[2]) if hd else None,
                       wheelbase=body.get("wheelbase", 2.9), front=body.get("front_axle"))
         M.key_vehicle(r, ps, wheels=wh, pivot=(0.0, 0.0, 0.36), body=body)
         M.wheel_marks(wh, wr, axis="Y")
@@ -400,13 +400,13 @@ def animate(scene, car, fill, patrols, pose=POSE):
         f"{b['roll']:.1f}°, braquage {a['steer']:.1f} à {b['steer']:.1f}°, {n} lumières de rampe clignotantes")
 
 
-def low_camera(scene, pose=POSE):
-    """La caméra du découpage v2 (p2_arc.low_cam_pos) : un travelling bas à l'intérieur de l'arc, visée sur la
-    berline, un tremblé faible de voiture travelling (motion.handheld)."""
+def chase_camera(scene, pose=POSE):
+    """La caméra de P2 (découpage v3) : la poursuite de dos à l'intérieur du virage, p2_arc.camera (tremblé
+    compris), passée dans le repère de la scène."""
     import motion as M
     cam = bpy.data.cameras.new("cam")
-    cam.lens = P.LOW_LENS
-    cam.sensor_fit = "AUTO"
+    cam.lens = P.CHASE_LENS
+    cam.sensor_fit = "AUTO"                         # en 9:16, les 36 mm vont à la hauteur
     cam.sensor_width = 36
     cam.clip_start = 0.05
     cam.clip_end = 2000
@@ -415,15 +415,9 @@ def low_camera(scene, pose=POSE):
     scene.camera = co
 
     def at(t):
-        x, y, z = P.low_cam_pos(t)
-        ax, ay, az = P.low_cam_aim(t)
-        x, y, _ = P.to_scene(pose, x, y)
-        ax, ay, _ = P.to_scene(pose, ax, ay)
-        dx, dy, dz = ax - x, ay - y, az - z
-        yaw = math.degrees(math.atan2(-dx, -dy))       # motion.key_camera : 0 regarde -y, positif vers -x
-        pitch = math.degrees(math.atan2(dz, math.hypot(dx, dy)))
-        dyaw, dpitch, droll, ddx, ddy, ddz = M.handheld(t, amp=0.25, rotor=0.15, seed=2.7)
-        return x + ddx, y + ddy, z + ddz, yaw + dyaw, pitch + dpitch, droll, P.LOW_LENS
+        x, y, z, yaw, pitch, roll, lens = P.camera(t)
+        x, y, yaw = P.to_scene(pose, x, y, yaw)
+        return x, y, z, yaw, pitch, roll, lens
     M.key_camera(co, range(P.F0 - 1, P.F0 + P.FRAMES + 1), at)
     scene.frame_set(scene.frame_current)
     return co
@@ -432,7 +426,7 @@ def low_camera(scene, pose=POSE):
 def drone(scene, pose=POSE, anim=False):
     """Le drone de p2_arc : à la verticale, le haut du cadre tourné vers le cap de la voiture ; anim : il tourne
     de CAM_TURN degrés pendant le plan (clés de motion.py)."""
-    cx, cy, cz, yaw, lens = P.camera()
+    cx, cy, cz, yaw, lens = P.drone_camera()
     x, y, a = P.to_scene(pose, cx, cy, yaw)
     cam = bpy.data.cameras.new("cam")
     cam.lens = lens

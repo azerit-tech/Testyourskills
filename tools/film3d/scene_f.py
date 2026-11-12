@@ -640,7 +640,7 @@ def build(plan=None, palier=None):
             c.hide_viewport = True
     A.make_world(scene)
     # (découpage v2 : le travelling bas à l'intérieur de l'arc remplace le drone, C.drone garde l'ancien cadre)
-    co = C.low_camera(scene, POSE)
+    co = C.chase_camera(scene, POSE)
     A.render_settings(scene)
     scene.render.use_motion_blur = True             # le flou de bougé suit les clés (obturateur 0,5)
     scene.render.motion_blur_shutter = 0.5
