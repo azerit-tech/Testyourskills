@@ -7,7 +7,7 @@
 #       --out ~/film/iter-gens/<essai> [--samples 64] [--only agent,conducteur,parebrise,variantes]
 #       [--poses crouch,aim,guard] [--lights phares,neons] [--views face,tq,dos] [--shots pied,taille] [--inspect]
 #       [--classes] [--wb] [--exposure 1.0]
-#   pare-brise : [--pb-lights phares,neons,projecteur] [--pb-views face,tq] [--pb-shots large,serre]
+#   pare-brise : [--pb-lights phares,neons,projecteur] [--pb-views face,tq,dos,tqdos] [--pb-shots large,serre]
 #       [--pb-poses volant,mains] [--hands "up,fwd,out,door_out,écart;…"] [--cabin 25] [--sky [--sky-strength 1]]
 #
 # Une image par case (720 × 1280, `<perso>-<pose>-<lumière>-<vue>-<cadre>.png`) et une planche par personnage et
@@ -480,10 +480,11 @@ def bench_windshield():
         for lt in opt("--pb-lights", "phares,neons,projecteur").split(","):
             use_lights(lights, lt)
             row = []
-            for v, az in [x for x in (("face", 0.0), ("tq", 32.0)) if x[0] in opt("--pb-views", "face,tq")]:
+            for v, az in [x for x in (("face", 0.0), ("tq", 32.0), ("dos", 180.0), ("tqdos", 150.0))
+                         if x[0] in opt("--pb-views", "face,tq").split(",")]:
                 # hors de la voiture (l'avant à 2,45 m du centre), un peu au-dessus du capot, visée sur le buste
                 for sh, dist, lens in [x for x in (("large", 6.0, 35.0), ("serre", 4.0, 70.0))
-                                       if x[0] in opt("--pb-shots", "large,serre")]:
+                                       if x[0] in opt("--pb-shots", "large,serre").split(",")]:
                     a = math.radians(az)
                     dirv = Vector((math.sin(a), math.cos(a), 0))
                     cam.data.lens = lens
