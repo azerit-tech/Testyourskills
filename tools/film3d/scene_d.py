@@ -447,13 +447,13 @@ def plan_FIN(scene, hidden, palier="socle"):
         L.face(cop, (STOP.x - 0.3, STOP.y + 0.6))
     except Exception as e:
         print(f"[pointe] agent non posé : {e!r}", flush=True)
-    # la fumée des pneus : sur la trace de la glissade, et qui dépasse la voiture vers nous, à droite
-    L.smoke("fumee_arriere", (CX + 1.6, CY - 3.2, 0.8), (3.6, 4.4, 1.4), density=0.5, seed=4.0)
-    L.smoke("fumee_trace", (CX + 1.5, CY - 11.0, 1.0), (3.5, 6.0, 1.6), density=0.28, seed=7.0)
-    L.smoke("fumee_avant", (CX - 1.6, CY + 2.4, 0.5), (2.6, 2.0, 0.8), density=0.42, seed=1.0)
-    # les lueurs : hors champ à droite et à gauche, et derrière l'agent (le contre-jour)
-    glows([((CX - 9.0, CY + 2.0, 1.4), L.LILAC, 4000.0), ((CX + 10.0, CY - 3.0, 1.5), L.CORAL, 3500.0),
-           ((CX + 6.5, CY - 6.0, 1.7), L.CORAL, 1600.0), ((CX - 12.0, CY - 14.0, 1.6), L.LILAC, 3000.0)])
+    # la fumée des pneus : sur la trace de la glissade, derrière la berline, aussi légère que dans FIN6. Une nappe
+    # devant la voiture (0,42, de 0,1 à 0,9 m, à 6 m de l'objectif) remplissait toute la moitié basse : éclairée
+    # par les lueurs, elle faisait le gris pâle et plat
+    L.smoke("fumee_arriere", (CX + 1.6, CY - 3.2, 0.8), (3.6, 4.4, 1.4), density=0.18, seed=4.0)
+    L.smoke("fumee_trace", (CX + 1.5, CY - 11.0, 1.0), (3.5, 6.0, 1.6), density=0.12, seed=7.0)
+    # plus de lueurs hors champ (FIN6 n'en a pas et son sol reste sombre) : le contre-jour de l'agent, c'est le
+    # lampadaire de la pointe, derrière lui
     # le lampadaire de la pointe frappe la berline : ambre à 3,2 kW, il la sortait orange vif ; plus faible et
     # plus blanc, elle reste bordeaux sombre
     lp = bpy.data.objects.get("lamp_pointe_light")
