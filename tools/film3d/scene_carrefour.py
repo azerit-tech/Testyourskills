@@ -206,8 +206,10 @@ def spray_material(name="spray", density=6.0, glow=0.0):
 
 
 def mat_wake():
-    """La trace des pneus dans l'eau : l'enrobé chassé de sa pellicule d'eau, plus mat et un peu plus clair que la
-    chaussée mouillée, effiloché par un bruit et fondu à son départ (u de 0 au début de la trace à 1 sous la roue)."""
+    """La trace des pneus dans l'eau : la gomme déposée sur l'enrobé chassé de sa pellicule d'eau, mate et plus
+    sombre que la chaussée mouillée, effilochée par un bruit et fondue à son départ (u de 0 au début de la trace à 1
+    sous la roue). (Claire, #8d8781 à 0,45 de rugosité, elle renvoyait les lampadaires : vue du drone, des traits
+    lumineux.)"""
     m, N, out = A.material("tyre_wake")
     uv = N.new("ShaderNodeTexCoord")
     sep = N.sep(uv.outputs["UV"])
@@ -216,7 +218,7 @@ def mat_wake():
     fade = N.math("POWER", N.math("MINIMUM", N.math("MULTIPLY", sep[0], 1.6), 1.0), 1.5)
     edge = N.math("SUBTRACT", 1.0, N.math("POWER", N.math("ABSOLUTE", N.math("SUBTRACT", N.math("MULTIPLY", sep[1], 2.0), 1.0)), 3.0))
     mask = N.math("MULTIPLY", N.math("MULTIPLY", fade, edge), N.math("ADD", 0.6, N.math("MULTIPLY", no.outputs["Factor"], 0.8)), clamp=True)
-    bs = A.principled(N, **{"Base Color": lin("#8d8781"), "Roughness": 0.45})
+    bs = A.principled(N, **{"Base Color": lin("#1d1b1a"), "Roughness": 0.8, "Specular IOR Level": 0.25})
     tr = N.new("ShaderNodeBsdfTransparent")
     mx = N.new("ShaderNodeMixShader")
     N.link(mask, mx.inputs["Fac"])
