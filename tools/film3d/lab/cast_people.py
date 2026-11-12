@@ -17,6 +17,8 @@
 # _skin_to_bone (vérifiée en chiffres seulement, suit la tête dans les trois poses), les styles 1 et 2 de
 # pose_officer, le buste à 20° du « crouch », la coupe des faces étirées du sweat (_cut_stretched, vue en
 # Workbench), et dans cast_people_render.py : l'habitacle repris de cast.py et la planche « situation ».
+# Au 12 nov. : matières et visages des agents vérifiés au banc (lab/people_bench.py, 256 éch.) :
+# agents de face, de trois quarts et de dos, en joue, accroupis et en garde, sous des phares puis des néons.
 #
 # Les modèles (licences CC0 / CC BY, crédits dans le rapport du laboratoire) sont
 # lus dans $FILM3D_ASSETS/cast/<dossier>/. Aucun code venu d'un téléchargement
@@ -133,32 +135,225 @@ def _principled(name, color, rough, sheen=0.0, coat=0.0, spec=0.5, bump=0.0, bum
     return m
 
 
+def _cached(name):
+    try:
+        if name in _MATS and _MATS[name].name in bpy.data.materials:
+            return _MATS[name]
+    except ReferenceError:
+        pass
+    return None
+
+
+class _Nodes:
+    """Une matière Principled vide et quelques raccourcis de nœuds (texture d'image, carte de normales, bruit)."""
+
+    def __init__(self, name):
+        m = bpy.data.materials.new(name)
+        if hasattr(m, "use_nodes"):
+            m.use_nodes = True
+        self.m, self.nt = m, m.node_tree
+        for n in list(self.nt.nodes):
+            self.nt.nodes.remove(n)
+        self.out = self.nt.nodes.new("ShaderNodeOutputMaterial")
+        self.p = self.nt.nodes.new("ShaderNodeBsdfPrincipled")
+        self.link(self.p.outputs[0], self.out.inputs[0])
+        self._co = None
+
+    def link(self, a, b):
+        self.nt.links.new(a, b)
+
+    def new(self, kind, **inputs):
+        n = self.nt.nodes.new(kind)
+        for k, v in inputs.items():
+            if k.startswith("_"):
+                setattr(n, k[1:], v)
+            else:
+                n.inputs[k].default_value = v
+        return n
+
+    def obj(self):
+        if self._co is None:
+            self._co = self.new("ShaderNodeTexCoord").outputs["Object"]
+        return self._co
+
+    def image(self, img, data=False):
+        n = self.new("ShaderNodeTexImage")
+        n.image = img
+        if data:
+            img.colorspace_settings.name = "Non-Color"
+        return n
+
+    def noise(self, scale, detail=2.0, lo=0.0, hi=1.0):
+        nz = self.new("ShaderNodeTexNoise", Scale=scale, Detail=detail)
+        self.link(self.obj(), nz.inputs["Vector"])
+        mr = self.new("ShaderNodeMapRange", **{"From Min": 0.3, "From Max": 0.7, "To Min": lo, "To Max": hi})
+        self.link(nz.outputs["Fac"], mr.inputs["Value"])
+        return mr.outputs["Result"]
+
+    def tinted(self, color, lo, hi, scale=8.0):
+        """Couleur unie multipliée par un bruit à grande échelle (lo..hi) : la teinte d'un vrai tissu n'est pas égale."""
+        self.link(self.scaled(color, self.noise(scale, 3.0, lo, hi)), self.p.inputs["Base Color"])
+
+    def scaled(self, color, fac):
+        """`color` (constante) multipliée par la valeur `fac` (une sortie de nœud)."""
+        vm = self.new("ShaderNodeVectorMath", _operation="SCALE")
+        vm.inputs[0].default_value = color[:3]
+        self.link(fac, vm.inputs["Scale"])
+        return vm.outputs["Vector"]
+
+    def normal(self, nrm_img=None, strength=1.0, bumps=()):
+        """Normale : la carte du modèle (s'il y en a une), puis des bosses de bruit (échelle, force, distance)."""
+        nrm = None
+        if nrm_img is not None:
+            t = self.image(nrm_img, data=True)
+            nm = self.new("ShaderNodeNormalMap", Strength=strength)
+            self.link(t.outputs["Color"], nm.inputs["Color"])
+            nrm = nm.outputs["Normal"]
+        for scale, force, dist in bumps:
+            nz = self.new("ShaderNodeTexNoise", Scale=scale, Detail=3.0)
+            self.link(self.obj(), nz.inputs["Vector"])
+            b = self.new("ShaderNodeBump", Strength=force, Distance=dist)
+            self.link(nz.outputs["Fac"], b.inputs["Height"])
+            if nrm is not None:
+                self.link(nrm, b.inputs["Normal"])
+            nrm = b.outputs["Normal"]
+        if nrm is not None:
+            self.link(nrm, self.p.inputs["Normal"])
+        return nrm
+
+    def done(self, name, preview):
+        self.m.diffuse_color = preview
+        _MATS[name] = self.m
+        return self.m
+
+
+def _set(p, **kw):
+    names = {"base": "Base Color", "rough": "Roughness", "spec": "Specular IOR Level", "metal": "Metallic",
+             "sheen": "Sheen Weight", "sheen_rough": "Sheen Roughness", "sheen_tint": "Sheen Tint",
+             "coat": "Coat Weight", "coat_rough": "Coat Roughness", "sss": "Subsurface Weight",
+             "sss_radius": "Subsurface Radius", "sss_scale": "Subsurface Scale", "ior": "IOR", "alpha": "Alpha"}
+    for k, v in kw.items():
+        p.inputs[names[k]].default_value = v
+
+
+def mat_fabric(name, color, nrm=None, rough=0.86, sheen=0.22, nstrength=1.0, weave=0.35, tint="#9aa0ad"):
+    """Drap de laine ou sergé sombre : couleur unie (aucun motif ni insigne du modèle), les plis et les coutures
+    de la carte de normales du modèle, un grain de tissage fin, un velouté (sheen) qui prend la lumière rasante,
+    une rugosité qui varie un peu, une teinte qui varie à grande échelle (l'usure, les reprises)."""
+    m = _cached(name)
+    if m:
+        return m
+    N = _Nodes(name)
+    N.tinted(color, 0.82, 1.12)
+    N.link(N.noise(30.0, 2.0, rough - 0.06, min(1.0, rough + 0.06)), N.p.inputs["Roughness"])
+    _set(N.p, spec=0.32, sheen=sheen, sheen_rough=0.5, sheen_tint=lin(tint))
+    N.normal(nrm, nstrength, bumps=((1600.0, weave, 0.0004), (220.0, 0.12, 0.001)))
+    return N.done(name, color)
+
+
+def mat_leather_tex(name, color=None, nrm=None, rough=0.42, coat=0.35, nstrength=1.0):
+    """Cuir noir (ceinturon, étuis, chaussures, gants, visière) : un grain fin, une patine (rugosité tachée),
+    un vernis léger qui accroche les phares."""
+    m = _cached(name)
+    if m:
+        return m
+    color = color or lin("#0b0a0a")
+    N = _Nodes(name)
+    _set(N.p, base=color, spec=0.5, coat=coat, coat_rough=0.28)
+    N.link(N.noise(40.0, 4.0, rough - 0.12, rough + 0.12), N.p.inputs["Roughness"])
+    N.normal(nrm, nstrength, bumps=((900.0, 0.18, 0.0003),))
+    return N.done(name, color)
+
+
+def mat_plate():
+    """Plaque métallique unie (là où le modèle portait un insigne) : nickel satiné, aucun relief, aucun texte."""
+    m = _cached("ppl_plate")
+    if m:
+        return m
+    N = _Nodes("ppl_plate")
+    _set(N.p, base=lin("#6a6965"), metal=1.0, rough=0.5)
+    return N.done("ppl_plate", lin("#8d8b86"))
+
+
 def mat_cotton():
     """Coton noir mat du sweat à capuche : presque noir, très rugueux, un voile de duvet (sheen)."""
     return _principled("ppl_cotton_black", lin("#151517"), 0.92, sheen=0.2, spec=0.3, bump=0.25, bump_scale=1400)
 
 
 def mat_leather():
-    """Cuir noir des gants : plus lisse, un vernis léger qui accroche les gyrophares."""
-    return _principled("ppl_leather_black", lin("#0d0d0e"), 0.36, coat=0.25, spec=0.6, bump=0.15, bump_scale=600)
+    """Cuir noir des gants : satiné, un grain fin ; peu de vernis (à 0,4 de rugosité et 0,3 de vernis, sous des
+    phares de face, les gants brillaient comme du latex et blanchissaient derrière le pare-brise)."""
+    return mat_leather_tex("ppl_leather_black", lin("#0d0d0e"), rough=0.58, coat=0.08)
 
 
 def mat_navy():
-    """Uniforme marine sombre, sans aucun insigne."""
-    return _principled("ppl_uniform_navy", lin("#1b2233"), 0.78, sheen=0.25, spec=0.35, bump=0.2, bump_scale=1200)
+    """Uniforme marine sombre, sans aucun insigne (sans carte de normales : la casquette rapportée de Tuzzy)."""
+    return mat_fabric("ppl_uniform_navy", lin("#1b2233"))
 
 
 def mat_belt():
-    return _principled("ppl_belt_black", lin("#0e0e10"), 0.42, coat=0.1, spec=0.55)
+    return mat_leather_tex("ppl_belt_black")
 
 
-def mat_skin():
-    """Peau neutre des policiers (jamais lisible à contre-jour)."""
-    return _principled("ppl_skin_neutral", lin("#6e5a4e"), 0.55, spec=0.4)
+def mat_skin(base=None, nrm=None, tone=(0.0, 1.0, 1.0), name="ppl_skin_neutral"):
+    """Peau : la texture du modèle (si donnée) passée par une teinte (décalage de teinte, saturation, valeur),
+    une diffusion sous la surface courte (pas de cire), une rugosité qui varie, les pores de la carte de
+    normales ; sans texture, une peau unie."""
+    m = _cached(name)
+    if m:
+        return m
+    N = _Nodes(name)
+    if base is not None:
+        t = N.image(base)
+        hsv = N.new("ShaderNodeHueSaturation", Hue=0.5 + tone[0], Saturation=tone[1], Value=tone[2], Fac=1.0)
+        N.link(t.outputs["Color"], hsv.inputs["Color"])
+        N.link(hsv.outputs["Color"], N.p.inputs["Base Color"])
+    else:
+        _set(N.p, base=lin("#6e5a4e"))
+    _set(N.p, sss=0.18, sss_radius=(1.0, 0.38, 0.2), sss_scale=0.004, ior=1.4, spec=0.45)
+    N.link(N.noise(14.0, 3.0, 0.42, 0.6), N.p.inputs["Roughness"])
+    N.normal(nrm, 0.6, bumps=((2600.0, 0.08, 0.0002),))
+    return N.done(name, lin("#6e5a4e"))
 
 
-def mat_hair():
-    return _principled("ppl_hair_dark", lin("#1a1612"), 0.6, spec=0.3)
+def mat_eye(base, name="ppl_eye"):
+    """Les yeux : la texture du modèle (iris, pupille), le blanc éteint, un film humide (vernis) qui attrape un
+    reflet ; ni trou noir ni bille blanche."""
+    m = _cached(name)
+    if m:
+        return m
+    N = _Nodes(name)
+    t = N.image(base)
+    hsv = N.new("ShaderNodeHueSaturation", Hue=0.5, Saturation=0.9, Value=0.62, Fac=1.0)
+    N.link(t.outputs["Color"], hsv.inputs["Color"])
+    N.link(hsv.outputs["Color"], N.p.inputs["Base Color"])
+    _set(N.p, rough=0.35, spec=0.3, coat=1.0, coat_rough=0.03)
+    return N.done(name, lin("#cfc6bd"))
+
+
+def mat_hair(base=None, alpha=None, nrm=None, tint="#2a2420", name="ppl_hair_dark"):
+    """Cheveux, barbe, moustache, cils : la texture du modèle ramenée vers `tint` (sa luminance garde les
+    mèches), une carte d'opacité si on en donne une ; sans texture, un brun noir uni."""
+    m = _cached(name)
+    if m:
+        return m
+    N = _Nodes(name)
+    col = lin(tint)
+    if base is not None:
+        t = N.image(base)
+        bw = N.new("ShaderNodeRGBToBW")
+        N.link(t.outputs["Color"], bw.inputs["Color"])
+        mr = N.new("ShaderNodeMapRange", **{"To Min": 0.55, "To Max": 1.6})
+        N.link(bw.outputs["Val"], mr.inputs["Value"])
+        N.link(N.scaled(col, mr.outputs["Result"]), N.p.inputs["Base Color"])
+    else:
+        _set(N.p, base=col)
+    if alpha is not None:
+        a = N.image(alpha, data=True)
+        N.link(a.outputs["Color"], N.p.inputs["Alpha"])
+    _set(N.p, rough=0.55, spec=0.35, sheen=0.2, sheen_rough=0.3)
+    N.normal(nrm, 0.5)
+    return N.done(name, col)
 
 
 def mat_gun():
@@ -643,6 +838,19 @@ def _hand_faces(ob, arm, thresh=0.5, extra=()):
     return {p.index for p in ob.data.polygons if sum(wv[i] for i in p.vertices) / len(p.vertices) > thresh}
 
 
+def _bone_faces(ob, arm, roles, thresh=0.5):
+    """Faces dont les sommets sont surtout pondérés sur les os de rôles `roles` (noms Mixamo sans préfixe)."""
+    names = {b.name for b in arm.data.bones if canon(b.name) in roles}
+    gi = {g.index for g in ob.vertex_groups if g.name in names}
+    if not gi:
+        return set()
+    wv = []
+    for v in ob.data.vertices:
+        tot = sum(g.weight for g in v.groups)
+        wv.append(sum(g.weight for g in v.groups if g.group in gi) / tot if tot > 0 else 0.0)
+    return {p.index for p in ob.data.polygons if sum(wv[i] for i in p.vertices) / len(p.vertices) > thresh}
+
+
 def _remove_faces(ob, idx):
     if not idx:
         return
@@ -963,8 +1171,136 @@ def _clean_arm_bleed(arm, ob):
     return stripped
 
 
-def _paint_officer(arm, meshes, variant):
+def _orig_images(mat):
+    """Les images d'une matière importée : couleur de base, carte de normales, opacité (branchée sur un mélange)."""
+    out = {}
+    if not mat or not mat.node_tree:
+        return out
+    for n in mat.node_tree.nodes:
+        if n.type != "TEX_IMAGE" or not n.image:
+            continue
+        for l in n.outputs[0].links:
+            to = l.to_node
+            if to.type == "BSDF_PRINCIPLED" and l.to_socket.name == "Base Color":
+                out["base"] = n.image
+            elif to.type == "NORMAL_MAP":
+                out["normal"] = n.image
+            elif to.type in ("MIX", "MIX_SHADER", "MATH") or l.to_socket.name == "Alpha":
+                out["alpha"] = n.image
+    return out
+
+
+def _pos_islands(o, digits=5):
+    """Îlots de faces connexes, les sommets confondus (coutures d'UV) comptés comme un seul : numéro d'îlot par face."""
+    key = {}
+    vid = []
+    for v in o.data.vertices:
+        k = tuple(round(c, digits) for c in v.co)
+        vid.append(key.setdefault(k, len(key)))
+    parent = list(range(len(key)))
+
+    def find(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+    for poly in o.data.polygons:
+        vs = [vid[i] for i in poly.vertices]
+        for v in vs[1:]:
+            a, b = find(vs[0]), find(v)
+            if a != b:
+                parent[a] = b
+    return [find(vid[p.vertices[0]]) for p in o.data.polygons]
+
+
+def _texture_classes(ob, small=400):
+    """Chaque face d'un vêtement de l'atlas SPP classée par la couleur de sa texture (sRGB tel que stocké) :
+    « plate » (doré ou argenté, sur une petite pièce rapportée : insigne, plaque, bouton, boucle : repeint en
+    plaque unie), « leather » (noir ou gris peu saturé : ceinturon, étuis, visière, mentonnière), « fabric »
+    (le reste : le drap). Un doré peint sur une grande pièce (les écussons d'épaule) reste du drap : la couleur
+    du modèle n'est jamais rendue, l'écusson disparaît avec elle."""
+    import colorsys
+    cols = _classify_by_texture(ob)
+    isl = _pos_islands(ob)
+    size = {}
+    for i in isl:
+        size[i] = size.get(i, 0) + 1
+    out = []
+    for fi, c in enumerate(cols if cols is not None else [(0.15, 0.18, 0.25)] * len(ob.data.polygons)):
+        h, s, v = colorsys.rgb_to_hsv(*[max(0.0, min(1.0, x)) for x in c])
+        piece = size[isl[fi]] < small
+        if piece and ((0.05 < h < 0.2 and s > 0.35 and v > 0.3) or (s < 0.2 and v >= 0.42)):
+            out.append("plate")
+        elif s < 0.25 and v < 0.42:
+            out.append("leather")
+        else:
+            out.append("fabric")
+    return out
+
+
+# l'allure de l'agent (load_officer, `look`) : teinte de peau (décalage de teinte, saturation, valeur de la
+# texture), barbe et moustache, teinte du drap, teinte des cheveux
+LOOKS = [
+    dict(tone=(0.0, 1.0, 0.92), beard=True, moustache=True, cloth="#1b2233", width=1.0, hair="#2a2420"),
+]
+
+
+def _paint_spp(arm, meshes, look):
+    """L'agent SPP : chaque vêtement garde la carte de normales de son modèle (plis, coutures, poches, surpiqûres)
+    mais jamais sa couleur (écussons, insigne de casquette, plaque de poitrine, mots) ; les pièces rapportées
+    dorées ou argentées deviennent des plaques unies sans relief ; ceinturon, étuis, chaussures et visière en
+    cuir noir ; la peau, les yeux, les cheveux, la barbe et les cils prennent leurs textures, teintées selon
+    `look` ; gants de cuir noir ; les lunettes de soleil sont retirées."""
+    L_ = LOOKS[look % len(LOOKS)]
+    tag = f"spp{look % len(LOOKS)}"
+    kept = []
+    for ob in meshes:
+        part = _spp_part(ob)
+        mat0 = ob.data.materials[0] if ob.data.materials else None
+        im = _orig_images(mat0)
+        if part in ("eyewear",) or (part == "beards" and not L_["beard"]) or \
+                (part == "moustaches" and not L_["moustache"]):
+            bpy.data.objects.remove(ob)
+            continue
+        kept.append(ob)
+        if part in ("tops", "bottoms", "hats"):
+            cls = _texture_classes(ob)
+            print(f"[gens] {part} : " + ", ".join(f"{k} {cls.count(k)}" for k in sorted(set(cls))), flush=True)
+            fab =mat_fabric(f"ppl_{part}_{tag}", lin(L_["cloth"]), nrm=im.get("normal"),
+                             rough=0.82 if part != "hats" else 0.78)
+            lea = mat_leather_tex(f"ppl_{part}_leather", nrm=im.get("normal"),
+                                  rough=0.3 if part == "hats" else 0.42, coat=0.55 if part == "hats" else 0.35)
+            _assign_by_faces(ob, cls, {"fabric": fab, "leather": lea, "plate": mat_plate()})
+        elif part == "shoes":
+            cols = _classify_by_texture(ob)
+            import colorsys
+            cls = []
+            for c in (cols if cols is not None else [(0.05, 0.05, 0.05)] * len(ob.data.polygons)):
+                h, s, v = colorsys.rgb_to_hsv(*[max(0.0, min(1.0, x)) for x in c])
+                cls.append("sole" if s > 0.3 else "leather")
+            _assign_by_faces(ob, cls, {
+                "leather": mat_leather_tex("ppl_shoes_leather", lin("#0a0909"), nrm=im.get("normal"), rough=0.32,
+                                           coat=0.6),
+                "sole": mat_leather_tex("ppl_shoes_sole", lin("#0e0d0c"), rough=0.75, coat=0.0)})
+        elif part in ("hair", "beards", "moustaches", "eyelashes"):
+            # (l'image que le modèle branche sur un mélange n'est pas une opacité mais un reflet gris-bleu : les
+            # mèches restent pleines, la texture de couleur fait le cheveu)
+            _set_all(ob, mat_hair(im.get("base"), None, im.get("normal") if part != "eyelashes" else None,
+                                  tint=L_["hair"], name=f"ppl_{part}_{tag}"))
+        elif part == "eyes":
+            _set_all(ob, mat_eye(im.get("base")))
+        else:   # le corps : la peau, les mains gantées
+            skin = mat_skin(im.get("base"), im.get("normal"), tone=L_["tone"], name=f"ppl_skin_{tag}")
+            hands = _hand_faces(ob, arm, 0.5) if arm else set()
+            _assign_by_faces(ob, ["glove" if p.index in hands else "skin" for p in ob.data.polygons],
+                             {"skin": skin, "glove": mat_leather()})
+    return kept
+
+
+def _paint_officer(arm, meshes, variant, look=0):
     """Uniforme marine uni, ceinture et chaussures noires, gants noirs, peau neutre ; aucun insigne."""
+    if variant == "spp":
+        return _paint_spp(arm, meshes, look)
     navy, belt, skin, hair, glove = mat_navy(), mat_belt(), mat_skin(), mat_hair(), mat_leather()
     kept = []
     for ob in meshes:
@@ -1150,18 +1486,64 @@ def _add_cap(arm, meshes):
     return cap
 
 
-def load_officer(variant="spp", name=None):
+def _spp_part(ob):
+    """La pièce d'un maillage SPP (« tops », « eyes »…), lue sur le nom du maillage glTF, sinon sur sa matière
+    et sa taille (corps, yeux et cils partagent la matière « Bodymat »)."""
+    m = re.match(r"(Body|Eyes|Eyelashes|Moustaches|Hair|Beards|Shoes|Bottoms|Hats|Tops|Eyewear)_", ob.data.name)
+    if m:
+        return m.group(1).lower()
+    mn = (ob.data.materials[0].name.lower() if ob.data.materials and ob.data.materials[0] else "")
+    for key, part in (("top", "tops"), ("bottom", "bottoms"), ("hat", "hats"), ("shoe", "shoes"),
+                      ("eyewear", "eyewear"), ("moustache", "moustaches"), ("beard", "beards"), ("hair", "hair")):
+        if key in mn:
+            return part
+    n = len(ob.data.vertices)
+    return "eyelashes" if n < 300 else "eyes" if n < 2000 else "body"
+
+
+def _smooth_mesh(ob, weld=True, subsurf=0):
+    """Plus de facettes : sommets confondus soudés (les coutures d'UV restent dans les UV), normales
+    recalculées lisses (les normales importées sont celles des faces sur certains modèles), et une subdivision
+    légère après l'armature (les silhouettes arrondies ; la pose ne change pas, elle déforme la cage)."""
+    if weld:
+        bm_ = bmesh.new()
+        bm_.from_mesh(ob.data)
+        bmesh.ops.remove_doubles(bm_, verts=bm_.verts, dist=1e-5)
+        bm_.to_mesh(ob.data)
+        bm_.free()
+        with bpy.context.temp_override(object=ob, active_object=ob, selected_objects=[ob]):
+            try:
+                bpy.ops.mesh.customdata_custom_splitnormals_clear()
+            except RuntimeError:
+                pass
+        ob.data.shade_smooth()
+    if subsurf:
+        md = ob.modifiers.new("lissage", "SUBSURF")
+        md.levels = md.render_levels = subsurf
+        md.quality = 2
+        md.uv_smooth = "PRESERVE_BOUNDARIES"
+
+
+def load_officer(variant="spp", name=None, look=0):
     """Un policier riggé, 1,78 m, uniforme marine uni sans insigne, ceinture noire, casquette, gants noirs.
+    `look` (agent SPP) : l'allure de LOOKS (peau, barbe, drap).
     Renvoie l'objet armature (les maillages en sont les enfants)."""
     spec = OFFICERS[variant]
     arm, meshes = _import(spec["path"])
     if spec["route"] == "R":
         arm, meshes = _rig_static(meshes, spec["donor"], spec.get("joints"))
     _normalise(arm, meshes)
+    if variant == "spp":
+        for o in meshes:
+            o.data.name = _spp_part(o).capitalize() + "_" + o.data.name
     _calibrate_palms(arm)
-    meshes = _paint_officer(arm, meshes, variant)
+    meshes = _paint_officer(arm, meshes, variant, look)
     if spec.get("cap"):
         meshes.append(_add_cap(arm, meshes))
+    if variant == "spp":
+        for o in meshes:
+            if _spp_part(o) in ("body", "tops", "bottoms", "hats", "shoes"):
+                _smooth_mesh(o, weld=False, subsurf=1)
     arm.name = name or f"officer_{variant}"
     arm["variant"] = variant
     arm["route"] = spec["route"]
