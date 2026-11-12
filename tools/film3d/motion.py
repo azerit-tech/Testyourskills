@@ -328,6 +328,62 @@ def key_vehicle(root, poses, wheels=(), ground=None, pivot=(0.0, 0.0, 0.5), body
     return root
 
 
+def rear_axle(pose, wheelbase=2.9):
+    """Le milieu de l'essieu arrière d'une pose de sample() (x, y) : là où naît la fumée d'une glisse."""
+    h = math.radians(pose["heading"])
+    return pose["x"] + math.sin(h) * wheelbase / 2, pose["y"] - math.cos(h) * wheelbase / 2
+
+
+def smoke_puffs(poses, wheelbase=2.9, slip_min=8.0, every=4):
+    """Les bouffées de fumée d'une glisse : une toutes les `every` images tant que la caisse dérive de plus de
+    `slip_min` degrés, posée à l'essieu arrière de cette image (elle reste où elle est née, donc derrière la
+    voiture). Renvoie [(image de naissance, x, y, force 0..1)]."""
+    out = []
+    for p in poses:
+        slip = abs(p["heading"] - p["travel"])
+        if slip >= slip_min and (not out or p["frame"] - out[-1][0] >= every):
+            out.append((p["frame"], *rear_axle(p, wheelbase), min(1.0, slip / 20.0)))
+    return out
+
+
+def key_smoke(ob, birth, frames, at, size=1.0, grow=10, rise=0.4, drift=(0.0, 0.0)):
+    """Une bouffée de fumée (une boîte de volume) en clés simples : invisible (échelle 1 %) avant sa naissance,
+    elle gonfle de 15 % à 100 % en `grow` images en montant de `rise` m et en dérivant de `drift` m."""
+    _clear(ob)
+    for f in frames:
+        u = 0.0 if f < birth else min(1.0, (f - birth) / grow)
+        e = 1 - (1 - u) ** 2
+        k = 0.01 if f < birth else size * (0.15 + 0.85 * e)
+        ob.scale = (k, k, k)
+        ob.location = (at[0] + drift[0] * e, at[1] + drift[1] * e, at[2] + rise * e)
+        ob.keyframe_insert("scale", frame=f)
+        ob.keyframe_insert("location", frame=f)
+
+
+def wheel_marks(wheels, radius=0.33):
+    """Un repère sur chaque roue (une branche de jante de couleur d'objet à part), pour juger à l'œil le sens et
+    la vitesse de rotation dans l'aperçu Workbench. Caché au rendu (hide_render) : render_lieux.py ne le rallume
+    qu'en Workbench. Les roues sont des objets séparés dont l'axe est le x local."""
+    import bpy
+    import bmesh
+    out = []
+    for w in wheels:
+        bm = bmesh.new()
+        m = bmesh.ops.create_cube(bm, size=1.0)
+        bmesh.ops.scale(bm, vec=(0.30, 0.07, radius * 0.75), verts=m["verts"])
+        bmesh.ops.translate(bm, vec=(0.0, 0.0, radius * 0.6), verts=m["verts"])
+        me = bpy.data.meshes.new("repere_" + w.name)
+        bm.to_mesh(me)
+        bm.free()
+        ob = bpy.data.objects.new("repere_" + w.name, me)
+        bpy.context.scene.collection.objects.link(ob)
+        ob.parent = w
+        ob.color = (1.0, 0.85, 0.0, 1.0)
+        ob.hide_render = True
+        out.append(ob)
+    return out
+
+
 def key_object(ob, frames, fn, f0=F0, fps=FPS):
     """Clés de position et d'orientation d'un objet quelconque : fn(t) -> (x, y, z, cap, tangage, roulis) dans la
     convention de lieux.put (hélicoptère, objets portés)."""

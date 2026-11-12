@@ -96,8 +96,8 @@ lockf -k <verrou> nice -n 19 /Applications/Blender.app/Contents/MacOS/Blender -b
 3. Une glisse se donne par `slip(t)` en degrés (négative : la caisse tournée plus à droite que sa route) ; sinon le cap se lit sur la trajectoire.
 4. Les distances : `M.min_gap({nom: pos}, images)` et un assert par plan dans `test_motion.py` ; jamais de choc entre véhicules.
 5. Dans la scène : `poses = M.sample(pos, range(F0 - 1, F0 + N + 1), slip=…, wheel_r=root["wheel_r"], wheelbase=…, seed=i)` (une image de plus de chaque côté pour l'obturateur).
-6. Puis `M.key_vehicle(root, poses, wheels=[…], ground=fn(x, y) -> (z, pente), pivot=(0, 0, h))` ; `wheels` pour la berline seulement (les roues des patrouilles et du fourgon sont fondues dans la caisse : ne pas les découper).
-7. Tout autre objet mobile : `M.key_object(ob, images, fn)`, `fn(t) -> (x, y, z, cap, tangage, roulis)`.
+6. Puis `M.key_vehicle(root, poses, wheels=[…], ground=fn(x, y) -> (z, pente), pivot=(0, 0, h))` ; `wheels` pour la berline seulement (les roues des patrouilles et du fourgon sont fondues dans la caisse : ne pas les découper) ; `M.wheel_marks(wheels, r)` pose sur ses roues un repère que seul l'aperçu Workbench montre.
+7. Tout autre objet mobile : `M.key_object(ob, images, fn)`, `fn(t) -> (x, y, z, cap, tangage, roulis)` ; la fumée d'une glisse : `M.smoke_puffs(poses)` puis `M.key_smoke(ob, naissance, images, lieu)`.
 8. La caméra : `M.key_camera(cam, images, fn)`, `fn(t) -> (x, y, z, lacet, site, roulis, focale)` ; l'épaule par `M.handheld(t, amp, rotor, seed)`.
 9. L'hélicoptère : `M.key_object`, `M.key_searchlight(h, images, cible_fn)`, `M.spin_rotors(h)` ; les rampes : `M.flash_bars(rigs, images)` (corail / lilas à 2 Hz).
 10. L'aperçu : `render_lieux.py -- --lieu … --plan … --anim` (ou `--scene … --anim`), Workbench sous le verrou ; le flou de bougé vient des clés (obturateur 0,5), plus de clés de flou à la main.

@@ -9,8 +9,11 @@
 # dernière.
 #
 # Écart au §2.4, assumé : 28 images ne tiennent pas « 120 km/h, freinage dès s = 10 m, entrée à 60 km/h, sortie sur
-# la voie du quai » (il faudrait plus de 3 s). Le plan prend la fin du freinage (76 km/h, l'avant plongé), l'entrée
-# en glisse et le début de la reprise ; la coupe tombe à 41° dans le virage, la voiture à 13 m de l'objectif.
+# la voie du quai » (il faudrait plus de 3 s). Le plan commence à l'entrée en glisse, le freinage juste fini hors
+# champ (l'assiette arrive plongée et se redresse), et finit au début de la reprise, 62° dans le virage. La caméra
+# est sur le bord de la voie du quai, là où la berline sort du virage : elle vient vers l'objectif et grandit d'un
+# quart à plus des deux tiers de la largeur du cadre (12 novembre : à 31 m, elle n'existait qu'aux huit dernières
+# images).
 import math
 
 import motion as M
@@ -24,11 +27,11 @@ TURN_R = 15.0
 LANE_X = TURN_C[0] - TURN_R            # 3,5 : la voie de droite du pont
 
 # --- la berline : vitesse et accélération (m/s, m/s²), instants (s)
-V0 = 21.0                    # 76 km/h à la première image, en plein freinage depuis la rampe
-BRAKE = -9.5                 # ~1 g
-T_IN = 0.45                  # l'entrée dans l'arc (16,7 m/s, 60 km/h)
+V0 = 16.7                    # 60 km/h à la première image : le freinage (~1 g) vient de finir, hors champ
+BRAKE = -9.5                 # ~1 g, avant la première image : l'assiette arrive plongée et se redresse
+T_IN = 0.02                  # l'entrée dans l'arc
 SCRUB = -3.0                 # la glisse mange la vitesse
-T_GO = 0.92                  # la reprise : on remet les gaz
+T_GO = 0.70                  # la reprise : on remet les gaz, l'arrière s'assied
 GO = 4.0
 SLIP = -22.0                 # degrés : la caisse tournée plus à droite que sa route, l'arrière dehors
 SLIP_OUT = -13.0             # à la reprise, la caisse se redresse un peu
@@ -71,16 +74,17 @@ def hero_phi(t):
     return max(0.0, math.degrees((HERO.s(t) - S_IN) / TURN_R))
 
 
-# --- la meute : sur la rampe, vers +y, à 30 m/s ; elle freine fort à la fin du plan (elle voit l'axe fermé)
+# --- la meute : au pied de la rampe, vers +y, à 30 m/s ; elle freine fort (elle voit l'axe fermé), sans
+# rattraper la berline (46 m derrière à la première image, 29 m au plus près)
 PACK_V = 30.0
 
 
 def _pack_accel(t):
-    return -6.0 * M.smoothstep(0.45, 0.65, t)
+    return -8.0 * M.smoothstep(0.35, 0.55, t)
 
 
 PACK = M.Profile(PACK_V, _pack_accel)
-PACK_START = [("patrol", -1.9, -4.0), ("patrol", -5.2, -16.0), ("van", -1.9, -36.0), ("patrol", 1.9, -55.0)]
+PACK_START = [("patrol", 1.9, 9.0), ("patrol", -1.9, -1.0), ("van", 1.9, -19.0), ("patrol", -1.9, -37.0)]
 
 
 def pack_pos(i):
@@ -96,9 +100,10 @@ def tracks():
     return out
 
 
-# --- l'hélicoptère : il monte de derrière le portique (au-dessus de l'eau) à droite du cadre
-HELI_A = (-24.0, -24.0, 6.0)
-HELI_B = (-30.0, -6.0, 45.0)   # assez haut pour que le faisceau passe au-dessus de la salle des machines
+# --- l'hélicoptère : il monte de derrière la file de conteneurs qui ferme l'axe, à l'ouest, et glisse vers le
+# nord ; la caméra, qui tourne avec la berline, le trouve dans le haut du cadre à la seconde moitié du plan
+HELI_A = (-44.0, 72.0, 10.0)
+HELI_B = (-40.0, 96.0, 38.0)
 
 
 def heli(t):
@@ -109,36 +114,46 @@ def heli(t):
     return x, y, z, -8.0 + 14.0 * e, -7.0 + 4.0 * e, -3.0 - 5.0 * M.smoothstep(0.2, 0.9, u)
 
 
-# --- la caméra : au bord nord de la voie du quai, à 40 cm du sol, 28 mm, à l'épaule
-CAM = (11.0, 77.0, 0.4)
-CAM_YAW = (13.0, 11.5)        # elle suit à peine la berline qui vient vers elle
-CAM_PITCH = (2.0, 16.0)       # le panoramique vers le haut (§2.4 : 25° ; 16° gardent la voiture au-dessus de la bande)
+# --- la caméra : dans le virage, 6 m à l'intérieur de l'arc (au plus près, la caisse passe à 9 m), à 30 cm du
+# sol, 28 mm, à l'épaule : elle voit la berline de trois quarts puis de flanc, la glisse et le contre-braquage
+# (de la sortie du virage, elle la voyait de face et la glisse ne se lisait pas). Elle la suit : le lacet vise son
+# centre, un peu en avance (elle reste dans le tiers central, panoramique de 65°) ; le site pose ses roues au
+# tiers bas, juste au-dessus de la bande des 15 %. La meute, 30 m derrière, reste hors champ.
+CAM = (20.0, 61.0, 0.3)
 CAM_ROLL = -2.0
+LENS = 28.0
+TAN_V = 18.0 / LENS           # demi-champ vertical (capteur de 36 mm sur la hauteur, cadre 9:16)
+GROUND_V = (-0.66, -0.60)     # où tombent les roues, en fraction de la demi-hauteur (-1 : le bas du cadre)
+LAG = -0.04                   # en avance : de l'air devant le capot (avec 60 ms de retard, elle filait au bord)
 
 
 def camera(t):
     dyaw, dpitch, droll, dx, dy, dz = M.handheld(t, amp=0.45, rotor=0.10 + 0.12 * M.smoothstep(0.3, 1.1, t), seed=0.7)
-    u = M.smoothstep(0.2, T_END + 0.05, t)
-    return (CAM[0] + dx, CAM[1] + dy, CAM[2] + dz, CAM_YAW[0] + (CAM_YAW[1] - CAM_YAW[0]) * u + dyaw,
-            CAM_PITCH[0] + (CAM_PITCH[1] - CAM_PITCH[0]) * u + dpitch, CAM_ROLL + droll, 28.0)
+    x, y = hero_pos(t - LAG)
+    ex, ey = x - CAM[0], y - CAM[1]
+    yaw = 180.0 - math.degrees(math.atan2(-ex, ey))          # lacet compté de -y vers -x (motion.key_camera)
+    v = GROUND_V[0] + (GROUND_V[1] - GROUND_V[0]) * M.smoothstep(0.0, T_END, t)
+    pitch = math.degrees(math.atan(-v * TAN_V) - math.atan(CAM[2] / math.hypot(ex, ey)))
+    return CAM[0] + dx, CAM[1] + dy, CAM[2] + dz, yaw + dyaw, pitch + dpitch, CAM_ROLL + droll, LENS
 
 
-# --- le faisceau : il balaie la brume, croise l'objectif vers l'image 14, se pose sur la berline vers l'image 20
-SWEEP = ((-50.0, 25.0, 0.0), (-8.0, 48.0, 3.0))
+# --- le faisceau : il balaie la brume derrière la berline, croise l'objectif vers l'image 10, se pose sur elle
+# vers l'image 16
+SWEEP = ((-30.0, 45.0, 0.0), (-5.0, 62.0, 2.0))
 
 
 def beam_target(t):
     f = t * M.FPS + F0
     car = hero_pos(t)
     car = (car[0], car[1], 0.7)
-    if f <= 8:
-        u = M.smoothstep(F0, 8, f)
+    if f <= 6:
+        u = M.smoothstep(F0, 6, f)
         return tuple(a + (b - a) * u for a, b in zip(*SWEEP))
-    if f <= 14:
-        u = M.smoothstep(8, 14, f)
+    if f <= 10:
+        u = M.smoothstep(6, 10, f)
         return tuple(a + (b - a) * u for a, b in zip(SWEEP[1], CAM))
-    if f <= 20:
-        u = M.smoothstep(14, 20, f)
+    if f <= 16:
+        u = M.smoothstep(10, 16, f)
         return tuple(a + (b - a) * u for a, b in zip(CAM, car))
     return car
 

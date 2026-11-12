@@ -778,7 +778,7 @@ def build_port(hidden, lamp_src, far=False, palier=None):
 import motion as M          # noqa: E402  (le mouvement calculé, pur Python)
 import p5_virage as P5      # noqa: E402  (la trajectoire de P5, écrite une fois)
 
-CAM = Vector(P5.CAM)                 # sur le bord nord de la voie du quai (le §2.4 : x = 10, y = 77)
+CAM = Vector(P5.CAM)                 # dans le virage, 6 m à l'intérieur de l'arc (le §2.4 : x = 10, y = 77)
 STILL_FRAME = 24                     # l'image fixe d'essai (rendu d'une seule image) : la berline en pleine glisse
 FRAMES = range(P5.F0 - 1, P5.F0 + P5.FRAMES + 1)   # une image de part et d'autre : l'obturateur du flou
 
@@ -855,17 +855,18 @@ def light_tower(at, target, energy=50000.0, along_x=False):
 
 
 def plan_P5(scene, hidden, palier="socle"):
-    """P5, le projecteur, animé (28 images, p5_virage.py) : la caméra à l'épaule à 40 cm du sol sur le bord nord
-    de la voie du quai, 28 mm, tournée vers le pied de la rampe, puis panoramique vers le haut. La berline arrive de
-    face en plein freinage (l'avant plongé), entre dans l'arc de 15 m et part en glisse à droite (contre-braquage,
-    roulis vers l'extérieur), reprend à la fin ; deux patrouilles au pied de la rampe, le fourgon et une troisième
-    sur la rampe la suivent sans la rattraper, rampes clignotantes ; l'hélicoptère monte de derrière le portique,
-    son faisceau balaie la brume, croise l'objectif vers l'image 14 et se pose sur elle vers l'image 20. Toutes les
-    clés viennent des trajectoires (motion.py) ; le flou de mouvement les suit.
+    """P5, le projecteur, animé (28 images, p5_virage.py) : la caméra à l'épaule à 30 cm du sol, 6 m à
+    l'intérieur de l'arc, 28 mm ; elle suit la berline (tiers central, roues au tiers bas). La berline entre
+    dans l'arc de 15 m l'assiette encore plongée du freinage, part en glisse à droite (contre-braquage, roulis vers
+    l'extérieur, fumée aux roues arrière), vient vers l'objectif et reprend à la fin ; deux patrouilles au pied de
+    la rampe, le fourgon et une troisième sur la rampe la suivent sans la rattraper, rampes clignotantes ;
+    l'hélicoptère monte de derrière le portique, son faisceau balaie la brume, croise l'objectif vers l'image 10 et
+    se pose sur elle vers l'image 16. Toutes les clés viennent des trajectoires (motion.py) ; le flou de mouvement
+    les suit.
 
-    Écart au §2.4 : la caméra est en (11, 77) et non (10, 77) (la berline de l'image fixe tient la moitié droite
-    du cadre, la meute la gauche) ; le panoramique monte de 14° et non de 25° (au-delà, la berline passe sous la
-    bande du bas) ; le plan ne couvre que la fin du freinage, la glisse et le début de la reprise (p5_virage.py)."""
+    Écart au §2.4 : la caméra est dans le virage en (20, 61) et non en (10, 77) (12 novembre : la berline
+    doit tenir un quart du cadre dès la première image) ; le panoramique suit la voiture (65° de lacet) ; le
+    plan commence à l'entrée en glisse, le freinage fini hors champ (p5_virage.py)."""
     import scene_c
     lamp_src = L.panorama(scene, hidden, bridge=None, port=None)
     scene_c.build_bridge(hidden, lamp_src)
@@ -874,13 +875,18 @@ def plan_P5(scene, hidden, palier="socle"):
     # --- la berline : freinage, glisse, reprise
     hero = L.hero()
     wheels = L.hero_wheels(hero)
-    poses = M.sample(P5.hero_pos, FRAMES, slip=P5.hero_slip, wheel_r=hero["wheel_r"], wheelbase=wheelbase(wheels))
+    wb = wheelbase(wheels)
+    poses = M.sample(P5.hero_pos, FRAMES, slip=P5.hero_slip, wheel_r=hero["wheel_r"], wheelbase=wb)
     M.key_vehicle(hero, poses, wheels=wheels)
-    # la fumée des pneus arrière, là où la glisse s'installe, sur l'extérieur de l'arc
-    a = math.radians(18.0)
-    out = Vector((-math.cos(a), math.sin(a), 0.0))
-    smoke_at = Vector((TURN_C[0], TURN_C[1], 0.0)) + out * (TURN_R + 0.8)
-    L.smoke("fumee_pneus", (smoke_at.x, smoke_at.y, 0.5), (3.0, 2.4, 0.7), density=0.12, seed=3.0)
+    M.wheel_marks(wheels, hero["wheel_r"])                # le repère de rotation, en Workbench seulement
+    # la fumée des pneus arrière : une bouffée toutes les quatre images de glisse, née à l'essieu arrière, qui reste
+    # où elle est née (derrière la voiture), gonfle, monte et dérive vers l'extérieur de l'arc
+    puffs = M.smoke_puffs(poses, wb)
+    for k, (f, x, y, s) in enumerate(puffs):
+        ob = L.smoke(f"fumee_pneus_{k}", (x, y, 0.4), (2.4, 2.0, 0.8), density=0.12 * s, seed=3.0 + k)
+        out = (Vector((x, y, 0.0)) - Vector((TURN_C[0], TURN_C[1], 0.0))).normalized()
+        M.key_smoke(ob, f, FRAMES, (x, y, 0.4), rise=0.5, drift=(out.x * 1.2, out.y * 1.2))
+    print(f"[P5] {len(puffs)} bouffées de fumée, images {[q[0] for q in puffs]}", flush=True)
     p = Vector((*P5.hero_pos(M.t_of(STILL_FRAME)), 0.0))
     # --- la meute : elle descend la rampe et freine, sans rattraper la berline
     rigs = scene_c.pack([(k, x, y, 0.0) for k, x, y in P5.PACK_START], speed=P5.PACK_V)
@@ -925,8 +931,8 @@ def plan_P5(scene, hidden, palier="socle"):
         lo.parent = heli
         lo.location = (0.0, -0.5, 2.6 + dz)
     L.haze((-140, 160), (-280, 115), (L.WATER_Z, 70), 0.0022)    # lieux.haze tourne ses normales vers l'extérieur
-    # --- la caméra à l'épaule, mise au point sur la berline (elle vient de 31 à 13 m)
-    cam = L.camera("cam_P5", tuple(CAM), (CAM.x, CAM.y - 50.0, CAM.z), lens=28, fstop=2.8, roll=-2.0)
+    # --- la caméra à l'épaule, mise au point sur la berline (de 13 à 9 m)
+    cam = L.camera("cam_P5", tuple(CAM), (CAM.x - 30.0, CAM.y - 40.0, CAM.z), lens=P5.LENS, fstop=2.8, roll=-2.0)
     M.key_camera(cam, FRAMES, P5.camera)
     cam.data.dof.focus_object = hero
     scene.render.use_motion_blur = True
