@@ -1312,16 +1312,8 @@ def plan_P5(scene, hidden, palier="conteneurs"):
     print(f"[P5] feux stop, images {P5.brake_windows()}", flush=True)
     f0, f1 = skid_p5(scene)
     print(f"[P5] traces de gomme des roues arrière, images {f0} à {f1}", flush=True)
-    # la fumée des pneus arrière : une bouffée toutes les quatre images de glisse, née à l'essieu arrière, qui reste
-    # où elle est née (derrière la voiture), gonfle, monte et dérive vers l'intérieur de l'arc (P5.SMOKE_DRIFT : la
-    # caméra passe à l'extérieur) ; sans celles qu'elle traverserait (p5_virage.smoke_keep : elles voilaient le bas
-    # du cadre)
-    puffs = P5.smoke_keep(M.smoke_puffs(poses, wb))
-    for k, (f, x, y, s) in enumerate(puffs):
-        ob = L.smoke(f"fumee_pneus_{k}", (x, y, 0.4), (2.4, 2.0, 0.8), density=0.45 * s, seed=3.0 + k)
-        out = (Vector((x, y, 0.0)) - Vector((P5.TURN_C[0], P5.TURN_C[1], 0.0))).normalized()
-        M.key_smoke(ob, f, FRAMES, (x, y, 0.4), rise=0.5, drift=(out.x * P5.SMOKE_DRIFT, out.y * P5.SMOKE_DRIFT))
-    print(f"[P5] {len(puffs)} bouffées de fumée, images {[q[0] for q in puffs]}", flush=True)
+    # plus de fumée des pneus dessinée par la scène (règle F du découpage v3.1 : ces bouffées se lisaient comme des
+    # taches de lumière) ; elle reviendra par fx, aux bouffées que p5_virage.smoke_keep garde loin de l'objectif
     # --- la meute : elle descend la voie du pont et freine, sans rattraper la berline
     rigs = scene_c.pack([(k, x, y, 0.0) for k, x, y in P5.PACK_START], speed=P5.PACK_V)
     for i, r in enumerate(rigs):
