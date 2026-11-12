@@ -1,0 +1,103 @@
+# Les tests de motion.py, sans Blender : python3 tools/film3d/test_motion.py
+import math
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import motion as M  # noqa: E402
+
+FRAMES = range(0, 30)
+FAIL = []
+
+
+def check(name, ok, detail=""):
+    print(f"{'ok  ' if ok else 'ÉCHEC'} {name}{' : ' + detail if detail else ''}")
+    if not ok:
+        FAIL.append(name)
+
+
+def test_straight():
+    """Une ligne droite à vitesse constante : ni roulis ni tangage, les roues tournent à v / r."""
+    r, v = 0.33, 20.0
+    ps = M.sample(M.straight(3.0, 0.0, v), FRAMES, wheel_r=r, noise=0.0)
+    check("droite : roulis nul", max(abs(p["roll"]) for p in ps) < 1e-3, f"{max(abs(p['roll']) for p in ps):.2e}°")
+    check("droite : tangage nul", max(abs(p["pitch"]) for p in ps) < 1e-3, f"{max(abs(p['pitch']) for p in ps):.2e}°")
+    check("droite : braquage nul", max(abs(p["steer"]) for p in ps) < 1e-3)
+    rate = (ps[-1]["spin"] - ps[0]["spin"]) / (ps[-1]["t"] - ps[0]["t"])
+    check("droite : roues à v / r", abs(rate - v / r) < 0.01 * v / r, f"{rate:.2f} rad/s pour {v / r:.2f}")
+    check("droite : roues dans le sens de la marche", rate > 0)
+    check("droite : cap constant", max(abs(p["heading"]) for p in ps) < 1e-6)
+    noisy = M.sample(M.straight(3.0, 0.0, v), FRAMES, wheel_r=r)
+    check("droite : bruit de suspension faible", max(abs(p["roll"]) for p in noisy) < 0.3
+          and max(abs(p["heave"]) for p in noisy) < 0.01)
+
+
+def test_braking():
+    """Un freinage à 9 m/s² : l'avant plonge (tangage négatif), sans dépasser 3°."""
+    pos = M.straight(0.0, 0.0, 25.0, accel=lambda t: -9.0 if t >= 0.2 else 0.0)
+    ps = M.sample(pos, FRAMES, noise=0.0)
+    lo = min(p["pitch"] for p in ps)
+    check("freinage : l'avant plonge", lo < -1.5, f"{lo:.2f}°")
+    check("freinage : plongée bornée à 3°", lo >= -M.PITCH_MAX - 1e-9)
+    before = [p for p in ps if p["t"] < 0.15]
+    check("freinage : rien avant le freinage", max(abs(p["pitch"]) for p in before) < 0.05)
+    # la caisse suit avec du retard : à 0,05 s du coup de frein elle n'a pas encore plongé de moitié
+    early = [p for p in ps if 0.2 < p["t"] <= 0.26]
+    check("freinage : la caisse suit avec retard", all(p["pitch"] > lo / 2 for p in early))
+    acc = [p for p in ps if p["t"] > 0.5]
+    check("freinage : accélération lue", all(abs(p["a_long"] + 9.0) < 0.3 for p in acc))
+
+
+def _circle(r, v, right=True):
+    """Un cercle de rayon r parcouru à v, qui part vers +y en tournant à droite (ou à gauche)."""
+    sgn = -1.0 if right else 1.0
+    cx = -sgn * r
+
+    def pos(t):
+        a = v * t / r
+        return cx + sgn * r * math.cos(a), r * math.sin(a)
+    return pos
+
+
+def test_right_turn():
+    """Un virage à droite : roulis vers la gauche (l'extérieur), braquage à droite ; en glisse, contre-braquage."""
+    ps = M.sample(_circle(30.0, 15.0), FRAMES, noise=0.0, warmup=1.0)
+    end = ps[-1]
+    check("virage à droite : accélération latérale vers la droite", end["a_lat"] < -5.0, f"{end['a_lat']:.2f} m/s²")
+    check("virage à droite : roulis vers la gauche", end["roll"] < -2.0, f"{end['roll']:.2f}°")
+    check("virage à droite : roulis borné", min(p["roll"] for p in ps) >= -M.ROLL_MAX)
+    check("virage à droite : braquage à droite", end["steer"] < -1.0, f"{end['steer']:.2f}°")
+    check("virage à droite : le cap décroît", ps[-1]["heading"] < ps[0]["heading"])
+    left = M.sample(_circle(30.0, 15.0, right=False), FRAMES, noise=0.0, warmup=1.0)
+    check("virage à gauche : roulis vers la droite", left[-1]["roll"] > 2.0, f"{left[-1]['roll']:.2f}°")
+    drift = M.sample(_circle(15.0, 15.0), FRAMES, slip=lambda t: -22.0, noise=0.0, warmup=1.0)
+    check("glisse à droite : contre-braquage (roues à gauche)", drift[-1]["steer"] > 2.0, f"{drift[-1]['steer']:.2f}°")
+    check("glisse à droite : la caisse plus à droite que la route",
+          abs(drift[-1]["heading"] - drift[-1]["travel"] + 22.0) < 1e-6)
+
+
+def test_gaps():
+    """Les véhicules d'un plan gardent leurs distances : jamais moins de 6 m entre deux centres (P5)."""
+    import p5_virage as P
+    d, f, a, b = M.min_gap(P.tracks(), range(P.F0 - 1, P.F0 + P.FRAMES + 1))
+    check("P5 : distances gardées", d >= 6.0, f"{d:.1f} m entre {a} et {b} à l'image {f}")
+    gap = min(math.dist(P.hero_pos(M.t_of(f)), P.pack_pos(0)(M.t_of(f))) for f in range(P.F0, P.F0 + P.FRAMES))
+    check("P5 : la meute ne rattrape pas la berline", gap > 25.0, f"{gap:.1f} m au plus près")
+    check("M.min_gap voit un croisement", M.min_gap({"a": lambda t: (0.0, 10 * t), "b": lambda t: (0.0, 10 - 10 * t)},
+                                                    range(0, 30))[0] < 0.5)
+
+
+def test_bars():
+    seq = [M.bar_phase(f) for f in range(24)]
+    check("rampes : 2 Hz, alternance corail / lilas", seq[:6] == ["corail"] * 6 and seq[6:12] == ["lilas"] * 6
+          and seq.count("corail") == 12)
+
+
+if __name__ == "__main__":
+    test_straight()
+    test_braking()
+    test_right_turn()
+    test_gaps()
+    test_bars()
+    print(f"\n{'tout passe' if not FAIL else str(len(FAIL)) + ' échec(s)'}")
+    sys.exit(1 if FAIL else 0)
