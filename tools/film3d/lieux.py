@@ -419,7 +419,7 @@ def mat_city(name="city_far", haze_color="#4a4b8e", fade=1700.0, lit_frac=None):
 SIGN_COLORS = ("#ff4a3a", "#ff7ab0", "#4ad8ff", "#6dff9a", "#ffb03a", "#b07aff", "#ff6a3d")
 
 
-def distant_city(name="ville", shore_y=CITY_SHORE_Y, xs=(-950.0, 1050.0), depth=900.0, gap=(-12.0, 12.0), seed=5,
+def distant_city(name="ville", shore_y=CITY_SHORE_Y, xs=(-950.0, 1050.0), depth=None, gap=None, seed=5,
                  bay=0.00012, all_lit=False):
     """La ville vue par-dessus la lagune, vers -y (la bande de 1,2 km du §2.4, élargie pour l'orbite de FIN6) :
     le quai et la promenade avec ses lampadaires (sources dans le cadre, reflétées par l'eau), une première rangée
@@ -429,7 +429,14 @@ def distant_city(name="ville", shore_y=CITY_SHORE_Y, xs=(-950.0, 1050.0), depth=
     sur les premiers rangs, que la distance et le flou rendent illisibles. Le rivage se courbe en baie vers les
     bords (il revient vers +y). `gap` : l'ouverture laissée à la route du pont.
     `all_lit` : bien plus de fenêtres allumées (P6, FIN6), mais une ville quand même. L'ouverture `gap` traverse
-    toute la profondeur : c'est l'avenue dans l'axe du pont (scene_c la pave et l'éclaire)."""
+    toute la profondeur : c'est l'avenue dans l'axe du pont (scene_c la pave et l'éclaire).
+    Ville unique (ville_on) : la vue lointaine de la ville vraie, pour les plans sur l'eau seulement (P4, P5, P6, FIN,
+    FIN6 : panorama ; jamais avec l'avenue, le rond-point ni la rue) : 100 m de profondeur (du quai à la promenade,
+    la vraie fait 150 m), l'ouverture de la rue, ±8 m. Sinon l'ancienne : 900 m, ±12 m."""
+    if depth is None:
+        depth = VILLE_LOIN_DEPTH if ville_on() else 900.0
+    if gap is None:
+        gap = VILLE_LOIN_GAP if ville_on() else (-12.0, 12.0)
     rng = random.Random(seed)
     xs0, xs1 = xs
 
@@ -924,13 +931,15 @@ def port_far(hidden, lamp_src):
 
 
 def panorama(scene, hidden, yaw=MER, all_lit=False, bridge="loin", port="loin", jetty=None, water_kind="lagune",
-             haubans=False, phare=True):
+             haubans=False, phare=True, lieu=None):
     """Tout ce qu'on voit de loin par-dessus l'eau, commun aux scènes C, D et E : le ciel commun (ciel, la bande
     corail vers `yaw`, du côté de la mer), la lagune, la ville lointaine (`all_lit` : toutes fenêtres allumées), l'autre rive.
     `bridge`, `port`, `jetty` : None, « loin » (grandes formes et lumières) ou « près » (le lieu entier) ; le port
     vient de scene_e.build_port s'il existe, sinon du terre-plein provisoire. `haubans` : le pont avec son pylône
     (palier « haubans » de scene_c). `phare` : le phare de la pointe à sa vraie place (PHARE_AT) ; True, False, ou
-    un dict d'arguments de phare() (phase, vitesse...). Renvoie la source des lampadaires."""
+    un dict d'arguments de phare() (phase, vitesse...). `lieu` (ville unique) : le lieu de la scène (pont, port,
+    jetee), le phare posé là où la pose de la jetée le met dans cette scène (phare_at) ; sinon PHARE_AT.
+    Renvoie la source des lampadaires."""
     sky(scene, yaw)
     water("lagune", (-7000, 7000), (-7000, 7000), WATER_Z, kind=water_kind)
     distant_city(all_lit=all_lit)
@@ -953,7 +962,8 @@ def panorama(scene, hidden, yaw=MER, all_lit=False, bridge="loin", port="loin", 
         scene_d.build_jetty(hidden, lamp_src, far=(jetty == "loin"))
         scene_d.build_pointe(hidden, lamp_src, far=(jetty == "loin"))
     if phare:
-        _build_phare(PHARE_AT, **(phare if isinstance(phare, dict) else {}))
+        at = phare_at(lieu) if (lieu and ville_on()) else PHARE_AT
+        _build_phare(at, **(phare if isinstance(phare, dict) else {}))
     return lamp_src
 
 
@@ -1759,8 +1769,71 @@ def stats():
 PHARE_AT = (POINTE[0] + (POINTE_R - 1.3) * math.cos(math.radians(100.0)),
             POINTE[1] + (POINTE_R - 1.3) * math.sin(math.radians(100.0)))   # (75,0 ; 458,3), azimut 100°
 PHARE_H = 17.9                     # du pied au sommet du chapeau (m, échelle 1)
+
 PHARE_FEU = 16.8                   # le milieu de la lanterne, l'axe des pinceaux
 PHARE_CREME = "#fff9cb"
+
+
+# ---------------------------------------------------------------- la ville unique (SPEC §18.36, ville.py)
+#
+# FILM3D_VILLE=1 (le défaut) : chaque lieu est rogné pour la ville, posé le long de la seule route (parcours.pose_ville),
+# sous un seul ciel ; FILM3D_VILLE=0 : les lieux autonomes d'avant, à l'identique. Les scènes appellent ville_on(),
+# mer_lieu() et phare_at() au lieu de lire la variable chacune de leur côté.
+
+def ville_on():
+    """FILM3D_VILLE : 1 (le défaut) le lieu rogné pour la ville unique ; 0 l'ancien lieu autonome. Lu à l'appel ;
+    la clé du cache de scène les distingue (debit.env_key : absent et « 1 » sont la même scène)."""
+    return os.environ.get("FILM3D_VILLE", "1").strip().lower() not in ("0", "non", "no", "false", "off")
+
+
+# la ville lointaine ramenée au vrai (plan de ville §3.2) : profondeur et ouverture de distant_city en ville unique
+VILLE_LOIN_DEPTH, VILLE_LOIN_GAP = 100.0, (-8.0, 8.0)
+# l'azimut unique de la bande corail, dans le repère de ville (convention de put, degrés) : la bissectrice de l'avenue
+# et de la jetée (plan de ville §3.3). Le seul réglage du ciel de la ville ; chaque lieu le lit par mer_lieu
+MER_VILLE_DEG = -70.0
+# les lieux de la ville et leur scène (parcours.LIEU) ; le plan dont l'ancre pose le lieu
+LIEUX_VILLE = {"avenue": "A", "rond-point": "F", "rue": "B", "pont": "C", "port": "E", "jetee": "D"}
+
+
+def _plan_du_lieu(nom):
+    """Le premier plan du parcours tourné dans le lieu `nom` (un nom de LIEUX_VILLE ou la lettre de sa scène)."""
+    import parcours as PC
+    lettre = LIEUX_VILLE.get(nom, nom)
+    for shot, _n in PC.SHOTS:
+        if PC.LIEU[shot] == lettre:
+            return shot
+    raise KeyError(f"lieu inconnu de parcours.LIEU : {nom}")
+
+
+def pose_ville(nom):
+    """(rot en degrés, sens trigonométrique, tx, ty) : la scène du lieu `nom` posée dans le repère de ville (celui du
+    pont), p_ville = R(rot) p_lieu + t ; celle de parcours.pose_ville, rien en dur."""
+    import parcours as PC
+    return PC.pose_ville(_plan_du_lieu(nom))
+
+
+def mer_lieu(nom):
+    """La bande corail du lieu `nom` pour ciel(mer=) (radians, convention de put, repère de sa scène) : l'azimut de la
+    ville MER_VILLE_DEG moins la rotation du lieu. +20° pour l'avenue et le rond-point, −70° pour la rue, le pont et
+    le port, −20° pour la jetée aux poses du plan de ville."""
+    return math.radians(MER_VILLE_DEG - pose_ville(nom)[0])
+
+
+def _rot2(deg, x, y):
+    c, s = math.cos(math.radians(deg)), math.sin(math.radians(deg))
+    return c * x - s * y, s * x + c * y
+
+
+def phare_at(nom=None):
+    """(x, y) du phare de la pointe : PHARE_AT dans la scène de la jetée, porté par la pose de la jetée dans le
+    repère de ville (nom None), ou ramené dans la scène du lieu `nom` (pour le panorama du pont ou du port)."""
+    rot, tx, ty = pose_ville("jetee")
+    u, v = _rot2(rot, *PHARE_AT)
+    x, y = u + tx, v + ty
+    if nom is None:
+        return x, y
+    rot, tx, ty = pose_ville(nom)
+    return _rot2(-rot, x - tx, y - ty)
 
 
 def _cone_bm(bm, z0, z1, r0, r1, seg=24, cap=True):
@@ -1966,7 +2039,9 @@ def phare_lointain(scene, cap, ecart, hauteur_deg, phase=0.0, distance=600.0, or
     Vu de loin : pinceaux relevés de `releve` degrés (à 1°, ils restaient sur l'horizon, une barre d'un bord à
     l'autre), longs de `pinceau_deg` degrés vus d'ici (de profil, moins d'un quart de la largeur au 24 mm) ;
     lanterne à `lanterne` (le point le plus vif de l'horizon, plus que les lampadaires) et halo de `halo_deg`
-    degrés de rayon (4 px environ à 720 de large, au 24 mm), force `halo_force`. Renvoie le vide du phare."""
+    degrés de rayon (4 px environ à 720 de large, au 24 mm), force `halo_force`. Renvoie le vide du phare.
+    Ville unique (ville_on) : ne plus l'appeler, le vrai phare est à sa place dans la ville (phare_at) ; c'est à la
+    scène de s'en passer (scene_a.far_lighthouse), pas à cette fonction de rendre None sous ses pieds."""
     if origine is None:
         origine = scene.camera.matrix_world.translation if scene.camera else (0.0, 0.0, 0.0)
     distance = min(600.0, distance)
