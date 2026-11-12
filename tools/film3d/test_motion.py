@@ -586,103 +586,122 @@ def test_fin6():
 
 
 def test_fin():
-    """FIN : la berline et la patrouille ne se touchent pas (0,5 m d'air au moins, caisses en rectangles) ; la
-    portière ne traverse pas l'agent ; rien ne frôle la caméra ; la berline arrêtée sur la pose validée."""
+    """FIN (découpage v3.1) : rien ne frôle la caméra ; la berline, prise en plein freinage, glisse sans pivoter à
+    l'arrêt et s'arrête vers l'image 36, 8 m avant le centre de la pointe, cap 25° ; ses feux stop dès la première
+    image ; les mains sortent par la vitre après un temps mort ; la caméra du cadre commun (2,4 m, 7,5 m, 24 mm) finit
+    près et fixe (2,0 m, 5,5 à 6,5 m) ; la patrouille 1 seule, devant à gauche, freine en virant et s'arrête en
+    travers, à gauche du cadre au moins 12 images de suite ; la meute, rien que ses phares, derrière la caméra."""
     import fin_pointe as P
     frames = range(P.F0, P.F0 + P.FRAMES)
-    g = min(P.rect_gap(P.hero_pos(M.t_of(f)), P.hero_heading(M.t_of(f)), P.HERO_BOX, P.PATROL, P.HERO_STOP,
-                       P.PATROL_BOX) for f in frames)
-    check("FIN : la berline ne touche pas la patrouille", g >= 0.5, f"{g:.2f} m au plus près")
-    d = min(P.seg_point(P.HINGE, tuple(P.HINGE[k] + P.door_dir(P.door_deg(M.t_of(f)))[k] * P.DOOR_LEN for k in (0, 1)),
-                        P.OFFICER) - P.OFFICER_R for f in frames)
-    check("FIN : la portière ne traverse pas l'agent", d >= 0.05, f"{d:.2f} m au plus près")
-    o = min(P.rect_gap(P.hero_pos(M.t_of(f)), P.hero_heading(M.t_of(f)), P.HERO_BOX, P.OFFICER, 0.0,
-                       (2 * P.OFFICER_R, 2 * P.OFFICER_R)) for f in frames)
-    check("FIN : la berline ne touche pas l'agent", o >= 0.5, f"{o:.2f} m au plus près")
     keyed = range(P.F0 - 1, P.F0 + P.FRAMES + 1)
     c = min(P.rect_gap(P.hero_pos(M.t_of(f)), P.hero_heading(M.t_of(f)), P.HERO_BOX, P.camera_rail(M.t_of(f))[:2],
                        0.0, (0.2, 0.2)) for f in keyed)
     check("FIN : rien ne frôle la caméra", c >= 1.0, f"{c:.2f} m au plus près")
+    # l'arrêt : motion.drive, au point d'arrêt, cap 25° ; vers l'image 36 (34 à 38), sans pivot une fois arrêtée
     x, y = P.hero_pos(P.T_STILL)
-    check("FIN : arrêtée au centre de la pointe, cap 25°", math.dist((x, y), (P.CX, P.CY)) < 1e-6
-          and abs(P.hero_heading(P.T_STILL) - P.HERO_STOP) < 1e-6)
-    ps = M.sample(P.hero_pos, range(0, 56), heading=P.hero_heading, noise=0.0)
+    check("FIN : arrêtée 8 m avant le centre de la pointe, cap de caisse 25° (±1)",
+          math.dist((x, y), (P.SX, P.SY)) < 0.01 and abs(P.SY - (P.CY - 8.0)) < 1e-9 and P.SX == P.CX
+          and abs(P.HERO_STOP - 25.0) <= 1.0, f"({x:.2f}, {y:.2f}), {P.HERO_STOP:.1f}°")
+    f_stop = P.F0 + P.T_STOP * M.FPS
+    check("FIN : l'arrêt vers l'image 36 (34 à 38)", 34 <= P.F_STOP <= 38 and abs(f_stop - P.F_STOP) < 0.5,
+          f"image {f_stop:.1f}")
+    held = max(math.dist(P.hero_pos(M.t_of(f)), (x, y)) for f in range(P.F_STOP, P.F0 + P.FRAMES + 1))
+    turn = max(abs(P.hero_heading(M.t_of(f)) - P.HERO_STOP) for f in range(P.F_STOP - 6, P.F0 + P.FRAMES + 1))
+    check("FIN : arrêtée, elle ne bouge plus et ne pivote pas (dès 6 images avant l'arrêt, moins de 1°)",
+          held < 0.01 and turn < 1.0, f"{held * 100:.1f} cm, {turn:.2f}°")
+    ps = M.sample(P.hero_pos, range(0, 56), heading=P.hero_heading, steer=P.hero_steer, noise=0.0)
     check("FIN : la caisse plonge au freinage", min(p["pitch"] for p in ps) < -1.0,
           f"{min(p['pitch'] for p in ps):.2f}°")
     first = next(p for p in ps if p["frame"] == P.F0)
-    check("FIN : la caisse ne se cabre pas à la première image (la berline arrive lancée)", first["pitch"] < 0.0,
+    check("FIN : la caisse ne se cabre pas à la première image (la berline arrive en freinant)", first["pitch"] < 0.0,
           f"{first['pitch']:.2f}°")
-    stop = min(f for f in range(P.F0, P.F0 + P.FRAMES) if math.dist(P.hero_pos(M.t_of(f)), (P.CX, P.CY)) < 1e-6)
-    check("FIN : la berline s'arrête à l'image 30", stop == 30 == P.F_STOP, f"image {stop}")
-    v0 = math.dist(P.hero_pos(M.t_of(0.5)), P.hero_pos(M.t_of(1.5))) * M.FPS
-    check("FIN : elle entre lancée (40 à 48 km/h)", 40.0 <= v0 * 3.6 <= 48.0, f"{v0 * 3.6:.0f} km/h")
-    # le temps : mains levées après le temps mort, agent debout avant elles, faisceau posé à l'arrêt
-    check("FIN : temps mort de l'arrêt aux mains (5 images), mains de 35 à 46, tenues jusqu'à la fin",
-          P.DRIVER_KEYS == (35, 46) and P.DRIVER_KEYS[0] - P.F_STOP >= 5 and P.DRIVER_KEYS[1] <= P.STILL_FRAME - 6)
-    check("FIN : l'agent debout en joue avant les mains", P.OFFICER_KEYS[-1][1] == "aim"
-          and P.OFFICER_KEYS[-1][0] <= P.DRIVER_KEYS[0], f"{P.OFFICER_KEYS}")
+    v0, a0 = P.HERO.speed(M.t_of(P.F0)), P.HERO.along(M.t_of(P.F0))
+    check("FIN : prise en plein freinage (20 à 30 km/h, 4 m/s² au moins à l'image 1)",
+          20.0 <= v0 * 3.6 <= 30.0 and a0 <= -4.0, f"{v0 * 3.6:.0f} km/h, {a0:.1f} m/s²")
+    slip = [P.hero_slip(M.t_of(f)) for f in frames]
+    check("FIN : la glisse de fin (8 à 18°, l'arrière à droite), figée à l'arrêt",
+          8.0 <= max(slip) <= 18.0 and min(slip) > -1.0 and abs(slip[-1] - P.hero_slip(P.T_STOP)) < 0.5,
+          f"crête {max(slip):.1f}°")
+    wins = P.HERO.brake_windows(frames=keyed)
+    check("FIN : les feux stop dès la première image (freinage de plus de 2 m/s²)", wins and wins[0][0] <= P.F0,
+          f"{wins}")
+    # le temps : temps mort après l'arrêt, les mains dehors en 6 à 8 images, tenues jusqu'à la fin
+    out = P.DRIVER_KEYS[0] + P.DRIVER_OUT
+    check("FIN : temps mort de l'arrêt aux mains (5 images au moins), mains dehors en 6 à 8 images, tenues",
+          P.DRIVER_KEYS[0] - P.F_STOP >= 5 and 6 <= P.DRIVER_OUT <= 8 and out <= P.STILL_FRAME - 3,
+          f"images {P.DRIVER_KEYS[0]} à {out}")
     check("FIN : le faisceau se pose sur elle à l'arrêt", P.F_BEAM == P.F_STOP
           and math.dist(P.beam_target(P.T_STOP)[:2], P.hero_pos(P.T_STOP)) < 1e-6)
-    # la caméra : derrière elle, à gauche, basse au départ ; elle freine sans à-coup, s'arrête, monte, puis tient
-    c0 = P.camera_rail(M.t_of(P.F0))
-    u0 = P.rail_u(P.hero_pos(M.t_of(P.F0))) - P.cam_u(M.t_of(P.F0))
-    check("FIN : la caméra part 7,5 à 8,5 m derrière, 1,2 m à gauche, à 0,6 m, 24 mm",
-          7.5 <= u0 <= 8.5 and abs(P.CAM_LEFT[0] - 1.2) < 1e-9 and abs(c0[2] - 0.6) < 1e-9 and c0[6] == 24.0,
-          f"{u0:.2f} m derrière")
-    steps = [abs(P.cam_u(M.t_of(f + 1)) - P.cam_u(M.t_of(f))) for f in range(P.F0, P.F_CAM_STOP)]
-    check("FIN : la caméra freine sans à-coup et s'arrête", all(b <= a + 1e-9 for a, b in zip(steps, steps[1:]))
-          and steps[-1] < 0.005, f"{steps[-1] * 1000:.1f} mm à la dernière image")
+    # la caméra : le cadre commun à la coupe, près et fixe à la fin
+    def geo(f):
+        cam = P.camera_rail(M.t_of(f))
+        hx, hy = P.hero_pos(M.t_of(f))
+        return cam[2], math.dist(cam[:2], (hx, hy)), cam[6]
+    h0, d0, l0 = geo(P.F0)
+    check("FIN : la caméra part à 2,4 m, 7,5 m derrière (±0,2), 24 mm", abs(h0 - 2.4) < 1e-9 and abs(d0 - 7.5) <= 0.2
+          and l0 == 24.0, f"{h0:.2f} m, {d0:.2f} m")
+    h1, d1, _ = geo(P.STILL_FRAME)
     cl = P.camera_rail(P.T_STILL)
-    still = all(math.dist(P.camera_rail(M.t_of(f))[:3], cl[:3]) < 1e-9
-                and abs(P.camera_rail(M.t_of(f))[4] - cl[4]) < 1e-9 for f in (P.STILL_FRAME, P.STILL_FRAME + 1))
-    check("FIN : la grue monte à 1,3 m et l'image 52 est fixe", abs(cl[2] - 1.3) < 1e-9 and still)
+    still = all(P.camera_rail(M.t_of(f)) == cl for f in (P.STILL_FRAME, P.STILL_FRAME + 1))
+    check("FIN : la caméra finit à 2,0 m, 5,5 à 6,5 m (les mains), à gauche, et l'image 52 est fixe",
+          abs(h1 - 2.0) < 1e-9 and 5.5 <= d1 <= 6.5 and P.CAM_LEFT[1] >= 0.8 and still, f"{h1:.2f} m, {d1:.2f} m")
     # les autres véhicules : 1,5 m d'air entre caisses, la caméra à 0,8 m au moins (motion.py mesure --v3 aussi)
-    others = {"patrol": (lambda t: P.PATROL, lambda t: P.HERO_STOP), "patrol_1": (P.patrol1_pos, lambda t: P.ROUTE_H)}
-    others.update({f"arc_{i}": (P.arc_pos(i), P.arc_heading(i)) for i in range(len(P.ARC))})
-    for name, (pos, head) in others.items():
-        g = min(P.rect_gap(pos(M.t_of(f)), head(M.t_of(f)), P.PATROL_BOX, P.hero_pos(M.t_of(f)),
-                           P.hero_heading(M.t_of(f)), P.HERO_BOX) for f in keyed)
-        cg = min(P.rect_gap(pos(M.t_of(f)), head(M.t_of(f)), P.PATROL_BOX, P.camera_rail(M.t_of(f))[:2], 0.0,
-                            (0.2, 0.2)) for f in keyed)
-        check(f"FIN : {name} à 1,5 m au moins de la berline, 0,8 m de la caméra", g >= 1.5 and cg >= 0.8,
-              f"{g:.2f} m, {cg:.2f} m")
-    # la patrouille 1 : à la hauteur de la caméra au départ, elle la dépasse par la gauche et s'arrête à gauche de
-    # la berline, près de son essieu arrière, avant les mains
-    d0 = P.rail_u(P.patrol1_pos(M.t_of(P.F0))) - P.cam_u(M.t_of(P.F0))
-    d1 = P.rail_u(P.patrol1_pos(P.T_STILL)) - P.cam_u(P.T_STILL)
+    check("FIN : seule la patrouille 1 roule avec la berline", set(P.tracks()) == {"hero", "patrol_1"}
+          and not hasattr(P, "PATROL") and not hasattr(P, "ARC"))
+    g = min(P.rect_gap(P.patrol1_pos(M.t_of(f)), P.patrol1_heading(M.t_of(f)), P.PATROL_BOX, P.hero_pos(M.t_of(f)),
+                       P.hero_heading(M.t_of(f)), P.HERO_BOX) for f in keyed)
+    cg = min(P.rect_gap(P.patrol1_pos(M.t_of(f)), P.patrol1_heading(M.t_of(f)), P.PATROL_BOX,
+                        P.camera_rail(M.t_of(f))[:2], 0.0, (0.2, 0.2)) for f in keyed)
+    check("FIN : la patrouille 1 à 1,5 m au moins de la berline, 0,8 m de la caméra", g >= 1.5 and cg >= 0.8,
+          f"{g:.2f} m, {cg:.2f} m")
+    # la patrouille 1 : devant à gauche dès l'image 1, elle freine en virant à droite et s'arrête en travers
+    # (sa caisse à 60° de la route de la berline, ±5) avant les mains, puis ne bouge plus
+    a0 = P.rail_u(P.patrol1_pos(M.t_of(P.F0))) - P.rail_u(P.hero_pos(M.t_of(P.F0)))
     moved = math.dist(P.patrol1_pos(M.t_of(P.F_P1_STOP)), P.patrol1_pos(P.T_STILL))
-    check("FIN : la patrouille 1 dépasse la caméra par la gauche et s'arrête avant les mains",
-          d0 < 2.5 and d1 > d0 + 3.0 and P.P1_LEFT > P.CAM_LEFT[1] + 2.0 and moved < 1e-6
-          and P.F_P1_STOP <= P.DRIVER_KEYS[0] + 3, f"{d0:+.1f} m puis {d1:+.1f} m de la caméra")
-    hx, hy = P.hero_pos(P.T_STILL)
-    px, py = P.patrol1_pos(P.T_STILL)
-    h = math.radians(P.HERO_STOP)
-    side = (px - hx) * -math.cos(h) + (py - hy) * -math.sin(h)
-    along = (px - hx) * -math.sin(h) + (py - hy) * math.cos(h)
-    check("FIN : la patrouille 1 à gauche de la berline, un peu en arrière de son essieu arrière",
-          side > 3.0 and -4.0 <= along <= -1.0, f"{side:.1f} m à gauche, {along:+.1f} m le long")
-    # les poursuivants : arrêtés l'un après l'autre derrière la caméra (8 m au moins), jamais devant elle
-    stops = [a[2] for a in P.ARC]
-    check("FIN : les poursuivants s'arrêtent l'un après l'autre", len(set(stops)) == len(stops)
-          and all(b - a >= 4 for a, b in zip(stops, stops[1:])), f"images {stops}")
-    for i in range(len(P.ARC)):
-        pos = P.arc_pos(i)
-        moved = math.dist(pos(M.t_of(stops[i])), pos(M.t_of(stops[i] + 6)))
-        behind = min(P.cam_u(M.t_of(f)) - P.rail_u(pos(M.t_of(f))) for f in keyed)
-        check(f"FIN : le poursuivant {i} arrêté à l'image {stops[i]}, toujours 6 m au moins derrière la caméra",
+    sw = P.patrol1_heading(P.T_STILL) - P.patrol1_heading(M.t_of(P.F0))
+    check("FIN : la patrouille 1 devant à gauche, freine en virant et s'arrête en travers avant les mains",
+          a0 > 10.0 and P.patrol1_pos(M.t_of(P.F0))[0] < P.hero_pos(M.t_of(P.F0))[0] and moved < 0.01
+          and P.F_P1_STOP <= P.DRIVER_KEYS[0] and abs(P.P1_HEAD + 60.0) <= 5.0 and sw <= -8.0,
+          f"{a0:+.1f} m devant, cap {P.P1_HEAD:.0f}°, {sw:+.0f}° pendant le plan")
+    run, best = 0, 0
+    for f in frames:
+        t = M.t_of(f)
+        c = P.camera_rail(t)
+        px, py = P.patrol1_pos(t)
+        b = M.frame_box(c, dict(x=px, y=py, heading=P.patrol1_heading(t)), (5.0, 1.95, 1.75))
+        hb = M.frame_box(c, dict(x=P.hero_pos(t)[0], y=P.hero_pos(t)[1], heading=P.hero_heading(t)))
+        hid = (max(0.0, min(b[1], hb[1]) - max(b[0], hb[0])) * max(0.0, min(b[3], hb[3]) - max(b[2], hb[2]))
+               / ((b[1] - b[0]) * (b[3] - b[2]))) if b else 1.0
+        ok = b and b[0] >= 2.0 and b[1] <= 98.0 and 12.0 <= b[2] <= b[3] <= 85.0 and (b[0] + b[1]) / 2 < 50.0 \
+            and hid <= 0.1
+        run = run + 1 if ok else 0
+        best = max(best, run)
+    check("FIN : la patrouille 1 entière dans le cadre, à gauche, visible, 12 images de suite au moins", best >= 12,
+          f"{best} images")
+    # la meute : rien que ses phares, allumés l'un après l'autre des images 36 à 52, arrêtés, 6 m au moins
+    # derrière la caméra
+    ins = [p[2] for p in P.PACK]
+    check("FIN : les phares de la meute arrivent l'un après l'autre, des images 36 à 52",
+          ins == sorted(ins) and len(set(ins)) == len(ins) and ins[0] >= 36 and all(p[3] <= 52 for p in P.PACK)
+          and P.pack_level(0, M.t_of(35)) == 0.0, f"images {ins}")
+    for i in range(len(P.PACK)):
+        pos = P.pack_pos(i)
+        moved = math.dist(pos(M.t_of(P.PACK[i][3])), pos(M.t_of(P.PACK[i][3] + 4)))
+        behind = min(P.cam_u(M.t_of(f)) - P.rail_u(pos(M.t_of(f))) - P.PACK_LAMP[0] for f in keyed)
+        check(f"FIN : la paire {i} arrêtée à l'image {P.PACK[i][3]}, toujours 6 m au moins derrière la caméra",
               moved < 1e-6 and behind >= 6.0, f"{behind:.1f} m")
     # le repli de face (FILM3D_FIN_FACE=1) : la pose validée de la v2, atteinte à l'arrêt de la berline, puis tenue
     fl = P.camera_face_rail(P.T_STOP)
     held = all(P.camera_face_rail(M.t_of(f)) == fl for f in range(P.F_STOP, P.F0 + P.FRAMES + 1))
     fc = min(P.rect_gap(P.hero_pos(M.t_of(f)), P.hero_heading(M.t_of(f)), P.HERO_BOX, P.camera_face_rail(M.t_of(f))[:2],
                         0.0, (0.2, 0.2)) for f in keyed)
-    check("FIN : le repli de face se pose sur la pose validée à l'image 30, puis tient", not P.FACE and held
+    check("FIN : le repli de face se pose sur la pose validée à l'arrêt, puis tient", not P.FACE and held
           and math.dist(fl[:3], P.FACE_CAM) < 1e-9 and fl[3:] == (1.0, 14.0, 0.0, 24.0) and fc >= 1.0,
           f"berline à {fc:.2f} m au plus près")
     # l'hélicoptère devant, bas, face à elle
-    hd = math.dist(P.HELI[:2], (P.CX, P.CY))
+    hd = math.dist(P.HELI[:2], (P.SX, P.SY))
     check("FIN : l'hélicoptère 22 m devant elle, à 8 m, le nez vers elle", abs(hd - 22.0) < 1e-6 and P.HELI[2] == 8.0
-          and abs(((P.HELI_HEADING - P.HELI_AZ) % 360.0) - 180.0) < 1e-6 and P.HELI[1] > P.CY + 15.0)
+          and abs(((P.HELI_HEADING - P.HELI_AZ) % 360.0) - 180.0) < 1e-6 and P.HELI[1] > P.SY + 15.0)
 
 
 def test_spin_steps():
@@ -883,8 +902,9 @@ def test_hero_body():
 
 
 def test_fin_stop():
-    """FIN : la berline freine, plonge, s'arrête ; la caisse revient un peu en arrière (10 à 30 % de la plongée, v3.1 :
-    pas de rebond franc), se pose ; les roues restent braquées à l'arrêt."""
+    """FIN : la berline freine, plonge, s'arrête ; la caisse se relève avec le freinage qui se relâche (motion.drive,
+    à-coup ≤ 12 m/s³ : relevée aux neuf dixièmes avant les mains), revient à peine en arrière (30 % de la plongée au
+    plus, v3.1 : pas de rebond franc), se pose ; les roues restent braquées à l'arrêt."""
     import fin_pointe as F
     with dyn(True):
         ps = M.sample(F.hero_pos, range(F.F0 - 1, F.F0 + F.FRAMES + 1), heading=F.hero_heading)
@@ -894,8 +914,10 @@ def test_fin_stop():
     dive = min(p["pitch"] for p in before)
     check("FIN : la plongée au freinage", dive <= -1.5, f"{dive:.2f}°")
     pk = max(after, key=lambda p: p["pitch"])
-    check("FIN : la caisse revient un peu en arrière après l'arrêt", 0.1 * -dive <= pk["pitch"] <= 0.3 * -dive,
-          f"{pk['pitch']:+.2f}° à l'image {pk['frame']}")
+    up = next(p for p in ps if p["frame"] == F.DRIVER_KEYS[0])["pitch"]
+    check("FIN : la caisse se relève avant les mains et revient à peine en arrière après l'arrêt",
+          up >= 0.1 * dive and 0.0 <= pk["pitch"] <= 0.3 * -dive,
+          f"{up:+.2f}° à l'image {F.DRIVER_KEYS[0]}, {pk['pitch']:+.2f}° à l'image {pk['frame']}")
     later = [p for p in after if p["frame"] > pk["frame"]]
     lo = min(later, key=lambda p: p["pitch"]) if later else None
     check("FIN : la seconde oscillation, plus petite", lo is not None and lo["pitch"] < 0.0
