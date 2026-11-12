@@ -165,6 +165,19 @@ def camera(t):
     return camera_rail(t)
 
 
+# Le phare lointain (découpage v3, §3) : comme en OUV (ouv_avenue.phare_pose), 600 m devant la caméra de la première
+# image, sur un cap sombre ; même repli : à 0,55 m du sol, le mur de la promenade le cache jusqu'à la lanterne, d'où
+# 1,3° comme en OUV (le tableau demandait 1,2). 21° à droite de l'axe et non 14 : la berline va au centre droit
+# (x 52 à 60 %, 38 % de large) et la caméra tourne vers la droite pour l'y tenir ; à 14°, le phare passait de x 75 à
+# 64 % et se cachait derrière son toit des images 13 à 20. À 21°, x 91 % à la première image, 80 % à la dernière,
+# toujours à plus de 4 % du bord droit de la berline et à plus de 9° de son centre.
+# Phase : de 90 à 180° sur le plan (48 images à 45°/s), à plus de 20° de l'objectif (249° vu du phare) : comme en
+# OUV, celle qui montre le moins de pinceau sur l'horizon (26 % de la largeur à l'image 1, 87 % à la dernière).
+PHARE_ECART = 21.0
+PHARE_PHASE = 90.0
+PHARE_PIED, PHARE_ECHELLE, PHARE_AT = OUV.phare_pose(camera(0.0), ecart=PHARE_ECART)
+
+
 def body_gap(t, hero_l=4.89, hero_w=1.88, patrol_l=5.1, patrol_w=1.95):
     """L'air entre les deux caisses (boîtes alignées sur l'avenue), en m."""
     (hx, hy), (px, py) = hero_pos(t), patrol_pos(t)

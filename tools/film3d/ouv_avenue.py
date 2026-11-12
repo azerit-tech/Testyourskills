@@ -78,6 +78,36 @@ def bars_on(frame):
     return frame >= BARS_ON
 
 
+# Le phare lointain (découpage v3, §3 ; scene_a le pose par lieux.phare_lointain) : sur l'horizon marin, 14° à droite
+# de l'axe de l'avenue, à 600 m de la caméra de la première image. À 0,55 m du sol, le mur de la promenade (0,95 m,
+# 41 m plus loin dans cette direction) monte à 0,56° au-dessus de l'horizon : posé sur l'eau, la tour de 1,0° n'en
+# sortait que par la lanterne. Le repli du §3 : sur un cap sombre, base à 0,5° au-dessus de l'horizon, 1,3° de haut.
+PHARE_CAP, PHARE_ECART = 0.0, 14.0   # cap de l'avenue (lieux : 0 vers +y), degrés à droite de l'axe
+PHARE_DEG = 1.3                      # hauteur angulaire de la tour, du pied au sommet du chapeau
+PHARE_BASE_DEG = 0.5                 # son pied au-dessus de l'horizon de la caméra
+PHARE_D = 600.0
+# l'azimut du premier pinceau à l'image 0 (degrés depuis +x, sens trigonométrique ; 45°/s) : de 95 à 170° sur le
+# plan. Relevés de 1° et vus de 600 m, les pinceaux restent sur l'horizon (y 46,5 à 50 %) quel que soit leur
+# azimut : la phase qui en montre le moins, à plus de 20° de l'objectif (256° vu du phare), l'un presque dans l'axe
+# du regard, l'autre filant hors du bord droit (32 % de la largeur à l'image 1, 77 % à la dernière).
+PHARE_PHASE = 95.0
+PHARE_TOUR, PHARE_FEU = 17.9, 16.8   # lieux.PHARE_H et PHARE_FEU (m, à l'échelle 1)
+
+
+def phare_pose(cam, cap=PHARE_CAP, ecart=PHARE_ECART, deg=PHARE_DEG, base_deg=PHARE_BASE_DEG, d=PHARE_D):
+    """(pied (x, y, z), échelle, lanterne (x, y, z)) du phare lointain vu de la caméra `cam` (x, y, z, …) : le calcul
+    de lieux.phare_lointain, la hauteur du pied en plus."""
+    import math
+    h = math.radians(cap - ecart)
+    x, y = cam[0] - math.sin(h) * d, cam[1] + math.cos(h) * d
+    z = cam[2] + d * math.tan(math.radians(base_deg))
+    s = d * math.tan(math.radians(deg)) / PHARE_TOUR
+    return (x, y, z), s, (x, y, z + PHARE_FEU * s)
+
+
+PHARE_PIED, PHARE_ECHELLE, PHARE_AT = phare_pose(camera(0.0))
+
+
 def braking(frame):
     return BRAKE[0] <= frame <= BRAKE[1]
 

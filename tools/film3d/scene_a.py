@@ -1883,6 +1883,56 @@ def hero_cabin(coupe):
     return L.cabin_light({"body": coupe.name}, energy=25.0)
 
 
+def far_lighthouse(P):
+    """Le phare lointain du plan P (ouv_avenue ou p1_avenue : PHARE_PIED, PHARE_ECHELLE, PHARE_PHASE), posé par
+    lieux.phare_lointain depuis la caméra de la première image, sur un cap sombre (le repli du découpage v3, §3 :
+    le pied à 0,5° au-dessus de l'horizon, que le cap relie à la mer). Le cap : un dôme bas et large de roche
+    presque noire, allongé en travers du regard, de la mer au pied de la tour ; il ne brille pas."""
+    import lieux as L
+    import motion as M
+    c = P.camera(M.t_of(P.F0))
+    (x, y, z), s, _feu = P.PHARE_PIED, P.PHARE_ECHELLE, P.PHARE_AT
+    root = L.phare_lointain(bpy.context.scene, OUV.PHARE_CAP, getattr(P, "PHARE_ECART", OUV.PHARE_ECART),
+                            OUV.PHARE_DEG, phase=P.PHARE_PHASE, distance=OUV.PHARE_D, origine=c[:3], z=z)
+    if abs(root.location.x - x) > 0.01 or abs(root.location.y - y) > 0.01 or abs(root.scale.x - s) > 1e-4:
+        raise RuntimeError(f"phare lointain : posé en {tuple(root.location)} × {root.scale.x:.3f}, le plan l'attend "
+                           f"en {(x, y, z)} × {s:.3f}")
+    # le cap : demi-axes 70 m en travers du regard, 28 m dans son axe ; de la mer (-1,7) au pied de la tour, un
+    # plateau de 12 m autour d'elle
+    rock = bpy.data.materials.get("cap_roche") or mat_plain("cap_roche", (0.012, 0.012, 0.016, 1), 0.85)
+    ax, ay, top, flat = 70.0, 28.0, z + 0.2, 12.0
+    view = math.atan2(y - c[1], x - c[0])
+    bm = bmesh.new()
+    rings, seg = 10, 48
+    tip = bm.verts.new((0.0, 0.0, top))
+    prev = None
+    for i in range(1, rings + 1):
+        r = i / rings
+        k = max(0.0, (r - flat / ax) / (1.0 - flat / ax))
+        h = -1.7 + (top + 1.7) * (1.0 - k * k) ** 0.8
+        ring = []
+        for j in range(seg):
+            a = math.tau * j / seg
+            u, v = ax * r * math.cos(a), ay * r * math.sin(a)      # u en travers du regard, v dans son axe
+            ring.append(bm.verts.new((u * -math.sin(view) + v * math.cos(view), u * math.cos(view) + v * math.sin(view), h)))
+        for j in range(seg):
+            if prev is None:
+                bm.faces.new((tip, ring[j], ring[(j + 1) % seg]))
+            else:
+                bm.faces.new((prev[j], ring[j], ring[(j + 1) % seg], prev[(j + 1) % seg]))
+        prev = ring
+    ob = bpy.data.objects.new("phare_cap", bpy.data.meshes.new("phare_cap"))
+    bm.to_mesh(ob.data)
+    bm.free()
+    ob.data.materials.append(rock)
+    bpy.context.scene.collection.objects.link(ob)
+    ob.location = (x, y, 0.0)
+    ob.visible_shadow = False
+    print(f"[scene_a] phare lointain : pied ({x:.1f}, {y:.1f}, {z:.2f}), échelle {s:.3f}, lanterne à "
+          f"{_feu[2]:.1f} m, phase {P.PHARE_PHASE:.0f}°", flush=True)
+    return root
+
+
 def ouv_motion(scene, coupe, police, cam, focus):
     """Le plan OUV animé (ouv_avenue.py) : la berline remonte l'avenue vers +y à 50 km/h, mise sur un rig
     (motion.rig_up) et clée par motion.key_vehicle (roues, suspension) ; la caméra la suit sur un rail
@@ -1907,6 +1957,7 @@ def ouv_motion(scene, coupe, police, cam, focus):
     cam.data.dof.aperture_fstop = OUV.FOCUS_F
     patrol_wake(police, frames)
     hero_cabin(coupe)
+    far_lighthouse(OUV)
     bpy.data.objects.remove(focus)
     scene.frame_set(frames[0])
     scene.render.motion_blur_shutter = 0.5
@@ -2051,6 +2102,7 @@ def p1_motion(scene, coupe, police, cam, focus):
     bpy.data.objects.remove(focus)
     p1_props(P)
     hero_cabin(coupe)
+    far_lighthouse(P)
     scene.frame_set(P.STILL)          # l'image fixe du banc : la rampe allumée
     scene.render.motion_blur_shutter = 0.5
     scene.render.use_motion_blur = True
