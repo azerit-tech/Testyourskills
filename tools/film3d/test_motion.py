@@ -100,9 +100,9 @@ SLIP31_LOSS = 0.10            # la vitesse perd au moins 10 % pendant une glisse
 SLIP31_BACK = 4.0             # ° au plus de retour de l'autre côté, une fois
 # la fluidité à l'écran (le centre de la berline vu par les clés finales, % de la largeur du cadre par image² et
 # image³) et la caisse (roulis et tangage bornés, Δ² du roulis par image², écart au seul transfert de masse)
-SCREEN31_D2, SCREEN31_D3 = 0.25, 0.35
+SCREEN31_D2, SCREEN31_D3 = 0.20, 0.20     # tremblés v3.1 : 0,04 à 0,16 sur les plans de dos ; sans tremblé, 0,10
 BODY31_ROLL, BODY31_PITCH = 4.0, 2.0
-BODY31_ROLL_D2, BODY31_NOISE = 0.10, 0.15
+BODY31_ROLL_D2, BODY31_NOISE = 0.10, 0.02
 CAM31_LIMITS_PLAN = {
     "P6": {"rise_after": 0.5, "rise_h_max": 3.6},           # monte à la fin pour découvrir la pointe
     "FIN": {"stop_h_min": 2.0, "stop_dist_min": 5.5},       # plus bas et plus près une fois la berline arrêtée
@@ -816,23 +816,23 @@ def _steady(ps, key, t_from):
 
 
 def test_hero_body():
-    """La berline : roulis de 4 à 6° vers l'extérieur à 0,8 g, plongée de 1,5 à 3° à 0,8 g de freinage, la caisse qui
-    suit avec retard et dépasse (elle a une masse)."""
+    """La berline (v3.1) : roulis de 3 à 4° vers l'extérieur à 0,8 g (4° au plus), plongée de 1,5 à 2° à 0,8 g de
+    freinage (2° au plus), la caisse qui suit avec retard et dépasse un peu (elle a une masse, sans rebondir)."""
     g = 0.8 * M.G
     v = 20.0
     r = v * v / g
     with dyn(True):
         ps = M.sample(_circle(r, v), range(0, 60), noise=0.0, warmup=1.5)
         roll = _steady(ps, "roll", 1.2)
-        check("berline : roulis à 0,8 g de 4 à 6°, vers l'extérieur", -6.0 <= roll <= -4.0, f"{roll:.2f}°")
+        check("berline : roulis à 0,8 g de 3 à 4°, vers l'extérieur", -4.0 <= roll <= -3.0, f"{roll:.2f}°")
         brk = M.sample(M.straight(0.0, 0.0, 30.0, accel=lambda t: -g if t >= 0.2 else 0.0), range(0, 40), noise=0.0)
         lo = min(p["pitch"] for p in brk)
         mid = _steady([p for p in brk if p["t"] < 1.4], "pitch", 1.0)
-        check("berline : plongée à 0,8 g de 1,5 à 3°", -3.0 <= mid <= -1.5 and lo >= -3.4, f"{mid:.2f}°, {lo:.2f}° au plus")
+        check("berline : plongée à 0,8 g de 1,5 à 2°", -2.0 <= mid <= -1.5 and lo >= -2.0, f"{mid:.2f}°, {lo:.2f}° au plus")
         # la réponse à un coup de frein : 63 % de la plongée entre 0,08 et 0,3 s après, un dépassement
         t63 = next(p["t"] for p in brk if p["pitch"] <= 0.63 * mid) - 0.2
         check("berline : la caisse suit avec retard", 0.08 <= t63 <= 0.3, f"{t63 * 1000:.0f} ms")
-        check("berline : la caisse dépasse (la masse)", lo < mid * 1.08, f"{lo:.2f} pour {mid:.2f}°")
+        check("berline : la caisse dépasse un peu (la masse)", mid * 1.15 < lo < mid * 1.02, f"{lo:.2f} pour {mid:.2f}°")
         acc = M.sample(M.straight(0.0, 0.0, 5.0, accel=lambda t: 0.45 * M.G if t >= 0.2 else 0.0), range(0, 40),
                        noise=0.0)
         up = _steady([p for p in acc if p["t"] < 1.4], "pitch", 1.0)
@@ -842,8 +842,8 @@ def test_hero_body():
 
 
 def test_fin_stop():
-    """FIN : la berline freine, plonge, s'arrête ; la caisse revient en arrière, repart, se pose (deux oscillations
-    amorties) ; les roues restent braquées à l'arrêt."""
+    """FIN : la berline freine, plonge, s'arrête ; la caisse revient un peu en arrière (10 à 30 % de la plongée, v3.1 :
+    pas de rebond franc), se pose ; les roues restent braquées à l'arrêt."""
     import fin_pointe as F
     with dyn(True):
         ps = M.sample(F.hero_pos, range(F.F0 - 1, F.F0 + F.FRAMES + 1), heading=F.hero_heading)
@@ -853,7 +853,7 @@ def test_fin_stop():
     dive = min(p["pitch"] for p in before)
     check("FIN : la plongée au freinage", dive <= -1.5, f"{dive:.2f}°")
     pk = max(after, key=lambda p: p["pitch"])
-    check("FIN : la caisse revient en arrière après l'arrêt", pk["pitch"] >= 0.25 * -dive,
+    check("FIN : la caisse revient un peu en arrière après l'arrêt", 0.1 * -dive <= pk["pitch"] <= 0.3 * -dive,
           f"{pk['pitch']:+.2f}° à l'image {pk['frame']}")
     later = [p for p in after if p["frame"] > pk["frame"]]
     lo = min(later, key=lambda p: p["pitch"]) if later else None
@@ -1010,16 +1010,17 @@ def test_operator():
     fixed = lambda t: (0.0, 0.0, 0.4, 0.0, 2.0, 0.0, 28.0)  # noqa: E731
     out = M.camera_operator(fixed, fr)
     check("opérateur : caméra fixe immobile", all(out[f] == fixed(M.t_of(f)) for f in fr), str(out["kind"]))
-    near = [{f: (2.5, -20.0 + 25.0 * M.t_of(f), 0.7) for f in fr}]
-    far = [{f: (6.0, -20.0 + 25.0 * M.t_of(f), 0.7) for f in fr}]
-    sh = M.camera_operator(fixed, fr, tracks=near)
-    nf = M.camera_operator(fixed, fr, tracks=far)
-    pk = max(range(len(fr)), key=lambda i: abs(sh[fr[i]][4] - 2.0))
-    a = abs(sh[fr[pk]][4] - 2.0)
-    tail = max(abs(sh[f][4] - 2.0) for f in fr[pk + 14:])
-    check("opérateur : un véhicule à 1,5 m la secoue, brièvement", a > 0.08 and tail < 0.25 * a,
+    fp = list(range(0, 60))       # la secousse v3.1 est plus lente (3 Hz, 0,3 s) : de quoi la voir s'éteindre
+    near = [{f: (2.5, -20.0 + 25.0 * M.t_of(f), 0.7) for f in fp}]
+    far = [{f: (6.0, -20.0 + 25.0 * M.t_of(f), 0.7) for f in fp}]
+    sh = M.camera_operator(fixed, fp, tracks=near)
+    nf = M.camera_operator(fixed, fp, tracks=far)
+    pk = max(range(len(fp)), key=lambda i: abs(sh[fp[i]][4] - 2.0))
+    a = abs(sh[fp[pk]][4] - 2.0)
+    tail = max(abs(sh[f][4] - 2.0) for f in fp[pk + 14:])
+    check("opérateur : un véhicule à 1,5 m la secoue, brièvement", a > 0.04 and tail < 0.25 * a,   # v3.1 : moitié de la v3
           f"{a:.2f}° puis {tail:.3f}° une demi-seconde après")
-    check("opérateur : à 5 m, rien", all(nf[f] == fixed(M.t_of(f)) for f in fr))
+    check("opérateur : à 5 m, rien", all(nf[f] == fixed(M.t_of(f)) for f in fp))
 
     def travel(v):
         return lambda t: (0.0, v * t, 0.5, 180.0, 3.0, 0.0, 24.0)

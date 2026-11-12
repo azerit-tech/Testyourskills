@@ -132,18 +132,22 @@ def dyn_on():
 # degré de tangage) ; heave_up/down : bornes du pompage (m) ; arch : le jeu vertical mesuré entre le haut du pneu
 # et le passage de roue (diag/dyn_arches.py), que la caisse ne mange jamais ; ext : la détente d'un ressort (m) ; track : la voie (m) ; jitter : le
 # désordre d'un exemplaire à l'autre (fraction, tirée de la graine).
+# v3.1 (« rien d'autre ne la secoue ») : roulis au plus 4° et plongée au plus 2°, en proportion des accélérations
+# (6,5 m/s² latéraux font 4°, 7 m/s² de freinage 2°), filtrés par des ressorts bien amortis (zeta 0,7 : 5 % de
+# dépassement, pas de rebond) ; ni grain de route ni corrections du conducteur (road = driver = 0). Le relief et
+# les ressauts que la scène passe à key_vehicle restent.
 CHASSIS = {
-    # une grosse berline des années 60 : souple, lente, elle s'assoit et flotte
-    "hero": dict(roll_per_g=6.4, roll_max=6.5, pitch_per_g=2.7, pitch_max=3.2, roll_hz=1.1, roll_zeta=0.32,
-                 pitch_hz=1.6, pitch_zeta=0.35, corner_hz=1.25, corner_zeta=0.35, road=0.007, driver=0.025,
+    # une grosse berline des années 60 : souple, lente, elle s'assoit
+    "hero": dict(roll_per_g=6.0, roll_max=4.0, pitch_per_g=2.8, pitch_max=2.0, roll_hz=1.1, roll_zeta=0.7,
+                 pitch_hz=1.4, pitch_zeta=0.5, corner_hz=1.25, corner_zeta=0.5, road=0.0, driver=0.0,
                  squat=0.006, heave_up=0.05, heave_down=0.03, arch=(0.055, 0.06), ext=0.12, track=1.55, jitter=0.0, steer_lag=0.07),
     # la patrouille : plus ferme, plus vive
-    "patrol": dict(roll_per_g=4.6, roll_max=5.0, pitch_per_g=2.1, pitch_max=2.6, roll_hz=1.45, roll_zeta=0.42,
-                   pitch_hz=1.5, pitch_zeta=0.40, corner_hz=1.55, corner_zeta=0.42, road=0.006, driver=0.04,
+    "patrol": dict(roll_per_g=4.6, roll_max=4.0, pitch_per_g=2.4, pitch_max=2.0, roll_hz=1.45, roll_zeta=0.7,
+                   pitch_hz=1.5, pitch_zeta=0.7, corner_hz=1.55, corner_zeta=0.55, road=0.0, driver=0.0,
                    squat=0.004, heave_up=0.045, heave_down=0.03, arch=0.03, ext=0.09, track=1.51, jitter=0.12, steer_lag=0.05),
     # le fourgon : haut, lourd, il roule beaucoup et tangue lentement
-    "van": dict(roll_per_g=8.0, roll_max=7.5, pitch_per_g=2.6, pitch_max=3.0, roll_hz=1.0, roll_zeta=0.30,
-                pitch_hz=1.1, pitch_zeta=0.32, corner_hz=1.15, corner_zeta=0.32, road=0.009, driver=0.04,
+    "van": dict(roll_per_g=6.0, roll_max=4.0, pitch_per_g=2.6, pitch_max=2.0, roll_hz=1.0, roll_zeta=0.7,
+                pitch_hz=1.1, pitch_zeta=0.7, corner_hz=1.15, corner_zeta=0.5, road=0.0, driver=0.0,
                 squat=0.006, heave_up=0.07, heave_down=0.035, arch=0.075, ext=0.12, track=1.68, jitter=0.12, steer_lag=0.08),
 }
 
@@ -380,8 +384,8 @@ def rebody(poses, chassis="hero", ground=None, corners=None, joints=None, seed=N
         pitch_c = math.degrees(math.atan2(mean(frt) - mean(rear), wb)) if frt and rear else 0.0
         # à l'accélération, l'arrière s'écrase et la caisse se tasse ; au freinage l'avant plonge, l'arrière se lève
         heave = sum(rel) / len(rel) - c["squat"] * max(0.0, pitch_i)
-        ps["roll"] = soft_limit(roll_i + roll_c, c["roll_max"] + 0.5, 0.85)
-        ps["pitch"] = soft_limit(pitch_i + pitch_c, c["pitch_max"] + 0.5, 0.85)
+        ps["roll"] = soft_limit(roll_i + roll_c, c["roll_max"], 0.85)
+        ps["pitch"] = soft_limit(pitch_i + pitch_c, c["pitch_max"], 0.85)
         ps["heave"] = max(-c["heave_down"], min(c["heave_up"], heave))
         # les roues dans leurs passages : la caisse ne descend jamais sur un pneu de plus que 80 % de son jeu. Elle se
         # soulève d'abord (le centre de tangage avance vers la roue chargée, la caisse se lève sur ses roues
@@ -560,18 +564,27 @@ def min_gap(tracks, frames=range(0, 30), f0=F0, fps=FPS):
     return best
 
 
+SHAKE_GAIN = 0.5            # v3.1 : les tremblés (plans et opérateur) à la moitié de l'amplitude v3
+SHAKE_HZ_MAX = 4.0          # v3.1 : rien au-dessus (le souffle du rotor, la vibration, les ressauts, les passages)
+
+
 def handheld(t, amp=0.6, rotor=0.12, seed=0.0):
     """La caméra à l'épaule : (dyaw, dpitch, droll en degrés, dx, dy, dz en m). Un bruit lent (0,4 à 1,3 Hz,
-    d'amplitude `amp` degrés) et le souffle du rotor (8 Hz, `rotor` degrés)."""
+    d'amplitude `amp` degrés) et le souffle du rotor (`rotor` degrés). Dynamique active (v3.1) : le tout à
+    SHAKE_GAIN, le souffle à 3,1 et 3,7 Hz (sous SHAKE_HZ_MAX) ; FILM3D_DYN=0 : celui d'avant, à 7,9 et 11,3 Hz."""
     def wob(k, f1, f2, f3):
         return (0.55 * math.sin(2 * math.pi * f1 * t + 1.7 * k + seed) + 0.3 * math.sin(2 * math.pi * f2 * t + 0.9 * k)
                 + 0.15 * math.sin(2 * math.pi * f3 * t + 2.3 * k + 2 * seed))
 
-    buf = lambda k: math.sin(2 * math.pi * 7.9 * t + 1.1 * k + seed) * 0.6 + math.sin(2 * math.pi * 11.3 * t + k) * 0.4
+    hz = (3.1, 3.7) if dyn_on() else (7.9, 11.3)
+    if dyn_on():
+        amp, rotor = amp * SHAKE_GAIN, rotor * SHAKE_GAIN
+    buf = lambda k: math.sin(2 * math.pi * hz[0] * t + 1.1 * k + seed) * 0.6 + math.sin(2 * math.pi * hz[1] * t + k) * 0.4  # noqa: E731
+    g = SHAKE_GAIN if dyn_on() else 1.0
     return (amp * wob(1, 0.41, 0.93, 1.31) + rotor * buf(1),
             amp * 0.8 * wob(2, 0.37, 0.87, 1.23) + rotor * buf(2),
             amp * 0.6 * wob(3, 0.29, 0.71, 1.17) + rotor * 0.5 * buf(3),
-            0.012 * wob(4, 0.33, 0.77, 1.1), 0.012 * wob(5, 0.31, 0.81, 1.4), 0.008 * wob(6, 0.43, 1.03, 1.6))
+            g * 0.012 * wob(4, 0.33, 0.77, 1.1), g * 0.012 * wob(5, 0.31, 0.81, 1.4), g * 0.008 * wob(6, 0.43, 1.03, 1.6))
 
 
 def bar_phase(frame, period=12, offset=0):
@@ -931,19 +944,23 @@ def key_object(ob, frames, fn, f0=F0, fps=FPS):
 # avec un léger retard ; le panoramique démarre et s'arrête en douceur, avec un léger dépassement (une tête
 # fluide : un second ordre, en avance de son retard pour suivre sans traîner). Les écarts sont bornés en fraction
 # du cadre (le sujet reste dans le tiers central, rien n'entre dans les bandes de l'habillage).
+# v3.1 (« pas fluide ») : les amplitudes à la moitié de celles de la v3 et plus rien au-dessus de 4 Hz (la
+# vibration à 2,3, 3,1 et 3,7 Hz au lieu de 7 à 14, les ressauts à 3,5 Hz au lieu de 7,5, les passages à 3 Hz
+# au lieu de 6, plus longs) : à 24 images par seconde, une vibration rapide se replie en sautillement image à image.
 OPERATOR = dict(
-    vib_deg=0.0032,          # degrés de vibration par m/s de la caméra (voiture-travelling)
-    vib_z=0.00010,           # m de vibration verticale par m/s
+    vib_deg=0.0016,          # degrés de vibration par m/s de la caméra (voiture-travelling)
+    vib_z=0.00005,           # m de vibration verticale par m/s
+    vib_hz=(2.3, 3.1, 3.7),
     vib_air=0.5,             # caméra en l'air (plus de 3 m) : la moitié, et pas de ressauts
     jolt_every=(7.0, 15.0),  # m entre deux ressauts sous la voiture-caméra
-    jolt_deg=0.16, jolt_z=0.006, jolt_hz=7.5, jolt_tau=0.12,
+    jolt_deg=0.08, jolt_z=0.003, jolt_hz=3.5, jolt_tau=0.22,
     pan_min=12.0,            # degrés de lacet sur le plan : au-delà, c'est un panoramique
     pan_hz=2.0, pan_zeta=0.6,
     tele_lens=100.0,         # mm : au-delà, longue focale
-    tele_float=0.009,        # fraction de la hauteur du cadre
+    tele_float=0.0045,       # fraction de la hauteur du cadre
     tele_lag=0.12,           # s
     pass_dist=3.0,           # m entre l'objectif et le flanc d'un véhicule (demi-largeur 1 m)
-    pass_deg=0.55, pass_hz=6.0, pass_tau=0.17,
+    pass_deg=0.275, pass_hz=3.0, pass_tau=0.3,
     max_yaw=0.02, max_pitch=0.012,   # fractions de la largeur et de la hauteur du cadre
     max_roll=0.6,            # degrés
 )
@@ -970,11 +987,14 @@ def camera_kind(fn, frames, f0=F0, fps=FPS):
                 air=min(v[2] for v in vals) > 3.0, lens=lens)
 
 
-def _decay(t, t0, amp, hz, tau, phase=0.0):
+def _decay(t, t0, amp, hz, tau, phase=0.0, rise=0.06):
+    """Une oscillation amortie qui naît en t0. Dynamique active (v3.1) : elle s'installe en douceur (valeur et
+    pente nulles en t0, sur `rise` s), sans quoi son départ est un à-coup d'une image ; FILM3D_DYN=0 : d'un coup."""
     if t < t0:
         return 0.0
     u = t - t0
-    return amp * math.exp(-u / tau) * math.sin(2 * math.pi * hz * u + phase)
+    on = (1.0 - math.exp(-u / rise)) ** 2 if dyn_on() else 1.0
+    return amp * on * math.exp(-u / tau) * math.sin(2 * math.pi * hz * u + phase)
 
 
 def camera_operator(fn, frames, f0=F0, fps=FPS, tracks=(), seed=0.0, warmup=0.5, op=None):
@@ -1066,20 +1086,21 @@ def camera_operator(fn, frames, f0=F0, fps=FPS, tracks=(), seed=0.0, warmup=0.5,
         if moving:
             g = o["vib_air"] if kind["air"] else 1.0
             a = o["vib_deg"] * speed * g
-            hf = lambda i: (0.5 * math.sin(2 * math.pi * 7.3 * t + ph[i]) + 0.3 * math.sin(2 * math.pi * 11.1 * t + ph[i + 1])  # noqa: E731
-                            + 0.2 * math.sin(2 * math.pi * 13.7 * t + ph[i + 2]))
+            f1, f2, f3 = o["vib_hz"]
+            hf = lambda i: (0.5 * math.sin(2 * math.pi * f1 * t + ph[i]) + 0.3 * math.sin(2 * math.pi * f2 * t + ph[i + 1])  # noqa: E731
+                            + 0.2 * math.sin(2 * math.pi * f3 * t + ph[i + 2]))
             dy += 0.5 * a * hf(4)
             dp += a * hf(5)
             dr += 0.6 * a * hf(6)
             dz += o["vib_z"] * speed * g * hf(7)
             for tj, s in jolts:
                 dp += _decay(t, tj, o["jolt_deg"] * s, o["jolt_hz"], o["jolt_tau"])
-                dr += _decay(t, tj, 0.5 * o["jolt_deg"] * s, o["jolt_hz"] * 0.8, o["jolt_tau"], 1.0)
+                dr += _decay(t, tj, 0.5 * o["jolt_deg"] * s, o["jolt_hz"] * 0.9, o["jolt_tau"], 1.0)
                 dz += _decay(t, tj, -o["jolt_z"] * s, o["jolt_hz"], o["jolt_tau"])
         for te, amp in events:
             dp += _decay(t, te, amp, o["pass_hz"], o["pass_tau"])
             dr += _decay(t, te, 0.7 * amp, o["pass_hz"] * 0.85, o["pass_tau"], 0.8)
-            dy += _decay(t, te, 0.4 * amp, o["pass_hz"] * 1.2, o["pass_tau"], 2.0)
+            dy += _decay(t, te, 0.4 * amp, o["pass_hz"] * 1.25, o["pass_tau"], 2.0)
         if k in want:
             base = fn(t_of(want[k], f0, fps))
             if land:
