@@ -446,6 +446,10 @@ def build_barrier(hidden, far=False):
 BOX_COLORS = {"corail": "#e35e38", "prune": "#4b2f54", "ambre": "#e8b25f", "indigo": "#4b4fb8",
               "marine": "#243152", "creme": "#ece4b8"}
 BOX_MIX = ["marine"] * 4 + ["prune"] * 3 + ["corail"] * 3 + ["indigo"] * 2 + ["ambre"] * 2 + ["creme"]
+# vus de près (P5, la caméra au sol au pied des piles), les mêmes teintes rabattues vers le gris et assombries :
+# des couleurs sourdes, la berline reste la seule couleur franche du cadre
+BOX_MUTED = {"corail": "#8a4a3a", "prune": "#3e2f45", "ambre": "#8c7650", "indigo": "#3d4166",
+             "marine": "#263040", "creme": "#9a957e"}
 BOX_GAP = 0.12                     # le jeu entre deux conteneurs posés bout à bout ou côte à côte
 BOX_TYPES = {"40": "40 Standard", "20": "20 Standard", "40hc": "40 High Cube"}
 
@@ -578,9 +582,10 @@ class Yard:
     """Pose les conteneurs (instances liées des sources : un seul maillage par type), un aplat de la palette par
     conteneur, et un numéro sur ceux qui sont près de la caméra (`numbers_near` : (point, rayon))."""
 
-    def __init__(self, srcs, seed=11, numbers_near=None):
+    def __init__(self, srcs, seed=11, numbers_near=None, colors=None):
         import random
         self.srcs, self.rng, self.near = srcs, random.Random(seed), numbers_near
+        self.colors = colors or BOX_COLORS
         self.n = self.nums = 0
 
     def box(self, key, x, y, z, along_x=False):
@@ -588,7 +593,7 @@ class Yard:
         rot = (math.pi / 2 if along_x else 0.0) + math.radians(self.rng.uniform(-0.6, 0.6))
         ob = S.instance(src, f"conteneur_{self.n}", (x + self.rng.uniform(-0.04, 0.04), y + self.rng.uniform(-0.04, 0.04),
                                                       z), rot)
-        ob.color = (*L.lin(BOX_COLORS[self.rng.choice(BOX_MIX)])[:3], 1.0)
+        ob.color = (*L.lin(self.colors[self.rng.choice(BOX_MIX)])[:3], 1.0)
         self.n += 1
         if self.near and (Vector((x, y)) - Vector(self.near[0])).length < self.near[1] and self.rng.random() < 0.75:
             self.number(ob, length, width, height)
@@ -630,7 +635,7 @@ def build_containers(hidden, far=False, numbers_near=None):
     deux murs montent à quatre et cinq (14 m) : vus à 35-60 m par la caméra de P5, trois niveaux n'atteignaient
     que 13° au-dessus de l'horizon et laissaient le haut du cadre vide."""
     srcs = container_sources(hidden)
-    yd = Yard(srcs, numbers_near=None if far else numbers_near)
+    yd = Yard(srcs, numbers_near=None if far else numbers_near, colors=BOX_COLORS if far else BOX_MUTED)
     W = srcs["40"][2] + BOX_GAP
     for i in range(2):                               # le mur droit (x < 0, à gauche de la voiture qui arrive)
         yd.row(-10.0 - W / 2 - i * W, 10.0, ["40", "20", "40", "40"], (4, 5) if i == 0 else 4, top_gaps=0.12)
@@ -768,6 +773,262 @@ def build_gantry(far=False):
           f"{p.z:.0f} m", flush=True)
 
 
+# ---------------------------------------------------------------- le côté est (ce que regarde la caméra de P5)
+
+# Le découpage v2 pose la caméra de P5 au sol en (0, 76) : elle commence face au sud (la voie du pont, la rampe, le
+# pylône) et finit vers l'est-sud-est, au-dessus de la berline qui s'éloigne, sur l'hélicoptère. Là, le terre-plein
+# était vide. Trois plans de profondeur, à hauteur de voiture : près, le mobilier du virage (la chaîne de l'axe, la
+# flaque, les caisses de la sortie ; fûts et palettes au pied des piles) ; à 25-75 m, deux blocs de piles de
+# conteneurs en couleurs sourdes ; à 90-130 m, deux grues à portail sur le quai est et un
+# cargo à quai, en silhouette, leurs feux ; au loin, l'eau et une rive basse semée de feux. Rien n'y est écrit :
+# toutes les matières livrées des modèles sont remplacées. Seulement pour P5 (build_port près) : la vue de loin du
+# port (lieux.port_far, pour P4 et P6) ne change pas.
+
+EAST_ROWS = [                      # (y de la file, x de départ, baies, niveaux) : files le long de x, au sud de la voie
+    (56.6, 25.0, ["40", "20", "40", "40"], (3, 5)),
+    (54.0, 25.0, ["40", "40", "20", "40"], (4, 5)),
+    (49.6, 31.0, ["40", "40", "40", "20"], (2, 4)),
+    (47.0, 31.0, ["20", "40", "40", "40"], (2, 3)),
+]
+# les grues à portail du quai est (64 m, rails selon y, flèche au repos le long du quai) : la première à droite
+# de l'hélicoptère dans le cadre final, la seconde traverse le cadre pendant le panoramique. Pas plus au nord :
+# leurs rails entreraient dans la voie du quai (y 63), et une grue derrière l'hélicoptère le noierait.
+PORTAL_CRANES = [(91.5, 40.0), (91.5, 8.0)]
+PORTAL_YAW = (0.0, 180.0)
+SHIP_AT = (114.0, -4.0)            # le cargo à quai, le long du quai est (127 m)
+SHIP_ROT = 90.0                    # livré la longueur selon x
+SHIP_DRAFT = 7.0                   # la quille sous l'eau (la coque fait 13,7 m)
+# la chaîne de l'axe, la flaque et les caisses de la sortie : leurs places viennent de la trajectoire (p5_virage)
+DRUMS = [(24.4, 59.4), (25.1, 59.7), (24.7, 60.3), (37.8, 59.2), (38.4, 59.8), (52.0, 59.4), (52.7, 59.2),
+         (53.2, 59.9), (61.5, 59.1)]
+PALLETS = [(28.5, 59.8, 0.2), (44.0, 59.6, 1.4), (58.0, 59.8, 0.6)]
+
+
+def mat_wood(name="caisse_bois"):
+    """Le bois des caisses : des planches de 14 cm (une teinte par planche), le fil, les joints sombres, mouillé."""
+    m, N, out = S.material(name)
+    co = N.new("ShaderNodeTexCoord").outputs["Object"]
+    rnd = N.new("ShaderNodeObjectInfo").outputs["Random"]
+    _, _, oz = N.sep(co)
+    plank = N.math("FLOOR", N.math("DIVIDE", oz, 0.14))
+    _, _, _, v = road.hash3(N, plank, N.math("MULTIPLY", rnd, 17.0), 2.7)
+    seam = road.smooth(N, N.math("ABSOLUTE", N.math("SUBTRACT", N.math("FRACT", N.math("DIVIDE", oz, 0.14)), 0.5)), 0.44, 0.5)
+    grain = road.noise(N, co, 3.0, 6.0, 0.6, stretch=(0.08, 0.08, 1.0))
+    # bois de caisse vieilli, en linéaire (à 0,33 il sortait rose pâle sous le faisceau, essai d)
+    col = N.mix(v, (0.055, 0.032, 0.016, 1), (0.11, 0.068, 0.035, 1))
+    col = N.mix(N.math("MULTIPLY", grain, 0.5), col, N.mix(1.0, col, (0.6, 0.55, 0.5, 1), "MULTIPLY"))
+    col = N.mix(N.math("MULTIPLY", seam, 0.85), col, (0.03, 0.025, 0.02, 1))
+    p = S.principled(N)
+    N.link(col, p.inputs["Base Color"])
+    p.inputs["Roughness"].default_value = 0.7
+    p.inputs["Coat Weight"].default_value = 0.3
+    p.inputs["Coat IOR"].default_value = 1.33
+    p.inputs["Coat Roughness"].default_value = 0.3
+    N.link(road.bump(N, N.math("MULTIPLY", seam, -1.0), N.new("ShaderNodeNewGeometry").outputs["Normal"], 0.6, 0.004),
+           p.inputs["Normal"])
+    N.link(p.outputs[0], out.inputs[0])
+    return m
+
+
+def mat_painted(name, rust=0.35):
+    """Une tôle peinte dont la teinte vient de la couleur de l'objet (fûts, poteaux) : salie, rouillée en plaques
+    et au pied, vernis mouillé."""
+    m, N, out = S.material(name)
+    co = N.new("ShaderNodeTexCoord").outputs["Object"]
+    oi = N.new("ShaderNodeObjectInfo")
+    _, _, oz = N.sep(co)
+    col = N.mix(1.0, oi.outputs["Color"], (0.85, 0.85, 0.85, 1), "MULTIPLY")
+    dirt = road.smooth(N, road.noise(N, co, 2.0, 4.0, 0.6, stretch=(1.0, 1.0, 0.2)), 0.45, 0.75)
+    col = N.mix(N.math("MULTIPLY", dirt, 0.6), col, N.mix(1.0, col, (0.4, 0.37, 0.33, 1), "MULTIPLY"))
+    spots = N.math("MULTIPLY", road.smooth(N, road.noise(N, co, 5.0, 6.0, 0.7), 0.62, 0.7), rust * 2.0)
+    foot = N.math("MULTIPLY", road.inv(N, road.smooth(N, oz, 0.0, 0.12)), rust)
+    rs = N.math("MINIMUM", N.math("ADD", spots, foot), 1.0)
+    col = N.mix(rs, col, (0.16, 0.06, 0.02, 1))
+    p = S.principled(N)
+    N.link(col, p.inputs["Base Color"])
+    N.link(N.mixf(rs, 0.42, 0.85), p.inputs["Roughness"])
+    p.inputs["Coat Weight"].default_value = 0.45
+    p.inputs["Coat IOR"].default_value = 1.33
+    p.inputs["Coat Roughness"].default_value = 0.15
+    N.link(p.outputs[0], out.inputs[0])
+    return m
+
+
+def mat_puddle(name="flaque_p5"):
+    """Une vraie flaque posée sur le béton : un film d'eau presque miroir (la ride fine des gouttes), son bord
+    fondu dans le mouillé du terre-plein (transparence lue sur une ellipse déformée par un bruit)."""
+    m, N, out = S.material(name)
+    co = N.new("ShaderNodeTexCoord").outputs["Object"]
+    P, _ = road.coords(N)
+    ox, oy, _ = N.sep(co)
+    r = N.new("ShaderNodeVectorMath", _operation="LENGTH")
+    N.link(road.combine(N, N.math("DIVIDE", ox, P5.PUDDLE_SIZE[0] / 2), N.math("DIVIDE", oy, P5.PUDDLE_SIZE[1] / 2)), r.inputs[0])
+    edge = N.math("ADD", r.outputs["Value"], N.math("MULTIPLY", N.math("SUBTRACT", road.noise(N, P, 0.9, 3.0, 0.6), 0.5), 0.7))
+    alpha = road.inv(N, road.smooth(N, edge, 0.72, 0.95))
+    p = S.principled(N, **{"Base Color": (0.012, 0.012, 0.014, 1), "Roughness": 0.02, "IOR": 1.33})
+    N.link(alpha, p.inputs["Alpha"])
+    N.link(road.ripples(N, P, scale=26.0, strength=0.04), p.inputs["Normal"])
+    N.link(p.outputs[0], out.inputs[0])
+    return m
+
+
+def _lib(rel, name, hidden, mat, height=None, scale=1.0, rot_z=0.0):
+    """Un modèle de bibliothèque joint en un objet, toutes ses matières remplacées par `mat` (aucune texture livrée
+    ne passe : ni lettres de coque ni marque), tourné de `rot_z`, mis à la hauteur `height` (sinon à l'échelle
+    `scale`), origine au sol au centre ; rangé dans les sources. Renvoie (source, emprise)."""
+    import cast_vehicles as cv
+    parts = [o for o in cv.import_model(os.path.join(L.ASSETS, rel)) if o.type == "MESH"]
+    ob = cv.join(parts, name)
+    ob.data.materials.clear()
+    ob.data.materials.append(mat)
+    for poly in ob.data.polygons:
+        poly.material_index = 0
+    def recentre():
+        # l'emprise lue sur les sommets : ob.bound_box n'est pas remis à jour après data.transform
+        import numpy as np
+        co = np.empty(len(ob.data.vertices) * 3)
+        ob.data.vertices.foreach_get("co", co)
+        co = co.reshape(-1, 3)
+        mn, mx = co.min(axis=0), co.max(axis=0)
+        ob.data.transform(Matrix.Translation((-(mn[0] + mx[0]) / 2, -(mn[1] + mx[1]) / 2, -mn[2])))
+        ob.location = (0.0, 0.0, 0.0)
+        return Vector(mx - mn)
+    size = recentre()
+    k = (height / size.z) if height else scale
+    ob.data.transform(Matrix.Rotation(rot_z, 4, "Z") @ Matrix.Scale(k, 4))
+    size = recentre()
+    for c in list(ob.users_collection):
+        c.objects.unlink(ob)
+    hidden.objects.link(ob)
+    print(f"[port] {name} : {size.x:.1f} × {size.y:.1f} × {size.z:.1f} m, {len(ob.data.polygons)} faces", flush=True)
+    return ob, size
+
+
+def _lamps(name, pts, color, strength, radius=0.25):
+    """Des feux : de petites sphères émissives, sans lumière (une source ponctuelle dans la brume fait du grain)."""
+    bm = L.bmesh.new()
+    for p in pts:
+        L.bmesh.ops.create_uvsphere(bm, u_segments=8, v_segments=5, radius=radius, matrix=Matrix.Translation(p))
+    o = L.mesh_object(name, bm, [bpy.data.materials.get(name) or L.emit_mat(name, L.lin(color), strength)])
+    o.visible_shadow = False
+    return o
+
+
+def _chain(name, posts, mat, sag=0.24, top=0.74, pitch=0.085):
+    """Une chaîne pendue entre des poteaux : des maillons ovales alternés d'un quart de tour, le long d'une
+    parabole de flèche `sag`. Renvoie (objet, nombre de maillons)."""
+    bm = L.bmesh.new()
+    links = 0
+    for (xa, ya), (xb, yb) in zip(posts, posts[1:]):
+        n = max(2, int(math.hypot(xb - xa, yb - ya) / pitch))
+
+        def at(u):
+            return Vector((xa + (xb - xa) * u, ya + (yb - ya) * u, top - sag * 4 * u * (1 - u)))
+        for k in range(n):
+            u = (k + 0.5) / n
+            p = at(u)
+            d = (at(u + 1e-3) - p).normalized()
+            res = L.bmesh.ops.create_circle(bm, cap_ends=True, segments=8, radius=1.0)
+            for v in res["verts"]:
+                v.co = Vector((0.0, v.co.y * 0.05, v.co.x * 0.026))       # l'ovale dans le plan y-z, long selon y
+            rot = d.to_track_quat("Y", "Z").to_matrix().to_4x4() @ Matrix.Rotation(math.pi / 2 * (k % 2), 4, "Y")
+            L.bmesh.ops.transform(bm, verts=res["verts"], matrix=Matrix.Translation(p) @ rot)
+            links += 1
+    ob = L.mesh_object(name, bm, [mat])
+    w = ob.modifiers.new("fil", "WIREFRAME")
+    w.thickness = 0.012
+    w.use_even_offset = False
+    return ob, links
+
+
+def build_east(hidden):
+    """Le côté est du terre-plein, vu par la caméra de P5 (voir l'en-tête de la section)."""
+    if "src_conteneur_40" in bpy.data.objects:
+        srcs = {}
+        for k in BOX_TYPES:
+            o = bpy.data.objects[f"src_conteneur_{k}"]
+            pts = [Vector(c) for c in o.bound_box]
+            d = Vector(map(max, *pts)) - Vector(map(min, *pts))
+            srcs[k] = (o, d.y, d.x, d.z)
+    else:
+        srcs = container_sources(hidden)
+    yd = Yard(srcs, seed=29, colors=BOX_MUTED)
+    yd.n = 1000                                    # les noms suivent ceux de build_containers
+    for y, x, keys, tiers in EAST_ROWS:
+        yd.row(x, y, keys, tiers, along_x=True, top_gaps=0.25)
+    n_boxes = yd.n - 1000
+    steel = bpy.data.materials.get("est_acier_sombre") or L.mat_steel("est_acier_sombre", color=(0.16, 0.17, 0.18),
+                                                                       rough=0.5, rust=0.35, paint=True)
+    # --- les grues à portail du quai est, en silhouette ; feu corail en tête, feux ambre au portail
+    crane, cs = _lib(os.path.join("lieux", "port", "crane-portal", "model.glb"), "src_grue_portail", hidden, steel)
+    for i, (x, y) in enumerate(PORTAL_CRANES):
+        S.instance(crane, f"grue_portail_{i}", (x, y, 0.0), math.radians(PORTAL_YAW[i]))
+    _lamps("grues_feux_tete", [(x, y, cs.z + 0.6) for x, y in PORTAL_CRANES], L.CORAL, 60.0, 0.5)
+    _lamps("grues_feux_portail", [(x + dx, y + dy, 12.0) for x, y in PORTAL_CRANES for dx in (-4.5, 4.5)
+                                  for dy in (-6.0, 6.0)], L.AMBER, 25.0, 0.3)
+    # --- le cargo à quai : une seule peinture sombre, des feux de pont
+    hull = bpy.data.materials.get("cargo_coque") or L.mat_steel("cargo_coque", color=(0.07, 0.075, 0.085), rough=0.5,
+                                                                 rust=0.5, paint=True)
+    ship, ss = _lib(os.path.join("lieux", "port", "ship-cargo", "model.glb"), "src_cargo", hidden, hull,
+                    rot_z=math.radians(SHIP_ROT))
+    S.instance(ship, "cargo", (*SHIP_AT, L.WATER_Z - SHIP_DRAFT), 0.0)
+    import random
+    rng = random.Random(4)
+    deck = L.WATER_Z - SHIP_DRAFT + ss.z * 0.33
+    _lamps("cargo_feux", [(SHIP_AT[0] + rng.uniform(-ss.x / 3, ss.x / 3), SHIP_AT[1] + rng.uniform(-ss.y / 2 + 8, ss.y / 2 - 8),
+                           deck + rng.uniform(0.5, 6.0)) for _ in range(26)], "#ffd9a0", 30.0, 0.35)
+    # --- au loin, une rive basse à l'est (celle de lieux.far_shore, tournée d'un quart de tour vers +x)
+    L.far_shore(y=1300.0, xs=(-1500.0, 1500.0), n=70, seed=21, name="rive_est")
+    for nm in ("rive_est_relief", "rive_est_lampes"):
+        bpy.data.objects[nm].data.transform(Matrix.Rotation(-math.pi / 2, 4, "Z"))
+    # --- près : la chaîne de l'axe, poteaux et maillons
+    paint = bpy.data.materials.get("tole_peinte_p5") or mat_painted("tole_peinte_p5")
+    pb = L.bmesh.new()
+    for x, y in P5.CHAIN_POSTS:
+        L.tube_bm(pb, (x, y, 0.0), (x, y, 0.82), 0.045, seg=12)
+        L.box_bm(pb, (x - 0.13, y - 0.13, 0.0), (x + 0.13, y + 0.13, 0.03))
+    posts = L.mesh_object("chaine_poteaux", pb, [paint], smooth=True)
+    posts.color = (*L.lin("#7a6430")[:3], 1.0)
+    iron = bpy.data.materials.get("chaine_fer") or L.mat_steel("chaine_fer", color=(0.18, 0.17, 0.16), rough=0.45, rust=0.7)
+    _, links = _chain("chaine", P5.CHAIN_POSTS, iron)
+    # --- la flaque sur la ligne des roues arrière
+    bm = L.bmesh.new()
+    hx, hy = P5.PUDDLE_SIZE[0] / 2 + 0.4, P5.PUDDLE_SIZE[1] / 2 + 0.4
+    bm.faces.new([bm.verts.new((x, y, 0.0)) for x, y in ((-hx, -hy), (hx, -hy), (hx, hy), (-hx, hy))])
+    pud = L.mesh_object("flaque_p5", bm, [bpy.data.materials.get("flaque_p5") or mat_puddle()])
+    pud.location = (*P5.PUDDLE_AT, 0.004)
+    pud.rotation_euler = (0.0, 0.0, math.radians(P5.PUDDLE_YAW))
+    pud.visible_shadow = False
+    # --- les caisses de la sortie : une pile de palettes, quatre caisses dont une de travers sur le dessus
+    wood = bpy.data.materials.get("caisse_bois") or mat_wood()
+    pallet, _ = _lib(os.path.join("lieux", "port", "pallets", "model.glb"), "src_palettes", hidden, wood, height=0.9)
+    cx, cy = P5.CRATES_AT
+    S.instance(pallet, "palettes_sortie", (cx + 1.7, cy - 0.5, 0.0), 0.5)
+    for i, (dx, dy, dz, w, d, h, a) in enumerate([(-0.3, 0.0, 0.0, 1.1, 0.9, 0.75, 0.05),
+                                                 (0.85, -0.1, 0.0, 1.0, 0.9, 0.7, -0.08),
+                                                 (0.2, 0.05, 0.75, 1.0, 0.85, 0.65, 0.42),
+                                                 (-0.9, -0.6, 0.0, 0.7, 0.6, 0.55, 0.3)]):
+        bm = L.bmesh.new()
+        L.box_bm(bm, (-w / 2, -d / 2, 0.0), (w / 2, d / 2, h))
+        o = L.mesh_object(f"caisse_{i}", bm, [wood])
+        o.location = (cx + dx, cy + dy, dz)
+        o.rotation_euler = (0.0, 0.0, a)
+    # --- fûts et palettes au pied des piles
+    db = L.bmesh.new()
+    for x, y in DRUMS:
+        L.bmesh.ops.create_cone(db, cap_ends=True, segments=20, radius1=0.29, radius2=0.29, depth=0.88,
+                                matrix=Matrix.Translation((x, y, 0.44)))
+        for z in (0.29, 0.59):                     # les deux cercles de roulement
+            L.bmesh.ops.create_cone(db, cap_ends=False, segments=20, radius1=0.305, radius2=0.305, depth=0.03,
+                                    matrix=Matrix.Translation((x, y, z)))
+    drums = L.mesh_object("futs", db, [paint], smooth=True)
+    drums.color = (*L.lin("#3a4656")[:3], 1.0)
+    for i, (x, y, a) in enumerate(PALLETS):
+        S.instance(pallet, f"palettes_{i}", (x, y, 0.0), a)
+    print(f"[port] côté est : {n_boxes} conteneurs, {len(PORTAL_CRANES)} grues à portail, cargo, "
+          f"chaîne ({links} maillons), flaque, caisses, {len(DRUMS)} fûts", flush=True)
+
+
 def build_port(hidden, lamp_src, far=False, palier=None):
     """Le port au pied du pont. `far` : la version vue du pont, de la jetée et de la pointe (grandes formes et
     lumières). `palier` : « socle », « conteneurs », « portique » (le dernier écrit par défaut). Enlève la chaussée
@@ -780,7 +1041,10 @@ def build_port(hidden, lamp_src, far=False, palier=None):
     if not far:
         build_props(hidden)
     if _palier_at_least(palier, "conteneurs"):
-        build_containers(hidden, far=far, numbers_near=((CAM.x, CAM.y), 75.0))
+        # aucun numéro ni aucune inscription sur les conteneurs (règle du film)
+        build_containers(hidden, far=far)
+        if not far:
+            build_east(hidden)
     if _palier_at_least(palier, "portique"):
         build_gantry(far=far)
     print(f"[port] terre-plein {X1 - X0:.0f} × {Y1 - Y0:.0f} m, voie du quai en y {QY:.0f}, axe fermé en y "
@@ -907,6 +1171,48 @@ def beam_lights(main, hero, ground, ground_w):
     c.light_linking.receiver_collection = sol
 
 
+def skid_p5(scene, width=0.24):
+    """Les deux traces de gomme des roues arrière dans la glisse (p5_virage.wheel_track), posées sur la dalle et
+    dévoilées sous les roues (modificateur Construction, une face par pas de temps). La matière est celle de P2 :
+    gomme mate et sombre sur la pellicule d'eau, fondue à son départ (claire, elle renvoyait les lampadaires)."""
+    from scene_carrefour import mat_wake
+    mat = bpy.data.materials.get("tyre_wake") or mat_wake()
+    dg = bpy.context.evaluated_depsgraph_get()
+
+    def ground(x, y):
+        hit, loc, *_ = scene.ray_cast(dg, Vector((x, y, 0.3)), Vector((0, 0, -1)), distance=1.0)
+        return (loc.z if hit else 0.0) + 0.005
+
+    f0, f1 = P5.SKID_FRAMES
+    for side, tag in ((-1, "g"), (1, "d")):
+        pts = P5.wheel_track(side)
+        n = len(pts)
+        verts, faces = [], []
+        for i, (_, x, y) in enumerate(pts):
+            ax = pts[min(i + 1, n - 1)][1] - pts[max(i - 1, 0)][1]
+            ay = pts[min(i + 1, n - 1)][2] - pts[max(i - 1, 0)][2]
+            ln = math.hypot(ax, ay) or 1.0
+            nx, ny = -ay / ln * width / 2, ax / ln * width / 2
+            verts += [(x - nx, y - ny, ground(x - nx, y - ny)), (x + nx, y + ny, ground(x + nx, y + ny))]
+            if i:
+                faces.append((2 * i - 2, 2 * i, 2 * i + 1, 2 * i - 1))
+        me = bpy.data.meshes.new(f"trace_p5_{tag}")
+        me.from_pydata(verts, [], faces)
+        uv = me.uv_layers.new(name="UVMap")
+        for poly in me.polygons:
+            for li in poly.loop_indices:
+                vi = me.loops[li].vertex_index
+                uv.data[li].uv = ((vi // 2) / (n - 1), vi % 2)
+        me.materials.append(mat)
+        ob = bpy.data.objects.new(me.name, me)
+        scene.collection.objects.link(ob)
+        ob.visible_shadow = False
+        b = ob.modifiers.new("devoile", "BUILD")
+        b.frame_start = f0
+        b.frame_duration = max(1, f1 - f0)
+    return f0, f1
+
+
 def car_fill(cam, hero, energy=1400.0, size=4.0):
     """La lumière de la berline, comme sur le pont : un disque doux et crème de face, porté par la caméra (1,5 m
     au-dessus de l'objectif, dans l'axe), qui n'éclaire qu'elle (~4 W/m² à 10 m : P ≈ π d²). Invisible à la
@@ -941,7 +1247,8 @@ def plan_P5(scene, hidden, palier="conteneurs"):
     (motion.py) ; le flou de mouvement les suit."""
     import scene_c
     lamp_src = L.panorama(scene, hidden, bridge=None, port=None)
-    scene_c.build_bridge(hidden, lamp_src)
+    # le pont avec son pylône et ses haubans (P4 les montre : au début de P5 ils sont dans l'axe, au fond)
+    scene_c.build_bridge(hidden, lamp_src, haubans=True)
     build_port(hidden, lamp_src, far=False, palier=palier)
     scene.frame_start, scene.frame_end = P5.F0, P5.F0 + P5.FRAMES - 1
     # --- la berline : déjà en travers, la glisse, la reprise
@@ -951,6 +1258,8 @@ def plan_P5(scene, hidden, palier="conteneurs"):
     poses = M.sample(P5.hero_pos, FRAMES, slip=P5.hero_slip, wheel_r=hero["wheel_r"], wheelbase=wb)
     M.key_vehicle(hero, poses, wheels=wheels)
     M.wheel_marks(wheels, hero["wheel_r"])                # le repère de rotation, en Workbench seulement
+    f0, f1 = skid_p5(scene)
+    print(f"[P5] traces de gomme des roues arrière, images {f0} à {f1}", flush=True)
     # la fumée des pneus arrière : une bouffée toutes les quatre images de glisse, née à l'essieu arrière, qui reste
     # où elle est née (derrière la voiture), gonfle, monte et dérive vers l'extérieur de l'arc
     puffs = M.smoke_puffs(poses, wb)
@@ -1029,9 +1338,12 @@ def plan_P5(scene, hidden, palier="conteneurs"):
 PLANS = {"P5": plan_P5}
 
 
-def build(plan, palier="socle"):
+PLAN_PALIER = {"P5": "conteneurs"}  # le palier de décor de chaque plan (render_film.py n'en passe pas)
+
+
+def build(plan, palier=None):
     scene, hidden = L.new_scene()
-    cam = PLANS[plan](scene, hidden, palier=palier)
+    cam = PLANS[plan](scene, hidden, palier=palier or PLAN_PALIER[plan])
     scene.camera = cam
     __import__("fx").dress(plan, scene)                 # les interactions (fx.py ; FILM3D_FX=0 les retire)
     scene.frame_set(STILL_FRAME)
