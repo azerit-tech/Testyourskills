@@ -17,7 +17,7 @@
 # comme render_b.py l'a toujours fait ; --grain N fixe la valeur dans les deux cas. Jamais de grain en Workbench.
 #
 # Les lieux et leurs plans : pont (scene_c.py) P4 ; pointe, la jetée et la pointe (scene_d.py) P6, FIN, FIN6 ;
-# port (scene_e.py) P5 ; rond-point (scene_f.py) P2 ; avenue (scene_a.py) OUV, l'ouverture.
+# port (scene_e.py) P5 ; rond-point (scene_f.py) P2 ; avenue (scene_a.py) OUV, l'ouverture, et P1, le rétroviseur.
 # Écrit Azerit/design/film/ref/lieux/<lieu>-<plan>-<palier>.png (et -raw.png sans grain ni vignette ; en Workbench
 # <lieu>-<plan>-<palier>-cadrage.png), et la scène assets/scene-<c|d>-<plan>.blend (sauf --no-save).
 #

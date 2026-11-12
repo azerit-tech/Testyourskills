@@ -1859,9 +1859,127 @@ def ouv_motion(scene, coupe, cam, focus):
           f"empattement {wb:.2f} m", flush=True)
 
 
+def key_hands(coupe, frames, steer_fn):
+    """Les mains gantées sur la jante, clés d'os : à chaque image clé, pose_driver_wheel reposée deux fois (la
+    main gauche à grip + braquage, la droite à grip - braquage, en degrés de volant) ; la jante ne tourne pas."""
+    from mathutils import Vector
+    import cast_people as CP
+    arm = next((o for o in coupe.children_recursive if o.type == "ARMATURE" and "wheel_fit" in o), None)
+    if arm is None:
+        print("[scene_a] P1 : pas de conducteur, mains non animées", flush=True)
+        return
+    bpy.context.view_layer.update()
+    fit = list(arm["wheel_fit"])
+    W = coupe.matrix_world
+    C, N, rad, pedal = W @ Vector(fit[0:3]), (W.to_3x3() @ Vector(fit[3:6])).normalized(), fit[6], W @ Vector(fit[7:10])
+    for f in frames:
+        a = steer_fn(f)
+        CP.pose_driver_wheel(arm, C, rad, N, grip_deg=62.0 + a, pedal=pedal)
+        left = {b.name: (b.location.copy(), b.rotation_quaternion.copy()) for b in arm.pose.bones if "Left" in b.name}
+        CP.pose_driver_wheel(arm, C, rad, N, grip_deg=62.0 - a, pedal=pedal)
+        for b in arm.pose.bones:
+            if b.name in left:
+                b.location, b.rotation_quaternion = left[b.name]
+            b.keyframe_insert("location", frame=f)
+            b.keyframe_insert("rotation_quaternion", frame=f)
+
+
+def p1_motion(scene, coupe, police, cam, focus):
+    """Le plan P1 animé (p1_habitacle.py), la suite d'OUV : la berline et la patrouille sur leurs rigs (roues,
+    suspension), la rampe éteinte puis allumée (corail et lilas, 2 Hz, motion.flash_bars) ; la caméra fixe dans
+    l'habitacle, parentée à la caisse, mise au point sur le rétroviseur intérieur (le vrai, celui du modèle) ;
+    les mains bougent à peine sur la jante ; une faible lumière froide sous le pavillon."""
+    import motion as M
+    import p1_habitacle as P
+    frames = range(P.F0, P.F0 + P.FRAMES)
+    scene.frame_start, scene.frame_end = frames[0], frames[-1]
+    on = min(f for f in frames if P.bars_on(f))
+    # les mains d'abord, la caisse encore immobile : deux degrés et demi de volant, une correction lente
+    key_hands(coupe, list(range(P.F0, P.F0 + P.FRAMES, 4)) + [P.F0 + P.FRAMES - 1],
+              lambda f: 2.5 * math.sin(math.pi * (f - P.F0) / (P.FRAMES - 1)))
+    # la berline
+    wheels = [o for o in coupe.children if o.name.startswith("wheel_")]
+    ys = [w.location.y for w in wheels]
+    wb = (max(ys) - min(ys)) if len(ys) > 1 else 2.9
+    x0, y0 = P.hero_pos(M.t_of(P.F0))
+    coupe.location = (x0, y0, 0)
+    coupe.rotation_euler = (0, 0, math.pi)
+    rig = M.rig_up(coupe, 0.0, "rig_berline")
+    poses = M.sample(P.hero_pos, frames, wheel_r=coupe["wheel_r"], wheelbase=wb)
+    M.key_vehicle(rig, poses, wheels=wheels)
+    M.wheel_marks(wheels, coupe["wheel_r"])
+    # la patrouille : garée, puis elle démarre en braquant vers l'avenue
+    prig = M.rig_up(police, OUV.PATROL[2], "rig_police")
+    wh, wr = M.wheels_of(police), police.get("wheel_r", 0.36)
+    pp = M.sample(P.patrol_pos, frames, heading=P.patrol_heading, wheel_r=wr, wheelbase=police.get("wheelbase", 2.9),
+                  front=police.get("front_axle"))
+    M.key_vehicle(prig, pp, wheels=wh, pivot=(0.0, 0.0, 0.36))
+    M.wheel_marks(wh, wr, axis="Y")
+    # la rampe : clignote à partir de l'image `on`, éteinte avant (lumières et matières émissives de la patrouille)
+    M.flash_bars([prig], range(on, frames[-1] + 1))
+    lit = []
+    for ob in police.children_recursive:
+        if ob.type == "LIGHT":
+            d = ob.data
+            full = d.get("motion_energy", d.energy)
+            for f in range(frames[0], on):
+                d.energy = 0.0
+                d.keyframe_insert("energy", frame=f)
+            if "motion_energy" not in d:
+                d.energy = full
+                d.keyframe_insert("energy", frame=on)
+            lit.append(d)
+    mats = {m for ob in [police, *police.children_recursive] if ob.type == "MESH" for m in ob.data.materials if m and m.node_tree}
+    for m in mats:
+        for n in m.node_tree.nodes:
+            s = n.inputs.get("Emission Strength") if n.type == "BSDF_PRINCIPLED" else (n.inputs.get("Strength") if n.type == "EMISSION" else None)
+            if s is None or s.is_linked or s.default_value <= 0.0:
+                continue
+            full = s.default_value
+            s.default_value = 0.0
+            s.keyframe_insert("default_value", frame=frames[0])
+            s.default_value = full
+            s.keyframe_insert("default_value", frame=on)
+            lit.append(m.node_tree)
+    for idb in lit:
+        for fc in M.fcurves(idb):
+            for kp in fc.keyframe_points:
+                kp.interpolation = "CONSTANT"
+    # la caméra : fixe dans la caisse (repère de street_hero : l'avant vers -y), regard vers l'avant, un peu plongé
+    from mathutils import Vector
+    cam.animation_data_clear()
+    cam.parent = coupe
+    cam.matrix_parent_inverse = Matrix.Identity(4)
+    cam.location = P.CAM_LOCAL
+    cam.rotation_mode = "QUATERNION"
+    b = math.radians(P.CAM_PITCH)
+    cam.rotation_quaternion = Vector((0.0, -math.cos(b), math.sin(b))).to_track_quat("-Z", "Y")
+    cam.data.lens = P.LENS
+    cam.data.shift_y = 0.0
+    cam.data.clip_start = 0.05
+    cam.data.dof.focus_object = None
+    cam.data.dof.focus_distance = (Vector(P.MIRROR) - Vector(P.CAM_LOCAL)).length
+    cam.data.dof.aperture_fstop = 2.8
+    bpy.data.objects.remove(focus)
+    # une faible lumière froide sous le pavillon (le reflet du ciel et des lampadaires), invisible à la caméra
+    d = bpy.data.lights.new("habitacle", "AREA")
+    d.size, d.energy, d.color = 0.6, 6.0, lin("#aab0e0")[:3]
+    lo = bpy.data.objects.new("habitacle", d)
+    scene.collection.objects.link(lo)
+    lo.parent = coupe
+    lo.location = (0.1, 0.1, 1.3)
+    lo.visible_camera = lo.visible_glossy = False
+    scene.frame_set(frames[0])
+    scene.render.motion_blur_shutter = 0.5
+    scene.render.use_motion_blur = True
+    print(f"[scene_a] P1 : {len(poses)} images, berline de y {poses[0]['y']:.1f} à {poses[-1]['y']:.1f}, rampe "
+          f"allumée à l'image {on}, {len(lit)} lumières et matières de la patrouille clées", flush=True)
+
+
 def build(plan=None, palier=None):
     """La scène A (l'avenue du front de mer). Sans plan : l'ancienne image fixe, écrite dans assets/scene-a.blend.
-    plan « OUV » (render_lieux --lieu avenue) : le plan animé d'ouverture, rendu sans écrire la scène ; palier ignoré."""
+    plan « OUV » ou « P1 » (render_lieux --lieu avenue) : le plan animé (l'ouverture, puis le rétroviseur dans
+    l'habitacle), rendu sans écrire la scène ; palier ignoré."""
     bpy.ops.wm.read_factory_settings(use_empty=True)
     scene = bpy.context.scene
     hidden = bpy.data.collections.new("sources")
@@ -1968,17 +2086,18 @@ def build(plan=None, palier=None):
         sp.visible_shadow = False
 
     # --- la patrouille : celle de bibliothèque des autres scènes (cast_vehicles.load_patrol, l'avant vers +x dans
-    # son repère), rampe éteinte ; elle garde le nom « police »
+    # son repère), rampe éteinte (en P1 ses lumières existent, éteintes par clés jusqu'à ce qu'elle s'allume) ; elle
+    # garde le nom « police »
     lab = os.path.join(HERE, "lab")
     if lab not in sys.path:
         sys.path.insert(0, lab)
     import cast_vehicles as cv
-    police = cv.load_patrol("jeandiz", lights_on=False, name="police")["body"]
+    police = cv.load_patrol("jeandiz", lights_on=(plan == "P1"), name="police")["body"]
     police.name = "police"
     police.location = (POLICE_X, POLICE_Y, 0)
     police.rotation_mode = "XYZ"
     police.rotation_euler = (0, 0, -math.pi / 2)        # l'avant vers -y
-    if plan == "OUV":
+    if plan in ("OUV", "P1"):
         # garée à l'angle de la rue transversale de y 120, côté ville (ouv_avenue.PATROL, cap des lieux)
         police.location = (OUV.PATROL[0], OUV.PATROL[1], 0)
         police.rotation_euler = (0, 0, math.radians(OUV.PATROL[2] + 90.0))
@@ -2100,6 +2219,9 @@ def build(plan=None, palier=None):
 
     if plan == "OUV":
         ouv_motion(scene, coupe, co, focus)
+        return scene
+    if plan == "P1":
+        p1_motion(scene, coupe, police, co, focus)
         return scene
 
     # --- le mouvement, pour le flou de bougé : tout roule à 50 km/h vers la caméra (−y),

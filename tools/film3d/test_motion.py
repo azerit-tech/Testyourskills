@@ -256,6 +256,27 @@ def test_spin_steps():
           f"{raw:.2f} rad par image, {worst:.2f} par clé")
 
 
+def test_p1():
+    """P1 : la suite exacte d'OUV (position et vitesse à la coupe, le pas d'une image) ; la berline passe à plus
+    de 2 m de la patrouille, de flanc à flanc ; la rampe ne s'allume qu'une fois la patrouille dépassée."""
+    import ouv_avenue as O
+    import p1_habitacle as P
+    h = 1.0 / 240.0
+    gap = math.dist(P.hero_pos(0.0), O.hero_pos(P.T_CUT))
+    check("P1 : même position à la coupe", gap < 1e-6, f"{gap:.2e} m")
+    step = P.hero_pos(0.0)[1] - O.hero_pos(M.t_of(O.F0 + O.FRAMES - 1))[1]
+    check("P1 : le pas d'une image à la coupe", abs(step - O.SPEED / M.FPS) < 1e-6, f"{step:.4f} m")
+    v1 = (P.hero_pos(h)[1] - P.hero_pos(0.0)[1]) / h
+    check("P1 : même vitesse à la coupe", abs(v1 - O.SPEED) < 0.01, f"{v1 * 3.6:.2f} km/h")
+    frames = range(P.F0, P.F0 + P.FRAMES)
+    d, f, a, b = M.min_gap(P.tracks(), frames)
+    check("P1 : la berline passe à plus de 2 m de la patrouille", d - 2 * 0.95 > 2.0,
+          f"{d - 1.9:.1f} m de flanc à flanc à l'image {f}")
+    first = min(f for f in frames if P.bars_on(f))
+    passed = P.hero_pos(M.t_of(first))[1] > P.patrol_pos(M.t_of(first))[1]
+    check("P1 : la rampe s'allume une fois la patrouille dépassée", passed, f"image {first}")
+
+
 def test_bars():
     seq = [M.bar_phase(f) for f in range(24)]
     check("rampes : 2 Hz, alternance corail / lilas", seq[:6] == ["corail"] * 6 and seq[6:12] == ["lilas"] * 6
@@ -275,6 +296,7 @@ if __name__ == "__main__":
     test_fin6()
     test_fin()
     test_spin_steps()
+    test_p1()
     test_bars()
     print(f"\n{'tout passe' if not FAIL else str(len(FAIL)) + ' échec(s)'}")
     sys.exit(1 if FAIL else 0)

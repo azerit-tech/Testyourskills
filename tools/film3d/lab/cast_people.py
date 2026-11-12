@@ -1656,6 +1656,9 @@ def cast_driver_in_car(body, rim_prefix, wheel_hint, variant="hooded", clench=0.
         _upd()
         top = arm.matrix_world @ pb(arm, "Head").head + Vector((0, 0, 0.25))
     arm["wheel_miss"] = str({k: round(v, 3) for k, v in miss.items()})
+    # la mesure du volant gardée (monde à la pose, la voiture à l'origine) : un plan qui anime les mains repose
+    # pose_driver_wheel avec un autre grip_deg (P1 : deux ou trois degrés de volant)
+    arm["wheel_fit"] = [*C, *N, rad, *pedal]
     log(f"[conducteur] volant {tuple(round(v, 3) for v in C)} r {rad:.3f} n {tuple(round(v, 2) for v in N)}, "
         f"assise {seat_z:.3f}, dossier {back_y:.3f}, plancher {floor_z:.3f}, bassin {tuple(round(v, 3) for v in hip)}, "
         f"tête {top.z:.3f} (pavillon {roof.z if roof is not None else float('nan'):.3f}), écart des mains {arm['wheel_miss']}")
