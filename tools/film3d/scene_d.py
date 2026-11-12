@@ -787,7 +787,7 @@ def plan_FIN(scene, hidden, palier="socle"):
     M.wheel_marks(wheels, hero["wheel_r"])
     L.hands_up_keys(hero, *F.DRIVER_KEYS)
     # à 25 W, les mains levées ne se distinguaient pas du reflet du ciel dans le pare-brise (rendu du 12 nov.)
-    L.cabin_light(hero, energy=float(os.environ.get("FILM3D_HABITACLE", "70")))
+    L.cabin_light(hero, energy=70.0)
     # la patrouille, parallèle à la berline, à sa droite et un peu en avant : sa portière gauche s'ouvre vers elle
     f = Vector((-math.sin(math.radians(HERO_STOP)), math.cos(math.radians(HERO_STOP)), 0.0))
     r = Vector((f.y, -f.x, 0.0))
