@@ -912,6 +912,7 @@ def officer_light(officers, plan, receivers=()):
             m = o + Vector((0.0, 0.55, 1.05))
         # (vu de dos, le corps cache le canon : la flamme est assez longue pour déborder de la silhouette vers le
         # centre du cadre, où fuit l'axe du canon)
+        flames = []
         for j, (sc, off) in enumerate((((0.62, 0.09, 0.09), 0.55), ((0.07, 0.2, 0.2), 0.08), ((0.14, 0.13, 0.04), 0.2))):
             f = bpy.data.objects.new(f"muzzle_flash_{k}_{j}", flash)
             bpy.context.scene.collection.objects.link(f)
@@ -920,12 +921,18 @@ def officer_light(officers, plan, receivers=()):
             f.rotation_quaternion = d.to_track_quat("X", "Z")
             f.scale = sc
             f.visible_shadow = False
+            flames.append(f)
         # (assez pour découper l'agent, pas pour brûler le flanc blanc de la patrouille à côté)
         lf = A.add_light(f"muzzle_{k}", "POINT", m + d * 0.15 + Vector((0, 0, 0.1)), (0, 0, -1), lin("#fff3e0"), 1500.0)
         lf.data.shadow_soft_size = 0.04
         lf.visible_camera = False
         # (l'éclair n'allume que les agents, leurs armes, les portières et les patrouilles : pas la chaussée)
-        only_on(lf, list(officers) + list(receivers), f"muzzle_{k}")
+        col = only_on(lf, list(officers) + list(receivers), f"muzzle_{k}")
+        # les flammes aussi, mêmes receveurs : à 600 de force, sans liaison, elles faisaient près des trois quarts de
+        # l'éclairement direct du sol au premier plan de P3 (passes par groupe, lab/lightgroups.py) ; la caméra les
+        # voit toujours, la liaison ne coupe que ce qu'elles éclairent
+        for f in flames:
+            f.light_linking.receiver_collection = col
     log(f"agents : liseré des phares{', éclairs de tir' if flash is not None else ''}")
 
 
