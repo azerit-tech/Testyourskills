@@ -839,7 +839,13 @@ def light_tower(at, target, energy=50000.0, along_x=False):
         L.box_bm(bm, (x + dx - 0.22, y - 0.12, 7.1), (x + dx + 0.22, y + 0.12, 7.5))
         L.box_bm(gb, (x + dx - 0.19, y - 0.13, 7.13), (x + dx + 0.19, y - 0.12, 7.47))
     L.mesh_object("tour_eclairage", bm, [steel])
-    L.mesh_object("tour_eclairage_glaces", gb, [glass]).visible_shadow = False
+    gl = L.mesh_object("tour_eclairage_glaces", gb, [glass])
+    gl.visible_shadow = False
+    # un émissif fort a sa liaison de lumière : les glaces ne s'éclairent qu'elles-mêmes, le projecteur fait la
+    # lumière (à 40 de force, elles allumaient le terre-plein en plus de lui)
+    own = bpy.data.collections.new("tour_glaces_seules")
+    own.objects.link(gl)
+    gl.light_linking.receiver_collection = own
     d = bpy.data.lights.new("tour_eclairage_spot", "SPOT")
     d.energy = energy
     d.color = L.lin("#fff2d6")[:3]
@@ -917,9 +923,11 @@ def plan_P5(scene, hidden, palier="socle"):
     heli, h = L.helicopter("heli")
     M.key_object(heli, FRAMES, P5.heli)
     sl = h["searchlight"].data
-    sl.energy = 1.6e6                                  # assez pour la brume, pas au point de blanchir le bordeaux
-    sl.spot_size = math.radians(5.0)
     sl.spot_blend = 0.25
+    # le faisceau principal (1,6 MW, assez pour la brume) exclut la berline ; un second, coaxial et crème, n'éclaire
+    # qu'elle, à ~2 W/m² sur la caisse (la règle de FIN : 8π d², d ≈ 66 m de l'hélicoptère à l'image 20)
+    import scene_d
+    scene_d.aim_helis([heli], P5.beam_target(M.t_of(20)), energy=1.6e6, car=hero, car_energy=1.1e5, cone=5.0)
     M.key_searchlight(h, FRAMES, P5.beam_target)
     for i, (dz, col, e) in enumerate(((0.2, L.CORAL, 0.4), (-1.2, L.CREAM, 0.25))):
         Ld = bpy.data.lights.new(f"heli_feu_{i}", "POINT")      # feu anticollision corail, feu blanc sous la cellule

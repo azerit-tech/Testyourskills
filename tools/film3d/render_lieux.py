@@ -59,6 +59,7 @@ ap.add_argument("--out", default=None)
 ap.add_argument("--anim", action="store_true",
                 help="toutes les images du plan (frame_start..frame_end) dans ref/anim/, assemblées en mp4 à 24 i/s "
                      "et en ralenti ×4 (une seule session Blender)")
+ap.add_argument("--frame", type=int, default=None, help="l'image du plan animé à rendre (sinon celle de l'image fixe)")
 args = ap.parse_args(sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else [])
 if not args.scene and not (args.lieu and args.plan):
     ap.error("--scene, ou --lieu et --plan")
@@ -106,6 +107,8 @@ if not args.no_save:
 
 if args.no_render:
     sys.exit(0)
+if args.frame is not None:
+    scene.frame_set(args.frame)
 
 r, c = scene.render, scene.cycles
 r.threads_mode = "FIXED"
