@@ -1036,13 +1036,15 @@ def hero_driver(root):
     return None
 
 
-def hands_up(root, up=0.10, fwd=0.22, out=0.2, door_out=0.04):
+def hands_up(root, up=0.12, fwd=0.18, out=0.36, door_out=0.12, spread=12.0):
     """Le conducteur lève les mains gantées derrière le pare-brise. La pose de cast_people.pose_driver_hands_up
     met les poignets 36 cm au-dessus des épaules : dans la berline, les doigts traversent le pavillon (vu au
-    cadrage du 11 novembre). Ici les poignets restent sous le pavillon et avancent vers le pare-brise : coudes
-    écartés, avant-bras dressés, paumes vers l'avant, mains à hauteur du visage. Le bras gauche, côté portière,
-    reste près du corps (`door_out`, coude vers le bas) : écarté comme le droit, l'avant-bras sortait par la
-    portière (vu de profil le 12 novembre, invisible de trois quarts face)."""
+    cadrage du 11 novembre). Ici les poignets restent sous le pavillon : coudes écartés, avant-bras dressés,
+    paumes vers l'avant, doigts écartés (`spread`), mains à hauteur du visage, bien écartées l'une de l'autre :
+    la gauche contre la vitre du conducteur (`door_out`, coude vers le bas), la droite vers le milieu du
+    pare-brise (`out`). Vues de la caméra de FIN (découpage v3 : 5 m derrière, 2,4 m à gauche, 1,3 m), la gauche
+    se lit par la vitre du conducteur et la droite par la lunette, de part et d'autre de l'appuie-tête ; plus
+    serrées (0,04 et 0,2), l'appuie-tête en cachait une. Plus haut, la gauche traverse le montant et le toit."""
     import cast_people as cp
     arm = hero_driver(root)
     if arm is None:
@@ -1059,7 +1061,7 @@ def hands_up(root, up=0.10, fwd=0.22, out=0.2, door_out=0.04):
         pole = side * 0.3 + cp.D * 1.0 + cp.B * 0.1 if door else side * 1.0 + cp.D * 0.8 + cp.B * 0.1
         cp.two_bone(arm, s + "Arm", s + "ForeArm", s + "Hand", wrist, pole)
         cp.set_hand(arm, s, (cp.U + side * 0.1 + cp.F * 0.08).normalized(), cp.F)
-        cp.curl(arm, s, angles=(8, 10, 6), thumb=(-5, 5, 5), spread=6)
+        cp.curl(arm, s, angles=(8, 10, 6), thumb=(-5, 5, 5), spread=spread)
     cp._head_look(arm, (cp.F + cp.D * 0.05).normalized())
 
 
