@@ -204,19 +204,10 @@ def road_module():
     return P
 
 
-# La chaussée de la rue (style propre, l'avenue garde « sechage ») : l'enrobé plus noir, une pellicule d'eau de
-# rugosité moyenne. Le voile laiteux de P3 venait du poids du vernis d'eau (1 dans road.wet_shader) : vu de 55 cm,
-# face aux phares, un vernis plein étale chaque source en nappe claire. Comme sur le tablier du pont (scene_c),
-# chaussée et cunettes plafonnent leur vernis à COAT (thin_coat) : sol sombre, phares en traînées, marquage lisible.
+# La chaussée de la rue (style propre, l'avenue garde « sechage ») : l'enrobé plus noir, une pellicule d'eau un peu
+# plus lisse. Le vernis d'eau garde son poids plein : le sol pâle de P3 n'était pas un reflet (les passes par groupe
+# l'ont mis sur les flammes des tirs, non liées), et le plafonner n'éteignait que les traînées des enseignes.
 RUE_STYLE = dict(road.STYLES["sechage"], dark=0.45, wet=(0.36, 0.22), cr=(0.14, 0.24))
-COAT = 0.3
-
-
-def thin_coat(*mats, weight=COAT):
-    for m in mats:
-        for n in m.node_tree.nodes:
-            if n.type == "BSDF_PRINCIPLED" and not n.inputs["Coat Weight"].is_linked:
-                n.inputs["Coat Weight"].default_value = min(n.inputs["Coat Weight"].default_value, weight)
 
 
 def build_street(hidden):
@@ -230,7 +221,6 @@ def build_street(hidden):
                              layout=dict(road.lane_layout(HALF, 2, centre=False), lanes=(60.0,)))
     pan, kerb, walk = road.mat_gutter_pan(st, "rue_gutter"), road.mat_kerb(st, "rue_kerb"), road.mat_pavement(st, "rue_walk")
     paint = road.mat_paint_decal(st, "rue_paint")
-    thin_coat(asphalt, plaza, pan)
     road.strip("rue_road", road.road_profile(), Y0, Y_END + 0.4, asphalt)
     for side in (-1, 1):
         road.strip(f"rue_gutter_{side}", road.pan_profile(side), Y0, Y_END, pan)
@@ -258,7 +248,6 @@ def build_street(hidden):
     rng = random.Random(41)
     src, dims = road.manhole_source(hidden)
     patch = road.mat_asphalt(st, "rue_asphalt_patch", force_patch=True, layout=lay)
-    thin_coat(patch)
     for k, (x, y) in enumerate(((-1.4, 9.0), (1.6, 36.0), (-0.9, 63.0), (1.3, 95.0), (-1.6, 118.0))):
         z = road.road_z(x)
         road.plane(f"rue_mh_patch_{k}", x, y, z + 0.0015, 1.4, 1.4, patch)
@@ -718,7 +707,6 @@ def build_foreground(hidden, plan):
     src, dims = road.manhole_source(hidden)
     st = RUE_STYLE
     patch = road.mat_asphalt(st, "rue_asphalt_patch_near", force_patch=True, layout=dict(road.lane_layout(HALF, 2), grime=0.6))
-    thin_coat(patch)
     x, y = cx - 1.9, cy + 1.8
     z = road.road_z(x)
     road.plane("rue_mh_patch_near", x, y, z + 0.0015, 1.4, 1.4, patch, 0.06)
