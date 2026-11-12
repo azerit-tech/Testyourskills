@@ -374,6 +374,18 @@ patrol1_pos, patrol1_heading, patrol1_slip, patrol1_steer = (PATROL1.pos, PATROL
                                                              PATROL1.steer)
 
 
+# le lampadaire de la pointe, dans FIN et FIN6 (scene_d les y déplace, sans le tourner) : à droite du point d'arrêt
+# et un peu en arrière, à 9,5 m de la berline, sa tête et son reflet sur l'enrobé mouillé hors du cadre à toutes
+# les images de FIN, avec 15 % de marge pour le flou du reflet. À sa place de la pointe (scene_d.LAMP_AT), sa tête
+# sortait du cadre en haut à droite et son reflet restait en bas : une tache blanche sans source lisible (règle
+# E). Sur une caméra qui plonge, le reflet n'est pas à l'aplomb de la tête à l'écran : on vérifie les deux.
+LAMP_FIN = (SX + 9.0, SY - 3.0)
+_LAMP_OLD = (80.0 + 5.5, 430.0 - 5.8)              # scene_d.LAMP_AT, le bras tourné vers la pointe (80, 430)
+_LAMP_K = 1.68 * 1.75 / math.hypot(80.0 - _LAMP_OLD[0], 430.0 - _LAMP_OLD[1])     # lieux.lamp, LAMP_S 1,75
+LAMP_HEAD = (LAMP_FIN[0] + (80.0 - _LAMP_OLD[0]) * _LAMP_K, LAMP_FIN[1] + (430.0 - _LAMP_OLD[1]) * _LAMP_K,
+             4.68 * 1.75)
+
+
 # --- l'hélicoptère, devant la berline, bas (8 m), à 22 m de son centre, un peu à droite de la route (sinon il
 # passait devant la tour du phare), le nez vers elle ; son faisceau la cherche pendant la glissade (devant elle,
 # un peu de balancement : en retard, sa tache tombait derrière elle, sur le sol blanc du tiers bas) et se pose sur

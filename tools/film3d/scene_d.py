@@ -838,6 +838,14 @@ def plan_FIN(scene, hidden, palier="socle"):
     if lp:
         lp.data.energy = 1300.0
         lp.data.color = L.lin("#ffe2c2")[:3]
+    # il se range à droite du nouveau point d'arrêt et un peu en arrière (fin_pointe.LAMP_FIN), sa tête et son
+    # reflet hors du cadre à toutes les images : à sa place de la pointe, sa tête sortait du cadre en haut à droite
+    # après l'image 1 et son reflet sur l'enrobé mouillé restait en bas, une tache blanche floue sans source lisible
+    # (règle E)
+    shift = Vector((F.LAMP_FIN[0] - LAMP_AT[0], F.LAMP_FIN[1] - LAMP_AT[1], 0.0))
+    for ob in (bpy.data.objects.get("lamp_pointe"), lp):
+        if ob is not None:
+            ob.location += shift
     # l'hélicoptère devant elle, bas, le nez vers elle, à droite de la tour du phare ; son projecteur la cherche
     # pendant la glissade et se pose sur elle à l'arrêt (fin_pointe.beam_target) : elle est à contre-jour
     heli, _ = L.helicopter("heli")

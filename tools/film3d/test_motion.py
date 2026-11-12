@@ -698,6 +698,14 @@ def test_fin():
     check("FIN : le repli de face se pose sur la pose validée à l'arrêt, puis tient", not P.FACE and held
           and math.dist(fl[:3], P.FACE_CAM) < 1e-9 and fl[3:] == (1.0, 14.0, 0.0, 24.0) and fc >= 1.0,
           f"berline à {fc:.2f} m au plus près")
+    # le lampadaire de la pointe : sa tête (et donc son reflet sur l'enrobé, au même azimut) hors du cadre à toutes
+    # les images (règle E : pas de tache sans source lisible)
+    hx, hy, hz = P.LAMP_HEAD
+    seen = [f for f in keyed for z in (hz, 0.0, -hz) if (lambda q: q is not None and -0.15 <= q[0] <= 1.15
+                                                          and -0.2 <= q[1] <= 1.2)(
+        M.screen_point(P.camera_rail(M.t_of(f)), (hx, hy, z)))]
+    check("FIN : le lampadaire de la pointe, sa tache au sol et son reflet hors du cadre", not seen,
+          f"images {sorted(set(seen))[:6]}")
     # l'hélicoptère devant, bas, face à elle
     hd = math.dist(P.HELI[:2], (P.SX, P.SY))
     check("FIN : l'hélicoptère 22 m devant elle, à 8 m, le nez vers elle", abs(hd - 22.0) < 1e-6 and P.HELI[2] == 8.0
