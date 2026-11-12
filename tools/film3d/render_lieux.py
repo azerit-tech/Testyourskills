@@ -17,7 +17,7 @@
 # comme render_b.py l'a toujours fait ; --grain N fixe la valeur dans les deux cas. Jamais de grain en Workbench.
 #
 # Les lieux et leurs plans : pont (scene_c.py) P4 ; pointe, la jetée et la pointe (scene_d.py) P6, FIN, FIN6 ;
-# port (scene_e.py) P5.
+# port (scene_e.py) P5 ; rond-point (scene_f.py) P2.
 # Écrit Azerit/design/film/ref/lieux/<lieu>-<plan>-<palier>.png (et -raw.png sans grain ni vignette ; en Workbench
 # <lieu>-<plan>-<palier>-cadrage.png), et la scène assets/scene-<c|d>-<plan>.blend (sauf --no-save).
 #
@@ -39,7 +39,7 @@ if HERE not in sys.path:
     sys.path.insert(0, HERE)
 import lieux as L  # noqa: E402
 
-LIEUX = {"pont": ("scene_c", "c"), "pointe": ("scene_d", "d"), "port": ("scene_e", "e")}
+LIEUX = {"pont": ("scene_c", "c"), "pointe": ("scene_d", "d"), "port": ("scene_e", "e"), "rond-point": ("scene_f", "f")}
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--lieu", choices=sorted(LIEUX))

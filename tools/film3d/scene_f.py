@@ -345,7 +345,9 @@ def ring_pools():
         lo.data.spot_blend = 0.9
 
 
-def build():
+def build(plan=None, palier=None):
+    """Écrit scene-f.blend (en ligne de commande), ou rend la scène à render_lieux.py (--lieu rond-point --plan
+    P2), sans l'écrire. Le plan P2 est animé (28 images, motion.py), posé à l'image de l'image fixe."""
     bpy.ops.wm.read_factory_settings(use_empty=True)
     scene = bpy.context.scene
     random.seed(17)
@@ -356,16 +358,19 @@ def build():
     build_walks()
     build_island(hidden)
     build_street_life(hidden, branches)
-    C.place_cars(scene, POSE)
+    C.place_cars(scene, POSE, anim=True)
     ring_pools()
     for c in bpy.data.collections:
         if c.name == "sources" or c.name.startswith("sources."):
             c.hide_render = True
             c.hide_viewport = True
     A.make_world(scene)
-    co = C.drone(scene, POSE)
+    co = C.drone(scene, POSE, anim=True)
     A.render_settings(scene)
-    scene.render.use_motion_blur = False
+    scene.render.use_motion_blur = True             # le flou de bougé suit les clés (obturateur 0,5)
+    scene.render.motion_blur_shutter = 0.5
+    if plan is not None:
+        return scene
     out = os.path.join(ASSETS, BLEND)
     bpy.ops.wm.save_as_mainfile(filepath=out, compress=True)
     x, y, z = co.location

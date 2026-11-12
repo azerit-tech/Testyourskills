@@ -77,6 +77,58 @@ def camera(t=STILL):
     return x, y, CAM_Z, CAM_YAW0 + CAM_TURN * t, CAM_LENS
 
 
+# --- le plan animé (motion.py) : le même arc, parcouru à vitesse constante, 28 images à 24 par seconde ; t en
+# secondes depuis la première image, t / T_END est l'instant du plan de cars() (0 à 1). Rien ci-dessus ne change.
+FRAMES = 28
+F0 = 1
+FPS = 24.0
+T_END = (FRAMES - 1) / FPS
+S0 = s_of(THETA0) - 6.0             # là où la glisse commence à s'installer (wheel_track)
+
+
+def s_hero(t):
+    return s_of(THETA0) + t / T_END * (s_of(THETA1) - s_of(THETA0))
+
+
+def frame_of_s(s):
+    """L'image (décimale) où le centre de la berline passe à l'abscisse s."""
+    return F0 + FPS * T_END * (s - s_of(THETA0)) / (s_of(THETA1) - s_of(THETA0))
+
+
+def hero_pos(t):
+    return point(s_hero(t))[:2]
+
+
+def hero_slip(t):
+    """La dérive de la caisse (degrés, positive : la caisse pointe plus à gauche que sa route), comme wheel_track."""
+    return DRIFT * min(1.0, max(0.0, (s_hero(t) - S0) / 10.0))
+
+
+def patrol_gap(i):
+    return GAP1 if i == 0 else GAP1 + GAP2
+
+
+def patrol_pos(i):
+    return lambda t: point(s_hero(t) - patrol_gap(i))[:2]
+
+
+def patrol_slip(i):
+    """La patrouille qui entre dans le virage glisse à peine (4°), installés sur ses six premiers mètres d'arc."""
+    def f(t):
+        u = min(1.0, max(0.0, (s_hero(t) - patrol_gap(i) + 2.0) / 6.0))
+        return 4.0 * u * u * (3 - 2 * u)
+    return f
+
+
+def drone_yaw(t):
+    return CAM_YAW0 + CAM_TURN * t / T_END
+
+
+def tracks():
+    """{nom: pos(t)} des trois véhicules en repère de l'arc (pour vérifier les distances)."""
+    return {"hero": hero_pos, "patrol_1": patrol_pos(0), "patrol_2": patrol_pos(1)}
+
+
 def to_scene(pose, x, y, heading=0.0):
     """Passe un point (et un cap, en degrés) du repère de l'arc au repère d'une scène : pose = (ox, oy, lacet)."""
     ox, oy, yaw = pose

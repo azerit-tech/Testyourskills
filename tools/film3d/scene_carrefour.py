@@ -226,12 +226,14 @@ def mat_wake():
     return m
 
 
-def wake(scene, wheels, spray_m, pose=POSE):
+def wake(scene, wheels, spray_m, pose=POSE, anim=False):
     """Le sillage de la glissade, écrit depuis p2_arc.wheel_track : quatre traces de pneus posées sur la chaussée
     (lancer de rayon vers le bas, la bordure et le bombé suivis), et derrière la roue arrière extérieure une traîne
-    de gerbes qui retombent."""
+    de gerbes qui retombent. anim : les traces vont jusqu'au bout du plan et se dévoilent sous les roues
+    (modificateur Construction, une face après l'autre, à la vitesse de la berline) ; la traîne suit la roue."""
     dg = bpy.context.evaluated_depsgraph_get()
     mat = mat_wake()
+    t_end = 1.0 + 1.0 / (P.FRAMES - 1) if anim else P.STILL
 
     def ground(x, y):
         hit, loc, *_ = scene.ray_cast(dg, Vector((x, y, 0.12)), Vector((0, 0, -1)), distance=1.0)
@@ -239,8 +241,10 @@ def wake(scene, wheels, spray_m, pose=POSE):
 
     for name, (lx, ly, _) in wheels.items():
         rear = name.endswith(("BL", "BR"))
-        pts = [P.to_scene(pose, x, y)[:2] for x, y in P.wheel_track(lx, ly)]
+        pts = [P.to_scene(pose, x, y)[:2] for x, y in P.wheel_track(lx, ly, t=t_end)]
+        s0, s1 = P.S0, P.s_of(P.THETA0) + t_end * (P.s_of(P.THETA1) - P.s_of(P.THETA0))
         if not rear:
+            s0 += (s1 - s0) * (len(pts) // 3) / (len(pts) - 1)
             pts = pts[len(pts) // 3:]          # les roues avant ne marquent qu'une fois la caisse en travers
         w = 0.24 if rear else 0.2
         me = bpy.data.meshes.new(f"wake_{name}")
@@ -263,6 +267,11 @@ def wake(scene, wheels, spray_m, pose=POSE):
         ob = bpy.data.objects.new(f"wake_{name}", me)
         scene.collection.objects.link(ob)
         ob.visible_shadow = False
+        if anim:
+            # la face i (de s0 à s1) paraît quand la roue y passe : le centre de la caisse à la même abscisse
+            b = ob.modifiers.new("devoile", "BUILD")
+            b.frame_start = P.frame_of_s(s0)
+            b.frame_duration = max(1.0, P.frame_of_s(s1) - P.frame_of_s(s0))
     # la traîne : la roue arrière extérieure (à droite, -x dans le repère de la caisse) laisse retomber l'eau
     lx, ly, _ = wheels.get("wheel_BR", wheels.get("wheel_BL"))
     lx = -abs(lx)
@@ -276,10 +285,17 @@ def wake(scene, wheels, spray_m, pose=POSE):
         sc = 1.0 - 0.18 * k
         sp.scale = (0.9 * sc, 0.9 * sc, 0.35 * sc)
         sp.visible_shadow = False
+        if anim:
+            # la gerbe suit la roue à `back` pas de 0,5 m derrière elle, image par image (clés simples)
+            for f in range(P.F0 - 1, P.F0 + P.FRAMES + 1):
+                q = P.wheel_track(lx - 0.4, ly, t=(f - P.F0) / (P.FRAMES - 1))
+                sp.location = (*P.to_scene(pose, *q[max(0, len(q) - 1 - back)])[:2], 0.25)
+                sp.keyframe_insert("location", frame=f)
 
 
-def place_cars(scene, pose=POSE):
-    """La berline et les deux patrouilles de p2_arc posées sur le décor (pose : voir p2_arc.to_scene)."""
+def place_cars(scene, pose=POSE, anim=False):
+    """La berline et les deux patrouilles de p2_arc posées sur le décor (pose : voir p2_arc.to_scene). anim : le
+    plan animé (28 images, motion.py), posé à l'image de l'instant STILL comme l'image fixe."""
     import cast_vehicles as cv
     import scene_b as B
     poses = {k: P.to_scene(pose, x, y, h) + (yb + pose[2],) for k, (x, y, h, yb) in P.cars().items()}
@@ -308,7 +324,7 @@ def place_cars(scene, pose=POSE):
         sp.scale = (1.0 if side < 0 else 0.6, 2.6, 0.55)
         sp.visible_shadow = False
     wheels = {w.name: Vector(w.location) for w in car.children if w.name.startswith("wheel_")}
-    wake(scene, wheels, sm, pose)
+    wake(scene, wheels, sm, pose, anim=anim)
     # une lumière douce au-dessus de la berline, invisible à la caméra et dans les reflets : le bordeaux de la
     # caisse se lit du ciel (la rue n'y pose que des taches ambre)
     f = A.add_light("hero_fill", "AREA", (x, y, 7.0), (0, 0, -1), lin("#ffd8c8"), 260.0, (3.0, 5.0))
@@ -333,11 +349,53 @@ def place_cars(scene, pose=POSE):
             lo.data.spot_blend = 0.9
             lo.visible_glossy = False
     log("berline : " + ", ".join(f"{k} ({v[0]:.1f}, {v[1]:.1f}) cap {v[2]:.0f}°" for k, v in poses.items()))
+    if anim:
+        animate(scene, car, f, cars, pose)
     return car
 
 
-def drone(scene, pose=POSE):
-    """Le drone de p2_arc : à la verticale, le haut du cadre tourné vers le cap de la voiture."""
+def animate(scene, car, fill, patrols, pose=POSE):
+    """Le plan P2 en clés calculées (motion.py) depuis la trajectoire de p2_arc, inchangée : chaque véhicule mis
+    sur un rig (ses lumières posées à part le suivent), la berline en glisse (roulis vers l'extérieur, roues qui
+    tournent, avant braqué du contre-braquage), les patrouilles derrière, rampes clignotantes. Les roues des
+    patrouilles sont fondues dans leur caisse : elles penchent avec elle et ne tournent pas."""
+    import motion as M
+    frames = range(P.F0 - 1, P.F0 + P.FRAMES + 1)
+    scene.frame_start, scene.frame_end = P.F0, P.F0 + P.FRAMES - 1
+
+    def in_scene(fn):
+        return lambda t: P.to_scene(pose, *fn(t))[:2]
+
+    t0 = P.STILL * P.T_END
+    wheels = [w for w in car.children if w.name.startswith("wheel_")]
+    d = [Vector(w.location).y for w in wheels]
+    wb = (max(d) - min(d)) if d else 2.9
+    head = P.to_scene(pose, 0.0, 0.0, P.point(P.s_hero(t0))[2] + P.hero_slip(t0))[2]
+    rig = M.rig_up(car, head, "rig_berline", extras=[fill])
+    poses = M.sample(in_scene(P.hero_pos), frames, slip=P.hero_slip, wheel_r=car["wheel_r"], wheelbase=wb)
+    M.key_vehicle(rig, poses, wheels=wheels, body=car)
+    M.wheel_marks(wheels, car["wheel_r"])
+    rigs = []
+    for i, (body, key) in enumerate(zip(patrols, ("patrol_1", "patrol_2"))):
+        s = P.s_hero(t0) - P.patrol_gap(i)
+        lights = [o for o in bpy.data.objects if o.name.startswith((f"bar_glow_{key}_", f"pool_{key}_"))]
+        r = M.rig_up(body, P.to_scene(pose, 0.0, 0.0, P.point(s)[2] + P.patrol_slip(i)(t0))[2], f"rig_{key}",
+                     extras=lights)
+        ps = M.sample(in_scene(P.patrol_pos(i)), frames, slip=P.patrol_slip(i), wheel_r=0.36, seed=float(i + 1))
+        M.key_vehicle(r, ps, pivot=(0.0, 0.0, 0.36), body=body)
+        rigs.append(r)
+    n = M.flash_bars(rigs, frames)
+    scene.render.use_motion_blur = True
+    scene.render.motion_blur_shutter = 0.5
+    scene.frame_set(int(round(P.F0 + t0 * P.FPS)))
+    a, b = poses[1], poses[-2]
+    log(f"P2 animé : {len(frames)} images de clés, berline {a['speed'] * 3.6:.0f} km/h, roulis {a['roll']:.1f} à "
+        f"{b['roll']:.1f}°, braquage {a['steer']:.1f} à {b['steer']:.1f}°, {n} lumières de rampe clignotantes")
+
+
+def drone(scene, pose=POSE, anim=False):
+    """Le drone de p2_arc : à la verticale, le haut du cadre tourné vers le cap de la voiture ; anim : il tourne
+    de CAM_TURN degrés pendant le plan (clés de motion.py)."""
     cx, cy, cz, yaw, lens = P.camera()
     x, y, a = P.to_scene(pose, cx, cy, yaw)
     cam = bpy.data.cameras.new("cam")
@@ -351,6 +409,11 @@ def drone(scene, pose=POSE):
     co.location = (x, y, cz)
     co.rotation_euler = (0, 0, math.radians(a))
     scene.camera = co
+    if anim:
+        import motion as M
+        M.key_object(co, range(P.F0 - 1, P.F0 + P.FRAMES + 1),
+                     lambda t: (x, y, cz, P.to_scene(pose, 0.0, 0.0, P.drone_yaw(t))[2], 0.0, 0.0))
+        scene.frame_set(scene.frame_current)
     return co
 
 

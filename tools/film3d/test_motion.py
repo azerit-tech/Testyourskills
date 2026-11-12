@@ -87,6 +87,20 @@ def test_gaps():
                                                     range(0, 30))[0] < 0.5)
 
 
+def test_p2():
+    """P2 : la trajectoire validée (cars) retrouvée par le plan animé à l'instant STILL ; aucune distance sous 6 m."""
+    import p2_arc as P
+    d, f, a, b = M.min_gap(P.tracks(), range(P.F0 - 1, P.F0 + P.FRAMES + 1))
+    check("P2 : distances gardées", d >= 6.0, f"{d:.1f} m entre {a} et {b} à l'image {f}")
+    t = P.STILL * P.T_END
+    ref = P.cars(P.STILL)
+    ok = all(math.dist(ref[k][:2], P.tracks()[k](t)) < 1e-6 for k in ref)
+    check("P2 : la trajectoire validée inchangée", ok and abs(P.hero_slip(t) - P.DRIFT) < 1e-9)
+    ps = M.sample(P.hero_pos, range(0, 30), slip=P.hero_slip, noise=0.0)
+    check("P2 : virage à gauche, roulis vers la droite", ps[-1]["roll"] > 2.0, f"{ps[-1]['roll']:.2f}°")
+    check("P2 : glisse à gauche, contre-braquage (roues à droite)", ps[-1]["steer"] < 0.0, f"{ps[-1]['steer']:.2f}°")
+
+
 def test_bars():
     seq = [M.bar_phase(f) for f in range(24)]
     check("rampes : 2 Hz, alternance corail / lilas", seq[:6] == ["corail"] * 6 and seq[6:12] == ["lilas"] * 6
@@ -98,6 +112,7 @@ if __name__ == "__main__":
     test_braking()
     test_right_turn()
     test_gaps()
+    test_p2()
     test_bars()
     print(f"\n{'tout passe' if not FAIL else str(len(FAIL)) + ' échec(s)'}")
     sys.exit(1 if FAIL else 0)

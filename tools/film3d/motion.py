@@ -261,6 +261,29 @@ def _clear(ob):
         ob.animation_data.action = None
 
 
+def rig_up(body, heading, name=None, extras=()):
+    """Un véhicule posé à la main (une caisse seule, sans rig : la rue, le rond-point) mis sur un rig pour
+    key_vehicle : un vide au sol sous la caisse, tourné de `heading` degrés (0 : +y, positif à gauche), qui devient
+    le parent de la caisse et des `extras` (ses lumières posées à part), leurs places dans le monde gardées."""
+    import bpy
+    from mathutils import Matrix
+    bpy.context.view_layer.update()
+    loc = body.matrix_world.translation
+    rig = bpy.data.objects.new(name or f"rig_{body.name}", None)
+    bpy.context.scene.collection.objects.link(rig)
+    rig.location = (loc.x, loc.y, 0.0)
+    rig.rotation_euler = (0.0, 0.0, math.radians(heading))
+    bpy.context.view_layer.update()
+    inv = rig.matrix_world.inverted()
+    for ob in (body, *extras):
+        mw = ob.matrix_world.copy()
+        ob.parent = rig
+        ob.matrix_parent_inverse = Matrix.Identity(4)
+        ob.matrix_basis = inv @ mw
+    rig["body"] = body.name
+    return rig
+
+
 def key_vehicle(root, poses, wheels=(), ground=None, pivot=(0.0, 0.0, 0.5), body=None):
     """Pose les clés d'un véhicule déjà construit (un rig de lieux : root, son enfant body["body"]).
 

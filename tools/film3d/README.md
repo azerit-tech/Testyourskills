@@ -74,12 +74,12 @@ Les planches comparatives citent aussi des candidats écartés que `fetch.py` ne
 - `scene_c.py` : le pont (320 m de la ville au port, quatre voies, crête à 7,2 m) et son plan P4, la meute.
 - `scene_d.py` : la jetée (300 m) et la pointe (terre-plein rond de 60 m), et ses plans P6, FIN, FIN6.
 - `scene_e.py` : le port, le terre-plein au pied du pont, le virage sur la voie du quai, et son plan P5, le projecteur de l'hélicoptère.
-- `render_lieux.py` : construit un plan d'un lieu au bord de l'eau et le rend (`--lieu pont|pointe|port --plan P4 [--palier socle]`), ou rend une scène déjà écrite (`--scene scene-b.blend`). Workbench par défaut (cadrage), `--engine cycles --samples 32` pour la lumière, `--gpu` sur la machine louée seulement ; grain ffmpeg 7 par défaut pour un lieu, 0 pour une scène (`--grain N` pour fixer).
+- `render_lieux.py` : construit un plan d'un lieu au bord de l'eau et le rend (`--lieu pont|pointe|port|rond-point --plan P4 [--palier socle]`), ou rend une scène déjà écrite (`--scene scene-b.blend`). Workbench par défaut (cadrage), `--engine cycles --samples 32` pour la lumière, `--gpu` sur la machine louée seulement ; grain ffmpeg 7 par défaut pour un lieu, 0 pour une scène (`--grain N` pour fixer).
 - `render_lieux.py --anim` (avec `--lieu/--plan` ou `--scene`) : rend toutes les images du plan dans `ref/anim/` et assemble `<lieu>-<plan>-anim.mp4` (ou `<scène>-anim.mp4`) et `-anim-ralenti.mp4` (×4), dans la même session Blender.
 - `motion.py` : le mouvement, en clés calculées depuis la trajectoire (aucune physique) ; `p5_virage.py` : la trajectoire de P5. Tests sans Blender : `python3 tools/film3d/test_motion.py`.
 - `scene_b.py` : la rue des enseignes (8 m, deux voies, enseignes en potence, guirlandes, au fond l'îlot du rond-point) et son plan P3, le barrage ; écrit `scene-b.blend`.
 - `render_b.py` : l'ancienne commande de rendu de la ville, devenue une enveloppe de `render_lieux.py --scene` (mêmes arguments, `scene-b.blend` et grain 0 par défaut).
-- `p2_arc.py` : le plan P2 écrit une fois (virage de 30 m à 70 km/h, contre-braquage, deux patrouilles, drone à 40 m et 35 mm) ; chaque décor ne donne qu'une pose.
+- `p2_arc.py` : le plan P2 écrit une fois (virage de 30 m à 70 km/h, contre-braquage, deux patrouilles, drone à 40 m et 35 mm) ; chaque décor ne donne qu'une pose. Le plan animé en lit le temps (`hero_pos`, `hero_slip`, `patrol_pos`, `drone_yaw`) ; `scene_f.py` le pose en clés (`scene_carrefour.animate`), sillage dévoilé sous les roues.
 - `scene_carrefour.py` : le socle de P2, le premier carrefour de la scène A et ses quatre angles seuls ; écrit `scene-carrefour.blend`.
 - `scene_f.py` : le rond-point de P2 (îlot et palmiers, anneau à deux voies tourné avec UV, quatre branches, terrasses), le même arc pris à contresens au ras de l'îlot ; écrit `scene-f.blend`.
 
