@@ -2059,11 +2059,14 @@ def p1_motion(scene, coupe, police, cam, focus):
     cam.data.shift_y = 0.0
     cam.data.clip_start = 0.05
     cam.data.dof.focus_object = None
-    cam.data.dof.focus_distance = (Vector(P.MIRROR) - Vector(P.CAM_LOCAL)).length
-    cam.data.dof.aperture_fstop = 2.8
+    # la mise au point : sur la glace du rétroviseur (1,3 m), le reflet de la patrouille (à 30 m de plus) sortait
+    # flou en trois points ; à 5 m et f/4, la glace et son cadre restent nets à 4 px près, le reflet et l'avenue
+    # nets, la capuche au premier plan floue
+    cam.data.dof.focus_distance = P.FOCUS
+    cam.data.dof.aperture_fstop = P.FSTOP
     bpy.data.objects.remove(focus)
     p1_cabin(scene, coupe, frames, on)
-    scene.frame_set(frames[0])
+    scene.frame_set(P.STILL)          # l'image fixe du banc : la rampe allumée dans le rétroviseur
     scene.render.motion_blur_shutter = 0.5
     scene.render.use_motion_blur = True
     print(f"[scene_a] P1 : {len(poses)} images, berline de y {poses[0]['y']:.1f} à {poses[-1]['y']:.1f}, rampe "

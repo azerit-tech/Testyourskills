@@ -31,6 +31,8 @@ CAM_PITCH = -12.0                  # le rétroviseur au tiers haut, hors de la b
 LENS = 28.0
 MIRROR = (0.0, -0.63, 1.225)       # le centre du rétroviseur intérieur (sonde du 12 novembre)
 BAR_Z = 1.15                       # la hauteur visée derrière, entre le pavillon et la rampe de la patrouille
+FOCUS, FSTOP = 5.0, 4.0            # la mise au point (m) et l'ouverture : le reflet du miroir net, la capuche floue
+STILL = 14                         # l'image fixe (banc) : la rampe allumée, corail, dans le rétroviseur
 
 
 def _accel(t):
