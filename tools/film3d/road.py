@@ -60,17 +60,22 @@ def lane_layout(half_width, n_lanes=2, centre=True, edge=False):
 # matières mouillées passent par wet_shader (enrobé de l'avenue, des lieux au bord de l'eau, de la rue des enseignes,
 # du rond-point ; cunettes, bordures, trottoirs), toutes les flaques posées par puddle_shader : on règle ici, jamais
 # dans une scène.
-#   coat        le poids du vernis d'eau. À 1, une pellicule continue : au ras du sol (téléobjectif de P4, caméra
-#               basse) la chaussée devenait un miroir qui renvoyait rampes et phares jusqu'au bas du cadre
-#   coat_rough  la rugosité du vernis : décalage ajouté à celle que calcule la matière, puis plancher. Le mouillé
-#               devient satiné (un reflet court et flou sous chaque source), les flaques gardent un reflet plus net
-#   puddle      le seuil des flaques sur le champ de « creux » de mat_asphalt (en écarts-types) : 10 % de la
-#               chaussée au plus, le reste en asphalte humide
-HUMIDITE = dict(coat=0.35, coat_rough=(0.18, 0.22), puddle=(1.1, 1.6))
+#   coat        le poids du vernis d'eau sur l'asphalte humide (dans une flaque : 1). À 1 partout, une pellicule
+#               continue : au ras du sol (téléobjectif de P4, caméra basse) la chaussée devenait un miroir
+#   coat_rough  la rugosité du vernis : décalage ajouté à celle que calcule la matière (0,2 à 0,34 sur le mouillé,
+#               0,035 dans une flaque), puis plancher. Le mouillé satiné, 0,26 à 0,40 : sombre près de la caméra, il
+#               luit au loin, là où l'angle rase (Fresnel) ; une flaque à 0,09
+#   puddle      le seuil des flaques sur le champ de « creux » de mat_asphalt (en écarts-types)
+#   bord        les flaques de l'enrobé ne sont que le long des cunettes, sur ce bord (m, depuis l'enrobé) : jamais
+#               dans les voies, où roulent la berline et la caméra (une flaque y renvoyait une tête de lampadaire en
+#               disque blanc au bas du cadre) ; 5 à 10 % de la chaussée
+#   fonce       ce que l'eau garde de la teinte de l'enrobé (humide, flaque). À 0,44, avec les lampadaires communs
+#               (1200 W), la chaussée tombait sous 8 % de médiane au bas du cadre (P1, P6, FIN) : l'enrobé illisible
+HUMIDITE = dict(coat=0.45, coat_rough=(0.06, 0.08), puddle=(1.1, 1.6), bord=1.2, fonce=(0.62, 0.30))
 
 STYLES = {
     # la rue qui sèche : le réglage gagnant du banc ; ses flaques, celles de l'humidité commune
-    "sechage": dict(dark=0.75, wet=(0.44, 0.27), D_off=0.0, rut=2.0, film=0.0, edge=0.9, puddle=HUMIDITE["puddle"],
+    "sechage": dict(dark=0.75, wet=HUMIDITE["fonce"], D_off=0.0, rut=2.0, film=0.0, edge=0.9, puddle=HUMIDITE["puddle"],
                     cr=(0.2, 0.34), track=0.06, stream=(0.07, 0.14), walk_D=0.0, walk_cr=0.28, film_grain=0.0),
     # juste après l'averse : beaucoup plus d'eau, une pellicule continue au bas de chaque voie
     "pluie": dict(dark=0.62, wet=(0.34, 0.2), D_off=0.6, rut=3.0, film=2.4, edge=1.8, puddle=(0.3, 0.85),
@@ -229,14 +234,18 @@ def wet_coat_rough(N, coat_r):
     return N.math("MAXIMUM", N.math("ADD", coat_r, off), floor)
 
 
-def wet_shader(N, out, col, base_rough, base_n, coat_r, coat_n, alpha=None):
+def wet_shader(N, out, col, base_rough, base_n, coat_r, coat_n, alpha=None, flaque=None):
     """L'eau : une couche de vernis d'indice 1,33 sur la matière, au poids et à la rugosité de l'humidité commune
-    (HUMIDITE) ; `coat_r`, la rugosité que la matière demande (0,03 dans ses flaques, 0,2 à 0,35 sur le mouillé)."""
+    (HUMIDITE) ; `coat_r`, la rugosité que la matière demande (0,03 dans ses flaques, 0,2 à 0,35 sur le mouillé) ;
+    `flaque` (0 à 1, nombre ou prise), la part de flaque : le vernis y monte à son poids plein."""
     p = S.principled(N)
     N.set(p.inputs["Base Color"], col)
     N.set(p.inputs["Roughness"], base_rough)
     N.set(p.inputs["Normal"], base_n)
-    p.inputs["Coat Weight"].default_value = HUMIDITE["coat"]
+    if flaque is None:
+        p.inputs["Coat Weight"].default_value = HUMIDITE["coat"]
+    else:
+        N.set(p.inputs["Coat Weight"], N.mixf(flaque, HUMIDITE["coat"], 1.0))
     p.inputs["Coat IOR"].default_value = 1.33
     N.set(p.inputs["Coat Roughness"], wet_coat_rough(N, coat_r))
     N.set(p.inputs["Coat Normal"], coat_n)
@@ -252,7 +261,7 @@ def puddle_shader(N, out, alpha=None, scale=22.0, strength=0.12):
     fine. Renvoie le nœud Principled."""
     P, _ = coords(N)
     rip = ripples(N, P, scale=scale, strength=strength)
-    return wet_shader(N, out, (0.018, 0.017, 0.018, 1), 0.5, rip, 0.03, rip, alpha=alpha)
+    return wet_shader(N, out, (0.018, 0.017, 0.018, 1), 0.5, rip, 0.03, rip, alpha=alpha, flaque=1.0)
 
 
 def ripples(N, P, scale=38.0, strength=0.06):
@@ -377,6 +386,9 @@ def mat_asphalt(st, name, force_patch=False, layout=None, uv=False):
         D = N.math("ADD", D, N.math("MULTIPLY", lowhalf, st["film"]))
     p0, p1 = st["puddle"]
     w = smooth(N, D, p0, p1)                              # 0 : humide, 1 : flaque ; bord adouci
+    # les flaques seulement le long des cunettes (HUMIDITE["bord"]), jamais dans les voies
+    b = HUMIDITE["bord"]
+    w = N.math("MULTIPLY", w, smooth(N, ax, asph() - b, asph() - 0.5 * b))
     deep = smooth(N, D, p1, p1 + 0.9)                     # les flaques profondes : miroir plat
     tipdry = smooth(N, d2, 0.62, 0.85)
     # --- la peinture salie, si le plan des voies le demande (layout["grime"], de 0 à 1 ; absent, comme pour
@@ -419,7 +431,7 @@ def mat_asphalt(st, name, force_patch=False, layout=None, uv=False):
     thin = vmix(N, st["film_grain"] + 0.3, rip, base_n)    # pellicule mince : le grain perce encore
     pud_n = vmix(N, deep, thin, rip)
     coat_n = vmix(N, smooth(N, w, 0.25, 1.0), base_n, pud_n)
-    wet_shader(N, out, col, br, base_n, cr, coat_n)
+    wet_shader(N, out, col, br, base_n, cr, coat_n, flaque=w)
     return m
 
 
