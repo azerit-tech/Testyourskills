@@ -1067,9 +1067,12 @@ def p6_foreground(hidden):
 # la lanterne de y 325 à 385, celle de droite à 3° ; les trois derniers de gauche sont retirés, les trois derniers de
 # droite et celui de la pointe baissés (tête à 8 au lieu de 40, sous la lanterne à 30 ; spot à moitié)
 P6_LAMPS_FAR = (7, 8, 9)                 # J_LAMPS[7:] : y 325, 355, 385
-# les pinceaux du phare, gelés en travers de l'axe : vue du phare, la caméra est à 271,7° (image 1) puis 272,7°
-# depuis +x ; à 90° de là, ils restent à 220 m d'elle au plus près, deux traits fins de part et d'autre de la lanterne
-P6_PHARE_PHASE, P6_PHARE_VITESSE = 272.2 + 90.0, 0.0
+# les pinceaux du phare, gelés : vue du phare, la caméra est à 271,7° (image 1) puis 272,7° depuis +x. Tout
+# pinceau qui s'écarte de l'axe de la jetée part de la lanterne (au centre) et sort par un bord du cadre : en travers,
+# deux traits d'un bord à l'autre (rendus f1 et f2), près de l'axe, l'un fuit derrière le phare (court), l'autre
+# vient vers l'objectif en bande large. Le premier est gelé 12° hors de l'axe, vers le large à gauche : un trait
+# court qui monte de la lanterne (17 % de la largeur au plus) ; le second, qui viendrait vers nous, ne se voit pas
+P6_PHARE_PHASE, P6_PHARE_VITESSE = 272.2 - 180.0 + 12.0, 0.0
 
 
 def p6_phare_clear(scene):
@@ -1120,10 +1123,13 @@ def plan_P6(scene, hidden, palier="socle"):
     build_jetty(hidden, lamp_src)
     build_pointe(hidden, lamp_src, far=True, marina=(palier in ("marina", "complet")))
     # le phare (lieux.panorama) : ses pinceaux, relevés de 1° seulement et vus de la jetée sous la lanterne, barrent
-    # toujours le cadre en passant par elle. Ceux qui tournent passent tôt ou tard près de l'objectif, et l'un deux
-    # devient une large bande blanche en travers du cadre (rendus e3 et e4) ; aucune phase ne l'évite de la jetée.
-    # Ils sont donc gelés en travers de l'axe, au plus loin de la caméra (P6_PHARE_PHASE)
+    # le cadre en passant par elle ; aucune phase ni vitesse ne l'évite de la jetée (rendus e3, e4, f1, f2). Gelés,
+    # l'un fuit vers le large, l'autre est caché à la caméra (P6_PHARE_PHASE) : la lanterne se lit, pas la barre
     L.phare_tourne(bpy.data.objects["phare"], phase=P6_PHARE_PHASE, vitesse=P6_PHARE_VITESSE)
+    vers_nous = bpy.data.objects.get("phare_pinceau_1")
+    if vers_nous is not None:
+        vers_nous.visible_camera = False
+        vers_nous.visible_glossy = False         # ni son reflet sur l'enrobé mouillé
     scene.frame_start, scene.frame_end = P6.F0, P6.F0 + P6.FRAMES - 1
     frames = range(P6.F0 - 1, P6.F0 + P6.FRAMES + 1)      # une image de part et d'autre : l'obturateur du flou
     hero = L.hero()
@@ -1176,6 +1182,9 @@ def plan_P6(scene, hidden, palier="socle"):
         jets = [j, L.clone(j, "jet_2")]
         for i, r in enumerate(jets):
             M.key_object(r, frames, P6.jet(i))
+            # sans flou de bougé : à 210 m/s, l'obturateur les étirait en traînée ; nets, leur silhouette se lit
+            for o in [r] + list(r.children_recursive):
+                o.cycles.use_motion_blur = False
     except Exception as e:  # l'avion n'est qu'une silhouette au fond : sans lui le plan tient
         print(f"[P6] avions non chargés : {e!r}", flush=True)
     # la brume seulement en couloir sur la jetée, sous la caméra : sur toute la lagune, vue de 35 m, elle diffusait

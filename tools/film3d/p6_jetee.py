@@ -143,10 +143,11 @@ def patrol1_pos(t):
 # --- les hélicoptères : devant la berline, faisceaux tournés vers l'arrière et le bas, sur elle ; (x monde, y
 # devant elle, hauteur) à l'image 1. Plus loin devant que la fiche (+16, +24, +38 m) : à +16 m, le premier sort du
 # cadre par la gauche, et la caméra montée reportait les autres vers 85 % de la hauteur ; à +30, +40 et +55 m, 71 à
-# 83 %. En x, ils s'étagent à 33, 77 et 58 % de la largeur, à 12 points au moins du phare (46 %), et laissent passer
+# 83 %. En x, ils s'étagent à 22, 77 et 58 % de la largeur, à 12 points au moins du phare (46 %), hors du chemin
+# des avions à l'écran (à 72 et x 77,5, le premier se confondait avec l'un d'eux), et laissent passer
 # les avions à 15 m au moins. Ils descendent de 2 à 2,5 m
 # pendant la montée de la caméra (vers la pointe, où FIN en pose un à 8 m)
-HELIS = [(77.0, 30.0, 8.0), (92.0, 40.0, 9.5), (86.0, 55.0, 12.0)]
+HELIS = [(73.5, 30.0, 8.0), (92.0, 40.0, 9.5), (86.0, 55.0, 12.0)]
 HELI_DROP = [2.0, 2.0, 2.5]
 
 
@@ -169,16 +170,19 @@ def beam_target(t):
 
 
 # --- les avions, l'événement du plan (la fiche) : de derrière la caméra (venus du port), au-dessus d'elle à
-# l'image 18 ; ils entrent grands par le haut du cadre vers l'image 25 (au-dessus de 88 % pendant 6 et 5 images,
-# AIR_ENTRY au plus : la tolérance de P6 dans test_motion.CAM_LIMITS_PLAN), puis filent vers la pointe en
-# rapetissant, sous 88 % ; au-dessus d'elle à l'image 42 (210 m/s), ils s'écartent (cap ±25°) et montent de 6 m
-# au-dessus de la mer. (x, z, cap de sortie.) Écarts à la fiche : au-dessus de la caméra à l'image 18 et non 24 :
-# à 24 mm et site -8°, un avion à 22 m de haut n'entre dans le cadre que 25 m devant elle, 0,2 s après l'avoir
-# passée (à l'image 25, on ne les voyait qu'à 30) ; un peu plus bas et plus écartés (24 et 28 m, x 70 et 90 dans la
-# fiche) : à 28 m, le second restait 12 images en haut du cadre ; ils passent à 15 m au moins des hélicoptères
-JETS = [(72.0, 22.0, 25.0), (95.0, 24.0, -25.0)]
+# l'image 15 ; ils entrent par le haut du cadre aux images 21 et 20 (au-dessus de 88 % pendant 3 et 5 images,
+# AIR_ENTRY au plus : la tolérance de P6 dans test_motion.CAM_LIMITS_PLAN), puis se lisent sous 88 % de l'image
+# 25 à la fin : à 84 m de l'objectif à l'image 26 (un sixième de la largeur), ils filent vers la pointe en
+# rapetissant ; au-dessus d'elle à l'image 39 (210 m/s), ils s'écartent (cap ±25°) et montent de 6 m au-dessus de
+# la mer. (x, z, cap de sortie.) Écarts à la fiche : au-dessus de la caméra à l'image 15 et non 24 : à 24 mm et
+# site -8°, un avion à 22 m de haut n'entre dans le cadre que 25 m devant elle et ne passe sous 88 % que 70 m
+# devant (à l'image 24, on ne les voyait qu'à 30, et à 26 encore en haut du cadre, flous) ; un peu plus bas et plus
+# écartés (x 66 et 95, 22 et 24 m ; x 70 et 90, 24 et 28 m dans la fiche) : à 28 m, le second restait 12 images en
+# haut du cadre ; ils passent à 15 m au moins des hélicoptères. scene_d leur retire le flou de bougé : une
+# silhouette nette
+JETS = [(66.0, 22.0, 25.0), (95.0, 24.0, -25.0)]
 JET_V = 210.0
-JET_OVER_CAM, JET_TURN = 18, 42
+JET_OVER_CAM, JET_TURN = 15, 39
 JET_CLIMB = 6.0
 AIR_ENTRY = 8
 
@@ -222,7 +226,7 @@ SITE0, SITE1 = -8.0, -21.0
 CRANE_F0 = 10
 LENS = 24.0
 SHAKE_BASE = 0.12                   # degrés, à 24 mm
-SHAKE_JETS = 0.30                   # au passage des avions, images 16 à 28
+SHAKE_JETS = 0.30                   # au passage des avions, images 13 à 25
 
 
 def ramp_cos(t, t0, t1):
@@ -266,9 +270,9 @@ def camera_rail(t):
 
 
 def jet_noise(t):
-    """Le souffle des avions, qui passent au-dessus de la caméra à l'image 18 : une bosse sur les images 16 à 28
-    (0 à 1), à plein de 20 à 24."""
-    return M.smoothstep(M.t_of(16), M.t_of(20), t) * (1.0 - M.smoothstep(M.t_of(24), M.t_of(28), t))
+    """Le souffle des avions, qui passent au-dessus de la caméra à l'image 15 : une bosse sur les images 13 à 25
+    (0 à 1), à plein de 17 à 21."""
+    return M.smoothstep(M.t_of(13), M.t_of(17), t) * (1.0 - M.smoothstep(M.t_of(21), M.t_of(25), t))
 
 
 def camera(t):
