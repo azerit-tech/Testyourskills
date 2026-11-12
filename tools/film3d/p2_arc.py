@@ -113,17 +113,18 @@ def p1_s(t):
     return P1_S0 + SPEED * t - ba * _ramp_int(t, b0, bd) + pa * _ramp_int(t, p0, pd)
 
 
-# --- la patrouille 2 : elle descend l'avenue nord (x = P2_X) et, juste avant la première image, débouche de la
-# bouche nord en glissant : sa route s'incurve vers le sud-ouest (une courbe de Bézier de P2_PATH, tangente à
-# l'avenue), sa caisse se met en travers, elle s'arrête sur l'anneau, à l'ouest de l'îlot (hors de ses palmiers
-# vus de la caméra), à 8,5 m de la route de la berline ; elle repart vers l'ouest à P2_T_GO. Sous la caméra haute, de l'image 1 à 14, elle glisse
-# en travers devant à droite pendant que la berline arrive sur elle, puis sort du cadre par la droite : la berline
-# passe à l'intérieur, la patrouille l'a ratée.
+# --- la patrouille 2 : elle descend l'avenue nord (x = P2_X), débouche de la bouche nord en glissant (sa route
+# s'incurve vers le sud-ouest, une courbe de Bézier de P2_PATH tangente à l'avenue, sa caisse se met en travers) et
+# finit sa glisse sur l'anneau, à l'ouest de l'îlot, à 8,5 m de la route de la berline ; elle repart vers l'ouest à
+# P2_T_GO. Sa glisse commence avant le plan : plus tôt, de la caméra, elle était derrière les palmiers de l'îlot.
+# Sous la caméra haute, de l'image 1 à 16, elle glisse ses 2 derniers mètres en travers, devant à droite, au-dessus
+# du toit de la berline qui arrive sur elle ; elle sort du cadre par la droite vers 20 : la berline passe à
+# l'intérieur, la patrouille l'a ratée.
 P2_X = -8.5
 P2_PATH = ((P2_X, 48.0), (P2_X, 41.0), (-15.0, 35.5))     # le début de la glisse, le point de contrôle, l'arrêt
 P2_DECEL = 8.0              # m/s² en glissant
-P2_T_SKID = t_of(-8)        # le début de la glisse (avant le plan)
-P2_TURN = (t_of(-4), t_of(12), 95.0)    # la caisse tourne de la descente (cap 180) à presque en travers (85)
+P2_T_SKID = t_of(-30)       # le début de la glisse (avant le plan)
+P2_TURN = (t_of(-20), t_of(6), 95.0)    # la caisse tourne de la descente (cap 180) à presque en travers (85)
 P2_T_GO, P2_GO = t_of(44), 3.0              # le départ, vers l'ouest (-x)
 
 
@@ -144,7 +145,7 @@ def _p2_table(n=200):
 _P2_ACC = _p2_table()
 P2_LEN = _P2_ACC[-1]                            # 14,4 m de glisse
 P2_V0 = math.sqrt(2 * P2_DECEL * P2_LEN)        # 15,2 m/s (55 km/h) dans l'avenue
-P2_T_STOP = P2_T_SKID + P2_V0 / P2_DECEL        # l'arrêt, à l'image 37
+P2_T_STOP = P2_T_SKID + P2_V0 / P2_DECEL        # l'arrêt, à l'image 16
 P2_STOP = P2_PATH[2]
 
 
@@ -204,7 +205,7 @@ def patrol1_heading(t):
 
 
 def tracks_heading():
-    """{nom: cap(t)} des caisses des patrouilles (la 2 s'arrête de l'image 34 à 44)."""
+    """{nom: cap(t)} des caisses des patrouilles (la 2 s'arrête de l'image 16 à 44)."""
     return {"patrol_1": patrol1_heading, "patrol_2": patrol2_heading}
 
 
