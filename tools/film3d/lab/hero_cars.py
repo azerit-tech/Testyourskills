@@ -58,14 +58,17 @@ def usure():
 # couleurs d'époque, choisies sur les nuanciers des photographies : foncées, lisibles à l'heure bleue,
 # distinctes de la patrouille (marine presque noir) et du coupé actuel (prune)
 PAINT = {
-    "w111": "#330516",  # bordeaux profond (rouge rubis foncé du catalogue des années 60), tiré vers le pourpre
-                        # pour ne pas virer à la brique sous les lampadaires ambre ; éclairci et saturé à teinte égale
-                        # (#2c0614 d'abord, brun-noir de profil et violet de trois quarts arrière à l'heure bleue)
+    "w111": "#4e0a28",  # bordeaux profond (rouge rubis foncé du catalogue des années 60), tiré vers le pourpre
+                        # pour ne pas virer à la brique sous les lampadaires ambre. Albédo relevé (rouge linéaire
+                        # 0,075 au lieu de 0,033), vert presque nul (pas d'orange sous l'ambre), bleu au quart du
+                        # rouge (lie-de-vin et pas rose sous le crème) : #330516 était une silhouette noire de nuit,
+                        # #5a0c22 (métal 0,25) tire au rouge vif ; avant : #2c0614, brun-noir à l'heure bleue
     "slc": "#0c2a24",   # vert sapin foncé, teinte courante du coupé dans les années 70, tiré vers le bleu
                         # pour ne pas virer à l'olive sous les lampadaires ambre
 }
-# la part métallique de la base de la berline (moins que la peinture par défaut : la part diffuse garde le rouge)
-PAINT_METAL = {"w111": 0.38}
+# la part métallique de la base de la berline (moins que la peinture par défaut : la part diffuse garde le rouge ;
+# 0,38 d'abord, la caisse ne renvoyait que son environnement)
+PAINT_METAL = {"w111": 0.2}
 
 
 def w111_paint():
