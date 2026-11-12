@@ -766,7 +766,8 @@ def headlight_spots(body, points, on=True, energy=HEAD_W, color=HEAD_CODES, angl
     """Deux phares en codes vers l'avant (+x), plongeant de HEAD_TILT, aux points donnés (repère du véhicule) : le
     cône blanc chaud sur la chaussée devant la voiture, qui s'éteint avec la distance. Sans reflet propre
     (visible_glossy) : sur le mouillé et les carrosseries, c'est le verre du phare qui se reflète ; le reflet du spot
-    faisait une nappe écrêtée sur la chaussée. Sans diffusion dans les volumes (la brume ne fait pas de cône blanc)."""
+    faisait une nappe écrêtée sur la chaussée. Sans diffusion dans les volumes (la brume ne fait pas de cône blanc).
+    Invisible à la caméra : Cycles montre une lampe ponctuelle comme une petite sphère ; c'est le verre qui se voit."""
     out = []
     if not on:
         return out
@@ -785,6 +786,7 @@ def headlight_spots(body, points, on=True, energy=HEAD_W, color=HEAD_CODES, angl
         ob.rotation_euler = (0.0, math.radians(-(90.0 - HEAD_TILT)), 0.0)
         ob.visible_glossy = False
         ob.visible_volume_scatter = False
+        ob.visible_camera = False
         out.append(ob)
     return out
 
@@ -876,6 +878,7 @@ def lightbar_lights(bar, energy=BAR_LIGHT):
             ob.location = loc
             ob.visible_glossy = False
             ob.visible_volume_scatter = False
+            ob.visible_camera = False
             ob.light_linking.receiver_collection = shell
             out.append(ob)
     bar_drive_lenses(bar, {"corail": out[0].data, "lilas": out[2].data})
@@ -920,6 +923,7 @@ def tail_lights(body, points, on=True, energy=6.0):
         ob.location = p
         ob.visible_glossy = False
         ob.visible_volume_scatter = False
+        ob.visible_camera = False
         out.append(ob)
     return out
 
