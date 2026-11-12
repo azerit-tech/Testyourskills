@@ -1078,6 +1078,172 @@ def hands_up_keys(root, f0, f1):
     return arm
 
 
+def driver_pane(root):
+    """Le carreau de la portière du conducteur : parmi les faces de vitre de la caisse et de ses enfants (l'objet
+    des vitres, propriété « vitre », en entier ; ailleurs, les faces dont la matière porte « glass », les carreaux
+    de côté restant dans les portières), les îlots dont le centre est à gauche du conducteur, à hauteur de sa tête
+    et à sa hauteur dans la longueur de la voiture (la vitre avant, pas l'arrière). Renvoie (objet, indices des
+    faces, boîte du carreau en espace armature du conducteur : (min, max)), ou None."""
+    import cast_people as cp
+    body = bpy.data.objects[root["body"]]
+    arm = hero_driver(root)
+    if arm is None:
+        return None
+    bpy.context.view_layer.update()
+    head = cp.pb(arm, "Head").head.copy()
+    Mi = arm.matrix_world.inverted()
+    log = os.environ.get("FILM3D_VITRES_LOG")
+    for g in [o for o in [body] + list(body.children_recursive) if o.type == "MESH"]:
+        me = g.data
+        if g.get("vitre"):
+            glass = None
+        else:
+            glass = {i for i, m in enumerate(me.materials) if m and "glass" in m.name.lower()}
+            if not glass:
+                continue
+        bm_ = bmesh.new()
+        bm_.from_mesh(me)
+        bm_.faces.ensure_lookup_table()
+        seen, picked, lo, hi = set(), [], None, None
+        if glass is not None:
+            seen = {f.index for f in bm_.faces if f.material_index not in glass}
+        for f in bm_.faces:
+            if f.index in seen:
+                continue
+            stack, isl = [f], []
+            seen.add(f.index)
+            while stack:
+                c = stack.pop()
+                isl.append(c)
+                for e in c.edges:
+                    for nf in e.link_faces:
+                        if nf.index not in seen:
+                            seen.add(nf.index)
+                            stack.append(nf)
+            pts = [Mi @ (g.matrix_world @ v.co) for c in isl for v in c.verts]
+            mn = Vector((min(p.x for p in pts), min(p.y for p in pts), min(p.z for p in pts)))
+            mx = Vector((max(p.x for p in pts), max(p.y for p in pts), max(p.z for p in pts)))
+            c = (mn + mx) / 2
+            # à gauche du conducteur (+x de l'armature), plutôt mince en x (une vitre de côté), à hauteur de tête,
+            # pas plus loin que 0,35 m derrière ni 0,9 m devant lui (-y : l'avant)
+            if log:
+                print(f"[lieux] {g.name} îlot {len(isl)} faces : centre {tuple(round(v, 2) for v in c - head)} "
+                      f"(depuis la tête), taille {tuple(round(v, 2) for v in mx - mn)}", flush=True)
+            if c.x > head.x + 0.2 and (mx.x - mn.x) < 0.2 and abs(c.z - head.z) < 0.45 and -0.9 < c.y - head.y < 0.35:
+                picked += [x.index for x in isl]
+                lo = mn if lo is None else Vector(map(min, lo, mn))
+                hi = mx if hi is None else Vector(map(max, hi, mx))
+        bm_.free()
+        if picked:
+            return g, picked, (lo, hi)
+    return None
+
+
+def lower_driver_window(root):
+    """Baisse la vitre du conducteur : son carreau (driver_pane) est retiré de l'objet des vitres de la scène
+    (le maillage est d'abord rendu propre à cet objet : lab/hero_cars.py n'est pas touché). Renvoie la boîte du
+    carreau en espace armature du conducteur (l'ouverture), ou None."""
+    found = driver_pane(root)
+    if not found:
+        print("[lieux] vitre du conducteur introuvable", flush=True)
+        return None
+    g, faces, box = found
+    if g.data.users > 1:
+        g.data = g.data.copy()
+    bm_ = bmesh.new()
+    bm_.from_mesh(g.data)
+    bm_.faces.ensure_lookup_table()
+    bmesh.ops.delete(bm_, geom=[bm_.faces[i] for i in faces], context="FACES")
+    bm_.to_mesh(g.data)
+    bm_.free()
+    root["vitre_baissee"] = [tuple(box[0]), tuple(box[1])]
+    print(f"[lieux] vitre du conducteur baissée : {len(faces)} faces, ouverture {tuple(round(c, 2) for c in box[0])} "
+          f"→ {tuple(round(c, 2) for c in box[1])}", flush=True)
+    return box
+
+
+def hands_out(root, out=1.0, lean=26.0, twist=34.0, reach=(0.30, 0.06), rise=(0.0, -0.12), back=0.10, gap=-0.12,
+              palm=0.7, spread=26.0):
+    """La reddition au volant : les deux avant-bras sortis par la vitre baissée du conducteur (lower_driver_window
+    d'abord), mains ouvertes levées, doigts écartés, détachées du flanc de la caisse. La main gauche (côté
+    portière) sort de `reach[0]` au-delà du plan de la vitre, `back` derrière la tête (vers la caméra de FIN, loin
+    du rétroviseur) ; la droite, qui traverse l'habitacle, sort de `reach[1]`, `gap` plus en avant (négatif : en
+    arrière, contre le montant arrière de la vitre, sur la capuche sombre : les deux mains bien séparées vues de
+    derrière). `rise` : la hauteur de chaque poignet par rapport au haut de l'ouverture (au-dessus, les mains
+    dépassent du pavillon et se lisent aussi de face, côté passager). Les paumes regardent l'arrière, tournées de
+    `palm` vers le dehors (la caméra de FIN, derrière à gauche, les voit de face). Le buste penche vers la
+    portière (`lean`) et tourne (`twist`) pour que la main droite atteigne la vitre ; la tête reste dedans. `out`
+    (0..1) : en dessous de 1, les poignets juste en deçà de la vitre, à mi-hauteur (la clé intermédiaire de
+    hands_out_keys, pour que les bras ne traversent pas la portière), 1, dehors. Renvoie l'écart de portée par
+    main (m, 0 si atteinte)."""
+    import cast_people as cp
+    arm = hero_driver(root)
+    if arm is None:
+        print("[lieux] pas de conducteur : mains dehors impossibles", flush=True)
+        return None
+    box = root.get("vitre_baissee")
+    if box is None:
+        box = lower_driver_window(root)
+    if box is None:
+        return None
+    lo, hi = Vector(box[0]), Vector(box[1])
+    cp.reset_pose(arm)
+    cp._seat(arm, recline=6)
+    cp._upd()
+    head = cp.pb(arm, "Head").head.copy()
+
+    def right_x():
+        cp._upd()
+        return cp.pb(arm, "RightArm").head.x
+    # le sens des rotations de colonne n'est pas supposé : on garde celui qui porte l'épaule droite vers la portière
+    for kw in ({"deg_side": lean}, {"deg_twist": twist}):
+        x0 = right_x()
+        cp._spine_bend(arm, 0.0, **kw)
+        if right_x() < x0:
+            cp._spine_bend(arm, 0.0, **{k: -2.0 * v for k, v in kw.items()})
+    cp._upd()
+    h = hi.z - lo.z
+    gaps = {}
+    # +y de l'armature : l'arrière
+    for s, r, dy, z, pole in (("Left", reach[0], back, hi.z + rise[0], cp.D * 1.0 + cp.F * 0.2),
+                              ("Right", reach[1], back - gap, hi.z + rise[1], cp.D * 1.0 + cp.R * 0.3 + cp.F * 0.2)):
+        if out < 1.0:
+            target = Vector((lo.x - 0.04, head.y + dy, lo.z + h * 0.55))
+        else:
+            target = Vector((hi.x + r, head.y + dy, z))
+        gaps[s] = round(max(0.0, cp.two_bone(arm, s + "Arm", s + "ForeArm", s + "Hand", target, pole)), 3)
+        cp.set_hand(arm, s, (cp.U + cp.L * 0.15).normalized(), (cp.B + cp.L * palm).normalized())
+        cp.curl(arm, s, angles=(3, 5, 2), thumb=(-14, 5, 5), spread=spread)
+    cp._head_look(arm, (cp.F + cp.D * 0.05).normalized())
+    cp._upd()
+    if os.environ.get("FILM3D_VITRES_LOG"):
+        hd = cp.pb(arm, "Head").head
+        ref = Vector((hi.x, head.y, hi.z))
+        print(f"[lieux] mains dehors : tête à {round(lo.x - hd.x, 3)} m du plan intérieur de la vitre ; poignets "
+              + ", ".join(f"{s_} {tuple(round(c, 2) for c in cp.pb(arm, s_ + 'Hand').head - ref)}"
+                          for s_ in ("Left", "Right")) + " (depuis le bord extérieur haut, à l'aplomb de la tête)",
+              flush=True)
+    return gaps
+
+
+def hands_out_keys(root, f0, f1, **kw):
+    """Les mains sortent par la vitre : une clé sur la pose assise à `f0` (les mains au volant), une à mi-chemin
+    sur hands_out(out=0) (poignets levés juste derrière la vitre, pour que les bras ne traversent pas la
+    portière), une sur hands_out à `f1` ; 6 à 8 images entre f0 et f1, sans à-coup (courbes de Bézier). La vitre
+    est baissée dès la pose de la scène."""
+    arm = hero_driver(root)
+    if arm is None:
+        print("[lieux] pas de conducteur : mains dehors impossibles", flush=True)
+        return None
+    lower_driver_window(root)
+    key_pose(arm, f0)
+    hands_out(root, out=0.0, **kw)
+    key_pose(arm, round(f0 + (f1 - f0) * 0.5))
+    hands_out(root, **kw)
+    key_pose(arm, f1)
+    return arm
+
+
 def patrol(name="patrol", lights_on=True):
     """La patrouille choisie (pare-buffle, grille d'habitacle : cast_vehicles.load_patrol « jeandiz »),
     rampe corail et lilas allumée, phares et feux arrière. Renvoie le rig."""
