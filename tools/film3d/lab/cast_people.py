@@ -17,8 +17,9 @@
 # _skin_to_bone (vérifiée en chiffres seulement, suit la tête dans les trois poses), les styles 1 et 2 de
 # pose_officer, le buste à 20° du « crouch », la coupe des faces étirées du sweat (_cut_stretched, vue en
 # Workbench), et dans cast_people_render.py : l'habitacle repris de cast.py et la planche « situation ».
-# Au 12 nov. : matières et visages des agents vérifiés au banc (lab/people_bench.py, 256 éch.) :
-# agents de face, de trois quarts et de dos, en joue, accroupis et en garde, sous des phares puis des néons.
+# Au 12 nov. : matières, visages et conducteur vérifiés au banc (lab/people_bench.py, 256 éch.) :
+# agents de face, de trois quarts et de dos, en joue, accroupis et en garde, sous des phares puis des néons ;
+# conducteur au volant et mains levées, seul et derrière le pare-brise de la berline.
 #
 # Les modèles (licences CC0 / CC BY, crédits dans le rapport du laboratoire) sont
 # lus dans $FILM3D_ASSETS/cast/<dossier>/. Aucun code venu d'un téléchargement
@@ -275,15 +276,42 @@ def mat_plate():
     return N.done("ppl_plate", lin("#8d8b86"))
 
 
-def mat_cotton():
-    """Coton noir mat du sweat à capuche : presque noir, très rugueux, un voile de duvet (sheen)."""
-    return _principled("ppl_cotton_black", lin("#151517"), 0.92, sheen=0.2, spec=0.3, bump=0.25, bump_scale=1400)
+def mat_cotton(nrm=None, name="ppl_cotton_black"):
+    """Coton noir mat du sweat à capuche : presque noir, très rugueux, un duvet léger (sheen) qui dessine les
+    formes, le grain du jersey ; les plis d'une carte de normales si on en donne une (la capuche scannée). Pas
+    celle du corps : c'est la carte d'un uniforme, poches et écusson compris."""
+    m = _cached(name)
+    if m:
+        return m
+    N = _Nodes(name)
+    N.tinted(lin("#26262a"), 0.8, 1.1, scale=6.0)
+    N.link(N.noise(25.0, 2.0, 0.84, 0.96), N.p.inputs["Roughness"])
+    _set(N.p, spec=0.25, sheen=0.35, sheen_rough=0.45, sheen_tint=lin("#9a9aa2"))
+    N.normal(nrm, 0.8, bumps=((2200.0, 0.3, 0.0003), (140.0, 0.18, 0.0015)))
+    return N.done(name, lin("#26262a"))
+
+
+def mat_void():
+    """Le dedans de la capuche, là où serait le visage : un noir de velours sans reflet. Il garantit qu'aucun
+    visage ne se lit, même sous des phares de face qui entrent droit dans la capuche."""
+    m = _cached("ppl_hood_void")
+    if m:
+        return m
+    N = _Nodes("ppl_hood_void")
+    _set(N.p, base=lin("#030303"), rough=1.0, spec=0.0)
+    return N.done("ppl_hood_void", lin("#030303"))
 
 
 def mat_leather():
     """Cuir noir des gants : satiné, un grain fin ; peu de vernis (à 0,4 de rugosité et 0,3 de vernis, sous des
     phares de face, les gants brillaient comme du latex et blanchissaient derrière le pare-brise)."""
     return mat_leather_tex("ppl_leather_black", lin("#0d0d0e"), rough=0.58, coat=0.08)
+
+
+def mat_glove_driver():
+    """Les gants du conducteur : cuir fauve clair (albédo vers 0,3), satiné. Noirs, ils disparaissaient derrière le
+    reflet du ciel dans le pare-brise : les mains levées sont le sens du plan final, elles doivent se lire."""
+    return mat_leather_tex("ppl_glove_tan", lin("#b39575"), rough=0.6, coat=0.05)
 
 
 def mat_navy():
@@ -1567,6 +1595,7 @@ def load_officer(variant="spp", name=None, look=0):
 def _add_hood(arm, meshes, path, yaw_deg=0.0):
     """Route B : une capuche (vêtement séparé) posée sur la tête, liée à l'os de la tête, coton noir."""
     hm = _static(path)
+    nrm = _orig_images(hm[0].data.materials[0] if hm and hm[0].data.materials else None).get("normal")
     hood = _join(hm, "hood")
     if yaw_deg:
         hood.data.transform(Matrix.Rotation(math.radians(yaw_deg), 4, "Z"))
@@ -1578,7 +1607,8 @@ def _add_hood(arm, meshes, path, yaw_deg=0.0):
     hood.data.transform(Matrix.Scale(s, 4) @ Matrix.Translation(-c))
     hood.location = Vector((top.x, top.y + 0.02, top.z + 0.03))
     _upd()
-    _set_all(hood, mat_cotton())
+    # les plis du vêtement scanné (sa carte de normales), pas son tartan
+    _set_all(hood, mat_cotton(nrm, name="ppl_cotton_hood") if nrm is not None else mat_cotton())
     _skin_to_bone(hood, arm, pb(arm, "Head").name)
     return hood
 
@@ -1648,7 +1678,7 @@ def _cut_stretched(arm, meshes, ratio=2.2, min_len=0.05):
 
 
 def load_driver(variant="hooded", name=None):
-    """Le conducteur : capuche relevée, tout en coton noir mat, gants de cuir noir, aucune peau.
+    """Le conducteur : capuche relevée, tout en coton noir mat, gants de cuir fauve clair, aucune peau.
     Renvoie l'objet armature."""
     spec = DRIVERS[variant]
     arm, meshes = _import(spec["path"])
@@ -1658,18 +1688,28 @@ def load_driver(variant="hooded", name=None):
     _calibrate_palms(arm)
     if spec["route"] == "R":
         _cut_stretched(arm, meshes)
-    cotton, leather = mat_cotton(), mat_leather()
+    cotton, leather, void = mat_cotton(), mat_glove_driver(), mat_void()
     for ob in list(meshes):
         names = " ".join(m.name.lower() for m in ob.data.materials if m)
         if spec["route"] == "B" and re.search(r"eye|lash", names):
             bpy.data.objects.remove(ob)
             meshes.remove(ob)
             continue
+        if spec["route"] == "B":
+            # le corps de Tuzzy est livré en faces à sommets séparés : soudé et relissé, plus de facettes
+            _smooth_mesh(ob, weld=True)
         hands = _hand_faces(ob, arm, 0.45)
-        classes = ["glove" if p.index in hands else "cotton" for p in ob.data.polygons]
-        _assign_by_faces(ob, classes, {"cotton": cotton, "glove": leather})
+        # le visage, les oreilles, les cheveux (les faces pesées sur la tête) : le noir sans reflet du fond de
+        # la capuche ; aucun visage ne se lit, même sous des phares de face
+        head = (_bone_faces(ob, arm, ("Head", "HeadTop_End"), 0.5) - hands) if spec.get("hood") else set()
+        classes = ["glove" if p.index in hands else "void" if p.index in head else "cotton" for p in ob.data.polygons]
+        _assign_by_faces(ob, classes, {"cotton": cotton, "glove": leather, "void": void})
     if spec.get("hood"):
         meshes.append(_add_hood(arm, meshes, spec["hood"], spec.get("hood_yaw", 0.0)))
+    if spec["route"] == "B":
+        for o in meshes:
+            if o.name != "hood":
+                _smooth_mesh(o, weld=False, subsurf=1)
     arm.name = name or f"driver_{variant}"
     arm["variant"] = variant
     arm["route"] = spec["route"]
