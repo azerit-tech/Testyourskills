@@ -334,17 +334,22 @@ def views(veh, root):
         "calandre": ((0.3, mx.y + 1.6, 0.75), Vector((0, mx.y - 0.3, H * 0.36)), 35.0),
         "coffre": ((0.3, mn.y - 1.8, H * 0.95), Vector((0, mn.y + 0.5, H * 0.55)), 35.0),
     }
-    for dd in (1, 3, 6):
-        # trois quarts arrière : son flanc droit, côté arrière, à dd m devant à gauche (25°), caméra tournée de 12°
-        q = Vector((mx.x, mn.y + 0.25 * L, 0.6))
-        cpos = q + dd * Vector((math.sin(math.radians(25)), -math.cos(math.radians(25)), 0.0))
-        yaw = math.radians(12)
-        out[f"amorce{dd}"] = (tuple(cpos), cpos + 10 * Vector((-math.sin(yaw), math.cos(yaw), 0.08)), 24.0)
-        # de flanc, plus en arrière : la roue arrière à 37° sur la gauche, caméra tournée de 30°
-        q = Vector((mx.x, mn.y + 0.2 * L, 0.6))
-        cpos = q + dd * Vector((math.sin(math.radians(37)), -math.cos(math.radians(37)), 0.0))
-        yaw = math.radians(30)
-        out[f"flanc{dd}"] = (tuple(cpos), cpos + 10 * Vector((-math.sin(yaw), math.cos(yaw), 0.08)), 24.0)
+    for dd in (3, 5, 8):
+        for h in (0.6, 1.5, 2.4):
+            # la patrouille 1 des caméras v3 : de trois quarts arrière, à gauche du cadre, son coin arrière droit à
+            # dd m de l'objectif (10° à gauche de l'axe), caméra à h m qui regarde la route droit devant (24 mm)
+            q = Vector((mx.x, mn.y, 0.0))
+            cpos = q + dd * Vector((math.sin(math.radians(10)), -math.cos(math.radians(10)), 0.0))
+            cpos.z = h
+            out[f"v3_{dd}_{int(h * 10):02d}"] = (tuple(cpos), Vector((cpos.x, cpos.y + 12.0, 0.9)), 24.0)
+    for dd in (5, 8):
+        # les caméras de dos d'après le verdict « trop bas » : 2,4 m de haut, plongée de 12°, 24 mm ; la patrouille
+        # 1 de trois quarts arrière à gauche du cadre, son coin arrière droit à dd m (12° à gauche de l'axe)
+        q = Vector((mx.x, mn.y, 0.0))
+        cpos = q + dd * Vector((math.sin(math.radians(12)), -math.cos(math.radians(12)), 0.0))
+        cpos.z = 2.4
+        pitch = math.radians(12)
+        out[f"haut{dd}"] = (tuple(cpos), cpos + 10 * Vector((0.0, math.cos(pitch), -math.sin(pitch))), 24.0)
     bar = find(root, "hq_lightbar")
     if bar is not None:
         bmn, bmx = extent_obj(bar)

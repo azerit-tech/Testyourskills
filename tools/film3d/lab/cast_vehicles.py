@@ -47,7 +47,9 @@ REF = os.path.join(os.path.dirname(ASSETS), "ref")
 NAVY = "#1d2747"        # caisse de la patrouille
 CREAM = "#cfc8aa"       # portières de la patrouille, filets du fourgon et de l'hélicoptère : crème rabattu (#e9e2bf
                         # brûlait en blanc sous les phares et les lampadaires, portière ouverte de FIN)
-PATROL_BODY = "#111830" # caisse de la patrouille détaillée : marine profond presque noir (sous vernis)
+PATROL_BODY = "#111830" # caisse du fourgon et de l'hélicoptère : marine profond presque noir (sous vernis)
+PATROL_PAINT = "#222d4c" # la caisse de la patrouille détaillée : le même marine, un cran plus clair, sous un vernis net
+                         # (vue de haut sur le mouillé sombre, #111830 se perdait noir sur noir)
 CORAL = "#ff6a3d"       # lentille gauche de la rampe
 LILAC = "#8d8cf0"       # lentille droite de la rampe
 LAMP = "#fff9cb"        # projecteur, phares
@@ -380,8 +382,10 @@ def mat_livery(name, bands=(), roof=None, base=NAVY, stripe=CREAM, metal=0.2, ro
     return m
 
 
-def mat_lenses(name="lightbar_lenses", strength=0.0, split_axis=1):
-    """Lentilles de rampe : corail d'un côté (coordonnée objet > 0), violet de l'autre ; strength > 0 les allume."""
+def mat_lenses(name="lightbar_lenses", strength=0.0, split_axis=1, per_m=0.0):
+    """Lentilles de rampe : corail d'un côté (coordonnée objet > 0), violet de l'autre ; strength > 0 les allume.
+    per_m > 0 : la lueur se range en modules, per_m par mètre le long de la rampe (les mêmes cellules que
+    _bar_modules) : une fente claire par module, un reste sombre entre deux."""
     m, nt, out = _mat(name)
     tc = nt.nodes.new("ShaderNodeTexCoord")
     sep = nt.nodes.new("ShaderNodeSeparateXYZ")
@@ -393,12 +397,34 @@ def mat_lenses(name="lightbar_lenses", strength=0.0, split_axis=1):
     mix.inputs[7].default_value = lin(CORAL)
     nt.links.new(side, mix.inputs["Factor"])
     p = _principled(nt, **{"Roughness": 0.08, "Transmission Weight": 0.6, "IOR": 1.5, "Emission Strength": strength})
-    nt.links.new(mix.outputs[2], p.inputs["Base Color"])
+    if per_m:
+        # un cache fumé : sa couleur pleine, éclairée par les lueurs de la rampe, refaisait le bloc entre les modules
+        smoke = nt.nodes.new("ShaderNodeMix")
+        smoke.data_type = "RGBA"
+        smoke.blend_type = "MULTIPLY"
+        smoke.inputs["Factor"].default_value = 1.0
+        nt.links.new(mix.outputs[2], smoke.inputs[6])
+        smoke.inputs[7].default_value = (0.18, 0.18, 0.18, 1.0)
+        nt.links.new(smoke.outputs[2], p.inputs["Base Color"])
+    else:
+        nt.links.new(mix.outputs[2], p.inputs["Base Color"])
     # la moitié éteinte du clignotement (motion.flash_bars, via lightbar_lights) s'éteint aussi ici
     on = _bar_on(nt, side)
     ecol = nt.nodes.new("ShaderNodeMix")
     ecol.data_type = "RGBA"
-    nt.links.new(_math(nt, "ADD", BAR_REST, _math(nt, "MULTIPLY", on, 1.0 - BAR_REST)), ecol.inputs["Factor"])
+    lvl = _math(nt, "ADD", BAR_REST, _math(nt, "MULTIPLY", on, 1.0 - BAR_REST))
+    if per_m:
+        # vue de dessus et de derrière (caméras de dos à 2,4 m), la moitié allumée luisait d'un bloc
+        cell = _math(nt, "ABSOLUTE", _math(nt, "SUBTRACT", _math(nt, "FRACT", _math(nt, "MULTIPLY", sep.outputs[split_axis], per_m)), 0.5))
+        slot = nt.nodes.new("ShaderNodeMapRange")
+        slot.clamp = True
+        slot.inputs["From Min"].default_value = 0.12
+        slot.inputs["From Max"].default_value = 0.24
+        slot.inputs["To Min"].default_value = 1.0
+        slot.inputs["To Max"].default_value = 0.12
+        nt.links.new(cell, slot.inputs["Value"])
+        lvl = _math(nt, "MULTIPLY", lvl, slot.outputs[0])
+    nt.links.new(lvl, ecol.inputs["Factor"])
     ecol.inputs[6].default_value = (0, 0, 0, 1)
     nt.links.new(mix.outputs[2], ecol.inputs[7])
     nt.links.new(ecol.outputs[2], p.inputs["Emission Color"])
@@ -763,6 +789,12 @@ def _blank_plate():
     return mat_plain("cast_plate", "#9f9c90", rough=0.5)
 
 
+def _dark_plate():
+    # la plaque de la patrouille : sombre, satinée, sans aucun signe ; claire, vue de haut sous les phares de la
+    # berline, elle se lisait en étiquette vierge collée au coffre
+    return mat_plain("cast_plate_dark", "#26282c", rough=0.32, metal=0.3)
+
+
 # ---------------------------------------------------------------- la rampe de gyrophares
 
 def lightbar(collection=None, strength=0.0, width=None):
@@ -905,7 +937,8 @@ def _bar_on(nt, side):
 
 def _bar_modules(nt, sep, zc, zh, per_m=8.5):
     """Les modules de la rampe, en coordonnées objet : un cœur par cellule le long de la rampe (y), dans la bande
-    du milieu de sa hauteur ; renvoie (cœur 0..1, réflecteur 0..1 : l'anneau autour du cœur)."""
+    du milieu de sa hauteur ; renvoie (cœur 0..1, réflecteur 0..1 : l'anneau autour du cœur, fente 0..1 : le
+    module vu à travers le dessus, une barre courte en travers par cellule)."""
     cell = _math(nt, "ABSOLUTE", _math(nt, "SUBTRACT", _math(nt, "FRACT", _math(nt, "MULTIPLY", sep.outputs[1], per_m)), 0.5))
     dz = _math(nt, "ABSOLUTE", _math(nt, "SUBTRACT", sep.outputs[2], zc))
 
@@ -925,7 +958,7 @@ def _bar_modules(nt, sep, zc, zh, per_m=8.5):
     dish = ramp(d, 0.30, 0.44)
     # le cœur ne déborde pas de la hauteur de la rampe
     core = _math(nt, "MULTIPLY", core, ramp(dz, 0.30 * zh, 0.40 * zh))
-    return core, _math(nt, "MAXIMUM", _math(nt, "SUBTRACT", dish, core), 0.0)
+    return core, _math(nt, "MAXIMUM", _math(nt, "SUBTRACT", dish, core), 0.0), ramp(cell, 0.12, 0.24)
 
 
 def mat_bar_retint(src, name, strength=0.0, zc=0.06, zh=0.12):
@@ -972,7 +1005,25 @@ def mat_bar_retint(src, name, strength=0.0, zc=0.06, zh=0.12):
     for l in list(p.inputs["Metallic"].links):
         nt.links.remove(l)
     p.inputs["Metallic"].default_value = 0.0
-    core, refl = _bar_modules(nt, sep, zc, zh)
+    core, refl, slot = _bar_modules(nt, sep, zc, zh)
+    # le dessus de la rampe (normale vers le haut) : vu de la caméra de dos à 2,4 m, toute la moitié allumée y
+    # luisait d'un bloc ; il ne montre plus que ses modules, une fente claire par cellule, séparées par du sombre
+    nrm = nt.nodes.new("ShaderNodeSeparateXYZ")
+    nt.links.new(tc.outputs["Normal"], nrm.inputs[0])
+    up = nt.nodes.new("ShaderNodeMapRange")
+    up.clamp = True
+    up.inputs["From Min"].default_value = 0.5
+    up.inputs["From Max"].default_value = 0.8
+    nt.links.new(nrm.outputs[2], up.inputs["Value"])
+    up = up.outputs[0]
+    side_w = _math(nt, "SUBTRACT", 1.0, up)
+    core = _math(nt, "ADD", _math(nt, "MULTIPLY", core, side_w), _math(nt, "MULTIPLY", _math(nt, "MULTIPLY", slot, up), 0.7))
+    refl = _math(nt, "MULTIPLY", refl, side_w)
+    diffuse = _math(nt, "MULTIPLY", BAR_DIFFUSE, _math(nt, "SUBTRACT", 1.0, _math(nt, "MULTIPLY", up, 0.75)))
+    # et le diffuseur se tient aux coupelles : entre deux modules, un quart de sa lueur (la moitié allumée ne
+    # se lit plus en aplat, de dos à 5-8 m)
+    dish = _math(nt, "MINIMUM", _math(nt, "ADD", refl, core), 1.0)
+    diffuse = _math(nt, "MULTIPLY", diffuse, _math(nt, "ADD", 0.25, _math(nt, "MULTIPLY", dish, 0.75)))
     # l'optique : un diffuseur fumé verni sur des réflecteurs chromés (visibles éteinte), à peine teinté de sa couleur
     tint = nt.nodes.new("ShaderNodeMix")
     tint.data_type = "RGBA"
@@ -995,7 +1046,7 @@ def mat_bar_retint(src, name, strength=0.0, zc=0.06, zh=0.12):
         nt.links.new(side, col.inputs["Factor"])
         col.inputs[6].default_value = LILAC_CORE
         col.inputs[7].default_value = CORAL_CORE
-        level = _math(nt, "MULTIPLY", _math(nt, "ADD", core, BAR_DIFFUSE),
+        level = _math(nt, "MULTIPLY", _math(nt, "ADD", core, diffuse),
                       _math(nt, "ADD", BAR_REST, _math(nt, "MULTIPLY", on, 1.0 - BAR_REST)))
         ecol = nt.nodes.new("ShaderNodeMix")
         ecol.data_type = "RGBA"
@@ -1044,7 +1095,7 @@ def hq_lightbar(collection=None, strength=0.0, width=1.2):
     for i, m in enumerate(base.data.materials):
         if m is not None:
             base.data.materials[i] = mat_bar_retint(m, "hq_lightbar_shell", strength, zc=0.5 * zh, zh=zh)
-    _assign([lens], mat_lenses("hq_lightbar_lenses", strength))
+    _assign([lens], mat_lenses("hq_lightbar_lenses", strength, per_m=8.5))
     parent_keep(lens, base)
     return base, lens
 
@@ -1730,7 +1781,7 @@ def rear_plate(body, tail_pts, tag, size=(0.31, 0.155)):
     me = bpy.data.meshes.new(f"{tag}_plate")
     bm.to_mesh(me)
     bm.free()
-    me.materials.append(_blank_plate())
+    me.materials.append(_dark_plate())
     ob = bpy.data.objects.new(me.name, me)
     body.users_collection[0].objects.link(ob)
     ob.parent = body
@@ -1797,7 +1848,7 @@ def load_patrol(variant="jeandiz", collection=None, lights_on=False, livery="doo
                      core=(sum(abs(q.y) for q in hp) / len(hp), sum(q.z for q in hp) / len(hp), front_axle + 0.3))
     _replace_mats(parts, spec["paint"], lambda m: livery_over(
         m, f"{tag}_paint", _patrol_boxes(livery, front_axle), keep_uv=spec.get("keep_uv", ()),
-        base=PATROL_BODY, rough=0.36, metal=0.45, flake=True, coat=0.8, coat_rough=0.09,
+        base=PATROL_PAINT, rough=0.36, metal=0.3, flake=True, coat=1.0, coat_rough=0.035,
         lamp_strength=PATROL_HEAD_GLASS * on, lamp_zones=zones,
         # les flancs, des portières avant aux portières arrière, sous les vitres : loin des feux (aux deux bouts)
         keep_out=((front_axle - 2.9, front_axle - 0.3, 0.0, 1.05),)))
