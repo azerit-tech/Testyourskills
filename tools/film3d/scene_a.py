@@ -2293,5 +2293,8 @@ def build(plan=None, palier=None):
     print(f"[scene_a] écrit {out}", flush=True)
 
 
+build = __import__("fx").hooked(build, ("OUV", "P1"))     # les interactions de OUV et P1 (fx.py ; FILM3D_FX=0)
+
+
 if __name__ == "__main__":
     build()

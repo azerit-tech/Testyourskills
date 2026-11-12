@@ -333,6 +333,7 @@ def build(plan, palier="complet"):
     scene, hidden = L.new_scene()
     cam = PLANS[plan](scene, hidden, haubans=(palier in ("haubans", "complet")))
     scene.camera = cam
+    __import__("fx").dress(plan, scene)                 # les interactions (fx.py ; FILM3D_FX=0 les retire)
     import p4_pont as P4
     scene.frame_set(P4.STILL_FRAME if plan == "P4" else 2)
     return scene

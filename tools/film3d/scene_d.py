@@ -973,5 +973,6 @@ def build(plan, palier="complet"):
     scene, hidden = L.new_scene()
     cam = PLANS[plan](scene, hidden, palier=palier)
     scene.camera = cam
+    __import__("fx").dress(plan, scene)                 # les interactions (fx.py ; FILM3D_FX=0 les retire)
     scene.frame_set(STILL.get(plan, 2))
     return scene

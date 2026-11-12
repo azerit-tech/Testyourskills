@@ -1336,6 +1336,7 @@ def build():
                 except Exception as e:
                     log(f"halo : {e!r}")
     ANIMATE[PLAN](scene)
+    __import__("fx").dress(PLAN, scene)                     # les interactions (fx.py ; FILM3D_FX=0 les retire)
 
     out = os.path.join(ASSETS, BLEND)
     bpy.ops.wm.save_as_mainfile(filepath=out, compress=True)

@@ -542,6 +542,7 @@ def build(plan=None, palier=None):
     A.render_settings(scene)
     scene.render.use_motion_blur = True             # le flou de bougé suit les clés (obturateur 0,5)
     scene.render.motion_blur_shutter = 0.5
+    __import__("fx").dress("P2", scene)                    # les interactions (fx.py ; FILM3D_FX=0 les retire)
     if plan is not None:
         return scene
     out = os.path.join(ASSETS, BLEND)
