@@ -293,6 +293,9 @@ def camera(car, parts, view):
     # caisse vu de derrière à hauteur de pare-chocs (échappement, dessous, passages de roue), l'aile arrière de trois
     # quarts au ras du sol
     shots["dos-6m"] = ((0.0, mx.y + 6.0, 1.4), (0.0, mx.y - 1.2, 0.80), 28.0)
+    # les bornes des caméras v3 : de dos entre 5 et 9 m, de 0,6 à 2,4 m de haut
+    shots["dos-5m-bas"] = ((0.4, mx.y + 5.0, 0.6), (0.0, mx.y - 1.2, 0.70), 28.0)
+    shots["dos-9m-haut"] = ((-0.4, mx.y + 9.0, 2.4), (0.0, mx.y - 1.2, 0.70), 32.0)
     shots["dos-bas"] = ((0.35, mx.y + 2.6, 0.30), (0.0, mx.y - 0.6, 0.30), 35.0)
     shots["arche"] = ((1.75, mx.y + 0.9, 0.45), (0.80, mx.y - 1.0, 0.40), 35.0)
     shots["p4"] = ((0.0, mn.y - 45.0, 1.2), (0.0, mn.y, 0.70), 200.0)

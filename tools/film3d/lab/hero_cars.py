@@ -995,6 +995,24 @@ def add_antenna(body, chrome, at=(1.30, -0.80), height=0.78, rake=9.0):
     return ob
 
 
+def add_trunk_handle(body, chrome, z=0.727, width=0.135, height=0.024, depth=0.018):
+    """La poignée du coffre, à la place du barillet : une barre chromée oblongue aux bouts arrondis (13,5 × 2,4 cm,
+    1,8 cm de saillie), posée sur la face arrière au milieu, au-dessus de la plaque (repère de la voiture : l'arrière
+    vers -x). None si la face arrière n'est pas trouvée."""
+    at = ray_x([body], 0.0, z, False)
+    if at is None:
+        return None
+    bm = bmesh.new()
+    c = at + Vector((-(depth / 2 - 0.003), 0.0, 0.0))     # enfoncée de 3 mm dans la tôle
+    bmesh.ops.create_cube(bm, size=1.0, matrix=Matrix.Translation(c) @ Matrix.Diagonal((depth, width, height, 1)))
+    bmesh.ops.bevel(bm, geom=list(bm.edges), offset=0.45 * min(height, depth), segments=4, affect="EDGES",
+                    profile=0.5)
+    ob = _mesh_object(f"{body.name}_trunk_handle", bm, [chrome], body.users_collection[0], smooth=True)
+    _stamp_rest([ob])
+    cv.parent_keep(ob, body)
+    return ob
+
+
 # la propriété d'objet des vitres : une lumière d'appoint de scène (lieux.car_fill, les nappes liées à la voiture)
 # ne doit pas les compter parmi ses receveurs, sinon elles la renvoient en miroir
 GLASS_TAG = "vitre"
@@ -1148,6 +1166,9 @@ def _w111_clean(parts):
             # la barrette du lettrage de modèle sur le coffre (trois lames de 23 cm, d'un seul côté, à la place du
             # nom du modèle) : trop longue pour la boîte du lettrage ci-dessus, retirée à part
             n += delete_islands(o, [((0.36, 0.75), (2.29, 2.34), (0.73, 0.78))], max_size=0.25, max_verts=40)
+            # le barillet de la serrure et son anneau, au-dessus de la plaque (quatre morceaux de 2 à 4 cm) : de dos
+            # à 6 m, l'anneau se lisait comme un emblème rond ; add_trunk_handle pose une poignée oblongue à sa place
+            n += delete_islands(o, [((-0.03, 0.03), (2.31, 2.38), (0.69, 0.76))], max_size=0.06)
             report[o.name] = f"{n} morceaux supprimés"
         elif "_rim_" in o.name and "chrome" in o.name:
             # l'étoile au centre de l'enjoliveur (72 sommets, 10 cm) ; le disque nu reste
@@ -1512,6 +1533,8 @@ def load_hero(variant="w111", collection=None, lights_on=True, raw=False):
             if rear is not None:
                 pl = add_plate(f"{body.name}_plate_rear", rear, -1, size=(0.305, 0.152), coll=body.users_collection[0])
                 cv.parent_keep(pl, body)
+            handle = add_trunk_handle(body, bpy.data.materials["hero_w111_chrome"])
+            car["report"]["poignée de coffre"] = "posée" if handle else "face arrière introuvable"
             ant = add_antenna(body, bpy.data.materials["hero_w111_chrome"])
             car["report"]["antenne"] = "posée" if ant else "aile introuvable"
             car["glass"] = split_glass(body, {"hero_w111_glass"})
