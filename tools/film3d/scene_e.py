@@ -907,10 +907,12 @@ def beam_lights(main, hero, ground, ground_w):
     c.light_linking.receiver_collection = sol
 
 
-def car_fill(cam, hero, energy=350.0, size=2.5):
+def car_fill(cam, hero, energy=1400.0, size=4.0):
     """La lumière de la berline, comme sur le pont : un disque doux et crème de face, porté par la caméra (1,5 m
-    au-dessus de l'objectif, dans l'axe), qui n'éclaire qu'elle (~1 W/m² à 10 m : P ≈ π d²). Invisible à la
-    caméra et à la brume ; son reflet doux sur le vernis dessine la caisse."""
+    au-dessus de l'objectif, dans l'axe), qui n'éclaire qu'elle (~4 W/m² à 10 m : P ≈ π d²). Invisible à la
+    caméra et à la brume ; son reflet doux sur le vernis dessine la caisse. À 350 W la caisse sortait lilas
+    (moyenne 93, 52, 79 : bleu sur rouge 0,85 quand le bordeaux seul en donne 0,5) : le vernis renvoie le ciel
+    et la brume derrière la caméra, une couche bleutée qui s'ajoute ; le diffus crème doit la dominer."""
     d = bpy.data.lights.new("berline_face", "AREA")
     d.shape = "DISK"
     d.size = size
