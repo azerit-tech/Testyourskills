@@ -346,33 +346,6 @@ def mat_plain(name, color, rough=0.5, metal=0.0):
     return m
 
 
-def mat_police_body():
-    """Deux tons marine et crème, sans lettrage : portières et toit crème."""
-    m, N, out = material("police_paint")
-    co = N.sep(N.new("ShaderNodeTexCoord").outputs["Object"])
-    x, z = co[0], co[2]
-    doors = N.math("MULTIPLY", N.math("MULTIPLY", N.math("GREATER_THAN", x, -1.05), N.math("LESS_THAN", x, 0.95)),
-                   N.math("MULTIPLY", N.math("GREATER_THAN", z, 0.42), N.math("LESS_THAN", z, 0.9)))
-    roof = N.math("GREATER_THAN", z, 1.27)
-    cream = N.math("MAXIMUM", doors, roof)
-    col = N.mix(cream, lin("#1d2747"), lin("#e9e2bf"))
-    p = principled(N, **{"Metallic": 0.2, "Roughness": 0.3, "Coat Weight": 1.0, "Coat Roughness": 0.03})
-    N.link(col, p.inputs["Base Color"])
-    N.link(p.outputs[0], out.inputs[0])
-    return m
-
-
-def mat_lightbar():
-    """Feux éteints : lentilles corail d'un côté, violettes de l'autre."""
-    m, N, out = material("lightbar_lenses")
-    y = N.sep(N.new("ShaderNodeTexCoord").outputs["Object"])[1]
-    col = N.mix(N.math("GREATER_THAN", y, 0.0), lin(CORAL), lin(LILAC))
-    p = principled(N, **{"Roughness": 0.08, "Transmission Weight": 0.6, "IOR": 1.5})
-    N.link(col, p.inputs["Base Color"])
-    N.link(p.outputs[0], out.inputs[0])
-    return m
-
-
 def mat_road():
     m, N, out = material("wet_asphalt")
     tc = N.new("ShaderNodeTexCoord").outputs["Object"]
@@ -1962,36 +1935,17 @@ def build():
         sp.scale = (0.45, 1.3, 0.35)
         sp.visible_shadow = False
 
-    # --- la patrouille
-    parts = import_glb("police.glb")
-    pol_paint = mat_police_body()
-    bar = mat_lightbar()
-    # phares en veilleuse seulement : la patrouille se remarque en second
-    pol_head = mat_emit("police_headlight", lin("#fff4d6"), 2.5)
-    keep = []
-    for o in parts:
-        n = o.name
-        if "Badges" in n:
-            bpy.data.objects.remove(o)
-            continue
-        if "Numberplate" in n:
-            o.data.materials[0] = plate
-        elif "Bodymat" in n:
-            o.data.materials[0] = pol_paint
-        elif "Lightbar_Glass" in n:
-            o.data.materials[0] = bar
-        elif "Headlights001_UCB" in n:
-            o.data.materials[0] = pol_head
-        elif "Headlights_Glass" in n:
-            o.data.materials[0] = lamp_glass
-        elif "Transperent" in n:
-            o.data.materials[0] = side_glass
-        keep.append(o)
-    police = join(keep, "police")
-    recentre(police)
+    # --- la patrouille : celle de bibliothèque des autres scènes (cast_vehicles.load_patrol, l'avant vers +x dans
+    # son repère), rampe éteinte ; elle garde le nom « police »
+    lab = os.path.join(HERE, "lab")
+    if lab not in sys.path:
+        sys.path.insert(0, lab)
+    import cast_vehicles as cv
+    police = cv.load_patrol("jeandiz", lights_on=False, name="police")["body"]
+    police.name = "police"
     police.location = (POLICE_X, POLICE_Y, 0)
     police.rotation_mode = "XYZ"
-    police.rotation_euler = (0, 0, -math.pi / 2)
+    police.rotation_euler = (0, 0, -math.pi / 2)        # l'avant vers -y
 
     # --- la ville : la route, les immeubles, la rue
     build_city(hidden)
