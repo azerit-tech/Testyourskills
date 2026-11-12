@@ -575,16 +575,47 @@ def glows(points):
         o.visible_camera = False
 
 
-def aim_helis(helis, target, energy=400000.0):
+def aim_helis(helis, target, energy=400000.0, car=None, car_energy=None, cone=None):
     """Les projecteurs des hélicoptères sur la cible. À 30-40 m, les 30 kW du projecteur de cast_vehicles
     éclairent la voiture vingt fois moins que le lampadaire : on les pousse (la lumière est partagée par les
-    copies) pour que le faisceau se lise dans la brume et que la tache tombe sur la carrosserie."""
+    copies) pour que le faisceau se lise dans la brume et que la tache tombe sur la carrosserie.
+    `car` (un rig) et `car_energy` : à pleine puissance, la peinture bordeaux sortait rose, hautes lumières
+    délavées ; le faisceau principal exclut alors la voiture (liaison de lumière) et un second projecteur
+    coaxial, crème, à `car_energy`, n'éclaire qu'elle. `cone` : l'ouverture en degrés (9 par défaut)."""
     bpy.context.view_layer.update()
+    spots = []
     for r in helis:
         for o in r.children_recursive:
             if o.type == "LIGHT" and o.name.endswith("searchlight_spot"):
                 o.data.energy = energy
                 o.data.color = L.lin("#e2eaff")[:3]     # xénon, bleuté : la berline reste bordeaux sous le faisceau
+                if cone:
+                    o.data.spot_size = math.radians(cone)
+                spots.append(o)
+    if car is not None and car_energy:
+        body = [o for o in car.children_recursive if o.type == "MESH"]
+        out_c, in_c = bpy.data.collections.new("faisceau_sans_berline"), bpy.data.collections.new("faisceau_berline")
+        for o in body:
+            out_c.objects.link(o)
+            in_c.objects.link(o)
+        for co in out_c.collection_objects:
+            co.light_linking.link_state = "EXCLUDE"
+        d = None
+        for i, o in enumerate(spots):
+            o.light_linking.receiver_collection = out_c
+            if d is None:
+                d = o.data.copy()
+                d.name = "searchlight_berline"
+                d.energy = car_energy
+                d.color = L.lin("#fff0d8")[:3]     # crème : des reflets chauds sur la caisse, pas de blanc bleuté
+            c = bpy.data.objects.new(f"{o.name}_berline", d)
+            for coll in o.users_collection:
+                coll.objects.link(c)
+            c.parent = o.parent
+            c.matrix_parent_inverse = o.matrix_parent_inverse.copy()
+            c.location, c.rotation_euler = o.location.copy(), o.rotation_euler.copy()
+            c.visible_volume_scatter = False                # la brume ne voit que le faisceau principal
+            c.light_linking.receiver_collection = in_c
     for r in helis:
         piv = next((o for o in r.children_recursive if o.name.endswith("searchlight_pivot")), None)
         if piv is None:
@@ -620,11 +651,11 @@ def plan_FIN(scene, hidden, palier="socle"):
     pat = L.patrol("patrol")
     L.put(pat, pp.x, pp.y, 0.0, heading=HERO_STOP)
     L.open_door(pat, side=1, angle=80.0)
-    L.bar_pools(pat, energy=600.0)
-    # ses phares, droit sur l'objectif, voilaient le tiers bas dans la brume : baissés (veilleuses)
+    # ni flaques ni phares : à 2-6 m du sol vu par l'objectif, ses flaques de rampe et ses phares (tournés vers
+    # nous) éclairaient tout le tiers bas ; restent la rampe, ses faisceaux et ses lueurs sur la carrosserie
     for o in pat.children_recursive:
         if o.type == "LIGHT" and "_head_" in o.name:
-            o.data.energy = 90.0
+            o.data.energy = 0.0
     # les faisceaux de sa rampe partent vers l'arrière, presque à l'horizontale : vers l'avant, le corail frappait
     # le sol juste devant l'objectif et blanchissait tout le tiers bas
     L.bar_beams(pat, "patrol", yaws=((125, L.CORAL), (-125, L.LILAC)), energy=3000.0, tilt=3.0)
@@ -652,9 +683,12 @@ def plan_FIN(scene, hidden, palier="socle"):
         lp.data.energy = 1300.0
         lp.data.color = L.lin("#ffe2c2")[:3]
     # le haut du cadre : un hélicoptère au-dessus de la jetée, son projecteur sur la berline (sous la bande des 12 %)
+    # le faisceau tombe raide (44°) et serré (6°) depuis l'avant droit : son empreinte reste autour de la berline
+    # (jusqu'à 3,5 m devant elle) au lieu de s'étirer vers l'objectif ; l'hélicoptère reste dans le cadre, à
+    # droite, sous la bande des 12 %
     heli, _ = L.helicopter("heli")
-    L.put(heli, CX + 6.0, CY - 42.0, 27.0, heading=170.0, pitch=-6.0, roll=-5.0)
-    aim_helis([heli], STOP + Vector((0, 0, 0.8)), energy=200000.0)
+    L.put(heli, CX - 10.0, CY - 34.0, 34.0, heading=-20.0, pitch=-6.0, roll=5.0)
+    aim_helis([heli], STOP + Vector((0, 0, 0.8)), energy=200000.0, car=hero, car_energy=60000.0, cone=6.0)
     # la brume est réelle depuis que lieux.haze tourne ses normales vers l'extérieur : 0,0005 sur 800 m laisse la
     # ville voilée mais lisible ; la nappe locale, plus dense, prend les faisceaux et les lueurs
     L.haze((CX - 80, CX + 80), (CY - 470, CY + 60), (L.WATER_Z, 50), 0.0005)
@@ -715,7 +749,7 @@ def plan_FIN6(scene, hidden, palier="socle"):
         x, y = _polar(a, 26.0)
         L.put(r, x, y, z, heading=a + 90, pitch=-5.0, roll=8.0)
         hs.append(r)
-    aim_helis(hs, STOP + Vector((0, 0, 0.8)))
+    aim_helis(hs, STOP + Vector((0, 0, 0.8)), car=hero, car_energy=50000.0)
     try:
         j = L.jet("jet")
         L.put(j, CX + 40.0, CY - 160.0, 55.0, heading=-8.0, pitch=-3.0, roll=18.0)
