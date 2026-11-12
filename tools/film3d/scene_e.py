@@ -388,6 +388,11 @@ def build_masts(far=False):
         key = (x, y) == KEY_MAST
         Ld = bpy.data.lights.new(f"mat_port_{i}", "SPOT")
         Ld.energy = L.S.lampe_w(MAST_H)                 # un lampadaire de 25 m (lumière v3.1, règle E)
+        if key:
+            # le projecteur pointé sur le virage, à 43 m en biais : il y pose l'éclairement d'un lampadaire commun
+            # sous sa tête (la distance d, l'incidence cos i : la hauteur équivalente d / √cos i)
+            d = math.dist((x, y, MAST_H - 0.5), (*TURN_AIM, 0.0))
+            Ld.energy = L.S.lampe_w(d / math.sqrt((MAST_H - 0.5) / d))
         Ld.color = L.lin(L.S.LAMPE)[:3]
         Ld.spot_size = math.radians(50 if key else 125)
         Ld.spot_blend = 0.45 if key else 0.7
@@ -1297,26 +1302,9 @@ def plan_P5(scene, hidden, palier="conteneurs"):
         M.wheel_marks(wh, wr, axis="Y")
     n = M.flash_bars(rigs, FRAMES)
     print(f"[P5] {n} lueurs de rampe clignotantes", flush=True)
-    # la tour devant le mur qui ferme l'axe, derrière la caméra, pointée sur le milieu de la glisse
-    tour = light_tower((24.0, 81.4), Vector((6.0, 66.5, 0.6)), energy=50000.0, along_x=True)
-    # la tour n'éclaire que le sol et le mobilier du virage. Exclus : les caisses de la sortie (à 10 m sous elle,
-    # saumon et plates), la berline (~25 W/m² de crème à 16 m, six fois car_fill : elle rosissait aux images 9 à 17,
-    # le bordeaux de l'image 1 est celui de car_fill et de l'ambre de côté) et les conteneurs, qui ont leur jumelle
-    # à 10 % (dorés et vifs à droite en fin de plan, ils concurrençaient le faisceau). 50 kW au lieu de 80 : le sol
-    # du virage, très éclairé, se reflétait dans le vernis du flanc et le rosissait
-    boxes = [o for o in bpy.data.objects if o.type == "MESH" and o.name.startswith("conteneur_")]
-    exclus = bpy.data.collections.new("tour_exclus")
-    for o in bpy.data.objects:
-        if o.type == "MESH" and o.name.startswith(("caisse_", "palettes_sortie")):
-            exclus.objects.link(o)
-    for o in L.car_parts(hero, glass=True):
-        exclus.objects.link(o)
-    for o in boxes:
-        exclus.objects.link(o)
-    for co in exclus.collection_objects:
-        co.light_linking.link_state = "EXCLUDE"
-    tour.light_linking.receiver_collection = exclus
-    _twin(tour, "tour_conteneurs", 0.10 * tour.data.energy, "#fff2d6", boxes)
+    # (plus de tour d'éclairage : 50 kW crème posés pour l'ancienne caméra de face, ils faisaient à droite de la
+    # berline une nappe claire plus grande qu'elle, qui sortait du cadre (lumière v3.1, règles B et E). Le virage
+    # est éclairé par les mâts du port, des lampadaires de 25 m, KEY_MAST compris)
     # --- l'hélicoptère : il arrive de l'est au ras des piles, vire sur la berline ; son faisceau court sur la voie
     # du pont derrière elle et la rattrape (p5_virage.beam_target)
     heli, h = L.helicopter("heli")
