@@ -85,6 +85,15 @@ def test_gaps():
     check("P5 : la meute ne rattrape pas la berline", gap > 25.0, f"{gap:.1f} m au plus près")
     check("M.min_gap voit un croisement", M.min_gap({"a": lambda t: (0.0, 10 * t), "b": lambda t: (0.0, 10 - 10 * t)},
                                                     range(0, 30))[0] < 0.5)
+    # le mur de conteneurs prolongé (x -15,1 à -10,1, y 54 à 79) et les jambes du portique (x -24 et -10,6, y 81 et
+    # 95) : aucun centre de véhicule à moins de 3 m (plus sa demi-largeur, 1 m)
+    boxes = [(-15.1, -10.1, 54.0, 79.0)] + [(x - 1.0, x + 1.0, y - 1.8, y + 1.8) for x in (-24.0, -10.6)
+                                             for y in (81.0, 95.0)]
+
+    def clear(q):
+        return min(math.hypot(max(b[0] - q[0], 0, q[0] - b[1]), max(b[2] - q[1], 0, q[1] - b[3])) for b in boxes)
+    near = min(clear(fn(M.t_of(f))) for fn in P.tracks().values() for f in range(P.F0 - 1, P.F0 + P.FRAMES + 1))
+    check("P5 : rien à moins de 3 m d'un conteneur ou du portique", near >= 4.0, f"{near:.1f} m")
 
 
 def test_p2():

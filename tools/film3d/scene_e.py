@@ -634,6 +634,9 @@ def build_containers(hidden, far=False, numbers_near=None):
     W = srcs["40"][2] + BOX_GAP
     for i in range(2):                               # le mur droit (x < 0, à gauche de la voiture qui arrive)
         yd.row(-10.0 - W / 2 - i * W, 10.0, ["40", "20", "40", "40"], (4, 5) if i == 0 else 4, top_gaps=0.12)
+    for i in range(2):                               # le mur droit prolongé au nord jusqu'à la file qui ferme l'axe :
+        # dans l'axe du panoramique de P5, il tient le haut du cadre et l'hélicoptère en sort
+        yd.row(-10.0 - W / 2 - i * W, 54.0, ["40", "40"], (4, 5), top_gaps=0.1)
     for i in range(2):                               # le mur gauche (x > 0), raccourci
         yd.row(10.0 + W / 2 + i * W, 10.0, ["40", "40"], (4, 5), top_gaps=0.15)
     yd.row(-30.0, BARRIER_Y + 3.6, ["40", "40", "20", "40", "40"], 3, along_x=True, top_gaps=0.15)
@@ -654,6 +657,10 @@ GANTRY_X = (-24.4, -11.0)          # les deux cadres de jambes (§2.4 : x de -25
 GANTRY_Y = (-7.0, 7.0)             # la jambe côté eau, la jambe côté terre (s de -7 à 7)
 GIRDER_Z = 24.0                    # le dessus des jambes, la poutre de roulement du chariot
 BOOM_L, BOOM_A = 20.5, 74.0        # la flèche relevée sur l'eau : longueur, angle sur l'horizontale (pointe à 45 m)
+# (12 novembre, nuit) le portique est glissé au bord nord du terre-plein, tourné d'un demi-tour (la flèche sur l'eau
+# du nord) : jambes en x -24 et -10,6, en y 81 et 95, à cheval sur la file de conteneurs qui ferme l'axe. La fin du
+# panoramique de P5 cadre ses jambes et sa poutre, le faisceau entre elles. Dessiné au sud, puis posé par ce demi-tour.
+GANTRY_POSE = (-35.0, 88.0, 180.0)
 
 
 def _gantry_light(name, kind, loc, color, energy, size=0.2, aim=None, spot=70.0):
@@ -749,7 +756,15 @@ def build_gantry(far=False):
             # discrets : à 25 kW ils remplissaient le portique de brume blanche et sa silhouette disparaissait
             _gantry_light(f"portique_projecteur_{x:.0f}", "SPOT", (x, 0.0, zg - 0.6), "#fff2d6", 6000.0,
                           size=0.5, aim=(x * 0.4, -2.0, 0.0), spot=60.0)
-    print(f"[port] portique : jambes en x {xa:.0f} et {xb:.0f}, poutre à {zg:.0f} m, pointe de flèche à "
+    pose = bpy.data.objects.new("portique_pose", None)
+    bpy.context.scene.collection.objects.link(pose)
+    pose.location = (GANTRY_POSE[0], GANTRY_POSE[1], 0.0)
+    pose.rotation_euler = (0.0, 0.0, math.radians(GANTRY_POSE[2]))
+    for ob in list(bpy.data.objects):
+        if ob is not pose and ob.parent is None and ob.name.startswith("portique"):
+            ob.parent = pose
+    print(f"[port] portique : jambes dessinées en x {xa:.0f} et {xb:.0f}, posées en ({GANTRY_POSE[0]:.0f}, "
+          f"{GANTRY_POSE[1]:.0f}) tournées de {GANTRY_POSE[2]:.0f}°, poutre à {zg:.0f} m, pointe de flèche à "
           f"{p.z:.0f} m", flush=True)
 
 
@@ -860,6 +875,37 @@ def light_tower(at, target, energy=50000.0, along_x=False):
     return lo
 
 
+def three_beams(main, hero, ground_w, car_w):
+    """Le faisceau de l'hélicoptère en trois lampes coaxiales. La principale (1,6 MW) n'est plus vue que par la
+    diffusion en volume : elle dessine le cône dans la brume et n'éclaire rien (à pleine puissance, son empreinte
+    brûlait le sol en blanc). La deuxième, invisible à la brume, éclaire le sol sauf la berline (`ground_w` : ~2,5
+    W/m² à 66 m, 4π d² × 2,5) ; la troisième, crème, n'éclaire que la berline (`car_w` : ~1 W/m²), qui garde son
+    bordeaux profond."""
+    main.visible_diffuse = main.visible_glossy = main.visible_transmission = False
+    body = [o for o in hero.children_recursive if o.type == "MESH"]
+    out_c, in_c = bpy.data.collections.new("faisceau_sans_berline"), bpy.data.collections.new("faisceau_berline")
+    for o in body:
+        out_c.objects.link(o)
+        in_c.objects.link(o)
+    for co in out_c.collection_objects:
+        co.light_linking.link_state = "EXCLUDE"
+    for name, energy, color, coll in (("sol", ground_w, "#e2eaff", out_c), ("berline", car_w, "#fff0d8", in_c)):
+        d = main.data.copy()
+        d.name = f"faisceau_{name}"
+        d.energy = energy
+        d.color = L.lin(color)[:3]
+        c = bpy.data.objects.new(d.name, d)
+        for coll_u in main.users_collection:
+            coll_u.objects.link(c)
+        c.parent = main.parent
+        c.matrix_parent_inverse = main.matrix_parent_inverse.copy()
+        c.location, c.rotation_euler = main.location.copy(), main.rotation_euler.copy()
+        c.rotation_mode = main.rotation_mode
+        c.rotation_quaternion = main.rotation_quaternion.copy()
+        c.visible_volume_scatter = False
+        c.light_linking.receiver_collection = coll
+
+
 def plan_P5(scene, hidden, palier="socle"):
     """P5, le projecteur, animé (28 images, p5_virage.py) : la caméra à l'épaule à 30 cm du sol, 6 m à
     l'intérieur de l'arc, 28 mm ; elle suit la berline (tiers central, roues au tiers bas). La berline entre
@@ -889,7 +935,7 @@ def plan_P5(scene, hidden, palier="socle"):
     # où elle est née (derrière la voiture), gonfle, monte et dérive vers l'extérieur de l'arc
     puffs = M.smoke_puffs(poses, wb)
     for k, (f, x, y, s) in enumerate(puffs):
-        ob = L.smoke(f"fumee_pneus_{k}", (x, y, 0.4), (2.4, 2.0, 0.8), density=0.12 * s, seed=3.0 + k)
+        ob = L.smoke(f"fumee_pneus_{k}", (x, y, 0.4), (2.4, 2.0, 0.8), density=0.45 * s, seed=3.0 + k)
         out = (Vector((x, y, 0.0)) - Vector((TURN_C[0], TURN_C[1], 0.0))).normalized()
         M.key_smoke(ob, f, FRAMES, (x, y, 0.4), rise=0.5, drift=(out.x * 1.2, out.y * 1.2))
     print(f"[P5] {len(puffs)} bouffées de fumée, images {[q[0] for q in puffs]}", flush=True)
@@ -904,30 +950,16 @@ def plan_P5(scene, hidden, palier="socle"):
     print(f"[P5] {n} lueurs de rampe clignotantes", flush=True)
     # la tour devant le mur qui ferme l'axe, derrière la caméra
     light_tower((24.0, 81.4), Vector((*TURN_AIM, 0.6)), energy=80000.0, along_x=True)
-    # le liseré corail, du côté de la meute (la lueur des rampes) : il détache la caisse bordeaux du fond et
-    # empêche le noir de la silhouette ; sans lui la peinture, très sombre, ne se lit qu'en reflets crème
-    d = bpy.data.lights.new("berline_lisere", "SPOT")
-    d.energy = 3000.0
-    d.color = L.lin(L.CORAL)[:3]
-    d.spot_size = math.radians(40.0)
-    d.spot_blend = 0.6
-    d.shadow_soft_size = 0.8
-    rim = bpy.data.objects.new(d.name, d)
-    scene.collection.objects.link(rim)
-    to_pack = (Vector((-1.9, -4.0, 0.0)) - p).normalized()
-    rim.location = p + to_pack * 7.0 + Vector((0.0, 0.0, 1.4))
-    rim.rotation_mode = "QUATERNION"
-    rim.rotation_quaternion = (p + Vector((0.0, 0.0, 0.7)) - rim.location).to_track_quat("-Z", "Y")
+    # (le liseré corail de la caisse est éteint : depuis la caméra du virage, il la sortait framboise)
     # --- l'hélicoptère : il monte de derrière le portique, au-dessus de l'eau, à droite du cadre ; son faisceau
     # balaie la brume, croise l'objectif, se pose sur la berline (p5_virage.beam_target)
     heli, h = L.helicopter("heli")
     M.key_object(heli, FRAMES, P5.heli)
     sl = h["searchlight"].data
     sl.spot_blend = 0.25
-    # le faisceau principal (1,6 MW, assez pour la brume) exclut la berline ; un second, coaxial et crème, n'éclaire
-    # qu'elle, à ~2 W/m² sur la caisse (la règle de FIN : 8π d², d ≈ 66 m de l'hélicoptère à l'image 20)
     import scene_d
-    scene_d.aim_helis([heli], P5.beam_target(M.t_of(20)), energy=1.6e6, car=hero, car_energy=1.1e5, cone=5.0)
+    scene_d.aim_helis([heli], P5.beam_target(M.t_of(20)), energy=1.6e6, cone=5.0)
+    three_beams(h["searchlight"], hero, ground_w=1.4e5, car_w=5.5e4)
     M.key_searchlight(h, FRAMES, P5.beam_target)
     for i, (dz, col, e) in enumerate(((0.2, L.CORAL, 0.4), (-1.2, L.CREAM, 0.25))):
         Ld = bpy.data.lights.new(f"heli_feu_{i}", "POINT")      # feu anticollision corail, feu blanc sous la cellule
