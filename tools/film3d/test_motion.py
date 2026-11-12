@@ -240,11 +240,14 @@ def test_ouv():
     d, f, a, b = M.min_gap(P.tracks(), range(P.F0, P.F0 + 96))
     check("OUV : la berline passe à plus de 2 m de la patrouille", d - 2 * 0.95 > 2.0,
           f"{d - 1.9:.1f} m de flanc à flanc à l'image {f}")
-    cx, cy = P.camera(M.t_of(P.F0))[:2]
-    a0 = math.degrees(math.atan2(cx - P.PATROL[0], P.PATROL[1] - cy))
     half = math.degrees(math.atan(10.125 / P.LENS))
-    check("OUV : la patrouille dans le cadre à la première image", abs(a0 - (180.0 - P.CAM_YAW)) < half,
-          f"{a0:.0f}° à gauche, le cadre de {180 - P.CAM_YAW - half:.0f} à {180 - P.CAM_YAW + half:.0f}°")
+    worst = 0.0
+    for f in range(P.F0, P.F0 + 20):
+        cx, cy = P.camera(M.t_of(f))[:2]
+        a = math.degrees(math.atan2(cx - P.PATROL[0], P.PATROL[1] - cy))   # vers la gauche
+        worst = max(worst, a + (P.CAM_YAW - 180.0))   # depuis l'axe de visée (tourné vers la droite de CAM_YAW - 180)
+    check("OUV : la patrouille dans le cadre jusqu'à l'image 20", worst < half - 2.5,
+          f"au plus {worst:.1f}° à gauche de l'axe, le bord à {half:.1f}°")
 
 
 def test_fin6():

@@ -1834,7 +1834,48 @@ def street_hero(scene):
     return body
 
 
-def ouv_motion(scene, coupe, cam, focus):
+def patrol_wake(police, frames):
+    """OUV : la patrouille garée se réveille. Chargée feux allumés (comme en P1), tout est éteint sauf ses phares, qui
+    s'allument en veilleuse à OUV.WAKE (lumières et verres clés, pas constant) ; la rampe et ses lueurs restent
+    éteintes, les feux arrière aussi."""
+    import motion as M
+    keyed = []
+    for ob in police.children_recursive:
+        if ob.type != "LIGHT":
+            continue
+        d = ob.data
+        if "_head_" in ob.name:
+            for f in frames:
+                d.energy = OUV.WAKE_HEAD_W if f >= OUV.WAKE else 0.0
+                d.keyframe_insert("energy", frame=f)
+            keyed.append(d)
+        else:
+            d.energy = 0.0
+    for m in {m for ob in [police, *police.children_recursive] if ob.type == "MESH" for m in ob.data.materials if m}:
+        if not m.node_tree:
+            continue
+        for n in m.node_tree.nodes:
+            s = n.inputs.get("Emission Strength") if n.type == "BSDF_PRINCIPLED" else (n.inputs.get("Strength") if n.type == "EMISSION" else None)
+            # (une force liée : les feux peints dans l'atlas de la caisse, dont cast_vehicles.lamp_drivers fait suivre
+            # le niveau à l'énergie des spots clés ci-dessus ; éteints avec eux, allumés avec eux)
+            if s is None or s.is_linked or s.default_value <= 0.0:
+                continue
+            if m.name.split(".")[0].endswith("_head"):
+                full = s.default_value * OUV.WAKE_LENS
+                for f in frames:
+                    s.default_value = full if f >= OUV.WAKE else 0.0
+                    s.keyframe_insert("default_value", frame=f)
+                keyed.append(m.node_tree)
+            else:
+                s.default_value = 0.0
+    for idb in keyed:
+        for fc in M.fcurves(idb):
+            for kp in fc.keyframe_points:
+                kp.interpolation = "CONSTANT"
+    print(f"[scene_a] OUV : la patrouille allume ses phares à l'image {OUV.WAKE} ({len(keyed)} sources clées)", flush=True)
+
+
+def ouv_motion(scene, coupe, police, cam, focus):
     """Le plan OUV animé (ouv_avenue.py) : la berline remonte l'avenue vers +y à 50 km/h, mise sur un rig
     (motion.rig_up) et clée par motion.key_vehicle (roues, suspension) ; la caméra la suit sur un rail
     (motion.key_camera) ; la mise au point sur la caisse ; flou de bougé d'un demi-obturateur."""
@@ -1856,20 +1897,7 @@ def ouv_motion(scene, coupe, cam, focus):
     M.key_camera(cam, frames, OUV.camera)
     cam.data.dof.focus_object = coupe
     cam.data.dof.aperture_fstop = OUV.FOCUS_F
-    x, y, w, l = OUV.PUDDLE
-    street_puddle("fx_flaque", x, y, w, l, seed=7)
-    # la patrouille garée qu'on devine se réveiller : l'écran de bord s'allume, froid, dans l'habitacle sombre
-    d = bpy.data.lights.new("patrouille_ecran", "POINT")
-    d.color, d.shadow_soft_size = lin("#9fb4e8")[:3], 0.08
-    lo = bpy.data.objects.new(d.name, d)
-    scene.collection.objects.link(lo)
-    lo.location = OUV.SCREEN
-    for f in frames:
-        d.energy = OUV.SCREEN_W if f >= OUV.WAKE else 0.0
-        d.keyframe_insert("energy", frame=f)
-    for fc in M.fcurves(d):
-        for kp in fc.keyframe_points:
-            kp.interpolation = "CONSTANT"
+    patrol_wake(police, frames)
     bpy.data.objects.remove(focus)
     scene.frame_set(frames[0])
     scene.render.motion_blur_shutter = 0.5
@@ -2135,7 +2163,7 @@ def build(plan=None, palier=None):
     if lab not in sys.path:
         sys.path.insert(0, lab)
     import cast_vehicles as cv
-    police = cv.load_patrol("jeandiz", lights_on=(plan == "P1"), name="police")["body"]
+    police = cv.load_patrol("jeandiz", lights_on=(plan in ("OUV", "P1")), name="police")["body"]
     police.name = "police"
     police.location = (POLICE_X, POLICE_Y, 0)
     police.rotation_mode = "XYZ"
@@ -2261,7 +2289,7 @@ def build(plan=None, palier=None):
     r = scene.render
 
     if plan == "OUV":
-        ouv_motion(scene, coupe, co, focus)
+        ouv_motion(scene, coupe, police, co, focus)
         return scene
     if plan == "P1":
         p1_motion(scene, coupe, police, co, focus)

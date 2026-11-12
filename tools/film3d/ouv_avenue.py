@@ -17,9 +17,10 @@ T_END = (FRAMES - 1) / M.FPS
 
 SPEED = 50 / 3.6              # m/s, la conduite calme
 HERO_X = 1.75                 # la voie intérieure de la chaussée qui monte vers +y
-CAM_BACK, CAM_SIDE, CAM_Z = 8.0, -1.4, 0.55   # CAM_SIDE : vers +x (la droite de la berline) ; négatif, à sa gauche
+CAM_BACK, CAM_SIDE, CAM_Z = 8.0, -0.6, 0.55  # CAM_SIDE : vers +x (la droite de la berline) ; négatif, à sa gauche
+# (à 1,4 m à gauche et 181,3° de lacet, le centre de la berline était à 74 % de la largeur : à 0,95 m et 182,5°, à 64 % ; on la veut à 55-65 %)
 CAM_LAG = 1.0                 # m/s : la caméra moins vite qu'elle
-CAM_YAW = 181.3               # lacet de motion.key_camera (180 : vers +y) ; à 180,6 la berline touchait le bord droit
+CAM_YAW = 182.5               # lacet de motion.key_camera (180 : vers +y) : la berline vers 60 %, la patrouille à gauche
 CAM_PITCH = 4.5               # site : le centre de la berline vers 54 % de la hauteur (plans bas : 50 à 62 %)
 LENS = 24.0
 FOCUS_F = 4.0                 # ouverture ; le point sur la berline
@@ -29,14 +30,13 @@ FOCUS_F = 4.0                 # ouverture ; le point sur la berline
 STREET = 266.0
 PATROL = (-5.9, STREET - 2.0, 180.0)  # x, y, cap (lieux : 0 vers +y) : garée le long de la bordure côté ville, avant vers -y
 Y0 = PATROL[1] - 25.0   # la berline à la première image, 25 m avant la patrouille (inchangé depuis le brouillon)
-# ce que la berline frôle (fx.py en tire la gerbe) : une ornière d'eau sur la ligne de ses roues gauches, côté caméra,
-# étroite (pas de flaque miroir large dans l'axe de la caméra) ; les roues avant y entrent vers l'image 13, les
-# arrière en sortent vers l'image 23
-PUDDLE = (1.03, 248.6, 0.55, 2.8)    # centre x, y, largeur, longueur (m)
-# la patrouille qu'on devine se réveiller : l'écran de bord s'allume (lumière froide dans l'habitacle) à WAKE
+# la patrouille garée qu'on devine se réveiller : ses phares s'allument à WAKE (on la voit de face, à 30 m), en veilleuse,
+# sans rampe (la rampe est pour P1). (L'ornière d'eau de la ligne des roues gauches est retirée : en miroir, elle
+# renvoyait le dessous noir de la berline, une tache sous son arrière à la dernière image.)
 WAKE = 16
-SCREEN = (PATROL[0] + 0.25, PATROL[1] - 0.2, 1.05)
-SCREEN_W = 6.0
+WAKE_HEAD_W = 150.0                  # W par phare (450 dans le modèle : de face à 30 m, ils éblouissaient le cadre)
+WAKE_LENS = 0.4                      # la force des verres maillés, en part de celle du modèle (les verres peints dans
+                                     # l'atlas suivent l'énergie des spots : cast_vehicles.lamp_drivers, ici un tiers)
 
 
 def hero_pos(t):
