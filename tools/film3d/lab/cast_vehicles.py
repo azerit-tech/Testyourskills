@@ -1059,7 +1059,6 @@ def mat_bar_retint(src, name, strength=0.0, zc=0.06, zh=0.12):
         nt.links.new(comb.outputs[0], ecol.inputs[7])
         em = nt.nodes.new("ShaderNodeEmission")
         nt.links.new(ecol.outputs[2], em.inputs["Color"])
-        # la force reste un nombre (lieux.bar_boost la multiplie pour les plans lointains)
         em.inputs["Strength"].default_value = strength * BAR_CORE
         add = nt.nodes.new("ShaderNodeAddShader")
         nt.links.new(lens.outputs[0], add.inputs[0])

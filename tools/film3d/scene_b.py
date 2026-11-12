@@ -1325,45 +1325,11 @@ def officer_light(officers, plan, receivers=()):
     log(f"agents : liseré des phares{', éclairs de tir' if flash is not None else ''}")
 
 
-def bar_boost_keyed(root, frames, gain):
-    """Les rampes du barrage plus fortes de loin, en clés : l'émission de leurs matières (partagées par les copies)
-    multipliée par gain(image). Vues à 35 m, elles ne font que quelques pixels et le piège ne s'annonçait pas avant
-    l'image 20 ; de près, à force normale (lieux.bar_boost, mais animé : AgX blanchirait les cœurs à 5 m)."""
-    keep = road.S
-    import lieux
-    road.S = keep
-    bar = lieux._bar_of(root)
-    done = set()
-    for o in ([bar] + list(bar.children_recursive)) if bar else []:
-        for m in getattr(o.data, "materials", []) or []:
-            if m is None or m.name in done or not m.node_tree:
-                continue
-            done.add(m.name)
-            for nd in m.node_tree.nodes:
-                for key in ("Emission Strength", "Strength"):
-                    sk = nd.inputs.get(key)
-                    if sk is None or sk.is_linked or not isinstance(sk.default_value, float) or sk.default_value <= 0:
-                        continue
-                    base = sk.default_value
-                    for f in frames:
-                        sk.default_value = base * gain(f)
-                        sk.keyframe_insert("default_value", frame=f)
-    return done
-
-
 def build_barrage(scene, hidden, plan):
     import cast_people as cp
     import cast_vehicles as cv
     pat = cv.load_patrol("jeandiz", lights_on=True, name="patrol_a")
     body = pat["body"]
-    # les flaques de couleur de la rampe sur la chaussée mouillée (lieux.bar_pools, avant les copies : elles en
-    # héritent) : leur reflet court vers la caméra dès l'image 1, c'est ce qui dit « c'est fermé » ; elles
-    # clignotent avec les lueurs (flash_bars) et la berline n'en reçoit rien (plus bas, liaison des rampes)
-    keep = road.S
-    import lieux
-    road.S = keep
-    body["bar"] = pat["lightbar"].name
-    lieux.bar_pools(body, energy=2000.0)
     doors, front_axle, hw = cut_doors(body)
     shells = [c for c in bpy.data.collections if c.name.endswith("_glow_exclude")]
     cars = [body] + [unshare_lights(dup_tree(body, None, tag)) for tag in ("b", "c")]
@@ -1428,8 +1394,7 @@ def build_barrage(scene, hidden, plan):
     # berline et du barrage, la meute qui pousse se lit sur les murs)
     beams += patrol_beams(cars[2], "c", [(CORAL, (-7.0, cy - 30.0, 5.5), 50000, 16), (LILAC, (7.0, cy - 40.0, 5.0), 50000, 16)])
     exclude_hero(beams, "faisceaux")
-    # les lueurs colorées des rampes (celles du modèle, 600 W à 0,4 m de la rampe, et les flaques de bar_pools,
-    # 2000 W) : la berline passe à 1,5 m, elles la teintaient de corail puis de lilas ; la liaison l'en retire comme
+    # les lueurs colorées des rampes (celles du modèle, 600 W à 0,4 m de la rampe) : la berline passe à 1,5 m, elles la teintaient de corail puis de lilas ; la liaison l'en retire comme
     # des faisceaux. (Plus de lueurs à part, bar_glow : copiées des rampes, les lumières des trois patrouilles
     # partagent leurs données et clignotent ensemble ; les lueurs à part battaient à contretemps de leurs optiques.)
     glows = [o for car in cars[:2] for o in car.children_recursive if o.type == "LIGHT" and "_glow_" in o.name]
@@ -1656,12 +1621,9 @@ def plan_P3(scene):
     for tag, car in (("a", ob["patrol_a"]), ("b", ob["patrol_a_b"])):
         keep_world_parent([o for o in ob if o.name.startswith(f"beam_{tag}_")], car)
     n_bars = MO.flash_bars([ob["patrol_a"], ob["patrol_a_b"], rig_c], frames)
-    # (les flaques de couleur des rampes, lieux.bar_pools : pleine force de loin, POOL_LOW de près ; chaque
-    # patrouille a ses données, unshare_lights ; chaque bloc une fois)
-    # et les faisceaux du barrage sur les façades devant lui, × BEAM_GAIN de loin : dès l'image 1, les murs battent
+    # les faisceaux du barrage sur les façades devant lui, × BEAM_GAIN de loin : dès l'image 1, les murs battent
     # corail et lilas autour de la berline, avant que le barrage lui-même se lise au-dessus du toit
-    gains = (("_pool_", lambda f: 1.0 - (1.0 - P3.POOL_LOW) * MO.smoothstep(*P3.POOL_FADE, f)),
-             ("beam_a_", lambda f: 1.0 + (P3.BEAM_GAIN - 1.0) * (1.0 - MO.smoothstep(*P3.BEAM_FADE, f))),
+    gains = (("beam_a_", lambda f: 1.0 + (P3.BEAM_GAIN - 1.0) * (1.0 - MO.smoothstep(*P3.BEAM_FADE, f))),
              ("beam_b_", lambda f: 1.0 + (P3.BEAM_GAIN - 1.0) * (1.0 - MO.smoothstep(*P3.BEAM_FADE, f))))
     seen = set()
     for key, gain in gains:
@@ -1672,9 +1634,6 @@ def plan_P3(scene):
             for fc in MO.fcurves(o.data):
                 for kp in fc.keyframe_points:
                     kp.co[1] *= gain(kp.co[0])
-    # (de loin, les rampes du barrage dix fois plus fortes ; à force normale à partir de P3.BAR_GAIN_FADE[1])
-    n_mat = len(bar_boost_keyed(ob["patrol_a"], frames,
-                                lambda f: 1.0 + (P3.BAR_GAIN - 1.0) * (1.0 - MO.smoothstep(*P3.BAR_GAIN_FADE, f))))
     # --- les tirs : flamme (trois maillages) et éclair ponctuel allumés une image, cachés sinon
     for k in P3.SHOTS:
         parts = [o for o in ob if o.name.startswith(f"muzzle_flash_{k}_")] + [ob[f"muzzle_{k}"]]
@@ -1693,7 +1652,7 @@ def plan_P3(scene):
         f"cap {st['heading']:.1f}°) ; {poses[1]['speed'] * 3.6:.0f} puis {poses[-2]['speed'] * 3.6:.0f} km/h, roulis "
         f"max {max(abs(p['roll']) for p in poses):.1f}°, tangage max {max(abs(p['pitch']) for p in poses):.1f}°, "
         f"braquage {min(p['steer'] for p in poses):.1f} à {max(p['steer'] for p in poses):.1f}° ; {n_bars} lueurs "
-        f"de rampe, {n_mat} matières de rampe renforcées de loin ; tirs {P3.SHOTS}")
+        f"de rampe ; tirs {P3.SHOTS}")
 
 
 ANIMATE = {"P3": plan_P3}

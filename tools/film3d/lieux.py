@@ -1335,61 +1335,6 @@ def bar_beams(root, tag, yaws=((35, CORAL), (-150, LILAC)), energy=9000.0, size=
     return out
 
 
-def _bar_of(root):
-    bn = root.get("bar", "")
-    return next((o for o in root.children_recursive if bn and (o.name == bn or o.name.endswith(":" + bn))), None)
-
-
-def bar_pools(root, energy=2000.0, out=0.9, radius=0.25):
-    """Les flaques de couleur de la rampe sur la chaussée mouillée : un point corail à gauche, un lilas à droite,
-    à 0,9 m hors de la caisse, au niveau de la rampe. Leur reflet sur l'eau dessine le ruban de gyrophares vu de
-    haut (P6) ; la rampe et ses lentilles ne les reçoivent pas (même liaison que cast_vehicles.lightbar_lights).
-    À poser sur le premier véhicule avant de le cloner : les copies en héritent."""
-    bpy.context.view_layer.update()
-    bar = _bar_of(root)
-    if bar is None:
-        return []
-    shell = bpy.data.collections.get(f"{bar.name}_glow_exclude")
-    lights = []
-    for side, col in ((1, CORAL), (-1, LILAC)):
-        d = bpy.data.lights.new(f"{bar.name}_pool_{'L' if side > 0 else 'R'}", "POINT")
-        d.energy = energy
-        d.color = lin(col)[:3]
-        d.shadow_soft_size = radius
-        ob = bpy.data.objects.new(d.name, d)
-        cols = [c for c in bar.users_collection if not c.name.endswith("_glow_exclude")]
-        (cols[0] if cols else bpy.context.scene.collection).objects.link(ob)
-        ob.parent = bar
-        ob.location = (0.0, side * (0.36 + out), 0.25)
-        ob.visible_camera = False               # la boule de lumière ne se voit pas, son reflet sur l'eau oui
-        ob.visible_volume_scatter = False       # ni dans la brume : vingt rampes la teintaient de rose sur 300 m
-        if shell:
-            ob.light_linking.receiver_collection = shell
-        lights.append(ob)
-    return lights
-
-
-def bar_boost(root, factor):
-    """Multiplie l'émission des lentilles de la rampe (matières partagées : toutes les copies suivent). Pour les
-    plans vus de loin, où la rampe fait quelques pixels ; de près, AgX la blanchirait."""
-    bar = _bar_of(root)
-    done = set()
-    for o in ([bar] + list(bar.children_recursive)) if bar else []:
-        for m in getattr(o.data, "materials", []) or []:
-            if m is None or m.name in done or not m.node_tree:
-                continue
-            done.add(m.name)
-            # la lentille plus forte se voit, mais n'éclaire plus : vingt rampes échantillonnées comme lumières
-            # teintaient toute la brume de rose au-dessus de l'eau (P6 du 12 novembre)
-            m.cycles.emission_sampling = "NONE"
-            for nd in m.node_tree.nodes:
-                for key in ("Emission Strength", "Strength"):
-                    s = nd.inputs.get(key)
-                    if s is not None and not s.is_linked and isinstance(s.default_value, float) and s.default_value > 0:
-                        s.default_value *= factor
-    return done
-
-
 def open_door(root, side=-1, angle=75.0, door_x=(-0.32, 0.99), door_z=(0.18, 1.42), inner=0.55, hinge=(0.96, 0.92)):
     """Ouvre la portière avant d'une patrouille (cast_vehicles « jeandiz » : caisse jointe, l'avant vers +x
     local, la gauche vers +y). La portière, sa vitre, sa poignée et son rétroviseur sont des îlots du maillage :

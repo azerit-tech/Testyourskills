@@ -936,7 +936,6 @@ def plan_FIN6(scene, hidden, palier="socle"):
         r = first.get(kind)
         if r is None:
             r = first[kind] = L.patrol("patrol") if kind == "patrol" else L.van("van")
-            L.bar_pools(r, energy=1200.0)
         else:
             r = L.clone(r, f"{kind}_{i}")
         h = L.heading_to((STOP.x - x, STOP.y - y)) + rnd.uniform(-28, 28)
@@ -1142,8 +1141,6 @@ def plan_P6(scene, hidden, palier="socle"):
     for i, (kind, _, _) in enumerate(P6.COLUMN):
         if kind not in src:
             r = src[kind] = L.patrol("patrol") if kind == "patrol" else L.van("van")
-            L.bar_pools(r, energy=2500.0)        # le ruban de gyrophares sur la chaussée mouillée, vu de 35 m
-            L.bar_boost(r, 4.0)
         else:
             r = L.clone(src[kind], f"{kind}_{i}")
         x, y = P6.column_pos(i)(P6.T_STILL)

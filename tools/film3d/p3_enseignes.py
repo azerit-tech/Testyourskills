@@ -160,13 +160,6 @@ PUDDLES = [("flaque_entree", -1.05, 97.5, 0.55, 2.4), ("flaque_feinte", 1.15, 10
            ("flaque_basse_1", 0.35, 114.9, 0.35, 1.7),
            ("flaque_arret", -2.3, 118.9, 0.4, 1.4), ("flaque_trottoir", 3.2, 117.0, 0.5, 2.6)]
 
-# --- les rampes du barrage, vues de loin (55 m à l'image 1) : leur émission × BAR_GAIN jusqu'à l'image 22,
-# ramenée à la normale à l'image 38, quand la berline arrive aux plots (scene_b.bar_boost_keyed) ; de loin elles ne
-# font que quelques pixels au-dessus du toit. Leurs flaques de couleur sur la chaussée (lieux.bar_pools, 2000 W)
-# gardent leur force jusqu'à l'image 28 (leur reflet court vers la caméra le long de la berline) puis tombent à
-# POOL_LOW à l'image 38 : de près, elles noyaient la rue de corail
-BAR_GAIN, BAR_GAIN_FADE = 10.0, (22, 38)
-POOL_LOW, POOL_FADE = 0.25, (28, 38)
 # les faisceaux des deux patrouilles du barrage sur les façades devant lui : × BEAM_GAIN jusqu'à l'image 22,
 # normaux à l'image 36 (la berline cache le barrage au début : ce sont les murs qui battent)
 BEAM_GAIN, BEAM_FADE = 2.5, (22, 36)
