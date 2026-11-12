@@ -838,6 +838,46 @@ def port_placeholder(lamp_src, far=True, name="port"):
     print("[lieux] port provisoire (terre-plein, voie du quai, quatre mâts)", flush=True)
 
 
+def _container_blocks(hidden):
+    """Les conteneurs vus de loin : un bloc par type (six faces, aux cotes des modèles de scene_e), sans tôle
+    ondulée ni numéros, la teinte de l'instance par la couleur de l'objet, un vernis d'eau mince. Au format de
+    scene_e.container_sources : {type: (source, longueur, largeur, hauteur)}."""
+    m = bpy.data.materials.get("conteneur_bloc")
+    if m is None:
+        m, N, out = S.material("conteneur_bloc")
+        oi = N.new("ShaderNodeObjectInfo")
+        p = S.principled(N, **{"Roughness": 0.55})
+        N.link(N.mix(1.0, oi.outputs["Color"], (0.7, 0.7, 0.7, 1), "MULTIPLY"), p.inputs["Base Color"])
+        p.inputs["Coat Weight"].default_value = 0.3
+        p.inputs["Coat IOR"].default_value = 1.33
+        N.link(p.outputs[0], out.inputs[0])
+    out = {}
+    for key, (ln, w, h) in {"40": (12.19, 2.44, 2.59), "20": (6.06, 2.44, 2.59), "40hc": (12.19, 2.44, 2.9)}.items():
+        bm = bmesh.new()
+        box_bm(bm, (-w / 2, -ln / 2, 0.0), (w / 2, ln / 2, h))
+        out[key] = (mesh_object(f"src_conteneur_bloc_{key}", bm, [m], coll=hidden), ln, w, h)
+    return out
+
+
+def port_far(hidden, lamp_src):
+    """Le port vu de loin (pont, jetée, pointe), allégé : le terre-plein, les mâts et l'axe fermé de
+    scene_e.build_port au palier « socle », puis les mêmes piles de conteneurs en blocs (scene_e.build_containers
+    posé sur _container_blocks au lieu des modèles de tôle) et le portique en silhouette (build_gantry vu de loin :
+    un seul feu). Rien ne change dans scene_e : ses sources sont seulement remplacées le temps de l'appel."""
+    import scene_e
+    scene_e.build_port(hidden, lamp_src, far=True, palier="socle")
+    if hasattr(scene_e, "build_containers") and hasattr(scene_e, "container_sources"):
+        blocks = _container_blocks(hidden)
+        full = scene_e.container_sources
+        scene_e.container_sources = lambda h: blocks
+        try:
+            scene_e.build_containers(hidden, far=True)
+        finally:
+            scene_e.container_sources = full
+    if hasattr(scene_e, "build_gantry"):
+        scene_e.build_gantry(far=True)
+
+
 def panorama(scene, hidden, yaw=math.pi, all_lit=False, bridge="loin", port="loin", jetty=None, water_kind="lagune",
              haubans=False):
     """Tout ce qu'on voit de loin par-dessus l'eau, commun aux scènes C, D et E : le ciel tourné de `yaw` (la bande
@@ -856,7 +896,10 @@ def panorama(scene, hidden, yaw=math.pi, all_lit=False, bridge="loin", port="loi
     if port:
         try:
             import scene_e
-            scene_e.build_port(hidden, lamp_src, far=(port == "loin"))
+            if port == "loin":
+                port_far(hidden, lamp_src)
+            else:
+                scene_e.build_port(hidden, lamp_src, far=False)
         except (ImportError, AttributeError):
             port_placeholder(lamp_src, far=(port == "loin"))
     if jetty:
@@ -1302,6 +1345,44 @@ def use_gpu(scene):
             return True
     print("[lieux] aucun GPU, rendu sur CPU", flush=True)
     return False
+
+
+def _images_of(mats):
+    out = set()
+    for m in mats:
+        if m and m.node_tree:
+            for n in m.node_tree.nodes:
+                if n.type == "TEX_IMAGE" and n.image:
+                    out.add(n.image.name)
+                elif n.type == "GROUP" and n.node_tree:
+                    for g in n.node_tree.nodes:
+                        if g.type == "TEX_IMAGE" and g.image:
+                            out.add(g.image.name)
+    return out
+
+
+def cap_images(px=1024, keep_objects=()):
+    """Ramène à `px` de côté toutes les images plus grandes de la scène, sauf celles des matières des objets
+    `keep_objects` (et de leurs enfants) : le premier plan garde ses 2K. Blender et Cycles en tiennent chacun une
+    copie : sur les plans de l'eau, les seize images 2K pesaient autant que tout le reste de la scène. Renvoie
+    le nombre d'images réduites."""
+    mats = []
+    for ob in keep_objects:
+        for o in [ob] + list(ob.children_recursive):
+            if o.type == "MESH":
+                mats += [s.material for s in o.material_slots]
+    keep = _images_of(mats)
+    n = 0
+    for im in bpy.data.images:
+        if im.name in keep or not im.users or im.source not in ("FILE", "GENERATED"):
+            continue
+        w, h = im.size
+        if max(w, h) > px:
+            f = px / max(w, h)
+            im.scale(max(1, int(w * f)), max(1, int(h * f)))
+            n += 1
+    print(f"[lieux] {n} images ramenées à {px} px ({len(keep)} gardées au premier plan)", flush=True)
+    return n
 
 
 def stats():

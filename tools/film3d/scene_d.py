@@ -697,6 +697,7 @@ def plan_FIN(scene, hidden, palier="socle"):
     cam_loc = Vector((CX + 0.7, CY + 8.97, 0.2))
     a = math.radians(-1.0)
     d = Vector((math.sin(a), -math.cos(a), math.tan(math.radians(14.0))))
+    L.cap_images(1024, keep_objects=[hero, bpy.data.objects["pointe_sol"]])
     cam = L.camera("cam_FIN", cam_loc, cam_loc + d * 40.0, lens=24, fstop=2.2,
                    focus=(STOP.x, STOP.y + 1.0, 1.0))
     scene.render.use_motion_blur = True
@@ -762,6 +763,7 @@ def plan_FIN6(scene, hidden, palier="socle"):
     L.haze((CX - 35, CX + 35), (CY - 35, CY + 35), (L.WATER_Z, 40), 0.004, name="haze_pointe")
     a = 95.0                                          # le milieu de l'arc de 150° (de 20° à 170°)
     cam_loc = (*_polar(a, 7.0), 0.25)
+    L.cap_images(1024, keep_objects=[hero, bpy.data.objects["pointe_sol"]])
     cam = L.camera("cam_FIN6", cam_loc, (STOP.x, STOP.y, 1.6), lens=18, fstop=2.8,
                    focus=(STOP.x, STOP.y, 1.1))
     return cam
@@ -838,6 +840,7 @@ def plan_P6(scene, hidden, palier="socle"):
     # la caméra au haut de la grue : la berline au tiers bas, la ville aux deux tiers (tangente 0,25 au-dessus du
     # centre au 24 mm vertical, soit 14° de plongée ; la berline 28° sous l'horizontale, donc à 65 m devant)
     cam_y = y_hero + 65.0
+    L.cap_images(1024)                                # tout est à 60 m et plus
     cam = L.camera("cam_P6", (JX + 1.0, cam_y, 35.0), (JX + 1.0, cam_y - 100.0, 35.0 - 100.0 * math.tan(math.radians(14))),
                    lens=24, fstop=0.0)
     scene.render.use_motion_blur = True
