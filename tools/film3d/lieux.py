@@ -1289,6 +1289,28 @@ def door_angle(ob, deg, frame=None):
         ob.keyframe_insert("rotation_euler", index=2, frame=frame)
 
 
+def key_pose(arm, frame):
+    """Une clé sur tous les os d'une armature, à la pose courante (position, rotation, échelle)."""
+    for p in arm.pose.bones:
+        p.keyframe_insert("location", frame=frame)
+        p.keyframe_insert("rotation_quaternion" if p.rotation_mode == "QUATERNION" else "rotation_euler", frame=frame)
+        p.keyframe_insert("scale", frame=frame)
+
+
+def officer_rig(keys, style=0, name="officer", gun=True):
+    """Un agent qui garde son armature, pour passer d'une pose de cast_people à l'autre : `keys`, une liste
+    [(image, pose)] (« crouch », « aim », « guard ») ; Blender interpole les os entre deux clés (aucune marche).
+    L'armature est l'objet renvoyé : origine au sol, il regarde vers −y (face() le tourne)."""
+    import cast_people as cp
+    arm = cp.load_officer("spp", name=f"{name}_rig")
+    for k, (frame, pose) in enumerate(keys):
+        cp.pose_officer(arm, pose, style=style)
+        if k == 0 and gun:
+            cp.attach_handgun(arm, cp.load_handgun("service"))   # posé dans la main de la première pose
+        key_pose(arm, frame)
+    return arm
+
+
 def cabin_light(root, energy=6.0, color="#ffcf9a"):
     """Un peu de lumière dans l'habitacle de la berline (le tableau de bord, une lampe de lecture) : les mains
     levées se lisent derrière le pare-brise. Repère du corps de scene_a.street_hero : l'avant vers -y local."""
