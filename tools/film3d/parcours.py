@@ -17,9 +17,15 @@ TOTAL = _f                        # 388
 V_OUV, V1, V_FAR = 50 / 3.6, 16.4, 30.0     # l'avenue ; avant le rond-point ; jamais atteinte : elle accélère
 S_GO = 31.0                                 # elle met les gaz
 S_ARC2, R2, A2 = 65.0, 30.0, 64.0           # le rond-point : début nominal, rayon, angle (à gauche)
-VA2, B2, G2 = 12.8, 9.0, 24.0               # vitesse d'arc, où elle la demande, où elle remet les gaz (m après S_ARC2)
-S_ARC5, R5, A5 = 182.0, 15.0, 50.0          # le port (à droite)
-VA5, B5, G5 = 9.47, 5.0, 9.0
+VA2, B2, G2 = 12.4, 10.0, 24.0              # vitesse d'arc, où elle la demande, où elle remet les gaz (m après S_ARC2) :
+                                            # le plan B de la feuille (§7), une glisse plus franche (−14 % de vitesse)
+# le port (à droite) : 22 m de rayon au lieu de 15 (feuille §9.1). Le terre-plein est une dalle nue ; sur les 60
+# images de P5 la berline reste à 4,1 m des poteaux de chaîne, 7,2 m des caisses, 8,6 m des conteneurs, 9,1 m des
+# séparateurs, la caméra à 4,6 m des poteaux. Elle sort de P5 à 10,1 m/s (7,9 avec 15 m) et de P6 à 16,0 (13,8).
+S_ARC5, R5, A5 = 182.0, 22.0, 50.0
+VA5 = math.sqrt(6.5 * 0.92 * R5)            # 11,47 m/s : la latérale visée par motion.drive sur ce rayon
+B5, G5 = 5.0 * R5 / 15.0, 9.0 * R5 / 15.0   # le freinage traîné et la remise des gaz, à l'échelle du rayon
+E5_GAIN = 1.15                              # l'entrée du port adoucie de 15 % : 105 °/s² de lacet de caisse (120)
 TAIL = 80.0
 LIM = dict(slip_per=16.0, slip_drag=0.14, slip_hold=0.4, slip_max=15.0)
 JERK = 12.0 * 0.72
@@ -49,17 +55,19 @@ def _route(pieces, ds=0.1):
 
 
 def _drive():
+    """(la route abstraite, la conduite)."""
     l2, l5 = R2 * math.radians(A2), R5 * math.radians(A5)
-    e2, e5 = _ease(R2), _ease(R5)
+    e2, e5 = _ease(R2), _ease(R5) * E5_GAIN
     route = _route([(S_ARC2, 0.0, 0.0), (l2, 1.0 / R2, e2), (S_ARC5 - S_ARC2 - l2, 0.0, 0.0), (l5, -1.0 / R5, e5),
                     (TAIL, 0.0, 0.0)])
     speed = [(0.0, V_OUV), (S_GO, V_OUV), (S_GO + 0.1, V1),
              (S_ARC2 + B2 - 0.1, V1), (S_ARC2 + B2, VA2), (S_ARC2 + G2, VA2), (S_ARC2 + G2 + 0.1, V_FAR),
              (S_ARC5 + B5 - 0.1, V_FAR), (S_ARC5 + B5, VA5), (S_ARC5 + G5, VA5), (S_ARC5 + G5 + 0.1, V_FAR)]
-    return M.drive(route, speed, t0=0.0, kind="hero", lim=LIM, ease=max(e2, e5), t_span=(-2.0, TOTAL / FPS + 2.5))
+    return route, M.drive(route, speed, t0=0.0, kind="hero", lim=LIM, ease=max(e2, e5),
+                          t_span=(-2.0, TOTAL / FPS + 2.5))
 
 
-DRIVE = _drive()
+ROUTE, DRIVE = _drive()
 
 
 def t_of(shot, frame):
@@ -67,24 +75,27 @@ def t_of(shot, frame):
     return (START[shot] + frame - 1) / FPS
 
 
-CAP_B = DRIVE.travel(t_of("P4", 10))           # la droite après le rond-point : +63,98°
-CAP_D = DRIVE.travel(TOTAL / FPS + 1.0)        # la droite après le port : +13,94°
-# plan : (image de référence, où la berline s'y trouve dans la scène, cap de la droite de la scène qui monte vers +y)
+CAP_B = ROUTE.at(S_ARC5 - 20.0)[2]             # la droite après le rond-point : +63,98°
+CAP_D = ROUTE.at(ROUTE.length)[2]              # la droite après le port : +13,94°
+# plan : (référence, où la berline s'y trouve dans la scène, cap de la droite de la scène qui monte vers +y) ; la
+# référence est une image du plan (un entier : là où la berline passe à cette image) ou ("s", abscisse) : un point
+# de la route, quelle que soit la vitesse. P2 et P5 s'ancrent sur la droite qui précède leur virage, 20 m avant son
+# début nominal : le virage reste à sa place dans la scène quand le profil de vitesse change.
 ANCHOR = {
     "OUV": (1, (1.75, 244.0), 0.0),
     "P1": (1, (1.75, 288.0), 0.0),
-    "P2": (1, (4.84, -39.77), 0.0),
+    "P2": (("s", S_ARC2 - 20.0), (4.84, -48.156), 0.0),
     "P3": (36, (0.35, 123.30), CAP_B),
     "P4": (48, (1.80, -35.69), CAP_B),
-    "P5": (1, (5.25, 43.80), CAP_B),
+    "P5": (("s", S_ARC5 - 20.0), (5.25, 35.066), CAP_B),
     "P6": (60, (81.75, 344.42), CAP_D),
 }
 
 
 def placer(shot):
     """(to_scene(x, y), cap) : la transformation du parcours vers la scène du plan, et le cap à retrancher."""
-    frame, (tx, ty), cap = ANCHOR[shot]
-    ax, ay = DRIVE.pos(t_of(shot, frame))
+    ref, (tx, ty), cap = ANCHOR[shot]
+    ax, ay = ROUTE.at(ref[1])[:2] if isinstance(ref, tuple) else DRIVE.pos(t_of(shot, ref))
     c, s = math.cos(math.radians(cap)), math.sin(math.radians(cap))
 
     def to_scene(x, y):
@@ -148,7 +159,6 @@ def brake_windows(shot):
 # ---- les états aux coupes, au niveau du module (indépendamment des plans) : les dérivées de motion.motion_state
 # sur la fenêtre de chaque plan, prises vers l'intérieur du plan ; roulis et tangage de M.sample sur tout le parcours
 FIXED_CAM = ("P4",)                # le plan de face, caméra fixe : pas de panoramique comparé
-YAW_ACC_STRICT = False             # l'entrée du virage du port tire 133 °/s² de lacet de caisse (120) : à reprendre
 _BODY = {}
 
 

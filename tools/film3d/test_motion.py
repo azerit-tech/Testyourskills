@@ -1391,12 +1391,10 @@ def test_parcours():
               ", ".join(bad) or f"v {sa['speed']:.2f} → {sb['speed']:.2f} m/s, pire {worst[1]} à "
               f"{worst[0] * 100:.0f} % du plafond")
     n = _drive_numbers(PC.DRIVE, list(range(1, PC.TOTAL + 1)))
-    keys = ("lat", "brake", "acc", "circle", "jerk") + (("yaw_acc",) if PC.YAW_ACC_STRICT else ())
-    bad = [k for k in keys if n[k] > CAR31_HERO[k] + 1e-9]
+    bad = [k for k in ("lat", "brake", "acc", "circle", "jerk", "yaw_acc") if n[k] > CAR31_HERO[k] + 1e-9]
     check("parcours : les limites de la voiture sur les 388 images", not bad and n["slip"] <= SLIP31_MAX
           and n["on"] <= SLIP31_ON and n["off"] <= SLIP31_OFF,
-          ", ".join(f"{k} {n[k]:.2f}" for k in ("lat", "brake", "acc", "circle", "jerk", "yaw_acc", "slip"))
-          + ("" if PC.YAW_ACC_STRICT else " (yaw_acc en information)"))
+          ", ".join(f"{k} {n[k]:.2f}" for k in ("lat", "brake", "acc", "circle", "jerk", "yaw_acc", "slip")))
 
 
 def test_v3():
