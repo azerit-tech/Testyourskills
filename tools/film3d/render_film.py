@@ -160,6 +160,11 @@ def is_draft():
     return 0 if v in ("", "0", "non", "no", "false", "off") else 2 if v == "2" else 1
 
 
+def with_ville(essais, a):
+    """--ville DIR : les images vont dans <PLAN>+ville, à part des prises du montage."""
+    return dict(essais, ville="") if getattr(a, "ville", None) else essais
+
+
 def plan_dirname(plan, essais, draft=None):
     """Le dossier d'images d'un plan ; un essai a le sien (P3+rugosite0.5), un brouillon FILM3D_DRAFT=1 ou 2 aussi
     (P3+brouillon, P3+brouillon2) : ni l'un ni l'autre ne devient une prise du montage, ni ne passe pour une image
@@ -221,7 +226,7 @@ def worker(a):
     plan = a.plan
     cut_n = read_cut()[plan]
     n = plan_frames({plan: cut_n}, (plan,))[plan]     # un plan pas encore migré garde le FRAMES de son module
-    essais = parse_essais(a.essai)
+    essais = with_ville(parse_essais(a.essai), a)
     out_dir = os.path.join(a.out, plan_dirname(plan, essais))
     os.makedirs(out_dir, exist_ok=True)
     ASSETS = os.path.realpath(assets_dir())
@@ -264,6 +269,10 @@ def worker(a):
         plan, arg, lambda: mod.build(arg) if arg and inspect.signature(mod.build).parameters else mod.build(),
         ASSETS, blend_out=os.environ["FILM3D_BLEND"], use=False if a.mode == "list" else None)
     seen.update(read)
+    if a.ville:
+        # la ville autour du plan (ville.voisins) : après le cache, qui garde la scène du plan seule
+        import ville
+        ville.voisins(scene, plan, os.path.abspath(a.ville))
     still = scene.frame_current
     span = scene.frame_end - scene.frame_start + 1
     animated = span > 3
@@ -573,7 +582,7 @@ def vram_used():
 
 
 def run_worker(a, plan, blender):
-    essais = parse_essais(a.essai)
+    essais = with_ville(parse_essais(a.essai), a)
     d = os.path.join(a.out, plan_dirname(plan, essais))
     os.makedirs(d, exist_ok=True)
     logpath = os.path.join(d, "blender.log")
@@ -588,6 +597,8 @@ def run_worker(a, plan, blender):
             args.append("--" + k.replace("_", "-"))
     for e in a.essai or ():
         args += ["--essai", e]
+    if a.ville:
+        args += ["--ville", os.path.abspath(a.ville)]
     env = dict(os.environ, FILM3D_ASSETS=a.assets)
     base = vram_used()
     peak = base
@@ -797,6 +808,9 @@ def main():
     ap.add_argument("--take", type=int, default=1)
     ap.add_argument("--force", action="store_true")
     ap.add_argument("--blender", default=None)
+    ap.add_argument("--ville", default=None, metavar="DIR",
+                    help="pas le défaut : pose autour du plan les lieux voisins de la ville (ville.CHARGE), pris dans "
+                         "DIR/lieux (ville.py --cache) ; images dans <PLAN>+ville")
     ap.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
     ap.add_argument("--mode", default="render", help=argparse.SUPPRESS)
     a = ap.parse_args(argv)
