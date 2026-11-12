@@ -187,10 +187,14 @@ def slide_pose(s):
     return x, y, HERO_STOP * s ** 1.6
 
 
-def skid_marks(name="traces_glissade", track=0.77, base=1.37, width=0.2, n=48):
+def skid_marks(name="traces_glissade", track=0.77, base=1.37, width=0.2, n=48, reveal=None):
     """Les traces de pneus du dérapage, de la sortie de la jetée au point d'arrêt : un ruban par roue (l'arrière
-    dès le freinage, l'avant un peu après), noir de gomme, plus mat que l'eau, qui s'efface par endroits.
-    Décalque à 6 mm du sol, coordonnées de texture : u le long de la trace, v en travers."""
+    dès le freinage, l'avant un peu après), de la gomme mate et sombre qui s'efface par endroits (comme celles de
+    P2 : #1d1b1a, rugosité 0,8 ; vernies, elles renvoyaient les lampadaires en traits clairs).
+    Décalque à 6 mm du sol, coordonnées de texture : u le long de la trace, v en travers ; une seconde carte
+    (« trace_s ») porte l'avancement s de la glissade (scene_d.slide_pose) sous la roue.
+    `reveal` : [(image, s)] ; la gomme n'apparaît que sous les roues déjà passées (FIN, la berline glisse encore :
+    sans cela les traces l'attendaient devant elle). Sans `reveal`, la trace entière (FIN6)."""
     m, N, out = S.material(name)
     uv = N.new("ShaderNodeTexCoord").outputs["UV"]
     u, v, _ = N.sep(uv)
@@ -199,14 +203,21 @@ def skid_marks(name="traces_glissade", track=0.77, base=1.37, width=0.2, n=48):
     a = N.math("MULTIPLY", road.smooth(N, u, 0.0, 0.25), road.smooth(N, streak, 0.3, 0.6))
     a = N.math("MULTIPLY", a, road.inv(N, road.smooth(N, N.math("ABSOLUTE", N.math("SUBTRACT", v, 0.5)), 0.32, 0.5)))
     a = N.math("MULTIPLY", a, N.mixf(road.smooth(N, road.noise(N, P, 0.8, 2.0), 0.35, 0.6), 0.45, 0.95))
-    p = S.principled(N, **{"Base Color": (0.006, 0.006, 0.006, 1), "Roughness": 0.42})
-    p.inputs["Coat Weight"].default_value = 0.6
-    p.inputs["Coat IOR"].default_value = 1.33
-    p.inputs["Coat Roughness"].default_value = 0.12
+    if reveal:
+        su = N.new("ShaderNodeUVMap")
+        su.uv_map = "trace_s"
+        sv, _, _ = N.sep(su.outputs["UV"])
+        front = N.new("ShaderNodeValue")
+        for f_, s_ in reveal:
+            front.outputs[0].default_value = s_
+            front.outputs[0].keyframe_insert("default_value", frame=f_)
+        a = N.math("MULTIPLY", a, road.inv(N, road.smooth(N, N.math("SUBTRACT", sv, front.outputs[0]), -0.004, 0.0)))
+    p = S.principled(N, **{"Base Color": L.lin("#1d1b1a"), "Roughness": 0.8, "Specular IOR Level": 0.25})
     N.link(a, p.inputs["Alpha"])
     N.link(p.outputs[0], out.inputs[0])
     bm = L.bmesh.new()
     uvl = bm.loops.layers.uv.new()
+    sl = bm.loops.layers.uv.new("trace_s")
     for lx in (-track, track):
         for ly, s0 in ((-base, 0.0), (base, 0.25)):
             pts = []
@@ -225,6 +236,7 @@ def skid_marks(name="traces_glissade", track=0.77, base=1.37, width=0.2, n=48):
                 f = bm.faces.new((rows[i][0], rows[i][1], rows[i + 1][1], rows[i + 1][0]))
                 for lp, (uu, vv) in zip(f.loops, ((i / n, 0.0), (i / n, 1.0), ((i + 1) / n, 1.0), ((i + 1) / n, 0.0))):
                     lp[uvl].uv = (uu, vv)
+                    lp[sl].uv = (s0 + (1.0 - s0) * uu, 0.0)
     ob = L.mesh_object(name, bm, [m])
     ob.visible_shadow = False
     return ob
@@ -706,7 +718,7 @@ def plan_FIN(scene, hidden, palier="socle"):
     decor(scene, hidden, marina=(palier in ("marina", "complet")))
     scene.frame_start, scene.frame_end = F.F0, F.F0 + F.FRAMES - 1
     frames = range(F.F0 - 1, F.F0 + F.FRAMES + 1)
-    skid_marks()
+    skid_marks(reveal=[(f_, F.slide_s(M.t_of(f_))) for f_ in frames])
     hero = L.hero()
     wheels = L.hero_wheels(hero)
     poses = M.sample(F.hero_pos, frames, heading=F.hero_heading, wheel_r=hero["wheel_r"])
