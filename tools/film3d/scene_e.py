@@ -746,7 +746,8 @@ def build_gantry(far=False):
         for x in (xa, xb):
             _gantry_light(f"portique_balise_{x:.0f}", "POINT", (x, yw + 1.5, zg + 11.6), L.AMBER, 150.0)
         for x in (xa + 3.0, xb - 3.0):                # les projecteurs sous la poutre, vers le pied de la rampe
-            _gantry_light(f"portique_projecteur_{x:.0f}", "SPOT", (x, 0.0, zg - 0.6), "#fff2d6", 25000.0,
+            # discrets : à 25 kW ils remplissaient le portique de brume blanche et sa silhouette disparaissait
+            _gantry_light(f"portique_projecteur_{x:.0f}", "SPOT", (x, 0.0, zg - 0.6), "#fff2d6", 6000.0,
                           size=0.5, aim=(x * 0.4, -2.0, 0.0), spot=60.0)
     print(f"[port] portique : jambes en x {xa:.0f} et {xb:.0f}, poutre à {zg:.0f} m, pointe de flèche à "
           f"{p.z:.0f} m", flush=True)
