@@ -192,6 +192,16 @@ def tracks_heading():
     return {"patrol_a": lambda t: -24.0, "patrol_b": lambda t: 24.0, "patrol_c": lambda t: CHASE[2]}
 
 
+# --- le phare, loin au-delà du pont, à droite du pylône (lieux.phare_lointain, pas encore posé par scene_b : ses
+# arguments viendront avec le nouveau phare) : à 600 m de l'image 1, PHARE_ECART à droite de l'axe de la rue (le
+# pylône, dans l'axe, couvre 2° de part et d'autre), PHARE_DEG de haut, son pied à PHARE_Z ; PHARE_AT, le milieu de
+# sa lanterne, pour motion.py mesure --v3 (lieux.PHARE_H 17,9 m du pied au chapeau, lieux.PHARE_FEU 16,8 m)
+PHARE_ORIGINE, PHARE_ECART, PHARE_DEG, PHARE_DIST, PHARE_Z = (0.0, 65.0, 0.0), 3.3, 1.8, 600.0, 4.0
+_PH_S = PHARE_DIST * math.tan(math.radians(PHARE_DEG)) / 17.9
+PHARE_AT = (PHARE_ORIGINE[0] + math.sin(math.radians(PHARE_ECART)) * PHARE_DIST,
+            PHARE_ORIGINE[1] + math.cos(math.radians(PHARE_ECART)) * PHARE_DIST, PHARE_Z + 16.8 * _PH_S)
+
+
 # les plots et les panneaux du barrage, pour motion.py mesure --v3 : (x, y, rayon)
 POSTS = [(x, y, CONE_R) for x, y in CONES] + [(x, y, 0.5) for x, y in PANELS]
 
