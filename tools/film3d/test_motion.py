@@ -24,9 +24,11 @@ CAM_LIMITS_PLAN = {
                              # à 1,5 m au moins de la berline : test_p3
     "P4": {"pan": 4.6, "vrel": None, "arel": None, "behind": 0.0,   # fixe, 200 mm, de face
            "zoom": True, "low_center": (0.52, 0.56), "low_all": True, "width_min": 0.17},
-    "P5": {"pan": 75.0, "pan_frames": 16, "pan_acc": 3.0, "behind": 0.67,   # le seul mouvement vif du film
-           # la berline prend 22 à 32 m/s² dans l'arc de 12 m : ni 4 par rapport à elle ni 8 en propre ne tiennent
-           "arel": None, "accel": 24.0},
+    # v3.1 : la berline vire sur le mouillé (route jusqu'à 36°/s, mise en virage en 20 images) et la caméra la suit à
+    # 7,6 m dans l'axe de sa vitesse : sa visée accélère comme ce cap (≈ 65°/s², la largeur de cadre 1,2 en vaut 55)
+    # et, à 7,6 m de rayon, elle tire 7,5 m/s² par rapport à la berline (4 demanderaient 1,6 s de mise en virage, plus
+    # que le plan n'en laisse) ; en sortie, la berline relancée à 6,8 m/s² et la caméra à l'extérieur, 8,2 en propre
+    "P5": {"pan": 42.0, "pan_acc": 1.4, "arel": 8.0, "accel": 8.5},
     # les avions entrent grands par le haut du cadre : 8 images au plus au-dessus de 88 % à leur entrée, puis
     # dessous (test_p6 le vérifie, avion par avion ; le plafond commun de motion.py est levé pour P6)
     "P6": {"air_top": 999.0, "air_entry": 8},
@@ -231,12 +233,13 @@ def test_gaps():
     check("P5 : caméra loin des séparateurs, des poteaux et des caisses", d_bar >= 2.0 and d_box >= 0.8,
           f"{d_bar:.1f} m des séparateurs, {d_box:.1f} m des poteaux et des caisses")
     check("P5 : horizon à plat", all(c[5] == 0.0 for c in cams))
-    # le premier plan : la flaque jamais dans les 15 % du bas du cadre, la roue arrière gauche dedans en glisse ;
+    # le premier plan : la flaque jamais dans les 15 % du bas du cadre, la roue arrière gauche dedans en sortie de
+    # glisse (images 40 à 48) ;
     # aucune bouffée de fumée gardée à moins de 2 m de la caméra
     low = min((q[1], f) for f in frames for q in (P.project(p, M.t_of(f)) for p in P.puddle_pts())
               if q and -5.0 <= q[0] <= 105.0)
     pud = M._rect(P.PUDDLE_AT, P.PUDDLE_YAW - 90.0, P.PUDDLE_SIZE)
-    wet = [round(t * M.FPS + P.F0) for t, x, y in P.wheel_track(-1, frames=(24, 40), n=32)
+    wet = [round(t * M.FPS + P.F0) for t, x, y in P.wheel_track(-1, frames=(40, 48), n=32)
            if M._point_gap((x, y), pud) == 0.0]
     check("P5 : la flaque hors du bas du cadre, sous la roue arrière gauche", low[0] >= P.FLOOR_BAND and wet,
           f"au plus bas à {low[0]:.1f} % (image {low[1]}) ; roue dedans aux images {wet[:1] + wet[-1:]}")
@@ -244,7 +247,7 @@ def test_gaps():
     check("P5 : la fumée gardée loin de l'objectif", len(kept) >= 4, f"{len(kept)} bouffées, dès l'image {kept[0][0]}"
           if kept else "aucune")
     # la patrouille 1 entière dans le cadre, à gauche de la berline, 12 images de suite au moins (PATROL_SEEN) ; elle
-    # s'arrête avant les séparateurs, en travers, et ne recule jamais
+    # s'arrête avant les séparateurs, le nez rentré (elle sous-vire), et ne recule jamais
     seen = [f for f in range(P.F0, P.F0 + P.FRAMES) if P.patrol_seen(f)]
     runs, cur = [], []
     for f in seen:
@@ -259,7 +262,7 @@ def test_gaps():
            (P.BARRIER_X[1], P.BARRIER_Y + 0.35), (P.BARRIER_X[0], P.BARRIER_Y + 0.35)]
     ys = [p0(M.t_of(f))[1] for f in frames]
     check("P5 : la patrouille 1 s'arrête avant les séparateurs", M._poly_gap(rect, bar) >= 1.2
-          and P.PATROL.v(M.t_of(P.F0 + P.FRAMES - 1)) < 0.1 and all(b >= a for a, b in zip(ys, ys[1:])),
+          and P.PATROL.speed(M.t_of(P.F0 + P.FRAMES - 1)) < 0.1 and all(b >= a for a, b in zip(ys, ys[1:])),
           f"{M._poly_gap(rect, bar):.2f} m, cap {P.patrol_heading(M.t_of(P.F0 + P.FRAMES - 1)):.0f}°")
     # le cadre final : l'hélicoptère devant elle, entre x 45 et 65 %, y 68 et 82 % du bas, au-dessus de la berline
     t1 = M.t_of(P.F0 + P.FRAMES - 1)
