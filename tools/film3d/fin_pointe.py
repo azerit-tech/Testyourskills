@@ -1,8 +1,12 @@
-# Le plan FIN écrit une fois, sans Blender (docs/cinematique-poursuite.md §2.3 et §2.4, « la pointe ») : caméra
-# fixe à 20 cm du sol, la berline finit sa glissade vers nous et s'immobilise au centre de la pointe, trois quarts
-# face ; la patrouille, arrivée la première, est arrêtée à sa droite, l'avant vers nous, portière du conducteur
-# déjà ouverte ; l'agent, accroupi derrière, la pousse à fond, puis se redresse et vise ; le conducteur lâche
-# le volant et lève ses mains gantées. Personne ne tire. Pas de gel ni de flash : le site les pose.
+# Le plan FIN écrit une fois, sans Blender (docs/cinematique-poursuite.md §2.3 et §2.4, « la pointe » ;
+# docs/cinematique-decoupage-v2.md, FIN) : caméra à 20 cm du sol qui avance de 2,2 m et se pose à l'image 22 sur le
+# cadre validé, puis tient. La berline finit sa glissade vers nous et s'immobilise au centre de la pointe, trois
+# quarts face, à l'image 22 ; la patrouille, arrivée la première, est arrêtée à sa droite, l'avant vers nous,
+# portière du conducteur déjà ouverte ; derrière la berline, trois poursuivants finissent leur freinage en arc et
+# s'arrêtent l'un après l'autre (images 8, 14, 20) ; l'agent, accroupi derrière la portière, la pousse à fond, puis
+# se redresse quand la berline s'arrête ; le faisceau de l'hélicoptère, en retard sur elle, se fixe sur elle. Puis
+# un temps mort (images 22 à 27 : seules battent les rampes), et le conducteur lâche le volant et lève lentement
+# ses mains gantées (27 à 35). Personne ne tire. Pas de gel ni de flash : le site les pose.
 # scene_d.py n'en lit que les fonctions du temps et les images clés.
 #
 # Repère de l'eau (lieux.py) : la pointe centrée en (80, 430), la jetée vers -y. La glissade suit
@@ -35,14 +39,18 @@ def slide_pose(s):
     return x, y, HERO_STOP * s ** 1.6
 
 
-# --- la glissade : 4,5 m en 0,9 s, décélération constante (36 km/h, ~1,1 g en travers), puis arrêt
+# --- la glissade : 4,5 m en 0,875 s, décélération constante (37 km/h, ~1,2 g en travers), arrêt à l'image 22.
+# Avant l'image 1 (l'obturateur, la mise en route des ressorts de motion.sample), la même décélération remonte le
+# temps : la berline arrive plus vite, elle n'est jamais immobile avant le plan (immobile puis lancée d'un coup,
+# la caisse se cabrait à l'image 1)
 SLIDE_D = 4.5
-T_STOP = 0.9
+F_STOP = 22
+T_STOP = M.t_of(F_STOP)
 SLIDE_L = CY - JY1 + 6.0           # 36 m : y est linéaire en e = 1 - (1 - s)²
 
 
 def slide_s(t):
-    u = min(1.0, max(0.0, t / T_STOP))
+    u = min(1.0, t / T_STOP)
     e = 1.0 - (SLIDE_D / SLIDE_L) * (1.0 - u) ** 2
     return 1.0 - math.sqrt(max(0.0, 1.0 - e))
 
@@ -83,24 +91,122 @@ def door_deg(t):
 
 
 # l'agent, derrière la portière ouverte (à 80°), sur la bissectrice de la portière et de l'arrière, à 0,75 m de la
-# charnière ; il regarde la berline. Accroupi jusqu'à l'image 18, en joue à l'image 28 (clés d'os).
+# charnière ; il regarde la berline. Accroupi jusqu'à l'image 15, debout en joue à l'image 23, quand la berline
+# vient de s'arrêter (clés d'os) : il a fini de bouger avant le temps mort.
 _d80 = door_dir(80.0)
 _bis = (_d80[0] - FWD[0], _d80[1] - FWD[1])
 _n = math.hypot(*_bis)
 OFFICER = (HINGE[0] + _bis[0] / _n * 0.75, HINGE[1] + _bis[1] / _n * 0.75)
 OFFICER_LOOK = (CX - 0.3, CY + 0.6)
-OFFICER_KEYS = [(18, "crouch"), (28, "aim")]
+OFFICER_KEYS = [(15, "crouch"), (23, "aim")]
 OFFICER_R = 0.3                    # son encombrement au sol (épaules, genou)
 
-# le conducteur : les mains au volant jusqu'à l'image 22 (la voiture vient de s'arrêter), levées à l'image 31
-DRIVER_KEYS = (22, 31)
+# le conducteur : les mains au volant jusqu'à l'image 27, après le temps mort (la voiture s'est arrêtée à 22, la
+# caisse a fini de se poser), levées à l'image 35, lentement (les clés d'os s'interpolent en douceur)
+DRIVER_KEYS = (27, 35)
 
 # la fumée des pneus : elle continue sur sa lancée après l'arrêt et dépasse la berline vers l'objectif (+y)
 SMOKE_DRIFT = 2.6
 
 
+# --- la caméra : la pose validée (lacet 1°, site 14°, 24 mm) à l'image 22, atteinte par une avancée de 2,2 m au ras
+# du sol dans l'axe de visée, lancée à ~23 km/h et freinée avec la berline (sans à-coup : vitesse et accélération
+# nulles à l'arrivée) ; une vibration de chariot, proportionnelle à sa vitesse, s'éteint avec elle
+CAM_YAW, CAM_PITCH, CAM_LENS = 1.0, 14.0, 24.0
+CAM_PUSH = 2.2
+F_LAND = 22
+T_LAND = M.t_of(F_LAND)
+_BACK = (math.sin(math.radians(CAM_YAW)), math.cos(math.radians(CAM_YAW)))   # l'opposé de la visée, au sol
+CAM_EASE = 2.3
+
+
+def camera(t):
+    """(x, y, z, lacet, site, roulis, focale) de motion.key_camera."""
+    u = min(1.0, t / T_LAND)
+    k = CAM_PUSH * (1.0 - u) ** CAM_EASE                 # ce qu'il reste à parcourir
+    s = (1.0 - u) ** (CAM_EASE - 1.0)                     # la vitesse, rapportée à celle du départ
+    dyaw, dpitch, droll, dx, dy, dz = M.handheld(t, amp=0.10, rotor=0.0, seed=2.2)
+    return (CAM[0] + _BACK[0] * k + dx * 0.3 * s, CAM[1] + _BACK[1] * k, CAM[2] + dz * 0.4 * s,
+            CAM_YAW + dyaw * s, CAM_PITCH + dpitch * s, droll * s, CAM_LENS)
+
+
+def focus_point(t):
+    """La mise au point suit l'avant de la berline (la pose validée : 1 m devant son centre, à 1 m)."""
+    x, y = hero_pos(t)
+    return x, y + 1.0, 1.0
+
+
+# --- le faisceau de l'hélicoptère : en retard sur la berline pendant la glissade (il la cherche, un peu de
+# balancement), il la rattrape et se fixe sur elle à l'image 26 ; immobile ensuite
+HELI = (CX - 10.0, CY - 34.0, 34.0)
+F_BEAM = 26
+
+
+def beam_target(t):
+    x, y = hero_pos(t)
+    w = 1.0 - M.smoothstep(0.0, M.t_of(F_BEAM), t)
+    lx, ly = hero_pos(t - 0.3)
+    sway = 1.1 * w * math.sin(2.0 * math.pi * 1.3 * t + 0.4)
+    return x + (lx - x) * w + sway, y + (ly - y) * w, 0.8
+
+
+# --- les poursuivants : trois patrouilles sorties de la jetée derrière la berline finissent leur freinage en arc,
+# côté gauche de la berline (la droite de l'image, la seule part du fond que la berline et la patrouille du premier
+# plan ne cachent pas), le nez vers elle ; elles s'arrêtent l'une après l'autre. Freinage constant à 0,9 g : la
+# dernière arrive à 33 km/h et parcourt 4,6 m, la première ne fait plus que s'asseoir.
+ARC_DECEL = 9.0
+# (arrêt (x, y), image d'arrêt, cap d'arrivée en degrés : elles sortent de la jetée, vers +y, en s'écartant)
+ARC = [((76.0, 401.0), 6, 2.0), ((72.5, 410.0), 13, 6.0), ((70.5, 419.0), 20, 12.0)]
+
+
+def _dir(h):
+    r = math.radians(h)
+    return -math.sin(r), math.cos(r)
+
+
+def arc_end_heading(i):
+    (x, y), _, _ = ARC[i]
+    return M.heading_of(CX - x, CY - y)
+
+
+def arc_len(i):
+    T = M.t_of(ARC[i][1])
+    return ARC_DECEL * T * T / 2.0
+
+
+def arc_pos(i):
+    """La trajectoire du poursuivant i : une courbe de Bézier du second degré de son arrivée (cap ARC[i][2]) à son
+    arrêt (nez vers la berline), parcourue à décélération constante ; avant l'image 1, la même décélération remonte
+    le temps (la courbe prolongée)."""
+    (ex, ey), f_stop, h0 = ARC[i]
+    T, Lc = M.t_of(f_stop), arc_len(i)
+    d1, d0 = _dir(arc_end_heading(i)), _dir(h0)
+    p1 = (ex - d1[0] * Lc / 2, ey - d1[1] * Lc / 2)
+    p0 = (p1[0] - d0[0] * Lc / 2, p1[1] - d0[1] * Lc / 2)
+
+    def pos(t):
+        u = 1.0 if t >= T else 1.0 - (1.0 - t / T) ** 2
+        a, b, c = (1 - u) ** 2, 2 * u * (1 - u), u * u
+        return a * p0[0] + b * p1[0] + c * ex, a * p0[1] + b * p1[1] + c * ey
+    return pos
+
+
+def arc_heading(i):
+    """Le cap du poursuivant i, lu sur sa trajectoire (le cap d'arrêt une fois arrêté)."""
+    pos, T = arc_pos(i), M.t_of(ARC[i][1])
+
+    def head(t):
+        if t >= T - 1e-3:
+            return arc_end_heading(i)
+        a, b = pos(t - 1e-3), pos(t + 1e-3)
+        return M.heading_of(b[0] - a[0], b[1] - a[1])
+    return head
+
+
 def tracks():
-    return {"hero": hero_pos, "patrol": lambda t: PATROL}
+    out = {"hero": hero_pos, "patrol": lambda t: PATROL}
+    out.update({f"arc_{i}": arc_pos(i) for i in range(len(ARC))})
+    return out
 
 
 def _corners(c, heading, box):
@@ -133,6 +239,8 @@ def seg_point(a, b, p):
 
 
 if __name__ == "__main__":
+    for i in range(len(ARC)):
+        print(f"poursuivant {i} : {arc_len(i):.1f} m, arrêt à l'image {ARC[i][1]}, cap {arc_end_heading(i):.0f}°")
     for f in (1, 8, 16, 22, 28, 36):
         t = M.t_of(f)
         x, y = hero_pos(t)

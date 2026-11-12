@@ -321,6 +321,37 @@ def test_fin():
     ps = M.sample(P.hero_pos, range(0, 40), heading=P.hero_heading, noise=0.0)
     check("FIN : la caisse plonge au freinage", min(p["pitch"] for p in ps) < -1.0,
           f"{min(p['pitch'] for p in ps):.2f}°")
+    first = next(p for p in ps if p["frame"] == P.F0)
+    check("FIN : la caisse ne se cabre pas à la première image (la berline arrive lancée)", first["pitch"] < 0.0,
+          f"{first['pitch']:.2f}°")
+    stop = min(f for f in range(P.F0, P.F0 + P.FRAMES) if math.dist(P.hero_pos(M.t_of(f)), (P.CX, P.CY)) < 1e-6)
+    check("FIN : la berline s'arrête à l'image 22", stop == 22, f"image {stop}")
+    # la caméra : l'avancée de 2,2 m se pose sur la pose validée à l'image 22 et n'en bouge plus
+    c0, cl = P.camera(M.t_of(P.F0)), P.camera(M.t_of(P.F_LAND))
+    still = all(P.camera(M.t_of(f)) == cl for f in range(P.F_LAND, P.F0 + P.FRAMES + 1))
+    check("FIN : la caméra se pose à l'image 22 sur la pose validée, puis tient",
+          math.dist(cl[:3], P.CAM) < 1e-9 and cl[3:] == (1.0, 14.0, 0.0, 24.0) and still)
+    check("FIN : l'avancée fait 2,2 m", abs(math.dist(c0[:2], cl[:2]) - 2.2) < 0.25, f"{math.dist(c0[:2], cl[:2]):.2f} m")
+    steps = [math.dist(P.camera(M.t_of(f))[:2], P.camera(M.t_of(f + 1))[:2]) for f in range(P.F0, P.F_LAND)]
+    check("FIN : l'avancée freine sans à-coup", all(b <= a + 1e-9 for a, b in zip(steps, steps[1:])) and steps[-1] < 0.005,
+          f"{steps[-1] * 1000:.1f} mm à la dernière image")
+    # les poursuivants : arrêtés l'un après l'autre, avant la berline ou avec elle, sans rien toucher
+    stops = [a[1] for a in P.ARC]
+    check("FIN : les poursuivants s'arrêtent l'un après l'autre", len(set(stops)) == len(stops)
+          and all(b - a >= 4 for a, b in zip(stops, stops[1:])) and max(stops) <= 22, f"images {stops}")
+    for i in range(len(P.ARC)):
+        pos, head = P.arc_pos(i), P.arc_heading(i)
+        moved = math.dist(pos(M.t_of(stops[i])), pos(M.t_of(stops[i] + 6)))
+        gaps = []
+        for f in range(P.F0 - 1, P.F0 + P.FRAMES + 1):
+            t = M.t_of(f)
+            gaps.append(P.rect_gap(pos(t), head(t), P.PATROL_BOX, P.hero_pos(t), P.hero_heading(t), P.HERO_BOX))
+            gaps.append(P.rect_gap(pos(t), head(t), P.PATROL_BOX, P.PATROL, P.HERO_STOP, P.PATROL_BOX))
+            for j in range(i):
+                gaps.append(P.rect_gap(pos(t), head(t), P.PATROL_BOX, P.arc_pos(j)(t), P.arc_heading(j)(t),
+                                       P.PATROL_BOX))
+        check(f"FIN : le poursuivant {i} arrêté à l'image {stops[i]}, à 1 m au moins de tout véhicule",
+              moved < 1e-6 and min(gaps) >= 1.0, f"{min(gaps):.2f} m au plus près")
 
 
 def test_spin_steps():

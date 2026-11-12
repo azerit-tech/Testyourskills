@@ -694,10 +694,13 @@ def plan_FIN(scene, hidden, palier="socle"):
     lueur corail. Hors champ, des lueurs corail et lilas battent dans la brume et sur le sol mouillé.
     (Au 35 mm du cahier des charges, la berline seule remplit la largeur à 9 m : le 24 mm fait entrer la patrouille.)
 
-    Animé (36 images, fin_pointe.py) : la berline finit les 4,5 derniers mètres de sa glissade et s'arrête à l'image
-    22 ; la portière, déjà ouverte, est poussée à fond ; l'agent passe d'accroupi à en joue (clés d'os, images 18
-    à 28) ; le conducteur lève les mains (images 22 à 31) ; la fumée dépasse la berline. La dernière image est la
-    pose validée."""
+    Animé (36 images, fin_pointe.py, découpage v2) : la caméra avance de 2,2 m au ras du sol et se pose sur la pose
+    validée à l'image 22, quand la berline, au bout des 4,5 derniers mètres de sa glissade, s'arrête (ses traces
+    de gomme naissent sous ses roues) ; derrière elle, à droite de l'image, trois poursuivants finissent leur
+    freinage en arc et s'arrêtent l'un après l'autre (images 6, 13, 20), rampes battantes ; la portière, déjà
+    ouverte, est poussée à fond ; l'agent se redresse en joue (clés d'os, images 15 à 23) ; le faisceau de
+    l'hélicoptère, en retard sur la berline, se fixe sur elle à l'image 26 ; temps mort ; le conducteur lève
+    lentement les mains (images 27 à 35) ; la fumée dépasse la berline. La dernière image est la pose validée."""
     import motion as M
     import fin_pointe as F
     decor(scene, hidden, marina=(palier in ("marina", "complet")))
@@ -710,7 +713,8 @@ def plan_FIN(scene, hidden, palier="socle"):
     M.key_vehicle(hero, poses, wheels=wheels)
     M.wheel_marks(wheels, hero["wheel_r"])
     L.hands_up_keys(hero, *F.DRIVER_KEYS)
-    L.cabin_light(hero, energy=25.0)
+    # à 25 W, les mains levées ne se distinguaient pas du reflet du ciel dans le pare-brise (rendu du 12 nov.)
+    L.cabin_light(hero, energy=float(os.environ.get("FILM3D_HABITACLE", "70")))
     # la patrouille, parallèle à la berline, à sa droite et un peu en avant : sa portière gauche s'ouvre vers elle
     f = Vector((-math.sin(math.radians(HERO_STOP)), math.cos(math.radians(HERO_STOP)), 0.0))
     r = Vector((f.y, -f.x, 0.0))
@@ -728,7 +732,9 @@ def plan_FIN(scene, hidden, palier="socle"):
     # les faisceaux de sa rampe partent vers l'arrière, presque à l'horizontale : vers l'avant, le corail frappait
     # le sol juste devant l'objectif et blanchissait tout le tiers bas
     L.bar_beams(pat, "patrol", yaws=((125, L.CORAL), (-125, L.LILAC)), energy=3000.0, tilt=3.0)
-    M.flash_bars([pat], frames)
+    arc = fin_arc(hero, frames)
+    # la patrouille du premier plan garde son rang (et sa phase) en tête de liste
+    M.flash_bars([pat] + arc, frames)
     # les lueurs de sa rampe éclairent la berline, à la différence de FIN6 : exclue d'elles, son flanc passait de
     # (41, 18, 27) à (19, 12, 23), presque noir ; FIN reste la référence de teinte (12 nov.)
     # l'agent garde son armature : accroupi derrière la portière, il se redresse en joue (fin_pointe.OFFICER_KEYS)
@@ -764,8 +770,12 @@ def plan_FIN(scene, hidden, palier="socle"):
     # (jusqu'à 3,5 m devant elle) au lieu de s'étirer vers l'objectif ; l'hélicoptère reste dans le cadre, à
     # droite, sous la bande des 12 %
     heli, _ = L.helicopter("heli")
-    L.put(heli, CX - 10.0, CY - 34.0, 34.0, heading=-20.0, pitch=-6.0, roll=5.0)
+    L.put(heli, *F.HELI, heading=-20.0, pitch=-6.0, roll=5.0)
     aim_helis([heli], STOP + Vector((0, 0, 0.8)), energy=200000.0, car=hero, car_energy=60000.0, cone=6.0)
+    # le faisceau cherche la berline pendant la glissade, puis se fixe sur elle (fin_pointe.beam_target) ; à la
+    # dernière image il retrouve la visée ci-dessus
+    piv = next(o for o in heli.children_recursive if o.name.endswith("searchlight_pivot"))
+    M.key_searchlight({"searchlight_pivot": piv}, frames, F.beam_target)
     # la brume est réelle depuis que lieux.haze tourne ses normales vers l'extérieur : 0,0005 sur 800 m laisse la
     # ville voilée mais lisible ; la nappe locale, plus dense, prend les faisceaux et les lueurs
     L.haze((CX - 80, CX + 80), (CY - 470, CY + 60), (L.WATER_Z, 50), 0.0005)
@@ -777,8 +787,51 @@ def plan_FIN(scene, hidden, palier="socle"):
     L.cap_images(1024, keep_objects=[hero, bpy.data.objects["pointe_sol"]])
     cam = L.camera("cam_FIN", cam_loc, cam_loc + d * 40.0, lens=24, fstop=2.2,
                    focus=(STOP.x, STOP.y + 1.0, 1.0))
+    # l'avancée de 2,2 m (fin_pointe.camera), posée sur la pose ci-dessus à l'image 22 ; la mise au point suit
+    # l'avant de la berline (key_camera vide l'action de la caméra : les clés de mise au point viennent après)
+    M.key_camera(cam, frames, F.camera)
+    for f_ in frames:
+        t = M.t_of(f_)
+        cam.data.dof.focus_distance = (Vector(F.focus_point(t)) - Vector(F.camera(t)[:3])).length
+        cam.data.dof.keyframe_insert("focus_distance", frame=f_)
     scene.render.use_motion_blur = True
+    scene.render.motion_blur_shutter = 0.5
     return cam
+
+
+def fin_arc(hero, frames):
+    """FIN : les trois poursuivants qui finissent leur freinage en arc derrière la berline (fin_pointe.ARC), une
+    patrouille chargée une fois et deux copies liées. Phares en veilleuse (le nez vers l'objectif, à 20-25 m :
+    pleins phares, deux taches blanches et leurs traînées sur l'enrobé) ; flaques de rampe sur le sol mouillé,
+    faisceaux de rampe dans la brume. Aucune de leurs lumières n'éclaire la berline (le rose de FIN6). Renvoie les
+    rigs."""
+    import motion as M
+    import fin_pointe as F
+    src, rigs = None, []
+    for i in range(len(F.ARC)):
+        if src is None:
+            r = src = L.patrol("patrol_arc")
+            for o in r.children_recursive:
+                if o.type == "LIGHT" and "_head_" in o.name:
+                    o.data.energy *= 0.12
+            L.bar_pools(r, energy=350.0)
+        else:
+            r = L.clone(src, f"patrol_arc_{i}")
+        pos, head = F.arc_pos(i), F.arc_heading(i)
+        x, y = pos(F.T_STILL)
+        L.put(r, x, y, 0.0, heading=F.arc_end_heading(i))
+        yaw = (40.0, -55.0, 20.0)[i]
+        L.bar_beams(r, f"patrol_arc_{i}", yaws=((yaw, L.CORAL), (yaw + 170.0, L.LILAC)), energy=4000.0, tilt=4.0)
+        body = M.body_of(r)
+        wh, wr = M.wheels_of(body), body.get("wheel_r", 0.36)
+        ps = M.sample(pos, frames, heading=head, wheel_r=wr, seed=3.0 + i,
+                      wheelbase=body.get("wheelbase", 2.9), front=body.get("front_axle"))
+        M.key_vehicle(r, ps, wheels=wh, pivot=(0.0, 0.0, 0.36))
+        M.wheel_marks(wh, wr, axis="Y")
+        rigs.append(r)
+    print(f"[FIN] {len(rigs)} poursuivants en arc, arrêts aux images {[a[1] for a in F.ARC]} ; berline exclue de "
+          f"{car_out_of_rigs(rigs, hero)} de leurs lumières", flush=True)
+    return rigs
 
 
 def plan_FIN6(scene, hidden, palier="socle"):
