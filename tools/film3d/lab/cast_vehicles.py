@@ -936,8 +936,9 @@ def _raw_tex(sock):
 
 
 # Les cœurs des modules, plus saturés que la palette : AgX désature une émission forte vers le blanc, un corail
-# pur à 8 sortait saumon. Le diffuseur reste à la couleur de la palette.
-CORAL_CORE = (1.0, 0.075, 0.018, 1.0)
+# pur à 8 sortait saumon. Sous l'écrêtage (BAR_CORE), le vert remonte : à 0,075 le corail se lisait rouge (P1, P4).
+# Le diffuseur reste à la couleur de la palette.
+CORAL_CORE = (1.0, 0.13, 0.03, 1.0)
 # le lilas des cœurs : un violet rosé (le rouge à 0,65 du bleu) qu'on ne prend pas pour un bleu de police, à la
 # luminance du corail (0,265 contre 0,267, Rec. 709 linéaire)
 LILAC_CORE = (0.62, 0.09, 0.95, 1.0)
