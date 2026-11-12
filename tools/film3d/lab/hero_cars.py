@@ -610,6 +610,13 @@ def mat_tyre(name, r_rim=0.19, r_out=0.31, wear=0.0):
     return m
 
 
+# la lunette (attribut de face « lunette » des vitres, mark_rear_window) : la part de son reflet retirée. Vue de dos,
+# couchée vers le ciel, elle en renvoyait un aplat clair où la silhouette du conducteur se perdait ; et sans gouttes
+# ni voile d'essuyage, qui la ternissaient en gris devant l'habitacle
+REAR_WINDOW = "lunette"
+REAR_REFL_CUT = 0.6
+
+
 def mat_window(name, tint=(0.80, 0.86, 0.84, 1), dark=0.0, wear=0.0):
     """Verre de vitre : sans réfraction (les vitres du modèle sont des lames minces à deux faces), reflet de Fresnel
     du verre réel (IOR 1,52) sur une transparence à peine verte, comme le verre trempé d'époque.
@@ -630,25 +637,31 @@ def mat_window(name, tint=(0.80, 0.86, 0.84, 1), dark=0.0, wear=0.0):
     gl = _glossy(nt)
     gl.inputs["Roughness"].default_value = 0.0
     mix = nt.nodes.new("ShaderNodeMixShader")
+    rw = nt.nodes.new("ShaderNodeAttribute")
+    rw.attribute_type = "GEOMETRY"
+    rw.attribute_name = REAR_WINDOW
+    clear = cv._math(nt, "SUBTRACT", 1.0, rw.outputs["Fac"])        # 0 sur la lunette, 1 ailleurs
     # un plancher de reflet : la vitre reste lisible de face
     floor = 0.04
     if wear > 0:
         rest = _rest(nt)
         haze = _imperfection(nt, rest, "SurfaceImperfections003", 0.8, 0.04, 0.4)
         spots = _imperfection(nt, rest, "SurfaceImperfections013", 0.4, 0.08, 0.6)
-        veil = cv._math(nt, "MAXIMUM", haze, spots)
+        veil = cv._math(nt, "MULTIPLY", cv._math(nt, "MAXIMUM", haze, spots), clear)
         nt.links.new(cv._math(nt, "MULTIPLY", veil, 0.10 * wear), gl.inputs["Roughness"])
         floor = cv._math(nt, "ADD", 0.04, cv._math(nt, "MULTIPLY", veil, 0.07 * wear))
         up = _up(nt, 0.25, 0.65)
         dens = min(1.0, 1.4 * wear)
         h1, m1 = _drops(nt, rest, 80.0, 0.34, cv._math(nt, "ADD", cv._math(nt, "MULTIPLY", up, 0.35 * dens), 0.03 * dens))
         h2, m2 = _drops(nt, rest, 230.0, 0.3, cv._math(nt, "ADD", cv._math(nt, "MULTIPLY", up, 0.3 * dens), 0.04 * dens))
-        b = _node(nt, "ShaderNodeBump", Height=cv._math(nt, "MAXIMUM", h1, h2), Strength=1.0, Distance=0.0025)
+        b = _node(nt, "ShaderNodeBump", Height=cv._math(nt, "MULTIPLY", cv._math(nt, "MAXIMUM", h1, h2), clear),
+                  Strength=1.0, Distance=0.0025)
         nt.links.new(b.outputs[0], gl.inputs["Normal"])
         nt.links.new(b.outputs[0], fr.inputs["Normal"])
     # la face de dos : la moitié du plancher (la lame a déjà reçu celui de sa face avant)
     f = cv._math(nt, "ADD", cv._math(nt, "MULTIPLY", fr.outputs[0], 0.9),
                  cv._math(nt, "MULTIPLY", floor, cv._math(nt, "SUBTRACT", 1.0, cv._math(nt, "MULTIPLY", bf, 0.5))))
+    f = cv._math(nt, "MULTIPLY", f, cv._math(nt, "SUBTRACT", 1.0, cv._math(nt, "MULTIPLY", rw.outputs["Fac"], REAR_REFL_CUT)))
     nt.links.new(f, mix.inputs[0])
     nt.links.new(tr.outputs[0], mix.inputs[1])
     nt.links.new(gl.outputs[0], mix.inputs[2])
@@ -1046,6 +1059,40 @@ def split_glass(body, mat_names):
     cv.parent_keep(ob, body)
     ob[GLASS_TAG] = True
     return ob
+
+
+def mark_rear_window(glass):
+    """L'attribut de face REAR_WINDOW (1) sur la lunette de l'objet des vitres (repère de la voiture au chargement :
+    l'arrière vers -x) : les faces de la moitié arrière tournées vers l'arrière et le ciel. Les verres des feux,
+    verticaux, n'en sont pas ; les carreaux des portes sont dans les portes. Renvoie le nombre de faces."""
+    me = glass.data
+    a = me.attributes.get(REAR_WINDOW) or me.attributes.new(REAR_WINDOW, "FLOAT", "FACE")
+    vals = [1.0 if (p.center.x < 0.0 and p.normal.x < -0.3 and p.normal.z > 0.2) else 0.0 for p in me.polygons]
+    a.data.foreach_set("value", vals)
+    return int(sum(vals))
+
+
+def dark_shelf(body, mats=("hero_w111_leather", "hero_w111_carpet"), x_max=-0.85, z_min=0.8):
+    """La plage arrière sombre : la moquette de la plage et le dessus du dossier arrière (le bourrelet de cuir cognac
+    tourné vers le ciel, sous la lunette) prennent une moquette brun noir mate, sans reflet. Sous le projecteur de
+    l'hélicoptère, ils faisaient une bande beige (0,77 de luminance) au pied de la lunette, plus claire que le toit
+    (0,54) : la silhouette du conducteur s'y perdait. Repère de la voiture au chargement (l'arrière vers -x). Renvoie
+    le nombre de faces."""
+    me = body.data
+    idx = {i for i, m in enumerate(me.materials) if m and m.name in mats}
+    if not idx:
+        return 0
+    m, nt, out = cv._mat("hero_w111_shelf")
+    p = cv._principled(nt, **{"Base Color": lin("#120c09"), "Roughness": 1.0, "Specular IOR Level": 0.05})
+    nt.links.new(p.outputs[0], out.inputs[0])
+    me.materials.append(m)
+    k = len(me.materials) - 1
+    n = 0
+    for f in me.polygons:
+        if f.material_index in idx and f.center.x < x_max and f.center.z > z_min and f.normal.z > 0.5:
+            f.material_index = k
+            n += 1
+    return n
 
 
 def _mesh_object(name, bm, mats, coll=None, smooth=False):
@@ -1539,6 +1586,9 @@ def load_hero(variant="w111", collection=None, lights_on=True, raw=False):
             car["report"]["antenne"] = "posée" if ant else "aile introuvable"
             car["glass"] = split_glass(body, {"hero_w111_glass"})
             car["report"]["vitres"] = "à part" if car["glass"] else "introuvables"
+            if car["glass"]:
+                car["report"]["lunette"] = f"{mark_rear_window(car['glass'])} faces"
+            car["report"]["plage arrière"] = f"{dark_shelf(body)} faces en moquette sombre"
             body[STOP] = 0.0
             body.id_properties_ui(STOP).update(min=0.0, max=1.0, description="feux stop (0 éteints, 1 allumés)")
             car["report"]["feux"] = tail_cores(body, on=lights_on)
