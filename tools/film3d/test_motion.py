@@ -316,34 +316,42 @@ def test_p3():
 
 
 def test_p6():
-    """P6 (découpage v2) : aucune distance sous 6 m au sol ; la colonne derrière la berline ; la caméra devant elle,
-    au ras du sol jusqu'à l'image 24, à 5 m et 13 m devant à la fin ; les appareils s'évitent, les avions au large
-    de la jetée ; rien ne frôle la caméra ; personne ne tire (il n'y a rien à tirer)."""
+    """P6 (découpage v3) : aucune distance sous 6 m au sol ; la colonne derrière la berline ; la caméra de dos, 7 m
+    derrière à 1,6 m à l'image 1, 8 m derrière à 3,6 m à la fin, grue sous 2,5 m/s ; la patrouille 1 à gauche, de
+    14 à 6 m derrière, et à 0,8 m au moins de la caméra ; les appareils s'évitent ; rien ne frôle la caméra ; les
+    avions au-dessus de la pointe à l'image 44 ; personne ne tire (il n'y a rien à tirer)."""
     import p6_jetee as P
     frames = range(P.F0 - 1, P.F0 + P.FRAMES + 1)
     d, f, a, b = M.min_gap(P.tracks(), frames)
     check("P6 : distances gardées", d >= 6.0, f"{d:.1f} m entre {a} et {b} à l'image {f}")
-    gap = min(math.dist(P.hero_pos(M.t_of(f)), P.column_pos(i)(M.t_of(f))) for f in frames for i in range(len(P.COLUMN)))
+    gap = min(math.dist(P.hero_pos(M.t_of(f)), P.column_pos(i)(M.t_of(f)))
+              for f in frames for i in range(len(P.COLUMN)) if i != 1)
     check("P6 : la colonne ne rattrape pas la berline", gap >= 15.0, f"{gap:.1f} m au plus près")
-    low = [P.camera_path(M.t_of(f)) for f in range(P.F0, P.LIFT_FRAME + 1)]
-    lo_ok = all(abs(c[1] - P.hero_pos(M.t_of(f))[1] - 7.0) < 0.01 and abs(c[2] - 0.55) < 0.01
-                for f, c in zip(range(P.F0, P.LIFT_FRAME + 1), low))
-    end = P.camera_path(P.T_END)
-    check("P6 : au ras du sol à 7 m devant jusqu'à l'image 24, 5 m de haut et 13 m devant à la fin",
-          lo_ok and abs(end[2] - 5.0) < 0.01 and abs(end[1] - P.hero_pos(P.T_END)[1] - 13.0) < 0.01,
-          f"fin {end[2]:.2f} m de haut, {end[1] - P.hero_pos(P.T_END)[1]:.2f} m devant")
+    c0, c1 = P.camera_rail(0.0), P.camera_rail(P.T_END)
+    h0, h1 = P.hero_pos(0.0), P.hero_pos(P.T_END)
+    ok = (abs(h0[1] - c0[1] - 7.0) < 0.01 and abs(c0[2] - 1.6) < 0.01 and abs(h1[1] - c1[1] - 8.0) < 0.01
+          and abs(c1[2] - 3.6) < 0.01 and all(P.hero_pos(M.t_of(g))[1] > P.camera_rail(M.t_of(g))[1] for g in frames))
+    check("P6 : de dos, 7 m derrière à 1,6 m, puis 8 m derrière à 3,6 m", ok,
+          f"début {h0[1] - c0[1]:.2f} m à {c0[2]:.2f} m, fin {h1[1] - c1[1]:.2f} m à {c1[2]:.2f} m")
+    vz = max(abs(P.camera_rail(M.t_of(g + 1))[2] - P.camera_rail(M.t_of(g - 1))[2]) * M.FPS / 2 for g in frames)
+    check("P6 : la grue sous 2,5 m/s", vz <= 2.5, f"{vz:.2f} m/s")
+    p1 = [P.hero_pos(M.t_of(g))[1] - P.patrol1_pos(M.t_of(g))[1] for g in (P.F0, P.F0 + P.FRAMES - 1)]
+    side = all(P.patrol1_pos(M.t_of(g))[0] < P.hero_pos(M.t_of(g))[0] for g in frames)
+    check("P6 : la patrouille 1 à gauche, de 14 à 6 m derrière", side and abs(p1[0] - 14.0) < 0.1 and abs(p1[1] - 6.0) < 0.1,
+          f"{p1[0]:.1f} puis {p1[1]:.1f} m")
+    # la caméra et la patrouille 1 : de flanc (demi-largeur 0,95 m) au moins 0,8 m
+    cam_p1 = min(abs(P.camera_rail(M.t_of(g))[0] - P.patrol1_pos(M.t_of(g))[0]) - 0.95 for g in frames)
+    check("P6 : la caméra à 0,8 m au moins de la patrouille 1", cam_p1 >= 0.8, f"{cam_p1:.2f} m de son flanc")
     air = {f"heli_{i}": P.heli(i) for i in range(len(P.HELIS))}
     air.update({f"jet_{i}": P.jet(i) for i in range(len(P.JETS))})
     worst = min((math.dist(air[p](M.t_of(f))[:3], air[q](M.t_of(f))[:3]), p, q, f)
                 for f in frames for p in air for q in air if p < q)
     check("P6 : les appareils s'évitent (15 m)", worst[0] >= 15.0, f"{worst[0]:.1f} m entre {worst[1]} et {worst[2]}")
-    side = min(abs(P.jet(i)(M.t_of(f))[0] - P.JX) for f in frames for i in range(len(P.JETS)))
-    check("P6 : les avions passent au large de la jetée (20 m)", side >= 20.0, f"{side:.1f} m de l'axe")
-    for name, fn in (("caméra", P.camera), ("caméra V1", P.camera_v1)):
-        cam = min(math.dist(fn(M.t_of(f))[:3], air[k](M.t_of(f))[:3]) for f in frames for k in air)
-        check(f"P6 : rien ne frôle la {name} (20 m)", cam >= 20.0, f"{cam:.1f} m au plus près")
-    car = min(math.dist(P.camera(M.t_of(f))[:2], P.hero_pos(M.t_of(f))) for f in frames)
-    check("P6 : la caméra garde 7 m devant la berline", car >= 6.9, f"{car:.2f} m au plus près")
+    cam = min(math.dist(P.camera(M.t_of(f))[:3], air[k](M.t_of(f))[:3]) for f in frames for k in air)
+    check("P6 : rien ne frôle la caméra (20 m)", cam >= 20.0, f"{cam:.1f} m au plus près")
+    over = [P.jet(i)(M.t_of(P.JET_TURN))[1] for i in range(len(P.JETS))]
+    check("P6 : les avions au-dessus de la pointe à l'image 44", all(410.0 < y < 470.0 for y in over),
+          f"y {over[0]:.0f}, {over[1]:.0f}")
 
 
 def test_ouv():

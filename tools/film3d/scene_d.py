@@ -1045,27 +1045,16 @@ def p6_clean_haze(scene, hero):
 
 # les flaques étroites sur la ligne des roues de la berline (x 81,0 et 82,5 : roues à ±0,75 m de x = 81,75), entre
 # les nappes des phares : (x, y, demi-largeur, allongement le long de la jetée). Nommées fx_flaque_* pour fx.py
-# (elle les traverse aux images 7, 12, 19, 25, 31 et 37)
+# (découpage v3 : elle les traverse aux images 16, 21, 28, 33, 40 et 46)
 P6_PUDDLES = [(82.5, 260.5, 0.20, 4.0), (81.0, 268.0, 0.17, 5.0), (82.5, 277.0, 0.22, 3.5), (81.0, 285.0, 0.18, 4.5),
               (82.5, 294.0, 0.20, 4.0), (81.0, 302.0, 0.19, 4.0)]
-# les balises du terre-plein central, sur le double axe (x = 80) : la colonne roule à 78,25 et 81,75, 0,75 m de
-# chaque flanc, et ne coupe jamais l'axe sur la jetée ; elles défilent à 1 m à droite de l'objectif
-P6_BOLLARDS = [JY0 + 8.0 + 4.0 * k for k in range(72)]       # 108 .. 392
 
 
 def p6_foreground(hidden):
-    """Le premier plan de P6 au ras du sol (0,55 m) : les balises du double axe (les bornes de rue du modèle libre
-    de la rue, CREDITS.md) qui traversent le bord droit du cadre, une toutes les 4 m, filées par 120 km/h ; d'en
-    haut, à l'envol, elles tracent l'axe de la jetée jusqu'à la colonne. Des flaques étroites sur la ligne des
-    roues de la berline (la recette de P2 et P3), qu'elle traverse : fx_flaque_*."""
+    """Le premier plan de P6 : des flaques étroites sur la ligne des roues de la berline (la recette de P2 et P3),
+    qu'elle traverse : fx_flaque_*. Découpage v3 : plus de balises sur le double axe ; la caméra roule à 0,75 m de
+    lui, elles défilaient énormes entre l'objectif et la berline."""
     import scene_b as B
-    P = B.lib_parts("lieux/rue/street-pack/model.glb", {"p6_balise_src": lambda o, c: o.name.startswith("Bollard_lp")},
-                    hidden, 6.0)
-    nb = 0
-    if P.get("p6_balise_src"):
-        for k, y in enumerate(P6_BOLLARDS):
-            S.instance(P["p6_balise_src"], f"p6_balise_{k}", (JX, y, jetty_point(JX, y).z), 0.7 * k)
-            nb += 1
     water = B.puddle_mat()
     for k, (x, y, r, sy) in enumerate(P6_PUDDLES):
         ob = B.puddle(f"fx_flaque_{k}", 0.0, 0.0, r, sy, 600 + k, water)
@@ -1074,23 +1063,66 @@ def p6_foreground(hidden):
             v.co.y += y
             v.co.z = jetty_point(v.co.x, v.co.y).z + 0.0025
         ob.data.update()
-    print(f"[P6] premier plan : {nb} balises sur l'axe, {len(P6_PUDDLES)} flaques fx_flaque_* sur la ligne des roues",
-          flush=True)
+    print(f"[P6] premier plan : {len(P6_PUDDLES)} flaques fx_flaque_* sur la ligne des roues", flush=True)
+
+
+# les lampadaires de la jetée qui noient le phare (découpage v3 §3 : la lanterne, le repère du film, doit être le point
+# le plus vif de l'horizon) : vue de la caméra de P6, la file de gauche (x 76 pour les têtes) passe à 1,5° au plus de
+# la lanterne de y 325 à 385, celle de droite à 3° ; les trois derniers de gauche sont retirés, les trois derniers de
+# droite et celui de la pointe baissés (tête à 8 au lieu de 40, sous la lanterne à 30 ; spot à moitié)
+P6_LAMPS_FAR = (7, 8, 9)                 # J_LAMPS[7:] : y 325, 355, 385
+P6_PHARE_PHASE, P6_PHARE_VITESSE = 115.0, 20.0
+
+
+def p6_phare_clear(scene):
+    """Retire ou baisse les lampadaires de la jetée et de la pointe sur l'azimut du phare."""
+    head = bpy.data.materials.get("lamp_head")
+    dim = None
+    if head is not None:
+        dim = head.copy()
+        dim.name = "p6_lamp_head_bas"
+        for n in dim.node_tree.nodes:
+            if n.type == "EMISSION":
+                n.inputs["Strength"].default_value = 8.0
+    gone, low = 0, 0
+    for k in P6_LAMPS_FAR:
+        for name in (f"lamp_jetee_{k}_g", f"lamp_jetee_{k}_g_light"):
+            ob = bpy.data.objects.get(name)
+            if ob is not None:
+                bpy.data.objects.remove(ob)
+                gone += 1
+    for name in [f"lamp_jetee_{k}_d" for k in P6_LAMPS_FAR] + ["lamp_pointe"]:
+        ob = bpy.data.objects.get(name)
+        if ob is None:
+            continue
+        if dim is not None:
+            for slot in ob.material_slots:
+                if slot.material is head:
+                    slot.link = "OBJECT"
+                    slot.material = dim
+        li = bpy.data.objects.get(f"{name}_light")
+        if li is not None:
+            li.data = li.data.copy()
+            li.data.energy *= 0.5
+        low += 1
+    print(f"[P6] phare dégagé : {gone // 2} lampadaires retirés, {low} baissés sur son azimut", flush=True)
 
 
 def plan_P6(scene, hidden, palier="socle"):
-    """P6, toute la ville, animé (40 images, p6_jetee.py ; découpage v2) : la caméra devant la berline, 0,75 m à
-    sa gauche, 7 m devant, à 0,55 m, 21 mm, site +8°, qui la précède jusqu'à l'image 24 ; puis elle s'envole en
-    reculant jusqu'à 5 m de haut et 13 m devant (site -8°). La berline en tête sur la jetée à 120 km/h ; derrière
-    elle quinze véhicules en colonne, rampes clignotantes, de la rampe du pont à la jetée par la voie du quai
-    (ils ralentissent dans les deux virages) ; trois hélicoptères serrés derrière elle, faisceaux croisés sur
-    elle ; deux avions à 30-34 m qui arrivent de derrière la ville, passent au-dessus de tout et sortent par le
-    haut (ils ne tirent rien) ; la caméra tremble à leur passage. Variante V1 : diag/p6_v1.py."""
+    """P6, toute la ville, animé (60 images, p6_jetee.py ; découpage v3) : de dos, la caméra roule 7 m derrière la
+    berline, 1 m à sa gauche, à 1,6 m, 24 mm, puis monte lentement à 3,6 m et 8 m derrière. La berline sur la
+    jetée à 120 km/h, la pointe et le phare droit devant ; la patrouille 1 qui remonte par la voie de gauche ;
+    derrière, la colonne, rampes clignotantes ; trois hélicoptères devant elle, faisceaux tournés vers l'arrière et
+    le bas sur elle ; deux avions qui arrivent de derrière nous, passent au-dessus de tout et s'écartent au-dessus
+    de la pointe (ils ne tirent rien) ; la caméra tremble à leur passage."""
     import motion as M
     import p6_jetee as P6
     lamp_src = L.panorama(scene, hidden, all_lit=True, bridge="loin", port="loin", haubans=(palier in ("haubans", "complet")))
     build_jetty(hidden, lamp_src)
     build_pointe(hidden, lamp_src, far=True, marina=(palier in ("marina", "complet")))
+    # le phare (lieux.panorama) : ses pinceaux à 20°/s, de 115° à 164° depuis +x sur le plan ; l'autre, de 295° à
+    # 344°, part à 23° de l'objectif (vu du phare, la caméra est à 272°) et traverse le haut du cadre vers la droite
+    L.phare_tourne(bpy.data.objects["phare"], phase=P6_PHARE_PHASE, vitesse=P6_PHARE_VITESSE)
     scene.frame_start, scene.frame_end = P6.F0, P6.F0 + P6.FRAMES - 1
     frames = range(P6.F0 - 1, P6.F0 + P6.FRAMES + 1)      # une image de part et d'autre : l'obturateur du flou
     hero = L.hero()
@@ -1145,6 +1177,7 @@ def plan_P6(scene, hidden, palier="socle"):
     L.haze((JX - 30, JX + 30), (JY0 - 20, JY1), (L.WATER_Z, 28), 0.0012)
     p6_clean_haze(scene, hero)
     p6_foreground(hidden)
+    p6_phare_clear(scene)
     # la berline à 7 m de l'objectif : ses textures gardent leur pleine définition, le reste est loin
     L.cap_images(1024, keep_objects=[hero])
     c = P6.camera(P6.T_STILL)
