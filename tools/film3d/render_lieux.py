@@ -6,6 +6,9 @@
 #     [--engine workbench|cycles] [--percent 50] [--samples 32] [--gpu] [--no-save] [--grain 7] [--no-render]
 #   lockf -k <verrou> nice -n 19 /Applications/Blender.app/Contents/MacOS/Blender -b -t 2 \
 #     -P tools/film3d/render_lieux.py -- --scene scene-b.blend [--engine ...] [--percent ...] [--out chemin.png]
+#   --anim (avec l'une ou l'autre forme) : le plan animé, toutes ses images dans ref/anim/<nom>/, puis
+#     ref/anim/<nom>-anim.mp4 et -anim-ralenti.mp4 (<nom> : <lieu>-<plan>, ou la scène sans .blend ; --out
+#     donne le chemin du mp4). En Workbench, les repères de roue (objets « repere_* », cachés en Cycles) s'allument.
 #
 # --scene : ouvre assets/<scene> sans rien construire ; Workbench en couleurs des matières (--color MATERIAL par
 # défaut, la couleur de base ou d'émission recopiée dans la couleur d'affichage), transformée de vue « Standard » ;
@@ -53,6 +56,9 @@ ap.add_argument("--no-save", action="store_true")
 ap.add_argument("--no-render", action="store_true")
 ap.add_argument("--grain", type=float, default=None, help="7 pour un lieu, 0 pour une scène")
 ap.add_argument("--out", default=None)
+ap.add_argument("--anim", action="store_true",
+                help="toutes les images du plan (frame_start..frame_end) dans ref/anim/, assemblées en mp4 à 24 i/s "
+                     "et en ralenti ×4 (une seule session Blender)")
 args = ap.parse_args(sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else [])
 if not args.scene and not (args.lieu and args.plan):
     ap.error("--scene, ou --lieu et --plan")
@@ -111,6 +117,8 @@ if args.engine == "workbench":
     for ob in scene.objects:
         if ob.type == "MESH" and ob.name.startswith(("haze", "fumee", "spray_")):
             ob.hide_render = True
+        if ob.name.startswith("repere_"):
+            ob.hide_render = False      # le repère des roues : il ne sert qu'à juger la rotation dans l'aperçu
     r.engine = "BLENDER_WORKBENCH"
     sh = scene.display.shading
     sh.light = "STUDIO"
@@ -138,6 +146,26 @@ else:
         L.use_gpu(scene)
     c.samples = args.samples
     c.use_denoising = True
+ffmpeg = shutil.which("ffmpeg") or "/opt/homebrew/bin/ffmpeg"
+if args.anim:
+    # la séquence : une image par fichier, puis deux mp4 (24 i/s, et chaque image tenue quatre fois)
+    name = os.path.splitext(args.scene)[0] if args.scene else f"{args.lieu}-{args.plan}"
+    anim = os.path.join(L.FILM, "ref", "anim")
+    seq = os.path.join(anim, f"{name}-{args.palier if not args.scene else args.engine}{suffix}")
+    os.makedirs(seq, exist_ok=True)
+    r.image_settings.file_format = "PNG"
+    r.filepath = seq + os.sep
+    t1 = time.time()
+    bpy.ops.render.render(animation=True)
+    print(f"[lieux] {scene.frame_end - scene.frame_start + 1} images {args.engine} en {time.time() - t1:.0f} s, "
+          f"dans {seq}", flush=True)
+    mp4 = args.out or os.path.join(anim, f"{name}-anim.mp4")
+    for path, vf in ((mp4, "null"), (os.path.splitext(mp4)[0] + "-ralenti.mp4", "setpts=4*PTS")):
+        subprocess.run(["nice", "-n", "19", ffmpeg, "-loglevel", "error", "-y", "-threads", "2", "-framerate", "24",
+                        "-start_number", str(scene.frame_start), "-i", os.path.join(seq, "%04d.png"), "-vf", vf,
+                        "-r", "24", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", path], check=True)
+        print(f"[lieux] écrit {path}", flush=True)
+    sys.exit(0)
 if args.scene:
     out = args.out or os.path.join(L.FILM, "ref", "lieux", f"{os.path.splitext(args.scene)[0]}-{args.engine}.png")
 else:
@@ -150,7 +178,6 @@ bpy.ops.render.render(write_still=True)
 print(f"[lieux] rendu {args.engine} {r.resolution_x * args.percent // 100}×{r.resolution_y * args.percent // 100}, "
       f"{c.samples if args.engine == 'cycles' else '-'} éch., {c.device if args.engine == 'cycles' else 'workbench'} : "
       f"{time.time() - t1:.0f} s", flush=True)
-ffmpeg = shutil.which("ffmpeg") or "/opt/homebrew/bin/ffmpeg"
 if args.grain > 0 and os.path.exists(ffmpeg):
     vf = f"vignette=angle=0.42,noise=c0s={args.grain:.1f}:c0f=t:c1s={args.grain / 3:.1f}:c2s={args.grain / 3:.1f}"
     subprocess.run(["nice", "-n", "19", ffmpeg, "-loglevel", "error", "-y", "-threads", "2", "-i", raw, "-vf", vf, out], check=True)

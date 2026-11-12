@@ -75,6 +75,8 @@ Les planches comparatives citent aussi des candidats écartés que `fetch.py` ne
 - `scene_d.py` : la jetée (300 m) et la pointe (terre-plein rond de 60 m), et ses plans P6, FIN, FIN6.
 - `scene_e.py` : le port, le terre-plein au pied du pont, le virage sur la voie du quai, et son plan P5, le projecteur de l'hélicoptère.
 - `render_lieux.py` : construit un plan d'un lieu au bord de l'eau et le rend (`--lieu pont|pointe|port --plan P4 [--palier socle]`), ou rend une scène déjà écrite (`--scene scene-b.blend`). Workbench par défaut (cadrage), `--engine cycles --samples 32` pour la lumière, `--gpu` sur la machine louée seulement ; grain ffmpeg 7 par défaut pour un lieu, 0 pour une scène (`--grain N` pour fixer).
+- `render_lieux.py --anim` (avec `--lieu/--plan` ou `--scene`) : rend toutes les images du plan dans `ref/anim/` et assemble `<lieu>-<plan>-anim.mp4` (ou `<scène>-anim.mp4`) et `-anim-ralenti.mp4` (×4), dans la même session Blender.
+- `motion.py` : le mouvement, en clés calculées depuis la trajectoire (aucune physique) ; `p5_virage.py` : la trajectoire de P5. Tests sans Blender : `python3 tools/film3d/test_motion.py`.
 - `scene_b.py` : la rue des enseignes (8 m, deux voies, enseignes en potence, guirlandes, au fond l'îlot du rond-point) et son plan P3, le barrage ; écrit `scene-b.blend`.
 - `render_b.py` : l'ancienne commande de rendu de la ville, devenue une enveloppe de `render_lieux.py --scene` (mêmes arguments, `scene-b.blend` et grain 0 par défaut).
 - `p2_arc.py` : le plan P2 écrit une fois (virage de 30 m à 70 km/h, contre-braquage, deux patrouilles, drone à 40 m et 35 mm) ; chaque décor ne donne qu'une pose.
@@ -86,3 +88,16 @@ lockf -k <verrou> nice -n 19 /Applications/Blender.app/Contents/MacOS/Blender -b
 lockf -k <verrou> nice -n 19 /Applications/Blender.app/Contents/MacOS/Blender -b -t 2 -P tools/film3d/render_lieux.py -- --scene scene-f.blend --engine cycles --samples 32
 lockf -k <verrou> nice -n 19 /Applications/Blender.app/Contents/MacOS/Blender -b -t 2 --factory-startup -P tools/film3d/render_lieux.py -- --lieu pont --plan P4
 ```
+
+**Animer un plan** (`motion.py`, modèle : `p5_virage.py` et `plan_P5` dans `scene_e.py`) :
+
+1. Écrire la trajectoire dans un fichier sans Blender `p<N>_<nom>.py` : `pos(t) -> (x, y)` en mètres, t en secondes, t = 0 à la première image du plan (`M.t_of(frame)`).
+2. La vitesse par `M.Profile(v0, accel_fn)` (`.s(t)` la distance, `.v(t)` la vitesse), la route par une fonction `road(s)` ; `pos = lambda t: road(P.s(t))`.
+3. Une glisse se donne par `slip(t)` en degrés (négative : la caisse tournée plus à droite que sa route) ; sinon le cap se lit sur la trajectoire.
+4. Les distances : `M.min_gap({nom: pos}, images)` et un assert par plan dans `test_motion.py` ; jamais de choc entre véhicules.
+5. Dans la scène : `poses = M.sample(pos, range(F0 - 1, F0 + N + 1), slip=…, wheel_r=root["wheel_r"], wheelbase=…, seed=i)` (une image de plus de chaque côté pour l'obturateur).
+6. Puis `M.key_vehicle(root, poses, wheels=[…], ground=fn(x, y) -> (z, pente), pivot=(0, 0, h))` ; `wheels` pour la berline seulement (les roues des patrouilles et du fourgon sont fondues dans la caisse : ne pas les découper).
+7. Tout autre objet mobile : `M.key_object(ob, images, fn)`, `fn(t) -> (x, y, z, cap, tangage, roulis)`.
+8. La caméra : `M.key_camera(cam, images, fn)`, `fn(t) -> (x, y, z, lacet, site, roulis, focale)` ; l'épaule par `M.handheld(t, amp, rotor, seed)`.
+9. L'hélicoptère : `M.key_object`, `M.key_searchlight(h, images, cible_fn)`, `M.spin_rotors(h)` ; les rampes : `M.flash_bars(rigs, images)` (corail / lilas à 2 Hz).
+10. L'aperçu : `render_lieux.py -- --lieu … --plan … --anim` (ou `--scene … --anim`), Workbench sous le verrou ; le flou de bougé vient des clés (obturateur 0,5), plus de clés de flou à la main.
