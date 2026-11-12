@@ -1139,25 +1139,13 @@ def light_tower(at, target, energy=50000.0, along_x=False):
     return lo
 
 
-def beam_lights(main, hero, ground, ground_w):
-    """Le faisceau de l'hélicoptère, comme sur la pointe : la lampe principale (1,6 MW) garde toutes ses
-    visibilités (le cône dans la brume) mais exclut, par liaison de lumière, le sol et la berline (à pleine
-    puissance, son empreinte brûlait le sol en blanc et sortait la caisse framboise). Une jumelle coaxiale crème,
-    invisible à la caméra et à la brume, n'éclaire que le sol (`ground_w` : ~2,5 W/m² à 56 m, 4π d² × 2,5). La
-    berline reçoit sa lumière de car_fill."""
-    body = [o for o in hero.children_recursive if o.type == "MESH"]
-    sans, sol = bpy.data.collections.new("faisceau_sans_sol_berline"), bpy.data.collections.new("faisceau_sol")
-    for o in body + list(ground):
-        sans.objects.link(o)
-    for o in ground:
-        sol.objects.link(o)
-    for co in sans.collection_objects:
-        co.light_linking.link_state = "EXCLUDE"
-    main.light_linking.receiver_collection = sans
+def _twin(main, name, energy, color, receivers):
+    """Une jumelle coaxiale d'une lampe (même parent, même pose, mêmes clés de visée par son parent), invisible à
+    la caméra et à la brume, qui n'éclaire que `receivers`."""
     d = main.data.copy()
-    d.name = "faisceau_sol"
-    d.energy = ground_w
-    d.color = L.lin("#fff2d6")[:3]
+    d.name = name
+    d.energy = energy
+    d.color = L.lin(color)[:3]
     c = bpy.data.objects.new(d.name, d)
     for coll_u in main.users_collection:
         coll_u.objects.link(c)
@@ -1168,7 +1156,55 @@ def beam_lights(main, hero, ground, ground_w):
     c.rotation_quaternion = main.rotation_quaternion.copy()
     c.visible_camera = False
     c.visible_volume_scatter = False
-    c.light_linking.receiver_collection = sol
+    col = bpy.data.collections.new(name + "_recoit")
+    for o in receivers:
+        col.objects.link(o)
+    c.light_linking.receiver_collection = col
+    return c
+
+
+def beam_lights(main, hero, ground, ground_w, car_w):
+    """Le faisceau de l'hélicoptère : la lampe principale (1,6 MW) garde toutes ses visibilités (le cône dans la
+    brume) mais exclut, par liaison de lumière, le sol, le décor qu'elle balaie et la berline (à pleine puissance,
+    son empreinte brûlait le sol en blanc et sortait la caisse framboise). Deux jumelles coaxiales, invisibles à la
+    caméra et à la brume : une crème pour le sol et le décor (`ground_w` : ~2,5 W/m² à 56 m, 4π d² × 2,5), une
+    blanc chaud pour la seule berline (`car_w`), pour que la tache se pose sur elle quand le faisceau la rattrape
+    (sans elle, la caisse ne changeait pas sous le faisceau). Blanc chaud et pas xénon : sous un bleuté le
+    bordeaux tourne au lilas."""
+    body = [o for o in hero.children_recursive if o.type == "MESH"]
+    sans = bpy.data.collections.new("faisceau_sans_sol_berline")
+    for o in body + list(ground):
+        sans.objects.link(o)
+    for co in sans.collection_objects:
+        co.light_linking.link_state = "EXCLUDE"
+    main.light_linking.receiver_collection = sans
+    _twin(main, "faisceau_sol", ground_w, "#fff2d6", ground)
+    return _twin(main, "faisceau_berline", car_w, "#fff1e2", body)
+
+
+def car_side(hero, at=(-10.0, 62.0, 4.5), aim=(6.0, 67.0, 0.8), energy=2600.0, size=3.0, color=None):
+    """L'ambre de côté sur la berline : la lumière d'une lampe au sodium du bord de la voie du pont, à gauche de
+    la caméra, qui prend son flanc gauche en écharpe par l'arrière et pose un liseré chaud sur le pavillon et les
+    ailes (le faisceau, froid, vient d'en face et d'en haut). Un disque doux lié à la seule berline (aucune autre
+    surface ne le voit, ni la brume ni la caméra : pas de grain). Avant, l'ambre des mâts tombait de haut et de
+    face et rosissait le capot sans dessiner la caisse."""
+    d = bpy.data.lights.new("berline_ambre_cote", "AREA")
+    d.shape = "DISK"
+    d.size = size
+    d.energy = energy
+    d.color = L.lin(color or L.AMBER)[:3]
+    lo = bpy.data.objects.new(d.name, d)
+    bpy.context.scene.collection.objects.link(lo)
+    lo.location = at
+    lo.rotation_mode = "QUATERNION"
+    lo.rotation_quaternion = (Vector(aim) - Vector(at)).to_track_quat("-Z", "Y")
+    lo.visible_camera = lo.visible_volume_scatter = False
+    col = bpy.data.collections.new("berline_ambre_seule")
+    for o in hero.children_recursive:
+        if o.type == "MESH":
+            col.objects.link(o)
+    lo.light_linking.receiver_collection = col
+    return lo
 
 
 def skid_p5(scene, width=0.24):
@@ -1297,18 +1333,31 @@ def plan_P5(scene, hidden, palier="conteneurs"):
                 ob.light_linking.receiver_collection = sans
     n = M.flash_bars(rigs, FRAMES)
     print(f"[P5] {n} lueurs de rampe clignotantes", flush=True)
-    # la tour devant le mur qui ferme l'axe, derrière la caméra
-    light_tower((24.0, 81.4), Vector((*TURN_AIM, 0.6)), energy=80000.0, along_x=True)
-    # (le liseré corail de la caisse est éteint : depuis la caméra du virage, il la sortait framboise)
-    # --- l'hélicoptère : il monte de derrière le portique, au-dessus de l'eau, à droite du cadre ; son faisceau
-    # balaie la brume, croise l'objectif, se pose sur la berline (p5_virage.beam_target)
+    # la tour devant le mur qui ferme l'axe, derrière la caméra, pointée sur le milieu de la glisse
+    tour = light_tower((24.0, 81.4), Vector((6.0, 66.5, 0.6)), energy=80000.0, along_x=True)
+    # les caisses de la sortie, à 10 m sous la tour, en sortaient saumon et plates (essai à 256 échantillons) :
+    # elles n'ont que le faisceau et la nuit
+    sans_caisses = bpy.data.collections.new("tour_sans_caisses")
+    for o in bpy.data.objects:
+        if o.type == "MESH" and o.name.startswith(("caisse_", "palettes_sortie")):
+            sans_caisses.objects.link(o)
+    for co in sans_caisses.collection_objects:
+        co.light_linking.link_state = "EXCLUDE"
+    tour.light_linking.receiver_collection = sans_caisses
+    # --- l'hélicoptère : il arrive de l'est au ras des piles, vire sur la berline ; son faisceau court sur la voie
+    # du pont derrière elle et la rattrape (p5_virage.beam_target)
     heli, h = L.helicopter("heli")
     M.key_object(heli, FRAMES, P5.heli)
     sl = h["searchlight"].data
     sl.spot_blend = 0.25
     import scene_d
     scene_d.aim_helis([heli], P5.beam_target(M.t_of(20)), energy=1.6e6, cone=5.0)
-    beam_lights(h["searchlight"], hero, [bpy.data.objects["port_terre_plein"]], ground_w=1.0e5)
+    # ce que balaie la tache : le terre-plein, le mobilier du virage, les conteneurs (la lampe principale y aurait
+    # posé des taches brûlées)
+    swept = [o for o in bpy.data.objects if o.type == "MESH" and (o.name == "port_terre_plein" or o.name.startswith((
+        "conteneur_", "flaque_p5", "chaine", "caisse_", "palettes_", "futs", "separateur_", "port_couronnement",
+        "trace_p5")))]
+    beam_lights(h["searchlight"], hero, swept, ground_w=1.0e5, car_w=P5_BEAM_CAR_W)
     M.key_searchlight(h, FRAMES, P5.beam_target)
     for i, (dz, col, e) in enumerate(((0.2, L.CORAL, 0.4), (-1.2, L.CREAM, 0.25))):
         Ld = bpy.data.lights.new(f"heli_feu_{i}", "POINT")      # feu anticollision corail, feu blanc sous la cellule
@@ -1319,12 +1368,21 @@ def plan_P5(scene, hidden, palier="conteneurs"):
         bpy.context.scene.collection.objects.link(lo)
         lo.parent = heli
         lo.location = (0.0, -0.5, 2.6 + dz)
-    L.haze((-140, 160), (-280, 115), (L.WATER_Z, 70), 0.0022)    # lieux.haze tourne ses normales vers l'extérieur
+        lo.visible_volume_scatter = False                  # une source ponctuelle dans la brume : du grain
+    # la brume ne prend corps que dans le faisceau : toute autre lampe (rampes à 20 kW, tour, feux, lampadaires)
+    # y posait des taches de grain lilas qui couvraient le ciel (essai c, 64 échantillons)
+    for ob in bpy.data.objects:
+        if ob.type == "LIGHT" and ob != h["searchlight"]:
+            ob.visible_volume_scatter = False
+    L.haze((-140, 160), (-280, 115), (L.WATER_Z, 70), 0.0016)    # lieux.haze tourne ses normales vers l'extérieur
     # --- la caméra fixe au sol, 32 mm, mise au point sur la berline (de 19 à 10 m, puis 11)
     cam = L.camera("cam_P5", tuple(CAM), (CAM.x + 3.5, CAM.y - 19.0, 0.7), lens=P5.LENS, fstop=4.0)
     M.key_camera(cam, FRAMES, P5.camera)
     cam.data.dof.focus_object = hero
     car_fill(cam, hero)
+    # l'ambre rase le flanc gauche (celui que voit la caméra) depuis l'arrière-gauche, au ras du capot : un
+    # liseré le long de la ceinture chromée ; posé plus loin à l'ouest (-10 ; 62), il n'éclairait que l'arrière
+    car_side(hero, at=(-9.0, 71.0, 2.2), aim=(6.0, 67.5, 0.7), energy=3000.0, size=2.5)
     scene.render.use_motion_blur = True
     scene.render.motion_blur_shutter = 0.5
     last = poses[-2]
@@ -1339,6 +1397,7 @@ PLANS = {"P5": plan_P5}
 
 
 PLAN_PALIER = {"P5": "conteneurs"}  # le palier de décor de chaque plan (render_film.py n'en passe pas)
+P5_BEAM_CAR_W = 5.0e4               # la jumelle du faisceau sur la berline (à 1,2e5 puis 7e4 elle sortait rose et brûlée)
 
 
 def build(plan, palier=None):
