@@ -39,10 +39,24 @@ def polar(a, r):
     return CX + r * math.cos(t), CY + r * math.sin(t)
 
 
+# la vitesse de départ, rapportée à la vitesse moyenne de l'orbite : la caméra part déjà en mouvement (la coupe
+# vient de P6, qui bouge), à la moitié de son allure, accélère, puis se pose sans à-coup (vitesse et accélération
+# nulles à la dernière image : les dix dernières images ne parcourent que 5°, la pose validée se lit avant d'être
+# gelée). Avant : lancée à 1,8 fois l'allure moyenne dès la première image, freinée tout du long
+START_SPEED = 0.5
+
+
+def ease(u):
+    """Une rampe du cinquième degré : g(0) = 0, g'(0) = START_SPEED, g''(0) = 0 ; g(1) = 1, g'(1) = g''(1) = 0."""
+    m = START_SPEED
+    return m * u + (10 - 6 * m) * u ** 3 + (-15 + 8 * m) * u ** 4 + (6 - 3 * m) * u ** 5
+
+
 def azimuth(t):
-    """L'azimut de la caméra : lancée dès la première image, elle ralentit et se pose sur la pose validée."""
+    """L'azimut de la caméra : déjà en route à la première image, elle accélère, ralentit et se pose sur la pose
+    validée."""
     u = min(1.0, max(0.0, t / T_END))
-    return A0 + (A1 - A0) * (1.0 - (1.0 - u) ** 1.8)
+    return A0 + (A1 - A0) * ease(u)
 
 
 def camera(t):
