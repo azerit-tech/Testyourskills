@@ -494,10 +494,11 @@ def test_spin_steps():
 
 
 def test_p1():
-    """P1 (découpage v3), après l'ellipse : la position d'OUV prolongée de ELLIPSIS à vitesse constante, la même
-    vitesse au début ; la patrouille à gauche, sur la double ligne, 1,5 m d'air au moins entre les caisses et 0,8 m
-    entre elle et l'objectif ; hors champ au début, son capot dans le cadre de l'image 30 à la fin ; la caméra
-    derrière tout le plan, rattrapée sans à-coup ; la berline au point de coupe au début et à la fin."""
+    """P1 (découpage v3, reprise du 12 au soir), après l'ellipse : la position d'OUV prolongée de ELLIPSIS à vitesse
+    constante, la même vitesse au début ; la patrouille sur la voie d'en face, 1,5 m d'air au moins entre les caisses
+    et 1 m entre elle et l'objectif ; hors champ à la première image, entrée par le bord gauche avant l'image 16, sa
+    rampe dans le cadre de l'image 28 à la fin ; la caméra derrière, qui monte au-dessus de 1,2 m ; la berline au
+    point de coupe au début, au centre droit à la fin."""
     import ouv_avenue as O
     import p1_avenue as P
     h = 1.0 / 240.0
@@ -511,25 +512,29 @@ def test_p1():
     air = min(P.body_gap(M.t_of(f)) for f in frames)
     lens = min(P.lens_gap(M.t_of(f)) for f in frames)
     left = min(P.hero_pos(M.t_of(f))[0] - P.patrol_pos(M.t_of(f))[0] for f in frames)
-    check("P1 : la patrouille à gauche, 1,5 m d'air entre les caisses, 0,8 m de l'objectif",
-          air >= 1.5 and lens >= 0.8 and left > 2.0, f"{air:.2f} m, {lens:.2f} m, {left:.2f} m à gauche")
-    seen = []
+    check("P1 : la patrouille à gauche, 1,5 m d'air entre les caisses, 1 m de l'objectif",
+          air >= 1.5 and lens >= 1.0 and left > 3.0, f"{air:.2f} m, {lens:.2f} m, {left:.2f} m à gauche")
+    seen, bar = [], []
     for f in frames:
-        c = P.camera_rail(M.t_of(f))
-        pat = M.hero_screen(c, *P.patrol_pos(M.t_of(f)), 0.0, 0.0, box=(5.1, 1.95, 1.5))
-        if pat and pat["u1"] > 0.0 and pat["u0"] < 1.0:
+        box, b = P.patrol_screen(M.t_of(f))
+        if box and box["u1"] > 0.0 and box["u0"] < 1.0:
             seen.append(f)
-    check("P1 : la patrouille hors champ au début, dans le cadre de l'image 30 à la fin",
-          seen and seen[0] > 10 and all(f in seen for f in range(30, P.F0 + P.FRAMES)),
-          f"de l'image {seen[0] if seen else None} à {seen[-1] if seen else None}")
-    back = [P.hero_pos(M.t_of(f))[1] - P.camera_rail(M.t_of(f))[1] for f in frames]
-    step = max(abs(b - a) for a, b in zip(back, back[1:]))
-    check("P1 : la caméra derrière, distancée sans à-coup au bond", min(back) > 6.0 and back[-1] > back[0] and step < 0.1,
-          f"de {back[0]:.2f} à {back[-1]:.2f} m, {step:.3f} m par image au plus")
-    for f in (P.F0, P.F0 + P.FRAMES - 1):
+        if b and 0.0 <= b[0] <= 1.0 and 0.0 <= b[1] <= 1.0:
+            bar.append(f)
+    check("P1 : la patrouille hors champ au début, entrée par la gauche avant l'image 16",
+          seen and P.F0 < seen[0] < 16, f"de l'image {seen[0] if seen else None} à {seen[-1] if seen else None}")
+    check("P1 : sa rampe dans le cadre de l'image 28 à la fin", all(f in bar for f in range(28, P.F0 + P.FRAMES)),
+          f"de l'image {bar[0] if bar else None} à {bar[-1] if bar else None}")
+    cams = [P.camera_rail(M.t_of(f)) for f in frames]
+    back = [P.hero_pos(M.t_of(f))[1] - c[1] for f, c in zip(frames, cams)]
+    check("P1 : la caméra derrière, qui monte au-dessus de 1,2 m", min(back) > 7.5 and cams[0][2] < 0.6
+          and max(c[2] for c in cams) > 1.2, f"de {back[0]:.2f} à {back[-1]:.2f} m, de {cams[0][2]:.2f} à "
+          f"{cams[-1][2]:.2f} m de haut")
+    for f, lo, hi in ((P.F0, 44, 56), (P.F0 + P.FRAMES - 1, 55, 58)):
         car = M.hero_screen(P.camera_rail(M.t_of(f)), *P.hero_pos(M.t_of(f)), 0.0, 0.0)
         x, y = car["u"] * 100, car["v"] * 100
-        check(f"P1 : la berline au point de coupe à l'image {f}", abs(x - 50) <= 8 and abs(y - 55) <= 5,
+        check(f"P1 : la berline à x {lo}-{hi}, y 55 ± 5, 33 % au moins à l'image {f}",
+              lo <= x <= hi and abs(y - 55) <= 5 and car["w"] >= 0.33,
               f"x {x:.0f}, y {y:.0f}, largeur {car['w'] * 100:.0f} %")
 
 

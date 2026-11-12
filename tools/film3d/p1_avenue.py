@@ -1,11 +1,13 @@
 # Le plan P1 écrit une fois, sans Blender (docs/cinematique-decoupage-v3.md §4, « la patrouille fond sur elle, elle
-# bondit ») : 1,5 s après la dernière image d'OUV (ellipse), la berline sur la même voie, à la même vitesse (50 km/h),
-# à la position d'OUV prolongée. Pendant l'ellipse la patrouille a fait demi-tour : elle roule derrière, rampe
-# allumée, à cheval sur la double ligne (2,35 m à gauche de la berline), hors champ à côté de la caméra ; elle
-# accélère à l'image 10 et tient sa vitesse à 24, son capot entre par le bord gauche à 27 ; la berline bondit à 32 ;
-# la patrouille tient le bord gauche jusqu'à la fin, son nez 4 m derrière le centre de la berline.
-# La caméra la suit de dos au ras de la chaussée, comme en OUV : 8 m derrière, 0,4 m à sa gauche, 0,6 m, 24 mm, sur
-# un rail à sa vitesse ; au bond elle ne suit qu'une part de son accélération et se laisse distancer.
+# bondit », reprise du 12 au soir) : 1,5 s après la dernière image d'OUV (ellipse), la berline sur la même voie, à la
+# même vitesse (50 km/h), à la position d'OUV prolongée. Pendant l'ellipse la patrouille a fait demi-tour : elle
+# arrive lancée sur la voie d'en face (92 km/h), rampe allumée, à côté de la caméra et hors champ ; elle entre par
+# le bord gauche à l'image 7, sa rampe dans le cadre à partir de 21 ; elle freine pour se caler à la hauteur de la
+# berline vers 34, vue de trois quarts arrière ; la berline bondit à 32 et lui reprend un mètre, la patrouille reste
+# au bord gauche, rampe comprise.
+# La caméra la suit de dos : 8 m derrière et 0,55 m du sol à la première image (le raccord d'OUV), elle monte à
+# 1,4 m pour voir par-dessus le coffre de la patrouille, recule à 9,3 m et glisse vers la gauche (de 0,3 à 1,6 m),
+# le lacet et le site recalculés à chaque image pour tenir la berline à sa place dans le cadre.
 import math
 
 import motion as M
@@ -19,38 +21,50 @@ T_CUT = OUV.FRAMES / M.FPS + ELLIPSIS   # le temps d'OUV prolongé de la premiè
 T_END = (FRAMES - 1) / M.FPS
 T_GO = M.t_of(32)                   # la berline bondit
 ACCEL = 4.0                         # m/s², atteint en 0,15 s
-LANE_X = -0.6                       # la patrouille à cheval sur la double ligne, 2,35 m à gauche de la berline
-# L'écart entre les centres. La fiche partait de 14 m : à 6 m/s² à partir de l'image 10, la patrouille n'y
-# regagnait que 3 m avant le bond, et son capot n'entrait pas dans le cadre avant la fin du plan. À 8,9 m, elle est
-# entière hors champ (son nez 1,6 m devant l'objectif, à 31° de l'axe : hors du demi-champ de 22,9°) ; son capot
-# entre par le bord gauche à l'image 27 ; elle finit à 6,6 m (son nez 4,1 m derrière le centre de la berline,
-# 1,7 m d'air entre les caisses), au bord gauche, x 0-23 %.
-GAP0 = 8.9
-# elle accélère à 6 m/s² à l'image 10 et tient sa vitesse (58 km/h) à 24 : jusqu'à 34 (la fiche), elle gagnait
-# 5 m/s sur la berline et la percutait avant la fin ; à 24, le bond de la berline (4 m/s²) efface l'écart de vitesse
-# vers l'image 44, et l'écart se stabilise
-T_PUSH = M.t_of(10)
-T_HOLD = M.t_of(24)
-PUSH = 6.0                          # m/s², atteint en 0,2 s
 
-# la caméra (repère du monde : l'avenue vers +y, l'océan à x > 0)
-CAM_BACK = 8.0                      # m derrière le centre de la berline jusqu'au bond (fiche : 7 m ; à 7 m, avec
-                                    # 1,5 m d'air entre les caisses, le capot ne montait pas au-delà de x 11 %)
-CAM_FOLLOW = 0.2                    # la part de l'accélération du bond que la caméra suit (accélération relative 3,2 m/s²)
-CAM_SIDE = -0.3                     # m à sa gauche (-x) : 1,07 m d'air entre l'objectif et le flanc de la patrouille (fiche : 0,4)
-CAM_Z = 0.6
-YAW0, YAW1 = 182.3, 179.5           # lacet (180 : vers +y ; plus, vers +x) : la berline de x 52 à x 57 %
-PITCH = 4.0                         # le centre de la berline à 53 % de la hauteur depuis le haut
+# La patrouille, voie d'en face : x -1,7, 1,53 m d'air avec le flanc de la berline quand elle est à sa hauteur.
+# Elle arrive lancée, son centre R1 par rapport à celui de la berline à la première image (à côté de l'objectif,
+# hors champ), et freine d'un seul tenant jusqu'à rouler à sa vitesse à T_MATCH, son centre alors R_MATCH devant le
+# sien : à sa hauteur, de trois quarts arrière, la rampe dans le cadre (plus en arrière, la rampe sortait par le
+# bord gauche : avec la berline au centre droit et 33 % de large au moins, le grand-angle de 24 mm ne voit pas plus
+# loin à gauche). Au bond elle lève le pied et recule vers le bord gauche. Partir derrière l'objectif et le doubler
+# vers l'image 12-16 demandait de freiner à plus de 1 g pour se caler à sa hauteur avant le bond : elle part à côté
+# de lui, hors champ.
+LANE_X = -1.7
+R1 = -7.5                           # m : son nez 3 m devant l'objectif, mais à 35° de l'axe, hors champ
+R_MATCH = 0.5
+T_MATCH = M.t_of(34)
+W0 = 2.0 * (R_MATCH - R1) / T_MATCH  # m/s de plus que la berline au départ (11,6 : 92 km/h)
+DECEL = W0 / T_MATCH                # m/s² : elle freine fort (8,5) pour se caler à sa hauteur
+PAT_LIFT = 1.5                      # m/s² : au bond, elle lève le pied, la berline lui reprend un peu plus d'un mètre
+
+# la caméra (repère du monde : l'avenue vers +y, l'océan à x > 0) : un seul mouvement, de la première image à
+# CAM_T1, en cosinus (vitesse et accélération nulles aux deux bouts) : elle recule, glisse vers la voie d'en face
+# (derrière la patrouille, qu'elle voit de trois quarts arrière) et monte par-dessus son coffre ; d'un seul tenant
+# pour que l'accélération par rapport à la berline reste sous 4 m/s²
+BACK0, BACK1 = 8.0, 9.3             # m derrière le centre de la berline
+SIDE0, SIDE1 = -0.3, -1.6           # m à sa droite (négatif : à sa gauche)
+Z0, Z1 = 0.55, 1.4                  # hauteur : le raccord d'OUV, puis par-dessus le coffre de la patrouille
+CAM_T1 = M.t_of(42)
+CAM_FOLLOW = 0.6                    # la part de l'élan du bond que la caméra suit
+# la berline dans le cadre : centre x (fraction de la largeur), du raccord au centre droit, puis 57 % à la fin ;
+# centre y 55 % depuis le haut (son centre à HERO_ZC du sol)
+U0, U30, U48 = 0.52, 0.60, 0.57
+V_HERO = 0.55
+HERO_ZC = 0.72
 LENS = 24.0
-FOCUS, FSTOP = 8.0, 5.6             # la berline nette, le capot de la patrouille contre l'objectif flou
-STILL = 30                          # l'image fixe (banc) : le capot de la patrouille dans le cadre, juste avant le bond
+FOCUS, FSTOP = 9.0, 5.6             # la berline nette, la patrouille à peine moins
+STILL = 30                          # l'image fixe (banc) : la patrouille calée à sa hauteur, juste avant le bond
 
 # ce que la berline frôle (fx.py en tire les effets) : trois feuilles de papier à plat 1,4 m à droite de sa ligne,
 # 20 m devant elle au départ, que son passage soulève (images 36 à 44)
 PAPERS = ((3.15, 309.4, 20.0), (3.55, 310.1, -35.0), (2.95, 310.9, 70.0))   # x, y, rotation (degrés)
-# les phares de la patrouille pleins (plus de veilleuse) : ils jettent l'ombre de la berline devant elle
+# les phares de la patrouille pleins (plus de veilleuse)
 PATROL_HEAD_W = 450.0
 PATROL_HEAD_LENS = 1.0
+
+HALF_W = math.atan(10.125 / LENS)            # demi-champ horizontal
+HALF_H = math.atan(18.0 / LENS)              # demi-champ vertical
 
 
 def _accel(t):
@@ -69,18 +83,18 @@ def hero_speed(t):
     return _PROF.v(t)
 
 
-def _push(t):
-    if t < T_PUSH or t >= T_HOLD:
-        return 0.0
-    return PUSH * min(1.0, (t - T_PUSH) / 0.2, (T_HOLD - t) / 0.2)
+def _patrol_accel(t):
+    if t < T_MATCH:
+        return -DECEL
+    return -PAT_LIFT * min(1.0, (t - T_GO) / 0.3) if t >= T_GO else 0.0
 
 
-_PATROL = M.Profile(OUV.SPEED, _push)
+_PATROL = M.Profile(OUV.SPEED + W0, _patrol_accel)
 
 
 def patrol_pos(t):
-    """Sur la double ligne, GAP0 derrière la berline à sa vitesse ; elle accélère à T_PUSH, tient sa vitesse à T_HOLD."""
-    return LANE_X, OUV.hero_pos(T_CUT)[1] - GAP0 + _PATROL.s(t)
+    """Voie d'en face ; lancée, elle freine jusqu'à la vitesse de la berline, puis lève le pied au bond."""
+    return LANE_X, OUV.hero_pos(T_CUT)[1] + R1 + _PATROL.s(t)
 
 
 def patrol_speed(t):
@@ -103,17 +117,47 @@ def bars_on(frame):
     return True
 
 
+def _ease(t):
+    """0 à 1 en cosinus de la première image à CAM_T1."""
+    u = min(1.0, max(0.0, t / CAM_T1))
+    return 0.5 - 0.5 * math.cos(math.pi * u)
+
+
 def cam_back(t):
-    """La distance de la caméra au centre de la berline : CAM_BACK, puis, au bond, la part de l'élan qu'elle ne suit pas."""
+    """La distance de la caméra au centre de la berline : de BACK0 à BACK1, plus, au bond, la part de l'élan qu'elle
+    ne suit pas."""
     extra = _PROF.s(t) - OUV.SPEED * t
-    return CAM_BACK + (1.0 - CAM_FOLLOW) * extra
+    return BACK0 + (BACK1 - BACK0) * _ease(t) + (1.0 - CAM_FOLLOW) * extra
+
+
+def _target_u(t):
+    a = M.smoothstep(0.0, M.t_of(30), t)
+    b = M.smoothstep(M.t_of(30), T_END, t)
+    return U0 + (U30 - U0) * a + (U48 - U30) * b
 
 
 def camera_rail(t):
-    """(x, y, z, lacet, site, roulis, focale) : sur un rail, sans secousse."""
-    x, y = hero_pos(t)
-    u = M.smoothstep(0.0, T_END, t)
-    return x + CAM_SIDE, y - cam_back(t), CAM_Z, YAW0 + (YAW1 - YAW0) * u, PITCH, 0.0, LENS
+    """(x, y, z, lacet, site, roulis, focale) : sur un rail qui monte et glisse à gauche, sans secousse ; le lacet et
+    le site posent le centre de la berline à (_target_u, V_HERO) du cadre."""
+    hx, hy = hero_pos(t)
+    x = hx + SIDE0 + (SIDE1 - SIDE0) * _ease(t)
+    y = hy - cam_back(t)
+    z = Z0 + (Z1 - Z0) * _ease(t)
+    dx, dy = hx - x, hy - y
+    # lacet de motion.key_camera : 180 vers +y, plus vers +x ; la berline à droite de l'axe de phi ; puis deux pas de
+    # Newton sur la boîte projetée (motion.hero_screen), dont le centre n'est pas celui de la caisse
+    phi = math.degrees(math.atan((_target_u(t) - 0.5) * 2.0 * math.tan(HALF_W)))
+    yaw = 180.0 + math.degrees(math.atan2(dx, dy)) - phi
+    beta = math.degrees(math.atan((V_HERO - 0.5) * 2.0 * math.tan(HALF_H)))
+    pitch = math.degrees(math.atan2(HERO_ZC - z, math.hypot(dx, dy))) + beta
+    want = (_target_u(t), V_HERO)
+    for _ in range(2):
+        b0 = M.hero_screen((x, y, z, yaw, pitch, 0.0, LENS), hx, hy, 0.0, 0.0)
+        bu = M.hero_screen((x, y, z, yaw + 0.1, pitch, 0.0, LENS), hx, hy, 0.0, 0.0)
+        bv = M.hero_screen((x, y, z, yaw, pitch + 0.1, 0.0, LENS), hx, hy, 0.0, 0.0)
+        yaw += 0.1 * (want[0] - b0["u"]) / (bu["u"] - b0["u"])
+        pitch += 0.1 * (want[1] - b0["v"]) / (bv["v"] - b0["v"])
+    return x, y, z, yaw, pitch, 0.0, LENS
 
 
 def camera(t):
@@ -138,16 +182,30 @@ def lens_gap(t, patrol_l=5.1, patrol_w=1.95):
     return math.hypot(dx, dy)
 
 
+def patrol_screen(t):
+    """(boîte de la patrouille à l'écran, (u, v) de sa rampe) ; None hors champ."""
+    c = camera_rail(t)
+    px, py = patrol_pos(t)
+    box = M.hero_screen(c, px, py, 0.0, 0.0, box=(5.1, 1.95, 1.5))
+    bar = M.screen_point(c, (px, py - 0.12, 1.62))
+    return box, bar
+
+
 if __name__ == "__main__":
-    for f in (1, 10, 20, 24, 27, 30, 32, 34, 40, 48):
+    for f in (1, 8, 12, 16, 20, 24, 28, 30, 32, 36, 40, 44, 48):
         t = M.t_of(f)
         c = camera(t)
         hx, hy = hero_pos(t)
         px, py = patrol_pos(t)
         car = M.hero_screen(c, hx, hy, 0.0, 0.0)
-        pat = M.hero_screen(c, px, py, 0.0, 0.0, box=(5.1, 1.95, 1.5))
-        where = "hors champ" if not pat or pat["u1"] < 0 or pat["u0"] > 1 else f"x 0-{pat['u1'] * 100:.0f} %"
-        print(f"image {f:2d} : berline {hero_speed(t) * 3.6:.0f} km/h, x {car['u'] * 100:.0f} y {car['v'] * 100:.0f} "
-              f"l {car['w'] * 100:.0f} % ; patrouille {patrol_speed(t) * 3.6:.0f} km/h, {hy - py:.2f} m (nez "
-              f"{hy - py - 2.55:.2f} m derrière le centre), {body_gap(t):.2f} m d'air, objectif à {lens_gap(t):.2f} m, "
-              f"{where} ; caméra {cam_back(t):.2f} m derrière")
+        box, bar = patrol_screen(t)
+        if not box or box["u1"] < 0:
+            where = "hors champ"
+        else:
+            where = f"x {max(0.0, box['u0']) * 100:.0f}-{min(1.0, box['u1']) * 100:.0f} %"
+            if bar and 0.0 <= bar[0] <= 1.0:
+                where += f", rampe x {bar[0] * 100:.0f} y {(1 - bar[1]) * 100:.0f} (bas)"
+        print(f"{f:2d} : berline {hero_speed(t) * 3.6:3.0f} km/h x {car['u'] * 100:.0f} y {car['v'] * 100:.0f} "
+              f"l {car['w'] * 100:.0f} % | patrouille {patrol_speed(t) * 3.6:3.0f} km/h, centre {py - hy:+.2f} m, "
+              f"{body_gap(t):.2f} m d'air, objectif {lens_gap(t):.2f} m, {where} | caméra {cam_back(t):.2f} m, "
+              f"{c[0] - hx:+.2f}, z {c[2]:.2f}, lacet {c[3]:.1f}, site {c[4]:.1f}")
