@@ -1895,6 +1895,30 @@ def p1_cabin(scene, coupe, frames, on):
     me = coupe.data
     mi = {i for i, m in enumerate(me.materials) if m and m.name.endswith("_mirror")}
     vs = sorted({v for p in me.polygons if p.material_index in mi for v in p.vertices})
+    # le miroir se détache du pare-brise : tout le rétroviseur du modèle est en chrome poli (boîtier compris), il
+    # reflétait l'avenue jusque sur ses bords. Seule la glace (faces tournées vers l'arrière, la caméra) reste miroir ;
+    # le boîtier, son bord arrondi (le liseré qui accroche la source froide), la tige et son pied prennent l'ivoire
+    # satiné du volant (hero_w111_wheel_rim)
+    ivory = bpy.data.materials.get(f"hero_{HERO}_wheel_rim")
+    if vs and ivory is not None:
+        if ivory.name not in me.materials:
+            me.materials.append(ivory)
+        k = list(me.materials).index(ivory)
+        glass = sorted({v for p in me.polygons if p.material_index in mi and p.normal.y > 0.9 for v in p.vertices})
+        n_case = n_stem = 0
+        for p in me.polygons:
+            if p.material_index in mi and p.normal.y <= 0.9:
+                p.material_index = k
+                n_case += 1
+            elif p.material_index not in mi and p.material_index != k:
+                c = p.center
+                mat = me.materials[p.material_index]
+                if (abs(c.x) < 0.04 and -0.75 < c.y < -0.55 and 1.25 < c.z < 1.42 and mat
+                        and not mat.name.endswith("_glass")):
+                    p.material_index = k
+                    n_stem += 1
+        print(f"[scene_a] P1 : rétroviseur, {len(glass)} sommets de glace, {n_case} faces de boîtier et "
+              f"{n_stem} de tige passées en ivoire", flush=True)
     if vs:
         c = sum((me.vertices[v].co for v in vs), Vector()) / len(vs)
         R = Matrix.Rotation(-math.radians(P.MIRROR_YAW), 3, "Z") @ Matrix.Rotation(math.radians(P.MIRROR_TILT), 3, "X")
@@ -1948,10 +1972,10 @@ def p1_cabin(scene, coupe, frames, on):
     lamp("habitacle", "#b4bce6", 45.0, 0.5, (0.1, 0.75, 1.33), (0.2, -0.75, 0.85))   # 25 W : le noyer restait noir
     # les lueurs de la rampe, derrière la lunette (repère de la caisse : l'arrière vers +y) : elles battent avec
     # elle (M.bar_phase, décalage 0 comme la patrouille dans flash_bars) et teintent le pavillon et l'épaule
-    for name, color, tone, x in (("lueur_corail", CORAL, "corail", 0.35), ("lueur_lilas", LILAC, "lilas", -0.35)):
-        d = lamp(name, color, 60.0, 0.25, (x, 2.0, 1.15), (0.3, 0.0, 1.25)).data
+    for name, color, tone, x, watts in (("lueur_corail", CORAL, "corail", 0.35, 40.0), ("lueur_lilas", LILAC, "lilas", -0.35, 60.0)):
+        d = lamp(name, color, watts, 0.25, (x, 2.0, 1.15), (0.3, 0.0, 1.25)).data   # corail à 60 W : pavillon et dossier trop roses
         for f in frames:
-            d.energy = 60.0 if f >= on and M.bar_phase(f) == tone else 0.0
+            d.energy = watts if f >= on and M.bar_phase(f) == tone else 0.0
             d.keyframe_insert("energy", frame=f)
         for fc in M.fcurves(d):
             for kp in fc.keyframe_points:
