@@ -159,6 +159,8 @@ def test_particle_at():
 
 
 def test_switch():
+    os.environ.pop("FILM3D_FX", None)
+    assert not fx.enabled() and fx.dress("P3") is None          # inactif par défaut
     os.environ["FILM3D_FX"] = "0"
     assert not fx.enabled() and fx.dress("P3") is None
     os.environ["FILM3D_FX"] = "1"

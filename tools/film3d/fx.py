@@ -11,8 +11,9 @@
 #   import fx
 #   fx.dress("P3")                       # en fin de construction du plan, après les clés de motion.py
 #
-# FILM3D_FX=0 retire tout (le plan sort comme avant) ; FILM3D_FX_ONLY=eau,gomme,vol,tremble,etincelles,arret ne
-# garde que ces familles (le banc). Les sprites et gouttes ne sont vus que par la caméra (ni ombre, ni rebond
+# Inactif par défaut (le plan sort comme avant) : FILM3D_FX=1 active les effets, plan par plan à mesure que chaque
+# bande est validée ; FILM3D_FX_ONLY=eau,gomme,vol,tremble,etincelles,arret ne garde que ces familles (le banc).
+# Les sprites et gouttes ne sont vus que par la caméra (ni ombre, ni rebond
 # diffus, ni reflet sur la caisse) et n'émettent rien : aucune lumière ajoutée, la berline ne change pas de teinte.
 # Les étincelles émettent, sans échantillonnage d'émission (elles n'éclairent rien).
 #
@@ -31,7 +32,7 @@ def log(msg):
 
 
 def enabled(family=None):
-    if os.environ.get("FILM3D_FX", "1").strip().lower() in ("0", "non", "off", "false", ""):
+    if os.environ.get("FILM3D_FX", "0").strip().lower() not in ("1", "oui", "on", "true"):
         return False
     only = os.environ.get("FILM3D_FX_ONLY", "").strip()
     if family and only:
@@ -1772,7 +1773,7 @@ def dress(plan, scene=None, **opt):
     """Pose les interactions du plan (OUV, P1… FIN6), sur la trajectoire de la scène telle qu'elle est. Sans
     berline lisible, ou FILM3D_FX=0, ne fait rien."""
     if not enabled():
-        log(f"{plan} : FILM3D_FX=0, aucun effet")
+        log(f"{plan} : effets inactifs (FILM3D_FX=1 les active)")
         return None
     bpy = _bpy()
     ctx = Ctx(plan, scene)

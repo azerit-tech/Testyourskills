@@ -8,7 +8,8 @@
 # Sur la machine louée seulement (OptiX) :
 #   FILM3D_ASSETS=~/film/assets ~/blender-5.2.2-linux-x64/blender -b --factory-startup -P tools/film3d/lab/fx_bench.py -- \
 #       --cam rase --frames 14,18,22,26 --samples 64 --out ~/film/iter-fx/banc --tag apres
-# FILM3D_FX=0 donne l'« avant » ; FILM3D_FX_ONLY=eau|gomme|vol isole une famille.
+# Le banc active les effets (FILM3D_FX=1 par défaut ici) ; FILM3D_FX=0 donne l'« avant » ; FILM3D_FX_ONLY=eau|gomme|vol
+# isole une famille.
 import argparse
 import math
 import os
@@ -23,6 +24,7 @@ for p in (HERE, os.path.join(HERE, "lab")):
 import bpy  # noqa: E402
 from mathutils import Vector  # noqa: E402
 
+os.environ.setdefault("FILM3D_FX", "1")
 import fx  # noqa: E402
 import lieux as L  # noqa: E402
 import motion as M  # noqa: E402
