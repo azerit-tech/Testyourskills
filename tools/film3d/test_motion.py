@@ -176,6 +176,20 @@ def test_p6():
     check("P6 : rien ne frôle la grue", cam >= 25.0, f"{cam:.1f} m au plus près")
 
 
+def test_ouv():
+    """OUV : la berline dépasse la patrouille garée à plus de 2 m (de flanc à flanc, demi-largeurs de 0,95 m), le
+    plan et les trois secondes qui le suivent (elle la dépasse vers l'image 48) ; la patrouille dans le cadre."""
+    import ouv_avenue as P
+    d, f, a, b = M.min_gap(P.tracks(), range(P.F0, P.F0 + 96))
+    check("OUV : la berline passe à plus de 2 m de la patrouille", d - 2 * 0.95 > 2.0,
+          f"{d - 1.9:.1f} m de flanc à flanc à l'image {f}")
+    cx, cy = P.camera(M.t_of(P.F0))[:2]
+    a0 = math.degrees(math.atan2(cx - P.PATROL[0], P.PATROL[1] - cy))
+    half = math.degrees(math.atan(10.125 / P.LENS))
+    check("OUV : la patrouille dans le cadre à la première image", abs(a0 - (180.0 - P.CAM_YAW)) < half,
+          f"{a0:.0f}° à gauche, le cadre de {180 - P.CAM_YAW - half:.0f} à {180 - P.CAM_YAW + half:.0f}°")
+
+
 def test_bars():
     seq = [M.bar_phase(f) for f in range(24)]
     check("rampes : 2 Hz, alternance corail / lilas", seq[:6] == ["corail"] * 6 and seq[6:12] == ["lilas"] * 6
@@ -191,6 +205,7 @@ if __name__ == "__main__":
     test_p4()
     test_p3()
     test_p6()
+    test_ouv()
     test_bars()
     print(f"\n{'tout passe' if not FAIL else str(len(FAIL)) + ' échec(s)'}")
     sys.exit(1 if FAIL else 0)

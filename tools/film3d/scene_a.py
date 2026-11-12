@@ -48,6 +48,7 @@ HERO = os.environ.get("FILM3D_HERO", "w111")
 BLEND = os.environ.get("FILM3D_BLEND", "scene-a.blend")
 if HERE not in sys.path:
     sys.path.insert(0, HERE)
+import ouv_avenue as OUV  # noqa: E402  (le plan OUV, sans Blender)
 
 
 def facade_module():
@@ -1829,7 +1830,38 @@ def street_hero(scene):
     return body
 
 
-def build():
+def ouv_motion(scene, coupe, cam, focus):
+    """Le plan OUV animé (ouv_avenue.py) : la berline remonte l'avenue vers +y à 50 km/h, mise sur un rig
+    (motion.rig_up) et clée par motion.key_vehicle (roues, suspension) ; la caméra la suit sur un rail
+    (motion.key_camera) ; la mise au point sur la caisse ; flou de bougé d'un demi-obturateur."""
+    import motion as M
+    frames = range(OUV.F0, OUV.F0 + OUV.FRAMES)
+    scene.frame_start, scene.frame_end = frames[0], frames[-1]
+    wheels = [o for o in coupe.children if o.name.startswith("wheel_")]
+    ys = [w.location.y for w in wheels]
+    wb = (max(ys) - min(ys)) if len(ys) > 1 else 2.9
+    # la caisse tournée l'avant vers +y (street_hero la pose vers -y) puis mise sur son rig, au cap 0
+    x0, y0 = OUV.hero_pos(M.t_of(OUV.F0))
+    coupe.location = (x0, y0, 0)
+    coupe.rotation_euler = (0, 0, math.pi)
+    rig = M.rig_up(coupe, 0.0, "rig_berline")
+    poses = M.sample(OUV.hero_pos, frames, wheel_r=coupe["wheel_r"], wheelbase=wb)
+    M.key_vehicle(rig, poses, wheels=wheels)
+    M.wheel_marks(wheels, coupe["wheel_r"])
+    cam.data.shift_y = 0.0
+    M.key_camera(cam, frames, OUV.camera)
+    cam.data.dof.focus_object = coupe
+    bpy.data.objects.remove(focus)
+    scene.frame_set(frames[0])
+    scene.render.motion_blur_shutter = 0.5
+    scene.render.use_motion_blur = True
+    print(f"[scene_a] OUV : {len(poses)} images, berline de y {poses[0]['y']:.1f} à {poses[-1]['y']:.1f}, "
+          f"empattement {wb:.2f} m", flush=True)
+
+
+def build(plan=None, palier=None):
+    """La scène A (l'avenue du front de mer). Sans plan : l'ancienne image fixe, écrite dans assets/scene-a.blend.
+    plan « OUV » (render_lieux --lieu avenue) : le plan animé d'ouverture, rendu sans écrire la scène ; palier ignoré."""
     bpy.ops.wm.read_factory_settings(use_empty=True)
     scene = bpy.context.scene
     hidden = bpy.data.collections.new("sources")
@@ -1946,6 +1978,10 @@ def build():
     police.location = (POLICE_X, POLICE_Y, 0)
     police.rotation_mode = "XYZ"
     police.rotation_euler = (0, 0, -math.pi / 2)        # l'avant vers -y
+    if plan == "OUV":
+        # garée à l'angle de la rue transversale de y 120, côté ville (ouv_avenue.PATROL, cap des lieux)
+        police.location = (OUV.PATROL[0], OUV.PATROL[1], 0)
+        police.rotation_euler = (0, 0, math.radians(OUV.PATROL[2] + 90.0))
 
     # --- la ville : la route, les immeubles, la rue
     build_city(hidden)
@@ -2061,6 +2097,10 @@ def build():
 
     render_settings(scene)
     r = scene.render
+
+    if plan == "OUV":
+        ouv_motion(scene, coupe, co, focus)
+        return scene
 
     # --- le mouvement, pour le flou de bougé : tout roule à 50 km/h vers la caméra (−y),
     # la caméra recule à la même vitesse (travelling avant). Image 2 = la pose ci-dessus.
