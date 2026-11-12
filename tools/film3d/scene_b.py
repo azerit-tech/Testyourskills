@@ -1284,7 +1284,7 @@ def build():
 
     out = os.path.join(ASSETS, BLEND)
     bpy.ops.wm.save_as_mainfile(filepath=out, compress=True)
-    log(f"écrit {out} (plan {PLAN}, caméra à s = {co.location.y:.1f}, berline à s = {hero.location.y:.1f}, "
+    log(f"écrit {out} (plan {PLAN}, caméra à s = {co.location.y:.1f}, berline à s = {hero.matrix_world.translation.y:.1f}, "
         f"{len(bpy.data.objects)} objets, {len([o for o in bpy.data.objects if o.type == 'LIGHT'])} lumières)")
 
 
