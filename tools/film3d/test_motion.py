@@ -77,7 +77,8 @@ def test_right_turn():
 
 
 def test_gaps():
-    """Les véhicules d'un plan gardent leurs distances : jamais moins de 6 m entre deux centres (P5)."""
+    """P5 : les véhicules gardent leurs distances (jamais moins de 6 m entre deux centres), la berline frôle sans
+    toucher, le cadre du découpage v2 tient (projection des boîtes, sans Blender)."""
     import p5_virage as P
     d, f, a, b = M.min_gap(P.tracks(), range(P.F0 - 1, P.F0 + P.FRAMES + 1))
     check("P5 : distances gardées", d >= 6.0, f"{d:.1f} m entre {a} et {b} à l'image {f}")
@@ -85,15 +86,60 @@ def test_gaps():
     check("P5 : la meute ne rattrape pas la berline", gap > 25.0, f"{gap:.1f} m au plus près")
     check("M.min_gap voit un croisement", M.min_gap({"a": lambda t: (0.0, 10 * t), "b": lambda t: (0.0, 10 - 10 * t)},
                                                     range(0, 30))[0] < 0.5)
-    # le mur de conteneurs prolongé (x -15,1 à -10,1, y 54 à 79) et les jambes du portique (x -24 et -10,6, y 81 et
-    # 95) : aucun centre de véhicule à moins de 3 m (plus sa demi-largeur, 1 m)
-    boxes = [(-15.1, -10.1, 54.0, 79.0)] + [(x - 1.0, x + 1.0, y - 1.8, y + 1.8) for x in (-24.0, -10.6)
-                                             for y in (81.0, 95.0)]
+    # le mur de conteneurs prolongé (x -15,1 à -10,1, y 54 à 79), les jambes du portique (x -24 et -10,6, y 81 et
+    # 95), les piles du côté est (x 24,9 à 70, y 45,7 à 57,9) : aucun centre de véhicule à moins de 3 m (plus sa
+    # demi-largeur, 1 m)
+    boxes = [(-15.1, -10.1, 54.0, 79.0), (24.9, 70.0, 45.7, 57.9)] + [(x - 1.0, x + 1.0, y - 1.8, y + 1.8)
+                                                                       for x in (-24.0, -10.6) for y in (81.0, 95.0)]
 
-    def clear(q):
-        return min(math.hypot(max(b[0] - q[0], 0, q[0] - b[1]), max(b[2] - q[1], 0, q[1] - b[3])) for b in boxes)
-    near = min(clear(fn(M.t_of(f))) for fn in P.tracks().values() for f in range(P.F0 - 1, P.F0 + P.FRAMES + 1))
+    def clear(q, bs=boxes):
+        return min(math.hypot(max(b[0] - q[0], 0, q[0] - b[1]), max(b[2] - q[1], 0, q[1] - b[3])) for b in bs)
+    frames = range(P.F0 - 1, P.F0 + P.FRAMES + 1)
+    near = min(clear(fn(M.t_of(f))) for fn in P.tracks().values() for f in frames)
     check("P5 : rien à moins de 3 m d'un conteneur ou du portique", near >= 4.0, f"{near:.1f} m")
+    # ce que la berline frôle sans le toucher : la caisse (ses coins et le milieu de ses flancs) à plus de 0,4 m
+    # des poteaux de la chaîne et des caisses de la sortie, et à moins de 2 m (sinon elle ne frôle rien) ; la
+    # meute à plus de 0,6 m des poteaux (demi-largeur d'une patrouille : 1 m)
+    poses = M.sample(P.hero_pos, frames, slip=P.hero_slip)
+
+    def body_pts(p):
+        h = math.radians(p["heading"])
+        fx, fy = -math.sin(h), math.cos(h)
+        return [(p["x"] + fx * a + fy * b, p["y"] + fy * a - fx * b) for a in (-2.45, 0.0, 2.45) for b in (-0.9, 0.9)]
+    posts = [(x - 0.13, x + 0.13, y - 0.13, y + 0.13) for x, y in P.CHAIN_POSTS]
+    d_chain = min(clear(q, posts) for p in poses for q in body_pts(p))
+    d_crates = min(clear(q, [P.CRATES_BOX]) for p in poses for q in body_pts(p))
+    check("P5 : la berline frôle la chaîne sans la toucher", 0.4 <= d_chain <= 2.0, f"{d_chain:.2f} m au plus près")
+    check("P5 : la berline frôle les caisses sans les toucher", 0.4 <= d_crates <= 2.0, f"{d_crates:.2f} m au plus près")
+    d_pack = min(clear(fn(M.t_of(f)), posts) for n, fn in P.tracks().items() if n != "hero" for f in frames)
+    check("P5 : la meute passe à côté de la chaîne", d_pack >= 1.6, f"{d_pack:.2f} m entre un centre et un poteau")
+    # rien ne frôle l'objectif : la caisse à plus de 5 m de la caméra
+    d_cam = min(math.dist(q, P.CAM[:2]) for p in poses for q in body_pts(p))
+    check("P5 : la berline à plus de 5 m de l'objectif", d_cam >= 5.0, f"{d_cam:.1f} m au plus près")
+    # le cadre (découpage v2) : la berline passe près (moins de 9 m, plus de la moitié de la largeur), le milieu de sa
+    # boîte reste dans le tiers central, elle ne touche ni la bande haute (12 %) ni la basse (15 %) ; l'hélicoptère
+    # dans le cadre final, au-dessus d'elle, hors de la bande haute ; la meute dans le champ aux premières images
+    boxes_f = [P.frame_box(p) for p in poses if P.F0 <= p["frame"] < P.F0 + P.FRAMES]
+    mids = [(b[0] + b[1]) / 2 for b in boxes_f]
+    check("P5 : la berline au milieu du cadre", all(33.0 <= m <= 67.0 for m in mids),
+          f"milieu de {min(mids):.0f} à {max(mids):.0f} %")
+    check("P5 : la berline hors des bandes d'habillage", all(b[2] >= 15.0 and b[3] <= 88.0 for b in boxes_f),
+          f"y de {min(b[2] for b in boxes_f):.0f} à {max(b[3] for b in boxes_f):.0f} %")
+    check("P5 : la berline passe près", min(b[4] for b in boxes_f) <= 9.0 and max(b[1] - b[0] for b in boxes_f) >= 50.0,
+          f"{min(b[4] for b in boxes_f):.1f} m, {max(b[1] - b[0] for b in boxes_f):.0f} % de la largeur")
+    t1 = M.t_of(P.F0 + P.FRAMES - 1)
+    hx = P.project(P.heli(t1)[:3], t1)
+    hero_top = boxes_f[-1][3]
+    check("P5 : l'hélicoptère au-dessus d'elle à la fin", hx and 30.0 <= hx[0] <= 70.0 and hero_top + 15.0 <= hx[1] <= 82.0,
+          f"x {hx[0]:.0f} %, y {hx[1]:.0f} %" if hx else "derrière")
+    pk = [P.project((*P.pack_pos(0)(M.t_of(f)), 0.8), M.t_of(f)) for f in range(P.F0, P.F0 + 6)]
+    check("P5 : la meute dans le champ au début", all(q and 0.0 <= q[0] <= 100.0 for q in pk),
+          f"x {', '.join(f'{q[0]:.0f}' for q in pk if q)} %")
+    yaws = [P.camera_aim(M.t_of(f))[0] for f in range(P.F0, P.F0 + P.FRAMES)]
+    steps = [b - a for a, b in zip(yaws, yaws[1:])]
+    check("P5 : panoramique amorti au départ et à l'arrivée", abs(steps[0]) < 1.0 and abs(steps[-1]) < 1.0
+          and max(abs(s) for s in steps) < 6.0, f"{steps[0]:.2f}°, {steps[-1]:.2f}° par image, {max(abs(s) for s in steps):.1f} au plus")
+    check("P5 : l'hélicoptère au-dessus des piles", min(P.heli(M.t_of(f))[2] for f in frames) >= 19.0)
 
 
 def test_p2():
