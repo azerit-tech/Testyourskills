@@ -931,11 +931,9 @@ def plan_FIN6(scene, hidden, palier="socle"):
     scene.frame_start, scene.frame_end = F6.F0, F6.F0 + F6.FRAMES - 1
     frames = range(F6.F0 - 1, F6.F0 + F6.FRAMES + 1)
     stop = Vector((F6.CX, F6.CY, 0.0))
-    # le ciel et le phare de FIN : la bande de crépuscule derrière le phare, un pinceau qui balaie
-    for n in scene.world.node_tree.nodes:
-        if n.type == "VECT_ROTATE":
-            n.inputs["Angle"].default_value = 0.0
-    ph = bpy.data.objects.get("phare")
+    # le ciel et le phare de FIN : la bande corail du ciel commun derrière le phare (lieux.ciel, sans rotation ; la
+    # boucle qui l'y remettait testait VECT_ROTATE, alors que Blender nomme le nœud VECTOR_ROTATE), un pinceau qui balaie
+    ph =bpy.data.objects.get("phare")
     if ph is not None:
         L.phare_tourne(ph, phase=-25.0, vitesse=45.0)
         L.phare_pinceaux(ph, releve=8.0, portee=9.0)
