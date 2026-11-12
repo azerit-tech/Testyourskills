@@ -581,8 +581,12 @@ def test_ouv():
         x, y = car["u"] * 100, car["v"] * 100
         check(f"OUV : la berline au point de coupe à l'image {f}", abs(x - 50) <= 6 and abs(y - 58) <= 4,
               f"x {x:.0f}, y {y:.0f}, largeur {car['w'] * 100:.0f} %")
-    check("OUV : phares, rampe puis feux stop", P.F0 < P.WAKE < P.BARS_ON < P.BRAKE[0] <= P.BRAKE[1] < P.F0 + P.FRAMES,
-          f"phares {P.WAKE}, rampe {P.BARS_ON}, feux stop {P.BRAKE[0]}-{P.BRAKE[1]}")
+    check("OUV : phares puis rampe, sans feux stop (le parcours : elle ne freine pas)",
+          P.F0 < P.WAKE < P.BARS_ON < P.F0 + P.FRAMES and not P.brake_windows() and not hasattr(P, "BRAKE"),
+          f"phares {P.WAKE}, rampe {P.BARS_ON}, feux stop {P.brake_windows()}")
+    import parcours as PC
+    d = max(math.dist(P.hero_pos(M.t_of(f)), PC.hero("OUV")["pos"](f)) for f in range(P.F0, P.F0 + P.FRAMES))
+    check("OUV : la berline sur la fenêtre du parcours", d < 1e-9, f"{d:.1e} m")
 
 
 def _common_frame(name, P):
