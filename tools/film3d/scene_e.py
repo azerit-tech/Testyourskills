@@ -975,6 +975,23 @@ def plan_P5(scene, hidden, palier="socle"):
         M.key_vehicle(r, ps, wheels=wh, ground=deck_ground, pivot=(0.0, 0.0, 0.36))
         M.wheel_marks(wh, wr, axis="Y")
     boost_bars(glow=20000.0)
+    # les lueurs de rampe (20 kW, corail puis lilas, réglées pour se lire à 90 m) n'éclairent pas la berline :
+    # sonde du 12 novembre, toutes les lampes fixes et le ciel coupés, le flanc restait à (159, 75, 77) ; c'étaient
+    # elles, animées, qui le sortaient framboise. Sans elles le flanc passe de (177, 97, 101) à (106, 51, 60). Le
+    # reste de l'écart à OUV (68, 19, 13) est la peinture elle-même (#4e0a28, tirée vers le pourpre) sous une
+    # lumière neutre : éclairée par la face et la tour crème seules, sans ciel, (84, 24, 29) ; OUV la voit sous les lampes ambre.
+    # Passer la face et la tour en ambre ne la déplace que de (-2, -4, -9) : le flanc est surtout éclairé de biais
+    # (sol mouillé, brume). FILM3D_P5_GLOW_CAR=1 rend l'état d'avant.
+    if os.environ.get("FILM3D_P5_GLOW_CAR", "0") != "1":
+        sans = bpy.data.collections.new("lueurs_sans_berline")
+        for o in hero.children_recursive:
+            if o.type == "MESH":
+                sans.objects.link(o)
+        for co in sans.collection_objects:
+            co.light_linking.link_state = "EXCLUDE"
+        for ob in bpy.data.objects:
+            if ob.type == "LIGHT" and ob.name.startswith("rampe_lueur"):
+                ob.light_linking.receiver_collection = sans
     n = M.flash_bars(rigs, FRAMES)
     print(f"[P5] {n} lueurs de rampe clignotantes", flush=True)
     # la tour devant le mur qui ferme l'axe, derrière la caméra
