@@ -1052,6 +1052,19 @@ def hands_up(root, up=0.10, fwd=0.22, out=0.2):
     cp._head_look(arm, (cp.F + cp.D * 0.05).normalized())
 
 
+def hands_up_keys(root, f0, f1):
+    """Le conducteur lâche le volant et lève les mains : une clé d'os sur sa pose assise (les mains au volant,
+    scene_a.street_hero) à l'image `f0`, une sur hands_up à `f1` ; Blender interpole les os entre les deux."""
+    arm = hero_driver(root)
+    if arm is None:
+        print("[lieux] pas de conducteur : mains levées impossibles", flush=True)
+        return None
+    key_pose(arm, f0)
+    hands_up(root)
+    key_pose(arm, f1)
+    return arm
+
+
 def patrol(name="patrol", lights_on=True):
     """La patrouille choisie (pare-buffle, grille d'habitacle : cast_vehicles.load_patrol « jeandiz »),
     rampe corail et lilas allumée, phares et feux arrière. Renvoie le rig."""
