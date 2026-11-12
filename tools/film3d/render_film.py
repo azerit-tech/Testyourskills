@@ -52,7 +52,7 @@ SOURCES = {
     "FIN6": ("scene_d", "FIN6"),
 }
 # (repli seulement si shared/film/cut.ts manque : il reste la seule source des durées ; découpage v3)
-FALLBACK_FRAMES = {"OUV": 40, "P1": 48, "P2": 48, "P3": 48, "P4": 48, "P5": 48, "P6": 60, "FIN": 52, "FIN6": 80}
+FALLBACK_FRAMES = {"OUV": 40, "P1": 48, "P2": 84, "P3": 48, "P4": 48, "P5": 48, "P6": 60, "FIN": 52, "FIN6": 80}
 # Le module de trajectoire de chaque plan (sans Blender) : son FRAMES est la longueur que sa scène sait animer. Un
 # plan pas encore migré au découpage de cut.ts se rend à la longueur de son module, et le journal le dit.
 TRAJ = {"OUV": "ouv_avenue", "P1": "p1_avenue", "P2": "p2_arc", "P3": "p3_enseignes", "P4": "p4_pont",
@@ -686,7 +686,7 @@ def assemble(a, plans, cut):
 def selftest():
     import tempfile
     cut = read_cut()
-    assert cut == FALLBACK_FRAMES and sum(cut.values()) == 472, cut          # cut.ts et le repli : le découpage v3
+    assert cut == FALLBACK_FRAMES and sum(cut.values()) == 508, cut          # cut.ts et le repli : le découpage v3
     # un plan pas encore migré (son module a encore FRAMES = 28) garde sa longueur ; les autres suivent cut.ts
     old = {"P3": 28, "FIN": 36}
     eff = plan_frames(cut, ORDER, frames_of=lambda p: old.get(p, cut[p]))
@@ -720,7 +720,7 @@ def selftest():
         open(frame_path(d, 5), "wb").write(png(18, 32))              # autre taille
         assert png_size(frame_path(d, 1)) == (36, 64) and png_size(frame_path(d, 3)) is None
         assert todo(d, range(1, 7), (36, 64)) == [3, 5, 6], todo(d, range(1, 7), (36, 64))
-    print("[film] selftest : durées (472 images, plans pas encore migrés compris), --frames, essais, reprise "
+    print("[film] selftest : durées (508 images, plans pas encore migrés compris), --frames, essais, reprise "
           "(absente, tronquée, autre taille) : ok")
 
 

@@ -14,8 +14,8 @@
 # d'accélération, 7,5 les deux ensemble, 12 m/s³ d'à-coup, 120 °/s² d'accélération de lacet. La berline arrive
 # en freinant (le nez plonge, les feux stop), relâche le frein en entrant dans le virage, l'arrière part vers
 # l'extérieur quand l'adhérence passe 5,5 m/s², les roues avant contre-braquent, la glisse mange la vitesse, se
-# résorbe avec un petit retour de l'autre côté, et la berline remet les gaz dans l'axe de la rue. Un quart de tour
-# à 6 m/s² prend 3,5 s à 13,5 m/s : le plan dure ce que la physique demande (FRAMES).
+# résorbe sans retour, et la berline remet les gaz. Le plan s'arrête à 84 images (3,5 s), une douzaine d'images
+# après la fin de la glisse, au cap 55° de l'arc : la sortie dans la rue des enseignes est montrée par P3.
 import math
 
 R = 30.0                    # rayon de l'arc
@@ -23,13 +23,13 @@ LC_IN, LC_OUT = 17.0, 14.0  # m : les clothoïdes d'entrée et de sortie
 LA = R * math.pi / 2 - (LC_IN + LC_OUT) / 2     # m : l'arc entre les deux
 S_EXIT = LC_IN + LA + LC_OUT                    # m : la fin de la clothoïde de sortie (cap 90°)
 Y_EXIT = R                  # la droite de sortie (y = +2,05 dans la scène F : la voie qui s'éloigne de l'îlot)
-FRAMES = 134
+FRAMES = 84
 F0 = 1
 FPS = 24.0
 T_END = (FRAMES - 1) / FPS
 V31 = True                  # le découpage v3.1 (cadre commun, voiture vraie) : vaut aussi V3
 V3 = True                   # les plafonds v3 des tests (test_motion, motion.py mesure) s'appliquent à ce plan
-STILL = 0.29  # l'instant de l'image fixe, de 0 (début du plan) à 1 (fin) : la glisse tenue
+STILL = 0.44  # l'instant de l'image fixe, de 0 (début du plan) à 1 (fin) : la glisse tenue
 
 # la vitesse : V0 à la première image ; l'accélération le long de la route, clés (s, m/s²) reliées en droite (à-coup
 # borné). Le freinage avant l'îlot, relâché dans la clothoïde d'entrée (le frein traîné : latéral et freinage ensemble
@@ -386,7 +386,7 @@ CHASE_SIG = 0.4             # s : le lissage du cap (gaussienne)
 CHASE_SLIP = 0.3            # la part de la glisse que la caméra suit
 CHASE_TAU = 0.25            # s
 CHASE_FRAME_Y = 0.58
-CHASE_U = ((0.0, 0.50), (4.0, 0.50), (5.5, 0.535))   # (t, centre depuis la gauche) : à la fin, vers la coupe de P3
+CHASE_U = ((0.0, 0.50), (2.0, 0.50), (3.46, 0.535))  # (t, centre depuis la gauche) : à la fin, vers la coupe de P3
 HERO_MID_Z = 0.725          # m : le milieu de la boîte de la berline (motion.HERO_BOX)
 
 

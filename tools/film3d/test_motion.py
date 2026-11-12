@@ -254,8 +254,8 @@ def test_gaps():
 
 
 def test_p2():
-    """P2 (découpage v3.1) : la pose de l'image fixe retrouvée par le plan animé ; la route à courbure continue, cap
-    90° à la fin ; la glisse (15 à 18°) et la dynamique ; la caméra sans tremblé écrit ; la berline au point de coupe
+    """P2 (découpage v3.1) : la pose de l'image fixe retrouvée par le plan animé ; la route à courbure continue, la
+    glisse finie et les gaz remis à la fin ; la glisse (15 à 18°) et la dynamique ; la caméra sans tremblé écrit ; la berline au point de coupe
     (y depuis le haut). Écarts, conduite et plafonds : test_v3 et les contrôles v3.1."""
     import p2_arc as P
     t = P.STILL * P.T_END
@@ -265,8 +265,10 @@ def test_p2():
     check("P2 : V31 et V3", P.V31 and P.V3)
     ks = [P.curvature(P.S_EXIT * i / 400) for i in range(401)]
     jump = max(abs(b - a) for a, b in zip(ks, ks[1:]))
-    check("P2 : courbure continue, cap 90° à la dernière image", jump < 1e-3
-          and abs(P.point(P.s_hero(P.T_END))[2] - 90.0) < 0.5, f"saut {jump:.5f} /m")
+    # (84 images : le plan s'arrête dans l'arc, glisse finie et gaz remis ; P3 montre la sortie)
+    t_out = P.t_of(P.F0 + P.FRAMES - 1)
+    check("P2 : courbure continue, glisse finie une douzaine d'images avant la fin, gaz remis", jump < 1e-3
+          and abs(P.hero_slip(t_out - 10 / 24)) < 0.05 and P.hero_accel(t_out) > 1.0, f"saut {jump:.5f} /m")
     frames = range(P.F0 - 1, P.F0 + P.FRAMES + 1)
     ps = M.sample(P.hero_pos, frames, slip=P.hero_slip, noise=0.0)
     peak = max(ps, key=lambda p: p["heading"] - p["travel"])
