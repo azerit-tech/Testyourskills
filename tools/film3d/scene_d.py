@@ -1077,6 +1077,41 @@ def p6_clean_haze(scene, hero):
     print(f"[P6] {n} lampadaires hors brume, volumes biaisés", flush=True)
 
 
+# les flaques étroites sur la ligne des roues de la berline (x 81,0 et 82,5 : roues à ±0,75 m de x = 81,75), entre
+# les nappes des phares : (x, y, demi-largeur, allongement le long de la jetée). Nommées fx_flaque_* pour fx.py
+# (elle les traverse aux images 7, 12, 19, 25, 31 et 37)
+P6_PUDDLES = [(82.5, 260.5, 0.20, 4.0), (81.0, 268.0, 0.17, 5.0), (82.5, 277.0, 0.22, 3.5), (81.0, 285.0, 0.18, 4.5),
+              (82.5, 294.0, 0.20, 4.0), (81.0, 302.0, 0.19, 4.0)]
+# les balises du terre-plein central, sur le double axe (x = 80) : la colonne roule à 78,25 et 81,75, 0,75 m de
+# chaque flanc, et ne coupe jamais l'axe sur la jetée ; elles défilent à 1 m à droite de l'objectif
+P6_BOLLARDS = [JY0 + 8.0 + 4.0 * k for k in range(72)]       # 108 .. 392
+
+
+def p6_foreground(hidden):
+    """Le premier plan de P6 au ras du sol (0,55 m) : les balises du double axe (les bornes de rue du modèle libre
+    de la rue, CREDITS.md) qui traversent le bord droit du cadre, une toutes les 4 m, filées par 120 km/h ; d'en
+    haut, à l'envol, elles tracent l'axe de la jetée jusqu'à la colonne. Des flaques étroites sur la ligne des
+    roues de la berline (la recette de P2 et P3), qu'elle traverse : fx_flaque_*."""
+    import scene_b as B
+    P = B.lib_parts("lieux/rue/street-pack/model.glb", {"p6_balise_src": lambda o, c: o.name.startswith("Bollard_lp")},
+                    hidden, 6.0)
+    nb = 0
+    if P.get("p6_balise_src"):
+        for k, y in enumerate(P6_BOLLARDS):
+            S.instance(P["p6_balise_src"], f"p6_balise_{k}", (JX, y, jetty_point(JX, y).z), 0.7 * k)
+            nb += 1
+    water = B.puddle_mat()
+    for k, (x, y, r, sy) in enumerate(P6_PUDDLES):
+        ob = B.puddle(f"fx_flaque_{k}", 0.0, 0.0, r, sy, 600 + k, water)
+        for v in ob.data.vertices:
+            v.co.x += x
+            v.co.y += y
+            v.co.z = jetty_point(v.co.x, v.co.y).z + 0.0025
+        ob.data.update()
+    print(f"[P6] premier plan : {nb} balises sur l'axe, {len(P6_PUDDLES)} flaques fx_flaque_* sur la ligne des roues",
+          flush=True)
+
+
 def plan_P6(scene, hidden, palier="socle"):
     """P6, toute la ville, animé (40 images, p6_jetee.py ; découpage v2) : la caméra devant la berline, 0,75 m à
     sa gauche, 7 m devant, à 0,55 m, 21 mm, site +8°, qui la précède jusqu'à l'image 24 ; puis elle s'envole en
@@ -1143,6 +1178,7 @@ def plan_P6(scene, hidden, palier="socle"):
     # le ciel en un voile rose qui noyait l'eau noire et ses reflets (rendus du 12 novembre)
     L.haze((JX - 30, JX + 30), (JY0 - 20, JY1), (L.WATER_Z, 28), 0.0012)
     p6_clean_haze(scene, hero)
+    p6_foreground(hidden)
     # la berline à 7 m de l'objectif : ses textures gardent leur pleine définition, le reste est loin
     L.cap_images(1024, keep_objects=[hero])
     c = P6.camera(P6.T_STILL)
