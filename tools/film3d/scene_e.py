@@ -62,7 +62,7 @@ TURN_AIM = (6.8, 64.4)                      # là où le projecteur du mât de d
 MAST_H = 25.0
 
 PALIERS = ("socle", "conteneurs", "portique")
-PALIER_MAX = "conteneurs"
+PALIER_MAX = "portique"
 
 
 def _palier_at_least(palier, which):
@@ -637,14 +637,119 @@ def build_containers(hidden, far=False, numbers_near=None):
     for i in range(2):                               # le mur gauche (x > 0), raccourci
         yd.row(10.0 + W / 2 + i * W, 10.0, ["40", "40"], (4, 5), top_gaps=0.15)
     yd.row(-30.0, BARRIER_Y + 3.6, ["40", "40", "20", "40", "40"], 3, along_x=True, top_gaps=0.15)
-    for i in range(4):                               # à l'ouest de la voie du pont
-        yd.row(-24.0 - i * (W + 1.2), 0.0, ["40", "40", "20", "40"], (2, 3), top_gaps=0.3)
+    for i in range(4):                               # à l'ouest de la voie du pont, derrière le portique
+        yd.row(-24.0 - i * (W + 1.2), 10.0, ["40", "40", "20", "40"], (2, 3), top_gaps=0.3)
     for i in range(3):                               # à l'est
         yd.row(30.0 + i * (W + 1.5), -10.0, ["40", "40", "20", "40", "40"], (2, 3), top_gaps=0.3)
     for i in range(2):                               # au nord-est, derrière la voie du quai
         yd.row(38.0, 88.0 + i * W, ["40", "40"], 2, along_x=True, top_gaps=0.3)
     print(f"[port] {yd.n} conteneurs (instances liées de {len(srcs)} sources), {yd.nums // 2} numéros", flush=True)
     return yd.n
+
+
+# ---------------------------------------------------------------- le portique (palier « portique »)
+
+GANTRY_X = (-24.4, -11.0)          # les deux cadres de jambes (§2.4 : x de -25 à -7 ; le cadre côté voie recule
+                                   # à -11, sinon sa jambe côté eau tombe sur le trottoir de la rampe)
+GANTRY_Y = (-7.0, 7.0)             # la jambe côté eau, la jambe côté terre (s de -7 à 7)
+GIRDER_Z = 24.0                    # le dessus des jambes, la poutre de roulement du chariot
+BOOM_L, BOOM_A = 20.5, 74.0        # la flèche relevée sur l'eau : longueur, angle sur l'horizontale (pointe à 45 m)
+
+
+def _gantry_light(name, kind, loc, color, energy, size=0.2, aim=None, spot=70.0):
+    d = bpy.data.lights.new(name, kind)
+    d.energy = energy
+    d.color = L.lin(color)[:3]
+    d.shadow_soft_size = size
+    if kind == "SPOT":
+        d.spot_size = math.radians(spot)
+        d.spot_blend = 0.6
+    lo = bpy.data.objects.new(name, d)
+    bpy.context.scene.collection.objects.link(lo)
+    lo.location = loc
+    if aim is not None:
+        lo.rotation_mode = "QUATERNION"
+        lo.rotation_quaternion = (Vector(aim) - Vector(loc)).to_track_quat("-Z", "Y")
+    return lo
+
+
+def build_gantry(far=False):
+    """Le portique de quai à conteneurs, écrit faute de modèle libre au niveau (§2.4 : 45 m, flèche relevée, à
+    gauche de la voie du pont, au bord sud du terre-plein) : deux cadres de jambes sur bogies, reliés par les
+    poutres de portail ; la poutre de roulement et son arrière-bec côté terre, la salle des machines dessus ; la
+    flèche relevée sur l'eau, en deux membrures entretoisées ; le chevalement au-dessus des jambes côté eau, ses
+    tirants vers la flèche et vers l'arrière-bec ; la cabine sous la poutre, sa vitre allumée. Feux de balisage
+    ambre aux extrémités, le feu corail fixe en tête de flèche, deux projecteurs crème sous la poutre (le pied de
+    la rampe et la brume). À 80 m et à contre-jour, la silhouette suffit : aucun mot ni logo, une seule matière."""
+    steel = bpy.data.materials.get("portique_acier") or L.mat_steel("portique_acier", color=(0.30, 0.32, 0.34),
+                                                                    rough=0.45, rust=0.3, paint=True)
+    amber = bpy.data.materials.get("portique_feu_ambre") or L.emit_mat("portique_feu_ambre", L.lin(L.AMBER), 30.0)
+    coral = bpy.data.materials.get("portique_feu_corail") or L.emit_mat("portique_feu_corail", L.lin(L.CORAL), 40.0)
+    glass = bpy.data.materials.get("portique_vitre") or L.emit_mat("portique_vitre", L.lin("#ffe2b0"), 2.5)
+    bm, fb = L.bmesh.new(), L.bmesh.new()
+    xa, xb = GANTRY_X
+    yw, yl = GANTRY_Y
+    zg, leg = GIRDER_Z, 0.7
+    top = zg + 2.2                                  # le dessus des poutres de roulement
+    back = yl + 12.0                                # le bout de l'arrière-bec
+    for x in (xa, xb):
+        for y in (yw, yl):
+            L.box_bm(bm, (x - leg, y - leg, 0.0), (x + leg, y + leg, zg))          # les jambes
+            L.box_bm(bm, (x - 1.0, y - 1.8, 0.0), (x + 1.0, y + 1.8, 1.3))        # les bogies sur rail
+        L.box_bm(bm, (x - 0.55, yw, 12.0), (x + 0.55, yl, 13.3))                   # la traverse basse
+        L.tube_bm(bm, (x, yw + leg, 13.3), (x, yl - leg, zg - 0.3), 0.28, seg=6)   # la croix du cadre
+        L.tube_bm(bm, (x, yl - leg, 13.3), (x, yw + leg, zg - 0.3), 0.28, seg=6)
+        L.box_bm(bm, (x - 0.8, yw - 2.5, zg), (x + 0.8, back, top))                 # la poutre et l'arrière-bec
+        # le chevalement : un A au-dessus de la jambe côté eau
+        apex = (x, yw + 1.5, zg + 11.0)
+        L.tube_bm(bm, (x, yw - 1.5, top), apex, 0.4, seg=6)
+        L.tube_bm(bm, (x, yw + 4.5, top), apex, 0.4, seg=6)
+        # la flèche relevée : une membrure par cadre, de la charnière à la pointe
+        hinge = Vector((x, yw - 2.5, zg + 1.0))
+        a = math.radians(BOOM_A)
+        tip = hinge + Vector((0.0, -math.cos(a) * BOOM_L, math.sin(a) * BOOM_L))
+        L.tube_bm(bm, hinge, tip, 0.5, seg=4)
+        for f in (0.55, 1.0):                                                        # les tirants avant
+            L.tube_bm(bm, apex, hinge.lerp(tip, f), 0.12, seg=4)
+        L.tube_bm(bm, apex, (x, back - 0.5, top), 0.14, seg=4)                       # le tirant arrière
+        for z, y in ((zg + 11.3, yw + 1.5), (tip.z + 0.4, tip.y)):                  # les feux ambre en tête
+            L.box_bm(fb, (x - 0.22, y - 0.22, z - 0.22), (x + 0.22, y + 0.22, z + 0.22))
+        L.box_bm(fb, (x - 0.22, back - 0.22, top), (x + 0.22, back + 0.22, top + 0.44))
+    for y in (yw, yl):                                                               # les poutres de portail
+        L.box_bm(bm, (xa - leg, y - 0.7, zg - 1.6), (xb + leg, y + 0.7, zg))
+    L.tube_bm(bm, (xa, yw + 1.5, zg + 11.0), (xb, yw + 1.5, zg + 11.0), 0.3, seg=6)  # le haut du chevalement
+    # l'entretoisement de la flèche : traverses et croix entre les deux membrures
+    a = math.radians(BOOM_A)
+    fs = (0.1, 0.32, 0.54, 0.76, 0.98)
+    pts = [Vector((0.0, yw - 2.5 - math.cos(a) * BOOM_L * f, zg + 1.0 + math.sin(a) * BOOM_L * f)) for f in fs]
+    for i, p in enumerate(pts):
+        L.tube_bm(bm, (xa, p.y, p.z), (xb, p.y, p.z), 0.25, seg=4)
+        if i:
+            q = pts[i - 1]
+            L.tube_bm(bm, (xa, q.y, q.z), (xb, p.y, p.z), 0.14, seg=4)
+            L.tube_bm(bm, (xb, q.y, q.z), (xa, p.y, p.z), 0.14, seg=4)
+    L.box_bm(bm, (xa - 0.4, yl + 3.0, top), (xb + 0.4, yl + 11.0, top + 3.6))        # la salle des machines
+    L.box_bm(bm, (xa + 0.9, -1.5, top), (xb - 0.9, 2.5, top + 1.1))                   # le chariot
+    cab = (xb - 4.2, xb - 1.2, -0.5, 2.3, zg - 3.4, zg - 0.4)                          # la cabine pendue
+    L.box_bm(bm, (cab[0], cab[2], cab[4]), (cab[1], cab[3], cab[5]))
+    L.box_bm(fb, (cab[0] + 0.2, cab[2] - 0.03, cab[4] + 0.8), (cab[1] - 0.2, cab[2], cab[5] - 0.4), mat=2)
+    L.mesh_object("portique", bm, [steel])
+    lamps = L.mesh_object("portique_feux", fb, [amber, coral, glass])
+    lamps.visible_shadow = False
+    # le feu corail fixe en tête de flèche, au milieu de la traverse de pointe
+    p = pts[-1]
+    tb = L.bmesh.new()
+    L.box_bm(tb, ((xa + xb) / 2 - 0.3, p.y - 0.3, p.z + 0.3), ((xa + xb) / 2 + 0.3, p.y + 0.3, p.z + 0.9))
+    L.mesh_object("portique_feu_tete", tb, [coral]).visible_shadow = False
+    _gantry_light("portique_tete", "POINT", ((xa + xb) / 2, p.y, p.z + 1.2), L.CORAL, 600.0)
+    if not far:
+        for x in (xa, xb):
+            _gantry_light(f"portique_balise_{x:.0f}", "POINT", (x, yw + 1.5, zg + 11.6), L.AMBER, 150.0)
+        for x in (xa + 3.0, xb - 3.0):                # les projecteurs sous la poutre, vers le pied de la rampe
+            _gantry_light(f"portique_projecteur_{x:.0f}", "SPOT", (x, 0.0, zg - 0.6), "#fff2d6", 25000.0,
+                          size=0.5, aim=(x * 0.4, -2.0, 0.0), spot=60.0)
+    print(f"[port] portique : jambes en x {xa:.0f} et {xb:.0f}, poutre à {zg:.0f} m, pointe de flèche à "
+          f"{p.z:.0f} m", flush=True)
 
 
 def build_port(hidden, lamp_src, far=False, palier=None):
@@ -660,6 +765,8 @@ def build_port(hidden, lamp_src, far=False, palier=None):
         build_props(hidden)
     if _palier_at_least(palier, "conteneurs"):
         build_containers(hidden, far=far, numbers_near=((CAM.x, CAM.y), 75.0))
+    if _palier_at_least(palier, "portique"):
+        build_gantry(far=far)
     print(f"[port] terre-plein {X1 - X0:.0f} × {Y1 - Y0:.0f} m, voie du quai en y {QY:.0f}, axe fermé en y "
           f"{BARRIER_Y:.1f}, {len(MASTS)} mâts, palier {palier}, {'vu de loin' if far else 'complet'}"
           f"{f', chaussée du pont retirée ({n} objets)' if n else ''}", flush=True)
