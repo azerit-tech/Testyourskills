@@ -45,7 +45,8 @@ REF = os.path.join(os.path.dirname(ASSETS), "ref")
 
 # palette (la même que scene_a.py)
 NAVY = "#1d2747"        # caisse de la patrouille
-CREAM = "#e9e2bf"       # portières et toit de la patrouille
+CREAM = "#cfc8aa"       # portières de la patrouille, filets du fourgon et de l'hélicoptère : crème rabattu (#e9e2bf
+                        # brûlait en blanc sous les phares et les lampadaires, portière ouverte de FIN)
 PATROL_BODY = "#111830" # caisse de la patrouille détaillée : marine profond presque noir (sous vernis)
 CORAL = "#ff6a3d"       # lentille gauche de la rampe
 LILAC = "#8d8cf0"       # lentille droite de la rampe
@@ -494,7 +495,7 @@ def rubber_over(src, name, dark=0.1, keep_uv=()):
 
 
 def livery_over(src, name, light_boxes=(), base=NAVY, light=CREAM, keep_uv=(), rough=0.3, metal=0.35, coat=1.0,
-                lamp_strength=0.0, flake=False, keep_out=(), lamp_zones=None):
+                lamp_strength=0.0, flake=False, keep_out=(), lamp_zones=None, coat_rough=None):
     """Repeint un matériau d'origine (ses cartes de normales et de rugosité restent) : caisse base,
     boîtes (x0, x1, z0, z1) en coordonnées objet peintes en light (portières, filet).
 
@@ -618,7 +619,7 @@ def livery_over(src, name, light_boxes=(), base=NAVY, light=CREAM, keep_uv=(), r
             if not p.inputs[key].links:
                 p.inputs[key].default_value = metal if key == "Metallic" else rough
     p.inputs["Coat Weight"].default_value = coat
-    p.inputs["Coat Roughness"].default_value = 0.02 if flake else 0.03
+    p.inputs["Coat Roughness"].default_value = coat_rough if coat_rough is not None else (0.02 if flake else 0.03)
     return m
 
 
@@ -1543,7 +1544,7 @@ def load_patrol(variant="jeandiz", collection=None, lights_on=False, livery="doo
                      core=(sum(abs(q.y) for q in hp) / len(hp), sum(q.z for q in hp) / len(hp), front_axle + 0.3))
     _replace_mats(parts, spec["paint"], lambda m: livery_over(
         m, f"{tag}_paint", _patrol_boxes(livery, front_axle), keep_uv=spec.get("keep_uv", ()),
-        base=PATROL_BODY, rough=0.28, metal=0.5, flake=True,
+        base=PATROL_BODY, rough=0.36, metal=0.45, flake=True, coat=0.8, coat_rough=0.09,
         lamp_strength=PATROL_HEAD_GLASS * on, lamp_zones=zones,
         # les flancs, des portières avant aux portières arrière, sous les vitres : loin des feux (aux deux bouts)
         keep_out=((front_axle - 2.9, front_axle - 0.3, 0.0, 1.05),)))
