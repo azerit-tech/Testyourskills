@@ -127,8 +127,10 @@ def test_p4():
     check("P4 : distances gardées", d >= 6.0, f"{d:.1f} m entre {a} et {b} à l'image {f}")
     gap = min(math.dist(P.hero_pos(M.t_of(f)), P.pack_pos(i)(M.t_of(f))) for f in frames for i in range(len(P.PACK)))
     check("P4 : la meute ne rattrape pas la berline", gap >= 25.0, f"{gap:.1f} m au plus près")
-    dist = P.CAM[1] - P.hero_pos(P.T_STILL)[1]
-    check("P4 : la berline à 70 m à l'image fixe", abs(dist - 70.0) < 1.0, f"{dist:.1f} m")
+    dist = P.Y_REF - P.hero_pos(P.T_STILL)[1]
+    check("P4 : la trajectoire inchangée (70 m de Y_REF à l'image fixe)", abs(dist - 70.0) < 1.0, f"{dist:.1f} m")
+    near = min(P.CAM[1] - P.hero_pos(M.t_of(f))[1] for f in frames)
+    check("P4 : la berline reste à 40 m de l'objectif au moins", near >= 40.0, f"{near:.1f} m")
 
 
 def test_p3():

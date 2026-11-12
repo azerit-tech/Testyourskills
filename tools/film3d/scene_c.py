@@ -130,11 +130,17 @@ def build_bridge(hidden, lamp_src, far=False, haubans=False):
             L.tube_bm(bm, (x, y, L.WATER_Z - 4.0), (x, y, zt - 1.2), 0.85, seg=20)
     L.mesh_object("pont_piles", bm, [M["concrete"]])
     if not far:
-        joint = S.mat_plain("joint_dilatation", (0.04, 0.04, 0.042, 1), 0.3, 1.0)
+        # les joints : une bande d'acier mouillé qui épouse le bombé de la chaussée, 3 mm au-dessus. En boîte plate
+        # à la hauteur de l'axe, le joint passait sous l'enrobé bombé et barrait tout le cadre de P4 d'un trait
+        # noir au 200 mm (une fente dans l'image)
+        joint = S.mat_plain("joint_dilatation", (0.42, 0.42, 0.44, 1), 0.22, 1.0)
         bm = L.bmesh.new()
+        xs = [-HALF + 0.5 + (2 * HALF - 1.0) * k / 40 for k in range(41)]
         for yj in (Y_START + 1.0, -282.5, -177.5, -72.5, Y_PORT + 0.5):
-            z = deck_z(yj)
-            L.box_bm(bm, (-HALF + 0.5, yj - 0.12, z + road.road_z(0) - 0.005), (HALF - 0.5, yj + 0.12, z + 0.004))
+            row = [(bm.verts.new((x, yj - 0.12, deck_z(yj - 0.12) + road.road_z(x) + 0.003)),
+                    bm.verts.new((x, yj + 0.12, deck_z(yj + 0.12) + road.road_z(x) + 0.003))) for x in xs]
+            for (a0, a1), (b0, b1) in zip(row, row[1:]):
+                bm.faces.new((a0, b0, b1, a1))
         L.mesh_object("pont_joints", bm, [joint])
     if haubans:
         build_haubans(out)
@@ -261,9 +267,10 @@ def pack(entries, speed=SPEED, beams=True, on=None):
 
 
 def plan_P4(scene, hidden, haubans=False):
-    """P4, la meute : 200 mm, sur le plat 50 m après le pied de la rampe, à 1,5 m, horizontale, face à la ville.
-    La berline descend vers nous (à 70 m de l'objectif à l'instant fort ; la décentration de 0,1 la pose au tiers
-    bas sans pencher la caméra) ; derrière elle trois patrouilles en V, le fourgon qui passe la crête."""
+    """P4, la meute (découpage v2) : 200 mm, sur le plat 32 m après le pied de la rampe, à 1,2 m, face à la ville,
+    un léger suivi qui garde la berline au centre. Elle descend vers nous de 80 à 42 m (de 24 à 46 % de large) ;
+    derrière elle trois patrouilles en V empilées par la longue focale, le fourgon qui passe la crête, le pylône
+    et ses haubans au fond."""
     # la bande corail du ciel tournée à 70° de l'axe, vers la droite du cadre : dans l'axe, la chaussée mouillée,
     # vue en rasant à 1,5 m, la reflétait en un voile rose-blanc sur toute la moitié basse
     lamp_src = L.panorama(scene, hidden, yaw=math.pi - math.radians(70.0), bridge=None, port="loin")
@@ -289,7 +296,8 @@ def plan_P4(scene, hidden, haubans=False):
     # mouillé ne la reçoit pas)
     L.car_fill(hero, loc=(0.4, 8.0, 2.2), energy=500.0)
     y_hero = P4.hero_pos(P4.T_STILL)[1]
-    entries = [(k, x, y_hero - gap, 0.0) for k, x, gap in P4.PACK] + [("van", *P4.van_pos(P4.T_STILL), 0.0)]
+    entries = [(e[0], *P4.pack_pos(i)(P4.T_STILL), 0.0) for i, e in enumerate(P4.PACK)] + \
+        [("van", *P4.van_pos(P4.T_STILL), 0.0)]
     rigs = pack(entries)
     fns = [P4.pack_pos(i) for i in range(len(P4.PACK))] + [P4.van_pos]
     for i, (r, fn) in enumerate(zip(rigs, fns)):
