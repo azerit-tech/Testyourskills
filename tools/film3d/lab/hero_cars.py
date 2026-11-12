@@ -968,6 +968,9 @@ def ray_x(objs, y, z, from_front=True):
     return best
 
 
+PLATE_TAG = "plaque"
+
+
 def add_plate(name, at, facing, size=(0.52, 0.11), coll=None):
     """Plaque vierge (tôle de 4 mm, bord relevé), posée à `at`, tournée vers +x (facing=1) ou -x (-1)."""
     bm = bmesh.new()
@@ -980,6 +983,8 @@ def add_plate(name, at, facing, size=(0.52, 0.11), coll=None):
     ob = bpy.data.objects.new(name, me)
     (coll or bpy.context.scene.collection).objects.link(ob)
     ob.location = at + Vector((0.004 * facing, 0, 0))
+    # l'appoint de poursuite (lieux.car_fill) ne l'éclaire pas : la plaque reste sombre, jamais une étiquette claire
+    ob[PLATE_TAG] = True
     return ob
 
 

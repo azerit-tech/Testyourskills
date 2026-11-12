@@ -55,6 +55,8 @@ def _args():
                     "lampe de lecture ; la planche de bord à 60 W), comme FIN et scene_d")
     ap.add_argument("--steer", type=float, default=0.0, help="braquage des roues avant, degrés (positif à gauche, "
                     "autour de leur centre, comme motion.key_vehicle)")
+    ap.add_argument("--chase-fill", default="", help="l'appoint de poursuite, lieux.car_fill : x,y,z,W,couleur,taille "
+                    "dans le repère du rig (+y vers l'avant), ex. 0,-4,6,800,ffe0cc,6")
     ap.add_argument("--stop", type=float, default=0.0, help="les feux stop (propriété « stop » de la caisse, 0 à 1)")
     ap.add_argument("--fill", default="", help="la source de face de lieux.car_fill (P4) : on, ou noglossy "
                                                "(invisible aux reflets)")
@@ -304,6 +306,8 @@ def camera(car, parts, view):
     # lunette, la plage arrière, le dessus du coffre et des ailes)
     d = 7.5 + 2.0
     shots["dos-7m5-haut"] = ((0.0, mx.y + 7.5, 2.4), (0.0, mx.y - 2.0, 2.4 - d * math.tan(math.radians(12.0))), 24.0)
+    # la même, décalée de 1,5 m à gauche de la voiture (la caméra de FIN ; la gauche de la caisse est +x au banc)
+    shots["ar-g-7m5-haut"] = ((1.5, mx.y + 7.5, 2.4), (0.0, mx.y - 2.0, 2.4 - d * math.tan(math.radians(12.0))), 24.0)
     shots["dos-bas"] = ((0.35, mx.y + 2.6, 0.30), (0.0, mx.y - 0.6, 0.30), 35.0)
     shots["arche"] = ((1.75, mx.y + 0.9, 0.45), (0.80, mx.y - 1.0, 0.40), 35.0)
     shots["p4"] = ((0.0, mn.y - 45.0, 1.2), (0.0, mn.y, 0.70), 200.0)
@@ -367,6 +371,11 @@ def main():
         lighting(kind)
         if a.fill:
             car_fill(car, glossy=a.fill != "noglossy")
+        if a.chase_fill:
+            import lieux as L
+            x, y, z, w, col, size = a.chase_fill.split(",")
+            # la caisse du banc a l'avant vers -y local, le rig de lieux.hero vers +y (lacet de 180°)
+            L.car_fill(car, loc=(-float(x), -float(y), float(z)), energy=float(w), color="#" + col, size=float(size))
         if a.cabin:
             import lieux as L
             L.cabin_light({"body": car.name}, energy=a.cabin)

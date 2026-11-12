@@ -1757,9 +1757,10 @@ def car_fill(car, loc=(0.4, 8.0, 2.2), energy=500.0, color="#f2e4d4", size=4.0):
     # si la collection existe déjà (scene_d._car_collections la crée avec les enfants seuls). Les vitres (propriété
     # « vitre », hero_cars.split_glass) n'en sont pas : elles renverraient l'appoint en miroir
     for o in car_parts(car):
-        if o.name not in in_c.objects:
+        if o.name not in in_c.objects and not o.get("plaque"):
             in_c.objects.link(o)
-    for o in [o for o in in_c.objects if o.get("vitre")]:
+    # ni la plaque (propriété « plaque », hero_cars.add_plate) : un appoint de dos l'éclairait en étiquette claire
+    for o in [o for o in in_c.objects if o.get("vitre") or o.get("plaque")]:
         in_c.objects.unlink(o)
     d = bpy.data.lights.new(f"{car.name}_face", "AREA")
     d.shape = "DISK"
