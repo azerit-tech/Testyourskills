@@ -96,7 +96,7 @@ def new_scene():
 # la berline roule vers +y, vers la mer : MER = 0. Même force partout ; l'exposition et la transformée d'affichage
 # sont celles de scene_a.render_settings, appelée par toutes les scènes.
 MER = 0.0              # l'azimut de la bande corail (convention de put : 0 vers +y, pi/2 vers -x), en radians
-CIEL_FORCE = 0.55      # la force du fond de monde
+CIEL_FORCE = 0.65      # la force du fond de monde : le ciel bas à 37 à 41 % (10 à 25° de hauteur), la lumière principale
 
 
 def ciel(scene, mer=MER, force=CIEL_FORCE):
@@ -128,8 +128,8 @@ def ciel(scene, mer=MER, force=CIEL_FORCE):
     elev = N.math("MAXIMUM", dxyz[2], 0.0)
     # la bande corail n'existe que du côté de la mer
     toward = N.math("POWER", N.math("MAXIMUM", dxyz[1], 0.0), 3.0)
-    dusk = N.ramp(elev, [(0.0, lin(CORAL)), (0.03, lin("#b9586f")), (0.08, lin(INDIGO)), (0.3, lin("#303c80")), (0.7, lin(NAVY))])
-    night = N.ramp(elev, [(0.0, lin("#3c3f86")), (0.1, lin("#2f3a78")), (0.5, lin(NAVY))])
+    dusk = N.ramp(elev, [(0.0, lin(CORAL)), (0.03, lin("#b9586f")), (0.08, lin(INDIGO)), (0.3, lin("#34418a")), (0.8, lin(NAVY))])
+    night = N.ramp(elev, [(0.0, lin("#3c3f86")), (0.1, lin("#2f3a78")), (0.6, lin(NAVY))])
     tint = N.mix(toward, night, dusk)
     bw = N.new("ShaderNodeRGBToBW")
     N.link(env.outputs["Color"], bw.inputs[0])
