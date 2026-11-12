@@ -1071,7 +1071,7 @@ def p6_foreground(hidden):
 # la lanterne de y 325 à 385, celle de droite à 3° ; les trois derniers de gauche sont retirés, les trois derniers de
 # droite et celui de la pointe baissés (tête à 8 au lieu de 40, sous la lanterne à 30 ; spot à moitié)
 P6_LAMPS_FAR = (7, 8, 9)                 # J_LAMPS[7:] : y 325, 355, 385
-P6_PHARE_PHASE, P6_PHARE_VITESSE = 115.0, 20.0
+P6_PHARE_PHASE, P6_PHARE_VITESSE = 113.0, 6.0
 
 
 def p6_phare_clear(scene):
@@ -1120,8 +1120,11 @@ def plan_P6(scene, hidden, palier="socle"):
     lamp_src = L.panorama(scene, hidden, all_lit=True, bridge="loin", port="loin", haubans=(palier in ("haubans", "complet")))
     build_jetty(hidden, lamp_src)
     build_pointe(hidden, lamp_src, far=True, marina=(palier in ("marina", "complet")))
-    # le phare (lieux.panorama) : ses pinceaux à 20°/s, de 115° à 164° depuis +x sur le plan ; l'autre, de 295° à
-    # 344°, part à 23° de l'objectif (vu du phare, la caméra est à 272°) et traverse le haut du cadre vers la droite
+    # le phare (lieux.panorama) : ses pinceaux, relevés de 1° seulement, vus de la jetée sous la lanterne, barrent
+    # toujours le cadre d'un bord à l'autre en passant par elle ; près de l'axe de la jetée, la barre penche (de 64 à
+    # 72 % de la hauteur, puis de 83 à 89 %) ; de travers, elle s'aplatissait sur l'horizon (à 20°/s, image 60). Donc
+    # lents, 6°/s : de 113° à 128° depuis +x sur le plan, l'autre de 293° à 308°, à 22° puis 36° de l'objectif (vu
+    # du phare, la caméra est à 272°)
     L.phare_tourne(bpy.data.objects["phare"], phase=P6_PHARE_PHASE, vitesse=P6_PHARE_VITESSE)
     scene.frame_start, scene.frame_end = P6.F0, P6.F0 + P6.FRAMES - 1
     frames = range(P6.F0 - 1, P6.F0 + P6.FRAMES + 1)      # une image de part et d'autre : l'obturateur du flou
