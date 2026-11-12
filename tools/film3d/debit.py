@@ -24,7 +24,7 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 # les scripts qui appellent la construction sans y prendre part : les retoucher n'invalide pas le cache
-CALLERS = {"render_film.py", "render_lieux.py", "iter_diag.py", "debit.py"}
+CALLERS = {"render_film.py", "render_lieux.py", "iter_diag.py", "debit.py", "ville.py"}
 # les variables qui ne changent pas la scène construite (rendu, chemins de sortie, ce module)
 NOT_KEY = {"FILM3D_BLEND", "FILM3D_RENDER", "FILM3D_DRAFT", "FILM3D_CACHE", "FILM3D_CACHE_DIR", "FILM3D_CACHE_GB",
            "FILM3D_PHASES"}
@@ -53,7 +53,10 @@ def sha1(path):
 
 def env_key(environ=None):
     environ = os.environ if environ is None else environ
-    return {k: v for k, v in sorted(environ.items()) if k.startswith("FILM3D_") and k not in NOT_KEY}
+    # FILM3D_VILLE (ville.py : 1, le défaut, le lieu rogné pour la ville ; 0, l'ancien lieu autonome) : absent et
+    # « 1 » construisent la même scène, une seule clé
+    return {k: v for k, v in sorted(environ.items()) if k.startswith("FILM3D_") and k not in NOT_KEY
+            and not (k == "FILM3D_VILLE" and v.strip() == "1")}
 
 
 def head_key(plan, arg, blender_version, environ=None):
