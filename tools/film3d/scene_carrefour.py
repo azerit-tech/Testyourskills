@@ -142,7 +142,7 @@ def build_street_life(M, hidden):
     for o in [o for o in parts if o not in mine]:
         bpy.data.objects.remove(o)
     lamp = A.join(mine, "lamp_src")
-    metal, lhead = A.mat_plain("lamp_metal", (0.05, 0.05, 0.055, 1), 0.35, 0.8), A.mat_emit("lamp_head", lin(AMBER), 40.0)
+    metal, lhead = A.mat_plain("lamp_metal", (0.05, 0.05, 0.055, 1), 0.35, 0.8), A.mat_emit("lamp_head", lin(A.LAMPE), A.LAMPE_TETE)
     for i, m in enumerate(lamp.data.materials):
         lamp.data.materials[i] = lhead if m.name.startswith("light") else metal
     A.recentre(lamp)
@@ -157,7 +157,7 @@ def build_street_life(M, hidden):
         hd = Vector((0, -1.68 * S, 4.68 * S))
         hd.rotate(Matrix.Rotation(rot, 3, "Z"))
         lo = A.add_light(f"lamp_light_{k}", "SPOT", Vector((x, yy, 0.15)) + hd - Vector((0, 0, 0.12)), (0, 0, -1),
-                         lin(AMBER), 2600.0, spot=130)
+                         lin(A.LAMPE), A.lampe_w(8.2), spot=130)
         lo.data.spot_blend = 0.5
         lo.data.shadow_soft_size = 0.25
     # --- les terrasses de l'angle : tables, parasols, lampe chaude dessous ; jardinières le long de la rue

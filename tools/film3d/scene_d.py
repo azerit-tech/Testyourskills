@@ -368,7 +368,7 @@ def build_pointe(hidden, lamp_src, far=False, marina=False):
     L.mesh_object("pointe_bornes", bm, [iron])
     # --- le lampadaire, bras vers le point d'arrêt
     d = Vector((STOP.x - LAMP_AT[0], STOP.y - LAMP_AT[1]))
-    out = L.lamp(lamp_src, (LAMP_AT[0], LAMP_AT[1], 0.0), arm=(d.x, d.y), energy=3200.0, name="lamp_pointe")
+    out = L.lamp(lamp_src, (LAMP_AT[0], LAMP_AT[1], 0.0), arm=(d.x, d.y), name="lamp_pointe")
     # son spot n'éclaire pas la brume : il y semait un nuage de grains autour de la tête (FIN, FIN6), qui
     # papillotait en mouvement ; ni l'équiangle, ni le clamp indirect, ni la tête non échantillonnée ne l'ôtaient,
     # le clamp direct si, mais il blanchit la tête et toutes les hautes lumières. La tête garde son halo
@@ -830,12 +830,8 @@ def plan_FIN(scene, hidden, palier="socle"):
     fin_pack_lights(frames, hero)
     # pas de fumée de pneus : à 24 km/h sur l'enrobé mouillé, une berline qui freine n'en fait pas ; et la nappe,
     # éclairée par le lampadaire de la pointe, passait floue et blanche à 3 m de l'objectif (brouillon v3.1)
-    # le lampadaire de la pointe frappe la berline : ambre à 3,2 kW, il la sortait orange vif ; plus faible et
-    # plus blanc, elle reste bordeaux sombre
+    # (le lampadaire de la pointe est le lampadaire commun, lieux.lamp : ambre, 1200 W, lumière v3.1 règle E)
     lp = bpy.data.objects.get("lamp_pointe_light")
-    if lp:
-        lp.data.energy = 1300.0
-        lp.data.color = L.lin("#ffe2c2")[:3]
     # il se range à droite du nouveau point d'arrêt et un peu en arrière (fin_pointe.LAMP_FIN), sa tête et son
     # reflet hors du cadre à toutes les images : à sa place de la pointe, sa tête sortait du cadre en haut à droite
     # après l'image 1 et son reflet sur l'enrobé mouillé restait en bas, une tache blanche floue sans source lisible
@@ -1109,7 +1105,7 @@ def p6_phare_clear(scene):
         dim.name = "p6_lamp_head_bas"
         for n in dim.node_tree.nodes:
             if n.type == "EMISSION":
-                n.inputs["Strength"].default_value = 8.0
+                n.inputs["Strength"].default_value = 0.25 * L.S.LAMPE_TETE
     gone, low = 0, 0
     for k in P6_LAMPS_FAR:
         for name in (f"lamp_jetee_{k}_g", f"lamp_jetee_{k}_g_light"):

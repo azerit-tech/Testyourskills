@@ -610,7 +610,7 @@ def lamp_source(hidden):
         bpy.data.objects.remove(o)
     lamp = S.join(mine, "lamp_src")
     metal = mat_steel("lamp_metal", color=(0.07, 0.075, 0.08), rough=0.4, rust=0.15, paint=True)
-    head = S.mat_emit("lamp_head", lin(AMBER), 40.0)
+    head = S.mat_emit("lamp_head", lin(S.LAMPE), S.LAMPE_TETE)
     for i, m in enumerate(lamp.data.materials):
         lamp.data.materials[i] = head if m.name.startswith("light") else metal
     S.recentre(lamp)
@@ -620,7 +620,7 @@ def lamp_source(hidden):
     return lamp
 
 
-def lamp(src, loc, arm=(1.0, 0.0), energy=2600.0, name=None, scale=LAMP_S):
+def lamp(src, loc, arm=(1.0, 0.0), energy=None, name=None, scale=LAMP_S):
     """Un lampadaire au pied `loc`, le bras tourné vers `arm` (x, y), et son spot ambre sous la tête.
     Renvoie (mât, lumière, position de la tête)."""
     n = name or f"lamp_{len([o for o in bpy.data.objects if o.name.startswith('lamp_')])}"
@@ -629,8 +629,8 @@ def lamp(src, loc, arm=(1.0, 0.0), energy=2600.0, name=None, scale=LAMP_S):
     headp = Vector((0, -1.68 * scale, 4.68 * scale))
     headp.rotate(Matrix.Rotation(rot, 3, "Z"))
     L = bpy.data.lights.new(f"{n}_light", "SPOT")
-    L.energy = energy
-    L.color = lin(AMBER)[:3]
+    L.energy = S.lampe_w(4.68 * scale) if energy is None else energy     # le même éclairement au sol partout
+    L.color = lin(S.LAMPE)[:3]
     L.spot_size = math.radians(130)
     L.spot_blend = 0.5
     L.shadow_soft_size = 0.5          # dans la brume, une source plus large n'étoile pas la tête du lampadaire
@@ -829,7 +829,7 @@ def roadway(name, ys, zfun=None, x0=0.0, half=7.0, walk=2.0, rail="parapet", gli
             for _, _, h in lamps:
                 bmesh.ops.create_uvsphere(hb, u_segments=8, v_segments=5, radius=0.55,
                                           matrix=Matrix.Translation(h - Vector((0, 0, 0.15))))
-            mesh_object(f"{name}_halos", hb, [emit_mat(f"{name}_halo", lin("#ffbf69"), 60.0)]).visible_shadow = False
+            mesh_object(f"{name}_halos", hb, [emit_mat(f"{name}_halo", lin(S.LAMPE), S.LAMPE_HALO)]).visible_shadow = False
     # tout est bâti autour de x = 0 (l'enrobé lit ses marquages en coordonnées objet), puis glissé en x0
     for ob in set(bpy.data.objects) - before:
         if ob.parent is None:
@@ -864,14 +864,14 @@ def port_placeholder(lamp_src, far=True, name="port"):
     ob.location = (BRIDGE_X - 7.0, QUAY_Y, 0.0)
     # les mâts d'éclairage aux angles
     mast = bpy.data.materials.get("lamp_metal") or mat_steel("lamp_metal", color=(0.07, 0.075, 0.08), paint=True)
-    head = emit_mat(f"{name}_mat_tete", lin(AMBER), 30.0)
+    head = emit_mat(f"{name}_mat_tete", lin(S.LAMPE), S.LAMPE_TETE)
     bm, hb = bmesh.new(), bmesh.new()
     for (x, y) in ((x0 + 6, y0 + 6), (x1 - 6, y0 + 6), (x0 + 6, y1 - 6), (x1 - 6, y1 - 6)):
         tube_bm(bm, (x, y, 0.0), (x, y, 25.0), 0.3, seg=12)
         box_bm(hb, (x - 1.6, y - 0.4, 25.0), (x + 1.6, y + 0.4, 25.5))
         Ld = bpy.data.lights.new(f"{name}_mat_{x:.0f}_{y:.0f}", "SPOT")
-        Ld.energy = 60000.0
-        Ld.color = lin(AMBER)[:3]
+        Ld.energy = S.lampe_w(25.0)
+        Ld.color = lin(S.LAMPE)[:3]
         Ld.spot_size = math.radians(120)
         Ld.spot_blend = 0.6
         Ld.shadow_soft_size = 0.8

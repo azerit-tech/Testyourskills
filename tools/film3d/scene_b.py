@@ -617,7 +617,7 @@ def build_lamps(hidden):
     for o in [o for o in parts if o not in mine]:
         bpy.data.objects.remove(o)
     lamp = A.join(mine, "rue_lamp_src")
-    metal, head = A.mat_plain("rue_lamp_metal", (0.05, 0.05, 0.055, 1), 0.35, 0.8), A.mat_emit("rue_lamp_head", lin(AMBER), 40.0)
+    metal, head = A.mat_plain("rue_lamp_metal", (0.05, 0.05, 0.055, 1), 0.35, 0.8), A.mat_emit("rue_lamp_head", lin(A.LAMPE), A.LAMPE_TETE)
     for i, m in enumerate(lamp.data.materials):
         lamp.data.materials[i] = head if m.name.startswith("light") else metal
     A.recentre(lamp)
@@ -632,7 +632,7 @@ def build_lamps(hidden):
         hd = Vector((0, -1.68 * S, 4.68 * S))
         hd.rotate(Matrix.Rotation(rot, 3, "Z"))
         lo = A.add_light(f"rue_lamp_light_{k}", "SPOT", Vector((x, y, road.WALK_Z)) + hd - Vector((0, 0, 0.1)),
-                         (0, 0, -1), lin(AMBER), 1800.0, spot=130)
+                         (0, 0, -1), lin(A.LAMPE), A.lampe_w(4.68 * S), spot=130)
         lo.data.spot_blend = 0.5
         lo.data.shadow_soft_size = 0.2
     log(f"{len(LAMPS)} lampadaires")
@@ -772,7 +772,7 @@ def build_street_end(hidden):
     # parapets montant vers la crête faisaient deux arcs blancs derrière le barrage, plus vifs que lui ; leurs têtes
     # à 10 : la file de points monte pile derrière le barrage, rien au fond de l'axe ne doit battre les rampes
     lamp = bpy.data.objects.get("rue_lamp_src")
-    halo = lieux.emit_mat("pont_halo", lin("#ffbf69"), 10.0)
+    halo = lieux.emit_mat("pont_halo", lin(A.LAMPE), A.LAMPE_HALO)
     hb = bmesh.new()
     S = 1.75
     n_real = 0
@@ -790,7 +790,7 @@ def build_street_end(hidden):
             bmesh.ops.create_uvsphere(hb, u_segments=8, v_segments=5, radius=0.45, matrix=Matrix.Translation(head))
             if k < 4:
                 lo = A.add_light(f"pont_lamp_light_{k}_{side}", "SPOT", head - Vector((0, 0, 0.15)), (0, 0, -1),
-                                 lin(AMBER), 800.0, spot=130)
+                                 lin(A.LAMPE), A.lampe_w(4.68 * S), spot=130)
                 lo.data.spot_blend = 0.5
                 lo.data.shadow_soft_size = 0.5
                 n_real += 1
@@ -852,7 +852,7 @@ def build_street_end(hidden):
         for k, x in enumerate((-34.0, -16.0, 16.0, 34.0)):
             A.instance(lamp, f"bd_lamp_{k}", (x, yq + 0.6, road.WALK_Z), 0.0, 1.3)
             lo = A.add_light(f"bd_lamp_light_{k}", "SPOT", (x, yq + 0.6 + 1.68 * 1.3, road.WALK_Z + 4.68 * 1.3 - 0.1),
-                             (0, 0, -1), lin(AMBER), 1800.0, spot=130)
+                             (0, 0, -1), lin(A.LAMPE), A.lampe_w(4.68 * 1.3), spot=130)
             lo.data.spot_blend = 0.5
     log(f"bout de rue : boulevard, quai, pont de {S_FAR - S_BRIDGE:.0f} m ({n_real} lampadaires allumés), pylône à "
         f"s = {S_PYLON:.0f}, autre rive")

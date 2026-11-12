@@ -70,6 +70,21 @@ NAVY = "#243152"
 CORAL = "#ff6a3d"
 AMBER = "#ffc36b"
 LILAC = "#8d8cf0"
+# Les lampadaires, les mêmes dans tous les lieux, mâts du port compris (lumière v3.1, règle E) : une seule teinte
+# chaude pour la tête et pour la lumière ; un même éclairement au sol, celui de 1200 W sous une tête à 8,2 m
+# (lampe_w) ; une tête émissive qui garde son ambre (à 40, AgX la blanchissait : des points blanc froid), un halo
+# pour les files vues de loin. À 2600 W et têtes à 40, la chaussée pompait de 5 à 20 % sous chaque lampadaire et
+# la berline virait au cuivre
+LAMPE = AMBER
+LAMPE_W, LAMPE_H = 1200.0, 8.2
+LAMPE_TETE = 4.0
+LAMPE_HALO = 6.0
+
+
+def lampe_w(h):
+    """La puissance du spot d'un lampadaire dont la tête est à `h` m du sol : le même éclairement au sol partout."""
+    return LAMPE_W * (h / LAMPE_H) ** 2
+
 
 # Le cadre
 LANE_X = -1.75         # la voie intérieure, celle du coupé
@@ -2252,7 +2267,7 @@ def build(plan=None, palier=None):
     for o in [o for o in parts if o not in mine]:
         bpy.data.objects.remove(o)
     lamp = join(mine, "lamp_src")
-    metal, head = mat_plain("lamp_metal", (0.05, 0.05, 0.055, 1), 0.35, 0.8), mat_emit("lamp_head", lin(AMBER), 40.0)
+    metal, head = mat_plain("lamp_metal", (0.05, 0.05, 0.055, 1), 0.35, 0.8), mat_emit("lamp_head", lin(LAMPE), LAMPE_TETE)
     for i, m in enumerate(lamp.data.materials):
         lamp.data.materials[i] = head if m.name.startswith("light") else metal
     recentre(lamp)
@@ -2274,8 +2289,8 @@ def build(plan=None, palier=None):
             head = Vector((0, -1.68 * S, 4.68 * S)).copy()
             head.rotate(__import__("mathutils").Euler((0, 0, rot)))
             L = bpy.data.lights.new(f"lamp_{k}", "SPOT")
-            L.energy = 2600
-            L.color = lin(AMBER)[:3]
+            L.energy = lampe_w(4.68 * S)
+            L.color = lin(LAMPE)[:3]
             L.spot_size = math.radians(130)
             L.spot_blend = 0.5
             L.shadow_soft_size = 0.25

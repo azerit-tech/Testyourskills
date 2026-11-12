@@ -366,7 +366,7 @@ def build_masts(far=False):
     """Les mâts d'éclairage de 25 m : fût conique, couronne de six projecteurs ambre, un spot large par mât."""
     steel = bpy.data.materials.get("mat_port_acier") or L.mat_steel("mat_port_acier", color=(0.42, 0.44, 0.45),
                                                                      rough=0.4, rust=0.2)
-    head = bpy.data.materials.get("mat_port_tete") or L.emit_mat("mat_port_tete", L.lin("#ffb257"), 60.0)
+    head = bpy.data.materials.get("mat_port_tete") or L.emit_mat("mat_port_tete", L.lin(L.S.LAMPE), L.S.LAMPE_TETE)
     plinth = bpy.data.materials.get("parapet") or L.mat_concrete("parapet", tint=(0.66, 0.64, 0.6), streaks=1.4, scale=0.6)
     bm, hb, pb = L.bmesh.new(), L.bmesh.new(), L.bmesh.new()
     for i, (x, y) in enumerate(MASTS):
@@ -387,8 +387,8 @@ def build_masts(far=False):
         # P5 sur le virage (la lumière de face de la berline, sinon à contre-jour du projecteur de l'hélicoptère)
         key = (x, y) == KEY_MAST
         Ld = bpy.data.lights.new(f"mat_port_{i}", "SPOT")
-        Ld.energy = 60000.0 if key else 45000.0
-        Ld.color = L.lin(L.AMBER)[:3]
+        Ld.energy = L.S.lampe_w(MAST_H)                 # un lampadaire de 25 m (lumière v3.1, règle E)
+        Ld.color = L.lin(L.S.LAMPE)[:3]
         Ld.spot_size = math.radians(50 if key else 125)
         Ld.spot_blend = 0.45 if key else 0.7
         Ld.shadow_soft_size = 1.2
