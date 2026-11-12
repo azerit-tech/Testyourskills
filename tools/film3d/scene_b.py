@@ -759,6 +759,9 @@ def cut_doors(body):
     names = [m.name.lower() if m else "" for m in me.materials]
     wheel = [f for f in bm.faces if "wheel" in names[f.material_index]]
     xs = [v.co.x for f in wheel for v in f.verts if v.co.x > 0]
+    # (les roues sont sorties de la caisse pour tourner, cast_vehicles.split_wheels : l'avant des roues avant est
+    # noté sur la caisse, la même mesure qu'avant, sur leurs sommets)
+    xs = xs or ([body["front_wheel_x"]] if "front_wheel_x" in body else [])
     front_axle = (max(xs) - 0.36) if xs else 1.45
     paint = [f for f in bm.faces if "paint" in names[f.material_index]]
     hw = max(abs(f.calc_center_median().y) for f in paint if 0.5 < f.calc_center_median().z < 0.9) if paint else 0.98
@@ -1181,8 +1184,11 @@ def plan_P3(scene):
     far = ob["patrol_a_c"]
     rig_c = MO.rig_up(far, P3.CHASE[2], name="rig_patrol_c",
                       extras=[o for o in ob if o.name.startswith("beam_c_")])
-    MO.key_vehicle(rig_c, MO.sample(P3.chase_pos, frames, heading=lambda t: P3.CHASE[2], wheel_r=0.36, seed=2.0),
-                   pivot=(0.0, 0.0, 0.36))
+    wh, wr = MO.wheels_of(far), far.get("wheel_r", 0.36)
+    MO.key_vehicle(rig_c, MO.sample(P3.chase_pos, frames, heading=lambda t: P3.CHASE[2], wheel_r=wr, seed=2.0,
+                                    wheelbase=far.get("wheelbase", 2.9), front=far.get("front_axle")),
+                   wheels=wh, pivot=(0.0, 0.0, 0.36))
+    MO.wheel_marks(wh, wr, axis="Y")
     # --- les rampes : lueurs et faisceaux des deux voitures garées rangés sous elles, puis 2 Hz corail / lilas
     for tag, car in (("a", ob["patrol_a"]), ("b", ob["patrol_a_b"])):
         keep_world_parent([o for o in ob if o.name.startswith((f"beam_{tag}_", f"bar_glow_{tag}_"))], car)

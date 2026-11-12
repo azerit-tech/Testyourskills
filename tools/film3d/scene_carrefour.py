@@ -358,7 +358,7 @@ def animate(scene, car, fill, patrols, pose=POSE):
     """Le plan P2 en clés calculées (motion.py) depuis la trajectoire de p2_arc, inchangée : chaque véhicule mis
     sur un rig (ses lumières posées à part le suivent), la berline en glisse (roulis vers l'extérieur, roues qui
     tournent, avant braqué du contre-braquage), les patrouilles derrière, rampes clignotantes. Les roues des
-    patrouilles sont fondues dans leur caisse : elles penchent avec elle et ne tournent pas."""
+    patrouilles sont séparées (cast_vehicles.split_wheels) : elles tournent et l'avant braque."""
     import motion as M
     frames = range(P.F0 - 1, P.F0 + P.FRAMES + 1)
     scene.frame_start, scene.frame_end = P.F0, P.F0 + P.FRAMES - 1
@@ -381,8 +381,13 @@ def animate(scene, car, fill, patrols, pose=POSE):
         lights = [o for o in bpy.data.objects if o.name.startswith((f"bar_glow_{key}_", f"pool_{key}_"))]
         r = M.rig_up(body, P.to_scene(pose, 0.0, 0.0, P.point(s)[2] + P.patrol_slip(i)(t0))[2], f"rig_{key}",
                      extras=lights)
-        ps = M.sample(in_scene(P.patrol_pos(i)), frames, slip=P.patrol_slip(i), wheel_r=0.36, seed=float(i + 1))
-        M.key_vehicle(r, ps, pivot=(0.0, 0.0, 0.36), body=body)
+        # (ses roues sont séparées, cast_vehicles.split_wheels : elles tournent et l'avant braque ; la trajectoire,
+        # le roulis et le tangage ne dépendent pas du rayon ni de l'empattement)
+        wh, wr = M.wheels_of(body), body.get("wheel_r", 0.36)
+        ps = M.sample(in_scene(P.patrol_pos(i)), frames, slip=P.patrol_slip(i), wheel_r=wr, seed=float(i + 1),
+                      wheelbase=body.get("wheelbase", 2.9), front=body.get("front_axle"))
+        M.key_vehicle(r, ps, wheels=wh, pivot=(0.0, 0.0, 0.36), body=body)
+        M.wheel_marks(wh, wr, axis="Y")
         rigs.append(r)
     n = M.flash_bars(rigs, frames)
     scene.render.use_motion_blur = True

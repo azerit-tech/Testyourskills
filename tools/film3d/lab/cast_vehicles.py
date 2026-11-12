@@ -197,6 +197,56 @@ def vertex_centroid(ob):
     return s / max(1, len(vs))
 
 
+def vertex_bbox(objs):
+    """Emprise monde (min, max) mesurée sur les sommets : juste même après un data.transform (bound_box, lui, n'est
+    rafraîchi qu'à l'évaluation de l'objet)."""
+    mn = Vector((1e18,) * 3)
+    mx = Vector((-1e18,) * 3)
+    for o in objs:
+        mw = o.matrix_world
+        for v in o.data.vertices:
+            p = mw @ v.co
+            mn = Vector(map(min, mn, p))
+            mx = Vector(map(max, mx, p))
+    return mn, mx
+
+
+def split_wheels(parts, is_wheel, tag):
+    """Sort des pièces d'un véhicule ses quatre roues (une pièce glTF par roue dans les modèles retenus), pour
+    qu'elles tournent : chaque roue garde sa géométrie, son origine passe au centre de ses sommets (sur l'axe),
+    elle s'appelle wheel_<FL|FR|BL|BR>_<tag> (l'avant vers +x, la gauche vers +y). Renvoie (le reste, les roues) ;
+    sans quatre roues, rien n'est sorti. À parenter à la caisse après le join (attach_wheels)."""
+    wheels = [o for o in parts if is_wheel(o)]
+    if len(wheels) != 4:
+        return parts, []
+    for o in wheels:
+        mn, mx = vertex_bbox([o])
+        c = (mn + mx) / 2
+        set_origin(o, c)
+        key = ("F" if c.x > 0 else "B") + ("L" if c.y > 0 else "R")
+        o.name = o.data.name = f"wheel_{key}_{tag}"
+        o.rotation_mode = "XYZ"
+        o["wheel_r"] = (mx.z - mn.z) / 2
+        o["front_x"] = mx.x
+    return [o for o in parts if o not in wheels], wheels
+
+
+def attach_wheels(body, wheels):
+    """Les roues sorties par split_wheels, enfants de la caisse, leurs places gardées ; la caisse note leur rayon,
+    l'empattement, l'essieu avant (x, repère de la caisse) et l'avant des roues avant (front_wheel_x)."""
+    if not wheels:
+        return
+    for w in wheels:
+        parent_keep(w, body)
+    front = [w for w in wheels if w.location.x > 0]
+    rear = [w for w in wheels if w.location.x <= 0]
+    body["wheel_r"] = sum(w["wheel_r"] for w in wheels) / 4
+    fx = sum(w.location.x for w in front) / max(1, len(front))
+    rx = sum(w.location.x for w in rear) / max(1, len(rear))
+    body["front_axle"], body["wheelbase"] = fx, fx - rx
+    body["front_wheel_x"] = max(w["front_x"] for w in front) if front else fx
+
+
 def split_loose(ob):
     """Sépare un maillage en morceaux disjoints ; renvoie la liste des morceaux."""
     bpy.ops.object.select_all(action="DESELECT")
@@ -821,8 +871,14 @@ def _load_van_hq(variant, spec, collection, lights_on, strength):
         _replace_mats(parts, spec["tyres"], lambda m: rubber_over(m, f"{tag}_tyres", 0.12, spec.get("rim_uv", ())))
     # vitres d'origine opaques (gris plat) : verre teinté, la caisse n'a pas d'aménagement intérieur
     _replace_mats(parts, spec.get("glass", ()), mat_glass(f"{tag}_tint", tint="#0d0f12"))
+    # les roues (une pièce par roue, matière des roues) : à part, pour tourner
+    # (la matière des roues vient d'être remplacée par rubber_over : elle s'appelle maintenant <tag>_tyres)
+    tyres = tuple(spec.get("tyres", ())) + (f"{tag}_tyres",)
+    parts, wheels = split_wheels(parts, lambda o: any(m and m.name.startswith(tyres) for m in o.data.materials), tag)
     body = join(parts, tag)
-    mn, mx = bbox([body])
+    attach_wheels(body, wheels)
+    # (l'emprise du véhicule entier, roues comprises : la hauteur des phares et la taille rendue n'ont pas bougé)
+    mn, mx = vertex_bbox([body] + wheels)
     bar, lens = hq_lightbar(collection, strength, width=spec["bar_w"])
     z = roof_z(body, spec["bar_x"]) or mx.z
     bar.location = (spec["bar_x"], 0, z - 0.015)
@@ -830,7 +886,7 @@ def _load_van_hq(variant, spec, collection, lights_on, strength):
     lights = lightbar_lights(bar) if lights_on else []
     lights += headlight_spots(body, [(mx.x - 0.1, 0.62, mn.z + 0.8), (mx.x - 0.1, -0.62, mn.z + 0.8)], on=lights_on)
     return dict(body=body, lightbar=bar, lenses=lens, lights=lights, length=mx.x - mn.x, height=mx.z - mn.z + 0.17,
-                tris=tris([body, bar, lens]))
+                tris=tris([body, bar, lens] + wheels), wheels=wheels)
 
 
 def load_van(variant="vandura", collection=None, lights_on=False, lens_strength=None):
@@ -1285,8 +1341,12 @@ def load_patrol(variant="jeandiz", collection=None, lights_on=False, livery="doo
     _assign(pick(parts, *spec["tail"]) if spec["tail"] else [], mat_lamp(f"{tag}_tail", "#ff2a1a", 3.0 * on, glass=True))
     _assign(pick(parts, *spec["amber"]) if spec["amber"] else [], mat_lamp(f"{tag}_amber", "#ffa21a", 2.0 * on))
     hmn, hmx = bbox(heads) if heads else (None, None)
+    # les roues (une pièce « Wheel.* » par roue ; étriers « WheelBrake » laissés à la caisse) : à part, pour tourner
+    parts, wheels = split_wheels(parts, lambda o: "Wheel." in o.name and "Brake" not in o.name, tag)
     body = join(parts, tag)
-    mn, mx = bbox([body])
+    attach_wheels(body, wheels)
+    # (l'emprise du véhicule entier, roues comprises : la hauteur des feux et la taille rendue n'ont pas bougé)
+    mn, mx = vertex_bbox([body] + wheels)
     strength = BAR_GLOW if lights_on else 0.0
     # la rampe détaillée (celle du modèle jeandiz, remise à neuf pour les deux variantes), au-dessus des montants B
     bar, lens = hq_lightbar(collection, strength, width=1.2)
@@ -1305,7 +1365,7 @@ def load_patrol(variant="jeandiz", collection=None, lights_on=False, livery="doo
     lights += headlight_spots(body, [(hx, hy, hz), (hx, -hy, hz)], on=lights_on, energy=450.0)
     lights += tail_lights(body, [(mn.x - 0.06, 0.6, mn.z + 0.86), (mn.x - 0.06, -0.6, mn.z + 0.86)], on=lights_on, energy=30.0)
     return dict(body=body, lightbar=bar, lenses=lens, lights=lights, length=mx.x - mn.x, height=mx.z - mn.z + 0.1,
-                tris=tris([body, bar, lens]))
+                tris=tris([body, bar, lens] + wheels), wheels=wheels)
 
 
 def _load_patrol_classic(collection=None, lights_on=False):

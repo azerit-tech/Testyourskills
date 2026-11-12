@@ -293,8 +293,13 @@ def plan_P4(scene, hidden, haubans=False):
     rigs = pack(entries)
     fns = [P4.pack_pos(i) for i in range(len(P4.PACK))] + [P4.van_pos]
     for i, (r, fn) in enumerate(zip(rigs, fns)):
-        ps = M.sample(fn, frames, wheel_r=0.36, seed=float(i + 1))
-        M.key_vehicle(r, ps, ground=ground, pivot=(0.0, 0.0, 0.36))   # roues fondues dans la caisse
+        # (roues séparées, cast_vehicles.split_wheels : elles tournent, l'avant braque ; trajectoire inchangée)
+        body = M.body_of(r)
+        wh, wr = M.wheels_of(body), body.get("wheel_r", 0.36)
+        ps = M.sample(fn, frames, wheel_r=wr, seed=float(i + 1), wheelbase=body.get("wheelbase", 2.9),
+                      front=body.get("front_axle"))
+        M.key_vehicle(r, ps, wheels=wh, ground=ground, pivot=(0.0, 0.0, 0.36))
+        M.wheel_marks(wh, wr, axis="Y")
     n = M.flash_bars(rigs, frames)
     # une brume légère et basse : au 200 mm, l'objectif regarde à travers 300 m d'air (à 0,0006 sur 70 m de haut,
     # les patrouilles du fond se voilaient)

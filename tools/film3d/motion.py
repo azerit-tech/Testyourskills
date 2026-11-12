@@ -284,6 +284,13 @@ def rig_up(body, heading, name=None, extras=()):
     return rig
 
 
+def body_of(root):
+    """La caisse d'un rig (lieux.rig, rig_up) : l'enfant nommé par root["body"] ; une copie de lieux.clone garde la
+    propriété de sa source, sa caisse est l'enfant « copie:nom »."""
+    name = root["body"]
+    return next(c for c in root.children if c.name == name or c.name.endswith(":" + name))
+
+
 def key_vehicle(root, poses, wheels=(), ground=None, pivot=(0.0, 0.0, 0.5), body=None):
     """Pose les clés d'un véhicule déjà construit (un rig de lieux : root, son enfant body["body"]).
 
@@ -295,9 +302,7 @@ def key_vehicle(root, poses, wheels=(), ground=None, pivot=(0.0, 0.0, 0.5), body
     déjà posées (les clés de flou faites à la main) : le flou de mouvement vient de ces clés."""
     from mathutils import Matrix, Vector
     if body is None:
-        # une copie de lieux.clone garde la propriété « body » de sa source : sa caisse est l'enfant « copie:nom »
-        name = root["body"]
-        body = next(c for c in root.children if c.name == name or c.name.endswith(":" + name))
+        body = body_of(root)
     for ob in (root, body, *wheels):
         _clear(ob)
     root.rotation_mode = body.rotation_mode = "XYZ"
@@ -383,17 +388,24 @@ def key_smoke(ob, birth, frames, at, size=1.0, grow=10, rise=0.4, drift=(0.0, 0.
         ob.keyframe_insert("location", frame=f)
 
 
-def wheel_marks(wheels, radius=0.33):
+def wheels_of(body):
+    """Les roues séparées d'une caisse (enfants « wheel_* », ou « copie:wheel_* » dans une copie de lieux.clone)."""
+    return [c for c in body.children if c.name.split(":")[-1].startswith("wheel_")]
+
+
+def wheel_marks(wheels, radius=0.33, axis="X"):
     """Un repère sur chaque roue (une branche de jante de couleur d'objet à part), pour juger à l'œil le sens et
     la vitesse de rotation dans l'aperçu Workbench. Caché au rendu (hide_render) : render_lieux.py ne le rallume
-    qu'en Workbench. Les roues sont des objets séparés dont l'axe est le x local."""
+    qu'en Workbench. Les roues sont des objets séparés dont l'axe est le x local (la berline) ; axis="Y" pour les
+    roues de cast_vehicles (patrouille, fourgon : l'avant vers +x, l'axe des roues en y local)."""
     import bpy
     import bmesh
     out = []
     for w in wheels:
         bm = bmesh.new()
         m = bmesh.ops.create_cube(bm, size=1.0)
-        bmesh.ops.scale(bm, vec=(0.30, 0.07, radius * 0.75), verts=m["verts"])
+        size = (0.30, 0.07, radius * 0.75) if axis == "X" else (0.07, 0.30, radius * 0.75)
+        bmesh.ops.scale(bm, vec=size, verts=m["verts"])
         bmesh.ops.translate(bm, vec=(0.0, 0.0, radius * 0.6), verts=m["verts"])
         me = bpy.data.meshes.new("repere_" + w.name)
         bm.to_mesh(me)
