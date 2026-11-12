@@ -23,7 +23,7 @@ CAM_LIMITS_PLAN = {
     # 21 mm, le virage de 30 m. accel : la berline y tire 12,6 m/s² (70 km/h sur 30 m) ; une caméra qui la suit à
     # 4 m/s² près (arel) en tire donc au moins 8,6 : le plafond commun de 8 ne peut pas tenir avec celui d'arel
     "P2": {"pan": 41.0, "behind": 0.67, "accel": 13.5},
-    "P3": {"gap": 0.05},     # la fiche fait passer la berline à 0,33 m du barrage (boîtes : 0,10 m) ; la patrouille 1
+    "P3": {"gap": 0.3},     # la trouée : 0,65 m entre les boîtes de la berline et du barrage (0,35 au moins) ; la patrouille 1
                              # à 1,5 m au moins de la berline : test_p3
     "P4": {"pan": 4.6, "vrel": None, "arel": None, "behind": 0.0,   # fixe, 200 mm, de face
            "zoom": True, "low_center": (0.52, 0.56), "low_all": True, "width_min": 0.17},
@@ -266,27 +266,36 @@ def test_p4():
 
 def test_p3():
     """P3 (découpage v3, de dos, 48 images) : aucun choc (la caisse à 15 cm au moins des patrouilles du barrage, des
-    agents, des plots et des caisses : elle passe de justesse, la fiche le veut ; la patrouille 1 à 1,5 m au moins
-    de la berline ; la caméra à 2 m au moins de la caisse et à 0,8 m au moins de tout le reste) ; roulis et tangage
-    bornés ; la berline de y 71,5–73,5 à 134 ; la caméra passe le barrage à sa suite sans jamais ralentir, et
-    descend de 1,9 à 0,7 m sans palier ; la berline dans le tiers central (son centre), son centre entre 50 et 62 %
-    de la hauteur depuis le haut quand la caméra est à 1 m ou moins (la règle des plans bas), entière hors des bandes
-    du HUD (15 % du bas, 12 % du haut), le trou des plots dans le cadre tant qu'il est devant ; le point de coupe à
-    la première et à la dernière image (x 50 ± 6 %, y 55 ± 6 % depuis le haut, largeur 42 ± 8 %) ; la patrouille 1
-    au bord gauche à l'image 1 (x 0–15 %), sortie du cadre avant l'image 14 ; éclairs d'une ou deux images."""
+    agents, des plots et des caisses : elle passe de justesse, la fiche le veut ; 0,35 m au moins des patrouilles
+    du barrage, la trouée ne se lit pas comme un choc ; la patrouille 1 à 1,5 m au moins de la berline ; la caméra
+    à 2 m au moins de la caisse et à 0,8 m au moins de tout le reste) ; roulis et tangage bornés ; la berline de
+    y 71,5–73,5 à 134 ; la caméra passe le barrage à sa suite sans jamais ralentir, et descend de Z0 à Z1 (2,4 à
+    1,4 m) sans palier ; la berline dans le tiers central (son centre), son centre entre 50 et 62 % de la hauteur
+    depuis le haut quand la caméra est à 1 m ou moins (la règle des plans bas), entière hors des bandes du HUD (15 %
+    du bas, 12 % du haut), le trou des plots dans le cadre tant qu'il est devant ; le point de coupe : à la
+    première image, celui de mesure (Δx ≤ 8, Δy ≤ 6, largeurs × 0,75–1,33 de la sortie de P2, 52/55/44), à la
+    dernière x 50 ± 6 %, y 55 ± 6 % depuis le haut, largeur 42 ± 8 % ; la patrouille 1 : sa rampe et la moitié de
+    sa caisse au moins dans le cadre, à gauche, 12 images de suite dès l'image 1, puis elle sort par le quart bas
+    gauche (l'arrière par le bas, l'avant en dernier par le bord gauche, sous la mi-hauteur) et n'y revient pas,
+    sans freinage sec (8 m/s² au plus, 1,25 m/s² d'une image à l'autre au plus), et à la dernière image l'avant de
+    sa caisse est avant les panneaux du barrage ; éclairs d'une ou deux images."""
     import p3_enseignes as P
     frames = range(P.F0 - 1, P.F0 + P.FRAMES + 1)
     tr = P.tracks()
     d, f, a, b = M.min_gap({k: tr[k] for k in ("hero", "patrol_c")}, frames)
-    check("P3 : la patrouille 1 loin de la berline (centres)", d >= 5.0, f"{d:.1f} m à l'image {f}")
-    body = min((P._poly_dist(P.hero_box(M.t_of(f)), P._car_box(*P.chase_pos(M.t_of(f)), P.CHASE[2], 2.5, 1.0)), f)
-               for f in frames)
+    check("P3 : la patrouille 1 dans sa voie, à côté de la berline (centres)", d >= 3.0, f"{d:.1f} m à l'image {f}")
+    body = min((P._poly_dist(P.hero_box(M.t_of(f / 4)), P._car_box(*P.chase_pos(M.t_of(f / 4)), P.CHASE[2],
+                                                                   *P.CHASE_HALF)), f / 4)
+               for f in range(4 * frames[0], 4 * frames[-1] + 1))
     check("P3 : 1,5 m au moins entre la berline et la patrouille 1", body[0] >= 1.5,
           f"{body[0]:.2f} m à l'image {body[1]}")
     cl = P.clearances(frames)
     cam = cl.pop("camera")
     n, (dm, fm) = min(cl.items(), key=lambda kv: kv[1][0])
     check("P3 : la caisse ne touche rien", dm >= 0.15, f"{dm:.2f} m de {n} à l'image {fm:.2f}")
+    bar = min(cl[k] for k in ("patrol_a", "patrol_b"))
+    check("P3 : la trouée large (0,35 m au moins des patrouilles du barrage)", bar[0] >= 0.35,
+          f"{bar[0]:.2f} m à l'image {bar[1]:.2f}")
     check("P3 : la caméra à 2 m au moins de la caisse", cam[0] >= 2.0, f"{cam[0]:.2f} m à l'image {cam[1]:.2f}")
     cc = P.cam_clearances()
     cc.pop("berline")
@@ -308,7 +317,7 @@ def test_p3():
     zs = [P.cam_z(M.t_of(f)) for f in shown]
     low = next(i for i, z in enumerate(zs) if z <= P.Z1 + 1e-6)
     top = max(i for i, z in enumerate(zs) if z >= P.Z0 - 1e-6)
-    check("P3 : descente de 1,9 à 0,7 m sans palier", abs(zs[0] - 1.9) < 1e-6 and abs(zs[-1] - 0.7) < 1e-6
+    check("P3 : descente de 2,4 à 1,4 m sans palier", abs(zs[0] - 2.4) < 1e-6 and abs(zs[-1] - 1.4) < 1e-6
           and all(zs[i + 1] < zs[i] - 1e-4 for i in range(top + 2, low - 1)),
           f"de l'image {top + P.F0} à l'image {low + P.F0}")
     bad = []
@@ -325,19 +334,37 @@ def test_p3():
     for f in (P.F0, P.F0 + P.FRAMES - 1):
         (u0, u1, v0, v1), (uc, vc) = P.hero_frame(M.t_of(f), P.camera(M.t_of(f)))
         cut.append((50 * ((u0 + u1) / 2 + 1), 100 * (1 - (v0 + v1) / 2), 50 * (u1 - u0)))   # la boîte, comme mesure
+    (x0, y0_, w0), (x1, y1_, w1) = cut
     check("P3 : le point de coupe à la première et à la dernière image",
-          all(abs(x - 50) <= 6 and abs(y - 55) <= 6 and abs(w - 42) <= 8 for x, y, w in cut),
+          abs(x0 - 52) <= 8 and abs(y0_ - 55) <= 6 and 0.75 <= w0 / 44.0 <= 1.33
+          and abs(x1 - 50) <= 6 and abs(y1_ - 55) <= 6 and abs(w1 - 42) <= 8,
           " ; ".join(f"x {x:.0f} y {y:.0f} l {w:.0f}" for x, y, w in cut))
-    edge = []
-    for f in (P.F0, P.F0 + 13):
+    seen, last, low = [], [], False
+    hl, hw = P.CHASE_HALF
+    for f in shown:
         t = M.t_of(f)
         c = P.camera(t)
         kx, ky = P.chase_pos(t)
-        us = [q[0] for q in (P.project(c, (kx + dx, ky + dy, z)) for dx in (-1, 1) for dy in (-2.5, 2.5)
-                             for z in (0.3, 1.6)) if q]
-        edge.append(max(us) if us else -9.0)
-    check("P3 : la patrouille 1 au bord gauche à l'image 1, sortie avant l'image 14",
-          -0.95 <= edge[0] <= -0.7 and edge[1] < -1.0, f"bord droit à x {50 * (edge[0] + 1):.0f} %, puis {50 * (edge[1] + 1):.0f} %")
+        qs = [P.project(c, (kx + sx * hw, ky + sy * hl, z)) for sx in (-1, 1) for sy in (-1, 1) for z in (0.3, 1.45)]
+        inn = [q for q in qs if q and -1 <= q[0] <= 1 and 0 <= q[1] <= 1]
+        r = P.project(c, (kx, ky, 1.62))
+        seen.append(bool(r and -1 <= r[0] <= 0 and 0.15 <= r[1] <= 0.88 and len(inn) >= 4))
+        if inn:
+            last.append((f, inn))
+        low = low or any(q and q[0] < 0 and q[1] < 0 for q in qs)
+    run = next((i for i, v in enumerate(seen) if not v), len(seen))
+    fl, inn = last[-1]
+    acc = [(P._CHASE.v(M.t_of(f + 1)) - P._CHASE.v(M.t_of(f))) * M.FPS for f in range(P.F0, P.F0 + P.FRAMES)]
+    jerk = max(abs(acc[i + 1] - acc[i]) for i in range(len(acc) - 1))
+    front = P.chase_pos(P.T_END)[1] + hl
+    panel = min(y for _, y in P.PANELS) - 0.5
+    check("P3 : la patrouille 1 dans le cadre à gauche (rampe et caisse), puis sortie par le bas à gauche",
+          run >= 12 and low and all(q[0] < 0 and q[1] < 0.55 for q in inn) and fl < P.F0 + P.FRAMES - 1
+          and [f for f, _ in last] == list(range(P.F0, fl + 1)),
+          f"{run} images de suite dès l'image 1, dernière vue à l'image {fl}")
+    check("P3 : la patrouille 1 lève le pied sans freinage sec, et reste avant le barrage",
+          min(acc) >= -8.05 and jerk <= 1.25 and front < panel,
+          f"{min(acc):.1f} m/s², {jerk:.2f} m/s² d'une image à l'autre ; l'avant à y {front:.1f} (panneaux à {panel:.1f})")
     runs = []
     for k in P.SHOTS:
         n = 0

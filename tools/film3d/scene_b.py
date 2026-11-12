@@ -1376,8 +1376,9 @@ def build_barrage(scene, hidden, plan):
     # 7 m de la caméra : plus près, le cadre vertical (45° de champ horizontal) ne montrerait que la brèche.
     yb = plan["barrage"]
     yaw = math.radians(25.0)
-    spots = [((-3.4, yb), (math.sin(yaw), math.cos(yaw)), -1, 0.045),   # gauche : sa portière droite (-y local)
-             ((3.4, yb), (-math.sin(yaw), math.cos(yaw)), 1, -0.045)]   # droite : sa portière gauche (+y local)
+    # (à P3.BAR_X de l'axe : écartées pour que la trouée ne se lise pas comme un choc)
+    spots = [((-P3.BAR_X, yb), (math.sin(yaw), math.cos(yaw)), -1, 0.045),   # gauche : sa portière droite (-y local)
+             ((P3.BAR_X, yb), (-math.sin(yaw), math.cos(yaw)), 1, -0.045)]   # droite : sa portière gauche (+y local)
     officers = []
     for car, ((x, y), (hx, hy), open_side, roll) in zip(cars[:2], spots):
         car.location = (x, y, road.road_z(abs(x)) + 0.04)
@@ -1462,8 +1463,8 @@ def build_barrage(scene, hidden, plan):
             A.instance(src, f"cone_{k}", (x, y, road.road_z(abs(x))), rng.uniform(0, math.tau))
             n += 1
     if S.get("panel_src"):
-        for side in (-1, 1):
-            A.instance(S["panel_src"], f"panel_{side}", (side * 2.8, yb + 3.7, road.road_z(2.8)), side * 0.25)
+        for side, (xw, yw) in zip((-1, 1), P3.PANELS):    # (P3.PANELS[0] à droite de la berline : à gauche en vue)
+            A.instance(S["panel_src"], f"panel_{side}", (-xw, S_CAM - yw, road.road_z(abs(xw))), side * 0.25)
     officer_light(officers, plan, cars[:2])
     crowd = lib_parts("cast/barrier-crowd/model.glb", {"crowd_src": lambda o, c: True}, hidden).get("crowd_src")
     if crowd:
