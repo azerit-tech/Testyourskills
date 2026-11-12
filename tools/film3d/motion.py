@@ -1681,19 +1681,24 @@ def shot_metrics(cam, hero, frames, heading=None, slip=None, ground=None, tracks
                 fin=hero_screen(final[last], *hp[last], hh[last], box))
 
 
-def _bridge_z(y, _cache={}):
-    """La hauteur du tablier de P4 (scene_c.deck_z, recopiée sans Blender) : crête en -130, pied en -5, 6 %."""
-    k = round(y * 4)
-    if k not in _cache:
+def _bridge_z(y, _tab={}):
+    """La hauteur du tablier de P4 (scene_c.deck_z, recopiée sans Blender) : crête en -130, pied en -5, 6 %.
+    Intégrée par pas de 0,25 m de -1010 à 110, puis lue en interpolation linéaire entre deux pas, comme deck_z :
+    un arrondi au quart de mètre ferait des marches de 7 mm sur la pente (des à-coups à 200 mm)."""
+    if not _tab:
         def ramp(y, a, t):
             return min(1.0, max(0.0, (y - (a - t / 2)) / t))
         z, yy, step = 0.0, -1010.0, 0.25
-        while yy < k / 4:
+        while yy <= 110.0:
+            _tab[round(yy * 4)] = z
             z += 0.06 * (ramp(yy + step / 2, -255.0, 12.0) - 2 * ramp(yy + step / 2, -130.0, 20.0)
                          + ramp(yy + step / 2, -5.0, 12.0)) * step
             yy += step
-        _cache[k] = max(0.0, z)
-    return _cache[k]
+    k = y * 4
+    k0 = math.floor(k)
+    a = _tab.get(k0, 0.0)
+    b = _tab.get(k0 + 1, a)
+    return max(0.0, a + (b - a) * (k - k0))
 
 
 def shot_specs():
