@@ -198,17 +198,17 @@ Cadre de poursuite : 24 mm, demi-champ 22,9° en largeur. « x » depuis la gauc
 
 | Image | Devant | Aussi dans le champ |
 |---|---|---|
-| OUV/1 à OUV/40 | l'îlot dans l'axe, à 123 puis 101 m ; ses palmiers font 5,6 puis 6,8° | la bouche de la rue à gauche, x 33 puis 29 % |
+| OUV/1 à OUV/40 | l'îlot dans l'axe, à 102 puis 80 m ; ses palmiers font 6,7 puis 8,6° | la bouche de la rue à gauche, à 104 puis 82 m, x 30 puis 24 % |
 | P1/1 à P1/48 | l'îlot à 79 puis 50 m (8,6 puis 13,6°) | la bouche de la rue à x 24 puis 8 %, à 53 m : ses premières façades et ses guirlandes |
 | P2/110 | **le barrage à 31 m** (x 41 %), le quai à 86 m | le pylône à 281 m, 10,5° de haut, x 38 % ; les mâts du port au-dessus du tablier |
 | P3/1 à P3/48 | le barrage à 31 puis 2 m ; le quai à 86 puis 57 m | le pylône à 281 puis 252 m (10,5 puis 11,7°), au centre ; le phare à 548 puis 519 m (1,9°), x 65 puis 78 % : **caché par les deux derniers immeubles de droite** |
 | P4 | la meute sur la rampe, la crête à 170 m | derrière la crête : voir 3.2 |
 | P5/1 | le terre-plein, les murs de conteneurs | le virage à 32 m à droite |
 | P5/60 | **la jetée, la pointe à 124 m**, x 67 % | le phare à 152 m, 6,7° de haut, x 63 % |
-| P6/1 à P6/60 | la pointe à 123 puis 93 m | le phare à 152 puis 122 m (6,7 puis 8,4°), x 62 puis 44 % ; le bord de la voie du quai au bord droit sur les premières images |
+| P6/1 à P6/60 | la pointe à 123 puis 93 m | le phare à 152 puis 122 m (6,7 puis 8,4°), x 62 puis 44 % ; le terre-plein à gauche jusqu'à l'image 10, à droite jusqu'à l'image 33 |
 
-- **Le rond-point.** Le bloc sombre et le vide de la fin de P2 sont l'angle nord-ouest du décor actuel, où rien n'est bâti. Dans la ville, la rue rognée commence à 17 m de l'îlot : la fin de P2 montre ses guirlandes, le barrage à 31 m, le quai, le pylône éclairé. C'est la zone la plus chaude du cadre, sans rien ajouter.
-- **La rue.** Le pont au fond se garde, mais c'est le vrai : crête et pylône 46 m plus loin que le faux, pylône de 52 m au lieu de 59, donc 11,7° au lieu de 16° à la dernière image.
+- **Le rond-point.** Le bloc sombre et le vide de la fin de P2 sont l'angle nord-ouest du décor actuel, où rien n'est bâti. Dans la ville, la rue rognée commence à 18 m de l'îlot : la fin de P2 montre ses guirlandes, le barrage à 31 m, le quai, le pylône éclairé. C'est la zone la plus chaude du cadre, sans rien ajouter.
+- **La rue.** Le pont au fond se garde, mais c'est le vrai : crête et pylône 46 m plus loin que le faux, pylône de 52 m au lieu de 59, donc 11,7° au lieu de 16° à la dernière image. Les deux immeubles du quai (30 à 33 m, s 150 à 162) l'encadrent.
 - **Le phare** n'est plus visible depuis l'avenue : il est à 55° à gauche, derrière les immeubles. Il n'entre dans le film qu'à la fin de P5. Option pour le voir dès P3 : remplacer les deux derniers immeubles de droite (s 130 à 162) par une placette basse ; le phare, la pointe et le port s'ouvrent alors à droite du pylône. Non retenu d'office : c'est le décor du barrage.
 
 ### 3.2 Le 200 mm du pont regarde la ville qu'on vient de quitter
@@ -224,10 +224,10 @@ De l'objectif (1,2 m de haut), la crête est à 2,0° ; le cadre monte jusqu'à 
 
 La ville vraie est trop basse : ni la rue, ni ses guirlandes, ni les lampadaires de l'avenue ne passent la crête. Il faut de la hauteur éclairée au quai :
 
-- **Deux immeubles de 9 à 10 niveaux (30 à 33 m) aux angles du boulevard du quai**, de part et d'autre de la sortie de la rue (x de ±8 à ±26, y −344 à −358), couronnés d'un bandeau lumineux sans texte. De P4 on en voit les 16 à 19 m du haut : 2,5 à 3,0°, un quart de la hauteur du cadre, sur 57 % de sa largeur ; entre eux, la fente de la rue.
+- **Les deux derniers immeubles de la rue portés à 9 ou 10 niveaux (30 à 33 m)**, de part et d'autre de sa sortie sur le boulevard du quai (s 150 à 162, y −356 à −344), couronnés d'un bandeau lumineux sans texte. La crête cache ce qui est sous 1,2 + 0,0353 × d, soit 15 m à cette distance (384 à 396 m). De P4 on en voit donc les 15 à 18 m du haut : 2,2 à 2,7°, un quart de la hauteur du cadre, sur plus de la moitié de sa largeur (le cadre va de x −15 à 24) ; entre eux, la fente de la rue. Chaque niveau vaut 0,5°.
 - **La ville lointaine ramenée au vrai** : ouverture de ±8 m (la rue) au lieu de ±22, profondeur 100 m. Ses rangs flanquent la fente.
 - **Le poids** : au 200 mm à f/4, mise au point sur la berline à 46 à 84 m, le fond à 365 m est flou de 7 pixels sur 1 080. Des boîtes à fenêtres procédurales (la matière de la ville lointaine) suffisent : une douzaine d'objets, aucune texture.
-- Ces deux immeubles encadrent aussi le pylône à la fin de P2 et dans tout P3.
+- Ces deux immeubles encadrent aussi le pylône à la fin de P2 et dans tout P3 : c'est ce qui fait lire la coupe de P3 à P4 comme une ellipse de temps. À la fin de P3 le pont est devant, entre eux ; au début de P4 ils sont derrière la meute.
 - Le ciel de P4 reste le côté nuit. Ce qui l'accorde aux autres plans : la ville éclairée derrière la meute, P3 qui passe lui aussi au côté nuit (3.3), et, si la lumière le veut, la bande rose pâle qu'un vrai crépuscule porte à l'opposé du couchant (5 à 15° de hauteur).
 
 ### 3.3 La bande corail : un seul azimut
@@ -245,14 +245,14 @@ L'avenue va à −90°, la rue et le pont à 0°, la jetée à −50°. Force de
 
 | Plan | Bande | Lecture |
 |---|---|---|
-| OUV, P1 | 20° à gauche | au point de fuite, un peu à gauche ; 83 % au centre |
+| OUV, P1 | 20° à gauche | côté ville, derrière les façades ; ce qu'on en voit est au point de fuite (83 %) et s'éteint vers la mer (39 % au bord droit) |
 | P2 | de 20° à gauche à 64° à droite | elle sort par la droite quand la berline tourne vers la rue |
 | P3 | 65 à 70° à droite | hors champ, derrière les façades ; le ciel de la fente est le côté nuit, la rue s'éclaire seule |
 | P4 | 110° | côté nuit, comme P3 : la coupe ne change plus d'heure |
 | P5 | de 70° à 29° à droite | elle rentre par la droite pendant le virage |
 | P6, FIN | 20° à droite | pleine au bord droit ; le phare est sur la bande à 78 % |
 
-Ce que cela raconte : le couchant à l'ouverture, la ville qui le cache, le large qui le rend. À juger sur deux images, P1/30 et P6/30, à ±10° près. Dans chaque lieu, `mer` = −70° − rot du lieu : +20° pour A et F, −70° pour B, C et E, −20° pour D.
+Ce que cela raconte : le couchant à l'ouverture, la ville qui le cache, le large qui le rend. À juger sur deux images, P1/30 et P6/30, à ±10° près ; à −90° l'avenue a la bande pleine dans l'axe et la jetée n'en garde que 45 % au centre, 87 % au bord droit. Dans chaque lieu, `mer` = −70° − rot du lieu : +20° pour A et F, −70° pour B, C et E, −20° pour D.
 
 ## 4. Les raccords transversaux
 
@@ -273,73 +273,68 @@ Mesuré : P3 synchronise 2 464 objets et 311 textures, 6 à 7 Go de mémoire vid
 
 Estimé d'après le code, à mesurer dès la première carte (`lieux.stats()` par lieu) :
 
-| Lieu | Objets, près | Loin |
+| Lieu rogné | Objets, près | Loin |
 |---|---|---|
-| Avenue entière | 2 000 à 2 500 | la ville lointaine |
 | Avenue, y_A 200 à 340 | 700 | |
 | Rond-point (avenue nord coupée à 200 m) | 500 | |
-| Rue rognée, barrage compris | 1 300 | 300 (à écrire) |
+| Rue, barrage compris | 1 300 | 12 (les deux immeubles du quai) |
 | Pont, pylône | 80, plus 12 véhicules | 40 |
 | Port | 600 | 150 |
-| Jetée et pointe | 250 | 60 |
+| Jetée et pointe | 200 | 60 |
 
-**La règle : une scène par prise, pas par plan.** Une coupe ne disparaît que si les deux côtés montrent le même monde au même niveau de détail.
+**La règle : une scène par conduite, pas par plan.** Une coupe ne disparaît que si les deux côtés montrent le même monde au même niveau de détail ; et P2 finit 11 m dans la rue, P5 commence la caméra sur la rampe.
 
-| Prise | Près | Loin | Objets, ordre de grandeur |
+| Scène | Près | Loin | Objets, ordre de grandeur |
 |---|---|---|---|
-| OUV | avenue (y_A 200 à 340), rond-point | rue | 1 500 |
-| P1 + P2 + P3 | avenue (y_A 250 à 340), rond-point, rue, barrage | pont et pylône, mâts du port, immeubles du quai | 2 900 |
-| P4 | pont, meute | socle du port, ville lointaine, immeubles du quai | 300 |
-| P5 + P6 | port, jetée, pointe, phare | pont (sous la caméra à P5/1), autre rive | 1 000 |
-| FIN, FIN6 | pointe, jetée, phare | port (à 50 à 150 m : conteneurs en blocs), pont, ville lointaine | 500 |
+| OUV + P1 + P2 + P3 (246 images) | avenue, rond-point, rue, barrage | pont et pylône, mâts du port, autre rive | 3 000 |
+| P4 (48 images) | pont, meute | socle du port, immeubles du quai, ville lointaine | 300 |
+| P5 + P6 (120 images) | pont de la crête au pied, port, jetée, pointe, phare | autre rive | 1 100 |
+| FIN, FIN6 | pointe, jetée, phare, nord-est du port | pont, ville lointaine | 600 |
 
-Plafond par prise : 4 000 objets, 12 Go, 180 s de construction, faite une fois (`debit.py` : la clé du cache prend la prise au lieu du plan). `ville.py` ne charge d'un lieu que ce qui entre dans le champ d'au moins une image de la prise (marge 10°) ou se trouve à moins de 30 m de la caméra.
+Plafond par scène : 4 000 objets, 12 Go, 180 s de construction, faite une fois (`debit.py` : la clé du cache prend la conduite au lieu du plan). `ville.py` ne charge d'un lieu que ce qui entre dans le champ d'au moins une image de la conduite (marge 10°) ou se trouve à moins de 30 m de la caméra.
 
 ## 6. Les films et les coupes
 
 | Raccord | Avant | Dans la ville |
 |---|---|---|
-| OUV / P1 | coupe | coupe : ellipse de temps |
-| P1 / P2 | coupe, 83 m sautés | **disparaît** : même prise, même bras |
+| OUV / P1 | coupe, 21 m sautés | **peut disparaître** : même conduite |
+| P1 / P2 | coupe, 83 m sautés | **disparaît** : même bras |
 | P2 / P3 | coupe, 100 m sautés | **disparaît** : le barrage est déjà dans le cadre 40 images avant |
-| P3 / P4 | coupe | coupe : 331 m, inversion d'axe |
+| P3 / P4 | coupe | coupe : ellipse de temps de 11,5 s, inversion d'axe |
 | P4 / P5 | coupe, 76 m sautés | changement de caméra, temps et espace continus |
 | P5 / P6 | coupe, 290 m sautés | **disparaît** |
 | P6 / FIN6, Pn / FIN | encre | encre |
 
-- La prise P1 à P3 dure 206 images (8,6 s), la prise P5 à P6 120 (5 s).
-- Les débuts de plan restent les seuils d'étoiles : `SHOT_START` devient OUV 0, P1 40, P2 88, P3 198, P4 246, P5 294, P6 354. Un film court s'arrête sur un seuil, au milieu d'une prise, sous l'encre.
+- La conduite d'OUV à P3 dure 246 images (10,25 s), celle de P5 à P6 120 (5 s).
+- Les débuts de plan restent les seuils d'étoiles : `SHOT_START` devient OUV 0, P1 40, P2 88, P3 198, P4 246, P5 294, P6 354. Un film court s'arrête sur un seuil, au milieu d'une conduite, sous l'encre.
 - Films : une étoile 164 images (inchangé), deux 274, trois 322, quatre 370, cinq 430, six 518. Tout film de deux étoiles et plus gagne 26 images.
-- La bascule vers FIN ne change pas : la fin est à la pointe, l'encre couvre le trajet. Son décor devient le vrai : port à 50 m, pont, ville.
-- À mettre à jour ensemble : `shared/film/cut.ts`, `render_film.FALLBACK_FRAMES`, `test_motion.py`, les constantes de P2 indexées par image.
+- La bascule vers FIN ne change pas : la fin est à la pointe, l'encre couvre le trajet. Son décor devient le vrai : port à 40 m, pont, ville.
+- À mettre à jour ensemble : `shared/film/cut.ts`, `render_film.FALLBACK_FRAMES` et son contrôle de somme, `test_motion.py`, les constantes de P2 indexées par image.
 
 ## 7. Le plan d'exécution
 
 Chaque étape se vérifie en gris (`render_film.py --dry`) et sur la carte de `ville.py`.
 
-| # | Étape | Fichiers | Critère chiffré | Avec |
+| # | Étape | Fichiers | Critère chiffré | Ordre |
 |---|---|---|---|---|
-| 0 | Socle : poses, carte, prise continue (en cours) | `ville.py` | les poses de 2.2 à 5 cm près ; la carte liste les chevauchements de 2.4 et aucun autre | |
-| 1 | La route : 2.1 | `parcours.py`, `cut.ts`, `test_motion.py` | `motion.py mesure` dans les plafonds ; P2/110 en (−29,15 ; 0,25) dans F ; P4/48 à 0,79 m de P5/1 ; total 414 | 0 |
-| 2 | Rognages, un agent par fichier | `scene_a`, `scene_f`, `scene_b`, `scene_c` | carte : aucune emprise de A, F, B, C ne se recouvre ; cadres gris d'OUV, P1, P3 inchangés à 2 % près | après 0 |
-| 3 | Port et jetée | `scene_e`, `scene_d` | de P6/1 à P6/60, l'eau à moins de 7 m des deux côtés à partir de l'image 20 ; aucun objet à moins de 3 m de la berline, 0,8 m de la caméra | avec 2 |
-| 4 | Raccords de sol et immeubles du quai (section 4) | `scene_a`, `scene_b`, `scene_c`, `scene_e` | prise continue grise : aucun trou de sol, aucune marche de plus de 2 cm sous les roues | après 2 et 3 |
-| 5 | Prises et lointains vrais | `ville.py`, `lieux.py`, `debit.py`, `render_film.py` | une construction par prise, moins de 180 s et de 4 000 objets ; aux trois coupes supprimées, deux images consécutives diffèrent de moins de 2 % hors berline | après 4 |
-| 6 | Plans recalés : P2 (110 images), P4 (fenêtre, caméra, voies de la meute) | `p2_arc`, `scene_f`, `p4_pont`, `scene_c` | contrôles v3.1 de `motion.py mesure` ; six rampes comptées à P4/1 | après 1, avec 2 à 5 |
-| 7 | Mer et phare | `lieux.py`, scènes | une image éclairée par prise ; ciel au centre de P1/30 et de P6/30 entre 30 et 41 % | après 5 |
+| 0 | Socle : poses, carte, conduite continue | `ville.py` | les poses de 2.2 à 5 cm près ; la carte liste les recouvrements de 2.4 et aucun autre | en cours |
+| 1 | La route : 2.1 | `parcours.py`, `cut.ts`, `test_motion.py`, `render_film.py` | `motion.py mesure` dans les plafonds ; P2/110 en (−29,15 ; 0,25) du rond-point ; OUV/40 à 0,58 m de P1/1 ; P4/48 à 0,79 m de P5/1 ; total 414 | en cours |
+| 2 | Les six lieux, un agent par fichier : rognage de 2.5 et portage du plan | `scene_a` à `scene_f`, `ouv_avenue`, `p2_arc`, `p4_pont` | carte sans recouvrement ; chaque joint à moins de 5 cm, sans marche de plus de 2 cm ; cadres gris d'OUV, P1 et P3 inchangés à 2 % près hors des zones nommées ; six rampes comptées à P4/1 ; P6 : l'eau à gauche à l'image 10, à droite à l'image 33 ; rien à moins de 3 m de la berline ni de 0,8 m de la caméra | après 0 et 1 ; les six en parallèle |
+| 3 | Scènes par conduite, lointains vrais (section 4) | `ville.py`, `lieux.py`, `debit.py`, `render_film.py` | une construction par conduite, moins de 180 s et de 4 000 objets ; conduites grises d'OUV à P3 et de P5 à P6 sans trou de sol ; à chaque coupe supprimée, deux images consécutives diffèrent de moins de 2 % hors berline | après 2 |
+| 4 | Mer, phare, lumière | `lieux.py`, scènes | une image éclairée par conduite ; la bande au point de fuite de P1/30 et de P6/30 ; les deux immeubles du quai lisibles derrière la meute à P4/24 ; le mât clé de P5 repris | après 3 |
 
-Ce qui se garde tel quel : `parcours.py` dans sa structure, le bras commun, les plans portés OUV, P1, P3, P5 et P6 (ancres inchangées ; P3 à P6 ne font que commencer 26 images plus tard), la lumière commune (sources, chaussée, phares), le cache. Ce qui est à refaire : le portage de P2 (ancre, durée, minutage des patrouilles), celui de P4 (ancre, caméra, voies), le phare lointain d'OUV à P3, l'azimut du ciel de chaque scène, le mât clé de P5, les appels à `panorama`.
+Ce qui se garde tel quel : `parcours.py` dans sa structure, le bras commun, les plans portés P1, P3, P5 et P6 (ancres inchangées ; P3 à P6 ne font que commencer 26 images plus tard), la lumière commune (sources, chaussée, phares), le cache. Ce qui est à refaire : le portage d'OUV (ancre, patrouille), de P2 (ancre, durée, minutage des patrouilles) et de P4 (ancre, caméra, voies), l'azimut du ciel de chaque scène, le mât clé de P5, les appels à `panorama`.
 
 Trois portes, à trancher sur une image grise, sans attendre :
 
-- **P4 glissé.** Son objectif tombe derrière les séparateurs et le mur de conteneurs. Soit ce mur et deux séparateurs sont absents de la prise de P4 (étagement −18 %), soit la caméra recule devant eux, en (4,65 ; 31,6), au 163 mm (étagement −29 %). Si aucune des deux ne tient les six rampes : P4 reste à sa place et le port aussi (t = 0), saut de 76 m caché par l'inversion d'axe.
-- **Port et jetée.** Si la prise grise P5 + P6 n'est pas propre vendredi soir : la jetée reste à sa place (pose du port), coupe gardée P5 / P6.
-- **P2 à 110 images.** Si c'est trop long à l'image : `R2` = 24 m.
+- **P4 glissé.** Si les six rampes ne se comptent plus à P4/1, ou si le port gêne l'objectif malgré le mur reculé : P4 et le port restent à leur place actuelle, saut de 76 m caché par l'inversion d'axe.
+- **Port et jetée.** Si la conduite grise de P5 à P6 n'est pas propre vendredi soir : la jetée reste à sa place actuelle (pose du port), coupe gardée entre P5 et P6.
+- **Immeubles du quai dans P3.** S'ils écrasent le fond de P3 à 30 à 33 m : 7 niveaux (23 m), soit 1,2° derrière la meute de P4 au lieu de 2,5°.
 
 ## 8. Avis
 
-- **Ce qui tient avant dimanche midi** : la ville d'un seul tenant de l'avenue au quai, la prise continue P1 à P3, le vrai pont au bout de la rue, le pont raccordé au port, un seul ciel. C'est du rognage et du paramétrage de décors existants, vérifiable en gris en une demi-journée.
-- **Ce qui est à pile ou face** : le port redécoupé. Sept heures de décor, puis la lumière de P5 à reprendre (son mât clé bouge) et le fond de FIN6 à revoir (le port passe de 330 à 50 m de la pointe). La porte de vendredi soir est là pour ça.
-- **Ce qui ne tiendra pas** : un film sans aucune coupe d'espace. Le trou de la rue au pont reste. Il ne se verra pas comme un défaut : on quitte la rue en voyant le pont, on retrouve la berline dessus, la ville derrière elle.
-- **Le risque principal n'est pas le décor mais le plan préféré du client.** P4 change de place, de voie et de fond ; il faut le juger en gris avant tout le reste, et garder sa version actuelle prête.
-- **Le calendrier** : ville grise complète vendredi midi ; raccords et prises vendredi soir ; une image éclairée par prise samedi matin ; brouillons samedi après-midi ; rendu final dans la nuit de samedi. 546 images au lieu de 520, et la prise P1 à P3 pèse plus que P3 seul : compter 10 % de temps de rendu en plus.
+- **Ce qui tient avant dimanche midi** : la ville d'un seul tenant de l'avenue au quai, la conduite continue d'OUV à P3, le vrai pont au bout de la rue, le pont raccordé au port, un seul ciel. C'est du rognage et du paramétrage de décors existants, vérifiable en gris en une demi-journée.
+- **Ce qui est à pile ou face** : le port redécoupé. Cinq heures de décor, puis la lumière de P5 à reprendre (son mât clé bouge) et le fond de FIN et de FIN6 à revoir (le port passe de 330 à 40 m de la pointe). La porte de vendredi soir est là pour ça.
+- **Ce qui reste** : une ellipse de temps, de la rue au pont. Elle ne se verra pas comme un défaut : on quitte la rue en voyant le pont, on retrouve la berline dessus, la rive quittée derrière elle.
+- **Le risque principal n'est pas le décor mais le plan préféré du client.** P4 change de place, de voie et de fond ; il faut le juger en gris avant tout le reste, et garder sa version actuelle prête (`FILM3D_VILLE=0`).
+- **Le calendrier** : ville grise complète vendredi soir ; scènes par conduite samedi matin ; une image éclairée par conduite samedi midi ; brouillons samedi après-midi ; rendu final dans la nuit de samedi. 546 images au lieu de 520, et la scène d'OUV à P3 pèse plus que P3 seul : compter 15 % de temps de rendu en plus.
