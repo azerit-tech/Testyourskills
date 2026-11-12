@@ -1168,6 +1168,46 @@ def load_van(variant="vandura", collection=None, lights_on=False, lens_strength=
 
 # ---------------------------------------------------------------- l'hélicoptère
 
+def mat_searchlight_lens(name, radius, on, core=90.0, ring=9.0):
+    """La lentille du projecteur, en coordonnées objet du disque (centré sur son axe) : un cœur vif (la lampe à
+    arc), un réflecteur strié qui s'allume moins fort autour, une bague sombre au bord. Éteinte, un verre sur un
+    réflecteur chromé."""
+    m, nt, out = _mat(name)
+    tc = nt.nodes.new("ShaderNodeTexCoord")
+    sep = nt.nodes.new("ShaderNodeSeparateXYZ")
+    nt.links.new(tc.outputs["Object"], sep.inputs[0])
+    r = _math(nt, "DIVIDE", _math(nt, "SQRT", _math(nt, "ADD", _math(nt, "MULTIPLY", sep.outputs[0], sep.outputs[0]),
+                                                     _math(nt, "MULTIPLY", sep.outputs[1], sep.outputs[1]))), radius)
+
+    def band(a, b, up=True):
+        n = nt.nodes.new("ShaderNodeMapRange")
+        n.clamp = True
+        n.inputs["From Min"].default_value = a
+        n.inputs["From Max"].default_value = b
+        n.inputs["To Min"].default_value = 0.0 if up else 1.0
+        n.inputs["To Max"].default_value = 1.0 if up else 0.0
+        nt.links.new(r, n.inputs["Value"])
+        return n.outputs[0]
+    hot = band(0.10, 0.28, up=False)
+    rings = _math(nt, "ADD", 0.6, _math(nt, "MULTIPLY", 0.4, _math(nt, "SINE", _math(nt, "MULTIPLY", r, 60.0))))
+    refl = _math(nt, "MULTIPLY", _math(nt, "MULTIPLY", band(0.2, 0.32), band(0.82, 0.92, up=False)), rings)
+    glass = _principled(nt, **{"Base Color": (0.7, 0.7, 0.72, 1), "Metallic": 1.0, "Roughness": 0.12,
+                               "Coat Weight": 1.0, "Coat Roughness": 0.01})
+    shader = glass.outputs[0]
+    if on:
+        lvl = _math(nt, "ADD", _math(nt, "MULTIPLY", hot, core), _math(nt, "MULTIPLY", refl, ring))
+        em = nt.nodes.new("ShaderNodeEmission")
+        em.inputs["Color"].default_value = lin(LAMP)
+        nt.links.new(lvl, em.inputs["Strength"])
+        add = nt.nodes.new("ShaderNodeAddShader")
+        nt.links.new(glass.outputs[0], add.inputs[0])
+        nt.links.new(em.outputs[0], add.inputs[1])
+        shader = add.outputs[0]
+    nt.links.new(shader, out.inputs[0])
+    m.cycles.emission_sampling = "NONE"       # le spot éclaire ; la lentille ne fait que se voir
+    return m
+
+
 def searchlight(parent, loc, collection=None, on=False, energy=30000.0, angle=9.0):
     """Projecteur écrit en code : chape, phare cylindrique, lentille et spot. Le pivot vise par sa rotation.
 
@@ -1201,7 +1241,7 @@ def searchlight(parent, loc, collection=None, on=False, energy=30000.0, angle=9.
     bmesh.ops.create_circle(bm, cap_ends=True, segments=24, radius=0.16, matrix=Matrix.Translation((0, 0, -0.225)))
     bm.to_mesh(lme)
     bm.free()
-    lme.materials.append(mat_emit("searchlight_lens", LAMP, 60.0 if on else 0.3))
+    lme.materials.append(mat_searchlight_lens("searchlight_lens", 0.16, on))
     lens = bpy.data.objects.new(lme.name, lme)
     coll.objects.link(lens)
     lens.parent = pivot
@@ -1302,7 +1342,9 @@ def load_helicopter(variant="solid", collection=None, searchlight_on=False, name
     h = mx.z - mn.z
     band = ((mn.x + 0.25 * (mx.x - mn.x), mx.x, mn.z + 0.30 * h, mn.z + 0.42 * h),)
     src = bpy.data.materials.get(paint.get("src_name", ""))
-    livery = livery_over(src, f"{tag}_livery", band, rough=0.3, metal=0.3) if src else mat_livery(f"{tag}_livery", bands=band)
+    # la même peinture que la patrouille et le fourgon : marine profond satiné, filet crème
+    livery = (livery_over(src, f"{tag}_livery", band, base=PATROL_BODY, rough=0.34, metal=0.4, coat=0.8, coat_rough=0.09)
+              if src else mat_livery(f"{tag}_livery", bands=band, base=PATROL_BODY))
     for i, m in enumerate(body.data.materials):
         if m == paint:
             body.data.materials[i] = livery
@@ -1325,10 +1367,57 @@ def load_helicopter(variant="solid", collection=None, searchlight_on=False, name
     x_sl = bmx.x - 0.18 * (bmx.x - bmn.x) if variant != "irs" else bmx.x - 0.12 * (bmx.x - bmn.x)
     floor = roof_under(body, x_sl, -0.35) or (bmn.z + 0.5)
     sl = searchlight(body, (x_sl, -0.35, floor - 0.3), collection, on=searchlight_on)
+    navs = heli_nav_lights(body, collection)
     mnb, mxb = bbox([body, main, tail])
     return dict(body=body, rotor_main=main, rotor_tail=tail, searchlight=sl["spot"], searchlight_pivot=sl["pivot"],
                 searchlight_lens=sl["lens"], main_axis=main_axis, tail_axis=tail_axis, length=mxb.x - mnb.x,
-                tris=tris([body, main, tail]))
+                tris=tris([body, main, tail]), nav_lights=navs)
+
+
+NAV_RED, NAV_GREEN, NAV_WHITE = "#ff2a1f", "#29ff6a", "#fff4e0"
+
+
+def nav_light(parent, loc, color, name, collection=None, radius=0.05, strength=25.0):
+    """Un feu de position : une petite ampoule émissive (pas de lampe : elle ne teinte rien autour), enfant de
+    parent, en loc (repère du parent)."""
+    me = bpy.data.meshes.new(name)
+    bm = bmesh.new()
+    bmesh.ops.create_uvsphere(bm, u_segments=10, v_segments=6, radius=radius)
+    bm.to_mesh(me)
+    bm.free()
+    m = mat_emit(name, color, strength)
+    m.cycles.emission_sampling = "NONE"
+    me.materials.append(m)
+    ob = bpy.data.objects.new(name, me)
+    _collection(collection).objects.link(ob)
+    ob.parent = parent
+    ob.location = loc
+    ob.visible_shadow = False
+    return ob
+
+
+def heli_nav_lights(body, collection=None):
+    """Les feux de l'hélicoptère, mesurés sur la cellule : rouge au bout gauche (+y) et vert au bout droit (-y) de
+    l'empennage horizontal, blanc tout au bout de la queue, un feu anticollision rouge sous le ventre (vu du sol)."""
+    mw = body.matrix_world
+    pts = [mw @ v.co for v in body.data.vertices]
+    mn, mx = bbox([body])
+    L = mx.x - mn.x
+    rear = [p for p in pts if p.x < mn.x + 0.35 * L]
+    out = []
+    if rear:
+        left = max(rear, key=lambda p: p.y)
+        right = min(rear, key=lambda p: p.y)
+        tailp = min(pts, key=lambda p: p.x)
+        out.append(nav_light(body, left + Vector((0, 0.03, 0)), NAV_RED, f"{body.name}_nav_L", collection))
+        out.append(nav_light(body, right - Vector((0, 0.03, 0)), NAV_GREEN, f"{body.name}_nav_R", collection))
+        out.append(nav_light(body, tailp - Vector((0.04, 0, 0)), NAV_WHITE, f"{body.name}_nav_T", collection, strength=12.0))
+    mid = [p for p in pts if abs(p.x - (mn.x + 0.62 * L)) < 0.3 and abs(p.y) < 0.15]
+    if mid:
+        belly = min(mid, key=lambda p: p.z)
+        out.append(nav_light(body, belly - Vector((0, 0, 0.05)), NAV_RED, f"{body.name}_beacon", collection,
+                             radius=0.06, strength=18.0))
+    return out
 
 
 def aim_searchlight(heli, target):
@@ -1381,10 +1470,50 @@ def _split_irs(parts, tag):
 
 JETS = {
     # concept d'avion de chasse imaginaire, gris, sans aucun marquage : le choix
-    "concept": dict(file="jet-concept/model.glb", length=16.5, repaint=False, remove=()),
+    "concept": dict(file="jet-concept/model.glb", length=16.5, repaint=False, remove=(), glow=dict(nozzle=3.5, strips=1.5)),
     # concept imaginaire noir de sixième génération
     "h900": dict(file="jet-h900/model.glb", length=17.5, repaint=False, remove=()),
 }
+
+
+JET_NOZZLE = (1.0, 0.30, 0.06, 1.0)   # la lueur des tuyères : orangé chaud (l'atlas la peignait bleu glacier)
+
+
+def jet_glow_over(src, name, nozzle=3.5, strips=1.5):
+    """L'avion fictif : son atlas d'émission peint l'intérieur des tuyères en bleu et des filets ambrés sur la
+    cellule. Le bleu devient un orangé chaud (nozzle : sa force), les filets restent ambrés mais faibles
+    (strips) : des feux de formation, pas des néons."""
+    m = src.copy()
+    m.name = name
+    nt = m.node_tree
+    p = next(n for n in nt.nodes if n.type == "BSDF_PRINCIPLED")
+    if not p.inputs["Emission Color"].links:
+        return m
+    tex = p.inputs["Emission Color"].links[0].from_socket
+    raw = _raw_tex(tex)
+    hsv = nt.nodes.new("ShaderNodeSeparateColor")
+    hsv.mode = "HSV"
+    nt.links.new(raw, hsv.inputs[0])
+    # bleu : teinte autour de 0,55-0,7
+    blue = _math(nt, "MULTIPLY", _math(nt, "GREATER_THAN", hsv.outputs[0], 0.5), _math(nt, "LESS_THAN", hsv.outputs[0], 0.75))
+    # le reste (filets ambrés et cœur blanc du jet de la tuyère) réchauffé : le blanc sortait rose pâle
+    warm = nt.nodes.new("ShaderNodeMix")
+    warm.data_type = "RGBA"
+    warm.blend_type = "MULTIPLY"
+    warm.inputs["Factor"].default_value = 1.0
+    nt.links.new(raw, warm.inputs[6])
+    warm.inputs[7].default_value = (1.0, 0.55, 0.28, 1.0)
+    col = nt.nodes.new("ShaderNodeMix")
+    col.data_type = "RGBA"
+    nt.links.new(blue, col.inputs["Factor"])
+    nt.links.new(warm.outputs[2], col.inputs[6])
+    col.inputs[7].default_value = JET_NOZZLE
+    nt.links.new(col.outputs[2], p.inputs["Emission Color"])
+    for l in list(p.inputs["Emission Strength"].links):
+        nt.links.remove(l)
+    lvl = _math(nt, "ADD", _math(nt, "MULTIPLY", blue, nozzle), _math(nt, "MULTIPLY", _math(nt, "SUBTRACT", 1.0, blue), strips))
+    nt.links.new(lvl, p.inputs["Emission Strength"])
+    return m
 
 
 def _nose_to_x(objs):
@@ -1423,6 +1552,8 @@ def load_jet(variant="concept", collection=None, nav_lights=True, name=None):
             for i, m in enumerate(o.data.materials):
                 if m and m.name.startswith(("mat_0-", "mat_16-")):
                     o.data.materials[i] = paint
+    if spec.get("glow"):
+        _replace_mats(parts, ("Material",), lambda m: jet_glow_over(m, f"{tag}_skin", **spec["glow"]))
     body = join(parts, tag)
     mn, mx = bbox([body])
     lights = []
