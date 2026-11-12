@@ -756,7 +756,10 @@ def mat_lamp(name, color=LAMP, strength=0.0, glass=False):
 
 
 HEAD_CODES = "#fff1dc"   # phares des poursuivants, en codes (la berline : #ffe6b8, hero_cars)
-HEAD_W = 150.0           # un phare en codes (W) : un seul réglage pour toutes les voitures, aucune retouche par plan
+# un phare en codes (W) : un seul réglage pour toutes les voitures, aucune retouche par plan. Un spot Cycles de P W
+# fait P / 4π W/sr ; un code fait 10 000 à 20 000 cd au point chaud, un lampadaire environ 2 000 cd (1200 W ici) :
+# à 150 W, le cône devant la voiture valait 1/20 de la plage d'un lampadaire et ne se lisait nulle part
+HEAD_W = 6000.0
 HEAD_CONE = 24.0         # ouverture du cône (degrés), bord adouci de moitié
 HEAD_TILT = 11.0         # plongée sous l'horizon (degrés) : le cône tombe sur la chaussée de 2 à 40 m
 
