@@ -52,7 +52,9 @@ JX = L.JETTY_X                                      # 80 : la voie du quai tourn
 J_EDGE = 6.7                                        # demi-largeur de la jetée au couronnement (scene_d.J_EDGE)
 BRIDGE_EDGE = 9.7                                   # le bord extérieur du parapet du pont, à la fin du tablier
 BARRIER_Y = 80.6                                    # la file de séparateurs qui ferme l'axe
-TURN_C = (18.5, 55.0)                               # le centre du virage à droite
+TURN_C = (15.5, 61.0)                               # le centre du virage à droite (celui de p5_virage : les arcs de
+                                                    # gomme peints au sol sous la glisse de P5 ; P4 et P6 ne voient le
+                                                    # terre-plein que de loin, sans ces arcs)
 TURN_R = 15.0
 COPING_W, COPING_H = 0.6, 0.22
 MASTS = [(-52.0, -12.0), (94.0, -12.0), (-52.0, 92.0), (94.0, 92.0),   # les quatre angles (§2.4)
@@ -82,6 +84,9 @@ def _line(N, px, py, axis, c, a, b, w=0.075):
 def _dashed(N, line, v, period=9.0, dash=3.0):
     m = N.math("FLOORED_MODULO", v, period)
     return N.math("MULTIPLY", line, N.math("LESS_THAN", m, dash))
+
+
+DRY_P5 = ((0.3, 71.0), 4.5, 6.5)     # le premier plan de la caméra de P5 sans flaque : centre, rayons de fondu
 
 
 def mat_terre_plein(name="terre_plein_port", far=False):
@@ -178,6 +183,14 @@ def mat_terre_plein(name="terre_plein_port", far=False):
     D = N.math("ADD", D, N.math("MULTIPLY", road.inv(N, road.smooth(N, jd, 0.0, 0.35)), 1.2))
     D = N.math("ADD", D, N.math("MULTIPLY", track, 1.6))
     D = N.math("ADD", D, N.math("MULTIPLY", N.math("SUBTRACT", r, 0.5), 1.4))   # chaque dalle a un peu basculé
+    if not far:
+        # devant l'objectif de P5, de 1 à 10 m, pas de flaque : à 45 cm du sol elles ne renvoyaient que le ciel
+        # nocturne, deux trous noirs dans l'axe aux premières images ; le béton y reste mouillé (la pellicule), et
+        # la flaque posée sur la ligne des roues (flaque_p5) est un objet à part
+        (dcx, dcy), d0, d1 = DRY_P5
+        dd = N.new("ShaderNodeVectorMath", _operation="LENGTH")
+        N.link(road.combine(N, N.math("SUBTRACT", px, dcx), N.math("SUBTRACT", py, dcy)), dd.inputs[0])
+        D = N.math("SUBTRACT", D, N.math("MULTIPLY", road.inv(N, road.smooth(N, dd.outputs["Value"], d0, d1)), 5.0))
     w = road.smooth(N, D, 0.5, 1.05)                      # 0 : humide, 1 : flaque
     deep = road.smooth(N, D, 1.1, 2.2)
     # --- couleur
