@@ -63,7 +63,7 @@ def project(cam, p):
     x, y, z, yaw, pitch, roll, lens = cam
     a, b = math.radians(yaw), math.radians(pitch)
     f = (-math.sin(a) * math.cos(b), -math.cos(a) * math.cos(b), math.sin(b))
-    r = (math.cos(a), -math.sin(a), 0.0)                                      # la droite de l'image
+    r = (-math.cos(a), math.sin(a), 0.0)                                      # la droite de l'image
     u_ = (r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0])   # le haut
     d = (p[0] - x, p[1] - y, p[2] - z)
     depth = sum(d[i] * f[i] for i in range(3))
