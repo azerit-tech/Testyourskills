@@ -86,7 +86,28 @@ def _dashed(N, line, v, period=9.0, dash=3.0):
     return N.math("MULTIPLY", line, N.math("LESS_THAN", m, dash))
 
 
-DRY_P5 = ((0.3, 71.0), 4.5, 6.5)     # le premier plan de la caméra de P5 sans flaque : centre, rayons de fondu
+# le terre-plein sans flaque autour des routes de P5 (lumière v3.1, 2.6) : rayons sans flaque puis de fondu, en m.
+# Aucune flaque à moins de 3 m de la route de la caméra (sous l'objectif, une flaque renvoie en miroir la tête d'un
+# mât du port : la tache claire au bas à droite de l'image 24), ni dans la voie de la berline
+DRY_CAM_R = (3.0, 4.5)
+DRY_LANE_R = (1.8, 2.8)
+DRY_STEP = 1.5                        # m entre deux centres le long d'une route
+
+
+def dry_spots(step=DRY_STEP):
+    """Les centres des zones sans flaque (x, y, r0, r1) : la route de la caméra de P5 et celle de la berline,
+    échantillonnées tous les `step` m sur toutes les images du plan, lues dans p5_virage à la construction (elles
+    suivent le tracé et la durée du plan)."""
+    out = []
+    last_f = P5.F0 + P5.FRAMES - 1
+    for fn, (r0, r1) in ((P5.cam_pos, DRY_CAM_R), (P5.hero_pos, DRY_LANE_R)):
+        last = None
+        for f in range(P5.F0, last_f + 1):
+            x, y = fn(M.t_of(f))[:2]
+            if last is None or math.hypot(x - last[0], y - last[1]) >= step or f == last_f:
+                out.append((x, y, r0, r1))
+                last = (x, y)
+    return out
 
 
 def mat_terre_plein(name="terre_plein_port", far=False):
@@ -184,13 +205,16 @@ def mat_terre_plein(name="terre_plein_port", far=False):
     D = N.math("ADD", D, N.math("MULTIPLY", track, 1.6))
     D = N.math("ADD", D, N.math("MULTIPLY", N.math("SUBTRACT", r, 0.5), 1.4))   # chaque dalle a un peu basculé
     if not far:
-        # devant l'objectif de P5, de 1 à 10 m, pas de flaque : à 45 cm du sol elles ne renvoyaient que le ciel
-        # nocturne, deux trous noirs dans l'axe aux premières images ; le béton y reste mouillé (la pellicule), et
-        # la flaque posée sur la ligne des roues (flaque_p5) est un objet à part
-        (dcx, dcy), d0, d1 = DRY_P5
-        dd = N.new("ShaderNodeVectorMath", _operation="LENGTH")
-        N.link(road.combine(N, N.math("SUBTRACT", px, dcx), N.math("SUBTRACT", py, dcy)), dd.inputs[0])
-        D = N.math("SUBTRACT", D, N.math("MULTIPLY", road.inv(N, road.smooth(N, dd.outputs["Value"], d0, d1)), 5.0))
+        # autour de la route de la caméra de P5 et dans la voie de la berline, pas de flaque (dry_spots) : le béton
+        # y reste mouillé (la pellicule), satiné ; la flaque posée sur la ligne des roues (flaque_p5) est un objet à
+        # part. (Un seul disque sec, posé pour l'ancienne caméra en (0,3 ; 71), ne protégeait plus la route recalée)
+        dry = None
+        for dcx, dcy, d0, d1 in dry_spots():
+            dd = N.new("ShaderNodeVectorMath", _operation="LENGTH")
+            N.link(road.combine(N, N.math("SUBTRACT", px, dcx), N.math("SUBTRACT", py, dcy)), dd.inputs[0])
+            k = road.inv(N, road.smooth(N, dd.outputs["Value"], d0, d1))
+            dry = k if dry is None else N.math("MAXIMUM", dry, k)
+        D = N.math("SUBTRACT", D, N.math("MULTIPLY", dry, 5.0))
     w = road.smooth(N, D, 0.5, 1.05)                      # 0 : humide, 1 : flaque
     deep = road.smooth(N, D, 1.1, 2.2)
     # --- couleur
