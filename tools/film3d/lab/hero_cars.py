@@ -897,6 +897,31 @@ def add_plate(name, at, facing, size=(0.52, 0.11), coll=None):
     return ob
 
 
+def add_antenna(body, chrome, at=(1.30, -0.80), height=0.78, rake=9.0):
+    """L'antenne d'aile d'époque, sur l'aile avant droite au pied du pare-brise (repère de la voiture : l'avant vers +x,
+    la droite vers -y) : une embase chromée bombée, un fouet de laiton chromé qui s'affine de 2,5 à 1,5 mm, penché
+    vers l'arrière, et sa boule. Posée au sol de l'aile par un rayon vertical ; None si l'aile n'est pas trouvée."""
+    inv = body.matrix_world.inverted()
+    hit, loc, nor, _ = body.ray_cast(inv @ Vector((at[0], at[1], 3.0)), Vector((0, 0, -1)), distance=4.0)
+    if not hit:
+        return None
+    base = body.matrix_world @ loc
+    tilt = Matrix.Rotation(math.radians(-rake), 4, "Y")       # le haut du fouet part vers l'arrière (-x)
+    bm = bmesh.new()
+    for z0, z1, r0, r1, seg in ((-0.004, 0.012, 0.013, 0.009, 24), (0.012, 0.030, 0.005, 0.004, 16),
+                                (0.030, height, 0.00125, 0.00075, 8)):
+        res = bmesh.ops.create_cone(bm, cap_ends=True, segments=seg, radius1=r0, radius2=r1, depth=z1 - z0,
+                                    matrix=Matrix.Translation(base) @ tilt @ Matrix.Translation((0, 0, (z0 + z1) / 2)))
+        for f in {f for v in res["verts"] for f in v.link_faces}:
+            f.smooth = True
+    bmesh.ops.create_uvsphere(bm, u_segments=10, v_segments=6, radius=0.0022,
+                              matrix=Matrix.Translation(base) @ tilt @ Matrix.Translation((0, 0, height)))
+    ob = _mesh_object(f"{body.name}_antenna", bm, [chrome], body.users_collection[0], smooth=True)
+    _stamp_rest([ob])
+    cv.parent_keep(ob, body)
+    return ob
+
+
 def _mesh_object(name, bm, mats, coll=None, smooth=False):
     me = bpy.data.meshes.new(name)
     bm.to_mesh(me)
@@ -1296,6 +1321,8 @@ def load_hero(variant="w111", collection=None, lights_on=True, raw=False):
             if rear is not None:
                 pl = add_plate(f"{body.name}_plate_rear", rear, -1, size=(0.305, 0.152), coll=body.users_collection[0])
                 cv.parent_keep(pl, body)
+            ant = add_antenna(body, bpy.data.materials["hero_w111_chrome"])
+            car["report"]["antenne"] = "posée" if ant else "aile introuvable"
             car["lights"] = _lights(car, lights_on, ("hero_w111_head_lens",), ("hero_w111_tail_lens",))
         # repères de l'habitacle (conduite à gauche) : œil du conducteur, centre du volant
         car["cockpit"] = dict(eye=Vector((-0.55, 0.36, 1.22)), wheel=Vector((0.55, 0.42, 0.87)))
