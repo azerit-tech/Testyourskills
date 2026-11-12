@@ -458,52 +458,90 @@ def test_fin():
     o = min(P.rect_gap(P.hero_pos(M.t_of(f)), P.hero_heading(M.t_of(f)), P.HERO_BOX, P.OFFICER, 0.0,
                        (2 * P.OFFICER_R, 2 * P.OFFICER_R)) for f in frames)
     check("FIN : la berline ne touche pas l'agent", o >= 0.5, f"{o:.2f} m au plus près")
-    c = min(P.rect_gap(P.hero_pos(M.t_of(f)), P.hero_heading(M.t_of(f)), P.HERO_BOX, P.CAM[:2], 0.0, (0.2, 0.2))
-            for f in frames)
+    keyed = range(P.F0 - 1, P.F0 + P.FRAMES + 1)
+    c = min(P.rect_gap(P.hero_pos(M.t_of(f)), P.hero_heading(M.t_of(f)), P.HERO_BOX, P.camera_rail(M.t_of(f))[:2],
+                       0.0, (0.2, 0.2)) for f in keyed)
     check("FIN : rien ne frôle la caméra", c >= 1.0, f"{c:.2f} m au plus près")
     x, y = P.hero_pos(P.T_STILL)
-    check("FIN : la pose validée à la fin", math.dist((x, y), (P.CX, P.CY)) < 1e-6
+    check("FIN : arrêtée au centre de la pointe, cap 25°", math.dist((x, y), (P.CX, P.CY)) < 1e-6
           and abs(P.hero_heading(P.T_STILL) - P.HERO_STOP) < 1e-6)
-    ps = M.sample(P.hero_pos, range(0, 40), heading=P.hero_heading, noise=0.0)
+    ps = M.sample(P.hero_pos, range(0, 56), heading=P.hero_heading, noise=0.0)
     check("FIN : la caisse plonge au freinage", min(p["pitch"] for p in ps) < -1.0,
           f"{min(p['pitch'] for p in ps):.2f}°")
     first = next(p for p in ps if p["frame"] == P.F0)
     check("FIN : la caisse ne se cabre pas à la première image (la berline arrive lancée)", first["pitch"] < 0.0,
           f"{first['pitch']:.2f}°")
     stop = min(f for f in range(P.F0, P.F0 + P.FRAMES) if math.dist(P.hero_pos(M.t_of(f)), (P.CX, P.CY)) < 1e-6)
-    check("FIN : la berline s'arrête à l'image 22", stop == 22, f"image {stop}")
-    # la caméra : l'avancée de 2,2 m se pose sur la pose validée à l'image 22 et n'en bouge plus
-    c0, cl = P.camera(M.t_of(P.F0)), P.camera(M.t_of(P.F_LAND))
-    still = all(P.camera(M.t_of(f)) == cl for f in range(P.F_LAND, P.F0 + P.FRAMES + 1))
-    check("FIN : la caméra se pose à l'image 22 sur la pose validée, puis tient",
-          math.dist(cl[:3], P.CAM) < 1e-9 and cl[3:] == (1.0, 14.0, 0.0, 24.0) and still)
-    check("FIN : l'avancée fait 2,2 m", abs(math.dist(c0[:2], cl[:2]) - 2.2) < 0.25, f"{math.dist(c0[:2], cl[:2]):.2f} m")
-    steps = [math.dist(P.camera(M.t_of(f))[:2], P.camera(M.t_of(f + 1))[:2]) for f in range(P.F0, P.F_LAND)]
-    check("FIN : l'avancée freine sans à-coup", all(b <= a + 1e-9 for a, b in zip(steps, steps[1:])) and steps[-1] < 0.005,
-          f"{steps[-1] * 1000:.1f} mm à la dernière image")
-    # plan bas : le milieu de la berline entre 50 et 62 % de la hauteur depuis le haut (62,6 % sur la pose validée,
-    # qui ne change pas : 0,7 point de tolérance), sans monter vers l'horizon au début de l'avancée
-    from fin6_orbite import project, HERO_BOX
-    hs = [1.0 - project(P.camera(M.t_of(f)), (*P.hero_pos(M.t_of(f)), HERO_BOX[2] / 2))[1] for f in frames]
-    check("FIN : le milieu de la berline entre 50 et 63 % de la hauteur", 0.50 <= min(hs) and max(hs) <= 0.63,
-          f"de {min(hs):.1%} à {max(hs):.1%}")
-    # les poursuivants : arrêtés l'un après l'autre, avant la berline ou avec elle, sans rien toucher
-    stops = [a[1] for a in P.ARC]
+    check("FIN : la berline s'arrête à l'image 30", stop == 30 == P.F_STOP, f"image {stop}")
+    v0 = math.dist(P.hero_pos(M.t_of(0.5)), P.hero_pos(M.t_of(1.5))) * M.FPS
+    check("FIN : elle entre lancée (40 à 48 km/h)", 40.0 <= v0 * 3.6 <= 48.0, f"{v0 * 3.6:.0f} km/h")
+    # le temps : mains levées après le temps mort, agent debout avant elles, faisceau posé à l'arrêt
+    check("FIN : temps mort de l'arrêt aux mains (5 images), mains de 35 à 46, tenues jusqu'à la fin",
+          P.DRIVER_KEYS == (35, 46) and P.DRIVER_KEYS[0] - P.F_STOP >= 5 and P.DRIVER_KEYS[1] <= P.STILL_FRAME - 6)
+    check("FIN : l'agent debout en joue avant les mains", P.OFFICER_KEYS[-1][1] == "aim"
+          and P.OFFICER_KEYS[-1][0] <= P.DRIVER_KEYS[0], f"{P.OFFICER_KEYS}")
+    check("FIN : le faisceau se pose sur elle à l'arrêt", P.F_BEAM == P.F_STOP
+          and math.dist(P.beam_target(P.T_STOP)[:2], P.hero_pos(P.T_STOP)) < 1e-6)
+    # la caméra : derrière elle, à gauche, basse au départ ; elle freine sans à-coup, s'arrête, monte, puis tient
+    c0 = P.camera_rail(M.t_of(P.F0))
+    u0 = P.rail_u(P.hero_pos(M.t_of(P.F0))) - P.cam_u(M.t_of(P.F0))
+    check("FIN : la caméra part 7,5 à 8,5 m derrière, 1,2 m à gauche, à 0,6 m, 24 mm",
+          7.5 <= u0 <= 8.5 and abs(P.CAM_LEFT[0] - 1.2) < 1e-9 and abs(c0[2] - 0.6) < 1e-9 and c0[6] == 24.0,
+          f"{u0:.2f} m derrière")
+    steps = [abs(P.cam_u(M.t_of(f + 1)) - P.cam_u(M.t_of(f))) for f in range(P.F0, P.F_CAM_STOP)]
+    check("FIN : la caméra freine sans à-coup et s'arrête", all(b <= a + 1e-9 for a, b in zip(steps, steps[1:]))
+          and steps[-1] < 0.005, f"{steps[-1] * 1000:.1f} mm à la dernière image")
+    cl = P.camera_rail(P.T_STILL)
+    still = all(math.dist(P.camera_rail(M.t_of(f))[:3], cl[:3]) < 1e-9
+                and abs(P.camera_rail(M.t_of(f))[4] - cl[4]) < 1e-9 for f in (P.STILL_FRAME, P.STILL_FRAME + 1))
+    check("FIN : la grue monte à 1,3 m et l'image 52 est fixe", abs(cl[2] - 1.3) < 1e-9 and still)
+    # les autres véhicules : 1,5 m d'air entre caisses, la caméra à 0,8 m au moins (motion.py mesure --v3 aussi)
+    others = {"patrol": (lambda t: P.PATROL, lambda t: P.HERO_STOP), "patrol_1": (P.patrol1_pos, lambda t: P.ROUTE_H)}
+    others.update({f"arc_{i}": (P.arc_pos(i), P.arc_heading(i)) for i in range(len(P.ARC))})
+    for name, (pos, head) in others.items():
+        g = min(P.rect_gap(pos(M.t_of(f)), head(M.t_of(f)), P.PATROL_BOX, P.hero_pos(M.t_of(f)),
+                           P.hero_heading(M.t_of(f)), P.HERO_BOX) for f in keyed)
+        cg = min(P.rect_gap(pos(M.t_of(f)), head(M.t_of(f)), P.PATROL_BOX, P.camera_rail(M.t_of(f))[:2], 0.0,
+                            (0.2, 0.2)) for f in keyed)
+        check(f"FIN : {name} à 1,5 m au moins de la berline, 0,8 m de la caméra", g >= 1.5 and cg >= 0.8,
+              f"{g:.2f} m, {cg:.2f} m")
+    # la patrouille 1 : à la hauteur de la caméra au départ, elle la dépasse par la gauche et s'arrête à gauche de
+    # la berline, près de son essieu arrière, avant les mains
+    d0 = P.rail_u(P.patrol1_pos(M.t_of(P.F0))) - P.cam_u(M.t_of(P.F0))
+    d1 = P.rail_u(P.patrol1_pos(P.T_STILL)) - P.cam_u(P.T_STILL)
+    moved = math.dist(P.patrol1_pos(M.t_of(P.F_P1_STOP)), P.patrol1_pos(P.T_STILL))
+    check("FIN : la patrouille 1 dépasse la caméra par la gauche et s'arrête avant les mains",
+          d0 < 2.5 and d1 > d0 + 3.0 and P.P1_LEFT > P.CAM_LEFT[1] + 2.0 and moved < 1e-6
+          and P.F_P1_STOP <= P.DRIVER_KEYS[0] + 3, f"{d0:+.1f} m puis {d1:+.1f} m de la caméra")
+    hx, hy = P.hero_pos(P.T_STILL)
+    px, py = P.patrol1_pos(P.T_STILL)
+    h = math.radians(P.HERO_STOP)
+    side = (px - hx) * -math.cos(h) + (py - hy) * -math.sin(h)
+    along = (px - hx) * -math.sin(h) + (py - hy) * math.cos(h)
+    check("FIN : la patrouille 1 à gauche de la berline, un peu en arrière de son essieu arrière",
+          side > 3.0 and -4.0 <= along <= -1.0, f"{side:.1f} m à gauche, {along:+.1f} m le long")
+    # les poursuivants : arrêtés l'un après l'autre derrière la caméra (8 m au moins), jamais devant elle
+    stops = [a[2] for a in P.ARC]
     check("FIN : les poursuivants s'arrêtent l'un après l'autre", len(set(stops)) == len(stops)
-          and all(b - a >= 4 for a, b in zip(stops, stops[1:])) and max(stops) <= 22, f"images {stops}")
+          and all(b - a >= 4 for a, b in zip(stops, stops[1:])), f"images {stops}")
     for i in range(len(P.ARC)):
-        pos, head = P.arc_pos(i), P.arc_heading(i)
+        pos = P.arc_pos(i)
         moved = math.dist(pos(M.t_of(stops[i])), pos(M.t_of(stops[i] + 6)))
-        gaps = []
-        for f in range(P.F0 - 1, P.F0 + P.FRAMES + 1):
-            t = M.t_of(f)
-            gaps.append(P.rect_gap(pos(t), head(t), P.PATROL_BOX, P.hero_pos(t), P.hero_heading(t), P.HERO_BOX))
-            gaps.append(P.rect_gap(pos(t), head(t), P.PATROL_BOX, P.PATROL, P.HERO_STOP, P.PATROL_BOX))
-            for j in range(i):
-                gaps.append(P.rect_gap(pos(t), head(t), P.PATROL_BOX, P.arc_pos(j)(t), P.arc_heading(j)(t),
-                                       P.PATROL_BOX))
-        check(f"FIN : le poursuivant {i} arrêté à l'image {stops[i]}, à 1 m au moins de tout véhicule",
-              moved < 1e-6 and min(gaps) >= 1.0, f"{min(gaps):.2f} m au plus près")
+        behind = min(P.cam_u(M.t_of(f)) - P.rail_u(pos(M.t_of(f))) for f in keyed)
+        check(f"FIN : le poursuivant {i} arrêté à l'image {stops[i]}, toujours 6 m au moins derrière la caméra",
+              moved < 1e-6 and behind >= 6.0, f"{behind:.1f} m")
+    # le repli de face (FILM3D_FIN_FACE=1) : la pose validée de la v2, atteinte à l'arrêt de la berline, puis tenue
+    fl = P.camera_face_rail(P.T_STOP)
+    held = all(P.camera_face_rail(M.t_of(f)) == fl for f in range(P.F_STOP, P.F0 + P.FRAMES + 1))
+    fc = min(P.rect_gap(P.hero_pos(M.t_of(f)), P.hero_heading(M.t_of(f)), P.HERO_BOX, P.camera_face_rail(M.t_of(f))[:2],
+                        0.0, (0.2, 0.2)) for f in keyed)
+    check("FIN : le repli de face se pose sur la pose validée à l'image 30, puis tient", not P.FACE and held
+          and math.dist(fl[:3], P.FACE_CAM) < 1e-9 and fl[3:] == (1.0, 14.0, 0.0, 24.0) and fc >= 1.0,
+          f"berline à {fc:.2f} m au plus près")
+    # l'hélicoptère devant, bas, face à elle
+    hd = math.dist(P.HELI[:2], (P.CX, P.CY))
+    check("FIN : l'hélicoptère 22 m devant elle, à 8 m, le nez vers elle", abs(hd - 22.0) < 1e-6 and P.HELI[2] == 8.0
+          and abs(((P.HELI_HEADING - P.HELI_AZ) % 360.0) - 180.0) < 1e-6 and P.HELI[1] > P.CY + 15.0)
 
 
 def test_spin_steps():
