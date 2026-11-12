@@ -4,7 +4,8 @@
 #
 #   python3 tools/film3d/render_film.py                   # les neuf plans, Cycles GPU (OptiX, sinon CUDA), 720 × 1280
 #   python3 tools/film3d/render_film.py --bench           # une image par plan, mesurée, et la durée du film estimée
-#   python3 tools/film3d/render_film.py --plan P3 --frames 17-17 --essai rugosite   # un essai de lumière, une image
+#   python3 tools/film3d/render_film.py --bench --plan P3 --essai rugosite   # un essai de lumière, sur l'image fixe
+#     du plan (banc/P3+rugosite0.5.png, à comparer à banc/P3.png)
 #   python3 tools/film3d/render_film.py --assemble        # les images -> une prise par plan (plans/<PLAN>-1.mp4)
 #   python3 tools/film3d/render_film.py --list            # construit sans rendre : la liste des assets chargés
 #   python3 tools/film3d/render_film.py --selftest        # la reprise, les cadences, les noms : sans Blender
@@ -237,6 +238,17 @@ def worker(a):
                 log(f"! fichier introuvable : {d.name} -> {p}")
             elif p.startswith(ASSETS):
                 seen.add(p)
+    # un .gltf lu : ses images et ses tampons aussi (l'import les empaquette sans passer par open de Python)
+    for p in [p for p in seen if p.endswith(".gltf")]:
+        try:
+            g = json.load(open(p, encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        for it in g.get("images", []) + g.get("buffers", []):
+            uri = it.get("uri", "")
+            if uri and not uri.startswith("data:"):
+                from urllib.parse import unquote
+                seen.add(os.path.realpath(os.path.join(os.path.dirname(p), unquote(uri))))
     rel = sorted(os.path.relpath(p, ASSETS) for p in seen if os.path.isfile(p))
     with open(os.path.join(out_dir, "assets.txt"), "w", encoding="utf-8") as f:
         f.write("".join(r + "\n" for r in rel))
