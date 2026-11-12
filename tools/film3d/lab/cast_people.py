@@ -232,7 +232,8 @@ def _set(p, **kw):
     names = {"base": "Base Color", "rough": "Roughness", "spec": "Specular IOR Level", "metal": "Metallic",
              "sheen": "Sheen Weight", "sheen_rough": "Sheen Roughness", "sheen_tint": "Sheen Tint",
              "coat": "Coat Weight", "coat_rough": "Coat Roughness", "sss": "Subsurface Weight",
-             "sss_radius": "Subsurface Radius", "sss_scale": "Subsurface Scale", "ior": "IOR", "alpha": "Alpha"}
+             "sss_radius": "Subsurface Radius", "sss_scale": "Subsurface Scale", "ior": "IOR", "alpha": "Alpha",
+             "emit": "Emission Color", "emit_str": "Emission Strength"}
     for k, v in kw.items():
         p.inputs[names[k]].default_value = v
 
@@ -264,6 +265,32 @@ def mat_leather_tex(name, color=None, nrm=None, rough=0.42, coat=0.35, nstrength
     N.link(N.noise(40.0, 4.0, rough - 0.12, rough + 0.12), N.p.inputs["Roughness"])
     N.normal(nrm, nstrength, bumps=((900.0, 0.18, 0.0003),))
     return N.done(name, color)
+
+
+def mat_vest():
+    """Le gilet des agents : un panneau clair et mat (gris perle), qui se lit à 30 m sur l'uniforme marine."""
+    m = _cached("ppl_vest")
+    if m:
+        return m
+    N = _Nodes("ppl_vest")
+    N.tinted(lin("#a7abb0"), 0.9, 1.05, scale=8.0)
+    N.link(N.noise(30.0, 2.0, 0.82, 0.95), N.p.inputs["Roughness"])
+    _set(N.p, spec=0.3, sheen=0.2, sheen_rough=0.5)
+    N.normal(None, bumps=((1800.0, 0.25, 0.0003),))
+    return N.done("ppl_vest", lin("#a7abb0"))
+
+
+def mat_vest_band():
+    """Les deux bandes du gilet : un blanc mat, un vernis léger, et une lueur qui tient lieu de la rétroréflexion
+    (Cycles ne renvoie pas la lumière vers sa source) : sous les phares, deux traits clairs."""
+    m = _cached("ppl_vest_band")
+    if m:
+        return m
+    N = _Nodes("ppl_vest_band")
+    # lisse et métallisée, elle renvoyait le ciel sombre : deux traits noirs sur le gilet (FIN, image 34)
+    _set(N.p, base=lin("#eeeee8"), rough=0.45, spec=0.5, coat=0.3, coat_rough=0.15,
+         emit=lin("#fff3e2"), emit_str=1.2)
+    return N.done("ppl_vest_band", lin("#dcdcd6"))
 
 
 def mat_plate():
@@ -1546,7 +1573,7 @@ def _add_cap(arm, meshes):
 def _spp_part(ob):
     """La pièce d'un maillage SPP (« tops », « eyes »…), lue sur le nom du maillage glTF, sinon sur sa matière
     et sa taille (corps, yeux et cils partagent la matière « Bodymat »)."""
-    m = re.match(r"(Body|Eyes|Eyelashes|Moustaches|Hair|Beards|Shoes|Bottoms|Hats|Tops|Eyewear)_", ob.data.name)
+    m = re.match(r"(Body|Eyes|Eyelashes|Moustaches|Hair|Beards|Shoes|Bottoms|Hats|Tops|Eyewear|Vest)_", ob.data.name)
     if m:
         return m.group(1).lower()
     mn = (ob.data.materials[0].name.lower() if ob.data.materials and ob.data.materials[0] else "")
@@ -1581,10 +1608,69 @@ def _smooth_mesh(ob, weld=True, subsurf=0):
         md.uv_smooth = "PRESERVE_BOUNDARIES"
 
 
-def load_officer(variant="spp", name=None, look=None):
+def _add_vest(arm, meshes, lift=0.02, thick=0.012, bands=((0.32, 0.045), (0.64, 0.045))):
+    """Le gilet, construit sur la chemise : les faces du torse (pondérées sur le dos, Spine à Spine2) copiées,
+    gonflées de `lift` le long des normales, épaissies de `thick` vers l'intérieur, avec la pondération et
+    l'armature de la chemise (il suit la pose). Panneau clair mat, deux bandes horizontales (centre en fraction
+    de la hauteur du gilet, demi-largeur en m) qui renvoient la lumière des phares. Ni mot ni écusson ; il couvre
+    la plaque de poitrine."""
+    tops = next((o for o in meshes if _spp_part(o) == "tops"), None)
+    if tops is None:
+        return None
+    torso = _bone_faces(tops, arm, ("Spine", "Spine1", "Spine2"), 0.5)
+    if not torso:
+        return None
+    vest = tops.copy()
+    vest.data = tops.data.copy()
+    vest.data.name = "Vest_" + tops.data.name.split("_", 1)[-1]
+    vest.name = "vest"
+    for c in tops.users_collection:
+        c.objects.link(vest)
+    # sans les pièces rapportées (plaques, boutons, boucles : les petits îlots), que le gilet recouvre
+    isl = _pos_islands(tops)
+    size = {}
+    for i in isl:
+        size[i] = size.get(i, 0) + 1
+    _remove_faces(vest, [p.index for p in vest.data.polygons if p.index not in torso or size[isl[p.index]] < 400])
+    # la pondération ramenée au tronc : un sommet du bord encore un peu tiré par le bras ou l'avant-bras faisait,
+    # en joue, une lame de plusieurs décimètres (vu au banc des distances)
+    keep = {b.name for b in arm.data.bones if canon(b.name) in
+            ("Hips", "Spine", "Spine1", "Spine2", "Neck", "LeftShoulder", "RightShoulder")}
+    gk = {g.index for g in vest.vertex_groups if g.name in keep}
+    sp = next((g for g in vest.vertex_groups if canon(g.name) == "Spine2"), None)
+    for v in vest.data.vertices:
+        for gi in [g.group for g in v.groups if g.group not in gk]:
+            vest.vertex_groups[gi].remove([v.index])
+        if sp is not None and not any(g.group in gk and g.weight > 1e-4 for g in v.groups):
+            sp.add([v.index], 1.0, "REPLACE")
+    k = lift / max(1e-6, vest.matrix_world.to_scale().x)
+    bm_ = bmesh.new()
+    bm_.from_mesh(vest.data)
+    bm_.normal_update()
+    for v in bm_.verts:
+        v.co += v.normal * k
+    bm_.to_mesh(vest.data)
+    bm_.free()
+    zs = [(vest.matrix_world @ v.co).z for v in vest.data.vertices]
+    z0, z1 = min(zs), max(zs)
+    h = max(1e-6, z1 - z0)
+    cls = []
+    for p in vest.data.polygons:
+        z = (sum(zs[i] for i in p.vertices) / len(p.vertices) - z0) / h
+        cls.append("band" if any(abs(z - c) * h < w for c, w in bands) else "panel")
+    _assign_by_faces(vest, cls, {"panel": mat_vest(), "band": mat_vest_band()})
+    md = vest.modifiers.new("epaisseur", "SOLIDIFY")
+    md.thickness = thick / max(1e-6, vest.matrix_world.to_scale().x)
+    md.offset = -1.0
+    md.use_even_offset = False
+    return vest
+
+
+def load_officer(variant="spp", name=None, look=None, vest=True):
     """Un policier riggé, 1,78 m, uniforme marine uni sans insigne, ceinture noire, casquette, gants noirs.
     `look` (agent SPP) : la variante de LOOKS (peau, barbe, carrure, drap) ; par défaut chaque agent chargé prend
     la suivante (0, 1, 2, 0…), pour que deux agents d'une même scène ne soient pas des clones.
+    `vest` (agent SPP) : le gilet clair à deux bandes (_add_vest), qui fait lire l'agent à 20–30 m.
     Renvoie l'objet armature (les maillages en sont les enfants)."""
     spec = OFFICERS[variant]
     if look is None:
@@ -1602,9 +1688,13 @@ def load_officer(variant="spp", name=None, look=None):
     meshes = _paint_officer(arm, meshes, variant, look)
     if spec.get("cap"):
         meshes.append(_add_cap(arm, meshes))
+    if variant == "spp" and vest:
+        v = _add_vest(arm, meshes)
+        if v is not None:
+            meshes.append(v)
     if variant == "spp":
         for o in meshes:
-            if _spp_part(o) in ("body", "tops", "bottoms", "hats", "shoes"):
+            if _spp_part(o) in ("body", "tops", "bottoms", "hats", "shoes", "vest"):
                 _smooth_mesh(o, weld=False, subsurf=1)
     arm.name = name or f"officer_{variant}"
     arm["variant"] = variant
