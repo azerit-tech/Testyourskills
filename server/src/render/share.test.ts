@@ -7,6 +7,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Resvg } from "@resvg/resvg-js";
 import { describe, expect, it } from "vitest";
+import { fileOf } from "../../../shared/caseFile";
 import { FIXTURES } from "../../../shared/fixtures";
 import { SKY_TEXT, skyTone } from "../../../shared/scenes";
 import { pruneStaleImages } from "../app";
@@ -68,26 +69,21 @@ describe("lieux du crime des images de partage", () => {
     }
   });
 
-  it("les comparaisons gardent l'encre, sans décor", async () => {
-    const { FIXTURE_COMPARISON } = await import("../../../shared/fixtures");
-    const cmp = { ...FIXTURE_COMPARISON, cv: { ...FIXTURE_COMPARISON.cv, avatarUrl: undefined }, github: { ...FIXTURE_COMPARISON.github, avatarUrl: undefined } };
-    for (const format of ["og", "portrait"] as const) expect(await renderSvg({ format, comparison: cmp, lang: "fr" })).not.toContain("data:image/jpeg");
-  });
-
-  it("une comparaison notée : la note du dossier entre les deux pièces, plus de colonne d'écarts (§18.37)", async () => {
+  it("un dossier à deux pièces prend les compositions d'une fiche, celle du dossier : une note, son décor (§18.36)", async () => {
     const { FIXTURE_COMPARISON } = await import("../../../shared/fixtures");
     const base = { ...FIXTURE_COMPARISON, cv: { ...FIXTURE_COMPARISON.cv, avatarUrl: undefined }, github: { ...FIXTURE_COMPARISON.github, avatarUrl: undefined } };
     const graded = { ...base, grid: { criteria: [{ code: "CODE" as const, score: 6, state: "scored" as const, counted: true, source: "github" as const, reached: { fr: "", en: "" }, flags: [] }], overall: 57 } };
-    for (const format of ["og", "portrait", "card"] as const) {
+    for (const format of ["og", "portrait", "story", "card"] as const) {
       const svg = await renderSvg({ format, comparison: graded, lang: "fr" });
-      expect(svg).toContain("LE DOSSIER");
+      expect(svg).toBe(await renderSvg({ format, card: fileOf(graded), lang: "fr" }));
       expect(svg).toContain(">57<");
-      // Les écarts stat par stat (« +12 », « −8 ») ne sont plus dessinés.
+      // Ni la note d'une pièce, ni la composition à deux fiches.
+      expect(svg).not.toContain(`>${base.cv.overall}<`);
+      expect(svg).not.toContain("LE DOSSIER");
       expect(svg).not.toMatch(/>[+−]\d+</);
-      const old = await renderSvg({ format, comparison: base, lang: "fr" });
-      expect(old).not.toContain("LE DOSSIER");
     }
-    expect(await renderSvg({ format: "og", comparison: graded, lang: "en" })).toContain("THE FILE");
+    // Le lieu du crime du profil, comme une fiche seule.
+    expect(await renderSvg({ format: "og", comparison: base, lang: "fr" })).toContain("data:image/jpeg");
   });
 
   it("sort des PNG opaques aux bonnes tailles", async () => {
@@ -114,7 +110,7 @@ describe("story 1080 × 1920", () => {
     expect(yOf(svg, "Fais la tienne")).toBeLessThanOrEqual(1920 - STORY_SAFE.bottom);
   });
 
-  it("sans peine, l'adresse remonte ; une comparaison donne la story de sa fiche GitHub", async () => {
+  it("sans peine, l'adresse remonte ; un dossier à deux pièces donne la story de sa fiche", async () => {
     const { sentence: _s, ...free } = light;
     const bare = await renderSvg({ format: "story", card: free, lang: "fr" });
     expect(bare).not.toContain("PEINE");

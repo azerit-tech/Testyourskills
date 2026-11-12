@@ -3,18 +3,18 @@
 import { renderAsync, type ResvgRenderOptions } from "@resvg/resvg-js";
 import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { fileOf } from "../../../shared/caseFile";
 import type { CardData, ComparisonData, Lang } from "../../../shared/types";
 import { fetchAvatar } from "./avatar";
-import {
-  CardOnly, ComparisonCard, ComparisonOg, ComparisonPortrait, HomeOg, OgImage, PortraitImage, StoryImage, type Avatars,
-} from "./compositions";
+import { CardOnly, HomeOg, OgImage, PortraitImage, StoryImage, type Avatars } from "./compositions";
 import { fontFiles } from "./fonts";
 import { encodeOpaquePng } from "./png";
 import { sceneFor } from "./scenes";
 
 /**
  * `home` : l'aperçu de lien de l'accueil, la promesse et la fiche donnée (celle de la vitrine).
- * `story` : 9:16 pour Instagram et TikTok, une fiche seule ; pour une comparaison, sa fiche GitHub.
+ * `story` : 9:16 pour Instagram et TikTok, une fiche seule.
+ * Un dossier à deux pièces prend les compositions d'une fiche : celle du dossier (§18.36).
  */
 export type ImageFormat = "card" | "og" | "portrait" | "story" | "home";
 
@@ -41,15 +41,8 @@ async function avatarsFor(cards: CardData[]): Promise<Avatars> {
 /** Construit l'élément SVG de la composition demandée. */
 export async function buildElement(input: RenderInput): Promise<ReactElement> {
   const { format, comparison, lang } = input;
-  // La story n'a qu'une fiche : celle qui prouve, la fiche GitHub d'une comparaison.
-  const card = format === "story" && comparison ? comparison.github : input.card;
-  if (comparison && format !== "story") {
-    const avatars = await avatarsFor([comparison.cv, comparison.github]);
-    const props = { cmp: comparison, lang, avatars };
-    if (format === "og") return createElement(ComparisonOg, props);
-    if (format === "portrait") return createElement(ComparisonPortrait, props);
-    return createElement(ComparisonCard, props);
-  }
+  // Un dossier, une fiche, une note (shared/caseFile.ts).
+  const card = comparison ? fileOf(comparison) : input.card;
   if (!card) throw new Error("renderImage : card ou comparison requis");
   const avatars = await avatarsFor([card]);
   const props = { card, lang, avatars };
@@ -69,7 +62,7 @@ export async function renderSvg(input: RenderInput): Promise<string> {
 
 export async function renderImage(input: RenderInput): Promise<Buffer> {
   const svg = await renderSvg(input);
-  const width = input.comparison && input.format === "card" ? 1920 : OUTPUT_WIDTH[input.format];
+  const width = OUTPUT_WIDTH[input.format];
   const opts: ResvgRenderOptions = {
     font: { fontFiles: fontFiles(), loadSystemFonts: false, defaultFontFamily: "Outfit" },
     fitTo: { mode: "width", value: width },

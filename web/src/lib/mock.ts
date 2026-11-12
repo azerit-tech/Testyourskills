@@ -314,10 +314,10 @@ function kindFromId(id: string): Kind | null {
 export const mockApi = {
   /**
    * En démo, la maquette de la carte vitrine, jugée avec son LinkedIn (§18.35) :
-   * les deux notes sous la carte, le lien vers une comparaison LinkedIn de démo.
+   * ses deux pièces sous la carte (§18.36), le lien vers un dossier LinkedIn de démo.
    */
   async getShowcase(): Promise<Showcase> {
-    return { card: FIXTURES.jmougeot, href: `/c/${MOCK_SHOWCASE_ID}`, declared: { source: "linkedin", overall: 55, case: 57 } };
+    return { card: FIXTURES.jmougeot, href: `/c/${MOCK_SHOWCASE_ID}`, pieces: ["linkedin", "github"] };
   },
   async createCard(input: CreateInput): Promise<CreateResult> {
     await sleep(350);

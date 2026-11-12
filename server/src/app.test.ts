@@ -466,7 +466,7 @@ describe("image d'aperçu de l'accueil (/og/home.png)", () => {
     const ctx = setup({}, { indexHtml: async () => INDEX });
     const { id } = await generate(ctx);
     const html = await (await ctx.app.request(`/c/${id}`)).text();
-    expect(html).toContain(`<meta property="og:image" content="https://skills.test/og/${id}.png?v=4">`);
+    expect(html).toContain(`<meta property="og:image" content="https://skills.test/og/${id}.png?v=5">`);
     expect(html).not.toContain("home.png");
     expect(count(html, /property="og:image"/g)).toBe(1);
   });
@@ -950,7 +950,7 @@ describe("page /c/:id et images", () => {
     expect(overall).toBeGreaterThanOrEqual(75);
     expect(html).toContain(`<meta property="og:title" content="@leamd est dans le viseur ★★★★★☆ · ${FIXTURES.gold.profile!.label.fr}">`);
     expect(html).toContain(`content="Fiche ★★★★★☆, ${overall}, fiche de dev de`);
-    expect(html).toContain(`<meta property="og:image" content="https://skills.test/og/${id}.png?v=4">`);
+    expect(html).toContain(`<meta property="og:image" content="https://skills.test/og/${id}.png?v=5">`);
     expect(html).toContain(`<meta property="og:url" content="https://skills.test/c/${id}">`);
     expect(html).toContain(`<meta property="og:image:width" content="1200">`);
     expect(html).toContain(`<meta name="twitter:card" content="summary_large_image">`);
@@ -970,22 +970,22 @@ describe("page /c/:id et images", () => {
     expect(html).toContain('<html lang="fr"');
   });
 
-  it("comparaison : titre et image de la comparaison", async () => {
+  it("dossier à deux pièces : le titre et l'image de sa fiche, ses pièces dans la description (§18.36)", async () => {
     const ctx = setup();
     const { json } = await postCv(ctx, PDF.slice(), "leamd");
     await ctx.pipeline.wait(json.id);
     const html = await (await ctx.app.request(`/c/${json.id}`)).text();
-    // Demandée en anglais (postCv envoie lang=en). À la troisième personne, d'après les notes des deux fiches :
-    // l'aperçu est lu par qui n'a pas fait la fiche, jamais le « Your CV » du catalogue.
-    expect(html).toContain("<title>@leamd&#39;s code shows more than their CV: 4 points</title>");
-    expect(html).not.toContain("Your CV");
+    // Demandée en anglais (postCv envoie lang=en). L'aperçu d'une fiche, à la troisième personne, une seule note.
+    expect(html).toMatch(/<title>@leamd is in the crosshairs ★/);
+    expect(html).toContain("Exhibits: CV and GitHub.");
+    expect(html).not.toMatch(/shows more|claims \d|Your CV/);
     expect(html).toContain('<meta property="og:locale" content="en_US">');
     expect(html).toContain(`/og/${json.id}.png`);
     const png = await ctx.app.request(`/og/${json.id}-portrait.png`);
     expect(png.status).toBe(200);
-    // La story d'une comparaison : le rendu reçoit la comparaison et en pose la fiche GitHub.
+    // Le rendu reçoit la fiche du dossier, à l'adresse du dossier.
     expect((await ctx.app.request(`/og/${json.id}-story.png`)).status).toBe(200);
-    expect(ctx.calls.render).toEqual(["portrait:comparison", "story:comparison"]);
+    expect(ctx.calls.render).toEqual(["portrait:card", "story:card"]);
   });
 
   it("carte inconnue : 404 avec balises génériques", async () => {

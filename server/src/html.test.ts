@@ -4,6 +4,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { FIXTURE_COMPARISON, FIXTURES } from "../../shared/fixtures";
+import { fileOf } from "../../shared/caseFile";
+import { IMAGE_QUERY } from "../../shared/images";
 import { publicView } from "../../shared/publicView";
 import { HOME_PROMISE, homeTitle, promiseTitle } from "../../shared/promise";
 import type { CardData, ComparisonData, Grid } from "../../shared/types";
@@ -25,26 +27,36 @@ function emptyGh(c: ComparisonData): ComparisonData {
   return { ...c, github: { ...c.github, grid: { criteria: [], overall: c.github.overall, rule: "empty_file" } } };
 }
 
-describe("aperçu de lien d'une comparaison", () => {
-  it("LinkedIn devant : « Le LinkedIn de @lea annonce 21 points que son code public ne montre pas encore »", () => {
-    expect(metaFor(cmp(80, 59, { declaredSource: "linkedin" }), "https://s.test").title).toBe("Le LinkedIn de @lea annonce 21\u00a0points que son code public ne montre pas encore");
+describe("aperçu de lien d'un dossier à deux pièces (§18.36) : l'aperçu d'une fiche, une note", () => {
+  const VERSUS = /sous-vend|annonce \d|en montre plus|undersell|claims \d|shows more|d'accord|\bécart|points? (que|between)/i;
+
+  it("le titre et l'image de la fiche du dossier ; la description dit ses deux pièces, aucune autre note", () => {
+    const c = cmp(60, 72);
+    const file = fileOf(c);
+    const m = metaFor(c, "https://s.test");
+    const alone = metaFor({ ...file, lang: "fr" }, "https://s.test");
+    expect(m.title).toBe(alone.title);
+    expect(m.title).toMatch(/^@lea est dans le viseur ★/);
+    expect(m.image).toBe(`https://s.test/og/${c.id}.png?${IMAGE_QUERY}`);
+    expect(m.description).toContain("Pièces\u00a0: CV et GitHub.");
+    expect(`${m.title} ${m.description} ${m.imageAlt}`).not.toMatch(/\b60\b/);
+    expect(`${m.title} ${m.description}`).not.toMatch(VERSUS);
   });
 
-  it("le code devant : « Le code de @lea en montre plus que son CV : 12 points »", () => {
-    expect(metaFor(cmp(60, 72), "https://s.test").title).toBe("Le code de @lea en montre plus que son CV\u00a0: 12\u00a0points");
+  it("LinkedIn, en anglais", () => {
+    const c = cmp(80, 59, { declaredSource: "linkedin" });
+    const m = metaFor({ ...c, cv: { ...c.cv, lang: "en" } }, "https://s.test");
+    expect(m.title).toMatch(/^@lea is in the crosshairs ★/);
+    expect(m.description).toContain("Exhibits: LinkedIn and GitHub.");
+    expect(`${m.title} ${m.description}`).not.toMatch(VERSUS);
   });
 
-  it("en anglais, et au singulier", () => {
-    const en = (c: ComparisonData) => ({ ...c, cv: { ...c.cv, lang: "en" as const } });
-    expect(metaFor(en(cmp(80, 59, { declaredSource: "linkedin" })), "https://s.test").title).toBe("@lea's LinkedIn claims 21 points their public code doesn't show yet");
-    expect(metaFor(en(cmp(60, 61)), "https://s.test").title).toBe("@lea's code shows more than their CV: 1 point");
-  });
-
-  it("sans pseudo, le nom ; à égalité, les deux pièces d'accord ; jamais le titre rangé", () => {
-    const anon = cmp(60, 72);
-    anon.github = { ...anon.github, login: undefined };
-    expect(metaFor(anon, "https://s.test").title).toBe(`Le code de ${anon.github.name} en montre plus que son CV\u00a0: 12\u00a0points`);
-    expect(metaFor(cmp(70, 70), "https://s.test").title).toBe("Le CV et le code de @lea sont d'accord");
+  it("noté (§18.37) : la note et les étoiles du dossier, pas celles d'une pièce", () => {
+    const graded: ComparisonData = { ...cmp(60, 72), grid: { criteria: [{ code: "CODE", score: 6, state: "scored", counted: true, source: "github", reached: { fr: "", en: "" }, flags: [] }], overall: 57 } };
+    const m = metaFor(graded, "https://s.test");
+    expect(m.title).toContain("★★★☆☆☆");
+    expect(m.imageAlt).toContain("57");
+    expect(`${m.title} ${m.description} ${m.imageAlt}`).not.toMatch(/\b(60|72)\b/);
   });
 
   it("jamais un mot qui accuse : ni vol, ni suspect, ni « contre »", () => {
@@ -60,13 +72,11 @@ describe("aperçu de lien d'une comparaison", () => {
       expect(metaFor(c, "https://s.test").title).not.toMatch(/\bton\b|\bTon\b/);
   });
 
-  it("face à un GitHub vide : le code reste à prouver, sans chiffre ni vol", () => {
-    const fr = metaFor(emptyGh(cmp(45, 20, { declaredSource: "linkedin" })), "https://s.test").title;
-    expect(fr).toBe("Le code de @lea reste à prouver\u00a0: son LinkedIn parle seul");
-    const en = emptyGh(cmp(45, 20));
-    en.cv = { ...en.cv, lang: "en" };
-    expect(metaFor(en, "https://s.test").title).toBe("@lea's code is still unproven: their CV does all the talking");
-    for (const t of [fr, metaFor(en, "https://s.test").title]) expect(t).not.toMatch(/\d|\bvol|stole/);
+  it("face à un GitHub vide : la fiche du dossier est celle du LinkedIn, sa note, rien côté GitHub", () => {
+    const m = metaFor(emptyGh(cmp(45, 20, { declaredSource: "linkedin" })), "https://s.test");
+    expect(m.title).toMatch(/^@lea est dans le viseur ★/);
+    expect(m.imageAlt).toContain("45");
+    expect(`${m.title} ${m.description} ${m.imageAlt}`).not.toMatch(/\b20\b/);
   });
 });
 
@@ -75,42 +85,36 @@ describe("dossier vide fait par un tiers, non revendiqué : l'aperçu ne dit pas
   const card: CardData = { ...FIXTURES.gold, login: "camroux", overall: 20, grid: empty };
   const NOTE = /\b20\b|★|☆/;
 
-  it("une fiche : ni la note, ni les étoiles, ni l'image ; le profil reste", () => {
+  it("une fiche : ni la note, ni les étoiles ; l'image est celle de la fiche scellée ; le profil reste", () => {
     for (const lang of ["fr", "en"] as const) {
       const m = metaFor(publicView({ ...card, lang }, { thirdParty: true }), "https://s.test");
       expect(`${m.title} ${m.description} ${m.imageAlt}`).not.toMatch(NOTE);
-      expect(m.image).toBeUndefined();
+      // La fiche scellée ne porte pas la note : son image revient dans l'aperçu.
+      expect(m.image).toBe(`https://s.test/og/${card.id}.png?${IMAGE_QUERY}`);
       expect(m.title).toContain("@camroux");
     }
     // Revendiquée, ou faite par la personne : la note revient.
     expect(metaFor(publicView(card, { thirdParty: false }), "https://s.test").title).toMatch(/★/);
   });
 
-  it("une comparaison face à ce dossier vide : le code reste à prouver, aucun chiffre côté GitHub", () => {
+  it("un dossier à deux pièces face à un GitHub vide garde la note de son LinkedIn, aucun chiffre côté GitHub", () => {
     const c = cmp(45, 20, { declaredSource: "linkedin" });
     c.github = { ...c.github, grid: empty };
     const m = metaFor(publicView(c, { thirdParty: true }), "https://s.test");
-    expect(m.title).toBe("Le code de @lea reste à prouver\u00a0: son LinkedIn parle seul");
-    expect(m.description).toContain("GitHub\u00a0: code à prouver.");
-    expect(m.description).not.toMatch(/GitHub\u00a0: Fiche|\b20\b/);
-    expect(m.image).toBeUndefined();
-  });
-});
-
-describe("aperçu de lien d'une comparaison notée (§18.37)", () => {
-  const graded = (c: ComparisonData): ComparisonData => ({ ...c, grid: { criteria: [{ code: "CODE", score: 6, state: "scored", counted: true, source: "github", reached: { fr: "", en: "" }, flags: [] }], overall: 57 } });
-
-  it("la note du dossier et ses étoiles en titre, la phrase en tête de la description", () => {
-    const m = metaFor(graded(cmp(60, 72)), "https://s.test");
-    expect(m.title).toBe("Le dossier de @lea\u00a0: ★★★☆☆☆, 57");
-    expect(m.description.startsWith("Le code de @lea en montre plus que son CV\u00a0: 12\u00a0points. CV\u00a0: Fiche")).toBe(true);
-    const en = graded(cmp(60, 72));
-    en.cv = { ...en.cv, lang: "en" };
-    expect(metaFor(en, "https://s.test").title).toBe("@lea's file: ★★★☆☆☆, 57");
+    expect(m.title).toMatch(/★/);
+    expect(m.description).toContain("Pièces\u00a0: LinkedIn et GitHub.");
+    expect(`${m.title} ${m.description} ${m.imageAlt}`).not.toMatch(/\b20\b/);
+    expect(m.image).toBeDefined();
   });
 
-  it("sans grille (comparaison d'avant, ou fiche dénoncée non revendiquée) : la phrase en titre", () => {
-    expect(metaFor(cmp(60, 72), "https://s.test").title).toBe("Le code de @lea en montre plus que son CV\u00a0: 12\u00a0points");
+  it("un dossier vide (sa propre grille en dossier vide) : scellé, ni note ni étoiles, l'image scellée", () => {
+    const c: ComparisonData = { ...cmp(20, 20, { declaredSource: "linkedin" }), grid: empty };
+    c.github = { ...c.github, grid: empty };
+    for (const lang of ["fr", "en"] as const) {
+      const m = metaFor(publicView({ ...c, cv: { ...c.cv, lang } }, { thirdParty: true }), "https://s.test");
+      expect(`${m.title} ${m.description} ${m.imageAlt}`).not.toMatch(NOTE);
+      expect(m.image).toBe(`https://s.test/og/${c.id}.png?${IMAGE_QUERY}`);
+    }
   });
 });
 

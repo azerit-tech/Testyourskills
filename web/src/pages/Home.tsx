@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { WeekTop } from "../../../shared/types";
 import { LEVEL_LABELS, starsFor } from "../../../shared/types";
+import { pieceLabel } from "../../../shared/caseFile";
 import { FIXTURES } from "../../../shared/fixtures";
 import { CardView } from "../card/CardView";
 import { Cover } from "../components/Cover";
@@ -63,9 +64,9 @@ function useTop(): WeekTop | null | undefined {
 
 /**
  * La fiche de Jacques : s'incline sous le pointeur, mène à sa page. Jugée avec son
- * LinkedIn (§18.35) : ses deux notes dessous, vers la comparaison.
+ * LinkedIn (§18.35) : une note, celle de la fiche, et ses pièces dessous (§18.36).
  */
-export function ExampleCard({ card, href, declared }: Showcase) {
+export function ExampleCard({ card, href, pieces }: Showcase) {
   const { t, lang } = useT();
   return (
     <figure className="showcase" aria-label={`${t.home.exampleLabel} · ${t.tierCard(LEVEL_LABELS[starsFor(card.overall)][lang])}`}>
@@ -74,15 +75,10 @@ export function ExampleCard({ card, href, declared }: Showcase) {
         <a href={href} onClick={(e) => onLinkClick(e, href)}>
           {t.home.exampleCaption}
         </a>
-        {/* La note du dossier d'abord, puis ses deux pièces (§18.37) : « Dossier 57 · LinkedIn 41 · GitHub 61 ». */}
-        {declared && (
-          <a className="showcase-scores" href={href} onClick={(e) => onLinkClick(e, href)} aria-label={t.home.exampleScoresLabel(declared.case ?? null, declared.overall, card.overall)}>
-            {declared.case !== undefined && (
-              <>
-                {t.home.exampleCase} <b className="is-case">{declared.case}</b> ·{" "}
-              </>
-            )}
-            LinkedIn <b className="is-linkedin">{declared.overall}</b> · GitHub <b className="is-github">{card.overall}</b>
+        {/* « Pièces au dossier : LinkedIn · GitHub » : d'où vient la preuve, la note est sur la fiche. */}
+        {pieces && pieces.length > 1 && (
+          <a className="showcase-scores" href={href} onClick={(e) => onLinkClick(e, href)}>
+            {t.result.pieces.line(pieces.map(pieceLabel).join(" · "))}
           </a>
         )}
       </figcaption>

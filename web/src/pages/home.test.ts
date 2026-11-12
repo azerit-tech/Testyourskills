@@ -10,7 +10,7 @@ import { MOCK_SHOWCASE_ID, mockApi } from "../lib/mock";
 import { ExampleCard } from "./Home";
 
 const card = { ...FIXTURES.jmougeot, id: "Gh12345678", overall: 71 };
-const COMPARED: Showcase = { card, href: "/c/Cmp1234567", declared: { source: "linkedin", overall: 55 } };
+const COMPARED: Showcase = { card, href: "/c/Cmp1234567", pieces: ["linkedin", "github"] };
 
 function render(el: ReactElement, language = "fr-FR"): string {
   vi.stubGlobal("localStorage", { getItem: () => null, setItem: () => undefined });
@@ -24,21 +24,23 @@ const captionLinks = (html: string) => [...(/<figcaption>(.*)<\/figcaption>/s.ex
 afterEach(() => vi.unstubAllGlobals());
 
 describe("la fiche de Jacques sous le titre", () => {
-  it("jugée avec son LinkedIn : les deux notes sous la légende, vers la comparaison", () => {
-    const links = captionLinks(render(createElement(ExampleCard, COMPARED)));
+  it("jugée avec son LinkedIn : une note, celle de la fiche, et ses pièces sous la légende, vers le dossier (§18.36)", () => {
+    const html = render(createElement(ExampleCard, COMPARED));
+    const links = captionLinks(html);
     expect(links).toHaveLength(2);
     for (const l of links) expect(l.attrs).toContain('href="/c/Cmp1234567"');
-    const scores = links[1]!;
-    expect(scores.attrs).toContain('class="showcase-scores"');
-    expect(scores.attrs).toContain('aria-label="LinkedIn\u00a0: 55 sur 100. GitHub\u00a0: 71 sur 100."');
-    expect(scores.inner.replace(/<[^>]+>/g, "")).toBe("LinkedIn 55 · GitHub 71");
-    expect(scores.inner).toContain('<b class="is-linkedin">55</b>');
-    expect(scores.inner).toContain('<b class="is-github">71</b>');
+    const pieces = links[1]!;
+    expect(pieces.attrs).toContain('class="showcase-scores"');
+    expect(pieces.inner).toBe("Pièces au dossier\u00a0: LinkedIn · GitHub");
+    // Plus de deuxième note sous la fiche.
+    const caption = /<figcaption>(.*)<\/figcaption>/s.exec(html)![1]!;
+    expect(caption).not.toContain("<b");
+    expect(caption).not.toContain("71");
   });
 
-  it("en anglais, le même libellé lu en entier", () => {
+  it("en anglais", () => {
     const links = captionLinks(render(createElement(ExampleCard, COMPARED), "en-US"));
-    expect(links[1]!.attrs).toContain('aria-label="LinkedIn: 55 out of 100. GitHub: 71 out of 100."');
+    expect(links[1]!.inner).toBe("Exhibits on file: LinkedIn · GitHub");
   });
 
   it("fiche GitHub seule, ou maquette : la légende seule", () => {
@@ -56,9 +58,9 @@ describe("la fiche de Jacques sous le titre", () => {
 });
 
 describe("démo (?mock=1)", () => {
-  it("la vitrine montre ses deux notes et mène à une comparaison LinkedIn de démo", async () => {
+  it("la vitrine montre ses deux pièces et mène à un dossier LinkedIn de démo", async () => {
     const s = await mockApi.getShowcase();
-    expect(s).toEqual({ card: FIXTURES.jmougeot, href: `/c/${MOCK_SHOWCASE_ID}`, declared: { source: "linkedin", overall: 55, case: 57 } });
+    expect(s).toEqual({ card: FIXTURES.jmougeot, href: `/c/${MOCK_SHOWCASE_ID}`, pieces: ["linkedin", "github"] });
     const job = await mockApi.getJob(MOCK_SHOWCASE_ID);
     expect(job).toMatchObject({ state: "done", kind: "comparison", comparison: { declaredSource: "linkedin" } });
   });

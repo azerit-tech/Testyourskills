@@ -290,7 +290,9 @@ describe("callback", () => {
     expect(existsSync(join(ctx.ogDir, `${cmp.id}.png`))).toBe(false);
 
     await ctx.app.request(`/og/${cmp.id}.png`);
-    expect(ctx.renders[0]!.comparison!.github.avatarUrl).toMatch(/^data:image\/jpeg/);
+    // L'image du dossier : sa fiche, avec la photo de la pièce GitHub.
+    expect(ctx.renders[0]!.card!.id).toBe(cmp.id);
+    expect(ctx.renders[0]!.card!.avatarUrl).toMatch(/^data:image\/jpeg/);
 
     // La suppression du groupe efface aussi la photo.
     expect((await ctx.app.request(`/api/card/${cmp.id}?token=tok`, { method: "DELETE" })).status).toBe(200);

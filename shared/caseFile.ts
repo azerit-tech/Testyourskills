@@ -22,6 +22,9 @@ export type { Piece };
 /** « LinkedIn » ou « CV », selon ce que la pièce déclarative a lu (§18.24). */
 export const declaredLabel = (cmp: Pick<ComparisonData, "declaredSource">): string => (declaredOf(cmp) === "linkedin" ? "LinkedIn" : "CV");
 
+/** Le nom d'une pièce, tel qu'on l'écrit : « LinkedIn », « CV », « GitHub ». */
+export const pieceLabel = (p: Piece): string => (p === "linkedin" ? "LinkedIn" : p === "cv" ? "CV" : "GitHub");
+
 /** `["linkedin", "github"]` ou `["cv", "github"]`. */
 export const piecesOf = (cmp: Pick<ComparisonData, "declaredSource">): Piece[] => [declaredOf(cmp), "github"];
 

@@ -63,10 +63,6 @@ const fr = {
     inlineCv: "ou avec ton CV",
     exampleLabel: "Exemple de fiche",
     exampleCaption: "La vraie fiche de Jacques, fondateur d'Azerit",
-    /** Sous la fiche de Jacques, la note du dossier puis ses deux pièces (§18.35, §18.37), lues en entier. */
-    exampleScoresLabel: (kase: number | null, linkedin: number, github: number) =>
-      `${kase !== null ? `Dossier\u00a0: ${kase} sur 100. ` : ""}LinkedIn\u00a0: ${linkedin} sur 100. GitHub\u00a0: ${github} sur 100.`,
-    exampleCase: "Dossier",
     /* La couverture (§18.31) : les plaques des photos d'identité, en capitales mono. */
     cover: {
       player: (login: string, rank: number) => `@${login}, n° ${rank} de la semaine`,
@@ -840,8 +836,6 @@ const en: Dict = {
     inlineCv: "or with your CV",
     exampleLabel: "Example sheet",
     exampleCaption: "The real sheet of Jacques, Azerit's founder",
-    exampleScoresLabel: (kase, linkedin, github) => `${kase !== null ? `File: ${kase} out of 100. ` : ""}LinkedIn: ${linkedin} out of 100. GitHub: ${github} out of 100.`,
-    exampleCase: "File",
     cover: {
       player: (login, rank) => `@${login}, #${rank} this week`,
       playerPlate: (rank, week) => `NO. ${rank} · WEEK ${week}`,

@@ -1,7 +1,7 @@
 // Client de l'API. En mode démo (?mock=1 ou VITE_MOCK=1), tout passe par mock.ts.
 import { fileOf } from "../../../shared/caseFile";
 import { IMAGE_QUERY } from "../../../shared/images";
-import type { CardData, JobState, Lang, WeekRank, WeekTop } from "../../../shared/types";
+import type { CardData, JobState, Lang, Piece, WeekRank, WeekTop } from "../../../shared/types";
 import { mockApi } from "./mock";
 import { mockTop, mockWeekRank } from "./mockTop";
 import { ApiError } from "./errors";
@@ -375,15 +375,17 @@ function track(event: AnalyticsEvent, cardId: string | null, meta: Record<string
 }
 
 /**
- * Le vrai jugement de la vitrine (§6.1, §18.35) : sa carte GitHub, le lien vers sa
- * fiche (la comparaison s'il y en a une) et la note de son LinkedIn, s'il est sorti.
+ * Le vrai jugement de la vitrine (§6.1, §18.35) : sa fiche (celle de son dossier
+ * s'il a deux pièces, §18.36), le lien vers elle et ses pièces.
  */
 export interface Showcase {
   card: CardData;
   href: string;
-  /** `case` : la note du dossier (§18.37), absente d'une comparaison d'avant la grille. */
-  declared?: { source: "linkedin"; overall: number; case?: number };
+  /** Un dossier à deux pièces : `["linkedin", "github"]`. */
+  pieces?: Piece[];
 }
+
+const PIECES: readonly Piece[] = ["linkedin", "cv", "github"];
 
 /** La vitrine de l'accueil ; null tant que le serveur ne l'a pas calculée. */
 async function getShowcase(): Promise<Showcase | null> {
@@ -392,12 +394,8 @@ async function getShowcase(): Promise<Showcase | null> {
   if (!res.ok) return null;
   const body = (await res.json()) as Partial<Showcase> & { card?: CardData | null };
   if (!body.card) return null;
-  const d = body.declared;
-  const declared =
-    d?.source === "linkedin" && Number.isFinite(d.overall)
-      ? { source: d.source, overall: d.overall, ...(Number.isFinite(d.case) ? { case: d.case } : {}) }
-      : undefined;
-  return { card: body.card, href: body.href ?? `/c/${body.card.id}`, ...(declared ? { declared } : {}) };
+  const pieces = Array.isArray(body.pieces) && body.pieces.length > 1 && body.pieces.every((p) => PIECES.includes(p)) ? body.pieces : undefined;
+  return { card: body.card, href: body.href ?? `/c/${body.card.id}`, ...(pieces ? { pieces } : {}) };
 }
 
 /** La requête du top en cours : la couverture et le tableau de l'accueil la partagent. */

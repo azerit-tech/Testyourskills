@@ -5,7 +5,9 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { fileOf } from "../../../shared/caseFile";
 import { FIXTURES } from "../../../shared/fixtures";
+import { publicView } from "../../../shared/publicView";
 import type { CvReading } from "../../../shared/readings";
 import type { CardData, ComparisonData, JobState, StatCode } from "../../../shared/types";
 import { createApp, type AppOptions } from "../app";
@@ -151,6 +153,8 @@ describe("entrée GitHub : le LinkedIn trouvé devient une comparaison", () => {
     const cmp = s.comparison;
     expect(cmp.declaredSource).toBe("linkedin");
     expect(cmp.cv.declaredSource).toBe("linkedin");
+    // Le lien est prouvé : pas de « Lien entre les deux pièces : à confirmer » sous la fiche.
+    expect(cmp.linkUnproven).toBeUndefined();
     expect(cmp.headline.fr).toBe("Ton LinkedIn annonce 7 points que ton code public ne montre pas encore.");
     expect(cmp.headline.en).toBe("Your LinkedIn claims 7 points your public code doesn't show yet.");
     // L'IA a lu le texte du profil, jamais stocké.
@@ -163,10 +167,9 @@ describe("entrée GitHub : le LinkedIn trouvé devient une comparaison", () => {
     expect(weekRank(ctx.store.db, cmp.github.id)).not.toBeNull();
     // « LinkedIn retrouvé » au dossier de l'enquête (§18.26).
     expect(cmp.github.findings?.find((f) => f.source === "linkedin")).toMatchObject({ kind: "linkedin_found", proof: URL_ });
-    // L'aperçu de lien dit « LinkedIn », jamais « CV ».
+    // L'aperçu de lien dit « LinkedIn », jamais « CV » : ses pièces, une seule note (§18.36).
     const page = await (await ctx.app.request(`/c/${json.id}`)).text();
-    expect(page).toContain("LinkedIn\u00a0: Fiche");
-    expect(page).toContain("Deux pièces au même dossier");
+    expect(page).toContain("Pièces\u00a0: LinkedIn et GitHub.");
     expect(page).not.toMatch(/butin|déclare contre/);
     expect(page).not.toMatch(/\bCV\b/);
   });
@@ -287,10 +290,10 @@ describe("la vitrine : le serveur se porte garant de son LinkedIn (§18.35)", ()
     expect(ctx.calls.collect).toHaveLength(0);
   });
 
-  type Showcase = { card: CardData | null; href?: string; declared?: { source: string; overall: number } };
+  type Showcase = { card: CardData | null; href?: string; pieces?: string[] };
   const showcase = async (ctx: Ctx) => (await (await ctx.app.request("/api/showcase")).json()) as Showcase;
 
-  it("l'accueil reçoit la carte GitHub de la comparaison, sa note LinkedIn et le lien vers la comparaison ; l'aperçu de lien suit", async () => {
+  it("l'accueil reçoit la fiche du dossier, ses pièces et le lien vers le dossier ; l'aperçu de lien suit (§18.36)", async () => {
     const homes: CardData[] = [];
     const ctx = setup(
       { forGithub: reads },
@@ -308,14 +311,15 @@ describe("la vitrine : le serveur se porte garant de son LinkedIn (§18.35)", ()
     const cmp = root.data as ComparisonData;
     const json = await showcase(ctx);
     expect(json.href).toBe(`/c/${root.id}`);
-    expect(json.declared).toEqual({ source: "linkedin", overall: cmp.cv.overall });
-    expect(json.card).toMatchObject({ id: cmp.github.id, source: "github", overall: cmp.github.overall, avatarUrl: "/jmougeot-linkedin.jpg", photoSource: "linkedin" });
+    expect(json.pieces).toEqual(["linkedin", "github"]);
+    const file = fileOf(publicView(cmp, { thirdParty: false }));
+    expect(json.card).toMatchObject({ id: root.id, overall: file.overall, pieces: ["linkedin", "github"], avatarUrl: "/jmougeot-linkedin.jpg", photoSource: "linkedin" });
     expect(json.card?.deleteToken).toBeUndefined();
     // Comparaison sortie : rien n'est relancé avant la semaine.
     await showcase(ctx);
     expect(ctx.calls.collect).toEqual(["jmougeot"]);
     await ctx.app.request("/og/home.png");
-    expect(homes.map((c) => c.id)).toEqual([cmp.github.id]);
+    expect(homes.map((c) => c.id)).toEqual([root.id]);
   });
 
   it("le LinkedIn n'est pas sorti : la fiche GitHub seule, retentée au bout d'une heure", async () => {
@@ -326,7 +330,7 @@ describe("la vitrine : le serveur se porte garant de son LinkedIn (§18.35)", ()
     const alone = await showcase(ctx);
     expect(alone.card).toMatchObject({ source: "github", login: "jmougeot" });
     expect(alone.href).toBe(`/c/${alone.card!.id}`);
-    expect(alone.declared).toBeUndefined();
+    expect(alone.pieces).toBeUndefined();
     // Moins d'une heure : on attend.
     await ctx.pipeline.drain();
     expect(ctx.calls.collect).toHaveLength(1);
@@ -336,7 +340,7 @@ describe("la vitrine : le serveur se porte garant de son LinkedIn (§18.35)", ()
     await ctx.pipeline.drain();
     expect(ctx.calls.collect).toHaveLength(2);
     const json = await showcase(ctx);
-    expect(json.declared?.source).toBe("linkedin");
+    expect(json.pieces?.[0]).toBe("linkedin");
     expect(json.href).toBe(`/c/${latest(ctx, "jmougeot")!.id}`);
   });
 });
@@ -350,6 +354,8 @@ describe("comparaison non prouvée : jamais sous le pseudo d'un tiers", () => {
     const forged = await post(ctx, { login: "victime", linkedin: URL_ });
     expect(await state(ctx, forged.json.id)).toMatchObject({ state: "done", kind: "comparison" });
     expect(ctx.store.getCard(forged.json.id)).toMatchObject({ login: "victime", facts: { linkedinUrl: URL_, linkedinProven: false } });
+    // La page le dit sous la fiche : « Lien entre les deux pièces : à confirmer ».
+    expect(await state(ctx, forged.json.id)).toMatchObject({ comparison: { linkUnproven: true } });
     expect((await ctx.app.request(`/c/${forged.json.id}`)).status).toBe(200);
 
     const typed = await post(ctx, { login: "victime" });

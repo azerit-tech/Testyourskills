@@ -9,6 +9,7 @@ import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promise
 import { dirname, join } from "node:path";
 import { z } from "zod";
 import { FIXTURES } from "../../shared/fixtures";
+import { fileOf, piecesOf } from "../../shared/caseFile";
 import { publicView } from "../../shared/publicView";
 import { isUpcomingPath } from "../../shared/routes";
 import type { CardData, ComparisonData, ErrorCode, Fact, JobState, Lang } from "../../shared/types";
@@ -274,6 +275,15 @@ export function createApp(opts: AppOptions) {
     return !!row.denouncedBy && !(login && store.getOwner(login));
   };
 
+  /**
+   * Dossier LinkedIn dont rien ne relie encore le LinkedIn au GitHub (§18.24) : la
+   * page le dit sous la fiche, « Lien entre les deux pièces : à confirmer ».
+   */
+  const withLinkFlag = (row: CardRow, cmp: ComparisonData): ComparisonData => {
+    const facts = row.facts as { linkedinUrl?: string; linkedinProven?: boolean } | null;
+    return facts?.linkedinUrl && facts.linkedinProven !== true ? { ...cmp, linkUnproven: true } : cmp;
+  };
+
   // Public : jamais de montant. ai = ok | budget (plafond du jour atteint) |
   // credits (solde sous AI_MIN_CREDIT_USD, ou 402 vu dans les 10 dernières
   // minutes sans solde suffisant lu depuis) | off (pas de clé).
@@ -286,8 +296,8 @@ export function createApp(opts: AppOptions) {
   app.get("/api/config", (c) => c.json({ linkedin: !!opts.linkedin, claim: !!opts.githubAuth, linkedinEntry: !!opts.linkedinProfiles }));
 
   // GET /api/showcase : le vrai jugement du pseudo vitrine, pour l'accueil (§6.1,
-  // §18.35) : sa carte GitHub, le lien vers sa fiche (la comparaison s'il y en a
-  // une) et la note de son LinkedIn. Hors quota. Null tant qu'aucun n'existe ; on
+  // §18.35) : sa fiche (celle de son dossier s'il a deux pièces, §18.36), le lien
+  // vers elle et ses pièces. Hors quota. Null tant qu'aucun n'existe ; on
   // en lance un si le dernier date de plus d'une semaine.
   app.get("/api/showcase", (c) => {
     c.header("Cache-Control", "public, max-age=300");
@@ -305,16 +315,16 @@ export function createApp(opts: AppOptions) {
     return c.json({
       card: showcaseCard(row),
       href: `/c/${row.id}`,
-      ...(cmp ? { declared: { source: "linkedin", overall: cmp.cv.overall, ...(cmp.grid ? { case: cmp.grid.overall } : {}) } } : {}),
+      ...(cmp ? { pieces: piecesOf(cmp) } : {}),
     });
   });
 
   /**
-   * La fiche de la vitrine telle que l'accueil la montre : la carte GitHub du
-   * jugement (celle de sa comparaison s'il y en a une), sans jeton, avec la photo de la vitrine.
+   * La fiche de la vitrine telle que l'accueil la montre : la fiche du jugement
+   * (celle de son dossier s'il a deux pièces), sans jeton, avec la photo de la vitrine.
    */
   const showcaseCard = (row: CardRow): CardData => {
-    const card = publicView(stripToken(row.kind === "comparison" ? (row.data as ComparisonData).github : (row.data as CardData)), { thirdParty: false });
+    const card = row.kind === "comparison" ? fileOf(publicView(stripToken(row.data as ComparisonData), { thirdParty: false })) : publicView(stripToken(row.data as CardData), { thirdParty: false });
     return opts.showcasePhoto ? { ...card, avatarUrl: opts.showcasePhoto, photoSource: "linkedin" } : card;
   };
 
@@ -522,7 +532,7 @@ export function createApp(opts: AppOptions) {
     const shown = personOf(c, row, mine) ? data : publicView(data, { thirdParty: thirdParty(row) });
     const state: JobState =
       row.kind === "comparison"
-        ? { state: "done", kind: "comparison", comparison: shown as ComparisonData, ...extra }
+        ? { state: "done", kind: "comparison", comparison: withLinkFlag(row, shown as ComparisonData), ...extra }
         : { state: "done", kind: "card", card: shown as CardData, ...extra };
     return c.json(state);
   });
@@ -607,7 +617,7 @@ export function createApp(opts: AppOptions) {
     const m = OG_FILE_RE.exec(c.req.param("file"));
     if (!m) return c.notFound();
     const id = m[1]!;
-    // Story d'une comparaison : celle de sa fiche GitHub (render/index.ts).
+    // Un dossier à deux pièces : les images de sa fiche (render/index.ts).
     const format: RenderInput["format"] = OG_FORMATS[m[2] ?? ""] ?? "og";
     const row = store.getCard(id);
     // Fiche masquée : aucune image, pour personne (les robots n'ont pas de session).
@@ -630,9 +640,9 @@ export function createApp(opts: AppOptions) {
           const inline = (card: CardData) => inlineAvatar(card, baseUrl, avatarDir);
           let input: RenderInput;
           if (row.kind === "comparison") {
-            // Fiche dénoncée non revendiquée : l'image ne porte pas la note du dossier (shared/publicView.ts).
-            const cmp = publicView(week.data as ComparisonData, { thirdParty: tp });
-            input = { format, comparison: { ...cmp, cv: await inline(cmp.cv), github: await inline(cmp.github) }, lang: cmp.cv.lang };
+            // Un dossier à deux pièces : l'image de sa fiche, celle du dossier (§18.36) ; scellée si vide et faite par un tiers.
+            const card = fileOf(publicView(week.data as ComparisonData, { thirdParty: tp }));
+            input = { format, card: await inline(card), lang: card.lang ?? (week.data as ComparisonData).cv.lang };
           } else {
             // Dossier vide fait par un tiers : la fiche scellée, sans note ni étoiles.
             const card = publicView(week.data as CardData, { thirdParty: tp });

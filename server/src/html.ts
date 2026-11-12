@@ -2,7 +2,7 @@
 // lisent les balises Open Graph et Twitter sans exécuter de JS, puis le
 // navigateur charge le front SPA qui affiche la carte.
 
-import { declaredLabel, theirHeadline } from "../../shared/compareText";
+import { declaredLabel, fileOf } from "../../shared/caseFile";
 import { usableGrid } from "../../shared/gridText";
 import { IMAGE_QUERY } from "../../shared/images";
 import { HOME_PROMISE, homeTitle, promiseTitle } from "../../shared/promise";
@@ -43,46 +43,25 @@ function isComparison(d: CardData | ComparisonData): d is ComparisonData {
 }
 
 export function metaFor(data: CardData | ComparisonData, baseUrl: string): PageMeta {
+  // Un dossier à deux pièces (§18.36) : l'aperçu d'une fiche, celle du dossier
+  // (shared/caseFile.ts), une seule note ; la description dit ses deux pièces.
+  if (isComparison(data)) {
+    const file = fileOf(data);
+    return cardMeta({ ...file, lang: data.cv.lang ?? data.github.lang ?? file.lang }, baseUrl, declaredLabel(data));
+  }
+  return cardMeta(data, baseUrl);
+}
+
+/** L'aperçu d'une fiche ; `exhibits` (« LinkedIn » ou « CV ») : celle d'un dossier à deux pièces. */
+function cardMeta(data: CardData, baseUrl: string, exhibits?: string): PageMeta {
   const url = `${baseUrl}/c/${data.id}`;
   // Spéciale de la semaine (§18.22), ou nouveau dessin (shared/images.ts) : une autre adresse
   // d'image, pour que les réseaux ne resservent pas l'ancienne.
-  const totw = (isComparison(data) ? data.github.special : data.special) === "totw";
-  const image = `${baseUrl}/og/${data.id}.png?${IMAGE_QUERY}${totw ? "&s=totw" : ""}`;
-
-  if (isComparison(data)) {
-    const lang = data.cv.lang ?? data.github.lang ?? "fr";
-    const name = data.github.name || data.cv.name;
-    const fr = lang === "fr";
-    // L'aperçu est lu par qui n'a pas fait la fiche : à la troisième personne, avec le @login
-    // (shared/compareText.ts, comme le visiteur de la page). À égalité, le titre du catalogue
-    // ne s'adresse à personne, et le nom le suit.
-    const who = data.github.login ? `@${data.github.login}` : name;
-    const sentence = theirHeadline(data, lang, who);
-    // Notée (§18.37) : la note du dossier en titre, la phrase en tête de la description.
-    const kase = usableGrid(data.grid) ? data.grid.overall : null;
-    const title =
-      kase === null ? sentence : fr ? `Le dossier de ${who}\u00a0: ${starsLine(starsFor(kase))}, ${kase}` : `${who}'s file: ${starsLine(starsFor(kase))}, ${kase}`;
-    const lead = kase === null ? "" : `${sentence}. `;
-    // LinkedIn et GitHub (§18.24) : « LinkedIn » partout où une comparaison dirait « CV ». Deux pièces d'un même dossier.
-    const src = declaredLabel(data);
-    // Dossier vide fait par un tiers (shared/publicView.ts) : ni la note de la fiche GitHub, ni l'image qui la porte.
-    const sealed = !!data.github.sealed;
-    const gh = sealed ? (fr ? "code à prouver" : "code yet to prove") : cardLabel(data.github, lang);
-    return {
-      lang,
-      url,
-      ...(sealed ? {} : { image }),
-      title,
-      description: fr
-        ? `${lead}${src}\u00a0: ${cardLabel(data.cv, lang)}. GitHub\u00a0: ${gh}. Deux pièces au même dossier, lues sur huit critères de recrutement. Fais la tienne.`
-        : `${lead}${src}: ${cardLabel(data.cv, lang)}. GitHub: ${gh}. Two exhibits in one file, read on eight hiring criteria. Make yours.`,
-      imageAlt: fr ? `Fiche ${src} et fiche GitHub de ${name}` : `${name}'s ${src} sheet and GitHub sheet`,
-    };
-  }
-
+  const image = `${baseUrl}/og/${data.id}.png?${IMAGE_QUERY}${data.special === "totw" ? "&s=totw" : ""}`;
   const lang = data.lang ?? "fr";
   const fr = lang === "fr";
-  if (data.sealed) return sealedMeta(data, lang, url);
+  const pieces = exhibits ? (fr ? `Pièces\u00a0: ${exhibits} et GitHub.` : `Exhibits: ${exhibits} and GitHub.`) : "";
+  if (data.sealed) return sealedMeta(data, lang, url, image, pieces);
   const label = cardLabel(data, lang);
   // §18.7 : « @X est dans le viseur ★★★★☆☆ · Oiseau de nuit » (épicène, §18.18 ;
   // les six étoiles, §18.27) ; sans profil (fiche d'avant le barème 0.2.0), le niveau.
@@ -94,6 +73,7 @@ export function metaFor(data: CardData | ComparisonData, baseUrl: string): PageM
   // Ce qu'est la note : une grille de recrutement (§18.37) ; une fiche d'avant la grille dit son temps de lecture.
   const parts = [
     status ? (fr ? `Chef d'accusation\u00a0: «\u00a0${status}\u00a0».` : `Charge: "${status}".`) : "",
+    pieces,
     usableGrid(data.grid)
       ? fr
         ? "Dossier lu sur huit critères de recrutement, chacun avec sa preuve. Fais la tienne."
@@ -114,21 +94,23 @@ export function metaFor(data: CardData | ComparisonData, baseUrl: string): PageM
 
 /**
  * Un dossier vide fait par un tiers et pas encore revendiqué (shared/publicView.ts) :
- * l'aperçu ne dit pas la note (la note plancher jugerait sans pièce), ni ses étoiles,
- * et ne montre pas l'image de la fiche, qui la porte. Le profil et le chef d'accusation restent.
+ * l'aperçu ne dit pas la note (la note plancher jugerait sans pièce), ni ses étoiles.
+ * L'image est celle de la fiche scellée, qui ne la porte pas non plus. Le profil et le chef d'accusation restent.
  */
-function sealedMeta(data: CardData, lang: Lang, url: string): PageMeta {
+function sealedMeta(data: CardData, lang: Lang, url: string, image: string, pieces: string): PageMeta {
   const fr = lang === "fr";
   const who = data.login ? `@${data.login}` : data.name;
   const tag = data.profile ? ` · ${data.profile.label[lang]}` : "";
   const status = data.statuses[0]?.label[lang];
   const parts = [
     status ? (fr ? `Chef d'accusation\u00a0: «\u00a0${status}\u00a0».` : `Charge: "${status}".`) : "",
+    pieces,
     fr ? "Le code reste à prouver\u00a0: la note attend la personne fichée. Fais la tienne." : "The code is yet to prove: the rating waits for the person on file. Make yours.",
   ].filter(Boolean);
   return {
     lang,
     url,
+    image,
     title: `${who} ${fr ? "est dans le viseur" : "is in the crosshairs"}${tag}`,
     description: parts.join(" "),
     imageAlt: fr ? `Fiche de dev de ${data.name}` : `${data.name}'s dev rap sheet`,
