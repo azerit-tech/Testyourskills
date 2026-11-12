@@ -683,6 +683,12 @@ def mat_lens(name, tint=(1, 1, 1, 1), emit_color=None, strength=0.0, flutes=0.0,
     sh = mix.outputs[0]
     if strength > 0:
         em = _node(nt, "ShaderNodeEmission", Color=lin(emit_color), Strength=strength)
+        if flutes:
+            # allumé, chaque strie renvoie la lumière par son flanc : l'émission suit les stries (55 à 100 %),
+            # le verre se lit en bandes au lieu d'un aplat blanc
+            nt.links.new(cv._math(nt, "MULTIPLY", strength,
+                                  cv._math(nt, "ADD", 0.55, cv._math(nt, "MULTIPLY", wv.outputs["Fac"], 0.45))),
+                         em.inputs["Strength"])
         add = nt.nodes.new("ShaderNodeAddShader")
         nt.links.new(sh, add.inputs[0])
         nt.links.new(em.outputs[0], add.inputs[1])
@@ -1046,7 +1052,7 @@ def _w111_materials(parts, lights_on, tag="hero_w111", paint_color=None, leather
         # les ampoules (dans l'assemblage des feux) : allumées à l'avant, sombres à l'arrière sauf le feu de position
         "Material_38": None,
         "light_reflector": None,
-        "front_light_glass": mat_lens(f"{tag}_head_lens", (0.97, 0.97, 0.95, 1), LAMP, 0.35 * on, flutes=60.0),
+        "front_light_glass": mat_lens(f"{tag}_head_lens", (0.97, 0.97, 0.95, 1), LAMP, 0.15 * on, flutes=60.0),
         "back_light_glass": mat_tail_lens(f"{tag}_tail_lens", lights_on),
         "reverse_light_glass": mat_lens(f"{tag}_reverse_lens", (0.95, 0.95, 0.95, 1)),
         "Acrylic_Transparent_Orange": mat_lens(f"{tag}_amber", lin("#ff8a1a"), AMBER, 0.0),
@@ -1061,7 +1067,10 @@ def _w111_materials(parts, lights_on, tag="hero_w111", paint_color=None, leather
         "mirror": mat_metal(f"{tag}_mirror", (0.95, 0.95, 0.95, 1), 0.0),
     }
     # ampoules et réflecteurs : l'avant (x de fichier < 0 dans y, l'avant est vers -y) s'allume crème, l'arrière rouge
-    head_ref = mat_reflector(f"{tag}_head_reflector", LAMP, 2.5 * on)
+    # le phare allumé : le cœur est l'ampoule (30) et ce que la parabole en renvoie ; la parabole n'émet qu'un fond
+    # (1,0) et le verre un voile strié (0,15). À 2,5 et 0,35, tout le verre faisait un disque blanc plein de près,
+    # sans stries ni ampoule ; de loin le phare reste un point blanc
+    head_ref = mat_reflector(f"{tag}_head_reflector", LAMP, 1.0 * on)
     # réflecteur arrière teinté rouge (le chrome nu blanchissait le feu en rose) ; sa lueur et l'ampoule restent
     # sous le cœur du verre, sinon le feu repasse au saumon
     tail_ref = mat_reflector(f"{tag}_tail_reflector", TAIL_GLOW[0], 0.12 * on)
@@ -1247,9 +1256,13 @@ def _lights(car, lights_on, head_mats, tail_mats):
     inv = body.matrix_world.inverted()
     pts = [inv @ (Vector((mx.x + 0.05, h.y, h.z))) for h in heads]
     out += cv.headlight_spots(body, pts, on=True, energy=550.0, angle=50.0)
-    # une petite lueur derrière chaque verre (le réflecteur et la calandre en reçoivent un peu)
+    # une petite lueur derrière chaque verre, dans le boîtier (le réflecteur en reçoit, le verre la diffuse), 1,5 W :
+    # le réflecteur la concentre, à 4 W le verre virait au blanc plein et ses stries ne se lisaient plus de près. Elle
+    # était posée 12 cm devant le verre et éclairait de près la tôle voisine. Les deux plaques gris rosé entre phare
+    # et calandre au 200 mm (P4) ne viennent pas d'elle : c'est le reflet du disque d'appoint de lieux.car_fill
+    # (visible en glossy), banc hero_bench.py --fill on / noglossy
     for i, h in enumerate(heads):
-        out.append(point_light(body, f"{body.name}_head_glow_{i}", inv @ (h + Vector((0.12, 0, 0))), LAMP, 4.0, 0.04))
+        out.append(point_light(body, f"{body.name}_head_glow_{i}", inv @ (h - Vector((0.05, 0, 0))), LAMP, 1.5, 0.03))
     for i, t in enumerate(tails):
         out.append(point_light(body, f"{body.name}_tail_glow_{i}", inv @ (Vector((mn.x - 0.06, t.y, t.z))), TAIL, 3.0, 0.05))
     return out
