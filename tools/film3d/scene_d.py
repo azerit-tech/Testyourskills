@@ -796,7 +796,9 @@ def plan_FIN6(scene, hidden, palier="socle"):
         print(f"[pointe] avions non chargés : {e!r}", flush=True)
     L.smoke("fumee_gelee", (CX + 0.8, CY - 2.6, 0.5), (3.0, 3.5, 0.8), density=0.16, seed=2.0)
     L.haze((CX - 90, CX + 90), (CY - 470, CY + 90), (L.WATER_Z, 60), 0.0005)
-    L.haze((CX - 35, CX + 35), (CY - 35, CY + 35), (L.WATER_Z, 40), 0.004, name="haze_pointe")
+    # la nappe de la pointe à 0,0025 comme dans FIN : à 0,004, prise par les trois faisceaux, elle voilait la
+    # berline de rose depuis l'objectif
+    L.haze((CX - 35, CX + 35), (CY - 35, CY + 35), (L.WATER_Z, 40), 0.0025, name="haze_pointe")
     a = 95.0                                          # le milieu de l'arc de 150° (de 20° à 170°)
     cam_loc = (*_polar(a, 7.0), 0.25)
     L.cap_images(1024, keep_objects=[hero, bpy.data.objects["pointe_sol"]])
