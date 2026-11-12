@@ -2284,6 +2284,7 @@ def v3_report(base, per_plan, plans=PLANS, v31=None):
         lim31, own31 = v31
         out["v31"] = {p: (datas[p]["v31"], plan_checks31(datas[p], lim31, own31.get(p, {}))) for p in plans}
         out["cuts31"] = cut_rows31(datas, lim31)
+        out["cut_state"] = cut_state_rows(datas, lim31)
     return out
 
 
@@ -2510,6 +2511,7 @@ def fluidity(d):
                        noise=_peak({f: max(abs(full[f][0] - pure[f][0]), abs(full[f][1] - pure[f][1]))
                                     for f in frames}) if pure else (0.0, frames[0]))
     out["steer"] = {f: full[f][2] for f in frames}
+    out["body_full"] = full
     return out
 
 
@@ -2678,6 +2680,285 @@ def cut_rows31(datas, lim):
     return rows
 
 
+# ---------------------------------------------------------------- §18.36 : la continuité du parcours aux coupes
+#
+# « À la fin le parcours est continu, sans à-coup » : de part et d'autre de chaque coupe, la berline et la caméra
+# sont dans le même état de mouvement. Sortie du plan A (sa dernière image) contre entrée du plan B (sa première),
+# dérivées prises du côté du plan (trois ou quatre images, formules décentrées d'ordre 2). Les bascules vers une
+# fin passent par l'encre (shared/film/cut.ts, CUT_INK : la dernière image de A et la première de la fin sont
+# couvertes) : on y compare l'avant-dernière de A à la deuxième de la fin, et seuls comptent le côté de la
+# patrouille 1 et la vraisemblance (la berline n'arrive pas plus vite qu'elle n'est partie).
+
+# les films, comme shared/film/cut.ts : la poursuite jusqu'au plan de l'étoile, puis sa fin
+FILMS = {n: ("OUV",) + tuple(f"P{k}" for k in range(1, n + 1)) + (("FIN6",) if n == 6 else ("FIN",))
+         for n in range(1, 7)}
+ENDS = ("FIN", "FIN6")
+# la patrouille 1 dans tracks() de chaque plan
+PATROL1 = {"OUV": "patrol", "P1": "patrol", "P2": "patrol_1", "P3": "patrol_c", "P4": "patrol_0", "P5": "patrol_0",
+           "P6": "patrol_1", "FIN": "patrol_1"}
+
+
+def film_cuts():
+    """Les coupes réelles des six films : [(A, B, [étoiles])], dans l'ordre du film."""
+    out = {}
+    for n, shots in FILMS.items():
+        for a, b in zip(shots, shots[1:]):
+            out.setdefault((a, b), []).append(n)
+    return [(a, b, ns) for (a, b), ns in out.items()]
+
+
+def _d1(g, s, h):
+    """Dérivée première décentrée d'ordre 2 d'une suite g(0), g(1), g(2) (s = +1 : vers l'avant, -1 : en arrière)."""
+    return s * (-3 * g[0] + 4 * g[1] - g[2]) / (2 * h)
+
+
+def _d2(g, h):
+    return (2 * g[0] - 5 * g[1] + 4 * g[2] - g[3]) / (h * h)
+
+
+def stop_windows(plan, d):
+    """Les fenêtres des feux stop telles que la scène les pose (None : le plan n'en pose pas)."""
+    mod = d["module"]
+    try:
+        if hasattr(mod, "BRAKE"):
+            return [tuple(mod.BRAKE)]
+        if hasattr(mod, "stop_frames"):
+            return list(mod.stop_frames())
+        if hasattr(mod, "brake_windows"):
+            return list(mod.brake_windows())
+        if hasattr(mod, "HERO") and hasattr(mod.HERO, "brake_windows"):
+            w = mod.HERO.brake_windows(frames=d["frames"])
+            return [(w[0][0], d["frames"][-1])] if w else []      # scene_d : tenus jusqu'au bout
+    except Exception:          # noqa: BLE001 — un plan en chantier ne casse pas la mesure
+        return None
+    return None
+
+
+def motion_state(d, f, s):
+    """L'état de mouvement à l'image f, dérivées prises vers l'intérieur du plan (s = -1 : en sortie, +1 : en
+    entrée). Rend un dict (voir le tableau d'état aux coupes)."""
+    P, fps = d["poses"], d["fps"]
+    fr = [f + s * k for k in range(4)]
+    h = 1.0 / fps
+    xs, ys = [P[g]["x"] for g in fr], [P[g]["y"] for g in fr]
+    vx, vy = _d1(xs, s, h), _d1(ys, s, h)
+    ax, ay = _d2(xs, h), _d2(ys, h)
+    sp = math.hypot(vx, vy)
+    st = dict(speed=sp)
+    if sp > 0.3:
+        ux, uy = vx / sp, vy / sp
+        st["along"], st["alat"] = ax * ux + ay * uy, ux * ay - uy * ax
+        st["travel"] = heading_of(vx, vy)
+        st["yaw"] = math.degrees(st["alat"] / sp)
+        st["slip"] = _unwrap(0.0, P[f]["heading"] - st["travel"])
+    else:
+        st["along"], st["alat"], st["yaw"], st["slip"] = -math.hypot(ax, ay) if sp > 0.05 else 0.0, 0.0, 0.0, 0.0
+        st["travel"] = P[f]["heading"]
+    body = (d.get("fluid") or {}).get("body_full") or hero_body(d)[0]
+    st["roll"], st["pitch"], st["steer"] = body[f]
+    wins = stop_windows(d["plan"], d)
+    st["lamps"] = None if wins is None else any(a <= f <= b for a, b in wins)
+    # la caméra : panoramique (dérivée du cap de visée, positive à gauche), bascule, écart à la vitesse
+    R = d["rail"]
+    yaw, prev = [], None
+    for g in fr:
+        v = R[g][3] if prev is None else _unwrap(prev, R[g][3])
+        yaw.append(v)
+        prev = v
+    st["pan"] = -_d1(yaw, s, h)
+    st["tilt"] = _d1([R[g][4] for g in fr], s, h)
+    st["cam_gap"] = _unwrap(0.0, 180.0 - R[f][3] - st["travel"])
+    # la berline à l'écran (clés finales), % de largeur par image
+    scr = screen_track(d, d["final"])
+    if all(scr.get(g) for g in fr[:3]):
+        st["scr"] = (_d1([scr[g][0] for g in fr], s, 1.0), _d1([scr[g][1] for g in fr], s, 1.0))
+    else:
+        st["scr"] = None
+    # la patrouille 1
+    name = PATROL1.get(d["plan"])
+    named = d["spec"].get("named") or {}
+    st["p1"] = None
+    if name in named:
+        fn = named[name]
+        t = P[f]["t"]
+        x, y = fn(t)[:2]
+        heads = d["module"].tracks_heading() if hasattr(d["module"], "tracks_heading") else {}
+        if name in heads:
+            ph = heads[name](t)
+        else:
+            (pvx, pvy), _ = kinematics(fn, t)
+            ph = heading_of(pvx, pvy) if math.hypot(pvx, pvy) > 0.3 else st["travel"]
+        box = frame_box(d["final"][f], dict(x=x, y=y, heading=ph, z=P[f]["z"]), _dims_of(name))
+        seen = bool(box and 0.0 <= (box[0] + box[1]) / 2 <= 100.0 and 0.0 <= (box[2] + box[3]) / 2 <= 100.0)
+        hr = math.radians(st["travel"])
+        dx, dy = x - P[f]["x"], y - P[f]["y"]
+        left = -dx * math.cos(hr) - dy * math.sin(hr)
+        ahead = -dx * math.sin(hr) + dy * math.cos(hr)
+        bars = d["module"].bars_on(f) if hasattr(d["module"], "bars_on") else True
+        st["p1"] = dict(seen=seen, side="gauche" if left >= 0 else "droite", gap=math.hypot(dx, dy), left=left,
+                        ahead=ahead, bars=bars)
+    return st
+
+
+def _fmt_state(st):
+    lamps = "éteints (aucun posé)" if st["lamps"] is None else ("allumés" if st["lamps"] else "éteints")
+    out = (f"v {st['speed']:5.2f} m/s, long {st['along']:+5.2f}, lat {st['alat']:+5.2f} m/s², lacet {st['yaw']:+6.1f}"
+           f" °/s, glisse {st['slip']:+5.1f}°, braquage {st['steer']:+5.1f}°, roulis {st['roll']:+4.1f}°, tangage "
+           f"{st['pitch']:+4.1f}°, feux stop {lamps} | caméra : pan {st['pan']:+6.1f} °/s, bascule {st['tilt']:+5.1f} °/s,"
+           f" cap−vitesse {st['cam_gap']:+6.1f}°, écran "
+           + (f"{st['scr'][0]:+5.2f}/{st['scr'][1]:+5.2f} %/image" if st["scr"] else "hors champ"))
+    p = st["p1"]
+    if p:
+        out += (f" | patrouille 1 : {'dans le cadre' if p['seen'] else 'hors cadre'}, {p['side']} ({p['left']:+.1f} m), "
+                f"{p['gap']:.1f} m, {p['ahead']:+.1f} m devant, rampe {'allumée' if p['bars'] else 'éteinte'}")
+    return out
+
+
+def cut_state_rows(datas, lim):
+    """La continuité aux coupes réelles des films : [dict(a, b, films, ink, fa, fb, sa, sb, checks=[(nom, tient,
+    détail)], fix)]."""
+    rows = []
+    for a, b, films in film_cuts():
+        if a not in datas or b not in datas:
+            continue
+        da, db = datas[a], datas[b]
+        ink = b in ENDS
+        fa = da["frames"][-2] if ink else da["frames"][-1]
+        fb = db["frames"][1] if ink else db["frames"][0]
+        sa, sb = motion_state(da, fa, -1), motion_state(db, fb, +1)
+        checks = []
+
+        def add(name, ok, detail, key=None, ratio=0.0):
+            checks.append((name, bool(ok), detail, key, ratio))
+        p1a, p1b = sa["p1"], sb["p1"]
+        both = bool(p1a and p1b and p1a["seen"] and p1b["seen"])
+        if both:
+            add("patrouille 1 du même côté", p1a["side"] == p1b["side"], f"{p1a['side']} → {p1b['side']}", "p1side", 9)
+        if ink:
+            add("vraisemblance : la berline n'arrive pas plus vite", sb["speed"] <= sa["speed"] + lim["cs_ink_dv"],
+                f"{sa['speed']:.1f} → {sb['speed']:.1f} m/s", "inkspeed", 9)
+        else:
+            ref = max(sa["speed"], 1e-6)
+            dv = (sb["speed"] - sa["speed"]) / ref
+            add(f"vitesse ±{lim['cs_speed'] * 100:.0f} %", abs(dv) <= lim["cs_speed"] + 1e-9 or
+                (sa["speed"] < 0.5 and sb["speed"] < 0.5), f"{sa['speed']:.2f} → {sb['speed']:.2f} m/s ({dv * 100:+.0f} %)",
+                "speed", abs(dv) / lim["cs_speed"])
+            for key, label, unit, lk in (("along", "longitudinale", "m/s²", "cs_along"),
+                                         ("alat", "latérale", "m/s²", "cs_alat"), ("yaw", "lacet", "°/s", "cs_yaw"),
+                                         ("slip", "glisse", "°", "cs_slip"), ("steer", "braquage", "°", "cs_steer"),
+                                         ("roll", "roulis", "°", "cs_roll"), ("pitch", "tangage", "°", "cs_pitch"),
+                                         ("pan", "panoramique", "°/s", "cs_pan")):
+                dd = sb[key] - sa[key]
+                add(f"{label} Δ ≤ {lim[lk]:g} {unit}", abs(dd) <= lim[lk] + 1e-9,
+                    f"{sa[key]:+.2f} → {sb[key]:+.2f} (Δ {dd:+.2f})", key, abs(dd) / lim[lk])
+            if sa["scr"] and sb["scr"]:
+                dd = math.hypot(sb["scr"][0] - sa["scr"][0], sb["scr"][1] - sa["scr"][1])
+                add(f"vitesse à l'écran Δ ≤ {lim['cs_screen']:g} % de largeur par image", dd <= lim["cs_screen"] + 1e-9,
+                    f"{sa['scr'][0]:+.2f}/{sa['scr'][1]:+.2f} → {sb['scr'][0]:+.2f}/{sb['scr'][1]:+.2f} (Δ {dd:.2f})",
+                    "scr", dd / lim["cs_screen"])
+            la, lb = bool(sa["lamps"]), bool(sb["lamps"])       # un plan qui n'en pose pas les a éteints
+            add("feux stop dans le même état", la == lb, f"{'allumés' if la else 'éteints'} → "
+                f"{'allumés' if lb else 'éteints'}", "lamps", 0 if la == lb else 5)
+            if both:
+                dg = p1b["gap"] - p1a["gap"]
+                add(f"patrouille 1 à ±{lim['cs_p1_gap']:g} m de la berline", abs(dg) <= lim["cs_p1_gap"] + 1e-9,
+                    f"{p1a['gap']:.1f} → {p1b['gap']:.1f} m (Δ {dg:+.1f})", "p1gap", abs(dg) / lim["cs_p1_gap"])
+        rows.append(dict(a=a, b=b, films=films, ink=ink, fa=fa, fb=fb, sa=sa, sb=sb,
+                         checks=[c[:3] for c in checks], fix=_cut_fix(a, b, sa, sb, checks, ink)))
+    return rows
+
+
+def _cut_fix(a, b, sa, sb, checks, ink):
+    """Une ligne : de quel côté corriger, d'après les écarts."""
+    bad = sorted((c for c in checks if not c[1]), key=lambda c: -c[4])
+    if not bad:
+        return ""
+    keys = {c[3] for c in bad}
+    parts = []
+    if ink:
+        if "inkspeed" in keys:
+            parts.append(f"la fin entre plus vite ({sb['speed']:.1f} m/s) que {a} ne sort ({sa['speed']:.1f}) : faire "
+                         f"entrer la fin à {sa['speed']:.1f} m/s au plus, ou finir {a} plus tard, plus lancée")
+        if "p1side" in keys:
+            parts.append(f"la patrouille 1 change de côté : la placer {sa['p1']['side']} dans la fin")
+        return " ; ".join(parts)
+    if {"alat", "yaw", "roll", "steer", "slip"} & keys:
+        if abs(sa["alat"]) > abs(sb["alat"]):
+            parts.append(f"{a} finit encore dans la courbe (lat {sa['alat']:+.1f} m/s², lacet {sa['yaw']:+.0f} °/s, roulis "
+                         f"{sa['roll']:+.1f}°, glisse {sa['slip']:+.1f}°) et {b} part droit : finir {a} plus tard, "
+                         f"courbe sortie, ou faire entrer {b} en fin de courbe avec cet état")
+        else:
+            parts.append(f"{b} entre déjà en courbe (lat {sb['alat']:+.1f} m/s², lacet {sb['yaw']:+.0f} °/s, roulis "
+                         f"{sb['roll']:+.1f}°) alors que {a} sort droit : faire commencer {b} avant l'entrée en courbe, "
+                         f"ou finir {a} en entrée de courbe")
+    if "speed" in keys:
+        dv = sb["speed"] - sa["speed"]
+        toward = sa["along"] * dv > 0 and abs(sa["along"]) > 0.5
+        rate = 2.8 if dv > 0 else 6.4
+        if toward and abs(dv) / abs(sa["along"]) <= 1.5:
+            parts.append(f"vitesse {sa['speed']:.1f} → {sb['speed']:.1f} m/s : {a} y va déjà "
+                         f"({sa['along']:+.1f} m/s²) : finir {a} {abs(dv) / abs(sa['along']):.1f} s plus tard, ou faire "
+                         f"entrer {b} à {sa['speed']:.1f} m/s")
+        else:
+            parts.append(f"vitesse {sa['speed']:.1f} → {sb['speed']:.1f} m/s ({dv:+.1f}, soit {abs(dv) / rate:.1f} s "
+                         f"{'d’accélération' if dv > 0 else 'de freinage'} à {rate:g} m/s²) : faire entrer {b} à "
+                         f"{sa['speed']:.1f} m/s et changer d'allure dans {b}, ou amener {a} à {sb['speed']:.1f} m/s "
+                         f"sur sa fin")
+    if "along" in keys or "pitch" in keys:
+        word = lambda x: "freinage" if x < 0 else "accélération"  # noqa: E731
+        if abs(sa["along"]) >= abs(sb["along"]):
+            parts.append(f"{a} finit en {word(sa['along'])} ({sa['along']:+.1f} m/s², tangage {sa['pitch']:+.1f}°), "
+                         f"{b} entre à {sb['along']:+.1f} : le prolonger sur le début de {b}, ou le relâcher avant la "
+                         f"fin de {a}")
+        else:
+            parts.append(f"{b} entre en {word(sb['along'])} ({sb['along']:+.1f} m/s², tangage {sb['pitch']:+.1f}°), "
+                         f"{a} sort à {sa['along']:+.1f} : l'amorcer à la fin de {a}, ou l'installer dans {b} après "
+                         f"quelques images")
+    if "lamps" in keys:
+        on, off = (a, b) if sa["lamps"] else (b, a)
+        so = sa if sa["lamps"] else sb
+        parts.append(f"feux stop allumés dans {on} ({so['along']:+.1f} m/s²), éteints dans {off} : "
+                     + (f"les éteindre dans {on} (il ne freine pas)" if so["along"] > -2.0 else
+                        f"les tenir dans {off} tant que le freinage dure"))
+    if "pan" in keys:
+        parts.append(f"caméra : panoramique {sa['pan']:+.0f} → {sb['pan']:+.0f} °/s : "
+                     + (f"amortir la fin de {a}" if abs(sa["pan"]) > abs(sb["pan"]) else f"démarrer {b} sans tourner")
+                     + " ou donner à l'autre plan le même mouvement")
+    if "scr" in keys:
+        parts.append(f"à l'écran {sa['scr'][0]:+.2f}/{sa['scr'][1]:+.2f} → {sb['scr'][0]:+.2f}/{sb['scr'][1]:+.2f} "
+                     "%/image : " + ("suit les écarts ci-dessus" if parts else
+                                     "accorder la vitesse caméra–berline des deux côtés"))
+    if "p1side" in keys or "p1gap" in keys:
+        parts.append(f"patrouille 1 : {sa['p1']['side']} à {sa['p1']['gap']:.1f} m ({sa['p1']['ahead']:+.1f} devant) → "
+                     f"{sb['p1']['side']} à {sb['p1']['gap']:.1f} m ({sb['p1']['ahead']:+.1f} devant) : la placer dans "
+                     f"{b} comme à la sortie de {a}")
+    return " ; ".join(parts)
+
+
+def cut_state_text(rows, films=None):
+    """Le tableau d'état aux coupes, puis le résumé par film."""
+    lines = ["== continuité aux coupes (§18.36) : sortie de A (dernière image, avant-dernière vers une fin) contre "
+             "entrée de B (première image, deuxième d'une fin, après l'encre) ; dérivées prises dans chaque plan"]
+    for r in rows:
+        tag = " (encre : côté de la patrouille et vraisemblance seulement)" if r["ink"] else ""
+        nbad = sum(not c[1] for c in r["checks"])
+        lines.append(f"-- {r['a']} → {r['b']}, films à {', '.join(map(str, r['films']))} étoile(s){tag} : "
+                     + ("tient" if not nbad else f"{nbad} écart(s)"))
+        lines.append(f"   sortie {r['a']} ({r['fa']}) : {_fmt_state(r['sa'])}")
+        lines.append(f"   entrée {r['b']} ({r['fb']}) : {_fmt_state(r['sb'])}")
+        for name, ok, detail in r["checks"]:
+            lines.append(f"   {'tient  ' if ok else 'DÉPASSE'} {name} : {detail}")
+        if r["fix"]:
+            lines.append(f"   → corriger : {r['fix']}")
+    lines.append("== continuité, par film")
+    for n in (films or sorted(FILMS)):
+        cuts = [r for r in rows if n in r["films"]]
+        bad = [f"{r['a']}→{r['b']}" for r in cuts if any(not c[1] for c in r["checks"])]
+        lines.append(f"   {n} étoile(s) ({' '.join(FILMS[n])}) : {len(cuts)} coupes, {len(bad)} en écart"
+                     + (f" ({', '.join(bad)})" if bad else ""))
+    return "\n".join(lines)
+
+
 def v31_text(rep):
     """Le rapport v3.1 : les contrôles par plan, les coupes en hauteur et distance, le diagnostic de fluidité."""
     lines = []
@@ -2723,6 +3004,7 @@ def _main(argv):
             rep = v3_report(base, per_plan, plans, v31=T.v31_limits())
             print(v3_text(rep))
             print(v31_text(rep))
+            print(cut_state_text(rep["cut_state"]))
             return 0
         plans = [p.upper() for p in argv[1:]] or list(PLANS)
         print(measure_table(measure_shots(plans)))

@@ -102,6 +102,18 @@ SLIP31_BACK = 4.0             # ° au plus de retour de l'autre côté, une fois
 SCREEN31_D2, SCREEN31_D3 = 0.20, 0.20     # tremblés v3.1 : 0,04 à 0,16 sur les plans de dos ; sans tremblé, 0,10
 BODY31_ROLL, BODY31_PITCH = 4.0, 2.0
 BODY31_ROLL_D2, BODY31_NOISE = 0.10, 0.02
+# §18.36, la continuité aux coupes (motion.cut_state_rows) : l'état de mouvement de la berline et de la caméra à la
+# sortie de A contre l'entrée de B. Points de départ ; informatifs tant que CUT_STATE_STRICT est faux.
+CUT_STATE_STRICT = False
+CUT_SPEED = 0.10              # vitesse à ±10 %
+CUT_ALONG, CUT_ALAT = 2.0, 1.5        # m/s², écarts d'accélération longitudinale et latérale
+CUT_YAW = 8.0                 # °/s, lacet du cap de la vitesse
+CUT_SLIP, CUT_STEER = 3.0, 5.0        # °, glisse et braquage des roues avant
+CUT_ROLL, CUT_PITCH = 1.0, 0.7        # °, caisse
+CUT_PAN = 8.0                 # °/s, panoramique
+CUT_SCREEN = 0.15             # % de la largeur par image, vitesse de la berline à l'écran
+CUT_P1_GAP = 2.0              # m, écart de la patrouille 1 à la berline (même côté exigé)
+CUT_INK_DV = 0.5              # m/s : vers une fin (l'encre), la berline n'arrive pas plus vite qu'elle n'est partie
 CAM31_LIMITS_PLAN = {
     "P6": {"rise_after": 0.5, "rise_h_max": 3.6},           # monte à la fin pour découvrir la pointe
     "FIN": {"stop_h_min": 2.0, "stop_dist_min": 5.5},       # plus bas et plus près une fois la berline arrêtée
@@ -116,7 +128,10 @@ def v31_limits():
                 car=dict(hero=CAR31_HERO, patrol=CAR31_PATROL), stop_lamp=CAR31_STOP_LAMP, slip_max=SLIP31_MAX,
                 slip_on=SLIP31_ON, slip_off=SLIP31_OFF, slip_acc=SLIP31_ACC, slip_loss=SLIP31_LOSS,
                 slip_back=SLIP31_BACK, screen_d2=SCREEN31_D2, screen_d3=SCREEN31_D3, body_roll=BODY31_ROLL,
-                body_pitch=BODY31_PITCH, body_roll_d2=BODY31_ROLL_D2, body_noise=BODY31_NOISE)
+                body_pitch=BODY31_PITCH, body_roll_d2=BODY31_ROLL_D2, body_noise=BODY31_NOISE,
+                cs_speed=CUT_SPEED, cs_along=CUT_ALONG, cs_alat=CUT_ALAT, cs_yaw=CUT_YAW, cs_slip=CUT_SLIP,
+                cs_steer=CUT_STEER, cs_roll=CUT_ROLL, cs_pitch=CUT_PITCH, cs_pan=CUT_PAN, cs_screen=CUT_SCREEN,
+                cs_p1_gap=CUT_P1_GAP, cs_ink_dv=CUT_INK_DV)
     return base, CAM31_LIMITS_PLAN
 
 
@@ -1376,6 +1391,18 @@ def test_v3():
         if chk is not None:
             check(f"v3.1 coupe {a} → {b} : |Δhauteur| ≤ {CAM31_CUT_DH:g} m, |Δdistance| ≤ {CAM31_CUT_DD:g} m, "
                   "même focale", chk[0], chk[1])
+    # §18.36 : la continuité du parcours aux coupes (berline, caméra, patrouille 1) ; informative tant que
+    # CUT_STATE_STRICT est faux (le détail : python3 tools/film3d/motion.py mesure --v3)
+    rows = rep["cut_state"]
+    bad = [r for r in rows if any(not c[1] for c in r["checks"])]
+    check(f"continuité aux coupes ({'stricte' if CUT_STATE_STRICT else 'information'}) : {len(rows)} coupes, "
+          f"{len(bad)} en écart", not (CUT_STATE_STRICT and bad),
+          ", ".join(f"{r['a']}→{r['b']} ({sum(not c[1] for c in r['checks'])})" for r in bad))
+    if CUT_STATE_STRICT:
+        for r in bad:
+            for name, ok, detail in r["checks"]:
+                if not ok:
+                    check(f"continuité {r['a']} → {r['b']} : {name}", ok, detail)
 
 
 if __name__ == "__main__":
