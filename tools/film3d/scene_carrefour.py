@@ -377,6 +377,10 @@ def animate(scene, car, fill, patrols, pose=POSE):
     poses = M.sample(in_scene(P.hero_pos), frames, slip=P.hero_slip, wheel_r=car["wheel_r"], wheelbase=wb)
     M.key_vehicle(rig, poses, wheels=wheels, body=car)
     M.wheel_marks(wheels, car["wheel_r"])
+    # les feux stop, après la mise en clés : les fenêtres où la berline freine à plus de 2 m/s² (découpage v3.1)
+    import hero_cars
+    for a, b in P.stop_frames():
+        hero_cars.stop_lamps(car, a, b)
     rigs = []
     for i, (body, key) in enumerate(zip(patrols, ("patrol_1", "patrol_2"))):
         lights = [o for o in bpy.data.objects if o.name.startswith((f"bar_glow_{key}_", f"pool_{key}_"))]
