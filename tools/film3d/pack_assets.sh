@@ -74,6 +74,11 @@ echo "source : $SOURCE"
 echo "$COUNT fichiers, $((KB / 1024)) Mo -> $ARCHIVE (liste : $LIST)"
 [ "$DRY" -eq 0 ] || exit 0
 
-# (COPYFILE_DISABLE : pas de fichiers « ._ » de métadonnées du Mac dans l'archive)
-COPYFILE_DISABLE=1 tar -cf "$ARCHIVE" -C "$ASSETS" -T "$LIST"
+# (COPYFILE_DISABLE et --no-xattrs : ni fichiers « ._ » ni attributs étendus du Mac dans l'archive, que le tar de
+# Linux signalerait à chaque fichier)
+if tar --version 2>/dev/null | grep -q bsdtar; then
+  COPYFILE_DISABLE=1 tar --no-xattrs --no-mac-metadata -cf "$ARCHIVE" -C "$ASSETS" -T "$LIST"
+else
+  tar -cf "$ARCHIVE" -C "$ASSETS" -T "$LIST"
+fi
 echo "écrit $ARCHIVE : $(du -h "$ARCHIVE" | cut -f1)"
