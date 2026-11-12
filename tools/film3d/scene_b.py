@@ -1097,8 +1097,11 @@ def place_hero(scene, plan):
     # des phares de route : plus forts et plus serrés que ceux de l'avenue, ils découpent les agents dans la brume
     spots = [c for c in car.children_recursive if c.type == "LIGHT" and c.data.type == "SPOT"]
     # les phares sont la source principale du plan : pleins phares dans la brume du barrage, vers la caméra
+    # (1000 W et non 2600 : face à la caméra, à 10 m, leur reflet brillant sur l'enrobé mouillé faisait le voile du
+    # sol de P3, 82 % de sa luminance au bas du cadre et 43 % jusqu'aux plots ; passes diffus / brillant et groupes
+    # fins, lab/lightgroups.py --split)
     for lo in spots:
-        lo.data.energy = 2600.0
+        lo.data.energy = 1000.0
         lo.data.spot_size = math.radians(44)
         # le halo vient des cœurs et de la nappe : dans la brume générale, les faisceaux voileraient le sol
         try:
