@@ -1395,8 +1395,48 @@ def test_parcours():
     les plafonds CUT_* contre l'entrée du suivant ; les feux stop sont dans le même état ; tout le parcours tient les
     limites de la voiture (CAR31_HERO, glisse) image par image."""
     import parcours as PC
-    check("parcours : sept plans, 388 images", [n for n, _ in PC.SHOTS] == ["OUV", "P1", "P2", "P3", "P4", "P5", "P6"]
-          and PC.TOTAL == sum(n for _, n in PC.SHOTS), f"{PC.TOTAL} images")
+    check("parcours : sept plans, 414 images", [n for n, _ in PC.SHOTS] == ["OUV", "P1", "P2", "P3", "P4", "P5", "P6"]
+          and PC.TOTAL == sum(n for _, n in PC.SHOTS) == 414, f"{PC.TOTAL} images")
+    # la ville (SPEC §18.36) : la route est la vraie chaussée, chaque lieu posé sur elle ; aux coupes continues, la
+    # berline de A prolongée d'une image est celle de B/1 (position, cap, vitesse) ; une seule ellipse, P3 → P4
+    route_cap = PC.ROUTE.at(PC.S_ARC5 - 20.0)[2]
+    check("parcours : le rond-point à angle droit (CAP_B = 90° exacts, la route les tient)",
+          PC.CAP_B == 90.0 and abs(route_cap - 90.0) < 1e-6 and abs(PC.ROUTE.at(PC.ROUTE.length)[2] - PC.CAP_D) < 1e-6,
+          f"CAP_B {PC.CAP_B:g}, route {route_cap:.6f}°, CAP_D {PC.CAP_D:g}")
+    check("parcours : une seule ellipse, P3 → P4", [k for k, v in PC.CONTINU.items() if not v] == [("P3", "P4")]
+          and len(PC.CONTINU) == 6, str(PC.CONTINU))
+    for (a, na), (b, _) in zip(PC.SHOTS, PC.SHOTS[1:]):
+        ha, hb = PC.hero(a), PC.hero(b)
+        (fa, ra), (fb, rb) = PC.vers_ville(a), PC.vers_ville(b)
+        same_t = abs(PC.t_of(a, na + 1) - PC.t_of(b, 1)) < 1e-12
+        dp = math.dist(fa(*ha["pos"](na + 1)), fb(*hb["pos"](1)))
+        dh = abs(ha["travel"](na + 1) + ra - hb["travel"](1) - rb)
+        dv = abs(ha["speed"](na + 1) - hb["speed"](1))
+        if PC.CONTINU[(a, b)]:
+            check(f"parcours, coupe {a} → {b} continue : A prolongé d'une image = B/1 dans la ville",
+                  same_t and dp < 1e-6 and dh < 1e-6 and dv < 1e-9, f"{dp:.1e} m, cap {dh:.1e}°, vitesse {dv:.1e} m/s")
+        else:
+            along, side = PC.SAUT[(a, b)]
+            check(f"parcours, coupe {a} → {b} en ellipse : la montée du pont sautée, même cap et même vitesse",
+                  same_t and 300.0 < along < 360.0 and abs(side) < 7.0 and dh < 1e-6 and dv < 1e-9,
+                  f"{along:.1f} m sautés, {side:+.2f} m en travers")
+    same = {}
+    for n, _ in PC.SHOTS:
+        same.setdefault(PC.LIEU[n], []).append(PC.pose_ville(n))
+    bad = [k for k, ps in same.items() if any(max(abs(u - v) for u, v in zip(p, ps[0])) > 1e-6 for p in ps)]
+    check("parcours : un lieu, une pose dans la ville (OUV et P1 sur la même avenue)", not bad, ", ".join(bad) or
+          f"A : rot {same['A'][0][0]:+.2f}°, t ({same['A'][0][1]:.2f}, {same['A'][0][2]:.2f})")
+    rot = {k: ps[0][0] for k, ps in same.items()}
+    check("parcours : l'avenue et le rond-point dans le même axe, la rue des enseignes à angle droit",
+          abs(rot["A"] - rot["F"]) < 1e-9 and abs(rot["B"] - rot["F"] - 90.0) < 1e-9, str(rot))
+    # le rond-point de scene_f.py : l'îlot de 6 m de rayon en (0, 0) ; la berline entre dans la voie de l'avenue, sort
+    # dans celle de P3 (y 0,35), son centre à plus de 4 m de la bordure de l'îlot
+    h2 = PC.hero("P2")
+    near = min(math.hypot(*h2["pos"](f / 4.0)) for f in range(4, 4 * dict(PC.SHOTS)["P2"] + 1)) - 6.0
+    end = h2["pos"](dict(PC.SHOTS)["P2"] + 24)
+    check("parcours : P2 entre en x 1,75, sort sur y 0,35, à plus de 4 m de l'îlot",
+          abs(h2["pos"](1)[0] - 1.75) < 1e-6 and abs(end[1] - 0.35) < 1e-3 and near > 4.0,
+          f"entrée x {h2['pos'](1)[0]:.2f}, sortie y {end[1]:.3f}, {near:.2f} m de la bordure")
     lims = dict(along=CUT_ALONG, alat=CUT_ALAT, yaw=CUT_YAW, slip=CUT_SLIP, steer=CUT_STEER, roll=CUT_ROLL,
                 pitch=CUT_PITCH, pan=CUT_PAN)
     for a, b, sa, sb in PC.cut_states():
@@ -1413,7 +1453,7 @@ def test_parcours():
               f"{worst[0] * 100:.0f} % du plafond")
     n = _drive_numbers(PC.DRIVE, list(range(1, PC.TOTAL + 1)))
     bad = [k for k in ("lat", "brake", "acc", "circle", "jerk", "yaw_acc") if n[k] > CAR31_HERO[k] + 1e-9]
-    check("parcours : les limites de la voiture sur les 388 images", not bad and n["slip"] <= SLIP31_MAX
+    check(f"parcours : les limites de la voiture sur les {PC.TOTAL} images", not bad and n["slip"] <= SLIP31_MAX
           and n["on"] <= SLIP31_ON and n["off"] <= SLIP31_OFF,
           ", ".join(f"{k} {n[k]:.2f}" for k in ("lat", "brake", "acc", "circle", "jerk", "yaw_acc", "slip")))
 

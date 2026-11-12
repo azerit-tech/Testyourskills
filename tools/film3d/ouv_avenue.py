@@ -42,11 +42,11 @@ LENS = 24.0
 HALF_W = math.atan(10.125 / LENS)            # demi-champ horizontal (capteur de 36 mm en 9:16)
 HALF_H = math.atan(18.0 / LENS)              # demi-champ vertical
 FOCUS_F = 4.0                 # ouverture ; le point sur la berline
-# la rue transversale de la patrouille : celle de y 266 (découpage v2, P1 option A, 12 novembre) ; il y a 250 m
-# d'avenue construite derrière la berline, et 400 devant
-STREET = 266.0
-PATROL = (-5.9, STREET - 2.0, 180.0)  # x, y, cap (lieux : 0 vers +y) : garée le long de la bordure côté ville, avant vers -y
 Y0 = HERO["pos"](F0)[1]  # la berline à la première image (parcours : 20 m avant la patrouille, qu'elle dépasse à 40)
+# la rue transversale de la patrouille (découpage v2, P1 option A, 12 novembre) : 22 m devant la première image,
+# y 286,85 depuis que l'ancre d'OUV touche P1 (y 266 quand OUV/1 était en 244)
+STREET = Y0 + 22.0
+PATROL = (-5.9, STREET - 2.0, 180.0)  # x, y, cap (lieux : 0 vers +y) : garée le long de la bordure côté ville, avant vers -y
 # la patrouille garée qui s'éveille : ses phares à WAKE (on la voit de face, à 25 m), sa rampe à BARS_ON (hors champ)
 WAKE = 14
 WAKE_HEAD_W = 150.0                  # W par phare (450 dans le modèle : de face à 30 m, ils éblouissaient le cadre)
