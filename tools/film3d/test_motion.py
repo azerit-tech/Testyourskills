@@ -122,6 +122,35 @@ def test_p4():
     check("P4 : la berline à 70 m à l'image fixe", abs(dist - 70.0) < 1.0, f"{dist:.1f} m")
 
 
+def test_p3():
+    """P3 : aucun choc (centres à plus de 3 m, caisse à 15 cm au moins des patrouilles, des agents, des plots et de
+    la caméra) ; roulis et tangage bornés ; le cadre validé à l'image fixe ; éclairs d'une ou deux images."""
+    import p3_enseignes as P
+    frames = range(P.F0 - 1, P.F0 + P.FRAMES + 1)
+    d, f, a, b = M.min_gap(P.tracks(), frames)
+    check("P3 : distances gardées", d >= 3.0, f"{d:.1f} m entre {a} et {b} à l'image {f}")
+    cl = P.clearances(frames)
+    n, (dm, fm) = min(cl.items(), key=lambda kv: kv[1][0])
+    check("P3 : la caisse ne touche rien", dm >= 0.15, f"{dm:.2f} m de {n} à l'image {fm:.2f}")
+    ps = M.sample(P.hero_pos, frames, heading=P.hero_heading, wheel_r=0.31, wheelbase=2.77)
+    check("P3 : roulis ≤ 6°", max(abs(p["roll"]) for p in ps) <= 6.0, f"{max(abs(p['roll']) for p in ps):.2f}°")
+    check("P3 : tangage ≤ 3°", max(abs(p["pitch"]) for p in ps) <= 3.0, f"{max(abs(p['pitch']) for p in ps):.2f}°")
+    x, y = P.hero_pos(P.T_STILL)
+    ok = abs(x - P.STILL[0]) < 1e-6 and abs(y - P.STILL[1]) < 1e-6 and abs(P.hero_heading(P.T_STILL) - P.STILL[2]) < 1e-9
+    check("P3 : la pose validée à l'image fixe", ok, f"({x:.3f}, {y:.3f}), {P.hero_heading(P.T_STILL):.2f}°")
+    runs = []
+    for k in P.SHOTS:
+        n = 0
+        for f in range(P.F0, P.F0 + P.FRAMES + 1):
+            if P.firing(k, f):
+                n += 1
+            elif n:
+                runs.append(n)
+                n = 0
+    check("P3 : éclairs d'une ou deux images", runs and max(runs) <= 2, f"durées {runs}")
+    check("P3 : éclairs sur l'image fixe", all(P.firing(k, P.STILL_FRAME) for k in P.SHOTS))
+
+
 def test_bars():
     seq = [M.bar_phase(f) for f in range(24)]
     check("rampes : 2 Hz, alternance corail / lilas", seq[:6] == ["corail"] * 6 and seq[6:12] == ["lilas"] * 6
@@ -135,6 +164,7 @@ if __name__ == "__main__":
     test_gaps()
     test_p2()
     test_p4()
+    test_p3()
     test_bars()
     print(f"\n{'tout passe' if not FAIL else str(len(FAIL)) + ' échec(s)'}")
     sys.exit(1 if FAIL else 0)

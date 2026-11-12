@@ -46,6 +46,8 @@ for p in (HERE, LAB):
 
 import scene_a as A          # noqa: E402
 import road                  # noqa: E402
+import motion as MO          # noqa: E402  (MO : M désigne ici les matières de la ville)
+import p3_enseignes as P3    # noqa: E402
 
 ASSETS = A.ASSETS
 BLEND = os.environ.get("FILM3D_BLEND", "scene-b.blend")
@@ -1005,15 +1007,15 @@ def build_barrage(scene, hidden, plan):
         "cone_src": lambda o, c: o.name.startswith("Traffic_Cone_2_2.002"),
         "panel_src": lambda o, c: o.name.startswith(("Vertical_Panel_1.001", "Collar_1.002")),
     }, hidden)
-    # (dans la brèche, juste devant les nez des patrouilles ; les deux du bout un peu en avant des nez)
+    # (dans la brèche, juste devant les nez des patrouilles, trois de chaque côté d'un trou où passe la berline :
+    # p3_enseignes.CONES, en repère monde, ramenés ici au repère de la caméra)
     rng = random.Random(5)
     n = 0
-    for k, (x, y) in enumerate(((-2.0, yb + 3.2), (-1.2, yb + 2.6), (-0.4, yb + 2.6), (0.4, yb + 2.6), (1.2, yb + 2.6),
-                                (2.0, yb + 3.2))):
+    for k, (xw, yw) in enumerate(P3.CONES):
+        x, y = -xw, S_CAM - yw
         src = S.get("cone_lamp_src" if k % 2 else "cone_src")
         if src:
-            A.instance(src, f"cone_{k}", (x + rng.uniform(-0.06, 0.06), y + rng.uniform(-0.12, 0.12), road.road_z(abs(x))),
-                       rng.uniform(0, math.tau))
+            A.instance(src, f"cone_{k}", (x, y, road.road_z(abs(x))), rng.uniform(0, math.tau))
             n += 1
     if S.get("panel_src"):
         for side in (-1, 1):
@@ -1144,6 +1146,71 @@ def to_world(scene):
     bpy.context.view_layer.update()
 
 
+def keep_world_parent(objs, parent):
+    """Parente des objets posés à part (lueurs et faisceaux d'une patrouille) à leur véhicule, leur place gardée."""
+    bpy.context.view_layer.update()
+    for o in objs:
+        mw = o.matrix_world.copy()
+        o.parent = parent
+        o.matrix_parent_inverse = parent.matrix_world.inverted()
+        o.matrix_world = mw
+
+
+def plan_P3(scene):
+    """P3, le barrage, animé (28 images, p3_enseignes.py), en repère monde après to_world : la berline arrive à
+    110 km/h, se tortille en passant la brèche (le nez à 4° vers la caméra à l'image fixe), passe le trou des plots
+    entre les deux agents et frôle l'objectif ; la troisième patrouille suit à 60 m ; les rampes clignotent ; chaque
+    agent tire deux fois, un éclair d'une image (la flamme et sa lumière, liées en lumière comme avant) ; la caméra
+    fixe prend la secousse du passage. L'image fixe (P3.STILL_FRAME) garde le cadre validé."""
+    frames = range(P3.F0 - 1, P3.F0 + P3.FRAMES + 1)        # une image de plus de chaque côté, pour l'obturateur
+    scene.frame_start, scene.frame_end = P3.F0, P3.F0 + P3.FRAMES - 1
+    ob = bpy.data.objects
+    # --- la berline : son rig au sol sous la caisse, tourné de son cap actuel ; la nappe d'appoint et la brume des
+    # phares la suivent
+    body = ob["coupe"]
+    extras = [o for o in (ob.get("hero_fill"), ob.get("haze_lamps")) if o is not None]
+    rig = MO.rig_up(body, P3.STILL[2], name="rig_berline", extras=extras)
+    wheels = [c for c in body.children if c.name.startswith("wheel_")]
+    ys = [Vector(w.location).y for w in wheels]
+    wb, front = (max(ys) - min(ys)), -min(ys)                 # l'avant vers -y dans la caisse
+    poses = MO.sample(P3.hero_pos, frames, heading=P3.hero_heading, wheel_r=body.get("wheel_r", 0.31),
+                      wheelbase=wb, front=front)
+    MO.key_vehicle(rig, poses, wheels=wheels)
+    MO.wheel_marks(wheels, body.get("wheel_r", 0.31))
+    # --- la troisième patrouille, ses deux faisceaux avec elle
+    far = ob["patrol_a_c"]
+    rig_c = MO.rig_up(far, P3.CHASE[2], name="rig_patrol_c",
+                      extras=[o for o in ob if o.name.startswith("beam_c_")])
+    MO.key_vehicle(rig_c, MO.sample(P3.chase_pos, frames, heading=lambda t: P3.CHASE[2], wheel_r=0.36, seed=2.0),
+                   pivot=(0.0, 0.0, 0.36))
+    # --- les rampes : lueurs et faisceaux des deux voitures garées rangés sous elles, puis 2 Hz corail / lilas
+    for tag, car in (("a", ob["patrol_a"]), ("b", ob["patrol_a_b"])):
+        keep_world_parent([o for o in ob if o.name.startswith((f"beam_{tag}_", f"bar_glow_{tag}_"))], car)
+    n_bars = MO.flash_bars([ob["patrol_a"], ob["patrol_a_b"], rig_c], frames)
+    # --- les tirs : flamme (trois maillages) et éclair ponctuel allumés une image, cachés sinon
+    for k in P3.SHOTS:
+        parts = [o for o in ob if o.name.startswith(f"muzzle_flash_{k}_")] + [ob[f"muzzle_{k}"]]
+        for o in parts:
+            for f in frames:
+                o.hide_render = o.hide_viewport = not P3.firing(k, f)
+                o.keyframe_insert("hide_render", frame=f)
+                o.keyframe_insert("hide_viewport", frame=f)
+    # --- la caméra : fixe, puis la secousse
+    MO.key_camera(ob["cam"], frames, P3.camera)
+    scene.render.use_motion_blur = True
+    scene.render.motion_blur_shutter = 0.5
+    scene.frame_set(P3.STILL_FRAME)
+    st = poses[P3.STILL_FRAME - frames[0]]
+    log(f"P3 animé : {P3.FRAMES} images, image fixe {P3.STILL_FRAME} (berline en ({st['x']:.2f}, {st['y']:.2f}), "
+        f"cap {st['heading']:.1f}°) ; {poses[1]['speed'] * 3.6:.0f} puis {poses[-2]['speed'] * 3.6:.0f} km/h, roulis "
+        f"max {max(abs(p['roll']) for p in poses):.1f}°, tangage max {max(abs(p['pitch']) for p in poses):.1f}°, "
+        f"braquage {min(p['steer'] for p in poses):.1f} à {max(p['steer'] for p in poses):.1f}° ; {n_bars} lueurs "
+        f"de rampe ; tirs {P3.SHOTS}")
+
+
+ANIMATE = {"P3": plan_P3}
+
+
 def build():
     bpy.ops.wm.read_factory_settings(use_empty=True)
     scene = bpy.context.scene
@@ -1213,7 +1280,7 @@ def build():
                     nd.inputs["Size"].default_value = 0.75
                 except Exception as e:
                     log(f"halo : {e!r}")
-    scene.render.use_motion_blur = False
+    ANIMATE[PLAN](scene)
 
     out = os.path.join(ASSETS, BLEND)
     bpy.ops.wm.save_as_mainfile(filepath=out, compress=True)
