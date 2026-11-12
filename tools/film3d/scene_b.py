@@ -1253,8 +1253,9 @@ def officer_light(officers, plan, receivers=()):
         o = a.matrix_world.translation.copy()
         out = 1.0 if o.x > 0 else -1.0
         tgt = o + Vector((0.0, 0.0, 1.0))
-        p = o + Vector((out * 0.5, 2.6, 1.7))
-        lo = A.add_light(f"rim_{k}", "SPOT", p, tgt - p, lin("#fff1dc"), 450.0, spot=35)
+        # (derrière lui pour la caméra : -y de vue ; devant, ce serait un aplat de face)
+        p = o + Vector((out * 0.7, -2.6, 2.1))
+        lo = A.add_light(f"rim_{k}", "SPOT", p, tgt - p, lin("#e6ecff"), 380.0, spot=40)
         lo.data.spot_blend = 0.6
         lo.data.shadow_soft_size = 0.15
         lo.visible_glossy = False
@@ -1300,13 +1301,80 @@ def officer_light(officers, plan, receivers=()):
 
 
 def bar_glow(car, tag):
-    """La lueur des deux couleurs de la rampe sur la chaussée mouillée, les portières et la brume autour."""
+    """La lueur des deux couleurs de la rampe sur la chaussée mouillée, les portières et la brume autour (700 W : à
+    350, de dos à 15 m, le sol du barrage restait blanc de guirlandes, rien n'y disait corail ni lilas)."""
     bpy.context.view_layer.update()
     for side, col in ((1, CORAL), (-1, LILAC)):
         lo = A.add_light(f"bar_glow_{tag}_{side}", "POINT", car.matrix_world @ Vector((-0.12, side * 0.5, 2.0)),
-                         (0, 0, -1), lin(col), 350.0)
+                         (0, 0, -1), lin(col), 700.0)
         lo.data.shadow_soft_size = 0.12
         lo.visible_camera = lo.visible_glossy = False
+
+
+def _sphere_mesh(name, mat):
+    me = bpy.data.meshes.new(name)
+    bm = bmesh.new()
+    bmesh.ops.create_icosphere(bm, subdivisions=2, radius=1.0)
+    bm.to_mesh(me)
+    bm.free()
+    me.materials.append(mat)
+    return me
+
+
+def bar_flares(cars, receivers):
+    """Les éclats des rampes, vus de face : à 2,0 d'émission, les lentilles se lisaient de face comme un trait pâle
+    sous la brume. Sur la face avant de chaque lentille, au bout corail et au bout lilas, un éclat émissif (6 : plus,
+    AgX le blanchit ; 20 cm de large, quelques pixels à 35 m) que plan_P3 allume la moitié de la période, en phase
+    avec les lueurs (motion.bar_phase, même décalage que flash_bars). Il n'éclaire que la patrouille, ses portières
+    et les agents : rien sur la berline."""
+    bpy.context.view_layer.update()
+    meshes = {tone: _sphere_mesh(f"bar_flare_{tone}", A.mat_emit(f"bar_flare_{tone}", lin(col), 6.0))
+              for tone, col in (("corail", CORAL), ("lilas", LILAC))}
+    out = []
+    for i, car in enumerate(cars):
+        lens = next((c for c in car.children_recursive if c.type == "MESH" and "lightbar_lenses" in c.name), None)
+        if lens is None:
+            continue
+        inv = car.matrix_world.inverted()
+        pts = [inv @ (lens.matrix_world @ v.co) for v in lens.data.vertices]
+        xf = max(p.x for p in pts)
+        ym = max(abs(p.y) for p in pts)
+        zc = 0.5 * (min(p.z for p in pts) + max(p.z for p in pts))
+        for side, tone in ((1, "corail"), (-1, "lilas")):
+            f = bpy.data.objects.new(f"bar_flare_{i}_{tone}", meshes[tone])
+            bpy.context.scene.collection.objects.link(f)
+            f.parent = car
+            f.location = (xf + 0.02, side * 0.72 * ym, zc)
+            f.scale = (0.04, 0.2, 0.07)
+            f.visible_shadow = False
+            f["bar_index"], f["bar_tone"] = i, tone
+            out.append(f)
+    col = None
+    for f in out:
+        if col is None:
+            col = only_on(f, list(cars) + list(receivers), "bar_flares")
+        else:
+            f.light_linking.receiver_collection = col
+    return out
+
+
+def head_cores(cars):
+    """Les phares des patrouilles, peints dans l'atlas, ne se lisaient pas de face sous les rampes : un cœur
+    émissif chaud (4 : sous le seuil du halo près, une source nette, pas une boule blanche qui mange la calandre)
+    à chaque spot de phare. La berline n'en reçoit rien."""
+    me = _sphere_mesh("patrol_head_core", A.mat_emit("patrol_head_core", lin("#fff0d8"), 4.0))
+    out = []
+    for car in cars:
+        for lo in [c for c in car.children_recursive if c.type == "LIGHT" and "_head_" in c.name]:
+            o = bpy.data.objects.new(f"core_{lo.name}", me)
+            bpy.context.scene.collection.objects.link(o)
+            o.parent = car
+            o.location = car.matrix_world.inverted() @ lo.matrix_world.translation + Vector((0.03, 0.0, 0.0))
+            o.scale = (0.03, 0.09, 0.05)
+            o.visible_shadow = False
+            out.append(o)
+    exclude_hero(out, "coeurs_phares")
+    return out
 
 
 def build_barrage(scene, hidden, plan):
@@ -1369,11 +1437,34 @@ def build_barrage(scene, hidden, plan):
     # les faisceaux : corail #ff6a3d et lilas #8d8cf0, qui balaient façades et chaussée
     # (les taches sur les façades à 25-35 m : plus près, elles tomberaient hors du cadre vertical ; à cette
     # distance, il faut cette puissance pour passer au-dessus des vitrines)
-    patrol_beams(cars[0], "a", [(CORAL, (-7.0, yb + 22.0, 6.0), 150000, 18), (LILAC, (2.0, yb + 30.0, 0.0), 60000, 18)])
-    patrol_beams(cars[1], "b", [(LILAC, (7.0, yb + 18.0, 6.5), 150000, 18), (CORAL, (-2.0, yb + 34.0, 0.0), 60000, 18)])
-    patrol_beams(cars[2], "c", [(CORAL, (-7.0, cy - 6.0, 6.0), 40000, 30), (LILAC, (7.0, cy + 7.0, 5.0), 40000, 30)])
+    beams = patrol_beams(cars[0], "a", [(CORAL, (-7.0, yb + 22.0, 6.0), 150000, 18), (LILAC, (2.0, yb + 30.0, 0.0), 60000, 18)])
+    beams += patrol_beams(cars[1], "b", [(LILAC, (7.0, yb + 18.0, 6.5), 150000, 18), (CORAL, (-2.0, yb + 34.0, 0.0), 60000, 18)])
+    # (la troisième suit derrière la caméra, hors champ : ses faisceaux balaient devant elle les façades autour de la
+    # berline et du barrage, la meute qui pousse se lit sur les murs)
+    beams += patrol_beams(cars[2], "c", [(CORAL, (-7.0, cy - 30.0, 5.5), 50000, 16), (LILAC, (7.0, cy - 40.0, 5.0), 50000, 16)])
+    exclude_hero(beams, "faisceaux")
     bar_glow(cars[0], "a")
     bar_glow(cars[1], "b")
+    # les lueurs colorées près des rampes (celles de bar_glow et celles du modèle, 600 W à 0,4 m de la rampe) : la
+    # berline passe à 1,5 m, elles la teintaient de corail puis de lilas ; la liaison l'en retire comme des faisceaux
+    glows = [o for car in cars[:2] for o in car.children_recursive if o.type == "LIGHT" and "_glow_" in o.name]
+    glows += [o for o in bpy.data.objects if o.type == "LIGHT" and o.name.startswith("bar_glow_")]
+    for sh in shells:
+        for o in hero_objects():
+            if o.name not in sh.objects:
+                sh.objects.link(o)
+        for co in sh.collection_objects:
+            co.light_linking.link_state = "EXCLUDE"
+    exclude_hero([o for o in glows if o.light_linking.receiver_collection is None], "lueurs")
+    # les éclats des rampes et les cœurs des phares, vus de face
+    doors = [c for car in cars[:2] for c in car.children if "_door_" in c.name]
+    bar_flares(cars[:2], doors + officers)
+    head_cores(cars[:2])
+    for car in cars[:2]:
+        for lo in car.children_recursive:
+            if lo.type == "LIGHT" and "_head_" in lo.name:
+                # (de face, à hauteur de capot, leur cône dans la brume faisait la tache blanche de l'image 21)
+                lo.data.volume_factor = 0.1
 
     # la ligne de plots en travers de la brèche, deux panneaux rayés à feu aux bouts, barrières de foule sur les
     # trottoirs (modèles libres, déjà à l'échelle) ; un plot sur deux porte sa balise
@@ -1478,28 +1569,22 @@ def place_hero(scene, plan):
     x, y, yaw = plan["hero"]
     car.location = (x, y, 0.0)
     car.rotation_euler = (0, 0, math.radians(yaw))
-    # des phares de route : plus forts et plus serrés que ceux de l'avenue, ils découpent les agents dans la brume
+    # des phares de route, vus de dos : ils portent vers le barrage, découpent les patrouilles et les agents de plus
+    # en plus fort à mesure qu'elle approche, et prennent corps dans la brume devant elle
+    # (avant le découpage v2, face à la caméra, ils étaient à 400 W : leur reflet sur l'enrobé mouillé voilait le sol)
     spots = [c for c in car.children_recursive if c.type == "LIGHT" and c.data.type == "SPOT"]
-    # les phares sont la source principale du plan : pleins phares dans la brume du barrage, vers la caméra
-    # (1000 W et non 2600 : face à la caméra, à 10 m, leur reflet brillant sur l'enrobé mouillé faisait le voile du
-    # sol de P3, 82 % de sa luminance au bas du cadre et 43 % jusqu'aux plots ; passes diffus / brillant et groupes
-    # fins, lab/lightgroups.py --split)
-    # (400 W et 34° : à 1000 W et 44°, de l'image 17 à l'image 21, ils mangeaient la calandre et blanchissaient
-    # tout le bas du cadre ; ce qu'il en reste suffit à découper les agents)
     for lo in spots:
-        lo.data.energy = 400.0
-        lo.data.spot_size = math.radians(34)
-        # le halo vient des cœurs et de la nappe : dans la brume générale, les faisceaux voileraient le sol
+        lo.data.energy = 900.0
+        lo.data.spot_size = math.radians(40)
         try:
-            lo.data.volume_factor = 0.1
+            lo.data.volume_factor = 0.35
         except AttributeError:
             pass
-        lo.data.spot_blend = 0.45
-    # la carrosserie bordeaux lisible malgré le contre-jour : une nappe douce au-dessus du capot, côté barrage
-    # (la lueur des vitrines et des rampes), invisible à la caméra ; son reflet dessine le capot et les ailes
-    # (150 W d'un blanc à peine chaud : à 1100 W rosé, le bordeaux de la caisse virait au saumon, celui d'OUV et de
-    # P4 le veut sombre ; les vitrines et les rampes suffisent à le dessiner)
-    fill = A.add_light("hero_fill", "AREA", (x, y - 4.5, 4.0), (0.0, 4.5, -3.2), lin("#fff0e6"), 150.0, (2.4, 1.4))
+        lo.data.spot_blend = 0.4
+    # la carrosserie bordeaux lisible de dos : une nappe douce au-dessus et en arrière du coffre (la lueur des
+    # guirlandes), invisible à la caméra, liée à la berline seule ; son reflet dessine le toit, la lunette et le coffre
+    # (150 W d'un blanc à peine chaud : plus fort ou rosé, le bordeaux virait au saumon)
+    fill = A.add_light("hero_fill", "AREA", (x, y + 2.2, 3.6), (0.0, -2.2, -3.6), lin("#fff0e6"), 150.0, (2.4, 1.4))
     fill.visible_camera = False
     only_on(fill, [car], "hero_fill")
     # le cœur des phares, vu de face à 20 m : une petite sphère émissive à la place de chaque lampe (le verre du
@@ -1578,6 +1663,12 @@ def plan_P3(scene):
     for tag, car in (("a", ob["patrol_a"]), ("b", ob["patrol_a_b"])):
         keep_world_parent([o for o in ob if o.name.startswith((f"beam_{tag}_", f"bar_glow_{tag}_"))], car)
     n_bars = MO.flash_bars([ob["patrol_a"], ob["patrol_a_b"], rig_c], frames)
+    # (les éclats de face, en phase avec les lueurs de leur voiture : même période, même décalage que flash_bars)
+    for o in [o for o in ob if o.name.startswith("bar_flare_") and "bar_index" in o]:
+        for f in frames:
+            o.hide_render = o.hide_viewport = MO.bar_phase(f, 12, (o["bar_index"] * 5) % 12) != o["bar_tone"]
+            o.keyframe_insert("hide_render", frame=f)
+            o.keyframe_insert("hide_viewport", frame=f)
     # --- les tirs : flamme (trois maillages) et éclair ponctuel allumés une image, cachés sinon
     for k in P3.SHOTS:
         parts = [o for o in ob if o.name.startswith(f"muzzle_flash_{k}_")] + [ob[f"muzzle_{k}"]]
@@ -1643,9 +1734,9 @@ def build():
     haze("haze_barrage", -6.5, 6.5, 9.0, 34.0, -0.05, 30.0, 0.0015, aniso=0.55)
     # devant la berline, au ras du sol, une nappe plus dense qui diffuse vers l'avant : le halo des phares
     hx, hy = plan["hero"][:2]
-    # (seulement autour des phares, pas jusqu'à la caméra : le sol devant reste un sol mouillé sombre ; 0,003 et
-    # non 0,02 : plus dense, ce halo posait un voile blanc sur la caisse, et le bordeaux devenait rose)
-    haze("haze_lamps", hx - 2.5, hx + 2.5, 10.0, hy + 0.5, -0.05, 2.6, 0.003, aniso=0.65, soft=True)
+    # (devant la berline seulement, elle l'emporte : ses faisceaux y prennent corps vers le barrage ; 0,004 et non
+    # 0,02 : plus dense, ce halo posait un voile blanc sur la caisse, et le bordeaux devenait rose)
+    haze("haze_lamps", hx - 2.5, hx + 2.5, hy - 2.4 - 8.0, hy - 2.0, -0.05, 2.6, 0.004, aniso=0.65, soft=True)
 
     # la caméra du plan
     cam = bpy.data.cameras.new("cam")
