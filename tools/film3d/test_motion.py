@@ -188,7 +188,7 @@ def test_right_turn():
 
 def test_gaps():
     """P5 (découpage v3) : ce que les contrôles v3 ne voient pas : la meute loin derrière, les conteneurs, ce que
-    la berline frôle sans le toucher, la caméra loin des séparateurs, la patrouille 1 qui double la caméra,
+    la berline frôle sans le toucher, la caméra loin des séparateurs, la patrouille 1 dans le cadre,
     l'hélicoptère au-dessus des piles et dans le cadre final (écarts, cadre et vitesses : test_v3)."""
     import p5_virage as P
     check("M.min_gap voit un croisement", M.min_gap({"a": lambda t: (0.0, 10 * t), "b": lambda t: (0.0, 10 - 10 * t)},
@@ -231,12 +231,24 @@ def test_gaps():
     check("P5 : caméra loin des séparateurs, des poteaux et des caisses", d_bar >= 2.0 and d_box >= 0.8,
           f"{d_bar:.1f} m des séparateurs, {d_box:.1f} m des poteaux et des caisses")
     check("P5 : horizon à plat", all(c[5] == 0.0 for c in cams))
-    # la patrouille 1 double la caméra par la gauche entre les images 1 et 12
+    # la patrouille 1 entière dans le cadre, à gauche de la berline, 12 images de suite au moins (PATROL_SEEN) ; elle
+    # s'arrête avant les séparateurs, en travers, et ne recule jamais
+    seen = [f for f in range(P.F0, P.F0 + P.FRAMES) if P.patrol_seen(f)]
+    runs, cur = [], []
+    for f in seen:
+        cur = cur + [f] if cur and f == cur[-1] + 1 else [f]
+        runs.append(cur)
+    run = max(runs, key=len) if runs else []
+    check("P5 : la patrouille 1 entière dans le cadre, à gauche de la berline, 12 images de suite",
+          len(run) >= 12 and (run[0], run[-1]) == P.PATROL_SEEN, f"images {run[0]} à {run[-1]}" if run else "jamais")
     p0 = tr["patrol_0"]
-    passed = [f for f in range(P.F0, P.F0 + P.FRAMES) if p0(M.t_of(f))[1] > P.camera_rail(M.t_of(f))[1]]
-    left = all(p0(M.t_of(f))[0] < P.camera_rail(M.t_of(f))[0] - 2.0 for f in range(P.F0, P.F0 + 14))
-    check("P5 : la patrouille 1 double la caméra par la gauche", passed and P.F0 <= passed[0] <= 12 and left,
-          f"devant elle dès l'image {passed[0] if passed else '—'}")
+    rect = M._rect(p0(M.t_of(P.F0 + P.FRAMES - 1)), P.patrol_heading(M.t_of(P.F0 + P.FRAMES - 1)), M.CAR_DIMS["patrol"])
+    bar = [(P.BARRIER_X[0], P.BARRIER_Y - 0.35), (P.BARRIER_X[1], P.BARRIER_Y - 0.35),
+           (P.BARRIER_X[1], P.BARRIER_Y + 0.35), (P.BARRIER_X[0], P.BARRIER_Y + 0.35)]
+    ys = [p0(M.t_of(f))[1] for f in frames]
+    check("P5 : la patrouille 1 s'arrête avant les séparateurs", M._poly_gap(rect, bar) >= 1.2
+          and P.PATROL.v(M.t_of(P.F0 + P.FRAMES - 1)) < 0.1 and all(b >= a for a, b in zip(ys, ys[1:])),
+          f"{M._poly_gap(rect, bar):.2f} m, cap {P.patrol_heading(M.t_of(P.F0 + P.FRAMES - 1)):.0f}°")
     # le cadre final : l'hélicoptère devant elle, entre x 45 et 65 %, y 68 et 82 % du bas, au-dessus de la berline
     t1 = M.t_of(P.F0 + P.FRAMES - 1)
     hh = P.aircraft()["heli"](t1)
@@ -844,7 +856,8 @@ def _plan_tracks():
            ("P4 berline", P4.hero_pos, {}, range(P4.F0 - 1, P4.F0 + P4.FRAMES + 1)),
            ("P4 fourgon", P4.van_pos, dict(seed=4.0), range(P4.F0 - 1, P4.F0 + P4.FRAMES + 1)),
            ("P5 berline", P5.hero_pos, dict(slip=P5.hero_slip), range(P5.F0 - 1, P5.F0 + P5.FRAMES + 1)),
-           ("P5 meute", P5.pack_pos(0), dict(seed=0.0), range(P5.F0 - 1, P5.F0 + P5.FRAMES + 1)),
+           ("P5 meute", P5.pack_pos(0), dict(seed=0.0, heading=P5.patrol_heading),
+            range(P5.F0 - 1, P5.F0 + P5.FRAMES + 1)),
            ("P6 berline", P6.hero_pos, {}, range(P6.F0 - 1, P6.F0 + P6.FRAMES + 1)),
            ("P6 colonne", P6.column_pos(3), dict(seed=3.0), range(P6.F0 - 1, P6.F0 + P6.FRAMES + 1)),
            ("FIN berline", F.hero_pos, dict(heading=F.hero_heading), range(F.F0 - 1, F.F0 + F.FRAMES + 1))]

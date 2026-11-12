@@ -1288,7 +1288,8 @@ def plan_P5(scene, hidden, palier="conteneurs"):
     """P5, l'hélicoptère fond sur le quai (découpage v3), animé (48 images, p5_virage.py) : la caméra suit la
     berline, 8 m derrière, puis prend le virage plus large et panoramique pour la garder pendant la glisse, 21 mm.
     La berline freine au bout du pont, vire à droite en glisse (contre-braquage, roulis vers l'extérieur) et file
-    sur la voie du quai ; la patrouille 1 double la caméra par la gauche et sort large ; la meute reste sur la
+    sur la voie du quai ; la patrouille 1, devant à gauche, rate le virage et s'arrête en travers devant les
+    séparateurs ; la meute reste sur la
     voie du pont, derrière ; l'hélicoptère plonge sur le quai devant elle, faisceau sur elle. Toutes les clés
     viennent des trajectoires (motion.py) ; le flou de mouvement les suit."""
     import scene_c
@@ -1320,6 +1321,7 @@ def plan_P5(scene, hidden, palier="conteneurs"):
         body = M.body_of(r)
         wh, wr = M.wheels_of(body), body.get("wheel_r", 0.36)
         ps = M.sample(P5.pack_pos(i), FRAMES, wheel_r=wr, seed=float(i),
+                      heading=P5.patrol_heading if i == 0 else None,
                       wheelbase=body.get("wheelbase", 2.9), front=body.get("front_axle"))
         M.key_vehicle(r, ps, wheels=wh, ground=deck_ground, pivot=(0.0, 0.0, 0.36))
         M.wheel_marks(wh, wr, axis="Y")

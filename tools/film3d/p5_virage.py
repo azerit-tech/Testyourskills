@@ -1,8 +1,8 @@
 # Le plan P5 écrit une fois, sans Blender (docs/cinematique-decoupage-v3.md, « P5 — L'hélicoptère fond sur le
 # quai, elle glisse dessous ») : la berline arrive par la voie du pont, freine, vire à droite en glisse et file
 # sur la voie du quai ; la caméra part derrière elle, sur son rail, puis prend un arc plus large à droite et
-# panoramique pour la garder pendant la glisse (le seul mouvement vif du film) ; la patrouille 1 double la caméra
-# par la gauche et rate le virage, large, vers les séparateurs ; l'hélicoptère arrive de l'est au-dessus des
+# panoramique pour la garder pendant la glisse (le seul mouvement vif du film) ; la patrouille 1, devant elle à
+# gauche, freine, rate le virage et s'arrête en travers devant les séparateurs ; l'hélicoptère arrive de l'est des
 # conteneurs et plonge sur le quai devant elle, nez vers elle, faisceau sur elle. scene_e.py n'en lit que les
 # fonctions du temps ; motion.py en tire roues, braquage et transfert de masse.
 #
@@ -18,9 +18,11 @@
 #   son accélération propre monte à 24 m/s² (la berline en prend 22 à 32 dans l'arc) ;
 # - le lacet tourne de 62° (≈ 70) et le panoramique culmine à 47°/s (images 14 à 27 au-dessus de 40) : plus vite,
 #   l'accélération propre et l'écart montaient sans que le cadre y gagne ;
-# - la patrouille 1 double la caméra par la gauche (image 11) mais n'entre pas dans le cadre : à 21 mm, derrière
-#   la berline, la voie de gauche n'y entre qu'à 14 m devant l'objectif ; elle ne s'arrête pas (P6 la reprend
-#   derrière elle) : elle tourne trop tard et sort large, sur la voie nord du quai.
+# - la patrouille 1 ne double pas la caméra (4–12) : à 21 mm, la caméra 7 m derrière la berline, elle n'y serait
+#   entière qu'une seconde après l'avoir doublée, quand le panoramique de la glisse regarde déjà le quai. Elle est
+#   déjà devant, à gauche, sur l'axe du pont (38 km/h, sur les freins) : entière dans le cadre aux images 1 à 12, elle
+#   rate le virage et s'arrête en travers (nez à -50°) à 1,7 m des séparateurs ; la visée garde la berline 2,5 points
+#   plus à droite aux images 6 à 28 pour la laisser au bord gauche.
 import math
 
 import motion as M
@@ -112,37 +114,45 @@ def hero_heading(t, h=1e-3):
     return M.heading_of(x1 - x0, y1 - y0) + hero_slip(t)
 
 
-# --- les poursuivants. La patrouille 1 (indice 0) : voie de gauche du pont (x -2,4), plus vite que la caméra, qui
-# la double par la gauche (images 1 à 11) ; elle voit le virage trop tard, freine, tourne trop tard et sort large,
-# vers les séparateurs, sur la voie nord du quai, où elle repart derrière la berline (P6 la reprend à sa gauche).
-# Elle n'entre pas dans le cadre : à 21 mm, la caméra 8 m derrière la berline et 1 m à sa gauche, la voie de gauche
-# (4,9 m de côté) n'y entre qu'à 14 m devant l'objectif. Le reste de la meute : sur la voie du pont, 30 m derrière
-# la berline au moins, qui freine fort (elle voit l'axe fermé) ; ses phares font l'ombre de la berline.
+# --- les poursuivants. La patrouille 1 (indice 0) est déjà devant, à gauche, au bout du pont : elle a pris la tête
+# pour couper la route à la berline, voit l'axe fermé, freine à fond, ne prend pas le virage (elle tire un peu à
+# droite, le nez qui rentre, l'arrière qui chasse) et s'arrête en travers devant les séparateurs ; la berline glisse
+# à droite derrière elle et s'échappe. Le cadre la montre à gauche de la berline (PATROL_SEEN, 12 images au moins) :
+# à 21 mm, la caméra 7 m derrière la berline, une voiture de la voie de gauche ne tient entière dans le cadre qu'à
+# 15 m au moins devant l'objectif (8 devant la berline) ; une patrouille qui doublerait la caméra n'y serait entière
+# qu'une seconde plus tard, devant les séparateurs, quand le panoramique de la glisse regarde déjà le quai.
+# Le reste de la meute : sur la voie du pont, 30 m derrière la berline au moins, qui freine fort (elle voit l'axe
+# fermé) ; ses phares font l'ombre de la berline.
 PACK_V = 30.0
-PATROL_X, PATROL_Y0, PATROL_V = -2.4, 43.6, 27.0
-PATROL_TURN_Y = 64.1          # elle tourne tard, après le dernier poteau de la chaîne…
-PATROL_R = 11.3               # … et sort sur la voie nord du quai, à l'extérieur de la berline (y 75,4)
-PATROL_C = (PATROL_X + PATROL_R, PATROL_TURN_Y)
-PATROL_BRAKE, PATROL_T_BRAKE = -9.9, (0.04, 0.29)
-PATROL_GO, PATROL_T_GO = 0.6, (0.92, 1.22)    # elle repart sur le quai, derrière la berline (P6 la reprend)
+PATROL_X, PATROL_Y0, PATROL_V = 0.0, 69.0, 10.5    # sur l'axe de la voie du pont, passé la chaîne ; 38 km/h
+PATROL_BRAKE, PATROL_T_BRAKE = -8.2, (-0.1, 0.17)   # déjà sur les freins
+PATROL_DRIFT, PATROL_DRIFT_Y = 0.0, (72.0, 76.0)    # ce qu'elle tire à droite en freinant (m, de y à y)
+PATROL_YAW, PATROL_T_YAW = -50.0, (0.4, 1.07)       # le nez qui rentre à droite, l'arrière qui chasse (degrés, s)
+PATROL_SEEN = (1, 12)                               # les images où elle est entière dans le cadre (test_motion)
 
 
 def _patrol_accel(t):
-    a = PATROL_BRAKE * M.smoothstep(*PATROL_T_BRAKE, t)
-    return a + (PATROL_GO - PATROL_BRAKE) * M.smoothstep(*PATROL_T_GO, t)
+    return PATROL_BRAKE * M.smoothstep(*PATROL_T_BRAKE, t)
 
 
 PATROL = M.Profile(PATROL_V, _patrol_accel, vmin=0.0)
 
 
 def _patrol_route(s):
-    u = s - (PATROL_TURN_Y - PATROL_Y0)
-    if u <= 0:
-        return PATROL_X, PATROL_TURN_Y + u
-    phi = u / PATROL_R
-    if phi > math.pi / 2:
-        return PATROL_C[0] + (u - PATROL_R * math.pi / 2), PATROL_C[1] + PATROL_R
-    return PATROL_C[0] - PATROL_R * math.cos(phi), PATROL_C[1] + PATROL_R * math.sin(phi)
+    y = PATROL_Y0 + s
+    return PATROL_X + PATROL_DRIFT * M.smoothstep(*PATROL_DRIFT_Y, y), y
+
+
+def patrol_heading(t, h=0.05):
+    """Le cap de la patrouille 1 : la tangente de sa route (définie à l'arrêt) plus la glisse."""
+    s = PATROL.s(t)
+    (x0, y0), (x1, y1) = _patrol_route(s - h), _patrol_route(s + h)
+    return M.heading_of(x1 - x0, y1 - y0) + PATROL_YAW * M.smoothstep(*PATROL_T_YAW, t)
+
+
+def tracks_heading():
+    """{nom: cap(t)} des véhicules dont le cap ne suit pas la vitesse (la patrouille 1 s'arrête en travers)."""
+    return {"patrol_0": patrol_heading}
 
 
 def _pack_accel(t):
@@ -253,6 +263,14 @@ PAN_BUMP, PAN_BUMP_FRAMES = 18.3, (7.4, 36.7)
 # et à gauche à la fin) de x 44 à 60 %, de y 49,5 à 49 % du haut : sa boîte au point de coupe, 50/53 puis 56/51
 FRAME_X = (43.8, 59.9)
 FRAME_Y = (49.55, 49.07)      # depuis le haut (la convention des fiches)
+# la visée retient la berline à droite du cadre au début (le panoramique part en retard) : la gauche du cadre montre
+# la patrouille 1 qui file tout droit vers les séparateurs ; montée, palier, retour (images), en points de largeur
+FX_BUMP, FX_BUMP_FRAMES = 2.5, (1.0, 6.0, 6.0, 28.0)
+
+
+def _fx_bump(f):
+    a, b, c, d = FX_BUMP_FRAMES
+    return FX_BUMP * M.smoothstep(a, b, f) * (1.0 - M.smoothstep(c, d, f))
 
 
 def pan_rate(f):
@@ -356,7 +374,7 @@ def camera_aim(t):
     cx, cy, cz = cam_pos(t)
     x, y = hero_pos(t)
     k = M.smoothstep(0.0, T_END, t)
-    fxp = FRAME_X[0] + (FRAME_X[1] - FRAME_X[0]) * k
+    fxp = FRAME_X[0] + (FRAME_X[1] - FRAME_X[0]) * k + _fx_bump(t * M.FPS + F0)
     fyp = 100.0 - (FRAME_Y[0] + (FRAME_Y[1] - FRAME_Y[0]) * k)
     yaw = psi(t) - 180.0 - math.degrees(math.atan((fxp - 50.0) / 50.0 * TAN_H))
     elev = math.degrees(math.atan2(CAR_DIMS[2] / 2 - cz, math.hypot(x - cx, y - cy)))
@@ -411,6 +429,34 @@ def frame_box(pose):
     pts = [q for q in pts if q]
     xs, ys = [q[0] for q in pts], [q[1] for q in pts]
     return min(xs), max(xs), min(ys), max(ys), min(q[2] for q in pts)
+
+
+PATROL_DIMS = (5.0, 1.95, 1.75)          # longueur, largeur, hauteur rampe comprise
+
+
+def patrol_box(t):
+    """La boîte de la patrouille 1 dans le cadre (x0, x1, y0, y1 en %, y depuis le bas) ; None si un coin est
+    derrière l'objectif."""
+    x, y = pack_pos(0)(t)
+    pts = [project(p, t) for p in car_box({"x": x, "y": y, "heading": patrol_heading(t), "t": t}, PATROL_DIMS)]
+    if not all(pts):
+        return None
+    xs, ys = [q[0] for q in pts], [q[1] for q in pts]
+    return min(xs), max(xs), min(ys), max(ys)
+
+
+def patrol_seen(f):
+    """Vrai si la patrouille 1 est entière dans le cadre à l'image f : dans x 1–99 %, y 15–88 % du bas (la zone
+    utile), à gauche de la berline (moins de 8 % de sa boîte sous celle de la berline, plus proche)."""
+    t = M.t_of(f)
+    b = patrol_box(t)
+    if b is None or b[0] < 1.0 or b[1] > 99.0 or b[2] < 15.0 or b[3] > 88.0:
+        return False
+    hx, hy = hero_pos(t)
+    hb = frame_box({"x": hx, "y": hy, "heading": hero_heading(t), "t": t})
+    ox = max(0.0, min(b[1], hb[1]) - max(b[0], hb[0]))
+    oy = max(0.0, min(b[3], hb[3]) - max(b[2], hb[2]))
+    return (b[0] + b[1]) / 2 < (hb[0] + hb[1]) / 2 and ox * oy <= 0.08 * (b[1] - b[0]) * (b[3] - b[2])
 
 
 def behind_angle(t):
@@ -470,11 +516,13 @@ if __name__ == "__main__":
         prev = yaw
         hx = heli(t)
         hp = project((hx[0], hx[1], hx[2] + HELI_BODY), t)
-        pk = project((*pack_pos(0)(t), 0.8), t)
+        pb = patrol_box(t)
+        pk = ((pb[0] + pb[1]) / 2, 0.0) if pb else None
         print(f"{f:2d} berline ({p['x']:5.1f},{p['y']:5.1f}) {HERO.v(t) * 3.6:3.0f} km/h dérive {hero_slip(t):5.1f} | "
               f"cam ({cx:5.1f},{cy:5.1f},{cz:3.1f}) {cam_d(t):4.1f} m lacet {yaw:6.1f} ({rate:5.1f}°/s) site "
               f"{pitch:5.1f} | x {(x0 + x1) / 2:3.0f} y {(y0 + y1) / 2:3.0f} l {x1 - x0:3.0f} à {d:4.1f} m, "
               f"derr. {behind_angle(t):3.0f}° | hélico "
-              + (f"{hp[0]:3.0f},{hp[1]:3.0f}" if hp else "--") + " | pat. " + (f"{pk[0]:4.0f}" if pk else "--"))
+              + (f"{hp[0]:3.0f},{hp[1]:3.0f}" if hp else "--") + " | pat. " + (f"{pk[0]:4.0f}" if pk else "--")
+              + (" entière" if patrol_seen(f) else ""))
     print("écart minimal :", M.min_gap(tracks(), range(F0 - 1, F0 + FRAMES + 1)))
     print(f"entrée de l'arc {T_IN * M.FPS + F0:.1f}, sortie {T_OUT * M.FPS + F0:.1f}")
