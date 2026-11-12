@@ -51,7 +51,6 @@ PATROL_BODY = "#111830" # caisse du fourgon et de l'hélicoptère : marine profo
 PATROL_PAINT = "#222d4c" # la caisse de la patrouille détaillée : le même marine, un cran plus clair, sous un vernis net
                          # (vue de haut sur le mouillé sombre, #111830 se perdait noir sur noir)
 CORAL = "#ff6a3d"       # lentille gauche de la rampe
-LILAC = "#8d8cf0"       # lentille droite de la rampe
 LAMP = "#fff9cb"        # projecteur, phares
 BAR_GLOW = 2.0         # émission de la rampe allumée (au-delà, AgX la blanchit et le corail / violet ne se lit plus)
 JET_GREY = "#3a404d"    # avion repeint, gris bleuté sombre
@@ -824,10 +823,17 @@ def lightbar(collection=None, strength=0.0, width=None):
     return base, lens
 
 
-def lightbar_lights(bar, energy=600.0):
+BAR_LIGHT = 40.0       # la lueur d'une moitié de rampe (point du dessus ; celui de devant aux deux tiers)
+
+
+def lightbar_lights(bar, energy=BAR_LIGHT):
     """La lueur de la rampe sur le toit, le capot et la chaussée mouillée : de chaque côté (corail +y, violet -y)
     un point juste au-dessus du cache et un point juste devant, hors du boîtier (sinon il le masque). Aucune avec
-    FILM3D_BARS=0."""
+    FILM3D_BARS=0.
+
+    Une vraie rampe est une petite lumière : une lueur douce sur la chaussée à 4-6 m, un liseré sur son toit et son
+    capot (à 600 W, elles peignaient la rue comme des lampadaires). Ces points n'ont pas de reflet propre
+    (visible_glossy) : sur le mouillé et les chromes, ce qui se reflète, c'est la lentille."""
     if not bars_on():
         return []
     bpy.context.view_layer.update()
@@ -845,15 +851,17 @@ def lightbar_lights(bar, energy=600.0):
     out = []
     for side, col in ((1, CORAL), (-1, BAR_LILAC)):
         for tag, loc, e in (("top", (0.0, side * 0.36, top + 0.06), 1.0),
-                            ("front", (front + 0.08, side * 0.36, top * 0.5), 0.8)):
+                            ("front", (front + 0.08, side * 0.36, top * 0.5), 0.65)):
             d = bpy.data.lights.new(f"{bar.name}_glow_{tag}_{'L' if side > 0 else 'R'}", "POINT")
             d.energy = energy * e
             d.color = lin(col)[:3]
-            d.shadow_soft_size = 0.12
+            d.shadow_soft_size = 0.25
             ob = bpy.data.objects.new(d.name, d)
             bar.users_collection[0].objects.link(ob)
             ob.parent = bar
             ob.location = loc
+            ob.visible_glossy = False
+            ob.visible_volume_scatter = False
             ob.light_linking.receiver_collection = shell
             out.append(ob)
     bar_drive_lenses(bar, {"corail": out[0].data, "lilas": out[2].data})
@@ -919,7 +927,7 @@ CORAL_CORE = (1.0, 0.075, 0.018, 1.0)
 # luminance du corail (0,265 contre 0,267, Rec. 709 linéaire)
 LILAC_CORE = (0.62, 0.09, 0.95, 1.0)
 BAR_LILAC = "#c27af2"   # la lueur lilas de la rampe, du même violet rosé (motion._tone la lit toujours « lilas »)
-BAR_CORE = 2.2        # cœur d'un module allumé : × la force de la rampe (BAR_GLOW 2 -> 4,4)
+BAR_CORE = 0.9        # cœur d'un module allumé : × la force de la rampe (BAR_GLOW 2 -> 1,8 ; à 4,4 il virait au blanc)
 BAR_DIFFUSE = 0.09    # le reste du diffuseur allumé, relatif au cœur
 BAR_REST = 0.03       # une moitié éteinte garde un reste de lueur (le diffuseur chauffé)
 
@@ -1926,7 +1934,7 @@ def _load_patrol_classic(collection=None, lights_on=False):
     body = join(parts, "patrol_ref")
     if lights_on and bars_on():
         # deux points corail / violet au-dessus de la rampe (x -0,26, z 1,5 dans le repère du fichier)
-        for side, col in ((1, CORAL), (-1, LILAC)):
+        for side, col in ((1, CORAL), (-1, BAR_LILAC)):
             d = bpy.data.lights.new(f"patrol_glow_{side}", "POINT")
             d.energy = 60.0
             d.color = lin(col)[:3]

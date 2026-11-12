@@ -3,6 +3,7 @@
 #   blender -b --factory-startup -P tools/film3d/lab/cast_bench.py -- --veh patrol --light ambre --tag avant
 #
 # --veh patrol | patrol_open | van | heli | jet   (patrol_open : les deux portières avant ouvertes)
+#       poursuite                                  (le cadre de poursuite : berline et patrouille 1, vues chasse)
 # --light ambre | neon                             (lampadaires ambre ; néons corail et lilas)
 # --views face,tq_front,flank,tq_rear,bar,wheel,... (voir VIEWS ; par défaut celles du véhicule)
 # --bar on | off                                    (rampe allumée ou éteinte)
@@ -233,7 +234,7 @@ def load(veh, bar_on=True):
         # celui des rampes (cast_vehicles.BAR_LILAC) ; chacun un tube émissif et sa lumière sur le mouillé
         root = bpy.data.objects.new("violets", None)
         bpy.context.scene.collection.objects.link(root)
-        for name, x, col in (("palette", -1.3, cv.LILAC), ("rampes", 1.3, cv.BAR_LILAC)):
+        for name, x, col in (("palette", -1.3, LILAC), ("rampes", 1.3, cv.BAR_LILAC)):
             ob = _light(f"violet_{name}", "AREA", (x, 2.0, 2.2), (x, 2.0, 0.0), col, 600.0, size=1.6, size_y=0.2)
             ob.data.spread = math.radians(120)
             bpy.ops.mesh.primitive_cylinder_add(radius=0.045, depth=1.6, location=(x, 2.0, 2.25),
@@ -241,6 +242,14 @@ def load(veh, bar_on=True):
             tube = bpy.context.active_object
             tube.name = f"violet_{name}_tube"
             tube.data.materials.append(cv.mat_emit(f"violet_{name}_tube", col, 8.0))
+    elif veh == "poursuite":
+        # le cadre de poursuite v3.1 : la berline à l'origine, l'avant vers +y, la patrouille 1 à sa gauche, un peu
+        # en retrait (son coin arrière droit à 5 m de l'objectif) ; caméra « chasse » (views)
+        root = L.hero()
+        L.put(root, 0, 0, 0, 0)
+        p1 = L.patrol("patrol_1")
+        L.put(p1, -3.2, -1.2, 0, 0)
+        MEUTE[:] = [p1]
     elif veh in ("meute", "meute_partage"):
         # trois patrouilles de front : meute par lieux.clone (chacune ses lumières, elles battent en désordre),
         # meute_partage par clone_partage (lumières partagées, elles battent ensemble)
@@ -282,6 +291,13 @@ def views(veh, root):
     mn, mx = extent(root)
     c = (mn + mx) / 2
     L, W, H = mx.y - mn.y, mx.x - mn.x, mx.z - mn.z
+    if veh == "poursuite":
+        # 2,4 m de haut, 7,5 m derrière la berline, plongée de 12°, 24 mm ; « chasse_g » : la patrouille plus près
+        pitch = math.radians(12)
+        aim = Vector((0.0, math.cos(pitch), -math.sin(pitch))) * 10
+        cam = Vector((0.0, -7.5, 2.4))
+        return {"chasse": (tuple(cam), cam + aim, 24.0),
+                "chasse_g": (tuple(cam + Vector((-1.2, 1.5, 0))), cam + Vector((-1.2, 1.5, 0)) + aim, 24.0)}
     if veh == "violets":
         return {"cote_a_cote": ((0.0, -3.0, 0.6), Vector((0.0, 2.0, 1.4)), 24.0)}
     if veh in ("meute", "meute_partage"):
@@ -391,7 +407,7 @@ def run(a):
     root = load(a.veh, bar_on=(a.bar == "on"))
     if a.veh in ("patrol", "patrol_open", "van") and a.bar == "on":
         M.flash_bars([root], range(1, 25))
-    if a.veh in ("meute", "meute_partage") and a.bar == "on":
+    if a.veh in ("meute", "meute_partage", "poursuite") and a.bar == "on":
         M.flash_bars(MEUTE, range(1, 25))
     if a.veh in ("heli", "heli_bas"):
         scene.render.use_motion_blur = True        # le disque des rotors (pilotes sur l'image)

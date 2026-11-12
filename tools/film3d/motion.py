@@ -3073,7 +3073,31 @@ def flash_bars(roots, frames, period=12, low=0.06):
                 for kp in fc.keyframe_points:
                     kp.interpolation = "CONSTANT"
             n += 1
+    bars_spare_car()
     return n
+
+
+def bars_spare_car(name="coupe"):
+    """Les lueurs des rampes n'éclairent pas les vitres de la berline (lumière v3.1) : ses vitres (propriété
+    « vitre ») entrent dans chaque collection « _glow_exclude » (celle que cast_vehicles.lightbar_lights donne à ses
+    lueurs, partagée par les copies). La caisse garde le lavis discret d'une patrouille proche, ses chromes le filet
+    des lentilles."""
+    import bpy
+    car = bpy.data.objects.get(name)
+    if car is None:
+        return 0
+    objs = [o for o in [car, *car.children_recursive] if o.get("vitre")]
+    k = 0
+    for col in bpy.data.collections:
+        if not col.name.endswith("_glow_exclude"):
+            continue
+        for o in objs:
+            if o.name not in col.objects:
+                col.objects.link(o)
+                k += 1
+        for co in col.collection_objects:
+            co.light_linking.link_state = "EXCLUDE"
+    return k
 
 
 def fcurves(idblock):
