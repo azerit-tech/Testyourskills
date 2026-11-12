@@ -427,6 +427,8 @@ def mat_lenses(name="lightbar_lenses", strength=0.0, split_axis=1, per_m=0.0):
     ecol.inputs[6].default_value = (0, 0, 0, 1)
     nt.links.new(mix.outputs[2], ecol.inputs[7])
     nt.links.new(ecol.outputs[2], p.inputs["Emission Color"])
+    if strength > 0:
+        _bar_aov(nt, ecol.outputs[2], strength)
     nt.links.new(p.outputs[0], out.inputs[0])
     return m
 
@@ -995,6 +997,29 @@ def _bar_modules(nt, sep, zc, zh, per_m=8.5):
     return core, _math(nt, "MAXIMUM", _math(nt, "SUBTRACT", dish, core), 0.0), ramp(cell, 0.12, 0.24)
 
 
+BAR_AOV = "rampe"     # la passe des lentilles allumées : halo.halo n'y pose son halo qu'à elles
+
+
+def _bar_aov(nt, color, scale, mask=None):
+    """L'émission des lentilles (couleur × `scale`, × `mask` s'il est donné) écrite dans la passe BAR_AOV : vue de la
+    caméra seulement (ni reflet ni lumière), c'est d'elle que le compositing tire l'éclat des rampes."""
+    v = nt.nodes.new("ShaderNodeVectorMath")
+    v.operation = "SCALE"
+    nt.links.new(color, v.inputs[0])
+    v.inputs["Scale"].default_value = scale
+    out = v.outputs[0]
+    if mask is not None:
+        w = nt.nodes.new("ShaderNodeVectorMath")
+        w.operation = "SCALE"
+        nt.links.new(out, w.inputs[0])
+        nt.links.new(mask, w.inputs["Scale"])
+        out = w.outputs[0]
+    aov = nt.nodes.new("ShaderNodeOutputAOV")
+    aov.aov_name = BAR_AOV
+    nt.links.new(out, aov.inputs["Color"])
+    return aov
+
+
 def mat_bar_retint(src, name, strength=0.0, zc=0.06, zh=0.12):
     """Rampe détaillée : le boîtier garde sa texture (sombre) ; toutes ses optiques (caches clairs et caches
     rouges / bleus de la texture d'origine) deviennent des diffuseurs clairs, fumés, sur des réflecteurs chromés :
@@ -1094,6 +1119,7 @@ def mat_bar_retint(src, name, strength=0.0, zc=0.06, zh=0.12):
         em = nt.nodes.new("ShaderNodeEmission")
         nt.links.new(ecol.outputs[2], em.inputs["Color"])
         em.inputs["Strength"].default_value = strength * BAR_CORE
+        _bar_aov(nt, ecol.outputs[2], strength * BAR_CORE, optic)
         add = nt.nodes.new("ShaderNodeAddShader")
         nt.links.new(lens.outputs[0], add.inputs[0])
         nt.links.new(em.outputs[0], add.inputs[1])
