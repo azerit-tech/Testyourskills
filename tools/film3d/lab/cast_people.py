@@ -1590,7 +1590,11 @@ def _spp_part(ob):
 def _smooth_mesh(ob, weld=True, subsurf=0):
     """Plus de facettes : sommets confondus soudés (les coutures d'UV restent dans les UV), normales
     recalculées lisses (les normales importées sont celles des faces sur certains modèles), et une subdivision
-    légère après l'armature (les silhouettes arrondies ; la pose ne change pas, elle déforme la cage)."""
+    légère appliquée à la maille au repos, avant l'armature (les silhouettes arrondies). Posée après l'armature,
+    elle était recalculée à chaque image : environ 4,5 s de processeur par image de P3 pour treize personnages,
+    le premier poste de la préparation de Cycles ; appliquée au repos, l'armature déforme la maille déjà lissée,
+    la même silhouette à coût quasi nul. Les modificateurs d'avant (l'épaisseur du gilet) sont appliqués au repos
+    avec elle. Une maille à clés de forme garde l'ancienne pile (rien à appliquer sans les perdre)."""
     if weld:
         bm_ = bmesh.new()
         bm_.from_mesh(ob.data)
@@ -1608,6 +1612,21 @@ def _smooth_mesh(ob, weld=True, subsurf=0):
         md.levels = md.render_levels = subsurf
         md.quality = 2
         md.uv_smooth = "PRESERVE_BOUNDARIES"
+        if ob.data.shape_keys is None:
+            _apply_at_rest(ob)
+
+
+def _apply_at_rest(ob):
+    """Applique à la maille au repos tous les modificateurs autres que l'armature, dans leur ordre (ils passent
+    devant elle, puis sont appliqués) : l'armature déforme ensuite la maille finale. La pondération des sommets
+    ajoutés par la subdivision est interpolée par Blender."""
+    if ob.data.users > 1:
+        ob.data = ob.data.copy()
+    rest = [m.name for m in ob.modifiers if m.type != "ARMATURE"]
+    with bpy.context.temp_override(object=ob, active_object=ob, selected_objects=[ob]):
+        for name in rest:
+            bpy.ops.object.modifier_move_to_index(modifier=name, index=0)
+            bpy.ops.object.modifier_apply(modifier=name)
 
 
 def _add_vest(arm, meshes, lift=0.02, thick=0.012, bands=((0.32, 0.045), (0.64, 0.045))):
