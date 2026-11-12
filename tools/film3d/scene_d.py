@@ -693,6 +693,67 @@ def aim_helis(helis, target, energy=400000.0, car=None, car_energy=None, cone=No
         piv.matrix_world = Matrix.Translation(p) @ d.to_track_quat("-Z", "Y").to_matrix().to_4x4()
 
 
+def beam_cones(helis, target, strength=1.2, color="#e2eaff", seg=32):
+    """Le faisceau visible des projecteurs d'hélicoptère en géométrie émissive : un cône ouvert, du projecteur sur
+    `length` m le long de sa visée, à l'ouverture du spot, enfant du pivot (il suit la visée). Il ne se voit que de
+    la caméra (ni ombre, ni reflet diffus, ni lumière : échantillonnage d'émission coupé) ; plus clair au cœur
+    qu'aux bords (le facteur de face), qui s'éteint en s'éloignant du projecteur. Les spots, eux, n'éclairent plus
+    la brume (visible_volume_scatter coupé) : un spot ponctuel qui éclaire une brume laissait un grain fin dans le
+    faisceau à 256 échantillons (FIN6, trois faisceaux). Le cône va jusqu'à la cible `target` (et 4 % au-delà, dans
+    le sol). Renvoie les cônes."""
+    bpy.context.view_layer.update()
+    m, N, out = S.material("faisceau_cone")
+    m.cycles.emission_sampling = "NONE"
+    if hasattr(m, "surface_render_method"):
+        m.surface_render_method = "BLENDED"
+    lw = N.new("ShaderNodeLayerWeight", Blend=0.5)
+    core = N.math("POWER", N.math("SUBTRACT", 1.0, lw.outputs["Facing"], clamp=True), 2.2)
+    co = N.new("ShaderNodeTexCoord").outputs["Object"]
+    _, _, z = N.sep(co)
+    length = N.new("ShaderNodeAttribute", _attribute_type="OBJECT", _attribute_name="faisceau_long").outputs["Fac"]
+    d = N.math("DIVIDE", N.math("MULTIPLY", z, -1.0), length)               # 0 au projecteur, 1 au bout
+    along = N.math("MULTIPLY", N.math("POWER", N.math("SUBTRACT", 1.0, d, clamp=True), 0.8),
+                   road.smooth(N, d, 0.0, 0.04))
+    k = N.math("MULTIPLY", N.math("MULTIPLY", core, along), strength)
+    em = N.new("ShaderNodeEmission", Color=L.lin(color))
+    N.link(k, em.inputs["Strength"])
+    tr = N.new("ShaderNodeBsdfTransparent")
+    add = N.new("ShaderNodeAddShader")
+    N.link(tr.outputs[0], add.inputs[0])
+    N.link(em.outputs[0], add.inputs[1])
+    N.link(add.outputs[0], out.inputs["Surface"])
+    cones = []
+    for r in helis:
+        for o in r.children_recursive:
+            if o.type != "LIGHT" or not o.name.endswith("searchlight_spot") or not o.visible_camera:
+                continue
+            o.visible_volume_scatter = False
+            half = o.data.spot_size / 2
+            length = (Vector(target) - o.matrix_world.translation).length * 1.04
+            bm = L.bmesh.new()
+            rad = length * math.tan(half)
+            ring0 = [bm.verts.new((0.03 * math.cos(a), 0.03 * math.sin(a), 0.0))
+                     for a in (i * math.tau / seg for i in range(seg))]
+            ring1 = [bm.verts.new((rad * math.cos(a), rad * math.sin(a), -length))
+                     for a in (i * math.tau / seg for i in range(seg))]
+            for i in range(seg):
+                j = (i + 1) % seg
+                bm.faces.new((ring0[i], ring0[j], ring1[j], ring1[i])).smooth = True
+            ob = L.mesh_object(f"{r.name}_faisceau", bm, [m], smooth=True)
+            ob.parent = o.parent
+            ob.matrix_parent_inverse = o.matrix_parent_inverse.copy()
+            ob.location = o.location.copy()
+            ob.rotation_mode = o.rotation_mode
+            ob.rotation_euler = o.rotation_euler.copy()
+            ob.visible_shadow = False
+            ob.visible_diffuse = False
+            ob.visible_transmission = False
+            ob.visible_volume_scatter = False
+            ob["faisceau_long"] = length
+            cones.append(ob)
+    return cones
+
+
 HERO_STOP = 25.0      # le cap de la berline arrêtée : le travers à gauche, trois quarts face pour FIN
 
 
@@ -914,6 +975,9 @@ def plan_FIN6(scene, hidden, palier="socle"):
     # des cônes de 6° comme dans FIN : à 9°, les trois faisceaux emplissaient la brume autour de la berline d'un
     # voile clair qui la passait au rose (la brume n'obéit pas à la liaison de lumière)
     aim_helis(hs, STOP + Vector((0, 0, 0.8)), car=hero, car_energy=15000.0, cone=6.0)
+    # le faisceau visible en géométrie émissive : le spot dans la brume sortait en grain marbré à 256 échantillons
+    # (720 × 1280, image 56 : 80 s par image avec le spot, 79 s avec le cône, net) ; le spot éclaire toujours
+    beam_cones(hs, STOP + Vector((0, 0, 0.8)))
     # le lampadaire de la pointe, ambre à 3,2 kW à 8 m de la berline, la sortait rose avec le faisceau : il garde sa
     # pleine puissance pour le sol et la brume, la berline n'en reçoit que la part de FIN (1300 W, crème)
     split_for_car([bpy.data.objects["lamp_pointe_light"]], hero, 1300.0, "#ffe2c2", tag="lampadaire")
@@ -924,11 +988,17 @@ def plan_FIN6(scene, hidden, palier="socle"):
         L.put(j2, CX + 12.0, CY - 190.0, 62.0, heading=-8.0, pitch=-3.0, roll=18.0)
     except Exception as e:
         print(f"[pointe] avions non chargés : {e!r}", flush=True)
-    L.smoke("fumee_gelee", (CX + 0.8, CY - 2.6, 0.5), (3.0, 3.5, 0.8), density=0.16, seed=2.0)
-    L.haze((CX - 90, CX + 90), (CY - 470, CY + 90), (L.WATER_Z, 60), 0.0005)
+    # plus de fumée gelée derrière la berline : prise dans les faisceaux, elle sortait en nuage de grains au départ
+    # de l'orbite (256 échantillons, 12 nov.) ; la vapeur des pneus est l'affaire de fx.py
+    hz = [L.haze((CX - 90, CX + 90), (CY - 470, CY + 90), (L.WATER_Z, 60), 0.0005)]
     # la nappe de la pointe à 0,0025 comme dans FIN : à 0,004, prise par les trois faisceaux, elle voilait la
     # berline de rose depuis l'objectif
-    L.haze((CX - 35, CX + 35), (CY - 35, CY + 35), (L.WATER_Z, 40), 0.0025, name="haze_pointe")
+    hz.append(L.haze((CX - 35, CX + 35), (CY - 35, CY + 35), (L.WATER_Z, 40), 0.0025, name="haze_pointe"))
+    # la brume ne se reflète plus dans la peinture : vue de trois quarts arrière (image 1), le flanc renvoyait la
+    # brume éclairée par les faisceaux derrière la caméra, gris mauve (84, 72, 90) au lieu de bordeaux (43, 21, 32
+    # sans), et ce reflet sortait en marbrure ; la brume vue de face ne change pas
+    for h in hz:
+        h.visible_glossy = False
     a = 95.0                                          # le milieu de l'arc de 150° (de 20° à 170°)
     cam_loc = (*_polar(a, 7.0), 0.25)
     L.cap_images(1024, keep_objects=[hero, bpy.data.objects["pointe_sol"]])
