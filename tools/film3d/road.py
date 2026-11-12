@@ -84,14 +84,16 @@ def road_z(x):
 
 # ---------------------------------------------------------------- petits outils de nœuds
 
-def coords(N):
-    """Coordonnées d'objet (alignées sur la rue, même tournée de 90°) + la position de l'objet."""
+def coords(N, uv=False):
+    """Coordonnées d'objet (alignées sur la rue, même tournée de 90°) + la position de l'objet. uv : les
+    coordonnées viennent de la carte UV, en mètres (u en travers de la chaussée, v le long) : une chaussée courbe,
+    l'anneau d'un rond-point, garde ainsi ses voies, ses tirets et ses traces de roues."""
     tc = N.new("ShaderNodeTexCoord")
     oi = N.new("ShaderNodeObjectInfo")
     v = N.new("ShaderNodeVectorMath", _operation="ADD")
-    N.link(tc.outputs["Object"], v.inputs[0])
+    N.link(tc.outputs["UV" if uv else "Object"], v.inputs[0])
     N.link(oi.outputs["Location"], v.inputs[1])
-    return v.outputs[0], tc.outputs["Object"]
+    return v.outputs[0], tc.outputs["UV" if uv else "Object"]
 
 
 def smooth(N, v, a, b):
@@ -253,12 +255,12 @@ def paint_colour(N, P):
     return N.mix(1.0, (0.50, 0.49, 0.45, 1), grey(N, dirt), "MULTIPLY")
 
 
-def mat_asphalt(st, name, force_patch=False, layout=None):
+def mat_asphalt(st, name, force_patch=False, layout=None, uv=False):
     """L'enrobé mouillé. force_patch : le carré refait autour d'une plaque, lu dans le monde. layout : le plan des
-    voies (AVENUE par défaut, sinon lane_layout())."""
+    voies (AVENUE par défaut, sinon lane_layout()). uv : coordonnées de la carte UV en mètres (voir coords)."""
     lay = dict(AVENUE, **(layout or {}))
     m, N, out = S.material(name)
-    P, O = coords(N)
+    P, O = coords(N, uv)
     ox, oy, _ = N.sep(O)
     lx, ly, _ = N.sep(P) if force_patch else (ox, oy, None)
     ax = N.math("ABSOLUTE", lx)
@@ -407,9 +409,10 @@ def mat_paint_decal(st, name="road_paint"):
 
 # ---------------------------------------------------------------- cunette, bordure, trottoir
 
-def mat_gutter_pan(st, name="gutter_pan"):
+def mat_gutter_pan(st, name="gutter_pan", uv=False):
+    # uv : coordonnées de la carte UV en mètres (voir coords), pour une cunette courbe
     m, N, out = S.material(name)
-    P, O = coords(N)
+    P, O = coords(N, uv)
     ox, oy, _ = N.sep(O)
     ax = N.math("ABSOLUTE", ox)
     uv = mapping(N, P, scale=(0.5, 0.5, 0.5))
