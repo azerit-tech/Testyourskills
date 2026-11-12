@@ -160,15 +160,20 @@ class Poses(list):
 
 
 def sample(pos, frames=range(0, 30), slip=None, heading=None, wheel_r=0.33, wheelbase=2.9, front=None, f0=F0,
-           fps=FPS, noise=1.0, seed=0.0, warmup=0.6, roll_per_g=ROLL_PER_G, pitch_per_g=PITCH_PER_G, chassis=None):
-    """Les poses d'un véhicule image par image.
+           fps=FPS, noise=1.0, seed=0.0, warmup=0.6, roll_per_g=ROLL_PER_G, pitch_per_g=PITCH_PER_G, chassis=None,
+           steer=None):
+    """Les poses d'un véhicule image par image. steer(t) : le braquage des roues avant à imposer (Drive.steer : le
+    contre-braquage de drive()) ; sinon celui de la géométrie.
 
     Dynamique active (dyn_on) : la caisse selon le réglage `chassis` (CHASSIS, la berline par défaut ;
     key_vehicle le refait selon le véhicule) ; x, y, cap, vitesse, roues et braquage sont ceux d'avant.
     roll_per_g et pitch_per_g ne servent qu'aux clés d'avant (FILM3D_DYN=0)."""
     if not dyn_on():
-        return _sample_legacy(pos, frames, slip, heading, wheel_r, wheelbase, front, f0, fps, noise, seed, warmup,
-                              roll_per_g, pitch_per_g)
+        out = _sample_legacy(pos, frames, slip, heading, wheel_r, wheelbase, front, f0, fps, noise, seed, warmup,
+                             roll_per_g, pitch_per_g)
+        for p in out if steer else ():
+            p["steer"] = steer(p["t"])
+        return out
     front = wheelbase / 2 if front is None else front
     frames = list(frames)
     t_first, t_last = t_of(frames[0], f0, fps), t_of(frames[-1], f0, fps)
@@ -217,7 +222,8 @@ def sample(pos, frames=range(0, 30), slip=None, heading=None, wheel_r=0.33, whee
         hist.append((base_step + i, t, p[0], p[1], head, travel, speed, a_long, a_lat, curv, dist, steer_t))
     out = Poses()
     out.hist = hist
-    out.meta = dict(want=want, dt=dt, seed=seed, wheel_r=wheel_r, wheelbase=wheelbase, front=front, noise=noise)
+    out.meta = dict(want=want, dt=dt, seed=seed, wheel_r=wheel_r, wheelbase=wheelbase, front=front, noise=noise,
+                    steer_fn=steer)
     for (k, t, x, y, head, travel, speed, a_long, a_lat, curv, dist, steer) in hist:
         if k in want:
             out.append(dict(frame=want[k], t=t, x=x, y=y, heading=head, travel=travel, speed=speed, a_long=a_long,
@@ -392,6 +398,8 @@ def rebody(poses, chassis="hero", ground=None, corners=None, joints=None, seed=N
         # délestées : l'anti-plongée et le cabrage d'un essieu arrière brisé), sans détendre aucun ressort de plus
         # que `ext` ; ce qui reste au-delà est réduit en douceur.
         fit_arches(ps, corners, [0.8 * a for a in arch_of(c, corners)], c["ext"])
+        if meta.get("steer_fn"):
+            ps["steer"] = meta["steer_fn"](ps["t"])
     poses.meta = dict(meta, chassis=kind, corners=corners)
     return poses
 
@@ -562,6 +570,379 @@ def min_gap(tracks, frames=range(0, 30), f0=F0, fps=FPS):
                 if d < best[0]:
                     best = (d, f, a, b)
     return best
+
+
+# ---------------------------------------------------------------- v3.1 : la conduite (une route, une vitesse voulue)
+#
+# Au lieu de régler la glisse à la main : drive() prend une route (morceaux droits et arcs, ou des points) et la
+# vitesse voulue, et rend une conduite qui tient les limites d'une voiture lourde sur le mouillé (test_motion :
+# CAR31_*, SLIP31_*). La courbure est rendue continue (entrées et sorties progressives, deux moyennes glissantes :
+# une clothoïde adoucie), la vitesse rabotée là où le cercle d'adhérence l'exige (on freine avant le virage, on
+# remet les gaz en sortie), l'accélération installée sans à-coup ; la glisse de l'arrière naît du dépassement
+# d'adhérence (accélération combinée au-delà de 5,5 m/s²), s'installe et se résorbe à vitesse bornée, avec un seul
+# petit retour, freine la voiture ; les roues avant contre-braquent (modèle bicyclette). Lisse et plausible, pas
+# exact. Exemple (vue de dessus : python3 tools/film3d/diag/conduite_demo.py) :
+#
+#   d = M.drive(dict(start=(0.0, 0.0, 0.0), pieces=[M.line(40), M.arc(28, 90), M.line(40)]), speed=19.0)
+#   poses = M.sample(d.pos, frames, heading=d.heading)        # position et cap de la caisse (glisse comprise)
+#   for a, b in d.brake_windows(): hero_cars.stop_lamps(body, a, b)    # après la mise en clés
+
+DRIVE = dict(lat=6.5, brake=7.0, acc=3.0, circle=7.5, jerk=12.0,   # les limites (CAR31_HERO)
+             margin=0.92,                 # la part des limites visée (le lissage en mange un peu)
+             grip=5.5,                    # m/s² combinés : au-delà, l'arrière glisse
+             slip_per=8.0,                # ° de glisse par m/s² au-delà de grip
+             slip_max=16.0,               # ° (18 au plus)
+             slip_on=36.0, slip_off=27.0,  # °/s (40 et 30 au plus)
+             slip_acc=70.0,               # °/s², pour que le lacet de la caisse reste sous 120 °/s²
+             slip_hold=0.7,               # s : le dépassement d'adhérence retombe lentement (une seule glisse)
+             slip_back=2.5, slip_back_s=0.45,   # le petit retour de l'autre côté (°, 4 au plus ; s), une fois
+             counter=0.9,                 # en glisse, les roues avant braquées vers l'extérieur : -0,9 × la glisse
+             slip_hz=0.9, slip_zeta=0.62,  # la réponse de l'arrière : un seul petit retour (moins de 4°)
+             slip_drag=0.22,              # m/s² de freinage par degré de glisse (la vitesse baisse en glissant)
+             front=1.45)                  # m du centre à l'essieu avant (braquage)
+DRIVE_KINDS = {"hero": DRIVE, "patrol": dict(DRIVE, lat=7.0, acc=4.0), "van": dict(DRIVE, lat=7.0, acc=4.0)}
+
+
+def line(length):
+    """Un morceau droit de route pour drive() : (longueur m, courbure)."""
+    return (float(length), 0.0)
+
+
+def arc(radius, angle):
+    """Un arc de route pour drive() : rayon (m), angle (°, positif : à gauche)."""
+    return (abs(radius * math.radians(angle)), math.copysign(1.0 / radius, angle))
+
+
+def _box(vals, n):
+    """Moyenne glissante sur n échantillons (impair), les bords prolongés."""
+    h = max(0, int(n) // 2)
+    if h == 0:
+        return list(vals)
+    pad = [vals[0]] * h + list(vals) + [vals[-1]] * h
+    pre = [0.0]
+    for v in pad:
+        pre.append(pre[-1] + v)
+    w = 2 * h + 1
+    return [(pre[i + w] - pre[i]) / w for i in range(len(vals))]
+
+
+def _lerp_tab(xs, ys, x):
+    """Interpolation linéaire dans une table à pas constant (xs[0], pas xs[1] - xs[0]), bornée aux extrémités."""
+    step = xs[1] - xs[0]
+    u = (x - xs[0]) / step
+    k = max(0, min(len(xs) - 2, int(math.floor(u))))
+    f = max(0.0, min(1.0, u - k))
+    return ys[k] + (ys[k + 1] - ys[k]) * f
+
+
+class Route:
+    """Une route à courbure continue, en abscisse curviligne : x, y, cap (°, convention de lieux.put) et courbure
+    (1/m, positive à gauche) tous les ds m ; au-delà des bouts, la droite qui la prolonge."""
+
+    def __init__(self, x0, y0, h0, kappa, ds):
+        self.ds, self.k = ds, kappa
+        self.s = [i * ds for i in range(len(kappa))]
+        th, x, y = math.radians(h0), x0, y0
+        self.x, self.y, self.h = [x], [y], [h0]
+        for i in range(1, len(kappa)):
+            km = 0.5 * (kappa[i - 1] + kappa[i])
+            tm = th + km * ds / 2
+            x += -math.sin(tm) * ds
+            y += math.cos(tm) * ds
+            th += km * ds
+            self.x.append(x)
+            self.y.append(y)
+            self.h.append(math.degrees(th))
+        self.length = self.s[-1]
+
+    def at(self, s):
+        """(x, y, cap, courbure) à l'abscisse s."""
+        for end, i in ((0.0, 0), (self.length, -1)):
+            if (s < 0.0 and i == 0) or (s > self.length and i == -1):
+                h = math.radians(self.h[i])
+                return self.x[i] - math.sin(h) * (s - end), self.y[i] + math.cos(h) * (s - end), self.h[i], 0.0
+        return (_lerp_tab(self.s, self.x, s), _lerp_tab(self.s, self.y, s), _lerp_tab(self.s, self.h, s),
+                _lerp_tab(self.s, self.k, s))
+
+
+def make_route(route, ease, ds=0.1):
+    """Route depuis dict(start=(x, y, cap), pieces=[line(…), arc(…), …]) ou une liste de points [(x, y), …] (lissés,
+    rééchantillonnés, puis leur courbure intégrée depuis le premier point : la route suit leurs virages, à
+    quelques décimètres près). ease : la longueur (m) de chacune des deux moyennes glissantes de la courbure."""
+    if isinstance(route, Route):
+        return route
+    if isinstance(route, dict):
+        x0, y0, h0 = route["start"]
+        raw = []
+        for length, k in route["pieces"]:
+            raw += [k] * max(1, int(round(length / ds)))
+    else:
+        pts = [tuple(p[:2]) for p in route]
+        for _ in range(3):                                   # Chaikin, les bouts gardés
+            q = [pts[0]]
+            for a, b in zip(pts, pts[1:]):
+                q += [(0.75 * a[0] + 0.25 * b[0], 0.75 * a[1] + 0.25 * b[1]),
+                      (0.25 * a[0] + 0.75 * b[0], 0.25 * a[1] + 0.75 * b[1])]
+            pts = q + [pts[-1]]
+        dense, acc = [pts[0]], 0.0                           # rééchantillonné tous les ds
+        for a, b in zip(pts, pts[1:]):
+            seg = math.dist(a, b)
+            while seg > 1e-9 and acc + seg >= ds:
+                u = (ds - acc) / seg
+                a = (a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u)
+                seg = math.dist(a, b)
+                dense.append(a)
+                acc = 0.0
+            acc += seg
+        hs = [heading_of(b[0] - a[0], b[1] - a[1]) for a, b in zip(dense, dense[1:])]
+        for i in range(1, len(hs)):
+            hs[i] = _unwrap(hs[i - 1], hs[i])
+        raw = [0.0] + [math.radians(hs[i + 1] - hs[i]) / ds for i in range(len(hs) - 1)] + [0.0]
+        x0, y0, h0 = dense[0][0], dense[0][1], hs[0]
+    n = max(1, int(round(ease / ds)) | 1)
+    pad = n * 2
+    k = _box(_box([raw[0]] * pad + raw + [raw[-1]] * pad, n), n)[pad:-pad]
+    return Route(x0, y0, h0, k, ds)
+
+
+class Drive:
+    """Le résultat de drive() : des fonctions du temps du plan (t en s) à passer telles quelles aux scènes.
+    pos(t) -> (x, y) ; heading(t) : le cap de la caisse (glisse comprise) ; slip(t) : la glisse (°, positive :
+    l'avant pointe à gauche de sa route) ; steer(t) : le braquage des roues avant (°, positif à gauche :
+    contre-braquage en glisse) ; speed(t) ; along(t), alat(t) (m/s²) ; brake_windows() : les fenêtres de freinage
+    pour hero_cars.stop_lamps ; t_stop : l'instant de l'arrêt (None s'il roule encore)."""
+
+    def __init__(self, tab, dt, t_stop):
+        self.tab, self.dt, self.t_stop = tab, dt, t_stop
+        self.t0 = tab["t"][0]
+
+    def _at(self, key, t):
+        return _lerp_tab(self.tab["t"], self.tab[key], t)
+
+    def pos(self, t):
+        T = self.tab
+        n = len(T["t"])
+        u = (t - self.t0) / self.dt
+        if u <= 0 or u >= n - 1:                     # hors de la table : en ligne droite, à vitesse tenue
+            i = 0 if u <= 0 else n - 1
+            h = math.radians(T["travel"][i])
+            d = T["v"][i] * (t - T["t"][i])
+            return T["x"][i] - math.sin(h) * d, T["y"][i] + math.cos(h) * d
+        k = int(math.floor(u))
+        f = u - k
+        out = []                                     # Hermite : position et vitesse aux deux bouts
+        for c, vc in (("x", "vx"), ("y", "vy")):
+            p0, p1, m0, m1 = T[c][k], T[c][k + 1], T[vc][k] * self.dt, T[vc][k + 1] * self.dt
+            out.append((2 * f ** 3 - 3 * f ** 2 + 1) * p0 + (f ** 3 - 2 * f ** 2 + f) * m0
+                       + (-2 * f ** 3 + 3 * f ** 2) * p1 + (f ** 3 - f ** 2) * m1)
+        return tuple(out)
+
+    def heading(self, t):
+        return self._at("head", t)
+
+    def travel(self, t):
+        return self._at("travel", t)
+
+    def slip(self, t):
+        return self._at("slip", t)
+
+    def steer(self, t):
+        return self._at("steer", t)
+
+    def speed(self, t):
+        return self._at("v", t)
+
+    def along(self, t):
+        return self._at("along", t)
+
+    def alat(self, t):
+        return self._at("alat", t)
+
+    def brake_windows(self, f0=F0, fps=FPS, thr=2.0, frames=None):
+        """[(première, dernière image)] où la voiture freine à plus de thr m/s² (les fenêtres de
+        hero_cars.stop_lamps) ; frames : les images à considérer (toute la table par défaut)."""
+        if frames is None:
+            frames = range(int(math.ceil(self.t0 * fps)) + f0, int(self.tab["t"][-1] * fps) + f0 + 1)
+        over = [f for f in frames if -self.along(t_of(f, f0, fps)) > thr]
+        return [(w[0], w[-1]) for w in _windows(over)]
+
+
+def drive(route, speed, t0=0.0, stop=False, kind="hero", drift=1.0, ease=None, lim=None, t_span=(-2.0, 12.0)):
+    """Une conduite qui tient les limites v3.1 (DRIVE, DRIVE_KINDS) : rend un Drive (pos, heading, slip, steer,
+    speed, brake_windows).
+
+    route : dict(start=(x, y, cap °), pieces=[line(m), arc(rayon, angle °), …]) ou [(x, y), …] ;
+    speed : la vitesse voulue (m/s) : un nombre, [(abscisse m, vitesse), …] (linéaire entre deux) ou v(s) ; la
+      voiture est au départ de la route à t0 (s), lancée à la vitesse voulue là (rabotée par l'adhérence) ;
+    stop : s'arrêter au bout de la route (sinon elle continue tout droit, à sa vitesse) ;
+    kind : "hero", "patrol" ou "van" (les limites) ; lim : des limites à changer (clés de DRIVE) ;
+    drift : le gain de la glisse (0 : jamais, 1 : le modèle) ; ease : la longueur (m) des entrées et sorties de
+      courbure (par défaut : ce que demande l'à-coup latéral à la vitesse du virage) ;
+    t_span : de quand à quand (s, temps du plan) la table est calculée ; hors de la table, en ligne droite."""
+    L = dict(DRIVE_KINDS.get(kind, DRIVE), **(lim or {}))
+    mg = L["margin"]
+    lat, brake, circle, acc = L["lat"] * mg, L["brake"] * mg, L["circle"] * mg, L["acc"] * mg
+    jerk = L["jerk"] * 0.72                  # longitudinal et latéral peuvent varier ensemble
+    if callable(speed):
+        want = speed
+    elif isinstance(speed, (int, float)):
+        want = lambda s: float(speed)  # noqa: E731
+    else:
+        pts = sorted((float(a), float(b)) for a, b in speed)
+
+        def want(s):
+            if s <= pts[0][0]:
+                return pts[0][1]
+            for (sa, va), (sb, vb) in zip(pts, pts[1:]):
+                if s <= sb:
+                    return va + (vb - va) * (s - sa) / max(1e-9, sb - sa)
+            return pts[-1][1]
+    ds = 0.1
+    if ease is None:                          # l'à-coup latéral : v³ κ' = v · a_lat / ease
+        rough = make_route(route, 1.0, ds)
+        ease = 2.0
+        for s_, k_ in zip(rough.s, rough.k):
+            if abs(k_) > 1e-4:
+                v = min(want(s_), math.sqrt(lat / abs(k_)))
+                ease = max(ease, min(lat, v * v * abs(k_)) * v / jerk)
+    R = make_route(route, ease, ds)
+    S = R.s
+    n = len(S)
+    fac = [1.0] * n                           # rabots supplémentaires (corrections après lissage)
+    drag = [0.0] * n                          # le freinage de la glisse (m/s²)
+    lift = [1.0] * n                          # les gaz : coupés pendant la glisse
+    dt = 1.0 / 240.0
+    win = max(1, int(round((brake + acc) / jerk / dt)) | 1)
+    for _ in range(14):
+        # 1. le profil le long de la route : plafonds, freinage en arrière, accélération en avant
+        v = [min(want(S[i]), math.sqrt(lat / max(1e-9, abs(R.k[i])))) * fac[i] for i in range(n)]
+        if stop:
+            v[-1] = 0.0
+        for i in range(n - 2, -1, -1):
+            al = v[i + 1] ** 2 * abs(R.k[i + 1])
+            b = min(brake, math.sqrt(max(0.0, circle * circle - al * al)))
+            v[i] = min(v[i], math.sqrt(v[i + 1] ** 2 + 2 * ds * b))
+        for i in range(n - 1):
+            al = v[i] ** 2 * abs(R.k[i])
+            a = min(acc, math.sqrt(max(0.0, circle * circle - al * al))) * lift[i] - drag[i]
+            v[i + 1] = min(v[i + 1], math.sqrt(max(0.0, v[i] ** 2 + 2 * ds * a)))
+        # 2. au temps : la table à 240 Hz, la vitesse lissée (l'accélération s'installe sans à-coup)
+        ts, t = [0.0], 0.0
+        for i in range(n - 1):
+            vm = v[i] + v[i + 1]
+            if vm < 1e-4:
+                break
+            t += 2 * ds / vm
+            ts.append(t)
+        m = len(ts)
+        t_end = ts[-1]
+        grid = [t_span[0] - t0 + k * dt for k in range(int((t_span[1] - t_span[0]) / dt) + 1)]
+        vt, j = [], 0
+        for tt in grid:
+            if tt <= 0.0:
+                vt.append(v[0])
+            elif tt >= t_end:
+                vt.append(v[m - 1])
+            else:
+                while ts[j + 1] < tt:
+                    j += 1
+                f = (tt - ts[j]) / (ts[j + 1] - ts[j])
+                vt.append(v[j] + (v[j + 1] - v[j]) * f)
+        vt = _box(vt, win)
+        k0 = next(k for k, tt in enumerate(grid) if tt >= 0.0)
+        st = [0.0] * len(grid)
+        for k in range(k0 + 1, len(grid)):
+            st[k] = st[k - 1] + 0.5 * (vt[k] + vt[k - 1]) * dt
+        for k in range(k0 - 1, -1, -1):
+            st[k] = st[k + 1] - 0.5 * (vt[k] + vt[k + 1]) * dt
+        # 3. accélérations, glisse, braquage
+        N = len(grid)
+        along = [(vt[min(N - 1, k + 1)] - vt[max(0, k - 1)]) / ((min(N - 1, k + 1) - max(0, k - 1)) * dt)
+                 for k in range(N)]
+        geo = [R.at(s) for s in st]
+        alat = [vt[k] ** 2 * geo[k][3] for k in range(N)]
+        slip, sv, tf, out_slip = 0.0, 0.0, 0.0, []
+        peak, side, kick = 0.0, 0.0, None
+        w = 2 * math.pi * L["slip_hz"]
+        for k in range(N):
+            comb = math.hypot(along[k], alat[k])
+            turn = max(-1.0, min(1.0, geo[k][3] * 25.0))
+            target = drift * turn * min(L["slip_max"], L["slip_per"] * max(0.0, comb - L["grip"]))
+            # la cible monte vite et retombe lentement : deux dépassements rapprochés font une seule glisse
+            rising = abs(target) > abs(tf) and target * tf >= 0.0
+            tf += (target - tf) * min(1.0, dt / (0.12 if rising else L["slip_hold"]))
+            # le petit retour : quand la glisse retombe sous le tiers de sa crête, l'arrière passe un peu de
+            # l'autre côté, une fois, puis plus rien
+            if abs(slip) > peak:
+                peak, side = abs(slip), math.copysign(1.0, slip)
+            if (kick is None and peak > 5.0 and abs(slip) < peak / 3.0 and sv * side < 0.0 and vt[k] > 4.0
+                    and drift > 0.0):
+                kick = (grid[k] + L["slip_back_s"], -side * min(L["slip_back"], 0.25 * peak))
+            goal = kick[1] if kick is not None and grid[k] < kick[0] else tf
+            a = w * w * (goal - slip) - 2 * L["slip_zeta"] * w * sv
+            a = max(-L["slip_acc"], min(L["slip_acc"], a))
+            sv += a * dt
+            cap = L["slip_on"] if sv * slip >= 0.0 and abs(goal) >= abs(slip) else L["slip_off"]
+            sv = max(-cap, min(cap, sv)) * smoothstep(0.2, 4.0, vt[k])   # à l'arrêt, la caisse ne tourne plus
+            slip += sv * dt
+            out_slip.append(slip)
+        # 4. les limites tiennent-elles après lissage ? sinon raboter là où elles cèdent et recommencer
+        new_drag, slid = [0.0] * n, [0.0] * n
+        for k in range(N):
+            if 0.0 <= st[k] <= S[-1]:
+                i = min(n - 1, int(st[k] / ds))
+                new_drag[i] = max(new_drag[i], L["slip_drag"] * abs(out_slip[k]))
+                slid[i] = max(slid[i], abs(out_slip[k]))
+        new_drag = _box(new_drag, int(1.0 / ds) | 1)
+        lift = _box([max(0.0, 1.0 - a / 3.0) for a in slid], int(2.0 / ds) | 1)
+        worst, at = 0.0, None
+        for k in range(N):
+            r = max(abs(alat[k]) / L["lat"], math.hypot(along[k], alat[k]) / L["circle"], -along[k] / L["brake"])
+            if r > worst:
+                worst, at = r, st[k]
+        changed = any(abs(a - b) > 0.05 for a, b in zip(new_drag, drag))
+        drag = new_drag
+        if worst <= 0.985 and not changed:
+            break
+        if worst > 0.985 and at is not None:
+            for i in range(n):
+                if abs(S[i] - at) < 2 * ease + 5.0:
+                    fac[i] *= 0.97
+    # 5. la table : position, vitesse, caps, braquage
+    tab = {k: [] for k in ("t", "x", "y", "vx", "vy", "v", "travel", "slip", "head", "steer", "along", "alat")}
+    prev_h = None
+    for k in range(N):
+        x, y, trav, kap = geo[k]
+        h = math.radians(trav)
+        tab["t"].append(grid[k] + t0)
+        tab["x"].append(x)
+        tab["y"].append(y)
+        tab["vx"].append(-math.sin(h) * vt[k])
+        tab["vy"].append(math.cos(h) * vt[k])
+        tab["v"].append(vt[k])
+        tab["travel"].append(trav)
+        tab["slip"].append(out_slip[k])
+        hd = trav + out_slip[k]
+        hd = hd if prev_h is None else _unwrap(prev_h, hd)
+        prev_h = hd
+        tab["head"].append(hd)
+        tab["along"].append(along[k])
+        tab["alat"].append(alat[k])
+    steer_prev = 0.0
+    for k in range(N):
+        a, b = max(0, k - 1), min(N - 1, k + 1)
+        om = math.radians(tab["head"][b] - tab["head"][a]) / ((b - a) * dt)
+        sp = vt[k]
+        if sp > 0.5:
+            be = math.radians(-out_slip[k])
+            geo_s = math.degrees(math.atan2(sp * math.sin(be) + om * L["front"], sp * math.cos(be)))
+            wcs = smoothstep(2.0, 6.0, abs(out_slip[k]))
+            steer_prev = max(-STEER_MAX, min(STEER_MAX, geo_s * (1.0 - wcs) - L["counter"] * out_slip[k] * wcs))
+        tab["steer"].append(steer_prev)
+    t_stop = None
+    if stop:
+        t_stop = next((tab["t"][k] for k in range(N) if grid[k] > 0 and vt[k] < 0.05), None)
+    return Drive(tab, dt, t_stop)
 
 
 SHAKE_GAIN = 0.5            # v3.1 : les tremblés (plans et opérateur) à la moitié de l'amplitude v3

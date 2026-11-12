@@ -1062,6 +1062,67 @@ def test_operator():
 
 
 
+def _drive_numbers(d, frames):
+    s = M.car_series(d.pos, frames, heads={f: d.heading(M.t_of(f)) for f in frames})
+    sl = {f: d.slip(M.t_of(f)) for f in frames}
+    rate = {f: (sl[f + 1] - sl[f - 1]) * M.FPS / 2 for f in frames[1:-1]}
+    grow = [r * (1 if sl[f] >= 0 else -1) for f, r in rate.items()]
+    return dict(lat=max(abs(v) for v in s["alat"].values()), brake=max(-v for v in s["along"].values()),
+                acc=max(s["along"].values()), circle=max(math.hypot(s["alat"][f], s["along"][f]) for f in s["alat"]),
+                jerk=max(s["jerk"].values()), yaw_acc=max(abs(v) for v in s["yaw_acc"].values()),
+                vmin=min(s["speed"].values()), slip=max(abs(v) for v in sl.values()), on=max(grow),
+                off=max(-g for g in grow), sl=sl)
+
+
+def test_drive():
+    """L'outil de conduite (motion.drive) : un virage de 28 m abordé à 19 m/s voulus, un arrêt en glisse depuis
+    44 km/h, une route en points ; toutes les limites v3.1 tenues aux images rendues ; on freine avant le virage
+    (feux stop), la glisse perd de la vitesse, contre-braque, ne revient qu'une fois et peu."""
+    def within(name, d, frames, L):
+        n = _drive_numbers(d, frames)
+        bad = [k for k in ("lat", "brake", "acc", "circle", "jerk", "yaw_acc") if n[k] > L[k] + 1e-9]
+        check(f"conduite, {name} : les limites de la voiture", not bad,
+              ", ".join(f"{k} {n[k]:.1f}" for k in ("lat", "brake", "acc", "circle", "jerk", "yaw_acc")))
+        check(f"conduite, {name} : la glisse ≤ {SLIP31_MAX:g}°, s'installe ≤ {SLIP31_ON:g}°/s, se résorbe ≤ "
+              f"{SLIP31_OFF:g}°/s", n["slip"] <= SLIP31_MAX and n["on"] <= SLIP31_ON and n["off"] <= SLIP31_OFF,
+              f"{n['slip']:.1f}°, {n['on']:.0f} et {n['off']:.0f} °/s")
+        return n
+    fr = list(range(1, 145))
+    turn = M.drive(dict(start=(0.0, 0.0, 0.0), pieces=[M.line(50), M.arc(28, 90), M.line(40)]), speed=19.0)
+    n = within("virage de 28 m", turn, fr, CAR31_HERO)
+    check("conduite : l'arc de 28 m pris à 13,5 m/s au plus", n["vmin"] <= 13.5, f"{n['vmin']:.1f} m/s")
+    arc_in = next(f for f in fr if abs(turn.travel(M.t_of(f))) > 2.0)
+    br = turn.brake_windows(frames=fr)
+    check("conduite : on freine avant le virage (feux stop)", br and br[0][0] < arc_in, f"{br}, virage à {arc_in}")
+    sl = n["sl"]
+    drift = [f for f in fr if abs(sl[f]) > 3.0]
+    v0, v1 = (turn.speed(M.t_of(drift[0])), turn.speed(M.t_of(drift[-1]))) if drift else (1.0, 1.0)
+    check("conduite : la glisse perd 10 % de vitesse au moins", drift and v1 <= (1 - SLIP31_LOSS) * v0,
+          f"{v0:.1f} → {v1:.1f} m/s")
+    cs = sum(turn.steer(M.t_of(f)) * sl[f] < 0 for f in drift) / max(1, len(drift))
+    check("conduite : contre-braquage pendant la glisse", cs >= 0.9, f"{cs * 100:.0f} % des images")
+    back = min(sl.values())
+    signs = [f for f in fr if sl[f] < -1.0]
+    check(f"conduite : un seul petit retour (≤ {SLIP31_BACK:g}°), puis plus rien", -SLIP31_BACK <= back
+          and (not signs or max(sl[f] for f in fr if f > signs[-1]) < 1.0), f"{back:.1f}°")
+    stop = M.drive(dict(start=(0.0, 0.0, 0.0), pieces=[M.line(12), M.arc(14, 70)]), speed=12.2, stop=True)
+    fs = list(range(1, 105))
+    n = within("arrêt en glisse", stop, fs, CAR31_HERO)
+    check("conduite : l'arrêt en glisse glisse et s'arrête", n["slip"] >= 5.0 and stop.t_stop is not None
+          and stop.speed(stop.t_stop + 0.5) < 0.01, f"{n['slip']:.1f}°, arrêt à {stop.t_stop}")
+    still = [stop.heading(stop.t_stop + k / 24) for k in range(0, 24)]
+    check("conduite : à l'arrêt la caisse ne tourne plus", max(still) - min(still) < 0.3,
+          f"{max(still) - min(still):.2f}°")
+    pts = [(0, 0), (0, 40), (-8, 60), (-28, 68), (-60, 68)]
+    road = M.drive(pts, speed=15.0, kind="patrol")
+    within("route en points (patrouille)", road, fr, CAR31_PATROL)
+    end = road.pos(12.0)
+    check("conduite : la route en points mène au dernier point (à 3 m près, en ligne)", abs(end[1] - 68.0) < 3.0
+          and end[0] < -60.0, f"({end[0]:.1f}, {end[1]:.1f})")
+    ps = M.sample(turn.pos, range(1, 60), heading=turn.heading, steer=turn.steer)
+    check("conduite : sample garde le braquage imposé", all(abs(p["steer"] - turn.steer(p["t"])) < 1e-9 for p in ps))
+
+
 def test_camera_measure():
     """La mesure des caméras des neuf plans (sans Blender) : chaque plan mesuré ; la vibration de l'opérateur ne
     compte pas comme un mouvement (avec et sans vibration, ressauts ni secousses, les vitesses de la colonne
@@ -1131,6 +1192,7 @@ if __name__ == "__main__":
     test_steer_dyn()
     test_aircraft()
     test_operator()
+    test_drive()
     test_camera_measure()
     test_v3()
     print(f"\n{'tout passe' if not FAIL else str(len(FAIL)) + ' échec(s)'}")
