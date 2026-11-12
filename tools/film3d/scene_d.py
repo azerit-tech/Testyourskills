@@ -623,6 +623,32 @@ def split_for_car(lights, car, energy=None, color=None, tag="lumiere", fraction=
     return twins
 
 
+def car_out_of_rigs(rigs, car):
+    """La voiture exclue de toutes les lumières des véhicules `rigs` (rampes, lueurs, flaques, phares, feux),
+    sauf de ses jumelles (split_for_car) : les lumières sans liaison reçoivent l'exclusion de la voiture, celles
+    qui excluaient déjà leur rampe (« _glow_exclude ») l'excluent aussi. Les lumières gardent leur pleine
+    puissance pour le sol et la brume. Renvoie le nombre de lumières touchées."""
+    out_c, _ = _car_collections(car)
+    body = list(out_c.objects)
+    n = 0
+    for r in rigs:
+        for o in r.children_recursive:
+            if o.type != "LIGHT" or o.name.endswith(f"_{car.name}"):
+                continue
+            rc = o.light_linking.receiver_collection
+            if rc is None:
+                o.light_linking.receiver_collection = out_c
+                n += 1
+            elif rc != out_c and any(co.light_linking.link_state == "EXCLUDE" for co in rc.collection_objects):
+                for b in body:
+                    if b.name not in rc.objects:
+                        rc.objects.link(b)
+                for co in rc.collection_objects:
+                    co.light_linking.link_state = "EXCLUDE"
+                n += 1
+    return n
+
+
 def aim_helis(helis, target, energy=400000.0, car=None, car_energy=None, cone=None):
     """Les projecteurs des hélicoptères sur la cible. À 30-40 m, les 30 kW du projecteur de cast_vehicles
     éclairent la voiture vingt fois moins que le lampadaire : on les pousse (la lumière est partagée par les
@@ -699,6 +725,8 @@ def plan_FIN(scene, hidden, palier="socle"):
     # le sol juste devant l'objectif et blanchissait tout le tiers bas
     L.bar_beams(pat, "patrol", yaws=((125, L.CORAL), (-125, L.LILAC)), energy=3000.0, tilt=3.0)
     M.flash_bars([pat], frames)
+    # comme dans FIN6 : les lueurs de sa rampe, à 4 m, n'excluaient que la rampe et teintaient la berline
+    car_out_of_rigs([pat], hero)
     # l'agent garde son armature : accroupi derrière la portière, il se redresse en joue (fin_pointe.OFFICER_KEYS)
     try:
         cop = L.officer_rig(F.OFFICER_KEYS, style=0, name="officer_fin")
@@ -791,6 +819,10 @@ def plan_FIN6(scene, hidden, palier="socle"):
     # le temps est gelé, pas les gyrophares : rampes, faisceaux et flaques battent à 2 Hz (corail, lilas)
     n = M.flash_bars(rigs, frames)
     print(f"[FIN6] {n} lumières de rampe clignotantes", flush=True)
+    # la vraie cause du rose et de la calandre brûlée : l'anneau gardait 42 lumières sans liaison (22 phares
+    # tournés vers la berline, 20 feux) et 66 lueurs et flaques de rampe qui n'excluaient que leur rampe ; à 14 m,
+    # toutes l'éclairaient en plein (calandre (187, 184, 209) au banc). Elle n'en reçoit plus que ses jumelles
+    print(f"[FIN6] berline exclue de {car_out_of_rigs(rigs, hero)} lumières de l'anneau", flush=True)
     try:
         cops = [L.officer(pz, style=st, name=f"officer_{pz}") for pz, st in (("aim", 0), ("crouch", 1), ("guard", 2))]
         for i, (a, kind) in enumerate(ring):
