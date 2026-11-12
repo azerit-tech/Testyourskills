@@ -1660,7 +1660,7 @@ def plan_P3(scene):
             for fc in MO.fcurves(o.data):
                 for kp in fc.keyframe_points:
                     kp.co[1] *= gain(kp.co[0])
-    # (de loin, les rampes du barrage dix fois plus fortes ; à force normale à partir de l'image 22)
+    # (de loin, les rampes du barrage dix fois plus fortes ; à force normale à partir de P3.BAR_GAIN_FADE[1])
     n_mat = len(bar_boost_keyed(ob["patrol_a"], frames,
                                 lambda f: 1.0 + (P3.BAR_GAIN - 1.0) * (1.0 - MO.smoothstep(*P3.BAR_GAIN_FADE, f))))
     # --- les tirs : flamme (trois maillages) et éclair ponctuel allumés une image, cachés sinon
