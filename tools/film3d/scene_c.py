@@ -284,6 +284,10 @@ def plan_P4(scene, hidden, haubans=False):
     poses = M.sample(P4.hero_pos, frames, wheel_r=hero["wheel_r"], wheelbase=(max(d) - min(d)) if d else 2.9)
     M.key_vehicle(hero, poses, wheels=wheels, ground=ground)
     M.wheel_marks(wheels, hero["wheel_r"])
+    # à contre-jour des lampadaires et des patrouilles, la berline n'était qu'une silhouette noire : une source
+    # douce de face, à 8 m devant elle, accrochée à son rig (elle suit les clés), qui n'éclaire qu'elle (le sol
+    # mouillé ne la reçoit pas)
+    L.car_fill(hero, loc=(0.4, 8.0, 2.2), energy=500.0)
     y_hero = P4.hero_pos(P4.T_STILL)[1]
     entries = [(k, x, y_hero - gap, 0.0) for k, x, gap in P4.PACK] + [("van", *P4.van_pos(P4.T_STILL), 0.0)]
     rigs = pack(entries)

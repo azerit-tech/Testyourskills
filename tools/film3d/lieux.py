@@ -1385,6 +1385,34 @@ def cap_images(px=1024, keep_objects=()):
     return n
 
 
+def car_fill(car, loc=(0.4, 8.0, 2.2), energy=500.0, color="#f2e4d4", size=4.0):
+    """Une source douce de face qui n'éclaire que la voiture (liaison de lumière, mêmes collections que
+    scene_d.split_for_car) : une lumière de surface accrochée au rig, en `loc` dans son repère (+y vers l'avant),
+    tournée vers le milieu de la caisse, invisible à la caméra, à la brume et aux reflets du sol (le sol ne la
+    reçoit pas). À contre-jour, la peinture se lit sans que le sol se rallume."""
+    in_c = bpy.data.collections.get(f"{car.name}_lumiere_avec")
+    if in_c is None:
+        in_c = bpy.data.collections.new(f"{car.name}_lumiere_avec")
+        for o in car.children_recursive:
+            if o.type == "MESH":
+                in_c.objects.link(o)
+    d = bpy.data.lights.new(f"{car.name}_face", "AREA")
+    d.shape = "DISK"
+    d.size = size
+    d.energy = energy
+    d.color = lin(color)[:3]
+    lo = bpy.data.objects.new(d.name, d)
+    bpy.context.scene.collection.objects.link(lo)
+    lo.parent = car
+    lo.location = loc
+    lo.rotation_mode = "QUATERNION"
+    lo.rotation_quaternion = (Vector((0.0, 0.0, 0.8)) - Vector(loc)).to_track_quat("-Z", "Y")
+    lo.visible_camera = False
+    lo.visible_volume_scatter = False
+    lo.light_linking.receiver_collection = in_c
+    return lo
+
+
 def stats():
     """Triangles et lumières de la scène (pour le journal)."""
     dg = bpy.context.evaluated_depsgraph_get()
