@@ -781,7 +781,9 @@ def plan_FIN6(scene, hidden, palier="socle"):
         hs.append(r)
     # sur la berline, trois projecteurs à 40 m : 15 kW chacun lui donnent la même lumière que les 60 kW du seul
     # projecteur de FIN, à 49 m, sous lequel elle reste bordeaux (à 50 kW chacun, elle sortait encore rose)
-    aim_helis(hs, STOP + Vector((0, 0, 0.8)), car=hero, car_energy=15000.0)
+    # des cônes de 6° comme dans FIN : à 9°, les trois faisceaux emplissaient la brume autour de la berline d'un
+    # voile clair qui la passait au rose (la brume n'obéit pas à la liaison de lumière)
+    aim_helis(hs, STOP + Vector((0, 0, 0.8)), car=hero, car_energy=15000.0, cone=6.0)
     # le lampadaire de la pointe, ambre à 3,2 kW à 8 m de la berline, la sortait rose avec le faisceau : il garde sa
     # pleine puissance pour le sol et la brume, la berline n'en reçoit que la part de FIN (1300 W, crème)
     split_for_car([bpy.data.objects["lamp_pointe_light"]], hero, 1300.0, "#ffe2c2", tag="lampadaire")
