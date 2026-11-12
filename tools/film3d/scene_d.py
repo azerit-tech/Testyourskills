@@ -571,44 +571,6 @@ def build_marina(hidden, far=False):
 
 # ---------------------------------------------------------------- le décor et les plans
 
-MUSOIR_AZ = 35.0        # le feu de musoir, au bout de la pointe (degrés depuis +x) : derrière la caméra de FIN ;
-                        # dans FIN6, à droite de la berline sur les premières images de l'orbite (à 40°, l'arrière
-                        # de la berline le cachait), puis hors champ
-
-
-def pointe_musoir():
-    """Le feu de musoir de la pointe (FIN6 seulement) : sur le couronnement, un socle de béton, un fût d'acier
-    peint, une lanterne corail (le côté bâbord d'une entrée de port) et son chapeau. Le temps de FIN6 est gelé :
-    le feu reste allumé, fixe (un éclat qui battrait serait une horloge de plus) ; sa lumière, faible, se lit sur
-    le couronnement, les bornes voisines et l'eau. Aucune inscription."""
-    x, y = _polar(MUSOIR_AZ, R - 1.3)
-    conc = bpy.data.materials.get("musoir_socle") or L.mat_concrete("musoir_socle", tint=(0.5, 0.49, 0.47), streaks=0.8)
-    paint = L.mat_steel("musoir_fut", color=(0.62, 0.62, 0.6), rough=0.4, rust=0.35, paint=True)
-    bm = L.bmesh.new()
-    L.tube_bm(bm, (x, y, 0.12), (x, y, 0.55), 0.55, seg=20)
-    bm2 = L.bmesh.new()
-    L.tube_bm(bm2, (x, y, 0.55), (x, y, 3.3), 0.16, seg=16)
-    L.tube_bm(bm2, (x, y, 3.3), (x, y, 3.36), 0.3, seg=16)            # la galerie
-    L.tube_bm(bm2, (x, y, 3.72), (x, y, 3.8), 0.24, seg=16)           # le chapeau
-    lb = L.bmesh.new()
-    L.tube_bm(lb, (x, y, 3.36), (x, y, 3.72), 0.14, seg=16)
-    L.mesh_object("musoir_socle", bm, [conc])
-    L.mesh_object("musoir_fut", bm2, [paint], smooth=True)
-    lm = L.emit_mat("musoir_lanterne", L.lin(L.CORAL), 0.0)
-    lan = L.mesh_object("musoir_lanterne", lb, [lm], smooth=True)
-    lan.visible_shadow = False
-    next(n for n in lm.node_tree.nodes if n.type == "EMISSION").inputs["Strength"].default_value = 40.0
-    d = bpy.data.lights.new("musoir_feu", "POINT")
-    d.color = L.lin(L.CORAL)[:3]
-    d.shadow_soft_size = 0.15
-    d.energy = 90.0
-    lo = bpy.data.objects.new(d.name, d)
-    bpy.context.scene.collection.objects.link(lo)
-    lo.location = (x, y, 3.54)
-    lo.visible_volume_scatter = False
-    return lan
-
-
 def decor(scene, hidden, all_lit=False, marina=False):
     lamp_src = L.panorama(scene, hidden, all_lit=all_lit, bridge="loin", port="loin")
     build_jetty(hidden, lamp_src)
@@ -960,7 +922,10 @@ def plan_FIN6(scene, hidden, palier="socle"):
     decor(scene, hidden, all_lit=True, marina=(palier in ("marina", "complet")))
     scene.frame_start, scene.frame_end = F6.F0, F6.F0 + F6.FRAMES - 1
     frames = range(F6.F0 - 1, F6.F0 + F6.FRAMES + 1)
-    pointe_musoir()
+    # le phare de la pointe (lieux.panorama, découpage v3 §3) remplace le feu de musoir : le temps est gelé, ses
+    # pinceaux aussi, l'un au-dessus de la berline
+    L.phare_tourne(bpy.data.objects["phare"], vitesse=0.0,
+                   phase=math.degrees(math.atan2(STOP.y - L.PHARE_AT[1], STOP.x - L.PHARE_AT[0])))
     rnd = random.Random(6)
     hero = L.hero()
     L.put(hero, STOP.x, STOP.y, 0.0, heading=HERO_STOP)

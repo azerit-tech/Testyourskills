@@ -883,12 +883,13 @@ def port_far(hidden, lamp_src):
 
 
 def panorama(scene, hidden, yaw=math.pi, all_lit=False, bridge="loin", port="loin", jetty=None, water_kind="lagune",
-             haubans=False):
+             haubans=False, phare=True):
     """Tout ce qu'on voit de loin par-dessus l'eau, commun aux scènes C, D et E : le ciel tourné de `yaw` (la bande
     corail derrière la ville), la lagune, la ville lointaine (`all_lit` : toutes fenêtres allumées), l'autre rive.
     `bridge`, `port`, `jetty` : None, « loin » (grandes formes et lumières) ou « près » (le lieu entier) ; le port
     vient de scene_e.build_port s'il existe, sinon du terre-plein provisoire. `haubans` : le pont avec son pylône
-    (palier « haubans » de scene_c). Renvoie la source des lampadaires."""
+    (palier « haubans » de scene_c). `phare` : le phare de la pointe à sa vraie place (PHARE_AT) ; True, False, ou
+    un dict d'arguments de phare() (phase, vitesse...). Renvoie la source des lampadaires."""
     sky(scene, yaw)
     water("lagune", (-7000, 7000), (-7000, 7000), WATER_Z, kind=water_kind)
     distant_city(all_lit=all_lit)
@@ -910,6 +911,8 @@ def panorama(scene, hidden, yaw=math.pi, all_lit=False, bridge="loin", port="loi
         import scene_d
         scene_d.build_jetty(hidden, lamp_src, far=(jetty == "loin"))
         scene_d.build_pointe(hidden, lamp_src, far=(jetty == "loin"))
+    if phare:
+        _build_phare(PHARE_AT, **(phare if isinstance(phare, dict) else {}))
     return lamp_src
 
 
@@ -1592,3 +1595,178 @@ def stats():
             tri += sum(len(p.vertices) - 2 for p in ob.data.polygons)
     nl = len([o for o in bpy.context.scene.objects if o.type == "LIGHT"])
     return tri, nl
+
+
+# ---------------------------------------------------------------- le phare de la pointe (découpage v3, §3)
+#
+# Le repère du film : une tour blanche de 16 m au bout de la pointe, une lanterne crème et deux pinceaux opposés
+# qui tournent. Dans le monde de l'eau (scènes C, D, E), lieux.panorama le pose à sa vraie place, PHARE_AT ;
+# ailleurs (scènes A, F, B), phare_lointain le pose loin, à l'échelle qui donne la hauteur voulue à l'écran.
+# Ni corail ni lilas (les rampes), ni blanc bleuté (les hélicoptères) : crème. Aucune inscription.
+
+PHARE_AT = (POINTE[0] + (POINTE_R - 1.3) * math.cos(math.radians(100.0)),
+            POINTE[1] + (POINTE_R - 1.3) * math.sin(math.radians(100.0)))   # (75,0 ; 458,3), azimut 100°
+PHARE_H = 17.9                     # du pied au sommet du chapeau (m, échelle 1)
+PHARE_FEU = 16.8                   # le milieu de la lanterne, l'axe des pinceaux
+PHARE_CREME = "#fff9cb"
+
+
+def _cone_bm(bm, z0, z1, r0, r1, seg=24, cap=True):
+    """Un tronc de cône vertical, de z0 (rayon r0) à z1 (rayon r1), centré sur l'axe z."""
+    bmesh.ops.create_cone(bm, cap_ends=cap, segments=seg, radius1=r0, radius2=r1, depth=z1 - z0,
+                          matrix=Matrix.Translation((0.0, 0.0, (z0 + z1) / 2)))
+
+
+def _mat_pinceau(strength=0.35, color="#fff4dc"):
+    """La matière des pinceaux : une émission additive sur du transparent, plus claire au cœur (le facteur de
+    face), qui s'éteint le long du pinceau ; sans échantillonnage d'émission (elle n'éclaire rien)."""
+    name = "phare_pinceau"
+    m = bpy.data.materials.get(name)
+    if m:
+        return m
+    m, N, out = S.material(name)
+    m.cycles.emission_sampling = "NONE"
+    if hasattr(m, "surface_render_method"):
+        m.surface_render_method = "BLENDED"
+    lw = N.new("ShaderNodeLayerWeight", Blend=0.5)
+    core = N.math("POWER", N.math("SUBTRACT", 1.0, lw.outputs["Facing"], clamp=True), 1.6)
+    # le cône est couché le long de son x : la coordonnée « générée » x vaut 0 à la lanterne, 1 au bout
+    u, _, _ = N.sep(N.new("ShaderNodeTexCoord").outputs["Generated"])
+    along = N.math("MULTIPLY", N.math("POWER", N.math("SUBTRACT", 1.0, u, clamp=True), 1.3),
+                   road.smooth(N, u, 0.0, 0.01))
+    k = N.math("MULTIPLY", N.math("MULTIPLY", core, along), strength)
+    em = N.new("ShaderNodeEmission", Color=lin(color))
+    N.link(k, em.inputs["Strength"])
+    tr = N.new("ShaderNodeBsdfTransparent")
+    add = N.new("ShaderNodeAddShader")
+    N.link(tr.outputs[0], add.inputs[0])
+    N.link(em.outputs[0], add.inputs[1])
+    N.link(add.outputs[0], out.inputs["Surface"])
+    return m
+
+
+def phare(at=PHARE_AT, scale=1.0, phase=0.0, vitesse=45.0, lanterne=30.0, name="phare"):
+    """Le phare, posé en `at` ((x, y) ou (x, y, z)), à l'échelle `scale` : tour de béton blanc cassé de 16 m (1,6 m
+    de diamètre au pied, 1,1 m en haut) sur un socle, galerie sombre à 16 m et sa rambarde, lanterne crème de 16,2
+    à 17,4 m (émission `lanterne`, lisible à 2 km), chapeau sombre ; une lumière faible pour son pied et la galerie.
+    Deux pinceaux opposés, cônes émissifs de 1,5° de demi-angle et 400 m de long, à 1° au-dessus de l'horizon, qui
+    tournent de `vitesse` °/s (45 : un tour en 8 s ; 0 : gelés) ; `phase` : l'azimut du premier pinceau à
+    l'image 0 (degrés depuis +x, sens trigonométrique). Ils ne diffusent pas dans la brume et n'éclairent rien.
+    Tout est enfant d'un vide `name` (l'échelle s'applique au vide). Renvoie le vide."""
+    x, y = at[0], at[1]
+    z = at[2] if len(at) > 2 else 0.0
+    root = bpy.data.objects.new(name, None)
+    bpy.context.scene.collection.objects.link(root)
+    root.location = (x, y, z)
+    root.scale = (scale,) * 3
+    root["phare"] = True
+
+    def part(nm, bm, mats, smooth=True):
+        ob = mesh_object(f"{name}_{nm}", bm, mats, smooth=smooth)
+        ob.parent = root
+        return ob
+
+    beton = bpy.data.materials.get("phare_beton")
+    if beton is None:
+        beton = mat_concrete("phare_beton", tint=(0.86, 0.84, 0.78), streaks=0.6, scale=0.6)
+        # la nuit, la tour n'est éclairée que par sa lanterne, au-dessus d'elle : sans une pointe d'émission
+        # blanc cassé elle sortait brun-mauve sur le ciel (essai du 13 nov.) ; elle doit se lire blanche, de près
+        # comme à 600 m
+        for n in beton.node_tree.nodes:
+            if n.type == "BSDF_PRINCIPLED":
+                n.inputs["Emission Color"].default_value = (0.86, 0.84, 0.78, 1.0)
+                n.inputs["Emission Strength"].default_value = 0.06
+    sombre = bpy.data.materials.get("phare_acier") or mat_steel("phare_acier", color=(0.07, 0.075, 0.08), rough=0.45,
+                                                                rust=0.3, paint=True)
+    bm = bmesh.new()
+    _cone_bm(bm, 0.0, 0.45, 0.95, 0.95, seg=32)                    # le socle (dans le couronnement : 10 cm du
+    _cone_bm(bm, 0.45, 16.0, 0.8, 0.55, seg=32)                    # garde-corps), puis la tour
+    part("tour", bm, [beton])
+    bm = bmesh.new()
+    _cone_bm(bm, 15.88, 16.0, 0.98, 0.98, seg=32)                  # la galerie
+    for i in range(16):                                            # sa rambarde : montants et main courante
+        a0, a1 = i * math.tau / 16, (i + 1) * math.tau / 16
+        p0 = (0.93 * math.cos(a0), 0.93 * math.sin(a0))
+        p1 = (0.93 * math.cos(a1), 0.93 * math.sin(a1))
+        tube_bm(bm, (*p0, 16.0), (*p0, 16.55), 0.015, seg=6)
+        tube_bm(bm, (*p0, 16.55), (*p1, 16.55), 0.02, seg=6)
+    _cone_bm(bm, 17.4, 17.52, 0.62, 0.62, seg=24)                  # le chapeau : un bord, un dôme, un épi
+    _cone_bm(bm, 17.52, 17.82, 0.6, 0.12, seg=24)
+    tube_bm(bm, (0.0, 0.0, 17.82), (0.0, 0.0, PHARE_H), 0.03, seg=6)
+    for i in range(8):                                             # les montants de la lanterne
+        a = i * math.tau / 8
+        p = (0.5 * math.cos(a), 0.5 * math.sin(a))
+        tube_bm(bm, (*p, 16.2), (*p, 17.4), 0.025, seg=6)
+    part("acier", bm, [sombre])
+    bm = bmesh.new()
+    _cone_bm(bm, 16.0, 16.2, 0.55, 0.55, seg=24)                   # le pied de la lanterne
+    _cone_bm(bm, 16.2, 17.4, 0.48, 0.48, seg=24)
+    lan = part("lanterne", bm, [emit_mat("phare_lanterne", lin(PHARE_CREME), lanterne)])
+    lan.visible_shadow = False
+    d = bpy.data.lights.new(f"{name}_feu", "POINT")
+    d.color = lin(PHARE_CREME)[:3]
+    d.energy = 600.0
+    d.shadow_soft_size = 0.4
+    lo = bpy.data.objects.new(d.name, d)
+    bpy.context.scene.collection.objects.link(lo)
+    lo.parent = root
+    lo.location = (0.0, 0.0, PHARE_FEU)
+    lo.visible_volume_scatter = False
+    # les pinceaux : un pivot qui tourne en z, deux cônes le long de son ±x, relevés de 1°
+    piv = bpy.data.objects.new(f"{name}_pivot", None)
+    bpy.context.scene.collection.objects.link(piv)
+    piv.parent = root
+    piv.location = (0.0, 0.0, PHARE_FEU)
+    piv.rotation_mode = "XYZ"
+    piv["phase"], piv["vitesse"] = phase, vitesse
+    mp = _mat_pinceau()
+    length, half, seg = 400.0, math.radians(1.5), 24
+    for k, sgn in enumerate((1.0, -1.0)):
+        bm = bmesh.new()
+        r1 = length * math.tan(half)
+        ring0 = [bm.verts.new((0.0, 0.12 * math.cos(a), 0.12 * math.sin(a))) for a in
+                 (i * math.tau / seg for i in range(seg))]
+        ring1 = [bm.verts.new((length, r1 * math.cos(a), r1 * math.sin(a))) for a in
+                 (i * math.tau / seg for i in range(seg))]
+        for i in range(seg):
+            j = (i + 1) % seg
+            bm.faces.new((ring0[i], ring0[j], ring1[j], ring1[i])).smooth = True
+        ob = mesh_object(f"{name}_pinceau_{k}", bm, [mp], smooth=True)
+        ob.parent = piv
+        ob.rotation_euler = (0.0, math.radians(-1.0), 0.0 if sgn > 0 else math.pi)    # relevé de 1°, puis opposé
+        for attr in ("visible_shadow", "visible_diffuse", "visible_transmission", "visible_volume_scatter"):
+            setattr(ob, attr, False)
+    phare_tourne(root, phase, vitesse)
+    return root
+
+
+def phare_tourne(root, phase=0.0, vitesse=45.0):
+    """Fait tourner (ou gèle, `vitesse` = 0) les pinceaux du phare `root` : azimut du premier pinceau = `phase` +
+    `vitesse` × t (degrés, t = image / 24). Un pilote d'expression simple (pas de script Python)."""
+    piv = next(o for o in root.children if o.name.endswith("_pivot"))
+    piv.driver_remove("rotation_euler", 2)
+    piv.rotation_euler.z = math.radians(phase)
+    if vitesse:
+        fc = piv.driver_add("rotation_euler", 2)
+        fc.driver.type = "SCRIPTED"
+        fc.driver.expression = f"{math.radians(phase):.6f} + {math.radians(vitesse) / 24.0:.8f} * frame"
+    return piv
+
+
+def phare_lointain(scene, cap, ecart, hauteur_deg, phase=0.0, distance=600.0, origine=None, z=0.0, vitesse=45.0):
+    """Le phare loin, pour les scènes hors du monde de l'eau (A, F, B) : posé à `distance` m (600 au plus) de
+    `origine` (par défaut la caméra de la scène, sinon l'origine du monde), dans la direction du cap `cap` (degrés,
+    0 vers +y, positif vers -x, comme les caps des véhicules) décalé de `ecart` degrés vers la droite, à l'échelle
+    qui lui donne `hauteur_deg` de hauteur vue de là ; `z` : la hauteur de son pied (au-dessus des toits). Les
+    pinceaux gardent leur longueur, à l'échelle. Renvoie le vide du phare."""
+    if origine is None:
+        origine = scene.camera.matrix_world.translation if scene.camera else (0.0, 0.0, 0.0)
+    distance = min(600.0, distance)
+    h = math.radians(cap - ecart)
+    x = origine[0] - math.sin(h) * distance
+    y = origine[1] + math.cos(h) * distance
+    s = distance * math.tan(math.radians(hauteur_deg)) / PHARE_H
+    return phare((x, y, z), scale=s, phase=phase, vitesse=vitesse, name="phare_lointain")
+
+
+_build_phare = phare
