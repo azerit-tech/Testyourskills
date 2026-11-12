@@ -1754,27 +1754,7 @@ def render_settings(scene):
     r.image_settings.file_format = "PNG"
     r.image_settings.color_depth = "8"
 
-    # --- compositing : halo des lumières, dispersion légère de l'objectif
-    ng = bpy.data.node_groups.new("comp_a", "CompositorNodeTree")
-    ng.interface.new_socket(name="Image", in_out="OUTPUT", socket_type="NodeSocketColor")
-    rl = ng.nodes.new("CompositorNodeRLayers")
-    gl = ng.nodes.new("CompositorNodeGlare")
-    for k, v in (("Type", "Bloom"), ("Quality", "High"), ("Threshold", 1.2), ("Strength", 0.12), ("Size", 0.6), ("Saturation", 1.0)):
-        try:
-            gl.inputs[k].default_value = v
-        except Exception as e:
-            print("[scene_a] glare", k, e)
-    ld = ng.nodes.new("CompositorNodeLensdist")
-    try:
-        ld.inputs["Dispersion"].default_value = 0.012
-        ld.inputs["Distortion"].default_value = -0.01
-    except Exception as e:
-        print("[scene_a] lens", e)
-    go = ng.nodes.new("NodeGroupOutput")
-    ng.links.new(rl.outputs["Image"], gl.inputs["Image"])
-    ng.links.new(gl.outputs["Image"], ld.inputs["Image"])
-    ng.links.new(ld.outputs["Image"], go.inputs[0])
-    scene.compositing_node_group = ng
+    __import__("halo").halo(scene)                        # le halo des sources, commun à tous les plans
 
 
 
