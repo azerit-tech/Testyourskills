@@ -1,10 +1,12 @@
-# Le banc des interactions (fx.py) : la berline qui roule en ligne à 60 km/h, traverse une flaque, puis prend une
-# courbe à gauche de 22 m de rayon en glisse (jusqu'à 22°) sur un enrobé mouillé ; une patrouille 14 m derrière,
-# phares allumés (le contre-jour) ; trois lampadaires ambre. Deux caméras à 0,45 m :
-#   rase   fixe, 3 m à gauche de la trace, devant la flaque : la berline vient vers elle et passe (gerbe, embruns,
-#          papiers, rides)
-#   suite  derrière la berline, 7 m en arrière et 1,2 m à gauche, qui la suit dans la courbe (fumée, embruns)
-#   arriere  trois quarts arrière à 7,5 m, 1,4 m de haut, 28 mm (le découpage v3) : le sillage dans l'axe
+# Le banc des interactions (fx.py) : la berline qui roule en ligne (--kmh, 60 par défaut), traverse une flaque,
+# puis prend une courbe à gauche dont le rayon garde l'accélération latérale sous 6,5 m/s² (22 m au moins), en glisse
+# (--glisse, 18° par défaut, installée en 10 images, résorbée en 12) sur un enrobé mouillé ; une patrouille 0,85 s
+# derrière, phares allumés (le contre-jour) ; trois lampadaires ambre. Caméras :
+#   rase   fixe à 0,45 m, 3 m à gauche de la trace, devant la flaque : la berline vient vers elle et passe
+#   suite  derrière la berline, 7 m en arrière et 1,2 m à gauche, à 0,45 m, qui la suit dans la courbe
+#   arriere  trois quarts arrière à 7,5 m, 1,4 m de haut, 28 mm (le découpage v3)
+#   dos    (par défaut) les plans v3.1 : 7,5 m derrière, 1 m à gauche, 2,4 m de haut, 24 mm, plongée de 12°
+# Gerbe : --kmh 60 à 90, images de la ligne droite ; glisse : --kmh 45 à 50, courbe dès la 24e image.
 #
 # Sur la machine louée seulement (OptiX) :
 #   FILM3D_ASSETS=~/film/assets ~/blender-5.2.2-linux-x64/blender -b --factory-startup -P tools/film3d/lab/fx_bench.py -- \
@@ -34,9 +36,18 @@ import road  # noqa: E402
 FRAMES = 48
 V = 60 / 3.6
 X0 = 1.8
-S1 = 22.0                    # la fin de la ligne droite (m)
-R = 22.0                     # le rayon de la courbe à gauche
+S1 = 22.0                    # la fin de la ligne droite (m) ; plus courte à petite vitesse (courbe dès 1 s)
+R = 22.0                     # le rayon de la courbe à gauche (V² / 6,5 m/s², 22 m au moins)
+GLISSE = 18.0                # l'angle de glisse en courbe (°)
 PUDDLE_T = 0.85              # la roue avant gauche entre dans la flaque vers cet instant
+
+
+def setup(kmh, glisse):
+    global V, S1, R, GLISSE
+    V = kmh / 3.6
+    S1 = min(22.0, V * 1.0)
+    R = max(22.0, V * V / 6.5)
+    GLISSE = glisse
 
 
 def path(t):
@@ -48,8 +59,9 @@ def path(t):
 
 
 def slip(t):
-    s = V * t
-    return 22.0 * M.smoothstep(S1 + 1.0, S1 + 7.0, s)
+    # installée en 10 images après l'entrée en courbe, tenue 2 images, résorbée en 12
+    f = (t - S1 / V) * M.FPS
+    return GLISSE * (M.smoothstep(0.0, 10.0, f) - M.smoothstep(12.0, 24.0, f))
 
 
 def look(cam, eye, target):
@@ -93,9 +105,10 @@ def build(cam_kind):
         cd.dof.focus_distance = 5.0
     else:
         # suite : 7 m derrière, 1,2 m à gauche, à 0,45 m ; arriere (le découpage v3) : trois quarts arrière gauche,
-        # 7,5 m derrière, 2,2 m à gauche, à 1,4 m, 28 mm, la berline vers 35 % de la largeur ; le sillage est dans
-        # l'axe, entre elle et l'objectif
-        back, side, high, aim = (7.0, 1.2, 0.45, 0.7) if cam_kind == "suite" else (7.5, 2.2, 1.4, 0.55)
+        # 7,5 m derrière, 2,2 m à gauche, à 1,4 m, 28 mm, la berline vers 35 % de la largeur ; dos (v3.1) : 7,5 m
+        # derrière, 1 m à gauche, 2,4 m, 24 mm, visée 0,6 m devant le centre et 1,7 m plus bas (plongée de 12°)
+        back, side, high, aim = {"suite": (7.0, 1.2, 0.45, 0.7), "arriere": (7.5, 2.2, 1.4, 0.55)}.get(
+            cam_kind, (7.5, 1.0, 2.4, 2.4 - math.tan(math.radians(12.0)) * math.hypot(8.1, 1.0)))
         if cam_kind == "arriere":
             cd.lens = 28.0
         cam.rotation_mode = "QUATERNION"
@@ -119,16 +132,16 @@ def build(cam_kind):
 def main():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     ap = argparse.ArgumentParser()
-    ap.add_argument("--cam", default="arriere", choices=("rase", "suite", "arriere"))
+    ap.add_argument("--cam", default="dos", choices=("rase", "suite", "arriere", "dos"))
     ap.add_argument("--frames", default="18,22")
     ap.add_argument("--samples", type=int, default=64)
     ap.add_argument("--res", default="360x640")
     ap.add_argument("--out", default=os.path.expanduser("~/film/iter-fx/banc"))
     ap.add_argument("--tag", default="apres")
     ap.add_argument("--kmh", type=float, default=60.0, help="la vitesse de la berline (la patrouille la suit)")
+    ap.add_argument("--glisse", type=float, default=GLISSE, help="l'angle de glisse en courbe (°)")
     a = ap.parse_args(argv)
-    global V
-    V = a.kmh / 3.6
+    setup(a.kmh, a.glisse)
     t0 = time.time()
     scene = build(a.cam)
     fx.dress("BANC", scene, puddle_t=PUDDLE_T)
