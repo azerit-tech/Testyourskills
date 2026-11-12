@@ -5,6 +5,7 @@
 #   ambre   l'avenue : lampadaires ambre en hauteur, ciel de l'heure bleue
 #   helico  le port : projecteur froid d'hélicoptère, à 30 m, dans une brume légère, nuit noire
 #   neon    la rue des enseignes : néons corail et lilas de part et d'autre, nuit noire
+#   ciel    le ciel de nuit violet seul, sans lampe (FIN, FIN6) : ce que le vernis et les vitres en renvoient
 #
 # Vues (repère de street_hero : l'avant vers -y, la gauche vers +x) : face, av-g, av-d, flanc-g, flanc-d, ar-g,
 # ar-d, dos ; gros plans : roue (avant gauche), calandre, phare (avant gauche), feu (arrière gauche), capot, coffre,
@@ -157,6 +158,10 @@ def lighting(kind):
     import cast_vehicles_render as cvr
     import scene_a as A
     lin = cv.lin
+    if kind == "ciel":
+        # le ciel de nuit violet seul, sans lampe (FIN, FIN6) : ce que le vernis et les vitres en renvoient
+        _world(cv, cvr, 0.9)
+        return
     if kind == "ambre":
         # l'avenue (OUV, P1) : un lampadaire qui plonge sur la caisse côté gauche avant, un derrière à droite, un loin
         _world(cv, cvr, 0.55)
