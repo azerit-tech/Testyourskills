@@ -1851,6 +1851,21 @@ def ouv_motion(scene, coupe, cam, focus):
     cam.data.shift_y = 0.0
     M.key_camera(cam, frames, OUV.camera)
     cam.data.dof.focus_object = coupe
+    cam.data.dof.aperture_fstop = OUV.FOCUS_F
+    x, y, w, l = OUV.PUDDLE
+    street_puddle("fx_flaque", x, y, w, l, seed=7)
+    # la patrouille garée qu'on devine se réveiller : l'écran de bord s'allume, froid, dans l'habitacle sombre
+    d = bpy.data.lights.new("patrouille_ecran", "POINT")
+    d.color, d.shadow_soft_size = lin("#9fb4e8")[:3], 0.08
+    lo = bpy.data.objects.new(d.name, d)
+    scene.collection.objects.link(lo)
+    lo.location = OUV.SCREEN
+    for f in frames:
+        d.energy = OUV.SCREEN_W if f >= OUV.WAKE else 0.0
+        d.keyframe_insert("energy", frame=f)
+    for fc in M.fcurves(d):
+        for kp in fc.keyframe_points:
+            kp.interpolation = "CONSTANT"
     bpy.data.objects.remove(focus)
     scene.frame_set(frames[0])
     scene.render.motion_blur_shutter = 0.5
