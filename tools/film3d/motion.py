@@ -824,13 +824,97 @@ def wheel_marks(wheels, radius=0.33, axis="X"):
     return out
 
 
+# ---------------------------------------------------------------- les aéronefs : l'assiette suit l'accélération
+
+AIR = {
+    # gain : fraction de l'inclinaison « physique » atan(a / g) ; hz, zeta : la cellule qui répond ; max : borne
+    # douce (degrés) ; breath : l'assiette du stationnaire (degrés), qui respire ; trem : le frémissement en vol
+    "heli": dict(gain=0.6, hz=0.9, zeta=0.75, max=9.0, breath=0.8, trem=0.25, pitch=True),
+    "jet": dict(gain=1.0, hz=1.4, zeta=0.8, max=30.0, breath=0.0, trem=0.2, pitch=False),
+}
+
+
+def aircraft_kind(ob):
+    """« heli », « jet » ou None, d'après la propriété « aircraft » ou le nom du rig (heli…, jet…)."""
+    k = ob.get("aircraft") if hasattr(ob, "get") else None
+    if k in AIR:
+        return k
+    n = ob.name.split(":")[-1].lower()
+    if n.startswith(("heli", "helico")):
+        return "heli"
+    if n.startswith(("jet", "avion", "plane")):
+        return "jet"
+    return None
+
+
+def aircraft_attitude(fn, frames, kind="heli", f0=F0, fps=FPS, seed=0.0, warmup=0.8):
+    """L'assiette d'un aéronef ajoutée à celle de sa trajectoire, sans toucher à sa position : fn(t) -> (x, y, z,
+    cap, tangage, roulis) ; renvoie {image: (x, y, z, cap, tangage, roulis)}. L'hélicoptère s'incline dans le sens de
+    son accélération horizontale (il pique pour accélérer, se cabre pour freiner, penche dans le virage), l'avion
+    roule dans ses virages ; au stationnaire, l'assiette respire. La part « vitesse constante » est déjà dans la
+    trajectoire (le nez bas d'un hélicoptère en poursuite) : seule l'accélération s'ajoute."""
+    c = AIR[kind]
+    frames = list(frames)
+    dt = 1.0 / (fps * 10)
+    t0, t1 = t_of(frames[0], f0, fps), t_of(frames[-1], f0, fps)
+    rng = random.Random(f"air:{kind}:{float(seed):.3f}")
+    ph = [rng.uniform(0, 2 * math.pi) for _ in range(6)]
+    h = 1.0 / 24.0
+    w = 2 * math.pi * c["hz"]
+    st = None
+    out = {}
+    want = {round(t_of(f, f0, fps) / dt): f for f in frames}
+    k0 = round((t0 - warmup) / dt)
+    for k in range(k0, round(t1 / dt) + 1):
+        t = k * dt
+        q0, qp, qm = fn(t), fn(t + h), fn(t - h)
+        ax, ay = (qp[0] - 2 * q0[0] + qm[0]) / (h * h), (qp[1] - 2 * q0[1] + qm[1]) / (h * h)
+        v = math.hypot(qp[0] - qm[0], qp[1] - qm[1]) / (2 * h)
+        hd = math.radians(q0[3])
+        a_f = -ax * math.sin(hd) + ay * math.cos(hd)        # le long du cap
+        a_left = -ax * math.cos(hd) - ay * math.sin(hd)     # vers la gauche du cap
+        # une trajectoire qui part lancée (immobile avant le plan) donne un pic sans réalité : ignoré au-delà de 5 g ;
+        # sinon l'accélération est bornée en douceur à 1 g (rien de ce qui vole ici ne tire plus)
+        mag = math.hypot(a_f, a_left)
+        if mag > 5.0 * G:
+            a_f = a_left = 0.0
+        elif mag > 1e-9:
+            s = soft_clamp(mag, G) / mag
+            a_f, a_left = a_f * s, a_left * s
+        # vers l'avant, le nez plonge (tangage < 0) ; vers la gauche, la cellule penche à gauche (roulis < 0)
+        tp = -c["gain"] * math.degrees(math.atan(a_f / G)) if c["pitch"] else 0.0
+        tr = -c["gain"] * math.degrees(math.atan(a_left / G))
+        tp, tr = soft_clamp(tp, c["max"]), soft_clamp(tr, c["max"])
+        if st is None:
+            st = [tp, 0.0, tr, 0.0]
+        st[1] += (w * w * (tp - st[0]) - 2 * c["zeta"] * w * st[1]) * dt
+        st[0] += st[1] * dt
+        st[3] += (w * w * (tr - st[2]) - 2 * c["zeta"] * w * st[3]) * dt
+        st[2] += st[3] * dt
+        if k in want:
+            hover = smoothstep(4.0, 1.0, v)
+            b = c["breath"] * hover
+            tr_ = c["trem"] * (1.0 - hover) * min(1.0, v / 20.0)
+            dp = (b * (0.7 * math.sin(2 * math.pi * 0.23 * t + ph[0]) + 0.3 * math.sin(2 * math.pi * 0.53 * t + ph[1]))
+                  + tr_ * math.sin(2 * math.pi * 1.7 * t + ph[2]))
+            dr = (b * 1.15 * (0.7 * math.sin(2 * math.pi * 0.17 * t + ph[3]) + 0.3 * math.sin(2 * math.pi * 0.41 * t + ph[4]))
+                  + tr_ * 1.3 * math.sin(2 * math.pi * 1.3 * t + ph[5]))
+            x, y, z, hh, p, r = fn(t)
+            out[want[k]] = (x, y, z, hh, p + st[0] + dp, r + st[2] + dr)
+    return out
+
+
 def key_object(ob, frames, fn, f0=F0, fps=FPS):
     """Clés de position et d'orientation d'un objet quelconque : fn(t) -> (x, y, z, cap, tangage, roulis) dans la
-    convention de lieux.put (hélicoptère, objets portés)."""
+    convention de lieux.put (hélicoptère, objets portés). Un aéronef (aircraft_kind : hélicoptère, avion) prend en
+    plus l'assiette de son accélération (aircraft_attitude), dynamique active ; sa position ne change pas."""
     _clear(ob)
     ob.rotation_mode = "XYZ"
+    frames = list(frames)
+    kind = aircraft_kind(ob) if dyn_on() else None
+    att = aircraft_attitude(fn, frames, kind, f0, fps, seed=sum(map(ord, ob.name)) % 97) if kind else None
     for f in frames:
-        x, y, z, h, p, r = fn(t_of(f, f0, fps))
+        x, y, z, h, p, r = att[f] if att else fn(t_of(f, f0, fps))
         ob.location = (x, y, z)
         ob.rotation_euler = (math.radians(p), math.radians(r), math.radians(h))
         ob.keyframe_insert("location", frame=f)

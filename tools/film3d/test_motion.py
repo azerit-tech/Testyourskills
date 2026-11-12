@@ -688,6 +688,41 @@ def test_steer_dyn():
     check("roues : vitesse de braquage bornée", rate <= M.STEER_RATE + 1e-6, f"{rate:.0f}°/s")
 
 
+def test_aircraft():
+    """Les aéronefs : l'hélicoptère pique pour accélérer, se cabre pour freiner, penche dans le virage ; l'avion
+    roule dans son virage ; au stationnaire l'assiette respire ; les positions ne changent jamais."""
+    fr = range(0, 30)
+
+    def line(a):
+        return lambda t: (0.0, 10.0 * t + 0.5 * a * t * t, 30.0, 0.0, -5.0, 0.0)
+    acc = M.aircraft_attitude(line(6.0), fr, "heli")
+    brk = M.aircraft_attitude(line(-6.0), fr, "heli")
+    check("hélicoptère : il pique pour accélérer", acc[25][4] < -5.0 - 1.0, f"{acc[25][4]:.1f}°")
+    check("hélicoptère : il se cabre pour freiner", brk[25][4] > -5.0 + 1.0, f"{brk[25][4]:.1f}°")
+    same = all(acc[f][:4] == line(6.0)(M.t_of(f))[:4] for f in fr)
+    check("hélicoptère : la trajectoire inchangée", same)
+
+    def turn(t, r=60.0, v=25.0):
+        a = v * t / r
+        return -r + r * math.cos(a), r * math.sin(a), 30.0, math.degrees(a), -6.0, 0.0
+    tl = M.aircraft_attitude(turn, fr, "heli", warmup=1.5)
+    check("hélicoptère : il penche dans le virage à gauche", tl[29][5] < -2.0, f"{tl[29][5]:.1f}°")
+    jt = M.aircraft_attitude(lambda t: turn(t, 900.0, 180.0), fr, "jet", warmup=1.5)
+    bank = math.degrees(math.atan(180.0 ** 2 / 900.0 / M.G))
+    check("avion : il roule dans son virage", -jt[29][5] > 0.6 * min(bank, 30.0), f"{jt[29][5]:.1f}° pour {bank:.0f}°")
+    hov = M.aircraft_attitude(lambda t: (0.0, 0.0, 20.0, 0.0, 0.0, 0.0), range(0, 60), "heli")
+    amp = max(abs(v[4]) + abs(v[5]) for v in hov.values())
+    check("hélicoptère : le stationnaire respire, doucement", 0.2 < amp < 2.5, f"{amp:.2f}°")
+    import p5_virage as P5
+    import p6_jetee as P6
+    p5 = M.aircraft_attitude(P5.heli, range(P5.F0 - 1, P5.F0 + P5.FRAMES + 1), "heli")
+    d5 = max(max(abs(v[4] - P5.heli(M.t_of(f))[4]), abs(v[5] - P5.heli(M.t_of(f))[5])) for f, v in p5.items())
+    check("P5 : l'hélicoptère s'incline, borné", 1.0 < d5 <= M.AIR["heli"]["max"] + 1.5, f"{d5:.1f}° ajoutés au plus")
+    fr6 = range(P6.F0 - 1, P6.F0 + P6.FRAMES + 1)
+    d6 = max(abs(v[4] - P6.heli(0)(M.t_of(f))[4]) for f, v in M.aircraft_attitude(P6.heli(0), fr6, "heli").items())
+    check("P6 : en poursuite à vitesse tenue, presque rien ajouté", d6 < 1.5, f"{d6:.2f}°")
+
+
 if __name__ == "__main__":
     test_straight()
     test_braking()
@@ -709,5 +744,6 @@ if __name__ == "__main__":
     test_arches()
     test_pack()
     test_steer_dyn()
+    test_aircraft()
     print(f"\n{'tout passe' if not FAIL else str(len(FAIL)) + ' échec(s)'}")
     sys.exit(1 if FAIL else 0)
