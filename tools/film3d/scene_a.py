@@ -1938,11 +1938,13 @@ def street_puddle(name, x, y, w, l, seed=21):
 
 
 def p1_props(P):
-    """Ce que la berline frôle en P1 : la flaque (street_puddle) et les feuilles de papier (blanc cassé, à peine
-    gondolées). Nommées fx_flaque et fx_papier_* pour fx.py."""
+    """Ce que la berline frôle en P1 : les feuilles de papier (blanc cassé, à peine gondolées), nommées fx_papier_*
+    pour fx.py ; la flaque (street_puddle, fx_flaque) si le plan en pose une (découpage v3 : plus de flaque, elle ne
+    se voit pas de dos)."""
     import road
-    x, y, w, l = P.PUDDLE
-    street_puddle("fx_flaque", x, y, w, l)
+    if getattr(P, "PUDDLE", None):
+        x, y, w, l = P.PUDDLE
+        street_puddle("fx_flaque", x, y, w, l)
     paper = mat_plain("p1_papier", (0.78, 0.76, 0.70, 1), 0.85)
     for i, (px, py, rot) in enumerate(P.PAPERS):
         bm = bmesh.new()
@@ -1958,13 +1960,13 @@ def p1_props(P):
         bpy.context.scene.collection.objects.link(ob)
         ob.location = (px, py, road.road_z(px) + 0.006)
         ob.rotation_euler = (0.0, 0.0, math.radians(rot))
-    print(f"[scene_a] P1 : ornière d'eau en ({x:.2f}, {y:.1f}), {len(P.PAPERS)} feuilles de papier", flush=True)
+    print(f"[scene_a] P1 : {len(P.PAPERS)} feuilles de papier", flush=True)
 
 
 def p1_motion(scene, coupe, police, cam, focus):
-    """Le plan P1 animé (p1_avenue.py), 2,5 s après OUV : la berline et la patrouille sur leurs rigs (roues,
-    suspension), la rampe éteinte puis allumée (corail et lilas, 2 Hz, motion.flash_bars) ; la caméra la précède
-    de trois quarts avant droit, au ras de la chaussée, en travelling avant (p1_avenue.camera)."""
+    """Le plan P1 animé (p1_avenue.py), après l'ellipse d'OUV : la berline et la patrouille sur leurs rigs (roues,
+    suspension), la rampe clignotante (corail et lilas, 2 Hz, motion.flash_bars) à partir de p1_avenue.bars_on ; la
+    caméra la suit de dos au ras de la chaussée, sur un rail (p1_avenue.camera)."""
     import motion as M
     import p1_avenue as P
     frames = range(P.F0, P.F0 + P.FRAMES)
@@ -1991,8 +1993,8 @@ def p1_motion(scene, coupe, police, cam, focus):
                   front=police.get("front_axle"))
     M.key_vehicle(prig, pp, wheels=wh, pivot=(0.0, 0.0, 0.36))
     M.wheel_marks(wh, wr, axis="Y")
-    # ses phares en veilleuse : à 450 W et 25 de force, leur reflet sur la chaussée mouillée brûlait plus fort que la
-    # berline (images 14 et 28 du premier rendu à 256) ; on regardait lui, pas elle
+    # ses phares à la force que fixe le plan (v2, de face : en veilleuse, leur reflet brûlait plus fort que la
+    # berline ; v3, de dos : pleins, ils jettent son ombre devant elle)
     for ob in police.children_recursive:
         if ob.type == "LIGHT" and "_head_" in ob.name:
             ob.data.energy = P.PATROL_HEAD_W
@@ -2031,8 +2033,7 @@ def p1_motion(scene, coupe, police, cam, focus):
         for fc in M.fcurves(idb):
             for kp in fc.keyframe_points:
                 kp.interpolation = "CONSTANT"
-    # la caméra : devant elle, de trois quarts avant droit, sur un rail ; point à 20 m, la berline et la patrouille
-    # nettes toutes les deux
+    # la caméra : sur un rail, de dos ; le point sur la berline
     cam.data.shift_y = 0.0
     M.key_camera(cam, frames, P.camera)
     cam.data.dof.focus_object = None

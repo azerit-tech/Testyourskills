@@ -480,32 +480,43 @@ def test_spin_steps():
 
 
 def test_p1():
-    """P1, après l'ellipse (§18.36) : la position d'OUV prolongée de 2,5 s à vitesse constante, la même vitesse au
-    début ; la patrouille derrière, dans la même voie, à plus de 15 m ; la rampe s'allume dans le plan ; la caméra
-    (découpage v2, option A) devant la berline, hors de sa voie, sans jamais la toucher, et rattrapée en douceur."""
+    """P1 (découpage v3), après l'ellipse : la position d'OUV prolongée de ELLIPSIS à vitesse constante, la même
+    vitesse au début ; la patrouille à gauche, sur la double ligne, 1,5 m d'air au moins entre les caisses et 0,8 m
+    entre elle et l'objectif ; hors champ au début, son capot dans le cadre de l'image 30 à la fin ; la caméra
+    derrière tout le plan, rattrapée sans à-coup ; la berline au point de coupe au début et à la fin."""
     import ouv_avenue as O
     import p1_avenue as P
     h = 1.0 / 240.0
     last = O.hero_pos(M.t_of(O.F0 + O.FRAMES - 1))
     want = last[1] + O.SPEED * (P.ELLIPSIS + 1.0 / M.FPS)
     gap = abs(P.hero_pos(0.0)[1] - want) + abs(P.hero_pos(0.0)[0] - last[0])
-    check("P1 : OUV prolongé de 2,5 s à vitesse constante", gap < 1e-6, f"{gap:.2e} m")
+    check(f"P1 : OUV prolongé de {P.ELLIPSIS} s à vitesse constante", gap < 1e-6, f"{gap:.2e} m")
     v1 = (P.hero_pos(h)[1] - P.hero_pos(0.0)[1]) / h
     check("P1 : même vitesse au début", abs(v1 - O.SPEED) < 0.01, f"{v1 * 3.6:.2f} km/h")
     frames = range(P.F0, P.F0 + P.FRAMES)
-    behind = min(P.hero_pos(M.t_of(f))[1] - P.patrol_pos(M.t_of(f))[1] for f in frames)
-    lane = max(abs(P.patrol_pos(M.t_of(f))[0] - P.hero_pos(M.t_of(f))[0]) for f in frames)
-    check("P1 : la patrouille derrière, à plus de 15 m, à moins d'une voie de côté", behind > 15.0 and lane < 1.5,
-          f"{behind:.1f} m au plus près, {lane:.2f} m d'écart latéral")
-    on = [f for f in frames if P.bars_on(f)]
-    check("P1 : la rampe s'allume dans le plan", on and on[0] > frames[0], f"image {on[0] if on else None}")
-    cams = [P.camera(M.t_of(f)) for f in frames]
-    ahead = [c[1] - P.hero_pos(M.t_of(f))[1] for c, f in zip(cams, frames)]
-    side = min(c[0] - P.hero_pos(M.t_of(f))[0] for c, f in zip(cams, frames))
-    check("P1 : la caméra devant, à plus de 10 m, hors de la voie de la berline", min(ahead) > 10.0 and side > 2.0,
-          f"{min(ahead):.2f} m au plus près, {side:.2f} m à droite")
-    step = max(abs(b - a) for a, b in zip(ahead, ahead[1:]))
-    check("P1 : la caméra se laisse rattraper sans à-coup", ahead[-1] < ahead[0] and step < 0.2, f"{step:.3f} m par image")
+    air = min(P.body_gap(M.t_of(f)) for f in frames)
+    lens = min(P.lens_gap(M.t_of(f)) for f in frames)
+    left = min(P.hero_pos(M.t_of(f))[0] - P.patrol_pos(M.t_of(f))[0] for f in frames)
+    check("P1 : la patrouille à gauche, 1,5 m d'air entre les caisses, 0,8 m de l'objectif",
+          air >= 1.5 and lens >= 0.8 and left > 2.0, f"{air:.2f} m, {lens:.2f} m, {left:.2f} m à gauche")
+    seen = []
+    for f in frames:
+        c = P.camera_rail(M.t_of(f))
+        pat = M.hero_screen(c, *P.patrol_pos(M.t_of(f)), 0.0, 0.0, box=(5.1, 1.95, 1.5))
+        if pat and pat["u1"] > 0.0 and pat["u0"] < 1.0:
+            seen.append(f)
+    check("P1 : la patrouille hors champ au début, dans le cadre de l'image 30 à la fin",
+          seen and seen[0] > 10 and all(f in seen for f in range(30, P.F0 + P.FRAMES)),
+          f"de l'image {seen[0] if seen else None} à {seen[-1] if seen else None}")
+    back = [P.hero_pos(M.t_of(f))[1] - P.camera_rail(M.t_of(f))[1] for f in frames]
+    step = max(abs(b - a) for a, b in zip(back, back[1:]))
+    check("P1 : la caméra derrière, distancée sans à-coup au bond", min(back) > 6.0 and back[-1] > back[0] and step < 0.1,
+          f"de {back[0]:.2f} à {back[-1]:.2f} m, {step:.3f} m par image au plus")
+    for f in (P.F0, P.F0 + P.FRAMES - 1):
+        car = M.hero_screen(P.camera_rail(M.t_of(f)), *P.hero_pos(M.t_of(f)), 0.0, 0.0)
+        x, y = car["u"] * 100, car["v"] * 100
+        check(f"P1 : la berline au point de coupe à l'image {f}", abs(x - 50) <= 8 and abs(y - 55) <= 5,
+              f"x {x:.0f}, y {y:.0f}, largeur {car['w'] * 100:.0f} %")
 
 
 def test_bars():
