@@ -1136,6 +1136,7 @@ def key_camera(cam, frames, fn, f0=F0, fps=FPS, operator=True):
 #   python3 tools/film3d/motion.py mesure [PLAN…]
 
 HERO_BOX = (4.9, 1.8, 1.45)      # la berline : longueur, largeur, hauteur (m)
+SMOOTH_HALF = 2                  # images de part et d'autre : la moyenne de la colonne « finale » (5 images)
 
 
 class handheld_off:
@@ -1193,7 +1194,7 @@ def shot_metrics(cam, hero, frames, heading=None, slip=None, ground=None, tracks
     passe à key_camera ; hero(t) -> (x, y) ; son cap : heading(t), sinon celui de sa marche plus slip(t) (rest à
     l'arrêt) ; ground(x, y) -> (z, …) le sol sous elle ; tracks : les pos(t) des véhicules (secousses de passage).
     frames : les images rendues ; op : des réglages de l'opérateur (OPERATOR) à changer pour la mesure.
-    Rend {"lissee": {...}, "finale": {...}, "kind": ..., "derriere": ..., "debut": ..., "fin": ...}."""
+    Rend {"lissee": {...}, "finale": {...}, "brute": {...}, "kind": ..., "derriere": ..., "debut": ..., "fin": ...}."""
     frames = list(frames)
     keyed = list(range(frames[0] - 1, frames[-1] + 2))
 
@@ -1226,9 +1227,9 @@ def shot_metrics(cam, hero, frames, heading=None, slip=None, ground=None, tracks
         final = {f: tuple(cam(t_of(f, f0, fps))) for f in keyed}
         kind = camera_kind(cam, keyed, f0, fps)
 
-    def rates(vals):
+    def rates(vals, angles=None):
         out = {}
-        ang = vals
+        ang = angles or vals
         for key, i in (("pan", 3), ("tilt", 4)):
             best, at = 0.0, frames[0]
             for fa, fb in zip(frames, frames[1:]):
@@ -1245,13 +1246,30 @@ def shot_metrics(cam, hero, frames, heading=None, slip=None, ground=None, tracks
         out["v_rel_at"], out["a_rel_at"] = frames[v.index(max(v))], frames[1 + a.index(max(a))]
         return out
 
+    def perceived(vals):
+        """Le lacet et le site des clés moyennés sur cinq images (0,2 s), fenêtre symétrique qui se resserre aux
+        bords (une rampe reste une rampe) : les vibrations (7 à 14 Hz), ressauts et tremblés rapides s'y effacent,
+        le mouvement reste. Les positions restent les clés : la vibration n'y pèse que quelques millimètres."""
+        un, prev = {}, None
+        for f in frames:
+            y = vals[f][3] if prev is None else _unwrap(prev, vals[f][3])
+            un[f] = (y, vals[f][4])
+            prev = y
+        out = {}
+        for f in frames:
+            h = min(SMOOTH_HALF, f - frames[0], frames[-1] - f)
+            win = [un[g] for g in range(f - h, f + h + 1)]
+            out[f] = (*vals[f][:3], sum(w[0] for w in win) / len(win), sum(w[1] for w in win) / len(win),
+                      *vals[f][5:])
+        return out
+
     behind = 0
     for f in frames:
         h = math.radians(hh[f])
         dx, dy = final[f][0] - hp[f][0], final[f][1] - hp[f][1]
         behind += (dx * -math.sin(h) + dy * math.cos(h)) < 0.0
     first, last = frames[0], frames[-1]
-    return dict(lissee=rates(smooth), finale=rates(final), kind=kind,
+    return dict(lissee=rates(smooth), finale=rates(final, perceived(final)), brute=rates(final), kind=kind,
                 derriere=behind / len(frames),
                 debut=hero_screen(final[first], *hp[first], hh[first], box),
                 fin=hero_screen(final[last], *hp[last], hh[last], box))
@@ -1332,20 +1350,21 @@ def measure_table(res):
     """Le tableau des mesures, une ligne par plan (lissée / finale)."""
     def scr(s):
         return "      hors champ     " if not s else f"{s['u'] * 100:3.0f} {s['v'] * 100:3.0f} {s['w'] * 100:3.0f}"
-    lines = ["plan  type   panoramique °/s (image)   bascule °/s (image)   v rel m/s       a rel m/s²    "
+    lines = ["plan  type   panoramique °/s (image)   bascule °/s (image)       v rel m/s       a rel m/s²    "
              "derrière  début u v l %  fin u v l %",
-             "             lissée finale             lissée finale         lissée finale  lissée finale"]
+             "             lissée finale brute       lissée finale brute     lissée finale  lissée finale"]
     for p, m in res.items():
         k = m["kind"]
         typ = ("tele" if k.get("tele") else "pan" if k.get("pan_active", k.get("pan", 0) >= OPERATOR["pan_min"])
                else "trav" if k.get("travel", 0) > 1.5 else "fixe") + ("/air" if k.get("air") else "")
-        a, b = m["lissee"], m["finale"]
-        lines.append(f"{p:5s} {typ:6s} {a['pan']:6.1f} {b['pan']:6.1f} ({a['pan_at']:2d})           "
-                     f"{a['tilt']:6.1f} {b['tilt']:6.1f} ({a['tilt_at']:2d})       "
+        a, b, c = m["lissee"], m["finale"], m["brute"]
+        lines.append(f"{p:5s} {typ:6s} {a['pan']:6.1f} {b['pan']:6.1f} {c['pan']:5.1f} ({a['pan_at']:2d})     "
+                     f"{a['tilt']:6.1f} {b['tilt']:6.1f} {c['tilt']:5.1f} ({a['tilt_at']:2d})   "
                      f"{a['v_rel']:6.1f} {b['v_rel']:6.1f}  {a['a_rel']:6.1f} {b['a_rel']:6.1f}   "
                      f"{m['derriere'] * 100:4.0f} %   {scr(m['debut'])}    {scr(m['fin'])}")
-    lines.append("lissée : la caméra écrite sans ses tremblés ; finale : les clés, tremblés et opérateur compris, "
-                 "image à image. u, v : centre de la berline depuis la gauche et le haut, l : sa largeur, en % du cadre.")
+    lines.append("lissée : la caméra écrite sans ses tremblés ; finale : les clés (tremblés et opérateur compris) "
+                 f"moyennées sur {2 * SMOOTH_HALF + 1} images ; brute : les clés image à image. u, v : centre de la "
+                 "berline depuis la gauche et le haut, l : sa largeur, en % du cadre.")
     return "\n".join(lines)
 
 

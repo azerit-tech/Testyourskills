@@ -10,7 +10,7 @@ FRAMES = range(0, 30)
 FAIL = []
 
 # Les plafonds des caméras, plan par plan (motion.shot_metrics, colonne « finale » : les clés, tremblés et
-# opérateur compris). None : pas de contrôle. Un nombre vaut pour les neuf
+# opérateur compris, lacet et site moyennés sur cinq images). None : pas de contrôle. Un nombre vaut pour les neuf
 # plans ; CAM_LIMITS_PLAN les remplace plan par plan, par exemple {"P5": dict(pan=60.0, behind=0.5)}.
 CAM_PAN_MAX = None       # °/s : le lacet, d'une image à la suivante
 CAM_TILT_MAX = None      # °/s : le site
@@ -18,6 +18,8 @@ CAM_VREL_MAX = None      # m/s : la caméra par rapport à la berline
 CAM_AREL_MAX = None      # m/s² : son accélération par rapport à la berline
 CAM_BEHIND_MIN = None    # part des images (0 à 1) où la caméra est derrière la berline (demi-espace arrière du cap)
 CAM_LIMITS_PLAN = {}
+CAM_VIB_TOL = 1.0        # °/s : ce que la vibration, les ressauts et les secousses de passage de l'opérateur
+                         # ajoutent au plus aux vitesses de la colonne « finale »
 
 
 def check(name, ok, detail=""):
@@ -799,11 +801,18 @@ def test_operator():
 
 
 def test_camera_measure():
-    """La mesure des caméras des neuf plans (sans Blender) : chaque plan mesuré ; les plafonds de tête de
-    fichier, plan par plan."""
+    """La mesure des caméras des neuf plans (sans Blender) : chaque plan mesuré ; la vibration de l'opérateur ne
+    compte pas comme un mouvement (avec et sans vibration, ressauts ni secousses, les vitesses de la colonne
+    « finale » diffèrent de moins de CAM_VIB_TOL) ; les plafonds de tête de fichier, plan par plan."""
     res = M.measure_shots()
     check("caméras : les neuf plans mesurés", list(res) == list(M.PLANS)
           and all(m["debut"] and m["fin"] for m in res.values()), ", ".join(res))
+    if M.dyn_on():
+        calm = M.measure_shots(op=dict(vib_deg=0.0, vib_z=0.0, jolt_deg=0.0, jolt_z=0.0, pass_deg=0.0))
+        worst = max(((abs(res[p]["finale"][k] - calm[p]["finale"][k]), p, k, res[p]["brute"][k] - calm[p]["brute"][k])
+                     for p in res for k in ("pan", "tilt")))
+        check("caméras : la vibration ne compte pas dans les vitesses", worst[0] <= CAM_VIB_TOL,
+              f"au plus {worst[0]:.2f}°/s ({worst[1]}, {worst[2]}) ; image à image, sans moyenne : {worst[3]:+.2f}°/s")
     lim = dict(pan=CAM_PAN_MAX, tilt=CAM_TILT_MAX, v_rel=CAM_VREL_MAX, a_rel=CAM_AREL_MAX, behind=CAM_BEHIND_MIN)
     for p, m in res.items():
         L = dict(lim, **CAM_LIMITS_PLAN.get(p, {}))
