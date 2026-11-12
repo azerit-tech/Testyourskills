@@ -21,7 +21,7 @@ function isoWeek(monday: number): number {
 }
 
 const ALL: [string, number][] = [
-  ["sindresorhus", 91],
+  ["svaaland", 91],
   ["leamd", 84],
   ["nour-rs", 79],
   ["camroux", 74],

@@ -133,7 +133,7 @@ describe("la ligne de la note finale", () => {
 });
 
 describe("la page partagée : ni école ni ancien employeur", () => {
-  const NAMES = /Télécom|Stealth|Orsay|Junior/;
+  const NAMES = /Halbrune|Stealth|Orsay|Junior/;
   const rows = (grid: Grid, shared: boolean, lang: Lang = "fr") =>
     grid.criteria.map((c) => rowText(c, { g: DICTS[lang].grid, pick: (f) => pick(f, lang), declared: "linkedin", shared }));
   const text = (r: ReturnType<typeof rowText>) => [r.line, r.label, r.href, r.reached, r.next, ...r.flags].filter(Boolean).join(" | ");

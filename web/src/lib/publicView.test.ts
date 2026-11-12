@@ -18,7 +18,7 @@ describe("la grille vue par un visiteur", () => {
   it("l'école : ni rang ni nom ; sa note seulement si elle a fait monter la note", () => {
     const g = publicGrid(declaredGridMock("LinkedIn"));
     const edu = byCode(g, "EDU");
-    expect(all(g)).not.toMatch(/Télécom|rang A|tier A/);
+    expect(all(g)).not.toMatch(/Halbrune|rang A|tier A/);
     expect(edu.reached).toEqual(SCHOOL_KEPT);
     expect(edu.evidence).toBeUndefined();
     // Comptée dans la moyenne : sa note reste, la formule tombe juste.
@@ -67,7 +67,7 @@ describe("la grille vue par un visiteur", () => {
   it("ni « ce qui manque » ni texte qui nomme ; idempotent", () => {
     const g = publicGrid(cmp.grid);
     expect(g.criteria.every((c) => c.next === undefined)).toBe(true);
-    expect(all(g)).not.toMatch(/Stealth|Orsay|Banque|Télécom/);
+    expect(all(g)).not.toMatch(/Stealth|Orsay|Banque|Halbrune/);
     expect(publicGrid(g)).toEqual(g);
   });
 

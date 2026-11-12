@@ -291,19 +291,19 @@ function declaredDrafts(src: "LinkedIn" | "CV", proof?: string, ghRepos?: number
   const p = proof ? { proof } : {};
   const fr = (s: string) => s.replaceAll("{src}", src);
   return [
-    c("EDU", 8, "scored", "linkedin", f("Télécom Paris, rang A.", "Télécom Paris, tier A."), {
+    c("EDU", 8, "scored", "linkedin", f("École Halbrune, rang A.", "École Halbrune, tier A."), {
       next: f(
         "Pour 10 : une école de rang S, ou une médaille internationale (olympiade, finale mondiale d'un concours de programmation).",
         "For 10: a tier S school, or an international medal (olympiad, world final of a programming contest).",
       ),
-      evidence: { text: f("Télécom Paris, rang A.", "Télécom Paris, tier A."), publicText: f("École de rang A.", "Tier A school."), source: "linkedin", ...p },
+      evidence: { text: f("École Halbrune, rang A.", "École Halbrune, tier A."), publicText: f("École de rang A.", "Tier A school."), source: "linkedin", ...p },
     }),
     c("XP", 9, "scored", "linkedin", f("8,4 ans comptés sur les postes datés : le palier « 8 ans ».", `8.4 years counted on the dated roles: the "8 years" step.`), {
       next: f("Pour 10 : 10 ans comptés. Tu en as 8,4.", "For 10: 10 years counted. You have 8.4."),
       evidence: {
         text: f(
-          "14 mois de stage ou d'alternance comptés pour moitié. 41 mois à la tête de Stealth Startup. 55 mois chez Banque Orsay. Junior Télécom est une association : non compté. Total : 8,4 ans.",
-          "14 months of internship or work-study counted at half. 41 months running Stealth Startup. 55 months at Banque Orsay. Junior Télécom is an association: not counted. Total: 8.4 years.",
+          "14 mois de stage ou d'alternance comptés pour moitié. 41 mois à la tête de Stealth Startup. 55 mois chez Banque Orsay. Junior Halbrune est une association : non compté. Total : 8,4 ans.",
+          "14 months of internship or work-study counted at half. 41 months running Stealth Startup. 55 months at Banque Orsay. Junior Halbrune is an association: not counted. Total: 8.4 years.",
         ),
         publicText: f(
           "14 mois de stage ou d'alternance comptés pour moitié. 41 mois à la tête d'une entreprise fondée. 55 mois dans un poste. Un poste d'association : non compté. Total : 8,4 ans.",

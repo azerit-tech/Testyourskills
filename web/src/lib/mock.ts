@@ -43,12 +43,12 @@ const BY_LOGIN: Record<string, FixtureKey> = {
   "kevin-dev42": "bronze",
   camroux: "silver",
   leamd: "gold",
-  sindresorhus: "icon",
-  torvalds: "icon",
+  svaaland: "icon",
+  otessier: "icon",
   "nour-rs": "wonderkid",
   jplefevre: "flashback",
   "ghost-coder": "lowReliability",
-  // une étoile (26), pour la démo du film (§18.36) : 1, 3 (ghost-coder) et 6 étoiles (sindresorhus)
+  // une étoile (26), pour la démo du film (§18.36) : 1, 3 (ghost-coder) et 6 étoiles (svaaland)
   x: "unknownLang",
   bronze: "bronze",
   silver: "silver",
