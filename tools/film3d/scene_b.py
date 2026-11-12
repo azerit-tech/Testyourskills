@@ -210,6 +210,29 @@ def road_module():
 # plus lisse. Le vernis d'eau garde son poids plein : le sol pâle de P3 n'était pas un reflet (les passes par groupe
 # l'ont mis sur les flammes des tirs, non liées), et le plafonner n'éteignait que les traînées des enseignes.
 RUE_STYLE = dict(road.STYLES["sechage"], dark=0.45, wet=(0.36, 0.22), cr=(0.14, 0.24))
+# la rugosité de l'enrobé et du caniveau sous la pellicule, × 0,5 (l'essai « rugosite » de render_film.py, retenu) :
+# les reflets des phares se resserrent en traînées au lieu de s'étaler en voile
+ROAD_ROUGH = 0.5
+
+
+def road_gloss(k=ROAD_ROUGH):
+    n = 0
+    for m in bpy.data.materials:
+        if not (m.node_tree and m.name.startswith(("rue_asphalt", "rue_gutter"))):
+            continue
+        nt = m.node_tree
+        for p in [nd for nd in nt.nodes if nd.type == "BSDF_PRINCIPLED"]:
+            inp = p.inputs["Roughness"]
+            if inp.links:
+                mul = nt.nodes.new("ShaderNodeMath")
+                mul.operation = "MULTIPLY"
+                mul.inputs[1].default_value = k
+                nt.links.new(inp.links[0].from_socket, mul.inputs[0])
+                nt.links.new(mul.outputs[0], inp)
+            else:
+                inp.default_value *= k
+            n += 1
+    log(f"chaussée : rugosité × {k} sur {n} matières")
 
 
 def build_street(hidden):
@@ -696,9 +719,12 @@ def build_foreground(hidden, plan):
     cx, cy = plan["cam"][:2]
     water, N, out = A.material("rue_puddle")
     bsdf = N.new("ShaderNodeBsdfPrincipled")
-    bsdf.inputs["Base Color"].default_value = (0.006, 0.006, 0.007, 1)
-    bsdf.inputs["Roughness"].default_value = 0.02
+    # (un miroir parfait au ras du sol ne renvoie que le ciel noir au-dessus des agents : des trous. Une ride fine
+    # et un peu de flou étirent dans l'eau les guirlandes, les enseignes et les phares ; le fond, l'enrobé noyé)
+    bsdf.inputs["Base Color"].default_value = (0.018, 0.017, 0.018, 1)
+    bsdf.inputs["Roughness"].default_value = 0.05
     bsdf.inputs["IOR"].default_value = 1.33
+    N.set(bsdf.inputs["Normal"], road.ripples(N, road.coords(N)[0], scale=22.0, strength=0.12))
     N.link(bsdf.outputs[0], out.inputs["Surface"])
     # (au ras du sol, une flaque de 50 cm à 2 m remplit le bas du cadre : petites et éclatées près de la caméra ;
     # positions relatives à la caméra)
@@ -882,7 +908,8 @@ def officer_light(officers, plan, receivers=()):
         bmesh.ops.create_icosphere(bm, subdivisions=2, radius=1.0)
         bm.to_mesh(me)
         bm.free()
-        me.materials.append(A.mat_emit("muzzle_flash", lin("#fff4e2"), 600.0))
+        # (25 : à 600, le halo du compositing faisait de l'éclair un voile blanc sur tout le centre du cadre)
+        me.materials.append(A.mat_emit("muzzle_flash", lin("#fff4e2"), 25.0))
         flash = me
     for k, a in enumerate(officers):
         o = a.matrix_world.translation.copy()
@@ -916,7 +943,7 @@ def officer_light(officers, plan, receivers=()):
             f.visible_shadow = False
             flames.append(f)
         # (assez pour découper l'agent, pas pour brûler le flanc blanc de la patrouille à côté)
-        lf = A.add_light(f"muzzle_{k}", "POINT", m + d * 0.15 + Vector((0, 0, 0.1)), (0, 0, -1), lin("#fff3e0"), 1500.0)
+        lf = A.add_light(f"muzzle_{k}", "POINT", m + d * 0.15 + Vector((0, 0, 0.1)), (0, 0, -1), lin("#fff3e0"), 250.0)
         lf.data.shadow_soft_size = 0.04
         lf.visible_camera = False
         # (l'éclair n'allume que les agents, leurs armes, les portières et les patrouilles : pas la chaussée)
@@ -986,6 +1013,12 @@ def build_barrage(scene, hidden, plan):
         a.rotation_mode = "XYZ"
         a.rotation_euler = (0, 0, math.atan2(fx, -fy))
         officers.append(a)
+    # leurs phares, braqués sur la brèche, en veilleuse (120 W au lieu de 450) : à pleine force, de face à 6 m, ils
+    # blanchissaient l'avant de la berline jusqu'au rose (le bordeaux d'OUV et de P4 se perdait)
+    for car in cars[:2]:
+        for lo in car.children_recursive:
+            if lo.type == "LIGHT" and "_head_" in lo.name:
+                lo.data.energy = 120.0
     # la troisième, 60 m derrière la berline, gyrophares au fond de la rue
     far = cars[2]
     cx, cy = plan["chase"]
@@ -1094,7 +1127,14 @@ def haze(name, x0, x1, y0, y1, z0, z1, density, color="#b8b4d8", aniso=0.45, sof
 
 # ---------------------------------------------------------------- la scène
 
+# la peinture de la berline dans cette rue : le bordeaux du catalogue (#4e0a28) est tiré vers le pourpre pour
+# l'ambre de l'avenue ; sous les lanternes blanches, les guirlandes et le lilas des rampes, il virait au rose
+# framboise. Ici, moins de bleu et moins clair : le bordeaux d'OUV et de P4 (FILM3D_PAINT l'emporte toujours)
+P3_PAINT = "#3c0812"
+
+
 def place_hero(scene, plan):
+    os.environ.setdefault("FILM3D_PAINT", P3_PAINT)
     car = A.street_hero(scene)
     x, y, yaw = plan["hero"]
     car.location = (x, y, 0.0)
@@ -1105,18 +1145,22 @@ def place_hero(scene, plan):
     # (1000 W et non 2600 : face à la caméra, à 10 m, leur reflet brillant sur l'enrobé mouillé faisait le voile du
     # sol de P3, 82 % de sa luminance au bas du cadre et 43 % jusqu'aux plots ; passes diffus / brillant et groupes
     # fins, lab/lightgroups.py --split)
+    # (400 W et 34° : à 1000 W et 44°, de l'image 17 à l'image 21, ils mangeaient la calandre et blanchissaient
+    # tout le bas du cadre ; ce qu'il en reste suffit à découper les agents)
     for lo in spots:
-        lo.data.energy = 1000.0
-        lo.data.spot_size = math.radians(44)
+        lo.data.energy = 400.0
+        lo.data.spot_size = math.radians(34)
         # le halo vient des cœurs et de la nappe : dans la brume générale, les faisceaux voileraient le sol
         try:
-            lo.data.volume_factor = 0.35
+            lo.data.volume_factor = 0.1
         except AttributeError:
             pass
         lo.data.spot_blend = 0.45
     # la carrosserie bordeaux lisible malgré le contre-jour : une nappe douce au-dessus du capot, côté barrage
     # (la lueur des vitrines et des rampes), invisible à la caméra ; son reflet dessine le capot et les ailes
-    fill = A.add_light("hero_fill", "AREA", (x, y - 4.5, 4.0), (0.0, 4.5, -3.2), lin("#ffe2cc"), 1100.0, (2.4, 1.4))
+    # (150 W d'un blanc à peine chaud : à 1100 W rosé, le bordeaux de la caisse virait au saumon, celui d'OUV et de
+    # P4 le veut sombre ; les vitrines et les rampes suffisent à le dessiner)
+    fill = A.add_light("hero_fill", "AREA", (x, y - 4.5, 4.0), (0.0, 4.5, -3.2), lin("#fff0e6"), 150.0, (2.4, 1.4))
     fill.visible_camera = False
     only_on(fill, [car], "hero_fill")
     # le cœur des phares, vu de face à 20 m : une petite sphère émissive à la place de chaque lampe (le verre du
@@ -1127,7 +1171,8 @@ def place_hero(scene, plan):
     bmesh.ops.create_icosphere(bm, subdivisions=2, radius=0.075)
     bm.to_mesh(me)
     bm.free()
-    me.materials.append(A.mat_emit("hero_lamp_core", lin("#fff2dc"), 500.0))
+    # (40 : à 500, le halo du compositing faisait des deux cœurs une seule tache blanche sur la calandre)
+    me.materials.append(A.mat_emit("hero_lamp_core", lin("#fff2dc"), 40.0))
     for k, lo in enumerate(spots):
         core = bpy.data.objects.new(f"hero_lamp_core_{k}", me)
         scene.collection.objects.link(core)
@@ -1236,6 +1281,7 @@ def build():
     build_furniture(M, hidden)
     build_foreground(hidden, plan)
     build_barrage(scene, hidden, plan)
+    road_gloss()
     hidden.hide_render = True
     hidden.hide_viewport = True
     for c in bpy.data.collections:
@@ -1252,8 +1298,9 @@ def build():
     haze("haze_barrage", -6.5, 6.5, 9.0, 34.0, -0.05, 30.0, 0.0015, aniso=0.55)
     # devant la berline, au ras du sol, une nappe plus dense qui diffuse vers l'avant : le halo des phares
     hx, hy = plan["hero"][:2]
-    # (seulement autour des phares, pas jusqu'à la caméra : le sol devant reste un sol mouillé sombre)
-    haze("haze_lamps", hx - 2.5, hx + 2.5, 10.0, hy + 0.5, -0.05, 2.6, 0.02, aniso=0.65, soft=True)
+    # (seulement autour des phares, pas jusqu'à la caméra : le sol devant reste un sol mouillé sombre ; 0,003 et
+    # non 0,02 : plus dense, ce halo posait un voile blanc sur la caisse, et le bordeaux devenait rose)
+    haze("haze_lamps", hx - 2.5, hx + 2.5, 10.0, hy + 0.5, -0.05, 2.6, 0.003, aniso=0.65, soft=True)
 
     # la caméra du plan
     cam = bpy.data.cameras.new("cam")
@@ -1277,13 +1324,15 @@ def build():
     scene.camera = co
     to_world(scene)
     A.render_settings(scene)
-    # le halo des phares plus large que sur l'avenue : ils flarent dans la brume du barrage
+    # le halo du compositing : un peu plus fort que sur l'avenue, mais seulement sur les vraies sources (seuil 3) ;
+    # à 0,22 et 0,75 au seuil de 1,2, les phares de face et les éclairs voilaient tout le centre du cadre
     for ng in bpy.data.node_groups:
         for nd in ng.nodes:
             if nd.type == "GLARE":
                 try:
-                    nd.inputs["Strength"].default_value = 0.22
-                    nd.inputs["Size"].default_value = 0.75
+                    nd.inputs["Threshold"].default_value = 3.0
+                    nd.inputs["Strength"].default_value = 0.14
+                    nd.inputs["Size"].default_value = 0.65
                 except Exception as e:
                     log(f"halo : {e!r}")
     ANIMATE[PLAN](scene)
