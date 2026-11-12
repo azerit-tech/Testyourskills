@@ -1674,46 +1674,14 @@ def tree_grate(name, x, y, size=1.3):
 
 # ---------------------------------------------------------------- scène
 
-def make_world(scene):
-    """Le ciel : HDRI réel, ramené à la palette par l'élévation."""
-    world = bpy.data.worlds.new("blue_hour")
-    scene.world = world
-    if hasattr(world, "use_nodes"):
-        world.use_nodes = True
-    nt = world.node_tree
-    for n in list(nt.nodes):
-        nt.nodes.remove(n)
-    N = Nodes(nt)
-    tc = N.new("ShaderNodeTexCoord")
-    # la lueur du soleil couché au bout de l'avenue (+y), le ciel plus sombre derrière la caméra
-    mp = N.new("ShaderNodeMapping", Rotation=(0, 0, math.radians(-90)))
-    N.link(tc.outputs["Generated"], mp.inputs[0])
-    env = N.new("ShaderNodeTexEnvironment")
-    env.image = bpy.data.images.load(os.path.join(ASSETS, "qwantani_dusk_2_puresky_2k.exr"))
-    N.link(mp.outputs[0], env.inputs[0])
-    dxyz = N.sep(tc.outputs["Generated"])
-    elev = N.math("MAXIMUM", dxyz[2], 0.0)
-    # la bande corail n'existe que du côté du couchant, au bout de l'avenue
-    toward = N.math("POWER", N.math("MAXIMUM", dxyz[1], 0.0), 3.0)
-    dusk = N.ramp(elev, [(0.0, lin(CORAL)), (0.03, lin("#b9586f")), (0.08, lin(INDIGO)), (0.3, lin("#303c80")), (0.7, lin(NAVY))])
-    night = N.ramp(elev, [(0.0, lin("#3c3f86")), (0.1, lin("#2f3a78")), (0.5, lin(NAVY))])
-    tint = N.mix(toward, night, dusk)
-    bw = N.new("ShaderNodeRGBToBW")
-    N.link(env.outputs["Color"], bw.inputs[0])
-    # la luminance de l'HDRI, comprimée : on garde ses nuages, pas son exposition
-    lum = N.math("MULTIPLY", N.math("POWER", bw.outputs[0], 0.5), 0.9)
-    skycol = N.mix(1.0, tint, N.new("ShaderNodeCombineColor").outputs[0], "MULTIPLY")
-    graded = N.new("ShaderNodeMix", _data_type="RGBA", _blend_type="MULTIPLY")
-    N.set(graded.inputs["Factor"], 1.0)
-    N.link(tint, graded.inputs[6])
-    N.link(lum, graded.inputs[7])
-    # 30 % de la couleur d'origine de l'HDRI, pour garder ses nuances
-    final = N.mix(0.05, graded.outputs[2], env.outputs["Color"])
-    bg = N.new("ShaderNodeBackground", Strength=0.55)
-    N.link(final, bg.inputs["Color"])
-    wo = N.new("ShaderNodeOutputWorld")
-    N.link(bg.outputs[0], wo.inputs["Surface"])
-    del skycol
+def make_world(scene, mer=0.0):
+    """Le ciel : le ciel commun du film (lieux.ciel, lumière v3.1 règle A), la bande corail du côté de la mer, au
+    bout de l'avenue (+y) par défaut ; `mer`, son azimut (lieux.ciel) là où la mer est ailleurs (le rond-point)."""
+    import road
+    keep = road.S                        # lieux, à sa première importation, branche road.S sur scene_a
+    import lieux
+    road.S = keep
+    return lieux.ciel(scene, mer)
 
 
 def render_settings(scene):

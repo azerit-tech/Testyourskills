@@ -1376,35 +1376,12 @@ def build_barrage(scene, hidden, plan):
 # ---------------------------------------------------------------- le ciel, la brume
 
 def make_world(scene):
-    """Le ciel de la rue : l'HDRI de scene_a pour ses nuages, ramené à la nuit bleue ; ni bande corail ni couchant
-    (la rue tourne le dos à la mer), une lueur de ville lilas au ras des toits."""
-    world = bpy.data.worlds.new("blue_hour_b")
-    scene.world = world
-    if hasattr(world, "use_nodes"):
-        world.use_nodes = True
-    nt = world.node_tree
-    for n in list(nt.nodes):
-        nt.nodes.remove(n)
-    N = A.Nodes(nt)
-    tc = N.new("ShaderNodeTexCoord")
-    mp = N.new("ShaderNodeMapping", Rotation=(0, 0, math.radians(-90)))
-    N.link(tc.outputs["Generated"], mp.inputs[0])
-    env = N.new("ShaderNodeTexEnvironment")
-    env.image = bpy.data.images.load(os.path.join(ASSETS, "qwantani_dusk_2_puresky_2k.exr"))
-    N.link(mp.outputs[0], env.inputs[0])
-    elev = N.math("MAXIMUM", N.sep(tc.outputs["Generated"])[2], 0.0)
-    tint = N.ramp(elev, [(0.0, lin("#55497e")), (0.06, lin("#3d3f86")), (0.25, lin("#2f3a78")), (0.6, lin(NAVY))])
-    bw = N.new("ShaderNodeRGBToBW")
-    N.link(env.outputs["Color"], bw.inputs[0])
-    lum = N.math("MULTIPLY", N.math("POWER", bw.outputs[0], 0.5), 0.9)
-    graded = N.new("ShaderNodeMix", _data_type="RGBA", _blend_type="MULTIPLY")
-    N.set(graded.inputs["Factor"], 1.0)
-    N.link(tint, graded.inputs[6])
-    N.link(lum, graded.inputs[7])
-    bg = N.new("ShaderNodeBackground", Strength=0.5)
-    N.link(graded.outputs[2], bg.inputs["Color"])
-    wo = N.new("ShaderNodeOutputWorld")
-    N.link(bg.outputs[0], wo.inputs["Surface"])
+    """Le ciel de la rue : le ciel commun du film (lieux.ciel, lumière v3.1 règle A), la bande corail vers +y, du
+    côté de la mer où va la berline (après to_world)."""
+    keep = road.S                        # lieux, à sa première importation, branche road.S sur scene_a
+    import lieux
+    road.S = keep
+    return lieux.ciel(scene)
 
 
 def haze(name, x0, x1, y0, y1, z0, z1, density, color="#b8b4d8", aniso=0.45, soft=False):
@@ -1640,17 +1617,7 @@ def build():
     scene.camera = co
     to_world(scene)
     A.render_settings(scene)
-    # le halo du compositing : un peu plus fort que sur l'avenue, mais seulement sur les vraies sources (seuil 3) ;
-    # à 0,22 et 0,75 au seuil de 1,2, les phares de face et les éclairs voilaient tout le centre du cadre
-    for ng in bpy.data.node_groups:
-        for nd in ng.nodes:
-            if nd.type == "GLARE":
-                try:
-                    nd.inputs["Threshold"].default_value = 3.0
-                    nd.inputs["Strength"].default_value = 0.14
-                    nd.inputs["Size"].default_value = 0.65
-                except Exception as e:
-                    log(f"halo : {e!r}")
+    # (le halo du compositing : celui de tous les plans, halo.halo)
     ANIMATE[PLAN](scene)
     __import__("fx").dress(PLAN, scene)                     # les interactions (fx.py ; FILM3D_FX=0 les retire)
 

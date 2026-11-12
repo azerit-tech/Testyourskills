@@ -32,8 +32,8 @@
 # toutes. `heading` en degrés, sens trigonométrique : 0 vers +y, 90 vers -x. Les rigs se posent par put(), se
 # clonent par clone() (maillages et lumières partagés : vingt patrouilles pèsent le poids d'une).
 #
-# Le ciel : celui de scene_a.make_world, tourné de 180° (yaw = pi) : la bande corail passe derrière la ville, vers
-# -y (la triche assumée du §2.4). Toutes les caméras des scènes C, D et E regardent la ville.
+# Le ciel : le ciel commun du film (ciel, lumière v3.1 règle A), la bande corail vers +y, du côté de la mer où va la
+# berline, comme sur l'avenue (plus de demi-tour vers la ville).
 #
 # Les modèles et textures : $FILM3D_ASSETS (Azerit/design/film/assets), crédités dans CREDITS.md.
 import math
@@ -91,25 +91,66 @@ def new_scene():
     return scene, hidden
 
 
-def sky(scene, yaw=math.pi):
-    """Le ciel du film (scene_a.make_world), tourné de `yaw` autour de z : la bande corail, d'abord vers +y,
-    passe vers (−sin yaw, cos yaw). L'HDRI tourne avec elle."""
-    S.make_world(scene)
-    if not yaw:
-        return scene.world
-    nt = scene.world.node_tree
-    tc = next(n for n in nt.nodes if n.type == "TEX_COORD")
-    rot = nt.nodes.new("ShaderNodeVectorRotate")
-    rot.rotation_type = "Z_AXIS"
-    rot.inputs["Angle"].default_value = -yaw
-    links = [l for l in nt.links if l.from_node == tc and l.from_socket.name == "Generated"]
-    targets = [l.to_socket for l in links]
-    for l in links:
-        nt.links.remove(l)
-    nt.links.new(tc.outputs["Generated"], rot.inputs["Vector"])
-    for t in targets:
-        nt.links.new(rot.outputs["Vector"], t)
-    return scene.world
+# Le ciel du film, un seul pour toute la poursuite (lumière v3.1, règle A : quatorze secondes, une seule heure) :
+# celui de l'avenue, bleu violet, la bande corail à l'horizon du côté de la mer, là où va la berline. Dans chaque lieu
+# la berline roule vers +y, vers la mer : MER = 0. Même force partout ; l'exposition et la transformée d'affichage
+# sont celles de scene_a.render_settings, appelée par toutes les scènes.
+MER = 0.0              # l'azimut de la bande corail (convention de put : 0 vers +y, pi/2 vers -x), en radians
+CIEL_FORCE = 0.55      # la force du fond de monde
+
+
+def ciel(scene, mer=MER, force=CIEL_FORCE):
+    """Le ciel commun : l'HDRI réel (pour ses nuages) ramené à la palette par l'élévation ; la bande corail du côté
+    de `mer`, le ciel plus sombre à l'opposé. L'appellent scene_a.make_world (avenue, rond-point, carrefour),
+    scene_b.make_world (rue des enseignes) et panorama (pont, port, jetée, pointe)."""
+    world = bpy.data.worlds.new("ciel_film")
+    scene.world = world
+    if hasattr(world, "use_nodes"):
+        world.use_nodes = True
+    nt = world.node_tree
+    for n in list(nt.nodes):
+        nt.nodes.remove(n)
+    N = S.Nodes(nt)
+    tc = N.new("ShaderNodeTexCoord")
+    d = tc.outputs["Generated"]
+    if mer:
+        rot = N.new("ShaderNodeVectorRotate", _rotation_type="Z_AXIS")
+        N.link(d, rot.inputs["Vector"])
+        rot.inputs["Angle"].default_value = -mer
+        d = rot.outputs["Vector"]
+    # l'HDRI tourné pour que sa lueur de couchant tombe sur la bande
+    mp = N.new("ShaderNodeMapping", Rotation=(0, 0, math.radians(-90)))
+    N.link(d, mp.inputs[0])
+    env = N.new("ShaderNodeTexEnvironment")
+    env.image = bpy.data.images.load(os.path.join(ASSETS, "qwantani_dusk_2_puresky_2k.exr"), check_existing=True)
+    N.link(mp.outputs[0], env.inputs[0])
+    dxyz = N.sep(d)
+    elev = N.math("MAXIMUM", dxyz[2], 0.0)
+    # la bande corail n'existe que du côté de la mer
+    toward = N.math("POWER", N.math("MAXIMUM", dxyz[1], 0.0), 3.0)
+    dusk = N.ramp(elev, [(0.0, lin(CORAL)), (0.03, lin("#b9586f")), (0.08, lin(INDIGO)), (0.3, lin("#303c80")), (0.7, lin(NAVY))])
+    night = N.ramp(elev, [(0.0, lin("#3c3f86")), (0.1, lin("#2f3a78")), (0.5, lin(NAVY))])
+    tint = N.mix(toward, night, dusk)
+    bw = N.new("ShaderNodeRGBToBW")
+    N.link(env.outputs["Color"], bw.inputs[0])
+    # la luminance de l'HDRI, comprimée : on garde ses nuages, pas son exposition
+    lum = N.math("MULTIPLY", N.math("POWER", bw.outputs[0], 0.5), 0.9)
+    graded = N.new("ShaderNodeMix", _data_type="RGBA", _blend_type="MULTIPLY")
+    N.set(graded.inputs["Factor"], 1.0)
+    N.link(tint, graded.inputs[6])
+    N.link(lum, graded.inputs[7])
+    # 5 % de la couleur d'origine de l'HDRI, pour ses nuances
+    final = N.mix(0.05, graded.outputs[2], env.outputs["Color"])
+    bg = N.new("ShaderNodeBackground", Strength=force)
+    N.link(final, bg.inputs["Color"])
+    wo = N.new("ShaderNodeOutputWorld")
+    N.link(bg.outputs[0], wo.inputs["Surface"])
+    return world
+
+
+def sky(scene, yaw=MER):
+    """Le ciel commun (ciel), la bande corail vers `yaw` (gardé pour le banc et les anciens appels)."""
+    return ciel(scene, yaw)
 
 
 # ---------------------------------------------------------------- petites géométries
@@ -882,10 +923,10 @@ def port_far(hidden, lamp_src):
         scene_e.build_gantry(far=True)
 
 
-def panorama(scene, hidden, yaw=math.pi, all_lit=False, bridge="loin", port="loin", jetty=None, water_kind="lagune",
+def panorama(scene, hidden, yaw=MER, all_lit=False, bridge="loin", port="loin", jetty=None, water_kind="lagune",
              haubans=False, phare=True):
-    """Tout ce qu'on voit de loin par-dessus l'eau, commun aux scènes C, D et E : le ciel tourné de `yaw` (la bande
-    corail derrière la ville), la lagune, la ville lointaine (`all_lit` : toutes fenêtres allumées), l'autre rive.
+    """Tout ce qu'on voit de loin par-dessus l'eau, commun aux scènes C, D et E : le ciel commun (ciel, la bande
+    corail vers `yaw`, du côté de la mer), la lagune, la ville lointaine (`all_lit` : toutes fenêtres allumées), l'autre rive.
     `bridge`, `port`, `jetty` : None, « loin » (grandes formes et lumières) ou « près » (le lieu entier) ; le port
     vient de scene_e.build_port s'il existe, sinon du terre-plein provisoire. `haubans` : le pont avec son pylône
     (palier « haubans » de scene_c). `phare` : le phare de la pointe à sa vraie place (PHARE_AT) ; True, False, ou

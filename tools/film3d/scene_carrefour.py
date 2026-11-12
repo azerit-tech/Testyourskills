@@ -417,7 +417,7 @@ def build():
         if c.name == "sources" or c.name.startswith("sources."):
             c.hide_render = True
             c.hide_viewport = True
-    A.make_world(scene)
+    A.make_world(scene, math.radians(35.0))        # le ciel commun, la bande 35° à gauche, vers la mer
 
     co = drone(scene)
     x, y, cz = co.location

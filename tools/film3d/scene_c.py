@@ -263,9 +263,8 @@ def plan_P4(scene, hidden, haubans=False):
     à 44 % de large) ; derrière elle la meute empilée par la longue focale, quatre patrouilles de plus qui passent la
     crête (y -130) aux images 8, 18, 28 et 38 : six rampes au début, dix à la fin. Le tablier court jusqu'à y -320,
     l'avenue de la ville au-delà."""
-    # la bande corail du ciel tournée à 70° de l'axe, vers la droite du cadre : dans l'axe, la chaussée mouillée,
-    # vue en rasant à 1,5 m, la reflétait en un voile rose-blanc sur toute la moitié basse
-    lamp_src = L.panorama(scene, hidden, yaw=math.pi - math.radians(70.0), bridge=None, port="loin")
+    # le ciel commun (lieux.ciel) : la bande corail du côté de la mer, derrière la caméra qui regarde la ville
+    lamp_src = L.panorama(scene, hidden, bridge=None, port="loin")
     build_bridge(hidden, lamp_src, haubans=haubans)
     # (plus de voile ni de lueur propres à P4 : le ciel commun, lieux.ciel ; la lueur que le voile envoyait aux
     # rayons réfléchis jusqu'à 15° faisait du tablier une nappe mauve et beige, lumière v3.1 règles A et B)

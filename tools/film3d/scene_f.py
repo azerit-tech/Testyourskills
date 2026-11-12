@@ -67,7 +67,6 @@ POSE = (5.0, -math.sqrt(_D ** 2 - _CX ** 2), 0.0)
 # les flaques de la voie extérieure (degré, rayon, taille, allongement), faites pour la caméra à 9 m : la caméra A2
 # roule dessus (r 12,5 à 13 de l'îlot, 215 à 235°), elles faisaient le miroir noir du bas du cadre ; retirées
 OUTER_PUDDLES = ()           # v2 : ((240, 13.4, 1.2, 2.0), (228, 14.0, 0.9, 1.7), (216, 13.2, 1.3, 2.2))
-GLOW_STRENGTH = 0.7          # la lueur d'horizon à l'est (build_dusk)
 CAR_FILL_W = 800.0           # W, l'appoint lié à la berline (keep_paint) : à 260, la porte à (55, 16, 30) puis
                              # (57, 6, 17) à l'image 28, le bon bordeaux mais plus sombre qu'OUV (73, 29, 26)
 
@@ -499,58 +498,6 @@ def build_backdrop(hidden):
         f"{lamps} lampadaires")
 
 
-def build_dusk(hidden):
-    """Ce que voit le cadre A2 aux images 1 à 10 (reprise du 12 novembre : un aplat marine sur un aplat noir). La
-    caméra y regarde l'est-sud-est, à l'opposé de la bande corail du ciel (A.make_world la met au nord) et vers un
-    angle de la place vide jusqu'au mur de la plage. Trois choses, aucune n'éclaire la berline (keep_paint) :
-    une lueur d'horizon au-dessus de la mer, visible de la caméra et dans les reflets de la chaussée mouillée, qui
-    n'éclaire rien ; un bosquet de palmiers royaux éclairés par le pied dans l'angle sud-est ; deux lampadaires
-    devant eux, que le mouillé renvoie."""
-    import lieux
-    m = bpy.data.materials.new("horizon_glow")
-    m.use_nodes = True
-    nt = m.node_tree
-    for nd in list(nt.nodes):
-        nt.nodes.remove(nd)
-    tc = nt.nodes.new("ShaderNodeTexCoord")
-    sep = nt.nodes.new("ShaderNodeSeparateXYZ")
-    nt.links.new(tc.outputs["Generated"], sep.inputs[0])
-    ramp = nt.nodes.new("ShaderNodeValToRGB")
-    els = ramp.color_ramp.elements
-    # (le plus vif à 15-35 m de haut, 0,4 à 1° au-dessus de l'horizon : plus bas, le mur de la promenade le cachait
-    # et il ne sortait qu'au bout du mur, en pavé rose à bord franc)
-    els[0].position, els[0].color = 0.0, lin("#b9586f")
-    els[1].position, els[1].color = 0.65, (0.0, 0.0, 0.0, 1.0)
-    for pos, col in ((0.14, CORAL), (0.32, "#6a3a7a")):
-        e = els.new(pos)
-        e.color = lin(col)
-    nt.links.new(sep.outputs["Z"], ramp.inputs[0])
-    em = nt.nodes.new("ShaderNodeEmission")
-    em.inputs["Strength"].default_value = GLOW_STRENGTH
-    nt.links.new(ramp.outputs["Color"], em.inputs["Color"])
-    add = nt.nodes.new("ShaderNodeAddShader")
-    tr = nt.nodes.new("ShaderNodeBsdfTransparent")
-    nt.links.new(em.outputs[0], add.inputs[0])
-    nt.links.new(tr.outputs[0], add.inputs[1])
-    out = nt.nodes.new("ShaderNodeOutputMaterial")
-    nt.links.new(add.outputs[0], out.inputs["Surface"])
-    # à 2 km à l'est, 6 km de large, de 20 m sous l'horizon à 300 m au-dessus (8,5°)
-    g = A.box("horizon_glow", 2000.0, 2001.0, -3000.0, 3000.0, -20.0, 300.0, m)
-    g.visible_diffuse = g.visible_shadow = g.visible_volume_scatter = g.visible_transmission = False
-    # le bosquet : (x, y) dans l'angle sud-est, hors des routes et du trajet de la caméra
-    royal = A.royal_source(hidden)
-    sc = 12.0 / max(royal.dimensions.z, 0.1)
-    rng = random.Random(41)
-    for k, (x, y) in enumerate(((24.0, -23.0), (31.0, -31.0), (38.0, -21.0), (29.0, -40.0), (42.0, -33.0))):
-        A.instance(royal, f"se_royal_{k}", (x, y, road.WALK_Z), rng.uniform(0, math.tau), sc * rng.uniform(0.85, 1.1))
-        p = Vector((x - 1.2, y + 0.6, road.WALK_Z + 0.1))
-        A.add_light(f"se_up_{k}", "SPOT", p, Vector((x, y, 11.0)) - p, lin(AMBER), 3000.0, spot=40)
-    src = lieux.lamp_source(hidden)
-    for k, (x, y) in enumerate(((20.0, -15.0), (35.0, -14.0))):
-        lieux.lamp(src, (x, y, road.WALK_Z), arm=(0, 1), name=f"lamp_se_{k}")
-    log("crépuscule : lueur d'horizon à l'est, 5 palmiers éclairés et 2 lampadaires dans l'angle sud-est")
-
-
 def keep_paint():
     """Le bordeaux de la berline (#4e0a28, comme dans OUV) tout le plan. Mesuré sur la porte à 256 échantillons :
     (146, 13, 2) à l'image 1, rouge orangé, (23, 3, 9) à l'image 28, presque noir ; OUV, (73, 29, 26). Les lumières
@@ -605,7 +552,8 @@ def build(plan=None, palier=None):
     build_island(hidden)
     build_street_life(hidden, branches)
     build_backdrop(hidden)
-    build_dusk(hidden)
+    # (build_dusk retiré : sa lueur d'horizon à l'est, son bosquet éclairé et ses deux lampadaires faisaient un
+    # second ciel pour une caméra qui n'existe plus ; lumière v3.1, règle A)
     build_edges(bpy.data.materials["ring_puddle"])
     C.place_cars(scene, POSE, anim=True)
     keep_paint()
@@ -613,7 +561,7 @@ def build(plan=None, palier=None):
         if c.name == "sources" or c.name.startswith("sources."):
             c.hide_render = True
             c.hide_viewport = True
-    A.make_world(scene)
+    A.make_world(scene, math.radians(35.0))        # le ciel commun, la bande 35° à gauche, vers la sortie
     # (découpage v2 : le travelling bas à l'intérieur de l'arc remplace le drone, C.drone garde l'ancien cadre)
     co = C.chase_camera(scene, POSE)
     A.render_settings(scene)

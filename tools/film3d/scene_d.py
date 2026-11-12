@@ -777,10 +777,8 @@ def plan_FIN(scene, hidden, palier="socle"):
     decor(scene, hidden, marina=(palier in ("marina", "complet")))
     scene.frame_start, scene.frame_end = F.F0, F.F0 + F.FRAMES - 1
     frames = range(F.F0 - 1, F.F0 + F.FRAMES + 1)
-    # le raccord de lumière : la bande de crépuscule du ciel (vers +y sans rotation) à l'horizon, derrière le phare
-    for n in scene.world.node_tree.nodes:
-        if n.type == "VECT_ROTATE":
-            n.inputs["Angle"].default_value = 0.0
+    # (la bande corail du ciel commun est vers +y, derrière le phare : lieux.ciel, sans rotation. La boucle qui la
+    # remettait là testait le type VECT_ROTATE, alors que Blender nomme le nœud VECTOR_ROTATE : elle ne trouvait rien)
     # le phare : un pinceau part vers la droite (-25°, azimut depuis +x) et s'enfonce vers le large ; l'autre
     # balaie la gauche et vient vers nous sans approcher l'objectif à moins de 24° (la caméra est à -83° de lui)
     ph = bpy.data.objects.get("phare")
