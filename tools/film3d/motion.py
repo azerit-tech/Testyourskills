@@ -2647,10 +2647,12 @@ def plan_checks31(d, lim, own):
         f"Δ² {sc[0]:.2f} ({sc[1]}), Δ³ {sc[2]:.2f} ({sc[3]}) ; sans tremblé {fl['screen']['rail'][0]:.2f} / "
         f"{fl['screen']['rail'][2]:.2f}")
     b = fl["body"]
+    # la caisse v3.1 est celle de la dynamique ; FILM3D_DYN=0 rend les clés d'avant (et leurs bosses) : information
     add(f"caisse : roulis ≤ {lim['body_roll']:g}°, tangage ≤ {lim['body_pitch']:g}°, Δ² du roulis ≤ "
-        f"{lim['body_roll_d2']:g}°/image², rien hors transfert de masse (≤ {lim['body_noise']:g}°)",
-        b["roll"][0] <= lim["body_roll"] + 1e-9 and b["pitch"][0] <= lim["body_pitch"] + 1e-9
-        and b["roll_d2"][0] <= lim["body_roll_d2"] + 1e-9 and b["noise"][0] <= lim["body_noise"] + 1e-9,
+        f"{lim['body_roll_d2']:g}°/image², rien hors transfert de masse (≤ {lim['body_noise']:g}°)"
+        + ("" if dyn_on() else " (FILM3D_DYN=0 : clés d'avant, information)"),
+        not dyn_on() or (b["roll"][0] <= lim["body_roll"] + 1e-9 and b["pitch"][0] <= lim["body_pitch"] + 1e-9
+                         and b["roll_d2"][0] <= lim["body_roll_d2"] + 1e-9 and b["noise"][0] <= lim["body_noise"] + 1e-9),
         f"roulis {b['roll'][0]:.1f}° ({b['roll'][1]}), tangage {b['pitch'][0]:.1f}° ({b['pitch'][1]}), Δ² "
         f"{b['roll_d2'][0]:.3f} ({b['roll_d2'][1]}), hors transfert {b['noise'][0]:.2f}° ({b['noise'][1]})")
     return out
