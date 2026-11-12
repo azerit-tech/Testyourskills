@@ -71,6 +71,8 @@ c.use_denoising = not a.no_denoise
 r.use_persistent_data = True
 r.image_settings.file_format = "PNG"
 r.image_settings.color_mode = "RGB"
+draft = debit.draft(scene)               # FILM3D_DRAFT=1 ou 2 : le brouillon allégé (voir debit.py)
+phases = debit.Phases()                  # FILM3D_PHASES=1 : les phases de Cycles par image
 
 if a.report:
     from mathutils import Vector
@@ -140,7 +142,7 @@ else:
 os.makedirs(a.out, exist_ok=True)
 for f in frames:
     scene.frame_set(f)
-    r.filepath = os.path.join(a.out, f"{a.plan}-{a.tag}-{f:04d}.png")
+    r.filepath = os.path.join(a.out, f"{a.plan}-{a.tag}{'-brouillon' + str(draft) if draft else ''}-{f:04d}.png")
     t1 = time.time()
     bpy.ops.render.render(write_still=True)
-    print(f"[diag] image {f} en {time.time() - t1:.1f} s -> {r.filepath}", flush=True)
+    print(f"[diag] image {f} en {time.time() - t1:.1f} s -> {r.filepath}{phases.line()}", flush=True)

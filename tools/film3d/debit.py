@@ -12,6 +12,9 @@
 #    rangées dans le .blend, sinon il relirait les fichiers en pleine taille. Vérifié sur P3 et P6 par render_film :
 #    image construite et image du cache diffèrent d'au plus 1 à 4 / 255 sur moins de 1 % des pixels, comme deux
 #    rendus du même .blend (bruit de Cycles) ; deux constructions de P3 diffèrent, elles, de 0,19 / 255 en moyenne.
+# 2. Le brouillon Cycles (FILM3D_DRAFT=1 fidèle, 2 mouvement ; jamais par défaut) : voir draft(). Le cadrage gris
+#    (Workbench, render_film --dry) y gagne aussi : subdivisions à 0.
+# 3. Les phases de Cycles par image (FILM3D_PHASES=1) : une ligne par image (synchro, lumières, échantillons…).
 import hashlib
 import json
 import os
@@ -236,3 +239,81 @@ def cached_build(plan, arg, build, assets, blend_out=None, use=None):
                 pass
     return scene, "construite", t_build, sorted(deps["assets"])
 
+
+# ---------------------------------------------------------------- le brouillon
+
+def draft_level():
+    """FILM3D_DRAFT : 0 (ou absent) normal ; 1 brouillon fidèle ; 2 brouillon de mouvement."""
+    v = (os.environ.get("FILM3D_DRAFT") or "").strip().lower()
+    if v in ("", "0", "non", "no", "false", "off"):
+        return 0
+    return 2 if v == "2" else 1
+
+
+def draft(scene, level=None):
+    """Le brouillon Cycles (FILM3D_DRAFT=1 ou 2), jamais une prise. Caméra, flou de bougé, lumières et matières restent
+    ceux de la scène. Mesuré sur P3 et P6 (360 × 640, 32 éch., même .blend) :
+    - 1, fidèle : subdivisions de rendu à 0 (simplification). Les personnages lissés (13 subdivisions de niveau 1 sur
+      P3) coûtent ≈ 48 s de synchro à la première image et ≈ 4,5 s à chaque image (le flou de bougé les réévalue aux
+      deux bords de l'obturateur). Écart à l'image normale : 0,05 / 255 en moyenne (P3), 0,006 (P6). P3 : première
+      image 62 -> 15 s, suivantes 14,9 -> 9,3 s ; P6 : 24 -> 8 s, 5,2 -> 3,3 s.
+    - 2, mouvement : en plus, l'arbre des lumières éteint (il est reconstruit à chaque image, les rampes clignotent :
+      3,8 s par image sur P3). À 32 éch., les reflets des petites sources sur la chaussée mouillée y perdent de leur
+      éclat (écart moyen 2 à 3 / 255) : pour juger caméra et conduite, pas les reflets. P3 : 11 s puis 4,4 s ; P6 :
+      6 s puis 2,7 s.
+    Couper le flou de bougé en plus ne gagne plus rien (mesuré) : il reste."""
+    level = draft_level() if level is None else level
+    if not level:
+        return 0
+    r = scene.render
+    r.use_simplify = True
+    r.simplify_subdivision_render = 0
+    if level >= 2:
+        scene.cycles.use_light_tree = False
+    log(f"BROUILLON {level} (FILM3D_DRAFT={level}) : subdivisions de rendu à 0"
+        + (", arbre des lumières éteint" if level >= 2 else "") + " ; jamais une prise")
+    return level
+
+
+# ---------------------------------------------------------------- les phases de Cycles
+
+class Phases:
+    """FILM3D_PHASES=1 : le temps de chaque phase de Cycles (synchro, lumières, échantillons…), une ligne par image."""
+
+    KEYS = (("échantillons", ("sample ", "path tracing")), ("débruitage", ("denois",)), ("noyaux", ("kernel",)),
+            ("bvh", ("bvh",)), ("textures", ("image", "loading", "texture")), ("lumières", ("light",)),
+            ("matières", ("shader",)), ("synchro", ("synchroniz",)), ("init", ("initializing",)),
+            ("géométrie", ("geometry", "mesh", "attribute", "displacement", "subdiv")), ("volumes", ("volume",)),
+            ("compositing", ("composit",)))
+
+    def __init__(self, on=None):
+        import bpy
+        self.on = flag("FILM3D_PHASES") if on is None else on
+        self.acc, self.last, self.t = {}, None, None
+        if self.on:
+            bpy.app.handlers.render_stats.append(self._stats)
+
+    def _kind(self, s):
+        low = " ".join(s.lower().rsplit("|", 2)[-2:])
+        for k, words in self.KEYS:
+            if any(w in low for w in words):
+                return k
+        return "autre"
+
+    def _stats(self, s, *_):
+        now = time.time()
+        k = self._kind(s)
+        if k != self.last:
+            if self.last is not None:
+                self.acc[self.last] = self.acc.get(self.last, 0.0) + now - self.t
+            self.last, self.t = k, now
+
+    def line(self):
+        """Les phases de l'image qui vient d'être rendue, puis remise à zéro."""
+        if not self.on:
+            return ""
+        if self.last is not None:
+            self.acc[self.last] = self.acc.get(self.last, 0.0) + time.time() - self.t
+        out = ", ".join(f"{k} {v:.1f}" for k, v in sorted(self.acc.items(), key=lambda kv: -kv[1]) if v >= 0.05)
+        self.acc, self.last = {}, None
+        return f" [{out}]"

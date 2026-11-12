@@ -154,11 +154,20 @@ def parse_essais(items):
     return out
 
 
-def plan_dirname(plan, essais):
-    """Le dossier d'images d'un plan ; un essai a le sien (P3+rugosite0.5), jamais une prise du montage."""
-    if not essais:
-        return plan
-    return plan + "+" + "+".join(re.sub(r"[^\w.-]", "", f"{k}{v}") for k, v in sorted(essais.items()))
+def is_draft():
+    """FILM3D_DRAFT=1 ou 2 (debit.draft) : le niveau du brouillon allégé (0 sinon), jamais une prise du montage."""
+    v = os.environ.get("FILM3D_DRAFT", "").strip().lower()
+    return 0 if v in ("", "0", "non", "no", "false", "off") else 2 if v == "2" else 1
+
+
+def plan_dirname(plan, essais, draft=None):
+    """Le dossier d'images d'un plan ; un essai a le sien (P3+rugosite0.5), un brouillon FILM3D_DRAFT=1 ou 2 aussi
+    (P3+brouillon, P3+brouillon2) : ni l'un ni l'autre ne devient une prise du montage, ni ne passe pour une image
+    faite à la reprise d'un vrai rendu."""
+    draft = is_draft() if draft is None else int(draft)
+    tags = [re.sub(r"[^\w.-]", "", f"{k}{v}") for k, v in sorted(essais.items())]
+    tags += ["brouillon"] if draft == 1 else ["brouillon2"] if draft else []
+    return plan + "".join("+" + t for t in tags)
 
 
 def frame_path(d, i):
@@ -295,8 +304,11 @@ def worker(a):
 
     apply_essais(bpy, scene, essais)
     res, engine, device, samples = setup_render(bpy, scene, a)
+    draft_mode = engine == "cycles" and debit.draft(scene)
+    phases = debit.Phases()
     write_info(module=mod_name, animated=animated, scene_frames=[scene.frame_start, scene.frame_end], still=still,
-               res=list(res), engine=engine, device=device, samples=samples, build_s=round(t_build, 1), scene_src=how)
+               res=list(res), engine=engine, device=device, samples=samples, build_s=round(t_build, 1), scene_src=how,
+               draft_mode=draft_mode)
     if a.mode == "list":
         return
 
@@ -363,7 +375,8 @@ def worker(a):
         if png_size(still_png) != tuple(res):
             dt = render_to(still_png, still)
             note(0, still, dt, True)
-            log(f"{plan} : image fixe {still} rendue en {dt:.1f} s, recopiée sur {len(left)} image(s) (plan pas animé)")
+            log(f"{plan} : image fixe {still} rendue en {dt:.1f} s, recopiée sur {len(left)} image(s) (plan pas animé)"
+                + phases.line())
         for i in left:
             shutil.copyfile(still_png, frame_path(out_dir, i)[:-4] + ".part.png")
             os.replace(frame_path(out_dir, i)[:-4] + ".part.png", frame_path(out_dir, i))
@@ -374,7 +387,8 @@ def worker(a):
             dt = render_to(frame_path(out_dir, i), f)
             done, spent = done + 1, spent + dt
             note(i, f, dt, False)
-            log(f"{plan} image {i}/{n} (scène {f}) : {dt:.1f} s ; reste environ {hms(spent / done * (len(left) - done))}")
+            log(f"{plan} image {i}/{n} (scène {f}) : {dt:.1f} s ; reste environ {hms(spent / done * (len(left) - done))}"
+                + phases.line())
     jf.close()
     write_info(rendered=len(left), complete=not todo(out_dir, idxs, res))
     log(f"{plan} : {len(idxs)} image(s) dans {out_dir}")
@@ -658,7 +672,8 @@ def assemble(a, plans, cut):
             log(f"! {plan} : {last} images sur {n} (plan court ou --frames) : la prise est courte, le montage tiendra "
                 f"la dernière")
         w, h = sizes[0]
-        full = w >= FULL[0] and h >= FULL[1] and info.get("engine") == "cycles" and not essais
+        full = (w >= FULL[0] and h >= FULL[1] and info.get("engine") == "cycles" and not essais and not is_draft()
+                and not info.get("draft_mode"))
         if full:
             os.makedirs(a.plans, exist_ok=True)
             dest = os.path.join(a.plans, f"{plan}-{a.take}.mp4")
@@ -699,7 +714,8 @@ def selftest():
     assert parse_frames("3-5", 28) == [3, 4, 5] and parse_frames("17", 28) == [17] and parse_frames(None, 3) == [1, 2, 3]
     assert parse_frames("20-40", 24) == [20, 21, 22, 23, 24]
     assert parse_frames("26,9,13,21-23", 28) == [9, 13, 21, 22, 23, 26] and parse_frames("1,40", 28) == [1]
-    assert plan_dirname("P3", {"rugosite": "0.5"}) == "P3+rugosite0.5" and plan_dirname("P3", {}) == "P3"
+    assert plan_dirname("P3", {"rugosite": "0.5"}, False) == "P3+rugosite0.5" and plan_dirname("P3", {}, False) == "P3"
+    assert plan_dirname("P3", {}, 1) == "P3+brouillon" and plan_dirname("P3", {"brume": "1"}, 2) == "P3+brume1+brouillon2"
     assert parse_essais(["rugosite"]) == {"rugosite": "0.5"} and parse_essais(["peinture=#4e0a28"])["peinture"]
     for bad in (["peinture"], ["inconnu=1"]):
         try:

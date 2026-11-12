@@ -150,6 +150,7 @@ else:
         L.use_gpu(scene)
     c.samples = args.samples
     c.use_denoising = True
+    __import__("debit").draft(scene)            # FILM3D_DRAFT=1 ou 2 : le brouillon allégé (voir debit.py)
 ffmpeg = shutil.which("ffmpeg") or "/opt/homebrew/bin/ffmpeg"
 if args.anim:
     # la séquence : une image par fichier, puis deux mp4 (24 i/s, et chaque image tenue quatre fois)
