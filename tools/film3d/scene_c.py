@@ -103,6 +103,12 @@ def build_bridge(hidden, lamp_src, far=False, haubans=False):
                     lamp_src=lamp_src, lamp_ys=LAMP_YS, far=far)
     M = out["M"]
     edge = out["edge"]
+    # le tablier, exposé au vent, sèche plus vite que l'avenue : un film d'eau plus mince (vernis à 0,3). À 1,5 m
+    # au-dessus, l'enrobé tout mouillé étalait phares, lampadaires et flaques en un voile laiteux (P4)
+    for m in (M["asphalt"], M["pan"]):
+        for n in m.node_tree.nodes:
+            if n.type == "BSDF_PRINCIPLED" and not n.inputs["Coat Weight"].is_linked:
+                n.inputs["Coat Weight"].default_value = min(n.inputs["Coat Weight"].default_value, 0.3)
     # la rue de la ville et le plat du port : la même chaussée, sans bord (posée sur la promenade, sur le terre-plein)
     # l'avenue de la ville éclairée tous les 30 m (au 200 mm, la file de lampadaires au fond de la crête) ; le plat
     # du port suit le tablier : la rampe ne touche le niveau du terre-plein qu'en y = 1 (en y = -20 elle est encore à
@@ -258,7 +264,9 @@ def plan_P4(scene, hidden, haubans=False):
     """P4, la meute : 200 mm, sur le plat 50 m après le pied de la rampe, à 1,5 m, horizontale, face à la ville.
     La berline descend vers nous (à 70 m de l'objectif à l'instant fort ; la décentration de 0,1 la pose au tiers
     bas sans pencher la caméra) ; derrière elle trois patrouilles en V, le fourgon qui passe la crête."""
-    lamp_src = L.panorama(scene, hidden, bridge=None, port="loin")
+    # la bande corail du ciel tournée à 70° de l'axe, vers la droite du cadre : dans l'axe, la chaussée mouillée,
+    # vue en rasant à 1,5 m, la reflétait en un voile rose-blanc sur toute la moitié basse
+    lamp_src = L.panorama(scene, hidden, yaw=math.pi - math.radians(70.0), bridge=None, port="loin")
     build_bridge(hidden, lamp_src, haubans=haubans)
     cam_y = Y_FOOT + 50.0
     hero = L.hero()
