@@ -83,9 +83,9 @@ _H = P3.hero_pos(P3.T_STILL)
 _C = P3.camera(0.0)
 _K = P3.chase_pos(P3.T_STILL)
 PLANS = {
-    # P3, le barrage, de dos (découpage v3) : la caméra suit la berline au 21 mm, 6,8 à 7,5 m derrière elle, de
-    # 1,9 m à 0,7 m de haut, et passe le barrage à sa suite ; la berline passe le barrage, les agents tirent puis
-    # se mettent à couvert (fire : éclairs). yaw : lacet de départ en degrés (positif : vers -x de vue).
+    # P3, le barrage, de dos (découpage v3.1) : la caméra suit la berline au 24 mm, 7,5 m derrière elle, à 2,4 m de
+    # haut, et passe le barrage à sa suite ; la berline passe le barrage, un agent tire, l'autre fait « stop », puis
+    # ils se mettent à couvert (fire : éclairs). yaw : lacet de départ en degrés (positif : vers -x de vue).
     "P3": dict(cam=(*vw(_C[0], _C[1]), _C[2]), lens=P3.LENS, shift_y=0.0, yaw=180.0, fstop=4.0,
                focus=(*vw(*_H), 0.8), hero=(*vw(*_H), P3.hero_heading(P3.T_STILL)), chase=vw(*_K), barrage=8.0,
                fire=True),
@@ -1618,12 +1618,12 @@ def keep_world_parent(objs, parent):
 
 
 def plan_P3(scene):
-    """P3, le barrage, de dos (48 images, p3_enseignes.py, découpage v3), en repère monde après to_world : la
-    berline arrive à 106 km/h, feinte vers la patrouille de droite, revient viser le trou des plots, remet les gaz
-    et passe entre les deux agents ; la caméra la suit au 21 mm, descend de 1,9 à 0,7 m et passe le barrage à sa
-    suite, sans freiner ; la patrouille 1 part au bord gauche du cadre, lâche et reste dans sa voie ; les rampes
-    clignotent ; les agents tirent (un éclair d'une image) puis plongent derrière leurs portières. L'image fixe
-    (P3.STILL_FRAME, la 34) : la berline à 6 m des plots, le souffle retenu."""
+    """P3, le barrage, de dos (48 images, p3_enseignes.py, découpage v3.1), en repère monde après to_world : la
+    berline arrive à 106 km/h, lève le pied et freine un peu (feux stop), vise le trou des plots, remet les gaz et
+    passe entre les deux agents ; la caméra la suit au 24 mm, 7,5 m derrière, à 2,4 m, et passe le barrage à sa
+    suite ; la patrouille 1, devant à gauche, freine, se fait dépasser et sort par le bas à gauche ; les rampes
+    clignotent ; un agent tire (un éclair d'une image), l'autre fait « stop », puis ils plongent derrière leurs
+    portières. L'image fixe (P3.STILL_FRAME, la 34) : la berline à quelques mètres des plots."""
     frames = range(P3.F0 - 1, P3.F0 + P3.FRAMES + 1)        # une image de plus de chaque côté, pour l'obturateur
     scene.frame_start, scene.frame_end = P3.F0, P3.F0 + P3.FRAMES - 1
     ob = bpy.data.objects
@@ -1639,6 +1639,10 @@ def plan_P3(scene):
                       wheelbase=wb, front=front)
     MO.key_vehicle(rig, poses, wheels=wheels)
     MO.wheel_marks(wheels, body.get("wheel_r", 0.31))
+    # les feux stop là où elle freine à plus de 2 m/s² (après les clés de la caisse)
+    import hero_cars
+    for first, last in P3.brake_windows():
+        hero_cars.stop_lamps(body, first, last)
     # --- la troisième patrouille, ses deux faisceaux avec elle
     far = ob["patrol_a_c"]
     rig_c = MO.rig_up(far, P3.CHASE[2], name="rig_patrol_c",
