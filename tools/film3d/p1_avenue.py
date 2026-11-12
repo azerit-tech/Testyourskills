@@ -1,13 +1,13 @@
 # Le plan P1 écrit une fois, sans Blender (docs/cinematique-decoupage-v3.md §4, « la patrouille fond sur elle, elle
-# bondit », reprise du 12 au soir) : 1,5 s après la dernière image d'OUV (ellipse), la berline sur la même voie, à la
-# même vitesse (50 km/h), à la position d'OUV prolongée. Pendant l'ellipse la patrouille a fait demi-tour : elle
-# arrive lancée sur la voie d'en face (92 km/h), rampe allumée, à côté de la caméra et hors champ ; elle entre par
-# le bord gauche à l'image 7, sa rampe dans le cadre à partir de 21 ; elle freine pour se caler à la hauteur de la
-# berline vers 34, vue de trois quarts arrière ; la berline bondit à 32 et lui reprend un mètre, la patrouille reste
-# au bord gauche, rampe comprise.
-# La caméra la suit de dos : 8 m derrière et 0,55 m du sol à la première image (le raccord d'OUV), elle monte à
-# 1,4 m pour voir par-dessus le coffre de la patrouille, recule à 9,3 m et glisse vers la gauche (de 0,3 à 1,6 m),
-# le lacet et le site recalculés à chaque image pour tenir la berline à sa place dans le cadre.
+# bondit », repris au découpage v3.1) : 1,5 s après la dernière image d'OUV (ellipse), la berline sur la même voie, à
+# la même vitesse (50 km/h), à la position d'OUV prolongée. Pendant l'ellipse la patrouille a fait demi-tour : elle
+# arrive par la voie d'en face, 15 km/h plus vite que la berline, rampe allumée, à sa hauteur et au bord gauche du
+# cadre ; elle freine (6 m/s² au plus, installés en 14 images) et se cale 3 m devant elle à l'image 32, vue de haut,
+# caisse et rampe. À 32 la berline s'arrache (3 m/s², installés en 14 images : le nez se lève un peu) ; la
+# patrouille remet les gaz un peu moins fort et reste au bord gauche.
+# La caméra : le cadre de poursuite commun (ouv_avenue, v3.1), 2,4 m de haut, 7,5 m derrière, 24 mm, comme à la fin
+# d'OUV ; un rail à la vitesse de la berline, sans grue, le lacet et le site recalculés (ouv_avenue.aim) pour tenir
+# la berline à sa place.
 import math
 
 import motion as M
@@ -16,45 +16,43 @@ import ouv_avenue as OUV
 FRAMES = 48
 F0 = 1
 V3 = True                           # les plafonds v3 de test_motion.py s'appliquent
+V31 = True                          # et ceux du découpage v3.1 (cadre commun, conduite)
 ELLIPSIS = 1.5                      # s entre la dernière image d'OUV et la première de P1
 T_CUT = OUV.FRAMES / M.FPS + ELLIPSIS   # le temps d'OUV prolongé de la première image de P1
 T_END = (FRAMES - 1) / M.FPS
-T_GO = M.t_of(32)                   # la berline bondit
-ACCEL = 4.0                         # m/s², atteint en 0,15 s
+T_GO = M.t_of(32)                   # la berline s'arrache
+ACCEL = 3.0                         # m/s² : une berline lourde ne bondit pas
+TAU = 0.6                           # s : chaque accélération s'installe en 14 images (patrouille : à-coup 10 m/s³)
 
-# La patrouille, voie d'en face : x -1,7, 1,53 m d'air avec le flanc de la berline quand elle est à sa hauteur.
-# Elle arrive lancée, son centre R1 par rapport à celui de la berline à la première image (à côté de l'objectif,
-# hors champ), et freine d'un seul tenant jusqu'à rouler à sa vitesse à T_MATCH, son centre alors R_MATCH devant le
-# sien : à sa hauteur, de trois quarts arrière, la rampe dans le cadre (plus en arrière, la rampe sortait par le
-# bord gauche : avec la berline au centre droit et 33 % de large au moins, le grand-angle de 24 mm ne voit pas plus
-# loin à gauche). Au bond elle lève le pied et recule vers le bord gauche. Partir derrière l'objectif et le doubler
-# vers l'image 12-16 demandait de freiner à plus de 1 g pour se caler à sa hauteur avant le bond : elle part à côté
-# de lui, hors champ.
+# La patrouille, voie d'en face : x -1,7, 1,53 m d'air avec le flanc de la berline. Elle freine d'un seul tenant de
+# la première image à T_MATCH (trapèze : DECEL atteints en TAU, tenus, relâchés en TAU), d'un écart de vitesse W0
+# jusqu'à rouler à la vitesse de la berline, son centre alors R_MATCH devant le sien. À 24 mm et 7,5 m, la voie d'en
+# face sort du cadre à la hauteur de la berline (la patrouille à 25° de l'axe pour un demi-champ de 23°) : calée 3 m
+# devant elle, plus loin de l'objectif, sa rampe et la moitié droite de sa caisse sont dans le cadre tout le plan.
+# Le freinage plafonné à 6 m/s² ne lui fait gagner que 3 m sur la berline : elle est déjà au bord gauche à la
+# première image. Au départ de la berline, elle remet les gaz (PAT_GO, installés en TAU), un peu moins qu'elle.
 LANE_X = -1.7
-R1 = -7.5                           # m : son nez 3 m devant l'objectif, mais à 35° de l'axe, hors champ
-R_MATCH = 0.5
-T_MATCH = M.t_of(34)
-W0 = 2.0 * (R_MATCH - R1) / T_MATCH  # m/s de plus que la berline au départ (11,6 : 92 km/h)
-DECEL = W0 / T_MATCH                # m/s² : elle freine fort (8,5) pour se caler à sa hauteur
-PAT_LIFT = 1.5                      # m/s² : au bond, elle lève le pied, la berline lui reprend un peu plus d'un mètre
+DECEL = 6.0                         # m/s² (patrouilles : freinage ≤ 7)
+T_MATCH = M.t_of(32)
+W0 = DECEL * (T_MATCH - TAU)        # m/s de plus que la berline au départ (4,1 : 65 km/h)
+R_MATCH = 3.0
+R1 = R_MATCH - W0 * T_MATCH / 2.0   # son centre par rapport à celui de la berline à la première image
+PAT_GO = 2.0                        # m/s² : elle remet les gaz au départ de la berline (patrouilles ≤ 4)
 
-# la caméra (repère du monde : l'avenue vers +y, l'océan à x > 0) : un seul mouvement, de la première image à
-# CAM_T1, en cosinus (vitesse et accélération nulles aux deux bouts) : elle recule, glisse vers la voie d'en face
-# (derrière la patrouille, qu'elle voit de trois quarts arrière) et monte par-dessus son coffre ; d'un seul tenant
-# pour que l'accélération par rapport à la berline reste sous 4 m/s²
-BACK0, BACK1 = 8.0, 9.3             # m derrière le centre de la berline
-SIDE0, SIDE1 = -0.3, -1.6           # m à sa droite (négatif : à sa gauche)
-Z0, Z1 = 0.55, 1.4                  # hauteur : le raccord d'OUV, puis par-dessus le coffre de la patrouille
-CAM_T1 = M.t_of(42)
-CAM_FOLLOW = 0.6                    # la part de l'élan du bond que la caméra suit
-# la berline dans le cadre : centre x (fraction de la largeur), du raccord au centre droit, puis 57 % à la fin ;
-# centre y 55 % depuis le haut (son centre à HERO_ZC du sol)
-U0, U30, U48 = 0.52, 0.60, 0.57
-V_HERO = 0.55
-HERO_ZC = 0.72
-LENS = 24.0
-FOCUS, FSTOP = 9.0, 5.6             # la berline nette, la patrouille à peine moins
-STILL = 30                          # l'image fixe (banc) : la patrouille calée à sa hauteur, juste avant le bond
+# la caméra : le cadre commun (ouv_avenue), à la vitesse de la berline ; au départ, elle n'en suit que CAM_FOLLOW de
+# l'élan (la berline s'éloigne de quelques décimètres : on la sent partir)
+BACK = OUV.CAM_BACK
+SIDE = OUV.CAM_SIDE
+CAM_Z = OUV.CAM_Z
+CAM_FOLLOW = 0.6
+# la berline dans le cadre : centre x de 52 % (le raccord d'OUV, 50) à 55 % à l'image 20 (de la place à gauche pour
+# la patrouille ; 56 sortait de x 50 ± 6 avec le tremblé de l'opérateur), y 58 % depuis le haut
+U0, U1 = 0.52, 0.55
+U_T1 = M.t_of(20)
+V_HERO = OUV.CAM_V
+LENS = OUV.LENS
+FOCUS, FSTOP = 7.8, 5.6             # la berline nette, la patrouille à peine moins
+STILL = 30                          # l'image fixe (banc) : la patrouille calée, juste avant le départ
 
 # ce que la berline frôle (fx.py en tire les effets) : trois feuilles de papier à plat 1,4 m à droite de sa ligne,
 # 20 m devant elle au départ, que son passage soulève (images 36 à 44)
@@ -63,12 +61,14 @@ PAPERS = ((3.15, 309.4, 20.0), (3.55, 310.1, -35.0), (2.95, 310.9, 70.0))   # x,
 PATROL_HEAD_W = 450.0
 PATROL_HEAD_LENS = 1.0
 
-HALF_W = math.atan(10.125 / LENS)            # demi-champ horizontal
-HALF_H = math.atan(18.0 / LENS)              # demi-champ vertical
+
+def _ramp(t, t0):
+    """0 avant t0, puis 1 en TAU (à-coup constant)."""
+    return min(1.0, max(0.0, (t - t0) / TAU))
 
 
 def _accel(t):
-    return 0.0 if t < T_GO else ACCEL * min(1.0, (t - T_GO) / 0.15)
+    return ACCEL * _ramp(t, T_GO)
 
 
 _PROF = M.Profile(OUV.SPEED, _accel)
@@ -84,9 +84,10 @@ def hero_speed(t):
 
 
 def _patrol_accel(t):
+    """Le trapèze de freinage jusqu'à T_MATCH, puis les gaz au départ de la berline."""
     if t < T_MATCH:
-        return -DECEL
-    return -PAT_LIFT * min(1.0, (t - T_GO) / 0.3) if t >= T_GO else 0.0
+        return -DECEL * min(1.0, t / TAU, (T_MATCH - t) / TAU) if t > 0.0 else 0.0
+    return PAT_GO * _ramp(t, T_GO)
 
 
 _PATROL = M.Profile(OUV.SPEED + W0, _patrol_accel)
@@ -117,47 +118,21 @@ def bars_on(frame):
     return True
 
 
-def _ease(t):
-    """0 à 1 en cosinus de la première image à CAM_T1."""
-    u = min(1.0, max(0.0, t / CAM_T1))
-    return 0.5 - 0.5 * math.cos(math.pi * u)
-
-
 def cam_back(t):
-    """La distance de la caméra au centre de la berline : de BACK0 à BACK1, plus, au bond, la part de l'élan qu'elle
-    ne suit pas."""
+    """La distance de la caméra au centre de la berline : BACK, plus, au départ, la part de l'élan qu'elle ne suit
+    pas."""
     extra = _PROF.s(t) - OUV.SPEED * t
-    return BACK0 + (BACK1 - BACK0) * _ease(t) + (1.0 - CAM_FOLLOW) * extra
+    return BACK + (1.0 - CAM_FOLLOW) * extra
 
 
 def _target_u(t):
-    a = M.smoothstep(0.0, M.t_of(30), t)
-    b = M.smoothstep(M.t_of(30), T_END, t)
-    return U0 + (U30 - U0) * a + (U48 - U30) * b
+    return U0 + (U1 - U0) * M.smoothstep(0.0, U_T1, t)
 
 
 def camera_rail(t):
-    """(x, y, z, lacet, site, roulis, focale) : sur un rail qui monte et glisse à gauche, sans secousse ; le lacet et
-    le site posent le centre de la berline à (_target_u, V_HERO) du cadre."""
+    """(x, y, z, lacet, site, roulis, focale) : le cadre commun, la berline à (_target_u, V_HERO)."""
     hx, hy = hero_pos(t)
-    x = hx + SIDE0 + (SIDE1 - SIDE0) * _ease(t)
-    y = hy - cam_back(t)
-    z = Z0 + (Z1 - Z0) * _ease(t)
-    dx, dy = hx - x, hy - y
-    # lacet de motion.key_camera : 180 vers +y, plus vers +x ; la berline à droite de l'axe de phi ; puis deux pas de
-    # Newton sur la boîte projetée (motion.hero_screen), dont le centre n'est pas celui de la caisse
-    phi = math.degrees(math.atan((_target_u(t) - 0.5) * 2.0 * math.tan(HALF_W)))
-    yaw = 180.0 + math.degrees(math.atan2(dx, dy)) - phi
-    beta = math.degrees(math.atan((V_HERO - 0.5) * 2.0 * math.tan(HALF_H)))
-    pitch = math.degrees(math.atan2(HERO_ZC - z, math.hypot(dx, dy))) + beta
-    want = (_target_u(t), V_HERO)
-    for _ in range(2):
-        b0 = M.hero_screen((x, y, z, yaw, pitch, 0.0, LENS), hx, hy, 0.0, 0.0)
-        bu = M.hero_screen((x, y, z, yaw + 0.1, pitch, 0.0, LENS), hx, hy, 0.0, 0.0)
-        bv = M.hero_screen((x, y, z, yaw, pitch + 0.1, 0.0, LENS), hx, hy, 0.0, 0.0)
-        yaw += 0.1 * (want[0] - b0["u"]) / (bu["u"] - b0["u"])
-        pitch += 0.1 * (want[1] - b0["v"]) / (bv["v"] - b0["v"])
-    return x, y, z, yaw, pitch, 0.0, LENS
+    return OUV.aim(hx - SIDE, hy - cam_back(t), CAM_Z, hx, hy, _target_u(t), V_HERO)
 
 
 def camera(t):
@@ -166,14 +141,12 @@ def camera(t):
 
 
 # Le phare lointain (découpage v3, §3) : comme en OUV (ouv_avenue.phare_pose), 600 m devant la caméra de la première
-# image, sur un cap sombre ; même repli : à 0,55 m du sol, le mur de la promenade le cache jusqu'à la lanterne, d'où
-# 1,3° comme en OUV (le tableau demandait 1,2). 21° à droite de l'axe et non 14 : la berline va au centre droit
-# (x 52 à 60 %, 38 % de large) et la caméra tourne vers la droite pour l'y tenir ; à 14°, le phare passait de x 75 à
-# 64 % et se cachait derrière son toit des images 13 à 20. À 21°, x 91 % à la première image, 80 % à la dernière,
-# toujours à plus de 4 % du bord droit de la berline et à plus de 9° de son centre.
-# Phase : de 90 à 180° sur le plan (48 images à 45°/s), à plus de 20° de l'objectif (249° vu du phare) : comme en
-# OUV, celle qui montre le moins de pinceau sur l'horizon (26 % de la largeur à l'image 1, 87 % à la dernière).
-PHARE_ECART = 21.0
+# image, sur un cap sombre, 14° à droite de l'axe (x 82 % à la première image, 87 % à la dernière, à 9 % au moins du
+# bord droit de la berline). Hauteur (1,3°), pied et cap : le repli du découpage v3 pour une caméra à 0,55 m, à
+# revoir à 2,4 m (le mur de la promenade ne cache plus la tour).
+# Phase : de 90 à 180° sur le plan (48 images à 45°/s), à plus de 20° de l'objectif (256° vu du phare) : comme en
+# OUV, celle qui montre le moins de pinceau sur l'horizon.
+PHARE_ECART = 14.0
 PHARE_PHASE = 90.0
 PHARE_PIED, PHARE_ECHELLE, PHARE_AT = OUV.phare_pose(camera(0.0), ecart=PHARE_ECART)
 

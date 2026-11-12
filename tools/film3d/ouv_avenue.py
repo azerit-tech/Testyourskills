@@ -9,27 +9,30 @@
 #
 # Repère de la scène A : l'avenue file vers +y (le soleil couché au bout), la ville à x < 0, l'océan à x > 0 ; les
 # rues transversales s'ouvrent côté ville. t = 0 à la première image ; 40 images, 24 par seconde.
+import math
+
 import motion as M
 
 FRAMES = 40
 F0 = 1
 T_END = (FRAMES - 1) / M.FPS
 V3 = True                     # les plafonds v3 de test_motion.py s'appliquent
+V31 = True                    # et ceux du découpage v3.1 (cadre commun, conduite)
 
 SPEED = 50 / 3.6              # m/s, la conduite calme
 HERO_X = 1.75                 # la voie intérieure de la chaussée qui monte vers +y
-# La caméra, 8 m derrière son centre au départ, 0,2 m à sa droite, 0,55 m du sol, 24 mm. La fiche la voulait 0,6 m à
-# gauche : de là, la berline au centre (x 50 %), la patrouille garée tombait à x 3-18 % et sortait à l'image 25 ; à
-# 0,2 m à droite, berline au centre, la patrouille est à x 12-26 %, juste à gauche de la berline sans passer derrière
-# elle, et sort du bord gauche à l'image 30 (fiche : de 24 à 32). Plus à droite, elle passerait derrière la berline.
-CAM_BACK, CAM_SIDE, CAM_Z = 8.0, 0.2, 0.55   # CAM_SIDE : vers +x (la droite de la berline)
-# 0,5 m/s moins vite qu'elle : 8,8 m derrière à la fin, la berline à 34 % de large (point de coupe vers P1, 44 % :
-# rapport 0,77) ; à 1 m/s (fiche : 9,6 m à la fin) elle finissait à 30 %, rapport 0,68, sous les 0,75 du raccord
-CAM_LAG = 0.5
-CAM_YAW = 178.6               # lacet de motion.key_camera (180 : vers +y ; moins, vers -x) : la berline à x 50 %
-# site : le centre de la berline à 53 % de la hauteur depuis le haut (fiche, point de coupe y 55 ± 5)
-CAM_PITCH = 4.5
+# La caméra, le cadre de poursuite commun du découpage v3.1 (tous les plans de dos) : 2,4 m au-dessus de la chaussée,
+# 7,5 m derrière le centre de la berline, 24 mm, la berline à x 50 % et à y 58 % depuis le haut. Un rail à sa vitesse,
+# sans grue ni travelling : la même place de la première à la dernière image, la même qu'au début de P1. Le lacet et le
+# site sont calculés (aim) pour poser le centre de la berline à sa place ; la route est droite, ils ne bougent pas.
+# Aucun décalage latéral : à gauche, le lacet tournerait vers la droite pour garder la berline au centre et la
+# patrouille garée sortirait plus tôt (1,0 m : à l'image 8 au lieu de 25).
+CAM_BACK, CAM_SIDE, CAM_Z = 7.5, 0.0, 2.4    # CAM_SIDE : vers -x (la gauche de la berline)
+CAM_U, CAM_V = 0.50, 0.58                    # le centre de la berline à l'écran (x depuis la gauche, y depuis le haut)
+HERO_ZC = 0.72                               # la hauteur de son centre
 LENS = 24.0
+HALF_W = math.atan(10.125 / LENS)            # demi-champ horizontal (capteur de 36 mm en 9:16)
+HALF_H = math.atan(18.0 / LENS)              # demi-champ vertical
 FOCUS_F = 4.0                 # ouverture ; le point sur la berline
 # la rue transversale de la patrouille : celle de y 266 (découpage v2, P1 option A, 12 novembre) ; il y a 250 m
 # d'avenue construite derrière la berline, et 400 devant
@@ -63,10 +66,28 @@ def tracks_heading():
     return {"patrol": lambda t: PATROL[2]}
 
 
+def aim(x, y, z, hx, hy, u=CAM_U, v=CAM_V):
+    """(x, y, z, lacet, site, roulis, focale) d'une caméra posée en (x, y, z) qui met le centre de la berline (hx, hy,
+    à HERO_ZC du sol) à (u, v) du cadre (v depuis le haut) : lacet de motion.key_camera (180 vers +y, plus vers +x),
+    puis trois pas de Newton sur la boîte projetée (motion.hero_screen), dont le centre n'est pas celui de la caisse."""
+    dx, dy = hx - x, hy - y
+    phi = math.degrees(math.atan((u - 0.5) * 2.0 * math.tan(HALF_W)))
+    yaw = 180.0 + math.degrees(math.atan2(dx, dy)) - phi
+    beta = math.degrees(math.atan((v - 0.5) * 2.0 * math.tan(HALF_H)))
+    pitch = math.degrees(math.atan2(HERO_ZC - z, math.hypot(dx, dy))) + beta
+    for _ in range(3):
+        b0 = M.hero_screen((x, y, z, yaw, pitch, 0.0, LENS), hx, hy, 0.0, 0.0)
+        bu = M.hero_screen((x, y, z, yaw + 0.1, pitch, 0.0, LENS), hx, hy, 0.0, 0.0)
+        bv = M.hero_screen((x, y, z, yaw, pitch + 0.1, 0.0, LENS), hx, hy, 0.0, 0.0)
+        yaw += 0.1 * (u - b0["u"]) / (bu["u"] - b0["u"])
+        pitch += 0.1 * (v - b0["v"]) / (bv["v"] - b0["v"])
+    return x, y, z, yaw, pitch, 0.0, LENS
+
+
 def camera_rail(t):
-    """(x, y, z, lacet, site, roulis, focale) : sur un rail, CAM_LAG moins vite que la berline, sans rotation."""
+    """Le cadre commun : CAM_BACK derrière la berline, CAM_SIDE à sa gauche, CAM_Z de haut, à sa vitesse."""
     x, y = hero_pos(t)
-    return x + CAM_SIDE, y - CAM_BACK - CAM_LAG * t, CAM_Z, CAM_YAW, CAM_PITCH, 0.0, LENS
+    return aim(x - CAM_SIDE, y - CAM_BACK, CAM_Z, x, y)
 
 
 def camera(t):
@@ -82,6 +103,7 @@ def bars_on(frame):
 # de l'axe de l'avenue, à 600 m de la caméra de la première image. À 0,55 m du sol, le mur de la promenade (0,95 m,
 # 41 m plus loin dans cette direction) monte à 0,56° au-dessus de l'horizon : posé sur l'eau, la tour de 1,0° n'en
 # sortait que par la lanterne. Le repli du §3 : sur un cap sombre, base à 0,5° au-dessus de l'horizon, 1,3° de haut.
+# À revoir au cadre v3.1 (caméra à 2,4 m : le mur ne cache plus la tour, elle peut revenir sur l'eau à 1,0°).
 PHARE_CAP, PHARE_ECART = 0.0, 14.0   # cap de l'avenue (lieux : 0 vers +y), degrés à droite de l'axe
 PHARE_DEG = 1.3                      # hauteur angulaire de la tour, du pied au sommet du chapeau
 PHARE_BASE_DEG = 0.5                 # son pied au-dessus de l'horizon de la caméra
