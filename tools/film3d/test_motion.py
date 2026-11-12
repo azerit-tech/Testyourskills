@@ -340,20 +340,32 @@ def test_p6():
 
 
 def test_ouv():
-    """OUV : la berline dépasse la patrouille garée à plus de 2 m (de flanc à flanc, demi-largeurs de 0,95 m), le
-    plan et les trois secondes qui le suivent (elle la dépasse vers l'image 44) ; la patrouille dans le cadre."""
+    """OUV (découpage v3) : la berline dépasse la patrouille garée à plus de 2 m (de flanc à flanc, demi-largeurs de
+    0,95 m), le plan et les trois secondes qui le suivent ; la patrouille dans le cadre à gauche de la berline (sans
+    passer derrière elle) jusqu'à l'image 24, hors champ à 32 ; la berline au point de coupe à la première et à la
+    dernière image (x 50 ± 6, y 55 ± 5 depuis le haut) ; l'éveil dans l'ordre : phares, rampe, feux stop."""
     import ouv_avenue as P
     d, f, a, b = M.min_gap(P.tracks(), range(P.F0, P.F0 + 96))
     check("OUV : la berline passe à plus de 2 m de la patrouille", d - 2 * 0.95 > 2.0,
           f"{d - 1.9:.1f} m de flanc à flanc à l'image {f}")
-    half = math.degrees(math.atan(10.125 / P.LENS))
-    worst = 0.0
-    for f in range(P.F0, P.F0 + 20):
-        cx, cy = P.camera(M.t_of(f))[:2]
-        a = math.degrees(math.atan2(cx - P.PATROL[0], P.PATROL[1] - cy))   # vers la gauche
-        worst = max(worst, a + (P.CAM_YAW - 180.0))   # depuis l'axe de visée (tourné vers la droite de CAM_YAW - 180)
-    check("OUV : la patrouille dans le cadre jusqu'à l'image 20", worst < half - 2.5,
-          f"au plus {worst:.1f}° à gauche de l'axe, le bord à {half:.1f}°")
+    seen, gap = [], 1.0
+    for f in range(P.F0, P.F0 + P.FRAMES):
+        c = P.camera_rail(M.t_of(f))
+        car = M.hero_screen(c, *P.hero_pos(M.t_of(f)), 0.0, 0.0)
+        pat = M.hero_screen(c, P.PATROL[0], P.PATROL[1], 0.0, P.PATROL[2], box=(5.1, 1.95, 1.5))
+        if pat and pat["u1"] > 0.0:
+            seen.append(f)
+            gap = min(gap, car["u0"] - pat["u1"])
+    check("OUV : la patrouille à gauche jusqu'à l'image 24, hors champ à 32, jamais derrière la berline",
+          seen and seen[0] == P.F0 and 24 <= seen[-1] < 32 and gap > 0.0,
+          f"dans le cadre jusqu'à l'image {seen[-1] if seen else None}, au plus près {gap * 100:.0f} % de la berline")
+    for f in (P.F0, P.F0 + P.FRAMES - 1):
+        car = M.hero_screen(P.camera_rail(M.t_of(f)), *P.hero_pos(M.t_of(f)), 0.0, 0.0)
+        x, y = car["u"] * 100, car["v"] * 100
+        check(f"OUV : la berline au point de coupe à l'image {f}", abs(x - 50) <= 6 and abs(y - 55) <= 5,
+              f"x {x:.0f}, y {y:.0f}, largeur {car['w'] * 100:.0f} %")
+    check("OUV : phares, rampe puis feux stop", P.F0 < P.WAKE < P.BARS_ON < P.BRAKE[0] <= P.BRAKE[1] < P.F0 + P.FRAMES,
+          f"phares {P.WAKE}, rampe {P.BARS_ON}, feux stop {P.BRAKE[0]}-{P.BRAKE[1]}")
 
 
 def test_fin6():
