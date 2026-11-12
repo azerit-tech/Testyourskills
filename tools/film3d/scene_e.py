@@ -1326,6 +1326,10 @@ def plan_P5(scene, hidden, palier="conteneurs"):
         for o in hero.children_recursive:
             if o.type == "MESH":
                 sans.objects.link(o)
+        # ni les caisses de la sortie : corail et lilas à 30 m, elles en sortaient roses (essai e)
+        for o in bpy.data.objects:
+            if o.type == "MESH" and o.name.startswith(("caisse_", "palettes_sortie")):
+                sans.objects.link(o)
         for co in sans.collection_objects:
             co.light_linking.link_state = "EXCLUDE"
         for ob in bpy.data.objects:
