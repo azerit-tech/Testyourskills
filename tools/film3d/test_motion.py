@@ -930,6 +930,23 @@ def test_p1():
         check(f"P1 : la {name} roule vrai (freinage ≤ 7, accélération ≤ {amax:g} m/s², à-coup ≤ 12 m/s³)",
               -7.0 - 1e-3 <= min(acc) and max(acc) <= amax + 1e-3 and jerk <= 12.5,
               f"{min(acc):.2f} à {max(acc):.2f} m/s², à-coup {jerk:.1f} m/s³")
+    # le parcours unique : la berline sur sa fenêtre, sa sortie dans l'état d'entrée de P2 du module, la patrouille 1
+    # calée à sa place de la coupe (gauche, 3,45 m, +3,0 m, à sa vitesse)
+    import parcours as PC
+    d = max(math.dist(P.hero_pos(M.t_of(f)), PC.hero("P1")["pos"](f)) for f in frames)
+    check("P1 : la berline sur la fenêtre du parcours", d < 1e-9, f"{d:.1e} m")
+    sa, sb = next((a, b) for x, y, a, b in PC.cut_states() if (x, y) == ("P1", "P2"))
+    lims = dict(speed=0.10 * sa["speed"], along=CUT_ALONG, alat=CUT_ALAT, yaw=CUT_YAW, slip=CUT_SLIP, steer=CUT_STEER,
+                roll=CUT_ROLL, pitch=CUT_PITCH)
+    bad = [k for k, lim in lims.items() if abs(sb[k] - sa[k]) > lim]
+    check("P1 : la sortie dans l'état d'entrée de P2 du module", not bad,
+          f"v {sa['speed']:.2f} → {sb['speed']:.2f} m/s, long {sa['along']:+.2f} → {sb['along']:+.2f}" + (f", {bad}" if bad else ""))
+    t = P.T_END
+    lead, left = P.patrol_pos(t)[1] - P.hero_pos(t)[1], P.hero_pos(t)[0] - P.patrol_pos(t)[0]
+    dv = P.patrol_speed(t) - P.hero_speed(t)
+    check("P1 : la patrouille 1 à sa place de la coupe vers P2 (gauche 3,45 m, +3,0 m, même vitesse)",
+          abs(left - 3.45) < 0.05 and abs(lead - 3.0) < 0.05 and abs(dv) < 0.05,
+          f"gauche {left:.2f} m, avance {lead:+.2f} m, écart de vitesse {dv:+.2f} m/s")
 
 
 def test_bars():

@@ -2029,9 +2029,13 @@ def p1_motion(scene, coupe, police, cam, focus):
     coupe.location = (x0, y0, 0)
     coupe.rotation_euler = (0, 0, math.pi)
     rig = M.rig_up(coupe, 0.0, "rig_berline")
-    poses = M.sample(P.hero_pos, frames, wheel_r=coupe["wheel_r"], wheelbase=wb)
+    poses = M.sample(P.hero_pos, frames, heading=P.hero_heading, steer=P.hero_steer, wheel_r=coupe["wheel_r"],
+                     wheelbase=wb)
     M.key_vehicle(rig, poses, wheels=wheels)
     M.wheel_marks(wheels, coupe["wheel_r"])
+    import hero_cars
+    for a, b in P.brake_windows():        # les feux stop du parcours (aucun en P1)
+        hero_cars.stop_lamps(coupe, a, b)
     # la patrouille : après l'ellipse, dans la voie de la berline, derrière elle (l'avant de son modèle vers +x)
     px, py = P.patrol_pos(M.t_of(P.F0))
     police.location = (px, py, 0)
