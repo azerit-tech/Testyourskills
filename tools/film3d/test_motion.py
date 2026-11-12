@@ -178,7 +178,7 @@ def test_p6():
 
 def test_ouv():
     """OUV : la berline dépasse la patrouille garée à plus de 2 m (de flanc à flanc, demi-largeurs de 0,95 m), le
-    plan et les trois secondes qui le suivent (elle la dépasse vers l'image 48) ; la patrouille dans le cadre."""
+    plan et les trois secondes qui le suivent (elle la dépasse vers l'image 44) ; la patrouille dans le cadre."""
     import ouv_avenue as P
     d, f, a, b = M.min_gap(P.tracks(), range(P.F0, P.F0 + 96))
     check("OUV : la berline passe à plus de 2 m de la patrouille", d - 2 * 0.95 > 2.0,

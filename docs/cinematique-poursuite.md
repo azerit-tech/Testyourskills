@@ -203,7 +203,7 @@ Effort : petit, quelques heures d'un agent ; moyen, une journée ; gros, deux jo
 **1. L'avenue des hôtels (scène A, elle existe) : OUV et P1**
 
 - *Dimensions* : chaussée de 14 m à quatre voies, trottoir de 4,5 m côté ville, promenade de 4,5 m et muret côté océan, façades de deux à sept étages d'un seul côté.
-- *OUV* : le décor ne change pas. La voiture roule à 50 km/h vers la bande corail, sur la voie de droite, l'océan à sa droite, de y 91 à y 104. La patrouille est garée gyrophare éteint à l'angle de la rue transversale de y 120, devant à gauche, côté ville. Caméra sur rail, à 1,5 m, 35 mm, trois quarts dos.
+- *OUV* : le décor ne change pas. La voiture roule à 50 km/h vers la bande corail, sur la voie de droite, l'océan à sa droite, de y 93 à y 106. La patrouille est garée gyrophare éteint à l'angle de la rue transversale de y 120, devant à gauche, côté ville. Caméra sur rail, à 1,5 m, 35 mm, trois quarts dos.
 - *P1* : le même lieu, cent mètres plus loin, vu de l'habitacle (28 mm). Par le pare-brise, flous, les feux orange du carrefour qui approche. La voiture bondit vers eux.
 - *Le carrefour de la scène A ne change pas* quand le rond-point arrive : à cent mètres et flou, ses feux passent pour ceux du rond-point.
 - *Pourquoi deux plans ici* : le calme tient en un seul lieu. La rupture vient avec le virage.
