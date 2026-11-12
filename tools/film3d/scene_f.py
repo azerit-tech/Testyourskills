@@ -64,6 +64,12 @@ BRANCHES = [("plage", 0.0, 4.0), ("avenue_nord", 90.0, 7.0), ("enseignes", 180.0
 _D = P.R + R_ISLAND + 1.5
 _CX = 5.0 - P.R
 POSE = (5.0, -math.sqrt(_D ** 2 - _CX ** 2), 0.0)
+# les flaques de la voie extérieure (degré, rayon, taille, allongement), faites pour la caméra à 9 m : la caméra A2
+# roule dessus (r 12,5 à 13 de l'îlot, 215 à 235°), elles faisaient le miroir noir du bas du cadre ; retirées
+OUTER_PUDDLES = ()           # v2 : ((240, 13.4, 1.2, 2.0), (228, 14.0, 0.9, 1.7), (216, 13.2, 1.3, 2.2))
+GLOW_STRENGTH = 0.7          # la lueur d'horizon à l'est (build_dusk)
+CAR_FILL_W = 800.0           # W, l'appoint lié à la berline (keep_paint) : à 260, la porte à (55, 16, 30) puis
+                             # (57, 6, 17) à l'image 28, le bon bordeaux mais plus sombre qu'OUV (73, 29, 26)
 
 
 def log(*a):
@@ -320,7 +326,7 @@ def build_edges(water):
         A.cyl(f"balise_band_{n}", (x, y, ISLAND_H + 0.55), (x, y, ISLAND_H + 0.68), 0.052, band)
         n += 1
     # (degré, rayon, taille, allongement) : sur la voie extérieure, hors de la route de la berline (r 8 à 11 ici)
-    for j, (deg, r, rad, sy) in enumerate(((240, 13.4, 1.2, 2.0), (228, 14.0, 0.9, 1.7), (216, 13.2, 1.3, 2.2))):
+    for j, (deg, r, rad, sy) in enumerate(OUTER_PUDDLES):
         t = math.radians(deg)
         ob = B.puddle(f"ring_puddle_out_{j}", 0.0, 0.0, rad, sy, 140 + j, water)
         for v in ob.data.vertices:
@@ -329,7 +335,7 @@ def build_edges(water):
             v.co.y = (r + lx) * math.sin(t) + ly * math.cos(t)
             v.co.z = ring_z(math.hypot(v.co.x, v.co.y)) + 0.0025
         ob.data.update()
-    log(f"bords : {n} balises sur l'îlot, 3 flaques sur la voie extérieure")
+    log(f"bords : {n} balises sur l'îlot, {len(OUTER_PUDDLES)} flaques sur la voie extérieure")
 
 
 def build_street_life(hidden, branches):
@@ -515,6 +521,97 @@ def build_backdrop(hidden):
         f"{lamps} lampadaires")
 
 
+def build_dusk(hidden):
+    """Ce que voit le cadre A2 aux images 1 à 10 (reprise du 12 novembre : un aplat marine sur un aplat noir). La
+    caméra y regarde l'est-sud-est, à l'opposé de la bande corail du ciel (A.make_world la met au nord) et vers un
+    angle de la place vide jusqu'au mur de la plage. Trois choses, aucune n'éclaire la berline (keep_paint) :
+    une lueur d'horizon au-dessus de la mer, visible de la caméra et dans les reflets de la chaussée mouillée, qui
+    n'éclaire rien ; un bosquet de palmiers royaux éclairés par le pied dans l'angle sud-est ; deux lampadaires
+    devant eux, que le mouillé renvoie."""
+    import lieux
+    m = bpy.data.materials.new("horizon_glow")
+    m.use_nodes = True
+    nt = m.node_tree
+    for nd in list(nt.nodes):
+        nt.nodes.remove(nd)
+    tc = nt.nodes.new("ShaderNodeTexCoord")
+    sep = nt.nodes.new("ShaderNodeSeparateXYZ")
+    nt.links.new(tc.outputs["Generated"], sep.inputs[0])
+    ramp = nt.nodes.new("ShaderNodeValToRGB")
+    els = ramp.color_ramp.elements
+    # (le plus vif à 15-35 m de haut, 0,4 à 1° au-dessus de l'horizon : plus bas, le mur de la promenade le cachait
+    # et il ne sortait qu'au bout du mur, en pavé rose à bord franc)
+    els[0].position, els[0].color = 0.0, lin("#b9586f")
+    els[1].position, els[1].color = 0.65, (0.0, 0.0, 0.0, 1.0)
+    for pos, col in ((0.14, CORAL), (0.32, "#6a3a7a")):
+        e = els.new(pos)
+        e.color = lin(col)
+    nt.links.new(sep.outputs["Z"], ramp.inputs[0])
+    em = nt.nodes.new("ShaderNodeEmission")
+    em.inputs["Strength"].default_value = GLOW_STRENGTH
+    nt.links.new(ramp.outputs["Color"], em.inputs["Color"])
+    add = nt.nodes.new("ShaderNodeAddShader")
+    tr = nt.nodes.new("ShaderNodeBsdfTransparent")
+    nt.links.new(em.outputs[0], add.inputs[0])
+    nt.links.new(tr.outputs[0], add.inputs[1])
+    out = nt.nodes.new("ShaderNodeOutputMaterial")
+    nt.links.new(add.outputs[0], out.inputs["Surface"])
+    # à 2 km à l'est, 6 km de large, de 20 m sous l'horizon à 300 m au-dessus (8,5°)
+    g = A.box("horizon_glow", 2000.0, 2001.0, -3000.0, 3000.0, -20.0, 300.0, m)
+    g.visible_diffuse = g.visible_shadow = g.visible_volume_scatter = g.visible_transmission = False
+    # le bosquet : (x, y) dans l'angle sud-est, hors des routes et du trajet de la caméra
+    royal = A.royal_source(hidden)
+    sc = 12.0 / max(royal.dimensions.z, 0.1)
+    rng = random.Random(41)
+    for k, (x, y) in enumerate(((24.0, -23.0), (31.0, -31.0), (38.0, -21.0), (29.0, -40.0), (42.0, -33.0))):
+        A.instance(royal, f"se_royal_{k}", (x, y, road.WALK_Z), rng.uniform(0, math.tau), sc * rng.uniform(0.85, 1.1))
+        p = Vector((x - 1.2, y + 0.6, road.WALK_Z + 0.1))
+        A.add_light(f"se_up_{k}", "SPOT", p, Vector((x, y, 11.0)) - p, lin(AMBER), 3000.0, spot=40)
+    src = lieux.lamp_source(hidden)
+    for k, (x, y) in enumerate(((20.0, -15.0), (35.0, -14.0))):
+        lieux.lamp(src, (x, y, road.WALK_Z), arm=(0, 1), name=f"lamp_se_{k}")
+    log("crépuscule : lueur d'horizon à l'est, 5 palmiers éclairés et 2 lampadaires dans l'angle sud-est")
+
+
+def keep_paint():
+    """Le bordeaux de la berline (#4e0a28, comme dans OUV) tout le plan. Mesuré sur la porte à 256 échantillons :
+    (146, 13, 2) à l'image 1, rouge orangé, (23, 3, 9) à l'image 28, presque noir ; OUV, (73, 29, 26). Les lumières
+    ambre et chaudes du rond-point (lampadaires, projecteurs de l'îlot) n'éclairent plus la caisse (liaison de
+    lumière, exclusion) ; une source douce liée à la seule berline (lieux.car_fill), du côté de la caméra (son flanc
+    gauche, +x dans son repère), lui rend une lumière neutre sur tout le plan."""
+    import lieux
+    car = bpy.data.objects["coupe"]
+    # toute la voiture, caisse comprise : la caisse (ailes, capot, coffre) est l'objet `coupe` lui-même, les portes
+    # et les roues ses enfants. (lieux.car_fill ne prend que les enfants : la caisse restait hors de l'appoint, les
+    # portes seules le recevaient, rouge magenta sur une caisse presque noire ; la collection est faite ici, il la
+    # reprend.)
+    whole = [o for o in (car, *car.children_recursive) if o.type == "MESH"]
+    sans = bpy.data.collections.new("berline_sans_ambre")
+    avec = bpy.data.collections.new(f"{car.name}_lumiere_avec")
+    for o in whole:
+        sans.objects.link(o)
+        avec.objects.link(o)
+    n = 0
+    for lo in bpy.data.objects:
+        if lo.type == "LIGHT" and lo.name.startswith(("lamp_", "island_low_", "island_up_", "se_up_")):
+            lo.light_linking.receiver_collection = sans
+            n += 1
+    for co in sans.collection_objects:
+        co.light_linking.link_state = "EXCLUDE"
+    # (sans reflet : vu de 5 m, celui d'une source de 3 m posait une tache rose blanc sur les portes ; chaude et
+    # haute : neutre, de 2,8 m, elle sortait la seule porte avant framboise, (82, 20, 50), le reste de la caisse noir)
+    # (de 5 m et large de 8 : de 3,4 m, l'aile avant restait 19 % plus sombre que la porte au même galbe)
+    fill = lieux.car_fill(car, loc=(5.0, 0.0, 3.0), energy=CAR_FILL_W, color="#ffc89a", size=8.0)
+    fill.visible_glossy = False
+    # les phares : 1400 W et 50° étaient faits pour le drone ; de face et à ras du sol, ils mangeaient la caisse
+    # (image 8 de l'essai 1) ; ceux de P3, de face eux aussi
+    for lo in [c for c in car.children_recursive if c.type == "LIGHT" and c.data.type == "SPOT"]:
+        lo.data.energy = 400.0
+        lo.data.spot_size = math.radians(34)
+    log(f"berline : {len(whole)} pièces, {n} lumières chaudes exclues, appoint lié de {CAR_FILL_W:.0f} W, "
+        f"phares à 400 W")
+
+
 def build(plan=None, palier=None):
     """Écrit scene-f.blend (en ligne de commande), ou rend la scène à render_lieux.py (--lieu rond-point --plan
     P2), sans l'écrire. Le plan P2 est animé (28 images, motion.py), posé à l'image de l'image fixe."""
@@ -529,9 +626,13 @@ def build(plan=None, palier=None):
     build_island(hidden)
     build_street_life(hidden, branches)
     build_backdrop(hidden)
+    build_dusk(hidden)
     build_edges(bpy.data.materials["ring_puddle"])
     C.place_cars(scene, POSE, anim=True)
-    ring_pools()
+    # (ring_pools, les deux faisceaux de 30 kW posés pour le drone devant la patrouille de l'image fixe, ne sont
+    # plus appelés : fixes dans un plan animé, ils tombaient sur la ligne de la berline des images 1 à 10 et la
+    # sortaient rouge orangé)
+    keep_paint()
     for c in bpy.data.collections:
         if c.name == "sources" or c.name.startswith("sources."):
             c.hide_render = True
