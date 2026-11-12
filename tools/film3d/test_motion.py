@@ -294,6 +294,9 @@ def test_fin6():
     check("FIN6 : la berline dans le cadre, hors du HUD, au milieu de la hauteur", not worst, f"images {worst[:5]}")
     off = max(abs(P.project(P.camera(M.t_of(f)), (P.CX, P.CY, P.HERO_BOX[2] / 2))[0]) / 2 for f in frames)
     check("FIN6 : le milieu de la berline dans le tiers central de la largeur", off <= 1 / 6, f"{off:.0%} du centre")
+    hs = [1.0 - P.project(P.camera(M.t_of(f)), (P.CX, P.CY, P.HERO_BOX[2] / 2))[1] for f in frames]
+    check("FIN6 : plan bas, le milieu de la berline entre 50 et 62 % de la hauteur", 0.50 <= min(hs) and max(hs) <= 0.62,
+          f"de {min(hs):.1%} à {max(hs):.1%}")
     w = [abs(P.azimuth(M.t_of(f + 1)) - P.azimuth(M.t_of(f))) for f in frames]
     check("FIN6 : départ et arrêt amortis", w[0] < 0.6 * max(w) and w[-2] < 0.05 * max(w),
           f"{w[0]:.2f}° puis {max(w):.2f}° au plus vite, {w[-2]:.3f}° à la fin")
@@ -340,6 +343,12 @@ def test_fin():
     steps = [math.dist(P.camera(M.t_of(f))[:2], P.camera(M.t_of(f + 1))[:2]) for f in range(P.F0, P.F_LAND)]
     check("FIN : l'avancée freine sans à-coup", all(b <= a + 1e-9 for a, b in zip(steps, steps[1:])) and steps[-1] < 0.005,
           f"{steps[-1] * 1000:.1f} mm à la dernière image")
+    # plan bas : le milieu de la berline entre 50 et 62 % de la hauteur depuis le haut (62,6 % sur la pose validée,
+    # qui ne change pas : 0,7 point de tolérance), sans monter vers l'horizon au début de l'avancée
+    from fin6_orbite import project, HERO_BOX
+    hs = [1.0 - project(P.camera(M.t_of(f)), (*P.hero_pos(M.t_of(f)), HERO_BOX[2] / 2))[1] for f in frames]
+    check("FIN : le milieu de la berline entre 50 et 63 % de la hauteur", 0.50 <= min(hs) and max(hs) <= 0.63,
+          f"de {min(hs):.1%} à {max(hs):.1%}")
     # les poursuivants : arrêtés l'un après l'autre, avant la berline ou avec elle, sans rien toucher
     stops = [a[1] for a in P.ARC]
     check("FIN : les poursuivants s'arrêtent l'un après l'autre", len(set(stops)) == len(stops)

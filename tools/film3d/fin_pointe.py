@@ -118,6 +118,10 @@ F_LAND = 22
 T_LAND = M.t_of(F_LAND)
 _BACK = (math.sin(math.radians(CAM_YAW)), math.cos(math.radians(CAM_YAW)))   # l'opposé de la visée, au sol
 CAM_EASE = 2.3
+# la caméra se relève de 2,5° en avançant : sans cela, la berline lointaine des premières images montait vers
+# l'horizon, son milieu à 64 % de la hauteur depuis le haut ; elle reste ainsi entre 61 et 63 % tout le plan
+# (62,6 % sur la pose validée, qui ne change pas)
+CAM_TILT = 2.5
 
 
 def camera(t):
@@ -127,7 +131,7 @@ def camera(t):
     s = (1.0 - u) ** (CAM_EASE - 1.0)                     # la vitesse, rapportée à celle du départ
     dyaw, dpitch, droll, dx, dy, dz = M.handheld(t, amp=0.10, rotor=0.0, seed=2.2)
     return (CAM[0] + _BACK[0] * k + dx * 0.3 * s, CAM[1] + _BACK[1] * k, CAM[2] + dz * 0.4 * s,
-            CAM_YAW + dyaw * s, CAM_PITCH + dpitch * s, droll * s, CAM_LENS)
+            CAM_YAW + dyaw * s, CAM_PITCH - CAM_TILT * (1.0 - u) ** CAM_EASE + dpitch * s, droll * s, CAM_LENS)
 
 
 def focus_point(t):
