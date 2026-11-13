@@ -1362,6 +1362,96 @@ def texte_releve(rows):
     return L_
 
 
+SUPERPOSE = 0.02                    # deux surfaces à moins de 2 cm l'une de l'autre : un combat de profondeur au rendu
+COMPOSE_PAS, COMPOSE_LARGE = 0.5, 6.0
+
+
+def empilements(scene, plan, f0, f1, pas=COMPOSE_PAS, large=COMPOSE_LARGE, seuil=SUPERPOSE):
+    """La scène composée d'un plan (sa scène + ses voisins, comme render_film --ville la rend) : des rayons verticaux
+    sur une grille de `pas` m à moins de `large` m de la berline, images f0 à f1 ; à chaque point, toutes les faces
+    visibles au rendu jusqu'à 0,5 m sous la première. Rend {(objet haut, lieu, objet bas, lieu): [n, dz min, dz max,
+    (x, y, z) du premier]} pour chaque couple d'objets différents empilés à moins de `seuil`."""
+    import bpy
+    from mathutils import Vector
+    h = P.hero(plan)
+    cells = set()
+    for f in range(f0, f1 + 1):
+        x, y = h["pos"](f)[:2]
+        k = int(large / pas)
+        for i in range(-k, k + 1):
+            for j in range(-k, k + 1):
+                if (i * i + j * j) * pas * pas <= large * large:
+                    cells.add((round(x / pas) + i, round(y / pas) + j))
+    scene.frame_set(f0)
+    # les rayons ne voient que ce qui est visible dans la vue : ce qui est rendu mais caché dans la vue y est remis
+    # le temps du contrôle ; les véhicules et figurants (familles is_cast, traces exceptées) sont passés : le sol
+    remis = [o for o in scene.objects if o.type == "MESH" and not o.hide_render and (o.hide_viewport or o.hide_get())]
+    for o in remis:
+        o.hide_viewport = False
+        o.hide_set(False)
+    cast = {o for t in _tops(set(scene.objects)) if is_cast(t) and not TRACES.match(t.name) for o in _family(t)}
+    bpy.context.view_layer.update()
+    dg = bpy.context.evaluated_depsgraph_get()
+    d = Vector((0.0, 0.0, -1.0))
+    out = {}
+    for ci, cj in sorted(cells):
+        o = Vector((ci * pas, cj * pas, 30.0))
+        left, faces = 60.0, []
+        for _ in range(16):
+            ok, loc, _n, _i, ob, _m = scene.ray_cast(dg, o, d, distance=left)
+            if not ok:
+                break
+            ob = ob.original if ob else ob
+            left -= (o.z - loc.z) + 0.001
+            o = loc + d * 0.001
+            if ob is None or ob in cast or ob.hide_render or any(c.hide_render for c in ob.users_collection):
+                continue
+            faces.append((loc.z, ob))
+            if loc.z < faces[0][0] - 0.5 or left <= 0:
+                break
+        for (za, a), (zb, b) in zip(faces, faces[1:]):
+            if a != b and za - zb < seuil:
+                key = (a.name, a.get("ville_lieu") or "propre", b.name, b.get("ville_lieu") or "propre")
+                r = out.setdefault(key, [0, 9.0, -9.0, (round(ci * pas, 1), round(cj * pas, 1), round(za, 3))])
+                r[0] += 1
+                r[1], r[2] = min(r[1], za - zb), max(r[2], za - zb)
+    for o in remis:
+        o.hide_viewport = True
+    return out, len(cells)
+
+
+def worker_compose(a):
+    """--compose P:f0-f1,... : pour chaque plan, sa scène composée (cache de debit + ville.voisins de DIR), et les
+    empilements sous la berline ; écrit DIR/compose-<P>.txt."""
+    import importlib
+    import inspect
+
+    import debit
+    plan, rng = a.plan_sol.split(":")
+    f0, f1 = (int(v) for v in rng.split("-"))
+    mod_name, arg = source(plan)
+    if mod_name == "scene_b":
+        os.environ["FILM3D_PLAN"] = plan
+    os.environ["FILM3D_BLEND"] = os.path.join(a.out, f"compose-{plan}.blend")
+    mod = importlib.import_module(mod_name)
+    scene, how, t_build, _ = debit.cached_build(
+        plan, arg, lambda: mod.build(arg) if arg and inspect.signature(mod.build).parameters else mod.build(),
+        assets_dir())
+    voisins(scene, plan, os.path.abspath(a.ville))
+    volumes(scene, False)
+    t0 = time.time()
+    out, n = empilements(scene, plan, f0, f1)
+    lines = [f"{plan} images {f0}-{f1} : scène composée ({how}), {n} points de {COMPOSE_PAS} m à moins de "
+             f"{COMPOSE_LARGE} m de la berline, {len(out)} couples empilés à moins de {SUPERPOSE * 100:.0f} cm "
+             f"({time.time() - t0:.0f} s)"]
+    for (an, al, bn, bl), (k, d0, d1, p) in sorted(out.items(), key=lambda kv: -kv[1][0]):
+        lines.append(f"  {k:5d} pts  {an} ({al}) sur {bn} ({bl})  dz {d0 * 100:.1f} à {d1 * 100:.1f} cm  "
+                     f"ex. ({p[0]} ; {p[1]} ; z {p[2]})")
+    with open(os.path.join(a.out, f"compose-{plan}.txt"), "w", encoding="utf-8") as fh:
+        fh.write("\n".join(lines) + "\n")
+    log("\n".join(lines))
+
+
 def worker_controles(a, noms):
     """--controles : reprend DIR/ville.blend, refait les contrôles (sol sous les roues, emprises réelles) et la carte,
     sans rien reconstruire ; écrit DIR/controles.json et DIR/controles.txt."""
@@ -1986,6 +2076,11 @@ def main():
     ap.add_argument("--releve", default=None, help="avec --controles : plages d'abscisse s0:s1,s0:s1 du relevé brut")
     ap.add_argument("--controles", action="store_true",
                     help="reprend DIR/ville.blend : sol sous les roues, emprises réelles, carte ; sans reconstruire")
+    ap.add_argument("--compose", default=None,
+                    help="P:f0-f1,... : scène composée de chaque plan (avec --ville DIR), surfaces empilées à moins de "
+                         "2 cm sous la berline ; bloquant (sortie 2) s'il y en a")
+    ap.add_argument("--ville", default=None, help="avec --compose : le dossier des lieux en cache (ville.py --cache)")
+    ap.add_argument("--plan-sol", default=None, help=argparse.SUPPRESS)
     ap.add_argument("--lieux", default=",".join(NOMS))
     ap.add_argument("--lointains", action="store_true", help="garder les faux lointains")
     ap.add_argument("--legende", default=None, help="la légende de la carte, lignes séparées par | (sinon les poses)")
@@ -2008,8 +2103,10 @@ def main():
             worker_prise(a)
         elif a.etape == "controles":
             worker_controles(a, noms)
+        elif a.etape == "compose":
+            worker_compose(a)
         return
-    if not (a.carte or a.prise or a.cache or a.controles):
+    if not (a.carte or a.prise or a.cache or a.controles or a.compose):
         print(table())
         return
     a.out = os.path.abspath(a.out or "ville")
@@ -2033,6 +2130,25 @@ def main():
         args += ["--releve", a.releve] if a.releve else []
         if not run_blender(blender, a.out, args, tag="controles"):
             sys.exit(1)
+    if a.compose:
+        if not a.ville:
+            sys.exit("[ville] --compose demande --ville DIR")
+        bad = 0
+        for spec in a.compose.split(","):
+            plan = spec.split(":")[0]
+            env = os.environ.copy()
+            env.pop("FILM3D_PLAN", None)
+            args = ["--etape", "compose", "--plan-sol", spec, "--ville", os.path.abspath(a.ville)]
+            if not run_blender(blender, a.out, args, env=env, tag=f"compose-{plan}"):
+                sys.exit(1)
+            with open(os.path.join(a.out, f"compose-{plan}.txt"), encoding="utf-8") as fh:
+                head = fh.readline()
+            n = int(re.search(r", (\d+) couples", head).group(1))
+            bad += n
+            log(f"{plan} : {n} couples de surfaces empilées à moins de 2 cm")
+        if bad:
+            log(f"BLOQUANT : {bad} couples de surfaces empilées dans les scènes composées")
+            sys.exit(2)
     if a.prise:
         args = ["--etape", "prise"] + (["--lointains"] if a.lointains else [])
         if not run_blender(blender, a.out, args, tag="prise"):
