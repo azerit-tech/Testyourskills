@@ -104,7 +104,7 @@ BODY31_ROLL, BODY31_PITCH = 4.0, 2.0
 BODY31_ROLL_D2, BODY31_NOISE = 0.10, 0.02
 # §18.36, la continuité aux coupes (motion.cut_state_rows) : l'état de mouvement de la berline et de la caméra à la
 # sortie de A contre l'entrée de B. Points de départ ; informatifs tant que CUT_STATE_STRICT est faux.
-CUT_STATE_STRICT = False
+CUT_STATE_STRICT = True
 CUT_SPEED = 0.10              # vitesse à ±10 %
 CUT_ALONG, CUT_ALAT = 2.0, 1.5        # m/s², écarts d'accélération longitudinale et latérale
 CUT_YAW = 8.0                 # °/s, lacet du cap de la vitesse

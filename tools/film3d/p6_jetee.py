@@ -193,14 +193,72 @@ def crane(t):
     return ramp_in(t, M.t_of(CRANE_F0), T_END)
 
 
-def camera_rail(t):
-    """La caméra sans tremblé : (x, y, z, lacet, site, roulis, focale)."""
+def _rail(t, du=0.0):
     c = crane(t)
     back = CAM_BACK0 + (CAM_BACK1 - CAM_BACK0) * c
     z = CAM_Z0 + (CAM_Z1 - CAM_Z0) * c
     x, y, _ = PC.camera("P6", _f(t), back=back, z=z)
     hx, hy = hero_pos(t)
-    return OUV.aim(x, y, z, hx, hy, OUV.CAM_U, HERO_V0 + (HERO_V1 - HERO_V0) * c)
+    return OUV.aim(x, y, z, hx, hy, OUV.CAM_U + du, HERO_V0 + (HERO_V1 - HERO_V0) * c)
+
+
+# ---- le raccord de visée avec P5 : à la coupe, la berline glisse à l'écran à la vitesse où P5 la laisse (le centre de
+# sa caisse, comme motion.motion_state le mesure : dérivée décentrée sur trois images, vers l'intérieur du plan),
+# puis la visée rejoint la sienne en AIM_JOIN images : un écart u(f) = dv · (f − 1) · (1 − w)³, w = (f − 1) / AIM_JOIN,
+# nul à la coupe, de pente dv à la coupe, nul, sans pente ni courbure à AIM_JOIN (accélération à l'écran continue)
+AIM_JOIN = 24
+
+
+def _offset(t, dv):
+    g = t * M.FPS                       # images depuis la première
+    if g >= AIM_JOIN:
+        return 0.0
+    if g <= 0.0:
+        return dv * g                   # avant le plan : la pente de la coupe, prolongée
+    return dv * g * (1.0 - g / AIM_JOIN) ** 3
+
+
+def _screen_speed(plan, spec, f, s):
+    """La vitesse en x du centre de la berline à l'écran (% de la largeur par image) à l'image f, telle que la mesure
+    de la coupe la prend (motion.motion_state : clés finales, opérateur commun compris)."""
+    d = M.plan_data(plan, spec)
+    scr = M.screen_track(d, d["final"])
+    return M._d1([scr[f + s * k][0] for k in range(3)], s, 1.0)
+
+
+_DV = []
+
+
+def aim_dv():
+    """La pente du raccord (fraction de la largeur par image) : celle qui donne à P6/1 la vitesse à l'écran de P5 à
+    sa dernière image, lue par la mesure de la coupe (deux essais : sans raccord, puis une sécante ; l'opérateur
+    commun ne rend pas la pente un pour un). Calculée une fois."""
+    if not _DV:
+        import p5_virage as P5
+        specs = M.shot_specs()
+        target = _screen_speed("P5", specs["P5"], P5.F0 + P5.FRAMES - 1, -1)
+
+        def entry(dv):
+            cam = lambda t: _rail(t, _offset(t, dv))       # noqa: E731
+            return _screen_speed("P6", dict(specs["P6"], cam=cam, rail=cam), F0, +1)
+        a0 = entry(0.0)
+        dv1 = (target - a0) / 100.0
+        a1 = entry(dv1)
+        _DV.append(dv1 if abs(a1 - a0) < 1e-9 else dv1 * (target - a0) / (a1 - a0))
+    return _DV[0]
+
+
+def aim_offset(t):
+    """L'écart de visée en x (fraction de la largeur) à t : le raccord avec P5, nul après AIM_JOIN images (sans lire
+    la mesure, que la fin du plan sert aussi au plan suivant)."""
+    if t * M.FPS >= AIM_JOIN:
+        return 0.0
+    return _offset(t, aim_dv())
+
+
+def camera_rail(t):
+    """La caméra sans tremblé : (x, y, z, lacet, site, roulis, focale)."""
+    return _rail(t, aim_offset(t))
 
 
 def camera(t):
