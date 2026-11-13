@@ -118,6 +118,10 @@ CAM31_LIMITS_PLAN = {
     # le virage du port sur le bras commun (parcours.camera, retard de 0,12 s) : le bras passe à 0,6 m à l'intérieur
     # du cap de la vitesse au plus fort du virage, et la caisse en glisse (15°) s'élargit à l'écran de 30 %
     "P5": {"cam_side": (-0.7, 1.5), "cam_width_var": 0.32},
+    # l'anneau sur le bras commun : la caméra reste à 7,51 m de la berline sur les 110 images ; c'est la caisse vue
+    # de trois quarts qui s'élargit (20° entre la caisse et la visée à P2/41 : 12° de glisse et 8° du bras, 0,3 m à
+    # gauche et 0,12 s de retard), son flanc entre dans la largeur : 56,5 % contre 42,2 de médiane, +34 %
+    "P2": {"cam_width_var": 0.36},
     "P6": {"rise_after": 0.5, "rise_h_max": 3.6},           # monte à la fin pour découvrir la pointe
     "FIN": {"stop_h_min": 2.0, "stop_dist_min": 5.5},       # plus bas et plus près une fois la berline arrêtée
 }

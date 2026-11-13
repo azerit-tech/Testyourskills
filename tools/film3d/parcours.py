@@ -35,6 +35,13 @@ B5, G5 = 5.0 * R5 / 15.0, 9.0 * R5 / 15.0   # le freinage traîné et la remise 
 E5_GAIN = 1.15                              # l'entrée du port adoucie de 15 % : 105 °/s² de lacet de caisse (120)
 TAIL = 80.0
 LIM = dict(slip_per=16.0, slip_drag=0.14, slip_hold=0.4, slip_max=15.0)
+# Dans l'anneau (P2), la glisse retombe encore à 4,4 m/s² de latérale, sous l'adhérence (5,5) : le petit retour de
+# l'autre côté de motion.drive (2,5° visés, 2,95 atteints à P2/67) y croissait sans adhérence dépassée. Un retour
+# qui naîtrait pendant P2 n'est pas joué par la caisse (motion.drive, slip_back_off) : la glisse s'y résorbe d'un
+# seul tenant, sans repasser de l'autre côté (12,2° à P2/41, 1,2 à P2/61, 0,02 à P2/99) ; son freinage (0,4 m/s²
+# au plus pendant 0,45 s) est gardé : la vitesse, la route au temps et les lieux ne bougent pas.
+# Le retour du port (P5 → P6) reste joué.
+LIM["slip_back_off"] = (START["P2"] / FPS, (START["P2"] + dict(SHOTS)["P2"]) / FPS)
 JERK = 12.0 * 0.72
 
 
@@ -194,6 +201,23 @@ CAM_TAU, CAM_BACK, CAM_LEFT, CAM_Z = 0.12, 7.5, 0.3, 2.4
 _H, _T0 = 1.0 / 240.0, -1.5
 
 
+# À l'entrée de l'anneau (P2), le cap de la vitesse prend 24°/s en une seconde : le bras à deux pôles y tournait à
+# 35°/s², 4,67 m/s² par rapport à la berline au bout de ses 7,5 m (plafond 4). Là seulement, le bras filtré est
+# lissé une seconde fois par une gaussienne centrée : elle n'ajoute aucun retard (une rotation régulière passe telle
+# quelle) et ne rabote que l'accélération du bras (3,68 m/s² à P2/22). Son écart monte de 0 à CAM_SMOOTH_S sur la
+# droite de la fin de P1 (images ON de P2, négatives : P1/25 à P1/41), où le bras ne tourne pas, puis redescend à 0
+# pendant la sortie de glisse (images OFF) : le bras devance le virage de quelques images (0,1°/s à P1/48, 0,6 à
+# P2/1) ; avant P1/25 et après P2/70 (la coupe P2 → P3 comprise), il est celui de tout le parcours.
+CAM_SMOOTH_SHOT, CAM_SMOOTH_ON, CAM_SMOOTH_OFF, CAM_SMOOTH_S = "P2", (-24.0, -8.0), (40.0, 70.0), 0.22
+
+
+def _smooth_sigma(t):
+    """L'écart (s) de la gaussienne du bras à l'instant t du parcours."""
+    f = t * FPS - START[CAM_SMOOTH_SHOT] + 1                      # l'image (décimale) de P2
+    (a, b), (c, d) = CAM_SMOOTH_ON, CAM_SMOOTH_OFF
+    return CAM_SMOOTH_S * M.smoothstep(a, b, f) * (1.0 - M.smoothstep(c, d, f))
+
+
 def _cam_table():
     a1 = a2 = DRIVE.travel(_T0)
     out = []
@@ -202,7 +226,19 @@ def _cam_table():
         a1 += (a - a1) * _H / CAM_TAU
         a2 += (a1 - a2) * _H / CAM_TAU
         out.append(a2)
-    return out
+    sm = list(out)
+    for k in range(len(out)):
+        sg = _smooth_sigma(_T0 + k * _H)
+        if sg <= 1e-4:
+            continue
+        n = int(3.0 * sg / _H)
+        num = den = 0.0
+        for j in range(-n, n + 1):
+            w = math.exp(-0.5 * (j * _H / sg) ** 2)
+            num += w * out[max(0, min(len(out) - 1, k + j))]
+            den += w
+        sm[k] = num / den
+    return sm
 
 
 _CAM = _cam_table()

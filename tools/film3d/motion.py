@@ -863,6 +863,12 @@ def drive(route, speed, t0=0.0, stop=False, kind="hero", drift=1.0, ease=None, l
         alat = [vt[k] ** 2 * geo[k][3] for k in range(N)]
         slip, sv, tf, out_slip = 0.0, 0.0, 0.0, []
         peak, side, kick = 0.0, 0.0, None
+        # slip_back_off = (ta, tb), temps de la conduite : un petit retour qui naîtrait entre ta et tb n'est pas joué
+        # par la caisse (slip2, la glisse rendue, se résorbe sans repasser de l'autre côté) ; le freinage reste
+        # celui de la glisse calculée avec lui (slip), pour que la vitesse, donc la route au temps, ne bouge pas.
+        # Sans la clé, slip2 est slip, au nombre près.
+        quiet_win = L.get("slip_back_off")
+        slip2, sv2, out_head = 0.0, 0.0, []
         w = 2 * math.pi * L["slip_hz"]
         for k in range(N):
             comb = math.hypot(along[k], alat[k])
@@ -886,6 +892,16 @@ def drive(route, speed, t0=0.0, stop=False, kind="hero", drift=1.0, ease=None, l
             sv = max(-cap, min(cap, sv)) * smoothstep(0.2, 4.0, vt[k])   # à l'arrêt, la caisse ne tourne plus
             slip += sv * dt
             out_slip.append(slip)
+            quiet = (kick is not None and quiet_win is not None
+                     and quiet_win[0] <= kick[0] - L["slip_back_s"] + t0 <= quiet_win[1])
+            goal2 = tf if quiet and grid[k] < kick[0] else goal
+            a = w * w * (goal2 - slip2) - 2 * L["slip_zeta"] * w * sv2
+            a = max(-L["slip_acc"], min(L["slip_acc"], a))
+            sv2 += a * dt
+            cap = L["slip_on"] if sv2 * slip2 >= 0.0 and abs(goal2) >= abs(slip2) else L["slip_off"]
+            sv2 = max(-cap, min(cap, sv2)) * smoothstep(0.2, 4.0, vt[k])
+            slip2 += sv2 * dt
+            out_head.append(slip2)
         # 4. les limites tiennent-elles après lissage ? sinon raboter là où elles cèdent et recommencer
         new_drag, slid = [0.0] * n, [0.0] * n
         for k in range(N):
@@ -921,8 +937,8 @@ def drive(route, speed, t0=0.0, stop=False, kind="hero", drift=1.0, ease=None, l
         tab["vy"].append(math.cos(h) * vt[k])
         tab["v"].append(vt[k])
         tab["travel"].append(trav)
-        tab["slip"].append(out_slip[k])
-        hd = trav + out_slip[k]
+        tab["slip"].append(out_head[k])
+        hd = trav + out_head[k]
         hd = hd if prev_h is None else _unwrap(prev_h, hd)
         prev_h = hd
         tab["head"].append(hd)
@@ -934,10 +950,10 @@ def drive(route, speed, t0=0.0, stop=False, kind="hero", drift=1.0, ease=None, l
         om = math.radians(tab["head"][b] - tab["head"][a]) / ((b - a) * dt)
         sp = vt[k]
         if sp > 0.5:
-            be = math.radians(-out_slip[k])
+            be = math.radians(-out_head[k])
             geo_s = math.degrees(math.atan2(sp * math.sin(be) + om * L["front"], sp * math.cos(be)))
-            wcs = smoothstep(2.0, 6.0, abs(out_slip[k]))
-            steer_prev = max(-STEER_MAX, min(STEER_MAX, geo_s * (1.0 - wcs) - L["counter"] * out_slip[k] * wcs))
+            wcs = smoothstep(2.0, 6.0, abs(out_head[k]))
+            steer_prev = max(-STEER_MAX, min(STEER_MAX, geo_s * (1.0 - wcs) - L["counter"] * out_head[k] * wcs))
         tab["steer"].append(steer_prev)
     t_stop = None
     if stop:
