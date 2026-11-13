@@ -7,6 +7,16 @@
 #   python3 tools/film3d/diag/lumiere_mesure.py --rampes allumees.png eteintes.png --patrouilles 2
 #       contrôle 3 : la même image rendue rampes allumées puis éteintes (6 % du cadre par patrouille visible, 12 % pour
 #       toutes ensemble)
+#   python3 tools/film3d/diag/lumiere_mesure.py --coupes <dossier des images du film>
+#       contrôle 5 : la berline de part et d'autre de chaque coupe continue du bras commun (parcours.RACCORDS), sur
+#       les images <dossier>/<PLAN>…/NNNN.png. La boîte du coffre n'est pas fixe : elle s'ancre sur les deux feux
+#       arrière (D = leur écart), 0,40 D au-dessus d'eux ; la chaussée est mesurée 0,60 D sous eux. Médiane des
+#       --mediane dernières images d'un plan et des premières du suivant (3 par défaut : sur une image seule, le bruit
+#       d'un brouillon à 32 échantillons atteint 12 % sur le rouge). Le rouge et la saturation, pas la luminance : elle
+#       pèse peu le rouge (de P1 à P2 du film éclairé n° 2, rouge +69 %, luminance +9 %). Puis, sans verdict, la part
+#       des images de chaque plan où le coffre tient dans sa bande cible (--pas : une image sur six).
+#   python3 tools/film3d/diag/lumiere_mesure.py --coffre P1-48-ciel400.png P1-48-ciel600.png
+#       la même mesure du coffre et de la chaussée, image par image (les images fixes d'un essai de dose), sans verdict
 #
 # La boîte de la berline (fractions du cadre, x vers la droite, y vers le bas depuis le haut) : BOITE par défaut, le
 # cadre de poursuite commun (berline à y 58 % depuis le haut) ; --boite x0,y0,x1,y1 pour toutes les images, ou
@@ -36,6 +46,21 @@ RAMPE_SURF_MAX = 0.12                   # toutes les rampes ensemble, quel que s
 RAMPE_CRETE, RAMPE_SAT = 0.35, 0.50
 CAISSE_VAR = 0.20                       # ± 20 % de la luminance médiane de la caisse
 CIEL_TEINTE = 15.0                      # degrés d'écart de teinte du bandeau de ciel
+# contrôle 5, la berline aux coupes continues (mesures sur le coffre, ancré sur les feux arrière)
+COUPE_ROUGE, COUPE_ROUGE_VISE = 0.20, 0.10     # écart du rouge médian du coffre : bloquant, visé
+COUPE_SAT = 8.0                         # points de saturation (TSV)
+COUPE_TEINTE = 5.0                      # degrés
+COUPE_ROUTE = 0.20                      # écart de la luminance de la chaussée derrière elle
+COUPE_MEDIANE = 3                       # images de chaque côté
+BANDE_COFFRE = {"teinte": (345.0, 355.0), "sat": (70.0, 85.0), "lum": (9.0, 15.0)}   # la cible du client
+# la recherche des feux arrière, en parts du cadre de poursuite (berline au centre, à 58 % du haut) et en pixels d'une
+# image de 360 de large (mis à l'échelle) ; le coffre et la chaussée en unités de D : (au-dessus des feux, demi-largeur,
+# demi-hauteur)
+FEUX_FENETRE = (70 / 360, 320 / 640, 290 / 360, 470 / 640)
+FEUX_MIN, FEUX_AMAS, FEUX_TROU, FEUX_D = 12, 5, 25, (45, 150)
+COFFRE = (0.40, 0.30, 0.085)
+PLANS_DE_FACE = ("P4",)                 # la berline vue de face : pas de coffre à mesurer
+CHAUSSEE = (-0.60, 0.50, 0.13)
 
 
 # ---------------------------------------------------------------- lecture PNG (8 ou 16 bits, gris, RVB, RVBA)
@@ -178,6 +203,192 @@ def controle_3(on, off, patrols, box_unused=None):
     return surf_f, crete, sat, surf_f <= min(RAMPE_SURF * max(1, patrols), RAMPE_SURF_MAX), crete <= RAMPE_CRETE, (not top) or sat >= RAMPE_SAT
 
 
+# ---------------------------------------------------------------- contrôle 5 : la berline aux coupes
+
+def _feu(p):
+    """Un pixel de feu arrière allumé : rouge orangé très clair."""
+    r, g, b = p
+    return r >= 225 and 40 <= g <= 215 and b <= 170 and r - b >= 80
+
+
+def feux(w, h, rows):
+    """Les deux feux arrière de la berline dans le cadre de poursuite : (milieu x, milieu y, écart D en pixels, angle
+    de leur ligne), ou None s'ils ne se trouvent pas (plan de face, berline hors de sa place)."""
+    k = w / 360.0
+    x0, y0, x1, y1 = (int(FEUX_FENETRE[0] * w), int(FEUX_FENETRE[1] * h), int(FEUX_FENETRE[2] * w),
+                      int(FEUX_FENETRE[3] * h))
+    pts = [(x, y) for y in range(y0, y1) for x in range(x0, x1) if _feu(rows[y][x])]
+    if len(pts) < FEUX_MIN * k * k:
+        return None
+    xs = sorted(p[0] for p in pts)
+    trou, i = max((xs[j + 1] - xs[j], j) for j in range(len(xs) - 1))      # deux amas : le plus grand trou en x
+    if trou < FEUX_TROU * k:
+        return None
+    cut = 0.5 * (xs[i] + xs[i + 1])
+    a = [p for p in pts if p[0] < cut]
+    b = [p for p in pts if p[0] >= cut]
+    if len(a) < FEUX_AMAS * k * k or len(b) < FEUX_AMAS * k * k:
+        return None
+    ax, ay = sum(p[0] for p in a) / len(a), sum(p[1] for p in a) / len(a)
+    bx, by = sum(p[0] for p in b) / len(b), sum(p[1] for p in b) / len(b)
+    d = math.hypot(bx - ax, by - ay)
+    if not FEUX_D[0] * k <= d <= FEUX_D[1] * k:
+        return None
+    return 0.5 * (ax + bx), 0.5 * (ay + by), d, math.atan2(by - ay, bx - ax)
+
+
+def _boite(anc, up, hw, hh):
+    """Une boîte orientée comme la ligne des feux : centre à `up` D au-dessus de leur milieu, demi-tailles en D."""
+    xm, ym, d, ang = anc
+    c, s = math.cos(ang), math.sin(ang)
+    cx, cy = xm + s * up * d, ym - c * up * d
+    return [(cx + (u * c - v * s) * d, cy + (u * s + v * c) * d) for u, v in ((-hw, -hh), (hw, -hh), (hw, hh), (-hw, hh))]
+
+
+def _dans(q, x, y):
+    sgn = 0
+    for i in range(4):
+        (xa, ya), (xb, yb) = q[i], q[(i + 1) % 4]
+        cr = (xb - xa) * (y - ya) - (yb - ya) * (x - xa)
+        if cr != 0:
+            if sgn == 0:
+                sgn = 1 if cr > 0 else -1
+            elif (cr > 0) != (sgn > 0):
+                return False
+    return True
+
+
+def _pixels(w, h, rows, q):
+    xs, ys = [p[0] for p in q], [p[1] for p in q]
+    return [rows[y][x] for y in range(max(0, int(min(ys))), min(h, int(max(ys)) + 1))
+            for x in range(max(0, int(min(xs))), min(w, int(max(xs)) + 1)) if _dans(q, x + 0.5, y + 0.5)]
+
+
+def teinte_mediane(ps):
+    """La teinte médiane (degrés) d'un lot de pixels : la médiane des teintes recentrées sur leur moyenne circulaire
+    pondérée par la saturation (le bordeaux est à cheval sur 0°)."""
+    sx = sy = 0.0
+    hs = []
+    for p in ps:
+        hh, s, _ = colorsys.rgb_to_hsv(p[0] / 255, p[1] / 255, p[2] / 255)
+        sx += s * math.cos(2 * math.pi * hh)
+        sy += s * math.sin(2 * math.pi * hh)
+        hs.append(hh * 360.0)
+    if not hs:
+        return float("nan")
+    m = math.degrees(math.atan2(sy, sx)) % 360.0
+    return (m + median([((v - m + 180.0) % 360.0) - 180.0 for v in hs])) % 360.0
+
+
+def coffre(path):
+    """Le coffre de la berline et la chaussée derrière elle sur une image de poursuite : teinte (degrés), saturation
+    TSV (%), luminance (%), rouge médian (0 à 255), RVB médian, luminance de la chaussée (%) ; None si les feux
+    arrière ne se trouvent pas."""
+    w, h, rows = read_png(path)
+    anc = feux(w, h, rows)
+    if anc is None:
+        return None
+    pc, pr = _pixels(w, h, rows, _boite(anc, *COFFRE)), _pixels(w, h, rows, _boite(anc, *CHAUSSEE))
+    if not pc or not pr:
+        return None
+    rgb = tuple(median([p[i] for p in pc]) for i in range(3))
+    return dict(teinte=teinte_mediane(pc), sat=100 * median([colorsys.rgb_to_hsv(*(c / 255 for c in p))[1] for p in pc]),
+                lum=100 * median([luma(p) for p in pc]), rouge=rgb[0], rgb=rgb, route=100 * median([luma(p) for p in pr]))
+
+
+def _ecart_teinte(a, b):
+    return ((b - a + 180.0) % 360.0) - 180.0
+
+
+def _resume(ms):
+    """La médiane de plusieurs mesures de coffre (la teinte recentrée sur la première)."""
+    t0 = ms[0]["teinte"]
+    out = {k: median([m[k] for m in ms]) for k in ("sat", "lum", "rouge", "route")}
+    out["teinte"] = (t0 + median([_ecart_teinte(t0, m["teinte"]) for m in ms])) % 360.0
+    out["rgb"] = tuple(median([m["rgb"][i] for m in ms]) for i in range(3))
+    return out
+
+
+def dossier_plan(base, plan, suffixe=None):
+    """Le dossier des images du plan sous `base` : <PLAN><suffixe> si donné, sinon le seul <PLAN> ou <PLAN>+… qui
+    contient des PNG."""
+    if suffixe is not None:
+        d = os.path.join(base, plan + suffixe)
+        return d if os.path.isdir(d) else None
+    cands = sorted(d for d in os.listdir(base) if (d == plan or d.startswith(plan + "+"))
+                   and any(f.endswith(".png") for f in os.listdir(os.path.join(base, d))))
+    if len(cands) > 1:
+        raise SystemExit(f"{base} : plusieurs dossiers pour {plan} ({', '.join(cands)}) ; préciser --suffixe")
+    return os.path.join(base, cands[0]) if cands else None
+
+
+def _mesures(d, images):
+    out = []
+    for f in images:
+        p = os.path.join(d, f"{f:04d}.png")
+        m = coffre(p) if os.path.isfile(p) else None
+        if m is not None:
+            out.append(m)
+    return out
+
+
+def dans_bande(m):
+    return (BANDE_COFFRE["teinte"][0] <= m["teinte"] <= BANDE_COFFRE["teinte"][1],
+            BANDE_COFFRE["sat"][0] <= m["sat"] <= BANDE_COFFRE["sat"][1],
+            BANDE_COFFRE["lum"][0] <= m["lum"] <= BANDE_COFFRE["lum"][1])
+
+
+def controle_coupes(base, n_med=COUPE_MEDIANE, suffixe=None, pas=6):
+    """Contrôle 5 sur le dossier d'images `base`. Renvoie le nombre de mesures dépassées (une coupe qui ne se mesure
+    pas compte pour une)."""
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    import parcours as PC
+    longueur = dict(PC.SHOTS)
+    bad = 0
+    for a, b in PC.RACCORDS:
+        da, db = dossier_plan(base, a, suffixe), dossier_plan(base, b, suffixe)
+        na = longueur[a]
+        ma = _mesures(da, range(na - n_med + 1, na + 1)) if da else []
+        mb = _mesures(db, range(1, n_med + 1)) if db else []
+        print(f"coupe {a}/{na} → {b}/1 (médiane de {len(ma)} et {len(mb)} image(s))")
+        if len(ma) < n_med or len(mb) < n_med:
+            print(f"  5 NON MESURÉE : {len(ma)} image(s) lue(s) avant, {len(mb)} après, {n_med} attendues de chaque côté "
+                  f"(images absentes, ou feux arrière introuvables)   DÉPASSE")
+            bad += 1
+            continue
+        x, y = _resume(ma), _resume(mb)
+        dr = (y["rouge"] - x["rouge"]) / x["rouge"] if x["rouge"] else float("inf")
+        ds = y["sat"] - x["sat"]
+        dt = _ecart_teinte(x["teinte"], y["teinte"])
+        dc = (y["route"] - x["route"]) / x["route"] if x["route"] else float("inf")
+        oks = (abs(dr) <= COUPE_ROUGE, abs(ds) <= COUPE_SAT, abs(dt) <= COUPE_TEINTE, abs(dc) <= COUPE_ROUTE)
+        vise = "" if abs(dr) <= COUPE_ROUGE_VISE or not oks[0] else f", au-delà des ± {100 * COUPE_ROUGE_VISE:.0f} % visés"
+        print(f"  5 rouge du coffre     {x['rouge']:5.0f} → {y['rouge']:5.0f}      {100 * dr:+6.0f} %    (± {100 * COUPE_ROUGE:.0f} %)   "
+              f"{verdict(oks[0])}{vise}")
+        print(f"  5 saturation          {x['sat']:5.1f} → {y['sat']:5.1f} %    {ds:+6.1f} pts  (± {COUPE_SAT:.0f})      {verdict(oks[1])}")
+        print(f"  5 teinte              {x['teinte']:5.1f} → {y['teinte']:5.1f}°    {dt:+6.1f}°    (± {COUPE_TEINTE:.0f}°)     {verdict(oks[2])}")
+        print(f"  5 chaussée derrière   {x['route']:5.1f} → {y['route']:5.1f} %    {100 * dc:+6.0f} %    (± {100 * COUPE_ROUTE:.0f} %)   {verdict(oks[3])}")
+        print(f"    luminance du coffre {x['lum']:5.1f} → {y['lum']:5.1f} %  ; RVB médian {tuple(int(v) for v in x['rgb'])} → "
+              f"{tuple(int(v) for v in y['rgb'])}   coupe : {'tient' if all(oks) else 'CASSE'}")
+        bad += sum(1 for o in oks if not o)
+    # sans verdict : le coffre dans sa bande cible, plan par plan
+    print(f"bande cible du coffre (teinte {BANDE_COFFRE['teinte'][0]:.0f} à {BANDE_COFFRE['teinte'][1]:.0f}°, saturation "
+          f"{BANDE_COFFRE['sat'][0]:.0f} à {BANDE_COFFRE['sat'][1]:.0f} %, luminance {BANDE_COFFRE['lum'][0]:.0f} à "
+          f"{BANDE_COFFRE['lum'][1]:.0f} %), une image sur {pas}, sans verdict :")
+    for plan, n in PC.SHOTS:
+        d = dossier_plan(base, plan, suffixe)
+        ms = _mesures(d, sorted(set(list(range(1, n + 1, pas)) + [n]))) if d and plan not in PLANS_DE_FACE else []
+        if not ms:
+            print(f"  {plan:4s} non mesuré (pas d'images, ou plan de face)")
+            continue
+        r = _resume(ms)
+        tout = sum(1 for m in ms if all(dans_bande(m)))
+        t, sa, lu = (sum(1 for m in ms if dans_bande(m)[i]) for i in range(3))
+        print(f"  {plan:4s} {tout:2d} image(s) sur {len(ms):2d} dans la bande (teinte {t}, saturation {sa}, luminance {lu}) ; "
+              f"médianes {r['teinte']:5.1f}°, {r['sat']:4.1f} %, {r['lum']:4.1f} %")
+    return bad
+
+
 # ---------------------------------------------------------------- sortie
 
 def parse_box(s):
@@ -193,7 +404,29 @@ def main(argv=None):
     ap.add_argument("--boite", action="append", default=[], help="x0,y0,x1,y1 ou IMAGE=x0,y0,x1,y1")
     ap.add_argument("--rampes", nargs=2, metavar=("ALLUMEES", "ETEINTES"))
     ap.add_argument("--patrouilles", type=int, default=1, help="patrouilles visibles (contrôle 3)")
+    ap.add_argument("--coupes", metavar="DOSSIER", help="contrôle 5 : la berline aux coupes continues, sur les images "
+                                                        "<DOSSIER>/<PLAN>…/NNNN.png")
+    ap.add_argument("--mediane", type=int, default=COUPE_MEDIANE, help="images de chaque côté d'une coupe (contrôle 5)")
+    ap.add_argument("--suffixe", default=None, help="le suffixe des dossiers de plan (contrôle 5), par exemple "
+                                                    "+ville+brouillon ; inutile s'il n'y en a qu'un par plan")
+    ap.add_argument("--pas", type=int, default=6, help="le relevé de la bande cible : une image sur --pas")
+    ap.add_argument("--coffre", nargs="+", metavar="IMAGE", help="le coffre et la chaussée de chaque image, sans verdict")
     a = ap.parse_args(argv)
+    if a.coffre:
+        for path in a.coffre:
+            m = coffre(path)
+            if m is None:
+                print(f"{path} : feux arrière introuvables (plan de face, berline hors de sa place)")
+                continue
+            t, sa, lu = dans_bande(m)
+            print(f"{path} : teinte {m['teinte']:5.1f}° ({'dans' if t else 'hors'}), saturation {m['sat']:4.1f} % "
+                  f"({'dans' if sa else 'hors'}), luminance {m['lum']:4.1f} % ({'dans' if lu else 'hors'} la bande) ; rouge "
+                  f"{m['rouge']:.0f}, RVB {tuple(int(v) for v in m['rgb'])} ; chaussée derrière {m['route']:4.1f} %")
+        return 0
+    if a.coupes:
+        bad = controle_coupes(a.coupes, max(1, a.mediane), a.suffixe, max(1, a.pas))
+        print(f"{bad} contrôle(s) dépassé(s)")
+        return 1 if bad else 0
     default, per = BOITE, {}
     for s in a.boite:
         if "=" in s:
