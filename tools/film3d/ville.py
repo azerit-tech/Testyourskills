@@ -507,6 +507,80 @@ def is_cast(ob):
     return any(o.type == "ARMATURE" for o in _family(ob))
 
 
+# Ce qui sort d'un lieu voisin (SPEC §18.36 : ce qui se voit des deux côtés d'une coupe continue est le même objet,
+# au même endroit, dans le même état) : seulement les acteurs animés de son plan (ce qui se déplace : une clé de
+# position qui varie, ou un chemin suivi), la caméra et les traces que laisse sa berline. Les voitures garées, le barrage et ses agents immobiles, les cônes, les lampes, les émissifs restent.
+TRACES = re.compile(r"^(wake|traces?|repere)([_.:]|$)")
+
+
+def _bouge(o):
+    import motion as M
+    if any(c.type == "FOLLOW_PATH" and not c.mute for c in o.constraints):
+        return True
+    try:
+        fcs = M.fcurves(o)
+    except Exception:
+        fcs = []
+    for fc in fcs:
+        # se déplacer : une position qui varie de plus de 5 cm (une portière, une roue, un geste sur place ne font
+        # pas un acteur : la voiture du barrage ouvre sa portière, l'agent vise, ils restent là)
+        if fc.data_path in ("location", "delta_location"):
+            vals = [k.co[1] for k in fc.keyframe_points]
+            if vals and max(vals) - min(vals) > 0.05:
+                return True
+    return False
+
+
+def is_acteur(top):
+    """Un acteur animé (à retirer d'un voisin) : la caméra, une trace de berline, ou une famille dont un objet bouge."""
+    if top.type == "CAMERA" or TRACES.match(top.name):
+        return True
+    return any(_bouge(o) for o in _family(top))
+
+
+def _decaler(idbs, d):
+    """Décale de `d` images les clés de ces blocs (chaque action une fois) : la phase d'un voisin de la même prise."""
+    import motion as M
+    seen = set()
+    n = 0
+    for idb in idbs:
+        ad = getattr(idb, "animation_data", None)
+        act = ad.action if ad else None
+        if act is None or act.name in seen:
+            continue
+        seen.add(act.name)
+        for fc in M.fcurves(idb):
+            for k in fc.keyframe_points:
+                k.co[0] += d
+                k.handle_left[0] += d
+                k.handle_right[0] += d
+            n += 1
+    return n
+
+
+def _blocs(objs):
+    """Les blocs animables d'objets : eux, leurs données, leurs matériaux et arbres de nœuds."""
+    out = []
+    for o in objs:
+        out.append(o)
+        if o.data is not None:
+            out.append(o.data)
+            if getattr(o.data, "node_tree", None) is not None:
+                out.append(o.data.node_tree)
+        for s in getattr(o, "material_slots", ()):
+            m = s.material
+            if m is not None:
+                out.append(m)
+                if m.node_tree is not None:
+                    out.append(m.node_tree)
+    return out
+
+
+def meme_prise(a, b):
+    """Les plans a et b sont-ils dans la même prise continue ?"""
+    return any(a in ps and b in ps for _a, _b, ps in prises())
+
+
 def is_lointain(nom, top, zone):
     """Le drapeau d'une famille (son objet de tête, avant la pose dans la ville) : 0 si elle est cachée de toute
     façon (les sources), 1 si son nom est celui d'un lointain ou si son centre sort de la zone du lieu ; une famille
@@ -525,10 +599,12 @@ def is_lointain(nom, top, zone):
     return not zone((x0 + x1) / 2, (y0 + y1) / 2)
 
 
-def assembler(scene, infos, noms, base=None):
+def assembler(scene, infos, noms, base=None, plan=None):
     """Ajoute chaque lieu à la scène de ville : sa collection, sa racine (la transformation de placement), ses
     objets parentés à la racine, ses drapeaux. `base` (4 × 4, lignes) : le repère de la scène, s'il n'est pas celui de
-    la ville (voisins : la scène d'un plan). Rend {nom: dict(racine, collection, objets, retirés, lointains)}."""
+    la ville (voisins : la scène d'un plan). `plan` (voisins) : le plan rendu ; un lieu de la même prise n'y perd que
+    ses acteurs animés (is_acteur), et ses clés passent dans la numérotation du plan (la même image de la prise, le
+    même état : lampes, rampes, enseignes). Rend {nom: dict(racine, collection, objets, retirés, lointains)}."""
     import bpy
     from mathutils import Matrix
     out = {}
@@ -538,6 +614,9 @@ def assembler(scene, infos, noms, base=None):
         with bpy.data.libraries.load(info["blend"], link=False) as (src, dst):
             dst.scenes = [info["scene"]]
         sc = dst.scenes[0]
+        nb_plan = lieu(nom)["plan"]
+        prise = plan is not None and nb_plan in P.START and plan in P.START and meme_prise(plan, nb_plan)
+        nb_fs = sc.frame_start
         coll = bpy.data.collections.new(f"ville_{nom}")
         scene.collection.children.link(coll)
         for ch in list(sc.collection.children):
@@ -551,12 +630,19 @@ def assembler(scene, infos, noms, base=None):
             bpy.data.worlds.remove(world)
         gone = set()
         for top in _tops(objs):
-            if is_cast(top):
+            if (is_acteur(top) if prise else is_cast(top)):
                 gone.update(_family(top))
         names_gone = sorted(o.name for o in _tops(gone))
         for ob in gone:
             bpy.data.objects.remove(ob, do_unlink=True)
         objs -= gone
+        shift = 0
+        if prise:
+            # l'image F du plan rendu est l'image de prise START[plan] + F − frame_start ; celle du voisin, la sienne
+            shift = (P.START[plan] - scene.frame_start) - (P.START[nb_plan] - nb_fs)
+            nk = _decaler(_blocs(objs), -shift) if shift else 0
+            log(f"{nom} ({nb_plan}) dans la prise de {plan} : entier hors acteurs animés, clés décalées de "
+                f"{-shift:+d} images ({nk} courbes)")
         bpy.context.view_layer.update()
         zone = zones()[nom]
         root = bpy.data.objects.new(f"ville_{nom}_racine", None)
@@ -565,7 +651,9 @@ def assembler(scene, infos, noms, base=None):
         root.matrix_world = (Matrix(base) if base else Matrix.Identity(4)) @ Matrix(matrice(lieu(nom)["plan"]))
         far = 0
         for top in _tops(objs):
-            flag = is_lointain(nom, top, zone)
+            # un véhicule ou un figurant gardé (immobile, d'un lieu de la même prise) est à son lieu, où qu'il soit
+            # posé : le barrage au bout de la rue n'imite aucun autre lieu
+            flag = False if (prise and is_cast(top)) else is_lointain(nom, top, zone)
             for o in _family(top):
                 o["ville_lieu"] = nom
                 o["ville_lointain"] = int(flag)
@@ -604,12 +692,51 @@ def voisins(scene, plan, ville_dir):
             log(f"! {plan} : {n}, son .blend a quitté le cache ({info['blend']}), pas posé")
             continue
         infos[n] = info
+    import bpy
+    own_objs = [o for o in scene.objects if o.get("ville_lieu") is None]
     base = Matrix(matrice(lieu(own)["plan"])).inverted()
-    built = assembler(scene, infos, list(infos), base=[list(r) for r in base])
+    built = assembler(scene, infos, list(infos), base=[list(r) for r in base], plan=plan)
     lointains(scene, False)
+    bpy.context.view_layer.update()
+    doubles = doublons(scene, own, own_objs, built)
     poses = ", ".join("%s (%d objets)" % (n, b["objets"]) for n, b in built.items()) or "aucun voisin"
-    log(f"{plan} dans la ville : {poses} autour de {own}")
+    log(f"{plan} dans la ville : {poses} autour de {own} ; {len(doubles)} faux lointains de {own} cachés sous un "
+        f"voisin chargé ({', '.join(sorted(doubles)[:8])}{'…' if len(doubles) > 8 else ''})")
     return built
+
+
+def doublons(scene, own, own_objs, built):
+    """Les faux lointains de la scène du plan (hors de la zone de son lieu) qui imitent un voisin chargé : le centre
+    de leur boîte dans la boîte d'un voisin. Cachés : le vrai lieu est là, et c'est lui qu'on voit des deux côtés de
+    la coupe. Les lointains de nom (ciel, mer, brume, phare lointain) restent. Rend leurs noms."""
+    from mathutils import Vector
+    boxes = []
+    for n in built:
+        pts = []
+        for o in scene.objects:
+            if o.get("ville_lieu") == n and not o.get("ville_lointain") and o.type == "MESH" and not o.hide_render:
+                pts += [o.matrix_world @ Vector(c) for c in (o.bound_box[0], o.bound_box[6])]
+        if pts:
+            boxes.append((min(p.x for p in pts), max(p.x for p in pts), min(p.y for p in pts), max(p.y for p in pts)))
+    zone = zones()[own]
+    objs = set(own_objs)
+    hidden = set()
+    for top in _tops(objs):
+        if is_cast(top) or is_acteur(top) or re.match(LOINTAIN_NOMS, top.name):
+            continue
+        if not is_lointain(own, top, zone):
+            continue
+        fam = [o for o in _family(top) if o.type in ("MESH", "CURVE", "FONT")]
+        pts = [o.matrix_world @ Vector(c) for o in fam for c in o.bound_box]
+        if not pts:
+            continue
+        cx = (min(p.x for p in pts) + max(p.x for p in pts)) / 2
+        cy = (min(p.y for p in pts) + max(p.y for p in pts)) / 2
+        if any(x0 <= cx <= x1 and y0 <= cy <= y1 for x0, x1, y0, y1 in boxes):
+            for o in _family(top):
+                o.hide_render = o.hide_viewport = True
+            hidden.add(top.name)
+    return hidden
 
 
 def montrer(scene, noms, show_far=False):
