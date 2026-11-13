@@ -763,6 +763,17 @@ HEAD_W = 6000.0
 # une voiture arrêtée garde ses feux de position, pas ses codes : à 6 kW, une patrouille à l'arrêt posait devant elle
 # une plaque claire de 2 à 6 m (barrage de P3, anneau de FIN6) ; ses feux de position, un cône court qui se lit
 HEAD_W_ARRET = 0.12 * HEAD_W
+# la nappe diffuse (taille de la source en m, bord adouci) : à 5 cm et bord à 0,5, le cône posait au sol une ellipse
+# à bord net, une tache sans cause lisible (FIN6) ; une source de 30 cm au bord fondu, une nappe qui s'éteint
+HEAD_NAPPE = (0.3, 1.0)
+
+
+def phares_nappe(lights, energy=None):
+    """Les phares `lights` en nappe diffuse (HEAD_NAPPE), à `energy` W si donné (HEAD_W_ARRET : à l'arrêt)."""
+    for o in lights:
+        o.data.shadow_soft_size, o.data.spot_blend = HEAD_NAPPE
+        if energy is not None:
+            o.data.energy = energy
 HEAD_CONE = 24.0         # ouverture du cône (degrés), bord adouci de moitié
 HEAD_TILT = 11.0         # plongée sous l'horizon (degrés) : le cône tombe sur la chaussée de 2 à 40 m
 

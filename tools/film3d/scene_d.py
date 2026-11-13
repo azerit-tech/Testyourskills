@@ -937,9 +937,7 @@ def plan_FIN(scene, hidden, palier="socle"):
     # la patrouille 1 : devant à gauche, elle freine en virant et s'arrête en travers au pied du phare
     # (fin_pointe.PATROL1, motion.drive)
     p1 = L.patrol("patrol_1")
-    for o in p1.children_recursive:
-        if o.type == "LIGHT" and "_head_" in o.name:
-            o.data.energy = _head_w_arret()   # arrêtée au pied du phare : ses feux de position (ses codes blanchissaient le sol)
+    phares_arret(p1)   # arrêtée au pied du phare : ses feux de position (ses codes blanchissaient le sol)
     L.put(p1, *F.P1_STOP, 0.0, heading=F.P1_HEAD)
     body = M.body_of(p1)
     wh, wr = M.wheels_of(body), body.get("wheel_r", 0.36)
@@ -1010,6 +1008,34 @@ def _head_w_arret():
     """Les feux de position d'une voiture à l'arrêt, le réglage commun (cast_vehicles.HEAD_W_ARRET)."""
     import cast_vehicles as cv
     return cv.HEAD_W_ARRET
+
+
+def _phares(rig):
+    """Les spots des phares d'un véhicule (cast_vehicles.headlight_spots), sans les lueurs des verres."""
+    return [o for o in rig.children_recursive if o.type == "LIGHT" and o.data.type == "SPOT" and "_head_" in o.name]
+
+
+def phares_arret(rig):
+    """Une voiture à l'arrêt : ses feux de position (cast_vehicles.HEAD_W_ARRET), en nappe diffuse."""
+    import cast_vehicles as cv
+    cv.phares_nappe(_phares(rig), cv.HEAD_W_ARRET)
+
+
+def hero_phares_fin6(hero, frames, fondu=12):
+    """FIN6 : les codes de la berline en nappe diffuse tant qu'elle roule (à bord net, ils posaient au sol une
+    ellipse et des taches sans cause lisible), ses feux de position une fois arrêtée (fin6_orbite.F_STOP, comme
+    toutes les voitures à l'arrêt), fondus sur `fondu` images avant l'arrêt."""
+    import cast_vehicles as cv
+    import fin6_orbite as F6
+    lights = _phares(hero)
+    cv.phares_nappe(lights)
+    for o in lights:
+        for f in frames:
+            w = min(1.0, max(0.0, (F6.F_STOP - f) / fondu))
+            o.data.energy = cv.HEAD_W_ARRET + (cv.HEAD_W - cv.HEAD_W_ARRET) * w
+            o.data.keyframe_insert("energy", frame=f)
+    print(f"[FIN6] {len(lights)} phares de la berline : nappe diffuse, feux de position à l'image {F6.F_STOP}",
+          flush=True)
 
 
 def fin_pack_lights(frames, hero):
@@ -1090,6 +1116,7 @@ def plan_FIN6(scene, hidden, palier="socle"):
     poses = M.sample(F6.hero_pos, frames, heading=F6.hero_heading, steer=F6.hero_steer, wheel_r=hero["wheel_r"])
     M.key_vehicle(hero, poses, wheels=wheels)
     M.wheel_marks(wheels, hero["wheel_r"])
+    hero_phares_fin6(hero, frames)
     if F.FACE:
         L.hands_up_keys(hero, *F6.DRIVER_KEYS)
     else:
@@ -1105,9 +1132,7 @@ def plan_FIN6(scene, hidden, palier="socle"):
     L.cabin_light(hero, energy=70.0 if F.FACE else 25.0)
     # la patrouille 1 de FIN (plan_FIN), image pour image
     p1 = L.patrol("patrol_1")
-    for o in p1.children_recursive:
-        if o.type == "LIGHT" and "_head_" in o.name:
-            o.data.energy = _head_w_arret()
+    phares_arret(p1)
     L.put(p1, *F6.P1_AT, 0.0, heading=F6.P1_HEAD)
     body = M.body_of(p1)
     wh, wr = M.wheels_of(body), body.get("wheel_r", 0.36)
@@ -1133,9 +1158,7 @@ def plan_FIN6(scene, hidden, palier="socle"):
         rigs.append(r)
     # l'anneau est à l'arrêt : feux de position, pas les codes (à 6 kW, des ovales clairs au sol devant chaque voiture)
     for r in rigs:
-        for o in r.children_recursive:
-            if o.type == "LIGHT" and "_head_" in o.name:
-                o.data.energy = _head_w_arret()
+        phares_arret(r)
     n = M.flash_bars(rigs, frames)
     print(f"[FIN6] {n} lumières de rampe clignotantes", flush=True)
     print(f"[FIN6] berline exclue de {car_out_of_rigs(rigs, hero)} lumières de l'anneau", flush=True)
