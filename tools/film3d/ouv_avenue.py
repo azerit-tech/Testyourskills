@@ -1,11 +1,14 @@
 # Le plan OUV écrit une fois, sans Blender (docs/cinematique-decoupage-v3.md §4, « la patrouille garée s'éveille ») :
 # la berline remonte l'avenue vers l'horizon corail à 50 km/h, sur la voie intérieure de sa chaussée ; la caméra la
-# suit de dos au ras de la chaussée, sur un rail, sans rotation, un peu moins vite qu'elle. La patrouille est garée à
-# l'angle de la rue transversale de y 266, devant à gauche, côté ville, l'avant vers la berline : ses phares
-# s'allument à l'image 14, elle glisse hors du bord gauche vers l'image 30 ; à 34 sa rampe s'allume dans notre dos
-# (hors champ : corail et lilas sur les façades, la chaussée et le flanc gauche de la berline). Elle ne freine pas :
-# elle passe à vitesse constante, sans feux stop (feuille de route du parcours, fiche OUV). C'est elle qui la prend en
-# chasse en P1.
+# suit de dos au ras de la chaussée, sur un rail, sans rotation, un peu moins vite qu'elle. La patrouille garée est à
+# l'angle de la rue transversale (STREET), devant à gauche, côté ville, l'avant vers la berline : ses phares
+# s'allument à l'image 14, elle glisse hors du bord gauche vers l'image 25 ; à 34 sa rampe s'allume dans notre dos
+# (hors champ : corail et lilas sur les façades, la chaussée et le flanc gauche de la berline), et elle reste là. La
+# berline ne freine pas : elle passe à vitesse constante, sans feux stop (feuille de route du parcours, fiche OUV).
+# OUV et P1 sont une seule prise (le monde continu, SPEC §18.36 : OUV/41 est P1/1). Celle qui la prend en chasse en P1
+# n'est donc pas la garée : c'est la patrouille 1, une autre voiture déjà lancée, qui remonte l'avenue par la voie
+# d'en face, 6 m/s plus vite qu'elle (chaser_pos : la loi de p1_avenue, une seule trajectoire sur les deux plans) ;
+# elle allume sa rampe avec la garée, à 34, et entre par le bord gauche du cadre sur les dernières images.
 # La berline et le bras de la caméra se lisent dans le parcours unique (parcours.py) : sa fenêtre « OUV », posée dans
 # la scène A ; rien du chemin n'est écrit ici. scene_a.py n'en lit que les fonctions du temps ; motion.py en tire
 # roues, braquage et transfert de masse.
@@ -78,16 +81,34 @@ def brake_windows():
 
 
 def patrol_pos(t):
+    """La patrouille garée (immobile)."""
     return PATROL[0], PATROL[1]
 
 
+def p1_time(t):
+    """L'instant de P1 (s depuis P1/1, négatif dans OUV) de l'instant t d'OUV."""
+    return t - (T_END + 1.0 / M.FPS)
+
+
+def chaser_pos(t):
+    """La patrouille 1 (celle de P1) : la loi de p1_avenue.patrol_pos prolongée en arrière dans OUV."""
+    import p1_avenue as P1
+    return P1.patrol_pos(p1_time(t))
+
+
+def chaser_heading(t):
+    import p1_avenue as P1
+    return P1.patrol_heading(p1_time(t))
+
+
 def tracks():
-    return {"hero": hero_pos, "patrol": patrol_pos}
+    """« patrol » : la patrouille 1 (motion.PATROL1, la même qu'en P1) ; « patrol_garee » : la garée."""
+    return {"hero": hero_pos, "patrol": chaser_pos, "patrol_garee": patrol_pos}
 
 
 def tracks_heading():
-    """Le cap des véhicules arrêtés (lieux : 0 vers +y) : la patrouille garée, l'avant vers -y."""
-    return {"patrol": lambda t: PATROL[2]}
+    """Le cap des véhicules (lieux : 0 vers +y) : la garée, l'avant vers -y ; la patrouille 1, celui de sa route."""
+    return {"patrol_garee": lambda t: PATROL[2], "patrol": chaser_heading}
 
 
 def aim(x, y, z, hx, hy, u=CAM_U, v=CAM_V):

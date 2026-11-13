@@ -1102,7 +1102,9 @@ def make_building(key, M, spec):
 
 # ---------------------------------------------------------------- la ville : la rue
 
-SIDE_STREETS = [(120.0, 134.0), (266.0, 280.0), (452.0, 466.0)]
+# la deuxième : celle de la patrouille garée d'OUV, 22 m devant la première image (y 286,85 ; 266 avant qu'OUV et P1
+# soient une seule prise)
+SIDE_STREETS = [(120.0, 134.0), (OUV.STREET, OUV.STREET + 14.0), (452.0, 466.0)]
 
 
 def in_street(y, m=2.0):
@@ -1421,8 +1423,9 @@ def build_city(hidden):
             yy += 4.0
 
     # côté ville, de près : chaque dessin une fois, puis une suite tirée au sort
+    # (l'hôtel d'angle de la rue de la patrouille garée, 1 m avant elle ; la suite reprend 2 m après)
     seq = [("deco", 20), ("hotel", 48), ("shop", 72), ("liner", 88), ("flats", 136), ("motel", 160),
-           ("tower", 196), ("block", 226)]
+           ("tower", 196), ("block", 226), ("hotel", SIDE_STREETS[1][0] - 23.0)]
     for i, (k, y0) in enumerate(seq):
         x = FRONT_X - (14.0 if k == "motel" else 0.0)
         place(k, x, y0, pastels[i % len(pastels)])
@@ -1432,7 +1435,7 @@ def build_city(hidden):
     box("motel_sign", FRONT_X - 1.7, FRONT_X - 1.3, 158.2, 162.8, 6.0, 9.2, M["sign"])
     box("motel_sign_rim", FRONT_X - 1.75, FRONT_X - 1.25, 158.1, 162.9, 9.2, 9.35, M["trim"])
     add_light("motel_sign_up", "SPOT", (FRONT_X + 1.2, 160.5, 0.3), (-0.4, 0, 1), lin("#ffe2bf"), 1500.0, spot=30)
-    y = 282.0
+    y = SIDE_STREETS[1][1] + 2.0
     keys = [kk for kk in protos if kk != "motel"]
     i = len(seq)
     while y < 640:
@@ -1793,24 +1796,48 @@ def street_hero(scene):
     return body
 
 
-def patrol_wake(police, frames):
-    """OUV : la patrouille garée se réveille. Chargée feux allumés (comme en P1), tout est éteint sauf ses phares, qui
-    s'allument en veilleuse à OUV.WAKE (lumières et verres clés, pas constant) ; la rampe et ses lueurs restent
-    éteintes, les feux arrière aussi."""
+def _bars_from(root, frames, shift, index):
+    """La rampe d'une patrouille de la prise OUV + P1 (shift : les images d'OUV qui précèdent le plan, 40 en P1) :
+    éteinte avant OUV.BARS_ON, puis le clignotement de motion.flash_bars, la phase continue à la coupe (index : son
+    rang dans la meute, cinq images de décalage chacun). Renvoie les lumières de rampe clées."""
     import motion as M
+    on = [f for f in frames if f + shift >= OUV.BARS_ON]
+    if on:
+        M.flash_bars([root], on, shift=shift + 5 * index)
+    bars = [ob.data for ob in root.children_recursive if ob.type == "LIGHT" and "motion_energy" in ob.data]
+    for d in bars:
+        for f in frames:
+            if f not in on:
+                d.energy = 0.0
+                d.keyframe_insert("energy", frame=f)
+        for fc in M.fcurves(d):
+            for kp in fc.keyframe_points:
+                kp.interpolation = "CONSTANT"
+    return bars
+
+
+def patrol_wake(police, frames, shift=0):
+    """La patrouille garée (OUV, puis P1 dans la même prise ; shift = 40 en P1) se réveille et reste à l'angle de la
+    rue. Chargée feux allumés, tout est éteint sauf ses phares, qui s'allument en veilleuse à OUV.WAKE (lumières et
+    verres clés, pas constant), et sa rampe, qui clignote dès OUV.BARS_ON (dans notre dos) ; ses feux arrière restent
+    éteints."""
+    import motion as M
+    bars = _bars_from(police, frames, shift, 1)
     keyed = []
     for ob in police.children_recursive:
-        if ob.type != "LIGHT":
+        if ob.type != "LIGHT" or ob.data in bars:
             continue
         d = ob.data
         if "_head_" in ob.name:
             for f in frames:
-                d.energy = OUV.WAKE_HEAD_W if f >= OUV.WAKE else 0.0
+                d.energy = OUV.WAKE_HEAD_W if f + shift >= OUV.WAKE else 0.0
                 d.keyframe_insert("energy", frame=f)
             keyed.append(d)
         else:
             d.energy = 0.0
-    for m in {m for ob in [police, *police.children_recursive] if ob.type == "MESH" for m in ob.data.materials if m}:
+    # (les optiques de la rampe suivent ses lueurs par leurs pilotes, bar_off_* : on n'y touche pas)
+    meshes = [ob for ob in [police, *police.children_recursive] if ob.type == "MESH" and "bar_off_corail" not in ob]
+    for m in {m for ob in meshes for m in ob.data.materials if m}:
         if not m.node_tree:
             continue
         for n in m.node_tree.nodes:
@@ -1822,7 +1849,7 @@ def patrol_wake(police, frames):
             if m.name.split(".")[0].endswith("_head"):
                 full = s.default_value * OUV.WAKE_LENS
                 for f in frames:
-                    s.default_value = full if f >= OUV.WAKE else 0.0
+                    s.default_value = full if f + shift >= OUV.WAKE else 0.0
                     s.keyframe_insert("default_value", frame=f)
                 keyed.append(m.node_tree)
             else:
@@ -1831,7 +1858,40 @@ def patrol_wake(police, frames):
         for fc in M.fcurves(idb):
             for kp in fc.keyframe_points:
                 kp.interpolation = "CONSTANT"
-    print(f"[scene_a] OUV : la patrouille allume ses phares à l'image {OUV.WAKE} ({len(keyed)} sources clées)", flush=True)
+    print(f"[scene_a] la patrouille garée : phares à l'image {OUV.WAKE}, rampe à {OUV.BARS_ON} d'OUV ({len(keyed)} "
+          f"sources clées, {len(bars)} lueurs de rampe)", flush=True)
+
+
+def chaser_motion(chaser, frames, pos, heading, shift=0):
+    """La patrouille 1 de la prise OUV + P1 (une autre voiture que la garée, déjà lancée) : sur son rig (roues,
+    suspension) le long de pos/heading (ouv_avenue.chaser_pos en OUV, p1_avenue.patrol_pos en P1 : la même loi),
+    phares pleins à la force de p1_avenue, le contour de son flanc droit, la rampe dès OUV.BARS_ON (shift = 40 en P1)."""
+    import motion as M
+    import p1_avenue as P1
+    t0 = M.t_of(frames[0])
+    px, py = pos(t0)
+    chaser.location = (px, py, 0)
+    chaser.rotation_euler = (0, 0, math.radians(heading(t0) + 90.0))
+    prig = M.rig_up(chaser, heading(t0), "rig_police1")
+    wh, wr = M.wheels_of(chaser), chaser.get("wheel_r", 0.36)
+    pp = M.sample(pos, frames, heading=heading, wheel_r=wr, wheelbase=chaser.get("wheelbase", 2.9),
+                  front=chaser.get("front_axle"))
+    M.key_vehicle(prig, pp, wheels=wh, pivot=(0.0, 0.0, 0.36))
+    M.wheel_marks(wh, wr, axis="Y")
+    # ses phares à la force que fixe P1 (v3, de dos : pleins, ils jettent l'ombre de la berline devant elle)
+    for ob in chaser.children_recursive:
+        if ob.type == "LIGHT" and "_head_" in ob.name:
+            ob.data.energy = P1.PATROL_HEAD_W
+    for m in {m for ob in [chaser, *chaser.children_recursive] if ob.type == "MESH" for m in ob.data.materials if m}:
+        if m.name.endswith("_head") and m.node_tree:
+            for n in m.node_tree.nodes:
+                if n.type == "BSDF_PRINCIPLED" and n.inputs["Emission Strength"].default_value > 0.0:
+                    n.inputs["Emission Strength"].default_value *= P1.PATROL_HEAD_LENS
+    patrol_rim(chaser)
+    bars = _bars_from(prig, frames, shift, 0)
+    print(f"[scene_a] la patrouille 1 : {len(pp)} images, de y {pp[0]['y']:.1f} à {pp[-1]['y']:.1f}, rampe à "
+          f"l'image {OUV.BARS_ON} d'OUV ({len(bars)} lueurs)", flush=True)
+    return prig
 
 
 def hero_cabin(coupe):
@@ -1922,10 +1982,11 @@ def patrol_rim(police, energy=400.0, color="#f3dcc4"):
     return lo
 
 
-def ouv_motion(scene, coupe, police, cam, focus):
+def ouv_motion(scene, coupe, police, cam, focus, chaser):
     """Le plan OUV animé (ouv_avenue.py) : la berline remonte l'avenue vers +y à 50 km/h, mise sur un rig
     (motion.rig_up) et clée par motion.key_vehicle (roues, suspension) ; la caméra la suit sur un rail
-    (motion.key_camera) ; la mise au point sur la caisse ; flou de bougé d'un demi-obturateur."""
+    (motion.key_camera) ; la mise au point sur la caisse ; flou de bougé d'un demi-obturateur. La garée s'éveille,
+    la patrouille 1 arrive par la voie d'en face ; les papiers de P1 sont déjà sur la chaussée (une seule prise)."""
     import motion as M
     frames = range(OUV.F0, OUV.F0 + OUV.FRAMES)
     scene.frame_start, scene.frame_end = frames[0], frames[-1]
@@ -1951,6 +2012,9 @@ def ouv_motion(scene, coupe, police, cam, focus):
     cam.data.dof.focus_object = coupe
     cam.data.dof.aperture_fstop = OUV.FOCUS_F
     patrol_wake(police, frames)
+    chaser_motion(chaser, frames, OUV.chaser_pos, OUV.chaser_heading)
+    import p1_avenue
+    p1_props(p1_avenue)
     hero_cabin(coupe)
     far_lighthouse(OUV)
     bpy.data.objects.remove(focus)
@@ -2015,15 +2079,14 @@ def p1_props(P):
     print(f"[scene_a] P1 : {len(P.PAPERS)} feuilles de papier", flush=True)
 
 
-def p1_motion(scene, coupe, police, cam, focus):
-    """Le plan P1 animé (p1_avenue.py), après l'ellipse d'OUV : la berline et la patrouille sur leurs rigs (roues,
-    suspension), la rampe clignotante (corail et lilas, 2 Hz, motion.flash_bars) à partir de p1_avenue.bars_on ; la
+def p1_motion(scene, coupe, police, cam, focus, chaser):
+    """Le plan P1 animé (p1_avenue.py), l'image qui suit OUV/40 : la berline et la patrouille 1 sur leurs rigs (roues,
+    suspension), sa rampe clignotante (corail et lilas, 2 Hz, motion.flash_bars) ; la garée à l'angle de la rue ; la
     caméra la suit de dos au ras de la chaussée, sur un rail (p1_avenue.camera)."""
     import motion as M
     import p1_avenue as P
     frames = range(P.F0, P.F0 + P.FRAMES)
     scene.frame_start, scene.frame_end = frames[0], frames[-1]
-    on = min(f for f in frames if P.bars_on(f))
     # la berline
     wheels = [o for o in coupe.children if o.name.startswith("wheel_")]
     ys = [w.location.y for w in wheels]
@@ -2039,58 +2102,11 @@ def p1_motion(scene, coupe, police, cam, focus):
     import hero_cars
     for a, b in P.brake_windows():        # les feux stop du parcours (aucun en P1)
         hero_cars.stop_lamps(coupe, a, b)
-    # la patrouille : après l'ellipse, dans la voie de la berline, derrière elle (l'avant de son modèle vers +x)
-    px, py = P.patrol_pos(M.t_of(P.F0))
-    police.location = (px, py, 0)
-    police.rotation_euler = (0, 0, math.radians(P.patrol_heading(0.0) + 90.0))
-    prig = M.rig_up(police, P.patrol_heading(0.0), "rig_police")
-    wh, wr = M.wheels_of(police), police.get("wheel_r", 0.36)
-    pp = M.sample(P.patrol_pos, frames, heading=P.patrol_heading, wheel_r=wr, wheelbase=police.get("wheelbase", 2.9),
-                  front=police.get("front_axle"))
-    M.key_vehicle(prig, pp, wheels=wh, pivot=(0.0, 0.0, 0.36))
-    M.wheel_marks(wh, wr, axis="Y")
-    # ses phares à la force que fixe le plan (v2, de face : en veilleuse, leur reflet brûlait plus fort que la
-    # berline ; v3, de dos : pleins, ils jettent son ombre devant elle)
-    for ob in police.children_recursive:
-        if ob.type == "LIGHT" and "_head_" in ob.name:
-            ob.data.energy = P.PATROL_HEAD_W
-    for m in {m for ob in [police, *police.children_recursive] if ob.type == "MESH" for m in ob.data.materials if m}:
-        if m.name.endswith("_head") and m.node_tree:
-            for n in m.node_tree.nodes:
-                if n.type == "BSDF_PRINCIPLED" and n.inputs["Emission Strength"].default_value > 0.0:
-                    n.inputs["Emission Strength"].default_value *= P.PATROL_HEAD_LENS
-    # le contour de son flanc droit (lié à elle seule)
-    patrol_rim(police)
-    # la rampe : clignote à partir de l'image `on`, éteinte avant (lumières et matières émissives de la patrouille)
-    M.flash_bars([prig], range(on, frames[-1] + 1))
-    lit = []
-    for ob in police.children_recursive:
-        if ob.type == "LIGHT":
-            d = ob.data
-            full = d.get("motion_energy", d.energy)
-            for f in range(frames[0], on):
-                d.energy = 0.0
-                d.keyframe_insert("energy", frame=f)
-            if "motion_energy" not in d:
-                d.energy = full
-                d.keyframe_insert("energy", frame=on)
-            lit.append(d)
-    mats = {m for ob in [police, *police.children_recursive] if ob.type == "MESH" for m in ob.data.materials if m and m.node_tree}
-    for m in mats:
-        for n in m.node_tree.nodes:
-            s = n.inputs.get("Emission Strength") if n.type == "BSDF_PRINCIPLED" else (n.inputs.get("Strength") if n.type == "EMISSION" else None)
-            if s is None or s.is_linked or s.default_value <= 0.0:
-                continue
-            full = s.default_value
-            s.default_value = 0.0
-            s.keyframe_insert("default_value", frame=frames[0])
-            s.default_value = full
-            s.keyframe_insert("default_value", frame=on)
-            lit.append(m.node_tree)
-    for idb in lit:
-        for fc in M.fcurves(idb):
-            for kp in fc.keyframe_points:
-                kp.interpolation = "CONSTANT"
+    # la patrouille 1 (p1_avenue.patrol_pos, entrée à la fin d'OUV) et la garée, restée à l'angle de la rue, rampe
+    # allumée dans notre dos : la même prise qu'OUV, 40 images plus loin (phares, rampes : phases continues)
+    shift = OUV.FRAMES
+    chaser_motion(chaser, frames, P.patrol_pos, P.patrol_heading, shift)
+    patrol_wake(police, frames, shift)
     # la caméra : sur un rail, de dos ; le point sur la berline
     cam.data.shift_y = 0.0
     M.key_camera(cam, frames, P.camera)
@@ -2104,8 +2120,7 @@ def p1_motion(scene, coupe, police, cam, focus):
     scene.frame_set(P.STILL)          # l'image fixe du banc : la rampe allumée
     scene.render.motion_blur_shutter = 0.5
     scene.render.use_motion_blur = True
-    print(f"[scene_a] P1 : {len(poses)} images, berline de y {poses[0]['y']:.1f} à {poses[-1]['y']:.1f}, rampe "
-          f"allumée à l'image {on}, {len(lit)} lumières et matières de la patrouille clées", flush=True)
+    print(f"[scene_a] P1 : {len(poses)} images, berline de y {poses[0]['y']:.1f} à {poses[-1]['y']:.1f}", flush=True)
 
 
 def build(plan=None, palier=None):
@@ -2229,10 +2244,15 @@ def build(plan=None, palier=None):
     police.location = (POLICE_X, POLICE_Y, 0)
     police.rotation_mode = "XYZ"
     police.rotation_euler = (0, 0, -math.pi / 2)        # l'avant vers -y
+    police1 = None
     if plan in ("OUV", "P1"):
-        # garée à l'angle de la rue transversale de y 266, côté ville (ouv_avenue.PATROL, cap des lieux)
+        # garée à l'angle de la rue transversale (ouv_avenue.STREET), côté ville (ouv_avenue.PATROL, cap des lieux)
         police.location = (OUV.PATROL[0], OUV.PATROL[1], 0)
         police.rotation_euler = (0, 0, math.radians(OUV.PATROL[2] + 90.0))
+        # la patrouille 1, une autre voiture, déjà lancée : elle entre à la fin d'OUV, elle chasse en P1
+        police1 = cv.load_patrol("jeandiz", lights_on=True, name="police1")["body"]
+        police1.name = "police1"
+        police1.rotation_mode = "XYZ"
 
     # --- la ville : la route, les immeubles, la rue
     build_city(hidden)
@@ -2350,10 +2370,10 @@ def build(plan=None, palier=None):
     r = scene.render
 
     if plan == "OUV":
-        ouv_motion(scene, coupe, police, co, focus)
+        ouv_motion(scene, coupe, police, co, focus, police1)
         return scene
     if plan == "P1":
-        p1_motion(scene, coupe, police, co, focus)
+        p1_motion(scene, coupe, police, co, focus, police1)
         return scene
 
     # --- le mouvement, pour le flou de bougé : tout roule à 50 km/h vers la caméra (−y),

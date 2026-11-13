@@ -3062,13 +3062,14 @@ def _tone(color):
     return None
 
 
-def flash_bars(roots, frames, period=12):
+def flash_bars(roots, frames, period=12, shift=0):
     """Le clignotement des rampes de la meute : chaque lumière corail ou lilas d'un véhicule (descendance du rig :
     les lueurs de rampe) suit le profil BAR_FLASH, corail et lilas en alternance, clés constantes ; chaque véhicule
-    est décalé de cinq images. Les lentilles suivent leurs lueurs (cast_vehicles.bar_drive_lenses)."""
+    est décalé de cinq images. Les lentilles suivent leurs lueurs (cast_vehicles.bar_drive_lenses). shift : les
+    images du plan qui précèdent celui-ci dans la même prise (P1 après OUV : 40), la phase continue à la coupe."""
     n = 0
     for i, root in enumerate(roots):
-        offset = (i * 5) % period
+        offset = (i * 5 + shift) % period
         for ob in [root, *root.children_recursive]:
             if ob.type != "LIGHT":
                 continue

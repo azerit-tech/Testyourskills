@@ -1,8 +1,10 @@
 # Le plan P1 écrit une fois, sans Blender (docs/cinematique-decoupage-v3.md §4, « la patrouille fond sur elle, elle
-# bondit », repris au découpage v3.1 et à la feuille de route du parcours, fiche P1) : après l'ellipse d'OUV, la
-# berline sur la même voie, à la même vitesse (50 km/h, droit, sans accélération). Elle met les gaz vers l'image 5 et
-# l'accélération dessine un triangle (+2,35 m/s² au plus vers l'image 24) : 16,4 m/s à la dernière image, presque
-# relâchée, l'état exact où P2 la prend. Pendant l'ellipse la patrouille a fait demi-tour : elle arrive par la voie
+# bondit », repris au découpage v3.1 et à la feuille de route du parcours, fiche P1) : l'image qui suit OUV/40 (une
+# seule prise, le monde continu de SPEC §18.36), la berline sur la même voie, à la même vitesse (50 km/h, droit, sans
+# accélération). Elle met les gaz vers l'image 5 et l'accélération dessine un triangle (+2,35 m/s² au plus vers
+# l'image 24) : 16,4 m/s à la dernière image, presque relâchée, l'état exact où P2 la prend. La patrouille 1 n'est pas
+# la garée d'OUV (elle reste à l'angle de la rue, rampe allumée, hors champ derrière nous) : une autre voiture, déjà
+# lancée, entrée par le bord gauche à la fin d'OUV (ouv_avenue.chaser_pos, la même loi) ; elle arrive par la voie
 # d'en face, 6 m/s plus vite que la berline, rampe allumée ; elle remonte jusqu'à sa portière, freine pour se caler
 # 3 m devant elle et roule ensuite à sa vitesse : c'est la place qu'elle garde à l'entrée de P2.
 # La berline et le bras de la caméra se lisent dans le parcours unique (parcours.py), fenêtre « P1 », posée dans la
@@ -64,9 +66,10 @@ def _lead(t):
     return LEAD0 + W0 * (_TA + (_TB - _TA) * _g((t - _TA) / (_TB - _TA))[1])
 
 
-# la berline dans le cadre : centre x de 52 % (le raccord d'OUV, 50) à 55 % à l'image 20 (de la place à gauche pour
-# la patrouille ; 56 sortait de x 50 ± 6 avec le tremblé de l'opérateur), y 58 % depuis le haut
-U0, U1 = 0.52, 0.55
+# la berline dans le cadre : centre x de 50 % (là où OUV/40 la laisse : une seule prise, plus de saut de 2 % à la
+# coupe) à 55 % à l'image 20 (de la place à gauche pour la patrouille ; 56 sortait de x 50 ± 6 avec le tremblé de
+# l'opérateur), y 58 % depuis le haut
+U0, U1 = OUV.CAM_U, 0.55
 U_T1 = M.t_of(20)
 V_HERO = OUV.CAM_V
 LENS = OUV.LENS
@@ -120,7 +123,12 @@ def patrol_heading(t):
 
 
 def tracks():
-    return {"hero": hero_pos, "patrol": patrol_pos}
+    """« patrol » : la patrouille 1 ; « patrol_garee » : la garée d'OUV, restée à l'angle de la rue."""
+    return {"hero": hero_pos, "patrol": patrol_pos, "patrol_garee": OUV.patrol_pos}
+
+
+def tracks_heading():
+    return {"patrol": patrol_heading, "patrol_garee": lambda t: OUV.PATROL[2]}
 
 
 def bars_on(frame):

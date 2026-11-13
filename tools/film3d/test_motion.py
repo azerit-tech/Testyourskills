@@ -567,9 +567,29 @@ def test_ouv():
     derrière, 24 mm), sans grue ; la berline au point de coupe à la première et à la dernière image (x 50 ± 6, y 58 ± 4
     depuis le haut) ; l'éveil dans l'ordre : phares, rampe, feux stop."""
     import ouv_avenue as P
-    d, f, a, b = M.min_gap(P.tracks(), range(P.F0, P.F0 + 96))
+    import p1_avenue as P1
+    d, f, a, b = M.min_gap({"hero": P.hero_pos, "patrol": P.patrol_pos}, range(P.F0, P.F0 + 96))
     check("OUV : la berline passe à plus de 2 m de la patrouille", d - 2 * 0.95 > 2.0,
           f"{d - 1.9:.1f} m de flanc à flanc à l'image {f}")
+    # la patrouille 1 (une autre voiture que la garée) : la trajectoire de P1, prolongée dans OUV ; elle entre par le
+    # bord gauche sur les dernières images, sans jamais en ressortir, là où P1/1 la reprend
+    gap = max(math.dist(P.chaser_pos(M.t_of(P.F0 + P.FRAMES)), P1.patrol_pos(0.0)),
+              max(math.dist(P.chaser_pos(M.t_of(f)), P1.patrol_pos(M.t_of(f - P.FRAMES))) for f in range(1, 41)))
+    seen = []
+    for f in range(P.F0, P.F0 + P.FRAMES):
+        c = P.camera_rail(M.t_of(f))
+        bx = M.hero_screen(c, *P.chaser_pos(M.t_of(f)), 0.0, 0.0, box=(5.1, 1.95, 1.5))
+        if bx and bx["u1"] > 0.0:
+            seen.append((f, bx["u1"]))
+    p1 = M.hero_screen(P1.camera_rail(0.0), *P1.patrol_pos(0.0), 0.0, 0.0, box=(5.1, 1.95, 1.5))
+    grow = all(b[1] > a[1] for a, b in zip(seen, seen[1:])) and seen and p1["u1"] > seen[-1][1]
+    check("OUV : la patrouille 1 sur la trajectoire de P1, entrée progressive par la gauche, continue à la coupe",
+          gap < 1e-9 and seen and seen[-1][0] == P.F0 + P.FRAMES - 1 and len(seen) == seen[-1][0] - seen[0][0] + 1
+          and grow and seen[-1][1] < 0.12,
+          f"{gap:.1e} m ; dans le cadre de l'image {seen[0][0] if seen else None}, bord droit "
+          f"{', '.join(f'{u * 100:.0f}' for _, u in seen)} % puis {p1['u1'] * 100:.0f} % à P1/1")
+    d, f, a, b = M.min_gap(P.tracks(), range(P.F0, P.F0 + P.FRAMES))
+    check("OUV : 1,5 m d'air au moins entre les trois voitures", d - 2 * 0.95 > 1.5, f"{d - 1.9:.2f} m ({a}, {b}, {f})")
     seen, gap = [], 1.0
     for f in range(P.F0, P.F0 + P.FRAMES):
         c = P.camera_rail(M.t_of(f))
