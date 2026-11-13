@@ -142,10 +142,10 @@ GF_NEON = {"red": (RED, 3.5)}
 # des enduits plus profonds que les pastels de l'avenue : terre cuite, ocre, vert d'eau, rose passé, bleu
 TINTS = ["#d98a6e", "#e2b56a", "#93c2ab", "#dc9ea2", "#a3bcdc", "#efe0c0", "#bba9d9", "#d9b85c", "#e7a98a",
          "#9fcfc4"]
-# les dessins de la rue rognée (FILM3D_VILLE) : la boutique d'angle à 9 niveaux (les immeubles du quai), la même à
+# les dessins de la rue rognée (FILM3D_VILLE) : la boutique d'angle à 6 niveaux (les immeubles du quai), la même à
 # 11 m, l'Art déco à 8,9 m (deux boutiques au lieu de trois)
 SPECS_VILLE = {
-    "rue_tour": dict(SPECS["rue_corner"], floors=9),
+    "rue_tour": dict(SPECS["rue_corner"], floors=6),
     "rue_coin11": dict(SPECS["rue_corner"], W=11),
     "rue_deco9": dict(SPECS["rue_deco"], W=8.9, nshops=2),     # (8,9 m : son rez-de-chaussée déborde de 8 cm)
 }
@@ -185,7 +185,7 @@ PARKED = [86.0, 99.5, 113.0]
 
 # En ville : la rue de 71 m du rond-point au boulevard. LEFT garde ses cinq premiers dessins, le cinquième (y_vue 32
 # à 44) ramené à 11 m pour ne pas passer le joint ; RIGHT ses quatre premiers et le cinquième (34 à 52) ramené à
-# 9 m. Les deux derniers immeubles (y_vue −28 à −16, s 150 à 162) montent à 9 niveaux : les immeubles du quai.
+# 9 m. Les deux derniers immeubles (y_vue −28 à −16, s 150 à 162) montent à 6 niveaux : les immeubles du quai.
 # Le reste des listes s'arrête au joint ; l'enseigne MOTEL (y_vue 72) est retirée.
 N_KEEP = {-1: 5, 1: 5}
 SWAP = {(-1, 0): "rue_tour", (1, 0): "rue_tour", (-1, 4): "rue_coin11", (1, 4): "rue_deco9"}
@@ -194,11 +194,11 @@ if VILLE:
     LAMPS = [(side, y) for side, y in LAMPS if y <= Y_END]
     PARKED = [y for y in PARKED if y <= Y_END]
     MOTEL = None
-# les immeubles du quai : 9 niveaux (rez-de-chaussée de 4,2 m, huit étages de 3,2 m : acrotère à 30,7 m), un
+# les immeubles du quai : 6 niveaux (rez-de-chaussée de 4,2 m, cinq étages de 3,2 m : acrotère à 21,1 m), un
 # bandeau lumineux sans texte en couronne (1,2 m, posé sur l'acrotère, 0,3 m en retrait), ambre à gauche de la
 # berline, blanc chaud à droite (jamais corail ni violet rose : les rampes) ; le côté du boulevard, sans fenêtres
 # dans le dessin, reçoit un parement de fenêtres procédurales (lieux.mat_city), vu seulement depuis le pont
-TOUR_FLOORS = 9
+TOUR_FLOORS = 6
 TOUR_BAND = {1: "#ffc36b", -1: "#fff1d6"}       # côté de vue : -1 (x_vue < 0) est à droite de la berline
 TOUR_BAND_W = 4.0                               # force d'émission du bandeau (à régler avec la lumière)
 
