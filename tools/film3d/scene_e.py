@@ -78,6 +78,20 @@ PALIER_MAX = "portique"
 VILLE = L.ville_on()
 NOTCH_X = 10.0                    # le bord ouest de l'encoche (le terre-plein garde x < 10 jusqu'au quai nord)
 RAIL_POST = 2.4                   # le pas des montants du garde-corps (celui de la pointe)
+# le port dégagé pour la jetée et pour le 200 mm de P4 (plan de ville §2.4, conflits 1 et 2) : le mât clé quitte
+# l'axe de la jetée (9 cm de lui en (32 ; 90)) pour un épaulement de 5 × 5 m accolé à son flanc droit ; le mur de
+# conteneurs qui ferme l'axe recule de y 84,2 à 89,0 et s'arrête en x 8 (l'objectif de P4 est en (4,65 ; 86,4 ;
+# 1,2), il regarde vers -y) ; les piles du nord-est et le mât (94 ; 92), sur l'eau, sont retirés
+if VILLE:
+    KEY_MAST = (38.4, 82.3)
+    MASTS = [(-52.0, -12.0), (94.0, -12.0), (-52.0, 92.0), KEY_MAST]
+SHOULDER = 5.0                    # le côté de l'épaulement du mât clé
+CLOSE_WALL_Y = 89.0 if VILLE else BARRIER_Y + 3.6
+CLOSE_WALL_KEYS = ["40", "40", "20", "20"] if VILLE else ["40", "40", "20", "40", "40"]
+# les panneaux à chevrons et leurs feux, sur les séparateurs : hors de x 3 à 6,5 en ville (rien de plus haut que
+# 0,9 m devant l'objectif de P4 ; les séparateurs font 0,83 m)
+CHEVRON_XS = (-6.6, -2.6, 1.6, 7.2) if VILLE else (-6.0, -2.0, 2.0, 6.0)
+P4_LENS_X = (3.0, 6.5)
 
 
 def _rot(deg, x, y):
@@ -550,7 +564,7 @@ def build_props(hidden):
     nb = nt = 0
     railed = {tuple(a) for a, _ in rail_edges()} if VILLE else set()
     for (a, b, n) in _edges():
-        with_bollards = tuple(a) not in railed             # pas de bittes sous le garde-corps
+        with_bollards = tuple(a) not in railed             # ni bittes ni pneus sous le garde-corps
         a, b = Vector((*a, 0)), Vector((*b, 0))
         d = b - a
         length = d.length
@@ -564,12 +578,82 @@ def build_props(hidden):
             nb += 1
             k += 15.0
         k = 3.0
-        while k < length - 2.0:
+        while with_bollards and k < length - 2.0:     # ni pneus : le flanc de la jetée n'en porte pas
             p = a + d * k + nn * 0.2
             S.instance(tyre, f"pneu_{nt}", (p.x, p.y, -1.15), rot)
             nt += 1
             k += 7.5
     print(f"[port] {nb} bittes d'amarrage, {nt} pneus de défense", flush=True)
+
+
+def shoulder_corners():
+    """L'épaulement du mât clé (ville unique) : un carré de SHOULDER accolé au flanc droit de la jetée (au bord de
+    son couronnement), centré le long de l'axe sur le mât ; ses quatre coins dans le sens trigonométrique."""
+    J = jetty_frame()
+    u, _ = jetty_uv(*KEY_MAST, J)
+    v0, v1 = -J["edge"] - SHOULDER, -J["edge"]
+    pts = [(u - SHOULDER / 2, v0), (u + SHOULDER / 2, v0), (u + SHOULDER / 2, v1), (u - SHOULDER / 2, v1)]
+    return [(J["o"][0] + J["d"][0] * a + J["n"][0] * b, J["o"][1] + J["d"][1] * a + J["n"][1] * b) for a, b in pts]
+
+
+def build_shoulder(far=False):
+    """L'épaulement : dalle du terre-plein, mur de quai et couronnement sur ses trois côtés d'eau (le quatrième
+    s'appuie sur le mur de la jetée)."""
+    C = shoulder_corners()
+    tp = bpy.data.materials.get("terre_plein_port_loin" if far else "terre_plein_port") or \
+        mat_terre_plein("terre_plein_port_loin" if far else "terre_plein_port", far=far)
+    bm = L.bmesh.new()
+    bm.faces.new([bm.verts.new((x, y, 0.0)) for x, y in C])
+    L.mesh_object("port_epaulement", bm, [tp]).visible_shadow = False
+    wall = bpy.data.materials.get("quai_pierre") or L.mat_quay("quai_pierre")
+    cop = bpy.data.materials.get("couronnement") or L.mat_coping("couronnement")
+    bw, bc = L.bmesh.new(), L.bmesh.new()
+    for i in range(3):                                  # C[3] -> C[0] : le côté de la jetée
+        a, b = C[i], C[i + 1]
+        n = _outward(a, b)
+        f = bw.faces.new([bw.verts.new((a[0], a[1], COPING_H)), bw.verts.new((b[0], b[1], COPING_H)),
+                          bw.verts.new((b[0], b[1], L.WATER_Z - 1.5)), bw.verts.new((a[0], a[1], L.WATER_Z - 1.5))])
+        f.normal_update()
+        if f.normal.dot(Vector((n[0], n[1], 0))) < 0:
+            f.normal_flip()
+        _strip_bm(bc, a, b, n, COPING_W, 0.0, COPING_H)
+    L.mesh_object("port_epaulement_mur", bw, [wall]).visible_shadow = not far
+    L.mesh_object("port_epaulement_couronnement", bc, [cop])
+
+
+def jetty_clearance(u_range=(-28.8, 71.2), skip=("port_terre_plein", "port_mur", "port_couronnement",
+                                                  "port_garde_corps", "port_epaulement")):
+    """La distance minimale (m) entre le décor du port et l'emprise de la jetée (|v| ≤ J_EDGE, u dans `u_range` :
+    de y_D 300 au bout de la pointe, terre-plein du joint compris), sur les boîtes des objets maillés, hors du sol,
+    du quai et de l'épaulement ; rend (distance, objet)."""
+    J = jetty_frame()
+    e = J["edge"]
+
+    def gap(x, y):
+        u, v = jetty_uv(x, y, J)
+        return math.hypot(max(u_range[0] - u, u - u_range[1], 0.0), max(abs(v) - e, 0.0))
+
+    best = (1e9, None)
+    bpy.context.view_layer.update()
+    for ob in bpy.data.objects:
+        if ob.type != "MESH" or ob.name.startswith(skip) or ob.name.startswith("src_") or ob.hide_render:
+            continue
+        if any(c.hide_render for c in ob.users_collection):
+            continue
+        mw = ob.matrix_world
+        if len(ob.data.vertices) <= 4000:               # les sommets eux-mêmes (un maillage joint : plusieurs mâts)
+            pts = [mw @ v.co for v in ob.data.vertices]
+        else:                                           # une instance lourde : les arêtes de sa boîte, tous les 0,2 m
+            c = [mw @ Vector(k) for k in ob.bound_box]
+            pts = []
+            for i, j in ((0, 1), (1, 2), (2, 3), (3, 0), (4, 5), (5, 6), (6, 7), (7, 4), (0, 4), (1, 5), (2, 6), (3, 7)):
+                n = max(1, int((c[j] - c[i]).length / 0.2))
+                pts += [c[i].lerp(c[j], k / n) for k in range(n + 1)]
+        for p in pts:
+            d = gap(p.x, p.y)
+            if d < best[0]:
+                best = (d, ob.name)
+    return best
 
 
 def build_masts(far=False):
@@ -603,6 +687,8 @@ def build_masts(far=False):
             # sous sa tête (la distance d, l'incidence cos i : la hauteur équivalente d / √cos i)
             d = math.dist((x, y, MAST_H - 0.5), (*TURN_AIM, 0.0))
             Ld.energy = L.S.lampe_w(d / math.sqrt((MAST_H - 0.5) / d))
+            print(f"[port] mât clé en ({x:.1f} ; {y:.1f}) : {d:.1f} m du point visé du virage {TURN_AIM}, "
+                  f"{Ld.energy:.0f} W", flush=True)
         Ld.color = L.lin(L.S.LAMPE)[:3]
         Ld.spot_size = math.radians(50 if key else 125)
         Ld.spot_blend = 0.45 if key else 0.7
@@ -616,6 +702,8 @@ def build_masts(far=False):
     L.mesh_object("port_mats", bm, [steel])
     o = L.mesh_object("port_mats_tetes", hb, [head])
     o.visible_shadow = False
+    if VILLE:
+        build_shoulder(far=far)
     L.mesh_object("port_mats_socles", pb, [plinth])
 
 
@@ -630,7 +718,7 @@ def build_barrier(hidden, far=False):
         L.box_bm(bm, (xs[0], BARRIER_Y - 0.3, 0.0), (xs[1], BARRIER_Y + 0.3, 0.82))
         L.mesh_object("port_separateurs", bm, [conc])
         bm = L.bmesh.new()
-        for x in (-6.0, -2.0, 2.0, 6.0):
+        for x in CHEVRON_XS:
             L.bmesh.ops.create_uvsphere(bm, u_segments=6, v_segments=4, radius=0.12,
                                         matrix=Matrix.Translation((x, BARRIER_Y, 1.75)))
         L.mesh_object("port_balises_feux", bm, [lamp]).visible_shadow = False
@@ -646,7 +734,7 @@ def build_barrier(hidden, far=False):
     chev = bpy.data.materials.get("chevrons_balise") or mat_chevrons()
     post = bpy.data.materials.get("mat_port_acier") or L.mat_steel("mat_port_acier", color=(0.42, 0.44, 0.45), rough=0.4, rust=0.2)
     pb, fb, lb = L.bmesh.new(), L.bmesh.new(), L.bmesh.new()
-    for x in (-6.0, -2.0, 2.0, 6.0):
+    for x in CHEVRON_XS:
         for dx in (-0.45, 0.45):
             L.tube_bm(pb, (x + dx, BARRIER_Y - 0.12, h - 0.05), (x + dx, BARRIER_Y - 0.12, h + 0.95), 0.025, seg=8)
         L.bmesh.ops.create_uvsphere(lb, u_segments=10, v_segments=6, radius=0.09,
@@ -661,7 +749,7 @@ def build_barrier(hidden, far=False):
     L.mesh_object("port_potelets", pb, [post])
     L.mesh_object("port_balises_feux", lb, [lamp]).visible_shadow = False
     # les panneaux : chacun son objet, pour que les chevrons pointent depuis son milieu (coordonnées objet)
-    for i, x in enumerate((-6.0, -2.0, 2.0, 6.0)):
+    for i, x in enumerate(CHEVRON_XS):
         bm = L.bmesh.new()
         L.box_bm(bm, (-0.6, -0.015, -0.25), (0.6, 0.015, 0.25))
         o = L.mesh_object(f"port_chevrons_{i}", bm, [chev])
@@ -872,12 +960,12 @@ def build_containers(hidden, far=False, numbers_near=None):
         yd.row(-10.0 - W / 2 - i * W, 54.0, ["40", "40"], (4, 5), top_gaps=0.1)
     for i in range(2):                               # le mur gauche (x > 0), raccourci
         yd.row(10.0 + W / 2 + i * W, 10.0, ["40", "40"], (4, 5), top_gaps=0.15)
-    yd.row(-30.0, BARRIER_Y + 3.6, ["40", "40", "20", "40", "40"], 3, along_x=True, top_gaps=0.15)
+    yd.row(-30.0, CLOSE_WALL_Y, CLOSE_WALL_KEYS, 3, along_x=True, top_gaps=0.15)
     for i in range(4):                               # à l'ouest de la voie du pont, derrière le portique
         yd.row(-24.0 - i * (W + 1.2), 10.0, ["40", "40", "20", "40"], (2, 3), top_gaps=0.3)
     for i in range(3):                               # à l'est
         yd.row(30.0 + i * (W + 1.5), -10.0, ["40", "40", "20", "40", "40"], (2, 3), top_gaps=0.3)
-    for i in range(2):                               # au nord-est, derrière la voie du quai
+    for i in range(0 if VILLE else 2):               # au nord-est, derrière la voie du quai (sur l'eau en ville)
         yd.row(38.0, 88.0 + i * W, ["40", "40"], 2, along_x=True, top_gaps=0.3)
     print(f"[port] {yd.n} conteneurs (instances liées de {len(srcs)} sources), {yd.nums // 2} numéros", flush=True)
     return yd.n
@@ -1414,6 +1502,10 @@ def plan_P5(scene, hidden, palier="conteneurs"):
     if not VILLE:
         scene_c.build_bridge(hidden, lamp_src, haubans=True)
     build_port(hidden, lamp_src, far=False, palier=palier)
+    if VILLE:
+        d, nm = jetty_clearance()
+        print(f"[port] le décor le plus près de l'emprise de la jetée (y_D 300 à 400, ±J_EDGE) : {nm}, à {d:.2f} m",
+              flush=True)
     scene.frame_start, scene.frame_end = P5.F0, P5.F0 + P5.FRAMES - 1
     # --- la berline : déjà en travers, la glisse, la reprise
     hero = L.hero()
