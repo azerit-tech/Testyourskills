@@ -1111,6 +1111,97 @@ def in_street(y, m=2.0):
     return any(a - m <= y <= b + m for a, b in SIDE_STREETS)
 
 
+# ---------------------------------------------------------------- la ville unique (FILM3D_VILLE, plan de ville §2.5)
+#
+# En ville (FILM3D_VILLE=1, le défaut, lieux.ville_on) l'avenue s'arrête au rond-point : rien au-delà du joint (le
+# bord du trottoir de l'anneau, 19 m avant le centre de l'îlot, y 340,69), le rang de façades et les rangs arrière
+# arrêtés à 338, les dalles et la ville arrière à x ≥ −89 ; ni « pointe de la baie », ni sea_far, ni phare lointain ;
+# un retour du mur de promenade le long du joint, de x 11,5 au mur du rond-point. Le fond est vide là où se pose le
+# rond-point : la ville assemblée le remplit. FILM3D_VILLE=0 : l'ancien lieu autonome, inchangé.
+VILLE = None                 # posé par build : None (autonome) ou dict(y=joint, row=fin du rang, x=dalles, mur=x du mur)
+VILLE_X_MIN = -89.0          # côté ville : au-delà, le boulevard du quai puis la lagune (plan de ville §2.5)
+
+
+def _lieux():
+    """lieux.py, importé sans lui laisser road.S (il le branche sur scene_a à sa première importation)."""
+    import road
+    keep = road.S
+    import lieux
+    road.S = keep
+    return lieux
+
+
+def ville_bounds():
+    """Les bornes de l'avenue en ville (None : l'ancien lieu autonome), dans son repère : le joint avec le rond-point
+    et le bout du mur de promenade, deux points de scene_f (le bord du trottoir de l'anneau, R_OUT + WALK_W de l'îlot
+    vers l'avenue ; son mur, SEA_X) portés dans l'avenue par les poses de la ville (lieux.pose_ville)."""
+    L = _lieux()
+    if not L.ville_on():
+        return None
+    import scene_f as F
+    rf, txf, tyf = L.pose_ville("rond-point")
+    ra, txa, tya = L.pose_ville("avenue")
+
+    def f2a(x, y):
+        u, v = L._rot2(rf, x, y)
+        return L._rot2(-ra, u + txf - txa, v + tyf - tya)
+    y = f2a(0.0, -(F.R_OUT + F.WALK_W))[1]
+    return dict(y=y, row=y - 2.7, x=VILLE_X_MIN, mur=f2a(F.SEA_X, -(F.R_OUT + F.WALK_W))[0])
+
+
+def ville_before(y, margin=0.0):
+    """Vrai si y (plus margin) reste en deçà du joint (toujours vrai hors ville)."""
+    return VILLE is None or y + margin <= VILLE["y"]
+
+
+def ville_crop(keep):
+    """Rogne ce que build_city, les palmiers et les lampadaires ont posé au-delà des bornes de la ville : un objet
+    tout entier au-delà est retiré ; un maillage propre à cheval est coupé (bmesh.bisect_plane, le côté au-delà
+    effacé) ; une instance (maillage partagé) ou une lumière est gardée si son origine est en deçà. keep : les objets
+    à laisser (sources, voitures, caméra)."""
+    import bmesh
+    if VILLE is None:
+        return
+    bpy.context.view_layer.update()
+    planes = ((Vector((0.0, VILLE["y"], 0.0)), Vector((0.0, 1.0, 0.0))),
+              (Vector((VILLE["x"], 0.0, 0.0)), Vector((-1.0, 0.0, 0.0))))
+    gone = cut = 0
+    for ob in list(bpy.context.scene.objects):
+        if ob in keep or ob.type not in ("MESH", "LIGHT", "CURVE", "EMPTY"):
+            continue
+        if ob.type == "MESH":
+            pts = [ob.matrix_world @ Vector(c) for c in ob.bound_box]
+        else:
+            pts = [ob.matrix_world.translation]
+        beyond = [all((p - co).dot(no) > 1e-4 for p in pts) for co, no in planes]
+        straddle = [any((p - co).dot(no) > 1e-4 for p in pts) for co, no in planes]
+        if any(beyond):
+            bpy.data.objects.remove(ob, do_unlink=True)
+            gone += 1
+            continue
+        if ob.type != "MESH" or not any(straddle):
+            continue
+        if ob.data.users > 1:
+            o = ob.matrix_world.translation
+            if any((o - co).dot(no) > 0.0 for co, no in planes):
+                bpy.data.objects.remove(ob, do_unlink=True)
+                gone += 1
+            continue
+        inv = ob.matrix_world.inverted()
+        nrm = inv.transposed().to_3x3()
+        bm = bmesh.new()
+        bm.from_mesh(ob.data)
+        for (co, no), s in zip(planes, straddle):
+            if s:
+                bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=inv @ co,
+                                       plane_no=(nrm @ no).normalized(), clear_outer=True)
+        bm.to_mesh(ob.data)
+        bm.free()
+        cut += 1
+    print(f"[scene_a] ville : l'avenue rognée en y {VILLE['y']:.2f} et x {VILLE['x']:.0f} ({gone} objets retirés, "
+          f"{cut} coupés)", flush=True)
+
+
 def segments(y0, y1):
     """Les tronçons de trottoir entre les rues transversales."""
     out, y = [], y0
@@ -1359,7 +1450,8 @@ def build_city(hidden):
     sand = mat_plain("wet_sand", lin("#3a332d"), 0.3)
     box("beach", ROAD_HALF + WALK, 34, -30, 1200, -1.6, -1.5, sand)
     box("sea", 34, 3000, -400, 4000, -1.7, -1.6, mat_sea())
-    box("sea_far", -3000, 3000, 900, 4000, -1.75, -1.65, bpy.data.materials["sea"])
+    if VILLE is None:                    # (en ville : la baie au-delà du rond-point est celle de la ville)
+        box("sea_far", -3000, 3000, 900, 4000, -1.75, -1.65, bpy.data.materials["sea"])
 
     # --- les immeubles : huit dessins, instanciés, chacun sa couleur
     P = prototypes(M)
@@ -1422,6 +1514,23 @@ def build_city(hidden):
             add_light(f"up_{n}_{int(yy)}", "SPOT", (x + 0.45, y0 + yy, zl), (-0.16, 0, 1), lin("#ffe2bf"), power, spot=60)
             yy += 4.0
 
+    def place_row(y_end, kind, x, y0, tint, **kw):
+        """place, sauf en ville au-delà de la fin du rang (338) : l'immeuble est posé puis retiré, pour que le tirage
+        au sort de la suite (immeubles, palmiers) reste celui du lieu autonome ; à sa place, le plus large des dessins
+        qui tient avant la fin du rang (tirage mis de côté), pour que le rang aille jusqu'au rond-point."""
+        old = None if VILLE is None or y_end <= VILLE["row"] else set(bpy.data.objects)
+        place(kind, x, y0, tint, **kw)
+        if old is None:
+            return
+        for o in set(bpy.data.objects) - old:
+            bpy.data.objects.remove(o, do_unlink=True)
+        fit = sorted((protos[k][3]["W"], k) for k in protos if k != "motel"
+                     and y0 + protos[k][3]["W"] <= VILLE["row"])
+        if fit and y0 < VILLE["row"]:
+            state = random.getstate()
+            place(fit[-1][1], x, y0, tint, **kw)
+            random.setstate(state)
+
     # côté ville, de près : chaque dessin une fois, puis une suite tirée au sort
     # (l'hôtel d'angle de la rue de la patrouille garée, 1 m avant elle ; la suite reprend 2 m après)
     seq = [("deco", 20), ("hotel", 48), ("shop", 72), ("liner", 88), ("flats", 136), ("motel", 160),
@@ -1444,11 +1553,11 @@ def build_city(hidden):
         nxt = next(((a, b) for a, b in SIDE_STREETS if a > y), None)
         if nxt and y + W > nxt[0] - 1.0:
             if nxt[0] - 1.0 - y >= 14.0:
-                place("shop", FRONT_X, y, pastels[i % len(pastels)], lights=y < 320)
+                place_row(y + 14.0, "shop", FRONT_X, y, pastels[i % len(pastels)], lights=y < 320)
                 i += 1
             y = nxt[1] + 2.0
             continue
-        place(k, FRONT_X, y, pastels[i % len(pastels)], lights=y < 320)
+        place_row(y + W, k, FRONT_X, y, pastels[i % len(pastels)], lights=y < 320)
         y += W + random.choice([0.0, 0.0, 2.0, 6.0])
         i += 1
     # la lumière de cinéma : de grands réflecteurs doux au-dessus de l'avenue, tournés vers les
@@ -1468,10 +1577,10 @@ def build_city(hidden):
             if nxt and y + W > nxt[0] - 1.0:
                 y = nxt[1] + 2.0
                 continue
-            place(k, xr, y, random.choice(pastels), lights=False, props=row == 0)
+            place_row(y + W, k, xr, y, random.choice(pastels), lights=False, props=row == 0)
             y += W + random.choice([0.0, 3.0, 8.0])
-    # au loin, de l'autre côté, la pointe de la baie
-    for k in range(7):
+    # au loin, de l'autre côté, la pointe de la baie (en ville : celle de la ville)
+    for k in range(7 if VILLE is None else 0):
         kind = ["tower", "liner", "block", "tower", "flats", "liner", "tower"][k]
         place(kind, 85.0, 650 + k * 38, pastels[(k * 2) % len(pastels)], mirror=True)
 
@@ -1504,7 +1613,7 @@ def build_city(hidden):
         spans.append(((-ROAD_HALF - 0.7, a - 1.2, 6.95), (ROAD_HALF + 0.7, b + 1.2, 6.95)))
         spans.append(((-ROAD_HALF - 0.7, a - 1.2, 6.8), (ROAD_HALF + 0.7, a - 1.2, 6.8)))
     # les poteaux de bois du côté ville, trois fils de l'un à l'autre, une descente vers les façades
-    poles = [y for y in range(30, 640, 42) if not in_street(y, 3)]
+    poles = [y for y in range(30, 640, 42) if not in_street(y, 3) and ville_before(y, 1.0)]
     for y in poles:
         cyl(f"upole_{y}", (FRONT_X + 0.5, y, 0.15), (FRONT_X + 0.5, y, 9.6), 0.14, wood)
         box(f"upole_arm_{y}", FRONT_X - 0.4, FRONT_X + 1.4, y - 0.06, y + 0.06, 9.0, 9.12, wood)
@@ -2016,7 +2125,8 @@ def ouv_motion(scene, coupe, police, cam, focus, chaser):
     import p1_avenue
     p1_props(p1_avenue)
     hero_cabin(coupe)
-    far_lighthouse(OUV)
+    if VILLE is None:                    # (en ville : le vrai phare, à la pointe, n'est pas visible d'ici)
+        far_lighthouse(OUV)
     bpy.data.objects.remove(focus)
     scene.frame_set(frames[0])
     scene.render.motion_blur_shutter = 0.5
@@ -2116,7 +2226,8 @@ def p1_motion(scene, coupe, police, cam, focus, chaser):
     bpy.data.objects.remove(focus)
     p1_props(P)
     hero_cabin(coupe)
-    far_lighthouse(P)
+    if VILLE is None:
+        far_lighthouse(P)
     scene.frame_set(P.STILL)          # l'image fixe du banc : la rampe allumée
     scene.render.motion_blur_shutter = 0.5
     scene.render.use_motion_blur = True
@@ -2127,10 +2238,12 @@ def build(plan=None, palier=None):
     """La scène A (l'avenue du front de mer). Sans plan : l'ancienne image fixe, écrite dans assets/scene-a.blend.
     plan « OUV » ou « P1 » (render_lieux --lieu avenue) : le plan animé (l'ouverture, puis la patrouille qui démarre
     derrière la berline), rendu sans écrire la scène ; palier ignoré."""
+    global VILLE
     bpy.ops.wm.read_factory_settings(use_empty=True)
     scene = bpy.context.scene
     hidden = bpy.data.collections.new("sources")
     scene.collection.children.link(hidden)
+    VILLE = ville_bounds()
 
     # --- la voiture poursuivie (FILM3D_HERO) ; le coupé : modèle générique haute définition, l'avant vers -y d'origine
     paint = mat_paint()[0]
@@ -2254,7 +2367,8 @@ def build(plan=None, palier=None):
         police1.name = "police1"
         police1.rotation_mode = "XYZ"
 
-    # --- la ville : la route, les immeubles, la rue
+    # --- la ville : la route, les immeubles, la rue (en ville unique : rognées au joint du rond-point)
+    before = list(scene.objects)
     build_city(hidden)
     if os.environ.get("FILM3D_PARKED", "1") != "0":
         parked_cars(hidden)
@@ -2326,10 +2440,19 @@ def build(plan=None, palier=None):
             lo.location = Vector((x, yy, 0.15)) + head - Vector((0, 0, 0.12))
             yy += 30.0
             k += 1
+    # --- la ville unique : rien au-delà du joint avec le rond-point ni des dalles ; le mur de promenade revient le
+    # long du joint jusqu'à celui du rond-point (la plage s'arrête à ce retour)
+    if VILLE is not None:
+        ville_crop(set(before) | set(hidden.all_objects))
+        wall = bpy.data.objects["sea_wall"].active_material
+        trim = bpy.data.objects["sea_wall_cap"].active_material
+        x0, y1 = ROAD_HALF + WALK, VILLE["y"]
+        box("sea_wall_retour", x0, VILLE["mur"], y1 - 0.35, y1, -1.6, 0.85, wall)
+        box("sea_wall_retour_cap", x0 - 0.08, VILLE["mur"], y1 - 0.45, y1, 0.85, 0.95, trim)
     hidden.hide_render = True
     hidden.hide_viewport = True
 
-    make_world(scene)
+    make_world(scene, _lieux().mer_lieu("avenue") if VILLE is not None else 0.0)    # (en ville : +20°, lieux.mer_lieu)
 
     # --- la brume d'après la pluie
     haze_m, HN, hout = material("haze")
