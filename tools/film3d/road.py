@@ -289,7 +289,9 @@ def paint_wear(N, P, d2, track, ax):
 
 def paint_colour(N, P):
     dirt = N.mixf(smooth(N, noise(N, P, 1.3, 4.0), 0.35, 0.7), 0.76, 1.0)
-    return N.mix(1.0, (0.50, 0.49, 0.45, 1), grey(N, dirt), "MULTIPLY")
+    # lumière v3.1 : un blanc de chaussée usé, 0,45 d'albédo propre (0,40 en moyenne, sali) ; à 0,50, les bandes du
+    # passage piéton de P2 sortaient presque blanches sous les phares de la patrouille
+    return N.mix(1.0, (0.45, 0.44, 0.41, 1), grey(N, dirt), "MULTIPLY")
 
 
 def mat_asphalt(st, name, force_patch=False, layout=None, uv=False):

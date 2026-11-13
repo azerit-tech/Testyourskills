@@ -197,6 +197,8 @@ def mat_wake():
     fade = N.math("POWER", N.math("MINIMUM", N.math("MULTIPLY", sep[0], 1.6), 1.0), 1.5)
     edge = N.math("SUBTRACT", 1.0, N.math("POWER", N.math("ABSOLUTE", N.math("SUBTRACT", N.math("MULTIPLY", sep[1], 2.0), 1.0)), 3.0))
     mask = N.math("MULTIPLY", N.math("MULTIPLY", fade, edge), N.math("ADD", 0.6, N.math("MULTIPLY", no.outputs["Factor"], 0.8)), clamp=True)
+    # lumière v3.1 : à demi-opacité, la chaussée mouillée transparaît ; pleines, ces traces zébraient P2 de noir dur
+    mask = N.math("MULTIPLY", mask, 0.5)
     bs = A.principled(N, **{"Base Color": lin("#1d1b1a"), "Roughness": 0.8, "Specular IOR Level": 0.25})
     tr = N.new("ShaderNodeBsdfTransparent")
     mx = N.new("ShaderNodeMixShader")
