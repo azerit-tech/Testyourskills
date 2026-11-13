@@ -14,8 +14,8 @@
 # La patrouille 1 entre comme elle sort de P1 : à gauche, 3,45 m sur le côté, 3,0 m devant, à la vitesse de la
 # berline, en freinage établi : elle pile, la berline la déborde en glissant à l'intérieur du virage, elle s'arrête
 # rampe allumée à l'entrée de l'anneau (vers l'image 69) et sort du cadre par la gauche vers l'image 43 ; elle
-# n'entre pas dans P3. La patrouille 2 descend l'avenue nord, freine, tourne à sa droite en glissant et s'arrête en
-# travers de la bouche nord : la berline lui passe sous le nez.
+# n'entre pas dans P3. La patrouille 2 descend l'avenue nord, de face, et vire derrière la berline à travers
+# l'anneau : à la dernière image elle passe derrière la caméra, c'est elle qui poursuit dans P3.
 import math
 
 import motion as M
@@ -280,22 +280,28 @@ def patrol1_lead(t):
 
 # ---------------------------------------------------------------- la patrouille 2
 
-# Elle descend l'avenue nord (x P2_X, cap 180), freine, tourne à sa droite en glissant et s'arrête en travers de la
-# bouche nord, à l'ouest de l'îlot : la berline lui passe devant. Sa conduite est celle de l'outil commun
-# (motion.drive : freinage avant le virage, glisse installée et résorbée, contre-braquage), lancée à l'instant P2_T0
-# du plan ; vue de la caméra, elle débouche derrière les palmiers de l'îlot pendant la glisse de la berline et
-# s'arrête devant à droite quand celle-ci la passe.
-P2_X = -3.5
-P2_ROUTE = dict(start=(P2_X, 30.05, 180.0), pieces=[(10.0, 0.0), (12.0 * math.radians(55.0), -1.0 / 12.0), (0.5, 0.0)])
-P2_SPEED = 14.0             # m/s voulus dans l'avenue (50 km/h)
-P2_T0 = t_of(30)            # elle part du haut de l'avenue nord à l'image 30
+# Elle descend l'avenue nord dans la voie de gauche (x P2_X, cap 180), de face pour la caméra pendant que la
+# berline tourne : elle traverse le cadre de gauche à droite au-dessus du toit (images 1 à 57), arrive à la bouche
+# nord et vire derrière la berline, sur un arc de P2_R m à travers le quart nord-ouest de l'anneau (la bordure de
+# l'angle à 1,4 m de sa caisse, l'îlot à 1,5 m), qui la pose dans la rue des enseignes à y P2_EXIT_Y. Sa conduite est
+# celle de l'outil commun (motion.drive : freinage avant le virage, glisse installée et résorbée, contre-braquage) ;
+# à la dernière image, elle passe derrière la caméra, à 5,9 m, en sortie de glisse et relancée : la poursuivante de
+# P3. Rampe allumée tout le plan.
+P2_X = -1.75
+P2_Y0 = 45.0                # son départ, à l'image 1 (m)
+P2_R = 16.0                 # le rayon de son virage dans l'anneau (m)
+P2_EXIT_Y = 1.0             # sa ligne dans la rue des enseignes, 0,65 m à gauche de celle de la berline
+P2_ROUTE = dict(start=(P2_X, P2_Y0, 180.0),
+                pieces=[(P2_Y0 - P2_EXIT_Y - P2_R, 0.0), (P2_R * math.pi / 2, -1.0 / P2_R), (40.0, 0.0)])
+P2_SPEED = 14.0             # m/s voulus (50 km/h) : le virage la ralentit, elle relance ensuite
+P2_T0 = t_of(1)
 _P2D = None
 
 
 def _p2():
     global _P2D
     if _P2D is None:
-        _P2D = M.drive(P2_ROUTE, P2_SPEED, t0=P2_T0, stop=True, kind="patrol", t_span=(-2.0, T_END + 2.0))
+        _P2D = M.drive(P2_ROUTE, P2_SPEED, t0=P2_T0, kind="patrol", t_span=(-2.0, T_END + 2.0))
     return _P2D
 
 
@@ -434,6 +440,11 @@ def sw_kerb(ville=True):
 
 
 SW_KERB = sw_kerb()
+# le nez de la bordure de l'angle nord-ouest, du bord ouest de l'avenue nord (x −7) au bord nord de la rue (y 4) par
+# l'anneau : la patrouille 2 le longe en virant derrière la berline
+NW_KERB = [(-7.0, 46.0)] + [(RING_FACE * math.cos(math.radians(a)), RING_FACE * math.sin(math.radians(a)))
+           for a in (90.0 + math.degrees(math.asin(7.0 / RING_FACE)) + (90.0 - math.degrees(math.asin(7.0 / RING_FACE))
+                     - math.degrees(math.asin(4.0 / RING_FACE))) * k / 32 for k in range(33))] + [(-45.0, 4.0)]
 
 
 def _poly_line_gap(poly, edge):
@@ -445,12 +456,13 @@ def _poly_line_gap(poly, edge):
 
 def kerb_gap(t, which=0):
     """L'air entre la caisse de la patrouille `which` (ou de la berline : which = None) et la bordure du coin
-    sud-ouest (l'intérieur du virage)."""
+    sud-ouest (l'intérieur du virage) ; pour une patrouille, aussi celle de l'angle nord-ouest."""
     if which is None:
         x, y = hero_pos(t)
         return _poly_line_gap(_corners(x, y, hero_heading(t), HALF_L, HALF_W), SW_KERB)
     px, py = patrol_pos(which)(t)
-    return _poly_line_gap(_corners(px, py, patrol_heading(which)(t), PATROL_L / 2, PATROL_W / 2), SW_KERB)
+    poly = _corners(px, py, patrol_heading(which)(t), PATROL_L / 2, PATROL_W / 2)
+    return min(_poly_line_gap(poly, SW_KERB), _poly_line_gap(poly, NW_KERB))
 
 
 def island_gap(t, which=0):

@@ -351,6 +351,29 @@ def test_p2():
             if (lambda b: b and b["u1"] > 0 and b["u0"] < 1)(P.patrol_screen(P.t_of(f), 0))]
     check("P2 : la patrouille 1 dans le cadre dès l'image 1, débordée, jusque vers l'image 40 au moins",
           seen and seen == list(range(P.F0, seen[-1] + 1)) and seen[-1] >= 40, f"images 1 à {seen[-1] if seen else 0}")
+    # la patrouille 2 : de face dans l'avenue nord, puis elle vire derrière la berline et passe derrière la caméra
+    air = min((P.body_gap(P.t_of(f), 1), f) for f in sub)
+    kerb = min((P.kerb_gap(P.t_of(f), 1), f) for f in sub)
+    isl = min((P.island_gap(P.t_of(f), 1), f) for f in sub)
+    lens = min((P.lens_gap(P.t_of(f), 1), f) for f in sub)
+    check("P2 : la patrouille 2 à 1,5 m de la berline, 1,2 m des bordures et de l'îlot, 0,8 m de l'objectif",
+          air[0] >= 1.5 and kerb[0] >= 1.2 and isl[0] >= 1.2 and lens[0] >= 0.8, f"air {air[0]:.2f}, bordure "
+          f"{kerb[0]:.2f}, îlot {isl[0]:.2f}, objectif {lens[0]:.2f} m")
+    seen = [f for f in range(P.F0, P.F0 + P.FRAMES)
+            if (lambda b: b and b["u1"] > 0 and b["u0"] < 1)(P.patrol_screen(P.t_of(f), 1))]
+    head = [f for f in seen if abs(P.patrol2_heading(P.t_of(f)) - 180.0) < 15.0]
+    check("P2 : la patrouille 2 de face dans l'avenue nord, dans le cadre dès l'image 1, 40 images au moins",
+          seen and seen == list(range(P.F0, seen[-1] + 1)) and len(head) >= 40, f"images 1 à {seen[-1] if seen else 0}"
+          f", de face sur {len(head)}")
+    t = P.T_END
+    c = P.camera_rail(t)
+    x, y = P.patrol2_pos(t)
+    yaw = math.radians(c[3])
+    ahead = (x - c[0]) * -math.sin(yaw) + (y - c[1]) * -math.cos(yaw)       # le long de la visée (motion.key_camera)
+    v = math.dist(P.patrol2_pos(t + 0.05), P.patrol2_pos(t - 0.05)) / 0.1
+    check("P2 : à la dernière image, la patrouille 2 derrière la caméra, lancée derrière la berline",
+          ahead < 0 and v > 5.0 and P.hero_pos(t)[0] < x, f"({x:.1f}, {y:.1f}), {-ahead:.1f} m derrière l'objectif, "
+          f"{v:.1f} m/s")
     tt = M.t_of(20)
     check("P2 : camera(t) = camera_rail(t) (aucun tremblé écrit)", P.camera(tt) == P.camera_rail(tt))
     # la caméra de poursuite : la berline au point de coupe à la première et à la dernière image
