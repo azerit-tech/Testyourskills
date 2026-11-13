@@ -37,18 +37,36 @@ S, road = L.S, L.road
 
 # ---------------------------------------------------------------- le tracé
 
-Y_CITY_END = -1000.0  # l'avenue continue dans la ville, dans l'axe du pont (le fond de P4)
+# FILM3D_VILLE (« 1 » par défaut) : le pont rogné pour la ville unique (docs/cinematique-plan-de-ville.md §2.5, tête
+# et pied de pont), son repère étant celui de la ville. « 0 » : le lieu autonome d'avant, inchangé (son avenue de
+# 680 m, son sol, ses faux lointains, le tablier arrêté au mur du port d'avant en y -20).
+VILLE = L.ville_on()
+
 Y_START = -320.0      # le tablier quitte le quai de la ville
 Y_FOOT_CITY = -255.0
 Y_CREST = -130.0
 Y_FOOT = -5.0         # pied de la rampe côté port
-Y_PORT = -20.0        # le mur du quai du port : le tablier s'arrête là, le terre-plein prend la suite
+if VILLE:
+    # la tête de pont : 8 m de chaussée sans enrobé entre le boulevard du quai de la rue (y -328, scene_b) et le
+    # tablier ; l'ouverture du quai de la rue fait ±9,7 m, le bord extérieur du parapet
+    Y_CITY_END = -328.0
+    # le pied : parapets jusqu'au pied de la rampe (y -5) ; le port, avancé de 46,3 m (sa pose dans parcours.py),
+    # passe dessous depuis son mur sud et prend la suite : de ce mur au pied, des murs de soutènement sous les rives
+    # remplacent les piles de -55 et -20. La chaussée seule descend encore jusqu'à la fin du raccord (Y_TOE, z = 0)
+    Y_PORT = Y_FOOT
+    Y_TOE = Y_FOOT + 6.0
+    Y_PORT_WALL = L.PORT_YS[0] + L.pose_ville("port")[2]       # -66,3 : le mur sud du port, dans la ville
+else:
+    Y_CITY_END = -1000.0  # l'avenue continue dans la ville, dans l'axe du pont (le fond de P4)
+    Y_PORT = -20.0        # le mur du quai du port : le tablier s'arrête là, le terre-plein prend la suite
+    Y_TOE = Y_PORT_WALL = None
 Y_END = 100.0
 GRADE = 0.06
 T_SAG, T_CREST = 12.0, 20.0     # longueurs des raccords (pied, crête) : 6 % × (125 − 20/4) = 7,2 m
 
 HALF = 7.0
 WALK = 2.0
+CITY_SHORE = L.CITY_SHORE_Y   # -325 : le mur du quai de la ville (scene_b, s 181 posé en y -325)
 LAMP_YS = [Y_START + 10.0 + 30.0 * k for k in range(11)]     # -310 .. -10
 PIERS = [Y_START + 20.0 + 35.0 * k for k in range(9)]        # -300 .. -20 : la dernière est la culée du port
 
@@ -110,15 +128,26 @@ def build_bridge(hidden, lamp_src, far=False, haubans=False):
     # 0,7 m ; plate, la chaussée du port y montrait la tranche du tablier en travers de P4)
     ave = [Y_START - 15.0 - 30.0 * k for k in range(int((Y_START - Y_CITY_END) / 30.0))]
     L.roadway("pont_ville", [Y_CITY_END, Y_START], half=HALF, walk=WALK, rail=None, M=M, far=far,
-              lamp_src=None if far else lamp_src, lamp_ys=ave)
-    L.roadway("pont_port", samples(Y_PORT, Y_END), deck_z, half=HALF, walk=WALK, rail=None, M=M, far=far)
+              lamp_src=None if (far or VILLE) else lamp_src, lamp_ys=ave)
     bm = L.bmesh.new()
-    L.box_bm(bm, (-12.5, Y_START - 45.0, L.WATER_Z - 1.5), (12.5, Y_START, -0.01))  # la culée de la ville
-    L.box_bm(bm, (-40.0, Y_CITY_END, -0.4), (40.0, Y_START - 45.0, -0.02))         # le sol de l'avenue
+    if VILLE:
+        # la fin du raccord du pied, sans bord, jusqu'à z = 0 (le nom ne commence pas par « pont_port_ » :
+        # scene_e._remove_bridge_flat la laisse) ; la culée de la ville, de son mur de quai au tablier
+        L.roadway("pont_pied", samples(Y_PORT, Y_TOE), deck_z, half=HALF, walk=WALK, rail=None, M=M, far=far)
+        L.box_bm(bm, (-12.5, CITY_SHORE, L.WATER_Z - 1.5), (12.5, Y_START, -0.01))
+    else:
+        L.roadway("pont_port", samples(Y_PORT, Y_END), deck_z, half=HALF, walk=WALK, rail=None, M=M, far=far)
+        L.box_bm(bm, (-12.5, Y_START - 45.0, L.WATER_Z - 1.5), (12.5, Y_START, -0.01))  # la culée de la ville
+        L.box_bm(bm, (-40.0, Y_CITY_END, -0.4), (40.0, Y_START - 45.0, -0.02))         # le sol de l'avenue
     L.mesh_object("pont_culee_ville", bm, [M["concrete"]])
-    # les piles tous les 35 m : un chevêtre sous le caisson, deux fûts dans l'eau
+    if VILLE:
+        build_retaining(edge, M["concrete"])
+    # les piles tous les 35 m : un chevêtre sous le caisson, deux fûts dans l'eau (dans la ville, pas sur le
+    # terre-plein du port : les murs de soutènement y portent la rampe)
     bm = L.bmesh.new()
     for y in PIERS[:-1]:
+        if VILLE and y > Y_PORT_WALL:
+            continue
         zt = deck_z(y) - 1.9
         L.box_bm(bm, (-6.2, y - 1.0, zt - 1.3), (6.2, y + 1.0, zt))
         for x in (-4.2, 4.2):
@@ -142,6 +171,30 @@ def build_bridge(hidden, lamp_src, far=False, haubans=False):
     print(f"[pont] tablier {Y_START:.0f}..{Y_PORT:.0f} m, crête {deck_z(Y_CREST):.2f} m en y {Y_CREST:.0f}, "
           f"{len(out['lamps'])} lampadaires, {'vu de loin' if far else 'complet'}", flush=True)
     return out
+
+
+def build_retaining(edge, conc):
+    """Dans la ville, la rampe au-dessus du terre-plein du port, de son mur sud (Y_PORT_WALL) au pied : deux murs
+    de soutènement de 0,5 m sous les rives (jusqu'au bord extérieur du parapet), du béton du port au-dessous du
+    caisson, et le mur de tête au droit du quai, de l'eau au tablier. Le vide sous la rampe est fermé : on n'y voit
+    plus le caisson s'enfoncer dans le béton."""
+    bm = L.bmesh.new()
+    ys = [y for y in samples(Y_PORT_WALL, Y_PORT, fine=1.0, coarse=2.0)]
+    for side in (-1, 1):
+        x0, x1 = sorted((side * (edge - 0.5), side * edge))
+        prev = None
+        for y in ys:
+            top = deck_z(y) - 1.5
+            if top <= 0.02:
+                break
+            ring = [bm.verts.new((x, y, z)) for x, z in ((x0, -0.3), (x1, -0.3), (x1, top), (x0, top))]
+            if prev:
+                for k in range(4):
+                    bm.faces.new((prev[k], prev[(k + 1) % 4], ring[(k + 1) % 4], ring[k]))
+            prev = ring
+    yw = Y_PORT_WALL
+    L.box_bm(bm, (-edge, yw - 0.6, L.WATER_Z - 1.5), (edge, yw, deck_z(yw) - 1.5))
+    L.mesh_object("pont_soutenement", bm, [conc])
 
 
 # ---------------------------------------------------------------- le pylône et les haubans
@@ -264,7 +317,12 @@ def plan_P4(scene, hidden, haubans=False):
     crête (y -130) aux images 8, 18, 28 et 38 : six rampes au début, dix à la fin. Le tablier court jusqu'à y -320,
     l'avenue de la ville au-delà."""
     # le ciel commun (lieux.ciel) : la bande corail du côté de la mer, derrière la caméra qui regarde la ville
-    lamp_src = L.panorama(scene, hidden, bridge=None, port="loin")
+    if VILLE:
+        # dans la ville, plus de port ni de jetée : ils viennent de la ville, à leur pose ; le panorama y ramène la
+        # ville lointaine au vrai (100 m derrière le quai, la fente de la rue de ±8 m) et pose le phare à sa place
+        lamp_src = L.panorama(scene, hidden, yaw=L.mer_lieu("pont"), bridge=None, port=None, lieu="pont")
+    else:
+        lamp_src = L.panorama(scene, hidden, bridge=None, port="loin")
     build_bridge(hidden, lamp_src, haubans=haubans)
     # (plus de voile ni de lueur propres à P4 : le ciel commun, lieux.ciel ; la lueur que le voile envoyait aux
     # rayons réfléchis jusqu'à 15° faisait du tablier une nappe mauve et beige, lumière v3.1 règles A et B)
