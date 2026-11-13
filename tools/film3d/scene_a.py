@@ -1115,11 +1115,13 @@ def in_street(y, m=2.0):
 #
 # En ville (FILM3D_VILLE=1, le défaut, lieux.ville_on) l'avenue s'arrête au rond-point : rien au-delà du joint (le
 # bord du trottoir de l'anneau, 19 m avant le centre de l'îlot, y 340,69), le rang de façades et les rangs arrière
-# arrêtés à 338, les dalles et la ville arrière à x ≥ −89 ; ni « pointe de la baie », ni sea_far, ni phare lointain ;
-# un retour du mur de promenade le long du joint, de x 11,5 au mur du rond-point. Le fond est vide là où se pose le
-# rond-point : la ville assemblée le remplit. FILM3D_VILLE=0 : l'ancien lieu autonome, inchangé.
-VILLE = None                 # posé par build : None (autonome) ou dict(y=joint, row=fin du rang, x=dalles, mur=x du mur)
-VILLE_X_MIN = -89.0          # côté ville : au-delà, le boulevard du quai puis la lagune (plan de ville §2.5)
+# arrêtés à 338 ; côté ville, tout (dalles, ville arrière, rues transversales et ce qu'elles portent) arrêté au bord
+# sud du boulevard du quai de la rue des enseignes (x −89,15, ville_nord) : la rue transversale y débouche ; ni
+# « pointe de la baie », ni sea_far, ni phare lointain ; un retour du mur de promenade le long du joint, de x 11,5 au
+# mur du rond-point. Le fond est vide là où se pose le rond-point : la ville assemblée le remplit. FILM3D_VILLE=0 :
+# l'ancien lieu autonome, inchangé.
+VILLE = None                 # posé par build : None (autonome) ou dict(y=joint, row=fin du rang, x=bord du boulevard,
+#                              mur=x du mur)
 
 
 def _lieux():
@@ -1146,7 +1148,18 @@ def ville_bounds():
         u, v = L._rot2(rf, x, y)
         return L._rot2(-ra, u + txf - txa, v + tyf - tya)
     y = f2a(0.0, -(F.R_OUT + F.WALK_W))[1]
-    return dict(y=y, row=y - 2.7, x=VILLE_X_MIN, mur=f2a(F.SEA_X, -(F.R_OUT + F.WALK_W))[0])
+    return dict(y=y, row=y - 2.7, x=ville_nord(L), mur=f2a(F.SEA_X, -(F.R_OUT + F.WALK_W))[0])
+
+
+def ville_nord(L):
+    """Le bord sud du boulevard du quai (scene_b : la rue finit et le boulevard commence en s = S_STREET, y = s dans
+    sa scène) porté dans l'avenue par les poses de la ville : le x de l'avenue au-delà duquel, côté ville, rien n'est
+    posé, ni la rue transversale ni la ville arrière (−89,15 aux poses du plan de ville)."""
+    import scene_b as B
+    rb, txb, tyb = L.pose_ville("rue")
+    ra, txa, tya = L.pose_ville("avenue")
+    u, v = L._rot2(rb, 0.0, B.S_STREET)
+    return L._rot2(-ra, u + txb - txa, v + tyb - tya)[0]
 
 
 def ville_before(y, margin=0.0):
@@ -1188,7 +1201,7 @@ def ville_crop(keep):
                 gone += 1
             continue
         inv = ob.matrix_world.inverted()
-        nrm = inv.transposed().to_3x3()
+        nrm = ob.matrix_world.to_3x3().transposed()     # (une normale du monde vers l'objet : Mᵀ n, sans échelle)
         bm = bmesh.new()
         bm.from_mesh(ob.data)
         for (co, no), s in zip(planes, straddle):
@@ -1198,7 +1211,7 @@ def ville_crop(keep):
         bm.to_mesh(ob.data)
         bm.free()
         cut += 1
-    print(f"[scene_a] ville : l'avenue rognée en y {VILLE['y']:.2f} et x {VILLE['x']:.0f} ({gone} objets retirés, "
+    print(f"[scene_a] ville : l'avenue rognée en y {VILLE['y']:.2f} et x {VILLE['x']:.2f} ({gone} objets retirés, "
           f"{cut} coupés)", flush=True)
 
 
@@ -2440,7 +2453,7 @@ def build(plan=None, palier=None):
             lo.location = Vector((x, yy, 0.15)) + head - Vector((0, 0, 0.12))
             yy += 30.0
             k += 1
-    # --- la ville unique : rien au-delà du joint avec le rond-point ni des dalles ; le mur de promenade revient le
+    # --- la ville unique : rien au-delà du joint avec le rond-point ni du bord du boulevard du quai ; le mur de promenade revient le
     # long du joint jusqu'à celui du rond-point (la plage s'arrête à ce retour)
     if VILLE is not None:
         ville_crop(set(before) | set(hidden.all_objects))
