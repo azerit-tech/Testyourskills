@@ -204,6 +204,27 @@ def beam(i, T):
     return tuple(a + (b - a) * w for a, b in zip(p5, p6))
 
 
+# ---- la lampe de l'appareil 0 (lumière v3.1) : une seule définition en temps du film, lue par P5 et P6. Le pinceau
+# visible est la puissance de la lampe de brume fois la densité de la brume du plan (P5 0,0016, P6 0,0012) : le même
+# produit des deux côtés de la coupe ; puis, sur BEAM0_FONDU s de P6, pendant qu'il rejoint sa place, sa lampe de
+# brume s'éteint jusqu'à celle des deux autres (BEAM0_FIN, la lampe de 8 kW de la jetée) et son cône passe de 5 à 4°,
+# sans marche. Au sol 8 kW (à 100 kW, une plaque claire au bas du cadre de P5), sur la berline seule 50 kW, partout
+BEAM0_PINCEAU = 1.6e6 * 0.0016      # W × densité : le pinceau de P5
+BEAM0_SOL, BEAM0_BERLINE = 8000.0, 5.0e4
+BEAM0_FIN = 8000.0
+BEAM0_CONE = (5.0, 4.0)
+BEAM0_FONDU = 1.75                  # s depuis P6/1
+BEAM0_SOURCE = (0.12, 0.25)         # la lampe de brume : taille de la source (m), bord du cône (celles de P5 ; à 1,5 m,
+                                    # celle de la jetée, le pinceau de P6 sortait flou et large)
+
+
+def beam0(T, density):
+    """(W, degrés) : la lampe de brume de l'appareil 0 au temps du film T, dans une brume de densité `density`."""
+    w = _quintic((T - T6) / BEAM0_FONDU)
+    start = BEAM0_PINCEAU / density
+    return start * (BEAM0_FIN / start) ** w, BEAM0_CONE[0] + (BEAM0_CONE[1] - BEAM0_CONE[0]) * w
+
+
 def beam_in_scene(shot, i):
     def fn(t):
         return to_scene(shot, beam(i, PC.t_of(shot, 1) + t))

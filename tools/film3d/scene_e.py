@@ -1735,14 +1735,15 @@ def plan_P5(scene, hidden, palier="conteneurs"):
         helicos.key(r, "P5", i, FRAMES)
         scene_d.heli_feux(r)
     sl = h["searchlight"].data
-    sl.spot_blend = 0.25
-    scene_d.aim_helis([heli], P5.beam_target(M.t_of(20)), energy=1.6e6, cone=5.0)
+    sl.shadow_soft_size, sl.spot_blend = helicos.BEAM0_SOURCE   # la lampe de l'appareil 0, la même qu'en P6
+    w0, c0 = helicos.beam0(helicos.T5, P5_HAZE)            # la lampe de l'appareil 0, la même qu'en P6 (helicos.beam0)
+    scene_d.aim_helis([heli], P5.beam_target(M.t_of(20)), energy=w0, cone=c0)
     # ce que balaie la tache : le terre-plein, le mobilier du virage, les conteneurs (la lampe principale y aurait
     # posé des taches brûlées)
     swept = [o for o in bpy.data.objects if o.type == "MESH" and (o.name == "port_terre_plein" or o.name.startswith((
         "conteneur_", "flaque_p5", "chaine", "caisse_", "palettes_", "futs", "separateur_", "port_couronnement",
         "trace_p5")))]
-    beam_lights(h["searchlight"], hero, swept, ground_w=1.0e5, car_w=P5_BEAM_CAR_W)
+    beam_lights(h["searchlight"], hero, swept, ground_w=helicos.BEAM0_SOL, car_w=helicos.BEAM0_BERLINE)
     M.key_searchlight(h, FRAMES, helicos.beam_in_scene("P5", 0))
     scene_d.helis_P6_light(others, range(1, helicos.N), hero, "P5", FRAMES)
     beams = {h["searchlight"]} | {o for r in others for o in r.children_recursive
@@ -1752,7 +1753,7 @@ def plan_P5(scene, hidden, palier="conteneurs"):
     for ob in bpy.data.objects:
         if ob.type == "LIGHT" and ob not in beams:
             ob.visible_volume_scatter = False
-    L.haze((-140, 160), (-280, 115), (L.WATER_Z, 70), 0.0016)    # lieux.haze tourne ses normales vers l'extérieur
+    L.haze((-140, 160), (-280, 115), (L.WATER_Z, 70), P5_HAZE)   # lieux.haze tourne ses normales vers l'extérieur
     # --- la caméra qui suit la berline (de 8 à 10,3 m), 21 mm, mise au point sur elle
     cam = L.camera("cam_P5", tuple(CAM), (CAM.x + 1.0, CAM.y + 8.0, 0.7), lens=P5.LENS, fstop=4.0)
     M.key_camera(cam, FRAMES, P5.camera)
@@ -1775,6 +1776,7 @@ PLANS = {"P5": plan_P5}
 
 
 PLAN_PALIER = {"P5": "conteneurs"}  # le palier de décor de chaque plan (render_film.py n'en passe pas)
+P5_HAZE = 0.0016                    # la brume du port (la lampe de l'appareil 0 s'y règle : helicos.beam0)
 P5_BEAM_CAR_W = 5.0e4               # la jumelle du faisceau sur la berline (à 1,2e5 puis 7e4 elle sortait rose et brûlée)
 
 

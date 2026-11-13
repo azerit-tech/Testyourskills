@@ -1197,6 +1197,31 @@ def p6_ground(x, y):
     return scene_e.deck_ground(x, y)
 
 
+P6_HAZE = 0.0012
+
+
+def p6_beam0_haze(heli0, frames):
+    """L'appareil 0 arrive de P5 avec son pinceau dans la brume : une jumelle de son projecteur qui n'éclaire que
+    la brume, à la force de P5 à la coupe, éteinte sur helicos.BEAM0_FONDU s (helicos.beam0), cône compris ; sa
+    lampe de 8 kW (celle des trois appareils de la jetée) reste au sol et sur la berline."""
+    import helicos
+    import parcours as PC
+    import scene_e
+    sp = next(o for o in heli0.children_recursive if o.type == "LIGHT" and o.name.endswith("searchlight_spot"))
+    brume = [o for o in bpy.data.objects if o.type == "MESH" and o.name.startswith("haze")]
+    tw = scene_e._twin(sp, "faisceau_brume_0", 0.0, "#e2eaff", brume)
+    tw.visible_volume_scatter = True
+    tw.data.shadow_soft_size, tw.data.spot_blend = helicos.BEAM0_SOURCE
+    for f in frames:
+        w, c = helicos.beam0(PC.t_of("P6", f), P6_HAZE)
+        tw.data.energy = max(0.0, w - helicos.BEAM0_FIN)     # la lampe de 8 kW éclaire déjà la brume
+        tw.data.spot_size = math.radians(c)
+        tw.data.keyframe_insert("energy", frame=f)
+        tw.data.keyframe_insert("spot_size", frame=f)
+    print(f"[P6] pinceau de l'appareil 0 : {helicos.beam0(PC.t_of('P6', frames[0]), P6_HAZE)[0]:.0f} W à la "
+          f"coupe, éteint en {helicos.BEAM0_FONDU} s", flush=True)
+
+
 def p6_clean_haze(scene, hero):
     """P6 au ras du sol (découpage v2) : les lampadaires de la jetée passent tout près de l'objectif ; leurs spots
     n'éclairent plus la brume (le nuage de grains qu'ils y semaient, comme celui de la pointe) ; le rendu des
@@ -1364,8 +1389,9 @@ def plan_P6(scene, hidden, palier="socle"):
         print(f"[P6] avions non chargés : {e!r}", flush=True)
     # la brume seulement en couloir sur la jetée, sous la caméra : sur toute la lagune, vue de 35 m, elle diffusait
     # le ciel en un voile rose qui noyait l'eau noire et ses reflets (rendus du 12 novembre)
-    L.haze((JX - 30, JX + 30), (JY0 - 20, JY1), (L.WATER_Z, 28), 0.0012)
+    L.haze((JX - 30, JX + 30), (JY0 - 20, JY1), (L.WATER_Z, 28), P6_HAZE)
     p6_clean_haze(scene, hero)
+    p6_beam0_haze(hs[0], frames)
     p6_foreground(hidden)
     p6_phare_clear(scene)
     # la berline à 7 m de l'objectif : ses textures gardent leur pleine définition, le reste est loin
