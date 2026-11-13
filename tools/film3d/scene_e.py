@@ -157,9 +157,27 @@ def _outward(a, b):
     return (dy / ln, -dx / ln)
 
 
+def e_to_c(x, y):
+    """Un point du port dans la scène du pont (le repère de la ville : la pose du pont est l'identité)."""
+    rot, tx, ty = L.pose_ville("port")
+    u, v = _rot(rot, x, y)
+    return u + tx, v + ty
+
+
+def c_to_e(x, y):
+    rot, tx, ty = L.pose_ville("port")
+    return _rot(-rot, x - tx, y - ty)
+
+
 def bridge_x():
     """L'axe du pont dans ce repère (x_E) : la pose du port dans la ville, celle du pont étant l'identité."""
-    return _rot(-L.pose_ville("port")[0], -L.pose_ville("port")[1], -L.pose_ville("port")[2])[0] if VILLE else 0.0
+    return c_to_e(0.0, 0.0)[0] if VILLE else 0.0
+
+
+def ramp_ys():
+    """(le pied de la rampe, la fin de son raccord à z = 0) en y_E, lus dans scene_c (Y_FOOT, Y_TOE) et la pose."""
+    import scene_c
+    return c_to_e(0.0, scene_c.Y_FOOT)[1], c_to_e(0.0, scene_c.Y_TOE)[1]
 
 
 def rail_edges():
@@ -302,6 +320,12 @@ def mat_terre_plein(name="terre_plein_port", far=False):
         banks = [_line(N, jv, ju, "x", s * (J["half"] - 0.15), u0, 0.0, W) for s in (-1, 1)]
         xl, xr = lane_cut(Q1 - 0.15, J)
         dl, dr = lane_cut(QY + 3.5, J)
+        # la voie du pont sur le terre-plein : dans l'axe du pont (sa pose), à partir de la fin du raccord du pied
+        # (z = 0) ; sous la rampe, plus de voie plate ni de marquage
+        bx, toe = bridge_x(), ramp_ys()[1]
+        lines[:4] = [_line(N, px, py, "x", bx + 6.85, toe, Q0 + 0.1, W), _line(N, px, py, "x", bx - 6.85, toe, Q1 - 0.05, W),
+                     _line(N, px, py, "x", bx + 0.12, toe, Q0 - 5.0, 0.06), _line(N, px, py, "x", bx - 0.12, toe, Q0 - 5.0, 0.06)]
+        dashes[:2] = [_dashed(N, _line(N, px, py, "x", bx + s * 3.5, toe, Q0 - 5.0, 0.06), py) for s in (-1, 1)]
         lines = lines[:4] + [
             _line(N, px, py, "y", Q0 + 0.15, 6.85, JX + 6.85, W),
             _line(N, px, py, "y", Q1 - 0.15, -6.85, xl - 1.0, W), _line(N, px, py, "y", Q1 - 0.15, xr + 1.0, JX - 6.85, W),
@@ -509,9 +533,19 @@ def _build_quay_ville(tp, top, far):
     bords sauf le joint de la jetée ; le garde-corps de la jetée (0,9 m, montants tous les 2,4 m, main courante et
     lisse) continué sur le quai nord et autour de l'encoche."""
     P = land_polygon()
+    # sous le raccord du pied de la rampe (de son pied à z = 0, chaussée du pont comprise), pas de dalle : la
+    # chaussée bombée du pont y est le sol (plus bas que 0 vers ses bords, elle passerait sous la dalle). Sous la
+    # rampe elle-même, la dalle reste, sous le tablier, entre les murs de soutènement du pont
+    import scene_c
+    foot, toe = ramp_ys()
+    bx = bridge_x()
+    xl, xr = bx - scene_c.HALF, bx + scene_c.HALF
+    pieces = [[(X0, toe), (X1, toe)] + P[2:], [(X0, Y0), (xl, Y0), (xl, toe), (X0, toe)],
+              [(xr, Y0), (X1, Y0), (X1, toe), (xr, toe)], [(xl, Y0), (xr, Y0), (xr, foot), (xl, foot)]]
     bm = L.bmesh.new()
-    face = bm.faces.new([bm.verts.new((x, y, top)) for x, y in P])
-    L.bmesh.ops.triangulate(bm, faces=[face])
+    for pc in pieces:
+        face = bm.faces.new([bm.verts.new((x, y, top)) for x, y in pc])
+        L.bmesh.ops.triangulate(bm, faces=[face])
     slab = L.mesh_object("port_terre_plein", bm, [tp])
     wall = bpy.data.materials.get("quai_pierre") or L.mat_quay("quai_pierre")
     cop = bpy.data.materials.get("couronnement") or L.mat_coping("couronnement")
@@ -953,12 +987,19 @@ def build_containers(hidden, far=False, numbers_near=None):
     srcs = container_sources(hidden)
     yd = Yard(srcs, numbers_near=None if far else numbers_near, colors=BOX_COLORS if far else BOX_MUTED)
     W = srcs["40"][2] + BOX_GAP
+    # en ville unique, la rampe du pont passe au-dessus du terre-plein jusqu'à son pied (ramp_ys) : les deux murs
+    # qui bordaient la voie plate du pont n'en gardent que ce qui est au-delà du pied (le gauche, de y 10 à 34,5,
+    # disparaît ; le droit commence au pied) ; rien sous la rampe ni contre ses parapets
+    foot = ramp_ys()[0] if VILLE else None
     for i in range(2):                               # le mur droit (x < 0, à gauche de la voiture qui arrive)
-        yd.row(-10.0 - W / 2 - i * W, 10.0, ["40", "20", "40", "40"], (4, 5) if i == 0 else 4, top_gaps=0.12)
+        if VILLE:
+            yd.row(-10.0 - W / 2 - i * W, foot + 0.3, ["40"], (4, 5) if i == 0 else 4, top_gaps=0.12)
+        else:
+            yd.row(-10.0 - W / 2 - i * W, 10.0, ["40", "20", "40", "40"], (4, 5) if i == 0 else 4, top_gaps=0.12)
     for i in range(2):                               # le mur droit prolongé au nord jusqu'à la file qui ferme l'axe :
         # dans l'axe du panoramique de P5, il tient le haut du cadre et l'hélicoptère en sort
         yd.row(-10.0 - W / 2 - i * W, 54.0, ["40", "40"], (4, 5), top_gaps=0.1)
-    for i in range(2):                               # le mur gauche (x > 0), raccourci
+    for i in range(0 if VILLE else 2):               # le mur gauche (x > 0), raccourci
         yd.row(10.0 + W / 2 + i * W, 10.0, ["40", "40"], (4, 5), top_gaps=0.15)
     yd.row(-30.0, CLOSE_WALL_Y, CLOSE_WALL_KEYS, 3, along_x=True, top_gaps=0.15)
     for i in range(4):                               # à l'ouest de la voie du pont, derrière le portique
@@ -1358,8 +1399,15 @@ def wheelbase(wheels, fwd=Vector((0.0, -1.0, 0.0))):
 
 
 def deck_ground(x, y):
-    """Le sol sous un véhicule de la meute : le tablier et sa pente sur la rampe, le terre-plein plat ensuite."""
+    """Le sol sous un véhicule : le tablier et sa pente sur la rampe, le terre-plein plat ensuite. En ville unique,
+    le point est porté dans la scène du pont par la pose : la chaussée bombée du pont jusqu'à la fin du raccord du
+    pied (scene_c.Y_TOE), entre ses parapets ; le terre-plein ailleurs."""
     import scene_c
+    if VILLE:
+        xc, yc = e_to_c(x, y)
+        if abs(xc) > BRIDGE_EDGE or yc >= scene_c.Y_TOE:
+            return 0.0, 0.0
+        return scene_c.deck_z(yc) + road.road_z(xc), math.degrees(math.atan(scene_c.deck_slope(yc)))
     z = scene_c.deck_z(y) + (road.road_z(x) if y < -20.0 else 0.0)
     return z, math.degrees(math.atan(scene_c.deck_slope(y)))
 
@@ -1502,6 +1550,10 @@ def plan_P5(scene, hidden, palier="conteneurs"):
     if not VILLE:
         scene_c.build_bridge(hidden, lamp_src, haubans=True)
     build_port(hidden, lamp_src, far=False, palier=palier)
+    # la caméra de P5/1 roule encore sur la rampe (y_E 34, tablier à 0,44 m) : le bras garde ses 2,4 m au-dessus
+    # de la chaussée
+    P5.GROUND = deck_ground if VILLE else None
+    P5.reset()
     if VILLE:
         d, nm = jetty_clearance()
         print(f"[port] le décor le plus près de l'emprise de la jetée (y_D 300 à 400, ±J_EDGE) : {nm}, à {d:.2f} m",
@@ -1513,7 +1565,8 @@ def plan_P5(scene, hidden, palier="conteneurs"):
     wb = wheelbase(wheels)
     poses = M.sample(P5.hero_pos, FRAMES, heading=P5.hero_heading, steer=P5.hero_steer, wheel_r=hero["wheel_r"],
                      wheelbase=wb)
-    M.key_vehicle(hero, poses, wheels=wheels)
+    # en ville, P5/1 est encore sur le raccord du pied de la rampe (z 9 cm, nul vers l'image 9)
+    M.key_vehicle(hero, poses, wheels=wheels, ground=deck_ground if VILLE else None)
     M.wheel_marks(wheels, hero["wheel_r"])                # le repère de rotation, en Workbench seulement
     # les feux stop sur chaque fenêtre de freinage à plus de 2 m/s², après la mise en clés (découpage v3.1)
     import hero_cars

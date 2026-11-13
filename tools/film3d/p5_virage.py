@@ -315,9 +315,15 @@ def cam_d(t):
     return math.hypot(CAM_BACK, cam_left(t))
 
 
+# le sol sous la caméra, (x, y) -> (z, pente), posé par la scène (scene_e en ville unique : la rampe du pont, où la
+# caméra de P5/1 roule encore) ; None : le terre-plein plat. Après l'avoir changé, appeler reset()
+GROUND = None
+
+
 def cam_pos(t):
-    """(x, y, z) de la caméra : le bras du parcours."""
-    return PC.camera("P5", _f(t))
+    """(x, y, z) de la caméra : le bras du parcours, à sa hauteur au-dessus du sol (GROUND)."""
+    x, y, z = PC.camera("P5", _f(t))
+    return (x, y, z + GROUND(x, y)[0]) if GROUND else (x, y, z)
 
 
 CAM = cam_pos(0.0)            # la caméra à la première image
