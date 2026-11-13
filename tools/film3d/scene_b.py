@@ -199,8 +199,10 @@ if VILLE:
 # berline, blanc chaud à droite (jamais corail ni violet rose : les rampes) ; le côté du boulevard, sans fenêtres
 # dans le dessin, reçoit un parement de fenêtres procédurales (lieux.mat_city), vu seulement depuis le pont
 TOUR_FLOORS = 6
-TOUR_BAND = {1: "#ffc36b", -1: "#fff1d6"}       # côté de vue : -1 (x_vue < 0) est à droite de la berline
-TOUR_BAND_W = 4.0                               # force d'émission du bandeau (à régler avec la lumière)
+TOUR_BAND = {1: "#ffb85c", -1: "#ffd9a8"}       # côté de vue : -1 (x_vue < 0) est à droite de la berline
+# lumière v3.1 : à 4, blancs, les deux bandeaux étaient les objets les plus lumineux de P4, devant la berline ; au
+# quart et réchauffés, ils restent des enseignes du quai, sous elle
+TOUR_BAND_W = 1.0
 
 
 def log(*a):
