@@ -465,14 +465,20 @@ def zones():
     import lieux as L
     import scene_b as B
     import scene_f as F
+    import scene_c as C
     (px0, px1), (py0, py1) = L.PORT_XS, L.PORT_YS
     m = 3.0
+    ville = L.ville_on() and getattr(C, "Y_TOE", None) is not None
+    y_lo = min(L.BRIDGE_Y[0], C.Y_CITY_END) if ville else L.BRIDGE_Y[0]
+    y_hi = C.Y_TOE if ville else py0 - 1e-6
     return {
         "avenue": lambda x, y: True,
         "rond-point": lambda x, y: abs(x) <= F.L + m and abs(y) <= F.L + m,
         # la rue, le boulevard du quai, le mur du quai et ses lampadaires : jusqu'à 1 m au-delà du quai (S_BRIDGE)
         "rue": lambda x, y: B.S_CAM - B.Y_END - m <= y <= B.S_BRIDGE + 1.0,
-        "pont": lambda x, y: L.BRIDGE_Y[0] - m <= y < py0 and abs(x - L.BRIDGE_X) <= 30.0,
+        # le pont : du quai de la ville au port ; en ville, de sa tête (scene_c.Y_CITY_END) à la fin du raccord de
+        # son pied (scene_c.Y_TOE), qui sont à lui et non des lointains
+        "pont": lambda x, y: y_lo - m <= y <= y_hi + m and abs(x - L.BRIDGE_X) <= 30.0,
         "port": lambda x, y: px0 - 15.0 <= x <= px1 + 40.0 and py0 <= y <= py1 + m,
         "jetee": lambda x, y: y >= L.JETTY_YS[0] - m and abs(x - L.JETTY_X) <= 80.0,
     }
