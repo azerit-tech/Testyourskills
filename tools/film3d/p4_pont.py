@@ -31,6 +31,7 @@ STILL_FRAME = 24
 T_STILL = M.t_of(STILL_FRAME)
 Y_CREST = -130.0
 SITE_AIM = (0.545, 0.545)     # le centre de la berline à 54,5 % de la hauteur depuis le haut (52 à 56)
+PORT_FRAMES = (34, 42)        # la lumière ambre du port monte sur sa calandre (lumière v3.1, P4 : images 36 à 48)
 
 # La meute, désordonnée et pas en bloc (« le nombre qui écrase ») : chacun à son rythme, qui louvoie, se jette en
 # avant puis lâche un peu. v3.1 (une voiture qui roule vrai) : des louvoiements de 3 à 3,6 s et de 0,4 m au plus

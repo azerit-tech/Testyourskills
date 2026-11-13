@@ -291,6 +291,22 @@ def place_on_deck(rig, x, y, heading=0.0):
 # ---------------------------------------------------------------- le plan
 
 SPEED = 30.0          # m/s, pleine vitesse (108 km/h)
+P4_FACE_W = 2000.0    # W, l'appoint de face de la berline (lieux.car_fill, lié à elle seule)
+P4_PORT_W = 900.0     # W, la lumière ambre du port sur sa calandre en fin de plan (port_glow)
+
+
+def port_glow(hero, frames):
+    """La lumière ambre du port (ses mâts, derrière la caméra) qui lèche la calandre de la berline quand elle
+    approche du pied du pont (plan de lumière v3.1, P4, images 36 à 48) : une source douce ambre liée à elle seule
+    (lieux.car_fill : invisible, sans reflet, le tablier ne la reçoit pas), devant elle, haute et sur sa droite,
+    qui monte de 0 à P4_PORT_W entre les deux images de `frames`. Renvoie la lumière."""
+    f0, f1 = frames
+    lo = L.car_fill(hero, loc=(-3.0, 9.0, 5.0), energy=P4_PORT_W, color=L.AMBER, size=6.0)
+    lo.name = lo.data.name = "hero_port"
+    for f, e in ((f0, 0.0), (f1, P4_PORT_W)):
+        lo.data.energy = e
+        lo.data.keyframe_insert("energy", frame=f)
+    return lo
 
 
 def pack(entries, speed=SPEED, beams=True, on=None):
@@ -344,8 +360,10 @@ def plan_P4(scene, hidden, haubans=False):
     M.wheel_marks(wheels, hero["wheel_r"])
     # à contre-jour des lampadaires et des patrouilles, la berline n'était qu'une silhouette noire : une source
     # douce de face, à 8 m devant elle, accrochée à son rig (elle suit les clés), qui n'éclaire qu'elle (le sol
-    # mouillé ne la reçoit pas)
-    L.car_fill(hero, loc=(0.4, 8.0, 2.2), energy=500.0)
+    # mouillé ne la reçoit pas). C'est la bande corail du ciel, derrière la caméra, sur sa calandre : à 500 W la
+    # caisse restait à 10 % (lumière v3.1, P4 : 12 à 16 %, dans la suite de P3 et P5)
+    L.car_fill(hero, loc=(0.4, 8.0, 2.2), energy=P4_FACE_W)
+    port_glow(hero, P4.PORT_FRAMES)
     y_hero = P4.hero_pos(P4.T_STILL)[1]
     entries = [(e[0], *P4.pack_pos(i)(P4.T_STILL), 0.0) for i, e in enumerate(P4.PACK)] + \
         [("van", *P4.van_pos(P4.T_STILL), 0.0)]
