@@ -472,7 +472,9 @@ def test_p3():
     des plots dans le cadre tant qu'il est à plus de 3 m devant la caméra (de 2,4 m, plus près, il passe sous le
     cadre) ; le centre de sa boîte à x 50 ± 6 %, y 58 ± 4 % depuis le haut à la première et à la dernière image ;
     la patrouille 1 n'entre pas dans la rue : arrêtée dans le rond-point là où P2 la laisse, hors du cadre tout le
-    plan, 1,2 m au moins avant les panneaux du barrage ; feux stop sur les images où la berline freine à plus de
+    plan, 1,2 m au moins avant les panneaux du barrage ; la patrouille 2 reprend exactement son état de P2/111,
+    poursuit derrière la caméra (hors du cadre, 4,5 m au moins de l'objectif, 1,2 m d'air avec tout, dans les limites
+    de conduite) et s'arrête devant le barrage ; feux stop sur les images où la berline freine à plus de
     2 m/s² ; éclairs d'une ou deux images."""
     import p3_enseignes as P
     import parcours as PC
@@ -570,6 +572,46 @@ def test_p3():
           f"dans le cadre aux images {inn[:6]}")
     check("P3 : la patrouille 1 arrêtée avant le barrage, 1,2 m d'air au moins", front <= panel,
           f"l'avant à y {front:.2f} (panneaux moins {P.CHASE_AIR} m d'air : {panel:.2f})")
+    # la patrouille 2 poursuit la berline depuis son état exact de P2/111, derrière la caméra, et s'arrête devant le
+    # barrage (le trou des plots laisse 0,36 m d'air de chaque côté de sa caisse)
+    D = P2._p2()
+    rot = PC.ANCHOR["P2"][2] - PC.ANCHOR["P3"][2]
+    gap = []
+    for f in (P.F0 - 1, P.F0):
+        t = M.t_of(f)
+        x2, y2 = PC.placer("P3")[0](*PC._to_route("P2")(*D.pos(t2 + t)))
+        gap.append(max(math.dist((x2, y2), P.patrol2_pos(t)), abs(P.patrol2_heading(t) - D.heading(t2 + t) - rot),
+                       abs(P.patrol2_speed(t) - D.speed(t2 + t)), abs(P.patrol2_accel(t) - D.along(t2 + t))))
+    check("P3 : la patrouille 2 reprend P2/111 exactement (place, cap glisse comprise, vitesse, accélération)",
+          max(gap) < 1e-9, f"écart {max(gap):.1e}")
+    inn = P.patrol2_in_frame(range(P.F0 - 24, P.F0 + P.FRAMES + 24))
+    p2c = P.patrol2_clearances(range(P.F0 - 1, int(P.P2_STOP * M.FPS) + P.F0 + 13))   # jusqu'à son arrêt
+    lens = p2c.pop("objectif")
+    check("P3 : la patrouille 2 hors du cadre tout le plan, 4,5 m au moins de l'objectif",
+          not inn and lens[0] >= P.P2_LENS, f"images {inn[:6]}, {lens[0]:.2f} m à l'image {lens[1]:.2f}")
+    n, (dm, fm) = min(p2c.items(), key=lambda kv: kv[1][0])
+    check("P3 : la patrouille 2 à 1,2 m au moins de tout (barrage, plots, caisses, garées, patrouille 1, bordures)",
+          dm >= P.P2_AIR, f"{dm:.2f} m de {n} à l'image {fm:.2f}")
+    dt = 1.0 / 480
+    ts = [k * dt for k in range(int(round((P.P2_STOP + 0.5) / dt)))]
+    acc = [P.patrol2_accel(t) for t in ts]
+    jerk = max(abs(b - a) / dt for a, b in zip(acc, acc[1:]))
+    ps = [P.patrol2_pos(t) for t in ts[::4]]
+    lat = 0.0
+    for a, b, c in zip(ps, ps[1:], ps[2:]):
+        u, w = (b[0] - a[0], b[1] - a[1]), (c[0] - b[0], c[1] - b[1])
+        nu, nw = math.hypot(*u), math.hypot(*w)
+        if min(nu, nw) * M.FPS * 5 > 0.5:                          # v > 0,5 m/s (pas de 1/120 s)
+            turn = math.asin(max(-1.0, min(1.0, (u[0] * w[1] - u[1] * w[0]) / (nu * nw))))
+            lat = max(lat, abs(turn) * (nw * 120.0) ** 2 / nw)
+    check("P3 : la conduite de la patrouille 2 dans les limites (accélération 3, freinage 7, à-coup 12, latérale 6,5)",
+          max(acc) <= 3.0 and min(acc) >= -7.0 and jerk <= 12.0 and lat <= 6.5,
+          f"{max(acc):.2f} / {min(acc):.2f} m/s², à-coup {jerk:.1f} m/s³, latérale {lat:.2f} m/s²")
+    stop = P.patrol2_pos(P.P2_STOP + 1.0)
+    still = all(P.patrol2_pos(P.P2_STOP + k * 0.25) == stop for k in range(1, 9))
+    check("P3 : la patrouille 2 s'arrête devant le barrage et y reste",
+          still and stop[1] + P.P2_HALF[0] + P.P2_AIR <= P.CONE_LINE,
+          f"centre à y {stop[1]:.2f}, à l'image {P.P2_STOP * M.FPS + P.F0:.1f}, l'avant à y {stop[1] + P.P2_HALF[0]:.2f}")
     lamps = P.brake_windows()
     on = {f for a, b in lamps for f in range(a, b + 1)}
     hard = {f for f in shown if P._accel(M.t_of(f)) < -2.0}

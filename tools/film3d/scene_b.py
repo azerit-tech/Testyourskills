@@ -104,7 +104,7 @@ PLANS = {
     # ils se mettent à couvert (fire : éclairs). yaw : lacet de départ en degrés (positif : vers -x de vue).
     "P3": dict(cam=(*vw(_C[0], _C[1]), _C[2]), lens=P3.LENS, shift_y=0.0, yaw=180.0, fstop=4.0,
                focus=(*vw(*_H), 0.8), hero=(*vw(*_H), P3.hero_heading(P3.T_STILL)), chase=vw(*_K), barrage=8.0,
-               fire=True),
+               fire=True, patrol2=vw(*P3.patrol2_pos(P3.T_STILL))),
 }
 
 # Les quatre dessins de la rue (§2.4 : la boutique d'angle, le petit hôtel, l'Art déco d'angle, le bloc bas), ceux
@@ -179,9 +179,9 @@ MOTEL_RUE = MOTEL      # (la table des enseignes en potence s'écarte toujours d
 SPANS = [-24.0, -13.0, 2.5, 13.0, 20.5, 28.0, 36.5, 46.0, 57.0, 70.0, 84.0, 100.0, 116.0]
 # lampadaires tous les 30 m en quinconce : (côté, y de vue)
 LAMPS = [(1, -14.0), (-1, 16.0), (1, 46.0), (-1, 76.0), (1, 106.0)]
-# les voitures garées, d'un seul côté (x > 0 en vue), derrière le départ de P3 : celles d'y de vue 59, 45,5, 32
-# et 23 (y monde 75 à 111) sont retirées, la patrouille 1 roule dans leur voie jusqu'au barrage
-PARKED = [86.0, 99.5, 113.0]
+# les voitures garées, d'un seul côté (x > 0 en vue, à gauche de la berline), en y de vue : p3_enseignes.PARKED_Y
+# (celles d'y monde 75 à 111 reviennent : la patrouille 2 roule au milieu de la rue, plus personne dans leur voie)
+PARKED = [S_CAM - y for y in P3.PARKED_Y]
 
 # En ville : la rue de 71 m du rond-point au boulevard. LEFT garde ses cinq premiers dessins, le cinquième (y_vue 32
 # à 44) ramené à 11 m pour ne pas passer le joint ; RIGHT ses quatre premiers et le cinquième (34 à 52) ramené à
@@ -861,7 +861,7 @@ def build_furniture(M, hidden):
         src = A.parked_wagon_source(hidden)
         tints = ["#5a2633", "#2b4756", "#b9a47c", "#34343a", "#3f5a3e", "#6b5a7a"]
         for k, y in enumerate(PARKED):
-            inst = A.instance(src, f"rue_parked_{k}", (HALF - 1.05, y, 0.0), math.pi)
+            inst = A.instance(src, f"rue_parked_{k}", (-P3.PARKED_X, y, 0.0), math.pi)
             inst.color = (*lin(tints[k % len(tints)])[:3], 1)
 
 
@@ -1105,7 +1105,7 @@ def stall(name, x0, x1, y0, y1, wood, tarp, metal):
 def build_sidewalk(hidden):
     """À hauteur de voiture, là où la caméra regarde : bornes le long des bordures avant le barrage, étals fermés
     et vélos sur les trottoirs, une pile de palettes et de cageots de livraison au bord de la voie de droite (la
-    berline la frôle dans sa feinte : p3_enseignes.CRATES), deux chevalets de café."""
+    berline et la patrouille 2 passent à côté : p3_enseignes.CRATES), deux chevalets de café."""
     import facade_proc as C
     P = lib_parts("lieux/rue/street-pack/model.glb", {
         "borne_src": lambda o, c: o.name.startswith("Bollard_lp"),
@@ -1484,7 +1484,7 @@ def build_barrage(scene, hidden, plan):
     body = pat["body"]
     doors, front_axle, hw = cut_doors(body)
     shells = [c for c in bpy.data.collections if c.name.endswith("_glow_exclude")]
-    cars = [body] + [unshare_lights(dup_tree(body, None, tag)) for tag in ("b", "c")]
+    cars = [body] + [unshare_lights(dup_tree(body, None, tag)) for tag in ("b", "c", "d")]
     # les lueurs de rampe excluent la rampe (liaison de lumière) : les copies y sont entrées aussi
     for sh in shells:
         for co in sh.collection_objects:
@@ -1529,14 +1529,17 @@ def build_barrage(scene, hidden, plan):
         for lo in car.children_recursive:
             if lo.type == "LIGHT" and "_head_" in lo.name:
                 lo.data.energy = 120.0
-    # la troisième, la patrouille 1 (p3_enseignes.chase_pos : au bord gauche du cadre à l'image 1)
-    far = cars[2]
-    cx, cy = plan["chase"]
-    far.location = (cx, cy, road.road_z(abs(cx)))
-    far.rotation_euler = (0, 0, heading_rot(0.06, -1.0))
-    for ch in far.children:
-        if "_door_" in ch.name:
-            ch.rotation_euler = (0, 0, 0)
+    # la troisième, la patrouille 1 (p3_enseignes.chase_pos : arrêtée dans le rond-point, hors du cadre), et la
+    # quatrième, la patrouille 2 (p3_enseignes.patrol2_pos : derrière la caméra), posées à l'image fixe, tournées de
+    # leur cap (le rig de plan_P3 garde la caisse comme elle est posée : cap du repère monde, 0 vers +y, vu ici vers
+    # -y) ; leurs phares aux codes communs (cast_vehicles.HEAD_W, ceux du modèle), portières fermées
+    for far, (cx, cy), cap in ((cars[2], plan["chase"], P3.chase_heading(P3.T_STILL)),
+                               (cars[3], plan["patrol2"], P3.patrol2_heading(P3.T_STILL))):
+        far.location = (cx, cy, road.road_z(abs(cx)))
+        far.rotation_euler = (0, 0, heading_rot(math.sin(math.radians(cap)), -math.cos(math.radians(cap))))
+        for ch in far.children:
+            if "_door_" in ch.name:
+                ch.rotation_euler = (0, 0, 0)
     # les lueurs colorées des rampes (celles du modèle, 600 W à 0,4 m de la rampe) : la berline passe à 1,5 m, elles la teintaient de corail puis de lilas ; la liaison l'en retire. (Plus de lueurs à part, bar_glow : copiées des rampes, les lumières des trois patrouilles
     # partagent leurs données et clignotent ensemble ; les lueurs à part battaient à contretemps de leurs optiques.)
     glows = [o for car in cars[:2] for o in car.children_recursive if o.type == "LIGHT" and "_glow_" in o.name]
@@ -1726,8 +1729,20 @@ def plan_P3(scene):
                                     wheelbase=far.get("wheelbase", 2.9), front=far.get("front_axle")),
                    wheels=wh, pivot=(0.0, 0.0, 0.36))
     MO.wheel_marks(wh, wr, axis="Y")
-    # --- les rampes : 2 Hz corail / lilas
-    n_bars = MO.flash_bars([ob["patrol_a"], ob["patrol_a_b"], rig_c], frames)
+    # --- la patrouille 2 : la poursuivante de P2, derrière la caméra (p3_enseignes.patrol2_pos, glisse comprise
+    # dans son cap)
+    p2c = ob["patrol_a_d"]
+    rig_d = MO.rig_up(p2c, P3.patrol2_heading(P3.T_STILL), name="rig_patrol_2")
+    wh, wr = MO.wheels_of(p2c), p2c.get("wheel_r", 0.36)
+    MO.key_vehicle(rig_d, MO.sample(P3.patrol2_pos, frames, heading=P3.patrol2_heading, wheel_r=wr, seed=3.0,
+                                    wheelbase=p2c.get("wheelbase", 2.9), front=p2c.get("front_axle")),
+                   wheels=wh, pivot=(0.0, 0.0, 0.36))
+    MO.wheel_marks(wh, wr, axis="Y")
+    # --- les rampes : 2 Hz corail / lilas ; celles des patrouilles 1 et 2 dans la phase où P2 les laisse
+    # (scene_carrefour : patrouille 1 puis 2, décalées de cinq images, la phase continue à la coupe)
+    n_bars = MO.flash_bars([ob["patrol_a"], ob["patrol_a_b"]], frames)
+    for k, r in enumerate((rig_c, rig_d)):
+        n_bars += MO.flash_bars([r], frames, shift=P3.P2_FRAMES + 5 * k)
     # --- les tirs : flamme (trois maillages) et éclair ponctuel allumés une image, cachés sinon
     for k in P3.SHOTS:
         parts = [o for o in ob if o.name.startswith(f"muzzle_flash_{k}_")] + [ob[f"muzzle_{k}"]]
