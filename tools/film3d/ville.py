@@ -449,7 +449,8 @@ def inventory(scene):
 # Ce que la ville ne reprend pas d'un lieu (les objets de tête et toute leur descendance) : les caméras, les véhicules
 # du plan (les rigs de lieux.rig, qui portent « body » ; la berline et la patrouille de l'avenue, « coupe » et
 # « police »), les personnages (toute descendance qui a une armature). Les voitures garées restent : c'est du décor.
-CAST = re.compile(r"^(hero|coupe|police|patrol|van|heli|jet|officer|agent|focus)([_.:]|$)")
+# les véhicules, les personnages et ce qu'ils laissent (wake : les traces de pneus de la berline d'un plan)
+CAST = re.compile(r"^(hero|coupe|police|patrol|van|heli|jet|officer|agent|focus|wake)([_.:]|$)")
 # Les faux lointains de chaque lieu : ce qui imite un autre lieu ou l'horizon. Deux règles, sur l'objet de tête :
 # son nom (le panorama de lieux.panorama, le phare lointain, les brumes), puis sa place dans la scène du lieu (le
 # centre de sa boîte hors de la zone propre du lieu, zones() : le fond de rue de la rue, le rond-point au bout de
@@ -1284,7 +1285,9 @@ def worker_carte(a, noms):
         o.hide_render = True
     rx = [p[1] for p in prof] + [v[0] for v in sol.values()]
     ry = [p[2] for p in prof] + [v[1] for v in sol.values()]
-    near = portrait((min(rx) - 60, min(ry) - 60, max(rx) + 60, max(ry) + 60))
+    # en bas, la place de la légende (un huitième de la hauteur) ; autour, celle des noms de lieux
+    h0 = max(ry) - min(ry) + 120
+    near = portrait((min(rx) - 90, min(ry) - 60 - 0.14 * h0, max(rx) + 90, max(ry) + 60))
     annoter(scene, near, max(6.0, (near[3] - near[1]) / 110.0), noms, a.legende or legende_defaut())
     rendre_carte(scene, near, os.path.join(a.out, "carte-route.png"))
     rendre_carte(scene, near, os.path.join(a.out, "carte-route-transparence.png"), xray=True)
