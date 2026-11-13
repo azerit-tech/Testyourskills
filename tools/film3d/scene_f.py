@@ -58,13 +58,9 @@ L = 46.0                     # demi-côté du décor : 30 m de branche au-delà 
 # les branches : (nom, direction vers l'extérieur en degrés, demi-largeur bordure à bordure)
 BRANCHES = [("plage", 0.0, 4.0), ("avenue_nord", 90.0, 7.0), ("enseignes", 180.0, 4.0), ("avenue_sud", 270.0, 7.0)]
 
-# Où tombe l'arc de p2_arc.py : la berline arrive par la branche sud, cap au nord, dans la voie extérieure (x = +5,
-# comme sur l'avenue de la scène A), et le virage de 30 m passe à 1,5 m de la bordure de l'îlot. Le centre du
-# virage est donc à 30 + 6 + 1,5 = 37,5 m du centre de l'îlot ; sa sortie tombe dans la voie de la rue des
-# enseignes qui s'éloigne du rond-point (y = +2).
-_D = P.R + R_ISLAND + 1.5
-_CX = 5.0 - P.R
-POSE = (5.0, -math.sqrt(_D ** 2 - _CX ** 2), 0.0)
+# Le plan P2 (p2_arc.py) est écrit dans le repère de cette scène (la fenêtre « P2 » du parcours, posée par son ancre) :
+# aucune pose à ajouter.
+POSE = (0.0, 0.0, 0.0)
 # les flaques de la voie extérieure (degré, rayon, taille, allongement), faites pour la caméra à 9 m : la caméra A2
 # roule dessus (r 12,5 à 13 de l'îlot, 215 à 235°), elles faisaient le miroir noir du bas du cadre ; retirées
 OUTER_PUDDLES = ()           # v2 : ((240, 13.4, 1.2, 2.0), (228, 14.0, 0.9, 1.7), (216, 13.2, 1.3, 2.2))
@@ -142,14 +138,19 @@ def branch_rot(phi):
 
 # ---------------------------------------------------------------- l'anneau
 
-def revolve(name, prof, rc, mat, gaps=(), step=1.0, flip=False):
-    """Un profil (x, z) de road.py tourné autour de l'îlot : rayon rc + x. Carte UV en mètres : u = x (en travers),
-    v = longueur d'arc sur l'axe. gaps : [(direction en degrés, demi-ouverture en degrés)], les bouches des
-    branches où la pièce s'interrompt."""
+def gap_spans(gaps):
+    """Les arcs (degrés, de s0 à s1) entre les bouches gaps = [(direction, demi-ouverture)]."""
     g = sorted(gaps)
-    spans = [(0.0, 360.0)] if not g else \
+    return [(0.0, 360.0)] if not g else \
         [(phi + d, g[(i + 1) % len(g)][0] + (360.0 if i + 1 == len(g) else 0.0) - g[(i + 1) % len(g)][1])
          for i, (phi, d) in enumerate(g)]
+
+
+def revolve(name, prof, rc, mat, gaps=(), step=1.0, flip=False, spans=None, centre=(0.0, 0.0)):
+    """Un profil (x, z) de road.py tourné autour de l'îlot (ou de centre) : rayon rc + x. Carte UV en mètres : u = x
+    (en travers), v = longueur d'arc sur l'axe. gaps : [(direction en degrés, demi-ouverture en degrés)], les bouches
+    des branches où la pièce s'interrompt ; spans : les arcs eux-mêmes (degrés), à la place."""
+    spans = spans or gap_spans(gaps)
     me = bpy.data.meshes.new(name)
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new("UVMap")
@@ -172,8 +173,19 @@ def revolve(name, prof, rc, mat, gaps=(), step=1.0, flip=False):
         me.flip_normals()
     ob = bpy.data.objects.new(name, me)
     bpy.context.collection.objects.link(ob)
+    ob.location = (centre[0], centre[1], 0.0)
     me.materials.append(mat)
     return ob
+
+
+def ring_spans(gaps):
+    """Les arcs de la cunette et de la bordure extérieures : entre les bouches, et en ville, au coin sud-ouest,
+    seulement entre les deux évasements (p2_arc.flare, p2_arc.entry_flare : leurs tangences sur l'anneau)."""
+    spans = gap_spans(gaps)
+    if not VILLE:
+        return spans
+    a_out, a_in = P.flare()[2] + 180.0, P.entry_flare()[2] + 180.0
+    return [(a_out, a_in) if s0 < 225.0 < s1 else (s0, s1) for s0, s1 in spans]
 
 
 def build_ring(hidden):
@@ -190,8 +202,8 @@ def build_ring(hidden):
     revolve("ring_gutter_in", road.pan_profile(-1), RING_MID, pan)
     gp = [(phi, math.degrees(math.asin(h / (R_OUT - 0.25)))) for _, phi, h in BRANCHES]
     gk = [(phi, math.degrees(math.asin((h + road.KERB) / (R_OUT + 0.1)))) for _, phi, h in BRANCHES]
-    revolve("ring_gutter_out", road.pan_profile(1), RING_MID, pan, gp)
-    revolve("ring_kerb_out", road.kerb_profile(1), RING_MID, kerb, gk)
+    revolve("ring_gutter_out", road.pan_profile(1), RING_MID, pan, spans=ring_spans(gp))
+    revolve("ring_kerb_out", road.kerb_profile(1), RING_MID, kerb, spans=ring_spans(gk))
     # l'îlot : bordure haute de 45 cm, terre sombre, un couvre-sol bas
     A.cyl("island_kerb", (0, 0, -0.05), (0, 0, ISLAND_H), R_ISLAND, kerb, seg=96)
     A.cyl("island_soil", (0, 0, 0.0), (0, 0, ISLAND_H + 0.02), R_ISLAND - 0.22,
@@ -241,8 +253,13 @@ def build_branches(kerb):
         end = branch_end(name)
         road.strip(f"{name}_road", road.road_profile(), y_road, end, asphalt, rot=rot)
         for side in (-1, 1):
-            road.strip(f"{name}_gutter_{side}", road.pan_profile(side), y_pan, end, pan, rot=rot)
-            road.strip(f"{name}_kerb_{side}", road.kerb_profile(side), y_kerb, end, kerb, smooth_faces=True, rot=rot)
+            y0p, y0k = y_pan, y_kerb
+            if VILLE and (name, side) == ("enseignes", -1):        # l'évasement de sortie va jusqu'à la jonction
+                continue
+            if VILLE and (name, side) == ("avenue_sud", 1):        # l'évasement d'entrée : depuis sa tangence
+                y0p = y0k = -P.entry_flare()[1]
+            road.strip(f"{name}_gutter_{side}", road.pan_profile(side), y0p, end, pan, rot=rot)
+            road.strip(f"{name}_kerb_{side}", road.kerb_profile(side), y0k, end, kerb, smooth_faces=True, rot=rot)
         # le passage piéton, bandes parallèles à la circulation, 3,2 m de long ; en ville, reculé vers l'anneau pour
         # finir avant la jonction, et pas de passage s'il n'y tient pas à 1,5 m de l'anneau (la branche ouest)
         y0 = min(y_kerb + 2.6, end - 3.3)
@@ -282,7 +299,9 @@ def build_walks():
         t2 = math.sqrt(rk ** 2 - (h2 + road.KERB) ** 2)
         pts = []
         n = 48
-        for k in range(n + 1):
+        if VILLE and (n1, n2) == ("enseignes", "avenue_sud"):
+            pts = sw_walk_edge()
+        for k in range(0 if not pts else n + 1, n + 1):
             t = math.radians(phi1 + d1 + (phi2 - d2 - phi1 - d1) * k / n)
             pts.append(Vector((rk * math.cos(t), rk * math.sin(t), 0)))
         # le long de la bordure de la branche 2 (son côté -n), jusqu'au bord du décor
@@ -312,6 +331,68 @@ def build_walks():
     ground = A.mat_plain("ground_dark", lin("#121214"), 0.8)
     A.box("ground", -160, 7.2 + AV_WALK, -160, NORTH_END, -0.6, -0.25, ground)
     A.box("ground_e", 7.2 + AV_WALK, SEA_X + 0.35, -160, L + 0.35, -0.6, -0.25, ground)
+
+
+def _arc(cx, cy, r, a0, a1, n=24):
+    return [Vector((cx + r * math.cos(math.radians(a0 + (a1 - a0) * k / n)),
+                    cy + r * math.sin(math.radians(a0 + (a1 - a0) * k / n)), 0.0)) for k in range(n + 1)]
+
+
+def sw_walk_edge():
+    """Le dos des bordures du coin sud-ouest en ville, de la rue des enseignes à l'avenue sud : l'évasement de sortie,
+    l'anneau entre les deux tangences, l'évasement d'entrée."""
+    cx, cy, a_f = P.flare()
+    ex, ey, a_e = P.entry_flare()
+    rk = R_OUT + road.KERB
+    return (_arc(cx, cy, P.FLARE_R - road.KERB, 90.0, a_f) + _arc(0.0, 0.0, rk, a_f + 180.0, a_e + 180.0, 12)[1:]
+            + _arc(ex, ey, P.ENTRY_R - road.KERB, a_e, 0.0)[1:])
+
+
+def build_flares(kerb):
+    """En ville, les deux évasements du coin sud-ouest (p2_arc.flare, p2_arc.entry_flare) : la bordure de sortie vers
+    la rue des enseignes, tangente à l'anneau et au bord de la rue (la berline y passait à 2 cm du nez), et celle
+    d'entrée depuis l'avenue sud (la patrouille 1 s'y arrête) ; chacun sa bordure et sa cunette en arc (les profils
+    de road.py retournés : la chaussée est hors du cercle), et l'enrobé qui comble le coin entre l'anneau, la branche
+    et la cunette, à la cote du bord de l'enrobé, dans la matière de la branche (posé dans son repère)."""
+    if not VILLE:
+        return
+    pan = bpy.data.materials["gutter_pan_ring"]
+    a_in = RING_HALF - road.PAN + RING_MID             # 14,5 m : le bord de l'enrobé de l'anneau
+    for key, (cx, cy, a_t), r, h, (a0, a1), phi in (
+            ("sortie", P.flare(), P.FLARE_R, 4.0, (P.flare()[2], 90.0), 180.0),
+            ("entree", P.entry_flare(), P.ENTRY_R, 7.0, (0.0, P.entry_flare()[2]), 270.0)):
+        a = with_half(h)
+        revolve(f"flare_{key}_gutter", road.pan_profile(-1), r + h, pan, spans=[(a0, a1)], step=0.5,
+                centre=(cx, cy))
+        revolve(f"flare_{key}_kerb", road.kerb_profile(-1), r + h, kerb, spans=[(a0, a1)], step=0.5,
+                centre=(cx, cy))
+        # l'enrobé du coin : de la tangence sur l'anneau, le long du bord de l'enrobé de l'anneau jusqu'à celui de la
+        # branche (à a de son axe), puis l'arc extérieur de la cunette de l'évasement, de sa tangence avec ce bord à
+        # sa tangence avec l'anneau
+        t_ring = a_t + 180.0
+        if phi == 180.0:          # la sortie : le bord y = −a de la rue, au sud ; l'arc de la cunette de 90° à a_t
+            t_b = 180.0 + math.degrees(math.asin(a / a_in))
+            poly = _arc(0.0, 0.0, a_in, t_ring, t_b, 16) + _arc(cx, cy, r + road.PAN, 90.0, a_t)[:-1]
+        else:                     # l'entrée : le bord x = −a de l'avenue, à l'ouest ; l'arc de 0° à a_t
+            t_b = 270.0 - math.degrees(math.asin(a / a_in))
+            poly = _arc(0.0, 0.0, a_in, t_ring, t_b, 16) + _arc(cx, cy, r + road.PAN, 0.0, a_t)[:-1]
+        mat = bpy.data.materials[f"asphalt_{int(2 * h)}m"]
+        rot = branch_rot(phi)
+        c, s = math.cos(-rot), math.sin(-rot)
+        me = bpy.data.meshes.new(f"flare_{key}_road")
+        bm = bmesh.new()
+        bm.faces.new([bm.verts.new((p.x * c - p.y * s, p.x * s + p.y * c, -road.CROWN)) for p in poly])
+        bmesh.ops.triangulate(bm, faces=bm.faces[:])
+        bm.normal_update()
+        bm.to_mesh(me)
+        bm.free()
+        if sum(q.normal.z for q in me.polygons) < 0:
+            me.flip_normals()
+        ob = bpy.data.objects.new(f"flare_{key}_road", me)
+        bpy.context.collection.objects.link(ob)
+        ob.rotation_euler = (0, 0, rot)
+        me.materials.append(mat)
+    log(f"évasements du coin sud-ouest : sortie {P.FLARE_R:g} m, entrée {P.ENTRY_R:g} m")
 
 
 # ---------------------------------------------------------------- l'îlot, les palmiers, la rue
@@ -617,6 +698,7 @@ def build(plan=None, palier=None):
     scene.collection.children.link(hidden)
     _, kerb = build_ring(hidden)
     branches = build_branches(kerb)
+    build_flares(kerb)
     build_walks()
     build_island(hidden)
     build_street_life(hidden, branches)

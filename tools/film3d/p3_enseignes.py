@@ -33,8 +33,8 @@
 # Repère : celui de scene-b.blend après scene_b.to_world (la berline roule vers +y, y = s, x positif à sa droite ;
 # le barrage à y = 126). t = 0 à la première image ; FRAMES images, 24 par seconde.
 #
-# L'émotion visée : le piège. Image 1 : le raccord de P2, la patrouille 1 au bord gauche, rampe allumée, qui freine
-# (elle sait que le piège est devant) et lâche ; le barrage au fond de la rue au-dessus du toit. La berline remet les
+# L'émotion visée : le piège. Image 1 : le raccord de P2, la patrouille 1 laissée dans le rond-point (elle n'entre
+# pas dans la rue) ; le barrage au fond de la rue au-dessus du toit. La berline remet les
 # gaz, les agents tirent et font « stop », plongent derrière leurs portières ; elle passe, la caméra à sa suite entre
 # les deux patrouilles ; à la dernière image, lancée, le quai, le pont qui monte et son pylône devant elle.
 import math
@@ -160,125 +160,44 @@ PUDDLES = [("flaque_entree", -1.05, 97.5, 0.55, 2.4), ("flaque_feinte", 1.15, 10
            ("flaque_arret", -2.3, 118.9, 0.4, 1.4), ("flaque_trottoir", 3.2, 117.0, 0.5, 2.6)]
 
 
-# --- la patrouille 1 (celle de P2) : elle entre comme elle sort de P2, à gauche de la berline, sur une route
-# parallèle à la sienne (la même sortie de rond-point, CHASE_SIDE plus à gauche), son centre CHASE_AHEAD devant
-# celui de la berline, CHASE_DV plus vite qu'elle, en freinant déjà à CHASE_A0 (elle sait que le piège est devant).
-# Hypothèse en attendant la sortie de P2 portée : en fin de P1 elle est 3,45 m à gauche et 3,0 m devant, à la vitesse
-# de la berline. La rue de 8 m ne laisse que CHASE_SIDE (sa caisse à 0,2 m de la bordure, 1,27 m d'air avec la
-# berline). 3 m devant à 13,2 m/s, elle ne s'arrête avant les panneaux du barrage avec CHASE_AIR d'air que si elle
-# freine déjà à fond à la coupe (à l'accélération de la berline, il lui faudrait 17,2 m : elle n'en a que 12,6) :
-# P2 installe le freinage (à-coup CHASE_JERK jusqu'à CHASE_BRAKE, 0,68 s avant la coupe), P3 le tient, puis le
-# relâche pour finir arrêtée. Rampe dans le cadre à gauche jusqu'à l'image 19, elle sort par la gauche à mi-hauteur
-# et s'arrête dans sa voie avant les panneaux. Les voitures garées de sa voie sont retirées (scene_b.PARKED)
-CHASE_SIDE, CHASE_AHEAD, CHASE_DV = 3.2, 3.0, 0.0
-CHASE_BRAKE, CHASE_JERK = 6.95, 11.0
-CHASE_A0 = -CHASE_BRAKE            # son accélération à l'image 1 (_accel(0) : elle n'a pas encore freiné)
+# --- la patrouille 1 (celle de P1 et P2) : elle n'entre pas dans P3. Débordée par la berline dans le rond-point,
+# elle s'y est arrêtée, rampe allumée, avant le coin de la rue (p2_arc.patrol1_pos) ; P3 la garde là, immobile, à sa
+# place de P2/110 passée dans ce repère par le parcours (derrière la caméra et à gauche, hors du cadre tout le plan).
+# Les noms CHASE_* restent ceux que scene_b et les tests lisent ; CHASE_STOP = 0 : elle est déjà arrêtée.
 CHASE_AIR = 1.2                    # m d'air au moins entre l'avant de sa caisse arrêtée et les panneaux
 CHASE_HALF = (2.6, 0.96)           # demi-longueur et demi-largeur de sa caisse (relevées sur scene-b.blend)
-_TB = M.t_of(F0)
 
 
-def _chase_profile():
-    """Les sommets (t, accélération) de son freinage, linéaire entre eux (à-coup CHASE_JERK) : l'accélération de la
-    berline jusqu'à ce qu'elle se mette à freiner (avant l'image 1 si CHASE_A0 l'exige), CHASE_A0 à l'image 1,
-    CHASE_BRAKE, tenu, relâché pour finir à vitesse nulle."""
-    ah, v0 = _accel(_TB), hero_speed(_TB) + CHASE_DV
-    ts = _TB - (ah - CHASE_A0) / CHASE_JERK                      # elle se met à freiner
-    tf = ts + (ah + CHASE_BRAKE) / CHASE_JERK                    # le freinage plein
-    t3 = CHASE_BRAKE / CHASE_JERK
-    # la vitesse à tf, puis la tenue qui la ramène à zéro à la fin du relâchement
-    vf = v0 + ((CHASE_A0 - CHASE_BRAKE) / 2 * (tf - _TB) if tf >= _TB else CHASE_BRAKE * (_TB - tf))
-    hold = (vf - 0.5 * CHASE_BRAKE * t3) / CHASE_BRAKE
-    return [(ts, ah), (tf, -CHASE_BRAKE), (tf + hold, -CHASE_BRAKE), (tf + hold + t3, 0.0)]
+def _chase_parked():
+    import p2_arc as P2
+    t = P2.T_END + 1.0 / M.FPS                                   # P2/111 = P3/1
+    x, y = PC.placer("P3")[0](*PC._to_route("P2")(*P2.patrol1_pos(t)))
+    return x, y, P2.patrol1_heading(t) + PC.ANCHOR["P2"][2] - PC.ANCHOR["P3"][2], P2.patrol1_speed(t)
 
 
-_CP = _chase_profile()
-CHASE_STOP = _CP[-1][0]            # l'instant où elle s'arrête
+CHASE_X, CHASE_Y, CHASE_CAP, _CV = _chase_parked()
+assert abs(_CV) < 1e-4, "la patrouille 1 roule encore à la fin de P2"
+CHASE_STOP = 0.0                   # l'instant où elle s'arrête : avant P3
 
 
 def chase_accel(t):
-    """Son accélération (m/s²) : celle de la berline avant de freiner, son freinage ensuite."""
-    if t <= _CP[0][0]:
-        return _accel(t)
-    for (ta, aa), (tb, ab) in zip(_CP, _CP[1:]):
-        if t <= tb:
-            return aa + (ab - aa) * (t - ta) / (tb - ta)
     return 0.0
 
 
-# sa route : celle de la berline décalée de CHASE_SIDE à gauche, lue par ordonnée sur la fenêtre du parcours
-_PATH = [HERO["pos"](F0 + k / 4.0) for k in range(-4 * 72, 4 * (FRAMES + 24))]
-
-
-def _path_x(y):
-    if y <= _PATH[0][1]:
-        return _PATH[0][0]
-    if y >= _PATH[-1][1]:
-        return _PATH[-1][0]
-    lo, hi = 0, len(_PATH) - 1
-    while hi - lo > 1:
-        mid = (lo + hi) // 2
-        lo, hi = (mid, hi) if _PATH[mid][1] <= y else (lo, mid)
-    (x0, y0), (x1, y1) = _PATH[lo], _PATH[hi]
-    return x0 + (x1 - x0) * (y - y0) / (y1 - y0)
-
-
-def _path_cos(y, h=0.05):
-    dx = _path_x(y + h) - _path_x(y - h)
-    return 2 * h / math.hypot(dx, 2 * h)
-
-
-_CT0, _CDT = min(-1.0, _CP[0][0] - 0.75), 1.0 / 480.0
-
-
-def _chase_table():
-    """[(y, vitesse)] au 1/480 s depuis _CT0 : la vitesse intégrée de chase_accel, recalée pour valoir celle de la
-    berline plus CHASE_DV à _TB ; y le long de sa route (dy = v cos du cap de la route), recalé pour qu'elle soit
-    CHASE_AHEAD devant la berline à _TB."""
-    k = int(round((_TB - _CT0) / _CDT))
-    v = hero_speed(_CT0)
-    for _ in range(2):                     # la vitesse de départ qui donne la bonne vitesse à _TB
-        w = v
-        for i in range(k):
-            t = _CT0 + i * _CDT
-            w += 0.5 * (chase_accel(t) + chase_accel(t + _CDT)) * _CDT
-        v += hero_speed(_TB) + CHASE_DV - w
-    y, out, t = hero_pos(_CT0)[1] + CHASE_AHEAD, [], _CT0
-    while t < max(T_END, CHASE_STOP) + 1.5:
-        out.append((y, v))
-        v1 = 0.0 if t + _CDT >= CHASE_STOP else max(0.0, v + 0.5 * (chase_accel(t) + chase_accel(t + _CDT)) * _CDT)
-        y += 0.5 * (v + v1) * _CDT * _path_cos(y)
-        v, t = v1, t + _CDT
-    dy = hero_pos(_TB)[1] + CHASE_AHEAD - out[k][0]
-    return [(y + dy, v) for y, v in out]
-
-
-_CT = _chase_table()
-
-
-def _chase_at(t):
-    u = max(0.0, (t - _CT0) / _CDT)
-    k = min(len(_CT) - 2, int(u))
-    w = min(1.0, u - k)
-    return tuple(a + (b - a) * w for a, b in zip(_CT[k], _CT[k + 1]))
-
-
 def chase_speed(t):
-    return _chase_at(t)[1]
+    return 0.0
 
 
 def chase_pos(t):
-    y = _chase_at(t)[0]
-    return _path_x(y) - CHASE_SIDE, y
+    return CHASE_X, CHASE_Y
 
 
 def chase_heading(t, h=0.05):
-    """Le cap de sa route là où elle est (degrés, 0 = +y, positif à gauche)."""
-    y = chase_pos(t)[1]
-    return M.heading_of(_path_x(y + h) - _path_x(y - h), 2 * h)
+    """Son cap (degrés, 0 = +y, positif à gauche), celui de son arrêt dans le rond-point."""
+    return CHASE_CAP
 
 
-CHASE = (chase_pos(0.0)[0], CHASE_AHEAD, chase_heading(0.0))   # (x, avance sur la berline, cap) à l'image 1
+CHASE = (CHASE_X, CHASE_Y - hero_pos(0.0)[1], CHASE_CAP)   # (x, avance sur la berline, cap) à l'image 1
 CHASE_FRONT_STOP = chase_pos(CHASE_STOP + 1.0)[1] + CHASE_HALF[0]   # l'avant de sa caisse, arrêtée
 
 

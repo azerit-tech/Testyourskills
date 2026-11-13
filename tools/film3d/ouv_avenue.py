@@ -7,7 +7,7 @@
 # berline ne freine pas : elle passe à vitesse constante, sans feux stop (feuille de route du parcours, fiche OUV).
 # OUV et P1 sont une seule prise (le monde continu, SPEC §18.36 : OUV/41 est P1/1). Celle qui la prend en chasse en P1
 # n'est donc pas la garée : c'est la patrouille 1, une autre voiture déjà lancée, qui remonte l'avenue par la voie
-# d'en face, 6 m/s plus vite qu'elle (chaser_pos : la loi de p1_avenue, une seule trajectoire sur les deux plans) ;
+# d'en face, 3 m/s plus vite qu'elle (chaser_pos : la loi de p1_avenue, une seule trajectoire sur les deux plans) ;
 # elle allume sa rampe avec la garée, à 34, et entre par le bord gauche du cadre sur les dernières images.
 # La berline et le bras de la caméra se lisent dans le parcours unique (parcours.py) : sa fenêtre « OUV », posée dans
 # la scène A ; rien du chemin n'est écrit ici. scene_a.py n'en lit que les fonctions du temps ; motion.py en tire

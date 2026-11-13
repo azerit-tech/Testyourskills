@@ -39,10 +39,10 @@ H, WALK, FRONT_X = A.ROAD_HALF, A.WALK, A.FRONT_X
 STREET = (120.0, 134.0)       # la rue transversale
 Y0, Y1 = 70.0, 175.0          # le décor : le carrefour et ses quatre angles, rien d'autre
 
-# Où tombe l'arc de p2_arc.py : il quitte la voie extérieure côté océan (x = +5, road.LANES) et passe à 4 m de la
-# bordure de l'angle côté ville (x = -7,2, y = 119,8) : centre du virage en (-25, 101), sortie dans la voie de droite
-# de la rue transversale (y = 131).
-POSE = (5.0, 101.0, 0.0)
+# Où tombe le plan de p2_arc.py (écrit dans le repère du rond-point, scène F) : l'avenue sur l'avenue (x inchangé),
+# sa sortie dans la voie de droite de la rue transversale (y = 131). Son virage de 30 m est celui d'un rond-point : ici
+# il coupe l'angle côté ville ; ce carrefour ne garde que l'ancien drone, P2 se tourne dans la scène F.
+POSE = (0.0, 130.65, 0.0)
 
 
 def log(*a):
@@ -221,11 +221,17 @@ def wake(scene, wheels, pose=POSE, anim=False):
 
     for name, (lx, ly, _) in wheels.items():
         rear = name.endswith(("BL", "BR"))
-        pts = [P.to_scene(pose, x, y)[:2] for x, y in P.wheel_track(lx, ly, t=t_end)]
-        s0, s1 = P.S_START - 6.0, P.s_hero(t_end * P.T_END)          # comme p2_arc.wheel_track
-        if not rear:
-            s0 += (s1 - s0) * (len(pts) // 3) / (len(pts) - 1)
-            pts = pts[len(pts) // 3:]          # les roues avant ne marquent qu'une fois la caisse en travers
+        track = P.wheel_track(lx, ly, t=t_end)
+        # une roue ne marque que pendant la glisse : l'arrière au-delà de 2,5°, l'avant une fois la caisse en
+        # travers (6°) ; la première glisse seulement (le léger contre-coup qui suit ne laisse rien)
+        thr = 2.5 if rear else 6.0
+        on = [k for k, (_, _, tt) in enumerate(track) if abs(P.hero_slip(tt)) >= thr]
+        if not on:
+            continue
+        k1 = next((k for k, j in zip(on, on[1:]) if j != k + 1), on[-1])
+        track = track[on[0]:k1 + 1]
+        pts = [P.to_scene(pose, x, y)[:2] for x, y, _ in track]
+        f_a, f_b = (P.F0 + track[k][2] * P.FPS for k in (0, -1))       # les images où la roue y passe
         w = 0.24 if rear else 0.2
         me = bpy.data.meshes.new(f"wake_{name}")
         verts, faces, uvs = [], [], []
@@ -250,8 +256,8 @@ def wake(scene, wheels, pose=POSE, anim=False):
         if anim:
             # la face i (de s0 à s1) paraît quand la roue y passe : le centre de la caisse à la même abscisse
             b = ob.modifiers.new("devoile", "BUILD")
-            b.frame_start = P.frame_of_s(s0)
-            b.frame_duration = max(1.0, P.frame_of_s(s1) - P.frame_of_s(s0))
+            b.frame_start = int(round(f_a))
+            b.frame_duration = max(1, int(round(f_b - f_a)))
 
 
 def place_cars(scene, pose=POSE, anim=False):
@@ -323,14 +329,15 @@ def animate(scene, car, fill, patrols, pose=POSE):
     wheels = [w for w in car.children if w.name.startswith("wheel_")]
     d = [Vector(w.location).y for w in wheels]
     wb = (max(d) - min(d)) if d else 2.9
-    head = P.to_scene(pose, 0.0, 0.0, P.point(P.s_hero(t0))[2] + P.hero_slip(t0))[2]
+    head = P.to_scene(pose, 0.0, 0.0, P.hero_heading(t0))[2]
     rig = M.rig_up(car, head, "rig_berline", extras=[fill])
-    poses = M.sample(in_scene(P.hero_pos), frames, slip=P.hero_slip, wheel_r=car["wheel_r"], wheelbase=wb)
+    poses = M.sample(in_scene(P.hero_pos), frames, heading=lambda t: P.to_scene(pose, 0.0, 0.0, P.hero_heading(t))[2],
+                     steer=P.hero_steer, wheel_r=car["wheel_r"], wheelbase=wb)
     M.key_vehicle(rig, poses, wheels=wheels, body=car)
     M.wheel_marks(wheels, car["wheel_r"])
     # les feux stop, après la mise en clés : les fenêtres où la berline freine à plus de 2 m/s² (découpage v3.1)
     import hero_cars
-    for a, b in P.stop_frames():
+    for a, b in P.brake_windows():
         hero_cars.stop_lamps(car, a, b)
     rigs = []
     for i, (body, key) in enumerate(zip(patrols, ("patrol_1", "patrol_2"))):

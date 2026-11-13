@@ -1718,8 +1718,7 @@ def _bridge_z(y, _tab={}):
 def shot_specs():
     """Les neuf plans comme leurs scènes les clés : {plan: arguments de shot_metrics} (les modules des plans, sans
     Blender). Un plan migré au découpage v3 porte V3 = True : sa caméra est camera(t), sa caméra sans tremblé
-    camera_rail(t) ; un plan v2 garde la caméra que sa scène clé (celle de P2 recopie scene_carrefour.low_camera,
-    en repère de l'arc). Chaque spec porte aussi module, v3 et named ({nom: pos(t)} des véhicules)."""
+    camera_rail(t) ; un plan v2 garde la caméra que sa scène clé. Chaque spec porte aussi module, v3 et named ({nom: pos(t)} des véhicules)."""
     import fin6_orbite as F6
     import fin_pointe as F
     import ouv_avenue as OUV
@@ -1736,15 +1735,6 @@ def shot_specs():
     def rng(mod):
         return range(mod.F0, mod.F0 + mod.FRAMES)
 
-    def p2_cam(t):
-        x, y, z = P2.low_cam_pos(t)
-        ax, ay, az = P2.low_cam_aim(t)
-        dx, dy, dz = ax - x, ay - y, az - z
-        yaw = math.degrees(math.atan2(-dx, -dy))
-        pitch = math.degrees(math.atan2(dz, math.hypot(dx, dy)))
-        dyaw, dpitch, droll, ddx, ddy, ddz = handheld(t, amp=0.25, rotor=0.15, seed=2.7)
-        return x + ddx, y + ddy, z + ddz, yaw + dyaw, pitch + dpitch, droll, P2.LOW_LENS
-
     def plan(mod, cam, name, **kw):
         v31 = bool(getattr(mod, "V31", False))
         v3 = bool(getattr(mod, "V3", False)) or v31
@@ -1755,7 +1745,7 @@ def shot_specs():
     return {
         "OUV": plan(OUV, OUV.camera, "cam", hero=OUV.hero_pos),
         "P1": plan(P1, P1.camera, "cam", hero=P1.hero_pos),
-        "P2": plan(P2, p2_cam, "cam", hero=P2.hero_pos, slip=P2.hero_slip),
+        "P2": plan(P2, P2.camera, "cam", hero=P2.hero_pos, heading=P2.hero_heading),
         "P3": plan(P3, P3.camera, "cam", hero=P3.hero_pos, heading=P3.hero_heading),
         "P4": plan(P4, P4.camera, "cam_P4", hero=P4.hero_pos, ground=lambda x, y: (_bridge_z(y),)),
         "P5": plan(P5, P5.camera, "cam_P5", hero=P5.hero_pos, slip=P5.hero_slip),

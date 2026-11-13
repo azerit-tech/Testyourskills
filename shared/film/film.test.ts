@@ -14,14 +14,14 @@ const LEVELS: Stars[] = [1, 2, 3, 4, 5, 6];
 const at = (frame: number) => (frame + 0.5) / FPS;
 
 describe("le découpage (docs/cinematique-decoupage-v3.md §7)", () => {
-  it("OUV 40, P1 48, P2 84, P3 et P4 48, P5 et P6 60 : la poursuite fait 388 images ; FIN 76 (52 de vidéo), FIN6 104 (80 de vidéo)", () => {
-    expect(SHOT_FRAMES).toEqual({ OUV: 40, P1: 48, P2: 84, P3: 48, P4: 48, P5: 60, P6: 60 });
-    expect(CHASE_FRAMES).toBe(388);
+  it("OUV 40, P1 48, P2 110, P3 et P4 48, P5 et P6 60 : la poursuite fait 414 images ; FIN 76 (52 de vidéo), FIN6 104 (80 de vidéo)", () => {
+    expect(SHOT_FRAMES).toEqual({ OUV: 40, P1: 48, P2: 110, P3: 48, P4: 48, P5: 60, P6: 60 });
+    expect(CHASE_FRAMES).toBe(414);
     expect(endingFrames("fin")).toBe(76);
     expect(endingFrames("fin6")).toBe(104);
     expect(ENDINGS.fin.video).toBe(52);
     expect(ENDINGS.fin6.video).toBe(80);
-    expect(SHOT_START).toEqual({ OUV: 0, P1: 40, P2: 88, P3: 172, P4: 220, P5: 268, P6: 328 });
+    expect(SHOT_START).toEqual({ OUV: 0, P1: 40, P2: 88, P3: 198, P4: 246, P5: 294, P6: 354 });
   });
 
   it("chaque image de la poursuite appartient à un seul plan, dans l'ordre", () => {
@@ -38,17 +38,17 @@ describe("le découpage (docs/cinematique-decoupage-v3.md §7)", () => {
 });
 
 describe("filmPlan (§2.1)", () => {
-  it("les durées du tableau (v3 §7) : 164, 248, 296, 344, 404 et 492 images ; 6,8 s, 12,3 s et 20,5 s à une, trois et six étoiles", () => {
+  it("les durées du tableau (v3 §7) : 164, 274, 322, 370, 430 et 518 images ; 6,8 s, 13,4 s et 21,6 s à une, trois et six étoiles", () => {
     const frames = LEVELS.map((n) => filmPlan(cardAt(n)).frames);
-    expect(frames).toEqual([164, 248, 296, 344, 404, 492]);
+    expect(frames).toEqual([164, 274, 322, 370, 430, 518]);
     // chaque niveau : la poursuite jusqu'à la fin de son dernier plan, puis sa fin entière
     for (const n of LEVELS) {
       const last = CHASE_SHOTS[n];
       expect(frames[n - 1]).toBe(SHOT_START[last] + SHOT_FRAMES[last] + endingFrames(n === 6 ? "fin6" : "fin"));
     }
     expect(filmPlan(cardAt(1)).duration).toBeCloseTo(6.8, 1);
-    expect(filmPlan(cardAt(3)).duration).toBeCloseTo(12.3, 1);
-    expect(filmPlan(cardAt(6)).duration).toBeCloseTo(20.5, 1);
+    expect(filmPlan(cardAt(3)).duration).toBeCloseTo(13.4, 1);
+    expect(filmPlan(cardAt(6)).duration).toBeCloseTo(21.6, 1);
     for (const n of LEVELS) {
       const p = filmPlan(cardAt(n));
       expect(Math.abs(p.duration - p.frames / FPS)).toBeLessThan(1e-9);
@@ -89,8 +89,8 @@ describe("filmPlan (§2.1)", () => {
     expect(p1.freeze).toBe(88 + 52);
     expect(p1.flash).toEqual({ from: 140 + 14, peak: 154 + 4, to: 164 });
     const p6 = filmPlan(cardAt(6));
-    expect(p6.freeze).toBe(388 + 80);
-    expect(p6.flash).toEqual({ from: 480, peak: 484, to: 492 });
+    expect(p6.freeze).toBe(414 + 80);
+    expect(p6.flash).toEqual({ from: 506, peak: 510, to: 518 });
   });
 
   it("l'étoile suivante clignote deux fois pendant le gel ; à six étoiles, rien ne clignote", () => {

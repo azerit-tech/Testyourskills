@@ -13,7 +13,7 @@ export type EndingId = "fin" | "fin6";
 export type ShotId = ChaseShot | "FIN" | "FIN6";
 
 /** Durée de chaque plan de la poursuite, en images. */
-export const SHOT_FRAMES: Record<ChaseShot, number> = { OUV: 40, P1: 48, P2: 84, P3: 48, P4: 48, P5: 60, P6: 60 };
+export const SHOT_FRAMES: Record<ChaseShot, number> = { OUV: 40, P1: 48, P2: 110, P3: 48, P4: 48, P5: 60, P6: 60 };
 
 /** Une fin : la vidéo (dérapage ou orbite), l'arrêt sur image sur sa dernière image, puis le flash. */
 export interface EndingCut {
@@ -47,7 +47,7 @@ export const SHOT_START: Record<ChaseShot, number> = (() => {
   return out;
 })();
 
-/** Le fichier `poursuite` entier (toujours les six étoiles) : 388 images. */
+/** Le fichier `poursuite` entier (toujours les six étoiles) : 414 images. */
 export const CHASE_FRAMES = CHASE_SHOTS.reduce((n, s) => n + SHOT_FRAMES[s], 0);
 
 /** Les bandes d'encre se ferment en tant d'images, à l'ouverture. */
