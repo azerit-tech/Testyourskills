@@ -2681,13 +2681,31 @@ def plan_checks31(d, lim, own):
         acc = _peak({f: max(0.0, v) for f, v in s["along"].items()})
         circ = _peak({f: math.hypot(s["alat"][f], s["along"][f]) for f in s["alat"]})
         jerk = _peak(s["jerk"]) if s["jerk"] else (0.0, frames[0])
-        yaw = _peak({f: abs(v) for f, v in s["yaw_acc"].items()}) if s["yaw_acc"] else (0.0, frames[0])
+        yaw_d = {f: abs(v) for f, v in s["yaw_acc"].items()}
+        # la berline en dérapage : le lacet de sa caisse y est celui de la glisse (l'arrière qui décroche et se
+        # rattrape), borné à part (slip_yaw_acc) aux images où elle glisse de plus de 0,5° (à 3 images près)
+        slid = set()
+        if kind == "hero" and lim.get("slip_yaw_acc"):
+            sl_, _ = _slip_series(d)
+            for f, v in sl_.items():
+                if abs(v) > 0.5:
+                    slid.update(range(f - 3, f + 4))
+        drift_yaw = {f: v for f, v in yaw_d.items() if f in slid}
+        yaw_d = {f: v for f, v in yaw_d.items() if f not in slid}
+        yaw = _peak(yaw_d) if yaw_d else (0.0, frames[0])
         vals = dict(lat=lat, brake=brk, acc=acc, circle=circ, jerk=jerk, yaw_acc=yaw)
         bad = [k for k in vals if vals[k][0] > L[k] + 1e-9]
+        extra = ""
+        if drift_yaw:
+            dy_ = _peak(drift_yaw)
+            vals["yaw_acc_glisse"] = dy_
+            if dy_[0] > lim["slip_yaw_acc"] + 1e-9:
+                bad.append("yaw_acc_glisse")
+            extra = f", en glisse ≤ {lim['slip_yaw_acc']:g} °/s²"
         rows.append((n, vals, bad))
         add(f"conduite {n} : latérale ≤ {L['lat']:g}, freinage ≤ {L['brake']:g}, accélération ≤ {L['acc']:g}, "
-            f"cercle ≤ {L['circle']:g} m/s², à-coup ≤ {L['jerk']:g} m/s³, lacet ≤ {L['yaw_acc']:g} °/s²", not bad,
-            ", ".join(f"{k} {vals[k][0]:.1f} ({vals[k][1]})" for k in vals))
+            f"cercle ≤ {L['circle']:g} m/s², à-coup ≤ {L['jerk']:g} m/s³, lacet ≤ {L['yaw_acc']:g} °/s²{extra}",
+            not bad, ", ".join(f"{k} {vals[k][0]:.1f} ({vals[k][1]})" for k in vals))
     d["cars"] = rows
     brake = [f for f, v in hero["along"].items() if -v > lim["stop_lamp"]]
     wins = _windows(brake)
@@ -2708,7 +2726,9 @@ def plan_checks31(d, lim, own):
         add(f"glisse : s'installe ≤ {lim['slip_on']:g}°/s, se résorbe ≤ {lim['slip_off']:g}°/s",
             on[0] <= lim["slip_on"] + 1e-9 and off[0] <= lim["slip_off"] + 1e-9,
             f"installation {max(0.0, on[0]):.0f}°/s ({on[1]}), retour {max(0.0, off[0]):.0f}°/s ({off[1]})")
-        early = [f for f, v in grow.items() if v > 2.0 and abs(s[f]) > 1.0
+        # une glisse qui croît sous l'adhérence est une erreur, sauf jusqu'à slip_back : l'appel du conducteur avant
+        # un dérapage (1 à 2° du mauvais côté) et le seul retour de l'autre côté après (l'élan de la caisse)
+        early = [f for f, v in grow.items() if v > 2.0 and abs(s[f]) > max(1.0, lim["slip_back"])
                  and max(hero["acc"].get(g, 0.0) for g in range(f - 6, f + 1)) < lim["slip_acc"]]
         add(f"glisse nulle sous {lim['slip_acc']:g} m/s² d'accélération combinée", not early,
             f"elle croît sans adhérence dépassée : images {early[:8]}" if early else "tient")

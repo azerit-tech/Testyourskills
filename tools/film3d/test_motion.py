@@ -92,12 +92,27 @@ CAM31_CUT_DH, CAM31_CUT_DD = 0.3, 0.8                     # m, aux coupes entre 
 CAR31_HERO = dict(lat=6.5, brake=7.0, acc=3.0, circle=7.5, jerk=12.0, yaw_acc=120.0)
 CAR31_PATROL = dict(lat=7.0, brake=7.0, acc=4.0, circle=7.5, jerk=12.0, yaw_acc=120.0)
 CAR31_STOP_LAMP = 2.0         # m/s² de freinage : fenêtres des feux stop (hero_cars.stop_lamps)
-# la glisse (cap de la caisse moins cap de la vitesse)
-SLIP31_MAX = 18.0             # °
-SLIP31_ON, SLIP31_OFF = 40.0, 30.0    # °/s, installation et retour
-SLIP31_ACC = 5.5              # m/s² d'accélération combinée : dessous, elle ne naît pas
+# la glisse (cap de la caisse moins cap de la vitesse). Les plafonds d'avant (18°, 40 et 30 °/s, 4° de retour, lacet
+# de caisse ≤ 120 °/s²) faisaient une trajectoire propre, pas un dérapage (« le dérapage est mou ») : depuis la
+# caméra de poursuite, 18 à 22° entre la caisse et le bras ne montrent pas le flanc. Les deux dérapages dessinés du
+# parcours (parcours.DERAP2, DERAP5) : crête de 29° au rond-point, 36° au port, l'arrière qui part à 70 et 80 °/s,
+# rattrapé à 50 à 55 °/s, un seul retour de 4° au port ; la caisse y prend 400 à 500 °/s² de lacet (une berline qui
+# décroche en un quart de seconde), sans à-coup (quintiques : glisse, vitesse et accélération continues).
+SLIP31_MAX = 40.0             # °
+SLIP31_ON, SLIP31_OFF = 85.0, 60.0    # °/s, installation et retour
+SLIP31_ACC = 5.5              # m/s² d'accélération combinée : dessous, elle ne naît pas (au-delà de SLIP31_BACK)
 SLIP31_LOSS = 0.10            # la vitesse perd au moins 10 % pendant une glisse de plus de 5°
-SLIP31_BACK = 4.0             # ° au plus de retour de l'autre côté, une fois
+SLIP31_BACK = 6.0             # ° au plus de retour de l'autre côté, une fois (et d'appel avant un dérapage)
+SLIP31_YAW_ACC = 600.0        # °/s², lacet de la caisse aux images où elle glisse (ailleurs : CAR31_*, 120)
+# les dérapages lisibles (test_derapages) : crête, tenue, montée de 5° à la crête, vitesse de la glisse au plus fort,
+# rattrapage, contre-braquage des roues avant, angle à l'écran entre la caisse et le bras
+DERAP31 = {"P2": dict(crest=(28.0, 32.0), hold=22.0, screen=(28.0, 35.0)),
+           "P5": dict(crest=(35.0, 40.0), hold=28.0, screen=(35.0, 45.0))}
+DERAP31_HOLD_S = (0.9, 1.3)       # s au-dessus du seuil de tenue (« environ une seconde »)
+DERAP31_RISE_S = (0.4, 0.6)       # s de 5° à la crête
+DERAP31_RATE = (60.0, 85.0)       # °/s au plus fort de la montée
+DERAP31_RECOVER_S = (0.6, 0.9)    # s : de 80 % de la crête, en redescendant, à moins de 2°
+DERAP31_COUNTER = (20.0, 30.0)    # ° de contre-braquage des roues avant au plus fort
 # la fluidité à l'écran (le centre de la berline vu par les clés finales, % de la largeur du cadre par image² et
 # image³) et la caisse (roulis et tangage bornés, Δ² du roulis par image², écart au seul transfert de masse)
 SCREEN31_D2, SCREEN31_D3 = 0.20, 0.20     # tremblés v3.1 : 0,04 à 0,16 sur les plans de dos ; sans tremblé, 0,10
@@ -117,12 +132,14 @@ CUT_P1_GAP = 2.0              # m, écart de la patrouille 1 à la berline (mêm
 CUT_INK_DV = 0.5              # m/s : vers une fin (l'encre), la berline n'arrive pas plus vite qu'elle n'est partie
 CAM31_LIMITS_PLAN = {
     # le virage du port sur le bras commun (parcours.camera, retard de 0,12 s) : le bras passe à 0,6 m à l'intérieur
-    # du cap de la vitesse au plus fort du virage, et la caisse en glisse (15°) s'élargit à l'écran de 30 %
-    "P5": {"cam_side": (-0.7, 1.5), "cam_width_var": 0.32},
-    # l'anneau sur le bras commun : la caméra reste à 7,51 m de la berline sur les 110 images ; c'est la caisse vue
-    # de trois quarts qui s'élargit (20° entre la caisse et la visée à P2/41 : 12° de glisse et 8° du bras, 0,3 m à
-    # gauche et 0,12 s de retard), son flanc entre dans la largeur : 56,5 % contre 42,2 de médiane, +34 %
-    "P2": {"cam_width_var": 0.36},
+    # du cap de la vitesse au plus fort du virage. Le grand dérapage (parcours.DERAP5, 36°, 41° entre la caisse et le
+    # bras) montre le flanc : la boîte va de 41 % (de dos, P5/1) à 72 % de la largeur ; la médiane du plan (62 %)
+    # tombe dans le dérapage, d'où −34 % ; entière dans le cadre hors des bandes du HUD (test_derapages)
+    "P5": {"cam_side": (-0.7, 1.5), "cam_width_var": 0.36},
+    # l'anneau sur le bras commun : la caméra reste à 7,51 m de la berline sur les 110 images. Le dérapage du
+    # rond-point (parcours.DERAP2, 29°, 35° entre la caisse et le bras) montre le flanc : la boîte passe de 42 % de
+    # médiane à 71 %, +69 % ; entière dans le cadre hors des bandes du HUD (test_derapages)
+    "P2": {"cam_width_var": 0.72},
     "P6": {"rise_after": 0.5, "rise_h_max": 3.6},           # monte à la fin pour découvrir la pointe
     "FIN": {"stop_h_min": 2.0, "stop_dist_min": 5.5},       # plus bas et plus près une fois la berline arrêtée
 }
@@ -135,7 +152,8 @@ def v31_limits():
                 cam_width_var=CAM31_WIDTH_VAR, cut_dh=CAM31_CUT_DH, cut_dd=CAM31_CUT_DD,
                 car=dict(hero=CAR31_HERO, patrol=CAR31_PATROL), stop_lamp=CAR31_STOP_LAMP, slip_max=SLIP31_MAX,
                 slip_on=SLIP31_ON, slip_off=SLIP31_OFF, slip_acc=SLIP31_ACC, slip_loss=SLIP31_LOSS,
-                slip_back=SLIP31_BACK, screen_d2=SCREEN31_D2, screen_d3=SCREEN31_D3, body_roll=BODY31_ROLL,
+                slip_back=SLIP31_BACK, slip_yaw_acc=SLIP31_YAW_ACC, screen_d2=SCREEN31_D2, screen_d3=SCREEN31_D3,
+                body_roll=BODY31_ROLL,
                 body_pitch=BODY31_PITCH, body_roll_d2=BODY31_ROLL_D2, body_noise=BODY31_NOISE,
                 cs_speed=CUT_SPEED, cs_along=CUT_ALONG, cs_alat=CUT_ALAT, cs_yaw=CUT_YAW, cs_slip=CUT_SLIP,
                 cs_steer=CUT_STEER, cs_roll=CUT_ROLL, cs_pitch=CUT_PITCH, cs_pan=CUT_PAN, cs_screen=CUT_SCREEN,
@@ -321,7 +339,8 @@ def test_p2():
     frames = range(P.F0 - 1, P.F0 + P.FRAMES + 1)
     ps = M.sample(P.hero_pos, frames, heading=P.hero_heading, noise=0.0)
     peak = max(ps, key=lambda p: abs(p["heading"] - p["travel"]))
-    check("P2 : la glisse du parcours, de 10 à 15°, résorbée avant la fin", 10.0 <= P.DRIFT <= 15.0
+    lo, hi = DERAP31["P2"]["crest"]          # le dérapage du rond-point (parcours.DERAP2, test_derapages)
+    check(f"P2 : le dérapage du parcours, de {lo:g} à {hi:g}°, résorbé avant la fin", lo <= P.DRIFT <= hi
           and abs(P.hero_slip(P.T_END)) < 1.0, f"{P.DRIFT:.1f}° à l'image {P.F_DRIFT}")
     check("P2 : en glisse, roulis vers la droite et contre-braquage (roues à droite)",
           peak["roll"] > 2.0 and peak["steer"] < -5.0, f"roulis {peak['roll']:.2f}°, braquage {peak['steer']:.2f}°")
@@ -1691,9 +1710,13 @@ def _drive_numbers(d, frames):
     sl = {f: d.slip(M.t_of(f)) for f in frames}
     rate = {f: (sl[f + 1] - sl[f - 1]) * M.FPS / 2 for f in frames[1:-1]}
     grow = [r * (1 if sl[f] >= 0 else -1) for f, r in rate.items()]
+    # le lacet de la caisse : CAR31_* hors glisse, SLIP31_YAW_ACC aux images où elle glisse (à 3 images près)
+    slid = {g for f, v in sl.items() if abs(v) > 0.5 for g in range(f - 3, f + 4)}
+    ya = [abs(v) for f, v in s["yaw_acc"].items() if f not in slid] or [0.0]
+    yd = [abs(v) for f, v in s["yaw_acc"].items() if f in slid] or [0.0]
     return dict(lat=max(abs(v) for v in s["alat"].values()), brake=max(-v for v in s["along"].values()),
                 acc=max(s["along"].values()), circle=max(math.hypot(s["alat"][f], s["along"][f]) for f in s["alat"]),
-                jerk=max(s["jerk"].values()), yaw_acc=max(abs(v) for v in s["yaw_acc"].values()),
+                jerk=max(s["jerk"].values()), yaw_acc=max(ya), yaw_slip=max(yd),
                 vmin=min(s["speed"].values()), slip=max(abs(v) for v in sl.values()), on=max(grow),
                 off=max(-g for g in grow), sl=sl)
 
@@ -1704,6 +1727,7 @@ def test_drive():
     (feux stop), la glisse perd de la vitesse, contre-braque, ne revient qu'une fois et peu."""
     def within(name, d, frames, L):
         n = _drive_numbers(d, frames)
+        n["yaw_acc"] = max(n["yaw_acc"], n["yaw_slip"])       # la glisse du modèle : le lacet sous CAR31_*, partout
         bad = [k for k in ("lat", "brake", "acc", "circle", "jerk", "yaw_acc") if n[k] > L[k] + 1e-9]
         check(f"conduite, {name} : les limites de la voiture", not bad,
               ", ".join(f"{k} {n[k]:.1f}" for k in ("lat", "brake", "acc", "circle", "jerk", "yaw_acc")))
@@ -1827,8 +1851,9 @@ def test_parcours():
     n = _drive_numbers(PC.DRIVE, list(range(1, PC.TOTAL + 1)))
     bad = [k for k in ("lat", "brake", "acc", "circle", "jerk", "yaw_acc") if n[k] > CAR31_HERO[k] + 1e-9]
     check(f"parcours : les limites de la voiture sur les {PC.TOTAL} images", not bad and n["slip"] <= SLIP31_MAX
-          and n["on"] <= SLIP31_ON and n["off"] <= SLIP31_OFF,
-          ", ".join(f"{k} {n[k]:.2f}" for k in ("lat", "brake", "acc", "circle", "jerk", "yaw_acc", "slip")))
+          and n["on"] <= SLIP31_ON and n["off"] <= SLIP31_OFF and n["yaw_slip"] <= SLIP31_YAW_ACC,
+          ", ".join(f"{k} {n[k]:.2f}" for k in ("lat", "brake", "acc", "circle", "jerk", "yaw_acc", "yaw_slip", "slip",
+                                                 "on", "off")))
 
 
 def test_v3():
@@ -1899,6 +1924,70 @@ def cut_pose_rows():
     return rows
 
 
+def derapage_numbers(shot):
+    """Les nombres d'un dérapage du parcours (P2, P5), au huitième d'image, sur le plan et la seconde qui suit (la
+    résorption du port peut finir dans P6) : crête, durée au-dessus du seuil de tenue, montée de 5° à la crête,
+    vitesse de glisse au plus fort, rattrapage (de 80 % de la crête en redescendant à moins de 2°), retour de
+    l'autre côté, contre-braquage des roues avant, angle à l'écran entre la caisse et le bras."""
+    import parcours as PC
+    n, h, q = dict(PC.SHOTS)[shot], PC.hero(shot), 8
+    fs = [1 + k / q for k in range(-12 * q, (n + 24) * q + 1)]
+    sl = [h["slip"](f) for f in fs]
+    inside = [i for i, f in enumerate(fs) if 1 <= f <= n]
+    ip = max(inside, key=lambda i: abs(sl[i]))
+    sg, crest = math.copysign(1.0, sl[ip]), abs(sl[ip])
+    thr = DERAP31[shot]["hold"]
+    i5 = max(i for i in range(ip) if sg * sl[i] < 5.0)
+    i80 = next(i for i in range(ip, len(fs)) if sg * sl[i] < 0.8 * crest)
+    i2 = next((i for i in range(i80, len(fs)) if sg * sl[i] < 2.0), len(fs) - 1)
+    dtq = 1.0 / (PC.FPS * q)
+    rate = max(abs(b - a) / dtq for a, b in zip(sl[i5:ip], sl[i5 + 1:ip + 1]))
+    steer = max(-sg * h["steer"](fs[i]) for i in range(i5, i2 + 1))
+    screen = max(abs(h["heading"](fs[i]) - PC.cam_cap(shot, fs[i])) for i in inside)
+    return dict(crest=crest, frame=fs[ip], hold=sum(1 for v in sl if sg * v >= thr) * dtq, rise=(ip - i5) * dtq,
+                rate=rate, recover=(i2 - i80) * dtq, back=max(0.0, max(-sg * v for v in sl[ip:])),
+                pre=max(0.0, max(-sg * v for v in sl[:ip])), counter=steer, screen=screen, side=sg)
+
+
+def test_derapages():
+    """Les deux dérapages du parcours (parcours.DERAP2, DERAP5 ; « le dérapage est mou ») : lisibles depuis la caméra
+    de poursuite (DERAP31_* : crête, une seconde de tenue, montée franche, rattrapage, contre-braquage, angle entre la
+    caisse et le bras à l'écran), un seul petit retour au port, aucun au rond-point ; la boîte de la berline, qui
+    s'élargit, entière dans le cadre hors des bandes du HUD (12 % du haut, 15 % du bas) sur tout le plan."""
+    specs = M.shot_specs()
+    for shot in ("P2", "P5"):
+        n = derapage_numbers(shot)
+        lim = DERAP31[shot]
+        check(f"{shot} : dérapage, crête {lim['crest'][0]:g} à {lim['crest'][1]:g}°, au moins {lim['hold']:g}° "
+              f"pendant {DERAP31_HOLD_S[0]:g} à {DERAP31_HOLD_S[1]:g} s",
+              lim["crest"][0] <= n["crest"] <= lim["crest"][1] and DERAP31_HOLD_S[0] <= n["hold"] <= DERAP31_HOLD_S[1],
+              f"{n['crest']:.1f}° à l'image {n['frame']:.1f}, {n['hold']:.2f} s")
+        check(f"{shot} : l'arrière part de 5° à la crête en {DERAP31_RISE_S[0]:g} à {DERAP31_RISE_S[1]:g} s, "
+              f"{DERAP31_RATE[0]:g} à {DERAP31_RATE[1]:g} °/s au plus fort",
+              DERAP31_RISE_S[0] <= n["rise"] <= DERAP31_RISE_S[1] and DERAP31_RATE[0] <= n["rate"] <= DERAP31_RATE[1],
+              f"{n['rise']:.2f} s, {n['rate']:.0f} °/s")
+        check(f"{shot} : rattrapée en {DERAP31_RECOVER_S[0]:g} à {DERAP31_RECOVER_S[1]:g} s ; retour de l'autre "
+              f"côté ≤ {SLIP31_BACK:g}° (aucun au rond-point), appel ≤ 2°",
+              DERAP31_RECOVER_S[0] <= n["recover"] <= DERAP31_RECOVER_S[1] and n["back"] <= SLIP31_BACK
+              and (shot != "P2" or n["back"] < 0.5) and n["pre"] <= 2.0,
+              f"{n['recover']:.2f} s, retour {n['back']:.1f}°, appel {n['pre']:.1f}°")
+        check(f"{shot} : contre-braquage des roues avant {DERAP31_COUNTER[0]:g} à {DERAP31_COUNTER[1]:g}°",
+              DERAP31_COUNTER[0] <= n["counter"] <= DERAP31_COUNTER[1], f"{n['counter']:.1f}°")
+        check(f"{shot} : à l'écran, {lim['screen'][0]:g} à {lim['screen'][1]:g}° entre la caisse et le bras au plus "
+              "fort", lim["screen"][0] <= n["screen"] <= lim["screen"][1], f"{n['screen']:.1f}°")
+        d = M.plan_data(shot, specs[shot])
+        worst = None
+        for f in d["frames"]:
+            b = M.frame_box(d["final"][f], d["poses"][f])
+            if b is None:
+                worst = (-99.0, f)
+                break
+            m = min(b[0], 100.0 - b[1], b[2] - 15.0, 88.0 - b[3])
+            worst = min(worst or (m, f), (m, f))
+        check(f"{shot} : la berline entière dans le cadre, hors des bandes du HUD (12 % du haut, 15 % du bas)",
+              worst[0] >= 0.0, f"marge {worst[0]:.1f} % au plus juste (image {worst[1]})")
+
+
 def test_cut_pose():
     for a, b, dp, dy, ds, dr, (la, lb) in cut_pose_rows():
         check(f"coupe {a} → {b} : même pose de caméra (position ≤ {CUT_POSE_DPOS * 100:.0f} cm, lacet, site, roulis "
@@ -1914,6 +2003,7 @@ if __name__ == "__main__":
     test_right_turn()
     test_gaps()
     test_p2()
+    test_derapages()
     test_p4()
     test_p3()
     test_p6()
