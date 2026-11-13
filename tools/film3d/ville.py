@@ -392,6 +392,62 @@ def selftest_voisins():
                 "av_walk_w", "lamp_prom_3"):
         assert not re.match(LOINTAIN_NOMS, nom), nom
     assert drapeau_voisin("avenue", "sea_wall", False, False, take1, True) == (False, "")
+    # (c) chaque brume posée par une scène (relevée dans le source) a son rôle ; une inconnue arrête tout
+    fichiers = {"scene_a.py": "avenue", "scene_f.py": "rond-point", "scene_carrefour.py": "rond-point",
+                "scene_b.py": "rue", "scene_c.py": "pont", "scene_e.py": "port", "scene_d.py": "jetee"}
+    vues = set()
+    for fn, nom_l in fichiers.items():
+        with open(os.path.join(HERE, fn), encoding="utf-8") as fh:
+            for line in fh:
+                code = line.split("#")[0]
+                for m in re.finditer(r"(?:\bhaze|\bbox)\(\s*\"(haze\w*)\"", code):          # scene_b.haze, scene_a.box
+                    vues.add((nom_l, m.group(1)))
+                if re.search(r"\bL\.haze\(", code):                                           # lieux.haze
+                    m = re.search(r"name=\"(haze\w*)\"", code)
+                    vues.add((nom_l, m.group(1) if m else "haze"))
+    assert vues and not vues - set(BRUMES), sorted(vues - set(BRUMES))
+    assert {("avenue", "haze"), ("rue", "haze_barrage"), ("port", "haze"), ("jetee", "haze_pointe")} <= vues, vues
+    assert role_brume("rue", "haze_quai.001") == "fond" and role_brume("avenue", "haze") == "fond"
+    try:
+        role_brume("rond-point", "haze")
+        raise AssertionError("une brume inconnue doit arrêter")
+    except ValueError:
+        pass
+    # une prise a sa brume ou n'en a pas ; une prise qui a la sienne ne compte aucune brume porteuse de pinceau
+    assert set(BRUME_PRISE) == {ps[0] for _a, _b, ps in prises()}
+    for _a, _b, ps in prises():
+        if BRUME_PRISE[ps[0]]:
+            lx = {lieu_of_shot(s)[0] for s in ps}
+            assert not [k for k, r in BRUMES.items() if k[0] in lx and r == "porteuse"], ps
+    ps, cfg = brume_prise("P2")
+    assert ps == ("OUV", "P1", "P2", "P3") and cfg["densite"] == 0.0006
+    assert brume_prise("P5") == (("P4", "P5", "P6"), None) and brume_prise("FIN") == (None, None)
+    # même densité des deux côtés de chaque coupe continue : la brume vient de la prise, pas du lieu
+    for (a, b), ok in P.CONTINU.items():
+        if ok:
+            assert brume_prise(a)[1] is brume_prise(b)[1], (a, b)
+    # ce que devient chaque brume (rôle, la prise a sa brume, du plan, de la prise)
+    assert sort_brume("fond", True, True, True) == "cachee"            # l'avenue en P1 : la brume de la prise
+    assert sort_brume("fond", True, False, True) == "cachee"           # l'avenue voisine de P2
+    assert sort_brume("locale", True, False, True) == "montree"        # le barrage de la rue vu de P2
+    assert sort_brume("locale", True, True, True) == "montree"
+    assert sort_brume("portee", True, True, True) == "intacte"         # haze_lamps dans P3
+    assert sort_brume("portee", True, False, True) == "cachee"
+    assert sort_brume(None, True, False, False) == "cachee"            # le pont, chargé loin de P1 à P3
+    assert sort_brume(None, False, True, True) == "intacte"            # P5 : sa brume porteuse
+    assert sort_brume(None, False, False, True) == "cachee"            # P6 voisine de P5 : comme avant
+    try:
+        sort_brume("porteuse", True, True, True)
+        raise AssertionError("une brume porteuse dans une prise qui a sa brume doit arrêter")
+    except ValueError:
+        pass
+    # la boîte de la prise couvre la berline de chaque image, marge comprise, au-dessus de l'eau
+    x0, x1, y0, y1, z0, z1 = boite_brume(ps, 100.0, 40.0)
+    for f in range(1, P.START["P4"] + 1):
+        hx, hy = hero_city(f)[:2]
+        assert x0 + 100.0 <= hx + 1e-6 and hx <= x1 - 100.0 + 1e-6 and y0 + 100.0 <= hy + 1e-6, f
+        assert hy <= y1 - 100.0 + 1e-6, f
+    assert -1.5 < z0 < 0.0 < z1 == 40.0
     # un seul phare : celui de la jetée ; celui du pont (P4 ne charge pas la jetée) est un doublon en P5 et P6
     take2 = {"pont", "port", "jetee"}
     assert drapeau_voisin("pont", "phare", True, True, take2, True) == (True, "doublon du phare de la jetée")
@@ -503,7 +559,7 @@ CAST = re.compile(r"^(hero|coupe|police|patrol|van|heli|jet|officer|agent|focus|
 #   sea, sea_far      la mer de l'avenue (scene_a, scene_carrefour) et du rond-point (scene_f), la baie lointaine de
 #                     l'avenue autonome ; deux boîtes au même niveau (−1,7 à −1,6 m) qui se recouvrent : une seule
 #                     par scène (sea.001 : la copie renommée au chargement)
-#   haze              les brumes
+#   haze              les brumes des voisins (puis décidées une à une par brume(), dans voisins : BRUMES)
 # et pas sea_wall*, le mur de promenade de l'avenue et du rond-point (sea_wall, sea_wall_cap, sea_wall_retour*,
 # sea_wall_e/n/av, sea_wall_cap_*) : « sea[._] » l'attrapait, visible en P1 et caché en P2 ; ni searchlight*, ni seat*.
 LOINTAIN_NOMS = r"^(phare_lointain|lagune|ville_|autre_rive|rive_|sea(\.\d+)?$|sea_far(\.\d+)?$|haze)"
@@ -536,6 +592,98 @@ def zones():
 
 # Les volumes (brumes, fumées, gerbes) : cachés au rendu gris, comme render_film --dry
 VOLUMES = ("haze", "fumee", "spray_")
+
+# La brume : une seule par prise continue (SPEC §18.36), posée par voisins() (brume), de même densité des deux côtés
+# de chaque coupe continue. Chaque lieu pose la sienne dans sa scène ; jusqu'ici, celle du lieu du plan restait et
+# celles des voisins étaient cachées par leur nom : l'avenue (0,0006) en P1, aucune en P2 (le rond-point n'en a pas).
+# Le rôle de chaque brume des scènes, par (lieu, nom sans le suffixe de copie), relevé dans les modules :
+#   fond      l'air du lieu : remplacé par la brume de la prise quand la prise en a une (BRUME_PRISE)
+#   locale    une nappe propre à un endroit du lieu (le barrage de la rue : ses phares et gyrophares y prennent corps ;
+#             la pointe de FIN) : un objet du décor comme un autre, montré chez le voisin de la même prise comme dans
+#             son plan, par-dessus la brume de la prise (en P3, la rue posait déjà la sienne par-dessus son fond)
+#   portee    portée par la berline (scene_b « haze_lamps », enfant de son rig) : elle part avec la berline d'un
+#             voisin ; dans son plan, elle est à la lumière de la berline, pas à ville.py
+#   porteuse  elle porte un pinceau d'hélicoptère réglé sur sa densité (helicos.beam0(T, densité) : la lampe de brume
+#             vaut BEAM0_PINCEAU / densité) et reçoit des lampes liées à elle seule (scene_e._twin, scene_d.helis_sans_tache
+#             et p6_beam0_haze) : ni remplacée ni retouchée ; une prise qui en compte une n'a pas de brume de prise
+BRUMES = {
+    ("avenue", "haze"): "fond",               # scene_a : 0,0006, −60 à 60 m sur 490 m, jusqu'à 40 m
+    ("rue", "haze"): "fond",                  # scene_b : 0,0006 le long de la rue, jusqu'à 30 m
+    ("rue", "haze_quai"): "fond",             # scene_b : 0,0005, le boulevard et le quai, ±100 m
+    ("rue", "haze_end"): "fond",              # scene_b, rue autonome seulement (FILM3D_VILLE=0) : 0,001
+    ("rue", "haze_barrage"): "locale",        # scene_b : 0,0015 devant le barrage
+    ("rue", "haze_lamps"): "portee",          # scene_b : 0,004 devant la berline, enfant de son rig
+    ("pont", "haze"): "fond",                 # scene_c : 0,0002 (au 200 mm, 300 m d'air), aucun pinceau
+    ("port", "haze"): "porteuse",             # scene_e : P5_HAZE 0,0016, le pinceau de l'appareil 0
+    ("jetee", "haze"): "porteuse",            # scene_d : P6_HAZE 0,0012 (FIN, FIN6 : 0,0005), le même pinceau
+    ("jetee", "haze_pointe"): "locale",       # scene_d, FIN et FIN6 : 0,0025 sur la pointe
+}
+# La brume de chaque prise continue (par son premier plan) : densité, marge autour de la conduite (m), haut (m).
+#   OUV à P3 : 0,0006, la valeur commune de l'avenue et de la rue (son quai : 0,0005 ; le rond-point : aucune) ; la
+#     boîte couvre la berline de toute la prise et 100 m autour (la brume du quai de la rue allait à ±100 m), de 30 cm
+#     au-dessus de l'eau (lieux.haze) à 40 m (celle de l'avenue, la plus longue de la prise).
+#   P4 à P6 : aucune pour l'instant. P5 et P6 portent le pinceau de l'appareil 0, réglé sur leurs densités
+#     différentes (0,0016 et 0,0012 : la coupe P5 → P6 change déjà de brume), et P4 regarde au 200 mm à travers
+#     0,0002. Valeur proposée : 0,0012 (celle de la jetée ; helicos.beam0 recale seul la lampe de brume sur la
+#     densité qu'on lui passe). À poser d'abord dans les scènes (P5_HAZE = P6_HAZE = 0,0012, P4 rejugé au 200 mm, les
+#     lampes liées à la brume de leur scène étendues à celle de la prise : brume() le fait pour une brume « fond »),
+#     puis ici : les trois brumes en « fond » et la ligne P4 remplie.
+BRUME_PRISE = {
+    "OUV": dict(densite=0.0006, marge=100.0, haut=40.0),
+    "P4": None,
+}
+BRUME_Z0 = -1.2          # m : le bas de la boîte, 30 cm au-dessus de l'eau (lieux.WATER_Z = −1,5 ; lieux.haze)
+
+
+def _nom_source(nom):
+    """Le nom d'un objet sans le suffixe de copie que Blender ajoute au chargement d'un voisin (haze.001 : haze)."""
+    return re.sub(r"\.\d{3}$", "", nom)
+
+
+def role_brume(lieu_nom, nom):
+    """Le rôle d'une brume (BRUMES) ; une brume inconnue arrête tout : elle doit être classée avant le rendu."""
+    k = (lieu_nom, _nom_source(nom))
+    if k not in BRUMES:
+        raise ValueError(f"[ville] brume inconnue : « {nom} » du lieu {lieu_nom} ; la classer dans ville.BRUMES "
+                         f"(fond, locale, portee ou porteuse) avant de rendre ce plan dans la ville")
+    return BRUMES[k]
+
+
+def brume_prise(plan):
+    """(plans de la prise, réglage de sa brume) pour le plan rendu ; (None, None) hors de toute prise (FIN, FIN6)."""
+    for _a, _b, ps in prises():
+        if plan in ps:
+            return ps, BRUME_PRISE.get(ps[0])
+    return None, None
+
+
+def sort_brume(role, prise_a_brume, propre, meme_prise):
+    """Ce que devient une brume dans la scène d'un plan : « intacte » (rien ne change), « cachee » ou « montree ».
+    `propre` : du lieu du plan ; `meme_prise` : d'un lieu de la prise du plan. Sans brume de prise, comme avant :
+    celle du plan reste, celles des voisins sont cachées."""
+    if not prise_a_brume or not (propre or meme_prise):
+        return "intacte" if propre else "cachee"
+    if role == "porteuse":
+        raise ValueError("[ville] une brume porteuse de pinceau dans une prise qui a sa brume : BRUME_PRISE et BRUMES "
+                         "se contredisent")
+    if role == "fond":
+        return "cachee"
+    if role == "locale":
+        return "montree"
+    if role == "portee":
+        return "intacte" if propre else "cachee"
+    raise ValueError(f"[ville] rôle de brume inconnu : {role!r}")
+
+
+def boite_brume(ps, marge, haut):
+    """(x0, x1, y0, y1, z0, z1) dans la ville : la boîte de la brume de la prise faite des plans `ps`, la berline de
+    toutes ses images et `marge` m autour."""
+    fs = [f for a, b, pp in prises() if tuple(pp) == tuple(ps) for f in range(a, b + 1)]
+    if not fs:
+        raise ValueError(f"[ville] {ps} n'est pas une prise continue")
+    pts = [hero_city(f)[:2] for f in fs]
+    return (min(p[0] for p in pts) - marge, max(p[0] for p in pts) + marge,
+            min(p[1] for p in pts) - marge, max(p[1] for p in pts) + marge, BRUME_Z0, haut)
 COULEURS = {"avenue": (0.95, 0.55, 0.15), "rond-point": (0.35, 0.8, 0.3), "rue": (0.85, 0.3, 0.75),
             "pont": (0.3, 0.55, 0.95), "port": (0.95, 0.85, 0.2), "jetee": (0.2, 0.85, 0.85)}
 SHOT_COL = {"OUV": (1, 1, 1), "P1": (0.1, 0.1, 0.1), "P2": (1, 1, 1), "P3": (0.1, 0.1, 0.1), "P4": (1, 1, 1),
@@ -798,6 +946,7 @@ def voisins(scene, plan, ville_dir):
     lointains(scene, False)
     bpy.context.view_layer.update()
     doubles = doublons(scene, own, own_objs, built, plan=plan)
+    brume(scene, plan, own, [list(r) for r in base])
     poses = ", ".join("%s (%d objets)" % (n, b["objets"]) for n, b in built.items()) or "aucun voisin"
     log(f"{plan} dans la ville : {poses} autour de {own} ; {len(doubles)} faux lointains de {own} cachés sous un "
         f"voisin chargé ({', '.join(sorted(doubles)[:8])}{'…' if len(doubles) > 8 else ''})")
@@ -873,6 +1022,92 @@ def volumes(scene, show):
     for ob in scene.objects:
         if ob.type == "MESH" and ob.name.startswith(VOLUMES):
             ob.hide_render = ob.hide_viewport = (not show) or bool(ob.get("ville_cache0"))
+
+
+def _densite(ob):
+    """La densité d'une brume (son volume principiel), None si elle est pilotée par des nœuds."""
+    for s in getattr(ob, "material_slots", ()):
+        m = s.material
+        if m is None or m.node_tree is None:
+            continue
+        for nd in m.node_tree.nodes:
+            if nd.type == "PRINCIPLED_VOLUME":
+                d = nd.inputs["Density"]
+                return None if d.links else round(d.default_value, 5)
+    return None
+
+
+def brume(scene, plan, own, base):
+    """La brume de la scène d'un plan dans la ville (voisins, après lointains) : une seule par prise continue
+    (BRUME_PRISE), posée dans le repère de la ville et ramenée dans celui de la scène (`base`, 4 × 4 lignes : ville ->
+    scène) ; les brumes « fond » des lieux de la prise cachées (le plan compris), les « locales » montrées des deux
+    côtés, les « portees » et les « porteuses » laissées (sort_brume). Une lampe liée à une brume « fond » cachée (sa
+    collection de liaison la contient) reçoit la brume de la prise au même état de liaison. Rend la brume posée ou
+    None."""
+    import bpy
+    from mathutils import Matrix
+    ps, cfg = brume_prise(plan)
+    faits = {"intacte": [], "cachee": [], "montree": []}
+    fonds = []
+    for o in [o for o in scene.objects if o.type == "MESH" and o.name.startswith("haze")]:
+        n = o.get("ville_lieu")
+        propre = n is None
+        nom_l = own if propre else n
+        if nom_l not in NOMS:
+            continue
+        meme = propre or (ps is not None and lieu(nom_l)["plan"] in ps)
+        role = role_brume(nom_l, o.name) if (cfg and meme) else None
+        d = sort_brume(role, cfg is not None, propre, meme)
+        if d == "cachee":
+            o.hide_render = o.hide_viewport = True
+            if role == "fond":
+                fonds.append(o)
+        elif d == "montree":
+            o.hide_render = o.hide_viewport = bool(o.get("ville_cache0"))
+            o["ville_lointain"] = 0
+        faits[d].append(f"{o.name} ({nom_l}, {_densite(o)})")
+    if not cfg:
+        log(f"{plan} : pas de brume de prise ({'hors prise' if ps is None else 'BRUME_PRISE[' + ps[0] + '] vide'}) : "
+            f"brumes du plan gardées ({', '.join(faits['intacte']) or 'aucune'}), celles des voisins cachées "
+            f"({', '.join(faits['cachee']) or 'aucune'})")
+        return None
+    import lieux as L
+    x0, x1, y0, y1, z0, z1 = boite_brume(ps, cfg["marge"], cfg["haut"])
+    ob = L.haze((x0, x1), (y0, y1), (z0, z1), cfg["densite"], name=f"haze_prise_{ps[0]}")
+    if ob.name not in scene.collection.objects:
+        scene.collection.objects.link(ob)
+    for c in list(ob.users_collection):
+        if c != scene.collection:
+            c.objects.unlink(ob)
+    ob.matrix_world = Matrix(base) @ ob.matrix_world
+    ob["ville_lieu"], ob["ville_lointain"], ob["ville_cache0"] = "prise", 0, 0
+    # les lampes liées à une brume « fond » cachée : la brume de la prise dans la même collection, au même état
+    # (Blender range collection_objects dans l'ordre de collection.objects)
+    relie = []
+    for em in scene.objects:
+        ll = getattr(em, "light_linking", None)
+        for attr in ("receiver_collection", "blocker_collection"):
+            c = getattr(ll, attr, None) if ll is not None else None
+            if c is None:
+                continue
+            etats = [co.light_linking.link_state for o, co in zip(c.objects, c.collection_objects) if o in fonds]
+            if not etats:
+                continue
+            if ob.name not in c.objects:
+                c.objects.link(ob)
+            for o, co in zip(c.objects, c.collection_objects):
+                if o == ob:
+                    co.light_linking.link_state = etats[0]
+            relie.append(f"{em.name} ({c.name}, {etats[0]})")
+    if _densite(ob) != round(cfg["densite"], 5):
+        raise RuntimeError(f"[ville] la brume de la prise n'a pas sa densité : {_densite(ob)} au lieu de "
+                           f"{cfg['densite']} (lieux.haze a changé ?)")
+    bpy.context.view_layer.update()
+    log(f"{plan} : brume de la prise {'+'.join(ps)} : {ob.name}, densité {cfg['densite']}, ville x {x0:.0f} à "
+        f"{x1:.0f}, y {y0:.0f} à {y1:.0f}, z {z0:.1f} à {z1:.0f} ; cachées : {', '.join(faits['cachee']) or 'aucune'} ; "
+        f"montrées : {', '.join(faits['montree']) or 'aucune'} ; laissées : {', '.join(faits['intacte']) or 'aucune'}"
+        f" ; lampes liées étendues : {', '.join(relie) or 'aucune'}")
+    return ob
 
 
 def mer(scene):
