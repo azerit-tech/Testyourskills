@@ -473,6 +473,17 @@ def selftest_voisins():
     assert sort_acteur("P2", "P3", False, None) == (True, "immobile")                       # le barrage
     assert sort_acteur("P3", "P2", True, None) == (False, "mobile")
     assert sort_acteur("P3", "P2", False, None) == (True, "immobile")
+    # (e) les liaisons de lumière d'un voisin qui ont perdu des objets
+    ici = {"lamp_light_3", "island_up_2", "ring_road", "haze.001", "sol_a", "sol_b"}
+    berline = [("coupe.001", "EXCLUDE"), ("door_FL.001", "EXCLUDE"), ("wheel_FL.001", "EXCLUDE")]
+    assert liaison_perdue("receiver_collection", berline, ici) == ("retirer", [n for n, _ in berline])  # rond-point
+    jumelle = [("coupe.002", "INCLUDE"), ("door_FL.002", "INCLUDE")]
+    assert liaison_perdue("receiver_collection", jumelle, ici)[0] == "eteindre"   # la jumelle sur la berline de P5
+    assert liaison_perdue("blocker_collection", jumelle, ici)[0] == "retirer"
+    assert liaison_perdue("receiver_collection", [("haze.001", "INCLUDE")], ici) == ("rien", [])   # brume cachée
+    sol = [("sol_a", "INCLUDE"), ("sol_b", "INCLUDE"), ("coupe.002", "INCLUDE")]
+    assert liaison_perdue("receiver_collection", sol, ici) == ("garder", ["coupe.002"])
+    assert liaison_perdue("receiver_collection", [], ici) == ("rien", [])
     # un seul phare : celui de la jetée ; celui du pont (P4 ne charge pas la jetée) est un doublon en P5 et P6
     take2 = {"pont", "port", "jetee"}
     assert drapeau_voisin("pont", "phare", True, True, take2, True) == (True, "doublon du phare de la jetée")
@@ -884,6 +895,30 @@ def sort_acteur(plan, plan_v, bouge, visible):
     return False, "mobile"
 
 
+def liaison_perdue(attr, membres, presents):
+    """Ce que devient la liaison de lumière d'une lampe d'un voisin dont des objets ont quitté la scène (sans
+    Blender). `attr` : « receiver_collection » (ce qu'elle éclaire) ou « blocker_collection » (ce qui porte son
+    ombre) ; `membres` : [(nom, état)] relevés au chargement, état INCLUDE ou EXCLUDE ; `presents` : les noms des objets
+    de la scène après l'assemblage. Rend (action, absents) :
+      « rien »      aucun absent ;
+      « retirer »   la collection retirée, la lampe rendue à tout le monde : il ne reste aucune inclusion présente
+                    (une exclusion de la berline du voisin, partie : les lampadaires du rond-point, berline_sans_ambre ;
+                    une ombre réservée à des absents) ;
+      « eteindre »  une lampe qui n'éclairait que des absents (sa jumelle sur la berline du voisin, partie avec elle) :
+                    rendue à tout le monde, elle poserait ses 50 kW sur toute la scène (Blender éclaire tout le monde
+                    par une collection vide) ; éteinte ;
+      « garder »    des inclusions restent : la collection ne garde que ses présents (Blender a ôté les absents)."""
+    absents = [n for n, _e in membres if n not in presents]
+    if not absents:
+        return "rien", []
+    inclus = [n for n, e in membres if e == "INCLUDE" and n in presents]
+    if inclus:
+        return "garder", absents
+    if attr == "receiver_collection" and any(e == "INCLUDE" for _n, e in membres):
+        return "eteindre", absents
+    return "retirer", absents
+
+
 # Le phare : un seul, celui de la jetée (SPEC §18.36). Un autre lieu qui en pose un (le pont : lieux.panorama,
 # lieu="pont", pour P4 qui ne charge pas la jetée) le cache, lui et ses lampes (ses enfants), dès que la jetée est là.
 PHARE_LIEU = "jetee"
@@ -945,7 +980,7 @@ def assembler(scene, infos, noms, base=None, plan=None, own=None, own_objs=None)
     import bpy
     from mathutils import Matrix
     out = {}
-    cams = {}
+    cams, releves = {}, {}
     presents = set(noms) | ({own} if own else set())
     for nom in noms:
         info = infos[nom]
@@ -963,6 +998,7 @@ def assembler(scene, infos, noms, base=None, plan=None, own=None, own_objs=None)
         for ob in list(sc.collection.objects):
             coll.objects.link(ob)
         objs = set(sc.objects)
+        releves[nom] = _releve_liaisons(objs)     # (avant toute sortie : liaisons() compare après l'assemblage)
         if prise:
             cams[nb_plan] = sc.camera             # (pour acteurs : le champ du voisin à son image 1)
         world = sc.world
@@ -1025,7 +1061,85 @@ def assembler(scene, infos, noms, base=None, plan=None, own=None, own_objs=None)
             f"({', '.join(names_gone[:12])}{'…' if len(names_gone) > 12 else ''}) en {time.time() - t0:.1f} s")
     if plan is not None and own_objs is not None:
         acteurs(scene, plan, out, own_objs, cams)
+    liaisons(scene, releves)
     return out
+
+
+LIAISONS = ("receiver_collection", "blocker_collection")
+
+
+def _membres_liaison(c):
+    """[(nom, état)] d'une collection de liaison de lumière : ses objets, puis ceux de ses sous-collections à l'état
+    de la sous-collection (Blender range collection_objects dans l'ordre de objects, collection_children dans celui
+    de children)."""
+    out = [(o.name, co.light_linking.link_state) for o, co in zip(c.objects, c.collection_objects)]
+    for ch, cc in zip(c.children, c.collection_children):
+        out += [(o.name, cc.light_linking.link_state) for o in ch.all_objects]
+    return out
+
+
+def _releve_liaisons(objs):
+    """{(objet, attribut): (collection, membres)} : les liaisons de lumière de ces objets, au chargement."""
+    out = {}
+    for o in objs:
+        ll = getattr(o, "light_linking", None)
+        for attr in LIAISONS:
+            c = getattr(ll, attr, None) if ll is not None else None
+            if c is not None:
+                out[(o.name, attr)] = (c.name, _membres_liaison(c))
+    return out
+
+
+def liaisons(scene, releves):
+    """Après l'assemblage : chaque lampe (ou émissif) d'un voisin dont la collection de liaison a perdu des objets
+    (retirés : acteurs, caméras, traces ; ou jamais dans la scène) est traitée (liaison_perdue) et nommée au journal.
+    Puis le contrôle : aucune lampe d'un voisin ne garde une liaison vers un objet absent de la scène ; sinon tout
+    s'arrête. `releves` : {lieu: _releve_liaisons(ses objets au chargement)}."""
+    import bpy
+    presents = {o.name for o in scene.objects}
+    lignes = []
+    for nom_l, rel in releves.items():
+        for (em_name, attr), (cname, membres) in sorted(rel.items()):
+            em = bpy.data.objects.get(em_name)
+            if em is None or em.name not in presents:
+                continue
+            action, absents = liaison_perdue(attr, membres, presents)
+            if action == "rien":
+                continue
+            c = getattr(em.light_linking, attr)
+            if action in ("retirer", "eteindre"):
+                setattr(em.light_linking, attr, None)
+                if c is not None and c.users == 0:
+                    bpy.data.collections.remove(c)
+            if action == "eteindre":
+                if em.type == "LIGHT":
+                    em.hide_render = True
+                    em["ville_cache0"] = 1
+                else:                                   # (un émissif reste visible : il éclaire tout le monde)
+                    action = "retirer, émissif à vérifier"
+            if action == "garder" and c is not None:
+                for ch in [c] + list(c.children_recursive):
+                    for o in [o for o in ch.objects if o.name not in presents]:
+                        ch.objects.unlink(o)
+            quoi = {"retirer": "liaison retirée, rendue à tout le monde", "eteindre": "éteinte (n'éclairait que des "
+                    "absents)", "garder": "liaison gardée sur ses présents"}.get(action, action)
+            lignes.append(f"{em_name} ({nom_l}, {'ombres' if attr == 'blocker_collection' else 'éclairage'} : {cname}, "
+                          f"{len(absents)} absents dont {', '.join(absents[:3])}) : {quoi}")
+    for ln in lignes:
+        log(f"liaison de lumière : {ln}")
+    bad = []
+    for o in scene.objects:
+        if o.get("ville_lieu") not in NOMS:
+            continue
+        ll = getattr(o, "light_linking", None)
+        for attr in LIAISONS:
+            c = getattr(ll, attr, None) if ll is not None else None
+            if c is not None:
+                bad += [f"{o.name} -> {m.name} ({c.name})" for m in c.all_objects if m.name not in presents]
+    if bad:
+        raise RuntimeError(f"[ville] {len(bad)} liaisons de lumière de voisins vers des objets absents : "
+                           f"{', '.join(bad[:8])}")
+    return lignes
 
 
 def _nature(top):
