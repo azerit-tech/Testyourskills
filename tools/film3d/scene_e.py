@@ -68,6 +68,92 @@ MAST_H = 25.0
 PALIERS = ("socle", "conteneurs", "portique")
 PALIER_MAX = "portique"
 
+# ---------------------------------------------------------------- la ville unique (plan de ville §2.5, « Port »)
+#
+# FILM3D_VILLE (lieux.ville_on, « 1 » par défaut) : le port rogné pour la ville. La jetée part de la sortie du
+# virage, à 50° à droite ; le terre-plein devient un polygone découpé autour d'elle : le quai nord recule au coin
+# droit du joint, l'eau entre dans une encoche à gauche de la jetée jusqu'à x = NOTCH_X. Le joint, ses coins et
+# l'axe de la jetée sont lus dans scene_d (J_JOINT, J_EDGE, J_HALF) et portés dans ce repère par les deux poses de
+# la ville (lieux.pose_ville) : rien en dur. « 0 » : le port autonome d'avant, inchangé.
+VILLE = L.ville_on()
+NOTCH_X = 10.0                    # le bord ouest de l'encoche (le terre-plein garde x < 10 jusqu'au quai nord)
+RAIL_POST = 2.4                   # le pas des montants du garde-corps (celui de la pointe)
+
+
+def _rot(deg, x, y):
+    c, s = math.cos(math.radians(deg)), math.sin(math.radians(deg))
+    return c * x - s * y, s * x + c * y
+
+
+def d_to_e(x, y):
+    """Un point de la scène de la jetée (D) dans celle du port (E), par leurs deux poses dans la ville."""
+    rd, tdx, tdy = L.pose_ville("jetee")
+    re_, tex, tey = L.pose_ville("port")
+    u, v = _rot(rd, x, y)
+    return _rot(-re_, u + tdx - tex, v + tdy - tey)
+
+
+def jetty_frame():
+    """La jetée dans ce repère : dict(o (l'axe au joint), d (la direction de l'axe, vers la pointe), n (sa normale à
+    gauche), right, left (les coins du joint, au bord du couronnement), half (la demi-chaussée), edge)."""
+    import scene_d as D
+    jx, yj = L.JETTY_X, D.J_JOINT
+    o, a = d_to_e(jx, yj), d_to_e(jx, yj + 1.0)
+    d = (a[0] - o[0], a[1] - o[1])
+    return dict(o=o, d=d, n=(-d[1], d[0]), right=d_to_e(jx + D.J_EDGE, yj), left=d_to_e(jx - D.J_EDGE, yj),
+                half=D.J_HALF, edge=D.J_EDGE, rail_h=D.RAIL_H, flank=lambda y: d_to_e(jx - D.J_EDGE, y))
+
+
+def jetty_uv(x, y, J=None):
+    """(le long de l'axe depuis le joint, à gauche de l'axe) d'un point du port."""
+    J = J or jetty_frame()
+    rx, ry = x - J["o"][0], y - J["o"][1]
+    return rx * J["d"][0] + ry * J["d"][1], rx * J["n"][0] + ry * J["n"][1]
+
+
+def lane_cut(y, J=None):
+    """(x min, x max) où la droite y = cte coupe les deux rives de la voie de la jetée."""
+    J = J or jetty_frame()
+    xs = []
+    for s in (-1, 1):
+        ox, oy = J["o"][0] + J["n"][0] * s * J["half"], J["o"][1] + J["n"][1] * s * J["half"]
+        u = (y - oy) / J["d"][1]
+        xs.append(ox + J["d"][0] * u)
+    return min(xs), max(xs)
+
+
+def land_polygon():
+    """Le terre-plein en ville unique, dans le sens trigonométrique : le quai sud, le quai est, le quai nord jusqu'au
+    coin droit du joint, le joint, le flanc gauche de la jetée jusqu'à x = NOTCH_X, l'encoche, le quai nord ouest."""
+    J = jetty_frame()
+    import scene_d as D
+    # le flanc gauche (x_D = JETTY_X − J_EDGE) coupe x = NOTCH_X : il est droit, deux points suffisent
+    y0, y1 = D.J_JOINT - 20.0, D.J_JOINT
+    p0, p1 = J["flank"](y0), J["flank"](y1)
+    k = (NOTCH_X - p0[0]) / (p1[0] - p0[0])
+    notch = (NOTCH_X, p0[1] + k * (p1[1] - p0[1]))
+    qn = J["right"][1]
+    return [(X0, Y0), (X1, Y0), (X1, qn), J["right"], J["left"], notch, (NOTCH_X, Y1), (X0, Y1)]
+
+
+def _outward(a, b):
+    """La normale vers l'eau d'un bord a -> b du polygone (sens trigonométrique : l'eau à droite)."""
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    ln = math.hypot(dx, dy)
+    return (dy / ln, -dx / ln)
+
+
+def bridge_x():
+    """L'axe du pont dans ce repère (x_E) : la pose du port dans la ville, celle du pont étant l'identité."""
+    return _rot(-L.pose_ville("port")[0], -L.pose_ville("port")[1], -L.pose_ville("port")[2])[0] if VILLE else 0.0
+
+
+def rail_edges():
+    """Les bords du terre-plein qui portent un garde-corps en ville unique : le quai nord, du coin droit du joint
+    au quai est, et l'encoche (le flanc de la jetée, puis x = NOTCH_X)."""
+    P = land_polygon()
+    return [(P[2], P[3]), (P[4], P[5]), (P[5], P[6])]
+
 
 def _palier_at_least(palier, which):
     return PALIERS.index(palier) >= PALIERS.index(which)
@@ -191,6 +277,23 @@ def mat_terre_plein(name="terre_plein_port", far=False):
     ]
     dashes = [_dashed(N, _line(N, px, py, "x", s * 3.5, Y0 + 1.0, Q0 - 5.0, 0.06), py) for s in (-1, 1)]
     dashes += [_dashed(N, _line(N, px, py, "y", QY + s * 3.5, 10.0, JX - 10.0, 0.06), px) for s in (-1, 1)]
+    if VILLE:
+        # la voie de la jetée : ses deux rives (8 m), de la sortie du virage au joint ; les lignes de l'ancien quai
+        # qui la traversent s'arrêtent à 1 m de ses rives, celles de l'ancienne jetée (x = 80) disparaissent
+        J = jetty_frame()
+        rx, ry = N.math("SUBTRACT", px, J["o"][0]), N.math("SUBTRACT", py, J["o"][1])
+        ju = N.math("ADD", N.math("MULTIPLY", rx, J["d"][0]), N.math("MULTIPLY", ry, J["d"][1]))
+        jv = N.math("ADD", N.math("MULTIPLY", rx, J["n"][0]), N.math("MULTIPLY", ry, J["n"][1]))
+        u0 = jetty_uv(*P5.hero_pos(P5.T_END), J)[0]
+        banks = [_line(N, jv, ju, "x", s * (J["half"] - 0.15), u0, 0.0, W) for s in (-1, 1)]
+        xl, xr = lane_cut(Q1 - 0.15, J)
+        dl, dr = lane_cut(QY + 3.5, J)
+        lines = lines[:4] + [
+            _line(N, px, py, "y", Q0 + 0.15, 6.85, JX + 6.85, W),
+            _line(N, px, py, "y", Q1 - 0.15, -6.85, xl - 1.0, W), _line(N, px, py, "y", Q1 - 0.15, xr + 1.0, JX - 6.85, W),
+        ] + lines[8:] + banks
+        dashes = dashes[:2] + [_dashed(N, _line(N, px, py, "y", QY - 3.5, 10.0, JX - 10.0, 0.06), px),
+                               _dashed(N, _line(N, px, py, "y", QY + 3.5, dr + 1.0, JX - 10.0, 0.06), px)]
     paint = lines[0]
     for l in lines[1:] + dashes:
         paint = N.math("MAXIMUM", paint, l)
@@ -308,7 +411,19 @@ def _source(rel, name, hidden, scale=1.0, mat=None, rot_z=0.0):
 # ---------------------------------------------------------------- le quai nu
 
 def _edges():
-    """Les tronçons de bord de quai (a, b, normale vers l'eau), coupés à la fin du pont et au départ de la jetée."""
+    """Les tronçons de bord de quai (a, b, normale vers l'eau), coupés à la fin du pont et au départ de la jetée.
+    En ville unique : les bords du polygone, sans le joint de la jetée (la jetée y continue la chaussée), le quai
+    sud coupé sous le pont (son axe lu dans la pose)."""
+    if VILLE:
+        P = land_polygon()
+        bx = bridge_x()
+        out = [(P[0], (bx - BRIDGE_EDGE, Y0), (0, -1)), ((bx + BRIDGE_EDGE, Y0), P[1], (0, -1))]
+        for i in range(1, len(P)):
+            a, b = P[i], P[(i + 1) % len(P)]
+            if i == 3:                                 # le joint, de J["right"] à J["left"]
+                continue
+            out.append((a, b, _outward(a, b)))
+        return out
     return [
         ((X0, Y0), (-BRIDGE_EDGE, Y0), (0, -1)), ((BRIDGE_EDGE, Y0), (X1, Y0), (0, -1)),
         ((X1, Y0), (X1, Y1), (1, 0)),
@@ -331,6 +446,8 @@ def build_quay(hidden, far=False):
     top = -0.06 if far else 0.0           # de loin, sous la chaussée du pont que les plans P4 posent par-dessus
     tp = bpy.data.materials.get("terre_plein_port_loin" if far else "terre_plein_port") or \
         mat_terre_plein("terre_plein_port_loin" if far else "terre_plein_port", far=far)
+    if VILLE:
+        return _build_quay_ville(tp, top, far)
     bm = L.bmesh.new()
     vs = [bm.verts.new((x, y, top)) for x, y in ((X0, Y0), (X1, Y0), (X1, Y1), (X0, Y1))]
     bm.faces.new(vs)
@@ -360,6 +477,69 @@ def build_quay(hidden, far=False):
     return slab
 
 
+def _strip_bm(bm, a, b, n, w, z0, z1):
+    """Une bande de largeur w le long du bord a -> b, côté terre (n : la normale vers l'eau), de z0 à z1."""
+    ia, ib = (a[0] - n[0] * w, a[1] - n[1] * w), (b[0] - n[0] * w, b[1] - n[1] * w)
+    ring = [a, b, ib, ia]
+    lo = [bm.verts.new((x, y, z0)) for x, y in ring]
+    hi = [bm.verts.new((x, y, z1)) for x, y in ring]
+    bm.faces.new(hi)
+    bm.faces.new(lo[::-1])
+    for i in range(4):
+        j = (i + 1) % 4
+        bm.faces.new((lo[i], lo[j], hi[j], hi[i]))
+
+
+def _build_quay_ville(tp, top, far):
+    """Le terre-plein en ville unique : le polygone (land_polygon), son mur de quai et son couronnement sur tous ses
+    bords sauf le joint de la jetée ; le garde-corps de la jetée (0,9 m, montants tous les 2,4 m, main courante et
+    lisse) continué sur le quai nord et autour de l'encoche."""
+    P = land_polygon()
+    bm = L.bmesh.new()
+    face = bm.faces.new([bm.verts.new((x, y, top)) for x, y in P])
+    L.bmesh.ops.triangulate(bm, faces=[face])
+    slab = L.mesh_object("port_terre_plein", bm, [tp])
+    wall = bpy.data.materials.get("quai_pierre") or L.mat_quay("quai_pierre")
+    cop = bpy.data.materials.get("couronnement") or L.mat_coping("couronnement")
+    bw, bc = L.bmesh.new(), L.bmesh.new()
+    for i in range(len(P)):
+        if i == 3:                                     # le joint : la jetée continue la chaussée
+            continue
+        a, b = P[i], P[(i + 1) % len(P)]
+        n = _outward(a, b)
+        f = bw.faces.new([bw.verts.new((a[0], a[1], COPING_H)), bw.verts.new((b[0], b[1], COPING_H)),
+                          bw.verts.new((b[0], b[1], L.WATER_Z - 1.5)), bw.verts.new((a[0], a[1], L.WATER_Z - 1.5))])
+        f.normal_update()
+        if f.normal.dot(Vector((n[0], n[1], 0))) < 0:
+            f.normal_flip()
+    for (a, b, n) in _edges():
+        _strip_bm(bc, a, b, n, COPING_W, top, COPING_H)
+    L.mesh_object("port_mur", bw, [wall]).visible_shadow = not far
+    L.mesh_object("port_couronnement", bc, [cop])
+    if not far:
+        J = jetty_frame()
+        rail = bpy.data.materials.get("garde_corps") or L.mat_steel("garde_corps", color=(0.32, 0.36, 0.36),
+                                                                   rough=0.35, rust=0.3, paint=True)
+        rb = L.bmesh.new()
+        for a, b in rail_edges():
+            n = _outward(a, b)
+            a = (a[0] - n[0] * 0.25, a[1] - n[1] * 0.25)
+            b = (b[0] - n[0] * 0.25, b[1] - n[1] * 0.25)
+            ln = math.dist(a, b)
+            k = max(1, round(ln / RAIL_POST))
+            pts = [(a[0] + (b[0] - a[0]) * i / k, a[1] + (b[1] - a[1]) * i / k) for i in range(k + 1)]
+            for p in pts:
+                L.tube_bm(rb, (p[0], p[1], COPING_H), (p[0], p[1], COPING_H + J["rail_h"]), 0.025, seg=8)
+            for h, r_ in ((J["rail_h"], 0.03), (0.5, 0.016)):
+                L.tube_bm(rb, (a[0], a[1], COPING_H + h), (b[0], b[1], COPING_H + h), r_, seg=8)
+        L.mesh_object("port_garde_corps", rb, [rail])
+    slab.visible_shadow = False
+    print(f"[port] ville unique : terre-plein en polygone ({len(P)} sommets), joint de la jetée de "
+          f"({J['right'][0]:.2f} ; {J['right'][1]:.2f}) à ({J['left'][0]:.2f} ; {J['left'][1]:.2f}), encoche en "
+          f"({P[5][0]:.2f} ; {P[5][1]:.2f})" if not far else "[port] ville unique : terre-plein en polygone", flush=True)
+    return slab
+
+
 def build_props(hidden):
     """Les bittes d'amarrage doubles sur le couronnement (une tous les 15 m) et les pneus de défense pendus au mur
     (un tous les 7,5 m), modèles de bibliothèque instanciés."""
@@ -368,7 +548,9 @@ def build_props(hidden):
     bol, _ = _source(os.path.join("lieux", "port", "bollard-double", "model.glb"), "src_bitte", hidden, scale=1.8, mat=iron)
     tyre, _ = _source(os.path.join("lieux", "port", "old-tyre", "old_tyre.gltf"), "src_pneu", hidden, scale=1.7)
     nb = nt = 0
+    railed = {tuple(a) for a, _ in rail_edges()} if VILLE else set()
     for (a, b, n) in _edges():
+        with_bollards = tuple(a) not in railed             # pas de bittes sous le garde-corps
         a, b = Vector((*a, 0)), Vector((*b, 0))
         d = b - a
         length = d.length
@@ -376,7 +558,7 @@ def build_props(hidden):
         nn = Vector((n[0], n[1], 0))
         rot = math.atan2(d.y, d.x)
         k = 6.0
-        while k < length - 4.0:
+        while with_bollards and k < length - 4.0:
             p = a + d * k - nn * (COPING_W * 0.5)
             S.instance(bol, f"bitte_{nb}", (p.x, p.y, COPING_H), rot)
             nb += 1
@@ -1227,8 +1409,10 @@ def plan_P5(scene, hidden, palier="conteneurs"):
     flou de mouvement les suit."""
     import scene_c
     lamp_src = L.panorama(scene, hidden, bridge=None, port=None)
-    # le pont avec son pylône et ses haubans (P4 les montre : au début de P5 ils sont dans l'axe, au fond)
-    scene_c.build_bridge(hidden, lamp_src, haubans=True)
+    # le pont avec son pylône et ses haubans (P4 les montre : au début de P5 ils sont dans l'axe, au fond). En ville
+    # unique, le port ne le construit plus : la ville le pose à sa place (render_film --ville, ville.voisins)
+    if not VILLE:
+        scene_c.build_bridge(hidden, lamp_src, haubans=True)
     build_port(hidden, lamp_src, far=False, palier=palier)
     scene.frame_start, scene.frame_end = P5.F0, P5.F0 + P5.FRAMES - 1
     # --- la berline : déjà en travers, la glisse, la reprise
