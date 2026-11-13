@@ -1325,9 +1325,11 @@ def build_east(hidden):
     _lamps("cargo_feux", [(SHIP_AT[0] + rng.uniform(-ss.x / 3, ss.x / 3), SHIP_AT[1] + rng.uniform(-ss.y / 2 + 8, ss.y / 2 - 8),
                            deck + rng.uniform(0.5, 6.0)) for _ in range(26)], "#ffd9a0", 30.0, 0.35)
     # --- au loin, une rive basse à l'est (celle de lieux.far_shore, tournée d'un quart de tour vers +x)
-    L.far_shore(y=1300.0, xs=(-1500.0, 1500.0), n=70, seed=21, name="rive_est")
-    for nm in ("rive_est_relief", "rive_est_lampes"):
-        bpy.data.objects[nm].data.transform(Matrix.Rotation(-math.pi / 2, 4, "Z"))
+    # (en ville unique, plus de rive à soi : l'autre rive vient de la ville)
+    if not VILLE:
+        L.far_shore(y=1300.0, xs=(-1500.0, 1500.0), n=70, seed=21, name="rive_est")
+        for nm in ("rive_est_relief", "rive_est_lampes"):
+            bpy.data.objects[nm].data.transform(Matrix.Rotation(-math.pi / 2, 4, "Z"))
     # --- près : la chaîne de l'axe, poteaux et maillons
     paint = bpy.data.materials.get("tole_peinte_p5") or mat_painted("tole_peinte_p5")
     pb = L.bmesh.new()
@@ -1554,7 +1556,12 @@ def plan_P5(scene, hidden, palier="conteneurs"):
     virage, derrière la caméra ; l'hélicoptère plonge devant elle, faisceau sur elle. Toutes les clés viennent des trajectoires (motion.py) ; le
     flou de mouvement les suit."""
     import scene_c
-    lamp_src = L.panorama(scene, hidden, bridge=None, port=None)
+    if VILLE:
+        # le ciel de la ville (la bande corail à son azimut unique, ramené dans ce repère), le phare à sa vraie place
+        # dans ce repère (la pose de la jetée) ; ni pont, ni jetée, ni pointe : la ville les pose (ville.voisins)
+        lamp_src = L.panorama(scene, hidden, yaw=L.mer_lieu("port"), bridge=None, port=None, jetty=None, lieu="port")
+    else:
+        lamp_src = L.panorama(scene, hidden, bridge=None, port=None)
     # le pont avec son pylône et ses haubans (P4 les montre : au début de P5 ils sont dans l'axe, au fond). En ville
     # unique, le port ne le construit plus : la ville le pose à sa place (render_film --ville, ville.voisins)
     if not VILLE:
