@@ -45,6 +45,22 @@ J_EDGE = J_HALF + 0.2 + J_WALK + 0.5      # 6,7 : le bord du couronnement
 # le ciel (médiane 5 % au bas du cadre de P6) ; à 20 m les plages se touchent presque et défilent avec la vitesse
 J_LAMPS = [JY0 + 15.0 + 20.0 * k for k in range(15)]   # 115 .. 395
 
+# La ville unique (FILM3D_VILLE, lieux.ville_on ; plan de ville §2.5, « Jetée et pointe ») : la jetée part du
+# terre-plein du port, redécoupé autour d'elle, au joint J_JOINT (la droite y = 328,8, perpendiculaire à l'axe,
+# chaussée contre chaussée à z = 0, bord du couronnement à ±6,7) : il en reste 71 m, garde-corps dès le joint des
+# deux côtés. Avant le joint, la berline roule sur le terre-plein du port (posé par ville.py). Les lampadaires avant
+# J_LAMP_FROM sont retirés, et le droit de y = 315 (il tomberait dans la voie du quai) ; le gauche reste, sur le
+# terre-plein. Le pont et le port lointains, la ville lointaine ne sont plus posés : ils viennent de la ville, à leur
+# vraie pose. À FILM3D_VILLE=0, le lieu autonome d'avant, inchangé.
+J_JOINT = 328.8
+J_LAMP_FROM = 315.0
+J_LAMP_DROP = ("lamp_jetee_10_d",)        # J_LAMPS[10] = 315, côté droit
+
+
+def jetty_y0():
+    """Le début de la jetée construite : le joint avec le port en ville unique, le bout du terre-plein sinon."""
+    return J_JOINT if L.ville_on() else JY0
+
 CX, CY = L.POINTE               # (80, 430)
 R = L.POINTE_R                  # 30
 COPING = 0.55
@@ -73,13 +89,42 @@ def place_on_jetty(rig, x, y, heading=0.0):
 
 # ---------------------------------------------------------------- la jetée
 
+def _drop_lamps(out, far):
+    """Ville unique : retire les lampadaires avant J_LAMP_FROM et ceux de J_LAMP_DROP (mât, spot, halo de la vue
+    lointaine). Ils sont construits puis retirés pour garder leur nom (lamp_jetee_<k>_<côté>, k l'indice dans
+    J_LAMPS : p6_phare_clear et la lumière les lisent par là)."""
+    keep, gone = [], 0
+    for mast, light, head in out["lamps"]:
+        if head.y < J_LAMP_FROM - 1.0 or mast.name in J_LAMP_DROP:
+            for ob in (light, mast):
+                bpy.data.objects.remove(ob)
+            gone += 1
+            if far:
+                halos = bpy.data.objects.get("jetee_halos")
+                if halos is not None:
+                    import bmesh
+                    bm = bmesh.new()
+                    bm.from_mesh(halos.data)
+                    bmesh.ops.delete(bm, geom=[v for v in bm.verts if (Vector(v.co) - head).length < 1.0],
+                                     context="VERTS")
+                    bm.to_mesh(halos.data)
+                    bm.free()
+        else:
+            keep.append((mast, light, head))
+    out["lamps"] = keep
+    return gone
+
+
 def build_jetty(hidden, lamp_src, far=False):
-    """La jetée de 300 m, droite et plate, du terre-plein du port à la pointe."""
-    ys = [JY0 + 4.0 * k for k in range(int((JY1 - JY0) / 4.0) + 1)] + [JY1 + 1.0]
+    """La jetée, droite et plate, du terre-plein du port à la pointe : 300 m (lieu autonome) ou 71 m depuis le joint
+    avec le port (ville unique, jetty_y0)."""
+    y0 = jetty_y0()
+    ys = [y0 + 4.0 * k for k in range(int((JY1 - y0) / 4.0) + 1)] + [JY1 + 1.0]
     out = L.roadway("jetee", ys, jetty_z, x0=JX, half=J_HALF, walk=J_WALK, rail="quai", lamp_src=lamp_src,
-                    lamp_ys=J_LAMPS, far=far, rail_ys=(JY0, CY - math.sqrt(R * R - J_EDGE * J_EDGE)))
-    print(f"[jetee] {JY1 - JY0:.0f} m en x {JX:.0f}, chaussée {2 * J_HALF:.0f} m, {len(out['lamps'])} lampadaires",
-          flush=True)
+                    lamp_ys=J_LAMPS, far=far, rail_ys=(y0, CY - math.sqrt(R * R - J_EDGE * J_EDGE)))
+    gone = _drop_lamps(out, far) if L.ville_on() else 0
+    print(f"[jetee] {JY1 - y0:.0f} m en x {JX:.0f} depuis y {y0:.1f}, chaussée {2 * J_HALF:.0f} m, "
+          f"{len(out['lamps'])} lampadaires ({gone} retirés avant le port)", flush=True)
     return out
 
 
@@ -575,8 +620,28 @@ def build_marina(hidden, far=False):
 
 # ---------------------------------------------------------------- le décor et les plans
 
+def panorama(scene, hidden, **kw):
+    """lieux.panorama pour la scène D. Ville unique : ni pont ni port lointains (ils viennent de la ville, à leur
+    vraie pose : le port est à 40 m du bord de la pointe), la mer à l'azimut unique de la ville (mer_lieu), le phare
+    porté par la pose de la jetée, et pas de ville lointaine : distant_city la pose dans le repère de l'eau (quai en
+    y = −325, celui du pont), qui n'est plus celui de la scène D tournée de −50° ; la ville vient de ville.py. Lieu
+    autonome : le pont et le port « loin » d'avant, la ville lointaine."""
+    if not L.ville_on():
+        kw.setdefault("bridge", "loin")
+        kw.setdefault("port", "loin")
+        return L.panorama(scene, hidden, **kw)
+    kw.update(bridge=None, port=None, yaw=L.mer_lieu("jetee"), lieu="jetee")
+    kw.pop("haubans", None)
+    city = L.distant_city
+    L.distant_city = lambda *a, **k: None          # le temps de l'appel (comme lieux.port_far avec scene_e)
+    try:
+        return L.panorama(scene, hidden, **kw)
+    finally:
+        L.distant_city = city
+
+
 def decor(scene, hidden, all_lit=False, marina=False):
-    lamp_src = L.panorama(scene, hidden, all_lit=all_lit, bridge="loin", port="loin")
+    lamp_src = panorama(scene, hidden, all_lit=all_lit)
     build_jetty(hidden, lamp_src)
     build_pointe(hidden, lamp_src, marina=marina)
     return lamp_src
@@ -1038,9 +1103,12 @@ def plan_FIN6(scene, hidden, palier="socle"):
 
 def p6_ground(x, y):
     """Le sol sous un véhicule de la colonne : la chaussée bombée de la jetée, le terre-plein plat, la rampe du
-    pont et sa pente (scene_e.deck_ground)."""
-    if y >= JY0 - 2.0 and abs(x - JX) < 6.0:
+    pont et sa pente (scene_e.deck_ground). Ville unique : avant le joint, le terre-plein du port, plat à z = 0 (la
+    rampe du pont est loin derrière : la meute est déjà dans le port à la première image)."""
+    if y >= jetty_y0() - (0.0 if L.ville_on() else 2.0) and abs(x - JX) < 6.0:
         return jetty_point(x, y).z, 0.0
+    if L.ville_on() or y >= JY0:
+        return 0.0, 0.0
     import scene_e
     return scene_e.deck_ground(x, y)
 
@@ -1135,7 +1203,7 @@ def plan_P6(scene, hidden, palier="socle"):
     (ils ne tirent rien)."""
     import motion as M
     import p6_jetee as P6
-    lamp_src = L.panorama(scene, hidden, all_lit=True, bridge="loin", port="loin", haubans=(palier in ("haubans", "complet")))
+    lamp_src = panorama(scene, hidden, all_lit=True, haubans=(palier in ("haubans", "complet")))
     build_jetty(hidden, lamp_src)
     build_pointe(hidden, lamp_src, far=True, marina=(palier in ("marina", "complet")))
     # le phare (lieux.panorama) : ses pinceaux, relevés de 1° seulement et vus de la jetée sous la lanterne, barrent
