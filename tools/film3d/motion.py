@@ -355,7 +355,11 @@ def rebody(poses, chassis="hero", ground=None, corners=None, joints=None, seed=N
         # la première image, la vitesse pleine ensuite) : la caisse n'en voit rien
         if math.hypot(a_long, a_lat) > 2.0 * G:
             a_long = a_lat = 0.0
-        roll_t = soft_limit(c["roll_per_g"] * (a_lat / G + driver(1, t, speed)), c["roll_max"])
+        # les ressorts lisent l'effort dans le repère de la caisse : en glisse, elle n'est plus dans l'axe de sa
+        # marche (à 36° de glisse, 81 % de la latérale fait le roulis, 59 % passe dans l'axe et fait le tangage)
+        b_ = math.radians(head - travel)
+        a_long, a_lat = a_long * math.cos(b_) + a_lat * math.sin(b_), a_lat * math.cos(b_) - a_long * math.sin(b_)
+        roll_t =soft_limit(c["roll_per_g"] * (a_lat / G + driver(1, t, speed)), c["roll_max"])
         pitch_t = soft_limit(c["pitch_per_g"] * (a_long / G + driver(0, t, speed)), c["pitch_max"])
         if roll is None:
             roll, pitch = roll_t, pitch_t
