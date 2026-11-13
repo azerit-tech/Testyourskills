@@ -535,6 +535,83 @@ def _strip_bm(bm, a, b, n, w, z0, z1):
         bm.faces.new((lo[i], lo[j], hi[j], hi[i]))
 
 
+RACCORD = 2.0                     # m : la bande de raccord de la dalle aux chaussées bombées (pied du pont, joint)
+
+
+def _bridge_half():
+    import scene_c
+    return scene_c.HALF
+
+
+def slab_z(x, y):
+    """La hauteur de la dalle du port en (x, y) (ville unique) : 0, sauf dans les deux bandes de raccord, où elle
+    descend linéairement sur RACCORD m vers le bombé de la chaussée voisine (le pont à la fin du raccord de son pied,
+    scene_c.Y_TOE ; la jetée à son joint), pour qu'aucune marche ne passe sous les roues."""
+    import scene_c
+    import scene_d as D
+    eps = 1e-6
+    xc, yc = e_to_c(x, y)
+    if abs(xc) <= scene_c.HALF + eps and scene_c.Y_TOE - eps <= yc <= scene_c.Y_TOE + RACCORD + eps:
+        w = max(0.0, min(1.0, 1.0 - (yc - scene_c.Y_TOE) / RACCORD))
+        with L.road_half(scene_c.HALF):
+            return w * (scene_c.deck_z(scene_c.Y_TOE) + road.road_z(xc))
+    J = jetty_frame()
+    u, v = jetty_uv(x, y, J)
+    if -RACCORD - eps <= u <= eps and abs(v) <= J["half"] + eps:
+        w = max(0.0, min(1.0, 1.0 + u / RACCORD))
+        with L.road_half(J["half"]):
+            return w * (D.jetty_z(D.J_JOINT) + road.road_z(v))
+    return 0.0
+
+
+def _ears(poly):
+    """Les triangles (indices) d'un polygone simple dans le sens trigonométrique, par oreilles."""
+    def cross(a, b, c):
+        return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+
+    def inside(p, a, b, c):
+        return cross(a, b, p) > 1e-9 and cross(b, c, p) > 1e-9 and cross(c, a, p) > 1e-9
+
+    idx, out = list(range(len(poly))), []
+    while len(idx) > 3:
+        for k in range(len(idx)):
+            i0, i1, i2 = idx[k - 1], idx[k], idx[(k + 1) % len(idx)]
+            a, b, c = poly[i0], poly[i1], poly[i2]
+            if cross(a, b, c) <= 1e-9:
+                continue
+            if any(inside(poly[j], a, b, c) for j in idx if j not in (i0, i1, i2)):
+                continue
+            out.append((i0, i1, i2))
+            idx.pop(k)
+            break
+        else:
+            raise ValueError(f"polygone non simple ou mal orienté : {poly}")
+    out.append(tuple(idx))
+    return out
+
+
+def _grid_bm(bm, at, ni, nj, zfun, skirt=0.08):
+    """Une grille (ni × nj cases) de sommets at(i, j) -> (x, y) à la hauteur zfun(x, y), faces vers le haut, et une
+    jupe verticale de `skirt` m sous ses quatre bords (les bandes de raccord touchent des dalles plates : la jupe
+    ferme la fente)."""
+    V = [[None] * (nj + 1) for _ in range(ni + 1)]
+    for i in range(ni + 1):
+        for j in range(nj + 1):
+            x, y = at(i, j)
+            V[i][j] = bm.verts.new((x, y, zfun(x, y)))
+    for i in range(ni):
+        for j in range(nj):
+            f = bm.faces.new((V[i][j], V[i + 1][j], V[i + 1][j + 1], V[i][j + 1]))
+            f.normal_update()
+            if f.normal.z < 0:
+                f.normal_flip()
+    ring = [V[i][0] for i in range(ni + 1)] + [V[ni][j] for j in range(1, nj + 1)] + \
+        [V[i][nj] for i in range(ni - 1, -1, -1)] + [V[0][j] for j in range(nj - 1, 0, -1)]
+    for a, b in zip(ring, ring[1:] + ring[:1]):
+        bm.faces.new((a, b, bm.verts.new((b.co.x, b.co.y, b.co.z - skirt)),
+                      bm.verts.new((a.co.x, a.co.y, a.co.z - skirt))))
+
+
 def _build_quay_ville(tp, top, far):
     """Le terre-plein en ville unique : le polygone (land_polygon), son mur de quai et son couronnement sur tous ses
     bords sauf le joint de la jetée ; le garde-corps de la jetée (0,9 m, montants tous les 2,4 m, main courante et
@@ -543,16 +620,37 @@ def _build_quay_ville(tp, top, far):
     # sous le raccord du pied de la rampe (de son pied à z = 0, chaussée du pont comprise), pas de dalle : la
     # chaussée bombée du pont y est le sol (plus bas que 0 vers ses bords, elle passerait sous la dalle). Sous la
     # rampe elle-même, la dalle reste, sous le tablier, entre les murs de soutènement du pont
-    import scene_c
+    # Deux raccords de chaussée, chacun une bande de RACCORD m côté port, maillée fin : au pied du pont (le bord de la
+    # dalle sur le bombé du pont, puis à plat) et au joint de la jetée (de plat au bombé de la jetée). Le reste en
+    # morceaux triangulés à la main (oreilles) : la triangulation de Blender remplissait l'encoche concave et la
+    # dalle recouvrait la jetée au-delà du joint
     foot, toe = ramp_ys()
-    bx = bridge_x()
-    xl, xr = bx - scene_c.HALF, bx + scene_c.HALF
-    pieces = [[(X0, toe), (X1, toe)] + P[2:], [(X0, Y0), (xl, Y0), (xl, toe), (X0, toe)],
-              [(xr, Y0), (X1, Y0), (X1, toe), (xr, toe)], [(xl, Y0), (xr, Y0), (xr, foot), (xl, foot)]]
+    xl, xr = bridge_x() - _bridge_half(), bridge_x() + _bridge_half()
+    t2 = toe + RACCORD
+    J = jetty_frame()
+    jh = J["half"]
+
+    def jp(u, v):
+        return (J["o"][0] + J["d"][0] * u + J["n"][0] * v, J["o"][1] + J["d"][1] * u + J["n"][1] * v)
+
+    qn = P[2][1]
+    a3 = [(NOTCH_X, qn), P[3], jp(0.0, -jh), jp(-RACCORD, -jh), jp(-RACCORD, jh), jp(0.0, jh), P[4], P[5]]
+    pieces = [[(X0, Y0), (xl, Y0), (xl, t2), (X0, t2)], [(xr, Y0), (X1, Y0), (X1, t2), (xr, t2)],
+              [(xl, Y0), (xr, Y0), (xr, foot), (xl, foot)], [(X0, t2), (X1, t2), (X1, qn), (X0, qn)],
+              [(X0, qn), (NOTCH_X, qn), (NOTCH_X, Y1), (X0, Y1)], a3]
     bm = L.bmesh.new()
     for pc in pieces:
-        face = bm.faces.new([bm.verts.new((x, y, top)) for x, y in pc])
-        L.bmesh.ops.triangulate(bm, faces=[face])
+        vs = [bm.verts.new((x, y, top)) for x, y in pc]
+        for i, j, k in _ears(pc):
+            bm.faces.new((vs[i], vs[j], vs[k]))
+    # le pied : de y toe (le bombé du pont, scene_c.deck_z + road_z) à toe + RACCORD (à plat), sur la chaussée du pont
+    nx = int(round((xr - xl) / 0.25))
+    _grid_bm(bm, lambda i, j: (xl + (xr - xl) * i / nx, toe + RACCORD * j / 4), nx, 4,
+             lambda x, y: top + slab_z(x, y))
+    # le joint : de toe à plat (u = -RACCORD) au bombé de la jetée (u = 0), sur sa chaussée
+    nv = int(round(2 * jh / 0.25))
+    _grid_bm(bm, lambda i, j: jp(-RACCORD + RACCORD * j / 4, -jh + 2 * jh * i / nv), nv, 4,
+             lambda x, y: top + slab_z(x, y))
     slab = L.mesh_object("port_terre_plein", bm, [tp])
     wall = bpy.data.materials.get("quai_pierre") or L.mat_quay("quai_pierre")
     cop = bpy.data.materials.get("couronnement") or L.mat_coping("couronnement")
@@ -1418,7 +1516,7 @@ def deck_ground(x, y):
     if VILLE:
         xc, yc = e_to_c(x, y)
         if abs(xc) > BRIDGE_EDGE or yc >= scene_c.Y_TOE:
-            return 0.0, 0.0
+            return slab_z(x, y), 0.0                    # la dalle, ses bandes de raccord comprises
         return scene_c.deck_z(yc) + road.road_z(xc), math.degrees(math.atan(scene_c.deck_slope(yc)))
     z = scene_c.deck_z(y) + (road.road_z(x) if y < -20.0 else 0.0)
     return z, math.degrees(math.atan(scene_c.deck_slope(y)))
