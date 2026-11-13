@@ -94,6 +94,13 @@ CHEVRON_XS = (-6.6, -2.6, 1.6, 7.2) if VILLE else (-6.0, -2.0, 2.0, 6.0)
 P4_LENS_X = (3.0, 6.5)
 
 
+def axe_ferme():
+    """FILM3D_PORT_AXE : « 1 » (le défaut) l'axe fermé par les séparateurs et le mur de conteneurs de CLOSE_WALL_Y ;
+    « 0 » les retire, pour la prise du 200 mm de P4 qui regarde le pont par-dessus le port (son objectif est derrière
+    eux, en y_E 86,4). Lu à l'appel ; la clé du cache de scène le distingue (debit.env_key : les FILM3D_*)."""
+    return os.environ.get("FILM3D_PORT_AXE", "1").strip().lower() not in ("0", "non", "no", "false", "off")
+
+
 def _rot(deg, x, y):
     c, s = math.cos(math.radians(deg)), math.sin(math.radians(deg))
     return c * x - s * y, s * x + c * y
@@ -1001,7 +1008,8 @@ def build_containers(hidden, far=False, numbers_near=None):
         yd.row(-10.0 - W / 2 - i * W, 54.0, ["40", "40"], (4, 5), top_gaps=0.1)
     for i in range(0 if VILLE else 2):               # le mur gauche (x > 0), raccourci
         yd.row(10.0 + W / 2 + i * W, 10.0, ["40", "40"], (4, 5), top_gaps=0.15)
-    yd.row(-30.0, CLOSE_WALL_Y, CLOSE_WALL_KEYS, 3, along_x=True, top_gaps=0.15)
+    if axe_ferme():
+        yd.row(-30.0, CLOSE_WALL_Y, CLOSE_WALL_KEYS, 3, along_x=True, top_gaps=0.15)
     for i in range(4):                               # à l'ouest de la voie du pont, derrière le portique
         yd.row(-24.0 - i * (W + 1.2), 10.0, ["40", "40", "20", "40"], (2, 3), top_gaps=0.3)
     for i in range(3):                               # à l'est
@@ -1368,7 +1376,8 @@ def build_port(hidden, lamp_src, far=False, palier=None):
     n = _remove_bridge_flat()
     build_quay(hidden, far=far)
     build_masts(far=far)
-    build_barrier(hidden, far=far)
+    if axe_ferme():
+        build_barrier(hidden, far=far)
     if not far:
         build_props(hidden)
     if _palier_at_least(palier, "conteneurs"):
@@ -1378,8 +1387,9 @@ def build_port(hidden, lamp_src, far=False, palier=None):
             build_east(hidden)
     if _palier_at_least(palier, "portique"):
         build_gantry(far=far)
-    print(f"[port] terre-plein {X1 - X0:.0f} × {Y1 - Y0:.0f} m, voie du quai en y {QY:.0f}, axe fermé en y "
-          f"{BARRIER_Y:.1f}, {len(MASTS)} mâts, palier {palier}, {'vu de loin' if far else 'complet'}"
+    axe = f"axe fermé en y {BARRIER_Y:.1f}" if axe_ferme() else "axe ouvert (FILM3D_PORT_AXE=0)"
+    print(f"[port] terre-plein {X1 - X0:.0f} × {Y1 - Y0:.0f} m, voie du quai en y {QY:.0f}, {axe}, "
+          f"{len(MASTS)} mâts, palier {palier}, {'vu de loin' if far else 'complet'}"
           f"{f', chaussée du pont retirée ({n} objets)' if n else ''}", flush=True)
 
 
