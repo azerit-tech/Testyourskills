@@ -531,10 +531,13 @@ def _bouge(o):
     return False
 
 
-def is_acteur(top):
-    """Un acteur animé (à retirer d'un voisin) : la caméra, une trace de berline, ou une famille dont un objet bouge."""
-    if top.type == "CAMERA" or TRACES.match(top.name):
+def is_acteur(top, traces=True):
+    """Un acteur animé (à retirer d'un voisin) : la caméra, une trace de berline (si `traces` : le plan du voisin
+    suit le plan rendu, la berline n'y est pas encore passée), ou une famille dont un objet bouge."""
+    if top.type == "CAMERA" or (traces and TRACES.match(top.name)):
         return True
+    if TRACES.match(top.name):
+        return False                    # une trace révélée par ses clés : son état est celui de son plan à la coupe
     return any(_bouge(o) for o in _family(top))
 
 
@@ -629,8 +632,10 @@ def assembler(scene, infos, noms, base=None, plan=None):
         if world is not None and world.users == 0:
             bpy.data.worlds.remove(world)
         gone = set()
+        # les traces d'un voisin dont le plan précède restent (la berline y est passée) ; s'il suit, elles sortent
+        suit = prise and P.START[nb_plan] > P.START[plan]
         for top in _tops(objs):
-            if (is_acteur(top) if prise else is_cast(top)):
+            if (is_acteur(top, traces=suit) if prise else is_cast(top)):
                 gone.update(_family(top))
         names_gone = sorted(o.name for o in _tops(gone))
         for ob in gone:
