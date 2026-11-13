@@ -449,8 +449,9 @@ def inventory(scene):
 # Ce que la ville ne reprend pas d'un lieu (les objets de tête et toute leur descendance) : les caméras, les véhicules
 # du plan (les rigs de lieux.rig, qui portent « body » ; la berline et la patrouille de l'avenue, « coupe » et
 # « police »), les personnages (toute descendance qui a une armature). Les voitures garées restent : c'est du décor.
-# les véhicules, les personnages et ce qu'ils laissent (wake : les traces de pneus de la berline d'un plan)
-CAST = re.compile(r"^(hero|coupe|police|patrol|van|heli|jet|officer|agent|focus|wake)([_.:]|$)")
+# les véhicules, les personnages et ce qu'ils laissent : les traces de pneus des berlines des plans (wake_wheel_*
+# du rond-point, trace_p5_* du port, traces_glissade de la pointe) et les repères de roue (repere_*)
+CAST = re.compile(r"^(hero|coupe|police|patrol|van|heli|jet|officer|agent|focus|wake|traces?|repere)([_.:]|$)")
 # Les faux lointains de chaque lieu : ce qui imite un autre lieu ou l'horizon. Deux règles, sur l'objet de tête :
 # son nom (le panorama de lieux.panorama, le phare lointain, les brumes), puis sa place dans la scène du lieu (le
 # centre de sa boîte hors de la zone propre du lieu, zones() : le fond de rue de la rue, le rond-point au bout de
@@ -847,64 +848,219 @@ def _axis(rows, s, direction, span=10.0):
 ETENDU = 600.0          # un objet plus grand que ça (m, en x ou en y) est un sol étendu : listé, hors de la grille
 
 
+# ---- les contrôles : le sol sous les roues, les emprises réelles
+
+TROU_PAS, TROU_LAT, TROU_HAUT, TROU_MARCHE = 0.5, (-1.0, 0.0, 1.0), 3.0, 0.03
+
+
+def _premiere_face(scene, dg, x, y, z0, depth):
+    """La première face sous (x, y, z0), quel que soit son objet (sauf la berline de la ville et les annotations) :
+    (z, objet, lieu) ; None si rien jusqu'à `depth` m. La mer de la ville compte comme un trou (lieu « mer »)."""
+    from mathutils import Vector
+    o = Vector((x, y, z0))
+    d = Vector((0.0, 0.0, -1.0))
+    left = depth
+    for _ in range(8):
+        ok, loc, _nor, _i, ob, _m = scene.ray_cast(dg, o, d, distance=left)
+        if not ok:
+            return None
+        ob = ob.original if ob else ob
+        who = ob.get("ville_lieu") if ob else None
+        if who not in ("berline", "annotation"):
+            return loc.z, ob.name, who
+        left -= (o.z - loc.z) + 0.005
+        if left <= 0:
+            return None
+        o = loc + d * 0.005
+    return None
+
+
+def _echantillons(a, b, ds):
+    """Les instants de la prise (a, b) espacés de `ds` m de chemin de la berline : [(t, x, y, cap de la vitesse)]."""
+    pos, _head = prise_pose(a)
+    t0, t1 = (a - 1) / FPS, (b - 1) / FPS
+    dt = 1.0 / 480.0
+    out, t, acc, prev = [], t0, ds, pos(t0)
+    while t <= t1 + 1e-9:
+        p = pos(t)
+        acc += math.hypot(p[0] - prev[0], p[1] - prev[1])
+        prev = p
+        if acc >= ds:
+            q0, q1 = pos(t - 1e-3), pos(t + 1e-3)
+            cap = math.degrees(math.atan2(-(q1[0] - q0[0]), q1[1] - q0[1]))
+            out.append((t, p[0], p[1], cap))
+            acc -= ds
+        t += dt
+    return out
+
+
+def trous(scene, ds=TROU_PAS, lats=TROU_LAT, up=TROU_HAUT, marche=TROU_MARCHE):
+    """Le sol sous les roues, par lancer de rayon vertical dans la ville assemblée : tous les `ds` m du chemin de la
+    berline, sur son axe et à ± 1 m, la première face sous z + `up` (z : le sol du pas précédent), quel que soit son
+    objet. Un trou : aucune face (ou la mer) ; une marche : un saut de hauteur de plus de `marche` entre deux pas, au-
+    delà de la pente du voisinage (la médiane des sauts de ± 4 pas : une rampe régulière n'est pas une marche).
+    Rend [dict(prise, s0, s1, plan, image, lat, genre, avant, apres, dz)] et le nombre de pas."""
+    import bpy
+    dg = bpy.context.evaluated_depsgraph_get()
+    events, n = [], 0
+    for k, (a, b, _shots) in enumerate(prises()):
+        samples = _echantillons(a, b, ds)
+        ss = [s_of_pos(*P.DRIVE.pos(t)) for t, _x, _y, _c in samples]
+        fr = [shot_of(min(P.TOTAL, max(1, int(round(t * FPS)) + 1))) for t, _x, _y, _c in samples]
+        for lat in lats:
+            line, zprev = [], None
+            for (t, x, y, cap) in samples:
+                c = math.radians(cap)
+                px, py = x - lat * math.cos(c), y - lat * math.sin(c)      # lat > 0 : à gauche de la berline
+                if zprev is None:
+                    h0 = _sol(scene, dg, px, py, cap)
+                    zprev = h0[0] if h0 else Z_CIEL - up
+                h = _premiere_face(scene, dg, px, py, zprev + up, up + 12.0)
+                if h is None or h[2] == "mer":
+                    line.append(None)
+                else:
+                    line.append(h)
+                    zprev = h[0]
+            n += len(line)
+            dz = [None] + [(line[i][0] - line[i - 1][0]) if line[i] and line[i - 1] else None
+                           for i in range(1, len(line))]
+            i = 0
+            while i < len(line):
+                if line[i] is None:
+                    j = i
+                    while j + 1 < len(line) and line[j + 1] is None:
+                        j += 1
+                    before = next((line[q] for q in range(i - 1, -1, -1) if line[q]), None)
+                    after = next((line[q] for q in range(j + 1, len(line)) if line[q]), None)
+                    events.append(dict(prise=k + 1, s0=round(ss[i], 2), s1=round(ss[j], 2), plan=fr[i][0],
+                                       image=fr[i][1], lat=lat, genre="trou", avant=before and before[1],
+                                       apres=after and after[1],
+                                       dz=round(after[0] - before[0], 3) if before and after else None))
+                    i = j + 1
+                    continue
+                if dz[i] is not None:
+                    nb = sorted(dz[q] for q in range(max(1, i - 4), min(len(dz), i + 5)) if q != i and dz[q] is not None)
+                    ref = nb[len(nb) // 2] if nb else 0.0
+                    if abs(dz[i] - ref) > marche:
+                        events.append(dict(prise=k + 1, s0=round(ss[i - 1], 2), s1=round(ss[i], 2), plan=fr[i][0],
+                                           image=fr[i][1], lat=lat, genre="marche", avant=line[i - 1][1],
+                                           apres=line[i][1], dz=round(dz[i], 3)))
+                i += 1
+    return events, n
+
+
+def _tris_xy(ob, dg):
+    """Les triangles de l'objet évalué, en plan dans la ville : tableau (n, 3, 2), ou None."""
+    import numpy as np
+    ev = ob.evaluated_get(dg)
+    try:
+        me = ev.to_mesh()
+    except RuntimeError:
+        return None
+    if me is None:
+        return None
+    try:
+        me.calc_loop_triangles()
+        nt = len(me.loop_triangles)
+        if nt == 0 or len(me.vertices) == 0:
+            return None
+        co = np.empty(len(me.vertices) * 3, dtype=np.float64)
+        me.vertices.foreach_get("co", co)
+        co = co.reshape(-1, 3)
+        tri = np.empty(nt * 3, dtype=np.int64)
+        me.loop_triangles.foreach_get("vertices", tri)
+        m = np.array(ob.matrix_world, dtype=np.float64)
+        w = co @ m[:3, :3].T + m[:3, 3]
+        return w[tri.reshape(-1, 3)][:, :, :2]
+    finally:
+        ev.to_mesh_clear()
+
+
+def _raster(T, x0, y0, cell, nx, ny):
+    """Les cases (indices à plat j·nx + i) de la grille que couvrent les triangles T (n, 3, 2) en plan : un petit
+    triangle (au plus 2 × 2 cases) par ses sommets et son centre ; un grand par le test des centres de case de sa
+    boîte, plus ses arêtes échantillonnées (une face verticale se projette en ligne)."""
+    import numpy as np
+    if T is None or not len(T):
+        return np.zeros(0, dtype=np.int64)
+    I = (T[..., 0] - x0) / cell
+    J = (T[..., 1] - y0) / cell
+    i0, i1 = np.floor(I.min(1)).astype(np.int64), np.floor(I.max(1)).astype(np.int64)
+    j0, j1 = np.floor(J.min(1)).astype(np.int64), np.floor(J.max(1)).astype(np.int64)
+    small = ((i1 - i0) <= 1) & ((j1 - j0) <= 1)
+    S = T[small]
+    pts = [S.reshape(-1, 2), S.mean(1)]
+    idx = []
+    for k in np.nonzero(~small)[0]:
+        (ax, ay), (bx, by), (cx, cy) = T[k]
+        xs = x0 + (np.arange(i0[k], i1[k] + 1) + 0.5) * cell
+        ys = y0 + (np.arange(j0[k], j1[k] + 1) + 0.5) * cell
+        X, Y = np.meshgrid(xs, ys)
+        d1 = (bx - ax) * (Y - ay) - (by - ay) * (X - ax)
+        d2 = (cx - bx) * (Y - by) - (cy - by) * (X - bx)
+        d3 = (ax - cx) * (Y - cy) - (ay - cy) * (X - cx)
+        inside = ((d1 >= 0) & (d2 >= 0) & (d3 >= 0)) | ((d1 <= 0) & (d2 <= 0) & (d3 <= 0))
+        jj, ii = np.nonzero(inside)
+        idx.append((jj + j0[k]) * nx + (ii + i0[k]))
+        for (px, py), (qx, qy) in (((ax, ay), (bx, by)), ((bx, by), (cx, cy)), ((cx, cy), (ax, ay))):
+            m = max(2, int(math.hypot(qx - px, qy - py) / (cell / 2)) + 1)
+            u = np.linspace(0.0, 1.0, m)
+            pts.append(np.stack([px + (qx - px) * u, py + (qy - py) * u], 1))
+    P_ = np.concatenate(pts) if pts else np.zeros((0, 2))
+    ii = np.floor((P_[:, 0] - x0) / cell).astype(np.int64)
+    jj = np.floor((P_[:, 1] - y0) / cell).astype(np.int64)
+    idx.append(jj * nx + ii)
+    flat = np.concatenate(idx)
+    ok = (flat >= 0) & (flat < nx * ny)
+    return np.unique(flat[ok])
+
+
 def emprises(scene, noms, cell=2.0):
     """Par lieu : la boîte englobante de ses objets visibles (faux lointains et volumes exclus) dans la ville, ses
-    sols étendus ; une grille de 2 m de son empreinte (boîtes des objets projetées), puis les chevauchements par
-    paire : surface, boîte, et les objets de chaque lieu qui y pèsent le plus."""
+    sols étendus (plus de ETENDU m, listés hors de la grille) ; l'empreinte réelle de ses faces (les triangles
+    rastérisés sur une grille de `cell` m), puis les chevauchements par paire : surface, boîte, et pour chaque lieu
+    les objets dont les faces couvrent le plus de cases communes (chacun compté pour ses propres faces).
+    Rend (boîtes, étendus, chevauchements, empreintes, grille) ; grille = (union des lieux, x0, y0, cell, nx, ny,
+    {lieu: grille})."""
     import numpy as np
     import bpy
+    from mathutils import Vector
     bpy.context.view_layer.update()
+    dg = bpy.context.evaluated_depsgraph_get()
     per = {nom: [] for nom in noms}
     for ob in scene.objects:
         nom = ob.get("ville_lieu")
         if nom not in per or ob.get("ville_lointain") or ob.type not in ("MESH", "CURVE", "FONT", "SURFACE"):
             continue
-        if _hidden(ob) or ob.name.startswith(VOLUMES):
+        if _hidden(ob) or ob.name.startswith(VOLUMES) or CAST.match(ob.name):
             continue
-        mw = ob.matrix_world
-        pts = [mw @ __import__("mathutils").Vector(c) for c in ob.bound_box]
-        per[nom].append((ob, [(p.x, p.y) for p in pts], min(p.z for p in pts), max(p.z for p in pts)))
+        pts = [ob.matrix_world @ Vector(c) for c in ob.bound_box]
+        per[nom].append((ob, min(p.x for p in pts), min(p.y for p in pts), min(p.z for p in pts),
+                         max(p.x for p in pts), max(p.y for p in pts), max(p.z for p in pts)))
     box, wide = {}, {}
     for nom, rows in per.items():
-        small = [r for r in rows if max(p[0] for p in r[1]) - min(p[0] for p in r[1]) <= ETENDU and
-                 max(p[1] for p in r[1]) - min(p[1] for p in r[1]) <= ETENDU]
-        wide[nom] = [(r[0].name, round(max(p[0] for p in r[1]) - min(p[0] for p in r[1])),
-                      round(max(p[1] for p in r[1]) - min(p[1] for p in r[1]))) for r in rows if r not in small]
+        small = [r for r in rows if r[4] - r[1] <= ETENDU and r[5] - r[2] <= ETENDU]
+        wide[nom] = [(r[0].name, round(r[4] - r[1]), round(r[5] - r[2])) for r in rows if r not in small]
         per[nom] = small
         if small:
-            box[nom] = (min(p[0] for r in small for p in r[1]), min(p[1] for r in small for p in r[1]),
-                        min(r[2] for r in small), max(p[0] for r in small for p in r[1]),
-                        max(p[1] for r in small for p in r[1]), max(r[3] for r in small))
+            box[nom] = (min(r[1] for r in small), min(r[2] for r in small), min(r[3] for r in small),
+                        max(r[4] for r in small), max(r[5] for r in small), max(r[6] for r in small))
     if not box:
-        return box, wide, [], None
+        return box, wide, [], {}, None
     x0 = min(b[0] for b in box.values()) - 10
     y0 = min(b[1] for b in box.values()) - 10
     x1 = max(b[3] for b in box.values()) + 10
     y1 = max(b[4] for b in box.values()) + 10
     nx, ny = int((x1 - x0) / cell) + 1, int((y1 - y0) / cell) + 1
-    grids, owner = {}, {}
+    grids, cells = {}, {}
     for nom, rows in per.items():
-        g = np.zeros((ny, nx), dtype=bool)
-        own = np.full((ny, nx), -1, dtype=np.int32)
-        for k, (ob, pts, _z0, _z1) in enumerate(rows):
-            hull = _hull(pts)
-            if len(hull) < 3:
-                continue
-            hx = [p[0] for p in hull]
-            hy = [p[1] for p in hull]
-            i0, i1 = max(0, int((min(hx) - x0) / cell)), min(nx - 1, int((max(hx) - x0) / cell) + 1)
-            j0, j1 = max(0, int((min(hy) - y0) / cell)), min(ny - 1, int((max(hy) - y0) / cell) + 1)
-            xs = x0 + (np.arange(i0, i1 + 1) + 0.5) * cell
-            ys = y0 + (np.arange(j0, j1 + 1) + 0.5) * cell
-            X, Y = np.meshgrid(xs, ys)
-            inside = np.ones(X.shape, dtype=bool)
-            for (ax, ay), (bx, by) in zip(hull, hull[1:] + hull[:1]):
-                inside &= (bx - ax) * (Y - ay) - (by - ay) * (X - ax) >= 0
-            sub = g[j0:j1 + 1, i0:i1 + 1]
-            sub |= inside
-            so = own[j0:j1 + 1, i0:i1 + 1]
-            so[inside] = k
-        grids[nom], owner[nom] = g, own
+        g = np.zeros(nx * ny, dtype=bool)
+        cs = []
+        for r in rows:
+            c = _raster(_tris_xy(r[0], dg), x0, y0, cell, nx, ny)
+            g[c] = True
+            cs.append((r[0].name, c))
+        grids[nom], cells[nom] = g, cs
     over = []
     for i, a in enumerate(noms):
         for b in noms[i + 1:]:
@@ -914,36 +1070,236 @@ def emprises(scene, noms, cell=2.0):
             area = float(m.sum()) * cell * cell
             if area <= 0:
                 continue
-            jj, ii = np.nonzero(m)
+            k = np.nonzero(m)[0]
+            jj, ii = k // nx, k % nx
             bb = (x0 + ii.min() * cell, y0 + jj.min() * cell, x0 + (ii.max() + 1) * cell, y0 + (jj.max() + 1) * cell)
 
             def heavy(nom):
-                ids, counts = np.unique(owner[nom][m], return_counts=True)
-                order = np.argsort(-counts)[:4]
-                return [(per[nom][ids[k]][0].name, round(float(counts[k]) * cell * cell)) for k in order if ids[k] >= 0]
+                cnt = [(name, int(m[c].sum())) for name, c in cells[nom] if len(c)]
+                cnt = sorted((t for t in cnt if t[1]), key=lambda t: -t[1])[:4]
+                return [(name, round(v * cell * cell)) for name, v in cnt]
             over.append(dict(a=a, b=b, area=round(area), box=[round(v, 1) for v in bb], wa=heavy(a), wb=heavy(b)))
     foot = {nom: round(float(g.sum()) * cell * cell) for nom, g in grids.items()}
-    return box, wide, over, foot
+    union = np.zeros(nx * ny, dtype=bool)
+    for g in grids.values():
+        union |= g
+    return box, wide, over, foot, (union.reshape(ny, nx), x0, y0, cell, nx, ny,
+                                   {n: g.reshape(ny, nx) for n, g in grids.items()})
 
 
-def _hull(pts):
-    """L'enveloppe convexe (sens trigonométrique) de points 2D."""
-    pts = sorted(set((round(x, 3), round(y, 3)) for x, y in pts))
-    if len(pts) < 3:
-        return pts
+def place_libre(grille, cadre, w, h, marge=6.0):
+    """Le centre d'un rectangle w × h (m) sans aucune empreinte de lieu dans le cadre (x0, y0, x1, y1), cherché
+    depuis le coin en haut à droite (vers le bas, puis vers la gauche) ; None s'il n'y en a pas."""
+    import numpy as np
+    union, gx0, gy0, cell, nx, ny, _ = grille
+    X0, Y0, X1, Y1 = cadre
+    occ = np.pad(union.astype(np.int32), 1).cumsum(0).cumsum(1)
 
-    def cross(o, a, b):
-        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
-    lower, upper = [], []
-    for p in pts:
-        while len(lower) >= 2 and cross(lower[-2], lower[-1], p) <= 0:
-            lower.pop()
-        lower.append(p)
-    for p in reversed(pts):
-        while len(upper) >= 2 and cross(upper[-2], upper[-1], p) <= 0:
-            upper.pop()
-        upper.append(p)
-    return lower[:-1] + upper[:-1]
+    def empty(cx, cy):
+        i0 = int((cx - w / 2 - marge - gx0) / cell)
+        i1 = int((cx + w / 2 + marge - gx0) / cell) + 1
+        j0 = int((cy - h / 2 - marge - gy0) / cell)
+        j1 = int((cy + h / 2 + marge - gy0) / cell) + 1
+        i0, i1 = max(0, i0), min(nx, i1)
+        j0, j1 = max(0, j0), min(ny, j1)
+        if i0 >= i1 or j0 >= j1:
+            return True
+        return occ[j1, i1] - occ[j0, i1] - occ[j1, i0] + occ[j0, i0] == 0
+    step = max(cell, min(w, h) / 6)
+    cx = X1 - w / 2 - marge
+    while cx - w / 2 >= X0:
+        cy = Y1 - h / 2 - marge
+        while cy - h / 2 >= Y0:
+            if empty(cx, cy):
+                return cx, cy
+            cy -= step
+        cx -= step
+    return None
+
+
+def centres_lieux(grille, cadre, size):
+    """{lieu: (x, y, rotation)} : où écrire le nom du lieu, au centre de masse de son empreinte dans le cadre, tourné
+    d'un quart de tour si l'empreinte est trois fois plus haute que large (le pont, sur son tablier)."""
+    import numpy as np
+    union, gx0, gy0, cell, nx, ny, grids = grille
+    X0, Y0, X1, Y1 = cadre
+    out = {}
+    for nom, g in grids.items():
+        jj, ii = np.nonzero(g)
+        if not len(ii):
+            continue
+        xs, ys = gx0 + (ii + 0.5) * cell, gy0 + (jj + 0.5) * cell
+        keep = (xs >= X0) & (xs <= X1) & (ys >= Y0) & (ys <= Y1)
+        if keep.sum() < 4:
+            continue
+        xs, ys = xs[keep], ys[keep]
+        w, h = xs.max() - xs.min(), ys.max() - ys.min()
+        tall = h > 3.0 * w
+        half_w = 0.75 * len(nom) * size * 2.6 / 2      # la demi-longueur du nom écrit
+        x, y = float(np.median(xs)), float(np.median(ys))
+        if tall:
+            y = min(max(y, Y0 + half_w + size), Y1 - half_w - size)
+        else:
+            x = min(max(x, X0 + half_w + size), X1 - half_w - size)
+            y = min(max(y, Y0 + 3 * size), Y1 - 3 * size)
+        out[nom] = (x, y, math.radians(90.0) if tall else 0.0)
+    return out
+
+
+def texte_trous(events, n):
+    if not events:
+        return [f"sol sous les roues (rayons verticaux, {n} pas de {TROU_PAS} m sur l'axe et à ±1 m) : ni trou ni "
+                f"marche de plus de {TROU_MARCHE * 100:.0f} cm"]
+    L_ = [f"sol sous les roues (rayons verticaux, {n} pas de {TROU_PAS} m sur l'axe et à ±1 m ; trou : aucune face "
+          f"ou la mer ; marche : plus de {TROU_MARCHE * 100:.0f} cm hors pente) : {len(events)} événements"]
+    for e in events:
+        where = f"s {e['s0']:.1f}" + (f"..{e['s1']:.1f}" if e["s1"] != e["s0"] else "")
+        L_.append(f"  prise {e['prise']} {e['genre']:6s} {where:15s} {e['plan']}/{e['image']:<3d} à {e['lat']:+.0f} m ; "
+                  f"{e['avant'] or '—'} -> {e['apres'] or '—'}" + (f" ; {e['dz'] * 100:+.1f} cm" if e["dz"] is not None
+                                                                    else ""))
+    return L_
+
+
+RELEVE_LAT = (-3.5, -1.0, 0.0, 1.0, 3.5)
+
+
+def releve(scene, plages, lats=RELEVE_LAT, ds=0.5, pile=0.5):
+    """Le relevé brut du sol sous la berline sur des plages d'abscisse [(s0, s1)] : tous les `ds` m de son chemin,
+    sur son axe et à `lats` m (positif à gauche), toutes les faces sous z + 3 m jusqu'à `pile` m sous la première
+    (deux chaussées superposées s'y voient), et les faux lointains cachés dont la boîte couvre le point (un raccord
+    classé lointain à tort s'y voit). [dict(s, plan, image, lat, faces=[(z, objet, lieu)], caches=[objet])]"""
+    import bpy
+    from mathutils import Vector
+    dg = bpy.context.evaluated_depsgraph_get()
+    hidden = []
+    for ob in scene.objects:
+        if ob.get("ville_lointain") and ob.type == "MESH":
+            pts = [ob.matrix_world @ Vector(c) for c in ob.bound_box]
+            hidden.append((ob.name, min(q.x for q in pts), max(q.x for q in pts), min(q.y for q in pts),
+                           max(q.y for q in pts), min(q.z for q in pts), max(q.z for q in pts)))
+    out = []
+    for a, b, _shots in prises():
+        for (tt, x, y, cap) in _echantillons(a, b, ds):
+            s = s_of_pos(*P.DRIVE.pos(tt))
+            if not any(s0 <= s <= s1 for s0, s1 in plages):
+                continue
+            shot, fr = shot_of(min(P.TOTAL, max(1, int(round(tt * FPS)) + 1)))
+            c = math.radians(cap)
+            for lat in lats:
+                px, py = x - lat * math.cos(c), y - lat * math.sin(c)
+                h0 = _sol(scene, dg, px, py, cap)
+                ztop = (h0[0] if h0 else 8.0) + TROU_HAUT
+                faces, z0, left = [], ztop, TROU_HAUT + 12.0
+                o, d = Vector((px, py, z0)), Vector((0.0, 0.0, -1.0))
+                for _ in range(12):
+                    ok, loc, _n, _i, ob, _m = scene.ray_cast(dg, o, d, distance=left)
+                    if not ok:
+                        break
+                    ob = ob.original if ob else ob
+                    who = ob.get("ville_lieu") if ob else None
+                    if who not in ("berline", "annotation"):
+                        faces.append((round(loc.z, 3), ob.name, who))
+                        if loc.z < faces[0][0] - pile:
+                            break
+                    left -= (o.z - loc.z) + 0.002
+                    o = loc + d * 0.002
+                    if left <= 0:
+                        break
+                caches = [hn for hn, x0, x1, y0, y1, z0_, z1_ in hidden
+                          if x0 <= px <= x1 and y0 <= py <= y1 and z0_ <= ztop and z1_ >= ztop - TROU_HAUT - 12.0]
+                out.append(dict(s=round(s, 2), plan=shot, image=fr, lat=lat, x=round(px, 2), y=round(py, 2),
+                                faces=faces, caches=caches[:6]))
+    return out
+
+
+def texte_releve(rows):
+    L_ = ["relevé du sol sous la berline (rayons verticaux ; faces de haut en bas ; superposées : à moins de 2 cm) :"]
+    for r in rows:
+        f = r["faces"]
+        sup = [g for g in f[1:] if f and abs(g[0] - f[0][0]) < 0.02 and g[1] != f[0][1]]
+        faces = " ; ".join(f"{z:+.3f} {n} ({w})" for z, n, w in f[:4]) or "RIEN"
+        L_.append(f"  s {r['s']:6.1f} {r['plan']}/{r['image']:<3d} {r['lat']:+4.1f} m ({r['x']:.1f} ; {r['y']:.1f}) : "
+                  f"{faces}" + (f"  SUPERPOSÉES : {', '.join(g[1] for g in sup)}" if sup else "")
+                  + (f"  [lointains cachés ici : {', '.join(r['caches'])}]" if r["caches"] else ""))
+    return L_
+
+
+def worker_controles(a, noms):
+    """--controles : reprend DIR/ville.blend, refait les contrôles (sol sous les roues, emprises réelles) et la carte,
+    sans rien reconstruire ; écrit DIR/controles.json et DIR/controles.txt."""
+    import bpy
+    bpy.ops.wm.open_mainfile(filepath=os.path.join(a.out, "ville.blend"), load_ui=False)
+    scene = bpy.data.scenes["ville"]
+    if bpy.context.window:
+        bpy.context.window.scene = scene
+    lointains(scene, False)
+    volumes(scene, False)
+    hero = [o for o in scene.objects if o.get("ville_lieu") == "berline"]
+    for o in hero:
+        o.hide_viewport = True
+    bpy.context.view_layer.update()
+    t0 = time.time()
+    ev, n = trous(scene)
+    log(f"sol sous les roues : {len(ev)} événements sur {n} pas en {time.time() - t0:.0f} s")
+    t0 = time.time()
+    box, wide, over, foot, grille = emprises(scene, noms)
+    log(f"emprises réelles en {time.time() - t0:.0f} s")
+    for o in hero:
+        o.hide_viewport = False
+        o.hide_render = True
+    rel = []
+    if a.releve:
+        plages = [tuple(float(v) for v in part.split(":")) for part in a.releve.split(",")]
+        rel = releve(scene, plages)
+        with open(os.path.join(a.out, "releve.txt"), "w", encoding="utf-8") as f:
+            f.write("\n".join(texte_releve(rel)) + "\n")
+        log(f"relevé : {len(rel)} points -> {os.path.join(a.out, 'releve.txt')}")
+    carte(scene, a, noms, grille)
+    rep = dict(trous=ev, pas=n, boites=box, etendus=wide, chevauchements=over, empreintes=foot, releve=rel)
+    with open(os.path.join(a.out, "controles.json"), "w", encoding="utf-8") as f:
+        json.dump(rep, f, ensure_ascii=False, indent=1)
+    txt = "\n".join(texte_chevauchements(rep) + texte_trous(ev, n))
+    with open(os.path.join(a.out, "controles.txt"), "w", encoding="utf-8") as f:
+        f.write(txt + "\n")
+    print(txt, flush=True)
+
+
+def carte(scene, a, noms, grille):
+    """Les trois cartes de DIR : la route (et en transparence), la ville entière ; portrait, nord en haut, les noms
+    des lieux sur leur empreinte, la légende dans un coin d'eau."""
+    couleurs_lieux(scene)
+    pts = [hero_city(f)[:2] for f in frames()] + [p[1:3] for p in route_pts(1.0)]
+    rx, ry = [p[0] for p in pts], [p[1] for p in pts]
+    near = portrait((min(rx) - 70, min(ry) - 60, max(rx) + 70, max(ry) + 60))
+    size = max(6.0, (near[3] - near[1]) / 110.0)
+    annoter(scene, near, size, noms, a.legende or legende_defaut(), grille)
+    rendre_carte(scene, near, os.path.join(a.out, "carte-route.png"))
+    rendre_carte(scene, near, os.path.join(a.out, "carte-route-transparence.png"), xray=True)
+    if grille:
+        union, gx0, gy0, cell, nx, ny, _ = grille
+        far = portrait((gx0, gy0, gx0 + nx * cell, gy0 + ny * cell))
+        big = far[3] - far[1]
+        annoter(scene, far, max(6.0, big / 110.0), noms, a.legende or legende_defaut(), grille)
+        rendre_carte(scene, far, os.path.join(a.out, "carte-ville.png"))
+
+
+def texte_chevauchements(r):
+    L_ = ["emprises (repère de ville, faux lointains et traces exclus ; m ; empreinte : faces rastérisées, 2 m) :"]
+    for n, b in r["boites"].items():
+        L_.append(f"  {n:11s} x {b[0]:8.1f} .. {b[3]:8.1f}  y {b[1]:8.1f} .. {b[4]:8.1f}  z {b[2]:6.1f} .. {b[5]:6.1f}"
+                  f"  empreinte {r['empreintes'].get(n, 0):7d} m²")
+    for n, wl in r["etendus"].items():
+        if wl:
+            L_.append(f"  {n} : sols étendus hors grille : " + ", ".join(f"{a} ({x}×{y} m)" for a, x, y in wl[:8]))
+    L_.append("chevauchements (faces rastérisées sur une grille de 2 m ; par objet : les cases communes que ses "
+              "propres faces couvrent) :")
+    for o in sorted(r["chevauchements"], key=lambda o: -o["area"]):
+        L_.append(f"  {o['a']} × {o['b']} : {o['area']} m², boîte x {o['box'][0]}..{o['box'][2]} y {o['box'][1]}.."
+                  f"{o['box'][3]} ; {o['a']} : " + ", ".join(f"{a} {m}" for a, m in o["wa"]) + f" ; {o['b']} : "
+                  + ", ".join(f"{a} {m}" for a, m in o["wb"]))
+    if not r["chevauchements"]:
+        L_.append("  aucun")
+    return L_
 
 
 # ---- la berline et la caméra
@@ -1048,7 +1404,7 @@ def _ribbon(name, pts, half, color, coll, z=Z_TOP, half1=None):
     return ob
 
 
-def annoter(scene, box, size, noms=NOMS, legende=None):
+def annoter(scene, box, size, noms=NOMS, legende=None, grille=None):
     """La route (un ruban par moitié de ville, l'ellipse en pointillé rouge), les fenêtres des plans (la berline image
     par image, blanc et noir alternés), leurs débuts (un trait blanc ; rouge à une coupe d'ellipse), le nom des plans et
     des lieux, une grille de 50 m, le nord. Dans une collection « annotation », à Z_TOP."""
@@ -1102,9 +1458,16 @@ def annoter(scene, box, size, noms=NOMS, legende=None):
         a = math.radians(cap)
         _text(f"ellipse_{a_}_{b_}", f"ELLIPSE {abs(along):.0f} M", (xa + xb) / 2 + 3.2 * size * math.cos(a),
               (ya + yb) / 2 + 3.2 * size * math.sin(a), size * 0.9, (0.95, 0.1, 0.1), coll, rot=math.radians(cap + 90))
-    # le nom des lieux : à gauche de la berline au milieu de leurs plans (le côté opposé au nom des plans)
-    for k, (nom, plans, plan) in enumerate(LIEUX):
+    # le nom des lieux : sur leur empreinte (centres_lieux) ; sans grille, de part et d'autre de la route
+    places = centres_lieux(grille, box, size) if grille else {}
+    for nom, (x, y, rot) in places.items():
         if nom not in noms:
+            continue
+        _text(f"lieu_{nom}", nom.upper(), x, y, size * 2.6, COULEURS[nom], coll, rot=rot)
+        _text(f"lieu_{nom}_ombre", nom.upper(), x + 0.12 * size, y - 0.12 * size, size * 2.6, (0.0, 0.0, 0.0), coll,
+              rot=rot).location.z -= 0.5
+    for k, (nom, plans, plan) in enumerate(LIEUX):
+        if nom not in noms or nom in places:
             continue
         fs = [f for f in frames() if shot_of(f)[0] in plans]
         if not fs:
@@ -1139,9 +1502,13 @@ def annoter(scene, box, size, noms=NOMS, legende=None):
             Z_TOP + 0.3, half1=0.9 * size)
     _text("nord", "N", nx, ny + 5.6 * size, size * 1.4, (1, 1, 1), coll)
     if legende:
-        for i, line in enumerate(legende.split("|")):
-            _text(f"legende_{i}", line.strip(), (gx0 + gx1) / 2, gy0 + (4.0 + 1.8 * (len(legende.split("|")) - 1 - i))
-                  * size, size * 0.95, (1, 1, 1), coll)
+        lines = [s.strip() for s in legende.split("|")]
+        ls = size * 0.8
+        w, h = 0.62 * ls * max(len(s) for s in lines), 1.8 * ls * len(lines)
+        at = place_libre(grille, box, w, h) if grille else None
+        cx, cy = at if at else ((gx0 + gx1) / 2, gy0 + h / 2 + 3 * size)
+        for i, line in enumerate(lines):
+            _text(f"legende_{i}", line, cx, cy + h / 2 - (i + 0.5) * 1.8 * ls, ls, (1, 1, 1), coll)
     for o in coll.objects:
         o["ville_lieu"], o["ville_lointain"], o["ville_cache0"] = "annotation", 0, 0
     return coll
@@ -1151,9 +1518,8 @@ def legende_defaut():
     """La légende de la carte : ce qu'elle montre et d'où viennent les poses (lignes séparées par |)."""
     poses = [f"{n.upper()} {r:+.0f}° ({x:.1f} ; {y:.1f})" for n, (r, x, y) in
              ((n, placement(lieu(n)["plan"])) for n in NOMS)]
-    return (f"LA VILLE UNIQUE VUE DE DESSUS, NORD EN HAUT, CARRÉS DE 50 M | ROUTE {P.ROUTE.length:.0f} M, "
-            f"{P.TOTAL} IMAGES ; PLANS EN BLANC ET NOIR, ELLIPSE EN ROUGE | " + "   ".join(poses[:3]) + " | "
-            + "   ".join(poses[3:]))
+    return " | ".join(["LA VILLE UNIQUE, NORD EN HAUT", "CARRÉS DE 50 M", f"ROUTE {P.ROUTE.length:.0f} M, {P.TOTAL} IMAGES",
+                       "PLANS EN BLANC ET NOIR", "ELLIPSE EN ROUGE", "POSES :"] + poses)
 
 
 def portrait(box, ratio=9.0 / 16.0):
@@ -1267,8 +1633,11 @@ def worker_carte(a, noms):
     cov, junc = jonctions(scene, noms)
     log(f"jonctions en {time.time() - t1:.0f} s")
     t1 = time.time()
-    box, wide, over, foot = emprises(scene, noms)
-    log(f"emprises et chevauchements en {time.time() - t1:.0f} s")
+    box, wide, over, foot, grille = emprises(scene, noms)
+    log(f"emprises réelles et chevauchements en {time.time() - t1:.0f} s")
+    t1 = time.time()
+    ev, n_pas = trous(scene)
+    log(f"sol sous les roues : {len(ev)} événements sur {n_pas} pas en {time.time() - t1:.0f} s")
     hero = poser_berline(scene, sol)
     poser_camera(scene, sol)
     scene.frame_start, scene.frame_end = 1, P.TOTAL
@@ -1279,31 +1648,16 @@ def worker_carte(a, noms):
     bpy.ops.wm.save_as_mainfile(filepath=blend, compress=False)
     t_save = time.time() - t1
     # la carte : à plat, une couleur par lieu, la route et ses fenêtres par-dessus
-    couleurs_lieux(scene)
-    hero.hide_render = True
-    for o in hero.children_recursive:
+    for o in _family(hero):
         o.hide_render = True
-    rx = [p[1] for p in prof] + [v[0] for v in sol.values()]
-    ry = [p[2] for p in prof] + [v[1] for v in sol.values()]
-    # en bas, la place de la légende (un huitième de la hauteur) ; autour, celle des noms de lieux
-    h0 = max(ry) - min(ry) + 120
-    near = portrait((min(rx) - 90, min(ry) - 60 - 0.14 * h0, max(rx) + 90, max(ry) + 60))
-    annoter(scene, near, max(6.0, (near[3] - near[1]) / 110.0), noms, a.legende or legende_defaut())
-    rendre_carte(scene, near, os.path.join(a.out, "carte-route.png"))
-    rendre_carte(scene, near, os.path.join(a.out, "carte-route-transparence.png"), xray=True)
-    if box:
-        far = (max(min(b[0] for b in box.values()), near[0] - 900), max(min(b[1] for b in box.values()), near[1] - 900),
-               min(max(b[3] for b in box.values()), near[2] + 900), min(max(b[4] for b in box.values()), near[3] + 900))
-        big = max(far[2] - far[0], far[3] - far[1])
-        far = portrait(far)
-        annoter(scene, far, max(6.0, big / 90.0), noms, a.legende or legende_defaut())
-        rendre_carte(scene, far, os.path.join(a.out, "carte-ville.png"))
+    carte(scene, a, noms, grille)
     rapport = dict(lieux={n: dict(blend=infos[n]["blend"], how=infos[n]["how"], build_s=infos[n]["build_s"],
                                   blend_mb=infos[n]["blend_mb"], **{k: v for k, v in built[n].items()
                                                                      if k not in ("racine", "collection")})
                           for n in noms},
                    placements={n: placement(lieu(n)["plan"]) for n in noms}, poses=ecarts_poses(), raccords=raccords(),
                    fenetres=fenetres(), boites=box, etendus=wide, chevauchements=over, empreintes=foot,
+                   trous=ev, pas=n_pas,
                    jonctions=junc, profil=[(round(p[0], 1), p[3] and round(p[3], 2), p[4]) for p in prof],
                    sol_berline={f: (round(v[2], 2), v[3]) for f, v in sol.items()}, prises=prises(),
                    couverture={n: [(r[0], round(r[1], 2), round(r[2], 2), round(r[3], 2)) for r in rows]
@@ -1323,18 +1677,7 @@ def _f(v, fmt="{:+.2f}"):
 
 
 def rapport_texte(r):
-    L_ = [table(), "", "emprises (repère de ville, faux lointains exclus ; m) :"]
-    for n, b in r["boites"].items():
-        L_.append(f"  {n:11s} x {b[0]:8.1f} .. {b[3]:8.1f}  y {b[1]:8.1f} .. {b[4]:8.1f}  z {b[2]:6.1f} .. {b[5]:6.1f}"
-                  f"  empreinte {r['empreintes'].get(n, 0):7d} m²")
-    for n, wl in r["etendus"].items():
-        if wl:
-            L_.append(f"  {n} : sols étendus hors grille : " + ", ".join(f"{a} ({x}×{y} m)" for a, x, y in wl[:8]))
-    L_.append("chevauchements (empreintes en plan, grille de 2 m) :")
-    for o in sorted(r["chevauchements"], key=lambda o: -o["area"]):
-        L_.append(f"  {o['a']} × {o['b']} : {o['area']} m², boîte x {o['box'][0]}..{o['box'][2]} y {o['box'][1]}.."
-                  f"{o['box'][3]} ; {o['a']} : " + ", ".join(f"{a} {m}" for a, m in o["wa"]) + f" ; {o['b']} : "
-                  + ", ".join(f"{a} {m}" for a, m in o["wb"]))
+    L_ = [table(), ""] + texte_chevauchements(r)
     L_.append("jonctions (le long de la route ; écart > 0 : un trou, < 0 : les deux chaussées se recouvrent) :")
     for j in r["jonctions"]:
         L_.append(f"  {j['a']} -> {j['b']}{'' if j.get('continu', True) else ' (ELLIPSE)'} : coupe s {j['s_cut']:.1f} ; fin de {j['a']} s {_f(j['a_end'], '{:.0f}')}, "
@@ -1342,25 +1685,14 @@ def rapport_texte(r):
                   f"z {_f(j['za'])} / {_f(j['zb'])} ; largeur {_f(j['wa'], '{:.1f}')} / {_f(j['wb'], '{:.1f}')} m ; "
                   f"milieu de chaussée à {_f(j['oa'], '{:+.1f}')} / {_f(j['ob'], '{:+.1f}')} m à gauche de la route ; "
                   f"axe {_f(j['axa'], '{:+.1f}')}° / {_f(j['axb'], '{:+.1f}')}°")
-    gaps = []
-    run = None
-    for s, z, who in r["profil"]:
-        if z is None and run is None:
-            run = s
-        elif z is not None and run is not None:
-            gaps.append((run, s))
-            run = None
-    if run is not None:
-        gaps.append((run, r["profil"][-1][0]))
-    L_.append("trous sous la route (aucun sol de lieu) : " + (", ".join(f"s {a:.1f}..{b:.1f}" for a, b in gaps)
-                                                           or "aucun"))
+    L_ += texte_trous(r.get("trous", []), r.get("pas", 0))
     seq = []
     for s, z, who in r["profil"]:
         if not seq or seq[-1][0] != who:
             seq.append([who, s, s])
         else:
             seq[-1][2] = s
-    L_.append("le sol sous la route, lieu par lieu (celui du dessus) : " +
+    L_.append("le sol sous la route, lieu par lieu (la chaussée la plus haute, large d'au moins 2,4 m) : " +
               ", ".join(f"{w or 'trou'} {a:.0f}..{b:.0f}" for w, a, b in seq))
     p = r["poids"]
     L_.append(f"poids : {p['objets']} objets, {p['mailles']} maillages, {p['images']} images, "
@@ -1513,6 +1845,9 @@ def main():
     ap.add_argument("--carte", action="store_true")
     ap.add_argument("--prise", action="store_true")
     ap.add_argument("--cache", action="store_true", help="seulement les lieux en cache et leur inventaire")
+    ap.add_argument("--releve", default=None, help="avec --controles : plages d'abscisse s0:s1,s0:s1 du relevé brut")
+    ap.add_argument("--controles", action="store_true",
+                    help="reprend DIR/ville.blend : sol sous les roues, emprises réelles, carte ; sans reconstruire")
     ap.add_argument("--lieux", default=",".join(NOMS))
     ap.add_argument("--lointains", action="store_true", help="garder les faux lointains")
     ap.add_argument("--legende", default=None, help="la légende de la carte, lignes séparées par | (sinon les poses)")
@@ -1533,8 +1868,10 @@ def main():
             worker_carte(a, noms)
         elif a.etape == "prise":
             worker_prise(a)
+        elif a.etape == "controles":
+            worker_controles(a, noms)
         return
-    if not (a.carte or a.prise or a.cache):
+    if not (a.carte or a.prise or a.cache or a.controles):
         print(table())
         return
     a.out = os.path.abspath(a.out or "ville")
@@ -1552,6 +1889,11 @@ def main():
         if a.legende:
             args += ["--legende", a.legende]
         if not run_blender(blender, a.out, args, tag="carte"):
+            sys.exit(1)
+    if a.controles:
+        args = ["--etape", "controles", "--lieux", ",".join(noms)] + (["--legende", a.legende] if a.legende else [])
+        args += ["--releve", a.releve] if a.releve else []
+        if not run_blender(blender, a.out, args, tag="controles"):
             sys.exit(1)
     if a.prise:
         args = ["--etape", "prise"] + (["--lointains"] if a.lointains else [])
