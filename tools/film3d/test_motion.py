@@ -1,6 +1,7 @@
 # Les tests de motion.py, sans Blender : python3 tools/film3d/test_motion.py
 import math
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -1430,6 +1431,96 @@ def test_aircraft():
           f"{d6:.2f}°")
 
 
+CUT_AIR_POS = 0.10            # m : un appareil à la coupe, P5/60 prolongé d'une image contre P6/1, dans la ville
+CUT_AIR_HEAD = 1.0            # ° : son cap, son tangage et son roulis (assiette comprise)
+CUT_AIR_SCREEN = 3.0          # % du cadre : sa place à l'écran, d'un côté à l'autre (une image de mouvement)
+
+
+def test_cut_p5_p6():
+    """La coupe continue P5 → P6 (P6/1 suit P5/60) : ce qui se voit des deux côtés est le même objet, au même endroit,
+    dans le même état et le même mouvement. Les hélicoptères (helicos.py), lus par chaque plan dans sa scène et ramenés
+    dans la ville : position, cap, assiette ; vitesse à ±10 % (CUT_SPEED) ou 0,5 m/s, lacet du cap à CUT_YAW ; leur
+    place à l'écran ; les deux de la jetée déjà dans P5 sa dernière seconde. Les rotors sur l'image du film. Le phare
+    de la jetée : un seul, gelé (le port n'en pose plus en ville) ; les traces de gomme de P5 posées dans P6."""
+    import helicos as H
+    import p5_virage as P5
+    import p6_jetee as P6
+    import parcours as PC
+    n5 = P5.F0 + P5.FRAMES - 1
+    fn5 = [P5.heli] + [P5.heli_n(i) for i in range(1, H.N)]
+    fn6 = [P6.heli(i) for i in range(H.N)]
+
+    def ville(shot, s):
+        return H.to_ville(shot, s)
+
+    def vel(shot, fn, f, s):
+        p = [ville(shot, fn(M.t_of(f + s * k)))[:3] for k in range(3)]
+        return [M._d1([q[j] for q in p], s, 1.0) * M.FPS for j in range(3)]
+    for i in range(H.N):
+        a = ville("P5", fn5[i](M.t_of(n5 + 1)))             # P5 prolongé d'une image
+        b = ville("P6", fn6[i](M.t_of(P6.F0)))
+        att5 = ville("P5", H.in_scene("P5", i, dyn=True)(M.t_of(n5 + 1)))
+        att6 = ville("P6", H.in_scene("P6", i, dyn=True)(M.t_of(P6.F0)))
+        dpos = math.dist(a[:3], b[:3])
+        dang = max(abs(M._unwrap(x, y) - x) for x, y in zip(att5[3:], att6[3:]))
+        v5, v6 = vel("P5", fn5[i], n5, -1), vel("P6", fn6[i], P6.F0, +1)
+        s5, s6 = math.hypot(*v5), math.hypot(*v6)
+        dv = abs(s6 - s5)
+        h5 = [ville("P5", fn5[i](M.t_of(n5 - k)))[3] for k in range(3)]
+        h6 = [ville("P6", fn6[i](M.t_of(P6.F0 + k)))[3] for k in range(3)]
+        y5 = M._d1([M._unwrap(h5[0], h) for h in h5], -1, 1.0) * M.FPS
+        y6 = M._d1([M._unwrap(h6[0], h) for h in h6], +1, 1.0) * M.FPS
+        check(f"P5 → P6 : l'hélicoptère {i}, même place, même cap, même assiette dans la ville",
+              dpos <= CUT_AIR_POS and dang <= CUT_AIR_HEAD,
+              f"{dpos:.3f} m, {dang:.2f}° (cap, tangage, roulis)")
+        check(f"P5 → P6 : l'hélicoptère {i}, même vitesse, même lacet",
+              (dv <= CUT_SPEED * max(s5, s6) or dv <= 0.5) and abs(y6 - y5) <= CUT_YAW,
+              f"{s5:.2f} → {s6:.2f} m/s, lacet {y5:+.1f} → {y6:+.1f} °/s")
+        q5 = M.screen_point(P5.camera_rail(M.t_of(n5)), fn5[i](M.t_of(n5))[:3])
+        q6 = M.screen_point(P6.camera_rail(M.t_of(P6.F0)), fn6[i](M.t_of(P6.F0))[:3])
+        du = 100 * max(abs(q6[0] - q5[0]), abs(q6[1] - q5[1])) if q5 and q6 else 0.0
+        check(f"P5 → P6 : l'hélicoptère {i} à la même place à l'écran (± {CUT_AIR_SCREEN:g} %)",
+              q5 is not None and q6 is not None and du <= CUT_AIR_SCREEN,
+              f"x {100 * q5[0]:.0f} → {100 * q6[0]:.0f} %, y {100 * q5[1]:.0f} → {100 * q6[1]:.0f} % depuis le haut")
+    # les deux de la jetée : dans P5 sa dernière seconde (le 2 dans le cadre, le 1 au bord droit, il y entre en P6)
+    seen = {i: [f for f in range(n5 - 23, n5 + 1)
+                if (lambda q: q is not None and -0.05 <= q[0] <= 1.05 and 0.0 <= q[1] <= 1.0)(
+                    M.screen_point(P5.camera_rail(M.t_of(f)), fn5[i](M.t_of(f))[:3]))] for i in (1, 2)}
+    check("P5 : les hélicoptères de la jetée déjà là sa dernière seconde (à 5 % du cadre au plus)",
+          all(seen[i] and seen[i][-1] == n5 for i in (1, 2)),
+          ", ".join(f"{i} : images {s[0]}–{s[-1]}" if s else f"{i} : jamais" for i, s in seen.items()))
+    # les rotors : l'image du film, pas celle du plan (cast_vehicles.spin_rotors pilote sur « frame »)
+
+    class _Drv:
+        def __init__(self, e):
+            self.driver = type("D", (), {"expression": e})()
+
+    class _Ob:
+        def __init__(self, e):
+            self.animation_data = type("A", (), {"drivers": [_Drv(e)]})()
+            self.children_recursive = []
+    ob5, ob6 = _Ob("0.0000 + frame * 0.99484"), _Ob("0.0000 + frame * 0.99484")
+    H.film_rotors(ob5, "P5")
+    H.film_rotors(ob6, "P6")
+    e5 = ob5.animation_data.drivers[0].driver.expression
+    e6 = ob6.animation_data.drivers[0].driver.expression
+    ph5 = eval(e5, {"frame": n5 + 1})                                       # noqa: S307
+    ph6 = eval(e6, {"frame": P6.F0})                                        # noqa: S307
+    check("P5 → P6 : les rotors en phase (pilotes sur l'image du film)", abs(ph5 - ph6) < 1e-9, f"{e5} | {e6}")
+    # le phare : celui de la jetée, gelé (P6_PHARE_VITESSE nul), vu par P5 dans la ville ; le port n'en pose pas
+    here = os.path.dirname(os.path.abspath(__file__))
+    with open(os.path.join(here, "scene_d.py"), encoding="utf-8") as f:
+        src_d = f.read()
+    with open(os.path.join(here, "scene_e.py"), encoding="utf-8") as f:
+        src_e = f.read()
+    gele = re.search(r"^P6_PHARE_PHASE, P6_PHARE_VITESSE = .*, 0\.0$", src_d, re.M) is not None
+    seul = re.search(r'lieu="port",\s*phare=False\)', src_e) is not None
+    check("P5 → P6 : un seul phare, celui de la jetée, gelé (le port n'en pose pas en ville)", gele and seul,
+          f"gelé {gele}, port sans phare {seul}")
+    check("P5 → P6 : les traces de gomme de P5 posées dans P6 (la ville ne reprend pas celles du port)",
+          'skid_p5(scene, place="P6")' in src_d and PC.LIEU["P5"] == "E")
+
+
 def _cam_dev(fn, fr, out):
     yaw = max(abs(out[f][3] - fn(M.t_of(f))[3]) for f in fr)
     pit = max(abs(out[f][4] - fn(M.t_of(f))[4]) for f in fr)
@@ -1706,6 +1797,7 @@ if __name__ == "__main__":
     test_pack()
     test_steer_dyn()
     test_aircraft()
+    test_cut_p5_p6()
     test_operator()
     test_drive()
     test_parcours()

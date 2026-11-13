@@ -763,6 +763,40 @@ def aim_helis(helis, target, energy=400000.0, car=None, car_energy=None, cone=No
         piv.matrix_world = Matrix.Translation(p) @ d.to_track_quat("-Z", "Y").to_matrix().to_4x4()
 
 
+def heli_feux(rig):
+    """Les feux d'un hélicoptère (ceux de P5, portés par chaque appareil de la distribution commune, helicos.py) :
+    l'anticollision corail sur la cellule, le blanc dessous ; hors de la brume (une source ponctuelle y fait du
+    grain)."""
+    for i, (dz, col, e) in enumerate(((0.2, L.CORAL, 0.4), (-1.2, L.CREAM, 0.25))):
+        Ld = bpy.data.lights.new(f"{rig.name}_feu_{i}", "POINT")
+        Ld.energy = 40.0 * e * 10
+        Ld.color = L.lin(col)[:3]
+        Ld.shadow_soft_size = 0.05
+        lo = bpy.data.objects.new(Ld.name, Ld)
+        bpy.context.scene.collection.objects.link(lo)
+        lo.parent = rig
+        lo.location = (0.0, -0.5, 2.6 + dz)
+        lo.visible_volume_scatter = False
+
+
+def helis_P6_light(hs, idx, hero, shot, frames):
+    """La lumière des hélicoptères de la jetée (celle de P6), portée par les appareils `idx` de la distribution
+    commune, dans la scène du plan `shot` (P6, ou P5 pour les deux qui y arrivent) : vus de face au ras du sol, 8 kW
+    sur le sol et 50 kW sur la berline seule (split_for_car), 4° ; une source de 1,5 m ; chaque faisceau sur sa
+    cible (helicos.beam_in_scene)."""
+    import helicos
+    import motion as M
+    idx = list(idx)
+    aim_helis(hs, helicos.beam_in_scene(shot, idx[0])(0.0), energy=8000.0, car=hero, car_energy=50000.0, cone=4.0)
+    for r in hs:
+        for o in r.children_recursive:
+            if o.type == "LIGHT" and o.name.endswith("searchlight_spot"):
+                o.data.shadow_soft_size = 1.5
+    for r, i in zip(hs, idx):
+        piv = next(o for o in r.children_recursive if o.name.endswith("searchlight_pivot"))
+        M.key_searchlight({"searchlight_pivot": piv}, frames, helicos.beam_in_scene(shot, i))
+
+
 def beam_cones(helis, target, strength=1.2, color="#e2eaff", seg=32):
     """Le faisceau visible des projecteurs d'hélicoptère en géométrie émissive : un cône ouvert, du projecteur sur
     `length` m le long de sa visée, à l'ouverture du spot, enfant du pivot (il suit la visée). Il ne se voit que de
@@ -1283,10 +1317,15 @@ def plan_P6(scene, hidden, palier="socle"):
     n = M.flash_bars(rigs, frames)
     print(f"[P6] meute de {len(rigs)} véhicules, {n} lumières de rampe clignotantes", flush=True)
 
+    # les trois hélicoptères de la distribution commune à P5 et P6 (helicos.py) : le 0 est celui de P5, qui quitte
+    # son stationnaire pour sa place ; le 1, son ailier, arrive de la droite ; le 2 est déjà sur la sienne. Clés en
+    # temps du film (assiette comprise), rotors sur l'image du film, les feux de P5 sur chacun
+    import helicos
     first, _ = L.helicopter("heli")
-    hs = [first] + [L.clone(first, f"heli_{i}") for i in range(1, len(P6.HELIS))]
+    hs = [first] + [L.clone(first, f"heli_{i}") for i in range(1, helicos.N)]
     for i, r in enumerate(hs):
-        M.key_object(r, frames, P6.heli(i))
+        helicos.key(r, "P6", i, frames)
+        heli_feux(r)
     scene.frame_set(P6.STILL_FRAME)
     # vus de face au ras du sol : à 150 kW et 6°, leur nappe sur l'enrobé mouillé faisait un aplat blanc brûlé
     # autour et devant la berline (rendu e4, images 30 et 60) ; à 50 kW et 4°, une tache contenue devant elle. Une
@@ -1294,15 +1333,14 @@ def plan_P6(scene, hidden, palier="socle"):
     # Lumière v3.1 (règles B, D et F) : cette tache, coupée en deux par l'ombre de la berline, faisait deux bouffées
     # blanches à ses flancs, à hauteur des roues (rendu h1 ; elles disparaissent hélicoptères cachés, pas brume
     # cachée). Le sol n'en reçoit plus que 8 kW, une lueur ; la berline garde ses 50 kW par une jumelle qui
-    # n'éclaire qu'elle (split_for_car, crème comme en FIN)
-    aim_helis(hs, P6.beam_target(P6.T_STILL), energy=8000.0, car=hero, car_energy=50000.0, cone=4.0)
-    for r in hs:
-        for o in r.children_recursive:
-            if o.type == "LIGHT" and o.name.endswith("searchlight_spot"):
-                o.data.shadow_soft_size = 1.5
-    for r in hs:
-        piv = next(o for o in r.children_recursive if o.name.endswith("searchlight_pivot"))
-        M.key_searchlight({"searchlight_pivot": piv}, frames, P6.beam_target)
+    # n'éclaire qu'elle (split_for_car, crème comme en FIN). Chaque faisceau sur sa cible (le 0 quitte celle de P5)
+    helis_P6_light(hs, range(helicos.N), hero, "P6", frames)
+    if L.ville_on():
+        # les traces de gomme que la berline a laissées dans le virage du port (P5) : la ville ne reprend pas celles
+        # du port (ville.CAST) ; elles sont au bas du cadre à P6/1 comme à P5/60
+        import scene_e
+        f0, f1 = scene_e.skid_p5(scene, place="P6")
+        print(f"[P6] traces de P5 posées entières (dévoilées dans P5 de {f0} à {f1})", flush=True)
     try:
         j = L.jet("jet")
         jets = [j, L.clone(j, "jet_2")]

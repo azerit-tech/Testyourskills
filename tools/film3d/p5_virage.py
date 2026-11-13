@@ -239,14 +239,21 @@ def tracks():
 
 
 def aircraft():
-    """{nom: pos(t) -> (x, y, z)} : l'hélicoptère, au milieu de sa cellule."""
-    return {"heli": lambda t: (*heli(t)[:2], heli(t)[2] + HELI_BODY)}
+    """{nom: pos(t) -> (x, y, z)} : les hélicoptères, au milieu de leur cellule (celui du plan, « heli », et les deux
+    qui attendent sur la jetée, helicos.py)."""
+    out = {}
+    for i, k in enumerate(("heli", "heli_1", "heli_2")):
+        fn = heli if i == 0 else heli_n(i)
+        out[k] = (lambda fn: lambda t: (*fn(t)[:2], fn(t)[2] + HELI_BODY))(fn)
+    return out
 
 
 # --- l'hélicoptère : il arrive de l'est au-dessus des piles de conteneurs (hors champ à droite), en vol d'avance
 # (nez bas), vire sur la gauche et plonge devant la berline ; il finit en ralentissant, nez vers elle, HELI_END[1] m
 # au-dessus du sol, HELI_END[0] m devant elle sur le cap de sa vitesse à la dernière image : le faisceau tombe sur
-# elle et relie les deux dans le cadre final.
+# elle et relie les deux dans le cadre final. Il y est en stationnaire (vitesse et accélération nulles), et P6 le
+# reprend de là : sa trajectoire de film, et celle des deux appareils qui attendent sur la jetée, sont dans
+# helicos.py (une seule distribution pour P5 et P6, dans le repère de ville) ; heli_arrival n'en est que l'arrivée.
 HELI_END = (24.0, 9.6)        # m devant elle, hauteur
 HELI_BODY = 1.5               # le milieu de la cellule au-dessus de l'origine du modèle (mesuré à l'image)
 
@@ -268,14 +275,31 @@ def _bez(pts, u):
 
 
 def _heli_u(t):
-    """L'avancement sur la trajectoire : vite au début, plus lent à la fin (il freine devant elle)."""
+    """L'avancement sur la trajectoire : vite au début, plus lent à la fin (il freine devant elle). Le départ de
+    1 − (1 − u)^1,6 (même vitesse et même freinage à la première image), mais à la dernière vitesse et accélération
+    nulles : 1 − (1 − u)³ (1 + 1,4 u + 1,68 u²). Avec l'exposant seul, la décélération n'avait pas de borne au bout,
+    et P6 reprend l'appareil de là (helicos.py)."""
     u = min(1.0, max(0.0, t / T_END))
-    return 1.0 - (1.0 - u) ** 1.6
+    return 1.0 - (1.0 - u) ** 3 * (1.0 + 1.4 * u + 1.68 * u * u)
 
 
 def heli(t):
-    """(x, y, z, cap, tangage, roulis) : le cap suit la route puis se tourne vers la berline, le nez bas tant
-    qu'il avance vite, le roulis à gauche dans le virage."""
+    """L'hélicoptère du plan dans la scène E : (x, y, z, cap, tangage, roulis), lu dans la distribution commune
+    (helicos.state, sans l'assiette de l'accélération)."""
+    import helicos
+    return helicos.in_scene("P5", 0, dyn=False)(t)
+
+
+def heli_n(i):
+    """L'appareil i de la distribution commune (1, 2 : ceux qui attendent sur la jetée), dans la scène E."""
+    import helicos
+    return helicos.in_scene("P5", i, dyn=False)
+
+
+def heli_arrival(t, turn=True):
+    """(x, y, z, cap, tangage, roulis) : l'arrivée de l'hélicoptère du plan ; le cap suit la route puis se tourne
+    vers la berline (`turn` ; sinon il suit la route jusqu'au bout), le nez bas tant qu'il avance vite, le roulis à
+    gauche dans le virage."""
     u = _heli_u(t)
     x, y, z = _bez(HELI_PATH, u)
     x2, y2, _ = _bez(HELI_PATH, min(1.0, max(0.0, u + 0.02)))
@@ -283,7 +307,7 @@ def heli(t):
     head = M.heading_of(x2 - x1, y2 - y1) if (x2 - x1) or (y2 - y1) else 60.0
     hx, hy = hero_pos(t)
     want = M.heading_of(hx - x, hy - y)
-    head = head + (M._unwrap(head, want) - head) * M.smoothstep(0.45, 0.95, t / T_END)
+    head = head + (M._unwrap(head, want) - head) * M.smoothstep(0.45, 0.95, t / T_END) * turn
     pitch = -11.0 + 9.0 * M.smoothstep(0.45, 1.0, t / T_END)
     roll = -12.0 - 6.0 * M.smoothstep(0.1, 0.5, t / T_END) + 16.0 * M.smoothstep(0.55, 0.95, t / T_END)
     return x, y, z, head, pitch, roll

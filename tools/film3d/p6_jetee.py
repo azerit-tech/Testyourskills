@@ -110,12 +110,22 @@ def column_pos(i):
 
 # ---- les hélicoptères : devant la berline, faisceaux tournés vers l'arrière et le bas, sur elle ; (x scène, y devant
 # elle, hauteur). À +30, +40 et +55 m, ils s'étagent à 22, 77 et 58 % de la largeur, hors du chemin des avions. Ils
-# descendent de 2 à 2,5 m pendant la montée de la caméra (vers la pointe, où FIN en pose un à 8 m)
+# descendent de 2 à 2,5 m pendant la montée de la caméra (vers la pointe, où FIN en pose un à 8 m). Ce sont leurs
+# places (heli_slot) ; leurs trajectoires sont celles de la distribution commune à P5 et P6 (helicos.py) : le 0 est
+# l'hélicoptère de P5, qui quitte son stationnaire de P5/60 pour sa place ; 1 et 2 arrivent sur la leur pendant P5.
 HELIS = [(73.5, 30.0, 8.0), (92.0, 40.0, 9.5), (86.0, 55.0, 12.0)]
 HELI_DROP = [2.0, 2.0, 2.5]
 
 
 def heli(i):
+    """L'appareil i dans la scène D, fn(t) -> (x, y, z, cap, tangage, roulis) (helicos.state, sans l'assiette de
+    l'accélération)."""
+    import helicos
+    return helicos.in_scene("P6", i, dyn=False)
+
+
+def heli_slot(i):
+    """La place de l'appareil i devant la berline, fn(t), t en s depuis P6/1 (négatif admis : P5)."""
     x0, ahead, z0 = HELIS[i]
 
     def fn(t):

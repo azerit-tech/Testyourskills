@@ -1603,17 +1603,27 @@ def beam_lights(main, hero, ground, ground_w, car_w):
     return _twin(main, "faisceau_berline", car_w, "#fff1e2", body)
 
 
-def skid_p5(scene, width=0.24):
+def skid_p5(scene, width=0.24, place=None):
     """Les deux traces de gomme des roues arrière dans la glisse (p5_virage.wheel_track), posées sur la dalle et
     dévoilées sous les roues (modificateur Construction, une face par pas de temps). La matière est celle de P2 :
-    gomme mate et sombre sur la pellicule d'eau, fondue à son départ (claire, elle renvoyait les lampadaires)."""
+    gomme mate et sombre sur la pellicule d'eau, fondue à son départ (claire, elle renvoyait les lampadaires).
+    `place` (ville unique) : le plan d'une autre scène où les poser entières (P6, qui les voit à sa première
+    image) : portées par la ville dans son repère, à la hauteur de la dalle (deck_ground), sans dévoilement."""
     from scene_carrefour import mat_wake
     mat = bpy.data.materials.get("tyre_wake") or mat_wake()
     dg = bpy.context.evaluated_depsgraph_get()
 
     def ground(x, y):
+        if place:
+            return deck_ground(x, y)[0] + 0.005
         hit, loc, *_ = scene.ray_cast(dg, Vector((x, y, 0.3)), Vector((0, 0, -1)), distance=1.0)
         return (loc.z if hit else 0.0) + 0.005
+
+    def move(x, y):
+        if not place:
+            return x, y
+        import helicos
+        return helicos.to_scene(place, helicos.to_ville("P5", (x, y)))[:2]
 
     f0, f1 = P5.SKID_FRAMES
     for side, tag in ((-1, "g"), (1, "d")):
@@ -1625,7 +1635,8 @@ def skid_p5(scene, width=0.24):
             ay = pts[min(i + 1, n - 1)][2] - pts[max(i - 1, 0)][2]
             ln = math.hypot(ax, ay) or 1.0
             nx, ny = -ay / ln * width / 2, ax / ln * width / 2
-            verts += [(x - nx, y - ny, ground(x - nx, y - ny)), (x + nx, y + ny, ground(x + nx, y + ny))]
+            verts += [(*move(x - nx, y - ny), ground(x - nx, y - ny)),
+                      (*move(x + nx, y + ny), ground(x + nx, y + ny))]
             if i:
                 faces.append((2 * i - 2, 2 * i, 2 * i + 1, 2 * i - 1))
         me = bpy.data.meshes.new(f"trace_p5_{tag}")
@@ -1639,9 +1650,10 @@ def skid_p5(scene, width=0.24):
         ob = bpy.data.objects.new(me.name, me)
         scene.collection.objects.link(ob)
         ob.visible_shadow = False
-        b = ob.modifiers.new("devoile", "BUILD")
-        b.frame_start = f0
-        b.frame_duration = max(1, f1 - f0)
+        if not place:
+            b = ob.modifiers.new("devoile", "BUILD")
+            b.frame_start = f0
+            b.frame_duration = max(1, f1 - f0)
     return f0, f1
 
 
@@ -1657,7 +1669,10 @@ def plan_P5(scene, hidden, palier="conteneurs"):
     if VILLE:
         # le ciel de la ville (la bande corail à son azimut unique, ramené dans ce repère), le phare à sa vraie place
         # dans ce repère (la pose de la jetée) ; ni pont, ni jetée, ni pointe : la ville les pose (ville.voisins)
-        lamp_src = L.panorama(scene, hidden, yaw=L.mer_lieu("port"), bridge=None, port=None, jetty=None, lieu="port")
+        # ni le phare : la ville pose la jetée et son phare tel que P6 le montre (pinceaux gelés, celui qui viendrait
+        # vers nous caché) ; le port en posait un second au même endroit, ses pinceaux tournants en travers du cadre
+        lamp_src = L.panorama(scene, hidden, yaw=L.mer_lieu("port"), bridge=None, port=None, jetty=None, lieu="port",
+                              phare=False)
     else:
         lamp_src = L.panorama(scene, hidden, bridge=None, port=None)
     # le pont avec son pylône et ses haubans (P4 les montre : au début de P5 ils sont dans l'axe, au fond). En ville
@@ -1709,11 +1724,18 @@ def plan_P5(scene, hidden, palier="conteneurs"):
     # est éclairé par les mâts du port, des lampadaires de 25 m, KEY_MAST compris)
     # --- l'hélicoptère : il arrive de l'est au ras des piles, vire sur la berline ; son faisceau court sur la voie
     # du pont derrière elle et la rattrape (p5_virage.beam_target)
+    # les trois appareils de la distribution commune à P5 et P6 (helicos.py) : celui du plan, son ailier qui arrive
+    # avec lui et celui qui attend sur la jetée ; clés en temps du film (assiette comprise), rotors sur l'image du
+    # film, les mêmes feux. Les deux autres portent la lumière qu'ils ont dans P6 (scene_d.helis_P6_light)
+    import helicos
+    import scene_d
     heli, h = L.helicopter("heli")
-    M.key_object(heli, FRAMES, P5.heli)
+    others = [L.clone(heli, f"heli_{i}") for i in range(1, helicos.N)]
+    for i, r in enumerate([heli] + others):
+        helicos.key(r, "P5", i, FRAMES)
+        scene_d.heli_feux(r)
     sl = h["searchlight"].data
     sl.spot_blend = 0.25
-    import scene_d
     scene_d.aim_helis([heli], P5.beam_target(M.t_of(20)), energy=1.6e6, cone=5.0)
     # ce que balaie la tache : le terre-plein, le mobilier du virage, les conteneurs (la lampe principale y aurait
     # posé des taches brûlées)
@@ -1721,21 +1743,14 @@ def plan_P5(scene, hidden, palier="conteneurs"):
         "conteneur_", "flaque_p5", "chaine", "caisse_", "palettes_", "futs", "separateur_", "port_couronnement",
         "trace_p5")))]
     beam_lights(h["searchlight"], hero, swept, ground_w=1.0e5, car_w=P5_BEAM_CAR_W)
-    M.key_searchlight(h, FRAMES, P5.beam_target)
-    for i, (dz, col, e) in enumerate(((0.2, L.CORAL, 0.4), (-1.2, L.CREAM, 0.25))):
-        Ld = bpy.data.lights.new(f"heli_feu_{i}", "POINT")      # feu anticollision corail, feu blanc sous la cellule
-        Ld.energy = 40.0 * e * 10
-        Ld.color = L.lin(col)[:3]
-        Ld.shadow_soft_size = 0.05
-        lo = bpy.data.objects.new(Ld.name, Ld)
-        bpy.context.scene.collection.objects.link(lo)
-        lo.parent = heli
-        lo.location = (0.0, -0.5, 2.6 + dz)
-        lo.visible_volume_scatter = False                  # une source ponctuelle dans la brume : du grain
-    # la brume ne prend corps que dans le faisceau : toute autre lampe (rampes à 20 kW, tour, feux, lampadaires)
+    M.key_searchlight(h, FRAMES, helicos.beam_in_scene("P5", 0))
+    scene_d.helis_P6_light(others, range(1, helicos.N), hero, "P5", FRAMES)
+    beams = {h["searchlight"]} | {o for r in others for o in r.children_recursive
+                                  if o.type == "LIGHT" and "searchlight_spot" in o.name}
+    # la brume ne prend corps que dans les faisceaux : toute autre lampe (rampes à 20 kW, tour, feux, lampadaires)
     # y posait des taches de grain lilas qui couvraient le ciel (essai c, 64 échantillons)
     for ob in bpy.data.objects:
-        if ob.type == "LIGHT" and ob != h["searchlight"]:
+        if ob.type == "LIGHT" and ob not in beams:
             ob.visible_volume_scatter = False
     L.haze((-140, 160), (-280, 115), (L.WATER_Z, 70), 0.0016)    # lieux.haze tourne ses normales vers l'extérieur
     # --- la caméra qui suit la berline (de 8 à 10,3 m), 21 mm, mise au point sur elle
