@@ -576,12 +576,15 @@ def camera_rail(t):
     """La caméra sans tremblé : (x, y, z, lacet, site, roulis, focale), dans la scène (motion.key_camera)."""
     x, y, z = chase_pos(t)
     yaw, pitch = _aim_smooth(t)
-    return x, y, z, yaw, pitch, 0.0, CHASE_LENS
+    return PC.raccord("P2", _f(t), (x, y, z, yaw, pitch, 0.0, CHASE_LENS))   # la visée commune aux deux bouts
 
 
 def camera(t):
     """La caméra de P2 : camera_rail telle quelle (v3.1 : le tremblé est celui de l'opérateur, motion.py)."""
     return camera_rail(t)
+
+
+camera.bras_commun = "P2"      # motion.camera_operator : vibration sur le temps du film, écarts fondus aux bouts
 
 
 def patrol_screen(t, which=0):

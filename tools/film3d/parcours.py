@@ -261,6 +261,112 @@ def camera(shot, frame, back=CAM_BACK, left=CAM_LEFT, z=CAM_Z):
     return x - back * fx - left * fy, y - back * fy + left * fx, z
 
 
+# ---- la visée commune : définie une fois, sur le temps du film, pour tous les plans du bras commun (OUV, P1, P2,
+# P3, P5, P6). À sa première image et à l'image qui suivrait sa dernière, un plan pose la caméra du bras visée par
+# visee() : la boîte de la berline (glisse comprise, motion.hero_screen) au centre VISEE_U depuis la gauche,
+# VISEE_V depuis le haut, au 24 mm. Ce qu'un plan vise en propre (la berline décalée, un panoramique d'intention, une
+# visée lissée) s'y ajoute par raccord() : son écart à la visée commune multiplié par fenetre(), nulle, de dérivée et
+# de dérivée seconde nulles aux deux bouts du plan. Les deux côtés d'une coupe ont ainsi la même pose (le bras y est
+# déjà le même) : avant, P1/48 → P2/1 sautait de 2,3° de lacet (la berline de 55 % à 50 %), P5 → P6 de 0,7° de
+# lacet et 0,5° de site.
+VISEE_U, VISEE_V, VISEE_LENS = 0.50, 0.58, 24.0
+RACCORD_IMAGES = 18.0             # la longueur des fondus d'écart, en images, à chaque bout
+
+
+VISEE_SIGMA = 0.25                # s : la visée exacte lissée (les coins de la boîte changent pendant une glisse)
+_VQ = 4                           # échantillons par image
+_VISEE = {}
+
+
+def _visee_exacte(shot, frame):
+    """(lacet, site) qui posent exactement la boîte de la berline à (VISEE_U, VISEE_V), depuis le bras commun."""
+    h = hero(shot)
+    x, y, z = camera(shot, frame)
+    hx, hy = h["pos"](frame)
+    head = h["heading"](frame)
+    yaw = math.degrees(math.atan2(-(hx - x), -(hy - y)))
+    pitch = math.degrees(math.atan2(M.HERO_BOX[2] / 2.0 - z, math.hypot(hx - x, hy - y)))
+    for _ in range(8):
+        cam = (x, y, z, yaw, pitch, 0.0, VISEE_LENS)
+        b0 = M.hero_screen(cam, hx, hy, 0.0, head)
+        if not b0:
+            break
+        bu = M.hero_screen((x, y, z, yaw + 0.05, pitch, 0.0, VISEE_LENS), hx, hy, 0.0, head)
+        bv = M.hero_screen((x, y, z, yaw, pitch + 0.05, 0.0, VISEE_LENS), hx, hy, 0.0, head)
+        eu, ev = VISEE_U - b0["u"], VISEE_V - b0["v"]
+        if abs(eu) < 1e-7 and abs(ev) < 1e-7:
+            break
+        yaw += 0.05 * eu / (bu["u"] - b0["u"])
+        pitch += 0.05 * ev / (bv["v"] - b0["v"])
+    return yaw, pitch
+
+
+def visee(shot, frame):
+    """(lacet, site) en degrés (convention de motion.key_camera : 0 regarde -y, positif vers -x) de la visée commune
+    à l'image `frame` du plan (décimale admise) : la visée exacte depuis le bras commun, lissée par une gaussienne
+    centrée de VISEE_SIGMA sur le temps du film. Elle ne dépend que du bras et de la berline (tous deux posés par une
+    rotation et une translation du parcours) et sa grille tombe sur les images : la même pose, au lacet de la
+    rotation du lieu près, des deux côtés d'une coupe."""
+    if shot not in _VISEE:
+        n = dict(SHOTS)[shot]
+        k0 = -40 * _VQ
+        raw, prev = [], None
+        for k in range(k0, (n + 40) * _VQ + 1):
+            yaw, pitch = _visee_exacte(shot, 1.0 + k / _VQ)
+            yaw = yaw if prev is None else prev + (yaw - prev + 180.0) % 360.0 - 180.0
+            prev = yaw
+            raw.append((yaw, pitch))
+        sg = VISEE_SIGMA * FPS * _VQ
+        m = int(3 * sg)
+        wts = [math.exp(-0.5 * (j / sg) ** 2) for j in range(-m, m + 1)]
+        tab = []
+        for i in range(len(raw)):
+            sy = sp = sw = 0.0
+            for j, w in zip(range(-m, m + 1), wts):
+                r = raw[max(0, min(len(raw) - 1, i + j))]
+                sy, sp, sw = sy + w * r[0], sp + w * r[1], sw + w
+            tab.append((sy / sw, sp / sw))
+        _VISEE[shot] = (k0, tab)
+    k0, tab = _VISEE[shot]
+    u = (frame - 1.0) * _VQ - k0
+    k = max(0, min(len(tab) - 2, int(math.floor(u))))
+    f = min(1.0, max(0.0, u - k))
+    return tuple(tab[k][j] + (tab[k + 1][j] - tab[k][j]) * f for j in range(2))
+
+
+def _s5(u):
+    u = min(1.0, max(0.0, u))
+    return u * u * u * (10.0 - 15.0 * u + 6.0 * u * u)
+
+
+RACCORDS = (("OUV", "P1"), ("P1", "P2"), ("P2", "P3"), ("P5", "P6"))   # les coupes continues du bras commun
+_DEBUT, _FIN = {b for _, b in RACCORDS}, {a for a, _ in RACCORDS}
+
+
+def fenetre(shot, frame):
+    """0 à l'image 1 du plan si une coupe du bras commun y arrive, à l'image n + 1 s'il en part une (et au-delà), 1
+    ailleurs ; montée et descente quintiques sur RACCORD_IMAGES : valeur, dérivée et dérivée seconde nulles à ces
+    bouts. Les autres bouts (le début du film, P3 → P4 et P4 → P5 qui changent de caméra, la fin de P6 que la fin
+    reprend) gardent la visée du plan."""
+    n = dict(SHOTS)[shot]
+    a = _s5((frame - 1.0) / RACCORD_IMAGES) if shot in _DEBUT else 1.0
+    b = _s5((n + 1.0 - frame) / RACCORD_IMAGES) if shot in _FIN else 1.0
+    return a * b
+
+
+def raccord(shot, frame, cam):
+    """La caméra `cam` (x, y, z, lacet, site, roulis, focale) d'un plan du bras commun, ramenée à la visée commune
+    aux deux bouts : lacet, site et roulis = visée commune + écart propre × fenetre. La position reste celle du
+    plan (le bras commun aux bouts), la focale doit être VISEE_LENS."""
+    w = fenetre(shot, frame)
+    if w >= 1.0:
+        return tuple(cam)
+    x, y, z, yaw, pitch, roll, lens = cam
+    vy, vp = visee(shot, frame)
+    dy = (yaw - vy + 180.0) % 360.0 - 180.0
+    return x, y, z, vy + dy * w, vp + (pitch - vp) * w, roll * w, lens
+
+
 def brake_windows(shot):
     """Les fenêtres des feux stop du plan, en images du plan : [(première, dernière)]."""
     return DRIVE.brake_windows(f0=1 - START[shot], frames=range(1, dict(SHOTS)[shot] + 1))

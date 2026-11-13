@@ -210,14 +210,17 @@ def _target_u(t):
 
 def camera_rail(t):
     """(x, y, z, lacet, site, roulis, focale) : le bras du parcours (parcours.camera), la berline à (_target_u,
-    V_HERO)."""
+    V_HERO), ramenée à la visée commune aux deux bouts (parcours.raccord : la berline à 50 % à P1/49 = P2/1)."""
     hx, hy = hero_pos(t)
-    return OUV.aim(*PC.camera("P1", _f(t)), hx, hy, _target_u(t), V_HERO)
+    return PC.raccord("P1", _f(t), OUV.aim(*PC.camera("P1", _f(t)), hx, hy, _target_u(t), V_HERO))
 
 
 def camera(t):
     """La caméra du plan : le rail, sans tremblé écrit (l'opérateur de motion.key_camera s'y ajoute au rendu)."""
     return camera_rail(t)
+
+
+camera.bras_commun = "P1"      # motion.camera_operator : vibration sur le temps du film, écarts fondus aux bouts
 
 
 # Le phare lointain (découpage v3, §3) : comme en OUV (ouv_avenue.phare_pose), 600 m devant la caméra de la première

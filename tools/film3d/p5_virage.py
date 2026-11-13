@@ -426,13 +426,16 @@ def camera_rail(t):
     """La caméra sans tremblé : (x, y, z, lacet, site, roulis, focale)."""
     x, y, z = cam_pos(t)
     yaw, pitch = camera_aim(t)
-    return x, y, z, yaw, pitch, 0.0, LENS
+    return PC.raccord("P5", _f(t), (x, y, z, yaw, pitch, 0.0, LENS))     # la visée commune aux deux bouts
 
 
 def camera(t):
     """La caméra du plan : le rail, sans tremblé écrit (l'opérateur de motion.key_camera ajoute vibration et
     secousses de passage selon le type de caméra)."""
     return camera_rail(t)
+
+
+camera.bras_commun = "P5"      # motion.camera_operator : vibration sur le temps du film, écarts fondus aux bouts
 
 
 def project(p, t):

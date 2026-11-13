@@ -139,14 +139,18 @@ SIDE_FROM = 22                # l'image où le bras commence à glisser vers la 
 
 
 def camera_rail(t):
-    """Le cadre commun : le bras du parcours (parcours.camera), visé sur la berline."""
+    """Le cadre commun : le bras du parcours (parcours.camera), visé sur la berline, à la visée commune aux deux
+    bouts (parcours.raccord)."""
     x, y = hero_pos(t)
-    return aim(*PC.camera("OUV", _f(t), left=cam_side(t)), x, y)
+    return PC.raccord("OUV", _f(t), aim(*PC.camera("OUV", _f(t), left=cam_side(t)), x, y))
 
 
 def camera(t):
     """La caméra du plan : le rail, sans tremblé écrit (l'opérateur de motion.key_camera s'y ajoute au rendu)."""
     return camera_rail(t)
+
+
+camera.bras_commun = "OUV"      # motion.camera_operator : vibration sur le temps du film, écarts fondus aux bouts
 
 
 def bars_on(frame):

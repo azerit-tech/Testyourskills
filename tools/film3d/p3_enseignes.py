@@ -451,11 +451,14 @@ def aim(x, y, z, hx, hy, heading, u=CAM_U, v=CAM_V):
 def camera_rail(t):
     """La caméra : (x, y, z, lacet, site, roulis, focale)."""
     x, y = hero_pos(t)
-    return aim(*PC.camera("P3", _f(t)), x, y, hero_heading(t))
+    return PC.raccord("P3", _f(t), aim(*PC.camera("P3", _f(t)), x, y, hero_heading(t)))   # visée commune aux bouts
 
 
 def camera(t):
     return camera_rail(t)
+
+
+camera.bras_commun = "P3"      # motion.camera_operator : vibration sur le temps du film, écarts fondus aux bouts
 
 
 # --- le cadre, sans Blender : la projection d'un point (repère de render : capteur de 36 mm sur la hauteur, le

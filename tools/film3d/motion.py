@@ -1416,7 +1416,17 @@ def camera_operator(fn, frames, f0=F0, fps=FPS, tracks=(), seed=0.0, warmup=0.5,
     frames = list(frames)
     kind = camera_kind(fn, frames, f0, fps)
     hfov, vfov = fov_deg(kind["lens"])
-    rng = random.Random(f"op:{float(seed):.3f}")
+    # un plan du bras commun (fn.bras_commun = son nom, parcours.SHOTS) : la vibration est tirée sur le temps du film,
+    # aux mêmes phases pour tous ces plans (elle passe la coupe sans saut) ; ce qui est tiré par plan (ressauts,
+    # passages, suiveur de panoramique) est multiplié par parcours.fenetre, nulle avec ses deux dérivées aux deux
+    # bouts : aux coupes, la pose est celle du rail plus la même vibration des deux côtés
+    shot = getattr(fn, "bras_commun", None)
+    clock, ends = 0.0, None
+    if shot is not None:
+        import parcours as PC
+        clock = PC.START[shot] / PC.FPS - t_of(1, f0, fps)
+        ends = lambda t: PC.fenetre(shot, 1.0 + (t + clock) * PC.FPS - PC.START[shot])   # noqa: E731
+    rng = random.Random(f"op:{float(seed):.3f}" if shot is None else "op:bras_commun")
     ph = [rng.uniform(0, 2 * math.pi) for _ in range(12)]
     dt = 1.0 / (fps * 10)
     t0, t1 = t_of(frames[0], f0, fps), t_of(frames[-1], f0, fps)
@@ -1494,16 +1504,18 @@ def camera_operator(fn, frames, f0=F0, fps=FPS, tracks=(), seed=0.0, warmup=0.5,
             fl = o["tele_float"] * vfov
             dy += (lp_y - y) + fl * (0.6 * math.sin(2 * math.pi * 0.13 * t + ph[0]) + 0.4 * math.sin(2 * math.pi * 0.31 * t + ph[1]))
             dp += (lp_p - p) + fl * 0.8 * (0.6 * math.sin(2 * math.pi * 0.17 * t + ph[2]) + 0.4 * math.sin(2 * math.pi * 0.47 * t + ph[3]))
+        vy = vp = vr = vz = 0.0
         if moving:
             g = o["vib_air"] if kind["air"] else 1.0
             a = o["vib_deg"] * speed * g
             f1, f2, f3 = o["vib_hz"]
-            hf = lambda i: (0.5 * math.sin(2 * math.pi * f1 * t + ph[i]) + 0.3 * math.sin(2 * math.pi * f2 * t + ph[i + 1])  # noqa: E731
-                            + 0.2 * math.sin(2 * math.pi * f3 * t + ph[i + 2]))
-            dy += 0.5 * a * hf(4)
-            dp += a * hf(5)
-            dr += 0.6 * a * hf(6)
-            dz += o["vib_z"] * speed * g * hf(7)
+            tc = t + clock
+            hf = lambda i: (0.5 * math.sin(2 * math.pi * f1 * tc + ph[i]) + 0.3 * math.sin(2 * math.pi * f2 * tc + ph[i + 1])  # noqa: E731
+                            + 0.2 * math.sin(2 * math.pi * f3 * tc + ph[i + 2]))
+            vy = 0.5 * a * hf(4)
+            vp = a * hf(5)
+            vr = 0.6 * a * hf(6)
+            vz = o["vib_z"] * speed * g * hf(7)
             for tj, s in jolts:
                 dp += _decay(t, tj, o["jolt_deg"] * s, o["jolt_hz"], o["jolt_tau"])
                 dr += _decay(t, tj, 0.5 * o["jolt_deg"] * s, o["jolt_hz"] * 0.9, o["jolt_tau"], 1.0)
@@ -1514,6 +1526,10 @@ def camera_operator(fn, frames, f0=F0, fps=FPS, tracks=(), seed=0.0, warmup=0.5,
             dy += _decay(t, te, 0.4 * amp, o["pass_hz"] * 1.25, o["pass_tau"], 2.0)
         if k in want:
             base = fn(t_of(want[k], f0, fps))
+            if ends is not None:
+                e = ends(t)
+                dy, dp, dr, dz = dy * e, dp * e, dr * e, dz * e
+            dy, dp, dr, dz = dy + vy, dp + vp, dr + vr, dz + vz
             if land:
                 e = smoothstep(t1, t1 - 0.3, t)
                 dy, dp, dr, dz = dy * e, dp * e, dr * e, dz * e

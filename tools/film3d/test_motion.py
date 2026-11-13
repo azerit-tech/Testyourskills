@@ -1775,7 +1775,41 @@ def test_v3():
                     check(f"continuité {r['a']} → {r['b']} : {name}", ok, detail)
 
 
+CUT_POSE_DPOS, CUT_POSE_DANG = 0.02, 0.1      # m, degrés : la même pose de caméra des deux côtés d'une coupe
+CUT_POSE_CUTS = __import__("parcours").RACCORDS   # les coupes continues du bras commun
+
+
+def cut_pose_rows():
+    """[(A, B, Δposition m, Δlacet, Δsite, Δroulis °, focales)] : la caméra de A à sa dernière image + 1 contre celle
+    de B à sa première, en repère de ville, sur les clés que la scène pose (motion.plan_data : clés finales, opérateur
+    et tremblé compris)."""
+    import parcours as PC
+    specs = M.shot_specs()
+    data = {p: M.plan_data(p, specs[p]) for p in {p for c in CUT_POSE_CUTS for p in c}}
+
+    def city(p, f):
+        x, y, z, yaw, pitch, roll, lens = data[p]["final"][f]
+        to_v, rot = PC.vers_ville(p)
+        u, v = to_v(x, y)
+        return u, v, z, yaw - rot, pitch, roll, lens       # (le lacet de key_camera tourne à l'envers du repère)
+    rows = []
+    for a, b in CUT_POSE_CUTS:
+        ca, cb = city(a, data[a]["frames"][-1] + 1), city(b, data[b]["frames"][0])
+        rows.append((a, b, math.dist(ca[:3], cb[:3]), M._unwrap(0.0, cb[3] - ca[3]), cb[4] - ca[4], cb[5] - ca[5],
+                     (ca[6], cb[6])))
+    return rows
+
+
+def test_cut_pose():
+    for a, b, dp, dy, ds, dr, (la, lb) in cut_pose_rows():
+        check(f"coupe {a} → {b} : même pose de caméra (position ≤ {CUT_POSE_DPOS * 100:.0f} cm, lacet, site, roulis "
+              f"≤ {CUT_POSE_DANG:g}°, même focale)",
+              dp <= CUT_POSE_DPOS and max(abs(dy), abs(ds), abs(dr)) <= CUT_POSE_DANG and abs(la - lb) < 1e-9,
+              f"Δ {dp * 100:.2f} cm, lacet {dy:+.3f}°, site {ds:+.3f}°, roulis {dr:+.3f}°, focales {la:g}/{lb:g} mm")
+
+
 if __name__ == "__main__":
+    test_cut_pose()
     test_straight()
     test_braking()
     test_right_turn()
