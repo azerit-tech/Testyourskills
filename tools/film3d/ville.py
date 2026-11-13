@@ -1047,7 +1047,7 @@ def _ribbon(name, pts, half, color, coll, z=Z_TOP, half1=None):
     return ob
 
 
-def annoter(scene, box, size, noms=NOMS):
+def annoter(scene, box, size, noms=NOMS, legende=None):
     """La route (un ruban par moitié de ville, l'ellipse en pointillé rouge), les fenêtres des plans (la berline image
     par image, blanc et noir alternés), leurs débuts (un trait blanc ; rouge à une coupe d'ellipse), le nom des plans et
     des lieux, une grille de 50 m, le nord. Dans une collection « annotation », à Z_TOP."""
@@ -1081,8 +1081,8 @@ def annoter(scene, box, size, noms=NOMS):
                 (3.0 if cut else 1.8) * size / 6.0, (0.95, 0.1, 0.1) if cut else (1.0, 1.0, 1.0), coll, Z_TOP + 0.2)
         xm, ym, _, capm, _ = pts[len(pts) // 2]
         a = math.radians(capm)
-        off = 2.4 * size
-        _text(f"nom_{name}", name, xm + off * math.cos(a), ym + off * math.sin(a), size, (1, 1, 1), coll)
+        off = 3.0 * size
+        _text(f"nom_{name}", name, xm + off * math.cos(a), ym + off * math.sin(a), size * 1.5, (1, 1, 1), coll)
     # l'ellipse : de la dernière image de A à la première de B, en pointillé rouge, sa longueur de vraie route
     for (a_, b_), ok in P.CONTINU.items():
         if ok:
@@ -1102,7 +1102,7 @@ def annoter(scene, box, size, noms=NOMS):
         _text(f"ellipse_{a_}_{b_}", f"ELLIPSE {abs(along):.0f} M", (xa + xb) / 2 + 3.2 * size * math.cos(a),
               (ya + yb) / 2 + 3.2 * size * math.sin(a), size * 0.9, (0.95, 0.1, 0.1), coll, rot=math.radians(cap + 90))
     # le nom des lieux : à gauche de la berline au milieu de leurs plans (le côté opposé au nom des plans)
-    for nom, plans, plan in LIEUX:
+    for k, (nom, plans, plan) in enumerate(LIEUX):
         if nom not in noms:
             continue
         fs = [f for f in frames() if shot_of(f)[0] in plans]
@@ -1110,9 +1110,11 @@ def annoter(scene, box, size, noms=NOMS):
             continue
         x, y, _, cap, _ = hero_city(fs[len(fs) // 2])
         a = math.radians(cap)
-        off = -4.5 * size
-        _text(f"lieu_{nom}", nom.upper(), x + off * math.cos(a), y + off * math.sin(a), size * 1.5,
+        off = (-1) ** k * 9.0 * size
+        _text(f"lieu_{nom}", nom.upper(), x + off * math.cos(a), y + off * math.sin(a), size * 2.6,
               COULEURS[nom], coll)
+        _text(f"lieu_{nom}_ombre", nom.upper(), x + off * math.cos(a) + 0.12 * size,
+              y + off * math.sin(a) - 0.12 * size, size * 2.6, (0.0, 0.0, 0.0), coll).location.z -= 0.5
     gx0, gy0, gx1, gy1 = box
     step = 50.0
     k = math.floor(gx0 / step)
@@ -1135,9 +1137,22 @@ def annoter(scene, box, size, noms=NOMS):
     _ribbon("nord_pointe", [(nx, ny + 3.0 * size, 0.0), (nx, ny + 4.2 * size, 0.0)], 0.0, (1, 1, 1), coll,
             Z_TOP + 0.3, half1=0.9 * size)
     _text("nord", "N", nx, ny + 5.6 * size, size * 1.4, (1, 1, 1), coll)
+    if legende:
+        for i, line in enumerate(legende.split("|")):
+            _text(f"legende_{i}", line.strip(), (gx0 + gx1) / 2, gy0 + (4.0 + 1.8 * (len(legende.split("|")) - 1 - i))
+                  * size, size * 0.95, (1, 1, 1), coll)
     for o in coll.objects:
         o["ville_lieu"], o["ville_lointain"], o["ville_cache0"] = "annotation", 0, 0
     return coll
+
+
+def legende_defaut():
+    """La légende de la carte : ce qu'elle montre et d'où viennent les poses (lignes séparées par |)."""
+    poses = [f"{n.upper()} {r:+.0f}° ({x:.1f} ; {y:.1f})" for n, (r, x, y) in
+             ((n, placement(lieu(n)["plan"])) for n in NOMS)]
+    return (f"LA VILLE UNIQUE VUE DE DESSUS, NORD EN HAUT, CARRÉS DE 50 M | ROUTE {P.ROUTE.length:.0f} M, "
+            f"{P.TOTAL} IMAGES ; PLANS EN BLANC ET NOIR, ELLIPSE EN ROUGE | " + "   ".join(poses[:3]) + " | "
+            + "   ".join(poses[3:]))
 
 
 def portrait(box, ratio=9.0 / 16.0):
@@ -1270,7 +1285,7 @@ def worker_carte(a, noms):
     rx = [p[1] for p in prof] + [v[0] for v in sol.values()]
     ry = [p[2] for p in prof] + [v[1] for v in sol.values()]
     near = portrait((min(rx) - 60, min(ry) - 60, max(rx) + 60, max(ry) + 60))
-    annoter(scene, near, max(6.0, (near[3] - near[1]) / 110.0), noms)
+    annoter(scene, near, max(6.0, (near[3] - near[1]) / 110.0), noms, a.legende or legende_defaut())
     rendre_carte(scene, near, os.path.join(a.out, "carte-route.png"))
     rendre_carte(scene, near, os.path.join(a.out, "carte-route-transparence.png"), xray=True)
     if box:
@@ -1278,7 +1293,7 @@ def worker_carte(a, noms):
                min(max(b[3] for b in box.values()), near[2] + 900), min(max(b[4] for b in box.values()), near[3] + 900))
         big = max(far[2] - far[0], far[3] - far[1])
         far = portrait(far)
-        annoter(scene, far, max(6.0, big / 90.0), noms)
+        annoter(scene, far, max(6.0, big / 90.0), noms, a.legende or legende_defaut())
         rendre_carte(scene, far, os.path.join(a.out, "carte-ville.png"))
     rapport = dict(lieux={n: dict(blend=infos[n]["blend"], how=infos[n]["how"], build_s=infos[n]["build_s"],
                                   blend_mb=infos[n]["blend_mb"], **{k: v for k, v in built[n].items()
@@ -1497,6 +1512,7 @@ def main():
     ap.add_argument("--cache", action="store_true", help="seulement les lieux en cache et leur inventaire")
     ap.add_argument("--lieux", default=",".join(NOMS))
     ap.add_argument("--lointains", action="store_true", help="garder les faux lointains")
+    ap.add_argument("--legende", default=None, help="la légende de la carte, lignes séparées par | (sinon les poses)")
     ap.add_argument("--out", default=None)
     ap.add_argument("--blender", default=None)
     ap.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
@@ -1530,6 +1546,8 @@ def main():
                 sys.exit(1)
     if a.carte:
         args = ["--etape", "carte", "--lieux", ",".join(noms)] + (["--lointains"] if a.lointains else [])
+        if a.legende:
+            args += ["--legende", a.legende]
         if not run_blender(blender, a.out, args, tag="carte"):
             sys.exit(1)
     if a.prise:
