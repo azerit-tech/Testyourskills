@@ -139,7 +139,9 @@ class PATROL:
 
 
 PATROL_YAW, PATROL_YAW_F = -9.0, (24.0, 48.0)       # le nez qui rentre à droite (degrés, de l'image à l'image)
-PATROL_SEEN = (1, 23)                               # les images où elle est entière dans le cadre (test_motion)
+# les images où elle est entière dans le cadre, à gauche de la berline (test_motion) : jusqu'à P5/14, quand le grand
+# dérapage (parcours.DERAP5) jette l'arrière de la berline vers la gauche, devant elle à l'écran (P5/23 avant)
+PATROL_SEEN = (1, 14)
 
 
 def patrol_heading(t):
@@ -368,7 +370,7 @@ def _aim_at(cx, cy, cz, x, y, fxp, fyp):
     return yaw, elev - math.degrees(math.atan((fyp - 50.0) / 50.0 * TAN_V))
 
 
-AIM_SMOOTH = 0.5              # s : la demi-largeur du lissage de la correction de visée
+AIM_SMOOTH = 0.7              # s : la demi-largeur du lissage de la correction de visée
 _AIM = None
 
 
@@ -390,11 +392,21 @@ def _aim_table():
             b = M.frame_box((cx, cy, cz, yaw, pitch, 0.0, LENS), {"x": x, "y": y, "heading": hero_heading(t)},
                             CAR_DIMS)
             raw.append((want_x - (b[0] + b[1]) / 2, want_y - (b[2] + b[3]) / 2))
+        # une gaussienne de même portée (±AIM_SMOOTH à 2,5 écarts) plutôt qu'une moyenne glissante : le grand
+        # dérapage (36°) déplace vite le centre de la boîte, la moyenne glissante en gardait des cassures de
+        # vitesse (1,49 largeur/s² d'accélération de panoramique à P5/27)
         w = int(round(AIM_SMOOTH / TAB_DT))
+        sg = w / 2.5
+        ker = [math.exp(-0.5 * (j / sg) ** 2) for j in range(-w, w + 1)]
         tab = []
         for i in range(len(raw)):
-            lo, hi = max(0, i - w), min(len(raw), i + w + 1)
-            tab.append(tuple(sum(r[j] for r in raw[lo:hi]) / (hi - lo) for j in range(2)))
+            num, den = [0.0, 0.0], 0.0
+            for j, kj in zip(range(-w, w + 1), ker):
+                r = raw[max(0, min(len(raw) - 1, i + j))]
+                num[0] += kj * r[0]
+                num[1] += kj * r[1]
+                den += kj
+            tab.append((num[0] / den, num[1] / den))
         _AIM = (n0, tab)
     return _AIM
 

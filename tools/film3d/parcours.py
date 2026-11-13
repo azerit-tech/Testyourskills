@@ -19,10 +19,14 @@ S_GO = 31.0                                 # elle met les gaz
 # le rond-point : début nominal, rayon, angle (à gauche). 90° : ses branches sont à angle droit, la rue des enseignes
 # part plein nord quand l'avenue file vers l'est (plan de ville) ; 64° auparavant
 S_ARC2, R2, A2 = 65.0, 30.0, 90.0
-VA2, B2 = 12.4, 10.0                        # vitesse d'arc, où elle la demande (m après S_ARC2) : le plan B de la
-                                            # feuille (§7), une glisse plus franche (−14 % de vitesse)
-G2 = R2 * math.radians(A2) - 9.51           # où elle remet les gaz : 9,51 m avant la fin nominale de l'arc, comme à
-                                            # 64° (24,0 m) ; 37,61 m à 90°
+# vitesse d'arc, où elle la demande (m après S_ARC2), où elle remet les gaz (m après S_ARC2, sorti de l'anneau) :
+# réglées (avec le freinage et les gaz du dérapage du port, DERAP5) pour que la berline passe aux images qui posent
+# les lieux dans la ville (P3/36, P4/48, P6/60) et à P5/60 aux mêmes abscisses qu'avant les dérapages dessinés, à
+# 3 mm près (134,04 ; 181,15 ; 244,72 ; 213,96 m), et presque aux mêmes vitesses (15,85 ; 19,08 ; 15,51 ; 10,15 m/s,
+# avant 15,89 ; 19,07 ; 15,50 ; 10,06) : les lieux ne bougent pas. Elle aborde l'anneau un peu plus vite (le
+# dérapage freine à sa place, la latérale de l'anneau plafonne sa vitesse) et ne remet les gaz qu'à sa sortie.
+VA2, B2 = 13.4556, 10.0
+G2 = 56.2252
 # le port (à droite) : 22 m de rayon au lieu de 15 (feuille §9.1). Le terre-plein est une dalle nue ; sur les 60
 # images de P5 la berline reste à 4,1 m des poteaux de chaîne, 7,2 m des caisses, 8,6 m des conteneurs, 9,1 m des
 # séparateurs, la caméra à 4,6 m des poteaux (mesuré avec le rond-point à 64°). Le rond-point à 90° la rend plus
@@ -34,14 +38,32 @@ VA5 = math.sqrt(6.5 * 0.92 * R5)            # 11,47 m/s : la latérale visée pa
 B5, G5 = 5.0 * R5 / 15.0, 9.0 * R5 / 15.0   # le freinage traîné et la remise des gaz, à l'échelle du rayon
 E5_GAIN = 1.15                              # l'entrée du port adoucie de 15 % : 105 °/s² de lacet de caisse (120)
 TAIL = 80.0
-LIM = dict(slip_per=16.0, slip_drag=0.14, slip_hold=0.4, slip_max=15.0)
-# Dans l'anneau (P2), la glisse retombe encore à 4,4 m/s² de latérale, sous l'adhérence (5,5) : le petit retour de
-# l'autre côté de motion.drive (2,5° visés, 2,95 atteints à P2/67) y croissait sans adhérence dépassée. Un retour
-# qui naîtrait pendant P2 n'est pas joué par la caisse (motion.drive, slip_back_off) : la glisse s'y résorbe d'un
-# seul tenant, sans repasser de l'autre côté (12,2° à P2/41, 1,2 à P2/61, 0,02 à P2/99) ; son freinage (0,4 m/s²
-# au plus pendant 0,45 s) est gardé : la vitesse, la route au temps et les lieux ne bougent pas.
-# Le retour du port (P5 → P6) reste joué.
-LIM["slip_back_off"] = (START["P2"] / FPS, (START["P2"] + dict(SHOTS)["P2"]) / FPS)
+# ---- les deux dérapages du film, dessinés (motion.drive, lim["derapages"]) : une berline lourde à propulsion sur le
+# mouillé, vue de dos par le bras commun. La glisse du modèle de motion.drive (née du dépassement d'adhérence,
+# 12° au rond-point, 15° au port) donnait une trajectoire propre, pas un dérapage : 18 à 22° entre la caisse et le
+# bras ne montrent pas le flanc. Ici le conducteur la provoque : un appel bref (pied levé et un léger coup de volant
+# vers l'extérieur, la caisse part de 1 à 2° du mauvais côté), puis l'arrière déchargé décroche, de 5° à la crête en
+# une demi-seconde (70 à 80 °/s au plus fort), tenu une seconde contre-braqué, rattrapé en trois quarts de seconde
+# (au port : un seul petit retour de l'autre côté, sans pompage). Les nœuds : (s depuis le passage de l'abscisse,
+# glisse °, vitesse °/s) ; entre deux, des quintiques (motion._hermite5). La route ne change pas : la caisse pivote
+# autour de son centre, qui garde sa trajectoire. Les pneus arrière qui frottent en travers freinent la voiture
+# (slip_drag m/s² par degré) ; au rond-point le pied reste levé tant qu'elle glisse, au port elle tient le grand
+# dérapage au tiers des gaz (une propulsion se tient en glisse à l'accélérateur) contre un frottement plus fort
+# (0,097 m/s² par degré) ; elle reprend ensuite. Les roues avant : contre-braquage de 0,78 × la glisse (motion.drive,
+# counter), 22 à 28° au plus fort. Leurs places, entre ce qui les borde :
+#  - rond-point : l'appel à s 70,4 (P2/28), la crête à P2/48, l'arrière qui balaie vers l'extérieur une fois la
+#    patrouille 1 débordée (une crête à P2/37 la frôlait à 0,9 m) ; rattrapé vite à la sortie de l'anneau (de 25 à 8°
+#    en 0,4 s, la queue plus douce) : la roue arrière extérieure y garde 0,6 m du nez de la bordure ;
+#  - port : l'appel dès s 185 (P5/5, le coup de volant avant le virage), la crête à P5/28, rattrapé à P5/60 (4,6° à
+#    la coupe) ; son seul retour de l'autre côté se joue dans P6, la coupe vers la fin (FIN) se fait sur une berline
+#    presque droite.
+DERAP2 = dict(s=70.4, side=1.0, keys=[(0.0, 0.0, 0.0), (0.15, -1.2, 0.0), (0.42, 7.0, 70.0), (0.60, 19.6, 70.0),
+                                       (0.85, 29.0, 0.0, -90.0), (1.50, 25.5, -14.0), (1.92, 8.0, -40.0),
+                                       (2.32, 2.0, -6.0), (2.70, 0.0, 0.0)])
+DERAP5 = dict(s=185.0, side=-1.0, keys=[(0.0, 0.0, 0.0), (0.17, -1.6, 0.0), (0.47, 8.0, 80.0), (0.67, 24.0, 80.0),
+                                         (0.95, 36.0, 0.0, -110.0), (1.62, 30.0, -14.0), (2.24, 9.0, -48.0),
+                                         (2.70, -4.0, 0.0), (3.22, 0.0, 0.0)], drag=0.0967, gas=0.3333)
+LIM = dict(slip_drag=0.07, counter=0.78, derapages=[DERAP2, DERAP5])
 JERK = 12.0 * 0.72
 
 
@@ -79,7 +101,7 @@ def _drive():
     speed = [(0.0, V_OUV), (S_GO, V_OUV), (S_GO + 0.1, V1),
              (S_ARC2 + B2 - 0.1, V1), (S_ARC2 + B2, VA2), (S_ARC2 + G2, VA2), (S_ARC2 + G2 + 0.1, V_FAR),
              (S_ARC5 + B5 - 0.1, V_FAR), (S_ARC5 + B5, VA5), (S_ARC5 + G5, VA5), (S_ARC5 + G5 + 0.1, V_FAR)]
-    return route, M.drive(route, speed, t0=0.0, kind="hero", lim=LIM, ease=max(e2, e5),
+    return route, M.drive(route, speed, t0=0.0, kind="hero", drift=0.0, lim=LIM, ease=max(e2, e5),
                           t_span=(-2.0, TOTAL / FPS + 2.5))
 
 

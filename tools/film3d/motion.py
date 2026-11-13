@@ -767,6 +767,26 @@ class Drive:
         return [(w[0], w[-1]) for w in _windows(over)]
 
 
+def _hermite5(keys, t):
+    """La glisse dessinée d'un dérapage à l'instant t (s depuis son départ) : keys = [(t, valeur °, vitesse °/s[,
+    accélération °/s²]), …], des quintiques d'Hermite d'un nœud à l'autre (valeur, vitesse et accélération continues :
+    la caisse n'a aucun à-coup) ; nulle avant le premier nœud et après le dernier."""
+    if t <= keys[0][0] or t >= keys[-1][0]:
+        return 0.0
+    for a, b in zip(keys, keys[1:]):
+        if t <= b[0]:
+            T = b[0] - a[0]
+            u = (t - a[0]) / T
+            u2, u3 = u * u, u * u * u
+            u4, u5 = u3 * u, u3 * u2
+            aa = a[3] if len(a) > 3 else 0.0
+            ab = b[3] if len(b) > 3 else 0.0
+            return ((1 - 10 * u3 + 15 * u4 - 6 * u5) * a[1] + (u - 6 * u3 + 8 * u4 - 3 * u5) * T * a[2]
+                    + (0.5 * u2 - 1.5 * u3 + 1.5 * u4 - 0.5 * u5) * T * T * aa + (10 * u3 - 15 * u4 + 6 * u5) * b[1]
+                    + (-4 * u3 + 7 * u4 - 3 * u5) * T * b[2] + (0.5 * u3 - u4 + 0.5 * u5) * T * T * ab)
+    return 0.0
+
+
 def drive(route, speed, t0=0.0, stop=False, kind="hero", drift=1.0, ease=None, lim=None, t_span=(-2.0, 12.0)):
     """Une conduite qui tient les limites v3.1 (DRIVE, DRIVE_KINDS) : rend un Drive (pos, heading, slip, steer,
     speed, brake_windows).
@@ -778,6 +798,12 @@ def drive(route, speed, t0=0.0, stop=False, kind="hero", drift=1.0, ease=None, l
     kind : "hero", "patrol" ou "van" (les limites) ; lim : des limites à changer (clés de DRIVE) ;
     drift : le gain de la glisse (0 : jamais, 1 : le modèle) ; ease : la longueur (m) des entrées et sorties de
       courbure (par défaut : ce que demande l'à-coup latéral à la vitesse du virage) ;
+    lim["derapages"] : des dérapages dessinés, ajoutés à la glisse du modèle : [dict(s=abscisse m, side=±1,
+      keys=[(t s, glisse °, vitesse °/s[, accélération °/s²]), …], drag=m/s² par degré, gas=part des gaz gardée)],
+      la glisse de _hermite5 comptée depuis l'instant où la voiture passe l'abscisse s (side : +1 l'avant vers la
+      gauche de sa route). Ils freinent la voiture (drag, slip_drag par défaut) et coupent les gaz (gas, 0 par
+      défaut : le pied levé comme pour la glisse du modèle) ; l'instant de départ suit donc la vitesse. Le braquage
+      des roues avant y tient STEER_RATE ;
     t_span : de quand à quand (s, temps du plan) la table est calculée ; hors de la table, en ligne droite."""
     L = dict(DRIVE_KINDS.get(kind, DRIVE), **(lim or {}))
     mg = L["margin"]
@@ -902,15 +928,33 @@ def drive(route, speed, t0=0.0, stop=False, kind="hero", drift=1.0, ease=None, l
             sv2 = max(-cap, min(cap, sv2)) * smoothstep(0.2, 4.0, vt[k])
             slip2 += sv2 * dt
             out_head.append(slip2)
+        # les dérapages dessinés (lim["derapages"]) : leur départ à l'instant où la voiture passe leur abscisse ; leur
+        # freinage (drag m/s² par degré, slip_drag par défaut) et la part des gaz gardée en glisse (gas : 0, pied levé
+        # comme dans le modèle ; une propulsion tient son dérapage aux gaz)
+        ev_drag, ev_lift, model_slip = [0.0] * N, [1.0] * N, list(out_slip)
+        for ev in L.get("derapages") or ():
+            k1 = next((k for k in range(1, N) if st[k] >= ev["s"] > st[k - 1]), None)
+            if k1 is None:
+                continue
+            t_ev = grid[k1 - 1] + (ev["s"] - st[k1 - 1]) / max(1e-9, st[k1] - st[k1 - 1]) * dt
+            dk, gas = ev.get("drag", L["slip_drag"]), ev.get("gas", 0.0)
+            for k in range(N):
+                d = ev["side"] * _hermite5(ev["keys"], grid[k] - t_ev)
+                out_slip[k] += d
+                out_head[k] += d
+                ev_drag[k] += dk * abs(d)
+                ev_lift[k] = min(ev_lift[k], 1.0 - (1.0 - gas) * min(1.0, abs(d) / 3.0))
         # 4. les limites tiennent-elles après lissage ? sinon raboter là où elles cèdent et recommencer
-        new_drag, slid = [0.0] * n, [0.0] * n
+        new_drag, slid, gas_i = [0.0] * n, [0.0] * n, [1.0] * n
         for k in range(N):
             if 0.0 <= st[k] <= S[-1]:
                 i = min(n - 1, int(st[k] / ds))
-                new_drag[i] = max(new_drag[i], L["slip_drag"] * abs(out_slip[k]))
-                slid[i] = max(slid[i], abs(out_slip[k]))
+                own = abs(model_slip[k])                     # la glisse du modèle seule
+                new_drag[i] = max(new_drag[i], L["slip_drag"] * own + ev_drag[k])
+                slid[i] = max(slid[i], own)
+                gas_i[i] = min(gas_i[i], ev_lift[k])
         new_drag = _box(new_drag, int(1.0 / ds) | 1)
-        lift = _box([max(0.0, 1.0 - a / 3.0) for a in slid], int(2.0 / ds) | 1)
+        lift = _box([min(max(0.0, 1.0 - a / 3.0), g) for a, g in zip(slid, gas_i)], int(2.0 / ds) | 1)
         worst, at = 0.0, None
         for k in range(N):
             r = max(abs(alat[k]) / L["lat"], math.hypot(along[k], alat[k]) / L["circle"], -along[k] / L["brake"])
@@ -955,6 +999,13 @@ def drive(route, speed, t0=0.0, stop=False, kind="hero", drift=1.0, ease=None, l
             wcs = smoothstep(2.0, 6.0, abs(out_head[k]))
             steer_prev = max(-STEER_MAX, min(STEER_MAX, geo_s * (1.0 - wcs) - L["counter"] * out_head[k] * wcs))
         tab["steer"].append(steer_prev)
+    if L.get("derapages"):
+        # un dérapage dessiné passe du braquage d'entrée au contre-braquage en un quart de seconde : les mains au
+        # volant tiennent STEER_RATE (60 °/s aux roues, comme la caisse refaite par rebody), lissées sur 0,1 s
+        st_ = tab["steer"]
+        for k in range(1, N):
+            st_[k] = st_[k - 1] + max(-STEER_RATE * dt, min(STEER_RATE * dt, st_[k] - st_[k - 1]))
+        tab["steer"] = _box(_box(st_, int(0.05 / dt) | 1), int(0.05 / dt) | 1)
     t_stop = None
     if stop:
         t_stop = next((tab["t"][k] for k in range(N) if grid[k] > 0 and vt[k] < 0.05), None)
