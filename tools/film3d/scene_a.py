@@ -2118,6 +2118,9 @@ def ouv_motion(scene, coupe, police, cam, focus, chaser):
     import motion as M
     frames = range(OUV.F0, OUV.F0 + OUV.FRAMES)
     scene.frame_start, scene.frame_end = frames[0], frames[-1]
+    # les clés : une image de plus de chaque côté, pour l'obturateur du flou (la dernière image du plan est floue
+    # comme les autres) ; ce sont aussi les images que la mesure (motion.plan_data) clé
+    keyed = range(OUV.F0 - 1, OUV.F0 + OUV.FRAMES + 1)
     wheels = [o for o in coupe.children if o.name.startswith("wheel_")]
     ys = [w.location.y for w in wheels]
     wb = (max(ys) - min(ys)) if len(ys) > 1 else 2.9
@@ -2126,7 +2129,7 @@ def ouv_motion(scene, coupe, police, cam, focus, chaser):
     coupe.location = (x0, y0, 0)
     coupe.rotation_euler = (0, 0, math.pi)
     rig = M.rig_up(coupe, 0.0, "rig_berline")
-    poses = M.sample(OUV.hero_pos, frames, heading=OUV.hero_heading, steer=OUV.hero_steer, wheel_r=coupe["wheel_r"],
+    poses = M.sample(OUV.hero_pos, keyed, heading=OUV.hero_heading, steer=OUV.hero_steer, wheel_r=coupe["wheel_r"],
                      wheelbase=wb)
     M.key_vehicle(rig, poses, wheels=wheels)
     M.wheel_marks(wheels, coupe["wheel_r"])
@@ -2136,11 +2139,11 @@ def ouv_motion(scene, coupe, police, cam, focus, chaser):
     for a, b in OUV.brake_windows():
         hero_cars.stop_lamps(coupe, a, b)
     cam.data.shift_y = 0.0
-    M.key_camera(cam, frames, OUV.camera)
+    M.key_camera(cam, keyed, OUV.camera)
     cam.data.dof.focus_object = coupe
     cam.data.dof.aperture_fstop = OUV.FOCUS_F
-    patrol_wake(police, frames)
-    chaser_motion(chaser, frames, OUV.chaser_pos, OUV.chaser_heading)
+    patrol_wake(police, keyed)
+    chaser_motion(chaser, keyed, OUV.chaser_pos, OUV.chaser_heading)
     import p1_avenue
     p1_props(p1_avenue)
     hero_cabin(coupe)
@@ -2216,6 +2219,7 @@ def p1_motion(scene, coupe, police, cam, focus, chaser):
     import p1_avenue as P
     frames = range(P.F0, P.F0 + P.FRAMES)
     scene.frame_start, scene.frame_end = frames[0], frames[-1]
+    keyed = range(P.F0 - 1, P.F0 + P.FRAMES + 1)        # une image de plus de chaque côté : l'obturateur du flou
     # la berline
     wheels = [o for o in coupe.children if o.name.startswith("wheel_")]
     ys = [w.location.y for w in wheels]
@@ -2224,7 +2228,7 @@ def p1_motion(scene, coupe, police, cam, focus, chaser):
     coupe.location = (x0, y0, 0)
     coupe.rotation_euler = (0, 0, math.pi)
     rig = M.rig_up(coupe, 0.0, "rig_berline")
-    poses = M.sample(P.hero_pos, frames, heading=P.hero_heading, steer=P.hero_steer, wheel_r=coupe["wheel_r"],
+    poses = M.sample(P.hero_pos, keyed, heading=P.hero_heading, steer=P.hero_steer, wheel_r=coupe["wheel_r"],
                      wheelbase=wb)
     M.key_vehicle(rig, poses, wheels=wheels)
     M.wheel_marks(wheels, coupe["wheel_r"])
@@ -2234,11 +2238,11 @@ def p1_motion(scene, coupe, police, cam, focus, chaser):
     # la patrouille 1 (p1_avenue.patrol_pos, entrée à la fin d'OUV) et la garée, restée à l'angle de la rue, rampe
     # allumée dans notre dos : la même prise qu'OUV, 40 images plus loin (phares, rampes : phases continues)
     shift = OUV.FRAMES
-    chaser_motion(chaser, frames, P.patrol_pos, P.patrol_heading, shift)
-    patrol_wake(police, frames, shift)
+    chaser_motion(chaser, keyed, P.patrol_pos, P.patrol_heading, shift)
+    patrol_wake(police, keyed, shift)
     # la caméra : sur un rail, de dos ; le point sur la berline
     cam.data.shift_y = 0.0
-    M.key_camera(cam, frames, P.camera)
+    M.key_camera(cam, keyed, P.camera)
     cam.data.dof.focus_object = None
     cam.data.dof.focus_distance = P.FOCUS
     cam.data.dof.aperture_fstop = P.FSTOP
