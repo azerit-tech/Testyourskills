@@ -51,6 +51,9 @@ import scene_a as A          # noqa: E402
 import road                  # noqa: E402
 import motion as MO          # noqa: E402  (MO : M désigne ici les matières de la ville)
 import p3_enseignes as P3    # noqa: E402
+_keep = road.S
+import lieux                 # noqa: E402  (ville_on, pose_ville, mer_lieu ; son import branche road.S sur scene_a)
+road.S = _keep
 
 ASSETS = A.ASSETS
 BLEND = os.environ.get("FILM3D_BLEND", "scene-b.blend")
@@ -71,6 +74,15 @@ S_CAM = 134.0          # le repère de vue est posé à s = 134 (4 m au-delà du
 Y0, Y_END = -28.0, 133.0   # la rue en repère de vue : s de 162 à 1 ; au-delà, l'entrée du rond-point
 RING = (0.0, 150.0)        # le centre du rond-point en repère de vue (s = -16) : îlot de 12 m, anneau de 15 m de rayon
 Y_FAR = 176.0              # la place du rond-point s'arrête au muret de la promenade
+
+# La ville (docs/cinematique-plan-de-ville.md §2.5, « Rue des enseignes ») : FILM3D_VILLE=1 (défaut) rogne la rue à
+# ses deux joints, le rond-point en s = 91 (y_vue 43) et le pont en s = 178 (fin du boulevard du quai) ; ni faux
+# rond-point, ni faux pont, ni eau, ni autre rive : ville.py les apporte, posés. FILM3D_VILLE=0 : la rue autonome.
+VILLE = lieux.ville_on()
+Y_END_RUE = Y_END          # la rue autonome, qui garde ses numéros d'objets en ville (les couleurs du gris en dépendent)
+if VILLE:
+    Y_END = 43.0           # s = 91 : le joint avec la branche ouest du rond-point (x_F −18,2)
+    RING = (0.0, 61.2)     # le vrai îlot, s = 72,8 (posé par ville.py, plus construit ici)
 
 
 def vw(x, y):
@@ -129,6 +141,17 @@ GF_NEON = {"red": (RED, 3.5)}
 # des enduits plus profonds que les pastels de l'avenue : terre cuite, ocre, vert d'eau, rose passé, bleu
 TINTS = ["#d98a6e", "#e2b56a", "#93c2ab", "#dc9ea2", "#a3bcdc", "#efe0c0", "#bba9d9", "#d9b85c", "#e7a98a",
          "#9fcfc4"]
+# les dessins de la rue rognée (FILM3D_VILLE) : la boutique d'angle à 11 m, l'Art déco à 8,9 m (deux boutiques au
+# lieu de trois)
+SPECS_VILLE = {
+    "rue_coin11": dict(SPECS["rue_corner"], W=11),
+    "rue_deco9": dict(SPECS["rue_deco"], W=8.9, nshops=2),     # (8,9 m : son rez-de-chaussée déborde de 8 cm)
+}
+GF_PLAN.update({
+    "rue_coin11": dict(GF_PLAN["rue_corner"]),
+    "rue_deco9": dict(GF_PLAN["rue_deco"], bays=["store", "bar"], open=0, awn={0: 1}),
+})
+UP_STYLE.update({"rue_coin11": dict(UP_STYLE["rue_corner"]), "rue_deco9": dict(UP_STYLE["rue_deco"])})
 
 # les deux rangs d'immeubles, en repère de vue : (dessin, y du bout côté rond-point), bout à bout de -28 à 128 (les
 # deux premiers font l'angle du boulevard du quai, au bout de la rue).
@@ -146,6 +169,7 @@ WORDS = [("HOTEL", "amber"), ("BAR", "red"), ("CAFE", "cream"), ("VACANCY", "cre
          ("BAR", "amber"), ("CAFE", "amber"), ("VACANCY", "red"), ("OPEN", "cream")]
 NEON_LIGHT = {"amber": "#ffc36b", "cream": "#fff1d6", "mint": "#7fe0c4", "red": RED}
 MOTEL = (-1, 72.0)     # l'enseigne MOTEL sur mât (modèle de bibliothèque) : côté, y de vue
+MOTEL_RUE = MOTEL      # (la table des enseignes en potence s'écarte toujours de sa place dans la rue entière)
 
 # câbles en travers : y de vue des portées ; une lanterne au milieu de chacune, des guirlandes entre elles
 SPANS = [-24.0, -13.0, 2.5, 13.0, 20.5, 28.0, 36.5, 46.0, 57.0, 70.0, 84.0, 100.0, 116.0]
@@ -154,6 +178,17 @@ LAMPS = [(1, -14.0), (-1, 16.0), (1, 46.0), (-1, 76.0), (1, 106.0)]
 # les voitures garées, d'un seul côté (x > 0 en vue), derrière le départ de P3 : celles d'y de vue 59, 45,5, 32
 # et 23 (y monde 75 à 111) sont retirées, la patrouille 1 roule dans leur voie jusqu'au barrage
 PARKED = [86.0, 99.5, 113.0]
+
+# En ville : la rue de 71 m du rond-point au boulevard. LEFT garde ses cinq premiers dessins, le cinquième (y_vue 32
+# à 44) ramené à 11 m pour ne pas passer le joint ; RIGHT ses quatre premiers et le cinquième (34 à 52) ramené à
+# 9 m. Le reste des listes s'arrête au joint ; l'enseigne MOTEL (y_vue 72) est retirée.
+N_KEEP = {-1: 5, 1: 5}
+SWAP = {(-1, 4): "rue_coin11", (1, 4): "rue_deco9"}
+if VILLE:
+    SPANS = [y for y in SPANS if y <= Y_END]
+    LAMPS = [(side, y) for side, y in LAMPS if y <= Y_END]
+    PARKED = [y for y in PARKED if y <= Y_END]
+    MOTEL = None
 
 
 def log(*a):
@@ -243,12 +278,15 @@ def build_street(hidden):
                              layout=dict(road.lane_layout(HALF, 2, centre=False), lanes=(60.0,)))
     pan, kerb, walk = road.mat_gutter_pan(st, "rue_gutter"), road.mat_kerb(st, "rue_kerb"), road.mat_pavement(st, "rue_walk")
     paint = road.mat_paint_decal(st, "rue_paint")
-    road.strip("rue_road", road.road_profile(), Y0, Y_END + 0.4, asphalt)
+    # (en ville, la chaussée s'arrête au joint : la branche du rond-point prend la suite, même profil)
+    road.strip("rue_road", road.road_profile(), Y0, Y_END + (0.0 if VILLE else 0.4), asphalt)
     for side in (-1, 1):
         road.strip(f"rue_gutter_{side}", road.pan_profile(side), Y0, Y_END, pan)
         road.strip(f"rue_kerb_{side}", road.kerb_profile(side), Y0, Y_END, kerb, smooth_faces=True)
         x0, x1 = sorted((side * (HALF + road.KERB), side * (FRONT + 0.6)))
         A.box(f"rue_walk_{side}", x0, x1, Y0, Y_END, -0.05, road.WALK_Z, walk)
+        if VILLE:
+            continue
         # le trottoir du coin, à l'entrée du rond-point, au-delà des derniers immeubles, et sa bordure
         # (le profil tourné d'un quart de tour : il regarde -y et file vers +x)
         xa, xb = sorted((side * (FRONT + 0.6), side * 80.0))
@@ -256,13 +294,15 @@ def build_street(hidden):
         xa, xb = sorted((side * (HALF + road.KERB), side * (FRONT + 0.6)))
         road.strip(f"rue_corner_kerb_{side}", road.kerb_profile(1, -road.CROWN), 0.0, 80.0 - HALF - road.KERB, kerb,
                    smooth_faces=True, loc=(HALF + road.KERB if side > 0 else -80.0, Y_END + HALF, 0.0), rot=-math.pi / 2)
-    # la place du rond-point, 3 cm plus bas (son niveau rejoint le bord de l'enrobé), jusqu'au muret
-    road.plane("rue_plaza", 0.0, (Y_END + Y_FAR) / 2, -road.CROWN - 0.002, 160.0, Y_FAR - Y_END, plaza)
-    # le cédez-le-passage (ses dents) et le passage piéton à la sortie de la rue
-    for k in range(6):
+    # la place du rond-point, 3 cm plus bas (son niveau rejoint le bord de l'enrobé), jusqu'au muret ; le
+    # cédez-le-passage (ses dents) et le passage piéton à la sortie de la rue. En ville, le rond-point porte les
+    # siens (passage piéton de 17,1 à 20,3 m de l'îlot, à cheval sur le joint)
+    if not VILLE:
+        road.plane("rue_plaza", 0.0, (Y_END + Y_FAR) / 2, -road.CROWN - 0.002, 160.0, Y_FAR - Y_END, plaza)
+    for k in ([] if VILLE else range(6)):
         x = 0.4 + k * 0.55
         road.decal_strip(f"rue_yield_{k}", x, x + 0.3, Y_END - 0.9, Y_END - 0.4, paint)
-    for k in range(8):
+    for k in ([] if VILLE else range(8)):
         x = -HALF + 0.55 + k * 0.98
         road.decal_strip(f"rue_zebra_{k}", x, x + 0.5, Y_END - 4.6, Y_END - 1.6, paint)
 
@@ -271,6 +311,8 @@ def build_street(hidden):
     src, dims = road.manhole_source(hidden)
     patch = road.mat_asphalt(st, "rue_asphalt_patch", force_patch=True, layout=lay)
     for k, (x, y) in enumerate(((-1.4, 9.0), (1.6, 36.0), (-0.9, 63.0), (1.3, 95.0), (-1.6, 118.0))):
+        if y > Y_END - 1.0:
+            continue
         z = road.road_z(x)
         road.plane(f"rue_mh_patch_{k}", x, y, z + 0.0015, 1.4, 1.4, patch)
         A.instance(src, f"rue_manhole_{k}", (x, y, z + 0.003 - dims.z), rng.uniform(0, math.tau))
@@ -279,7 +321,12 @@ def build_street(hidden):
     k = 0
     for side, start in ((-1, 12.0), (1, 28.0)):
         y = start
-        while y < Y_END - 6:
+        # (numérotés comme dans la rue entière : en ville, les avaloirs gardés gardent leur nom)
+        while y < Y_END_RUE - 6:
+            if y >= Y_END - 6:
+                k += 1
+                y += 26.0
+                continue
             road.plane(f"rue_grate_{k}", side * (HALF - 0.26), y, road.road_z(HALF - 0.26) + 0.002, 0.72, 0.56, gm,
                        math.pi / 2)
             xa, xb = sorted((side * HALF, side * (HALF + 0.013)))
@@ -287,7 +334,7 @@ def build_street(hidden):
             k += 1
             y += 26.0
     log(f"rue : chaussée de {2 * HALF:.0f} m à deux voies, trottoirs de {WALK:.0f} m, {Y_END - Y0:.0f} m, "
-        f"puis la place du rond-point")
+        f"{'joint du rond-point en s = ' + format(S_CAM - Y_END, '.1f') if VILLE else 'puis la place du rond-point'}")
     return kerb
 
 
@@ -330,15 +377,29 @@ def prototypes(M, hidden):
         hidden.objects.link(ob)
         out[key] = (ob, props, lights, spec)
         log(f"dessin {key} : {len(ob.data.polygons)} faces, {len(props)} accessoires, {len(lights)} lumières")
+    if VILLE:
+        # (le hasard commun gardé : les dessins de la ville ne déplacent pas celui des climatiseurs et des lanternes)
+        keep = random.getstate()
+        for key, spec in SPECS_VILLE.items():
+            spec = dict(spec)
+            ob, props, lights = make(key, M, spec)
+            for c in list(ob.users_collection):
+                c.objects.unlink(ob)
+            hidden.objects.link(ob)
+            out[key] = (ob, props, lights, spec)
+            log(f"dessin {key} (ville) : {len(ob.data.polygons)} faces, {len(props)} accessoires, {len(lights)} lumières")
+        random.setstate(keep)
     return out
 
 
-def place(protos, kind, loc, rot, tint, srcs, lights=True):
+def place(protos, kind, loc, rot, tint, srcs, lights=True, name=None):
     """Pose un dessin (façade en x = 0 tournée vers +x dans son repère) tourné de rot autour de z, avec ses
-    accessoires et ses lumières passés dans le même repère (place() de scene_a ne sait que le côté ville)."""
+    accessoires et ses lumières passés dans le même repère (place() de scene_a ne sait que le côté ville).
+    name : le nom de l'instance (sinon le dessin numéroté dans l'ordre de pose)."""
     ob, props, lts, spec = protos[kind]
-    n = len([o for o in bpy.data.objects if o.name.startswith(ob.name + "_")])
-    inst = A.instance(ob, f"{ob.name}_{n}", loc, rot)
+    if name is None:
+        name = f"{ob.name}_{len([o for o in bpy.data.objects if o.name.startswith(ob.name + '_')])}"
+    inst = A.instance(ob, name, loc, rot)
     inst.color = (*lin(tint)[:3], 1)
     R = Matrix.Rotation(rot, 3, "Z")
     t = Vector(loc)
@@ -367,23 +428,44 @@ def place(protos, kind, loc, rot, tint, srcs, lights=True):
     return inst
 
 
-def build_city(M, hidden):
+def street_rows():
+    """Les immeubles de la rue : (côté de vue, dessin, y0, largeur prise dans la rue, teinte, nom), dans l'ordre de
+    pose de la rue autonome ; teintes et noms sont ceux de la rue entière (en ville, les immeubles gardés ne changent
+    ni de teinte ni de nom : le gris de render_film les colore d'après leur nom)."""
+    out, count, i = [], {}, 0
+    for side, rows in ((-1, LEFT), (1, RIGHT)):
+        for k, (kind, y0) in enumerate(rows):
+            n = count.get(kind, 0)
+            count[kind] = n + 1
+            tint = TINTS[i % len(TINTS)] if side < 0 else TINTS[(i + 1) % len(TINTS)]
+            i += 3
+            name = f"bld_{kind}_{n}"
+            if VILLE:
+                if k >= N_KEEP[side]:
+                    continue
+                if (side, k) in SWAP:
+                    kind = SWAP[(side, k)]
+                    name = f"bld_{kind}_{'g' if side < 0 else 'd'}"
+            out.append((side, kind, y0, tint, name))
+    return out
+
+
+def build_city(M, hidden, lights=True):
     protos = prototypes(M, hidden)
     ac_parts = A.import_glb("exterior_aircon_unit/exterior_aircon_unit.gltf")
     ac_src = [A.source([o], f"rue_ac_src_{i}", hidden) for i, o in enumerate(ac_parts)]
     tank_src = A.source(A.import_glb("water-tank.glb"), "rue_tank_src", hidden)
     srcs = (ac_src, tank_src)
-    i = 0
-    # côté gauche : façade à x = -7, tournée vers +x
-    for kind, y0 in LEFT:
-        place(protos, kind, (-FRONT, y0, 0), 0.0, TINTS[i % len(TINTS)], srcs)
-        i += 3
-    # côté droit : façade à x = +7, tournée vers -x (le dessin tourné d'un demi-tour)
-    for kind, y0 in RIGHT:
-        W = protos[kind][3]["W"]
-        place(protos, kind, (FRONT, y0 + W, 0), math.pi, TINTS[(i + 1) % len(TINTS)], srcs)
-        i += 3
-    log(f"{len(LEFT) + len(RIGHT)} immeubles")
+    rows = street_rows()
+    for side, kind, y0, tint, name in rows:
+        if side < 0:
+            # côté gauche de vue : façade à x = -7, tournée vers +x
+            place(protos, kind, (-FRONT, y0, 0), 0.0, tint, srcs, lights, name)
+        else:
+            # côté droit : façade à x = +7, tournée vers -x (le dessin tourné d'un demi-tour)
+            W = protos[kind][3]["W"]
+            place(protos, kind, (FRONT, y0 + W, 0), math.pi, tint, srcs, lights, name)
+    log(f"{len(rows)} immeubles")
     return protos
 
 
@@ -414,7 +496,7 @@ def blade_table():
     # (depuis l'angle du boulevard du quai, au bout de la rue, que la caméra regarde maintenant)
     for side, y in ((-1, -25.0), (1, -20.0)):
         while y < 125.0:
-            if not (side == MOTEL[0] and abs(y - MOTEL[1]) < 3.5):
+            if not (side == MOTEL_RUE[0] and abs(y - MOTEL_RUE[1]) < 3.5):
                 text, col = WORDS[w % len(WORDS)]
                 w += 1
                 hp = len(text) * 0.504 + 0.36
@@ -495,12 +577,16 @@ def build_signs(M, hidden):
                 iron=C.mat_pbr("blade_iron", "#1b1a1d", 0.5, 0.7, noise_amt=0.25),
                 transfo=L.get("transfo") or M["metal"], cable=L.get("cable") or M["metal"])
     blades = blade_table()
+    n = 0
     for k, (side, y, z0, text, col) in enumerate(blades):
+        if y > Y_END - 0.5:          # (en ville : rien au-delà du joint ; les autres gardent leur numéro)
+            continue
         blade_sign(L, C, k, side, y, z0, text, col, mats)
+        n += 1
     # l'enseigne MOTEL sur mât, au bord du trottoir (une des trois du modèle, ramenée à 7 m), face à la rue
     src = lib_parts("lieux/rue/neon-motel/model.glb", {"motel_src": lambda o, c: "motel_1_01" in mat_names(o)},
-                    hidden, 0.63).get("motel_src")
-    if src:
+                    hidden, 0.63).get("motel_src") if MOTEL else None
+    if src and MOTEL:
         side, y = MOTEL
         A.instance(src, "motel_pole", (side * (FRONT - 1.3), y, road.WALK_Z), math.pi / 2)
         for f in (-1, 1):
@@ -516,7 +602,7 @@ def build_signs(M, hidden):
         A.box("cherry_arm", x, FRONT, y - 0.02, y + 0.02, 4.12, 4.16, mats["iron"])
         lo = A.add_light("cherry_glow", "POINT", (x, y - 0.5, 3.5), (0, 0, -1), lin(RED), 45.0)
         lo.visible_camera = lo.visible_glossy = lo.visible_transmission = False
-    log(f"{len(blades)} enseignes en potence, l'enseigne MOTEL sur mât, le néon cerise")
+    log(f"{n} enseignes en potence, {'l’enseigne MOTEL sur mât, ' if MOTEL else ''}le néon cerise")
 
 
 # ---------------------------------------------------------------- câbles, lanternes, guirlandes, lampadaires
@@ -615,7 +701,10 @@ def build_overhead(M, hidden):
     # des fils de téléphone et d'électricité, plus haut, d'une façade à l'autre
     spans = []
     for y, dz in ((5.0, 10.4), (12.0, 9.2), (40.0, 10.1), (69.0, 9.6), (97.0, 9.9), (121.0, 9.4)):
-        spans.append(((-FRONT, y, dz), (FRONT, y + 3.5, dz - 0.3)))
+        if y > Y_END:
+            continue
+        # (en ville, le fil de y_vue 40 s'accroche au plus tard au dernier mètre de la rue)
+        spans.append(((-FRONT, y, dz), (FRONT, min(y + 3.5, Y_END - 0.5), dz - 0.3)))
         spans.append(((-FRONT, y + 0.4, dz - 0.35), (FRONT, y - 2.0, dz - 0.1)))
     A.wires("rue_wires", spans, cable, sag=0.9, r=0.01)
     log(f"{len(SPANS)} câbles à lanterne, {n_bulbs} ampoules de guirlande")
@@ -659,6 +748,8 @@ def build_furniture(M, hidden):
         bpy.data.objects.remove(o)
     can = A.source(mine, "rue_can_src", hidden)
     for side, y in ((-1, 23.0), (1, 41.0), (-1, 58.0), (1, 79.0), (-1, 104.0)):
+        if y > Y_END - 0.5:
+            continue
         A.instance(can, f"rue_can_{y:.0f}", (side * (HALF + 0.75), y, road.WALK_Z), random.uniform(0, 6))
     # la borne d'incendie (une des deux du modèle) près de la caméra, le distributeur de journaux (livré en cm)
     hyd = lib_parts("lieux/rue/fire-hydrant/fire_hydrant.gltf", {"hydrant_src": lambda o, c: c.x < 0}, hidden).get("hydrant_src")
@@ -934,7 +1025,8 @@ def build_sidewalk(hidden):
     tarp2 = C.mat_pbr("rue_bache_rayee", "#6b2a2a", 0.6, 0.0, noise_amt=0.25, coat=0.3)
     metal = C.mat_pbr("rue_metal_sombre", "#2a2a2e", 0.45, 0.8, noise_amt=0.2)
     for k, (xw, yw, t) in enumerate(((5.2, 96.0, tarp), (5.3, 113.5, tarp2), (-5.4, 92.0, tarp2))):
-        x, y = vw(xw, yw)
+        # (en ville, l'étal de s 92 recule de 0,4 m : il ne passe plus le joint du rond-point, s 91)
+        x, y = vw(xw, max(yw, S_CAM - Y_END + 1.4))
         stall(f"etal_{k}", x - 0.55, x + 0.55, y - 1.3, y + 1.3, wood, t, metal)
     # des vélos appuyés le long des façades, côté droit, et deux près du barrage
     frames = [C.mat_pbr(f"rue_velo_{i}", c, 0.4, 0.3, coat=0.5) for i, c in enumerate(("#1f4e5a", "#7a2f25", "#d8cfb8"))]
@@ -1391,11 +1483,9 @@ def build_barrage(scene, hidden, plan):
 
 def make_world(scene):
     """Le ciel de la rue : le ciel commun du film (lieux.ciel, lumière v3.1 règle A), la bande corail vers +y, du
-    côté de la mer où va la berline (après to_world)."""
-    keep = road.S                        # lieux, à sa première importation, branche road.S sur scene_a
-    import lieux
-    road.S = keep
-    return lieux.ciel(scene)
+    côté de la mer où va la berline (après to_world). En ville, l'azimut unique de la ville (lieux.mer_lieu, −70° :
+    la rue regarde le côté nuit, la bande est hors champ à droite, derrière les façades)."""
+    return lieux.ciel(scene, mer=lieux.mer_lieu("rue")) if VILLE else lieux.ciel(scene)
 
 
 def haze(name, x0, x1, y0, y1, z0, z1, density, color="#b8b4d8", aniso=0.45, soft=False):
@@ -1569,7 +1659,8 @@ def build():
     hero = place_hero(scene, plan)
     M = A.city_mats()
     kerb = build_street(hidden)
-    build_ring_end(hidden, kerb)
+    if not VILLE:
+        build_ring_end(hidden, kerb)
     build_city(M, hidden)
     build_signs(M, hidden)
     build_overhead(M, hidden)
@@ -1588,8 +1679,9 @@ def build():
     # la brume d'après la pluie, plus dense au barrage : les phares et les gyrophares y prennent corps
     # (les boîtes sont de vraies brumes depuis que leurs normales sortent : quelques millièmes suffisent, la caméra
     # est dedans ; le sol devant elle reste un mouillé sombre, la brume ne se lit que dans la profondeur)
-    haze("haze", -14, 14, Y0, 128.0, -0.1, 30, 0.0006)
-    haze("haze_end", -60, 60, 128.0, Y_FAR + 2, -0.1, 30, 0.001)
+    haze("haze", -14, 14, Y0, min(128.0, Y_END), -0.1, 30, 0.0006)
+    if not VILLE:
+        haze("haze_end", -60, 60, 128.0, Y_FAR + 2, -0.1, 30, 0.001)
     # au-delà du bout de la rue, sur l'eau et le pont : une brume légère qui étage les plans (le pylône plus pâle
     # que le carrefour) ; le fond de la boîte au-dessus de l'eau (lieux.haze)
     haze("haze_quai", -200, 200, vw(0.0, 1000.0)[1], Y0 - 0.5, -1.2, 90, 0.0005)
