@@ -142,17 +142,20 @@ GF_NEON = {"red": (RED, 3.5)}
 # des enduits plus profonds que les pastels de l'avenue : terre cuite, ocre, vert d'eau, rose passé, bleu
 TINTS = ["#d98a6e", "#e2b56a", "#93c2ab", "#dc9ea2", "#a3bcdc", "#efe0c0", "#bba9d9", "#d9b85c", "#e7a98a",
          "#9fcfc4"]
-# les dessins de la rue rognée (FILM3D_VILLE) : la boutique d'angle à 11 m, l'Art déco à 8,9 m (deux boutiques au
-# lieu de trois)
+# les dessins de la rue rognée (FILM3D_VILLE) : la boutique d'angle à 9 niveaux (les immeubles du quai), la même à
+# 11 m, l'Art déco à 8,9 m (deux boutiques au lieu de trois)
 SPECS_VILLE = {
+    "rue_tour": dict(SPECS["rue_corner"], floors=9),
     "rue_coin11": dict(SPECS["rue_corner"], W=11),
     "rue_deco9": dict(SPECS["rue_deco"], W=8.9, nshops=2),     # (8,9 m : son rez-de-chaussée déborde de 8 cm)
 }
 GF_PLAN.update({
+    "rue_tour": dict(GF_PLAN["rue_corner"]),
     "rue_coin11": dict(GF_PLAN["rue_corner"]),
     "rue_deco9": dict(GF_PLAN["rue_deco"], bays=["store", "bar"], open=0, awn={0: 1}),
 })
-UP_STYLE.update({"rue_coin11": dict(UP_STYLE["rue_corner"]), "rue_deco9": dict(UP_STYLE["rue_deco"])})
+UP_STYLE.update({"rue_tour": dict(UP_STYLE["rue_corner"]), "rue_coin11": dict(UP_STYLE["rue_corner"]),
+                 "rue_deco9": dict(UP_STYLE["rue_deco"])})
 
 # les deux rangs d'immeubles, en repère de vue : (dessin, y du bout côté rond-point), bout à bout de -28 à 128 (les
 # deux premiers font l'angle du boulevard du quai, au bout de la rue).
@@ -182,14 +185,22 @@ PARKED = [86.0, 99.5, 113.0]
 
 # En ville : la rue de 71 m du rond-point au boulevard. LEFT garde ses cinq premiers dessins, le cinquième (y_vue 32
 # à 44) ramené à 11 m pour ne pas passer le joint ; RIGHT ses quatre premiers et le cinquième (34 à 52) ramené à
-# 9 m. Le reste des listes s'arrête au joint ; l'enseigne MOTEL (y_vue 72) est retirée.
+# 9 m. Les deux derniers immeubles (y_vue −28 à −16, s 150 à 162) montent à 9 niveaux : les immeubles du quai.
+# Le reste des listes s'arrête au joint ; l'enseigne MOTEL (y_vue 72) est retirée.
 N_KEEP = {-1: 5, 1: 5}
-SWAP = {(-1, 4): "rue_coin11", (1, 4): "rue_deco9"}
+SWAP = {(-1, 0): "rue_tour", (1, 0): "rue_tour", (-1, 4): "rue_coin11", (1, 4): "rue_deco9"}
 if VILLE:
     SPANS = [y for y in SPANS if y <= Y_END]
     LAMPS = [(side, y) for side, y in LAMPS if y <= Y_END]
     PARKED = [y for y in PARKED if y <= Y_END]
     MOTEL = None
+# les immeubles du quai : 9 niveaux (rez-de-chaussée de 4,2 m, huit étages de 3,2 m : acrotère à 30,7 m), un
+# bandeau lumineux sans texte en couronne (1,2 m, posé sur l'acrotère, 0,3 m en retrait), ambre à gauche de la
+# berline, blanc chaud à droite (jamais corail ni violet rose : les rampes) ; le côté du boulevard, sans fenêtres
+# dans le dessin, reçoit un parement de fenêtres procédurales (lieux.mat_city), vu seulement depuis le pont
+TOUR_FLOORS = 9
+TOUR_BAND = {1: "#ffc36b", -1: "#fff1d6"}       # côté de vue : -1 (x_vue < 0) est à droite de la berline
+TOUR_BAND_W = 4.0                               # force d'émission du bandeau (à régler avec la lumière)
 
 
 def log(*a):
@@ -466,8 +477,51 @@ def build_city(M, hidden, lights=True):
             # côté droit : façade à x = +7, tournée vers -x (le dessin tourné d'un demi-tour)
             W = protos[kind][3]["W"]
             place(protos, kind, (FRONT, y0 + W, 0), math.pi, tint, srcs, lights, name)
+    if VILLE:
+        quay_towers(protos)
     log(f"{len(rows)} immeubles")
     return protos
+
+
+def quay_towers(protos, far=False):
+    """Les immeubles du quai (en ville) : sur les deux derniers dessins de la rue, montés à TOUR_FLOORS niveaux, le
+    bandeau lumineux en couronne et, côté boulevard (y_vue −28, s 162), le parement de fenêtres que voit le pont.
+    far : la version lointaine (une boîte à fenêtres procédurales par immeuble, sans le dessin)."""
+    keep = road.S
+    import lieux
+    road.S = keep
+    spec = protos["rue_tour"][3] if protos else dict(SPECS_VILLE["rue_tour"])
+    W, D = spec["W"], spec["D"]
+    top = 4.2 + (spec["floors"] - 1) * A.FH + 0.9           # l'acrotère (facade_b.upper : top_par)
+    win = lieux.mat_city("quai_fenetres", lit_frac=0.35)
+    out = []
+    for side in (-1, 1):
+        x0, x1 = sorted((side * FRONT, side * (FRONT + D)))
+        y0, y1 = Y0, Y0 + W
+        band = lieux.emit_mat(f"quai_bandeau_{'g' if side < 0 else 'd'}", lin(TOUR_BAND[side]), TOUR_BAND_W)
+        bm = bmesh.new()
+        if far:
+            lieux.box_bm(bm, (x0, y0, 0.0), (x1, y1, top))
+        else:
+            # le parement côté boulevard, 3 cm devant le mur aveugle du dessin, au-dessus du rez-de-chaussée
+            lieux.box_bm(bm, (x0 + 0.3, y0 - 0.05, 4.4), (x1 - 0.3, y0 - 0.02, top - 0.3))
+        ob = lieux.mesh_object(f"quai_tour_{'g' if side < 0 else 'd'}{'_loin' if far else '_fenetres'}", bm, [win])
+        ob.visible_shadow = far
+        out.append(ob)
+        # le bandeau : une frise lumineuse de 1,2 m sur l'acrotère, 0,3 m en retrait des quatre faces
+        bb = bmesh.new()
+        r, h = 0.3, 1.2
+        for lo, hi in (((x0 + r, y0 + r, top), (x1 - r, y0 + r + 0.12, top + h)),
+                       ((x0 + r, y1 - r - 0.12, top), (x1 - r, y1 - r, top + h)),
+                       ((x0 + r, y0 + r, top), (x0 + r + 0.12, y1 - r, top + h)),
+                       ((x1 - r - 0.12, y0 + r, top), (x1 - r, y1 - r, top + h))):
+            lieux.box_bm(bb, lo, hi)
+        ob = lieux.mesh_object(f"quai_bandeau_{'g' if side < 0 else 'd'}{'_loin' if far else ''}", bb, [band])
+        ob.visible_shadow = False
+        out.append(ob)
+    log(f"immeubles du quai : {spec['floors']} niveaux, acrotère à {top:.1f} m, bandeau jusqu'à {top + 1.2:.1f} m"
+        f"{' (version lointaine)' if far else ''}")
+    return out
 
 
 # ---------------------------------------------------------------- les enseignes en potence
