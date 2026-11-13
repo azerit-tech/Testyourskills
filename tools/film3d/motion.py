@@ -1759,7 +1759,7 @@ def shot_specs():
         "P3": plan(P3, P3.camera, "cam", hero=P3.hero_pos, heading=P3.hero_heading),
         "P4": plan(P4, P4.camera, "cam_P4", hero=P4.hero_pos, ground=lambda x, y: (_bridge_z(y),)),
         "P5": plan(P5, P5.camera, "cam_P5", hero=P5.hero_pos, slip=P5.hero_slip),
-        "P6": plan(P6, P6.camera, "cam_P6", hero=P6.hero_pos),
+        "P6": plan(P6, P6.camera, "cam_P6", hero=P6.hero_pos, heading=P6.hero_heading),
         "FIN": plan(F, F.camera, "cam_FIN", hero=F.hero_pos, heading=F.hero_heading),
         "FIN6": plan(F6, F6.camera, "cam_FIN6", hero=getattr(F6, "hero_pos", lambda t: (F6.CX, F6.CY)),
                      heading=getattr(F6, "hero_heading", lambda t: F6.HERO_STOP)),

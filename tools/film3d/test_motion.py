@@ -482,53 +482,59 @@ def test_p3():
 
 
 def test_p6():
-    """P6 (découpage v3) : aucune distance sous 6 m au sol (la patrouille 1 à part, 1,5 m d'air de flanc à flanc
-    avec la berline) ; la colonne derrière la berline ; la caméra de dos au cadre commun v3.1 (7,5 m derrière à
-    2,4 m) jusqu'à l'image 30, puis 8 m derrière à 3,6 m à la fin, grue sous 2,5 m/s, la berline à y 58 % depuis le
-    haut (± 4) ; la patrouille 1 à gauche, de 6,5 m derrière à 3,3 m devant, au
-    bord gauche du cadre de l'image 20 à la fin, à 0,8 m au moins de la caméra ; les appareils s'évitent ; rien ne
-    frôle la caméra ; les hélicoptères sous 88 % du cadre, les avions aussi, sauf à leur entrée par le haut
-    (air_entry images au plus) ; les avions au-dessus de la pointe vers l'image 44 (JET_TURN) ; personne ne tire."""
+    """P6 (découpage v3.1, la conduite unique) : la berline sur la fenêtre « P6 » du parcours, sans feux stop ; la
+    meute de P5 à la file derrière elle (son chemin, son allure, un retard en secondes), à 15 m au moins, dans les
+    limites de la voiture ; la caméra au bras commun du parcours jusqu'à l'image 30, puis 8 m derrière à 3,6 m à la
+    fin, grue sous 2,5 m/s, la berline à y 58 % depuis le haut (± 4) ; rien à moins de 0,8 m de la caméra ; les
+    appareils s'évitent ; rien ne frôle la caméra ; les hélicoptères sous 88 % du cadre, les avions aussi, sauf à
+    leur entrée par le haut (air_entry images au plus) ; les avions au-dessus de la pointe à l'image JET_TURN ;
+    personne ne tire."""
     import p6_jetee as P
+    import parcours as PC
     frames = range(P.F0 - 1, P.F0 + P.FRAMES + 1)
-    d, f, a, b = M.min_gap({k: v for k, v in P.tracks().items() if k != "patrol_1"}, frames)
+    T = lambda g: M.t_of(g)                                                    # noqa: E731
+    # le parcours unique : la berline sur sa fenêtre ; P5 → P6 continu (l'état d'entrée est celui du module)
+    d = max(math.dist(P.hero_pos(T(g)), PC.hero("P6")["pos"](g)) for g in frames)
+    check("P6 : la berline sur la fenêtre du parcours", d < 1e-9 and P.FRAMES == dict(PC.SHOTS)["P6"], f"{d:.1e} m")
+    check("P6 : sans feux stop (elle accélère)", not P.brake_windows(), str(P.brake_windows()))
+    d, f, a, b = M.min_gap(P.tracks(), frames)
     check("P6 : distances gardées", d >= 6.0, f"{d:.1f} m entre {a} et {b} à l'image {f}")
-    flank = min(abs(P.hero_pos(M.t_of(g))[0] - P.patrol1_pos(M.t_of(g))[0]) - 0.9 - 0.95 for g in frames)
-    check("P6 : 1,5 m d'air entre la berline et la patrouille 1", flank >= 1.5, f"{flank:.2f} m")
-    gap = min(math.dist(P.hero_pos(M.t_of(f)), P.column_pos(i)(M.t_of(f)))
-              for f in frames for i in range(len(P.COLUMN)) if i != 1)
-    check("P6 : la colonne ne rattrape pas la berline", gap >= 15.0, f"{gap:.1f} m au plus près")
-    c0, c1 = P.camera_rail(0.0), P.camera_rail(P.T_END)
-    h0, h1 = P.hero_pos(0.0), P.hero_pos(P.T_END)
-    cm = P.camera_rail(M.t_of(30))
-    hm = P.hero_pos(M.t_of(30))
-    ok = (abs(h0[1] - c0[1] - 7.5) < 0.01 and abs(c0[2] - 2.4) < 0.01 and abs(hm[1] - cm[1] - 7.5) < 0.01
-          and abs(cm[2] - 2.4) < 0.01 and abs(h1[1] - c1[1] - 8.0) < 0.01 and c1[2] <= 3.6 + 1e-6
-          and all(P.hero_pos(M.t_of(g))[1] > P.camera_rail(M.t_of(g))[1] for g in frames))
-    check("P6 : de dos, 7,5 m derrière à 2,4 m jusqu'à l'image 30, puis 8 m derrière à 3,6 m au plus", ok,
-          f"début {h0[1] - c0[1]:.2f} m à {c0[2]:.2f} m, fin {h1[1] - c1[1]:.2f} m à {c1[2]:.2f} m")
-    vs = [M.hero_screen(P.camera_rail(M.t_of(g)), *P.hero_pos(M.t_of(g)), 0.0, 0.0)["v"] for g in frames]
+    # la meute à la file : la berline elle-même, son retard plus tôt
+    off = max(math.dist(P.column_pos(i)(T(g)), P.hero_pos(T(g) - tau)) for g in frames
+              for i, (_, tau) in enumerate(P.COLUMN))
+    gap = min(math.dist(P.hero_pos(T(f)), P.column_pos(i)(T(f))) for f in frames for i in range(len(P.COLUMN)))
+    check("P6 : la meute à la file, sur le chemin de la berline, à 15 m au moins", off < 1e-9 and gap >= 15.0,
+          f"{gap:.1f} m au plus près")
+    # les autres véhicules roulent vrai : latérale ≤ 6,5, freinage ≤ 7, accélération ≤ 3 m/s² (à 1 % près)
+    for k, fn in P.tracks().items():
+        if k == "hero":
+            continue
+        lat, lon = [], []
+        for g in frames:
+            (vx, vy), (ax, ay) = M.kinematics(fn, T(g))
+            v = math.hypot(vx, vy)
+            lat.append(abs(vx * ay - vy * ax) / v)
+            lon.append((vx * ax + vy * ay) / v)
+        check(f"P6 : {k} roule vrai", max(lat) <= 6.5 * 1.01 and min(lon) >= -7.0 and max(lon) <= 3.0 * 1.01,
+              f"latérale {max(lat):.2f}, de {min(lon):+.2f} à {max(lon):+.2f} m/s²")
+    # le bras commun (7,5 m, 0,3 m à gauche, 2,4 m) jusqu'à l'image 30, puis la grue : 8 m derrière à 3,6 m
+    dist = lambda g: math.dist(P.hero_pos(T(g)), P.camera_rail(T(g))[:2])  # noqa: E731
+    c0, cm, c1 = (P.camera_rail(T(g)) for g in (P.F0, P.CRANE_F0, P.F0 + P.FRAMES - 1))
+    ok = (abs(dist(P.F0) - math.hypot(7.5, 0.3)) < 0.01 and abs(c0[2] - 2.4) < 0.01
+          and abs(dist(P.CRANE_F0) - math.hypot(7.5, 0.3)) < 0.01 and abs(cm[2] - 2.4) < 0.01
+          and abs(dist(P.F0 + P.FRAMES - 1) - math.hypot(8.0, 0.3)) < 0.01 and c1[2] <= 3.6 + 1e-6
+          and all(abs(P.camera_rail(T(g))[:3][k] - PC.camera("P6", g)[k]) < 1e-9 for g in range(P.F0, P.CRANE_F0)
+                  for k in range(3)))
+    check("P6 : le bras commun jusqu'à l'image 30, puis 8 m derrière à 3,6 m au plus", ok,
+          f"début {dist(P.F0):.2f} m à {c0[2]:.2f} m, fin {dist(P.F0 + P.FRAMES - 1):.2f} m à {c1[2]:.2f} m")
+    vs = [M.hero_screen(P.camera_rail(T(g)), *P.hero_pos(T(g)), 0.0, 0.0)["v"] for g in frames]
     check("P6 : la berline à y 58 % depuis le haut (± 4)", all(abs(v - 0.58) <= 0.04 for v in vs),
           f"{min(vs) * 100:.1f} à {max(vs) * 100:.1f} %")
-    vz = max(abs(P.camera_rail(M.t_of(g + 1))[2] - P.camera_rail(M.t_of(g - 1))[2]) * M.FPS / 2 for g in frames)
+    vz = max(abs(P.camera_rail(T(g + 1))[2] - P.camera_rail(T(g - 1))[2]) * M.FPS / 2 for g in frames)
     check("P6 : la grue sous 2,5 m/s", vz <= 2.5, f"{vz:.2f} m/s")
-    p1 = [P.hero_pos(M.t_of(g))[1] - P.patrol1_pos(M.t_of(g))[1] for g in (P.F0, P.F0 + P.FRAMES - 1)]
-    side = all(P.patrol1_pos(M.t_of(g))[0] < P.hero_pos(M.t_of(g))[0] for g in frames)
-    check("P6 : la patrouille 1 à gauche, de 6,5 m derrière à 3,3 m devant",
-          side and abs(p1[0] - 6.5) < 0.1 and abs(p1[1] + 3.3) < 0.1, f"{p1[0]:.1f} puis {p1[1]:.1f} m")
-    # son nez (le coin avant droit) dans le cadre à partir de l'image 20
-    seen = []
-    for g in range(P.F0, P.F0 + P.FRAMES):
-        px, py = P.patrol1_pos(M.t_of(g))
-        q = M.screen_point(P.camera_rail(M.t_of(g)), (px + 0.95, py + 2.45, 0.8))
-        if q is not None and 0.0 <= q[0] <= 1.0:
-            seen.append(g)
-    check("P6 : la patrouille 1 au bord gauche de l'image 20 à la fin",
-          bool(seen) and seen[0] <= 20 and seen == list(range(seen[0], P.F0 + P.FRAMES)),
-          f"de l'image {seen[0] if seen else '-'}")
-    # la caméra et la patrouille 1 : de flanc (demi-largeur 0,95 m) au moins 0,8 m
-    cam_p1 = min(abs(P.camera_rail(M.t_of(g))[0] - P.patrol1_pos(M.t_of(g))[0]) - 0.95 for g in frames)
-    check("P6 : la caméra à 0,8 m au moins de la patrouille 1", cam_p1 >= 0.8, f"{cam_p1:.2f} m de son flanc")
+    cam_v = min(math.dist(P.camera_rail(T(g))[:2], fn(T(g))) - 0.95 for g in frames
+                for k, fn in P.tracks().items() if k != "hero")
+    check("P6 : la caméra à 0,8 m au moins des autres véhicules", cam_v >= 0.8, f"{cam_v:.2f} m de leur flanc")
     air = {f"heli_{i}": P.heli(i) for i in range(len(P.HELIS))}
     air.update({f"jet_{i}": P.jet(i) for i in range(len(P.JETS))})
     worst = min((math.dist(air[p](M.t_of(f))[:3], air[q](M.t_of(f))[:3]), p, q, f)
@@ -874,7 +880,7 @@ def test_spin_steps():
     de clés pour 150 rad parcourus)."""
     import p6_jetee as P
     fr = range(P.F0 - 1, P.F0 + P.FRAMES + 1)
-    ps = M.sample(P.column_pos(0), fr, wheel_r=0.33, seed=0.0)
+    ps = M.sample(M.straight(P.JX, 0.0, 120 / 3.6), fr, wheel_r=0.33, seed=0.0)      # 120 km/h, l'ancien P6
     d = sum(math.dist((ps[k]["x"], ps[k]["y"]), (ps[k + 1]["x"], ps[k + 1]["y"])) for k in range(len(ps) - 1))
     spin = ps[-1]["spin"] - ps[0]["spin"]
     check("roues : angle cumulé = distance / rayon", abs(spin - d / 0.33) < 0.01 * d / 0.33,
@@ -1021,7 +1027,7 @@ def _plan_tracks():
            ("P5 meute", P5.pack_pos(0), dict(seed=0.0, heading=P5.patrol_heading),
             range(P5.F0 - 1, P5.F0 + P5.FRAMES + 1)),
            ("P6 berline", P6.hero_pos, {}, range(P6.F0 - 1, P6.F0 + P6.FRAMES + 1)),
-           ("P6 colonne", P6.column_pos(3), dict(seed=3.0), range(P6.F0 - 1, P6.F0 + P6.FRAMES + 1)),
+           ("P6 colonne", P6.column_pos(2), dict(seed=3.0), range(P6.F0 - 1, P6.F0 + P6.FRAMES + 1)),
            ("FIN berline", F.hero_pos, dict(heading=F.hero_heading), range(F.F0 - 1, F.F0 + F.FRAMES + 1))]
     return out
 
@@ -1244,7 +1250,9 @@ def test_aircraft():
     check("P5 : l'hélicoptère s'incline, borné", 1.0 < d5 <= M.AIR["heli"]["max"] + 1.5, f"{d5:.1f}° ajoutés au plus")
     fr6 = range(P6.F0 - 1, P6.F0 + P6.FRAMES + 1)
     d6 = max(abs(v[4] - P6.heli(0)(M.t_of(f))[4]) for f, v in M.aircraft_attitude(P6.heli(0), fr6, "heli").items())
-    check("P6 : en poursuite à vitesse tenue, presque rien ajouté", d6 < 1.5, f"{d6:.2f}°")
+    # la conduite unique : elle accélère sur la jetée (2,8 m/s²), les hélicoptères avec elle, le nez plonge, borné
+    check("P6 : en poursuite qui accélère, le nez plonge, borné", 1.0 < d6 <= M.AIR["heli"]["max"] + 1.5,
+          f"{d6:.2f}°")
 
 
 def _cam_dev(fn, fr, out):

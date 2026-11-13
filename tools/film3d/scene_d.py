@@ -1060,27 +1060,23 @@ def p6_clean_haze(scene, hero):
     print(f"[P6] {n} lampadaires hors brume, volumes biaisés", flush=True)
 
 
-# les flaques étroites sur la ligne des roues de la berline (x 81,0 et 82,5 : roues à ±0,75 m de x = 81,75), entre
-# les nappes des phares : (x, y, demi-largeur, allongement le long de la jetée). Nommées fx_flaque_* pour fx.py
-# (découpage v3 : elle les traverse aux images 16, 21, 28, 33, 40 et 46)
-P6_PUDDLES = [(82.5, 260.5, 0.20, 4.0), (81.0, 268.0, 0.17, 5.0), (82.5, 277.0, 0.22, 3.5), (81.0, 285.0, 0.18, 4.5),
-              (82.5, 294.0, 0.20, 4.0), (81.0, 302.0, 0.19, 4.0)]
-
-
 def p6_foreground(hidden):
     """Le premier plan de P6 : des flaques étroites sur la ligne des roues de la berline (la recette de P2 et P3),
-    qu'elle traverse : fx_flaque_*. Découpage v3 : plus de balises sur le double axe ; la caméra roule à 0,75 m de
-    lui, elles défilaient énormes entre l'objectif et la berline."""
+    qu'elle traverse aux images de p6_jetee.PUDDLE_FRAMES : fx_flaque_* (fx.py). Découpage v3 : plus de balises sur
+    le double axe ; la caméra roule à 0,75 m de lui, elles défilaient énormes entre l'objectif et la berline. Posées
+    sur le sol sous elles : la jetée, ou le terre-plein du port avant le joint (ville unique)."""
+    import p6_jetee as P6
     import scene_b as B
     water = B.puddle_mat()
-    for k, (x, y, r, sy) in enumerate(P6_PUDDLES):
+    pts = P6.puddles()
+    for k, (x, y, r, sy) in enumerate(pts):
         ob = B.puddle(f"fx_flaque_{k}", 0.0, 0.0, r, sy, 600 + k, water)
         for v in ob.data.vertices:
             v.co.x += x
             v.co.y += y
-            v.co.z = jetty_point(v.co.x, v.co.y).z + 0.0025
+            v.co.z = p6_ground(v.co.x, v.co.y)[0] + 0.0025
         ob.data.update()
-    print(f"[P6] premier plan : {len(P6_PUDDLES)} flaques fx_flaque_* sur la ligne des roues", flush=True)
+    print(f"[P6] premier plan : {len(pts)} flaques fx_flaque_* sur la ligne des roues", flush=True)
 
 
 # les lampadaires de la jetée qui noient le phare (découpage v3 §3 : la lanterne, le repère du film, doit être le point
@@ -1131,13 +1127,12 @@ def p6_phare_clear(scene):
 
 
 def plan_P6(scene, hidden, palier="socle"):
-    """P6, toute la ville, animé (60 images, p6_jetee.py ; découpage v3) : de dos, la caméra roule 7 m derrière la
-    berline, dans son axe, à 1,6 m, 24 mm, puis monte lentement à 3,6 m et 8 m derrière. La berline sur la jetée à
-    120 km/h, droit sur la pointe et le phare, juste au-dessus de son toit ; la patrouille 1 qui remonte à sa
-    hauteur par la voie de gauche ;
-    derrière, la colonne, rampes clignotantes ; trois hélicoptères devant elle, faisceaux tournés vers l'arrière et
-    le bas sur elle ; deux avions qui arrivent de derrière nous, passent au-dessus de tout et s'écartent au-dessus
-    de la pointe (ils ne tirent rien) ; la caméra tremble à leur passage."""
+    """P6, la jetée, animé (p6_jetee.py ; découpage v3.1, la conduite unique) : la berline sort du virage du port
+    (P6/1 suit P5/60) et file sur la jetée vers la pointe et le phare, en accélérant ; la caméra au bras commun du
+    parcours, 7,5 m derrière à 2,4 m, 24 mm, puis la grue jusqu'à 3,6 m et 8 m derrière. Derrière, la meute de P5 à
+    la file, rampes clignotantes ; trois hélicoptères devant elle, faisceaux tournés vers l'arrière et le bas sur
+    elle ; deux avions qui arrivent de derrière nous, passent au-dessus de tout et s'écartent au-dessus de la pointe
+    (ils ne tirent rien)."""
     import motion as M
     import p6_jetee as P6
     lamp_src = L.panorama(scene, hidden, all_lit=True, bridge="loin", port="loin", haubans=(palier in ("haubans", "complet")))
@@ -1155,12 +1150,15 @@ def plan_P6(scene, hidden, palier="socle"):
     frames = range(P6.F0 - 1, P6.F0 + P6.FRAMES + 1)      # une image de part et d'autre : l'obturateur du flou
     hero = L.hero()
     wheels = L.hero_wheels(hero)
-    poses = M.sample(P6.hero_pos, frames, wheel_r=hero["wheel_r"])
+    poses = M.sample(P6.hero_pos, frames, heading=P6.hero_heading, steer=P6.hero_steer, wheel_r=hero["wheel_r"])
     M.key_vehicle(hero, poses, wheels=wheels, ground=p6_ground)
     M.wheel_marks(wheels, hero["wheel_r"])
+    for a, b in P6.brake_windows():        # les feux stop du parcours (aucun en P6 : elle accélère)
+        import hero_cars
+        hero_cars.stop_lamps(M.body_of(hero), a, b)
 
     src, rigs = {}, []
-    for i, (kind, _, _) in enumerate(P6.COLUMN):
+    for i, (kind, _) in enumerate(P6.COLUMN):
         if kind not in src:
             r = src[kind] = L.patrol("patrol") if kind == "patrol" else L.van("van")
         else:
@@ -1176,7 +1174,7 @@ def plan_P6(scene, hidden, palier="socle"):
         M.wheel_marks(wh, wr, axis="Y")
         rigs.append(r)
     n = M.flash_bars(rigs, frames)
-    print(f"[P6] colonne de {len(rigs)} véhicules, {n} lumières de rampe clignotantes", flush=True)
+    print(f"[P6] meute de {len(rigs)} véhicules, {n} lumières de rampe clignotantes", flush=True)
 
     first, _ = L.helicopter("heli")
     hs = [first] + [L.clone(first, f"heli_{i}") for i in range(1, len(P6.HELIS))]
