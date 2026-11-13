@@ -300,7 +300,7 @@ def place_cars(scene, pose=POSE, anim=False):
     # caisse se lit du ciel (la rue n'y pose que des taches ambre)
     f = A.add_light("hero_fill", "AREA", (x, y, 7.0), (0, 0, -1), lin("#ffd8c8"), 260.0, (3.0, 5.0))
     f.visible_camera = f.visible_glossy = f.visible_transmission = False
-    # les deux patrouilles (l'avant vers +x dans leur repère), rampes allumées, leurs flaques de couleur
+    # les deux patrouilles (l'avant vers +x dans leur repère), rampes allumées
     pat = cv.load_patrol("jeandiz", lights_on=True, name="patrol_1")
     # (la copie prend ses propres lumières, lieux.own_lights : les deux rampes clignotent chacune à sa phase ; les
     # lueurs de rampe sont celles du modèle, scene_b.bar_glow n'existe plus)
@@ -313,14 +313,8 @@ def place_cars(scene, pose=POSE, anim=False):
         x, y, h, yb = poses[key]
         body.location = (x, y, 0.0)
         body.rotation_euler = (0, 0, math.radians(yb + 90.0))
-        # vues du ciel, les rampes posent sur le mouillé une flaque corail d'un côté, lilas de l'autre
-        bpy.context.view_layer.update()
-        for side, col in ((1, CORAL), (-1, LILAC)):
-            p = body.matrix_world @ Vector((-0.1, side * 0.6, 2.1))
-            t = body.matrix_world @ Vector((1.5, side * 4.5, 0.0))
-            lo = A.add_light(f"pool_{key}_{side}", "SPOT", p, t - p, lin(col), 9000.0, spot=70)
-            lo.data.spot_blend = 0.9
-            lo.visible_glossy = False
+        # (plus de flaques de couleur sous les rampes : deux projecteurs de 9000 W corail et lilas, sans source
+        # visible, peignaient le mouillé ; la rampe éclaire par ses propres lueurs, lumière v3.1 règle C)
     log("berline : " + ", ".join(f"{k} ({v[0]:.1f}, {v[1]:.1f}) cap {v[2]:.0f}°" for k, v in poses.items()))
     if anim:
         animate(scene, car, f, cars, pose)
