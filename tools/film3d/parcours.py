@@ -97,14 +97,15 @@ CAP_D = A2 - A5                                # la droite après le port : +40�
 #    et P1 sont une seule prise (auparavant 20,85 m d'avenue sautés, OUV/1 en y 244,00).
 #  - P2 : la berline arrive dans la voie de l'avenue (x 1,75, comme en OUV et P1) et sort du rond-point sur y = 0,35
 #    de son repère (l'îlot en (0, 0)), la voie de P3 ; son arc passe à 5,1 m de la bordure de l'îlot (rayon 6 m).
-#  - P4 : sa dernière image au pied de la rampe du pont (l'image suivante est P5/1), dans la voie de P5 (x 5,25).
+#  - P4 : sa dernière image au pied de la rampe du pont (l'image suivante est P5/1), dans la voie du pont où le plan
+#    de face cadre le tablier ouvert (x 1,80) ; le port, posé par la voie de P5 (x 5,25 dans son repère), s'y décale.
 _Y_EXIT2 = ROUTE.at(S_ARC2 + R2 * math.radians(A2) + 15.0)[1]     # la droite de sortie du rond-point (route) : y
 ANCHOR = {
     "OUV": (1 + 40, (1.75, 288.0), 0.0),
     "P1": (1, (1.75, 288.0), 0.0),
     "P2": (("s", S_ARC2 - 20.0), (1.75, 0.35 - (_Y_EXIT2 - (S_ARC2 - 20.0))), 0.0),          # (1,75 ; −49,81)
     "P3": (36, (0.35, 123.30), CAP_B),
-    "P4": (48, (5.25, -5.69), CAP_B),
+    "P4": (48, (1.80, -5.69), CAP_B),
     "P5": (("s", S_ARC5 - 20.0), (5.25, 35.066), CAP_B),
     "P6": (60, (81.75, 344.42), CAP_D),
 }
