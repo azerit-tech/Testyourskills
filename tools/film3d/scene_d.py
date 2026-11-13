@@ -825,6 +825,8 @@ def beam_cones(helis, target, strength=1.2, color="#e2eaff", seg=32):
 
 
 HERO_STOP = 25.0      # le cap de la berline arrêtée : le travers à gauche, trois quarts face pour FIN
+FIN_FILL_W = 1900.0   # W, l'appoint de poursuite de la berline en FIN (lieux.car_fill, plan de lumière 2.5)
+FIN_FILL_COLOR = "#c9c6ec"    # le côté nuit du ciel, derrière la caméra
 
 
 def plan_FIN(scene, hidden, palier="socle"):
@@ -895,6 +897,22 @@ def plan_FIN(scene, hidden, palier="socle"):
     M.flash_bars([p1], frames)
     # la meute : rien que ses phares, derrière la caméra
     fin_pack_lights(frames, hero)
+    # l'appoint de poursuite (plan de lumière v3.1, 2.5), lié à elle seule, invisible : avant que la meute n'arrive, le
+    # ciel et lui tiennent son arrière (sans lui, la caisse à 8,7 %, la plus sombre du film). Plus bas et plus en
+    # arrière que l'appoint commun (4 m derrière, 6 m au-dessus) : de haut, il aplatissait toit et coffre en un rouge
+    # vif uniforme ; de 5 m derrière et 3,5 m au-dessus, il prend le panneau arrière comme le feront les phares de la
+    # meute. De la teinte du ciel derrière la caméra (son côté nuit, lavande) et non crème : crème, la peinture virait
+    # au rouge vif (teinte 358°) ; lavande, elle reste bordeaux (347 à 348°) à la même luminance. Sans le conducteur :
+    # par-dessus, il blanchissait les gants sortis par la vitre (85 à 94 %) ; ce sont les phares de la meute, de dos,
+    # qui éclairent les mains
+    fill = L.car_fill(hero, loc=(0.0, -5.0, 3.5), energy=FIN_FILL_W, color=FIN_FILL_COLOR, size=6.0)
+    arm = L.hero_driver(hero)
+    driver = {o.name for o in arm.children_recursive if o.type == "MESH"} if arm else set()
+    paint = bpy.data.collections.new(f"{hero.name}_appoint_sans_conducteur")
+    for o in fill.light_linking.receiver_collection.objects:
+        if o.name not in driver:
+            paint.objects.link(o)
+    fill.light_linking.receiver_collection = paint
     # pas de fumée de pneus : à 24 km/h sur l'enrobé mouillé, une berline qui freine n'en fait pas ; et la nappe,
     # éclairée par le lampadaire de la pointe, passait floue et blanche à 3 m de l'objectif (brouillon v3.1)
     # (le lampadaire de la pointe est le lampadaire commun, lieux.lamp : ambre, 1200 W, lumière v3.1 règle E)
@@ -940,34 +958,45 @@ def plan_FIN(scene, hidden, palier="socle"):
     return cam
 
 
-PACK_HEAD_W = 150.0   # un phare de la meute (W), en codes comme cast_vehicles.HEAD_W
+# un phare de la meute (W) : des pleins phares braqués sur la berline arrêtée, la lumière principale de la fin de FIN
+# (plan de lumière v3.1). À 150 W et la berline exclue, elle restait la voiture la plus sombre du film (caisse 8,7 %).
+# Réglé sur les gants clairs du conducteur, de dos à 18 m : 1500 W les passait à 70-80 %, 700 W à 61 % (90e centile),
+# 550 W à 30 % de médiane, 56 % au 90e (cible 35 à 50) ; la peinture bordeaux en reçoit peu, l'appoint la tient
+PACK_HEAD_W = 550.0
+PACK_CONE = 20.0      # l'ouverture (degrés) : à 18 m, un disque de 6 m centré sur elle, pas de nappe sur la pointe
+PACK_AIM_Z = 1.1      # la hauteur visée sur la berline (m) : le panneau arrière et la vitre du conducteur
 
 
 def fin_pack_lights(frames, hero):
     """FIN : la meute réduite à sa lumière (fin_pointe.PACK) : par voiture, deux spots de phares sur le rail, hors
-    champ derrière la caméra, qui avancent, s'allument l'un après l'autre (images 36 à 52) et s'arrêtent. La berline
-    ne les reçoit pas (liaison de lumière, la règle des vitres : sa collection « sans ») mais porte son ombre, qui
-    s'allonge vers le phare. Renvoie les spots."""
+    champ derrière la caméra, qui avancent, s'allument l'un après l'autre (images 36 à 52) et s'arrêtent. Ce sont
+    des pleins phares braqués sur la berline arrêtée (sur son point d'arrêt, à PACK_AIM_Z) : ils éclairent son
+    arrière et les mains sorties par la vitre, et allongent son ombre vers le phare. Ni la brume (règle E : les phares
+    ne prennent pas corps dans l'air) ni les reflets propres (le verre des phares est hors champ). Renvoie les spots."""
     import motion as M
     import fin_pointe as F
-    out_c, _ = _car_collections(hero)
     fx, fy = F.FWD_R
     lx, ly = F.LEFT_R
     ahead, half, z = F.PACK_LAMP
+    target = Vector((F.SX, F.SY, PACK_AIM_Z))
     out = []
     for i in range(len(F.PACK)):
         pos = F.pack_pos(i)
         for k, side in enumerate((-1.0, 1.0)):
             d = bpy.data.lights.new(f"meute_{i}_phare_{k}", "SPOT")
             d.color = L.lin("#fff1dc")[:3]
-            d.spot_size = math.radians(48.0)
-            d.spot_blend = 0.7
+            d.spot_size = math.radians(PACK_CONE)
+            d.spot_blend = 0.6
             d.shadow_soft_size = 0.05
             ob = bpy.data.objects.new(d.name, d)
             bpy.context.scene.collection.objects.link(ob)
-            ob.light_linking.receiver_collection = out_c
-            # vers l'avant du rail, 1,5° sous l'horizon (le spot éclaire selon -z local)
-            ob.rotation_euler = (math.radians(88.5), 0.0, math.radians(F.ROUTE_H))
+            ob.visible_volume_scatter = False
+            ob.visible_glossy = False
+            # braqué de sa place d'arrêt sur la berline arrêtée (le spot éclaire selon -z local)
+            x1, y1 = pos(M.t_of(frames[-1]))
+            p1 = Vector((x1 + fx * ahead + lx * half * side, y1 + fy * ahead + ly * half * side, z))
+            ob.rotation_mode = "QUATERNION"
+            ob.rotation_quaternion = (target - p1).to_track_quat("-Z", "Y")
             for f_ in frames:
                 t = M.t_of(f_)
                 x, y = pos(t)
