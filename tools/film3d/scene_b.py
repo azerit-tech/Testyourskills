@@ -1490,12 +1490,12 @@ def keep_world_parent(objs, parent):
 
 
 def plan_P3(scene):
-    """P3, le barrage, de dos (48 images, p3_enseignes.py, découpage v3.1), en repère monde après to_world : la
-    berline arrive à 106 km/h, lève le pied et freine un peu (feux stop), vise le trou des plots, remet les gaz et
-    passe entre les deux agents ; la caméra la suit au 24 mm, 7,5 m derrière, à 2,4 m, et passe le barrage à sa
-    suite ; la patrouille 1, devant à gauche, freine, se fait dépasser et sort par le bas à gauche ; les rampes
-    clignotent ; un agent tire (un éclair d'une image), l'autre fait « stop », puis ils plongent derrière leurs
-    portières. L'image fixe (P3.STILL_FRAME, la 34) : la berline à quelques mètres des plots."""
+    """P3, le barrage, de dos (p3_enseignes.py sur le parcours unique), en repère monde après to_world : la berline
+    sort du rond-point, accélère dans la rue et passe le trou des plots entre les deux agents ; la caméra (le bras
+    commun) la suit au 24 mm, 7,5 m derrière, à 2,4 m, et passe le barrage à sa suite ; la patrouille 1, devant à
+    gauche, freine, se fait dépasser, sort par le bas à gauche et s'arrête avant le barrage ; les rampes clignotent ;
+    un agent tire (un éclair d'une image), l'autre fait « stop », puis ils plongent derrière leurs portières. L'image
+    fixe (P3.STILL_FRAME) : la dernière balle, la berline à quelques mètres des plots."""
     frames = range(P3.F0 - 1, P3.F0 + P3.FRAMES + 1)        # une image de plus de chaque côté, pour l'obturateur
     scene.frame_start, scene.frame_end = P3.F0, P3.F0 + P3.FRAMES - 1
     ob = bpy.data.objects
@@ -1516,8 +1516,8 @@ def plan_P3(scene):
     wheels = [c for c in body.children if c.name.startswith("wheel_")]
     ys = [Vector(w.location).y for w in wheels]
     wb, front = (max(ys) - min(ys)), -min(ys)                 # l'avant vers -y dans la caisse
-    poses = MO.sample(P3.hero_pos, frames, heading=P3.hero_heading, wheel_r=body.get("wheel_r", 0.31),
-                      wheelbase=wb, front=front)
+    poses = MO.sample(P3.hero_pos, frames, heading=P3.hero_heading, steer=P3.hero_steer,
+                      wheel_r=body.get("wheel_r", 0.31), wheelbase=wb, front=front)
     MO.key_vehicle(rig, poses, wheels=wheels)
     MO.wheel_marks(wheels, body.get("wheel_r", 0.31))
     # les feux stop là où elle freine à plus de 2 m/s² (après les clés de la caisse)
@@ -1526,9 +1526,9 @@ def plan_P3(scene):
         hero_cars.stop_lamps(body, first, last)
     # --- la troisième patrouille
     far = ob["patrol_a_c"]
-    rig_c = MO.rig_up(far, P3.CHASE[2], name="rig_patrol_c")
+    rig_c = MO.rig_up(far, P3.chase_heading(P3.T_STILL), name="rig_patrol_c")
     wh, wr = MO.wheels_of(far), far.get("wheel_r", 0.36)
-    MO.key_vehicle(rig_c, MO.sample(P3.chase_pos, frames, heading=lambda t: P3.CHASE[2], wheel_r=wr, seed=2.0,
+    MO.key_vehicle(rig_c, MO.sample(P3.chase_pos, frames, heading=P3.chase_heading, wheel_r=wr, seed=2.0,
                                     wheelbase=far.get("wheelbase", 2.9), front=far.get("front_axle")),
                    wheels=wh, pivot=(0.0, 0.0, 0.36))
     MO.wheel_marks(wh, wr, axis="Y")
