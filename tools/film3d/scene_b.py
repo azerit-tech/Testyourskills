@@ -1523,12 +1523,12 @@ def build_barrage(scene, hidden, plan):
         a.rotation_mode = "XYZ"
         a.rotation_euler = (0, 0, math.atan2(fx, -fy))
         officers.append(a)
-    # leurs phares, braqués sur la brèche, en veilleuse (120 W au lieu de 450) : à pleine force, de face à 6 m, ils
-    # blanchissaient l'avant de la berline jusqu'au rose (le bordeaux d'OUV et de P4 se perdait)
+    # leurs phares, braqués sur la brèche : à l'arrêt, les feux de position communs (cast_vehicles.HEAD_W_ARRET) ; en
+    # codes, de face à 6 m, ils blanchissaient l'avant de la berline jusqu'au rose
     for car in cars[:2]:
         for lo in car.children_recursive:
             if lo.type == "LIGHT" and "_head_" in lo.name:
-                lo.data.energy = 120.0
+                lo.data.energy = cv.HEAD_W_ARRET
     # la troisième, la patrouille 1 (p3_enseignes.chase_pos : arrêtée dans le rond-point, hors du cadre), et la
     # quatrième, la patrouille 2 (p3_enseignes.patrol2_pos : derrière la caméra), posées à l'image fixe, tournées de
     # leur cap (le rig de plan_P3 garde la caisse comme elle est posée : cap du repère monde, 0 vers +y, vu ici vers

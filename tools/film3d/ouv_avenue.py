@@ -52,7 +52,6 @@ STREET = Y0 + 22.0
 PATROL = (-5.9, STREET - 2.0, 180.0)  # x, y, cap (lieux : 0 vers +y) : garée le long de la bordure côté ville, avant vers -y
 # la patrouille garée qui s'éveille : ses phares à WAKE (on la voit de face, à 25 m), sa rampe à BARS_ON (hors champ)
 WAKE = 14
-WAKE_HEAD_W = 150.0                  # W par phare (450 dans le modèle : de face à 30 m, ils éblouissaient le cadre)
 WAKE_LENS = 0.4                      # la force des verres maillés, en part de celle du modèle (les verres peints dans
                                      # l'atlas suivent l'énergie des spots : cast_vehicles.lamp_drivers, ici un tiers)
 BARS_ON = 34

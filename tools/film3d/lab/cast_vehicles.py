@@ -760,6 +760,9 @@ HEAD_CODES = "#fff1dc"   # phares des poursuivants, en codes (la berline : #ffe6
 # fait P / 4π W/sr ; un code fait 10 000 à 20 000 cd au point chaud, un lampadaire environ 2 000 cd (1200 W ici) :
 # à 150 W, le cône devant la voiture valait 1/20 de la plage d'un lampadaire et ne se lisait nulle part
 HEAD_W = 6000.0
+# une voiture arrêtée garde ses feux de position, pas ses codes : à 6 kW, une patrouille à l'arrêt posait devant elle
+# une plaque claire de 2 à 6 m (barrage de P3, anneau de FIN6) ; ses feux de position, un cône court qui se lit
+HEAD_W_ARRET = 0.12 * HEAD_W
 HEAD_CONE = 24.0         # ouverture du cône (degrés), bord adouci de moitié
 HEAD_TILT = 11.0         # plongée sous l'horizon (degrés) : le cône tombe sur la chaussée de 2 à 40 m
 

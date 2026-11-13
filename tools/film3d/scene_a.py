@@ -1866,6 +1866,12 @@ def render_settings(scene):
 
 
 
+def _head_w():
+    """Un phare en codes, le réglage commun de toutes les voitures (cast_vehicles.HEAD_W)."""
+    import cast_vehicles as cv
+    return cv.HEAD_W
+
+
 def street_hero(scene):
     """La voiture poursuivie d'époque (lab/hero_cars.py), mise au repère de la rue comme le coupé : l'avant vers -y,
     au sol, à sa place sur la voie. Le quart de tour est appliqué aux maillages (les roues tournent ensuite autour de
@@ -1952,7 +1958,7 @@ def patrol_wake(police, frames, shift=0):
         d = ob.data
         if "_head_" in ob.name:
             for f in frames:
-                d.energy = OUV.WAKE_HEAD_W if f + shift >= OUV.WAKE else 0.0
+                d.energy = _head_w() if f + shift >= OUV.WAKE else 0.0
                 d.keyframe_insert("energy", frame=f)
             keyed.append(d)
         else:
@@ -2000,10 +2006,10 @@ def chaser_motion(chaser, frames, pos, heading, shift=0):
                   front=chaser.get("front_axle"))
     M.key_vehicle(prig, pp, wheels=wh, pivot=(0.0, 0.0, 0.36))
     M.wheel_marks(wh, wr, axis="Y")
-    # ses phares à la force que fixe P1 (v3, de dos : pleins, ils jettent l'ombre de la berline devant elle)
+    # ses phares en codes, le réglage commun (de dos, ils jettent l'ombre de la berline devant elle)
     for ob in chaser.children_recursive:
         if ob.type == "LIGHT" and "_head_" in ob.name:
-            ob.data.energy = P1.PATROL_HEAD_W
+            ob.data.energy = _head_w()
     for m in {m for ob in [chaser, *chaser.children_recursive] if ob.type == "MESH" for m in ob.data.materials if m}:
         if m.name.endswith("_head") and m.node_tree:
             for n in m.node_tree.nodes:

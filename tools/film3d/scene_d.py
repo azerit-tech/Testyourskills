@@ -939,7 +939,7 @@ def plan_FIN(scene, hidden, palier="socle"):
     p1 = L.patrol("patrol_1")
     for o in p1.children_recursive:
         if o.type == "LIGHT" and "_head_" in o.name:
-            o.data.energy *= 0.3          # pleins, ses phares blanchissaient le sol du cadre
+            o.data.energy = _head_w_arret()   # arrêtée au pied du phare : ses feux de position (ses codes blanchissaient le sol)
     L.put(p1, *F.P1_STOP, 0.0, heading=F.P1_HEAD)
     body = M.body_of(p1)
     wh, wr = M.wheels_of(body), body.get("wheel_r", 0.36)
@@ -1004,6 +1004,12 @@ def plan_FIN(scene, hidden, palier="socle"):
 PACK_HEAD_W = 550.0
 PACK_CONE = 20.0      # l'ouverture (degrés) : à 18 m, un disque de 6 m centré sur elle, pas de nappe sur la pointe
 PACK_AIM_Z = 1.1      # la hauteur visée sur la berline (m) : le panneau arrière et la vitre du conducteur
+
+
+def _head_w_arret():
+    """Les feux de position d'une voiture à l'arrêt, le réglage commun (cast_vehicles.HEAD_W_ARRET)."""
+    import cast_vehicles as cv
+    return cv.HEAD_W_ARRET
 
 
 def fin_pack_lights(frames, hero):
@@ -1101,7 +1107,7 @@ def plan_FIN6(scene, hidden, palier="socle"):
     p1 = L.patrol("patrol_1")
     for o in p1.children_recursive:
         if o.type == "LIGHT" and "_head_" in o.name:
-            o.data.energy *= 0.3
+            o.data.energy = _head_w_arret()
     L.put(p1, *F6.P1_AT, 0.0, heading=F6.P1_HEAD)
     body = M.body_of(p1)
     wh, wr = M.wheels_of(body), body.get("wheel_r", 0.36)
@@ -1125,6 +1131,11 @@ def plan_FIN6(scene, hidden, palier="socle"):
         h = L.heading_to((stop.x - x, stop.y - y)) + rnd.uniform(-28, 28)
         L.put(r, x, y, 0.0, heading=h)
         rigs.append(r)
+    # l'anneau est à l'arrêt : feux de position, pas les codes (à 6 kW, des ovales clairs au sol devant chaque voiture)
+    for r in rigs:
+        for o in r.children_recursive:
+            if o.type == "LIGHT" and "_head_" in o.name:
+                o.data.energy = _head_w_arret()
     n = M.flash_bars(rigs, frames)
     print(f"[FIN6] {n} lumières de rampe clignotantes", flush=True)
     print(f"[FIN6] berline exclue de {car_out_of_rigs(rigs, hero)} lumières de l'anneau", flush=True)
