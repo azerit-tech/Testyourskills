@@ -207,17 +207,31 @@ def mat_wake():
     return m
 
 
-def wake(scene, wheels, pose=POSE, anim=False):
+# le sol hors du décor du plan (en ville, là où un lieu voisin le pose après coup) : z(x, y), ou None (0)
+GROUND_MISS = None
+
+
+def wake(scene, wheels, pose=POSE, anim=False, skip=()):
     """Le sillage de la glissade, écrit depuis p2_arc.wheel_track : quatre traces de pneus posées sur la chaussée
     (lancer de rayon vers le bas, la bordure et le bombé suivis). anim : les traces vont jusqu'au bout du plan et se
-    dévoilent sous les roues (modificateur Construction, une face après l'autre, à la vitesse de la berline)."""
+    dévoilent sous les roues (modificateur Construction, une face après l'autre, à la vitesse de la berline). skip :
+    les objets que le rayon traverse (la berline posée à l'image fixe : sous ses roues, il touchait les pneus et la
+    trace se cassait en marches) ; hors du décor, GROUND_MISS."""
     dg = bpy.context.evaluated_depsgraph_get()
     mat = mat_wake()
     t_end = 1.0 + 1.0 / (P.FRAMES - 1) if anim else P.STILL
+    skip = {o.name for o in skip}
 
     def ground(x, y):
-        hit, loc, *_ = scene.ray_cast(dg, Vector((x, y, 0.12)), Vector((0, 0, -1)), distance=1.0)
-        return (loc.z if hit else 0.0) + 0.004
+        z = 0.12
+        for _ in range(8):
+            hit, loc, _n, _i, ob, _m = scene.ray_cast(dg, Vector((x, y, z)), Vector((0, 0, -1)), distance=1.0)
+            if not hit:
+                break
+            if ob.name not in skip:
+                return loc.z + 0.004
+            z = loc.z - 1e-3
+        return (GROUND_MISS(x, y) if GROUND_MISS else 0.0) + 0.004
 
     for name, (lx, ly, _) in wheels.items():
         rear = name.endswith(("BL", "BR"))
@@ -281,7 +295,7 @@ def place_cars(scene, pose=POSE, anim=False):
     # (plus de gerbes d'eau dessinées derrière les roues, règle F de la lumière v3.1 : ces volumes gris couvraient le
     # tiers bas du cadre et se lisaient en taches de lumière ; les effets reviendront par fx)
     wheels = {w.name: Vector(w.location) for w in car.children if w.name.startswith("wheel_")}
-    wake(scene, wheels, pose, anim=anim)
+    wake(scene, wheels, pose, anim=anim, skip=[car] + list(car.children_recursive))
     # une lumière douce au-dessus de la berline, invisible à la caméra et dans les reflets : le bordeaux de la
     # caisse se lit du ciel (la rue n'y pose que des taches ambre)
     f = A.add_light("hero_fill", "AREA", (x, y, 7.0), (0, 0, -1), lin("#ffd8c8"), 260.0, (3.0, 5.0))

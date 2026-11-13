@@ -74,7 +74,7 @@ CAR_FILL_W = 800.0           # W, l'appoint lié à la berline (keep_paint) : à
 # passe ces deux droites : branches, places, terrasses, lampadaires, promenade, plage et mer s'y arrêtent.
 VILLE = lieux.ville_on()     # (relu par build, à l'appel)
 SUD_Y = -19.0                # la jonction avec l'avenue
-OUEST_X = -18.2              # la jonction avec la rue des enseignes
+OUEST_X = P.X_RUE            # la jonction avec la rue des enseignes (s 91 de la scène B : x −18,154)
 DALLE_X = -89.0              # la dalle du rang de l'avenue nord s'arrête là (au-delà : le boulevard du quai)
 
 
@@ -309,20 +309,23 @@ def build_walks():
         mid = math.radians((phi1 + phi2) / 2)
         pts.append(Vector((math.copysign(L, math.cos(mid)), math.copysign(L, math.sin(mid)), 0)))
         pts.append(u1 * (L / max(abs(u1.x), abs(u1.y))) + nn1 * (h1 + road.KERB))
-        me = bpy.data.meshes.new(f"walk_{n1}_{n2}")
-        bm = bmesh.new()
-        for poly in clip_lieu(pts):              # (en ville, coupé aux jonctions : une ou deux pièces)
+        # (en ville, coupé aux jonctions : une ou deux pièces, un objet chacune ; d'un seul tenant, la boîte de
+        # l'objet couvrait la rue entre les deux, et la carte de la ville l'y comptait)
+        for k, poly in enumerate(clip_lieu(pts)):
+            name = f"walk_{n1}_{n2}" + (f"_{k}" if k else "")
+            me = bpy.data.meshes.new(name)
+            bm = bmesh.new()
             poly = [p for j, p in enumerate(poly) if (p - poly[j - 1]).length > 1e-4]
             bm.faces.new([bm.verts.new((p.x, p.y, road.WALK_Z)) for p in poly])
-        bmesh.ops.triangulate(bm, faces=bm.faces[:])
-        bm.normal_update()
-        bm.to_mesh(me)
-        bm.free()
-        if sum(p.normal.z for p in me.polygons) < 0:
-            me.flip_normals()
-        ob = bpy.data.objects.new(f"walk_{n1}_{n2}", me)
-        bpy.context.collection.objects.link(ob)
-        me.materials.append(walk)
+            bmesh.ops.triangulate(bm, faces=bm.faces[:])
+            bm.normal_update()
+            bm.to_mesh(me)
+            bm.free()
+            if sum(p.normal.z for p in me.polygons) < 0:
+                me.flip_normals()
+            ob = bpy.data.objects.new(name, me)
+            bpy.context.collection.objects.link(ob)
+            me.materials.append(walk)
     # sous tout, au-delà du décor : un sol sombre (les coins du cadre tourné ne tombent jamais dans le vide)
     # (en deux pièces : il s'arrête au mur de promenade, la plage et la mer sont plus bas, build_backdrop ; en ville,
     # aucun : c'est un faux lointain, les voisins posent leur sol)
@@ -706,6 +709,8 @@ def build(plan=None, palier=None):
     # (build_dusk retiré : sa lueur d'horizon à l'est, son bosquet éclairé et ses deux lampadaires faisaient un
     # second ciel pour une caméra qui n'existe plus ; lumière v3.1, règle A)
     build_edges(bpy.data.materials["ring_puddle"])
+    # en ville, au sud du joint, la trace de pneus passe sur l'avenue (posée après coup par ville.py) : son profil
+    C.GROUND_MISS = (lambda x, y: (with_half(7.0), road.road_z(x))[1] if y < SUD_Y else 0.0) if VILLE else None
     C.place_cars(scene, POSE, anim=True)
     keep_paint()
     for c in bpy.data.collections:

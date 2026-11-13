@@ -397,11 +397,14 @@ def lens_gap(t, which=0):
 
 # Le coin sud-ouest de l'anneau, l'intérieur du virage : la berline y coupe la corde. Son nez de bordure (anneau de
 # 15 m, branches de 7 et 4 m de demi-largeur) passait à 2 cm de la caisse vers l'image 80 ; en ville, scene_f l'arrondit
-# en évasement de sortie : un arc de FLARE_R m (le nez de bordure) tangent à l'anneau et au bord de la rue, qui finit
-# avant la jonction (x −18,2). La berline passe alors à 0,9 m de la bordure. Les cotes sont celles du nez (la face
-# de la bordure côté chaussée) ; scene_f les lit ici.
+# en évasement de sortie : un arc de FLARE_R m (le nez de bordure) tangent à l'anneau et au bord de la rue, tangent à
+# ce bord au joint même (X_RUE), le plus grand arc qui ne fasse pas de cran avec la bordure de la rue. La caisse de la
+# berline passe alors à 0,7 m de la bordure (P2/82) ; au joint, la bordure de la rue (y −4) n'en laisse que 0,8. Les
+# cotes sont celles du nez (la face de la bordure côté chaussée) ; scene_f les lit ici.
 RING_FACE = 15.0                 # le nez de la bordure de l'anneau (scene_f.R_OUT)
-FLARE_R = 5.5
+# le joint avec la rue des enseignes : s 91 de la scène B (scene_b.Y_END), passé dans ce repère par le parcours
+X_RUE = PC.placer("P2")[0](*PC._to_route("P3")(0.0, 91.0))[0]                    # −18,154
+FLARE_R = (X_RUE ** 2 + 4.0 ** 2 - RING_FACE ** 2) / (2.0 * RING_FACE - 2.0 * 4.0)   # 5,48 : centre en x X_RUE
 ENTRY_R = 10.0                   # l'évasement d'entrée, de l'avenue sud dans l'anneau
 
 

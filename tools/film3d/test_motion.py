@@ -327,6 +327,29 @@ def test_p2():
     check("P2 : roulis ≤ 4°", max(abs(p["roll"]) for p in ps) <= 4.0, f"{max(abs(p['roll']) for p in ps):.2f}°")
     check("P2 : les feux stop du parcours, au freinage d'avant l'îlot", P.brake_windows() == PC.brake_windows("P2")
           and P.brake_windows()[0][0] <= 15, f"{P.brake_windows()}")
+    # la berline sur l'enrobé : ses quatre roues (empreintes de 0,66 × 0,24 m) hors des cunettes (0,5 m devant le nez
+    # des bordures) et sa caisse sans bordure dessous, glisse comprise, de l'avenue sud à s 110 de la rue (x −37)
+    x110 = PC.placer("P2")[0](*PC._to_route("P3")(0.0, 110.0))[0]
+    kerbs = (P.SW_KERB, P.NW_KERB)
+    worst_w, worst_b = (9.0, 0), (9.0, 0)
+    for f4 in range(4 * (P.F0 - 24), 4 * (P.F0 + P.FRAMES + 40)):
+        tt = P.t_of(f4 / 4)
+        hx, hy = P.hero_pos(tt)
+        if hx < x110:
+            break
+        hd = P.hero_heading(tt)
+        h = math.radians(hd)
+        fx, fy = -math.sin(h), math.cos(h)
+        for a, b in ((1.38, 0.76), (1.38, -0.76), (-1.39, 0.76), (-1.39, -0.76)):
+            wx, wy = hx + fx * a + fy * b, hy + fy * a - fx * b
+            patch = P._corners(wx, wy, hd, 0.33, 0.12)
+            g = min(min(P._poly_line_gap(patch, k) for k in kerbs), min(math.hypot(*q) for q in patch) - 6.0)
+            worst_w = min(worst_w, (g, f4 / 4))
+        body = P._corners(hx, hy, hd, P.HALF_L, P.HALF_W)
+        worst_b = min(worst_b, (min(P._poly_line_gap(body, k) for k in kerbs), f4 / 4))
+    check("P2 : la berline sur l'enrobé jusqu'à s 110 (roues à 0,5 m au moins du nez des bordures, caisse sans bordure "
+          "dessous)", worst_w[0] >= 0.5 and worst_b[0] > 0.0, f"roues à {worst_w[0]:.2f} m (image {worst_w[1]:.2f}), "
+          f"caisse à {worst_b[0]:.2f} m (image {worst_b[1]:.2f})")
     # la patrouille 1 : P2/1 est P1/49 prolongée, dans la ville (position, vitesse, freinage)
     t1 = P1.T_END + 1.0 / M.FPS
     at = PC.placer("P2")[0](*PC._to_route("P1")(*P1.patrol_pos(t1)))
