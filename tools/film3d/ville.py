@@ -451,7 +451,8 @@ def zones():
     return {
         "avenue": lambda x, y: True,
         "rond-point": lambda x, y: abs(x) <= F.L + m and abs(y) <= F.L + m,
-        "rue": lambda x, y: B.S_CAM - B.Y_END - m <= y <= B.S_CAM - B.Y0 + m,
+        # la rue, le boulevard du quai, le mur du quai et ses lampadaires : jusqu'à 1 m au-delà du quai (S_BRIDGE)
+        "rue": lambda x, y: B.S_CAM - B.Y_END - m <= y <= B.S_BRIDGE + 1.0,
         "pont": lambda x, y: L.BRIDGE_Y[0] - m <= y < py0 and abs(x - L.BRIDGE_X) <= 30.0,
         "port": lambda x, y: px0 - 15.0 <= x <= px1 + 40.0 and py0 <= y <= py1 + m,
         "jetee": lambda x, y: y >= L.JETTY_YS[0] - m and abs(x - L.JETTY_X) <= 80.0,
