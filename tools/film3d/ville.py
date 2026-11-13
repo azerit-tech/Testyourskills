@@ -380,6 +380,18 @@ def selftest_voisins():
     # les lointains de nom restent cachés partout
     for nom in ("lagune", "ville_b12", "autre_rive_relief", "phare_lointain", "sea"):
         assert drapeau_voisin("rond-point", nom, False, False, take1, True)[0], nom
+    # (b) les noms posés par les scènes : les vraies mers et les lointains, pas le mur de promenade
+    for nom in ("sea", "sea.001", "sea_far", "sea_far.002", "lagune", "lagune.001", "phare_lointain",
+                "phare_lointain_tour", "ville_b12", "ville_enseignes_ff3d7f", "ville_lampes", "ville_quai",
+                "autre_rive_relief", "autre_rive_lampes", "rive_est", "rive_est_lampes", "haze", "haze.001",
+                "haze_quai", "haze_barrage"):
+        assert re.match(LOINTAIN_NOMS, nom), nom
+    for nom in ("sea_wall", "sea_wall.001", "sea_wall_cap", "sea_wall_retour", "sea_wall_retour_cap", "sea_wall_e",
+                "sea_wall_n", "sea_wall_av", "sea_wall_cap_av", "sea_wall_cap_e", "seat", "seat_back", "searchlight",
+                "searchlight_spot", "beach", "beach_e", "wet_sand", "rue_eau", "phare", "phare_lanterne", "patrol_a",
+                "av_walk_w", "lamp_prom_3"):
+        assert not re.match(LOINTAIN_NOMS, nom), nom
+    assert drapeau_voisin("avenue", "sea_wall", False, False, take1, True) == (False, "")
     # un seul phare : celui de la jetée ; celui du pont (P4 ne charge pas la jetée) est un doublon en P5 et P6
     take2 = {"pont", "port", "jetee"}
     assert drapeau_voisin("pont", "phare", True, True, take2, True) == (True, "doublon du phare de la jetée")
@@ -482,7 +494,19 @@ CAST = re.compile(r"^(hero|coupe|police|patrol|van|heli|jet|officer|agent|focus|
 # l'avenue nord, et dans le monde de l'eau le pont, le port ou la jetée vus depuis un autre de ces trois lieux). La
 # seconde ne vaut plus pour un voisin de la même prise continue (drapeau_voisin) : ces faux lieux n'existent plus en
 # ville, et ce qu'elle cachait était à son lieu.
-LOINTAIN_NOMS = r"^(phare_lointain|lagune|ville_|autre_rive|rive_|sea$|sea[._]|haze)"
+# Ce que chaque motif attrape dans les scènes (relevé sur les noms posés par les modules, 13 novembre) :
+#   phare_lointain    le phare loin des scènes A, F, B (lieux.phare_lointain) et ses pièces phare_lointain_*
+#   lagune            l'eau du panorama des scènes de l'eau (lieux.panorama : water("lagune"))
+#   ville_            la ville lointaine (lieux.distant_city : ville_b*, ville_enseignes_*, ville_quai, ville_sol,
+#                     ville_lampes, ville_balises)
+#   autre_rive, rive_ l'autre rive (lieux.far_shore) et la rive est du port autonome (rive_est*, hors ville)
+#   sea, sea_far      la mer de l'avenue (scene_a, scene_carrefour) et du rond-point (scene_f), la baie lointaine de
+#                     l'avenue autonome ; deux boîtes au même niveau (−1,7 à −1,6 m) qui se recouvrent : une seule
+#                     par scène (sea.001 : la copie renommée au chargement)
+#   haze              les brumes
+# et pas sea_wall*, le mur de promenade de l'avenue et du rond-point (sea_wall, sea_wall_cap, sea_wall_retour*,
+# sea_wall_e/n/av, sea_wall_cap_*) : « sea[._] » l'attrapait, visible en P1 et caché en P2 ; ni searchlight*, ni seat*.
+LOINTAIN_NOMS = r"^(phare_lointain|lagune|ville_|autre_rive|rive_|sea(\.\d+)?$|sea_far(\.\d+)?$|haze)"
 
 
 def zones():
