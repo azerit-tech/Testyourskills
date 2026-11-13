@@ -364,8 +364,32 @@ def selftest():
     import debit
     assert debit.env_key({"FILM3D_VILLE": "1", "FILM3D_HERO": "w111"}) == debit.env_key({"FILM3D_HERO": "w111"})
     assert debit.env_key({"FILM3D_VILLE": "0"}) != debit.env_key({})
+    selftest_voisins()
     print("[ville] selftest : poses de parcours, un lieu une place, prises sans saut, conduite des prises, route sous "
-          "la berline, fenêtres, chargement, clé FILM3D_VILLE : ok")
+          "la berline, fenêtres, chargement, clé FILM3D_VILLE, voisins : ok")
+
+
+def selftest_voisins():
+    """Les décisions de voisins(), sans Blender, sur les vrais noms des scènes."""
+    take1 = {"avenue", "rond-point", "rue", "pont"}
+    # (a) le fond nord du rond-point (scene_f.build_backdrop) hors de sa zone : gardé dans la prise, caché au-delà
+    for nom in ("av_walk_w", "av_block_w", "av_royal_3", "lamp_av_4", "prom_royal_7", "beach_n"):
+        assert drapeau_voisin("rond-point", nom, True, False, take1, True) == (False, ""), nom
+    assert drapeau_voisin("rond-point", "av_walk_w", True, False, take1, False) == (True, "hors zone")
+    assert drapeau_voisin("rue", "patrol_a", False, False, take1, True) == (False, "")
+    # les lointains de nom restent cachés partout
+    for nom in ("lagune", "ville_b12", "autre_rive_relief", "phare_lointain", "sea"):
+        assert drapeau_voisin("rond-point", nom, False, False, take1, True)[0], nom
+    # un seul phare : celui de la jetée ; celui du pont (P4 ne charge pas la jetée) est un doublon en P5 et P6
+    take2 = {"pont", "port", "jetee"}
+    assert drapeau_voisin("pont", "phare", True, True, take2, True) == (True, "doublon du phare de la jetée")
+    assert drapeau_voisin("pont", "phare", True, True, {"pont", "port", "rue"}, True) == (False, "")
+    assert drapeau_voisin("jetee", "phare", False, True, take2, True) == (False, "")
+    # les boîtes qui cachent les faux lointains du plan : celles des voisins hors de sa prise seulement
+    assert voisins_hors_prise("P2", ["avenue", "rue", "pont"]) == ["pont"]
+    assert voisins_hors_prise("P4", ["port", "rue"]) == ["rue"]
+    assert voisins_hors_prise("FIN", ["port", "pont"]) == ["port", "pont"]       # FIN n'est dans aucune prise
+    assert voisins_hors_prise(None, ["port"]) == ["port"]
 
 
 # ---------------------------------------------------------------- dans Blender : chaque lieu en cache
@@ -455,7 +479,9 @@ CAST = re.compile(r"^(hero|coupe|police|patrol|van|heli|jet|officer|agent|focus|
 # Les faux lointains de chaque lieu : ce qui imite un autre lieu ou l'horizon. Deux règles, sur l'objet de tête :
 # son nom (le panorama de lieux.panorama, le phare lointain, les brumes), puis sa place dans la scène du lieu (le
 # centre de sa boîte hors de la zone propre du lieu, zones() : le fond de rue de la rue, le rond-point au bout de
-# l'avenue nord, et dans le monde de l'eau le pont, le port ou la jetée vus depuis un autre de ces trois lieux).
+# l'avenue nord, et dans le monde de l'eau le pont, le port ou la jetée vus depuis un autre de ces trois lieux). La
+# seconde ne vaut plus pour un voisin de la même prise continue (drapeau_voisin) : ces faux lieux n'existent plus en
+# ville, et ce qu'elle cachait était à son lieu.
 LOINTAIN_NOMS = r"^(phare_lointain|lagune|ville_|autre_rive|rive_|sea$|sea[._]|haze)"
 
 
@@ -584,16 +610,37 @@ def meme_prise(a, b):
     return any(a in ps and b in ps for _a, _b, ps in prises())
 
 
-def is_lointain(nom, top, zone):
-    """Le drapeau d'une famille (son objet de tête, avant la pose dans la ville) : 0 si elle est cachée de toute
-    façon (les sources), 1 si son nom est celui d'un lointain ou si son centre sort de la zone du lieu ; une famille
-    qui contient le centre du lieu (un grand sol) reste au lieu."""
+# Le phare : un seul, celui de la jetée (SPEC §18.36). Un autre lieu qui en pose un (le pont : lieux.panorama,
+# lieu="pont", pour P4 qui ne charge pas la jetée) le cache, lui et ses lampes (ses enfants), dès que la jetée est là.
+PHARE_LIEU = "jetee"
+
+
+def drapeau_voisin(lieu_nom, nom, hors_zone, phare, presents, prise):
+    """(caché ?, raison) d'une famille d'un lieu voisin, sans Blender. `nom` : son objet de tête ; `hors_zone` : le
+    centre de sa boîte sort de la zone du lieu (zones()) ; `phare` : c'est un phare (lieux.phare, propriété « phare ») ;
+    `presents` : les lieux de la scène (le lieu du plan et ses voisins) ; `prise` : le voisin est de la même prise
+    continue que le plan rendu.
+    Un lointain de nom (LOINTAIN_NOMS) reste caché partout. Un phare d'un autre lieu que la jetée est un vrai doublon
+    quand la jetée est chargée. La règle de zone ne vaut plus dans une même prise : en ville (FILM3D_VILLE), chaque
+    scène est rognée à ses jonctions et ne pose plus aucun faux lieu (scene_a.ville_crop, scene_f « rond-point rogné »,
+    scene_b, et lieux.panorama sans pont, port ni jetée « loin » dans les scènes de l'eau) ; ce qui sort de la zone
+    d'un lieu est à lui (le fond nord du rond-point : l'avenue nord, ses immeubles, ses palmiers, ses trottoirs), et ce
+    qui se voit en P2 doit se voir de P1 et de P3. Hors de la prise (un lieu « loin » au-delà de l'ellipse), elle
+    reste : on n'y regarde que ce qui dépasse dans le champ."""
+    if re.match(LOINTAIN_NOMS, nom):
+        return True, "lointain"
+    if phare and lieu_nom != PHARE_LIEU and PHARE_LIEU in presents:
+        return True, "doublon du phare de la jetée"
+    if hors_zone and not prise:
+        return True, "hors zone"
+    return False, ""
+
+
+def _hors_zone(top, zone):
+    """Le centre de la boîte de la famille (ses maillages) sort-il de la zone du lieu ? (repère de la scène du lieu ;
+    une famille sans maillage n'en sort jamais)"""
     from mathutils import Vector
     fam = [o for o in _family(top) if o.type in ("MESH", "CURVE", "FONT")]
-    if all(_hidden(o) for o in _family(top)):
-        return False
-    if re.match(LOINTAIN_NOMS, top.name):
-        return True
     if not fam:
         return False
     pts = [o.matrix_world @ Vector(c) for o in fam for c in o.bound_box]
@@ -602,15 +649,28 @@ def is_lointain(nom, top, zone):
     return not zone((x0 + x1) / 2, (y0 + y1) / 2)
 
 
-def assembler(scene, infos, noms, base=None, plan=None):
+def is_lointain(nom, top, zone):
+    """Le drapeau d'une famille (son objet de tête, avant la pose dans la ville) : 0 si elle est cachée de toute
+    façon (les sources), 1 si son nom est celui d'un lointain ou si son centre sort de la zone du lieu ; une famille
+    qui contient le centre du lieu (un grand sol) reste au lieu."""
+    if all(_hidden(o) for o in _family(top)):
+        return False
+    if re.match(LOINTAIN_NOMS, top.name):
+        return True
+    return _hors_zone(top, zone)
+
+
+def assembler(scene, infos, noms, base=None, plan=None, own=None):
     """Ajoute chaque lieu à la scène de ville : sa collection, sa racine (la transformation de placement), ses
     objets parentés à la racine, ses drapeaux. `base` (4 × 4, lignes) : le repère de la scène, s'il n'est pas celui de
     la ville (voisins : la scène d'un plan). `plan` (voisins) : le plan rendu ; un lieu de la même prise n'y perd que
     ses acteurs animés (is_acteur), et ses clés passent dans la numérotation du plan (la même image de la prise, le
-    même état : lampes, rampes, enseignes). Rend {nom: dict(racine, collection, objets, retirés, lointains)}."""
+    même état : lampes, rampes, enseignes) ; il ne perd rien par la règle de zone (drapeau_voisin). `own` (voisins) :
+    le lieu du plan rendu. Rend {nom: dict(racine, collection, objets, retirés, lointains)}."""
     import bpy
     from mathutils import Matrix
     out = {}
+    presents = set(noms) | ({own} if own else set())
     for nom in noms:
         info = infos[nom]
         t0 = time.time()
@@ -655,10 +715,18 @@ def assembler(scene, infos, noms, base=None, plan=None):
         coll.objects.link(root)
         root.matrix_world = (Matrix(base) if base else Matrix.Identity(4)) @ Matrix(matrice(lieu(nom)["plan"]))
         far = 0
+        doubles = []
         for top in _tops(objs):
-            # un véhicule ou un figurant gardé (immobile, d'un lieu de la même prise) est à son lieu, où qu'il soit
-            # posé : le barrage au bout de la rue n'imite aucun autre lieu
-            flag = False if (prise and is_cast(top)) else is_lointain(nom, top, zone)
+            # (les sources cachées d'origine n'ont pas de drapeau : elles restent cachées de toute façon)
+            if all(_hidden(o) for o in _family(top)):
+                flag, why = False, ""
+            else:
+                # (dans une même prise, la zone ne compte plus : un véhicule ou un figurant gardé, le barrage au
+                # bout de la rue, le fond nord du rond-point sont à leur lieu, où qu'ils soient posés)
+                flag, why = drapeau_voisin(nom, top.name, (not prise) and _hors_zone(top, zone),
+                                           bool(top.get("phare")), presents, prise)
+            if why.startswith("doublon"):
+                doubles.append(f"{top.name} ({why}, {len(_family(top))} objets, lampes comprises)")
             for o in _family(top):
                 o["ville_lieu"] = nom
                 o["ville_lointain"] = int(flag)
@@ -666,6 +734,8 @@ def assembler(scene, infos, noms, base=None, plan=None):
                 far += flag
             top.parent = root
             top.matrix_parent_inverse = Matrix.Identity(4)
+        if doubles:
+            log(f"{nom} : doublons réels cachés avec leurs lampes : {', '.join(doubles)}")
         root["ville_lieu"] = nom
         root["ville_lointain"] = 0
         root["ville_cache0"] = 0
@@ -700,23 +770,33 @@ def voisins(scene, plan, ville_dir):
     import bpy
     own_objs = [o for o in scene.objects if o.get("ville_lieu") is None]
     base = Matrix(matrice(lieu(own)["plan"])).inverted()
-    built = assembler(scene, infos, list(infos), base=[list(r) for r in base], plan=plan)
+    built = assembler(scene, infos, list(infos), base=[list(r) for r in base], plan=plan, own=own)
     lointains(scene, False)
     bpy.context.view_layer.update()
-    doubles = doublons(scene, own, own_objs, built)
+    doubles = doublons(scene, own, own_objs, built, plan=plan)
     poses = ", ".join("%s (%d objets)" % (n, b["objets"]) for n, b in built.items()) or "aucun voisin"
     log(f"{plan} dans la ville : {poses} autour de {own} ; {len(doubles)} faux lointains de {own} cachés sous un "
         f"voisin chargé ({', '.join(sorted(doubles)[:8])}{'…' if len(doubles) > 8 else ''})")
     return built
 
 
-def doublons(scene, own, own_objs, built):
-    """Les faux lointains de la scène du plan (hors de la zone de son lieu) qui imitent un voisin chargé : le centre
-    de leur boîte dans la boîte d'un voisin. Cachés : le vrai lieu est là, et c'est lui qu'on voit des deux côtés de
-    la coupe. Les lointains de nom (ciel, mer, brume, phare lointain) restent. Rend leurs noms."""
+def voisins_hors_prise(plan, noms):
+    """Les lieux de `noms` qui ne sont pas de la prise continue du plan (sans Blender) : les seuls dont la boîte peut
+    cacher un faux lointain du plan (doublons). Un lieu de la même prise ne cache rien du plan : il ne perd lui-même
+    rien par la règle de zone (drapeau_voisin), le plan ne perd rien sous lui, et le même objet se voit des deux côtés
+    de la coupe (la boîte d'un voisin, alignée sur les axes, couvrait large : celle de la rue, son eau de 5 km
+    comprise, recouvrait l'avenue nord du rond-point)."""
+    return [n for n in noms if plan is None or not meme_prise(plan, lieu(n)["plan"])]
+
+
+def doublons(scene, own, own_objs, built, plan=None):
+    """Les faux lointains de la scène du plan (hors de la zone de son lieu) qui imitent un voisin chargé hors de sa
+    prise (voisins_hors_prise) : le centre de leur boîte dans la boîte de ce voisin. Cachés : le vrai lieu est là, et
+    c'est lui qu'on voit des deux côtés de la coupe. Les lointains de nom (ciel, mer, brume, phare lointain) restent.
+    Rend leurs noms."""
     from mathutils import Vector
     boxes = []
-    for n in built:
+    for n in voisins_hors_prise(plan, built):
         pts = []
         for o in scene.objects:
             if o.get("ville_lieu") == n and not o.get("ville_lointain") and o.type == "MESH" and not o.hide_render:
