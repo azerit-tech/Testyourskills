@@ -254,7 +254,7 @@ def aircraft():
 # elle et relie les deux dans le cadre final. Il y est en stationnaire (vitesse et accélération nulles), et P6 le
 # reprend de là : sa trajectoire de film, et celle des deux appareils qui attendent sur la jetée, sont dans
 # helicos.py (une seule distribution pour P5 et P6, dans le repère de ville) ; heli_arrival n'en est que l'arrivée.
-HELI_END = (24.0, 9.6)        # m devant elle, hauteur
+HELI_END = (33.0, 12.8)        # m devant elle, hauteur
 HELI_BODY = 1.5               # le milieu de la cellule au-dessus de l'origine du modèle (mesuré à l'image)
 
 

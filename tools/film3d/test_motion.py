@@ -636,8 +636,8 @@ def test_p6():
     limites de la voiture ; la caméra au bras commun du parcours jusqu'à l'image 30, puis 8 m derrière à 3,6 m à la
     fin, grue sous 2,5 m/s, la berline à y 58 % depuis le haut (± 4) ; rien à moins de 0,8 m de la caméra ; les
     appareils s'évitent ; rien ne frôle la caméra ; les hélicoptères sous 88 % du cadre, les avions aussi, sauf à
-    leur entrée par le haut (air_entry images au plus) ; les avions au-dessus de la pointe à l'image JET_TURN ;
-    personne ne tire."""
+    leur entrée par le haut (air_entry images au plus) ; la mise en scène des aéronefs (test_p6_air) ; personne ne
+    tire."""
     import p6_jetee as P
     import parcours as PC
     frames = range(P.F0 - 1, P.F0 + P.FRAMES + 1)
@@ -704,9 +704,108 @@ def test_p6():
         ok = len(high) <= allowed and (not high or high == list(range(inw[0], inw[0] + len(high))))
         check(f"P6 : {k} sous {CAM_AIR_TOP:.0f} % du cadre" + ("" if allowed == 0 else f", sauf {entry} images à son entrée"),
               ok, f"{len(high)} image(s) au-dessus" + (f" ({high[0]}-{high[-1]}, entré à {inw[0]})" if high else ""))
-    over = [P.jet(i)(M.t_of(P.JET_TURN))[1] for i in range(len(P.JETS))]
-    check(f"P6 : les avions au-dessus de la pointe à l'image {P.JET_TURN}", all(410.0 < y < 470.0 for y in over),
-          f"y {over[0]:.0f}, {over[1]:.0f}")
+    test_p6_air()
+
+
+# la mise en scène des aéronefs sur la jetée (film éclairé du 13 novembre : des jouets, à hauteur de lampadaire, piqués
+# en apparence, l'un sur l'autre et sur les mâts ; les avions en travers du cadre, frôlant un hélicoptère)
+AIR_ATT_MAX = 15.0            # ° : tangage et roulis des hélicoptères (assiette de l'accélération comprise)
+AIR_HELI_LAMPS = (1.5, 2.0)   # hauteurs de lampadaire au-dessus de la jetée : l'appareil 0 (faisceau sur elle), les autres
+AIR_SEP = 25.0                # m entre deux hélicoptères
+AIR_OVERLAP = 6               # images au plus où deux boîtes projetées se recouvrent (appareils, mâts)
+JET_HELI_MIN = 150.0          # m : un avion et un hélicoptère
+JET_CAM_MIN = 300.0           # m : les avions en fond
+JET_TOP = 12.0                # % du haut du cadre : rien d'un avion dedans
+HELI_DISC, HELI_HULL = 5.3, (-1.5, 1.7)   # m : le rayon du rotor ; la cellule autour de son milieu (HELI_BODY)
+
+
+def _screen_rect(cam, pts):
+    """Le rectangle (u0, u1, v0, v1) de points à l'écran (v depuis le haut), None si l'un est derrière."""
+    qs = [M.screen_point(cam, p) for p in pts]
+    if any(q is None for q in qs):
+        return None
+    return min(q[0] for q in qs), max(q[0] for q in qs), min(q[1] for q in qs), max(q[1] for q in qs)
+
+
+def _heli_pts(c):
+    return [(c[0] + HELI_DISC * math.cos(a), c[1] + HELI_DISC * math.sin(a), c[2] + dz)
+            for a in (2 * math.pi * k / 16 for k in range(16)) for dz in HELI_HULL]
+
+
+def _box_pts(c, h):
+    return [(c[0] + sx * h[0], c[1] + sy * h[1], c[2] + sz * h[2]) for sx in (-1, 1) for sy in (-1, 1) for sz in (-1, 1)]
+
+
+def _in_frame(b):
+    return b is not None and b[1] > 0 and b[0] < 1 and b[3] > 0 and b[2] < 1
+
+
+def _overlap(a, b):
+    return _in_frame(a) and _in_frame(b) and a[0] < b[1] and b[0] < a[1] and a[2] < b[3] and b[2] < a[3]
+
+
+def test_p6_air():
+    """P6, les aéronefs : les hélicoptères (assiette de l'accélération comprise, comme rendue) en tangage et roulis
+    sous AIR_ATT_MAX ; au-dessus de deux hauteurs de lampadaire (une et demie pour le 0, faisceau sur elle) ;
+    AIR_SEP m entre eux ; à l'écran, leurs boîtes projetées (rotor et cellule) ne se recouvrent pas, ni celles des mâts
+    de la jetée restés dans la ville (lampadaires de droite de y 315 à 395, celui de la pointe, le phare), plus de
+    AIR_OVERLAP images ; les avions sur une ligne tendue (vitesse constante), à JET_CAM_MIN m de la caméra au moins,
+    JET_HELI_MIN m de tout hélicoptère, jamais sur un hélicoptère à l'écran, rien d'eux dans les JET_TOP % du haut."""
+    import p6_jetee as P
+    import p5_virage as P5
+    import helicos as H
+    frames = range(P.F0, P.F0 + P.FRAMES)
+    hel = {i: [H.in_scene("P6", i, dyn=True)(M.t_of(f)) for f in frames] for i in range(H.N)}
+    cams = [P.camera_rail(M.t_of(f)) for f in frames]
+    att = max((max(abs(s[4]), abs(s[5])), i) for i in hel for s in hel[i])
+    check(f"P6 : l'assiette des hélicoptères sous {AIR_ATT_MAX:g}°", att[0] <= AIR_ATT_MAX,
+          f"{att[0]:.1f}° au plus (appareil {att[1]})")
+    for i in hel:
+        need = (AIR_HELI_LAMPS[0] if i == 0 else AIR_HELI_LAMPS[1]) * P.LAMP_H
+        low = min(s[2] for s in hel[i])
+        check(f"P6 : l'hélicoptère {i} au-dessus de {need / P.LAMP_H:g} hauteurs de lampadaire", low >= need,
+              f"{low:.1f} m au plus bas, {need:.1f} m demandés")
+    sep = min((math.dist(hel[a][k][:3], hel[b][k][:3]), a, b, k + P.F0) for k in range(len(cams))
+              for a in hel for b in hel if a < b)
+    check(f"P6 : les hélicoptères à {AIR_SEP:g} m les uns des autres", sep[0] >= AIR_SEP,
+          f"{sep[0]:.1f} m entre {sep[1]} et {sep[2]} à l'image {sep[3]}")
+    lamp = P.LAMP_H / 2
+    masts = {f"lampadaire_{y:.0f}_d": ((P.JX + 5.5, y, lamp), (0.6, 0.3, lamp)) for y in (315.0, 335.0, 355.0, 375.0, 395.0)}
+    masts["lampadaire_pointe"] = ((P.JX + 5.5, P.POINTE_Y - 5.8, lamp), (0.6, 0.6, lamp))
+    masts["phare"] = ((75.0, 458.3, 9.0), (2.0, 2.0, 9.0))      # lieux.PHARE_AT, PHARE_H
+    count = {}
+    for k, cam in enumerate(cams):
+        hb = {i: _screen_rect(cam, _heli_pts((hel[i][k][0], hel[i][k][1], hel[i][k][2] + P5.HELI_BODY))) for i in hel}
+        mb = {n: _screen_rect(cam, _box_pts(c, h)) for n, (c, h) in masts.items()}
+        for i in hel:
+            for j in [j for j in hel if j > i] + list(mb):
+                if _overlap(hb[i], hb[j] if j in hb else mb[j]):
+                    count[(i, j)] = count.get((i, j), 0) + 1
+    worst = max(((v, k) for k, v in count.items()), default=(0, None))
+    check(f"P6 : les hélicoptères ne se recouvrent pas à l'écran, ni les mâts, plus de {AIR_OVERLAP} images",
+          worst[0] <= AIR_OVERLAP, f"{worst[0]} image(s)" + (f" ({worst[1][0]} et {worst[1][1]})" if worst[1] else ""))
+    jets = [P.jet(i) for i in range(len(P.JETS))]
+    v = [[(jet(M.t_of(f) + 0.5) [j] - jet(M.t_of(f) - 0.5)[j]) for j in range(3)] for jet in jets for f in frames]
+    straight = max(math.dist(a, v[0 if k < len(frames) else len(frames)]) for k, a in enumerate(v))
+    check("P6 : les avions sur une ligne tendue, à vitesse constante", straight < 1e-6, f"{straight:.1e} m/s")
+    cam_d = min(math.dist(cams[k][:3], jet(M.t_of(f))[:3]) for jet in jets for k, f in enumerate(frames))
+    heli_d = min(math.dist(hel[i][k][:3], jet(M.t_of(f))[:3]) for jet in jets for i in hel
+                 for k, f in enumerate(frames))
+    check(f"P6 : les avions en fond ({JET_CAM_MIN:g} m de la caméra), à {JET_HELI_MIN:g} m des hélicoptères",
+          cam_d >= JET_CAM_MIN and heli_d >= JET_HELI_MIN, f"{cam_d:.0f} m de la caméra, {heli_d:.0f} m d'un hélicoptère")
+    top, on, seen = 100.0, 0, 0
+    for k, f in enumerate(frames):
+        for jet in jets:
+            p = jet(M.t_of(f))
+            jb = _screen_rect(cams[k], _box_pts(p[:3], (8.0, 8.0, 2.5)))
+            if not _in_frame(jb):
+                continue
+            seen += 1
+            top = min(top, 100 * jb[2])
+            on += sum(_overlap(jb, _screen_rect(cams[k], _heli_pts((hel[i][k][0], hel[i][k][1],
+                                                                     hel[i][k][2] + P5.HELI_BODY)))) for i in hel)
+    check(f"P6 : les avions dans le cadre, sous les {JET_TOP:g} % du haut, jamais sur un hélicoptère",
+          seen > 0 and top >= JET_TOP and on == 0, f"{seen} vue(s), à {top:.0f} % du haut au plus haut, {on} recouvrement(s)")
 
 
 def test_ouv():

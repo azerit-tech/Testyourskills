@@ -4,9 +4,9 @@
 # même appareil, même place, même cap, même assiette, même vitesse des deux côtés de la coupe, rotors en phase.
 #  - 0 : celui de P5 ; il arrive de l'est et freine devant la berline (p5_virage.heli_arrival), en stationnaire à
 #    P5/60, puis rejoint en JOIN_A s sa place devant elle sur la jetée (p6_jetee.heli_slot(0)), en se retournant.
-#  - 1 et 2 : ceux qui l'attendent sur la jetée (p6_jetee.heli_slot(1), (2)) ; dans P5 ils arrivent, plus haut
-#    (APPROACH) : le 2 de l'avant, posé sur sa place à P6/1 ; le 1 de la droite, au-dessus de l'eau, sur la sienne
-#    deux secondes après la coupe (position, vitesse et accélération continues partout).
+#  - 1 et 2 : ceux qui l'attendent sur la jetée (p6_jetee.heli_slot(1), (2)), haut et loin devant elle ; dans P5
+#    ils arrivent de l'avant, plus haut encore (APPROACH), posés sur leur place à P6/1 (position, vitesse et
+#    accélération continues partout).
 # Ce module ne lit que les deux plans et le parcours, sans Blender (sauf film_rotors, appelé par les scènes).
 import math
 
@@ -25,14 +25,9 @@ TURN_A = 1.6          # s : son demi-tour, du nez vers elle au cap de la jetée 
 BEAM_JOIN = 1.0       # s : son faisceau, de la visée de P5 (elle, en retard) à celle de P6 (2 m devant elle)
 # l'arrivée des appareils 1 et 2 sur leur place : (début, fin) en s autour de P6/1, et d'où ils arrivent (le long de
 # la jetée, vers sa gauche, en hauteur, m) ; un écart à leur place qui s'éteint en quintique (vitesse et accélération
-# continues), freinage de 5,8 × l'écart / durée² au plus. Le 1 vient de la droite, au-dessus de l'eau : par l'avant,
-# il croisait l'appareil 0, qui plonge devant elle pendant P5 sur le chemin de sa place (moins de 5 m).
-APPROACH = [None, None, (-4.0, 0.0, (16.0, 4.0, 6.0))]
-# le 1 est l'ailier du 0 : il arrive de l'est avec lui sur la même courbe, WING m à côté (dans la ville : vers l'est,
-# vers le nord, en hauteur ; 16 m d'air au moins avec les deux autres), sans se tourner vers elle ; il la quitte pour
-# sa place sur WING_JOIN (s autour de P6/1) : au bord droit du cadre à la coupe, il y entre au début de P6 (15 m au moins sous les avions)
-WING = (17.0, -4.0, 0.0)
-WING_JOIN = (-1.5, 1.5)
+# continues), freinage de 5,8 × l'écart / durée² au plus. Leurs places sont haut et loin (à deux hauteurs de
+# lampadaire et plus, 70 et 140 m devant elle) : ils passent au-dessus du 0, qui plonge devant elle pendant P5.
+APPROACH = [None, (-4.0, 0.0, (20.0, 8.0, 6.0)), (-4.0, 0.0, (20.0, -8.0, 6.0))]
 SEEDS = (11.0, 23.0, 37.0)      # l'assiette de chaque appareil (motion.aircraft_attitude), la même dans les deux plans
 
 
@@ -133,19 +128,6 @@ def state(i, T):
         k = _quintic(u)
         return (*pos, head, hold[4] + (slot[4] - hold[4]) * k, hold[5] + (slot[5] - hold[5]) * k)
     s = _slot(i, T)
-    if APPROACH[i] is None:
-        # l'ailier : la courbe du 0 décalée de WING, puis sa place (quintique : position, vitesse, accélération
-        # continues) ; le cap de l'un à l'autre par le plus court
-        t0, t1 = WING_JOIN
-        w = _quintic((T - (T6 + t0)) / (t1 - t0))
-        if w >= 1.0:
-            return s
-        x, y, z, h, p, r = to_ville("P5", P5.heli_arrival(min(T, T5_END) - T5, turn=False))
-        pre = (x + WING[0], y + WING[1], z + WING[2], h, p, r)
-        if w <= 0.0:
-            return pre
-        return tuple(a + (b - a) * w for a, b in zip(pre[:3], s[:3])) + \
-            (h + (M._unwrap(h, s[3]) - h) * w, p + (s[4] - p) * w, r + (s[5] - r) * w)
     t0, t1, (a, l, up) = APPROACH[i]
     g = 1.0 - _quintic((T - (T6 + t0)) / (t1 - t0))
     if g <= 0.0:
@@ -164,11 +146,25 @@ F_LAST = PC.START["P6"] + P6.F0 + P6.FRAMES   # une image après P6/60
 _ATT = {}
 
 
+ATT_MAX, ATT_KNEE = 15.0, 10.0   # ° : tangage et roulis bornés à 15° (vol de police, pas de voltige), sans cassure
+
+
+def _soft(a):
+    """L'angle a tel quel jusqu'à ATT_KNEE, puis replié en douceur vers ATT_MAX (dérivée continue)."""
+    m = abs(a)
+    if m <= ATT_KNEE:
+        return a
+    w = ATT_MAX - ATT_KNEE
+    return math.copysign(ATT_KNEE + w * math.tanh((m - ATT_KNEE) / w), a)
+
+
 def attitude(i):
-    """{image du film: (x, y, z, cap, tangage, roulis)} dans la ville, l'assiette de l'accélération comprise."""
+    """{image du film: (x, y, z, cap, tangage, roulis)} dans la ville, l'assiette de l'accélération comprise,
+    tangage et roulis sous ATT_MAX."""
     if i not in _ATT:
-        _ATT[i] = M.aircraft_attitude(lambda T: state(i, T), range(F_FIRST, F_LAST + 1), "heli", f0=1, fps=FPS,
-                                      seed=SEEDS[i])
+        raw = M.aircraft_attitude(lambda T: state(i, T), range(F_FIRST, F_LAST + 1), "heli", f0=1, fps=FPS,
+                                  seed=SEEDS[i])
+        _ATT[i] = {f: tuple(s[:4]) + (_soft(s[4]), _soft(s[5])) + tuple(s[6:]) for f, s in raw.items()}
     return _ATT[i]
 
 

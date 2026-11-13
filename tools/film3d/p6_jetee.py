@@ -1,7 +1,7 @@
 # Le plan P6 écrit une fois, sans Blender (découpage v3.1, P6 ; SPEC §18.36, la conduite unique) : la berline sort du
 # virage du port et file sur la jetée vers la pointe, un cul-de-sac entouré d'eau ; la patrouille 1 remonte par la
-# voie de gauche, la colonne suit par ses lumières, trois hélicoptères devant elle, faisceaux sur elle ; deux avions
-# arrivent de derrière nous, passent au-dessus de tout et s'écartent au-dessus de la pointe (ils ne tirent rien).
+# voie de gauche, la colonne suit par ses lumières, trois hélicoptères devant elle, haut, faisceaux sur elle ; deux
+# avions traversent le fond du ciel au-delà de la pointe, sur une ligne tendue (ils ne tirent rien).
 #
 # La berline et le bras de la caméra se lisent dans le parcours unique (parcours.py), fenêtre « P6 », posée dans la
 # scène D : rien du chemin n'est écrit ici. P5 → P6 n'est plus une coupe d'espace : P6/1 est l'image qui suit P5/60,
@@ -109,12 +109,19 @@ def column_pos(i):
 
 
 # ---- les hélicoptères : devant la berline, faisceaux tournés vers l'arrière et le bas, sur elle ; (x scène, y devant
-# elle, hauteur). À +30, +40 et +55 m, ils s'étagent à 22, 77 et 58 % de la largeur, hors du chemin des avions. Ils
-# descendent de 2 à 2,5 m pendant la montée de la caméra (vers la pointe, où FIN en pose un à 8 m). Ce sont leurs
-# places (heli_slot) ; leurs trajectoires sont celles de la distribution commune à P5 et P6 (helicos.py) : le 0 est
-# l'hélicoptère de P5, qui quitte son stationnaire de P5/60 pour sa place ; 1 et 2 arrivent sur la leur pendant P5.
-HELIS = [(73.5, 30.0, 8.0), (92.0, 40.0, 9.5), (86.0, 55.0, 12.0)]
-HELI_DROP = [2.0, 2.0, 2.5]
+# elle, hauteur, cap). Vus de la caméra au ras du sol, des appareils à hauteur de lampadaire, de dos et proches, se
+# lisaient comme des jouets (le film éclairé du 13 novembre : la poutre de queue dressée vers nous, piqués en
+# apparence à 45-60°, les mâts et les autres appareils en travers). Ils volent donc haut et à distance, dans le « V »
+# du ciel que les lampadaires laissent libre au-dessus de l'axe (le sommet d'un mât à l'azimut a est à 1,16 a de
+# hauteur angulaire) : le 0, celui de P5, faisceau sur elle, à une hauteur et demie de lampadaire, 45 m devant elle ;
+# le 1 et le 2 au-dessus de lui, à deux hauteurs et plus, 70 et 140 m devant elle, de part et d'autre de l'axe ; de
+# trois quarts (cap de 20 à 25° sur leur route, en crabe, le projecteur sur elle). Ce sont leurs places (heli_slot) ;
+# leurs trajectoires sont celles de la distribution commune à P5 et P6 (helicos.py) : le 0 quitte son stationnaire
+# de P5/60 pour sa place ; 1 et 2 arrivent sur la leur pendant P5.
+HELIS = [(80.5, 45.0, 14.0, -20.0), (58.0, 70.0, 21.5, -25.0), (102.0, 140.0, 46.0, 25.0)]
+HELI_DROP = [0.5, 0.5, 2.0]
+HELI_PITCH = -5.0           # le nez bas du vol d'avance (l'accélération y ajoute au plus 9°, motion.AIR)
+LAMP_H = 4.68 * 1.75        # la hauteur des lampadaires de la jetée (lieux.lamp, LAMP_S)
 
 
 def heli(i):
@@ -126,13 +133,13 @@ def heli(i):
 
 def heli_slot(i):
     """La place de l'appareil i devant la berline, fn(t), t en s depuis P6/1 (négatif admis : P5)."""
-    x0, ahead, z0 = HELIS[i]
+    x0, ahead, z0, cap = HELIS[i]
 
     def fn(t):
         _, y = hero_pos(t)
         bob = 0.35 * math.sin(2 * math.pi * 0.6 * t + 1.7 * i)
         z = z0 - HELI_DROP[i] * M.smoothstep(M.t_of(CRANE_F0 - 10), T_END, t)
-        return x0, y + ahead, z + bob, (x0 - JX) * 0.4, -7.0, 2.0 * math.sin(2 * math.pi * 0.4 * t + i)
+        return x0, y + ahead, z + bob, cap, HELI_PITCH, 2.0 * math.sin(2 * math.pi * 0.4 * t + i)
     return fn
 
 
@@ -144,37 +151,22 @@ def beam_target(t):
     return x - 2.0 * math.sin(h), y + 2.0 * math.cos(h), 0.6
 
 
-# ---- les avions, l'événement du plan : de derrière la caméra (venus du port), au-dessus d'elle à l'image
-# JET_OVER_CAM ; ils entrent par le haut du cadre, filent vers la pointe en rapetissant ; au-dessus d'elle à l'image
-# JET_TURN, ils s'écartent (cap ±25°) et montent de 6 m au-dessus de la mer. (x, z, cap de sortie.) La pointe n'est
-# plus qu'à 120 m de la caméra (190 avant la conduite unique) : 180 m/s au lieu de 210, le virage à l'image 32.
-JETS = [(66.0, 22.0, 25.0), (96.0, 24.0, -25.0)]
-JET_V = 180.0
-JET_OVER_CAM, JET_TURN = 15, 32
-JET_CLIMB = 6.0
+# ---- les avions : en fond, haut et loin, sur une ligne tendue. Ils traversent le cadre de droite à gauche au-dessus
+# de la mer, au-delà de la pointe (y 760 et 795, 420 m devant la caméra), à 48 et 58 m, en patrouille à 200 m/s ; ils
+# entrent après P6/1 (pas dans P5) et sortent avant la fin ; sous les hélicoptères à l'écran (le 0 au plus bas),
+# loin des 12 % du haut, à plus de 150 m de tout appareil. Ils ne tirent rien. (y, z, x à P6/1.) Avant, ils
+# passaient au-dessus de la caméra et frôlaient l'hélicoptère de gauche (film éclairé, images 376-378).
+JETS = [(760.0, 48.0, 318.0), (795.0, 58.0, 362.0)]
+JET_V = 200.0
 AIR_ENTRY = 8
 
 
 def jet(i):
-    x0, z0, cap = JETS[i]
-    t_over, t_turn = M.t_of(JET_OVER_CAM), M.t_of(JET_TURN)
-    y_over = camera_rail(t_over)[1]
+    y0, z0, x0 = JETS[i]
 
     def fn(t):
-        y = y_over + JET_V * (min(t, t_turn) - t_over)
-        x, h = x0, 0.0
-        if t > t_turn:
-            n = 24
-            for k in range(n):                     # le virage, intégré : cap de 0 à ±25° en 0,4 s
-                tk = t_turn + (t - t_turn) * (k + 0.5) / n
-                hk = cap * M.smoothstep(t_turn, t_turn + 0.4, tk)
-                x -= JET_V * math.sin(math.radians(hk)) * (t - t_turn) / n
-                y += JET_V * math.cos(math.radians(hk)) * (t - t_turn) / n
-            h = cap * M.smoothstep(t_turn, t_turn + 0.4, t)
-        climb = M.smoothstep(t_turn, T_END + 0.3, t)
-        z = z0 + JET_CLIMB * climb
-        bank = -1.2 * h + 2.0 * math.sin(3.0 * t + i)
-        return x, y, z, h, -2.0 + 6.0 * (climb > 0) * (1.0 - climb), bank
+        x = x0 - JET_V * t
+        return x, y0, z0, 90.0, 0.0, 1.5 * math.sin(1.3 * t + i)
     return fn
 
 
@@ -283,7 +275,7 @@ if __name__ == "__main__":
         hx, hy = hero_pos(t)
         print(f"image {f:2d} : berline ({hx:.2f}, {hy:.2f}) {hero_speed(t):5.2f} m/s, caméra "
               f"{math.dist(c[:2], (hx, hy)):4.2f} m, z {c[2]:.2f}, site {c[4]:+.1f}°, lacet {c[3]:+.1f}° ; "
-              f"avions en y {jet(0)(t)[1]:.0f}, {jet(1)(t)[1]:.0f}")
+              f"avions en x {jet(0)(t)[0]:.0f}, {jet(1)(t)[0]:.0f}")
     print("écart minimal au sol :", M.min_gap(tracks(), range(F0 - 1, F0 + FRAMES + 1)))
     for f in (F0, F0 + FRAMES - 1):
         for k, v in state_out(f).items():
