@@ -829,6 +829,26 @@ FIN_FILL_W = 1900.0   # W, l'appoint de poursuite de la berline en FIN (lieux.ca
 FIN_FILL_COLOR = "#c9c6ec"    # le côté nuit du ciel, derrière la caméra
 
 
+def fin_fill(hero, energy=FIN_FILL_W):
+    """FIN et FIN6 : l'appoint de poursuite (plan de lumière v3.1, 2.5), lié à la berline seule, invisible : avant que
+    la meute n'arrive, le ciel et lui tiennent son arrière (sans lui, la caisse à 8,7 %, la plus sombre du film). Plus
+    bas et plus en arrière que l'appoint commun (4 m derrière, 6 m au-dessus) : de haut, il aplatissait toit et coffre
+    en un rouge vif uniforme ; de 5 m derrière et 3,5 m au-dessus, il prend le panneau arrière comme le feront les
+    phares de la meute. De la teinte du ciel derrière la caméra (son côté nuit, lavande) et non crème : crème, la
+    peinture virait au rouge vif (teinte 358°) ; lavande, elle reste bordeaux (347 à 348°) à la même luminance. Sans
+    le conducteur : par-dessus, il blanchissait les gants sortis par la vitre (85 à 94 %) ; ce sont les phares de la
+    meute, de dos, qui éclairent les mains. Renvoie la lumière."""
+    fill = L.car_fill(hero, loc=(0.0, -5.0, 3.5), energy=energy, color=FIN_FILL_COLOR, size=6.0)
+    arm = L.hero_driver(hero)
+    driver = {o.name for o in arm.children_recursive if o.type == "MESH"} if arm else set()
+    paint = bpy.data.collections.new(f"{hero.name}_appoint_sans_conducteur")
+    for o in fill.light_linking.receiver_collection.objects:
+        if o.name not in driver:
+            paint.objects.link(o)
+    fill.light_linking.receiver_collection = paint
+    return fill
+
+
 def plan_FIN(scene, hidden, palier="socle"):
     """FIN, l'arrestation (découpage v3.1, 52 images, fin_pointe.py), de dos dans le cadre de poursuite commun : la
     caméra suit la berline 7,5 m derrière, 2,4 m au-dessus de la chaussée, 24 mm ; la berline freine en glissant
@@ -897,22 +917,7 @@ def plan_FIN(scene, hidden, palier="socle"):
     M.flash_bars([p1], frames)
     # la meute : rien que ses phares, derrière la caméra
     fin_pack_lights(frames, hero)
-    # l'appoint de poursuite (plan de lumière v3.1, 2.5), lié à elle seule, invisible : avant que la meute n'arrive, le
-    # ciel et lui tiennent son arrière (sans lui, la caisse à 8,7 %, la plus sombre du film). Plus bas et plus en
-    # arrière que l'appoint commun (4 m derrière, 6 m au-dessus) : de haut, il aplatissait toit et coffre en un rouge
-    # vif uniforme ; de 5 m derrière et 3,5 m au-dessus, il prend le panneau arrière comme le feront les phares de la
-    # meute. De la teinte du ciel derrière la caméra (son côté nuit, lavande) et non crème : crème, la peinture virait
-    # au rouge vif (teinte 358°) ; lavande, elle reste bordeaux (347 à 348°) à la même luminance. Sans le conducteur :
-    # par-dessus, il blanchissait les gants sortis par la vitre (85 à 94 %) ; ce sont les phares de la meute, de dos,
-    # qui éclairent les mains
-    fill = L.car_fill(hero, loc=(0.0, -5.0, 3.5), energy=FIN_FILL_W, color=FIN_FILL_COLOR, size=6.0)
-    arm = L.hero_driver(hero)
-    driver = {o.name for o in arm.children_recursive if o.type == "MESH"} if arm else set()
-    paint = bpy.data.collections.new(f"{hero.name}_appoint_sans_conducteur")
-    for o in fill.light_linking.receiver_collection.objects:
-        if o.name not in driver:
-            paint.objects.link(o)
-    fill.light_linking.receiver_collection = paint
+    fin_fill(hero)
     # pas de fumée de pneus : à 24 km/h sur l'enrobé mouillé, une berline qui freine n'en fait pas ; et la nappe,
     # éclairée par le lampadaire de la pointe, passait floue et blanche à 3 m de l'objectif (brouillon v3.1)
     # (le lampadaire de la pointe est le lampadaire commun, lieux.lamp : ambre, 1200 W, lumière v3.1 règle E)
@@ -1010,6 +1015,11 @@ def fin_pack_lights(frames, hero):
     return out
 
 
+# W, la jumelle du projecteur de l'hélicoptère, sur la berline seule, en FIN6 : à 60 kW (celle de FIN), la caisse
+# passait à 27 % de profil quand la caméra tourne vers son flanc éclairé (cible 12 à 16)
+FIN6_HELI_CAR_W = 35000.0
+
+
 def plan_FIN6(scene, hidden, palier="socle"):
     """FIN6, la fin à six étoiles (découpage v3.1, 80 images, fin6_orbite.py) : elle suit P6 et raconte l'arrivée
     et l'arrêt à la pointe comme FIN, puis l'encerclement. La berline entre à 24 km/h en plein freinage (feux stop),
@@ -1095,12 +1105,10 @@ def plan_FIN6(scene, hidden, palier="socle"):
         print(f"[FIN6] agents non posés : {e!r}", flush=True)
     # la meute de FIN : rien que ses phares, derrière la caméra
     fin_pack_lights(frames, hero)
-    # le lampadaire de la pointe, comme dans FIN (1300 W crème), rangé à fin6_orbite.LAMP_AT : sa tête et son reflet
-    # hors du cadre à toutes les images (règle E)
+    fin_fill(hero)
+    # le lampadaire de la pointe, celui de FIN (le lampadaire commun, lieux.lamp : ambre), rangé à fin6_orbite.LAMP_AT :
+    # sa tête et son reflet hors du cadre à toutes les images (règle E)
     lp = bpy.data.objects.get("lamp_pointe_light")
-    if lp:
-        lp.data.energy = 1300.0
-        lp.data.color = L.lin("#ffe2c2")[:3]
     shift = Vector((F6.LAMP_AT[0] - LAMP_AT[0], F6.LAMP_AT[1] - LAMP_AT[1], 0.0))
     for ob in (bpy.data.objects.get("lamp_pointe"), lp):
         if ob is not None:
@@ -1109,7 +1117,9 @@ def plan_FIN6(scene, hidden, palier="socle"):
     heli, _ = L.helicopter("heli")
     L.put(heli, *F6.HELI, heading=F6.HELI_HEADING, pitch=-6.0, roll=0.0)
     aim = Vector((F6.CX, F6.CY, 0.8))
-    aim_helis([heli], aim, energy=28000.0, car=hero, car_energy=60000.0, cone=5.0)
+    # à 28 kW, le faisceau prend corps dans la brume et sa tache tombe sur la berline, qui la cache : pas de plaque au
+    # sol (lumière v3.1, contrôlé aux images 20, 50, 80) ; à 6 kW, le faisceau disparaissait de l'air
+    aim_helis([heli], aim, energy=28000.0, car=hero, car_energy=FIN6_HELI_CAR_W, cone=5.0)
     beam_cones([heli], aim, strength=0.8)
     piv = next(o for o in heli.children_recursive if o.name.endswith("searchlight_pivot"))
     M.key_searchlight({"searchlight_pivot": piv}, frames, F6.beam_target)
