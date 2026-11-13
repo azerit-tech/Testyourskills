@@ -1200,7 +1200,20 @@ def p6_ground(x, y):
 P6_HAZE = 0.0012
 
 
-def p6_beam0_haze(heli0, frames):
+def helis_sans_tache(spots):
+    """Une tache de projecteur au sol n'existe que si son pinceau se voit dans la brume jusqu'à l'appareil : les
+    projecteurs de la jetée (8 kW, leur pinceau ne se voit pas) n'éclairent plus que la brume ; la berline garde sa
+    jumelle (split_for_car). À appeler une fois la brume posée."""
+    col = bpy.data.collections.new("faisceau_brume_seule")
+    for o in bpy.data.objects:
+        if o.type == "MESH" and o.name.startswith("haze"):
+            col.objects.link(o)
+    for o in spots:
+        o.light_linking.receiver_collection = col
+    return col
+
+
+def p6_beam0_haze(heli0, frames, hero):
     """L'appareil 0 arrive de P5 avec son pinceau dans la brume : une jumelle de son projecteur qui n'éclaire que
     la brume, à la force de P5 à la coupe, éteinte sur helicos.BEAM0_FONDU s (helicos.beam0), cône compris ; sa
     lampe de 8 kW (celle des trois appareils de la jetée) reste au sol et sur la berline."""
@@ -1212,14 +1225,31 @@ def p6_beam0_haze(heli0, frames):
     tw = scene_e._twin(sp, "faisceau_brume_0", 0.0, "#e2eaff", brume)
     tw.visible_volume_scatter = True
     tw.data.shadow_soft_size, tw.data.spot_blend = helicos.BEAM0_SOURCE
+    # sa jumelle sur la berline (split_for_car, 50 kW) : ses propres données, la source et le cône de beam0 (la
+    # jumelle commune de la jetée, 4° et 1,5 m, ne posait sur le toit qu'une part de la tache de P5 : -28 % à la coupe)
+    cars = [o for o in sp.parent.children if o.type == "LIGHT" and o is not sp and o.name.startswith(sp.name + "_")]
+    for o in cars:
+        o.data = o.data.copy()
+        o.data.energy = helicos.BEAM0_BERLINE
+        o.data.shadow_soft_size, o.data.spot_blend = helicos.BEAM0_SOURCE
+    # sa tache au sol (8 kW, celle de P5) tant que son pinceau se voit, éteinte avec lui ; les projecteurs de la
+    # jetée, eux, n'éclairent plus le sol (helis_sans_tache)
+    sol = [o for o in bpy.data.objects if o.type == "MESH" and not o.name.startswith("haze")
+           and o not in set(L.car_parts(hero, glass=True))]
+    tg = scene_e._twin(sp, "faisceau_sol_0", helicos.BEAM0_SOL, "#fff2d6", sol)
+    tg.data.shadow_soft_size, tg.data.spot_blend = helicos.BEAM0_SOURCE
+    cars.append(tg)
     for f in frames:
         w, c = helicos.beam0(PC.t_of("P6", f), P6_HAZE)
+        tg.data.energy = helicos.BEAM0_SOL * helicos.beam0_sol(PC.t_of("P6", f))
+        tg.data.keyframe_insert("energy", frame=f)
         tw.data.energy = max(0.0, w - helicos.BEAM0_FIN)     # la lampe de 8 kW éclaire déjà la brume
-        tw.data.spot_size = math.radians(c)
+        for d in [tw.data] + [o.data for o in cars]:
+            d.spot_size = math.radians(c)
+            d.keyframe_insert("spot_size", frame=f)
         tw.data.keyframe_insert("energy", frame=f)
-        tw.data.keyframe_insert("spot_size", frame=f)
     print(f"[P6] pinceau de l'appareil 0 : {helicos.beam0(PC.t_of('P6', frames[0]), P6_HAZE)[0]:.0f} W à la "
-          f"coupe, éteint en {helicos.BEAM0_FONDU} s", flush=True)
+          f"coupe, éteint en {helicos.BEAM0_FONDU} s ; {len(cars)} jumelle(s) sur la berline", flush=True)
 
 
 def p6_clean_haze(scene, hero):
@@ -1391,7 +1421,9 @@ def plan_P6(scene, hidden, palier="socle"):
     # le ciel en un voile rose qui noyait l'eau noire et ses reflets (rendus du 12 novembre)
     L.haze((JX - 30, JX + 30), (JY0 - 20, JY1), (L.WATER_Z, 28), P6_HAZE)
     p6_clean_haze(scene, hero)
-    p6_beam0_haze(hs[0], frames)
+    helis_sans_tache([o for r in hs for o in r.children_recursive
+                      if o.type == "LIGHT" and o.name.endswith("searchlight_spot")])
+    p6_beam0_haze(hs[0], frames, hero)
     p6_foreground(hidden)
     p6_phare_clear(scene)
     # la berline à 7 m de l'objectif : ses textures gardent leur pleine définition, le reste est loin

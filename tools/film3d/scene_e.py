@@ -1754,6 +1754,9 @@ def plan_P5(scene, hidden, palier="conteneurs"):
         if ob.type == "LIGHT" and ob not in beams:
             ob.visible_volume_scatter = False
     L.haze((-140, 160), (-280, 115), (L.WATER_Z, 70), P5_HAZE)   # lieux.haze tourne ses normales vers l'extérieur
+    # les deux appareils de la jetée : pas de tache au sol sans pinceau visible (scene_d.helis_sans_tache)
+    scene_d.helis_sans_tache([o for r in others for o in r.children_recursive
+                              if o.type == "LIGHT" and o.name.endswith("searchlight_spot")])
     # --- la caméra qui suit la berline (de 8 à 10,3 m), 21 mm, mise au point sur elle
     cam = L.camera("cam_P5", tuple(CAM), (CAM.x + 1.0, CAM.y + 8.0, 0.7), lens=P5.LENS, fstop=4.0)
     M.key_camera(cam, FRAMES, P5.camera)

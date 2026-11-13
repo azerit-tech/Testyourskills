@@ -225,6 +225,12 @@ def beam0(T, density):
     return start * (BEAM0_FIN / start) ** w, BEAM0_CONE[0] + (BEAM0_CONE[1] - BEAM0_CONE[0]) * w
 
 
+def beam0_sol(T):
+    """La part de sa tache au sol que garde l'appareil 0 au temps T : entière tant que son pinceau se voit (P5, P6/1),
+    éteinte avec lui (une tache au sol n'existe que si son pinceau se voit jusqu'à l'appareil)."""
+    return 1.0 - _quintic((T - T6) / BEAM0_FONDU)
+
+
 def beam_in_scene(shot, i):
     def fn(t):
         return to_scene(shot, beam(i, PC.t_of(shot, 1) + t))
