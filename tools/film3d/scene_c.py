@@ -127,7 +127,10 @@ def build_bridge(hidden, lamp_src, far=False, haubans=False):
     # du port suit le tablier : la rampe ne touche le niveau du terre-plein qu'en y = 1 (en y = -20 elle est encore à
     # 0,7 m ; plate, la chaussée du port y montrait la tranche du tablier en travers de P4)
     ave = [Y_START - 15.0 - 30.0 * k for k in range(int((Y_START - Y_CITY_END) / 30.0))]
-    L.roadway("pont_ville", [Y_CITY_END, Y_START], half=HALF, walk=WALK, rail=None, M=M, far=far,
+    # dans la ville, la tête de pont (y -328 à -320) porte le parapet du tablier, bord extérieur ±9,7 : il vient mourir
+    # contre le mur du quai de la rue (de |x| 9,7, jusqu'en y -324,5), sans bande vide entre les deux
+    L.roadway("pont_ville", [Y_CITY_END, Y_START], half=HALF, walk=WALK, rail="parapet" if VILLE else None,
+              under="caisson" if VILLE else None, M=M, far=far,
               lamp_src=None if (far or VILLE) else lamp_src, lamp_ys=ave)
     bm = L.bmesh.new()
     if VILLE:
