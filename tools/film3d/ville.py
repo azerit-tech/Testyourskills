@@ -259,6 +259,23 @@ def cam_city(f, ground=0.0):
     return (out[0], out[1], out[2] + ground) + tuple(out[3:])
 
 
+# Les plans qui ne sont pas filmés par le bras commun (parcours.camera) : leur caméra propre, module.fonction(t) ->
+# (x, y, z, lacet, site, roulis, focale) dans la scène du plan (t en s depuis l'image 1 du plan)
+CAMERA_PLAN = {"P4": ("p4_pont", "camera")}
+
+
+def cam_plan(f):
+    """La caméra propre du plan de l'image f (CAMERA_PLAN), posée dans la ville ; None pour le bras commun."""
+    import importlib
+    shot, fr = shot_of(f)
+    if shot not in CAMERA_PLAN:
+        return None
+    mod, fn = CAMERA_PLAN[shot]
+    c = getattr(importlib.import_module(mod), fn)((fr - 1) / FPS)
+    to_v, rot = P.vers_ville(shot)
+    return (*to_v(c[0], c[1]), c[2], c[3] + rot) + tuple(c[4:])
+
+
 SAUT = 3.0     # m : au-delà, deux images voisines de la berline ne sont plus la même prise (contrôle de prises())
 
 
@@ -980,7 +997,7 @@ def poser_camera(scene, sol, smooth=12):
     def zg(f):
         ks = [sol[k][2] for k in range(f - smooth, f + smooth + 1) if k in sol and take[k] == take[f]]
         return sum(ks) / len(ks)
-    vals = {f: cam_city(f, zg(f)) for f in frames()}
+    vals = {f: cam_plan(f) or cam_city(f, zg(f)) for f in frames()}
     c0 = vals[1]
     cam = L.camera("cam_ville", c0[:3], (c0[0], c0[1] + 10.0, c0[2]), lens=24.0, fstop=0.0)
     M.key_camera(cam, frames(), lambda t: vals[min(P.TOTAL, max(1, int(round(t * FPS)) + 1))], f0=1,
