@@ -524,6 +524,44 @@ def quay_towers(protos, far=False):
     return out
 
 
+def build_far(pose=None, kind="rue"):
+    """La rue vue de loin, pour les prises de la ville où elle n'est qu'un fond (l'ouverture et P1 depuis l'avenue,
+    le pont) : kind « rue », les façades des deux rangs rognés et les immeubles du quai, câbles, lanternes et
+    guirlandes (leurs matières émissives), sans chaussée, mobilier, enseignes en potence ni lumière ; kind « quai »,
+    les immeubles du quai seuls en boîtes à fenêtres procédurales et leurs bandeaux (le fond de P4, à 380 m).
+    pose : (rot en degrés, tx, ty), la pose du repère de la rue (y = s) dans la scène qui l'accueille ; par défaut
+    celle de la ville (lieux.pose_ville). Rend l'empty « rue_loin » (ou « quai_loin ») qui porte le tout."""
+    rot, tx, ty = pose if pose is not None else lieux.pose_ville("rue")
+    scene = bpy.context.scene
+    before = set(bpy.data.objects)
+    if kind == "quai":
+        quay_towers(None, far=True)
+    else:
+        hidden = bpy.data.collections.new("sources_rue_loin")
+        scene.collection.children.link(hidden)
+        M = A.city_mats()
+        build_city(M, hidden, lights=False)
+        build_overhead(M, hidden, lights=False)
+        # les sources (les dessins, les pièces de bibliothèque de facade_mix) cachées, comme build() le fait
+        for c in bpy.data.collections:
+            if c.name.startswith("sources"):
+                c.hide_render = c.hide_viewport = True
+    bpy.context.view_layer.update()
+    roots = [o for o in bpy.data.objects if o not in before and o.parent is None
+             and not any(c.name.startswith("sources") for c in o.users_collection)]
+    root = bpy.data.objects.new(f"{kind}_loin", None)
+    scene.collection.objects.link(root)
+    root.matrix_world = (Matrix.Translation((tx, ty, 0.0)) @ Matrix.Rotation(math.radians(rot), 4, "Z") @
+                         Matrix.Translation((0.0, S_CAM, 0.0)) @ Matrix.Rotation(math.pi, 4, "Z"))
+    for o in roots:
+        mw = o.matrix_world.copy()
+        o.parent = root
+        o.matrix_parent_inverse = Matrix.Identity(4)
+        o.matrix_basis = mw
+    log(f"{kind} vue de loin : {len(roots)} objets, posée en ({tx:.1f} ; {ty:.1f}), rot {rot:.0f}°")
+    return root
+
+
 # ---------------------------------------------------------------- les enseignes en potence
 
 def obj_with_mat(src, name, loc, rot, scale, mat):
@@ -715,7 +753,9 @@ def bulb_source(hidden):
     return ob
 
 
-def build_overhead(M, hidden):
+def build_overhead(M, hidden, lights=True):
+    """Les câbles en travers, leurs lanternes et leurs guirlandes (allumées), les fils plus haut. lights=False : sans
+    les lumières des lanternes (la rue vue de loin, build_far)."""
     import facade_proc as C
     cable = M["metal"]
     lantern = lantern_source(hidden, M)
@@ -732,12 +772,14 @@ def build_overhead(M, hidden):
         drop = 0.55
         C.tube([[tuple(mid), tuple(mid - Vector((0, 0, drop)))]], 0.006, cable, f"lantern_wire_{k}")
         A.instance(lantern, f"lantern_{k}", mid - Vector((0, 0, drop)), random.uniform(0, 1))
-        lo = A.add_light(f"lantern_{k}_down", "SPOT", mid - Vector((0, 0, drop + 0.2)), (0, 0, -1), lamp_col, 250.0, spot=90)
-        # (250 W : à 1400 W, les lanternes au-dessus du premier plan éclairaient la chaussée en plein jour ; à 500,
-        # la caisse de la berline sortait à 21 %, lumière v3.1)
-        lo.data.spot_blend = 0.8
-        lo.data.shadow_soft_size = 0.12
-        lo.visible_glossy = False
+        if lights:
+            lo = A.add_light(f"lantern_{k}_down", "SPOT", mid - Vector((0, 0, drop + 0.2)), (0, 0, -1), lamp_col, 250.0,
+                             spot=90)
+            # (250 W : à 1400 W, les lanternes au-dessus du premier plan éclairaient la chaussée en plein jour ; à
+            # 500, la caisse de la berline sortait à 21 %, lumière v3.1)
+            lo.data.spot_blend = 0.8
+            lo.data.shadow_soft_size = 0.12
+            lo.visible_glossy = False
         # les guirlandes : deux brins en zigzag de part et d'autre du câble, plus bas, une ampoule tous les 55 cm
         if k < len(SPANS) - 1:
             yn = SPANS[k + 1]
