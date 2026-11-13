@@ -448,6 +448,31 @@ def selftest_voisins():
         assert x0 + 100.0 <= hx + 1e-6 and hx <= x1 - 100.0 + 1e-6 and y0 + 100.0 <= hy + 1e-6, f
         assert hy <= y1 - 100.0 + 1e-6, f
     assert -1.5 < z0 < 0.0 < z1 == 40.0
+    # (d) les acteurs des voisins de la même prise
+    assert prise_de("P2") == ("OUV", "P1", "P2", "P3") and prise_de("P6") == ("P4", "P5", "P6")
+    assert prise_de("FIN") is None and suivant("P1") == "P2" and suivant("P3") is None and suivant("FIN") is None
+    assert [classer_ecart(d) for d in (0.0, 0.004, 2.49, 2.5, 3.45, 7.9, 8.0, 86.0)] == \
+        ["jumeau"] * 3 + ["douteux"] * 3 + ["distinct"] * 2          # 3,45 m : la patrouille à côté de la berline
+    # les images : la dernière de P1 dans la scène de P1 (qui commence à 1) est 48 ; la première de P2, 49
+    assert image_scene("P1", 1, derniere("P1")) == 48 and image_scene("P1", 1, P.START["P2"]) == 49
+    assert image_scene("P2", 1, derniere("P1")) == 0 and image_scene("P3", 1, derniere("P2")) == 0
+    # les coupes comparées : celles dont les deux plans sont dans la scène (OUV ne charge pas l'avenue de P1)
+    assert paires_prise("P1", {"P1", "P2", "P3"}) == [("P1", "P2"), ("P2", "P3")]
+    assert paires_prise("OUV", {"OUV", "P2", "P3"}) == [("P2", "P3")]
+    assert paires_prise("P5", {"P4", "P5", "P6"}) == [("P4", "P5"), ("P5", "P6")]
+    assert paires_prise("FIN", {"FIN", "P5", "P6"}) == []
+    # qui perd ses jumeaux : le voisin ; entre deux voisins, le plus loin du plan rendu
+    assert cote_retire("P1", "P1", "P2") == "P2" and cote_retire("P3", "P2", "P3") == "P2"
+    assert cote_retire("P1", "P2", "P3") == "P3"       # rig_patrol_c (P3) sort : la patrouille 1 de P2 la précède
+    assert cote_retire("OUV", "P2", "P3") == "P3" and cote_retire("P6", "P4", "P5") == "P4"
+    # sans jumeau : immobile, il reste ; mobile, il sort, sauf l'entrant du plan suivant dans le champ à son image 1
+    assert sort_acteur("P1", "P2", True, True) == (True, "entrant, dans le champ à P2/1")    # la patrouille 2
+    assert sort_acteur("P1", "P2", True, False)[0] is False
+    assert sort_acteur("OUV", "P2", True, True) == (False, "mobile")                        # P1 est entre les deux
+    assert sort_acteur("P5", "P6", True, False)[0] is False                                 # les avions de P6
+    assert sort_acteur("P2", "P3", False, None) == (True, "immobile")                       # le barrage
+    assert sort_acteur("P3", "P2", True, None) == (False, "mobile")
+    assert sort_acteur("P3", "P2", False, None) == (True, "immobile")
     # un seul phare : celui de la jetée ; celui du pont (P4 ne charge pas la jetée) est un doublon en P5 et P6
     take2 = {"pont", "port", "jetee"}
     assert drapeau_voisin("pont", "phare", True, True, take2, True) == (True, "doublon du phare de la jetée")
@@ -707,7 +732,10 @@ def is_cast(ob):
 
 # Ce qui sort d'un lieu voisin (SPEC §18.36 : ce qui se voit des deux côtés d'une coupe continue est le même objet,
 # au même endroit, dans le même état) : seulement les acteurs animés de son plan (ce qui se déplace : une clé de
-# position qui varie, ou un chemin suivi), la caméra et les traces que laisse sa berline. Les voitures garées, le barrage et ses agents immobiles, les cônes, les lampes, les émissifs restent.
+# position qui varie, ou un chemin suivi), la caméra et les traces que laisse sa berline. Les voitures garées, le
+# barrage et ses agents immobiles, les cônes, les lampes, les émissifs restent. Dans la même prise, acteurs() en
+# décide après la pose : les jumeaux d'un acteur d'un plan voisin sortent même immobiles, l'entrant du plan suivant
+# reste (voir JUMEAU_M).
 TRACES = re.compile(r"^(wake|traces?|repere)([_.:]|$)")
 
 
@@ -782,6 +810,80 @@ def meme_prise(a, b):
     return any(a in ps and b in ps for _a, _b, ps in prises())
 
 
+def prise_de(plan):
+    """Les plans de la prise continue du plan, None hors de toute prise (FIN, FIN6)."""
+    return next((ps for _a, _b, ps in prises() if plan in ps), None)
+
+
+# Les acteurs d'un voisin de la même prise (SPEC §18.36 : ce qui se voit des deux côtés d'une coupe continue est le
+# même objet, au même endroit, dans le même état et le même mouvement). Deux règles, décidées après la pose (acteurs) :
+# 1. Les jumeaux : à chaque coupe continue dont les deux plans sont dans la scène, un acteur d'un côté et un acteur de
+#    même nature de l'autre, à moins de JUMEAU_M l'un de l'autre à la dernière image avant la coupe, sont le même
+#    (la patrouille de P1, « rig_police1 », et celle de P2, « rig_patrol_1 » ; la patrouille 1 de P2 et
+#    « rig_patrol_c », arrêtée là où P2 la laisse et immobile tout P3 ; la patrouille 2 de P2 et de P3 ; la meute et
+#    les hélicoptères de P5 et P6). Un seul reste : celui du plan rendu, sinon celui du plan le plus proche de lui. Entre
+#    JUMEAU_M et DOUTE_M, un jumeau mal raccordé ou un voisin serré : retiré quand même (jamais de doublon), signalé.
+# 2. Les autres : un acteur immobile reste (le barrage, ses agents, les voitures garées) ; un acteur qui se déplace
+#    sort, sauf celui du plan qui suit le plan rendu, visible à son image 1 depuis sa caméra et sans jumeau dans le
+#    plan rendu (la patrouille 2 de P2, à 86 m devant la berline, phares face caméra, absente de P1) : il existe à la
+#    dernière image du plan rendu, à la place et dans l'état de ses clés décalées.
+JUMEAU_M = 2.5          # m (en trois dimensions, origines des objets de tête : le rig au sol sous la caisse)
+DOUTE_M = 8.0
+
+
+def classer_ecart(d):
+    """« jumeau », « douteux » ou « distinct » : deux acteurs de même nature à d m l'un de l'autre à une coupe."""
+    return "jumeau" if d < JUMEAU_M else "douteux" if d < DOUTE_M else "distinct"
+
+
+def image_scene(plan, frame_start, g):
+    """L'image de la scène du plan rendu (sa première : frame_start) qui montre l'image g de la ville (0 : OUV/1) :
+    celle où les clés décalées d'un voisin de la prise montrent cette image."""
+    return frame_start + g - P.START[plan]
+
+
+def derniere(plan):
+    """L'image de la ville (0 : OUV/1) de la dernière image du plan."""
+    return P.START[plan] + dict(P.SHOTS)[plan] - 1
+
+
+def paires_prise(plan, presents):
+    """Les coupes continues de la prise du plan dont les deux plans sont dans la scène (le plan rendu, les plans des
+    voisins de la prise), dans l'ordre de la prise : [(a, b)]."""
+    ps = prise_de(plan) or ()
+    return [(a, b) for a, b in zip(ps, ps[1:]) if a in presents and b in presents]
+
+
+def cote_retire(plan, a, b):
+    """Le plan, a ou b, dont les jumeaux sortent de la scène du plan rendu à la coupe a → b : l'autre que le plan
+    rendu s'il en est ; sinon le plus loin de lui (deux plans après lui : b ; deux plans avant : a)."""
+    if plan == a:
+        return b
+    if plan == b:
+        return a
+    ps = prise_de(plan)
+    return b if ps.index(a) > ps.index(plan) else a
+
+
+def suivant(plan):
+    """Le plan qui suit le plan dans sa prise, None au bout."""
+    ps = prise_de(plan) or ()
+    i = ps.index(plan) if plan in ps else -1
+    return ps[i + 1] if 0 <= i < len(ps) - 1 else None
+
+
+def sort_acteur(plan, plan_v, bouge, visible):
+    """(gardé ?, raison) d'un acteur sans jumeau d'un voisin de la même prise : plan_v, le plan du voisin ; bouge, il
+    se déplace ; visible, il est dans le champ de plan_v à son image 1 (None : pas regardé)."""
+    if not bouge:
+        return True, "immobile"
+    if plan_v == suivant(plan):
+        if visible:
+            return True, f"entrant, dans le champ à {plan_v}/1"
+        return False, f"mobile, hors du champ à {plan_v}/1"
+    return False, "mobile"
+
+
 # Le phare : un seul, celui de la jetée (SPEC §18.36). Un autre lieu qui en pose un (le pont : lieux.panorama,
 # lieu="pont", pour P4 qui ne charge pas la jetée) le cache, lui et ses lampes (ses enfants), dès que la jetée est là.
 PHARE_LIEU = "jetee"
@@ -832,16 +934,18 @@ def is_lointain(nom, top, zone):
     return _hors_zone(top, zone)
 
 
-def assembler(scene, infos, noms, base=None, plan=None, own=None):
+def assembler(scene, infos, noms, base=None, plan=None, own=None, own_objs=None):
     """Ajoute chaque lieu à la scène de ville : sa collection, sa racine (la transformation de placement), ses
     objets parentés à la racine, ses drapeaux. `base` (4 × 4, lignes) : le repère de la scène, s'il n'est pas celui de
     la ville (voisins : la scène d'un plan). `plan` (voisins) : le plan rendu ; un lieu de la même prise n'y perd que
-    ses acteurs animés (is_acteur), et ses clés passent dans la numérotation du plan (la même image de la prise, le
-    même état : lampes, rampes, enseignes) ; il ne perd rien par la règle de zone (drapeau_voisin). `own` (voisins) :
-    le lieu du plan rendu. Rend {nom: dict(racine, collection, objets, retirés, lointains)}."""
+    sa caméra, les traces de sa berline s'il suit, et les acteurs que acteurs() lui retire (jumeaux, acteurs qui se
+    déplacent), et ses clés passent dans la numérotation du plan (la même image de la prise, le même état : lampes,
+    rampes, enseignes) ; il ne perd rien par la règle de zone (drapeau_voisin). `own`, `own_objs` (voisins) : le lieu
+    du plan rendu et les objets de sa scène. Rend {nom: dict(racine, collection, objets, retirés, lointains)}."""
     import bpy
     from mathutils import Matrix
     out = {}
+    cams = {}
     presents = set(noms) | ({own} if own else set())
     for nom in noms:
         info = infos[nom]
@@ -859,15 +963,19 @@ def assembler(scene, infos, noms, base=None, plan=None, own=None):
         for ob in list(sc.collection.objects):
             coll.objects.link(ob)
         objs = set(sc.objects)
+        if prise:
+            cams[nb_plan] = sc.camera             # (pour acteurs : le champ du voisin à son image 1)
         world = sc.world
         bpy.data.scenes.remove(sc)
         if world is not None and world.users == 0:
             bpy.data.worlds.remove(world)
         gone = set()
-        # les traces d'un voisin dont le plan précède restent (la berline y est passée) ; s'il suit, elles sortent
+        # les traces d'un voisin dont le plan précède restent (la berline y est passée) ; s'il suit, elles sortent.
+        # Dans la prise, la caméra et les acteurs attendent la pose de tous les lieux (acteurs) : les jumeaux se
+        # comparent dans la scène, à la coupe, et le champ du voisin se lit depuis sa caméra
         suit = prise and P.START[nb_plan] > P.START[plan]
         for top in _tops(objs):
-            if (is_acteur(top, traces=suit) if prise else is_cast(top)):
+            if (suit and TRACES.match(top.name)) if prise else is_cast(top):
                 gone.update(_family(top))
         names_gone = sorted(o.name for o in _tops(gone))
         for ob in gone:
@@ -878,8 +986,8 @@ def assembler(scene, infos, noms, base=None, plan=None, own=None):
             # l'image F du plan rendu est l'image de prise START[plan] + F − frame_start ; celle du voisin, la sienne
             shift = (P.START[plan] - scene.frame_start) - (P.START[nb_plan] - nb_fs)
             nk = _decaler(_blocs(objs), -shift) if shift else 0
-            log(f"{nom} ({nb_plan}) dans la prise de {plan} : entier hors acteurs animés, clés décalées de "
-                f"{-shift:+d} images ({nk} courbes)")
+            log(f"{nom} ({nb_plan}) dans la prise de {plan} : clés décalées de {-shift:+d} images ({nk} courbes), "
+                f"caméra et acteurs décidés après la pose de tous les lieux")
         bpy.context.view_layer.update()
         zone = zones()[nom]
         root = bpy.data.objects.new(f"ville_{nom}_racine", None)
@@ -915,7 +1023,139 @@ def assembler(scene, infos, noms, base=None, plan=None, own=None):
                         load_s=round(time.time() - t0, 1))
         log(f"{nom} : {len(objs)} objets ajoutés ({far} faux lointains), {len(gone)} retirés "
             f"({', '.join(names_gone[:12])}{'…' if len(names_gone) > 12 else ''}) en {time.time() - t0:.1f} s")
+    if plan is not None and own_objs is not None:
+        acteurs(scene, plan, out, own_objs, cams)
     return out
+
+
+def _nature(top):
+    """« personne » (une armature dans la famille) ou « engin » : deux jumeaux sont de même nature."""
+    return "personne" if any(o.type == "ARMATURE" for o in _family(top)) else "engin"
+
+
+def _liste_acteurs(tops):
+    """[(objet de tête, nature, se déplace ?)] : les acteurs parmi ces familles, véhicules, personnages, appareils
+    (is_cast) et tout ce qui se déplace ; ni caméra, ni trace, ni source cachée d'origine (les modèles des
+    collections « sources »)."""
+    out = []
+    for top in tops:
+        if top.type == "CAMERA" or TRACES.match(top.name) or all(_hidden(o) for o in _family(top)):
+            continue
+        mv = any(_bouge(o) for o in _family(top))
+        if mv or is_cast(top):
+            out.append((top, _nature(top), mv))
+    return out
+
+
+def _vu(scene, cam, top):
+    """La famille est-elle dans le champ de la caméra `cam` (un coin de la boîte d'un de ses maillages rendus, devant
+    l'objectif, dans le cadre) ? Sans occultation. Le cadre est celui des réglages de rendu de la scène (9:16 partout)."""
+    from bpy_extras.object_utils import world_to_camera_view
+    from mathutils import Vector
+    if cam is None or cam.type != "CAMERA":
+        return False
+    near, far = cam.data.clip_start, cam.data.clip_end
+    for o in _family(top):
+        if o.type != "MESH" or o.hide_render:
+            continue
+        mw = o.matrix_world
+        for c in list(o.bound_box) + [tuple(sum(v[i] for v in o.bound_box) / 8.0 for i in range(3))]:
+            p = world_to_camera_view(scene, cam, mw @ Vector(c))
+            if 0.0 <= p.x <= 1.0 and 0.0 <= p.y <= 1.0 and near < p.z < far:
+                return True
+    return False
+
+
+def _premiere_cle(top):
+    """(image, pas) : l'image de la scène (clés décalées) de la première clé de position de la famille, et le
+    déplacement d'une image à la suivante à cette clé (m, le plus grand des axes et des objets) ; (None, 0) sans clé.
+    Un acteur qui part déjà lancé à sa première clé est figé avant elle (l'extrapolation constante de Blender)."""
+    import motion as M
+    k0, pas = None, 0.0
+    curves = []
+    for o in _family(top):
+        try:
+            fcs = M.fcurves(o)
+        except Exception:
+            fcs = []
+        curves += [fc for fc in fcs if fc.data_path in ("location", "delta_location") and len(fc.keyframe_points)]
+    if not curves:
+        return None, 0.0
+    k0 = min(min(k.co[0] for k in fc.keyframe_points) for fc in curves)
+    for fc in curves:
+        pas = max(pas, abs(fc.evaluate(k0 + 1.0) - fc.evaluate(k0)))
+    return k0, pas
+
+
+def acteurs(scene, plan, built, own_objs, cams):
+    """Les acteurs des voisins de la même prise que le plan rendu (voir JUMEAU_M) : les jumeaux comparés à chaque
+    coupe dont les deux plans sont dans la scène (à la dernière image avant elle), les entrants regardés depuis la
+    caméra du plan suivant à son image 1, puis les sorties (sort_acteur) ; les caméras des voisins sortent. Après la
+    pose de tous les lieux (assembler), avant le rendu. Met à jour built[nom] (objets, retirés). Rend {nom: [(objet,
+    gardé ?, raison)]}."""
+    import bpy
+    ps = prise_de(plan)
+    lieux_p = {lieu(n)["plan"]: n for n in built if ps and lieu(n)["plan"] in ps and lieu(n)["plan"] != plan}
+    if not lieux_p:
+        return {}
+    groupes = {plan: _liste_acteurs(_tops(set(own_objs)))}
+    for p, n in lieux_p.items():
+        groupes[p] = _liste_acteurs(list(built[n]["racine"].children))
+    cur, fs = scene.frame_current, scene.frame_start
+    jumeaux = {}
+    try:
+        for a, b in paires_prise(plan, set(groupes)):
+            scene.frame_set(image_scene(plan, fs, derniere(a)))
+            side = cote_retire(plan, a, b)
+            other = b if side == a else a
+            ref = [(t.name, nat, t.matrix_world.translation.copy()) for t, nat, _mv in groupes[other]]
+            for top, nat, _mv in groupes[side]:
+                p = top.matrix_world.translation
+                cands = sorted(((p - q).length, nm) for nm, n2, q in ref if n2 == nat)
+                if cands and classer_ecart(cands[0][0]) != "distinct":
+                    jumeaux[top] = (classer_ecart(cands[0][0]), cands[0][0], other, cands[0][1])
+        vus = {}
+        nxt = suivant(plan)
+        if nxt in lieux_p:
+            scene.frame_set(image_scene(plan, fs, P.START[nxt]))
+            for top, _nat, mv in groupes[nxt]:
+                if mv and top not in jumeaux:
+                    vus[top] = _vu(scene, cams.get(nxt), top)
+    finally:
+        scene.frame_set(cur)
+    rapport = {}
+    for p, n in lieux_p.items():
+        gone, lignes, rows = set(), [], []
+        for top, _nat, mv in groupes[p]:
+            if top in jumeaux:
+                c, d, other, tw = jumeaux[top]
+                ok, why = False, f"{c} de {tw} ({other}) à {d:.2f} m"
+                if c == "douteux":
+                    log(f"! {plan} : {top.name} ({n}, {p}) à {d:.2f} m de {tw} ({other}) à la coupe : ni jumeau sûr "
+                        f"(< {JUMEAU_M} m) ni distinct (≥ {DOUTE_M} m) ; retiré, à vérifier (raccord ou voisin serré)")
+            else:
+                ok, why = sort_acteur(plan, p, mv, vus.get(top))
+            if ok and why.startswith("entrant"):
+                k0, pas = _premiere_cle(top)
+                if k0 is not None and k0 > fs and pas > 0.01:
+                    log(f"! {plan} : {top.name} ({n}) entre de {p} déjà lancé ({pas * FPS:.1f} m/s à sa première clé, "
+                        f"image {k0 - fs + 1:.0f} de {plan}) : il y est figé avant ; à demander à {p} : ses clés dès "
+                        f"son image {P.START[plan] - P.START[p] + 1}")
+            if not ok:
+                gone.update(_family(top))
+            rows.append((top.name, ok, why))
+            lignes.append(f"{top.name} {'gardé' if ok else 'retiré'} ({why})")
+        for o in [o for o in scene.objects if o.get("ville_lieu") == n and o.type == "CAMERA"]:
+            gone.update(_family(o))
+            lignes.append(f"{o.name} retiré (caméra)")
+        names = sorted(o.name for o in gone if o.parent is None or o.parent not in gone)
+        for ob in gone:
+            bpy.data.objects.remove(ob, do_unlink=True)
+        built[n]["objets"] -= len(gone)
+        built[n]["retires"] = sorted(set(built[n]["retires"]) | set(names))
+        rapport[n] = rows
+        log(f"{plan} : acteurs de {n} ({p}) : {'; '.join(lignes) or 'aucun'}")
+    return rapport
 
 
 def voisins(scene, plan, ville_dir):
@@ -942,7 +1182,7 @@ def voisins(scene, plan, ville_dir):
     import bpy
     own_objs = [o for o in scene.objects if o.get("ville_lieu") is None]
     base = Matrix(matrice(lieu(own)["plan"])).inverted()
-    built = assembler(scene, infos, list(infos), base=[list(r) for r in base], plan=plan, own=own)
+    built = assembler(scene, infos, list(infos), base=[list(r) for r in base], plan=plan, own=own, own_objs=own_objs)
     lointains(scene, False)
     bpy.context.view_layer.update()
     doubles = doublons(scene, own, own_objs, built, plan=plan)
