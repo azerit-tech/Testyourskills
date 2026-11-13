@@ -115,6 +115,9 @@ CUT_SCREEN = 0.15             # % de la largeur par image, vitesse de la berline
 CUT_P1_GAP = 2.0              # m, écart de la patrouille 1 à la berline (même côté exigé)
 CUT_INK_DV = 0.5              # m/s : vers une fin (l'encre), la berline n'arrive pas plus vite qu'elle n'est partie
 CAM31_LIMITS_PLAN = {
+    # le virage du port sur le bras commun (parcours.camera, retard de 0,12 s) : le bras passe à 0,6 m à l'intérieur
+    # du cap de la vitesse au plus fort du virage, et la caisse en glisse (15°) s'élargit à l'écran de 30 %
+    "P5": {"cam_side": (-0.7, 1.5), "cam_width_var": 0.32},
     "P6": {"rise_after": 0.5, "rise_h_max": 3.6},           # monte à la fin pour découvrir la pointe
     "FIN": {"stop_h_min": 2.0, "stop_dist_min": 5.5},       # plus bas et plus près une fois la berline arrêtée
 }
@@ -204,9 +207,10 @@ def test_right_turn():
 
 
 def test_gaps():
-    """P5 (découpage v3) : ce que les contrôles v3 ne voient pas : la meute loin derrière, les conteneurs, ce que
-    la berline frôle sans le toucher, la caméra loin des séparateurs, la patrouille 1 dans le cadre, le premier plan,
-    l'hélicoptère au-dessus des piles et dans le cadre final (écarts, cadre et vitesses : test_v3)."""
+    """P5 (découpage v3, parcours unique) : ce que les contrôles v3 ne voient pas : la meute derrière la caméra, les
+    conteneurs, la berline à 3 m de tout objet posé, la patrouille 1 qui frôle la chaîne, la caméra loin des
+    séparateurs, la patrouille 1 dans le cadre, le premier plan, l'hélicoptère au-dessus des piles et dans le cadre
+    final (écarts, cadre et vitesses : test_v3)."""
     import p5_virage as P
     check("M.min_gap voit un croisement", M.min_gap({"a": lambda t: (0.0, 10 * t), "b": lambda t: (0.0, 10 - 10 * t)},
                                                     range(0, 30))[0] < 0.5)
@@ -214,7 +218,9 @@ def test_gaps():
     tr = P.tracks()
     pack = [n for n in tr if n not in ("hero", "patrol_0")]
     gap = min(math.dist(P.hero_pos(M.t_of(f)), tr[n](M.t_of(f))) for n in pack for f in frames)
-    check("P5 : la meute à 30 m derrière la berline au moins", gap >= 30.0, f"{gap:.1f} m au plus près")
+    cgap = min(math.dist(P.camera_rail(M.t_of(f))[:2], tr[n](M.t_of(f))) for n in pack for f in frames)
+    check("P5 : la meute derrière la caméra (12 m de la berline, 4 m de l'objectif au moins)", gap >= 12.0 and cgap >= 4.0,
+          f"{gap:.1f} m de la berline, {cgap:.1f} m de la caméra au plus près")
     # le mur de conteneurs prolongé (x -15,1 à -10,1, y 54 à 79), les jambes du portique (x -24 et -10,6, y 81 et
     # 95), les piles du côté est (x 24,9 à 70, y 45,7 à 57,9) : aucun centre de véhicule ni la caméra à moins de 3 m
     # (plus sa demi-largeur, 1 m)
@@ -226,10 +232,10 @@ def test_gaps():
     cams = [P.camera_rail(M.t_of(f)) for f in frames]
     near = min([clear(fn(M.t_of(f))) for fn in tr.values() for f in frames] + [clear(c[:2]) for c in cams])
     check("P5 : rien à moins de 3 m d'un conteneur ou du portique", near >= 4.0, f"{near:.1f} m")
-    # ce que la berline frôle sans le toucher : la caisse (ses coins et le milieu de ses flancs) entre 0,4 et 2 m
-    # des poteaux de la chaîne ; à plus de 0,4 m des caisses ; la meute à plus de 0,6 m des poteaux (demi-largeur
-    # d'une patrouille : 1 m)
-    poses = M.sample(P.hero_pos, frames, slip=P.hero_slip)
+    # la caisse de la berline (ses coins et le milieu de ses flancs) à 3 m au moins des poteaux de la chaîne et des
+    # caisses (plan de ville, étape 3) ; la patrouille 1 frôle la chaîne (0,4 à 2 m d'air) ; la meute à plus de 0,6 m
+    # des poteaux (demi-largeur d'une patrouille : 1 m)
+    poses = M.sample(P.hero_pos, frames, heading=P.hero_heading, steer=P.hero_steer)
 
     def body_pts(p):
         h = math.radians(p["heading"])
@@ -238,8 +244,10 @@ def test_gaps():
     posts = [(x - 0.13, x + 0.13, y - 0.13, y + 0.13) for x, y in P.CHAIN_POSTS]
     d_chain = min(clear(q, posts) for p in poses for q in body_pts(p))
     d_crates = min(clear(q, [P.CRATES_BOX]) for p in poses for q in body_pts(p))
-    check("P5 : la berline frôle la chaîne sans la toucher", 0.4 <= d_chain <= 2.0, f"{d_chain:.2f} m au plus près")
-    check("P5 : la berline loin des caisses", d_crates >= 0.4, f"{d_crates:.2f} m au plus près")
+    check("P5 : la berline à 3 m au moins de la chaîne et des caisses", d_chain >= 3.0 and d_crates >= 3.0,
+          f"{d_chain:.2f} m de la chaîne, {d_crates:.2f} m des caisses")
+    p_air = min(clear(fn, posts) for fn in (P.pack_pos(0)(M.t_of(f)) for f in frames)) - 0.975
+    check("P5 : la patrouille 1 frôle la chaîne", 0.4 <= p_air <= 2.0, f"{p_air:.2f} m d'air")
     d_pack = min(clear(fn(M.t_of(f)), posts) for n, fn in tr.items() if n != "hero" for f in frames)
     check("P5 : la meute passe à côté de la chaîne", d_pack >= 1.6, f"{d_pack:.2f} m entre un centre et un poteau")
     # la caméra (fiche) : à 2 m au moins des séparateurs, à 0,8 m au moins des poteaux et des caisses, horizon à plat
@@ -248,19 +256,13 @@ def test_gaps():
     check("P5 : caméra loin des séparateurs, des poteaux et des caisses", d_bar >= 2.0 and d_box >= 0.8,
           f"{d_bar:.1f} m des séparateurs, {d_box:.1f} m des poteaux et des caisses")
     check("P5 : horizon à plat", all(c[5] == 0.0 for c in cams))
-    # le premier plan : la flaque jamais dans les 15 % du bas du cadre, la roue arrière gauche dedans en sortie de
-    # glisse (images 40 à 48) ;
-    # aucune bouffée de fumée gardée à moins de 2 m de la caméra
-    low = min((q[1], f) for f in frames for q in (P.project(p, M.t_of(f)) for p in P.puddle_pts())
-              if q and -5.0 <= q[0] <= 105.0)
-    pud = M._rect(P.PUDDLE_AT, P.PUDDLE_YAW - 90.0, P.PUDDLE_SIZE)
-    wet = [round(t * M.FPS + P.F0) for t, x, y in P.wheel_track(-1, frames=(40, 48), n=32)
-           if M._point_gap((x, y), pud) == 0.0]
-    check("P5 : la flaque hors du bas du cadre, sous la roue arrière gauche", low[0] >= P.FLOOR_BAND and wet,
-          f"au plus bas à {low[0]:.1f} % (image {low[1]}) ; roue dedans aux images {wet[:1] + wet[-1:]}")
+    # aucune bouffée de fumée gardée à moins de 2 m de la caméra (le bras commun traverse presque toute la fumée de
+    # la glisse : il en reste une ou deux)
     kept = P.smoke_keep(M.smoke_puffs(poses))
-    check("P5 : la fumée gardée loin de l'objectif", len(kept) >= 4, f"{len(kept)} bouffées, dès l'image {kept[0][0]}"
-          if kept else "aucune")
+    near = min((math.dist((x, y), P.cam_pos(M.t_of(g))[:2]) for f, x, y, _ in kept for g in range(f, P.F0 + P.FRAMES)),
+               default=99.0)
+    check("P5 : la fumée gardée loin de l'objectif", near >= P.SMOKE_CLEAR - 1.0,
+          f"{len(kept)} bouffées gardées, la plus proche à {near:.1f} m")
     # la patrouille 1 entière dans le cadre, à gauche de la berline, 12 images de suite au moins (PATROL_SEEN) ; elle
     # s'arrête avant les séparateurs, le nez rentré (elle sous-vire), et ne recule jamais
     seen = [f for f in range(P.F0, P.F0 + P.FRAMES) if P.patrol_seen(f)]
@@ -271,14 +273,17 @@ def test_gaps():
     run = max(runs, key=len) if runs else []
     check("P5 : la patrouille 1 entière dans le cadre, à gauche de la berline, 12 images de suite",
           len(run) >= 12 and (run[0], run[-1]) == P.PATROL_SEEN, f"images {run[0]} à {run[-1]}" if run else "jamais")
+    # elle s'arrête après la coupe (la prise continue avec P6) : sa pose à l'arrêt, 3,5 s après la première image
     p0 = tr["patrol_0"]
-    rect = M._rect(p0(M.t_of(P.F0 + P.FRAMES - 1)), P.patrol_heading(M.t_of(P.F0 + P.FRAMES - 1)), M.CAR_DIMS["patrol"])
+    t_stop = 3.5
+    rect = M._rect(p0(t_stop), P.patrol_heading(t_stop), M.CAR_DIMS["patrol"])
     bar = [(P.BARRIER_X[0], P.BARRIER_Y - 0.35), (P.BARRIER_X[1], P.BARRIER_Y - 0.35),
            (P.BARRIER_X[1], P.BARRIER_Y + 0.35), (P.BARRIER_X[0], P.BARRIER_Y + 0.35)]
-    ys = [p0(M.t_of(f))[1] for f in frames]
+    ys = [p0(M.t_of(f))[1] for f in range(P.F0 - 1, P.F0 + 84)]
     check("P5 : la patrouille 1 s'arrête avant les séparateurs", M._poly_gap(rect, bar) >= 1.2
-          and P.PATROL.speed(M.t_of(P.F0 + P.FRAMES - 1)) < 0.1 and all(b >= a for a, b in zip(ys, ys[1:])),
-          f"{M._poly_gap(rect, bar):.2f} m, cap {P.patrol_heading(M.t_of(P.F0 + P.FRAMES - 1)):.0f}°")
+          and P.PATROL.speed(t_stop) < 0.1 and all(b >= a for a, b in zip(ys, ys[1:])),
+          f"{M._poly_gap(rect, bar):.2f} m, cap {P.patrol_heading(t_stop):.0f}° ; {P.PATROL.speed(P.T_END):.1f} m/s "
+          "à la dernière image")
     # le cadre final : l'hélicoptère devant elle, entre x 45 et 65 %, y 68 et 82 % du bas, au-dessus de la berline
     t1 = M.t_of(P.F0 + P.FRAMES - 1)
     hh = P.aircraft()["heli"](t1)

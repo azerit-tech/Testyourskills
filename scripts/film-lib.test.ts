@@ -116,7 +116,7 @@ describe("les arguments de ffmpeg", () => {
     for (const part of ["-profile:v main", "-r 24", `-frames:v ${CHASE_FRAMES}`, "-g 48", "-sc_threshold 0", "-forced-idr 1", "-movflags +faststart", "-an", "-crf 25", "scale=540:960"])
       expect(a).toContain(part);
     expect(a).toContain(`-force_key_frames ${forceKeyframesExpr(keys)}`);
-    expect(a).toContain("-force_key_frames expr:eq(n,0)+eq(n,40)+eq(n,88)+eq(n,136)+eq(n,172)+eq(n,220)+eq(n,268)+eq(n,316)+eq(n,364)");
+    expect(a).toContain("-force_key_frames expr:eq(n,0)+eq(n,40)+eq(n,88)+eq(n,136)+eq(n,172)+eq(n,220)+eq(n,268)+eq(n,316)+eq(n,328)+eq(n,376)");
     for (const tag of ["-colorspace bt709", "-color_primaries bt709", "-color_trc bt709", "-color_range tv"]) expect(a).toContain(tag);
     expect(a).not.toContain("-g 12");
     expect(encodeArgs({ list: "l.txt", out: "o.mp4", size: 720, crf: 23, frames: 36, keys: [0] }).join(" ")).not.toContain("scale=");
@@ -151,9 +151,9 @@ describe("les arguments de ffmpeg", () => {
 describe("les images clés", () => {
   it("sur chaque coupe entre plans, plus une toutes les 48 images au plus", () => {
     expect(MAX_GOP).toBe(48);
-    // les coupes de cut.ts ; P2 (84 images), P6 (60), FIN (52) et FIN6 (80) en reçoivent une de plus, 48 images après la leur
+    // les coupes de cut.ts ; P2 (84 images), P5 (60), P6 (60), FIN (52) et FIN6 (80) en reçoivent une de plus, 48 images après la leur
     for (const k of Object.values(SHOT_START)) expect(keyframePlan("poursuite")).toContain(k);
-    expect(keyframePlan("poursuite")).toEqual([0, 40, 88, 136, 172, 220, 268, 316, 364]);
+    expect(keyframePlan("poursuite")).toEqual([0, 40, 88, 136, 172, 220, 268, 316, 328, 376]);
     expect(keyframePlan("fin")).toEqual([0, 48]);
     expect(keyframePlan("fin6")).toEqual([0, 48]);
     for (const film of ["poursuite", "fin", "fin6"] as const) {

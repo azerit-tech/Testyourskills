@@ -1,170 +1,150 @@
 # Le plan P5 écrit une fois, sans Blender (docs/cinematique-decoupage-v3.md, « P5 — L'hélicoptère fond sur le
-# quai, elle glisse dessous », et sa section v3.1 qui prime) : la berline arrive par la voie du pont, freine en ligne,
-# vire à droite en glissant de 16° et repart vers le quai ; la caméra de poursuite commune (24 mm, 2,4 m, 7,5 m
-# derrière) la suit sur le cap de sa vitesse, un peu à l'extérieur du virage ; la patrouille 1, devant elle à
-# gauche, freine, sous-vire tout droit et s'arrête devant les séparateurs ; l'hélicoptère arrive de l'est des
-# conteneurs et plonge sur le quai devant elle, nez vers elle, faisceau sur elle. scene_e.py n'en lit que les
-# fonctions du temps ; motion.py en tire roues, braquage et transfert de masse.
+# quai, elle glisse dessous », sa section v3.1 qui prime, et la feuille de route du parcours, fiche P5) : la berline
+# arrive du pont sur les freins, vire à droite sur un cercle de 22 m en glissant d'une quinzaine de degrés qui monte
+# et se résorbe, et sort vers la jetée ; la caméra de poursuite commune (24 mm, 2,4 m, 7,5 m derrière, 0,3 m à
+# gauche) la suit sur le cap de sa vitesse ; la patrouille 1, à sa portière gauche, file tout droit et s'arrête
+# devant les séparateurs ; la meute la suit dans son virage, derrière la caméra ; l'hélicoptère arrive de l'est et
+# plonge devant elle, faisceau sur elle. scene_e.py n'en lit que les fonctions du temps ; motion.py en tire roues,
+# braquage et transfert de masse.
 #
-# Repère du port (celui de lieux.py) : la voie du pont sur l'axe x = 0, la berline sur sa voie de droite (x = 3,5)
-# vers +y ; la voie du quai (axe y = 70, bords 63 et 77) vers +x ; la file de séparateurs qui ferme l'axe en
-# y = 80,6. t = 0 à la première image ; 48 images, 24 par seconde (shared/film/cut.ts).
+# La berline et le bras de la caméra se lisent dans le parcours unique (parcours.py), fenêtre « P5 », posée dans la
+# scène E par son ancre (la droite du pont, 20 m avant le virage) : rien du chemin n'est écrit ici. Durée, vitesses,
+# glisse, feux stop, centre du virage, traces, flaque et hélicoptère en découlent ; si la route change, le plan suit.
 #
-# Écarts à la fiche v3, assumés (v3.1) : la berline ne fait plus le quart de tour dans le plan. Sur le mouillé
-# (latéral ≤ 6,5 m/s², lacet de caisse ≤ 120°/s², glisse installée et rendue sans à-coup), avec une caméra qui ne
-# panoramique pas au-delà de 40°/s, elle tourne de 50° en 48 images et finit cap au nord-est, à l'entrée du quai, en
-# (8,9 ; 64,7) à 36 km/h : la fin du virage est hors champ, P6 reprend sur la jetée.
+# Repère du port (celui de lieux.py) : la voie du pont sur l'axe x = 0, la berline sur x = 5,25 vers +y ; la voie du
+# quai (axe y = 70, bords 63 et 77) vers +x ; la file de séparateurs qui ferme l'axe en y = 80,6. t = 0 à la première
+# image, 24 par seconde.
 import math
 
 import motion as M
+import parcours as PC
 
 V3 = True
 V31 = True                    # découpage v3.1 : cadre de poursuite commun, voiture vraie (motion.py mesure --v3)
-FRAMES = 48
+FRAMES = dict(PC.SHOTS)["P5"]
 F0 = 1
 T_END = (FRAMES - 1) / M.FPS
 
-LANE_X = 3.5                  # la voie de droite du pont
-Y_START = 46.0                # la berline à la première image
-
 CAR_DIMS = (4.9, 1.8, 1.45)   # longueur, largeur, hauteur de la berline (à quelques centimètres)
-
-# --- la berline (découpage v3.1, « la voiture roule vrai ») : une berline lourde sur le mouillé, réglée dans le
-# temps par trois courbes adoucies (en images) : son accélération le long de sa route, la vitesse de lacet de sa route
-# (sa vitesse tourne) et la glisse de sa caisse. Elle sort du pont à 51 km/h déjà sur les freins (5,8 m/s², le nez
-# plonge, feux stop des images 1 à 24), braque en entrée progressive dès l'image 5 (la route tourne jusqu'à 36°/s :
-# courbure continue, 6,4 m/s² de latéral au plus) en lâchant le frein ; l'arrière part vers l'extérieur du virage dès
-# l'image 3, sous près de 6 m/s² d'adhérence demandée, et atteint 16° à l'image 29 (25°/s au plus), les roues avant
-# contre-braquent, la vitesse tombe de 21 % ; la glisse se résorbe en 17 images (28°/s au plus) et elle remet les gaz
-# (2,2 m/s²) vers le quai dès l'image 30. Toutes les transitions sont des rampes adoucies : à-coup ≤ 12 m/s³,
-# accélération de lacet de la caisse ≤ 100°/s² (motion.py mesure --v3 P5).
-V0 = 14.1                     # m/s à la première image (51 km/h)
-# (début image, durée images, valeur visée) ; chaque courbe part de 0
-ACC_STEPS = ((-19.0, 22.0, -5.8), (9.5, 18.0, -1.6), (30.0, 10.5, 2.2))      # m/s² le long de la route
-YAW_STEPS = ((4.5, 20.0, 36.0),)                                              # °/s, vers la droite
-SLIP_STEPS = ((3.3, 23.0, -16.0), (29.5, 24.0, 2.8), (50.0, 17.0, 0.0))       # ° (négative : l'arrière à gauche)
+HERO = PC.hero("P5")          # la fenêtre du parcours, en image du plan (1 = la première), décimale admise
 
 
-def _steps(steps, u, start=0.0):
-    out = start
-    prev = start
-    for u0, du, val in steps:
-        out += (val - prev) * M.smoothstep(u0, u0 + du, u)
-        prev = val
-    return out
-
-
-TAB_DT = 1.0 / 240.0
-TAB_T = (-2.0, T_END + 1.0)
-_HERO = None
-
-
-def _hero_table():
-    """(x, y, vitesse, cap de la vitesse en degrés à droite de +y) tous les TAB_DT s, de TAB_T[0] à TAB_T[1] :
-    intégrés depuis l'image 1 (LANE_X, Y_START, V0, plein nord), en ligne droite avant."""
-    global _HERO
-    if _HERO is None:
-        k0 = int(round(-TAB_T[0] / TAB_DT))
-        n = int(round((TAB_T[1] - TAB_T[0]) / TAB_DT))
-        x, y, v, th = LANE_X, Y_START, V0, 0.0
-        fwd = [(x, y, v, th)]
-        for k in range(1, n - k0 + 1):
-            f = (k - 0.5) * TAB_DT * M.FPS + F0
-            a, r = _steps(ACC_STEPS, f), _steps(YAW_STEPS, f)
-            vm = v + a * TAB_DT / 2
-            rr = math.radians(th + r * TAB_DT / 2)
-            th += r * TAB_DT
-            x, y, v = x + math.sin(rr) * vm * TAB_DT, y + math.cos(rr) * vm * TAB_DT, v + a * TAB_DT
-            fwd.append((x, y, v, th))
-        back = []
-        x, y, v = LANE_X, Y_START, V0
-        for k in range(1, k0 + 1):
-            f = -(k - 0.5) * TAB_DT * M.FPS + F0
-            a = _steps(ACC_STEPS, f)
-            vm = v - a * TAB_DT / 2
-            y, v = y - vm * TAB_DT, v - a * TAB_DT
-            back.append((x, y, v, 0.0))
-        _HERO = back[::-1] + fwd
-    return _HERO
-
-
-def _hero_at(t):
-    tab = _hero_table()
-    u = (t - TAB_T[0]) / TAB_DT
-    k = max(0, min(len(tab) - 2, int(math.floor(u))))
-    f = u - k
-    a, b = tab[k], tab[k + 1]
-    return tuple(a[i] * (1 - f) + b[i] * f for i in range(4))
+def _f(t):
+    return F0 + t * M.FPS
 
 
 def hero_pos(t):
-    return _hero_at(t)[:2]
+    """La berline (scène E), t en s depuis la première image ; définie avant elle (les ressorts de M.sample)."""
+    return HERO["pos"](_f(t))
+
+
+def hero_heading(t):
+    """Le cap de la caisse (convention de lieux.put)."""
+    return HERO["heading"](_f(t))
+
+
+def hero_steer(t):
+    return HERO["steer"](_f(t))
 
 
 def hero_speed(t):
-    return _hero_at(t)[2]
+    return HERO["speed"](_f(t))
 
 
 def travel_bearing(t):
     """Le cap de la vitesse de la berline (degrés à droite de +y)."""
-    return _hero_at(t)[3]
+    return -HERO["travel"](_f(t))
 
 
 def hero_slip(t):
     """La glisse de la caisse (degrés, négative : l'avant pointe à droite de sa route, l'arrière dehors)."""
-    return _steps(SLIP_STEPS, t * M.FPS + F0)
+    return HERO["slip"](_f(t))
 
 
-def hero_heading(t, h=1e-3):
-    """Le cap de la caisse (cap de la vitesse plus glisse), convention de lieux.put."""
-    return -travel_bearing(t) + hero_slip(t)
+def brake_windows():
+    """Les fenêtres des feux stop (images du plan) : celles du parcours."""
+    return PC.brake_windows("P5")
 
 
-def brake_windows(thr=2.0, frames=None):
-    """Les fenêtres [(première, dernière image)] où la berline freine à plus de thr m/s², pour
-    hero_cars.stop_lamps (une image de part et d'autre du plan comprise)."""
-    frames = list(frames or range(F0 - 1, F0 + FRAMES + 1))
-    on = [f for f in frames if -_steps(ACC_STEPS, f) > thr]
-    out = []
-    for f in on:
-        if out and f == out[-1][1] + 1:
-            out[-1] = (out[-1][0], f)
-        else:
-            out.append((f, f))
-    return out
+def _turn_center():
+    """Le centre du cercle nominal du virage dans la scène : la droite du pont (l'ancre, 20 m avant le début de
+    l'arc) prolongée jusqu'au début de l'arc, puis R5 à sa droite."""
+    to_scene, _ = PC.placer("P5")
+    x, y, cap, _ = PC.ROUTE.at(PC.S_ARC5 - 20.0)
+    h = math.radians(cap)
+    fx, fy = -math.sin(h), math.cos(h)
+    return to_scene(x + 20.0 * fx + PC.R5 * fy, y + 20.0 * fy - PC.R5 * fx)
 
 
-def _turn_center(f=30):
-    """Le centre de courbure de la route à l'image f (pour la dérive de la fumée, vers l'extérieur)."""
-    t = M.t_of(f)
-    x, y, v, th = _hero_at(t)
-    r = v / math.radians(_steps(YAW_STEPS, f))
-    a = math.radians(th)
-    return x + r * math.cos(a), y - r * math.sin(a)
+TURN_C = _turn_center()       # (27,25 ; 55,07) : la berline y tourne à 21,7 m de lui
+TURN_R = PC.R5
+_SLIPS = [(abs(hero_slip(M.t_of(f))), f) for f in range(F0, F0 + FRAMES)]
+SLIP_PEAK = max(_SLIPS)[1]    # l'image du plus fort de la glisse
+SKID_FRAMES = (min(f for s, f in _SLIPS if s > 8.0), max(f for s, f in _SLIPS if s > 8.0))   # la gomme marque
 
 
-TURN_C = _turn_center()
+# --- la patrouille 1 (indice 0) arrive du pont à la portière gauche de la berline, dans l'état où P4 la laisse
+# (PATROL_IN) ; déjà sur les freins, elle voit l'axe fermé, ne prend pas le virage : elle file tout droit, le nez
+# rentré de quelques degrés (elle sous-vire, les roues braquées, la caisse qui pivote à peine), et s'arrête en douceur
+# devant les séparateurs (le freinage relâché à la fin, à-coup borné). Le cadre la montre entière à gauche de la
+# berline (PATROL_SEEN).
+# PATROL_IN : l'état de sortie de P4 (P4/48 prolongé d'une image = P5/1), à confirmer par le portage de P4 : à gauche
+# de la berline (m), son avance (m, centre contre centre, le long de la voie), son freinage (m/s²). Sa vitesse s'en
+# déduit : celle qui l'arrête, freinage tenu, le nez PATROL_STOP m avant les séparateurs.
+PATROL_IN = dict(left=3.1, lead=7.0, decel=6.4)
+PATROL_STOP = 5.0
+PATROL_RELEASE = 0.9          # s : le freinage relâché jusqu'à l'arrêt (à-coup 7 m/s³)
+BARRIER_Y, BARRIER_X = 80.6, (-7.6, 7.6)    # la file de séparateurs (scene_e.build_barrier)
+PATROL_X = hero_pos(0.0)[0] - PATROL_IN["left"]
+PATROL_Y0 = hero_pos(0.0)[1] + PATROL_IN["lead"]
 
 
-# --- les poursuivants. La patrouille 1 (indice 0) est déjà devant, à gauche, au bout du pont : elle a pris la tête
-# pour couper la route à la berline, voit l'axe fermé et freine (6,5 m/s² au plus, installés en 0,9 s) ; elle braque
-# à droite pour prendre le virage mais la route mouillée ne la tient pas : elle sous-vire, file tout droit, le nez
-# rentré de 9° seulement (les roues braquées, la caisse qui pivote à peine), et s'arrête en douceur devant les
-# séparateurs (le freinage relâché à la fin). Le cadre la montre entière à gauche de la berline (PATROL_SEEN).
-# Le reste de la meute : sur la voie du pont, 30 m derrière la berline au moins, qui freine (4 m/s²) en voyant l'axe
-# fermé ; ses phares font l'ombre de la berline.
-PATROL_X, PATROL_Y0 = 0.0, 69.0                   # sur l'axe de la voie du pont, passé la chaîne, à l'image 1
-# la conduite commune (motion.drive) : une route qui file tout droit depuis (0 ; 60) et s'arrête 16 m plus loin,
-# abordée à 36 km/h voulus ; l'outil la rabote (34 km/h à l'image 1, déjà sur les freins) et l'arrête en douceur
-PATROL = M.drive(dict(start=(PATROL_X, 60.0, 0.0), pieces=[M.line(16.0)]), 10.0, t0=-0.9, stop=True,
-                 kind="patrol")
-PATROL_YAW, PATROL_YAW_F = -9.0, (4.0, 30.0)        # le nez qui rentre à droite (degrés, de l'image à l'image)
-PATROL_SEEN = (1, 22)                               # les images où elle est entière dans le cadre (test_motion)
+def _patrol_profile(v0):
+    d = PATROL_IN["decel"]
+    t1 = v0 / d - PATROL_RELEASE / 2
+
+    def acc(t):
+        return -d if t < t1 else -d * max(0.0, 1.0 - (t - t1) / PATROL_RELEASE)
+    return M.Profile(v0, acc, t0=-2.0, t1=T_END + 3.0)
+
+
+def _patrol_v0():
+    """La vitesse d'entrée qui l'arrête le nez à PATROL_STOP m des séparateurs (bissection)."""
+    want = BARRIER_Y - 0.35 - PATROL_STOP - M.CAR_DIMS["patrol"][0] / 2 - PATROL_Y0
+    lo, hi = 5.0, 30.0
+    for _ in range(40):
+        mid = (lo + hi) / 2
+        lo, hi = (lo, mid) if _patrol_profile(mid).s(T_END + 3.0) > want else (mid, hi)
+    return (lo + hi) / 2
+
+
+PATROL_V0 = _patrol_v0()      # 17,58 m/s : elle a pris la tête et freine plus fort que la berline
+_PATROL = _patrol_profile(PATROL_V0)
+
+
+class PATROL:
+    """La patrouille 1 : pos(t), speed(t), heading(t) (sa route : tout droit vers +y)."""
+
+    @staticmethod
+    def pos(t):
+        return PATROL_X, PATROL_Y0 + _PATROL.s(t)
+
+    @staticmethod
+    def speed(t):
+        return _PATROL.v(t)
+
+    @staticmethod
+    def heading(t):
+        return 0.0
+
+
+PATROL_YAW, PATROL_YAW_F = -9.0, (24.0, 48.0)       # le nez qui rentre à droite (degrés, de l'image à l'image)
+PATROL_SEEN = (1, 23)                               # les images où elle est entière dans le cadre (test_motion)
 
 
 def patrol_heading(t):
-    """Le cap de la patrouille 1 : celui de sa conduite (tout droit) plus le nez rentré du sous-virage."""
-    return PATROL.heading(t) + PATROL_YAW * M.smoothstep(*PATROL_YAW_F, t * M.FPS + F0)
+    """Le cap de la patrouille 1 : tout droit, plus le nez rentré du sous-virage."""
+    return PATROL.heading(t) + PATROL_YAW * M.smoothstep(*PATROL_YAW_F, _f(t))
 
 
 def tracks_heading():
@@ -172,49 +152,61 @@ def tracks_heading():
     return {"patrol_0": patrol_heading}
 
 
-PACK_V = 17.0
-PACK_ACC = ((-12.0, 24.0, -4.0),)                   # (début image, durée images, m/s²)
+# --- la meute : elle descend la rampe et suit la berline dans son virage, à la file, derrière la caméra (ses phares
+# font l'ombre de la berline). Chacune roule sur la route de la berline avec un retard fixe (`delay`, s), décalée de
+# `left` m à sa gauche : les vitesses et les accélérations de la berline, sous les plafonds des patrouilles.
+# PACK_IN : l'état de sortie de P4, à confirmer par son portage ; elles entrent dans P6 comme elles sortent d'ici
+# (pack_state).
+PACK_IN = [("patrol", 1.6, 0.0), ("van", 2.5, 0.0), ("patrol", 3.4, 0.0)]
+PACK_START = [("patrol", PATROL_X, PATROL_Y0)] + [(k, *hero_pos(-d)) for k, d, _ in PACK_IN]
 
 
-def _pack_accel(t):
-    return _steps(PACK_ACC, t * M.FPS + F0)
-
-
-PACK = M.Profile(PACK_V, _pack_accel)
-PACK_START = [("patrol", PATROL_X, PATROL_Y0), ("patrol", 2.8, 3.0), ("van", -2.4, -9.0), ("patrol", 2.8, -23.0)]
+def _follow(delay, left):
+    def pos(t):
+        x, y = hero_pos(t - delay)
+        if not left:
+            return x, y
+        a = math.radians(HERO["travel"](_f(t - delay)))
+        return x - left * math.cos(a), y - left * math.sin(a)
+    return pos
 
 
 def pack_pos(i):
     if i == 0:
         return PATROL.pos
-    _, x, y0 = PACK_START[i]
-    return lambda t: (x, y0 + PACK.s(t))
+    _, d, left = PACK_IN[i - 1]
+    return _follow(d, left)
 
 
-# --- ce que la berline frôle (posé par scene_e.build_east, contrôlé par test_motion) : la chaîne pendue sur l'axe
-# de la voie du pont, que l'arrière en glisse longe (la caméra, à l'extérieur du virage, y passe à 1,2 m) ; la
-# flaque que la roue arrière gauche traverse en sortie de glisse (images 44 à 46), assez tard pour que la caméra ne
-# la voie jamais dans les 15 % du bas (sous l'objectif, elle renvoyait le ciel noir et un lampadaire : un disque
-# sombre et une boule claire au premier plan) ; les caisses, rangées au bord sud du quai.
+def pack_state(i, t=T_END):
+    """(x, y, cap, vitesse) d'un véhicule de la meute (scène E) à l'instant t : l'état qu'il porte dans P6."""
+    pos = pack_pos(i)
+    (vx, vy), _ = M.kinematics(pos, t)
+    x, y = pos(t)
+    return x, y, M.heading_of(vx, vy), math.hypot(vx, vy)
+
+
+# --- ce que la berline longe (posé par scene_e.build_east, contrôlé par test_motion) : la chaîne pendue sur l'axe
+# de la voie du pont, que la patrouille 1 frôle ; les caisses, rangées au bord sud du quai. La berline reste à 3 m au
+# moins de tout objet posé. Plus de flaque sur la ligne des roues : la caméra, sur le bras commun, suit la route de la
+# berline et la passait au bas du cadre à la fin du plan (et la lumière ne veut aucune flaque dans sa voie).
 CHAIN_POSTS = [(0.0, 52.0), (0.0, 54.7), (0.0, 57.4), (0.0, 60.1)]
-PUDDLE_AT, PUDDLE_SIZE, PUDDLE_YAW = (6.8, 63.8), (3.0, 1.8), -49.0
-PUDDLE_MARGIN = 0.4           # le fondu du bord (scene_e.build_east : la plaque déborde de 0,4 m)
-FLOOR_BAND = 15.0             # le bas du cadre (%) où rien ne doit se poser au sol
+REAR_AXLE, TRACK = -1.45, 0.75          # l'essieu arrière (m devant le centre) et la demi-voie de la berline
 SMOKE_CLEAR = 2.0             # m : une bouffée que la caméra frôlerait de plus près (elle suit la route) est omise
 SMOKE_DRIFT = -0.8            # m : la fumée dérive vers l'intérieur du virage (le vent) ; dehors, la caméra la traversait
 
 
-def puddle_pts(n=4):
-    """Des points de la plaque de la flaque, bord fondu compris (x, y, 0)."""
-    c, s = math.cos(math.radians(PUDDLE_YAW)), math.sin(math.radians(PUDDLE_YAW))
-    hx, hy = PUDDLE_SIZE[0] / 2 + PUDDLE_MARGIN, PUDDLE_SIZE[1] / 2 + PUDDLE_MARGIN
-    return [(PUDDLE_AT[0] + u * c - v * s, PUDDLE_AT[1] + u * s + v * c, 0.0)
-            for u in (hx * (2 * i / n - 1) for i in range(n + 1)) for v in (hy * (2 * j / n - 1) for j in range(n + 1))]
+def wheel_at(t, side, axle=REAR_AXLE):
+    """Le point de contact d'une roue (side : -1 gauche, +1 droite) à l'instant t."""
+    x, y = hero_pos(t)
+    h = math.radians(hero_heading(t))
+    fx, fy = -math.sin(h), math.cos(h)
+    return x + fx * axle + fy * TRACK * side, y + fy * axle - fx * TRACK * side
 
 
 def smoke_keep(puffs, drift=SMOKE_DRIFT, grow=10):
-    """Les bouffées de motion.smoke_puffs que la caméra ne traverse pas : elle suit la route de la berline, jusqu'à
-    1 m plus à gauche ; à moins de SMOKE_CLEAR m, la bouffée voilait le bas du cadre."""
+    """Les bouffées de motion.smoke_puffs que la caméra ne traverse pas : elle suit la route de la berline (le bras
+    commun la traverse presque toute) ; à moins de SMOKE_CLEAR m, la bouffée voilait le bas du cadre."""
     out = []
     for f, x, y, s in puffs:
         ox, oy = x - TURN_C[0], y - TURN_C[1]
@@ -231,7 +223,6 @@ def smoke_keep(puffs, drift=SMOKE_DRIFT, grow=10):
 
 CRATES_AT = (19.5, 64.8)
 CRATES_BOX = (18.45, 20.6, 63.8, 65.45)     # l'emprise des caisses et des palettes (x0, x1, y0, y1)
-BARRIER_Y, BARRIER_X = 80.6, (-7.6, 7.6)    # la file de séparateurs (scene_e.build_barrier)
 # ce que la caméra ne doit pas toucher (motion.plan_checks) : (x, y, rayon) des poteaux de la chaîne, des coins des
 # caisses et des séparateurs, un tous les mètres
 POSTS = ([(x, y, 0.13) for x, y in CHAIN_POSTS]
@@ -253,11 +244,22 @@ def aircraft():
 
 
 # --- l'hélicoptère : il arrive de l'est au-dessus des piles de conteneurs (hors champ à droite), en vol d'avance
-# (nez bas), vire sur la gauche et plonge sur le quai devant la berline ; il entre dans le cadre par la droite vers
-# l'image 34 et finit en ralentissant, nez vers elle, à 9,6 m, 24 m devant elle dans l'axe du quai (x 53 %, y 79 %
-# du bas) : le faisceau tombe sur elle et relie les deux dans le cadre final.
-HELI_PATH = ((70.0, 40.0, 22.0), (64.0, 56.0, 21.0), (44.0, 76.0, 14.0), (28.9, 78.1, 9.6))
+# (nez bas), vire sur la gauche et plonge devant la berline ; il finit en ralentissant, nez vers elle, HELI_END[1] m
+# au-dessus du sol, HELI_END[0] m devant elle sur le cap de sa vitesse à la dernière image : le faisceau tombe sur
+# elle et relie les deux dans le cadre final.
+HELI_END = (24.0, 9.6)        # m devant elle, hauteur
 HELI_BODY = 1.5               # le milieu de la cellule au-dessus de l'origine du modèle (mesuré à l'image)
+
+
+def _heli_path():
+    x, y = hero_pos(T_END)
+    a = math.radians(travel_bearing(T_END))
+    ex, ey = x + HELI_END[0] * math.sin(a), y + HELI_END[0] * math.cos(a)
+    # l'arrivée : de l'est, la dernière tangente le long du quai, vers l'ouest
+    return ((70.0, 40.0, 22.0), (64.0, 56.0, 21.0), (ex + 15.0, ey - 2.0, 14.0), (ex, ey, HELI_END[1]))
+
+
+HELI_PATH = _heli_path()
 
 
 def _bez(pts, u):
@@ -287,50 +289,22 @@ def heli(t):
     return x, y, z, head, pitch, roll
 
 
-# --- la caméra (cadre de poursuite commun du découpage v3.1) : sur un véhicule, 24 mm, à 2,4 m, 7,5 m derrière le
-# centre de la berline, dans l'axe du cap de sa vitesse pris avec un retard doux (CAM_LAG), 1,45 m à gauche : dans
-# le virage à droite elle reste à l'extérieur (0,35 à 1,45 m mesurés depuis la route, le retard la ramenant vers
-# l'intérieur) et la caisse en travers s'y lit de trois quarts arrière sans se présenter de flanc (largeur à l'écran
-# à ±15 %). Distance et hauteur fixes, ni grue ni tremblé écrit ; le centre de la boîte de la berline à l'écran à
-# x 50 %, y 58 % depuis le haut (la correction de visée lissée, _aim_table).
+# --- la caméra : le bras commun du parcours (parcours.camera : 7,5 m derrière le centre de la berline sur le cap
+# filtré de sa vitesse, 0,3 m à gauche, 2,4 m), 24 mm ; dans le virage à droite elle passe un peu à l'extérieur et la
+# caisse en travers s'y lit de trois quarts arrière. Visée : le centre de la boîte de la berline à l'écran en x 50 %,
+# y 58 % depuis le haut (la correction de visée lissée, _aim_table). Ni grue ni tremblé écrit.
 LENS = 24.0
 TAN_V = 18.0 / LENS           # demi-champ vertical (capteur de 36 mm sur la hauteur, cadre 9:16)
 TAN_H = TAN_V * 9.0 / 16.0
-CAM_BACK, CAM_Z = 7.5, 2.4
-CAM_LEFT = 1.45               # m à gauche de l'axe de la caméra (le décalage mesuré tient de 0 à 1,5 m)
-CAM_LAG = 0.12                # s : la constante du retard (filtre du second ordre, amorti critique)
+CAM_BACK, CAM_Z, CAM_LEFT = PC.CAM_BACK, PC.CAM_Z, PC.CAM_LEFT
 FRAME_X = 50.0                # % depuis la gauche : le centre de la boîte de la berline à l'écran
 FRAME_Y = 58.0                # % depuis le haut (la convention des fiches)
-FRAME_Y_STEPS = ((34.0, 14.0, -1.5),)       # (image, durée, écart) : 56,5 % à la coupe vers P6 (encore en v3, à 52)
-
-_PSI = None
-
-
-def _psi_table():
-    """Le cap suivi par la caméra : celui de la vitesse de la berline, filtré (deux pôles à 1/CAM_LAG), en régime
-    établi avant la première image."""
-    global _PSI
-    if _PSI is None:
-        n0, n1 = int(-1.0 / TAB_DT), int((T_END + 1.0) / TAB_DT)
-        y1 = y2 = travel_bearing(n0 * TAB_DT)
-        tab = []
-        a = TAB_DT / CAM_LAG
-        for k in range(n0, n1 + 1):
-            u = travel_bearing(k * TAB_DT)
-            y1 += a * (u - y1)
-            y2 += a * (y1 - y2)
-            tab.append(y2)
-        _PSI = (n0, tab)
-    return _PSI
+TAB_DT = 1.0 / 240.0
 
 
 def psi(t):
-    """Le cap de la caméra (degrés à droite de +y)."""
-    n0, tab = _psi_table()
-    u = t / TAB_DT - n0
-    k = max(0, min(len(tab) - 2, int(math.floor(u))))
-    f = u - k
-    return tab[k] * (1 - f) + tab[k + 1] * f
+    """Le cap du bras (degrés à droite de +y)."""
+    return -PC.cam_cap("P5", _f(t))
 
 
 def cam_left(t):
@@ -342,20 +316,17 @@ def cam_d(t):
 
 
 def cam_pos(t):
-    """(x, y, z) de la caméra : CAM_BACK m derrière la berline dans l'axe du cap filtré, cam_left(t) m à gauche."""
-    x, y = hero_pos(t)
-    a = math.radians(psi(t))
-    left = cam_left(t)
-    return (x - CAM_BACK * math.sin(a) - left * math.cos(a), y - CAM_BACK * math.cos(a) + left * math.sin(a), CAM_Z)
+    """(x, y, z) de la caméra : le bras du parcours."""
+    return PC.camera("P5", _f(t))
 
 
 CAM = cam_pos(0.0)            # la caméra à la première image
 
 
 def reset():
-    """À appeler après avoir changé un réglage de la route ou de la caméra (les tables sont calculées une fois)."""
-    global _PSI, _HERO, _AIM
-    _PSI = _HERO = _AIM = None
+    """À appeler après avoir changé un réglage de la caméra (la table de visée est calculée une fois)."""
+    global _AIM
+    _AIM = None
 
 
 def _aim_at(cx, cy, cz, x, y, fxp, fyp):
@@ -408,12 +379,12 @@ def _aim_fix(t):
 
 def _aim_want(t):
     """La visée du centre de la boîte : (x % depuis la gauche, y % depuis le bas)."""
-    return FRAME_X, 100.0 - FRAME_Y - _steps(FRAME_Y_STEPS, t * M.FPS + F0)
+    return FRAME_X, 100.0 - FRAME_Y
 
 
 def camera_aim(t):
     """(lacet, site) sans le tremblé : le centre de la boîte de la berline à l'écran (ce que mesure motion.py) à
-    FRAME_X, FRAME_Y (plus FRAME_Y_STEPS), à la correction lissée près."""
+    FRAME_X, FRAME_Y, à la correction lissée près."""
     cx, cy, cz = cam_pos(t)
     x, y = hero_pos(t)
     want_x, want_y = _aim_want(t)
@@ -508,32 +479,21 @@ def behind_angle(t):
     return math.degrees(math.acos(max(-1.0, min(1.0, c))))
 
 
-REAR_AXLE, TRACK = -1.45, 0.75          # l'essieu arrière (m devant le centre) et la demi-voie de la berline
-SKID_FRAMES = (15, 40)                  # la gomme marque tant que la glisse dépasse 8° (images de scène)
-
-
 def wheel_track(side, axle=REAR_AXLE, frames=SKID_FRAMES, n=96):
     """La trace d'une roue (side : -1 gauche, +1 droite) au sol entre deux images : [(t, x, y)]."""
     t0, t1 = M.t_of(frames[0]), M.t_of(frames[1])
-    out = []
-    for i in range(n + 1):
-        t = t0 + (t1 - t0) * i / n
-        x, y = hero_pos(t)
-        h = math.radians(hero_heading(t))
-        fx, fy = -math.sin(h), math.cos(h)
-        out.append((t, x + fx * axle + fy * TRACK * side, y + fy * axle - fx * TRACK * side))
-    return out
+    return [(t, *wheel_at(t, side, axle)) for t in (t0 + (t1 - t0) * i / n for i in range(n + 1))]
 
 
-# --- le faisceau : sa tache court sur la voie du quai vers la berline, la trouve à l'image 24, puis la tient avec
-# un léger retard (l'opérateur du projecteur la suit à 0,06 s).
-SWEEP = ((30.0, 66.0, 0.0), (9.0, 70.0, 0.0))     # sur le quai, devant elle, vers elle
-BEAM_FIND = 24
+# --- le faisceau : sa tache court vers la berline le long de sa route à venir, la trouve à BEAM_FIND, puis la tient
+# avec un léger retard (l'opérateur du projecteur la suit à 0,06 s).
+BEAM_FIND = 30
 BEAM_LAG = 0.06
+SWEEP = ((*hero_pos(T_END + 1.0), 0.0), (*hero_pos(M.t_of(BEAM_FIND + 12)), 0.0))   # devant elle, vers elle
 
 
 def beam_target(t):
-    f = t * M.FPS + F0
+    f = _f(t)
     hx, hy = hero_pos(t - BEAM_LAG)
     car = (hx, hy, 0.6)
     if f <= BEAM_FIND:
@@ -545,7 +505,7 @@ def beam_target(t):
 
 
 if __name__ == "__main__":
-    poses = M.sample(hero_pos, range(F0, F0 + FRAMES), slip=hero_slip)
+    poses = M.sample(hero_pos, range(F0, F0 + FRAMES), heading=hero_heading, steer=hero_steer)
     prev = None
     for p in poses:
         f, t = p["frame"], p["t"]
@@ -557,11 +517,15 @@ if __name__ == "__main__":
         hp = project((hx[0], hx[1], hx[2] + HELI_BODY), t)
         pb = patrol_box(t)
         pk = ((pb[0] + pb[1]) / 2, 0.0) if pb else None
-        print(f"{f:2d} berline ({p['x']:5.1f},{p['y']:5.1f}) {hero_speed(t) * 3.6:3.0f} km/h dérive {hero_slip(t):5.1f} | "
-              f"cam ({cx:5.1f},{cy:5.1f},{cz:3.1f}) {cam_d(t):4.1f} m lacet {yaw:6.1f} ({rate:5.1f}°/s) site "
+        print(f"{f:2d} berline ({p['x']:5.1f},{p['y']:5.1f}) {hero_speed(t) * 3.6:3.0f} km/h glisse {hero_slip(t):5.1f} | "
+              f"cam ({cx:5.1f},{cy:5.1f},{cz:3.1f}) lacet {yaw:6.1f} ({rate:5.1f}°/s) site "
               f"{pitch:5.1f} | x {(x0 + x1) / 2:3.0f} y {(y0 + y1) / 2:3.0f} l {x1 - x0:3.0f} à {d:4.1f} m, "
               f"derr. {behind_angle(t):3.0f}° | hélico "
               + (f"{hp[0]:3.0f},{hp[1]:3.0f}" if hp else "--") + " | pat. " + (f"{pk[0]:4.0f}" if pk else "--")
               + (" entière" if patrol_seen(f) else ""))
     print("écart minimal :", M.min_gap(tracks(), range(F0 - 1, F0 + FRAMES + 1)))
-    print(f"centre de l'arc ({TURN_C[0]:.1f}, {TURN_C[1]:.1f})")
+    print(f"centre du virage ({TURN_C[0]:.2f}, {TURN_C[1]:.2f}), glisse au plus fort à l'image {SLIP_PEAK}, gomme "
+          f"{SKID_FRAMES}, patrouille 1 à {PATROL_V0:.2f} m/s")
+    for i in range(1, len(PACK_START)):
+        x, y, h, v = pack_state(i)
+        print(f"meute {i} ({PACK_START[i][0]}) à la dernière image : ({x:.2f}, {y:.2f}), cap {h:+.1f}°, {v:.2f} m/s")

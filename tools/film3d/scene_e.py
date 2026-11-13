@@ -52,10 +52,12 @@ JX = L.JETTY_X                                      # 80 : la voie du quai tourn
 J_EDGE = 6.7                                        # demi-largeur de la jetée au couronnement (scene_d.J_EDGE)
 BRIDGE_EDGE = 9.7                                   # le bord extérieur du parapet du pont, à la fin du tablier
 BARRIER_Y = 80.6                                    # la file de séparateurs qui ferme l'axe
-TURN_C = (15.5, 61.0)                               # le centre du virage à droite (celui de p5_virage : les arcs de
-                                                    # gomme peints au sol sous la glisse de P5 ; P4 et P6 ne voient le
-                                                    # terre-plein que de loin, sans ces arcs)
-TURN_R = 15.0
+import p5_virage as P5      # noqa: E402  (la trajectoire de P5, lue dans le parcours unique ; Python pur)
+
+TURN_C = P5.TURN_C                                  # le centre du virage à droite (le cercle nominal du parcours :
+                                                    # les arcs de gomme peints au sol sous la glisse de P5 ; P4 et P6
+                                                    # ne voient le terre-plein que de loin, sans ces arcs)
+TURN_R = P5.TURN_R
 COPING_W, COPING_H = 0.6, 0.22
 MASTS = [(-52.0, -12.0), (94.0, -12.0), (-52.0, 92.0), (94.0, 92.0),   # les quatre angles (§2.4)
          (32.0, 90.0)]                                                   # le mât derrière la caméra de P5
@@ -163,14 +165,16 @@ def mat_terre_plein(name="terre_plein_port", far=False):
     trk_q = N.math("MULTIPLY", road.inv(N, road.smooth(N, tq, 0.05, 0.4)),
                    road.smooth(N, road.noise(N, P, 0.5, 2.0, stretch=(0.08, 1.0, 1.0)), 0.4, 0.62))
     track = N.math("MAXIMUM", N.math("MULTIPLY", trk_b, on_bridge), N.math("MULTIPLY", trk_q, on_quay))
-    # les arcs de gomme dans le virage (les tracteurs et les poursuites d'avant), au rayon de 11 à 19 m
+    # les arcs de gomme dans le virage (les tracteurs et les poursuites d'avant), de 4 m en deçà à 4 m au-delà du
+    # rayon du virage (18 à 26 m pour 22)
     dxc, dyc = N.math("SUBTRACT", px, TURN_C[0]), N.math("SUBTRACT", py, TURN_C[1])
     rad = N.new("ShaderNodeVectorMath", _operation="LENGTH")
     N.link(road.combine(N, dxc, dyc), rad.inputs[0])
     rr = N.math("ADD", rad.outputs["Value"], N.math("MULTIPLY", N.math("SUBTRACT", road.noise(N, P, 0.3, 2.0), 0.5), 1.6))
     quad = N.math("MULTIPLY", N.math("LESS_THAN", dxc, 2.0), N.math("GREATER_THAN", dyc, -6.0))
     arc = N.math("MULTIPLY", road.inv(N, road.smooth(N, N.math("ABSOLUTE", N.math("SUBTRACT", N.math("FLOORED_MODULO", rr, 1.7), 0.85)), 0.1, 0.3)),
-                 N.math("MULTIPLY", road.smooth(N, rr, 10.5, 12.0), road.inv(N, road.smooth(N, rr, 18.0, 20.0))))
+                 N.math("MULTIPLY", road.smooth(N, rr, TURN_R - 4.5, TURN_R - 3.0),
+                        road.inv(N, road.smooth(N, rr, TURN_R + 3.0, TURN_R + 5.0))))
     arc = N.math("MULTIPLY", N.math("MULTIPLY", arc, quad), road.smooth(N, road.noise(N, P, 0.9, 2.0), 0.42, 0.62))
     rubber = N.math("MAXIMUM", N.math("MULTIPLY", track, 0.55), N.math("MULTIPLY", arc, 0.8))
     # --- huile : des taches, plus nombreuses au milieu des voies et devant les séparateurs
@@ -206,8 +210,8 @@ def mat_terre_plein(name="terre_plein_port", far=False):
     D = N.math("ADD", D, N.math("MULTIPLY", N.math("SUBTRACT", r, 0.5), 1.4))   # chaque dalle a un peu basculé
     if not far:
         # autour de la route de la caméra de P5 et dans la voie de la berline, pas de flaque (dry_spots) : le béton
-        # y reste mouillé (la pellicule), satiné ; la flaque posée sur la ligne des roues (flaque_p5) est un objet à
-        # part. (Un seul disque sec, posé pour l'ancienne caméra en (0,3 ; 71), ne protégeait plus la route recalée)
+        # y reste mouillé (la pellicule), satiné ; la flaque posée sur la ligne des roues (flaque_p5) est retirée :
+        # le bras commun la passait au bas du cadre. (Un seul disque sec, posé pour l'ancienne caméra en (0,3 ; 71), ne protégeait plus la route recalée)
         dry = None
         for dcx, dcy, d0, d1 in dry_spots():
             dd = N.new("ShaderNodeVectorMath", _operation="LENGTH")
@@ -896,21 +900,6 @@ def mat_painted(name, rust=0.35):
     return m
 
 
-def mat_puddle(name="flaque_p5"):
-    """Une vraie flaque posée sur le béton : un film d'eau presque miroir (la ride fine des gouttes), son bord
-    fondu dans le mouillé du terre-plein (transparence lue sur une ellipse déformée par un bruit)."""
-    m, N, out = S.material(name)
-    co = N.new("ShaderNodeTexCoord").outputs["Object"]
-    P, _ = road.coords(N)
-    ox, oy, _ = N.sep(co)
-    r = N.new("ShaderNodeVectorMath", _operation="LENGTH")
-    N.link(road.combine(N, N.math("DIVIDE", ox, P5.PUDDLE_SIZE[0] / 2), N.math("DIVIDE", oy, P5.PUDDLE_SIZE[1] / 2)), r.inputs[0])
-    edge = N.math("ADD", r.outputs["Value"], N.math("MULTIPLY", N.math("SUBTRACT", road.noise(N, P, 0.9, 3.0, 0.6), 0.5), 0.7))
-    alpha = road.inv(N, road.smooth(N, edge, 0.72, 0.95))
-    road.puddle_shader(N, out, alpha=alpha, scale=26.0, strength=0.04)     # la flaque commune (road.HUMIDITE)
-    return m
-
-
 def _lib(rel, name, hidden, mat, height=None, scale=1.0, rot_z=0.0):
     """Un modèle de bibliothèque joint en un objet, toutes ses matières remplacées par `mat` (aucune texture livrée
     ne passe : ni lettres de coque ni marque), tourné de `rot_z`, mis à la hauteur `height` (sinon à l'échelle
@@ -1030,14 +1019,6 @@ def build_east(hidden):
     posts.color = (*L.lin("#7a6430")[:3], 1.0)
     iron = bpy.data.materials.get("chaine_fer") or L.mat_steel("chaine_fer", color=(0.18, 0.17, 0.16), rough=0.45, rust=0.7)
     _, links = _chain("chaine", P5.CHAIN_POSTS, iron)
-    # --- la flaque sur la ligne des roues arrière
-    bm = L.bmesh.new()
-    hx, hy = P5.PUDDLE_SIZE[0] / 2 + 0.4, P5.PUDDLE_SIZE[1] / 2 + 0.4
-    bm.faces.new([bm.verts.new((x, y, 0.0)) for x, y in ((-hx, -hy), (hx, -hy), (hx, hy), (-hx, hy))])
-    pud = L.mesh_object("flaque_p5", bm, [bpy.data.materials.get("flaque_p5") or mat_puddle()])
-    pud.location = (*P5.PUDDLE_AT, 0.004)
-    pud.rotation_euler = (0.0, 0.0, math.radians(P5.PUDDLE_YAW))
-    pud.visible_shadow = False
     # --- les caisses de la sortie : une pile de palettes, quatre caisses dont une de travers sur le dessus
     wood = bpy.data.materials.get("caisse_bois") or mat_wood()
     pallet, _ = _lib(os.path.join("lieux", "port", "pallets", "model.glb"), "src_palettes", hidden, wood, height=0.9)
@@ -1065,7 +1046,7 @@ def build_east(hidden):
     for i, (x, y, a) in enumerate(PALLETS):
         S.instance(pallet, f"palettes_{i}", (x, y, 0.0), a)
     print(f"[port] côté est : {n_boxes} conteneurs, {len(PORTAL_CRANES)} grues à portail, cargo, "
-          f"chaîne ({links} maillons), flaque, caisses, {len(DRUMS)} fûts", flush=True)
+          f"chaîne ({links} maillons), caisses, {len(DRUMS)} fûts", flush=True)
 
 
 def build_port(hidden, lamp_src, far=False, palier=None):
@@ -1094,10 +1075,9 @@ def build_port(hidden, lamp_src, far=False, palier=None):
 # ---------------------------------------------------------------- le plan
 
 import motion as M          # noqa: E402  (le mouvement calculé, pur Python)
-import p5_virage as P5      # noqa: E402  (la trajectoire de P5, écrite une fois)
 
-CAM = Vector(P5.CAM)                 # la caméra à la première image, 7,6 m derrière la berline (découpage v3.1)
-STILL_FRAME = 29                     # l'image fixe d'essai (rendu d'une seule image) : au plus fort de la glisse
+CAM = Vector(P5.CAM)                 # la caméra à la première image, 7,5 m derrière la berline (le bras commun)
+STILL_FRAME = P5.SLIP_PEAK           # l'image fixe d'essai (rendu d'une seule image) : au plus fort de la glisse
 FRAMES = range(P5.F0 - 1, P5.F0 + P5.FRAMES + 1)   # une image de part et d'autre : l'obturateur du flou
 
 
@@ -1238,12 +1218,12 @@ def skid_p5(scene, width=0.24):
 
 
 def plan_P5(scene, hidden, palier="conteneurs"):
-    """P5, l'hélicoptère fond sur le quai (découpage v3.1), animé (48 images, p5_virage.py) : la caméra de
-    poursuite commune (24 mm, 2,4 m, 7,5 m derrière, un peu à l'extérieur du virage) suit le cap de la vitesse de
-    la berline. La berline freine en ligne au bout du pont (feux stop), vire à droite en glissant de 16°
-    (contre-braquage, roulis vers l'extérieur) et repart vers le quai ; la patrouille 1, devant à gauche, sous-vire
-    tout droit et s'arrête devant les séparateurs ; la meute reste sur la voie du pont, derrière ; l'hélicoptère
-    plonge sur le quai devant elle, faisceau sur elle. Toutes les clés viennent des trajectoires (motion.py) ; le
+    """P5, l'hélicoptère fond sur le quai (découpage v3.1), animé (60 images, la fenêtre « P5 » du parcours unique,
+    p5_virage.py) : la caméra de poursuite commune (24 mm, 2,4 m, 7,5 m derrière, 0,3 m à gauche) suit le cap de la
+    vitesse de la berline. La berline arrive du pont sur les freins (feux stop), vire à droite sur 22 m de rayon en
+    glissant d'une quinzaine de degrés (contre-braquage, roulis vers l'extérieur) et sort vers la jetée ; la
+    patrouille 1, devant à gauche, file tout droit et s'arrête devant les séparateurs ; la meute la suit dans le
+    virage, derrière la caméra ; l'hélicoptère plonge devant elle, faisceau sur elle. Toutes les clés viennent des trajectoires (motion.py) ; le
     flou de mouvement les suit."""
     import scene_c
     lamp_src = L.panorama(scene, hidden, bridge=None, port=None)
@@ -1255,7 +1235,8 @@ def plan_P5(scene, hidden, palier="conteneurs"):
     hero = L.hero()
     wheels = L.hero_wheels(hero)
     wb = wheelbase(wheels)
-    poses = M.sample(P5.hero_pos, FRAMES, slip=P5.hero_slip, wheel_r=hero["wheel_r"], wheelbase=wb)
+    poses = M.sample(P5.hero_pos, FRAMES, heading=P5.hero_heading, steer=P5.hero_steer, wheel_r=hero["wheel_r"],
+                     wheelbase=wb)
     M.key_vehicle(hero, poses, wheels=wheels)
     M.wheel_marks(wheels, hero["wheel_r"])                # le repère de rotation, en Workbench seulement
     # les feux stop sur chaque fenêtre de freinage à plus de 2 m/s², après la mise en clés (découpage v3.1)
@@ -1267,8 +1248,8 @@ def plan_P5(scene, hidden, palier="conteneurs"):
     print(f"[P5] traces de gomme des roues arrière, images {f0} à {f1}", flush=True)
     # plus de fumée des pneus dessinée par la scène (règle F du découpage v3.1 : ces bouffées se lisaient comme des
     # taches de lumière) ; elle reviendra par fx, aux bouffées que p5_virage.smoke_keep garde loin de l'objectif
-    # --- la meute : elle descend la voie du pont et freine, sans rattraper la berline
-    rigs = scene_c.pack([(k, x, y, 0.0) for k, x, y in P5.PACK_START], speed=P5.PACK_V)
+    # --- la patrouille 1 file tout droit et s'arrête ; la meute descend la rampe et suit la berline dans le virage
+    rigs = scene_c.pack([(k, x, y, 0.0) for k, x, y in P5.PACK_START], speed=P5.hero_speed(0.0))
     for i, r in enumerate(rigs):
         body = M.body_of(r)
         wh, wr = M.wheels_of(body), body.get("wheel_r", 0.36)
