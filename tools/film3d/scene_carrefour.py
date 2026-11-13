@@ -196,9 +196,11 @@ def mat_wake():
     N.link(uv.outputs["Object"], no.inputs["Vector"])
     fade = N.math("POWER", N.math("MINIMUM", N.math("MULTIPLY", sep[0], 1.6), 1.0), 1.5)
     edge = N.math("SUBTRACT", 1.0, N.math("POWER", N.math("ABSOLUTE", N.math("SUBTRACT", N.math("MULTIPLY", sep[1], 2.0), 1.0)), 3.0))
-    mask = N.math("MULTIPLY", N.math("MULTIPLY", fade, edge), N.math("ADD", 0.6, N.math("MULTIPLY", no.outputs["Factor"], 0.8)), clamp=True)
-    # lumière v3.1 : à demi-opacité, la chaussée mouillée transparaît ; pleines, ces traces zébraient P2 de noir dur
-    mask = N.math("MULTIPLY", mask, 0.5)
+    # lumière v3.1 : à demi-opacité, la chaussée mouillée transparaît (pleines, ces traces zébraient P2 de noir dur),
+    # et presque unies : le bruit ne module plus que de ±15 %. Écrêté à 1, l'ancien masque (0,6 + 0,8 × bruit) cachait
+    # son bruit ; divisé par deux, il le montrait en gravier sur toute la voie (P5, film éclairé n° 2)
+    grain = N.math("ADD", 0.85, N.math("MULTIPLY", no.outputs["Factor"], 0.3))
+    mask = N.math("MULTIPLY", N.math("MULTIPLY", N.math("MULTIPLY", fade, edge), grain), 0.5, clamp=True)
     bs = A.principled(N, **{"Base Color": lin("#1d1b1a"), "Roughness": 0.8, "Specular IOR Level": 0.25})
     tr = N.new("ShaderNodeBsdfTransparent")
     mx = N.new("ShaderNodeMixShader")
