@@ -80,6 +80,7 @@ Y_FAR = 176.0              # la place du rond-point s'arrête au muret de la pro
 # rond-point, ni faux pont, ni eau, ni autre rive : ville.py les apporte, posés. FILM3D_VILLE=0 : la rue autonome.
 VILLE = lieux.ville_on()
 Y_END_RUE = Y_END          # la rue autonome, qui garde ses numéros d'objets en ville (les couleurs du gris en dépendent)
+QUAY_HALF = 9.7 if VILLE else 8.5      # l'ouverture du quai : le bord extérieur du vrai tablier (±9,7)
 if VILLE:
     Y_END = 43.0           # s = 91 : le joint avec la branche ouest du rond-point (x_F −18,2)
     RING = (0.0, 61.2)     # le vrai îlot, s = 72,8 (posé par ville.py, plus construit ici)
@@ -815,7 +816,9 @@ def build_street_end(hidden):
     """Ce que la caméra regarde au-delà du barrage (de 40 à 500 m) : le boulevard du quai en travers et ses
     trottoirs, le quai et son garde-corps, l'eau, le pont qui part dans l'axe de la rue et monte, ses lampadaires
     en file, son pylône en H éclairé au pied, le feu corail au sommet, ses haubans ; au loin le port et l'autre
-    rive en points de lumière. Trois plans : le barrage, le carrefour, le pont et le ciel."""
+    rive en points de lumière. Trois plans : le barrage, le carrefour, le pont et le ciel.
+    En ville (VILLE) : le boulevard, ses trottoirs, le mur du quai, son garde-corps et ses lampadaires seulement,
+    l'ouverture du quai à ±9,7 m (le bord du vrai tablier) ; rien au-delà du joint du pont (s 178) hormis le quai."""
     keep = road.S
     import lieux
     road.S = keep
@@ -834,7 +837,7 @@ def build_street_end(hidden):
         x0, x1 = sorted((side * (HALF + road.KERB), side * 100.0))
         A.box(f"bd_walk_near_{side}", x0, x1, ya - 3.0, ya + 0.01, -0.05, road.WALK_Z, walk)
         A.box(f"bd_kerb_near_{side}", x0, x1, ya - 3.2, ya - 3.0, -0.05, road.WALK_Z, kerb)
-        x0, x1 = sorted((side * BRIDGE_HALF, side * 100.0))
+        x0, x1 = sorted((side * QUAY_HALF, side * 100.0))
         A.box(f"bd_walk_quay_{side}", x0, x1, yb - 3.0, yb, -0.05, road.WALK_Z, walk)
         A.box(f"bd_kerb_quay_{side}", x0, x1, yb - 0.2, yb, -0.05, road.WALK_Z, kerb)
     # le quai : son mur, son garde-corps (main courante et montants), hors du départ du pont
@@ -842,7 +845,7 @@ def build_street_end(hidden):
     rail = lieux.mat_steel("rue_garde_corps", color=(0.32, 0.36, 0.36), rough=0.35, rust=0.3, paint=True)
     yq = yb - 3.0
     for side in (-1, 1):
-        x0, x1 = sorted((side * BRIDGE_HALF, side * 100.0))
+        x0, x1 = sorted((side * QUAY_HALF, side * 100.0))
         A.box(f"bd_quay_wall_{side}", x0, x1, yq - 0.5, yq, lieux.WATER_Z - 1.0, road.WALK_Z, quay)
         A.box(f"bd_rail_{side}", x0, x1, yq - 0.06, yq + 0.0, 1.05, 1.1, rail)
         A.box(f"bd_rail_low_{side}", x0, x1, yq - 0.05, yq - 0.01, 0.55, 0.58, rail)
@@ -850,6 +853,19 @@ def build_street_end(hidden):
         while x < x1:
             A.box(f"bd_post_{side}_{x:.0f}", x, x + 0.05, yq - 0.06, yq, road.WALK_Z, 1.1, rail)
             x += 1.6
+    lamp = bpy.data.objects.get("rue_lamp_src")
+    # les lampadaires du quai, de part et d'autre du départ du pont
+    if lamp is not None:
+        for k, x in enumerate((-34.0, -16.0, 16.0, 34.0)):
+            A.instance(lamp, f"bd_lamp_{k}", (x, yq + 0.6, road.WALK_Z), 0.0, 1.3)
+            lo = A.add_light(f"bd_lamp_light_{k}", "SPOT", (x, yq + 0.6 + 1.68 * 1.3, road.WALK_Z + 4.68 * 1.3 - 0.1),
+                             (0, 0, -1), lin(A.LAMPE), A.lampe_w(4.68 * 1.3), spot=130)
+            lo.data.spot_blend = 0.5
+    if VILLE:
+        # (en ville, le pont apporte sa chaussée de s 178 au tablier, l'eau, le pylône, l'autre rive et le port)
+        log(f"bout de rue : boulevard de s {S_STREET:.0f} à {S_QUAY:.0f}, mur du quai en s {S_QUAY + 3:.0f}, ouverture "
+            f"±{QUAY_HALF} m ; le pont vient de la ville")
+        return
     # l'eau, de part et d'autre du pont, jusqu'à l'autre rive
     water = lieux.mat_water("rue_lagune")
     yw = vw(0.0, 2400.0)[1]
@@ -874,7 +890,6 @@ def build_street_end(hidden):
     # suivantes ne sont que leur tête lumineuse (une file de points qui monte vers la crête) ; à 2600 W, les
     # parapets montant vers la crête faisaient deux arcs blancs derrière le barrage, plus vifs que lui ; leurs têtes
     # à 10 : la file de points monte pile derrière le barrage, rien au fond de l'axe ne doit battre les rampes
-    lamp = bpy.data.objects.get("rue_lamp_src")
     halo = lieux.emit_mat("pont_halo", lin(A.LAMPE), A.LAMPE_HALO)
     hb = bmesh.new()
     S = 1.75
@@ -951,13 +966,6 @@ def build_street_end(hidden):
         bmesh.ops.create_uvsphere(lb, u_segments=8, v_segments=5, radius=2.2,
                                   matrix=Matrix.Translation((x, vw(0.0, 620.0)[1], 25.0)))
     lieux.mesh_object("rue_rive_lampes", lb, [warm]).visible_shadow = False
-    # les lampadaires du quai, de part et d'autre du départ du pont
-    if lamp is not None:
-        for k, x in enumerate((-34.0, -16.0, 16.0, 34.0)):
-            A.instance(lamp, f"bd_lamp_{k}", (x, yq + 0.6, road.WALK_Z), 0.0, 1.3)
-            lo = A.add_light(f"bd_lamp_light_{k}", "SPOT", (x, yq + 0.6 + 1.68 * 1.3, road.WALK_Z + 4.68 * 1.3 - 0.1),
-                             (0, 0, -1), lin(A.LAMPE), A.lampe_w(4.68 * 1.3), spot=130)
-            lo.data.spot_blend = 0.5
     log(f"bout de rue : boulevard, quai, pont de {S_FAR - S_BRIDGE:.0f} m ({n_real} lampadaires allumés), pylône à "
         f"s = {S_PYLON:.0f}, autre rive")
 
@@ -1684,7 +1692,11 @@ def build():
         haze("haze_end", -60, 60, 128.0, Y_FAR + 2, -0.1, 30, 0.001)
     # au-delà du bout de la rue, sur l'eau et le pont : une brume légère qui étage les plans (le pylône plus pâle
     # que le carrefour) ; le fond de la boîte au-dessus de l'eau (lieux.haze)
-    haze("haze_quai", -200, 200, vw(0.0, 1000.0)[1], Y0 - 0.5, -1.2, 90, 0.0005)
+    # (en ville, sur le boulevard et le quai seulement : la lagune est à la ville)
+    if VILLE:
+        haze("haze_quai", -100, 100, vw(0.0, S_QUAY + 3.5)[1], Y0 - 0.5, -1.2, 90, 0.0005)
+    else:
+        haze("haze_quai", -200, 200, vw(0.0, 1000.0)[1], Y0 - 0.5, -1.2, 90, 0.0005)
     # (jusqu'au haut de la brume générale : un bord de boîte dans le cadre se lirait comme une ligne)
     # (au-delà des agents seulement : rien entre la caméra et eux)
     haze("haze_barrage", -6.5, 6.5, 9.0, 34.0, -0.05, 30.0, 0.0015, aniso=0.55)
