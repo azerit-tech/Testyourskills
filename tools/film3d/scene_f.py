@@ -650,7 +650,7 @@ def build_backdrop(hidden):
 
 
 def keep_paint():
-    """Le bordeaux de la berline (#4e0a28, comme dans OUV) tout le plan. Mesuré sur la porte à 256 échantillons :
+    """Le bordeaux de la berline (hero_cars.PAINT, comme dans OUV) tout le plan. Mesuré sur la porte à 256 échantillons :
     (146, 13, 2) à l'image 1, rouge orangé, (23, 3, 9) à l'image 28, presque noir ; OUV, (73, 29, 26). Les lumières
     ambre et chaudes du rond-point (lampadaires, projecteurs de l'îlot) n'éclairent plus la caisse (liaison de
     lumière, exclusion) ; une source douce liée à la seule berline (lieux.car_fill), du côté de la caméra (son flanc

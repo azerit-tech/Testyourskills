@@ -1624,14 +1624,9 @@ def haze(name, x0, x1, y0, y1, z0, z1, density, color="#b8b4d8", aniso=0.45, sof
 
 # ---------------------------------------------------------------- la scène
 
-# la peinture de la berline dans cette rue : le bordeaux du catalogue (#4e0a28) est tiré vers le pourpre pour
-# l'ambre de l'avenue ; sous les lanternes blanches, les guirlandes et le lilas des rampes, il virait au rose
-# framboise. Ici, moins de bleu et moins clair : le bordeaux d'OUV et de P4 (FILM3D_PAINT l'emporte toujours)
-P3_PAINT = "#3c0812"
-
 
 def place_hero(scene, plan):
-    os.environ.setdefault("FILM3D_PAINT", P3_PAINT)
+    # la peinture de la berline : celle de tout le film (hero_cars.PAINT), plus de teinte propre à cette rue
     car = A.street_hero(scene)
     x, y, yaw = plan["hero"]
     car.location = (x, y, 0.0)

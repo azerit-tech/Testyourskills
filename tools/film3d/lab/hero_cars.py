@@ -62,8 +62,10 @@ def usure():
 # couleurs d'époque, choisies sur les nuanciers des photographies : foncées, lisibles à l'heure bleue,
 # distinctes de la patrouille (marine presque noir) et du coupé actuel (prune)
 PAINT = {
-    "w111": "#4e0a28",  # bordeaux profond (rouge rubis foncé du catalogue des années 60), tiré vers le pourpre
-                        # pour ne pas virer à la brique sous les lampadaires ambre. Albédo relevé (rouge linéaire
+    "w111": "#4e0a18",  # bordeaux profond (rouge rubis foncé du catalogue des années 60), une seule peinture pour
+                        # tout le film (lumière v3.1) : la teinte de la rue de P3 (348°, moins de bleu, le plan où
+                        # elle était la plus juste) à la clarté d'avant ; #4e0a28 (333°) virait au fuchsia sous le
+                        # crème et le froid, et P3 et P4 avaient la leur (#3c0812). Albédo relevé (rouge linéaire
                         # 0,075 au lieu de 0,033), vert presque nul (pas d'orange sous l'ambre), bleu au quart du
                         # rouge (lie-de-vin et pas rose sous le crème) : #330516 était une silhouette noire de nuit,
                         # #5a0c22 (métal 0,25) tire au rouge vif ; avant : #2c0614, brun-noir à l'heure bleue
