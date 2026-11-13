@@ -23,7 +23,9 @@
 #   python3 tools/film3d/ville.py --prise --out DIR    # les prises continues grises (Workbench 360 × 640) de
 #                                                      # ville.blend : prise-1.mp4 (OUV à P3), prise-2.mp4 (P4 à P6)
 #   options : --lieux avenue,pont… ; --lointains (garder les faux lointains) ; --blender PATH
-#   render_film.py --ville DIR                         # un plan rendu avec ses voisins de la ville (voisins, CHARGE)
+#   render_film.py --ville DIR                         # un plan rendu avec ses voisins de la ville (voisins, CHARGE) ;
+#                                                      # un voisin plus ancien que son code est refusé, sauf
+#                                                      # VILLE_VOISINS_PERIMES=1 (essais, signalé au journal)
 #
 # Les drapeaux des objets de la ville (propriétés) : ville_lieu (le nom du lieu), ville_lointain (1 : un faux lointain
 # de ce lieu, un décor qui imite un autre lieu ou l'horizon ; lointains(scene, False) les cache tous).
@@ -484,6 +486,40 @@ def selftest_voisins():
     sol = [("sol_a", "INCLUDE"), ("sol_b", "INCLUDE"), ("coupe.002", "INCLUDE")]
     assert liaison_perdue("receiver_collection", sol, ici) == ("garder", ["coupe.002"])
     assert liaison_perdue("receiver_collection", [], ici) == ("rien", [])
+    # (f) l'empreinte d'un voisin en cache : à jour, variables, Blender, code changé, absent
+    import tempfile
+    import debit
+    with tempfile.TemporaryDirectory() as d:
+        os.makedirs(os.path.join(d, "lieux"))
+        blend = os.path.join(d, "P2-abc-def.blend")
+        open(blend, "wb").close()
+        rel = "tools/film3d/parcours.py"
+        sha = debit.sha1(os.path.join(debit.ROOT, rel))
+
+        def poser(env, code, blender="5.2.2"):
+            with open(os.path.join(d, "lieux", "rond-point.json"), "w", encoding="utf-8") as fh:
+                json.dump(dict(nom="rond-point", blend=blend), fh)
+            with open(blend[:-6] + ".json", "w", encoding="utf-8") as fh:
+                json.dump(dict(head=dict(plan="P2", arg="P2", blender=blender, env=env), deps=dict(code={rel: code}),
+                               made=0), fh)
+        poser({}, sha)
+        assert empreinte_voisin(d, "rond-point", environ={}, blender="5.2.2")["ok"]
+        e = empreinte_voisin(d, "rond-point", environ={"FILM3D_HERO": "w111"})
+        assert not e["ok"] and "FILM3D_HERO" in e["raison"] and e["attendu"] == "FILM3D_HERO=w111", e
+        assert e["trouve"] == "FILM3D_HERO=(absente)", e
+        assert empreinte_voisin(d, "rond-point", environ={VOISINS_PERIMES: "1"})["ok"]   # hors de la clé
+        e = empreinte_voisin(d, "rond-point", environ={}, blender="5.3.0")
+        assert not e["ok"] and e["raison"] == "version de Blender" and e["trouve"] == "5.2.2", e
+        poser({}, "0" * 40)
+        e = empreinte_voisin(d, "rond-point", environ={})
+        assert not e["ok"] and rel in e["raison"] and e["attendu"] == f"sha1 {sha[:12]}", e
+        assert e["trouve"] == "sha1 000000000000", e
+        # la rue : FILM3D_PLAN entre dans sa clé (env_for), celle du plan rendu n'y entre pas
+        assert debit.env_key(env_for("rue", {"FILM3D_PLAN": "P2"})) == {"FILM3D_PLAN": "P3"}
+        assert debit.env_key(env_for("rond-point", {"FILM3D_PLAN": "P3"})) == {}
+        assert not empreinte_voisin(d, "pont", environ={})["ok"]                             # pas d'inventaire
+        os.remove(blend)
+        assert empreinte_voisin(d, "rond-point", environ={})["raison"] == "le .blend a quitté le cache"
     # un seul phare : celui de la jetée ; celui du pont (P4 ne charge pas la jetée) est un doublon en P5 et P6
     take2 = {"pont", "port", "jetee"}
     assert drapeau_voisin("pont", "phare", True, True, take2, True) == (True, "doublon du phare de la jetée")
@@ -1275,7 +1311,9 @@ def acteurs(scene, plan, built, own_objs, cams):
 def voisins(scene, plan, ville_dir):
     """render_film --ville DIR : autour de la scène du plan (son lieu, sa berline, sa caméra, son ciel), les autres
     lieux que CHARGE lui donne, pris des .blend de DIR/lieux (ville.py --cache), posés dans le repère du lieu du plan,
-    sans leurs faux lointains. Un lieu absent de DIR est signalé et sauté."""
+    sans leurs faux lointains. Un lieu absent de DIR est signalé et sauté ; un lieu dont le .blend est plus ancien
+    que son code (empreinte_voisin) est refusé : tout s'arrête, sauf VILLE_VOISINS_PERIMES=1 (signalé)."""
+    import bpy
     from mathutils import Matrix
     own = lieu_of_shot(plan)[0]
     infos = {}
@@ -1292,8 +1330,16 @@ def voisins(scene, plan, ville_dir):
         if not os.path.exists(info["blend"]):
             log(f"! {plan} : {n}, son .blend a quitté le cache ({info['blend']}), pas posé")
             continue
+        e = empreinte_voisin(ville_dir, n, blender=bpy.app.version_string)
+        if not e["ok"]:
+            msg = (f"{plan} : le voisin {n} n'est plus la construction de son code ({e['raison']}) : attendu "
+                   f"{e['attendu']}, trouvé {e['trouve']} ({info['blend']}) ; à refaire : python3 "
+                   f"tools/film3d/ville.py --cache --lieux {n} --out {ville_dir}")
+            if os.environ.get(VOISINS_PERIMES) != "1":
+                raise RuntimeError(f"[ville] {msg} (refusé ; {VOISINS_PERIMES}=1 pour le charger quand même pendant "
+                                   f"les essais)")
+            log(f"! {msg} ; CHARGÉ QUAND MÊME ({VOISINS_PERIMES}=1) : ce rendu ne vaut pas contrôle")
         infos[n] = info
-    import bpy
     own_objs = [o for o in scene.objects if o.get("ville_lieu") is None]
     base = Matrix(matrice(lieu(own)["plan"])).inverted()
     built = assembler(scene, infos, list(infos), base=[list(r) for r in base], plan=plan, own=own, own_objs=own_objs)
@@ -2734,24 +2780,86 @@ def run_blender(blender, out, args, env=None, tag="ville"):
     return p.returncode == 0
 
 
+# Passer outre un voisin périmé (render_film --ville, voisins), en connaissance de cause, pendant les essais :
+# VILLE_VOISINS_PERIMES=1, signalé au journal. (Pas FILM3D_… : debit.env_key la mettrait dans la clé de toutes les
+# scènes, et dans l'empreinte attendue de chaque voisin.)
+VOISINS_PERIMES = "VILLE_VOISINS_PERIMES"
+
+
+def _ecart_deps(deps, root=None):
+    """Le premier fichier lu par la construction qui a changé depuis : (fichier, attendu, trouvé), « attendu » étant
+    ce que le dépôt porte aujourd'hui et « trouvé » ce que la construction a lu (code : sha1 ; assets : taille et
+    date) ; None si rien n'a changé (la règle de debit.deps_match)."""
+    import debit
+    root = root or debit.ROOT
+    for rel, want in sorted(deps.get("code", {}).items()):
+        try:
+            cur = debit.sha1(os.path.join(root, rel))
+        except OSError:
+            cur = "absent"
+        if cur != want:
+            return rel, f"sha1 {cur[:12]}", f"sha1 {want[:12]}"
+    for p, (size, mtime) in sorted(deps.get("assets", {}).items()):
+        try:
+            st = os.stat(p)
+            cur = (st.st_size, int(st.st_mtime))
+        except OSError:
+            cur = None
+        if cur != (size, mtime):
+            return (p, "absent" if cur is None else f"{cur[0]} o du {time.strftime('%d/%m %H:%M', time.localtime(cur[1]))}",
+                    f"{size} o du {time.strftime('%d/%m %H:%M', time.localtime(mtime))}")
+    return None
+
+
+def empreinte_voisin(out, nom, environ=None, blender=None):
+    """Le .blend du lieu (DIR/lieux/<nom>.json, ville.py --cache) est-il toujours celui de son code ? Sans Blender.
+    Rend dict(ok, raison, attendu, trouve) : la clé du cache de debit (variables FILM3D_*, version de Blender si
+    `blender` est donnée, fichiers lus par la construction) recalculée pour le dépôt d'aujourd'hui (« attendu ») et
+    lue dans la construction (« trouvé ») ; le premier écart seulement."""
+    import debit
+    info_p = os.path.join(out, "lieux", f"{nom}.json")
+    try:
+        with open(info_p, encoding="utf-8") as f:
+            info = json.load(f)
+        blend = info["blend"]
+    except (OSError, ValueError, KeyError) as e:
+        return dict(ok=False, raison=f"inventaire illisible ({info_p} : {e.__class__.__name__})", attendu="un "
+                    "inventaire de ville.py --cache", trouve="rien")
+    if not os.path.isfile(blend):
+        return dict(ok=False, raison="le .blend a quitté le cache", attendu=blend, trouve="rien")
+    try:
+        with open(blend[:-6] + ".json", encoding="utf-8") as f:
+            meta = json.load(f)
+        head = meta["head"]
+    except (OSError, ValueError, KeyError) as e:
+        return dict(ok=False, raison=f"pas de clé de cache à côté du .blend ({e.__class__.__name__})",
+                    attendu=blend[:-6] + ".json", trouve="rien")
+    want = debit.env_key(env_for(nom, environ))
+    got = head.get("env", {})
+    if got != want:
+        ks = sorted(k for k in set(want) | set(got) if want.get(k) != got.get(k))
+        return dict(ok=False, raison=f"variables de construction ({', '.join(ks)})",
+                    attendu=", ".join(f"{k}={want.get(k, '(absente)')}" for k in ks),
+                    trouve=", ".join(f"{k}={got.get(k, '(absente)')}" for k in ks))
+    if blender is not None and head.get("blender") != blender:
+        return dict(ok=False, raison="version de Blender", attendu=blender, trouve=str(head.get("blender")))
+    ec = _ecart_deps(meta.get("deps", {}))
+    if ec:
+        made = time.strftime("%d/%m %H:%M", time.localtime(meta.get("made", 0)))
+        return dict(ok=False, raison=f"{ec[0]} a changé depuis la construction du {made}", attendu=ec[1],
+                    trouve=ec[2])
+    return dict(ok=True, raison="", attendu=os.path.basename(blend), trouve=os.path.basename(blend))
+
+
 def still_cached(out, nom):
     """Le lieu a-t-il déjà son inventaire, et le .blend du cache est-il toujours celui de son code (debit) ?"""
-    import debit
-    try:
-        with open(os.path.join(out, "lieux", f"{nom}.json"), encoding="utf-8") as f:
-            info = json.load(f)
-        with open(info["blend"][:-6] + ".json", encoding="utf-8") as f:
-            meta = json.load(f)
-    except (OSError, ValueError, KeyError):
-        return False
-    return (os.path.isfile(info["blend"]) and meta["head"]["env"] == debit.env_key(env_for(nom))
-            and debit.deps_match(meta.get("deps", {})))
+    return empreinte_voisin(out, nom)["ok"]
 
 
-def env_for(nom):
+def env_for(nom, environ=None):
     """L'environnement de render_film pour le plan du lieu : FILM3D_PLAN pour la rue seulement (il entre dans la clé
     du cache), rien d'autre."""
-    env = os.environ.copy()
+    env = dict(os.environ if environ is None else environ)
     env.pop("FILM3D_PLAN", None)
     plan = lieu(nom)["plan"]
     if source(plan)[0] == "scene_b":
