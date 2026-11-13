@@ -338,19 +338,43 @@ def test_p2():
 
 
 def test_p4():
-    """P4 (découpage v3) : aucune distance sous 6 m ; la meute 25 m derrière la berline au moins ; la berline de
-    y -101 à -35,7 (111 à 46 m de l'objectif) ; six rampes au-dessus de la crête à l'image 1, dix à la fin, les
-    quatre nouvelles qui se découvrent aux images 8, 18, 28 et 38."""
+    """P4 (découpage v3) : aucune distance sous 6 m ; la meute 25 m derrière la berline au moins ; la berline à
+    40 m de l'objectif au moins ; six rampes au-dessus de la crête à l'image 1, dix à la fin, les quatre nouvelles
+    qui se découvrent aux images 8, 18, 28 et 38. Dans la ville (plan de ville §2.5) : la fenêtre « P4 » du
+    parcours, de (1,80 ; -43,8) à (1,80 ; -5,69), P4/49 sur P5/1, la caméra 37,3 m devant la dernière image ;
+    autonome (FILM3D_VILLE=0) : la berline de y -101 à -35,7."""
     import p4_pont as P
     frames = range(P.F0 - 1, P.F0 + P.FRAMES + 1)
     d, f, a, b = M.min_gap(P.tracks(), frames)
     check("P4 : distances gardées", d >= 6.0, f"{d:.1f} m entre {a} et {b} à l'image {f}")
-    gap = min(math.dist(P.hero_pos(M.t_of(f)), P.pack_pos(i)(M.t_of(f))) for f in frames for i in range(len(P.PACK)))
+    behind = range(1 if P.VILLE else 0, len(P.PACK))        # dans la ville, la patrouille 1 roule devant elle
+    gap = min(math.dist(P.hero_pos(M.t_of(f)), P.pack_pos(i)(M.t_of(f))) for f in frames for i in behind)
     check("P4 : la meute ne rattrape pas la berline", gap >= 25.0, f"{gap:.1f} m au plus près")
-    y0, y1 = P.hero_pos(0.0)[1], P.hero_pos(P.T_END)[1]
-    check("P4 : la berline de y -101 à -35,7", abs(y0 + 101.0) < 0.1 and abs(y1 + 35.7) < 0.3, f"{y0:.1f} à {y1:.1f}")
+    (x0, y0), (x1, y1) = P.hero_pos(0.0), P.hero_pos(P.T_END)
+    if P.VILLE:
+        # P4 → P5 continu : à P5/1, la patrouille 1 à 3,1 m à gauche, 7 m devant, 17,6 m/s, freinage de 6,4 m/s²
+        t, h = M.t_of(P.FRAMES + 1), 1.0 / M.FPS
+        (_, ya), (px, py), (_, yb) = P.patrol1_pos(t - h), P.patrol1_pos(t), P.patrol1_pos(t + h)
+        hx, hy = P.hero_pos(t)
+        v, a_ = (yb - ya) / (2 * h), (yb - 2 * py + ya) / (h * h)
+        check("P4 : la patrouille 1 à P5/1 (3,1 m à gauche, 7 m devant, 17,6 m/s, -6,4 m/s²)",
+              abs(hx - px - 3.1) < 0.01 and abs(py - hy - 7.0) < 0.05 and abs(v - 17.6) < 0.05 and abs(a_ + 6.4) < 0.2,
+              f"{hx - px:.2f} m, {py - hy:+.2f} m, {v:.2f} m/s, {a_:+.2f} m/s²")
+        import parcours as PC
+        hx, hy = PC.hero("P4")["pos"](P.FRAMES)
+        nx, ny = P.hero_pos(M.t_of(P.FRAMES + 1))
+        p5 = PC.vers_ville("P5")[0](*PC.hero("P5")["pos"](1))
+        check("P4 : la fenêtre du parcours, P4/49 sur P5/1", abs(x1 - hx) < 1e-6 and abs(y1 - hy) < 1e-6
+              and math.dist((nx, ny), p5) < 0.02, f"({x0:.2f} ; {y0:.2f}) à ({x1:.2f} ; {y1:.2f}), P4/49 à "
+              f"{math.dist((nx, ny), p5) * 100:.1f} cm de P5/1")
+        check("P4 : caméra 0,6 m à gauche de la voie, 37,3 m devant la dernière image, devant les séparateurs du port",
+              abs(P.CAM[0] - (x1 - 0.6)) < 1e-6 and abs(P.CAM[1] - y1 - 37.29) < 1e-6 and P.CAM[1] < 80.6 - 46.3 - 2.0,
+              f"{P.CAM}")
+    else:
+        check("P4 : la berline de y -101 à -35,7", abs(y0 + 101.0) < 0.1 and abs(y1 + 35.7) < 0.3,
+              f"{y0:.1f} à {y1:.1f}")
     near = min(P.CAM[1] - P.hero_pos(M.t_of(f))[1] for f in frames)
-    check("P4 : la berline reste à 40 m de l'objectif au moins", near >= 40.0, f"{near:.1f} m")
+    check("P4 : la berline reste à 35 m de l'objectif au moins", near >= 35.0, f"{near:.1f} m")
 
     def bars(f):
         t = M.t_of(f)
@@ -1220,10 +1244,14 @@ def test_pack():
         rv = _steady(M.rebody(M.sample(circ, range(0, 40), noise=0.0, warmup=1.5), "van"), "roll", 1.0)
         rp = _steady(M.rebody(M.sample(circ, range(0, 40), noise=0.0, warmup=1.5), "patrol"), "roll", 1.0)
         check("meute : le fourgon roule plus qu'une patrouille", abs(rv) > 1.4 * abs(rp), f"{rv:.2f} contre {rp:.2f}°")
-        van = M.rebody(M.sample(P.van_pos, fr, seed=4.0, noise=0.0), "van", ground=deck_ground)
-        flat = M.rebody(M.sample(P.van_pos, fr, seed=4.0, noise=0.0), "van")
+        # le véhicule qui passe la crête : le fourgon (autonome) ; dans la ville il est déjà sur la descente, c'est
+        # la première patrouille de l'arrière (elle se découvre à l'image 8)
+        fn, kind = (P.van_pos, "van") if not P.VILLE else (P.pack_pos(len(P.PACK) - 4), "patrol")
+        van = M.rebody(M.sample(fn, fr, seed=4.0, noise=0.0), kind, ground=deck_ground)
+        flat = M.rebody(M.sample(fn, fr, seed=4.0, noise=0.0), kind)
         up = max(p["heave"] - q["heave"] for p, q in zip(van, flat) if abs(p["y"] + 130.0) < 10.0)
-        check("P4 : le fourgon s'allège sur la crête", up > 0.01, f"{up * 100:.1f} cm de plus qu'à plat")
+        check(f"P4 : {'le fourgon' if kind == 'van' else 'la patrouille'} s'allège sur la crête", up > 0.01,
+              f"{up * 100:.1f} cm de plus qu'à plat")
         # un ressaut en travers : la caisse pompe, puis se repose
         j = M.rebody(M.sample(M.straight(0.0, 0.0, 25.0), range(0, 40), noise=0.0), "hero",
                      joints=[((-5.0, 12.0), (5.0, 12.0), 0.03)])

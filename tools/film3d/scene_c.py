@@ -331,7 +331,8 @@ def plan_P4(scene, hidden, haubans=False):
     qui garde la berline au centre, à 54 % de la hauteur depuis le haut. Elle descend vers nous de 111 à 46 m (de 16
     à 44 % de large) ; derrière elle la meute empilée par la longue focale, quatre patrouilles de plus qui passent la
     crête (y -130) aux images 8, 18, 28 et 38 : six rampes au début, dix à la fin. Le tablier court jusqu'à y -320,
-    l'avenue de la ville au-delà."""
+    l'avenue de la ville au-delà. Dans la ville (p4_pont) : la conduite unique, la caméra en (1,2 ; 31,6 ; 1,2) devant
+    les séparateurs du port, 163 puis 173 mm ; la berline de 75 à 37 m, feux stop à partir de l'image 40."""
     # le ciel commun (lieux.ciel) : la bande corail du côté de la mer, derrière la caméra qui regarde la ville
     if VILLE:
         # dans la ville, plus de port ni de jetée : ils viennent de la ville, à leur pose ; le panorama y ramène la
@@ -355,9 +356,14 @@ def plan_P4(scene, hidden, haubans=False):
     hero = L.hero()
     wheels = L.hero_wheels(hero)
     d = [Vector(w.location).y for w in wheels]
-    poses = M.sample(P4.hero_pos, frames, wheel_r=hero["wheel_r"], wheelbase=(max(d) - min(d)) if d else 2.9)
+    poses = M.sample(P4.hero_pos, frames, heading=P4.hero_heading, wheel_r=hero["wheel_r"],
+                     wheelbase=(max(d) - min(d)) if d else 2.9)
     M.key_vehicle(hero, poses, wheels=wheels, ground=ground)
     M.wheel_marks(wheels, hero["wheel_r"])
+    if P4.brake_windows():
+        import hero_cars          # les feux stop du parcours : elle freine pour le virage du port
+        for a, b in P4.brake_windows():
+            hero_cars.stop_lamps(bpy.data.objects[hero["body"]], a, b)
     # à contre-jour des lampadaires et des patrouilles, la berline n'était qu'une silhouette noire : une source
     # douce de face, à 8 m devant elle, accrochée à son rig (elle suit les clés), qui n'éclaire qu'elle (le sol
     # mouillé ne la reçoit pas). C'est la bande corail du ciel, derrière la caméra, sur sa calandre : à 500 W la
