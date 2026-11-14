@@ -332,6 +332,58 @@ describe("withWeekSpecial", () => {
   });
 });
 
+describe("fiche née d'une dénonciation", () => {
+  it("n'entre au top et ne porte la spéciale qu'une fois son login revendiqué", () => {
+    const store = newStore();
+    const snitch = gh("delateur", 50, W46 + H);
+    const target = gh("cible", 95, W46 + H);
+    store.insertCards([snitch, target, ...crowd("n", TOTW_MIN_ENTRIES, W46 + H)]);
+    // Avant d'être dénoncée, une fiche ordinaire : elle mène (le classement est gardé 60 s).
+    expect(weekTop(store.db, { now: NOW }).entries[0]!.login).toBe("cible");
+    store.markDenounced(target.id, snitch.id, null);
+    const read = () => withWeekSpecial(store.db, store.getCard(target.id)!.data as CardData, NOW);
+    // Dénoncée, non revendiquée : hors du top dès la lecture suivante, ni rang ni spéciale.
+    expect(weekTop(store.db, { now: NOW }).entries.map((e) => e.login)).not.toContain("cible");
+    expect(weekTop(store.db, { now: NOW }).total).toBe(TOTW_MIN_ENTRIES + 1);
+    expect(weekRank(store.db, target.id, NOW)).toBeNull();
+    expect(read().data.special).toBeUndefined();
+    expect(read().week).toBeNull();
+    // Les fiches ordinaires ne changent pas.
+    expect(weekRank(store.db, snitch.id, NOW)).toMatchObject({ rank: 1 });
+    // Revendiquée : elle entre, en tête, avec la spéciale.
+    store.claimOwner("cible", 4242);
+    expect(weekTop(store.db, { now: NOW }).entries[0]).toMatchObject({ login: "cible", cardId: target.id });
+    expect(weekRank(store.db, target.id, NOW)).toMatchObject({ rank: 1, inTop5: true });
+    expect(read().data.special).toBe("totw");
+  });
+
+  it("une autre fiche du même login, faite par lui, garde sa place", () => {
+    const store = newStore();
+    const own = gh("cible2", 70, W46 + H);
+    const denounced = gh("cible2", 90, W46 + 2 * H);
+    store.insertCards([own, denounced]);
+    store.markDenounced(denounced.id, own.id, null);
+    expect(weekTop(store.db, { now: NOW }).entries.map((e) => [e.login, e.cardId])).toEqual([["cible2", own.id]]);
+    expect(weekRank(store.db, denounced.id, NOW)).toBeNull();
+  });
+
+  it("comparaison dénoncée : sa carte GitHub attend aussi la revendication", () => {
+    const store = newStore();
+    const cmpId = "cmpDenon1";
+    const child = gh("duo", 88, W46 + H, { parentId: cmpId });
+    store.insertCards([
+      { id: cmpId, createdAt: W46 + H, source: "linkedin", login: "duo", kind: "comparison", data: { ...FIXTURES.gold, id: cmpId } as never, facts: { linkedinUrl: "https://www.linkedin.com/in/d", linkedinProven: true }, deleteToken: "t" },
+      child,
+    ]);
+    expect(weekRank(store.db, child.id, NOW)).toMatchObject({ rank: 1 });
+    store.markDenounced(cmpId, "someone01", null);
+    expect(weekTop(store.db, { now: NOW }).entries).toEqual([]);
+    expect(weekRank(store.db, child.id, NOW)).toBeNull();
+    store.claimOwner("duo", 77);
+    expect(weekRank(store.db, child.id, NOW)).toMatchObject({ rank: 1 });
+  });
+});
+
 describe("routes", () => {
   function setup() {
     const store = newStore();

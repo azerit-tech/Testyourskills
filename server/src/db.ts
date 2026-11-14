@@ -345,6 +345,8 @@ export class Store {
     this.db
       .prepare(`UPDATE cards SET denounced_by = ?, denouncer_login = ? WHERE id = ? AND denounced_by IS NULL`)
       .run(byCardId, byLogin ? byLogin.toLowerCase() : null, id);
+    // Une fiche dénoncée sort du top tant que son login n'est pas revendiqué (top.ts).
+    forgetWeekRanks(this.db);
   }
 
   /** Remplace le JSON d'une carte ou d'une comparaison (photo LinkedIn). */

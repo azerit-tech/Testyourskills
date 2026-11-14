@@ -5,7 +5,9 @@
 // célébrités gardent leur fiche mais ne bouchent pas le haut du tableau.
 // La carte GitHub d'une comparaison LinkedIn n'entre que si le lien est prouvé
 // (GitHub affiche ce LinkedIn, §18.24) : une comparaison montée par un tiers
-// sur le pseudo d'un autre ne le classe pas.
+// sur le pseudo d'un autre ne le classe pas. De même, une fiche née d'une
+// dénonciation (`cards.denounced_by`) n'entre, et ne porte la spéciale, qu'une
+// fois son login revendiqué (`owners`).
 // Une ligne par login : sa meilleure note de la semaine ; à égalité, la fiche la
 // plus ancienne passe devant. Tout se calcule à la lecture, rien n'est écrit.
 // Le classement d'une semaine est gardé 60 s en mémoire : il est demandé à
@@ -43,6 +45,16 @@ const PROVEN_SQL = `NOT EXISTS (
            SELECT 1 FROM cards p
            WHERE p.id = c.parent_id AND p.source = 'linkedin'
              AND COALESCE(json_extract(p.facts_json, '$.linkedinProven'), 0) <> 1)`;
+
+/**
+ * Écarte la carte `c` née d'une dénonciation (elle, ou la comparaison dont elle
+ * est la carte GitHub, a `denounced_by`) tant que son login n'est pas revendiqué :
+ * une fiche faite par un tiers ne classe pas quelqu'un qui n'a rien demandé.
+ */
+const CLAIMED_IF_DENOUNCED_SQL = `(
+           EXISTS (SELECT 1 FROM owners o WHERE o.login = c.login)
+           OR (c.denounced_by IS NULL
+               AND NOT EXISTS (SELECT 1 FROM cards p WHERE p.id = c.parent_id AND p.denounced_by IS NOT NULL)))`;
 
 /** Durée pendant laquelle le classement d'une semaine est gardé en mémoire. */
 export const RANK_CACHE_MS = 60_000;
@@ -85,6 +97,7 @@ function computeWeek(db: Database.Database, monday: number, now: number): Ranked
          AND COALESCE(json_extract(c.facts_json, '$.profile.followers'), 0) <= ?
          AND NOT EXISTS (SELECT 1 FROM owners o WHERE o.login = c.login AND o.hidden = 1)
          AND ${PROVEN_SQL}
+         AND ${CLAIMED_IF_DENOUNCED_SQL}
        ORDER BY overall DESC, c.created_at ASC, c.id ASC`,
     )
     .all(monday, monday + WEEK_MS, now, CELEBRITY_FOLLOWERS) as Ranked[];
@@ -147,7 +160,8 @@ export function weekRankDetail(
        WHERE c.id = ? AND c.kind = 'card' AND c.source = 'github' AND c.degraded = 0
          AND (c.expires_at IS NULL OR c.expires_at > ?)
          AND COALESCE(json_extract(c.facts_json, '$.profile.followers'), 0) <= ?
-         AND ${PROVEN_SQL}`,
+         AND ${PROVEN_SQL}
+         AND ${CLAIMED_IF_DENOUNCED_SQL}`,
     )
     .get(cardId, now, CELEBRITY_FOLLOWERS);
   if (!own) return null;
