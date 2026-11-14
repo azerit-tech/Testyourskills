@@ -27,6 +27,8 @@ const githubTokens = tokensFromEnv(process.env);
 const githubToken = githubTokens[0] ?? "";
 // Fiches traitées en même temps ; les suivantes attendent leur tour (le VPS est partagé).
 const maxConcurrentCards = Math.floor(Number(process.env.MAX_CONCURRENT_CARDS)) || undefined;
+// Délai de traitement d'une fiche, en ms, hors file d'attente (60 s par défaut, pipeline.ts).
+const cardTimeoutMs = Math.floor(Number(process.env.CARD_TIMEOUT_MS)) > 0 ? Math.floor(Number(process.env.CARD_TIMEOUT_MS)) : undefined;
 const baseUrl = (process.env.BASE_URL ?? (prod ? "https://skills.azerit.tech" : "http://localhost:5180")).replace(/\/+$/, "");
 const dbPath = resolve(process.env.DB_PATH ?? join(projectRoot, "var/cards.db"));
 // Cache disque des images, un dossier par dessin (shared/images.ts) : og/v2/…
@@ -95,6 +97,7 @@ const { app, pipeline } = createApp({
   githubToken,
   githubPool: new TokenPool(githubTokens),
   maxConcurrentCards,
+  timeoutMs: cardTimeoutMs,
   baseUrl,
   ogDir,
   leadsEndpoint: process.env.LEADS_ENDPOINT || undefined,

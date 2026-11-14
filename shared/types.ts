@@ -297,7 +297,8 @@ export interface WeekTop {
 export type JobState =
   /** `queue` : rang dans la file d'attente (1 = la prochaine à passer). Absent dès que la fiche est en traitement. */
   /** `findings` : les trouvailles déjà sorties (§18.26), dans l'ordre où les montrer, la plus forte en dernier. */
-  | { state: "pending"; progress: ProgressEvent[]; queue?: number; findings?: Finding[] }
+  /** `timeLeft` : ms avant que le serveur coupe la fiche en traitement (rallonge LinkedIn comprise). Absent en file. */
+  | { state: "pending"; progress: ProgressEvent[]; queue?: number; findings?: Finding[]; timeLeft?: number }
   /** `mine` : la session GitHub est propriétaire revendiquée du login de la fiche (§18.1). */
   | { state: "done"; kind: "card"; card: CardData; week?: WeekRank; mine?: boolean }
   | { state: "done"; kind: "comparison"; comparison: ComparisonData; week?: WeekRank; mine?: boolean }

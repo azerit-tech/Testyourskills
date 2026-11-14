@@ -9,7 +9,7 @@ import type { CardData, ComparisonData, Fact, JobState } from "../../shared/type
 import type { CvReading, CvTextCounts } from "../../shared/readings";
 import { createApp, normalizeLogin, purge, type AppOptions } from "./app";
 import { RETENTION_MS, Store } from "./db";
-import { MESSAGES, type CardBody, type Deps } from "./pipeline";
+import { CARD_TIMEOUT_MS, MESSAGES, type CardBody, type Deps } from "./pipeline";
 import { noteCreditBalance, noteCreditsExhausted, recordUsage, resetBudgetForTests, type AiStatus } from "./ai/budget";
 import { ChatHttpError } from "./ai/client";
 import { readCode } from "./ai/readCode";
@@ -285,7 +285,26 @@ describe("erreurs du moteur", () => {
   });
 });
 
-describe("timeout de 30 s", () => {
+describe("délai de la fiche (60 s par défaut)", () => {
+  it("60 s par défaut, et le temps qui reste dans l'état du job", async () => {
+    expect(CARD_TIMEOUT_MS).toBe(60_000);
+    const gate = deferred();
+    const ctx = setup({ collectGithub: async (login) => (await gate.promise, { login }) });
+    const { json } = await postLogin(ctx, "lent");
+    await new Promise((r) => setTimeout(r, 5));
+    const s = (await getState(ctx, json.id)).state as Extract<JobState, { state: "pending" }>;
+    expect(s.state).toBe("pending");
+    expect(s.timeLeft).toBeGreaterThan(CARD_TIMEOUT_MS - 2000);
+    expect(s.timeLeft).toBeLessThanOrEqual(CARD_TIMEOUT_MS);
+    gate.resolve();
+    await ctx.pipeline.wait(json.id);
+  });
+
+  it("le message de coupure ne cite plus de durée fausse", () => {
+    expect(MESSAGES.timeout.fr).not.toMatch(/\d+ secondes/);
+    expect(MESSAGES.timeout.en).not.toMatch(/\d+ seconds/);
+  });
+
   it("coupe un module qui écoute le signal", async () => {
     let aborted = false;
     const ctx = setup(
@@ -1262,7 +1281,7 @@ describe("file d'attente (MAX_CONCURRENT_CARDS)", () => {
     for (const id of ids) expect((await getState(ctx, id)).state).toMatchObject({ state: "done" });
   });
 
-  it("le timeout de 30 s ne compte qu'à partir du traitement, pas de l'attente", async () => {
+  it("le délai de la fiche ne compte qu'à partir du traitement, pas de l'attente", async () => {
     const g = gated();
     const ctx = setup(g.deps, { maxConcurrentCards: 1, timeoutMs: 80 });
     const a = await postLogin(ctx, "a1");

@@ -18,8 +18,8 @@ import { IconLinkedIn, IconShare, IconX } from "./Icons";
 import "./denounce.css";
 
 const POLL_MS = 700;
-/** Au-delà, le serveur a déjà coupé (30 s de calcul, 3 min de file) : on s'arrête aussi. */
-const GIVE_UP_MS = 4 * 60_000;
+/** Au-delà, le serveur a déjà coupé (3 min de file, 60 s de calcul et 60 s de rallonge LinkedIn) : on s'arrête aussi. */
+const GIVE_UP_MS = 5.5 * 60_000;
 
 type State =
   | { s: "idle"; error?: string }

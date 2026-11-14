@@ -31,8 +31,8 @@ interface Line {
 
 const MIN_GAP = 950; // un message reste lisible au moins ce temps
 const FILL_AFTER = 2300; // silence avant un message de remplissage
-/** Durée estimée d'une carte : la barre y arrive presque, jamais tout à fait. */
-const EXPECTED_MS = 11_000;
+/** Durée estimée d'une carte (24 s mesurées, §18.32) : la barre y arrive presque, jamais tout à fait. */
+const EXPECTED_MS = 20_000;
 /** Une trouvaille toutes les 2,5 s. */
 const PIECE_MS = 2500;
 /** Fiche prête : on laisse au moins ce nombre de trouvailles tomber avant la révélation. */

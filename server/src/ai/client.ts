@@ -78,7 +78,7 @@ export class ChatHttpError extends Error {
 }
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-/** Timeout par requête HTTP ; le signal de l'appelant borne le tout (30 s par carte). */
+/** Timeout par requête HTTP ; le signal de l'appelant borne le tout (le délai de la fiche, 60 s par défaut). */
 const REQUEST_TIMEOUT_MS = 25_000;
 
 /** Client OpenRouter par défaut. Lit la clé à chaque appel. */

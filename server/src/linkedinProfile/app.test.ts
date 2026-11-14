@@ -184,6 +184,32 @@ describe("entrée GitHub : le LinkedIn trouvé devient une comparaison", () => {
     expect(ctx.calls.forGithub).toHaveLength(1);
   });
 
+  it("une lecture de profil lente repousse le délai de la fiche de la durée de la lecture, que le front lit", async () => {
+    let seen: JobState | null = null;
+    let ctx!: Ctx;
+    let id = "";
+    ctx = setup(
+      {
+        forGithub: async (_facts, opts) => {
+          // Le fournisseur se donne 300 ms : la fiche, réglée à 80 ms, gagne autant.
+          opts?.onSlow?.(300);
+          await new Promise((r) => setTimeout(r, 150));
+          seen = await state(ctx, id);
+          return FOUND;
+        },
+      },
+      {},
+      { timeoutMs: 80 },
+    );
+    const res = await ctx.app.request("/api/card", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ lang: "fr", login: "camille-ardent" }) });
+    id = ((await res.json()) as { id: string }).id;
+    await ctx.pipeline.wait(id);
+    // Pendant la lecture, au-delà des 80 ms d'origine : le délai annoncé dépasse encore 150 ms.
+    expect(seen).toMatchObject({ state: "pending" });
+    expect((seen as unknown as { timeLeft: number }).timeLeft).toBeGreaterThan(150);
+    expect(await state(ctx, id)).toMatchObject({ state: "done", kind: "comparison" });
+  });
+
   it("aucun LinkedIn, ou une panne : la fiche GitHub sort seule", async () => {
     for (const forGithub of [async () => null, async () => Promise.reject(new Error("boom"))]) {
       const ctx = setup({ forGithub });

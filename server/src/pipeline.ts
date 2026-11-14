@@ -124,8 +124,8 @@ export const MESSAGES: Record<MessageKey, Fact> = {
     en: "PDF too long: 5 MB and 10 pages max. A recruiter wouldn't read more.",
   },
   timeout: {
-    fr: "Le jugement a pris plus de 30 secondes. Plutôt que d'inventer une fiche, on s'arrête là : réessaie dans un instant.",
-    en: "Judging took more than 30 seconds. Rather than make up a sheet, we stopped: try again in a moment.",
+    fr: "Le jugement a pris trop de temps. Plutôt que d'inventer une fiche, on s'arrête là : réessaie dans un instant.",
+    en: "Judging took too long. Rather than make up a sheet, we stopped: try again in a moment.",
   },
   rate_limited: {
     fr: "20 fiches par jour, c'est le maximum. Reviens demain : même les recruteurs font des pauses.",
@@ -253,7 +253,7 @@ export interface PipelineOptions {
   githubToken?: string;
   /** Jetons GitHub en rotation (GITHUB_TOKENS), partagés par toutes les fiches. */
   githubPool?: TokenPool;
-  /** Timeout global d'une carte (SPEC §12). */
+  /** Délai de traitement d'une fiche (SPEC §12), hors file d'attente ; CARD_TIMEOUT_MS par défaut. */
   timeoutMs?: number;
   /** Durée de conservation en mémoire d'un job en erreur. */
   errorTtlMs?: number;
@@ -274,9 +274,15 @@ export interface PipelineOptions {
 }
 
 export const MAX_CONCURRENT_CARDS = 4;
+/**
+ * Délai de traitement d'une fiche, compté dès qu'elle sort de la file
+ * (CARD_TIMEOUT_MS dans l'environnement). Une vraie fiche prend 24 s mesurées
+ * (§18.32), bien plus quand GitHub traîne : 60 s laissent la marge.
+ */
+export const CARD_TIMEOUT_MS = 60_000;
 /** Entrée GitHub : le LinkedIn n'est attendu que jusqu'à cette marge avant le délai de la fiche. */
 export const LINKEDIN_MARGIN_MS = 2500;
-/** Après une lecture de profil lente : le temps laissé à la lecture IA et au barème. */
+/** Après une lecture de profil lente : au moins ce temps laissé à la lecture IA et au barème. */
 export const LINKEDIN_AFTER_MS = 25_000;
 export const QUEUE_TIMEOUT_MS = 3 * 60_000;
 export const BUSY_AFTER_MS = 2 * 60_000;
@@ -299,6 +305,8 @@ interface Job {
   findings: Finding[];
   /** Entrée en file, puis début du traitement : les `at` de la progression partent de là. */
   startedAt: number;
+  /** Fin du délai de traitement (ms epoch), dès que la fiche sort de la file ; repoussée par LinkedIn. */
+  deadline?: number;
   finishedAt?: number;
   error?: JobError;
   done: Promise<void>;
@@ -329,6 +337,8 @@ interface Ctx {
   seconds(): number;
   /** Fin du délai de la fiche (ms epoch). */
   deadline(): number;
+  /** Fin du délai d'origine, avant toute rallonge (ms epoch). */
+  readonly budgetEnd: number;
   /** Repousse la fin du délai (lecture LinkedIn lente, §18.24). Jamais en arrière. */
   extendTo(at: number): void;
 }
@@ -349,14 +359,15 @@ interface LinkedinResult {
 }
 
 /**
- * Une lecture de profil commence (jusqu'à 60 s chez Apify) : la fiche gagne ce
- * temps plus de quoi lire le profil par l'IA, et l'attente le dit au front, qui
- * patiente d'autant.
+ * Une lecture de profil commence (jusqu'à `ms`, 60 s chez Apify) : ce temps ne
+ * compte pas dans le délai de la fiche, repoussé d'autant (§18.24), et jamais à
+ * moins de LINKEDIN_AFTER_MS après la fin de la lecture. L'attente le dit au
+ * front, qui lit le nouveau délai dans l'état du job (`timeLeft`).
  */
 function linkedinSlow(ctx: Ctx) {
   return (ms: number) => {
     ctx.emit("linkedin_wait");
-    ctx.extendTo(Date.now() + ms + LINKEDIN_AFTER_MS);
+    ctx.extendTo(Math.max(ctx.budgetEnd + ms, Date.now() + ms + LINKEDIN_AFTER_MS));
   };
 }
 
@@ -416,7 +427,7 @@ export class Pipeline {
   readonly github: TokenPool;
 
   constructor(private opts: PipelineOptions) {
-    this.timeoutMs = opts.timeoutMs ?? 30_000;
+    this.timeoutMs = opts.timeoutMs ?? CARD_TIMEOUT_MS;
     this.errorTtlMs = opts.errorTtlMs ?? 3600_000;
     this.maxConcurrent = Math.max(1, Math.floor(opts.maxConcurrent ?? MAX_CONCURRENT_CARDS));
     this.queueTimeoutMs = opts.queueTimeoutMs ?? QUEUE_TIMEOUT_MS;
@@ -431,7 +442,9 @@ export class Pipeline {
     if (job.state === "queued") return { state: "pending", progress: [], queue: this.queue.indexOf(job) + 1 };
     if (job.state === "running") {
       const findings = forReveal(job.findings);
-      return { state: "pending", progress: [...job.progress], ...(findings.length ? { findings } : {}) };
+      // Le temps qui reste avant que le serveur coupe : le front patiente jusque-là (rallonge LinkedIn comprise).
+      const timeLeft = job.deadline === undefined ? null : Math.max(0, job.deadline - Date.now());
+      return { state: "pending", progress: [...job.progress], ...(findings.length ? { findings } : {}), ...(timeLeft === null ? {} : { timeLeft }) };
     }
     return { state: "error", code: job.error!.code, message: job.error!.msg };
   }
@@ -569,7 +582,8 @@ export class Pipeline {
       ac.abort(new JobError("timeout", MESSAGES.timeout));
       rejectTimeout(new JobError("timeout", MESSAGES.timeout));
     };
-    let deadline = job.startedAt + this.timeoutMs;
+    const budgetEnd = job.startedAt + this.timeoutMs;
+    job.deadline = budgetEnd;
     let timer = setTimeout(fire, this.timeoutMs);
 
     const ctx: Ctx = {
@@ -586,10 +600,11 @@ export class Pipeline {
         job.findings = [...job.findings, ...list];
       },
       findings: () => job.findings,
-      deadline: () => deadline,
+      deadline: () => job.deadline ?? budgetEnd,
+      budgetEnd,
       extendTo: (at) => {
-        if (timedOut || at <= deadline) return;
-        deadline = at;
+        if (timedOut || at <= (job.deadline ?? budgetEnd)) return;
+        job.deadline = at;
         clearTimeout(timer);
         timer = setTimeout(fire, Math.max(0, at - Date.now()));
       },

@@ -27,6 +27,7 @@ import { pick, useT } from "../i18n";
 import { api, ApiError, tokens, type CaseInfo } from "../lib/api";
 import { isClosed } from "../lib/errors";
 import { useHold, type SceneState } from "../lib/hold";
+import { gaveUp, nextPatience, type Patience } from "../lib/patience";
 import { navigate, onLinkClick } from "../lib/router";
 import { freshLogin, freshSince, iDenounced, myCard, prefillFromLast, rememberMine, type MyCard } from "../lib/session";
 import { revealScene, revealToPlay } from "../lib/revealScene";
@@ -41,10 +42,6 @@ const loadFilm = () => import("../components/Film");
 const Film = lazy(() => loadFilm().then((m) => ({ default: m.Film })));
 
 const POLL_MS = 600;
-const CLIENT_TIMEOUT = 45_000;
-/** Un profil LinkedIn en lecture (§18.24) : le serveur se donne jusqu'à 60 s de plus, le front patiente d'autant. */
-const CLIENT_TIMEOUT_LINKEDIN = 120_000;
-const readingLinkedin = (progress: ProgressEvent[]) => progress.some((e) => e.key === "linkedin_wait" || e.key === "linkedin");
 
 type View =
   | { s: "loading" }
@@ -64,7 +61,8 @@ function useJob(id: string, nonce: number) {
     let alive = true;
     let timer = 0;
     // Le temps passé en file d'attente ne compte pas : le serveur coupe lui-même au bout de 3 min.
-    let started = freshSince(id) ?? Date.now();
+    // En traitement, on attend le délai que le serveur annonce, rallonge LinkedIn comprise (lib/patience.ts).
+    let patience: Patience = { started: freshSince(id) ?? Date.now(), giveUpAt: null };
     const poll = async () => {
       try {
         const job: JobState = await api.getJob(id);
@@ -72,8 +70,8 @@ function useJob(id: string, nonce: number) {
         if (job.state === "pending") {
           setSawPending(true);
           setView({ s: "pending", progress: job.progress ?? [], queue: job.queue, findings: job.findings });
-          if (job.queue) started = Date.now();
-          if (Date.now() - started > (readingLinkedin(job.progress ?? []) ? CLIENT_TIMEOUT_LINKEDIN : CLIENT_TIMEOUT)) {
+          patience = nextPatience(patience, job, Date.now());
+          if (gaveUp(patience, Date.now())) {
             setView({ s: "error", message: t.errors.timeout });
             return;
           }
