@@ -1,4 +1,4 @@
-// Mesure (SPEC §9, §13, §16, §18.0, §18.6, §18.27, §18.36) : dix événements enregistrés dans la table
+// Mesure (SPEC §9, §13, §16, §18.0, §18.6, §18.27, §18.36, §18.38) : la liste fermée ci-dessous, enregistrée dans la table
 // `events`, pas d'outil d'analytics. shared_visit marque l'arrivée par un lien
 // partagé (?r=), une fois par session, avec la fiche d'origine. L'email laissé
 // sur une carte est relayé à LEADS_ENDPOINT au même format que la page Try de
@@ -24,12 +24,17 @@ export const EVENT_NAMES = [
   "plea",
   // Le film (§18.36, docs/cinematique-poursuite.md §5.6) : une fois par lecture, ce qu'il en est advenu.
   "film",
+  // Les bandes (§18.38) : entrer et sortir, par le serveur seul ; la page d'une bande vue et son partage, par le front.
+  "band_join",
+  "band_leave",
+  "band_view",
+  "band_share",
 ] as const;
 export type EventName = (typeof EVENT_NAMES)[number];
 
 /** Événements que le front peut envoyer. card_generated, denounce_sent, denounce_claimed et jury_vote sont posés par le serveur seul. */
 const cardEventSchema = z.object({
-  event: z.enum(["card_shared", "card_email", "cta_azerit_clicked", "shared_visit", "denounce_landed", "plea"]),
+  event: z.enum(["card_shared", "card_email", "cta_azerit_clicked", "shared_visit", "denounce_landed", "plea", "band_view", "band_share"]),
   cardId: z.string().regex(/^[A-Za-z0-9]{6,32}$/).optional(),
   meta: z
     .record(z.string().max(40), z.union([z.string().max(200), z.number(), z.boolean(), z.null()]))

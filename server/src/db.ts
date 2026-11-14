@@ -9,6 +9,7 @@ import { withCatalogProfiles } from "../../shared/profileCatalog";
 import type { CardData, ComparisonData, Source } from "../../shared/types";
 import { ensureLinkedinTables, purgeLinkedin } from "./linkedinProfile/store";
 import { forgetWeekRanks } from "./top";
+import { ensureBandTables, forgetBands, removeBandMembers } from "./bands";
 
 export const RETENTION_MS = 90 * 24 * 3600 * 1000;
 export const CACHE_MS = 24 * 3600 * 1000;
@@ -225,6 +226,8 @@ export function migrate(db: Database.Database) {
     created_at INTEGER NOT NULL,
     PRIMARY KEY (card_id, ip_hash)
   )`);
+  // Les bandes (§18.38) : une ligne par personne et par ligue, posée par son toucher.
+  ensureBandTables(db);
 }
 
 export class Store {
@@ -399,6 +402,8 @@ export class Store {
       }),
     )();
     forgetWeekRanks(this.db);
+    // Supprimer sa fiche la retire de ses bandes (§18.38).
+    removeBandMembers(this.db, ids);
     return ids;
   }
 
@@ -426,6 +431,7 @@ export class Store {
     this.db.prepare(`DELETE FROM ratelimit WHERE day < ?`).run(cutoff);
     purgeLinkedin(this.db, now);
     if (ids.length) forgetWeekRanks(this.db);
+    removeBandMembers(this.db, ids);
     return ids;
   }
 
@@ -539,12 +545,15 @@ export class Store {
     })();
     // Un renommage déplace des fiches d'un login à l'autre.
     forgetWeekRanks(this.db);
+    forgetBands(this.db);
     return this.getOwner(l)!;
   }
 
   setOwnerHidden(login: string, hidden: boolean) {
     this.db.prepare(`UPDATE owners SET hidden = ? WHERE login = ?`).run(hidden ? 1 : 0, login.toLowerCase());
     forgetWeekRanks(this.db);
+    // Une fiche masquée ne compte plus dans ses bandes (§18.38) ; rendue visible, elle y revient.
+    forgetBands(this.db);
   }
 
   /** true si le propriétaire de ce login a masqué ses fiches. */

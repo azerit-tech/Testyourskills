@@ -22,6 +22,7 @@ import { inlineAvatar, mountLinkedin, removeAvatars, type LinkedinConfig } from 
 import { mountAuth, ownerFromRequest, sameOrigin, type GithubAuthConfig } from "./auth";
 import { DENOUNCE_LIMITED, DENOUNCE_PER_DAY, mountDenounce, parseDenunciation } from "./denounce";
 import { mountJury } from "./jury";
+import { mountBands } from "./bands";
 import { aiStatus as budgetAiStatus, type AiStatus } from "./ai/budget";
 import type { TokenPool } from "./github/tokens";
 import { weekTop, withWeekSpecial } from "./top";
@@ -711,6 +712,8 @@ export function createApp(opts: AppOptions) {
   mountDenounce(app, { store, hiddenFrom, notFound: MESSAGES.not_found, withdrawn: MESSAGES.withdrawn, jury });
   // Demande de retrait d'une fiche sans pseudo GitHub, par la personne fichée (removal.ts).
   mountRemoval(app, { store, limiter, leadsEndpoint: opts.leadsEndpoint, baseUrl, fetchImpl });
+  // Les bandes (§18.38) : les tableaux, la page d'une bande, entrer et sortir (bands.ts).
+  mountBands(app, { store, limiter, ownedBy, tokenMatches, hiddenFrom, notFound: MESSAGES.not_found, withdrawn: MESSAGES.withdrawn });
 
   mountLinkedin(app, {
     store,
