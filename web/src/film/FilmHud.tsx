@@ -1,8 +1,9 @@
 // Ce que le site pose sur le film (§18.36, docs/cinematique-poursuite.md §2.2,
-// §3.3) : deux bandes d'encre, les six étoiles, la radio, l'arrêt sur image
-// (deux tons, toise, plaque, niveau), les deux images d'encre de la coupe, le
-// grain et la vignette. Tout vient de hudAt : aucun état, aucune animation CSS
-// qui dériverait de l'image. Mat : aplats, ni halo ni ombre lumineuse.
+// §3.3) : deux bandes d'encre, les six étoiles, la radio, la plaque et le
+// niveau de l'arrêt sur image (son image en deux tons, toise comprise, est
+// tirée par freeze.ts), les deux images d'encre de la coupe, le grain et la
+// vignette. Tout vient de hudAt : aucun état, aucune animation CSS qui
+// dériverait de l'image. Mat : aplats, ni halo ni ombre lumineuse.
 import type { Lang } from "../../../shared/types";
 import type { FilmPlan, Hud } from "../../../shared/film";
 
@@ -49,14 +50,6 @@ export function FilmHud({ plan, hud, lang }: { plan: FilmPlan; hud: Hud; lang: L
   const grain = grainTile();
   return (
     <>
-      {hud.freeze && (
-        <>
-          {/* les ombres de l'image gelée remontent à la teinte d'ombre : jamais de noir */}
-          <div className="film-shadow" />
-          {/* la toise de la photo d'identité */}
-          <div className="film-rule" />
-        </>
-      )}
       {grain && <div className="film-grain" style={{ backgroundImage: `url(${grain})`, transform: `translate(${hud.grain[0]}px, ${hud.grain[1]}px)` }} />}
       <div className="film-vignette" />
       {hud.ink && <div className="film-ink" />}

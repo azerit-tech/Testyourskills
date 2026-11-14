@@ -70,6 +70,8 @@ interface Options {
   cover: HTMLElement;
   /** À chaque rafraîchissement pendant la lecture, et à chaque seek. */
   onTime(t: number): void;
+  /** Pendant la préparation, la balise de fin posée sur sa dernière image : l'arrêt sur image se tire là, hors de la lecture. */
+  onStill?(video: HTMLVideoElement): void;
 }
 
 type Mode = "chase" | "ending" | "tail";
@@ -105,7 +107,7 @@ const once = (v: HTMLVideoElement, ok: string, ms = 8000) =>
 
 const twoFrames = () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
 
-export function createFilmPlayer({ plan, host, cover, onTime }: Options): FilmPlayer {
+export function createFilmPlayer({ plan, host, cover, onTime, onStill }: Options): FilmPlayer {
   const [a, b] = filmVideos() as [FrameVideo, FrameVideo];
   let q: Quality = filmVariant();
   const rvfc = typeof a.requestVideoFrameCallback === "function";
@@ -399,6 +401,15 @@ export function createFilmPlayer({ plan, host, cover, onTime }: Options): FilmPl
         halt(v);
       }
       if (disposed) throw new Error("film: abandonné");
+      if (onStill) {
+        try {
+          place(b, plan.endVideo - 1);
+          if (b.seeking) await once(b, "seeked", 3000);
+          if (!disposed) onStill(b);
+        } catch {
+          /* l'arrêt sur image se tirera au gel, sur l'image à l'écran */
+        }
+      }
       place(a, 0);
       place(b, 0);
       await Promise.all([a, b].map((v) => (v.seeking ? once(v, "seeked") : Promise.resolve())));

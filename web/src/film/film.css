@@ -67,17 +67,19 @@
 }
 
 /* L'arrêt sur image en deux tons (le traitement des visages de la couverture) :
-   l'image en gris, multipliée par la teinte des lumières, ses ombres remontées
-   à la teinte d'ombre ; la toise par-dessus. Une seule composition, sur une image fixe. */
-.film-frame.is-frozen {
-  background: var(--film-light);
+   une toile tirée de la dernière image de la fin pendant l'attente (freeze.ts),
+   cadrée comme la vidéo. La berline en teinte claire, le fond dans la teinte
+   d'ombre, la toise derrière elle. Sans toile (lecture refusée), l'image reste
+   en couleur. Ni vignette par-dessus : deux tons, pas trois. */
+.film-still {
+  visibility: hidden;
 }
-.film-frame.is-frozen .film-video {
-  filter: grayscale(1) contrast(1.3) brightness(1.08);
-  mix-blend-mode: multiply;
+.film-frame.is-frozen .film-still[data-ready] {
+  visibility: visible;
 }
-.film-shadow,
-.film-rule,
+.film-frame.is-frozen .film-vignette {
+  display: none;
+}
 .film-grain,
 .film-vignette,
 .film-ink,
@@ -86,15 +88,6 @@
   inset: 0;
   pointer-events: none;
 }
-.film-shadow {
-  background: var(--film-shadow);
-  mix-blend-mode: lighten;
-}
-.film-rule {
-  background: repeating-linear-gradient(to bottom, transparent 0 calc(7cqh - 1px), var(--film-shadow) calc(7cqh - 1px) 7cqh);
-  opacity: 0.28;
-}
-
 /* le grain : une tuile de 128 px, déplacée douze fois par seconde, à 7 % */
 .film-grain {
   inset: -128px;

@@ -121,6 +121,26 @@ async function started(level = 3) {
   return { p, plan, a, b, now: () => last };
 }
 
+describe("l'arrêt sur image, tiré pendant la préparation", () => {
+  it("la balise de fin est montrée sur sa dernière image, puis remise au début", async () => {
+    const { createFilmPlayer } = await import("./player");
+    const plan = filmPlan({ ...FIXTURES.silver, id: "f", overall: 50 });
+    const seen: number[] = [];
+    const p = createFilmPlayer({
+      plan,
+      host: div() as unknown as HTMLElement,
+      cover: div() as unknown as HTMLElement,
+      onTime: () => undefined,
+      onStill: (v) => seen.push(Math.floor(v.currentTime * FPS)),
+    });
+    const ready = p.prepare();
+    await vi.advanceTimersByTimeAsync(200);
+    expect(await ready).toBe("ready");
+    expect(seen).toEqual([plan.endVideo - 1]);
+    expect(Math.floor(videos[1].currentTime * FPS)).toBe(0);
+  });
+});
+
 describe("le chien de garde, branché sur le lecteur", () => {
   it("une lecture normale va au bout sans relance", async () => {
     const { p, plan, now } = await started();

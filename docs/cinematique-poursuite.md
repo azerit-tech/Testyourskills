@@ -152,7 +152,7 @@ Les lignes de radio viennent de `shared/film/radio.ts`, une par étoile : « Vé
 
 **FIN : l'arrestation** (niveaux ★ à ★★★★★)
 1. *L'arrêt* (52 images de vidéo, la vitesse passe du normal au ralenti). Cadre serré : caméra fixe à 20 cm du sol, 35 mm, sur une esplanade vide sous un seul lampadaire. La voiture en fuite finit de freiner vers nous, la fumée de pneus la dépasse. Au premier plan, l'avant d'une patrouille, portière ouverte ; derrière la portière, une silhouette se redresse. Tout autour, hors champ, des lueurs corail et lilas battent dans la brume. Derrière le pare-brise plein de reflets, deux mains gantées se lèvent. Personne ne tire.
-2. *L'arrêt sur image* (14 images). La dernière image gèle et passe en deux tons (§3.1), les traits de la toise passent par-dessus, une plaque d'encre porte « @pseudo », et le niveau claque en Barlow Condensed 700, crème. L'image gelée est la photo d'identité.
+2. *L'arrêt sur image* (14 images). La dernière image gèle et passe en deux tons (§3.1, §3.3) : la berline en teinte claire, le fond dans la teinte d'ombre, les traits de la toise derrière elle ; une plaque d'encre porte « @pseudo », et le niveau claque en Barlow Condensed 700, crème. L'image gelée est la photo d'identité.
 3. *Le flash* (10 images). Crème `#fff9cb` plein écran, les bandes s'ouvrent. Au sommet du flash, la fiche est posée sur le ciel peint de son lieu du crime (SPEC §18.29).
 
 Le cadre serré de FIN règle le nombre de poursuivants sans rendre cinq fins : une seule patrouille et une seule silhouette sont visibles, ce qui est exact à une étoile ; au-dessus, les autres sont suggérées par les lueurs hors champ, et le niveau est porté par le HUD.
@@ -371,12 +371,14 @@ Ce qui attache le film au site : la palette, les bandes de la couleur de la page
 | Grain | une tuile de bruit de 128 px, déplacée 12 fois par seconde, opacité 7 % |
 | Vignette | un dégradé radial fixe |
 | Secousse à chaque étoile | translation de l'image sur quatre images |
-| Deux tons de l'arrêt sur image | filtre CSS sur une image fixe |
+| Deux tons de l'arrêt sur image | une toile tirée de la dernière image de la fin pendant l'attente (`web/src/film/freeze.ts`), posée au gel ; à défaut, au gel même |
 | Flash | un aplat crème en opacité ; il part aussi tout de suite sur une erreur de lecture (§5.5) |
 | Cache de la bascule | un aplat crème (la couleur de l'éclair) posé par le lecteur, sans attendre React, tant que la fin n'a pas peint sa première image |
 | Vibration | une impulsion par étoile (`web/src/lib/haptics.ts`, Android) |
 
 Le grain n'est pas gravé dans les fichiers : il gonflerait le débit pour rien.
+
+**Le deux-tons de l'arrêt sur image** ne seuille pas la luminance : de nuit, la carrosserie rouge est aussi sombre que le bitume, et un seuil en gris garde le ciel et perd la voiture. Il seuille une clé : la pureté du rouge cramoisi de la carrosserie (même dans l'ombre), plus les lumières vives (feux, phares, lampes). Le bitume brun, les reflets orangés au sol, le ciel bleu et violet restent dans l'ombre. Les deux seuils sont lus sur chaque image (Otsu à trois classes sur la zone d'action) : un rendu final plus contrasté ou plus sombre donne le même tirage. La clé suppose la berline rouge : si sa teinte change au rendu final, régler `HUE_FULL` et `HUE_ZERO` dans `freeze.ts` et revoir les deux fins. La toise, un trait tous les 7 % de la hauteur, ne passe que sur la teinte d'ombre. Ni vignette pendant le gel : deux tons, pas trois.
 
 ---
 
@@ -421,6 +423,7 @@ web/src/film/
   media/          les mp4 et l'affiche, écrits par le montage
   unlock.ts       les deux balises, débloquées par le geste qui lance la fiche
   FilmHud.tsx     bandes, étoiles, radio, arrêt sur image, flash, grain, vignette
+  freeze.ts       l'arrêt sur image en deux tons : la clé, les seuils, la toise, tirés sur une toile
   film.css
 shared/film/budget.ts           les plafonds de poids, lus par le montage et le lecteur
 web/src/components/Film.tsx     même contrat que Walkout3D envers la page d'une fiche ; délai d'abandon, événement

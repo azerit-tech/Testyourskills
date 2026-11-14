@@ -22,6 +22,7 @@ import { buzz } from "../lib/haptics";
 import { inAppBrowser } from "../lib/sharing";
 import { canPlayFilm, createFilmPlayer, type FilmPlayer, type FilmStats } from "../film/player";
 import { FilmHud } from "../film/FilmHud";
+import { ensureStill, paintStill } from "../film/freeze";
 import type { FileId } from "../film/files";
 import { filmLoadMs, filmNet, filmRemaining } from "../film/loader";
 import { readyVerdict, VisibleClock } from "../film/net";
@@ -82,6 +83,7 @@ function FilmView({ card, lang, phase, onReady, onGesture, onHandoff, onDone, on
   const plan = useMemo(() => filmPlan(card), [card]);
   const frameRef = useRef<HTMLDivElement>(null);
   const coverRef = useRef<HTMLDivElement>(null);
+  const stillRef = useRef<HTMLCanvasElement>(null);
   const player = useRef<FilmPlayer | null>(null);
   const sound = useRef<FilmSound | null>(null);
   const [time, setTime] = useState(0);
@@ -134,6 +136,7 @@ function FilmView({ card, lang, phase, onReady, onGesture, onHandoff, onDone, on
         flushSync(() => setTime(t));
         cue.current(t);
       },
+      onStill: (v) => paintStill(v, stillRef.current, plan.tone),
     });
     player.current = p;
     let settled = false;
@@ -249,6 +252,10 @@ function FilmView({ card, lang, phase, onReady, onGesture, onHandoff, onDone, on
 
   const hud = hudAt(plan, time, lang);
   const landed = hud.video === null;
+  const frozen = hud.freeze !== null;
+  useEffect(() => {
+    if (frozen) ensureStill(stillRef.current, plan.tone);
+  }, [frozen, plan]);
   const vars = {
     "--film-light": plan.tone.light,
     "--film-shadow": plan.tone.shadow,
@@ -262,6 +269,8 @@ function FilmView({ card, lang, phase, onReady, onGesture, onHandoff, onDone, on
         <div ref={frameRef} className={`film-frame${hud.freeze ? " is-frozen" : ""}`} data-frame={hud.frame} data-shot={hud.shot}>
           {/* les deux balises vidéo sont posées ici par le lecteur */}
           <div ref={coverRef} className="film-cover" />
+          {/* l'arrêt sur image en deux tons, tiré pendant l'attente (freeze.ts) */}
+          <canvas ref={stillRef} className="film-video film-still" />
           <FilmHud plan={plan} hud={hud} lang={lang} />
         </div>
         {hud.flash > 0 && <div className="film-flash" style={{ opacity: hud.flash }} />}
