@@ -33,6 +33,7 @@ import { primesOpen, seasonDates, type Season } from "../../shared/season";
 import { loadSeason } from "./season";
 import { mountRemoval } from "./removal";
 import { mountPrimes, purgeEntries } from "./primes";
+import { mountPrimePages } from "./primePages";
 import { loadRules } from "./rules";
 
 export interface AppOptions {
@@ -749,6 +750,8 @@ export function createApp(opts: AppOptions) {
     notFound: MESSAGES.not_found,
     withdrawn: MESSAGES.withdrawn,
   });
+  // Leur partage : l'image 1200 × 630 d'une prime et les balises de /primes (primePages.ts).
+  mountPrimePages(app, { store, season, baseUrl, ogDir, render: (input) => deps.renderImage(input), indexHtml: opts.indexHtml });
 
   mountLinkedin(app, {
     store,

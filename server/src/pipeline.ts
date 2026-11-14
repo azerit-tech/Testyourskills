@@ -18,6 +18,8 @@ import { githubShowsLinkedin } from "./linkedinProfile/url";
 import { asLinkedinCard, asLinkedinComparison, profileToText } from "./linkedinProfile/text";
 import { linkedinFindings } from "./linkedinProfile/findings";
 import { highBarEmployers, type HighBarList } from "./scoring/employers";
+import type { PrimeView } from "../../shared/primes";
+import type { PrimeLogo } from "./render/prime";
 
 export type CardBody = Omit<CardData, "id" | "createdAt">;
 
@@ -26,11 +28,14 @@ export type GithubAuth = string | TokenPool;
 
 export interface RenderInput {
   /** `home` : l'aperçu de lien de l'accueil (/og/home.png), avec la fiche de la vitrine. `story` : 9:16, une fiche seule. */
-  format: "card" | "og" | "portrait" | "story" | "home" | "band";
+  format: "card" | "og" | "portrait" | "story" | "home" | "band" | "prime";
   card?: CardData;
   comparison?: ComparisonData;
   /** `band` : l'aperçu de lien d'une bande (§18.38). */
   band?: BandStanding;
+  /** `prime` : l'aperçu de lien d'une prime (§18.4), et son logo en data URI s'il en a un. */
+  prime?: PrimeView;
+  logo?: PrimeLogo | null;
   lang: Lang;
 }
 

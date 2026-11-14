@@ -250,6 +250,12 @@ export function primeById(season: Season | null, id: string): Prime | null {
   return season.primes.find((p) => p.id === id) ?? null;
 }
 
+/** Une prime telle qu'on la montre (phase, jours, inscriptions), ou null. */
+export function primeViewById(store: Store, season: Season | null, id: string, now = Date.now()): PrimeView | null {
+  const p = primeById(season, id);
+  return p && season ? primeView(season, p, standings(store, season, p, now).length, now) : null;
+}
+
 const refuse = (c: Context, status: 400 | 401 | 403 | 404 | 409 | 410 | 429, code: string, message: Fact) => c.json({ state: "error", code, message }, status);
 
 export function mountPrimes(app: Hono, o: PrimesOptions): void {

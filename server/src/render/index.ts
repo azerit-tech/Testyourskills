@@ -5,9 +5,11 @@ import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { fileOf } from "../../../shared/caseFile";
 import type { BandStanding } from "../../../shared/bands";
+import type { PrimeView } from "../../../shared/primes";
 import type { CardData, ComparisonData, Lang } from "../../../shared/types";
 import { fetchAvatar } from "./avatar";
 import { BandOg } from "./band";
+import { PrimeOg, type PrimeLogo } from "./prime";
 import { CardOnly, HomeOg, OgImage, PortraitImage, StoryImage, type Avatars } from "./compositions";
 import { fontFiles } from "./fonts";
 import { encodeOpaquePng } from "./png";
@@ -18,7 +20,7 @@ import { sceneFor } from "./scenes";
  * `story` : 9:16 pour Instagram et TikTok, une fiche seule.
  * Un dossier à deux pièces prend les compositions d'une fiche : celle du dossier (§18.36).
  */
-export type ImageFormat = "card" | "og" | "portrait" | "story" | "home" | "band";
+export type ImageFormat = "card" | "og" | "portrait" | "story" | "home" | "band" | "prime";
 
 export interface RenderInput {
   format: ImageFormat;
@@ -26,11 +28,14 @@ export interface RenderInput {
   comparison?: ComparisonData;
   /** `band` : l'aperçu de lien d'une bande (§18.38, band.tsx), sans fiche. */
   band?: BandStanding;
+  /** `prime` : l'aperçu de lien d'une prime (§18.4, prime.tsx), son logo s'il en a un. */
+  prime?: PrimeView;
+  logo?: PrimeLogo | null;
   lang: Lang;
 }
 
 /** Largeur de sortie par format (la hauteur suit le viewBox). */
-const OUTPUT_WIDTH: Record<ImageFormat, number> = { card: 1080, og: 1200, portrait: 1080, story: 1080, home: 1200, band: 1200 };
+const OUTPUT_WIDTH: Record<ImageFormat, number> = { card: 1080, og: 1200, portrait: 1080, story: 1080, home: 1200, band: 1200, prime: 1200 };
 
 async function avatarsFor(cards: CardData[]): Promise<Avatars> {
   const out: Avatars = {};
@@ -48,6 +53,10 @@ export async function buildElement(input: RenderInput): Promise<ReactElement> {
   if (format === "band") {
     if (!input.band) throw new Error("renderImage : band requis");
     return createElement(BandOg, { band: input.band, lang });
+  }
+  if (format === "prime") {
+    if (!input.prime) throw new Error("renderImage : prime requise");
+    return createElement(PrimeOg, { prime: input.prime, logo: input.logo ?? null, lang });
   }
   // Un dossier, une fiche, une note (shared/caseFile.ts).
   const card = comparison ? fileOf(comparison) : input.card;

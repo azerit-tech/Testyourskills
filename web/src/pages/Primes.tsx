@@ -188,7 +188,9 @@ export function PrimePage({ id }: { id: string }) {
   const positions = prime.positions.map((x) => t.positions[x]).join(", ");
   const job = t.primes.job(prime.contract, positions);
   const entry = me?.entry ?? null;
-  const where = [prime.place ? t.primes.onSite(prime.place) : null, prime.remote ? t.primes.remote : null].filter(Boolean).join(", ");
+  // « À Ville Démo, télétravail possible » : la seconde moitié sans majuscule.
+  const remote = t.primes.remote;
+  const where = prime.place ? `${t.primes.onSite(prime.place)}${prime.remote ? `, ${remote.charAt(0).toLowerCase()}${remote.slice(1)}` : ""}` : prime.remote ? remote : "";
 
   const withdraw = async () => {
     try {
