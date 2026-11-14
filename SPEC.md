@@ -1402,3 +1402,15 @@ Le §18.38 est en ligne sur `master`. Ce qui a été tranché en le construisant
 - **La page d'une bande** : cinquante dossiers au plus, triés par étoiles, chacun avec son profil criminel, jamais un nom ; le pseudo GitHub seulement si la fiche est revendiquée. *À corriger* : deux dossiers du même profil se lisent comme un doublon.
 - **Mesure** : `band_join`, `band_leave`, `band_view`, `band_share` ; la page Confidentialité liste désormais les quinze événements et porte une section « Les bandes ».
 - **Non vérifié à ce jour** : la porte LinkedIn sur « Fais ta fiche pour … » (le serveur local n'avait pas LinkedIn), la feuille de partage sur un vrai téléphone, l'image de partage après le dernier changement de texte.
+
+### 18.42 Le film est la révélation par défaut, avec le brouillon monté (14 novembre 2026)
+
+Le §18.39 est en ligne sur `master` pour l'image ; le son suit.
+
+- **Par défaut** : le film. L'ascenseur ne joue plus qu'avec `?scene=walkout` et son code (three.js, modèles) ne se charge plus sur le chemin par défaut. Film absent, illisible ou réseau trop lent : la fiche se pose directement. Lecture refusée sans geste : la pilule « Ouvrir mon dossier » sur l'écran d'attente, puis le film (on garde ce cas : le film est la révélation, on ne le saute pas pour un toucher).
+- **Ce que le site joue** : le découpage réel, 414, 52 et 80 images, monté depuis le brouillon éclairé n° 2 (fin une à cinq étoiles tirée du n° 1). Prises sans perte tirées des PNG 360 × 640, agrandies deux fois : l'image est douce, **ce n'est pas la qualité du lancement**. L'étalonnage du montage est neutre : les plans sortent déjà étalonnés du rendu. Le contrôle des fichiers contre le découpage est bloquant.
+- **Poids** : le plafond de la poursuite suit le découpage au poids par image du premier budget (5,48 Mo en haute pour 414 images). Mesuré : 5,25 Mo par personne en haute, 2,12 Mo en éco.
+- **Durées** : de 6,8 s à une étoile à 21,6 s à six (164, 274, 322, 370, 430, 518 images).
+- **La coupe vers la fin, de une à cinq étoiles** : douze images avant, la radio dit « Interception · barrage en place » et le garde pendant la fin ; l'étoile suivante clignote deux fois puis reste éteinte ; un éclair crème de deux images à la coupe (deux images sombres dans un film de nuit se lisaient comme une image perdue). À six étoiles, seul l'éclair.
+- **Vérifié** en lecture réelle à 390 × 844 dans Chrome sans tête, niveaux 1, 3 et 6 : aucune image perdue ni noire, bascule entre les deux balises en moins de 33 ms. **Pas vérifié** : un vrai iPhone, le navigateur intégré de LinkedIn, les niveaux 2, 4 et 5 en lecture.
+- **Défauts à l'écran** : (1) la fin une à cinq étoiles montre un hélicoptère dès une étoile, à corriger au rendu (une patrouille et une silhouette seulement) ; (2) l'arrêt sur image en deux tons perd la berline dans les deux fins : la « photo d'identité » ne se lit pas, à corriger dans le site ; (3) les hélicoptères de P5 et P6 frôlent la zone du haut ; (4) un à-coup d'environ 130 ms quand la fiche se pose.
