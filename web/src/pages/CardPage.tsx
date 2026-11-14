@@ -1,6 +1,6 @@
 // Route /c/:id : attente, révélation puis résultat pour une carte fraîche ;
 // affichage direct (sans pack) pour un lien partagé.
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { fileOf } from "../../../shared/caseFile";
 import type { CardData, Fact, Finding, JobState, ProgressEvent } from "../../../shared/types";
 import { declaredOf, LEVEL_LABELS, starsFor } from "../../../shared/types";
@@ -336,7 +336,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
   const { t, lang } = useT();
   const id = item.kind === "card" ? item.card.id : item.comparison.id;
   // Un dossier à deux pièces s'affiche comme une fiche seule : la fiche du dossier, sa note (§18.36).
-  const main: CardData = item.kind === "card" ? item.card : fileOf(item.comparison);
+  // Calculée une fois par dossier : un objet neuf à chaque rendu recréait le film en route (lecteur, son, gel).
+  const main: CardData = useMemo(() => (item.kind === "card" ? item.card : fileOf(item.comparison)), [item]);
   const [scene] = useState(revealScene);
   // Le film part dès que l'attente se lève : sa première image est déjà à l'écran.
   const { phase, open, skip, stage, staged, handoff, finish, animating, settled } = useReveal(animate, start, scene === "film" ? 0 : undefined);
