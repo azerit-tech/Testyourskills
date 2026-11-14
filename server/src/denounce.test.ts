@@ -87,7 +87,7 @@ async function post(ctx: Ctx, payload: Record<string, unknown>, headers: Record<
     headers: { "content-type": "application/json", "x-forwarded-for": "198.51.100.7", ...headers },
     body: JSON.stringify({ lang: "fr", ...payload }),
   });
-  const json = (await res.json()) as { id: string; code?: string; message?: { fr: string } };
+  const json = (await res.json()) as { id: string; deleteToken?: string; code?: string; message?: { fr: string } };
   if (json.id) await ctx.pipeline.wait(json.id);
   return { status: res.status, json };
 }
@@ -110,6 +110,31 @@ describe("colonne cards.denounced_by", () => {
     const cols = (db.prepare(`PRAGMA table_info(cards)`).all() as { name: string }[]).map((c) => c.name);
     expect(cols).toEqual(expect.arrayContaining(["denounced_by", "denouncer_login", "ref_card_id", "degraded"]));
     expect(db.prepare(`SELECT id, denounced_by FROM cards`).all()).toEqual([{ id: "OldCard001", denounced_by: null }]);
+    db.close();
+  });
+
+  it("denounce_born : née d'une dénonciation si son événement précède sa création, sinon dénoncée depuis le cache", () => {
+    const db = new Database(":memory:");
+    db.exec(`CREATE TABLE cards (id TEXT PRIMARY KEY, parent_id TEXT, created_at INTEGER NOT NULL, source TEXT NOT NULL, login TEXT,
+      kind TEXT NOT NULL, json TEXT NOT NULL, facts_json TEXT, email TEXT, delete_token TEXT NOT NULL, expires_at INTEGER,
+      denounced_by TEXT, denouncer_login TEXT);
+      CREATE TABLE events (id INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER NOT NULL, event TEXT NOT NULL, card_id TEXT, meta TEXT);`);
+    const card = db.prepare(`INSERT INTO cards (id, created_at, source, login, kind, json, delete_token, denounced_by) VALUES (?, 1000, 'github', ?, 'card', '{}', 't', ?)`);
+    card.run("BornCard01", "a", "Snitch0001");
+    card.run("LateCard01", "b", "Snitch0001");
+    card.run("NoTrace001", "c", "Snitch0001");
+    card.run("PlainCard1", "d", null);
+    const ev = db.prepare(`INSERT INTO events (at, event, card_id) VALUES (?, 'denounce_sent', ?)`);
+    ev.run(990, "BornCard01");
+    ev.run(5000, "LateCard01");
+    migrate(db);
+    migrate(db);
+    expect(db.prepare(`SELECT id, denounce_born FROM cards ORDER BY id`).all()).toEqual([
+      { id: "BornCard01", denounce_born: 1 },
+      { id: "LateCard01", denounce_born: 0 },
+      { id: "NoTrace001", denounce_born: 1 },
+      { id: "PlainCard1", denounce_born: 0 },
+    ]);
     db.close();
   });
 });
@@ -157,6 +182,28 @@ describe("POST /api/card avec denouncedBy", () => {
     expect(first.json.id).toBe(target.json.id);
     await post(ctx, { login: "camroux", denouncedBy: b.json.id });
     expect(ctx.store.getCard(target.json.id)!.denouncedBy).toBe(a.json.id);
+  });
+
+  it("une fiche déjà faite, dénoncée ensuite : dite dénoncée, mais sa personne garde ses droits", async () => {
+    const ctx = setup();
+    const a = await post(ctx, { login: "leamd" });
+    const own = await post(ctx, { login: "camroux" });
+    const born = await post(ctx, { login: "jplefevre", denouncedBy: a.json.id });
+    await post(ctx, { login: "camroux", denouncedBy: a.json.id });
+    const row = ctx.store.getCard(own.json.id)!;
+    expect(row).toMatchObject({ denouncedBy: a.json.id, denounceBorn: false });
+    expect(ctx.store.getCard(born.json.id)).toMatchObject({ denouncedBy: a.json.id, denounceBorn: true });
+    expect((await getCase(ctx, own.json.id)).json.denounced).toBe(true);
+    // Le jeton de la personne qui a fait la fiche vaut toujours : elle entre dans une bande.
+    const join = (id: string, token: string) =>
+      ctx.app.request("/api/bands/join", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-card-token": token, "x-forwarded-for": "198.51.100.9" },
+        body: JSON.stringify({ cardId: id, type: "ecole", id: "epitech" }),
+      });
+    expect((await join(own.json.id, own.json.deleteToken!)).status).toBe(200);
+    // Le jeton d'une fiche née d'une dénonciation est au dénonciateur : refusé.
+    expect((await join(born.json.id, born.json.deleteToken!)).status).toBe(403);
   });
 
   it("ignore un denouncedBy inconnu, mal formé ou qui vise sa propre fiche", async () => {

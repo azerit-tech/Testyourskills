@@ -36,8 +36,15 @@ export interface CardRow {
   refCardId: string | null;
   /** Sortie sans lecture IA : visible à son adresse, jamais resservie par le cache 24 h (§12). */
   degraded: boolean;
-  /** Fiche de la personne qui a dénoncé celle-ci (§18.6), sinon null. */
+  /** Fiche de la personne qui a dénoncé celle-ci (§18.6), sinon null : à sa naissance ou depuis le cache. */
   denouncedBy: string | null;
+  /**
+   * Née d'une dénonciation : calculée pour un tiers, son jeton est celui du
+   * dénonciateur. Une fiche déjà faite, dénoncée ensuite depuis le cache, garde
+   * `denouncedBy` pour la page partagée mais pas ce drapeau : rien ne change pour
+   * sa personne (top, grille, bandes, jeton).
+   */
+  denounceBorn: boolean;
   /** Login du dénonciateur, posé seulement s'il était connecté comme propriétaire de sa fiche ; sinon anonyme. */
   denouncerLogin: string | null;
 }
@@ -111,6 +118,7 @@ interface RawRow {
   degraded: number | null;
   denounced_by?: string | null;
   denouncer_login?: string | null;
+  denounce_born?: number | null;
 }
 
 const SCHEMA = `
@@ -129,7 +137,8 @@ CREATE TABLE IF NOT EXISTS cards (
   ref_card_id  TEXT,              -- fiche d'origine du lien partagé (?r=), sinon NULL ; voir migrate()
   degraded     INTEGER NOT NULL DEFAULT 0, -- 1 = sortie sans lecture IA, hors cache 24 h ; voir migrate()
   denounced_by    TEXT,           -- fiche du dénonciateur (§18.6), sinon NULL ; voir migrate()
-  denouncer_login TEXT            -- son login s'il était propriétaire connecté, sinon NULL (anonyme)
+  denouncer_login TEXT,           -- son login s'il était propriétaire connecté, sinon NULL (anonyme)
+  denounce_born   INTEGER NOT NULL DEFAULT 0 -- 1 = née d'une dénonciation (calculée pour un tiers) ; voir migrate()
 );
 CREATE INDEX IF NOT EXISTS cards_login ON cards(login, created_at) WHERE parent_id IS NULL;
 CREATE INDEX IF NOT EXISTS cards_parent ON cards(parent_id);
@@ -193,6 +202,7 @@ function toRow(r: RawRow): CardRow {
     degraded: r.degraded === 1,
     denouncedBy: r.denounced_by ?? null,
     denouncerLogin: r.denouncer_login ?? null,
+    denounceBorn: r.denounce_born === 1,
   };
 }
 
@@ -216,6 +226,20 @@ export function migrate(db: Database.Database) {
   if (!cols.has("degraded")) db.exec(`ALTER TABLE cards ADD COLUMN degraded INTEGER NOT NULL DEFAULT 0`);
   if (!cols.has("denounced_by")) db.exec(`ALTER TABLE cards ADD COLUMN denounced_by TEXT`);
   if (!cols.has("denouncer_login")) db.exec(`ALTER TABLE cards ADD COLUMN denouncer_login TEXT`);
+  if (!cols.has("denounce_born")) {
+    db.exec(`ALTER TABLE cards ADD COLUMN denounce_born INTEGER NOT NULL DEFAULT 0`);
+    // Les fiches déjà dénoncées : nées d'une dénonciation si son événement précède
+    // leur création (la demande part avant le calcul), ou s'il n'en reste aucune
+    // trace ; dénoncées depuis le cache si l'événement vient après.
+    const events = db.prepare(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'events'`).get();
+    db.exec(
+      events
+        ? `UPDATE cards SET denounce_born = 1 WHERE denounced_by IS NOT NULL AND (
+             NOT EXISTS (SELECT 1 FROM events e WHERE e.card_id = cards.id AND e.event = 'denounce_sent')
+             OR EXISTS (SELECT 1 FROM events e WHERE e.card_id = cards.id AND e.event = 'denounce_sent' AND e.at <= cards.created_at))`
+        : `UPDATE cards SET denounce_born = 1 WHERE denounced_by IS NOT NULL`,
+    );
+  }
   // Cache et budget de la lecture des profils LinkedIn (§18.24) : tables neuves.
   ensureLinkedinTables(db);
   // Le jury de la page partagée (§18.27) : un vote par fiche et par IP, l'IP en hash seulement.
@@ -346,13 +370,15 @@ export class Store {
 
   /**
    * Marque une fiche comme dénoncée (§18.6). La première dénonciation reste :
-   * une fiche déjà dénoncée garde son dénonciateur.
+   * une fiche déjà dénoncée garde son dénonciateur. `born` : la fiche vient
+   * d'être calculée pour cette dénonciation ; faux pour une fiche reprise du
+   * cache ou d'un calcul déjà lancé, qui ne change pas de statut.
    */
-  markDenounced(id: string, byCardId: string, byLogin: string | null) {
+  markDenounced(id: string, byCardId: string, byLogin: string | null, born = true) {
     this.db
-      .prepare(`UPDATE cards SET denounced_by = ?, denouncer_login = ? WHERE id = ? AND denounced_by IS NULL`)
-      .run(byCardId, byLogin ? byLogin.toLowerCase() : null, id);
-    // Une fiche dénoncée sort du top tant que son login n'est pas revendiqué (top.ts).
+      .prepare(`UPDATE cards SET denounced_by = ?, denouncer_login = ?, denounce_born = ? WHERE id = ? AND denounced_by IS NULL`)
+      .run(byCardId, byLogin ? byLogin.toLowerCase() : null, born ? 1 : 0, id);
+    // Une fiche née d'une dénonciation sort du top tant que son login n'est pas revendiqué (top.ts).
     forgetWeekRanks(this.db);
   }
 

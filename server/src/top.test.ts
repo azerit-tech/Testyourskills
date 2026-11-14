@@ -357,6 +357,19 @@ describe("fiche née d'une dénonciation", () => {
     expect(read().data.special).toBe("totw");
   });
 
+  it("une fiche déjà faite, dénoncée ensuite par un tiers, garde sa place", () => {
+    const store = newStore();
+    const snitch = gh("delateur3", 50, W46 + H);
+    const own = gh("cible3", 95, W46 + H);
+    store.insertCards([snitch, own, ...crowd("p", TOTW_MIN_ENTRIES, W46 + H)]);
+    expect(weekRank(store.db, own.id, NOW)).toMatchObject({ rank: 1, inTop5: true });
+    store.markDenounced(own.id, snitch.id, null, false);
+    expect(store.getCard(own.id)).toMatchObject({ denouncedBy: snitch.id, denounceBorn: false });
+    expect(weekTop(store.db, { now: NOW }).entries[0]).toMatchObject({ login: "cible3", cardId: own.id });
+    expect(weekRank(store.db, own.id, NOW)).toMatchObject({ rank: 1, inTop5: true });
+    expect(withWeekSpecial(store.db, store.getCard(own.id)!.data as CardData, NOW).data.special).toBe("totw");
+  });
+
   it("une autre fiche du même login, faite par lui, garde sa place", () => {
     const store = newStore();
     const own = gh("cible2", 70, W46 + H);

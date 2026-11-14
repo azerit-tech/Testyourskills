@@ -270,16 +270,16 @@ export function createApp(opts: AppOptions) {
 
   /**
    * La personne fichée : propriétaire revendiquée du login, ou qui tient le jeton
-   * de la fiche (en-tête X-Card-Token) quand elle n'a pas été dénoncée ; le jeton
-   * d'une fiche dénoncée est celui du dénonciateur.
+   * de la fiche (en-tête X-Card-Token) quand elle n'est pas née d'une
+   * dénonciation ; le jeton d'une fiche née d'une dénonciation est celui du dénonciateur.
    */
   const personOf = (c: Context, row: CardRow, mine: boolean): boolean =>
-    mine || (!row.denouncedBy && tokenMatches(c.req.header("x-card-token"), row.deleteToken));
+    mine || (!row.denounceBorn && tokenMatches(c.req.header("x-card-token"), row.deleteToken));
 
-  /** Fiche faite par un tiers (dénoncée) que personne n'a encore revendiquée : pas de grille (§18.37). */
+  /** Fiche née d'une dénonciation que personne n'a encore revendiquée : pas de grille (§18.37). */
   const thirdParty = (row: CardRow): boolean => {
     const login = store.loginOf(row);
-    return !!row.denouncedBy && !(login && store.getOwner(login));
+    return row.denounceBorn && !(login && store.getOwner(login));
   };
 
   /**
@@ -460,12 +460,17 @@ export function createApp(opts: AppOptions) {
       if (denounce && !limiter.allowed("denounce", ip, DENOUNCE_PER_DAY)) {
         return c.json(errorBody("rate_limited", DENOUNCE_LIMITED), 429);
       }
-      /** Compte la dénonciation et marque la fiche du complice, dès qu'elle existe. */
-      const denounced = (id: string) => {
+      /**
+       * Compte la dénonciation et marque la fiche du complice, dès qu'elle existe.
+       * `born` : calculée pour cette dénonciation. Une fiche reprise du cache ou
+       * d'un calcul déjà lancé est seulement dite dénoncée : son classement et
+       * les droits de sa personne ne changent pas.
+       */
+      const denounced = (id: string, born = false) => {
         if (!denounce) return;
         limiter.take("denounce", ip, DENOUNCE_PER_DAY);
         store.recordEvent("denounce_sent", id, { by: denounce.byCardId });
-        const mark = () => store.markDenounced(id, denounce.byCardId, denounce.named);
+        const mark = () => store.markDenounced(id, denounce.byCardId, denounce.named, born);
         if (store.getCard(id)) mark();
         else void pipeline.wait(id).then(mark);
       };
@@ -518,7 +523,7 @@ export function createApp(opts: AppOptions) {
         // Lectures payantes de profils LinkedIn : une limite par IP en plus du budget du jour (§18.24).
         linkedinSpend: () => limiter.take("linkedin", ip, PAID_CALLS_PER_IP),
       });
-      denounced(id);
+      denounced(id, true);
       // L'insertion arrive toujours après ce retour (le pipeline attend au moins
       // une fois) : la ref est écrite dans la ligne, puis oubliée en fin de job.
       if (ref) {

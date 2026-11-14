@@ -6,8 +6,9 @@
 // La carte GitHub d'une comparaison LinkedIn n'entre que si le lien est prouvé
 // (GitHub affiche ce LinkedIn, §18.24) : une comparaison montée par un tiers
 // sur le pseudo d'un autre ne le classe pas. De même, une fiche née d'une
-// dénonciation (`cards.denounced_by`) n'entre, et ne porte la spéciale, qu'une
-// fois son login revendiqué (`owners`).
+// dénonciation (`cards.denounce_born`) n'entre, et ne porte la spéciale, qu'une
+// fois son login revendiqué (`owners`) ; une fiche déjà faite, dénoncée ensuite
+// depuis le cache, garde sa place.
 // Une ligne par login : sa meilleure note de la semaine ; à égalité, la fiche la
 // plus ancienne passe devant. Tout se calcule à la lecture, rien n'est écrit.
 // Le classement d'une semaine est gardé 60 s en mémoire : il est demandé à
@@ -48,13 +49,14 @@ const PROVEN_SQL = `NOT EXISTS (
 
 /**
  * Écarte la carte `c` née d'une dénonciation (elle, ou la comparaison dont elle
- * est la carte GitHub, a `denounced_by`) tant que son login n'est pas revendiqué :
+ * est la carte GitHub, a `denounce_born`) tant que son login n'est pas revendiqué :
  * une fiche faite par un tiers ne classe pas quelqu'un qui n'a rien demandé.
+ * Dénoncer après coup une fiche déjà faite ne la fait pas sortir.
  */
 const CLAIMED_IF_DENOUNCED_SQL = `(
            EXISTS (SELECT 1 FROM owners o WHERE o.login = c.login)
-           OR (c.denounced_by IS NULL
-               AND NOT EXISTS (SELECT 1 FROM cards p WHERE p.id = c.parent_id AND p.denounced_by IS NOT NULL)))`;
+           OR (c.denounce_born = 0
+               AND NOT EXISTS (SELECT 1 FROM cards p WHERE p.id = c.parent_id AND p.denounce_born = 1)))`;
 
 /** Durée pendant laquelle le classement d'une semaine est gardé en mémoire. */
 export const RANK_CACHE_MS = 60_000;

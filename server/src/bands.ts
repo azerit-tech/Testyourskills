@@ -367,7 +367,7 @@ type Refusal = { status: 403 | 404 | 409 | 410; code: string; message: Fact };
 /**
  * La fiche, si la requête vient de sa personne : le propriétaire connecté, ou le
  * jeton de la fiche (en-tête X-Card-Token) quand elle n'est pas née d'une
- * dénonciation ; une fiche dénoncée ne joue qu'une fois revendiquée.
+ * dénonciation ; une fiche née d'une dénonciation ne joue qu'une fois revendiquée.
  */
 function authorize(o: BandsOptions, c: Context, cardId: string, now: number): { root: CardRow } | Refusal {
   const row = o.store.getCard(cardId);
@@ -376,9 +376,9 @@ function authorize(o: BandsOptions, c: Context, cardId: string, now: number): { 
   if (o.hiddenFrom(c, o.store.loginOf(root))) return { status: 410, code: "gone", message: o.withdrawn };
   const login = o.store.loginOf(root);
   const claimed = !!login && !!o.store.getOwner(login);
-  if (root.denouncedBy && !claimed) return { status: 403, code: "denounced", message: BAND_MESSAGES.denounced };
+  if (root.denounceBorn && !claimed) return { status: 403, code: "denounced", message: BAND_MESSAGES.denounced };
   const mine = o.ownedBy(c, root);
-  const token = !root.denouncedBy && o.tokenMatches(c.req.header("x-card-token"), root.deleteToken);
+  const token = !root.denounceBorn && o.tokenMatches(c.req.header("x-card-token"), root.deleteToken);
   if (!mine && !token) return { status: 403, code: "forbidden", message: BAND_MESSAGES.forbidden };
   return { root };
 }
