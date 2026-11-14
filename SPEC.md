@@ -1437,3 +1437,13 @@ Suite des §18.40 et §18.41, en ligne sur `master`.
 - **L'image d'une bande** : le décor à son format et, dessous, les vingt places de la bande, pleines ou vides.
 - **Textes** : « Ta fiche en une minute. » ; un test compare les événements nommés sur la page Confidentialité à ceux que le serveur enregistre (quinze). Le lien « Aller au contenu » ne sort plus qu'au clavier.
 - **Restent** : une insulte masquée par un astérisque passe ; la page « Cette bande n'existe pas » est une impasse ; les erreurs anglaises du serveur disent « gang » quand le site dit « crew » ; « 0 file » en anglais ; la création réelle d'une fiche LinkedIn et le partage sur un vrai téléphone ne sont pas vérifiés.
+
+### 18.45 L'arrêt sur image et le passage à la fiche (14 novembre 2026)
+
+Corrige le défaut (2) du §18.42, en ligne sur `master`.
+
+- **L'arrêt sur image garde la berline** : ce n'est plus un filtre qui seuille la lumière (de nuit, une carrosserie rouge est aussi sombre que le bitume, elle partait avec le sol). Le deux-tons est tiré sur une toile (`web/src/film/freeze.ts`) à partir d'une clé « rouge de la carrosserie + lumières vives », avec des seuils lus sur l'image elle-même, donc valables pour un rendu final plus contrasté. Il est calculé pendant l'attente, pas au moment du gel. **La clé suppose une berline rouge** : si la teinte de la voiture change au rendu final, régler `HUE_FULL` et `HUE_ZERO`.
+- **La plaque et le niveau** se posent entre 73 et 85 % de la hauteur, sous la voiture, le niveau sur une seule ligne à toutes les tailles et dans les deux langues.
+- **Le passage à la fiche** : la fiche se monte, invisible, six images après le début du gel ; au sommet de l'éclair elle est là, et c'est l'éclair qui la révèle en retombant. L'à-coup mesuré au sommet (60 à 140 ms, processeur ralenti six fois) a disparu ; le balayage de lumière de la fiche va à son terme.
+- **Vérifié** : la chaîne entière sur le build de production (attente, film, arrêt sur image, éclair, fiche), sans erreur, dans Chrome sur ordinateur.
+- **Restent** : à six étoiles, l'horizon au couchant ressort en clair presque autant que la voiture (à revoir sur le rendu final) ; sur ordinateur, le film est rogné sur les côtés ; rien n'est vérifié sur un vrai iPhone.
