@@ -1,0 +1,51 @@
+{
+  "number": 1,
+  "start": "2026-11-01",
+  "end": "2026-12-31",
+  "rulesPublished": true,
+  "primes": [
+    {
+      "id": "demo-backend-stage",
+      "company": "Entreprise Démo",
+      "contract": "stage",
+      "positions": ["BE", "FS"],
+      "languages": ["Go", "TypeScript"],
+      "interviews": 3,
+      "place": "Ville Démo",
+      "remote": false,
+      "to": "2026-11-26",
+      "pitch": {
+        "fr": "Prime de démonstration : une équipe inventée cherche un stage backend. Rien de réel ici.",
+        "en": "Demo bounty: a made-up team looks for a backend intern. Nothing real here."
+      }
+    },
+    {
+      "id": "demo-data-alternance",
+      "company": "Atelier Démo",
+      "contract": "alternance",
+      "positions": ["DATA", "ML"],
+      "languages": ["Python"],
+      "interviews": 2,
+      "remote": true,
+      "pitch": {
+        "fr": "Prime de démonstration : une alternance data, en télétravail. Entreprise inventée.",
+        "en": "Demo bounty: a remote data work-study. Made-up company."
+      }
+    },
+    {
+      "id": "demo-front-cdi",
+      "company": "Bureau Démo",
+      "contract": "cdi",
+      "positions": ["FE"],
+      "interviews": 1,
+      "place": "Ville Démo",
+      "remote": true,
+      "from": "2026-11-01",
+      "to": "2026-11-10",
+      "pitch": {
+        "fr": "Prime de démonstration, close : un CDI frontend. Entreprise inventée.",
+        "en": "Demo bounty, closed: a frontend full-time job. Made-up company."
+      }
+    }
+  ]
+}

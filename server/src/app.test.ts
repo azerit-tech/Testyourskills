@@ -295,7 +295,8 @@ describe("/api/config : la saison et les primes (data/season.json)", () => {
   });
 
   it("une prime ouverte le dit ; sans saison, ni dates ni prime", async () => {
-    const open = setup({}, { season: { number: 2, start: "2020-01-01", end: "2099-12-31", primes: [{ id: "p1" }] } });
+    const p1 = { id: "p1", company: "Entreprise Démo", contract: "stage" as const, positions: ["BE" as const], languages: [], interviews: 1, remote: true, pitch: { fr: "a", en: "b" } };
+    const open = setup({}, { season: { number: 2, start: "2020-01-01", end: "2099-12-31", primes: [p1], rulesPublished: false } });
     expect(await (await open.app.request("/api/config")).json()).toMatchObject({ primesOpen: true, season: { number: 2, start: "2020-01-01", end: "2099-12-31" } });
     expect(JSON.stringify(await (await open.app.request("/api/config")).json())).not.toContain("p1");
     const none = setup({}, { season: null });
