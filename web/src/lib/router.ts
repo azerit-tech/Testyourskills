@@ -1,6 +1,7 @@
 // Petit routeur sur l'API history : un chemin, des écouteurs, rien de plus.
 import { useSyncExternalStore } from "react";
 import { isReservedSegment, isUpcomingPath } from "../../../shared/routes";
+import type { BandType } from "../../../shared/bands";
 import { parseLogin } from "./util";
 
 const listeners = new Set<() => void>();
@@ -46,6 +47,9 @@ export type Route =
   | { kind: "home" }
   | { kind: "card"; id: string }
   | { kind: "privacy" }
+  /** Les bandes (§18.38) : les deux tableaux, puis la page d'une bande. */
+  | { kind: "bands" }
+  | { kind: "band"; type: BandType; id: string }
   | { kind: "direct"; login: string }
   /** Page à venir (§18.27) : retour à l'accueil, jamais de fiche. */
   | { kind: "upcoming" }
@@ -65,6 +69,9 @@ export function routeOf(path: string): Route {
   if (card) return { kind: "card", id: card[1] };
   if (path === "/" || path === "") return { kind: "home" };
   if (/^\/(confidentialite|privacy)\/?$/.test(path)) return { kind: "privacy" };
+  if (/^\/bandes\/?$/i.test(path)) return { kind: "bands" };
+  const band = /^\/bandes\/(ecole|boite)\/([a-z0-9]+(?:-[a-z0-9]+)*)\/?$/.exec(path);
+  if (band) return { kind: "band", type: band[1] as BandType, id: band[2] };
   if (isUpcomingPath(path)) return { kind: "upcoming" };
   // /{pseudo} : la carte sans champ (§6.1).
   const direct = /^\/([^/]+)\/?$/.exec(path);

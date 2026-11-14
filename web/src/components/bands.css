@@ -1,0 +1,320 @@
+/* Les bandes (§18.38) : le bloc « Tu roules pour qui ? » sous la fiche, /bandes,
+   la page d'une bande et le top de l'accueil. Même système que le top de la
+   semaine (.board) et les blocs de l'après-fiche (.after-block) : aplats, titres
+   crème en Barlow Condensed, pilules rose poudré, aucune lueur, aucun dégradé.
+   Téléphone d'abord ; zones à toucher de 44 px au moins. */
+
+/* ---------- le bloc sous la fiche ---------- */
+
+.bands-pick {
+  gap: 16px;
+}
+.bp-league {
+  display: grid;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--lilac-faint);
+}
+.bp-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+}
+.bp-pills .pill {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bp-form {
+  display: grid;
+  gap: 8px;
+}
+.bp-form .pill {
+  width: 100%;
+}
+.bp-results {
+  display: grid;
+  list-style: none;
+  border-radius: 18px;
+  background: var(--ink-2);
+  overflow: hidden;
+}
+.bp-results li + li {
+  box-shadow: inset 0 1px 0 var(--lilac-faint);
+}
+.bp-result {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 20px;
+  border: 0;
+  background: none;
+  font: 500 16px/1.3 var(--f-text);
+  color: var(--cream);
+  text-align: left;
+  cursor: pointer;
+}
+.bp-result:hover,
+.bp-result:focus-visible {
+  background: var(--ink-1);
+}
+.bands-pick .bp-none {
+  padding: 12px 20px;
+  font: 500 14px/1.4 var(--f-text);
+  color: var(--lilac-dim);
+}
+.bands-pick .bp-error {
+  font: 500 14px/1.4 var(--f-text);
+  color: var(--siren-ink);
+}
+.bands-pick .bp-line {
+  font: 500 18px/1.4 var(--f-text);
+  color: var(--cream);
+}
+.bp-line a {
+  color: var(--cream);
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+.bp-stars {
+  color: var(--star);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.bp-rank {
+  display: block;
+  margin-top: 2px;
+  font: 600 16px/1.35 var(--f-text);
+  color: var(--blush);
+}
+.bp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+}
+
+/* ---------- une bande sur une ligne (BandRow) ---------- */
+
+.board-row.band-row {
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  min-height: 56px;
+}
+.band-name {
+  display: grid;
+  min-width: 0;
+  padding: 6px 0;
+}
+.band-name .board-login {
+  color: var(--cream);
+  font-weight: 600;
+}
+.band-count {
+  font: 500 13px/1.25 var(--f-text);
+  color: var(--lilac-dim);
+}
+.band-score {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font: 700 24px/1 var(--f-name);
+  color: var(--cream);
+  font-variant-numeric: tabular-nums;
+}
+.band-score svg {
+  width: 14px;
+  height: 14px;
+  fill: var(--star);
+}
+
+/* ---------- /bandes ---------- */
+
+.bands,
+.band,
+.band-roster,
+.band-recruit {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 24px var(--gutter) 0;
+}
+.bands h1,
+.band h1 {
+  font: 700 44px/0.92 var(--f-name);
+  text-transform: uppercase;
+  color: var(--cream);
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+.bands-intro {
+  font: 500 16px/1.45 var(--f-text);
+  color: var(--lilac-2);
+}
+.bands-tabs {
+  margin: 8px 0 4px;
+}
+.bands-panel {
+  display: grid;
+  gap: 12px;
+  min-height: 120px;
+}
+.bands-empty {
+  padding: 18px 16px;
+  border-radius: 18px;
+  background: var(--navy);
+  font: 500 15px/1.4 var(--f-text);
+  color: var(--lilac-2);
+}
+.bands-make {
+  padding-bottom: 56px;
+}
+
+/* ---------- la page d'une bande ---------- */
+
+.band-back {
+  justify-self: start;
+}
+.band-total {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 4px;
+}
+.band-total-score {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: 800 64px/0.9 var(--f-name);
+  color: var(--cream);
+  font-variant-numeric: tabular-nums;
+}
+.band-total-score svg {
+  width: 36px;
+  height: 36px;
+  fill: var(--star);
+}
+.band-total-count {
+  font: 600 17px/1.2 var(--f-text);
+  color: var(--lilac-2);
+}
+.band-rank {
+  font: 600 18px/1.35 var(--f-text);
+  color: var(--blush);
+}
+.band-ahead {
+  font: 500 15px/1.4 var(--f-text);
+  color: var(--lilac-dim);
+}
+.band-ahead a {
+  color: var(--lilac);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.band-share {
+  justify-self: start;
+  margin-top: 4px;
+}
+.band-make {
+  width: min(calc(100% - 2 * var(--gutter)), calc(680px - 2 * var(--gutter)));
+  margin: 28px auto 0;
+}
+.band-make .band-make-note {
+  font: 500 14px/1.4 var(--f-text);
+  color: var(--lilac-2);
+}
+.page-band {
+  padding-bottom: 56px;
+}
+.band-roster {
+  padding-top: 32px;
+}
+.band-roster h2 {
+  font: 700 34px/0.95 var(--f-name);
+  text-transform: uppercase;
+  color: var(--cream);
+}
+.band-member {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 0 14px;
+  font: 500 15px/1.25 var(--f-text);
+  color: var(--lilac);
+}
+.band-members > li + li {
+  box-shadow: inset 0 1px 0 var(--lilac-faint);
+}
+.band-member-profile {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.band-member-login {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font: 600 14px/1 var(--f-mono);
+  color: var(--blush);
+  text-decoration: none;
+}
+.band-member-login:hover {
+  color: var(--cream);
+}
+.band-more {
+  font: 500 14px/1.4 var(--f-text);
+  color: var(--lilac-dim);
+}
+.band-recruit {
+  padding-top: 28px;
+  padding-bottom: 8px;
+  font: 500 15px/1.45 var(--f-text);
+  color: var(--lilac-2);
+}
+.band-recruit a {
+  color: var(--peach);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ---------- le top de l'accueil ---------- */
+
+.bands-top-cols {
+  display: grid;
+  gap: 14px;
+}
+.bands-top-all {
+  justify-self: start;
+}
+
+@media (min-width: 900px) {
+  .bands h1,
+  .band h1 {
+    font-size: 64px;
+  }
+  .bands,
+  .band,
+  .band-roster,
+  .band-recruit {
+    padding-top: 40px;
+  }
+  .band-total-score {
+    font-size: 80px;
+  }
+  .board > .bands-top-cols {
+    grid-template-columns: 1fr 1fr;
+    max-width: 880px;
+    text-align: left;
+  }
+  .board > .bands-top-all {
+    width: auto;
+    justify-self: center;
+  }
+}

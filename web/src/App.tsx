@@ -5,6 +5,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { LangProvider } from "./i18n";
 import { isMock } from "./lib/api";
 import { navigate, routeOf, usePath } from "./lib/router";
+import { BandPage, Bands } from "./pages/Bands";
 import { CardPage } from "./pages/CardPage";
 import { DirectCard } from "./pages/DirectCard";
 import { Home } from "./pages/Home";
@@ -38,6 +39,10 @@ function Routes() {
       return <Home />;
     case "privacy":
       return <Privacy />;
+    case "bands":
+      return <Bands />;
+    case "band":
+      return <BandPage key={`${route.type}/${route.id}`} type={route.type} id={route.id} />;
     case "direct":
       return <DirectCard key={route.login} login={route.login} />;
     case "upcoming":

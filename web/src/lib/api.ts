@@ -11,7 +11,7 @@ import { currentRef } from "./session";
 
 export { ApiError };
 
-export type AnalyticsEvent = "card_generated" | "card_shared" | "card_email" | "cta_azerit_clicked" | "shared_visit" | "denounce_landed" | "plea" | "film";
+export type AnalyticsEvent = "card_generated" | "card_shared" | "card_email" | "cta_azerit_clicked" | "shared_visit" | "denounce_landed" | "plea" | "film" | "band_view" | "band_share";
 
 export interface CreateInput {
   login?: string;

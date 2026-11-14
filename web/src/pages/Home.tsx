@@ -1,6 +1,6 @@
 // Entrée (§6.1, §18.5, §18.31) : la couverture, puis sous elle le titre, les
 // portes, le champ et la promesse ; la fiche de Jacques, le mur des 13 profils
-// (§18.28) et le top de la semaine (§18.22). Rien d'autre.
+// (§18.28), le top de la semaine (§18.22) et celui des bandes (§18.38). Rien d'autre.
 // L'exemple est la vraie fiche de Jacques (fondateur d'Azerit) : la maquette
 // s'affiche d'abord, la fiche calculée par le serveur la remplace dès qu'elle existe.
 // Aucun dégradé dans la page : seuls ceux de la fiche et des illustrations.
@@ -14,6 +14,7 @@ import { Cover } from "../components/Cover";
 import { EntryForm } from "../components/EntryForm";
 import { ProfileWall } from "../components/ProfileWall";
 import { WeekBoard } from "../components/WeekBoard";
+import { BandsTop } from "../components/BandsTop";
 import { useT } from "../i18n";
 import { api, type Showcase } from "../lib/api";
 import { onLinkClick } from "../lib/router";
@@ -145,6 +146,7 @@ export function Home() {
       </section>
       <ProfileWall onPlay={play} />
       <WeekBoard onPlay={play} />
+      <BandsTop />
     </main>
   );
 }

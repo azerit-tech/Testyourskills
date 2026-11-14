@@ -6,6 +6,7 @@ import type { CardData, Fact, Finding, JobState, ProgressEvent } from "../../../
 import { declaredOf, LEVEL_LABELS, starsFor } from "../../../shared/types";
 import { AddSource, Claim, Contest, DeleteCard, EmailForm, Hiring, LinkedInPhoto, ShareBar, useMe, useToast } from "../components/After";
 import type { Shareable } from "../components/After";
+import { BandPick } from "../components/BandPick";
 import { Denounce } from "../components/Denounce";
 import { EntryForm } from "../components/EntryForm";
 import { ErrorBoundary } from "../components/ErrorBoundary";
@@ -520,6 +521,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
         {!visitor && <RecruiterGrid item={item} shared={false} who={main.login ? `@${main.login}` : main.name} />}
         {/* Dénonce un complice (§18.6), juste après le partage. */}
         {!visitor && <Denounce cardId={id} selfLogin={cardLogin} toast={toast.show} />}
+        {/* Tu roules pour qui ? (§18.38) : l'école et la boîte, après la dénonciation, avant le dossier. */}
+        {!visitor && <BandPick cardId={id} toast={toast.show} />}
         {/* L'enquête en direct (§18.26) : les trois trouvailles les plus fortes, chacune vers sa preuve. */}
         {!visitor && <Dossier card={main} />}
         {/* Fiche LinkedIn seule (§18.24) : « Ajoute ton GitHub pour prouver » est l'appel principal, pas une ligne repliée. */}
