@@ -33,6 +33,7 @@ import { primesOpen, seasonDates, type Season } from "../../shared/season";
 import { loadSeason } from "./season";
 import { mountRemoval } from "./removal";
 import { mountPrimes, purgeEntries } from "./primes";
+import { loadRules } from "./rules";
 
 export interface AppOptions {
   store: Store;
@@ -48,6 +49,8 @@ export interface AppOptions {
   leadsEndpoint?: string;
   /** La saison et ses primes (data/season.json). Absent : lu dans le fichier ; null : pas de saison. */
   season?: Season | null;
+  /** Le texte public du règlement (rules.ts). Absent : lu dans docs/ si la saison le publie ; null : pas de règlement. */
+  rules?: string | null;
   timeoutMs?: number;
   /** File d'attente des fiches (voir PipelineOptions). */
   maxConcurrentCards?: number;
@@ -307,6 +310,8 @@ export function createApp(opts: AppOptions) {
   // linkedinEntry : le champ de l'accueil accepte une adresse LinkedIn (§18.24).
   // season, primesOpen : les dates de la saison et si une prime est ouverte (data/season.json).
   const season = opts.season === undefined ? loadSeason() : opts.season;
+  // Le règlement n'existe que publié par la saison et présent sur le disque (rules.ts).
+  const rules = season?.rulesPublished ? (opts.rules === undefined ? loadRules() : opts.rules) : null;
   app.get("/api/config", (c) =>
     c.json({
       linkedin: !!opts.linkedin,
@@ -315,8 +320,8 @@ export function createApp(opts: AppOptions) {
       primesOpen: primesOpen(season, Date.now()),
       // primesListed : la saison porte au moins une prime (ouverte, à venir ou close) : /primes existe.
       primesListed: !!season && season.primes.length > 0,
-      // rulesPublished : /reglement est servi (relu par Jacques).
-      rulesPublished: !!season?.rulesPublished,
+      // rulesPublished : /reglement est servi (relu par Jacques, rules.ts).
+      rulesPublished: !!rules,
       season: season ? seasonDates(season) : null,
     }),
   );
@@ -735,6 +740,7 @@ export function createApp(opts: AppOptions) {
   mountPrimes(app, {
     store,
     season,
+    rules,
     limiter,
     baseUrl,
     owner: ownerFromRequest,

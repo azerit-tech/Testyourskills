@@ -14,6 +14,7 @@ import { SESSION_COOKIE, signSession } from "./auth";
 import { Store } from "./db";
 import type { Deps } from "./pipeline";
 import { purgeEntries } from "./primes";
+import { publicRules, RULES_MARK } from "./rules";
 
 const BASE = "https://skills.test";
 const SECRET = "s".repeat(40);
@@ -47,12 +48,12 @@ afterEach(() => {
   while (stores.length) stores.pop()!.close();
 });
 
-function setup(season: Season | null = seasonWith([prime()])) {
+function setup(season: Season | null = seasonWith([prime()]), rules: string | null = null) {
   const store = new Store(":memory:");
   stores.push(store);
   const ogDir = join(mkdtempSync(join(tmpdir(), "tys-primes-")), "og");
   mkdirSync(ogDir);
-  const { app } = createApp({ store, deps, githubToken: "t", baseUrl: BASE, ogDir, season, githubAuth: { clientId: "c", clientSecret: "x", sessionSecret: SECRET } });
+  const { app } = createApp({ store, deps, githubToken: "t", baseUrl: BASE, ogDir, season, rules, githubAuth: { clientId: "c", clientSecret: "x", sessionSecret: SECRET } });
   return { app, store, ogDir };
 }
 type Ctx = ReturnType<typeof setup>;
@@ -131,6 +132,7 @@ describe("sans prime, rien ne change", () => {
         expect(r.headers.get("location")).toBe("/");
       }
       expect((await ctx.app.request("/reglement")).status).toBe(404);
+      expect((await call(ctx, "/api/rules")).status).toBe(404);
       expect((await call(ctx, "/api/primes/demo-stage")).status).toBe(404);
       const id = insert(ctx.store, { login: "solo" });
       expect((await join_(ctx, owner(ctx.store, "solo"))).status).toBe(404);
@@ -287,5 +289,33 @@ describe("purge", () => {
     expect(purgeEntries(ctx.store.db, season, end + 29 * DAY)).toBe(0);
     await purge(ctx.store, ctx.ogDir, end + 31 * DAY, undefined, season);
     expect(ctx.store.db.prepare(`SELECT login FROM entries`).all()).toEqual([{ login: "gagne" }]);
+  });
+});
+
+describe("le règlement (/reglement)", () => {
+  const RAW = `# À relire\n\nPoint réservé à l'équipe.\n\n${RULES_MARK}\n\n# Règlement\n\nArticle 1.`;
+
+  it("seul le texte après le repère est public", () => {
+    expect(publicRules(RAW)).toBe("# Règlement\n\nArticle 1.");
+    expect(publicRules("# Sans repère")).toBeNull();
+  });
+
+  it("servi seulement quand la saison le publie et que le texte existe", async () => {
+    const text = publicRules(RAW);
+    // Publié, texte présent : la page passe au front, l'API rend le texte public seul.
+    const on = setup(seasonWith([prime()], { rulesPublished: true }), text);
+    expect((await call<Record<string, unknown>>(on, "/api/config")).json).toMatchObject({ rulesPublished: true });
+    const r = await call<{ lang: string; text: string }>(on, "/api/rules");
+    expect(r.status).toBe(200);
+    expect(r.json.text).toBe(text);
+    expect(r.text).not.toContain("réservé");
+    // Publié mais fichier absent : fermé.
+    const missing = setup(seasonWith([prime()], { rulesPublished: true }), null);
+    expect((await call<Record<string, unknown>>(missing, "/api/config")).json).toMatchObject({ rulesPublished: false });
+    expect((await missing.app.request("/Reglement/")).status).toBe(404);
+    // Texte présent mais pas publié : fermé.
+    const off = setup(seasonWith([prime()]), text);
+    expect((await call(off, "/api/rules")).status).toBe(404);
+    expect((await off.app.request("/reglement")).status).toBe(404);
   });
 });

@@ -11,6 +11,7 @@ import { CardPage } from "./pages/CardPage";
 import { DirectCard } from "./pages/DirectCard";
 import { Home } from "./pages/Home";
 import { PrimePage, PrimesList } from "./pages/Primes";
+import { Rules } from "./pages/Rules";
 import { NotFound, Privacy } from "./pages/Privacy";
 
 /** Mode démo uniquement : aperçu du site dans des cadres de téléphone (360 et 390 px). */
@@ -39,6 +40,13 @@ function PrimesGate({ children }: { children: React.ReactNode }) {
   return cfg.primesListed ? <>{children}</> : <BackHome />;
 }
 
+/** Le règlement n'existe que publié (data/season.json, rulesPublished) : sinon, page introuvable. */
+function RulesGate() {
+  const cfg = useAppConfig();
+  if (!cfg) return <main className="page" id="main" aria-busy />;
+  return cfg.rulesPublished ? <Rules /> : <NotFound />;
+}
+
 function Routes() {
   const route = routeOf(usePath());
   switch (route.kind) {
@@ -64,6 +72,8 @@ function Routes() {
           <PrimePage id={route.id} />
         </PrimesGate>
       );
+    case "rules":
+      return <RulesGate />;
     case "direct":
       return <DirectCard key={route.login} login={route.login} />;
     case "upcoming":

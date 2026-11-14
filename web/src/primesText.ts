@@ -110,6 +110,11 @@ const fr = {
       generic: "Ça n'a pas pris. Réessaie.",
     },
   },
+  rules: {
+    title: "Règlement de la saison",
+    enNote: "",
+    error: "Le règlement n'est pas disponible pour l'instant.",
+  },
   privacy: {
     h: "Les primes",
     p: "Rien n'est gardé sans «\u00a0Concourir\u00a0». Si tu concours, on garde ton pseudo GitHub, la prime, ta fiche, ta ligue, ton email, tes liens de preuves, la date de ton accord, ta réponse sur l'âge et sur le lieu, ta note et l'état de ta candidature. Le classement public montre ton pseudo, ta note et ton rang\u00a0; ton email et tes preuves ne sont jamais publics. L'entreprise de la prime ne reçoit ton profil (pseudo, email, lien de fiche, preuves) que si tu es finaliste, comme tu l'as accepté. «\u00a0Me retirer\u00a0», sur la page de la prime, efface l'inscription tout de suite\u00a0; supprimer ou masquer ta fiche aussi. Sans victoire, tout est effacé 30 jours après la fin de la saison.",
@@ -216,6 +221,11 @@ const en: PrimesDict = {
       proofs: "That link doesn't look like a web address.",
       generic: "That didn't take. Try again.",
     },
+  },
+  rules: {
+    title: "Season rules",
+    enNote: "These are the season's contest rules. Only the French text below is binding. In short: entry is free and open to people 18 or older; each bounty ranks claimed sheets by their overall rating alone, no bonus, ties broken by evidence then entry date; the top ten become finalists and, as they agreed, their profile goes to the bounty's company; you can withdraw in one tap; entries without a win are erased 30 days after the season ends.",
+    error: "The rules aren't available yet.",
   },
   privacy: {
     h: "Bounties",

@@ -228,6 +228,8 @@ const joinSchema = z.object({
 export interface PrimesOptions {
   store: Store;
   season: Season | null;
+  /** Le texte public du règlement (rules.ts) ; null : /reglement répond 404. */
+  rules: string | null;
   limiter: RateLimiter;
   baseUrl: string;
   /** Propriétaire connecté (auth.ts), sinon null. */
@@ -407,6 +409,14 @@ export function mountPrimes(app: Hono, o: PrimesOptions): void {
     return c.json({ needsGithub: false, degraded: false, lines } satisfies Race);
   });
 
+  // GET /api/rules : le texte public du règlement, en français (il fait foi).
+  // Jamais les points à relire qui le précèdent dans le fichier (rules.ts).
+  app.get("/api/rules", (c) => {
+    if (!o.rules) return refuse(c, 404, "not_found", o.notFound);
+    c.header("Cache-Control", "public, max-age=300");
+    return c.json({ lang: "fr", text: o.rules });
+  });
+
   // Les pages. Sans prime dans la saison, /primes ramène à l'accueil comme avant ;
   // le règlement n'existe pas tant que rulesPublished est faux.
   const home = (c: Context) => {
@@ -417,7 +427,7 @@ export function mountPrimes(app: Hono, o: PrimesOptions): void {
   app.get("*", async (c, next) => {
     const path = c.req.path;
     if (/^\/primes(?:\/|$)/i.test(path)) return listed ? next() : home(c);
-    if (/^\/reglement\/?$/i.test(path)) return season?.rulesPublished ? next() : c.text("Not found", 404);
+    if (/^\/reglement\/?$/i.test(path)) return o.rules ? next() : c.text("Not found", 404);
     return next();
   });
 }

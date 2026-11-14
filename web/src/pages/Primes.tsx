@@ -29,7 +29,7 @@ export function PrimesList() {
   const [primes, setPrimes] = useState<PrimeView[] | null>(null);
 
   useEffect(() => {
-    document.title = `${tl.title} · Testyourskills`;
+    document.title = tl.title;
   }, [tl.title]);
 
   useEffect(() => {
@@ -154,7 +154,7 @@ export function PrimePage({ id }: { id: string }) {
   const prime = data?.prime;
   useEffect(() => {
     if (!prime) return;
-    document.title = `${prime.company} · ${t.primes.contract[prime.contract]}`;
+    document.title = `${prime.company} : ${t.primes.contract[prime.contract]}`;
     const key = `tys_prime_seen_${prime.id}`;
     try {
       if (sessionStorage.getItem(key)) return;
