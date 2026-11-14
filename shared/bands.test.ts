@@ -175,6 +175,9 @@ describe("le nom libre d'une boîte : refus et nettoyage", () => {
     expect(cleanCompanyLabel("★★ ALAN ★★")).toBe("ALAN");
     expect(cleanCompanyLabel("BNP PARIBAS CARDIF")).toBe("BNP Paribas Cardif");
     expect(cleanCompanyLabel("IBM")).toBe("IBM");
+    expect(cleanCompanyLabel("🚀 MA PETITE BOÎTE ★")).toBe("Ma Petite Boîte");
+    expect(cleanCompanyLabel("THE ACCOUNTS OF IBM")).toBe("The Accounts of IBM");
+    expect(cleanCompanyLabel("CAISSE DES DÉPÔTS")).toBe("Caisse des Dépôts");
     expect(cleanCompanyLabel("doctolib")).toBe("Doctolib");
     expect(cleanCompanyLabel("leBonCoin")).toBe("leBonCoin");
     expect(cleanCompanyLabel("Ça Marche & Cie!!!")).toBe("Ça Marche");

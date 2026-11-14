@@ -273,6 +273,9 @@ export function isBlockedBand(type: BandType, id: string, label?: string | null)
 /** Les signes gardés dans un libellé : lettres, chiffres, espaces, & ' ’ . , + ( ) - /. Le reste (emoji, étoiles, #, !, _…) part. */
 const KEEP_RE = /[^\p{L}\p{M}\p{N} &'’.,+()/-]/gu;
 
+/** Petits mots français et anglais qu'un nom en capitales ne garde pas en capitales. */
+const SMALL_WORDS = new Set(["le", "la", "les", "l", "de", "des", "du", "d", "et", "en", "au", "aux", "un", "une", "ma", "mon", "mes", "ta", "ton", "sa", "son", "nos", "vos", "the", "of", "and", "my", "a", "an", "for", "by"]);
+
 const capitalize = (w: string) => w.charAt(0).toLocaleUpperCase("fr") + w.slice(1).toLocaleLowerCase("fr");
 
 /**
@@ -303,7 +306,14 @@ export function cleanCompanyLabel(name: string): string {
     .replace(/[^\p{L}\p{N})]+$/u, "");
   const letters = s.replace(/[^\p{L}]/gu, "");
   if (letters.length > 1 && letters === letters.toLocaleUpperCase("fr") && letters !== letters.toLocaleLowerCase("fr")) {
-    s = s.replace(/\p{L}+/gu, (w) => (w.length > 4 ? capitalize(w) : w));
+    // Les petits mots courants (« MA », « LA », « THE ») ne sont pas des sigles : en tête, une capitale ; ailleurs, minuscules.
+    let first = true;
+    s = s.replace(/\p{L}+/gu, (w) => {
+      const lead = first;
+      first = false;
+      if (SMALL_WORDS.has(w.toLocaleLowerCase("fr"))) return lead ? capitalize(w) : w.toLocaleLowerCase("fr");
+      return w.length > 4 ? capitalize(w) : w;
+    });
   } else if (letters && letters === letters.toLocaleLowerCase("fr")) {
     s = s.charAt(0).toLocaleUpperCase("fr") + s.slice(1);
   }
