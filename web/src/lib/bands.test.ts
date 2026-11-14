@@ -1,9 +1,9 @@
 // Les bandes côté front (§18.38) : les adresses, la ligne du rang, les pastilles
 // proposées, et des textes sans tiret long ni point médian ni rang d'école.
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { BandStanding, MyBands } from "../../../shared/bands";
 import { DICTS } from "../i18n";
-import { filledStars, suggestedPills } from "./bands";
+import { BAND_HINT_MS, bandHint, filledStars, rememberBandHint, suggestedPills } from "./bands";
 import { routeOf } from "./router";
 
 const { fr, en } = DICTS;
@@ -95,5 +95,21 @@ describe("les textes des bandes", () => {
     const sec = fr.privacy.sections.find((s) => s.h === "Les bandes");
     expect(sec?.p).toMatch(/Sortir/);
     expect(en.privacy.sections.some((s) => s.h === "Crews")).toBe(true);
+  });
+});
+
+describe("la bande d'où l'on vient", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("passe en tête sous la fiche faite le même jour, plus après", () => {
+    const mem = new Map<string, string>();
+    vi.stubGlobal("localStorage", { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => void mem.set(k, v) });
+    const t = 1_800_000_000_000;
+    rememberBandHint({ type: "ecole", id: "epitech", label: "Epitech" }, t);
+    expect(bandHint(t + 3600_000)).toEqual({ type: "ecole", id: "epitech", label: "Epitech" });
+    expect(bandHint(t + BAND_HINT_MS + 1)).toBeNull();
+    // Un souvenir d'avant cette règle, sans date : ignoré.
+    mem.set("tys_band_hint", JSON.stringify({ type: "ecole", id: "epitech", label: "Epitech" }));
+    expect(bandHint(t)).toBeNull();
   });
 });

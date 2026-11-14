@@ -111,13 +111,18 @@ const isRef = (v: unknown): v is BandRef =>
   !!v && typeof v === "object" && ((v as BandRef).type === "ecole" || (v as BandRef).type === "boite") && typeof (v as BandRef).id === "string" && typeof (v as BandRef).label === "string";
 
 /** La bande d'où l'on vient (sa page vue) : « Fais ta fiche pour… », puis sa pastille en tête. */
-export function rememberBandHint(ref: BandRef) {
-  writeJson(HINT_KEY, { type: ref.type, id: ref.id, label: ref.label });
+export function rememberBandHint(ref: BandRef, now = Date.now()) {
+  writeJson(HINT_KEY, { type: ref.type, id: ref.id, label: ref.label, at: now });
 }
 
-export function bandHint(): BandRef | null {
+/** Elle vaut un jour : une fiche faite bien plus tard, ou par quelqu'un d'autre sur ce navigateur, ne la reçoit pas en tête. */
+export const BAND_HINT_MS = 24 * 3600 * 1000;
+
+export function bandHint(now = Date.now()): BandRef | null {
   const v = readJson<unknown>(HINT_KEY);
-  return isRef(v) ? v : null;
+  const at = v && typeof v === "object" ? (v as { at?: unknown }).at : null;
+  if (!isRef(v) || typeof at !== "number" || now - at > BAND_HINT_MS) return null;
+  return { type: v.type, id: v.id, label: v.label };
 }
 
 /** Les bandes choisies depuis ce navigateur, pour « Ta bande » sur /bandes. */
