@@ -249,9 +249,11 @@ function bandMembers(store: Store, type: BandType, id: string, now: number): Ban
     const row = store.getCard(r.cardId);
     const card = row ? mainCard(row) : null;
     const profile = card?.profile?.label ?? null;
+    // Le poste, déjà sur la fiche publique : deux dossiers du même profil ne se lisent plus comme un doublon.
+    const position = card?.position;
     // Le @pseudo seulement pour une fiche revendiquée par ce login, jamais le nom d'une fiche LinkedIn ou CV.
     const claimed = !!r.login && r.personKey === `gh:${r.login}` && !!store.getOwner(r.login);
-    return { stars: r.stars, profile, ...(claimed ? { login: card?.login ?? r.login!, cardId: r.cardId } : {}) };
+    return { stars: r.stars, profile, ...(position ? { position } : {}), ...(claimed ? { login: card?.login ?? r.login!, cardId: r.cardId } : {}) };
   });
 }
 

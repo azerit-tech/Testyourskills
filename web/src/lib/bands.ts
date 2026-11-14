@@ -212,9 +212,11 @@ const mock = {
       { fr: "L'Architecte", en: "The Architect" },
       null,
     ];
+    const positions = ["BE", "FE", "DATA", "FS", "OPS"] as const;
     const members = Array.from({ length: Math.min(band.members, 12) }, (_, i) => ({
       stars: Math.max(1, 6 - Math.floor(i / 3)),
       profile: profiles[i % profiles.length],
+      position: positions[i % positions.length],
       ...(i === 0 ? { login: "leamd", cardId: "m-gold-abcd" } : {}),
     }));
     return { band, members };

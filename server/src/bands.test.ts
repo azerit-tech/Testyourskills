@@ -351,6 +351,8 @@ describe("pages publiques", () => {
       [4, null, null],
     ]);
     expect(r.json.members[0]!.profile).toEqual(FIXTURES.gold.profile!.label);
+    // Le poste de la fiche, déjà public, distingue deux dossiers du même profil.
+    expect(r.json.members.map((m) => m.position)).toEqual([FIXTURES.gold.position, FIXTURES.gold.position, FIXTURES.gold.position]);
     const text = JSON.stringify(r.json);
     expect(text).not.toMatch(/Léa Martin|Nom Caché|Personne LinkedIn|anonyme|linkedin\.com|rang [SABC]|tier|"school"/);
   });

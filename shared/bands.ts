@@ -15,7 +15,7 @@
 //   qu'à partir de trois dossiers (`hasPage`).
 
 import raw from "../data/bands.json";
-import type { Fact } from "./types";
+import type { Fact, Position } from "./types";
 
 /** Les deux ligues, telles qu'elles s'écrivent dans les adresses (/bandes/ecole/:id). */
 export type BandType = "ecole" | "boite";
@@ -84,6 +84,8 @@ export interface BandMember {
   stars: number;
   /** Nom du profil criminel, si la fiche en a un. */
   profile: Fact | null;
+  /** Le poste de la fiche (backend, front, data…), déjà public sur la fiche : distingue deux dossiers du même profil. */
+  position?: Position;
   /** Pseudo GitHub, seulement pour une fiche revendiquée. */
   login?: string;
   /** Adresse de la fiche, seulement pour une fiche revendiquée. */

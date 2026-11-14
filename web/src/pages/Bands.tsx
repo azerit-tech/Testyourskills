@@ -105,6 +105,8 @@ export function Bands() {
 function Member({ m }: { m: BandMember }) {
   const { t, lang } = useT();
   const profile = m.profile ? pick(m.profile, lang) : t.bands.page.unnamed;
+  // Le poste de la fiche à côté du profil : deux dossiers du même profil ne se lisent pas comme un doublon.
+  const position = m.position ? t.positions[m.position] : null;
   const href = m.cardId ? `/c/${m.cardId}` : null;
   return (
     <li className="band-member">
@@ -113,7 +115,10 @@ function Member({ m }: { m: BandMember }) {
           <Star key={i} className={i >= 6 - m.stars ? "on" : undefined} />
         ))}
       </span>
-      <span className="band-member-profile">{profile}</span>
+      <span className="band-member-profile">
+        {profile}
+        {position && <span className="band-member-position">{position}</span>}
+      </span>
       {m.login && href && (
         <a className="band-member-login" href={href} onClick={(e) => onLinkClick(e, href)}>
           @{m.login}

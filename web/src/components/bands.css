@@ -260,9 +260,19 @@
   box-shadow: inset 0 1px 0 var(--lilac-faint);
 }
 .band-member-profile {
+  display: grid;
+  min-width: 0;
+  padding: 6px 0;
+}
+.band-member-profile,
+.band-member-position {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+.band-member-position {
+  font: 500 13px/1.25 var(--f-text);
+  color: var(--lilac-dim);
 }
 .band-member-login {
   display: inline-flex;
