@@ -43,6 +43,9 @@ const showcaseLinkedinRaw = process.env.SHOWCASE_LINKEDIN ?? (process.env.SHOWCA
 const showcaseLinkedin = showcaseLinkedinRaw?.trim() ? (normalizeLinkedinUrl(showcaseLinkedinRaw) ?? undefined) : undefined;
 if (showcaseLinkedinRaw?.trim() && !showcaseLinkedin) console.warn("SHOWCASE_LINKEDIN n'est pas une adresse de profil (linkedin.com/in/…) : vitrine sans LinkedIn.");
 const githubAuth = githubAuthFromEnv(process.env);
+// La trace du film (FILM_TRACE=1) : à côté de la base, var/film-trace.log en local.
+const filmTraceFile = process.env.FILM_TRACE === "1" ? join(dirname(dbPath), "film-trace.log") : undefined;
+if (filmTraceFile) console.log(`Trace du film : POST /api/film-trace écrit dans ${filmTraceFile}.`);
 
 if (!githubToken) {
   if (prod) {
@@ -111,6 +114,7 @@ const { app, pipeline } = createApp({
   githubAuth,
   secureCookies: prod,
   avatarDir,
+  filmTraceFile,
 });
 
 // Purge 90 jours (§11) au démarrage puis toutes les heures.

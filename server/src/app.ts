@@ -32,6 +32,7 @@ import { forgetLinkedinOfCard, recentLinkedinCard } from "./linkedinProfile/card
 import { primesOpen, seasonDates, type Season } from "../../shared/season";
 import { loadSeason } from "./season";
 import { mountRemoval } from "./removal";
+import { mountFilmTrace } from "./filmTrace";
 import { mountPrimes, purgeEntries } from "./primes";
 import { mountPrimePages } from "./primePages";
 import { loadRules } from "./rules";
@@ -86,6 +87,8 @@ export interface AppOptions {
   aiStatus?: () => AiStatus;
   /** LinkedIn contre GitHub, et l'entrée LinkedIn (§18.24). Absent : pas de jeton de fournisseur, fonctionnalité absente. */
   linkedinProfiles?: LinkedinFinder;
+  /** La trace du film (FILM_TRACE=1, filmTrace.ts) : le fichier où l'écrire. Absent : pas de route. */
+  filmTraceFile?: string;
 }
 
 /** La carte vitrine est recalculée au plus une fois par semaine. */
@@ -733,6 +736,8 @@ export function createApp(opts: AppOptions) {
   mountDenounce(app, { store, hiddenFrom, notFound: MESSAGES.not_found, withdrawn: MESSAGES.withdrawn, jury });
   // Demande de retrait d'une fiche sans pseudo GitHub, par la personne fichée (removal.ts).
   mountRemoval(app, { store, limiter, leadsEndpoint: opts.leadsEndpoint, baseUrl, fetchImpl });
+  // La trace du film sur un vrai téléphone, seulement si on l'a demandée (filmTrace.ts).
+  if (opts.filmTraceFile) mountFilmTrace(app, { file: opts.filmTraceFile });
   // Les bandes (§18.38) : les tableaux, la page d'une bande, entrer et sortir (bands.ts).
   mountBands(app, { store, limiter, ownedBy, tokenMatches, hiddenFrom, notFound: MESSAGES.not_found, withdrawn: MESSAGES.withdrawn });
   // Leur partage : l'image 1200 × 630 d'une bande et les balises de /bandes (bandPages.ts).
