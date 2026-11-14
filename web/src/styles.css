@@ -137,7 +137,8 @@ svg {
   transform: translateY(-160%);
   transition: transform 0.2s var(--ease-out);
 }
-.skip-link:focus {
+/* Au clavier seulement : un toucher ou un focus posé par le navigateur ne le sort pas par-dessus la page. */
+.skip-link:focus-visible {
   transform: none;
 }
 
