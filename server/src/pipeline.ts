@@ -8,6 +8,7 @@
 
 import { randomBytes, randomInt } from "node:crypto";
 import type { CardData, ComparisonData, ErrorCode, Fact, Finding, JobState, Lang, ProgressEvent } from "../../shared/types";
+import type { BandStanding } from "../../shared/bands";
 import { forReveal, githubFindings, strongest } from "./findings";
 import type { CodeReadingResult, CvReading, CvTextCounts, RepoFiles } from "../../shared/readings";
 import type { NewCardRow, Store } from "./db";
@@ -25,9 +26,11 @@ export type GithubAuth = string | TokenPool;
 
 export interface RenderInput {
   /** `home` : l'aperçu de lien de l'accueil (/og/home.png), avec la fiche de la vitrine. `story` : 9:16, une fiche seule. */
-  format: "card" | "og" | "portrait" | "story" | "home";
+  format: "card" | "og" | "portrait" | "story" | "home" | "band";
   card?: CardData;
   comparison?: ComparisonData;
+  /** `band` : l'aperçu de lien d'une bande (§18.38). */
+  band?: BandStanding;
   lang: Lang;
 }
 

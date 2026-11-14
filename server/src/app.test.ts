@@ -1396,7 +1396,6 @@ describe("pages à venir (§18.27)", () => {
       ["/primes", "/"],
       ["/Reglement/", "/"],
       ["/vs/a/b?mock=1", "/?mock=1"],
-      ["/bandes", "/"],
       ["/badge/octocat", "/"],
       ["/u/octocat?mock=1&x=2", "/?mock=1&x=2"],
     ];

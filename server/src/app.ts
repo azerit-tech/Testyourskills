@@ -23,6 +23,7 @@ import { mountAuth, ownerFromRequest, sameOrigin, type GithubAuthConfig } from "
 import { DENOUNCE_LIMITED, DENOUNCE_PER_DAY, mountDenounce, parseDenunciation } from "./denounce";
 import { mountJury } from "./jury";
 import { mountBands } from "./bands";
+import { mountBandPages } from "./bandPages";
 import { aiStatus as budgetAiStatus, type AiStatus } from "./ai/budget";
 import type { TokenPool } from "./github/tokens";
 import { weekTop, withWeekSpecial } from "./top";
@@ -714,6 +715,8 @@ export function createApp(opts: AppOptions) {
   mountRemoval(app, { store, limiter, leadsEndpoint: opts.leadsEndpoint, baseUrl, fetchImpl });
   // Les bandes (§18.38) : les tableaux, la page d'une bande, entrer et sortir (bands.ts).
   mountBands(app, { store, limiter, ownedBy, tokenMatches, hiddenFrom, notFound: MESSAGES.not_found, withdrawn: MESSAGES.withdrawn });
+  // Leur partage : l'image 1200 × 630 d'une bande et les balises de /bandes (bandPages.ts).
+  mountBandPages(app, { store, baseUrl, ogDir, render: (input) => deps.renderImage(input), indexHtml: opts.indexHtml });
 
   mountLinkedin(app, {
     store,

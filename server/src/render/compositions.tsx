@@ -101,7 +101,7 @@ function Scene({ w, h, horizon, sun, maxH, palms }: { w: number; h: number; hori
 }
 
 /** Fond d'encre plat. */
-function Ink({ w, h }: { w: number; h: number }) {
+export function Ink({ w, h }: { w: number; h: number }) {
   return <rect width={w} height={h} fill={PALETTE.ink0} />;
 }
 
@@ -172,7 +172,7 @@ const skyInk = (scene: SceneImage | null | undefined) => SKY_TEXT[scene?.tone ??
  * (`xMidYMid`, le sujet est au centre de l'illustration) ou calée en haut (`xMidYMin`,
  * le ciel reste). Sans fichier, le front de mer dessiné. `r` : coins du panneau.
  */
-function SceneFrame({ scene, id, x, y, w, h, align, r = 0 }: { scene: SceneImage | null | undefined; id: string; x: number; y: number; w: number; h: number; align: "xMidYMid" | "xMidYMin"; r?: number }) {
+export function SceneFrame({ scene, id, x, y, w, h, align, r = 0 }: { scene: SceneImage | null | undefined; id: string; x: number; y: number; w: number; h: number; align: "xMidYMid" | "xMidYMin"; r?: number }) {
   const clip = `${id}-frame`;
   const horizon = Math.round(h * 0.84);
   const k = h / 300;
@@ -276,7 +276,7 @@ export function OgImage({ card, lang, avatars, scene }: { card: CardData; lang: 
 }
 
 /** « Fais la tienne : skills.azerit.tech », au pied des aperçus de lien. */
-function CtaLine({ x, y, lang }: { x: number; y: number; lang: Lang }) {
+export function CtaLine({ x, y, lang }: { x: number; y: number; lang: Lang }) {
   const s = t(lang);
   const cta = lang === "fr" ? `${s.cta}\u00a0:` : `${s.cta}:`;
   const ctaW = fit(cta, { font: "sans-500", size: 26, minSize: 26, maxWidth: 4000 }).width;

@@ -3,7 +3,7 @@ import { routeOf } from "./router";
 
 describe("routeOf (§18.27)", () => {
   it("une page à venir n'est jamais un pseudo, quelle que soit la casse", () => {
-    for (const p of ["/primes", "/PRIMES", "/reglement/", "/vs", "/bandes", "/badge", "/u", "/u/octocat", "/vs/a/b"]) {
+    for (const p of ["/primes", "/PRIMES", "/reglement/", "/vs", "/badge", "/u", "/u/octocat", "/vs/a/b"]) {
       expect(routeOf(p), p).toEqual({ kind: "upcoming" });
     }
   });
