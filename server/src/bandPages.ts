@@ -46,11 +46,11 @@ export function bandMeta(b: BandStanding, baseUrl: string): PageMeta {
     lang: "fr",
     url: `${baseUrl}/bandes/${b.type}/${b.id}`,
     image: `${baseUrl}${bandImagePath(b)}`,
-    title: `${b.label}, ${where} · ★ ${b.score}`,
+    title: `${b.label} : ${where}, ★ ${b.score}`,
     description: b.rank
       ? `${dossiersFr(b.members)}. Viens gonfler la bande : fais ta fiche pour ${b.label}.`
       : `${formingFr(b.missing)}. Fais ta fiche pour ${b.label}.`,
-    imageAlt: `${b.label} · ★ ${b.score} · ${dossiersFr(b.members)}`,
+    imageAlt: `${b.label}, ★ ${b.score}, ${dossiersFr(b.members)}`,
   };
 }
 
@@ -59,7 +59,7 @@ export function boardMeta(baseUrl: string): PageMeta {
   return {
     lang: "fr",
     url: `${baseUrl}/bandes`,
-    title: "Les bandes · écoles et boîtes · Testyourskills",
+    title: "Les bandes de Testyourskills : écoles et boîtes",
     description: "Les écoles et les boîtes classées aux étoiles de leurs dossiers. Fais ta fiche, et rapporte à ta bande.",
     image: `${baseUrl}${HOME_IMAGE_PATH}`,
     imageAlt: "Testyourskills, les bandes",
@@ -129,7 +129,7 @@ export function mountBandPages(app: Hono, o: BandPagesOptions): void {
     const type = c.req.param("type");
     const id = c.req.param("id");
     const band = isBandType(type) && BAND_ID_RE.test(id) ? bandStanding(store.db, type, id) : null;
-    if (!band) return page(c, { ...boardMeta(baseUrl), title: "Bande introuvable · Testyourskills" }, 404);
+    if (!band) return page(c, { ...boardMeta(baseUrl), title: "Bande introuvable" }, 404);
     return page(c, bandMeta(band, baseUrl), 200);
   });
 }

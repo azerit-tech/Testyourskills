@@ -56,7 +56,7 @@
     { "id": "insa-autres", "label": "INSA, autres campus", "pattern": "\\binsa\\b|institut national des sciences appliquees" },
     { "id": "utc", "label": "UTC", "pattern": "\\butc\\b|universite de technologie de compiegne" },
     { "id": "epita", "label": "EPITA", "pattern": "\\bepita\\b" },
-    { "id": "ecole-42", "label": "42", "pattern": "^(l )?(ecole )?42\\b|\\becole 42\\b|\\b42 (paris|school|network)\\b" },
+    { "id": "ecole-42", "label": "École 42", "pattern": "^(l )?(ecole )?42\\b|\\becole 42\\b|\\b42 (paris|school|network)\\b" },
     { "id": "dauphine", "label": "Dauphine", "pattern": "\\bdauphine\\b" },
     { "id": "psl", "label": "Université PSL", "pattern": "\\bpsl\\b|paris sciences (et|and) lettres" },
     { "id": "paris-saclay", "label": "Université Paris-Saclay", "pattern": "\\bparis saclay\\b|universite paris sud|\\bparis (11|xi)\\b" },

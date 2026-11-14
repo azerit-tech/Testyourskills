@@ -63,30 +63,30 @@ const standing = (o: Partial<BandStanding>): BandStanding => ({
 describe("balises d'une bande", () => {
   it("le nom, le rang, le score ; l'image porte la clé de ce qu'elle dit", () => {
     const m = bandMeta(standing({}), BASE);
-    expect(m.title).toBe("CentraleSupélec, 3e des écoles · ★ 74");
+    expect(m.title).toBe("CentraleSupélec : 3e des écoles, ★ 74");
     expect(m.description).toBe("31 dossiers. Viens gonfler la bande : fais ta fiche pour CentraleSupélec.");
     expect(m.url).toBe(`${BASE}/bandes/ecole/centralesupelec`);
     expect(m.image).toMatch(new RegExp(`^${BASE}/og/b/ecole/centralesupelec\\.png\\?v=\\d+&k=[0-9a-f]{10}$`));
-    expect(bandMeta(standing({ rank: 1, ahead: null, gap: null }), BASE).title).toBe("CentraleSupélec, n° 1 des écoles · ★ 74");
+    expect(bandMeta(standing({ rank: 1, ahead: null, gap: null }), BASE).title).toBe("CentraleSupélec : n° 1 des écoles, ★ 74");
     const forming = bandMeta(standing({ rank: null, missing: 2, members: 1, score: 5, gap: null, ahead: null }), BASE);
-    expect(forming.title).toBe("CentraleSupélec, bande en formation · ★ 5");
+    expect(forming.title).toBe("CentraleSupélec : bande en formation, ★ 5");
     expect(forming.description).toBe("Bande en formation : il manque 2 complices. Fais ta fiche pour CentraleSupélec.");
     expect(bandImageKey(standing({ score: 75 }))).not.toBe(bandImageKey(standing({})));
   });
 
   it("la ligne du rang", () => {
-    expect(bandRankLine(standing({}), "fr")).toBe("3e des écoles · à 6 étoiles de la 2e");
-    expect(bandRankLine(standing({ rank: 2, ahead: { id: "x", label: "X", rank: 1 }, gap: 0 }), "fr")).toBe("2e des écoles · à égalité avec la tête");
+    expect(bandRankLine(standing({}), "fr")).toBe("3e des écoles, à 6 étoiles de la 2e");
+    expect(bandRankLine(standing({ rank: 2, ahead: { id: "x", label: "X", rank: 1 }, gap: 0 }), "fr")).toBe("2e des écoles, à égalité avec la tête");
     expect(bandRankLine(standing({ type: "boite", rank: 1, ahead: null, gap: null }), "fr")).toBe("n° 1 des boîtes");
     expect(bandRankLine(standing({ rank: null, missing: 1, gap: null, ahead: null }), "fr")).toBe("Bande en formation : il manque 1 complice");
-    expect(bandRankLine(standing({}), "en")).toBe("#3 among schools · 6 stars behind #2");
+    expect(bandRankLine(standing({}), "en")).toBe("#3 among schools, 6 stars behind #2");
   });
 
   it("GET /bandes/:type/:id injecte ses balises dans le front ; elles suivent le score", async () => {
     const ctx = setup();
     for (let i = 0; i < 3; i++) member(ctx.store, "epitech");
     const html = await (await ctx.app.request("/bandes/ecole/epitech")).text();
-    expect(html).toContain(`<meta property="og:title" content="Epitech, n° 1 des écoles · ★ 12">`);
+    expect(html).toContain(`<meta property="og:title" content="Epitech : n° 1 des écoles, ★ 12">`);
     expect(html).toContain('<div id="root">');
     const image = /og:image" content="([^"]+)"/.exec(html)![1]!;
     member(ctx.store, "epitech");
@@ -123,7 +123,7 @@ describe("la composition", () => {
     expect(svg).toContain("CENTRALESUPÉLEC");
     expect(svg).toContain(">74<");
     expect(svg).toContain("31 dossiers");
-    expect(svg).toContain("3e des écoles · à 6 étoiles de la 2e");
+    expect(svg).toContain("3e des écoles, à 6 étoiles de la 2e");
     expect(svg).not.toMatch(/rang [SABC]\b|tier/i);
   });
 });

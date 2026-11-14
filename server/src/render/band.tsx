@@ -16,24 +16,24 @@ import { sceneFor } from "./scenes";
 const STAR = "M12 2.6l2.9 6.1 6.7.8-4.9 4.6 1.3 6.6L12 17.4l-6 3.3 1.3-6.6L2.4 9.5l6.7-.8z";
 
 const LEAGUE: Record<Lang, Record<BandStanding["type"], { kicker: string; of: string }>> = {
-  fr: { ecole: { kicker: "Bande · École", of: "des écoles" }, boite: { kicker: "Bande · Boîte", of: "des boîtes" } },
-  en: { ecole: { kicker: "Gang · School", of: "among schools" }, boite: { kicker: "Gang · Company", of: "among companies" } },
+  fr: { ecole: { kicker: "Bande d’école", of: "des écoles" }, boite: { kicker: "Bande de boîte", of: "des boîtes" } },
+  en: { ecole: { kicker: "School crew", of: "among schools" }, boite: { kicker: "Company crew", of: "among companies" } },
 };
 
-/** « 3e des écoles · à 6 étoiles de la 2e », « n° 1 des écoles », ou ce qui manque à une bande en formation. */
+/** « 3e des écoles, à 6 étoiles de la 2e », « n° 1 des écoles », ou ce qui manque à une bande en formation. */
 export function bandRankLine(b: BandStanding, lang: Lang): string {
   const l = LEAGUE[lang][b.type];
   if (lang === "en") {
-    if (!b.rank) return `Gang forming: ${b.missing} more ${b.missing > 1 ? "accomplices" : "accomplice"} needed`;
+    if (!b.rank) return `Crew forming: ${b.missing} more ${b.missing > 1 ? "accomplices" : "accomplice"} needed`;
     const ord = `#${b.rank} ${l.of}`;
     if (!b.ahead || b.gap === null) return ord;
-    return b.gap > 0 ? `${ord} · ${b.gap} ${b.gap > 1 ? "stars" : "star"} behind #${b.ahead.rank}` : `${ord} · level with #${b.ahead.rank}`;
+    return b.gap > 0 ? `${ord}, ${b.gap} ${b.gap > 1 ? "stars" : "star"} behind #${b.ahead.rank}` : `${ord}, level with #${b.ahead.rank}`;
   }
   if (!b.rank) return `Bande en formation : il manque ${b.missing} ${b.missing > 1 ? "complices" : "complice"}`;
   const ord = `${b.rank === 1 ? "n° 1" : `${b.rank}e`} ${l.of}`;
   if (!b.ahead || b.gap === null) return ord;
   const ahead = b.ahead.rank === 1 ? "la tête" : `la ${b.ahead.rank}e`;
-  return b.gap > 0 ? `${ord} · à ${b.gap} ${b.gap > 1 ? "étoiles" : "étoile"} de ${ahead}` : `${ord} · à égalité avec ${ahead}`;
+  return b.gap > 0 ? `${ord}, à ${b.gap} ${b.gap > 1 ? "étoiles" : "étoile"} de ${ahead}` : `${ord}, à égalité avec ${ahead}`;
 }
 
 export function BandOg({ band, lang }: { band: BandStanding; lang: Lang }) {
