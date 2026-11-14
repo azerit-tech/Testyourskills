@@ -1461,3 +1461,13 @@ Le minimum des §18.4 et §18.5 est en ligne sur `master`, **éteint** : tant qu
 - **Mesure** : `prime_view`, `prime_join`, `prime_withdraw` (dix-huit événements au total) ; section « Les primes » sur la page Confidentialité.
 - **Démonstration** : `SEASON_FILE=scripts/demo/season-demo.json` (entreprises fictives) allume tout en local.
 - **Pas vérifié** : un vrai logo, les aperçus de partage sur LinkedIn, la transmission réelle.
+
+### 18.47 Premier essai sur iPhone : le film figé, et la trace (14 novembre, nuit)
+
+Premier essai sur un vrai iPhone (Safari, site servi sur le réseau local, mode démo). Verdict de Jacques : « il démarre seul, une seule image, il part mais s'arrête, ça skip direct sur la fin », avec « un son qui grésille ».
+
+- **Cause, mesurée sur l'iPhone et sur Chrome de bureau.** Pour un dossier de type comparaison (la porte par défaut), la page reconstruisait la fiche à chaque rendu ; le plan du film changeait donc d'identité, et le lecteur était détruit puis recréé (sept montages mesurés). Le dernier lecteur, prêt après le passage en lecture, n'était jamais lancé : première image figée, son réduit à la pluie. La porte GitHub seule n'était pas touchée, et c'est la seule que les essais précédents avaient jouée. Leçon : tout essai du film se rejoue par la porte par défaut.
+- **Correction.** Un seul objet fiche par dossier dans la page ; le plan du film ne change que si son contenu change (`samePlan`, `shared/film/plan.ts`) ; un lecteur recréé pendant la lecture est lancé dès qu'il est prêt ; l'événement `film` est celui de la révélation, un seul par révélation. Test de non-régression `web/src/components/film.test.ts`.
+- **La trace du film.** `?filmtrace=1` affiche en bas de l'écran ce que font les deux balises vidéo et le lecteur, et l'envoie à `POST /api/film-trace`, route montée seulement si `FILM_TRACE=1` (sortie : `film-trace.log` à côté de la base). Sans le paramètre, rien n'est chargé. Aucune donnée de fiche ni de personne. La route reste éteinte en production, sauf le temps d'un diagnostic.
+- **Reste à juger sur l'iPhone** après correction : la lecture entière, la coupe, l'arrêt sur image, le passage à la fiche, le son sur le haut-parleur, et le navigateur intégré de LinkedIn.
+
