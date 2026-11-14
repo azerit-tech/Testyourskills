@@ -1426,3 +1426,14 @@ Le film a son son, entièrement synthétisé dans le navigateur (aucun fichier a
 - **Niveaux mesurés** : −16 LUFS à six étoiles, −17 à deux, crête sous −1 dBFS ; la basse passe par ses harmoniques (150 et 400 Hz), pas par les sous-basses, pour un haut-parleur de téléphone.
 - **Pas vérifié** : l'écoute elle-même, un vrai téléphone (interrupteur silencieux de l'iPhone, navigateur de LinkedIn, retard Bluetooth), un vrai calage de la vidéo dans un navigateur.
 - Le rendu hors ligne de la bande-son existe : il servira au clip à partager.
+
+### 18.44 Les bandes : les risques fermés (14 novembre 2026)
+
+Suite des §18.40 et §18.41, en ligne sur `master`.
+
+- **Le nom libre d'une boîte** : une boîte hors alias n'a ni page publique, ni image de partage, ni place au tableau avant trois dossiers ; d'ici là, seule la personne la voit, sous sa fiche, « en formation ». À l'entrée, un nom est refusé s'il porte une insulte ou un terme haineux (`refusedWords`, `refusedStems` dans `data/bands.json`), une adresse, un `@` ou six chiffres ; le libellé affiché est toujours nettoyé. Une bande se ferme à la main par `blocked` dans `data/bands.json` (effet au redéploiement). `npm run bands:review` liste les boîtes hors alias : **à lancer chaque jour la première semaine**, car aucun filtre n'arrête le nom d'une personne tapé comme nom de boîte.
+- **Le top et les dénonciations** (clôt le point ouvert du §18.40) : `cards.denounce_born` distingue la fiche née d'une dénonciation de la fiche dénoncée après coup. Le top, le jeton de la fiche, la grille et l'entrée dans une bande ne lisent que ce drapeau : dénoncer une fiche déjà faite ne retire plus rien à sa personne.
+- **La page d'une bande** : chaque dossier porte son poste sous son profil ; sous le tableau de `/bandes`, le formulaire de l'accueil. La porte LinkedIn s'affiche par défaut sur « Fais ta fiche pour … » (vérifié en local, sans appel au fournisseur) ; la bande d'où l'on vient est proposée en premier pendant 24 heures.
+- **L'image d'une bande** : le décor à son format et, dessous, les vingt places de la bande, pleines ou vides.
+- **Textes** : « Ta fiche en une minute. » ; un test compare les événements nommés sur la page Confidentialité à ceux que le serveur enregistre (quinze). Le lien « Aller au contenu » ne sort plus qu'au clavier.
+- **Restent** : une insulte masquée par un astérisque passe ; la page « Cette bande n'existe pas » est une impasse ; les erreurs anglaises du serveur disent « gang » quand le site dit « crew » ; « 0 file » en anglais ; la création réelle d'une fiche LinkedIn et le partage sur un vrai téléphone ne sont pas vérifiés.
