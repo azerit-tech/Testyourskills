@@ -27,6 +27,8 @@ import type { TokenPool } from "./github/tokens";
 import { weekTop, withWeekSpecial } from "./top";
 import { normalizeLinkedinUrl, PAID_CALLS_PER_IP, type LinkedinFinder } from "./linkedinProfile/index";
 import { forgetLinkedinOfCard, recentLinkedinCard } from "./linkedinProfile/cards";
+import { primesOpen, seasonDates, type Season } from "../../shared/season";
+import { loadSeason } from "./season";
 
 export interface AppOptions {
   store: Store;
@@ -40,6 +42,8 @@ export interface AppOptions {
   /** Cache disque des PNG du dessin en cours (var/og/v2 en dev, /data/og/v2 en prod, shared/images.ts). */
   ogDir: string;
   leadsEndpoint?: string;
+  /** La saison et ses primes (data/season.json). Absent : lu dans le fichier ; null : pas de saison. */
+  season?: Season | null;
   timeoutMs?: number;
   /** File d'attente des fiches (voir PipelineOptions). */
   maxConcurrentCards?: number;
@@ -293,7 +297,17 @@ export function createApp(opts: AppOptions) {
 
   // Ce que le front doit afficher ou masquer.
   // linkedinEntry : le champ de l'accueil accepte une adresse LinkedIn (§18.24).
-  app.get("/api/config", (c) => c.json({ linkedin: !!opts.linkedin, claim: !!opts.githubAuth, linkedinEntry: !!opts.linkedinProfiles }));
+  // season, primesOpen : les dates de la saison et si une prime est ouverte (data/season.json).
+  const season = opts.season === undefined ? loadSeason() : opts.season;
+  app.get("/api/config", (c) =>
+    c.json({
+      linkedin: !!opts.linkedin,
+      claim: !!opts.githubAuth,
+      linkedinEntry: !!opts.linkedinProfiles,
+      primesOpen: primesOpen(season, Date.now()),
+      season: season ? seasonDates(season) : null,
+    }),
+  );
 
   // GET /api/showcase : le vrai jugement du pseudo vitrine, pour l'accueil (§6.1,
   // §18.35) : sa fiche (celle de son dossier s'il a deux pièces, §18.36), le lien

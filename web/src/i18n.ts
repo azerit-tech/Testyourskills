@@ -25,13 +25,19 @@ const fr = {
     skipToContent: "Aller au contenu",
   },
   home: {
-    /** Fin de la saison 1 (§18.4, dates proposées) : à lire dans data/season.json quand les primes existeront. */
-    season: "Saison 1 · jusqu'au 31 décembre",
+    /** Le bandeau de saison, dates lues dans data/season.json (web/src/lib/season.ts). */
+    season: {
+      soon: (n: number, day: string) => `Saison ${n} · dès le ${day}`,
+      on: (n: number, day: string) => `Saison ${n} · jusqu'au ${day}`,
+      over: (n: number) => `Saison ${n} terminée`,
+    },
     /** Le titre, deux phrases de deux lignes chacune (shared/promise.ts, sa seule source).
      * Insécables : une seule coupure possible par phrase, jamais un mot seul. */
     titleClaim: heroSentence(HOME_PROMISE.fr.claim),
     titleProof: heroSentence(HOME_PROMISE.fr.proof),
-    titleB: "Le haut du classement décroche un entretien.",
+    /** La ligne sous le titre, choisie par web/src/lib/season.ts : l'entretien seulement si une prime est ouverte. */
+    hookPrimes: "Le haut du classement décroche un entretien.",
+    hookPlay: "Fais ta fiche. Fais gagner ta bande.",
     tabGithub: "Ton GitHub",
     loginLabel: "Pseudo GitHub ou URL du profil",
     loginPlaceholder: "ton-pseudo",
@@ -753,10 +759,15 @@ const en: Dict = {
     skipToContent: "Skip to content",
   },
   home: {
-    season: "Season 1 · until 31 December",
+    season: {
+      soon: (n, day) => `Season ${n} · from ${day}`,
+      on: (n, day) => `Season ${n} · until ${day}`,
+      over: (n) => `Season ${n} is over`,
+    },
     titleClaim: heroSentence(HOME_PROMISE.en.claim),
     titleProof: heroSentence(HOME_PROMISE.en.proof),
-    titleB: "The top of the board lands an interview.",
+    hookPrimes: "The top of the board lands an interview.",
+    hookPlay: "Get your file. Make your crew win.",
     tabGithub: "Your GitHub",
     loginLabel: "GitHub username or profile URL",
     loginPlaceholder: "your-username",

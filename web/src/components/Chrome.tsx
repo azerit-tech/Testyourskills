@@ -3,6 +3,7 @@ import type { Lang } from "../../../shared/types";
 import { useT } from "../i18n";
 import { api, isMock } from "../lib/api";
 import { onLinkClick } from "../lib/router";
+import { seasonLine, useAppConfig } from "../lib/season";
 import { Brand } from "./Brand";
 
 export function LangToggle() {
@@ -48,12 +49,15 @@ function Palm({ className }: { className: string }) {
 
 /** Le bandeau de la saison, en aplat pêche au-dessus de l'accueil, deux palmiers à chaque bout (§18.31). */
 export function SeasonBand() {
-  const { t } = useT();
+  const { t, lang } = useT();
+  // Les dates de data/season.json, servies par /api/config (lib/season.ts).
+  const text = seasonLine(t.home.season, useAppConfig()?.season ?? null, lang, Date.now());
+  if (!text) return null;
   return (
     <p className="season-band">
       <Palm className="is-l" />
       <Palm className="is-l is-small" />
-      <span className="season-text">{t.home.season}</span>
+      <span className="season-text">{text}</span>
       <Palm className="is-r is-small" />
       <Palm className="is-r" />
     </p>

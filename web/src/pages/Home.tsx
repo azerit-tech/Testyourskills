@@ -17,6 +17,7 @@ import { WeekBoard } from "../components/WeekBoard";
 import { useT } from "../i18n";
 import { api, type Showcase } from "../lib/api";
 import { onLinkClick } from "../lib/router";
+import { homeHook, useAppConfig } from "../lib/season";
 
 /** Au-delà, le top est tenu pour absent : la couverture ne garde pas ses cases prunes. */
 const TOP_WAIT_MS = 3000;
@@ -95,6 +96,8 @@ export function Home() {
   const nextRef = useRef<HTMLElement>(null);
   const showcase = useShowcase();
   const top = useTop();
+  // La ligne sous le titre (lib/season.ts) : l'entretien seulement si une prime est ouverte.
+  const hook = homeHook(h, useAppConfig());
 
   useEffect(() => {
     document.title = t.meta.title;
@@ -128,8 +131,8 @@ export function Home() {
           </h1>
           {/* La promesse : sous la pilule sur téléphone, en colonne de droite sur ordinateur ;
            * l'une des deux est toujours en display: none, donc lue une seule fois. */}
-          <EntryForm inputRef={inputRef} note={<p className="hero-hook hero-hook-s">{h.titleB}</p>} />
-          <p className="hero-hook hero-hook-l">{h.titleB}</p>
+          <EntryForm inputRef={inputRef} note={<p className="hero-hook hero-hook-s">{hook}</p>} />
+          <p className="hero-hook hero-hook-l">{hook}</p>
           <button type="button" className="hero-next" onClick={next} aria-label={h.next}>
             <svg viewBox="0 0 24 24" aria-hidden>
               <path d="M6 9.5l6 6 6-6" />

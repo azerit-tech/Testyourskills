@@ -1,6 +1,8 @@
 // Client de l'API. En mode démo (?mock=1 ou VITE_MOCK=1), tout passe par mock.ts.
 import { fileOf } from "../../../shared/caseFile";
 import { IMAGE_QUERY } from "../../../shared/images";
+import { parseSeason, seasonDates, type SeasonDates } from "../../../shared/season";
+import seasonJson from "../../../data/season.json";
 import type { CardData, JobState, Lang, Piece, WeekRank, WeekTop } from "../../../shared/types";
 import { mockApi } from "./mock";
 import { mockTop, mockWeekRank } from "./mockTop";
@@ -93,6 +95,23 @@ export interface AppConfig {
   claim: boolean;
   /** Le champ unique accepte un lien LinkedIn : le serveur a un fournisseur de profils (§18.24). */
   linkedinEntry: boolean;
+  /** Une prime au moins est ouverte (data/season.json, §18.4). */
+  primesOpen: boolean;
+  /** Les dates de la saison (data/season.json) ; null si le serveur n'en a pas. */
+  season: SeasonDates | null;
+}
+
+/** La configuration lue dans une réponse de /api/config (ou sa copie de session) : tout champ douteux vaut « non ». */
+export function parseConfig(raw: unknown): AppConfig {
+  const c = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const s = parseSeason(c.season && typeof c.season === "object" ? { ...c.season, primes: [] } : null);
+  return {
+    linkedin: c.linkedin === true,
+    claim: c.claim === true,
+    linkedinEntry: c.linkedinEntry === true,
+    primesOpen: c.primesOpen === true,
+    season: s ? seasonDates(s) : null,
+  };
 }
 
 /** Propriétaire connecté par GitHub (§18.1). */
@@ -101,8 +120,16 @@ export interface Me {
   hidden: boolean;
 }
 
+/**
+ * Les dates de data/season.json, prises au build : ce que le bandeau affiche avant
+ * la réponse de /api/config (le même fichier, servi par le serveur), sans saut.
+ */
+const parsedSeason = parseSeason(seasonJson);
+export const SEASON_FILE: SeasonDates | null = parsedSeason ? seasonDates(parsedSeason) : null;
+
 let configPromise: Promise<AppConfig> | null = null;
-const MOCK_CONFIG: AppConfig = { linkedin: true, claim: true, linkedinEntry: true };
+/** Mode démo : la saison du fichier, aucune prime ouverte (il n'en existe pas encore). */
+const MOCK_CONFIG: AppConfig = { linkedin: true, claim: true, linkedinEntry: true, primesOpen: false, season: SEASON_FILE };
 const CONFIG_KEY = "tys_config";
 /** La configuration une fois connue : en RAM, et dans sessionStorage pour la page suivante. */
 let configMemo: AppConfig | null = null;
@@ -114,8 +141,7 @@ function getConfig(): Promise<AppConfig> {
       ? Promise.resolve(MOCK_CONFIG)
       : fetch("/api/config", { headers: { Accept: "application/json" } })
           .then(async (r) => {
-            const c = (r.ok ? await r.json() : {}) as { linkedin?: boolean; claim?: boolean; linkedinEntry?: boolean } | null;
-            const cfg = { linkedin: c?.linkedin === true, claim: c?.claim === true, linkedinEntry: c?.linkedinEntry === true };
+            const cfg = parseConfig(r.ok ? await r.json() : null);
             // Seule une vraie réponse est gardée pour la session : une panne passagère ne fige rien.
             if (r.ok) {
               try {
@@ -126,7 +152,7 @@ function getConfig(): Promise<AppConfig> {
             }
             return cfg;
           })
-          .catch(() => ({ linkedin: false, claim: false, linkedinEntry: false }));
+          .catch(() => parseConfig(null));
     void configPromise.then((c) => (configMemo = c));
   }
   return configPromise;
@@ -139,8 +165,7 @@ function knownConfig(): AppConfig | null {
   try {
     const raw = sessionStorage.getItem(CONFIG_KEY);
     if (!raw) return null;
-    const c = JSON.parse(raw) as Partial<AppConfig> | null;
-    return { linkedin: c?.linkedin === true, claim: c?.claim === true, linkedinEntry: c?.linkedinEntry === true };
+    return parseConfig(JSON.parse(raw));
   } catch {
     return null;
   }

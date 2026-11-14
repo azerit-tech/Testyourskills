@@ -127,7 +127,7 @@ async function callback(ctx: ReturnType<typeof setup>, qs: string, cookie = jar)
 describe("configuration", () => {
   it("désactivée sans les variables : health, config, start", async () => {
     const ctx = setup(undefined, false);
-    expect(await (await ctx.app.request("/api/config")).json()).toEqual({ linkedin: false, claim: false, linkedinEntry: false });
+    expect(await (await ctx.app.request("/api/config")).json()).toMatchObject({ linkedin: false, claim: false, linkedinEntry: false });
     expect((await (await ctx.app.request("/api/health")).json()).linkedin).toBe(false);
     insertCard(ctx.store);
     expect((await start(ctx, "CardAAAA01")).status).toBe(404);
@@ -135,7 +135,7 @@ describe("configuration", () => {
 
   it("activée : config le dit", async () => {
     const ctx = setup();
-    expect(await (await ctx.app.request("/api/config")).json()).toEqual({ linkedin: true, claim: false, linkedinEntry: false });
+    expect(await (await ctx.app.request("/api/config")).json()).toMatchObject({ linkedin: true, claim: false, linkedinEntry: false });
   });
 });
 

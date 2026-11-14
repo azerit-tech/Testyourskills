@@ -14,6 +14,8 @@ describe("image de l'accueil", () => {
     // Le titre de l'accueil, de shared/promise.ts : deux phrases de deux lignes.
     for (const line of ["AZERIT OUVRE", "TON DOSSIER.", "TU PLAIDES", "QUOI"]) expect(fr.toUpperCase()).toContain(line);
     expect(fr.toUpperCase()).not.toContain("DIT SENIOR");
+    // Aucune prime ouverte (data/season.json) : l'aperçu ne promet pas d'entretien.
+    expect(fr).not.toMatch(/entretien/i);
     expect(fr).toContain("Fais la tienne");
     const en = await renderSvg({ format: "home", card, lang: "en" });
     for (const line of ["AZERIT OPENS", "YOUR FILE.", "HOW DO", "YOU PLEAD?"]) expect(en.toUpperCase()).toContain(line);

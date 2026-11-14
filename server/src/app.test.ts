@@ -285,6 +285,24 @@ describe("erreurs du moteur", () => {
   });
 });
 
+describe("/api/config : la saison et les primes (data/season.json)", () => {
+  it("lit le fichier : les dates de la saison 1, aucune prime ouverte", async () => {
+    const ctx = setup();
+    expect(await (await ctx.app.request("/api/config")).json()).toMatchObject({
+      primesOpen: false,
+      season: { number: 1, start: "2026-11-19", end: "2026-12-31" },
+    });
+  });
+
+  it("une prime ouverte le dit ; sans saison, ni dates ni prime", async () => {
+    const open = setup({}, { season: { number: 2, start: "2020-01-01", end: "2099-12-31", primes: [{ id: "p1" }] } });
+    expect(await (await open.app.request("/api/config")).json()).toMatchObject({ primesOpen: true, season: { number: 2, start: "2020-01-01", end: "2099-12-31" } });
+    expect(JSON.stringify(await (await open.app.request("/api/config")).json())).not.toContain("p1");
+    const none = setup({}, { season: null });
+    expect(await (await none.app.request("/api/config")).json()).toMatchObject({ primesOpen: false, season: null });
+  });
+});
+
 describe("délai de la fiche (60 s par défaut)", () => {
   it("60 s par défaut, et le temps qui reste dans l'état du job", async () => {
     expect(CARD_TIMEOUT_MS).toBe(60_000);
