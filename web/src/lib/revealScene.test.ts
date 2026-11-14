@@ -11,29 +11,45 @@ function fakeWindow(search: string, store: Map<string, string>) {
   });
 }
 
-describe("la scène de la révélation (§18.33)", () => {
+describe("la scène de la révélation (§18.39)", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("l'ascenseur par défaut, tant que la poursuite n'est pas validée", () => {
-    expect(DEFAULT_SCENE).toBe("walkout");
+  it("le film par défaut", () => {
+    expect(DEFAULT_SCENE).toBe("film");
     fakeWindow("", new Map());
-    expect(revealScene()).toBe("walkout");
+    expect(revealScene()).toBe("film");
   });
 
-  it("?scene=film choisit le film (§18.36), sans changer le défaut", () => {
+  it("?scene=walkout garde l'ascenseur pour la session, sans changer le défaut", () => {
     const store = new Map<string, string>();
-    fakeWindow("?mock=1&scene=film", store);
+    fakeWindow("?mock=1&scene=walkout", store);
+    expect(revealScene()).toBe("walkout");
+    // la navigation de l'accueil à la fiche perd l'adresse, pas le choix
+    fakeWindow("", store);
+    expect(revealScene()).toBe("walkout");
+    expect(parseScene("walkout")).toBe("walkout");
+    expect(DEFAULT_SCENE).toBe("film");
+    // ?scene=film revient au film dans la même session
+    fakeWindow("?scene=film", store);
     expect(revealScene()).toBe("film");
     fakeWindow("", store);
     expect(revealScene()).toBe("film");
-    expect(parseScene("film")).toBe("film");
-    expect(DEFAULT_SCENE).toBe("walkout");
   });
 
   it("une valeur inconnue ne change rien", () => {
     expect(parseScene("3d")).toBeNull();
     fakeWindow("?scene=3d", new Map());
-    expect(revealScene()).toBe("walkout");
+    expect(revealScene()).toBe("film");
+  });
+
+  it("stockage de session bloqué : l'adresse, sinon le film", () => {
+    vi.stubGlobal("window", {
+      location: { search: "" },
+      get sessionStorage(): Storage {
+        throw new Error("bloqué");
+      },
+    });
+    expect(revealScene()).toBe("film");
   });
 
   it("mouvement réduit : rien ne joue, ni film ni ascenseur", () => {
@@ -42,8 +58,8 @@ describe("la scène de la révélation (§18.33)", () => {
     expect(revealToPlay("film", false)).toBe("film");
   });
 
-  it("le premier contact avec le formulaire précharge le film, vidéos comprises, sauf économiseur de données ou mouvement réduit", () => {
-    expect(prefetchScene("film", { saveData: false, reduced: false })).toBe("film");
+  it("le premier contact avec le formulaire précharge la seule scène qui jouera, sauf économiseur de données ou mouvement réduit", () => {
+    expect(prefetchScene(DEFAULT_SCENE, { saveData: false, reduced: false })).toBe("film");
     expect(prefetchScene("film", { saveData: true, reduced: false })).toBeNull();
     expect(prefetchScene("film", { saveData: false, reduced: true })).toBeNull();
     expect(prefetchScene("walkout", { saveData: false, reduced: false })).toBe("walkout");
