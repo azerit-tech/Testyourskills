@@ -31,9 +31,13 @@ export function formingFr(missing: number): string {
 
 export const dossiersFr = (n: number): string => `${n} ${n > 1 ? "dossiers" : "dossier"}`;
 
-/** La clé de l'image d'une bande : elle change avec tout ce que l'image dit. */
+/** Le dessin de l'image d'une bande (2 : le décor à son format et les places de la bande). */
+export const BAND_IMAGE_DESIGN = 2;
+
+/** La clé de l'image d'une bande : elle change avec tout ce que l'image dit, et avec son dessin. */
 export function bandImageKey(b: BandStanding): string {
-  const said = [b.label, b.score, b.members, b.rank, b.missing, b.gap, b.ahead?.rank ?? null];
+  // BAND_IMAGE_DESIGN : change avec le dessin de l'image, pour que les PNG gardés en cache se refassent.
+  const said = [BAND_IMAGE_DESIGN, b.label, b.score, b.members, b.rank, b.missing, b.gap, b.ahead?.rank ?? null];
   return createHash("sha256").update(JSON.stringify(said)).digest("hex").slice(0, 10);
 }
 

@@ -1,10 +1,12 @@
 // L'image de partage d'une bande (SPEC §18.38), 1200 × 630, dans la langue des
-// aperçus de fiche (compositions.tsx) : l'encre plate, le lieu du crime par
-// défaut en panneau à droite, et à gauche ce qu'on lit en miniature : la ligue,
-// le nom de la bande en grand, son score en étoiles, son rang (ou ce qui lui
-// manque pour entrer au tableau), puis l'adresse. Aucun dégradé ajouté, aucune
-// lueur. Jamais le rang d'école du barème, jamais un membre.
-import type { BandStanding } from "../../../shared/bands";
+// aperçus de fiche (compositions.tsx) : l'encre plate ; à gauche ce qu'on lit en
+// miniature : la ligue, le nom de la bande en grand, son score en étoiles, son
+// rang (ou ce qui lui manque pour entrer au tableau), puis l'adresse. À droite,
+// le lieu du crime par défaut à son format (sans recadrage ni aplat vide), et
+// dessous les places de la bande : les vingt dossiers qui comptent, pleins ou
+// libres, ou les trois qu'il faut pour entrer au tableau. Aucun dégradé ajouté,
+// aucune lueur. Jamais le rang d'école du barème, jamais un membre.
+import { BAND_MIN_MEMBERS, BAND_TOP_MEMBERS, type BandStanding } from "../../../shared/bands";
 import { fontAttrs } from "../../../shared/card/fonts";
 import { fit, fitLines, upper, wrap } from "../../../shared/card/text";
 import { PALETTE } from "../../../shared/card/themes";
@@ -36,10 +38,58 @@ export function bandRankLine(b: BandStanding, lang: Lang): string {
   return b.gap > 0 ? `${ord}, à ${b.gap} ${b.gap > 1 ? "étoiles" : "étoile"} de ${ahead}` : `${ord}, à égalité avec ${ahead}`;
 }
 
+/** Ce que disent les places sous le décor. */
+const SLOTS: Record<Lang, { top: string; forming: string }> = {
+  fr: { top: `Les ${BAND_TOP_MEMBERS} meilleurs dossiers comptent`, forming: `${BAND_MIN_MEMBERS} dossiers pour entrer au tableau` },
+  en: { top: `The best ${BAND_TOP_MEMBERS} files count`, forming: `${BAND_MIN_MEMBERS} files to make the board` },
+};
+
+/**
+ * Les places de la bande, sous le décor : un dossier plein porte son étoile, une
+ * place libre est un cadre en pointillé. Au tableau, les vingt qui comptent ; en
+ * formation, les trois qu'il faut.
+ */
+function Slots({ band, lang, x, y, w, bottom }: { band: BandStanding; lang: Lang; x: number; y: number; w: number; bottom: number }) {
+  const forming = !band.rank;
+  const n = forming ? BAND_MIN_MEMBERS : BAND_TOP_MEMBERS;
+  const cols = forming ? n : 5;
+  const rows = Math.ceil(n / cols);
+  const gap = forming ? 14 : 10;
+  const captionY = bottom;
+  const tileW = (w - gap * (cols - 1)) / cols;
+  const tileH = forming ? 120 : (captionY - 40 - y - gap * (rows - 1)) / rows;
+  const top = forming ? y + Math.round((captionY - 40 - y - tileH) / 2) : y;
+  const filled = Math.min(band.members, n);
+  const star = Math.min(tileH, tileW) * (forming ? 0.42 : 0.5);
+  return (
+    <g>
+      {Array.from({ length: n }, (_, i) => {
+        const tx = x + (i % cols) * (tileW + gap);
+        const ty = top + Math.floor(i / cols) * (tileH + gap);
+        if (i >= filled) {
+          return <rect key={i} x={tx + 1} y={ty + 1} width={tileW - 2} height={tileH - 2} rx={8} fill="none" stroke={PALETTE.lilac} strokeOpacity={0.35} strokeWidth={2} strokeDasharray="6 6" />;
+        }
+        return (
+          <g key={i}>
+            <rect x={tx} y={ty} width={tileW} height={tileH} rx={8} fill={PALETTE.navy} />
+            <g transform={`translate(${tx + (tileW - star) / 2} ${ty + (tileH - star) / 2}) scale(${star / 24})`}>
+              <path d={STAR} fill={PALETTE.star} />
+            </g>
+          </g>
+        );
+      })}
+      <text x={x} y={captionY} {...fontAttrs("sans-500")} fontSize={24} fill={PALETTE.lilac} fillOpacity={0.8}>
+        {forming ? SLOTS[lang].forming : SLOTS[lang].top}
+      </text>
+    </g>
+  );
+}
+
 export function BandOg({ band, lang }: { band: BandStanding; lang: Lang }) {
   const W = 1200;
   const H = 630;
-  const panel = { x: 760, y: 32, w: 408, h: 566 };
+  // Le décor « small » fait 576 × 384 : le panneau garde ce format, rien n'est recadré.
+  const panel = { x: 760, y: 32, w: 408, h: 272 };
   const x = 64;
   const maxW = panel.x - x - 48;
 
@@ -63,7 +113,13 @@ export function BandOg({ band, lang }: { band: BandStanding; lang: Lang }) {
   const scoreW = fit(scoreText, { font: "display-800", size: scoreSize, minSize: scoreSize, maxWidth: 4000 }).width;
   const dossiers = lang === "fr" ? `${band.members} ${band.members > 1 ? "dossiers" : "dossier"}` : `${band.members} ${band.members === 1 ? "file" : "files"}`;
 
-  const rank = wrap(bandRankLine(band, lang), "sans-600", 34, maxW, 2);
+  // En formation, deux lignes voulues : « Bande en formation », puis « Il manque 1 complice ».
+  const rankText = bandRankLine(band, lang);
+  const cut = band.rank ? -1 : rankText.indexOf(":");
+  const rank =
+    cut > 0
+      ? [rankText.slice(0, cut).trimEnd(), rankText.slice(cut + 1).trim().replace(/^./, (c) => c.toLocaleUpperCase(lang))]
+      : wrap(rankText, "sans-600", 34, maxW, 2);
   const rankY = scoreY + 64;
 
   return (
@@ -92,6 +148,7 @@ export function BandOg({ band, lang }: { band: BandStanding; lang: Lang }) {
           {l}
         </text>
       ))}
+      <Slots band={band} lang={lang} x={panel.x} y={panel.y + panel.h + 28} w={panel.w} bottom={598} />
       <CtaLine x={x} y={598} lang={lang} />
     </svg>
   );
