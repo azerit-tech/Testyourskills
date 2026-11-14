@@ -4,6 +4,7 @@
 // tirée par freeze.ts), les deux images d'encre de la coupe, le grain et la
 // vignette. Tout vient de hudAt : aucun état, aucune animation CSS qui
 // dériverait de l'image. Mat : aplats, ni halo ni ombre lumineuse.
+import type { CSSProperties } from "react";
 import type { Lang } from "../../../shared/types";
 import type { FilmPlan, Hud } from "../../../shared/film";
 
@@ -57,7 +58,7 @@ export function FilmHud({ plan, hud, lang }: { plan: FilmPlan; hud: Hud; lang: L
       {hud.freeze && (
         <div className="film-mug">
           <span className="film-plate">{plan.plate}</span>
-          <span className="film-level" style={{ transform: `scale(${hud.freeze.titleScale})` }}>
+          <span className="film-level" style={{ transform: `scale(${hud.freeze.titleScale})`, "--n": plan.title[lang].length } as CSSProperties}>
             {plan.title[lang]}
           </span>
         </div>

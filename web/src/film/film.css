@@ -109,25 +109,30 @@
   opacity: 0;
 }
 
-/* la plaque « @pseudo » et le niveau, au-dessus de la bande du bas */
+/* La plaque « @pseudo » et le niveau, sous la voiture : entre le bas de la
+   berline (70 % de la hauteur dans les deux fins, docs §7.3) et les 15 % du bas
+   réservés à la radio et à « Passer ». Le titre tient sur une ligne, à toutes
+   les étoiles et dans les deux langues : sa taille suit sa longueur (--n,
+   0,47 em par caractère au plus dans la police du titre) ; tout suit la hauteur
+   du film (cqh), du petit téléphone à la colonne de l'ordinateur. */
 .film-mug {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: calc(12cqh + env(safe-area-inset-bottom, 0px) + 28px);
+  bottom: max(15cqh, calc(12cqh + env(safe-area-inset-bottom, 0px) + 1.5cqh));
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 0.9cqh;
   pointer-events: none;
 }
 .film-plate {
   max-width: calc(100% - 48px);
-  padding: 7px 12px 8px;
+  padding: 0.8cqh 1.4cqh 0.9cqh;
   border-radius: 3px;
   background: #0c0d1b;
   color: #fff9cb;
-  font: 600 22px/1 var(--f-name);
+  font: 600 min(22px, 2.5cqh)/1 var(--f-name);
   letter-spacing: 0.02em;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -135,12 +140,13 @@
   transform: rotate(-1.2deg);
 }
 .film-level {
-  max-width: calc(100% - 40px);
-  padding: 6px 14px 8px;
+  max-width: calc(100% - 24px);
+  padding: 0.6cqh 1.6cqh 0.8cqh;
   background: var(--film-shadow);
   color: #fff9cb;
-  font: 700 56px/0.92 var(--f-name);
+  font: 700 min(54px, 5.6cqh, (100cqw - 48px - 3.2cqh) / (var(--n, 12) * 0.47))/0.92 var(--f-name);
   letter-spacing: 0.01em;
+  white-space: nowrap;
   text-align: center;
   text-transform: uppercase;
   transform-origin: 50% 60%;
