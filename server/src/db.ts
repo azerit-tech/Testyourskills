@@ -12,6 +12,8 @@ import { forgetWeekRanks } from "./top";
 
 export const RETENTION_MS = 90 * 24 * 3600 * 1000;
 export const CACHE_MS = 24 * 3600 * 1000;
+/** Les événements de mesure (§13) sont gardés 180 jours, puis effacés par la purge horaire. */
+export const EVENTS_RETENTION_MS = 180 * 24 * 3600 * 1000;
 
 export type CardKind = "card" | "comparison";
 /** `linkedin` : fiche jugée sur un profil LinkedIn, seule ou en comparaison contre GitHub (§18.24). */
@@ -142,6 +144,8 @@ CREATE TABLE IF NOT EXISTS events (
   meta    TEXT
 );
 CREATE INDEX IF NOT EXISTS events_at ON events(at);
+-- Une fiche supprimée ou purgée délie ses événements (Store.unlinkEvents).
+CREATE INDEX IF NOT EXISTS events_card ON events(card_id);
 
 CREATE TABLE IF NOT EXISTS ratelimit (
   key TEXT NOT NULL,              -- portée + hash de l'IP, jamais l'IP en clair
@@ -373,6 +377,15 @@ export class Store {
     return ids;
   }
 
+  /**
+   * Une fiche partie : ses événements restent comptés par `npm run weekly` (clics,
+   * visites, à leur date), mais ne la nomment plus, ni par `card_id` ni dans `meta`.
+   */
+  private unlinkEvents(id: string) {
+    this.db.prepare(`UPDATE events SET card_id = NULL, meta = json_remove(meta, '$.ref') WHERE card_id = ?`).run(id);
+    this.db.prepare(`UPDATE events SET meta = json_remove(meta, '$.by') WHERE event = 'denounce_sent' AND json_extract(meta, '$.by') = ?`).run(id);
+  }
+
   /** Supprime la carte et son groupe. Renvoie les ids supprimés. */
   deleteGroup(id: string): string[] {
     const ids = this.groupIds(id);
@@ -382,13 +395,17 @@ export class Store {
       ids.forEach((i) => {
         stmt.run(i);
         votes.run(i);
+        this.unlinkEvents(i);
       }),
     )();
     forgetWeekRanks(this.db);
     return ids;
   }
 
-  /** Supprime les cartes expirées sans email. Renvoie leurs ids pour effacer les PNG. */
+  /**
+   * Supprime les cartes expirées sans email (leurs événements perdent leur lien),
+   * et les événements de plus de EVENTS_RETENTION_MS. Renvoie les ids des cartes pour effacer les PNG.
+   */
   purgeExpired(now = Date.now()): string[] {
     const rows = this.db
       .prepare(`SELECT id FROM cards WHERE email IS NULL AND expires_at IS NOT NULL AND expires_at < ?`)
@@ -400,8 +417,10 @@ export class Store {
       ids.forEach((i) => {
         stmt.run(i);
         votes.run(i);
+        this.unlinkEvents(i);
       }),
     )();
+    this.db.prepare(`DELETE FROM events WHERE at < ?`).run(now - EVENTS_RETENTION_MS);
     // Compteurs de limite : on ne garde que les deux derniers jours.
     const cutoff = new Date(now - 2 * 24 * 3600 * 1000).toISOString().slice(0, 10);
     this.db.prepare(`DELETE FROM ratelimit WHERE day < ?`).run(cutoff);

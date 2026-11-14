@@ -731,7 +731,7 @@ const fr = {
       },
       {
         h: "Mesure",
-        p: "Neuf événements anonymes, enregistrés par notre serveur : fiche générée, fiche partagée, visite par un lien partagé, email donné, clic vers azerit.tech, dénonciation envoyée, arrivée sur une fiche dénoncée, fiche dénoncée revendiquée, vote du jury. Pas de cookie publicitaire, pas d'outil tiers.",
+        p: "Neuf événements anonymes, enregistrés par notre serveur : fiche générée, fiche partagée, visite par un lien partagé, email donné, clic vers azerit.tech, dénonciation envoyée, arrivée sur une fiche dénoncée, fiche dénoncée revendiquée, vote du jury. Gardés 180 jours, puis effacés ; une fiche supprimée n'y est plus nommée. Pas de cookie publicitaire, pas d'outil tiers.",
       },
     ],
     contact: "Une question : hello@azerit.tech",
@@ -1397,7 +1397,7 @@ const en: Dict = {
       },
       {
         h: "Measurement",
-        p: "Nine anonymous events, recorded by our own server: sheet generated, sheet shared, visit from a shared link, email given, click to azerit.tech, tip-off sent, arrival on a turned-in sheet, turned-in sheet claimed, jury vote. No ad cookies, no third-party tools.",
+        p: "Nine anonymous events, recorded by our own server: sheet generated, sheet shared, visit from a shared link, email given, click to azerit.tech, tip-off sent, arrival on a turned-in sheet, turned-in sheet claimed, jury vote. Kept 180 days, then erased; a deleted sheet is no longer named in them. No ad cookies, no third-party tools.",
       },
     ],
     contact: "Questions: hello@azerit.tech",

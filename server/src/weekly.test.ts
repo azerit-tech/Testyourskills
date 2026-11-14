@@ -3,7 +3,7 @@
 import Database from "better-sqlite3";
 import { afterEach, describe, expect, it } from "vitest";
 import { FIXTURES } from "../../shared/fixtures";
-import { Store, type NewCardRow } from "./db";
+import { EVENTS_RETENTION_MS, Store, type NewCardRow } from "./db";
 import { formatWeekly, isoWeekLabel, viralCoefficient, weekStart, weeklyReport } from "./weekly";
 
 const stores: Store[] = [];
@@ -82,6 +82,42 @@ describe("weeklyReport", () => {
     expect(viralCoefficient(w46!)).toBe("0.60");
     expect(viralCoefficient(w45!)).toBe("0.00");
     expect(viralCoefficient(w44!)).toBe("—");
+  });
+
+  it("une fiche supprimée ou purgée : ses événements ne la nomment plus, les clics et les visites restent comptés", () => {
+    const store = new Store(":memory:");
+    stores.push(store);
+    store.insertCards([card("Gone000001", W46 + H, "tom"), card("Keep000001", W46 + H, "max"), card("Old0000001", W46 + H, "eve")]);
+    store.setEmail("Keep000001", "max@example.com"); // gardée par son email
+    store.recordEvent("shared_visit", "Gone000001", { ref: "Gone000001" }, W46 + 2 * H);
+    store.recordEvent("cta_azerit_clicked", "Gone000001", { from: "result" }, W46 + 2 * H);
+    store.recordEvent("denounce_sent", "Keep000001", { by: "Gone000001" }, W46 + 2 * H);
+    store.recordEvent("card_shared", "Keep000001", { channel: "x" }, W46 + 2 * H);
+    store.recordEvent("jury_vote", "Old0000001", { verdict: "guilty" }, W46 + 2 * H);
+    const before = weeklyReport(store.db, { weeks: 1, now: NOW })[0]!;
+
+    store.deleteGroup("Gone000001");
+    // Purge des 90 jours : Old0000001 n'a pas d'email.
+    store.purgeExpired(W46 + H + 91 * 24 * H);
+    const text = JSON.stringify(store.listEvents());
+    expect(text).not.toContain("Gone000001");
+    expect(text).not.toContain("Old0000001");
+    expect(store.listEvents("shared_visit")[0]).toMatchObject({ cardId: null, meta: {} });
+    expect(store.listEvents("denounce_sent")[0]).toMatchObject({ cardId: "Keep000001", meta: {} });
+    // Le tableau ne bouge pas, hors les fiches parties elles-mêmes.
+    const after = weeklyReport(store.db, { weeks: 1, now: NOW })[0]!;
+    expect(after).toMatchObject({ ctaClicks: before.ctaClicks, sharedVisits: before.sharedVisits, shared: 1, generated: before.generated - 2 });
+  });
+
+  it("les événements de plus de 180 jours sont effacés par la purge", () => {
+    const store = new Store(":memory:");
+    stores.push(store);
+    const now = NOW;
+    store.recordEvent("cta_azerit_clicked", null, { from: "footer" }, now - EVENTS_RETENTION_MS - 1);
+    store.recordEvent("cta_azerit_clicked", null, { from: "footer" }, now - EVENTS_RETENTION_MS + 60_000);
+    store.purgeExpired(now);
+    expect(store.listEvents()).toHaveLength(1);
+    expect(EVENTS_RETENTION_MS).toBe(180 * 24 * H);
   });
 
   it("une origine supprimée depuis compte toujours, faute de login à comparer", () => {
