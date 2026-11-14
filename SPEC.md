@@ -1389,3 +1389,16 @@ Sept corrections issues de l'état des lieux du §18.38, en ligne sur `master`. 
 - **Film** : `scripts/film-media.test.ts` compare la durée des fichiers du site au découpage ; l'écart des cartons est toléré par `GAP_EXPECTED`, à passer à faux dès que le vrai découpage est monté (§18.39).
 
 Écarts de texte restants : la description de partage de l'accueil dit « Ta fiche en dix secondes » (on mesure 24 s) ; la page Confidentialité annonce neuf événements, il y en a onze.
+
+### 18.41 Les bandes, livrées (14 novembre 2026)
+
+Le §18.38 est en ligne sur `master`. Ce qui a été tranché en le construisant :
+
+- **Adresses et types** : `/bandes`, `/bandes/ecole/:id`, `/bandes/boite/:id` ; en anglais, une bande est un « crew ». Image de partage par bande (`/og/b/:type/:id.png`), en français seulement.
+- **Qui est une personne** : le pseudo GitHub, sinon l'adresse LinkedIn, sinon l'identifiant de la fiche. Une école et une boîte au plus. Seule la personne qui a fait la fiche (ou qui l'a revendiquée) entre ou sort ; une fiche dénoncée non revendiquée ne peut pas entrer. Trois entrées par jour et par IP ; changer de bande compte, sortir non.
+- **Le score** : la somme des étoiles des vingt meilleurs dossiers, les étoiles prises à l'entrée. À égalité : le plus de dossiers, puis l'entrée la plus ancienne. Tableau à partir de trois dossiers ; une école de la liste sans membre a déjà sa page (« il en manque 3 »), une boîte sans membre n'existe pas.
+- **Les écoles** : 136 dans `data/bands.json`, la liste du barème sans les rangs plus les écoles de dev courantes ; pas d'écoles de commerce ni d'IUT par ville. L'école lue sur un profil reste privée (`CardData.school`, retirée de la vue publique) tant que la personne ne la choisit pas.
+- **Les boîtes** : des alias pour les noms courants ; sinon le nom tapé par le premier membre, nettoyé, 80 caractères au plus. *Risque ouvert* : ce texte libre s'affiche sur une page publique et son image de partage ; il faut une liste de blocage, pas de page ni d'image avant trois dossiers pour une boîte hors alias, et un moyen de fermer une bande à la main.
+- **La page d'une bande** : cinquante dossiers au plus, triés par étoiles, chacun avec son profil criminel, jamais un nom ; le pseudo GitHub seulement si la fiche est revendiquée. *À corriger* : deux dossiers du même profil se lisent comme un doublon.
+- **Mesure** : `band_join`, `band_leave`, `band_view`, `band_share` ; la page Confidentialité liste désormais les quinze événements et porte une section « Les bandes ».
+- **Non vérifié à ce jour** : la porte LinkedIn sur « Fais ta fiche pour … » (le serveur local n'avait pas LinkedIn), la feuille de partage sur un vrai téléphone, l'image de partage après le dernier changement de texte.
