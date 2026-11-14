@@ -50,6 +50,10 @@ export type Route =
   /** Les bandes (§18.38) : les deux tableaux, puis la page d'une bande. */
   | { kind: "bands" }
   | { kind: "band"; type: BandType; id: string }
+  /** Les primes (§18.4) et le règlement : la saison décide de les montrer (App.tsx). */
+  | { kind: "primes" }
+  | { kind: "prime"; id: string }
+  | { kind: "rules" }
   | { kind: "direct"; login: string }
   /** Page à venir (§18.27) : retour à l'accueil, jamais de fiche. */
   | { kind: "upcoming" }
@@ -72,6 +76,11 @@ export function routeOf(path: string): Route {
   if (/^\/bandes\/?$/i.test(path)) return { kind: "bands" };
   const band = /^\/bandes\/(ecole|boite)\/([a-z0-9]+(?:-[a-z0-9]+)*)\/?$/.exec(path);
   if (band) return { kind: "band", type: band[1] as BandType, id: band[2] };
+  if (/^\/primes\/?$/i.test(path)) return { kind: "primes" };
+  const prime = /^\/primes\/([a-z0-9]+(?:-[a-z0-9]+)*)\/?$/.exec(path);
+  if (prime) return { kind: "prime", id: prime[1] };
+  if (/^\/primes\//i.test(path)) return { kind: "primes" };
+  if (/^\/reglement\/?$/i.test(path)) return { kind: "rules" };
   if (isUpcomingPath(path)) return { kind: "upcoming" };
   // /{pseudo} : la carte sans champ (§6.1).
   const direct = /^\/([^/]+)\/?$/.exec(path);

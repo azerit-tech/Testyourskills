@@ -21,7 +21,7 @@ describe("la ligne de l'accueil", () => {
   });
 
   it("la config du serveur : primesOpen et les dates, tout champ douteux vaut « non »", () => {
-    expect(parseConfig({ linkedin: true, primesOpen: true, season: S1 })).toEqual({ linkedin: true, claim: false, linkedinEntry: false, primesOpen: true, season: S1 });
+    expect(parseConfig({ linkedin: true, primesOpen: true, season: S1 })).toEqual({ linkedin: true, claim: false, linkedinEntry: false, primesOpen: true, primesListed: false, rulesPublished: false, season: S1 });
     expect(parseConfig({ primesOpen: "yes", season: { number: 1, start: "x", end: "y" } })).toMatchObject({ primesOpen: false, season: null });
     expect(parseConfig(null)).toMatchObject({ primesOpen: false, season: null });
   });

@@ -413,7 +413,11 @@ export function mountPrimes(app: Hono, o: PrimesOptions): void {
     c.header("Cache-Control", "no-store");
     return c.redirect(`/${new URL(c.req.url).search}`, 302);
   };
-  app.get("/primes", async (c, next) => (listed ? next() : home(c)));
-  app.get("/primes/*", async (c, next) => (listed ? next() : home(c)));
-  app.get("/reglement", async (c, next) => (season?.rulesPublished ? next() : c.text("Not found", 404)));
+  // Toute casse, barre finale comprise (« /Primes/ », « /Reglement/ »).
+  app.get("*", async (c, next) => {
+    const path = c.req.path;
+    if (/^\/primes(?:\/|$)/i.test(path)) return listed ? next() : home(c);
+    if (/^\/reglement\/?$/i.test(path)) return season?.rulesPublished ? next() : c.text("Not found", 404);
+    return next();
+  });
 }

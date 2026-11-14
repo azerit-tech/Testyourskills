@@ -1,0 +1,472 @@
+/* Les primes (§18.4, §18.5) : la rangée de l'accueil, « Tu es en course » sous
+   la fiche, /primes et la page d'une prime. Même système que les bandes et le
+   top de la semaine : aplats, titres crème en Barlow Condensed, pilules rose
+   poudré, aucune lueur, aucun dégradé. Téléphone d'abord ; 44 px à toucher. */
+
+/* ---------- la carte d'une prime ---------- */
+
+.prime-card {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  height: 100%;
+  min-height: 132px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: var(--navy);
+  color: var(--lilac);
+  text-decoration: none;
+  transition: transform 0.18s var(--ease-out);
+}
+.prime-card:hover {
+  transform: translateY(-1px);
+}
+.prime-card.is-closed {
+  background: var(--ink-1);
+}
+.prime-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 32px;
+}
+.prime-logo {
+  display: block;
+  max-width: 120px;
+  max-height: 32px;
+  object-fit: contain;
+}
+.prime-logo.is-big {
+  max-width: 200px;
+  max-height: 56px;
+}
+.prime-name {
+  overflow: hidden;
+  font: 700 24px/1 var(--f-name);
+  text-transform: uppercase;
+  color: var(--cream);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.prime-when {
+  flex: none;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--peach);
+  color: var(--ink-0);
+  font: 600 13px/1.2 var(--f-text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.prime-when.is-soon {
+  background: var(--lilac-faint);
+  color: var(--lilac);
+}
+.prime-when.is-closed {
+  background: none;
+  box-shadow: inset 0 0 0 1.5px var(--lilac-faint);
+  color: var(--lilac-dim);
+}
+.prime-card-job {
+  font: 600 17px/1.3 var(--f-text);
+  color: var(--cream);
+}
+.prime-tag {
+  margin-right: 4px;
+  color: var(--blush);
+}
+.prime-card-meta {
+  font: 500 14px/1.35 var(--f-text);
+  color: var(--lilac-2);
+}
+
+/* ---------- l'accueil : une rangée qui défile ---------- */
+
+.primes-strip {
+  display: grid;
+  gap: 10px;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 8px 0 40px;
+}
+.primes-strip h2 {
+  padding: 0 var(--gutter);
+  font: 700 34px/0.95 var(--f-name);
+  text-transform: uppercase;
+  color: var(--cream);
+}
+.primes-row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: min(280px, 78vw);
+  gap: 12px;
+  padding: 0 var(--gutter) 4px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scroll-padding: 0 var(--gutter);
+  scrollbar-width: none;
+  list-style: none;
+}
+.primes-row::-webkit-scrollbar {
+  display: none;
+}
+.primes-row > li {
+  scroll-snap-align: start;
+}
+.primes-strip > .link-alt {
+  justify-self: start;
+  margin-left: calc(var(--gutter) - 4px);
+}
+
+/* ---------- « Tu es en course », sous la fiche ---------- */
+
+.prime-leagues {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+}
+.prime-race.is-loading {
+  min-height: 120px;
+}
+.prime-race > .link-quiet {
+  justify-self: start;
+}
+.prime-race-lines {
+  display: grid;
+  list-style: none;
+  border-radius: 18px;
+  background: var(--ink-2);
+}
+.prime-race-line {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+}
+.prime-race-line + .prime-race-line {
+  box-shadow: inset 0 1px 0 var(--lilac-faint);
+}
+.after-block .prime-race-text {
+  font: 500 17px/1.4 var(--f-text);
+  color: var(--cream);
+}
+.prime-race-line > .prime-when {
+  justify-self: start;
+}
+.prime-race-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+}
+.after-block .prime-race-note {
+  font: 500 14px/1.4 var(--f-text);
+  color: var(--lilac-dim);
+}
+.prime-race-fun {
+  font: 500 15px/1.4 var(--f-text);
+  color: var(--lilac-dim);
+  text-align: center;
+}
+
+/* ---------- /primes et la page d'une prime ---------- */
+
+.primes-page,
+.prime-head,
+.page-prime > .after-block,
+.prime-board {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 24px var(--gutter) 0;
+}
+.page-primes,
+.page-prime {
+  padding-bottom: 56px;
+}
+.primes-page h1,
+.prime-head h1 {
+  font: 700 44px/0.92 var(--f-name);
+  text-transform: uppercase;
+  color: var(--cream);
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+.primes-intro,
+.prime-pitch {
+  font: 500 16px/1.45 var(--f-text);
+  color: var(--lilac-2);
+}
+.primes-empty {
+  padding: 18px 16px;
+  border-radius: 18px;
+  background: var(--navy);
+  font: 500 15px/1.4 var(--f-text);
+  color: var(--lilac-2);
+}
+.primes-group {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+.primes-group h2,
+.prime-board h2 {
+  font: 700 34px/0.95 var(--f-name);
+  text-transform: uppercase;
+  color: var(--cream);
+}
+.primes-grid {
+  display: grid;
+  gap: 12px;
+  list-style: none;
+}
+
+.prime-back {
+  justify-self: start;
+  margin-left: -4px;
+}
+.prime-head .surtitre {
+  color: var(--blush);
+}
+.prime-head .prime-logo {
+  margin: 4px 0;
+}
+.prime-facts {
+  display: grid;
+  padding: 4px 16px;
+  border-radius: 18px;
+  background: var(--navy);
+}
+.prime-facts > div {
+  display: grid;
+  gap: 2px;
+  padding: 10px 0;
+}
+.prime-facts > div + div {
+  box-shadow: inset 0 1px 0 var(--lilac-faint);
+}
+.prime-facts dt {
+  font: 600 12px/1.2 var(--f-text);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--lilac-dim);
+}
+.prime-facts dd {
+  font: 500 16px/1.4 var(--f-text);
+  color: var(--cream);
+}
+.prime-facts dd .prime-when {
+  display: inline-block;
+  margin-left: 4px;
+  vertical-align: 1px;
+}
+.prime-facts-note {
+  color: var(--lilac-dim);
+  font-size: 14px;
+}
+.prime-share {
+  justify-self: start;
+  margin-top: 4px;
+}
+
+/* le rang et le formulaire : des blocs prune, comme sous la fiche */
+.page-prime > .after-block {
+  width: min(calc(100% - 2 * var(--gutter)), calc(680px - 2 * var(--gutter)));
+  margin-top: 24px;
+  padding: 20px;
+  scroll-margin-top: 16px;
+}
+.after-block.prime-mine h2 {
+  text-transform: none;
+  font-family: var(--f-text);
+  font-size: 22px;
+  line-height: 1.2;
+}
+.prime-mine .link-danger {
+  justify-self: start;
+  margin-left: -4px;
+}
+.after-block .prime-would {
+  font: 600 16px/1.35 var(--f-text);
+  color: var(--blush);
+}
+
+.prime-board {
+  padding-top: 32px;
+}
+.prime-board .board-meta {
+  margin-bottom: 4px;
+}
+.board-row.prime-row {
+  grid-template-columns: 28px minmax(0, 1fr) auto 34px;
+}
+.board-row.prime-row.is-me {
+  background: var(--plum);
+}
+.board-row.prime-row.is-me .board-login {
+  color: var(--cream);
+  font-weight: 600;
+}
+.board-list.is-top > li:first-child .prime-row.is-me {
+  border-radius: 14px 14px 0 0;
+}
+.board-list.is-top > li:last-child .prime-row.is-me {
+  border-radius: 0 0 14px 14px;
+}
+.prime-rule {
+  display: grid;
+  gap: 6px;
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 18px;
+  box-shadow: inset 0 0 0 1.5px var(--lilac-faint);
+}
+.prime-rule h3 {
+  font: 700 22px/1 var(--f-name);
+  text-transform: uppercase;
+  color: var(--cream);
+}
+.prime-rule p {
+  font: 500 15px/1.45 var(--f-text);
+  color: var(--lilac-2);
+}
+.prime-rule .link-alt {
+  justify-self: start;
+  margin-left: -4px;
+}
+
+/* ---------- le formulaire « Concourir » ---------- */
+
+.prime-form {
+  display: grid;
+  gap: 18px;
+}
+.prime-field {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  border: 0;
+}
+.prime-field > label,
+.prime-field > legend {
+  padding: 0;
+  font: 600 15px/1.3 var(--f-text);
+  color: var(--cream);
+}
+.prime-field > legend {
+  margin-bottom: 8px;
+}
+.prime-input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--ink-2);
+  box-shadow: inset 0 0 0 1.5px var(--lilac-faint);
+  color: var(--cream);
+  font: 500 16px/1.2 var(--f-text);
+}
+.prime-input::placeholder {
+  color: var(--lilac-dim);
+}
+.prime-input:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--lilac-2);
+}
+.prime-input[aria-invalid="true"] {
+  box-shadow: inset 0 0 0 2px var(--siren-ink);
+}
+.after-block .prime-note {
+  font: 500 13px/1.4 var(--f-text);
+  color: var(--lilac-dim);
+}
+.after-block .prime-field-error {
+  font: 600 14px/1.35 var(--f-text);
+  color: var(--siren-ink);
+}
+.prime-yesno {
+  display: flex;
+  gap: 8px;
+}
+.prime-choice {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 88px;
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1.5px var(--lilac-faint);
+  color: var(--lilac);
+  font: 600 15px/1 var(--f-text);
+  cursor: pointer;
+}
+.prime-choice.is-on {
+  background: var(--blush);
+  box-shadow: none;
+  color: var(--ink-0);
+}
+.prime-choice input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.prime-choice:focus-within {
+  outline: 2px solid var(--lilac-2);
+  outline-offset: 2px;
+}
+.prime-check {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  min-height: 44px;
+  padding: 10px 0;
+  font: 500 15px/1.4 var(--f-text);
+  color: var(--lilac);
+  cursor: pointer;
+}
+.prime-check input {
+  width: 22px;
+  height: 22px;
+  margin-top: 0;
+  accent-color: var(--blush);
+}
+.prime-check input[aria-invalid="true"] {
+  outline: 2px solid var(--siren-ink);
+  outline-offset: 2px;
+}
+.prime-rules-link {
+  justify-self: start;
+  margin: -10px 0 0 32px;
+}
+.prime-form > .pill {
+  width: 100%;
+}
+
+@media (min-width: 900px) {
+  .primes-page h1,
+  .prime-head h1 {
+    font-size: 64px;
+  }
+  .primes-page,
+  .prime-head {
+    padding-top: 40px;
+  }
+  .primes-row {
+    grid-auto-columns: 280px;
+  }
+  .primes-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .prime-form > .pill {
+    width: auto;
+    justify-self: start;
+  }
+}

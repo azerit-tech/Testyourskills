@@ -2,10 +2,10 @@
 // (§18.27). Une seule liste, lue par le front (App.tsx) et le serveur (app.ts).
 
 /** Pages annoncées mais pas encore construites : leur adresse ramène à l'accueil. */
-export const UPCOMING_PAGES = ["primes", "reglement", "vs", "badge", "u"] as const;
+export const UPCOMING_PAGES = ["vs", "badge", "u"] as const;
 
 /** Routes qui existent déjà, côté front ou serveur. */
-const SITE_ROUTES = ["c", "bandes", "api", "og", "auth", "avatar", "assets", "3d", "privacy", "confidentialite", "__devices"] as const;
+const SITE_ROUTES = ["c", "bandes", "primes", "reglement", "api", "og", "auth", "avatar", "assets", "3d", "privacy", "confidentialite", "__devices"] as const;
 
 export const RESERVED_SEGMENTS: ReadonlySet<string> = new Set<string>([...UPCOMING_PAGES, ...SITE_ROUTES]);
 

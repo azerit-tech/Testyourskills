@@ -9,6 +9,7 @@ import type { Shareable } from "../components/After";
 import { BandPick } from "../components/BandPick";
 import { Denounce } from "../components/Denounce";
 import { EntryForm } from "../components/EntryForm";
+import { PrimeRace } from "../components/Primes";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { Dossier } from "../components/Findings";
 import { Jury, JuryLine } from "../components/Jury";
@@ -506,6 +507,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
 
       <div className={`after${settled ? " is-in" : ""}`} aria-hidden={!settled} inert={!settled ? true : undefined}>
         {/* L'après-fiche raccourci (§18.27) : le pari et le jury, la peine, le partage, la dénonciation, le dossier, puis le reste en lignes. */}
+        {/* « Tu es en course » (§18.5) : en tête, seulement si une prime est ouverte. */}
+        {!visitor && <PrimeRace cardId={id} card={main} />}
         {/* La ligne du recruteur et les huit tuiles (§18.37) : sous la fiche, avant le pari. */}
         {!visitor && <RecruiterRead item={item} shared={false} who={main.login ? `@${main.login}` : main.name} />}
         {!visitor && (

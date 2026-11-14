@@ -11,7 +11,7 @@ import { currentRef } from "./session";
 
 export { ApiError };
 
-export type AnalyticsEvent = "card_generated" | "card_shared" | "card_email" | "cta_azerit_clicked" | "shared_visit" | "denounce_landed" | "plea" | "film" | "band_view" | "band_share";
+export type AnalyticsEvent = "card_generated" | "card_shared" | "card_email" | "cta_azerit_clicked" | "shared_visit" | "denounce_landed" | "plea" | "film" | "band_view" | "band_share" | "prime_view";
 
 export interface CreateInput {
   login?: string;
@@ -97,6 +97,10 @@ export interface AppConfig {
   linkedinEntry: boolean;
   /** Une prime au moins est ouverte (data/season.json, §18.4). */
   primesOpen: boolean;
+  /** La saison porte au moins une prime, ouverte, à venir ou close : /primes existe. */
+  primesListed: boolean;
+  /** Le règlement relu est servi sur /reglement. */
+  rulesPublished: boolean;
   /** Les dates de la saison (data/season.json) ; null si le serveur n'en a pas. */
   season: SeasonDates | null;
 }
@@ -110,6 +114,8 @@ export function parseConfig(raw: unknown): AppConfig {
     claim: c.claim === true,
     linkedinEntry: c.linkedinEntry === true,
     primesOpen: c.primesOpen === true,
+    primesListed: c.primesListed === true,
+    rulesPublished: c.rulesPublished === true,
     season: s ? seasonDates(s) : null,
   };
 }
@@ -129,7 +135,7 @@ export const SEASON_FILE: SeasonDates | null = parsedSeason ? seasonDates(parsed
 
 let configPromise: Promise<AppConfig> | null = null;
 /** Mode démo : la saison du fichier, aucune prime ouverte (il n'en existe pas encore). */
-const MOCK_CONFIG: AppConfig = { linkedin: true, claim: true, linkedinEntry: true, primesOpen: false, season: SEASON_FILE };
+const MOCK_CONFIG: AppConfig = { linkedin: true, claim: true, linkedinEntry: true, primesOpen: false, primesListed: false, rulesPublished: false, season: SEASON_FILE };
 const CONFIG_KEY = "tys_config";
 /** La configuration une fois connue : en RAM, et dans sessionStorage pour la page suivante. */
 let configMemo: AppConfig | null = null;
@@ -204,10 +210,11 @@ async function getMe(): Promise<Me | null> {
 
 /**
  * Part chez GitHub prouver que la fiche est la sienne ; le serveur revient sur
- * la page en cours. `login` ne sert qu'au mode démo (une fiche retirée ne le donne pas).
+ * la page en cours, ou sur `returnTo` (« Concourir » ramène à la prime). `login`
+ * ne sert qu'au mode démo (une fiche retirée ne le donne pas).
  */
-function startClaim(cardId: string, login = "leamd") {
-  const back = window.location.pathname + window.location.search;
+function startClaim(cardId: string, login = "leamd", returnTo?: string) {
+  const back = returnTo ?? window.location.pathname + window.location.search;
   if (isMock()) {
     mockMe = { login: login.toLowerCase(), hidden: mockMe?.hidden ?? false };
     const u = new URL(back, window.location.origin);

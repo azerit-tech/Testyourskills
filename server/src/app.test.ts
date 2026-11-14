@@ -1394,8 +1394,9 @@ describe("pages à venir (§18.27)", () => {
     writeFileSync(join(root, "index.html"), index);
     const ctx = setup({}, { staticRoot: root, indexHtml: async () => index });
     const cases: [string, string][] = [
+      // Sans prime dans la saison, /primes ramène à l'accueil comme avant (primes.ts).
       ["/primes", "/"],
-      ["/Reglement/", "/"],
+      ["/Primes/x?mock=1", "/?mock=1"],
       ["/vs/a/b?mock=1", "/?mock=1"],
       ["/badge/octocat", "/"],
       ["/u/octocat?mock=1&x=2", "/?mock=1&x=2"],
@@ -1406,6 +1407,8 @@ describe("pages à venir (§18.27)", () => {
       expect(res.headers.get("location"), path).toBe(to);
     }
     expect(ctx.calls.collect).toBe(0);
+    // Le règlement n'existe pas tant qu'il n'est pas publié : 404, jamais une fiche.
+    for (const path of ["/reglement", "/Reglement/"]) expect((await ctx.app.request(path)).status, path).toBe(404);
     // Un vrai pseudo qui commence par un mot réservé passe au front.
     for (const path of ["/usain", "/badger"]) expect((await ctx.app.request(path)).status, path).toBe(200);
   });

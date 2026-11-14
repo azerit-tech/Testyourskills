@@ -15,6 +15,7 @@ import { EntryForm } from "../components/EntryForm";
 import { ProfileWall } from "../components/ProfileWall";
 import { WeekBoard } from "../components/WeekBoard";
 import { BandsTop } from "../components/BandsTop";
+import { PrimesStrip } from "../components/Primes";
 import { useT } from "../i18n";
 import { api, type Showcase } from "../lib/api";
 import { onLinkClick } from "../lib/router";
@@ -141,6 +142,8 @@ export function Home() {
           </button>
         </section>
       </div>
+      {/* Les primes ouvertes (§18.4) : rien tant que la saison n'en porte pas. */}
+      <PrimesStrip />
       <section className="home-example" ref={nextRef}>
         <ExampleCard {...showcase} />
       </section>

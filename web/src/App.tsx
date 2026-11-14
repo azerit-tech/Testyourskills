@@ -5,10 +5,12 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { LangProvider } from "./i18n";
 import { isMock } from "./lib/api";
 import { navigate, routeOf, usePath } from "./lib/router";
+import { useAppConfig } from "./lib/season";
 import { BandPage, Bands } from "./pages/Bands";
 import { CardPage } from "./pages/CardPage";
 import { DirectCard } from "./pages/DirectCard";
 import { Home } from "./pages/Home";
+import { PrimePage, PrimesList } from "./pages/Primes";
 import { NotFound, Privacy } from "./pages/Privacy";
 
 /** Mode démo uniquement : aperçu du site dans des cadres de téléphone (360 et 390 px). */
@@ -30,6 +32,13 @@ function BackHome() {
   return null;
 }
 
+/** Les primes n'existent que si la saison en porte une (data/season.json) : sinon, l'accueil. */
+function PrimesGate({ children }: { children: React.ReactNode }) {
+  const cfg = useAppConfig();
+  if (!cfg) return <main className="page" id="main" aria-busy />;
+  return cfg.primesListed ? <>{children}</> : <BackHome />;
+}
+
 function Routes() {
   const route = routeOf(usePath());
   switch (route.kind) {
@@ -43,6 +52,18 @@ function Routes() {
       return <Bands />;
     case "band":
       return <BandPage key={`${route.type}/${route.id}`} type={route.type} id={route.id} />;
+    case "primes":
+      return (
+        <PrimesGate>
+          <PrimesList />
+        </PrimesGate>
+      );
+    case "prime":
+      return (
+        <PrimesGate key={route.id}>
+          <PrimePage id={route.id} />
+        </PrimesGate>
+      );
     case "direct":
       return <DirectCard key={route.login} login={route.login} />;
     case "upcoming":

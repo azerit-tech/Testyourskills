@@ -6,6 +6,7 @@ import type { CriterionCode, Lang, Position, StatCode } from "../../shared/types
 import { showsTotal } from "../../shared/week";
 import { HOME_PROMISE, heroSentence, homeTitle } from "../../shared/promise";
 import { BANDS_TEXT } from "./bandsText";
+import { PRIMES_TEXT } from "./primesText";
 
 /** L'adresse de contact de la page Confidentialité, aussi le repli d'une demande de retrait. */
 export const CONTACT_EMAIL = "hello@azerit.tech";
@@ -683,6 +684,8 @@ const fr = {
   },
   /* les bandes (§18.38) : bandsText.ts */
   bands: BANDS_TEXT.fr,
+  /* les primes (§18.4, §18.5) : primesText.ts */
+  primes: PRIMES_TEXT.fr,
   errors: {
     title: "Pas de fiche cette fois",
     retry: "Réessayer",
@@ -739,9 +742,10 @@ const fr = {
         h: "Les bandes",
         p: "Rien n'y entre sans ton toucher. Si tu choisis une école ou une boîte sous ta fiche, on garde ce choix avec l'identifiant de la fiche et ses étoiles : une école et une boîte au plus. L'école lue sur ton profil reste privée tant que tu ne la choisis pas. La page d'une bande montre le profil et les étoiles de chaque dossier, jamais un nom ; ton pseudo GitHub seulement si ta fiche est revendiquée. Pour en sortir : « Sortir », sous ta fiche. Supprimer ta fiche t'en retire aussi, la masquer la retire du compte.",
       },
+      PRIMES_TEXT.fr.privacy,
       {
         h: "Mesure",
-        p: "Quinze événements anonymes, enregistrés par notre serveur : fiche générée, fiche partagée, visite par un lien partagé, email donné, clic vers azerit.tech, dénonciation envoyée, arrivée sur une fiche dénoncée, fiche dénoncée revendiquée, vote du jury, plaidoyer choisi, déroulement du film de révélation, entrée dans une bande, sortie d'une bande, page d'une bande vue, bande partagée. Gardés 180 jours, puis effacés ; une fiche supprimée n'y est plus nommée. Pas de cookie publicitaire, pas d'outil tiers.",
+        p: "Dix-huit événements anonymes, enregistrés par notre serveur : fiche générée, fiche partagée, visite par un lien partagé, email donné, clic vers azerit.tech, dénonciation envoyée, arrivée sur une fiche dénoncée, fiche dénoncée revendiquée, vote du jury, plaidoyer choisi, déroulement du film de révélation, entrée dans une bande, sortie d'une bande, page d'une bande vue, bande partagée, page d'une prime vue, inscription à une prime, retrait d'une prime. Gardés 180 jours, puis effacés ; une fiche supprimée n'y est plus nommée. Pas de cookie publicitaire, pas d'outil tiers.",
       },
     ],
     contact: `Une question : ${CONTACT_EMAIL}`,
@@ -1365,6 +1369,7 @@ const en: Dict = {
     failed: "Vote not counted. Try again.",
   },
   bands: BANDS_TEXT.en,
+  primes: PRIMES_TEXT.en,
   errors: {
     title: "No sheet this time",
     retry: "Try again",
@@ -1421,9 +1426,10 @@ const en: Dict = {
         h: "Crews",
         p: "Nothing goes in without your tap. If you pick a school or a company under your sheet, we keep that choice with the sheet's ID and its stars: one school and one company at most. The school read from your profile stays private until you pick it. A crew's page shows each file's profile and stars, never a name; your GitHub username only if your sheet is claimed. To leave: “Leave”, under your sheet. Deleting your sheet removes you too, hiding it takes it out of the count.",
       },
+      PRIMES_TEXT.en.privacy,
       {
         h: "Measurement",
-        p: "Fifteen anonymous events, recorded by our own server: sheet generated, sheet shared, visit from a shared link, email given, click to azerit.tech, tip-off sent, arrival on a turned-in sheet, turned-in sheet claimed, jury vote, plea chosen, how the reveal film played, crew joined, crew left, crew page viewed, crew shared. Kept 180 days, then erased; a deleted sheet is no longer named in them. No ad cookies, no third-party tools.",
+        p: "Eighteen anonymous events, recorded by our own server: sheet generated, sheet shared, visit from a shared link, email given, click to azerit.tech, tip-off sent, arrival on a turned-in sheet, turned-in sheet claimed, jury vote, plea chosen, how the reveal film played, crew joined, crew left, crew page viewed, crew shared, bounty page viewed, bounty entered, bounty withdrawn. Kept 180 days, then erased; a deleted sheet is no longer named in them. No ad cookies, no third-party tools.",
       },
     ],
     contact: `Questions: ${CONTACT_EMAIL}`,
