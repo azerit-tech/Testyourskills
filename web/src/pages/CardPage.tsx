@@ -15,6 +15,7 @@ import { MakeYours } from "../components/MakeYours";
 import { PleaVerdict } from "../components/Plea";
 import { RecruiterGrid } from "../components/RecruiterGrid";
 import { RecruiterRead } from "../components/RecruiterRead";
+import { RemovalRequest } from "../components/Removal";
 import { AddLinkedin } from "../components/AddLinkedin";
 import { Pieces } from "../components/Pieces";
 import { Penalty, ProfileSky } from "../components/ProfileTile";
@@ -496,6 +497,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
                 </>
               )}
             </section>
+            {/* Sans pseudo GitHub, ni revendication ni masquage : la personne fichée demande le retrait. */}
+            {!cardLogin && <RemovalRequest cardId={id} />}
           </div>
         )}
       </div>

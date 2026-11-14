@@ -81,18 +81,19 @@ export interface Lead {
   id: string;
   email: string;
   role: string;
-  event: "card_email";
+  /** card_email : email laissé sous sa fiche ; retrait : demande de retrait d'une fiche (removal.ts). */
+  event: "card_email" | "retrait";
   createdAt: string;
   cardId: string;
   cardUrl: string;
 }
 
-export function buildLead(email: string, cardId: string, baseUrl: string): Lead {
+export function buildLead(email: string, cardId: string, baseUrl: string, event: Lead["event"] = "card_email"): Lead {
   return {
     id: randomUUID(),
     email,
     role: "",
-    event: "card_email",
+    event,
     createdAt: new Date().toISOString(),
     cardId,
     cardUrl: `${baseUrl}/c/${cardId}`,

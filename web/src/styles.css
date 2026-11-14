@@ -1817,6 +1817,22 @@ button.cover-panel:focus-visible {
 .visitor-col .denounced-title {
   text-wrap: balance;
 }
+/* « Demander son retrait » : une fiche sans pseudo GitHub vue par un tiers, en pied de colonne */
+.removal {
+  margin: 0;
+  font-size: 14px;
+  color: var(--lilac-dim);
+}
+.removal .link-quiet {
+  min-height: 44px;
+  font-size: 13px;
+  color: var(--lilac-dim);
+  text-align: left;
+}
+.removal.email-form > label,
+.removal.email-form > .email-note {
+  grid-column: 1 / -1;
+}
 
 /* « Fais la tienne » : la carte marine du visiteur */
 .you {

@@ -185,6 +185,21 @@ describe("le ciel de la page (§18.29)", () => {
   });
 });
 
+describe("demander le retrait d'une fiche sans pseudo GitHub", () => {
+  const linkedin = () => card({ id: "LinkedIn001", login: undefined, source: "cv", declaredSource: "linkedin" } as Partial<CardData>);
+  it("sur la page partagée d'une fiche LinkedIn ou CV, après « Et toi ? », un lien discret", () => {
+    const html = renderResult(linkedin(), { owner: false });
+    expect(html).toContain("Ce n&#x27;est pas toi qui as fait cette fiche ? Demander son retrait");
+    expect(html.indexOf('class="removal"')).toBeGreaterThan(html.indexOf('id="you"'));
+    expect(renderResult(linkedin(), { owner: false, lang: "en-US" })).toContain("Didn&#x27;t make this sheet yourself? Ask for its removal");
+  });
+
+  it("jamais pour qui a fait la fiche, ni sur une fiche qui a un pseudo GitHub (« C'est moi » y suffit)", () => {
+    expect(renderResult(linkedin(), { owner: true })).not.toContain('class="removal"');
+    expect(renderResult(card({ id: "GhCard00001" }), { owner: false })).not.toContain('class="removal"');
+  });
+});
+
 describe("bloc recruteur", () => {
   it("en fin de page, pour le visiteur comme pour qui a fait la fiche : un titre, une phrase, une pilule vers azerit.tech", () => {
     const visitor = renderResult(card({ id: "HireCard001" }), { owner: false });

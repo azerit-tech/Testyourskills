@@ -29,6 +29,7 @@ import { normalizeLinkedinUrl, PAID_CALLS_PER_IP, type LinkedinFinder } from "./
 import { forgetLinkedinOfCard, recentLinkedinCard } from "./linkedinProfile/cards";
 import { primesOpen, seasonDates, type Season } from "../../shared/season";
 import { loadSeason } from "./season";
+import { mountRemoval } from "./removal";
 
 export interface AppOptions {
   store: Store;
@@ -708,6 +709,8 @@ export function createApp(opts: AppOptions) {
   // POST /api/vote : le jury de la page partagée (§18.27) ; son décompte part aussi avec /case.
   const jury = mountJury(app, { store, limiter, notFound: MESSAGES.not_found, withdrawn: MESSAGES.withdrawn });
   mountDenounce(app, { store, hiddenFrom, notFound: MESSAGES.not_found, withdrawn: MESSAGES.withdrawn, jury });
+  // Demande de retrait d'une fiche sans pseudo GitHub, par la personne fichée (removal.ts).
+  mountRemoval(app, { store, limiter, leadsEndpoint: opts.leadsEndpoint, baseUrl, fetchImpl });
 
   mountLinkedin(app, {
     store,

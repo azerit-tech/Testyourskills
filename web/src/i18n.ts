@@ -6,6 +6,9 @@ import type { CriterionCode, Lang, Position, StatCode } from "../../shared/types
 import { showsTotal } from "../../shared/week";
 import { HOME_PROMISE, heroSentence, homeTitle } from "../../shared/promise";
 
+/** L'adresse de contact de la page Confidentialité, aussi le repli d'une demande de retrait. */
+export const CONTACT_EMAIL = "hello@azerit.tech";
+
 const fr = {
   meta: {
     /** Le titre de l'accueil vient de shared/promise.ts, sa seule source. */
@@ -711,7 +714,7 @@ const fr = {
       },
       {
         h: "La fiche de quelqu'un d'autre",
-        p: "On peut générer une fiche sur n'importe quel pseudo public : elle repose sur des données publiques et reste en mode taquin. Le propriétaire du pseudo peut la faire supprimer en prouvant son compte GitHub.",
+        p: `On peut générer une fiche sur n'importe quel pseudo public : elle repose sur des données publiques et reste en mode taquin. La personne qui détient le pseudo peut la faire supprimer en prouvant son compte GitHub. Une fiche faite par quelqu'un d'autre depuis ton LinkedIn ou ton CV, sans pseudo GitHub : « Demander son retrait » sous la fiche, ou un email à ${CONTACT_EMAIL} avec son lien. On la retire après vérification ; ton email sert seulement à te répondre.`,
       },
       {
         h: "Revendiquer ta fiche",
@@ -734,7 +737,18 @@ const fr = {
         p: "Neuf événements anonymes, enregistrés par notre serveur : fiche générée, fiche partagée, visite par un lien partagé, email donné, clic vers azerit.tech, dénonciation envoyée, arrivée sur une fiche dénoncée, fiche dénoncée revendiquée, vote du jury. Gardés 180 jours, puis effacés ; une fiche supprimée n'y est plus nommée. Pas de cookie publicitaire, pas d'outil tiers.",
       },
     ],
-    contact: "Une question : hello@azerit.tech",
+    contact: `Une question : ${CONTACT_EMAIL}`,
+  },
+  /** Fiche sans pseudo GitHub vue par un tiers (LinkedIn, CV) : la personne fichée demande son retrait. */
+  removal: {
+    link: "Ce n'est pas toi qui as fait cette fiche ? Demander son retrait",
+    label: "Retrait de cette fiche : ton email, pour te répondre",
+    placeholder: "ton@email.fr",
+    send: "Envoyer",
+    sending: "Envoi…",
+    done: "Demande reçue. On vérifie, on retire la fiche et on te répond par email.",
+    invalid: "Cet email n'a pas l'air valide.",
+    fallback: "Écris-nous avec le lien de cette fiche, on la retire après vérification :",
   },
   notFound: { title: "Page introuvable", text: "Même GitHub renverrait une 404 ici.", home: "Retour à l'accueil" },
   crash: { title: "La page n'a pas chargé", text: "Le réseau a peut-être coupé, ou le site vient d'être mis à jour.", reload: "Recharger" },
@@ -1377,7 +1391,7 @@ const en: Dict = {
       },
       {
         h: "Someone else's sheet",
-        p: "Anyone can generate a sheet for any public username: it relies on public data and stays in teasing mode. The username's owner can have it deleted by proving the GitHub account is theirs.",
+        p: `Anyone can generate a sheet for any public username: it relies on public data and stays in teasing mode. The username's owner can have it deleted by proving the GitHub account is theirs. A sheet someone else made from your LinkedIn or your CV, with no GitHub username: “Ask for its removal” under the sheet, or an email to ${CONTACT_EMAIL} with its link. We remove it after checking; your email is only used to reply.`,
       },
       {
         h: "Claiming your sheet",
@@ -1400,7 +1414,17 @@ const en: Dict = {
         p: "Nine anonymous events, recorded by our own server: sheet generated, sheet shared, visit from a shared link, email given, click to azerit.tech, tip-off sent, arrival on a turned-in sheet, turned-in sheet claimed, jury vote. Kept 180 days, then erased; a deleted sheet is no longer named in them. No ad cookies, no third-party tools.",
       },
     ],
-    contact: "Questions: hello@azerit.tech",
+    contact: `Questions: ${CONTACT_EMAIL}`,
+  },
+  removal: {
+    link: "Didn't make this sheet yourself? Ask for its removal",
+    label: "Removing this sheet: your email, so we can reply",
+    placeholder: "you@email.com",
+    send: "Send",
+    sending: "Sending…",
+    done: "Request received. We check, remove the sheet and reply by email.",
+    invalid: "That email doesn't look valid.",
+    fallback: "Write to us with the link to this sheet, we remove it after checking:",
   },
   notFound: { title: "Page not found", text: "Even GitHub would return a 404 here.", home: "Back to home" },
   crash: { title: "The page didn't load", text: "The network may have dropped, or the site was just updated.", reload: "Reload" },

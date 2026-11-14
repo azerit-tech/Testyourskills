@@ -372,6 +372,24 @@ async function sendEmail(cardId: string, email: string): Promise<void> {
   if (!res.ok) throw await readError(res);
 }
 
+/**
+ * Demande de retrait d'une fiche sans pseudo GitHub, par la personne fichée.
+ * « sent » : relayée ; « fallback » : pas de relais côté serveur, écrire à
+ * l'adresse de contact. Une autre erreur remonte en ApiError, avec son message.
+ */
+async function requestRemoval(cardId: string, email: string): Promise<"sent" | "fallback"> {
+  if (isMock()) return new Promise((r) => setTimeout(() => r("sent"), 400));
+  let res: Response;
+  try {
+    res = await fetch("/api/removal", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cardId, email }) });
+  } catch {
+    return "fallback";
+  }
+  if (res.ok) return "sent";
+  if (res.status === 502 || res.status === 503) return "fallback";
+  throw await readError(res);
+}
+
 /** `token` null : la session du propriétaire revendiqué (cookie) fait foi. */
 async function deleteCard(id: string, token: string | null): Promise<void> {
   if (isMock()) return mockApi.deleteCard(id, token ?? "");
@@ -445,7 +463,7 @@ async function fetchTop(): Promise<WeekTop | null> {
   }
 }
 
-export const api = { createCard, getJob, getCase, vote, sendEmail, deleteCard, track, getConfig, knownConfig, startLinkedInPhoto, getShowcase, getTop, getMe, startClaim, setHidden, logout };
+export const api = { createCard, getJob, getCase, vote, sendEmail, requestRemoval, deleteCard, track, getConfig, knownConfig, startLinkedInPhoto, getShowcase, getTop, getMe, startClaim, setHidden, logout };
 
 /** URLs des images rendues par le serveur (§7). `?v=` : le dessin en cours, servi avec un cache d'un an (shared/images.ts). */
 export const images = {
