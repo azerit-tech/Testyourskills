@@ -5,7 +5,7 @@ import { EVENT_NAMES } from "./events";
 
 describe("la Mesure de la page Confidentialité", () => {
   it("nomme autant d'événements, en toutes lettres, que le serveur en enregistre", () => {
-    const words: Record<number, { fr: string; en: string }> = { 15: { fr: "Quinze", en: "Fifteen" } };
+    const words: Record<number, { fr: string; en: string }> = { 15: { fr: "Quinze", en: "Fifteen" }, 18: { fr: "Dix-huit", en: "Eighteen" } };
     for (const lang of ["fr", "en"] as const) {
       const section = DICTS[lang].privacy.sections.at(-1)!.p;
       expect(section.startsWith(words[EVENT_NAMES.length]?.[lang] ?? "?"), lang).toBe(true);
