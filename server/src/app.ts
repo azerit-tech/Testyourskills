@@ -32,6 +32,7 @@ import { forgetLinkedinOfCard, recentLinkedinCard } from "./linkedinProfile/card
 import { primesOpen, seasonDates, type Season } from "../../shared/season";
 import { loadSeason } from "./season";
 import { mountRemoval } from "./removal";
+import { mountPrimes, purgeEntries } from "./primes";
 
 export interface AppOptions {
   store: Store;
@@ -201,8 +202,12 @@ export async function pruneStaleImages(ogRoot: string, keep: string): Promise<nu
   return stale.length;
 }
 
-/** Purge §11 : cartes de plus de 90 jours sans email, leurs PNG et leurs photos. */
-export async function purge(store: Store, ogDir: string, now = Date.now(), avatarDir = defaultAvatarDir(ogDir)): Promise<number> {
+/**
+ * Purge §11 : cartes de plus de 90 jours sans email, leurs PNG et leurs photos ;
+ * et les inscriptions aux primes sans victoire, 30 jours après la fin de la saison (§18.4).
+ */
+export async function purge(store: Store, ogDir: string, now = Date.now(), avatarDir = defaultAvatarDir(ogDir), season: Season | null = loadSeason()): Promise<number> {
+  purgeEntries(store.db, season, now);
   const ids = store.purgeExpired(now);
   await Promise.all([removeImages(ogDir, ids), removeAvatars(avatarDir, ids)]);
   return ids.length;
@@ -308,6 +313,10 @@ export function createApp(opts: AppOptions) {
       claim: !!opts.githubAuth,
       linkedinEntry: !!opts.linkedinProfiles,
       primesOpen: primesOpen(season, Date.now()),
+      // primesListed : la saison porte au moins une prime (ouverte, à venir ou close) : /primes existe.
+      primesListed: !!season && season.primes.length > 0,
+      // rulesPublished : /reglement est servi (relu par Jacques).
+      rulesPublished: !!season?.rulesPublished,
       season: season ? seasonDates(season) : null,
     }),
   );
@@ -722,6 +731,18 @@ export function createApp(opts: AppOptions) {
   mountBands(app, { store, limiter, ownedBy, tokenMatches, hiddenFrom, notFound: MESSAGES.not_found, withdrawn: MESSAGES.withdrawn });
   // Leur partage : l'image 1200 × 630 d'une bande et les balises de /bandes (bandPages.ts).
   mountBandPages(app, { store, baseUrl, ogDir, render: (input) => deps.renderImage(input), indexHtml: opts.indexHtml });
+  // Les primes (§18.4, §18.5) : tout part de data/season.json ; sans prime, rien ne change (primes.ts).
+  mountPrimes(app, {
+    store,
+    season,
+    limiter,
+    baseUrl,
+    owner: ownerFromRequest,
+    sameOrigin: (c) => sameOrigin(c, baseUrl),
+    hiddenFrom,
+    notFound: MESSAGES.not_found,
+    withdrawn: MESSAGES.withdrawn,
+  });
 
   mountLinkedin(app, {
     store,

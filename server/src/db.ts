@@ -10,6 +10,7 @@ import type { CardData, ComparisonData, Source } from "../../shared/types";
 import { ensureLinkedinTables, purgeLinkedin } from "./linkedinProfile/store";
 import { forgetWeekRanks } from "./top";
 import { ensureBandTables, forgetBands, removeBandMembers } from "./bands";
+import { ensurePrimeTables, removeEntriesForCards, removeEntriesForLogin } from "./primes";
 
 export const RETENTION_MS = 90 * 24 * 3600 * 1000;
 export const CACHE_MS = 24 * 3600 * 1000;
@@ -252,6 +253,8 @@ export function migrate(db: Database.Database) {
   )`);
   // Les bandes (§18.38) : une ligne par personne et par ligue, posée par son toucher.
   ensureBandTables(db);
+  // Les primes (§18.4) : une inscription par login et par prime, posée par « Concourir ».
+  ensurePrimeTables(db);
 }
 
 export class Store {
@@ -430,6 +433,8 @@ export class Store {
     forgetWeekRanks(this.db);
     // Supprimer sa fiche la retire de ses bandes (§18.38).
     removeBandMembers(this.db, ids);
+    // Et de ses primes (§18.4) : l'inscription qu'elle portait est effacée.
+    removeEntriesForCards(this.db, ids);
     return ids;
   }
 
@@ -458,6 +463,7 @@ export class Store {
     purgeLinkedin(this.db, now);
     if (ids.length) forgetWeekRanks(this.db);
     removeBandMembers(this.db, ids);
+    removeEntriesForCards(this.db, ids);
     return ids;
   }
 
@@ -580,6 +586,8 @@ export class Store {
     forgetWeekRanks(this.db);
     // Une fiche masquée ne compte plus dans ses bandes (§18.38) ; rendue visible, elle y revient.
     forgetBands(this.db);
+    // Masquer ses fiches vaut retrait de toutes ses primes (§18.4) : les inscriptions sont effacées.
+    if (hidden) removeEntriesForLogin(this.db, login);
   }
 
   /** true si le propriétaire de ce login a masqué ses fiches. */

@@ -29,12 +29,16 @@ export const EVENT_NAMES = [
   "band_leave",
   "band_view",
   "band_share",
+  // Les primes (§18.4) : la page d'une prime vue, par le front ; concourir et se retirer, par le serveur seul.
+  "prime_view",
+  "prime_join",
+  "prime_withdraw",
 ] as const;
 export type EventName = (typeof EVENT_NAMES)[number];
 
 /** Événements que le front peut envoyer. card_generated, denounce_sent, denounce_claimed et jury_vote sont posés par le serveur seul. */
 const cardEventSchema = z.object({
-  event: z.enum(["card_shared", "card_email", "cta_azerit_clicked", "shared_visit", "denounce_landed", "plea", "band_view", "band_share"]),
+  event: z.enum(["card_shared", "card_email", "cta_azerit_clicked", "shared_visit", "denounce_landed", "plea", "band_view", "band_share", "prime_view"]),
   cardId: z.string().regex(/^[A-Za-z0-9]{6,32}$/).optional(),
   meta: z
     .record(z.string().max(40), z.union([z.string().max(200), z.number(), z.boolean(), z.null()]))
