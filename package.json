@@ -12,6 +12,7 @@
     "test": "vitest run",
     "typecheck": "tsc -b",
     "weekly": "tsx --env-file-if-exists=.env scripts/weekly.ts",
+    "finalists": "tsx --env-file-if-exists=.env scripts/finalists.ts",
     "backup": "tsx --env-file-if-exists=.env scripts/backup.ts",
     "percentiles": "tsx --env-file-if-exists=.env scripts/percentiles.ts",
     "bands:review": "tsx --env-file-if-exists=.env scripts/bands-review.ts"
