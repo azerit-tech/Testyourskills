@@ -1375,3 +1375,17 @@ Jacques, le 14 novembre : « la révélation est la vidéo maintenant, il faut t
 - **Le son** : le film était muet. Une musique qui monte avec les étoiles (une couche de plus par étoile, la même mécanique que les renforts à l'image), les bruits de la poursuite calés sur le découpage, la radio. Débloqué par le geste qui lance la fiche ; coupé d'un toucher ; rien si le son est coupé.
 - **Le rendu final** : la machine louée du 12 au 13 novembre n'existe plus (son adresse répond avec une autre identité : on ne s'y connecte pas). Une nouvelle machine est à louer par Jacques, à réinstaller (Blender, archive des modèles, caches des scènes à reconstruire). Les trois chantiers codés sans rendu (dérapages, lumière unique sur la berline, même décor aux coupes) s'y vérifient d'abord, puis le rendu final dans l'ordre de l'audience.
 - **Ensuite** : le clip à partager (§18.8) se fait à partir du film, les étoiles et le pseudo incrustés par ffmpeg côté serveur, sans Remotion.
+
+### 18.40 Durcissement avant le lancement (14 novembre 2026)
+
+Sept corrections issues de l'état des lieux du §18.38, en ligne sur `master`. Elles priment sur ce que disent les §11, §12, §13, §18.17, §18.22 à §18.25 quand elles les contredisent.
+
+- **Délai d'une fiche** (§12, §18.17, §18.24) : 60 s par défaut au lieu de 30 (on mesure 24 s), réglable par `CARD_TIMEOUT_MS`. Une lecture LinkedIn lente repousse l'échéance (au plus 60 s de plus). Le serveur donne le temps restant, le site attend 15 s de plus que lui, et aucun message n'annonce plus de durée. Au pire : 4 minutes file comprise, 5 avec LinkedIn.
+- **Top de la semaine** (§18.22, §18.23) : une fiche née d'une dénonciation n'entre au top et au « Top 5 » qu'une fois revendiquée par sa personne. *Reste ouvert* : une fiche déjà faite qu'un tiers dénonce ensuite sort du top jusqu'à sa revendication ; il faut distinguer « née d'une dénonciation » de « dénoncée après coup ».
+- **Promesse d'entretien** (§18.25) : la ligne ne s'affiche que si une prime est ouverte. Les dates de la saison et les primes vivent dans `data/season.json` (`number`, `start`, `end`, `primes[{from?, to?}]`), `/api/config` porte `primesOpen` et `season`. Sans prime, l'accueil dit « Fais ta fiche. Fais gagner ta bande. ».
+- **Événements** (§11, §13) : gardés 180 jours puis effacés ; ceux d'une fiche supprimée restent comptés mais ne la nomment plus.
+- **Sauvegarde** : `npm run backup` copie la base (14 copies gardées sur le volume), cron quotidien et restauration décrits dans `ops/DEPLOY.md`. Les avatars et les images de partage ne sont pas sauvegardés (ils se régénèrent). À installer sur le serveur au déploiement.
+- **Retrait d'une fiche LinkedIn ou CV** : sous une fiche sans pseudo GitHub, le visiteur trouve « Ce n'est pas toi qui as fait cette fiche ? Demander son retrait » : son email part par `LEADS_ENDPOINT` (événement « retrait »), rien n'est gardé en base ; sans relais, l'adresse de contact s'affiche. Trois demandes par jour et par IP. Le retrait lui-même reste fait à la main.
+- **Film** : `scripts/film-media.test.ts` compare la durée des fichiers du site au découpage ; l'écart des cartons est toléré par `GAP_EXPECTED`, à passer à faux dès que le vrai découpage est monté (§18.39).
+
+Écarts de texte restants : la description de partage de l'accueil dit « Ta fiche en dix secondes » (on mesure 24 s) ; la page Confidentialité annonce neuf événements, il y en a onze.
