@@ -137,6 +137,66 @@ ssh azerit 'cat /opt/testyourskills/.deployed_commit; docker ps --filter name=te
 ssh azerit 'docker logs --tail 80 testyourskills'
 ```
 
+## Sauvegarde de la base
+
+`scripts/backup.ts` copie la base par l'API de sauvegarde de SQLite : une copie
+cohérente pendant que le site tourne (jamais un `cp` du fichier, en mode WAL une
+page peut être à moitié écrite), vérifiée (`quick_check`), autonome (sans fichier
+`-wal`), horodatée en UTC dans `/data/backups/cards-AAAAMMJJ-HHMMSSZ.db`, sur le
+volume. Il garde les 14 dernières (`--keep N` pour changer). Code de sortie 1 si
+la copie échoue ; les anciennes ne sont alors pas touchées. La base seule : ni
+les PNG (`/data/og`, refaits à la demande) ni les photos LinkedIn
+(`/data/avatars`).
+
+À la main, sur le VPS :
+
+```sh
+ssh azerit docker exec testyourskills node_modules/.bin/tsx scripts/backup.ts
+ssh azerit docker exec testyourskills ls -l /data/backups
+```
+
+Tous les jours à 3 h 17 (heure du serveur), proposé pour la crontab de l'hôte
+(`ssh azerit`, puis `crontab -e`) :
+
+```cron
+17 3 * * * docker exec testyourskills nice -n 10 node_modules/.bin/tsx scripts/backup.ts >> /opt/testyourskills/backup.log 2>&1
+```
+
+Les copies vivent sur le même disque que la base : elles protègent d'une erreur
+ou d'une base abîmée, pas de la perte du VPS. Pour en garder une ailleurs, depuis
+le Mac :
+
+```sh
+ssh azerit 'docker exec testyourskills sh -c "ls -1 /data/backups | tail -1"'   # la dernière
+ssh azerit 'docker cp testyourskills:/data/backups/cards-….db /tmp/' && scp azerit:/tmp/cards-….db ~/Sauvegardes/
+```
+
+### Restaurer
+
+Site coupé le temps de la copie (une minute). La base en place est d'abord mise
+de côté dans `/data/avant-restauration/`.
+
+```sh
+ssh azerit
+cd /opt/testyourskills
+docker exec testyourskills ls -1 /data/backups          # choisir la copie
+docker compose stop testyourskills                      # la base se ferme proprement
+docker run --rm -v testyourskills_testyourskills-data:/data node:22-slim sh -c '
+  set -e
+  mkdir -p /data/avant-restauration
+  cp -p /data/cards.db* /data/avant-restauration/
+  cp /data/backups/cards-AAAAMMJJ-HHMMSSZ.db /data/cards.db
+  rm -f /data/cards.db-wal /data/cards.db-shm
+  chown node:node /data/cards.db'
+docker compose start testyourskills
+docker logs --tail 20 testyourskills
+curl -s https://skills.azerit.tech/api/health
+```
+
+Au démarrage, le serveur migre la base restaurée si elle date d'une version
+plus ancienne. Le cache des PNG (`/data/og`) peut montrer une fiche qui n'existe
+plus dans la copie : il ne sert que les fiches présentes en base.
+
 ## Le tableau de la semaine
 
 Les chiffres du §13 de la spec, dont le coefficient viral, lus dans la base de production :

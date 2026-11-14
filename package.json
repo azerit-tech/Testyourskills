@@ -12,6 +12,7 @@
     "test": "vitest run",
     "typecheck": "tsc -b",
     "weekly": "tsx --env-file-if-exists=.env scripts/weekly.ts",
+    "backup": "tsx --env-file-if-exists=.env scripts/backup.ts",
     "percentiles": "tsx --env-file-if-exists=.env scripts/percentiles.ts"
   },
   "dependencies": {
