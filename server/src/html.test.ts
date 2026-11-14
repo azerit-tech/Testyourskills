@@ -142,4 +142,10 @@ describe("le titre de l'accueil, en un seul endroit (shared/promise.ts)", () => 
   it("la description dit la méthode, sans opposer le profil et le code", () => {
     for (const lang of ["fr", "en"] as const) expect(`${promiseTitle(lang)} ${HOME_PROMISE[lang].description}`).not.toMatch(/\bcontre\b|\bvs\b|against|IA t'interroge|\bAI\b/i);
   });
+
+  it("la description ne promet pas de durée en secondes (on mesure 24 s, §18.40)", () => {
+    expect(HOME_PROMISE.fr.description).toContain("Ta fiche en une minute.");
+    expect(HOME_PROMISE.en.description).toContain("Your sheet in a minute.");
+    for (const lang of ["fr", "en"] as const) expect(HOME_PROMISE[lang].description).not.toMatch(/secondes?|seconds?|instant/i);
+  });
 });

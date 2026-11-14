@@ -26,12 +26,12 @@ export const HOME_PROMISE: Record<Lang, HomePromise> = {
   fr: {
     claim: ["Azerit ouvre", "ton dossier."],
     proof: ["Tu plaides", "quoi ?"],
-    description: "Huit critères de recrutement, chacun sur 10, chacun avec sa preuve. Ta fiche en dix secondes. Par Azerit.",
+    description: "Huit critères de recrutement, chacun sur 10, chacun avec sa preuve. Ta fiche en une minute. Par Azerit.",
   },
   en: {
     claim: ["Azerit opens", "your file."],
     proof: ["How do", "you plead?"],
-    description: "Eight hiring criteria, each out of 10, each with its proof. Your sheet in ten seconds. By Azerit.",
+    description: "Eight hiring criteria, each out of 10, each with its proof. Your sheet in a minute. By Azerit.",
   },
 };
 
