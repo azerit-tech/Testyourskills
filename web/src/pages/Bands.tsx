@@ -90,11 +90,11 @@ export function Bands() {
             </div>
           )}
         </div>
-        <p className="bands-make">
-          <a className="link-alt" href="/" onClick={(e) => onLinkClick(e, "/")}>
-            {tb.make}
-          </a>
-        </p>
+      </section>
+      {/* L'appel de l'accueil : le champ et « Ouvrir mon dossier », et ce qu'il faut faire ensuite. */}
+      <section className="after-block band-make bands-make" aria-labelledby="bands-make-title">
+        <h2 id="bands-make-title">{tb.makeTitle}</h2>
+        <EntryForm note={<p className="band-make-note">{tb.make}</p>} />
       </section>
     </main>
   );

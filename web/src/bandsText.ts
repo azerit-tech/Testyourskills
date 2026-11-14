@@ -52,7 +52,8 @@ const fr = {
     yours: "Ta bande",
     rowLabel: (rank: number | null, label: string, score: number, dossiers: number) =>
       `${rank ? `${rank}e` : "En formation"}, ${label}, ${score} étoiles, ${dossiers} ${dossiers > 1 ? "dossiers" : "dossier"}`,
-    make: "Fais ta fiche, puis choisis ta bande dessous.",
+    makeTitle: "Fais gagner ta bande",
+    make: "Fais ta fiche, puis choisis ton école et ta boîte dessous : tes étoiles comptent pour elles.",
   },
   page: {
     make: (label: string) => `Fais ta fiche pour ${label}`,
@@ -121,7 +122,8 @@ const en: BandsDict = {
     yours: "Your crew",
     rowLabel: (rank: number | null, label: string, score: number, dossiers: number) =>
       `${rank ? `#${rank}` : "Forming"}, ${label}, ${score} stars, ${dossiers} ${dossiers > 1 ? "files" : "file"}`,
-    make: "Make your file, then pick your crew below it.",
+    makeTitle: "Make your crew win",
+    make: "Make your file, then pick your school and your company below it: your stars count for them.",
   },
   page: {
     make: (label: string) => `Make your file for ${label}`,
