@@ -18,6 +18,7 @@ const b = (o: Partial<BandStanding>): BandStanding => ({
   missing: 0,
   gap: 6,
   ahead: { id: "epitech", label: "Epitech", rank: 2 },
+  hasPage: true,
   ...o,
 });
 

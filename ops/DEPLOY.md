@@ -204,3 +204,19 @@ Les chiffres du §13 de la spec, dont le coefficient viral, lus dans la base de 
 ```sh
 ssh azerit docker exec testyourskills node_modules/.bin/tsx scripts/weekly.ts --weeks 8
 ```
+
+## Relire les bandes de boîte
+
+Le nom d'une boîte hors de la table d'alias est tapé par son premier membre. Il
+n'a ni page publique ni image avant trois dossiers, mais il se relit à la main
+(chaque jour la première semaine) :
+
+```sh
+ssh azerit docker exec testyourskills node_modules/.bin/tsx scripts/bands-review.ts
+```
+
+Pour fermer une bande : ajouter `"boite/<id>"` à `blocked` dans
+`data/bands.json`, puis redéployer. Elle répond alors 404 partout, sort du
+tableau, et personne ne peut plus y entrer. Un mot à refuser partout :
+`companies.refusedWords` (mot entier) ou `companies.refusedStems` (n'importe où
+dans le nom), même fichier.

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import scoring from "../data/scoring.json";
-import { BAND_ID_RE, companyBand, companyKey, matchSchool, schoolById, schoolList, searchSchools } from "./bands";
+import { BAND_ID_RE, bandHasPage, cleanCompanyLabel, companyBand, companyCheck, companyKey, isBlockedBand, matchSchool, schoolById, schoolList, searchSchools } from "./bands";
 
 describe("écoles des bandes (§18.38)", () => {
   it("des ids uniques, au bon format, et aucun rang du barème", () => {
@@ -68,8 +68,8 @@ describe("écoles des bandes (§18.38)", () => {
 });
 
 describe("boîtes des bandes (§18.38)", () => {
-  it("casse, accents, @ et forme juridique ne font qu'une bande", () => {
-    for (const name of ["Doctolib", "DOCTOLIB", "@doctolib", "Doctolib SAS", "Doctolib S.A.S.", "doctolib, sas"]) {
+  it("casse, accents et forme juridique ne font qu'une bande", () => {
+    for (const name of ["Doctolib", "DOCTOLIB", "Doctolib SAS", "Doctolib S.A.S.", "doctolib, sas", "  Doctolib  "]) {
       expect(companyBand(name), name).toMatchObject({ type: "boite", id: "doctolib" });
     }
     expect(companyBand("Doctolib SAS")?.label).toBe("Doctolib");
@@ -139,5 +139,63 @@ describe("boîtes des bandes (§18.38)", () => {
       expect(b, name).not.toBeNull();
       expect(b!.id, name).toMatch(BAND_ID_RE);
     }
+  });
+});
+
+describe("le nom libre d'une boîte : refus et nettoyage", () => {
+  it("une insulte ou un terme haineux, même déguisé : refusé", () => {
+    for (const name of ["Connard", "connards & co", "Bande de salopes", "Enculés SAS", "3nculé", "fuuuuck", "F U C K", "s4l0pe", "Nazi Corp", "Sale Arabe", "Hitler Industries", "Ta gueule", "white power inc"]) {
+      expect(companyCheck(name), name).toEqual({ refused: "word" });
+    }
+  });
+
+  it("de vraies boîtes passent, même proches d'un mot refusé", () => {
+    for (const name of ["Cockpit Labs", "Scunthorpe Steel", "Spice Group", "Niger Telecom", "Salopette Studio", "Pornic Plage", "Faguo", "Connexion", "Computer Lab", "Unique", "Violette", "Ecole 42 Partners"]) {
+      expect(companyCheck(name), name).toHaveProperty("ref");
+    }
+  });
+
+  it("une adresse, un @ ou un numéro : refusé", () => {
+    for (const name of ["@doctolib", "jean@dupont.fr", "www.example.org", "https://x.y", "monsite.com", "06 12 34 56 78", "+33612345678", "12 rue de la Paix", "4 bis avenue Foch"]) {
+      expect(companyCheck(name), name).toEqual({ refused: "contact" });
+    }
+    expect(companyCheck("3DS Outscale")).toHaveProperty("ref");
+    expect(companyCheck("360Learning")).toHaveProperty("ref");
+  });
+
+  it("vide, freelance ou trop long : pas une bande", () => {
+    expect(companyCheck("Freelance")).toEqual({ refused: "none" });
+    expect(companyCheck("")).toEqual({ refused: "none" });
+    expect(companyCheck("x".repeat(81))).toEqual({ refused: "none" });
+  });
+
+  it("le libellé est nettoyé : espaces, casse, ni emoji ni ponctuation décorative", () => {
+    expect(cleanCompanyLabel("  Doctolib   SAS  ")).toBe("Doctolib");
+    expect(cleanCompanyLabel("🚀 Qonto 🚀")).toBe("Qonto");
+    expect(cleanCompanyLabel("★★ ALAN ★★")).toBe("ALAN");
+    expect(cleanCompanyLabel("BNP PARIBAS CARDIF")).toBe("BNP Paribas Cardif");
+    expect(cleanCompanyLabel("IBM")).toBe("IBM");
+    expect(cleanCompanyLabel("doctolib")).toBe("Doctolib");
+    expect(cleanCompanyLabel("leBonCoin")).toBe("leBonCoin");
+    expect(cleanCompanyLabel("Ça Marche & Cie!!!")).toBe("Ça Marche");
+    expect(cleanCompanyLabel("Ça Marche!!! Studio")).toBe("Ça Marche Studio");
+    expect(cleanCompanyLabel("~~~Datadog~~~ ###")).toBe("Datadog");
+    expect(cleanCompanyLabel("L'Oréal")).toBe("L'Oréal");
+    expect(cleanCompanyLabel("Ledger ---- Paris")).toBe("Ledger - Paris");
+    expect(companyBand("🔥 la super boîte 🔥")).toEqual({ type: "boite", id: "la-super-boite", label: "La super boîte" });
+  });
+
+  it("une bande fermée, ou dont le nom est refusé, est bloquée ; une école de la liste non", () => {
+    expect(isBlockedBand("boite", "connard-corp")).toBe(true);
+    expect(isBlockedBand("boite", "doctolib")).toBe(false);
+    expect(isBlockedBand("boite", "doctolib", "Doctolib connard")).toBe(true);
+    expect(isBlockedBand("ecole", "epitech")).toBe(false);
+  });
+
+  it("une page publique : toute école, toute boîte d'alias, une boîte au nom libre à trois dossiers", () => {
+    expect(bandHasPage("ecole", "epitech", 0)).toBe(true);
+    expect(bandHasPage("boite", "meta", 1)).toBe(true);
+    expect(bandHasPage("boite", "doctolib", 2)).toBe(false);
+    expect(bandHasPage("boite", "doctolib", 3)).toBe(true);
   });
 });

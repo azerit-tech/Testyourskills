@@ -78,6 +78,14 @@
   text-decoration-thickness: 1.5px;
   text-underline-offset: 3px;
 }
+.bp-line .bp-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.bands-pick .bp-nopage {
+  font: 500 14px/1.4 var(--f-text);
+  color: var(--lilac-2);
+}
 .bp-stars {
   color: var(--star);
   letter-spacing: 0.04em;

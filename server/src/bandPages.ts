@@ -2,7 +2,8 @@
 // Open Graph de /bandes et /bandes/:type/:id, que les robots de LinkedIn et X
 // lisent sans exécuter de JS. L'adresse de l'image porte une clé de ce qu'elle
 // dit (score, dossiers, rang) : le score change, l'aperçu change. Jamais le rang
-// d'école du barème, jamais le nom d'un membre.
+// d'école du barème, jamais le nom d'un membre. Une boîte au nom libre n'a ni
+// page ni image avant trois dossiers, une bande fermée jamais : 404.
 
 import { createHash } from "node:crypto";
 import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
@@ -11,7 +12,7 @@ import type { Context, Hono } from "hono";
 import { BAND_ID_RE, isBandType, type BandStanding, type BandType } from "../../shared/bands";
 import { IMAGE_QUERY } from "../../shared/images";
 import type { Lang } from "../../shared/types";
-import { bandStanding } from "./bands";
+import { publicBandStanding } from "./bands";
 import type { Store } from "./db";
 import { HOME_IMAGE_PATH, injectMeta, standalonePage, type PageMeta } from "./html";
 
@@ -91,7 +92,7 @@ export function mountBandPages(app: Hono, o: BandPagesOptions): void {
   app.get("/og/b/:type/:file", async (c) => {
     const type = c.req.param("type");
     const m = /^([a-z0-9-]{1,60})\.png$/.exec(c.req.param("file"));
-    const band = m && isBandType(type) && BAND_ID_RE.test(m[1]!) ? bandStanding(store.db, type, m[1]!) : null;
+    const band = m && isBandType(type) && BAND_ID_RE.test(m[1]!) ? publicBandStanding(store.db, type, m[1]!) : null;
     if (!band) return c.notFound();
     const prefix = `${band.type}.${band.id}.`;
     const path = join(dir, `${prefix}${bandImageKey(band)}.png`);
@@ -128,7 +129,7 @@ export function mountBandPages(app: Hono, o: BandPagesOptions): void {
   app.get("/bandes/:type/:id", (c) => {
     const type = c.req.param("type");
     const id = c.req.param("id");
-    const band = isBandType(type) && BAND_ID_RE.test(id) ? bandStanding(store.db, type, id) : null;
+    const band = isBandType(type) && BAND_ID_RE.test(id) ? publicBandStanding(store.db, type, id) : null;
     if (!band) return page(c, { ...boardMeta(baseUrl), title: "Bande introuvable" }, 404);
     return page(c, bandMeta(band, baseUrl), 200);
   });

@@ -1,5 +1,5 @@
 {
-  "_doc": "Les bandes (SPEC §18.38). Écoles : la liste du barème (data/scoring.json, cv.TEC.school.list) sans les rangs, dans le même ordre, avec les campus des familles (INSA, Mines, Télécom) avant elles, puis des écoles de dev et d'ingénieurs courantes qui y manquaient. Un nom lu est normalisé (minuscules, sans accents, toute ponctuation devient une espace) puis comparé aux motifs dans l'ordre : le premier qui correspond donne la bande. Boîtes : un nom normalisé par règle (shared/bands.ts), une petite table d'alias, et les mots qui ne font pas une bande.",
+  "_doc": "Les bandes (SPEC §18.38). Écoles : la liste du barème (data/scoring.json, cv.TEC.school.list) sans les rangs, dans le même ordre, avec les campus des familles (INSA, Mines, Télécom) avant elles, puis des écoles de dev et d'ingénieurs courantes qui y manquaient. Un nom lu est normalisé (minuscules, sans accents, toute ponctuation devient une espace) puis comparé aux motifs dans l'ordre : le premier qui correspond donne la bande. Boîtes : un nom normalisé par règle (shared/bands.ts), une petite table d'alias, et les mots qui ne font pas une bande. Un nom de boîte qui porte un mot de refusedWords (mot entier, après normalisation) ou de refusedStems (n'importe où, espaces retirées) est refusé. blocked : les bandes fermées à la main, sous la forme de leur adresse sans /bandes/ (« boite/nom-de-la-bande ») ; elles répondent 404 et personne ne peut plus y entrer. Lister les boîtes à relire : npm run bands:review. Un changement de ce fichier vaut au redémarrage du serveur.",
   "schools": [
     { "id": "polytech", "label": "Polytech", "pattern": "\\bpolytech\\b|polytechnique universitaire" },
     { "id": "ece", "label": "ECE", "pattern": "^ece\\b|\\bece (paris|lyon)\\b|ecole centrale d electronique" },
@@ -138,6 +138,7 @@
     { "id": "esprit", "label": "ESPRIT", "pattern": "^esprit\\b|\\becole (superieure )?privee d ingenierie" },
     { "id": "enit", "label": "ENIT", "pattern": "\\benit\\b" }
   ],
+  "blocked": [],
   "companies": {
     "aliases": [
       { "id": "meta", "label": "Meta", "names": ["facebook", "meta platforms", "facebook france"] },
@@ -172,6 +173,17 @@
       "confidential", "confidentiel", "undisclosed", "agent libre", "free agent"
     ],
     "noneExact": ["self", "me", "myself", "moi", "moi meme", "personal", "personnel", "perso", "n a", "na", "none", "aucun", "aucune", "nothing", "rien", "divers", "various", "other", "autre", "home", "private", "prive"],
+    "refusedWords": [
+      "connard", "connards", "connasse", "conasse", "salope", "salopes", "salaud", "pute", "putes", "putain", "encule", "encules", "enfoire", "enfoires",
+      "batard", "batarde", "abruti", "abrutie", "debile", "cretin", "cretine", "merde", "merdique", "chier", "nique", "niquer", "ntm", "fdp", "ta gueule",
+      "pd", "pede", "pedes", "tapette", "tarlouze", "gouine", "negre", "negresse", "bougnoul", "bougnoule", "bicot", "youpin", "youtre", "chintok", "bamboula",
+      "sale arabe", "sale juif", "sale juive", "sale noir", "sale noire", "sale race", "nazi", "nazis", "neonazi", "hitler", "heil", "kkk", "pedophile", "pedo",
+      "viol", "violeur", "couille", "couilles", "branleur", "branleuse", "trou du cul",
+      "fuck", "fucker", "fucking", "shit", "shitty", "bullshit", "bitch", "bitches", "cunt", "dickhead", "cock", "pussy", "asshole", "arsehole", "bastard",
+      "whore", "slut", "nigger", "nigga", "faggot", "fag", "retarded", "kike", "spic", "chink", "wetback", "tranny", "rape", "rapist", "porn", "porno", "kys",
+      "white power", "white pride", "kill yourself"
+    ],
+    "refusedStems": ["encul", "connard", "connasse", "fuck", "nigger", "nigga", "faggot", "hitler", "pedophil", "bougnoul", "youpin", "tarlouz", "killyourself", "whitepower", "siegheil"],
     "legalForms": ["sas", "sasu", "sa", "sarl", "eurl", "sci", "snc", "sca", "inc", "incorporated", "ltd", "limited", "llc", "llp", "plc", "pty", "gmbh", "ag", "bv", "nv", "srl", "spa", "ab", "oy", "kk", "co", "corp", "corporation", "company", "cie", "group", "groupe", "holding", "s a s u", "s a s", "s a r l", "s a", "l l c", "b v", "n v", "s r l", "s p a"]
   }
 }

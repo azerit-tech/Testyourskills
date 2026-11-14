@@ -17,6 +17,11 @@
 // Le rang d'école du barème n'apparaît nulle part ici. Sur la page d'une bande,
 // jamais un nom : le profil criminel et les étoiles, le @pseudo seulement pour
 // une fiche revendiquée.
+//
+// Le nom d'une boîte hors alias est tapé par son premier membre : refusé s'il
+// porte une insulte, une adresse, un @ ou un numéro, toujours nettoyé, et sans
+// page publique, image ni place au tableau avant trois dossiers (hasPage). Une
+// bande fermée à la main (data/bands.json, blocked) n'existe plus pour personne.
 
 import type Database from "better-sqlite3";
 import type { Context, Hono } from "hono";
@@ -28,9 +33,13 @@ import {
   BAND_MIN_MEMBERS,
   BAND_TOP_MEMBERS,
   COMPANY_INPUT_MAX,
+  bandHasPage,
+  cleanCompanyLabel,
   companyAliasLabel,
   companyBand,
+  companyCheck,
   isBandType,
+  isBlockedBand,
   schoolById,
   type BandBoard,
   type BandMember,
@@ -68,6 +77,8 @@ export const BAND_MESSAGES = {
   unknownSchool: f("Choisis une école de la liste.", "Pick a school from the list."),
   limited: f("Trois entrées par jour, c'est le maximum. Reviens demain.", "Three joins a day is the limit. Come back tomorrow."),
   notFound: f("Cette bande n'existe pas, ou plus.", "This gang doesn't exist, or no longer does."),
+  refusedWord: f("Ce nom ne passe pas. Donne le nom de ta boîte, tel qu'il s'écrit.", "That name won't do. Give your company's name as it's written."),
+  refusedContact: f("Le nom de la boîte seulement : ni adresse, ni @, ni numéro.", "Just the company's name: no address, no @, no number."),
 } as const;
 
 // --- Table --------------------------------------------------------------------
@@ -122,10 +133,10 @@ export function forgetBands(db: Database.Database): void {
   cache.delete(db);
 }
 
-/** Le libellé d'une bande : la liste pour une école, l'alias ou le premier membre pour une boîte. */
+/** Le libellé d'une bande : la liste pour une école, l'alias ou le nom nettoyé du premier membre pour une boîte. */
 function labelOf(type: BandType, id: string, first: string): string {
   if (type === "ecole") return schoolById(id)?.label ?? first;
-  return companyAliasLabel(id) ?? first;
+  return companyAliasLabel(id) ?? (cleanCompanyLabel(first) || id);
 }
 
 function compute(db: Database.Database, type: BandType, now: number): Computed {
@@ -148,6 +159,8 @@ function compute(db: Database.Database, type: BandType, now: number): Computed {
   }
   const all = new Map<string, League>();
   for (const [id, g] of groups) {
+    // Fermée à la main, ou nom refusé : la bande n'existe plus, ni au tableau ni ailleurs.
+    if (isBlockedBand(type, id, g.first.label)) continue;
     const score = g.stars.slice(0, BAND_TOP_MEMBERS).reduce((s, n) => s + n, 0);
     all.set(id, { type, id, label: labelOf(type, id, g.first.label), score, members: g.stars.length, since: g.first.at });
   }
@@ -169,7 +182,7 @@ function league(db: Database.Database, type: BandType, now: number): Computed {
 
 function toStanding(c: Computed, b: League): BandStanding {
   const i = c.ranked.indexOf(b);
-  const base = { type: b.type, id: b.id, label: b.label, score: b.score, members: b.members };
+  const base = { type: b.type, id: b.id, label: b.label, score: b.score, members: b.members, hasPage: bandHasPage(b.type, b.id, b.members) };
   if (i < 0) return { ...base, rank: null, missing: Math.max(0, BAND_MIN_MEMBERS - b.members), gap: null, ahead: null };
   const prev = i > 0 ? c.ranked[i - 1]! : null;
   return {
@@ -183,11 +196,12 @@ function toStanding(c: Computed, b: League): BandStanding {
 
 /** Une école de la liste sans membre compté : en formation, il manque trois complices. */
 function emptyStanding(ref: BandRef): BandStanding {
-  return { ...ref, score: 0, members: 0, rank: null, missing: BAND_MIN_MEMBERS, gap: null, ahead: null };
+  return { ...ref, score: 0, members: 0, rank: null, missing: BAND_MIN_MEMBERS, gap: null, ahead: null, hasPage: bandHasPage(ref.type, ref.id, 0) };
 }
 
-/** La place d'une bande ; une école de la liste existe toujours, une boîte sans membre non. */
+/** La place d'une bande ; une école de la liste existe toujours, une boîte sans membre non, une bande fermée non plus. */
 export function bandStanding(db: Database.Database, type: BandType, id: string, now = Date.now()): BandStanding | null {
+  if (isBlockedBand(type, id)) return null;
   const c = league(db, type, now);
   const b = c.all.get(id);
   if (b) return toStanding(c, b);
@@ -195,11 +209,17 @@ export function bandStanding(db: Database.Database, type: BandType, id: string, 
   return school ? emptyStanding(school) : null;
 }
 
+/** La place d'une bande qui a sa page publique (hasPage) ; null pour une boîte au nom libre en formation. */
+export function publicBandStanding(db: Database.Database, type: BandType, id: string, now = Date.now()): BandStanding | null {
+  const b = bandStanding(db, type, id, now);
+  return b?.hasPage ? b : null;
+}
+
 /** Le tableau d'une ligue : les vingt premières, et `withId` si elle est plus bas ou en formation. */
 export function bandBoard(db: Database.Database, type: BandType, withId?: string | null, now = Date.now()): BandBoard {
   const c = league(db, type, now);
   const entries = c.ranked.slice(0, BOARD_SIZE).map((b) => toStanding(c, b));
-  const extra = withId && !entries.some((e) => e.id === withId) ? bandStanding(db, type, withId, now) : null;
+  const extra = withId && !entries.some((e) => e.id === withId) ? publicBandStanding(db, type, withId, now) : null;
   return { type, total: c.ranked.length, entries, extra: extra && extra.members > 0 ? extra : null };
 }
 
@@ -235,9 +255,9 @@ function bandMembers(store: Store, type: BandType, id: string, now: number): Ban
   });
 }
 
-/** La page d'une bande ; null si elle n'existe pas. */
+/** La page d'une bande ; null si elle n'existe pas ou n'a pas encore de page publique. */
 export function bandPage(store: Store, type: BandType, id: string, now = Date.now()): BandPage | null {
-  const band = bandStanding(store.db, type, id, now);
+  const band = publicBandStanding(store.db, type, id, now);
   if (!band) return null;
   return { band, members: band.members > 0 ? bandMembers(store, type, id, now) : [] };
 }
@@ -274,7 +294,8 @@ function suggestions(root: CardRow): MyBands["suggest"] {
   const data = root.data as CardData | ComparisonData;
   const cmp = root.kind === "comparison" ? (data as ComparisonData) : null;
   const schoolId = cmp ? (cmp.cv.school ?? cmp.github.school) : (data as CardData).school;
-  const club = mainCard(root).club;
+  // L'employeur lu s'écrit parfois « @Doctolib » : ce @ de tête part ; tapé à la main, un @ est refusé.
+  const club = mainCard(root).club?.replace(/^\s*@\s*/, "");
   return { ecole: schoolId ? schoolById(schoolId) : null, boite: companyBand(club) };
 }
 
@@ -294,9 +315,10 @@ export function myBands(store: Store, root: CardRow, now = Date.now()): MyBands 
   const key = personKey(store, root);
   const standing = (type: BandType): BandStanding | null => {
     const m = membership(store.db, key, type);
-    if (!m) return null;
+    // Une bande fermée à la main : la personne n'en est plus, elle peut en choisir une autre.
+    if (!m || isBlockedBand(type, m.band_id, m.label)) return null;
     // Sa propre fiche ne compte plus (masquée, expirée) : la bande reste nommée, à zéro.
-    return bandStanding(store.db, type, m.band_id, now) ?? emptyStanding({ type, id: m.band_id, label: m.label });
+    return bandStanding(store.db, type, m.band_id, now) ?? emptyStanding({ type, id: m.band_id, label: labelOf(type, m.band_id, m.label) });
   };
   return { stars: starsOfRow(root), ecole: standing("ecole"), boite: standing("boite"), suggest: suggestions(root) };
 }
@@ -441,10 +463,14 @@ export function mountBands(app: Hono, o: BandsOptions): void {
       ref = id ? schoolById(id) : null;
       if (!ref) return c.json({ state: "error", code: "unknown_school", message: BAND_MESSAGES.unknownSchool }, 400);
     } else {
-      // Une boîte déjà au tableau (sa page, une pastille) par son id, sinon le nom tapé, normalisé.
+      // Une boîte qui a déjà des membres (sa page, une pastille) par son id, sinon le nom tapé, vérifié et normalisé.
       const known = id ? bandStanding(store.db, "boite", id, now) : null;
-      ref = known ? { type: "boite", id: known.id, label: known.label } : companyBand(name);
-      if (!ref) return c.json({ state: "error", code: "not_a_band", message: BAND_MESSAGES.notBand }, 400);
+      const check = known ? null : companyCheck(name);
+      if (check && "refused" in check) {
+        const message = check.refused === "word" ? BAND_MESSAGES.refusedWord : check.refused === "contact" ? BAND_MESSAGES.refusedContact : BAND_MESSAGES.notBand;
+        return c.json({ state: "error", code: check.refused === "none" ? "not_a_band" : "refused", message }, 400);
+      }
+      ref = known ? { type: "boite", id: known.id, label: known.label } : check!.ref;
     }
 
     const ip = clientIp(c);

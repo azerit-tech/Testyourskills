@@ -38,6 +38,9 @@ const fr = {
     share: "Partager",
     shareLabel: (label: string) => `Partager la bande ${label}`,
     shareText: (stars: string, label: string, rank: string) => `Je rapporte ${stars} à ${label}. ${rank} Viens gonfler la bande :`,
+    /** Une boîte au nom libre sans page publique : le lien mène à l'accueil. */
+    shareTextNoPage: (stars: string, label: string, rank: string) => `Je rapporte ${stars} à ${label}. ${rank} Fais ta fiche et tape « ${label} » dessous :`,
+    noPage: "Sa page publique s'ouvre à trois dossiers.",
     linkedinHint: "Texte copié : colle-le dans ton post LinkedIn.",
     failed: "Ça n'a pas pris. Réessaie.",
   },
@@ -105,6 +108,8 @@ const en: BandsDict = {
     share: "Share",
     shareLabel: (label: string) => `Share the ${label} crew`,
     shareText: (stars: string, label: string, rank: string) => `I bring ${stars} to ${label}. ${rank} Come pump up the crew:`,
+    shareTextNoPage: (stars: string, label: string, rank: string) => `I bring ${stars} to ${label}. ${rank} Make your file and type "${label}" below it:`,
+    noPage: "Its public page opens at three files.",
     linkedinHint: "Text copied: paste it in your LinkedIn post.",
     failed: "That didn't take. Try again.",
   },

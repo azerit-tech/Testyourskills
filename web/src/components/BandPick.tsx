@@ -18,12 +18,16 @@ import "./bands.css";
 
 type Toast = (m: string) => void;
 
-/** Le partage d'une bande : la feuille du téléphone, sinon LinkedIn avec le texte au presse-papier (comme After.tsx). */
+/**
+ * Le partage d'une bande : la feuille du téléphone, sinon LinkedIn avec le texte au
+ * presse-papier (comme After.tsx). Une boîte au nom libre en formation n'a pas
+ * encore de page publique : le lien mène à l'accueil, le texte dit quoi taper.
+ */
 export function useBandShare(toast: Toast) {
   const { t } = useT();
   const native = hasNativeShare() && isTouch();
-  const share = async (b: Pick<BandRef, "type" | "id">, text: string, cardId: string | null) => {
-    const url = bandUrl(b);
+  const share = async (b: Pick<BandRef, "type" | "id"> & { hasPage?: boolean }, text: string, cardId: string | null) => {
+    const url = b.hasPage === false ? `${window.location.origin}/` : bandUrl(b);
     const meta = { type: b.type, id: b.id };
     if (native) {
       try {
@@ -199,9 +203,11 @@ interface JoinedProps {
 function Joined({ b, stars, head, busy, error, native, onLeave, onShare }: JoinedProps) {
   const { t } = useT();
   const p = t.bands.pick;
-  const href = bandPath(b);
+  // Sans page publique (boîte au nom libre, moins de trois dossiers) : ni lien, et le partage dit quoi taper.
+  const href = b.hasPage ? bandPath(b) : null;
   const glyphs = filledStars(stars);
   const rank = t.bands.rank(b);
+  const text = b.hasPage ? p.shareText(glyphs, b.label, rank) : p.shareTextNoPage(glyphs, b.label, rank);
   return (
     <div className="bp-league is-in" aria-busy={busy}>
       <p className="surtitre">{head}</p>
@@ -211,14 +217,19 @@ function Joined({ b, stars, head, busy, error, native, onLeave, onShare }: Joine
           {glyphs}
         </span>{" "}
         {p.line[1]}{" "}
-        <a href={href} onClick={(e) => onLinkClick(e, href)}>
-          {b.label}
-        </a>
+        {href ? (
+          <a href={href} onClick={(e) => onLinkClick(e, href)}>
+            {b.label}
+          </a>
+        ) : (
+          <strong className="bp-name">{b.label}</strong>
+        )}
         .{" "}
         <span className="bp-rank">{rank}</span>
       </p>
+      {!b.hasPage && <p className="bp-nopage">{p.noPage}</p>}
       <div className="bp-actions">
-        <button type="button" className="pill" onClick={() => onShare(p.shareText(glyphs, b.label, rank))} aria-label={p.shareLabel(b.label)}>
+        <button type="button" className="pill" onClick={() => onShare(text)} aria-label={p.shareLabel(b.label)}>
           {native ? <IconShare /> : <IconLinkedIn />}
           {p.share}
         </button>

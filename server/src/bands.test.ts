@@ -389,3 +389,70 @@ describe("pages publiques", () => {
     expect((await send("band_join")).status).toBe(400);
   });
 });
+
+describe("le nom libre d'une boîte", () => {
+  const raw = (store: Store, cardId: string, bandId: string, label: string) =>
+    store.db
+      .prepare(`INSERT INTO band_members (person_key, kind, band_id, label, card_id, login, stars, joined_at) VALUES (?, 'boite', ?, ?, ?, NULL, 4, ?)`)
+      .run(`card:${cardId}`, bandId, label, cardId, Date.now());
+
+  it("avant trois dossiers : ni page, ni image, ni tableau ; sous sa fiche, la personne la voit", async () => {
+    const ctx = setup();
+    const a = insert(ctx.store);
+    const r = await join_(ctx, a, { type: "boite", name: "🚀 PETITE BOÎTE ★" });
+    expect(r.status).toBe(200);
+    expect(r.json.boite).toMatchObject({ id: "petite-boite", label: "Petite Boîte", members: 1, rank: null, hasPage: false });
+    expect((await call(ctx, "/api/bands/boite/petite-boite")).status).toBe(404);
+    expect((await ctx.app.request("/og/b/boite/petite-boite.png")).status).toBe(404);
+    expect((await ctx.app.request("/bandes/boite/petite-boite")).status).toBe(404);
+    expect((await call<BandBoard>(ctx, "/api/bands?type=boite&with=petite-boite")).json.extra).toBeNull();
+    // Trois dossiers : la page, l'image et le tableau.
+    for (const id of [insert(ctx.store), insert(ctx.store)]) expect((await join_(ctx, id, { type: "boite", name: "Petite boîte" }, { ip: `203.0.113.${id.slice(-2)}` })).status).toBe(200);
+    const page = await call<BandPage>(ctx, "/api/bands/boite/petite-boite");
+    expect(page.status).toBe(200);
+    expect(page.json.band).toMatchObject({ label: "Petite Boîte", members: 3, rank: 1, hasPage: true });
+    expect((await ctx.app.request("/og/b/boite/petite-boite.png")).status).toBe(200);
+    expect((await ctx.app.request("/bandes/boite/petite-boite")).status).toBe(200);
+  });
+
+  it("une boîte de la table d'alias a sa page dès le premier dossier", async () => {
+    const ctx = setup();
+    const a = insert(ctx.store);
+    expect((await join_(ctx, a, { type: "boite", name: "Facebook" })).json.boite).toMatchObject({ id: "meta", hasPage: true });
+    expect((await call(ctx, "/api/bands/boite/meta")).status).toBe(200);
+  });
+
+  it("une insulte, une adresse, un @ ou un numéro : refusés avec un message sobre", async () => {
+    const ctx = setup();
+    const a = insert(ctx.store);
+    const word = await join_(ctx, a, { type: "boite", name: "Les connards" });
+    expect(word.status).toBe(400);
+    expect(word.json).toMatchObject({ code: "refused", message: { fr: expect.stringContaining("ne passe pas") } });
+    for (const name of ["jean@dupont.fr", "06 12 34 56 78", "www.exemple.fr"]) {
+      const r = await join_(ctx, a, { type: "boite", name });
+      expect(r.status, name).toBe(400);
+      expect(r.json, name).toMatchObject({ code: "refused", message: { fr: expect.stringContaining("ni @") } });
+    }
+    expect(ctx.store.db.prepare(`SELECT COUNT(*) AS n FROM band_members`).get()).toEqual({ n: 0 });
+  });
+
+  it("un nom refusé déjà en base : la bande n'existe plus, ni au tableau, ni par son id, ni sous la fiche", async () => {
+    const ctx = setup();
+    const ids = [insert(ctx.store), insert(ctx.store), insert(ctx.store)];
+    for (const id of ids) raw(ctx.store, id, "boite-propre", "Boîte connard");
+    expect(bandBoard(ctx.store.db, "boite").entries).toEqual([]);
+    expect(bandStanding(ctx.store.db, "boite", "boite-propre")).toBeNull();
+    expect((await call(ctx, "/api/bands/boite/boite-propre")).status).toBe(404);
+    expect((await ctx.app.request("/og/b/boite/boite-propre.png")).status).toBe(404);
+    expect((await call<MyBands>(ctx, `/api/card/${ids[0]}/bands`, { token: `tok-${ids[0]}` })).json.boite).toBeNull();
+    // On n'y entre plus par son id.
+    const late = insert(ctx.store);
+    expect((await join_(ctx, late, { type: "boite", id: "boite-propre" })).status).toBe(400);
+  });
+
+  it("le libellé affiché est le nom nettoyé, même pour une ligne ancienne", () => {
+    const ctx = setup();
+    for (const id of [insert(ctx.store), insert(ctx.store), insert(ctx.store)]) raw(ctx.store, id, "datadog", "  ~~DATADOG~~ 🚀 ");
+    expect(bandStanding(ctx.store.db, "boite", "datadog")).toMatchObject({ label: "Datadog", hasPage: true });
+  });
+});

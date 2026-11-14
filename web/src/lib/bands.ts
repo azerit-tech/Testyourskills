@@ -2,7 +2,7 @@
 // souvenirs locaux, la bande de la dernière page vue (sa pastille passe en
 // premier sous la fiche) et les bandes choisies ici (« Ta bande » sur /bandes).
 import type { BandBoard, BandPage, BandRef, BandsTop, BandStanding, BandType, MyBands } from "../../../shared/bands";
-import { BAND_MIN_MEMBERS, schoolById } from "../../../shared/bands";
+import { BAND_MIN_MEMBERS, bandHasPage, companyCheck, schoolById } from "../../../shared/bands";
 import { isMock, tokens } from "./api";
 import { ApiError } from "./errors";
 
@@ -148,7 +148,7 @@ export const bandUrl = (b: Pick<BandRef, "type" | "id">) => `${window.location.o
 /* ---------- la démo (?mock=1) ---------- */
 
 function standing(type: BandType, id: string, label: string, score: number, members: number): Omit<BandStanding, "rank" | "gap" | "ahead"> {
-  return { type, id, label, score, members, missing: Math.max(0, BAND_MIN_MEMBERS - members) };
+  return { type, id, label, score, members, missing: Math.max(0, BAND_MIN_MEMBERS - members), hasPage: bandHasPage(type, id, members) };
 }
 
 const MOCK_BANDS: Record<BandType, Omit<BandStanding, "rank" | "gap" | "ahead">[]> = {
@@ -181,6 +181,7 @@ function mockStandings(type: BandType): BandStanding[] {
     b.score += 4;
     b.members += 1;
     b.missing = Math.max(0, BAND_MIN_MEMBERS - b.members);
+    b.hasPage = bandHasPage(type, b.id, b.members);
   }
   const ranked = list.filter((b) => b.members >= BAND_MIN_MEMBERS).sort((a, b) => b.score - a.score || b.members - a.members);
   return list.map((b) => {
@@ -199,12 +200,12 @@ const mock = {
   board(type: BandType, withId: string | null): BandBoard {
     const all = mockStandings(type);
     const entries = all.filter((b) => b.rank !== null).sort((a, b) => a.rank! - b.rank!);
-    const extra = withId && !entries.some((b) => b.id === withId) ? (all.find((b) => b.id === withId) ?? null) : null;
+    const extra = withId && !entries.some((b) => b.id === withId) ? (all.find((b) => b.id === withId && b.hasPage) ?? null) : null;
     return { type, total: entries.length, entries: entries.slice(0, 20), extra };
   },
   page(type: BandType, id: string): BandPage | null {
     const band = mockStandings(type).find((b) => b.id === id) ?? (type === "ecole" && schoolById(id) ? { ...standing("ecole", id, schoolById(id)!.label, 0, 0), rank: null, gap: null, ahead: null } : null);
-    if (!band) return null;
+    if (!band?.hasPage) return null;
     const profiles = [
       { fr: "Le Bâtisseur", en: "The Builder" },
       { fr: "Le Mainteneur", en: "The Maintainer" },
@@ -229,10 +230,21 @@ const mock = {
     };
   },
   join(cardId: string, type: BandType, pick: { id?: string; name?: string }): MyBands {
-    const label = pick.id ? (MOCK_BANDS[type].find((b) => b.id === pick.id)?.label ?? schoolById(pick.id)?.label ?? pick.id) : (pick.name ?? "").trim();
-    const id = pick.id ?? label.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-    if (!id) throw new ApiError(400, "not_a_band", { fr: "Ce nom ne fait pas une bande.", en: "That name doesn't make a crew." });
-    mockJoined.set(cardId, { ...mockJoined.get(cardId), [type]: { id, label } });
+    const known = pick.id ? (MOCK_BANDS[type].find((b) => b.id === pick.id)?.label ?? schoolById(pick.id)?.label ?? null) : null;
+    // Comme le serveur : un nom de boîte tapé passe par la même vérification (insulte, adresse, @, numéro).
+    const check = known === null && type === "boite" ? companyCheck(pick.name) : null;
+    if (check && "refused" in check) {
+      const fact =
+        check.refused === "word"
+          ? { fr: "Ce nom ne passe pas. Donne le nom de ta boîte, tel qu'il s'écrit.", en: "That name won't do. Give your company's name as it's written." }
+          : check.refused === "contact"
+            ? { fr: "Le nom de la boîte seulement : ni adresse, ni @, ni numéro.", en: "Just the company's name: no address, no @, no number." }
+            : { fr: "Pas une bande. Donne le nom de ta boîte.", en: "Not a gang. Give your company's name." };
+      throw new ApiError(400, check.refused === "none" ? "not_a_band" : "refused", fact);
+    }
+    const ref = check && "ref" in check ? check.ref : { id: pick.id ?? "", label: known ?? pick.id ?? "" };
+    if (!ref.id) throw new ApiError(400, "not_a_band", { fr: "Pas une bande.", en: "Not a crew." });
+    mockJoined.set(cardId, { ...mockJoined.get(cardId), [type]: { id: ref.id, label: ref.label } });
     return mock.mine(cardId);
   },
   leave(cardId: string, type: BandType): MyBands {
