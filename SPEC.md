@@ -1471,3 +1471,46 @@ Premier essai sur un vrai iPhone (Safari, site servi sur le réseau local, mode 
 - **La trace du film.** `?filmtrace=1` affiche en bas de l'écran ce que font les deux balises vidéo et le lecteur, et l'envoie à `POST /api/film-trace`, route montée seulement si `FILM_TRACE=1` (sortie : `film-trace.log` à côté de la base). Sans le paramètre, rien n'est chargé. Aucune donnée de fiche ni de personne. La route reste éteinte en production, sauf le temps d'un diagnostic.
 - **Reste à juger sur l'iPhone** après correction : la lecture entière, la coupe, l'arrêt sur image, le passage à la fiche, le son sur le haut-parleur, et le navigateur intégré de LinkedIn.
 
+### 18.48 Revue complète du site : les décisions du premier tour (15 novembre)
+
+Demande de Jacques (14 novembre, minuit) : repasser sur tout le design, chaque détail, tout requestionner, l'expérience (« est-ce que tout ce qui est là est fait dans l'objectif ») et le visuel, autant d'agents et de tours qu'il faut. Méthode : des critiques qui jugent sur captures sans toucher au code (parcours, visuel du cœur, visuel des pages autour, textes, exécution), puis des agents qui corrigent par lot, puis un nouveau tour de critique. Ce qui suit tranche les constats du premier tour. Tout se juge à 390 px d'abord et par la porte par défaut.
+
+**Le système visuel (un seul, partout)**
+- **Étoiles** : un seul dessin sur tout le site, la fiche, le film et les images. Remplies de gauche à droite. Allumée : crème `#fff9cb` pleine. Éteinte : la même étoile en contour 1,5 px blanc à 35 %, sans remplissage. Trois tailles : 14 px (listes), 22 px (fiche, verdict), 26 px (film, pari).
+- **Échelle typographique** : sept crans, 12, 14, 16, 22, 28, 44, 60 (bureau : titre de page 64). Corps Outfit 16, secondaire Outfit 14, une seule étiquette (JetBrains Mono 12 capitales, approche 0,08 em), titres en Barlow Condensed. Aucun texte sous 11 px. Titre de page : une taille ; titre de section : une taille ; titre de bloc : une taille.
+- **Couleur** : le rose poudré `#ffb2c6` veut dire « ça se touche » et rien d'autre (bouton principal, liens). L'emphase dans une phrase est crème en gras. Les réserves sont pêche `#ffd3a5`. L'erreur est `#ff7a6b`, avec pictogramme et contour du champ. Le rang et « place libre » ne sont plus roses.
+- **Boutons** : un seul bouton rose plein par écran, 52 px, corps 16. Secondaire en contour crème, 44 px. Tertiaire en lien texte souligné. Désactivé : contour discret, pas de rose terne. En cours : rose plein et trois points animés.
+- **Rayons** : 999 (pilules, champs), 24 (blocs, fiche), 14 (éléments dans un bloc). La couverture garde ses angles de planche.
+- **Conteneurs** : une largeur de page au bureau (1080 px), un padding de bloc (20 px téléphone, 28 px bureau), une marge latérale (16 px téléphone). Le bureau est pensé : deux colonnes pour le héros de l'accueil et pour la page d'une fiche (personne fichée comme visiteur).
+- **Plaque d'identité** : un gabarit, « @PSEUDO » en capitales Barlow Condensed, seconde ligne mono « N° · date », sur la couverture, l'attente, le film et la fiche.
+
+**La fiche**
+- Les étoiles deviennent un signe majeur de la fiche : une rangée sous la note, avec le nom du niveau ; même chose, en plus grand, sur l'image de partage.
+- Les six barres du recto restent, sous le nom de « traits » : elles sont toujours remplies, même avec une seule source, alors que les huit critères peuvent être vides. La note vient des huit critères, montrés au verso et dans un seul bloc sous la fiche (le doublon « Ce que la grille retient » puis « Voici comment un recruteur te lit » fusionne : huit tuiles dépliables, détail replié par défaut).
+- Les nombres de la toise ne sont plus coupés par la photo. Un avatar absent ou générique devient la silhouette à initiales. Le retournement se commande par un lien sous la fiche, pas par une pastille posée dessus.
+- Le niveau à trois étoiles ne s'appelle plus comme l'en-tête : Petit délit, Délit, Mandat d'arrêt, Haute surveillance, Menace publique, Priorité absolue (Petty crime, Misdemeanor, Warrant out, Under surveillance, Public menace, Top priority).
+
+**Le film**
+- Un toucher sur l'image ne saute plus le film ; seul le bouton « Passer » le fait. Les boutons s'effacent à l'arrêt sur image.
+- Le film joue une fois. Ensuite un lien « Revoir ma poursuite » le relance, et toute fiche propose « Voir la poursuite » aux visiteurs et à la personne dénoncée (jamais en lecture automatique pour eux).
+
+**Le parcours**
+- **Accueil** : le premier écran dit ce qu'on obtient. Titre « Ta fiche de dev. Combien d'étoiles ? » (“Your dev rap sheet. How many stars?”), promesse « De une à six étoiles, en une minute. Sans compte. », bouton « Faire ma fiche ». La couverture rétrécit sur téléphone pour que le bouton tienne au-dessus de 600 px ; la fiche d'exemple est pleine largeur et vient juste après. Ordre : fiche d'exemple, top de la semaine, primes (si ouvertes), bandes, galerie des niveaux, formulaire final. L'accueil se souvient d'une fiche déjà faite ou en cours. Le bandeau de saison ne s'affiche que primes ouvertes, et mène à `/primes`. Base vide : un seul bloc d'invitation, pas cinq « Place libre », pas de section bandes sans bande.
+- **Page de la personne fichée** : fiche ; ligne du verdict (pari, jury) ; partage ; bande ; dénoncer ; course aux primes si ouvertes ; critères (détail replié) ; le reste replié. Sous trois étoiles, « Ajoute ton LinkedIn » remonte sous le verdict et le rang ne s'affiche que s'il flatte (top 10).
+- **Page vue par un visiteur** : une phrase qui dit ce que c'est, et une barre fixe pleine largeur « Fais la tienne » (la pilule flottante disparaît) ; au bureau, le formulaire est sous la fiche dans la colonne de droite. Après le vote du jury : « À ton tour ».
+- **Fiche d'une personne dénoncée** : titre qui vaut pour tout visiteur, « C'est moi, je reprends ma fiche » et « Ce n'est pas moi : faire la mienne », la demande de retrait dans le même bloc.
+- **Dénoncer** accepte un lien LinkedIn ou un pseudo GitHub quand le serveur sait lire LinkedIn. Après la dénonciation, le premier bouton envoie le lien à la personne ; X n'est plus un bouton.
+- **Bandes** : la page d'une bande a trois états (sans fiche, avec fiche, membre) ; la bande choisie depuis sa page suit jusqu'à la fiche.
+- **Navigation** : la barre du haut porte « Bandes » et « Ma fiche » ; le rang de la semaine mène au tableau ; le pied de page mène aux bandes, aux primes et au règlement quand ils sont ouverts, à la vie privée et aux crédits.
+- **Contester** offre de vraies sorties : ajouter une source, supprimer la fiche.
+- **Erreurs** : un état « commissariat injoignable » dessiné, distinct de « introuvable » ; une seule mise en page d'erreur, dans l'univers.
+- **Nom** : le seul nom visible est Azerit, l'objet est la fiche (« avis de recherche » pour l'univers) ; « Testyourskills » ne paraît plus à l'écran ni dans les titres d'onglet.
+
+**Les règles durcies**
+- La lettre du rang d'une école ne s'affiche nulle part, y compris pour la personne fichée.
+- Le règlement n'est pas servi tant qu'il contient un champ entre crochets.
+- La limite de création passe à 300 fiches par jour et par adresse, doublée d'une limite de 6 par navigateur ; le plafond de dépense par jour reste le vrai garde-fou.
+- Une adresse `/<pseudo>` préremplit le formulaire, elle ne lance plus une fiche à la simple visite.
+
+**Le vocabulaire** (un mot par chose) : fiche / rap sheet puis sheet (l'objet) ; dossier / file (la métaphore, dans les phrases seulement) ; source (LinkedIn, CV, GitHub) ; pièce / exhibit (un constat au verso) ; chef d'accusation / charge ; bande / crew ; prime / bounty ; « entrer dans la course » ; « faire appel » pour contester ; « C'est moi » / “That's me” pour reprendre sa fiche ; toute note s'écrit avec son échelle (79/100, 8/10). Anglais américain. Le texte de partage dit « Ma fiche de dev », la note avec son échelle, et n'envoie le rang que s'il flatte.
+
