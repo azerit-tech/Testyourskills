@@ -19,6 +19,7 @@
 //   grille du tout. Le jeu reste ; la grille s'ouvre quand la personne revendique.
 // - Un dossier à deux pièces part avec sa fiche (shared/caseFile.ts), faite avant
 //   que la grille du dossier ne parte : un dossier fait par un tiers garde sa note.
+// - L'école des bandes (`school`, §18.38) ne part jamais, sur aucune fiche.
 // Idempotent : appliqué deux fois, le même résultat.
 
 import { caseCard } from "./caseFile";
@@ -110,7 +111,9 @@ export interface ViewOpts {
   thirdParty: boolean;
 }
 
-function publicCard(card: CardData, o: ViewOpts): CardData {
+function publicCard(withSchool: CardData, o: ViewOpts): CardData {
+  // L'école des bandes (§18.38) reste à la personne fichée.
+  const { school: _school, ...card } = withSchool;
   if (!card.grid) return card;
   const { grid, ...rest } = card;
   if (!o.thirdParty) return { ...rest, grid: publicGrid(grid) };

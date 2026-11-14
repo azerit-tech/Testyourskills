@@ -163,3 +163,16 @@ describe("la démo applique la même vue que le serveur", () => {
     expect(gridOf(await mockApi.getJob("m-silver-abcd"))).toBeDefined();
   });
 });
+
+describe("l'école des bandes (§18.38)", () => {
+  it("ne part jamais vers un visiteur, fiche seule ou dossier, avec ou sans grille", () => {
+    const card: CardData = { ...FIXTURES.gold, school: "centralesupelec" };
+    const bare: CardData = { ...card, grid: undefined };
+    for (const thirdParty of [false, true]) {
+      expect(publicView(card, { thirdParty })).not.toHaveProperty("school");
+      expect(publicView(bare, { thirdParty })).not.toHaveProperty("school");
+    }
+    const cmp: ComparisonData = { ...FIXTURE_COMPARISON, cv: { ...FIXTURE_COMPARISON.cv, school: "epitech" } };
+    expect(JSON.stringify(publicView(cmp, { thirdParty: false }))).not.toMatch(/"school"/);
+  });
+});

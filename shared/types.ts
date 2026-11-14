@@ -195,6 +195,11 @@ export interface CardData {
   mainLanguage?: string;
   /** Employeur déclaré, sinon null → « Agent libre ». */
   club: string | null;
+  /**
+   * L'école lue sur LinkedIn ou le CV, ramenée à la liste des bandes (data/bands.json, §18.38) :
+   * son id. Privée : retirée de la vue publique (shared/publicView.ts), jamais dessinée sur la fiche.
+   */
+  school?: string;
 
   /** Toujours dans l'ordre STAT_CODES. */
   stats: Stat[];

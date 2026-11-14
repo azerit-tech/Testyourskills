@@ -3,6 +3,7 @@
 // 0.4.0) : école, expérience comptée sur les postes datés, parcours, stack et
 // ownership déclarés. L'école n'entre plus dans TEC : elle est le critère EDU.
 
+import { matchSchool } from "../../../shared/bands";
 import type { CvReading, CvTextCounts } from "../../../shared/readings";
 import type { CardData, Fact, Lang, Position, Stat, StatCode } from "../../../shared/types";
 import { tierFor } from "../../../shared/types";
@@ -214,6 +215,8 @@ export function scoreCv(
     r.full_name?.trim() || opts.github?.profile.name?.trim() || opts.github?.login || (opts.lang === "fr" ? "CV anonyme" : "Anonymous CV");
   const special = specialOf(values, false);
   const club = currentRole(r)?.company?.trim() || null;
+  // L'école lue, ramenée à la liste des bandes (§18.38) : privée, absente de la vue publique.
+  const school = matchSchool(r.school_name)?.id;
   return {
     source: "cv",
     scoringVersion: SCORING.version,
@@ -226,6 +229,7 @@ export function scoreCv(
     position: cvPosition(r),
     mainLanguage: cvMainLanguage(r),
     club,
+    ...(school ? { school } : {}),
     stats,
     statuses,
     // Le profil de la fiche CV ne lit que le CV : les faits GitHub d'une

@@ -60,6 +60,14 @@ describe("barème CV §4.5", () => {
     expect(card.position).toBe("FS");
   });
 
+  it("l'école lue devient l'id de sa bande (§18.38), hors liste rien", () => {
+    const base = cvReading({ seniority_claimed: "mid" });
+    expect(scoreCv({ ...base, school_name: "CentraleSupélec", school_tier: "A" }, cvCounts(), opts).school).toBe("centralesupelec");
+    expect(scoreCv({ ...base, school_name: "INSA de Lyon", school_tier: "B" }, cvCounts(), opts).school).toBe("insa-lyon");
+    expect(scoreCv({ ...base, school_name: "Université de nulle part", school_tier: "C" }, cvCounts(), opts)).not.toHaveProperty("school");
+    expect(scoreCv(base, cvCounts(), opts)).not.toHaveProperty("school");
+  });
+
   it("TEC plafonné à 99, DOC −10 au-delà de 1 200 mots", () => {
     const many = Array.from({ length: 20 }, (_, i) => `t${i}`);
     expect(stat(scoreCv(cvReading({ seniority_claimed: "lead", technos_described: many }), cvCounts(), opts), "TEC").value).toBe(99);
