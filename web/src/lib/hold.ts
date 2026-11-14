@@ -7,6 +7,7 @@
 // la fiche sort sans révélation.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { soundNeedsGesture, unlockAudio } from "./audio";
+import { filmTrace } from "../film/trace";
 import { unlockFilm } from "../film/unlock";
 
 /** Fiche prête : au plus ce temps sur l'attente, lecture des pièces et chargement de la scène compris. */
@@ -95,6 +96,7 @@ export function useHold({ active, animate }: { active: boolean; animate: boolean
   const onScene = useCallback((s: SceneState) => setScene(s), []);
   /** Le geste de la pilule : il débloque le son et les balises du film, puis l'écran se lève. */
   const onOpen = useCallback(() => {
+    filmTrace("pilule:touchée");
     unlockAudio();
     unlockFilm();
     lift();

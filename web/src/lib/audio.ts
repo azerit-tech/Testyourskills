@@ -76,6 +76,11 @@ export function soundNeedsGesture(): boolean {
   return !gestured && !readMuted() && !!ctor();
 }
 
+/** L'état du contexte de la page, sans le créer ni le relancer (la trace du film, film/traceRecorder.ts). */
+export function peekAudio(): { state: string; currentTime: number } | null {
+  return ctx ? { state: ctx.state, currentTime: ctx.currentTime } : null;
+}
+
 let watching = false;
 /** Une fois pour la page : chaque geste relance le contexte s'il s'est endormi (onglet en veille, appel). */
 export function watchGestures(): void {

@@ -31,6 +31,7 @@ import { api, ApiError, tokens, type CaseInfo } from "../lib/api";
 import { isClosed } from "../lib/errors";
 import { useHold, type SceneState } from "../lib/hold";
 import { gaveUp, nextPatience, type Patience } from "../lib/patience";
+import { filmTrace } from "../film/trace";
 import { navigate, onLinkClick } from "../lib/router";
 import { freshLogin, freshSince, iDenounced, myCard, prefillFromLast, rememberMine, type MyCard } from "../lib/session";
 import { revealScene, revealToPlay } from "../lib/revealScene";
@@ -367,7 +368,10 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
   useEffect(() => {
     if (!animating) return;
     const on = (e: KeyboardEvent) => {
-      if (e.key === "Escape") skip();
+      if (e.key === "Escape") {
+        filmTrace("passer : échap");
+        skip();
+      }
     };
     window.addEventListener("keydown", on);
     return () => window.removeEventListener("keydown", on);
@@ -457,6 +461,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
               className="skip-btn"
               onClick={(e) => {
                 e.stopPropagation();
+                filmTrace("passer : bouton");
                 skip();
               }}
             >

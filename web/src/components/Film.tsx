@@ -27,6 +27,7 @@ import type { FileId } from "../film/files";
 import { filmLoadMs, filmNet, filmRemaining } from "../film/loader";
 import { readyVerdict, VisibleClock } from "../film/net";
 import { filmReport, interruptedOutcome, type FilmOutcome } from "../film/report";
+import { filmTrace, filmTraceMount } from "../film/trace";
 import type { Phase } from "./Reveal";
 import "../card/fonts.css";
 import "../film/film.css";
@@ -113,15 +114,18 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
     if (!live) return;
     if (!c.staged && t >= plan.stageAt - 1e-6) {
       c.staged = true;
+      filmTrace("fiche:montée", { ft: t });
       cb.current.onStage?.();
     }
     if (!c.handed && t >= plan.handoffAt - 1e-6) {
       c.handed = true;
+      filmTrace("relais", { ft: t });
       buzz(40);
       cb.current.onHandoff();
     }
     if (!c.done && t >= plan.duration - 1e-6) {
       c.done = true;
+      filmTrace("film:fin", { ft: t });
       reading.current.send(player.current?.stats().aborted ? "error" : "played");
       cb.current.onDone();
     }
@@ -145,6 +149,7 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
       onStill: (v) => paintStill(v, stillRef.current, plan.tone),
     });
     player.current = p;
+    const untrace = filmTraceMount({ stats: p.stats, plan: { duration: plan.duration, cut: plan.cut, endVideo: plan.endVideo, level: plan.level } });
     let settled = false;
     const needed: FileId[] = ["poursuite", plan.ending];
     // L'événement `film` : ce qu'il est advenu de cette lecture, une seule fois, sans rien de personnel.
@@ -152,6 +157,7 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
     r.send = (outcome) => {
       if (r.sent) return;
       r.sent = true;
+      filmTrace("issue", { outcome, gesture: r.gesture, started: r.started });
       const s = p.stats();
       const net = filmNet();
       api.track("film", null, {
@@ -184,6 +190,7 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
     };
     const fail = (outcome: FilmOutcome) => {
       if (settled) return;
+      filmTrace("repli", { outcome });
       stop();
       r.send(outcome);
       cb.current.onFail();
@@ -199,23 +206,31 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
     const timer = window.setInterval(check, READY_CHECK_MS);
     document.addEventListener("visibilitychange", onVis);
     check();
+    filmTrace("prepare:début");
     p.prepare().then(
       (ready) => {
+        filmTrace(`prepare:${ready}`, { settled });
         if (settled) return;
         stop();
         if (ready === "gesture" && cb.current.onGesture) {
           r.gesture = true;
+          filmTrace("pilule:montrée");
           cb.current.onGesture();
         } else cb.current.onReady?.();
       },
-      () => fail(canPlayFilm() ? "error" : "nocodec"),
+      (e: unknown) => {
+        filmTrace("prepare:erreur", { message: e instanceof Error ? `${e.name}: ${e.message}` : String(e), settled });
+        fail(canPlayFilm() ? "error" : "nocodec");
+      },
     );
     if (import.meta.env.DEV || isMock()) window.__film = { plan, seek: p.seek, hold: p.hold, stats: p.stats };
     return () => {
+      filmTrace("démontage", { phase: phaseRef.current });
       stop();
       window.removeEventListener("pagehide", onHide);
       // démontée avant la fin : passée (la révélation close), pilule jamais touchée, ou page quittée
       r.send(interruptedOutcome({ closed: phaseRef.current === "done", started: r.started, gesture: r.gesture }));
+      untrace();
       p.dispose();
       player.current = null;
       if (window.__film?.plan === plan) delete window.__film;
@@ -224,15 +239,21 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
 
   // La lecture : seulement en « playing » et « handoff », onglet visible.
   useEffect(() => {
+    filmTrace("phase", { phase });
     const p = player.current;
     if (!p || (phase !== "playing" && phase !== "handoff")) return;
     reading.current.started = true;
+    filmTrace("play()", { phase, hidden: document.hidden });
     p.play();
     const onVis = () => {
       if (document.hidden) {
+        filmTrace("pause() : onglet caché");
         p.pause();
         sound.current?.pause();
-      } else p.play();
+      } else {
+        filmTrace("play() : onglet visible");
+        p.play();
+      }
     };
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
@@ -256,6 +277,11 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
     sound.current?.setMuted(m);
   };
 
+  const onTapTraced = () => {
+    filmTrace("toucher", { phase });
+    onTap?.();
+  };
+
   const hud = hudAt(plan, time, lang);
   const landed = hud.video === null;
   const frozen = hud.freeze !== null;
@@ -271,7 +297,7 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
 
   return (
     <>
-      <div className={`film-stage${landed ? " is-landed" : ""}`} style={vars} aria-hidden="true" onClick={landed ? undefined : onTap}>
+      <div className={`film-stage${landed ? " is-landed" : ""}`} style={vars} aria-hidden="true" onClick={landed ? undefined : onTapTraced}>
         <div ref={frameRef} className={`film-frame${hud.freeze ? " is-frozen" : ""}`} data-frame={hud.frame} data-shot={hud.shot}>
           {/* les deux balises vidéo sont posées ici par le lecteur */}
           <div ref={coverRef} className="film-cover" />

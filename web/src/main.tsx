@@ -2,9 +2,13 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { api } from "./lib/api";
+import { initFilmTrace } from "./film/trace";
 import { watchGestures } from "./lib/audio";
 import { captureRef } from "./lib/session";
 import "./styles.css";
+
+// La trace du film (`?filmtrace=1`), lue avant que la navigation ne change l'adresse : sans elle, rien.
+initFilmTrace();
 
 // Arrivée par un lien partagé (?r=) : on garde l'origine et on nettoie l'adresse
 // avant le premier rendu, pour que la fiche créée ensuite la porte (§18.0).
