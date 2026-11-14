@@ -101,16 +101,22 @@ export function CardView(props: CardViewProps) {
     if (!flippable) setFlipped(false);
   }, [flippable]);
 
-  // Balayage à l'apparition (et à chaque passage de reveal à true)
+  // Balayage à l'apparition (et à chaque passage de reveal à true). Il va à son
+  // terme même si reveal retombe entre-temps : le film rend la main 0,3 s après
+  // le relais, le balayage ne se coupe pas en plein vol.
+  const sweep = useRef(0);
   useEffect(() => {
-    if (!reveal || reduced) {
+    if (reduced) {
+      window.clearTimeout(sweep.current);
       setRevealing(false);
       return;
     }
+    if (!reveal) return;
+    window.clearTimeout(sweep.current);
     setRevealing(true);
-    const t = window.setTimeout(() => setRevealing(false), 1500);
-    return () => window.clearTimeout(t);
+    sweep.current = window.setTimeout(() => setRevealing(false), 1500);
   }, [reveal, reduced]);
+  useEffect(() => () => window.clearTimeout(sweep.current), []);
 
   useEffect(() => {
     const el = ref.current;

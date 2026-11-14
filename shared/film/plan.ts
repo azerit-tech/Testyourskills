@@ -6,7 +6,10 @@ import type { CardData, Fact, Lang, Stars } from "../types";
 import { LEVEL_LABELS, starsFor } from "../types";
 import { SCENE_LIGHT, sceneOf, type Light } from "../scenes";
 import { radioLines, type Radio, type RadioCard } from "./radio";
-import { ENDINGS, FLICKER_ON, FPS, INTERCEPT_LEAD, SHOT_START, CHASE_FRAMES, CHASE_SHOTS, type EndingId } from "./cut";
+import { ENDINGS, FLICKER_ON, FPS, INTERCEPT_LEAD, SHOT_START, CHASE_FRAMES, CHASE_SHOTS, TITLE_POP, type EndingId } from "./cut";
+
+/** La fiche se monte deux images après le claquement du titre : l'image est fixe, rien ne bouge à l'écran. */
+const STAGE_AFTER = TITLE_POP + 2;
 
 /** Les deux tons de l'arrêt sur image, selon la lumière du profil (§3.1). */
 export interface FreezeTone {
@@ -58,6 +61,11 @@ export interface FilmPlan {
   duration: number;
   /** Le passage de relais (sommet du flash), en secondes. */
   handoffAt: number;
+  /**
+   * La fiche se monte, invisible, sous l'arrêt sur image (secondes) : après le
+   * claquement du titre, avant le flash. Au sommet, il ne reste qu'à la montrer.
+   */
+  stageAt: number;
   /** « @pseudo » (ou le nom, sans pseudo) sur la plaque de l'arrêt sur image. */
   plate: string;
   /** Le niveau, qui claque sur l'arrêt sur image. */
@@ -100,6 +108,7 @@ export function filmPlan(card: FilmCard): FilmPlan {
     frames: flash.to,
     duration: flash.to / FPS,
     handoffAt: flash.peak / FPS,
+    stageAt: (freeze + STAGE_AFTER) / FPS,
     plate: card.login ? `@${card.login}` : card.name,
     title: LEVEL_LABELS[level],
     radio: { fr: radioLines(card, "fr"), en: radioLines(card, "en") },

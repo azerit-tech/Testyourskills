@@ -1718,6 +1718,11 @@ button.cover-panel:focus-visible {
 .card-slot.phase-handoff .card-rig {
   animation: fade-in 0.5s ease-out both;
 }
+/* montée sous l'arrêt sur image du film : entière dès le sommet du flash, c'est
+   le flash qui la révèle en retombant (sans fondu propre, coupé à la fin du relais) */
+.card-slot.phase-handoff.is-staged .card-rig {
+  animation: none;
+}
 
 .skip-btn,
 .sound-btn {

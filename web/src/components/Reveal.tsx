@@ -31,6 +31,8 @@ const AUTO_OPEN = 700;
  */
 export function useReveal(animate: boolean, start = true, autoOpen = AUTO_OPEN) {
   const [phase, setPhase] = useState<Phase>(animate ? "ready" : "done");
+  /** La fiche est montée, invisible, avant le relais (le film, sous son arrêt sur image) : au relais, il ne reste qu'à la montrer. */
+  const [staged, setStaged] = useState(false);
   const opened = useRef(false);
 
   const open = useCallback(() => {
@@ -38,6 +40,7 @@ export function useReveal(animate: boolean, start = true, autoOpen = AUTO_OPEN) 
     opened.current = true;
     setPhase("playing");
   }, []);
+  const stage = useCallback(() => setStaged(true), []);
   const handoff = useCallback(() => setPhase((p) => (p === "playing" ? "handoff" : p)), []);
   const finish = useCallback(() => setPhase("done"), []);
   const skip = useCallback(() => {
@@ -56,7 +59,7 @@ export function useReveal(animate: boolean, start = true, autoOpen = AUTO_OPEN) 
   const animating = phase !== "done";
   /** Le contenu sous la carte apparaît une fois la scène éteinte. */
   const settled = phase === "done";
-  return { phase, open, skip, handoff, finish, animating, settled };
+  return { phase, open, skip, stage, staged, handoff, finish, animating, settled };
 }
 
 interface RevealCardProps {
@@ -68,17 +71,19 @@ interface RevealCardProps {
   primary?: boolean;
   /** La carte 3D vient se poser sur cet emplacement. */
   anchor?: boolean;
+  /** Montée avant le relais, invisible (opacité nulle tant que la face n'est pas montrée). */
+  staged?: boolean;
 }
 
-export function RevealCard({ card, lang, phase, idPrefix, primary = true, anchor = primary }: RevealCardProps) {
+export function RevealCard({ card, lang, phase, idPrefix, primary = true, anchor = primary, staged = false }: RevealCardProps) {
   const accent = levelAccent(card);
   const style = styleOf(card);
   const showCard = phase === "handoff" || phase === "done";
   const vars = { "--ca": accent.a, "--cb": accent.b, "--ink": accent.ink } as CSSProperties;
 
   return (
-    <div className={`card-slot phase-${phase}${showCard ? " show-front" : ""}`} style={vars} data-style={style} data-scene-anchor={anchor ? "" : undefined}>
-      <div className="card-rig">{showCard && <CardView card={card} lang={lang} interactive={phase === "done"} reveal={phase === "handoff"} idPrefix={idPrefix} />}</div>
+    <div className={`card-slot phase-${phase}${showCard ? " show-front" : ""}${staged ? " is-staged" : ""}`} style={vars} data-style={style} data-scene-anchor={anchor ? "" : undefined}>
+      <div className="card-rig">{(showCard || staged) && <CardView card={card} lang={lang} interactive={phase === "done"} reveal={phase === "handoff"} idPrefix={idPrefix} />}</div>
     </div>
   );
 }

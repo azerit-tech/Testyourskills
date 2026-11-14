@@ -337,7 +337,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
   const main: CardData = item.kind === "card" ? item.card : fileOf(item.comparison);
   const [scene] = useState(revealScene);
   // Le film part dès que l'attente se lève : sa première image est déjà à l'écran.
-  const { phase, open, skip, handoff, finish, animating, settled } = useReveal(animate, start, scene === "film" ? 0 : undefined);
+  const { phase, open, skip, stage, staged, handoff, finish, animating, settled } = useReveal(animate, start, scene === "film" ? 0 : undefined);
   // La scène ne viendra pas (délai dépassé, WebGL absent, animation passée) : l'attente n'a plus à la guetter.
   useEffect(() => {
     if (abort) skip();
@@ -434,7 +434,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
           <ErrorBoundary fallback={null} onError={finish}>
             <Suspense fallback={null}>
               {scene === "film" ? (
-                <Film card={main} lang={lang} phase={phase} onReady={() => onScene("ready")} onGesture={() => onScene("gesture")} onHandoff={handoff} onDone={finish} onTap={onStageClick} />
+                <Film card={main} lang={lang} phase={phase} onReady={() => onScene("ready")} onGesture={() => onScene("gesture")} onStage={stage} onHandoff={handoff} onDone={finish} onTap={onStageClick} />
               ) : (
                 <Walkout3D card={main} lang={lang} declared={declaredOf(item.kind === "comparison" ? item.comparison : item.card)} phase={phase} anchorRef={stageRef} controlRef={walkoutCtl} onReady={() => onScene("ready")} onHandoff={handoff} onDone={finish} />
               )}
@@ -446,7 +446,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
             {/* La fiche se retourne (§18.27). Les étoiles ne s'allument ici que sans révélation 3D : sinon elles se rallumeraient sur la carte posée. */}
             {/* Un dossier à deux pièces : une seule fiche, et ses pièces dessous (§18.36). */}
             <CardViewOptions.Provider value={{ flippable: true, starsIntro: !animate }}>
-              <RevealCard card={main} lang={lang} phase={phase} idPrefix="result" />
+              <RevealCard card={main} lang={lang} phase={phase} idPrefix="result" staged={staged} />
             </CardViewOptions.Provider>
             {item.kind === "comparison" && settled && <Pieces cmp={item.comparison} />}
           </div>

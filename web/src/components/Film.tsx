@@ -54,6 +54,8 @@ interface Props {
   onReady?: () => void;
   /** La lecture demande un geste : l'attente montre la pilule « Ouvrir mon dossier ». */
   onGesture?: () => void;
+  /** Sous l'arrêt sur image : la fiche peut se monter, invisible (plan.stageAt). */
+  onStage?: () => void;
   onHandoff: () => void;
   onDone: () => void;
   /** Un toucher sur la scène (CardPage : passer). */
@@ -78,7 +80,7 @@ export function Film(props: Props) {
   return <FilmView {...props} onFail={props.onDone} />;
 }
 
-function FilmView({ card, lang, phase, onReady, onGesture, onHandoff, onDone, onTap, onFail }: Props & { onFail: () => void }) {
+function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, onDone, onTap, onFail }: Props & { onFail: () => void }) {
   const { t: tr } = useT();
   const plan = useMemo(() => filmPlan(card), [card]);
   const frameRef = useRef<HTMLDivElement>(null);
@@ -88,11 +90,11 @@ function FilmView({ card, lang, phase, onReady, onGesture, onHandoff, onDone, on
   const sound = useRef<FilmSound | null>(null);
   const [time, setTime] = useState(0);
   const [muted, setMuted] = useState(readMuted);
-  const cb = useRef({ onReady, onGesture, onHandoff, onDone, onFail });
-  cb.current = { onReady, onGesture, onHandoff, onDone, onFail };
+  const cb = useRef({ onReady, onGesture, onStage, onHandoff, onDone, onFail });
+  cb.current = { onReady, onGesture, onStage, onHandoff, onDone, onFail };
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
-  const cues = useRef({ star: 0, handed: false, done: false });
+  const cues = useRef({ star: 0, staged: false, handed: false, done: false });
   /** L'événement `film` (§5.6), une fois par lecture : la pilule a-t-elle été montrée, la lecture a-t-elle commencé. */
   const reading = useRef<Reading>({ gesture: false, started: false, sent: false, send: () => undefined });
 
@@ -109,6 +111,10 @@ function FilmView({ card, lang, phase, onReady, onGesture, onHandoff, onDone, on
     }
     sound.current?.tick(t);
     if (!live) return;
+    if (!c.staged && t >= plan.stageAt - 1e-6) {
+      c.staged = true;
+      cb.current.onStage?.();
+    }
     if (!c.handed && t >= plan.handoffAt - 1e-6) {
       c.handed = true;
       buzz(40);
@@ -126,7 +132,7 @@ function FilmView({ card, lang, phase, onReady, onGesture, onHandoff, onDone, on
     const host = frameRef.current;
     const cover = coverRef.current;
     if (!host || !cover) return;
-    cues.current = { star: 0, handed: false, done: false };
+    cues.current = { star: 0, staged: false, handed: false, done: false };
     const p = createFilmPlayer({
       plan,
       host,

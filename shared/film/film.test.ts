@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { FIXTURES } from "../fixtures";
 import type { CardData, Stars } from "../types";
-import { CHASE_FRAMES, CHASE_SHOTS, ENDINGS, FPS, SHOT_FRAMES, SHOT_START, chaseShotAt, endingFrames, filmPlan, hudAt } from "./index";
+import { CHASE_FRAMES, CHASE_SHOTS, ENDINGS, FPS, SHOT_FRAMES, SHOT_START, TITLE_POP, chaseShotAt, endingFrames, filmPlan, hudAt } from "./index";
 import { radioLines } from "./radio";
 
 const OVERALL: Record<Stars, number> = { 1: 12, 2: 33, 3: 50, 4: 66, 5: 80, 6: 93 };
@@ -84,6 +84,12 @@ describe("filmPlan (§2.1)", () => {
       expect(p.freeze).toBe(p.cut + e.video);
       expect(p.flash).toEqual({ from: p.freeze + e.freeze, peak: p.freeze + e.freeze + e.rise, to: p.freeze + e.freeze + e.flash });
       expect(p.handoffAt).toBeCloseTo(p.flash.peak / FPS, 9);
+    }
+    // la fiche se monte sous le gel, titre claqué, au moins six images avant le flash
+    for (const n of LEVELS) {
+      const p = filmPlan(cardAt(n));
+      expect(p.stageAt * FPS).toBeGreaterThanOrEqual(p.freeze + TITLE_POP);
+      expect(p.stageAt * FPS).toBeLessThanOrEqual(p.flash.from - 6);
     }
     const p1 = filmPlan(cardAt(1));
     expect(p1.freeze).toBe(88 + 52);
