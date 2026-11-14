@@ -64,23 +64,24 @@ Ce qui tient et ce qui reste à faire après les premières images : SPEC §18.3
 | Niveau | Plans joués | Images | Durée |
 |---|---|---|---|
 | ★ | OUV, P1, FIN | 164 | 6,8 s |
-| ★★ | OUV, P1, P2, FIN | 212 | 8,8 s |
-| ★★★ | OUV, P1 à P3, FIN | 260 | 10,8 s |
-| ★★★★ | OUV, P1 à P4, FIN | 308 | 12,8 s |
-| ★★★★★ | OUV, P1 à P5, FIN | 356 | 14,8 s |
-| ★★★★★★ | OUV, P1 à P6, FIN6 | 444 | 18,5 s |
+| ★★ | OUV, P1, P2, FIN | 274 | 11,4 s |
+| ★★★ | OUV, P1 à P3, FIN | 322 | 13,4 s |
+| ★★★★ | OUV, P1 à P4, FIN | 370 | 15,4 s |
+| ★★★★★ | OUV, P1 à P5, FIN | 430 | 17,9 s |
+| ★★★★★★ | OUV, P1 à P6, FIN6 | 518 | 21,6 s |
 
 Les durées du découpage v3 (`docs/cinematique-decoupage-v3.md` §7) :
 
 | Plan | Images de vidéo | Dessiné ensuite par le site |
 |---|---|---|
 | OUV | 40 | |
-| P1 à P5 | 48 chacun | |
-| P6 | 60 | |
+| P1, P3, P4 | 48 chacun | |
+| P2 | 110 | |
+| P5, P6 | 60 chacun | |
 | FIN | 52 | arrêt sur image 14, flash 10 (76 en tout) |
 | FIN6 | 80 | arrêt sur image 12, flash 12 (104 en tout) |
 
-La poursuite entière (OUV et P1 à P6) fait 340 images. Une fin propre aux cinq étoiles (`fin5`, 52 images de vidéo) reste en option (SPEC §18.36) ; `shared/film/cut.ts` ne connaît aujourd'hui que `fin` et `fin6`, et cinq étoiles jouent `fin`.
+La poursuite entière (OUV et P1 à P6) fait 414 images (`shared/film/cut.ts`, la seule source). Une fin propre aux cinq étoiles (`fin5`, 52 images de vidéo) reste en option (SPEC §18.36) ; `shared/film/cut.ts` ne connaît aujourd'hui que `fin` et `fin6`, et cinq étoiles jouent `fin`.
 
 **La courbe.** Chaque ligne doit être plus forte que la précédente.
 
@@ -389,13 +390,13 @@ Le grain n'est pas gravé dans les fichiers : il gonflerait le débit pour rien.
 
 | Fichier | Contenu | Images | Plafond de poids |
 |---|---|---|---|
-| `poursuite-720.mp4` | OUV puis P1 à P6 | 340 | 4,5 Mo |
+| `poursuite-720.mp4` | OUV puis P1 à P6 | 414 | 5,48 Mo |
 | `fin-720.mp4` | FIN | 52 | 0,9 Mo |
 | `fin6-720.mp4` | FIN6 | 80 | 1,4 Mo |
-| `poursuite-540.mp4`, `fin-540.mp4`, `fin6-540.mp4` | les mêmes en 540 × 960 | les mêmes | 1,68 Mo, 0,34 Mo, 0,52 Mo |
+| `poursuite-540.mp4`, `fin-540.mp4`, `fin6-540.mp4` | les mêmes en 540 × 960 | les mêmes | 2,04 Mo, 0,34 Mo, 0,52 Mo |
 | `affiche.jpg` | la première image, 720 × 1280 (hors du site) | 1 | 60 Ko |
 
-Une personne ne charge que la poursuite et une seule fin : au plus 5,4 Mo en haute (5,9 Mo à six étoiles), 2,2 Mo en éco. Les plafonds de l'éco sont ceux de la haute ramenés à ce total. Encodage : H.264 profil Main, 24 images par seconde, une image clé sur chaque coupe entre plans (lues dans `shared/film/cut.ts`) et au plus toutes les 48 images, couleurs étiquetées bt709, `+faststart`, sans piste son. Les plafonds sont dans `shared/film/budget.ts`, lus par le montage et par le lecteur. Chaque fichier part du CRF 20 en haute, 22 en éco, et monte de 2 tant qu'il dépasse son plafond ; s'il fallait dépasser le CRF 28 pour le tenir, **le montage échoue** (code de sortie 1) au lieu de livrer une image dégradée.
+Une personne ne charge que la poursuite et une seule fin : au plus 6,38 Mo en haute (6,88 Mo à six étoiles), 2,57 Mo en éco. Le plafond de la poursuite suit le découpage au poids par image fixé pour le premier (4,5 Mo pour 340 images) ; l'éco garde le rapport du premier budget (2,2 Mo pour 5,9) et ses plafonds sont ceux de la haute ramenés à ce total. Le brouillon éclairé monté le 14 novembre (images de 360 × 640, agrandies deux fois par le montage, étalonnage neutre) pèse 5,25 Mo par personne en haute (CRF 24 pour la poursuite) et 2,12 Mo en éco (CRF 28). Encodage : H.264 profil Main, 24 images par seconde, une image clé sur chaque coupe entre plans (lues dans `shared/film/cut.ts`) et au plus toutes les 48 images, couleurs étiquetées bt709, `+faststart`, sans piste son. Les plafonds sont dans `shared/film/budget.ts`, lus par le montage et par le lecteur. Chaque fichier part du CRF 20 en haute, 22 en éco, et monte de 2 tant qu'il dépasse son plafond ; s'il fallait dépasser le CRF 28 pour le tenir, **le montage échoue** (code de sortie 1) au lieu de livrer une image dégradée.
 
 Les polices (Barlow Condensed, Outfit, JetBrains Mono) et les décors peints des profils (`web/public/profiles/`) sont déjà servis par le site.
 
@@ -469,7 +470,7 @@ Essais en développement : `?film=gesture`, `?film=missing`, `?film=nocodec`.
 
 | Mesure | Cible sur un téléphone moyen |
 |---|---|
-| Téléchargement d'une personne | 5,4 Mo au plus en haute (5,9 Mo à six étoiles), 2,2 Mo en éco |
+| Téléchargement d'une personne | 6,38 Mo au plus en haute (6,88 Mo à six étoiles), 2,57 Mo en éco |
 | Images vidéo perdues | 0 sur tout le film |
 | Bascule de la poursuite à la fin | 2 images au plus |
 | Délai entre la levée de l'attente et la première image qui bouge | 300 ms au plus |
@@ -494,7 +495,7 @@ Construit le 10 novembre 2026 (SPEC §18.36) : le plan, le HUD pur, le lecteur �
 
 `scripts/film-assemble.ts` transforme les prises en fichiers du site ; tant qu'une prise manque, son carton la remplace. Critères :
 
-1. `npx tsx scripts/film-assemble.ts` produit les six mp4 et l'affiche en moins de deux minutes sur le Mac ; `ffprobe` confirme 340, 52 et 80 images (`shared/film/cut.ts`), 24 i/s, 720 × 1280 et 540 × 960, aucune piste son.
+1. `npx tsx scripts/film-assemble.ts` produit les six mp4 et l'affiche en moins de deux minutes sur le Mac ; `ffprobe` confirme 414, 52 et 80 images (`shared/film/cut.ts`), 24 i/s, 720 × 1280 et 540 × 960, aucune piste son.
 2. Un plan absent de `design/film/plans/` est remplacé par son carton, sans erreur.
 3. Les poids tiennent dans les plafonds du §4.1 ; sinon le script baisse la qualité et le dit, jusqu'au CRF 28, au-delà il échoue.
 4. À 390 px, dans le lecteur : aucun plan ne garde de bande noire, de filigrane ou de texte ; rien d'important sous les bandes ni dans les 9 % rognés de chaque côté.

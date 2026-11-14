@@ -39,7 +39,7 @@ export type SizeId = keyof typeof SIZES;
  * Plafonds de poids (§4.1), en octets (1 Mo = 10^6 octets, lecture stricte),
  * lus dans shared/film/budget.ts : le lecteur s'en sert aussi. Par fichier, et
  * pour une personne (la poursuite et la plus lourde des deux fins, car on ne
- * charge que la fin utile) : 5,9 Mo en 720p, 2,2 Mo en 540p.
+ * charge que la fin utile) : 6,88 Mo en 720p, 2,57 Mo en 540p.
  */
 export const CEILINGS: Record<SizeId, Record<FilmId, number>> = { 720: FILE_CEILINGS["720"], 540: FILE_CEILINGS["540"] };
 export const TOTAL_CEILINGS: Record<SizeId, number> = { 720: PERSON_CEILINGS["720"], 540: PERSON_CEILINGS["540"] };

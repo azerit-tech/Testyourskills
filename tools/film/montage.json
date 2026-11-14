@@ -1,14 +1,14 @@
 {
   "//": "Liste de montage du film. Mode d'emploi : tools/film/README.md. Les durées des plans ne se règlent pas ici (scripts/film-lib.ts, puis shared/film/cut.ts).",
   "grade": {
-    "//": "Étalonnage commun aux prises, point de départ à régler sur les vrais plans : contraste doux, ombres vers la prune, lumières vers le crème.",
-    "contrast": 0.97,
+    "//": "Étalonnage commun aux prises, neutre : les plans rendus en 3D sortent déjà étalonnés, plan par plan (tools/film3d/). L'ancien point de départ (contraste 0,97, ombres vers la prune, lumières vers le crème) ternissait le ciel du brouillon éclairé. À ne régler que pour une prise qui ne sort pas du rendu.",
+    "contrast": 1,
     "brightness": 0,
-    "saturation": 1.05,
+    "saturation": 1,
     "gamma": 1,
-    "shadows": [0.04, -0.03, 0.06],
+    "shadows": [0, 0, 0],
     "midtones": [0, 0, 0],
-    "highlights": [0.03, 0.02, -0.03],
+    "highlights": [0, 0, 0],
     "lut": null
   },
   "shots": {

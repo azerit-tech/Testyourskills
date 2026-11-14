@@ -136,10 +136,13 @@ describe("les arguments de ffmpeg", () => {
     expect(nextCrf(28)).toBeNull();
   });
 
-  it("tient les plafonds du §4.1 : 4,5 / 0,9 / 1,4 Mo en 720p, 2,2 Mo pour une personne en 540p", () => {
-    expect(CEILINGS[720]).toEqual({ poursuite: 4_500_000, fin: 900_000, fin6: 1_400_000 });
-    expect(TOTAL_CEILINGS[720]).toBe(5_900_000);
-    expect(TOTAL_CEILINGS[540]).toBe(2_200_000);
+  it("tient les plafonds du §4.1 : 5,48 / 0,9 / 1,4 Mo en 720p, 2,57 Mo pour une personne en 540p", () => {
+    // la poursuite au poids par image du premier découpage (4,5 Mo pour 340 images), rapporté aux 414 de cut.ts
+    expect(filmFrames("poursuite")).toBe(414);
+    expect(CEILINGS[720]).toEqual({ poursuite: 5_479_412, fin: 900_000, fin6: 1_400_000 });
+    expect(TOTAL_CEILINGS[720]).toBe(6_879_412);
+    // l'éco garde le rapport 2,2 / 5,9 du premier découpage
+    expect(TOTAL_CEILINGS[540]).toBe(2_565_204);
     // une personne charge la poursuite et une seule fin
     expect(personBytes(CEILINGS[720])).toBe(TOTAL_CEILINGS[720]);
     expect(personBytes(CEILINGS[540])).toBeLessThanOrEqual(TOTAL_CEILINGS[540]);
@@ -174,22 +177,22 @@ describe("tenir les plafonds", () => {
 
   it("chaque fichier sous son plafond, au meilleur CRF qui y tient", () => {
     const seen: string[] = [];
-    const r = fitCeilings(720, fake({ poursuite: 5_000_000, fin: 500_000, fin6: 800_000 }, seen));
+    const r = fitCeilings(720, fake({ poursuite: 6_000_000, fin: 500_000, fin6: 800_000 }, seen));
     expect(r.crf).toEqual({ poursuite: 22, fin: 20, fin6: 20 });
     expect(seen).toEqual(["poursuite@20", "poursuite@22", "fin@20", "fin6@20"]);
   });
 
   it("le total compte la poursuite et une seule fin, pas les trois fichiers : rien ne baisse pour rien", () => {
-    // 4,4 + 0,88 + 1,39 = 6,67 Mo à trois, mais 5,79 Mo pour une personne : sous les 5,9 Mo
-    const r = fitCeilings(720, fake({ poursuite: 4_400_000, fin: 880_000, fin6: 1_390_000 }));
+    // 5,4 + 0,88 + 1,39 = 7,67 Mo à trois, mais 6,79 Mo pour une personne : sous les 6,88 Mo
+    const r = fitCeilings(720, fake({ poursuite: 5_400_000, fin: 880_000, fin6: 1_390_000 }));
     expect(r.crf).toEqual({ poursuite: 20, fin: 20, fin6: 20 });
     expect(personBytes(r.bytes)).toBeLessThanOrEqual(TOTAL_CEILINGS[720]);
   });
 
   it("il faudrait dépasser le CRF 28 : le montage échoue au lieu d'avertir", () => {
     const log: string[] = [];
-    expect(() => fitCeilings(720, fake({ poursuite: 20_000_000, fin: 500_000, fin6: 800_000 }), (m) => log.push(m))).toThrow(CeilingError);
-    expect(() => fitCeilings(720, fake({ poursuite: 20_000_000, fin: 500_000, fin6: 800_000 }))).toThrow(/dépasser le CRF 28/);
+    expect(() => fitCeilings(720, fake({ poursuite: 30_000_000, fin: 500_000, fin6: 800_000 }), (m) => log.push(m))).toThrow(CeilingError);
+    expect(() => fitCeilings(720, fake({ poursuite: 30_000_000, fin: 500_000, fin6: 800_000 }))).toThrow(/dépasser le CRF 28/);
     // il est passé par 22, 24, 26 et 28 avant d'échouer
     expect(log.map((m) => m.match(/CRF (\d+)$/)?.[1])).toEqual(["22", "24", "26", "28"]);
   });

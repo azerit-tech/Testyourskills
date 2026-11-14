@@ -3,13 +3,12 @@
 // comparé à filmFrames() : 414 images pour la poursuite, 52 pour la fin, 80
 // pour la fin à six étoiles, à 24 i/s.
 //
-// Sans ffprobe, le contrôle se saute en le disant. Écart connu (14 novembre
-// 2026) : les cartons en place (204, 36 et 56 images) précèdent le découpage
-// v3, les vrais plans arrivent d'un autre chantier. Tant que GAP_EXPECTED vaut
-// true, un écart s'affiche (avertissement et tests « skipped » avec la raison)
-// sans faire échouer `npm test`. Les vrais plans montés : passer GAP_EXPECTED à
-// false, l'écart redevient bloquant. FILM_MEDIA_STRICT=1 le rend bloquant dès
-// maintenant (FILM_MEDIA_STRICT=1 npx vitest run scripts/film-media.test.ts).
+// Sans ffprobe, le contrôle se saute en le disant. L'écart des cartons (204,
+// 36 et 56 images, d'avant le découpage v3) est résolu le 14 novembre 2026 :
+// le brouillon éclairé est monté, GAP_EXPECTED vaut false et tout écart est
+// bloquant. Le remettre à true n'affiche plus l'écart qu'en avertissement
+// (tests « skipped » avec la raison) ; FILM_MEDIA_STRICT=1 le rend alors
+// bloquant (FILM_MEDIA_STRICT=1 npx vitest run scripts/film-media.test.ts).
 
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
@@ -19,8 +18,8 @@ import { FPS } from "../shared/film/cut";
 import { FFPROBE, ROOT, probeTake } from "./film-io";
 import { FILMS, SIZES, filmFrames, type FilmId } from "./film-lib";
 
-/** Écart connu et attendu entre les cartons et le découpage : à passer à false quand les vrais plans sont montés. */
-const GAP_EXPECTED = true;
+/** Un écart entre les fichiers et le découpage est-il attendu ? Non depuis le montage du brouillon éclairé. */
+const GAP_EXPECTED = false;
 const strict = !GAP_EXPECTED || process.env.FILM_MEDIA_STRICT === "1";
 
 const MEDIA = resolve(ROOT, "web/src/film/media");
