@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { FIXTURES, FIXTURE_COMPARISON } from "../../shared/fixtures";
 import type { CardData, ComparisonData, Fact, JobState } from "../../shared/types";
 import type { CvReading, CvTextCounts } from "../../shared/readings";
+import { SCHOOL_RANK_RE } from "../../shared/schoolRank";
 import { createApp, normalizeLogin, purge, type AppOptions } from "./app";
 import { RETENTION_MS, Store } from "./db";
 import { CARD_TIMEOUT_MS, MESSAGES, type CardBody, type Deps } from "./pipeline";
@@ -1411,5 +1412,48 @@ describe("pages à venir (§18.27)", () => {
     for (const path of ["/reglement", "/Reglement/"]) expect((await ctx.app.request(path)).status, path).toBe(404);
     // Un vrai pseudo qui commence par un mot réservé passe au front.
     for (const path of ["/usain", "/badger"]) expect((await ctx.app.request(path)).status, path).toBe(200);
+  });
+});
+
+describe("le rang d'une école ne part dans aucune réponse (§18.48)", () => {
+  /** Le critère École d'une grille rangée avant la règle : la lettre dans la pièce, sa version publique et la suite. */
+  const legacyGrid = () => ({
+    overall: 72,
+    criteria: [
+      {
+        code: "EDU" as const,
+        score: 8,
+        state: "scored" as const,
+        counted: true,
+        source: "linkedin" as const,
+        reached: { fr: "CentraleSupélec, rang A.", en: "CentraleSupélec, tier A." },
+        next: { fr: "Pour 10 : une école de rang S, ou une médaille internationale.", en: "For 10: a tier S school, or an international medal." },
+        flags: [],
+        evidence: { text: { fr: "CentraleSupélec, rang A.", en: "CentraleSupélec, tier A." }, publicText: { fr: "École de rang A.", en: "Tier A school." }, source: "linkedin" as const },
+      },
+    ],
+  });
+
+  it("ni à la personne fichée, ni au visiteur, ni dans l'aperçu ; la note sur 10 reste", async () => {
+    const ctx = setup();
+    const cmp: ComparisonData = { ...FIXTURE_COMPARISON, id: "rangcmp", grid: legacyGrid(), cv: { ...FIXTURE_COMPARISON.cv, grid: legacyGrid() } };
+    ctx.store.insertCards([
+      { id: "rangcard", createdAt: Date.now(), source: "linkedin", login: null, kind: "card", data: { ...FIXTURES.gold, id: "rangcard", grid: legacyGrid() }, deleteToken: "tok1" },
+      { id: "rangcmp", createdAt: Date.now(), source: "linkedin", login: "jmougeot", kind: "comparison", data: cmp, deleteToken: "tok2" },
+    ]);
+    for (const [id, token] of [
+      ["rangcard", "tok1"],
+      ["rangcmp", "tok2"],
+    ]) {
+      const owner = await ctx.app.request(`/api/card/${id}`, { headers: { "x-card-token": token! } });
+      const ownerText = await owner.text();
+      expect(owner.status).toBe(200);
+      expect(ownerText, id).not.toMatch(SCHOOL_RANK_RE);
+      expect(ownerText, id).toContain("CentraleSupélec : comptée au dossier.");
+      expect(ownerText, id).toContain('"score":8');
+      const visitor = await (await ctx.app.request(`/api/card/${id}`)).text();
+      expect(visitor, id).not.toMatch(SCHOOL_RANK_RE);
+      expect(await (await ctx.app.request(`/c/${id}`)).text(), id).not.toMatch(SCHOOL_RANK_RE);
+    }
   });
 });

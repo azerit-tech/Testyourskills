@@ -6,6 +6,7 @@ import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { withCatalogProfiles } from "../../shared/profileCatalog";
+import { withoutSchoolRank } from "../../shared/schoolRank";
 import type { CardData, ComparisonData, Source } from "../../shared/types";
 import { ensureLinkedinTables, purgeLinkedin } from "./linkedinProfile/store";
 import { forgetWeekRanks } from "./top";
@@ -193,8 +194,9 @@ function toRow(r: RawRow): CardRow {
     source: r.source,
     login: r.login,
     kind: r.kind,
-    // Le nom et la phrase du profil se relisent au catalogue (shared/profileCatalog.ts).
-    data: withCatalogProfiles(JSON.parse(r.json)),
+    // Le nom et la phrase du profil se relisent au catalogue (shared/profileCatalog.ts) ;
+    // une grille rangée avant le §18.48 perd le rang de son école (shared/schoolRank.ts).
+    data: withoutSchoolRank(withCatalogProfiles(JSON.parse(r.json))),
     facts: r.facts_json ? JSON.parse(r.facts_json) : null,
     email: r.email,
     deleteToken: r.delete_token,

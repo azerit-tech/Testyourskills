@@ -507,10 +507,10 @@ const fr = {
     /** Les tables de niveaux, du plus haut au plus bas (docs/bareme-recrutement.md §3). */
     levels: {
       EDU: [
-        [10, "École de rang S, ou médaille internationale (olympiade, finale mondiale d'un concours de programmation)."],
-        [8, "École de rang A, ou sélection prouvée hors école : classement dans un concours de code, prix de hackathon, programme sélectif."],
-        [6, "École de rang B."],
-        [4, "École de rang C, ou un hackathon, un concours, sans classement."],
+        [10, "École parmi les plus sélectives, ou médaille internationale (olympiade, finale mondiale d'un concours de programmation)."],
+        [8, "École très sélective, ou sélection prouvée hors école : classement dans un concours de code, prix de hackathon, programme sélectif."],
+        [6, "École sélective."],
+        [4, "Autre école de tech, ou un hackathon, un concours, sans classement."],
       ],
       XP: [
         [10, "10 ans et plus."],
@@ -1205,10 +1205,10 @@ const en: Dict = {
     levelNo: (n: number) => `${n}/10`,
     levels: {
       EDU: [
-        [10, "A tier S school, or an international medal (olympiad, world final of a programming contest)."],
-        [8, "A tier A school, or a proven selection outside school: a ranking in a coding contest, a hackathon prize, a selective programme."],
-        [6, "A tier B school."],
-        [4, "A tier C school, or a hackathon or competition, unranked."],
+        [10, "One of the most selective schools, or an international medal (olympiad, world final of a programming contest)."],
+        [8, "A highly selective school, or a proven selection outside school: a ranking in a coding contest, a hackathon prize, a selective programme."],
+        [6, "A selective school."],
+        [4, "Another tech school, or a hackathon or competition, unranked."],
       ],
       XP: [
         [10, "10 years or more."],

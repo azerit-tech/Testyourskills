@@ -3,6 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { CodeReadingResult, CvReading, SchoolTier } from "../../../shared/readings";
+import { SCHOOL_RANK_RE, schoolCounted } from "../../../shared/schoolRank";
 import { CRITERION_CODES, type CriterionCode, type Fact, type Grid, type GridCriterion } from "../../../shared/types";
 import type { GithubFacts } from "../github/facts";
 import { cvReading, daysAgo, facts, repo, tree } from "./__fixtures__/make";
@@ -365,6 +366,18 @@ describe("l'école ne peut pas faire baisser la note (§4, règle 2)", () => {
     }
   });
 
+  it("le rang de l'école donne la note, il ne s'écrit nulle part dans la grille (§18.48)", () => {
+    const scores: number[] = [];
+    for (const [school_name, school_tier] of TIERS) {
+      const g = declaredGrid(decl({ ...lumineReading(), school_name, school_tier, selection_signals: [] }, undefined));
+      const edu = crit(g, "EDU");
+      scores.push(edu.score!);
+      expect(JSON.stringify(g), school_name).not.toMatch(SCHOOL_RANK_RE);
+      expect(edu.reached, school_name).toEqual(schoolCounted(school_name));
+    }
+    expect(scores).toEqual([10, 8, 6, 4]);
+  });
+
   it("une personne sans école a exactement la moyenne de ses autres critères", () => {
     const g = declaredGrid(decl({ ...seniorReading(), school_name: "", school_tier: "none" }, fictivaProfile()));
     expect(crit(g, "EDU").state).toBe("missing");
@@ -376,7 +389,7 @@ describe("l'école ne peut pas faire baisser la note (§4, règle 2)", () => {
 
   it("un semestre d'échange n'est pas lu ici : seule l'école retenue par la lecture compte", () => {
     const g = declaredGrid(decl(lumineReading(), lumineProfile()));
-    expect(crit(g, "EDU").reached.fr).toBe("CentraleSupélec, rang A.");
+    expect(crit(g, "EDU").reached.fr).toBe("CentraleSupélec\u00a0: comptée au dossier.");
   });
 });
 

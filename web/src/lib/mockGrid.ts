@@ -17,6 +17,7 @@
 //   un LinkedIn et le pseudo x  face à un GitHub vide : code non prouvé, dossier 75
 
 import { GRID_WEIGHTS } from "../../../shared/gridText";
+import { EDU_NEXT, EDU_NEXT_GITHUB, SCHOOL_COUNTED, schoolCounted } from "../../../shared/schoolRank";
 import type { CriterionCode, Fact, Grid, GridCriterion, GridSource } from "../../../shared/types";
 import { CRITERION_CODES } from "../../../shared/types";
 
@@ -205,7 +206,7 @@ const GITHUB: Record<string, (login: string) => Grid> = {
   wonderkid: (l) =>
     finalizeMock([
       c("EDU", 4, "scored", "github", f("Un hackathon ou un concours, sans classement cité.", "A hackathon or a competition, no ranking on file."), {
-        next: f("Pour 6 : une école de rang B, sur LinkedIn.", "For 6: a tier B school, on LinkedIn."),
+        next: EDU_NEXT_GITHUB,
         evidence: { text: f("Dépôt hackathon-drone-2025 : hackathon ou concours.", "Repo hackathon-drone-2025: hackathon or competition."), source: "github", proof: gh(l, "hackathon-drone-2025") },
       }),
       xpGh(l, 2, 4, xpMore(5, 3, 2)),
@@ -289,17 +290,14 @@ const GITHUB: Record<string, (login: string) => Grid> = {
 /** « sur LinkedIn », « sur le CV » : où la pièce déclarative a été lue (comme le moteur). */
 const on = (src: "LinkedIn" | "CV"): Fact => (src === "CV" ? f("sur le CV", "on the CV") : f("sur LinkedIn", "on LinkedIn"));
 
-/** Ce que déclare le profil de démo : 8,4 ans comptés, une entreprise fondée tenue 3,4 ans, une école de rang A. */
+/** Ce que déclare le profil de démo : 8,4 ans comptés, une entreprise fondée tenue 3,4 ans, une école notée 8/10. */
 function declaredDrafts(src: "LinkedIn" | "CV", proof?: string, ghRepos?: number): Draft[] {
   const p = proof ? { proof } : {};
   const fr = (s: string) => s.replaceAll("{src}", src);
   return [
-    c("EDU", 8, "scored", "linkedin", f("École Halbrune, rang A.", "École Halbrune, tier A."), {
-      next: f(
-        "Pour 10 : une école de rang S, ou une médaille internationale (olympiade, finale mondiale d'un concours de programmation).",
-        "For 10: a tier S school, or an international medal (olympiad, world final of a programming contest).",
-      ),
-      evidence: { text: f("École Halbrune, rang A.", "École Halbrune, tier A."), publicText: f("École de rang A.", "Tier A school."), source: "linkedin", ...p },
+    c("EDU", 8, "scored", "linkedin", schoolCounted("École Halbrune"), {
+      next: EDU_NEXT[8],
+      evidence: { text: schoolCounted("École Halbrune"), publicText: SCHOOL_COUNTED, source: "linkedin", ...p },
     }),
     c("XP", 9, "scored", "linkedin", f("8,4 ans comptés sur les postes datés : le palier « 8 ans ».", `8.4 years counted on the dated roles: the "8 years" step.`), {
       next: f("Pour 10 : 10 ans comptés. Tu en as 8,4.", "For 10: 10 years counted. You have 8.4."),

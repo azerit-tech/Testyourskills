@@ -30,6 +30,7 @@ import { GRID_CAP_UNPROVEN, GRID_EMPTY_SCORE } from "../../../shared/gridText";
 import { asLinkedinCard, asLinkedinComparison } from "../../../shared/linkedinText";
 import { DICTS, LangProvider } from "../i18n";
 import { comparisonGridsMock } from "../lib/mockGrid";
+import { SCHOOL_RANK_RE } from "../../../shared/schoolRank";
 import type { Shareable } from "./After";
 import { RecruiterGrid } from "./RecruiterGrid";
 import { RecruiterRead } from "./RecruiterRead";
@@ -88,6 +89,22 @@ describe("la page partagée : aucun nom d'école ni d'ancien employeur, au mot p
     const html = textOf(render(item, false));
     expect(count(html, "Banque Orsay")).toBeGreaterThanOrEqual(2);
     expect(html).toContain("Centrale Méditerranée");
+  });
+
+  // §18.48 : le rang d'une école ne s'affiche nulle part, pas même pour la personne fichée.
+  for (const lang of ["fr-FR", "en-US"]) {
+    it(`l'école : son nom et « comptée au dossier » pour la personne, jamais son rang, ni dans les niveaux (${lang})`, () => {
+      for (const shared of [false, true]) expect(textOf(render(item, shared, lang))).not.toMatch(SCHOOL_RANK_RE);
+      expect(textOf(render(item, false, lang))).toContain(lang === "fr-FR" ? "Centrale Méditerranée : comptée au dossier." : "Centrale Méditerranée: counted in the file.");
+    });
+  }
+
+  it("aucun texte du site ni de la démo ne porte un rang d'école", () => {
+    // Les textes fixes et le corps des fonctions de texte (leurs gabarits).
+    const strings = (x: unknown): string[] =>
+      typeof x === "string" ? [x] : typeof x === "function" ? [String(x)] : x && typeof x === "object" ? Object.values(x).flatMap(strings) : [];
+    for (const lang of ["fr", "en"] as const) for (const s of strings(DICTS[lang])) expect(s).not.toMatch(SCHOOL_RANK_RE);
+    expect(JSON.stringify(comparisonGridsMock("LinkedIn", "camille-ardent"))).not.toMatch(SCHOOL_RANK_RE);
   });
 
   for (const lang of ["fr-FR", "en-US"]) {

@@ -21,6 +21,7 @@ import { GRID, type GridRoleKind } from "./config";
 import { isTutorialRepo, type GithubMetrics } from "./derive";
 import { highBarEmployer, type HighBarList } from "./employers";
 import { normSchool, schoolListNames, schoolTier } from "./school";
+import { EDU_NEXT, EDU_NEXT_GITHUB, SCHOOL_COUNTED, schoolCounted } from "../../../shared/schoolRank";
 
 const DAY = 86_400_000;
 const YEAR = 365.25 * DAY;
@@ -344,18 +345,6 @@ const SELECTION_TEXT: Record<SelectionKind, Fact> = {
   contest_entry: f("hackathon ou concours, sans classement", "hackathon or competition, unranked"),
 };
 
-const EDU_NEXT: Record<number, Fact> = {
-  4: f("Pour 6 : une école de rang B.", "For 6: a tier B school."),
-  6: f(
-    "Pour 8 : une école de rang A, ou une sélection prouvée hors école (classement dans un concours, prix de hackathon, programme sélectif).",
-    "For 8: a tier A school, or a proven selection outside school (competition ranking, hackathon prize, selective programme).",
-  ),
-  8: f(
-    "Pour 10 : une école de rang S, ou une médaille internationale (olympiade, finale mondiale d'un concours de programmation).",
-    "For 10: a tier S school, or an international medal (olympiad, world final of a programming contest).",
-  ),
-};
-
 export function eduDeclared(d: DeclaredInput): Draft {
   const r = d.reading;
   const school = schoolTier(r.school_name, r.school_tier);
@@ -370,14 +359,15 @@ export function eduDeclared(d: DeclaredInput): Draft {
       f("Ni école de tech, ni sélection citée\u00a0: le critère ne fait pas baisser la note.", "No tech school, no selection on file: the criterion doesn't lower the rating."),
     );
   const name = r.school_name.trim();
-  const schoolFact = schoolScore !== null ? f(`${name}, rang ${school.tier}.`, `${name}, tier ${school.tier}.`) : null;
+  // Le rang de l'école donne la note, il ne s'écrit jamais (shared/schoolRank.ts, SPEC §18.48).
+  const schoolFact = schoolScore !== null ? schoolCounted(name) : null;
   const signalFact = best ? f(`Sélection : ${SELECTION_TEXT[best.kind].fr}.`, `Selection: ${SELECTION_TEXT[best.kind].en}.`) : null;
   const useSchool = schoolScore !== null && (signalScore === null || schoolScore >= signalScore);
   const score = useSchool ? schoolScore! : signalScore!;
   const reached = useSchool ? schoolFact! : signalFact!;
-  // Page partagée : le rang, jamais le nom ; la sorte de sélection, jamais l'extrait.
+  // Page partagée : ni le rang ni le nom ; la sorte de sélection, jamais l'extrait.
   const evidence = useSchool
-    ? { text: schoolFact!, publicText: f(`École de rang ${school.tier}.`, `Tier ${school.tier} school.`), source: "linkedin" as const, ...(d.url ? { proof: d.url } : {}) }
+    ? { text: schoolFact!, publicText: SCHOOL_COUNTED, source: "linkedin" as const, ...(d.url ? { proof: d.url } : {}) }
     : {
         text: f(`« ${best!.quote.slice(0, 120)} »`, `"${best!.quote.slice(0, 120)}"`),
         publicText: signalFact!,
@@ -397,7 +387,7 @@ export function eduGithub(g: GithubInput): Draft {
     state: "scored",
     source: "github",
     reached: f("Un hackathon ou un concours, sans classement cité.", "A hackathon or a competition, no ranking on file."),
-    next: f("Pour 6 : une école de rang B, sur LinkedIn.", "For 6: a tier B school, on LinkedIn."),
+    next: EDU_NEXT_GITHUB,
     evidence: { text: f(`Dépôt ${hit.name} : hackathon ou concours.`, `Repo ${hit.name}: hackathon or competition.`), source: "github", proof: repoUrl(hit) },
   });
 }
