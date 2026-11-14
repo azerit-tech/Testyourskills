@@ -8,7 +8,7 @@
 // être prêt dans les 4 s d'onglet visible après la fiche (estimé sur le débit
 // mesuré), la fiche sort sans révélation, comme sans WebGL ; erreur en cours,
 // flash immédiat.
-// Sans Three.js ni WebGL. Muet : la bande-son (T3) se branche sur `FilmSound`.
+// Sans Three.js ni WebGL. La bande-son (T3) se branche sur `FilmSound`.
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { flushSync } from "react-dom";
@@ -17,6 +17,7 @@ import { filmPlan, hudAt, type FilmPlan } from "../../../shared/film";
 import { useT } from "../i18n";
 import { api, isMock } from "../lib/api";
 import { readMuted, unlockAudio, writeMuted } from "../lib/audio";
+import { createFilmSound } from "../lib/filmSound";
 import { buzz } from "../lib/haptics";
 import { inAppBrowser } from "../lib/sharing";
 import { canPlayFilm, createFilmPlayer, type FilmPlayer, type FilmStats } from "../film/player";
@@ -228,13 +229,15 @@ function FilmView({ card, lang, phase, onReady, onGesture, onHandoff, onDone, on
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [phase]);
 
-  useEffect(
-    () => () => {
-      sound.current?.dispose();
-      sound.current = null;
-    },
-    [],
-  );
+  // La bande-son (§18.39, lib/filmSound.ts) : créée avec le plan, libérée au démontage.
+  useEffect(() => {
+    const s = createFilmSound(plan);
+    sound.current = s;
+    return () => {
+      s.dispose();
+      if (sound.current === s) sound.current = null;
+    };
+  }, [plan]);
 
   const toggleSound = () => {
     const m = !muted;
