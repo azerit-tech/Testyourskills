@@ -35,7 +35,7 @@ import { mountRemoval } from "./removal";
 import { mountFilmTrace } from "./filmTrace";
 import { mountPrimes, purgeEntries } from "./primes";
 import { mountPrimePages } from "./primePages";
-import { loadRules } from "./rules";
+import { loadRules, servableRules } from "./rules";
 
 export interface AppOptions {
   store: Store;
@@ -314,8 +314,8 @@ export function createApp(opts: AppOptions) {
   // linkedinEntry : le champ de l'accueil accepte une adresse LinkedIn (§18.24).
   // season, primesOpen : les dates de la saison et si une prime est ouverte (data/season.json).
   const season = opts.season === undefined ? loadSeason() : opts.season;
-  // Le règlement n'existe que publié par la saison et présent sur le disque (rules.ts).
-  const rules = season?.rulesPublished ? (opts.rules === undefined ? loadRules() : opts.rules) : null;
+  // Le règlement n'existe que publié par la saison, présent sur le disque et sans champ à remplir (rules.ts).
+  const rules = season?.rulesPublished ? servableRules(opts.rules === undefined ? loadRules() : opts.rules) : null;
   app.get("/api/config", (c) =>
     c.json({
       linkedin: !!opts.linkedin,

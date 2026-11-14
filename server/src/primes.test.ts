@@ -4,7 +4,7 @@
 import { mkdirSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { FIXTURES } from "../../shared/fixtures";
 import type { PrimeMe, PrimePageData, Race } from "../../shared/primes";
 import type { Prime, Season } from "../../shared/season";
@@ -14,7 +14,7 @@ import { SESSION_COOKIE, signSession } from "./auth";
 import { Store } from "./db";
 import type { Deps } from "./pipeline";
 import { purgeEntries } from "./primes";
-import { publicRules, RULES_MARK } from "./rules";
+import { publicRules, rulesBlanks, RULES_MARK } from "./rules";
 
 const BASE = "https://skills.test";
 const SECRET = "s".repeat(40);
@@ -317,5 +317,23 @@ describe("le règlement (/reglement)", () => {
     const off = setup(seasonWith([prime()]), text);
     expect((await call(off, "/api/rules")).status).toBe(404);
     expect((await off.app.request("/reglement")).status).toBe(404);
+  });
+
+  it("un champ encore entre crochets ferme le règlement, et le journal le dit (§18.48)", async () => {
+    expect(rulesBlanks("Organisé par [raison sociale], SIREN [SIREN]. Voir [la CNIL](https://cnil.fr), case [ ].")).toEqual(["[raison sociale]", "[SIREN]"]);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const holes = setup(seasonWith([prime()], { rulesPublished: true }), "# Règlement\n\nVersion du [date de publication]. Contact : [email de contact].");
+      expect(warn.mock.calls.flat().join(" ")).toMatch(/\[date de publication\].*\/reglement reste fermé/);
+      expect((await call<Record<string, unknown>>(holes, "/api/config")).json).toMatchObject({ rulesPublished: false });
+      expect((await call(holes, "/api/rules")).status).toBe(404);
+      expect((await holes.app.request("/reglement")).status).toBe(404);
+      // Rempli, avec un lien Markdown : servi.
+      const filled = setup(seasonWith([prime()], { rulesPublished: true }), "# Règlement\n\nVoir [la CNIL](https://cnil.fr).");
+      expect((await call<Record<string, unknown>>(filled, "/api/config")).json).toMatchObject({ rulesPublished: true });
+      expect((await call(filled, "/api/rules")).status).toBe(200);
+    } finally {
+      warn.mockRestore();
+    }
   });
 });

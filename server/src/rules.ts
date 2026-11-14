@@ -1,7 +1,8 @@
 // Le règlement de la saison (/reglement). Le fichier docs/reglement-saison-1.md
 // commence par les points à relire, réservés à l'équipe : seul ce qui suit le
 // repère RULES_MARK est servi, et seulement quand data/season.json dit
-// rulesPublished. Fichier absent ou sans repère : pas de règlement, 404.
+// rulesPublished. Fichier absent, sans repère, ou avec un champ encore entre
+// crochets (« [raison sociale] ») : pas de règlement, 404.
 
 import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -20,6 +21,30 @@ export function publicRules(raw: string): string | null {
   return text || null;
 }
 
+/**
+ * Un champ resté à remplir : « [raison sociale] », « [SIREN] », « [date d'annonce] ».
+ * Un lien Markdown (« [texte](adresse) ») n'en est pas un.
+ */
+const BLANK_RE = /\[[^\]\n]*\p{L}[^\]\n]*\](?!\()/gu;
+
+/** Les champs à remplir du texte public, sans doublon, dans l'ordre du texte. */
+export function rulesBlanks(text: string): string[] {
+  return [...new Set(text.match(BLANK_RE) ?? [])];
+}
+
+/**
+ * Le texte servi sur /reglement, ou null : un règlement à trous ne se publie
+ * pas (SPEC §18.48). Le journal du serveur dit pourquoi, au démarrage.
+ */
+export function servableRules(text: string | null): string | null {
+  if (!text) return null;
+  const blanks = rulesBlanks(text);
+  if (!blanks.length) return text;
+  const shown = blanks.slice(0, 8).join(", ");
+  console.warn(`[règlement] ${blanks.length} champ(s) entre crochets à remplir (${shown}${blanks.length > 8 ? ", …" : ""}) : /reglement reste fermé.`);
+  return null;
+}
+
 export function loadRules(path = RULES_FILE): string | null {
   let raw: string;
   try {
@@ -30,5 +55,5 @@ export function loadRules(path = RULES_FILE): string | null {
   }
   const text = publicRules(raw);
   if (!text) console.warn(`[règlement] ${path} sans le repère ${RULES_MARK} : /reglement reste fermé.`);
-  return text;
+  return servableRules(text);
 }
