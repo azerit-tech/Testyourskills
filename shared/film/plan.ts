@@ -75,6 +75,15 @@ export interface FilmPlan {
 
 export type FilmCard = Pick<CardData, "id" | "login" | "name"> & RadioCard;
 
+/**
+ * Deux plans qui jouent le même film : même contenu, quel que soit l'objet. Le
+ * plan n'est fait que de données (nombres, textes, tableaux), la comparaison
+ * de leur écriture suffit et suit d'elle-même tout ce que le plan lira demain.
+ */
+export function samePlan(a: FilmPlan, b: FilmPlan): boolean {
+  return a === b || JSON.stringify(a) === JSON.stringify(b);
+}
+
 export function filmPlan(card: FilmCard): FilmPlan {
   const level = starsFor(card.overall);
   const scene = sceneOf(card.profile?.id);

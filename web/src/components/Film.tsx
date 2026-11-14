@@ -9,11 +9,11 @@
 // mesuré), la fiche sort sans révélation, comme sans WebGL ; erreur en cours,
 // flash immédiat.
 // Sans Three.js ni WebGL. La bande-son (T3) se branche sur `FilmSound`.
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { flushSync } from "react-dom";
 import type { CardData, Lang } from "../../../shared/types";
-import { filmPlan, hudAt, type FilmPlan } from "../../../shared/film";
+import { filmPlan, hudAt, samePlan, type FilmPlan } from "../../../shared/film";
 import { useT } from "../i18n";
 import { api, isMock } from "../lib/api";
 import { readMuted, unlockAudio, writeMuted } from "../lib/audio";
@@ -69,25 +69,44 @@ declare global {
   }
 }
 
-/** Une lecture du film, pour son événement : la pilule montrée, la lecture commencée, l'événement parti. */
+/** Une révélation, pour son événement : la pilule montrée, la lecture commencée, l'événement parti. */
 interface Reading {
   gesture: boolean;
   started: boolean;
   sent: boolean;
-  send(outcome: FilmOutcome): void;
 }
 
 export function Film(props: Props) {
   return <FilmView {...props} onFail={props.onDone} />;
 }
 
+/**
+ * Le plan, stable tant que la fiche joue le même film. Le parent peut repasser
+ * un objet neuf au même contenu (la fiche d'un dossier, recalculée) : le plan
+ * reste le même objet, donc ni le lecteur, ni la bande-son, ni l'arrêt sur
+ * image ne sont recréés. Recalculé seulement quand l'objet change.
+ */
+function useFilmPlan(card: CardData): FilmPlan {
+  const kept = useRef<{ card: CardData; plan: FilmPlan } | null>(null);
+  if (kept.current?.card !== card) {
+    const next = filmPlan(card);
+    kept.current = { card, plan: kept.current && samePlan(kept.current.plan, next) ? kept.current.plan : next };
+  }
+  return kept.current.plan;
+}
+
 function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, onDone, onTap, onFail }: Props & { onFail: () => void }) {
   const { t: tr } = useT();
-  const plan = useMemo(() => filmPlan(card), [card]);
+  const plan = useFilmPlan(card);
+  const planRef = useRef(plan);
+  planRef.current = plan;
   const frameRef = useRef<HTMLDivElement>(null);
   const coverRef = useRef<HTMLDivElement>(null);
   const stillRef = useRef<HTMLCanvasElement>(null);
+  /** Le dernier lecteur créé (ses mesures servent à l'événement, même libéré). */
   const player = useRef<FilmPlayer | null>(null);
+  /** Le lecteur prêt (posé sur sa première image) : la lecture ne part que sur lui. */
+  const [prepared, setPrepared] = useState<FilmPlayer | null>(null);
   const sound = useRef<FilmSound | null>(null);
   const [time, setTime] = useState(0);
   const [muted, setMuted] = useState(readMuted);
@@ -96,8 +115,55 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
   const cues = useRef({ star: 0, staged: false, handed: false, done: false });
-  /** L'événement `film` (§5.6), une fois par lecture : la pilule a-t-elle été montrée, la lecture a-t-elle commencé. */
-  const reading = useRef<Reading>({ gesture: false, started: false, sent: false, send: () => undefined });
+  /**
+   * L'événement `film` (§5.6), une fois par révélation, pas par lecteur : un
+   * lecteur recréé (le plan a changé) continue la même révélation.
+   */
+  const reading = useRef<Reading>({ gesture: false, started: false, sent: false });
+  const send = useRef<(outcome: FilmOutcome) => void>(() => undefined);
+  send.current = (outcome) => {
+    const r = reading.current;
+    const p = player.current;
+    if (r.sent || !p) return;
+    r.sent = true;
+    filmTrace("issue", { outcome, gesture: r.gesture, started: r.started });
+    const s = p.stats();
+    const net = filmNet();
+    api.track("film", null, {
+      ...filmReport({
+        outcome,
+        variant: s.quality,
+        bytes: net.bytes,
+        loadMs: filmLoadMs(["poursuite", planRef.current.ending]),
+        startMs: s.startMs,
+        dropped: r.started ? s.dropped : null,
+        switchMs: s.switchMs,
+        bps: net.bps,
+        inApp: inAppBrowser(navigator.userAgent),
+        gesture: r.gesture,
+      }),
+    });
+  };
+
+  // L'issue de la révélation quand le film s'en va avant sa fin : au démontage
+  // (passée, pilule jamais touchée), ou la page fermée ou quittée en route
+  // (React ne démonte rien, on le dit ici). Déclaré avant le lecteur : au
+  // démontage, l'issue part avant qu'il soit libéré. Une révélation neuve à
+  // chaque montage (StrictMode rejoue les effets en dev) : avant le lecteur,
+  // qui la reprend.
+  useEffect(() => {
+    reading.current = { gesture: false, started: false, sent: false };
+    const interrupted = (closed: boolean) => {
+      const r = reading.current;
+      send.current(interruptedOutcome({ closed, started: r.started, gesture: r.gesture }));
+    };
+    const onHide = () => interrupted(false);
+    window.addEventListener("pagehide", onHide);
+    return () => {
+      window.removeEventListener("pagehide", onHide);
+      interrupted(phaseRef.current === "done");
+    };
+  }, []);
 
   // Les repères : une vibration par étoile, une longue au flash ; le relais au sommet, la fin après.
   const cue = useRef<(t: number) => void>(() => undefined);
@@ -126,12 +192,13 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
     if (!c.done && t >= plan.duration - 1e-6) {
       c.done = true;
       filmTrace("film:fin", { ft: t });
-      reading.current.send(player.current?.stats().aborted ? "error" : "played");
+      send.current(player.current?.stats().aborted ? "error" : "played");
       cb.current.onDone();
     }
   };
 
   // Le lecteur : chargement, première image, puis prêt (ou geste demandé) ; sinon le repli.
+  // Un par plan : le plan ne change que si la fiche joue un autre film (useFilmPlan).
   useEffect(() => {
     const host = frameRef.current;
     const cover = coverRef.current;
@@ -152,33 +219,7 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
     const untrace = filmTraceMount({ stats: p.stats, plan: { duration: plan.duration, cut: plan.cut, endVideo: plan.endVideo, level: plan.level } });
     let settled = false;
     const needed: FileId[] = ["poursuite", plan.ending];
-    // L'événement `film` : ce qu'il est advenu de cette lecture, une seule fois, sans rien de personnel.
-    const r: Reading = { gesture: false, started: false, sent: false, send: () => undefined };
-    r.send = (outcome) => {
-      if (r.sent) return;
-      r.sent = true;
-      filmTrace("issue", { outcome, gesture: r.gesture, started: r.started });
-      const s = p.stats();
-      const net = filmNet();
-      api.track("film", null, {
-        ...filmReport({
-          outcome,
-          variant: s.quality,
-          bytes: net.bytes,
-          loadMs: filmLoadMs(needed),
-          startMs: s.startMs,
-          dropped: r.started ? s.dropped : null,
-          switchMs: s.switchMs,
-          bps: net.bps,
-          inApp: inAppBrowser(navigator.userAgent),
-          gesture: r.gesture,
-        }),
-      });
-    };
-    reading.current = r;
-    // la page fermée ou quittée en cours de route : React ne démonte rien, on le dit ici
-    const onHide = () => r.send(interruptedOutcome({ closed: false, started: r.started, gesture: r.gesture }));
-    window.addEventListener("pagehide", onHide);
+    const r = reading.current;
     // Le délai d'abandon (§5.5) : en temps d'onglet visible seulement, et sur
     // l'avancement réel du chargement. Le reste arrive à temps : on attend ;
     // sinon la fiche se pose tout de suite, sans attendre le délai pour rien.
@@ -192,7 +233,7 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
       if (settled) return;
       filmTrace("repli", { outcome });
       stop();
-      r.send(outcome);
+      send.current(outcome);
       cb.current.onFail();
     };
     const check = () => {
@@ -212,6 +253,9 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
         filmTrace(`prepare:${ready}`, { settled });
         if (settled) return;
         stop();
+        // Prêt : la lecture part dessus dès la phase « playing », ou tout de suite
+        // si elle y est déjà (lecteur recréé en route : jamais de lecteur prêt qui attend).
+        setPrepared(p);
         if (ready === "gesture" && cb.current.onGesture) {
           r.gesture = true;
           filmTrace("pilule:montrée");
@@ -227,20 +271,19 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
     return () => {
       filmTrace("démontage", { phase: phaseRef.current });
       stop();
-      window.removeEventListener("pagehide", onHide);
-      // démontée avant la fin : passée (la révélation close), pilule jamais touchée, ou page quittée
-      r.send(interruptedOutcome({ closed: phaseRef.current === "done", started: r.started, gesture: r.gesture }));
+      // Libéré : l'issue de la révélation ne part pas d'ici (un lecteur recréé la continue),
+      // mais au démontage du film, plus haut.
+      setPrepared((cur) => (cur === p ? null : cur));
       untrace();
       p.dispose();
-      player.current = null;
       if (window.__film?.plan === plan) delete window.__film;
     };
   }, [plan]);
 
-  // La lecture : seulement en « playing » et « handoff », onglet visible.
+  // La lecture : seulement en « playing » et « handoff », onglet visible, sur le lecteur prêt.
   useEffect(() => {
-    filmTrace("phase", { phase });
-    const p = player.current;
+    filmTrace("phase", { phase, prepared: !!prepared });
+    const p = prepared;
     if (!p || (phase !== "playing" && phase !== "handoff")) return;
     reading.current.started = true;
     filmTrace("play()", { phase, hidden: document.hidden });
@@ -257,7 +300,7 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
     };
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
-  }, [phase]);
+  }, [phase, prepared]);
 
   // La bande-son (§18.39, lib/filmSound.ts) : créée avec le plan, libérée au démontage.
   useEffect(() => {
