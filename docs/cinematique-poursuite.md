@@ -104,7 +104,7 @@ Deux bandes d'encre `#0c0d1b` encadrent l'image, de la couleur exacte de la page
 - Les bandes se ferment en 8 images à l'ouverture et s'ouvrent au flash.
 - À chaque étoile, l'image tremble de 3 px sur quatre images.
 
-Les lignes de radio viennent de `shared/film/radio.ts`, une par étoile : « Véhicule en fuite · {poste} », « Arme signalée : {langage} », « Motif : {chef d'accusation} », « Affiliation : {affiliation} », « Profil identifié : {profil} », « Toutes les unités · {niveau} », et à la fin « Fin de course · {niveau} ».
+Les lignes de radio viennent de `shared/film/radio.ts`, une par étoile : « Véhicule en fuite · {poste} », « Arme signalée : {langage} », « Motif : {chef d'accusation} », « Affiliation : {affiliation} », « Profil identifié : {profil} », « Toutes les unités · {niveau} » ; de une à cinq étoiles, douze images avant la coupe vers la fin, « Interception · barrage en place », qui tient pendant la fin ; à l'arrêt sur image, « Fin de course · {niveau} ».
 
 ### 2.3 Plan par plan
 
@@ -152,7 +152,7 @@ Les lignes de radio viennent de `shared/film/radio.ts`, une par étoile : « Vé
 
 **FIN : l'arrestation** (niveaux ★ à ★★★★★)
 1. *L'arrêt* (52 images de vidéo, la vitesse passe du normal au ralenti). Cadre serré : caméra fixe à 20 cm du sol, 35 mm, sur une esplanade vide sous un seul lampadaire. La voiture en fuite finit de freiner vers nous, la fumée de pneus la dépasse. Au premier plan, l'avant d'une patrouille, portière ouverte ; derrière la portière, une silhouette se redresse. Tout autour, hors champ, des lueurs corail et lilas battent dans la brume. Derrière le pare-brise plein de reflets, deux mains gantées se lèvent. Personne ne tire.
-2. *L'arrêt sur image* (14 images). La dernière image gèle et passe en deux tons (§3.1), les traits de la toise passent par-dessus, une plaque d'encre porte « @pseudo », et le niveau claque en Barlow Condensed 700, crème. L'image gelée est la photo d'identité. Dans la bande du haut, l'étoile suivante clignote deux fois et reste éteinte.
+2. *L'arrêt sur image* (14 images). La dernière image gèle et passe en deux tons (§3.1), les traits de la toise passent par-dessus, une plaque d'encre porte « @pseudo », et le niveau claque en Barlow Condensed 700, crème. L'image gelée est la photo d'identité.
 3. *Le flash* (10 images). Crème `#fff9cb` plein écran, les bandes s'ouvrent. Au sommet du flash, la fiche est posée sur le ciel peint de son lieu du crime (SPEC §18.29).
 
 Le cadre serré de FIN règle le nombre de poursuivants sans rendre cinq fins : une seule patrouille et une seule silhouette sont visibles, ce qui est exact à une étoile ; au-dessus, les autres sont suggérées par les lueurs hors champ, et le niveau est porté par le HUD.
@@ -373,7 +373,7 @@ Ce qui attache le film au site : la palette, les bandes de la couleur de la page
 | Secousse à chaque étoile | translation de l'image sur quatre images |
 | Deux tons de l'arrêt sur image | filtre CSS sur une image fixe |
 | Flash | un aplat crème en opacité ; il part aussi tout de suite sur une erreur de lecture (§5.5) |
-| Cache d'encre de la bascule | un aplat d'encre posé par le lecteur, sans attendre React, tant que la fin n'a pas peint sa première image |
+| Cache de la bascule | un aplat crème (la couleur de l'éclair) posé par le lecteur, sans attendre React, tant que la fin n'a pas peint sa première image |
 | Vibration | une impulsion par étoile (`web/src/lib/haptics.ts`, Android) |
 
 Le grain n'est pas gravé dans les fichiers : il gonflerait le débit pour rien.
@@ -440,7 +440,8 @@ tools/film3d/                   la scène Blender et son rendu
 ### 5.3 La lecture
 
 - **Deux balises `<video muted playsinline>`.** La première joue `poursuite` (toujours le fichier complet à six étoiles). La seconde porte la fin, calée sur sa première image : `fin` de ★ à ★★★★★, `fin6` à ★★★★★★.
-- **La coupe au niveau de la fiche** : quand la première balise atteint la dernière image de son dernier plan joué, la seconde démarre et passe devant. Deux images d'encre couvrent la bascule : la dernière du plan et la première de la fin.
+- **La coupe au niveau de la fiche** : quand la première balise atteint la dernière image de son dernier plan joué, la seconde démarre et passe devant. Deux images d'éclair crème couvrent la bascule : la dernière du plan et la première de la fin (§18.39 : deux images sombres dans un film de nuit se lisaient comme une image perdue).
+- **La coupe assumée, de une à cinq étoiles** (§18.39) : la ville est continue, le saut du dernier plan joué à la pointe se voit. Douze images avant la coupe, la radio annonce l'interception et l'étoile suivante clignote deux fois (trois images allumée, trois éteinte), éteinte sur les trois dernières images ; puis l'éclair, puis la fin. À six étoiles, la poursuite va au bout de son fichier : seul l'éclair.
 - **Fichiers chargés en entier avant de jouer** (`fetch` puis `Blob`, `loader.ts`) : aucune mise en mémoire tampon pendant le film. Un fichier à la fois, la poursuite d'abord ; chacun une fois pour la page.
 - **La variante, sur le débit mesuré.** La réponse se lit en flux (`ReadableStream`) : sur les 350 premiers Ko du premier fichier en haute, débit sous 5 Mbit/s (`ECO_BELOW_BPS`, `net.ts`) : ce fichier est abandonné et tout est repris en éco (540 × 960). Économiseur de données : éco d'emblée, rien n'est demandé en haute. Sans `ReadableStream` : pas de mesure, le repli d'avant (éco si la connexion annoncée est en 3G ou moins). Une fois tranchée, la variante ne change plus pour la page. Encodage : celui du §4.1.
 - **Ordinateur** : le film dans une colonne 9:16 centrée, haute comme la fenêtre (900 px au plus), sur l'encre.

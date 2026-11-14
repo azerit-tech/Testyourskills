@@ -93,17 +93,23 @@ describe("filmPlan (§2.1)", () => {
     expect(p6.flash).toEqual({ from: 506, peak: 510, to: 518 });
   });
 
-  it("l'étoile suivante clignote deux fois pendant le gel ; à six étoiles, rien ne clignote", () => {
+  it("l'interception : l'étoile suivante clignote deux fois juste avant la coupe, dans le dernier plan joué ; à six étoiles, rien", () => {
     for (const n of LEVELS) {
       const p = filmPlan(cardAt(n));
-      if (n === 6) expect(p.flicker).toBeNull();
-      else {
+      if (n === 6) {
+        expect(p.flicker).toBeNull();
+        expect(p.intercept).toBeNull();
+      } else {
+        expect(p.intercept).toBe(p.cut - 12);
+        // l'interception tombe dans le dernier plan joué, après son étoile
+        expect(p.intercept).toBeGreaterThan(p.stars[n - 1].frame);
         expect(p.flicker?.star).toBe(n + 1);
         expect(p.flicker!.frames).toHaveLength(2);
+        expect(p.flicker!.frames[0][0]).toBe(p.intercept);
         for (const [a, b] of p.flicker!.frames) {
-          expect(a).toBeGreaterThanOrEqual(p.freeze);
-          expect(b).toBeLessThanOrEqual(p.flash.from);
           expect(b).toBeGreaterThan(a);
+          // éteinte avant l'éclair de la coupe (sa première image : cut - 1)
+          expect(b).toBeLessThan(p.cut - 1);
         }
       }
     }
@@ -138,10 +144,11 @@ describe("hudAt (§2.2, §5.2)", () => {
         expect(h.lit).toBeLessThanOrEqual(n);
         expect(h.lit).toBeGreaterThanOrEqual(prev);
         prev = h.lit;
-        // une étoile au-delà du niveau ne s'allume qu'en clignotant, pendant le gel
+        // une étoile au-delà du niveau ne s'allume qu'en clignotant, juste avant la coupe
         const extra = h.stars.slice(n).filter((s) => s.on).length;
         if (extra) {
-          expect(h.phase).toBe("freeze");
+          expect(h.phase).toBe("chase");
+          expect(f).toBeGreaterThanOrEqual(p.cut - 12);
           expect(extra).toBe(1);
         }
       }
@@ -168,18 +175,24 @@ describe("hudAt (§2.2, §5.2)", () => {
     expect(hudAt(p, at(SHOT_START.P1), "en").radio?.text).toBe(p.radio.en.beats[0]);
   });
 
-  it("la radio cite la fiche : « Véhicule en fuite · Backend », puis la fin de course au gel", () => {
+  it("la radio cite la fiche : « Véhicule en fuite · Backend », annonce l'interception, puis la fin de course au gel", () => {
     const p = filmPlan(cardAt(4));
     expect(hudAt(p, at(SHOT_START.P1 + 6), "fr").radio?.text).toBe("Véhicule en fuite · Backend");
     expect(hudAt(p, at(SHOT_START.P2 + 8), "fr").radio?.text).toBe("Arme signalée : Python");
-    expect(hudAt(p, at(p.cut + 3), "fr").radio?.text).toBe(p.radio.fr.beats[3]);
+    expect(hudAt(p, at(p.cut - 13), "fr").radio?.text).toBe(p.radio.fr.beats[3]);
+    expect(hudAt(p, at(p.cut - 12), "fr").radio?.text).toBe("Interception · barrage en place");
+    expect(hudAt(p, at(p.cut + 3), "fr").radio?.text).toBe("Interception · barrage en place");
+    expect(hudAt(p, at(p.freeze - 1), "en").radio?.text).toBe("Intercept · roadblock in place");
+    // six étoiles : pas d'interception, la dernière ligne tient jusqu'au gel
+    const p6 = filmPlan(cardAt(6));
+    expect(hudAt(p6, at(p6.cut + 3), "fr").radio?.text).toBe(p6.radio.fr.beats[5]);
     expect(hudAt(p, at(p.freeze), "fr").radio?.text).toBe("Fin de course · Haute surveillance");
     expect(hudAt(p, at(p.freeze), "en").radio?.text).toBe("End of the line · High surveillance");
     const squares = new Set(Array.from({ length: FPS }, (_, i) => hudAt(p, at(SHOT_START.P1 + 6 + i), "fr").radio?.square));
     expect(squares).toEqual(new Set(["coral", "lilac"]));
   });
 
-  it("la bascule : la poursuite jusqu'à la coupe, deux images d'encre (la dernière de la poursuite, la première de la fin), puis la fin ; aucune image du plan suivant", () => {
+  it("la bascule : la poursuite jusqu'à la coupe, deux images d'éclair (la dernière de la poursuite, la première de la fin), puis la fin ; aucune image du plan suivant", () => {
     for (const n of LEVELS) {
       const p = filmPlan(cardAt(n));
       expect(hudAt(p, at(p.cut - 2), "fr")).toMatchObject({ phase: "chase", video: "chase", videoFrame: p.cut - 2, ink: false, shot: CHASE_SHOTS[n] });
@@ -204,14 +217,17 @@ describe("hudAt (§2.2, §5.2)", () => {
     expect(hudAt(p, at(p.flash.from + 1), "fr").videoFrame).toBe(p.endVideo - 1);
   });
 
-  it("le clignotement : l'étoile suivante s'allume deux fois et finit éteinte", () => {
-    const p = filmPlan(cardAt(3));
-    const seq = Array.from({ length: p.flash.from - p.freeze }, (_, i) => hudAt(p, at(p.freeze + i), "fr").stars[3].on);
-    let blinks = 0;
-    for (let i = 0; i < seq.length; i++) if (seq[i] && !seq[i - 1]) blinks++;
-    expect(blinks).toBe(2);
-    expect(seq[seq.length - 1]).toBe(false);
-    expect(hudAt(p, p.duration, "fr").stars[3].on).toBe(false);
+  it("le clignotement, à chaque niveau de une à cinq étoiles : l'étoile suivante s'allume deux fois avant la coupe et finit éteinte", () => {
+    for (const n of [1, 2, 3, 4, 5] as const) {
+      const p = filmPlan(cardAt(n));
+      const seq = Array.from({ length: p.frames }, (_, f) => hudAt(p, at(f), "fr").stars[n].on);
+      let blinks = 0;
+      for (let i = 0; i < seq.length; i++) if (seq[i] && !seq[i - 1]) blinks++;
+      expect(blinks).toBe(2);
+      // éteinte sur les deux images d'avant l'éclair, sur l'éclair, et jusqu'au bout
+      expect(seq.slice(p.cut - 3).every((on) => !on)).toBe(true);
+      expect(hudAt(p, p.duration, "fr").stars[n].on).toBe(false);
+    }
     const p6 = filmPlan(cardAt(6));
     for (let f = p6.freeze; f < p6.frames; f++) expect(hudAt(p6, at(f), "fr").stars.every((s) => s.on)).toBe(true);
   });
@@ -258,6 +274,7 @@ describe("radioLines", () => {
     expect(fr.beats[3]).toContain("Pharelune Santé");
     expect(fr.beats[4]).toContain(FIXTURES.silver.profile!.label.fr);
     expect(radioLines({ ...FIXTURES.silver, club: null }, "en").beats[3]).toContain("Lone wolf");
-    for (const l of [...fr.beats, fr.end]) expect(l.length).toBeGreaterThan(0);
+    for (const l of [...fr.beats, fr.intercept, fr.end]) expect(l.length).toBeGreaterThan(0);
+    expect(radioLines(FIXTURES.silver, "en").intercept).toBe("Intercept · roadblock in place");
   });
 });

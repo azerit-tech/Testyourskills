@@ -6,8 +6,9 @@
 // vidéo : t = image présentée de A, puis coupe + image présentée de B, puis
 // l'horloge du navigateur pour le gel et le flash. Le HUD ne peut pas se
 // décaler de l'image. La coupe au niveau : quand A présente la dernière image
-// du dernier plan joué, l'encre la couvre, A s'arrête, B part et passe devant ;
-// l'encre reste jusqu'à la première image de B (deux images au plus).
+// du dernier plan joué, le cache la couvre (l'éclair crème de la coupe, §18.39 ;
+// « l'encre » dans ce fichier), A s'arrête, B part et passe devant ; le cache
+// reste jusqu'à la première image de B (deux images au plus).
 // Le chien de garde (watchdog.ts, §5.5) : une erreur de balise, une pause non
 // demandée ou une horloge figée plus de 1,5 s pendant la lecture : une
 // relance, puis le flash et la fiche. Jamais d'image figée ni d'écran noir.
@@ -65,7 +66,7 @@ interface Options {
   plan: FilmPlan;
   /** Le cadre du film : les deux balises y sont posées. */
   host: HTMLElement;
-  /** Le cache d'encre de la bascule, piloté sans attendre React. */
+  /** Le cache de la bascule (l'éclair crème), piloté sans attendre React. */
   cover: HTMLElement;
   /** À chaque rafraîchissement pendant la lecture, et à chaque seek. */
   onTime(t: number): void;

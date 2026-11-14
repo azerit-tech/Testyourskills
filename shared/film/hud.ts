@@ -32,7 +32,7 @@ export interface Hud {
   radio: { text: string; square: "coral" | "lilac" } | null;
   /** Fermeture des bandes d'encre : 0 ouvertes, 1 fermées. */
   bands: number;
-  /** Les deux images d'encre de la bascule. */
+  /** Les deux images de l'éclair de la bascule vers la fin (le nom vient de l'encre qui les couvrait d'abord). */
   ink: boolean;
   /** L'arrêt sur image : deux tons, plaque et titre (échelle du claquement, 1,2 à 1). */
   freeze: { titleScale: number } | null;
@@ -83,9 +83,11 @@ export function hudAt(plan: FilmPlan, t: number, lang: Lang): Hud {
     }
   }
 
-  // La radio : muette à l'ouverture, une ligne par étoile, puis la fin de course au gel.
+  // La radio : muette à l'ouverture, une ligne par étoile, l'interception juste
+  // avant la coupe (une à cinq étoiles) et pendant la fin, puis la fin de course au gel.
   const r = plan.radio[lang];
-  const text = phase === "chase" || phase === "ending" ? (lit > 0 ? r.beats[lit - 1] : null) : r.end;
+  const intercepted = plan.intercept !== null && frame >= plan.intercept;
+  const text = phase === "chase" || phase === "ending" ? (intercepted ? r.intercept : lit > 0 ? r.beats[lit - 1] : null) : r.end;
   const radio = text ? { text, square: (Math.floor(frame / SQUARE_STEP) % 2 === 0 ? "coral" : "lilac") as "coral" | "lilac" } : null;
 
   // Les bandes se ferment à l'ouverture, s'ouvrent après le sommet du flash.

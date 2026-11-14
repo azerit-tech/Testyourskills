@@ -104,10 +104,13 @@
 .film-vignette {
   background: radial-gradient(120% 90% at 50% 50%, transparent 55%, rgb(12 13 27 / 0.5) 100%);
 }
-/* les deux images d'encre de la coupe (HUD), et le cache du lecteur si la fin tarde */
+/* l'éclair de la coupe vers la fin (HUD, deux images, §18.39), et le cache du
+   lecteur si la fin tarde : la même couleur, pour que l'attente d'une image
+   prolonge l'éclair au lieu de tomber au noir. Sous les bandes : les étoiles et
+   la radio restent lisibles. */
 .film-ink,
 .film-cover {
-  background: #0c0d1b;
+  background: #fff9cb;
 }
 .film-cover {
   opacity: 0;

@@ -6,7 +6,7 @@ import type { CardData, Fact, Lang, Stars } from "../types";
 import { LEVEL_LABELS, starsFor } from "../types";
 import { SCENE_LIGHT, sceneOf, type Light } from "../scenes";
 import { radioLines, type Radio, type RadioCard } from "./radio";
-import { ENDINGS, FLICKER_ON, FPS, SHOT_START, CHASE_FRAMES, CHASE_SHOTS, type EndingId } from "./cut";
+import { ENDINGS, FLICKER_ON, FPS, INTERCEPT_LEAD, SHOT_START, CHASE_FRAMES, CHASE_SHOTS, type EndingId } from "./cut";
 
 /** Les deux tons de l'arrêt sur image, selon la lumière du profil (§3.1). */
 export interface FreezeTone {
@@ -47,7 +47,9 @@ export interface FilmPlan {
   endVideo: number;
   /** Première image de l'arrêt sur image. */
   freeze: number;
-  /** L'étoile suivante clignote deux fois pendant le gel ; absent à six étoiles. */
+  /** L'interception (une à cinq étoiles) : la radio l'annonce dès cette image, avant la coupe ; absente à six étoiles. */
+  intercept: number | null;
+  /** L'étoile suivante clignote deux fois juste avant la coupe, puis s'éteint ; absent à six étoiles. */
   flicker: { star: Stars; frames: [number, number][] } | null;
   /** Le flash : début, sommet (la fiche se pose : passage de relais), fin du film. */
   flash: { from: number; peak: number; to: number };
@@ -92,7 +94,8 @@ export function filmPlan(card: FilmCard): FilmPlan {
     cut,
     endVideo: e.video,
     freeze,
-    flicker: level < 6 ? { star: (level + 1) as Stars, frames: FLICKER_ON.map(([a, b]) => [freeze + a, freeze + b] as [number, number]) } : null,
+    intercept: level < 6 ? cut - INTERCEPT_LEAD : null,
+    flicker: level < 6 ? { star: (level + 1) as Stars, frames: FLICKER_ON.map(([a, b]) => [cut + a, cut + b] as [number, number]) } : null,
     flash,
     frames: flash.to,
     duration: flash.to / FPS,

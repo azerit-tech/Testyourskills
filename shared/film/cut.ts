@@ -65,10 +65,13 @@ export const SHAKE: readonly (readonly [number, number])[] = [
   [-1, 0],
 ];
 /**
- * Les deux images d'encre qui couvrent la bascule de la poursuite à la fin :
- * la dernière image du dernier plan joué et la première de la fin. L'encre
- * part de la dernière image de la poursuite : la balise en a toujours une
- * d'avance, et le plan suivant ne doit jamais paraître.
+ * Les deux images qui couvrent la bascule de la poursuite à la fin : la
+ * dernière image du dernier plan joué et la première de la fin. Elles partent
+ * de la dernière image de la poursuite : la balise en a toujours une d'avance,
+ * et le plan suivant ne doit jamais paraître. Couvertes d'abord d'encre, elles
+ * sont un éclair crème depuis le 14 novembre (§18.39) : deux images sombres
+ * dans un film de nuit se lisaient comme une image perdue, l'éclair assume la
+ * coupe (le champ `ink` du HUD garde son nom).
  */
 export const CUT_INK = 2;
 /** Le grain bouge douze fois par seconde : une nouvelle position toutes les deux images. */
@@ -76,12 +79,19 @@ export const GRAIN_STEP = 2;
 /** Le carré de la radio alterne corail et lilas toutes les six images (deux fois par seconde chacun). */
 export const SQUARE_STEP = 6;
 /**
- * L'étoile suivante clignote deux fois pendant l'arrêt sur image et reste
- * éteinte : allumée sur ces intervalles d'images, comptés depuis le gel.
+ * L'interception, de une à cinq étoiles (§18.39) : la ville est continue, le
+ * saut du dernier plan joué à la pointe se voit ; il est assumé. Tant
+ * d'images avant la coupe vers la fin, la radio annonce l'interception et
+ * l'étoile suivante clignote ; elle s'éteint avant l'éclair de la coupe.
+ */
+export const INTERCEPT_LEAD = 12;
+/**
+ * L'étoile suivante clignote deux fois et reste éteinte : allumée sur ces
+ * intervalles d'images, comptés depuis la coupe (négatifs : avant elle).
  */
 export const FLICKER_ON: readonly (readonly [number, number])[] = [
-  [1, 4],
-  [7, 10],
+  [-12, -9],
+  [-6, -3],
 ];
 
 /** Le plan joué à l'image `frame` du fichier `poursuite`. */

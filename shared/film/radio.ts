@@ -22,6 +22,7 @@ const WORDS = {
     profile: (p: string) => `Profil identifié : ${p}`,
     noProfile: "Profil : inconnu au fichier",
     allUnits: (l: string) => `Toutes les unités · ${l}`,
+    intercept: "Interception · barrage en place",
     end: (l: string) => `Fin de course · ${l}`,
   },
   en: {
@@ -34,6 +35,7 @@ const WORDS = {
     profile: (p: string) => `Profile identified: ${p}`,
     noProfile: "Profile: not on file",
     allUnits: (l: string) => `All units · ${l}`,
+    intercept: "Intercept · roadblock in place",
     end: (l: string) => `End of the line · ${l}`,
   },
 } satisfies Record<Lang, Record<string, unknown>>;
@@ -41,6 +43,8 @@ const WORDS = {
 export interface Radio {
   /** Une ligne par étoile, de la première à la sixième. */
   beats: string[];
+  /** L'interception, juste avant la coupe vers la fin (une à cinq étoiles, §18.39). */
+  intercept: string;
   /** La ligne de la fin, quand la voiture freine : le niveau atteint. */
   end: string;
 }
@@ -61,6 +65,7 @@ export function radioLines(card: RadioCard, lang: Lang): Radio {
       card.profile ? w.profile(card.profile.label[lang]) : w.noProfile,
       w.allUnits(LEVEL_LABELS[6][lang]),
     ],
+    intercept: w.intercept,
     end: w.end(level),
   };
 }
