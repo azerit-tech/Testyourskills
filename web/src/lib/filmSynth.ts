@@ -510,6 +510,10 @@ export function createFilmSynth(ctx: BaseAudioContext, score: FilmScore, dest: A
       case "slam":
         hit(slam.gain, w, 0.5 * v, 0.002, 0.5);
         break;
+      case "snap":
+        // l'éclair de la coupe : un claquement clair et bref, sur la voix des charlestons
+        hit(hat.gain, w, 0.6 * v, 0.001, 0.08);
+        break;
     }
   };
 

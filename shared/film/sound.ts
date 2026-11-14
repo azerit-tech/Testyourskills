@@ -42,7 +42,8 @@ export type Voice =
   | "beep"
   | "rise"
   | "whoosh"
-  | "slam";
+  | "slam"
+  | "snap";
 
 export interface SoundEvent {
   voice: Voice;
@@ -327,24 +328,38 @@ export function filmScore(plan: FilmPlan): FilmScore {
   for (const s of plan.stars) {
     push("boom", s.frame, { vel: 0.55 + 0.07 * s.star, dur: 0.7, layer: 0 });
     if (s.star >= 2) push("crash", s.frame, { vel: 0.8, layer: 2 });
-    push("chime", s.frame, { notes: [CHIMES[s.star - 1]], vel: 0.8, dur: 1.5 });
+    push("chime", s.frame, { notes: [CHIMES[s.star - 1]], vel: 0.8, dur: 1.3 });
     push("radio", s.frame + 2, { dur: 0.34, vel: 0.7 });
     push("beep", s.frame + 5, { vel: 0.7 });
     push("radio", s.frame + 28, { dur: 0.12, vel: 0.45 });
   }
 
-  // ---- la coupe vers la fin : la musique s'arrête net sur le temps, la nappe prend le relais
+  // ---- l'interception (une à cinq étoiles) : la radio grésille sur sa ligne ; l'étoile suivante clignote deux
+  // fois sur la grille (le dernier temps et sa croche), un tintement étouffé qui ne s'allume pas
+  if (plan.intercept !== null) {
+    push("radio", plan.intercept, { dur: 0.4, vel: 0.85 });
+    push("beep", plan.intercept + 3, { vel: 0.8 });
+  }
+  // calé sur le temps ou la croche la plus proche (P2 a des temps de 12,2 images : 9 ms d'écart au plus)
+  const onGrid = (f: number) => {
+    for (const b of beats) for (const g of [b.frame, b.frame + b.len / 2]) if (Math.abs(g - f) <= 0.5) return g;
+    return f;
+  };
+  if (plan.flicker) for (const [a] of plan.flicker.frames) push("deny", onGrid(a), { notes: [CHIMES[plan.flicker.star - 1]], vel: 0.5 });
+
+  // ---- la coupe vers la fin : un claquement sur l'éclair crème (sa première image, cut - 1), puis la musique
+  // s'arrête net sur le temps de la coupe et la nappe prend le relais
+  push("snap", cut - 1, { vel: 1 });
   push("kick", cut, { vel: 1, layer: 0 });
   push("boom", cut, { vel: 1, dur: 1.4, layer: 0 });
   push("crash", cut, { vel: 1, layer: 0 });
   push("nappe", cut, { notes: level === 6 ? NAPPE_FIN6 : NAPPE_FIN, dur: (flash.peak - cut) / FPS, release: (flash.to - flash.peak) / FPS, vel: 1 });
 
-  // ---- l'arrêt sur image : l'impact, la radio de fin, l'étoile suivante qui clignote sans s'allumer
+  // ---- l'arrêt sur image : l'impact, la radio de fin
   push("boom", freeze, { vel: 1, dur: 1.2 });
   push("slam", freeze, { vel: 1 });
   push("radio", freeze + 3, { dur: 0.3, vel: 0.6 });
   push("beep", freeze + 6, { vel: 0.6 });
-  if (plan.flicker) for (const [a] of plan.flicker.frames) push("deny", a, { notes: [CHIMES[plan.flicker.star - 1]], vel: 0.5 });
 
   // ---- l'éclair : un souffle qui monte pendant le gel et culmine quand la fiche se pose
   const pre = Math.max(freeze + 1, flash.from - 8);

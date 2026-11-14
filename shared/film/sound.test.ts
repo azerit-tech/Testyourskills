@@ -72,17 +72,28 @@ describe("les repères", () => {
     const of = (v: string) => score.events.filter((e) => e.voice === v);
     expect(of("chime").map((e) => e.frame)).toEqual(plan.stars.map((s) => s.frame));
     expect(of("chime").map((e) => e.notes[0])).toEqual(CHIMES.slice(0, n));
-    // la radio : ouverture et fermeture du canal à chaque étoile, puis la ligne de fin
-    expect(of("beep")).toHaveLength(n + 1);
-    expect(of("radio")).toHaveLength(2 * n + 1);
+    // la radio : ouverture et fermeture du canal à chaque étoile, l'interception (une à cinq étoiles), la ligne de fin
+    const intercept = plan.intercept === null ? 0 : 1;
+    expect(intercept).toBe(n < 6 ? 1 : 0);
+    expect(of("beep")).toHaveLength(n + 1 + intercept);
+    expect(of("radio")).toHaveLength(2 * n + 1 + intercept);
+    if (plan.intercept !== null) expect(of("radio").map((e) => e.frame)).toContain(plan.intercept);
+    // l'éclair crème de la coupe (sa première image, cut - 1) a son claquement, à chaque niveau
+    expect(of("snap").map((e) => e.frame)).toEqual([plan.cut - 1]);
     expect(of("slam").map((e) => e.frame)).toEqual([plan.freeze]);
     expect(of("boom").map((e) => e.frame)).toContain(plan.freeze);
     const whoosh = of("whoosh");
     expect(whoosh).toHaveLength(1);
     expect(whoosh[0].frame).toBeGreaterThan(plan.freeze);
     expect(whoosh[0].at + whoosh[0].dur).toBeCloseTo(plan.flash.peak / FPS, 9);
-    // l'étoile suivante clignote deux fois sans s'allumer ; à six étoiles il n'y en a plus
-    expect(of("deny").map((e) => e.frame)).toEqual(plan.flicker ? plan.flicker.frames.map(([a]) => a) : []);
+    // l'étoile suivante clignote deux fois sans s'allumer, avant la coupe et sur la grille ; à six étoiles il n'y en a plus
+    const blinks = plan.flicker ? plan.flicker.frames.map(([a]) => a) : [];
+    expect(of("deny")).toHaveLength(blinks.length);
+    for (const [i, e] of of("deny").entries()) {
+      expect(Math.abs(e.frame - blinks[i])).toBeLessThanOrEqual(0.5);
+      expect(e.frame).toBeLessThan(plan.cut);
+      expect(score.beats.some((b) => b.frame === e.frame || b.frame + b.len / 2 === e.frame)).toBe(true);
+    }
   });
 
   it.each(LEVELS)("%i étoile(s) : rien ne part après la fin du film, tout est dans l'ordre", (n) => {
