@@ -763,55 +763,6 @@ const fr = frTypoDeep({
   },
   privacy: {
     title: "Vie privée",
-    intro: "En quatre lignes. On lit ce qui est public : ton profil LinkedIn, ton GitHub, ou le CV que tu donnes. On garde ta fiche 90 jours par défaut, jamais ton CV. Aucun contact n'est affiché, aucun cookie publicitaire, aucun outil tiers de mesure. Tu supprimes ta fiche quand tu veux : le lien est sous ta fiche, et la demande de retrait sous celle qu'on a faite à ta place.",
-    sections: [
-      {
-        h: "Ce qu'on garde",
-        p: "Les faits publics tirés de GitHub (déjà calculés), les constats de l'IA, les notes, les statuts. Ton email, seulement si tu le donnes. Si tu viens du lien d'une fiche partagée, l'identifiant de cette fiche. Pour une fiche née d'une dénonciation, l'identifiant de la fiche qui a dénoncé, et son pseudo seulement si elle est revendiquée.",
-      },
-      {
-        h: "Ce qu'on ne garde jamais",
-        p: "Ton CV : le fichier est lu en mémoire, les constats sont extraits, le fichier et son texte sont jetés. Les fichiers de code lus par l'IA ne sont pas conservés non plus.",
-      },
-      {
-        h: "Combien de temps",
-        p: "90 jours, puis la fiche et ses images sont supprimées automatiquement. Sauf si tu as laissé ton email : la fiche reste tant que tu ne la supprimes pas.",
-      },
-      {
-        h: "Supprimer ta fiche",
-        p: "Un lien « Supprimer ma fiche » est affiché sous ta fiche et envoyé dans l'email. Il efface la fiche et ses images immédiatement.",
-      },
-      {
-        h: "La fiche de quelqu'un d'autre",
-        p: `On peut générer une fiche sur n'importe quel pseudo public : elle repose sur des données publiques et reste sur le ton de la plaisanterie. La personne qui détient le pseudo peut la faire supprimer en prouvant son compte GitHub. Une fiche faite par quelqu'un d'autre depuis ton LinkedIn ou ton CV, sans pseudo GitHub : « Demander son retrait » sous la fiche, ou un email à ${CONTACT_EMAIL} avec son lien. On la retire après vérification ; ton email sert seulement à te répondre.`,
-      },
-      {
-        h: "Revendiquer ta fiche",
-        p: "Si tu te connectes avec GitHub, on lit seulement ton pseudo et ton identifiant publics, sans aucune autorisation sur ton compte, et le jeton d'accès est jeté aussitôt. Un cookie signé, valable 30 jours, retient que tes fiches sont à toi. Une fiche revendiquée reste en ligne jusqu'à ce que tu la supprimes.",
-      },
-      {
-        h: "Photo LinkedIn",
-        p: "Seulement si tu connectes LinkedIn toi-même : on récupère ta photo de profil, rangée avec la fiche et supprimée avec elle. Rien d'autre n'est lu par cette connexion.",
-      },
-      {
-        h: "Profil LinkedIn",
-        p: "Si tu donnes un lien LinkedIn, ou si ton GitHub en affiche un, un service tiers de collecte de profils publics lit ce profil public. On le garde 30 jours pour ne pas le relire : titre, résumé, postes, formation, compétences. Ni photo, ni lieu, ni contact. La fiche suit la règle des 90 jours. Pour t'y opposer : masque ta fiche (« C'est moi »), supprime-la, le profil gardé part avec elle, ou écris-nous.",
-      },
-      {
-        h: "Le jury",
-        p: "Si tu votes sur une fiche partagée, on garde ton vote (coupable ou relaxe) avec une empreinte hachée de ton adresse IP, jamais l'adresse elle-même : c'est ce qui limite à un vote par fiche. Les votes partent avec la fiche.",
-      },
-      {
-        h: "Les bandes",
-        p: "Rien n'y entre sans ton accord. Si tu choisis une école ou une boîte sous ta fiche, on garde ce choix avec l'identifiant de la fiche et ses étoiles : une école et une boîte au plus. L'école lue sur ton profil reste privée tant que tu ne la choisis pas. La page d'une bande montre le profil et les étoiles de chaque fiche, jamais un nom ; ton pseudo GitHub seulement si ta fiche est revendiquée. Pour en sortir : « Sortir », sous ta fiche. Supprimer ta fiche t'en retire aussi, la masquer la retire du compte.",
-      },
-      PRIMES_TEXT.fr.privacy,
-      {
-        h: "Mesure",
-        p: "Dix-huit événements anonymes, enregistrés par notre serveur : fiche générée, fiche partagée, visite par un lien partagé, email donné, clic vers azerit.tech, dénonciation envoyée, arrivée sur une fiche dénoncée, fiche dénoncée revendiquée, vote du jury, plaidoyer choisi, déroulement du film de révélation, entrée dans une bande, sortie d'une bande, page d'une bande vue, bande partagée, page d'une prime vue, inscription à une prime, retrait d'une prime. Gardés 180 jours, puis effacés ; une fiche supprimée n'y est plus nommée. Pas de cookie publicitaire, pas d'outil tiers.",
-      },
-    ],
-    contact: `Une question : ${CONTACT_EMAIL}`,
   },
   /** Fiche sans pseudo GitHub vue par un tiers (LinkedIn, CV) : la personne fichée demande son retrait. */
   removal: {
@@ -824,7 +775,8 @@ const fr = frTypoDeep({
     invalid: "Cet email n'a pas l'air valide.",
     fallback: "Écris-nous avec le lien de cette fiche, on la retire après vérification :",
   },
-  notFound: { title: "Page introuvable", text: "Cette adresse n'est dans aucun dossier.", home: "Retour à l'accueil" },
+  /** Le titre de l'onglet d'une adresse inconnue (la page : components/ErrorPage.tsx, textes sous `pages.error`). */
+  notFound: { title: "Page introuvable" },
   crash: { title: "La page n'a pas chargé", text: "Le réseau a peut-être coupé, ou le site vient d'être mis à jour.", reload: "Recharger" },
 });
 
@@ -1482,55 +1434,6 @@ const en: Dict = {
   },
   privacy: {
     title: "Privacy",
-    intro: "In four lines. We read what is public: your LinkedIn profile, your GitHub, or the CV you give us. We keep your sheet for 90 days by default, never your CV. No contact details are shown, no ad cookies, no third-party tracking tools. You can delete your sheet any time: the link is under your sheet, and the removal request under one made on your behalf.",
-    sections: [
-      {
-        h: "What we keep",
-        p: "Public facts derived from GitHub (already computed), the AI's findings, the ratings, the statuses. Your email, only if you give it. If you arrived through a shared sheet's link, that sheet's ID. For a sheet born from a tip-off, the ID of the sheet that turned it in, and its username only if that sheet is claimed.",
-      },
-      {
-        h: "What we never keep",
-        p: "Your CV: the file is read in memory, findings are extracted, then the file and its text are thrown away. Code files read by the AI aren't kept either.",
-      },
-      {
-        h: "How long",
-        p: "90 days, then the sheet and its images are deleted automatically. Unless you left your email: then the sheet stays until you delete it.",
-      },
-      {
-        h: "Deleting your sheet",
-        p: "A “Delete my sheet” link is shown under your sheet and sent in the email. It erases the sheet and its images immediately.",
-      },
-      {
-        h: "Someone else's sheet",
-        p: `Anyone can generate a sheet for any public username: it relies on public data and stays a light-hearted tease. The username's owner can have it deleted by proving the GitHub account is theirs. A sheet someone else made from your LinkedIn or your CV, with no GitHub username: “Ask for its removal” under the sheet, or an email to ${CONTACT_EMAIL} with its link. We remove it after checking; your email is only used to reply.`,
-      },
-      {
-        h: "Claiming your sheet",
-        p: "If you sign in with GitHub, we only read your public username and ID, with no permission on your account, and the access token is thrown away at once. A signed cookie, valid for 30 days, remembers that your sheets are yours. A claimed sheet stays online until you delete it.",
-      },
-      {
-        h: "LinkedIn photo",
-        p: "Only if you connect LinkedIn yourself: we fetch your profile picture, stored with the sheet and deleted with it. Nothing else is read through this connection.",
-      },
-      {
-        h: "LinkedIn profile",
-        p: "If you give a LinkedIn link, or your GitHub shows one, a third-party service that collects public profiles reads that public profile. We keep it 30 days so we don't read it twice: headline, summary, positions, education, skills. No photo, location or contact details. The sheet follows the 90-day rule. To object: hide your sheet (“That's me”), delete it, and the stored profile goes with it, or write to us.",
-      },
-      {
-        h: "The jury",
-        p: "If you vote on a shared sheet, we keep your vote (guilty or cleared) with a hash of your IP address, never the address itself: that's what limits it to one vote per sheet. Votes are deleted with the sheet.",
-      },
-      {
-        h: "Crews",
-        p: "Nothing goes in without your say-so. If you pick a school or a company under your sheet, we keep that choice with the sheet's ID and its stars: one school and one company at most. The school read from your profile stays private until you pick it. A crew's page shows each sheet's profile and stars, never a name; your GitHub username only if your sheet is claimed. To leave: “Leave”, under your sheet. Deleting your sheet removes you too, hiding it takes it out of the count.",
-      },
-      PRIMES_TEXT.en.privacy,
-      {
-        h: "Measurement",
-        p: "Eighteen anonymous events, recorded by our own server: sheet generated, sheet shared, visit from a shared link, email given, click to azerit.tech, tip-off sent, arrival on a turned-in sheet, turned-in sheet claimed, jury vote, plea chosen, how the reveal film played, crew joined, crew left, crew page viewed, crew shared, bounty page viewed, bounty entered, bounty withdrawn. Kept 180 days, then erased; a deleted sheet is no longer named in them. No ad cookies, no third-party tools.",
-      },
-    ],
-    contact: `Questions: ${CONTACT_EMAIL}`,
   },
   removal: {
     link: "Didn't make this sheet yourself? Ask for its removal",
@@ -1542,7 +1445,7 @@ const en: Dict = {
     invalid: "That email doesn't look valid.",
     fallback: "Write to us with the link to this sheet, we remove it after checking:",
   },
-  notFound: { title: "Page not found", text: "This address isn't in any file.", home: "Back to home" },
+  notFound: { title: "Page not found" },
   crash: { title: "The page didn't load", text: "The network may have dropped, or the site was just updated.", reload: "Reload" },
 };
 

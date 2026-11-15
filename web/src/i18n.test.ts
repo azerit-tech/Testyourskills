@@ -122,9 +122,10 @@ describe("les libellés qui tranchent (§18.48)", () => {
   });
 
   it("la 404 ne nomme aucune marque", () => {
-    for (const lang of ["fr", "en"] as const) expect(JSON.stringify(DICTS[lang].notFound)).not.toMatch(/GTA|FIFA|Rockstar|Vice|404 étoiles/i);
-    expect(DICTS.fr.notFound.text).toBe("Cette adresse n'est dans aucun dossier.");
-    expect(DICTS.en.notFound.text).toBe("This address isn't in any file.");
+    // La page : components/ErrorPage.tsx, textes sous `pages.error` ; l'onglet garde `notFound.title`.
+    for (const lang of ["fr", "en"] as const) expect(JSON.stringify([DICTS[lang].notFound, DICTS[lang].pages.error])).not.toMatch(/GTA|FIFA|Rockstar|Vice|404 étoiles/i);
+    expect(DICTS.fr.pages.error.page.text).toBe("Cette adresse n'est dans aucun dossier.");
+    expect(DICTS.en.pages.error.page.text).toBe("This address isn't in any file.");
   });
 
   it("les niveaux : « Avis de recherche » reste le titre de l'affiche, plus celui d'un niveau", () => {

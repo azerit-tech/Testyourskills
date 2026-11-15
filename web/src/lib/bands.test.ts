@@ -92,9 +92,9 @@ describe("les textes des bandes", () => {
   });
 
   it("la confidentialité dit ce qui est gardé et comment sortir", () => {
-    const sec = fr.privacy.sections.find((s) => s.h === "Les bandes");
-    expect(sec?.p).toMatch(/Sortir/);
-    expect(en.privacy.sections.some((s) => s.h === "Crews")).toBe(true);
+    const sec = fr.pages.privacy.sections("x@y.z").find((s) => s.h === "Les bandes");
+    expect(sec?.blocks.flat().join(" ")).toMatch(/Sortir/);
+    expect(en.pages.privacy.sections("x@y.z").some((s) => s.h === "Crews")).toBe(true);
   });
 });
 

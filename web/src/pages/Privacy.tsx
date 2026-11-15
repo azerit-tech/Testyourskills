@@ -1,48 +1,57 @@
-// Confidentialité (§11), courte, FR et EN.
+// Vie privée (§11), FR et EN : un résumé en tête, puis des sections courtes,
+// paragraphes et listes (textes : pagesText.ts, sous `t.pages.privacy`).
+// L'adresse de contact est un lien.
 import { useEffect } from "react";
-import { useT } from "../i18n";
+import { CONTACT_EMAIL, useT } from "../i18n";
 import { onLinkClick } from "../lib/router";
 
 export function Privacy() {
   const { t } = useT();
-  const p = t.privacy;
+  const p = t.pages.privacy;
+  const title = t.privacy.title;
   useEffect(() => {
-    document.title = t.meta.titlePage(p.title);
-  }, [t, p.title]);
+    document.title = t.meta.titlePage(title);
+  }, [t, title]);
   return (
     <main className="page page-prose" id="main">
       <article className="prose">
         <a className="link-back" href="/" onClick={(e) => onLinkClick(e, "/")}>
           ← {t.common.back}
         </a>
-        <h1>{p.title}</h1>
-        <p className="prose-intro">{p.intro}</p>
-        {p.sections.map((s) => (
+        <h1>{title}</h1>
+        <section className="block block-info prose-summary" aria-labelledby="privacy-summary-title">
+          <h2 className="label" id="privacy-summary-title">
+            {p.summaryTitle}
+          </h2>
+          <ul>
+            {p.summary.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </section>
+        {p.sections(CONTACT_EMAIL).map((s) => (
           <section key={s.h}>
             <h2>{s.h}</h2>
-            <p>{s.p}</p>
+            {s.blocks.map((b, i) =>
+              typeof b === "string" ? (
+                <p key={i}>{b}</p>
+              ) : (
+                <ul key={i}>
+                  {b.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              ),
+            )}
           </section>
         ))}
-        <p className="prose-contact">{p.contact}</p>
+        <p className="prose-contact">
+          {p.contact}{" "}
+          <a className="link-alt" href={`mailto:${CONTACT_EMAIL}`}>
+            {CONTACT_EMAIL}
+          </a>
+        </p>
       </article>
-    </main>
-  );
-}
-
-export function NotFound() {
-  const { t } = useT();
-  useEffect(() => {
-    document.title = t.meta.titlePage(t.notFound.title);
-  }, [t]);
-  return (
-    <main className="page page-card" id="main">
-      <div className="panel-center error-panel">
-        <h1>{t.notFound.title}</h1>
-        <p>{t.notFound.text}</p>
-        <a className="btn-primary" href="/" onClick={(e) => onLinkClick(e, "/")}>
-          {t.notFound.home}
-        </a>
-      </div>
     </main>
   );
 }

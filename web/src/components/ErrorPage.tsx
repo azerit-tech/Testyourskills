@@ -8,6 +8,7 @@
 // <BandNotFound />, <PrimeNotFound />, et <Unreachable /> quand le serveur ne
 // répond pas (jamais « introuvable » : « Réessayer »). Avec `bare`, le panneau
 // seul, à poser dans son propre <main>.
+import { useEffect } from "react";
 import { useT } from "../i18n";
 import { onLinkClick } from "../lib/router";
 
@@ -112,6 +113,9 @@ export function Unreachable({ bare }: Preset) {
 export function NotFound({ bare }: Preset) {
   const { t } = useT();
   const p = t.pages.error.page;
+  useEffect(() => {
+    document.title = t.meta.titlePage(t.notFound.title);
+  }, [t]);
   return <ErrorPage bare={bare} stamp="none" title={p.title} text={p.text} action={{ label: p.action, href: "/" }} />;
 }
 

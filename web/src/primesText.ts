@@ -117,10 +117,6 @@ const fr = {
     title: "Règlement de la saison",
     error: "Le règlement n'est pas disponible pour l'instant.",
   },
-  privacy: {
-    h: "Les primes",
-    p: "Rien n'est gardé sans «\u00a0Entrer dans la course\u00a0». Si tu entres dans la course, on garde ton pseudo GitHub, la prime, ta fiche, ta ligue, ton email, tes liens de preuves, la date de ton accord, ta réponse sur l'âge et sur le lieu, ta note et l'état de ta candidature. Le classement public montre ton pseudo, ta note et ton rang\u00a0; ton email et tes preuves ne sont jamais publics. L'entreprise de la prime ne reçoit ton profil (pseudo, email, lien de fiche, preuves) que si tu es finaliste, comme tu l'as accepté. «\u00a0Me retirer\u00a0», sur la page de la prime, efface l'inscription tout de suite\u00a0; supprimer ou masquer ta fiche aussi. Sans victoire, tout est effacé 30 jours après la fin de la saison.",
-  },
   /* --- clés neuves de la revue du 15 novembre (SPEC §18.48), groupées --- */
   /** La porte d'entrée d'une prime : trois étapes numérotées, cochées selon l'état. */
   steps: {
@@ -279,10 +275,6 @@ const en: PrimesDict = {
   rules: {
     title: "Season rules",
     error: "The rules aren't available yet.",
-  },
-  privacy: {
-    h: "Bounties",
-    p: "Nothing is kept unless you hit “Enter the race”. If you enter, we keep your GitHub username, the bounty, your sheet, your league, your email, your supporting links, the date of your agreement, your answers on age and location, your rating and your entry's status. The public board shows your username, rating and rank; your email and supporting links are never public. The bounty's company only receives your profile (username, email, sheet link, supporting links) if you're a finalist, as you agreed. “Withdraw”, on the bounty's page, erases the entry at once; deleting or hiding your sheet does too. Without a win, everything is erased 30 days after the season ends.",
   },
   steps: {
     title: "Enter the race",
