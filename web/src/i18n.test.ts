@@ -78,10 +78,14 @@ describe("un seul nom, un seul lexique", () => {
   });
 
   it("anglais américain : « crew », « scorecard », « Get yours », « unproven »", () => {
-    // Les lignes du critère École citent des rangs : un autre lot les retire.
-    const edu = /levels\.EDU/;
     expect(bad(EN, /\bgangs?\b|hiring grid|\brubric\b|\bthe grid\b|Make yours|Make your file|yet to prove|It's me\b|case file/i, /reveal\.open/)).toEqual([]);
-    expect(bad(EN, /practised|favourable|\bmaths\b|\bprogramme\b|\borganisation\b/i, edu)).toEqual([]);
+    expect(bad(EN, /practised|favourable|\bmaths\b|\bprogramme\b|\borganisation\b/i)).toEqual([]);
+  });
+
+  it("la lettre du rang d'une école ne s'affiche nulle part (§18.48)", () => {
+    const letter = /\b(rang|tier) [SABC]\b|s'arrête à [SABC]\b|stops at [SABC]\b/i;
+    expect(bad(FR, letter)).toEqual([]);
+    expect(bad(EN, letter)).toEqual([]);
     expect(bad(EN, /\d+ files?\b|three files|The files\b/i)).toEqual([]);
   });
 
@@ -103,16 +107,32 @@ describe("les libellés qui tranchent (§18.48)", () => {
     expect(DICTS.fr.bands.home.hook).toBe("Fais ta fiche. Fais gagner ta bande.");
   });
 
-  it("« C'est moi » réclame, « Faire appel » conteste : « Appeler mon avocat » ne nomme plus trois gestes", () => {
+  it("« C'est moi » réclame, « Faire appel » conteste, dans les deux langues", () => {
     expect(DICTS.fr.result.claim.kicker).toBe("Verrouille ta fiche");
-    expect(DICTS.en.result.claim.kicker).toBe("Lock your rap sheet");
+    expect(DICTS.en.result.claim.kicker).toBe("Lock your sheet");
     expect(DICTS.fr.result.claim.btnLawyer).toMatch(/^C'est moi/);
     expect(DICTS.en.result.claim.btnLawyer).toMatch(/^That's me/);
     expect(DICTS.fr.result.contest.button).toBe("Faire appel");
-    // En anglais « Call my lawyer » reste le bouton de la blague, et de la blague seule.
-    expect(DICTS.en.result.contest.button).toBe("Call my lawyer");
-    const lawyer = [...FR, ...EN].filter(([, s]) => /Appeler mon avocat|Call my lawyer/i.test(s)).map(([p]) => p.replace(/\.[^.]+$/, ""));
-    expect([...new Set(lawyer)]).toEqual(["result.contest"]);
+    expect(DICTS.en.result.contest.button).toBe("Appeal");
+    expect(DICTS.en.result.contest.again).toBe("Appeal again");
+    expect(DICTS.en.result.contest.title).toBe("The defense replies");
+    const lawyer = [...FR, ...EN].filter(([, s]) => /Appeler mon avocat|Call my lawyer/i.test(s));
+    expect(lawyer).toEqual([]);
+  });
+
+  it("les plis parlent à l'impératif tutoyé (§18.48)", () => {
+    const r = DICTS.fr.result;
+    expect([r.dossier.title, r.rest.photo, r.rest.email, r.rest.contest, r.claim.kicker].map((s) => s.replace(/\u00a0/g, " "))).toEqual([
+      "Vois les autres pièces",
+      "Mets ta photo LinkedIn",
+      "Garde ta fiche au-delà de 90 jours",
+      "Fais appel",
+      "Verrouille ta fiche",
+    ]);
+    expect(DICTS.en.result.rest.email).toBe("Keep your sheet past 90 days");
+    // L'email : rien ne part, aucun mot d'envoi.
+    expect(Object.values(DICTS.fr.result.email).join(" ")).not.toMatch(/envoi|recevoir/i);
+    expect(Object.values(DICTS.en.result.email).join(" ")).not.toMatch(/send|sending/i);
   });
 
   it("un seul libellé pour LinkedIn, et la ligne d'aide qui dit où part le texte", () => {

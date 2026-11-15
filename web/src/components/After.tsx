@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import type { FormEvent, MouseEvent, ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { CardData, ComparisonData, Lang, WeekRank } from "../../../shared/types";
-import { declaredOf, LEVEL_LABELS, STAT_CODES, starsFor } from "../../../shared/types";
+import { declaredOf, LEVEL_LABELS, starsFor } from "../../../shared/types";
 import { declaredLabel, fileOf } from "../../../shared/caseFile";
 import { usableGrid } from "../../../shared/gridText";
 import { recruiterRead } from "../../../shared/recruiterLine";
@@ -11,6 +11,7 @@ import { pick, useT } from "../i18n";
 import { api, hasGithub, images, isMine, isMock, tokens, weekOf } from "../lib/api";
 import { navigate } from "../lib/router";
 import { getPlea } from "../lib/plea";
+import { useAppConfig } from "../lib/season";
 import { setPrefill } from "../lib/session";
 import { flatteringRank, shareLead, shareText, type ShareInput } from "../lib/shareText";
 import { canShareFile, hasNativeShare, imageFile, inAppBrowser, markTextCopied, portraitFile, preloadImage, preloadPortrait, shareFile, shareSheet, useTextCopied } from "../lib/sharing";
@@ -600,53 +601,12 @@ export function LinkedInPhoto({ cardId, hasAvatar }: { cardId: string; hasAvatar
   );
 }
 
-/* ---------- pièces à conviction ---------- */
-
-/** Ce que la fiche ne dit pas : la peine, ce que veut dire chaque sigle, et le poids de chacun.
- * Les valeurs et les barres sont déjà sur la fiche : on ne les répète pas. */
-function WhyCard({ card, withSentence }: { card: CardData; withSentence: boolean }) {
-  const { t, lang } = useT();
-  const sentence = withSentence ? card.sentence : undefined;
-  return (
-    <>
-      {/* La peine et la caution (§18.2) */}
-      {sentence && (
-        <p className="why-sentence">
-          <span>{pick(sentence.label, lang)}</span>
-          {sentence.bail && <span className="why-bail">{pick(sentence.bail, lang)}</span>}
-        </p>
-      )}
-      <dl className="why-legend">
-        {STAT_CODES.map((code) => (
-          <div key={code} className={code === "BUZZ" ? "is-buzz" : undefined}>
-            <dt>{code}</dt>
-            <dd>
-              <b>{t.stats[code].name}</b> {t.stats[code].what}
-            </dd>
-          </div>
-        ))}
-      </dl>
-      <p className="why-formula">{usableGrid(card.grid) ? t.result.why.gridLine : t.result.why.overallLine}</p>
-    </>
-  );
-}
-
-/** Un dossier à deux pièces s'explique comme une fiche : celle du dossier (§18.36), sans onglet par pièce. */
-export function Why({ item, withSentence = true }: { item: Shareable; withSentence?: boolean }) {
-  const { t } = useT();
-  return (
-    <Fold name="why" title={t.result.rest.why}>
-      <WhyCard card={item.kind === "card" ? item.card : fileOf(item.comparison)} withSentence={withSentence} />
-    </Fold>
-  );
-}
-
 /* ---------- contester ---------- */
 
 /**
- * « Pas d'accord avec la note ? » (§18.48) : une ligne d'humour, puis de vraies sorties. Qui ouvre ce pli
- * se sent mal noté : on lui dit d'où vient la note, comment elle bouge (une source de plus), et sa fiche
- * se supprime d'ici.
+ * « Fais appel » (§18.48) : une ligne d'humour, puis de vraies sorties. Qui ouvre ce pli se sent mal noté :
+ * on lui dit d'où vient la note, comment elle bouge (la source qui manque, nommée), et sa fiche se supprime
+ * d'ici, le seul endroit de la page où elle se supprime.
  */
 export function Contest({ card, cardId, onDeleted }: { card: CardData; cardId: string; onDeleted: () => void }) {
   const { t } = useT();
@@ -686,7 +646,7 @@ export function Contest({ card, cardId, onDeleted }: { card: CardData; cardId: s
           {lowest && <p className="var-hint">{c.lowest(t.stats[lowest.code].name, lowest.value)}</p>}
         </div>
       )}
-      <p className="contest-real">{canAdd ? c.real : c.realNoSource}</p>
+      <p className="contest-real">{canAdd ? c.real(card.source === "github" ? c.realAdd.career : c.realAdd.code) : c.realNoSource}</p>
       <div className="contest-exits">
         {canAdd && (
           <button type="button" className="pill" onClick={toSource}>
@@ -765,16 +725,9 @@ interface ClaimProps {
 export function Claim({ cardId, login, lawyer, me, onMe, toast }: ClaimProps) {
   const { t } = useT();
   const c = t.result.claim;
-  const [enabled, setEnabled] = useState(false);
+  const cfg = useAppConfig();
   const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    let alive = true;
-    void api.getConfig().then((cfg) => alive && setEnabled(cfg.claim));
-    return () => {
-      alive = false;
-    };
-  }, []);
-  if (!enabled || !login) return null;
+  if (!cfg?.claim || !login) return null;
 
   if (me && me.login === login.toLowerCase()) {
     const run = async (action: () => Promise<Me>, done: string) => {
@@ -815,7 +768,8 @@ export function Claim({ cardId, login, lawyer, me, onMe, toast }: ClaimProps) {
 
   return (
     <Fold name="claim" title={lawyer ? c.kickerLawyer : c.kicker}>
-      <p>{lawyer ? c.textLawyer : c.text}</p>
+      {/* Primes éteintes : rien sur la course ; une prime ouverte : la course en plus. */}
+      <p>{lawyer ? c.textLawyer : cfg.primesOpen ? c.textPrimes : c.text}</p>
       <button type="button" className="pill pill-peach" onClick={() => api.startClaim(cardId, login)}>
         <GhMark />
         <span>{lawyer ? c.btnLawyer : c.btn}</span>
@@ -884,9 +838,12 @@ export function EmailForm({ cardId }: { cardId: string }) {
           </button>
         </form>
       )}
-      <p id="email-note" className={`email-note${state === "invalid" || state === "error" ? " is-error" : ""}`} role={state === "invalid" || state === "error" ? "alert" : undefined}>
-        {state === "invalid" ? e.invalid : state === "error" ? e.error : e.note}
-      </p>
+      {/* L'adresse gardée : la confirmation suffit, la note ne la redit pas. */}
+      {state !== "done" && (
+        <p id="email-note" className={`email-note${state === "invalid" || state === "error" ? " is-error" : ""}`} role={state === "invalid" || state === "error" ? "alert" : undefined}>
+          {state === "invalid" ? e.invalid : state === "error" ? e.error : e.note}
+        </p>
+      )}
     </Fold>
   );
 }

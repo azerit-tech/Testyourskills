@@ -172,23 +172,28 @@ describe("après-fiche, vue par qui a fait la fiche (§18.27)", () => {
     const rows = [...rest.matchAll(/<details class="fold ([a-z- ]+)"( open="")?><summary class="fold-row"><span>([^<]+)<\/span><svg class="fold-chevron"/g)];
     // Fiche seule : « Pourquoi cette note » est au dos de la fiche, plus dans les lignes.
     expect(rows.map((r) => r[1])).toEqual(["dossier", "add-source", "email", "contest"]);
-    expect(rows.map((r) => r[3])).toEqual(["Aussi au dossier", "Ajoute ton CV au dossier", "Recevoir ma fiche par email", "Pas d&#x27;accord avec la note ?"]);
+    // Les titres à l'impératif tutoyé (§18.48).
+    expect(rows.map((r) => r[3].replace(/\u00a0/g, " "))).toEqual(["Vois les autres pièces", "Ajoute ton CV au dossier", "Garde ta fiche au-delà de 90 jours", "Fais appel"]);
     // toutes fermées au départ
     expect(rows.every((r) => !r[2])).toBe(true);
     // le contenu reste monté, fermé : le formulaire d'email est là
     expect(rest).toContain('id="email-input"');
   });
 
-  it("« Pas d'accord avec la note ? » : d'où vient la note, puis de vraies sorties, dont supprimer sa fiche (§18.48)", () => {
+  it("« Fais appel » : d'où vient la note, la source qui manque nommée, et le seul « Supprimer ma fiche » de la page (§18.48)", () => {
     const html = renderResult(mine("OwnCard0005"), { owner: true, token: "tok" }).replace(/&#x27;/g, "'");
     const fold = /<details class="fold contest">.*?<\/details>/.exec(html)?.[0] ?? "";
     expect(fold).toContain('<p class="contest-real">Pour de vrai : la note sort de la grille');
-    // La blague reste, en lien ; la suppression est dans le pli, et toujours en pied de page.
+    // La blague reste, en lien ; la suppression n'est que dans le pli.
     expect(fold).toMatch(/<div class="contest-exits"><button type="button" class="link-alt">Faire appel<\/button><\/div>/);
     expect(fold).toMatch(/<div class="delete-card"><button type="button" class="link-danger">Supprimer ma fiche<\/button><\/div>/);
-    expect(html.match(/class="delete-card"/g)).toHaveLength(2);
+    expect(html.match(/class="delete-card"/g)).toHaveLength(1);
     expect(DICTS.fr.result.contest.addSource).toBe("Ajouter une source");
-    expect(DICTS.en.result.rest.contest).toBe("Disagree with the rating?");
+    expect(DICTS.en.result.rest.contest).toBe("Appeal the rating");
+    // Seule la source qui manque est nommée.
+    expect(DICTS.fr.result.contest.real(DICTS.fr.result.contest.realAdd.career).replace(/\u00a0/g, " ")).toBe(
+      "Pour de vrai : la note sort de la grille et bouge avec ton dossier. Ajoute ton LinkedIn ou ton CV et elle est recalculée.",
+    );
   });
 
   it("sans jeton de cette fiche, pas de ligne d'email ; fiche LinkedIn seule, « Ajoute ton GitHub » en bloc, hors des lignes", () => {
@@ -410,7 +415,7 @@ describe("la lecture du recruteur (§18.37)", () => {
     const li = renderResult(card({ id: "LowCard0002", overall: 30, source: "cv", declaredSource: "linkedin", linkedinUrl: "https://www.linkedin.com/in/x" }), { owner: true });
     expect(li.indexOf('class="after-block add-source"')).toBeLessThan(li.indexOf('class="after-block out"'));
     // Le bouton de la source reste secondaire : le rose de la page est au partage.
-    expect(one).toMatch(/<button type="submit" class="pill pill-big pill-ghost entry-submit"/);
+    expect(one).toMatch(/<button type="submit" class="pill pill-ghost entry-submit"/);
   });
 
   it("sous trois étoiles, le rang ne s'affiche que dans le top 10 ; au-delà de trois étoiles, toujours", () => {

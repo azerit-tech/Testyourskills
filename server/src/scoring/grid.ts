@@ -383,7 +383,7 @@ export function eduDeclared(d: DeclaredInput): Draft {
 export function eduGithub(g: GithubInput): Draft {
   const hit = g.facts.repos.find((r) => EDU_GITHUB_RE.test(norm([r.name.replace(/[-_]/g, " "), r.description ?? "", ...r.topics].join(" "))));
   if (!hit)
-    return missing("EDU", "github", f("L'école se lit sur LinkedIn ou le CV\u00a0: pas encore au dossier.", "School is read on LinkedIn or the CV: not on file yet."));
+    return missing("EDU", "github", f("L'école se lit sur LinkedIn ou le CV\u00a0: pas encore au dossier.", "School is read on LinkedIn or the résumé: not on file yet."));
   return crit("EDU", {
     score: GRID.EDU.githubScore,
     state: "scored",
@@ -873,7 +873,7 @@ export function traceFound(t: Trace, facts: GithubFacts, m: GithubMetrics): bool
 }
 
 /** « Sur LinkedIn », « sur le CV » : où la pièce déclarative a été lue. */
-const declaredOn = (label: string): Fact => (label === "CV" ? f("sur le CV", "on the CV") : f(`sur ${label}`, `on ${label}`));
+const declaredOn = (label: string): Fact => (label === "CV" ? f("sur le CV", "on the résumé") : f(`sur ${label}`, `on ${label}`));
 
 /**
  * Les signaux de la stack, jamais une note : « À confirmer » (les technos
@@ -1461,7 +1461,7 @@ export function githubGrid(g: GithubInput): Grid {
   return finalize([
     eduGithub(g),
     xpGithub(g),
-    missing("EMP", "github", f("Le parcours se lit sur LinkedIn ou le CV\u00a0: pas encore au dossier.", "Career path is read on LinkedIn or the CV: not on file yet.")),
+    missing("EMP", "github", f("Le parcours se lit sur LinkedIn ou le CV\u00a0: pas encore au dossier.", "Career path is read on LinkedIn or the résumé: not on file yet.")),
     stkGithub(g),
     codeGithub(g),
     actGithub(g),

@@ -22,7 +22,7 @@
       "labelOne": { "fr": "Peine : 1 README de 300 mots", "en": "Sentence: 1 README, 300 words" }
     }
   },
-  "acquittal": { "fr": "Relaxe. Le tribunal s'excuse.", "en": "Case dismissed. The court apologizes." },
+  "acquittal": { "fr": "Peine : aucune. Le tribunal s'excuse.", "en": "Sentence: none. The court apologizes." },
   "bail": {
     "gh_private_talent": { "fr": "Caution : un repo public", "en": "Bail: one public repo" },
     "gh_archaeologist": { "fr": "Caution : un commit cette année", "en": "Bail: one commit this year" },

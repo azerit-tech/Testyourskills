@@ -285,9 +285,9 @@ const fr = frTypoDeep({
     count: (n: number) => (n === 1 ? "1 étoile sur 6" : `${n} étoiles sur 6`),
     pleading: "Tu plaides",
     /** Sous le pari fait, pendant l'attente : quand tombe le verdict. */
-    noted: "Pari noté. Verdict après la poursuite.",
+    noted: "C'est noté. Verdict après la poursuite.",
     pleaded: "Tu plaidais",
-    verdict: "Verdict :",
+    verdict: "Verdict",
     gap: { over: "Excès de confiance", exact: "Lucide", under: "Trop modeste" },
   },
   positions: {
@@ -315,6 +315,8 @@ const fr = frTypoDeep({
     /** Au-dessus d'une fiche dénoncée, sur téléphone : ce qui arrive, en une ligne. */
     leadDenounced: (who: string, by: string | null) => (by ? `@${by} a dénoncé ${who}.` : `Quelqu'un a dénoncé ${who}.`),
     yourTurn: "Sur ces huit critères, tu vaux combien d'étoiles\u00a0? Ton LinkedIn ou ton GitHub suffit.",
+    /** Sans bloc des critères au-dessus (fiche dénoncée sans grille) : la même question, sans « ces huit critères ». */
+    yourTurnBare: "Et toi, tu vaux combien d'étoiles\u00a0? Ton LinkedIn ou ton GitHub suffit.",
     /** Sous la fiche d'un dossier à deux sources (§18.36) : d'où vient la preuve, une seule note. */
     pieces: {
       line: (labels: string) => `Sources au dossier\u00a0: ${labels}`,
@@ -397,21 +399,15 @@ const fr = frTypoDeep({
     },
     /* L'enquête en direct (§18.26) : les trois trouvailles les plus fortes, chacune vers sa preuve. */
     dossier: {
-      /** « Aussi au dossier » : à ne pas confondre avec les pièces qui justifient une note. */
-      title: "Aussi au dossier",
-      proof: "Preuve",
+      /** Les trouvailles numérotées de l'attente : à ne pas confondre avec les pièces qui justifient une note. */
+      title: "Vois les autres pièces",
+      proof: "Voir la preuve",
     },
-    /* « Le reste » sous la fiche (§18.27) : une ligne repliée par bloc. */
+    /* « Le reste » sous la fiche (§18.27) : une ligne repliée par bloc, titrée à l'impératif tutoyé. */
     rest: {
-      why: "Pourquoi cette note",
-      photo: "Ma photo LinkedIn",
-      email: "Recevoir ma fiche par email",
-      contest: "Pas d'accord avec la note ?",
-    },
-    why: {
-      overallLine: "Note globale = TEC 30 %, SHIP 20 %, ARCH 20 %, DOC 15 %, XP 15 %.",
-      /** Fiche notée par la grille de recrutement (§18.37) : la note vient des huit critères, pas des barres. */
-      gridLine: "La note est la moyenne pondérée des huit critères de la grille, détaillés sur cette page. Les six barres de la fiche sont ses traits : elles font le portrait, pas la note.",
+      photo: "Mets ta photo LinkedIn",
+      email: "Garde ta fiche au-delà de 90 jours",
+      contest: "Fais appel",
     },
     contest: {
       button: "Faire appel",
@@ -429,7 +425,9 @@ const fr = frTypoDeep({
       /** `trait` : le nom du trait en clair (« Communication »), jamais son code. */
       lowest: (trait: string, v: number) => `Indice : ton trait le plus bas est ${trait}, à ${v}/100. Un commit vaut mieux qu'un recours.`,
       /* après la blague, les vraies sorties (§18.48) : ajouter une source, supprimer la fiche */
-      real: "Pour de vrai : la note sort de la grille et bouge avec ton dossier. Une source de plus (LinkedIn, CV, GitHub) et elle est recalculée.",
+      /** `add` : seulement les sources qui manquent (`realAdd`). */
+      real: (add: string) => `Pour de vrai : la note sort de la grille et bouge avec ton dossier. Ajoute ${add} et elle est recalculée.`,
+      realAdd: { code: "ton GitHub", career: "ton LinkedIn ou ton CV" },
       realNoSource: "Pour de vrai : la note sort de la grille, avec tout ton dossier. Si elle te gêne, ta fiche se supprime d'ici.",
       addSource: "Ajouter une source",
     },
@@ -440,19 +438,22 @@ const fr = frTypoDeep({
     },
     addGithub: { title: "Ajoute ton GitHub au dossier", text: "Ton CV porte le parcours. Ton GitHub porte le code\u00a0: trois critères s'ouvrent.", btn: "Ajouter mon GitHub" },
     /** Fiche LinkedIn seule (§18.24) : un seul appel, relancé en comparaison. */
-    prove: { title: "Ajoute ton GitHub\u00a0: trois critères s'ouvrent", label: "Pseudo GitHub", btn: "Ajouter à ma fiche" },
+    prove: { title: "Ajoute ton GitHub\u00a0: trois critères s'ouvrent", label: "Pseudo GitHub", btn: "Ajouter mon GitHub" },
     /** Sous une fiche GitHub seule, en miroir : LinkedIn porte le parcours. */
     addLinkedin: {
       title: "Ajoute ton LinkedIn au dossier",
       text: "Ton GitHub porte le code. Ton LinkedIn porte le parcours\u00a0: expérience, employeurs et école entrent au dossier.",
       label: "Lien de ton profil LinkedIn",
-      btn: "Ajouter à ma fiche",
+      btn: "Ajouter mon LinkedIn",
     },
     claim: {
       /** Pour qui vient de faire sa fiche : le bénéfice d'abord (§18.48). */
       kicker: "Verrouille ta fiche",
       kickerLawyer: "Avis de recherche à ton nom ?",
-      text: "Prouve que ce compte GitHub est le tien : tu peux alors masquer ta fiche, la supprimer et entrer dans la course aux primes. On lit ton pseudo public, rien d'autre, et on ne garde aucun accès.",
+      /** Primes éteintes : ce que « C'est moi » donne vraiment. */
+      text: "Prouve que ce compte GitHub est le tien : tu peux alors masquer ta fiche ou la supprimer, depuis n'importe quel appareil. On lit ton pseudo public, rien d'autre, et on ne garde aucun accès.",
+      /** Une prime ouverte : la course en plus. */
+      textPrimes: "Prouve que ce compte GitHub est le tien : tu peux alors masquer ta fiche, la supprimer et entrer dans la course aux primes. On lit ton pseudo public, rien d'autre, et on ne garde aucun accès.",
       textLawyer: "Ce compte GitHub est le tien ? Prouve-le et reprends la main sur ta fiche.",
       btn: "C'est moi",
       btnLawyer: "C'est moi, je reprends ma fiche",
@@ -478,13 +479,13 @@ const fr = frTypoDeep({
     email: {
       label: "Adresse email",
       placeholder: "toi@exemple.dev",
-      btn: "Recevoir",
-      sending: "Envoi…",
-      /** Vrai que l'email parte ou non : ce que l'adresse change à coup sûr. */
-      done: "C'est noté. Ta fiche est gardée au-delà de 90 jours.",
+      btn: "Garder ma fiche",
+      sending: "Enregistrement…",
+      /** Aucun email ne part : ce que l'adresse change à coup sûr. */
+      done: "Ta fiche est gardée.",
       invalid: "Cette adresse ne ressemble pas à un email.",
-      error: "L'envoi a échoué. Réessaie plus tard.",
-      note: "Facultatif. Ta fiche est alors conservée au-delà de 90 jours.",
+      error: "Ça n'a pas pris. Réessaie.",
+      note: "Laisse ton email : ta fiche reste en ligne, et Azerit peut t'écrire pour un poste.",
     },
     /* le bloc recruteur, en fin de page : on vouvoie qui recrute */
     cta: { title: "Vous recrutez ?", text: "Azerit vous présente des devs lus comme ici : l'expérience d'abord, le code en preuve.", link: "azerit.tech" },
@@ -493,7 +494,8 @@ const fr = frTypoDeep({
       confirm: "Supprimer définitivement ?",
       yes: "Oui, supprimer",
       no: "Annuler",
-      done: "Fiche supprimée. Elle n'existe plus, ni son image.",
+      done: "Fiche supprimée",
+      doneText: "Elle n'existe plus, ni son image.",
       error: "La suppression a échoué.",
     },
     again: "Faire une autre fiche",
@@ -505,11 +507,15 @@ const fr = frTypoDeep({
   read: {
     pending: "Pas encore au dossier",
     /** Plus de deux critères sans note : une ligne, jamais un mur de cases vides (§18.48). */
-    pendingLine: (names: string) => `Pas encore au dossier : ${names}.`,
+    /** Les noms en bas de casse au milieu de la phrase (« expérience, parcours, code »). */
+    pendingLine: (names: string) => `Pas encore au dossier : ${names.toLowerCase()}.`,
     hint: "Touche un critère\u00a0: sa preuve s'affiche.",
     tile: (name: string, n: number) => `${name}\u00a0: ${n} sur 10`,
     tileNone: (name: string) => `${name}\u00a0: pas encore de note`,
     tileKept: (name: string) => `${name}\u00a0: gardée pour la personne`,
+    /** L'école comptée : jamais son niveau, ni ici ni ailleurs ; la note reste dans la moyenne. */
+    tileCounted: (name: string) => `${name}\u00a0: comptée au dossier`,
+    counted: "comptée",
     /** Un dossier à deux sources (§18.36) : la tuile dit où la note a été lue, « Expérience : 7 sur 10, lu sur LinkedIn ». */
     tileFrom: (name: string, n: number, from: string) => `${name}\u00a0: ${n} sur 10, ${from}`,
     /** La provenance sous le nom de la tuile, quand les deux sources ont parlé : « LinkedIn et GitHub ». */
@@ -545,6 +551,8 @@ const fr = frTypoDeep({
     foot: "C'est la lecture qu'Azerit fait pour les équipes qui recrutent.",
     /** Sous la grille, surtout en vue partagée : un jeu, pas un verdict d'embauche. */
     game: "Un jeu, fait avec une vraie grille. Pas une décision d'embauche\u00a0: aucun poste, aucun entretien, données publiques seulement.",
+    /** Une prime ouverte : seules les primes mènent à un entretien. */
+    gamePrimes: "Un jeu, fait avec une vraie grille. La note n'est pas une décision d'embauche\u00a0: seules les primes mènent à un entretien, et seulement si tu y entres.",
     criteriaLabel: "Les huit critères",
     names: {
       EDU: "École et sélection",
@@ -684,7 +692,7 @@ const fr = frTypoDeep({
     } as Partial<Record<CriterionCode, [number, string][]>>,
     /** Sous la table : comment elle se lit. */
     levelNotes: {
-      EDU: "Sans école de tech, pas de note d'école : le critère sort de la moyenne, et apprendre en autodidacte ne coûte rien. Liste française d'abord\u00a0: une école absente s'arrête à B pour l'instant. Une école ne fait jamais baisser la note.",
+      EDU: "Sans école de tech, pas de note d'école : le critère sort de la moyenne, et apprendre en autodidacte ne coûte rien. Liste française d'abord\u00a0: une école absente de la liste s'arrête à 6/10 pour l'instant. Une école ne fait jamais baisser la note.",
       XP: "Compté poste par poste : stage et alternance pour moitié, association étudiante et bénévolat pour zéro, deux postes en même temps une seule fois. Sans LinkedIn : estimée sur les années actives de GitHub, arrêtée à 8.",
       EMP: "Lu sur LinkedIn ou le CV seulement.",
       STK: "Se lit dans le code public. Sans GitHub au dossier, elle se lit sur LinkedIn et la table s'arrête à 6.",
@@ -701,12 +709,14 @@ const fr = frTypoDeep({
     },
     final: {
       title: "La note sur 100",
-      caseTitle: "La note du dossier",
+      caseTitle: "La note de la fiche",
       how: "Moyenne pondérée des critères notés, × 10.",
       /** « (Code 7 × 2 + Stack 6 × 1,5) ÷ 3,5 » : chaque note sur 10 et son coefficient. */
-      term: (name: string, score: number, coef: string) => `${name} ${score} × ${coef}`,
-      formula: (terms: string, den: string) => `(${terms}) ÷ ${den}`,
-      result: (mean: string) => `= ${mean} sur 10`,
+      term: (name: string, score: number, coef: string) => `${name} ${score} × ${coef}`,
+      /** L'école comptée, sans son niveau. */
+      termCounted: (name: string, coef: string) => `${name} (comptée) × ${coef}`,
+      formula: (terms: string, den: string) => `(${terms}) ÷ ${den}`,
+      result: (mean: string) => `= ${mean} sur 10`,
       out: {
         unproven: "Non prouvé, hors moyenne",
         missing: "Non renseigné, hors moyenne",
@@ -716,7 +726,7 @@ const fr = frTypoDeep({
       belowWhy: "L'école et l'open source ne font jamais baisser la note.",
       capped: "Aucun code prouvé : la note ne peut pas dépasser 85. La sixième étoile se prouve.",
       cappedHit: (raw: number) => `Aucun code prouvé : le calcul donne ${raw}, la note s'arrête à 85.`,
-      empty: "Dossier vide : moins d'un quart des coefficients sont notés. Note plancher : 20, une étoile.",
+      empty: "Fiche vide : moins d'un quart des coefficients sont notés. Note plancher : 20, une étoile.",
       emptyWhy: "Non prouvé ne veut pas dire mauvais : le jour où le code est public, les critères s'ouvrent.",
       score: (n: number) => `${n}`,
       outOf: "sur 100",
@@ -1084,7 +1094,7 @@ const en: Dict = {
     pleading: "You plead",
     noted: "Plea entered. Verdict after the chase.",
     pleaded: "You pleaded",
-    verdict: "Verdict:",
+    verdict: "Verdict",
     gap: { over: "Overconfidence", exact: "Clear-eyed", under: "Too modest" },
   },
   positions: {
@@ -1108,6 +1118,7 @@ const en: Dict = {
     leadShort: (who) => `${who}'s dev rap sheet.`,
     leadDenounced: (who, by) => (by ? `@${by} turned in ${who}.` : `Someone turned in ${who}.`),
     yourTurn: "On these eight criteria, how many stars are you? Your LinkedIn or your GitHub is all it takes.",
+    yourTurnBare: "What about you, how many stars? Your LinkedIn or your GitHub is all it takes.",
     pieces: {
       line: (labels) => `Sources on file: ${labels}`,
       pair: (a, b) => `${a} and ${b}`,
@@ -1165,23 +1176,18 @@ const en: Dict = {
       error: "LinkedIn said no. Try again.",
     },
     dossier: {
-      title: "Also on file",
-      proof: "Evidence",
+      title: "See the other exhibits",
+      proof: "See the evidence",
     },
     rest: {
-      why: "Why this rating",
-      photo: "My LinkedIn photo",
-      email: "Get my sheet by email",
-      contest: "Disagree with the rating?",
-    },
-    why: {
-      overallLine: "Overall = TEC 30%, SHIP 20%, ARCH 20%, DOC 15%, XP 15%.",
-      gridLine: "The rating is the weighted average of the eight criteria on the scorecard, detailed on this page. The six bars on the sheet are its traits: they paint the portrait, not the rating.",
+      photo: "Add your LinkedIn photo",
+      email: "Keep your sheet past 90 days",
+      contest: "Appeal the rating",
     },
     contest: {
-      button: "Call my lawyer",
-      again: "Call my lawyer again",
-      title: "Your lawyer says",
+      button: "Appeal",
+      again: "Appeal again",
+      title: "The defense replies",
       replies: [
         "Your lawyer read the file. They advise you to plead guilty.",
         "Your complaint has been forwarded to the relevant department: a TODO.md that doesn't exist yet.",
@@ -1192,27 +1198,29 @@ const en: Dict = {
         "The jury met. The jury is a pure function. It returned the same rating.",
       ],
       lowest: (trait, v) => `Hint: your lowest trait is ${trait}, at ${v}/100. A commit beats an appeal.`,
-      real: "For real: the rating comes from the scorecard and moves with your file. Add a source (LinkedIn, CV, GitHub) and it's recalculated.",
+      real: (add) => `For real: the rating comes from the scorecard and moves with your file. Add ${add} and it's recalculated.`,
+      realAdd: { code: "your GitHub", career: "your LinkedIn or your résumé" },
       realNoSource: "For real: the rating comes from the scorecard, with your whole file. If it bothers you, you can delete your sheet right here.",
       addSource: "Add a source",
     },
     addCv: {
-      title: "Add your CV to the file",
-      text: "Your GitHub carries the code. Your CV carries the career: school, experience and employers go on file.",
-      btn: "Add my CV",
+      title: "Add your résumé to the file",
+      text: "Your GitHub carries the code. Your résumé carries the career: school, experience and employers go on file.",
+      btn: "Add my résumé",
     },
-    addGithub: { title: "Add your GitHub to the file", text: "Your CV carries the career. Your GitHub carries the code: three more criteria open.", btn: "Add my GitHub" },
-    prove: { title: "Add your GitHub: three more criteria open", label: "GitHub username", btn: "Add to my sheet" },
+    addGithub: { title: "Add your GitHub to the file", text: "Your résumé carries the career. Your GitHub carries the code: three more criteria open.", btn: "Add my GitHub" },
+    prove: { title: "Add your GitHub: three more criteria open", label: "GitHub username", btn: "Add my GitHub" },
     addLinkedin: {
-      title: "Add your LinkedIn to your file",
+      title: "Add your LinkedIn to the file",
       text: "Your GitHub carries the code. Your LinkedIn carries the career: experience, employers and school go on file.",
       label: "Your LinkedIn profile link",
-      btn: "Add to my sheet",
+      btn: "Add my LinkedIn",
     },
     claim: {
-      kicker: "Lock your rap sheet",
+      kicker: "Lock your sheet",
       kickerLawyer: "Wanted under your name?",
-      text: "Prove this GitHub account is yours: you can then hide your sheet, delete it and enter the bounty race. We read your public username, nothing else, and keep no access.",
+      text: "Prove this GitHub account is yours: you can then hide or delete your sheet from any device. We read your public username, nothing else, and keep no access.",
+      textPrimes: "Prove this GitHub account is yours: you can then hide your sheet, delete it and enter the bounty race. We read your public username, nothing else, and keep no access.",
       textLawyer: "Is this GitHub account yours? Prove it and take your sheet back.",
       btn: "That's me",
       btnLawyer: "That's me, claim my sheet",
@@ -1238,12 +1246,12 @@ const en: Dict = {
     email: {
       label: "Email address",
       placeholder: "you@example.dev",
-      btn: "Send it",
-      sending: "Sending…",
-      done: "Done. Your rap sheet is kept beyond 90 days.",
+      btn: "Keep my sheet",
+      sending: "Saving…",
+      done: "Your sheet is kept.",
       invalid: "That doesn't look like an email address.",
-      error: "Sending failed. Try again later.",
-      note: "Optional. Your sheet is then kept beyond 90 days.",
+      error: "That didn't take. Try again.",
+      note: "Leave your email: your sheet stays up, and Azerit may reach out about a job.",
     },
     cta: { title: "Hiring?", text: "Azerit introduces you to devs vetted this way: experience first, code as proof.", link: "azerit.tech" },
     del: {
@@ -1251,10 +1259,11 @@ const en: Dict = {
       confirm: "Delete for good?",
       yes: "Yes, delete",
       no: "Cancel",
-      done: "Sheet deleted. It's gone, image included.",
+      done: "Sheet deleted",
+      doneText: "It's gone, image included.",
       error: "Deletion failed.",
     },
-    again: "Make another sheet",
+    again: "Get another sheet",
   },
   read: {
     pending: "Not on file yet",
@@ -1263,6 +1272,8 @@ const en: Dict = {
     tile: (name: string, n: number) => `${name}: ${n} out of 10`,
     tileNone: (name: string) => `${name}: no score yet`,
     tileKept: (name: string) => `${name}: kept on the person's side`,
+    tileCounted: (name: string) => `${name}: on file`,
+    counted: "on file",
     tileFrom: (name: string, n: number, from: string) => `${name}: ${n} out of 10, ${from}`,
     fromBoth: (src: string) => `${src} and GitHub`,
     none: "n/a",
@@ -1274,7 +1285,7 @@ const en: Dict = {
     titleThem: (who: string) => `How Azerit reads ${who}`,
     method: {
       linkedin: "Your career: we go by LinkedIn.",
-      cv: "Your career: we go by your CV.",
+      cv: "Your career: we go by your résumé.",
       noCareer: "Your career: not on file yet.",
       code: "Your code: we go by GitHub.",
       noCode: "Your code: not on file yet.",
@@ -1283,7 +1294,7 @@ const en: Dict = {
     },
     methodThem: {
       linkedin: "Their career: we go by LinkedIn.",
-      cv: "Their career: we go by their CV.",
+      cv: "Their career: we go by their résumé.",
       noCareer: "Their career: not on file yet.",
       code: "Their code: we go by GitHub.",
       noCode: "Their code: not on file yet.",
@@ -1292,6 +1303,7 @@ const en: Dict = {
     },
     foot: "This is how Azerit reads devs for hiring teams.",
     game: "A game built on a real scorecard. Not a hiring decision: no job, no interview, public data only.",
+    gamePrimes: "A game built on a real scorecard. The rating isn't a hiring decision: only bounties lead to an interview, and only if you enter.",
     criteriaLabel: "The eight criteria",
     names: {
       EDU: "School and selectivity",
@@ -1324,7 +1336,7 @@ const en: Dict = {
       out: "doesn't lower the rating",
       private: "kept on the person's side",
     },
-    source: { linkedin: "LinkedIn", cv: "CV", github: "GitHub", both: "cross-checked" },
+    source: { linkedin: "LinkedIn", cv: "résumé", github: "GitHub", both: "cross-checked" },
     sourceWith: (src: string, what: string) => `${src}, ${what}`,
     detailDeclared: {
       EDU: "education",
@@ -1425,9 +1437,9 @@ const en: Dict = {
       ],
     } as Partial<Record<CriterionCode, [number, string][]>>,
     levelNotes: {
-      EDU: "No tech school, no school score: the criterion leaves the average, and being self-taught costs nothing. French schools first for now: a school missing from the list stops at B. A school never lowers the rating.",
+      EDU: "No tech school, no school score: the criterion leaves the average, and being self-taught costs nothing. French schools first for now: a school not on the list stops at 6/10. A school never lowers the rating.",
       XP: "Counted role by role: internships and apprenticeships at half, student associations and volunteering at zero, overlapping roles once. Without LinkedIn: estimated from active years on GitHub, capped at 8.",
-      EMP: "Read on LinkedIn or the CV only.",
+      EMP: "Read on LinkedIn or the résumé only.",
       STK: "Read in public code. With no GitHub on file, it is read on LinkedIn and the table stops at 6.",
       CODE: "Three repos read: twice their average level. 9 and 10 need tests in half the active repos; 7 and up, a repo with 20 commits.",
       ACT: "8 and 10 need a public repo with 20 commits.",
@@ -1441,9 +1453,10 @@ const en: Dict = {
     },
     final: {
       title: "The rating out of 100",
-      caseTitle: "The file's rating",
+      caseTitle: "The sheet's rating",
       how: "Weighted average of the scored criteria, × 10.",
-      term: (name: string, score: number, coef: string) => `${name} ${score} × ${coef}`,
+      term: (name: string, score: number, coef: string) => `${name} ${score} × ${coef}`,
+      termCounted: (name: string, coef: string) => `${name} (on file) × ${coef}`,
       formula: (terms: string, den: string) => `(${terms}) ÷ ${den}`,
       result: (mean: string) => `= ${mean} out of 10`,
       out: {
@@ -1455,7 +1468,7 @@ const en: Dict = {
       belowWhy: "School and open source never lower the rating.",
       capped: "No code proven: the rating cannot go above 85. The sixth star has to be proven.",
       cappedHit: (raw: number) => `No code proven: the math gives ${raw}, the rating stops at 85.`,
-      empty: "Empty file: under a quarter of the weights are scored. Floor rating: 20, one star.",
+      empty: "Empty sheet: under a quarter of the weights are scored. Floor rating: 20, one star.",
       emptyWhy: "Not proven does not mean bad: the day the code goes public, the criteria open up.",
       score: (n: number) => `${n}`,
       outOf: "out of 100",
@@ -1468,7 +1481,7 @@ const en: Dict = {
     compare: {
       keptFrom: {
         linkedin: "read on LinkedIn",
-        cv: "read on the CV",
+        cv: "read on the résumé",
         github: "read on GitHub",
         both: "read on both sources",
       },

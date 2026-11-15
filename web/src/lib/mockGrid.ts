@@ -58,9 +58,9 @@ export function finalizeMock(drafts: Draft[]): Grid {
 const gh = (login: string, repo?: string, path = "") => `https://github.com/${login}${repo ? `/${repo}` : ""}${path}`;
 
 const eduNone = () =>
-  c("EDU", null, "missing", "github", f("L'école se lit sur LinkedIn ou le CV : ajoute l'un des deux.", "School is read from LinkedIn or the CV: add either one."));
+  c("EDU", null, "missing", "github", f("L'école se lit sur LinkedIn ou le CV : pas encore au dossier.", "School is read on LinkedIn or the résumé: not on file yet."));
 const empNone = () =>
-  c("EMP", null, "missing", "github", f("Le parcours se lit sur LinkedIn ou le CV : ajoute l'un des deux.", "Career path is read from LinkedIn or the CV: add either one."));
+  c("EMP", null, "missing", "github", f("Le parcours se lit sur LinkedIn ou le CV : pas encore au dossier.", "Career path is read on LinkedIn or the résumé: not on file yet."));
 
 function xpGh(login: string, active: number, score: number, next: Fact): Draft {
   const yfr = `${active} année${active > 1 ? "s" : ""} active${active > 1 ? "s" : ""}`;

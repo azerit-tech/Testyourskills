@@ -492,7 +492,7 @@ describe("les traces dans le code (§3.4)", () => {
     const mixed = cvReading({ technos_listed: [...named, "Kubernetes", "Redis", "MongoDB", "Terraform", "TypeScript"], technos_described: [] });
     const flag = stackFlags(decl(mixed), gh(facts())).find((x) => /^À confirmer/.test(x.fr))!;
     expect(flag.fr).toBe("À confirmer\u00a0: Kubernetes, Redis, MongoDB. Déclarées sur le CV, pas encore visibles dans 5 repos publics.");
-    expect(flag.en).toBe("To confirm: Kubernetes, Redis, MongoDB. Listed on the CV, not visible yet in 5 public repos.");
+    expect(flag.en).toBe("To confirm: Kubernetes, Redis, MongoDB. Listed on the résumé, not visible yet in 5 public repos.");
     for (const n of named) expect(flag.fr).not.toContain(n);
   });
 
@@ -507,7 +507,7 @@ describe("les traces dans le code (§3.4)", () => {
     // Sans seuil : une techno sur deux absente suffit, la retrouvée n'est pas citée
     const few = cvReading({ technos_listed: ["Kubernetes", "TypeScript"], technos_described: [] });
     expect(stackFlags(decl(few), gh(facts())).filter((x) => /^À confirmer/.test(x.fr)).map((x) => [x.fr, x.en])).toEqual([
-      ["À confirmer\u00a0: Kubernetes. Déclarées sur le CV, pas encore visibles dans 5 repos publics.", "To confirm: Kubernetes. Listed on the CV, not visible yet in 5 public repos."],
+      ["À confirmer\u00a0: Kubernetes. Déclarées sur le CV, pas encore visibles dans 5 repos publics.", "To confirm: Kubernetes. Listed on the résumé, not visible yet in 5 public repos."],
     ]);
     // Aucun dépôt public : pas où chercher, rien à confirmer (pas de « 0 dépôt public »)
     expect(stackFlags(decl(few), gh(facts({ repos: [] }))).filter((x) => /^À confirmer/.test(x.fr))).toEqual([]);

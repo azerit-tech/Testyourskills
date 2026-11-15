@@ -99,7 +99,7 @@ export function AddLinkedin({ login }: { login: string }) {
           />
         </div>
         {/* Secondaire : le rose de la page reste au partage (§18.48). */}
-        <button type="submit" className="pill pill-big pill-ghost entry-submit" disabled={busy}>
+        <button type="submit" className="pill pill-ghost entry-submit" disabled={busy}>
           {busy ? t.home.submitting : p.btn}
         </button>
         <p id={`${uid}-err`} className={`entry-error${error ? " is-on" : ""}`} role="alert">

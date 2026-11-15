@@ -227,7 +227,7 @@ describe("la peine et la caution §18.2", () => {
 
   it("tous à 80 ou plus : relaxe, sans caution, même avec des chefs d'accusation", () => {
     const s = sentenceFor({ ...N, TEC: 80, SHIP: 99, ARCH: 80, DOC: 81, XP: 1, BUZZ: 99 }, [st("gh_no_tests")]);
-    expect(s).toEqual({ label: { fr: "Relaxe. Le tribunal s'excuse.", en: "Case dismissed. The court apologizes." } });
+    expect(s).toEqual({ label: { fr: "Peine\u00a0: aucune. Le tribunal s'excuse.", en: "Sentence: none. The court apologizes." } });
   });
 
   it("la caution du premier chef d'accusation qui en a une ; aucune pour des positifs", () => {

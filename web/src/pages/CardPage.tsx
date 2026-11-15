@@ -3,9 +3,10 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { fileOf } from "../../../shared/caseFile";
+import { usableGrid } from "../../../shared/gridText";
 import type { CardData, Fact, Finding, JobState, ProgressEvent } from "../../../shared/types";
 import { declaredOf, LEVEL_LABELS, starsFor } from "../../../shared/types";
-import { AddSource, Claim, Contest, DeleteCard, EmailForm, Hiring, LinkedInPhoto, ShareBar, useMe, useToast } from "../components/After";
+import { AddSource, Claim, Contest, EmailForm, Hiring, LinkedInPhoto, ShareBar, useMe, useToast } from "../components/After";
 import type { Shareable } from "../components/After";
 import { BandPick } from "../components/BandPick";
 import { Denounce } from "../components/Denounce";
@@ -321,9 +322,10 @@ export function CardPage({ id }: { id: string }) {
     return (
       <main className="page page-card" id="main">
         <div className="panel-center">
-          <p className="deleted-msg" role="status">
-            {t.result.del.done}
-          </p>
+          <div role="status">
+            <h1 className="deleted-msg">{t.result.del.done}</h1>
+            <p>{t.result.del.doneText}</p>
+          </div>
           <a className="btn-primary" href="/" onClick={(e) => onLinkClick(e, "/")}>
             {t.result.again}
           </a>
@@ -667,7 +669,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
               <p className="you-lead">
                 {t.result.lead(who)} {t.result.leadYours}
               </p>
-              <p className="you-turn">{t.result.yourTurn}</p>
+              {/* Sans bloc des critères au-dessus, la question ne parle pas de « ces huit critères ». */}
+              <p className="you-turn">{usableGrid(item.kind === "card" ? item.card.grid : item.comparison.grid) ? t.result.yourTurn : t.result.yourTurnBare}</p>
               <EntryForm variant="inline" />
             </section>
           ))}
@@ -714,12 +717,12 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
           </div>
         )}
         <Hiring cardId={id} />
+        {/* « Supprimer ma fiche » n'est que dans le pli « Fais appel » : une action, un endroit. */}
         {!visitor && (
           <div className="after-foot">
             <a className="link-alt" href="/" onClick={(e) => onLinkClick(e, "/")}>
               {t.result.again}
             </a>
-            <DeleteCard cardId={id} onDeleted={onDeleted} />
           </div>
         )}
       </div>
