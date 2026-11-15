@@ -1,8 +1,8 @@
 /* Les bandes (§18.38) : le bloc « Tu roules pour qui ? » sous la fiche, /bandes,
    la page d'une bande et le top de l'accueil. Même système que le top de la
    semaine (.board) et les blocs de l'après-fiche (.after-block) : aplats, titres
-   crème en Barlow Condensed, pilules rose poudré, aucune lueur, aucun dégradé.
-   Téléphone d'abord ; zones à toucher de 44 px au moins. */
+   crème en Barlow Condensed, aucune lueur, aucun dégradé. Tailles, rayons et
+   couleurs de rôle : les jetons de styles.css. Téléphone d'abord ; 44 px à toucher. */
 
 /* ---------- le bloc sous la fiche ---------- */
 
@@ -13,7 +13,7 @@
   display: grid;
   gap: 8px;
   padding-top: 14px;
-  border-top: 1px solid var(--lilac-faint);
+  border-top: 1px solid var(--c-line);
 }
 .bp-pills {
   display: flex;
@@ -36,66 +36,59 @@
 .bp-results {
   display: grid;
   list-style: none;
-  border-radius: 18px;
-  background: var(--ink-2);
+  border-radius: var(--r-item);
+  background: var(--s-field);
   overflow: hidden;
 }
 .bp-results li + li {
-  box-shadow: inset 0 1px 0 var(--lilac-faint);
+  box-shadow: inset 0 1px 0 var(--c-line);
 }
 .bp-result {
   display: block;
   width: 100%;
-  min-height: 44px;
+  min-height: var(--h-tap);
   padding: 10px 20px;
   border: 0;
   background: none;
-  font: 500 16px/1.3 var(--f-text);
+  font: 500 var(--t-16) / 1.4 var(--f-text);
   color: var(--cream);
   text-align: left;
   cursor: pointer;
 }
 .bp-result:hover,
 .bp-result:focus-visible {
-  background: var(--ink-1);
+  background: var(--s-item);
 }
 .bands-pick .bp-none {
   padding: 12px 20px;
-  font: 500 14px/1.4 var(--f-text);
-  color: var(--lilac-dim);
-}
-.bands-pick .bp-error {
-  font: 500 14px/1.4 var(--f-text);
-  color: var(--siren-ink);
+  font: var(--font-small);
+  color: var(--c-text-2);
 }
 .bands-pick .bp-line {
-  font: 500 18px/1.4 var(--f-text);
+  font: 500 var(--t-16) / 1.4 var(--f-text);
   color: var(--cream);
 }
+/* un lien dans une phrase : rose, souligné */
 .bp-line a {
-  color: var(--cream);
+  color: var(--c-action);
   text-decoration: underline;
-  text-decoration-thickness: 1.5px;
-  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
 }
 .bp-line .bp-name {
   font-weight: 600;
   overflow-wrap: anywhere;
 }
 .bands-pick .bp-nopage {
-  font: 500 14px/1.4 var(--f-text);
-  color: var(--lilac-2);
+  font: var(--font-small);
+  color: var(--c-text);
 }
-.bp-stars {
-  color: var(--star);
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-}
+/* le rang : l'emphase, crème en gras (le rose est réservé à ce qui se touche) */
 .bp-rank {
   display: block;
   margin-top: 2px;
-  font: 600 16px/1.35 var(--f-text);
-  color: var(--blush);
+  font: 700 var(--t-16) / 1.4 var(--f-text);
+  color: var(--c-emphasis);
 }
 .bp-actions {
   display: flex;
@@ -107,7 +100,7 @@
 /* ---------- une bande sur une ligne (BandRow) ---------- */
 
 .board-row.band-row {
-  grid-template-columns: 28px minmax(0, 1fr) auto;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
   min-height: 56px;
 }
 .band-name {
@@ -120,21 +113,16 @@
   font-weight: 600;
 }
 .band-count {
-  font: 500 13px/1.25 var(--f-text);
-  color: var(--lilac-dim);
+  font: 500 var(--t-14) / 1.2 var(--f-text);
+  color: var(--c-text-2);
 }
 .band-score {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font: 700 24px/1 var(--f-name);
+  font: var(--font-item);
   color: var(--cream);
   font-variant-numeric: tabular-nums;
-}
-.band-score svg {
-  width: 14px;
-  height: 14px;
-  fill: var(--star);
 }
 
 /* ---------- /bandes ---------- */
@@ -146,21 +134,21 @@
   display: grid;
   gap: 10px;
   width: 100%;
-  max-width: 680px;
+  max-width: var(--measure);
   margin: 0 auto;
   padding: 24px var(--gutter) 0;
 }
 .bands h1,
 .band h1 {
-  font: 700 44px/0.92 var(--f-name);
+  font: var(--font-page);
   text-transform: uppercase;
   color: var(--cream);
   overflow-wrap: anywhere;
   text-wrap: balance;
 }
 .bands-intro {
-  font: 500 16px/1.45 var(--f-text);
-  color: var(--lilac-2);
+  font: var(--font-body);
+  color: var(--c-text);
 }
 .bands-tabs {
   margin: 8px 0 4px;
@@ -171,11 +159,11 @@
   min-height: 120px;
 }
 .bands-empty {
-  padding: 18px 16px;
-  border-radius: 18px;
-  background: var(--navy);
-  font: 500 15px/1.4 var(--f-text);
-  color: var(--lilac-2);
+  padding: var(--pad-block);
+  border-radius: var(--r-block);
+  background: var(--s-info);
+  font: var(--font-body);
+  color: var(--c-text);
 }
 .page-bands {
   padding-bottom: 56px;
@@ -197,43 +185,45 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font: 800 64px/0.9 var(--f-name);
+  font: var(--font-score);
   color: var(--cream);
   font-variant-numeric: tabular-nums;
 }
-.band-total-score svg {
-  width: 36px;
-  height: 36px;
-  fill: var(--star);
+/* l'étoile du total : le dessin commun, à sa plus grande taille */
+.band-total-score .star-mark {
+  width: 26px;
+  height: 26px;
 }
 .band-total-count {
-  font: 600 17px/1.2 var(--f-text);
-  color: var(--lilac-2);
+  font: 500 var(--t-16) / 1.2 var(--f-text);
+  color: var(--c-text);
 }
+/* le rang : l'emphase, crème en gras */
 .band-rank {
-  font: 600 18px/1.35 var(--f-text);
-  color: var(--blush);
+  font: 700 var(--t-16) / 1.4 var(--f-text);
+  color: var(--c-emphasis);
 }
 .band-ahead {
-  font: 500 15px/1.4 var(--f-text);
-  color: var(--lilac-dim);
+  font: var(--font-small);
+  color: var(--c-text-2);
 }
 .band-ahead a {
-  color: var(--lilac);
+  color: var(--c-action);
   text-decoration: underline;
-  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
 }
 .band-share {
   justify-self: start;
   margin-top: 4px;
 }
 .band-make {
-  width: min(calc(100% - 2 * var(--gutter)), calc(680px - 2 * var(--gutter)));
+  width: min(calc(100% - 2 * var(--gutter)), calc(var(--measure) - 2 * var(--gutter)));
   margin: 28px auto 0;
 }
 .band-make .band-make-note {
-  font: 500 14px/1.4 var(--f-text);
-  color: var(--lilac-2);
+  font: var(--font-small);
+  color: var(--c-text);
 }
 .page-band {
   padding-bottom: 56px;
@@ -242,7 +232,7 @@
   padding-top: 32px;
 }
 .band-roster h2 {
-  font: 700 34px/0.95 var(--f-name);
+  font: var(--font-section);
   text-transform: uppercase;
   color: var(--cream);
 }
@@ -253,11 +243,11 @@
   gap: 12px;
   min-height: 48px;
   padding: 0 14px;
-  font: 500 15px/1.25 var(--f-text);
-  color: var(--lilac);
+  font: 500 var(--t-16) / 1.2 var(--f-text);
+  color: var(--c-text);
 }
 .band-members > li + li {
-  box-shadow: inset 0 1px 0 var(--lilac-faint);
+  box-shadow: inset 0 1px 0 var(--c-line);
 }
 .band-member-profile {
   display: grid;
@@ -271,35 +261,35 @@
   text-overflow: ellipsis;
 }
 .band-member-position {
-  font: 500 13px/1.25 var(--f-text);
-  color: var(--lilac-dim);
+  font: 500 var(--t-14) / 1.2 var(--f-text);
+  color: var(--c-text-2);
 }
 .band-member-login {
   display: inline-flex;
   align-items: center;
-  min-height: 44px;
-  font: 600 14px/1 var(--f-mono);
-  color: var(--blush);
+  min-height: var(--h-tap);
+  font: 500 var(--t-14) / 1 var(--f-text);
+  color: var(--c-action);
   text-decoration: none;
 }
 .band-member-login:hover {
   color: var(--cream);
 }
 .band-more {
-  font: 500 14px/1.4 var(--f-text);
-  color: var(--lilac-dim);
+  font: var(--font-small);
+  color: var(--c-text-2);
 }
 .band-recruit {
   padding-top: 28px;
   padding-bottom: 8px;
-  font: 500 15px/1.45 var(--f-text);
-  color: var(--lilac-2);
+  font: var(--font-small);
+  color: var(--c-text);
 }
 .band-recruit a {
-  color: var(--peach);
-  font-weight: 600;
+  color: var(--c-action);
   text-decoration: underline;
-  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
 }
 
 /* ---------- le top de l'accueil ---------- */
@@ -313,22 +303,15 @@
 }
 
 @media (min-width: 900px) {
-  .bands h1,
-  .band h1 {
-    font-size: 64px;
-  }
   .bands,
   .band,
   .band-roster,
   .band-recruit {
     padding-top: 40px;
   }
-  .band-total-score {
-    font-size: 80px;
-  }
   .board > .bands-top-cols {
     grid-template-columns: 1fr 1fr;
-    max-width: 880px;
+    max-width: var(--page-w);
     text-align: left;
   }
   .board > .bands-top-all {
