@@ -1,11 +1,13 @@
 /* Polices de la carte : les mêmes TTF que le rendu serveur (server/fonts),
-   sous les noms de famille que le SVG référence (cf. shared/card/fonts.ts). */
+   sous les noms de famille que le SVG référence (cf. shared/card/fonts.ts).
+   Une face par fichier : « Barlow Condensed SemiBold » et « ExtraBold », que le
+   SVG nomme en premier pour resvg, retombent ici sur « Barlow Condensed » 600
+   et 800, le même fichier. Le navigateur ne télécharge que les faces affichées ;
+   Barlow 700 et Outfit 400, celles du premier écran, sont préchargées (index.html). */
 
 @font-face { font-family: "Barlow Condensed"; font-weight: 600; font-display: swap; src: url("../../../server/fonts/barlow-condensed-600.ttf") format("truetype"); }
 @font-face { font-family: "Barlow Condensed"; font-weight: 700; font-display: swap; src: url("../../../server/fonts/barlow-condensed-700.ttf") format("truetype"); }
 @font-face { font-family: "Barlow Condensed"; font-weight: 800; font-display: swap; src: url("../../../server/fonts/barlow-condensed-800.ttf") format("truetype"); }
-@font-face { font-family: "Barlow Condensed SemiBold"; font-weight: 600; font-display: swap; src: url("../../../server/fonts/barlow-condensed-600.ttf") format("truetype"); }
-@font-face { font-family: "Barlow Condensed ExtraBold"; font-weight: 800; font-display: swap; src: url("../../../server/fonts/barlow-condensed-800.ttf") format("truetype"); }
 
 @font-face { font-family: "Outfit"; font-weight: 400; font-display: swap; src: url("../../../server/fonts/outfit-400.ttf") format("truetype"); }
 @font-face { font-family: "Outfit"; font-weight: 500; font-display: swap; src: url("../../../server/fonts/outfit-500.ttf") format("truetype"); }
@@ -15,4 +17,3 @@
 @font-face { font-family: "JetBrains Mono"; font-weight: 400; font-display: swap; src: url("../../../server/fonts/jetbrains-mono-400.ttf") format("truetype"); }
 @font-face { font-family: "JetBrains Mono"; font-weight: 500; font-display: swap; src: url("../../../server/fonts/jetbrains-mono-500.ttf") format("truetype"); }
 @font-face { font-family: "JetBrains Mono"; font-weight: 700; font-display: swap; src: url("../../../server/fonts/jetbrains-mono-700.ttf") format("truetype"); }
-@font-face { font-family: "JetBrains Mono Medium"; font-weight: 500; font-display: swap; src: url("../../../server/fonts/jetbrains-mono-500.ttf") format("truetype"); }

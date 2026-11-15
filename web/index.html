@@ -26,6 +26,9 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="https://skills.azerit.tech/og/home.png" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- Les deux polices du premier écran (titres, texte courant), demandées sans attendre la feuille. -->
+    <link rel="preload" as="font" type="font/ttf" crossorigin href="../server/fonts/barlow-condensed-700.ttf" />
+    <link rel="preload" as="font" type="font/ttf" crossorigin href="../server/fonts/outfit-400.ttf" />
     <!-- La coquille du premier affichage (#root ci-dessous) : sa feuille tient ici, sans attendre styles.css. -->
     <style>
       html,body{margin:0;background:#0c0d1b;color-scheme:dark}
