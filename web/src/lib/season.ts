@@ -33,8 +33,15 @@ export function homeHook(h: HookLines, cfg: Pick<AppConfig, "primesOpen"> | null
 
 interface SeasonLines {
   soon: (n: number, day: string) => string;
-  on: (n: number, day: string) => string;
+  win: (n: number, interviews: number) => string;
+  until: (day: string) => string;
   over: (n: number) => string;
+}
+
+/** Le bandeau : la ligne qui tient sur un téléphone, et la fin de phrase que le bureau ajoute. */
+export interface SeasonBandText {
+  text: string;
+  tail: string | null;
 }
 
 /** « 31 décembre », « 1er décembre », « December 31 » (anglais américain : le mois d'abord). */
@@ -45,12 +52,15 @@ export function dayLabel(day: string, lang: Lang): string {
   return lang === "fr" ? `${n === 1 ? "1er" : n} ${month}` : `${month} ${n}`;
 }
 
-/** Le texte du bandeau : « Saison 1 : dès le 19 novembre », « … : jusqu'au 31 décembre », « Saison 1 terminée ». */
-export function seasonLine(s: SeasonLines, season: SeasonDates | null, lang: Lang, now: number): string | null {
+/**
+ * Le texte du bandeau : « Saison 1 : dès le 19 novembre » ; pendant la saison, ce qu'on gagne,
+ * « Saison 1 : 6 entretiens à gagner », et au bureau « jusqu'au 31 décembre » ; « Saison 1 terminée ».
+ */
+export function seasonLine(s: SeasonLines, season: SeasonDates | null, lang: Lang, now: number, interviews = 0): SeasonBandText | null {
   const dates = season ?? SEASON_FILE;
   if (!dates) return null;
   const phase = seasonPhase(dates, now);
-  if (phase === "soon") return s.soon(dates.number, dayLabel(dates.start, lang));
-  if (phase === "on") return s.on(dates.number, dayLabel(dates.end, lang));
-  return s.over(dates.number);
+  if (phase === "soon") return { text: s.soon(dates.number, dayLabel(dates.start, lang)), tail: null };
+  if (phase === "on") return { text: s.win(dates.number, interviews), tail: s.until(dayLabel(dates.end, lang)) };
+  return { text: s.over(dates.number), tail: null };
 }

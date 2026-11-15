@@ -59,13 +59,18 @@ export function SeasonBand() {
   const cfg = useAppConfig();
   if (!cfg?.primesOpen) return null;
   // Les dates de data/season.json, servies par /api/config (lib/season.ts).
-  const text = seasonLine(t.home.season, cfg.season ?? null, lang, Date.now());
-  if (!text) return null;
+  const line = seasonLine(t.home.season, cfg.season ?? null, lang, Date.now(), cfg.interviews);
+  if (!line) return null;
+  const full = line.tail ? `${line.text}, ${line.tail}` : line.text;
   return (
-    <a className="season-band" href="/primes" onClick={(e) => onLinkClick(e, "/primes")} aria-label={`${text}. ${t.chrome.seePrimes}`}>
+    <a className="season-band" href="/primes" onClick={(e) => onLinkClick(e, "/primes")} aria-label={`${full}. ${t.chrome.seePrimes}`}>
       <Palm className="is-l" />
       <Palm className="is-l is-small" />
-      <span className="season-text">{text}</span>
+      {/* téléphone : ce qu'on gagne, sur une ligne ; le bureau ajoute jusqu'à quand */}
+      <span className="season-text">
+        {line.text}
+        {line.tail && <span className="season-tail">, {line.tail}</span>}
+      </span>
       <Palm className="is-r is-small" />
       <Palm className="is-r" />
     </a>

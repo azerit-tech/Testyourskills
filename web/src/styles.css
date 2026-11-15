@@ -718,6 +718,9 @@ svg {
 .season-text::after {
   content: " →";
 }
+.season-tail {
+  display: none;
+}
 .season-palm {
   position: absolute;
   bottom: 0;
@@ -750,6 +753,24 @@ svg {
   }
   .season-palm.is-small {
     display: none;
+  }
+}
+/* au bureau : la phrase entière, et les palmiers aux bords du conteneur de la page, pas de la fenêtre */
+@media (min-width: 900px) {
+  .season-tail {
+    display: inline;
+  }
+  .season-palm.is-l {
+    left: max(6px, calc(50% - var(--page-w) / 2));
+  }
+  .season-palm.is-l.is-small {
+    left: max(30px, calc(50% - var(--page-w) / 2 + 24px));
+  }
+  .season-palm.is-r {
+    right: max(6px, calc(50% - var(--page-w) / 2));
+  }
+  .season-palm.is-r.is-small {
+    right: max(30px, calc(50% - var(--page-w) / 2 + 24px));
   }
 }
 

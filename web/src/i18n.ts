@@ -41,7 +41,9 @@ const fr = frTypoDeep({
     /** Le bandeau de saison, dates lues dans data/season.json (web/src/lib/season.ts). */
     season: {
       soon: (n: number, day: string) => `Saison ${n} : dès le ${day}`,
-      on: (n: number, day: string) => `Saison ${n} : jusqu'au ${day}`,
+      /** Pendant la saison : ce qu'on gagne (les entretiens des primes ouvertes), puis, au bureau, jusqu'à quand. */
+      win: (n: number, k: number) => `Saison ${n} : ${k > 1 ? `${k} entretiens` : k === 1 ? "1 entretien" : "des entretiens"} à gagner`,
+      until: (day: string) => `jusqu'au ${day}`,
       over: (n: number) => `Saison ${n} terminée`,
     },
     /** Le titre, deux phrases de deux lignes chacune (shared/promise.ts, sa seule source).
@@ -841,7 +843,8 @@ const en: Dict = {
   home: {
     season: {
       soon: (n, day) => `Season ${n} starts ${day}`,
-      on: (n, day) => `Season ${n} runs until ${day}`,
+      win: (n, k) => `Season ${n}: ${k > 1 ? `${k} interviews` : k === 1 ? "1 interview" : "interviews"} to win`,
+      until: (day) => `until ${day}`,
       over: (n) => `Season ${n} is over`,
     },
     titleClaim: heroSentence(HOME_PROMISE.en.claim),

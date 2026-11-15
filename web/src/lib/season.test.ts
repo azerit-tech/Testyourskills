@@ -22,7 +22,9 @@ describe("la ligne de l'accueil", () => {
   });
 
   it("la config du serveur : primesOpen et les dates, tout champ douteux vaut « non »", () => {
-    expect(parseConfig({ linkedin: true, primesOpen: true, season: S1 })).toEqual({ linkedin: true, claim: false, linkedinEntry: false, primesOpen: true, primesListed: false, rulesPublished: false, season: S1 });
+    expect(parseConfig({ linkedin: true, primesOpen: true, season: S1 })).toEqual({ linkedin: true, claim: false, linkedinEntry: false, primesOpen: true, primesListed: false, rulesPublished: false, season: S1, interviews: 0 });
+    expect(parseConfig({ interviews: 6 })).toMatchObject({ interviews: 6 });
+    expect(parseConfig({ interviews: -1 })).toMatchObject({ interviews: 0 });
     expect(parseConfig({ primesOpen: "yes", season: { number: 1, start: "x", end: "y" } })).toMatchObject({ primesOpen: false, season: null });
     expect(parseConfig(null)).toMatchObject({ primesOpen: false, season: null });
   });
@@ -31,17 +33,18 @@ describe("la ligne de l'accueil", () => {
 describe("le bandeau de saison", () => {
   const fr = DICTS.fr.home.season;
   const en = DICTS.en.home.season;
-  it("lit ses dates : avant, pendant, après", () => {
-    expect(seasonLine(fr, S1, "fr", Date.parse("2026-11-14T12:00:00Z"))).toBe("Saison 1\u00a0: dès le 19 novembre");
-    expect(seasonLine(fr, S1, "fr", Date.parse("2026-11-20T12:00:00Z"))).toBe("Saison 1\u00a0: jusqu'au 31 décembre");
-    expect(seasonLine(fr, S1, "fr", Date.parse("2027-01-01T12:00:00Z"))).toBe("Saison 1 terminée");
-    // En anglais américain : une phrase, le mois avant le jour.
-    expect(seasonLine(en, S1, "en", Date.parse("2026-11-14T12:00:00Z"))).toBe("Season 1 starts November 19");
-    expect(seasonLine(en, S1, "en", Date.parse("2026-12-31T20:00:00Z"))).toBe("Season 1 runs until December 31");
+  it("lit ses dates : avant, pendant (ce qu'on gagne, puis jusqu'à quand), après", () => {
+    expect(seasonLine(fr, S1, "fr", Date.parse("2026-11-14T12:00:00Z"))).toEqual({ text: "Saison 1\u00a0: dès le 19 novembre", tail: null });
+    expect(seasonLine(fr, S1, "fr", Date.parse("2026-11-20T12:00:00Z"), 6)).toEqual({ text: "Saison 1\u00a0: 6 entretiens à gagner", tail: "jusqu'au 31 décembre" });
+    expect(seasonLine(fr, S1, "fr", Date.parse("2026-11-20T12:00:00Z"), 1)?.text).toBe("Saison 1\u00a0: 1 entretien à gagner");
+    expect(seasonLine(fr, S1, "fr", Date.parse("2027-01-01T12:00:00Z"))).toEqual({ text: "Saison 1 terminée", tail: null });
+    // En anglais américain : le mois avant le jour.
+    expect(seasonLine(en, S1, "en", Date.parse("2026-11-14T12:00:00Z"))?.text).toBe("Season 1 starts November 19");
+    expect(seasonLine(en, S1, "en", Date.parse("2026-12-31T20:00:00Z"), 3)).toEqual({ text: "Season 1: 3 interviews to win", tail: "until December 31" });
   });
 
-  it("sans réponse du serveur : les dates du fichier pris au build", () => {
-    expect(seasonLine(fr, null, "fr", Date.parse("2026-11-20T12:00:00Z"))).toBe("Saison 1\u00a0: jusqu'au 31 décembre");
+  it("sans réponse du serveur : les dates du fichier pris au build, des entretiens sans nombre", () => {
+    expect(seasonLine(fr, null, "fr", Date.parse("2026-11-20T12:00:00Z"))?.text).toBe("Saison 1\u00a0: des entretiens à gagner");
   });
 
   it("le premier du mois en français ; en anglais, le mois d'abord", () => {
