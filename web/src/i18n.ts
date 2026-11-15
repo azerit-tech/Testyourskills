@@ -1591,18 +1591,73 @@ export const DICTS: Record<Lang, Dict> = { fr, en };
 
 const STORAGE_KEY = "tys_lang";
 
+const asLang = (v: string | null | undefined): Lang | null => (v === "fr" || v === "en" ? v : null);
+
+/** Ce que la page sait au démarrage pour choisir sa langue. */
+export interface LangFacts {
+  /** `?lang=` de l'adresse. */
+  query: string | null;
+  /** Le choix enregistré dans ce navigateur (FR/EN touché, ou un `?lang=` déjà venu). */
+  stored: string | null;
+  path: string;
+  /** Sur la page d'une fiche servie par le serveur : la langue de la fiche. */
+  card: string | null;
+  /** `navigator.language`. */
+  nav: string;
+}
+
+/**
+ * La langue du site (§18.52) : `?lang=` d'abord, puis le choix enregistré, puis
+ * l'adresse de la vie privée (une par langue), puis sur une fiche la langue de la
+ * fiche, puis le navigateur. Un dev au téléphone en anglais qui arrive d'un post
+ * en français lit la fiche en français.
+ */
+export function chooseLang(f: LangFacts): Lang {
+  const q = asLang(f.query);
+  if (q) return q;
+  const s = asLang(f.stored);
+  if (s) return s;
+  if (f.path.startsWith("/privacy")) return "en";
+  if (f.path.startsWith("/confidentialite")) return "fr";
+  const c = asLang(f.card);
+  if (c) return c;
+  return f.nav.toLowerCase().startsWith("fr") ? "fr" : "en";
+}
+
+/**
+ * La langue de la fiche, écrite par le serveur dans `<html lang>` quand il sert
+ * `/c/<id>` d'une fiche qu'il connaît : son image d'aperçu porte alors l'adresse
+ * `/og/<id>.png`. Sans elle (fiche inconnue, page servie sans le serveur), rien :
+ * la balise ne dit que la langue de la requête.
+ */
+export function cardLangOf(doc: Pick<Document, "documentElement" | "querySelector">, path: string): string | null {
+  const id = /^\/c\/([A-Za-z0-9_-]+)\/?$/.exec(path)?.[1];
+  if (!id) return null;
+  const image = doc.querySelector<HTMLMetaElement>('meta[property="og:image"]')?.content ?? "";
+  if (!image.includes(`/og/${id}.png`)) return null;
+  return doc.documentElement.getAttribute("lang");
+}
+
 function initialLang(): Lang {
+  if (typeof window === "undefined") return "fr";
+  let stored: string | null = null;
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === "fr" || stored === "en") return stored;
+    stored = localStorage.getItem(STORAGE_KEY);
   } catch {
     /* stockage indisponible */
   }
-  const path = typeof window !== "undefined" ? window.location.pathname : "";
-  if (path.startsWith("/privacy")) return "en";
-  if (path.startsWith("/confidentialite")) return "fr";
-  const nav = typeof navigator !== "undefined" ? navigator.language : "fr";
-  return nav.toLowerCase().startsWith("fr") ? "fr" : "en";
+  const query = new URLSearchParams(window.location.search).get("lang");
+  const path = window.location.pathname;
+  const lang = chooseLang({ query, stored, path, card: cardLangOf(document, path), nav: typeof navigator !== "undefined" ? navigator.language : "fr" });
+  // Un `?lang=` vaut un choix : il est retenu pour la suite de la visite et les suivantes.
+  if (asLang(query)) {
+    try {
+      localStorage.setItem(STORAGE_KEY, lang);
+    } catch {
+      /* stockage bloqué : l'adresse le garde, le routeur recopie la requête */
+    }
+  }
+  return lang;
 }
 
 interface LangCtx {
@@ -1621,6 +1676,13 @@ export function LangProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(STORAGE_KEY, l);
     } catch {
       /* rien */
+    }
+    // Le choix touché passe avant le `?lang=` de l'adresse : il quitte l'adresse, un rechargement le garde.
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("lang")) {
+      params.delete("lang");
+      const qs = params.toString();
+      window.history.replaceState(window.history.state, "", window.location.pathname + (qs ? `?${qs}` : "") + window.location.hash);
     }
   }, []);
   useEffect(() => {
