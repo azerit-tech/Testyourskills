@@ -2368,7 +2368,7 @@ button.cover-panel:focus-visible {
   color: var(--cream);
 }
 
-/* sous la fiche du visiteur : le jury, le profil, le dossier, « Et toi ? » */
+/* sous la fiche du visiteur : ce qu'il regarde, le jury, les critères, le reste replié ; puis « À ton tour » */
 .visitor-col {
   display: grid;
   gap: 12px;
@@ -2376,6 +2376,26 @@ button.cover-panel:focus-visible {
 }
 .visitor-col .jury {
   margin-bottom: 0;
+}
+/* la phrase qui dit ce que c'est : le texte de la page, sous la fiche, avant tout bloc */
+.visitor-lead {
+  font: 500 var(--t-16) / 1.5 var(--f-text);
+  color: var(--c-text);
+  text-wrap: pretty;
+}
+/* la peine et la caution, au pied du bloc du jury : deux lignes discrètes sous un filet */
+.jury .penalty {
+  padding-top: 12px;
+  border-top: 1px solid var(--c-line);
+  font: var(--font-small);
+  color: var(--c-text);
+}
+/* « À ton tour » et la demande de retrait suivent la colonne, au même pas que ses blocs */
+.result-top > .you {
+  margin-top: 16px;
+}
+.result-top > .removal {
+  margin-top: 16px;
 }
 .visitor-col .denounced-title {
   text-wrap: balance;
@@ -2547,49 +2567,9 @@ button.cover-panel:focus-visible {
   border-top: 1px solid var(--c-line);
 }
 
-/* « Fais la tienne » toujours visible (§18.27) : téléphone seulement */
-.make-yours {
-  display: none;
-}
-@media (max-width: 640px) {
-  .make-yours {
-    display: inline-flex;
-    position: fixed;
-    left: 50%;
-    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-    z-index: 70;
-    max-width: calc(100vw - 32px);
-    /* un liseré d'encre la détache de ce qui défile dessous, sans ombre */
-    box-shadow: 0 0 0 4px var(--ink-0);
-    transform: translateX(-50%);
-    transition:
-      transform 0.3s var(--ease-out),
-      opacity 0.2s,
-      visibility 0s;
-  }
-  .make-yours:hover,
-  .make-yours:active {
-    transform: translateX(-50%);
-  }
-  /* le toast, rendu juste après elle, passe au-dessus (12 + 52 + 4 de liseré + 12 px) */
-  .make-yours:not(.is-off) ~ .toast {
-    bottom: calc(80px + env(safe-area-inset-bottom, 0px));
-  }
-  .make-yours.is-off {
-    transform: translate(-50%, 160%);
-    opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
-    transition:
-      transform 0.3s var(--ease-out),
-      opacity 0.2s,
-      visibility 0s 0.3s;
-  }
-  /* la pilule ne masque jamais le dernier contenu de la page */
-  .shell:has(.page-result.is-visitor) .footer-links {
-    padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
-  }
-}
+/* « Fais la tienne » toujours sous le pouce (§18.48) : la barre fixe du visiteur est la même pièce
+   que celle de la personne fichée (.dock, plus bas), avec un seul bouton rose pleine largeur ;
+   le toast et la marge basse de la page s'y calent par les règles du .dock */
 
 /* ============ sous la fiche ============ */
 
@@ -3364,11 +3344,12 @@ a.dossier-item:hover {
     text-align: left;
   }
 
-  /* la page personnage : la ligne d'en-tête et la colonne du texte à gauche, la fiche à droite */
+  /* la page personnage : la ligne d'en-tête et la colonne du texte à gauche ; à droite la fiche,
+     puis « À ton tour » sous elle (sa fiche, puis la tienne), qui suit le défilement de la colonne */
   .is-visitor .result-top {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 360px;
-    grid-template-rows: auto 1fr;
+    grid-template-rows: auto auto 1fr auto;
     column-gap: 72px;
     row-gap: 24px;
     align-items: start;
@@ -3385,7 +3366,33 @@ a.dossier-item:hover {
   }
   .is-visitor .visitor-col {
     grid-column: 1;
-    grid-row: 2;
+    grid-row: 2 / span 2;
+  }
+  .is-visitor .result-top > .you {
+    grid-column: 2;
+    grid-row: 3;
+    position: sticky;
+    top: 24px;
+    margin-top: 0;
+  }
+  .is-visitor .result-top > .removal {
+    grid-column: 2;
+    grid-row: 4;
+    margin-top: 0;
+  }
+  /* dans la colonne de 360 px : le champ, puis le bouton dessous, de toute sa largeur */
+  .is-visitor .you .entry {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: none;
+  }
+  .is-visitor .you .entry.has-doors > .entry-doors,
+  .is-visitor .you .entry.has-doors > .field,
+  .is-visitor .you .entry.has-doors > .entry-submit {
+    grid-column: 1;
+    grid-row: auto;
+  }
+  .is-visitor .you .entry-submit {
+    width: 100%;
   }
   .wanted-head {
     gap: 8px;

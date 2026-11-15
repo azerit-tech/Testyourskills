@@ -3,6 +3,7 @@
 // d'accusation de la fiche, jamais sur la personne (principe 4) : deux boutons,
 // un décompte, aucun autre texte. Le serveur garde un vote par fiche et par IP.
 import { useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import type { CardData, Lang } from "../../../shared/types";
 import { pick, useT } from "../i18n";
 import { api, ApiError, type Jury as Tally, type Verdict } from "../lib/api";
@@ -61,9 +62,11 @@ interface Props {
   /** Décompte lu avec /case ; null tant qu'il charge. */
   jury: Tally | null;
   toast: (m: string) => void;
+  /** Au pied du bloc : la peine et la caution de la fiche. */
+  children?: ReactNode;
 }
 
-export function Jury({ cardId, card, jury, toast }: Props) {
+export function Jury({ cardId, card, jury, toast, children }: Props) {
   const { t, lang } = useT();
   const reduced = useReducedMotion();
   const [tally, setTally] = useState<Tally | null>(jury);
@@ -116,6 +119,7 @@ export function Jury({ cardId, card, jury, toast }: Props) {
           </button>
         </div>
       )}
+      {children}
     </section>
   );
 }

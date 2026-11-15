@@ -509,6 +509,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
   }, [wantedYou, id]);
   const other = mine && mine.id !== id && !(mine.login && main.login && mine.login === main.login.toLowerCase()) ? mine : null;
   const proveFirst = item.kind === "card" && declaredOf(item.card) === "linkedin";
+  const who = main.login ? `@${main.login}` : main.name;
   // La source qui manque au dossier, en bloc : le GitHub d'une fiche LinkedIn seule, le LinkedIn d'une fiche GitHub seule.
   const missing =
     visitor || item.kind !== "card" ? null : proveFirst ? (
@@ -573,41 +574,52 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
           </p>
         </section>
 
-        {/* Sous la fiche, pour le visiteur : le jury, la peine, le dossier, puis « Et toi ? ». */}
+        {/* Sous la fiche, pour le visiteur (§18.48) : ce qu'il regarde, le jury, les critères, le reste replié. */}
         {visitor && (
           <div className="visitor-col">
+            {/* Une phrase dit ce que c'est ; sans fiche à soi, elle dit aussi ce que coûte la sienne. */}
+            <p className="visitor-lead">
+              {t.result.lead(who)}
+              {!other && <> {t.result.leadYours}</>}
+            </p>
             {/* Fiche dénoncée (§18.6) : « Avis de recherche à ton nom », juste sous la fiche. */}
             {wantedYou && <Denounced by={kase?.by ?? null} onLawyer={claimOn && cardLogin ? () => api.startClaim(id, cardLogin) : null} />}
+            {/* Le jury (§18.27) : un geste à un toucher ; la peine et la caution dans son bloc. */}
+            <Jury cardId={id} card={main} jury={kase?.jury ?? null} toast={toast.show}>
+              <Penalty card={main} />
+            </Jury>
             {/* Les critères (§18.37, §18.48) : la ligne du recruteur, les huit tuiles, le détail replié ; ni nom d'école ni d'ancien employeur. */}
-            <RecruiterRead item={item} shared who={main.login ? `@${main.login}` : main.name} />
-            {/* Le jury (§18.27) : un geste à un toucher, avant « Et toi ? ». */}
-            <Jury cardId={id} card={main} jury={kase?.jury ?? null} toast={toast.show} />
-            <Penalty card={main} />
-            {/* L'enquête en direct (§18.26) : les trois trouvailles les plus fortes, chacune vers sa preuve, en ligne repliée. */}
+            <RecruiterRead item={item} shared who={who} />
             <div className="rest">
+              {/* L'enquête en direct (§18.26) : les trois trouvailles les plus fortes, chacune vers sa preuve, en ligne repliée. */}
               <Dossier card={main} />
+              {/* Fiche dénoncée : « C'est moi » est déjà sous la fiche. */}
+              {!(wantedYou && claimOn) && <Claim cardId={id} login={cardLogin} lawyer me={me} onMe={onMe} toast={toast.show} />}
             </div>
-            <section className="you" id="you" aria-labelledby="you-title">
-              <h2 id="you-title">{t.denounce.andYou}</h2>
-              {other ? (
-                <>
-                  {/* Dossier scellé : sa note ne se dit pas, même face à la sienne. */}
-                  {!main.sealed && <p className="versus-line">{versusLine(t.denounce, other, main)}</p>}
-                  <a className="pill pill-peach" href={`/c/${other.id}`} onClick={(e) => onLinkClick(e, `/c/${other.id}`)}>
-                    {t.denounce.mine}
-                  </a>
-                </>
-              ) : (
-                <>
-                  <p>{t.result.yourTurn}</p>
-                  <EntryForm variant="inline" />
-                </>
-              )}
-            </section>
-            {/* Sans pseudo GitHub, ni revendication ni masquage : la personne fichée demande le retrait. */}
-            {!cardLogin && <RemovalRequest cardId={id} />}
           </div>
         )}
+        {/* « À ton tour » : en fin de page sur téléphone (la barre fixe y mène), sous la fiche dans la colonne de droite au bureau. */}
+        {visitor && (
+          <section className="you" id="you" aria-labelledby="you-title">
+            <h2 id="you-title">{t.denounce.andYou}</h2>
+            {other ? (
+              <>
+                {/* Dossier scellé : sa note ne se dit pas, même face à la sienne. */}
+                {!main.sealed && <p className="versus-line">{versusLine(t.denounce, other, main)}</p>}
+                <a className="pill pill-peach" href={`/c/${other.id}`} onClick={(e) => onLinkClick(e, `/c/${other.id}`)}>
+                  {t.denounce.mine}
+                </a>
+              </>
+            ) : (
+              <>
+                <p>{t.result.yourTurn}</p>
+                <EntryForm variant="inline" />
+              </>
+            )}
+          </section>
+        )}
+        {/* Sans pseudo GitHub, ni revendication ni masquage : la personne fichée demande le retrait. */}
+        {visitor && !cardLogin && <RemovalRequest cardId={id} />}
       </div>
 
       <div className={`after${settled ? " is-in" : ""}`} aria-hidden={!settled} inert={!settled ? true : undefined}>
@@ -631,20 +643,21 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
         {/* « Tu es en course » (§18.5) : seulement si une prime est ouverte, après le partage. */}
         {!visitor && <PrimeRace cardId={id} card={main} />}
         {/* Les critères (§18.37, §18.48) : un seul bloc, la ligne du recruteur, les huit tuiles, le détail replié. */}
-        {!visitor && <RecruiterRead item={item} shared={false} who={main.login ? `@${main.login}` : main.name} />}
+        {!visitor && <RecruiterRead item={item} shared={false} who={who} />}
         {/* La source qui manque, sous les critères qu'elle ouvre : « Ajoute ton GitHub » (§18.24) ou, en miroir, « Ajoute ton LinkedIn » (§18.37). */}
         {!low && missing}
-        <div className="rest">
-          {/* L'enquête en direct (§18.26) : les trois trouvailles les plus fortes, chacune vers sa preuve, en ligne repliée. */}
-          {!visitor && <Dossier card={main} />}
-          {/* Ses pièces à conviction sont au dos de la fiche (§18.27), dossier à deux pièces compris. */}
-          {/* Fiche dénoncée : « Appeler mon avocat » est déjà sous la fiche. */}
-          {!(wantedYou && claimOn) && <Claim cardId={id} login={cardLogin} lawyer={!owner} me={me} onMe={onMe} toast={toast.show} />}
-          {!visitor && <LinkedInPhoto cardId={id} hasAvatar={item.kind === "card" ? !!item.card.avatarUrl : !!item.comparison.cv.avatarUrl} />}
-          {!visitor && item.kind === "card" && !proveFirst && <AddSource card={item.card} />}
-          {!visitor && <EmailForm cardId={id} />}
-          {!visitor && <Contest card={main} />}
-        </div>
+        {!visitor && (
+          <div className="rest">
+            {/* L'enquête en direct (§18.26) : les trois trouvailles les plus fortes, chacune vers sa preuve, en ligne repliée. */}
+            <Dossier card={main} />
+            {/* Ses pièces à conviction sont au dos de la fiche (§18.27), dossier à deux pièces compris. */}
+            <Claim cardId={id} login={cardLogin} lawyer={!owner} me={me} onMe={onMe} toast={toast.show} />
+            <LinkedInPhoto cardId={id} hasAvatar={item.kind === "card" ? !!item.card.avatarUrl : !!item.comparison.cv.avatarUrl} />
+            {item.kind === "card" && !proveFirst && <AddSource card={item.card} />}
+            <EmailForm cardId={id} />
+            <Contest card={main} />
+          </div>
+        )}
         <Hiring cardId={id} />
         {!visitor && (
           <div className="after-foot">
@@ -657,8 +670,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
       </div>
       {/* La barre du pouce (§18.27) : mêmes conditions que le bloc de partage, une fois la fiche posée. Avant le toast, qui se cale dessus. */}
       {!visitor && !(claimed && me?.hidden) && <ShareDock item={item} ready={settled} toast={toast.show} />}
-      {/* « Fais la tienne » toujours visible sur téléphone (§18.27). */}
-      {visitor && settled && <MakeYours mine={other} />}
+      {/* « Fais la tienne » : la barre fixe du visiteur sur téléphone (§18.48). Qui a déjà sa fiche a « Ma fiche » dans la barre du haut. */}
+      {visitor && settled && !other && <MakeYours watch={wantedYou} />}
       {toast.node}
     </main>
   );

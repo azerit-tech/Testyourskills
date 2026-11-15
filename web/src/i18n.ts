@@ -285,6 +285,9 @@ const fr = frTypoDeep({
   } satisfies Record<Position, string>,
   result: {
     makeYours: "Fais la tienne",
+    /** Sous la fiche vue par un visiteur (§18.48) : ce qu'il regarde, en une phrase ; puis, sans fiche à soi, ce que coûte la sienne. */
+    lead: (who: string) => `Azerit a dressé la fiche de dev de ${who} comme en recrutement : l'expérience d'abord, le code en preuve.`,
+    leadYours: "La tienne prend une minute, sans compte.",
     yourTurn: "Sur ces huit critères, tu vaux combien d'étoiles\u00a0? Ton LinkedIn ou ton GitHub suffit.",
     /** Sous la fiche d'un dossier à deux sources (§18.36) : d'où vient la preuve, une seule note. */
     pieces: {
@@ -1018,6 +1021,8 @@ const en: Dict = {
   },
   result: {
     makeYours: "Get yours",
+    lead: (who) => `Azerit drew up ${who}'s dev rap sheet the way a recruiter would: experience first, code as proof.`,
+    leadYours: "Yours takes one minute, no account.",
     yourTurn: "On these eight criteria, how many stars are you? Your LinkedIn or your GitHub is all it takes.",
     pieces: {
       line: (labels) => `Sources on file: ${labels}`,
