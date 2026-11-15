@@ -137,6 +137,15 @@ describe("page partagée, vue par un visiteur", () => {
     expect(page).toMatch(/setClaimedAs\(as\.toLowerCase\(\)\);\s*window\.scrollTo\(0, 0\);/);
   });
 
+  it("au bureau, « À ton tour » vient avant la colonne dans le document : le clavier suit l'écran (exécution 11)", () => {
+    expect(page).toContain('const desk = useMediaQuery("(min-width: 900px)");');
+    expect(page).toContain("const turnFirst = desk && !wantedYou;");
+    const first = page.indexOf("{turnFirst && turn}");
+    expect(first).toBeGreaterThan(0);
+    expect(first).toBeLessThan(page.indexOf('<div className="visitor-col">'));
+    expect(page.indexOf("{!turnFirst && turn}")).toBeGreaterThan(page.indexOf('<div className="visitor-col">'));
+  });
+
   it("une fiche supprimée ou introuvable : le navigateur l'oublie, plus de « Ma fiche » qui mène nulle part (parcours 4)", () => {
     expect(page).toMatch(/if \(view\.s === "none" \|\| view\.s === "deleted"\) forgetMine\(id\);/);
   });

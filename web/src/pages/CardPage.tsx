@@ -41,7 +41,7 @@ import { ChaseLink } from "../film/ChaseLink";
 import { navigate, onLinkClick } from "../lib/router";
 import { chaseWatched, filmOwed, forgetMine, freshCv, markChaseWatched, freshLogin, freshSince, freshSlug, iDenounced, lastVisited, markFilmSeen, myCard, prefillFromLast, rememberMine, rememberVisited, type MyCard } from "../lib/session";
 import { revealScene, revealToPlay } from "../lib/revealScene";
-import { useReducedMotion } from "../lib/util";
+import { useMediaQuery, useReducedMotion } from "../lib/util";
 
 /** La révélation 3D et Three.js, hors du bundle de l'accueil. */
 const loadWalkout = () => import("../components/Walkout3D");
@@ -635,6 +635,25 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
   const lawyer = other ? null : (claimHere ?? remake?.go ?? null);
   // Qui a sa fiche : le duel, et le même envoi dans la barre fixe.
   const duel = useDuelSend(visitor ? other : null, main, toast.show);
+  // « À ton tour » : en fin de page sur téléphone (la barre fixe y mène) ; au bureau, en tête de la colonne de droite,
+  // avec la phrase qui dit ce qu'on regarde (sous le bloc d'une fiche dénoncée, qui a son propre bouton rose).
+  // Qui a déjà sa fiche : le duel à la place, avec le score à envoyer.
+  const turn = !visitor ? null : other ? (
+    <Duel mine={other} card={main} duel={duel} strong />
+  ) : (
+    <section className="you" id="you" aria-labelledby="you-title">
+      <h2 id="you-title">{t.denounce.andYou}</h2>
+      <p className="you-lead">
+        {t.result.lead(who)} {t.result.leadYours}
+      </p>
+      {/* Sans bloc des critères au-dessus, la question ne parle pas de « ces huit critères ». */}
+      <p className="you-turn">{usableGrid(item.kind === "card" ? item.card.grid : item.comparison.grid) ? t.result.yourTurn : t.result.yourTurnBare}</p>
+      <EntryForm variant="inline" />
+    </section>
+  );
+  // Au bureau, l'ordre du document suit l'écran : « À ton tour » avant la colonne, sauf sous une fiche dénoncée (son bloc d'abord).
+  const desk = useMediaQuery("(min-width: 900px)");
+  const turnFirst = desk && !wantedYou;
   // Sa fiche toute neuve, après être arrivé par celle d'un autre : le duel en tête du partage, une fois.
   const fromRival = !visitor && fresh && rival && rival.id !== id && !(rival.login && main.login && rival.login.toLowerCase() === main.login.toLowerCase()) ? rival : null;
   const own: MyCard = { id, login: main.login ?? null, overall: main.overall };
@@ -722,6 +741,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
           </p>
         </section>
 
+        {/* Au bureau, « À ton tour » ouvre la colonne de droite : il vient aussi d'abord au clavier (exécution 11). */}
+        {turnFirst && turn}
         {/* Sous la fiche, pour le visiteur (§18.48) : ce qu'il regarde, le jury, les critères, le reste replié. */}
         {visitor && (
           <div className="visitor-col">
@@ -745,23 +766,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
             </div>
           </div>
         )}
-        {/* « À ton tour » : en fin de page sur téléphone (la barre fixe y mène) ; au bureau, en tête de la colonne de droite,
-            avec la phrase qui dit ce qu'on regarde (sous le bloc d'une fiche dénoncée, qui a son propre bouton rose). */}
-        {/* Qui a déjà sa fiche : le duel à la place, avec le score à envoyer. */}
-        {visitor &&
-          (other ? (
-            <Duel mine={other} card={main} duel={duel} strong />
-          ) : (
-            <section className="you" id="you" aria-labelledby="you-title">
-              <h2 id="you-title">{t.denounce.andYou}</h2>
-              <p className="you-lead">
-                {t.result.lead(who)} {t.result.leadYours}
-              </p>
-              {/* Sans bloc des critères au-dessus, la question ne parle pas de « ces huit critères ». */}
-              <p className="you-turn">{usableGrid(item.kind === "card" ? item.card.grid : item.comparison.grid) ? t.result.yourTurn : t.result.yourTurnBare}</p>
-              <EntryForm variant="inline" />
-            </section>
-          ))}
+        {!turnFirst && turn}
         {/* Sans pseudo GitHub, ni revendication ni masquage : la personne fichée demande le retrait. */}
         {/* Fiche dénoncée : la demande est déjà dans son bloc, sous la fiche. */}
         {visitor && !cardLogin && !wantedYou && <RemovalRequest cardId={id} />}
