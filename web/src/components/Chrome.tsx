@@ -129,7 +129,7 @@ export function Footer() {
             {label}
           </a>
         ))}
-        <a href="/3d/CREDITS.txt" target="_blank" rel="noopener">
+        <a href="/credits.txt" target="_blank" rel="noopener">
           {t.chrome.credits}
         </a>
         <a className="is-out" href="https://azerit.tech" target="_blank" rel="noopener" onClick={() => api.track("cta_azerit_clicked", null, { from: "footer" })}>

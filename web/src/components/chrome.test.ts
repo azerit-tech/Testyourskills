@@ -79,14 +79,14 @@ describe("le pied de page", () => {
     expect(links(render(createElement(Footer)))).toEqual([
       ["/bandes", "Bandes"],
       ["/confidentialite", DICTS.fr.footer.privacy],
-      ["/3d/CREDITS.txt", "Crédits"],
+      ["/credits.txt", "Crédits"],
       ["https://azerit.tech", "azerit.tech"],
     ]);
   });
 
   it("primes listées et règlement publié : leurs liens s'ajoutent, dans l'ordre", () => {
     const html = render(createElement(Footer), { config: { primesOpen: true, primesListed: true, rulesPublished: true, season: SEASON } });
-    expect(links(html).map((l) => l[0])).toEqual(["/bandes", "/primes", "/reglement", "/confidentialite", "/3d/CREDITS.txt", "https://azerit.tech"]);
+    expect(links(html).map((l) => l[0])).toEqual(["/bandes", "/primes", "/reglement", "/confidentialite", "/credits.txt", "https://azerit.tech"]);
   });
 
   it("en anglais", () => {
@@ -96,7 +96,7 @@ describe("le pied de page", () => {
       ["/primes", "Bounties"],
       ["/reglement", "Rules"],
       ["/privacy", DICTS.en.footer.privacy],
-      ["/3d/CREDITS.txt", "Credits"],
+      ["/credits.txt", "Credits"],
       ["https://azerit.tech", "azerit.tech"],
     ]);
   });

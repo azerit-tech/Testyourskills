@@ -1,0 +1,194 @@
+Azerit · Crédits / Credits
+==========================
+
+Ce que le site montre aujourd'hui : le film de la poursuite, la fiche, ses
+illustrations, ses polices et ses icônes. Tout modèle tiers est sous licence
+CC0 ou CC BY 4.0. Les modèles CC BY ont été modifiés pour le film (échelle,
+peinture, marques et inscriptions retirées, éclairage).
+
+What the site shows today: the chase film, the sheet, its illustrations,
+fonts and icons. Every third-party model is CC0 or CC BY 4.0. The CC BY
+models were modified for the film (scale, paint, badges and lettering removed,
+lighting).
+
+CC BY 4.0 : https://creativecommons.org/licenses/by/4.0/
+CC0 1.0   : https://creativecommons.org/publicdomain/zero/1.0/
+
+
+1. Le film de la poursuite / The chase film
+-------------------------------------------
+
+Rendu dans Blender pour Azerit. La ville, les immeubles, la route et
+l'éclairage sont écrits en code ; aucun lieu réel. Le son est synthétisé dans
+le navigateur : aucun fichier audio.
+Rendered in Blender for Azerit. The city, buildings, road and lighting are
+written in code; no real place. The sound is synthesized in the browser: no
+audio file.
+
+Modèles 3D, CC BY 4.0 / 3D models, CC BY 4.0
+
+Les voitures / The cars
+- Coupé / coupe : MMC Works (mmcworks)
+  https://sketchfab.com/3d-models/generic-sport-coupe-car-820a13c4831c41959ce75e6c2014e882
+- Berline des années 60 / 1960s sedan : Elements Creative Studio
+  https://sketchfab.com/3d-models/b1bb1e82fe394153932ba1c2a341dded
+- Coupé des années 70 / 1970s coupe : Iv4sHka (igoresha228gelic)
+  https://sketchfab.com/3d-models/79612cb9ee714df9967c6d6c4fc967b1
+- Rétroviseur intérieur / rear-view mirror : movemama
+  https://sketchfab.com/3d-models/rear-view-mirror-72f3ac9e3ff5423f823841b3c801d0c1
+- Fourgonnettes garées / parked station wagons : Martin Trafas (TinoD2)
+  https://sketchfab.com/3d-models/2b734bf738dc405998c2074953965cc6
+
+Les poursuivants / The pursuers
+- Patrouille / patrol car : Mateusz Woliński (jeandiz, SpatialNeglect)
+  https://sketchfab.com/3d-models/police-car-9166b13b6ae341f4bfc093edb71d74f4
+- Patrouille / patrol car : L95XP
+  https://sketchfab.com/3d-models/ford-crown-victoria-free-b1615ed43a5443a2876c8020a734cf6e
+- Patrouille / patrol car : Daniel Zhabotinsky
+  https://sketchfab.com/3d-models/fairheaven-lt-80-cop-cruiser-low-poly-model-61766c1e6e1e4b2b803c174f33433a74
+- Fourgon / van : bunny (bunnyuwuj, snafuj)
+  https://sketchfab.com/3d-models/gmc-vandura1976-van-40cf97bc0f7d4bdb8135c4e9d2264923
+- Hélicoptère / helicopter : solid3DDD
+  https://sketchfab.com/3d-models/eurocopter-ec135-politia-high-poly-02373bff3f7f48bf8649805455fe4260
+- Avions de chasse / jets : Gabriel (wokom) ; Tim Samedov (citizensnip)
+  https://sketchfab.com/3d-models/concept-jet-69012312f3ab4f13b637b6a188aa3d4c
+  https://sketchfab.com/3d-models/7a13c91f07e042a685b4d265644fdc06
+  https://sketchfab.com/3d-models/b9e7a67cf726485da1493545fccce557
+
+Les personnes / The people
+- Conducteur / driver : Jules Winnfield
+  https://sketchfab.com/3d-models/low-poly-character-0e95ddfd01ed4d23aeb1d9b7fe79ea26
+- Capuche / hood : Tijerín Art Studio
+  https://sketchfab.com/3d-models/balaclava-scarf-as-a-hood-3d-scan-5c037f1a66634c5ea25ad8e87a4c3923
+- Agents / officers : SPP Animation Studio ; TUZZY--
+  https://sketchfab.com/3d-models/policeman-d47bb1f61fa340588b5801cdb63812c8
+  https://sketchfab.com/3d-models/police-character-fuse-made-98f6136cc24f41f1bb1b1f3262bde2ff
+- Casquette / cap : Aramuor
+  https://sketchfab.com/3d-models/officer-police-captain-pilot-hat-cap-whatever-9697ef10105a4e02a6074bc9bca464bd
+- Arme inventée / fictional handgun : 4d_Bob (3d_Bob)
+  https://sketchfab.com/3d-models/t77-handgun-7e6a5ffc9deb4994a4092ccdba85c965
+
+Le barrage / The roadblock
+- Barrière / fence barricade : Rocz3D
+  https://sketchfab.com/3d-models/fence-barricade-03-2a09091d4e7b4539abe03f6a50762409
+- Cône / traffic cone : Kuutti Siitonen
+  https://sketchfab.com/3d-models/worn-traffic-cone-1cbffb4169684e5a84ba186882bd55d7
+- Cônes, balises, panneaux / cones, beacons, boards : NotAnotherApocalypticCo.
+  https://sketchfab.com/3d-models/e03b1d2dfdc0416bb8324d15573ea60c
+- Barrière de foule / crowd barrier : Gianluca Gatto (shockproof)
+  https://sketchfab.com/3d-models/438c36d48ab04ec4b5178c6989d3ab3b
+- Herse / spike strip : Eric (ericzilic176)
+  https://sketchfab.com/3d-models/spike-strip-2c8370fccfbf4a7f9b9d9729112b8e61
+- Mât d'éclairage / light tower : krambulini
+  https://sketchfab.com/3d-models/light-tower-9addea6a4129438b83a1fc3ed4a784ec
+
+La rue / The street
+- Cocotiers / coconut palms : Next Spring
+  https://sketchfab.com/3d-models/realistic-palm-tree-2-free-d05c8ffb6ec64a7184c4b673e21f7224
+- Palmiers royaux / royal palms : PlantCatalog
+  https://sketchfab.com/3d-models/realistic-hd-royal-palm-325-3113aadb615e432f934ec5d3407d11ce
+- Lampadaires / street lights : KMB3D (kmb_jr) ; Mercuri-sodyum ; StratoArt
+  https://sketchfab.com/3d-models/various-low-poly-street-lights-1173b0c4d9b0400bbeaafbee0e94ca59
+  https://sketchfab.com/3d-models/e72cababe3094faa93544727b77ff2cf
+  https://sketchfab.com/3d-models/c4471f470a56422d804b279cfddb4b27
+  https://sketchfab.com/3d-models/d0f6ca0318c044d6a99ac5e376b8ceca
+- Feux de circulation / traffic light : evgenymur
+  https://sketchfab.com/3d-models/nyc-80s-traffic-light-bad8aa4988474919be8f48920dde7e3d
+- Panneaux / road signs : FrodoUndead
+  https://sketchfab.com/3d-models/c39bf97110494b5db3de84165211f592
+- Glissière / guardrail : xplanepilot
+  https://sketchfab.com/3d-models/693dee3dc6a1495f90ab0ba1f8237cb4
+- Réservoirs de toit / rooftop water tanks : Username.blend (chrismasmanidis3)
+  https://sketchfab.com/3d-models/water-tank-aff4e9fd3f7042d5855fade7411df4df
+- Lettres néon / neon letters : danny_p3d
+  https://sketchfab.com/3d-models/a88035b37ba4498b8d7fe9cfbc0dccc8
+- Enseignes / signs : Black vizual ; plaggy
+  https://sketchfab.com/3d-models/794708f56b4e454caec677701781bca0
+  https://sketchfab.com/3d-models/9a924db296cf4a1eb12991702ab48da5
+  https://sketchfab.com/3d-models/ba11464601794316a2351d150774f10d
+- Store / awning : plaggy
+  https://sketchfab.com/3d-models/47e5fd8a6b194b48aad20425869d15ba
+- Intérieurs de boutique / storefront interiors : 99.Miles
+  https://sketchfab.com/3d-models/348da01c195d46eca29e478e98aab16c
+- Fenêtres / windows : hnanw
+  https://sketchfab.com/3d-models/e8a3914fb654483790abc0cd72fb7099
+- Portes vitrées / glass doors : carlcapu9
+  https://sketchfab.com/3d-models/e0ff1a543cb34979999d2fd87843203e
+- Climatiseurs / air conditioners : Khoa Nguyen
+  https://sketchfab.com/3d-models/3b930497c77f47269847e75b9ee85b20
+- Garde-corps / railings : Owen.Barden
+  https://sketchfab.com/3d-models/b5b629702e814263816769db0ee660cc
+- Parcmètre / parking meter : sixonetwo
+  https://sketchfab.com/3d-models/c0f5e3e1c8a64ab3b64d4b077bd09210
+- Distributeur de journaux / newspaper box : chrisg4919
+  https://sketchfab.com/3d-models/29cca5a8e99e438c8fb644d1aea3587e
+- Mobilier de rue / street furniture : Dominik Biały
+  https://sketchfab.com/3d-models/9752f598cc5541acb3de07150d1a4ae4
+
+Le port et la marina / The harbor and the marina
+- Conteneurs / containers : Invictus fulgur ; Aidan Callaghan ; Sebastian Webster
+  https://sketchfab.com/3d-models/ac9356745e9a43d6b5cb7d53d8f26008
+  https://sketchfab.com/3d-models/f555ce5532d84cac8ad963dec5833934
+  https://sketchfab.com/3d-models/772f4be391a245f699c54e6cf157c58d
+- Grues / cranes : jhervianto ; MisterH ; Randonavt
+  https://sketchfab.com/3d-models/ae2b1da54f6a4e28ba5f7daa1c6dc5b8
+  https://sketchfab.com/3d-models/d4d582ebd707426f93f1f5a9cdd0ce03
+  https://sketchfab.com/3d-models/965188af6132410189a2eb1210f9095c
+- Navires / ships : RM02 ; hungry_drifter ; Moon Moon
+  https://sketchfab.com/3d-models/aaa41cca946b4a08bc08cf692b7757be
+  https://sketchfab.com/3d-models/b7c97df584824ca682d26daabf401f87
+  https://sketchfab.com/3d-models/fd28c35b76754c9386b32aa281a0e238
+- Chariot élévateur / forklift : louis-muir
+  https://sketchfab.com/3d-models/060f3f8bc7de4e6ca2f348d414702e9d
+- Bitte d'amarrage / bollard : henkei
+  https://sketchfab.com/3d-models/d62977f75f2d49688fd0094fbf5b1d41
+- Palettes / pallets : Anna Denisova
+  https://sketchfab.com/3d-models/18fbfb830f294b44aa8dff530cc2ea12
+- Bateaux de plaisance / pleasure boats : Taldinc ; Miguelangelo Rosario ;
+  BoatUS Foundation ; Sergei
+  https://sketchfab.com/3d-models/d59913994a44444b8d054f4de5f519bc
+  https://sketchfab.com/3d-models/09a9fc4a0061464fba1bc3ba76848869
+  https://sketchfab.com/3d-models/14564c5ec6ee4f11a3ea8e213b981cb1
+  https://sketchfab.com/3d-models/0dd451f295d049cea20c17d3ffa87ee3
+
+Modèles, textures et ciel, CC0 / Models, textures and sky, CC0
+
+- Poly Haven (https://polyhaven.com/license) : ciel / sky qwantani_dusk_2_puresky
+  (Greg Zaal, Jarod Guest) ; asphalt_02 ; asphalt_04 (Jenelle van Heerden,
+  Sergej Majboroda) ; aerial_asphalt_01 (Rob Tuytel) ; brushed_concrete_04
+  (Amal Kumar) ; concrete_floor_01 ; beige_wall_001 ; coral_fort_wall_01
+  (Dimitrios Savva, Rico Cilliers) ; water_manhole_cover (Raunox) ; shrub_01 ;
+  exterior_aircon_unit ; modular_street_seating ; metal_trash_can ;
+  outdoor_table_chair_set_01 ; modular_metal_gutter ; utility_box_01 ;
+  security_light ; potted_plant_02 ; rollershutter_door ; bar_chair_round_01 ;
+  concrete_road_barrier ; concrete_road_barrier_02 ; service_pistol
+  (Mateusz Sadek) ; old_tyre ; ocean_buoy ; fire_hydrant.
+  https://polyhaven.com/a/<nom / name>
+- ambientCG, Lennart Demes (https://ambientcg.com) : Grate002 ;
+  PaintedPlaster017 ; Plaster003 ; Leaking004, 007, 008, 009 ;
+  SurfaceImperfections003, 013, 017.
+  https://ambientcg.com/view?id=<nom / name>
+
+
+2. La fiche et les images / The sheet and the images
+----------------------------------------------------
+
+- Illustrations des profils et des personnages : créées pour Azerit.
+  Profile and character illustrations: made for Azerit.
+- Icônes des langages / language icons : Simple Icons, CC0.
+  https://simpleicons.org
+- Polices / fonts, SIL Open Font License 1.1 (https://openfontlicense.org) :
+  Outfit, The Outfit Project Authors (https://github.com/Outfitio/Outfit-Fonts) ;
+  Barlow Condensed, Jeremy Tribby (https://github.com/jpt/barlow) ;
+  JetBrains Mono, JetBrains (https://github.com/JetBrains/JetBrainsMono).
+
+
+3. L'ancienne révélation en 3D / The former 3D reveal
+-----------------------------------------------------
+
+La scène de l'ascenseur ne fait plus partie du parcours. Ses modèles, ses
+textures et les données OpenStreetMap (© OpenStreetMap contributors, ODbL)
+restent crédités dans /3d/CREDITS.txt.
+The elevator scene is no longer part of the flow. Its models, textures and
+OpenStreetMap data (© OpenStreetMap contributors, ODbL) stay credited in
+/3d/CREDITS.txt.
