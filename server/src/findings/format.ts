@@ -58,10 +58,8 @@ export function weekday(i: number, lang: Lang): string {
   return WEEKDAYS[lang][i]!;
 }
 
-/** Typographie française : espace insécable avant « : ; ! ? » et dans les guillemets, pour qu'aucun signe ne passe seul à la ligne. */
-export function frTypo(s: string): string {
-  return s.replace(/ ([:;!?»])/g, `${NBSP}$1`).replace(/« /g, `«${NBSP}`);
-}
+/** Typographie française (shared/typo.ts) : aucun signe double, aucune unité ne passe seul à la ligne. */
+export { frTypo } from "../../../shared/typo";
 
 /** Singulier ou pluriel, sur le nombre seulement : jamais d'accord avec la personne. */
 export function plural(n: number, one: string, many: string): string {
