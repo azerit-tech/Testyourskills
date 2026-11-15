@@ -1,6 +1,6 @@
 // L'image de partage d'une bande (SPEC §18.38), 1200 × 630, dans la langue des
 // aperçus de fiche (compositions.tsx) : l'encre plate ; à gauche ce qu'on lit à
-// 360 px de large, dans l'ordre : la ligue, le nom de la bande en grand, puis
+// 360 px de large, dans l'ordre : la ligue signée (« AZERIT · BANDE D'ÉCOLE »), le nom de la bande en grand, puis
 // l'accroche au premier rang, en pêche (son rang, ou « Bande en formation »),
 // ce qui la sépare de la bande de devant (ou ce qui lui manque), une phrase qui
 // dit à qui voit l'image ce qu'il y gagne, et l'appel « Rejoins la bande ». À
@@ -14,7 +14,7 @@ import { fontAttrs } from "../../../shared/card/fonts";
 import { fit, fitLines, upper, wrap } from "../../../shared/card/text";
 import { PALETTE } from "../../../shared/card/themes";
 import type { Lang } from "../../../shared/types";
-import { CtaPill, IMAGE_WORDS, Ink, SceneFrame, SKYLINE_FOCUS, STAR_PATH } from "./compositions";
+import { BrandKicker, CtaPill, IMAGE_WORDS, Ink, SceneFrame, SKYLINE_FOCUS, STAR_PATH } from "./compositions";
 import { sceneFor } from "./scenes";
 
 const LEAGUE: Record<Lang, Record<BandStanding["type"], { kicker: string; of: string }>> = {
@@ -71,7 +71,7 @@ const WORDS: Record<Lang, { stars: (n: number) => string; sheets: (n: number) =>
     stars: (n) => (n === 1 ? "star" : "stars"),
     sheets: (n) => (n === 1 ? "sheet" : "sheets"),
     yours: (label) => `Your stars count for ${label}.`,
-    top: `The best ${BAND_TOP_MEMBERS} sheets count`,
+    top: `Top ${BAND_TOP_MEMBERS} sheets count`,
     forming: `${BAND_MIN_MEMBERS} sheets to make the board`,
   },
 };
@@ -182,9 +182,7 @@ export function BandOg({ band, lang }: { band: BandStanding; lang: Lang }) {
     <svg xmlns="http://www.w3.org/2000/svg" width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
       <Ink w={W} h={H} />
       <SceneFrame scene={sceneFor(undefined, "large")} id="band" x={panel.x} y={panel.y} w={panel.w} h={panel.h} align="xMidYMid" r={14} focus={SKYLINE_FOCUS} />
-      <text x={x} y={top + 44} {...fontAttrs("sans-600")} fontSize={26} letterSpacing={26 * 0.26} fill={PALETTE.cream} fillOpacity={0.7}>
-        {kicker}
-      </text>
+      <BrandKicker x={x} y={top + 44} size={26} text={kicker} />
       {lines.lines.map((l, i) => (
         <text key={i} x={x - 2} y={nameY + i * step} {...fontAttrs("display-700")} fontSize={lines.size} letterSpacing={0.5} fill={PALETTE.cream}>
           {l}

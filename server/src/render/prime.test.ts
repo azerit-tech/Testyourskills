@@ -40,7 +40,7 @@ describe("l'image d'une prime", () => {
     expect(lot[1]!.size).toBe(lot[0]!.size);
     expect(Math.max(...all.filter((t) => t.text !== "J-12").map((t) => t.size))).toBe(lot[0]!.size);
     // La colonne de gauche, de haut en bas, sans écart de plus de 90 px entre deux lignes.
-    const column = [at("PRIME, STAGE"), ...lot, at("ENTREPRISE DÉMO"), at("Backend, Full-stack"), at("À Ville Démo")];
+    const column = [at("· PRIME, STAGE"), ...lot, at("ENTREPRISE DÉMO"), at("Backend, Full-stack"), at("À Ville Démo")];
     for (let i = 1; i < column.length; i++) {
       expect(column[i]!.y).toBeGreaterThan(column[i - 1]!.y);
       expect(column[i]!.y - column[i]!.size * 0.72 - column[i - 1]!.y).toBeLessThan(90);
@@ -79,8 +79,8 @@ describe("l'image d'une prime", () => {
     expect(closed).toContain(`>${IMAGE_WORDS.fr.primeClosed} :</text>`);
     expect(closed).toContain(">1 ENTRETIEN</text>");
     expect(closed).toContain(">ÉTAIT EN JEU</text>");
-    expect(closed).toContain(">CLOSE</text>");
-    // Close : la tuile n'est plus pleine, elle est en contour.
+    expect(closed).toContain(">TERMINÉE</text>");
+    // Terminée : la tuile n'est plus pleine, elle est en contour.
     expect(closed).not.toMatch(/rx="14" fill="#ffd3a5"/);
   });
 

@@ -19,8 +19,13 @@
 // étoiles, la phrase du profil à la place du chef d'accusation ; la bande, la prime et l'accueil refaits.
 // v8 (15 novembre 2026) : la signature en pied de fiche passe de 8 à 10, plus claire, et dit
 // « Fiche lue par Azerit » (“Sheet read by Azerit”) ; au dos, “weighted average”.
+// v9 (15 novembre 2026) : la fiche se lit à 334 px (aucun texte sous 12 unités), matricule à
+// six chiffres sur la plaque, note crème à tous les niveaux ; l'aperçu d'une fiche écrit
+// « 79/100 » ; la marque signe les images de bande et de prime, la prime a son décor doré et
+// dit « Terminée » ; le titre de l'accueil en lilas puis crème ; le portrait pose « Avis de
+// recherche » sur sa plaque, comme la story.
 
-export const IMAGE_DESIGN = 8;
+export const IMAGE_DESIGN = 9;
 
 /** Dossier du cache disque, sous og/. */
 export const IMAGE_DESIGN_DIR = `v${IMAGE_DESIGN}`;

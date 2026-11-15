@@ -108,7 +108,7 @@ describe("page /c/:id avec ?r=", () => {
     expect(html).toBe(await plain.text());
     expect(html).toContain(`<meta property="og:url" content="https://skills.test/c/${id}">`);
     expect(html).toContain(`<link rel="canonical" href="https://skills.test/c/${id}">`);
-    expect(html).toContain(`<meta property="og:image" content="https://skills.test/og/${id}.png?v=8">`);
+    expect(html).toContain(`<meta property="og:image" content="https://skills.test/og/${id}.png?v=9">`);
     expect(html).not.toContain("?r=");
     expect(withRef.headers.get("cache-control")).toBe(plain.headers.get("cache-control"));
   });

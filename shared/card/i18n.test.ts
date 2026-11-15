@@ -1,11 +1,12 @@
 // Les règles des textes du site (§18.48), tenues aussi sur ce qui se dessine :
-// le dictionnaire de la fiche et des images, et les textes venus des données
-// (chefs d'accusation, profils, peines et cautions). Typographie française,
-// lexique, aucun tiret cadratin ni point médian dans un mot.
+// le dictionnaire de la fiche, les mots des images et les textes venus des
+// données (chefs d'accusation, profils, peines et cautions). Typographie
+// française, lexique, aucun tiret cadratin ni point médian dans un mot.
 import { describe, expect, it } from "vitest";
 import profilesJson from "../../data/profiles.json";
 import sentencesJson from "../../data/sentences.json";
 import statusesJson from "../../data/statuses.json";
+import { IMAGE_WORDS } from "../../server/src/render/compositions";
 import { STRINGS } from "./i18n";
 
 /** Des arguments d'essai pour les fonctions du dictionnaire. */
@@ -40,8 +41,8 @@ function shown(value: unknown, lang: "fr" | "en", path = "", out: [string, strin
 }
 
 const DATA = { profiles: profilesJson, sentences: sentencesJson, statuses: statusesJson };
-const FR = [...texts(STRINGS.fr), ...Object.entries(DATA).flatMap(([name, d]) => shown(d, "fr", name))];
-const EN = [...texts(STRINGS.en), ...Object.entries(DATA).flatMap(([name, d]) => shown(d, "en", name))];
+const FR = [...texts(STRINGS.fr), ...texts(IMAGE_WORDS.fr, "image"), ...Object.entries(DATA).flatMap(([name, d]) => shown(d, "fr", name))];
+const EN = [...texts(STRINGS.en), ...texts(IMAGE_WORDS.en, "image"), ...Object.entries(DATA).flatMap(([name, d]) => shown(d, "en", name))];
 const bad = (all: [string, string][], re: RegExp) => all.filter(([, s]) => re.test(s)).map(([p, s]) => `${p}: ${s.slice(0, 90)}`);
 
 describe("la fiche et les données se relisent en entier", () => {

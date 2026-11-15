@@ -3,8 +3,11 @@
 // 360 px de large : le contrat, puis le lot au premier rang (« 3 entretiens à la
 // clé », sur deux lignes), l'entreprise (son logo s'il existe, sinon son nom, en
 // pêche), les postes, le lieu, et l'appel « Entre dans la course » (« Voir le
-// classement » une fois close). À droite, le haut du lieu du crime par défaut,
-// et dessous l'échéance en grand dans sa tuile pêche (en contour une fois close).
+// classement » une fois terminée). En haut, la marque signe le surtitre
+// (« AZERIT · PRIME, STAGE »). À droite, le décor de l'heure dorée (celui de la
+// machine à livrer, dans le pêche de la saison : il ne se confond pas avec la
+// ville des bandes), et dessous l'échéance en grand dans sa tuile pêche (en
+// contour une fois terminée).
 // Aucun dégradé ajouté, aucune lueur. Jamais un pseudo, jamais un rang.
 import type { ReactNode } from "react";
 import type { PrimeView } from "../../../shared/primes";
@@ -14,7 +17,7 @@ import { STRINGS } from "../../../shared/card/i18n";
 import { fit, fitLines, upper, wrap } from "../../../shared/card/text";
 import { PALETTE } from "../../../shared/card/themes";
 import type { Lang } from "../../../shared/types";
-import { CtaPill, IMAGE_WORDS, Ink, SceneFrame, SKYLINE_FOCUS } from "./compositions";
+import { BrandKicker, CtaPill, IMAGE_WORDS, Ink, SceneFrame } from "./compositions";
 import { sceneFor } from "./scenes";
 
 const WORDS: Record<
@@ -38,14 +41,14 @@ const WORDS: Record<
     interviews: (k, over) => [`${k} ${k > 1 ? "entretiens" : "entretien"}`, over ? (k > 1 ? "étaient en jeu" : "était en jeu") : "à la clé"],
     remote: "Télétravail possible",
     onSite: (p) => `À ${p}`,
-    closed: "Close",
+    closed: "Terminée",
     last: "Dernier jour",
     left: (k) => `J-${k}`,
     opens: (d) => `Ouvre le ${d}`,
     tile: { left: (k) => `J-${k}`, toEnter: "pour entrer dans la course", over: "La course est finie", opening: "Ouverture de la course" },
   },
   en: {
-    kicker: { stage: "Bounty, internship", alternance: "Bounty, work-study", cdi: "Bounty, full-time" },
+    kicker: { stage: "Bounty, internship", alternance: "Bounty, apprenticeship", cdi: "Bounty, full-time" },
     interviews: (k, over) => [`${k} ${k > 1 ? "interviews" : "interview"}`, over ? (k > 1 ? "were at stake" : "was at stake") : "up for grabs"],
     remote: "Remote possible",
     onSite: (p) => `In ${p}`,
@@ -65,7 +68,7 @@ function dayOf(day: string, lang: Lang): string {
   return lang === "fr" ? `${n === 1 ? "1er" : n} ${month}` : `${month} ${n}`;
 }
 
-/** « J-12 », « Dernier jour », « Close », « Ouvre le 2 décembre ». */
+/** « J-12 », « Dernier jour », « Terminée », « Ouvre le 2 décembre ». */
 export function primeWhen(p: Pick<PrimeView, "phase" | "daysLeft" | "from">, lang: Lang): string {
   const w = WORDS[lang];
   if (p.phase === "closed") return w.closed;
@@ -93,6 +96,11 @@ function deadline(p: Pick<PrimeView, "phase" | "daysLeft" | "from">, lang: Lang)
   if (p.phase === "soon") return { big: dayOf(p.from, lang), small: w.tile.opening };
   return { big: p.daysLeft ? w.tile.left(p.daysLeft) : w.last, small: w.tile.toEnter };
 }
+
+/** Le décor des primes : l'heure dorée, jamais la ville de nuit des bandes. */
+const PRIME_SCENE = "delivery_machine";
+/** Le cadre resserré sur la camionnette et le ciel, la route plate hors du panneau. */
+const PRIME_FOCUS = { zoom: 1.3, x: 0.56, y: 0.45 };
 
 export function PrimeOg({ prime, logo, lang }: { prime: PrimeView; logo: PrimeLogo | null; lang: Lang }) {
   const W = 1200;
@@ -166,10 +174,8 @@ export function PrimeOg({ prime, logo, lang }: { prime: PrimeView; logo: PrimeLo
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
       <Ink w={W} h={H} />
-      <SceneFrame scene={sceneFor(undefined, "large")} id="prime" x={panel.x} y={panel.y} w={panel.w} h={panel.h} align="xMidYMid" r={14} focus={SKYLINE_FOCUS} />
-      <text x={x} y={top + 44} {...fontAttrs("sans-600")} fontSize={26} letterSpacing={26 * 0.26} fill={PALETTE.cream} fillOpacity={0.7}>
-        {kicker}
-      </text>
+      <SceneFrame scene={sceneFor(PRIME_SCENE, "large")} id="prime" x={panel.x} y={panel.y} w={panel.w} h={panel.h} align="xMidYMid" r={14} focus={PRIME_FOCUS} />
+      <BrandKicker x={x} y={top + 44} size={26} text={kicker} />
       {lot.map((l, i) => (
         <text key={i} x={x - 2} y={lotY + i * lotStep} {...fontAttrs("display-800")} fontSize={lotSize} letterSpacing={0.5} fill={PALETTE.cream}>
           {l}

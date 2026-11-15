@@ -46,12 +46,14 @@ describe("lieux du crime des images de partage", () => {
     const svg = await renderSvg({ format: "og", card: light, lang: "fr" });
     expect(svg).toMatch(/^<svg[^>]*viewBox="0 0 1200 630"/);
     expect(svg).toContain('fill="#0c0d1b"');
-    // Le décor ne porte pas d'information : un bandeau, moins du tiers de la hauteur de la colonne.
-    expect(svg).toMatch(/<image href="data:image\/jpeg;base64,[^"]+" x="560" y="86" width="576" height="180" preserveAspectRatio="xMidYMid slice"/);
-    expect(svg).toMatch(/<rect x="560" y="86" width="576" height="180" rx="8"/);
+    // Le décor ne porte pas d'information : un bandeau, le quart de la hauteur de la colonne.
+    expect(svg).toMatch(/<image href="data:image\/jpeg;base64,[^"]+" x="560" y="86" width="576" height="132" preserveAspectRatio="xMidYMid slice"/);
+    expect(svg).toMatch(/<rect x="560" y="86" width="576" height="132" rx="8"/);
     // Le titre d'affiche : crème pleine, 50 px (15 px dans une vignette de 360 px de large).
     expect(svg).toMatch(/<text x="560"[^>]*font-size="50"[^>]*fill="#fff9cb">AVIS DE RECHERCHE</);
     expect(svg).toContain("LÉA MARTIN-DUBOIS");
+    // La note porte son échelle, sur la ligne des étoiles : « 79/100 ».
+    expect(svg).toContain(`>${light.overall}/100</text>`);
   });
 
   it("aperçu de lien : six étoiles de 44 px remplies de gauche à droite, crème pleine puis contour, et le niveau", async () => {
@@ -109,12 +111,13 @@ describe("lieux du crime des images de partage", () => {
     expect(short).not.toContain("…</text>");
   });
 
-  it("portrait : le décor de bord à bord, calé sur son ciel, le surtitre dans la couleur de son heure", async () => {
+  it("portrait : le décor de bord à bord, calé sur son ciel, le surtitre sur sa plaque d'encre comme la story", async () => {
     const pink = await renderSvg({ format: "portrait", card: light, lang: "fr" });
     expect(pink).toMatch(/<image href="data:image\/jpeg;base64,[^"]+" x="0" y="0" width="1080" height="620" preserveAspectRatio="xMidYMin slice"/);
-    expect(pink).toMatch(/fill="#0c0d1b" fill-opacity="1">AVIS DE RECHERCHE</);
+    // Sur un ciel clair comme sur un ciel de nuit : crème sur la plaque, un seul dessin.
+    expect(pink).toMatch(/<rect [^>]*fill="#0c0d1b"><\/rect><text [^>]*fill="#fff9cb" fill-opacity="1">AVIS DE RECHERCHE</);
     const night = await renderSvg({ format: "portrait", card: blue, lang: "en" });
-    expect(night).toMatch(/fill="#fff9cb" fill-opacity="1">WANTED</);
+    expect(night).toMatch(/<rect [^>]*fill="#0c0d1b"><\/rect><text [^>]*fill="#fff9cb" fill-opacity="1">WANTED</);
   });
 
   it("portrait : sous la fiche, ce que c'est en une ligne et l'appel, en français ou en anglais", async () => {

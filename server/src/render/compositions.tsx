@@ -14,13 +14,13 @@
 // sert qu'à l'appel (CtaPill), la citation est pêche.
 import type { ReactNode } from "react";
 import { LEVEL_LABELS, starsFor, type CardData, type Lang } from "../../../shared/types";
+import { AzeritGem } from "../../../shared/card/AzeritGem";
 import { CardGraphic } from "../../../shared/card/Card";
 import { fontAttrs } from "../../../shared/card/fonts";
 import { CARD_H, CARD_R, CARD_W } from "../../../shared/card/geometry";
 import { t } from "../../../shared/card/i18n";
 import { fit, fitLines, measure, upper, wrap } from "../../../shared/card/text";
 import { PALETTE, themeOf } from "../../../shared/card/themes";
-import { SKY_TEXT } from "../../../shared/scenes";
 import { HOME_PROMISE } from "../../../shared/promise";
 import type { SceneImage } from "./scenes";
 
@@ -213,14 +213,35 @@ function PosterTitle({ x, y, size, lang }: { x: number; y: number; size: number;
   );
 }
 
+/**
+ * Le surtitre d'une image de bande ou de prime, signé : la gemme et « AZERIT »
+ * (le dessin de la barre du site, 28 de haut), puis « · BANDE D'ÉCOLE ». Sur
+ * l'image d'une fiche, la marque est déjà dans la fiche.
+ */
+export function BrandKicker({ x, y, size, text }: { x: number; y: number; size: number; text: string }) {
+  const ls = size * 0.26;
+  const gemH = 28;
+  const brand = "AZERIT";
+  const tx = x + Math.round(gemH * 0.87) + 10;
+  const brandW = measure(brand, "sans-600", size, ls);
+  return (
+    <g data-brand="">
+      <AzeritGem x={x} y={+(y - size * 0.35 - gemH / 2).toFixed(1)} h={gemH} />
+      <text x={tx} y={y} {...fontAttrs("sans-600")} fontSize={size} letterSpacing={+ls.toFixed(2)} fill={PALETTE.cream}>
+        {brand}
+      </text>
+      <text x={+(tx + brandW + ls + size * 0.3).toFixed(1)} y={y} {...fontAttrs("sans-600")} fontSize={size} letterSpacing={+ls.toFixed(2)} fill={PALETTE.cream} fillOpacity={0.7}>
+        {`· ${text}`}
+      </text>
+    </g>
+  );
+}
+
 /** Le format des décors (1152 × 768, 576 × 384). */
 const SCENE_RATIO = 3 / 2;
 
 /** Le cadre des aperçus d'une bande et d'une prime sur le décor par défaut : la ligne d'immeubles et son reflet. */
 export const SKYLINE_FOCUS = { zoom: 2, x: 0.6, y: 0.51 };
-
-/** La couleur d'un texte posé sur le haut d'un ciel ; le front de mer dessiné est sombre. */
-const skyInk = (scene: SceneImage | null | undefined) => SKY_TEXT[scene?.tone ?? "dark"];
 
 /**
  * Le lieu du crime dans un cadre : l'image recadrée pour le remplir (`slice`), centrée
@@ -331,16 +352,19 @@ export function OgImage({ card, lang, avatars, scene }: { card: CardData; lang: 
   const upperName = upper(card.name, lang);
   const one = fit(upperName, { font: "display-700", size: 84, minSize: 56, maxWidth: maxW, letterSpacing: 0.5 });
   const name = one.text === upperName ? { lines: [one.text], size: one.size } : fitLines(upperName, { font: "display-700", size: 64, minSize: 44, maxWidth: maxW, letterSpacing: 0.5 });
-  // Le bandeau du décor rend sa place à un nom sur deux lignes.
-  const panelH = name.lines.length > 1 ? 132 : 180;
+  // Le bandeau du décor, assez bas pour laisser sa ligne à la note sur 100.
+  const panelH = 132;
   const nameY = panelY + panelH + 22 + Math.round(name.size * 0.72);
   const lastNameY = nameY + (name.lines.length - 1) * Math.round(name.size * 0.98);
-  // Les étoiles et le niveau, sur une ligne ; un dossier scellé n'a ni note ni étoiles : ses deux mots à la place.
+  // Les étoiles et la note sur 100 sur une ligne, le niveau dessous ; une fiche scellée n'a ni note ni étoiles : ses deux mots à la place.
   const stars = starsFor(card.overall);
   const starSize = 44;
   const starsY = lastNameY + 22;
   const starsW = card.sealed ? 0 : starRowWidth(starSize) + 22;
-  const level = fit(upper(card.sealed ? t(lang).sealed : LEVEL_LABELS[stars][lang], lang), { font: "display-700", size: 42, minSize: 26, maxWidth: maxW - starsW, letterSpacing: 1 });
+  const score = card.sealed ? null : `${card.overall}/100`;
+  const level = fit(upper(card.sealed ? t(lang).sealed : LEVEL_LABELS[stars][lang], lang), { font: "display-700", size: 42, minSize: 26, maxWidth: maxW, letterSpacing: 1 });
+  const levelY = card.sealed ? starsY + starSize / 2 + Math.round(level.size * 0.35) : starsY + starSize + 12 + Math.round(level.size * 0.7);
+  const quoteY = card.sealed ? starsY + starSize + 48 : levelY + 48;
   const quote = imageQuote(card, lang);
   const quoted = quote ? (lang === "fr" ? `« ${quote} »` : `“${quote}”`) : "";
   const qLines = quote ? wrap(quoted, "sans-600", 34, maxW, name.lines.length > 1 ? 1 : 2) : [];
@@ -356,11 +380,16 @@ export function OgImage({ card, lang, avatars, scene }: { card: CardData; lang: 
         </text>
       ))}
       {!card.sealed && <StarRow n={stars} x={tx} y={starsY} size={starSize} />}
-      <text x={tx + starsW} y={starsY + starSize / 2 + Math.round(level.size * 0.35)} {...fontAttrs("display-700")} fontSize={level.size} letterSpacing={level.letterSpacing} fill={PALETTE.cream}>
+      {score && (
+        <text x={tx + starsW} y={starsY + starSize / 2 + Math.round(42 * 0.35)} {...fontAttrs("display-700")} fontSize={42} letterSpacing={1} fill={PALETTE.cream}>
+          {score}
+        </text>
+      )}
+      <text x={tx} y={levelY} {...fontAttrs("display-700")} fontSize={level.size} letterSpacing={level.letterSpacing} fill={PALETTE.cream}>
         {level.text}
       </text>
       {qLines.map((l, i) => (
-        <text key={i} x={tx} y={starsY + starSize + 48 + i * 42} {...fontAttrs("sans-600")} fontSize={34} fill={PALETTE.peach}>
+        <text key={i} x={tx} y={quoteY + i * 42} {...fontAttrs("sans-600")} fontSize={34} fill={PALETTE.peach}>
           {l}
         </text>
       ))}
@@ -407,7 +436,7 @@ export function CtaPill({ x, bottom, label, lang, size, maxW, anchor = "start" }
 /* ------------------------------------------------------------------ */
 
 /** La promesse, le titre de l'accueil (shared/promise.ts, sa seule source) : deux
- *  phrases de deux lignes, la première en crème, la seconde en pêche. */
+ *  phrases de deux lignes, la première en lilas, la seconde en crème : les couleurs du titre de l'accueil. */
 const PROMISE = (lang: Lang): [string[], string[]] => [HOME_PROMISE[lang].claim, HOME_PROMISE[lang].proof];
 
 /** Même mise en page que l'aperçu d'une fiche : la fiche de la vitrine à gauche,
@@ -439,7 +468,7 @@ export function HomeOg({ card, lang, avatars }: { card: CardData; lang: Lang; av
       <Placed card={card} lang={lang} avatars={avatars} id="home" x={cx} y={cy} w={cw} />
       <PosterTitle x={tx} y={cy + 35} size={50} lang={lang} />
       {lines.map((l, i) => (
-        <text key={i} x={tx - 2} y={Math.round(titleTop + size * 0.72 + i * size * 0.94)} {...fontAttrs("display-700")} fontSize={size} letterSpacing={0.5} fill={i >= claim.length ? PALETTE.peach : PALETTE.cream}>
+        <text key={i} x={tx - 2} y={Math.round(titleTop + size * 0.72 + i * size * 0.94)} {...fontAttrs("display-700")} fontSize={size} letterSpacing={0.5} fill={i >= claim.length ? PALETTE.cream : PALETTE.lilac}>
           {l}
         </text>
       ))}
@@ -455,7 +484,7 @@ export function HomeOg({ card, lang, avatars }: { card: CardData; lang: Lang; av
 /** La page d'une fiche (§18.29) en 4:5 : le lieu du crime de bord à bord en haut,
  *  calé sur son ciel, l'encre plate dessous, et la fiche en grand (les deux tiers de la
  *  largeur, lisible en miniature dans un fil) qui chevauche le bas de l'image.
- *  « Avis de recherche » sur le ciel, ce que c'est en une ligne et l'appel en pied. */
+ *  « Avis de recherche » sur sa plaque d'encre comme sur la story, ce que c'est en une ligne et l'appel en pied. */
 export function PortraitImage({ card, lang, avatars, scene }: { card: CardData; lang: Lang; avatars: Avatars; scene?: SceneImage | null }) {
   const W = 1080;
   const H = 1350;
@@ -469,7 +498,7 @@ export function PortraitImage({ card, lang, avatars, scene }: { card: CardData; 
     <svg xmlns="http://www.w3.org/2000/svg" width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
       <Ink w={W} h={H} />
       <SceneFrame scene={scene} id="pt" x={0} y={0} w={W} h={skyH} align="xMidYMin" />
-      <Poster x={W / 2} y={82} size={40} lang={lang} fill={skyInk(scene)} opacity={1} />
+      <PosterPlate x={W / 2} y={82} size={40} lang={lang} />
       <Placed card={card} lang={lang} avatars={avatars} id="pt" x={cx} y={cy} w={cw} />
       <text x={W / 2} y={Math.round(bottom + 56)} {...fontAttrs("sans-500")} fontSize={what.size} textAnchor="middle" fill={PALETTE.lilac}>
         {what.text}
