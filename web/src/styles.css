@@ -1184,10 +1184,25 @@ button.cover-panel:focus-visible {
   .page-home .board > .bands-top-all {
     justify-self: start;
   }
+  /* la semaine vide (une seule carte « La place n° 1 est libre ») : à mi-hauteur de la fiche,
+     pas collée en haut d'une colonne vide */
+  .home-proof > .board:has(.board-empty) {
+    align-self: center;
+  }
+  /* le dernier formulaire : une seule colonne centrée de 560 px, le titre en grand */
   .home-last {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 440px);
-    column-gap: 40px;
-    align-items: center;
+    grid-template-columns: minmax(0, 560px);
+    justify-content: center;
+    gap: 24px;
+  }
+  .home-last-head {
+    text-align: center;
+  }
+  .home-last-head h2 {
+    font-size: var(--t-60);
+  }
+  .page-home .home-last .entry {
+    max-width: none;
   }
   /* les deux formulaires de l'accueil, empilés comme sur téléphone : portes, champ, bouton */
   .page-home .entry {
@@ -1506,6 +1521,35 @@ button.cover-panel:focus-visible {
     align-self: stretch;
     aspect-ratio: auto;
     padding: 16px;
+  }
+  /* bureau : la légende sous l'image, en entier, sans voile ; l'image garde ses angles */
+  .wall-tile:not(.wall-cta) {
+    display: grid;
+    align-content: start;
+    gap: 10px;
+    aspect-ratio: auto;
+    overflow: visible;
+    border-radius: 0;
+    background: none;
+  }
+  .wall-tile:not(.wall-cta) .wall-img {
+    position: static;
+    height: auto;
+    aspect-ratio: 3 / 2;
+    border-radius: var(--r-item);
+    background: var(--s-item);
+  }
+  .wall-text {
+    position: static;
+  }
+  .wall-text::before {
+    content: none;
+  }
+  .wall-tagline {
+    display: block;
+    -webkit-line-clamp: none;
+    line-clamp: none;
+    color: var(--c-text-2);
   }
 }
 @media (min-width: 1200px) {
