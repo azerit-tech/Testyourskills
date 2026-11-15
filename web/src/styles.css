@@ -879,9 +879,9 @@ svg {
 .lang-toggle button:hover:not([aria-pressed="true"]) {
   color: var(--c-text);
 }
-/* écran très étroit : la gemme seule, sans le nom */
+/* écran très étroit : la gemme seule, sans le nom, seulement quand « Ma fiche » prend sa place */
 @media (max-width: 349px) {
-  .brand-name {
+  .topbar:has(.topbar-link + .topbar-link) .brand-name {
     display: none;
   }
 }
