@@ -48,6 +48,21 @@ export function strongPoint(grid: Grid): (GridCriterion & { score: number }) | n
   return ranked[0] ?? null;
 }
 
+/**
+ * Le critère le plus faible de la note (« Fais appel », §18.52) : la note la plus
+ * basse parmi les critères comptés dans la moyenne, jamais l'école (aucun chiffre
+ * d'école ne s'affiche) ; à égalité, le plus lourd coefficient, puis l'ordre du
+ * recruteur. Null sans grille ou sans critère compté (fiche vide).
+ */
+export function weakestCriterion(grid: Grid | undefined | null): (GridCriterion & { score: number }) | null {
+  if (!usableGrid(grid) || grid.rule === "empty_file") return null;
+  const ranked = RECRUITER_ORDER.map((code) => grid.criteria.find((c) => c.code === code))
+    .filter(noted)
+    .filter((c) => c.counted && c.code !== "EDU")
+    .sort((a, b) => a.score - b.score || GRID_WEIGHTS[b.code] - GRID_WEIGHTS[a.code] || RECRUITER_ORDER.indexOf(a.code) - RECRUITER_ORDER.indexOf(b.code));
+  return ranked[0] ?? null;
+}
+
 export type Dig =
   | { kind: "prove"; code: CriterionCode }
   | { kind: "dig"; code: CriterionCode; score: number }

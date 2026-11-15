@@ -6,7 +6,8 @@ import type { CardData, ComparisonData, Lang, WeekRank } from "../../../shared/t
 import { declaredOf, LEVEL_LABELS, starsFor } from "../../../shared/types";
 import { declaredLabel, fileOf } from "../../../shared/caseFile";
 import { usableGrid } from "../../../shared/gridText";
-import { recruiterRead } from "../../../shared/recruiterLine";
+import { recruiterRead, weakestCriterion } from "../../../shared/recruiterLine";
+import { t as cardT } from "../../../shared/card/i18n";
 import { pick, useT } from "../i18n";
 import { api, hasGithub, images, isMine, isMock, tokens, weekOf } from "../lib/api";
 import { navigate } from "../lib/router";
@@ -601,12 +602,13 @@ export function LinkedInPhoto({ cardId, hasAvatar }: { cardId: string; hasAvatar
  * d'ici, le seul endroit de la page où elle se supprime.
  */
 export function Contest({ card, cardId, onDeleted }: { card: CardData; cardId: string; onDeleted: () => void }) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const c = t.result.contest;
   const reduced = useReducedMotion();
   const [reply, setReply] = useState<number | null>(null);
   const [round, setRound] = useState(0);
-  const lowest = card.stats.filter((s) => s.code !== "BUZZ").sort((a, b) => a.value - b.value)[0];
+  // Le critère le plus faible de la note, nommé comme au dos (§18.52) ; pas un trait du recto, qui ne fait pas la note.
+  const lowest = weakestCriterion(card.grid);
   // Une source manque-t-elle encore au dossier ? Son bloc ou son pli est alors dans la page.
   const SOURCE = ".after-block.add-source, details.fold.add-source";
   const [canAdd, setCanAdd] = useState(false);
@@ -635,7 +637,7 @@ export function Contest({ card, cardId, onDeleted }: { card: CardData; cardId: s
         <div className="var-panel" key={round} role="status">
           <p className="surtitre">{c.title}</p>
           <p className="var-text">{c.replies[reply]}</p>
-          {lowest && <p className="var-hint">{c.lowest(t.stats[lowest.code].name, lowest.value)}</p>}
+          {lowest && <p className="var-hint">{c.lowest(cardT(lang).back.criteria[lowest.code], lowest.score)}</p>}
         </div>
       )}
       <p className="contest-real">{canAdd ? c.real(card.source === "github" ? c.realAdd.career : c.realAdd.code) : c.realNoSource}</p>

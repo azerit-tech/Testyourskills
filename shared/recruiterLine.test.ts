@@ -2,7 +2,7 @@
 // gabarit, jamais du texte libre ; le point fort jamais l'école ; le point à
 // creuser jamais l'école ni l'open source ; « À prouver » d'abord.
 import { describe, expect, it } from "vitest";
-import { digPoint, recruiterRead, RECRUITER_ORDER, strongPoint, tileOrder, yearsText } from "./recruiterLine";
+import { digPoint, recruiterRead, RECRUITER_ORDER, strongPoint, tileOrder, weakestCriterion, yearsText } from "./recruiterLine";
 import type { CriterionCode, Grid, GridCriterion } from "./types";
 
 const crit = (code: CriterionCode, score: number | null, over: Partial<GridCriterion> = {}): GridCriterion => ({
@@ -107,5 +107,19 @@ describe("la ligne", () => {
   it("aucun mot qui accuse, épicène", () => {
     const g = grid({ XP: 2, EMP: 3, STK: 2, CODE: 2, ACT: 2, OWN: 2 });
     for (const lang of ["fr", "en"] as const) expect(recruiterRead(card, g, lang)!.text).not.toMatch(/menteu|suspect|faux|fake|liar|\bil\b|\belle\b/i);
+  });
+});
+
+// « Fais appel » (§18.52) : le critère le plus faible de la note, jamais un trait du recto, jamais l'école.
+describe("le critère le plus faible de la note", () => {
+  it("la note la plus basse parmi les critères comptés ; ni l'école, ni un critère hors moyenne ; à égalité, le plus lourd", () => {
+    expect(weakestCriterion(grid({ EDU: 2, XP: 7, STK: 6, CODE: 8, ACT: 4, OWN: 5 }))?.code).toBe("ACT");
+    expect(weakestCriterion(grid({ XP: 7, CODE: 8, ACT: 3 }, { ACT: { counted: false } }))?.code).toBe("XP");
+    expect(weakestCriterion(grid({ XP: 6, CODE: 6, ACT: 6 }))?.code).toBe("CODE");
+  });
+
+  it("rien sans grille, ni sur une fiche vide", () => {
+    expect(weakestCriterion(undefined)).toBeNull();
+    expect(weakestCriterion({ ...grid({ XP: 2 }), rule: "empty_file" })).toBeNull();
   });
 });

@@ -425,8 +425,8 @@ const fr = frTypoDeep({
         "Demande enregistrée. Délai de traitement estimé : le temps que tu ajoutes des tests.",
         "Le jury s'est réuni. Le jury, c'est une fonction pure. Elle a rendu la même note.",
       ],
-      /** `trait` : le nom du trait en clair (« Communication »), jamais son code. */
-      lowest: (trait: string, v: number) => `Indice : ton trait le plus bas est ${trait}, à ${v}/100. Un commit vaut mieux qu'un recours.`,
+      /** Le critère le plus faible de la note (§18.52), avec le nom qu'il porte au dos de la fiche (« Activité »), et sa note sur 10. */
+      lowest: (name: string, v: number) => `Indice : ton critère le plus faible est ${name}, à ${v}/10. Un commit vaut mieux qu'un recours.`,
       /* après la blague, les vraies sorties (§18.48) : ajouter une source, supprimer la fiche */
       /** `add` : seulement les sources qui manquent (`realAdd`). */
       real: (add: string) => `Pour de vrai : la note sort de la grille et bouge avec ton dossier. Ajoute ${add} et elle est recalculée.`,
@@ -1209,7 +1209,7 @@ const en: Dict = {
         "Request logged. Estimated processing time: however long it takes you to add tests.",
         "The jury met. The jury is a pure function. It returned the same rating.",
       ],
-      lowest: (trait, v) => `Hint: your lowest trait is ${trait}, at ${v}/100. A commit beats an appeal.`,
+      lowest: (name, v) => `Hint: your weakest criterion is ${name}, at ${v}/10. A commit beats an appeal.`,
       real: (add) => `For real: the rating comes from the scorecard and moves with your file. Add ${add} and it's recalculated.`,
       realAdd: { code: "your GitHub", career: "your LinkedIn or your résumé" },
       realNoSource: "For real: the rating comes from the scorecard, with your whole file. If it bothers you, you can delete your sheet right here.",
