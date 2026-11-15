@@ -1550,3 +1550,50 @@ Neuf lots fusionnés sur `master` : règles du serveur, images de partage, fonda
 - Sous le champ : « Profil public seulement. » (LinkedIn), « Repos publics seulement. » (GitHub).
 
 **Reste connu après ce tour** : le bandeau de saison arrive après la configuration et pousse la page de 44 px à la première visite ; le routeur colle la requête après l'ancre (`/#semaine?mock=1`) ; rien n'a encore été revu sur un vrai iPhone depuis la correction du film, ni dans le navigateur intégré de LinkedIn ; personne n'a écouté le son. Un deuxième tour de critique suit la fusion des lots en cours.
+
+### 18.50 Revue complète : la fin du premier tour, et le deuxième tour lancé (15 novembre, matin)
+
+Quatre lots de plus sur `master` : les pages autour, l'écran d'attente, la page d'une fiche, les finitions. Treize lots en tout. Un deuxième tour de critique (mêmes cinq angles, critiques neufs) juge le résultat fusionné. Décisions prises en route et gardées :
+
+**Pannes** (une règle pour tout le site, `web/src/lib/remote.ts`)
+- 404 ou 410 : introuvable. Toute autre panne : injoignable, après dix secondes de tentatives silencieuses. Deux états distincts, une seule mise en page d'erreur (toise, silhouette au point d'interrogation, tampon, un bouton, un lien d'appoint).
+- Sur la page d'une fiche : pendant l'attente de sa propre fiche, c'est l'écran d'attente qui le dit (trois échecs d'affilée : la barre s'arrête, « Le commissariat ne répond pas. », « Réessayer » qui ne fait que relire l'état, jamais d'appel payant) ; à l'arrivée sur une fiche déjà faite, c'est la page d'erreur.
+- Une fiche masquée par son propriétaire (410) garde son panneau propre, parce qu'il offre « C'est moi ».
+
+**Bandes et primes**
+- Une bande a trois états : sans fiche (le formulaire, et la bande suit jusqu'à la fiche créée), avec fiche (« Rejoindre avec ma fiche »), membre (son apport, son rang, « Partager la bande » en bouton principal). Moins de trois fiches : trois cases à remplir. Les fiches anonymes tiennent en une ligne (« Et 23 fiches anonymes. »).
+- Au bureau, `/bandes` montre écoles et boîtes en deux colonnes, sans onglets.
+- Une prime : porte en trois étapes numérotées (ta fiche, prouver que c'est toi par GitHub avec la raison, entrer dans la course) ; bloc « Tu es en course » avec partage ; retrait confirmé sur place, absent pour la personne gagnante ; états de fin au passé (classement final, finaliste, gagnant).
+- Les champs d'exemple ne citent plus d'école ni d'entreprise réelles.
+- `/primes` et `/reglement` n'ont plus de garde dans le routeur : les pages lisent elles-mêmes le serveur.
+
+**Vie privée, retrait, crédits**
+- La vie privée s'ouvre sur un résumé en quatre lignes, puis des sections courtes ; elle nomme chacun des événements mesurés et l'identifiant du navigateur.
+- La demande de retrait est un lien souligné qu'on trouve, son accusé un bloc avec une coche.
+- « Crédits » mène à `/credits.txt`, à jour (modèles du film CC BY et CC0, textures, sons, polices). Tous les modèles de `tools/film3d/CREDITS.md` y sont, faute de savoir lesquels sont au montage final : à resserrer une fois le film rendu.
+
+**Écran d'attente**
+- En haut la gemme et « AZERIT », puis « Un dossier s'ouvre. Le tien. » ; la photo, le pari, la pile de pièces, chacun à une hauteur fixe ; en bas la barre à une place fixe, puis une seule ligne d'état. Avant la première pièce, une feuille vierge « PIÈCE 01 » en pointillé.
+- Pari fait : « Pari noté. Verdict après la poursuite. », sans durée annoncée.
+- La page d'une fiche est chargée pendant la demande : plus d'écran vide entre l'accueil et l'attente.
+
+**Page d'une fiche**
+- Propriétaire, dans l'ordre : verdict (pari, jury, peine et caution), partage, bande, dénoncer, primes si ouvertes, critères (un seul bloc « Voici comment Azerit te lit », détail replié pour tout le monde), reste replié. La page à 390 px passe d'environ 6 280 px à 4 040 px.
+- Sous trois étoiles, la source qui manque remonte sous le verdict ; à partir de trois, elle est sous les critères, en bouton de contour. Le rang ne s'affiche que dans le top 10, et mène au top de la semaine.
+- Partage : un bouton rose « Partager sur LinkedIn », puis des liens (copier, image, story) ; plus de bouton X ; « Ton lien reste en ligne 90 jours. » ; si le presse-papiers refuse (navigateurs intégrés), un champ à copier à la main.
+- Visiteur : une phrase qui dit ce que c'est, une barre fixe pleine largeur « Fais la tienne » (absente pour qui a déjà sa fiche : « Ma fiche » est en haut), le formulaire sous la fiche dans la colonne de droite au bureau ; après le vote, « Tu as jugé @x. » et « À ton tour », sans défilement automatique.
+- Duel : « 79/100 contre 68/100 » est le titre du bloc ; « Lui envoyer le score » envoie le lien de sa propre fiche ; rien pour une fiche scellée.
+- Fiche dénoncée : « Quelqu'un a dénoncé @x » ; « C'est moi » en rose avec une ligne d'aide ; « Ce n'est pas moi : faire la mienne » ; le retrait par email seulement pour une fiche sans pseudo GitHub.
+- Dénoncer accepte un lien LinkedIn ou un pseudo GitHub (le serveur aussi) ; « Envoyer à @x » d'abord.
+- « Pas d'accord avec la note ? » : la blague, puis de vraies sorties (ajouter une source, supprimer sa fiche). Pas de relecture à la demande.
+- Téléphones courts : la fiche rétrécit par la hauteur (248 px au minimum) pour tenir entière au-dessus de la barre fixe.
+- Bureau, propriétaire : deux colonnes (fiche 360 px à gauche, qui suit le défilement ; blocs 648 px à droite).
+
+**Finitions**
+- La vitrine de l'accueil n'est plus rafraîchie par une visite : le serveur le fait lui-même, au démarrage puis tous les quarts d'heure, sous le plafond du jour.
+- La signature de la fiche se lit (corps 10, opacité 0,82) : « Fiche lue par Azerit en 9 s · prouvé à 95 % » / “Sheet read by Azerit in 9s”. Au dos, “weighted average”. Le dessin des images passe à la version 8.
+- Film : sur petit téléphone et en paysage, la ligne radio ne passe plus sous les boutons et se lit en entier, sur deux lignes au plus.
+- Toute réponse compressée annonce `Vary: Accept-Encoding` ; les fichiers sans empreinte (icônes, ciels des profils, personnages) ont un cache d'un jour.
+- `docs/bareme-recrutement.md` ne donne plus en exemple le rang d'une école réelle.
+
+**À trancher par Jacques** : la liste des écoles et de leur rang est dans `data/scoring.json`, publique depuis la première version du dépôt. La sortir du dépôt (fichier ignoré, posé sur le serveur, comme la liste des employeurs) est faisable ; l'effacer de l'historique demande de réécrire l'historique publié.
