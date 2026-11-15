@@ -74,7 +74,7 @@ describe("page partagée, vue par un visiteur", () => {
   it("un seul h1, lu « Avis de recherche : @login », sans étoiles, profil ni peine dans l'en-tête", () => {
     const html = renderResult(card(), { owner: false });
     expect(html.match(/<h1/g)).toHaveLength(1);
-    const head = /<h1 class="wanted-head">.*?<\/h1>/.exec(html)?.[0] ?? "";
+    const head = /<h1 class="wanted-head"[^>]*>.*?<\/h1>/.exec(html)?.[0] ?? "";
     const text = head.replace(/<[^>]+>/g, "");
     expect(text).toBe(`Avis de recherche : @${FIXTURES.gold.login}`);
     expect(head).not.toContain("svg");
