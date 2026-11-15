@@ -20,6 +20,10 @@
 // Plus d'écran noir (§18.27) : l'attente reste à l'écran tant que le film n'est
 // pas prêt (`scene="loading"`, « La poursuite se prépare »), et porte la pilule
 // « Lancer la poursuite » quand le son demande un geste (`scene="tap"`).
+//
+// Réseau coupé (`offline`) : la barre s'arrête, la ligne dit que le commissariat
+// ne répond pas, et « Réessayer » prend la place de la barre. Il ne fait que
+// relire l'état de la fiche (`onRetry`), jamais une nouvelle demande.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Finding, ProgressEvent } from "../../../shared/types";
 import { useT } from "../i18n";
@@ -70,11 +74,15 @@ interface WaitingProps {
   onOpen?: () => void;
   /** L'écran se lève : il s'efface en fondu sur la scène (ou la fiche) déjà dessous. */
   leaving?: boolean;
+  /** Le commissariat ne répond plus (réseau coupé) : la barre s'arrête, « Réessayer » s'affiche. */
+  offline?: boolean;
+  /** « Réessayer » : relire l'état de la fiche tout de suite. Aucune nouvelle demande. */
+  onRetry?: () => void;
 }
 
 const idOf = (f: Finding) => `${f.source}:${f.kind}`;
 
-export function Waiting({ cardId, progress, startedAt, queue, findings = [], login, avatarUrl, slug, createdAt, plea = false, ready = false, onRelease, scene, onOpen, leaving = false }: WaitingProps) {
+export function Waiting({ cardId, progress, startedAt, queue, findings = [], login, avatarUrl, slug, createdAt, plea = false, ready = false, onRelease, scene, onOpen, leaving = false, offline = false, onRetry }: WaitingProps) {
   const { t, lang } = useT();
   // L'attente s'ouvre en haut de la page, avant sa première image : jamais à la hauteur où l'accueil était défilé.
   useLayoutEffect(() => {
@@ -97,6 +105,8 @@ export function Waiting({ cardId, progress, startedAt, queue, findings = [], log
   findingsRef.current = findings;
   const release = useRef({ ready, onRelease, done: false });
   release.current = { ...release.current, ready, onRelease };
+  const offlineRef = useRef(offline);
+  offlineRef.current = offline;
 
   const known = t.waiting.progress;
 
@@ -126,8 +136,8 @@ export function Waiting({ cardId, progress, startedAt, queue, findings = [], log
           setPieces(piecesRef.current);
         }
       }
-      // Fiche prête : plus rien à annoncer, la dernière ligne reste.
-      if (r.ready) return;
+      // Fiche prête : plus rien à annoncer, la dernière ligne reste. Réseau coupé : rien de neuf non plus.
+      if (r.ready || offlineRef.current) return;
       const evts = progressRef.current.filter((e) => known[e.key]);
       if (ts - lastAt.current < MIN_GAP) return;
       if (consumed.current < evts.length) {
@@ -168,16 +178,26 @@ export function Waiting({ cardId, progress, startedAt, queue, findings = [], log
   if (scene === "loading") sceneSaid.current = true;
   const sceneOn = scene === "loading" || (leaving && sceneSaid.current);
   const sceneLine: Line | undefined = sceneOn ? { uid: -1000, key: "scene" } : undefined;
+  // Réseau coupé pendant la préparation : le commissariat ne répond pas.
+  const offLine: Line | undefined = offline && !ready ? { uid: -2000, key: "offline" } : undefined;
   // La pilule du geste : la fiche est prête, la ligne le dit (plus de progression périmée dessous).
   const tapLine: Line | undefined = scene === "tap" ? { uid: -3000, key: "ready" } : undefined;
-  const current = tapLine ?? sceneLine ?? queueLine ?? lines[lines.length - 1];
+  const current = offLine ?? tapLine ?? sceneLine ?? queueLine ?? lines[lines.length - 1];
   const piece = pieces[pieces.length - 1];
-  const lineText = (l: Line) => (l.key === "ready" ? t.waiting.ready : l.key === "scene" ? t.waiting.scene : l.key === "queue" ? t.waiting.queue(queue ?? 1) : textOf(l));
+  const lineText = (l: Line) => (l.key === "offline" ? t.waiting.offline : l.key === "ready" ? t.waiting.ready : l.key === "scene" ? t.waiting.scene : l.key === "queue" ? t.waiting.queue(queue ?? 1) : textOf(l));
 
   // La barre reste au départ tant que la fiche est en file, et part quand elle passe.
   const barFrom = useRef(startedAt);
   if (queued) barFrom.current = now;
-  const barElapsed = Math.max(0, now - Math.max(startedAt, barFrom.current));
+  // Réseau coupé : la barre s'arrête là où elle est, et ce temps-là ne compte pas.
+  const paused = useRef<{ ms: number; since: number | null }>({ ms: 0, since: null });
+  if (offLine && paused.current.since === null) paused.current.since = now;
+  if (!offLine && paused.current.since !== null) {
+    paused.current.ms += Math.max(0, now - paused.current.since);
+    paused.current.since = null;
+  }
+  const pausedMs = paused.current.ms + (paused.current.since !== null ? Math.max(0, now - paused.current.since) : 0);
+  const barElapsed = Math.max(0, now - Math.max(startedAt, barFrom.current) - pausedMs);
   // La barre avance sur la durée estimée, puis ralentit : elle ne touche jamais 100 avant la fiche.
   const pct = useMemo(() => {
     if (ready) return 100;
@@ -186,12 +206,16 @@ export function Waiting({ cardId, progress, startedAt, queue, findings = [], log
     return Math.round(linear + tail);
   }, [barElapsed, ready]);
 
-  // Ce qui tient la place de la barre : la pilule du geste, ou la barre elle-même.
+  // Ce qui tient la place de la barre : la pilule du geste, « Réessayer », ou la barre elle-même.
   const act =
     scene === "tap" ? (
       // Le son demande un geste : une pilule à portée de pouce, jamais un texte gris.
       <button type="button" className="pill pill-big load-act-btn" onClick={onOpen}>
         {t.reveal.open}
+      </button>
+    ) : offLine ? (
+      <button type="button" className="pill pill-big load-act-btn" onClick={onRetry}>
+        {t.waiting.retry}
       </button>
     ) : (
       <div className={`load-bar${sceneOn ? " is-busy" : ""}`} aria-hidden>
@@ -200,7 +224,7 @@ export function Waiting({ cardId, progress, startedAt, queue, findings = [], log
     );
 
   return (
-    <section className={`loadscreen${leaving ? " is-leaving" : ""}`} aria-labelledby="waiting-title" inert={leaving ? true : undefined}>
+    <section className={`loadscreen${leaving ? " is-leaving" : ""}${offLine ? " is-offline" : ""}`} aria-labelledby="waiting-title" inert={leaving ? true : undefined}>
       <div className="load-main">
         <header className="load-head">
           <p className="load-brand label" aria-hidden>
@@ -240,12 +264,12 @@ export function Waiting({ cardId, progress, startedAt, queue, findings = [], log
       {/* En bas, à une place fixe : la barre (ou le bouton qui la remplace), puis la ligne sur deux rangs réservés. */}
       <div className="load-foot">
         <div className="load-act">{act}</div>
-        <p className="load-line" aria-hidden key={current?.uid}>
+        <p className={`load-line${offLine ? " is-alert" : ""}`} aria-hidden key={current?.uid}>
           {current ? lineText(current) : ""}
         </p>
         {/* Une seule annonce à la fois pour les lecteurs d'écran. */}
         <p className="sr-only" aria-live="polite">
-          {sceneLine ? t.waiting.scene : piece ? `${t.waiting.piece(pieces.length)} : ${piece.text[lang]}` : current ? lineText(current) : ""}
+          {offLine ? t.waiting.offline : sceneLine ? t.waiting.scene : piece ? `${t.waiting.piece(pieces.length)} : ${piece.text[lang]}` : current ? lineText(current) : ""}
         </p>
       </div>
     </section>

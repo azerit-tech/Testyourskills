@@ -1930,7 +1930,7 @@ button.cover-panel:focus-visible {
   align-items: end;
   height: var(--h-main);
 }
-/* le son demande un geste : la pilule, à portée de pouce */
+/* le son demande un geste, ou le réseau est revenu : la pilule, à portée de pouce */
 .load-act-btn {
   width: 100%;
   animation: line-in 0.4s var(--ease-out);
@@ -1947,6 +1947,15 @@ button.cover-panel:focus-visible {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   animation: line-in 0.4s var(--ease-out);
+}
+/* le commissariat ne répond pas : la ligne passe en crème, une phrase par rang ;
+   la feuille vierge cesse de respirer, rien ne fait croire que ça avance */
+.load-line.is-alert {
+  color: var(--c-emphasis);
+  white-space: pre-line;
+}
+.loadscreen.is-offline .piece-skel {
+  animation: none;
 }
 @keyframes line-in {
   from {

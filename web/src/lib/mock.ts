@@ -353,6 +353,8 @@ export const mockApi = {
    * grille tant que la personne fichée ne l'a pas revendiquée ; /c/m-…-C… est dénoncée et revendiquée.
    */
   async getJob(id: string, me: string | null = null): Promise<JobState> {
+    // Hors ligne (réseau coupé dans le navigateur) : la démo échoue comme un vrai fetch.
+    if (typeof navigator !== "undefined" && navigator.onLine === false) throw new TypeError("Failed to fetch");
     const state = await mockApi.engineJob(id);
     if (state.state !== "done") return state;
     const main = state.kind === "card" ? state.card : state.comparison.github;

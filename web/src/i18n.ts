@@ -167,6 +167,10 @@ const fr = frTypoDeep({
     queue: (n: number) => (n === 1 ? "1 fiche devant toi au commissariat" : `${n} fiches devant toi au commissariat`),
     /** La fiche est prête, le film pas encore (§18.27). */
     scene: "La poursuite se prépare…",
+    /** Réseau coupé pendant la préparation : la fiche continue côté serveur, on relit dès que possible. */
+    offline: "Le commissariat ne répond pas.\nOn reprend dès que ton réseau revient.",
+    /** Relire l'état de la fiche, sans refaire la demande. */
+    retry: "Réessayer",
     /** Sous « Lancer la poursuite » : la fiche est prête, le film attend un toucher. */
     ready: "Ta fiche est prête.",
     progress: {
@@ -905,6 +909,8 @@ const en: Dict = {
     piece: (n) => `Exhibit ${String(n).padStart(2, "0")}`,
     queue: (n) => (n === 1 ? "1 sheet ahead of you at the station" : `${n} sheets ahead of you at the station`),
     scene: "Getting the chase ready…",
+    offline: "The station isn't answering.\nWe'll pick up when you're back online.",
+    retry: "Try again",
     ready: "Your sheet is ready.",
     progress: {
       lazy_commits: (n) => `Reading your ${n ?? "many"} “wip” commits…`,

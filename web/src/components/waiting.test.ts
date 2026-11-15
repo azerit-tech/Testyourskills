@@ -1,7 +1,8 @@
 // L'écran d'attente (§18.27, §18.48) : chaque emplacement a sa hauteur réservée,
-// pour que rien ne bouge d'une étape à l'autre.
+// pour que rien ne bouge d'une étape à l'autre ; le réseau coupé se dit, et
+// « Réessayer » ne fait que relire l'état de la fiche.
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { DICTS } from "../i18n";
 
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), "utf8");
@@ -37,7 +38,23 @@ describe("les textes de l'attente", () => {
     }
   });
 
+  it("le commissariat ne répond pas, et « Réessayer »", () => {
+    expect(DICTS.fr.waiting.offline).toMatch(/^Le commissariat ne répond pas\./);
+    expect(DICTS.en.waiting.offline).toMatch(/^The station isn't answering\./);
+    expect([DICTS.fr.waiting.retry, DICTS.en.waiting.retry]).toEqual(["Réessayer", "Try again"]);
+  });
+
   it("plus aucune trace de l'ancien bouton « Ouvrir mon dossier »", () => {
     for (const f of ["./Waiting.tsx", "../lib/hold.ts", "../film/unlock.ts", "../../../server/src/events.ts"]) expect(read(f)).not.toMatch(/Ouvrir mon dossier/);
+  });
+});
+
+describe("la démo hors ligne", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("lire l'état d'une fiche échoue comme un vrai fetch, réseau coupé", async () => {
+    vi.stubGlobal("navigator", { onLine: false });
+    const { mockApi } = await import("../lib/mock");
+    await expect(mockApi.getJob("m-gold-x")).rejects.toThrow(TypeError);
   });
 });

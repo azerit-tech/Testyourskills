@@ -1,6 +1,6 @@
 // Route /c/:id : attente, révélation puis résultat pour une carte fraîche ;
 // affichage direct (sans pack) pour un lien partagé.
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { fileOf } from "../../../shared/caseFile";
 import type { CardData, Fact, Finding, JobState, ProgressEvent } from "../../../shared/types";
@@ -50,6 +50,8 @@ const loadFilm = () => import("../components/Film");
 const Film = lazy(() => loadFilm().then((m) => ({ default: m.Film })));
 
 const POLL_MS = 600;
+/** Échecs réseau d'affilée avant que l'attente dise que le commissariat ne répond pas (environ 5 s). */
+const OFFLINE_AFTER = 3;
 
 type View =
   | { s: "loading" }
@@ -66,25 +68,42 @@ type View =
 function useJob(id: string, nonce: number) {
   const [view, setView] = useState<View>({ s: "loading" });
   const [sawPending, setSawPending] = useState(false);
+  // Réseau coupé : l'attente le dit et propose « Réessayer », qui relit seulement l'état de la fiche.
+  const [offline, setOffline] = useState(false);
+  const retry = useRef<() => void>(() => undefined);
   const { t } = useT();
 
   useEffect(() => {
     let alive = true;
     let timer = 0;
+    let busy = false;
+    let fails = 0;
+    /** La fiche est arrivée (ou a échoué) : plus rien à relire, ni au retour du réseau. */
+    let over = false;
     // Le temps passé en file d'attente ne compte pas : le serveur coupe lui-même au bout de 3 min.
     // En traitement, on attend le délai que le serveur annonce, rallonge LinkedIn comprise (lib/patience.ts).
     let patience: Patience = { started: freshSince(id) ?? Date.now(), giveUpAt: null };
     let downSince = 0;
+    /** On attend sa propre fiche (écran d'attente), et non une fiche déjà faite qu'on vient voir. */
+    let waiting = freshSince(id) != null;
     const poll = async () => {
+      if (busy) return;
+      busy = true;
+      window.clearTimeout(timer);
       try {
         const job: JobState = await api.getJob(id);
         if (!alive) return;
         downSince = 0;
+        fails = 0;
+        setOffline(false);
+        over = job.state !== "pending";
+        if (job.state === "pending") waiting = true;
         if (job.state === "pending") {
           setSawPending(true);
           setView({ s: "pending", progress: job.progress ?? [], queue: job.queue, findings: job.findings });
           patience = nextPatience(patience, job, Date.now());
           if (gaveUp(patience, Date.now())) {
+            over = true;
             setView({ s: "error", message: t.errors.timeout });
             return;
           }
@@ -100,32 +119,50 @@ function useJob(id: string, nonce: number) {
         }
       } catch (e) {
         if (!alive) return;
+        over = e instanceof ApiError && (e.status === 404 || e.status === 410);
         if (e instanceof ApiError && e.status === 404) setView({ s: "none" });
         else if (e instanceof ApiError && e.status === 410) setView({ s: "withdrawn" });
         else {
-          // Réseau capricieux, serveur en panne : on retente en silence, puis la page le dit.
+          // Réseau capricieux, serveur en panne : on retente en silence. Pendant l'attente de sa
+          // fiche, l'écran d'attente le dit et garde la main (« Réessayer ») ; à l'arrivée sur
+          // une fiche, la page d'erreur prend le relais au bout de la patience commune.
           downSince ||= Date.now();
-          if (Date.now() - downSince >= REMOTE_PATIENCE_MS) setView({ s: "down" });
-          else timer = window.setTimeout(poll, POLL_MS * 3);
+          if (waiting) {
+            if (++fails >= OFFLINE_AFTER) setOffline(true);
+            timer = window.setTimeout(poll, POLL_MS * 3);
+          } else if (Date.now() - downSince >= REMOTE_PATIENCE_MS) {
+            over = true;
+            setView({ s: "down" });
+          } else timer = window.setTimeout(poll, POLL_MS * 3);
         }
+      } finally {
+        busy = false;
       }
     };
+    // Le réseau revient, ou « Réessayer » : on relit tout de suite, sans attendre le prochain essai.
+    const now = () => {
+      if (!over) void poll();
+    };
+    retry.current = now;
+    window.addEventListener("online", now);
     void poll();
     return () => {
       alive = false;
       window.clearTimeout(timer);
+      window.removeEventListener("online", now);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, nonce]);
 
-  return { view, setView, sawPending };
+  const onRetry = useCallback(() => retry.current(), []);
+  return { view, setView, sawPending, offline, onRetry };
 }
 
 export function CardPage({ id }: { id: string }) {
   const { t, lang } = useT();
   const [nonce, setNonce] = useState(0);
   const [notice, setNotice] = useState<{ text: string; n: number } | null>(null);
-  const { view, setView, sawPending } = useJob(id, nonce);
+  const { view, setView, sawPending, offline, onRetry } = useJob(id, nonce);
   const fresh = freshSince(id) !== null;
   const owner = fresh || tokens.get(id) !== null;
   // Le film joue une fois (§18.48) : dû à une fiche demandée ici (ou rechargée en plein film)
@@ -249,6 +286,8 @@ export function CardPage({ id }: { id: string }) {
         scene={hold.line}
         onOpen={hold.onOpen}
         leaving={hold.leaving}
+        offline={offline}
+        onRetry={onRetry}
       />
     ) : null;
 
