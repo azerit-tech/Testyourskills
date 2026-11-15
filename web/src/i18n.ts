@@ -87,6 +87,8 @@ const fr = {
     },
     /** La flèche sous le héros, sur ordinateur. */
     next: "Voir la suite",
+    /** Le dernier formulaire de l'accueil, avant le pied de page (§18.48). */
+    lastTitle: "À toi.",
     /* Mur des 13 profils (§18.28) */
     wall: {
       title: "Lequel es-tu ?",
@@ -844,6 +846,7 @@ const en: Dict = {
       suspect: (profile) => `Painted portrait of the ${profile} profile`,
     },
     next: "See more",
+    lastTitle: "Your turn.",
     wall: {
       title: "Which one are you?",
       you: "And you?",

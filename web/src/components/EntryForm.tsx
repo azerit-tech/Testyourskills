@@ -28,8 +28,11 @@ interface Props {
   inputRef?: React.RefObject<HTMLInputElement | null>;
   /** « inline » : sans onglets ni CV, pour le bandeau d'une carte partagée. */
   variant?: "full" | "inline";
-  /** Une ligne posée entre la pilule et les liens du pied (la promesse de l'accueil, sur téléphone). */
+  /** Une ligne posée entre la pilule et les liens du pied (ce qu'il faut faire ensuite, sur la page d'une bande). */
   note?: ReactNode;
+  /** Un second formulaire sur la même page (le bas de l'accueil) : ni focus d'emblée, ni
+   * raccourcis de page (collage, dépôt de PDF), que le premier porte déjà. */
+  secondary?: boolean;
 }
 
 const DOORS: Door[] = ["linkedin", "github"];
@@ -84,11 +87,11 @@ function initialEntry(raw: string | undefined): { door: Door; login: string } {
   return { door: sessionDoor(), login: s };
 }
 
-export function EntryForm({ inputRef, variant = "full", note }: Props) {
+export function EntryForm({ inputRef, variant = "full", note, secondary = false }: Props) {
   const inline = variant === "inline";
   const { t, lang } = useT();
   const h = t.home;
-  const [init] = useState(() => (inline ? null : takePrefill()));
+  const [init] = useState(() => (inline || secondary ? null : takePrefill()));
   const [first] = useState(() => initialEntry(init?.login));
   const [mode, setMode] = useState<Mode>(init?.mode ?? "single");
   const [tab, setTab] = useState<Tab>(init?.tab ?? "github");
@@ -136,7 +139,7 @@ export function EntryForm({ inputRef, variant = "full", note }: Props) {
       return;
     }
     // Sur desktop, le champ a le focus d'emblée. Pas sur mobile : le clavier cacherait la carte.
-    if (!inline && !isTouch()) loginRef.current?.focus({ preventScroll: true });
+    if (!inline && !secondary && !isTouch()) loginRef.current?.focus({ preventScroll: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -238,6 +241,7 @@ export function EntryForm({ inputRef, variant = "full", note }: Props) {
 
   // Dépôt n'importe où sur la page, avec un voile pendant le survol.
   useEffect(() => {
+    if (secondary) return;
     let depth = 0;
     const onEnter = (e: DragEvent) => {
       if (!hasFiles(e.dataTransfer)) return;
@@ -282,6 +286,7 @@ export function EntryForm({ inputRef, variant = "full", note }: Props) {
 
   // Collage n'importe où : une URL GitHub, un lien LinkedIn ou un PDF.
   useEffect(() => {
+    if (secondary) return;
     const onPaste = (e: ClipboardEvent) => {
       const dt = e.clipboardData;
       if (!dt || busyRef.current) return;

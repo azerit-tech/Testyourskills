@@ -1,7 +1,9 @@
 // Entrée (§6.1, §18.31, §18.48). Le premier écran dit ce qu'on obtient : la
 // couverture, le titre, la promesse dessous, puis les portes, le champ et le
-// bouton. Ensuite la fiche de Jacques, le mur des 13 profils (§18.28), le top
-// de la semaine (§18.22) et celui des bandes (§18.38). Rien d'autre.
+// bouton. Ensuite, dans l'ordre de l'envie : la fiche de Jacques (le produit),
+// le top de la semaine (§18.22), les primes si elles sont ouvertes (§18.4), les
+// bandes (§18.38), le mur des 13 profils (§18.28), et un dernier formulaire
+// avant le pied de page. Rien d'autre.
 // L'exemple est la vraie fiche de Jacques (fondateur d'Azerit) : la maquette
 // s'affiche d'abord, la fiche calculée par le serveur la remplace dès qu'elle existe.
 // Aucun dégradé dans la page : seuls ceux de la fiche et des illustrations.
@@ -133,14 +135,27 @@ export function Home() {
           <EntryForm inputRef={inputRef} />
         </section>
       </div>
+      {/* Le produit, puis la preuve que d'autres y sont : côte à côte au bureau. */}
+      <div className="home-proof">
+        <section className="home-example">
+          <ExampleCard {...showcase} />
+        </section>
+        <WeekBoard onPlay={play} />
+      </div>
       {/* Les primes ouvertes (§18.4) : rien tant que la saison n'en porte pas. */}
       <PrimesStrip />
-      <section className="home-example">
-        <ExampleCard {...showcase} />
-      </section>
-      <ProfileWall onPlay={play} />
-      <WeekBoard onPlay={play} />
       <BandsTop />
+      <ProfileWall onPlay={play} />
+      {/* Qui a tout lu n'a pas à remonter : le même formulaire, dans le bloc d'appel. */}
+      <section className="home-last block block-call" aria-labelledby="home-last-title">
+        <div className="home-last-head">
+          <h2 id="home-last-title" className="t-section">
+            {h.lastTitle}
+          </h2>
+          <p>{hook}</p>
+        </div>
+        <EntryForm secondary />
+      </section>
     </main>
   );
 }
