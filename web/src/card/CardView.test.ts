@@ -33,7 +33,7 @@ describe("la fiche se retourne", () => {
     // Un vrai bouton (clavier, lecteur d'écran), qui dit où il mène, sans pictogramme.
     expect(fr).toMatch(/<button type="button" class="tys-card__flip" data-to="back"><span class="tys-card__flip-label">Voir les pièces à conviction<\/span><\/button>/);
     const en = renderToStaticMarkup(createElement(CardView, { card, lang: "en", flippable: true }));
-    expect(en).toContain('<span class="tys-card__flip-label">See the evidence</span>');
+    expect(en).toContain('<span class="tys-card__flip-label">See the exhibits</span>');
   });
 
   it("la fiche reste nue : le lien est hors du cadre qui s'incline, sans pictogramme posé sur elle", () => {

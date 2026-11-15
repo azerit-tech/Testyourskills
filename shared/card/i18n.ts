@@ -109,7 +109,7 @@ export const STRINGS = {
     } as Record<string, string>,
     back: {
       title: "Exhibits",
-      toBack: "See the evidence",
+      toBack: "See the exhibits",
       toFront: "Back to the sheet",
       unproven: "unproven",
       missing: "not on file",
