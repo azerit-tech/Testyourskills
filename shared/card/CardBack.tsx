@@ -160,8 +160,9 @@ const sourceLabel = (card: Pick<CardData, "declaredSource" | "pieces">, source: 
 
 /**
  * Une pièce sur `maxLines` lignes. Si elle ne tient pas, on garde les phrases
- * entières qui tiennent plutôt qu'une phrase coupée ; puis le début de la
- * première phrase jusqu'à son premier « : » ou sa première virgule, s'il dit
+ * entières qui tiennent plutôt qu'une phrase coupée ; puis la première phrase
+ * arrêtée à une virgule ou avant « depuis » / “since” (la plus longue qui tient) ;
+ * puis son début jusqu'à son premier « : » ou sa première virgule, s'il dit
  * quelque chose seul (trois mots au moins : « 6 années actives. ») ; à défaut,
  * la dernière ligne finit par « … ».
  */
@@ -174,6 +175,16 @@ export function clipProof(text: string, maxWidth: number, maxLines: number): str
   const sentences = text.split(/(?<=[.!?»])\s+(?=[\p{Lu}\p{N}«"])/u);
   for (let n = sentences.length - 1; n >= 1; n--) {
     const lines = lay(sentences.slice(0, n).join(" "));
+    if (fits(lines)) return lines;
+  }
+  // La première phrase raccourcie à une virgule, ou avant « depuis » / “since” :
+  // « TypeScript : 734 commits dans 14 repos. » plutôt que « … depuis juin… ».
+  const first = sentences[0].replace(/[.…]+$/, "");
+  const cuts = [...first.matchAll(/,\s|\s(?:depuis|since)\s/gu)].map((m) => m.index!).reverse();
+  for (const at of cuts) {
+    const head = first.slice(0, at).trim();
+    if (head.split(/\s+/).length < 3) continue;
+    const lines = lay(`${head}.`);
     if (fits(lines)) return lines;
   }
   const clause = /^(.+?)(?:\s?:\s|,\s|\s;\s)/u.exec(sentences[0])?.[1]?.trim();

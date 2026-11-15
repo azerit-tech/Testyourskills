@@ -224,8 +224,8 @@ describe("dos de la fiche : la note vient des huit critères (§18.48)", () => {
     }
     const long = "TypeScript : 734 commits dans 14 dépôts depuis juin 2023, dernier push aujourd'hui. Rust aussi dans le code. Une troisième phrase qui ne tiendra pas sur deux lignes de la fiche, c'est certain.";
     expect(clipProof(long, FW, 2).join(" ")).toBe("TypeScript : 734 commits dans 14 dépôts depuis juin 2023, dernier push aujourd'hui.");
-    // Sur une ligne, la coupe tombe entre deux mots, jamais au milieu d'un mot.
-    expect(clipProof(long, FW, 1)).toEqual(["TypeScript : 734 commits dans 14 dépôts depuis…"]);
+    // Sur une ligne, la première phrase s'arrête avant « depuis », jamais sur un « … ».
+    expect(clipProof(long, FW, 1)).toEqual(["TypeScript : 734 commits dans 14 dépôts."]);
     // Une seule phrase trop longue : elle est coupée, et le dit par « … ».
     const one = clipProof("Une seule phrase beaucoup trop longue pour tenir sur une ligne de la fiche sans être coupée quelque part", FW, 1);
     expect(one).toHaveLength(1);
