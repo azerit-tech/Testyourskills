@@ -82,7 +82,7 @@ describe("LinkedinRole.contract → Expérience", () => {
     const reading = read({ ...rawUn(), roles: [] }, text);
     const d = input(profile, reading);
     expect(kindAt(d, "Fonds Exemple")).toBe("internship");
-    expect(crit(d, "XP").evidence!.text.fr).toMatch(/^13 mois de stage ou d'alternance comptés pour moitié\./);
+    expect(crit(d, "XP").evidence!.text.fr).toMatch(/^1,1.an compté, poste par poste\. 13 mois de stage ou d'alternance comptés pour moitié\./);
 
     editItem(item, "Fonds Exemple", { employmentType: undefined });
     const plain = collected(item);
@@ -153,7 +153,7 @@ describe("CvRole.kind → Expérience, rattaché au poste du profil par l'entrep
     expect(kindAt(d2, "Atelier Perso")).toBe("project");
     const xp = crit(d2, "XP");
     expect(xp.evidence!.text.fr).toContain("Atelier Perso est un projet personnel : non compté.");
-    expect(xp.evidence!.text.fr).toMatch(/Total : 1,1 an\.$/);
+    expect(xp.evidence!.text.fr).toMatch(/^1,1.an compté, poste par poste\./);
   });
 });
 
@@ -255,7 +255,7 @@ describe("les deux profils d'exemple, du fournisseur à la note de la fiche Link
   it("exemple un : 41 ; exemple deux : 45 (docs/bareme-recrutement.md §7)", () => {
     const un = card(itemUn(), rawUn());
     expect(un.grid!.criteria.find((c) => c.code === "XP")!.evidence!.text.fr).toBe(
-      "13 mois de stage ou d'alternance comptés pour moitié. 7 mois à la tête d'Azerit. Centrale Méditerranée Finance est une association : non compté. Total : 1,1 an.",
+      "1,1 an compté, poste par poste. 13 mois de stage ou d'alternance comptés pour moitié. 7 mois à la tête d'Azerit. Centrale Méditerranée Finance est une association : non compté.",
     );
     expect(un.overall).toBe(41);
     expect(card(itemDeux(), rawDeux()).overall).toBe(45);

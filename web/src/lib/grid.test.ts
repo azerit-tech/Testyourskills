@@ -162,7 +162,7 @@ describe("la page partagée : ni école ni ancien employeur", () => {
     const [edu, xp, emp] = rows(declaredGridMock("LinkedIn"), true);
     // L'école, ni rang ni nom : gardée pour la personne fichée ; puis la phrase de son état, sans chiffre (§18.52).
     expect(edu.line).toMatch(/^École gardée pour la personne fichée\. (Elle compte dans la note, sans chiffre affiché|Une école ne fait jamais baisser la note)\.$/);
-    expect(xp.line).toContain("8,4 ans");
+    expect(xp.line).toMatch(/^8,4.ans comptés, poste par poste\. /);
     expect(xp.line).toContain("41 mois à la tête d'une entreprise fondée");
     expect(emp.line).toBe("Entreprise fondée : depuis juin 2023, 41 mois. Poste : janvier 2019 – août 2023, 4,6 ans.");
     expect(emp.flags).toEqual(["Équipe encadrée"]);

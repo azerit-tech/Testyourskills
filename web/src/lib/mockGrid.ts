@@ -303,12 +303,12 @@ function declaredDrafts(src: "LinkedIn" | "CV", proof?: string, ghRepos?: number
       next: f("Pour 10 : 10 ans comptés. Tu en as 8,4.", "For 10: 10 years counted. You have 8.4."),
       evidence: {
         text: f(
-          "14 mois de stage ou d'alternance comptés pour moitié. 41 mois à la tête de Stealth Startup. 55 mois chez Banque Orsay. Junior Halbrune est une association : non compté. Total : 8,4 ans.",
-          "14 months of internship or apprenticeship counted at half. 41 months running Stealth Startup. 55 months at Banque Orsay. Junior Halbrune is an association: not counted. Total: 8.4 years.",
+          "8,4 ans comptés, poste par poste. 14 mois de stage ou d'alternance comptés pour moitié. 41 mois à la tête de Stealth Startup. 55 mois chez Banque Orsay. Junior Halbrune est une association : non compté.",
+          "8.4 years counted, role by role. 14 months of internship or apprenticeship counted at half. 41 months running Stealth Startup. 55 months at Banque Orsay. Junior Halbrune is a nonprofit: not counted.",
         ),
         publicText: f(
-          "14 mois de stage ou d'alternance comptés pour moitié. 41 mois à la tête d'une entreprise fondée. 55 mois dans un poste. Un poste d'association : non compté. Total : 8,4 ans.",
-          "14 months of internship or apprenticeship counted at half. 41 months running a company they founded. 55 months in a role. An association role: not counted. Total: 8.4 years.",
+          "8,4 ans comptés, poste par poste. 14 mois de stage ou d'alternance comptés pour moitié. 41 mois à la tête d'une entreprise fondée. 55 mois dans un poste. Un poste d'association : non compté.",
+          "8.4 years counted, role by role. 14 months of internship or apprenticeship counted at half. 41 months running a company they founded. 55 months in a role. A nonprofit role: not counted.",
         ),
         source: "linkedin",
         ...p,

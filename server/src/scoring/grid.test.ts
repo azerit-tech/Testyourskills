@@ -141,7 +141,7 @@ describe("les deux fondateurs (§7), à un point près", () => {
 
   it("les pièces se lisent poste par poste, avec les chiffres de la personne", () => {
     expect(crit(declaredGrid(decl(jacquesReading(), jacquesProfile())), "XP").evidence?.text.fr).toBe(
-      "13 mois de stage ou d'alternance comptés pour moitié. 7 mois à la tête d'Azerit. Centrale Méditerranée Finance est une association : non compté. Total : 1,1 an.",
+      "1,1 an compté, poste par poste. 13 mois de stage ou d'alternance comptés pour moitié. 7 mois à la tête d'Azerit. Centrale Méditerranée Finance est une association : non compté.",
     );
     expect(crit(jLinkedin, "EMP").next?.fr).toBe("Pour 6 : tenir Azerit un an (7 mois aujourd'hui), ou un poste tenu deux ans.");
     expect(crit(jGithub, "STK").next?.fr).toBe("Pour 8 : 500 commits dans ton langage principal (tu en as 329).");
@@ -175,7 +175,7 @@ describe("les recoupements LinkedIn × GitHub : la pièce « recoupé » (§3, �
     const g = jCase();
     expect(both(g)).toEqual(["XP", "EMP", "STK", "OWN"]);
     expect(crit(g, "XP").evidence!.text.fr).toBe(
-      "13 mois de stage ou d'alternance comptés pour moitié. 7 mois à la tête d'Azerit. Centrale Méditerranée Finance est une association : non compté. Total : 1,1 an. GitHub : 2 années actives (50 contributions ou plus sur douze mois). Recoupé\u00a0: le code public couvre la même période.",
+      "1,1 an compté, poste par poste. 13 mois de stage ou d'alternance comptés pour moitié. 7 mois à la tête d'Azerit. Centrale Méditerranée Finance est une association : non compté. GitHub : 2 années actives (50 contributions ou plus sur douze mois). Recoupé\u00a0: le code public couvre la même période.",
     );
     expect(crit(g, "EMP").evidence!.text.fr).toBe(
       "LinkedIn : Research Intern, McMaster University, février 2025 – novembre 2025. GitHub : agda-notes, 25 commits, actif sur les mêmes mois. Poste confirmé par le code.",

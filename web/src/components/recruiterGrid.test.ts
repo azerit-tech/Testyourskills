@@ -113,7 +113,7 @@ describe("la page partagée : aucun nom d'école ni d'ancien employeur, au mot p
       expect(html).not.toMatch(NAMES);
       expect(html).not.toContain("linkedin.com");
       // Mais la pièce est là, en comptes et en dates.
-      expect(textOf(html)).toContain(lang === "fr-FR" ? "Un poste d'association : non compté." : "An association role: not counted.");
+      expect(textOf(html)).toContain(lang === "fr-FR" ? "Un poste d'association : non compté." : "A nonprofit role: not counted.");
     });
   }
 });

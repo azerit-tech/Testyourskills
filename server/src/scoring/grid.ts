@@ -443,7 +443,7 @@ export function xpDeclared(d: DeclaredInput): Draft {
       "XP",
       "linkedin",
       a
-        ? f(`Aucun mois compté : ${a.role.company} est une association, l'association et le bénévolat ne comptent pas.`, `No month counted: ${a.role.company} is an association; associations and volunteering do not count.`)
+        ? f(`Aucun mois compté : ${a.role.company} est une association, l'association et le bénévolat ne comptent pas.`, `No month counted: ${a.role.company} is a nonprofit; nonprofits and volunteering do not count.`)
         : p
           ? f(`Aucun mois compté : ${projectFact(p).fr}`, `No month counted: ${projectFact(p).en}`)
           : f("Aucun mois compté sur les postes datés.", "No month counted on the dated roles."),
@@ -454,14 +454,16 @@ export function xpDeclared(d: DeclaredInput): Draft {
   const y = total / 12;
   const lvl = levelFor(y);
   const nextLvl = [...GRID.XP.levels].reverse().find((l) => l.score > lvl.score);
-  // La pièce : stages à moitié, postes, associations non comptées, total. Chaque
-  // morceau a sa version sans nom, pour la page partagée (même ordre, mêmes chiffres).
+  // La pièce : le total d'abord (le dos de la fiche n'en montre que la première phrase),
+  // puis stages à moitié, postes, associations non comptées. Chaque morceau a sa
+  // version sans nom, pour la page partagée (même ordre, mêmes chiffres).
   const parts: Fact[] = [];
   const publicParts: Fact[] = [];
   const both = (x: Fact, pub: Fact = x) => {
     parts.push(x);
     publicParts.push(pub);
   };
+  both(f(`${years(y).fr} ${counted(y)}, poste par poste.`, `${years(y).en} counted, role by role.`));
   const interns = infos.filter((r) => r.kind === "internship");
   const im = unionMonths(interns);
   if (im) both(f(`${im} mois de stage ou d'alternance comptés pour moitié.`, `${im} month${im === 1 ? "" : "s"} of internship or apprenticeship counted at half.`));
@@ -473,10 +475,9 @@ export function xpDeclared(d: DeclaredInput): Draft {
   }
   if (fulls.length > 2) both(f(`${fulls.length - 2} autre${fulls.length > 3 ? "s" : ""} poste${fulls.length > 3 ? "s" : ""}.`, `${fulls.length - 2} more role${fulls.length > 3 ? "s" : ""}.`));
   const assoc = infos.find((r) => r.kind === "association");
-  if (assoc) both(f(`${assoc.role.company} est une association : non compté.`, `${assoc.role.company} is an association: not counted.`), f("Un poste d'association : non compté.", "An association role: not counted."));
+  if (assoc) both(f(`${assoc.role.company} est une association : non compté.`, `${assoc.role.company} is a nonprofit: not counted.`), f("Un poste d'association : non compté.", "A nonprofit role: not counted."));
   const project = infos.find((r) => r.kind === "project");
   if (project) both(projectFact(project), f("Un projet personnel : non compté.", "A personal project: not counted."));
-  both(f(`Total : ${years(y).fr}.`, `Total: ${years(y).en}.`));
 
   return crit("XP", {
     score: lvl.score,
