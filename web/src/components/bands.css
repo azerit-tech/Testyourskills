@@ -142,6 +142,10 @@
 .page-band {
   padding: 24px var(--gutter) 56px;
 }
+/* une page à lien de retour : le haut commun à toutes (styles.css, --page-top) */
+.page-band {
+  padding-top: var(--page-top);
+}
 .bands,
 .bands-make,
 .band-side,
@@ -412,6 +416,9 @@
   .page-band {
     padding-top: 40px;
     padding-bottom: 80px;
+  }
+  .page-band {
+    padding-top: var(--page-top);
   }
   /* /bandes : les deux ligues côte à côte, sans onglets, sur le conteneur de la page */
   .bands,

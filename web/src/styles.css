@@ -128,6 +128,9 @@
 
   --card-w: min(360px, calc(100vw - 32px));
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  /* le haut des pages à lien de retour (bande, prime, règlement, crédits, vie privée) : le lien
+     « ← Retour » (44 px de zone, son texte au milieu) à 16 px sous la barre, 32 au bureau */
+  --page-top: 4px;
 
   color-scheme: dark;
 }
@@ -137,6 +140,7 @@
     --t-section: var(--t-44);
     --gutter: max(32px, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
     --pad-block: 28px;
+    --page-top: 20px;
   }
 }
 
@@ -3474,7 +3478,7 @@ a.dossier-item:hover {
 }
 
 .page-prose {
-  padding: 8px var(--gutter) 64px;
+  padding: var(--page-top) var(--gutter) 64px;
 }
 .prose {
   max-width: var(--measure);
@@ -3607,7 +3611,7 @@ a.dossier-item:hover {
    le texte garde sa colonne de lecture */
 @media (min-width: 900px) {
   .page-prose {
-    padding-top: 24px;
+    padding-top: var(--page-top);
     padding-bottom: 80px;
   }
   .prose {
