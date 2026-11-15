@@ -104,6 +104,8 @@ export interface AppConfig {
   rulesPublished: boolean;
   /** Les dates de la saison (data/season.json) ; null si le serveur n'en a pas. */
   season: SeasonDates | null;
+  /** Les entretiens en jeu dans les primes ouvertes : ce que le bandeau de saison annonce. */
+  interviews: number;
 }
 
 /** La configuration lue dans une réponse de /api/config (ou sa copie de session) : tout champ douteux vaut « non ». */
@@ -118,6 +120,7 @@ export function parseConfig(raw: unknown): AppConfig {
     primesListed: c.primesListed === true,
     rulesPublished: c.rulesPublished === true,
     season: s ? seasonDates(s) : null,
+    interviews: typeof c.interviews === "number" && Number.isInteger(c.interviews) && c.interviews > 0 ? c.interviews : 0,
   };
 }
 
@@ -136,7 +139,7 @@ export const SEASON_FILE: SeasonDates | null = parsedSeason ? seasonDates(parsed
 
 let configPromise: Promise<AppConfig> | null = null;
 /** Mode démo : la saison du fichier, aucune prime ouverte (il n'en existe pas encore). */
-const MOCK_CONFIG: AppConfig = { linkedin: true, claim: true, linkedinEntry: true, primesOpen: false, primesListed: false, rulesPublished: false, season: SEASON_FILE };
+const MOCK_CONFIG: AppConfig = { linkedin: true, claim: true, linkedinEntry: true, primesOpen: false, primesListed: false, rulesPublished: false, season: SEASON_FILE, interviews: 0 };
 const CONFIG_KEY = "tys_config";
 /** La configuration une fois connue : en RAM, et dans sessionStorage pour la page suivante. */
 let configMemo: AppConfig | null = null;
@@ -165,10 +168,26 @@ function getConfig(): Promise<AppConfig> {
   return configPromise;
 }
 
-/** La configuration si elle est déjà connue (cette page ou plus tôt dans la session), sinon null. Synchrone. */
+/** Celle que le serveur a écrite dans la page (server/src/html.ts, injectConfig), lue une fois. */
+let pageConfig: AppConfig | null | undefined;
+function configInPage(): AppConfig | null {
+  if (pageConfig === undefined) {
+    try {
+      const raw = document.getElementById("tys-config")?.textContent;
+      pageConfig = raw ? parseConfig(JSON.parse(raw)) : null;
+    } catch {
+      pageConfig = null;
+    }
+  }
+  return pageConfig;
+}
+
+/** La configuration si elle est déjà connue (cette page, plus tôt dans la session, ou écrite dans le HTML), sinon null. Synchrone. */
 function knownConfig(): AppConfig | null {
   if (configMemo) return configMemo;
   if (isMock()) return MOCK_CONFIG;
+  const inPage = configInPage();
+  if (inPage) return inPage;
   try {
     const raw = sessionStorage.getItem(CONFIG_KEY);
     if (!raw) return null;

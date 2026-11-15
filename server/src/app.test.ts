@@ -546,6 +546,21 @@ describe("image d'aperçu de l'accueil (/og/home.png)", () => {
     }
   });
 
+  it("chaque page porte la configuration du site : le bandeau de saison est juste dès la première image", async () => {
+    const root = mkdtempSync(join(tmpdir(), "tys-web-"));
+    writeFileSync(join(root, "index.html"), INDEX);
+    const p1 = { id: "p1", company: "Entreprise Démo", contract: "stage" as const, positions: ["BE" as const], languages: [], interviews: 3, remote: true, pitch: { fr: "a", en: "b" } };
+    const ctx = setup({}, { staticRoot: root, indexHtml: async () => INDEX, season: { number: 2, start: "2020-01-01", end: "2099-12-31", primes: [p1], rulesPublished: false } });
+    for (const path of ["/", "/bandes", "/privacy"]) {
+      const html = await (await ctx.app.request(path)).text();
+      const raw = /<script id="tys-config" type="application\/json">(.*?)<\/script>/.exec(html)?.[1];
+      expect(raw, path).toBeTruthy();
+      expect(JSON.parse(raw!)).toMatchObject({ primesOpen: true, primesListed: true, interviews: 3, season: { number: 2 } });
+      expect(count(html, /id="tys-config"/g)).toBe(1);
+    }
+    expect(await (await ctx.app.request("/api/config")).json()).toMatchObject({ interviews: 3 });
+  });
+
   it("la vie privée a son propre titre, sa description et son adresse, avec l'image de l'accueil", async () => {
     const root = mkdtempSync(join(tmpdir(), "tys-web-"));
     writeFileSync(join(root, "index.html"), INDEX);

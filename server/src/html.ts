@@ -230,6 +230,18 @@ export function injectMeta(template: string, m: PageMeta): string {
   return `<!doctype html><html lang="${m.lang}"><head><meta charset="utf-8">${tags}</head><body>${cleaned}</body></html>`;
 }
 
+/**
+ * La configuration du site (/api/config), écrite dans la page : le front la lit au
+ * premier rendu (web/src/lib/api.ts, knownConfig). Le bandeau de saison et le pied
+ * sont justes dès la première image, sans attendre une réponse ni pousser la page.
+ * Un bloc de données, jamais exécuté ; « < » échappé, il ne ferme rien.
+ */
+export function injectConfig(html: string, config: object): string {
+  if (!/<\/head>/i.test(html) || html.includes('id="tys-config"')) return html;
+  const json = JSON.stringify(config).replace(/</g, "\\u003c");
+  return html.replace(/<\/head>/i, () => `    <script id="tys-config" type="application/json">${json}</script>\n  </head>`);
+}
+
 // --- Les pages servies sans le site ------------------------------------------------
 // Lien de suppression ouvert depuis un email, fiche retirée ou page introuvable
 // quand le front n'est pas là : une langue (celle du navigateur), le gabarit du

@@ -15,7 +15,7 @@ import { isSitePage, isUpcomingPath } from "../../shared/routes";
 import type { CardData, ComparisonData, ErrorCode, Fact, JobState, Lang } from "../../shared/types";
 import { stripToken, type CardRow, type Store } from "./db";
 import { buildLead, clientEventSchema, sendLead } from "./events";
-import { genericMeta, HOME_IMAGE_PATH, injectHomeImage, injectMeta, langOfRequest, messagePage, metaFor, requestLang, siteStylesheets, standalonePage, type MessageKey } from "./html";
+import { genericMeta, HOME_IMAGE_PATH, injectConfig, injectHomeImage, injectMeta, langOfRequest, messagePage, metaFor, requestLang, siteStylesheets, standalonePage, type MessageKey } from "./html";
 import { ID_RE, MAX_PDF_BYTES, MESSAGES, Pipeline, type Deps, type RenderInput } from "./pipeline";
 import { CARDS_PER_BROWSER, CARDS_PER_DAY, RateLimiter, browserId, clientIp } from "./ratelimit";
 import { inlineAvatar, mountLinkedin, removeAvatars, type LinkedinConfig } from "./linkedin";
@@ -29,7 +29,7 @@ import type { TokenPool } from "./github/tokens";
 import { weekTop, withWeekSpecial } from "./top";
 import { normalizeLinkedinUrl, PAID_CALLS_PER_IP, type LinkedinFinder } from "./linkedinProfile/index";
 import { forgetLinkedinOfCard, recentLinkedinCard } from "./linkedinProfile/cards";
-import { primesOpen, seasonDates, type Season } from "../../shared/season";
+import { primePhase, primesOpen, seasonDates, type Season } from "../../shared/season";
 import { loadSeason } from "./season";
 import { mountRemoval } from "./removal";
 import { mountFilmTrace } from "./filmTrace";
@@ -261,7 +261,9 @@ export function createApp(opts: AppOptions) {
       if (c.req.path.startsWith("/.vite/")) return c.text("Not found", 404);
       await next();
       if (c.req.method !== "GET" || !(c.res.headers.get("content-type") ?? "").startsWith("text/html")) return;
-      const html = manifest ? withPreloads(await c.res.text(), manifest, c.req.path, c.res.status) : await c.res.text();
+      const raw = manifest ? withPreloads(await c.res.text(), manifest, c.req.path, c.res.status) : await c.res.text();
+      // La configuration dans la page : le bandeau de saison est là dès la première image (html.ts).
+      const html = injectConfig(raw, appConfig());
       const headers = new Headers(c.res.headers);
       headers.delete("content-length");
       const page = await compressHtml(new Response(html, { status: c.res.status, headers }), c.req.header("accept-encoding"));
@@ -358,19 +360,24 @@ export function createApp(opts: AppOptions) {
   const season = opts.season === undefined ? loadSeason() : opts.season;
   // Le règlement n'existe que publié par la saison, présent sur le disque et sans champ à remplir (rules.ts).
   const rules = season?.rulesPublished ? servableRules(opts.rules === undefined ? loadRules() : opts.rules) : null;
-  app.get("/api/config", (c) =>
-    c.json({
+  // La même réponse est écrite dans chaque page servie (injectConfig, plus haut).
+  const appConfig = () => {
+    const now = Date.now();
+    return {
       linkedin: !!opts.linkedin,
       claim: !!opts.githubAuth,
       linkedinEntry: !!opts.linkedinProfiles,
-      primesOpen: primesOpen(season, Date.now()),
+      primesOpen: primesOpen(season, now),
       // primesListed : la saison porte au moins une prime (ouverte, à venir ou close) : /primes existe.
       primesListed: !!season && season.primes.length > 0,
       // rulesPublished : /reglement est servi (relu par Jacques, rules.ts).
       rulesPublished: !!rules,
       season: season ? seasonDates(season) : null,
-    }),
-  );
+      // interviews : les entretiens en jeu dans les primes ouvertes, que le bandeau de saison annonce.
+      interviews: season ? season.primes.filter((p) => primePhase(season, p, now) === "open").reduce((n, p) => n + p.interviews, 0) : 0,
+    };
+  };
+  app.get("/api/config", (c) => c.json(appConfig()));
 
   // Les moteurs de recherche : de vrais fichiers, sans les fiches (seo.ts).
   app.get("/robots.txt", (c) => {
