@@ -87,7 +87,7 @@ describe("dos de la fiche", () => {
         const text = p.lines.join(" ");
         expect(text).not.toMatch(/[+−]\s?\d/);
         const svg = back(card, lang);
-        expect(svg).toContain(lang === "fr" ? "MOYENNE PONDÉRÉE" : "WEIGHTED MEAN");
+        expect(svg).toContain(lang === "fr" ? "MOYENNE PONDÉRÉE" : "WEIGHTED AVERAGE");
         expect(svg).toContain(`= ${grid.overall}`);
         if (grid === empty) expect(f.tail).toBeUndefined();
         else expect(f.tail).toContain("÷");
@@ -143,7 +143,7 @@ describe("dos de la fiche : la note vient des huit critères (§18.48)", () => {
       const order = [...svg.matchAll(/data-criterion="([A-Z]+)"/g)].map((m) => m[1]);
       expect(order).toEqual(["XP", "EMP", "STK", "CODE", "OWN", "ACT", "EDU", "OSS"]);
       expect(svg.match(/>\/10</g)!.length).toBeGreaterThanOrEqual(6);
-      expect(svg).toContain(lang === "fr" ? "MOYENNE PONDÉRÉE DES CRITÈRES NOTÉS" : "WEIGHTED MEAN OF THE SCORED CRITERIA");
+      expect(svg).toContain(lang === "fr" ? "MOYENNE PONDÉRÉE DES CRITÈRES NOTÉS" : "WEIGHTED AVERAGE OF THE SCORED CRITERIA");
       expect(svg).toContain("= 67");
       expect(svg).toContain(">/100<");
       // Les critères viennent avant la formule ; les codes des six traits ne reviennent pas.

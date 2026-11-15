@@ -6,8 +6,8 @@ const NBSP = " ";
 export const STRINGS = {
   fr: {
     loneWolf: "Sans bande",
-    /** Pied : « Dossier lu par Azerit en 9 s · preuves 34 % ». Épicène (§2.4) : rien ne s'accorde avec la personne. */
-    questioned: (s: number) => `Dossier lu par Azerit en ${s}${NBSP}s`,
+    /** Pied : « Fiche lue par Azerit en 9 s · prouvé à 34 % ». Épicène (§2.4) : rien ne s'accorde avec la personne. */
+    questioned: (s: number) => `Fiche lue par Azerit en ${s}${NBSP}s`,
     evidence: "preuves",
     percent: (n: number) => `${n}${NBSP}%`,
     /** La part de la note appuyée sur des preuves : « prouvé à 95 % ». */
@@ -70,7 +70,7 @@ export const STRINGS = {
   },
   en: {
     loneWolf: "Lone wolf",
-    questioned: (s: number) => `File read by Azerit in ${s}${NBSP}s`,
+    questioned: (s: number) => `Sheet read by Azerit in ${s}s`,
     evidence: "evidence",
     percent: (n: number) => `${n}%`,
     proven: (n: number) => `${n}% proven`,
@@ -111,7 +111,7 @@ export const STRINGS = {
       noFact: "No fact on file",
       rating: "The rating",
       weight: (w: number) => `${Math.round(w * 100)}%`,
-      gridRating: "The rating · weighted mean of the scored criteria × 10",
+      gridRating: "The rating · weighted average of the scored criteria × 10",
       criteria: { EDU: "School", XP: "Experience", EMP: "Career", STK: "Stack", CODE: "Code", ACT: "Activity", OWN: "Ownership", OSS: "Open source" },
       term: (name: string, score: number, coef: string) => `${name} ${score}${NBSP}×${NBSP}${coef}`,
       divide: (den: string) => `÷${NBSP}${den}`,
