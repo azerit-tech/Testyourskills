@@ -1484,21 +1484,38 @@ button.cover-panel:focus-visible {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
-/* place libre : l'appel à jouer, en lilas discret (le rose est réservé à ce qui se touche en propre) */
+/* les places libres du top 5, en une seule ligne : le texte en lilas discret, puis
+   l'invitation, qui se touche (rose, soulignée comme un lien) */
 .board-row.is-free .board-avatar {
   background: none;
   box-shadow: inset 0 0 0 1.5px var(--c-line);
 }
 .board-row.is-free .board-login {
-  grid-column: 3 / -1;
   color: var(--c-text-2);
 }
-.board-row.is-free:hover .board-login,
-.board-row.is-free:focus-visible .board-login {
-  color: var(--cream);
+.board-take {
+  grid-column: 4 / -1;
+  font: 500 var(--t-14) / 1.2 var(--f-text);
+  color: var(--c-action);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  white-space: nowrap;
 }
-/* le top 5 : une étiquette de dossier en tête de l'aplat, posée seulement
-   quand des lignes suivent ; puis un filet avant le 6e */
+.board-row.is-free:hover .board-take,
+.board-row.is-free:focus-visible .board-take {
+  color: var(--c-emphasis);
+}
+/* semaine vide : un seul bloc d'invitation à la place du tableau */
+.board-empty p {
+  color: var(--c-text);
+}
+.board-empty .pill {
+  justify-self: start;
+  margin-top: 4px;
+}
+/* le top 5 : une étiquette de dossier en tête de l'aplat, dès qu'il y a une
+   ligne ; puis un filet avant le 6e */
 .board-top {
   display: grid;
 }

@@ -144,7 +144,7 @@ export function Home() {
       </div>
       {/* Les primes ouvertes (§18.4) : rien tant que la saison n'en porte pas. */}
       <PrimesStrip />
-      <BandsTop />
+      <BandsTop lead={h.bandsLead} />
       <ProfileWall onPlay={play} />
       {/* Qui a tout lu n'a pas à remonter : le même formulaire, dans le bloc d'appel. */}
       <section className="home-last block block-call" aria-labelledby="home-last-title">

@@ -89,6 +89,8 @@ const fr = {
     next: "Voir la suite",
     /** Le dernier formulaire de l'accueil, avant le pied de page (§18.48). */
     lastTitle: "À toi.",
+    /** Au-dessus du tableau des bandes : pourquoi une bande. */
+    bandsLead: "Fais ta fiche. Fais gagner ta bande.",
     /* Mur des 13 profils (§18.28) */
     wall: {
       title: "Lequel es-tu ?",
@@ -102,6 +104,11 @@ const fr = {
       meta: (week: number, n: number, left: string) => [`Semaine ${week}`, showsTotal(n) && `${n} dossiers`, `fin dans ${left}`].filter(Boolean).join(" · "),
       left: (d: number, h: number, m: number) => (d > 0 ? `${d} j ${h} h` : h > 0 ? `${h} h ${m} min` : `${m} min`),
       cut: "Top 5",
+      /* Semaine vide : un seul bloc d'invitation ; top 5 incomplet : une seule ligne pour les places libres (§18.48). */
+      emptyTitle: "La place n°\u00a01 est libre",
+      emptyText: "La première fiche de la semaine la prend.",
+      freeRange: (from: number, to: number) => (from === to ? `Place ${from} libre` : `Places ${from} à ${to} libres`),
+      take: (n: number): string => (n === 1 ? "Prends-la" : "Prends-en une"),
       free: "Place libre",
       freeLabel: (rank: number) => `Place ${rank} libre : entre ton pseudo GitHub`,
       rowLabel: (rank: number, login: string, overall: number) => `Place ${rank} : @${login}, note ${overall}`,
@@ -847,6 +854,7 @@ const en: Dict = {
     },
     next: "See more",
     lastTitle: "Your turn.",
+    bandsLead: "Get your rap sheet. Make your crew win.",
     wall: {
       title: "Which one are you?",
       you: "And you?",
@@ -857,6 +865,10 @@ const en: Dict = {
       meta: (week, n, left) => [`Week ${week}`, showsTotal(n) && `${n} files`, `ends in ${left}`].filter(Boolean).join(" · "),
       left: (d, h, m) => (d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m}min` : `${m}min`),
       cut: "Top 5",
+      emptyTitle: "Spot #1 is open",
+      emptyText: "This week's first sheet takes it.",
+      freeRange: (from, to) => (from === to ? `Spot ${from} is open` : `Spots ${from} to ${to} are open`),
+      take: (n) => (n === 1 ? "Take it" : "Take one"),
       free: "Open spot",
       freeLabel: (rank) => `Spot ${rank} is open: enter your GitHub username`,
       rowLabel: (rank, login, overall) => `Spot ${rank}: @${login}, rating ${overall}`,
