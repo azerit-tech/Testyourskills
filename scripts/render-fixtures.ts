@@ -7,6 +7,9 @@
 //   --profiles : planche des 13 profils de data/profiles.json (noms et phrases),
 //   posés tour à tour sur les fiches de la maquette, plus une fiche sans profil.
 //   --back : planche des dos de fiche (§18.27), plus un dos aux faits très longs.
+//   --autour : avec des clés, rend aussi les images sans fiche à soi (accueil, bande, prime),
+//   en français et en anglais ; sans clé, elles sont toujours rendues.
+//   Chaque image de partage se juge réduite à 360 px de large, sa taille dans un fil (§18.48).
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createElement } from "react";
@@ -19,7 +22,9 @@ import type { CardData, Lang } from "../shared/types";
 import { CardGraphic } from "../shared/card/Card";
 import { CardBackGraphic } from "../shared/card/CardBack";
 import { CARD_H, CARD_W } from "../shared/card/geometry";
-import { renderImage, type ImageFormat } from "../server/src/render/index";
+import type { BandStanding } from "../shared/bands";
+import type { PrimeView } from "../shared/primes";
+import { renderImage, type ImageFormat, type RenderInput } from "../server/src/render/index";
 import { fetchAvatar } from "../server/src/render/avatar";
 import { fontFiles } from "../server/src/render/fonts";
 
@@ -32,6 +37,7 @@ const only = args.filter((a) => !a.startsWith("--"));
 const sheetOnly = args.includes("--sheet-only");
 const profilesSheet = args.includes("--profiles");
 const backSheet = args.includes("--back");
+const around = args.includes("--autour");
 const langArg = args.find((a) => a.startsWith("--lang="))?.slice(7) as Lang | undefined;
 
 const nightOwl = profilesJson.profiles.find((p) => p.id === "night_owl")!;
@@ -133,7 +139,31 @@ async function main() {
       }
     }
   }
+  if (only.length === 0 || around) await aroundImages();
   console.log(`Terminé en ${Date.now() - t0} ms`);
+}
+
+/** Les images sans fiche à soi : l'accueil, une bande (au tableau, en formation, vide) et une prime (ouverte, close), en français et en anglais. */
+async function aroundImages() {
+  const band = (o: Partial<BandStanding>): BandStanding => ({ type: "ecole", id: "ecole-demo", label: "École Démo", score: 88, members: 23, rank: 1, missing: 0, gap: null, ahead: null, hasPage: true, ...o });
+  const prime = (o: Partial<PrimeView>): PrimeView => ({ id: "demo", company: "Entreprise Démo", contract: "stage", positions: ["BE", "FS"], languages: [], interviews: 3, place: "Ville Démo", remote: false, pitch: { fr: "", en: "" }, from: "2026-11-01", to: "2026-11-26", phase: "open", daysLeft: 12, entrants: 4, ...o });
+  const jobs: [string, Omit<RenderInput, "lang">][] = [
+    ["home", { format: "home", card: { ...FIXTURES.jmougeot, avatarUrl: undefined } }],
+    ["band-top", { format: "band", band: band({}) }],
+    ["band-second", { format: "band", band: band({ type: "boite", label: "Boîte Démo", score: 47, members: 10, rank: 2, gap: 5, ahead: { id: "x", label: "X", rank: 1 } }) }],
+    ["band-forming", { format: "band", band: band({ label: "Université de technologie de Démoville", score: 5, members: 1, rank: null, missing: 2 }) }],
+    ["band-empty", { format: "band", band: band({ score: 0, members: 0, rank: null, missing: 3 }) }],
+    ["prime-open", { format: "prime", prime: prime({}), logo: null }],
+    ["prime-closed", { format: "prime", prime: prime({ contract: "cdi", positions: ["FE"], interviews: 1, remote: true, phase: "closed", daysLeft: null }), logo: null }],
+  ];
+  for (const [name, input] of jobs) {
+    for (const lang of langArg ? [langArg] : (["fr", "en"] as Lang[])) {
+      const t = Date.now();
+      const png = await renderImage({ ...input, lang });
+      writeFileSync(resolve(OUT, `${name}-${lang}.png`), png);
+      console.log(`→ ${name}-${lang}.png  ${png.length >> 10} Ko  ${Date.now() - t} ms`);
+    }
+  }
 }
 
 main().catch((e) => {
