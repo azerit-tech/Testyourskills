@@ -5,7 +5,8 @@
 // bandes (§18.38), le mur des 13 profils (§18.28), et un dernier formulaire
 // avant le pied de page. Rien d'autre.
 // L'accueil se souvient : la fiche déjà faite (ou le dossier encore en cours) tient
-// en une ligne au-dessus du formulaire, et prend la case « Ta place » de la couverture.
+// en une ligne au-dessus du formulaire, à la place de la promesse, et prend la case
+// « Ta place » de la couverture.
 // L'exemple est la vraie fiche de Jacques (fondateur d'Azerit) : la maquette
 // s'affiche d'abord, la fiche calculée par le serveur la remplace dès qu'elle existe.
 // Aucun dégradé dans la page : seuls ceux de la fiche et des illustrations.
@@ -223,9 +224,9 @@ export function Home() {
             <span className="hero-title-proof">{h.titleProof}</span>
           </h1>
           {/* La promesse, sous le titre : ce qu'on obtient, avant de demander quoi que ce soit. */}
-          <p className="hero-hook">{hook}</p>
-          {/* L'accueil se souvient : la fiche déjà faite ou le dossier en cours, à un geste. */}
-          <BackLine mine={mem.mine} pending={mem.pending} />
+          {/* L'accueil se souvient : qui a déjà sa fiche (ou un dossier en cours) connaît la
+              promesse ; la ligne qui y ramène prend sa place, le bouton ne descend pas. */}
+          {mem.mine || mem.pending ? <BackLine mine={mem.mine} pending={mem.pending} /> : <p className="hero-hook">{hook}</p>}
           <EntryForm inputRef={inputRef} />
         </section>
       </div>
