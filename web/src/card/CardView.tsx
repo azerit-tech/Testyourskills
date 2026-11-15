@@ -14,6 +14,7 @@ import { CardBack } from "../../../shared/card/CardBack";
 import { t as cardT } from "../../../shared/card/i18n";
 import { CARD_MASK_URL, CARD_PATH } from "../../../shared/card/geometry";
 import { themeCssVars, themeOf } from "../../../shared/card/themes";
+import { useAvatar } from "./avatar";
 import "./fonts.css";
 import "./card.css";
 
@@ -99,6 +100,9 @@ export function CardView(props: CardViewProps) {
   const tap = useRef<{ x: number; y: number; moved: boolean } | null>(null);
   const style = styleOf(card);
   const s = cardT(lang ?? card.lang ?? "fr");
+  // La photo se montre d'emblée (elle charge dans le SVG) ; en échec, ou si c'est
+  // l'avatar généré par GitHub, la fiche repasse à la silhouette à initiales.
+  const avatarHref = useAvatar(card.avatarUrl) === "none" ? "" : undefined;
 
   useEffect(() => {
     if (!flippable) setFlipped(false);
@@ -216,7 +220,7 @@ export function CardView(props: CardViewProps) {
 
   const front = (
     <>
-      <Card card={card} lang={lang} idPrefix={idPrefix} className="tys-card__svg" />
+      <Card card={card} lang={lang} avatarHref={avatarHref} idPrefix={idPrefix} className="tys-card__svg" />
       <div className="tys-card__fx tys-card__grain" aria-hidden />
       <div className="tys-card__fx tys-card__sweep" aria-hidden />
     </>

@@ -1,6 +1,6 @@
 // Mémoire de session : pré-remplissage de l'entrée et cartes fraîches (en RAM),
 // origine du visiteur venu par un lien partagé (sessionStorage).
-import type { Door } from "../../../shared/entry";
+import { linkedinSlug, type Door } from "../../../shared/entry";
 import type { Fact } from "../../../shared/types";
 
 export type Mode = "single" | "both";
@@ -21,6 +21,8 @@ let lastInput: { login?: string; file?: File | null } = {};
 const fresh = new Map<string, number>();
 /** Le pseudo GitHub tapé pour chacune : l'attente en montre l'avatar dès la première seconde (§18.27). */
 const freshLogins = new Map<string, string>();
+/** Le nom du lien LinkedIn collé pour chacune (« camille-ardent ») : la plaque de l'attente le porte. */
+const freshSlugs = new Map<string, string>();
 
 export function setPrefill(p: Prefill) {
   prefill = { file: lastInput.file ?? null, ...p };
@@ -43,11 +45,18 @@ export function rememberInput(i: { login?: string; file?: File | null }) {
 }
 
 /** `login` : le pseudo GitHub de la demande, s'il y en a un (ni lien LinkedIn, ni CV seul). */
-export function markFresh(id: string, login?: string | null) {
+export function markFresh(id: string, login?: string | null, linkedin?: string | null) {
   fresh.set(id, Date.now());
   if (login) freshLogins.set(id, login);
   seen.delete(id);
   writeSession(OWED_KEY, id);
+  const slug = linkedin ? linkedinSlug(linkedin) : null;
+  if (slug) freshSlugs.set(id, slug);
+}
+
+/** Le nom du lien LinkedIn collé pour cette fiche dans cet onglet, ou null. */
+export function freshSlug(id: string): string | null {
+  return freshSlugs.get(id) ?? null;
 }
 
 // --- Le film joue une fois (§18.48) ------------------------------------------

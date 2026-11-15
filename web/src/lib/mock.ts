@@ -395,10 +395,13 @@ export const mockApi = {
     if (kind === "slow")
       return { state: "error", code: "timeout", message: { fr: "Trop long, on arrête là.", en: "Too long, stopping here." } };
     const mg = await loadGrids();
+    // Une fiche faite à l'instant porte le jour de sa demande, comme sur le serveur :
+    // la plaque de l'attente et celle de la fiche disent la même date.
+    const dated = <T extends { createdAt: string }>(x: T): T => (job ? { ...x, createdAt: new Date(job.start).toISOString() } : x);
     if (kind === "cmp" || kind === "licmp" || kind === "liempty")
-      return { state: "done", kind: "comparison", comparison: buildComparison(id, job, mg, kind !== "cmp", kind === "liempty") };
-    if (kind === "li") return { state: "done", kind: "card", card: buildLinkedinCard(id, job, mg) };
-    return { state: "done", kind: "card", card: buildCard(kind as FixtureKey, id, job, mg) };
+      return { state: "done", kind: "comparison", comparison: dated(buildComparison(id, job, mg, kind !== "cmp", kind === "liempty")) };
+    if (kind === "li") return { state: "done", kind: "card", card: dated(buildLinkedinCard(id, job, mg)) };
+    return { state: "done", kind: "card", card: dated(buildCard(kind as FixtureKey, id, job, mg)) };
   },
 
   /**
