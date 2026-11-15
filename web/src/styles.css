@@ -1197,7 +1197,8 @@ button.cover-panel:focus-visible {
 /* l'accueil se souvient : une ligne à la place de la promesse, dans la même voix, tout
    entière un lien. Sa zone tactile (44 px) déborde sur les blancs voisins sans les agrandir. */
 .home-back {
-  margin: -11px 0;
+  /* la ligne garde la hauteur de la promesse (1,4 em) : le reste de ses 44 px déborde */
+  margin: calc((1.4em - var(--h-tap)) / 2) 0;
   font: var(--font-body);
   color: var(--c-text);
 }
