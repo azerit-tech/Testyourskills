@@ -42,7 +42,12 @@ export function useReveal(animate: boolean, start = true, autoOpen = AUTO_OPEN) 
   }, []);
   const stage = useCallback(() => setStaged(true), []);
   const handoff = useCallback(() => setPhase((p) => (p === "playing" ? "handoff" : p)), []);
-  const finish = useCallback(() => setPhase("done"), []);
+  // Fini, ou replié avant d'avoir joué (le film pas prêt à temps sur un réseau lent) : la révélation
+  // est close, l'attente qui se lève ensuite ne la rouvre pas (plus d'écran noir à trois points).
+  const finish = useCallback(() => {
+    opened.current = true;
+    setPhase("done");
+  }, []);
   const skip = useCallback(() => {
     opened.current = true;
     setPhase("done");

@@ -280,7 +280,11 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
       const visibleMs = clock.at(performance.now(), !document.hidden);
       // onglet caché : rien ne se décide dans le dos de la personne
       if (document.hidden) return;
-      if (readyVerdict({ visibleMs, remainingBytes: filmRemaining(needed), bps: filmNet().bps }) === "give-up") fail("timeout");
+      const facts = { visibleMs, remainingBytes: filmRemaining(needed), bps: filmNet().bps };
+      if (readyVerdict(facts) === "give-up") {
+        filmTrace("délai", { visible: Math.round(visibleMs), reste: facts.remainingBytes, bps: facts.bps === null ? null : Math.round(facts.bps) });
+        fail("timeout");
+      }
     };
     const onVis = () => check();
     const timer = window.setInterval(check, READY_CHECK_MS);

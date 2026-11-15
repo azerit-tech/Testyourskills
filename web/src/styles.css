@@ -2191,18 +2191,19 @@ button.cover-panel:focus-visible {
   background: var(--cream);
   transition: width 0.4s linear;
 }
-/* la fiche est prête, la scène 3D se charge : la barre ne sait plus où elle en est, elle défile */
+/* la fiche est prête, le film se charge : la barre reste pleine (elle ne recule jamais) et respire */
 .load-bar.is-busy span {
-  width: 34% !important;
-  transition: none;
+  width: 100% !important;
   animation: load-busy 1.3s ease-in-out infinite;
 }
 @keyframes load-busy {
-  from {
-    transform: translateX(-100%);
+  50% {
+    opacity: 0.6;
   }
-  to {
-    transform: translateX(295%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .load-bar.is-busy span {
+    animation: none;
   }
 }
 

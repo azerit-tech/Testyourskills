@@ -123,6 +123,28 @@ export function Waiting({ cardId, progress, startedAt, queue, findings = [], log
   useLayoutEffect(() => {
     window.scrollTo(0, 0);
   }, []);
+  // Tant qu'elle couvre l'écran, la page dessous (la fiche déjà posée, le film qui se prépare) est
+  // inerte : ni focus, ni lecture d'écran, ni annonce de la fiche avant sa révélation. Reposé à
+  // chaque rendu, la page dessous changeant d'élément en route (chargement, puis fiche).
+  useLayoutEffect(() => {
+    const main = document.getElementById("main");
+    if (!main || leaving) return;
+    main.inert = true;
+    return () => {
+      main.inert = false;
+    };
+  });
+  // Levée sur une fiche posée sans film (film pas prêt, mouvement réduit), ou sur l'erreur (délai
+  // dépassé) : le focus va à son titre, comme après le film. Pendant un film, la page le donnera à la fin.
+  useEffect(
+    () => () => {
+      const head = document.querySelector<HTMLElement>(".page-result:not(.is-animating) .wanted-head, #main .error-panel h1");
+      if (!head || (document.activeElement && document.activeElement !== document.body)) return;
+      if (!head.hasAttribute("tabindex")) head.setAttribute("tabindex", "-1");
+      head.focus({ preventScroll: true });
+    },
+    [],
+  );
   const [lines, setLines] = useState<Line[]>([]);
   const [now, setNow] = useState(() => Date.now());
   const consumed = useRef(0);
