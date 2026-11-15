@@ -391,6 +391,11 @@
   background: #fff9cb;
   pointer-events: none;
 }
+/* la fiche posée, les bandes d'encre s'ouvrent vides : ni étoiles ni radio coupées au bord */
+.film-stage.is-landed .film-stars,
+.film-stage.is-landed .film-radio {
+  visibility: hidden;
+}
 
 /* « Passer » (CardPage) et le son, en bas à droite de la bande du bas, 44 px :
    un contour discret, moins lourds que la radio. Ils s'effacent à l'arrêt sur

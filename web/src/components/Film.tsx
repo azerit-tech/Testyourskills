@@ -70,6 +70,16 @@ declare global {
   }
 }
 
+/**
+ * Le flash tel qu'il se voit : plein en deux images (80 ms) au lieu de quatre, puis, la fiche
+ * posée, effacé en trois images au lieu de six. Le crème à mi-opacité sur l'arrêt sur image ou
+ * sur la fiche vire au kaki : il ne doit durer qu'un instant.
+ */
+export function flashLook(flash: number, landed: boolean): number {
+  if (flash <= 0) return 0;
+  return landed ? Math.max(0, Math.min(1, (flash - 0.5) * 2)) : Math.min(1, flash * 2);
+}
+
 /** Le fond du bureau : une image toutes les 125 ms au plus (8 par seconde), sur une toile minuscule. */
 const BACK_MS = 125;
 const BACK_W = 18;
@@ -407,7 +417,7 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
         <div className="film-radio-wide" style={{ transform: `translateY(${(1 - hud.bands) * 100}%)` }}>
           <FilmRadio radio={hud.radio} />
         </div>
-        {hud.flash > 0 && <div className="film-flash" style={{ opacity: hud.flash }} />}
+        {flashLook(hud.flash, landed) > 0 && <div className="film-flash" style={{ opacity: flashLook(hud.flash, landed) }} />}
       </div>
       {phase === "playing" && (
         <button type="button" className="sound-btn film-sound" aria-pressed={!muted} aria-label={muted ? tr.reveal.unmute : tr.reveal.mute} title={muted ? tr.reveal.unmute : tr.reveal.mute} onClick={toggleSound}>
