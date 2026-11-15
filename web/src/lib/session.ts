@@ -29,7 +29,9 @@ export function setPrefill(p: Prefill) {
 /** Pré-remplit l'entrée avec la dernière saisie (bouton « Réessayer »). */
 export function prefillFromLast(error: Fact | string | null) {
   const { login, file } = lastInput;
-  prefill = { login, file: file ?? null, mode: login && file ? "both" : "single", tab: file && !login ? "cv" : "github", error };
+  // Le dossier vient d'échouer : l'accueil n'a plus à y ramener.
+  clearPending();
+  prefill ={ login, file: file ?? null, mode: login && file ? "both" : "single", tab: file && !login ? "cv" : "github", error };
 }
 
 export function takePrefill(): Prefill | null {
@@ -46,6 +48,8 @@ export function rememberInput(i: { login?: string; file?: File | null }) {
 export function markFresh(id: string, login?: string | null) {
   fresh.set(id, Date.now());
   if (login) freshLogins.set(id, login);
+  memPending = { id, at: Date.now() };
+  writeSession(PENDING_KEY, JSON.stringify(memPending));
 }
 
 /** Le pseudo GitHub tapé pour cette fiche dans cet onglet, ou null. */
@@ -55,6 +59,37 @@ export function freshLogin(id: string): string | null {
 
 export function freshSince(id: string): number | null {
   return fresh.get(id) ?? null;
+}
+
+// --- Le dossier en cours (§18.48) --------------------------------------------
+// La dernière demande partie de cet onglet. Tant que sa fiche n'est pas sortie,
+// l'accueil y ramène (« Ton dossier s'ouvre encore »). RAM, recopiée dans
+// sessionStorage pour survivre à un rechargement.
+
+const PENDING_KEY = "tys_pending";
+/** Passé ce délai, le serveur a tranché depuis longtemps : le dossier n'est plus « en cours ». */
+export const PENDING_MAX_MS = 10 * 60_000;
+let memPending: { id: string; at: number } | null = null;
+
+/** L'id du dossier demandé dans cet onglet et pas encore vu fini, ou null. */
+export function pendingFile(now = Date.now()): string | null {
+  let p = memPending;
+  if (!p) {
+    try {
+      const v = JSON.parse(readSession(PENDING_KEY) ?? "null") as { id?: unknown; at?: unknown } | null;
+      if (v && typeof v.id === "string" && typeof v.at === "number") p = { id: v.id, at: v.at };
+    } catch {
+      /* rien */
+    }
+  }
+  return p && p.id && now - p.at < PENDING_MAX_MS ? p.id : null;
+}
+
+/** Le dossier est sorti, ou a échoué. Avec un id : seulement si c'est encore celui-là. */
+export function clearPending(id?: string) {
+  if (id && pendingFile() !== id) return;
+  memPending = null;
+  writeSession(PENDING_KEY, "");
 }
 
 // --- La porte de l'entrée ----------------------------------------------------
@@ -94,6 +129,7 @@ export const MINE_EVENT = "tys:mine";
 
 export function rememberMine(card: MyCard) {
   memMine = { id: card.id, login: card.login ? card.login.toLowerCase() : null, overall: card.overall };
+  clearPending(card.id);
   try {
     localStorage.setItem(MINE_KEY, JSON.stringify(memMine));
   } catch {

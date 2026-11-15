@@ -1,12 +1,15 @@
 // Les tableaux de l'accueil (§18.48) : le top de la semaine et celui des bandes,
-// rendus en chaîne, sans navigateur ni serveur.
+// et la ligne de mémoire, rendus en chaîne, sans navigateur ni serveur.
 import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { BandStanding } from "../../../shared/bands";
+import { FIXTURES } from "../../../shared/fixtures";
 import type { TopEntry, WeekTop } from "../../../shared/types";
 import { LangProvider } from "../i18n";
+import { BackLine } from "../pages/Home";
 import { BandsTopView } from "./BandsTop";
+import { Cover } from "./Cover";
 import { WeekBoardView } from "./WeekBoard";
 
 function render(el: ReactElement, language = "fr-FR"): string {
@@ -51,6 +54,69 @@ describe("le top de la semaine sur l'accueil", () => {
     const html = board(7);
     expect(count(html, 'class="board-row"')).toBe(7);
     expect(html).toContain("is-rest");
+  });
+});
+
+describe("ma ligne au top de la semaine", () => {
+  const mine = (m: { id: string; login: string | null }) => render(createElement(WeekBoardView, { top: week(7), now: 0, onPlay: () => undefined, mine: { ...m, overall: 80 } }));
+
+  it("le tableau porte l'ancre « semaine »", () => {
+    expect(board(3)).toContain('<section class="board" id="semaine"');
+  });
+
+  it("la fiche en mémoire, par son id ou par son pseudo : une seule ligne mise en évidence, dans le top 5 comme après", () => {
+    const byId = mine({ id: "Card000002", login: null });
+    expect(count(byId, "is-me")).toBe(1);
+    expect(byId).toMatch(/class="board-row is-me" href="\/c\/Card000002"[^>]*aria-current="true"/);
+    const byLogin = mine({ id: "Autre00000", login: "dev6" });
+    expect(count(byLogin, "is-me")).toBe(1);
+    expect(byLogin).toMatch(/class="board-row is-me" href="\/c\/Card000006"/);
+  });
+
+  it("sans fiche en mémoire, ou hors du tableau : aucune ligne mise en évidence", () => {
+    expect(board(7)).not.toContain("is-me");
+    expect(mine({ id: "Autre00000", login: "ailleurs" })).not.toContain("is-me");
+  });
+});
+
+describe("la ligne de mémoire au-dessus du formulaire", () => {
+  it("une fiche en mémoire : ses étoiles, sa note sur 100, le lien vers elle", () => {
+    const html = render(createElement(BackLine, { mine: { id: "Card000001", login: "dev1", overall: 79 }, pending: null }));
+    expect(html).toContain('href="/c/Card000001"');
+    expect(html).toContain('aria-label="5 étoiles sur 6"');
+    expect(html).toContain("79/100.");
+    expect(html).toContain("La revoir");
+    expect(render(createElement(BackLine, { mine: { id: "Card000001", login: null, overall: 46 }, pending: null }), "en-US")).toContain("See it again");
+  });
+
+  it("un dossier en cours passe devant la fiche déjà faite", () => {
+    const html = render(createElement(BackLine, { mine: { id: "Card000001", login: "dev1", overall: 79 }, pending: "Card000009" }));
+    expect(html).toContain('href="/c/Card000009"');
+    expect(html).toContain("Ton dossier s&#x27;ouvre encore.");
+    expect(html).toContain("Y retourner");
+    expect(html).not.toContain("79/100");
+  });
+
+  it("rien en mémoire : pas de ligne", () => {
+    expect(render(createElement(BackLine, { mine: null, pending: null }))).toBe("");
+  });
+});
+
+describe("la case « Ta place » de la couverture", () => {
+  const founder = { card: FIXTURES.jmougeot, href: "/jmougeot" };
+  const cover = (mine?: { href: string; overall: number; card: null }) => render(createElement(Cover, { onPlay: () => undefined, top: null, founder, seed: 7, mine }));
+
+  it("sans fiche en mémoire : la place libre, un bouton", () => {
+    const html = cover();
+    expect(html).toContain("TA PLACE");
+    expect(html).not.toContain("cover-mine");
+  });
+
+  it("une fiche en mémoire : la case y mène et le dit, la place libre a disparu", () => {
+    const html = cover({ href: "/c/Card000001", overall: 79, card: null });
+    expect(html).toMatch(/<a class="cover-panel cover-free cover-mine" [^>]*href="\/c\/Card000001"[^>]*aria-label="Ta fiche, 79\/100 : la revoir"/);
+    expect(html).toContain("TA FICHE");
+    expect(html).not.toContain("TA PLACE");
   });
 });
 

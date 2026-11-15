@@ -91,3 +91,43 @@ describe("captureRef", () => {
     expect(s.captureRef()).toBeNull();
   });
 });
+
+describe("le dossier en cours (§18.48)", () => {
+  it("une demande partie de l'onglet tient jusqu'à sa fiche, et survit à un rechargement", async () => {
+    browser("https://skills.test/");
+    const s = await fresh();
+    expect(s.pendingFile()).toBeNull();
+    s.markFresh("AbCdEf1234", "leamd");
+    expect(s.pendingFile()).toBe("AbCdEf1234");
+    // Rechargement : la RAM repart de zéro, sessionStorage non.
+    const reloaded = await fresh();
+    expect(reloaded.pendingFile()).toBe("AbCdEf1234");
+    // Une autre fiche vue entre-temps ne ferme pas le dossier ; la sienne, si.
+    reloaded.rememberMine({ id: "ZyXwVu9876", login: null, overall: 50 });
+    expect(reloaded.pendingFile()).toBe("AbCdEf1234");
+    reloaded.rememberMine({ id: "AbCdEf1234", login: "leamd", overall: 79 });
+    expect(reloaded.pendingFile()).toBeNull();
+    expect((await fresh()).pendingFile()).toBeNull();
+  });
+
+  it("un dossier échoué (retour à l'entrée) ou trop vieux n'est plus en cours", async () => {
+    browser("https://skills.test/");
+    const s = await fresh();
+    s.markFresh("AbCdEf1234");
+    expect(s.pendingFile(Date.now() + s.PENDING_MAX_MS + 1)).toBeNull();
+    expect(s.pendingFile()).toBe("AbCdEf1234");
+    s.prefillFromLast(null);
+    expect(s.pendingFile()).toBeNull();
+  });
+
+  it("stockage bloqué : le dossier tient en RAM pour la page", async () => {
+    browser("https://skills.test/", { blocked: true });
+    const s = await fresh();
+    s.markFresh("AbCdEf1234");
+    expect(s.pendingFile()).toBe("AbCdEf1234");
+    s.clearPending("ZyXwVu9876");
+    expect(s.pendingFile()).toBe("AbCdEf1234");
+    s.clearPending();
+    expect(s.pendingFile()).toBeNull();
+  });
+});

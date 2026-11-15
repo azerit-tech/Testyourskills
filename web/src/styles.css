@@ -1024,6 +1024,18 @@ svg {
     display: none;
   }
 }
+/* « Ta place », quand une fiche est en mémoire : sa vignette. Le haut de la fiche (la note,
+   les étoiles, le portrait) en pleine case, sans toise ni deux tons, la plaque par-dessus. */
+.cover-mine .cover-face::before,
+.cover-mine .cover-face::after {
+  content: none;
+}
+.cover-mine .tys-card {
+  position: absolute;
+  top: 5cqw;
+  left: 5cqw;
+  width: 90cqw;
+}
 a.cover-panel:focus-visible,
 button.cover-panel:focus-visible {
   border-radius: 3px;
@@ -1181,6 +1193,26 @@ button.cover-panel:focus-visible {
   font: var(--font-body);
   color: var(--c-text);
   text-wrap: pretty;
+}
+/* l'accueil se souvient : une ligne au-dessus du formulaire, tout entière un lien. Sa zone
+   tactile (44 px) déborde sur les blancs voisins sans les agrandir. */
+.home-back {
+  margin: -12px 0;
+  font: var(--font-small);
+  color: var(--c-text);
+}
+.home-back a {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 8px;
+  min-height: var(--h-tap);
+  color: inherit;
+  text-decoration: none;
+}
+.home-back a:hover .link-alt {
+  color: var(--cream);
+  text-decoration-color: currentColor;
 }
 .hero .entry {
   margin-top: 8px;
@@ -1483,6 +1515,14 @@ button.cover-panel:focus-visible {
   color: var(--cream);
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+/* ma ligne (la fiche en mémoire) : sur l'aplat d'appel, le pseudo en crème et en gras */
+.board-row.is-me {
+  background: var(--s-call);
+}
+.board-row.is-me .board-login {
+  font-weight: 700;
+  color: var(--cream);
 }
 /* les places libres du top 5, en une seule ligne : le texte en lilas discret, puis
    l'invitation, qui se touche (rose, soulignée comme un lien) */

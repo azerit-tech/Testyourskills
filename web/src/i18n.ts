@@ -84,6 +84,9 @@ const fr = {
       freePlate: "DOSSIER À OUVRIR",
       /** Un portrait peint : le rôle, jamais un genre, un âge ou une origine. */
       suspect: (profile: string) => `Portrait peint du profil ${profile}`,
+      /** La case « Ta place », quand une fiche est en mémoire : sa vignette. */
+      mine: "Ta fiche",
+      mineLabel: (overall: number) => `Ta fiche, ${overall}/100 : la revoir`,
     },
     /** La flèche sous le héros, sur ordinateur. */
     next: "Voir la suite",
@@ -91,6 +94,13 @@ const fr = {
     lastTitle: "À toi.",
     /** Au-dessus du tableau des bandes : pourquoi une bande. */
     bandsLead: "Fais ta fiche. Fais gagner ta bande.",
+    /** L'accueil se souvient (§18.48) : la fiche déjà faite, ou le dossier encore en cours. */
+    back: {
+      mine: "Ta fiche\u00a0:",
+      mineGo: "La revoir",
+      pending: "Ton dossier s'ouvre encore.",
+      pendingGo: "Y retourner",
+    },
     /* Mur des 13 profils (§18.28) */
     wall: {
       title: "Lequel es-tu ?",
@@ -851,10 +861,18 @@ const en: Dict = {
       freeLabel: "Your spot: open your file",
       freePlate: "FILE TO OPEN",
       suspect: (profile) => `Painted portrait of the ${profile} profile`,
+      mine: "Your sheet",
+      mineLabel: (overall) => `Your sheet, ${overall}/100: see it again`,
     },
     next: "See more",
     lastTitle: "Your turn.",
     bandsLead: "Get your rap sheet. Make your crew win.",
+    back: {
+      mine: "Your sheet:",
+      mineGo: "See it again",
+      pending: "Your file is still opening.",
+      pendingGo: "Go back to it",
+    },
     wall: {
       title: "Which one are you?",
       you: "And you?",

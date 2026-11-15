@@ -4,13 +4,15 @@
 // le top de la semaine (§18.22), les primes si elles sont ouvertes (§18.4), les
 // bandes (§18.38), le mur des 13 profils (§18.28), et un dernier formulaire
 // avant le pied de page. Rien d'autre.
+// L'accueil se souvient : la fiche déjà faite (ou le dossier encore en cours) tient
+// en une ligne au-dessus du formulaire, et prend la case « Ta place » de la couverture.
 // L'exemple est la vraie fiche de Jacques (fondateur d'Azerit) : la maquette
 // s'affiche d'abord, la fiche calculée par le serveur la remplace dès qu'elle existe.
 // Aucun dégradé dans la page : seuls ceux de la fiche et des illustrations.
 import { useEffect, useRef, useState } from "react";
-import type { WeekTop } from "../../../shared/types";
+import type { CardData, WeekTop } from "../../../shared/types";
 import { LEVEL_LABELS, starsFor } from "../../../shared/types";
-import { pieceLabel } from "../../../shared/caseFile";
+import { fileOf, pieceLabel } from "../../../shared/caseFile";
 import { FIXTURES } from "../../../shared/fixtures";
 import { CardView } from "../card/CardView";
 import { Cover } from "../components/Cover";
@@ -19,10 +21,12 @@ import { ProfileWall } from "../components/ProfileWall";
 import { WeekBoard } from "../components/WeekBoard";
 import { BandsTop } from "../components/BandsTop";
 import { PrimesStrip } from "../components/Primes";
+import { Stars } from "../components/Stars";
 import { useT } from "../i18n";
-import { api, type Showcase } from "../lib/api";
+import { ApiError, api, type Showcase } from "../lib/api";
 import { onLinkClick } from "../lib/router";
 import { homeHook, useAppConfig } from "../lib/season";
+import { clearPending, myCard, pendingFile, type MyCard } from "../lib/session";
 
 /** Au-delà, le top est tenu pour absent : la couverture ne garde pas ses cases prunes. */
 const TOP_WAIT_MS = 3000;
@@ -68,6 +72,93 @@ function useTop(): WeekTop | null | undefined {
   return top;
 }
 
+/** Ce que l'accueil sait déjà du visiteur (§18.48). */
+interface Memory {
+  /** La fiche faite dans ce navigateur. */
+  mine: MyCard | null;
+  /** Cette fiche entière, dès que le serveur l'a rendue : la vignette de la couverture. */
+  card: CardData | null;
+  /** Le dossier demandé dans cet onglet, pas encore sorti. */
+  pending: string | null;
+}
+
+/**
+ * La mémoire de l'accueil : lue d'emblée (la ligne a sa place au premier rendu), puis
+ * vérifiée auprès du serveur. Un dossier sorti entre-temps devient « Ta fiche », un
+ * dossier échoué ou une fiche retirée disparaît.
+ */
+function useMemory(): Memory {
+  const [mem, setMem] = useState<Memory>(() => ({ mine: myCard(), card: null, pending: pendingFile() }));
+
+  useEffect(() => {
+    let alive = true;
+    const gone = (e: unknown) => e instanceof ApiError && (e.status === 404 || e.status === 410);
+    const check = async () => {
+      let { mine } = mem;
+      const { pending } = mem;
+      if (pending) {
+        try {
+          const job = await api.getJob(pending);
+          if (job.state === "pending") return;
+          clearPending(pending);
+          if (job.state === "done") {
+            const main = job.kind === "card" ? job.card : fileOf(job.comparison);
+            mine = { id: pending, login: main.login ?? null, overall: main.overall };
+            if (alive) setMem({ mine, card: main, pending: null });
+            return;
+          }
+        } catch (e) {
+          // Réseau capricieux : on laisse la ligne, la page du dossier saura dire.
+          if (!gone(e)) return;
+          clearPending(pending);
+        }
+        if (!alive) return;
+        setMem((m) => ({ ...m, pending: null }));
+      }
+      if (!mine) return;
+      const id = mine.id;
+      try {
+        const job = await api.getJob(id);
+        if (!alive || job.state !== "done") return;
+        const main = job.kind === "card" ? job.card : fileOf(job.comparison);
+        setMem((m) => ({ ...m, mine: { id, login: main.login ?? null, overall: main.overall }, card: main }));
+      } catch (e) {
+        if (alive && gone(e)) setMem((m) => ({ ...m, mine: null }));
+      }
+    };
+    void check();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return mem;
+}
+
+/** La ligne au-dessus du formulaire : « Ta fiche : ★★★★★☆ 79/100. La revoir », ou le dossier en cours. */
+export function BackLine({ mine, pending }: Pick<Memory, "mine" | "pending">) {
+  const { t } = useT();
+  const b = t.home.back;
+  if (!mine && !pending) return null;
+  const href = `/c/${pending ?? mine!.id}`;
+  const stars = mine ? starsFor(mine.overall) : 0;
+  return (
+    <p className="home-back">
+      <a href={href} onClick={(e) => onLinkClick(e, href)}>
+        {pending ? (
+          <span>{b.pending}</span>
+        ) : (
+          <span>
+            {b.mine} <Stars n={stars} label={t.plea.count(stars)} /> {mine!.overall}/100.
+          </span>
+        )}
+        <span className="link-alt">{pending ? b.pendingGo : b.mineGo}</span>
+      </a>
+    </p>
+  );
+}
+
 /**
  * La fiche de Jacques : s'incline sous le pointeur, mène à sa page. Jugée avec son
  * LinkedIn (§18.35) : une note, celle de la fiche, et ses pièces dessous (§18.36).
@@ -100,6 +191,7 @@ export function Home() {
   const inputRef = useRef<HTMLInputElement>(null);
   const showcase = useShowcase();
   const top = useTop();
+  const mem = useMemory();
   // La ligne sous le titre (lib/season.ts) : l'entretien seulement si une prime est ouverte.
   const hook = homeHook(h, useAppConfig());
 
@@ -123,7 +215,7 @@ export function Home() {
   return (
     <main className="page page-home" id="main">
       <div className="home-top">
-        <Cover onPlay={play} top={top} founder={showcase} />
+        <Cover onPlay={play} top={top} founder={showcase} mine={mem.mine && { href: `/c/${mem.mine.id}`, overall: mem.mine.overall, card: mem.card }} />
         <section className="hero">
           {/* Deux phrases (shared/promise.ts) : la première en lilas, la question en crème. */}
           <h1 className="hero-title">
@@ -132,6 +224,8 @@ export function Home() {
           </h1>
           {/* La promesse, sous le titre : ce qu'on obtient, avant de demander quoi que ce soit. */}
           <p className="hero-hook">{hook}</p>
+          {/* L'accueil se souvient : la fiche déjà faite ou le dossier en cours, à un geste. */}
+          <BackLine mine={mem.mine} pending={mem.pending} />
           <EntryForm inputRef={inputRef} />
         </section>
       </div>
