@@ -173,13 +173,23 @@
   display: flex;
   gap: 8px;
 }
+/* les étoiles du site (§18.48), en 26 px : remplies de gauche à droite ;
+   allumée, crème pleine ; éteinte, la même en contour 1,5 px blanc à 35 % */
 .film-star {
   display: block;
-  fill: #243152;
+  overflow: visible;
+  fill: none;
+  stroke: rgb(255 255 255 / 0.35);
+  stroke-width: 1.5px;
+  stroke-linejoin: round;
   transform-origin: 50% 55%;
+}
+.film-star path {
+  vector-effect: non-scaling-stroke;
 }
 .film-star.is-on {
   fill: #fff9cb;
+  stroke: none;
 }
 .film-band-bottom {
   bottom: 0;
