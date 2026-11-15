@@ -9,12 +9,12 @@ export function AzeritMark({ size = 18, className }: { size?: number; className?
   );
 }
 
-/** La gemme et « AZERIT », en haut à gauche de chaque page (maquette validée de l'accueil). */
+/** La gemme et « AZERIT », en haut à gauche de chaque page : le seul nom visible du site (SPEC §18.48). */
 export function Brand() {
   return (
     <span className="brand">
-      <AzeritMark size={13} />
-      AZERIT
+      <AzeritMark size={18} />
+      <span className="brand-name">AZERIT</span>
     </span>
   );
 }

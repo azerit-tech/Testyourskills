@@ -89,6 +89,8 @@ export interface MyCard {
 
 const MINE_KEY = "tys_mine";
 let memMine: MyCard | null = null;
+/** Envoyé sur window quand la fiche en mémoire change : la barre du haut y gagne « Ma fiche ». */
+export const MINE_EVENT = "tys:mine";
 
 export function rememberMine(card: MyCard) {
   memMine = { id: card.id, login: card.login ? card.login.toLowerCase() : null, overall: card.overall };
@@ -96,6 +98,11 @@ export function rememberMine(card: MyCard) {
     localStorage.setItem(MINE_KEY, JSON.stringify(memMine));
   } catch {
     /* stockage bloqué : la RAM suffit pour cette visite */
+  }
+  try {
+    window.dispatchEvent(new Event(MINE_EVENT));
+  } catch {
+    /* hors navigateur */
   }
 }
 

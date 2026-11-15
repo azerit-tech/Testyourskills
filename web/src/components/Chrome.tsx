@@ -1,11 +1,14 @@
-// Bandeau de la saison, barre du haut, pied de page, sélecteur de langue.
+// Bandeau de la saison, barre du haut, pied de page, choix de la langue (SPEC §18.48).
+import { useEffect, useState } from "react";
 import type { Lang } from "../../../shared/types";
 import { useT } from "../i18n";
 import { api, isMock } from "../lib/api";
-import { onLinkClick } from "../lib/router";
+import { onLinkClick, usePath } from "../lib/router";
 import { seasonLine, useAppConfig } from "../lib/season";
+import { MINE_EVENT, myCard } from "../lib/session";
 import { Brand } from "./Brand";
 
+/** La langue en deux mots, « FR · EN » : l'active soulignée, chacune sur 44 px de zone tactile. */
 export function LangToggle() {
   const { lang, setLang, t } = useT();
   const opts: Lang[] = ["fr", "en"];
@@ -47,31 +50,60 @@ function Palm({ className }: { className: string }) {
   );
 }
 
-/** Le bandeau de la saison, en aplat pêche au-dessus de l'accueil, deux palmiers à chaque bout (§18.31). */
+/**
+ * Le bandeau de la saison, en aplat pêche au-dessus de l'accueil, deux palmiers à chaque bout (§18.31).
+ * Il n'existe que si une prime est ouverte, et c'est un lien vers /primes : sans geste à offrir, il se tait.
+ */
 export function SeasonBand() {
   const { t, lang } = useT();
+  const cfg = useAppConfig();
+  if (!cfg?.primesOpen) return null;
   // Les dates de data/season.json, servies par /api/config (lib/season.ts).
-  const text = seasonLine(t.home.season, useAppConfig()?.season ?? null, lang, Date.now());
+  const text = seasonLine(t.home.season, cfg.season ?? null, lang, Date.now());
   if (!text) return null;
   return (
-    <p className="season-band">
+    <a className="season-band" href="/primes" onClick={(e) => onLinkClick(e, "/primes")} aria-label={`${text}. ${t.chrome.seePrimes}`}>
       <Palm className="is-l" />
       <Palm className="is-l is-small" />
       <span className="season-text">{text}</span>
       <Palm className="is-r is-small" />
       <Palm className="is-r" />
-    </p>
+    </a>
   );
 }
 
-/** La barre du haut, sur l'encre, au-dessus de la couverture de l'accueil (§18.31) comme ailleurs. */
+/**
+ * La barre du haut, sur l'encre : la marque, puis « Bandes », « Ma fiche » (seulement si une fiche
+ * est en mémoire dans ce navigateur) et la langue.
+ */
 export function TopBar() {
   const { t } = useT();
+  const path = usePath();
+  // La barre se relit à chaque changement de page, et dès qu'une fiche entre en mémoire.
+  const [, reread] = useState(0);
+  useEffect(() => {
+    const on = () => reread((n) => n + 1);
+    window.addEventListener(MINE_EVENT, on);
+    return () => window.removeEventListener(MINE_EVENT, on);
+  }, []);
+  const mine = myCard();
+  const mineHref = mine ? `/c/${mine.id}` : null;
+  const onBands = /^\/bandes(\/|$)/.test(path);
   return (
     <header className="topbar">
-      <a href="/" className="topbar-brand" onClick={(e) => onLinkClick(e, "/")} aria-label="Testyourskills">
+      <a href="/" className="topbar-brand" onClick={(e) => onLinkClick(e, "/")} aria-label={t.chrome.home}>
         <Brand />
       </a>
+      <nav className="topbar-nav" aria-label={t.chrome.nav}>
+        <a className="topbar-link" href="/bandes" onClick={(e) => onLinkClick(e, "/bandes")} aria-current={onBands ? "page" : undefined}>
+          {t.chrome.bands}
+        </a>
+        {mineHref && (
+          <a className="topbar-link" href={mineHref} onClick={(e) => onLinkClick(e, mineHref)} aria-current={path === mineHref ? "page" : undefined}>
+            {t.chrome.mine}
+          </a>
+        )}
+      </nav>
       <div className="topbar-right">
         {isMock() && <span className="demo-pill">{t.common.demo}</span>}
         <LangToggle />
@@ -80,20 +112,28 @@ export function TopBar() {
   );
 }
 
+/** Le pied de page : les liens du site (primes et règlement seulement quand ils sont ouverts), puis azerit.tech. */
 export function Footer() {
   const { t, lang } = useT();
+  const cfg = useAppConfig();
   const privacy = lang === "fr" ? "/confidentialite" : "/privacy";
+  const inner: [string, string][] = [["/bandes", t.chrome.bands]];
+  if (cfg?.primesListed) inner.push(["/primes", t.chrome.primes]);
+  if (cfg?.rulesPublished) inner.push(["/reglement", t.chrome.rules]);
+  inner.push([privacy, t.footer.privacy]);
   return (
     <footer className="footer">
-      <nav className="footer-links">
-        <a href="https://azerit.tech" target="_blank" rel="noopener" onClick={() => api.track("cta_azerit_clicked", null, { from: "footer" })}>
-          azerit.tech
-        </a>
-        <a href={privacy} onClick={(e) => onLinkClick(e, privacy)}>
-          {t.footer.privacy}
-        </a>
+      <nav className="footer-links" aria-label={t.chrome.nav}>
+        {inner.map(([href, label]) => (
+          <a key={href} href={href} onClick={(e) => onLinkClick(e, href)}>
+            {label}
+          </a>
+        ))}
         <a href="/3d/CREDITS.txt" target="_blank" rel="noopener">
-          {t.footer.credits3d}
+          {t.chrome.credits}
+        </a>
+        <a className="is-out" href="https://azerit.tech" target="_blank" rel="noopener" onClick={() => api.track("cta_azerit_clicked", null, { from: "footer" })}>
+          azerit.tech
         </a>
       </nav>
     </footer>

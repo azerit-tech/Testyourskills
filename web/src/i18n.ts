@@ -698,6 +698,17 @@ const fr = {
     privacy: "Confidentialité",
     credits3d: "Crédits 3D",
   },
+  /** La barre du haut et le pied de page (Chrome.tsx) : les liens du site. */
+  chrome: {
+    home: "Azerit, accueil",
+    nav: "Le site",
+    bands: "Bandes",
+    mine: "Ma fiche",
+    primes: "Primes",
+    rules: "Règlement",
+    credits: "Crédits",
+    seePrimes: "Voir les primes",
+  },
   privacy: {
     title: "Confidentialité",
     intro: "Court, parce qu'on stocke peu.",
@@ -1381,6 +1392,16 @@ const en: Dict = {
   footer: {
     privacy: "Privacy",
     credits3d: "3D credits",
+  },
+  chrome: {
+    home: "Azerit, home",
+    nav: "Site",
+    bands: "Crews",
+    mine: "My sheet",
+    primes: "Bounties",
+    rules: "Rules",
+    credits: "Credits",
+    seePrimes: "See the bounties",
   },
   privacy: {
     title: "Privacy",
