@@ -21,6 +21,7 @@ import { markFresh, rememberDoor, rememberInput, sessionDoor, setPrefill, takePr
 import type { Mode, Tab } from "../lib/session";
 import { checkPdf, isTouch, parseLogin } from "../lib/util";
 import type { PdfCheck } from "../lib/util";
+import { BusyDots, busyLabel } from "./Busy";
 import { IconClose } from "./Icons";
 
 interface Props {
@@ -523,10 +524,11 @@ export function EntryForm({ inputRef, variant = "full", note }: Props) {
       <form className={`entry entry-inline${doorsOn ? " has-doors" : ""}`} onSubmit={submit} onInput={prefetchReveal} onPointerDown={prefetchReveal} noValidate>
         {doorsSwitch}
         {loginField}
-        <button type="submit" className="pill pill-big entry-submit" disabled={busy}>
-          {busy ? h.submitting : h.submit}
-        </button>
         {errorLine}
+        <button type="submit" className={`pill pill-big entry-submit${busy ? " is-busy" : ""}`} disabled={busy}>
+          {busy ? busyLabel(h.submitting) : h.submit}
+          {busy && <BusyDots />}
+        </button>
         <div className="entry-foot" id={`${uid}-hint`}>
           {whereLink}
           <button
@@ -588,11 +590,13 @@ export function EntryForm({ inputRef, variant = "full", note }: Props) {
         </div>
       )}
 
-      <button type="submit" className="pill pill-big entry-submit" disabled={busy}>
-        {busy ? h.submitting : mode === "both" ? h.submitBoth : h.submit}
+      {errorLine}
+
+      <button type="submit" className={`pill pill-big entry-submit${busy ? " is-busy" : ""}`} disabled={busy}>
+        {busy ? busyLabel(h.submitting) : mode === "both" ? h.submitBoth : h.submit}
+        {busy && <BusyDots />}
       </button>
 
-      {errorLine}
       {note}
 
       <div className="entry-foot" id={`${uid}-hint`}>
