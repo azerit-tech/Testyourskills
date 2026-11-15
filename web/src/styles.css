@@ -1617,8 +1617,25 @@ button.cover-panel:focus-visible {
   text-transform: uppercase;
   color: var(--c-text-2);
 }
-.board-tag + .board-list.is-top {
+.board-tag ~ .board-list.is-top {
   border-top-left-radius: 0;
+}
+/* l'échelle des notes, dite une fois sur la ligne de l'onglet, au droit de la colonne des notes */
+.board-scale {
+  grid-area: 1 / 1;
+  justify-self: end;
+  align-self: end;
+  padding: 7px 12px 5px;
+  font: var(--font-label);
+  letter-spacing: var(--ls-label);
+  text-transform: uppercase;
+  color: var(--c-text-2);
+}
+.board-top > .board-tag {
+  grid-area: 1 / 1;
+}
+.board-top > .board-scale ~ .board-list {
+  grid-row: 2;
 }
 .board-list.is-rest {
   margin-top: 4px;

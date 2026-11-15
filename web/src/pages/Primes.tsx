@@ -17,6 +17,7 @@ import { useToast } from "../components/After";
 import { IconLink, IconShare } from "../components/Icons";
 import { PrimeCard, PrimeMark, usePrimeWhen, withSup } from "../components/Primes";
 import { Stars } from "../components/Stars";
+import { SCALE } from "../components/WeekBoard";
 import { pick, useT } from "../i18n";
 import { api, ApiError } from "../lib/api";
 import { primesApi, type JoinBody } from "../lib/primes";
@@ -467,11 +468,16 @@ export function PrimePage({ id }: { id: string }) {
           {data.board.length === 0 ? (
             <p className="primes-empty">{closed ? tp.boardEmptyClosed : tp.boardEmpty}</p>
           ) : (
-            <ol className="board-list is-top">
-              {data.board.map((r) => (
-                <Row key={r.login} r={r} me={!!me?.login && me.login === r.login.toLowerCase()} />
-              ))}
-            </ol>
+            <div className="board-top">
+              <span className="board-scale" aria-hidden>
+                {SCALE}
+              </span>
+              <ol className="board-list is-top">
+                {data.board.map((r) => (
+                  <Row key={r.login} r={r} me={!!me?.login && me.login === r.login.toLowerCase()} />
+                ))}
+              </ol>
+            </div>
           )}
           <div className="prime-rule">
             <h3>{tp.rule}</h3>

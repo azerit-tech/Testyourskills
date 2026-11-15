@@ -200,7 +200,7 @@
   .bands-panel-tag {
     display: none;
   }
-  .bands-panel-tag + .board-list.is-top {
+  .bands-panel-tag ~ .board-list.is-top {
     border-top-left-radius: var(--r-block);
   }
 }
@@ -224,16 +224,15 @@
 }
 .band-total-score {
   display: inline-flex;
-  align-items: center;
+  align-items: baseline;
   gap: 8px;
   font: var(--font-score);
   color: var(--cream);
   font-variant-numeric: tabular-nums;
 }
-/* l'étoile du total : le dessin commun, à sa plus grande taille */
-.band-total-score .star-mark {
-  width: 26px;
-  height: 26px;
+.band-total-unit {
+  font: 600 var(--t-16) / 1.2 var(--f-text);
+  color: var(--c-emphasis);
 }
 .band-total-count {
   font: 500 var(--t-16) / 1.2 var(--f-text);

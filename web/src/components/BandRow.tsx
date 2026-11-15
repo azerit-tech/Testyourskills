@@ -4,7 +4,6 @@ import type { BandStanding } from "../../../shared/bands";
 import { bandPath } from "../../../shared/bands";
 import { useT } from "../i18n";
 import { onLinkClick } from "../lib/router";
-import { StarMark } from "./Stars";
 import "./bands.css";
 
 export function BandRow({ b }: { b: BandStanding }) {
@@ -18,10 +17,8 @@ export function BandRow({ b }: { b: BandStanding }) {
           <span className="board-login">{b.label}</span>
           <span className="band-count">{b.rank ? t.bands.dossiers(b.members) : `${t.bands.forming}, ${t.bands.dossiers(b.members)}`}</span>
         </span>
-        <span className="band-score">
-          <StarMark />
-          {b.score}
-        </span>
+        {/* l'unité est dans l'en-tête du tableau (« Étoiles ») : la ligne porte le nombre seul */}
+        <span className="band-score">{b.score}</span>
       </a>
     </li>
   );

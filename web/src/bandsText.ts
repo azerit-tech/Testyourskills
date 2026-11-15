@@ -21,6 +21,8 @@ const fr = {
   },
   dossiers: (k: number) => n(k, "fiche", "fiches"),
   score: (k: number) => n(k, "étoile", "étoiles"),
+  /** Le mot seul, sous le grand nombre de la page d'une bande. */
+  scoreWord: (k: number): string => (k > 1 ? "étoiles" : "étoile"),
   league: { ecole: "Écoles", boite: "Boîtes" } as Record<BandType, string>,
   kicker: { ecole: "Bande d'école", boite: "Bande de boîte" } as Record<BandType, string>,
   forming: "En formation",
@@ -51,6 +53,8 @@ const fr = {
     intro: "Chaque fiche rapporte ses étoiles à son école et à sa boîte. Les vingt meilleures comptent, trois suffisent pour entrer au tableau.",
     tabs: "Tableau",
     yours: "Ta bande",
+    /** L'unité des notes de bande, une fois en tête du tableau. */
+    scale: "Étoiles",
     rowLabel: (rank: number | null, label: string, score: number, dossiers: number) =>
       `${rank ? (rank === 1 ? "n° 1" : `${rank}e`) : "En formation"}, ${label}, ${n(score, "étoile", "étoiles")}, ${n(dossiers, "fiche", "fiches")}`,
     makeTitle: "Fais gagner ta bande",
@@ -124,6 +128,7 @@ const en: BandsDict = {
   },
   dossiers: (k: number) => nEn(k, "sheet", "sheets"),
   score: (k: number) => nEn(k, "star", "stars"),
+  scoreWord: (k: number) => (k === 1 ? "star" : "stars"),
   league: { ecole: "Schools", boite: "Companies" },
   kicker: { ecole: "School crew", boite: "Company crew" },
   forming: "Forming",
@@ -152,6 +157,7 @@ const en: BandsDict = {
     intro: "Every sheet brings its stars to its school and its company. The best twenty count, three are enough to make the board.",
     tabs: "Board",
     yours: "Your crew",
+    scale: "Stars",
     rowLabel: (rank: number | null, label: string, score: number, dossiers: number) =>
       `${rank ? `#${rank}` : "Forming"}, ${label}, ${nEn(score, "star", "stars")}, ${nEn(dossiers, "sheet", "sheets")}`,
     makeTitle: "Put your crew on top",

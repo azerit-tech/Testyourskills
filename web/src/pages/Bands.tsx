@@ -37,6 +37,11 @@ function BoardPanel({ board, type, on }: { board: BandBoard; type: BandType; on:
     <section className={`bands-panel${on ? " is-on" : ""}`} id={`bands-panel-${type}`} role="tabpanel" aria-labelledby={`bands-tab-${type}`}>
       <div className="board-top">
         <p className="board-tag bands-panel-tag">{t.bands.league[type]}</p>
+        {board.entries.length > 0 && (
+          <span className="board-scale" aria-hidden>
+            {tb.scale}
+          </span>
+        )}
         {board.entries.length === 0 ? (
           <p className="bands-empty">{t.bands.none.league[type]}</p>
         ) : (
@@ -50,6 +55,9 @@ function BoardPanel({ board, type, on }: { board: BandBoard; type: BandType; on:
       {board.extra && (
         <div className="board-top bands-yours">
           <p className="board-tag">{tb.yours}</p>
+          <span className="board-scale" aria-hidden>
+            {tb.scale}
+          </span>
           <ol className="board-list is-top">
             <BandRow b={board.extra} />
           </ol>
@@ -333,9 +341,10 @@ export function BandPage({ type, id }: { type: BandType; id: string }) {
           <h1>{band.label}</h1>
           {band.rank ? (
             <p className="band-total">
-              <span className="band-total-score" role="img" aria-label={t.bands.score(band.score)}>
-                <StarMark />
+              {/* « 88 étoiles », les mots de l'image de la bande, puis « 23 fiches » */}
+              <span className="band-total-score">
                 {band.score}
+                <span className="band-total-unit">{t.bands.scoreWord(band.score)}</span>
               </span>
               <span className="band-total-count">{t.bands.dossiers(band.members)}</span>
             </p>

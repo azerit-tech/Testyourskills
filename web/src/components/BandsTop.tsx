@@ -44,6 +44,9 @@ export function BandsTopView({ top, lead }: { top: Top; lead?: ReactNode }) {
           top[type].length === 0 ? null : (
             <div key={type} className="board-top">
               <p className="board-tag">{t.bands.league[type]}</p>
+              <span className="board-scale" aria-hidden>
+                {t.bands.board.scale}
+              </span>
               <ol className="board-list is-top">
                 {top[type].slice(0, SHOWN).map((b) => (
                   <BandRow key={b.id} b={b} />

@@ -10,9 +10,12 @@ import { useT } from "../i18n";
 import { api } from "../lib/api";
 import { onLinkClick } from "../lib/router";
 import { myCard, type MyCard } from "../lib/session";
+import { Avatar } from "./Avatar";
 import { Stars } from "./Stars";
 
 const SIZE = 10;
+/** L'échelle des notes, dite une fois en tête du tableau (§18.48 : toute note a son échelle). */
+export const SCALE = "/100";
 const TOP = 5;
 /** L'ancre du tableau : le rang de la semaine d'une fiche y mène (« /#semaine »). */
 export const WEEK_ANCHOR = "semaine";
@@ -33,19 +36,12 @@ const isMine = (e: TopEntry, mine: MyCard | null | undefined) => !!mine && (e.ca
 function Row({ e, me }: { e: TopEntry; me: boolean }) {
   const { t } = useT();
   const href = `/c/${e.cardId}`;
-  // Avatar introuvable : l'initiale, jamais l'icône d'image cassée.
-  const [broken, setBroken] = useState(false);
   return (
     <li>
       <a className={`board-row${me ? " is-me" : ""}`} href={href} onClick={(ev) => onLinkClick(ev, href)} aria-label={t.home.top.rowLabel(e.rank, e.login, e.overall)} aria-current={me ? "true" : undefined}>
         <span className="board-rank">{e.rank}</span>
-        <span className="board-avatar">
-          {e.avatarUrl && !broken ? (
-            <img src={e.avatarUrl} alt="" width={32} height={32} loading="lazy" onError={() => setBroken(true)} />
-          ) : (
-            e.login.slice(0, 1).toUpperCase()
-          )}
-        </span>
+        {/* sans photo sûre, l'initiale (Avatar.tsx) */}
+        <Avatar login={e.login} src={e.avatarUrl ?? ""} />
         <span className="board-login">@{e.login}</span>
         <Stars n={e.stars} size={14} />
         <span className="board-score">{e.overall}</span>
@@ -97,6 +93,9 @@ function Wait() {
       </p>
       <div className="board-top">
         <p className="board-tag">{tt.cut}</p>
+        <span className="board-scale" aria-hidden>
+          {SCALE}
+        </span>
         <div className="board-list is-top board-wait" />
       </div>
     </section>
@@ -156,6 +155,9 @@ export function WeekBoardView({ top, now, onPlay, mine }: { top: WeekTop; now: n
       ) : (
         <div className="board-top">
           <p className="board-tag">{tt.cut}</p>
+          <span className="board-scale" aria-hidden>
+            {SCALE}
+          </span>
           <ol className="board-list is-top">
             {first.map((e) => (
               <Row key={e.cardId} e={e} me={isMine(e, mine)} />
