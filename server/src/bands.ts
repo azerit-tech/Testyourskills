@@ -53,6 +53,7 @@ import {
 import { fileOf } from "../../shared/caseFile";
 import type { CardData, ComparisonData, Fact } from "../../shared/types";
 import { starsFor } from "../../shared/types";
+import { frTypo } from "../../shared/typo";
 import type { CardRow, Store } from "./db";
 import { clientIp, type RateLimiter } from "./ratelimit";
 
@@ -67,16 +68,16 @@ export const BAND_PAGE_MEMBERS = 50;
 export const BOARD_SIZE = 20;
 export const HOME_SIZE = 5;
 
-const f = (fr: string, en: string): Fact => ({ fr, en });
+const f = (fr: string, en: string): Fact => ({ fr: frTypo(fr), en });
 
 export const BAND_MESSAGES = {
-  forbidden: f("Seule la personne fichée fait entrer sa fiche dans une bande.", "Only the person on file can put their sheet in a gang."),
-  denounced: f("Une fiche née d'une dénonciation entre dans une bande une fois revendiquée.", "A sheet born from a tip-off joins a gang once it's claimed."),
-  degraded: f("Cette fiche est sortie sans lecture. Refais-la pour rejoindre une bande.", "This sheet came out unread. Make it again to join a gang."),
-  notBand: f("Pas une bande. Donne le nom de ta boîte.", "Not a gang. Give your company's name."),
+  forbidden: f("Seule la personne fichée fait entrer sa fiche dans une bande.", "Only the person on file can put their sheet in a crew."),
+  denounced: f("Une fiche née d'une dénonciation entre dans une bande une fois revendiquée.", "A sheet born from a tip-off joins a crew once it's claimed."),
+  degraded: f("Cette fiche est sortie sans que le code soit lu. Refais-la pour rejoindre une bande.", "This sheet came out without the code being read. Make it again to join a crew."),
+  notBand: f("Pas une bande. Donne le nom de ta boîte.", "Not a crew. Give your company's name."),
   unknownSchool: f("Choisis une école de la liste.", "Pick a school from the list."),
   limited: f("Trois entrées par jour, c'est le maximum. Reviens demain.", "Three joins a day is the limit. Come back tomorrow."),
-  notFound: f("Cette bande n'existe pas, ou plus.", "This gang doesn't exist, or no longer does."),
+  notFound: f("Cette bande n'existe pas, ou plus.", "This crew doesn't exist, or no longer does."),
   refusedWord: f("Ce nom ne passe pas. Donne le nom de ta boîte, tel qu'il s'écrit.", "That name won't do. Give your company's name as it's written."),
   refusedContact: f("Le nom de la boîte seulement : ni adresse, ni @, ni numéro.", "Just the company's name: no address, no @, no number."),
 } as const;

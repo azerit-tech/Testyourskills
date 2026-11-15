@@ -7,9 +7,9 @@ import { FIXTURE_COMPARISON, FIXTURES } from "../../shared/fixtures";
 import { fileOf } from "../../shared/caseFile";
 import { IMAGE_QUERY } from "../../shared/images";
 import { publicView } from "../../shared/publicView";
-import { HOME_PROMISE, homeTitle, promiseTitle } from "../../shared/promise";
+import { HOME_PROMISE, homeTitle, pageTitle, promiseTitle } from "../../shared/promise";
 import type { CardData, ComparisonData, Grid } from "../../shared/types";
-import { genericMeta, homeImageAlt, injectHomeImage, metaFor } from "./html";
+import { genericMeta, homeImageAlt, injectHomeImage, metaFor, requestLang, staticPageMeta } from "./html";
 
 /** Une comparaison où la fiche déclarative a `cv` points et la fiche GitHub `gh`. */
 function cmp(cv: number, gh: number, over: Partial<ComparisonData> = {}): ComparisonData {
@@ -38,7 +38,7 @@ describe("aperçu de lien d'un dossier à deux pièces (§18.36) : l'aperçu d'u
     expect(m.title).toBe(alone.title);
     expect(m.title).toMatch(/^@lea est dans le viseur ★/);
     expect(m.image).toBe(`https://s.test/og/${c.id}.png?${IMAGE_QUERY}`);
-    expect(m.description).toContain("Pièces\u00a0: CV et GitHub.");
+    expect(m.description).toContain("Sources\u00a0: CV et GitHub.");
     expect(`${m.title} ${m.description} ${m.imageAlt}`).not.toMatch(/\b60\b/);
     expect(`${m.title} ${m.description}`).not.toMatch(VERSUS);
   });
@@ -47,7 +47,7 @@ describe("aperçu de lien d'un dossier à deux pièces (§18.36) : l'aperçu d'u
     const c = cmp(80, 59, { declaredSource: "linkedin" });
     const m = metaFor({ ...c, cv: { ...c.cv, lang: "en" } }, "https://s.test");
     expect(m.title).toMatch(/^@lea is in the crosshairs ★/);
-    expect(m.description).toContain("Exhibits: LinkedIn and GitHub.");
+    expect(m.description).toContain("Sources: LinkedIn and GitHub.");
     expect(`${m.title} ${m.description}`).not.toMatch(VERSUS);
   });
 
@@ -102,7 +102,7 @@ describe("dossier vide fait par un tiers, non revendiqué : l'aperçu ne dit pas
     c.github = { ...c.github, grid: empty };
     const m = metaFor(publicView(c, { thirdParty: true }), "https://s.test");
     expect(m.title).toMatch(/★/);
-    expect(m.description).toContain("Pièces\u00a0: LinkedIn et GitHub.");
+    expect(m.description).toContain("Sources\u00a0: LinkedIn et GitHub.");
     expect(`${m.title} ${m.description} ${m.imageAlt}`).not.toMatch(/\b20\b/);
     expect(m.image).toBeDefined();
   });
@@ -115,6 +115,40 @@ describe("dossier vide fait par un tiers, non revendiqué : l'aperçu ne dit pas
       expect(`${m.title} ${m.description} ${m.imageAlt}`).not.toMatch(NOTE);
       expect(m.image).toBe(`https://s.test/og/${c.id}.png?${IMAGE_QUERY}`);
     }
+  });
+});
+
+describe("la langue des balises d'une page sans fiche", () => {
+  it("`?lang=` d'abord, puis la première langue du navigateur ; un robot qui ne dit rien lit le français", () => {
+    expect(requestLang("en", "fr-FR,fr;q=0.9")).toBe("en");
+    expect(requestLang("fr", "en-US")).toBe("fr");
+    expect(requestLang(undefined, "en-US,en;q=0.9,fr;q=0.8")).toBe("en");
+    expect(requestLang(undefined, "fr-CA,en;q=0.8")).toBe("fr");
+    expect(requestLang("de", "de-DE")).toBe("en");
+    expect(requestLang(undefined, undefined)).toBe("fr");
+    expect(requestLang(null, "")).toBe("fr");
+  });
+
+  it("la vie privée et le règlement ont leur titre, « sujet · Azerit » ; toute autre adresse garde l'accueil", () => {
+    expect(staticPageMeta("https://s.test", "/confidentialite", "en")).toMatchObject({ lang: "fr", title: "Vie privée · Azerit", url: "https://s.test/confidentialite" });
+    expect(staticPageMeta("https://s.test", "/privacy", "fr")).toMatchObject({ lang: "en", title: "Privacy · Azerit" });
+    expect(staticPageMeta("https://s.test", "/reglement", "fr")?.title).toBe("Règlement de la saison · Azerit");
+    expect(staticPageMeta("https://s.test", "/reglement/", "en")?.title).toBe("Season rules · Azerit");
+    expect(staticPageMeta("https://s.test", "/", "fr")).toBeNull();
+    expect(staticPageMeta("https://s.test", "/nimporte", "en")).toBeNull();
+  });
+});
+
+describe("l'aperçu d'une fiche : la note avec son échelle, sans chaîne de points médians", () => {
+  it("« Fiche ★★★★★☆, 79/100 » ; le titre sépare le profil par une virgule", () => {
+    for (const lang of ["fr", "en"] as const) {
+      const m = metaFor({ ...FIXTURES.gold, lang }, "https://s.test");
+      expect(m.imageAlt).toContain(`${FIXTURES.gold.overall}/100`);
+      expect(m.title).not.toContain("·");
+      expect(m.title).toContain(`, ${FIXTURES.gold.profile!.label[lang]}`);
+      expect(`${m.title} ${m.description} ${m.imageAlt}`).not.toMatch(/Testyourskills|Make yours|\bgrid\b|\bproof\b/);
+    }
+    expect(metaFor({ ...FIXTURES.gold, lang: "en" }, "https://s.test").imageAlt).toMatch(/rap sheet/);
   });
 });
 
@@ -131,12 +165,16 @@ describe("le titre de l'accueil, en un seul endroit (shared/promise.ts)", () => 
   it("les balises des pages sans fiche et le texte de l'image de l'accueil viennent de la même source", () => {
     for (const lang of ["fr", "en"] as const) {
       const m = genericMeta("https://s.test", "/", lang);
-      expect(m.title).toBe(`Testyourskills · ${promiseTitle(lang)}`);
+      // Le seul nom visible du produit est « Azerit » (§18.48).
+      expect(m.title).toBe(`Azerit · ${promiseTitle(lang)}`);
+      expect(`${m.title} ${m.description} ${m.imageAlt}`).not.toMatch(/Testyourskills/);
       expect(m.description).toBe(HOME_PROMISE[lang].description);
     }
-    expect(promiseTitle("fr")).toBe("Azerit ouvre ton dossier. Tu plaides quoi ?");
-    expect(promiseTitle("en")).toBe("Azerit opens your file. How do you plead?");
-    expect(injectHomeImage("<html><head></head></html>", "https://s.test")).toContain(`content="${homeImageAlt()}"`);
+    expect(promiseTitle("fr")).toBe("Ta fiche de dev. Combien d'étoiles\u00a0?");
+    expect(promiseTitle("en")).toBe("Your dev rap sheet. How many stars?");
+    expect(pageTitle("Vie privée")).toBe("Vie privée · Azerit");
+    // L'apostrophe de « d'étoiles » sort échappée dans la balise.
+    expect(injectHomeImage("<html><head></head></html>", "https://s.test")).toContain(`content="${homeImageAlt().replace(/'/g, "&#39;")}"`);
   });
 
   it("la description dit la méthode, sans opposer le profil et le code", () => {
@@ -144,8 +182,8 @@ describe("le titre de l'accueil, en un seul endroit (shared/promise.ts)", () => 
   });
 
   it("la description ne promet pas de durée en secondes (on mesure 24 s, §18.40)", () => {
-    expect(HOME_PROMISE.fr.description).toContain("Ta fiche en une minute.");
-    expect(HOME_PROMISE.en.description).toContain("Your sheet in a minute.");
+    expect(HOME_PROMISE.fr.description).toContain("LinkedIn ou GitHub, une minute.");
+    expect(HOME_PROMISE.en.description).toContain("LinkedIn or GitHub, one minute.");
     for (const lang of ["fr", "en"] as const) expect(HOME_PROMISE[lang].description).not.toMatch(/secondes?|seconds?|instant/i);
   });
 });

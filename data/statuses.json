@@ -97,7 +97,7 @@
     {
       "id": "gh_maintainer", "source": "github", "tone": "positive", "rule": "maintainer", "params": { "atLeast": 10 },
       "label": { "fr": "Maintient des projets", "en": "Maintainer" },
-      "ruleText": { "fr": "{m} : {n} contributeurs externes (seuil {t}).", "en": "{m}: {n} outside contributors (threshold {t})." }
+      "ruleText": { "fr": "{m} : {n} comptes externes qui contribuent (seuil {t}).", "en": "{m}: {n} outside contributors (threshold {t})." }
     },
 
     {

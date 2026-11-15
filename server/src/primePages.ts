@@ -1,6 +1,6 @@
 // Le partage d'une prime (§18.4) : son image 1200 × 630 et les balises Open
 // Graph de /primes et /primes/:id, que les robots de LinkedIn et X lisent sans
-// exécuter de JS. Même mécanique que les bandes (bandPages.ts) : l'adresse de
+// exécuter de JS, en français ou en anglais. Même mécanique que les bandes (bandPages.ts) : l'adresse de
 // l'image porte une clé de ce qu'elle dit (phase, jours restants, logo), l'image
 // est gardée sur disque sous cette clé. Sans prime dans la saison, rien n'est
 // monté : /primes ramène à l'accueil (primes.ts).
@@ -15,7 +15,9 @@ import { IMAGE_QUERY } from "../../shared/images";
 import type { PrimeView } from "../../shared/primes";
 import type { Lang } from "../../shared/types";
 import type { Store } from "./db";
-import { HOME_IMAGE_PATH, injectMeta, standalonePage, type PageMeta } from "./html";
+import { pageTitle } from "../../shared/promise";
+import { frTypo } from "../../shared/typo";
+import { HOME_IMAGE_PATH, injectMeta, requestLang, standalonePage, type PageMeta } from "./html";
 import { primeViewById } from "./primes";
 import { primeJobs, primeWhen, type PrimeLogo } from "./render/prime";
 
@@ -60,36 +62,63 @@ export function primeImageKey(p: PrimeView): string {
 export const primeImagePath = (p: PrimeView): string => `/og/p/${p.id}.png?${IMAGE_QUERY}&k=${primeImageKey(p)}`;
 
 const CONTRACT_FR: Record<PrimeView["contract"], string> = { stage: "stage", alternance: "alternance", cdi: "CDI" };
+const CONTRACT_EN: Record<PrimeView["contract"], string> = { stage: "internship", alternance: "work-study", cdi: "full-time job" };
 
-/** Les balises de la page d'une prime. */
-export function primeMeta(p: PrimeView, baseUrl: string): PageMeta {
-  const jobs = primeJobs(p, "fr");
+/** « J-12 » reste tel quel ; « Dernier jour », « Ouvre le 19 novembre » perdent leur majuscule au milieu d'une phrase. */
+const inSentence = (s: string) => (/^[A-Z]-/.test(s) ? s : `${s.charAt(0).toLowerCase()}${s.slice(1)}`);
+
+/** Les balises de la page d'une prime, dans la langue demandée. */
+export function primeMeta(p: PrimeView, baseUrl: string, lang: Lang = "fr"): PageMeta {
+  const jobs = primeJobs(p, lang);
+  const when = inSentence(primeWhen(p, lang));
+  const url = `${baseUrl}/primes/${p.id}`;
+  const image = `${baseUrl}${primeImagePath(p)}`;
+  if (lang === "en") {
+    const interviews = `${p.interviews} ${p.interviews === 1 ? "interview" : "interviews"}`;
+    return {
+      lang,
+      url,
+      image,
+      title: pageTitle(`${p.company}, ${jobs} ${CONTRACT_EN[p.contract]}`),
+      description:
+        p.phase === "closed"
+          ? `Bounty closed: ${interviews} for the top-ranked sheets. Get your rap sheet for the next ones.`
+          : `${interviews} for the top-ranked sheets, ${when}. Get your rap sheet and enter the race.`,
+      imageAlt: `${p.company}, ${jobs} ${CONTRACT_EN[p.contract]}, ${interviews}`,
+    };
+  }
   const interviews = `${p.interviews} ${p.interviews > 1 ? "entretiens" : "entretien"}`;
-  const when = primeWhen(p, "fr");
   return {
-    lang: "fr",
-    url: `${baseUrl}/primes/${p.id}`,
-    image: `${baseUrl}${primeImagePath(p)}`,
-    title: `${p.company} : ${CONTRACT_FR[p.contract]} ${jobs}`,
-    description:
+    lang,
+    url,
+    image,
+    title: pageTitle(`${p.company}, ${CONTRACT_FR[p.contract]} ${jobs}`),
+    description: frTypo(
       p.phase === "closed"
-        ? `Prime close : ${interviews} pour le haut du classement. Fais ta fiche pour les prochaines.`
-        : `${interviews} pour le haut du classement, ${when === "Dernier jour" ? "dernier jour" : when}. Fais ta fiche et concours.`,
+        ? `Prime terminée : ${interviews} pour les fiches les mieux classées. Fais ta fiche pour les prochaines.`
+        : `${interviews} pour les fiches les mieux classées, ${when}. Fais ta fiche et entre dans la course.`,
+    ),
     imageAlt: `${p.company}, ${CONTRACT_FR[p.contract]} ${jobs}, ${interviews}`,
   };
 }
 
 /** Les balises de /primes : l'image de l'accueil. */
-export function primesMeta(baseUrl: string): PageMeta {
+export function primesMeta(baseUrl: string, lang: Lang = "fr"): PageMeta {
+  const fr = lang === "fr";
   return {
-    lang: "fr",
+    lang,
     url: `${baseUrl}/primes`,
-    title: "Les primes de Testyourskills : des entretiens au haut du classement",
-    description: "Stage, alternance, CDI : des entreprises offrent des entretiens aux fiches les mieux notées. Fais ta fiche et concours.",
+    title: frTypo(pageTitle(fr ? "Les primes : des entretiens pour le haut du classement" : "Bounties: interviews for the top of the board")),
+    description: fr
+      ? frTypo("Stage, alternance, CDI : des entreprises offrent des entretiens aux fiches les mieux classées. Fais ta fiche et entre dans la course.")
+      : "Internship, work-study, full-time: companies offer interviews to the top-ranked sheets. Get your rap sheet and enter the race.",
     image: `${baseUrl}${HOME_IMAGE_PATH}`,
-    imageAlt: "Testyourskills, les primes",
+    imageAlt: fr ? "Azerit, les primes" : "Azerit, the bounties",
   };
 }
+
+/** Le titre d'une prime qui n'existe pas (404). */
+export const primeNotFoundTitle = (lang: Lang): string => pageTitle(lang === "fr" ? "Prime introuvable" : "Bounty not found");
 
 export interface PrimeImageInput {
   format: "prime";
@@ -149,14 +178,18 @@ export function mountPrimePages(app: Hono, o: PrimePagesOptions): void {
   const page = async (c: Context, meta: PageMeta, status: 200 | 404) => {
     const template = o.indexHtml ? await o.indexHtml().catch(() => null) : null;
     c.header("Cache-Control", "public, max-age=300");
+    // Les balises suivent la langue demandée : un cache ne sert pas l'une pour l'autre.
+    c.header("Vary", "Accept-Language");
     return c.html(template ? injectMeta(template, meta) : standalonePage(meta), status);
   };
+  const langOf = (c: Context): Lang => requestLang(c.req.query("lang"), c.req.header("Accept-Language"));
 
   // Les pages du front, rendues ici pour leurs balises (après le garde de primes.ts).
-  app.get("/primes", (c) => page(c, primesMeta(baseUrl), 200));
+  app.get("/primes", (c) => page(c, primesMeta(baseUrl, langOf(c)), 200));
   app.get("/primes/:id", (c) => {
+    const lang = langOf(c);
     const prime = primeViewById(store, season, c.req.param("id"), now());
-    if (!prime) return page(c, { ...primesMeta(baseUrl), title: "Prime introuvable" }, 404);
-    return page(c, primeMeta(prime, baseUrl), 200);
+    if (!prime) return page(c, { ...primesMeta(baseUrl, lang), title: primeNotFoundTitle(lang) }, 404);
+    return page(c, primeMeta(prime, baseUrl, lang), 200);
   });
 }

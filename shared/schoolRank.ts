@@ -22,7 +22,7 @@ export const EDU_NEXT: Record<number, Fact> = {
   4: f("Pour 6 : une école sélective.", "For 6: a selective school."),
   6: f(
     "Pour 8 : une école très sélective, ou une sélection prouvée hors école (classement dans un concours, prix de hackathon, programme sélectif).",
-    "For 8: a highly selective school, or a proven selection outside school (competition ranking, hackathon prize, selective programme).",
+    "For 8: a highly selective school, or a proven selection outside school (competition ranking, hackathon prize, selective program).",
   ),
   8: f(
     "Pour 10 : une école parmi les plus sélectives, ou une médaille internationale (olympiade, finale mondiale d'un concours de programmation).",
@@ -52,6 +52,7 @@ function rewriteEn(s: string): string {
     .replace(/^Tier [SABC] school\./, SCHOOL_COUNTED.en)
     .replace(/, tier [SABC]\./g, ": counted in the file.")
     .replace(/a tier ([SABC]) school/g, (_m, t: string) => EN_SCHOOL[t]!)
+    .replace(/selective programme\b/g, "selective program")
     .replace(/,? tier [SABC]\b/gi, "");
 }
 

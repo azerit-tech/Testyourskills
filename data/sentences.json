@@ -6,8 +6,8 @@
   "axes": ["TEC", "SHIP", "ARCH", "DOC"],
   "sentences": {
     "TEC": {
-      "label": { "fr": "Peine : relire {n} PR de mainteneurs", "en": "Sentence: review {n} maintainer PRs" },
-      "labelOne": { "fr": "Peine : relire 1 PR de mainteneur", "en": "Sentence: review 1 maintainer PR" }
+      "label": { "fr": "Peine : relire {n} PR pour l'équipe de maintenance", "en": "Sentence: review {n} maintainer PRs" },
+      "labelOne": { "fr": "Peine : relire 1 PR pour l'équipe de maintenance", "en": "Sentence: review 1 maintainer PR" }
     },
     "SHIP": {
       "label": { "fr": "Peine : {n} semaines de commits", "en": "Sentence: {n} weeks of commits" },

@@ -9,6 +9,7 @@
 import { randomBytes, randomInt } from "node:crypto";
 import type { CardData, ComparisonData, ErrorCode, Fact, Finding, JobState, Lang, ProgressEvent } from "../../shared/types";
 import type { BandStanding } from "../../shared/bands";
+import { frTypo, typoFacts } from "../../shared/typo";
 import { forReveal, githubFindings, strongest } from "./findings";
 import type { CodeReadingResult, CvReading, CvTextCounts, RepoFiles } from "../../shared/readings";
 import type { NewCardRow, Store } from "./db";
@@ -110,7 +111,8 @@ type MessageKey =
   | "linkedin_bad_url"
   | "linkedin_unreadable";
 
-export const MESSAGES: Record<MessageKey, Fact> = {
+/* Le français de chaque message passe par la typographie commune (shared/typo.ts). */
+export const MESSAGES: Record<MessageKey, Fact> = typoFacts({
   unknown_user: {
     fr: "Ce pseudo n'existe pas sur GitHub. Une faute de frappe ?",
     en: "That username doesn't exist on GitHub. Typo?",
@@ -128,8 +130,8 @@ export const MESSAGES: Record<MessageKey, Fact> = {
     en: "This PDF has no readable text (a scan?). Export it from your word processor.",
   },
   pdf_too_large: {
-    fr: "PDF trop long : 5 Mo et 10 pages maximum. Un recruteur n'en lirait pas plus.",
-    en: "PDF too long: 5 MB and 10 pages max. A recruiter wouldn't read more.",
+    fr: "PDF trop long : 5 Mo et 10 pages maximum. En recrutement, personne n'en lit plus.",
+    en: "PDF too long: 5 MB and 10 pages max. No recruiter reads more.",
   },
   timeout: {
     fr: "Le jugement a pris trop de temps. Plutôt que d'inventer une fiche, on s'arrête là : réessaie dans un instant.",
@@ -149,15 +151,15 @@ export const MESSAGES: Record<MessageKey, Fact> = {
   },
   busy: {
     fr: "Le commissariat déborde : trop de dossiers d'un coup, GitHub nous fait souffler. Reviens dans quelques minutes.",
-    en: "The station is overflowing: too many suspects at once, GitHub is making us take a breather. Come back in a few minutes.",
+    en: "The station is overflowing: too many files at once, GitHub is making us take a breather. Come back in a few minutes.",
   },
   gone: {
-    fr: "Ce dossier a quitté la ville : fiche retirée par son propriétaire.",
-    en: "This dev has left town: their sheet was withdrawn by its owner.",
+    fr: "Ce dossier a quitté la ville : fiche retirée à la demande de la personne.",
+    en: "This dev has left town: rap sheet taken down at their request.",
   },
   withdrawn: {
-    fr: "Fiche retirée par son propriétaire.",
-    en: "Sheet withdrawn by its owner.",
+    fr: "Fiche retirée à la demande de la personne.",
+    en: "Taken down at the person's request.",
   },
   queue_timeout: {
     fr: "Trop de monde au commissariat : ton dossier a attendu plus de 3 minutes sans passer. Réessaie dans un instant.",
@@ -171,21 +173,22 @@ export const MESSAGES: Record<MessageKey, Fact> = {
     fr: "Fiche introuvable : elle a expiré ou a été supprimée.",
     en: "Sheet not found: it expired or was deleted.",
   },
+  /* La sortie n'est jamais GitHub seul : qui n'a pas de GitHub garde son CV. */
   linkedin: {
-    fr: "Entrée LinkedIn indisponible, tape ton pseudo GitHub.",
-    en: "LinkedIn entry unavailable, type your GitHub username.",
+    fr: "LinkedIn ne répond pas pour l'instant. Passe par ton GitHub ou ton CV, ou réessaie dans un moment.",
+    en: "LinkedIn isn't answering right now. Use your GitHub or your CV, or try again in a moment.",
   },
   linkedin_off: {
-    fr: "Entrée LinkedIn indisponible, tape ton pseudo GitHub.",
-    en: "LinkedIn entry unavailable, type your GitHub username.",
+    fr: "LinkedIn ne répond pas pour l'instant. Passe par ton GitHub ou ton CV, ou réessaie dans un moment.",
+    en: "LinkedIn isn't answering right now. Use your GitHub or your CV, or try again in a moment.",
   },
   linkedin_busy: {
-    fr: "Entrée LinkedIn indisponible pour aujourd'hui, tape ton pseudo GitHub.",
-    en: "LinkedIn entry unavailable for today, type your GitHub username.",
+    fr: "LinkedIn est fermé pour aujourd'hui. Passe par ton GitHub ou ton CV, ou reviens demain.",
+    en: "LinkedIn is closed for today. Use your GitHub or your CV, or come back tomorrow.",
   },
   linkedin_not_found: {
-    fr: "Profil LinkedIn introuvable (privé ou trop récent). Tape ton pseudo GitHub.",
-    en: "LinkedIn profile not found (private or too new). Type your GitHub username.",
+    fr: "Profil LinkedIn introuvable (privé ou trop récent). Vérifie le lien, ou passe par ton GitHub ou ton CV.",
+    en: "LinkedIn profile not found (private or too new). Check the link, or use your GitHub or your CV.",
   },
   linkedin_bad_url: {
     fr: "Ce lien n'est pas un profil LinkedIn (linkedin.com/in/…).",
@@ -203,7 +206,7 @@ export const MESSAGES: Record<MessageKey, Fact> = {
     fr: "Quelque chose a cassé de notre côté. Réessaie dans un instant.",
     en: "Something broke on our side. Try again in a moment.",
   },
-};
+});
 
 /** Erreur de job déjà traduite en code public et message. */
 export class JobError extends Error {
@@ -224,8 +227,8 @@ export function isAiClosed(err: unknown): boolean {
 export function busyError(waitMs: number): JobError {
   const n = Math.max(1, Math.ceil(waitMs / 60_000));
   return new JobError("busy", {
-    fr: `Le commissariat déborde : trop de dossiers d'un coup, GitHub nous fait souffler. Reviens dans ${n} minute${n > 1 ? "s" : ""}.`,
-    en: `The station is overflowing: too many suspects at once, GitHub is making us take a breather. Come back in ${n} minute${n > 1 ? "s" : ""}.`,
+    fr: frTypo(`Le commissariat déborde : trop de dossiers d'un coup, GitHub nous fait souffler. Reviens dans ${n} minute${n > 1 ? "s" : ""}.`),
+    en: `The station is overflowing: too many files at once, GitHub is making us take a breather. Come back in ${n} minute${n > 1 ? "s" : ""}.`,
   });
 }
 

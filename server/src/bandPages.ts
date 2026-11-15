@@ -1,9 +1,10 @@
 // Le partage d'une bande (SPEC §18.38) : son image 1200 × 630 et les balises
 // Open Graph de /bandes et /bandes/:type/:id, que les robots de LinkedIn et X
-// lisent sans exécuter de JS. L'adresse de l'image porte une clé de ce qu'elle
-// dit (score, dossiers, rang) : le score change, l'aperçu change. Jamais le rang
-// d'école du barème, jamais le nom d'un membre. Une boîte au nom libre n'a ni
-// page ni image avant trois dossiers, une bande fermée jamais : 404.
+// lisent sans exécuter de JS, en français ou en anglais (requestLang, html.ts).
+// L'adresse de l'image porte une clé de ce qu'elle dit (score, fiches, rang) : le
+// score change, l'aperçu change. Jamais le rang d'école de la grille, jamais le
+// nom d'un membre. Une boîte au nom libre n'a ni page ni image avant trois
+// fiches, une bande fermée jamais : 404.
 
 import { createHash } from "node:crypto";
 import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
@@ -14,9 +15,12 @@ import { IMAGE_QUERY } from "../../shared/images";
 import type { Lang } from "../../shared/types";
 import { publicBandStanding } from "./bands";
 import type { Store } from "./db";
-import { HOME_IMAGE_PATH, injectMeta, standalonePage, type PageMeta } from "./html";
+import { pageTitle } from "../../shared/promise";
+import { frTypo } from "../../shared/typo";
+import { HOME_IMAGE_PATH, injectMeta, requestLang, standalonePage, type PageMeta } from "./html";
 
 const LEAGUE_FR: Record<BandType, string> = { ecole: "des écoles", boite: "des boîtes" };
+const LEAGUE_EN: Record<BandType, string> = { ecole: "among schools", boite: "among companies" };
 
 /** « 3e des écoles », « n° 1 des boîtes » : rien ne s'accorde. Null en formation. */
 export function rankFr(b: Pick<BandStanding, "rank" | "type">): string | null {
@@ -29,7 +33,11 @@ export function formingFr(missing: number): string {
   return `Bande en formation : il manque ${missing} ${missing > 1 ? "complices" : "complice"}`;
 }
 
-export const dossiersFr = (n: number): string => `${n} ${n > 1 ? "dossiers" : "dossier"}`;
+/** « 3 fiches » : le compte d'une bande dit « fiche », jamais « dossier ». */
+export const dossiersFr = (n: number): string => `${n} ${n > 1 ? "fiches" : "fiche"}`;
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+const starsFr = (n: number) => `${n} ${n > 1 ? "étoiles" : "étoile"}`;
 
 /** Le dessin de l'image d'une bande (2 : le décor à son format et les places de la bande). */
 export const BAND_IMAGE_DESIGN = 2;
@@ -44,32 +52,55 @@ export function bandImageKey(b: BandStanding): string {
 /** Adresse de l'image d'une bande, clé comprise. */
 export const bandImagePath = (b: BandStanding): string => `/og/b/${b.type}/${b.id}.png?${IMAGE_QUERY}&k=${bandImageKey(b)}`;
 
-/** Les balises de la page d'une bande : son nom, son rang et son score. */
-export function bandMeta(b: BandStanding, baseUrl: string): PageMeta {
+/** Les balises de la page d'une bande, dans la langue demandée : son nom, son rang et son score. */
+export function bandMeta(b: BandStanding, baseUrl: string, lang: Lang = "fr"): PageMeta {
+  const url = `${baseUrl}/bandes/${b.type}/${b.id}`;
+  const image = `${baseUrl}${bandImagePath(b)}`;
+  if (lang === "en") {
+    const where = b.rank ? `#${b.rank} ${LEAGUE_EN[b.type]}` : "crew forming";
+    return {
+      lang,
+      url,
+      image,
+      title: pageTitle(`${b.label}, ${where}`),
+      description: b.rank
+        ? `${plural(b.members, "sheet", "sheets")}, ${plural(b.score, "star", "stars")}. Come add your stars: get your rap sheet for ${b.label}.`
+        : `Crew forming: ${plural(b.missing, "more accomplice", "more accomplices")} needed. Get your rap sheet for ${b.label}.`,
+      imageAlt: `${b.label}, ${plural(b.score, "star", "stars")}, ${plural(b.members, "sheet", "sheets")}`,
+    };
+  }
   const where = rankFr(b) ?? "bande en formation";
   return {
-    lang: "fr",
-    url: `${baseUrl}/bandes/${b.type}/${b.id}`,
-    image: `${baseUrl}${bandImagePath(b)}`,
-    title: `${b.label} : ${where}, ★ ${b.score}`,
-    description: b.rank
-      ? `${dossiersFr(b.members)}. Viens gonfler la bande : fais ta fiche pour ${b.label}.`
-      : `${formingFr(b.missing)}. Fais ta fiche pour ${b.label}.`,
-    imageAlt: `${b.label}, ★ ${b.score}, ${dossiersFr(b.members)}`,
+    lang,
+    url,
+    image,
+    title: frTypo(pageTitle(`${b.label}, ${where}`)),
+    description: frTypo(
+      b.rank
+        ? `${dossiersFr(b.members)}, ${starsFr(b.score)}. Viens grossir les rangs : fais ta fiche pour ${b.label}.`
+        : `${formingFr(b.missing)}. Fais ta fiche pour ${b.label}.`,
+    ),
+    imageAlt: frTypo(`${b.label}, ${starsFr(b.score)}, ${dossiersFr(b.members)}`),
   };
 }
 
 /** Les balises de /bandes : l'image de l'accueil. */
-export function boardMeta(baseUrl: string): PageMeta {
+export function boardMeta(baseUrl: string, lang: Lang = "fr"): PageMeta {
+  const fr = lang === "fr";
   return {
-    lang: "fr",
+    lang,
     url: `${baseUrl}/bandes`,
-    title: "Les bandes de Testyourskills : écoles et boîtes",
-    description: "Les écoles et les boîtes classées aux étoiles de leurs dossiers. Fais ta fiche, et rapporte à ta bande.",
+    title: frTypo(pageTitle(fr ? "Les bandes : écoles et boîtes" : "Crews: schools and companies")),
+    description: fr
+      ? frTypo("Les écoles et les boîtes classées aux étoiles de leurs fiches. Fais ta fiche : tes étoiles comptent pour ta bande.")
+      : "Schools and companies ranked by the stars of their sheets. Get your rap sheet: your stars count for your crew.",
     image: `${baseUrl}${HOME_IMAGE_PATH}`,
-    imageAlt: "Testyourskills, les bandes",
+    imageAlt: fr ? "Azerit, les bandes" : "Azerit, the crews",
   };
 }
+
+/** Le titre d'une bande qui n'existe pas (404). */
+export const bandNotFoundTitle = (lang: Lang): string => pageTitle(lang === "fr" ? "Bande introuvable" : "Crew not found");
 
 export interface BandImageInput {
   format: "band";
@@ -125,16 +156,20 @@ export function mountBandPages(app: Hono, o: BandPagesOptions): void {
   const page = async (c: Context, meta: PageMeta, status: 200 | 404) => {
     const template = o.indexHtml ? await o.indexHtml().catch(() => null) : null;
     c.header("Cache-Control", "public, max-age=300");
+    // Les balises suivent la langue demandée : un cache ne sert pas l'une pour l'autre.
+    c.header("Vary", "Accept-Language");
     return c.html(template ? injectMeta(template, meta) : standalonePage(meta), status);
   };
+  const langOf = (c: Context): Lang => requestLang(c.req.query("lang"), c.req.header("Accept-Language"));
 
   // Pages du front, rendues ici pour leurs balises : /bandes et /bandes/:type/:id.
-  app.get("/bandes", (c) => page(c, boardMeta(baseUrl), 200));
+  app.get("/bandes", (c) => page(c, boardMeta(baseUrl, langOf(c)), 200));
   app.get("/bandes/:type/:id", (c) => {
     const type = c.req.param("type");
     const id = c.req.param("id");
+    const lang = langOf(c);
     const band = isBandType(type) && BAND_ID_RE.test(id) ? publicBandStanding(store.db, type, id) : null;
-    if (!band) return page(c, { ...boardMeta(baseUrl), title: "Bande introuvable" }, 404);
-    return page(c, bandMeta(band, baseUrl), 200);
+    if (!band) return page(c, { ...boardMeta(baseUrl, lang), title: bandNotFoundTitle(lang) }, 404);
+    return page(c, bandMeta(band, baseUrl, lang), 200);
   });
 }

@@ -584,7 +584,7 @@ describe("masquer", () => {
       const api = await ctx.app.request(`/api/card/${id}`);
       expect(api.status).toBe(410);
       const state = (await api.json()) as JobState;
-      expect(state).toMatchObject({ state: "error", code: "gone", message: { fr: "Fiche retirée par son propriétaire." } });
+      expect(state).toMatchObject({ state: "error", code: "gone", message: { fr: "Fiche retirée à la demande de la personne." } });
     }
 
     // Le propriétaire, lui, voit toujours ses fiches (mais pas d'image OG publique).
@@ -603,6 +603,7 @@ describe("masquer", () => {
     expect(page.status).toBe(410);
     const html = await page.text();
     expect(html).toContain("<h1>Fiche retirée</h1>");
+    expect(html).not.toMatch(/propriétaire/);
     expect(html).toContain("og:title");
     expect(html).not.toContain("og:image");
   });

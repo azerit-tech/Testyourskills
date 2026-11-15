@@ -130,12 +130,13 @@ function contributionsYear(c: Ctx): Finding | null {
 function topStarred(c: Ctx): Finding | null {
   const top = [...c.f.repos].sort((a, b) => b.stars - a.stars || a.name.localeCompare(b.name))[0];
   if (!top || !(top.stars >= MIN.stars)) return null;
-  const fr = `${num(top.stars, "fr")}${NBSP}${plural(top.stars, "étoile", "étoiles")}`;
-  const en = `${num(top.stars, "en")}${NBSP}${plural(top.stars, "star", "stars")}`;
+  // Les étoiles d'un repo se disent « stars GitHub » : « étoiles » est le mot de la note.
+  const fr = `${num(top.stars, "fr")}${NBSP}${plural(top.stars, "star", "stars")} GitHub`;
+  const en = `${num(top.stars, "en")}${NBSP}GitHub ${plural(top.stars, "star", "stars")}`;
   return make(
     "top_starred",
     BASE.top_starred + bounded(8 * Math.log10(top.stars), 36),
-    { fr: `Repo le plus étoilé : ${top.name}, ${fr}.`, en: `Most-starred repo: ${top.name}, ${en}.` },
+    { fr: `Repo le plus suivi : ${top.name}, ${fr}.`, en: `Most-starred repo: ${top.name}, ${en}.` },
     { fr, en },
     c.repoUrl(top.name),
   );
@@ -388,7 +389,7 @@ function lazyMessage(c: Ctx): Finding | null {
   return make(
     "lazy_message",
     BASE.lazy_message + bounded(n, 20),
-    { fr: `Message de commit préféré : « ${m} », ${n}${NBSP}fois.`, en: `Favourite commit message: “${m}”, ${n}${NBSP}times.` },
+    { fr: `Message de commit préféré : « ${m} », ${n}${NBSP}fois.`, en: `Favorite commit message: “${m}”, ${n}${NBSP}times.` },
     { fr: `${n}${NBSP}fois`, en: `${n}${NBSP}times` },
     c.commitUrl(last),
   );

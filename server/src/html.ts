@@ -5,8 +5,9 @@
 import { declaredLabel, fileOf } from "../../shared/caseFile";
 import { usableGrid } from "../../shared/gridText";
 import { IMAGE_QUERY } from "../../shared/images";
-import { HOME_PROMISE, homeTitle, promiseTitle } from "../../shared/promise";
+import { HOME_PROMISE, homeTitle, pageTitle, promiseTitle, SITE_NAME } from "../../shared/promise";
 import { starsLine } from "../../shared/stars";
+import { frTypoDeep } from "../../shared/typo";
 import type { CardData, ComparisonData, Lang, Special } from "../../shared/types";
 import { LEVEL_LABELS, starsFor } from "../../shared/types";
 
@@ -25,17 +26,28 @@ const SPECIAL_NAMES: Record<Lang, Record<Special, string>> = {
   en: { wonderkid: "New in town", flashback: "Cold case", totw: "This week's top 5" },
 };
 
-const SITE = "Testyourskills · azerit.tech";
+/** og:site_name : le seul nom visible du produit (§18.48). */
+const SITE = SITE_NAME;
+
+/**
+ * La langue des balises d'une page sans fiche (bande, prime, règlement) : `?lang=` d'abord,
+ * que le lien partagé depuis le site en anglais porte ; sinon la première langue du
+ * navigateur. Un robot qui ne dit rien lit le français.
+ */
+export function requestLang(query: string | undefined | null, acceptLanguage: string | undefined | null): Lang {
+  if (query === "en" || query === "fr") return query;
+  return langOfRequest(acceptLanguage);
+}
 
 export function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]!);
 }
 
-/** « Fiche ★★★★★☆, 78 » / « ★★★★★☆ sheet, 78 » ; une spéciale ajoute son nom (§17.3). */
+/** « Fiche ★★★★★☆, 78/100 » / « ★★★★★☆ rap sheet, 78/100 » ; une spéciale ajoute son nom (§17.3). */
 export function cardLabel(card: Pick<CardData, "tier" | "special" | "overall">, lang: Lang): string {
   const stars = starsLine(starsFor(card.overall));
   const special = card.special ? ` ${SPECIAL_NAMES[lang][card.special]}` : "";
-  return lang === "fr" ? `Fiche ${stars}${special}, ${card.overall}` : `${stars}${special} sheet, ${card.overall}`;
+  return lang === "fr" ? `Fiche ${stars}${special}, ${card.overall}/100` : `${stars}${special} rap sheet, ${card.overall}/100`;
 }
 
 function isComparison(d: CardData | ComparisonData): d is ComparisonData {
@@ -43,8 +55,8 @@ function isComparison(d: CardData | ComparisonData): d is ComparisonData {
 }
 
 export function metaFor(data: CardData | ComparisonData, baseUrl: string): PageMeta {
-  // Un dossier à deux pièces (§18.36) : l'aperçu d'une fiche, celle du dossier
-  // (shared/caseFile.ts), une seule note ; la description dit ses deux pièces.
+  // Un dossier à deux sources (§18.36) : l'aperçu d'une fiche, celle du dossier
+  // (shared/caseFile.ts), une seule note ; la description dit ses deux sources.
   if (isComparison(data)) {
     const file = fileOf(data);
     return cardMeta({ ...file, lang: data.cv.lang ?? data.github.lang ?? file.lang }, baseUrl, declaredLabel(data));
@@ -52,7 +64,7 @@ export function metaFor(data: CardData | ComparisonData, baseUrl: string): PageM
   return cardMeta(data, baseUrl);
 }
 
-/** L'aperçu d'une fiche ; `exhibits` (« LinkedIn » ou « CV ») : celle d'un dossier à deux pièces. */
+/** L'aperçu d'une fiche ; `exhibits` (« LinkedIn » ou « CV ») : celle d'un dossier à deux sources. */
 function cardMeta(data: CardData, baseUrl: string, exhibits?: string): PageMeta {
   const url = `${baseUrl}/c/${data.id}`;
   // Spéciale de la semaine (§18.22), ou nouveau dessin (shared/images.ts) : une autre adresse
@@ -60,27 +72,27 @@ function cardMeta(data: CardData, baseUrl: string, exhibits?: string): PageMeta 
   const image = `${baseUrl}/og/${data.id}.png?${IMAGE_QUERY}${data.special === "totw" ? "&s=totw" : ""}`;
   const lang = data.lang ?? "fr";
   const fr = lang === "fr";
-  const pieces = exhibits ? (fr ? `Pièces\u00a0: ${exhibits} et GitHub.` : `Exhibits: ${exhibits} and GitHub.`) : "";
+  const pieces = exhibits ? (fr ? `Sources\u00a0: ${exhibits} et GitHub.` : `Sources: ${exhibits} and GitHub.`) : "";
   if (data.sealed) return sealedMeta(data, lang, url, image, pieces);
   const label = cardLabel(data, lang);
-  // §18.7 : « @X est dans le viseur ★★★★☆☆ · Oiseau de nuit » (épicène, §18.18 ;
+  // §18.7 : « @X est dans le viseur ★★★★☆☆, Oiseau de nuit » (épicène, §18.18 ;
   // les six étoiles, §18.27) ; sans profil (fiche d'avant le barème 0.2.0), le niveau.
   const who = data.login ? `@${data.login}` : data.name;
   const n = starsFor(data.overall);
   const tag = data.profile ? data.profile.label[lang] : LEVEL_LABELS[n][lang];
-  const title = `${who} ${fr ? "est dans le viseur" : "is in the crosshairs"} ${starsLine(n)} · ${tag}`;
+  const title = `${who} ${fr ? "est dans le viseur" : "is in the crosshairs"} ${starsLine(n)}, ${tag}`;
   const status = data.statuses[0]?.label[lang];
   // Ce qu'est la note : une grille de recrutement (§18.37) ; une fiche d'avant la grille dit son temps de lecture.
   const parts = [
-    status ? (fr ? `Chef d'accusation\u00a0: «\u00a0${status}\u00a0».` : `Charge: "${status}".`) : "",
+    status ? (fr ? `Chef d'accusation\u00a0: «\u00a0${status}\u00a0».` : `Charge: “${status}”.`) : "",
     pieces,
     usableGrid(data.grid)
       ? fr
-        ? "Dossier lu sur huit critères de recrutement, chacun avec sa preuve. Fais la tienne."
-        : "File read on eight hiring criteria, each with its proof. Make yours."
+        ? "Fiche de dev lue sur huit critères de recrutement, chacun avec sa preuve. Fais la tienne."
+        : "Dev rap sheet, scored on eight hiring criteria, each with its evidence. Get yours."
       : fr
-        ? `Dossier lu par Azerit en ${data.judgedInSeconds} s. Fais la tienne.`
-        : `File read by Azerit in ${data.judgedInSeconds}s. Make yours.`,
+        ? `Fiche dressée par Azerit en ${data.judgedInSeconds}\u00a0s. Fais la tienne.`
+        : `Rap sheet drawn up by Azerit in ${data.judgedInSeconds}s. Get yours.`,
   ].filter(Boolean);
   return {
     lang,
@@ -94,18 +106,18 @@ function cardMeta(data: CardData, baseUrl: string, exhibits?: string): PageMeta 
 
 /**
  * Un dossier vide fait par un tiers et pas encore revendiqué (shared/publicView.ts) :
- * l'aperçu ne dit pas la note (la note plancher jugerait sans pièce), ni ses étoiles.
+ * l'aperçu ne dit pas la note (la note plancher jugerait sans preuve), ni ses étoiles.
  * L'image est celle de la fiche scellée, qui ne la porte pas non plus. Le profil et le chef d'accusation restent.
  */
 function sealedMeta(data: CardData, lang: Lang, url: string, image: string, pieces: string): PageMeta {
   const fr = lang === "fr";
   const who = data.login ? `@${data.login}` : data.name;
-  const tag = data.profile ? ` · ${data.profile.label[lang]}` : "";
+  const tag = data.profile ? `, ${data.profile.label[lang]}` : "";
   const status = data.statuses[0]?.label[lang];
   const parts = [
-    status ? (fr ? `Chef d'accusation\u00a0: «\u00a0${status}\u00a0».` : `Charge: "${status}".`) : "",
+    status ? (fr ? `Chef d'accusation\u00a0: «\u00a0${status}\u00a0».` : `Charge: “${status}”.`) : "",
     pieces,
-    fr ? "Le code reste à prouver\u00a0: la note attend la personne fichée. Fais la tienne." : "The code is yet to prove: the rating waits for the person on file. Make yours.",
+    fr ? "Le code reste à prouver\u00a0: la note attend la personne fichée. Fais la tienne." : "Code still unproven: the rating waits for the person on file. Get yours.",
   ].filter(Boolean);
   return {
     lang,
@@ -128,8 +140,26 @@ export function genericMeta(baseUrl: string, path: string, lang: Lang = "fr"): P
   };
 }
 
-/** Le texte de l'image de l'accueil : « Testyourskills : Azerit ouvre ton dossier. Tu plaides quoi ? » */
-export const homeImageAlt = (lang: Lang = "fr"): string => `Testyourskills${lang === "fr" ? "\u00a0: " : ": "}${promiseTitle(lang)}`;
+/** Le texte de l'image de l'accueil : « Azerit : Ta fiche de dev. Combien d'étoiles ? » */
+export const homeImageAlt = (lang: Lang = "fr"): string => `${SITE_NAME}${lang === "fr" ? "\u00a0: " : ": "}${promiseTitle(lang)}`;
+
+/**
+ * Les pages du front qui ont leur titre sans fiche ni image à elles : la vie privée
+ * (une adresse par langue) et le règlement. Null pour toute autre adresse.
+ */
+export function staticPageMeta(baseUrl: string, path: string, lang: Lang): PageMeta | null {
+  const p = path.replace(/\/+$/, "").toLowerCase();
+  const page =
+    p === "/confidentialite"
+      ? { lang: "fr" as Lang, title: "Vie privée" }
+      : p === "/privacy"
+        ? { lang: "en" as Lang, title: "Privacy" }
+        : p === "/reglement"
+          ? { lang, title: lang === "fr" ? "Règlement de la saison" : "Season rules" }
+          : null;
+  if (!page) return null;
+  return { ...genericMeta(baseUrl, p, page.lang), title: pageTitle(page.title), image: `${baseUrl}${HOME_IMAGE_PATH}` };
+}
 
 /** L'image de l'accueil (la promesse et la fiche de la vitrine), à cette adresse stable. */
 export const HOME_IMAGE_PATH = "/og/home.png";
@@ -213,14 +243,14 @@ export type MessageKey = "deleted" | "badDeleteLink" | "cardNotFound" | "withdra
 
 /** Les textes de ces pages : un titre court, une phrase. */
 export const SERVER_PAGES: Record<Lang, Record<MessageKey, { title: string; text: string }> & { home: string }> = {
-  fr: {
+  fr: frTypoDeep({
     deleted: { title: "Fiche supprimée", text: "Ta fiche et ses images sont effacées." },
     badDeleteLink: { title: "Lien non valide", text: "Ce lien de suppression n'est pas valide : ta fiche n'a pas bougé." },
     cardNotFound: { title: "Fiche introuvable", text: "Elle a expiré, ou elle a été supprimée." },
     withdrawn: { title: "Fiche retirée", text: "La personne fichée l'a retirée." },
     pageNotFound: { title: "Page introuvable", text: "Cette adresse ne mène à aucune page." },
     home: "Retour à l'accueil",
-  },
+  }),
   en: {
     deleted: { title: "Sheet deleted", text: "Your rap sheet and its images are erased." },
     badDeleteLink: { title: "Invalid link", text: "This delete link isn't valid: your sheet hasn't changed." },
@@ -278,7 +308,7 @@ function shell(lang: Lang, head: string, main: string, styles: string): string {
 /** Repli sans index.html du front : les balises pour les robots, l'image et un bouton pour les humains. */
 export function standalonePage(m: PageMeta): string {
   const img = m.image ? `<img src="${escapeHtml(m.image)}" alt="${escapeHtml(m.imageAlt)}" width="1200" height="630">` : "";
-  return shell(m.lang, metaTags(m), `${img}\n      <a class="m-btn" href="/">${m.lang === "fr" ? "Fais la tienne" : "Make yours"}</a>`, "");
+  return shell(m.lang, metaTags(m), `${img}\n      <a class="m-btn" href="/">${m.lang === "fr" ? "Fais la tienne" : "Get yours"}</a>`, "");
 }
 
 /**
@@ -289,7 +319,7 @@ export function standalonePage(m: PageMeta): string {
 export function messagePage(key: MessageKey, lang: Lang, styles = ""): string {
   const t = SERVER_PAGES[lang];
   const { title, text } = t[key];
-  const head = `<meta name="robots" content="noindex">\n    <title>${escapeHtml(title)} · Azerit</title>`;
+  const head = `<meta name="robots" content="noindex">\n    <title>${escapeHtml(pageTitle(title))}</title>`;
   const main = `<h1>${escapeHtml(title)}</h1>\n      <p>${escapeHtml(text)}</p>\n      <a class="m-btn" href="/">${escapeHtml(t.home)}</a>`;
   return shell(lang, head, main, styles);
 }

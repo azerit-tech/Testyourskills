@@ -64,7 +64,7 @@ describe("le point fort et le point à creuser", () => {
     const even = grid({ XP: 8, EMP: 7, STK: 7, CODE: 9, ACT: 7, OWN: 8, OSS: 2, EDU: 3 });
     expect(digPoint(even)).toEqual({ kind: "even", floor: 7 });
     expect(recruiterRead(card, even, "fr")?.dig).toBe("Dossier régulier\u00a0: rien sous 7/10.");
-    expect(recruiterRead(card, even, "en")?.dig).toBe("Even file: nothing under 7/10.");
+    expect(recruiterRead(card, even, "en")?.dig).toBe("Solid across the board: nothing under 7/10.");
     // Tout à égalité sous 7 : rien sous le point fort, la ligne s'arrête au point fort.
     const flat = grid({ XP: 6, EMP: 6, STK: 6, CODE: 6, ACT: 6, OWN: 6 });
     expect(digPoint(flat)).toBeNull();
@@ -78,7 +78,7 @@ describe("la ligne", () => {
   it("le métier, le langage, les années comptées, le point fort, le point à creuser", () => {
     const g = grid({ XP: 7, EMP: 6, STK: 6, CODE: 8, ACT: 5, OWN: 3 });
     expect(recruiterRead(card, g, "fr")?.text).toBe("Full-stack TypeScript, 5\u00a0ans comptés. Point fort\u00a0: niveau du code, 8/10. À creuser\u00a0: ownership.");
-    expect(recruiterRead(card, g, "en")?.text).toBe("Full-stack TypeScript, 5 years counted. Strong point: code level, 8/10. To dig into: ownership.");
+    expect(recruiterRead(card, g, "en")?.text).toBe("Full-stack TypeScript, 5 years counted. Strongest: code level, 8/10. To dig into: ownership.");
   });
 
   it("une fiche LinkedIn seule : « À prouver : le code. »", () => {

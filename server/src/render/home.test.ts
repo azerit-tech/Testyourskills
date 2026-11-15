@@ -14,7 +14,7 @@ describe("image de l'accueil", () => {
     const fr = await renderSvg({ format: "home", card, lang: "fr" });
     expect(fr).toContain(`viewBox="0 0 1200 630"`);
     // Le titre de l'accueil, de shared/promise.ts : deux phrases de deux lignes.
-    for (const line of ["AZERIT OUVRE", "TON DOSSIER.", "TU PLAIDES", "QUOI"]) expect(fr.toUpperCase()).toContain(line);
+    for (const line of ["TA FICHE", "DE DEV.", "COMBIEN", "ÉTOILES"]) expect(fr.toUpperCase()).toContain(line);
     expect(fr.toUpperCase()).not.toContain("DIT SENIOR");
     // Aucune prime ouverte (data/season.json) : l'aperçu ne promet pas d'entretien.
     expect(fr).not.toMatch(/entretien/i);
@@ -23,7 +23,7 @@ describe("image de l'accueil", () => {
     expect(fr).not.toContain("Fais la tienne");
     const en = await renderSvg({ format: "home", card, lang: "en" });
     expect(en).toContain(`>${IMAGE_WORDS.en.home}:</text>`);
-    for (const line of ["AZERIT OPENS", "YOUR FILE.", "HOW DO", "YOU PLEAD?"]) expect(en.toUpperCase()).toContain(line);
+    for (const line of ["YOUR DEV", "RAP SHEET.", "HOW MANY", "STARS?"]) expect(en.toUpperCase()).toContain(line);
   });
 
   /** Ce que la colonne de droite pose, de haut en bas : les lignes du titre, l'appel, les toits et les fenêtres du décor. */

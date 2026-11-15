@@ -170,7 +170,7 @@ describe("entrée GitHub : le LinkedIn trouvé devient une comparaison", () => {
     expect(cmp.github.findings?.find((f) => f.source === "linkedin")).toMatchObject({ kind: "linkedin_found", proof: URL_ });
     // L'aperçu de lien dit « LinkedIn », jamais « CV » : ses pièces, une seule note (§18.36).
     const page = await (await ctx.app.request(`/c/${json.id}`)).text();
-    expect(page).toContain("Pièces\u00a0: LinkedIn et GitHub.");
+    expect(page).toContain("Sources\u00a0: LinkedIn et GitHub.");
     expect(page).not.toMatch(/butin|déclare contre/);
     expect(page).not.toMatch(/\bCV\b/);
   });
@@ -475,7 +475,9 @@ describe("entrée LinkedIn (le champ unique)", () => {
     const ctx = setup(null);
     const r = await post(ctx, { login: "linkedin.com/in/camille-ardent" });
     expect(r).toMatchObject({ status: 400, json: { code: "linkedin" } });
-    expect(r.json.message?.fr).toBe("Entrée LinkedIn indisponible, tape ton pseudo GitHub.");
+    // La sortie n'est jamais GitHub seul : qui n'a pas de GitHub garde son CV.
+    expect(r.json.message?.fr).toBe("LinkedIn ne répond pas pour l'instant. Passe par ton GitHub ou ton CV, ou réessaie dans un moment.");
+    expect((r.json.message as { en?: string } | undefined)?.en).toBe("LinkedIn isn't answering right now. Use your GitHub or your CV, or try again in a moment.");
     const both = await post(ctx, { login: "camille-ardent", linkedin: URL_ });
     expect(await state(ctx, both.json.id)).toMatchObject({ state: "done", kind: "card", card: { source: "github" } });
   });

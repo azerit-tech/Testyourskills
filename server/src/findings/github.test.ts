@@ -85,7 +85,7 @@ describe("trouvailles GitHub (§18.26), chaque type", () => {
   it("le vendredi soir, le message préféré", () => {
     expect(plain(all.get("friday_evening")!.text.fr)).toBe(`6 commits poussés un vendredi après 18${NB}h.`);
     expect(plain(all.get("lazy_message")!.text.fr)).toBe(`Message de commit préféré : « fix », 5${NB}fois.`);
-    expect(all.get("lazy_message")!.text.en).toBe(`Favourite commit message: “fix”, 5${NB}times.`);
+    expect(all.get("lazy_message")!.text.en).toBe(`Favorite commit message: “fix”, 5${NB}times.`);
   });
 
   it("le calendrier : dimanche contre lundi, la plus longue série", () => {
@@ -93,9 +93,9 @@ describe("trouvailles GitHub (§18.26), chaque type", () => {
     expect(plain(all.get("longest_streak")!.text.fr)).toBe(`Plus longue série de l'année : 43${NB}jours de contributions d'affilée.`);
   });
 
-  it("les repos : le plus étoilé, l'abandonné, ceux d'un jour, le langage abandonné", () => {
-    expect(plain(all.get("top_starred")!.text.fr)).toBe(`Repo le plus étoilé : react-thing, 1${NB}240${NB}étoiles.`);
-    expect(all.get("top_starred")!.text.en).toBe(`Most-starred repo: react-thing, 1,240${NB}stars.`);
+  it("les repos : le plus suivi (en « stars GitHub », « étoiles » est le mot de la note), l'abandonné, ceux d'un jour, le langage abandonné", () => {
+    expect(plain(all.get("top_starred")!.text.fr)).toBe(`Repo le plus suivi : react-thing, 1${NB}240${NB}stars GitHub.`);
+    expect(all.get("top_starred")!.text.en).toBe(`Most-starred repo: react-thing, 1,240${NB}GitHub stars.`);
     expect(plain(all.get("abandoned_repo")!.text.fr)).toBe("Repo abandonné le plus ancien : todo-app-v3, dernier push en 2018.");
     expect(plain(all.get("one_day_repos")!.text.fr)).toBe("3 repos sur 6 n'ont jamais reçu de push après leur premier jour.");
     expect(plain(all.get("dead_language")!.text.fr)).toBe("Langage abandonné : PHP, dernier repo poussé en 2019.");
