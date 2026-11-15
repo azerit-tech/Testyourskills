@@ -1723,6 +1723,12 @@ button.cover-panel:focus-visible {
 .entry:has(.entry-error.is-on) .entry-reassure {
   display: none;
 }
+/* limite atteinte : sous l'erreur, alignée comme elle, une autre porte que le bouton
+   (passé en contour) qui échouerait encore */
+.entry-meanwhile {
+  justify-self: start;
+  margin: -10px 0 0 20px;
+}
 .entry-foot {
   display: flex;
   flex-wrap: wrap;

@@ -111,8 +111,8 @@ function useJob(id: string, nonce: number) {
         } else if (job.state === "done") {
           setView({ s: "done", item: job.kind === "card" ? { kind: "card", card: job.card } : { kind: "comparison", comparison: job.comparison } });
         } else if (isClosed(job.code)) {
-          // Commissariat fermé : retour à l'entrée, pseudo prérempli, message affiché.
-          prefillFromLast(job.message ?? t.errors.closed);
+          // Commissariat fermé : retour à l'entrée, pseudo prérempli, message affiché, bouton en contour.
+          prefillFromLast(job.message ?? t.errors.closed, true);
           navigate("/", { replace: true });
         } else {
           setView({ s: "error", message: job.message });

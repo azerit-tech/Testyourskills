@@ -12,6 +12,8 @@ export interface Prefill {
   login?: string;
   file?: File | null;
   error?: Fact | string | null;
+  /** L'erreur est une limite (commissariat fermé) : le même toucher échouerait encore. */
+  blocked?: boolean;
 }
 
 let prefill: Prefill | null = null;
@@ -28,12 +30,12 @@ export function setPrefill(p: Prefill) {
   prefill = { file: lastInput.file ?? null, ...p };
 }
 
-/** Pré-remplit l'entrée avec la dernière saisie (bouton « Réessayer »). */
-export function prefillFromLast(error: Fact | string | null) {
+/** Pré-remplit l'entrée avec la dernière saisie (bouton « Réessayer »). `blocked` : une limite, pas une faute de saisie. */
+export function prefillFromLast(error: Fact | string | null, blocked = false) {
   const { login, file } = lastInput;
   // Le dossier vient d'échouer : l'accueil n'a plus à y ramener.
   clearPending();
-  prefill = { login, file: file ?? null, mode: login && file ? "both" : "single", tab: file && !login ? "cv" : "github", error };
+  prefill = { login, file: file ?? null, mode: login && file ? "both" : "single", tab: file && !login ? "cv" : "github", error, blocked };
 }
 
 /**

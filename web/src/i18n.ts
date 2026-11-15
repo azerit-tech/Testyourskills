@@ -152,6 +152,9 @@ const fr = frTypoDeep({
     errTooLarge: (mb: string) => `Fichier de ${mb} Mo : la limite est 5 Mo. Un CV, pas une thèse.`,
     errTooManyPages: (n: number) => `${n}\u00a0pages\u00a0: la limite est 10. Un CV tient en une ou deux.`,
     errNetwork: "Le serveur ne répond pas. Réessaie dans un instant.",
+    /** Limite atteinte (§18.48) : sous l'erreur, une autre porte que le bouton qui échouerait. */
+    meanwhileTop: "En attendant : le top de la semaine",
+    meanwhileBands: "En attendant : les bandes",
   },
   stats: {
     TEC: { name: "Technique", what: "La profondeur de ce qui est écrit ou décrit." },
@@ -936,6 +939,8 @@ const en: Dict = {
     errTooLarge: (mb) => `${mb} MB file: the limit is 5 MB. A résumé, not a thesis.`,
     errTooManyPages: (n) => `${n} pages: the limit is 10. A résumé fits on one or two.`,
     errNetwork: "The server isn't answering. Try again in a moment.",
+    meanwhileTop: "Meanwhile: this week's top",
+    meanwhileBands: "Meanwhile: the crews",
   },
   stats: {
     TEC: { name: "Technique", what: "How deep the written or described work goes." },

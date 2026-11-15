@@ -11,7 +11,7 @@ import { createPortal } from "react-dom";
 import { detectEntry, linkedinSlug, parseGithubLogin, resolveDoor } from "../../../shared/entry";
 import type { Door } from "../../../shared/entry";
 import { pick, useT } from "../i18n";
-import { api, tokens } from "../lib/api";
+import { api, ApiError, tokens } from "../lib/api";
 import { errorFact } from "../lib/errors";
 import { navigate } from "../lib/router";
 import { loadCardPage } from "../pages/cardPageLoader";
@@ -39,6 +39,12 @@ interface Props {
 }
 
 const DOORS: Door[] = ["linkedin", "github"];
+
+/** Les erreurs qui reviendraient au même toucher (limite du jour, commissariat fermé ou débordé) :
+ * le bouton passe en contour tant que le champ n'a pas changé, et un lien propose autre chose. */
+const BLOCKING = new Set(["rate_limited", "closed", "busy"]);
+/** Le top de la semaine sur l'accueil (WeekBoard.tsx, WEEK_ANCHOR) : pas importé, pour ne pas l'emporter dans ce paquet. */
+const WEEK_ID = "semaine";
 
 /** Un collage ne lance la carte que s'il ressemble à une URL GitHub (ou LinkedIn), pas à un simple mot. */
 const GITHUB_URL_RE = /github\.com\//i;
@@ -106,6 +112,8 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
   const [help, setHelp] = useState(false);
   const [file, setFile] = useState<File | null>(init?.file ?? null);
   const [error, setError] = useState<string | null>(init?.error ? (typeof init.error === "string" ? init.error : pick(init.error, lang)) : null);
+  /** Une limite atteinte : le même toucher échouerait encore (§18.48, un seul rose qui sert). */
+  const [blocked, setBlocked] = useState(!!init?.blocked);
   const [busy, setBusy] = useState(false);
   const [drag, setDrag] = useState(false);
   // Au doigt, on ne glisse pas un fichier : la zone du CV le dit autrement.
@@ -180,6 +188,7 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
       setBusy(false);
       const msg = errorFact(err, t.errors.closed, h.errNetwork);
       setError(typeof msg === "string" ? msg : pick(msg, lang));
+      setBlocked(err instanceof ApiError && BLOCKING.has(err.code));
     }
   };
 
@@ -452,6 +461,7 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
       onChange={(e) => {
         setLogin(e.target.value);
         if (error) setError(null);
+        setBlocked(false);
       }}
       onBlur={() => {
         // Un lien LinkedIn tapé à la main devient ce qui suit « /in/ » ; pas à chaque frappe.
@@ -474,6 +484,22 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
       {error}
     </p>
   );
+
+  /** Limite atteinte : « En attendant : le top de la semaine », plutôt qu'un bouton qui échouera. */
+  const meanwhile = blocked && !!error && (
+    <button
+      type="button"
+      className="link-alt entry-meanwhile"
+      onClick={() => {
+        const board = document.getElementById(WEEK_ID);
+        if (board) board.scrollIntoView({ block: "start", behavior: "smooth" });
+        else navigate("/bandes");
+      }}
+    >
+      {document.getElementById(WEEK_ID) ? h.meanwhileTop : h.meanwhileBands}
+    </button>
+  );
+  const submitCls = `pill pill-big entry-submit${busy ? " is-busy" : ""}${blocked && error && !busy ? " pill-ghost" : ""}`;
 
   /** Sous le champ seul, tant qu'il n'y a pas d'erreur (elle prend sa place) : ce que la porte sait lire. */
   const hintLine = mode === "single" && tab === "github" && !error && (
@@ -548,7 +574,8 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
         {doorsSwitch}
         {loginField}
         {errorLine}
-        <button type="submit" className={`pill pill-big entry-submit${busy ? " is-busy" : ""}`} disabled={busy}>
+        {meanwhile}
+        <button type="submit" className={submitCls} disabled={busy}>
           {busy ? busyLabel(h.submitting) : h.submit}
           {busy && <BusyDots />}
         </button>
@@ -621,8 +648,9 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
 
       {errorLine}
       {hintLine}
+      {meanwhile}
 
-      <button type="submit" className={`pill pill-big entry-submit${busy ? " is-busy" : ""}`} disabled={busy}>
+      <button type="submit" className={submitCls} disabled={busy}>
         {busy ? busyLabel(h.submitting) : mode === "both" ? h.submitBoth : h.submit}
         {busy && <BusyDots />}
       </button>

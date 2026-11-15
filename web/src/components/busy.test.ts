@@ -25,11 +25,12 @@ describe("le bouton en cours", () => {
     expect(forms.length).toBeGreaterThanOrEqual(2);
     for (const f of forms) {
       const err = f.indexOf("{errorLine}");
-      const btn = f.indexOf("entry-submit");
+      // Les deux boutons d'envoi partagent leur classe (submitCls : en cours, ou en contour sur une limite).
+      const btn = f.indexOf("className={submitCls}");
       expect(err).toBeGreaterThan(-1);
       expect(btn).toBeGreaterThan(err);
-      expect(f).toContain("is-busy");
       expect(f).toContain("<BusyDots />");
     }
+    expect(src).toContain('const submitCls = `pill pill-big entry-submit${busy ? " is-busy" : ""}');
   });
 });
