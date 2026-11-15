@@ -15,7 +15,7 @@ import { isSitePage, isUpcomingPath } from "../../shared/routes";
 import type { CardData, ComparisonData, ErrorCode, Fact, JobState, Lang } from "../../shared/types";
 import { stripToken, type CardRow, type Store } from "./db";
 import { buildLead, clientEventSchema, sendLead } from "./events";
-import { genericMeta, HOME_IMAGE_PATH, injectConfig, injectHomeImage, injectMeta, langOfRequest, messagePage, metaFor, requestLang, siteStylesheets, standalonePage, type MessageKey } from "./html";
+import { genericMeta, HOME_IMAGE_PATH, HOME_IMAGE_PATH_EN, injectConfig, injectHomeImage, injectMeta, langOfRequest, messagePage, metaFor, requestLang, siteStylesheets, standalonePage, type MessageKey } from "./html";
 import { ID_RE, MAX_PDF_BYTES, MESSAGES, Pipeline, type Deps, type RenderInput } from "./pipeline";
 import { CARDS_PER_BROWSER, CARDS_PER_DAY, RateLimiter, browserId, clientIp } from "./ratelimit";
 import { inlineAvatar, mountLinkedin, removeAvatars, type LinkedinConfig } from "./linkedin";
@@ -257,7 +257,8 @@ export function createApp(opts: AppOptions) {
   const fetchImpl = opts.fetchImpl ?? fetch;
   const rendering = new Map<string, Promise<Uint8Array>>();
   /** Image de l'accueil déjà rendue : une par fiche de vitrine et par processus (un déploiement la refait). */
-  let homeImage: { key: string; png: Promise<Uint8Array> } | null = null;
+  /** L'image de l'accueil, une par langue. */
+  const homeImages = new Map<Lang, { key: string; png: Promise<Uint8Array> }>();
   const avatarDir = opts.avatarDir ?? defaultAvatarDir(ogDir);
   const aiStatus = opts.aiStatus ?? budgetAiStatus;
 
@@ -479,20 +480,21 @@ export function createApp(opts: AppOptions) {
   // GET /og/home.png : l'aperçu de lien de l'accueil (1200 × 630), la promesse
   // et la fiche de la vitrine, ou la fiche d'exemple tant qu'elle n'existe pas.
   // Adresse stable pour og:image ; l'image suit la vitrine, d'où le cache d'une heure.
-  const serveHomeImage = async (c: Context) => {
+  // /og/home-en.png : la même, en anglais, pour l'aperçu d'un lien anglais.
+  const serveHomeImage = async (c: Context, lang: Lang) => {
     const login = opts.showcaseLogin;
     const row = login && !store.isHidden(login) ? store.findLatestShowcase(login) : null;
     const key = row?.id ?? "exemple";
-    let entry = homeImage;
+    let entry = homeImages.get(lang);
     if (entry?.key !== key) {
       const card = row ? showcaseCard(row) : FIXTURES.jmougeot;
-      const png = (async () => deps.renderImage({ format: "home", card: await inlineAvatar(await frontAvatar(card), baseUrl, avatarDir), lang: "fr" }))();
+      const png = (async () => deps.renderImage({ format: "home", card: await inlineAvatar(await frontAvatar(card), baseUrl, avatarDir), lang }))();
       const fresh = (entry = { key, png });
       // Un rendu raté ne reste pas en mémoire : la demande suivante réessaie.
       png.catch(() => {
-        if (homeImage === fresh) homeImage = null;
+        if (homeImages.get(lang) === fresh) homeImages.delete(lang);
       });
-      homeImage = fresh;
+      homeImages.set(lang, fresh);
     }
     return c.body(new Uint8Array(await entry.png), 200, { "Content-Type": "image/png", "Cache-Control": "public, max-age=3600" });
   };
@@ -762,7 +764,8 @@ export function createApp(opts: AppOptions) {
 
   // Images : /og/:id.png (1200×630), /og/:id-portrait.png (1080×1350), /og/:id-story.png (1080×1920), /og/:id-card.png.
   app.get("/og/:file", async (c) => {
-    if (`/og/${c.req.param("file")}` === HOME_IMAGE_PATH) return serveHomeImage(c);
+    if (`/og/${c.req.param("file")}` === HOME_IMAGE_PATH) return serveHomeImage(c, "fr");
+    if (`/og/${c.req.param("file")}` === HOME_IMAGE_PATH_EN) return serveHomeImage(c, "en");
     const m = OG_FILE_RE.exec(c.req.param("file"));
     if (!m) return c.notFound();
     const id = m[1]!;
@@ -914,7 +917,7 @@ export function createApp(opts: AppOptions) {
       const lang = requestLang(c.req.query("lang"), c.req.header("Accept-Language"));
       const own = /^\/reglement\/?$/i.test(c.req.path) && !rules ? null : sitePageMeta(c.req.path, baseUrl, lang);
       if (own) return c.html(injectMeta(template, own));
-      if (lang === "en" && c.req.path === "/") return c.html(injectMeta(template, { ...genericMeta(baseUrl, "/", "en"), image: `${baseUrl}${HOME_IMAGE_PATH}` }));
+      if (lang === "en" && c.req.path === "/") return c.html(injectMeta(template, { ...genericMeta(baseUrl, "/", "en"), image: `${baseUrl}${HOME_IMAGE_PATH_EN}` }));
       return c.html(withPageUrl(injectHomeImage(template, baseUrl), `${baseUrl}/`));
     };
     // Avant le statique, qui servirait le fichier tel quel.

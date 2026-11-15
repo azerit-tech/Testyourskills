@@ -9,7 +9,9 @@ describe("balises des pages du site", () => {
     expect(rules?.title).toBe("Season rules · Azerit");
     expect(rules?.description).toBe(PAGE_DESCRIPTIONS.rules.en);
     expect(rules?.url).toBe("https://skills.test/reglement");
-    expect(rules?.image).toBe("https://skills.test/og/home.png");
+    // En anglais, l'image anglaise de l'accueil (§18.52).
+    expect(rules?.image).toBe("https://skills.test/og/home-en.png");
+    expect(sitePageMeta("/reglement", "https://skills.test", "fr")?.image).toBe("https://skills.test/og/home.png");
     expect(sitePageMeta("/reglement", "https://skills.test", "fr")?.lang).toBe("fr");
     expect(sitePageMeta("/confidentialite", "https://skills.test", "en")?.description).toBe(PAGE_DESCRIPTIONS.privacy.fr);
     expect(sitePageMeta("/privacy/", "https://skills.test", "fr")?.title).toBe("Privacy · Azerit");

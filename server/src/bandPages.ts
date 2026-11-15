@@ -17,7 +17,7 @@ import { publicBandStanding } from "./bands";
 import type { Store } from "./db";
 import { pageTitle } from "../../shared/promise";
 import { frTypo } from "../../shared/typo";
-import { HOME_IMAGE_PATH, homeImageAlt, injectMeta, requestLang, standalonePage, type PageMeta } from "./html";
+import { homeImageAlt, homeImagePath, injectMeta, requestLang, standalonePage, type PageMeta } from "./html";
 
 const LEAGUE_FR: Record<BandType, string> = { ecole: "des écoles", boite: "des boîtes" };
 const LEAGUE_EN: Record<BandType, string> = { ecole: "among schools", boite: "among companies" };
@@ -94,7 +94,7 @@ export function boardMeta(baseUrl: string, lang: Lang = "fr"): PageMeta {
     description: fr
       ? frTypo("Les écoles et les boîtes classées aux étoiles de leurs fiches. Fais ta fiche : tes étoiles comptent pour ta bande.")
       : "Schools and companies ranked by the stars of their sheets. Get your rap sheet: your stars count for your crew.",
-    image: `${baseUrl}${HOME_IMAGE_PATH}`,
+    image: `${baseUrl}${homeImagePath(lang)}`,
     // l'image est celle de l'accueil : son texte aussi
     imageAlt: homeImageAlt(lang),
   };

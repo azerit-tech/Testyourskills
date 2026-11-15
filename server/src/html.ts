@@ -162,11 +162,14 @@ export function staticPageMeta(baseUrl: string, path: string, lang: Lang): PageM
             ? { lang, title: lang === "fr" ? "Crédits" : "Credits" }
             : null;
   if (!page) return null;
-  return { ...genericMeta(baseUrl, p, page.lang), title: pageTitle(page.title), image: `${baseUrl}${HOME_IMAGE_PATH}` };
+  return { ...genericMeta(baseUrl, p, page.lang), title: pageTitle(page.title), image: `${baseUrl}${homeImagePath(page.lang)}` };
 }
 
 /** L'image de l'accueil (la promesse et la fiche de la vitrine), à cette adresse stable. */
 export const HOME_IMAGE_PATH = "/og/home.png";
+/** La même, en anglais : l'aperçu d'un lien anglais parle anglais. */
+export const HOME_IMAGE_PATH_EN = "/og/home-en.png";
+export const homeImagePath = (lang: Lang): string => (lang === "en" ? HOME_IMAGE_PATH_EN : HOME_IMAGE_PATH);
 
 /**
  * Pages du front sans fiche (accueil, repli SPA) : l'image de l'accueil en

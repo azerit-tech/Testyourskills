@@ -10,7 +10,7 @@ import type { Prime, Season } from "../../shared/season";
 import { createApp } from "./app";
 import { Store } from "./db";
 import type { Deps, RenderInput } from "./pipeline";
-import { logoSize, primeImageKey, primeMeta, primesMeta, readLogo } from "./primePages";
+import { logoSize, primeImageKey, primeImagePath, primeMeta, primesMeta, readLogo } from "./primePages";
 import { renderImage } from "./render/index";
 
 const DAY = 24 * 3600 * 1000;
@@ -94,6 +94,17 @@ describe("l'image d'une prime", () => {
     expect((await ctx.app.request("/og/p/inconnue.png")).status).toBe(404);
   });
 
+  it("en anglais (`&l=en`) : son image à elle, rendue en anglais, sans effacer la française", async () => {
+    const ctx = setup(season([prime()]));
+    await ctx.app.request("/og/p/demo-stage.png");
+    expect((await ctx.app.request("/og/p/demo-stage.png?l=en")).status).toBe(200);
+    await ctx.app.request("/og/p/demo-stage.png?l=en");
+    await ctx.app.request("/og/p/demo-stage.png");
+    expect(ctx.calls.map((c) => c.lang)).toEqual(["fr", "en"]);
+    expect(primeImagePath(view(), "en")).toMatch(/&l=en$/);
+    expect(primeImagePath(view())).not.toContain("l=en");
+  });
+
   it("la clé change avec ce que l'image dit", () => {
     expect(primeImageKey(view())).toBe(primeImageKey(view({ entrants: 99 })));
     expect(primeImageKey(view())).not.toBe(primeImageKey(view({ daysLeft: 11 })));
@@ -124,10 +135,13 @@ describe("les balises des pages", () => {
     expect(page).toContain("<title>Entreprise Démo, stage Backend, Full-stack · Azerit</title>");
     const en = await ctx.app.request("/primes/demo-stage?lang=en");
     expect(en.headers.get("Vary")).toMatch(/Accept-Language/);
-    expect(await en.text()).toContain("<title>Entreprise Démo, Backend, Full-stack internship · Azerit</title>");
+    const enPage = await en.text();
+    expect(enPage).toContain("<title>Entreprise Démo, Backend, Full-stack internship · Azerit</title>");
+    expect(enPage).toMatch(/\/og\/p\/demo-stage\.png\?[^"]*&amp;l=en"/);
     const list = await ctx.app.request("/primes");
     expect(list.status).toBe(200);
     expect(await list.text()).toContain("/og/home.png");
+    expect(await (await ctx.app.request("/primes?lang=en")).text()).toContain("/og/home-en.png");
     expect((await ctx.app.request("/primes/inconnue")).status).toBe(404);
   });
 

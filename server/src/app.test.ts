@@ -593,7 +593,9 @@ describe("image d'aperçu de l'accueil (/og/home.png)", () => {
     expect(html).toContain("<title>Privacy · Azerit</title>");
     expect(html).toContain('<html lang="en"');
     expect(html).toContain(`<meta property="og:url" content="https://skills.test/privacy">`);
-    expect(html).toContain(`<meta property="og:image" content="https://skills.test/og/home.png">`);
+    // En anglais, l'image anglaise de l'accueil.
+    expect(html).toContain(`<meta property="og:image" content="https://skills.test/og/home-en.png">`);
+    expect(await (await ctx.app.request("/confidentialite")).text()).toContain(`<meta property="og:image" content="https://skills.test/og/home.png">`);
     expect(count(html, /<title>/g)).toBe(1);
     expect(count(html, /name="description"/g)).toBe(1);
   });
@@ -628,6 +630,12 @@ describe("image d'aperçu de l'accueil (/og/home.png)", () => {
     expect((await ctx.app.request("/og/home.png")).status).toBe(200);
     expect(inputs).toHaveLength(1);
     expect(inputs[0]).toMatchObject({ format: "home", login: "jmougeot", lang: "fr" });
+    // L'image anglaise, pour l'aperçu d'un lien anglais : rendue une fois aussi, sans chasser la française.
+    expect((await ctx.app.request("/og/home-en.png")).status).toBe(200);
+    expect((await ctx.app.request("/og/home-en.png")).status).toBe(200);
+    expect((await ctx.app.request("/og/home.png")).status).toBe(200);
+    expect(inputs).toHaveLength(2);
+    expect(inputs[1]).toMatchObject({ format: "home", login: "jmougeot", lang: "en" });
     // La photo servie par le front est lue sur disque : le rendu n'appelle pas le réseau.
     expect(inputs[0]!.avatarUrl).toBe(`data:image/jpeg;base64,${Buffer.from([0xff, 0xd8, 0xff, 1]).toString("base64")}`);
   });

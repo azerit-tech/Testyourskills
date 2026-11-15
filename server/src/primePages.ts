@@ -17,7 +17,7 @@ import type { Lang } from "../../shared/types";
 import type { Store } from "./db";
 import { pageTitle } from "../../shared/promise";
 import { frTypo } from "../../shared/typo";
-import { HOME_IMAGE_PATH, homeImageAlt, injectMeta, requestLang, standalonePage, type PageMeta } from "./html";
+import { homeImageAlt, homeImagePath, injectMeta, requestLang, standalonePage, type PageMeta } from "./html";
 import { primeViewById } from "./primes";
 import { primeJobs, primeWhen, type PrimeLogo } from "./render/prime";
 
@@ -59,7 +59,8 @@ export function primeImageKey(p: PrimeView): string {
   return createHash("sha256").update(JSON.stringify(said)).digest("hex").slice(0, 10);
 }
 
-export const primeImagePath = (p: PrimeView): string => `/og/p/${p.id}.png?${IMAGE_QUERY}&k=${primeImageKey(p)}`;
+/** L'adresse de l'image d'une prime ; en anglais, `&l=en` : l'aperçu d'un lien anglais parle anglais. */
+export const primeImagePath = (p: PrimeView, lang: Lang = "fr"): string => `/og/p/${p.id}.png?${IMAGE_QUERY}&k=${primeImageKey(p)}${lang === "en" ? "&l=en" : ""}`;
 
 const CONTRACT_FR: Record<PrimeView["contract"], string> = { stage: "stage", alternance: "alternance", cdi: "CDI" };
 const CONTRACT_EN: Record<PrimeView["contract"], string> = { stage: "internship", alternance: "apprenticeship", cdi: "full-time job" };
@@ -72,7 +73,7 @@ export function primeMeta(p: PrimeView, baseUrl: string, lang: Lang = "fr"): Pag
   const jobs = primeJobs(p, lang);
   const when = inSentence(primeWhen(p, lang));
   const url = `${baseUrl}/primes/${p.id}`;
-  const image = `${baseUrl}${primeImagePath(p)}`;
+  const image = `${baseUrl}${primeImagePath(p, lang)}`;
   if (lang === "en") {
     const interviews = `${p.interviews} ${p.interviews === 1 ? "interview" : "interviews"}`;
     return {
@@ -112,7 +113,7 @@ export function primesMeta(baseUrl: string, lang: Lang = "fr"): PageMeta {
     description: fr
       ? frTypo("Stage, alternance, CDI : des entreprises offrent des entretiens aux fiches les mieux classées. Fais ta fiche et entre dans la course.")
       : "Internship, apprenticeship, full-time: companies offer interviews to the top-ranked sheets. Get your rap sheet and enter the race.",
-    image: `${baseUrl}${HOME_IMAGE_PATH}`,
+    image: `${baseUrl}${homeImagePath(lang)}`,
     // l'image est celle de l'accueil : son texte aussi
     imageAlt: homeImageAlt(lang),
   };
@@ -153,17 +154,20 @@ export function mountPrimePages(app: Hono, o: PrimePagesOptions): void {
     const prime = m && PRIME_ID_RE.test(m[1]!) ? primeViewById(store, season, m[1]!, now()) : null;
     if (!prime) return c.notFound();
     const prefix = `${prime.id}.`;
-    const path = join(dir, `${prefix}${primeImageKey(prime)}.png`);
+    const lang: Lang = c.req.query("l") === "en" ? "en" : "fr";
+    const key = primeImageKey(prime);
+    const path = join(dir, `${prefix}${key}${lang === "en" ? ".en" : ""}.png`);
     let png: Uint8Array | null = await readFile(path).catch(() => null);
     if (!png) {
       let p = rendering.get(path);
       if (!p) {
         p = (async () => {
           const logo = await readLogo(prime.logo, o.logoDir);
-          const buf = await o.render({ format: "prime", prime, logo, lang: "fr" });
+          const buf = await o.render({ format: "prime", prime, logo, lang });
           await mkdir(dir, { recursive: true });
           const old = await readdir(dir).catch(() => [] as string[]);
-          await Promise.all(old.filter((n) => n.startsWith(prefix)).map((n) => rm(join(dir, n), { force: true })));
+          // Les images d'une clé périmée partent ; l'autre langue de la même clé reste.
+          await Promise.all(old.filter((n) => n.startsWith(prefix) && !n.startsWith(`${prefix}${key}.`)).map((n) => rm(join(dir, n), { force: true })));
           const tmp = `${path}.${process.pid}.tmp`;
           await writeFile(tmp, buf);
           await rename(tmp, path);
