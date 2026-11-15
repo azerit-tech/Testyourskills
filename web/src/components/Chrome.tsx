@@ -124,6 +124,7 @@ export function TopBar() {
 export function Footer() {
   const { t, lang } = useT();
   const cfg = useAppConfig();
+  const path = usePath();
   const privacy = lang === "fr" ? "/confidentialite" : "/privacy";
   const inner: [string, string][] = [["/bandes", t.chrome.bands]];
   if (cfg?.primesListed) inner.push(["/primes", t.chrome.primes]);
@@ -143,7 +144,8 @@ export function Footer() {
         </p>
         <nav className="footer-links" aria-label={t.chrome.nav}>
           {inner.map(([href, label]) => (
-            <a key={href} href={href} onClick={(e) => onLinkClick(e, href)}>
+            // la page en cours, soulignée comme dans la barre du haut
+            <a key={href} href={href} onClick={(e) => onLinkClick(e, href)} aria-current={path === href ? "page" : undefined}>
               {label}
             </a>
           ))}

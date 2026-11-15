@@ -3712,8 +3712,20 @@ a.dossier-item:hover {
   font: 500 var(--t-14) / 1 var(--f-text);
   color: var(--c-text);
 }
-.footer-links a:hover {
+.footer-links a:hover,
+.footer-links a[aria-current="page"] {
   color: var(--cream);
+}
+.footer-links a[aria-current="page"] {
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 6px;
+}
+/* téléphone de 320 : cinq liens (bandes, primes, règlement, vie privée, crédits) sur deux lignes au plus */
+@media (max-width: 359px) {
+  .footer-links {
+    gap: 0 16px;
+  }
 }
 
 /* ============ ordinateur ============ */
