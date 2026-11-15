@@ -845,7 +845,7 @@ const fr = frTypoDeep({
     retry: "Réessayer",
     timeout: "Ça prend trop de temps, on préfère s'arrêter là plutôt que d'inventer. Réessaie.",
     generic: "Quelque chose a cassé de notre côté.",
-    closed: "Le commissariat est fermé pour ce soir. Reviens demain.",
+    closed: "Le commissariat a fermé pour aujourd'hui. Reviens demain.",
   },
   footer: {
     privacy: "Vie privée",
@@ -1572,7 +1572,7 @@ const en: Dict = {
     retry: "Try again",
     timeout: "It's taking too long. We'd rather stop than make things up. Try again.",
     generic: "Something broke on our side.",
-    closed: "The station is closed for tonight. Come back tomorrow.",
+    closed: "The station is closed for the day. Come back tomorrow.",
   },
   footer: {
     privacy: "Privacy",

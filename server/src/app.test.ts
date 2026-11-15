@@ -860,8 +860,8 @@ describe("CV et comparaison", () => {
 describe("commissariat fermé (plafond IA ou crédit épuisé)", () => {
   /** Erreur telle que la lève ai/client.ts (AiClosedError), reconnue à son code. */
   const closed = (reason: "budget" | "credits") => Object.assign(new Error(reason), { code: "closed", reason });
-  const CLOSED_FR = "Le commissariat est fermé pour ce soir. Reviens demain.";
-  const CLOSED_EN = "The station is closed for tonight. Come back tomorrow.";
+  const CLOSED_FR = "Le commissariat a fermé pour aujourd'hui. Reviens demain.";
+  const CLOSED_EN = "The station is closed for the day. Come back tomorrow.";
 
   it("un 402 sur la lecture du code fait échouer la fiche en closed, sans fiche dégradée", async () => {
     // Vrai readCode, faux client OpenRouter qui répond 402.

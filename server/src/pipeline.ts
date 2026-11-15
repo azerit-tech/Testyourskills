@@ -146,8 +146,8 @@ export const MESSAGES: Record<MessageKey, Fact> = typoFacts({
     en: "GitHub is asking us to slow down. Try again in a few minutes.",
   },
   closed: {
-    fr: "Le commissariat est fermé pour ce soir. Reviens demain.",
-    en: "The station is closed for tonight. Come back tomorrow.",
+    fr: "Le commissariat a fermé pour aujourd'hui. Reviens demain.",
+    en: "The station is closed for the day. Come back tomorrow.",
   },
   busy: {
     fr: "Le commissariat déborde : trop de dossiers d'un coup, GitHub nous fait souffler. Reviens dans quelques minutes.",
@@ -199,8 +199,8 @@ export const MESSAGES: Record<MessageKey, Fact> = typoFacts({
     en: "We couldn't read this LinkedIn profile right now. Try again in a moment.",
   },
   bad_request: {
-    fr: "Donne un pseudo GitHub valide, un CV en PDF, ou les deux.",
-    en: "Give a valid GitHub username, a PDF CV, or both.",
+    fr: "Donne ton lien LinkedIn, ton pseudo GitHub ou ton CV en PDF.",
+    en: "Give your LinkedIn link, your GitHub username or your résumé as a PDF.",
   },
   internal: {
     fr: "Quelque chose a cassé de notre côté. Réessaie dans un instant.",
