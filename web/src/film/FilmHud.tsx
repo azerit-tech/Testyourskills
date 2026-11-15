@@ -73,7 +73,14 @@ export function FilmHud({ plan, hud, lang }: { plan: FilmPlan; hud: Hud; lang: L
       <div className="film-band film-band-top" style={{ transform: `translateY(${(hud.bands - 1) * 100}%)` }}>
         <div className="film-stars">
           {hud.stars.map((s, i) => (
-            <svg key={i} className={`film-star${s.on ? " is-on" : ""}`} viewBox="0 0 24 24" width="26" height="26" style={s.scale !== 1 ? { transform: `scale(${s.scale})` } : undefined}>
+            <svg
+              key={i}
+              className={`film-star${s.on ? " is-on" : ""}${s.pending !== undefined ? " is-pending" : ""}`}
+              viewBox="0 0 24 24"
+              width="26"
+              height="26"
+              style={s.pending !== undefined ? { opacity: s.pending } : s.scale !== 1 ? { transform: `scale(${s.scale})` } : undefined}
+            >
               <path d={STAR} />
             </svg>
           ))}

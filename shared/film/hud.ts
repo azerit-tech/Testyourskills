@@ -12,6 +12,9 @@ export interface StarHud {
   on: boolean;
   /** 1,5 au claquement, puis 1. */
   scale: number;
+  /** L'étoile en suspens, juste avant la coupe : jamais pleine, son contour seul, à cette
+   * opacité (0,6 au battement, 0,25 entre deux). Absente le reste du film. */
+  pending?: number;
 }
 
 export interface Hud {
@@ -78,8 +81,12 @@ export function hudAt(plan: FilmPlan, t: number, lang: Lang): Hud {
       const age = frame - s.frame;
       stars.push({ on: true, scale: age < STAR_POP ? 1.5 - (0.5 * age) / STAR_POP : 1 });
     } else {
-      const blink = plan.flicker?.star === k && plan.flicker.frames.some(([a, b]) => frame >= a && frame < b);
-      stars.push({ on: blink, scale: 1 });
+      // L'étoile suivante, en suspens : son contour bat deux fois, elle ne s'allume jamais
+      // (une capture à cet instant ne doit pas montrer une étoile de trop).
+      const fl = plan.flicker?.star === k ? plan.flicker.frames : null;
+      const inSpan = !!fl?.length && frame >= fl[0][0] && frame < fl[fl.length - 1][1];
+      const blink = !!fl && fl.some(([a, b]) => frame >= a && frame < b);
+      stars.push(inSpan ? { on: false, scale: 1, pending: blink ? 0.6 : 0.25 } : { on: false, scale: 1 });
     }
   }
 

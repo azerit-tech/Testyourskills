@@ -152,8 +152,9 @@ describe("hudAt (§2.2, §5.2)", () => {
         expect(h.lit).toBeLessThanOrEqual(n);
         expect(h.lit).toBeGreaterThanOrEqual(prev);
         prev = h.lit;
-        // une étoile au-delà du niveau ne s'allume qu'en clignotant, juste avant la coupe
-        const extra = h.stars.slice(n).filter((s) => s.on).length;
+        // une étoile au-delà du niveau ne s'allume jamais ; elle n'est qu'en suspens (contour), juste avant la coupe
+        expect(h.stars.slice(n).some((s) => s.on)).toBe(false);
+        const extra = h.stars.slice(n).filter((s) => s.pending !== undefined).length;
         if (extra) {
           expect(h.phase).toBe("chase");
           expect(f).toBeGreaterThanOrEqual(p.cut - 12);
@@ -229,16 +230,23 @@ describe("hudAt (§2.2, §5.2)", () => {
     expect(hudAt(p, at(p.flash.from + 1), "fr").videoFrame).toBe(p.endVideo - 1);
   });
 
-  it("le clignotement, à chaque niveau de une à cinq étoiles : l'étoile suivante s'allume deux fois avant la coupe et finit éteinte", () => {
+  it("le clignotement, à chaque niveau de une à cinq étoiles : l'étoile suivante bat deux fois en contour avant la coupe, jamais pleine, et finit éteinte", () => {
     for (const n of [1, 2, 3, 4, 5] as const) {
       const p = filmPlan(cardAt(n));
-      const seq = Array.from({ length: p.frames }, (_, f) => hudAt(p, at(f), "fr").stars[n].on);
+      const stars = Array.from({ length: p.frames }, (_, f) => hudAt(p, at(f), "fr").stars[n]);
+      expect(stars.some((s) => s.on)).toBe(false);
+      for (const s of stars) {
+        if (s.pending === undefined) continue;
+        expect(s.pending).toBeGreaterThanOrEqual(0.25);
+        expect(s.pending).toBeLessThanOrEqual(0.6);
+      }
+      const seq = stars.map((s) => s.pending === 0.6);
       let blinks = 0;
       for (let i = 0; i < seq.length; i++) if (seq[i] && !seq[i - 1]) blinks++;
       expect(blinks).toBe(2);
       // éteinte sur les deux images d'avant l'éclair, sur l'éclair, et jusqu'au bout
       expect(seq.slice(p.cut - 3).every((on) => !on)).toBe(true);
-      expect(hudAt(p, p.duration, "fr").stars[n].on).toBe(false);
+      expect(hudAt(p, p.duration, "fr").stars[n]).toEqual({ on: false, scale: 1 });
     }
     const p6 = filmPlan(cardAt(6));
     for (let f = p6.freeze; f < p6.frames; f++) expect(hudAt(p6, at(f), "fr").stars.every((s) => s.on)).toBe(true);

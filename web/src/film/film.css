@@ -236,6 +236,11 @@
   fill: #fff9cb;
   stroke: none;
 }
+/* l'étoile en suspens, juste avant la coupe : le contour crème seul, son opacité bat
+   entre 25 et 60 % (FilmHud) ; jamais pleine */
+.film-star.is-pending {
+  stroke: #fff9cb;
+}
 .film-band-bottom {
   /* 12 % de l'image ; sur un téléphone court (320 × 568), jusqu'à 84 px sans
      passer les 15 % que l'image laisse libres : 28 px de radio au-dessus des boutons */
