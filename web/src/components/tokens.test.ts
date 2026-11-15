@@ -41,7 +41,8 @@ describe("les jetons", () => {
   it("trois rayons, deux hauteurs tactiles, les marges", () => {
     expect([token("--r-pill"), token("--r-block"), token("--r-item")]).toEqual(["999px", "24px", "14px"]);
     expect([token("--h-main"), token("--h-tap")]).toEqual(["52px", "44px"]);
-    expect([token("--gutter"), token("--pad-block"), token("--page-w")]).toEqual(["16px", "20px", "1080px"]);
+    // La marge : 16 px, ou plus si l'encoche d'un téléphone en paysage l'exige.
+    expect([token("--gutter"), token("--pad-block"), token("--page-w")]).toEqual(["max(16px, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px))", "20px", "1080px"]);
   });
 
   it("le rose ne sert qu'à l'action, la crème à l'emphase et aux étoiles", () => {

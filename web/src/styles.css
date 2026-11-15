@@ -115,7 +115,8 @@
   --r-pill: 999px;
   --r-block: 24px;
   --r-item: 14px;
-  --gutter: 16px;
+  /* l'encoche d'un téléphone en paysage repousse la marge (viewport-fit=cover) */
+  --gutter: max(16px, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
   --pad-block: 20px;
   --page-w: 1080px;
   --page-max: calc(var(--page-w) + 2 * var(--gutter));
@@ -133,7 +134,7 @@
   :root {
     --t-page: 64px;
     --t-section: var(--t-44);
-    --gutter: 32px;
+    --gutter: max(32px, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
     --pad-block: 28px;
   }
 }
