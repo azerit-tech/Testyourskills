@@ -602,7 +602,7 @@ describe("image d'aperçu de l'accueil (/og/home.png)", () => {
     const ctx = setup({}, { indexHtml: async () => INDEX });
     const { id } = await generate(ctx);
     const html = await (await ctx.app.request(`/c/${id}`)).text();
-    expect(html).toContain(`<meta property="og:image" content="https://skills.test/og/${id}.png?v=9">`);
+    expect(html).toContain(`<meta property="og:image" content="https://skills.test/og/${id}.png?v=10">`);
     expect(html).not.toContain("home.png");
     expect(count(html, /property="og:image"/g)).toBe(1);
   });
@@ -1123,7 +1123,7 @@ describe("page /c/:id et images", () => {
     expect(overall).toBeGreaterThanOrEqual(75);
     expect(html).toContain(`<meta property="og:title" content="@leamd est dans le viseur ★★★★★☆, ${FIXTURES.gold.profile!.label.fr}">`);
     expect(html).toContain(`content="Fiche ★★★★★☆, ${overall}/100, fiche de dev de`);
-    expect(html).toContain(`<meta property="og:image" content="https://skills.test/og/${id}.png?v=9">`);
+    expect(html).toContain(`<meta property="og:image" content="https://skills.test/og/${id}.png?v=10">`);
     expect(html).toContain(`<meta property="og:url" content="https://skills.test/c/${id}">`);
     expect(html).toContain(`<meta property="og:image:width" content="1200">`);
     expect(html).toContain(`<meta name="twitter:card" content="summary_large_image">`);

@@ -144,8 +144,10 @@ describe("la composition", () => {
     // Chaque nombre avec son mot, l'accroche au premier rang, puis ce qui sépare de la bande de devant.
     expect(svg).toMatch(/>74<\/text><text[^>]*>ÉTOILES</);
     expect(svg).toMatch(/>31<\/text><text[^>]*>FICHES</);
-    expect(svg).toContain(">3E DES ÉCOLES<");
-    expect(svg).toContain(">À 6 étoiles de la 2e<");
+    // Le rang s'écrit « 3ᵉ », l'exposant à part, comme à l'écran (§18.52) : plus de « 3E ».
+    expect(svg).toMatch(/<tspan>3<\/tspan><tspan font-size="\d+" dy="-\d+">e<\/tspan><tspan dy="\d+"> DES ÉCOLES<\/tspan>/);
+    expect(svg).toMatch(/<tspan>À 6 étoiles de la 2<\/tspan><tspan font-size="\d+" dy="-\d+">e<\/tspan><\/text>/);
+    expect(svg).not.toContain("3E DES");
     expect(svg).not.toMatch(/rang [SABC]\b|tier/i);
   });
 });

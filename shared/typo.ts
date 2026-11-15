@@ -43,6 +43,23 @@ export function frTypoDeep<T>(value: T): T {
   return value;
 }
 
+/**
+ * Un texte découpé autour de ses ordinaux français (« 1er », « 3e ») : la marque
+ * à part, pour l'écrire en exposant, à l'écran comme sur les images (SPEC §18.52).
+ * Sans ordinal, un seul morceau.
+ */
+export function ordinalParts(text: string): { text: string; sup: boolean }[] {
+  const out: { text: string; sup: boolean }[] = [];
+  let last = 0;
+  for (const m of text.matchAll(/(?<![\p{L}\d])(\d+)(er|e)(?![\p{L}\d])/gu)) {
+    const cut = m.index + m[1]!.length;
+    out.push({ text: text.slice(last, cut), sup: false }, { text: m[2]!, sup: true });
+    last = m.index + m[0].length;
+  }
+  if (last < text.length || out.length === 0) out.push({ text: text.slice(last), sup: false });
+  return out;
+}
+
 /** Une table de faits bilingues (messages du serveur) : le français de chacun est repris. */
 export function typoFacts<T extends Record<string, { fr: string }>>(facts: T): T {
   const out: Record<string, { fr: string }> = {};

@@ -40,7 +40,11 @@ describe("l'image d'une prime", () => {
     expect(lot[1]!.size).toBe(lot[0]!.size);
     expect(Math.max(...all.filter((t) => t.text !== "J-12").map((t) => t.size))).toBe(lot[0]!.size);
     // La colonne de gauche, de haut en bas, sans écart de plus de 90 px entre deux lignes.
-    const column = [at("· PRIME, STAGE"), ...lot, at("ENTREPRISE DÉMO"), at("Backend, Full-stack"), at("À Ville Démo")];
+    // Le contrat en pastille, sur la ligne des postes, comme sur la carte et la page (§18.52).
+    expect(svg).toMatch(/<g data-tag=""><rect [^>]*rx="21" fill="none"[^>]*><\/rect><text [^>]*>STAGE<\/text><\/g>/);
+    expect(at("STAGE").y).toBeLessThan(at("Backend, Full-stack").y + 1);
+    expect(at("STAGE").y).toBeGreaterThan(at("Backend, Full-stack").y - 12);
+    const column = [at("· PRIME"), ...lot, at("ENTREPRISE DÉMO"), at("Backend, Full-stack"), at("À Ville Démo")];
     for (let i = 1; i < column.length; i++) {
       expect(column[i]!.y).toBeGreaterThan(column[i - 1]!.y);
       expect(column[i]!.y - column[i]!.size * 0.72 - column[i - 1]!.y).toBeLessThan(90);
@@ -77,6 +81,10 @@ describe("l'image d'une prime", () => {
     expect(await renderSvg({ format: "prime", prime: prime({}), logo: null, lang: "en" })).toContain(`>${IMAGE_WORDS.en.prime}:</text>`);
     const closed = await renderSvg({ format: "prime", prime: prime({ phase: "closed", daysLeft: null, interviews: 1 }), logo: null, lang: "fr" });
     expect(closed).toContain(`>${IMAGE_WORDS.fr.primeClosed} :</text>`);
+    // Close sans inscrit : pas de classement à voir, la fiche à faire.
+    const none = await renderSvg({ format: "prime", prime: prime({ phase: "closed", daysLeft: null, entrants: 0 }), logo: null, lang: "fr" });
+    expect(none).toContain(`>${IMAGE_WORDS.fr.home}`);
+    expect(none).not.toContain(IMAGE_WORDS.fr.primeClosed);
     expect(closed).toContain(">1 ENTRETIEN</text>");
     expect(closed).toContain(">ÉTAIT EN JEU</text>");
     expect(closed).toContain(">TERMINÉE</text>");

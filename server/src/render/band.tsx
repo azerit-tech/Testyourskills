@@ -14,8 +14,36 @@ import { fontAttrs } from "../../../shared/card/fonts";
 import { fit, fitLines, upper, wrap } from "../../../shared/card/text";
 import { PALETTE } from "../../../shared/card/themes";
 import type { Lang } from "../../../shared/types";
+import { ordinalParts } from "../../../shared/typo";
 import { BrandKicker, CtaPill, IMAGE_WORDS, Ink, SceneFrame, SKYLINE_FOCUS, STAR_PATH } from "./compositions";
 import { sceneFor } from "./scenes";
+
+/**
+ * Le contenu d'un texte de l'image dont les ordinaux (« 2e ») s'écrivent en
+ * exposant, comme à l'écran : « 2ᵉ DES BOÎTES », jamais « 2E » (SPEC §18.52).
+ * `caps` : le reste en capitales. Sans ordinal, le texte seul.
+ */
+export function OrdinalText({ text, size, caps, lang }: { text: string; size: number; caps: boolean; lang: Lang }) {
+  const parts = ordinalParts(text);
+  const cased = (s: string) => (caps ? upper(s, lang) : s);
+  if (parts.length === 1) return <>{cased(text)}</>;
+  const rise = Math.round(size * 0.38);
+  return (
+    <>
+      {parts.map((p, i) =>
+        p.sup ? (
+          <tspan key={i} fontSize={Math.round(size * 0.5)} dy={-rise}>
+            {p.text}
+          </tspan>
+        ) : (
+          <tspan key={i} dy={i > 0 ? rise : undefined}>
+            {cased(p.text)}
+          </tspan>
+        ),
+      )}
+    </>
+  );
+}
 
 const LEAGUE: Record<Lang, Record<BandStanding["type"], { kicker: string; of: string }>> = {
   fr: { ecole: { kicker: "Bande d’école", of: "des écoles" }, boite: { kicker: "Bande de boîte", of: "des boîtes" } },
@@ -164,19 +192,27 @@ export function BandOg({ band, lang }: { band: BandStanding; lang: Lang }) {
   const one = fit(name, { font: "display-700", size: 140, minSize: 84, maxWidth: maxW, letterSpacing: 0.5 });
   const lines = one.text === name ? { lines: [one.text], size: one.size } : fitLines(name, { font: "display-700", size: 84, minSize: 48, maxWidth: maxW, letterSpacing: 0.5 });
   const step = Math.round(lines.size * 0.96);
-  const nameY = 100 + Math.round(lines.size * 0.72);
-  const nameBottom = nameY + (lines.lines.length - 1) * step;
 
   // L'accroche, au premier rang après le nom, puis ce qui sépare la bande de celle de devant.
   const said = bandHook(band, lang);
   const hook = fit(upper(said.head, lang), { font: "display-800", size: lines.lines.length > 1 ? 88 : 104, minSize: 52, maxWidth: maxW, letterSpacing: 0.5 });
-  const hookY = nameBottom + 36 + Math.round(hook.size * 0.72);
   const sub = said.sub ? fit(said.sub, { font: "sans-600", size: 40, minSize: 28, maxWidth: maxW }) : null;
-
-  // Au-dessus de l'appel : ce que la bande rapporte à qui voit l'image.
+  // Puis ce que la bande rapporte à qui voit l'image.
   const pillSize = 30;
   const yours = wrap(WORDS[lang].yours(band.label), "sans-500", 30, maxW, 2);
-  const yoursLast = bottom - Math.round(pillSize * 1.95) - 34;
+
+  // La colonne de gauche d'un seul bloc (nom, accroche, écart, ce que la bande rapporte),
+  // centrée entre le surtitre et l'appel : plus de vide sous la phrase.
+  const top0 = 100;
+  const nameY0 = top0 + Math.round(lines.size * 0.72);
+  const hookY0 = nameY0 + (lines.lines.length - 1) * step + 36 + Math.round(hook.size * 0.72);
+  const yoursY0 = (sub ? hookY0 + 54 : hookY0) + (sub ? 62 : 72);
+  const blockH = yoursY0 + (yours.length - 1) * 40 + 8 - top0;
+  const room = bottom - Math.round(pillSize * 1.95) - 30 - top0;
+  const dy = Math.max(0, Math.round((room - blockH) / 2));
+  const nameY = nameY0 + dy;
+  const hookY = hookY0 + dy;
+  const yoursY = yoursY0 + dy;
 
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
@@ -189,15 +225,15 @@ export function BandOg({ band, lang }: { band: BandStanding; lang: Lang }) {
         </text>
       ))}
       <text x={x - 1} y={hookY} {...fontAttrs("display-800")} fontSize={hook.size} letterSpacing={0.5} fill={PALETTE.peach}>
-        {hook.text}
+        <OrdinalText text={hook.text === upper(said.head, lang) ? said.head : hook.text} size={hook.size} caps lang={lang} />
       </text>
       {sub && (
         <text x={x} y={hookY + 54} {...fontAttrs("sans-600")} fontSize={sub.size} fill={PALETTE.cream}>
-          {sub.text}
+          <OrdinalText text={sub.text} size={sub.size} caps={false} lang={lang} />
         </text>
       )}
       {yours.map((l, i) => (
-        <text key={i} x={x} y={yoursLast - (yours.length - 1 - i) * 40} {...fontAttrs("sans-500")} fontSize={30} fill={PALETTE.lilac}>
+        <text key={i} x={x} y={yoursY + i * 40} {...fontAttrs("sans-500")} fontSize={30} fill={PALETTE.lilac}>
           {l}
         </text>
       ))}

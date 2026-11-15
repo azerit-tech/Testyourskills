@@ -3,6 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { BandStanding } from "../../../shared/bands";
+import { measure } from "../../../shared/card/text";
 import { bandHook, bandRankLine } from "./band";
 import { IMAGE_WORDS } from "./compositions";
 import { renderImage, renderSvg } from "./index";
@@ -12,10 +13,12 @@ const second = band({ type: "boite", label: "Boîte Démo", score: 47, members: 
 const forming = band({ score: 5, members: 1, rank: null, missing: 2 });
 const empty = band({ score: 0, members: 0, rank: null, missing: 3 });
 
-/** Le corps et l'ordonnée d'un texte de l'image. */
+/** Le corps et l'ordonnée d'un texte de l'image (ses morceaux en exposant recollés). */
 function textOf(svg: string, text: string) {
-  const m = new RegExp(`<text x="[\\d.]+" y="([\\d.]+)"[^>]*font-size="([\\d.]+)"[^>]*>${text}</text>`).exec(svg);
-  return m ? { y: Number(m[1]), size: Number(m[2]) } : null;
+  for (const m of svg.matchAll(/<text x="[\d.]+" y="([\d.]+)"[^>]*font-size="([\d.]+)"[^>]*>(.*?)<\/text>/g)) {
+    if (m[3]!.replace(/<[^>]+>/g, "") === text) return { y: Number(m[1]), size: Number(m[2]) };
+  }
+  return null;
 }
 
 describe("l'accroche d'une bande", () => {
@@ -40,12 +43,14 @@ describe("l'image d'une bande", () => {
     const svg = await renderSvg({ format: "band", band: second, lang: "fr" });
     expect(svg).toMatch(/^<svg[^>]*viewBox="0 0 1200 630"/);
     const name = textOf(svg, "BOÎTE DÉMO")!;
-    const hook = textOf(svg, "2E DES BOÎTES")!;
+    // Le rang : « 2ᵉ », la marque en exposant, jamais « 2E » (§18.52).
+    const hook = textOf(svg, "2e DES BOÎTES")!;
     const sub = textOf(svg, "À 5 étoiles de la tête")!;
     // L'accroche : juste sous le nom, 80 px au moins (24 px dans une vignette de 360 px de large).
     expect(hook.y).toBeGreaterThan(name.y);
     expect(hook.size).toBeGreaterThanOrEqual(80);
-    expect(svg).toMatch(/fill="#ffd3a5">2E DES BOÎTES</);
+    expect(svg).toMatch(/fill="#ffd3a5"><tspan>2<\/tspan><tspan font-size="\d+" dy="-\d+">e<\/tspan>/);
+    expect(svg).not.toContain("2E DES");
     expect(sub.y).toBeGreaterThan(hook.y);
     expect(sub.size).toBeGreaterThanOrEqual(36);
     // Plus de nombre nu : « 47 étoiles », « 10 fiches ».
@@ -67,6 +72,25 @@ describe("l'image d'une bande", () => {
     expect(en).toContain(">#2 AMONG COMPANIES</text>");
     expect(en).toMatch(/>47<\/text><text[^>]*>STARS</);
     expect(en).toMatch(/>10<\/text><text[^>]*>SHEETS</);
+  });
+
+  it("la colonne de gauche d'un bloc, centrée au-dessus de l'appel : pas de vide sous la phrase", async () => {
+    for (const b of [second, band({})]) {
+      const svg = await renderSvg({ format: "band", band: b, lang: "fr" });
+      const name = textOf(svg, b.label.toUpperCase())!;
+      const yours = textOf(svg, `Tes étoiles comptent pour ${b.label}.`)!;
+      const pillTop = Number(/<g data-cta=""><rect x="64" y="(\d+)"/.exec(svg)![1]);
+      const above = name.y - name.size * 0.72 - 76;
+      const below = pillTop - yours.y;
+      expect(Math.abs(above - below)).toBeLessThan(40);
+    }
+    // L'adresse suit l'appel d'une seule espace (environ 0,25 de son corps), plus d'une double.
+    const svg = await renderSvg({ format: "band", band: second, lang: "fr" });
+    const m = /<g data-cta="">.*?<text x="([\d.]+)"[^>]*font-size="([\d.]+)"[^>]*>([^<]+)<\/text><text x="([\d.]+)"/.exec(svg)!;
+    const size = Number(m[2]);
+    const gap = Number(m[4]) - Number(m[1]) - measure(m[3]!, "sans-600", size) / 1.03;
+    expect(gap).toBeGreaterThan(size * 0.15);
+    expect(gap).toBeLessThan(size * 0.35);
   });
 
   it("en formation : trois places, pleines ou libres, et ce qui manque", async () => {

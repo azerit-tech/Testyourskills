@@ -1,7 +1,7 @@
 // La typographie française des textes du site (shared/typo.ts).
 
 import { describe, expect, it } from "vitest";
-import { frTypo, frTypoDeep, NBSP, typoFact, typoFacts } from "./typo";
+import { frTypo, frTypoDeep, NBSP, ordinalParts, typoFact, typoFacts } from "./typo";
 
 const N = NBSP;
 
@@ -60,5 +60,22 @@ describe("les messages bilingues du serveur", () => {
   it("seul le français est repris", () => {
     expect(typoFact({ fr: "Trop long : 5 Mo max.", en: "Too long: 5 MB max." })).toEqual({ fr: `Trop long${N}: 5${N}Mo max.`, en: "Too long: 5 MB max." });
     expect(typoFacts({ a: { fr: "Quoi ?", en: "What?" } }).a).toEqual({ fr: `Quoi${N}?`, en: "What?" });
+  });
+});
+
+describe("les ordinaux en exposant (§18.52)", () => {
+  it("« 3e », « 1er » : la marque à part ; le reste intact", () => {
+    expect(ordinalParts("3e des écoles, à 6 étoiles de la 2e")).toEqual([
+      { text: "3", sup: false },
+      { text: "e", sup: true },
+      { text: " des écoles, à 6 étoiles de la 2", sup: false },
+      { text: "e", sup: true },
+    ]);
+    expect(ordinalParts("Du 1er novembre")).toEqual([
+      { text: "Du 1", sup: false },
+      { text: "er", sup: true },
+      { text: " novembre", sup: false },
+    ]);
+    for (const plain of ["J-12", "n° 1 des écoles", "#2 among companies", "3 entretiens", "2emploi", ""]) expect(ordinalParts(plain)).toEqual([{ text: plain, sup: false }]);
   });
 });

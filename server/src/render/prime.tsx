@@ -1,10 +1,11 @@
 // L'image de partage d'une prime (§18.4), 1200 × 630, dans la langue des aperçus
 // de bande (band.tsx) : l'encre plate ; à gauche, dans l'ordre où on le lit à
-// 360 px de large : le contrat, puis le lot au premier rang (« 3 entretiens à la
-// clé », sur deux lignes), l'entreprise (son logo s'il existe, sinon son nom, en
-// pêche), les postes, le lieu, et l'appel « Entre dans la course » (« Voir le
-// classement » une fois terminée). En haut, la marque signe le surtitre
-// (« AZERIT · PRIME, STAGE »). À droite, le décor de l'heure dorée (celui de la
+// 360 px de large, la hiérarchie de la carte et de la page d'une prime : le lot
+// au premier rang (« 3 entretiens à la clé », sur deux lignes), l'entreprise (son
+// logo s'il existe, sinon son nom, en pêche), le contrat en pastille devant les
+// postes, le lieu, le tout centré au-dessus de l'appel « Entre dans la course »
+// (une fois terminée, « Voir le classement », ou « Fais ta fiche » sans inscrit).
+// En haut, la marque signe le surtitre (« AZERIT · PRIME »). À droite, le décor de l'heure dorée (celui de la
 // machine à livrer, dans le pêche de la saison : il ne se confond pas avec la
 // ville des bandes), et dessous l'échéance en grand dans sa tuile pêche (en
 // contour une fois terminée).
@@ -14,7 +15,7 @@ import type { PrimeView } from "../../../shared/primes";
 import type { Contract } from "../../../shared/season";
 import { fontAttrs } from "../../../shared/card/fonts";
 import { STRINGS } from "../../../shared/card/i18n";
-import { fit, fitLines, upper, wrap } from "../../../shared/card/text";
+import { fit, fitLines, measure, upper, wrap } from "../../../shared/card/text";
 import { PALETTE } from "../../../shared/card/themes";
 import type { Lang } from "../../../shared/types";
 import { BrandKicker, CtaPill, IMAGE_WORDS, Ink, SceneFrame } from "./compositions";
@@ -23,7 +24,9 @@ import { sceneFor } from "./scenes";
 const WORDS: Record<
   Lang,
   {
-    kicker: Record<Contract, string>;
+    kicker: string;
+    /** Le contrat, en pastille devant les postes. */
+    contract: Record<Contract, string>;
     /** Le lot, en deux lignes : « 3 entretiens », « à la clé » ; une fois la prime close, « étaient en jeu ». */
     interviews: (k: number, over: boolean) => [string, string];
     remote: string;
@@ -37,7 +40,8 @@ const WORDS: Record<
   }
 > = {
   fr: {
-    kicker: { stage: "Prime, stage", alternance: "Prime, alternance", cdi: "Prime, CDI" },
+    kicker: "Prime",
+    contract: { stage: "Stage", alternance: "Alternance", cdi: "CDI" },
     interviews: (k, over) => [`${k} ${k > 1 ? "entretiens" : "entretien"}`, over ? (k > 1 ? "étaient en jeu" : "était en jeu") : "à la clé"],
     remote: "Télétravail possible",
     onSite: (p) => `À ${p}`,
@@ -48,7 +52,8 @@ const WORDS: Record<
     tile: { left: (k) => `J-${k}`, toEnter: "pour entrer dans la course", over: "La course est finie", opening: "Ouverture de la course" },
   },
   en: {
-    kicker: { stage: "Bounty, internship", alternance: "Bounty, apprenticeship", cdi: "Bounty, full-time" },
+    kicker: "Bounty",
+    contract: { stage: "Internship", alternance: "Apprenticeship", cdi: "Full-time" },
     interviews: (k, over) => [`${k} ${k > 1 ? "interviews" : "interview"}`, over ? (k > 1 ? "were at stake" : "was at stake") : "up for grabs"],
     remote: "Remote possible",
     onSite: (p) => `In ${p}`,
@@ -114,13 +119,19 @@ export function PrimeOg({ prime, logo, lang }: { prime: PrimeView; logo: PrimeLo
   const w = WORDS[lang];
   const open = prime.phase === "open";
 
-  const kicker = upper(w.kicker[prime.contract], lang);
+  const kicker = upper(w.kicker, lang);
+
+  // Le contrat en pastille, en tête de la ligne des postes, comme sur la carte et la page d'une prime.
+  const tag = upper(w.contract[prime.contract], lang);
+  const tagSize = 24;
+  const tagW = Math.round(measure(tag, "sans-600", tagSize, 1.5) + 2 * 16);
+  const jobsX = x + tagW + 16;
 
   // L'entreprise en lettres (sans logo) : son nom sur une ou deux lignes. Les postes : une ou deux lignes.
   const name = upper(prime.company, lang);
   const one = fit(name, { font: "display-700", size: 62, minSize: 44, maxWidth: maxW, letterSpacing: 0.5 });
   const lines = one.text === name ? { lines: [one.text], size: one.size } : fitLines(name, { font: "display-700", size: 48, minSize: 36, maxWidth: maxW, letterSpacing: 0.5 });
-  const jobs = wrap(primeJobs(prime, lang), "sans-600", 36, maxW, 2);
+  const jobs = wrap(primeJobs(prime, lang), "sans-600", 36, maxW - (jobsX - x), 2);
 
   // Le lot, au premier rang : deux lignes à la même taille, celle que la plus longue permet.
   // Un logo ou un nom sur deux lignes, des postes sur deux lignes : le lot leur rend de la hauteur.
@@ -128,7 +139,14 @@ export function PrimeOg({ prime, logo, lang }: { prime: PrimeView; logo: PrimeLo
   const lot = w.interviews(prime.interviews, prime.phase === "closed").map((l) => upper(l, lang));
   const lotSize = Math.min(...lot.map((l) => fit(l, { font: "display-800", size: [118, 100, 84][tall]!, minSize: 72, maxWidth: maxW, letterSpacing: 0.5 }).size));
   const lotStep = Math.round(lotSize * 0.92);
-  const lotY = 98 + Math.round(lotSize * 0.72);
+
+  // La colonne de gauche d'un seul bloc (lot, entreprise, postes, lieu), centrée entre le
+  // surtitre et l'appel : plus de vide sous le lieu. Sa hauteur d'abord, sa place ensuite.
+  const where = prime.place ? `${w.onSite(prime.place)}${prime.remote ? `, ${w.remote.charAt(0).toLowerCase()}${w.remote.slice(1)}` : ""}` : prime.remote ? w.remote : "";
+  const headH = logo ? 30 + Math.round(logo.height * Math.min(420 / logo.width, 84 / logo.height)) : 32 + Math.round(lines.size * 0.72) + (lines.lines.length - 1) * Math.round(lines.size * 0.98);
+  const columnH = Math.round(lotSize * 0.72) + lotStep + headH + 54 + (jobs.length - 1) * 44 + (where ? 44 : 0) + 8;
+  const room = bottom - Math.round(30 * 1.95) - 30 - 98;
+  const lotY = 98 + Math.max(0, Math.round((room - columnH) / 2)) + Math.round(lotSize * 0.72);
   let y = lotY + lotStep;
 
   // L'entreprise : son logo, tenu dans 420 × 84, ou son nom.
@@ -155,8 +173,7 @@ export function PrimeOg({ prime, logo, lang }: { prime: PrimeView; logo: PrimeLo
   }
 
   const jobsY = y + 54;
-  // « À Ville Démo, télétravail possible » : la seconde moitié sans majuscule.
-  const where = prime.place ? `${w.onSite(prime.place)}${prime.remote ? `, ${w.remote.charAt(0).toLowerCase()}${w.remote.slice(1)}` : ""}` : prime.remote ? w.remote : "";
+  // « À Ville Démo, télétravail possible » : la seconde moitié sans majuscule (plus haut).
   const whereFit = where ? fit(where, { font: "sans-500", size: 30, minSize: 24, maxWidth: maxW }) : null;
   const whereY = jobsY + (jobs.length - 1) * 44 + 44;
 
@@ -182,8 +199,14 @@ export function PrimeOg({ prime, logo, lang }: { prime: PrimeView; logo: PrimeLo
         </text>
       ))}
       {head}
+      <g data-tag="">
+        <rect x={x + 1} y={jobsY - 13 - 22 + 1} width={tagW - 2} height={42} rx={21} fill="none" stroke={PALETTE.lilac} strokeOpacity={0.55} strokeWidth={2} />
+        <text x={x + 16} y={jobsY - 5} {...fontAttrs("sans-600")} fontSize={tagSize} letterSpacing={1.5} fill={PALETTE.lilac}>
+          {tag}
+        </text>
+      </g>
       {jobs.map((l, i) => (
-        <text key={i} x={x} y={jobsY + i * 44} {...fontAttrs("sans-600")} fontSize={36} fill={PALETTE.cream}>
+        <text key={i} x={jobsX} y={jobsY + i * 44} {...fontAttrs("sans-600")} fontSize={36} fill={PALETTE.cream}>
           {l}
         </text>
       ))}
@@ -192,7 +215,8 @@ export function PrimeOg({ prime, logo, lang }: { prime: PrimeView; logo: PrimeLo
           {whereFit.text}
         </text>
       )}
-      <CtaPill x={x} bottom={bottom} label={prime.phase === "closed" ? IMAGE_WORDS[lang].primeClosed : IMAGE_WORDS[lang].prime} lang={lang} size={30} maxW={maxW} />
+      {/* close : son classement s'il en a un, sinon la fiche à faire (la page n'a plus que ça à offrir) */}
+      <CtaPill x={x} bottom={bottom} label={prime.phase !== "closed" ? IMAGE_WORDS[lang].prime : prime.entrants > 0 ? IMAGE_WORDS[lang].primeClosed : IMAGE_WORDS[lang].home} lang={lang} size={30} maxW={maxW} />
       {open ? (
         <rect x={tile.x} y={tile.y} width={tile.w} height={tile.h} rx={14} fill={PALETTE.peach} />
       ) : (

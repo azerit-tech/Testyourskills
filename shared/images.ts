@@ -24,8 +24,11 @@
 // « 79/100 » ; la marque signe les images de bande et de prime, la prime a son décor doré et
 // dit « Terminée » ; le titre de l'accueil en lilas puis crème ; le portrait pose « Avis de
 // recherche » sur sa plaque, comme la story.
+// v10 (15 novembre 2026) : la prime prend la hiérarchie de sa carte (le lot, l'entreprise, le
+// contrat en pastille devant les postes) ; bande et prime centrent leur colonne de gauche au-dessus
+// de l'appel ; un rang s'écrit « 2ᵉ » ; l'appel n'a plus de double espace après ses deux-points.
 
-export const IMAGE_DESIGN = 9;
+export const IMAGE_DESIGN = 10;
 
 /** Dossier du cache disque, sous og/. */
 export const IMAGE_DESIGN_DIR = `v${IMAGE_DESIGN}`;

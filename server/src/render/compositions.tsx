@@ -407,9 +407,11 @@ export function OgImage({ card, lang, avatars, scene }: { card: CardData; lang: 
 export function CtaPill({ x, bottom, label, lang, size, maxW, anchor = "start" }: { x: number; bottom: number; label: string; lang: Lang; size: number; maxW: number; anchor?: "start" | "middle" }) {
   const call = lang === "fr" ? `${label}\u00a0:` : `${label}:`;
   const host = ctaHost();
+  // L'adresse suit l'appel d'une seule espace : la mesure de l'appel, sans sa marge de
+  // sécurité de 3 % (shared/card/text.ts), sinon l'écart se lit comme une double espace.
   const widthAt = (s: number) => {
-    const callW = measure(call, "sans-600", s);
-    return { callW, total: s * 0.85 * 2 + callW + s * 0.3 + measure(host, "sans-700", s) };
+    const callW = measure(call, "sans-600", s) / 1.03;
+    return { callW, total: s * 0.85 * 2 + callW + s * 0.25 + measure(host, "sans-700", s) };
   };
   let s = size;
   while (widthAt(s).total > maxW && s > 16) s -= 0.5;
@@ -424,7 +426,7 @@ export function CtaPill({ x, bottom, label, lang, size, maxW, anchor = "start" }
       <text x={+(x0 + s * 0.85).toFixed(1)} y={+base.toFixed(1)} {...fontAttrs("sans-600")} fontSize={s} fill={PALETTE.ink0}>
         {call}
       </text>
-      <text x={+(x0 + s * 0.85 + callW + s * 0.3).toFixed(1)} y={+base.toFixed(1)} {...fontAttrs("sans-700")} fontSize={s} fill={PALETTE.ink0}>
+      <text x={+(x0 + s * 0.85 + callW + s * 0.25).toFixed(1)} y={+base.toFixed(1)} {...fontAttrs("sans-700")} fontSize={s} fill={PALETTE.ink0}>
         {host}
       </text>
     </g>
