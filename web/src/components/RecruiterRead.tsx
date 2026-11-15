@@ -70,7 +70,7 @@ export function RecruiterRead({ item, shared, who }: Props) {
   const detail = chosen ? rowText(chosen, { g: t.grid, pick: (f) => pick(f, lang), declared, shared }).line : "";
 
   const isCase = item.kind === "comparison";
-  const src = pieceLabel(declared);
+  const src = pieceLabel(declared, lang);
   /** La provenance d'une tuile notée d'un dossier, null sinon. */
   const fromOf = (c: GridCriterion): string | null =>
     !isCase || c.private || c.score === null ? null : c.source === "both" ? R.fromBoth(src) : c.source === "github" ? pieceLabel("github") : src;

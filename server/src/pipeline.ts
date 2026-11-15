@@ -167,7 +167,7 @@ export const MESSAGES: Record<MessageKey, Fact> = typoFacts({
   },
   cv_unreadable: {
     fr: "On n'a pas réussi à lire ce CV pour l'instant. Réessaie dans un instant.",
-    en: "We couldn't read this CV right now. Try again in a moment.",
+    en: "We couldn't read this résumé right now. Try again in a moment.",
   },
   not_found: {
     fr: "Fiche introuvable : elle a expiré ou a été supprimée.",
@@ -176,19 +176,19 @@ export const MESSAGES: Record<MessageKey, Fact> = typoFacts({
   /* La sortie n'est jamais GitHub seul : qui n'a pas de GitHub garde son CV. */
   linkedin: {
     fr: "LinkedIn ne répond pas pour l'instant. Passe par ton GitHub ou ton CV, ou réessaie dans un moment.",
-    en: "LinkedIn isn't answering right now. Use your GitHub or your CV, or try again in a moment.",
+    en: "LinkedIn isn't answering right now. Use your GitHub or your résumé, or try again in a moment.",
   },
   linkedin_off: {
     fr: "LinkedIn ne répond pas pour l'instant. Passe par ton GitHub ou ton CV, ou réessaie dans un moment.",
-    en: "LinkedIn isn't answering right now. Use your GitHub or your CV, or try again in a moment.",
+    en: "LinkedIn isn't answering right now. Use your GitHub or your résumé, or try again in a moment.",
   },
   linkedin_busy: {
     fr: "LinkedIn est fermé pour aujourd'hui. Passe par ton GitHub ou ton CV, ou reviens demain.",
-    en: "LinkedIn is closed for today. Use your GitHub or your CV, or come back tomorrow.",
+    en: "LinkedIn is closed for today. Use your GitHub or your résumé, or come back tomorrow.",
   },
   linkedin_not_found: {
     fr: "Profil LinkedIn introuvable (privé ou trop récent). Vérifie le lien, ou passe par ton GitHub ou ton CV.",
-    en: "LinkedIn profile not found (private or too new). Check the link, or use your GitHub or your CV.",
+    en: "LinkedIn profile not found (private or too new). Check the link, or use your GitHub or your résumé.",
   },
   linkedin_bad_url: {
     fr: "Ce lien n'est pas un profil LinkedIn (linkedin.com/in/…).",

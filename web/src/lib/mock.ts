@@ -174,7 +174,7 @@ const CV_FACTS: Record<StatCode, { fr: string; en: string }[]> = {
   ARCH: [{ fr: "1 mention concrète de tests, CI ou revue de code.", en: "1 concrete mention of tests, CI or code review." }],
   DOC: [
     { fr: "Qualité d'écriture jugée 3 sur 5.", en: "Writing quality rated 3/5." },
-    { fr: "CV de 1 340 mots, au-delà des 1 200 qui se lisent.", en: "1,340-word CV, past the 1,200 that get read." },
+    { fr: "CV de 1 340 mots, au-delà des 1 200 qui se lisent.", en: "1,340-word résumé, past the 1,200 that get read." },
   ],
   XP: [{ fr: "11 ans d'expérience déclarés.", en: "11 years of experience claimed." }],
   BUZZ: [

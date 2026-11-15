@@ -172,7 +172,7 @@ export function scoreCv(
     value: clampScore(scoreOn(C.DOC.scale, r.writing_quality) - (long ? C.DOC.longCvPenalty : 0)),
     sufficient: enoughText,
     facts: [
-      fact(`Structure et clarté du CV : ${r.writing_quality}/5`, `CV structure and clarity: ${r.writing_quality}/5`),
+      fact(`Structure et clarté du CV : ${r.writing_quality}/5`, `Résumé structure and clarity: ${r.writing_quality}/5`),
       fact(
         `${nf(counts.words, "fr")} mots sur ${counts.pages} page${counts.pages > 1 ? "s" : ""}${long ? `, au-delà de ${nf(C.DOC.longCvWords, "fr")} mots : note réduite` : ""}`,
         `${nf(counts.words, "en")} words over ${counts.pages} page${counts.pages === 1 ? "" : "s"}${long ? `, over ${nf(C.DOC.longCvWords, "en")} words: score reduced` : ""}`,
@@ -212,7 +212,7 @@ export function scoreCv(
   const statuses = composeStatuses(candidates);
 
   const name =
-    r.full_name?.trim() || opts.github?.profile.name?.trim() || opts.github?.login || (opts.lang === "fr" ? "CV anonyme" : "Anonymous CV");
+    r.full_name?.trim() || opts.github?.profile.name?.trim() || opts.github?.login || (opts.lang === "fr" ? "CV anonyme" : "Anonymous résumé");
   const special = specialOf(values, false);
   const club = currentRole(r)?.company?.trim() || null;
   // L'école lue, ramenée à la liste des bandes (§18.38) : privée, absente de la vue publique.

@@ -171,7 +171,7 @@ export function shareInput(item: Shareable, lang: Lang, rank: string | null): Sh
     secs: c.judgedInSeconds,
     rank,
     plea,
-    ...(item.kind === "comparison" ? { exhibits: declaredLabel(item.comparison) } : {}),
+    ...(item.kind === "comparison" ? { exhibits: declaredLabel(item.comparison, lang) } : {}),
   };
 }
 

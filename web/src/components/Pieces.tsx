@@ -8,12 +8,12 @@ import type { ComparisonData } from "../../../shared/types";
 import { useT } from "../i18n";
 
 export function Pieces({ cmp }: { cmp: ComparisonData }) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const p = t.result.pieces;
   const unproven = cmp.github.grid?.rule === "empty_file" || !!cmp.github.sealed;
   return (
     <div className="pieces">
-      <p className="pieces-line">{p.line(p.pair(declaredLabel(cmp), "GitHub"))}</p>
+      <p className="pieces-line">{p.line(p.pair(declaredLabel(cmp, lang), "GitHub"))}</p>
       {unproven && <p className="pieces-note">{p.unproven}</p>}
       {cmp.linkUnproven && <p className="pieces-note">{p.link}</p>}
     </div>

@@ -481,7 +481,7 @@ describe("entrée LinkedIn (le champ unique)", () => {
     expect(r).toMatchObject({ status: 400, json: { code: "linkedin" } });
     // La sortie n'est jamais GitHub seul : qui n'a pas de GitHub garde son CV.
     expect(r.json.message?.fr).toBe("LinkedIn ne répond pas pour l'instant. Passe par ton GitHub ou ton CV, ou réessaie dans un moment.");
-    expect((r.json.message as { en?: string } | undefined)?.en).toBe("LinkedIn isn't answering right now. Use your GitHub or your CV, or try again in a moment.");
+    expect((r.json.message as { en?: string } | undefined)?.en).toBe("LinkedIn isn't answering right now. Use your GitHub or your résumé, or try again in a moment.");
     const both = await post(ctx, { login: "camille-ardent", linkedin: URL_ });
     expect(await state(ctx, both.json.id)).toMatchObject({ state: "done", kind: "card", card: { source: "github" } });
   });

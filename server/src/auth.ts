@@ -302,7 +302,7 @@ export function mountAuth(app: Hono, o: AuthRoutesOptions) {
     const row = ID_RE.test(id) ? o.store.getCard(id) : null;
     if (!row) return c.json({ ok: false, message: { fr: "Fiche introuvable.", en: "Sheet not found." } }, 404);
     if (!o.store.loginOf(row)) {
-      return c.json({ ok: false, message: { fr: "Une fiche CV seule ne se revendique pas par GitHub.", en: "A CV-only sheet can't be claimed with GitHub." } }, 400);
+      return c.json({ ok: false, message: { fr: "Une fiche CV seule ne se revendique pas par GitHub.", en: "A résumé-only sheet can't be claimed with GitHub." } }, 400);
     }
     // Retour demandé s'il est sûr, sinon la fiche elle-même : jamais de redirection ouverte.
     const returnPath = safeReturnPath(c.req.query("return")) ?? `/c/${id}`;

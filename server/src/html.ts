@@ -61,7 +61,8 @@ export function metaFor(data: CardData | ComparisonData, baseUrl: string): PageM
   // (shared/caseFile.ts), une seule note ; la description dit ses deux sources.
   if (isComparison(data)) {
     const file = fileOf(data);
-    return cardMeta({ ...file, lang: data.cv.lang ?? data.github.lang ?? file.lang }, baseUrl, declaredLabel(data));
+    const lang = data.cv.lang ?? data.github.lang ?? file.lang;
+    return cardMeta({ ...file, lang }, baseUrl, declaredLabel(data, lang ?? "fr"));
   }
   return cardMeta(data, baseUrl);
 }

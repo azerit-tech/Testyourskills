@@ -107,8 +107,8 @@
     },
     {
       "id": "cv_longer_than_readmes", "source": "cv", "tone": "gap", "rule": "cv_longer_than_readmes", "params": {}, "retired": true,
-      "label": { "fr": "CV plus long que ses README", "en": "CV longer than their READMEs" },
-      "ruleText": { "fr": "{n} mots de CV contre {m} mots de README sur les repos actifs.", "en": "{n} words of CV against {m} words of README across active repos." }
+      "label": { "fr": "CV plus long que ses README", "en": "Résumé longer than their READMEs" },
+      "ruleText": { "fr": "{n} mots de CV contre {m} mots de README sur les repos actifs.", "en": "{n} words of résumé against {m} words of README across active repos." }
     },
     {
       "id": "cv_buzzwords", "source": "cv", "tone": "negative", "rule": "buzz_density", "params": { "per100AtLeast": 3 },

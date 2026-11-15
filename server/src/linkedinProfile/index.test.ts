@@ -9,6 +9,7 @@ import { LinkedinCache } from "./store";
 import { profileToText, asLinkedinCard } from "./text";
 import { linkedinFromGithub } from "./url";
 import { linkedinFindings } from "./findings";
+import { linkedinFact } from "../../../shared/linkedinText";
 
 const NOW = Date.parse("2026-11-09T12:00:00Z");
 const DAY = 24 * 3600 * 1000;
@@ -319,5 +320,17 @@ describe("profil → texte, et « CV » devient « LinkedIn »", () => {
     expect(card.stats[0]!.facts[0]).toEqual({ fr: "Ton LinkedIn cite React", en: "Your LinkedIn lists React" });
     expect(card.statuses[0]!.label.fr).toBe("LinkedIn gonflé");
     expect(card.statuses[0]!.rule.en).toBe("The LinkedIn profile promises more");
+  });
+
+  it("en anglais, “résumé” devient « LinkedIn » comme « CV » (§18.51)", () => {
+    const en = (s: string) => linkedinFact({ fr: "", en: s }).en;
+    expect(en("Bail: strike “synergy” from the résumé")).toBe("Bail: strike “synergy” from LinkedIn");
+    expect(en("Bail: a five-tech résumé")).toBe("Bail: a five-tech LinkedIn profile");
+    expect(en("The résumé promises more")).toBe("The LinkedIn profile promises more");
+    expect(en("Résumé longer than their READMEs")).toBe("LinkedIn longer than their READMEs");
+    expect(en("{n} words of résumé against {m} words of README")).toBe("{n} words of LinkedIn against {m} words of README");
+    expect(en("Résumé structure and clarity: 4/5")).toBe("LinkedIn structure and clarity: 4/5");
+    // Un mot qui contient « résumé » sans l'être reste tel quel.
+    expect(en("résuméd")).toBe("résuméd");
   });
 });

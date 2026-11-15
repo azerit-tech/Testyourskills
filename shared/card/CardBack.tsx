@@ -153,8 +153,8 @@ export interface BackCriterion {
 }
 
 /** D'où vient une pièce. La fiche d'un dossier dit ses pièces (`pieces`) ; une fiche seule, sa source déclarée. */
-const sourceLabel = (card: Pick<CardData, "declaredSource" | "pieces">, source: GridSource): string => {
-  const declared = pieceLabel(card.pieces?.find((p) => p !== "github") ?? declaredOf(card));
+const sourceLabel = (card: Pick<CardData, "declaredSource" | "pieces">, source: GridSource, lang: Lang): string => {
+  const declared = pieceLabel(card.pieces?.find((p) => p !== "github") ?? declaredOf(card), lang);
   return source === "github" ? "GitHub" : source === "both" ? `${declared} + GitHub` : declared;
 };
 
@@ -204,7 +204,7 @@ export function backCriteria(card: Pick<CardData, "grid" | "declaredSource" | "p
     .map((c) => {
       const why = excludedWhy(c);
       const evSource = c.evidence?.source ?? c.source;
-      const src = sourceLabel(card, evSource);
+      const src = sourceLabel(card, evSource, lang);
       const pick = (f: { fr: string; en: string } | undefined) => (f ? (f[lang] ?? f.fr).trim() : "");
       // L'école (§18.52) : « comptée » ou « hors moyenne », jamais un chiffre, la même ligne pour tout le monde.
       const school = schoolState(c);

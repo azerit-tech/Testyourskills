@@ -228,7 +228,7 @@ export function ExampleCard({ card, href, pieces }: Showcase) {
         <a href={href} onClick={(e) => onLinkClick(e, href)}>
           {t.home.exampleCaption}
         </a>
-        {pieces && pieces.length > 1 && <>, {t.home.exampleFrom(pieces.map(pieceLabel).reduce((a, b) => t.result.pieces.pair(a, b)))}</>}
+        {pieces && pieces.length > 1 && <>, {t.home.exampleFrom(pieces.map((p) => pieceLabel(p, lang)).reduce((a, b) => t.result.pieces.pair(a, b)))}</>}
       </figcaption>
     </figure>
   );

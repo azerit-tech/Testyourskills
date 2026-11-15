@@ -288,7 +288,7 @@ const GITHUB: Record<string, (login: string) => Grid> = {
 // --- La fiche déclarative (LinkedIn ou CV) ---------------------------------------------------
 
 /** « sur LinkedIn », « sur le CV » : où la pièce déclarative a été lue (comme le moteur). */
-const on = (src: "LinkedIn" | "CV"): Fact => (src === "CV" ? f("sur le CV", "on the CV") : f("sur LinkedIn", "on LinkedIn"));
+const on = (src: "LinkedIn" | "CV"): Fact => (src === "CV" ? f("sur le CV", "on the résumé") : f("sur LinkedIn", "on LinkedIn"));
 
 /** Ce que déclare le profil de démo : 8,4 ans comptés, une entreprise fondée tenue 3,4 ans, une école notée 8/10. */
 function declaredDrafts(src: "LinkedIn" | "CV", proof?: string, ghRepos?: number): Draft[] {
