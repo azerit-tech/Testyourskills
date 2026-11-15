@@ -15,20 +15,9 @@ const SHEETS: Record<string, string> = {
 /** La valeur d'un jeton dans le premier :root. */
 const token = (name: string) => new RegExp(`${name}:\\s*([^;]+);`).exec(site)?.[1];
 
-/**
- * Le corps d'une feuille, sans les commentaires ni les déclarations de jetons. Dans styles.css,
- * la couverture et le héros de l'accueil gardent leurs tailles propres (titre fluide, plaques
- * en unités de conteneur) : ce bloc sort du contrôle.
- */
-function body(name: string, css: string): string {
-  let s = css;
-  if (name === "styles.css") {
-    const from = s.indexOf("/* --- la couverture");
-    const to = s.indexOf("/* --- mur des 13 profils");
-    // Sans ces deux repères (bloc réécrit), toute la feuille passe au contrôle.
-    if (from > -1 && to > from) s = s.slice(0, from) + s.slice(to);
-  }
-  return s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*--[\w-]+:[^;]*;/gm, "");
+/** Le corps d'une feuille, sans les commentaires ni les déclarations de jetons. Aucun bloc n'y échappe. */
+function body(css: string): string {
+  return css.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*--[\w-]+:[^;]*;/gm, "");
 }
 
 describe("les jetons", () => {
@@ -53,7 +42,7 @@ describe("les jetons", () => {
 
 describe("les feuilles du site", () => {
   for (const [name, css] of Object.entries(SHEETS)) {
-    const s = body(name, css);
+    const s = body(css);
 
     it(`${name} : aucune taille de texte en dur`, () => {
       expect(s.match(/font-size:\s*[\d.]+px/g) ?? []).toEqual([]);

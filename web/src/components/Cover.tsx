@@ -45,14 +45,14 @@ const ON_PHONE = slotsIn(PHONE);
 const EAGER = new Set([...firstRow(PHONE), ...firstRow(DESKTOP)].filter((id) => ON_PHONE.has(id)));
 /** La plus grande case du premier rang : en priorité haute. */
 const HERO = "s1";
-/** Largeur intérieure de la couverture sur ordinateur, au plus. */
-const WIDE_INNER = 1060;
+/** Largeur intérieure de la couverture sur ordinateur, au plus : la colonne de droite du héros (§18.48). */
+const WIDE_INNER = 504;
 
-/** La largeur affichée d'une case, pour choisir entre -s.jpg et le grand fichier. */
+/** La largeur affichée d'une case, pour choisir entre -s.jpg et le grand fichier.
+ * La grille du téléphone sert à toutes les largeurs : une bande sur téléphone, une colonne au bureau. */
 function sizes(id: string): string {
-  const wide = Math.ceil(widthShare(DESKTOP, id) * WIDE_INNER);
-  const phone = widthShare(PHONE, id);
-  return `(min-width: 900px) ${wide}px, ${Math.ceil((phone || widthShare(DESKTOP, id)) * 92)}vw`;
+  const share = widthShare(PHONE, id) || widthShare(DESKTOP, id);
+  return `(min-width: 900px) ${Math.ceil(share * WIDE_INNER)}px, ${Math.ceil(share * 92)}vw`;
 }
 
 /** Le nom de chaque profil, pour le texte de remplacement d'un portrait. */

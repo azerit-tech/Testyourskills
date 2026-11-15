@@ -870,30 +870,29 @@ svg {
 
 /* ============ accueil ============ */
 
-/* --- la couverture (§18.31) ---
+/* --- la couverture (§18.31, §18.48) ---
    Une mosaïque encadrée (Cover.tsx) : un cadre prune foncé plat, des cases
    séparées par des joints d'encre (le fond du cadre), autant de marge que de
    joint. Les grilles viennent de lib/cover.ts par variables (--cover-*-s pour
    le téléphone, --cover-*-l pour l'ordinateur) : une seule source pour la
    feuille et pour le test des lumières voisines. Ni lueur, ni ombre, ni dégradé.
-   Téléphone : 12 px de marge de chaque côté, 16:10 au plus, jusqu'à 16:9 si
-   l'écran est bas (le budget est au bloc du héros). Ordinateur : 1080 px au
-   plus, centrée, 16:8,5 au plus, plus basse si l'écran l'exige. */
+   Elle garde ses angles de planche (6 px, 3 px par case). Les cinq cases du
+   téléphone à toutes les largeurs : une bande sous la barre sur téléphone, la
+   colonne de droite du héros au bureau (les cases « is-wide » restent cachées). */
 :root {
   --cover-frame: #241a3a;
 }
 .cover {
-  --cover-gap: 6px;
+  --cover-gap: 4px;
   display: grid;
   grid-template-columns: var(--cover-cols-s);
   grid-template-rows: repeat(2, minmax(0, 1fr));
   grid-template-areas: var(--cover-areas-s);
   gap: var(--cover-gap);
-  width: calc(100% - 24px);
-  height: calc((100vw - 24px) * 0.625);
-  margin: 0 auto;
+  width: 100%;
+  height: clamp(128px, 38vw, 300px);
   padding: var(--cover-gap);
-  border-radius: 7px;
+  border-radius: 6px;
   background: var(--cover-frame);
 }
 .cover-panel {
@@ -906,7 +905,7 @@ svg {
   border: 0;
   border-radius: 3px;
   /* la teinte de la case tant que l'image se charge : rien ne bouge à l'arrivée */
-  background: var(--plum);
+  background: var(--s-call);
   animation: cover-in 0.3s var(--ease-out) both;
   animation-delay: calc(var(--i, 0) * 40ms);
 }
@@ -960,7 +959,7 @@ svg {
   content: "";
   position: absolute;
   inset: 0;
-  background: var(--plum);
+  background: var(--s-call);
   mix-blend-mode: lighten;
   pointer-events: none;
 }
@@ -978,7 +977,7 @@ svg {
   inset: 12% 0 0;
   width: 100%;
   height: 88%;
-  fill: var(--plum);
+  fill: var(--s-call);
 }
 .cover-face-mark {
   position: absolute;
@@ -1037,18 +1036,10 @@ button.cover-panel:focus-visible {
 }
 @media (min-width: 900px) {
   .cover {
-    --cover-gap: 10px;
-    grid-template-columns: var(--cover-cols-l);
-    grid-template-areas: var(--cover-areas-l);
-    width: min(1080px, 100% - 64px);
-    height: calc(min(1080px, 100vw - 64px) * 0.53125);
-    border-radius: 8px;
+    --cover-gap: 8px;
   }
   .cover-panel {
     border-radius: 4px;
-  }
-  .cover-panel.is-wide {
-    display: block;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1057,63 +1048,85 @@ button.cover-panel:focus-visible {
   }
 }
 
-/* --- le héros, sous la couverture (§18.31) ---
-   Téléphone, de haut en bas, au premier écran jusqu'à 390 × 700 et 360 × 640
-   (navigateur intégré de LinkedIn) : bandeau 44, barre 64, couverture, 14,
-   titre (4 lignes de 0,92 em), 14, portes 44, 10, champ 56, 10, pilule 52,
-   soit 308 px plus 3,68 em de titre. La couverture prend le reste moins 8 px,
-   entre 16:9 et 16:10 de sa largeur : 229 px à 390 × 700 (16:10), 195 px à
-   360 × 640. La promesse et les liens du formulaire suivent, sous le pli s'il
-   le faut.
-   Ordinateur : la couverture, puis une rangée de trois colonnes sur sa largeur
-   (le titre, une phrase par ligne ; le formulaire ; la promesse en capitales),
-   la flèche dessous. Bandeau 44, barre 76, couverture, 24, rangée 164 (portes
-   44, 10, champ 56, 10, liens 44), 4, flèche 44 : 356 px hors couverture, qui
-   prend 100svh - 360 px, entre 380 px et 16:8,5 de sa largeur (452 px à
-   1440 × 812). */
+/* --- le héros (§18.48) : le premier écran dit ce qu'on obtient ---
+   Téléphone, de haut en bas : la couverture en bande (38 % de la largeur, 148 px
+   à 390), le titre à la taille du jeton, la promesse dessous, puis les portes,
+   le champ, sa ligne et le bouton. À 390 px, le bas du bouton reste au-dessus
+   de 600 px, bandeau de saison compris.
+   Bureau : deux colonnes dans le conteneur de la page. À gauche le titre, la
+   promesse et le formulaire empilés sur 440 px ; à droite la couverture, de la
+   hauteur de la colonne. */
 .home-top {
-  /* 38 px à 390, 35 à 360, jamais moins de 34 */
-  --hero-title: clamp(34px, 9.75vw, 40px);
-}
-.home-top .cover {
-  height: clamp(calc((100vw - 24px) * 0.5625), calc(100vh - 316px - 3.68 * var(--hero-title)), calc((100vw - 24px) * 0.625));
-  height: clamp(calc((100vw - 24px) * 0.5625), calc(100svh - 316px - 3.68 * var(--hero-title)), calc((100vw - 24px) * 0.625));
+  display: grid;
+  gap: 16px;
+  width: 100%;
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 4px var(--gutter) 0;
 }
 .hero {
   display: grid;
-  gap: 14px;
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 14px var(--gutter) 40px;
+  gap: 8px;
+  min-width: 0;
 }
+/* deux phrases (shared/promise.ts), chacune sur une ligne si elle tient, sinon coupée
+   à son seul blanc sécable. La première en lilas, la question en crème, la couleur des étoiles. */
 .hero-title {
-  font: 700 var(--hero-title, 38px) / 0.92 var(--f-name);
+  font: var(--font-page);
   text-transform: uppercase;
-  color: var(--cream);
+  color: var(--c-emphasis);
   overflow-wrap: anywhere;
 }
-/* deux phrases, chacune sur deux lignes : à 6,4 em, chacune coupe à son seul blanc
-   sécable (la plus courte, « TON CV DIT SENIOR. », fait 6,97 em ; le plus long
-   morceau, « YOUR LINKEDIN », 5,42 em). La déclaration en crème, la preuve en rose poudré. */
 .hero-title > span {
   display: block;
-  max-width: 6.4em;
 }
-.hero-title-proof {
-  color: var(--blush);
+.hero-title-claim {
+  color: var(--c-text);
+}
+/* la promesse : sous le titre, dans la voix du texte courant */
+.hero-hook {
+  font: var(--font-body);
+  color: var(--c-text);
+  text-wrap: pretty;
 }
 .hero .entry {
-  margin-top: 0;
+  margin-top: 8px;
 }
-/* la promesse : une ligne lilas sous la pilule (281 px en 14 à 360 px, pour 328) */
-.hero-hook {
-  font: 500 var(--t-14) / 1.4 var(--f-text);
-  color: var(--c-text);
-  text-align: center;
-}
-.hero-hook-l,
-.hero-next {
-  display: none;
+
+@media (min-width: 900px) {
+  .home-top {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 40px;
+    align-items: stretch;
+    padding-top: 16px;
+  }
+  .hero {
+    grid-column: 1;
+    grid-row: 1;
+    align-content: center;
+    gap: 12px;
+    padding: 24px 0;
+  }
+  .home-top .cover {
+    grid-column: 2;
+    grid-row: 1;
+    height: auto;
+    min-height: 440px;
+  }
+  /* le formulaire empilé, comme sur téléphone : portes, champ, bouton */
+  .hero .entry {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 440px;
+    margin-top: 12px;
+  }
+  .page-home .hero .entry > *,
+  .page-home .hero .entry.has-doors > * {
+    grid-column: 1;
+    grid-row: auto;
+  }
+  .hero .entry-submit {
+    width: 100%;
+  }
 }
 
 /* la fiche de Jacques : sa propre section, centrée, sous le héros */
@@ -1128,111 +1141,34 @@ button.cover-panel:focus-visible {
   gap: 4px;
   min-width: 0;
 }
-.showcase figcaption a {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  padding: 0 4px;
-  font: 500 var(--t-14) / 1.4 var(--f-text);
-  color: var(--c-text-2);
-  text-align: center;
-  text-decoration: underline;
-  text-decoration-color: var(--lilac-faint);
-  text-underline-offset: 4px;
-}
-.showcase figcaption a:hover {
-  color: var(--cream);
-}
-/* ses deux notes (§18.35) : sous la légende, mates, les chiffres en mono */
+/* la légende, puis ses pièces (§18.36) : deux liens discrets vers le même dossier */
 .showcase figcaption {
   display: grid;
   justify-items: center;
 }
+.showcase figcaption a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--h-tap);
+  padding: 0 4px;
+  font: var(--font-small);
+  font-weight: 500;
+  color: var(--c-text-2);
+  text-align: center;
+  text-decoration: underline;
+  text-decoration-color: var(--c-line);
+  text-underline-offset: 4px;
+}
+.showcase figcaption a:hover {
+  color: var(--c-emphasis);
+}
 .showcase figcaption .showcase-scores {
   margin-top: -10px; /* les deux liens mènent au même endroit : leurs zones de 44 px peuvent se toucher */
-  gap: 0.35em;
   white-space: nowrap;
   text-decoration: none;
 }
-.showcase-scores b {
-  font: 600 var(--t-14) / 1 var(--f-mono);
-}
-.showcase-scores .is-linkedin {
-  color: var(--blush);
-}
-.showcase-scores .is-github {
-  color: var(--cream);
-}
-.showcase-scores .is-case {
-  color: var(--peach);
-}
 
 @media (min-width: 900px) {
-  .home-top .cover {
-    height: clamp(380px, calc(100vh - 360px), calc(min(1080px, 100vw - 64px) * 0.53125));
-    height: clamp(380px, calc(100svh - 360px), calc(min(1080px, 100vw - 64px) * 0.53125));
-  }
-  /* sur la largeur de la couverture : à 1440, 364 · 440 · 228 px. Le titre anglais le
-     plus long, « YOUR LINKEDIN SAYS SENIOR. », fait 355 px en 34 ; « DÉCROCHE UN
-     ENTRETIEN. », 212 px en 17 avec son interlettrage. */
-  .hero {
-    grid-template-columns: minmax(0, 1.6fr) minmax(0, 440px) minmax(0, 1fr);
-    column-gap: 20px;
-    row-gap: 4px;
-    align-items: start;
-    width: min(1080px, 100% - 64px);
-    max-width: none;
-    padding: 24px 0 8px;
-  }
-  /* le titre et la promesse centrés sur les portes et le champ (110 px) */
-  .hero-title {
-    margin-top: 22px;
-    font-size: 34px;
-    line-height: 0.95;
-  }
-  .hero-title > span {
-    max-width: none;
-  }
-  .hero .entry {
-    max-width: none;
-  }
-  .hero-hook-s {
-    display: none;
-  }
-  .hero-hook-l {
-    display: block;
-    margin-top: 36px;
-    font: 700 var(--t-16) / 1.2 var(--f-name);
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    text-align: right;
-    color: var(--lilac);
-  }
-  .hero-next {
-    grid-column: 1 / -1;
-    justify-self: center;
-    display: grid;
-    place-items: center;
-    width: 44px;
-    height: 44px;
-    border: 0;
-    border-radius: 999px;
-    background: none;
-    color: var(--blush);
-    transition: transform 0.18s var(--ease-out);
-  }
-  .hero-next:hover {
-    transform: translateY(2px);
-  }
-  .hero-next svg {
-    width: 28px;
-    height: 28px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2.4;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-  }
   .home-example {
     padding: 40px var(--gutter) 72px;
   }
@@ -1569,15 +1505,14 @@ button.cover-panel:focus-visible {
   width: 100%;
 }
 /* l'erreur : sous le champ, avant le bouton (dessin commun .field-error) ; tant qu'elle
-   est là, la promesse et la réassurance se taisent */
+   est là, la réassurance se tait */
 .entry-error {
   display: none;
 }
 .entry-error.is-on {
   display: flex;
 }
-.entry:has(.entry-error.is-on) .entry-reassure,
-.hero:has(.entry-error.is-on) .hero-hook-s {
+.entry:has(.entry-error.is-on) .entry-reassure {
   display: none;
 }
 .entry-foot {

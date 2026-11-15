@@ -1,6 +1,7 @@
-// Entrée (§6.1, §18.5, §18.31) : la couverture, puis sous elle le titre, les
-// portes, le champ et la promesse ; la fiche de Jacques, le mur des 13 profils
-// (§18.28), le top de la semaine (§18.22) et celui des bandes (§18.38). Rien d'autre.
+// Entrée (§6.1, §18.31, §18.48). Le premier écran dit ce qu'on obtient : la
+// couverture, le titre, la promesse dessous, puis les portes, le champ et le
+// bouton. Ensuite la fiche de Jacques, le mur des 13 profils (§18.28), le top
+// de la semaine (§18.22) et celui des bandes (§18.38). Rien d'autre.
 // L'exemple est la vraie fiche de Jacques (fondateur d'Azerit) : la maquette
 // s'affiche d'abord, la fiche calculée par le serveur la remplace dès qu'elle existe.
 // Aucun dégradé dans la page : seuls ceux de la fiche et des illustrations.
@@ -95,7 +96,6 @@ export function Home() {
   const { t } = useT();
   const h = t.home;
   const inputRef = useRef<HTMLInputElement>(null);
-  const nextRef = useRef<HTMLElement>(null);
   const showcase = useShowcase();
   const top = useTop();
   // La ligne sous le titre (lib/season.ts) : l'entretien seulement si une prime est ouverte.
@@ -118,33 +118,24 @@ export function Home() {
     input.focus({ preventScroll: true });
   };
 
-  /** La flèche sous le héros : la section suivante. */
-  const next = () => nextRef.current?.scrollIntoView({ block: "start", behavior: reducedMotion() ? "auto" : "smooth" });
-
   return (
     <main className="page page-home" id="main">
       <div className="home-top">
         <Cover onPlay={play} top={top} founder={showcase} />
         <section className="hero">
-          {/* Deux phrases (shared/promise.ts) : la première en crème, la seconde en rose poudré. */}
+          {/* Deux phrases (shared/promise.ts) : la première en lilas, la question en crème. */}
           <h1 className="hero-title">
             <span className="hero-title-claim">{h.titleClaim}</span>{" "}
             <span className="hero-title-proof">{h.titleProof}</span>
           </h1>
-          {/* La promesse : sous la pilule sur téléphone, en colonne de droite sur ordinateur ;
-           * l'une des deux est toujours en display: none, donc lue une seule fois. */}
-          <EntryForm inputRef={inputRef} note={<p className="hero-hook hero-hook-s">{hook}</p>} />
-          <p className="hero-hook hero-hook-l">{hook}</p>
-          <button type="button" className="hero-next" onClick={next} aria-label={h.next}>
-            <svg viewBox="0 0 24 24" aria-hidden>
-              <path d="M6 9.5l6 6 6-6" />
-            </svg>
-          </button>
+          {/* La promesse, sous le titre : ce qu'on obtient, avant de demander quoi que ce soit. */}
+          <p className="hero-hook">{hook}</p>
+          <EntryForm inputRef={inputRef} />
         </section>
       </div>
       {/* Les primes ouvertes (§18.4) : rien tant que la saison n'en porte pas. */}
       <PrimesStrip />
-      <section className="home-example" ref={nextRef}>
+      <section className="home-example">
         <ExampleCard {...showcase} />
       </section>
       <ProfileWall onPlay={play} />
