@@ -86,7 +86,7 @@ describe("barème CV §4.5", () => {
     expect(a.overall).toBeGreaterThanOrEqual(none.overall);
     const edu = (c: ReturnType<typeof scoreCv>) => c.grid!.criteria.find((x) => x.code === "EDU")!;
     expect(edu(a).score).toBe(8);
-    expect(edu(a).reached.fr).toBe("CentraleSupélec\u00a0: comptée au dossier.");
+    expect(edu(a).reached.fr).toBe("CentraleSupélec\u00a0: au dossier.");
     expect(edu(none).state).toBe("missing");
     expect(edu(none).counted).toBe(false);
 

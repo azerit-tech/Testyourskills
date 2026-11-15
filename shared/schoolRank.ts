@@ -11,11 +11,18 @@ const f = (fr: string, en: string): Fact => ({ fr, en });
 /** Un rang d'école dans un texte : « rang A », « tier S ». Aucun texte affichable ne doit le porter. */
 export const SCHOOL_RANK_RE = /\b(?:rang|tier) [SABC]\b/i;
 
-/** La pièce de l'école, chez la personne fichée : « CentraleSupélec : comptée au dossier. » */
-export const schoolCounted = (name: string): Fact => f(`${name} : comptée au dossier.`, `${name}: counted in the file.`);
+/**
+ * La pièce de l'école, chez la personne fichée : « CentraleSupélec : au dossier. » Ni son rang
+ * ni sa note ; « comptée » ou « hors moyenne » se dit à côté (shared/gridText.ts, schoolState),
+ * puisque la moyenne n'est connue qu'une fois tous les critères notés (SPEC §18.52).
+ */
+export const schoolCounted = (name: string): Fact => f(`${name} : au dossier.`, `${name}: on file.`);
 
 /** La même, sans le nom (version publique de la pièce). */
-export const SCHOOL_COUNTED: Fact = f("École comptée au dossier.", "School counted in the file.");
+export const SCHOOL_COUNTED: Fact = f("École au dossier.", "School on file.");
+
+/** La pièce écrite avant le §18.52, qui disait « comptée » même hors moyenne. */
+const LEGACY_COUNTED = /(?:comptée au dossier|counted in the file)\./;
 
 /** Ce qui manque pour le niveau suivant, selon la note atteinte (table de docs/bareme-recrutement.md §3, sans les lettres). */
 export const EDU_NEXT: Record<number, Fact> = {
@@ -41,7 +48,9 @@ const EN_SCHOOL: Record<string, string> = { S: "one of the most selective school
 function rewriteFr(s: string): string {
   return s
     .replace(/^École de rang [SABC]\./, SCHOOL_COUNTED.fr)
-    .replace(/, rang [SABC]\./g, " : comptée au dossier.")
+    .replace(/, rang [SABC]\./g, " : au dossier.")
+    .replace(/^École comptée au dossier\./, SCHOOL_COUNTED.fr)
+    .replace(/\s?:\s?comptée au dossier\./g, " : au dossier.")
     .replace(/une école de rang ([SABC])/g, (_m, t: string) => FR_SCHOOL[t]!)
     .replace(/ de rang [SABC]\b/g, "")
     .replace(/,? rang [SABC]\b/g, "");
@@ -50,13 +59,16 @@ function rewriteFr(s: string): string {
 function rewriteEn(s: string): string {
   return s
     .replace(/^Tier [SABC] school\./, SCHOOL_COUNTED.en)
-    .replace(/, tier [SABC]\./g, ": counted in the file.")
+    .replace(/, tier [SABC]\./g, ": on file.")
+    .replace(/^School counted in the file\./, SCHOOL_COUNTED.en)
+    .replace(/: counted in the file\./g, ": on file.")
     .replace(/a tier ([SABC]) school/g, (_m, t: string) => EN_SCHOOL[t]!)
     .replace(/selective programme\b/g, "selective program")
     .replace(/,? tier [SABC]\b/gi, "");
 }
 
-const fact = (x: Fact | undefined): Fact | undefined => (x && (SCHOOL_RANK_RE.test(x.fr) || SCHOOL_RANK_RE.test(x.en)) ? f(rewriteFr(x.fr), rewriteEn(x.en)) : x);
+const stale = (s: string) => SCHOOL_RANK_RE.test(s) || LEGACY_COUNTED.test(s);
+const fact = (x: Fact | undefined): Fact | undefined => (x && (stale(x.fr) || stale(x.en)) ? f(rewriteFr(x.fr), rewriteEn(x.en)) : x);
 
 function criterion(c: GridCriterion): GridCriterion {
   if (c.code !== "EDU") return c;

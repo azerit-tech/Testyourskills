@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import scoring from "../../data/scoring.json";
 import { fontFiles } from "../../server/src/render/fonts";
 import { FIXTURES } from "../fixtures";
+import { publicView } from "../publicView";
 import type { CardData, CriterionCode, Grid, GridCriterion, Lang } from "../types";
 import { STAT_CODES } from "../types";
 import { BACK_LAYOUT, CardBackGraphic, OVERALL_WEIGHTS, backCriteria, clipProof, formulaRule, formulaTerms, gridFormula, packTerms, placeCriteria, strongestFact } from "./CardBack";
@@ -157,20 +158,33 @@ describe("dos de la fiche : la note vient des huit critères (§18.48)", () => {
     }
   });
 
-  it("le dos se montre à tout le monde : jamais le nom de l'école, jamais sa note ; comptée, elle le dit ; sinon « hors moyenne »", () => {
-    const out: Grid = { ...grid, criteria: grid.criteria.map((c) => (c.code === "EDU" ? { ...c, counted: false } : c)) };
+  // §18.52 : l'école ne montre jamais de chiffre, à personne, comptée ou non ; deux mots, « comptée » ou « hors moyenne ».
+  it("le dos se montre à tout le monde : jamais le nom de l'école, jamais un chiffre d'école ; « comptée » ou « hors moyenne », pareil pour la personne et le visiteur", () => {
+    const withEdu = (edu: Partial<GridCriterion>): CardData => ({ ...card, grid: { ...grid, criteria: grid.criteria.map((c) => (c.code === "EDU" ? { ...c, ...edu } : c)) } });
+    const cases = [
+      { name: "comptée, au-dessus de la moyenne", card: withEdu({ score: 10, counted: true }), word: { fr: "COMPTÉE", en: "COUNTED" } },
+      { name: "sous la moyenne, lue sur LinkedIn", card: withEdu({ score: 4, counted: false }), word: { fr: "HORS MOYENNE", en: "NOT AVERAGED" } },
+      { name: "sous la moyenne, lue sur GitHub (hackathon)", card: withEdu({ score: 4, counted: false, source: "github", evidence: { source: "github", text: fact("Repo hackathon-2025 : hackathon ou concours.") } }), word: { fr: "HORS MOYENNE", en: "NOT AVERAGED" } },
+    ];
     for (const lang of ["fr", "en"] as Lang[]) {
-      const svg = back(card, lang);
-      expect(svg).not.toMatch(/Secr[eè]te|Secret School/);
-      expect(svg).toContain(lang === "fr" ? "Comptée au dossier, sa note reste privée." : "On file, its score stays private.");
-      expect(backCriteria(card, lang).find((c) => c.code === "EDU")!).toMatchObject({ score: null, hidden: true, counted: true });
-      const eduRow = /data-criterion="EDU">(.*?)<\/g>/.exec(svg)![1];
-      expect(eduRow).not.toContain("/10");
-      expect(eduRow).not.toContain(">8<");
-      const edu = backCriteria({ ...card, grid: out }, lang).find((c) => c.code === "EDU")!;
-      expect(edu).toMatchObject({ score: null, counted: false, tag: lang === "fr" ? "hors moyenne" : "not averaged" });
-      expect(back({ ...card, grid: out }, lang)).not.toMatch(/Secr[eè]te|Secret School/);
+      for (const k of cases) {
+        const owner = back(k.card, lang);
+        const visitor = back(publicView(k.card, { thirdParty: false }), lang);
+        const row = (svg: string) => /data-criterion="EDU">(.*?)<\/g>/.exec(svg)![1];
+        for (const svg of [owner, visitor]) {
+          expect(svg, k.name).not.toMatch(/Secr[eè]te|Secret School/);
+          // Aucun chiffre dans la rangée de l'école : ni note, ni « /10 », ni tiret.
+          expect(row(svg).replace(/<[^>]+>/g, " "), `${k.name} ${lang}`).not.toMatch(/\d|–/);
+          expect(row(svg), k.name).toContain(`>${k.word[lang]}<`);
+          // La formule ne détaille jamais le terme de l'école.
+          expect(svg, k.name).not.toMatch(lang === "fr" ? /École \d/ : /School \d/);
+        }
+        expect(row(visitor), `${k.name} ${lang}`).toBe(row(owner));
+      }
     }
+    const fr = (c: CardData) => backCriteria(c, "fr").find((x) => x.code === "EDU")!;
+    expect(fr(cases[0].card)).toMatchObject({ score: null, hidden: true, counted: true, state: "comptée", proof: "Elle compte dans la note, sans chiffre affiché." });
+    expect(fr(cases[1].card)).toMatchObject({ score: null, hidden: true, counted: false, state: "hors moyenne", proof: "Une école ne fait jamais baisser la note." });
   });
 
   it("chaque critère dit d'où vient sa pièce : GitHub, CV ou LinkedIn selon le dossier ; sans preuve, il le dit", () => {

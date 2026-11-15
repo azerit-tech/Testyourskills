@@ -9,7 +9,7 @@
 
 import { t as cardT } from "./card/i18n";
 import { langTitle } from "./card/languages";
-import { FORMULA_ORDER, GRID_WEIGHTS, usableGrid } from "./gridText";
+import { FORMULA_ORDER, GRID_WEIGHTS, schoolState, usableGrid } from "./gridText";
 import type { CardData, CriterionCode, Grid, GridCriterion, Lang } from "./types";
 
 /** L'ordre du recruteur : le métier et les années, où, la stack, le code, puis le reste. */
@@ -34,7 +34,8 @@ const noted = (c: GridCriterion | undefined): c is GridCriterion & { score: numb
 export function tileOrder(grid: Grid): { scored: GridCriterion[]; pending: GridCriterion[] } {
   const byCode = new Map(grid.criteria.map((c) => [c.code, c]));
   const all = RECRUITER_ORDER.map((code) => byCode.get(code)).filter((c): c is GridCriterion => !!c);
-  const on = (c: GridCriterion) => c.score !== null || !!c.private;
+  // L'école dit toujours « comptée » ou « hors moyenne » (§18.52) : elle reste parmi les notés, chez tout le monde.
+  const on = (c: GridCriterion) => c.score !== null || !!c.private || schoolState(c) !== null;
   return { scored: all.filter(on), pending: all.filter((c) => !on(c)) };
 }
 

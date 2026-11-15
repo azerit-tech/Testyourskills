@@ -8,13 +8,13 @@
 // Hors de la révélation : le bloc se pose avec l'après-fiche, sans animation.
 // Fiche sans grille (d'avant 0.4.0) : rien.
 import { useId, useState } from "react";
-import { dec, usableGrid } from "../../../shared/gridText";
+import { dec, schoolState, usableGrid } from "../../../shared/gridText";
 import { publicGrid } from "../../../shared/publicView";
 import type { DeclaredSource, Grid, GridCriterion } from "../../../shared/types";
 import { RECRUITER_ORDER } from "../../../shared/recruiterLine";
 import { declaredOf } from "../../../shared/types";
 import { pick, useT, type Dict } from "../i18n";
-import { finalLines, GRID_WEIGHTS, keptFrom, levelTable, reachedRow, rowText, schoolKept, stateTags } from "../lib/grid";
+import { finalLines, GRID_WEIGHTS, keptFrom, levelTable, reachedRow, rowText, stateTags } from "../lib/grid";
 import type { Shareable } from "./After";
 
 type G = Dict["grid"];
@@ -55,22 +55,23 @@ function Row({ c, grid, declared, shared, isCase }: RowProps) {
   const text = rowText(c, { g, pick: (f) => pick(f, lang), declared, shared });
   const tags = stateTags(c, grid);
   const table = levelTable(c, g);
-  // L'école comptée : ni note, ni jauge, ni palier surligné, ni « pour le suivant » (qui dirait le palier).
-  const kept = schoolKept(c);
+  // L'école : ni note, ni jauge, ni palier surligné, ni « pour le suivant » (qui dirait le palier) ; hors moyenne, pas de coefficient (§18.52).
+  const school = schoolState(c);
+  const kept = school !== null;
   const row = kept ? -1 : reachedRow(c, table);
   const name = g.names[c.code];
-  const coef = g.coef(dec(GRID_WEIGHTS[c.code], lang));
+  const coef = school === "out" ? null : g.coef(dec(GRID_WEIGHTS[c.code], lang));
   const none = g.compare.none;
   const flags = text.flags;
   const cross = c.evidence?.source === "both";
 
   return (
-    <li className={`rg-row is-${c.score === null ? "none" : c.state}${c.counted ? "" : " is-out"}`}>
+    <li className={`rg-row is-${school ? (school === "out" ? "none" : "scored") : c.score === null ? "none" : c.state}${c.counted ? "" : " is-out"}`}>
       <h3 className="rg-head">
         <button type="button" className="rg-toggle" aria-expanded={open} aria-controls={panel} onClick={() => setOpen((o) => !o)}>
           <span className="rg-name">{name}</span>
           {kept ? (
-            <span className="rg-score rg-counted">{t.read.counted}</span>
+            <span className="rg-score rg-counted">{school === "counted" ? t.read.counted : t.read.out}</span>
           ) : (
             <>
               <span className="rg-score" aria-hidden>
@@ -81,7 +82,7 @@ function Row({ c, grid, declared, shared, isCase }: RowProps) {
             </>
           )}
           <span className="rg-meta">
-            <span className="rg-coef">{coef}</span>
+            {coef && <span className="rg-coef">{coef}</span>}
             {isCase && c.score !== null && !c.private && <span className="rg-kept">{keptFrom(c, g, declared)}</span>}
             {tags.map((tag) => (
               <span key={tag} className={`rg-tag tag-${tag}`}>

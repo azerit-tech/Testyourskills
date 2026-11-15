@@ -53,6 +53,23 @@ export function excludedWhy(c: GridCriterion): ExcludedWhy | null {
   return c.counted ? null : "below";
 }
 
+/** Ce que l'école dit d'elle-même : « comptée » ou « hors moyenne », rien d'autre. */
+export type SchoolState = "counted" | "out";
+
+/**
+ * L'école (SPEC §18.52) : jamais un chiffre, à personne, comptée ou non. Deux mots
+ * seulement, « comptée » (dans la moyenne) ou « hors moyenne » (sous la moyenne des
+ * autres, sans école de tech, ou gardée pour la personne sur la page partagée) : la
+ * personne fichée lit la même chose que le visiteur. null : pas une école, ou une
+ * école pas encore lue sur une fiche GitHub seule (elle se lit sur LinkedIn ou le CV).
+ */
+export function schoolState(c: Pick<GridCriterion, "code" | "score" | "counted" | "private" | "source">): SchoolState | null {
+  if (c.code !== "EDU") return null;
+  if (c.private) return "out";
+  if (c.score === null && c.source === "github") return null;
+  return c.counted && c.score !== null ? "counted" : "out";
+}
+
 /** D'où vient la note sur 100 : les termes comptés, la moyenne, la règle qui a joué. */
 export function gridMath(grid: Grid): GridMath {
   const byCode = new Map(grid.criteria.map((c) => [c.code, c]));

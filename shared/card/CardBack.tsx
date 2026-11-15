@@ -13,7 +13,7 @@
 // leur fait le plus fort, et la formule des cinq axes si elle donne bien la note.
 import { useId } from "react";
 import { pieceLabel } from "../caseFile";
-import { dec, excludedWhy, gridMath, usableGrid } from "../gridText";
+import { dec, excludedWhy, gridMath, schoolState, usableGrid } from "../gridText";
 import { publicGrid } from "../publicView";
 import { RECRUITER_ORDER } from "../recruiterLine";
 import type { CardData, GridCriterion, GridSource, Lang, Stat, StatCode } from "../types";
@@ -140,7 +140,7 @@ export interface BackCriterion {
   name: string;
   /** La note sur 10 ; null : pas de note à montrer. */
   score: number | null;
-  /** L'école comptée dans la note : ni note ni tiret, la ligne dit qu'elle est au dossier. */
+  /** L'école, comptée ou non : ni note ni tiret, l'état dit « comptée » ou « hors moyenne ». */
   hidden?: boolean;
   /** false : la note n'entre pas dans la moyenne. */
   counted: boolean;
@@ -206,9 +206,11 @@ export function backCriteria(card: Pick<CardData, "grid" | "declaredSource" | "p
       const evSource = c.evidence?.source ?? c.source;
       const src = sourceLabel(card, evSource);
       const pick = (f: { fr: string; en: string } | undefined) => (f ? (f[lang] ?? f.fr).trim() : "");
-      // L'école comptée : la ligne dit qu'elle est au dossier, sa note ne se montre pas.
-      if (c.code === "EDU" && !c.private && c.score !== null && why === null) {
-        return { code: c.code, name: s.criteria.EDU, score: null, hidden: true, counted: !empty, tag: src, state: "", proof: s.schoolCounted };
+      // L'école (§18.52) : « comptée » ou « hors moyenne », jamais un chiffre, la même ligne pour tout le monde.
+      const school = schoolState(c);
+      if (school) {
+        const state = school === "counted" ? s.counted : s.outOfMean;
+        return { code: c.code, name: s.criteria.EDU, score: null, hidden: true, counted: school === "counted" && !empty, tag: state, state, proof: school === "counted" ? s.schoolCounted : s.schoolOut };
       }
       const score = c.private ? null : c.score;
       const state = c.private || why === "below" ? s.outOfMean : why === "missing" ? s.missing : why === "unproven" ? s.unproven : "";
@@ -242,7 +244,8 @@ function CriterionRow({ row, lang, ink, inkSoft, last }: { row: PlacedCriterion;
   const name = upper(row.name, lang);
   const nameW = measure(name, "display-700", C.name, 0.4);
   const scaleW = measure("/10", "sans-600", BACK_MIN_TEXT);
-  const scoreW = row.hidden ? 0 : row.score === null ? 14 : measure(String(row.score), "display-700", C.score) + scaleW + 3;
+  // Sans note, l'état écrit à côté du nom suffit : ni chiffre ni tiret.
+  const scoreW = row.hidden || row.score === null ? 0 : measure(String(row.score), "display-700", C.score) + scaleW + 3;
   const state = row.state ? truncate(upper(row.state, lang), "sans-600", BACK_MIN_TEXT, FW - nameW - scoreW - 18, 0.5) : "";
   // Le bloc (nom, puis la ligne) centré dans sa rangée.
   const top = +(row.y + (row.h - (C.lineY + 4)) / 2).toFixed(2);
@@ -257,11 +260,7 @@ function CriterionRow({ row, lang, ink, inkSoft, last }: { row: PlacedCriterion;
           {state}
         </Txt>
       )}
-      {row.hidden ? null : row.score === null ? (
-        <Txt x={RIGHT} y={+(top + C.nameY + 1).toFixed(2)} font="display-700" size={C.score} anchor="end" fill={inkSoft} opacity={0.45}>
-          –
-        </Txt>
-      ) : (
+      {row.hidden || row.score === null ? null : (
         <>
           <Txt x={+(RIGHT - scaleW - 2).toFixed(2)} y={+(top + C.nameY + 1).toFixed(2)} font="display-700" size={C.score} anchor="end" fill={ink} opacity={dim}>
             {row.score}

@@ -1707,7 +1707,7 @@ describe("le rang d'une école ne part dans aucune réponse (§18.48)", () => {
       const ownerText = await owner.text();
       expect(owner.status).toBe(200);
       expect(ownerText, id).not.toMatch(SCHOOL_RANK_RE);
-      expect(ownerText, id).toContain("École Démo : comptée au dossier.");
+      expect(ownerText, id).toContain("École Démo : au dossier.");
       expect(ownerText, id).toContain('"score":8');
       const visitor = await (await ctx.app.request(`/api/card/${id}`)).text();
       expect(visitor, id).not.toMatch(SCHOOL_RANK_RE);

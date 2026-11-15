@@ -5,20 +5,20 @@
 // sous « Pas encore au dossier », en une seule ligne dès qu'ils sont plus de
 // deux (jamais un mur de cases vides). Une tuile touchée prend un contour crème
 // et montre sa pièce juste sous sa rangée ; le détail entier se déplie sur place
-// (RecruiterGrid). L'école comptée ne dit jamais son niveau : « comptée au dossier ».
+// (RecruiterGrid). L'école ne dit jamais de chiffre : « comptée » ou « hors moyenne » (§18.52).
 // Un dossier à deux pièces (§18.36) : chaque tuile notée dit sous son nom où la
 // note a été lue (« LinkedIn », « GitHub », « LinkedIn et GitHub ») ; une fiche
 // seule n'en dit rien, la provenance y serait partout la même.
 // Matte : aucun effet, aucune animation.
 import { useEffect, useId, useRef, useState } from "react";
 import { fileOf, pieceLabel } from "../../../shared/caseFile";
-import { usableGrid } from "../../../shared/gridText";
+import { schoolState, usableGrid } from "../../../shared/gridText";
 import { publicGrid } from "../../../shared/publicView";
 import { recruiterRead, tileOrder } from "../../../shared/recruiterLine";
 import type { CriterionCode, Grid, GridCriterion } from "../../../shared/types";
 import { declaredOf } from "../../../shared/types";
 import { pick, useT } from "../i18n";
-import { keptFrom, rowText, schoolKept } from "../lib/grid";
+import { keptFrom, rowText } from "../lib/grid";
 import { useAppConfig } from "../lib/season";
 import { useReducedMotion } from "../lib/util";
 import type { Shareable } from "./After";
@@ -78,11 +78,13 @@ export function RecruiterRead({ item, shared, who }: Props) {
   const tile = (c: GridCriterion) => {
     const name = R.short[c.code];
     const from = fromOf(c);
-    const kept = schoolKept(c);
-    const label = c.private
-      ? R.tileKept(name)
-      : kept
-        ? R.tileCounted(name)
+    // L'école (§18.52) : « comptée » ou « hors moyenne », pareil pour la personne fichée et le visiteur.
+    const school = schoolState(c);
+    const kept = school !== null;
+    const label = school === "counted"
+      ? R.tileCounted(name)
+      : school === "out" || c.private
+        ? R.tileKept(name)
         : c.score === null
           ? R.tileNone(name)
           : from
@@ -92,7 +94,7 @@ export function RecruiterRead({ item, shared, who }: Props) {
       <li key={c.code}>
         <button
           type="button"
-          className={`rr-tile is-${c.private ? "private" : c.score === null ? "none" : kept ? "counted" : c.state}${from ? " has-from" : ""}`}
+          className={`rr-tile is-${kept ? "counted" : c.private ? "private" : c.score === null ? "none" : c.state}${from ? " has-from" : ""}`}
           aria-expanded={open === c.code}
           aria-controls={panel}
           aria-label={label}
@@ -106,7 +108,7 @@ export function RecruiterRead({ item, shared, who }: Props) {
           )}
           {/* L'école : ni note ni jauge, sa note compte dans la moyenne sans se dire. */}
           {kept ? (
-            <span className="rr-score rr-counted">{R.counted}</span>
+            <span className="rr-score rr-counted">{school === "counted" ? R.counted : R.out}</span>
           ) : (
             <span className="rr-score">
               {c.score ?? R.none}

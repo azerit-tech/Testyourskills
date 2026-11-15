@@ -93,9 +93,9 @@ describe("la page partagée : aucun nom d'école ni d'ancien employeur, au mot p
 
   // §18.48 : le rang d'une école ne s'affiche nulle part, pas même pour la personne fichée.
   for (const lang of ["fr-FR", "en-US"]) {
-    it(`l'école : son nom et « comptée au dossier » pour la personne, jamais son rang, ni dans les niveaux (${lang})`, () => {
+    it(`l'école : son nom « au dossier » pour la personne, jamais son rang, ni dans les niveaux (${lang})`, () => {
       for (const shared of [false, true]) expect(textOf(render(item, shared, lang))).not.toMatch(SCHOOL_RANK_RE);
-      expect(textOf(render(item, false, lang))).toContain(lang === "fr-FR" ? "Centrale Méditerranée : comptée au dossier." : "Centrale Méditerranée: counted in the file.");
+      expect(textOf(render(item, false, lang))).toContain(lang === "fr-FR" ? "Centrale Méditerranée : au dossier." : "Centrale Méditerranée: on file.");
     });
   }
 
@@ -183,7 +183,7 @@ describe("« recoupé » : de la sortie du moteur à l'étiquette affichée", ()
       expect(cls).toContain("has-from");
       expect(allowed).toContain(from);
       expect(from).toBe(c.source === "both" ? "LinkedIn et GitHub" : c.source === "github" ? "GitHub" : "LinkedIn");
-      // L'école comptée ne dit jamais son niveau (§18.48) : « comptée au dossier ».
+      // L'école comptée ne dit jamais son niveau (§18.48) : « comptée dans la note ».
       if (c.code === "EDU") expect(aria.replace(/&#x27;/g, "'")).toBe(R.tileCounted(name));
       else expect(aria.replace(/&#x27;/g, "'")).toBe(`${name}\u00a0: ${c.score} sur 10, ${keptFrom(c, DICTS.fr.grid, "linkedin")}`);
     }
@@ -289,7 +289,7 @@ describe("une vraie grille du serveur, à travers le bloc : les deux profils d'e
     // L'école comptée entre dans la formule sans sa note (§18.48) : « École et sélection (comptée) × 1 ».
     const edu = grid.criteria.find((c) => c.code === "EDU" && c.counted && c.score !== null);
     if (edu) {
-      expect(formula).toMatch(/\((comptée|on file)\) × 1\b/);
+      expect(formula).toMatch(/\((comptée|counted)\) × 1\b/);
       expect(formula).not.toMatch(new RegExp(`(École et sélection|School and selection) ${edu.score} ×`));
       terms.push([edu.score!, 1]);
     }

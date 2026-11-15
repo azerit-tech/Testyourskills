@@ -30,9 +30,15 @@ describe("l'ordre des tuiles", () => {
   });
 
   it("les critères sans note descendent sous « Pas encore au dossier », dans le même ordre", () => {
-    const { scored, pending } = tileOrder(grid({ XP: 7, STK: 6, CODE: 8, ACT: 5, OWN: 4 }));
+    const { scored, pending } = tileOrder(grid({ XP: 7, STK: 6, CODE: 8, ACT: 5, OWN: 4 }, { EDU: { source: "github", state: "missing" } }));
     expect(scored.map((c) => c.code)).toEqual(["XP", "STK", "CODE", "OWN", "ACT"]);
     expect(pending.map((c) => c.code)).toEqual(["EMP", "EDU", "OSS"]);
+  });
+
+  it("l'école lue sur LinkedIn ou le CV dit toujours « comptée » ou « hors moyenne » : elle reste parmi les critères au dossier (§18.52)", () => {
+    const { scored, pending } = tileOrder(grid({ XP: 7, CODE: 8 }, { EDU: { state: "missing" } }));
+    expect(scored.map((c) => c.code)).toEqual(["XP", "CODE", "EDU"]);
+    expect(pending.map((c) => c.code)).not.toContain("EDU");
   });
 
   it("l'école gardée pour la personne reste parmi les critères au dossier", () => {

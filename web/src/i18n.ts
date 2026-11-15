@@ -515,10 +515,11 @@ const fr = frTypoDeep({
     hint: "Touche un critère\u00a0: sa preuve s'affiche.",
     tile: (name: string, n: number) => `${name}\u00a0: ${n} sur 10`,
     tileNone: (name: string) => `${name}\u00a0: pas encore de note`,
-    tileKept: (name: string) => `${name}\u00a0: gardée pour la personne`,
-    /** L'école comptée : jamais son niveau, ni ici ni ailleurs ; la note reste dans la moyenne. */
-    tileCounted: (name: string) => `${name}\u00a0: comptée au dossier`,
+    /** L'école (§18.52) : jamais un chiffre, ni ici ni ailleurs, pour personne. Deux mots : « comptée », « hors moyenne ». */
+    tileKept: (name: string) => `${name}\u00a0: hors moyenne`,
+    tileCounted: (name: string) => `${name}\u00a0: comptée dans la note`,
     counted: "comptée",
+    out: "hors moyenne",
     /** Un dossier à deux sources (§18.36) : la tuile dit où la note a été lue, « Expérience : 7 sur 10, lu sur LinkedIn ». */
     tileFrom: (name: string, n: number, from: string) => `${name}\u00a0: ${n} sur 10, ${from}`,
     /** La provenance sous le nom de la tuile, quand les deux sources ont parlé : « LinkedIn et GitHub ». */
@@ -710,8 +711,13 @@ const fr = frTypoDeep({
       xpNone: "Aucun mois compté sur les postes datés.",
       hidden: "L'école, les noms d'employeurs et les points à confirmer sont gardés pour la personne fichée.",
     },
+    /** La fin de la ligne de l'école, la même pour tout le monde, sans chiffre (§18.52). */
+    school: {
+      counted: "Elle compte dans la note, sans chiffre affiché.",
+      out: "Une école ne fait jamais baisser la note.",
+    },
     final: {
-      title: "La note sur 100",
+      title: "La note de la fiche",
       caseTitle: "La note de la fiche",
       how: "Moyenne pondérée des critères notés, × 10.",
       /** « (Code 7 × 2 + Stack 6 × 1,5) ÷ 3,5 » : chaque note sur 10 et son coefficient. */
@@ -726,7 +732,9 @@ const fr = frTypoDeep({
         below: "Sous la moyenne des autres, hors moyenne",
       },
       outList: (label: string, names: string) => `${label} : ${names}.`,
-      belowWhy: "L'école et l'open source ne font jamais baisser la note.",
+      belowWhy: "L'open source ne fait jamais baisser la note.",
+      /** L'école hors moyenne : sa propre ligne, jamais « sous la moyenne des autres » (§18.52). */
+      schoolOut: (name: string) => `Hors moyenne : ${name}. Une école ne fait jamais baisser la note.`,
       capped: "Aucun code prouvé : la note ne peut pas dépasser 85. La sixième étoile se prouve.",
       cappedHit: (raw: number) => `Aucun code prouvé : le calcul donne ${raw}, la note s'arrête à 85.`,
       empty: "Fiche vide : moins d'un quart des coefficients sont notés. Note plancher : 20, une étoile.",
@@ -1276,9 +1284,10 @@ const en: Dict = {
     hint: "Tap a criterion to see its evidence.",
     tile: (name: string, n: number) => `${name}: ${n} out of 10`,
     tileNone: (name: string) => `${name}: no score yet`,
-    tileKept: (name: string) => `${name}: kept on the person's side`,
-    tileCounted: (name: string) => `${name}: on file`,
-    counted: "on file",
+    tileKept: (name: string) => `${name}: not averaged`,
+    tileCounted: (name: string) => `${name}: counted in the rating`,
+    counted: "counted",
+    out: "not averaged",
     tileFrom: (name: string, n: number, from: string) => `${name}: ${n} out of 10, ${from}`,
     fromBoth: (src: string) => `${src} and GitHub`,
     none: "n/a",
@@ -1330,7 +1339,7 @@ const en: Dict = {
       estimated: "estimated",
       below: "doesn't count against you",
       out: "doesn't count against you",
-      private: "kept for you",
+      private: "private to you",
     },
     tagsThem: {
       declared: "declared, to be confirmed",
@@ -1339,7 +1348,7 @@ const en: Dict = {
       estimated: "estimated",
       below: "doesn't lower the rating",
       out: "doesn't lower the rating",
-      private: "kept on the person's side",
+      private: "kept private",
     },
     source: { linkedin: "LinkedIn", cv: "résumé", github: "GitHub", both: "cross-checked" },
     sourceWith: (src: string, what: string) => `${src}, ${what}`,
@@ -1456,12 +1465,16 @@ const en: Dict = {
       xpNone: "No month counted on the dated roles.",
       hidden: "School, employer names and points to confirm are kept for the person on file.",
     },
+    school: {
+      counted: "It counts toward the rating, no number shown.",
+      out: "A school never lowers the rating.",
+    },
     final: {
-      title: "The rating out of 100",
+      title: "The sheet's rating",
       caseTitle: "The sheet's rating",
       how: "Weighted average of the scored criteria, × 10.",
       term: (name: string, score: number, coef: string) => `${name} ${score} × ${coef}`,
-      termCounted: (name: string, coef: string) => `${name} (on file) × ${coef}`,
+      termCounted: (name: string, coef: string) => `${name} (counted) × ${coef}`,
       formula: (terms: string, den: string) => `(${terms}) ÷ ${den}`,
       result: (mean: string) => `= ${mean} out of 10`,
       out: {
@@ -1470,7 +1483,8 @@ const en: Dict = {
         below: "Below the others' average, left out",
       },
       outList: (label: string, names: string) => `${label}: ${names}.`,
-      belowWhy: "School and open source never lower the rating.",
+      belowWhy: "Open source never lowers the rating.",
+      schoolOut: (name: string) => `Not averaged: ${name}. A school never lowers the rating.`,
       capped: "No code proven: the rating cannot go above 85. The sixth star has to be proven.",
       cappedHit: (raw: number) => `No code proven: the math gives ${raw}, the rating stops at 85.`,
       empty: "Empty sheet: under a quarter of the weights are scored. Floor rating: 20, one star.",

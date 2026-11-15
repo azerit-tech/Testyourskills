@@ -4,7 +4,7 @@
 // pièce où la note a été lue, et la version de la page partagée, sans nom d'école ni
 // d'ancien employeur (question 5 du barème). Pur : testé sans navigateur.
 
-import { dec, excludedWhy, gridMath, GRID_WEIGHTS } from "../../../shared/gridText";
+import { dec, excludedWhy, gridMath, GRID_WEIGHTS, schoolState } from "../../../shared/gridText";
 import type { CriterionCode, DeclaredSource, Grid, GridCriterion, GridSource, Lang } from "../../../shared/types";
 import type { Dict } from "../i18n";
 
@@ -20,15 +20,16 @@ export type Tag = keyof G["tags"];
  * autres). Un critère noté sur sa source de preuve n'en a aucune (§3).
  */
 /**
- * L'école comptée (SPEC §18.48) : son niveau ne s'affiche nulle part, ni pour la personne fichée ni en
- * public. La note reste dans la moyenne ; la tuile, la ligne du détail et la formule disent « comptée ».
+ * L'école (SPEC §18.48, §18.52) : jamais un chiffre, à personne, comptée ou non. La tuile, la ligne du
+ * détail et la formule disent « comptée » ou « hors moyenne », pareil pour la personne fichée et en public.
  */
-export function schoolKept(c: Pick<GridCriterion, "code" | "score" | "private">): boolean {
-  return c.code === "EDU" && c.score !== null && !c.private;
+export function schoolKept(c: Pick<GridCriterion, "code" | "score" | "counted" | "private" | "source">): boolean {
+  return schoolState(c) !== null;
 }
 
 export function stateTags(c: GridCriterion, grid?: Pick<Grid, "rule">): Tag[] {
-  // Page partagée : l'école hors moyenne est gardée pour la personne fichée (shared/publicView.ts).
+  // L'école : son mot (« comptée », « hors moyenne ») tient lieu de note et d'étiquette.
+  if (schoolState(c)) return [];
   if (c.private) return ["private"];
   const tags: Tag[] = [];
   if (c.state === "declared") tags.push("declared");
@@ -143,8 +144,14 @@ export function rowText(c: GridCriterion, opts: { g: G; pick: PickFn; declared: 
   const flags = c.flags.map((f) => pick(f)).filter(Boolean);
   const publicText = c.evidence?.publicText ? pick(c.evidence.publicText) : "";
   // L'école, ni son rang ni son nom : gardée pour la personne fichée (rapport du recruteur, §6).
+  // Comptée ou hors moyenne, la ligne finit par la même phrase pour tout le monde, sans chiffre (§18.52).
+  const school = schoolState(c);
+  const why = school && c.score !== null ? ` ${g.school[school]}` : school && c.private ? ` ${g.school.out}` : "";
   if (shared && c.code === "EDU" && evSource !== "github") {
-    return { line: g.shared.school, label: null, href: null, reached: null, next: null, flags: [], redacted: true };
+    return { line: `${g.shared.school}${why}`, label: null, href: null, reached: null, next: null, flags: [], redacted: true };
+  }
+  if (school) {
+    return { line: `${line}${why}`, label, href: shared && href && !href.startsWith("https://github.com/") ? null : href, reached: null, next: null, flags: shared ? flags.map(flagName) : flags, redacted: false };
   }
   if (shared && evSource !== "github" && publicText) {
     return {
@@ -210,11 +217,14 @@ export function finalLines(grid: Grid, g: G, lang: Lang, unprovenCase?: { src: s
   }
   const terms = m.terms.map((x) => (x.code === "EDU" ? F.termCounted(g.names[x.code], dec(x.weight, lang)) : F.term(g.names[x.code], x.score, dec(x.weight, lang)))).join(" + ");
   const out: string[] = [];
+  // L'école a sa propre ligne, sans « sous la moyenne des autres » : ce serait dire où est sa note (§18.52).
   for (const why of ["unproven", "missing", "below"] as const) {
-    const names = m.excluded.filter((x) => x.why === why).map((x) => g.names[x.code]);
+    const names = m.excluded.filter((x) => x.why === why && x.code !== "EDU").map((x) => g.names[x.code]);
     if (!names.length) continue;
     out.push(F.outList(F.out[why], names.join(", ")) + (why === "below" ? ` ${F.belowWhy}` : ""));
   }
+  const edu = grid.criteria.find((c) => c.code === "EDU");
+  if (edu && schoolState(edu) === "out") out.push(F.schoolOut(g.names.EDU));
   let rule = m.rule === "capped_unproven" ? (m.capHit ? F.cappedHit(m.raw!) : F.capped) : null;
   if (unprovenCase && m.rule === "capped_unproven") {
     const opens = F.opensList(m.excluded.filter((x) => x.why === "unproven").map((x) => g.names[x.code]));

@@ -126,9 +126,10 @@ describe("la ligne de la note finale", () => {
     expect(f.overall).toBe(20);
   });
 
-  it("l'école sous la moyenne sort, et la ligne dit pourquoi", () => {
+  it("l'école sous la moyenne sort, sur sa propre ligne, sans « sous la moyenne des autres » (§18.52)", () => {
     const f = finalLines(githubGridMock("wonderkid", "nour-rs")!, FR, "fr");
-    expect(f.out.some((o) => o.includes("École") && o.includes(FR.final.belowWhy))).toBe(true);
+    expect(f.out).toContain(FR.final.schoolOut(FR.names.EDU));
+    expect(f.out.filter((o) => o.startsWith(FR.final.out.below)).join(" ")).not.toContain(FR.names.EDU);
   });
 });
 
@@ -159,8 +160,8 @@ describe("la page partagée : ni école ni ancien employeur", () => {
 
   it("ce qui reste : la version publique de la pièce, écrite par le moteur, et le nom du chef d'accusation", () => {
     const [edu, xp, emp] = rows(declaredGridMock("LinkedIn"), true);
-    // L'école, ni rang ni nom : gardée pour la personne fichée.
-    expect(edu.line).toBe("École gardée pour la personne fichée.");
+    // L'école, ni rang ni nom : gardée pour la personne fichée ; puis la phrase de son état, sans chiffre (§18.52).
+    expect(edu.line).toMatch(/^École gardée pour la personne fichée\. (Elle compte dans la note, sans chiffre affiché|Une école ne fait jamais baisser la note)\.$/);
     expect(xp.line).toContain("8,4 ans");
     expect(xp.line).toContain("41 mois à la tête d'une entreprise fondée");
     expect(emp.line).toBe("Entreprise fondée : depuis juin 2023, 41 mois. Poste : janvier 2019 – août 2023, 4,6 ans.");
@@ -172,7 +173,7 @@ describe("la page partagée : ni école ni ancien employeur", () => {
     const old: Grid = { ...declaredGridMock("LinkedIn") };
     old.criteria = old.criteria.map((c) => (c.evidence ? { ...c, evidence: { text: c.evidence.text, source: c.evidence.source } } : c));
     const [edu, xp, emp] = rows(old, true);
-    expect(edu.line).toBe("École gardée pour la personne fichée.");
+    expect(edu.line.startsWith("École gardée pour la personne fichée.")).toBe(true);
     expect(xp.line).toContain("8,4 ans");
     expect(emp.line).toBe(FR.levels.EMP.find(([n]) => n <= 8)![1]);
     for (const r of rows(old, true)) expect(text(r)).not.toMatch(NAMES);

@@ -50,8 +50,10 @@ export const STRINGS = {
       unproven: "non prouvé",
       missing: "pas au dossier",
       outOfMean: "hors moyenne",
-      /** L'école comptée dans la note : jamais sa note, ni sur le dos, ni dans la formule. */
-      schoolCounted: "Comptée au dossier, sa note reste privée.",
+      /** L'école (§18.52) : deux mots seulement, « comptée » ou « hors moyenne », jamais un chiffre, pour personne. */
+      counted: "comptée",
+      schoolCounted: "Elle compte dans la note, sans chiffre affiché.",
+      schoolOut: "Une école ne fait jamais baisser la note.",
       /** Repli d'une pièce qui ne se montre pas en public : d'où elle vient. */
       readOn: (src: string) => `Lu sur ${src}.`,
       /** Fiche sans grille rangée (dénoncée, pas encore reprise) : d'où vient la note, sans formule. */
@@ -112,7 +114,9 @@ export const STRINGS = {
       unproven: "unproven",
       missing: "not on file",
       outOfMean: "not averaged",
-      schoolCounted: "On file, its score stays private.",
+      counted: "counted",
+      schoolCounted: "It counts toward the rating, no number shown.",
+      schoolOut: "A school never lowers the rating.",
       readOn: (src: string) => `Read on ${src}.`,
       fromGrid: "Rating read from the hiring scorecard: eight criteria, each scored out of 10.",
       axes: { TEC: "Tech skill", SHIP: "Shipping", ARCH: "Rigor", DOC: "Communication", XP: "Experience", BUZZ: "Buzzwords" },

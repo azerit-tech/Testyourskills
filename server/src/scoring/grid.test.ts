@@ -389,7 +389,7 @@ describe("l'école ne peut pas faire baisser la note (§4, règle 2)", () => {
 
   it("un semestre d'échange n'est pas lu ici : seule l'école retenue par la lecture compte", () => {
     const g = declaredGrid(decl(lumineReading(), lumineProfile()));
-    expect(crit(g, "EDU").reached.fr).toBe("CentraleSupélec\u00a0: comptée au dossier.");
+    expect(crit(g, "EDU").reached.fr).toBe("CentraleSupélec\u00a0: au dossier.");
   });
 });
 

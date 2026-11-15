@@ -3,8 +3,9 @@
 // appliqué par le serveur à la réponse de GET /api/card/:id (rien de privé ne
 // part sur le réseau) et par le front à la vue partagée (mêmes règles en démo).
 //
-// - L'école est gardée pour la personne : sa note ne se montre que si elle a
-//   fait monter la note (comptée dans la moyenne), jamais son rang ni son nom.
+// - L'école est gardée pour la personne : sa note ne part que si elle a fait
+//   monter la note (comptée dans la moyenne, pour la formule), jamais son rang
+//   ni son nom. Aucun écran ne la montre (shared/gridText.ts, schoolState).
 // - Les recoupements ne se montrent que positifs. Les points « à confirmer »
 //   (signaux du critère depuis le §18.36 : « À confirmer en entretien », « À
 //   confirmer : Kafka… ») restent privés, comme les chefs d'accusation de la
