@@ -466,7 +466,7 @@ Le barème (§4.4, §4.5), le catalogue de statuts (§5) et la liste des mots cr
 
 ## 12. Garde-fous
 
-- Vingt cartes par adresse IP et par jour.
+- 300 fiches par adresse IP et par jour, et 6 par navigateur (identifiant aléatoire gardé dans le navigateur, mentionné sur la page vie privée) ; le plafond de dépense par jour reste le vrai garde-fou (§18.48).
 - Une carte par pseudo par 24 h, servie depuis le cache.
 - Timeout de 30 secondes par carte, au-delà message d'erreur honnête et pas de carte vide.
 - Budget de tokens par carte plafonné, coût suivi par jour, persisté en base. Plafond du jour atteint ou crédit OpenRouter épuisé : « Le commissariat est fermé pour ce soir », jamais une fiche sans lecture (§18.0).
@@ -1514,3 +1514,39 @@ Demande de Jacques (14 novembre, minuit) : repasser sur tout le design, chaque d
 
 **Le vocabulaire** (un mot par chose) : fiche / rap sheet puis sheet (l'objet) ; dossier / file (la métaphore, dans les phrases seulement) ; source (LinkedIn, CV, GitHub) ; pièce / exhibit (un constat au verso) ; chef d'accusation / charge ; bande / crew ; prime / bounty ; « entrer dans la course » ; « faire appel » pour contester ; « C'est moi » / “That's me” pour reprendre sa fiche ; toute note s'écrit avec son échelle (79/100, 8/10). Anglais américain. Le texte de partage dit « Ma fiche de dev », la note avec son échelle, et n'envoie le rang que s'il flatte.
 
+### 18.49 Revue complète : ce que le premier tour a livré (15 novembre, nuit)
+
+Neuf lots fusionnés sur `master` : règles du serveur, images de partage, fondations visuelles, film, fiche, textes, vitesse, accueil. Le lot des pages autour (bandes, primes, règlement, vie privée, retrait, erreurs) est en cours de fusion ; la page d'une fiche, l'écran d'attente et une liste de finitions sont en cours. Les décisions prises en route par les agents, et gardées :
+
+**Film**
+- Rechargé en plein film : la page revient sur la pastille « Lancer la poursuite », puis le film reprend du début. Rechargé après la pose de la fiche : la fiche directement. Le film n'est dû qu'une fois par fiche et par onglet (`tys_film_owed`).
+- Fini ou passé, le focus va au titre de la fiche, pour le clavier et le lecteur d'écran.
+- Téléphone couché : « Passer » et le son vont dans la marge d'encre à droite, hors de l'encoche.
+
+**Fiche**
+- Les étoiles de la fiche dessinée font 22 px, sous la note.
+- Un avatar généré par GitHub (pas une photo) est reconnu côté navigateur à sa taille reçue (420 × 420) et remplacé par l'initiale. Vérifié sur trois comptes seulement.
+- Les libellés lus par les lecteurs d'écran n'ont plus de tiret long ; la note y est dite avec son échelle.
+
+**Textes**
+- Le site ne promet aucun courriel : il n'en envoie pas. Donner son adresse garde la fiche au-delà de 90 jours, rien de plus. Un vrai courriel avec lien de suppression reste à décider.
+- Le message de limite de création ne cite aucun nombre.
+- Le rang ne figure dans le texte de partage que dans le top 10.
+- Les onglets et les aperçus de lien disent « Azerit » ; le serveur les sert en anglais sur `?lang=en` puis selon la langue du navigateur. Le règlement et la vie privée ont leur titre et leur description.
+- Une seule règle de typographie française pour le site et le serveur (`shared/typo.ts`) ; un test garde les textes dans les deux langues.
+
+**Vitesse et moteurs de recherche**
+- Le HTML porte la marque et un trait d'attente : plus d'écran noir. Chaque page arrive avec ses seuls morceaux, annoncés par le serveur ; les fichiers partent compressés (brotli, sinon gzip), sans dépendance nouvelle. Mesure sur téléphone simulé en 4G lente : premier contenu en 0,9 s au lieu de 4 à 5,8 s.
+- Les fiches (page et images) sont en `noindex` : elles portent un nom. `robots.txt` autorise tout, pour que les aperçus de lien marchent ; `sitemap.xml` ne liste que l'accueil, les bandes, les primes et le règlement quand ils existent, la vie privée.
+- Icônes : la gemme Azerit sur encre (onglet, écran d'accueil du téléphone), manifeste nommé « Azerit ».
+- Les polices restent en TTF (compressées à l'envoi) : la conversion en WOFF2 demande un outil absent du Mac, gain attendu d'environ 15 %.
+
+**Accueil**
+- Premier écran à 390 × 844 : couverture réduite, titre sur deux lignes, promesse sous le titre, portes, champ, bouton. Le bas du bouton est à 544 px (617 avant), 588 avec le bandeau de saison.
+- La première ligne du titre est lilas, la seconde crème : le rose reste réservé à ce qui se touche.
+- Ordre : fiche d'exemple (en grand, juste sous le formulaire), top de la semaine, primes si ouvertes, bandes précédées de « Fais ta fiche. Fais gagner ta bande. », galerie des profils, bloc final « À toi. » avec un second formulaire.
+- Semaine vide : un seul bloc « La place n° 1 est libre ». Top incomplet : une ligne « Places 3 à 5 libres ». Pas de section bandes tant qu'il n'y en a aucune.
+- L'accueil se souvient : « Ta fiche : ★★★★★☆ 79/100. La revoir » ou « Ton dossier s'ouvre encore. Y retourner » prend la place de la promesse, et la case « TA PLACE » devient la vignette de la fiche. Le dossier en cours tient dans `tys_pending` (session du navigateur).
+- Sous le champ : « Profil public seulement. » (LinkedIn), « Repos publics seulement. » (GitHub).
+
+**Reste connu après ce tour** : le bandeau de saison arrive après la configuration et pousse la page de 44 px à la première visite ; le routeur colle la requête après l'ancre (`/#semaine?mock=1`) ; rien n'a encore été revu sur un vrai iPhone depuis la correction du film, ni dans le navigateur intégré de LinkedIn ; personne n'a écouté le son. Un deuxième tour de critique suit la fusion des lots en cours.
