@@ -51,11 +51,11 @@ export const bandsApi = {
     if (isMock()) return mock.top();
     return getJson<BandsTop>("/api/bands/top").catch(() => null);
   },
-  /** Le tableau d'une ligue, et sa propre bande si elle est plus bas. */
-  async board(type: BandType, withId?: string | null): Promise<BandBoard | null> {
+  /** Le tableau d'une ligue, et sa propre bande si elle est plus bas. Une panne remonte en ApiError. */
+  async board(type: BandType, withId?: string | null): Promise<BandBoard> {
     if (isMock()) return mock.board(type, withId ?? null);
     const q = withId ? `&with=${encodeURIComponent(withId)}` : "";
-    return getJson<BandBoard>(`/api/bands?type=${type}${q}`).catch(() => null);
+    return getJson<BandBoard>(`/api/bands?type=${type}${q}`);
   },
   /** La page d'une bande ; null si elle n'existe pas. Une panne réseau remonte en ApiError. */
   async page(type: BandType, id: string): Promise<BandPage | null> {
@@ -122,6 +122,39 @@ export function bandHint(now = Date.now()): BandRef | null {
   const v = readJson<unknown>(HINT_KEY);
   const at = v && typeof v === "object" ? (v as { at?: unknown }).at : null;
   if (!isRef(v) || typeof at !== "number" || now - at > BAND_HINT_MS) return null;
+  return { type: v.type, id: v.id, label: v.label };
+}
+
+/* La bande choisie sur sa page, portée à travers la création jusqu'à la fiche posée :
+   sous la fiche, BandPick la rejoint (une fois). sessionStorage, la RAM en repli. */
+const JOIN_KEY = "tys_band_join";
+let memJoin: (BandRef & { cardId: string }) | null = null;
+
+export function rememberBandJoin(cardId: string, ref: BandRef) {
+  memJoin = { cardId, type: ref.type, id: ref.id, label: ref.label };
+  try {
+    sessionStorage.setItem(JOIN_KEY, JSON.stringify(memJoin));
+  } catch {
+    /* stockage bloqué : la RAM suffit pour cet onglet */
+  }
+}
+
+/** La bande qui attend cette fiche, ou null ; elle n'est lue qu'une fois. */
+export function takeBandJoin(cardId: string): BandRef | null {
+  let v: unknown = memJoin;
+  try {
+    const raw = sessionStorage.getItem(JOIN_KEY);
+    if (raw) v = JSON.parse(raw);
+  } catch {
+    /* la RAM fait foi */
+  }
+  if (!isRef(v) || (v as { cardId?: unknown }).cardId !== cardId) return null;
+  memJoin = null;
+  try {
+    sessionStorage.removeItem(JOIN_KEY);
+  } catch {
+    /* rien */
+  }
   return { type: v.type, id: v.id, label: v.label };
 }
 

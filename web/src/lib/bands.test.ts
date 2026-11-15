@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { BandStanding, MyBands } from "../../../shared/bands";
 import { DICTS } from "../i18n";
-import { BAND_HINT_MS, bandHint, filledStars, rememberBandHint, suggestedPills } from "./bands";
+import { BAND_HINT_MS, bandHint, filledStars, rememberBandHint, rememberBandJoin, suggestedPills, takeBandJoin } from "./bands";
 import { routeOf } from "./router";
 
 const { fr, en } = DICTS;
@@ -111,5 +111,50 @@ describe("la bande d'où l'on vient", () => {
     // Un souvenir d'avant cette règle, sans date : ignoré.
     mem.set("tys_band_hint", JSON.stringify({ type: "ecole", id: "epitech", label: "Epitech" }));
     expect(bandHint(t)).toBeNull();
+  });
+});
+
+describe("la bande choisie avant de faire la fiche", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("suit jusqu'à la fiche posée, pour cette fiche seulement, et une seule fois", () => {
+    const mem = new Map<string, string>();
+    vi.stubGlobal("sessionStorage", { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => void mem.set(k, v), removeItem: (k: string) => void mem.delete(k) });
+    rememberBandJoin("fiche00001", { type: "boite", id: "ma-boite", label: "Ma Boîte" });
+    // une autre fiche ne l'emporte pas
+    expect(takeBandJoin("fiche00002")).toBeNull();
+    expect(takeBandJoin("fiche00001")).toEqual({ type: "boite", id: "ma-boite", label: "Ma Boîte" });
+    // lue une fois : recharger la fiche ne la fait pas rentrer de nouveau
+    expect(takeBandJoin("fiche00001")).toBeNull();
+    expect(mem.size).toBe(0);
+  });
+
+  it("stockage bloqué : la mémoire de l'onglet suffit", () => {
+    const blocked = () => {
+      throw new Error("bloqué");
+    };
+    vi.stubGlobal("sessionStorage", { getItem: blocked, setItem: blocked, removeItem: blocked });
+    rememberBandJoin("fiche00003", { type: "ecole", id: "epitech", label: "Epitech" });
+    expect(takeBandJoin("fiche00003")).toEqual({ type: "ecole", id: "epitech", label: "Epitech" });
+    expect(takeBandJoin("fiche00003")).toBeNull();
+  });
+});
+
+describe("les trois états de la page d'une bande, en mots", () => {
+  it("les fiches anonymes tiennent en une ligne, à la suite des fiches nommées ou seules", () => {
+    expect(fr.bands.states.anonymous(12, 3)).toBe("Et 12 fiches anonymes.");
+    expect(fr.bands.states.anonymous(1, 2)).toBe("Et 1 fiche anonyme.");
+    expect(fr.bands.states.anonymous(4, 0)).toMatch(/^4 fiches anonymes\. /);
+    expect(en.bands.states.anonymous(12, 3)).toBe("And 12 anonymous sheets.");
+  });
+
+  it("les clés neuves : ni tiret long, ni point médian, et plus de « un toucher dessous »", () => {
+    for (const d of [fr, en]) {
+      const s = d.bands.states;
+      const n = d.bands.none;
+      const texts = [s.follow, s.joinTitle, s.joinText, s.join, s.moving("X"), s.lost, s.seeCard, s.pickUnder, s.landed("X"), s.slots(1), s.anonymous(2, 0), s.anonymous(2, 1), n.title, n.note, n.league.ecole, n.league.boite];
+      for (const x of texts) expect(x, x).not.toMatch(/[—·]/);
+      expect(s.follow).not.toMatch(/toucher dessous|tap below/);
+    }
   });
 });

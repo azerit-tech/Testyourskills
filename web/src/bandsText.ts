@@ -52,7 +52,6 @@ const fr = {
     title: "Les bandes",
     intro: "Chaque fiche rapporte ses étoiles à son école et à sa boîte. Les vingt meilleures comptent, trois suffisent pour entrer au tableau.",
     tabs: "Tableau",
-    empty: "Aucune bande au tableau. Trois fiches suffisent pour en monter une.",
     yours: "Ta bande",
     rowLabel: (rank: number | null, label: string, score: number, dossiers: number) =>
       `${rank ? (rank === 1 ? "n° 1" : `${rank}e`) : "En formation"}, ${label}, ${n(score, "étoile", "étoiles")}, ${n(dossiers, "fiche", "fiches")}`,
@@ -81,6 +80,37 @@ const fr = {
     hook: "Fais ta fiche. Fais gagner ta bande.",
     empty: "Trois fiches font une bande. Aucune n'est encore au tableau.",
     all: "Toutes les bandes",
+  },
+  /* --- clés neuves de la revue du 15 novembre (SPEC §18.48), groupées --- */
+  /** La page d'une bande, trois états : sans fiche, avec une fiche, membre. */
+  states: {
+    /** Sans fiche : la bande choisie ici suit jusqu'à la fiche posée. */
+    follow: "Ta fiche posée, tu entres dans cette bande : tes étoiles comptent tout de suite.",
+    joinTitle: "Tu as déjà ta fiche",
+    joinText: "Un toucher, et ses étoiles comptent pour cette bande.",
+    join: "Rejoindre avec ma fiche",
+    /** Déjà dans une autre bande de la même ligue : une école, une boîte au plus. */
+    moving: (label: string) => `Tu roules pour ${label} : rejoindre ici t'en fait sortir.`,
+    /** La fiche n'est plus à portée de ce navigateur (jeton perdu, session finie). */
+    lost: "Ta fiche ne répond pas depuis ce navigateur. Ouvre-la, puis choisis ta bande dessous.",
+    seeCard: "Voir ma fiche",
+    /** /bandes, avec une fiche : le choix se fait sous elle. */
+    pickUnder: "Tu as déjà ta fiche : choisis ton école et ta boîte dessous.",
+    /** La fiche vient de se poser, sa bande l'attendait (message éphémère sous la fiche). */
+    landed: (label: string) => `Tu roules pour ${label}.`,
+    /** Les trois emplacements d'une bande en formation, pour un lecteur d'écran. */
+    slots: (k: number) => `${k} sur 3`,
+    /** Les fiches sans pseudo, en une ligne ; `named` : celles qui s'affichent au-dessus. */
+    anonymous: (k: number, named: number) => {
+      const some = k > 1 ? `${k} fiches anonymes` : "1 fiche anonyme";
+      return named > 0 ? `Et ${some}.` : `${some}. Une fiche revendiquée avec « C'est moi » s'affiche ici avec son pseudo.`;
+    },
+  },
+  /** /bandes sans bande : l'appel à monter la première ; une ligue vide à côté d'une pleine. */
+  none: {
+    title: "Monte la première bande",
+    note: "Trois fiches d'une même école ou d'une même boîte, et elle entre au tableau.",
+    league: { ecole: "Aucune école au tableau pour l'instant.", boite: "Aucune boîte au tableau pour l'instant." } as Record<BandType, string>,
   },
 };
 
@@ -125,7 +155,6 @@ const en: BandsDict = {
     title: "The crews",
     intro: "Every sheet brings its stars to its school and its company. The best twenty count, three are enough to make the board.",
     tabs: "Board",
-    empty: "No crew on the board yet. Three sheets are enough to start one.",
     yours: "Your crew",
     rowLabel: (rank: number | null, label: string, score: number, dossiers: number) =>
       `${rank ? `#${rank}` : "Forming"}, ${label}, ${nEn(score, "star", "stars")}, ${nEn(dossiers, "sheet", "sheets")}`,
@@ -152,6 +181,27 @@ const en: BandsDict = {
     hook: "Get your rap sheet. Put your crew on top.",
     empty: "Three sheets make a crew. None has made the board yet.",
     all: "All crews",
+  },
+  states: {
+    follow: "Once your sheet lands, you are in this crew: your stars count right away.",
+    joinTitle: "You already have your sheet",
+    joinText: "One tap, and its stars count for this crew.",
+    join: "Join with my sheet",
+    moving: (label: string) => `You ride for ${label}: joining here takes you out of it.`,
+    lost: "Your sheet isn't answering from this browser. Open it, then pick your crew below it.",
+    seeCard: "See my sheet",
+    pickUnder: "You already have your sheet: pick your school and your company below it.",
+    landed: (label: string) => `You ride for ${label}.`,
+    slots: (k: number) => `${k} of 3`,
+    anonymous: (k: number, named: number) => {
+      const some = k > 1 ? `${k} anonymous sheets` : "1 anonymous sheet";
+      return named > 0 ? `And ${some}.` : `${some}. A sheet claimed with “That's me” shows here with its username.`;
+    },
+  },
+  none: {
+    title: "Start the first crew",
+    note: "Three sheets from the same school or company, and it makes the board.",
+    league: { ecole: "No school on the board yet.", boite: "No company on the board yet." },
   },
 };
 

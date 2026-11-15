@@ -94,6 +94,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: space-between;
   gap: 4px 16px;
 }
 
@@ -127,16 +128,25 @@
 
 /* ---------- /bandes ---------- */
 
+/* la page tient la marge ; ses blocs s'alignent sur une colonne de lecture, puis sur le
+   conteneur du bureau */
+.page-bands,
+.page-band {
+  padding: 24px var(--gutter) 56px;
+}
+.bands,
+.bands-make,
+.band-side,
+.band-main {
+  width: 100%;
+  max-width: calc(var(--measure) - 2 * var(--gutter));
+  margin: 0 auto;
+}
 .bands,
 .band,
-.band-roster,
-.band-recruit {
+.band-roster {
   display: grid;
   gap: 10px;
-  width: 100%;
-  max-width: var(--measure);
-  margin: 0 auto;
-  padding: 24px var(--gutter) 0;
 }
 .bands h1,
 .band h1 {
@@ -147,16 +157,21 @@
   text-wrap: balance;
 }
 .bands-intro {
+  max-width: var(--measure);
   font: var(--font-body);
   color: var(--c-text);
 }
 .bands-tabs {
   margin: 8px 0 4px;
 }
+.bands-cols {
+  display: grid;
+  gap: 24px;
+}
 .bands-panel {
   display: grid;
+  align-content: start;
   gap: 12px;
-  min-height: 120px;
 }
 .bands-empty {
   padding: var(--pad-block);
@@ -165,14 +180,40 @@
   font: var(--font-body);
   color: var(--c-text);
 }
-.page-bands {
-  padding-bottom: 56px;
+.bands-make {
+  margin-top: 28px;
+}
+/* aucune bande : l'appel prend la place du tableau, juste sous le titre */
+.page-bands.is-empty .bands-make {
+  margin-top: 20px;
+}
+.band-make .band-make-note,
+.bands-make .band-make-note {
+  font: var(--font-small);
+  color: var(--c-text);
+}
+/* téléphone : une ligue à la fois, sous les onglets (l'étiquette de la ligue serait un doublon) */
+@media (max-width: 899px) {
+  .bands-panel:not(.is-on) {
+    display: none;
+  }
+  .bands-panel-tag {
+    display: none;
+  }
+  .bands-panel-tag + .board-list.is-top {
+    border-top-left-radius: var(--r-block);
+  }
 }
 
 /* ---------- la page d'une bande ---------- */
 
-.band-back {
-  justify-self: start;
+.band-side,
+.band-main {
+  display: grid;
+  gap: 28px;
+}
+.band-main {
+  margin-top: 32px;
 }
 .band-total {
   display: flex;
@@ -198,6 +239,28 @@
   font: 500 var(--t-16) / 1.2 var(--f-text);
   color: var(--c-text);
 }
+/* une bande en formation : trois emplacements, pleins ou à remplir (jamais « ★ 0 ») */
+.band-slots {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+.band-slot {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border: 1.5px dashed var(--c-text-2);
+  border-radius: var(--r-item);
+}
+.band-slot.is-on {
+  border: 0;
+  background: var(--s-info);
+}
+.band-slot .star-mark {
+  width: 26px;
+  height: 26px;
+}
 /* le rang : l'emphase, crème en gras */
 .band-rank {
   font: 700 var(--t-16) / 1.4 var(--f-text);
@@ -213,83 +276,60 @@
   text-decoration-thickness: 1px;
   text-underline-offset: 4px;
 }
-.band-share {
+.band .band-share {
   justify-self: start;
   margin-top: 4px;
 }
-.band-make {
-  width: min(calc(100% - 2 * var(--gutter)), calc(var(--measure) - 2 * var(--gutter)));
-  margin: 28px auto 0;
+/* le bloc d'appel, selon l'état : faire sa fiche, rejoindre, partager */
+.band-call .btn-primary {
+  width: 100%;
 }
-.band-make .band-make-note {
-  font: var(--font-small);
+.band-call.is-loading {
+  min-height: 180px;
+}
+.band-call p {
   color: var(--c-text);
 }
-.page-band {
-  padding-bottom: 56px;
+.band-call .band-call-note {
+  font: var(--font-small);
+  color: var(--c-reserve);
 }
-.band-roster {
-  padding-top: 32px;
+.band-call .link-alt {
+  justify-self: center;
+}
+/* « Tu rapportes ★★★★ à … » : les étoiles tiennent sur la ligne du titre */
+.band-mine .stars {
+  vertical-align: -2px;
 }
 .band-roster h2 {
   font: var(--font-section);
   text-transform: uppercase;
   color: var(--cream);
 }
-.band-member {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
+/* une fiche revendiquée : visage, pseudo et profil, étoiles ; la ligne mène à la fiche */
+.board-row.band-member {
+  grid-template-columns: 32px minmax(0, 1fr) auto;
   gap: 12px;
-  min-height: 48px;
-  padding: 0 14px;
-  font: 500 var(--t-16) / 1.2 var(--f-text);
-  color: var(--c-text);
+  min-height: 56px;
 }
-.band-members > li + li {
-  box-shadow: inset 0 1px 0 var(--c-line);
-}
-.band-member-profile {
-  display: grid;
-  min-width: 0;
-  padding: 6px 0;
-}
-.band-member-profile,
-.band-member-position {
+.band-member .band-count {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.band-member-position {
-  font: 500 var(--t-14) / 1.2 var(--f-text);
-  color: var(--c-text-2);
-}
-.band-member-login {
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--h-tap);
-  font: 500 var(--t-14) / 1 var(--f-text);
-  color: var(--c-action);
-  text-decoration: none;
-}
-.band-member-login:hover {
-  color: var(--cream);
-}
+/* les fiches anonymes : une ligne, sous les fiches nommées */
 .band-more {
+  padding-left: 12px;
   font: var(--font-small);
   color: var(--c-text-2);
 }
+/* « Tu recrutes chez … ? » : après les fiches, discret */
 .band-recruit {
-  padding-top: 28px;
-  padding-bottom: 8px;
   font: var(--font-small);
-  color: var(--c-text);
+  color: var(--c-text-2);
 }
-.band-recruit a {
-  color: var(--c-action);
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 4px;
+.band-recruit .link-alt {
+  display: inline;
 }
 
 /* ---------- le top de l'accueil ---------- */
@@ -303,11 +343,59 @@
 }
 
 @media (min-width: 900px) {
-  .bands,
-  .band,
-  .band-roster,
-  .band-recruit {
+  .page-bands,
+  .page-band {
     padding-top: 40px;
+    padding-bottom: 80px;
+  }
+  /* /bandes : les deux ligues côte à côte, sans onglets, sur le conteneur de la page */
+  .bands,
+  .bands-make {
+    max-width: var(--page-w);
+  }
+  .seg.bands-tabs {
+    display: none;
+  }
+  .bands-cols {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: 16px;
+  }
+  .board-tag + .bands-empty {
+    border-top-left-radius: 0;
+  }
+  /* l'appel : le titre à gauche, le champ à droite, sur la largeur du tableau */
+  .bands-make {
+    grid-template-columns: minmax(0, 1fr) minmax(0, var(--w-form));
+    align-items: center;
+    gap: 12px 56px;
+    margin-top: 40px;
+  }
+  .bands-make > h2 {
+    grid-row: 1 / span 2;
+  }
+  .bands-make > :not(h2) {
+    grid-column: 2;
+  }
+  /* la page d'une bande : la bande et l'appel à gauche (ils suivent la lecture), les fiches à droite */
+  .page-band {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 0 56px;
+    max-width: var(--page-max);
+    margin: 0 auto;
+  }
+  .band-side,
+  .band-main {
+    max-width: none;
+    margin: 0;
+  }
+  .band-side {
+    position: sticky;
+    top: 24px;
+  }
+  .band-main {
+    padding-top: 44px;
   }
   .board > .bands-top-cols {
     grid-template-columns: 1fr 1fr;

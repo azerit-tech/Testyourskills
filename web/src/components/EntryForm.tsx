@@ -33,6 +33,8 @@ interface Props {
   /** Un second formulaire sur la même page (le bas de l'accueil) : ni focus d'emblée, ni
    * raccourcis de page (collage, dépôt de PDF), que le premier porte déjà. */
   secondary?: boolean;
+  /** La fiche vient d'être créée, avant de partir vers elle (la page d'une bande y accroche sa bande). */
+  onCreated?: (id: string) => void;
 }
 
 const DOORS: Door[] = ["linkedin", "github"];
@@ -87,7 +89,7 @@ function initialEntry(raw: string | undefined): { door: Door; login: string } {
   return { door: sessionDoor(), login: s };
 }
 
-export function EntryForm({ inputRef, variant = "full", note, secondary = false }: Props) {
+export function EntryForm({ inputRef, variant = "full", note, secondary = false, onCreated }: Props) {
   const inline = variant === "inline";
   const { t, lang } = useT();
   const h = t.home;
@@ -164,6 +166,7 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false 
       // « Réessayer » remet le lien LinkedIn dans le champ unique.
       rememberInput({ login: input.login ?? input.linkedin, file: input.file ?? null });
       markFresh(res.id, input.login, input.linkedin);
+      onCreated?.(res.id);
       navigate(`/c/${res.id}`);
     } catch (err) {
       busyRef.current = false;
