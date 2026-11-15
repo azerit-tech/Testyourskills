@@ -402,23 +402,6 @@ export function CtaPill({ x, bottom, label, lang, size, maxW, anchor = "start" }
   );
 }
 
-/** « Fais la tienne : skills.azerit.tech », au pied des aperçus de lien. */
-export function CtaLine({ x, y, lang }: { x: number; y: number; lang: Lang }) {
-  const s = t(lang);
-  const cta = lang === "fr" ? `${s.cta}\u00a0:` : `${s.cta}:`;
-  const ctaW = fit(cta, { font: "sans-500", size: 26, minSize: 26, maxWidth: 4000 }).width;
-  return (
-    <>
-      <text x={x} y={y} {...fontAttrs("sans-500")} fontSize={26} fill={PALETTE.lilac} fillOpacity={0.8}>
-        {cta}
-      </text>
-      <text x={x + ctaW + 10} y={y} {...fontAttrs("sans-600")} fontSize={26} fill={PALETTE.cream}>
-        {ctaHost()}
-      </text>
-    </>
-  );
-}
-
 /* ------------------------------------------------------------------ */
 /* Aperçu de lien de l'accueil 1200 × 630                               */
 /* ------------------------------------------------------------------ */
