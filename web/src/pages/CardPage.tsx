@@ -214,6 +214,8 @@ export function CardPage({ id }: { id: string }) {
   const { t, lang } = useT();
   const [nonce, setNonce] = useState(0);
   const [notice, setNotice] = useState<{ text: string; n: number } | null>(null);
+  // « C'est moi » vient de réussir : le pseudo GitHub repris, pour le bandeau en haut de la fiche.
+  const [claimedAs, setClaimedAs] = useState<string | null>(null);
   const { view, setView, sawPending, offline, onRetry } = useJob(id, nonce);
   const { kase, late: caseLate } = useCase(id, nonce);
   const fresh = freshSince(id) !== null;
@@ -256,9 +258,14 @@ export function CardPage({ id }: { id: string }) {
       const qs = params.toString();
       window.history.replaceState(window.history.state, "", window.location.pathname + (qs ? `?${qs}` : ""));
       const c = t.result.claim;
-      const text =
-        claim === "ok" && as ? c.claimed(as) : claim === "mismatch" && as ? c.mismatch(as) : claim === "limited" ? c.limited : c.error;
-      setNotice({ text, n: Date.now() });
+      // Reprise réussie (§18.52) : pas un message qui passe, la page remonte et le dit en haut, avec « Voir ma poursuite ».
+      if (claim === "ok" && as) {
+        setClaimedAs(as.toLowerCase());
+        window.scrollTo(0, 0);
+      } else {
+        const text = claim === "ok" ? c.error : claim === "mismatch" && as ? c.mismatch(as) : claim === "limited" ? c.limited : c.error;
+        setNotice({ text, n: Date.now() });
+      }
       if (claim === "ok") {
         setMeNonce((n) => n + 1);
         setNonce((n) => n + 1);
@@ -388,7 +395,7 @@ export function CardPage({ id }: { id: string }) {
   if (view.s === "withdrawn") {
     return (
       <main className="page page-card" id="main">
-        <Withdrawn cardId={id} notice={notice?.text ?? null} />
+        <Withdrawn cardId={id} notice={notice?.text ?? (claimedAs ? t.result.claim.claimed(claimedAs) : null)} />
       </main>
     );
   }
@@ -437,6 +444,7 @@ export function CardPage({ id }: { id: string }) {
         fresh={fresh && owed}
         kase={kase}
         caseLate={caseLate}
+        claimedAs={claimedAs}
         notice={notice}
         me={me}
         onMe={setMe}
@@ -461,13 +469,15 @@ export interface ResultProps {
   kase: CaseInfo | null;
   /** Le dossier tarde : l'après-fiche se montre quand même, sans sa ligne du jury. */
   caseLate: boolean;
+  /** « C'est moi » vient de réussir pour ce pseudo : le bandeau en haut de la fiche. */
+  claimedAs?: string | null;
   notice: { text: string; n: number } | null;
   me: Awaited<ReturnType<typeof api.getMe>>;
   onMe: (me: Awaited<ReturnType<typeof api.getMe>>) => void;
   onDeleted: () => void;
 }
 
-export function Result({ item, animate, start, abort, onScene, owner, fresh, kase, caseLate, notice, me, onMe, onDeleted }: ResultProps) {
+export function Result({ item, animate, start, abort, onScene, owner, fresh, kase, caseLate, claimedAs = null, notice, me, onMe, onDeleted }: ResultProps) {
   const { t, lang } = useT();
   const id = item.kind === "card" ? item.card.id : item.comparison.id;
   // Un dossier à deux pièces s'affiche comme une fiche seule : la fiche du dossier, sa note (§18.36).
@@ -626,6 +636,12 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
       {claimed && me?.hidden && (
         <p className="hidden-banner" role="status">
           {t.result.claim.hiddenBanner}
+        </p>
+      )}
+      {/* « C'est moi » réussi (§18.52) : la fiche est à ton nom ; « Voir ma poursuite » est dans la tête, juste dessous. */}
+      {claimed && !me?.hidden && claimedAs === cardLogin?.toLowerCase() && (
+        <p className="hidden-banner" role="status">
+          {t.result.claim.claimedBanner(claimedAs)}
         </p>
       )}
 

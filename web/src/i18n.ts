@@ -469,6 +469,8 @@ const fr = frTypoDeep({
       logout: "Se déconnecter",
       loggedOut: "Déconnexion faite. La fiche reste à toi.",
       claimed: (login: string) => `Fiche revendiquée. Bienvenue au commissariat, @${login}.`,
+      /** En haut de la fiche reprise par « C'est moi » (§18.52), au-dessus de « Voir ma poursuite ». */
+      claimedBanner: (login: string) => `Fiche reprise : elle est à ton nom, @${login}.`,
       mismatch: (login: string) => `Ce n'est pas ta fiche : tu es sur le compte GitHub @${login}.`,
       error: "GitHub n'a pas confirmé. Réessaie dans un instant.",
       limited: "Trop de tentatives aujourd'hui. Reviens demain.",
@@ -1243,6 +1245,7 @@ const en: Dict = {
       logout: "Sign out",
       loggedOut: "Signed out. The sheet is still yours.",
       claimed: (login) => `Sheet claimed. Welcome to the station, @${login}.`,
+      claimedBanner: (login) => `Sheet claimed: it's in your name now, @${login}.`,
       mismatch: (login) => `Not your sheet: you're on the GitHub account @${login}.`,
       error: "GitHub didn't confirm. Try again in a moment.",
       limited: "Too many attempts today. Come back tomorrow.",

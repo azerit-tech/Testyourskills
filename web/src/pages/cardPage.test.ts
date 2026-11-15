@@ -37,7 +37,7 @@ function stub(lang: string) {
   vi.stubGlobal("document", { documentElement: { dataset: {}, classList: { add: () => undefined, remove: () => undefined } }, querySelector: () => null, getElementById: () => null });
 }
 
-function renderResult(item: Shareable, opts: { owner: boolean; lang?: string; token?: string; plea?: number }): string {
+function renderResult(item: Shareable, opts: { owner: boolean; lang?: string; token?: string; plea?: number; me?: ResultProps["me"]; claimedAs?: string }): string {
   stub(opts.lang ?? "fr-FR");
   const id = item.kind === "card" ? item.card.id : item.comparison.id;
   if (opts.token) tokens.set(id, opts.token);
@@ -52,8 +52,9 @@ function renderResult(item: Shareable, opts: { owner: boolean; lang?: string; to
     fresh: false,
     kase: null,
     caseLate: false,
+    claimedAs: opts.claimedAs ?? null,
     notice: null,
-    me: null,
+    me: opts.me ?? null,
     onMe: () => undefined,
     onDeleted: () => undefined,
   };
@@ -119,6 +120,21 @@ describe("page partagée, vue par un visiteur", () => {
     markChaseWatched("SeenCard01");
     const seen = renderResult(card({ id: "SeenCard01" }), { owner: true, lang: "en-US" });
     expect(/<header class="wanted">.*?<\/header>/.exec(seen)?.[0]).toContain("Replay my chase");
+  });
+
+  it("« C'est moi » réussi : en haut de la page, la fiche est à ton nom ; un seul « Voir ma poursuite », dans l'en-tête (§18.52)", () => {
+    const login = FIXTURES.gold.login!;
+    const me = { login: login.toLowerCase(), hidden: false };
+    const fr = renderResult(card({ id: "ClaimCard01" }), { owner: false, me, claimedAs: login.toLowerCase() }).replace(/ /g, " ");
+    expect(fr).toContain(`<p class="hidden-banner" role="status">Fiche reprise : elle est à ton nom, @${login.toLowerCase()}.</p>`);
+    expect(fr.indexOf("hidden-banner")).toBeLessThan(fr.indexOf('class="wanted"'));
+    expect(fr.match(/class="chase-link"/g)?.length ?? 0).toBeLessThanOrEqual(2);
+    expect(/<header class="wanted">.*?<\/header>/.exec(fr)?.[0]).toContain("Voir ma poursuite");
+    const en = renderResult(card({ id: "ClaimCard02" }), { owner: false, me, claimedAs: login.toLowerCase(), lang: "en-US" }).replace(/&#x27;/g, "'");
+    expect(en).toContain(`Sheet claimed: it's in your name now, @${login.toLowerCase()}.`);
+    // Sans retour de « C'est moi », rien.
+    expect(renderResult(card({ id: "ClaimCard03" }), { owner: false, me })).not.toContain("Fiche reprise");
+    expect(page).toMatch(/setClaimedAs\(as\.toLowerCase\(\)\);\s*window\.scrollTo\(0, 0\);/);
   });
 
   it("une fiche supprimée ou introuvable : le navigateur l'oublie, plus de « Ma fiche » qui mène nulle part (parcours 4)", () => {
