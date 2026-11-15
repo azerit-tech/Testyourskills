@@ -144,11 +144,10 @@ export function BandNotFound({ bare }: Preset) {
   return <ErrorPage bare={bare} stamp="none" title={b.title} text={b.text} action={{ label: b.action, href: "/" }} alt={{ label: b.alt, href: "/bandes" }} />;
 }
 
-/** Une prime inconnue : les autres primes si la saison en porte, sinon l'accueil. */
+/** Une prime inconnue : « Faire ma fiche » comme partout ; les autres primes en appoint si la saison en porte. */
 export function PrimeNotFound({ bare, listed }: Preset & { listed: boolean }) {
   const { t } = useT();
   const p = t.pages.error.prime;
   useTabTitle(t.pages.error.tab.prime);
-  if (!listed) return <ErrorPage bare={bare} stamp="none" title={p.title} text={p.text} action={{ label: t.pages.error.page.action, href: "/" }} />;
-  return <ErrorPage bare={bare} stamp="none" title={p.title} text={p.text} action={{ label: p.action, href: "/primes" }} alt={{ label: p.alt, href: "/" }} />;
+  return <ErrorPage bare={bare} stamp="none" title={p.title} text={p.text} action={{ label: p.action, href: "/" }} alt={listed ? { label: p.alt, href: "/primes" } : undefined} />;
 }

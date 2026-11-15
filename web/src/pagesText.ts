@@ -225,8 +225,8 @@ const fr = {
     prime: {
       title: "Cette prime n'existe pas",
       text: "Elle a pu être retirée, ou l'adresse est mal copiée.",
-      action: "Voir les primes",
-      alt: "Retour à l'accueil",
+      action: "Faire ma fiche",
+      alt: "Voir les primes",
     },
   },
   /** Une demande de retrait partie : un accusé qui a une forme. */
@@ -415,8 +415,8 @@ const en: PagesDict = {
     prime: {
       title: "This bounty doesn't exist",
       text: "It may have been removed, or the address was copied wrong.",
-      action: "See the bounties",
-      alt: "Back to home",
+      action: "Get my rap sheet",
+      alt: "See the bounties",
     },
   },
   removal: {

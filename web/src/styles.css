@@ -3448,7 +3448,8 @@ a.dossier-item:hover {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   white-space: nowrap;
-  color: var(--siren);
+  /* la sirène, foncée : 4,7:1 sur le lilas du mur, 5,6:1 sur le pêche */
+  color: #a01a2b;
   transform: translateX(-50%) rotate(-7deg);
 }
 /* injoignable, interrompu : le mur passe au pêche, la personne existe peut-être */

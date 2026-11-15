@@ -40,14 +40,15 @@ describe("la mise en page d'erreur", () => {
     }
   });
 
-  it("introuvable : une fiche mène à l'accueil, une bande à l'accueil et au tableau, une prime aux primes", () => {
+  it("introuvable : « Faire ma fiche » partout ; une bande offre le tableau, une prime les primes", () => {
     expect(render(createElement(CardNotFound))).toContain('<a class="btn-primary err-action" href="/">Faire ma fiche</a>');
     const band = render(createElement(BandNotFound));
     expect(band).toContain("Introuvable");
     expect(band).toContain('<a class="link-alt" href="/bandes">Toutes les bandes</a>');
     const prime = render(createElement(PrimeNotFound, { listed: true }));
     expect(prime).toContain("Cette prime n&#x27;existe pas");
-    expect(prime).toContain('<a class="btn-primary err-action" href="/primes">Voir les primes</a>');
+    expect(prime).toContain('<a class="btn-primary err-action" href="/">Faire ma fiche</a>');
+    expect(prime).toContain('<a class="link-alt" href="/primes">Voir les primes</a>');
     // une saison sans prime : pas de lien vers une page qui ramène à l'accueil
     expect(render(createElement(PrimeNotFound, { listed: false }))).not.toContain('href="/primes"');
   });
