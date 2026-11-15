@@ -1597,3 +1597,36 @@ Quatre lots de plus sur `master` : les pages autour, l'écran d'attente, la page
 - `docs/bareme-recrutement.md` ne donne plus en exemple le rang d'une école réelle.
 
 **À trancher par Jacques** : la liste des écoles et de leur rang est dans `data/scoring.json`, publique depuis la première version du dépôt. La sortir du dépôt (fichier ignoré, posé sur le serveur, comme la liste des employeurs) est faisable ; l'effacer de l'historique demande de réécrire l'historique publié.
+
+### 18.51 Revue complète : le deuxième tour (15 novembre, après-midi)
+
+Cinq critiques ont rejugé sur captures le site fusionné ; trois zones corrigées et fusionnées, la page d'une fiche en cours.
+
+**Autour de la fiche**
+- Bandeau de saison : présent dès la première image (la barre ne saute plus) et il dit ce qu'on gagne : « Saison 1 : 5 entretiens à gagner → ».
+- Barre du haut : à 320 px, « AZERIT » reste à côté de la gemme tant qu'il a la place ; la gemme seule et chaque lien du pied gardent 44 px à toucher.
+- Pied : qui fait le site, puis une vraie page des crédits (« Breaks garés »).
+- Primes : nom d'entreprise long tenu dans sa carte, le lot en titre, « Entrer dans la course → » au bas ; page d'une prime : l'appel dans le premier écran, erreurs en rouge, tampon pour finaliste et gagnant.
+- Bandes : les mots disent l'adhésion, « encore 2 fiches », l'échelle de six dans le partage ; page d'une bande : fiches anonymes dans le bloc, vrai bloc recruteur, noms longs sur deux lignes ; au bureau le titre de l'appel passe en grand.
+- Tableaux : l'échelle dite une fois en tête (« /100 » ou « Étoiles »), l'initiale au lieu du damier.
+- Pages d'erreur : une seule action « Faire ma fiche », un titre d'onglet par page. Page introuvable : pas d'adresse canonique.
+- Vie privée et retrait : l'email dit ce qu'il fait ; la demande de retrait parle à la personne fichée.
+- Exceptions aux fondations : les cases à cocher gardent un rayon de 6 px ; l'exposant de « 1er » est à 12 px.
+
+**Le dessin**
+- Recto et dos se lisent sur un téléphone (plancher de lisibilité tenu) ; la note de l'école reste privée partout.
+- Le lien qui retourne la fiche est rose, souligné, centré, et dit où il mène.
+- Images de partage : la note sur 100, la marque sur les bandes et les primes, un titre aux couleurs du site. Dessin des images : version 9.
+- Textes venus des données : typographie française juste.
+- La face Barlow Condensed 600, déclarée sans usage, sort de la feuille des pages.
+
+**Avant la fiche**
+- Accueil : une seule légende sous la fiche d'exemple ; la case « Et toi ? » dit « Faire ma fiche » ; `/<pseudo>` arrive avec la bonne porte et le pseudo dans le champ.
+- Formulaire : pseudo inconnu ou organisation, retour au formulaire avec une seule erreur sous le champ ; limite atteinte, le bouton passe en contour et un lien propose le top de la semaine.
+- Revenu en plein film, la note reste cachée : « Ta poursuite t'attend. La voir ».
+- À 320 px le bouton tient dans le premier écran ; couché, titre et formulaire à côté de la couverture. Au bureau, légendes des profils sous l'image.
+- Texte agrandi dans le navigateur : tout le texte du site grandit avec lui.
+- Attente : plaque et initiales sont celles de la fiche quelle que soit la porte, la silhouette les porte déjà ; les lignes d'ambiance ne parlent que de ce qu'on lit ; la ligne ne recule jamais.
+- Film : l'étoile en suspens n'est jamais pleine ; ligne radio 14 px sur téléphone, 16 au-delà ; sur réseau lent, une fiche servie vite garde sa poursuite ; « Voir ma poursuite » tant que le film n'a pas joué ici, mouvement réduit compris.
+- Pari en anglais : “Plea entered.” Fiche scellée : l'annonce dit « Fiche scellée ».
+- `?mock=1` reste la démo même quand le navigateur bloque son stockage.
