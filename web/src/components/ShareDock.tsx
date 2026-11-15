@@ -1,6 +1,6 @@
 // La barre du pouce (§18.27) : sur téléphone, dès que la fiche est posée, « Partager »
-// et « Dénoncer » restent sous le pouce. Elle s'efface quand le bloc de partage ou la
-// fiche d'un complice prête à envoyer est à l'écran, et pendant qu'on écrit dans un champ.
+// et « Dénoncer » restent sous le pouce. Elle s'efface quand le bouton rose du bloc de partage
+// ou la fiche d'un complice prête à envoyer est à l'écran, et pendant qu'on écrit dans un champ.
 // Tant que le bloc « Dénonce un complice » est à l'écran, « Dénoncer » quitte la barre :
 // « Partager » reste seul, pleine largeur.
 import { useEffect, useState } from "react";
@@ -48,7 +48,10 @@ function Dock({ item, toast, add }: { item: Shareable; toast: (m: string) => voi
   // d'un complice prête à envoyer (« Envoyer à @x »), et sous trois étoiles devant le bouton rose du
   // bloc de la source à ajouter (le bouton, pas le haut du bloc : la barre reste tant qu'il est sous le pli).
   // Ces blocs arrivent et repartent : on les guette.
-  const hides = add ? ".after-block.out, .after-block.denounce.is-done, .after-block.add-source .entry-submit" : ".after-block.out, .after-block.denounce.is-done";
+  // Du bloc de partage aussi, c'est le bouton qui compte : son titre qui affleure au bas du premier écran ne retire plus le rose.
+  const hides = add
+    ? ".after-block.out .out-main, .after-block.denounce.is-done, .after-block.add-source .entry-submit"
+    : ".after-block.out .out-main, .after-block.denounce.is-done";
   useEffect(() => {
     if (typeof IntersectionObserver !== "function") return setBlockSeen(false);
     const seen = new Set<Element>();

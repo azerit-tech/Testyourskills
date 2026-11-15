@@ -186,7 +186,7 @@ describe("barre du pouce (§18.27)", () => {
       expect(html).not.toContain("Dénoncer");
     }
     // La barre s'efface aussi devant le bloc de la source, dont le bouton est le rose.
-    expect(readFileSync(join(__dirname, "ShareDock.tsx"), "utf8")).toContain('".after-block.out, .after-block.denounce.is-done, .after-block.add-source .entry-submit"');
+    expect(readFileSync(join(__dirname, "ShareDock.tsx"), "utf8")).toContain('".after-block.out .out-main, .after-block.denounce.is-done, .after-block.add-source .entry-submit"');
   });
 
   it("pas pendant la révélation, pas sur ordinateur", () => {
