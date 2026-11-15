@@ -8,14 +8,17 @@
 // sur un ciel suit son heure (shared/scenes.ts). Sans fichier de décor, le front
 // de mer dessiné ci-dessous le remplace. Seule lumière : le halo de ★★★★★★, un
 // rectangle flou derrière la fiche (le drop-shadow CSS de l'écran ne passe pas dans le PNG).
+// Chaque image se juge réduite à 360 px de large, sa taille dans un fil sur
+// téléphone (§18.48) : les étoiles, le niveau, « Avis de recherche » et l'appel
+// s'y lisent. Les étoiles suivent la règle du site (StarRow), le rose poudré ne
+// sert qu'à l'appel (CtaPill), la citation est pêche.
 import type { ReactNode } from "react";
-import type { CardData, Lang } from "../../../shared/types";
+import { LEVEL_LABELS, starsFor, type CardData, type Lang } from "../../../shared/types";
 import { CardGraphic } from "../../../shared/card/Card";
-import { AzeritGem } from "../../../shared/card/AzeritGem";
 import { fontAttrs } from "../../../shared/card/fonts";
 import { CARD_H, CARD_R, CARD_W } from "../../../shared/card/geometry";
 import { t } from "../../../shared/card/i18n";
-import { fit, fitLines, upper, wrap } from "../../../shared/card/text";
+import { fit, fitLines, measure, upper, wrap } from "../../../shared/card/text";
 import { PALETTE, themeOf } from "../../../shared/card/themes";
 import { SKY_TEXT } from "../../../shared/scenes";
 import { HOME_PROMISE } from "../../../shared/promise";
@@ -41,14 +44,15 @@ export interface Avatars {
 /** Data URI de l'avatar, ou "" pour forcer les initiales (jamais d'URL distante dans resvg). */
 const av = (avatars: Avatars, id: string) => avatars[id] ?? "";
 
-/** Hôte affiché dans la ligne d'appel (BASE_URL sans protocole). */
+/** Hôte affiché dans l'appel (BASE_URL sans protocole). Jamais vide : un BASE_URL réduit à « / » (les tests) rend l'adresse du site. */
 export function ctaHost(): string {
+  const site = "skills.azerit.tech";
   const raw = process.env.BASE_URL;
-  if (!raw) return "skills.azerit.tech";
+  if (!raw) return site;
   try {
-    return new URL(raw).host;
+    return new URL(raw).host || site;
   } catch {
-    return raw.replace(/^https?:\/\//, "").replace(/\/$/, "");
+    return raw.replace(/^https?:\/\//, "").replace(/\/$/, "") || site;
   }
 }
 
@@ -134,25 +138,60 @@ function Placed({ card, lang, avatars, id, x, y, w }: { card: CardData; lang: La
   );
 }
 
-/** « skills.azerit.tech » précédé de la gemme, centré ou calé à gauche. */
-function Host({ x, y, size, anchor = "middle" }: { x: number; y: number; size: number; anchor?: "start" | "middle" }) {
-  const host = upper(ctaHost(), "en");
-  const ls = size * 0.2;
-  const f = fit(host, { font: "sans-600", size, minSize: size, maxWidth: 4000, letterSpacing: ls });
-  const gemH = size * 1.15;
-  const gemW = gemH * (104 / 120);
-  const gap = size * 0.5;
-  const total = gemW + gap + f.width;
-  const x0 = anchor === "middle" ? x - total / 2 : x;
+/** L'étoile du site, dans une boîte de 24 : le tracé de la fiche et des classements. */
+export const STAR_PATH = "M12 2.6l2.9 6.1 6.7.8-4.9 4.6 1.3 6.6L12 17.4l-6 3.3 1.3-6.6L2.4 9.5l6.7-.8z";
+/** Le tracé laisse 2,4 unités de marge à gauche de sa boîte de 24. */
+const STAR_INSET = 2.4 / 24;
+/** Contour d'une étoile éteinte : 1,5 px pour une étoile de 22 (§18.48), à l'échelle. */
+const STAR_STROKE = (1.5 / 22) * 24;
+
+/**
+ * Six étoiles, la règle unique du site (§18.48) : remplies de gauche à droite,
+ * allumée en crème pleine, éteinte en contour blanc à 35 %, sans remplissage.
+ * `x` est le bord visible de la première étoile (calé sur un texte), `y` le haut de la rangée.
+ */
+export function StarRow({ n, x, y, size, gap = Math.round(size * 0.12) }: { n: number; x: number; y: number; size: number; gap?: number }) {
+  const k = size / 24;
+  // Le contour est à cheval sur le tracé : l'étoile éteinte est rentrée d'autant, pour garder la taille de l'allumée.
+  const inner = (24 - STAR_STROKE) / 24;
   return (
-    <g>
-      <AzeritGem x={x0} y={y - gemH * 0.9} h={gemH} />
-      <text x={x0 + gemW + gap} y={y} {...fontAttrs("sans-600")} fontSize={size} letterSpacing={ls} fill={PALETTE.lilac} fillOpacity={0.8}>
-        {host}
-      </text>
+    <g data-star-row={n}>
+      {Array.from({ length: 6 }, (_, i) => (
+        <g key={i} transform={`translate(${+(x - STAR_INSET * size + i * (size + gap)).toFixed(2)} ${y}) scale(${+k.toFixed(4)})`}>
+          {i < n ? (
+            <path d={STAR_PATH} fill={PALETTE.cream} />
+          ) : (
+            <path d={STAR_PATH} transform={`translate(12 12) scale(${+inner.toFixed(4)}) translate(-12 -12)`} fill="none" stroke="#ffffff" strokeOpacity={0.35} strokeWidth={+STAR_STROKE.toFixed(3)} strokeLinejoin="round" />
+          )}
+        </g>
+      ))}
     </g>
   );
 }
+
+/** Largeur visible d'une rangée de six étoiles. */
+export const starRowWidth = (size: number, gap = Math.round(size * 0.12)) => 6 * size + 5 * gap - 2 * STAR_INSET * size;
+
+/**
+ * Les textes propres aux images. L'appel d'une fiche (« Fais la tienne ») et
+ * « Avis de recherche » restent ceux de la fiche (shared/card/i18n.ts).
+ */
+export const IMAGE_WORDS: Record<Lang, { what: string; home: string; band: string; prime: string; primeClosed: string }> = {
+  fr: {
+    what: "Une fiche de dev, de une à six étoiles, en une minute.",
+    home: "Fais ta fiche",
+    band: "Rejoins la bande",
+    prime: "Entre dans la course",
+    primeClosed: "Voir le classement",
+  },
+  en: {
+    what: "A dev rap sheet, one to six stars, in one minute.",
+    home: "Get your rap sheet",
+    band: "Join the crew",
+    prime: "Enter the race",
+    primeClosed: "See the ranking",
+  },
+};
 
 /** Surtitre « AVIS DE RECHERCHE » : crème atténué sur l'encre, plein dans la couleur du ciel quand il s'y pose. */
 function Poster({ x, y, size, lang, anchor = "middle", fill = PALETTE.cream, opacity = 0.6 }: { x: number; y: number; size: number; lang: Lang; anchor?: "start" | "middle"; fill?: string; opacity?: number }) {
@@ -164,6 +203,22 @@ function Poster({ x, y, size, lang, anchor = "middle", fill = PALETTE.cream, opa
   );
 }
 
+/** « AVIS DE RECHERCHE » en titre d'affiche, pour les aperçus de lien : capitales
+ *  condensées, crème pleine, calé à gauche. À 360 px de large il se lit encore. */
+function PosterTitle({ x, y, size, lang }: { x: number; y: number; size: number; lang: Lang }) {
+  return (
+    <text x={x} y={y} {...fontAttrs("display-700")} fontSize={size} letterSpacing={+(size * 0.12).toFixed(2)} fill={PALETTE.cream}>
+      {upper(t(lang).poster, lang)}
+    </text>
+  );
+}
+
+/** Le format des décors (1152 × 768, 576 × 384). */
+const SCENE_RATIO = 3 / 2;
+
+/** Le cadre des aperçus d'une bande et d'une prime sur le décor par défaut : la ligne d'immeubles et son reflet. */
+export const SKYLINE_FOCUS = { zoom: 2, x: 0.6, y: 0.51 };
+
 /** La couleur d'un texte posé sur le haut d'un ciel ; le front de mer dessiné est sombre. */
 const skyInk = (scene: SceneImage | null | undefined) => SKY_TEXT[scene?.tone ?? "dark"];
 
@@ -171,9 +226,21 @@ const skyInk = (scene: SceneImage | null | undefined) => SKY_TEXT[scene?.tone ??
  * Le lieu du crime dans un cadre : l'image recadrée pour le remplir (`slice`), centrée
  * (`xMidYMid`, le sujet est au centre de l'illustration) ou calée en haut (`xMidYMin`,
  * le ciel reste). Sans fichier, le front de mer dessiné. `r` : coins du panneau.
+ * `focus` resserre le cadre sur une partie du décor (les décors sont en 3:2) :
+ * `zoom` au-delà du remplissage, puis le point de l'image (`x`, `y`, de 0 à 1)
+ * amené au centre du panneau. Il sert à laisser hors champ le ciel vide du haut
+ * et le sol plat et sombre du bas.
  */
-export function SceneFrame({ scene, id, x, y, w, h, align, r = 0 }: { scene: SceneImage | null | undefined; id: string; x: number; y: number; w: number; h: number; align: "xMidYMid" | "xMidYMin"; r?: number }) {
+export function SceneFrame({ scene, id, x, y, w, h, align, r = 0, focus }: { scene: SceneImage | null | undefined; id: string; x: number; y: number; w: number; h: number; align: "xMidYMid" | "xMidYMin"; r?: number; focus?: { zoom: number; x: number; y: number } }) {
   const clip = `${id}-frame`;
+  // Le rectangle de l'image entière, quand le cadre est resserré : jamais de vide dans le panneau.
+  let image = { x, y, w, h };
+  if (focus) {
+    const iw = Math.max(w, h * SCENE_RATIO) * focus.zoom;
+    const ih = iw / SCENE_RATIO;
+    const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+    image = { x: Math.round(clamp(x + w / 2 - focus.x * iw, x + w - iw, x)), y: Math.round(clamp(y + h / 2 - focus.y * ih, y + h - ih, y)), w: Math.round(iw), h: Math.round(ih) };
+  }
   const horizon = Math.round(h * 0.84);
   const k = h / 300;
   return (
@@ -185,7 +252,7 @@ export function SceneFrame({ scene, id, x, y, w, h, align, r = 0 }: { scene: Sce
       </defs>
       <g clipPath={`url(#${clip})`}>
         {scene ? (
-          <image href={scene.href} x={x} y={y} width={w} height={h} preserveAspectRatio={`${align} slice`} />
+          <image href={scene.href} x={image.x} y={image.y} width={image.w} height={image.h} preserveAspectRatio={`${align} slice`} />
         ) : (
           <svg x={x} y={y} width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
             <Scene
@@ -212,6 +279,20 @@ function mainStatus(card: CardData, lang: Lang): string | null {
   return st ? st.label[lang] ?? st.label.fr : null;
 }
 
+/**
+ * La phrase citée à côté de la fiche. À partir de trois étoiles, le chef
+ * d'accusation le plus drôle. En dessous (et pour un dossier scellé), la phrase
+ * d'accroche du profil, celle qui sauve la face : personne ne publie « A fini le
+ * tutoriel » sous son nom. Sans profil, un chef d'accusation flatteur s'il y en a un, sinon rien.
+ */
+export function imageQuote(card: CardData, lang: Lang): string | null {
+  if (!card.sealed && starsFor(card.overall) >= 3) return mainStatus(card, lang);
+  const tagline = card.profile?.tagline;
+  if (tagline) return tagline[lang] ?? tagline.fr;
+  const kind = card.statuses.find((st) => st.tone === "positive" || st.tone === "special");
+  return kind ? kind.label[lang] ?? kind.label.fr : null;
+}
+
 /* ------------------------------------------------------------------ */
 /* Carte seule                                                          */
 /* ------------------------------------------------------------------ */
@@ -228,11 +309,13 @@ export function CardOnly({ card, lang, avatars }: { card: CardData; lang: Lang; 
 /* Aperçu de lien 1200 × 630                                            */
 /* ------------------------------------------------------------------ */
 
-/** La fiche à gauche, comme avant ; à droite, la colonne de la couverture : le
- *  surtitre sur l'encre, calé sur le haut de la fiche, le lieu du crime en panneau,
- *  puis seulement ce qui ne se lit pas sur la fiche en vignette : le nom en grand
- *  et le chef d'accusation le plus drôle. La note, le niveau et le pied sont sur la
- *  fiche. Le surtitre ne se pose pas sur le panneau : sur deux ciels clairs
+/** La fiche à gauche ; à droite, sur l'encre, ce qu'un fil doit dire en une
+ *  demi-seconde, de haut en bas : « AVIS DE RECHERCHE » en titre d'affiche, calé
+ *  sur le haut de la fiche ; le lieu du crime en bandeau (il donne la couleur du
+ *  profil, pas d'information : il ne garde qu'un quart de la colonne) ; le nom en
+ *  grand ; la rangée d'étoiles et le niveau (LE résultat, illisibles sur la fiche
+ *  en vignette) ; la phrase citée (imageQuote) ; l'appel, calé sur le bas de la
+ *  fiche. Le titre ne se pose pas sur le bandeau : sur deux ciels clairs
  *  (repeat_offender, old_school), le coin haut n'atteint pas 3:1. */
 export function OgImage({ card, lang, avatars, scene }: { card: CardData; lang: Lang; avatars: Avatars; scene?: SceneImage | null }) {
   const W = 1200;
@@ -243,21 +326,28 @@ export function OgImage({ card, lang, avatars, scene }: { card: CardData; lang: 
   const cy = 32;
   const tx = 560;
   const maxW = W - tx - 64;
-  const panelY = cy + 34;
-  const panelH = 290;
-  // Le nom sur une ligne jusqu'en 56 ; plus long, sur deux lignes, et le chef d'accusation sur une.
+  const panelY = cy + 54;
+  // Le nom sur une ligne jusqu'en 56 ; plus long, sur deux lignes, et la citation sur une.
   const upperName = upper(card.name, lang);
   const one = fit(upperName, { font: "display-700", size: 84, minSize: 56, maxWidth: maxW, letterSpacing: 0.5 });
   const name = one.text === upperName ? { lines: [one.text], size: one.size } : fitLines(upperName, { font: "display-700", size: 64, minSize: 44, maxWidth: maxW, letterSpacing: 0.5 });
-  const nameY = panelY + panelH + 20 + Math.round(name.size * 0.74);
+  // Le bandeau du décor rend sa place à un nom sur deux lignes.
+  const panelH = name.lines.length > 1 ? 132 : 180;
+  const nameY = panelY + panelH + 22 + Math.round(name.size * 0.72);
   const lastNameY = nameY + (name.lines.length - 1) * Math.round(name.size * 0.98);
-  const quote = mainStatus(card, lang);
+  // Les étoiles et le niveau, sur une ligne ; un dossier scellé n'a ni note ni étoiles : ses deux mots à la place.
+  const stars = starsFor(card.overall);
+  const starSize = 44;
+  const starsY = lastNameY + 22;
+  const starsW = card.sealed ? 0 : starRowWidth(starSize) + 22;
+  const level = fit(upper(card.sealed ? t(lang).sealed : LEVEL_LABELS[stars][lang], lang), { font: "display-700", size: 42, minSize: 26, maxWidth: maxW - starsW, letterSpacing: 1 });
+  const quote = imageQuote(card, lang);
   const quoted = quote ? (lang === "fr" ? `« ${quote} »` : `“${quote}”`) : "";
   const qLines = quote ? wrap(quoted, "sans-600", 34, maxW, name.lines.length > 1 ? 1 : 2) : [];
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
       <Ink w={W} h={H} />
-      <Poster x={tx} y={cy + 15} size={20} lang={lang} anchor="start" />
+      <PosterTitle x={tx} y={cy + 35} size={50} lang={lang} />
       <SceneFrame scene={scene} id="og" x={tx} y={panelY} w={maxW} h={panelH} align="xMidYMid" r={8} />
       <Placed card={card} lang={lang} avatars={avatars} id="og" x={cx} y={cy} w={cw} />
       {name.lines.map((l, i) => (
@@ -265,13 +355,50 @@ export function OgImage({ card, lang, avatars, scene }: { card: CardData; lang: 
           {l}
         </text>
       ))}
+      {!card.sealed && <StarRow n={stars} x={tx} y={starsY} size={starSize} />}
+      <text x={tx + starsW} y={starsY + starSize / 2 + Math.round(level.size * 0.35)} {...fontAttrs("display-700")} fontSize={level.size} letterSpacing={level.letterSpacing} fill={PALETTE.cream}>
+        {level.text}
+      </text>
       {qLines.map((l, i) => (
-        <text key={i} x={tx} y={lastNameY + 52 + i * 42} {...fontAttrs("sans-600")} fontSize={34} fill={PALETTE.blush}>
+        <text key={i} x={tx} y={starsY + starSize + 48 + i * 42} {...fontAttrs("sans-600")} fontSize={34} fill={PALETTE.peach}>
           {l}
         </text>
       ))}
-      <CtaLine x={tx} y={604} lang={lang} />
+      <CtaPill x={tx} bottom={cy + ch} label={t(lang).cta} lang={lang} size={28} maxW={maxW} />
     </svg>
+  );
+}
+
+/**
+ * L'appel des images, « Fais la tienne : skills.azerit.tech », en pilule rose
+ * poudré au texte d'encre : le bouton principal du site, et la seule chose rose
+ * d'une image (§18.48). `bottom` est le bas de la pilule ; le corps descend si
+ * l'appel dépasse `maxW`. `anchor` : calée à gauche sur `x`, ou centrée dessus.
+ */
+export function CtaPill({ x, bottom, label, lang, size, maxW, anchor = "start" }: { x: number; bottom: number; label: string; lang: Lang; size: number; maxW: number; anchor?: "start" | "middle" }) {
+  const call = lang === "fr" ? `${label}\u00a0:` : `${label}:`;
+  const host = ctaHost();
+  const widthAt = (s: number) => {
+    const callW = measure(call, "sans-600", s);
+    return { callW, total: s * 0.85 * 2 + callW + s * 0.3 + measure(host, "sans-700", s) };
+  };
+  let s = size;
+  while (widthAt(s).total > maxW && s > 16) s -= 0.5;
+  const { callW, total } = widthAt(s);
+  const h = Math.round(s * 1.95);
+  const x0 = anchor === "middle" ? x - total / 2 : x;
+  const y = bottom - h;
+  const base = y + h / 2 + s * 0.35;
+  return (
+    <g data-cta="">
+      <rect x={+x0.toFixed(1)} y={y} width={+total.toFixed(1)} height={h} rx={h / 2} fill={PALETTE.blush} />
+      <text x={+(x0 + s * 0.85).toFixed(1)} y={+base.toFixed(1)} {...fontAttrs("sans-600")} fontSize={s} fill={PALETTE.ink0}>
+        {call}
+      </text>
+      <text x={+(x0 + s * 0.85 + callW + s * 0.3).toFixed(1)} y={+base.toFixed(1)} {...fontAttrs("sans-700")} fontSize={s} fill={PALETTE.ink0}>
+        {host}
+      </text>
+    </g>
   );
 }
 
@@ -335,23 +462,28 @@ export function HomeOg({ card, lang, avatars }: { card: CardData; lang: Lang; av
 /* ------------------------------------------------------------------ */
 
 /** La page d'une fiche (§18.29) en 4:5 : le lieu du crime de bord à bord en haut,
- *  calé sur son ciel, l'encre plate dessous, et la fiche en grand (72 % de la
+ *  calé sur son ciel, l'encre plate dessous, et la fiche en grand (les deux tiers de la
  *  largeur, lisible en miniature dans un fil) qui chevauche le bas de l'image.
- *  « Avis de recherche » sur le ciel, l'adresse en pied. */
+ *  « Avis de recherche » sur le ciel, ce que c'est en une ligne et l'appel en pied. */
 export function PortraitImage({ card, lang, avatars, scene }: { card: CardData; lang: Lang; avatars: Avatars; scene?: SceneImage | null }) {
   const W = 1080;
   const H = 1350;
   const skyH = 620;
-  const cw = 780;
+  const cw = 720;
   const cx = (W - cw) / 2;
-  const cy = 150;
+  const cy = 116;
+  const bottom = cy + (cw * CARD_H) / CARD_W;
+  const what = fit(IMAGE_WORDS[lang].what, { font: "sans-500", size: 34, minSize: 26, maxWidth: W - 2 * 60 });
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
       <Ink w={W} h={H} />
       <SceneFrame scene={scene} id="pt" x={0} y={0} w={W} h={skyH} align="xMidYMin" />
-      <Poster x={W / 2} y={98} size={40} lang={lang} fill={skyInk(scene)} opacity={1} />
+      <Poster x={W / 2} y={82} size={40} lang={lang} fill={skyInk(scene)} opacity={1} />
       <Placed card={card} lang={lang} avatars={avatars} id="pt" x={cx} y={cy} w={cw} />
-      <Host x={W / 2} y={1322} size={28} />
+      <text x={W / 2} y={Math.round(bottom + 56)} {...fontAttrs("sans-500")} fontSize={what.size} textAnchor="middle" fill={PALETTE.lilac}>
+        {what.text}
+      </text>
+      <CtaPill x={W / 2} bottom={H - 40} label={t(lang).cta} lang={lang} size={38} maxW={W - 2 * 60} anchor="middle" />
     </svg>
   );
 }
@@ -382,14 +514,14 @@ function PosterPlate({ x, y, size, lang }: { x: number; y: number; size: number;
 
 /** La story : le lieu du crime sur le haut, « Avis de recherche » sur sa plaque sous la
  *  zone de l'appli, la fiche à cheval sur le bas de l'image, puis la peine en capitales
- *  crème et la caution en rose (la page d'une fiche les donne aussi sous la fiche,
+ *  crème et la caution en pêche (la page d'une fiche les donne aussi sous la fiche,
  *  §18.29 ; le profil et sa phrase sont déjà sur la fiche), et l'adresse, au-dessus de
  *  la zone du bas. */
 export function StoryImage({ card, lang, avatars, scene }: { card: CardData; lang: Lang; avatars: Avatars; scene?: SceneImage | null }) {
   const W = 1080;
   const H = 1920;
   const skyH = 860;
-  const cw = 740;
+  const cw = 720;
   const cx = (W - cw) / 2;
   const cy = 338;
   const bottom = cy + (cw * CARD_H) / CARD_W;
@@ -397,8 +529,9 @@ export function StoryImage({ card, lang, avatars, scene }: { card: CardData; lan
   const sentence = card.sentence;
   const penalty = sentence ? fit(upper(sentence.label[lang] ?? sentence.label.fr, lang), { font: "display-700", size: 54, minSize: 36, maxWidth: maxW, letterSpacing: 0.6 }) : null;
   const bail = sentence?.bail ? fit(sentence.bail[lang] ?? sentence.bail.fr, { font: "sans-600", size: 34, minSize: 24, maxWidth: maxW }) : null;
-  const penaltyY = bottom + 60;
-  const hostY = Math.min(H - STORY_SAFE.bottom - 8, penalty ? penaltyY + (bail ? 110 : 66) : bottom + 80);
+  const penaltyY = bottom + 62;
+  // La pilule de l'appel sous la peine et la caution, jamais dans la zone du bas.
+  const ctaBottom = Math.min(H - STORY_SAFE.bottom - 10, (penalty ? penaltyY + (bail ? 46 : 0) : bottom) + 30 + 62);
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
       <Ink w={W} h={H} />
@@ -411,37 +544,11 @@ export function StoryImage({ card, lang, avatars, scene }: { card: CardData; lan
         </text>
       )}
       {bail && (
-        <text x={W / 2} y={penaltyY + 46} {...fontAttrs("sans-600")} fontSize={bail.size} textAnchor="middle" fill={PALETTE.blush}>
+        <text x={W / 2} y={penaltyY + 46} {...fontAttrs("sans-600")} fontSize={bail.size} textAnchor="middle" fill={PALETTE.peach}>
           {bail.text}
         </text>
       )}
-      <StoryCta x={W / 2} y={hostY} lang={lang} />
+      <CtaPill x={W / 2} bottom={ctaBottom} label={t(lang).cta} lang={lang} size={32} maxW={maxW} anchor="middle" />
     </svg>
-  );
-}
-
-/** « Fais la tienne : skills.azerit.tech », centré, la gemme devant. */
-function StoryCta({ x, y, lang }: { x: number; y: number; lang: Lang }) {
-  const s = t(lang);
-  const size = 30;
-  const cta = lang === "fr" ? `${s.cta}\u00a0:` : `${s.cta}:`;
-  const host = ctaHost();
-  const ctaW = fit(cta, { font: "sans-500", size, minSize: size, maxWidth: 4000 }).width;
-  const hostW = fit(host, { font: "sans-600", size, minSize: size, maxWidth: 4000 }).width;
-  const gemH = size * 1.15;
-  const gemW = gemH * (104 / 120);
-  const gap = size * 0.4;
-  const total = gemW + gap + ctaW + 10 + hostW;
-  const x0 = x - total / 2;
-  return (
-    <g>
-      <AzeritGem x={x0} y={y - gemH * 0.88} h={gemH} />
-      <text x={x0 + gemW + gap} y={y} {...fontAttrs("sans-500")} fontSize={size} fill={PALETTE.lilac} fillOpacity={0.8}>
-        {cta}
-      </text>
-      <text x={x0 + gemW + gap + ctaW + 10} y={y} {...fontAttrs("sans-600")} fontSize={size} fill={PALETTE.cream}>
-        {host}
-      </text>
-    </g>
   );
 }

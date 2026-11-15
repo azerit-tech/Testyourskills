@@ -11,7 +11,9 @@ import { fileOf } from "../../../shared/caseFile";
 import { FIXTURES } from "../../../shared/fixtures";
 import { SKY_TEXT, skyTone } from "../../../shared/scenes";
 import { pruneStaleImages } from "../app";
-import { OgImage, PortraitImage, STORY_SAFE } from "./compositions";
+import { t } from "../../../shared/card/i18n";
+import { LEVEL_LABELS, type CardData } from "../../../shared/types";
+import { IMAGE_WORDS, imageQuote, OgImage, PortraitImage, STORY_SAFE } from "./compositions";
 import { renderImage, renderSvg } from "./index";
 import { encodeOpaquePng } from "./png";
 import { sceneFor } from "./scenes";
@@ -40,14 +42,62 @@ describe("lieux du crime des images de partage", () => {
     expect(SKY_TEXT).toEqual({ dark: "#fff9cb", light: "#0c0d1b" });
   });
 
-  it("aperçu de lien : l'encre, le décor en panneau centré sur son sujet, le surtitre sur l'encre", async () => {
+  it("aperçu de lien : l'encre, le décor en bandeau centré sur son sujet, le titre d'affiche sur l'encre", async () => {
     const svg = await renderSvg({ format: "og", card: light, lang: "fr" });
     expect(svg).toMatch(/^<svg[^>]*viewBox="0 0 1200 630"/);
     expect(svg).toContain('fill="#0c0d1b"');
-    expect(svg).toMatch(/<image href="data:image\/jpeg;base64,[^"]+" x="560" y="66" width="576" height="290" preserveAspectRatio="xMidYMid slice"/);
-    expect(svg).toMatch(/<rect x="560" y="66" width="576" height="290" rx="8"/);
-    expect(svg).toContain("AVIS DE RECHERCHE");
+    // Le décor ne porte pas d'information : un bandeau, moins du tiers de la hauteur de la colonne.
+    expect(svg).toMatch(/<image href="data:image\/jpeg;base64,[^"]+" x="560" y="86" width="576" height="180" preserveAspectRatio="xMidYMid slice"/);
+    expect(svg).toMatch(/<rect x="560" y="86" width="576" height="180" rx="8"/);
+    // Le titre d'affiche : crème pleine, 50 px (15 px dans une vignette de 360 px de large).
+    expect(svg).toMatch(/<text x="560"[^>]*font-size="50"[^>]*fill="#fff9cb">AVIS DE RECHERCHE</);
     expect(svg).toContain("LÉA MARTIN-DUBOIS");
+  });
+
+  it("aperçu de lien : six étoiles de 44 px remplies de gauche à droite, crème pleine puis contour, et le niveau", async () => {
+    for (const [card, n] of [[FIXTURES.unknownLang, 1], [FIXTURES.lowReliability, 3], [light, 5], [FIXTURES.icon, 6]] as const) {
+      const svg = await renderSvg({ format: "og", card: { ...card, avatarUrl: undefined }, lang: "fr" });
+      const row = new RegExp(`<g data-star-row="${n}">(.*?)</g></g>`).exec(svg)![1]!;
+      const stars = [...row.matchAll(/<path [^>]*>/g)].map((m) => m[0]);
+      expect(stars).toHaveLength(6);
+      stars.forEach((s, i) => {
+        if (i < n) expect(s).toContain('fill="#fff9cb"');
+        else expect(s).toMatch(/fill="none" stroke="#ffffff" stroke-opacity="0.35"/);
+      });
+      expect(row).toContain("scale(1.8333)"); // 44 px dans une boîte de 24
+      expect(svg).toContain(`>${LEVEL_LABELS[n].fr.toLocaleUpperCase("fr-FR")}</text>`);
+    }
+  });
+
+  it("la citation : le chef d'accusation à partir de trois étoiles, la phrase qui sauve la face en dessous", () => {
+    // Une étoile, deux étoiles : l'accroche du profil, jamais « A fini le tutoriel ».
+    expect(imageQuote(FIXTURES.unknownLang, "fr")).toBe(FIXTURES.unknownLang.profile!.tagline.fr);
+    expect(imageQuote(FIXTURES.bronze, "en")).toBe(FIXTURES.bronze.profile!.tagline.en);
+    // Sans profil : un chef d'accusation flatteur s'il y en a un, sinon rien.
+    const label = (card: CardData, id: string) => card.statuses.find((s) => s.id === id)!.label.fr;
+    expect(imageQuote({ ...FIXTURES.unknownLang, profile: undefined }, "fr")).toBe(label(FIXTURES.unknownLang, "gh_private_talent"));
+    expect(imageQuote({ ...FIXTURES.bronze, profile: undefined }, "fr")).toBeNull();
+    // Trois étoiles et plus : le chef d'accusation, comme avant.
+    expect(imageQuote(FIXTURES.lowReliability, "fr")).toBe(label(FIXTURES.lowReliability, "gh_private_talent"));
+    expect(imageQuote(light, "fr")).toBe(label(light, "gh_lazy_commits"));
+    // Un dossier scellé (fait par un tiers, sans note) : la phrase du profil, pas un chef d'accusation.
+    expect(imageQuote({ ...FIXTURES.silver, sealed: true }, "fr")).toBe(FIXTURES.silver.profile!.tagline.fr);
+  });
+
+  it("un dossier scellé n'a ni étoiles ni niveau à côté de la fiche", async () => {
+    const svg = await renderSvg({ format: "og", card: { ...FIXTURES.silver, avatarUrl: undefined, sealed: true }, lang: "fr" });
+    expect(svg).not.toContain("data-star-row");
+    expect(svg).not.toContain(`>${LEVEL_LABELS[4].fr.toLocaleUpperCase("fr-FR")}</text>`);
+  });
+
+  it("l'appel : une pilule rose au texte d'encre, calée sur le bas de la fiche, dans la langue de l'image", async () => {
+    const fr = await renderSvg({ format: "og", card: light, lang: "fr" });
+    const pill = /<g data-cta=""><rect x="560" y="(\d+)" width="[\d.]+" height="(\d+)" rx="[\d.]+" fill="#ffb2c6"><\/rect><text [^>]*fill="#0c0d1b">([^<]+)<\/text><text [^>]*fill="#0c0d1b">([^<]+)<\/text>/.exec(fr)!;
+    expect(Number(pill[1]) + Number(pill[2])).toBe(598);
+    expect(pill[3]).toBe(`${t("fr").cta} :`);
+    expect(pill[4]).toBe("skills.azerit.tech");
+    const en = await renderSvg({ format: "og", card: light, lang: "en" });
+    expect(en).toContain(`>${t("en").cta}:</text>`);
   });
 
   it("un nom trop long passe sur deux lignes, sans couper ce qui tenait", async () => {
@@ -64,6 +114,22 @@ describe("lieux du crime des images de partage", () => {
     expect(pink).toMatch(/fill="#0c0d1b" fill-opacity="1">AVIS DE RECHERCHE</);
     const night = await renderSvg({ format: "portrait", card: blue, lang: "en" });
     expect(night).toMatch(/fill="#fff9cb" fill-opacity="1">WANTED</);
+  });
+
+  it("portrait : sous la fiche, ce que c'est en une ligne et l'appel, en français ou en anglais", async () => {
+    const yOf = (svg: string, text: string) => Number(new RegExp(`<text[^>]* y="([\\d.]+)"[^>]*>${text}`).exec(svg)?.[1]);
+    for (const lang of ["fr", "en"] as const) {
+      const svg = await renderSvg({ format: "portrait", card: light, lang });
+      const what = yOf(svg, IMAGE_WORDS[lang].what.slice(0, 12));
+      const call = yOf(svg, t(lang).cta);
+      // La fiche finit à 1156 ; la ligne puis l'appel dessous, dans l'image.
+      expect(what).toBeGreaterThan(1156 + 30);
+      expect(call).toBeGreaterThan(what + 40);
+      expect(call).toBeLessThan(1350 - 40);
+      expect(svg).toContain(IMAGE_WORDS[lang].what);
+      expect(svg).toContain(">skills.azerit.tech</text>");
+      expect(svg).not.toContain("…</text>");
+    }
   });
 
   it("sans fichier de décor, le front de mer dessiné, jamais une image cassée", () => {
