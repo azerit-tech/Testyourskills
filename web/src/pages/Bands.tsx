@@ -136,15 +136,14 @@ export function Bands() {
       {/* L'appel : le champ de l'accueil, ou sa fiche si elle existe. Sans bande au tableau, il prend la place du tableau. */}
       <section className="after-block band-make bands-make" aria-labelledby="bands-make-title">
         <h2 id="bands-make-title">{empty ? t.bands.none.title : tb.makeTitle}</h2>
+        {/* la phrase suit le titre : au bureau, les deux à gauche, le champ seul à droite */}
+        <p className="band-make-note">{mineHref ? t.bands.states.pickUnder : empty ? t.bands.none.note : tb.make}</p>
         {mineHref ? (
-          <>
-            <p className="band-make-note">{t.bands.states.pickUnder}</p>
-            <a className="btn-primary" href={mineHref} onClick={(e) => onLinkClick(e, mineHref)}>
-              {t.bands.states.seeCard}
-            </a>
-          </>
+          <a className="btn-primary" href={mineHref} onClick={(e) => onLinkClick(e, mineHref)}>
+            {t.bands.states.seeCard}
+          </a>
         ) : (
-          <EntryForm note={<p className="band-make-note">{empty ? t.bands.none.note : tb.make}</p>} />
+          <EntryForm />
         )}
       </section>
     </main>
@@ -169,6 +168,49 @@ function Member({ m }: { m: BandMember & { login: string; cardId: string } }) {
         </span>
         <Stars n={m.stars} size={14} label={t.bands.score(m.stars)} />
       </a>
+    </li>
+  );
+}
+
+/** Le nombre d'anonymes par nombre d'étoiles, du plus étoilé au moins étoilé : [[6, 2], [5, 5]]. */
+export function starSpread(members: BandMember[]): [number, number][] {
+  const count = new Map<number, number>();
+  for (const m of members) count.set(m.stars, (count.get(m.stars) ?? 0) + 1);
+  return [...count.entries()].sort((a, b) => b[0] - a[0]);
+}
+
+/**
+ * Les fiches sans pseudo, en dernière ligne de la liste : une pile de silhouettes (huit au
+ * plus), leur nombre, et leur répartition en étoiles quand la page les a toutes reçues.
+ */
+function Anonymous({ count, spread }: { count: number; spread: [number, number][] | null }) {
+  const { t } = useT();
+  const ts = t.bands.states;
+  return (
+    <li className="band-anon">
+      <span className="band-anon-faces" aria-hidden>
+        {Array.from({ length: Math.min(8, count) }, (_, i) => (
+          <span key={i} className="band-anon-face">
+            <svg viewBox="0 0 100 100" focusable="false">
+              <circle cx="50" cy="40" r="19" />
+              <path d="M12 100c0-25 17-41 38-41s38 16 38 41z" />
+            </svg>
+          </span>
+        ))}
+      </span>
+      <span className="band-anon-text">
+        <span className="band-anon-count">{ts.anonymous(count)}</span>
+        {spread && spread.length > 0 && (
+          <span className="band-anon-spread" role="img" aria-label={ts.spread(spread)}>
+            {spread.map(([s, k]) => (
+              <span key={s}>
+                <Stars n={s} total={s} size={14} />
+                {k}
+              </span>
+            ))}
+          </span>
+        )}
+      </span>
     </li>
   );
 }
@@ -328,6 +370,9 @@ export function BandPage({ type, id }: { type: BandType; id: string }) {
   const aheadHref = band.ahead ? bandPath({ type: band.type, id: band.ahead.id }) : null;
   const named = data.members.filter((m): m is BandMember & { login: string; cardId: string } => !!m.login && !!m.cardId);
   const anonymous = Math.max(0, band.members - named.length);
+  // La répartition seulement si la page a reçu toutes les fiches anonymes (le serveur en envoie 50 au plus).
+  const anonList = data.members.filter((m) => !m.login || !m.cardId);
+  const spread = anonList.length === anonymous ? starSpread(anonList) : null;
   const shareBand = () => void share(band, tp.shareText(band.label, rank), mine?.id ?? null);
 
   return (
@@ -374,24 +419,28 @@ export function BandPage({ type, id }: { type: BandType; id: string }) {
       <div className="band-main">
         <section className="band-roster" aria-labelledby="band-roster-title">
           <h2 id="band-roster-title">{tp.roster}</h2>
-          {named.length > 0 && (
+          {band.members > 0 && (
             <ol className="board-list is-top band-members">
               {named.map((m) => (
                 <Member key={m.cardId} m={m} />
               ))}
+              {/* les fiches sans pseudo : dans le même bloc, en dernière ligne, comptées et réparties */}
+              {anonymous > 0 && <Anonymous count={anonymous} spread={spread} />}
             </ol>
           )}
-          {/* les fiches sans pseudo : comptées en une ligne, pas listées */}
-          {anonymous > 0 && <p className={named.length > 0 ? "band-more" : "bands-empty"}>{t.bands.states.anonymous(anonymous, named.length)}</p>}
+          {anonymous > 0 && named.length === 0 && <p className="band-more">{t.bands.states.claimHint}</p>}
           {band.members === 0 && <p className="bands-empty">{tp.rosterNone}</p>}
         </section>
+        {/* une bande de boîte : le bloc recruteur de la page d'une fiche, au nom de la boîte */}
         {band.type === "boite" && (
-          <p className="band-recruit">
-            {tp.recruiter(band.label)}{" "}
-            <a className="link-alt" href="https://azerit.tech" target="_blank" rel="noopener" onClick={() => api.track("cta_azerit_clicked", null, { from: "band" })}>
+          <section className="after-block hire band-hire" aria-labelledby="band-hire-title">
+            <h2 id="band-hire-title">{tp.recruiter(band.label)}</h2>
+            <p>{tp.recruiterText}</p>
+            <a className="pill pill-ghost" href="https://azerit.tech" target="_blank" rel="noopener" onClick={() => api.track("cta_azerit_clicked", null, { from: "band" })}>
               {tp.recruiterLink}
+              <span aria-hidden>↗</span>
             </a>
-          </p>
+          </section>
         )}
       </div>
       {toast.node}

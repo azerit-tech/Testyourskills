@@ -68,7 +68,8 @@ const fr = {
     unnamed: "Fiche sans profil",
     more: (k: number) => `Et ${n(k, "autre fiche", "autres fiches")}.`,
     /* On vouvoie qui recrute, comme sous la fiche. */
-    recruiter: (label: string) => `Vous recrutez chez ${label} ? Azerit lit le parcours, puis le code.`,
+    recruiter: (label: string) => `Vous recrutez chez ${label} ?`,
+    recruiterText: "Azerit vous présente des devs lus comme leurs fiches : l'expérience d'abord, le code en preuve.",
     recruiterLink: "azerit.tech",
     share: "Partager la bande",
     shareText: (label: string, rank: string) => `${label} : ${lowerFirst(rank)} Viens grossir les rangs :`,
@@ -102,11 +103,12 @@ const fr = {
     landed: (label: string) => `Tu roules pour ${label}.`,
     /** Les trois emplacements d'une bande en formation, pour un lecteur d'écran. */
     slots: (k: number) => `${k} sur 3`,
-    /** Les fiches sans pseudo, en une ligne ; `named` : celles qui s'affichent au-dessus. */
-    anonymous: (k: number, named: number) => {
-      const some = k > 1 ? `${k} fiches anonymes` : "1 fiche anonyme";
-      return named > 0 ? `Et ${some}.` : `${some}. Une fiche revendiquée avec « C'est moi » s'affiche ici avec son pseudo.`;
-    },
+    /** Les fiches sans pseudo, en dernière ligne de la liste, derrière une pile de silhouettes. */
+    anonymous: (k: number) => n(k, "fiche anonyme", "fiches anonymes"),
+    /** Sous la liste, quand aucune fiche n'a de pseudo. */
+    claimHint: "Une fiche revendiquée avec « C'est moi » s'affiche ici avec son pseudo.",
+    /** La répartition des anonymes, pour un lecteur d'écran : « 2 fiches à 6 étoiles, 5 fiches à 5 étoiles ». */
+    spread: (parts: [number, number][]) => parts.map(([s, k]) => `${n(k, "fiche", "fiches")} à ${n(s, "étoile", "étoiles")}`).join(", "),
   },
   /** /bandes sans bande : l'appel à monter la première ; une ligue vide à côté d'une pleine. */
   none: {
@@ -170,7 +172,8 @@ const en: BandsDict = {
     rosterNone: "Nobody yet. The spot is open.",
     unnamed: "Sheet without a profile",
     more: (k: number) => `And ${nEn(k, "other sheet", "other sheets")}.`,
-    recruiter: (label: string) => `Hiring at ${label}? Azerit reads the track record, then the code.`,
+    recruiter: (label: string) => `Hiring at ${label}?`,
+    recruiterText: "Azerit brings you devs read like their sheets: experience first, code as proof.",
     recruiterLink: "azerit.tech",
     share: "Share the crew",
     shareText: (label: string, rank: string) => `${label}: ${rank} Come add your stars:`,
@@ -195,10 +198,9 @@ const en: BandsDict = {
     pickUnder: "You already have your sheet: open it, your school and your company are picked right under it.",
     landed: (label: string) => `You ride for ${label}.`,
     slots: (k: number) => `${k} of 3`,
-    anonymous: (k: number, named: number) => {
-      const some = k > 1 ? `${k} anonymous sheets` : "1 anonymous sheet";
-      return named > 0 ? `And ${some}.` : `${some}. A sheet claimed with “That's me” shows here with its username.`;
-    },
+    anonymous: (k: number) => nEn(k, "anonymous sheet", "anonymous sheets"),
+    claimHint: "A sheet claimed with “That's me” shows here with its username.",
+    spread: (parts: [number, number][]) => parts.map(([s, k]) => `${nEn(k, "sheet", "sheets")} at ${nEn(s, "star", "stars")}`).join(", "),
   },
   none: {
     title: "Start the first crew",

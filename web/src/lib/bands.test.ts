@@ -142,18 +142,18 @@ describe("la bande choisie avant de faire la fiche", () => {
 });
 
 describe("les trois états de la page d'une bande, en mots", () => {
-  it("les fiches anonymes tiennent en une ligne, à la suite des fiches nommées ou seules", () => {
-    expect(fr.bands.states.anonymous(12, 3)).toBe("Et 12 fiches anonymes.");
-    expect(fr.bands.states.anonymous(1, 2)).toBe("Et 1 fiche anonyme.");
-    expect(fr.bands.states.anonymous(4, 0)).toMatch(/^4 fiches anonymes\. /);
-    expect(en.bands.states.anonymous(12, 3)).toBe("And 12 anonymous sheets.");
+  it("les fiches anonymes : leur nombre, et leur répartition en étoiles pour un lecteur d'écran", () => {
+    expect(fr.bands.states.anonymous(12)).toBe("12\u00a0fiches anonymes");
+    expect(fr.bands.states.anonymous(1)).toBe("1\u00a0fiche anonyme");
+    expect(en.bands.states.anonymous(12)).toBe("12\u00a0anonymous sheets");
+    expect(fr.bands.states.spread([[6, 2], [5, 1]])).toBe("2\u00a0fiches à 6\u00a0étoiles, 1\u00a0fiche à 5\u00a0étoiles");
   });
 
   it("les clés neuves : ni tiret long, ni point médian, et plus de « un toucher dessous »", () => {
     for (const d of [fr, en]) {
       const s = d.bands.states;
       const n = d.bands.none;
-      const texts = [s.follow, s.joinTitle, s.joinText, s.join, s.moving("X"), s.lost, s.seeCard, s.pickUnder, s.landed("X"), s.slots(1), s.anonymous(2, 0), s.anonymous(2, 1), n.title, n.note, n.league.ecole, n.league.boite];
+      const texts = [s.follow, s.joinTitle, s.joinText, s.join, s.moving("X"), s.lost, s.seeCard, s.pickUnder, s.landed("X"), s.slots(1), s.anonymous(2), s.claimHint, s.spread([[4, 2]]), n.title, n.note, n.league.ecole, n.league.boite];
       for (const x of texts) expect(x, x).not.toMatch(/[—·]/);
       expect(s.follow).not.toMatch(/toucher dessous|tap below/);
     }

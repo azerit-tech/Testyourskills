@@ -255,7 +255,8 @@ const mock = {
       null,
     ];
     const positions = ["BE", "FE", "DATA", "FS", "OPS"] as const;
-    const members = Array.from({ length: Math.min(band.members, 12) }, (_, i) => ({
+    // Comme le serveur : toutes les fiches jusqu'à 50 (BAND_PAGE_MEMBERS), les anonymes comprises.
+    const members = Array.from({ length: Math.min(band.members, 50) }, (_, i) => ({
       stars: Math.max(1, 6 - Math.floor(i / 3)),
       profile: profiles[i % profiles.length],
       position: positions[i % positions.length],
