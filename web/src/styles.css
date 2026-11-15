@@ -1063,6 +1063,16 @@ svg {
     display: none;
   }
 }
+/* une case très étroite (320 px de large) : le nom passe à la ligne plutôt que d'être
+   coupé (« TA PLA… ») */
+@container (max-width: 90px) {
+  .cover-plate {
+    white-space: normal;
+  }
+  .cover-plate b {
+    line-height: 1.05;
+  }
+}
 /* « Ta place », quand une fiche est en mémoire : sa vignette. Le haut de la fiche (la note,
    les étoiles, le portrait) en pleine case, sans toise ni deux tons, la plaque par-dessus. */
 .cover-mine .cover-face::before,
@@ -1289,6 +1299,37 @@ button.cover-panel:focus-visible {
   }
   .hero .entry {
     margin-top: 12px;
+  }
+}
+/* très petit téléphone (320 px) : le titre tient en deux lignes et le bouton remonte
+   au-dessus du pli */
+@media (max-width: 359px) {
+  .hero-title {
+    font-size: var(--t-28);
+  }
+}
+/* téléphone couché (640 à 899 px de large, peu de hauteur) : le premier écran n'est plus
+   la seule couverture. Le titre et le formulaire à gauche, la couverture à droite, de la
+   hauteur de la colonne. */
+@media (min-width: 640px) and (max-width: 899px) and (max-height: 520px) {
+  .home-top {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr);
+    column-gap: 24px;
+    align-items: stretch;
+  }
+  .hero {
+    grid-column: 1;
+    grid-row: 1;
+    align-content: start;
+  }
+  .hero-title {
+    font-size: var(--t-28);
+  }
+  .home-top .cover {
+    grid-column: 2;
+    grid-row: 1;
+    height: auto;
+    min-height: 0;
   }
 }
 
