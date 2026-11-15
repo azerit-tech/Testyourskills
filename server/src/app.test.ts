@@ -572,6 +572,19 @@ describe("image d'aperçu de l'accueil (/og/home.png)", () => {
     }
   });
 
+  it("une page introuvable n'a pas d'adresse canonique, et la configuration se garde une minute", async () => {
+    const root = mkdtempSync(join(tmpdir(), "tys-web-"));
+    writeFileSync(join(root, "index.html"), INDEX);
+    const ctx = setup({}, { staticRoot: root, indexHtml: async () => INDEX });
+    const res = await ctx.app.request("/nulle/part");
+    expect(res.status).toBe(404);
+    const html = await res.text();
+    expect(html).not.toContain(`rel="canonical"`);
+    expect(html).not.toContain(`property="og:url"`);
+    expect(html).toContain(`<meta property="og:image" content="https://skills.test/og/home.png">`);
+    expect((await ctx.app.request("/api/config")).headers.get("cache-control")).toBe("public, max-age=60");
+  });
+
   it("la vie privée a son propre titre, sa description et son adresse, avec l'image de l'accueil", async () => {
     const root = mkdtempSync(join(tmpdir(), "tys-web-"));
     writeFileSync(join(root, "index.html"), INDEX);

@@ -37,7 +37,7 @@ import { mountPrimes, purgeEntries } from "./primes";
 import { mountPrimePages } from "./primePages";
 import { loadRules, servableRules } from "./rules";
 import { addVary, compressHtml, isCompressible, readManifest, StaticCompressor, withPreloads } from "./assets";
-import { NOINDEX, robotsTxt, sitemapPaths, sitemapXml, sitePageMeta, withPageUrl } from "./seo";
+import { NOINDEX, robotsTxt, sitemapPaths, sitemapXml, sitePageMeta, withoutPageUrl, withPageUrl } from "./seo";
 
 export interface AppOptions {
   store: Store;
@@ -260,7 +260,15 @@ export function createApp(opts: AppOptions) {
     app.use("*", async (c, next) => {
       if (c.req.path.startsWith("/.vite/")) return c.text("Not found", 404);
       await next();
-      if (c.req.method !== "GET" || !(c.res.headers.get("content-type") ?? "").startsWith("text/html")) return;
+      if (c.req.method !== "GET") return;
+      // Les réponses JSON de l'API, compressées au-dessus de 1 Ko comme le HTML (assets.ts).
+      if ((c.res.headers.get("content-type") ?? "").startsWith("application/json") && c.req.path.startsWith("/api/")) {
+        const packed = await compressHtml(c.res, c.req.header("accept-encoding"));
+        c.res = undefined;
+        c.res = packed;
+        return;
+      }
+      if (!(c.res.headers.get("content-type") ?? "").startsWith("text/html")) return;
       const raw = manifest ? withPreloads(await c.res.text(), manifest, c.req.path, c.res.status) : await c.res.text();
       // La configuration dans la page : le bandeau de saison est là dès la première image (html.ts).
       const html = injectConfig(raw, appConfig());
@@ -304,7 +312,8 @@ export function createApp(opts: AppOptions) {
   const pageNotFound = async (c: Context): Promise<Response> => {
     const template = await siteTemplate();
     c.header("Cache-Control", "no-cache");
-    if (template) return c.html(injectHomeImage(template, baseUrl), 404);
+    // Une page introuvable n'a pas d'adresse canonique : ni celle de l'accueil, ni la sienne.
+    if (template) return c.html(withoutPageUrl(injectHomeImage(template, baseUrl)), 404);
     return c.html(await serverPage(c, "pageNotFound"), 404);
   };
 
@@ -377,7 +386,11 @@ export function createApp(opts: AppOptions) {
       interviews: season ? season.primes.filter((p) => primePhase(season, p, now) === "open").reduce((n, p) => n + p.interviews, 0) : 0,
     };
   };
-  app.get("/api/config", (c) => c.json(appConfig()));
+  // Une minute de cache : chaque page la porte déjà dans son HTML, la réponse ne fait que confirmer.
+  app.get("/api/config", (c) => {
+    c.header("Cache-Control", "public, max-age=60");
+    return c.json(appConfig());
+  });
 
   // Les moteurs de recherche : de vrais fichiers, sans les fiches (seo.ts).
   app.get("/robots.txt", (c) => {
@@ -811,7 +824,7 @@ export function createApp(opts: AppOptions) {
       return c.html(injectMeta(page, generic), mine ? 200 : 410);
     }
     // L'aperçu est lu par tout le monde : la version publique (shared/publicView.ts).
-    const found = row ? metaFor(publicView(withWeekSpecial(store.db, row.data).data, { thirdParty: thirdParty(row) }), baseUrl) : genericMeta(baseUrl, `/c/${id}`);
+    const found = row ? metaFor(publicView(withWeekSpecial(store.db, row.data).data, { thirdParty: thirdParty(row) }), baseUrl) : genericMeta(baseUrl, `/c/${id}`, requestLang(c.req.query("lang"), c.req.header("Accept-Language")));
     const meta = { ...found, noindex: true };
     const html = template ? injectMeta(template, meta) : standalonePage(meta);
     c.header("Cache-Control", "public, max-age=300");

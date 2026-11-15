@@ -34,6 +34,7 @@ describe("balises des pages du site", () => {
       expect(index).toContain(tag);
     const manifest = JSON.parse(readFileSync(join(__dirname, "../../web/public/site.webmanifest"), "utf8"));
     expect(manifest.name).toBe("Azerit");
-    expect(manifest.icons.map((i: { sizes: string }) => i.sizes)).toEqual(["192x192", "512x512"]);
+    // « any » et « maskable » séparés : une icône masquable a sa propre marge (scripts/icons.ts).
+    expect(manifest.icons.map((i: { sizes: string; purpose: string }) => `${i.sizes} ${i.purpose}`)).toEqual(["192x192 any", "512x512 any", "512x512 maskable"]);
   });
 });

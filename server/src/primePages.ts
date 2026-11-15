@@ -17,7 +17,7 @@ import type { Lang } from "../../shared/types";
 import type { Store } from "./db";
 import { pageTitle } from "../../shared/promise";
 import { frTypo } from "../../shared/typo";
-import { HOME_IMAGE_PATH, injectMeta, requestLang, standalonePage, type PageMeta } from "./html";
+import { HOME_IMAGE_PATH, homeImageAlt, injectMeta, requestLang, standalonePage, type PageMeta } from "./html";
 import { primeViewById } from "./primes";
 import { primeJobs, primeWhen, type PrimeLogo } from "./render/prime";
 
@@ -111,9 +111,10 @@ export function primesMeta(baseUrl: string, lang: Lang = "fr"): PageMeta {
     title: frTypo(pageTitle(fr ? "Les primes : des entretiens pour le haut du classement" : "Bounties: interviews for the top of the board")),
     description: fr
       ? frTypo("Stage, alternance, CDI : des entreprises offrent des entretiens aux fiches les mieux classées. Fais ta fiche et entre dans la course.")
-      : "Internship, work-study, full-time: companies offer interviews to the top-ranked sheets. Get your rap sheet and enter the race.",
+      : "Internship, apprenticeship, full-time: companies offer interviews to the top-ranked sheets. Get your rap sheet and enter the race.",
     image: `${baseUrl}${HOME_IMAGE_PATH}`,
-    imageAlt: fr ? "Azerit, les primes" : "Azerit, the bounties",
+    // l'image est celle de l'accueil : son texte aussi
+    imageAlt: homeImageAlt(lang),
   };
 }
 

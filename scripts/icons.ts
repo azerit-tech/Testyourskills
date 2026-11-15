@@ -1,7 +1,8 @@
 // Les icônes du site, dessinées depuis la gemme d'Azerit (web/src/components/Brand.tsx)
 // sur l'encre, par le moteur d'images du serveur (resvg) : l'onglet (favicon.svg et
 // favicon.ico), l'écran d'accueil du téléphone (apple-touch-icon.png) et le
-// manifeste (icon-192.png, icon-512.png). Rien n'est téléchargé.
+// manifeste (icon-192.png, icon-512.png, et icon-maskable-512.png que le système découpe).
+// Rien n'est téléchargé.
 //
 //   npx tsx scripts/icons.ts
 //
@@ -62,6 +63,8 @@ const tab = (size: number) => iconSvg(size, 0.78, size * 0.22);
 writeFileSync(join(OUT, "favicon.svg"), tab(64) + "\n");
 writeFileSync(join(OUT, "favicon.ico"), ico([16, 32, 48].map((size) => ({ size, data: png(tab(size)) }))));
 writeFileSync(join(OUT, "apple-touch-icon.png"), png(iconSvg(180, 0.6)));
-writeFileSync(join(OUT, "icon-192.png"), png(iconSvg(192, 0.56)));
-writeFileSync(join(OUT, "icon-512.png"), png(iconSvg(512, 0.56)));
+// « any » : la gemme en grand ; « maskable » : dans la zone sûre, le système arrondit ou découpe le fond.
+writeFileSync(join(OUT, "icon-192.png"), png(iconSvg(192, 0.72)));
+writeFileSync(join(OUT, "icon-512.png"), png(iconSvg(512, 0.72)));
+writeFileSync(join(OUT, "icon-maskable-512.png"), png(iconSvg(512, 0.56)));
 console.log("Icônes écrites dans", OUT);

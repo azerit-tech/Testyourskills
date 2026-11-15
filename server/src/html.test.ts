@@ -158,7 +158,8 @@ describe("le titre de l'accueil, en un seul endroit (shared/promise.ts)", () => 
   it("web/index.html, la seule copie à la main, porte le même titre, la même description et le même texte d'image", () => {
     expect(INDEX).toContain(`<title>${homeTitle("fr")}</title>`);
     expect(INDEX).toContain(`<meta property="og:title" content="${homeTitle("fr")}" />`);
-    expect(INDEX.match(new RegExp(`content="${HOME_PROMISE.fr.description}"`, "g"))).toHaveLength(2);
+    expect(INDEX.match(new RegExp(`content="${HOME_PROMISE.fr.description}"`, "g"))).toHaveLength(3);
+    expect(INDEX).toContain(`<meta name="twitter:title" content="${homeTitle("fr")}" />`);
     expect(INDEX).toContain(`<meta property="og:image:alt" content="${homeImageAlt("fr")}" />`);
   });
 

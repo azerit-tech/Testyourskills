@@ -53,6 +53,11 @@ export function sitePageMeta(path: string, baseUrl: string, lang: Lang): PageMet
   return { ...own, description: PAGE_DESCRIPTIONS[page][own.lang] };
 }
 
+/** Une page introuvable : sans adresse canonique ni og:url (celles du index.html désignent l'accueil). */
+export function withoutPageUrl(html: string): string {
+  return html.replace(/<link\s+rel=["']canonical["'][^>]*>\s*/gi, "").replace(/<meta\s+property=["']og:url["'][^>]*>\s*/gi, "");
+}
+
 /** L'adresse canonique d'une page (accueil, ou accueil prérempli par /pseudo) : canonical et og:url, remplacés, jamais doublés. */
 export function withPageUrl(html: string, url: string): string {
   const e = escapeHtml;
