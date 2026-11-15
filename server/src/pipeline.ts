@@ -136,8 +136,8 @@ export const MESSAGES: Record<MessageKey, Fact> = {
     en: "Judging took too long. Rather than make up a sheet, we stopped: try again in a moment.",
   },
   rate_limited: {
-    fr: "20 fiches par jour, c'est le maximum. Reviens demain : même les recruteurs font des pauses.",
-    en: "20 sheets a day is the limit. Come back tomorrow: even recruiters take breaks.",
+    fr: "Assez de fiches pour aujourd'hui. Reviens demain : même les recruteurs font des pauses.",
+    en: "That's enough sheets for today. Come back tomorrow: even recruiters take breaks.",
   },
   github_rate_limited: {
     fr: "GitHub nous demande de ralentir. Réessaie dans quelques minutes.",

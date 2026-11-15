@@ -250,11 +250,39 @@ async function logout(): Promise<void> {
   if (!res.ok) throw await readError(res);
 }
 
+/** Clé de l'identifiant du navigateur en stockage local (limite de fiches par navigateur, §18.48). */
+const BROWSER_KEY = "tys_browser";
+let browserFallback: string | null = null;
+
+/**
+ * Un identifiant tiré au hasard, gardé en stockage local : il ne dit rien de la
+ * personne, il sert seulement à compter les fiches de ce navigateur dans la
+ * journée ; le serveur n'en garde que le hash. Sans stockage, un tirage par visite.
+ */
+export function browserId(): string {
+  const fresh = () => {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  };
+  try {
+    const kept = localStorage.getItem(BROWSER_KEY);
+    if (kept && /^[A-Za-z0-9_-]{16,64}$/.test(kept)) return kept;
+    const id = fresh();
+    localStorage.setItem(BROWSER_KEY, id);
+    return id;
+  } catch {
+    return (browserFallback ??= fresh());
+  }
+}
+
 async function createCard(input: CreateInput): Promise<CreateResult> {
   if (isMock()) return mockApi.createCard(input);
   let res: Response;
   // Fiche d'origine si on est arrivé par un lien partagé (§18.0) ; le serveur l'ignore si elle n'existe pas.
   const ref = currentRef() ?? undefined;
+  const browser = { "X-Browser-Id": browserId() };
   try {
     if (input.cv) {
       const fd = new FormData();
@@ -262,11 +290,11 @@ async function createCard(input: CreateInput): Promise<CreateResult> {
       if (input.login) fd.append("login", input.login);
       fd.append("lang", input.lang);
       if (ref) fd.append("ref", ref);
-      res = await fetch("/api/card", { method: "POST", body: fd });
+      res = await fetch("/api/card", { method: "POST", headers: browser, body: fd });
     } else {
       res = await fetch("/api/card", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...browser },
         body: JSON.stringify({ login: input.login, linkedin: input.linkedin, lang: input.lang, ref, denouncedBy: input.denouncedBy }),
       });
     }

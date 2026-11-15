@@ -17,7 +17,7 @@ import { stripToken, type CardRow, type Store } from "./db";
 import { buildLead, clientEventSchema, sendLead } from "./events";
 import { genericMeta, HOME_IMAGE_PATH, injectHomeImage, injectMeta, messagePage, metaFor, standalonePage } from "./html";
 import { ID_RE, MAX_PDF_BYTES, MESSAGES, Pipeline, type Deps, type RenderInput } from "./pipeline";
-import { CARDS_PER_DAY, RateLimiter, clientIp } from "./ratelimit";
+import { CARDS_PER_BROWSER, CARDS_PER_DAY, RateLimiter, browserId, clientIp } from "./ratelimit";
 import { inlineAvatar, mountLinkedin, removeAvatars, type LinkedinConfig } from "./linkedin";
 import { mountAuth, ownerFromRequest, sameOrigin, type GithubAuthConfig } from "./auth";
 import { DENOUNCE_LIMITED, DENOUNCE_PER_DAY, mountDenounce, parseDenunciation } from "./denounce";
@@ -58,8 +58,11 @@ export interface AppOptions {
   maxConcurrentCards?: number;
   queueTimeoutMs?: number;
   busyAfterMs?: number;
+  /** Fiches calculées par jour et par IP (CARDS_PER_DAY). Défaut : ratelimit.ts. */
   cardsPerDay?: number;
-  /** Sel du hash des IP pour les compteurs de limite. */
+  /** Fiches calculées par jour et par navigateur (CARDS_PER_BROWSER), hors dénonciation. Défaut : ratelimit.ts. */
+  cardsPerBrowser?: number;
+  /** Sel du hash des IP (et des identifiants de navigateur) pour les compteurs de limite. */
   ipSalt?: string;
   /** Prod : dossier du front buildé (dist/web), servi en statique avec repli SPA. */
   staticRoot?: string;
@@ -238,6 +241,7 @@ export function createApp(opts: AppOptions) {
   });
   const limiter = new RateLimiter(store, opts.ipSalt ?? "testyourskills");
   const cardsPerDay = opts.cardsPerDay ?? CARDS_PER_DAY;
+  const cardsPerBrowser = opts.cardsPerBrowser ?? CARDS_PER_BROWSER;
   const fetchImpl = opts.fetchImpl ?? fetch;
   const rendering = new Map<string, Promise<Uint8Array>>();
   /** Image de l'accueil déjà rendue : une par fiche de vitrine et par processus (un déploiement la refait). */
@@ -522,16 +526,20 @@ export function createApp(opts: AppOptions) {
         return c.json(errorBody("closed", MESSAGES.closed), 503);
       }
 
-      // 20 cartes par IP et par jour : seules les cartes réellement calculées comptent.
-      // GitHub nous a coupé l'accès pour longtemps : on le dit tout de suite, sans entamer le quota de l'IP.
+      // 300 fiches par IP et 6 par navigateur, par jour (§18.48) : seules les fiches réellement calculées comptent.
+      // GitHub nous a coupé l'accès pour longtemps : on le dit tout de suite, sans entamer les quotas.
       if (login) {
         const busy = pipeline.githubBusy();
         if (busy) return c.json(errorBody(busy.code, busy.msg), 503);
       }
 
-      if (!limiter.take("card", ip, cardsPerDay)) {
+      // La dénonciation garde sa propre limite : elle n'entame pas celle du navigateur.
+      const browser = denounce ? null : browserId(c);
+      if (!limiter.allowed("card", ip, cardsPerDay) || (browser && !limiter.allowed("card-browser", browser, cardsPerBrowser))) {
         return c.json(errorBody("rate_limited", MESSAGES.rate_limited), 429);
       }
+      limiter.take("card", ip, cardsPerDay);
+      if (browser) limiter.take("card-browser", browser, cardsPerBrowser);
 
       const { id, deleteToken } = pipeline.start({
         lang,

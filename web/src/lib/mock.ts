@@ -317,8 +317,9 @@ export const mockApi = {
     const lower = login?.toLowerCase() ?? "";
     if (lower === "ratelimit") {
       throw new ApiError(429, "rate_limited", {
-        fr: "Vingt cartes aujourd'hui depuis cette adresse. Reviens demain, ton code n'aura pas bougé.",
-        en: "Twenty cards today from this address. Come back tomorrow, your code won't have moved.",
+        // Le texte du serveur (server/src/pipeline.ts, MESSAGES.rate_limited).
+        fr: "Assez de fiches pour aujourd'hui. Reviens demain : même les recruteurs font des pauses.",
+        en: "That's enough sheets for today. Come back tomorrow: even recruiters take breaks.",
       });
     }
     if (lower === "busy") {

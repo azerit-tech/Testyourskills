@@ -9,6 +9,7 @@ import type { CardData, ComparisonData, Fact, JobState } from "../../shared/type
 import type { CvReading, CvTextCounts } from "../../shared/readings";
 import { SCHOOL_RANK_RE } from "../../shared/schoolRank";
 import { createApp, normalizeLogin, purge, type AppOptions } from "./app";
+import { CARDS_PER_BROWSER, CARDS_PER_DAY, limitFromEnv } from "./ratelimit";
 import { RETENTION_MS, Store } from "./db";
 import { CARD_TIMEOUT_MS, MESSAGES, type CardBody, type Deps } from "./pipeline";
 import { noteCreditBalance, noteCreditsExhausted, recordUsage, resetBudgetForTests, type AiStatus } from "./ai/budget";
@@ -570,7 +571,14 @@ describe("image d'aperçu de l'accueil (/og/home.png)", () => {
   });
 });
 
-describe("limite de 20 cartes par IP et par jour", () => {
+describe("limites de fiches par jour : par IP et par navigateur (§18.48)", () => {
+  it("par défaut, 300 par IP et 6 par navigateur ; réglables par l'environnement", () => {
+    expect(CARDS_PER_DAY).toBe(300);
+    expect(CARDS_PER_BROWSER).toBe(6);
+    expect(limitFromEnv("1000", CARDS_PER_DAY)).toBe(1000);
+    for (const bad of [undefined, "", "0", "-3", "beaucoup"]) expect(limitFromEnv(bad, CARDS_PER_DAY)).toBe(300);
+  });
+
   it("répond 429 avec un message fr/en au-delà", async () => {
     const ctx = setup({}, { cardsPerDay: 2 });
     const ip = { "x-forwarded-for": "203.0.113.9" };
@@ -579,7 +587,7 @@ describe("limite de 20 cartes par IP et par jour", () => {
     const third = await postLogin(ctx, "a3", ip);
     expect(third.res.status).toBe(429);
     expect(third.json).toMatchObject({ state: "error", code: "rate_limited" });
-    expect(third.json.message?.fr).toContain("20 fiches par jour");
+    expect(third.json.message?.fr).toContain("Reviens demain");
     // Une autre IP n'est pas concernée, la dernière entrée de X-Forwarded-For fait foi.
     expect((await postLogin(ctx, "a3", { "x-forwarded-for": "203.0.113.9, 198.51.100.1" })).res.status).toBe(202);
     await ctx.pipeline.drain();
@@ -598,6 +606,36 @@ describe("limite de 20 cartes par IP et par jour", () => {
     const keys = ctx.store.db.prepare("SELECT key FROM ratelimit").all() as { key: string }[];
     expect(keys.some((k) => k.key.includes("203.0.113.9"))).toBe(false);
     await ctx.pipeline.drain();
+  });
+
+  it("un navigateur : sa propre limite, sous celle de son IP, sans entamer celle de l'IP au refus", async () => {
+    const ctx = setup({}, { cardsPerDay: 5, cardsPerBrowser: 2 });
+    const one = { "x-forwarded-for": "203.0.113.20", "x-browser-id": "navigateur-un-0123456789" };
+    const two = { "x-forwarded-for": "203.0.113.20", "x-browser-id": "navigateur-deux-0123456789" };
+    expect((await postLogin(ctx, "b1", one)).res.status).toBe(202);
+    expect((await postLogin(ctx, "b2", one)).res.status).toBe(202);
+    const third = await postLogin(ctx, "b3", one);
+    expect(third.res.status).toBe(429);
+    expect(third.json).toMatchObject({ state: "error", code: "rate_limited" });
+    // Même adresse, autre navigateur : passe ; le refus du premier n'a rien coûté à l'IP.
+    expect((await postLogin(ctx, "b3", two)).res.status).toBe(202);
+    expect((await postLogin(ctx, "b4", two)).res.status).toBe(202);
+    // Sans identifiant (ou mal formé), seule l'IP compte : 5 au total.
+    expect((await postLogin(ctx, "b5", { "x-forwarded-for": "203.0.113.20", "x-browser-id": "court" })).res.status).toBe(202);
+    expect((await postLogin(ctx, "b6", { "x-forwarded-for": "203.0.113.20" })).res.status).toBe(429);
+    // L'identifiant n'est gardé qu'en hash.
+    const keys = (ctx.store.db.prepare("SELECT key FROM ratelimit").all() as { key: string }[]).map((k) => k.key).join(" ");
+    expect(keys).not.toContain("navigateur");
+    await ctx.pipeline.drain();
+  });
+
+  it("le cache ne compte pas pour le navigateur non plus", async () => {
+    const ctx = setup({}, { cardsPerBrowser: 1 });
+    const nav = { "x-browser-id": "navigateur-cache-0123456789" };
+    const { json } = await postLogin(ctx, "leamd", nav);
+    await ctx.pipeline.wait(json.id);
+    expect((await postLogin(ctx, "leamd", nav)).res.status).toBe(200);
+    expect((await postLogin(ctx, "autre", nav)).res.status).toBe(429);
   });
 });
 

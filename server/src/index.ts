@@ -15,6 +15,7 @@ import { linkedinFromEnv } from "./linkedin";
 import { linkedinProfilesFromEnv, normalizeLinkedinUrl } from "./linkedinProfile/index";
 import { githubAuthFromEnv } from "./auth";
 import { Store } from "./db";
+import { CARDS_PER_BROWSER, CARDS_PER_DAY, limitFromEnv } from "./ratelimit";
 import { realDeps } from "./deps";
 import { TokenPool, tokensFromEnv } from "./github/tokens";
 
@@ -105,6 +106,9 @@ const { app, pipeline } = createApp({
   ogDir,
   leadsEndpoint: process.env.LEADS_ENDPOINT || undefined,
   ipSalt: process.env.IP_SALT || undefined,
+  // Fiches calculées par jour : par adresse IP, et par navigateur (SPEC §18.48).
+  cardsPerDay: limitFromEnv(process.env.CARDS_PER_DAY, CARDS_PER_DAY),
+  cardsPerBrowser: limitFromEnv(process.env.CARDS_PER_BROWSER, CARDS_PER_BROWSER),
   showcaseLogin: process.env.SHOWCASE_LOGIN ?? "jmougeot",
   showcasePhoto: process.env.SHOWCASE_PHOTO ?? (process.env.SHOWCASE_LOGIN ? undefined : "/jmougeot-linkedin.jpg"),
   showcaseLinkedin,

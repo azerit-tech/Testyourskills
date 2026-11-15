@@ -55,7 +55,8 @@ La liste commentée fait foi dans `.env.example`.
 | `HIGH_BAR_EMPLOYERS_FILE` | fichier du serveur, hors du dépôt, de la forme de `data/employers.example.json` (SPEC §18.37) | liste vide |
 | `SHOWCASE_LOGIN`, `SHOWCASE_PHOTO`, `SHOWCASE_LINKEDIN` | la fiche d'exemple de l'accueil (SPEC §18.35) | voir `.env.example` |
 | `LEADS_ENDPOINT` | webhook qui reçoit les emails laissés | aucun |
-| `IP_SALT` | sel du hachage des IP pour les limites par jour ; une valeur aléatoire en production | constante |
+| `IP_SALT` | sel du hachage des IP et des identifiants de navigateur pour les limites par jour ; une valeur aléatoire en production | constante |
+| `CARDS_PER_DAY`, `CARDS_PER_BROWSER` | fiches calculées par jour, par adresse IP et par navigateur (SPEC §18.48) | `300`, `6` |
 | `PORT` | port de l'API | `8787` |
 | `DEV_WEB_URL` | serveur Vite en dev | `http://localhost:5180` |
 
