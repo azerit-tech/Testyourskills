@@ -529,7 +529,7 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
 
   /** Porte LinkedIn : « Où est mon lien ? » ouvre une ligne d'aide, sous les liens du pied. */
   const whereLink = fieldDoor === "linkedin" && (
-    <button type="button" className="link-alt" aria-expanded={help} aria-controls={`${uid}-help`} onClick={() => setHelp((v) => !v)}>
+    <button type="button" className="link-alt entry-where" aria-expanded={help} aria-controls={`${uid}-help`} onClick={() => setHelp((v) => !v)}>
       {h.linkedinWhere}
     </button>
   );

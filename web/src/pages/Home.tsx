@@ -170,16 +170,12 @@ export function ExampleCard({ card, href, pieces }: Showcase) {
   return (
     <figure className="showcase" aria-label={`${t.home.exampleLabel}, ${t.tierCard(LEVEL_LABELS[starsFor(card.overall)][lang])}`}>
       <CardView card={card} lang={lang} interactive idPrefix="hero" />
+      {/* Une seule ligne : le lien vers sa page, puis, en texte, d'où vient la preuve (« d'après LinkedIn et GitHub »). */}
       <figcaption>
         <a href={href} onClick={(e) => onLinkClick(e, href)}>
           {t.home.exampleCaption}
         </a>
-        {/* « Sources au dossier : LinkedIn et GitHub » : d'où vient la preuve, la note est sur la fiche. */}
-        {pieces && pieces.length > 1 && (
-          <a className="showcase-scores" href={href} onClick={(e) => onLinkClick(e, href)}>
-            {t.result.pieces.line(pieces.map(pieceLabel).reduce((a, b) => t.result.pieces.pair(a, b)))}
-          </a>
-        )}
+        {pieces && pieces.length > 1 && <>, {t.home.exampleFrom(pieces.map(pieceLabel).reduce((a, b) => t.result.pieces.pair(a, b)))}</>}
       </figcaption>
     </figure>
   );

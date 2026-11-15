@@ -1310,31 +1310,27 @@ button.cover-panel:focus-visible {
 .showcase .tys-card {
   width: 100%;
 }
-/* la légende, puis ses pièces (§18.36) : deux liens discrets vers le même dossier */
+/* la légende, une seule phrase centrée : le lien vers sa page en rose (il se touche),
+   puis ses pièces (§18.36) en texte, « d'après LinkedIn et GitHub ». La zone de toucher
+   du lien (44 px) déborde sur les blancs sans agrandir la ligne. */
 .showcase figcaption {
-  display: grid;
-  justify-items: center;
-}
-.showcase figcaption a {
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--h-tap);
-  padding: 0 4px;
+  margin-top: 8px;
   font: var(--font-small);
-  font-weight: 500;
   color: var(--c-text-2);
   text-align: center;
+  text-wrap: balance;
+}
+.showcase figcaption a {
+  display: inline;
+  padding: 13px 0;
+  font-weight: 500;
+  color: var(--c-action);
   text-decoration: underline;
-  text-decoration-color: var(--c-line);
-  text-underline-offset: 4px;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
 }
 .showcase figcaption a:hover {
   color: var(--c-emphasis);
-}
-.showcase figcaption .showcase-scores {
-  margin-top: -10px; /* les deux liens mènent au même endroit : leurs zones de 44 px peuvent se toucher */
-  white-space: nowrap;
-  text-decoration: none;
 }
 
 /* --- mur des 13 profils (§18.28) : téléphone, un rail aimanté qui sort du bord
@@ -1734,6 +1730,11 @@ button.cover-panel:focus-visible {
   justify-content: center;
   gap: 0 16px;
   text-align: center;
+}
+/* porte LinkedIn : deux liens qui ne se lisent pas comme une phrase, un à chaque bout
+   (« Où est mon lien ? » à gauche, « Plutôt avec ton CV » à droite) */
+.entry-foot:has(> .entry-where) {
+  justify-content: space-between;
 }
 .entry-reassure {
   flex-basis: 100%;

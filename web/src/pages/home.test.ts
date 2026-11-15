@@ -24,23 +24,21 @@ const captionLinks = (html: string) => [...(/<figcaption>(.*)<\/figcaption>/s.ex
 afterEach(() => vi.unstubAllGlobals());
 
 describe("la fiche de Jacques sous le titre", () => {
-  it("jugée avec son LinkedIn : une note, celle de la fiche, et ses sources sous la légende, vers le dossier (§18.36)", () => {
+  it("jugée avec son LinkedIn : une note, celle de la fiche, et ses sources en texte après le seul lien de la légende (§18.36)", () => {
     const html = render(createElement(ExampleCard, COMPARED));
     const links = captionLinks(html);
-    expect(links).toHaveLength(2);
-    for (const l of links) expect(l.attrs).toContain('href="/c/Cmp1234567"');
-    const pieces = links[1]!;
-    expect(pieces.attrs).toContain('class="showcase-scores"');
-    expect(pieces.inner).toBe("Sources au dossier\u00a0: LinkedIn et GitHub");
-    // Plus de deuxième note sous la fiche.
+    expect(links).toHaveLength(1);
+    expect(links[0]!.attrs).toContain('href="/c/Cmp1234567"');
+    // Une seule phrase : le lien, puis « d'après LinkedIn et GitHub », sans deuxième note.
     const caption = /<figcaption>(.*)<\/figcaption>/s.exec(html)![1]!;
+    expect(caption.replace(/<[^>]+>/g, "").replace(/&#x27;/g, "'")).toBe("La vraie fiche de Jacques, fondateur d'Azerit, d'après LinkedIn et GitHub");
     expect(caption).not.toContain("<b");
     expect(caption).not.toContain("71");
   });
 
   it("en anglais", () => {
-    const links = captionLinks(render(createElement(ExampleCard, COMPARED), "en-US"));
-    expect(links[1]!.inner).toBe("Sources on file: LinkedIn and GitHub");
+    const caption = /<figcaption>(.*)<\/figcaption>/s.exec(render(createElement(ExampleCard, COMPARED), "en-US"))![1]!;
+    expect(caption.replace(/<[^>]+>/g, "")).toBe("The actual rap sheet of Jacques, founder of Azerit, based on LinkedIn and GitHub");
   });
 
   it("fiche GitHub seule, ou maquette : la légende seule", () => {

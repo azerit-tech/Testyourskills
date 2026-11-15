@@ -25,7 +25,7 @@ describe("le formulaire d'entrée de l'accueil", () => {
 
   it("le CV est à un lien, un seul : plus de « ou les deux » depuis l'accueil", () => {
     const html = render();
-    expect(html).toContain("ou avec ton CV");
+    expect(html).toContain("Plutôt avec ton CV");
     expect(html).not.toContain("ou les deux");
   });
 
