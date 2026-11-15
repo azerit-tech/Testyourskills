@@ -3912,12 +3912,13 @@ a.dossier-item:hover {
 }
 
 @media (min-width: 900px) {
-  /* un bandeau sur toute la largeur ; fondu à 55 % : le texte de la colonne de gauche, sous le jury, est sur l'encre */
+  /* un bandeau sur toute la largeur, le ciel seul : entièrement fondu à 300 px, à peine plus de 120 px sous le
+     haut de la fiche ; ni immeuble ni palmier en rayures à droite de la fiche */
   .card-sky {
     --sky-img: 1200px;
-    height: clamp(380px, 46vh, 520px);
-    -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent);
-    mask-image: linear-gradient(to bottom, #000 55%, transparent);
+    height: 300px;
+    -webkit-mask-image: linear-gradient(to bottom, #000 45%, transparent);
+    mask-image: linear-gradient(to bottom, #000 45%, transparent);
   }
   .card-sky.is-tall {
     --sky-img: 1400px;
