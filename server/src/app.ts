@@ -896,6 +896,13 @@ export function createApp(opts: AppOptions) {
       await next();
       if (c.res.status === 200) c.res.headers.set("Cache-Control", "public, max-age=604800");
     });
+    // Ciels des profils, personnages, icônes et photo de la vitrine : sans empreinte, ils
+    // peuvent changer à la même adresse. Un jour, puis resservis pendant la revalidation.
+    const unhashed = /^\/(?:profiles|characters)\/[^/]+$|^\/(?:favicon\.svg|favicon\.ico|apple-touch-icon\.png|icon-\d+\.png|site\.webmanifest|jmougeot-linkedin\.jpg)$/;
+    app.use("*", async (c, next) => {
+      await next();
+      if (c.res.status === 200 && unhashed.test(c.req.path)) c.res.headers.set("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800");
+    });
     // Les fichiers texte du front en brotli ou gzip, depuis la mémoire ; ceux de
     // /assets sont compressés d'avance, au démarrage (assets.ts).
     const packer = new StaticCompressor(root);

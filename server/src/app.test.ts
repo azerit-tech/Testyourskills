@@ -1382,6 +1382,25 @@ describe("divers", () => {
     expect(old.headers.get("content-type") ?? "").toMatch(/text\/html/);
   });
 
+  it("prod : icône, ciels des profils et personnages, sans empreinte, partent avec un cache d'un jour, jamais immuable", async () => {
+    const root = mkdtempSync(join(tmpdir(), "tys-web-"));
+    mkdirSync(join(root, "profiles"));
+    mkdirSync(join(root, "characters"));
+    const index = "<!doctype html><html><head><title>T</title></head><body>SPA</body></html>";
+    writeFileSync(join(root, "index.html"), index);
+    writeFileSync(join(root, "favicon.svg"), `<svg xmlns="http://www.w3.org/2000/svg">${" ".repeat(2000)}</svg>`);
+    writeFileSync(join(root, "profiles", "ghost.jpg"), Buffer.alloc(512, 1));
+    writeFileSync(join(root, "characters", "forger-s.jpg"), Buffer.alloc(512, 1));
+    const ctx = setup({}, { staticRoot: root, indexHtml: async () => index });
+    for (const [path, enc] of [["/favicon.svg", "br"], ["/favicon.svg", ""], ["/profiles/ghost.jpg", ""], ["/characters/forger-s.jpg", ""]] as const) {
+      const res = await ctx.app.request(path, { headers: { "Accept-Encoding": enc } });
+      expect(res.status, path).toBe(200);
+      expect(res.headers.get("cache-control"), path).toBe("public, max-age=86400, stale-while-revalidate=604800");
+    }
+    // Absent : pas de cache posé sur la réponse d'erreur.
+    expect((await ctx.app.request("/profiles/absent.jpg")).headers.get("cache-control") ?? "").not.toContain("max-age=86400");
+  });
+
   it("prod : un fichier texte servi brut annonce quand même Vary: Accept-Encoding", async () => {
     const root = mkdtempSync(join(tmpdir(), "tys-web-"));
     mkdirSync(join(root, "assets"));
