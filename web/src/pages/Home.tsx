@@ -27,7 +27,7 @@ import { useT } from "../i18n";
 import { ApiError, api, type Showcase } from "../lib/api";
 import { onLinkClick } from "../lib/router";
 import { homeHook, useAppConfig } from "../lib/season";
-import { clearPending, myCard, pendingFile, type MyCard } from "../lib/session";
+import { clearPending, filmOwed, myCard, pendingFile, type MyCard } from "../lib/session";
 
 /** Au-delà, le top est tenu pour absent : la couverture ne garde pas ses cases prunes. */
 const TOP_WAIT_MS = 3000;
@@ -138,24 +138,29 @@ function useMemory(): Memory {
   return mem;
 }
 
-/** La ligne au-dessus du formulaire : « Ta fiche : ★★★★★☆ 79/100. La revoir », ou le dossier en cours. */
-export function BackLine({ mine, pending }: Pick<Memory, "mine" | "pending">) {
+/**
+ * La ligne au-dessus du formulaire : « Ta fiche : ★★★★★☆ 79/100. La revoir », ou le dossier en cours.
+ * `owed` : la fiche est sortie mais son film reste à voir (retour arrière en plein film) ; la note
+ * ne se lit pas avant la poursuite, la ligne y ramène (« Ta poursuite t'attend. La voir »).
+ */
+export function BackLine({ mine, pending, owed = false }: Pick<Memory, "mine" | "pending"> & { owed?: boolean }) {
   const { t } = useT();
   const b = t.home.back;
   if (!mine && !pending) return null;
   const href = `/c/${pending ?? mine!.id}`;
   const stars = mine ? starsFor(mine.overall) : 0;
+  const waiting = pending || owed;
   return (
     <p className="home-back">
       <a href={href} onClick={(e) => onLinkClick(e, href)}>
-        {pending ? (
-          <span>{b.pending}</span>
+        {waiting ? (
+          <span>{pending ? b.pending : b.owed}</span>
         ) : (
           <span>
             {b.mine} <Stars n={stars} label={t.plea.count(stars)} /> {mine!.overall}/100.
           </span>
         )}
-        <span className="link-alt">{pending ? b.pendingGo : b.mineGo}</span>
+        <span className="link-alt">{pending ? b.pendingGo : owed ? b.owedGo : b.mineGo}</span>
       </a>
     </p>
   );
@@ -192,6 +197,8 @@ export function Home() {
   const mem = useMemory();
   // La ligne sous le titre (lib/season.ts) : l'entretien seulement si une prime est ouverte.
   const hook = homeHook(h, useAppConfig());
+  // Revenu en plein film : la fiche existe, sa note attend la poursuite (la case reste « Ta place »).
+  const owed = !!mem.mine && filmOwed(mem.mine.id);
 
   useEffect(() => {
     document.title = t.meta.title;
@@ -213,7 +220,7 @@ export function Home() {
   return (
     <main className="page page-home" id="main">
       <div className="home-top">
-        <Cover onPlay={play} top={top} founder={showcase} mine={mem.mine && { href: `/c/${mem.mine.id}`, overall: mem.mine.overall, card: mem.card }} />
+        <Cover onPlay={play} top={top} founder={showcase} mine={mem.mine && !owed ? { href: `/c/${mem.mine.id}`, overall: mem.mine.overall, card: mem.card } : null} />
         <section className="hero">
           {/* Deux phrases (shared/promise.ts) : la première en lilas, la question en crème. */}
           <h1 className="hero-title">
@@ -223,7 +230,7 @@ export function Home() {
           {/* La promesse, sous le titre : ce qu'on obtient, avant de demander quoi que ce soit. */}
           {/* L'accueil se souvient : qui a déjà sa fiche (ou un dossier en cours) connaît la
               promesse ; la ligne qui y ramène prend sa place, le bouton ne descend pas. */}
-          {mem.mine || mem.pending ? <BackLine mine={mem.mine} pending={mem.pending} /> : <p className="hero-hook">{hook}</p>}
+          {mem.mine || mem.pending ? <BackLine mine={mem.mine} pending={mem.pending} owed={owed} /> : <p className="hero-hook">{hook}</p>}
           <EntryForm inputRef={inputRef} />
         </section>
       </div>

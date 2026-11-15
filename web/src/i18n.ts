@@ -121,6 +121,9 @@ const fr = frTypoDeep({
       mineGo: "La revoir",
       pending: "Ton dossier s'ouvre encore.",
       pendingGo: "Y retourner",
+      /** Retour arrière en plein film : la note attend la poursuite. */
+      owed: "Ta poursuite t'attend.",
+      owedGo: "La voir",
     },
     /* Mur des 13 profils (§18.28) */
     wall: {
@@ -913,6 +916,8 @@ const en: Dict = {
       mineGo: "See it again",
       pending: "Your file is still opening.",
       pendingGo: "Go back to it",
+      owed: "Your chase is waiting.",
+      owedGo: "Watch it",
     },
     wall: {
       title: "Which profile are you?",
