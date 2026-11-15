@@ -61,6 +61,11 @@ interface WaitingProps {
   avatarUrl?: string | null;
   /** Entrée par LinkedIn : le nom du lien, sur la plaque tant que le nom n'est pas connu. */
   slug?: string | null;
+  /** Entrée par CV : « TON CV » sur la plaque tant que le nom n'est pas lu. */
+  cv?: boolean;
+  /** Fiche prête : son nom et ses initiales, ceux mêmes de la fiche (la plaque et le portrait ne changent plus à la révélation). */
+  name?: string | null;
+  initials?: string | null;
   /** Le jour de la fiche, dès qu'elle est prête : la plaque de l'attente et celle de la fiche portent la même date. */
   createdAt?: string | null;
   /** Le pari se propose (une vraie attente, pas une fiche servie du cache). */
@@ -82,7 +87,7 @@ interface WaitingProps {
 
 const idOf = (f: Finding) => `${f.source}:${f.kind}`;
 
-export function Waiting({ cardId, progress, startedAt, queue, findings = [], login, avatarUrl, slug, createdAt, plea = false, ready = false, onRelease, scene, onOpen, leaving = false, offline = false, onRetry }: WaitingProps) {
+export function Waiting({ cardId, progress, startedAt, queue, findings = [], login, avatarUrl, slug, cv = false, name, initials, createdAt, plea = false, ready = false, onRelease, scene, onOpen, leaving = false, offline = false, onRetry }: WaitingProps) {
   const { t, lang } = useT();
   // L'attente s'ouvre en haut de la page, avant sa première image : jamais à la hauteur où l'accueil était défilé.
   useLayoutEffect(() => {
@@ -235,7 +240,7 @@ export function Waiting({ cardId, progress, startedAt, queue, findings = [], log
             {t.waiting.title}
           </h1>
         </header>
-        <Mugshot cardId={cardId} login={login} slug={slug} src={avatarUrl} createdAt={createdAt ?? startedAt} />
+        <Mugshot cardId={cardId} login={login} slug={slug} cv={cv} name={name} initials={initials} src={avatarUrl} createdAt={createdAt ?? startedAt} />
         {/* le pari a sa place dès la première image : la question, puis la ligne, sans rien pousser */}
         <div className="load-plea">{plea && <PleaPrompt cardId={cardId} />}</div>
         <div className="load-dossier" aria-hidden>

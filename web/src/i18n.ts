@@ -174,6 +174,8 @@ const fr = frTypoDeep({
     title: "Un dossier s'ouvre. Le tien.",
     /** L'enquête en direct (§18.26) : le numéro de la trouvaille versée au dossier. */
     piece: (n: number) => `Pièce ${String(n).padStart(2, "0")}`,
+    /** La plaque de l'attente par la porte CV, tant que le nom n'est pas lu. */
+    yourCv: "Ton CV",
     /** Fiche en file d'attente : n fiches passent avant (rang dans la file). */
     queue: (n: number) => (n === 1 ? "1 fiche devant toi au commissariat" : `${n} fiches devant toi au commissariat`),
     /** La fiche est prête, le film pas encore (§18.27). */
@@ -959,6 +961,7 @@ const en: Dict = {
   waiting: {
     title: "A file just opened. Yours.",
     piece: (n) => `Exhibit ${String(n).padStart(2, "0")}`,
+    yourCv: "Your résumé",
     queue: (n) => (n === 1 ? "1 sheet ahead of you at the station" : `${n} sheets ahead of you at the station`),
     scene: "Getting the chase ready…",
     offline: "The station isn't answering.\nWe'll pick up when you're back online.",

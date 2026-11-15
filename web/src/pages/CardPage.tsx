@@ -38,7 +38,7 @@ import { REMOTE_PATIENCE_MS } from "../lib/remote";
 import { filmTrace } from "../film/trace";
 import { ChaseLink } from "../film/ChaseLink";
 import { navigate, onLinkClick } from "../lib/router";
-import { filmOwed, freshLogin, freshSince, freshSlug, iDenounced, markFilmSeen, myCard, prefillFromLast, rememberMine, type MyCard } from "../lib/session";
+import { filmOwed, freshCv, freshLogin, freshSince, freshSlug, iDenounced, markFilmSeen, myCard, prefillFromLast, rememberMine, type MyCard } from "../lib/session";
 import { revealScene, revealToPlay } from "../lib/revealScene";
 import { useReducedMotion } from "../lib/util";
 
@@ -279,6 +279,9 @@ export function CardPage({ id }: { id: string }) {
         login={typed ?? doneCard?.login}
         avatarUrl={typed ? null : doneCard?.avatarUrl}
         slug={freshSlug(id)}
+        cv={freshCv(id)}
+        name={doneCard?.name}
+        initials={doneCard?.initials}
         createdAt={doneCard?.createdAt}
         plea={owner && sawPending}
         progress={w.progress}

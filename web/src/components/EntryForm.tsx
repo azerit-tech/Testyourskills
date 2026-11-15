@@ -180,7 +180,7 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
       if (res.deleteToken) tokens.set(res.id, res.deleteToken);
       // « Réessayer » remet le lien LinkedIn dans le champ unique.
       rememberInput({ login: input.login ?? input.linkedin, file: input.file ?? null });
-      markFresh(res.id, input.login, input.linkedin);
+      markFresh(res.id, input.login, input.linkedin, !!input.file);
       onCreated?.(res.id);
       navigate(`/c/${res.id}`);
     } catch (err) {

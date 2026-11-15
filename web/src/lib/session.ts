@@ -64,21 +64,42 @@ export function rememberInput(i: { login?: string; file?: File | null }) {
   lastInput = i;
 }
 
-/** `login` : le pseudo GitHub de la demande, s'il y en a un (ni lien LinkedIn, ni CV seul). */
-export function markFresh(id: string, login?: string | null, linkedin?: string | null) {
+/** `login` : le pseudo GitHub de la demande, s'il y en a un (ni lien LinkedIn, ni CV seul). `cv` : un CV joint. */
+export function markFresh(id: string, login?: string | null, linkedin?: string | null, cv = false) {
   fresh.set(id, Date.now());
   if (login) freshLogins.set(id, login);
+  if (cv) freshCvs.add(id);
   memPending = { id, at: Date.now() };
   writeSession(PENDING_KEY, JSON.stringify(memPending));
   seen.delete(id);
   writeSession(OWED_KEY, id);
   const slug = linkedin ? linkedinSlug(linkedin) : null;
   if (slug) freshSlugs.set(id, slug);
+  writeSession(SOURCE_KEY, JSON.stringify({ id, login: login ?? null, slug, cv }));
+}
+
+/** Les sources de la dernière demande, recopiées pour un rechargement en pleine attente : la plaque garde son nom. */
+const SOURCE_KEY = "tys_fresh_src";
+const freshCvs = new Set<string>();
+
+function storedSource(id: string): { login: string | null; slug: string | null; cv: boolean } | null {
+  try {
+    const v = JSON.parse(readSession(SOURCE_KEY) ?? "null") as { id?: unknown; login?: unknown; slug?: unknown; cv?: unknown } | null;
+    if (!v || v.id !== id) return null;
+    return { login: typeof v.login === "string" ? v.login : null, slug: typeof v.slug === "string" ? v.slug : null, cv: v.cv === true };
+  } catch {
+    return null;
+  }
 }
 
 /** Le nom du lien LinkedIn collé pour cette fiche dans cet onglet, ou null. */
 export function freshSlug(id: string): string | null {
-  return freshSlugs.get(id) ?? null;
+  return freshSlugs.get(id) ?? storedSource(id)?.slug ?? null;
+}
+
+/** Un CV a été joint à cette demande, dans cet onglet. */
+export function freshCv(id: string): boolean {
+  return freshCvs.has(id) || storedSource(id)?.cv === true;
 }
 
 // --- Le film joue une fois (§18.48) ------------------------------------------
@@ -107,7 +128,7 @@ export function markFilmSeen(id: string) {
 
 /** Le pseudo GitHub tapé pour cette fiche dans cet onglet, ou null. */
 export function freshLogin(id: string): string | null {
-  return freshLogins.get(id) ?? null;
+  return freshLogins.get(id) ?? storedSource(id)?.login ?? null;
 }
 
 export function freshSince(id: string): number | null {
