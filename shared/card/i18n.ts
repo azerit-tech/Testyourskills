@@ -25,7 +25,7 @@ export const STRINGS = {
     affiliation: "Affiliation",
     charges: "Chefs d'accusation",
     caseNo: "N°",
-    insufficient: "données insuffisantes",
+    insufficient: "peu de données",
     buzzNote: "hors note",
     cta: "Fais la tienne",
     /** Titre des images de partage, comme la page partagée (§18.18). */
@@ -94,7 +94,7 @@ export const STRINGS = {
     affiliation: "Affiliation",
     charges: "Charges",
     caseNo: "No.",
-    insufficient: "not enough data",
+    insufficient: "thin data",
     buzzNote: "not rated",
     cta: "Get yours",
     poster: "Wanted",

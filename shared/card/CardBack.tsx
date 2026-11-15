@@ -292,6 +292,8 @@ function AxisRow({ stat, code, y, h, lang, ink, inkSoft, last }: { stat?: Stat; 
   const name = upper(s.back.axes[code], lang) + (code === "BUZZ" ? ` · ${upper(s.buzzNote, lang)}` : weak ? ` · ${upper(s.insufficient, lang)}` : "");
   const valueW = measure(value, "display-700", 24);
   const nameMax = FW - 46 - valueW - 8;
+  // « COMMUNICATION · PEU DE DONNÉES » tient entier : l'approche se resserre plutôt qu'un mot se coupe.
+  const nameLs = measure(name, "sans-600", BACK_MIN_TEXT, 0.5) <= nameMax ? 0.5 : 0;
   const fact = strongestFact(stat, lang) ?? s.back.noFact;
   const lines = clipProof(fact, FW, R.lines);
   const top = +(y + (h - 40) / 2).toFixed(2);
@@ -300,8 +302,8 @@ function AxisRow({ stat, code, y, h, lang, ink, inkSoft, last }: { stat?: Stat; 
       <Txt x={LEFT} y={top + 17} font="display-700" size={19} ls={0.3} fill={ink}>
         {code}
       </Txt>
-      <Txt x={LEFT + 46} y={top + 16} font="sans-600" size={BACK_MIN_TEXT} ls={0.5} fill={inkSoft} opacity={0.75}>
-        {truncate(name, "sans-600", BACK_MIN_TEXT, nameMax, 0.5)}
+      <Txt x={LEFT + 46} y={top + 16} font="sans-600" size={BACK_MIN_TEXT} ls={nameLs} fill={inkSoft} opacity={0.75}>
+        {truncate(name, "sans-600", BACK_MIN_TEXT, nameMax, nameLs)}
       </Txt>
       <Txt x={RIGHT} y={top + 18} font="display-700" size={24} anchor="end" fill={ink} opacity={weak && code !== "BUZZ" ? 0.6 : undefined}>
         {value}

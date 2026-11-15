@@ -255,3 +255,16 @@ describe("dos de la fiche : la note vient des huit critères (§18.48)", () => {
     expect(back(card, "en")).toContain("hiring scorecard");
   });
 });
+
+// §18.52 : une donnée manquante au dos dit « peu de données » / “thin data”, jamais un mot coupé.
+describe("dos d'une fiche d'avant la grille, peu fournie", () => {
+  it("chaque trait dit « peu de données » en entier, sans « … »", () => {
+    const thin: CardData = { ...FIXTURES.unknownLang, grid: undefined };
+    for (const lang of ["fr", "en"] as Lang[]) {
+      const svg = back(thin, lang);
+      const word = lang === "fr" ? "PEU DE DONNÉES" : "THIN DATA";
+      expect(svg.split(word).length - 1, lang).toBeGreaterThanOrEqual(4);
+      for (const m of svg.matchAll(/>([^<]*·[^<]*)</g)) expect(m[1], lang).not.toContain("…");
+    }
+  });
+});
