@@ -30,10 +30,10 @@ describe("la fiche se retourne", () => {
     const fr = renderToStaticMarkup(createElement(CardView, { card, lang: "fr", flippable: true }));
     expect(fr).toContain('data-side="back"');
     expect(fr).toMatch(/class="tys-card__face tys-card__back" aria-hidden="true"/);
-    // Un vrai bouton (clavier, lecteur d'écran), qui dit où il mène ; la flèche n'est pas lue.
-    expect(fr).toMatch(/<button type="button" class="tys-card__flip" data-to="back"><span class="tys-card__flip-label">Pièces à conviction<\/span><span aria-hidden="true"> ↻<\/span><\/button>/);
+    // Un vrai bouton (clavier, lecteur d'écran), qui dit où il mène, sans pictogramme.
+    expect(fr).toMatch(/<button type="button" class="tys-card__flip" data-to="back"><span class="tys-card__flip-label">Voir les pièces à conviction<\/span><\/button>/);
     const en = renderToStaticMarkup(createElement(CardView, { card, lang: "en", flippable: true }));
-    expect(en).toContain('<span class="tys-card__flip-label">Exhibits</span>');
+    expect(en).toContain('<span class="tys-card__flip-label">See the evidence</span>');
   });
 
   it("la fiche reste nue : le lien est hors du cadre qui s'incline, sans pictogramme posé sur elle", () => {

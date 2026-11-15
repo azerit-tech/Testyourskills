@@ -258,7 +258,7 @@ export function CardView(props: CardViewProps) {
         )}
       </div>
       {flippable && (
-        // Sous la fiche, à droite : le lien dit où il mène, et change de mot une fois la fiche retournée.
+        // Sous la fiche, centré : le lien dit où il mène, et change de mot une fois la fiche retournée.
         <button
           type="button"
           className="tys-card__flip"
@@ -270,7 +270,6 @@ export function CardView(props: CardViewProps) {
           }}
         >
           <span className="tys-card__flip-label">{flipped ? s.back.toFront : s.back.toBack}</span>
-          <span aria-hidden> ↻</span>
         </button>
       )}
     </div>

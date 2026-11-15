@@ -235,14 +235,15 @@
   }
 }
 
-/* Le lien qui retourne la fiche : sous elle, à droite, hors de son cadre (la
-   fiche reste nue, comme l'image partagée). Zone de 44 px ; le parent garde
-   cette hauteur libre sous la fiche. */
+/* Le lien qui retourne la fiche : sous elle, centré, hors de son cadre (la
+   fiche reste nue, comme l'image partagée). Un lien d'action, rose et souligné
+   comme les autres ; il dit où il mène, sans pictogramme. Zone de 44 px ; le
+   parent garde cette hauteur libre sous la fiche. */
 .tys-card__flip {
   position: absolute;
   top: 100%;
-  /* le texte s'aligne sur le bord droit de la fiche ; la zone déborde de 8 px pour loger l'anneau de focus */
-  right: -8px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 2;
   min-width: 44px;
   height: 44px;
@@ -250,7 +251,7 @@
   border: 0;
   background: none;
   font: 500 14px/1 var(--f-text, "Outfit", system-ui, sans-serif);
-  color: var(--lilac-2, #ccc2f5);
+  color: var(--c-action, #ffb2c6);
   white-space: nowrap;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
