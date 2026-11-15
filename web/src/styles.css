@@ -2412,6 +2412,52 @@ button.cover-panel:focus-visible {
 .loading-slot {
   margin: 40px auto;
 }
+/* le serveur tarde (au-delà de 1,2 s) : la place de la fiche se dessine, à sa taille, et trois
+   points crème battent au centre ; la page ne reste plus vide jusqu'à l'erreur (10 s) */
+.page-card.is-loading .loading-slot {
+  border-radius: calc(var(--card-w) * 16 / 360);
+  background: #1f1a36;
+  opacity: 0;
+  animation: loading-show 0.3s ease-out 1.2s forwards;
+}
+.page-card.is-loading .loading-slot::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  border-radius: 999px;
+  background: var(--cream);
+  box-shadow:
+    -16px 0 0 var(--cream),
+    16px 0 0 var(--cream);
+  animation: loading-dots 1.2s ease-in-out infinite;
+}
+@keyframes loading-show {
+  to {
+    opacity: 1;
+  }
+}
+@keyframes loading-dots {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-card.is-loading .loading-slot {
+    animation-duration: 0.01s;
+  }
+  .page-card.is-loading .loading-slot::after {
+    animation: none;
+    opacity: 0.7;
+  }
+}
 /* une fiche qui se charge : la page tient un écran, le pied de page attend dessous (il ne saute plus dedans) */
 .page-card.is-loading {
   min-height: 100vh;
