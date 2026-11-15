@@ -421,7 +421,7 @@ const en: PagesDict = {
   },
   removal: {
     doneTitle: "Request received",
-    doneText: "We check, remove the sheet and reply by email.",
+    doneText: "We'll check, take the sheet down and reply by email.",
   },
   privacy: {
     summaryTitle: "In four lines",

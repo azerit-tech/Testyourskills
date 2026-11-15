@@ -44,7 +44,7 @@
       "id": "arsonist",
       "any": [{ "rule": "friday_evening", "params": { "minShare": 0.3, "minSample": 10 } }],
       "label": { "fr": "Pyromane", "en": "Arsonist" },
-      "tagline": { "fr": "Déploie le vendredi soir. Sans peur, sans rollback", "en": "Deploys on Friday night. No fear, no rollback" }
+      "tagline": { "fr": "Déploie le vendredi soir, sans peur ni rollback", "en": "Deploys on Friday night, no fear, no rollback" }
     },
     {
       "id": "repeat_offender",
