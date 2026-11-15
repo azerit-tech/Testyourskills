@@ -364,11 +364,17 @@
   color: var(--c-text-2);
   font-size: var(--t-14);
 }
-/* « 1er » : l'exposant ne pousse pas la ligne ; 12 px, le plancher du système */
+/* « 1er », « 3e » : l'exposant ne pousse pas la ligne ; 12 px, le plancher du système */
 .prime-card sup,
+.prime-race sup,
 .page-prime sup {
   font-size: var(--t-12);
   line-height: 0;
+  /* « 2ᵉ » dans un titre en capitales : la marque reste en bas de casse */
+  text-transform: none;
+}
+.page-prime .prime-mine-big sup {
+  font-size: 0.5em;
 }
 .prime-share {
   justify-self: start;

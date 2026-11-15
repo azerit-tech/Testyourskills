@@ -168,6 +168,22 @@
   overflow-wrap: anywhere;
   text-wrap: balance;
 }
+/* le nom d'une bande ne se coupe jamais au milieu d'un mot (« CENTRALESUPÉLE / C ») : coupure aux
+   espaces seulement, et le corps descend jusqu'à ce que le plus long mot (--len, posé par la page)
+   tienne dans la colonne (capitales condensées : 0,56 em par signe au plus) */
+.band {
+  container-type: inline-size;
+}
+.band h1 {
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: manual;
+  font-size: clamp(1.75rem, calc(100cqi / (0.56 * var(--len, 1))), var(--t-page));
+}
+.band sup {
+  font-size: var(--t-12);
+  line-height: 0;
+}
 .bands-intro {
   max-width: var(--measure);
   font: var(--font-body);
@@ -392,7 +408,15 @@
 .band-anon-spread > span {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 2px;
+}
+.band-anon-spread .star-mark {
+  width: 13px;
+  height: 13px;
+}
+.band-anon-times {
+  margin-left: 4px;
+  color: var(--c-text-2);
 }
 /* aucune fiche nommée : la phrase qui dit comment s'y montrer, sous le bloc */
 .band-more {

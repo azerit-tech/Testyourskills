@@ -3,11 +3,10 @@
 // l'après-fiche avec la question de ligue. Rien ne s'affiche tant qu'aucune
 // prime n'est ouverte : la configuration du serveur le dit (primesOpen).
 import { useEffect, useState } from "react";
-import type { ReactNode } from "react";
 import type { League, PrimeView, Race, RaceLine } from "../../../shared/primes";
 import { LEAGUES, primePath } from "../../../shared/primes";
 import type { CardData } from "../../../shared/types";
-import { ordinalParts } from "../../../shared/typo";
+import { withSup } from "./Sup";
 import { useT } from "../i18n";
 import { api } from "../lib/api";
 import { primesApi, saveLeague, savedLeague } from "../lib/primes";
@@ -18,10 +17,8 @@ import "./primes.css";
 
 /* ---------- la carte d'une prime ---------- */
 
-/** « 1er novembre », « 3e sur 12 » : l'exposant, comme on l'écrit (SPEC §18.52). */
-export function withSup(text: string): ReactNode[] {
-  return ordinalParts(text).map((part, i) => (part.sup ? <sup key={i}>{part.text}</sup> : part.text));
-}
+/** « 1er novembre », « 3e sur 12 » : l'exposant, comme on l'écrit (Sup.tsx). */
+export { withSup };
 
 /** Le logo, ou le nom de l'entreprise en lettres. */
 export function PrimeMark({ p, big = false }: { p: Pick<PrimeView, "company" | "logo">; big?: boolean }) {
@@ -238,7 +235,7 @@ function RaceRow({ line, position, cardId, login, claimOn }: { line: RaceLine; p
   return (
     <li className="prime-race-line">
       <span className="prime-when is-open">{when(p)}</span>
-      <p className="prime-race-text">{text}</p>
+      <p className="prime-race-text">{withSup(text)}</p>
       <span className="prime-race-actions">
         {!line.entered && (line.gate === "ok" || canClaim) && (
           <button type="button" className="pill" onClick={join}>

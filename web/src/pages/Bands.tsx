@@ -8,6 +8,7 @@
 // fiche »), membre (son apport, « Partager la bande » en bouton principal).
 // Serveur muet : « le commissariat ne répond pas », jamais « introuvable ».
 import { useEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import type { BandBoard, BandMember, BandPage as BandPageData, BandStanding, BandType, MyBands } from "../../../shared/bands";
 import { BAND_MIN_MEMBERS, BAND_TYPES, bandPath } from "../../../shared/bands";
 import { Avatar } from "../components/Avatar";
@@ -16,6 +17,7 @@ import { BandRow } from "../components/BandRow";
 import { BusyDots } from "../components/Busy";
 import { BandNotFound, Unreachable } from "../components/ErrorPage";
 import { StarMark, Stars } from "../components/Stars";
+import { withSup } from "../components/Sup";
 import { EntryForm } from "../components/EntryForm";
 import { useToast } from "../components/After";
 import { IconLinkedIn, IconShare } from "../components/Icons";
@@ -152,6 +154,11 @@ export function Bands() {
 
 /* ---------- /bandes/:type/:id ---------- */
 
+/** Le nombre de signes du plus long mot d'un nom : « CentraleSupélec » → 15. */
+export function longestWord(label: string): number {
+  return Math.max(1, ...label.split(/[\s-]+/).map((w) => [...w].length));
+}
+
 /** Une fiche revendiquée : son visage, son pseudo, son profil, ses étoiles ; la ligne mène à la fiche. */
 function Member({ m }: { m: BandMember & { login: string; cardId: string } }) {
   const { t, lang } = useT();
@@ -202,10 +209,12 @@ function Anonymous({ count, spread }: { count: number; spread: [number, number][
         <span className="band-anon-count">{ts.anonymous(count)}</span>
         {spread && spread.length > 0 && (
           <span className="band-anon-spread" role="img" aria-label={ts.spread(spread)}>
+            {/* « 6★ × 2 » : le nombre d'étoiles, puis combien de fiches ; rien à compter à l'œil */}
             {spread.map(([s, k]) => (
               <span key={s}>
-                <Stars n={s} total={s} size={14} />
-                {k}
+                {s}
+                <StarMark />
+                <span className="band-anon-times">× {k}</span>
               </span>
             ))}
           </span>
@@ -273,7 +282,7 @@ function BandCall({ band, mine, mb, onJoined, onShare, native }: CallProps) {
       <section className="block band-call band-mine" aria-labelledby="band-mine-title">
         <p className="label">{t.bands.board.yours}</p>
         <h2 className="t-block" id="band-mine-title">
-          {t.bands.pick.line[0]} <Stars n={mb.stars} total={mb.stars} size={22} label={t.bands.score(mb.stars)} /> {t.bands.pick.line[1]} {band.label}
+          {t.bands.pick.line[0]} <Stars n={mb.stars} size={22} label={t.bands.score(mb.stars)} /> {t.bands.pick.line[1]} {band.label}
         </h2>
         <button type="button" className="btn-primary band-share" onClick={onShare}>
           {native ? <IconShare /> : <IconLinkedIn />}
@@ -383,7 +392,8 @@ export function BandPage({ type, id }: { type: BandType; id: string }) {
             ← {tp.all}
           </a>
           <p className="label">{t.bands.kicker[band.type]}</p>
-          <h1>{band.label}</h1>
+          {/* un nom d'école ne se coupe jamais au milieu d'un mot : son corps suit le mot le plus long (bands.css) */}
+          <h1 style={{ "--len": longestWord(band.label) } as CSSProperties}>{band.label}</h1>
           {band.rank ? (
             <p className="band-total">
               {/* « 88 étoiles », les mots de l'image de la bande, puis « 23 fiches » */}
@@ -396,7 +406,7 @@ export function BandPage({ type, id }: { type: BandType; id: string }) {
           ) : (
             <Slots members={band.members} />
           )}
-          <p className="band-rank">{rank}</p>
+          <p className="band-rank">{withSup(rank)}</p>
           {band.ahead && aheadHref && (
             <p className="band-ahead">
               {tp.ahead}{" "}

@@ -168,10 +168,10 @@ function Mine({ prime, entry, job, native, onShare, onWithdraw }: MineProps) {
         </span>
       )}
       <h2 className={stamp ? "prime-mine-big" : "t-block"} id="prime-mine-title">
-        {view.title}
+        {withSup(view.title)}
       </h2>
       {entry.state === "winner" && <Stars n={starsFor(entry.overall)} size={22} label={t.bands.score(starsFor(entry.overall))} />}
-      <p>{view.text}</p>
+      <p>{withSup(view.text)}</p>
       <button type="button" className="btn-primary prime-mine-share" onClick={() => onShare(view.share)}>
         {native ? <IconShare /> : <IconLinkedIn />}
         {entry.state === "winner" ? tm.shareWin : view.button}
@@ -333,7 +333,7 @@ function Steps({ prime, me, mine, positions, claimOn, rulesLink, onDone }: Steps
             <p>{withSup(t.primes.opens(dayLabel(prime.from, lang)))}</p>
           ) : s3 === "now" && gate === "ok" ? (
             <>
-              {me?.wouldBe && <p className="prime-would">{t.primes.page.would(me.wouldBe.rank, me.wouldBe.total)}</p>}
+              {me?.wouldBe && <p className="prime-would">{withSup(t.primes.page.would(me.wouldBe.rank, me.wouldBe.total))}</p>}
               <JoinForm prime={prime} rulesLink={rulesLink} onDone={onDone} />
             </>
           ) : s3 === "now" && gate === "position" && me?.card ? (
