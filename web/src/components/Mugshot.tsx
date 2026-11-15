@@ -5,7 +5,7 @@
 // ou CV, image en échec, avatar généré par GitHub) : la silhouette, ses initiales.
 // La plaque est celle de la fiche (§18.48) : même nom, même numéro, même date.
 import { useId } from "react";
-import { MUG_PHOTO, MUG_SIZE, Plate, Silhouette, Toise, initialsOf, plateName, plateSub, toiseCover } from "../../../shared/card/mug";
+import { MUG_PHOTO, MUG_SIZE, Plate, Silhouette, Toise, plateInitials, plateName, plateSub, toiseCover } from "../../../shared/card/mug";
 import { useAvatar } from "../card/avatar";
 import { useT } from "../i18n";
 import { useReducedMotion } from "../lib/util";
@@ -50,9 +50,9 @@ export function Mugshot({ cardId, login, slug, src, createdAt, cv = false, name,
   const { t, lang } = useT();
   // La plaque : « @pseudo », sinon le nom de la fiche, sinon celui du lien (sans son code), sinon « TON CV ».
   const shown = name?.trim() || slugName(slug) || (cv && !login ? t.waiting.yourCv : null);
-  // Les initiales : celles de la fiche dès qu'elle est prête ; avant, celles du nom du lien. D'un pseudo
-  // GitHub on ne les devine pas (la fiche les tire du nom) : la silhouette attend sans lettres.
-  const mark = initials ?? (name ? initialsOf(name) : slug ? initialsOf(slugName(slug)) : null);
+  // Les initiales : la règle de la fiche (plateInitials : pseudo, sinon nom, sinon lien), sur ce que
+  // l'attente sait déjà ; « TON CV » n'en donne pas. Le repli de la fiche (ses initiales) en dernier.
+  const mark = plateInitials({ login, name: name?.trim() || slugName(slug) }) || initials || null;
   const reduced = useReducedMotion();
   const uid = useId().replace(/:/g, "");
   const url = src || (login ? githubAvatar(login) : null);
