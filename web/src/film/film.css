@@ -242,15 +242,22 @@
   stroke: #fff9cb;
 }
 .film-band-bottom {
-  /* 12 % de l'image ; sur un téléphone court (320 × 568), jusqu'à 84 px sans
-     passer les 15 % que l'image laisse libres : 28 px de radio au-dessus des boutons */
+  /* 12 % de l'image ; sur un téléphone court, 94 px au moins (jusqu'à 17 % de l'image,
+     à 320 × 568) : 32 px de radio, 12 px d'air, puis « Passer » (44 px, à 6 px du bas) */
   --band-b: 12cqh;
   bottom: 0;
   height: calc(var(--band-b) + env(safe-area-inset-bottom, 0px));
 }
 @media (max-width: 999px) {
   .film-band-bottom {
-    --band-b: max(12cqh, min(86px, 15cqh));
+    --band-b: max(12cqh, min(94px, 17cqh));
+  }
+}
+/* téléphone debout : la plaque reste posée sur la bande du bas, même quand celle-ci
+   passe les 15 % (320 × 568) */
+@media (max-width: 999px) and (orientation: portrait) {
+  .film-mug {
+    bottom: max(15cqh, min(94px, 17cqh), calc(12cqh + env(safe-area-inset-bottom, 0px) + 1.5cqh));
   }
 }
 /* la radio, seul texte du film qui parle de la personne : une seule ligne en 14 px
@@ -258,7 +265,7 @@
    dans la bande entre l'image et les boutons (--radio-zone : la bande sans les
    boutons) ; le chef d'accusation porte son étiquette au-dessus, en petit */
 .film-band-bottom {
-  --radio-zone: max(32px, calc(var(--band-b) - 56px));
+  --radio-zone: max(32px, calc(var(--band-b) - 62px));
 }
 .film-radio {
   position: absolute;
