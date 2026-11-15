@@ -57,13 +57,13 @@ describe("le duel de qui a déjà sa fiche", () => {
   const duel = (overall: number, over: Partial<CardData> = {}, lang?: string) =>
     render(createElement(DuelWith, { mine: { id: "MyCard00001", login: "leamd", overall }, card: { ...card, ...over } }), lang);
 
-  it("les deux notes en titre, l'écart ensuite ; « Lui envoyer mon score » en rose (le visiteur n'a que ce geste), « Ma fiche » en lien", () => {
+  it("les deux notes en titre, l'écart ensuite ; « Lui envoyer ma note » en rose (le visiteur n'a que ce geste), « Ma fiche » en lien", () => {
     const html = duel(83).replace(/\u00a0/g, " ");
     expect(html).toContain('<h2 id="you-title">83/100 contre 68/100 : une étoile d\'avance</h2>');
-    expect(html).toMatch(/<button type="button" class="pill pill-big">Lui envoyer mon score<\/button><a class="link-alt" href="\/c\/MyCard00001">Ma fiche<\/a>/);
+    expect(html).toMatch(/<button type="button" class="pill pill-big">Lui envoyer ma note<\/button><a class="link-alt" href="\/c\/MyCard00001">Ma fiche<\/a>/);
     const en = duel(83, {}, "en-US");
     expect(en).toContain(">83/100 vs 68/100: one star ahead</h2>");
-    expect(en).toContain(">Send them my score</button>");
+    expect(en).toContain(">Send them my rating</button>");
   });
 
   it("un dossier scellé : ni note, ni score à envoyer", () => {

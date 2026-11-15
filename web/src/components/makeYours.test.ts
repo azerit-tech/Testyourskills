@@ -96,10 +96,10 @@ describe("la barre « Faire ma fiche » du visiteur", () => {
     expect(page).toMatch(/\{chase && <div className="stage-chase">\{chase\}<\/div>\}/);
   });
 
-  it("qui a déjà sa fiche : « Lui envoyer mon score » dans la barre, le geste du duel ; rien face à un dossier scellé", () => {
+  it("qui a déjà sa fiche : « Lui envoyer ma note » dans la barre, le geste du duel ; rien face à un dossier scellé", () => {
     expect(page).toMatch(/visitor && settled && \(!other \|\| duel\.send\) && <MakeYours watch=\{wantedYou\} onLawyer=\{lawyer\} onSend=\{other \? duel\.send : null\} \/>/);
     const html = render(true, "fr-FR", { onSend: () => undefined });
     expect(html.match(/<button/g)).toHaveLength(1);
-    expect(html).toContain('<button type="button" class="pill pill-big dock-main">Lui envoyer mon score</button>');
+    expect(html).toContain('<button type="button" class="pill pill-big dock-main">Lui envoyer ma note</button>');
   });
 });

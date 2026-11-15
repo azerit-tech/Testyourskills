@@ -811,12 +811,12 @@ const fr = frTypoDeep({
     pointsBehind: (n: number) => (n === 1 ? "1 point de retard" : `${n} points de retard`),
     tie: "à égalité",
     /* le duel s'envoie : le score, puis le lien de sa propre fiche */
-    sendScore: "Lui envoyer mon score",
+    sendScore: "Lui envoyer ma note",
     /** Sur sa fiche toute neuve : la fiche par laquelle on est arrivé (le duel, une fois). */
     duelFrom: (who: string) => `Tu viens de la fiche de ${who}`,
     duelText: (me: number, them: number, verdict: string, who: string, rel: "ahead" | "behind" | "tie") =>
       `${me}/100 contre ${them}/100 : ${verdict} ${rel === "tie" ? "avec" : "sur"} ${who}. Verdict d'Azerit :`,
-    scoreCopied: "Score copié : colle-le dans ton message.",
+    scoreCopied: "Note copiée : colle-la dans ton message.",
   },
   /* le jury de la page partagée (§18.27) : on vote sur le chef d'accusation, jamais sur la personne */
   jury: {
@@ -1547,10 +1547,10 @@ const en: Dict = {
     pointsAhead: (n) => (n === 1 ? "1 point ahead" : `${n} points ahead`),
     pointsBehind: (n) => (n === 1 ? "1 point behind" : `${n} points behind`),
     tie: "dead heat",
-    sendScore: "Send them my score",
+    sendScore: "Send them my rating",
     duelFrom: (who) => `You came from ${who}'s sheet`,
     duelText: (me, them, verdict, who, rel) => `${me}/100 vs ${them}/100: ${verdict}${rel === "ahead" ? " of" : rel === "tie" ? " with" : ""} ${who}. Azerit's verdict:`,
-    scoreCopied: "Score copied: paste it into your message.",
+    scoreCopied: "Rating copied: paste it into your message.",
   },
   jury: {
     title: "Guilty or cleared?",
