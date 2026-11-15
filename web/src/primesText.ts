@@ -75,7 +75,6 @@ const fr = {
     withdrawn: "Inscription effacée.",
     share: "Partager la prime",
     shareText: (company: string, job: string) => `${company} offre des entretiens aux fiches les mieux classées, pour ${job}. Fais ta fiche\u00a0:`,
-    copied: "Lien copié.",
     notFound: "Cette prime n'existe pas, ou plus.",
     gate: {
       claim: "Deux étapes\u00a0: fais ta fiche, puis touche «\u00a0C'est moi\u00a0» juste sous elle (GitHub prouve qu'elle est à toi). Reviens ensuite ici.",
@@ -242,7 +241,6 @@ const en: PrimesDict = {
     withdrawn: "Entry erased.",
     share: "Share the bounty",
     shareText: (company, job) => `${company} is offering interviews to the top-ranked sheets, for ${job}. Get your rap sheet:`,
-    copied: "Link copied.",
     notFound: "This bounty doesn't exist, or no longer does.",
     gate: {
       claim: "Two steps: get your rap sheet, then tap “That's me” right under it (GitHub proves it's yours). Then come back here.",
