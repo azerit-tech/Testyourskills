@@ -74,7 +74,8 @@ export const LAYOUT = {
   traits: { labelY: 363, labelSize: 7.5 },
   stats: { y: 367, rowH: 19.5 },
   charges: { labelY: 437, y: 455, size: 14, minSize: 12, lineH: 19, labelSize: 7.5 },
-  footer: { y: 510, size: 8, minSize: 7 },
+  /** La signature, en 10 : lisible à 390 px de large sans peser (revue §18.48). */
+  footer: { y: 510, size: 10, minSize: 8.5 },
 } as const;
 
 /** Le tampon « D'après LinkedIn » : sur le haut de la photo ; sans photo, plus haut, et la silhouette descend d'autant. */
@@ -579,7 +580,7 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
 
         <Charges statuses={card.statuses} th={th} lang={lang} />
 
-        <Txt x={LEFT} y={LAYOUT.footer.y} font="mono-400" size={footerFit.size} ls={footerFit.letterSpacing} fill={th.inkSoft} opacity={0.5}>
+        <Txt x={LEFT} y={LAYOUT.footer.y} font="mono-400" size={footerFit.size} ls={footerFit.letterSpacing} fill={th.inkSoft} opacity={0.82}>
           {footerFit.text}
         </Txt>
 

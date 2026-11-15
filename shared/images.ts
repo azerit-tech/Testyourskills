@@ -17,8 +17,9 @@
 // l'aperçu d'une fiche, le titre d'affiche, la rangée d'étoiles et le niveau, le décor en bandeau ;
 // l'appel en pilule sur toutes, et sur le portrait avec ce que c'est en une ligne ; sous trois
 // étoiles, la phrase du profil à la place du chef d'accusation ; la bande, la prime et l'accueil refaits.
+// v8 (15 novembre 2026) : la signature en pied de fiche passe de 8 à 10, plus claire.
 
-export const IMAGE_DESIGN = 7;
+export const IMAGE_DESIGN = 8;
 
 /** Dossier du cache disque, sous og/. */
 export const IMAGE_DESIGN_DIR = `v${IMAGE_DESIGN}`;

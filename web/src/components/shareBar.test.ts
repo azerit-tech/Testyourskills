@@ -65,12 +65,12 @@ describe("bloc de partage selon l'appareil (§18.27)", () => {
     // Le fichier porte le seul nom visible du produit.
     expect(html).not.toMatch(/testyourskills/i);
     // Le dessin en cours dans l'adresse : le cache d'un an ne ressert pas l'ancienne image.
-    expect(html).toContain('href="/og/AbCdEf1234-portrait.png?v=7"');
+    expect(html).toContain('href="/og/AbCdEf1234-portrait.png?v=8"');
   });
 
   it("« Image pour story » : un lien d'appoint après l'image, téléchargé comme elle", () => {
     const html = render({ ua: DESKTOP, touch: false, share: false });
-    expect(html).toMatch(/Télécharger l&#x27;image<\/a><\/div><a class="link-quiet out-story" href="\/og\/AbCdEf1234-story\.png\?v=7" download="azerit-[^"]+-story\.png">Image pour story<\/a>/);
+    expect(html).toMatch(/Télécharger l&#x27;image<\/a><\/div><a class="link-quiet out-story" href="\/og\/AbCdEf1234-story\.png\?v=8" download="azerit-[^"]+-story\.png">Image pour story<\/a>/);
     // Discret : pas une quatrième pilule.
     expect(ghosts(html)).toHaveLength(3);
   });
