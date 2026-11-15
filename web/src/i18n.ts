@@ -311,7 +311,7 @@ const fr = frTypoDeep({
     /** Un seul libellé pour l'action du visiteur : la barre fixe et le bouton du formulaire disent la même chose. */
     makeYours: "Faire ma fiche",
     /** Dans « À ton tour » au bureau (§18.48) : ce qu'il regarde, en une phrase ; puis, sans fiche à soi, ce que coûte la sienne. */
-    lead: (who: string) => `Azerit a dressé la fiche de dev de ${who} comme un recruteur la lirait : l'expérience d'abord, le code en preuve.`,
+    lead: (who: string) => `Azerit a dressé la fiche de dev de ${who} comme un recruteur la lirait : l'expérience d'abord, le code comme preuve.`,
     leadYours: "La tienne prend une minute, sans compte.",
     /** Au-dessus de la fiche, sur téléphone : la même chose en deux lignes au plus (`who` : « @pseudo » ou le prénom). */
     leadShort: (who: string) => `La fiche de dev de ${who}.`,
@@ -491,7 +491,7 @@ const fr = frTypoDeep({
       note: "Laisse ton email : ta fiche reste en ligne, et Azerit peut t'écrire pour un poste.",
     },
     /* le bloc recruteur, en fin de page : on vouvoie qui recrute */
-    cta: { title: "Vous recrutez ?", text: "Azerit vous présente des devs lus comme ici : l'expérience d'abord, le code en preuve.", link: "azerit.tech" },
+    cta: { title: "Vous recrutez ?", text: "Azerit vous présente des devs lus comme ici : l'expérience d'abord, le code comme preuve.", link: "azerit.tech" },
     del: {
       link: "Supprimer ma fiche",
       confirm: "Supprimer définitivement ?",

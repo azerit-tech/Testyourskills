@@ -87,7 +87,7 @@ describe("page partagée, vue par un visiteur", () => {
     expect(fr).toContain(`<p class="visitor-lead">La fiche de dev de @${login}.<br/>La tienne prend une minute, sans compte.</p>`);
     // Bureau : la phrase entière ouvre « À ton tour », à droite de la fiche.
     expect(fr).toContain(
-      `<p class="you-lead">Azerit a dressé la fiche de dev de @${login} comme un recruteur la lirait : l'expérience d'abord, le code en preuve. La tienne prend une minute, sans compte.</p>`,
+      `<p class="you-lead">Azerit a dressé la fiche de dev de @${login} comme un recruteur la lirait : l'expérience d'abord, le code comme preuve. La tienne prend une minute, sans compte.</p>`,
     );
     const en = renderResult(card(), { owner: false, lang: "en-US" }).replace(/&#x27;/g, "'");
     expect(en).toContain(`<p class="visitor-lead">@${login}'s dev rap sheet.<br/>Yours takes one minute, no account.</p>`);
