@@ -22,7 +22,7 @@ const fr = frTypoDeep({
     title: homeTitle("fr"),
     /** « Léa Martin-Dubois ★★★★★☆ · Azerit » : la note se lit à ses étoiles, le seul nom visible est Azerit (§18.48). */
     titleCard: (name: string, overall: number) => `${name} ${starsLine(starsFor(overall))} · Azerit`,
-    /** Dossier scellé (shared/publicView.ts) : le titre de l'onglet ne dit pas la note. */
+    /** Fiche scellée (shared/publicView.ts) : le titre de l'onglet ne dit pas la note. */
     titleSealed: (name: string) => `${name} · Azerit`,
     /** Les pages sans fiche : « Vie privée · Azerit ». */
     titlePage: (subject: string) => `${subject} · Azerit`,
@@ -241,7 +241,7 @@ const fr = frTypoDeep({
     /** Sa propre poursuite, jamais vue ici (repliée faute de réseau, ou mouvement réduit). */
     watchMine: "Voir ma poursuite",
     revealed: (level: string, overall: number) => `Fiche ${level}, ${overall}/100.`,
-    revealedSealed: "Dossier scellé\u00a0: le code reste à prouver.",
+    revealedSealed: "Fiche scellée\u00a0: le code reste à prouver.",
     fireworks: "Clique ou Espace : feux d'artifice",
     fireworksTouch: "Touche l'écran : feux d'artifice",
     statusLabel: "Statut",
@@ -1023,7 +1023,7 @@ const en: Dict = {
     watch: "Watch the chase",
     watchMine: "Watch my chase",
     revealed: (level, overall) => `${level} sheet, rated ${overall}/100.`,
-    revealedSealed: "Sealed file: code still unproven.",
+    revealedSealed: "Sealed sheet: code still unproven.",
     fireworks: "Click or Space: fireworks",
     fireworksTouch: "Tap the screen: fireworks",
     statusLabel: "Status",

@@ -303,7 +303,7 @@ describe("un dossier, une fiche, une note (§18.36)", () => {
   it("un dossier scellé ne dit sa note ni au lecteur d'écran, ni dans le duel", () => {
     const sealed: CardData = { ...file, sealed: true };
     const html = renderResult(cmp({ id: "DossierSeal1", file: sealed }), { owner: false });
-    expect(html).toContain("Dossier scellé\u00a0: le code reste à prouver.");
+    expect(html).toContain("Fiche scellée\u00a0: le code reste à prouver.");
     expect(html).not.toMatch(/note \d+\./);
     expect(html).not.toContain('class="versus-line"');
   });
