@@ -8,7 +8,7 @@ import { setPrefill } from "../lib/session";
 
 /** Préremplit l'accueil avec ce pseudo (un mot réservé n'en est jamais un), puis y va. */
 export function openDirect(login: string) {
-  if (!isReservedSegment(login)) setPrefill({ login, mode: "single", tab: "github" });
+  if (!isReservedSegment(login)) setPrefill({ login, mode: "single", tab: "github", direct: true });
   navigate("/", { replace: true });
 }
 

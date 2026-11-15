@@ -14,6 +14,8 @@ export interface Prefill {
   error?: Fact | string | null;
   /** L'erreur est une limite (commissariat fermé) : le même toucher échouerait encore. */
   blocked?: boolean;
+  /** Venu d'une adresse /<pseudo> (DirectCard) : le pseudo de quelqu'un, pas une saisie à corriger. */
+  direct?: boolean;
 }
 
 let prefill: Prefill | null = null;

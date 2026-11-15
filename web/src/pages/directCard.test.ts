@@ -27,7 +27,8 @@ describe("la route /{pseudo}", () => {
     const at = stubWindow("?mock=1");
     openDirect("kevin-dev42");
     expect(at.path).toBe("/?mock=1");
-    expect(takePrefill()).toMatchObject({ login: "kevin-dev42", mode: "single", tab: "github" });
+    // Marqué « direct » : pour qui a déjà une autre fiche, l'accueil en fait une dénonciation (§18.52).
+    expect(takePrefill()).toMatchObject({ login: "kevin-dev42", mode: "single", tab: "github", direct: true });
     expect(create).not.toHaveBeenCalled();
   });
 

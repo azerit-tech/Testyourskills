@@ -70,14 +70,16 @@ interface Props {
   /** Son pseudo GitHub : on ne se dénonce pas soi-même. */
   selfLogin?: string;
   toast: (m: string) => void;
+  /** Le champ déjà rempli (l'accueil ouvert sur /<pseudo> par qui a déjà sa fiche). */
+  initial?: string;
 }
 
-export function Denounce({ cardId, selfLogin, toast }: Props) {
+export function Denounce({ cardId, selfLogin, toast, initial }: Props) {
   const { t, lang } = useT();
   const d = t.denounce;
   const uid = useId().replace(/:/g, "");
   const [state, setState] = useState<State>({ s: "idle" });
-  const [value, setValue] = useState("");
+  const [value, setValue] = useState(initial ?? "");
   const [suggestions, setSuggestions] = useState<CaseInfo["accomplices"]>([]);
   const alive = useRef(true);
   const busy = useRef(false);
