@@ -1,9 +1,10 @@
-// Sous la fiche, avant le pari (rapport « jugé comme par un recruteur », §3 ;
-// SPEC §18.37) : ce qu'un recruteur dit en cinq secondes, écrit par gabarit
-// (shared/recruiterLine.ts), puis les huit critères en tuiles, deux colonnes à
-// 390 px : nom court, note sur 10, mini-jauge. L'ordre du recruteur ; les
-// critères sans note en bas, sous « Pas encore au dossier ». Une tuile touchée
-// montre sa pièce dessous ; le détail entier reste dans la grille (#grille).
+// Les critères, un seul bloc sous la fiche (SPEC §18.37, §18.48) : ce qu'un
+// recruteur dit en cinq secondes, écrit par gabarit (shared/recruiterLine.ts),
+// puis les huit critères en tuiles, deux colonnes à 390 px : nom court, note
+// sur 10, mini-jauge. L'ordre du recruteur ; les critères sans note en bas,
+// sous « Pas encore au dossier », en une seule ligne dès qu'ils sont plus de
+// deux (jamais un mur de cases vides). Une tuile touchée montre sa pièce
+// dessous ; le détail entier se déplie sur place (RecruiterGrid).
 // Un dossier à deux pièces (§18.36) : chaque tuile notée dit sous son nom où la
 // note a été lue (« LinkedIn », « GitHub », « LinkedIn et GitHub ») ; une fiche
 // seule n'en dit rien, la provenance y serait partout la même.
@@ -18,6 +19,10 @@ import { declaredOf } from "../../../shared/types";
 import { pick, useT } from "../i18n";
 import { keptFrom, rowText } from "../lib/grid";
 import type { Shareable } from "./After";
+import { RecruiterGrid } from "./RecruiterGrid";
+
+/** Au-delà, les critères sans note tiennent en une ligne. */
+const PENDING_TILES = 2;
 
 /** Dix segments, lus par la tuile elle-même : la jauge est décorative. */
 function MiniGauge({ c }: { c: GridCriterion }) {
@@ -97,33 +102,40 @@ export function RecruiterRead({ item, shared, who }: Props) {
   };
 
   return (
-    <section className="after-block rr" aria-labelledby="rr-title">
-      <h2 id="rr-title">{shared ? R.titleThem(who) : R.title}</h2>
+    <section className="after-block rr" id="grille" aria-labelledby="rr-title">
+      <h2 id="rr-title">{shared ? t.grid.titleThem(who) : t.grid.title}</h2>
       {read && <p className="rr-line">{read.text}</p>}
-      <ul className="rr-tiles" aria-label={t.grid.criteriaLabel}>
-        {scored.map(tile)}
-      </ul>
-      {pending.length > 0 && (
-        <>
-          <p className="rr-pending">{R.pending}</p>
-          <ul className="rr-tiles" aria-label={R.pending}>
-            {pending.map(tile)}
-          </ul>
-        </>
+      {scored.length > 0 && (
+        <ul className="rr-tiles" aria-label={t.grid.criteriaLabel}>
+          {scored.map(tile)}
+        </ul>
       )}
-      <p id={panel} className="rr-detail" aria-live="polite">
-        {chosen ? (
+      {pending.length > PENDING_TILES ? (
+        <p className="rr-pending-line">{R.pendingLine(pending.map((c) => R.short[c.code]).join(", "))}</p>
+      ) : (
+        pending.length > 0 && (
           <>
-            <b>{t.grid.names[chosen.code]}</b> {detail.replace(/`/g, "")}
+            <p className="rr-pending">{R.pending}</p>
+            <ul className="rr-tiles" aria-label={R.pending}>
+              {pending.map(tile)}
+            </ul>
           </>
-        ) : (
-          R.hint
-        )}
-      </p>
-      <a className="rr-more" href="#grille">
-        {R.more}
-        <span aria-hidden> ↓</span>
-      </a>
+        )
+      )}
+      {scored.length + (pending.length > PENDING_TILES ? 0 : pending.length) > 0 && (
+        <p id={panel} className="rr-detail" aria-live="polite">
+          {chosen ? (
+            <>
+              <b>{t.grid.names[chosen.code]}</b> {detail.replace(/`/g, "")}
+            </>
+          ) : (
+            R.hint
+          )}
+        </p>
+      )}
+      {/* Le détail, critère par critère : replié pour tout le monde, déplié sur place. */}
+      <RecruiterGrid item={item} shared={shared} />
+      <p className="rr-game">{t.grid.game}</p>
     </section>
   );
 }

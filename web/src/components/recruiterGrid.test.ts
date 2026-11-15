@@ -46,7 +46,7 @@ function renderNode(node: ReturnType<typeof createElement>, lang = "fr-FR"): str
   vi.stubGlobal("document", { documentElement: { dataset: {}, classList: { add: () => undefined, remove: () => undefined } }, querySelector: () => null, getElementById: () => null });
   return renderToStaticMarkup(createElement(LangProvider, null, node));
 }
-const render = (item: Shareable, shared: boolean, lang = "fr-FR") => renderNode(createElement(RecruiterGrid, { item, shared, who: "@dev" }), lang);
+const render = (item: Shareable, shared: boolean, lang = "fr-FR") => renderNode(createElement(RecruiterGrid, { item, shared }), lang);
 
 afterEach(() => vi.unstubAllGlobals());
 

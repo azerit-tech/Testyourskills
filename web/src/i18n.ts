@@ -456,11 +456,10 @@ const fr = frTypoDeep({
      une note sur 10 chacun, une moyenne pondérée. Jamais un « +n ». Épicène : « tu », « son », sans accord. */
   /** Sous la fiche, avant le pari (§18.37) : la ligne écrite par gabarit (shared/recruiterLine.ts) et les huit tuiles. */
   read: {
-    title: "Ce que la grille retient",
-    titleThem: (who: string) => `Ce que la grille retient de ${who}`,
     pending: "Pas encore au dossier",
+    /** Plus de deux critères sans note : une ligne, jamais un mur de cases vides (§18.48). */
+    pendingLine: (names: string) => `Pas encore au dossier : ${names}.`,
     hint: "Touche un critère\u00a0: sa preuve s'affiche.",
-    more: "Tout le détail de la grille",
     tile: (name: string, n: number) => `${name}\u00a0: ${n} sur 10`,
     tileNone: (name: string) => `${name}\u00a0: pas encore de note`,
     tileKept: (name: string) => `${name}\u00a0: gardée pour la personne`,
@@ -474,7 +473,7 @@ const fr = frTypoDeep({
   },
   grid: {
     title: "Voici comment Azerit te lit",
-    /** Vue partagée : le détail replié sous les tuiles. */
+    /** Le détail replié sous les tuiles, pour tout le monde (§18.48). */
     fold: "Le détail, critère par critère",
     titleThem: (who: string) => `Voici comment Azerit lit ${who}`,
     /** Les sources lues : une ligne par source, « pas encore au dossier » pour celle qui manque. */
@@ -1155,11 +1154,9 @@ const en: Dict = {
     again: "Make another sheet",
   },
   read: {
-    title: "What the scorecard says",
-    titleThem: (who: string) => `What the scorecard says about ${who}`,
     pending: "Not on file yet",
+    pendingLine: (names: string) => `Not on file yet: ${names}.`,
     hint: "Tap a criterion to see its evidence.",
-    more: "See the full scorecard",
     tile: (name: string, n: number) => `${name}: ${n} out of 10`,
     tileNone: (name: string) => `${name}: no score yet`,
     tileKept: (name: string) => `${name}: kept on the person's side`,

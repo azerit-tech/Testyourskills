@@ -17,7 +17,6 @@ import { Dossier } from "../components/Findings";
 import { Jury, JuryLine } from "../components/Jury";
 import { MakeYours } from "../components/MakeYours";
 import { PleaVerdict } from "../components/Plea";
-import { RecruiterGrid } from "../components/RecruiterGrid";
 import { RecruiterRead } from "../components/RecruiterRead";
 import { RemovalRequest } from "../components/Removal";
 import { AddLinkedin } from "../components/AddLinkedin";
@@ -570,13 +569,11 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
           <div className="visitor-col">
             {/* Fiche dénoncée (§18.6) : « Avis de recherche à ton nom », juste sous la fiche. */}
             {wantedYou && <Denounced by={kase?.by ?? null} onLawyer={claimOn && cardLogin ? () => api.startClaim(id, cardLogin) : null} />}
-            {/* La ligne du recruteur et les huit tuiles (§18.37), juste sous la fiche. */}
+            {/* Les critères (§18.37, §18.48) : la ligne du recruteur, les huit tuiles, le détail replié ; ni nom d'école ni d'ancien employeur. */}
             <RecruiterRead item={item} shared who={main.login ? `@${main.login}` : main.name} />
             {/* Le jury (§18.27) : un geste à un toucher, avant « Et toi ? ». */}
             <Jury cardId={id} card={main} jury={kase?.jury ?? null} toast={toast.show} />
             <Penalty card={main} />
-            {/* Le barème (§18.37) : comment un recruteur d'Azerit lit la personne, sans nom d'école ni d'ancien employeur. */}
-            <RecruiterGrid item={item} shared who={main.login ? `@${main.login}` : main.name} />
             {/* L'enquête en direct (§18.26) : les trois trouvailles les plus fortes, chacune vers sa preuve. */}
             <Dossier card={main} />
             <section className="you" id="you" aria-labelledby="you-title">
@@ -606,7 +603,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
         {/* L'après-fiche raccourci (§18.27) : le pari et le jury, la peine, le partage, la dénonciation, le dossier, puis le reste en lignes. */}
         {/* « Tu es en course » (§18.5) : en tête, seulement si une prime est ouverte. */}
         {!visitor && <PrimeRace cardId={id} card={main} />}
-        {/* La ligne du recruteur et les huit tuiles (§18.37) : sous la fiche, avant le pari. */}
+        {/* Les critères (§18.37, §18.48) : un seul bloc, la ligne du recruteur, les huit tuiles, le détail replié. */}
         {!visitor && <RecruiterRead item={item} shared={false} who={main.login ? `@${main.login}` : main.name} />}
         {!visitor && (
           <div className="after-head">
@@ -617,8 +614,6 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
         {!visitor && <Penalty card={main} />}
         {/* Fiche masquée : /og/* et /c/:id répondent 404 / 410 à tous, l'image ne se télécharge pas et le lien ne montre rien. */}
         {!visitor && !(claimed && me?.hidden) && <ShareBar item={item} toast={toast.show} />}
-        {/* Le barème de recrutement (§18.37) : « Voici comment un recruteur d'Azerit te lit », juste après le partage, hors de la révélation. */}
-        {!visitor && <RecruiterGrid item={item} shared={false} who={main.login ? `@${main.login}` : main.name} />}
         {/* Dénonce un complice (§18.6), juste après le partage. */}
         {!visitor && <Denounce cardId={id} selfLogin={cardLogin} toast={toast.show} />}
         {/* Tu roules pour qui ? (§18.38) : l'école et la boîte, après la dénonciation, avant le dossier. */}

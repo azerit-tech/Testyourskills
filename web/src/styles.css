@@ -3514,9 +3514,6 @@ a.dossier-item:hover {
    (pas de boîtes), une jauge de dix segments en aplats. L'état se lit en texte (étiquettes) et en
    forme (segments fermés en tirets au-delà de 6 pour un déclaré, pointillés sans note) : jamais à la
    couleur seule. Les recoupements en marine, la note finale sur l'encre. Aucune lueur. */
-.rg {
-  gap: 16px;
-}
 .rg .rg-method {
   list-style: none;
   display: grid;
@@ -3854,17 +3851,24 @@ a.rg-src.is-both {
   font: 500 var(--t-14) / 1.4 var(--f-text);
   color: var(--c-text);
 }
-/* vue partagée : le détail de la grille replié sous son titre */
+/* le détail de la grille, replié au bas du bloc des critères : une ligne entre deux filets */
 .rg-fold {
+  min-width: 0;
+  border-top: 1px solid var(--c-line);
+  border-bottom: 1px solid var(--c-line);
+}
+.rg-fold-body {
   display: grid;
   gap: 16px;
+  min-width: 0;
+  padding: 4px 0 16px;
 }
 .rg-fold-sum {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: var(--h-tap);
+  min-height: var(--h-main);
   font: 600 var(--t-16) / 1.4 var(--f-text);
   color: var(--cream);
   cursor: pointer;
@@ -3988,6 +3992,12 @@ a.rg-src.is-both {
   text-transform: uppercase;
   color: var(--c-text-2);
 }
+/* plus de deux critères sans note : une ligne, pas un mur de cases vides */
+.rr .rr-pending-line {
+  font: var(--font-small);
+  color: var(--c-text-2);
+  text-wrap: pretty;
+}
 .rr .rr-detail {
   min-height: 2.8em;
   font: var(--font-small);
@@ -3996,19 +4006,9 @@ a.rg-src.is-both {
 .rr-detail b {
   color: var(--cream);
 }
-.rr-more {
-  justify-self: start;
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--h-tap);
-  font: var(--font-label);
-  letter-spacing: var(--ls-label);
-  text-transform: uppercase;
-  color: var(--c-action);
-}
 
 /* un jeu, pas un verdict d'embauche : la dernière ligne, la plus discrète */
-.rg .rg-game {
+.rr .rr-game {
   font: 500 var(--t-14) / 1.4 var(--f-text);
   color: var(--c-text-2);
 }

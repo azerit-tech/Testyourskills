@@ -282,17 +282,21 @@ describe("la lecture du recruteur (§18.37)", () => {
       const html = renderResult(card(), { owner, token: owner ? "tok" : undefined });
       expect(html).not.toContain('id="grille"');
       expect(html).not.toContain('class="after-block rr"');
-      expect(html).not.toContain("Ce que la grille retient");
+      expect(html).not.toContain("Voici comment Azerit");
     }
   });
 
-  it("avec sa grille : le titre, huit critères, une jauge lue « n sur 10 », la note, aucun « + n »", () => {
+  it("avec sa grille : un seul bloc, un seul titre, huit critères, une jauge lue « n sur 10 », la note, aucun « + n »", () => {
     const html = renderResult(card({ grid, overall: grid.overall }), { owner: true, token: "tok" });
-    expect(html).toContain("Voici comment Azerit te lit");
+    expect(html.match(/Voici comment Azerit te lit/g)).toHaveLength(1);
     expect(html.match(/class="rg-row /g)).toHaveLength(8);
     expect(html).toMatch(/aria-label="\d+ sur 10"/);
-    const block = /<section class="after-block rg".*?<\/section>/s.exec(html)![0].replace(/<[^>]+>/g, " ");
+    const block = /<section class="after-block rr" id="grille".*?<\/section>/s.exec(html)![0].replace(/<[^>]+>/g, " ");
     expect(block).not.toMatch(/(^|\s)[+−]\s?\d/);
+    // Les deux blocs d'avant n'en font qu'un (§18.48) : plus de second titre, plus de lien vers une ancre.
+    expect(html).not.toContain('class="after-block rg"');
+    expect(html).not.toContain("Ce que la grille retient");
+    expect(html).not.toContain("rr-more");
   });
 
   it("vue par un visiteur : le titre à la troisième personne", () => {
@@ -308,14 +312,30 @@ describe("la lecture du recruteur (§18.37)", () => {
     expect(rr).toBeLessThan(html.indexOf('class="after-head"'));
     expect(html.match(/class="rr-tile /g)).toHaveLength(8);
     expect(html).toMatch(/<p class="rr-line">[^<]+, [^<]+\. Point fort\u00a0: [^<]+, \d+\/10\./);
-    // Les tuiles dans l'ordre du recruteur, les critères sans note en bas.
+    // Les tuiles dans l'ordre du recruteur, les critères sans note en bas (deux au plus en tuiles).
     const names = [...html.matchAll(/<span class="rr-name">([^<]+)<\/span>/g)].map((m) => m[1]);
     const { scored, pending } = tileOrder(grid);
+    expect(pending.length).toBeLessThanOrEqual(2);
     expect(names).toEqual([...scored, ...pending].map((c) => DICTS.fr.read.short[c.code]));
     expect(names[0]).toBe("Expérience");
     if (pending.length) expect(html).toContain('<p class="rr-pending">Pas encore au dossier</p>');
-    // La personne fichée voit le détail de la grille ouvert.
-    expect(html).not.toContain('class="rg-fold"');
+    // Le détail de la grille : replié pour la personne fichée aussi (§18.48), dans le même bloc.
+    const block = /<section class="after-block rr" id="grille".*?<\/section>/s.exec(html)![0];
+    expect(block).toMatch(/<details class="rg rg-fold"><summary class="rg-fold-sum"><span>Le détail, critère par critère<\/span>/);
+  });
+
+  it("plus de deux critères sans note : une ligne, pas un mur de cases vides (§18.48)", () => {
+    const low = githubGridMock("unknownLang", "x")!;
+    const { scored, pending } = tileOrder(low);
+    expect(pending.length).toBeGreaterThan(2);
+    const html = renderResult(card({ grid: low, overall: low.overall }), { owner: true, token: "tok" });
+    expect(html.match(/class="rr-tile /g) ?? []).toHaveLength(scored.length);
+    const line = /<p class="rr-pending-line">([^<]+)<\/p>/.exec(html)?.[1] ?? "";
+    expect(line).toBe(DICTS.fr.read.pendingLine(pending.map((c) => DICTS.fr.read.short[c.code]).join(", ")));
+    expect(line).toMatch(/^Pas encore au dossier.: /);
+    expect(html).not.toContain('class="rr-pending"');
+    // Le détail garde les huit lignes, repliées.
+    expect(html.match(/class="rg-row /g)).toHaveLength(8);
   });
 
   it("fiche GitHub seule : « Ajoute ton LinkedIn au dossier », en miroir de l'ajout du GitHub ; jamais pour un visiteur", () => {
@@ -336,10 +356,9 @@ describe("la lecture du recruteur (§18.37)", () => {
     const html = renderResult(card({ grid, overall: grid.overall }), { owner: false });
     const col = html.slice(html.indexOf('class="visitor-col"'));
     expect(col.indexOf('class="after-block rr"')).toBeGreaterThan(-1);
-    expect(col.indexOf('class="after-block rr"')).toBeLessThan(col.indexOf('class="after-block rg"'));
-    expect(html).toMatch(/<details class="rg-fold"><summary class="rg-fold-sum"><span>Le détail, critère par critère<\/span>/);
+    expect(html).toMatch(/<details class="rg rg-fold"><summary class="rg-fold-sum"><span>Le détail, critère par critère<\/span>/);
     expect(html).toContain("Pas une décision d&#x27;embauche");
-    expect(html).toContain("Ce que la grille retient de @");
+    expect(html.match(/Voici comment Azerit lit @/g)).toHaveLength(1);
   });
 });
 

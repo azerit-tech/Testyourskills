@@ -176,11 +176,10 @@ interface Props {
   item: Shareable;
   /** Vue par quelqu'un d'autre que la personne fichée : troisième personne, ni nom d'école ni d'ancien employeur. */
   shared: boolean;
-  /** « @login » pour le titre à la troisième personne. */
-  who: string;
 }
 
-export function RecruiterGrid({ item, shared, who }: Props) {
+/** « Le détail, critère par critère » : le pli au bas du bloc des critères (RecruiterRead), fermé pour tout le monde. */
+export function RecruiterGrid({ item, shared }: Props) {
   const { t, lang } = useT();
   const raw = item.kind === "card" ? item.card.grid : item.comparison.grid;
   if (!usableGrid(raw)) return null;
@@ -216,23 +215,17 @@ export function RecruiterGrid({ item, shared, who }: Props) {
       {redacted && <p className="rg-hidden">{g.shared.hidden}</p>}
     </>
   );
+  // Les tuiles disent l'essentiel : le détail se replie, pour la personne fichée comme pour le visiteur (§18.48).
   return (
-    <section className="after-block rg" id="grille" aria-labelledby="rg-title">
-      <h2 id="rg-title">{shared ? g.titleThem(who) : g.title}</h2>
-      {/* Vue partagée : les tuiles disent l'essentiel, le détail se replie (rapport du recruteur, §6). */}
-      {shared ? (
-        <details className="rg-fold">
-          <summary className="rg-fold-sum">
-            <span>{g.fold}</span>
-            <Chevron />
-          </summary>
-          {detail}
-        </details>
-      ) : (
-        detail
-      )}
-      <p className="rg-foot">{g.foot}</p>
-      <p className="rg-game">{g.game}</p>
-    </section>
+    <details className="rg rg-fold">
+      <summary className="rg-fold-sum">
+        <span>{g.fold}</span>
+        <Chevron />
+      </summary>
+      <div className="rg-fold-body">
+        {detail}
+        <p className="rg-foot">{g.foot}</p>
+      </div>
+    </details>
   );
 }
