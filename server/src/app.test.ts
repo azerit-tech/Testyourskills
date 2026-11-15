@@ -1645,10 +1645,10 @@ describe("le rang d'une école ne part dans aucune réponse (§18.48)", () => {
         state: "scored" as const,
         counted: true,
         source: "linkedin" as const,
-        reached: { fr: "CentraleSupélec, rang A.", en: "CentraleSupélec, tier A." },
+        reached: { fr: "École Démo, rang A.", en: "École Démo, tier A." },
         next: { fr: "Pour 10 : une école de rang S, ou une médaille internationale.", en: "For 10: a tier S school, or an international medal." },
         flags: [],
-        evidence: { text: { fr: "CentraleSupélec, rang A.", en: "CentraleSupélec, tier A." }, publicText: { fr: "École de rang A.", en: "Tier A school." }, source: "linkedin" as const },
+        evidence: { text: { fr: "École Démo, rang A.", en: "École Démo, tier A." }, publicText: { fr: "École de rang A.", en: "Tier A school." }, source: "linkedin" as const },
       },
     ],
   });
@@ -1668,7 +1668,7 @@ describe("le rang d'une école ne part dans aucune réponse (§18.48)", () => {
       const ownerText = await owner.text();
       expect(owner.status).toBe(200);
       expect(ownerText, id).not.toMatch(SCHOOL_RANK_RE);
-      expect(ownerText, id).toContain("CentraleSupélec : comptée au dossier.");
+      expect(ownerText, id).toContain("École Démo : comptée au dossier.");
       expect(ownerText, id).toContain('"score":8');
       const visitor = await (await ctx.app.request(`/api/card/${id}`)).text();
       expect(visitor, id).not.toMatch(SCHOOL_RANK_RE);

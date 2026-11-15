@@ -101,7 +101,7 @@ Les huit critères, leurs noms et leurs coefficients :
 - Ne comptent pas comme école : semestre d'échange, école d'été, MOOC, certificat, formation continue. À écrire dans la consigne de lecture : aujourd'hui, un semestre d'échange dans une école de rang S pourrait donner le rang S.
 - L'école doit figurer dans le texte lu, sinon rien (déjà en place).
 
-**La pièce affichée** : « Centrale Méditerranée, rang B. » — LinkedIn, formation. Ou : « Prix du hackathon cité en 2024, dépôt retrouvé. » — recoupé.
+**La pièce affichée** : « Centrale Méditerranée : comptée au dossier. » — LinkedIn, formation. Le rang de l'école reste dans ce barème : il donne la note, il ne s'affiche nulle part (SPEC §18.48, `shared/schoolRank.ts`). Ou : « Prix du hackathon cité en 2024, dépôt retrouvé. » — recoupé.
 
 **Données** : le rang existe (0.3.0). À ajouter : les signaux de sélection (lecture IA avec extrait ; dépôts GitHub par mot-clé, en code), la section des distinctions.
 
@@ -419,7 +419,7 @@ Données réelles du 10 novembre 2026 (profils LinkedIn tels que lus, faits GitH
 
 | Critère | Note | Le niveau atteint, et pourquoi pas le suivant | Source |
 |---|---|---|---|
-| École et sélection | **6/10** | Centrale Méditerranée, rang B. | LinkedIn, formation |
+| École et sélection | **6/10** | Centrale Méditerranée : comptée au dossier. | LinkedIn, formation |
 | Expérience | **3/10** | Stages de février 2025 à mars 2026 : 13 mois à 50 %. Azerit depuis avril 2026 : 7 mois. Association de l'école : 0. Total 1,1 an : le palier « 1 an ». | LinkedIn, postes datés |
 | Parcours et employeurs | **4/10** | Une entreprise fondée, tenue 7 mois. Pour 6 : la tenir un an. | LinkedIn, postes |
 | Stack technique | **6/10** | TypeScript : 329 commits, pratiqué depuis 2 ans, push de la veille. Pour 8 : 500 commits (la seconde famille, Agda, y est déjà). Déclarée sur LinkedIn : une seule techno décrite, non renseigné. | GitHub |
@@ -437,7 +437,7 @@ Données réelles du 10 novembre 2026 (profils LinkedIn tels que lus, faits GitH
 
 | Critère | Note | Le niveau atteint, et pourquoi pas le suivant | Source |
 |---|---|---|---|
-| École et sélection | **8/10** | CentraleSupélec, rang A. Le semestre d'échange ne compte pas. | LinkedIn, formation |
+| École et sélection | **8/10** | CentraleSupélec : comptée au dossier. Le semestre d'échange ne compte pas. | LinkedIn, formation |
 | Expérience | **3/10** | Sejo, septembre 2024 à août 2025 : 11 mois. Azerit depuis janvier 2026 : 10 mois. Total 1,75 an : le palier « 1 an ». | LinkedIn, postes datés |
 | Parcours et employeurs | **4/10** | Deux entreprises fondées, chacune tenue moins d'un an. Pour 6 : en tenir une un an. | LinkedIn, postes |
 | Stack technique | non prouvé | Un dépôt public, sans commit. Aucune techno décrite sur LinkedIn. | GitHub |

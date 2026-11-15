@@ -14,10 +14,10 @@ const legacyEdu = (tier: "S" | "A" | "B" | "C", score: number): GridCriterion =>
   state: "scored",
   counted: true,
   source: "linkedin",
-  reached: f(`CentraleSupélec, rang ${tier}.`, `CentraleSupélec, tier ${tier}.`),
+  reached: f(`École Démo, rang ${tier}.`, `École Démo, tier ${tier}.`),
   next: f(`Pour 10 : une école de rang S, ou une médaille internationale.`, `For 10: a tier S school, or an international medal.`),
   flags: [],
-  evidence: { text: f(`CentraleSupélec, rang ${tier}.`, `CentraleSupélec, tier ${tier}.`), publicText: f(`École de rang ${tier}.`, `Tier ${tier} school.`), source: "linkedin" },
+  evidence: { text: f(`École Démo, rang ${tier}.`, `École Démo, tier ${tier}.`), publicText: f(`École de rang ${tier}.`, `Tier ${tier} school.`), source: "linkedin" },
 });
 
 const legacyGrid = (): Grid => ({ overall: 70, criteria: [legacyEdu("A", 8)] });
@@ -28,8 +28,8 @@ describe("withoutSchoolRank", () => {
     const edu = card.grid!.criteria[0]!;
     expect(JSON.stringify(card)).not.toMatch(SCHOOL_RANK_RE);
     expect(edu.score).toBe(8);
-    expect(edu.reached).toEqual(schoolCounted("CentraleSupélec"));
-    expect(edu.evidence!.text).toEqual(schoolCounted("CentraleSupélec"));
+    expect(edu.reached).toEqual(schoolCounted("École Démo"));
+    expect(edu.evidence!.text).toEqual(schoolCounted("École Démo"));
     expect(edu.evidence!.publicText).toEqual(SCHOOL_COUNTED);
     expect(edu.next!.fr).toBe("Pour 10 : une école parmi les plus sélectives, ou une médaille internationale.");
     expect(edu.next!.en).toBe("For 10: one of the most selective schools, or an international medal.");
