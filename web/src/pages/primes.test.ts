@@ -54,12 +54,14 @@ describe("le formulaire d'une prime", () => {
 describe("les états de fin d'une prime", () => {
   it("terminée : ni présent, ni « la première place est libre »", () => {
     const m = fr.primes.mine;
-    const over = [m.over, m.final, m.finalText, m.finalistText(2, 57, "Entreprise Démo"), m.winner, m.winnerText("Entreprise Démo"), fr.primes.boardFinal, fr.primes.page.boardEmptyClosed];
+    const over = [m.over, m.final, m.finalText, m.finalistText(2, 57, "Entreprise Démo"), m.winner, m.winnerText("Entreprise Démo"), fr.primes.boardFinal, fr.primes.over.text];
     for (const s of over) {
       expect(s, s).not.toMatch(/place est libre/);
       expect(s, s).not.toMatch(/\bTu es (n°|\d)/);
     }
-    expect(fr.primes.page.boardEmptyClosed).toBe("Prime terminée sans inscription.");
+    // Terminée sans y être : une sortie, la fiche à faire (§18.52).
+    expect(fr.primes.over.text).toMatch(/^Fais ta fiche/);
+    expect(en.primes.over.text).toMatch(/^Get your rap sheet/);
   });
 
   it("la place se dit sans accord avec la personne, et se partage", () => {
@@ -85,10 +87,11 @@ describe("les états de fin d'une prime", () => {
   });
 });
 
-describe("« 1er » en exposant", () => {
-  it("la date du premier du mois, et rien d'autre", () => {
+describe("« 1er », « 3e » en exposant (§18.52)", () => {
+  it("la date du premier du mois et le rang, rien d'autre", () => {
     const html = (s: string) => renderToStaticMarkup(createElement("p", null, withSup(s)));
-    expect(html("Du 1er novembre au 26 novembre")).toBe("<p>Du <span>1<sup>er</sup></span> novembre au 26 novembre</p>");
+    expect(html("Du 1er novembre au 26 novembre")).toBe("<p>Du 1<sup>er</sup> novembre au 26 novembre</p>");
+    expect(html("Tu es 3e sur 12.")).toBe("<p>Tu es 3<sup>e</sup> sur 12.</p>");
     expect(html("Du 21 novembre au 31 décembre")).toBe("<p>Du 21 novembre au 31 décembre</p>");
   });
 });

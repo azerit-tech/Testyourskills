@@ -16,7 +16,7 @@ import { EntryForm } from "../components/EntryForm";
 import { PrimeNotFound, Unreachable } from "../components/ErrorPage";
 import { useToast } from "../components/After";
 import { IconLinkedIn, IconShare } from "../components/Icons";
-import { PrimeCard, PrimeMark, usePrimeWhen, withSup } from "../components/Primes";
+import { PrimeCard, PrimeMark, PrimeTag, usePrimeWhen, withSup } from "../components/Primes";
 import { Stars } from "../components/Stars";
 import { SCALE } from "../components/WeekBoard";
 import { pick, useT } from "../i18n";
@@ -195,6 +195,37 @@ function Mine({ prime, entry, job, native, onShare, onWithdraw }: MineProps) {
         <button type="button" className="link-quiet prime-withdraw" onClick={() => setAsking(true)}>
           {t.primes.page.withdraw}
         </button>
+      )}
+    </section>
+  );
+}
+
+/**
+ * Une prime terminée, pour qui n'y était pas : plus d'entrée ni de partage, une sortie.
+ * Sans fiche, le champ pour la faire (la prochaine prime se joue dessus) ; avec, sa fiche.
+ * D'autres primes ouvertes : le lien vers elles.
+ */
+function Over({ mine, othersOpen }: { mine: MyCard | null; othersOpen: boolean }) {
+  const { t } = useT();
+  const to = t.primes.over;
+  const cardHref = mine ? `/c/${mine.id}` : null;
+  return (
+    <section className="block prime-over" aria-labelledby="prime-over-title">
+      <h2 className="t-block" id="prime-over-title">
+        {t.primes.mine.over}
+      </h2>
+      <p>{to.text}</p>
+      {cardHref ? (
+        <a className="btn-primary" href={cardHref} onClick={(e) => onLinkClick(e, cardHref)}>
+          {to.mine}
+        </a>
+      ) : (
+        <EntryForm variant="inline" />
+      )}
+      {othersOpen && (
+        <a className="link-alt prime-others" href="/primes" onClick={(e) => onLinkClick(e, "/primes")}>
+          {t.primes.page.others}
+        </a>
       )}
     </section>
   );
@@ -405,6 +436,8 @@ export function PrimePage({ id }: { id: string }) {
       {tp.share}
     </button>
   );
+  // Terminée sans personne : pas de classement vide à montrer.
+  const noBoard = closed && data.total === 0;
 
   const withdraw = async () => {
     try {
@@ -423,96 +456,103 @@ export function PrimePage({ id }: { id: string }) {
           <a className="link-back" href="/primes" onClick={(e) => onLinkClick(e, "/primes")}>
             ← {tp.all}
           </a>
-          <p className="label">
-            {t.primes.contract[prime.contract]}, {t.primes.interviews(prime.interviews)}
+          {/* la hiérarchie de la carte et de l'image de partage : le lot en titre, l'entreprise,
+              puis le contrat en pastille devant les postes */}
+          <div className="prime-head-top">
+            <h1>
+              <span className="prime-head-prize">{t.primes.interviews(prime.interviews)}</span>
+              <span className="sr-only">, </span>
+              {prime.logo ? <PrimeMark p={prime} big /> : <span className="prime-head-company">{prime.company}</span>}
+            </h1>
+            {/* l'échéance à côté du lot, comme sur la carte : dans le premier écran, même court */}
+            <span className={`prime-when is-${prime.phase}`}>{withSup(when(prime))}</span>
+          </div>
+          <p className="prime-head-job">
+            <PrimeTag contract={prime.contract} /> {positions}
           </p>
-          {prime.logo && <PrimeMark p={prime} big />}
-          <h1>{prime.company}</h1>
           <p className="prime-pitch">{pick(prime.pitch, lang)}</p>
-          {/* deux colonnes : postes et lieu, puis langages et dates */}
-          <dl className="prime-facts">
+        </section>
+
+        {/* deux colonnes : lieu et langages, puis les dates ; un fait seul sur sa ligne prend toute la largeur */}
+        <dl className="prime-facts">
+          {where && (
             <div>
-              <dt>{tp.positions}</dt>
-              <dd>{positions}</dd>
+              <dt>{tp.place}</dt>
+              <dd>{where}</dd>
             </div>
-            {where && (
-              <div>
-                <dt>{tp.place}</dt>
-                <dd>{where}</dd>
-              </div>
-            )}
-            {prime.languages.length > 0 && (
-              <div>
-                <dt>{tp.languages}</dt>
-                <dd>
-                  {prime.languages.join(", ")} <span className="prime-facts-note">({tp.languagesNote})</span>
-                </dd>
-              </div>
-            )}
+          )}
+          {prime.languages.length > 0 && (
             <div>
-              <dt>{tp.period}</dt>
+              <dt>{tp.languages}</dt>
               <dd>
-                {withSup(tp.dates(dayLabel(prime.from, lang), dayLabel(prime.to, lang)))} <span className={`prime-when is-${prime.phase}`}>{withSup(when(prime))}</span>
+                {prime.languages.join(", ")} <span className="prime-facts-note">({tp.languagesNote})</span>
               </dd>
             </div>
-          </dl>
-          {/* terminée : plus d'entrée, le partage reste ici */}
-          {closed && !entry && shareButton}
-        </section>
+          )}
+          <div>
+            <dt>{tp.period}</dt>
+            <dd>
+              {withSup(tp.dates(dayLabel(prime.from, lang), dayLabel(prime.to, lang)))}
+            </dd>
+          </div>
+        </dl>
 
         {entry ? (
           <Mine prime={prime} entry={entry} job={job} native={native} onShare={(text) => void share(prime, text)} onWithdraw={withdraw} />
+        ) : closed ? (
+          /* Terminée : plus d'entrée ni de partage ; une sortie, la fiche à faire (la prochaine prime se joue dessus). */
+          <Over mine={mine} othersOpen={!!cfg?.primesOpen} />
         ) : (
-          /* Terminée : plus d'entrée, le classement dit tout. */
-          !closed && (
-            <Steps
-              prime={prime}
-              me={me}
-              mine={mine}
-              positions={positions}
-              claimOn={!!cfg?.claim}
-              rulesLink={!!cfg?.rulesPublished}
-              onDone={(m) => {
-                setMe(m);
-                toast.show(t.primes.form.done);
-                setNonce((n) => n + 1);
-              }}
-            />
-          )
+          <Steps
+            prime={prime}
+            me={me}
+            mine={mine}
+            positions={positions}
+            claimOn={!!cfg?.claim}
+            rulesLink={!!cfg?.rulesPublished}
+            onDone={(m) => {
+              setMe(m);
+              toast.show(t.primes.form.done);
+              setNonce((n) => n + 1);
+            }}
+          />
         )}
         {/* entrer d'abord, partager ensuite : sous la porte d'entrée (inscrite, son bloc partage sa place) */}
         {!closed && !entry && shareButton}
       </div>
 
-      <div className="prime-main">
-        <section className="prime-board" aria-labelledby="prime-board-title">
-          <h2 id="prime-board-title">{closed ? t.primes.boardFinal : tp.board}</h2>
-          {data.total > 0 && <p className="board-meta">{closed ? tp.totalClosed(data.total) : tp.total(data.total)}</p>}
-          {data.board.length === 0 ? (
-            <p className="primes-empty">{closed ? tp.boardEmptyClosed : tp.boardEmpty}</p>
-          ) : (
-            <div className="board-top">
-              <span className="board-scale" aria-hidden>
-                {SCALE}
-              </span>
-              <ol className="board-list is-top">
-                {data.board.map((r) => (
-                  <Row key={r.login} r={r} me={!!me?.login && me.login === r.login.toLowerCase()} />
-                ))}
-              </ol>
-            </div>
-          )}
-          <div className="prime-rule">
-            <h3>{tp.rule}</h3>
-            <p>{tp.ruleText}</p>
-            {cfg?.rulesPublished && (
-              <a className="link-alt" href="/reglement" onClick={(e) => onLinkClick(e, "/reglement")}>
-                {tp.rules}
-              </a>
+      {/* un seul titre, celui du tableau ; la règle du classement se lit dessous, sous une étiquette */}
+      {!noBoard && (
+        <div className="prime-main">
+          <section className="prime-board" aria-labelledby="prime-board-title">
+            <h2 id="prime-board-title">{closed ? t.primes.boardFinal : tp.board}</h2>
+            {data.total > 0 && <p className="board-meta">{closed ? tp.totalClosed(data.total) : tp.total(data.total)}</p>}
+            {data.board.length === 0 ? (
+              <p className="primes-empty">{tp.boardEmpty}</p>
+            ) : (
+              <div className="board-top">
+                <span className="board-scale" aria-hidden>
+                  {SCALE}
+                </span>
+                <ol className="board-list is-top">
+                  {data.board.map((r) => (
+                    <Row key={r.login} r={r} me={!!me?.login && me.login === r.login.toLowerCase()} />
+                  ))}
+                </ol>
+              </div>
             )}
-          </div>
-        </section>
-      </div>
+            <div className="prime-rule">
+              <p className="label">{tp.rule}</p>
+              <p>{tp.ruleText}</p>
+              {cfg?.rulesPublished && (
+                <a className="link-alt" href="/reglement" onClick={(e) => onLinkClick(e, "/reglement")}>
+                  {tp.rules}
+                </a>
+              )}
+            </div>
+          </section>
+        </div>
+      )}
       {toast.node}
     </main>
   );

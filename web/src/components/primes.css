@@ -23,8 +23,9 @@
 .prime-card:hover {
   transform: translateY(-1px);
 }
-/* une prime close : le même bloc d'information, son contenu en retrait, sauf « Terminée » qui reste lisible */
-.prime-card.is-closed > :not(.prime-card-top),
+/* une prime close : le même bloc d'information, son contenu en retrait, sauf « Terminée » et le
+   lien du bas, qui restent lisibles (4,5:1 au moins : un lien reste un lien) */
+.prime-card.is-closed > :not(.prime-card-top, .prime-card-go),
 .prime-card.is-closed .prime-card-top > :not(.prime-when) {
   opacity: 0.62;
 }
@@ -46,16 +47,14 @@
   max-width: 200px;
   max-height: 56px;
 }
-/* un nom long revient à la ligne, sur deux lignes au plus : la carte garde sa largeur,
-   l'échéance reste à l'écran */
+/* l'entreprise, sous le lot : la preuve, pas le titre. Un nom long revient à la ligne,
+   sur deux lignes au plus : la carte garde sa largeur */
 .prime-name {
   display: -webkit-box;
   min-width: 0;
   overflow: hidden;
-  padding-top: 5px;
-  font: var(--font-item);
-  text-transform: uppercase;
-  color: var(--cream);
+  font: 600 var(--t-16) / 1.4 var(--f-text);
+  color: var(--c-text);
   overflow-wrap: anywhere;
   text-wrap: balance;
   -webkit-box-orient: vertical;
@@ -86,19 +85,27 @@
   font: 600 var(--t-16) / 1.4 var(--f-text);
   color: var(--cream);
 }
-/* le type de contrat : une précision, en lilas (ni action, ni réserve) */
+/* le contrat, la ligue : une pastille en contour lilas (ni action, ni réserve), devant les postes ;
+   elle ne se lit jamais avec eux comme un seul intitulé */
 .prime-tag {
-  margin-right: 4px;
-  font-weight: 500;
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 10px 2px;
+  border-radius: var(--r-pill);
+  box-shadow: inset 0 0 0 1px rgba(229, 221, 255, 0.5);
+  font: 500 var(--t-14) / 1.4 var(--f-text);
   color: var(--c-text);
+  white-space: nowrap;
+  vertical-align: 1px;
 }
 .prime-card-meta {
   font: var(--font-small);
   color: var(--c-text);
 }
-/* ce qu'on gagne : le titre de la carte, comme sur l'image de partage */
+/* ce qu'on gagne : le titre de la carte, comme sur l'image de partage et la page */
 .prime-card-prize {
-  font: var(--font-item);
+  padding-top: 2px;
+  font: var(--font-block);
   text-transform: uppercase;
   color: var(--c-emphasis);
 }
@@ -219,6 +226,10 @@
 .page-prime {
   padding: 24px var(--gutter) 56px;
 }
+/* une page à lien de retour : le haut commun à toutes (styles.css, --page-top) */
+.page-prime {
+  padding-top: var(--page-top);
+}
 .primes-page,
 .prime-side,
 .prime-main {
@@ -286,7 +297,36 @@
 .prime-head .prime-logo {
   margin: 4px 0;
 }
-/* deux colonnes : la moitié de la hauteur, l'appel remonte dans le premier écran */
+/* le titre de la page : le lot, puis l'entreprise (son logo, ou son nom en lilas), comme la
+   carte et l'image de partage ; puis le contrat en pastille devant les postes */
+.prime-head h1 {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+/* l'échéance en haut à droite du lot, comme sur la carte */
+.prime-head-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+/* centrée sur la ligne du lot (titre de page, interligne 0,95) */
+.prime-head-top > .prime-when {
+  margin-top: max(0px, calc((var(--t-page) * 0.95 - 27px) / 2));
+}
+.prime-head-company {
+  font: var(--font-block);
+  color: var(--c-text);
+}
+.prime-head-job {
+  font: 600 var(--t-16) / 1.4 var(--f-text);
+  color: var(--cream);
+}
+/* deux colonnes : la moitié de la hauteur, l'appel remonte dans le premier écran ; collée à l'avis */
+.prime-head + .prime-facts {
+  margin-top: -16px;
+}
 .prime-facts {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -305,6 +345,10 @@
 .prime-facts > div:nth-child(n + 3) {
   box-shadow: inset 0 1px 0 var(--c-line);
 }
+/* un fait seul sur sa ligne (nombre impair) prend toute la largeur : pas de case vide */
+.prime-facts > div:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
 .prime-facts dt {
   font: var(--font-label);
   letter-spacing: var(--ls-label);
@@ -315,11 +359,6 @@
   font: 500 var(--t-16) / 1.4 var(--f-text);
   color: var(--cream);
   overflow-wrap: anywhere;
-}
-.prime-facts dd .prime-when {
-  display: inline-block;
-  margin-left: 4px;
-  vertical-align: 1px;
 }
 .prime-facts-note {
   color: var(--c-text-2);
@@ -386,6 +425,24 @@
 }
 .prime-others {
   justify-self: start;
+}
+/* une prime terminée, pour qui n'y était pas : le bloc d'appel, la fiche à faire */
+.prime-over p {
+  color: var(--c-text);
+}
+.prime-over > .btn-primary {
+  width: 100%;
+}
+/* téléphone court (le navigateur de LinkedIn : 390 × 664) : la porte d'entrée et son bouton rose
+   passent avant les faits, dans le premier écran */
+@media (max-width: 899px) and (max-height: 720px) {
+  .prime-side > .prime-facts {
+    order: 1;
+    margin-top: 0;
+  }
+  .prime-side > .prime-share {
+    order: 2;
+  }
 }
 .prime-mine .btn-primary,
 .prime-join .btn-primary {
@@ -507,18 +564,14 @@
   color: var(--cream);
   font-weight: 600;
 }
-/* le renvoi au règlement : quelques lignes sous le classement, sans cadre */
+/* comment on classe, et le renvoi au règlement : quelques lignes sous le classement, sans cadre
+   ni second titre (une étiquette, le seul titre est celui du tableau) */
 .prime-rule {
   display: grid;
   gap: 6px;
   margin-top: 16px;
 }
-.prime-rule h3 {
-  font: var(--font-item);
-  text-transform: uppercase;
-  color: var(--cream);
-}
-.prime-rule p {
+.prime-rule p:not(.label) {
   font: var(--font-small);
   color: var(--c-text);
 }
@@ -643,7 +696,7 @@
 /* une colonne de lecture (66 caractères au plus), un résumé et un sommaire en tête ;
    au bureau, le sommaire suit la lecture dans une colonne à gauche */
 .page-rules {
-  padding: 8px var(--gutter) 56px;
+  padding: var(--page-top) var(--gutter) 56px;
 }
 .rules-page {
   display: grid;
@@ -765,6 +818,9 @@
     padding-top: 40px;
     padding-bottom: 80px;
   }
+  .page-prime {
+    padding-top: var(--page-top);
+  }
   .primes-page {
     max-width: var(--page-w);
   }
@@ -802,13 +858,13 @@
     max-width: none;
     margin: 0;
   }
-  /* le haut du classement s'aligne sur le surtitre de gauche, sous le lien de retour */
+  /* le haut du classement s'aligne sur le titre de gauche (le lot), sous le lien de retour */
   .prime-main {
     padding-top: 66px;
   }
   /* le règlement : le sommaire à gauche, collé, le texte à droite */
   .page-rules {
-    padding-top: 24px;
+    padding-top: var(--page-top);
     padding-bottom: 80px;
   }
   .rules-page {

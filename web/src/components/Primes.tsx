@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import type { League, PrimeView, Race, RaceLine } from "../../../shared/primes";
 import { LEAGUES, primePath } from "../../../shared/primes";
 import type { CardData } from "../../../shared/types";
+import { ordinalParts } from "../../../shared/typo";
 import { useT } from "../i18n";
 import { api } from "../lib/api";
 import { primesApi, saveLeague, savedLeague } from "../lib/primes";
@@ -17,17 +18,9 @@ import "./primes.css";
 
 /* ---------- la carte d'une prime ---------- */
 
-/** « 1er novembre » : l'exposant, comme on l'écrit. */
+/** « 1er novembre », « 3e sur 12 » : l'exposant, comme on l'écrit (SPEC §18.52). */
 export function withSup(text: string): ReactNode[] {
-  return text.split(/\b(1er)\b/).map((part, i) =>
-    part === "1er" ? (
-      <span key={i}>
-        1<sup>er</sup>
-      </span>
-    ) : (
-      part
-    ),
-  );
+  return ordinalParts(text).map((part, i) => (part.sup ? <sup key={i}>{part.text}</sup> : part.text));
 }
 
 /** Le logo, ou le nom de l'entreprise en lettres. */
@@ -35,6 +28,12 @@ export function PrimeMark({ p, big = false }: { p: Pick<PrimeView, "company" | "
   const [broken, setBroken] = useState(false);
   if (p.logo && !broken) return <img className={`prime-logo${big ? " is-big" : ""}`} src={`/primes/${p.logo}`} alt={p.company} onError={() => setBroken(true)} />;
   return <span className={`prime-name${big ? " is-big" : ""}`}>{p.company}</span>;
+}
+
+/** Le contrat, la ligue d'une prime, en pastille : « Stage », « Alternance », « CDI ». */
+export function PrimeTag({ contract }: { contract: PrimeView["contract"] }) {
+  const { t } = useT();
+  return <span className="prime-tag">{t.primes.contract[contract]}</span>;
 }
 
 /** « J-12 », « Dernier jour », « Close », « Ouvre le 2 décembre ». */
@@ -50,19 +49,20 @@ export function PrimeCard({ p }: { p: PrimeView }) {
   const where = p.remote ? t.primes.remote : p.place ? t.primes.onSite(p.place) : null;
   return (
     <a className={`prime-card is-${p.phase}`} href={href} onClick={(e) => onLinkClick(e, href)}>
+      {/* la hiérarchie de l'image de partage et de la page : ce qu'on gagne en titre, l'entreprise,
+          le contrat en pastille devant les postes, puis où */}
       <span className="prime-card-top">
-        <PrimeMark p={p} />
+        <span className="prime-card-prize">{t.primes.interviews(p.interviews)}</span>
         <span className={`prime-when is-${p.phase}`}>{withSup(when(p))}</span>
       </span>
-      {/* ce qu'on gagne, en titre, comme sur l'image de partage ; puis le poste, puis où */}
-      <span className="prime-card-prize">{t.primes.interviews(p.interviews)}</span>
+      <PrimeMark p={p} />
       <span className="prime-card-job">
-        <span className="prime-tag">{t.primes.contract[p.contract]}</span> {p.positions.map((x) => t.positions[x]).join(", ")}
+        <PrimeTag contract={p.contract} /> {p.positions.map((x) => t.positions[x]).join(", ")}
       </span>
       {where && <span className="prime-card-meta">{where}</span>}
-      {/* la carte entière se touche ; cette ligne le dit */}
+      {/* la carte entière se touche ; cette ligne le dit. Close sans inscrit : pas de classement, la page offre la fiche */}
       <span className="prime-card-go">
-        {p.phase === "open" ? t.primes.card.enter : p.phase === "closed" ? t.primes.card.board : t.primes.card.see} <span aria-hidden>→</span>
+        {p.phase === "open" ? t.primes.card.enter : p.phase === "closed" ? (p.entrants > 0 ? t.primes.card.board : t.primes.card.see) : t.primes.card.see} <span aria-hidden>→</span>
       </span>
     </a>
   );

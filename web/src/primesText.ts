@@ -60,13 +60,11 @@ const fr = {
     place: "Lieu",
     period: "Dates",
     dates: (from: string, to: string) => `Du ${from} au ${to}`,
-    rule: "Le classement",
+    rule: "Comment on classe",
     ruleText: "La note globale de la fiche, sans bonus. À égalité\u00a0: la part prouvée, puis la date d'inscription. Les langages et le lieu ne changent jamais le rang.",
     rules: "Le règlement",
     board: "Le top 20",
     boardEmpty: "Personne en course. La première place est libre.",
-    /** Une prime finie sans personne : rien à compter, une seule phrase. */
-    boardEmptyClosed: "Prime terminée sans inscription.",
     total: (k: number) => plural(k, "fiche en course", "fiches en course"),
     totalClosed: (k: number) => plural(k, "fiche classée", "fiches classées"),
     you: (rank: number, total: number) => `Tu es ${ordFr(rank)} sur ${total}.`,
@@ -165,6 +163,8 @@ const fr = {
   addProof: "Ajouter un lien",
   /** La dernière ligne d'une carte de prime : elle dit que la carte se touche, et où elle mène. */
   card: { enter: "Entrer dans la course", see: "Voir la prime", board: "Voir le classement" },
+  /** Une prime terminée, pour qui n'y était pas : une sortie, la fiche (SPEC §18.52). */
+  over: { text: "Fais ta fiche : la prochaine prime se joue dessus.", mine: "Voir ma fiche" },
   /** /reglement : le résumé en tête (au « tu », repris du texte qui suit, qui garde son « vous »), le sommaire, et la note de la page anglaise. */
   rulesPage: {
     summaryTitle: "En trois lignes",
@@ -227,12 +227,11 @@ const en: PrimesDict = {
     place: "Location",
     period: "Dates",
     dates: (from, to) => `From ${from} to ${to}`,
-    rule: "The ranking",
+    rule: "How we rank",
     ruleText: "The sheet's overall rating, no bonus. On a tie: the share proven, then the entry date. Languages and location never change the rank.",
     rules: "The rules",
     board: "Top 20",
     boardEmpty: "Nobody in the race. First place is open.",
-    boardEmptyClosed: "Bounty closed with no entries.",
     total: (k) => pluralEn(k, "sheet in the race", "sheets in the race"),
     totalClosed: (k) => pluralEn(k, "sheet ranked", "sheets ranked"),
     you: (rank, total) => `You're ${ordEn(rank)} of ${total}.`,
@@ -320,6 +319,7 @@ const en: PrimesDict = {
   boardFinal: "Final ranking",
   addProof: "Add a link",
   card: { enter: "Enter the race", see: "See the bounty", board: "See the ranking" },
+  over: { text: "Get your rap sheet: the next bounty is played on it.", mine: "See my rap sheet" },
   rulesPage: {
     summaryTitle: "In three lines",
     summary: [
