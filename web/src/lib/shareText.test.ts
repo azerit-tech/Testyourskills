@@ -11,6 +11,7 @@ const N = " ";
 const card: CardShare = {
   kind: "card",
   stars: 4,
+  level: "Pyromane",
   overall: 71,
   profile: "Sous couverture",
   finding: "61 % des derniers commits partent entre 22 h et 5 h.",
@@ -38,32 +39,36 @@ describe("étoiles du texte de partage (§18.27)", () => {
 });
 
 describe("texte de partage d'une fiche", () => {
-  it("sans pari : étoiles, note sur 100, profil, rang, trouvaille, lien", () => {
+  it("sans pari : la fiche d'abord (étoiles, niveau, note sur 100), puis profil, rang, trouvaille, lien", () => {
     expect(shareText(fr, card, URL)).toBe(
-      `Fiche ★★★★☆☆, 71/100, profil «${N}Sous couverture${N}», 7e cette semaine. 61 % des derniers commits partent entre 22 h et 5 h. Fiche dressée par Azerit en 12${N}s. Fais la tienne${N}: ${URL}`,
+      `Ma fiche de dev${N}: ★★★★☆☆ Pyromane, 71/100.\nProfil «${N}Sous couverture${N}», 7e cette semaine. 61 % des derniers commits partent entre 22 h et 5 h. Fiche dressée par Azerit en 12${N}s. Fais la tienne${N}: ${URL}`,
     );
   });
 
-  it("avec pari : une ligne courte d'abord, et les étoiles ne se répètent pas", () => {
-    expect(shareText(fr, { ...card, plea: 5 }, URL)).toBe(
-      `Je plaidais ★★★★★☆. Verdict${N}: ★★★★☆☆.\nNote${N}: 71/100, profil «${N}Sous couverture${N}», 7e cette semaine. 61 % des derniers commits partent entre 22 h et 5 h. Fiche dressée par Azerit en 12${N}s. Fais la tienne${N}: ${URL}`,
+  it("avec pari : il vient en deuxième ligne, avec son mot en bas de casse", () => {
+    expect(shareText(fr, { ...card, plea: 3 }, URL)).toBe(
+      `Ma fiche de dev${N}: ★★★★☆☆ Pyromane, 71/100.\nJe plaidais ★★★☆☆☆${N}: trop modeste.\nProfil «${N}Sous couverture${N}», 7e cette semaine. 61 % des derniers commits partent entre 22 h et 5 h. Fiche dressée par Azerit en 12${N}s. Fais la tienne${N}: ${URL}`,
     );
+    expect(shareLead(fr, { ...card, plea: 5 })).toContain(`Je plaidais ★★★★★☆${N}: excès de confiance.`);
+    expect(shareLead(fr, { ...card, plea: 4 })).toContain(`Je plaidais ★★★★☆☆${N}: lucide.`);
   });
 
   it("sans trouvaille, le chef d'accusation ; sans rien, ni l'un ni l'autre", () => {
     expect(shareLead(fr, { ...card, finding: null, rank: null })).toBe(
-      `Fiche ★★★★☆☆, 71/100, profil «${N}Sous couverture${N}». Chef d'accusation${N}: «${N}Commits de 3${N}h du matin${N}». Fiche dressée par Azerit en 12${N}s. Fais la tienne${N}:`,
+      `Ma fiche de dev${N}: ★★★★☆☆ Pyromane, 71/100.\nProfil «${N}Sous couverture${N}». Chef d'accusation${N}: «${N}Commits de 3${N}h du matin${N}». Fiche dressée par Azerit en 12${N}s. Fais la tienne${N}:`,
     );
-    expect(shareLead(fr, { ...card, finding: null, status: null, profile: null, rank: null })).toBe(`Fiche ★★★★☆☆, 71/100. Fiche dressée par Azerit en 12${N}s. Fais la tienne${N}:`);
+    expect(shareLead(fr, { ...card, finding: null, status: null, profile: null, rank: null })).toBe(
+      `Ma fiche de dev${N}: ★★★★☆☆ Pyromane, 71/100.\nFiche dressée par Azerit en 12${N}s. Fais la tienne${N}:`,
+    );
   });
 
   it("en anglais", () => {
-    const x: CardShare = { ...card, plea: 6, profile: "Undercover", rank: "#7 this week", finding: "61% of recent commits go out between 10 p.m. and 5 a.m." };
+    const x: CardShare = { ...card, level: "Arsonist", plea: 6, profile: "Undercover", rank: "#7 this week", finding: "61% of recent commits go out between 10 p.m. and 5 a.m." };
     expect(shareText(en, x, URL)).toBe(
-      `I pleaded ★★★★★★. Verdict: ★★★★☆☆.\nRating: 71/100, profile “Undercover”, #7 this week. 61% of recent commits go out between 10 p.m. and 5 a.m. Rap sheet drawn up by Azerit in 12s. Get yours: ${URL}`,
+      `My dev rap sheet: ★★★★☆☆ Arsonist, 71/100.\nI pleaded ★★★★★★: overconfident.\nThe “Undercover” profile, #7 this week. 61% of recent commits go out between 10 p.m. and 5 a.m. Rap sheet drawn up by Azerit in 12s. Get yours: ${URL}`,
     );
     expect(shareLead(en, { ...x, plea: null, finding: null })).toBe(
-      "★★★★☆☆ rap sheet, 71/100, profile “Undercover”, #7 this week. Charge: “Commits de 3 h du matin”. Rap sheet drawn up by Azerit in 12s. Get yours:",
+      "My dev rap sheet: ★★★★☆☆ Arsonist, 71/100.\nThe “Undercover” profile, #7 this week. Charge: “Commits de 3 h du matin”. Rap sheet drawn up by Azerit in 12s. Get yours:",
     );
   });
 });
@@ -104,30 +109,30 @@ describe("le texte qu'on signe de son nom (§18.48)", () => {
     expect(SHARE_RANK_MAX).toBe(10);
     expect([1, 4, 10].every(flatteringRank)).toBe(true);
     expect([0, 11, 37, 412].some(flatteringRank)).toBe(false);
-    // Sans rang, la première phrase s'arrête au profil.
-    expect(shareLead(fr, { ...card, rank: null })).toContain(`profil «${N}Sous couverture${N}». `);
+    // Sans rang, la phrase s'arrête au profil.
+    expect(shareLead(fr, { ...card, rank: null })).toContain(`Profil «${N}Sous couverture${N}». `);
   });
 });
 
 describe("texte de partage avec la grille de recrutement (§18.37)", () => {
   const graded: CardShare = { ...card, overall: 61, profile: "Oiseau de nuit", rank: null, finding: null, status: null, graded: true, strong: `Point fort${N}: niveau du code, 8/10.` };
 
-  it("une fiche : la grille d'Azerit dès la première ligne, puis le point fort", () => {
-    expect(shareLead(fr, graded)).toBe(
-      `Ma fiche de dev, passée à la grille de recrutement d'Azerit${N}: ★★★★☆☆, 61/100, profil «${N}Oiseau de nuit${N}». Point fort${N}: niveau du code, 8/10. Fais la tienne${N}:`,
+  it("une fiche : la grille d'Azerit dès la première ligne, puis le profil et le point fort", () => {
+    expect(shareLead(fr, { ...graded, level: "Menace publique" })).toBe(
+      `Ma fiche de dev selon la grille de recrutement d'Azerit${N}: ★★★★☆☆ Menace publique, 61/100.\nProfil «${N}Oiseau de nuit${N}». Point fort${N}: niveau du code, 8/10. Fais la tienne${N}:`,
     );
-    expect(shareLead(en, { ...graded, profile: "Night owl", strong: "Strongest: code level, 8/10." })).toBe(
-      "My dev rap sheet, run through Azerit's hiring scorecard: ★★★★☆☆, 61/100, profile “Night owl”. Strongest: code level, 8/10. Get yours:",
+    expect(shareLead(en, { ...graded, level: "Public menace", profile: "Night owl", strong: "Top strength: code level, 8/10." })).toBe(
+      "My dev rap sheet, by Azerit's hiring scorecard: ★★★★☆☆ Public menace, 61/100.\nThe “Night owl” profile. Top strength: code level, 8/10. Get yours:",
     );
-    // Avec le pari, les étoiles ne se répètent pas.
-    expect(shareLead(fr, { ...graded, plea: 3 })).toBe(
-      `Je plaidais ★★★☆☆☆. Verdict${N}: ★★★★☆☆.\nMa fiche de dev, passée à la grille de recrutement d'Azerit${N}: 61/100, profil «${N}Oiseau de nuit${N}». Point fort${N}: niveau du code, 8/10. Fais la tienne${N}:`,
+    // L'exemple du rapport : la fiche, le pari en chute, le profil et son rang, le point fort.
+    expect(shareLead(fr, { ...graded, stars: 5, level: "Menace publique", overall: 79, plea: 3, profile: "Machine à livrer", rank: "4e cette semaine", strong: `Point fort${N}: open source, 10/10.` })).toBe(
+      `Ma fiche de dev selon la grille de recrutement d'Azerit${N}: ★★★★★☆ Menace publique, 79/100.\nJe plaidais ★★★☆☆☆${N}: trop modeste.\nProfil «${N}Machine à livrer${N}», 4e cette semaine. Point fort${N}: open source, 10/10. Fais la tienne${N}:`,
     );
   });
 
   it("aucun mot qui accuse ni « une IA » dans les mots du partage", () => {
     for (const w of [fr, en]) {
-      const all = [w.file("★", 1), w.ai(9), w.exhibits("LinkedIn")].join(" ");
+      const all = [w.file("★", "x", 1), w.ai(9), w.exhibits("LinkedIn")].join(" ");
       expect(all).not.toMatch(/\bvol|stole|suspect|une IA|an AI|contre|against/i);
     }
   });
@@ -138,10 +143,10 @@ describe("un dossier à deux sources se partage comme une fiche (§18.36)", () =
 
   it("une note, le point fort, puis ses deux sources ; jamais l'une contre l'autre", () => {
     expect(shareLead(fr, dossier)).toBe(
-      `Ma fiche de dev, passée à la grille de recrutement d'Azerit${N}: ★★★☆☆☆, 57/100, profil «${N}Oiseau de nuit${N}». Point fort${N}: niveau du code, 8/10. Deux sources au dossier${N}: LinkedIn et GitHub. Fais la tienne${N}:`,
+      `Ma fiche de dev selon la grille de recrutement d'Azerit${N}: ★★★☆☆☆ Pyromane, 57/100.\nProfil «${N}Oiseau de nuit${N}». Point fort${N}: niveau du code, 8/10. Deux sources au dossier${N}: LinkedIn et GitHub. Fais la tienne${N}:`,
     );
-    expect(shareLead(en, { ...dossier, profile: "Night owl", strong: "Strongest: code level, 8/10.", exhibits: "CV" })).toBe(
-      "My dev rap sheet, run through Azerit's hiring scorecard: ★★★☆☆☆, 57/100, profile “Night owl”. Strongest: code level, 8/10. Two sources on file: CV and GitHub. Get yours:",
+    expect(shareLead(en, { ...dossier, level: "Arsonist", profile: "Night owl", strong: "Top strength: code level, 8/10.", exhibits: "résumé" })).toBe(
+      "My dev rap sheet, by Azerit's hiring scorecard: ★★★☆☆☆ Arsonist, 57/100.\nThe “Night owl” profile. Top strength: code level, 8/10. Two sources on file: résumé and GitHub. Get yours:",
     );
     for (const w of [fr, en]) expect(shareLead(w, dossier)).not.toMatch(/sous-vend|annonce \d|en montre plus|undersell|claims \d|shows more/i);
   });
@@ -157,8 +162,8 @@ describe("un dossier à deux sources se partage comme une fiche (§18.36)", () =
 describe("dossier vide fait par un tiers, non revendiqué : le partage ne dit pas la note", () => {
   it("ni note, ni étoiles, ni pari, pour une fiche comme pour un dossier à deux sources", () => {
     const sealedCard: CardShare = { ...card, overall: 20, stars: 1, plea: 3, sealed: true };
-    expect(shareLead(fr, sealedCard)).toBe(`Une fiche ouverte chez Azerit, le code reste à prouver, profil «${N}Sous couverture${N}». Fais la tienne${N}:`);
-    expect(shareLead(en, sealedCard)).toBe("A rap sheet opened at Azerit, code still unproven, profile “Sous couverture”. Get yours:");
+    expect(shareLead(fr, sealedCard)).toBe(`Une fiche ouverte chez Azerit, le code reste à prouver. Profil «${N}Sous couverture${N}». Fais la tienne${N}:`);
+    expect(shareLead(en, sealedCard)).toBe("A rap sheet opened at Azerit, code still unproven. The “Sous couverture” profile. Get yours:");
     const sealedCmp: CardShare = { ...sealedCard, graded: true, exhibits: "LinkedIn" };
     for (const w of [fr, en]) {
       for (const x of [sealedCard, sealedCmp]) {
@@ -197,20 +202,20 @@ describe("texte pour X : jamais plus de 280 avec le lien", () => {
   it("trop long : la trouvaille laisse la place au chef d'accusation", () => {
     const text = shareTextX(fr, { ...card, plea: 5, finding: long(200) });
     expect(text).toBe(
-      `Je plaidais ★★★★★☆. Verdict${N}: ★★★★☆☆.\nNote${N}: 71/100, profil «${N}Sous couverture${N}», 7e cette semaine. Chef d'accusation${N}: «${N}Commits de 3${N}h du matin${N}». Fiche dressée par Azerit en 12${N}s. Fais la tienne${N}:`,
+      `Ma fiche de dev${N}: ★★★★☆☆ Pyromane, 71/100.\nJe plaidais ★★★★★☆${N}: excès de confiance.\nProfil «${N}Sous couverture${N}», 7e cette semaine. Chef d'accusation${N}: «${N}Commits de 3${N}h du matin${N}». Fiche dressée par Azerit en 12${N}s. Fais la tienne${N}:`,
     );
   });
 
   it("toujours trop long : la trouvaille part, puis le reste dans l'ordre", () => {
     const base: CardShare = { ...card, plea: 5, finding: long(200), status: long(190) };
     expect(shareTextX(fr, base)).toBe(
-      `Je plaidais ★★★★★☆. Verdict${N}: ★★★★☆☆.\nNote${N}: 71/100, profil «${N}Sous couverture${N}», 7e cette semaine. Fiche dressée par Azerit en 12${N}s. Fais la tienne${N}:`,
+      `Ma fiche de dev${N}: ★★★★☆☆ Pyromane, 71/100.\nJe plaidais ★★★★★☆${N}: excès de confiance.\nProfil «${N}Sous couverture${N}», 7e cette semaine. Fiche dressée par Azerit en 12${N}s. Fais la tienne${N}:`,
     );
-    const noAi = shareTextX(fr, { ...base, profile: long(140) });
+    const noAi = shareTextX(fr, { ...base, profile: long(100) });
     expect(noAi).not.toContain("Fiche dressée par Azerit");
     expect(noAi).toContain("7e cette semaine");
     const bare = shareTextX(fr, { ...base, profile: long(240) });
-    expect(bare).toBe(`Je plaidais ★★★★★☆. Verdict${N}: ★★★★☆☆.\nNote${N}: 71/100. Fais la tienne${N}:`);
+    expect(bare).toBe(`Ma fiche de dev${N}: ★★★★☆☆ Pyromane, 71/100.\nJe plaidais ★★★★★☆${N}: excès de confiance.\nFais la tienne${N}:`);
   });
 
   it("ne dépasse jamais, quelles que soient les longueurs, dans les deux langues", () => {

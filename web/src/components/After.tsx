@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import type { FormEvent, MouseEvent, ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { CardData, ComparisonData, Lang, WeekRank } from "../../../shared/types";
-import { declaredOf, STAT_CODES, starsFor } from "../../../shared/types";
+import { declaredOf, LEVEL_LABELS, STAT_CODES, starsFor } from "../../../shared/types";
 import { declaredLabel, fileOf } from "../../../shared/caseFile";
 import { usableGrid } from "../../../shared/gridText";
 import { recruiterRead } from "../../../shared/recruiterLine";
@@ -88,9 +88,13 @@ export function Fold({ name, title, attention = false, onOpen, children }: FoldP
 
 /* ---------- rang de la semaine (§18.22) ---------- */
 
+/** L'écart au top 5 ne se dit que s'il encourage : 10 points au plus. */
+export const GAP_SHOWN_MAX = 10;
+
 /**
- * Une ligne, en tête du partage : le rang, puis ce qui manque (ou la place à défendre). Hors classement : rien.
- * `low` : sous trois étoiles, le rang ne s'affiche que s'il flatte (top 10, §18.48).
+ * Une ligne, en tête du partage, juste au-dessus du bouton : le rang, puis ce qui manque (ou la place
+ * à défendre). Un argument pour partager, pas une sortie : du texte, sans lien. Hors classement : rien.
+ * `low` : sous trois étoiles, le rang ne s'affiche que s'il flatte (top 10, §18.48), et sans l'écart.
  */
 export function WeekLine({ week, low }: { week: WeekRank | null; low: boolean }) {
   const { t } = useT();
@@ -102,12 +106,18 @@ export function WeekLine({ week, low }: { week: WeekRank | null; low: boolean })
       : w.closedLine(week.rank, week.total, week.week)
     : week.inTop5
       ? w.top5
-      : w.line(week.rank, week.total, week.gapToTop5);
-  // Une ligne, et un lien : le rang mène au top de la semaine, sur l'accueil (§18.48).
+      : !low && week.gapToTop5 <= GAP_SHOWN_MAX
+        ? w.line(week.rank, week.total, week.gapToTop5)
+        : w.rank(week.rank, week.total);
+  return <p className="week-rank">{text}</p>;
+}
+
+/** « Voir le top de la semaine » : sous les liens du partage, quand la fiche est classée. */
+function BoardLink() {
+  const { t } = useT();
   return (
-    <a className="week-rank" href={`/#${BOARD_ID}`} onClick={toBoard}>
-      {text}
-      <span aria-hidden> →</span>
+    <a className="link-alt out-board" href={`/#${BOARD_ID}`} onClick={toBoard}>
+      {t.result.week.board}
     </a>
   );
 }
@@ -154,6 +164,7 @@ export function shareInput(item: Shareable, lang: Lang, rank: string | null): Sh
   return {
     kind: "card",
     stars: starsFor(c.overall),
+    level: pick(LEVEL_LABELS[starsFor(c.overall)], lang),
     overall: c.overall,
     sealed: !!c.sealed,
     graded,
@@ -371,11 +382,12 @@ export function ShareBar({ item, toast }: { item: Shareable; toast: (m: string) 
       {/* Le reste en liens : le lien, l'image, l'image pour story. X passe par la feuille de partage du téléphone. */}
       <div className="out-more">
         <button type="button" className="link-alt" onClick={onCopy}>
-          {ts.copy}
+          {ts.copyShort}
         </button>
         <SaveImage kit={kit} toast={toast} />
         <SaveStory kit={kit} toast={toast} />
       </div>
+      {weekOf(id) && <BoardLink />}
       <p className="out-keep">{ts.keep}</p>
     </section>
   );
@@ -402,7 +414,7 @@ function SaveStory({ kit, toast }: { kit: Sharing; toast: (m: string) => void })
       alive = false;
     };
   }, [id, filename, kit.filename, native]);
-  return <ImageAction kit={kit} toast={toast} file={file} src={isMock() ? null : images.story(id)} filename={filename} label={ts.story} channel="story" className="link-alt" />;
+  return <ImageAction kit={kit} toast={toast} file={file} src={isMock() ? null : images.story(id)} filename={filename} label={ts.storyShort} title={ts.story} channel="story" className="link-alt" />;
 }
 
 /** Une adresse `blob:` pour un fichier, rendue à la mémoire quand il change ou que le bloc part. */
@@ -432,7 +444,7 @@ function useObjectUrl(file: File | null): string | null {
  */
 function SaveImage({ kit, toast }: { kit: Sharing; toast: (m: string) => void }) {
   const { t } = useT();
-  return <ImageAction kit={kit} toast={toast} file={kit.file} src={isMock() ? null : images.portrait(kit.id)} filename={kit.filename} label={t.result.share.download} channel="download" className="link-alt" />;
+  return <ImageAction kit={kit} toast={toast} file={kit.file} src={isMock() ? null : images.portrait(kit.id)} filename={kit.filename} label={t.result.share.downloadShort} title={t.result.share.download} channel="download" className="link-alt" />;
 }
 
 interface ImageActionProps {
@@ -444,13 +456,15 @@ interface ImageActionProps {
   src: string | null;
   filename: string;
   label: ReactNode;
+  /** Le libellé entier, lu par les lecteurs d'écran (« Télécharger l'image ») quand l'écran dit « Image ». */
+  title: string;
   /** Le canal de l'événement `card_shared`. */
   channel: string;
   className: string;
 }
 
 /** Une image de partage : en fichier dans la feuille de partage, en panneau dans un navigateur intégré, en téléchargement ailleurs. */
-function ImageAction({ kit, toast, file, src: server, filename, label, channel, className }: ImageActionProps) {
+function ImageAction({ kit, toast, file, src: server, filename, label, title, channel, className }: ImageActionProps) {
   const { t } = useT();
   const ts = t.result.share;
   const { track } = kit;
@@ -460,19 +474,15 @@ function ImageAction({ kit, toast, file, src: server, filename, label, channel, 
   const demo = useObjectUrl(isMock() ? file : null);
   const src = isMock() ? demo : server;
 
-  if (kit.native && canShareFile(file))
-    return (
-      <button type="button" className={className} onClick={() => void shareFile(file).then((ok) => ok && track(channel))}>
-        {label}
-      </button>
-    );
-
+  // Navigateur intégré d'abord (LinkedIn, Instagram) : la feuille de partage y reste en suspens hors iOS,
+  // le panneau plein écran marche partout (appui long pour enregistrer).
   if (inAppBrowser(navigator.userAgent))
     return (
       <>
         <button
           type="button"
           className={className}
+          aria-label={title}
           aria-haspopup="dialog"
           onClick={() => {
             if (!src) return toast(ts.downloadDemo);
@@ -486,9 +496,17 @@ function ImageAction({ kit, toast, file, src: server, filename, label, channel, 
       </>
     );
 
+  if (kit.native && canShareFile(file))
+    return (
+      <button type="button" className={className} aria-label={title} onClick={() => void shareFile(file).then((ok) => ok && track(channel))}>
+        {label}
+      </button>
+    );
+
   return (
     <a
       className={className}
+      aria-label={title}
       href={src ?? images.portrait(kit.id)}
       download={filename}
       onClick={(e) => {

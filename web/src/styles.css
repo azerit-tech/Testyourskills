@@ -2947,25 +2947,18 @@ a.dossier-item:hover {
   color: var(--c-text);
 }
 
-/* rang de la semaine (§18.22) : une ligne sous le titre du partage, et un lien vers le top de la semaine.
-   Crème soulignée de rose : une information qui se touche, pas un second titre. Pas de capitales : « 6e » resterait « 6E ». */
+/* rang de la semaine (§18.22) : une ligne sous le titre du partage, juste au-dessus du bouton.
+   Crème, sans lien : un argument pour partager, pas une sortie ; « Voir le top de la semaine » est sous les liens.
+   Pas de capitales : « 6e » resterait « 6E ». */
 .after-block .week-rank {
-  justify-self: start;
-  margin: -4px 0;
-  padding: 10px 0;
+  margin: -2px 0 0;
   font: 600 var(--t-16) / 1.4 var(--f-text);
   color: var(--c-emphasis);
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-decoration-color: rgba(255, 178, 198, 0.45);
-  text-underline-offset: 4px;
   text-wrap: balance;
 }
-.after-block .week-rank:hover {
-  text-decoration-color: var(--c-action);
-}
-.week-rank > span {
-  color: var(--c-action);
+.out .out-board {
+  justify-self: start;
+  margin: -8px 0 -4px;
 }
 .out .out-main,
 .out .out-second {
@@ -2981,12 +2974,11 @@ a.dossier-item:hover {
 .out .out-hint.is-copied {
   color: var(--c-emphasis);
 }
-/* le reste du partage en liens, sur une ligne qui passe à la suivante sans rien couper :
-   le lien, l'image, l'image pour story */
+/* le reste du partage en liens, sur une seule ligne dès 320 px : « Copier le lien », « Image », « Story » */
 .out-more {
   display: flex;
   flex-wrap: wrap;
-  gap: 0 24px;
+  gap: 0 20px;
   margin: -4px 0;
 }
 /* la durée de vie du lien : la ligne la plus discrète du bloc */

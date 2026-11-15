@@ -88,8 +88,8 @@ describe("un seul nom, un seul lexique", () => {
   it("la note porte son échelle dans les phrases qui la disent", () => {
     expect(DICTS.fr.home.top.rowLabel(2, "leamd", 79)).toContain("79/100");
     expect(DICTS.en.home.top.rowLabel(2, "leamd", 79)).toContain("79/100");
-    expect(DICTS.fr.result.share.words.sheet("★★★★★☆", 79)).toBe("Fiche ★★★★★☆, 79/100");
-    expect(DICTS.en.result.share.words.score(79)).toBe("Rating: 79/100");
+    expect(DICTS.fr.result.share.words.sheet("★★★★★☆", "Menace publique", 79).replace(/ /g, " ")).toBe("Ma fiche de dev : ★★★★★☆ Menace publique, 79/100.");
+    expect(DICTS.en.result.share.words.file("★★★★★☆", "Public menace", 79)).toBe("My dev rap sheet, by Azerit's hiring scorecard: ★★★★★☆ Public menace, 79/100.");
   });
 });
 

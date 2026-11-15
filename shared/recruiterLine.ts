@@ -115,7 +115,7 @@ export const LINE_WORDS: Record<
   en: {
     names: { EDU: "school", XP: "experience", EMP: "career path", STK: "stack", CODE: "code level", ACT: "activity", OWN: "ownership", OSS: "open source" },
     the: { EDU: "school", XP: "experience", EMP: "the career path", STK: "the stack", CODE: "the code", ACT: "activity", OWN: "ownership", OSS: "open source" },
-    strong: (name, score) => `Strongest: ${name}, ${score}/10.`,
+    strong: (name, score) => `Top strength: ${name}, ${score}/10.`,
     dig: (name) => `To dig into: ${name}.`,
     prove: (the) => `Still unproven: ${the}.`,
     even: (floor) => `Solid across the board: nothing under ${floor}/10.`,

@@ -46,11 +46,12 @@ describe("feuille de partage : l'image, sinon le texte et le lien, sinon le lien
 
   afterEach(() => vi.unstubAllGlobals());
 
-  it("avec l'image quand le navigateur prend les fichiers", async () => {
+  it("avec l'image quand le navigateur prend les fichiers : le lien écrit dans le texte, jamais seul dans `url` (parcours 1)", async () => {
     const { share, writeText } = nav({ share: async () => undefined, canShare: () => true });
     expect(await shareSheet({ ...data, file })).toBe("native_file");
     expect(share).toHaveBeenCalledTimes(1);
-    expect(share).toHaveBeenCalledWith({ files: [file], ...data });
+    // Plusieurs cibles gardent l'image et jettent `url` : le texte finit sur l'adresse.
+    expect(share).toHaveBeenCalledWith({ files: [file], title: data.title, text: `${data.text} ${data.url}` });
     expect(writeText).not.toHaveBeenCalled();
   });
 

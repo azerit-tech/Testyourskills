@@ -424,6 +424,19 @@ describe("la lecture du recruteur (§18.37)", () => {
     expect(line(14, false)).toContain("14e");
   });
 
+  it("le rang : du texte au-dessus du bouton, jamais un lien ; l'écart seulement s'il encourage (parcours 14 et 22, textes 18)", () => {
+    const at = (rank: number, gap: number, low: boolean) => {
+      stub("fr-FR");
+      const w = { week: 46, rank, total: 40, gapToTop5: gap, inTop5: false, closed: false };
+      return renderToStaticMarkup(createElement(LangProvider, null, createElement(WeekLine, { week: w, low }))).replace(/ /g, " ");
+    };
+    expect(at(8, 6, false)).toBe('<p class="week-rank">8e sur 40 cette semaine, à 6 points du top 5</p>');
+    // Plus de 10 points, ou sous trois étoiles : le rang seul.
+    expect(at(8, 49, false)).toBe('<p class="week-rank">8e sur 40 cette semaine</p>');
+    expect(at(8, 4, true)).toBe('<p class="week-rank">8e sur 40 cette semaine</p>');
+    expect(page).not.toMatch(/<a className="week-rank"/);
+  });
+
   it("le champ LinkedIn : le lien entier, ou ce qui suit linkedin.com/in/", () => {
     expect(linkedinFromField("camille-ardent")).toBe("https://www.linkedin.com/in/camille-ardent");
     expect(linkedinFromField("https://www.linkedin.com/in/camille-ardent/")).toBe("https://www.linkedin.com/in/camille-ardent");

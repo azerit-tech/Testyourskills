@@ -1,16 +1,21 @@
-// Le texte de partage (§18.27, §18.48), en fonction pure : « Ma fiche de dev »,
-// six étoiles pleines puis vides, la note avec son échelle, le pari s'il existe,
-// le profil, la trouvaille, le rang quand il flatte, le lien. Une phrase : des
-// virgules, jamais une chaîne de points médians.
+// Le texte de partage (§18.27, §18.48), en fonction pure. Dans le fil LinkedIn, deux
+// lignes se lisent avant « voir plus » : la fiche d'abord (« Ma fiche de dev selon la
+// grille de recrutement d'Azerit : ★★★★★☆ Menace publique, 79/100. »), le pari en chute
+// (« Je plaidais ★★★☆☆☆ : trop modeste. »), puis le profil et le rang quand il flatte,
+// le point fort, la trouvaille, et « Fais la tienne : » avec le lien. Des virgules,
+// jamais une chaîne de points médians.
 // Les mots viennent d'i18n (`result.share.words`) ; rien ici ne lit le navigateur.
 import { starsLine } from "../../../shared/stars";
 import type { Dict } from "../i18n";
+import { pleaGap } from "./plea";
 
 export type ShareWords = Dict["result"]["share"]["words"];
 
 interface Common {
   /** Étoiles du verdict, de 1 à 6. */
   stars: number;
+  /** Le nom du niveau, déjà dans la langue (« Menace publique »). */
+  level: string;
   /** Profil criminel, déjà dans la langue. */
   profile: string | null;
   /** Dossier vide fait par un tiers, pas encore revendiqué (shared/publicView.ts) : ni note, ni étoiles, ni pari. */
@@ -73,21 +78,22 @@ const CUTS: Cut[] = [0, 1, 2, 3, 4, 5];
 function build(w: ShareWords, x: ShareInput, cut: Cut): string {
   if (x.sealed) {
     // La note plancher d'un dossier vide jugerait sans preuve : le texte ne la dit pas.
-    return [`${w.sealed}${cut < 5 && x.profile ? `, ${w.profile(x.profile)}` : ""}.`, w.cta].join(" ");
+    return [`${w.sealed}.`, cut < 5 && x.profile ? `${w.profile(x.profile)}.` : null, w.cta].filter(Boolean).join(" ");
   }
-  const plea = x.plea ? w.plea(starsLine(x.plea), starsLine(x.stars)) : null;
-  // Avec le pari, le verdict porte déjà les étoiles : on ne les répète pas.
-  const stars = plea ? null : starsLine(x.stars);
+  // Première ligne : la fiche, ses étoiles, son niveau et sa note sur 100 (§18.37 : la grille dès qu'elle note).
+  const stars = starsLine(x.stars);
+  const head = x.graded ? w.file(stars, x.level, x.overall) : w.sheet(stars, x.level, x.overall);
+  // Deuxième ligne : le pari, en chute.
+  const plea = x.plea ? w.plea(starsLine(x.plea), pleaGap(x.plea, x.stars)) : null;
+  // Puis le profil et le rang (« Profil « Machine à livrer », 4e cette semaine. »).
+  const rank = cut < 4 ? x.rank : null;
+  const who = cut < 5 && x.profile ? `${w.profile(x.profile)}${rank ? `, ${rank}` : ""}.` : rank ? `${rank}.` : null;
   // La trouvaille part d'abord : remplacée par le chef d'accusation, plus court, puis retirée.
   const detail = cut === 0 ? (x.finding ?? (x.status ? w.charge(x.status) : null)) : cut === 1 && x.finding && x.status ? w.charge(x.status) : null;
-  const tail = `${cut < 5 && x.profile ? `, ${w.profile(x.profile)}` : ""}${cut < 4 && x.rank ? `, ${x.rank}` : ""}.`;
-  // Fiche notée par la grille (§18.37) : « Ma fiche de dev, passée à la grille de recrutement d'Azerit : ★★★★☆☆, 61/100, profil « Cerveau ». Point fort : … ».
-  const head = x.graded ? w.file(stars, x.overall) : stars ? w.sheet(stars, x.overall) : w.score(x.overall);
   // Les sources du dossier partent en premier quand la place manque.
   const exhibits = cut === 0 && x.exhibits ? w.exhibits(x.exhibits) : null;
-  const parts: (string | null)[] = [head + tail, cut < 3 && x.graded ? (x.strong ?? null) : null, exhibits, detail, cut < 3 && !x.graded ? w.ai(x.secs) : null, w.cta];
-  const body = parts.filter(Boolean).join(" ");
-  return plea ? `${plea}\n${body}` : body;
+  const parts: (string | null)[] = [who, cut < 3 && x.graded ? (x.strong ?? null) : null, exhibits, detail, cut < 3 && !x.graded ? w.ai(x.secs) : null, w.cta];
+  return [head, plea, parts.filter(Boolean).join(" ")].filter(Boolean).join("\n");
 }
 
 /** Le texte sans le lien, pour qui le reçoit à part (feuille de partage du système). Il finit sur « Fais la tienne : ». */

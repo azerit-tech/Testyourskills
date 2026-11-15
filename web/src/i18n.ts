@@ -333,8 +333,12 @@ const fr = frTypoDeep({
       linkedin: "Partager sur LinkedIn",
       copy: "Copier le lien",
       download: "Télécharger l'image",
+      /** Les trois liens sous les boutons, sur une ligne à 390 px : libellés courts (le long reste lu). */
+      copyShort: "Copier le lien",
+      downloadShort: "Image",
       /** La même image en 9:16, pour Instagram et TikTok : une action discrète sous les boutons. */
       story: "Image pour story",
+      storyShort: "Story",
       native: "Partager",
       /** La ligne d'aide sous le bouton LinkedIn, en permanence : vraie avant comme après l'appui. */
       linkedinCopied: "Ton texte part dans le presse-papiers : colle-le dans ton post LinkedIn.",
@@ -354,14 +358,14 @@ const fr = frTypoDeep({
       imageAlt: "Ta fiche",
       /** Les morceaux du texte de partage, assemblés et raccourcis par lib/shareText.ts (§18.27). */
       words: {
-        plea: (pleaded: string, verdict: string) => `Je plaidais ${pleaded}. Verdict : ${verdict}.`,
-        sheet: (stars: string, overall: number) => `Fiche ${stars}, ${overall}/100`,
-        /** Après la ligne du pari : le verdict porte déjà les étoiles. */
-        score: (overall: number) => `Note : ${overall}/100`,
-        /** Fiche notée par la grille (§18.37) : ce qu'est la note, dès la première ligne. `stars` null après le pari. */
-        file: (stars: string | null, overall: number) => `Ma fiche de dev, passée à la grille de recrutement d'Azerit\u00a0: ${stars ? `${stars}, ` : ""}${overall}/100`,
-        /** Dans la première ligne, après la note : « , profil « Machine à livrer » ». */
-        profile: (label: string) => `profil « ${label} »`,
+        /** Deuxième ligne, après la fiche : le pari et son mot, en bas de casse (« Je plaidais ★★★☆☆☆ : trop modeste. »). */
+        plea: (pleaded: string, gap: "over" | "exact" | "under") => `Je plaidais ${pleaded} : ${{ over: "excès de confiance", exact: "lucide", under: "trop modeste" }[gap]}.`,
+        /** Fiche d'avant la grille : la première ligne, sans « selon la grille ». */
+        sheet: (stars: string, level: string, overall: number) => `Ma fiche de dev : ${stars} ${level}, ${overall}/100.`,
+        /** Fiche notée par la grille (§18.37) : ce qu'est la note, dès la première ligne. */
+        file: (stars: string, level: string, overall: number) => `Ma fiche de dev selon la grille de recrutement d'Azerit : ${stars} ${level}, ${overall}/100.`,
+        /** En tête de la ligne suivante : « Profil « Machine à livrer » », puis le rang. */
+        profile: (label: string) => `Profil « ${label} »`,
         charge: (status: string) => `Chef d'accusation : « ${status} ».`,
         /** Fiche d'avant la grille : le temps de lecture. */
         ai: (secs: number) => `Fiche dressée par Azerit en ${secs} s.`,
@@ -376,6 +380,10 @@ const fr = frTypoDeep({
     week: {
       line: (rank: number, total: number, gap: number) =>
         `${rank}e${showsTotal(total) ? ` sur ${total}` : ""} cette semaine, à ${gap} ${gap > 1 ? "points" : "point"} du top 5`,
+    /** L'écart ne se dit que s'il encourage (10 points au plus, trois étoiles au moins) : sinon le rang seul. */
+    rank: (rank: number, total: number) => `${rank}e${showsTotal(total) ? ` sur ${total}` : ""} cette semaine`,
+    /** Sous les liens du partage : vers le top de la semaine, sur l'accueil. */
+    board: "Voir le top de la semaine",
       top5: "Top 5 de la semaine : défends ta place jusqu'à dimanche",
       closedLine: (rank: number, total: number, week: number) => `${rank}e${showsTotal(total) ? ` sur ${total}` : ""}, semaine ${week}`,
       closedTop5: (week: number) => `Top 5 de la semaine ${week}`,
@@ -1114,7 +1122,10 @@ const en: Dict = {
       linkedin: "Share on LinkedIn",
       copy: "Copy link",
       download: "Download image",
+      copyShort: "Copy link",
+      downloadShort: "Image",
       story: "Story image",
+      storyShort: "Story",
       native: "Share",
       linkedinCopied: "Your text goes to the clipboard: paste it into your LinkedIn post.",
       copiedShort: "Text copied: paste it into your LinkedIn post.",
@@ -1127,11 +1138,10 @@ const en: Dict = {
       keep: "Your link stays up for 90 days.",
       imageAlt: "Your rap sheet",
       words: {
-        plea: (pleaded, verdict) => `I pleaded ${pleaded}. Verdict: ${verdict}.`,
-        sheet: (stars, overall) => `${stars} rap sheet, ${overall}/100`,
-        score: (overall) => `Rating: ${overall}/100`,
-        file: (stars, overall) => `My dev rap sheet, run through Azerit's hiring scorecard: ${stars ? `${stars}, ` : ""}${overall}/100`,
-        profile: (label) => `profile “${label}”`,
+        plea: (pleaded, gap) => `I pleaded ${pleaded}: ${{ over: "overconfident", exact: "clear-eyed", under: "too modest" }[gap]}.`,
+        sheet: (stars, level, overall) => `My dev rap sheet: ${stars} ${level}, ${overall}/100.`,
+        file: (stars, level, overall) => `My dev rap sheet, by Azerit's hiring scorecard: ${stars} ${level}, ${overall}/100.`,
+        profile: (label) => `The “${label}” profile`,
         charge: (status) => `Charge: “${status}”.`,
         ai: (secs) => `Rap sheet drawn up by Azerit in ${secs}s.`,
         sealed: "A rap sheet opened at Azerit, code still unproven",
@@ -1141,6 +1151,8 @@ const en: Dict = {
     },
     week: {
       line: (rank, total, gap) => `#${rank}${showsTotal(total) ? ` of ${total}` : ""} this week, ${gap} ${gap === 1 ? "point" : "points"} from the top 5`,
+      rank: (rank, total) => `#${rank}${showsTotal(total) ? ` of ${total}` : ""} this week`,
+      board: "See this week's top",
       top5: "This week's top 5: hold your spot until Sunday",
       closedLine: (rank, total, week) => `#${rank}${showsTotal(total) ? ` of ${total}` : ""}, week ${week}`,
       closedTop5: (week) => `Top 5 of week ${week}`,

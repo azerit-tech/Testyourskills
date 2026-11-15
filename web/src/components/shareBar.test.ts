@@ -71,7 +71,9 @@ describe("bloc de partage selon l'appareil (§18.27)", () => {
     expect(main(html)).toContain('rel="noopener"');
     expect(pinks(html)).toHaveLength(1);
     expect(ghosts(html)).toHaveLength(0);
-    expect(links(html)).toEqual(["Copier le lien", "Télécharger l'image", "Image pour story"]);
+    // Trois libellés courts, sur une ligne à 390 px ; le libellé entier reste lu.
+    expect(links(html)).toEqual(["Copier le lien", "Image", "Story"]);
+    expect(html).toContain('aria-label="Télécharger l&#x27;image"');
     expect(html).not.toMatch(/>X<|x\.com/);
     expect(html).toMatch(/<a class="link-alt"[^>]*download="azerit-[^"]+\.png"/);
     // La durée de vie du lien, dite là où on le partage.
@@ -84,14 +86,15 @@ describe("bloc de partage selon l'appareil (§18.27)", () => {
 
   it("« Image pour story » : un lien après l'image, téléchargé comme elle", () => {
     const html = render({ ua: DESKTOP, touch: false, share: false });
-    expect(html).toMatch(/Télécharger l&#x27;image<\/a><a class="link-alt" href="\/og\/AbCdEf1234-story\.png\?v=9" download="azerit-[^"]+-story\.png">Image pour story<\/a><\/div>/);
+    expect(html).toMatch(/>Image<\/a><a class="link-alt" aria-label="Image pour story" href="\/og\/AbCdEf1234-story\.png\?v=9" download="azerit-[^"]+-story\.png">Story<\/a><\/div>/);
   });
 
   it("« Image pour story » sur téléphone et dans un navigateur intégré, comme l'image", () => {
     const phone = render({ ua: IPHONE, touch: true, share: true });
-    expect(phone).toContain(">Image pour story</a>");
+    expect(phone).toContain('aria-label="Image pour story"');
+    expect(phone).toContain(">Story</a>");
     const inApp = render({ ua: LINKEDIN_ANDROID, touch: true, share: false });
-    expect(inApp).toMatch(/<button type="button" class="link-alt" aria-haspopup="dialog">Image pour story<\/button>/);
+    expect(inApp).toMatch(/<button type="button" class="link-alt" aria-label="Image pour story" aria-haspopup="dialog">Story<\/button>/);
   });
 
   it("en anglais : la durée de vie du lien", () => {
@@ -99,14 +102,14 @@ describe("bloc de partage selon l'appareil (§18.27)", () => {
     vi.stubGlobal("navigator", { userAgent: DESKTOP, language: "en-US" });
     const html = renderToStaticMarkup(createElement(LangProvider, null, createElement(ShareBar, { item, toast: () => undefined })));
     expect(html).toContain('<p class="out-keep">Your link stays up for 90 days.</p>');
-    expect(links(html)).toEqual(["Copy link", "Download image", "Story image"]);
+    expect(links(html)).toEqual(["Copy link", "Image", "Story"]);
   });
 
   it("en anglais : « Story image », « Share on LinkedIn »", () => {
     const item = stub({ ua: DESKTOP, touch: false, share: false }, "AbCdEf1234");
     vi.stubGlobal("navigator", { userAgent: DESKTOP, language: "en-US" });
     const html = renderToStaticMarkup(createElement(LangProvider, null, createElement(ShareBar, { item, toast: () => undefined })));
-    expect(html).toContain(">Story image</a>");
+    expect(html).toContain('aria-label="Story image"');
     expect(main(html)).toContain("Share on LinkedIn");
     expect(html).toContain("Your text goes to the clipboard: paste it into your LinkedIn post.");
   });
@@ -120,8 +123,8 @@ describe("bloc de partage selon l'appareil (§18.27)", () => {
     expect(ghosts(html)).toHaveLength(1);
     expect(html).toMatch(/<a class="pill pill-ghost out-second" href="https:\/\/skills\.test\/c\//);
     expect(html).not.toContain(">X</button>");
-    expect(html).toMatch(/LinkedIn.*Copier le lien.*Télécharger l&#x27;image/);
-    expect(links(html)).toEqual(["Copier le lien", "Télécharger l'image", "Image pour story"]);
+    expect(html).toMatch(/LinkedIn.*Copier le lien.*>Image</);
+    expect(links(html)).toEqual(["Copier le lien", "Image", "Story"]);
   });
 
   it("navigateur intégré sans feuille de partage : LinkedIn devant, l'image s'ouvre en panneau", () => {
@@ -131,7 +134,7 @@ describe("bloc de partage selon l'appareil (§18.27)", () => {
     expect(html).not.toContain("download=");
     // Rien à copier à la main tant qu'aucune copie n'a échoué.
     expect(html).not.toContain("out-manual");
-    expect(html).toMatch(/<button[^>]*aria-haspopup="dialog"[^>]*>.*Télécharger l&#x27;image/);
+    expect(html).toMatch(/<button[^>]*aria-label="Télécharger l&#x27;image" aria-haspopup="dialog"[^>]*>Image</);
   });
 
   it("le bouton dit « Partager sur LinkedIn » avant comme après l'appui ; la ligne d'aide dit où part le texte, en permanence", () => {

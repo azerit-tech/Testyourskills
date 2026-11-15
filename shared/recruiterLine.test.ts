@@ -78,7 +78,7 @@ describe("la ligne", () => {
   it("le métier, le langage, les années comptées, le point fort, le point à creuser", () => {
     const g = grid({ XP: 7, EMP: 6, STK: 6, CODE: 8, ACT: 5, OWN: 3 });
     expect(recruiterRead(card, g, "fr")?.text).toBe("Full-stack TypeScript, 5\u00a0ans comptés. Point fort\u00a0: niveau du code, 8/10. À creuser\u00a0: ownership.");
-    expect(recruiterRead(card, g, "en")?.text).toBe("Full-stack TypeScript, 5 years counted. Strongest: code level, 8/10. To dig into: ownership.");
+    expect(recruiterRead(card, g, "en")?.text).toBe("Full-stack TypeScript, 5 years counted. Top strength: code level, 8/10. To dig into: ownership.");
   });
 
   it("une fiche LinkedIn seule : « À prouver : le code. »", () => {

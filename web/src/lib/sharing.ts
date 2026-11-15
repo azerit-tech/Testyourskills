@@ -94,7 +94,9 @@ export async function shareSheet(data: { title: string; text: string; url: strin
   if (hasNativeShare()) {
     if (canShareFile(file)) {
       try {
-        await navigator.share({ files: [file], title, text, url });
+        // Avec une image, plusieurs cibles (LinkedIn, WhatsApp) gardent le fichier et jettent `url` :
+        // le lien est écrit dans le texte, et `url` ne part pas (il doublerait le lien ailleurs).
+        await navigator.share({ files: [file], title, text: `${text} ${url}` });
         return "native_file";
       } catch (e) {
         if (dismissed(e)) return null;
