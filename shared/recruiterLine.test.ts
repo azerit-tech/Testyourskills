@@ -87,6 +87,12 @@ describe("la ligne", () => {
     expect(recruiterRead(card, g, "en")?.text).toBe("Full-stack TypeScript, 5 years counted. Top strength: code level, 8/10. To dig into: ownership.");
   });
 
+  it("une fiche GitHub seule : « Pas encore au dossier : le parcours. », jamais « À prouver » pour un critère absent", () => {
+    const g = grid({ XP: 8, STK: 6, CODE: 8, ACT: 6, OWN: 6 }, { EDU: { source: "github", state: "missing" }, EMP: { source: "github", state: "missing" } });
+    expect(recruiterRead(card, g, "fr")?.dig).toBe("Pas encore au dossier\u00a0: le parcours.");
+    expect(recruiterRead(card, g, "en")?.dig).toBe("Not on file yet: career path.");
+  });
+
   it("une fiche LinkedIn seule : « À prouver : le code. »", () => {
     const g = grid({ EDU: 8, XP: 9, EMP: 8, STK: 6, OWN: 6 }, { STK: { state: "declared", source: "linkedin" }, OWN: { state: "declared", source: "linkedin" } });
     expect(recruiterRead(card, g, "fr")?.text).toBe("Full-stack TypeScript, 8 ou 9\u00a0ans comptés. Point fort\u00a0: expérience, 9/10. À prouver\u00a0: le code.");

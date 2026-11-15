@@ -64,7 +64,8 @@ export function weakestCriterion(grid: Grid | undefined | null): (GridCriterion 
 }
 
 export type Dig =
-  | { kind: "prove"; code: CriterionCode }
+  /** `missing` : rien au dossier pour ce critère (pas de LinkedIn ni de CV pour le parcours), rien de déclaré à prouver. */
+  | { kind: "prove"; code: CriterionCode; missing?: true }
   | { kind: "dig"; code: CriterionCode; score: number }
   /** Rien à creuser : la note la plus basse (hors école et open source), pour « rien sous n/10 ». */
   | { kind: "even"; floor: number };
@@ -82,7 +83,7 @@ export function digPoint(grid: Grid, strong = strongPoint(grid)): Dig | null {
     const c = byCode.get(code);
     return !!c && c.score === null;
   });
-  if (open) return { kind: "prove", code: open };
+  if (open) return { kind: "prove", code: open, ...(byCode.get(open)?.state === "missing" ? { missing: true as const } : {}) };
   const marked = RECRUITER_ORDER.map((code) => byCode.get(code))
     .filter(noted)
     .filter((c) => !NEVER_DIG.includes(c.code));
@@ -107,6 +108,8 @@ export const LINE_WORDS: Record<
     strong: (name: string, score: number) => string;
     dig: (name: string) => string;
     prove: (the: string) => string;
+    /** Un critère absent du dossier : « Pas encore au dossier : le parcours. » */
+    pending: (the: string, name: string) => string;
     /** Rien à creuser : « Dossier régulier : rien sous 7/10. » */
     even: (floor: number) => string;
     /** Les années, du palier de la table d'expérience (docs/bareme-recrutement.md §3). */
@@ -122,6 +125,7 @@ export const LINE_WORDS: Record<
     strong: (name, score) => `Point fort\u00a0: ${name}, ${score}/10.`,
     dig: (name) => `À creuser\u00a0: ${name}.`,
     prove: (the) => `À prouver\u00a0: ${the}.`,
+    pending: (the) => `Pas encore au dossier\u00a0: ${the}.`,
     even: (floor) => `Dossier régulier\u00a0: rien sous ${floor}/10.`,
     years: { 10: "10\u00a0ans et plus", 9: "8 ou 9\u00a0ans", 8: "6 ou 7\u00a0ans", 7: "5\u00a0ans", 6: "4\u00a0ans", 5: "3\u00a0ans", 4: "2\u00a0ans", 3: "1\u00a0an", 2: "moins d'un an" },
     counted: (years, score) => `${years} ${score <= 3 ? "compté" : "comptés"}`,
@@ -134,6 +138,7 @@ export const LINE_WORDS: Record<
     strong: (name, score) => `Top strength: ${name}, ${score}/10.`,
     dig: (name) => `To dig into: ${name}.`,
     prove: (the) => `Still unproven: ${the}.`,
+    pending: (_the, name) => `Not on file yet: ${name}.`,
     even: (floor) => `Solid across the board: nothing under ${floor}/10.`,
     years: { 10: "10+ years", 9: "8 or 9 years", 8: "6 or 7 years", 7: "5 years", 6: "4 years", 5: "3 years", 4: "2 years", 3: "1 year", 2: "under a year" },
     counted: (years) => `${years} counted`,
@@ -180,6 +185,6 @@ export function recruiterRead(card: Pick<CardData, "position" | "mainLanguage">,
   const s = strongPoint(grid);
   const strong = s ? w.strong(w.names[s.code], s.score) : null;
   const d = digPoint(grid, s);
-  const dig = !d ? null : d.kind === "prove" ? w.prove(w.the[d.code]) : d.kind === "even" ? w.even(d.floor) : w.dig(w.names[d.code]);
+  const dig = !d ? null : d.kind === "prove" ? (d.missing ? w.pending(w.the[d.code], w.names[d.code]) : w.prove(w.the[d.code])) : d.kind === "even" ? w.even(d.floor) : w.dig(w.names[d.code]);
   return { head, strong, dig, text: [head, strong, dig].filter(Boolean).join(" ") };
 }
