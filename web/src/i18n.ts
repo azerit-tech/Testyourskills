@@ -1059,7 +1059,7 @@ const en: Dict = {
     star: (n) => (n === 1 ? "Plead 1 star" : `Plead ${n} stars`),
     count: (n) => (n === 1 ? "1 of 6 stars" : `${n} of 6 stars`),
     pleading: "You plead",
-    noted: "Bet placed. Verdict after the chase.",
+    noted: "Plea entered. Verdict after the chase.",
     pleaded: "You pleaded",
     verdict: "Verdict:",
     gap: { over: "Overconfidence", exact: "Clear-eyed", under: "Too modest" },
