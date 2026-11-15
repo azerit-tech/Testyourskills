@@ -1,4 +1,4 @@
-// « Fais la tienne » toujours sous le pouce (SPEC §18.48) : sur téléphone, la page
+// « Faire ma fiche » toujours sous le pouce (SPEC §18.48) : sur téléphone, la page
 // vue par un visiteur porte la même barre fixe que celle de la personne fichée,
 // pleine largeur, avec un seul bouton rose qui mène au champ de « À ton tour ».
 // Elle sort par le bas dès que ce bloc touche l'écran (son bouton prend le relais),
@@ -12,11 +12,13 @@ import { useMediaQuery, useReducedMotion } from "../lib/util";
 interface Props {
   /** Le bloc d'une fiche dénoncée vient d'arriver dans la page : la barre le guette aussi. */
   watch?: boolean;
+  /** Fiche dénoncée qu'on peut reprendre : « C'est moi » en rose, « Faire ma fiche » en contour (§18.48). */
+  onLawyer?: (() => void) | null;
 }
 
-export function MakeYours({ watch = false }: Props) {
+export function MakeYours({ watch = false, onLawyer = null }: Props) {
   const narrow = useMediaQuery("(max-width: 640px)");
-  return narrow ? <Bar watch={watch} /> : null;
+  return narrow ? <Bar watch={watch} onLawyer={onLawyer} /> : null;
 }
 
 const isField = (el: Element | null) => !!el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName);
@@ -30,7 +32,7 @@ export function toYourTurn(reduced: boolean) {
   input?.focus({ preventScroll: true });
 }
 
-function Bar({ watch }: { watch: boolean }) {
+function Bar({ watch, onLawyer }: { watch: boolean; onLawyer: (() => void) | null }) {
   const { t } = useT();
   const reduced = useReducedMotion();
   // null : on ne sait pas encore ce qui est à l'écran, la barre attend (pas d'apparition furtive).
@@ -38,7 +40,8 @@ function Bar({ watch }: { watch: boolean }) {
   const [typing, setTyping] = useState(false);
 
   useEffect(() => {
-    const marks = [document.getElementById("you"), document.querySelector(".denounced")].filter((el): el is HTMLElement => !!el);
+    // Fiche dénoncée : la barre attend que les boutons du bloc soient à l'écran, pas son seul bord.
+    const marks = [document.getElementById("you"), document.querySelector(".denounced .pill") ?? document.querySelector(".denounced")].filter((el): el is HTMLElement => !!el);
     if (!marks.length || typeof IntersectionObserver !== "function") return setSeen(false);
     const on = new Set<Element>();
     const io = new IntersectionObserver((entries) => {
@@ -73,7 +76,12 @@ function Bar({ watch }: { watch: boolean }) {
   const on = seen === false && !typing;
   return (
     <div className={`dock make-yours${on ? " is-on" : ""}`} role="region" aria-label={t.result.makeYours} inert={on ? undefined : true}>
-      <button type="button" className="pill pill-big dock-main" onClick={() => toYourTurn(reduced)}>
+      {onLawyer && (
+        <button type="button" className="pill pill-big dock-main" onClick={onLawyer}>
+          {t.denounce.lawyerShort}
+        </button>
+      )}
+      <button type="button" className={onLawyer ? "pill pill-big pill-ghost" : "pill pill-big dock-main"} onClick={() => toYourTurn(reduced)}>
         {t.result.makeYours}
       </button>
     </div>

@@ -66,9 +66,9 @@ const card = (over: Partial<CardData> = {}): Shareable => ({ kind: "card", card:
 afterEach(() => vi.unstubAllGlobals());
 
 describe("page partagée, vue par un visiteur", () => {
-  it("l'en-tête, la fiche, la phrase qui dit ce que c'est, le jury et sa peine, le dossier replié, « À ton tour » (§18.48)", () => {
+  it("l'en-tête, la phrase qui dit ce que c'est, la fiche, le jury et sa peine, le dossier replié, « À ton tour » (§18.48)", () => {
     const html = renderResult(card(), { owner: false });
-    const order = at(html, ['class="wanted"', 'class="result-stage"', 'class="visitor-lead"', 'class="jury"', 'class="penalty"', 'class="fold dossier"', 'id="you"']);
+    const order = at(html, ['class="wanted"', 'class="visitor-lead"', 'class="result-stage"', 'class="jury"', 'class="penalty"', 'class="fold dossier"', 'id="you"']);
     expect(ascending(order), JSON.stringify(order)).toBe(true);
     // La peine est dans le bloc du jury, « À ton tour » hors de la colonne (au bureau, il passe sous la fiche).
     expect(html).toMatch(/<section class="jury".*?<p class="penalty">.*?<\/p><\/section>/);
@@ -78,12 +78,16 @@ describe("page partagée, vue par un visiteur", () => {
 
   it("la phrase du visiteur : ce qu'il regarde, et ce que coûte la sienne ; jamais pour qui a fait la fiche", () => {
     const login = FIXTURES.gold.login;
-    const fr = renderResult(card(), { owner: false });
-    expect(fr.replace(/&#x27;/g, "'")).toContain(
-      `<p class="visitor-lead">Azerit a dressé la fiche de dev de @${login} comme en recrutement : l'expérience d'abord, le code en preuve. La tienne prend une minute, sans compte.</p>`,
+    const fr = renderResult(card(), { owner: false }).replace(/&#x27;/g, "'").replace(/\u00a0/g, " ");
+    // Téléphone : au-dessus de la fiche, deux lignes au plus.
+    expect(fr).toContain(`<p class="visitor-lead">La fiche de dev de @${login}.<br/>La tienne prend une minute, sans compte.</p>`);
+    // Bureau : la phrase entière ouvre « À ton tour », à droite de la fiche.
+    expect(fr).toContain(
+      `<p class="you-lead">Azerit a dressé la fiche de dev de @${login} comme un recruteur la lirait : l'expérience d'abord, le code en preuve. La tienne prend une minute, sans compte.</p>`,
     );
-    const en = renderResult(card(), { owner: false, lang: "en-US" });
-    expect(en.replace(/&#x27;/g, "'")).toContain(`Azerit drew up @${login}'s dev rap sheet the way a recruiter would: experience first, code as proof. Yours takes one minute, no account.</p>`);
+    const en = renderResult(card(), { owner: false, lang: "en-US" }).replace(/&#x27;/g, "'");
+    expect(en).toContain(`<p class="visitor-lead">@${login}'s dev rap sheet.<br/>Yours takes one minute, no account.</p>`);
+    expect(en).toContain(`<p class="you-lead">Azerit drew up @${login}'s dev rap sheet the way a recruiter would: experience first, code as proof. Yours takes one minute, no account.</p>`);
     expect(renderResult(card({ id: "LeadOwner01" }), { owner: true })).not.toContain("visitor-lead");
   });
 

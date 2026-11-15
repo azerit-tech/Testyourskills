@@ -302,7 +302,7 @@ export function CardPage({ id }: { id: string }) {
     return (
       <>
         {waiting}
-        <main className="page page-card" id="main">
+        <main className="page page-card is-loading" id="main">
           {!waiting && (
             <div className="stage-slot loading-slot" aria-busy="true">
               <span className="sr-only">{t.common.loading}</span>
@@ -522,6 +522,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
   const other = mine && mine.id !== id && !(mine.login && main.login && mine.login === main.login.toLowerCase()) ? mine : null;
   const proveFirst = item.kind === "card" && declaredOf(item.card) === "linkedin";
   const who = main.login ? `@${main.login}` : main.name;
+  // Au-dessus de la fiche, sur téléphone : « @pseudo », ou le prénom seul.
+  const whoShort = main.login ? `@${main.login}` : (main.name.split(/\s+/)[0] ?? main.name);
   // La source qui manque au dossier, en bloc : le GitHub d'une fiche LinkedIn seule, le LinkedIn d'une fiche GitHub seule.
   const missing =
     visitor || item.kind !== "card" ? null : proveFirst ? (
@@ -532,8 +534,13 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
   // Sous trois étoiles (§18.48) : la source qui manque est le remède, elle remonte sous le verdict.
   const low = starsFor(main.overall) < 3;
 
+  // « Revoir ma poursuite » : dans la tête de la fiche ; sur un téléphone court, la tête se masque
+  // et le lien descend sous la fiche, à côté de « Pièces à conviction » (le CSS choisit).
+  const chase = scene === "film" && settled ? <ChaseLink mine={!visitor} seen={chaseWatched(id)} onPlay={playChase} /> : null;
+  const lawyer = wantedYou && claimOn && cardLogin ? () => api.startClaim(id, cardLogin) : null;
+
   return (
-    <main className={`page page-card page-result${animating ? " is-animating" : ""}${visitor ? " is-visitor" : ""}`} id="main">
+    <main className={`page page-card page-result${animating ? " is-animating" : ""}${visitor ? " is-visitor" : ""}${wantedYou ? " is-wanted" : ""}`} id="main">
       {/* Le ciel de la page (§18.29) : derrière la barre du haut, une fois la fiche posée. */}
       {/* Le film se pose sur ce ciel : il entre sous le flash, au passage de relais. */}
       <ProfileSky card={main} shown={settled || (scene === "film" && phase === "handoff")} />
@@ -545,7 +552,26 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
 
       <div className="result-top">
         {/* L'en-tête posé sur le ciel, puis la fiche entière au-dessus de la ligne de flottaison (§18.7, §18.29). */}
-        <WantedHead card={main}>{scene === "film" && settled && <ChaseLink mine={!visitor} seen={chaseWatched(id)} onPlay={playChase} />}</WantedHead>
+        <WantedHead card={main}>{chase}</WantedHead>
+        {/* Le visiteur, sur téléphone (§18.48) : ce qu'il regarde, au-dessus de la fiche, deux lignes au plus.
+            Au bureau, la phrase entière ouvre « À ton tour », en tête de la colonne de droite. */}
+        {visitor && (
+          <p className="visitor-lead">
+            {wantedYou ? (
+              t.result.leadDenounced(who, kase?.by ?? null)
+            ) : (
+              <>
+                {t.result.leadShort(whoShort)}
+                {!other && (
+                  <>
+                    <br />
+                    {t.result.leadYours}
+                  </>
+                )}
+              </>
+            )}
+          </p>
+        )}
 
         {animating && (
           // Morceau 3D introuvable : même repli que sans WebGL, la fiche sort sans révélation.
@@ -568,6 +594,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
             </CardViewOptions.Provider>
             {item.kind === "comparison" && settled && <Pieces cmp={item.comparison} />}
           </div>
+          {chase && <div className="stage-chase">{chase}</div>}
           {animating && phase !== "ready" && (
             <button
               type="button"
@@ -589,14 +616,9 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
         {/* Sous la fiche, pour le visiteur (§18.48) : ce qu'il regarde, le jury, les critères, le reste replié. */}
         {visitor && (
           <div className="visitor-col">
-            {/* Une phrase dit ce que c'est ; sans fiche à soi, elle dit aussi ce que coûte la sienne. */}
-            <p className="visitor-lead">
-              {t.result.lead(who)}
-              {!other && <> {t.result.leadYours}</>}
-            </p>
             {/* Fiche dénoncée (§18.6, §18.48) : qui l'a dénoncée, « C'est moi », « Ce n'est pas moi », la demande de retrait, en un bloc. */}
             {wantedYou && (
-              <Denounced who={who} by={kase?.by ?? null} onLawyer={claimOn && cardLogin ? () => api.startClaim(id, cardLogin) : null} notMe={!other}>
+              <Denounced who={who} by={kase?.by ?? null} onLawyer={lawyer} notMe={!other}>
                 {!cardLogin && <RemovalRequest cardId={id} short />}
               </Denounced>
             )}
@@ -614,7 +636,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
             </div>
           </div>
         )}
-        {/* « À ton tour » : en fin de page sur téléphone (la barre fixe y mène), sous la fiche dans la colonne de droite au bureau. */}
+        {/* « À ton tour » : en fin de page sur téléphone (la barre fixe y mène) ; au bureau, en tête de la colonne de droite,
+            avec la phrase qui dit ce qu'on regarde (sous le bloc d'une fiche dénoncée, qui a son propre bouton rose). */}
         {/* Qui a déjà sa fiche : le duel à la place, avec le score à envoyer. */}
         {visitor &&
           (other ? (
@@ -622,7 +645,10 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
           ) : (
             <section className="you" id="you" aria-labelledby="you-title">
               <h2 id="you-title">{t.denounce.andYou}</h2>
-              <p>{t.result.yourTurn}</p>
+              <p className="you-lead">
+                {t.result.lead(who)} {t.result.leadYours}
+              </p>
+              <p className="you-turn">{t.result.yourTurn}</p>
               <EntryForm variant="inline" />
             </section>
           ))}
@@ -680,7 +706,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
       {/* La barre du pouce (§18.27) : mêmes conditions que le bloc de partage, une fois la fiche posée. Avant le toast, qui se cale dessus. */}
       {!visitor && !(claimed && me?.hidden) && <ShareDock item={item} ready={settled} toast={toast.show} />}
       {/* « Fais la tienne » : la barre fixe du visiteur sur téléphone (§18.48). Qui a déjà sa fiche a « Ma fiche » dans la barre du haut. */}
-      {visitor && settled && !other && <MakeYours watch={wantedYou} />}
+      {visitor && settled && !other && <MakeYours watch={wantedYou} onLawyer={lawyer} />}
       {toast.node}
     </main>
   );

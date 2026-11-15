@@ -305,10 +305,15 @@ const fr = frTypoDeep({
     CTO: "CTO",
   } satisfies Record<Position, string>,
   result: {
-    makeYours: "Fais la tienne",
-    /** Sous la fiche vue par un visiteur (§18.48) : ce qu'il regarde, en une phrase ; puis, sans fiche à soi, ce que coûte la sienne. */
-    lead: (who: string) => `Azerit a dressé la fiche de dev de ${who} comme en recrutement : l'expérience d'abord, le code en preuve.`,
+    /** Un seul libellé pour l'action du visiteur : la barre fixe et le bouton du formulaire disent la même chose. */
+    makeYours: "Faire ma fiche",
+    /** Dans « À ton tour » au bureau (§18.48) : ce qu'il regarde, en une phrase ; puis, sans fiche à soi, ce que coûte la sienne. */
+    lead: (who: string) => `Azerit a dressé la fiche de dev de ${who} comme un recruteur la lirait : l'expérience d'abord, le code en preuve.`,
     leadYours: "La tienne prend une minute, sans compte.",
+    /** Au-dessus de la fiche, sur téléphone : la même chose en deux lignes au plus (`who` : « @pseudo » ou le prénom). */
+    leadShort: (who: string) => `La fiche de dev de ${who}.`,
+    /** Au-dessus d'une fiche dénoncée, sur téléphone : ce qui arrive, en une ligne. */
+    leadDenounced: (who: string, by: string | null) => (by ? `@${by} a dénoncé ${who}.` : `Quelqu'un a dénoncé ${who}.`),
     yourTurn: "Sur ces huit critères, tu vaux combien d'étoiles\u00a0? Ton LinkedIn ou ton GitHub suffit.",
     /** Sous la fiche d'un dossier à deux sources (§18.36) : d'où vient la preuve, une seule note. */
     pieces: {
@@ -763,6 +768,8 @@ const fr = frTypoDeep({
     by: (login: string) => `Dénonciation : @${login}`,
     anonymous: "Dénonciation anonyme",
     lawyer: "C'est moi, je reprends ma fiche",
+    /** Le même geste, dans la barre fixe du téléphone. */
+    lawyerShort: "C'est moi",
     lawyerHint: "Connexion GitHub : on lit ton pseudo public, rien d'autre. Ta fiche reprise, tu peux la masquer ou la supprimer.",
     notMe: "Ce n'est pas moi : faire la mienne",
     andYou: "À ton tour",
@@ -788,6 +795,8 @@ const fr = frTypoDeep({
     /* « votes » plutôt que « jurés », qui s'accorde */
     tally: (pct: number, n: number) => `${pct}\u00a0% coupable (${n}\u00a0${n === 1 ? "vote" : "votes"})`,
     owner: (tally: string) => `Jury : ${tally}`,
+    /** Pour qui a fait la fiche, avant tout vote : la ligne garde sa place, rien ne saute. */
+    ownerNone: "Jury : pas encore de vote.",
     failed: "Vote non compté. Réessaie.",
     /* après le vote : la suite, vers « À ton tour » */
     judged: (who: string) => `Tu as jugé ${who}.`,
@@ -1082,9 +1091,11 @@ const en: Dict = {
     CTO: "CTO",
   },
   result: {
-    makeYours: "Get yours",
+    makeYours: "Get my rap sheet",
     lead: (who) => `Azerit drew up ${who}'s dev rap sheet the way a recruiter would: experience first, code as proof.`,
     leadYours: "Yours takes one minute, no account.",
+    leadShort: (who) => `${who}'s dev rap sheet.`,
+    leadDenounced: (who, by) => (by ? `@${by} turned in ${who}.` : `Someone turned in ${who}.`),
     yourTurn: "On these eight criteria, how many stars are you? Your LinkedIn or your GitHub is all it takes.",
     pieces: {
       line: (labels) => `Sources on file: ${labels}`,
@@ -1479,6 +1490,7 @@ const en: Dict = {
     by: (login) => `Tip-off: @${login}`,
     anonymous: "Anonymous tip-off",
     lawyer: "That's me, claim my sheet",
+    lawyerShort: "That's me",
     lawyerHint: "GitHub sign-in: we read your public username, nothing else. Once claimed, you can hide or delete your sheet.",
     notMe: "Not me: get mine",
     andYou: "Your turn",
@@ -1500,6 +1512,7 @@ const en: Dict = {
     cleared: "Cleared",
     tally: (pct, n) => `${pct}% guilty (${n}\u00a0${n === 1 ? "vote" : "votes"})`,
     owner: (tally) => `Jury: ${tally}`,
+    ownerNone: "Jury: no votes yet.",
     failed: "Vote not counted. Try again.",
     judged: (who) => `You judged ${who}.`,
     turn: "Your turn",

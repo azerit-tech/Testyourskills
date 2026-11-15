@@ -136,12 +136,20 @@
 
 /* ---------- arrivée sur une fiche dénoncée (CardPage) ---------- */
 
+/* marine : il informe ; le jury, juste dessous, est l'appel (prune) */
 .denounced {
   display: grid;
   gap: 10px;
   padding: var(--pad-block);
   border-radius: var(--r-block);
-  background: var(--s-call);
+  background: var(--s-info);
+}
+/* 320 px : « C'est moi, je reprends ma fiche » passe à la ligne plutôt que d'élargir le bloc */
+.denounced .pill {
+  max-width: 100%;
+  white-space: normal;
+  text-align: center;
+  text-wrap: balance;
 }
 .denounced-title {
   font: var(--font-block);
