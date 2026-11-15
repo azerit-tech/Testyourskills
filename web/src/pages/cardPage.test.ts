@@ -1,5 +1,7 @@
 // La page de la fiche, rendue en chaîne sans navigateur : l'ordre des blocs du
 // visiteur (lien partagé) et de qui a fait la fiche (§18.27, §18.28).
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -18,6 +20,8 @@ import { githubGridMock } from "../lib/mockGrid";
 import { setPlea } from "../lib/plea";
 import { markChaseWatched } from "../lib/session";
 import { Result, type ResultProps } from "./CardPage";
+
+const page = readFileSync(join(__dirname, "CardPage.tsx"), "utf8");
 
 const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1";
 
@@ -113,6 +117,15 @@ describe("page partagée, vue par un visiteur", () => {
     markChaseWatched("SeenCard01");
     const seen = renderResult(card({ id: "SeenCard01" }), { owner: true, lang: "en-US" });
     expect(/<header class="wanted">.*?<\/header>/.exec(seen)?.[0]).toContain("Replay my chase");
+  });
+
+  it("une fiche supprimée ou introuvable : le navigateur l'oublie, plus de « Ma fiche » qui mène nulle part (parcours 4)", () => {
+    expect(page).toMatch(/if \(view\.s === "none" \|\| view\.s === "deleted"\) forgetMine\(id\);/);
+  });
+
+  it("sa fiche toute neuve, arrivé par celle d'un autre : le duel en tête du partage (parcours 7)", () => {
+    expect(page).toMatch(/\{fromRival && <Duel mine=\{own\} card=\{fromRival\} duel=\{fromDuel\} from \/>\}\s*\{!visitor && !\(claimed && me\?\.hidden\) && <ShareBar/);
+    expect(page).toMatch(/if \(visitor && settled && kase && !wantedYou && !main\.sealed\) rememberVisited\(/);
   });
 
   it("la peine, en texte sous la fiche : l'image du profil est en ciel de page, plus en tuile", () => {

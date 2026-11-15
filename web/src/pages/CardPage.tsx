@@ -38,7 +38,7 @@ import { REMOTE_PATIENCE_MS } from "../lib/remote";
 import { filmTrace } from "../film/trace";
 import { ChaseLink } from "../film/ChaseLink";
 import { navigate, onLinkClick } from "../lib/router";
-import { chaseWatched, filmOwed, freshCv, markChaseWatched, freshLogin, freshSince, freshSlug, iDenounced, markFilmSeen, myCard, prefillFromLast, rememberMine, type MyCard } from "../lib/session";
+import { chaseWatched, filmOwed, forgetMine, freshCv, markChaseWatched, freshLogin, freshSince, freshSlug, iDenounced, lastVisited, markFilmSeen, myCard, prefillFromLast, rememberMine, rememberVisited, type MyCard } from "../lib/session";
 import { revealScene, revealToPlay } from "../lib/revealScene";
 import { useReducedMotion } from "../lib/util";
 
@@ -264,6 +264,10 @@ export function CardPage({ id }: { id: string }) {
   const lastPending = useRef<{ progress: ProgressEvent[]; queue?: number; findings?: Finding[] }>({ progress: [] });
   if (view.s === "pending") lastPending.current = view;
   const animate = view.s === "done" && (owed || sawPending) && !reduced;
+  // Ma fiche n'existe plus à son adresse : le navigateur l'oublie (« Ma fiche », l'accueil, le duel).
+  useEffect(() => {
+    if (view.s === "none" || view.s === "deleted") forgetMine(id);
+  }, [view.s, id]);
   const hold = useHold({ active: view.s === "done" && (animate || sawPending), animate });
 
   // La photo d'identité : l'avatar du pseudo tapé dès la première seconde ; sinon, fiche prête, sa photo.
@@ -506,6 +510,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
   useEffect(() => {
     if (!visitor) rememberMine({ id: main.id, login: main.login ?? null, overall: main.overall });
   }, [visitor, main.id, main.login, main.overall]);
+  // La fiche d'un autre, regardée ici : celle qu'on fera ensuite s'y mesure (parcours 7).
+  const [rival] = useState(lastVisited);
   // « Avis de recherche à ton nom » : pas pour qui a dénoncé cette fiche depuis ce navigateur.
   const wantedYou = visitor && !!kase?.denounced && !iDenounced(id);
   useEffect(() => {
@@ -519,6 +525,9 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
     }
     api.track("denounce_landed", id);
   }, [wantedYou, id]);
+  useEffect(() => {
+    if (visitor && settled && kase && !wantedYou && !main.sealed) rememberVisited({ id: main.id, login: main.login ?? null, name: main.name, overall: main.overall });
+  }, [visitor, settled, kase, wantedYou, main.id, main.login, main.name, main.sealed, main.overall]);
   const other = mine && mine.id !== id && !(mine.login && main.login && mine.login === main.login.toLowerCase()) ? mine : null;
   const proveFirst = item.kind === "card" && declaredOf(item.card) === "linkedin";
   const who = main.login ? `@${main.login}` : main.name;
@@ -544,6 +553,10 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
   const lawyer = other ? null : (claimHere ?? remake?.go ?? null);
   // Qui a sa fiche : le duel, et le même envoi dans la barre fixe.
   const duel = useDuelSend(visitor ? other : null, main, toast.show);
+  // Sa fiche toute neuve, après être arrivé par celle d'un autre : le duel en tête du partage, une fois.
+  const fromRival = !visitor && fresh && rival && rival.id !== id && !(rival.login && main.login && rival.login.toLowerCase() === main.login.toLowerCase()) ? rival : null;
+  const own: MyCard = { id, login: main.login ?? null, overall: main.overall };
+  const fromDuel = useDuelSend(fromRival && !main.sealed ? own : null, fromRival ?? main, toast.show);
 
   return (
     <main className={`page page-card page-result${animating ? " is-animating" : ""}${visitor ? " is-visitor" : ""}${wantedYou ? " is-wanted" : ""}`} id="main">
@@ -676,6 +689,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
         {/* Sous trois étoiles : « Ajoute ton LinkedIn » (ou ton GitHub) tout de suite, avant le partage. */}
         {low && missing}
         {/* Fiche masquée : /og/* et /c/:id répondent 404 / 410 à tous, l'image ne se télécharge pas et le lien ne montre rien. */}
+        {fromRival && <Duel mine={own} card={fromRival} duel={fromDuel} from />}
         {!visitor && !(claimed && me?.hidden) && <ShareBar item={item} toast={toast.show} />}
         {/* Tu roules pour qui ? (§18.38) : l'école et la boîte, la raison de partager, juste après le partage. */}
         {!visitor && <BandPick cardId={id} toast={toast.show} />}

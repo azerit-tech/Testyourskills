@@ -246,6 +246,54 @@ export function rememberMine(card: MyCard) {
   }
 }
 
+/**
+ * La fiche n'existe plus (supprimée ici, ou 404 / 410 à l'adresse de « Ma fiche ») :
+ * le navigateur l'oublie, la barre du haut perd « Ma fiche », l'accueil sa ligne.
+ */
+export function forgetMine(id: string) {
+  if (memMine?.id === id) memMine = null;
+  try {
+    const raw = localStorage.getItem(MINE_KEY);
+    if (raw && (JSON.parse(raw) as Partial<MyCard>).id === id) localStorage.removeItem(MINE_KEY);
+  } catch {
+    /* rien */
+  }
+  try {
+    window.dispatchEvent(new Event(MINE_EVENT));
+  } catch {
+    /* hors navigateur */
+  }
+}
+
+/** La dernière fiche regardée en visiteur dans cet onglet : la fiche qu'on fait ensuite s'y mesure (le duel). */
+export interface Visited {
+  id: string;
+  login: string | null;
+  name: string;
+  overall: number;
+}
+const VISITED_KEY = "tys_visited";
+let memVisited: Visited | null = null;
+
+export function rememberVisited(v: Visited) {
+  memVisited = v;
+  writeSession(VISITED_KEY, JSON.stringify(v));
+}
+
+export function lastVisited(): Visited | null {
+  try {
+    const raw = readSession(VISITED_KEY);
+    if (raw) {
+      const v = JSON.parse(raw) as Partial<Visited>;
+      if (typeof v.id === "string" && typeof v.name === "string" && typeof v.overall === "number" && Number.isFinite(v.overall))
+        return { id: v.id, login: typeof v.login === "string" ? v.login : null, name: v.name, overall: v.overall };
+    }
+  } catch {
+    /* rien */
+  }
+  return memVisited;
+}
+
 export function myCard(): MyCard | null {
   try {
     const raw = localStorage.getItem(MINE_KEY);

@@ -2,7 +2,8 @@
 // « 83/100 contre 68/100 : une étoile d'avance », et peut lui envoyer son score avec
 // le lien de sa propre fiche. Face à un dossier scellé, la note ne se dit pas : il ne
 // reste que « Ma fiche ». L'envoi est un crochet : la barre fixe du téléphone fait le
-// même geste que le bouton du bloc.
+// même geste que le bouton du bloc. Sur sa propre fiche toute neuve, le même duel
+// face à la fiche par laquelle on est arrivé, en tête du partage (« Tu viens de… »).
 import { useCallback, useState } from "react";
 import type { CardData } from "../../../shared/types";
 import { useT } from "../i18n";
@@ -28,7 +29,10 @@ function said(d: ReturnType<typeof useT>["t"]["denounce"], me: number, them: num
   return { text, rel: v.by === "tie" ? ("tie" as const) : v.ahead ? ("ahead" as const) : ("behind" as const) };
 }
 
-export function useDuelSend(mine: MyCard | null, card: CardData, toast: (m: string) => void): DuelSend {
+/** L'autre fiche : la fiche regardée, ou celle par laquelle on est arrivé. */
+export type Rival = Pick<CardData, "name" | "overall"> & { login?: string | null; sealed?: boolean };
+
+export function useDuelSend(mine: MyCard | null, card: Rival, toast: (m: string) => void): DuelSend {
   const { t } = useT();
   const d = t.denounce;
   const [manual, setManual] = useState<string | null>(null);
@@ -60,15 +64,33 @@ interface Props {
   /** La fiche du visiteur, faite ou reprise depuis ce navigateur. */
   mine: MyCard;
   /** La fiche regardée. */
-  card: CardData;
+  card: Rival;
   duel: DuelSend;
   /** Le seul rose de l'écran (visiteur) ; en contour sous le partage de sa propre fiche. */
   strong?: boolean;
+  /** Sur sa propre fiche : la fiche par laquelle on est arrivé, sans lien « Ma fiche ». */
+  from?: boolean;
 }
 
-export function Duel({ mine, card, duel, strong = false }: Props) {
+export function Duel({ mine, card, duel, strong = false, from = false }: Props) {
   const { t } = useT();
   const d = t.denounce;
+  if (from) {
+    if (!duel.send) return null;
+    const send = duel.send;
+    return (
+      <section className="after-block duel duel-from" aria-labelledby="duel-from-title">
+        <p className="surtitre">{d.duelFrom(card.login ? `@${card.login}` : card.name)}</p>
+        <h2 id="duel-from-title">{d.versus(mine.overall, card.overall, said(d, mine.overall, card.overall).text)}</h2>
+        <div className="duel-actions">
+          <button type="button" className="pill" onClick={() => void send()}>
+            {d.sendScore}
+          </button>
+        </div>
+        {duel.manual && <ManualCopy m={{ kind: "message", value: duel.manual }} />}
+      </section>
+    );
+  }
   const mineLink = (
     <a className="link-alt" href={`/c/${mine.id}`} onClick={(e) => onLinkClick(e, `/c/${mine.id}`)}>
       {d.mine}
