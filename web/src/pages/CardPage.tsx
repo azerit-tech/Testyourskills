@@ -188,11 +188,34 @@ function useJob(id: string, nonce: number) {
   return { view, setView, sawPending, offline, onRetry };
 }
 
+/** Le dossier tarde : la page se montre quand même, sans ce qu'il dit (2,5 s). */
+const CASE_LATE_MS = 2500;
+
+/**
+ * Le dossier de la fiche (dénonciation, jury), lu en même temps que la fiche : la page d'un visiteur
+ * entre en une fois, phrase et bloc d'une fiche dénoncée compris, sans rien pousser sous les yeux.
+ */
+function useCase(id: string, nonce: number) {
+  const [kase, setKase] = useState<CaseInfo | null>(null);
+  const [late, setLate] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    void api.getCase(id).then((c) => alive && setKase(c));
+    const timer = window.setTimeout(() => alive && setLate(true), CASE_LATE_MS);
+    return () => {
+      alive = false;
+      window.clearTimeout(timer);
+    };
+  }, [id, nonce]);
+  return { kase, late };
+}
+
 export function CardPage({ id }: { id: string }) {
   const { t, lang } = useT();
   const [nonce, setNonce] = useState(0);
   const [notice, setNotice] = useState<{ text: string; n: number } | null>(null);
   const { view, setView, sawPending, offline, onRetry } = useJob(id, nonce);
+  const { kase, late: caseLate } = useCase(id, nonce);
   const fresh = freshSince(id) !== null;
   const owner = fresh || tokens.get(id) !== null;
   // Le film joue une fois (§18.48) : dû à une fiche demandée ici (ou rechargée en plein film)
@@ -329,7 +352,9 @@ export function CardPage({ id }: { id: string }) {
       />
     ) : null;
 
-  if (view.s === "loading" || view.s === "pending") {
+  // Le visiteur attend aussi le dossier (2,5 s au plus) : une fiche dénoncée entre avec sa phrase et son bloc (CLS).
+  const caseWait = view.s === "done" && !owner && kase === null && !caseLate && !waiting;
+  if (view.s === "loading" || view.s === "pending" || caseWait) {
     return (
       <>
         {waiting}
@@ -410,6 +435,8 @@ export function CardPage({ id }: { id: string }) {
         onScene={hold.onScene}
         owner={owner}
         fresh={fresh && owed}
+        kase={kase}
+        caseLate={caseLate}
         notice={notice}
         me={me}
         onMe={setMe}
@@ -430,13 +457,17 @@ export interface ResultProps {
   onScene: (state: SceneState) => void;
   owner: boolean;
   fresh: boolean;
+  /** Le dossier (dénonciation, jury), lu par la page ; null tant qu'il charge. */
+  kase: CaseInfo | null;
+  /** Le dossier tarde : l'après-fiche se montre quand même, sans sa ligne du jury. */
+  caseLate: boolean;
   notice: { text: string; n: number } | null;
   me: Awaited<ReturnType<typeof api.getMe>>;
   onMe: (me: Awaited<ReturnType<typeof api.getMe>>) => void;
   onDeleted: () => void;
 }
 
-export function Result({ item, animate, start, abort, onScene, owner, fresh, notice, me, onMe, onDeleted }: ResultProps) {
+export function Result({ item, animate, start, abort, onScene, owner, fresh, kase, caseLate, notice, me, onMe, onDeleted }: ResultProps) {
   const { t, lang } = useT();
   const id = item.kind === "card" ? item.card.id : item.comparison.id;
   // Un dossier à deux pièces s'affiche comme une fiche seule : la fiche du dossier, sa note (§18.36).
@@ -525,19 +556,14 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
   const visitor = !owner && !claimed;
 
   // Dénonciation (§18.6) et page partagée (§18.7).
-  const [kase, setKase] = useState<CaseInfo | null>(null);
-  const [claimOn, setClaimOn] = useState(false);
+  // La configuration est déjà dans la page (ou en mémoire) : « C'est moi » est là dès la première image, rien ne pousse le bloc.
+  const [claimOn, setClaimOn] = useState(() => api.knownConfig()?.claim ?? false);
   const [mine] = useState<MyCard | null>(() => myCard());
-  // Le dossier tarde : l'après-fiche se montre quand même, sans sa ligne du jury.
-  const [caseLate, setCaseLate] = useState(false);
   useEffect(() => {
     let alive = true;
-    void api.getCase(id).then((c) => alive && setKase(c));
     void api.getConfig().then((c) => alive && setClaimOn(c.claim));
-    const late = window.setTimeout(() => alive && setCaseLate(true), 2500);
     return () => {
       alive = false;
-      window.clearTimeout(late);
     };
   }, [id]);
   // Sa propre fiche, faite ou revendiquée ici : la référence des comparaisons à venir.

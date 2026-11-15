@@ -35,31 +35,35 @@ function render(props: { by?: string | null; lawyer?: boolean; remake?: boolean;
 afterEach(() => vi.unstubAllGlobals());
 
 describe("le bloc d'une fiche dénoncée", () => {
-  it("un titre qui vaut pour tout visiteur, qui a dénoncé, puis « C'est moi » en rose et « Ce n'est pas moi » en contour", () => {
-    const html = render({ by: "leamd" });
-    expect(html).toContain('<h2 class="denounced-title" id="denounced-title">Quelqu\'un a dénoncé @camroux</h2>');
+  it("« C'est toi ? » pour tout visiteur, qui a dénoncé dit une fois, « C'est moi » en rose et « Ce n'est pas moi » en lien (§18.52)", () => {
+    const html = render({ by: "leamd" }).replace(/\u00a0/g, " ");
+    expect(html).toContain('<h2 class="denounced-title" id="denounced-title">C\'est toi ?</h2>');
     expect(html).not.toContain("à ton nom");
-    expect(html).toContain("Dénonciation : @leamd");
+    // Qui a dénoncé : la phrase au-dessus de la fiche (téléphone), ce rappel au bureau seulement (denounce.css).
+    expect(html).toContain('<p class="denounced-by">@leamd a dénoncé @camroux.</p>');
+    expect(render({})).toContain('<p class="denounced-by">Quelqu\'un a dénoncé @camroux.</p>');
     const buttons = [...html.matchAll(/<button type="button" class="([^"]+)">([^<]+)<\/button>/g)].map((m) => [m[1], m[2]]);
+    // Un bouton par intention : le formulaire de « Ce n'est pas moi » est celui de « À ton tour ».
     expect(buttons).toEqual([
       ["pill pill-big", "C'est moi, je reprends ma fiche"],
-      ["pill", "Ce n'est pas moi : faire la mienne"],
+      ["link-alt denounced-notme", "Ce n'est pas moi : faire la mienne"],
     ]);
     // Ce que fait le premier bouton, dit dessous.
-    expect(html).toMatch(/<\/button><p class="denounced-hint">Connexion GitHub : [^<]+masquer ou la supprimer\.<\/p>/);
-    expect(render({})).toContain("Dénonciation anonyme");
+    expect(html).toMatch(/<\/button><p class="denounced-hint">Connexion GitHub : [^<]+masquer ou la supprimer\.<\/p>/);
+    const css = readFileSync(join(__dirname, "denounce.css"), "utf8");
+    expect(css).toMatch(/@media \(max-width: 899px\) \{\s*\.denounced-by \{\s*display: none;/);
   });
 
   it("en anglais : “That's me” d'abord", () => {
     const html = render({}, "en-US");
-    expect(html).toContain(">Someone turned in @camroux</h2>");
+    expect(html).toContain(">Is this you?</h2>");
     expect(html).toMatch(/class="pill pill-big">That's me, claim my sheet<\/button>/);
     expect(html).toContain(">Not me: get mine</button>");
   });
 
   it("sans reprise possible : « Ce n'est pas moi » devient le bouton rose, la demande de retrait est dans le bloc", () => {
     const html = render({ lawyer: false, removal: true, who: "Camille Ardent" });
-    expect(html).toContain(">Quelqu'un a dénoncé Camille Ardent</h2>");
+    expect(html).toContain(">Quelqu'un a dénoncé Camille Ardent.</p>");
     expect(html.match(/pill-big/g)).toHaveLength(1);
     expect(html).toMatch(/class="pill pill-big">Ce n'est pas moi/);
     expect(html).toMatch(/<p class="removal"><button type="button" class="link-alt">C'est toi \? Demander le retrait de cette fiche<\/button><\/p><\/section>$/);
@@ -74,10 +78,10 @@ describe("le bloc d'une fiche dénoncée", () => {
 
   it("dénoncée par son lien LinkedIn : « C'est moi : faire ma fiche moi-même » en rose, et ce qu'il fait, dit comme dans le message reçu", () => {
     const html = render({ lawyer: false, remake: true, removal: true, who: "Maxime Bernard" }).replace(/\u00a0/g, " ");
-    const buttons = [...html.matchAll(/<button type="button" class="(pill[^"]*)">([^<]+)<\/button>/g)].map((m) => [m[1], m[2]]);
+    const buttons = [...html.matchAll(/<button type="button" class="((?:pill|link-alt denounced)[^"]*)">([^<]+)<\/button>/g)].map((m) => [m[1], m[2]]);
     expect(buttons).toEqual([
       ["pill pill-big", "C'est moi : faire ma fiche moi-même"],
-      ["pill", "Ce n'est pas moi : faire la mienne"],
+      ["link-alt denounced-notme", "Ce n'est pas moi : faire la mienne"],
     ]);
     expect(html).toContain('<p class="denounced-hint">Reprends-la : refais-la depuis ton LinkedIn');
     expect(render({ lawyer: false, remake: true }, "en-US")).toContain(">That's me: make it myself</button>");

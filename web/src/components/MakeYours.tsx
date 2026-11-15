@@ -43,19 +43,24 @@ function Bar({ watch, onLawyer, onSend }: Required<Props>) {
   const [typing, setTyping] = useState(false);
 
   useEffect(() => {
-    // Fiche dénoncée : la barre attend que les boutons du bloc soient à l'écran, pas son seul bord.
+    // Fiche dénoncée : la barre reste tant que le bouton « C'est moi » du bloc n'est pas entier à l'écran
+    // (§18.52) : un bouton rose coupé au bas de l'écran ne remplace pas celui de la barre.
     // Le duel : seul son bouton prend le relais (le bloc dénoncé est alors en contour).
     const den = onSend ? null : (document.querySelector(".denounced .pill") ?? document.querySelector(".denounced"));
     const marks = [document.getElementById("you"), den].filter((el): el is Element => !!el);
     if (!marks.length || typeof IntersectionObserver !== "function") return setSeen(false);
     const on = new Set<Element>();
-    const io = new IntersectionObserver((entries) => {
-      for (const e of entries) {
-        if (e.isIntersecting) on.add(e.target);
-        else on.delete(e.target);
-      }
-      setSeen(on.size > 0);
-    });
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          const shown = e.target === den ? e.intersectionRatio >= 0.98 : e.isIntersecting;
+          if (shown) on.add(e.target);
+          else on.delete(e.target);
+        }
+        setSeen(on.size > 0);
+      },
+      { threshold: [0, 0.98] },
+    );
     marks.forEach((m) => io.observe(m));
     return () => io.disconnect();
   }, [watch, onSend]);

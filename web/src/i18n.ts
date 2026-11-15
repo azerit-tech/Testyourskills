@@ -790,10 +790,8 @@ const fr = frTypoDeep({
     linkCopied: "Lien copié.",
     again: "Dénoncer quelqu'un d'autre",
     /* à l'arrivée de la cible */
-    /* un titre qui vaut pour la personne visée comme pour un tiers (§18.48) */
-    banner: (who: string) => `Quelqu'un a dénoncé ${who}`,
-    by: (login: string) => `Dénonciation : @${login}`,
-    anonymous: "Dénonciation anonyme",
+    /* un titre qui vaut pour la personne visée comme pour un tiers ; qui a dénoncé est dit une fois, au-dessus (§18.52) */
+    isYou: "C'est toi ?",
     lawyer: "C'est moi, je reprends ma fiche",
     /** Le même geste, dans la barre fixe du téléphone. */
     lawyerShort: "C'est moi",
@@ -1530,9 +1528,7 @@ const en: Dict = {
     copyLink: "Copy link",
     linkCopied: "Link copied.",
     again: "Turn in someone else",
-    banner: (who) => `Someone turned in ${who}`,
-    by: (login) => `Tip-off: @${login}`,
-    anonymous: "Anonymous tip-off",
+    isYou: "Is this you?",
     lawyer: "That's me, claim my sheet",
     lawyerShort: "That's me",
     lawyerHint: "GitHub sign-in: we read your public username, nothing else. Once claimed, you can hide or delete your sheet.",

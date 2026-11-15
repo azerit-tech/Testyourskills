@@ -50,6 +50,8 @@ function renderResult(item: Shareable, opts: { owner: boolean; lang?: string; to
     onScene: () => undefined,
     owner: opts.owner,
     fresh: false,
+    kase: null,
+    caseLate: false,
     notice: null,
     me: null,
     onMe: () => undefined,
