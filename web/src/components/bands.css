@@ -438,6 +438,9 @@
   }
   .bands-make > h2 {
     grid-column: 1;
+  }
+  /* le titre en 44 : il passe devant celui, commun, des blocs d'appel (.after-block h2) */
+  .bands-make.after-block > h2 {
     font: var(--font-section);
   }
   .bands-make > .band-make-note {
