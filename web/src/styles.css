@@ -2080,16 +2080,22 @@ button.cover-panel:focus-visible {
 .load-mug-photo {
   animation: fade-in 0.2s ease-out both;
 }
-/* écran bas (petit téléphone) : le titre s'efface, la photo, le pari et les pièces d'abord */
+/* écran bas (390 × 664, la hauteur dans le navigateur de LinkedIn ; 320 × 568) : la marque et le
+   titre restent, serrés ; c'est la photo qui rétrécit, juste assez pour que tout tienne (sa
+   largeur suit la hauteur libre : 664 → 170 px, 568 → 96 px) */
 @media (max-height: 680px) {
-  .load-head {
-    display: none;
-  }
   .load-main {
     gap: 12px;
   }
+  .load-head {
+    gap: 4px;
+  }
+  .load-mug {
+    width: clamp(96px, calc((100vh - 456px) * 0.85), 170px);
+    width: clamp(96px, calc((100svh - 456px) * 0.85), 170px);
+  }
 }
-/* écran très bas (téléphone couché) : les pièces et la barre d'abord */
+/* écran très bas (téléphone couché) : la photo s'efface, la marque, le titre, les pièces et la barre restent */
 @media (max-height: 480px) {
   .load-mug {
     display: none;
