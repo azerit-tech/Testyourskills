@@ -3049,6 +3049,28 @@ a.dossier-item:hover {
   color: var(--c-reserve) !important;
 }
 
+/* /__devices (mode démo) : le site dans des cadres de téléphone, chacun sous sa taille */
+.devices {
+  display: flex;
+  gap: 24px;
+  min-height: 100vh;
+  padding: 16px;
+  overflow-x: auto;
+  background: var(--s-page);
+}
+.device {
+  display: grid;
+  flex: none;
+  align-content: start;
+  gap: 8px;
+}
+.device iframe {
+  display: block;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-block);
+  background: var(--s-page);
+}
+
 .page-prose {
   padding: 8px var(--gutter) 64px;
 }

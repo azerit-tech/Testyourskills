@@ -19,14 +19,25 @@ const PrimePage = lazy(() => import("./pages/Primes").then((m) => ({ default: m.
 const Rules = lazy(() => import("./pages/Rules").then((m) => ({ default: m.Rules })));
 const Privacy = lazy(() => import("./pages/Privacy").then((m) => ({ default: m.Privacy })));
 
-/** Mode démo uniquement : aperçu du site dans des cadres de téléphone (360 et 390 px). */
+/** Les téléphones de l'aperçu : le plus courant, le plus étroit. */
+const DEVICES = [
+  { w: 390, h: 844 },
+  { w: 360, h: 740 },
+];
+
+/** Mode démo uniquement : aperçu du site dans des cadres de téléphone, aux couleurs du site, chacun avec sa taille. */
 function Devices() {
   const src = new URLSearchParams(window.location.search).get("src") ?? "/";
   const url = src + (src.includes("?") ? "&" : "?") + "mock=1";
   return (
-    <div style={{ display: "flex", gap: 20, padding: 12, background: "#1a1f27", minHeight: "100vh" }}>
-      {[390, 360].map((w) => (
-        <iframe key={w} title={`${w}px`} src={url} style={{ width: w, height: 760, border: "1px solid #223040", borderRadius: 18, background: "#0a0f16" }} />
+    <div className="devices">
+      {DEVICES.map(({ w, h }) => (
+        <figure key={w} className="device">
+          <figcaption className="label">
+            {w} × {h}
+          </figcaption>
+          <iframe title={`${w} × ${h}`} src={url} width={w} height={h} />
+        </figure>
       ))}
     </div>
   );
