@@ -12,32 +12,32 @@
     {
       "id": "gh_archaeologist", "source": "github", "tone": "special", "rule": "old_activity", "params": {},
       "label": { "fr": "Archéologue", "en": "Archaeologist" },
-      "ruleText": { "fr": "{n} % de l'activité a plus de 5 ans (seuil {t} %), peu d'activité cette année.", "en": "{n}% of activity is over 5 years old (threshold {t}%), little activity this year." }
+      "ruleText": { "fr": "{n} % de l'activité a plus de 5 ans (seuil {t} %), peu d'activité cette année.", "en": "{n}% of activity is over 5 years old (threshold {t}%), little activity this year." }
     },
     {
       "id": "gh_lazy_commits", "source": "github", "tone": "negative", "rule": "lazy_commits", "params": { "minShare": 0.4, "minSample": 10 },
-      "label": { "fr": "Commits : fix, fix2, final fix", "en": "Commits: fix, fix2, final fix" },
-      "ruleText": { "fr": "{n} % de commits paresseux (seuil {t} %).", "en": "{n}% lazy commits (threshold {t}%)." }
+      "label": { "fr": "Commits : fix, fix2, final fix", "en": "Commits: fix, fix2, final fix" },
+      "ruleText": { "fr": "{n} % de commits paresseux (seuil {t} %).", "en": "{n}% lazy commits (threshold {t}%)." }
     },
     {
       "id": "gh_no_tests", "source": "github", "tone": "negative", "rule": "no_tests", "params": { "minRepos": 1 },
-      "label": { "fr": "Tests : bientôt", "en": "Tests: coming soon" },
+      "label": { "fr": "Tests : bientôt", "en": "Tests: coming soon" },
       "ruleText": { "fr": "Aucun test sur les {n} repos actifs.", "en": "No tests across the {n} active repos." }
     },
     {
       "id": "gh_readme_wip", "source": "github", "tone": "negative", "rule": "readme_wip", "params": { "maxWords": 50, "minAgeYears": 2 },
       "label": { "fr": "README en construction depuis {year}", "en": "README under construction since {year}" },
-      "ruleText": { "fr": "README du repo principal : {n} mots (moins de {t}), repo créé en {year}.", "en": "Main repo README: {n} words (under {t}), repo created in {year}." }
+      "ruleText": { "fr": "README du repo principal : {n} mots (moins de {t}), repo créé en {year}.", "en": "Main repo README: {n} words (under {t}), repo created in {year}." }
     },
     {
       "id": "gh_friday_push", "source": "github", "tone": "negative", "rule": "friday_evening", "params": { "minShare": 0.3, "minSample": 10 },
       "label": { "fr": "Push sur main le vendredi soir", "en": "Pushes to main on Friday night" },
-      "ruleText": { "fr": "{n} % des commits le vendredi après 18 h (seuil {t} %).", "en": "{n}% of commits on Friday after 6pm (threshold {t}%)." }
+      "ruleText": { "fr": "{n} % des commits le vendredi après 18 h (seuil {t} %).", "en": "{n}% of commits on Friday after 6pm (threshold {t}%)." }
     },
     {
       "id": "gh_3am_commit", "source": "github", "tone": "negative", "rule": "night_commits", "params": { "minShare": 0.15, "minSample": 10 },
-      "label": { "fr": "Commit de 3 h du matin", "en": "3am committer" },
-      "ruleText": { "fr": "{n} % des commits entre 1 h et 5 h (seuil {t} %).", "en": "{n}% of commits between 1am and 5am (threshold {t}%)." }
+      "label": { "fr": "Commit de 3 h du matin", "en": "3am committer" },
+      "ruleText": { "fr": "{n} % des commits entre 1 h et 5 h (seuil {t} %).", "en": "{n}% of commits between 1am and 5am (threshold {t}%)." }
     },
     {
       "id": "gh_finished_tutorial", "source": "github", "tone": "negative", "rule": "tutorial_repos", "params": { "atLeast": 3 },
@@ -47,12 +47,12 @@
     {
       "id": "gh_repos_alive", "source": "github", "tone": "negative", "rule": "repos_alive", "params": { "minRepos": 10, "maxAliveShare": 0.2 },
       "label": { "fr": "{n} repos, {m} {alive}", "en": "{n} repos, {m} {alive}" },
-      "ruleText": { "fr": "{m} repos poussés dans l'année sur {n} (au plus {t} %).", "en": "{m} of {n} repos pushed this year (at most {t}%)." }
+      "ruleText": { "fr": "{m} repos poussés dans l'année sur {n} (au plus {t} %).", "en": "{m} of {n} repos pushed this year (at most {t}%)." }
     },
     {
       "id": "gh_ghost_contributor", "source": "github", "tone": "negative", "rule": "ghost_contributor", "params": { "minAccountYears": 3 },
       "label": { "fr": "Contributions fantômes", "en": "Ghost contributor" },
-      "ruleText": { "fr": "Aucune PR fusionnée chez les autres en {n} ans de compte.", "en": "No merged PR elsewhere in {n} years on GitHub." }
+      "ruleText": { "fr": "Aucune PR fusionnée chez les autres en {n} ans de compte.", "en": "No merged PR elsewhere in {n} years on GitHub." }
     },
     {
       "id": "gh_framework_hopper", "source": "github", "tone": "negative", "rule": "framework_hopper", "params": { "atLeast": 4 },
@@ -61,13 +61,13 @@
     },
     {
       "id": "gh_stars_mom", "source": "github", "tone": "negative", "rule": "few_stars", "params": { "maxStars": 2, "minRepos": 5 },
-      "label": { "fr": "Stars : la famille", "en": "Stars: mom and me" },
+      "label": { "fr": "Stars : la famille", "en": "Stars: mom and me" },
       "ruleText": { "fr": "{n} star(s) au total sur {m} repos.", "en": "{n} star(s) in total across {m} repos." }
     },
     {
       "id": "gh_polyglot", "source": "github", "tone": "negative", "rule": "polyglot", "params": { "atLeast": 6 },
       "label": { "fr": "Polyglotte (ou girouette)", "en": "Polyglot (or undecided)" },
-      "ruleText": { "fr": "{n} langages avec 10 Ko de code ou plus (seuil {t}).", "en": "{n} languages with 10 KB of code or more (threshold {t})." }
+      "ruleText": { "fr": "{n} langages avec 10 Ko de code ou plus (seuil {t}).", "en": "{n} languages with 10 KB of code or more (threshold {t})." }
     },
     {
       "id": "gh_node_modules", "source": "github", "tone": "negative", "rule": "node_modules", "params": {},
@@ -76,7 +76,7 @@
     },
     {
       "id": "gh_ship_or_nothing", "source": "github", "tone": "positive", "rule": "stat_at_least", "params": { "SHIP": 85 },
-      "label": { "fr": "Ship ou rien", "en": "Ship or nothing" },
+      "label": { "fr": "Ship ou rien", "en": "Ship it or skip it" },
       "ruleText": { "fr": "SHIP à {n} (seuil {t}).", "en": "SHIP at {n} (threshold {t})." }
     },
     {
@@ -97,13 +97,13 @@
     {
       "id": "gh_maintainer", "source": "github", "tone": "positive", "rule": "maintainer", "params": { "atLeast": 10 },
       "label": { "fr": "Maintient des projets", "en": "Maintainer" },
-      "ruleText": { "fr": "{m} : {n} comptes externes qui contribuent (seuil {t}).", "en": "{m}: {n} outside contributors (threshold {t})." }
+      "ruleText": { "fr": "{m} : {n} comptes externes qui contribuent (seuil {t}).", "en": "{m}: {n} outside contributors (threshold {t})." }
     },
 
     {
       "id": "cv_senior_from_cv", "source": "cv", "tone": "gap", "rule": "senior_from_cv", "params": { "minGapYears": 3 }, "retired": true,
       "label": { "fr": "Senior, à prouver", "en": "Senior, yet to prove" },
-      "ruleText": { "fr": "{n} ans déclarés, {m} sur GitHub (écart de {t} ans ou plus).", "en": "{n} years claimed, {m} on GitHub (gap of {t}+ years)." }
+      "ruleText": { "fr": "{n} ans déclarés, {m} sur GitHub (écart de {t} ans ou plus).", "en": "{n} years claimed, {m} on GitHub (gap of {t}+ years)." }
     },
     {
       "id": "cv_longer_than_readmes", "source": "cv", "tone": "gap", "rule": "cv_longer_than_readmes", "params": {}, "retired": true,
@@ -118,7 +118,7 @@
     {
       "id": "cv_passion", "source": "cv", "tone": "negative", "rule": "passion", "params": { "atLeast": 2 },
       "label": { "fr": "Passion citée {n} fois", "en": "Passionate (mentioned {n} times)" },
-      "ruleText": { "fr": "« passion… » apparaît {n} fois (seuil {t}).", "en": "\"passion…\" appears {n} times (threshold {t})." }
+      "ruleText": { "fr": "« passion… » apparaît {n} fois (seuil {t}).", "en": "\"passion…\" appears {n} times (threshold {t})." }
     },
     {
       "id": "cv_expert_frameworks", "source": "cv", "tone": "negative", "rule": "many_technos_listed", "params": { "atLeast": 12 },

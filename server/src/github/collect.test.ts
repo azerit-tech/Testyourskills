@@ -313,7 +313,7 @@ describe("de la collecte à la grille (§18.37)", () => {
   it("agentFiles : « IA dans l'atelier » sur la stack, sans toucher la note", async () => {
     const { facts } = await collect();
     const stk = crit(facts, "STK");
-    expect(stk.flags.map((x) => x.fr)).toContain("IA dans l'atelier : des fichiers d'agent dans atelier.");
+    expect(stk.flags.map((x) => x.fr)).toContain("IA dans l'atelier : des fichiers d'agent dans atelier.");
     const without = { ...facts, trees: facts.trees.map(({ agentFiles: _a, ...t }) => t) };
     const bare = crit(without, "STK");
     expect(bare.flags.map((x) => x.fr).filter((x) => x.startsWith("IA dans l'atelier"))).toEqual([]);

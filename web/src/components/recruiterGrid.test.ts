@@ -113,7 +113,7 @@ describe("la page partagée : aucun nom d'école ni d'ancien employeur, au mot p
       expect(html).not.toMatch(NAMES);
       expect(html).not.toContain("linkedin.com");
       // Mais la pièce est là, en comptes et en dates.
-      expect(textOf(html)).toContain(lang === "fr-FR" ? "Un poste d'association : non compté." : "An association role: not counted.");
+      expect(textOf(html)).toContain(lang === "fr-FR" ? "Un poste d'association : non compté." : "An association role: not counted.");
     });
   }
 });
@@ -199,7 +199,7 @@ describe("« recoupé » : de la sortie du moteur à l'étiquette affichée", ()
 
   it("la page partagée montre le recoupement sans nommer le poste", () => {
     const emp = textOf(rowsOf(render(item, true)).get("Parcours et employeurs")!);
-    expect(emp).toContain("LinkedIn : stage ou alternance, février 2025 – novembre 2025. GitHub : un repo public de 25 commits, actif sur les mêmes mois. Poste confirmé par le code.");
+    expect(emp).toContain("LinkedIn : stage ou alternance, février 2025 – novembre 2025. GitHub : un repo public de 25 commits, actif sur les mêmes mois. Poste confirmé par le code.");
     expect(emp).not.toMatch(/McMaster|Research Intern|agda-notes/);
     const own = textOf(rowsOf(render(item, false)).get("Parcours et employeurs")!);
     expect(own).toContain("Research Intern, McMaster University");

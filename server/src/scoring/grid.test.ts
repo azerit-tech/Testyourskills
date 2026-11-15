@@ -141,17 +141,17 @@ describe("les deux fondateurs (§7), à un point près", () => {
 
   it("les pièces se lisent poste par poste, avec les chiffres de la personne", () => {
     expect(crit(declaredGrid(decl(jacquesReading(), jacquesProfile())), "XP").evidence?.text.fr).toBe(
-      "13 mois de stage ou d'alternance comptés pour moitié. 7 mois à la tête d'Azerit. Centrale Méditerranée Finance est une association : non compté. Total : 1,1 an.",
+      "13 mois de stage ou d'alternance comptés pour moitié. 7 mois à la tête d'Azerit. Centrale Méditerranée Finance est une association : non compté. Total : 1,1 an.",
     );
-    expect(crit(jLinkedin, "EMP").next?.fr).toBe("Pour 6 : tenir Azerit un an (7 mois aujourd'hui), ou un poste tenu deux ans.");
-    expect(crit(jGithub, "STK").next?.fr).toBe("Pour 8 : 500 commits dans ton langage principal (tu en as 329).");
-    expect(crit(jGithub, "STK").evidence?.text.fr).toMatch(/^TypeScript : 329 commits dans 7 repos depuis novembre 2024, dernier push hier \(sequence-mail\)\. Agda aussi dans le code\.$/);
+    expect(crit(jLinkedin, "EMP").next?.fr).toBe("Pour 6 : tenir Azerit un an (7 mois aujourd'hui), ou un poste tenu deux ans.");
+    expect(crit(jGithub, "STK").next?.fr).toBe("Pour 8 : 500 commits dans ton langage principal (tu en as 329).");
+    expect(crit(jGithub, "STK").evidence?.text.fr).toMatch(/^TypeScript : 329 commits dans 7 repos depuis novembre 2024, dernier push hier \(sequence-mail\)\. Agda aussi dans le code\.$/);
     expect(crit(jGithub, "CODE").reached.fr).toBe("Niveau moyen lu 3,6 sur 5, sur 3 repos.");
-    expect(crit(jGithub, "CODE").evidence?.text.fr).toMatch(/^sequence-mail, `src\/services\/outreach\.test\.ts` : niveau 4 sur 5\./);
+    expect(crit(jGithub, "CODE").evidence?.text.fr).toMatch(/^sequence-mail, `src\/services\/outreach\.test\.ts` : niveau 4 sur 5\./);
     expect(crit(jGithub, "CODE").evidence?.proof).toBe("https://github.com/jmougeot/sequence-mail/blob/main/src/services/outreach.test.ts");
-    expect(crit(jGithub, "ACT").next?.fr).toBe("Pour 10 : 48 semaines actives (tu en as 43).");
+    expect(crit(jGithub, "ACT").next?.fr).toBe("Pour 10 : 48 semaines actives (tu en as 43).");
     expect(crit(jGithub, "OSS").next?.fr).toMatch(/La destination des PR n'est pas encore lue\.$/);
-    expect(crit(jGithub, "XP").reached.fr).toMatch(/^Estimée : 2 années actives/);
+    expect(crit(jGithub, "XP").reached.fr).toMatch(/^Estimée : 2 années actives/);
   });
 
   it("la comparaison garde les deux notes de chaque critère, et retient le prouvé", () => {
@@ -175,15 +175,15 @@ describe("les recoupements LinkedIn × GitHub : la pièce « recoupé » (§3, �
     const g = jCase();
     expect(both(g)).toEqual(["XP", "EMP", "STK", "OWN"]);
     expect(crit(g, "XP").evidence!.text.fr).toBe(
-      "13 mois de stage ou d'alternance comptés pour moitié. 7 mois à la tête d'Azerit. Centrale Méditerranée Finance est une association : non compté. Total : 1,1 an. GitHub : 2 années actives (50 contributions ou plus sur douze mois). Recoupé\u00a0: le code public couvre la même période.",
+      "13 mois de stage ou d'alternance comptés pour moitié. 7 mois à la tête d'Azerit. Centrale Méditerranée Finance est une association : non compté. Total : 1,1 an. GitHub : 2 années actives (50 contributions ou plus sur douze mois). Recoupé\u00a0: le code public couvre la même période.",
     );
     expect(crit(g, "EMP").evidence!.text.fr).toBe(
-      "LinkedIn : Research Intern, McMaster University, février 2025 – novembre 2025. GitHub : agda-notes, 25 commits, actif sur les mêmes mois. Poste confirmé par le code.",
+      "LinkedIn : Research Intern, McMaster University, février 2025 – novembre 2025. GitHub : agda-notes, 25 commits, actif sur les mêmes mois. Poste confirmé par le code.",
     );
     expect(crit(g, "STK").evidence!.text.fr).toMatch(/\(sequence-mail\)\. Agda aussi dans le code\. Déclarées sur LinkedIn\u00a0: Python, Agda, TypeScript, Kubernetes\. Retrouvées dans le code\u00a0: Agda, TypeScript\.$/);
-    expect(crit(g, "OWN").evidence!.text.fr).toBe("sequence-mail : 120 commits sur 17 mois. Sur LinkedIn\u00a0: une entreprise fondée (Azerit). Aucun résultat daté et chiffré.");
+    expect(crit(g, "OWN").evidence!.text.fr).toBe("sequence-mail : 120 commits sur 17 mois. Sur LinkedIn\u00a0: une entreprise fondée (Azerit). Aucun résultat daté et chiffré.");
     // Un dossier, une fiche, une note (§18.36) : aucune tournure d'écart dans les pièces.
-    for (const c of g.criteria) expect(JSON.stringify([c.evidence, c.flags]), c.code).not.toMatch(/Sans trace publique|Moins d'années|Du code public sur plus|en dessous de la vérité|Déclaré :/);
+    for (const c of g.criteria) expect(JSON.stringify([c.evidence, c.flags]), c.code).not.toMatch(/Sans trace publique|Moins d'années|Du code public sur plus|en dessous de la vérité|Déclaré :/);
   });
 
   it("un recoupement ne change aucune note, ni la note du dossier", () => {
@@ -201,7 +201,7 @@ describe("les recoupements LinkedIn × GitHub : la pièce « recoupé » (§3, �
     expect(xp.score).toBe(crit(declaredGrid(d), "XP").score);
     expect(withGh.overall).toBe(declaredGrid(d).overall);
     expect(xp.evidence!.source).toBe("linkedin");
-    expect(xp.evidence!.text.fr).toMatch(/ GitHub : 2 années actives \(50 contributions ou plus sur douze mois\)\.$/);
+    expect(xp.evidence!.text.fr).toMatch(/ GitHub : 2 années actives \(50 contributions ou plus sur douze mois\)\.$/);
     expect(xp.evidence!.publicText!.fr).not.toMatch(/GitHub/);
     const flag = "À confirmer en entretien : une partie de ces années ne se voit pas en code public. C'est courant, le code d'entreprise est privé.";
     expect(xp.flags.map((x) => x.fr)).toContain(flag);
@@ -231,8 +231,8 @@ describe("les recoupements LinkedIn × GitHub : la pièce « recoupé » (§3, �
     ] };
     const emp = crit(jCase(f), "EMP").evidence!;
     expect(emp.source).toBe("both");
-    expect(emp.text.fr).toContain("GitHub : 2 PR fusionnées dans agda/agda-stdlib sur ces mois. Poste confirmé par le code.");
-    expect(emp.publicText!.fr).toBe("LinkedIn : stage ou alternance, février 2025 – novembre 2025. GitHub : 2 PR fusionnées dans un repo public sur ces mois. Poste confirmé par le code.");
+    expect(emp.text.fr).toContain("GitHub : 2 PR fusionnées dans agda/agda-stdlib sur ces mois. Poste confirmé par le code.");
+    expect(emp.publicText!.fr).toBe("LinkedIn : stage ou alternance, février 2025 – novembre 2025. GitHub : 2 PR fusionnées dans un repo public sur ces mois. Poste confirmé par le code.");
   });
 
   it("sans dépôt du poste : le même employeur sur le profil GitHub, pour le poste en cours", () => {
@@ -240,7 +240,7 @@ describe("les recoupements LinkedIn × GitHub : la pièce « recoupé » (§3, �
     f.repos = f.repos.filter((r) => r.name !== "agda-notes");
     const emp = crit(jCase(f), "EMP").evidence!;
     expect(emp.source).toBe("both");
-    expect(emp.text.fr).toBe("LinkedIn : Co-founder, Azerit, depuis avril 2026. Profil GitHub, société : Azerit. Même employeur des deux côtés.");
+    expect(emp.text.fr).toBe("LinkedIn : Co-founder, Azerit, depuis avril 2026. Profil GitHub, société : Azerit. Même employeur des deux côtés.");
     expect(emp.publicText!.fr).not.toMatch(NAMES);
     // Ni dépôt, ni société, ni site : la pièce reste celle de LinkedIn.
     f.profile = { ...f.profile, company: null, blog: null };

@@ -82,7 +82,7 @@ describe("LinkedinRole.contract → Expérience", () => {
     const reading = read({ ...rawUn(), roles: [] }, text);
     const d = input(profile, reading);
     expect(kindAt(d, "Fonds Exemple")).toBe("internship");
-    expect(crit(d, "XP").evidence!.text.fr).toMatch(/^13 mois de stage ou d'alternance comptés pour moitié\./);
+    expect(crit(d, "XP").evidence!.text.fr).toMatch(/^13 mois de stage ou d'alternance comptés pour moitié\./);
 
     editItem(item, "Fonds Exemple", { employmentType: undefined });
     const plain = collected(item);
@@ -152,8 +152,8 @@ describe("CvRole.kind → Expérience, rattaché au poste du profil par l'entrep
     const d2 = input(bare.profile, read(raw, bare.text));
     expect(kindAt(d2, "Atelier Perso")).toBe("project");
     const xp = crit(d2, "XP");
-    expect(xp.evidence!.text.fr).toContain("Atelier Perso est un projet personnel : non compté.");
-    expect(xp.evidence!.text.fr).toMatch(/Total : 1,1 an\.$/);
+    expect(xp.evidence!.text.fr).toContain("Atelier Perso est un projet personnel : non compté.");
+    expect(xp.evidence!.text.fr).toMatch(/Total : 1,1 an\.$/);
   });
 });
 
@@ -166,7 +166,7 @@ describe("CvRole.employer_type → Parcours", () => {
     editReading(raw, "Sejo", { title: "Product Manager", end: "2025-09" });
     const emp = crit(input(profile, read(raw, text)), "EMP");
     expect(emp.score).toBe(6);
-    expect(emp.reached.fr).toBe("12 mois dans une startup de produit : Sejo.");
+    expect(emp.reached.fr).toBe("12 mois dans une startup de produit : Sejo.");
 
     editReading(raw, "Sejo", { employer_type: undefined });
     expect(crit(input(profile, read(raw, text)), "EMP").score).toBe(4);
@@ -182,7 +182,7 @@ describe("CvReading.selection_signals → École et sélection", () => {
     const reading = read(raw, text);
     expect(reading.selection_signals).toEqual([{ kind: "hackathon_prize", quote: "Prix du jury, Hackathon Exemple 2024" }]);
     const edu = crit(input(profile, reading), "EDU");
-    expect([edu.score, edu.reached.fr]).toEqual([8, "Sélection : prix de hackathon."]);
+    expect([edu.score, edu.reached.fr]).toEqual([8, "Sélection : prix de hackathon."]);
 
     const invented = read({ ...rawUn(), selection_signals: [{ kind: "hackathon_prize", quote: "Prix au hackathon de la Lune" }] }, text);
     expect(crit(input(profile, invented), "EDU").score).toBe(6);
@@ -203,7 +203,7 @@ describe("CvReading.management_fact → Parcours", () => {
     const { profile, text } = collected(item);
     const reading = read({ ...rawUn(), management_quote: "Encadrement d'une équipe de trois développeurs." }, text);
     expect(reading.management_fact).toEqual({ quote: "Encadrement d'une équipe de trois développeurs." });
-    expect(crit(input(profile, reading), "EMP").flags.map((x) => x.fr)).toEqual(["Équipe encadrée : « Encadrement d'une équipe de trois développeurs. »"]);
+    expect(crit(input(profile, reading), "EMP").flags.map((x) => x.fr)).toEqual(["Équipe encadrée : « Encadrement d'une équipe de trois développeurs. »"]);
 
     const invented = read({ ...rawUn(), management_quote: "A dirigé cinquante personnes." }, text);
     expect(invented.management_fact).toBeNull();
@@ -232,7 +232,7 @@ describe("la liste des employeurs à forte barre → Parcours, niveau 10", () =>
     const withList = declaredGrid(declaredInput(reading, { profile: declaredLinkedin(profile), now: NOW, highBar: list })).criteria.find((c) => c.code === "EMP")!;
     expect(list.employers.length).toBe(3);
     expect(withList.score).toBe(10);
-    expect(withList.reached.fr).toBe("3,9 ans chez Fictiva Labs Paris, employeur à forte barre d'embauche, et une équipe encadrée.");
+    expect(withList.reached.fr).toBe("3,9 ans chez Fictiva Labs Paris, employeur à forte barre d'embauche, et une équipe encadrée.");
     expect(crit(input(profile, reading), "EMP").score).toBe(6);
   });
 
@@ -255,7 +255,7 @@ describe("les deux profils d'exemple, du fournisseur à la note de la fiche Link
   it("exemple un : 41 ; exemple deux : 45 (docs/bareme-recrutement.md §7)", () => {
     const un = card(itemUn(), rawUn());
     expect(un.grid!.criteria.find((c) => c.code === "XP")!.evidence!.text.fr).toBe(
-      "13 mois de stage ou d'alternance comptés pour moitié. 7 mois à la tête d'Azerit. Centrale Méditerranée Finance est une association : non compté. Total : 1,1 an.",
+      "13 mois de stage ou d'alternance comptés pour moitié. 7 mois à la tête d'Azerit. Centrale Méditerranée Finance est une association : non compté. Total : 1,1 an.",
     );
     expect(un.overall).toBe(41);
     expect(card(itemDeux(), rawDeux()).overall).toBe(45);

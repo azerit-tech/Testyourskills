@@ -163,7 +163,7 @@ describe("le profil LinkedIn rangé va au scoreur (§18.37)", () => {
     const card = scoreCv(READING, cvCounts(), { lang: "fr", judgedInSeconds: 6, linkedin: fit, now: "2026-11-10T12:00:00Z" });
     const xp = card.grid!.criteria.find((c) => c.code === "XP")!;
     // 2022-03 → 2026-11 : 56 mois ; stage de 6 mois à moitié : 3 mois. 59 mois, 4,9 ans.
-    expect(xp.reached.fr).toMatch(/^4,9 ans comptés/);
+    expect(xp.reached.fr).toMatch(/^4,9 ans comptés/);
     // L'école est celle que retient la lecture du profil, pas la liste de formation brute
     // (un semestre d'échange n'y compte pas) : ici la lecture n'en retient aucune.
     expect(card.grid!.criteria.find((c) => c.code === "EDU")!.state).toBe("missing");

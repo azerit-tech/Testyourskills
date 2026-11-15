@@ -32,13 +32,13 @@
       "id": "delivery_machine",
       "any": [{ "rule": "stat_at_least", "params": { "SHIP": 85 } }],
       "label": { "fr": "Machine à livrer", "en": "Delivery machine" },
-      "tagline": { "fr": "Livre plus vite que la police ne lit", "en": "Ships faster than the cops can read" }
+      "tagline": { "fr": "Livre plus vite que la police ne suit", "en": "Ships faster than the cops can keep up" }
     },
     {
       "id": "night_owl",
       "any": [{ "rule": "night_commits", "params": { "minShare": 0.15, "minSample": 10 } }],
       "label": { "fr": "Oiseau de nuit", "en": "Night owl" },
-      "tagline": { "fr": "Les meilleurs coups partent à 3 h du matin", "en": "The best jobs go out at 3am" }
+      "tagline": { "fr": "Les meilleurs coups partent à 3 h du matin", "en": "The best jobs go out at 3am" }
     },
     {
       "id": "arsonist",
@@ -50,7 +50,7 @@
       "id": "repeat_offender",
       "any": [{ "rule": "lazy_commits", "params": { "minShare": 0.4, "minSample": 10 } }],
       "label": { "fr": "Récidiviste", "en": "Repeat offender" },
-      "tagline": { "fr": "fix, fix2, final fix : une signature de légende", "en": "fix, fix2, final fix: a signature move" }
+      "tagline": { "fr": "fix, fix2, final fix : une signature de légende", "en": "fix, fix2, final fix: a signature move" }
     },
     {
       "id": "hoarder",
@@ -80,7 +80,7 @@
       "id": "ghost",
       "any": [{ "rule": "few_public_repos", "params": { "below": 3 } }],
       "label": { "fr": "Fantôme", "en": "Ghost" },
-      "tagline": { "fr": "Aucune trace publique : du travail de pro", "en": "No public trace: strictly pro work" }
+      "tagline": { "fr": "Aucune trace publique : du travail de pro", "en": "No public trace: strictly pro work" }
     },
     {
       "id": "sleeper_agent",

@@ -22,12 +22,14 @@ import { isTutorialRepo, type GithubMetrics } from "./derive";
 import { highBarEmployer, type HighBarList } from "./employers";
 import { normSchool, schoolListNames, schoolTier } from "./school";
 import { EDU_NEXT, EDU_NEXT_GITHUB, SCHOOL_COUNTED, schoolCounted } from "../../../shared/schoolRank";
+import { frTypo } from "../../../shared/typo";
 
 const DAY = 86_400_000;
 const YEAR = 365.25 * DAY;
 const MONTH = YEAR / 12;
 
-const f = (fr: string, en: string): Fact => ({ fr, en });
+// Les faits sortent en typographie française juste (insécables avant « : », dans les guillemets, entre nombre et unité).
+const f = (fr: string, en: string): Fact => ({ fr: frTypo(fr), en });
 /** Minuscules, sans accents, espaces réduites ; la ponctuation reste. */
 const norm = (s: string) =>
   s

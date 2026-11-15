@@ -179,7 +179,7 @@ describe("la fiche porte son profil et sa peine", () => {
     const card = scoreGithub(nightFacts(), null, opts);
     expect(card.profile?.id).toBe("night_owl");
     expect(card.profile?.label).toEqual({ fr: "Oiseau de nuit", en: "Night owl" });
-    expect(card.sentence?.label.fr).toMatch(/^Peine : |^Relaxe/);
+    expect(card.sentence?.label.fr).toMatch(/^Peine : |^Relaxe/);
   });
 
   it("fiche CV : le profil ne lit que le CV", () => {
@@ -207,22 +207,22 @@ const st = (id: string, tone: StatusInstance["tone"] = "negative"): StatusInstan
 describe("la peine et la caution §18.2", () => {
   it("l'axe le plus faible parmi TEC, SHIP, ARCH, DOC ; n = ⌈(80 − v) / 5⌉", () => {
     const s = sentenceFor({ ...N, TEC: 70, SHIP: 75, ARCH: 60, DOC: 66, XP: 1 }, [st("gh_no_tests")]);
-    expect(s.label).toEqual({ fr: "Peine : 4 mois de tests unitaires", en: "Sentence: 4 months of unit tests" });
-    expect(s.bail).toEqual({ fr: "Caution : un dossier de tests", en: "Bail: one test folder" });
-    expect(sentenceFor({ ...N, TEC: 61, SHIP: 90, ARCH: 90, DOC: 90 }, []).label.fr).toBe("Peine : relire 4 PR pour l'équipe de maintenance");
-    expect(sentenceFor({ ...N, TEC: 90, SHIP: 41, ARCH: 90, DOC: 90 }, []).label.fr).toBe("Peine : 8 semaines de commits");
-    expect(sentenceFor({ ...N, TEC: 90, SHIP: 90, ARCH: 90, DOC: 1 }, []).label.en).toBe("Sentence: 16 READMEs of 300 words");
+    expect(s.label).toEqual({ fr: "Peine : 4 mois de tests unitaires", en: "Sentence: 4 months of unit tests" });
+    expect(s.bail).toEqual({ fr: "Caution : un dossier de tests", en: "Bail: one test folder" });
+    expect(sentenceFor({ ...N, TEC: 61, SHIP: 90, ARCH: 90, DOC: 90 }, []).label.fr).toBe("Peine : relire 4 PR pour l'équipe de maintenance");
+    expect(sentenceFor({ ...N, TEC: 90, SHIP: 41, ARCH: 90, DOC: 90 }, []).label.fr).toBe("Peine : 8 semaines de commits");
+    expect(sentenceFor({ ...N, TEC: 90, SHIP: 90, ARCH: 90, DOC: 1 }, []).label.en).toBe("Sentence: 16 READMEs, 300 words each");
   });
 
   it("au moins 1, au singulier", () => {
     const s = sentenceFor({ ...N, TEC: 79, SHIP: 80, ARCH: 80, DOC: 80 }, []);
-    expect(s.label).toEqual({ fr: "Peine : relire 1 PR pour l'équipe de maintenance", en: "Sentence: review 1 maintainer PR" });
+    expect(s.label).toEqual({ fr: "Peine : relire 1 PR pour l'équipe de maintenance", en: "Sentence: review 1 maintainer PR" });
     expect(sentenceFor({ ...N, TEC: 80, SHIP: 79, ARCH: 80, DOC: 80 }, []).label.en).toBe("Sentence: 1 week of commits");
   });
 
   it("à égalité, le premier de la liste TEC, SHIP, ARCH, DOC", () => {
-    expect(sentenceFor({ ...N, TEC: 60, SHIP: 60, ARCH: 60, DOC: 60 }, []).label.fr).toBe("Peine : relire 4 PR pour l'équipe de maintenance");
-    expect(sentenceFor({ ...N, TEC: 70, SHIP: 70, ARCH: 60, DOC: 60 }, []).label.fr).toBe("Peine : 4 mois de tests unitaires");
+    expect(sentenceFor({ ...N, TEC: 60, SHIP: 60, ARCH: 60, DOC: 60 }, []).label.fr).toBe("Peine : relire 4 PR pour l'équipe de maintenance");
+    expect(sentenceFor({ ...N, TEC: 70, SHIP: 70, ARCH: 60, DOC: 60 }, []).label.fr).toBe("Peine : 4 mois de tests unitaires");
   });
 
   it("tous à 80 ou plus : relaxe, sans caution, même avec des chefs d'accusation", () => {
@@ -231,7 +231,7 @@ describe("la peine et la caution §18.2", () => {
   });
 
   it("la caution du premier chef d'accusation qui en a une ; aucune pour des positifs", () => {
-    expect(sentenceFor(N, [st("gh_ship_or_nothing", "positive"), st("gh_node_modules"), st("gh_no_tests")]).bail?.fr).toBe("Caution : un .gitignore");
+    expect(sentenceFor(N, [st("gh_ship_or_nothing", "positive"), st("gh_node_modules"), st("gh_no_tests")]).bail?.fr).toBe("Caution : un .gitignore");
     expect(sentenceFor(N, [st("gh_ship_or_nothing", "positive"), st("fallback_clean_record", "positive")]).bail).toBeUndefined();
   });
 

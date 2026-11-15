@@ -55,7 +55,7 @@ export const STRINGS = {
       /** Repli d'une pièce qui ne se montre pas en public : d'où elle vient. */
       readOn: (src: string) => `Lu sur ${src}.`,
       /** Fiche sans grille rangée (dénoncée, pas encore reprise) : d'où vient la note, sans formule. */
-      fromGrid: "Note lue sur la grille de recrutement : huit critères, chacun noté sur 10.",
+      fromGrid: `Note lue sur la grille de recrutement${NBSP}: huit critères, chacun noté sur 10.`,
       axes: { TEC: "Technique", SHIP: "Livraison", ARCH: "Rigueur", DOC: "Communication", XP: "Expérience", BUZZ: "Buzzwords" },
       noFact: "Aucun fait relevé",
       rating: "La note",
