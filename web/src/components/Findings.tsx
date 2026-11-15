@@ -1,8 +1,9 @@
 // L'enquête en direct (SPEC §18.26) : une trouvaille, son chiffre clé en rose
-// poudré ; et, sous la fiche, « Le dossier » : les trois plus fortes, chacune
-// cliquable vers sa preuve publique.
+// poudré ; et, sous la fiche, « Aussi au dossier » : les trois plus fortes, chacune
+// cliquable vers sa preuve publique, dans une ligne repliée (§18.48).
 import type { CardData, Finding, Lang } from "../../../shared/types";
 import { pick, useT } from "../i18n";
+import { Fold } from "./After";
 
 /** La phrase, avec le chiffre clé mis en avant s'il s'y lit tel quel. */
 export function FindingText({ finding, lang }: { finding: Finding; lang: Lang }) {
@@ -30,8 +31,7 @@ export function Dossier({ card }: { card: CardData }) {
   if (!list.length) return null;
   const d = t.result.dossier;
   return (
-    <section className="after-block dossier" aria-labelledby="dossier-title">
-      <h2 id="dossier-title">{d.title}</h2>
+    <Fold name="dossier" title={d.title}>
       <ol className="dossier-list">
         {list.map((f, i) => {
           const href = safeProof(f.proof);
@@ -62,6 +62,6 @@ export function Dossier({ card }: { card: CardData }) {
           );
         })}
       </ol>
-    </section>
+    </Fold>
   );
 }

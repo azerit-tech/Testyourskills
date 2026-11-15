@@ -509,6 +509,13 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
   }, [wantedYou, id]);
   const other = mine && mine.id !== id && !(mine.login && main.login && mine.login === main.login.toLowerCase()) ? mine : null;
   const proveFirst = item.kind === "card" && declaredOf(item.card) === "linkedin";
+  // La source qui manque au dossier, en bloc : le GitHub d'une fiche LinkedIn seule, le LinkedIn d'une fiche GitHub seule.
+  const missing =
+    visitor || item.kind !== "card" ? null : proveFirst ? (
+      <AddSource card={main} />
+    ) : item.card.source === "github" && item.card.login ? (
+      <AddLinkedin login={item.card.login} />
+    ) : null;
 
   return (
     <main className={`page page-card page-result${animating ? " is-animating" : ""}${visitor ? " is-visitor" : ""}`} id="main">
@@ -574,8 +581,10 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
             {/* Le jury (§18.27) : un geste à un toucher, avant « Et toi ? ». */}
             <Jury cardId={id} card={main} jury={kase?.jury ?? null} toast={toast.show} />
             <Penalty card={main} />
-            {/* L'enquête en direct (§18.26) : les trois trouvailles les plus fortes, chacune vers sa preuve. */}
-            <Dossier card={main} />
+            {/* L'enquête en direct (§18.26) : les trois trouvailles les plus fortes, chacune vers sa preuve, en ligne repliée. */}
+            <div className="rest">
+              <Dossier card={main} />
+            </div>
             <section className="you" id="you" aria-labelledby="you-title">
               <h2 id="you-title">{t.denounce.andYou}</h2>
               {other ? (
@@ -600,32 +609,30 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
       </div>
 
       <div className={`after${settled ? " is-in" : ""}`} aria-hidden={!settled} inert={!settled ? true : undefined}>
-        {/* L'après-fiche raccourci (§18.27) : le pari et le jury, la peine, le partage, la dénonciation, le dossier, puis le reste en lignes. */}
-        {/* « Tu es en course » (§18.5) : en tête, seulement si une prime est ouverte. */}
-        {!visitor && <PrimeRace cardId={id} card={main} />}
-        {/* Les critères (§18.37, §18.48) : un seul bloc, la ligne du recruteur, les huit tuiles, le détail replié. */}
-        {!visitor && <RecruiterRead item={item} shared={false} who={main.login ? `@${main.login}` : main.name} />}
+        {/* L'après-fiche dans l'ordre de §18.48 : le verdict, le partage, la bande, dénoncer, la course aux primes, les critères, puis le reste replié. */}
+        {/* Le verdict : le pari, le jury, la peine et la caution, un seul bloc aligné à gauche. Vide, il ne s'affiche pas. */}
         {!visitor && (
           <div className="after-head">
             <PleaVerdict cardId={id} overall={main.overall} shown={settled} />
             <JuryLine jury={kase?.jury ?? null} />
+            <Penalty card={main} />
           </div>
         )}
-        {!visitor && <Penalty card={main} />}
         {/* Fiche masquée : /og/* et /c/:id répondent 404 / 410 à tous, l'image ne se télécharge pas et le lien ne montre rien. */}
         {!visitor && !(claimed && me?.hidden) && <ShareBar item={item} toast={toast.show} />}
-        {/* Dénonce un complice (§18.6), juste après le partage. */}
-        {!visitor && <Denounce cardId={id} selfLogin={cardLogin} toast={toast.show} />}
-        {/* Tu roules pour qui ? (§18.38) : l'école et la boîte, après la dénonciation, avant le dossier. */}
+        {/* Tu roules pour qui ? (§18.38) : l'école et la boîte, la raison de partager, juste après le partage. */}
         {!visitor && <BandPick cardId={id} toast={toast.show} />}
-        {/* L'enquête en direct (§18.26) : les trois trouvailles les plus fortes, chacune vers sa preuve. */}
-        {!visitor && <Dossier card={main} />}
-        {/* Fiche LinkedIn seule (§18.24) : « Ajoute ton GitHub pour prouver » est l'appel principal, pas une ligne repliée. */}
-        {!visitor && proveFirst && <AddSource card={main} />}
-        {/* Fiche GitHub seule, en miroir : « Ajoute ton LinkedIn au dossier » (§18.37). */}
-        {!visitor && item.kind === "card" && item.card.source === "github" && item.card.login && <AddLinkedin login={item.card.login} />}
+        {/* Dénonce un complice (§18.6). */}
+        {!visitor && <Denounce cardId={id} selfLogin={cardLogin} toast={toast.show} />}
+        {/* « Tu es en course » (§18.5) : seulement si une prime est ouverte, après le partage. */}
+        {!visitor && <PrimeRace cardId={id} card={main} />}
+        {/* Les critères (§18.37, §18.48) : un seul bloc, la ligne du recruteur, les huit tuiles, le détail replié. */}
+        {!visitor && <RecruiterRead item={item} shared={false} who={main.login ? `@${main.login}` : main.name} />}
+        {/* La source qui manque, sous les critères qu'elle ouvre : « Ajoute ton GitHub » (§18.24) ou, en miroir, « Ajoute ton LinkedIn » (§18.37). */}
+        {missing}
         <div className="rest">
-          {/* La peine est déjà sous la fiche. */}
+          {/* L'enquête en direct (§18.26) : les trois trouvailles les plus fortes, chacune vers sa preuve, en ligne repliée. */}
+          {!visitor && <Dossier card={main} />}
           {/* Ses pièces à conviction sont au dos de la fiche (§18.27), dossier à deux pièces compris. */}
           {/* Fiche dénoncée : « Appeler mon avocat » est déjà sous la fiche. */}
           {!(wantedYou && claimOn) && <Claim cardId={id} login={cardLogin} lawyer={!owner} me={me} onMe={onMe} toast={toast.show} />}

@@ -2518,15 +2518,33 @@ button.cover-panel:focus-visible {
   color: var(--c-text);
   text-wrap: balance;
 }
-/* en tête de l'après-fiche : le pari et le jury, centrés dans la même bande */
+/* en tête de l'après-fiche, le verdict : le pari, le jury, la peine et la caution dans un même bloc,
+   alignés à gauche sur le contenu des autres blocs */
 .after-head {
   display: grid;
-  justify-items: center;
-  gap: 8px;
-  text-align: center;
+  gap: 10px;
+  padding: var(--pad-block);
+  border-radius: var(--r-block);
+  background: var(--s-item);
 }
 .after-head:empty {
   display: none;
+}
+.after-head .plea-verdict {
+  justify-items: start;
+  text-align: left;
+}
+.after-head .jury-line {
+  text-wrap: pretty;
+}
+/* la peine et la caution : deux lignes discrètes sous le verdict, séparées de lui par un filet */
+.after-head .penalty {
+  font: var(--font-small);
+  color: var(--c-text);
+}
+.after-head > :not(.penalty) + .penalty {
+  padding-top: 10px;
+  border-top: 1px solid var(--c-line);
 }
 
 /* « Fais la tienne » toujours visible (§18.27) : téléphone seulement */
@@ -3472,19 +3490,14 @@ a.dossier-item:hover {
   color: var(--c-text);
 }
 
-/* moins de boîtes : les blocs respirent (16 px), le bloc recruteur se pose sur l'encre sans aplat ;
-   le jury, le dossier, le partage et la dénonciation gardent leur fond de carte */
+/* les blocs respirent (16 px) ; chaque texte vit dans un bloc, le bloc recruteur compris :
+   plus de ligne flottante entre deux cartes */
 .page-result .visitor-col,
 .page-result .after {
   gap: 16px;
 }
 .page-result.is-visitor .after {
   padding-top: 16px;
-}
-.page-result .hire {
-  padding: 4px 0 0;
-  border-radius: 0;
-  background: none;
 }
 
 @media (min-width: 900px) {
