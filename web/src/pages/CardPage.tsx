@@ -222,8 +222,9 @@ export function CardPage({ id }: { id: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Titre de l'onglet.
+  // Titre de l'onglet. Fiche introuvable ou serveur muet : le gabarit d'erreur pose le sien.
   useEffect(() => {
+    if (view.s === "none" || view.s === "down") return;
     if (view.s !== "done") {
       document.title = t.meta.title;
       return;

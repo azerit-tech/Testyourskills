@@ -2450,26 +2450,18 @@ button.cover-panel:focus-visible {
     --card-w: clamp(calc((100vw - 32px) * 0.92), calc((100svh - 182px) * 0.6923), min(360px, calc(100vw - 32px)));
   }
 }
-/* le lien qui retourne la fiche (card.css) : rose parce qu'il se touche, centré sur l'axe de la fiche */
-.page-result .tys-card__flip {
-  right: 50%;
-  transform: translateX(50%);
-  color: var(--c-action);
-}
-.page-result .tys-card__flip:hover,
-.page-result .tys-card__flip:active {
-  color: var(--c-emphasis);
-}
-/* « Revoir ma poursuite » sous la fiche, à gauche, quand la tête est masquée : la ligne sous la fiche
-   porte alors les deux liens, la poursuite à gauche, les pièces à conviction à droite */
+/* « Revoir ma poursuite » sous la fiche quand la tête est masquée : une seconde ligne centrée, sous
+   « Voir les pièces à conviction », tout sur l'axe de la fiche ; la fiche réserve la place des deux lignes */
 .stage-chase {
   display: none;
   position: absolute;
-  top: calc(8px + var(--card-w) * 520 / 360);
-  left: calc(50% - var(--card-w) / 2 - 8px);
+  top: calc(8px + var(--card-w) * 520 / 360 + 44px);
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 2;
   height: 44px;
   align-items: center;
+  white-space: nowrap;
 }
 /* sous la fiche, sur l'encre : rose, même quand la tête passe à l'encre sur un ciel clair */
 .page-result .stage-chase .chase-link,
@@ -2496,9 +2488,8 @@ button.cover-panel:focus-visible {
   .page-result.is-visitor .stage-chase {
     display: flex;
   }
-  .page-result.is-visitor .result-stage:has(> .stage-chase) .tys-card__flip {
-    right: -8px;
-    transform: none;
+  .page-result.is-visitor .result-stage:has(> .stage-chase) .card-slot {
+    margin-bottom: 88px;
   }
 }
 /* téléphone court (sous 760 px de haut) : la tête répète la plaque de la fiche, elle se masque pour la fiche */
@@ -2515,9 +2506,8 @@ button.cover-panel:focus-visible {
   .page-result .stage-chase {
     display: flex;
   }
-  .page-result .result-stage:has(> .stage-chase) .tys-card__flip {
-    right: -8px;
-    transform: none;
+  .page-result .result-stage:has(> .stage-chase) .card-slot {
+    margin-bottom: 88px;
   }
 }
 .card-slot:not(.show-front) .card-rig {
