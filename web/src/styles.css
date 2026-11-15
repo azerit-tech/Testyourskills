@@ -3046,22 +3046,22 @@ a.dossier-item:hover {
   isolation: isolate;
 }
 .card-sky {
-  /* La hauteur de l'image, plus grande que le cadre : son cinquième haut, du ciel seul, couvre la barre
-     et l'en-tête (64 + 70 px) ; l'aplat sombre du bas sort du cadre. Rendue en 1 230 × 820 à 390 px. */
-  --sky-img: 820px;
+  /* Le ciel seul : le cadre s'arrête au cinquième haut de l'image (220 px sur 1 100), là où il n'y a ni
+     arbre ni immeuble. Il couvre la barre et l'en-tête (64 + 80 px), puis se fond dans l'encre derrière
+     le haut de la fiche : de part et d'autre de la fiche, aucun morceau de décor ne dépasse. */
+  --sky-img: 1100px;
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   z-index: -1;
-  height: 50vh;
-  height: 50svh;
+  height: 220px;
   overflow: hidden;
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.9s ease;
-  -webkit-mask-image: linear-gradient(to bottom, #000 62%, transparent);
-  mask-image: linear-gradient(to bottom, #000 62%, transparent);
+  -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent);
+  mask-image: linear-gradient(to bottom, #000 70%, transparent);
 }
 .card-sky.is-in {
   opacity: 1;
