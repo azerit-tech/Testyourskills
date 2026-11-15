@@ -787,9 +787,11 @@ svg {
   padding: 0 var(--gutter);
   transition: opacity 0.6s ease;
 }
+/* 44 px à toucher, même réduite à la gemme (320 px, primes ouvertes) */
 .topbar-brand {
   display: inline-flex;
   align-items: center;
+  min-width: var(--h-tap);
   min-height: var(--h-tap);
   margin-right: auto;
 }
@@ -3442,6 +3444,7 @@ a.dossier-item:hover {
 .footer-links a {
   display: inline-flex;
   align-items: center;
+  min-width: var(--h-tap);
   min-height: var(--h-tap);
   font: 500 var(--t-14) / 1 var(--f-text);
   color: var(--c-text);
