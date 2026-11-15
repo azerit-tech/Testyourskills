@@ -39,9 +39,13 @@ function bestStatus(card: CardData, lang: Lang): string | null {
   return s ? pick(s.label, lang) : null;
 }
 
-/** Profil, sinon le niveau (fiches d'avant le barème 0.2.0). */
-function tagOf(card: CardData, lang: Lang): string {
-  return card.profile ? pick(card.profile.label, lang) : pick(LEVEL_LABELS[starsFor(card.overall)], lang);
+/**
+ * Ce qui suit les étoiles : le nom du niveau (« Haute surveillance »), comme partout ailleurs (§18.48, un mot
+ * par chose). Un dossier scellé ne dit pas son niveau : son profil, s'il en a un.
+ */
+export function tagOf(card: CardData, lang: Lang): string {
+  if (card.sealed && card.profile) return pick(card.profile.label, lang);
+  return pick(LEVEL_LABELS[starsFor(card.overall)], lang);
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -258,7 +262,7 @@ export function Wanted({ card, toast, onAgain }: { card: CardData; toast: (m: st
 
   return (
     <section className="after-block denounce is-done" aria-live="polite">
-      {/* Le titre seul ; les étoiles et le profil sur leur ligne, jamais mêlés au texte. */}
+      {/* Le titre seul ; les étoiles et le nom du niveau sur leur ligne, jamais mêlés au texte. */}
       <h2 className="denounce-head">
         <span className="denounce-who-name">{who}</span> {d.inSights}
       </h2>

@@ -34,6 +34,9 @@ describe("Dénoncer : la fiche du complice", () => {
     );
     expect(sealed).not.toMatch(/[★☆]/);
     expect(sealed).not.toContain("star-shape");
+    // Après les étoiles, le nom du niveau, comme partout (§18.52) ; le profil ne vient qu'au dossier scellé.
+    expect(html).toContain('<span class="denounce-tag">Menace publique</span>');
+    expect(html).not.toContain("Machine à livrer");
   });
 
   it("« Envoyer à @x » d'abord, en rose ; LinkedIn en contour ; X n'est plus un bouton (§18.48)", () => {
