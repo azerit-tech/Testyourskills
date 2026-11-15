@@ -11,6 +11,7 @@ import { createApp } from "./app";
 import { SESSION_COOKIE, signSession } from "./auth";
 import { migrate, Store } from "./db";
 import { DENOUNCE_PER_DAY } from "./denounce";
+import type { LinkedinFinder } from "./linkedinProfile/index";
 import type { CardBody, Deps } from "./pipeline";
 
 const BASE = "https://skills.test";
@@ -56,14 +57,37 @@ const deps = {
   async renderImage() {
     return new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
   },
+  // Le chemin LinkedIn (dénoncer par un lien de profil, §18.48) : une fiche déclarée figée.
+  cvTextCounts: () => ({ words: 80, pages: 1, buzzwords: {}, buzzwordsPer100: 0, passionCount: 0 }),
+  async readCv() {
+    return { language: "fr", position: "FS", full_name: "Camille Ardent", is_dev_profile: true, roles: [], technos_listed: [], technos_described: [] };
+  },
+  scoreCv(_r: unknown, _c: unknown, { lang, judgedInSeconds }: { lang: "fr" | "en"; judgedInSeconds: number }) {
+    return { ...body(FIXTURES.cv), lang, judgedInSeconds };
+  },
 } as unknown as Deps;
+
+const LINKEDIN = "https://www.linkedin.com/in/camille-ardent";
+/** Un lecteur de profils factice : tout lien donne le même profil, sans GitHub relié. */
+const linkedinProfiles: LinkedinFinder = {
+  async forGithub() {
+    return null;
+  },
+  async forUrl(url) {
+    return {
+      status: "found",
+      githubLogin: null,
+      profile: { url, name: "Camille Ardent", headline: "Dev", title: "Dev", summary: "", roles: [], education: [], skills: [] },
+    };
+  },
+};
 
 const stores: Store[] = [];
 afterEach(() => {
   while (stores.length) stores.pop()!.close();
 });
 
-function setup() {
+function setup(opt: { linkedin?: boolean } = {}) {
   const store = new Store(":memory:");
   stores.push(store);
   const ogDir = join(mkdtempSync(join(tmpdir(), "tys-denounce-")), "og");
@@ -75,6 +99,7 @@ function setup() {
     baseUrl: BASE,
     ogDir,
     githubAuth: { clientId: "gh-client", clientSecret: "x", sessionSecret: SECRET },
+    ...(opt.linkedin ? { linkedinProfiles } : {}),
   });
   return { app, pipeline, store };
 }
@@ -204,6 +229,47 @@ describe("POST /api/card avec denouncedBy", () => {
     expect((await join(own.json.id, own.json.deleteToken!)).status).toBe(200);
     // Le jeton d'une fiche née d'une dénonciation est au dénonciateur : refusé.
     expect((await join(born.json.id, born.json.deleteToken!)).status).toBe(403);
+  });
+
+  it("par un lien LinkedIn, quand le serveur sait lire LinkedIn : la fiche naît dénoncée, le cache aussi la marque (§18.48)", async () => {
+    const ctx = setup({ linkedin: true });
+    const mine = await post(ctx, { login: "leamd" });
+    const r = await post(ctx, { linkedin: `${LINKEDIN}/?trk=x`, denouncedBy: mine.json.id });
+    expect(r.status).toBe(202);
+    // La marque suit la fin du calcul d'un tour de boucle (le moteur factice finit avant la réponse).
+    await new Promise((res) => setTimeout(res, 0));
+    const row = ctx.store.getCard(r.json.id)!;
+    expect(row).toMatchObject({ source: "linkedin", denouncedBy: mine.json.id, denounceBorn: true });
+    expect((await getCase(ctx, r.json.id)).json).toMatchObject({ denounced: true, by: null });
+    expect(ctx.store.listEvents("denounce_sent")).toMatchObject([{ cardId: r.json.id, meta: { by: mine.json.id } }]);
+    // Le champ unique envoie aussi le lien dans `login` : même chemin.
+    const again = await post(ctx, { login: "linkedin.com/in/camille-ardent", denouncedBy: mine.json.id });
+    expect(again.status).toBe(200);
+    expect(again.json.id).toBe(r.json.id);
+    expect(ctx.store.listEvents("denounce_sent")).toHaveLength(2);
+  });
+
+  it("par un lien LinkedIn : une fiche déjà faite par sa personne est dite dénoncée, pas reprise ; son propre lien n'est pas une dénonciation", async () => {
+    const ctx = setup({ linkedin: true });
+    const own = await post(ctx, { linkedin: LINKEDIN });
+    expect(own.status).toBe(202);
+    // Sa propre fiche LinkedIn, passée en denouncedBy avec son propre lien : rien.
+    const self = await post(ctx, { linkedin: LINKEDIN, denouncedBy: own.json.id });
+    expect(self.json.id).toBe(own.json.id);
+    expect(ctx.store.getCard(own.json.id)!.denouncedBy).toBeNull();
+    const snitch = await post(ctx, { login: "leamd" });
+    const r = await post(ctx, { linkedin: LINKEDIN, denouncedBy: snitch.json.id });
+    expect(r.json.id).toBe(own.json.id);
+    expect(ctx.store.getCard(own.json.id)).toMatchObject({ denouncedBy: snitch.json.id, denounceBorn: false });
+  });
+
+  it("sans lecteur de profils, un lien LinkedIn est refusé, dénonciation ou non", async () => {
+    const ctx = setup();
+    const mine = await post(ctx, { login: "leamd" });
+    const r = await post(ctx, { linkedin: LINKEDIN, denouncedBy: mine.json.id });
+    expect(r.status).toBe(400);
+    expect(r.json.code).toBe("linkedin");
+    expect(ctx.store.listEvents("denounce_sent")).toHaveLength(0);
   });
 
   it("ignore un denouncedBy inconnu, mal formé ou qui vise sa propre fiche", async () => {

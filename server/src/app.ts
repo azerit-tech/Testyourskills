@@ -532,17 +532,14 @@ export function createApp(opts: AppOptions) {
         if (!login) return c.json(errorBody("linkedin", MESSAGES.linkedin_off), 400);
         linkedinUrl = undefined;
       }
-      if (linkedinUrl && !login) {
-        const cached = recentLinkedinCard(store.db, { url: linkedinUrl });
-        if (cached) return c.json({ id: cached, cached: true }, 200);
-      }
 
       // Login masqué par son propriétaire : personne d'autre que lui n'en refait une fiche (§18.1).
       if (login && hiddenFrom(c, login)) return c.json(errorBody("gone", MESSAGES.gone), 410);
 
       // Dénonciation (§18.6) : cinq par jour et par IP, vérifiées avant tout calcul.
       const ip = clientIp(c);
-      const denounce = login && !pdf ? parseDenunciation(denouncedBy, login, store, c) : undefined;
+      // On dénonce un pseudo GitHub ou un lien LinkedIn (§18.48), jamais un CV.
+      const denounce = (login || linkedinUrl) && !pdf ? parseDenunciation(denouncedBy, { login, linkedin: linkedinUrl }, store, c) : undefined;
       if (denounce && !limiter.allowed("denounce", ip, DENOUNCE_PER_DAY)) {
         return c.json(errorBody("rate_limited", DENOUNCE_LIMITED), 429);
       }
@@ -560,6 +557,15 @@ export function createApp(opts: AppOptions) {
         if (store.getCard(id)) mark();
         else void pipeline.wait(id).then(mark);
       };
+
+      // Fiche LinkedIn récente du même profil : resservie, et dite dénoncée s'il y a lieu.
+      if (linkedinUrl && !login) {
+        const cached = recentLinkedinCard(store.db, { url: linkedinUrl });
+        if (cached) {
+          denounced(cached);
+          return c.json({ id: cached, cached: true }, 200);
+        }
+      }
 
       // Cache 24 h et déduplication des jobs en cours, pour GitHub seul (§4.7, §12).
       if (login && !pdf && !linkedinUrl) {

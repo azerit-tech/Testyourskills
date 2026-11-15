@@ -1,7 +1,8 @@
 // « Dénonce un complice » (SPEC §18.6) et ce que la page partagée en montre (§18.7).
 //
 // Envoi : POST /api/card { login, lang, denouncedBy } où denouncedBy est l'id
-// de la fiche du dénonciateur. La fiche du complice sort par le moteur habituel
+// de la fiche du dénonciateur ; à la place du pseudo GitHub, un lien de profil
+// LinkedIn (`linkedin`) quand le serveur sait lire LinkedIn (§18.48). La fiche du complice sort par le moteur habituel
 // (le cache 24 h compris) ; elle est marquée `cards.denounced_by`, cinq
 // dénonciations par jour et par IP au plus. Le login du dénonciateur n'est
 // gardé que s'il était connecté comme propriétaire de sa propre fiche (§18.1) :
@@ -43,14 +44,17 @@ export interface Denunciation {
 
 /**
  * Lit `denouncedBy` d'une demande de fiche. Rien (fiche normale) si l'id est
- * absent, mal formé, inconnu, ou si c'est sa propre fiche qu'on dénonce.
+ * absent, mal formé, inconnu, ou si c'est sa propre fiche qu'on dénonce (son
+ * pseudo GitHub, ou le lien LinkedIn dont elle est tirée).
  */
-export function parseDenunciation(raw: unknown, target: string, store: Store, c: Context): Denunciation | undefined {
+export function parseDenunciation(raw: unknown, target: { login?: string; linkedin?: string }, store: Store, c: Context): Denunciation | undefined {
   if (typeof raw !== "string" || !ID_RE.test(raw)) return undefined;
   const row = store.getCard(raw);
   if (!row) return undefined;
   const byLogin = store.loginOf(row);
-  if (byLogin && byLogin.toLowerCase() === target.toLowerCase()) return undefined;
+  if (byLogin && target.login && byLogin.toLowerCase() === target.login.toLowerCase()) return undefined;
+  const byLinkedin = (row.facts as { linkedinUrl?: unknown } | null)?.linkedinUrl;
+  if (target.linkedin && byLinkedin === target.linkedin) return undefined;
   const owner = ownerFromRequest(c);
   const named = owner && byLogin && owner.login === byLogin.toLowerCase() ? owner.login : null;
   return { byCardId: row.id, named };

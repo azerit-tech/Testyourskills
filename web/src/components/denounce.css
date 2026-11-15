@@ -106,6 +106,16 @@
   display: grid;
   gap: 8px;
 }
+/* « Envoyer à @pseudo » : un pseudo trop long se coupe, le bouton ne déborde pas */
+.denounce-actions .pill {
+  min-width: 0;
+}
+.denounce-send {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .denounce-links {
   display: flex;
   flex-wrap: wrap;

@@ -1,6 +1,6 @@
 // La barre du pouce (§18.27) : sur téléphone, dès que la fiche est posée, « Partager »
-// et « Dénoncer » restent sous le pouce. Elle s'efface quand le bloc de partage est à
-// l'écran, et pendant qu'on écrit dans un champ.
+// et « Dénoncer » restent sous le pouce. Elle s'efface quand le bloc de partage ou la
+// fiche d'un complice prête à envoyer est à l'écran, et pendant qu'on écrit dans un champ.
 import { useEffect, useState } from "react";
 import { useT } from "../i18n";
 import { useMediaQuery } from "../lib/util";
@@ -29,12 +29,33 @@ function Dock({ item, toast }: { item: Shareable; toast: (m: string) => void }) 
   const [blockSeen, setBlockSeen] = useState<boolean | null>(null);
   const [typing, setTyping] = useState(false);
 
+  // Un seul bouton rose par écran : la barre s'efface devant le bloc de partage, et devant la fiche
+  // d'un complice prête à envoyer (« Envoyer à @x »). Ce second bloc arrive et repart : on le guette.
   useEffect(() => {
-    const block = document.querySelector(".after-block.out");
-    if (!block || typeof IntersectionObserver !== "function") return setBlockSeen(false);
-    const io = new IntersectionObserver((entries) => setBlockSeen(entries[entries.length - 1].isIntersecting));
-    io.observe(block);
-    return () => io.disconnect();
+    if (typeof IntersectionObserver !== "function") return setBlockSeen(false);
+    const seen = new Set<Element>();
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        if (e.isIntersecting) seen.add(e.target);
+        else seen.delete(e.target);
+      }
+      setBlockSeen(seen.size > 0);
+    });
+    const scan = () => {
+      io.disconnect();
+      seen.clear();
+      const marks = document.querySelectorAll(".after-block.out, .after-block.denounce.is-done");
+      if (!marks.length) setBlockSeen(false);
+      marks.forEach((m) => io.observe(m));
+    };
+    scan();
+    const after = document.querySelector(".page-result .after");
+    const mo = after && typeof MutationObserver === "function" ? new MutationObserver(scan) : null;
+    if (after) mo?.observe(after, { childList: true });
+    return () => {
+      io.disconnect();
+      mo?.disconnect();
+    };
   }, []);
 
   // Le clavier est ouvert : la barre ne passe pas devant le champ.
