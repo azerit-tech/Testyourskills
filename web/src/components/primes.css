@@ -23,8 +23,9 @@
 .prime-card:hover {
   transform: translateY(-1px);
 }
-/* une prime close : le même bloc d'information, son contenu en retrait */
-.prime-card.is-closed > * {
+/* une prime close : le même bloc d'information, son contenu en retrait, sauf « Terminée » qui reste lisible */
+.prime-card.is-closed > :not(.prime-card-top),
+.prime-card.is-closed .prime-card-top > :not(.prime-when) {
   opacity: 0.62;
 }
 .prime-card-top {
@@ -75,10 +76,11 @@
   background: var(--c-line);
   color: var(--c-text);
 }
+/* « Terminée » : un contour, le texte lisible sans transparence (4,5:1 au moins sur la carte) */
 .prime-when.is-closed {
   background: none;
   box-shadow: inset 0 0 0 1.5px var(--c-line);
-  color: var(--c-text-2);
+  color: rgba(229, 221, 255, 0.8);
 }
 .prime-card-job {
   font: 600 var(--t-16) / 1.4 var(--f-text);
@@ -284,18 +286,23 @@
 .prime-head .prime-logo {
   margin: 4px 0;
 }
+/* deux colonnes : la moitié de la hauteur, l'appel remonte dans le premier écran */
 .prime-facts {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 16px;
   padding: 4px var(--pad-block);
   border-radius: var(--r-block);
   background: var(--s-info);
 }
 .prime-facts > div {
   display: grid;
+  align-content: start;
   gap: 2px;
+  min-width: 0;
   padding: 10px 0;
 }
-.prime-facts > div + div {
+.prime-facts > div:nth-child(n + 3) {
   box-shadow: inset 0 1px 0 var(--c-line);
 }
 .prime-facts dt {
@@ -307,6 +314,7 @@
 .prime-facts dd {
   font: 500 var(--t-16) / 1.4 var(--f-text);
   color: var(--cream);
+  overflow-wrap: anywhere;
 }
 .prime-facts dd .prime-when {
   display: inline-block;
@@ -317,10 +325,10 @@
   color: var(--c-text-2);
   font-size: var(--t-14);
 }
-/* « 1er » : l'exposant ne pousse pas la ligne */
+/* « 1er » : l'exposant ne pousse pas la ligne ; 12 px, le plancher du système */
 .prime-card sup,
 .page-prime sup {
-  font-size: 0.7em;
+  font-size: var(--t-12);
   line-height: 0;
 }
 .prime-share {
@@ -337,6 +345,47 @@
 .prime-mine p,
 .prime-join p {
   color: var(--c-text);
+}
+/* une erreur reste rouge, pictogramme compris, dans les blocs dont le texte est lilas */
+.prime-mine p.field-error,
+.prime-join p.field-error {
+  color: var(--c-error);
+}
+/* la case et son message : 8 px, comme le champ et le sien */
+.prime-check + .field-error {
+  margin-top: -10px;
+}
+/* finaliste, prime emportée : le tampon des avis, crème sur prune, en haut à droite */
+.prime-mine {
+  position: relative;
+}
+.prime-stamp {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  padding: 3px 10px 4px;
+  border: 2.5px solid currentColor;
+  border-radius: 3px;
+  font: 700 var(--t-22) / 1 var(--f-name);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--cream);
+  transform: rotate(-7deg);
+}
+.prime-mine-big {
+  font: 700 var(--t-44) / 0.95 var(--f-name);
+  text-transform: uppercase;
+  color: var(--cream);
+  text-wrap: balance;
+}
+/* la ligne du surtitre porte le tampon : le titre commence sous lui, sans le toucher */
+.prime-mine:has(.prime-stamp) > .label {
+  min-height: 40px;
+  padding-right: 140px;
+}
+.prime-others {
+  justify-self: start;
 }
 .prime-mine .btn-primary,
 .prime-join .btn-primary {
@@ -753,8 +802,9 @@
     max-width: none;
     margin: 0;
   }
+  /* le haut du classement s'aligne sur le surtitre de gauche, sous le lien de retour */
   .prime-main {
-    padding-top: 44px;
+    padding-top: 66px;
   }
   /* le règlement : le sommaire à gauche, collé, le texte à droite */
   .page-rules {

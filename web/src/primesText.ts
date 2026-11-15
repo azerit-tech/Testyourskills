@@ -78,11 +78,13 @@ const fr = {
     copied: "Lien copié.",
     notFound: "Cette prime n'existe pas, ou plus.",
     gate: {
-      claim: "Deux étapes\u00a0: fais ta fiche, puis touche «\u00a0C'est moi\u00a0» dessous (GitHub prouve qu'elle est à toi). Reviens ensuite ici.",
+      claim: "Deux étapes\u00a0: fais ta fiche, puis touche «\u00a0C'est moi\u00a0» juste sous elle (GitHub prouve qu'elle est à toi). Reviens ensuite ici.",
       nocard: "Aucune fiche à ton pseudo. Fais-la, puis reviens entrer dans la course.",
       degraded: "Ta dernière fiche est sortie sans que le code soit lu. Refais-la pour entrer dans la course.",
       position: (yours: string, wanted: string) => `Ta fiche vise ${yours}. Cette prime cherche ${wanted}.`,
     },
+    /** Sous un poste qui ne correspond pas : une issue. */
+    others: "Voir les autres primes",
   },
   form: {
     title: "Entrer dans la course",
@@ -122,7 +124,7 @@ const fr = {
   steps: {
     title: "Entrer dans la course",
     card: "Ta fiche",
-    proof: "Prouver que c'est toi (GitHub)",
+    proof: "Prouve que c'est toi, avec GitHub",
     enter: "Entrer dans la course",
     /** Pourquoi GitHub : l'expérience d'abord, le code comme preuve. */
     why: "Pourquoi GitHub ? Ton parcours compte d'abord, ton code en apporte la preuve : une prime classe les fiches dont le compte GitHub est prouvé.",
@@ -130,7 +132,7 @@ const fr = {
     /** Une fiche LinkedIn ou CV, sans pseudo GitHub. */
     noGithub: "Ta fiche n'a pas encore de GitHub. Ajoute-le sous ta fiche, puis reviens ici.",
     openCard: "Ouvrir ma fiche",
-    prove: "Prouver que c'est moi",
+    prove: "C'est moi",
     proveNote: "GitHub confirme ton pseudo, rien d'autre : aucun accès à tes repos.",
     /** La preuve par GitHub n'est pas branchée sur ce serveur : le geste vit sous la fiche. */
     proveOnCard: "« C'est moi » est sous ta fiche.",
@@ -154,6 +156,10 @@ const fr = {
     winnerText: (company: string) => `Tu remportes la prime de ${company} : l'entretien est à toi.`,
     shareWinnerText: (job: string, company: string) => `Prime emportée : ${job} chez ${company}. Fais ta fiche :`,
     share: "Partager",
+    /** Prime emportée : le bouton dit la victoire. */
+    shareWin: "Partager ma victoire",
+    /** Le tampon posé en haut du bloc, finaliste ou prime emportée. */
+    stamp: { finalist: "Finaliste", winner: "Emportée" },
   },
   /** Le classement d'une prime terminée, et le formulaire. */
   boardFinal: "Classement final",
@@ -178,8 +184,8 @@ export type PrimesDict = typeof fr;
 const ordEn = (n: number) => `#${n}`;
 
 const en: PrimesDict = {
-  contract: { stage: "Internship", alternance: "Work-study", cdi: "Full-time" },
-  job: (c, position) => (c === "stage" ? `the ${position} internship` : c === "alternance" ? `the ${position} work-study` : `the ${position} full-time job`),
+  contract: { stage: "Internship", alternance: "Apprenticeship", cdi: "Full-time" },
+  job: (c, position) => (c === "stage" ? `the ${position} internship` : c === "alternance" ? `the ${position} apprenticeship` : `the ${position} full-time job`),
   interviews: (k) => pluralEn(k, "interview", "interviews"),
   days: (k) => (k === 0 ? "Last day" : k === 1 ? "1 day left" : `${k} days left`),
   closed: "Closed",
@@ -188,8 +194,8 @@ const en: PrimesDict = {
   onSite: (place) => `In ${place}`,
   league: {
     title: "Your league",
-    ask: "Looking for an internship, a work-study, a full-time job, or nothing, just for fun?",
-    options: { stage: "An internship", alternance: "A work-study", cdi: "A full-time job", fun: "Just for fun" },
+    ask: "Looking for an internship, an apprenticeship, a full-time job, or nothing, just for fun?",
+    options: { stage: "An internship", alternance: "An apprenticeship", cdi: "A full-time job", fun: "Just for fun" },
     fun: "Just for fun: no bounty ranks you.",
     change: "Change league",
   },
@@ -208,7 +214,7 @@ const en: PrimesDict = {
   strip: { title: "Open bounties", all: "All bounties" },
   list: {
     title: "Bounties",
-    intro: "Companies offer interviews to the top-ranked sheets. One league per contract: internship, work-study, full-time.",
+    intro: "Companies offer interviews to the top-ranked sheets. One league per contract: internship, apprenticeship, full-time.",
     empty: "No bounty yet.",
     open: "Open",
     later: "Coming",
@@ -239,11 +245,12 @@ const en: PrimesDict = {
     copied: "Link copied.",
     notFound: "This bounty doesn't exist, or no longer does.",
     gate: {
-      claim: "Two steps: get your rap sheet, then tap “That's me” below it (GitHub proves it's yours). Then come back here.",
-      nocard: "No sheet under your username. Make it, then come back to enter the race.",
-      degraded: "Your last sheet came out without the code being read. Make it again to enter the race.",
+      claim: "Two steps: get your rap sheet, then tap “That's me” right under it (GitHub proves it's yours). Then come back here.",
+      nocard: "No sheet under your username. Get one, then come back to enter the race.",
+      degraded: "Your last sheet came out without the code being read. Get it again to enter the race.",
       position: (yours, wanted) => `Your sheet targets ${yours}. This bounty wants ${wanted}.`,
     },
+    others: "See the other bounties",
   },
   form: {
     title: "Enter the race",
@@ -281,13 +288,13 @@ const en: PrimesDict = {
   steps: {
     title: "Enter the race",
     card: "Your sheet",
-    proof: "Prove it's you (GitHub)",
+    proof: "Prove it's you, with GitHub",
     enter: "Enter the race",
     why: "Why GitHub? Your track record comes first, your code is the proof: a bounty ranks the sheets whose GitHub account is proven.",
     done: "done",
     noGithub: "Your sheet has no GitHub yet. Add it under your sheet, then come back here.",
     openCard: "Open my sheet",
-    prove: "That's me: prove it",
+    prove: "That's me",
     proveNote: "GitHub confirms your username, nothing else: no access to your repositories.",
     proveOnCard: "“That's me” is under your sheet.",
   },
@@ -295,20 +302,22 @@ const en: PrimesDict = {
     place: (rank, total) => `${ordEn(rank)} of ${total}`,
     moves: "Your rank moves with your rating.",
     sharePlace: "Share my spot",
-    sharePlaceText: (rank, total, job, company) => `I'm ${ordEn(rank)} of ${total} for ${job} at ${company}. Make your sheet and enter the race:`,
+    sharePlaceText: (rank, total, job, company) => `I'm ${ordEn(rank)} of ${total} for ${job} at ${company}. Get your rap sheet and enter the race:`,
     withdrawAsk: "Withdraw from this bounty? Your entry and your answers are erased.",
     stay: "Stay",
     over: "Bounty over",
     final: "Final ranking",
     finalText: "The bounty is over: your rank no longer moves.",
-    shareFinalText: (rank, total, job, company) => `I finished ${ordEn(rank)} of ${total} for ${job} at ${company}. Make your sheet:`,
+    shareFinalText: (rank, total, job, company) => `I finished ${ordEn(rank)} of ${total} for ${job} at ${company}. Get your rap sheet:`,
     finalist: "You're a finalist",
     finalistText: (rank, total, company) => `${ordEn(rank)} of ${total}. ${company} receives your profile, as you agreed.`,
-    shareFinalistText: (job, company) => `Finalist for ${job} at ${company}. Make your sheet:`,
+    shareFinalistText: (job, company) => `Finalist for ${job} at ${company}. Get your rap sheet:`,
     winner: "Bounty won",
     winnerText: (company) => `You win ${company}'s bounty: the interview is yours.`,
-    shareWinnerText: (job, company) => `Bounty won: ${job} at ${company}. Make your sheet:`,
+    shareWinnerText: (job, company) => `Bounty won: ${job} at ${company}. Get your rap sheet:`,
     share: "Share",
+    shareWin: "Share my win",
+    stamp: { finalist: "Finalist", winner: "Won" },
   },
   boardFinal: "Final ranking",
   addProof: "Add a link",

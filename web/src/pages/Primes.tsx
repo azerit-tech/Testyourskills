@@ -9,12 +9,13 @@ import { useEffect, useId, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import type { BoardRow, MyEntry, PrimeMe, PrimePageData, PrimeView } from "../../../shared/primes";
 import { cleanProof, MAX_PROOFS } from "../../../shared/primes";
+import { starsFor } from "../../../shared/types";
 import { Avatar } from "../components/Avatar";
 import { BusyDots } from "../components/Busy";
 import { EntryForm } from "../components/EntryForm";
 import { PrimeNotFound, Unreachable } from "../components/ErrorPage";
 import { useToast } from "../components/After";
-import { IconLink, IconShare } from "../components/Icons";
+import { IconLinkedIn, IconShare } from "../components/Icons";
 import { PrimeCard, PrimeMark, usePrimeWhen, withSup } from "../components/Primes";
 import { Stars } from "../components/Stars";
 import { SCALE } from "../components/WeekBoard";
@@ -99,7 +100,7 @@ function Row({ r, me }: { r: BoardRow; me: boolean }) {
   );
 }
 
-/** Le partage d'une prime ou de sa place : la feuille du téléphone, sinon le texte et le lien au presse-papier. */
+/** Le partage d'une prime ou de sa place : la feuille du téléphone, sinon LinkedIn, le texte au presse-papier (comme une bande). */
 function usePrimeShare(toast: (m: string) => void) {
   const { t, lang } = useT();
   const native = hasNativeShare() && isTouch();
@@ -114,7 +115,9 @@ function usePrimeShare(toast: (m: string) => void) {
       }
       return;
     }
-    toast((await copyText(`${text} ${url}`)) ? t.primes.page.copied : url);
+    window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`, "_blank", "noopener");
+    // LinkedIn n'accepte pas de texte prérempli : il part dans le presse-papier.
+    toast((await copyText(`${text} ${url}`)) ? t.bands.pick.linkedinHint : url);
   };
   return { share, native };
 }
@@ -145,6 +148,8 @@ function Mine({ prime, entry, job, native, onShare, onWithdraw }: MineProps) {
         : closed
           ? { label: tm.final, title: tm.place(entry.rank, entry.total), text: tm.finalText, button: tm.share, share: tm.shareFinalText(entry.rank, entry.total, job, prime.company) }
           : { label: t.primes.race.title, title: tm.place(entry.rank, entry.total), text: tm.moves, button: tm.sharePlace, share: tm.sharePlaceText(entry.rank, entry.total, job, prime.company) };
+  // Finaliste ou prime emportée : le tampon des avis, en crème sur prune, et un titre en grand.
+  const stamp = entry.state === "winner" ? tm.stamp.winner : entry.state === "finalist" ? tm.stamp.finalist : null;
 
   const withdraw = async () => {
     if (busy) return;
@@ -157,26 +162,32 @@ function Mine({ prime, entry, job, native, onShare, onWithdraw }: MineProps) {
   return (
     <section className={`block prime-mine is-${entry.state}${closed ? " is-over" : ""}`} aria-labelledby="prime-mine-title">
       <p className="label">{view.label}</p>
-      <h2 className="t-block" id="prime-mine-title">
+      {stamp && (
+        <span className="prime-stamp" aria-hidden>
+          {stamp}
+        </span>
+      )}
+      <h2 className={stamp ? "prime-mine-big" : "t-block"} id="prime-mine-title">
         {view.title}
       </h2>
+      {entry.state === "winner" && <Stars n={starsFor(entry.overall)} size={22} label={t.bands.score(starsFor(entry.overall))} />}
       <p>{view.text}</p>
       <button type="button" className="btn-primary prime-mine-share" onClick={() => onShare(view.share)}>
-        {native ? <IconShare /> : <IconLink />}
-        {view.button}
+        {native ? <IconShare /> : <IconLinkedIn />}
+        {entry.state === "winner" ? tm.shareWin : view.button}
       </button>
       {/* une prime emportée ne se retire pas d'un toucher : l'adresse de contact est là pour ça */}
       {entry.state === "winner" ? null : asking ? (
         <div className="prime-ask" role="group" aria-labelledby="prime-ask-text">
           <p id="prime-ask-text">{tm.withdrawAsk}</p>
           <div className="prime-ask-actions">
-            <button type="button" className={`pill prime-withdraw-yes${busy ? " is-busy" : ""}`} onClick={() => void withdraw()} aria-busy={busy}>
+            {/* le choix sans risque reçoit le clavier, en pilule ; le retrait reste un lien */}
+            <button type="button" className="pill prime-stay" autoFocus onClick={() => setAsking(false)}>
+              {tm.stay}
+            </button>
+            <button type="button" className={`link-quiet prime-withdraw-yes${busy ? " is-busy" : ""}`} onClick={() => void withdraw()} aria-busy={busy}>
               {t.primes.page.withdraw}
               {busy && <BusyDots />}
-            </button>
-            {/* le choix sans risque reçoit le clavier */}
-            <button type="button" className="link-quiet" autoFocus onClick={() => setAsking(false)}>
-              {tm.stay}
             </button>
           </div>
         </div>
@@ -295,7 +306,12 @@ function Steps({ prime, me, mine, positions, claimOn, rulesLink, onDone }: Steps
               <JoinForm prime={prime} rulesLink={rulesLink} onDone={onDone} />
             </>
           ) : s3 === "now" && gate === "position" && me?.card ? (
-            <p>{tg.position(t.positions[me.card.position], positions)}</p>
+            <>
+              <p>{tg.position(t.positions[me.card.position], positions)}</p>
+              <a className="link-alt prime-others" href="/primes" onClick={(e) => onLinkClick(e, "/primes")}>
+                {t.primes.page.others}
+              </a>
+            </>
           ) : null}
         </Step>
       </ol>
@@ -380,9 +396,15 @@ export function PrimePage({ id }: { id: string }) {
   const closed = prime.phase === "closed";
   // Une inscription retirée n'en est plus une.
   const entry = me?.entry && me.entry.state !== "withdrawn" ? me.entry : null;
-  // « À Ville Démo, télétravail possible » : la seconde moitié sans majuscule.
+  // « Ville Démo, télétravail possible » sous l'étiquette « Lieu » : la seconde moitié sans majuscule.
   const remote = t.primes.remote;
-  const where = prime.place ? `${t.primes.onSite(prime.place)}${prime.remote ? `, ${remote.charAt(0).toLowerCase()}${remote.slice(1)}` : ""}` : prime.remote ? remote : "";
+  const where = prime.place ? `${prime.place}${prime.remote ? `, ${remote.charAt(0).toLowerCase()}${remote.slice(1)}` : ""}` : prime.remote ? remote : "";
+  const shareButton = (
+    <button type="button" className="pill prime-share" onClick={() => void share(prime, tp.shareText(prime.company, job))}>
+      {native ? <IconShare /> : <IconLinkedIn />}
+      {tp.share}
+    </button>
+  );
 
   const withdraw = async () => {
     try {
@@ -407,23 +429,24 @@ export function PrimePage({ id }: { id: string }) {
           {prime.logo && <PrimeMark p={prime} big />}
           <h1>{prime.company}</h1>
           <p className="prime-pitch">{pick(prime.pitch, lang)}</p>
+          {/* deux colonnes : postes et lieu, puis langages et dates */}
           <dl className="prime-facts">
             <div>
               <dt>{tp.positions}</dt>
               <dd>{positions}</dd>
             </div>
+            {where && (
+              <div>
+                <dt>{tp.place}</dt>
+                <dd>{where}</dd>
+              </div>
+            )}
             {prime.languages.length > 0 && (
               <div>
                 <dt>{tp.languages}</dt>
                 <dd>
                   {prime.languages.join(", ")} <span className="prime-facts-note">({tp.languagesNote})</span>
                 </dd>
-              </div>
-            )}
-            {where && (
-              <div>
-                <dt>{tp.place}</dt>
-                <dd>{where}</dd>
               </div>
             )}
             <div>
@@ -433,10 +456,8 @@ export function PrimePage({ id }: { id: string }) {
               </dd>
             </div>
           </dl>
-          <button type="button" className="pill prime-share" onClick={() => void share(prime, tp.shareText(prime.company, job))}>
-            {native ? <IconShare /> : <IconLink />}
-            {tp.share}
-          </button>
+          {/* terminée : plus d'entrée, le partage reste ici */}
+          {closed && !entry && shareButton}
         </section>
 
         {entry ? (
@@ -459,6 +480,8 @@ export function PrimePage({ id }: { id: string }) {
             />
           )
         )}
+        {/* entrer d'abord, partager ensuite : sous la porte d'entrée (inscrite, son bloc partage sa place) */}
+        {!closed && !entry && shareButton}
       </div>
 
       <div className="prime-main">
@@ -578,12 +601,16 @@ function JoinForm({ prime, rulesLink, onDone }: { prime: PrimeView; rulesLink: b
             clear("email");
           }}
           aria-invalid={has("email")}
-          aria-describedby={`${uid}-email-note${has("email") ? ` ${uid}-email-err` : ""}`}
+          aria-describedby={has("email") ? `${uid}-email-err` : `${uid}-email-note`}
         />
-        <p className="prime-note" id={`${uid}-email-note`}>
-          {tf.emailNote}
-        </p>
-        {err("email")}
+        {/* l'erreur prend la place de la ligne d'aide, collée au champ */}
+        {has("email") ? (
+          err("email")
+        ) : (
+          <p className="prime-note" id={`${uid}-email-note`}>
+            {tf.emailNote}
+          </p>
+        )}
       </div>
 
       {needsPlace && (
@@ -600,6 +627,7 @@ function JoinForm({ prime, rulesLink, onDone }: { prime: PrimeView; rulesLink: b
                   type="radio"
                   name={`${uid}-place`}
                   checked={placeOk === v}
+                  aria-invalid={has("place")}
                   onChange={() => {
                     setPlaceOk(v);
                     clear("place");
@@ -609,10 +637,13 @@ function JoinForm({ prime, rulesLink, onDone }: { prime: PrimeView; rulesLink: b
               </label>
             ))}
           </div>
-          <p className="prime-note" id={`${uid}-place-note`}>
-            {tf.placeNote}
-          </p>
-          {err("place")}
+          {has("place") ? (
+            err("place")
+          ) : (
+            <p className="prime-note" id={`${uid}-place-note`}>
+              {tf.placeNote}
+            </p>
+          )}
         </fieldset>
       )}
 

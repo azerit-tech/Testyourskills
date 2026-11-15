@@ -30,7 +30,7 @@ describe("la porte d'entrée d'une prime : trois étapes cochées selon l'état"
   });
 
   it("les trois intitulés, et la raison de GitHub : l'expérience d'abord, le code comme preuve", () => {
-    expect([fr.primes.steps.card, fr.primes.steps.proof, fr.primes.steps.enter]).toEqual(["Ta fiche", "Prouver que c'est toi (GitHub)", "Entrer dans la course"]);
+    expect([fr.primes.steps.card, fr.primes.steps.proof, fr.primes.steps.enter]).toEqual(["Ta fiche", "Prouve que c'est toi, avec GitHub", "Entrer dans la course"]);
     expect(fr.primes.steps.why).toMatch(/parcours compte d'abord/);
     expect(en.primes.steps.why).toMatch(/track record comes first/);
     for (const d of [fr, en]) expect(d.primes.steps.why).not.toMatch(/remplace|replaces/i);
