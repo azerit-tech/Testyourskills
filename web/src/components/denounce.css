@@ -89,6 +89,16 @@
 }
 
 /* prêt à partager (prune, comme le bloc qu'il remplace : le partage au-dessus est marine) */
+/* sous le titre : ce qui va se passer */
+.denounce-intro {
+  margin: 0;
+  font: 400 var(--t-14) / 1.45 var(--f-text);
+  color: var(--c-text);
+}
+/* le profil sur sa ligne : jamais un séparateur en début de ligne */
+.denounce-tag {
+  display: block;
+}
 .denounce-head {
   overflow-wrap: anywhere;
 }

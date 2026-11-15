@@ -58,16 +58,16 @@ export function finalizeMock(drafts: Draft[]): Grid {
 const gh = (login: string, repo?: string, path = "") => `https://github.com/${login}${repo ? `/${repo}` : ""}${path}`;
 
 const eduNone = () =>
-  c("EDU", null, "missing", "github", f("L'école se lit sur LinkedIn ou le CV : sans objet ici.", "School is read on LinkedIn or the CV: not applicable here."));
+  c("EDU", null, "missing", "github", f("L'école se lit sur LinkedIn ou le CV : ajoute l'un des deux.", "School is read from LinkedIn or the CV: add either one."));
 const empNone = () =>
-  c("EMP", null, "missing", "github", f("Le parcours se lit sur LinkedIn ou le CV : sans objet ici.", "Career path is read on LinkedIn or the CV: not applicable here."));
+  c("EMP", null, "missing", "github", f("Le parcours se lit sur LinkedIn ou le CV : ajoute l'un des deux.", "Career path is read from LinkedIn or the CV: add either one."));
 
 function xpGh(login: string, active: number, score: number, next: Fact): Draft {
   const yfr = `${active} année${active > 1 ? "s" : ""} active${active > 1 ? "s" : ""}`;
   const yen = `${active} active year${active > 1 ? "s" : ""}`;
   return c("XP", score, "scored", "github", f(`Estimée : ${yfr} sur GitHub (50 contributions ou plus sur douze mois), table arrêtée à 8.`, `Estimated: ${yen} on GitHub (50+ contributions over twelve months), table stops at 8.`), {
     next,
-    evidence: { text: f(`${yfr} sur les contributions par année.`, `${yen} in the contributions per year.`), source: "github", proof: gh(login) },
+    evidence: { text: f(`${yfr}, d'après le calendrier de contributions.`, `${yen}, going by the contribution calendar.`), source: "github", proof: gh(login) },
   });
 }
 const xpMore = (score: number, years: number, active: number) =>
@@ -75,7 +75,7 @@ const xpMore = (score: number, years: number, active: number) =>
 const xpTop = () => f("Pour aller plus haut : des postes datés sur LinkedIn.", "To go higher: dated roles on LinkedIn.");
 
 function code(login: string, repo: string, file: string, level: number, avg: string, avgEn: string, score: number, quote: string, next?: Fact): Draft {
-  return c("CODE", score, "scored", "github", f(`Niveau moyen lu ${avg} sur 5, sur 3 dépôts.`, `Average level read ${avgEn} out of 5, across 3 repos.`), {
+  return c("CODE", score, "scored", "github", f(`Niveau moyen lu ${avg} sur 5, sur 3 repos.`, `Average level read ${avgEn} out of 5, across 3 repos.`), {
     ...(next ? { next } : {}),
     evidence: {
       text: f(`${repo}, \`${file}\` : niveau ${level} sur 5. « ${quote} »`, `${repo}, \`${file}\`: level ${level} out of 5. "${quote}"`),
@@ -97,24 +97,24 @@ const actNext = (target: number, weeks: number) =>
 
 const OWN_REACHED: Record<number, Fact> = {
   10: f("Un projet dont beaucoup se servent, avec trois releases dans l'année.", "A project many people use, with three releases this year."),
-  8: f("Un projet porté plus d'un an, publié, et utilisé par d'autres.", "A project carried for over a year, published, and used by others."),
-  4: f("Un projet porté 6 mois ou plus.", "A project carried for 6 months or more."),
-  2: f("Des dépôts, aucun porté dans la durée.", "Repos, none carried over time."),
+  8: f("Un projet porté plus d'un an, publié, et utilisé par d'autres.", "A project kept alive for over a year, released, and used by others."),
+  4: f("Un projet porté 6 mois ou plus.", "A project kept alive for 6 months or more."),
+  2: f("Des repos, aucun porté dans la durée.", "Repos, none kept alive over time."),
 };
 const OWN_NEXT: Record<number, Fact> = {
-  4: f("Pour 6 : de quoi mettre en production dans un dépôt actif (Dockerfile, CI ou release).", "For 6: what it takes to ship in an active repo (Dockerfile, CI or release)."),
+  4: f("Pour 6 : de quoi mettre en production dans un repo actif (Dockerfile, CI ou release).", "For 6: what it takes to ship in an active repo (Dockerfile, CI or release)."),
   6: f(
-    "Pour 8 : un projet de plus d'un an et 100 commits, publié, utilisé par d'autres (100 étoiles ou 3 contributeurs externes).",
-    "For 8: a project over a year old with 100 commits, published, used by others (100 stars or 3 outside contributors).",
+    "Pour 8 : un projet de plus d'un an et 100 commits, publié, utilisé par d'autres (100 stars GitHub ou 3 comptes externes qui contribuent).",
+    "For 8: a project over a year old with 100 commits, released, used by others (100 GitHub stars or 3 outside contributors).",
   ),
-  8: f("Pour 10 : 1 000 étoiles ou 10 contributeurs externes, et 3 releases dans l'année.", "For 10: 1,000 stars or 10 outside contributors, and 3 releases this year."),
+  8: f("Pour 10 : 1 000 stars GitHub ou 10 comptes externes qui contribuent, et 3 releases dans l'année.", "For 10: 1,000 GitHub stars or 10 outside contributors, and 3 releases this year."),
 };
 
 function own(login: string, score: number, repo: string, commits: number, months: number, extra: Fact = f("", ""), deploy?: string): Draft {
-  const reached = score === 6 ? f(`Un projet porté 6 mois ou plus, et de quoi mettre en production (${deploy ?? repo}).`, `A project carried for 6 months or more, and what it takes to ship (${deploy ?? repo}).`) : OWN_REACHED[score];
+  const reached = score === 6 ? f(`Un projet porté 6 mois ou plus, et de quoi mettre en production (${deploy ?? repo}).`, `A project kept alive for 6 months or more, and what it takes to ship (${deploy ?? repo}).`) : OWN_REACHED[score];
   const next =
     score === 2
-      ? f(`Pour 4 : un projet porté 6 mois avec 50 commits. Le plus gros : ${repo} : ${commits} commits sur ${months} mois.`, `For 4: a project carried for 6 months with 50 commits. The biggest: ${repo}: ${commits} commits over ${months} months.`)
+      ? f(`Pour 4 : un projet porté 6 mois avec 50 commits. Le plus gros : ${repo} : ${commits} commits sur ${months} mois.`, `For 4: a project kept alive for 6 months with 50 commits. The biggest: ${repo}: ${commits} commits over ${months} months.`)
       : OWN_NEXT[score];
   return c("OWN", score, "scored", "github", reached, {
     ...(next ? { next } : {}),
@@ -134,7 +134,7 @@ function oss(login: string, score: number, prs: number, reached?: Fact, next?: F
 const ossNext = (target: number, need: number, prs: number) =>
   f(`Pour ${target} : ${need} PR fusionnées chez les autres (tu en as ${prs}).`, `For ${target}: ${need} PRs merged into other people's repos (you have ${prs}).`);
 const oss10 = () =>
-  f("Pour 10 : maintenir un projet de 1 000 étoiles, ou 20 PR fusionnées dans de tels projets.", "For 10: maintain a project with 1,000 stars, or 20 PRs merged into such projects.");
+  f("Pour 10 : maintenir un projet de 1 000 stars GitHub, ou 20 PR fusionnées dans de tels projets.", "For 10: maintain a project with 1,000 GitHub stars, or 20 PRs merged into such projects.");
 
 function stk(login: string, score: number, reached: Fact, evidence: Fact, lastRepo: string, next?: Fact, flags: Fact[] = []): Draft {
   return c("STK", score, "scored", "github", reached, { ...(next ? { next } : {}), flags, evidence: { text: evidence, source: "github", proof: gh(login, lastRepo) } });
@@ -151,12 +151,12 @@ const GITHUB: Record<string, (login: string) => Grid> = {
       stk(
         l,
         6,
-        f("JavaScript : 231 commits dans 9 dépôts, pratiqué depuis 1,4 an.", "JavaScript: 231 commits in 9 repos, practised for 1.4 years."),
-        f("JavaScript : 231 commits dans 9 dépôts depuis juin 2025, dernier push il y a 3 jours (todo-app-v4).", "JavaScript: 231 commits in 9 repos since June 2025, last push 3 days ago (todo-app-v4)."),
+        f("JavaScript : 231 commits dans 9 repos, pratiqué depuis 1,4 an.", "JavaScript: 231 commits in 9 repos, practiced for 1.4 years."),
+        f("JavaScript : 231 commits dans 9 repos depuis juin 2025, dernier push il y a 3 jours (todo-app-v4).", "JavaScript: 231 commits in 9 repos since June 2025, last push 3 days ago (todo-app-v4)."),
         "todo-app-v4",
         f(
-          "Pour 8 : 500 commits dans ton langage principal (tu en as 231), pratiqué depuis 2 ans (1,4 an aujourd'hui), une autre famille de langages, avec un dépôt de 10 commits.",
-          "For 8: 500 commits in your main language (you have 231), practised for 2 years (1.4 years today), another language family, with a 10-commit repo.",
+          "Pour 8 : 500 commits dans ton langage principal (tu en as 231), pratiqué depuis 2 ans (1,4 an aujourd'hui), une autre famille de langages, avec un repo de 10 commits.",
+          "For 8: 500 commits in your main language (you have 231), practiced for 2 years (1.4 years today), another language family, with a 10-commit repo.",
         ),
       ),
       code(l, "todo-app-v4", "src/App.js", 2, "2,2", "2.2", 4, "fetch(url).then(r => r.json()).then(setTodos) // TODO erreurs", f("Pour 5 : un niveau moyen de 2,3 sur 5 (tu as 2,2).", "For 5: an average level of 2.3 out of 5 (you have 2.2).")),
@@ -172,15 +172,15 @@ const GITHUB: Record<string, (login: string) => Grid> = {
       stk(
         l,
         6,
-        f("Python : 412 commits dans 11 dépôts, pratiqué depuis 4,2 ans, 1 autre famille de langages.", "Python: 412 commits in 11 repos, practised for 4.2 years, 1 other language family."),
-        f("Python : 412 commits dans 11 dépôts depuis septembre 2022, dernier push hier (rdv-sync). Go aussi dans le code.", "Python: 412 commits in 11 repos since September 2022, last push yesterday (rdv-sync). Go in the code too."),
+        f("Python : 412 commits dans 11 repos, pratiqué depuis 4,2 ans, 1 autre famille de langages.", "Python: 412 commits in 11 repos, practiced for 4.2 years, 1 other language family."),
+        f("Python : 412 commits dans 11 repos depuis septembre 2022, dernier push hier (rdv-sync). Go aussi dans le code.", "Python: 412 commits in 11 repos since September 2022, last push yesterday (rdv-sync). Go in the code too."),
         "rdv-sync",
         f("Pour 8 : 500 commits dans ton langage principal (tu en as 412).", "For 8: 500 commits in your main language (you have 412)."),
       ),
       code(l, "rdv-sync", "rdv_sync/slots.py", 3, "3,1", "3.1", 6, "def free_slots(calendar: Calendar, day: date) -> list[Slot]:", f("Pour 7 : un niveau moyen de 3,3 sur 5 (tu as 3,1).", "For 7: an average level of 3.3 out of 5 (you have 3.1).")),
       act(l, 41, "734", "734", 8, actNext(10, 41)),
-      own(l, 6, "rdv-sync", 188, 19, f(" Dockerfile, CI, 38 étoiles.", " Dockerfile, CI, 38 stars.")),
-      oss(l, 8, 9, f("142 étoiles sur ses dépôts.", "142 stars on own repos."), oss10()),
+      own(l, 6, "rdv-sync", 188, 19, f(" Dockerfile, CI, 38 stars GitHub.", " Dockerfile, CI, 38 GitHub stars.")),
+      oss(l, 8, 9, f("142 stars GitHub sur ses repos.", "142 GitHub stars on own repos."), oss10()),
     ]),
   gold: (l) =>
     finalizeMock([
@@ -190,8 +190,8 @@ const GITHUB: Record<string, (login: string) => Grid> = {
       stk(
         l,
         8,
-        f("TypeScript : 734 commits dans 14 dépôts, pratiqué depuis 3,4 ans, 1 autre famille de langages.", "TypeScript: 734 commits in 14 repos, practised for 3.4 years, 1 other language family."),
-        f("TypeScript : 734 commits dans 14 dépôts depuis juin 2023, dernier push aujourd'hui (typed-env). Rust aussi dans le code.", "TypeScript: 734 commits in 14 repos since June 2023, last push today (typed-env). Rust in the code too."),
+        f("TypeScript : 734 commits dans 14 repos, pratiqué depuis 3,4 ans, 1 autre famille de langages.", "TypeScript: 734 commits in 14 repos, practiced for 3.4 years, 1 other language family."),
+        f("TypeScript : 734 commits dans 14 repos depuis juin 2023, dernier push aujourd'hui (typed-env). Rust aussi dans le code.", "TypeScript: 734 commits in 14 repos since June 2023, last push today (typed-env). Rust in the code too."),
         "typed-env",
         f(
           "Pour 10 : 1 000 commits dans ton langage principal (tu en as 734), 2 autres familles de langages (tu en as 1).",
@@ -200,29 +200,29 @@ const GITHUB: Record<string, (login: string) => Grid> = {
       ),
       code(l, "typed-env", "src/parse.test.ts", 5, "4,1", "4.1", 8, "it.each(cases)('rejects %s with a typed error', …", f("Pour 9 : un niveau moyen de 4,3 sur 5 (tu as 4,1).", "For 9: an average level of 4.3 out of 5 (you have 4.1).")),
       act(l, 46, "1 284", "1,284", 8, actNext(10, 46)),
-      own(l, 8, "typed-env", 412, 31, f(" Publié sur npm, 6 contributeurs externes.", " Published on npm, 6 outside contributors.")),
-      oss(l, 10, 27, f("Maintient typed-env, 1 240 étoiles.", "Maintainer of typed-env, 1,240 stars.")),
+      own(l, 8, "typed-env", 412, 31, f(" Publié sur npm, 6 comptes externes qui contribuent.", " Published on npm, 6 outside contributors.")),
+      oss(l, 10, 27, f("Maintient typed-env, 1 240 stars GitHub.", "Maintainer of typed-env, 1,240 GitHub stars.")),
     ]),
   wonderkid: (l) =>
     finalizeMock([
       c("EDU", 4, "scored", "github", f("Un hackathon ou un concours, sans classement cité.", "A hackathon or a competition, no ranking on file."), {
         next: EDU_NEXT_GITHUB,
-        evidence: { text: f("Dépôt hackathon-drone-2025 : hackathon ou concours.", "Repo hackathon-drone-2025: hackathon or competition."), source: "github", proof: gh(l, "hackathon-drone-2025") },
+        evidence: { text: f("Repo hackathon-drone-2025 : hackathon ou concours.", "Repo hackathon-drone-2025: hackathon or competition."), source: "github", proof: gh(l, "hackathon-drone-2025") },
       }),
       xpGh(l, 2, 4, xpMore(5, 3, 2)),
       empNone(),
       stk(
         l,
         6,
-        f("Rust : 268 commits dans 6 dépôts, pratiqué depuis 1,6 an, 1 autre famille de langages.", "Rust: 268 commits in 6 repos, practised for 1.6 years, 1 other language family."),
-        f("Rust : 268 commits dans 6 dépôts depuis avril 2025, dernier push il y a 2 jours (stm32-flight). C aussi dans le code.", "Rust: 268 commits in 6 repos since April 2025, last push 2 days ago (stm32-flight). C in the code too."),
+        f("Rust : 268 commits dans 6 repos, pratiqué depuis 1,6 an, 1 autre famille de langages.", "Rust: 268 commits in 6 repos, practiced for 1.6 years, 1 other language family."),
+        f("Rust : 268 commits dans 6 repos depuis avril 2025, dernier push il y a 2 jours (stm32-flight). C aussi dans le code.", "Rust: 268 commits in 6 repos since April 2025, last push 2 days ago (stm32-flight). C in the code too."),
         "stm32-flight",
-        f("Pour 8 : 500 commits dans ton langage principal (tu en as 268), pratiqué depuis 2 ans (1,6 an aujourd'hui).", "For 8: 500 commits in your main language (you have 268), practised for 2 years (1.6 years today)."),
+        f("Pour 8 : 500 commits dans ton langage principal (tu en as 268), pratiqué depuis 2 ans (1,6 an aujourd'hui).", "For 8: 500 commits in your main language (you have 268), practiced for 2 years (1.6 years today)."),
         [f("IA dans l'atelier : des fichiers d'agent dans stm32-flight.", "AI in the workshop: agent files in stm32-flight.")],
       ),
-      code(l, "stm32-flight", "src/pid.rs", 4, "3,9", "3.9", 8, "#[test] fn saturates_output_at_limits()", f("Pour 9 : un niveau moyen de 4,3 sur 5 (tu as 3,9), des tests dans la moitié des dépôts actifs.", "For 9: an average level of 4.3 out of 5 (you have 3.9), tests in half of the active repos.")),
+      code(l, "stm32-flight", "src/pid.rs", 4, "3,9", "3.9", 8, "#[test] fn saturates_output_at_limits()", f("Pour 9 : un niveau moyen de 4,3 sur 5 (tu as 3,9), des tests dans la moitié des repos actifs.", "For 9: an average level of 4.3 out of 5 (you have 3.9), tests in half of the active repos.")),
       act(l, 42, "903", "903", 8, actNext(10, 42)),
-      own(l, 6, "stm32-flight", 141, 11, f(" CI, 12 étoiles.", " CI, 12 stars.")),
+      own(l, 6, "stm32-flight", 141, 11, f(" CI, 12 stars GitHub.", " CI, 12 GitHub stars.")),
       oss(l, 4, 7, undefined, ossNext(6, 20, 7)),
     ]),
   flashback: (l) =>
@@ -233,15 +233,15 @@ const GITHUB: Record<string, (login: string) => Grid> = {
       stk(
         l,
         4,
-        f("C : 1 840 commits dans 23 dépôts, pratiqué depuis 14,2 ans, 2 autres familles de langages.", "C: 1,840 commits in 23 repos, practised for 14.2 years, 2 other language families."),
-        f("C : 1 840 commits dans 23 dépôts depuis mars 2012, dernier push il y a 14 mois (ringbuf). Perl, Fortran aussi dans le code.", "C: 1,840 commits in 23 repos since March 2012, last push 14 months ago (ringbuf). Perl, Fortran in the code too."),
+        f("C : 1 840 commits dans 23 repos, pratiqué depuis 14,2 ans, 2 autres familles de langages.", "C: 1,840 commits in 23 repos, practiced for 14.2 years, 2 other language families."),
+        f("C : 1 840 commits dans 23 repos depuis mars 2012, dernier push il y a 14 mois (ringbuf). Perl, Fortran aussi dans le code.", "C: 1,840 commits in 23 repos since March 2012, last push 14 months ago (ringbuf). Perl, Fortran in the code too."),
         "ringbuf",
         f("Pour 6 : du code poussé depuis moins de 12 mois.", "For 6: code pushed within 12 months."),
       ),
-      code(l, "ringbuf", "ringbuf.c", 4, "4", "4", 8, "assert(rb->head < rb->cap);", f("Pour 9 : un niveau moyen de 4,3 sur 5 (tu as 4), des tests dans la moitié des dépôts actifs.", "For 9: an average level of 4.3 out of 5 (you have 4), tests in half of the active repos.")),
+      code(l, "ringbuf", "ringbuf.c", 4, "4", "4", 8, "assert(rb->head < rb->cap);", f("Pour 9 : un niveau moyen de 4,3 sur 5 (tu as 4), des tests dans la moitié des repos actifs.", "For 9: an average level of 4.3 out of 5 (you have 4), tests in half of the active repos.")),
       act(l, 6, "41", "41", 2, actNext(4, 6)),
-      own(l, 8, "ringbuf", 612, 96, f(" 14 contributeurs externes.", " 14 outside contributors.")),
-      oss(l, 8, 31, f("Un dépôt avec 14 contributeurs externes (ringbuf).", "A repo with 14 outside contributors (ringbuf)."), oss10()),
+      own(l, 8, "ringbuf", 612, 96, f(" 14 comptes externes qui contribuent.", " 14 outside contributors.")),
+      oss(l, 8, 31, f("Un repo avec 14 comptes externes qui contribuent (ringbuf).", "A repo with 14 outside contributors (ringbuf)."), oss10()),
     ]),
   lowReliability: (l) =>
     finalizeMock([
@@ -251,15 +251,15 @@ const GITHUB: Record<string, (login: string) => Grid> = {
       stk(
         l,
         2,
-        f("Go : 31 commits dans 2 dépôts, pratiqué depuis 3,1 ans.", "Go: 31 commits in 2 repos, practised for 3.1 years."),
-        f("Go : 31 commits dans 2 dépôts depuis octobre 2023, dernier push il y a 5 mois (dotfiles-go).", "Go: 31 commits in 2 repos since October 2023, last push 5 months ago (dotfiles-go)."),
+        f("Go : 31 commits dans 2 repos, pratiqué depuis 3,1 ans.", "Go: 31 commits in 2 repos, practiced for 3.1 years."),
+        f("Go : 31 commits dans 2 repos depuis octobre 2023, dernier push il y a 5 mois (dotfiles-go).", "Go: 31 commits in 2 repos since October 2023, last push 5 months ago (dotfiles-go)."),
         "dotfiles-go",
         f("Pour 4 : 50 commits dans ton langage principal (tu en as 31).", "For 4: 50 commits in your main language (you have 31)."),
       ),
-      c("CODE", null, "unproven", "github", f("Aucun dépôt lisible : deux dépôts publics, des dotfiles. Le code est dans des dépôts privés.", "No readable repo: two public repos, dotfiles. The code is in private repos."), {
-        next: f("Pour s'ouvrir : un dépôt public avec du code à lire.", "To open up: a public repo with code to read."),
+      c("CODE", null, "unproven", "github", f("Aucun repo lisible : deux repos publics, des dotfiles. Le code est dans des repos privés.", "No readable repo: two public repos, dotfiles. The code is in private repos."), {
+        next: f("Pour s'ouvrir : un repo public avec du code à lire.", "To open up: a public repo with code to read."),
       }),
-      act(l, 44, "1 106", "1,106", 6, f("Pour 8 : un dépôt public de 20 commits.", "For 8: a public repo with 20 commits."), [
+      act(l, 44, "1 106", "1,106", 6, f("Pour 8 : un repo public de 20 commits.", "For 8: a public repo with 20 commits."), [
         f("Activité sans code visible : on voit que ça code, pas ce que ça code.", "Activity, no visible code: it shows coding, not what is coded."),
       ]),
       own(l, 2, "dotfiles-go", 17, 9),
@@ -273,12 +273,12 @@ const GITHUB: Record<string, (login: string) => Grid> = {
       stk(
         l,
         2,
-        f("Brainfuck : 3 commits dans 1 dépôt, pratiqué depuis 0,2 an.", "Brainfuck: 3 commits in 1 repo, practised for 0.2 years."),
-        f("Brainfuck : 3 commits dans 1 dépôt depuis septembre 2026, dernier push il y a 41 jours (hello-bf).", "Brainfuck: 3 commits in 1 repo since September 2026, last push 41 days ago (hello-bf)."),
+        f("Brainfuck : 3 commits dans 1 repo, pratiqué depuis 0,2 an.", "Brainfuck: 3 commits in 1 repo, practiced for 0.2 years."),
+        f("Brainfuck : 3 commits dans 1 repo depuis septembre 2026, dernier push il y a 41 jours (hello-bf).", "Brainfuck: 3 commits in 1 repo since September 2026, last push 41 days ago (hello-bf)."),
         "hello-bf",
         f("Pour 4 : 50 commits dans ton langage principal (tu en as 3).", "For 4: 50 commits in your main language (you have 3)."),
       ),
-      c("CODE", null, "unproven", "github", f("Aucun dépôt lu : rien de lisible.", "No repo read: nothing readable.")),
+      c("CODE", null, "unproven", "github", f("Aucun repo lu : rien de lisible.", "No repo read: nothing readable.")),
       c("ACT", null, "unproven", "github", f("2 semaines actives sur 52 : GitHub trop mince pour juger.", "2 active weeks out of 52: GitHub too thin to judge.")),
       c("OWN", null, "unproven", "github", f("GitHub trop mince pour juger.", "GitHub too thin to judge.")),
       c("OSS", null, "unproven", "github", f("GitHub trop mince pour juger.", "GitHub too thin to judge.")),
@@ -332,7 +332,7 @@ function declaredDrafts(src: "LinkedIn" | "CV", proof?: string, ghRepos?: number
       flags: ghRepos
         ? [
             f(
-              `À confirmer\u00a0: Kubernetes, Kafka. Déclarées ${on(src).fr}, pas encore visibles dans ${ghRepos} dépôts publics.`,
+              `À confirmer\u00a0: Kubernetes, Kafka. Déclarées ${on(src).fr}, pas encore visibles dans ${ghRepos} repos publics.`,
               `To confirm: Kubernetes, Kafka. Listed ${on(src).en}, not visible yet in ${ghRepos} public repos.`,
             ),
             f("Stack prouvée au-delà du profil\u00a0: Rust.", "Stack proven beyond the profile: Rust."),
@@ -372,7 +372,7 @@ function crossChecked(drafts: Draft[], src: "LinkedIn" | "CV", login: string): D
           ...d.flags,
           f(
             "À confirmer en entretien\u00a0: une partie de ces années ne se voit pas en code public. C'est courant, le code d'entreprise est privé.",
-            "To confirm in interview: part of these years doesn't show in public code. That's common, company code is private.",
+            "To check in an interview: part of these years doesn't show in public code. That's common, company code is private.",
           ),
         ],
         evidence: {

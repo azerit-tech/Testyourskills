@@ -212,9 +212,10 @@ const mock = {
     const band = mockStandings(type).find((b) => b.id === id) ?? (type === "ecole" && schoolById(id) ? { ...standing("ecole", id, schoolById(id)!.label, 0, 0), rank: null, gap: null, ahead: null } : null);
     if (!band?.hasPage) return null;
     const profiles = [
-      { fr: "Le Bâtisseur", en: "The Builder" },
-      { fr: "Le Mainteneur", en: "The Maintainer" },
-      { fr: "L'Architecte", en: "The Architect" },
+      // Les noms épicènes du vrai catalogue (data/profiles.json).
+      { fr: "Machine à livrer", en: "Delivery machine" },
+      { fr: "Légende du milieu", en: "Underworld legend" },
+      { fr: "Cerveau", en: "Mastermind" },
       null,
     ];
     const positions = ["BE", "FE", "DATA", "FS", "OPS"] as const;
@@ -246,7 +247,7 @@ const mock = {
           ? { fr: "Ce nom ne passe pas. Donne le nom de ta boîte, tel qu'il s'écrit.", en: "That name won't do. Give your company's name as it's written." }
           : check.refused === "contact"
             ? { fr: "Le nom de la boîte seulement : ni adresse, ni @, ni numéro.", en: "Just the company's name: no address, no @, no number." }
-            : { fr: "Pas une bande. Donne le nom de ta boîte.", en: "Not a gang. Give your company's name." };
+            : { fr: "Pas une bande. Donne le nom de ta boîte.", en: "Not a crew. Give your company's name." };
       throw new ApiError(400, check.refused === "none" ? "not_a_band" : "refused", fact);
     }
     const ref = check && "ref" in check ? check.ref : { id: pick.id ?? "", label: known ?? pick.id ?? "" };

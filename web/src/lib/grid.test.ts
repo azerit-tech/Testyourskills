@@ -32,7 +32,7 @@ describe("l'état d'un critère, en étiquettes lisibles sans la couleur", () =>
     const tags = stateTags(crit("STK", 6, { state: "declared", source: "linkedin" }));
     expect(tags).toEqual(["declared"]);
     expect(FR.tags.declared).toBe("déclaré, à confirmer");
-    expect(EN.tags.declared).toBe("declared, to confirm");
+    expect(EN.tags.declared).toBe("declared, to be confirmed");
   });
 
   it("non prouvé et non renseigné sortent de la moyenne", () => {
@@ -202,7 +202,7 @@ describe("la pièce où chaque note d'un dossier a été lue (§18.36)", () => {
     }
     expect(keptFrom({ ...by("EDU"), source: "linkedin" }, FR, "cv")).toBe("lu sur le CV");
     expect(keptFrom({ ...by("CODE"), source: "github" }, EN, "linkedin")).toBe("read on GitHub");
-    expect(keptFrom({ ...by("OWN"), source: "both" }, EN, "cv")).toBe("read on both exhibits");
+    expect(keptFrom({ ...by("OWN"), source: "both" }, EN, "cv")).toBe("read on both sources");
   });
 
   it("aucun mot de duel dans ces libellés", () => {

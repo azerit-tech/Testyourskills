@@ -162,7 +162,9 @@ describe("après-fiche, vue par qui a fait la fiche (§18.27)", () => {
   it("le jury du propriétaire : une ligne de texte courant, pas un titre", () => {
     stub("fr-FR");
     const html = renderToStaticMarkup(createElement(LangProvider, null, createElement(JuryLine, { jury: { guilty: 3, cleared: 1, mine: null } })));
-    expect(html).toBe('<p class="jury-line">Le jury : 75 % coupable · 4 votes</p>');
+    expect(html).toBe('<p class="jury-line">Jury\u00a0: 75\u00a0% coupable (4\u00a0votes)</p>');
+    // Une phrase, sans point médian.
+    expect(html).not.toContain("·");
   });
 });
 
@@ -200,7 +202,7 @@ describe("demander le retrait d'une fiche sans pseudo GitHub", () => {
   const linkedin = () => card({ id: "LinkedIn001", login: undefined, source: "cv", declaredSource: "linkedin" } as Partial<CardData>);
   it("sur la page partagée d'une fiche LinkedIn ou CV, après « Et toi ? », un lien discret", () => {
     const html = renderResult(linkedin(), { owner: false });
-    expect(html).toContain("Ce n&#x27;est pas toi qui as fait cette fiche ? Demander son retrait");
+    expect(html).toContain("Ce n&#x27;est pas toi qui as fait cette fiche\u00a0? Demander son retrait");
     expect(html.indexOf('class="removal"')).toBeGreaterThan(html.indexOf('id="you"'));
     expect(renderResult(linkedin(), { owner: false, lang: "en-US" })).toContain("Didn&#x27;t make this sheet yourself? Ask for its removal");
   });
@@ -248,16 +250,16 @@ describe("un dossier, une fiche, une note (§18.36)", () => {
         expect(textOf(html)).not.toMatch(VERSUS);
         // L'en-tête d'une fiche seule, au-dessus de la fiche ; les pièces dessous.
         expect(html.indexOf('class="wanted"')).toBeLessThan(html.indexOf('class="result-stage"'));
-        const line = lang === "fr-FR" ? "Pièces au dossier\u00a0: LinkedIn · GitHub" : "Exhibits on file: LinkedIn · GitHub";
+        const line = lang === "fr-FR" ? "Sources au dossier\u00a0: LinkedIn et GitHub" : "Sources on file: LinkedIn and GitHub";
         expect(html).toContain(`<p class="pieces-line">${line}</p>`);
         expect(html.indexOf('class="pieces"')).toBeGreaterThan(html.indexOf('class="tys-card '));
       }
   });
 
-  it("un CV au dossier : « CV · GitHub » ; le lien non prouvé et le code à prouver sur leur ligne", () => {
-    expect(renderResult(cmp({ id: "DossierCv01" }), { owner: true })).toContain("Pièces au dossier\u00a0: CV · GitHub");
+  it("un CV au dossier : « CV et GitHub » ; le lien non prouvé et le code à prouver sur leur ligne", () => {
+    expect(renderResult(cmp({ id: "DossierCv01" }), { owner: true })).toContain("Sources au dossier\u00a0: CV et GitHub");
     const unproven = renderResult(cmp({ id: "DossierLi01", declaredSource: "linkedin", linkUnproven: true }), { owner: false });
-    expect(unproven).toContain('<p class="pieces-note">Lien entre les deux pièces\u00a0: à confirmer</p>');
+    expect(unproven).toContain('<p class="pieces-note">Lien entre les deux sources\u00a0: à confirmer</p>');
     expect(unproven).not.toContain("Code à prouver");
     const empty = renderResult(cmp({ id: "DossierEm01", github: { ...FIXTURE_COMPARISON.github, sealed: true } }), { owner: false });
     expect(empty).toContain('<p class="pieces-note">Code à prouver</p>');
@@ -286,7 +288,7 @@ describe("la lecture du recruteur (§18.37)", () => {
 
   it("avec sa grille : le titre, huit critères, une jauge lue « n sur 10 », la note, aucun « + n »", () => {
     const html = renderResult(card({ grid, overall: grid.overall }), { owner: true, token: "tok" });
-    expect(html).toContain("Voici comment un recruteur d&#x27;Azerit te lit");
+    expect(html).toContain("Voici comment Azerit te lit");
     expect(html.match(/class="rg-row /g)).toHaveLength(8);
     expect(html).toMatch(/aria-label="\d+ sur 10"/);
     const block = /<section class="after-block rg".*?<\/section>/s.exec(html)![0].replace(/<[^>]+>/g, " ");

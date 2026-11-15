@@ -129,6 +129,7 @@ export function Denounce({ cardId, selfLogin, toast }: Props) {
   return (
     <section className="after-block denounce" aria-labelledby={`${uid}-title`} aria-busy={state.s === "pending"}>
       <h2 id={`${uid}-title`}>{d.title}</h2>
+      {state.s !== "pending" && <p className="denounce-intro">{d.intro}</p>}
       {state.s === "pending" ? (
         <div className="denounce-pending" role="status">
           <p>{d.pending(state.login)}</p>
@@ -215,7 +216,7 @@ export function Wanted({ card, x, toast, onAgain }: { card: CardData; x: string 
   const onMain = async () => {
     if (canNative) {
       try {
-        await navigator.share({ title: "Testyourskills", text: text("").trim(), url });
+        await navigator.share({ title: "Azerit", text: text("").trim(), url });
         track("native");
       } catch {
         /* partage annulé */
@@ -242,7 +243,7 @@ export function Wanted({ card, x, toast, onAgain }: { card: CardData; x: string 
             <Stars n={n} size={22} label={t.result.wantedStars(n, pick(LEVEL_LABELS[n], lang))} />{" "}
           </>
         )}
-        · {tag}
+        <span className="denounce-tag">{tag}</span>
       </h2>
       {status && <p>{d.charge(status)}</p>}
       <div className="denounce-actions">

@@ -583,7 +583,7 @@ export function EntryForm({ inputRef, variant = "full", note }: Props) {
             <label htmlFor={`${uid}-file`} className="drop-empty">
               <span className="drop-title">{h.dropTitle}</span>
               <span className="drop-sub">
-                {h.dropOr} <u>{h.dropBrowse}</u> · {h.dropHint}
+                {h.dropOr} <u>{h.dropBrowse}</u> ({h.dropHint})
               </span>
             </label>
           )}
@@ -613,7 +613,7 @@ export function EntryForm({ inputRef, variant = "full", note }: Props) {
         {mode === "single" && tab === "cv" && (
           <>
             <button type="button" className="link-alt" onClick={() => switchTab("github")}>
-              ← {h.tabGithub}
+              ← {liOn ? h.tabDoors : h.tabGithub}
             </button>
             <button
               type="button"

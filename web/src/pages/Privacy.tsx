@@ -7,8 +7,8 @@ export function Privacy() {
   const { t } = useT();
   const p = t.privacy;
   useEffect(() => {
-    document.title = `${p.title} · Testyourskills`;
-  }, [p.title]);
+    document.title = t.meta.titlePage(p.title);
+  }, [t, p.title]);
   return (
     <main className="page page-prose" id="main">
       <article className="prose">
@@ -31,6 +31,9 @@ export function Privacy() {
 
 export function NotFound() {
   const { t } = useT();
+  useEffect(() => {
+    document.title = t.meta.titlePage(t.notFound.title);
+  }, [t]);
   return (
     <main className="page page-card" id="main">
       <div className="panel-center error-panel">
