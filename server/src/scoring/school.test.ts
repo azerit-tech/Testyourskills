@@ -1,122 +1,126 @@
-import { describe, expect, it } from "vitest";
-import { SCHOOL_TIERS } from "../../../shared/readings";
+import { existsSync, readFileSync } from "node:fs";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { SCHOOL_TIERS, type SchoolTier } from "../../../shared/readings";
+import example from "../../../data/schools.example.json";
 import { SCORING } from "./config";
-import { normSchool, schoolTier } from "./school";
+import {
+  SCHOOLS_ENV,
+  loadRankedSchools,
+  normSchool,
+  parseSchools,
+  rankedSchools,
+  schoolListNames,
+  schoolTier,
+  setRankedSchoolsForTests,
+  type RankedSchoolList,
+} from "./school";
 
-const tier = (name: string, ai: "S" | "A" | "B" | "C" | "none" = "C") => schoolTier(name, ai);
+const EXAMPLE_PATH = new URL("../../../data/schools.example.json", import.meta.url).pathname;
+// La vraie liste, hors du dépôt (§18.50) : absente en intégration continue, vérifiée seulement si elle est là.
+const REAL_PATH = new URL("../../../data/schools.json", import.meta.url).pathname;
+const HAS_REAL = existsSync(REAL_PATH);
 
-describe("liste des écoles", () => {
-  it("chaque entrée compile, a un rang valable, et son propre nom tombe sur elle (l'ordre ne la masque pas)", () => {
-    const list = SCORING.cv.TEC.school.list;
-    expect(list.length).toBeGreaterThanOrEqual(60);
-    expect(list.length).toBeLessThanOrEqual(80);
-    for (const e of list) {
-      expect(SCHOOL_TIERS).toContain(e.tier);
-      expect(() => new RegExp(e.pattern)).not.toThrow();
-      expect(tier(e.school), e.school).toEqual({ tier: e.tier, known: e.school });
-    }
-    expect(new Set(list.map((e) => e.school)).size).toBe(list.length);
+type Check = { name: string; ai: SchoolTier; tier: SchoolTier; known: string | null };
+type ListFile = { schools: { school: string; tier: string; pattern: string }[]; checks?: Check[] };
+
+afterEach(() => setRankedSchoolsForTests(null));
+
+/** Chaque entrée compile, a un rang, et son propre nom tombe sur elle (l'ordre ne la masque pas) ; puis les contrôles du fichier. */
+function checkFile(path: string): void {
+  const raw = JSON.parse(readFileSync(path, "utf8")) as ListFile;
+  const list = loadRankedSchools({ [SCHOOLS_ENV]: path });
+  expect(list.source).toBe(path);
+  expect(list.schools.length).toBe(raw.schools.length);
+  expect(new Set(schoolListNames(list)).size).toBe(list.schools.length);
+  for (const e of raw.schools) {
+    expect(SCHOOL_TIERS, e.school).toContain(e.tier);
+    expect(e.tier).not.toBe("none");
+    expect(schoolTier(e.school, "C", list), e.school).toEqual({ tier: e.tier, known: e.school });
+  }
+  for (const c of raw.checks ?? []) expect(schoolTier(c.name, c.ai, list), `${c.name} (${c.ai})`).toEqual({ tier: c.tier, known: c.known });
+}
+
+describe("la liste des écoles, hors du dépôt (§18.50)", () => {
+  it("l'exemple du dépôt se lit, avec ses écoles inventées, et tient ses contrôles", () => {
+    const list = loadRankedSchools({ [SCHOOLS_ENV]: EXAMPLE_PATH });
+    expect(schoolListNames(list)).toEqual(["Académie Nébuleuse", "École Orbitale de Lisière", "École Orbitale (autres)", "Institut Zéphyr"]);
+    expect(parseSchools(example)).toEqual(list.schools);
+    expect(example.checks.length).toBeGreaterThan(0);
+    checkFile(EXAMPLE_PATH);
   });
+
+  it.skipIf(!HAS_REAL)("la vraie liste, si elle est posée ici : même forme, et ses propres contrôles", () => {
+    checkFile(REAL_PATH);
+  });
+
+  it("sans fichier : liste vide, aucun avertissement, rien ne plante ; toute école prend le rang de l'IA, plafonné", () => {
+    const warn = vi.fn();
+    expect(loadRankedSchools({}, undefined, warn)).toEqual({ schools: [], source: null });
+    expect(loadRankedSchools({ [SCHOOLS_ENV]: "  " }, undefined, warn)).toEqual({ schools: [], source: null });
+    expect(warn).not.toHaveBeenCalled();
+    // La liste du processus de test : aucune variable, donc vide.
+    expect(rankedSchools().schools).toEqual([]);
+    expect(schoolTier("Académie Nébuleuse", "S")).toEqual({ tier: SCORING.cv.TEC.school.aiMaxTier, known: null });
+    expect(schoolTier("Institut Zéphyr", "C")).toEqual({ tier: "C", known: null });
+  });
+
+  it("fichier absent, illisible ou vide : liste vide et un avertissement, sans lever", () => {
+    const warn = vi.fn();
+    expect(loadRankedSchools({ [SCHOOLS_ENV]: "/nulle/part/schools.json" }, undefined, warn).schools).toEqual([]);
+    expect(loadRankedSchools({ [SCHOOLS_ENV]: "x.json" }, () => "{pas du json", warn).schools).toEqual([]);
+    expect(loadRankedSchools({ [SCHOOLS_ENV]: "x.json" }, () => '{"schools":[{"school":""},{"tier":"S"},3]}', warn).schools).toEqual([]);
+    expect(warn).toHaveBeenCalledTimes(3);
+  });
+
+  it("une entrée mal formée est ignorée : rang inconnu, motif qui ne compile pas, nom vide", () => {
+    const schools = parseSchools({
+      schools: [
+        { school: "Bon", tier: "A", pattern: "\\bbon\\b" },
+        { school: "Rang inconnu", tier: "Z", pattern: "x" },
+        { school: "Rang none", tier: "none", pattern: "x" },
+        { school: "Motif cassé", tier: "B", pattern: "(" },
+        { school: "  ", tier: "B", pattern: "x" },
+      ],
+    });
+    expect(schools.map((e) => e.school)).toEqual(["Bon"]);
+  });
+
+  it("le dépôt ne garde que l'exemple : le fichier réel est ignoré, la variable documentée sans valeur, le barème sans liste", () => {
+    const env = readFileSync(new URL("../../../.env.example", import.meta.url), "utf8");
+    expect(env).toMatch(/^SCHOOL_TIERS_FILE=$/m);
+    const ignore = readFileSync(new URL("../../../.gitignore", import.meta.url), "utf8");
+    expect(ignore).toMatch(/^data\/schools\.json$/m);
+    expect(Object.keys(SCORING.cv.TEC.school).sort()).toEqual(["_doc", "aiMaxTier"]);
+  });
+});
+
+describe("le rang d'une école", () => {
+  const list: RankedSchoolList = { schools: parseSchools(example), source: "exemple" };
+  const tier = (name: string, ai: SchoolTier = "C") => schoolTier(name, ai, list);
 
   it("normalise casse, accents et ponctuation", () => {
-    expect(normSchool("  École CentraleSupélec — Paris-Saclay ")).toBe("ecole centralesupelec paris saclay");
+    expect(normSchool("  École Orbitale — de-Lisière ")).toBe("ecole orbitale de lisiere");
     expect(normSchool("l'X")).toBe("l x");
   });
-});
 
-describe("alias", () => {
-  it("CentraleSupélec : rang A sous toutes ses graphies", () => {
-    for (const n of ["CentraleSupélec", "Centrale Supelec", "Centrale-Supélec", "CENTRALESUPELEC", "École Centrale Paris", "Ecole Centrale de Paris", "Supélec", "CentraleSupélec - Université Paris-Saclay"]) {
-      expect(tier(n), n).toEqual({ tier: "A", known: "CentraleSupélec" });
-    }
+  it("le cas particulier avant sa famille ; jamais un morceau de mot", () => {
+    expect(tier("École Orbitale de Lisière")).toEqual({ tier: "A", known: "École Orbitale de Lisière" });
+    expect(tier("École Orbitale de Brume")).toEqual({ tier: "B", known: "École Orbitale (autres)" });
+    expect(tier("Institut Zéphyrin", "C")).toEqual({ tier: "C", known: null });
   });
 
-  it("Centrale Méditerranée, ex-Centrale Marseille : rang B", () => {
-    for (const n of ["Centrale Méditerranée", "Centrale Mediterranee", "Centrale Marseille", "École Centrale de Marseille", "Ecole Centrale Marseille"]) {
-      expect(tier(n), n).toEqual({ tier: "B", known: "Centrale Méditerranée" });
-    }
-    expect(tier("École Centrale de Lyon").known).toBe("Centrale Lyon");
-    expect(tier("École Centrale Casablanca")).toEqual({ tier: "B", known: "Centrale (autres)" });
+  it("la liste prime, même contre l'IA ; hors liste l'IA est plafonnée, jamais relevée", () => {
+    expect(tier("Institut Zéphyr", "S").tier).toBe("C");
+    expect(tier("Académie Nébuleuse", "C").tier).toBe("S");
+    expect(tier("Université de Nulle Part", "S")).toEqual({ tier: "B", known: null });
+    expect(tier("Université de Nulle Part", "A").tier).toBe("B");
+    expect(tier("Université de Nulle Part", "B").tier).toBe("B");
+    expect(tier("Université de Nulle Part", "C").tier).toBe("C");
   });
 
-  it("École centrale d'électronique n'est pas une Centrale", () => {
-    expect(tier("École Centrale d'Électronique")).toEqual({ tier: "C", known: "ECE" });
-    expect(tier("ECE Paris").known).toBe("ECE");
-  });
-
-  it("l'X et Polytechnique, mais pas Polytech ni les autres « polytechniques »", () => {
-    for (const n of ["X", "l'X", "X2015", "École polytechnique", "Ecole Polytechnique (X)", "Polytechnique", "École polytechnique, Palaiseau", "Ecole polytechnique de Paris"]) {
-      expect(tier(n), n).toEqual({ tier: "S", known: "École polytechnique" });
-    }
-    for (const n of ["Polytech Nantes", "Polytech Sorbonne", "Polytech' Lille", "École polytechnique universitaire de Lille", "Polytech Paris-Saclay"]) {
-      expect(tier(n), n).toEqual({ tier: "C", known: "Polytech" });
-    }
-    expect(tier("Polytechnique Montréal").known).toBe("Polytechnique Montréal");
-    expect(tier("École Polytechnique de Montréal").tier).toBe("B");
-    expect(tier("École Polytechnique Fédérale de Lausanne")).toEqual({ tier: "A", known: "EPFL" });
-    expect(tier("Institut Polytechnique de Paris")).toEqual({ tier: "A", known: "Institut Polytechnique de Paris" });
-    expect(tier("Grenoble INP - Institut polytechnique de Grenoble").known).toBe("Grenoble INP");
-    expect(tier("Institut National Polytechnique de Toulouse").known).toBe("Toulouse INP - ENSEEIHT");
-    // Hors liste : le rang de l'IA, plafonné.
-    for (const n of ["École nationale polytechnique d'Alger", "Université Polytechnique Hauts-de-France", "École Polytechnique de Tunisie", "SpaceX Academy"]) {
-      expect(tier(n, "S"), n).toEqual({ tier: "B", known: null });
-    }
-  });
-
-  it("les ENS, Mines, Télécom, ENSTA : l'école de Paris d'abord, puis la famille", () => {
-    expect(tier("ENS Ulm").tier).toBe("S");
-    expect(tier("École normale supérieure - PSL").tier).toBe("S");
-    expect(tier("École Normale Supérieure").tier).toBe("S");
-    expect(tier("ENS Paris-Saclay")).toEqual({ tier: "A", known: "ENS Paris-Saclay" });
-    expect(tier("ENS Cachan").known).toBe("ENS Paris-Saclay");
-    expect(tier("École normale supérieure de Lyon").known).toBe("ENS Lyon");
-    expect(tier("ENS Rennes").tier).toBe("B");
-    expect(tier("École normale supérieure de Tunis", "A")).toEqual({ tier: "B", known: null });
-    expect(tier("Mines ParisTech")).toEqual({ tier: "A", known: "Mines Paris" });
-    expect(tier("Mines Paris - PSL").known).toBe("Mines Paris");
-    expect(tier("École des mines de Paris").known).toBe("Mines Paris");
-    expect(tier("Mines Saint-Étienne")).toEqual({ tier: "B", known: "Mines (autres)" });
-    expect(tier("IMT Mines Albi").tier).toBe("B");
-    expect(tier("Télécom ParisTech")).toEqual({ tier: "A", known: "Télécom Paris" });
-    expect(tier("Télécom SudParis")).toEqual({ tier: "B", known: "Télécom (autres)" });
-    expect(tier("ENST Bretagne").tier).toBe("B");
-    expect(tier("ENSTA Paris").tier).toBe("A");
-    expect(tier("ENSTA Bretagne").tier).toBe("B");
-    expect(tier("École des Ponts ParisTech").tier).toBe("A");
-    expect(tier("Grenoble INP - Ensimag").known).toBe("Ensimag");
-  });
-
-  it("homonymes et écoles voisines", () => {
-    expect(tier("Oxford Brookes University", "B")).toEqual({ tier: "B", known: null });
-    expect(tier("University of Oxford").tier).toBe("S");
-    expect(tier("MIT Manipal", "A")).toEqual({ tier: "B", known: null });
-    expect(tier("Massachusetts Institute of Technology").known).toBe("MIT");
-    expect(tier("ETH Zürich").tier).toBe("S");
-    expect(tier("Technische Universität München").known).toBe("TU Munich");
-    expect(tier("INSA Lyon")).toEqual({ tier: "B", known: "INSA" });
-    expect(tier("École 42").known).toBe("42");
-    expect(tier("42 Paris").known).toBe("42");
-    expect(tier("Epitech").tier).toBe("C");
-    expect(tier("EPITA").tier).toBe("B");
-    expect(tier("Polytech Sorbonne").known).toBe("Polytech");
-    expect(tier("Sorbonne Université").known).toBe("Sorbonne Université");
-  });
-});
-
-describe("l'IA hors liste", () => {
-  it("plafonnée à B, jamais relevée", () => {
-    expect(tier("Université de Bordeaux", "S")).toEqual({ tier: "B", known: null });
-    expect(tier("Université de Bordeaux", "A").tier).toBe("B");
-    expect(tier("Université de Bordeaux", "B").tier).toBe("B");
-    expect(tier("IUT de Lannion", "C").tier).toBe("C");
-  });
-
-  it("la liste prime, même contre l'IA ; « none » et un nom vide restent none", () => {
-    expect(tier("CentraleSupélec", "C").tier).toBe("A");
-    expect(tier("École polytechnique", "B").tier).toBe("S");
-    expect(tier("Epitech", "A").tier).toBe("C");
-    expect(tier("Stanford Graduate School of Business", "none")).toEqual({ tier: "none", known: null });
+  it("« none » de l'IA et un nom vide restent none", () => {
+    expect(tier("Académie Nébuleuse", "none")).toEqual({ tier: "none", known: null });
     expect(tier("", "A")).toEqual({ tier: "none", known: null });
-    expect(schoolTier(undefined, undefined)).toEqual({ tier: "none", known: null });
+    expect(schoolTier(undefined, undefined, list)).toEqual({ tier: "none", known: null });
   });
 });

@@ -3,6 +3,10 @@ import type { CvReading } from "../../../shared/readings";
 import { NOW, cvCounts, cvReading, daysAgo, facts, repo } from "./__fixtures__/make";
 import { AI_BUZZ_KEY } from "./config";
 import { compareCards, cvTextCounts, scoreCv, scoreGithub } from "./index";
+import { useTestSchools } from "./__fixtures__/schools";
+
+// Jamais la vraie liste des écoles : celles des lectures d'exemple, puis l'exemple aux écoles inventées.
+useTestSchools();
 
 // `now` figé : l'expérience se compte sur les postes datés, jusqu'à aujourd'hui.
 const opts = { lang: "fr" as const, judgedInSeconds: 6, now: NOW };
@@ -77,25 +81,26 @@ describe("barème CV §4.5", () => {
   it("école : plus de bonus TEC, elle se lit dans le critère Formation de la grille", () => {
     const base = cvReading({ seniority_claimed: "mid" });
     const none = scoreCv(base, cvCounts(), opts);
-    const a = scoreCv({ ...base, school_name: "CentraleSupélec", school_tier: "A" }, cvCounts(), opts);
+    // Écoles inventées, rangées par la liste d'exemple (data/schools.example.json).
+    const a = scoreCv({ ...base, school_name: "École Orbitale de Lisière", school_tier: "A" }, cvCounts(), opts);
     // TEC ne dépend plus de l'école, ni en valeur ni en faits.
     expect(stat(a, "TEC").value).toBe(stat(none, "TEC").value);
     expect(stat(a, "TEC").facts).toEqual(stat(none, "TEC").facts);
-    expect(stat(a, "TEC").facts.map((f) => f.fr).join()).not.toMatch(/École|CentraleSupélec/);
+    expect(stat(a, "TEC").facts.map((f) => f.fr).join()).not.toMatch(/École|Orbitale/);
     // L'école ne baisse jamais la note (§4, règle 2).
     expect(a.overall).toBeGreaterThanOrEqual(none.overall);
     const edu = (c: ReturnType<typeof scoreCv>) => c.grid!.criteria.find((x) => x.code === "EDU")!;
     expect(edu(a).score).toBe(8);
-    expect(edu(a).reached.fr).toBe("CentraleSupélec\u00a0: au dossier.");
+    expect(edu(a).reached.fr).toBe("École Orbitale de Lisière\u00a0: au dossier.");
     expect(edu(none).state).toBe("missing");
     expect(edu(none).counted).toBe(false);
 
     const eduOf = (school_name: string, school_tier: CvReading["school_tier"]) => edu(scoreCv({ ...base, school_name, school_tier }, cvCounts(), opts)).score;
-    expect(eduOf("École polytechnique", "S")).toBe(10);
-    expect(eduOf("Centrale Méditerranée", "B")).toBe(6);
-    expect(eduOf("IUT de Lannion", "C")).toBe(4);
+    expect(eduOf("Académie Nébuleuse", "S")).toBe(10);
+    expect(eduOf("École Orbitale de Brume", "B")).toBe(6);
+    expect(eduOf("Institut Zéphyr", "C")).toBe(4);
     // La liste prime sur l'IA ; hors liste, l'IA ne donne pas plus que B.
-    expect(eduOf("Centrale Marseille", "S")).toBe(6);
+    expect(eduOf("École Orbitale de Brume", "S")).toBe(6);
     expect(eduOf("Université de Nulle Part", "S")).toBe(6);
     // Sans école de tech : sans objet, jamais une pénalité.
     expect(eduOf("Le Wagon", "none")).toBeNull();

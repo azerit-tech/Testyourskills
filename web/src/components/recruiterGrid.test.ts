@@ -35,6 +35,10 @@ import type { Shareable } from "./After";
 import { RecruiterGrid } from "./RecruiterGrid";
 import { RecruiterRead } from "./RecruiterRead";
 import { keptFrom } from "../lib/grid";
+import { useTestSchools } from "../../../server/src/scoring/__fixtures__/schools";
+
+// Jamais la vraie liste des écoles : celles des lectures d'exemple, puis l'exemple aux écoles inventées.
+useTestSchools();
 
 function renderNode(node: ReturnType<typeof createElement>, lang = "fr-FR"): string {
   vi.stubGlobal("window", {

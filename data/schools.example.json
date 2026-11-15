@@ -1,0 +1,21 @@
+{
+  "$comment": "Exemple, écoles inventées. La vraie liste des écoles et de leur rang (critère École, SPEC §18.37, §18.50) vit hors du dépôt public, sur le serveur, au chemin donné par SCHOOL_TIERS_FILE. Même forme : le nom affiché, le rang (S, A, B ou C) et un motif (expression régulière) essayé sur le nom normalisé (minuscules, sans accents, toute ponctuation devient une espace). Les motifs sont essayés dans l'ordre : le premier qui correspond donne le rang, d'où les cas particuliers avant leur famille. « checks » : des noms tels qu'on les lit, avec le rang de l'IA, et ce que la liste doit en faire (known : l'entrée qui donne le rang, null hors liste) ; server/src/scoring/school.test.ts les vérifie.",
+  "version": 1,
+  "schools": [
+    { "school": "Académie Nébuleuse", "tier": "S", "pattern": "\\bacademie nebuleuse\\b|^an\\d*$" },
+    { "school": "École Orbitale de Lisière", "tier": "A", "pattern": "\\borbitale (de )?lisiere\\b" },
+    { "school": "École Orbitale (autres)", "tier": "B", "pattern": "\\becole orbitale\\b" },
+    { "school": "Institut Zéphyr", "tier": "C", "pattern": "\\binstitut zephyr\\b|^zephyr\\b" }
+  ],
+  "checks": [
+    { "name": "Académie Nébuleuse", "ai": "C", "tier": "S", "known": "Académie Nébuleuse" },
+    { "name": "AN2019", "ai": "B", "tier": "S", "known": "Académie Nébuleuse" },
+    { "name": "École Orbitale de Lisière", "ai": "C", "tier": "A", "known": "École Orbitale de Lisière" },
+    { "name": "ECOLE ORBITALE - LISIÈRE", "ai": "C", "tier": "A", "known": "École Orbitale de Lisière" },
+    { "name": "École Orbitale de Brume", "ai": "S", "tier": "B", "known": "École Orbitale (autres)" },
+    { "name": "Institut Zéphyr", "ai": "A", "tier": "C", "known": "Institut Zéphyr" },
+    { "name": "Institut Zéphyrin", "ai": "S", "tier": "B", "known": null },
+    { "name": "Université de Nulle Part", "ai": "C", "tier": "C", "known": null },
+    { "name": "Académie Nébuleuse", "ai": "none", "tier": "none", "known": null }
+  ]
+}

@@ -7,6 +7,10 @@ import type { CardData } from "../../../shared/types";
 import { cvCounts } from "./__fixtures__/make";
 import { FOUNDERS_NOW, JACQUES_AI, jacquesFacts, jacquesProfile, jacquesReading, lumineFacts, lumineProfile, lumineReading } from "./__fixtures__/founders";
 import { compareCards, scoreCv, scoreGithub } from "./index";
+import { useTestSchools } from "./__fixtures__/schools";
+
+// Jamais la vraie liste des écoles : celles des lectures d'exemple, puis l'exemple aux écoles inventées.
+useTestSchools();
 
 const opts = { lang: "fr" as const, judgedInSeconds: 6 };
 const card = <T extends object>(c: T, id: string) => ({ ...c, id, createdAt: FOUNDERS_NOW }) as unknown as CardData;

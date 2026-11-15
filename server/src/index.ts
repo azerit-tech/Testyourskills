@@ -18,6 +18,9 @@ import { Store } from "./db";
 import { CARDS_PER_BROWSER, CARDS_PER_DAY, limitFromEnv } from "./ratelimit";
 import { realDeps } from "./deps";
 import { TokenPool, tokensFromEnv } from "./github/tokens";
+import { SCORING } from "./scoring/config";
+import { EMPLOYERS_ENV, highBarEmployers } from "./scoring/employers";
+import { SCHOOLS_ENV, rankedSchools } from "./scoring/school";
 
 const prod = process.env.NODE_ENV === "production";
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -69,6 +72,16 @@ if (!githubAuth) {
 if (prod && !existsSync(join(webRoot, "index.html"))) {
   console.warn(`Front introuvable dans ${webRoot} : lance \`npx vite build\` avant \`npm start\`.`);
 }
+// Les deux listes privées, hors du dépôt (SPEC §18.37, §18.50), lues dès le démarrage pour le dire ici.
+const schools = rankedSchools();
+if (schools.schools.length) console.log(`Écoles : ${schools.schools.length} rangs lus dans ${schools.source}.`);
+else
+  console.warn(
+    `${SCHOOLS_ENV} absent ou illisible : aucune école listée, chaque école prend le rang de l'IA plafonné à ${SCORING.cv.TEC.school.aiMaxTier} (critère École). Poser data/schools.json sur le serveur (ops/DEPLOY.md).`,
+  );
+const employers = highBarEmployers();
+if (employers.employers.length) console.log(`Employeurs à forte barre : ${employers.employers.length} lus dans ${employers.source}.`);
+else console.warn(`${EMPLOYERS_ENV} absent ou illisible : aucun employeur à forte barre (critère Parcours). Poser data/employers.json sur le serveur (ops/DEPLOY.md).`);
 
 /**
  * index.html du front où injecter les balises OG de /c/:id.

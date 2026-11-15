@@ -34,6 +34,10 @@ import {
 import { publicGrid } from "../../../shared/publicView";
 import employersExample from "../../../data/employers.example.json";
 import { parseEmployers, type HighBarList } from "./employers";
+import { useTestSchools } from "./__fixtures__/schools";
+
+// Jamais la vraie liste des écoles : celles des lectures d'exemple, puis l'exemple aux écoles inventées.
+useTestSchools();
 
 const NOW = Date.parse(FOUNDERS_NOW);
 /** La liste d'exemple aux noms inventés (data/employers.example.json), lue par le chargeur du serveur. */
@@ -343,11 +347,12 @@ describe("aucune note par addition", () => {
 });
 
 describe("l'école ne peut pas faire baisser la note (§4, règle 2)", () => {
+  // Écoles inventées, rangées par la liste d'exemple (data/schools.example.json).
   const TIERS: [string, SchoolTier][] = [
-    ["École polytechnique", "S"],
-    ["CentraleSupélec", "A"],
-    ["Centrale Méditerranée", "B"],
-    ["IUT de Lannion", "C"],
+    ["Académie Nébuleuse", "S"],
+    ["École Orbitale de Lisière", "A"],
+    ["École Orbitale de Brume", "B"],
+    ["Institut Zéphyr", "C"],
   ];
   const bases: [string, CvReading, FounderProfile | undefined][] = [
     ["Jacques", jacquesReading(), jacquesProfile()],
@@ -404,7 +409,7 @@ describe("l'expérience se compte en code, poste par poste (§3.2)", () => {
     expect(months([role("Développeur", "Acme", "2025-01", "2025-07")])).toBe(6);
     expect(months([role("Trésorier", "BDE Centrale", "2024-01", "2025-01")])).toBe(0);
     expect(months([role("Trésorier", "Centrale Méditerranée Finance", "2024-01", "2025-01")])).toBe(0);
-    expect(months([role("Président", "Junior ISEP", "2024-01", "2025-01")])).toBe(0);
+    expect(months([role("Président", "Junior Institut Zéphyr", "2024-01", "2025-01")])).toBe(0);
     // L'école elle-même, ou un poste de recherche dans une de ses associations, reste un poste.
     expect(months([role("Doctorant", "Centrale Méditerranée", "2024-01", "2025-01")])).toBe(12);
     expect(months([role("Chercheur", "CentraleSupélec Robotique", "2024-01", "2025-01")])).toBe(12);

@@ -1,7 +1,8 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import scoring from "../data/scoring.json";
 import { BAND_ID_RE, bandHasPage, cleanCompanyLabel, companyBand, companyCheck, companyKey, isBlockedBand, matchSchool, schoolById, schoolList, searchSchools } from "./bands";
+
+const REAL_SCHOOLS = new URL("../data/schools.json", import.meta.url).pathname;
 
 describe("écoles des bandes (§18.38)", () => {
   it("des ids uniques, au bon format, et aucun rang du barème", () => {
@@ -13,8 +14,10 @@ describe("écoles des bandes (§18.38)", () => {
     for (const s of list) expect(Object.keys(s).sort()).toEqual(["id", "label"]);
   });
 
-  it("chaque école du barème a sa bande", () => {
-    for (const e of scoring.cv.TEC.school.list) expect(matchSchool(e.school), e.school).not.toBeNull();
+  // La liste des rangs vit hors du dépôt (§18.50) : vérifiée seulement si elle est posée ici.
+  it.skipIf(!existsSync(REAL_SCHOOLS))("chaque école de la liste des rangs (data/schools.json) a sa bande", () => {
+    const { schools } = JSON.parse(readFileSync(REAL_SCHOOLS, "utf8")) as { schools: { school: string }[] };
+    for (const e of schools) expect(matchSchool(e.school), e.school).not.toBeNull();
   });
 
   it("un nom lu sur LinkedIn ou un CV donne sa bande, les campus avant leur famille", () => {

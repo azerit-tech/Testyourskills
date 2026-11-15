@@ -22,6 +22,10 @@ import { GRID } from "./config";
 import { EMPLOYERS_ENV, loadHighBarEmployers } from "./employers";
 import { analyzeRoles, declaredGrid, declaredInput, type DeclaredInput } from "./grid";
 import { scoreCv } from "./index";
+import { useTestSchools } from "./__fixtures__/schools";
+
+// Jamais la vraie liste des écoles : celles des lectures d'exemple, puis l'exemple aux écoles inventées.
+useTestSchools();
 
 const NOW = Date.parse(FOUNDERS_NOW);
 

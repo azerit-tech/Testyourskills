@@ -11,3 +11,5 @@ tools/bake/.cache/
 __pycache__/
 # La liste des employeurs à forte barre ne quitte jamais le serveur (§18.37) : seul l'exemple est versionné.
 data/employers.json
+# La liste des écoles et de leur rang non plus (§18.50) : seul l'exemple est versionné.
+data/schools.json

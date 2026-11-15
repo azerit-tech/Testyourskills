@@ -16,6 +16,10 @@ import {
   lumineReading,
 } from "./__fixtures__/founders";
 import { compareCards, scoreCv, scoreGithub } from "./index";
+import { useTestSchools } from "./__fixtures__/schools";
+
+// Jamais la vraie liste des écoles : celles des lectures d'exemple, puis l'exemple aux écoles inventées.
+useTestSchools();
 
 const opts = { lang: "fr" as const, judgedInSeconds: 6 };
 const card = <T extends object>(c: T, id: string) => ({ ...c, id, createdAt: FOUNDERS_NOW }) as unknown as CardData;

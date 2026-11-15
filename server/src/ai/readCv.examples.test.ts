@@ -16,6 +16,10 @@ import lectureDeux from "./__fixtures__/reading-exemple-deux.json";
 import { resetBudgetForTests } from "./budget";
 import { readCv } from "./readCv";
 import { fakeClient } from "./testing";
+import { useTestSchools } from "../scoring/__fixtures__/schools";
+
+// Jamais la vraie liste des écoles : celles des lectures d'exemple, puis l'exemple aux écoles inventées.
+useTestSchools();
 
 beforeEach(() => resetBudgetForTests());
 

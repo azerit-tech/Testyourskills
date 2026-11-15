@@ -20,7 +20,7 @@ import { df, nf } from "./common";
 import { GRID, type GridRoleKind } from "./config";
 import { isTutorialRepo, type GithubMetrics } from "./derive";
 import { highBarEmployer, type HighBarList } from "./employers";
-import { normSchool, schoolListNames, schoolTier } from "./school";
+import { normSchool, rankedSchools, schoolListNames, schoolTier, type RankedSchoolList } from "./school";
 import { EDU_NEXT, EDU_NEXT_GITHUB, SCHOOL_COUNTED, schoolCounted } from "../../../shared/schoolRank";
 import { frTypo } from "../../../shared/typo";
 
@@ -243,10 +243,19 @@ export interface RoleInfo {
  * un poste de recherche ou d'enseignement. La liste, pas la formation du profil :
  * ajouter ou retirer une école ne change jamais l'expérience.
  */
-const SCHOOL_KEYS = schoolListNames()
-  .filter((n) => !n.includes("("))
-  .map(normSchool)
-  .filter((k) => k.replace(/\s/g, "").length >= 4);
+let schoolKeysCache: { list: RankedSchoolList; keys: string[] } | null = null;
+function schoolKeys(): string[] {
+  const list = rankedSchools();
+  if (schoolKeysCache?.list !== list)
+    schoolKeysCache = {
+      list,
+      keys: schoolListNames(list)
+        .filter((n) => !n.includes("("))
+        .map(normSchool)
+        .filter((k) => k.replace(/\s/g, "").length >= 4),
+    };
+  return schoolKeysCache.keys;
+}
 const SCHOOL_ASSOC_WORDS_RE = rx(GRID.XP.schoolAssociationWords);
 
 /**
@@ -267,7 +276,7 @@ export function roleKind(role: DatedRole): RoleKind {
   const company = norm(role.company);
   if (ASSOC_RE.test(title) || ASSOC_RE.test(company)) return "association";
   const companyKey = normSchool(role.company);
-  if (companyKey && SCHOOL_ASSOC_WORDS_RE.test(companyKey) && !SCHOOL_ROLE_EXCEPT_RE.test(title) && SCHOOL_KEYS.some((k) => wordIn(k, companyKey)))
+  if (companyKey && SCHOOL_ASSOC_WORDS_RE.test(companyKey) && !SCHOOL_ROLE_EXCEPT_RE.test(title) && schoolKeys().some((k) => wordIn(k, companyKey)))
     return "association";
   if (INTERN_RE.test(title)) return "internship";
   return contract ?? ai ?? "full";
