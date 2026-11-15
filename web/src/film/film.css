@@ -441,4 +441,27 @@
   .film-sound {
     right: max(16px, env(safe-area-inset-right, 0px));
   }
+  /* la colonne n'a que 220 px environ : la bande du bas descend jusqu'aux 15 % que
+     l'image laisse libres, toute à la radio, et sa ligne passe sur deux lignes en 12 px
+     au lieu d'être coupée */
+  .film-band-bottom {
+    height: max(15cqh, calc(12cqh + env(safe-area-inset-bottom, 0px)));
+    --radio-zone: max(12cqh, calc(15cqh - env(safe-area-inset-bottom, 0px)));
+  }
+  /* la bande d'encre des marges reste au niveau de celle de la colonne */
+  .film-wide-bottom {
+    height: max(calc(var(--film-h) * 0.15), calc(var(--film-h) * 0.12 + env(safe-area-inset-bottom, 0px)));
+  }
+  .film-radio {
+    white-space: normal;
+  }
+  .film-radio-kicker {
+    white-space: nowrap;
+  }
+  .film-radio-text {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
 }
