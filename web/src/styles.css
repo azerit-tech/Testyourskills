@@ -2612,6 +2612,10 @@ button.cover-panel:focus-visible {
   .page-result.is-visitor .stage-chase {
     display: flex;
   }
+  /* un seul lien de la poursuite, celui qu'on voit : celui de la tête masquée sort de la tabulation */
+  .page-result.is-visitor .wanted .chase-link {
+    display: none;
+  }
   .page-result.is-visitor .result-stage:has(> .stage-chase) .card-slot {
     margin-bottom: 88px;
   }
@@ -2629,6 +2633,9 @@ button.cover-panel:focus-visible {
   }
   .page-result .stage-chase {
     display: flex;
+  }
+  .page-result > .result-top > .wanted .chase-link {
+    display: none;
   }
   .page-result .result-stage:has(> .stage-chase) .card-slot {
     margin-bottom: 88px;
