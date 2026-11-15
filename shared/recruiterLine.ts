@@ -115,10 +115,10 @@ export const LINE_WORDS: Record<
   en: {
     names: { EDU: "school", XP: "experience", EMP: "career path", STK: "stack", CODE: "code level", ACT: "activity", OWN: "ownership", OSS: "open source" },
     the: { EDU: "school", XP: "experience", EMP: "the career path", STK: "the stack", CODE: "the code", ACT: "activity", OWN: "ownership", OSS: "open source" },
-    strong: (name, score) => `Strong point: ${name}, ${score}/10.`,
+    strong: (name, score) => `Strongest: ${name}, ${score}/10.`,
     dig: (name) => `To dig into: ${name}.`,
-    prove: (the) => `Yet to prove: ${the}.`,
-    even: (floor) => `Even file: nothing under ${floor}/10.`,
+    prove: (the) => `Still unproven: ${the}.`,
+    even: (floor) => `Solid across the board: nothing under ${floor}/10.`,
     years: { 10: "10+ years", 9: "8 or 9 years", 8: "6 or 7 years", 7: "5 years", 6: "4 years", 5: "3 years", 4: "2 years", 3: "1 year", 2: "under a year" },
     counted: (years) => `${years} counted`,
     estimated: (years) => `${years} estimated from GitHub`,

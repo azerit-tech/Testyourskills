@@ -1,5 +1,7 @@
-// Le texte de partage (§18.27), en fonction pure : six étoiles pleines puis
-// vides, le pari s'il existe, le profil, la trouvaille, le rang, le lien.
+// Le texte de partage (§18.27, §18.48), en fonction pure : « Ma fiche de dev »,
+// six étoiles pleines puis vides, la note avec son échelle, le pari s'il existe,
+// le profil, la trouvaille, le rang quand il flatte, le lien. Une phrase : des
+// virgules, jamais une chaîne de points médians.
 // Les mots viennent d'i18n (`result.share.words`) ; rien ici ne lit le navigateur.
 import { starsLine } from "../../../shared/stars";
 import type { Dict } from "../i18n";
@@ -13,7 +15,7 @@ interface Common {
   profile: string | null;
   /** Dossier vide fait par un tiers, pas encore revendiqué (shared/publicView.ts) : ni note, ni étoiles, ni pari. */
   sealed?: boolean;
-  /** « 7e cette semaine », seulement pendant la semaine en cours. */
+  /** « 7e cette semaine », seulement pendant la semaine en cours et dans le top 10 (`flatteringRank`). */
   rank: string | null;
   /** Étoiles plaidées pendant l'attente (lib/plea.ts), ou null. */
   plea: number | null;
@@ -31,14 +33,18 @@ export interface CardShare extends Common {
   /** Le chef d'accusation, à défaut de trouvaille. */
   status: string | null;
   secs: number;
-  /** Un dossier à deux pièces (§18.36) : « LinkedIn » ou « CV », pour « Deux pièces au dossier : LinkedIn et GitHub. » */
+  /** Un dossier à deux sources (§18.36) : « LinkedIn » ou « CV », pour « Deux sources au dossier : LinkedIn et GitHub. » */
   exhibits?: string;
 }
 
-/** Un dossier à deux pièces se partage comme une fiche, la sienne (§18.36) : un seul texte. */
+/** Un dossier à deux sources se partage comme une fiche, la sienne (§18.36) : un seul texte. */
 export type ShareInput = CardShare;
 
 export { starsLine };
+
+/** Le rang ne part dans le texte que s'il flatte : le top 10 de la semaine (§18.48). */
+export const SHARE_RANK_MAX = 10;
+export const flatteringRank = (rank: number): boolean => rank >= 1 && rank <= SHARE_RANK_MAX;
 
 /** X plafonne un post à 280 caractères et compte tout lien pour 23. */
 export const X_MAX = 280;
@@ -66,18 +72,18 @@ const CUTS: Cut[] = [0, 1, 2, 3, 4, 5];
 
 function build(w: ShareWords, x: ShareInput, cut: Cut): string {
   if (x.sealed) {
-    // La note plancher d'un dossier vide jugerait sans pièce : le texte ne la dit pas.
-    return [`${w.sealed}${cut < 5 && x.profile ? ` · ${x.profile}` : ""}.`, w.cta].join(" ");
+    // La note plancher d'un dossier vide jugerait sans preuve : le texte ne la dit pas.
+    return [`${w.sealed}${cut < 5 && x.profile ? `, ${w.profile(x.profile)}` : ""}.`, w.cta].join(" ");
   }
   const plea = x.plea ? w.plea(starsLine(x.plea), starsLine(x.stars)) : null;
   // Avec le pari, le verdict porte déjà les étoiles : on ne les répète pas.
   const stars = plea ? null : starsLine(x.stars);
   // La trouvaille part d'abord : remplacée par le chef d'accusation, plus court, puis retirée.
   const detail = cut === 0 ? (x.finding ?? (x.status ? w.charge(x.status) : null)) : cut === 1 && x.finding && x.status ? w.charge(x.status) : null;
-  const tail = `${cut < 5 && x.profile ? ` · ${x.profile}` : ""}${cut < 4 && x.rank ? ` · ${x.rank}` : ""}.`;
-  // Fiche notée par la grille (§18.37) : « Mon dossier, passé à la grille de recrutement d'Azerit : ★★★★☆☆, 61. Point fort : … ».
+  const tail = `${cut < 5 && x.profile ? `, ${w.profile(x.profile)}` : ""}${cut < 4 && x.rank ? `, ${x.rank}` : ""}.`;
+  // Fiche notée par la grille (§18.37) : « Ma fiche de dev, passée à la grille de recrutement d'Azerit : ★★★★☆☆, 61/100, profil « Cerveau ». Point fort : … ».
   const head = x.graded ? w.file(stars, x.overall) : stars ? w.sheet(stars, x.overall) : w.score(x.overall);
-  // Les pièces du dossier partent en premier quand la place manque.
+  // Les sources du dossier partent en premier quand la place manque.
   const exhibits = cut === 0 && x.exhibits ? w.exhibits(x.exhibits) : null;
   const parts: (string | null)[] = [head + tail, cut < 3 && x.graded ? (x.strong ?? null) : null, exhibits, detail, cut < 3 && !x.graded ? w.ai(x.secs) : null, w.cta];
   const body = parts.filter(Boolean).join(" ");

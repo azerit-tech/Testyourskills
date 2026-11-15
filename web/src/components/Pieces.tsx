@@ -13,7 +13,7 @@ export function Pieces({ cmp }: { cmp: ComparisonData }) {
   const unproven = cmp.github.grid?.rule === "empty_file" || !!cmp.github.sealed;
   return (
     <div className="pieces">
-      <p className="pieces-line">{p.line(`${declaredLabel(cmp)} · GitHub`)}</p>
+      <p className="pieces-line">{p.line(p.pair(declaredLabel(cmp), "GitHub"))}</p>
       {unproven && <p className="pieces-note">{p.unproven}</p>}
       {cmp.linkUnproven && <p className="pieces-note">{p.link}</p>}
     </div>

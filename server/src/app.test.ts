@@ -509,8 +509,9 @@ describe("image d'aperçu de l'accueil (/og/home.png)", () => {
       expect(count(html, /property="og:image"/g)).toBe(1);
       expect(count(html, /name="twitter:image"/g)).toBe(1);
       expect(html).not.toContain("skills.azerit.tech/og/home.png");
-      // Le reste du index.html ne bouge pas.
-      expect(html).toContain(`<meta name="twitter:card" content="summary_large_image" />`);
+      // À l'accueil, le reste du index.html ne bouge pas ; la vie privée porte son titre.
+      if (path === "/") expect(html).toContain(`<meta name="twitter:card" content="summary_large_image" />`);
+      else expect(html).toContain("<title>Privacy · Azerit</title>");
       expect(html).toContain(`<div id="root">`);
     }
   });
@@ -1036,16 +1037,16 @@ describe("page /c/:id et images", () => {
     expect(res.status).toBe(200);
     const html = await res.text();
     const overall = FIXTURES.gold.overall;
-    // §18.7 : « @X est dans le viseur ★★★★★☆ · {profil} », les six étoiles (§18.27).
+    // §18.7 : « @X est dans le viseur ★★★★★☆, {profil} », les six étoiles (§18.27).
     expect(overall).toBeGreaterThanOrEqual(75);
-    expect(html).toContain(`<meta property="og:title" content="@leamd est dans le viseur ★★★★★☆ · ${FIXTURES.gold.profile!.label.fr}">`);
-    expect(html).toContain(`content="Fiche ★★★★★☆, ${overall}, fiche de dev de`);
+    expect(html).toContain(`<meta property="og:title" content="@leamd est dans le viseur ★★★★★☆, ${FIXTURES.gold.profile!.label.fr}">`);
+    expect(html).toContain(`content="Fiche ★★★★★☆, ${overall}/100, fiche de dev de`);
     expect(html).toContain(`<meta property="og:image" content="https://skills.test/og/${id}.png?v=7">`);
     expect(html).toContain(`<meta property="og:url" content="https://skills.test/c/${id}">`);
     expect(html).toContain(`<meta property="og:image:width" content="1200">`);
     expect(html).toContain(`<meta name="twitter:card" content="summary_large_image">`);
     // Une fiche sans grille dit son temps de lecture, par Azerit ; jamais « une IA t'interroge ».
-    expect(html).toMatch(/og:description" content="Chef d&#39;accusation\u00a0: «\u00a0Typage jusqu&#39;au bout\u00a0»\. Dossier lu par Azerit en \d+ s\. Fais la tienne\./);
+    expect(html).toMatch(/og:description" content="Chef d&#39;accusation\u00a0: «\u00a0Typage jusqu&#39;au bout\u00a0»\. Fiche dressée par Azerit en \d+\u00a0s\. Fais la tienne\./);
     expect(html).not.toMatch(/Interrogatoire|une IA/);
   });
 
@@ -1067,7 +1068,7 @@ describe("page /c/:id et images", () => {
     const html = await (await ctx.app.request(`/c/${json.id}`)).text();
     // Demandée en anglais (postCv envoie lang=en). L'aperçu d'une fiche, à la troisième personne, une seule note.
     expect(html).toMatch(/<title>@leamd is in the crosshairs ★/);
-    expect(html).toContain("Exhibits: CV and GitHub.");
+    expect(html).toContain("Sources: CV and GitHub.");
     expect(html).not.toMatch(/shows more|claims \d|Your CV/);
     expect(html).toContain('<meta property="og:locale" content="en_US">');
     expect(html).toContain(`/og/${json.id}.png`);
@@ -1376,7 +1377,7 @@ describe("file d'attente (MAX_CONCURRENT_CARDS)", () => {
     await ctx.pipeline.wait(b.json.id);
     const s = await getState(ctx, b.json.id);
     expect(s.state).toMatchObject({ state: "error", code: "timeout" });
-    expect((s.state as { message: Fact }).message.fr).toMatch(/3 minutes/);
+    expect((s.state as { message: Fact }).message.fr).toMatch(/3\u00a0minutes/);
     expect(ctx.pipeline.load()).toEqual({ running: 1, queued: 0 });
     await g.release("a1");
     await ctx.pipeline.wait(a.json.id);
@@ -1397,7 +1398,7 @@ describe("file d'attente (MAX_CONCURRENT_CARDS)", () => {
     expect(res.status).toBe(503);
     expect(json).toMatchObject({ state: "error", code: "busy" });
     expect(json.message!.fr).toMatch(/commissariat/);
-    expect(json.message!.fr).toMatch(/2[56] minutes/);
+    expect(json.message!.fr).toMatch(/2[56]\u00a0minutes/);
     expect(json.message!.en).toMatch(/station/);
     expect(ctx.calls.collect).toBe(0);
     // Le CV seul ne dépend pas de GitHub : il passe, et c'est lui qui prend le quota.

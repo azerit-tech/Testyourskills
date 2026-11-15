@@ -364,8 +364,8 @@ export function starsFor(overall: number): Stars {
 export const LEVEL_LABELS: Record<Stars, Fact> = {
   1: { fr: "Petit délit", en: "Petty crime" },
   2: { fr: "Délit", en: "Misdemeanor" },
-  3: { fr: "Avis de recherche", en: "Wanted" },
-  4: { fr: "Haute surveillance", en: "High surveillance" },
+  3: { fr: "Mandat d'arrêt", en: "Warrant out" },
+  4: { fr: "Haute surveillance", en: "Under surveillance" },
   5: { fr: "Menace publique", en: "Public menace" },
   6: { fr: "Priorité absolue", en: "Top priority" },
 };

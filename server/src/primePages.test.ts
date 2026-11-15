@@ -10,7 +10,7 @@ import type { Prime, Season } from "../../shared/season";
 import { createApp } from "./app";
 import { Store } from "./db";
 import type { Deps, RenderInput } from "./pipeline";
-import { logoSize, primeImageKey, primeMeta, readLogo } from "./primePages";
+import { logoSize, primeImageKey, primeMeta, primesMeta, readLogo } from "./primePages";
 import { renderImage } from "./render/index";
 
 const DAY = 24 * 3600 * 1000;
@@ -121,7 +121,10 @@ describe("les balises des pages", () => {
     const ctx = setup(season([prime()]));
     const page = await (await ctx.app.request("/primes/demo-stage")).text();
     expect(page).toContain("/og/p/demo-stage.png?");
-    expect(page).toContain("Entreprise Démo : stage Backend, Full-stack");
+    expect(page).toContain("<title>Entreprise Démo, stage Backend, Full-stack · Azerit</title>");
+    const en = await ctx.app.request("/primes/demo-stage?lang=en");
+    expect(en.headers.get("Vary")).toMatch(/Accept-Language/);
+    expect(await en.text()).toContain("<title>Entreprise Démo, Backend, Full-stack internship · Azerit</title>");
     const list = await ctx.app.request("/primes");
     expect(list.status).toBe(200);
     expect(await list.text()).toContain("/og/home.png");
@@ -129,7 +132,12 @@ describe("les balises des pages", () => {
   });
 
   it("le texte suit la phase, sans pseudo ni rang", () => {
-    expect(primeMeta(view(), "https://x").description).toBe("3 entretiens pour le haut du classement, J-12. Fais ta fiche et concours.");
-    expect(primeMeta(view({ phase: "closed", daysLeft: null }), "https://x").description).toMatch(/^Prime close/);
+    expect(primeMeta(view(), "https://x").description).toBe("3 entretiens pour les fiches les mieux classées, J-12. Fais ta fiche et entre dans la course.");
+    expect(primeMeta(view({ phase: "closed", daysLeft: null }), "https://x").description).toMatch(/^Prime terminée\u00a0: 3 entretiens/);
+    // En anglais : « enter the race », « closed », jamais « file ».
+    expect(primeMeta(view(), "https://x", "en").description).toBe("3 interviews for the top-ranked sheets, 12 days left. Get your rap sheet and enter the race.");
+    expect(primeMeta(view({ phase: "closed", daysLeft: null }), "https://x", "en").description).toMatch(/^Bounty closed: 3 interviews/);
+    expect(primesMeta("https://x", "en").title).toBe("Bounties: interviews for the top of the board · Azerit");
+    expect(primesMeta("https://x", "fr").title).toBe("Les primes\u00a0: des entretiens pour le haut du classement · Azerit");
   });
 });

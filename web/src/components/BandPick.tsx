@@ -25,14 +25,15 @@ type Toast = (m: string) => void;
  * encore de page publique : le lien mène à l'accueil, le texte dit quoi taper.
  */
 export function useBandShare(toast: Toast) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const native = hasNativeShare() && isTouch();
   const share = async (b: Pick<BandRef, "type" | "id"> & { hasPage?: boolean }, text: string, cardId: string | null) => {
-    const url = b.hasPage === false ? `${window.location.origin}/` : bandUrl(b);
+    // Partagé depuis le site en anglais, le lien le dit : son aperçu sort en anglais.
+    const url = `${b.hasPage === false ? `${window.location.origin}/` : bandUrl(b)}${lang === "en" ? "?lang=en" : ""}`;
     const meta = { type: b.type, id: b.id };
     if (native) {
       try {
-        await navigator.share({ title: "Testyourskills", text, url });
+        await navigator.share({ title: "Azerit", text, url });
         api.track("band_share", cardId, { ...meta, channel: "native" });
       } catch {
         /* partage annulé */

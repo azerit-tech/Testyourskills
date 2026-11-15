@@ -37,8 +37,8 @@ describe("la ligne du rang", () => {
     expect(fr.bands.rank(b({}))).toBe("3e des écoles, à 6 étoiles de la 2e.");
     expect(fr.bands.rank(b({ gap: 1 }))).toBe("3e des écoles, à 1 étoile de la 2e.");
     expect(fr.bands.rank(b({ rank: 2, gap: 0, ahead: { id: "x", label: "X", rank: 1 } }))).toBe("2e des écoles, à égalité avec la tête.");
-    expect(fr.bands.rank(b({ type: "boite", rank: 1, gap: null, ahead: null }))).toBe("n° 1 des boîtes.");
-    expect(fr.bands.rank(b({ rank: null, missing: 2, gap: null, ahead: null }))).toBe("Bande en formation : il manque 2 complices.");
+    expect(fr.bands.rank(b({ type: "boite", rank: 1, gap: null, ahead: null }))).toBe("N°\u00a01 des boîtes.");
+    expect(fr.bands.rank(b({ rank: null, missing: 2, gap: null, ahead: null }))).toBe("Bande en formation\u00a0: il manque 2\u00a0complices.");
   });
 
   it("en anglais", () => {

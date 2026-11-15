@@ -47,6 +47,12 @@ export function useReveal(animate: boolean, start = true, autoOpen = AUTO_OPEN) 
     opened.current = true;
     setPhase("done");
   }, []);
+  /** Revoir (§18.48) : la révélation repart du début sur la fiche posée, qui se remonte sous l'arrêt sur image. */
+  const replay = useCallback(() => {
+    opened.current = true;
+    setStaged(false);
+    setPhase("playing");
+  }, []);
 
   useEffect(() => {
     if (!animate || !start) return;
@@ -59,7 +65,7 @@ export function useReveal(animate: boolean, start = true, autoOpen = AUTO_OPEN) 
   const animating = phase !== "done";
   /** Le contenu sous la carte apparaît une fois la scène éteinte. */
   const settled = phase === "done";
-  return { phase, open, skip, stage, staged, handoff, finish, animating, settled };
+  return { phase, open, skip, replay, stage, staged, handoff, finish, animating, settled };
 }
 
 interface RevealCardProps {

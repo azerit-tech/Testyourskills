@@ -35,16 +35,16 @@ describe("Dénoncer : la fiche du complice", () => {
 
   it("le texte partagé porte les six étoiles", () => {
     expect(DICTS.fr.denounce.shareText("@leamd", starsLine(5), "Sous couverture", null, "https://x.test")).toBe(
-      "@leamd est dans le viseur ★★★★★☆ · Sous couverture. Droit de faire appel : https://x.test",
+      "@leamd est dans le viseur ★★★★★☆, Sous couverture. Droit de faire appel\u00a0: https://x.test",
     );
   });
 
   it("dossier scellé : ni étoiles dans le titre, ni dans le texte partagé", () => {
     expect(DICTS.fr.denounce.shareText("@camroux", "", "Sous couverture", null, "https://x.test")).toBe(
-      "@camroux est dans le viseur · Sous couverture. Droit de faire appel : https://x.test",
+      "@camroux est dans le viseur, Sous couverture. Droit de faire appel\u00a0: https://x.test",
     );
     expect(DICTS.en.denounce.shareText("@camroux", "", "Undercover", null, "https://x.test")).toBe(
-      "@camroux is in the crosshairs · Undercover. Right to appeal: https://x.test",
+      "@camroux is in the crosshairs, Undercover. Right to appeal: https://x.test",
     );
   });
 });

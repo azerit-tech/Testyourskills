@@ -341,7 +341,7 @@ const SELECTION_TEXT: Record<SelectionKind, Fact> = {
   international_medal: f("médaille internationale", "international medal"),
   ranked_contest: f("classement dans un concours", "ranking in a competition"),
   hackathon_prize: f("prix de hackathon", "hackathon prize"),
-  selective_programme: f("programme sélectif", "selective programme"),
+  selective_programme: f("programme sélectif", "selective program"),
   contest_entry: f("hackathon ou concours, sans classement", "hackathon or competition, unranked"),
 };
 
@@ -388,7 +388,7 @@ export function eduGithub(g: GithubInput): Draft {
     source: "github",
     reached: f("Un hackathon ou un concours, sans classement cité.", "A hackathon or a competition, no ranking on file."),
     next: EDU_NEXT_GITHUB,
-    evidence: { text: f(`Dépôt ${hit.name} : hackathon ou concours.`, `Repo ${hit.name}: hackathon or competition.`), source: "github", proof: repoUrl(hit) },
+    evidence: { text: f(`Repo ${hit.name} : hackathon ou concours.`, `Repo ${hit.name}: hackathon or competition.`), source: "github", proof: repoUrl(hit) },
   });
 }
 
@@ -517,7 +517,7 @@ export function xpGithub(g: GithubInput): Draft {
     next: nextLvl
       ? f(`Pour ${nextLvl.score} : ${nextLvl.years} années actives. Tu en as ${active}. Ou des postes datés sur LinkedIn.`, `For ${nextLvl.score}: ${nextLvl.years} active years. You have ${active}. Or dated roles on LinkedIn.`)
       : f("Pour aller plus haut : des postes datés sur LinkedIn.", "To go higher: dated roles on LinkedIn."),
-    evidence: { text: f(`${yrs.fr} sur les contributions par année.`, `${yrs.en} in the contributions per year.`), source: "github", proof: profileUrl(facts.login) },
+    evidence: { text: f(`${yrs.fr}, d'après le calendrier de contributions.`, `${yrs.en}, going by the contribution calendar.`), source: "github", proof: profileUrl(facts.login) },
   });
 }
 
@@ -745,7 +745,7 @@ export function stkGithub(g: GithubInput): Draft {
   const agent = facts.trees.find((t) => facts.activeRepos.includes(t.repo) && (t.agentFiles?.length ?? 0) > 0);
   if (agent) flags.push(f(`IA dans l'atelier : des fichiers d'agent dans ${agent.repo}.`, `AI in the workshop: agent files in ${agent.repo}.`));
   if (!main || main.commits <= 0)
-    return unproven("STK", "github", f("Aucun dépôt public avec du code à compter.", "No public repo with code to count."), flags);
+    return unproven("STK", "github", f("Aucun repo public avec du code à compter.", "No public repo with code to count."), flags);
   const now = m.now;
   const yrs = (now - main.firstCreated) / YEAR;
   const fresh = (now - main.lastPushed) / MONTH;
@@ -758,19 +758,19 @@ export function stkGithub(g: GithubInput): Draft {
   const n = main.repos.length;
 
   const reached = f(
-    `${lang} : ${nf(main.commits, "fr")} commits dans ${n} dépôt${n > 1 ? "s" : ""}, pratiqué depuis ${years(yrs).fr}${others.length ? `, ${others.length} autre${others.length > 1 ? "s" : ""} famille${others.length > 1 ? "s" : ""} de langages` : ""}.`,
-    `${lang}: ${nf(main.commits, "en")} commits in ${n} repo${n > 1 ? "s" : ""}, practised for ${years(yrs).en}${others.length ? `, ${others.length} other language famil${others.length > 1 ? "ies" : "y"}` : ""}.`,
+    `${lang} : ${nf(main.commits, "fr")} commits dans ${n} repo${n > 1 ? "s" : ""}, pratiqué depuis ${years(yrs).fr}${others.length ? `, ${others.length} autre${others.length > 1 ? "s" : ""} famille${others.length > 1 ? "s" : ""} de langages` : ""}.`,
+    `${lang}: ${nf(main.commits, "en")} commits in ${n} repo${n > 1 ? "s" : ""}, practiced for ${years(yrs).en}${others.length ? `, ${others.length} other language famil${others.length > 1 ? "ies" : "y"}` : ""}.`,
   );
   let next: Fact | undefined;
   if (nextLvl) {
     const missingParts: Fact[] = [];
     if (main.commits < nextLvl.commits)
       missingParts.push(f(`${nf(nextLvl.commits, "fr")} commits dans ton langage principal (tu en as ${nf(main.commits, "fr")})`, `${nf(nextLvl.commits, "en")} commits in your main language (you have ${nf(main.commits, "en")})`));
-    if (yrs < nextLvl.years) missingParts.push(f(`pratiqué depuis ${years(nextLvl.years).fr} (${years(yrs).fr} aujourd'hui)`, `practised for ${years(nextLvl.years).en} (${years(yrs).en} today)`));
+    if (yrs < nextLvl.years) missingParts.push(f(`pratiqué depuis ${years(nextLvl.years).fr} (${years(yrs).fr} aujourd'hui)`, `practiced for ${years(nextLvl.years).en} (${years(yrs).en} today)`));
     if (others.length < nextLvl.otherFamilies)
       missingParts.push(
         nextLvl.otherFamilies === 1
-          ? f("une autre famille de langages, avec un dépôt de 10 commits", "another language family, with a 10-commit repo")
+          ? f("une autre famille de langages, avec un repo de 10 commits", "another language family, with a 10-commit repo")
           : f(`${nextLvl.otherFamilies} autres familles de langages (tu en as ${others.length})`, `${nextLvl.otherFamilies} other language families (you have ${others.length})`),
       );
     if (nextLvl.freshMonths !== null && fresh >= nextLvl.freshMonths)
@@ -782,7 +782,7 @@ export function stkGithub(g: GithubInput): Draft {
   const otherNames = others.slice(0, 2).map((o) => o.lead);
   const evidence = {
     text: f(
-      `${lang} : ${nf(main.commits, "fr")} commits dans ${n} dépôt${n > 1 ? "s" : ""} depuis ${since.fr}, dernier push ${last.fr} (${main.lastRepo.name}).${otherNames.length ? ` ${otherNames.join(", ")} aussi dans le code.` : ""}`,
+      `${lang} : ${nf(main.commits, "fr")} commits dans ${n} repo${n > 1 ? "s" : ""} depuis ${since.fr}, dernier push ${last.fr} (${main.lastRepo.name}).${otherNames.length ? ` ${otherNames.join(", ")} aussi dans le code.` : ""}`,
       `${lang}: ${nf(main.commits, "en")} commits in ${n} repo${n > 1 ? "s" : ""} since ${since.en}, last push ${last.en} (${main.lastRepo.name}).${otherNames.length ? ` ${otherNames.join(", ")} in the code too.` : ""}`,
     ),
     source: "github" as const,
@@ -893,7 +893,7 @@ export function stackFlags(d: DeclaredInput, gh: Pick<GithubInput, "facts" | "m"
     const on = declaredOn(d.label);
     out.push(
       f(
-        `À confirmer\u00a0: ${list}. Déclarées ${on.fr}, pas encore visibles dans ${n} dépôt${n > 1 ? "s" : ""} public${n > 1 ? "s" : ""}.`,
+        `À confirmer\u00a0: ${list}. Déclarées ${on.fr}, pas encore visibles dans ${n} repo${n > 1 ? "s" : ""} public${n > 1 ? "s" : ""}.`,
         `To confirm: ${list}. Listed ${on.en}, not visible yet in ${n} public repo${n === 1 ? "" : "s"}.`,
       ),
     );
@@ -917,7 +917,7 @@ const roundHalfUp = (x: number) => Math.floor(x + 0.5 + 1e-9);
 export function codeGithub(g: GithubInput): Draft {
   const { facts, m, ai } = g;
   const readings = ai?.readings ?? [];
-  if (!readings.length) return unproven("CODE", "github", f("Aucun dépôt lu : lecture du code indisponible.", "No repo read: code reading unavailable."));
+  if (!readings.length) return unproven("CODE", "github", f("Aucun repo lu : lecture du code indisponible.", "No repo read: code reading unavailable."));
   const C = GRID.CODE;
   const weight = (repo: string) => Math.max(1, facts.repos.find((r) => r.name === repo)?.activity ?? 1);
   let sw = 0;
@@ -933,16 +933,16 @@ export function codeGithub(g: GithubInput): Draft {
   const notes: Fact[] = [];
   if (score >= C.testsFrom && testsShare < C.testsShare) {
     score = C.capWithoutTests;
-    notes.push(f(`des tests dans moins de la moitié des dépôts actifs : arrêtée à ${C.capWithoutTests}`, `tests in under half of the active repos: stops at ${C.capWithoutTests}`));
+    notes.push(f(`des tests dans moins de la moitié des repos actifs : arrêtée à ${C.capWithoutTests}`, `tests in under half of the active repos: stops at ${C.capWithoutTests}`));
   }
   if (score >= C.commitsFrom && !enoughCommits) {
     score = C.capWithoutCommits;
-    notes.push(f(`aucun dépôt de ${C.repoCommits} commits : arrêtée à ${C.capWithoutCommits}`, `no repo with ${C.repoCommits} commits: stops at ${C.capWithoutCommits}`));
+    notes.push(f(`aucun repo de ${C.repoCommits} commits : arrêtée à ${C.capWithoutCommits}`, `no repo with ${C.repoCommits} commits: stops at ${C.capWithoutCommits}`));
   }
   const best = [...readings].sort((a, b) => b.level - a.level || weight(b.repo) - weight(a.repo))[0];
   const n = readings.length;
   const reached = f(
-    `Niveau moyen lu ${df(level, "fr")} sur 5, sur ${n} dépôt${n > 1 ? "s" : ""}${notes.length ? ` ; ${notes.map((x) => x.fr).join(" ; ")}` : ""}.`,
+    `Niveau moyen lu ${df(level, "fr")} sur 5, sur ${n} repo${n > 1 ? "s" : ""}${notes.length ? ` ; ${notes.map((x) => x.fr).join(" ; ")}` : ""}.`,
     `Average level read ${df(level, "en")} out of 5, across ${n} repo${n > 1 ? "s" : ""}${notes.length ? `; ${notes.map((x) => x.en).join("; ")}` : ""}.`,
   );
   let next: Fact | undefined;
@@ -952,8 +952,8 @@ export function codeGithub(g: GithubInput): Draft {
     const parts: Fact[] = [];
     if (C.multiplier * level < target - 0.5)
       parts.push(f(`un niveau moyen de ${df(needLevel, "fr")} sur 5 (tu as ${df(level, "fr")})`, `an average level of ${df(needLevel, "en")} out of 5 (you have ${df(level, "en")})`));
-    if (target >= C.commitsFrom && !enoughCommits) parts.push(f(`un dépôt de ${C.repoCommits} commits`, `a repo with ${C.repoCommits} commits`));
-    if (target >= C.testsFrom && testsShare < C.testsShare) parts.push(f("des tests dans la moitié des dépôts actifs", "tests in half of the active repos"));
+    if (target >= C.commitsFrom && !enoughCommits) parts.push(f(`un repo de ${C.repoCommits} commits`, `a repo with ${C.repoCommits} commits`));
+    if (target >= C.testsFrom && testsShare < C.testsShare) parts.push(f("des tests dans la moitié des repos actifs", "tests in half of the active repos"));
     if (parts.length) next = f(`Pour ${target} : ${parts.map((p) => p.fr).join(", ")}.`, `For ${target}: ${parts.map((p) => p.en).join(", ")}.`);
   }
   const repo = facts.repos.find((r) => r.name === best.repo);
@@ -1000,7 +1000,7 @@ export function actGithub(g: GithubInput): Draft {
   if (nextLvl) {
     const parts: Fact[] = [];
     if (weeks < nextLvl.weeks) parts.push(f(`${nextLvl.weeks} semaines actives (tu en as ${weeks})`, `${nextLvl.weeks} active weeks (you have ${weeks})`));
-    if (nextLvl.score >= A.codeFrom && !codeVisible) parts.push(f(`un dépôt public de ${A.codeRepoCommits} commits`, `a public repo with ${A.codeRepoCommits} commits`));
+    if (nextLvl.score >= A.codeFrom && !codeVisible) parts.push(f(`un repo public de ${A.codeRepoCommits} commits`, `a public repo with ${A.codeRepoCommits} commits`));
     next = f(`Pour ${nextLvl.score} : ${parts.map((p) => p.fr).join(", ")}.`, `For ${nextLvl.score}: ${parts.map((p) => p.en).join(", ")}.`);
   }
   return crit("ACT", {
@@ -1060,21 +1060,21 @@ export function ownGithub(g: GithubInput): Draft {
   };
   const reachedText: Record<number, Fact> = {
     10: f("Un projet dont beaucoup se servent, avec trois releases dans l'année.", "A project many people use, with three releases this year."),
-    8: f("Un projet porté plus d'un an, publié, et utilisé par d'autres.", "A project carried for over a year, published, and used by others."),
-    6: f(`Un projet porté 6 mois ou plus, et de quoi mettre en production (${deployable}).`, `A project carried for 6 months or more, and what it takes to ship (${deployable}).`),
-    4: f("Un projet porté 6 mois ou plus.", "A project carried for 6 months or more."),
-    2: f("Des dépôts, aucun porté dans la durée.", "Repos, none carried over time."),
+    8: f("Un projet porté plus d'un an, publié, et utilisé par d'autres.", "A project kept alive for over a year, released, and used by others."),
+    6: f(`Un projet porté 6 mois ou plus, et de quoi mettre en production (${deployable}).`, `A project kept alive for 6 months or more, and what it takes to ship (${deployable}).`),
+    4: f("Un projet porté 6 mois ou plus.", "A project kept alive for 6 months or more."),
+    2: f("Des repos, aucun porté dans la durée.", "Repos, none kept alive over time."),
   };
   const nextText: Record<number, Fact> = {
-    2: f(`Pour 4 : un projet porté 6 mois avec ${lv(4).commits} commits. Le plus gros : ${desc(shown).fr}.`, `For 4: a project carried for 6 months with ${lv(4).commits} commits. The biggest: ${desc(shown).en}.`),
-    4: f("Pour 6 : de quoi mettre en production dans un dépôt actif (Dockerfile, CI ou release).", "For 6: what it takes to ship in an active repo (Dockerfile, CI or release)."),
+    2: f(`Pour 4 : un projet porté 6 mois avec ${lv(4).commits} commits. Le plus gros : ${desc(shown).fr}.`, `For 4: a project kept alive for 6 months with ${lv(4).commits} commits. The biggest: ${desc(shown).en}.`),
+    4: f("Pour 6 : de quoi mettre en production dans un repo actif (Dockerfile, CI ou release).", "For 6: what it takes to ship in an active repo (Dockerfile, CI or release)."),
     6: f(
-      `Pour 8 : un projet de plus d'un an et ${lv(8).commits} commits, publié, utilisé par d'autres (${lv(8).stars} étoiles ou ${lv(8).external} contributeurs externes).`,
-      `For 8: a project over a year old with ${lv(8).commits} commits, published, used by others (${lv(8).stars} stars or ${lv(8).external} outside contributors).`,
+      `Pour 8 : un projet de plus d'un an et ${lv(8).commits} commits, publié, utilisé par d'autres (${lv(8).stars} stars GitHub ou ${lv(8).external} comptes externes qui contribuent).`,
+      `For 8: a project over a year old with ${lv(8).commits} commits, released, used by others (${lv(8).stars} GitHub stars or ${lv(8).external} outside contributors).`,
     ),
     8: f(
-      `Pour 10 : ${nf(lv(10).stars!, "fr")} étoiles ou ${lv(10).external} contributeurs externes, et ${lv(10).releasesInYear} releases dans l'année.`,
-      `For 10: ${nf(lv(10).stars!, "en")} stars or ${lv(10).external} outside contributors, and ${lv(10).releasesInYear} releases this year.`,
+      `Pour 10 : ${nf(lv(10).stars!, "fr")} stars GitHub ou ${lv(10).external} comptes externes qui contribuent, et ${lv(10).releasesInYear} releases dans l'année.`,
+      `For 10: ${nf(lv(10).stars!, "en")} GitHub stars or ${lv(10).external} outside contributors, and ${lv(10).releasesInYear} releases this year.`,
     ),
   };
   const deployRepo = deployable ? facts.repos.find((r) => r.name === deployable) : undefined;
@@ -1085,7 +1085,7 @@ export function ownGithub(g: GithubInput): Draft {
   if (deployRepo && (deployRepo.releaseDates ?? []).length) deployBits.push("release");
   const extra =
     deployRepo && deployRepo.name !== shown.name && score >= 6
-      ? f(` ${deployRepo.name} : ${deployBits.join(", ")}, ${deployRepo.stars} étoile${deployRepo.stars > 1 ? "s" : ""}.`, ` ${deployRepo.name}: ${deployBits.join(", ")}, ${deployRepo.stars} star${deployRepo.stars === 1 ? "" : "s"}.`)
+      ? f(` ${deployRepo.name} : ${deployBits.join(", ")}, ${deployRepo.stars} star${deployRepo.stars > 1 ? "s" : ""} GitHub.`, ` ${deployRepo.name}: ${deployBits.join(", ")}, ${deployRepo.stars} GitHub star${deployRepo.stars === 1 ? "" : "s"}.`)
       : f("", "");
   return crit("OWN", {
     score,
@@ -1173,14 +1173,14 @@ export function ossGithub(g: GithubInput): Draft {
   const reachedBy: Fact =
     score === 10
       ? maintainer
-        ? f(`Maintient ${maintainer.name}, ${nf(maintainer.stars, "fr")} étoiles.`, `Maintainer of ${maintainer.name}, ${nf(maintainer.stars, "en")} stars.`)
-        : f(`${bigPrs} PR fusionnées dans des projets de ${nf(O.bigStars, "fr")} étoiles ou plus.`, `${bigPrs} PRs merged into projects with ${nf(O.bigStars, "en")}+ stars.`)
+        ? f(`Maintient ${maintainer.name}, ${nf(maintainer.stars, "fr")} stars GitHub.`, `Maintainer of ${maintainer.name}, ${nf(maintainer.stars, "en")} GitHub stars.`)
+        : f(`${bigPrs} PR fusionnées dans des projets de ${nf(O.bigStars, "fr")} stars GitHub ou plus.`, `${bigPrs} PRs merged into projects with ${nf(O.bigStars, "en")}+ GitHub stars.`)
       : score === 8
         ? bigPrs >= 1
-          ? f(`Une PR fusionnée dans un projet de ${nf(O.bigStars, "fr")} étoiles ou plus.`, `A PR merged into a project with ${nf(O.bigStars, "en")}+ stars.`)
+          ? f(`Une PR fusionnée dans un projet de ${nf(O.bigStars, "fr")} stars GitHub ou plus.`, `A PR merged into a project with ${nf(O.bigStars, "en")}+ GitHub stars.`)
           : ownStars >= (lvl.ownStars ?? Infinity)
-            ? f(`${nf(ownStars, "fr")} étoiles sur ses dépôts.`, `${nf(ownStars, "en")} stars on own repos.`)
-            : f(`Un dépôt avec ${maxExt} contributeurs externes (${m.maxExternal?.repo}).`, `A repo with ${maxExt} outside contributors (${m.maxExternal?.repo}).`)
+            ? f(`${nf(ownStars, "fr")} stars GitHub sur ses repos.`, `${nf(ownStars, "en")} GitHub stars on own repos.`)
+            : f(`Un repo avec ${maxExt} comptes externes qui contribuent (${m.maxExternal?.repo}).`, `A repo with ${maxExt} outside contributors (${m.maxExternal?.repo}).`)
         : prs
           ? f(`${nf(prs, "fr")} PR fusionnée${prs > 1 ? "s" : ""} chez les autres.`, `${nf(prs, "en")} PR${prs === 1 ? "" : "s"} merged into other people's repos.`)
           : f("Aucune PR fusionnée chez les autres.", "No PR merged into other people's repos.");
@@ -1191,13 +1191,13 @@ export function ossGithub(g: GithubInput): Draft {
       next = f(`Pour ${nextLvl.score} : ${nextLvl.prs} PR fusionnées chez les autres (tu en as ${nf(prs, "fr")}).`, `For ${nextLvl.score}: ${nextLvl.prs} PRs merged into other people's repos (you have ${nf(prs, "en")}).`);
     else if (nextLvl.score === 8)
       next = f(
-        `Pour 8 : une PR fusionnée dans un projet de ${nf(O.bigStars, "fr")} étoiles, ${nextLvl.ownStars} étoiles sur tes dépôts (tu en as ${nf(ownStars, "fr")}), ou un dépôt avec ${nextLvl.external} contributeurs externes.${dest ? "" : " La destination des PR n'est pas encore lue."}`,
-        `For 8: a PR merged into a project with ${nf(O.bigStars, "en")} stars, ${nextLvl.ownStars} stars on your repos (you have ${nf(ownStars, "en")}), or a repo with ${nextLvl.external} outside contributors.${dest ? "" : " Where the PRs went is not read yet."}`,
+        `Pour 8 : une PR fusionnée dans un projet de ${nf(O.bigStars, "fr")} stars GitHub, ${nextLvl.ownStars} stars GitHub sur tes repos (tu en as ${nf(ownStars, "fr")}), ou un repo avec ${nextLvl.external} comptes externes qui contribuent.${dest ? "" : " La destination des PR n'est pas encore lue."}`,
+        `For 8: a PR merged into a project with ${nf(O.bigStars, "en")} GitHub stars, ${nextLvl.ownStars} GitHub stars on your repos (you have ${nf(ownStars, "en")}), or a repo with ${nextLvl.external} outside contributors.${dest ? "" : " Where the PRs went is not read yet."}`,
       );
     else
       next = f(
-        `Pour 10 : maintenir un projet de ${nf(O.bigStars, "fr")} étoiles, ou ${O.levels[0].bigPrs} PR fusionnées dans de tels projets.`,
-        `For 10: maintain a project with ${nf(O.bigStars, "en")} stars, or ${O.levels[0].bigPrs} PRs merged into such projects.`,
+        `Pour 10 : maintenir un projet de ${nf(O.bigStars, "fr")} stars GitHub, ou ${O.levels[0].bigPrs} PR fusionnées dans de tels projets.`,
+        `For 10: maintain a project with ${nf(O.bigStars, "en")} GitHub stars, or ${O.levels[0].bigPrs} PRs merged into such projects.`,
       );
   }
   // La pièce : où vont les PR quand on le sait, sinon leur nombre.
@@ -1265,7 +1265,7 @@ export function xpCrossCheck(draft: Draft, d: DeclaredInput, gh: GithubSide): Dr
         ...draft.flags,
         f(
           "À confirmer en entretien\u00a0: une partie de ces années ne se voit pas en code public. C'est courant, le code d'entreprise est privé.",
-          "To confirm in interview: part of these years doesn't show in public code. That's common, company code is private.",
+          "To check in an interview: part of these years doesn't show in public code. That's common, company code is private.",
         ),
       ],
       evidence: { ...ev, text: join([ev.text, github]) },
@@ -1337,7 +1337,7 @@ export function empCrossCheck(draft: Draft, d: DeclaredInput, gh: GithubSide): D
         ...draft,
         evidence: {
           text: join([head(r), f(`GitHub : ${n} dans ${repo} sur ces mois.`, `GitHub: ${nEn} into ${repo} over those months.`), confirmed]),
-          publicText: join([headPublic(r), f(`GitHub : ${n} dans un dépôt public sur ces mois.`, `GitHub: ${nEn} into a public repo over those months.`), confirmed]),
+          publicText: join([headPublic(r), f(`GitHub : ${n} dans un repo public sur ces mois.`, `GitHub: ${nEn} into a public repo over those months.`), confirmed]),
           source: "both",
           ...proof,
         },
@@ -1354,7 +1354,7 @@ export function empCrossCheck(draft: Draft, d: DeclaredInput, gh: GithubSide): D
         ...draft,
         evidence: {
           text: join([head(r), f(`GitHub : ${own.name}, ${nf(c, "fr")} commits, actif sur les mêmes mois.`, `GitHub: ${own.name}, ${nf(c, "en")} commits, active over the same months.`), confirmed]),
-          publicText: join([headPublic(r), f(`GitHub : un dépôt public de ${nf(c, "fr")} commits, actif sur les mêmes mois.`, `GitHub: a public repo with ${nf(c, "en")} commits, active over the same months.`), confirmed]),
+          publicText: join([headPublic(r), f(`GitHub : un repo public de ${nf(c, "fr")} commits, actif sur les mêmes mois.`, `GitHub: a public repo with ${nf(c, "en")} commits, active over the same months.`), confirmed]),
           source: "both",
           ...proof,
         },

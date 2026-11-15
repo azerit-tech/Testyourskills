@@ -1,6 +1,7 @@
 // Route /c/:id : attente, révélation puis résultat pour une carte fraîche ;
 // affichage direct (sans pack) pour un lien partagé.
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { fileOf } from "../../../shared/caseFile";
 import type { CardData, Fact, Finding, JobState, ProgressEvent } from "../../../shared/types";
 import { declaredOf, LEVEL_LABELS, starsFor } from "../../../shared/types";
@@ -32,8 +33,9 @@ import { isClosed } from "../lib/errors";
 import { useHold, type SceneState } from "../lib/hold";
 import { gaveUp, nextPatience, type Patience } from "../lib/patience";
 import { filmTrace } from "../film/trace";
+import { ChaseLink } from "../film/ChaseLink";
 import { navigate, onLinkClick } from "../lib/router";
-import { freshLogin, freshSince, iDenounced, myCard, prefillFromLast, rememberMine, type MyCard } from "../lib/session";
+import { filmOwed, freshLogin, freshSince, freshSlug, iDenounced, markFilmSeen, myCard, prefillFromLast, rememberMine, type MyCard } from "../lib/session";
 import { revealScene, revealToPlay } from "../lib/revealScene";
 import { useReducedMotion } from "../lib/util";
 import { verdict } from "../lib/versus";
@@ -115,6 +117,9 @@ export function CardPage({ id }: { id: string }) {
   const { view, setView, sawPending } = useJob(id, nonce);
   const fresh = freshSince(id) !== null;
   const owner = fresh || tokens.get(id) !== null;
+  // Le film joue une fois (§18.48) : dû à une fiche demandée ici (ou rechargée en plein film)
+  // tant qu'il ne s'est pas posé. Lu à l'arrivée sur la fiche : la page ne bascule pas quand il se pose.
+  const [owed] = useState(() => filmOwed(id));
   const reduced = useReducedMotion();
   const [startedAt] = useState(() => freshSince(id) ?? Date.now());
   const [meNonce, setMeNonce] = useState(0);
@@ -182,12 +187,12 @@ export function CardPage({ id }: { id: string }) {
   // fiche prête, le niveau est connu : seule la fin utile se charge (fin6 à six étoiles).
   useEffect(() => {
     const scene = revealToPlay(revealScene(), reduced);
-    if (scene === "film" && view.s === "done" && (fresh || sawPending)) {
+    if (scene === "film" && view.s === "done" && (owed || sawPending)) {
       const main = view.item.kind === "card" ? view.item.card : fileOf(view.item.comparison);
       loadFilm()
         .then((m) => m.preloadFilm(starsFor(main.overall)))
         .catch(() => undefined);
-    } else if (scene && (view.s === "pending" || (view.s === "loading" && fresh))) {
+    } else if (scene && (view.s === "pending" || (view.s === "loading" && owed))) {
       if (scene === "film")
         loadFilm()
           .then((m) => m.preloadFilm())
@@ -206,7 +211,7 @@ export function CardPage({ id }: { id: string }) {
   // Vaut pour une fiche fraîche servie du cache, qui n'a ni pièces ni pari.
   const lastPending = useRef<{ progress: ProgressEvent[]; queue?: number; findings?: Finding[] }>({ progress: [] });
   if (view.s === "pending") lastPending.current = view;
-  const animate = view.s === "done" && (fresh || sawPending) && !reduced;
+  const animate = view.s === "done" && (owed || sawPending) && !reduced;
   const hold = useHold({ active: view.s === "done" && (animate || sawPending), animate });
 
   // La photo d'identité : l'avatar du pseudo tapé dès la première seconde ; sinon, fiche prête, sa photo.
@@ -215,12 +220,14 @@ export function CardPage({ id }: { id: string }) {
   const w = view.s === "pending" ? view : lastPending.current;
   // L'attente garde la même instance de bout en bout (clé fixe) : la photo, le pari et les pièces restent en place.
   const waiting =
-    view.s === "pending" || (view.s === "loading" && fresh) || hold.show ? (
+    view.s === "pending" || (view.s === "loading" && owed) || hold.show ? (
       <Waiting
         key="waiting"
         cardId={id}
         login={typed ?? doneCard?.login}
         avatarUrl={typed ? null : doneCard?.avatarUrl}
+        slug={freshSlug(id)}
+        createdAt={doneCard?.createdAt}
         plea={owner && sawPending}
         progress={w.progress}
         startedAt={startedAt}
@@ -305,7 +312,7 @@ export function CardPage({ id }: { id: string }) {
         abort={hold.abort}
         onScene={hold.onScene}
         owner={owner}
-        fresh={fresh}
+        fresh={fresh && owed}
         notice={notice}
         me={me}
         onMe={setMe}
@@ -340,7 +347,16 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
   const main: CardData = useMemo(() => (item.kind === "card" ? item.card : fileOf(item.comparison)), [item]);
   const [scene] = useState(revealScene);
   // Le film part dès que l'attente se lève : sa première image est déjà à l'écran.
-  const { phase, open, skip, stage, staged, handoff, finish, animating, settled } = useReveal(animate, start, scene === "film" ? 0 : undefined);
+  const { phase, open, skip, replay, stage, staged, handoff, finish, animating, settled } = useReveal(animate, start, scene === "film" ? 0 : undefined);
+  // Revoir le film (§18.48) : depuis la tête de la fiche, pour tout le monde, jamais en lecture automatique.
+  // Le film se charge au toucher ; la page remonte en haut, la fiche se remonte sous l'arrêt sur image.
+  const reduced = useReducedMotion();
+  const [replayed, setReplayed] = useState(false);
+  const playChase = () => {
+    setReplayed(true);
+    window.scrollTo(0, 0);
+    replay();
+  };
   // La scène ne viendra pas (délai dépassé, WebGL absent, animation passée) : l'attente n'a plus à la guetter.
   useEffect(() => {
     if (abort) skip();
@@ -348,6 +364,10 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
   useEffect(() => {
     if (animate && phase === "done") onScene("off");
   }, [animate, phase, onScene]);
+  // La fiche posée (film vu, passé ou replié) : revenir ici ne relance plus le film (§18.48).
+  useEffect(() => {
+    if (settled) markFilmSeen(id);
+  }, [settled, id]);
   const toast = useToast();
   const tracked = useRef(false);
   const stageRef = useRef<HTMLElement>(null);
@@ -378,7 +398,9 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
     return () => window.removeEventListener("keydown", on);
   }, [animating, skip]);
 
+  // Un toucher sur le film ne le saute plus (§18.48) : seul « Passer » le fait. L'ascenseur (?scene=walkout) garde son geste.
   const onStageClick = () => {
+    if (scene === "film") return;
     if (phase === "ready") open();
     else if (animating && !walkoutCtl.current?.interact()) skip();
   };
@@ -433,25 +455,25 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
 
       <div className="result-top">
         {/* L'en-tête posé sur le ciel, puis la fiche entière au-dessus de la ligne de flottaison (§18.7, §18.29). */}
-        <WantedHead card={main} />
+        <WantedHead card={main}>{scene === "film" && !reduced && settled && <ChaseLink mine={!visitor} onPlay={playChase} />}</WantedHead>
 
         {animating && (
           // Morceau 3D introuvable : même repli que sans WebGL, la fiche sort sans révélation.
           <ErrorBoundary fallback={null} onError={finish}>
             <Suspense fallback={null}>
               {scene === "film" ? (
-                <Film card={main} lang={lang} phase={phase} onReady={() => onScene("ready")} onGesture={() => onScene("gesture")} onStage={stage} onHandoff={handoff} onDone={finish} onTap={onStageClick} />
+                <Film card={main} lang={lang} phase={phase} onReady={() => onScene("ready")} onGesture={() => onScene("gesture")} onStage={stage} onHandoff={handoff} onDone={finish} replay={replayed} />
               ) : (
                 <Walkout3D card={main} lang={lang} declared={declaredOf(item.kind === "comparison" ? item.comparison : item.card)} phase={phase} anchorRef={stageRef} controlRef={walkoutCtl} onReady={() => onScene("ready")} onHandoff={handoff} onDone={finish} />
               )}
             </Suspense>
           </ErrorBoundary>
         )}
-        <section ref={stageRef} className="result-stage" onClick={animating ? onStageClick : undefined}>
+        <section ref={stageRef} className="result-stage" onClick={animating && scene !== "film" ? onStageClick : undefined}>
           <div className="single-stage">
             {/* La fiche se retourne (§18.27). Les étoiles ne s'allument ici que sans révélation 3D : sinon elles se rallumeraient sur la carte posée. */}
             {/* Un dossier à deux pièces : une seule fiche, et ses pièces dessous (§18.36). */}
-            <CardViewOptions.Provider value={{ flippable: true, starsIntro: !animate }}>
+            <CardViewOptions.Provider value={{ flippable: true, starsIntro: !animate && !replayed }}>
               <RevealCard card={main} lang={lang} phase={phase} idPrefix="result" staged={staged} />
             </CardViewOptions.Provider>
             {item.kind === "comparison" && settled && <Pieces cmp={item.comparison} />}
@@ -581,7 +603,7 @@ function versusLine(d: Dict["denounce"], mine: MyCard, card: CardData): string {
  * En tête d'une fiche, posé sur le ciel : « AVIS DE RECHERCHE » dans la voix qui annonce, puis « @LOGIN ».
  * La fiche dit le reste (étoiles, profil, note) ; le texte sous la fiche, la peine. Lu « Avis de recherche : @x ».
  */
-export function WantedHead({ card }: { card: CardData }) {
+export function WantedHead({ card, children }: { card: CardData; children?: ReactNode }) {
   const { t } = useT();
   return (
     <header className="wanted">
@@ -590,6 +612,8 @@ export function WantedHead({ card }: { card: CardData }) {
         <span className="sr-only">{t.result.wantedSep}</span>
         <span className="wanted-name">{card.login ? `@${card.login}` : card.name}</span>
       </h1>
+      {/* « Revoir ma poursuite » (§18.48), sur la ligne de « Avis de recherche » */}
+      {children}
     </header>
   );
 }

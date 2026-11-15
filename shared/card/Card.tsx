@@ -14,6 +14,7 @@ import { fontAttrs, type FontKey } from "./fonts";
 import { CARD_H, CARD_R, CARD_W } from "./geometry";
 import { t } from "./i18n";
 import { langIcon } from "./languages";
+import { MUG_PHOTO, Plate, Silhouette, Toise, caseLabel, caseNumber, plateName, plateSub, toiseCover } from "./mug";
 import { fit, fitLines, measure, upper, type FittedLines } from "./text";
 import { PALETTE, themeOf, type CardTheme } from "./themes";
 
@@ -49,30 +50,35 @@ const MUG = { x: 178, y: 44, w: 164, h: 192, r: 6 };
 const MUG_NO_PROFILE_H = 266;
 /** Niveau en grand des fiches sans profil : dernière ligne de base, taille. */
 const BIG_LEVEL = { bottom: 306, size: 32, minSize: 20 };
-const PLACARD = { w: 136, h: 44, bottom: 10 };
 /** Horizon des fiches au ciel peint (★★★★★, ★★★★★★). */
 const HY = 242;
-const STAR_SIZE = 17;
-const STAR_GAP = 3;
+/** La note : sa ligne de base. Son haut s'aligne sur le haut de la photo. */
+const NOTE_Y = 128;
+/** Les étoiles, signe majeur de la fiche (§18.48) : une rangée de six sous la note,
+ *  de la largeur de la colonne à gauche de la photo ; le nom du niveau dessous. */
+export const STARS = { y: 139, size: 22, gap: 3 } as const;
+const LEVEL = { y: 178, size: 15, minSize: 11 };
 
 /**
  * Hiérarchie de lecture (de la plus forte à la plus faible) : la note, le nom
  * du profil, sa phrase (la blague qu'on capture), les chefs d'accusation, puis
  * le reste. Lignes de base, de haut en bas, sous la photo.
  */
-/** Coin bas droit gardé libre pour le bouton rond qui retourne la fiche (web). */
-export const FLIP_CORNER = 36;
-
 export const LAYOUT = {
   profileName: { y: 270, size: 30, minSize: 20 },
   /** La phrase du profil : une ou deux lignes, jamais coupée (tests). */
   tagline: { y: 292, size: 18, minSize: 15, lineH: 21 },
   divider: 323,
   facts: { labelY: 334, valueY: 348, labelSize: 7.5 },
-  stats: { y: 355, rowH: 20 },
-  charges: { labelY: 427, y: 445, size: 14, minSize: 12, lineH: 19, labelSize: 7.5 },
+  /** Les six traits : leur étiquette dit que la note ne vient pas d'eux. */
+  traits: { labelY: 363, labelSize: 7.5 },
+  stats: { y: 367, rowH: 19.5 },
+  charges: { labelY: 437, y: 455, size: 14, minSize: 12, lineH: 19, labelSize: 7.5 },
   footer: { y: 510, size: 8, minSize: 7 },
 } as const;
+
+/** Le tampon « D'après LinkedIn » : sur le haut de la photo ; sans photo, plus haut, et la silhouette descend d'autant. */
+const STAMP = { y: 40, yBare: 30, drop: 12 } as const;
 
 export const STAR = "M12 2.6l2.9 6.1 6.7.8-4.9 4.6 1.3 6.6L12 17.4l-6 3.3 1.3-6.6L2.4 9.5l6.7-.8z";
 const PALM = [
@@ -107,18 +113,7 @@ export function sanitize(id: string) {
   return id.replace(/[^a-zA-Z0-9_-]/g, "");
 }
 
-/** Numéro de dossier : l'id court de la carte, en majuscules, 4 à 6 signes. */
-export function caseNumber(id: string): string {
-  const clean = id.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-  return (clean || "0000").slice(0, 6);
-}
-
-function caseDate(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${p(d.getUTCDate())}.${p(d.getUTCMonth() + 1)}.${String(d.getUTCFullYear()).slice(2)}`;
-}
+export { caseNumber };
 
 interface TxtProps {
   x: number;
@@ -144,25 +139,29 @@ export function Txt({ x, y, font, size, fill, ls = 0, anchor = "start", opacity,
 /* Blocs                                                                */
 /* ------------------------------------------------------------------ */
 
-/** Étoiles du HUD : six emplacements, les allumées blanches et mates calées à
- *  droite ; les éteintes pleines et sombres (blanc à 13 % sur l'encre). */
-export function Stars({ n, onSky }: { n: number; onSky: boolean }) {
-  const k = STAR_SIZE / 24;
-  const x0 = RIGHT - 6 * STAR_SIZE - 5 * STAR_GAP;
+/**
+ * Les étoiles (§18.48) : six emplacements, remplis de gauche à droite. Allumée :
+ * crème pleine. Éteinte : la même étoile en contour de 1,5, blanc à 35 %, sans
+ * remplissage. `x`, `y` : le coin haut gauche de la rangée.
+ */
+export function Stars({ n, x = LEFT, y = STARS.y, size = STARS.size, gap = STARS.gap }: { n: number; x?: number; y?: number; size?: number; gap?: number }) {
+  const k = size / 24;
+  // Le contour est centré sur le tracé : l'étoile éteinte rentre de la moitié du trait pour garder l'empreinte de l'allumée.
+  const off = (size - 1.5) / 24;
   // Une étoile allumée garde son emplacement éteint dessous : à l'arrivée (option
   // starsIntro de CardView), le calque allumé apparaît par-dessus, dans l'ordre
-  // data-star : 0 = la première allumée, la plus à droite, puis vers la gauche.
+  // data-star : 0 = la première, la plus à gauche, puis vers la droite.
   return (
-    <g>
+    <g data-star-row="">
       {[0, 1, 2, 3, 4, 5].map((i) => {
-        const on = i >= 6 - n;
+        const on = i < n;
+        const sx = +(x + i * (size + gap)).toFixed(2);
         return (
-          <g key={i} transform={`translate(${x0 + i * (STAR_SIZE + STAR_GAP)} 15) scale(${k})`}>
-            {onSky ? <path d={STAR} fill="#14141e" fillOpacity={0.55} /> : <path d={STAR} fill="#fff" fillOpacity={0.13} />}
+          <g key={i}>
+            <path d={STAR} transform={`translate(${+(sx + 0.75).toFixed(2)} ${y + 0.75}) scale(${+off.toFixed(4)})`} fill="none" stroke="#fff" strokeOpacity={0.35} strokeWidth={+(1.5 / off).toFixed(3)} strokeLinejoin="round" />
             {on && (
-              <g className="tys-star-on" data-star={5 - i}>
-                <path d={STAR} transform={`translate(0 ${+(1 / k).toFixed(3)})`} fill="#000" fillOpacity={0.28} />
-                <path d={STAR} fill={PALETTE.star} />
+              <g className="tys-star-on" data-star={i}>
+                <path d={STAR} transform={`translate(${sx} ${y}) scale(${+k.toFixed(4)})`} fill={PALETTE.cream} />
               </g>
             )}
           </g>
@@ -238,8 +237,7 @@ function Charges({ statuses, th, lang }: { statuses: StatusInstance[]; th: CardT
         const y = C.y + i * C.lineH;
         const tag = st.byAI ? ` · ${s.ai}` : "";
         const tagW = st.byAI ? measure(tag, "mono-400", 9) : 0;
-        // La troisième ligne laisse le coin bas droit au bouton « Retourner la fiche » (web).
-        const label = fit(st.label[lang] ?? st.label.fr, { font: "sans-500", size: C.size, minSize: C.minSize, maxWidth: FW - 18 - tagW - (i === 2 ? FLIP_CORNER : 0) });
+        const label = fit(st.label[lang] ?? st.label.fr, { font: "sans-500", size: C.size, minSize: C.minSize, maxWidth: FW - 18 - tagW });
         return (
           <g key={st.id + i}>
             <Pastille tone={st.tone} cx={LEFT + 6.2} cy={y - 4.9} th={th} />
@@ -311,7 +309,7 @@ export function sealedFace(lang: Lang, maxWidth: number): { title: FittedLines; 
 /** Le bloc mat de la note scellée, sous la marque, à gauche de la photo. */
 function SealedMark({ sealed, ink, inkSoft }: { sealed: { title: FittedLines; sub: FittedLines }; ink: string; inkSoft: string }) {
   const { title, sub } = sealed;
-  // Deux lignes de titre au plus, calées pour que la dernière tombe sur la ligne de base de la note (134).
+  // Deux lignes de titre au plus, calées pour que la dernière tombe à hauteur du bas de la note (134).
   const top = 134 - (title.lines.length - 1) * title.size * 0.98;
   return (
     <g data-sealed-mark="">
@@ -345,19 +343,18 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
   const u = (k: string) => `url(#${idp}-${k})`;
   const sky = th.grad === "sky" && th.sky ? th.sky : null;
   const M = { ...MUG, h: card.profile ? MUG.h : MUG_NO_PROFILE_H };
+  const stamped = card.source === "cv";
 
   // Haut gauche : la note, le niveau, la pilule des spéciales
   const overallSize = card.overall >= 100 ? 92 : 118;
-  const level = fit(upper(levelLabel, lang), { font: "sans-600", size: 11, minSize: 9, maxWidth: M.x - LEFT - 8, letterSpacing: 1.65, minLetterSpacing: 0.5 });
+  const level = fit(upper(levelLabel, lang), { font: "display-700", size: LEVEL.size, minSize: LEVEL.minSize, maxWidth: M.x - LEFT - 8, letterSpacing: 0.9, minLetterSpacing: 0.3 });
   const bigLevel = card.profile ? null : fitLines(upper(levelLabel, lang), { font: "display-700", size: BIG_LEVEL.size, minSize: BIG_LEVEL.minSize, maxWidth: M.x - LEFT - 10, letterSpacing: 0.4 });
-  const badgeY = card.profile ? 172 : 148;
+  // La pilule des spéciales : sous le nom du niveau, ou sous les étoiles quand le niveau est en grand plus bas.
+  const badgeY = card.profile ? LEVEL.y + 8 : STARS.y + STARS.size + 9;
   const badge = th.badge ? fit(upper(th.label[lang], lang), { font: "sans-600", size: 8.5, minSize: 7.5, maxWidth: M.x - LEFT - 8 - 18, letterSpacing: 1.2, minLetterSpacing: 0.4 }) : null;
 
-  // Écriteau
-  const plX = M.x + (M.w - PLACARD.w) / 2;
-  const plY = M.y + M.h - PLACARD.bottom - PLACARD.h;
-  const placardName = fit(upper(card.login ?? card.name, lang), { font: "display-700", size: 20, minSize: 12, maxWidth: PLACARD.w - 16, letterSpacing: 1.6, minLetterSpacing: 0.3 });
-  const caseFit = fit(`${s.caseNo} ${caseNumber(card.id)} · ${caseDate(card.createdAt)}`, { font: "mono-400", size: 8.5, minSize: 7, maxWidth: PLACARD.w - 12, letterSpacing: 0.85, minLetterSpacing: 0.2 });
+  // Le numéro de dossier, en haut à droite, à la place des étoiles d'avant
+  const caseNo = caseLabel(card.id, lang);
 
   // Profil criminel (§18.2) : le nom comme une page personnage, l'accroche seulement si elle tient entière
   const profileName = card.profile
@@ -375,12 +372,14 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
   ];
 
   // Pied, en procès-verbal
-  const footerFit = fit(`${s.questioned(card.judgedInSeconds)} · ${s.evidence} ${s.percent(card.reliability)}`, { font: "mono-400", size: LAYOUT.footer.size, minSize: LAYOUT.footer.minSize, maxWidth: FW - 30, letterSpacing: 0, minLetterSpacing: 0 });
+  const footerFit = fit(`${s.questioned(card.judgedInSeconds)} · ${s.proven(card.reliability)}`, { font: "mono-400", size: LAYOUT.footer.size, minSize: LAYOUT.footer.minSize, maxWidth: FW - 30, letterSpacing: 0, minLetterSpacing: 0 });
 
   const stats = STAT_ORDER.map((code) => card.stats.find((st) => st.code === code)).filter((st): st is Stat => !!st);
   // Dossier scellé (shared/publicView.ts) : à la place de la note, du niveau et des étoiles, deux mots mats.
   const sealed = card.sealed ? sealedFace(lang, M.x - LEFT - 8) : null;
-  const ariaLabel = sealed ? `${s.card} — ${s.sealed}, ${s.sealedSub} — ${card.name}` : `${s.card} ${levelLabel} ${card.overall}, ${s.stars(n)} — ${card.name}`;
+  const ariaLabel = sealed ? `${s.card} — ${s.sealed}, ${s.sealedSub} — ${card.name}` : `${s.card} ${levelLabel} ${card.overall}/100, ${s.stars(n)} — ${card.name}`;
+  // Les six traits ne font pas la note d'une fiche jugée sur la grille : leur étiquette le dit.
+  const traitsLabel = card.grid ? s.traitsNote : s.traits;
 
   return (
     <svg
@@ -479,20 +478,25 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
         )}
         <rect width={CARD_W} height={CARD_H} filter={u("grain")} opacity={0.05} />
 
-        {/* Haut : la marque à gauche, les étoiles du HUD à droite */}
+        {/* Haut : la marque à gauche, le numéro de dossier à droite */}
         <AzeritGem x={LEFT} y={18} h={13} />
         <Txt x={LEFT + 17} y={29.5} font="sans-600" size={10} ls={2.2} fill={th.inkSoft} opacity={0.85}>
           AZERIT
         </Txt>
-        {!sealed && <Stars n={n} onSky={!!sky} />}
+        <Txt x={RIGHT} y={29.5} font="mono-500" size={9} ls={0.7} anchor="end" fill={th.inkSoft} opacity={0.75}>
+          {caseNo}
+        </Txt>
 
-        {/* La note : crème plat, ou le seul dégradé de la fiche */}
+        {/* La note : crème plat, ou le seul dégradé de la fiche ; dessous, les six étoiles */}
         {sealed ? (
           <SealedMark sealed={sealed} ink={th.ink} inkSoft={th.inkSoft} />
         ) : (
-          <text x={16} y={134} {...fontAttrs("display-800")} fontSize={overallSize} letterSpacing={-2.4} fill={th.grad === "num" ? u("g") : th.ink}>
-            {card.overall}
-          </text>
+          <>
+            <text x={16} y={NOTE_Y} {...fontAttrs("display-800")} fontSize={overallSize} letterSpacing={-2.4} fill={th.grad === "num" ? u("g") : th.ink}>
+              {card.overall}
+            </text>
+            <Stars n={n} />
+          </>
         )}
         {sealed ? null : bigLevel ? (
           bigLevel.lines.map((line, i, all) => (
@@ -501,7 +505,7 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
             </Txt>
           ))
         ) : (
-          <Txt x={LEFT} y={157} font="sans-600" size={level.size} ls={level.letterSpacing} fill={th.inkSoft}>
+          <Txt x={LEFT} y={LEVEL.y} font="display-700" size={level.size} ls={level.letterSpacing} fill={th.ink}>
             {level.text}
           </Txt>
         )}
@@ -516,22 +520,15 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
 
         {/* Photo d'identité judiciaire */}
         <g clipPath={u("mug")}>
-          <rect x={M.x} y={M.y} width={M.w} height={M.h} fill={th.gray ? "#a9b0b6" : "#b4bfcb"} />
-          {Array.from({ length: Math.floor((M.h - 25) / 26.5) + 1 }, (_, i) => (
-            <rect key={i} x={M.x} y={M.y + 25 + i * 26.5} width={M.w} height={1.5} fill="#141c28" fillOpacity={0.32} />
-          ))}
-          {["190", "180", "170", "160"].map((tck, i) => (
-            <Txt key={tck} x={M.x + 6} y={M.y + 21 + i * 53} font="mono-700" size={8} fill="#141c28" opacity={0.6}>
-              {tck}
-            </Txt>
-          ))}
+          <Toise x={M.x} y={M.y} w={M.w} h={M.h} gray={th.gray} coverTop={toiseCover(M.h, !!avatar)} />
           {avatar ? (
-            <image href={avatar} x={M.x + 12} y={M.y + M.h - 168} width={140} height={168} preserveAspectRatio="xMidYMin slice" filter={u("photo")} />
+            <image href={avatar} x={M.x + MUG_PHOTO.inset} y={M.y + M.h - MUG_PHOTO.h} width={MUG_PHOTO.w} height={MUG_PHOTO.h} preserveAspectRatio="xMidYMin slice" filter={u("photo")} />
           ) : (
-            <Initials initials={card.initials} M={M} />
+            // Sous le tampon (fiche lue sur LinkedIn ou un CV), la silhouette descend : le tampon ne couvre pas les initiales.
+            <Silhouette x={M.x} y={M.y + (stamped ? STAMP.drop : 0)} w={M.w} h={M.h} gray={th.gray} initials={card.initials} />
           )}
-          {card.source === "cv" && (
-            <g transform={`translate(${M.x + M.w / 2} ${M.y + 40}) rotate(-9)`} opacity={0.88}>
+          {stamped && (
+            <g transform={`translate(${M.x + M.w / 2} ${M.y + (avatar ? STAMP.y : STAMP.yBare)}) rotate(-9)`} opacity={0.88}>
               <rect x={-64} y={-16} width={128} height={32} rx={3} fill="none" stroke="#a3261b" strokeWidth={2.2} />
               <rect x={-60} y={-12} width={120} height={24} rx={1.5} fill="none" stroke="#a3261b" strokeWidth={0.8} />
               <Txt x={0} y={5.4} font="display-800" size={15.5} ls={1.4} anchor="middle" fill="#a3261b">
@@ -539,15 +536,7 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
               </Txt>
             </g>
           )}
-          <g transform={`rotate(-1.2 ${plX + PLACARD.w / 2} ${plY + PLACARD.h / 2})`}>
-            <rect x={plX} y={plY} width={PLACARD.w} height={PLACARD.h} rx={3} fill="#111111" />
-            <Txt x={plX + PLACARD.w / 2 + placardName.letterSpacing / 2} y={plY + 22} font="display-700" size={placardName.size} ls={placardName.letterSpacing} anchor="middle" fill="#f4f1ea">
-              {placardName.text}
-            </Txt>
-            <Txt x={plX + PLACARD.w / 2} y={plY + 35} font="mono-400" size={caseFit.size} ls={caseFit.letterSpacing} anchor="middle" fill="#bdb8ad">
-              {caseFit.text}
-            </Txt>
-          </g>
+          <Plate x={M.x} y={M.y} w={M.w} h={M.h} name={plateName(card, lang)} sub={plateSub(card.id, card.createdAt, lang)} />
         </g>
         <rect x={M.x + 0.5} y={M.y + 0.5} width={M.w - 1} height={M.h - 1} rx={M.r} fill="none" stroke="#fff" strokeOpacity={0.14} />
 
@@ -580,7 +569,10 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
           );
         })}
 
-        {/* Six stats en barres de dix segments */}
+        {/* Six traits en barres de dix segments */}
+        <Txt x={LEFT} y={LAYOUT.traits.labelY} font="sans-600" size={LAYOUT.traits.labelSize} ls={1.1} fill={th.inkSoft} opacity={0.62}>
+          {upper(traitsLabel, lang)}
+        </Txt>
         {stats.map((st, i) => (
           <StatRow key={st.code} stat={st} x={LEFT + (i < 3 ? 0 : 169)} y={LAYOUT.stats.y + (i % 3) * LAYOUT.stats.rowH} th={th} />
         ))}
@@ -602,15 +594,6 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
         )}
       </g>
     </svg>
-  );
-}
-
-function Initials({ initials, M }: { initials: string; M: typeof MUG }) {
-  const f = fit(initials.slice(0, 3).toUpperCase(), { font: "display-800", size: 72, minSize: 40, maxWidth: M.w - 30 });
-  return (
-    <Txt x={M.x + M.w / 2} y={M.y + 108 + (M.h - MUG.h) / 2} font="display-800" size={f.size} anchor="middle" fill="#2b3442" opacity={0.85}>
-      {f.text}
-    </Txt>
   );
 }
 

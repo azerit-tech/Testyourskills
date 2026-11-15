@@ -129,6 +129,7 @@ export function Denounce({ cardId, selfLogin, toast }: Props) {
   return (
     <section className="after-block denounce" aria-labelledby={`${uid}-title`} aria-busy={state.s === "pending"}>
       <h2 id={`${uid}-title`}>{d.title}</h2>
+      {state.s !== "pending" && <p className="denounce-intro">{d.intro}</p>}
       {state.s === "pending" ? (
         <div className="denounce-pending" role="status">
           <p>{d.pending(state.login)}</p>
@@ -179,18 +180,7 @@ export function Denounce({ cardId, selfLogin, toast }: Props) {
                 {shown.map((a) => (
                   <li key={a.login}>
                     <button type="button" className="pill pill-ghost denounce-who" onClick={() => void run(a.login)}>
-                      <img
-                        src={a.avatarUrl}
-                        alt=""
-                        width={28}
-                        height={28}
-                        loading="lazy"
-                        referrerPolicy="no-referrer"
-                        // Avatar injoignable : un rond vide plutôt qu'une image cassée.
-                        onError={(e) => {
-                          e.currentTarget.removeAttribute("src");
-                        }}
-                      />
+                      <WhoFace src={a.avatarUrl} login={a.login} />
                       <span>@{a.login}</span>
                     </button>
                   </li>
@@ -226,7 +216,7 @@ export function Wanted({ card, x, toast, onAgain }: { card: CardData; x: string 
   const onMain = async () => {
     if (canNative) {
       try {
-        await navigator.share({ title: "Testyourskills", text: text("").trim(), url });
+        await navigator.share({ title: "Azerit", text: text("").trim(), url });
         track("native");
       } catch {
         /* partage annulé */
@@ -253,7 +243,7 @@ export function Wanted({ card, x, toast, onAgain }: { card: CardData; x: string 
             <Stars n={n} size={22} label={t.result.wantedStars(n, pick(LEVEL_LABELS[n], lang))} />{" "}
           </>
         )}
-        · {tag}
+        <span className="denounce-tag">{tag}</span>
       </h2>
       {status && <p>{d.charge(status)}</p>}
       <div className="denounce-actions">
@@ -276,4 +266,17 @@ export function Wanted({ card, x, toast, onAgain }: { card: CardData; x: string 
       </div>
     </section>
   );
+}
+
+/** La pastille d'un complice : son avatar ; sans image, ou si elle ne charge pas, son initiale (comme au top de la semaine). */
+function WhoFace({ src, login }: { src?: string | null; login: string }) {
+  const [broken, setBroken] = useState(false);
+  useEffect(() => setBroken(false), [src]);
+  if (!src || broken)
+    return (
+      <i className="denounce-who-initial" aria-hidden>
+        {[...login.replace(/[^\p{L}\p{N}]/gu, "")][0]?.toUpperCase() ?? "?"}
+      </i>
+    );
+  return <img src={src} alt="" width={28} height={28} loading="lazy" referrerPolicy="no-referrer" onError={() => setBroken(true)} />;
 }

@@ -979,6 +979,13 @@ svg {
   height: 88%;
   fill: var(--s-call);
 }
+/* les initiales, dans la tête de la silhouette : la couleur du mur (la taille est en
+   unités du dessin, 100 de large) */
+.cover-face-initials {
+  font: 800 var(--t-22) / 1 var(--f-name);
+  letter-spacing: 0.02em;
+  fill: var(--tint, #ccc2f5);
+}
 .cover-face-mark {
   position: absolute;
   z-index: 2;
@@ -1000,7 +1007,7 @@ svg {
   padding: 0.34em 0.6em 0.38em;
   border-radius: 3px;
   background: #111;
-  transform: translateX(-50%) rotate(-1.2deg);
+  transform: translateX(-50%) rotate(-1.5deg);
   font-size: clamp(var(--t-12), 10.5cqw, 24px);
   text-align: center;
   white-space: nowrap;
@@ -1008,15 +1015,15 @@ svg {
 .cover-plate b {
   overflow: hidden;
   font: 700 1em/1 var(--f-name);
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   text-overflow: ellipsis;
-  color: #f4f1ea;
+  color: var(--cream);
 }
 .cover-plate i {
   font: 400 max(var(--t-12), 0.4em) / 1.1 var(--f-mono);
   font-style: normal;
   letter-spacing: 0.08em;
-  color: #bdb8ad;
+  color: rgb(255 249 203 / 0.7);
 }
 /* une case étroite : la plaque ne garde que le nom (la seconde ligne ne descend pas sous 12 px) */
 @container (max-width: 190px) {
@@ -2093,7 +2100,7 @@ button.cover-panel:focus-visible {
   z-index: 2;
   display: flex;
   justify-content: center;
-  padding: 8px 0 28px;
+  padding: 8px 0;
 }
 .page-result.is-animating .result-stage {
   cursor: pointer;
@@ -2118,7 +2125,7 @@ button.cover-panel:focus-visible {
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  margin-top: 14px;
+  margin-top: 4px;
   text-align: center;
   animation: pieces-in 0.5s ease both;
 }
@@ -2172,6 +2179,11 @@ button.cover-panel:focus-visible {
 .card-rig {
   position: absolute;
   inset: 0;
+}
+/* sous la fiche de la page, 44 px pour le lien qui la retourne (card.css) :
+   gardés dès l'arrivée, rien ne bouge quand la fiche se pose */
+.result-stage .card-slot {
+  margin-bottom: 44px;
 }
 .card-slot:not(.show-front) .card-rig {
   opacity: 0;
@@ -2568,12 +2580,15 @@ a.dossier-item:hover {
 .out .out-second {
   width: 100%;
 }
-/* « Texte copié · colle-le dans ton post » : à 390 px, le libellé passe sur deux lignes plutôt que de déborder */
-.out .is-copied {
-  padding-block: 8px;
-  line-height: 1.2;
-  white-space: normal;
+/* la ligne d'aide sous le bouton LinkedIn, en permanence : où part le texte du post */
+.out .out-hint {
+  margin: -4px 0 0;
+  font: 400 var(--t-14) / 1.4 var(--f-text);
+  color: var(--c-text);
   text-wrap: balance;
+}
+.out .out-hint.is-copied {
+  color: var(--c-emphasis);
 }
 .out-more {
   display: grid;
@@ -3126,22 +3141,22 @@ a.dossier-item:hover {
   isolation: isolate;
 }
 .card-sky {
-  /* La hauteur de l'image, plus grande que le cadre : son cinquième haut, du ciel seul, couvre la barre
-     et l'en-tête (64 + 70 px) ; l'aplat sombre du bas sort du cadre. Rendue en 1 230 × 820 à 390 px. */
-  --sky-img: 820px;
+  /* Le ciel seul : le cadre s'arrête au cinquième haut de l'image (220 px sur 1 100), là où il n'y a ni
+     arbre ni immeuble. Il couvre la barre et l'en-tête (64 + 80 px), puis se fond dans l'encre derrière
+     le haut de la fiche : de part et d'autre de la fiche, aucun morceau de décor ne dépasse. */
+  --sky-img: 1100px;
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   z-index: -1;
-  height: 50vh;
-  height: 50svh;
+  height: 220px;
   overflow: hidden;
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.9s ease;
-  -webkit-mask-image: linear-gradient(to bottom, #000 62%, transparent);
-  mask-image: linear-gradient(to bottom, #000 62%, transparent);
+  -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent);
+  mask-image: linear-gradient(to bottom, #000 70%, transparent);
 }
 .card-sky.is-in {
   opacity: 1;

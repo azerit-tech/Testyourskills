@@ -49,6 +49,10 @@ interface WaitingProps {
   login?: string | null;
   /** Une photo déjà connue, à la place de l'avatar du pseudo. */
   avatarUrl?: string | null;
+  /** Entrée par LinkedIn : le nom du lien, sur la plaque tant que le nom n'est pas connu. */
+  slug?: string | null;
+  /** Le jour de la fiche, dès qu'elle est prête : la plaque de l'attente et celle de la fiche portent la même date. */
+  createdAt?: string | null;
   /** Le pari se propose (une vraie attente, pas une fiche servie du cache). */
   plea?: boolean;
   /** La fiche est prête : rendre la main dès que les trouvailles minimales sont lues. */
@@ -64,7 +68,7 @@ interface WaitingProps {
 
 const idOf = (f: Finding) => `${f.source}:${f.kind}`;
 
-export function Waiting({ cardId, progress, startedAt, queue, findings = [], login, avatarUrl, plea = false, ready = false, onRelease, scene, onOpen, leaving = false }: WaitingProps) {
+export function Waiting({ cardId, progress, startedAt, queue, findings = [], login, avatarUrl, slug, createdAt, plea = false, ready = false, onRelease, scene, onOpen, leaving = false }: WaitingProps) {
   const { t, lang } = useT();
   const [lines, setLines] = useState<Line[]>([]);
   const [now, setNow] = useState(() => Date.now());
@@ -176,7 +180,7 @@ export function Waiting({ cardId, progress, startedAt, queue, findings = [], log
       </h1>
 
       <div className="load-main">
-        <Mugshot cardId={cardId} login={login} src={avatarUrl} />
+        <Mugshot cardId={cardId} login={login} slug={slug} src={avatarUrl} createdAt={createdAt ?? startedAt} />
         {plea && <PleaPrompt cardId={cardId} />}
         {piece && (
           <div className="load-dossier" aria-hidden>

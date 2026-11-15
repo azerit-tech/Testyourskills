@@ -81,7 +81,7 @@ describe("couverture (§18.31)", () => {
     const free = ps.filter((p) => p.tag === "button");
     expect(free).toHaveLength(1);
     expect(free[0].area).toBe("fr");
-    expect(free[0].html).toContain('aria-label="Ta place : ouvre ton dossier"');
+    expect(free[0].html).toContain('aria-label="Ta place\u00a0: fais ta fiche"');
     // le reste : des décors, jamais une case vide
     const scenes = ps.filter((p) => p.tag === "div");
     expect(scenes).toHaveLength(SLOTS.length - 2);
@@ -106,8 +106,8 @@ describe("couverture (§18.31)", () => {
   it("anglais : le rang en toutes lettres pour les lecteurs d'écran", () => {
     const html = render({ top: week(TOP5.slice(0, 1)) }, "en-US");
     expect(html).toContain('aria-label="@alice, #1 this week"');
-    expect(html).toContain('aria-label="Your spot: open your file"');
-    expect(html).toContain('aria-label="The real sheet of Jacques, Azerit&#x27;s founder"');
+    expect(html).toContain('aria-label="Your spot: get your rap sheet"');
+    expect(html).toContain('aria-label="The actual rap sheet of Jacques, founder of Azerit"');
   });
 
   it("la graine tire la distribution ; les visages restent au top, la place libre en dernier", () => {

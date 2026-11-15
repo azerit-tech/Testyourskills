@@ -12,6 +12,7 @@
 import type { Hono } from "hono";
 import { z } from "zod";
 import type { Fact } from "../../shared/types";
+import { typoFact } from "../../shared/typo";
 import type { Store } from "./db";
 import { buildLead, sendLead } from "./events";
 import { ID_RE, MESSAGES } from "./pipeline";
@@ -25,10 +26,10 @@ const removalSchema = z.object({
 });
 
 const BAD_EMAIL: Fact = { fr: "Cet email n'a pas l'air valide.", en: "That email doesn't look valid." };
-const HAS_GITHUB: Fact = {
-  fr: "Cette fiche porte un pseudo GitHub : sa personne la masque ou la supprime avec « C'est moi ».",
-  en: "This sheet has a GitHub username: its owner hides or deletes it with “It's me”.",
-};
+const HAS_GITHUB: Fact = typoFact({
+  fr: "Cette fiche porte un pseudo GitHub : la personne fichée la masque ou la supprime avec « C'est moi ».",
+  en: "This sheet has a GitHub username: the person on file hides or deletes it with “That's me”.",
+});
 const LIMITED: Fact = { fr: "Trois demandes par jour, c'est le maximum. Reviens demain.", en: "Three requests a day is the limit. Come back tomorrow." };
 
 export function mountRemoval(

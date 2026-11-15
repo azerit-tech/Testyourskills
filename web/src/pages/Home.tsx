@@ -168,16 +168,16 @@ export function BackLine({ mine, pending }: Pick<Memory, "mine" | "pending">) {
 export function ExampleCard({ card, href, pieces }: Showcase) {
   const { t, lang } = useT();
   return (
-    <figure className="showcase" aria-label={`${t.home.exampleLabel} · ${t.tierCard(LEVEL_LABELS[starsFor(card.overall)][lang])}`}>
+    <figure className="showcase" aria-label={`${t.home.exampleLabel}, ${t.tierCard(LEVEL_LABELS[starsFor(card.overall)][lang])}`}>
       <CardView card={card} lang={lang} interactive idPrefix="hero" />
       <figcaption>
         <a href={href} onClick={(e) => onLinkClick(e, href)}>
           {t.home.exampleCaption}
         </a>
-        {/* « Pièces au dossier : LinkedIn · GitHub » : d'où vient la preuve, la note est sur la fiche. */}
+        {/* « Sources au dossier : LinkedIn et GitHub » : d'où vient la preuve, la note est sur la fiche. */}
         {pieces && pieces.length > 1 && (
           <a className="showcase-scores" href={href} onClick={(e) => onLinkClick(e, href)}>
-            {t.result.pieces.line(pieces.map(pieceLabel).join(" · "))}
+            {t.result.pieces.line(pieces.map(pieceLabel).reduce((a, b) => t.result.pieces.pair(a, b)))}
           </a>
         )}
       </figcaption>

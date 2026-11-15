@@ -29,7 +29,7 @@ export function PrimesList() {
   const [primes, setPrimes] = useState<PrimeView[] | null>(null);
 
   useEffect(() => {
-    document.title = tl.title;
+    document.title = t.meta.titlePage(tl.title);
   }, [tl.title]);
 
   useEffect(() => {
@@ -89,14 +89,15 @@ function Row({ r, me }: { r: BoardRow; me: boolean }) {
 }
 
 function usePrimeShare(toast: (m: string) => void) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const native = hasNativeShare() && isTouch();
   const share = async (p: PrimeView, job: string) => {
-    const url = `${window.location.origin}/primes/${p.id}`;
+    // Partagé depuis le site en anglais, le lien le dit : son aperçu sort en anglais.
+    const url = `${window.location.origin}/primes/${p.id}${lang === "en" ? "?lang=en" : ""}`;
     const text = t.primes.page.shareText(p.company, job);
     if (native) {
       try {
-        await navigator.share({ title: "Testyourskills", text, url });
+        await navigator.share({ title: "Azerit", text, url });
       } catch {
         /* partage annulé */
       }
@@ -148,7 +149,9 @@ export function PrimePage({ id }: { id: string }) {
   const prime = data?.prime;
   useEffect(() => {
     if (!prime) return;
-    document.title = `${prime.company} : ${t.primes.contract[prime.contract]}`;
+    // Dans la phrase, le contrat perd sa capitale ; un sigle (CDI) garde les siennes.
+    const contract = t.primes.contract[prime.contract];
+    document.title = t.meta.titlePage(`${prime.company}, ${contract === contract.toUpperCase() ? contract : contract.toLowerCase()}`);
     const key = `tys_prime_seen_${prime.id}`;
     try {
       if (sessionStorage.getItem(key)) return;
@@ -277,9 +280,10 @@ export function PrimePage({ id }: { id: string }) {
 
       <section className="prime-board" aria-labelledby="prime-board-title">
         <h2 id="prime-board-title">{tp.board}</h2>
-        <p className="board-meta">{prime.phase === "closed" ? `${tp.frozen} ${tp.totalClosed(data.total)}` : tp.total(data.total)}</p>
+        {/* À zéro, pas de compte : la phrase suffit. */}
+        {data.total > 0 && <p className="board-meta">{prime.phase === "closed" ? `${tp.frozen} ${tp.totalClosed(data.total)}` : tp.total(data.total)}</p>}
         {data.board.length === 0 ? (
-          <p className="primes-empty">{tp.boardEmpty}</p>
+          <p className="primes-empty">{prime.phase === "closed" ? tp.boardEmptyClosed : tp.boardEmpty}</p>
         ) : (
           <ol className="board-list is-top">
             {data.board.map((r) => (

@@ -27,7 +27,7 @@ export function Bands() {
   const tabs = useRef<(HTMLButtonElement | null)[]>([]);
 
   useEffect(() => {
-    document.title = tb.title;
+    document.title = t.meta.titlePage(tb.title);
   }, [tb.title]);
 
   useEffect(() => {
@@ -146,7 +146,7 @@ export function BandPage({ type, id }: { type: BandType; id: string }) {
   const band = data?.band;
   useEffect(() => {
     if (!band) return;
-    document.title = `${band.label} : ${t.bands.kicker[band.type].toLowerCase()}`;
+    document.title = t.meta.titlePage(`${band.label}, ${t.bands.kicker[band.type].toLowerCase()}`);
     // Venir d'ici : sa pastille passe en tête sous la fiche qu'on va faire.
     rememberBandHint(band);
     const key = `tys_band_seen_${band.type}_${band.id}`;

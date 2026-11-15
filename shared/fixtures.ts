@@ -49,7 +49,7 @@ const S = {
   noTests: { id: "gh_no_tests", tone: "negative", label: { fr: "Tests : bientôt", en: "Tests: coming soon" }, rule: { fr: "Aucun test sur les 5 repos actifs.", en: "No tests across the 5 active repos." } },
   friday: { id: "gh_friday_push", tone: "negative", label: { fr: "Push sur main le vendredi soir", en: "Pushes to main on Friday night" }, rule: { fr: "31 % des commits le vendredi après 18 h.", en: "31% of commits on Friday after 6pm." } },
   ship: { id: "gh_ship_or_nothing", tone: "positive", label: { fr: "Ship ou rien", en: "Ship or nothing" }, rule: { fr: "SHIP ≥ 85.", en: "SHIP ≥ 85." } },
-  maintainer: { id: "gh_maintainer", tone: "positive", label: { fr: "Maintient des projets", en: "Maintainer" }, rule: { fr: "Un repo avec 10 contributeurs externes ou plus.", en: "A repo with 10+ outside contributors." } },
+  maintainer: { id: "gh_maintainer", tone: "positive", label: { fr: "Maintient des projets", en: "Maintainer" }, rule: { fr: "Un repo avec 10 comptes externes qui contribuent, ou plus.", en: "A repo with 10+ outside contributors." } },
   stars: { id: "gh_read_by_others", tone: "positive", label: { fr: "Code lu par d'autres", en: "Read by others" }, rule: { fr: "100 stars cumulées ou plus.", en: "100+ total stars." } },
   tutorial: { id: "gh_finished_tutorial", tone: "negative", label: { fr: "A fini le tutoriel", en: "Finished the tutorial" }, rule: { fr: "3 repos tutoriels ou plus.", en: "3+ tutorial repos." } },
   archeo: { id: "gh_archaeologist", tone: "special", label: { fr: "Archéologue", en: "Archaeologist" }, rule: { fr: "64 % de l'activité a plus de 5 ans.", en: "64% of activity is over 5 years old." } },

@@ -1,6 +1,6 @@
 // Mémoire de session : pré-remplissage de l'entrée et cartes fraîches (en RAM),
 // origine du visiteur venu par un lien partagé (sessionStorage).
-import type { Door } from "../../../shared/entry";
+import { linkedinSlug, type Door } from "../../../shared/entry";
 import type { Fact } from "../../../shared/types";
 
 export type Mode = "single" | "both";
@@ -21,6 +21,8 @@ let lastInput: { login?: string; file?: File | null } = {};
 const fresh = new Map<string, number>();
 /** Le pseudo GitHub tapé pour chacune : l'attente en montre l'avatar dès la première seconde (§18.27). */
 const freshLogins = new Map<string, string>();
+/** Le nom du lien LinkedIn collé pour chacune (« camille-ardent ») : la plaque de l'attente le porte. */
+const freshSlugs = new Map<string, string>();
 
 export function setPrefill(p: Prefill) {
   prefill = { file: lastInput.file ?? null, ...p };
@@ -45,11 +47,44 @@ export function rememberInput(i: { login?: string; file?: File | null }) {
 }
 
 /** `login` : le pseudo GitHub de la demande, s'il y en a un (ni lien LinkedIn, ni CV seul). */
-export function markFresh(id: string, login?: string | null) {
+export function markFresh(id: string, login?: string | null, linkedin?: string | null) {
   fresh.set(id, Date.now());
   if (login) freshLogins.set(id, login);
   memPending = { id, at: Date.now() };
   writeSession(PENDING_KEY, JSON.stringify(memPending));
+  seen.delete(id);
+  writeSession(OWED_KEY, id);
+  const slug = linkedin ? linkedinSlug(linkedin) : null;
+  if (slug) freshSlugs.set(id, slug);
+}
+
+/** Le nom du lien LinkedIn collé pour cette fiche dans cet onglet, ou null. */
+export function freshSlug(id: string): string | null {
+  return freshSlugs.get(id) ?? null;
+}
+
+// --- Le film joue une fois (§18.48) ------------------------------------------
+// Une fiche demandée ici a droit à son film tant qu'il ne s'est pas posé (vu en
+// entier, passé, ou replié faute de pouvoir jouer) ; ensuite, revenir sur la
+// fiche ne le relance plus, seul « Revoir ma poursuite » le fait. La marque
+// « fraîche » elle-même reste (elle dit aussi à qui est la fiche). La dette est
+// recopiée dans sessionStorage : une page rechargée en plein film le rejoue,
+// depuis le début, la personne ne l'ayant pas vu.
+
+const OWED_KEY = "tys_film_owed";
+/** Les fiches dont le film s'est posé dans cet onglet. */
+const seen = new Set<string>();
+
+/** Le film de cette fiche reste à voir : demandée ici (ou rechargée en plein film), pas encore posée. */
+export function filmOwed(id: string): boolean {
+  if (seen.has(id)) return false;
+  return fresh.has(id) || readSession(OWED_KEY) === id;
+}
+
+/** Le film s'est posé (vu, passé ou replié) : il ne rejouera plus seul. */
+export function markFilmSeen(id: string) {
+  seen.add(id);
+  if (readSession(OWED_KEY) === id) removeSession(OWED_KEY);
 }
 
 /** Le pseudo GitHub tapé pour cette fiche dans cet onglet, ou null. */
@@ -210,6 +245,14 @@ function writeSession(key: string, value: string) {
     sessionStorage.setItem(key, value);
   } catch {
     /* stockage bloqué : la RAM suffit pour cette page */
+  }
+}
+
+function removeSession(key: string) {
+  try {
+    sessionStorage.removeItem(key);
+  } catch {
+    /* rien */
   }
 }
 

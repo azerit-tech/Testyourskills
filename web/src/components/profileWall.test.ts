@@ -51,24 +51,24 @@ describe("mur des profils (§18.28)", () => {
 
   it("français : titre, noms et phrases du catalogue, puis « Et toi ? »", () => {
     const html = render("fr-FR");
-    expect(html).toContain('<h2 id="wall-title">Lequel es-tu ?</h2>');
+    expect(html).toContain('<h2 id="wall-title">Quel profil es-tu\u00a0?</h2>');
     const ids = WALL_PROFILES.map((p) => p.id);
     expect(srcs(html)).toEqual(ids.map((id) => sceneOf(id)));
     const byId = new Map(catalog.map((p) => [p.id, p]));
-    expect(names(html)).toEqual([...ids.map((id) => byId.get(id)!.label.fr), "Et toi ?"]);
+    expect(names(html)).toEqual([...ids.map((id) => byId.get(id)!.label.fr), "Et toi\u00a0?"]);
     for (const id of ids) expect(html).toContain(byId.get(id)!.tagline.fr.replace(/'/g, "&#x27;"));
-    expect(html).toMatch(/<button type="button" class="pill">Découvre le tien<\/button><\/li><\/ul>/);
+    expect(html).toMatch(/<button type="button" class="pill">Découvre ton profil<\/button><\/li><\/ul>/);
   });
 
   it("anglais : mêmes tuiles, textes anglais", () => {
     const html = render("en-US");
-    expect(html).toContain("Which one are you?");
+    expect(html).toContain("Which profile are you?");
     const ids = WALL_PROFILES.map((p) => p.id);
     expect(srcs(html)).toEqual(ids.map((id) => sceneOf(id)));
     const byId = new Map(catalog.map((p) => [p.id, p]));
     expect(names(html)).toEqual([...ids.map((id) => byId.get(id)!.label.en), "And you?"]);
     for (const id of ids) expect(html).toContain(byId.get(id)!.tagline.en.replace(/'/g, "&#x27;"));
-    expect(html).toContain(">Find yours</button>");
+    expect(html).toContain(">Find your profile</button>");
   });
 
   it("une liste au clavier, nommée par le titre", () => {

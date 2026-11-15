@@ -125,7 +125,7 @@ describe("la case « Ta place » de la couverture", () => {
 
   it("une fiche en mémoire : la case y mène et le dit, la place libre a disparu", () => {
     const html = cover({ href: "/c/Card000001", overall: 79, card: null });
-    expect(html).toMatch(/<a class="cover-panel cover-free cover-mine" [^>]*href="\/c\/Card000001"[^>]*aria-label="Ta fiche, 79\/100 : la revoir"/);
+    expect(html).toMatch(/<a class="cover-panel cover-free cover-mine" [^>]*href="\/c\/Card000001"[^>]*aria-label="Ta fiche, 79\/100[ \u00a0]: la revoir"/);
     expect(html).toContain("TA FICHE");
     expect(html).not.toContain("TA PLACE");
   });

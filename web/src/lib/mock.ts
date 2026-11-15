@@ -197,11 +197,11 @@ function mockFindings(login: string): Finding[] {
   });
   return [
     f("account_age", 14, `Compte GitHub ouvert en avril${NB}2016\u00a0: 10${NB}ans de maison.`, `GitHub account opened in April${NB}2016: 10${NB}years on the books.`, [`10${NB}ans`, `10${NB}years`]),
-    f("top_starred", 44, `Repo le plus étoilé\u00a0: dotfiles, 312${NB}étoiles.`, `Most-starred repo: dotfiles, 312${NB}stars.`, [`312${NB}étoiles`, `312${NB}stars`], `${gh}/dotfiles`),
+    f("top_starred", 44, `Repo le plus suivi\u00a0: dotfiles, 312${NB}stars GitHub.`, `Most-starred repo: dotfiles, 312${NB}GitHub stars.`, [`312${NB}stars GitHub`, `312${NB}GitHub stars`], `${gh}/dotfiles`),
     f("longest_streak", 47, `Plus longue série de l'année\u00a0: 43${NB}jours de contributions d'affilée.`, `Longest streak of the year: 43${NB}days of contributions in a row.`, [`43${NB}jours`, `43${NB}days`]),
     f("abandoned_repo", 50, "Repo abandonné le plus ancien\u00a0: todo-app-v3, dernier push en 2018.", "Oldest abandoned repo: todo-app-v3, last push in 2018.", ["2018", "2018"], `${gh}/todo-app-v3`),
     f("accomplice", 57, "Complice principal\u00a0: @camroux, 214 commits sur les mêmes repos.", "Main accomplice: @camroux, 214 commits on the same repos.", ["@camroux", "@camroux"], "https://github.com/camroux"),
-    f("lazy_message", 58, `Message de commit préféré\u00a0: «\u00a0fix\u00a0», 37${NB}fois.`, `Favourite commit message: “fix”, 37${NB}times.`, [`37${NB}fois`, `37${NB}times`]),
+    f("lazy_message", 58, `Message de commit préféré\u00a0: «\u00a0fix\u00a0», 37${NB}fois.`, `Favorite commit message: “fix”, 37${NB}times.`, [`37${NB}fois`, `37${NB}times`]),
     f("night_share", 70, `61${NB}% des derniers commits partent entre 22${NB}h et 5${NB}h.`, `61% of recent commits go out between 10${NB}p.m. and 5${NB}a.m.`, [`61${NB}%`, "61%"]),
     f("first_commit", 74, `Plus vieux commit retrouvé\u00a0: 14${NB}mars 2016, à 2${NB}h${NB}47 du matin.`, `Oldest commit on record: March${NB}14, 2016, at 2:47${NB}a.m.`, [`14${NB}mars 2016`, `March${NB}14, 2016`]),
   ];
@@ -324,8 +324,8 @@ export const mockApi = {
     }
     if (lower === "busy") {
       throw new ApiError(503, "busy", {
-        fr: "Le commissariat déborde : trop de dossiers d'un coup, GitHub nous fait souffler. Reviens dans 12 minutes.",
-        en: "The station is overflowing: too many suspects at once, GitHub is making us take a breather. Come back in 12 minutes.",
+        fr: "Le commissariat déborde : trop de dossiers d'un coup, GitHub nous fait souffler. Reviens dans 12 minutes.",
+        en: "The station is overflowing: too many files at once, GitHub is making us take a breather. Come back in 12 minutes.",
       });
     }
     // « queue » : trois fiches avant, une toutes les 1,5 s, puis la fiche normale.
@@ -384,21 +384,31 @@ export const mockApi = {
       return {
         state: "error",
         code: "unknown_user",
-        message: { fr: "Aucun compte GitHub à ce nom. Vérifie l'orthographe.", en: "No GitHub account by that name. Check the spelling." },
+        message: { fr: "Ce pseudo n'existe pas sur GitHub. Une faute de frappe ?", en: "That username doesn't exist on GitHub. Typo?" },
       };
     if (kind === "org")
       return {
         state: "error",
         code: "organization",
-        message: { fr: "C'est une organisation. On juge les gens, pas les entreprises.", en: "That's an organization. We judge people, not companies." },
+        message: { fr: "C'est une organisation, pas une personne. Essaie le pseudo d'un de ses membres.", en: "That's an organization, not a person. Try one of its members." },
       };
     if (kind === "slow")
-      return { state: "error", code: "timeout", message: { fr: "Trop long, on arrête là.", en: "Too long, stopping here." } };
+      return {
+        state: "error",
+        code: "timeout",
+        message: {
+          fr: "Le jugement a pris trop de temps. Plutôt que d'inventer une fiche, on s'arrête là : réessaie dans un instant.",
+          en: "Judging took too long. Rather than make up a sheet, we stopped: try again in a moment.",
+        },
+      };
     const mg = await loadGrids();
+    // Une fiche faite à l'instant porte le jour de sa demande, comme sur le serveur :
+    // la plaque de l'attente et celle de la fiche disent la même date.
+    const dated = <T extends { createdAt: string }>(x: T): T => (job ? { ...x, createdAt: new Date(job.start).toISOString() } : x);
     if (kind === "cmp" || kind === "licmp" || kind === "liempty")
-      return { state: "done", kind: "comparison", comparison: buildComparison(id, job, mg, kind !== "cmp", kind === "liempty") };
-    if (kind === "li") return { state: "done", kind: "card", card: buildLinkedinCard(id, job, mg) };
-    return { state: "done", kind: "card", card: buildCard(kind as FixtureKey, id, job, mg) };
+      return { state: "done", kind: "comparison", comparison: dated(buildComparison(id, job, mg, kind !== "cmp", kind === "liempty")) };
+    if (kind === "li") return { state: "done", kind: "card", card: dated(buildLinkedinCard(id, job, mg)) };
+    return { state: "done", kind: "card", card: dated(buildCard(kind as FixtureKey, id, job, mg)) };
   },
 
   /**

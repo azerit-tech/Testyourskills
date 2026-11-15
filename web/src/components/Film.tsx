@@ -13,7 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { flushSync } from "react-dom";
 import type { CardData, Lang } from "../../../shared/types";
-import { filmPlan, hudAt, samePlan, type FilmPlan } from "../../../shared/film";
+import { FPS, filmPlan, hudAt, samePlan, type FilmPlan } from "../../../shared/film";
 import { useT } from "../i18n";
 import { api, isMock } from "../lib/api";
 import { readMuted, unlockAudio, writeMuted } from "../lib/audio";
@@ -22,6 +22,7 @@ import { buzz } from "../lib/haptics";
 import { inAppBrowser } from "../lib/sharing";
 import { canPlayFilm, createFilmPlayer, type FilmPlayer, type FilmStats } from "../film/player";
 import { FilmHud } from "../film/FilmHud";
+import { filmVideos } from "../film/unlock";
 import { ensureStill, paintStill } from "../film/freeze";
 import type { FileId } from "../film/files";
 import { filmLoadMs, filmNet, filmRemaining } from "../film/loader";
@@ -53,19 +54,54 @@ interface Props {
   lang: Lang;
   phase: Phase;
   onReady?: () => void;
-  /** La lecture demande un geste : l'attente montre la pilule « Ouvrir mon dossier ». */
+  /** La lecture demande un geste : l'attente montre la pilule « Lancer la poursuite ». */
   onGesture?: () => void;
   /** Sous l'arrêt sur image : la fiche peut se monter, invisible (plan.stageAt). */
   onStage?: () => void;
   onHandoff: () => void;
   onDone: () => void;
-  /** Un toucher sur la scène (CardPage : passer). */
-  onTap?: () => void;
+  /** Rejoué depuis la tête de la fiche (§18.48) : la révélation a eu son événement `film`, celui-ci n'en envoie pas. */
+  replay?: boolean;
 }
 
 declare global {
   interface Window {
     __film?: { plan: FilmPlan; seek(t: number): void; hold(on: boolean): void; stats(): FilmStats };
+  }
+}
+
+/** Le fond du bureau : une image toutes les 125 ms au plus (8 par seconde), sur une toile minuscule. */
+const BACK_MS = 125;
+const BACK_W = 18;
+const BACK_H = 32;
+let backAt = 0;
+
+/**
+ * Au bureau, derrière la colonne du film (§18.48) : l'image du film, réduite à
+ * 18 × 32 points, adoucie et assombrie dans la toile, puis agrandie par le
+ * navigateur (le lissage de l'agrandissement fait le flou). Aucun filtre CSS
+ * plein écran : la toile ne coûte presque rien à tirer. Rien sur téléphone, où
+ * la colonne couvre l'écran. Au gel, l'arrêt sur image en deux tons.
+ */
+function paintBack(back: HTMLCanvasElement | null, still: HTMLCanvasElement | null, frozen: boolean) {
+  if (!back) return;
+  const now = performance.now();
+  if (now - backAt < BACK_MS) return;
+  // la colonne fait toute la largeur : pas de fond à tirer
+  if (window.innerWidth <= Math.min(window.innerHeight, 900) * (9 / 16) + 2) return;
+  backAt = now;
+  const g = back.getContext("2d");
+  if (!g) return;
+  const [a, b] = filmVideos();
+  const src = frozen && still?.dataset.ready !== undefined ? still : a.style.visibility === "visible" ? a : b;
+  try {
+    g.filter = "blur(1.5px)";
+    g.drawImage(src, -2, -2, BACK_W + 4, BACK_H + 4);
+    g.filter = "none";
+    g.fillStyle = "rgb(12 13 27 / 0.62)";
+    g.fillRect(0, 0, BACK_W, BACK_H);
+  } catch {
+    /* image pas encore décodée : la suivante */
   }
 }
 
@@ -95,7 +131,7 @@ function useFilmPlan(card: CardData): FilmPlan {
   return kept.current.plan;
 }
 
-function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, onDone, onTap, onFail }: Props & { onFail: () => void }) {
+function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, onDone, replay = false, onFail }: Props & { onFail: () => void }) {
   const { t: tr } = useT();
   const plan = useFilmPlan(card);
   const planRef = useRef(plan);
@@ -103,6 +139,7 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
   const frameRef = useRef<HTMLDivElement>(null);
   const coverRef = useRef<HTMLDivElement>(null);
   const stillRef = useRef<HTMLCanvasElement>(null);
+  const backRef = useRef<HTMLCanvasElement>(null);
   /** Le dernier lecteur créé (ses mesures servent à l'événement, même libéré). */
   const player = useRef<FilmPlayer | null>(null);
   /** Le lecteur prêt (posé sur sa première image) : la lecture ne part que sur lui. */
@@ -126,7 +163,8 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
     const p = player.current;
     if (r.sent || !p) return;
     r.sent = true;
-    filmTrace("issue", { outcome, gesture: r.gesture, started: r.started });
+    filmTrace("issue", { outcome, gesture: r.gesture, started: r.started, replay });
+    if (replay) return;
     const s = p.stats();
     const net = filmNet();
     api.track("film", null, {
@@ -212,6 +250,7 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
         // rendu tout de suite, dans le rafraîchissement de l'image : le HUD ne retarde pas d'un cran
         flushSync(() => setTime(t));
         cue.current(t);
+        paintBack(backRef.current, stillRef.current, t >= plan.freeze / FPS);
       },
       onStill: (v) => paintStill(v, stillRef.current, plan.tone),
     });
@@ -320,14 +359,14 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
     sound.current?.setMuted(m);
   };
 
-  const onTapTraced = () => {
-    filmTrace("toucher", { phase });
-    onTap?.();
-  };
+  // Un toucher sur l'image ne fait rien (§18.48) : seul « Passer » saute le film. Il reste noté dans la trace.
+  const onTapTraced = () => filmTrace("toucher", { phase });
 
   const hud = hudAt(plan, time, lang);
   const landed = hud.video === null;
   const frozen = hud.freeze !== null;
+  /** L'arrêt sur image et l'éclair : plus rien à passer ni à régler, les boutons s'effacent. */
+  const quiet = hud.phase === "freeze" || hud.phase === "flash" || hud.phase === "over";
   useEffect(() => {
     if (frozen) ensureStill(stillRef.current, plan.tone);
   }, [frozen, plan]);
@@ -340,13 +379,25 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
 
   return (
     <>
-      <div className={`film-stage${landed ? " is-landed" : ""}`} style={vars} aria-hidden="true" onClick={landed ? undefined : onTapTraced}>
+      <div className={`film-stage${landed ? " is-landed" : ""}${quiet ? " is-quiet" : ""}`} style={vars} aria-hidden="true" onClick={landed ? undefined : onTapTraced}>
+        {/* au bureau, autour de la colonne : l'image du film floutée et assombrie, et les bandes d'encre sur toute la largeur */}
+        <canvas ref={backRef} className="film-back" width={18} height={32} />
+        <div className="film-wide film-wide-top" style={{ transform: `translateY(${(hud.bands - 1) * 100}%)` }} />
+        <div className="film-wide film-wide-bottom" style={{ transform: `translateY(${(1 - hud.bands) * 100}%)` }} />
         <div ref={frameRef} className={`film-frame${hud.freeze ? " is-frozen" : ""}`} data-frame={hud.frame} data-shot={hud.shot}>
           {/* les deux balises vidéo sont posées ici par le lecteur */}
           <div ref={coverRef} className="film-cover" />
           {/* l'arrêt sur image en deux tons, tiré pendant l'attente (freeze.ts) */}
           <canvas ref={stillRef} className="film-video film-still" />
           <FilmHud plan={plan} hud={hud} lang={lang} />
+          {/* rejoué depuis la fiche, le film se charge au toucher : trois points tant qu'il n'est pas prêt */}
+          {!prepared && phase === "playing" && (
+            <div className="film-loading">
+              <i />
+              <i />
+              <i />
+            </div>
+          )}
         </div>
         {hud.flash > 0 && <div className="film-flash" style={{ opacity: hud.flash }} />}
       </div>

@@ -4,6 +4,8 @@
 // holographique ni glare ; seul ★★★★★★ porte un halo, son contour éclairé.
 // En option (désactivées par défaut) : la fiche qui se retourne (§18.27, le
 // dos <CardBack>) et les étoiles qui s'allument une à une à l'arrivée.
+// La fiche reste nue, comme l'image partagée : ce qui la retourne est un lien
+// texte posé sous elle (§18.48), jamais un bouton dessiné dessus.
 import { createContext, useContext, useEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import type { CardData, Lang } from "../../../shared/types";
 import { styleOf } from "../../../shared/types";
@@ -12,6 +14,7 @@ import { CardBack } from "../../../shared/card/CardBack";
 import { t as cardT } from "../../../shared/card/i18n";
 import { CARD_MASK_URL, CARD_PATH } from "../../../shared/card/geometry";
 import { themeCssVars, themeOf } from "../../../shared/card/themes";
+import { useAvatar } from "./avatar";
 import "./fonts.css";
 import "./card.css";
 
@@ -26,9 +29,10 @@ export interface CardViewProps {
   reveal?: boolean;
   idPrefix?: string;
   className?: string;
-  /** La fiche se retourne (§18.27) : un toucher ou un clic, ou le bouton rond du coin. Défaut false. */
+  /** La fiche se retourne (§18.27) : un toucher ou un clic, ou le lien posé sous elle
+   *  (44 px de haut, hors du cadre de la fiche : le parent lui garde la place). Défaut false. */
   flippable?: boolean;
-  /** Au montage, les étoiles s'allument une à une, de la première (la plus à droite)
+  /** Au montage, les étoiles s'allument une à une, de la première (la plus à gauche)
    *  à la dernière, 120 ms d'écart ; rien en mouvement réduit. Défaut false. */
   starsIntro?: boolean;
 }
@@ -96,6 +100,9 @@ export function CardView(props: CardViewProps) {
   const tap = useRef<{ x: number; y: number; moved: boolean } | null>(null);
   const style = styleOf(card);
   const s = cardT(lang ?? card.lang ?? "fr");
+  // La photo se montre d'emblée (elle charge dans le SVG) ; en échec, ou si c'est
+  // l'avatar généré par GitHub, la fiche repasse à la silhouette à initiales.
+  const avatarHref = useAvatar(card.avatarUrl) === "none" ? "" : undefined;
 
   useEffect(() => {
     if (!flippable) setFlipped(false);
@@ -168,6 +175,8 @@ export function CardView(props: CardViewProps) {
     };
 
     const onMove = (e: PointerEvent) => {
+      // Le lien sous la fiche n'est pas la fiche : il ne l'incline pas.
+      if (e.target instanceof Element && e.target.closest(".tys-card__flip")) return rest();
       const r = el.getBoundingClientRect();
       aim((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
     };
@@ -211,7 +220,7 @@ export function CardView(props: CardViewProps) {
 
   const front = (
     <>
-      <Card card={card} lang={lang} idPrefix={idPrefix} className="tys-card__svg" />
+      <Card card={card} lang={lang} avatarHref={avatarHref} idPrefix={idPrefix} className="tys-card__svg" />
       <div className="tys-card__fx tys-card__grain" aria-hidden />
       <div className="tys-card__fx tys-card__sweep" aria-hidden />
     </>
@@ -249,21 +258,19 @@ export function CardView(props: CardViewProps) {
         )}
       </div>
       {flippable && (
+        // Sous la fiche, à droite : le lien dit où il mène, et change de mot une fois la fiche retournée.
         <button
           type="button"
           className="tys-card__flip"
-          aria-label={s.back.flip}
-          aria-pressed={flipped}
+          data-to={flipped ? "front" : "back"}
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
             setFlipped((f) => !f);
           }}
         >
-          <svg viewBox="0 0 24 24" aria-hidden focusable="false">
-            <path d="M5.5 9.5a7 7 0 0 1 12.2-3.6M18.5 14.5a7 7 0 0 1-12.2 3.6" />
-            <path d="M18 2.8v3.6h-3.6M6 21.2v-3.6h3.6" />
-          </svg>
+          <span className="tys-card__flip-label">{flipped ? s.back.toFront : s.back.toBack}</span>
+          <span aria-hidden> ↻</span>
         </button>
       )}
     </div>

@@ -42,6 +42,7 @@ import {
 import { dayStart, primePhase, primeWindow, PRIME_ID_RE, type Prime, type Season } from "../../shared/season";
 import type { CardData, ComparisonData, Fact, Position } from "../../shared/types";
 import { starsFor } from "../../shared/types";
+import { frTypo } from "../../shared/typo";
 import type { CardRow, Store } from "./db";
 import { clientIp, type RateLimiter } from "./ratelimit";
 
@@ -52,7 +53,7 @@ export const JOINS_PER_DAY = 10;
 /** Durée pendant laquelle le classement d'une prime est gardé en mémoire. */
 export const PRIMES_CACHE_MS = 30_000;
 
-const f = (fr: string, en: string): Fact => ({ fr, en });
+const f = (fr: string, en: string): Fact => ({ fr: frTypo(fr), en });
 
 export const PRIME_MESSAGES = {
   notFound: f("Cette prime n'existe pas, ou plus.", "This bounty doesn't exist, or no longer does."),
@@ -60,13 +61,13 @@ export const PRIME_MESSAGES = {
   closed: f("Cette prime n'accepte plus d'inscription.", "This bounty no longer takes entries."),
   soon: f("Cette prime n'est pas encore ouverte.", "This bounty isn't open yet."),
   nocard: f("Aucune fiche à ton pseudo. Fais-la d'abord.", "No sheet under your username. Make it first."),
-  degraded: f("Ta dernière fiche est sortie sans lecture. Refais-la pour concourir.", "Your last sheet came out unread. Make it again to enter."),
+  degraded: f("Ta dernière fiche est sortie sans que le code soit lu. Refais-la pour entrer dans la course.", "Your last sheet came out without the code being read. Make it again to enter the race."),
   position: f("Ta fiche ne vise aucun poste de cette prime.", "Your sheet doesn't match any position of this bounty."),
   email: f("Cet email n'a pas l'air valide.", "That email doesn't look valid."),
-  consent: f("Coche l'accord de transmission pour concourir.", "Tick the sharing agreement to enter."),
-  adult: f("Il faut avoir 18 ans ou plus pour concourir.", "You must be 18 or older to enter."),
+  consent: f("Coche l'accord de transmission pour entrer dans la course.", "Check the sharing agreement box to enter the race."),
+  adult: f("Il faut avoir 18 ans ou plus pour entrer dans la course.", "You must be 18 or older to enter the race."),
   place: f("Réponds à la question du lieu.", "Answer the location question."),
-  proofs: f("Un lien de preuve n'a pas l'air d'une adresse web.", "A proof link doesn't look like a web address."),
+  proofs: f("Un lien de preuve n'a pas l'air d'une adresse web.", "One of your links doesn't look like a web address."),
   limited: f("Trop d'inscriptions aujourd'hui depuis cette adresse. Reviens demain.", "Too many entries from this address today. Come back tomorrow."),
   forbidden: f("Requête refusée.", "Request refused."),
 } as const;

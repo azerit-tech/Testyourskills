@@ -68,7 +68,7 @@ function Dock({ item, toast }: { item: Shareable; toast: (m: string) => void }) 
   const on = blockSeen === false && !typing;
   return (
     <div className={`dock${on ? " is-on" : ""}`} role="region" aria-label={t.result.share.title} inert={on ? undefined : true}>
-      <ShareMain kit={kit} className="dock-main" from="dock" short />
+      <ShareMain kit={kit} className="dock-main" from="dock" />
       <button type="button" className="pill pill-big pill-ghost" onClick={toDenounce}>
         {t.denounce.btn}
       </button>

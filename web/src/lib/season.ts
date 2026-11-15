@@ -37,15 +37,15 @@ interface SeasonLines {
   over: (n: number) => string;
 }
 
-/** « 31 décembre », « 1er décembre », « 31 December ». */
+/** « 31 décembre », « 1er décembre », « December 31 » (anglais américain : le mois d'abord). */
 export function dayLabel(day: string, lang: Lang): string {
   const d = new Date(`${day}T00:00:00Z`);
-  const month = new Intl.DateTimeFormat(lang === "fr" ? "fr-FR" : "en-GB", { month: "long", timeZone: "UTC" }).format(d);
+  const month = new Intl.DateTimeFormat(lang === "fr" ? "fr-FR" : "en-US", { month: "long", timeZone: "UTC" }).format(d);
   const n = d.getUTCDate();
-  return `${lang === "fr" && n === 1 ? "1er" : n} ${month}`;
+  return lang === "fr" ? `${n === 1 ? "1er" : n} ${month}` : `${month} ${n}`;
 }
 
-/** Le texte du bandeau : « Saison 1 · dès le 19 novembre », « … · jusqu'au 31 décembre », « Saison 1 terminée ». */
+/** Le texte du bandeau : « Saison 1 : dès le 19 novembre », « … : jusqu'au 31 décembre », « Saison 1 terminée ». */
 export function seasonLine(s: SeasonLines, season: SeasonDates | null, lang: Lang, now: number): string | null {
   const dates = season ?? SEASON_FILE;
   if (!dates) return null;

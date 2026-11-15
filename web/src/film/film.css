@@ -25,7 +25,6 @@
   place-items: center;
   overflow: hidden;
   background: #0c0d1b;
-  cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
@@ -35,6 +34,38 @@
   background: transparent;
   cursor: default;
   pointer-events: none;
+}
+
+/* Au bureau, la colonne ne flotte plus dans le noir (§18.48) : derrière elle,
+   l'image du film tirée sur une toile de 18 × 32 points (Film.tsx, paintBack),
+   agrandie par le navigateur, ce qui la floute, et assombrie dans la toile ;
+   les deux bandes d'encre continuent sur toute la largeur, comme au cinéma.
+   Sur téléphone, la colonne couvre tout : rien de cela ne se voit. */
+.film-back {
+  position: absolute;
+  inset: -6%;
+  width: 112%;
+  height: 112%;
+  object-fit: cover;
+  pointer-events: none;
+}
+.film-wide {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: #0c0d1b;
+  pointer-events: none;
+}
+.film-wide-top {
+  top: var(--film-y);
+  height: calc(var(--film-h) * 0.09);
+}
+.film-wide-bottom {
+  bottom: var(--film-y);
+  height: calc(var(--film-h) * 0.12);
+}
+.film-stage.is-landed .film-back {
+  visibility: hidden;
 }
 
 .film-frame {
@@ -126,18 +157,32 @@
   gap: 0.9cqh;
   pointer-events: none;
 }
+/* la plaque de la fiche (§18.48, shared/card/mug.tsx) : « @PSEUDO » en capitales,
+   puis « N° · date » en mono, crème sur #111, inclinée de 1,5° */
 .film-plate {
+  display: grid;
+  justify-items: center;
+  gap: 0.55cqh;
   max-width: calc(100% - 48px);
-  padding: 0.8cqh 1.4cqh 0.9cqh;
+  padding: 0.8cqh 1.5cqh 0.85cqh;
   border-radius: 3px;
-  background: #0c0d1b;
+  background: #111;
   color: #fff9cb;
-  font: 600 min(22px, 2.5cqh)/1 var(--f-name);
-  letter-spacing: 0.02em;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
-  transform: rotate(-1.2deg);
+  transform: rotate(-1.5deg);
+}
+.film-plate b {
+  max-width: 100%;
+  overflow: hidden;
+  font: 700 min(22px, 2.5cqh)/1 var(--f-name);
+  letter-spacing: 0.06em;
+  text-overflow: ellipsis;
+}
+.film-plate i {
+  font: 400 min(9.5px, 1.1cqh)/1 var(--f-mono);
+  font-style: normal;
+  letter-spacing: 0.08em;
+  opacity: 0.7;
 }
 .film-level {
   max-width: calc(100% - 24px);
@@ -173,40 +218,72 @@
   display: flex;
   gap: 8px;
 }
+/* les étoiles du site (§18.48), en 26 px : remplies de gauche à droite ;
+   allumée, crème pleine ; éteinte, la même en contour 1,5 px blanc à 35 % */
 .film-star {
   display: block;
-  fill: #243152;
+  overflow: visible;
+  fill: none;
+  stroke: rgb(255 255 255 / 0.35);
+  stroke-width: 1.5px;
+  stroke-linejoin: round;
   transform-origin: 50% 55%;
+}
+.film-star path {
+  vector-effect: non-scaling-stroke;
 }
 .film-star.is-on {
   fill: #fff9cb;
+  stroke: none;
 }
 .film-band-bottom {
   bottom: 0;
   height: calc(12cqh + env(safe-area-inset-bottom, 0px));
 }
-/* la radio : une seule ligne, coupée au-delà de 350 px, au-dessus de « Passer » */
+/* la radio : une seule ligne, coupée au-delà de 360 px, centrée dans la bande
+   entre l'image et les boutons (--radio-zone : la bande sans les boutons ; au
+   bureau, les boutons sortent de la colonne, la bande entière) ; le chef
+   d'accusation porte son étiquette au-dessus, en petit */
+.film-band-bottom {
+  --radio-zone: max(28px, calc(12cqh - 56px));
+}
 .film-radio {
   position: absolute;
-  top: 8px;
+  top: 0;
   left: 50%;
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
   width: max-content;
-  max-width: min(350px, calc(100% - 32px));
+  max-width: min(360px, calc(100% - 24px));
+  height: var(--radio-zone);
   margin: 0;
   transform: translateX(-50%);
-  font: 500 13px/16px var(--f-mono);
+  font: 500 14px/18px var(--f-mono);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: #fff9cb;
   white-space: nowrap;
 }
-.film-radio span {
+.film-radio-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.film-radio-text,
+.film-radio-kicker {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* l'étiquette, alignée sur le texte (après le carré et son espace) */
+.film-radio-kicker {
+  padding-left: 14px;
+  font: 500 12px/14px var(--f-mono);
+  letter-spacing: 0.08em;
+  color: rgb(255 249 203 / 0.62);
 }
 .film-square {
   flex: none;
@@ -220,6 +297,45 @@
   background: #8d8cf0;
 }
 
+/* le film rejoué depuis la fiche (§18.48) se charge au toucher : trois points crème au centre */
+.film-loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  gap: 8px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.film-loading i {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #fff9cb;
+  animation: film-dot 1.2s ease-in-out infinite;
+}
+.film-loading i:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.film-loading i:nth-child(3) {
+  animation-delay: 0.4s;
+}
+@keyframes film-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+/* pendant le film, rien de la page ne passe devant : la colonne du visiteur (sa fiche rejouée) attend la fiche */
+.page-result:has(.film-stage:not(.is-landed)) .visitor-col {
+  visibility: hidden;
+}
+
 /* le flash crème, plein écran : la fiche se pose à son sommet */
 .film-flash {
   position: absolute;
@@ -229,20 +345,61 @@
   pointer-events: none;
 }
 
-/* « Passer » (CardPage) et le son, en bas à droite de la bande du bas, 44 px */
+/* « Passer » (CardPage) et le son, en bas à droite de la bande du bas, 44 px :
+   un contour discret, moins lourds que la radio. Ils s'effacent à l'arrêt sur
+   image et pendant l'éclair (il n'y a plus rien à passer). */
 .page-result:has(.film-stage) .skip-btn,
 .film-sound {
   bottom: calc(var(--film-y) + env(safe-area-inset-bottom, 0px) + 6px);
-  background: #0c0d1b;
-  box-shadow: inset 0 0 0 1.5px #243152;
-  color: #fff9cb;
+  background: rgb(12 13 27 / 0.6);
+  box-shadow: inset 0 0 0 1.5px rgb(255 249 203 / 0.2);
+  color: rgb(255 249 203 / 0.78);
+  transition:
+    opacity 0.15s ease,
+    visibility 0s;
 }
 .page-result:has(.film-stage) .skip-btn {
   left: auto;
   right: calc(var(--film-x) + 16px + 44px + 8px);
   height: 44px;
+  padding: 0 20px;
+  font: 500 14px/1 var(--f-text);
+  letter-spacing: 0.02em;
   transform: none;
 }
 .film-sound {
   right: calc(var(--film-x) + 16px);
+}
+.page-result:has(.film-stage.is-quiet) .skip-btn,
+.film-stage.is-quiet ~ .film-sound {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 0.15s ease,
+    visibility 0s 0.15s;
+}
+/* au bureau (la colonne laisse au moins 247 px de chaque côté), les boutons
+   sortent de la colonne : à droite de l'écran, à 48 px du bord, centrés dans la
+   bande d'encre du bas ; la radio a toute la bande de la colonne pour elle */
+@media (min-width: 1000px) {
+  .page-result:has(.film-stage) .skip-btn,
+  .film-sound {
+    bottom: calc(var(--film-y) + (var(--film-h) * 0.12 - 44px) / 2);
+  }
+  .film-sound {
+    right: 48px;
+  }
+  .page-result:has(.film-stage) .skip-btn {
+    right: calc(48px + 44px + 12px);
+  }
+  .film-band-bottom {
+    --radio-zone: 12cqh;
+  }
+}
+
+/* un toucher sur l'image ne fait rien (§18.48) : pas de main au survol */
+.film-stage,
+.page-result:has(.film-stage) .result-stage {
+  cursor: default;
 }

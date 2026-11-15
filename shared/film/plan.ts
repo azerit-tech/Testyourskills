@@ -5,6 +5,7 @@
 import type { CardData, Fact, Lang, Stars } from "../types";
 import { LEVEL_LABELS, starsFor } from "../types";
 import { SCENE_LIGHT, sceneOf, type Light } from "../scenes";
+import { plateSub } from "../card/mug";
 import { radioLines, type Radio, type RadioCard } from "./radio";
 import { ENDINGS, FLICKER_ON, FPS, INTERCEPT_LEAD, SHOT_START, CHASE_FRAMES, CHASE_SHOTS, TITLE_POP, type EndingId } from "./cut";
 
@@ -68,12 +69,14 @@ export interface FilmPlan {
   stageAt: number;
   /** « @pseudo » (ou le nom, sans pseudo) sur la plaque de l'arrêt sur image. */
   plate: string;
+  /** La seconde ligne de la plaque, celle de la fiche : « N° MGOLDB · 14.10.26 ». */
+  plateSub: Fact;
   /** Le niveau, qui claque sur l'arrêt sur image. */
   title: Fact;
   radio: Record<Lang, Radio>;
 }
 
-export type FilmCard = Pick<CardData, "id" | "login" | "name"> & RadioCard;
+export type FilmCard = Pick<CardData, "id" | "login" | "name" | "createdAt"> & RadioCard;
 
 /**
  * Deux plans qui jouent le même film : même contenu, quel que soit l'objet. Le
@@ -119,6 +122,7 @@ export function filmPlan(card: FilmCard): FilmPlan {
     handoffAt: flash.peak / FPS,
     stageAt: (freeze + STAGE_AFTER) / FPS,
     plate: card.login ? `@${card.login}` : card.name,
+    plateSub: { fr: plateSub(card.id, card.createdAt, "fr"), en: plateSub(card.id, card.createdAt, "en") },
     title: LEVEL_LABELS[level],
     radio: { fr: radioLines(card, "fr"), en: radioLines(card, "en") },
   };

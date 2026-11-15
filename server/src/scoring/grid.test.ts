@@ -145,8 +145,8 @@ describe("les deux fondateurs (§7), à un point près", () => {
     );
     expect(crit(jLinkedin, "EMP").next?.fr).toBe("Pour 6 : tenir Azerit un an (7 mois aujourd'hui), ou un poste tenu deux ans.");
     expect(crit(jGithub, "STK").next?.fr).toBe("Pour 8 : 500 commits dans ton langage principal (tu en as 329).");
-    expect(crit(jGithub, "STK").evidence?.text.fr).toMatch(/^TypeScript : 329 commits dans 7 dépôts depuis novembre 2024, dernier push hier \(sequence-mail\)\. Agda aussi dans le code\.$/);
-    expect(crit(jGithub, "CODE").reached.fr).toBe("Niveau moyen lu 3,6 sur 5, sur 3 dépôts.");
+    expect(crit(jGithub, "STK").evidence?.text.fr).toMatch(/^TypeScript : 329 commits dans 7 repos depuis novembre 2024, dernier push hier \(sequence-mail\)\. Agda aussi dans le code\.$/);
+    expect(crit(jGithub, "CODE").reached.fr).toBe("Niveau moyen lu 3,6 sur 5, sur 3 repos.");
     expect(crit(jGithub, "CODE").evidence?.text.fr).toMatch(/^sequence-mail, `src\/services\/outreach\.test\.ts` : niveau 4 sur 5\./);
     expect(crit(jGithub, "CODE").evidence?.proof).toBe("https://github.com/jmougeot/sequence-mail/blob/main/src/services/outreach.test.ts");
     expect(crit(jGithub, "ACT").next?.fr).toBe("Pour 10 : 48 semaines actives (tu en as 43).");
@@ -205,7 +205,7 @@ describe("les recoupements LinkedIn × GitHub : la pièce « recoupé » (§3, �
     expect(xp.evidence!.publicText!.fr).not.toMatch(/GitHub/);
     const flag = "À confirmer en entretien : une partie de ces années ne se voit pas en code public. C'est courant, le code d'entreprise est privé.";
     expect(xp.flags.map((x) => x.fr)).toContain(flag);
-    expect(xp.flags.map((x) => x.en)).toContain("To confirm in interview: part of these years doesn't show in public code. That's common, company code is private.");
+    expect(xp.flags.map((x) => x.en)).toContain("To check in an interview: part of these years doesn't show in public code. That's common, company code is private.");
     const pub = publicGrid(withGh).criteria.find((c) => c.code === "XP")!;
     expect(pub.flags).toEqual([]);
     expect(JSON.stringify(pub)).not.toMatch(/À confirmer|To confirm/);
@@ -232,7 +232,7 @@ describe("les recoupements LinkedIn × GitHub : la pièce « recoupé » (§3, �
     const emp = crit(jCase(f), "EMP").evidence!;
     expect(emp.source).toBe("both");
     expect(emp.text.fr).toContain("GitHub : 2 PR fusionnées dans agda/agda-stdlib sur ces mois. Poste confirmé par le code.");
-    expect(emp.publicText!.fr).toBe("LinkedIn : stage ou alternance, février 2025 – novembre 2025. GitHub : 2 PR fusionnées dans un dépôt public sur ces mois. Poste confirmé par le code.");
+    expect(emp.publicText!.fr).toBe("LinkedIn : stage ou alternance, février 2025 – novembre 2025. GitHub : 2 PR fusionnées dans un repo public sur ces mois. Poste confirmé par le code.");
   });
 
   it("sans dépôt du poste : le même employeur sur le profil GitHub, pour le poste en cours", () => {
@@ -491,7 +491,7 @@ describe("les traces dans le code (§3.4)", () => {
     // Cinq technos de la table, dont quatre absentes du code, plus six hors table : seules les cinq comptent, et seules les absentes sont citées.
     const mixed = cvReading({ technos_listed: [...named, "Kubernetes", "Redis", "MongoDB", "Terraform", "TypeScript"], technos_described: [] });
     const flag = stackFlags(decl(mixed), gh(facts())).find((x) => /^À confirmer/.test(x.fr))!;
-    expect(flag.fr).toBe("À confirmer\u00a0: Kubernetes, Redis, MongoDB. Déclarées sur le CV, pas encore visibles dans 5 dépôts publics.");
+    expect(flag.fr).toBe("À confirmer\u00a0: Kubernetes, Redis, MongoDB. Déclarées sur le CV, pas encore visibles dans 5 repos publics.");
     expect(flag.en).toBe("To confirm: Kubernetes, Redis, MongoDB. Listed on the CV, not visible yet in 5 public repos.");
     for (const n of named) expect(flag.fr).not.toContain(n);
   });
@@ -507,7 +507,7 @@ describe("les traces dans le code (§3.4)", () => {
     // Sans seuil : une techno sur deux absente suffit, la retrouvée n'est pas citée
     const few = cvReading({ technos_listed: ["Kubernetes", "TypeScript"], technos_described: [] });
     expect(stackFlags(decl(few), gh(facts())).filter((x) => /^À confirmer/.test(x.fr)).map((x) => [x.fr, x.en])).toEqual([
-      ["À confirmer\u00a0: Kubernetes. Déclarées sur le CV, pas encore visibles dans 5 dépôts publics.", "To confirm: Kubernetes. Listed on the CV, not visible yet in 5 public repos."],
+      ["À confirmer\u00a0: Kubernetes. Déclarées sur le CV, pas encore visibles dans 5 repos publics.", "To confirm: Kubernetes. Listed on the CV, not visible yet in 5 public repos."],
     ]);
     // Aucun dépôt public : pas où chercher, rien à confirmer (pas de « 0 dépôt public »)
     expect(stackFlags(decl(few), gh(facts({ repos: [] }))).filter((x) => /^À confirmer/.test(x.fr))).toEqual([]);
@@ -521,7 +521,7 @@ describe("les traces dans le code (§3.4)", () => {
     const proven = githubGrid(gh(jacquesFacts(), JACQUES_AI));
     const file = caseGrid(declaredGrid(d, gh(jacquesFacts())), proven);
     const flag = crit(file, "STK").flags.find((x) => /^À confirmer/.test(x.fr))!;
-    expect(flag.fr).toMatch(/^À confirmer\u00a0: Kubernetes\. Déclarées sur LinkedIn, pas encore visibles dans \d+ dépôts? publics?\.$/);
+    expect(flag.fr).toMatch(/^À confirmer\u00a0: Kubernetes\. Déclarées sur LinkedIn, pas encore visibles dans \d+ repos? publics?\.$/);
     expect(flag.fr).not.toContain("TypeScript");
     expect(scores(file)).toEqual(scores(caseGrid(declaredGrid(d), proven)));
     expect(file.overall).toBe(caseGrid(declaredGrid(d), proven).overall);

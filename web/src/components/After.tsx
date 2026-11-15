@@ -12,7 +12,7 @@ import { api, hasGithub, images, isMine, isMock, tokens, weekOf } from "../lib/a
 import { navigate } from "../lib/router";
 import { getPlea } from "../lib/plea";
 import { setPrefill } from "../lib/session";
-import { shareLead, shareText, shareTextX, type ShareInput } from "../lib/shareText";
+import { flatteringRank, shareLead, shareText, shareTextX, type ShareInput } from "../lib/shareText";
 import { canShareFile, hasNativeShare, imageFile, inAppBrowser, markTextCopied, portraitFile, preloadImage, preloadPortrait, shareFile, shareSheet, useTextCopied } from "../lib/sharing";
 import { copyText, isTouch, shareUrl } from "../lib/util";
 import { IconClose, IconDownload, IconLink, IconLinkedIn, IconShare, IconX } from "./Icons";
@@ -100,11 +100,15 @@ function WeekLine({ week }: { week: WeekRank | null }) {
     : week.inTop5
       ? w.top5
       : w.line(week.rank, week.total, week.gapToTop5);
-  const [head, ...rest] = text.split(" · ");
+  // « 7e cette semaine, à 3 points du top 5 » : le rang en grand, l'écart dessous, sans la virgule.
+  // Une semaine close (« 8e, semaine 45 ») ou le top 5 restent d'un seul tenant.
+  const cut = week.closed || week.inTop5 ? -1 : text.indexOf(", ");
+  const head = cut < 0 ? text : text.slice(0, cut);
+  const next = cut < 0 ? "" : text.slice(cut + 2);
   return (
     <p className="week-rank" role="status">
       <span>{head}</span>
-      {rest.length > 0 && <span className="week-rank-next">{rest.join(" · ")}</span>}
+      {next && <span className="week-rank-next">{next}</span>}
     </p>
   );
 }
@@ -156,11 +160,11 @@ export function useSharing(item: Shareable, toast: (m: string) => void) {
   const id = idOf(item);
   const url = shareUrl(id);
   const week = weekOf(id);
-  // Le rang n'entre dans le texte que pendant sa semaine : « 7e cette semaine ».
-  const rank = week && !week.closed ? t.result.week.share(week.rank) : null;
+  // Le rang n'entre dans le texte que pendant sa semaine, et seulement s'il flatte (top 10) : « 7e cette semaine ».
+  const rank = week && !week.closed && flatteringRank(week.rank) ? t.result.week.share(week.rank) : null;
   const input = shareInput(item, lang, rank);
   const named = item.kind === "card" ? item.card : fileOf(item.comparison);
-  const filename = `testyourskills-${named.login ?? named.initials}.png`;
+  const filename = `azerit-${named.login ?? named.initials}.png`;
   // Sur téléphone, « Partager » ouvre la feuille du système. Sans elle (ordinateur, WebView Android), LinkedIn reste devant.
   const native = isTouch() && hasNativeShare();
 
@@ -180,7 +184,7 @@ export function useSharing(item: Shareable, toast: (m: string) => void) {
 
   /** Geste direct : rien n'attend avant `navigator.share`. L'image part si elle est déjà là. */
   const share = (from?: string) => {
-    void shareSheet({ title: "Testyourskills", text: shareLead(ts.words, input), url, file }).then((r) => {
+    void shareSheet({ title: "Azerit", text: shareLead(ts.words, input), url, file }).then((r) => {
       if (r === null) return;
       if (r === "copy_failed") return toast(url);
       if (r === "copy") toast(ts.copiedLink);
@@ -195,7 +199,12 @@ export function useSharing(item: Shareable, toast: (m: string) => void) {
    * presse-papier, dans le geste et avant que l'onglet s'ouvre (Safari refuse une copie tardive).
    */
   const onLinkedIn = (from?: string) => {
-    void copyText(shareText(ts.words, input, url)).then((ok) => ok && markTextCopied(id));
+    void copyText(shareText(ts.words, input, url)).then((ok) => {
+      if (!ok) return;
+      markTextCopied(id);
+      // La barre du pouce n'a pas la ligne d'aide : la confirmation y passe en message.
+      if (from === "dock") toast(ts.copiedShort);
+    });
     track("linkedin", from);
   };
 
@@ -213,14 +222,14 @@ export function aimAt(a: HTMLAnchorElement, target: string, rest: string) {
 }
 
 /**
- * LinkedIn : un vrai lien, qui s'ouvre même là où `window.open` est bloqué. Son libellé garde
- * « Texte copié » : on le lit au retour sur l'onglet, pas dans un message déjà parti.
+ * LinkedIn : un vrai lien, qui s'ouvre même là où `window.open` est bloqué. Son libellé ne change
+ * jamais (« Partager sur LinkedIn ») : la ligne d'aide sous le bouton dit où part le texte.
  *
  * Les bloqueurs de contenu masquent tout lien dont l'adresse est celle du partage LinkedIn
  * (listes « réseaux sociaux ») : le bouton principal disparaissait. Le lien porte donc l'adresse
  * de la fiche, et ne prend celle de LinkedIn que le temps du clic.
  */
-function LinkedInLink({ kit, className, from, short = false }: { kit: Sharing; className: string; from?: string; short?: boolean }) {
+function LinkedInLink({ kit, className, from }: { kit: Sharing; className: string; from?: string }) {
   const { t } = useT();
   const ts = t.result.share;
   return (
@@ -236,13 +245,13 @@ function LinkedInLink({ kit, className, from, short = false }: { kit: Sharing; c
       onAuxClick={(e) => aimAt(e.currentTarget, kit.liHref, kit.url)}
     >
       <IconLinkedIn />
-      <span aria-live="polite">{kit.textCopied ? (short ? ts.copiedShort : ts.linkedinCopied) : ts.linkedin}</span>
+      <span>{ts.linkedin}</span>
     </a>
   );
 }
 
 /** Le bouton principal : « Partager » sur téléphone, LinkedIn ailleurs. La barre du pouce a le même. */
-export function ShareMain({ kit, className = "", from, short }: { kit: Sharing; className?: string; from?: string; short?: boolean }) {
+export function ShareMain({ kit, className = "", from }: { kit: Sharing; className?: string; from?: string }) {
   const { t } = useT();
   if (kit.native)
     return (
@@ -251,7 +260,7 @@ export function ShareMain({ kit, className = "", from, short }: { kit: Sharing; 
         {t.result.share.native}
       </button>
     );
-  return <LinkedInLink kit={kit} className={`pill pill-big ${className}`} from={from} short={short} />;
+  return <LinkedInLink kit={kit} className={`pill pill-big ${className}`} from={from} />;
 }
 
 export function ShareBar({ item, toast }: { item: Shareable; toast: (m: string) => void }) {
@@ -275,6 +284,10 @@ export function ShareBar({ item, toast }: { item: Shareable; toast: (m: string) 
       <ShareMain kit={kit} className="out-main" />
       {/* Trois boutons secondaires au plus. Sur téléphone, X passe par la feuille de partage. */}
       {kit.native && <LinkedInLink kit={kit} className="pill pill-ghost out-second" />}
+      {/* En permanence, sous le bouton LinkedIn : où part le texte, avant comme après l'appui. */}
+      <p className={`out-hint${kit.textCopied ? " is-copied" : ""}`} aria-live="polite">
+        {ts.linkedinCopied}
+      </p>
       <div className="out-more">
         {!kit.native && (
           <button
@@ -558,7 +571,7 @@ export function Contest({ card }: { card: CardData }) {
         <div className="var-panel" key={round} role="status">
           <p className="surtitre">{c.title}</p>
           <p className="var-text">{c.replies[reply]}</p>
-          {lowest && <p className="var-hint">{c.lowest(lowest.code, lowest.value)}</p>}
+          {lowest && <p className="var-hint">{c.lowest(t.stats[lowest.code].name, lowest.value)}</p>}
         </div>
       )}
       <button type="button" className="pill pill-ghost" onClick={ask}>

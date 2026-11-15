@@ -24,7 +24,10 @@ describe("six étoiles", () => {
   it("six libellés épicènes, en français et en anglais", () => {
     expect(Object.keys(LEVEL_LABELS)).toHaveLength(6);
     expect(LEVEL_LABELS[1]).toEqual({ fr: "Petit délit", en: "Petty crime" });
-    expect(LEVEL_LABELS[3]).toEqual({ fr: "Avis de recherche", en: "Wanted" });
+    // Le niveau 3 ne porte plus le nom de la fiche (« Avis de recherche », le titre de chaque affiche).
+    expect(LEVEL_LABELS[3]).toEqual({ fr: "Mandat d'arrêt", en: "Warrant out" });
+    expect(LEVEL_LABELS[4]).toEqual({ fr: "Haute surveillance", en: "Under surveillance" });
+    expect(Object.values(LEVEL_LABELS).map((l) => l.fr)).not.toContain("Avis de recherche");
     expect(LEVEL_LABELS[6]).toEqual({ fr: "Priorité absolue", en: "Top priority" });
   });
 

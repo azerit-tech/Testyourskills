@@ -24,14 +24,14 @@ const captionLinks = (html: string) => [...(/<figcaption>(.*)<\/figcaption>/s.ex
 afterEach(() => vi.unstubAllGlobals());
 
 describe("la fiche de Jacques sous le titre", () => {
-  it("jugée avec son LinkedIn : une note, celle de la fiche, et ses pièces sous la légende, vers le dossier (§18.36)", () => {
+  it("jugée avec son LinkedIn : une note, celle de la fiche, et ses sources sous la légende, vers le dossier (§18.36)", () => {
     const html = render(createElement(ExampleCard, COMPARED));
     const links = captionLinks(html);
     expect(links).toHaveLength(2);
     for (const l of links) expect(l.attrs).toContain('href="/c/Cmp1234567"');
     const pieces = links[1]!;
     expect(pieces.attrs).toContain('class="showcase-scores"');
-    expect(pieces.inner).toBe("Pièces au dossier\u00a0: LinkedIn · GitHub");
+    expect(pieces.inner).toBe("Sources au dossier\u00a0: LinkedIn et GitHub");
     // Plus de deuxième note sous la fiche.
     const caption = /<figcaption>(.*)<\/figcaption>/s.exec(html)![1]!;
     expect(caption).not.toContain("<b");
@@ -40,7 +40,7 @@ describe("la fiche de Jacques sous le titre", () => {
 
   it("en anglais", () => {
     const links = captionLinks(render(createElement(ExampleCard, COMPARED), "en-US"));
-    expect(links[1]!.inner).toBe("Exhibits on file: LinkedIn · GitHub");
+    expect(links[1]!.inner).toBe("Sources on file: LinkedIn and GitHub");
   });
 
   it("fiche GitHub seule, ou maquette : la légende seule", () => {

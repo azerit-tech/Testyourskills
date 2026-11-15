@@ -154,7 +154,7 @@
 /* ------------------------------------------------------------------ */
 /* Les étoiles s'allument à l'arrivée, option starsIntro de CardView :  */
 /* une à une, 120 ms d'écart, de la première allumée (data-star 0, la   */
-/* plus à droite) à la dernière. Rien en mouvement réduit.              */
+/* plus à gauche) à la dernière. Rien en mouvement réduit.              */
 /* ------------------------------------------------------------------ */
 
 .tys-card.is-stars-intro .tys-card__svg:not([data-side="back"]) .tys-star-on {
@@ -235,48 +235,37 @@
   }
 }
 
-/* Le bouton rond du coin bas droit : cible de 44 px, pastille mate de 30 px */
+/* Le lien qui retourne la fiche : sous elle, à droite, hors de son cadre (la
+   fiche reste nue, comme l'image partagée). Zone de 44 px ; le parent garde
+   cette hauteur libre sous la fiche. */
 .tys-card__flip {
   position: absolute;
-  right: 2px;
-  bottom: 2px;
+  top: 100%;
+  /* le texte s'aligne sur le bord droit de la fiche ; la zone déborde de 8 px pour loger l'anneau de focus */
+  right: -8px;
   z-index: 2;
-  width: 44px;
+  min-width: 44px;
   height: 44px;
-  padding: 0;
+  padding: 0 10px;
   border: 0;
-  border-radius: 50%;
   background: none;
-  color: #fff9cb;
+  font: 500 14px/1 var(--f-text, "Outfit", system-ui, sans-serif);
+  color: var(--lilac-2, #ccc2f5);
+  white-space: nowrap;
   cursor: pointer;
-  display: grid;
-  place-items: center;
   -webkit-tap-highlight-color: transparent;
 }
-.tys-card__flip::before {
-  content: "";
-  position: absolute;
-  inset: 7px;
-  border-radius: 50%;
-  background: rgba(12, 13, 27, 0.72);
-  box-shadow: inset 0 0 0 1px rgba(255, 249, 203, 0.26);
-  transition: background-color 0.15s ease;
+.tys-card__flip-label {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
 }
-.tys-card__flip:hover::before,
-.tys-card__flip[aria-pressed="true"]::before {
-  background: rgba(12, 13, 27, 0.9);
+.tys-card__flip:hover,
+.tys-card__flip:active {
+  color: var(--cream, #fff9cb);
 }
 .tys-card__flip:focus-visible {
-  outline: 2px solid #ffb2c6;
-  outline-offset: -4px;
-}
-.tys-card__flip svg {
-  position: relative;
-  width: 16px;
-  height: 16px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+  outline: 2px solid var(--cream, #fff9cb);
+  outline-offset: -8px;
+  border-radius: 12px;
 }

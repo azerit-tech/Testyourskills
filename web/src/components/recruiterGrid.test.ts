@@ -199,7 +199,7 @@ describe("« recoupé » : de la sortie du moteur à l'étiquette affichée", ()
 
   it("la page partagée montre le recoupement sans nommer le poste", () => {
     const emp = textOf(rowsOf(render(item, true)).get("Parcours et employeurs")!);
-    expect(emp).toContain("LinkedIn : stage ou alternance, février 2025 – novembre 2025. GitHub : un dépôt public de 25 commits, actif sur les mêmes mois. Poste confirmé par le code.");
+    expect(emp).toContain("LinkedIn : stage ou alternance, février 2025 – novembre 2025. GitHub : un repo public de 25 commits, actif sur les mêmes mois. Poste confirmé par le code.");
     expect(emp).not.toMatch(/McMaster|Research Intern|agda-notes/);
     const own = textOf(rowsOf(render(item, false)).get("Parcours et employeurs")!);
     expect(own).toContain("Research Intern, McMaster University");
@@ -229,12 +229,12 @@ describe("face à un GitHub vide : le code n'est pas prouvé, rien ne se compare
   it("la dernière ligne de la note du dossier : code non prouvé, et ce qui changerait la note", () => {
     const html = render(item, false);
     expect(lastRule(html)).toBe(
-      "Code non prouvé : ton GitHub public ne montre encore rien de jugeable. La note du dossier se fait sur ton LinkedIn, sans dépasser 85. Ce qui la changerait : un vrai projet public sur GitHub, qui ouvre niveau du code, stack technique, activité et open source.",
+      "Code non prouvé\u00a0: ton GitHub public ne montre encore rien de jugeable. La note du dossier se fait sur ton LinkedIn, sans dépasser 85. Ce qui la changerait\u00a0: un vrai projet public sur GitHub, qui ouvre niveau du code, stack technique, activité et open source.",
     );
     expect(lastFinalLine(html)).toMatch(/^<p class="rg-rule is-unproven">Code non prouvé/);
     // Une seule règle : pas le plafond générique en plus.
     expect(count(html, 'class="rg-rule')).toBe(1);
-    expect(lastRule(render(item, true))).toMatch(/^Code non prouvé : son GitHub public .* La note du dossier se fait sur son LinkedIn/);
+    expect(lastRule(render(item, true))).toMatch(/^Code non prouvé\u00a0: son GitHub public .* La note du dossier se fait sur son LinkedIn/);
     expect(lastRule(render(item, false, "en-US"))).toMatch(/^Code not proven: your public GitHub shows nothing to judge yet\. .* which opens code level, tech stack, activity and open source\.$/);
     expect(lastRule(render(item, true, "en-US"))).toMatch(/^Code not proven: their public GitHub/);
   });

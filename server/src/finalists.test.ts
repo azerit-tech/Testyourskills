@@ -61,6 +61,6 @@ describe("les finalistes d'une prime", () => {
     const csv = finalistsCsv(r).split("\n");
     expect(csv[0]).toBe("rang,login,email,note,fiche,preuves");
     expect(csv[1]).toBe("1,dev-demo-2,dev-demo-2@exemple.dev,42,https://skills.test/c/Fin0000002,https://exemple.dev/projet");
-    expect(finalistsText(r)).toContain("Prime close : classement figé.");
+    expect(finalistsText(r)).toContain("Prime terminée : classement figé.");
   });
 });

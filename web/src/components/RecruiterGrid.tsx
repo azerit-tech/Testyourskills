@@ -69,7 +69,7 @@ function Row({ c, grid, declared, shared, isCase }: RowProps) {
           <span className="rg-name">{name}</span>
           <span className="rg-score" aria-hidden>
             {c.score ?? none}
-            <small>/10</small>
+            {c.score !== null && <small>/10</small>}
           </span>
           <Gauge c={c} g={g} />
           <span className="rg-meta">
@@ -96,7 +96,7 @@ function Row({ c, grid, declared, shared, isCase }: RowProps) {
           <a className={`rg-src${cross ? " is-both" : ""}`} href={text.href} target="_blank" rel="noopener noreferrer">
             {text.label}
             <span aria-hidden> ↗</span>
-            <span className="sr-only"> · {g.proof}</span>
+            <span className="sr-only">, {g.proof}</span>
           </a>
         ) : (
           <span className={`rg-src${cross ? " is-both" : ""}`}>{text.label}</span>

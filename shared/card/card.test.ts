@@ -8,7 +8,7 @@ import profilesJson from "../../data/profiles.json";
 import { FIXTURES } from "../fixtures";
 import type { CardData, Lang } from "../types";
 import { LEVEL_LABELS, starsFor } from "../types";
-import { CardGraphic, LAYOUT, profileTagline } from "./Card";
+import { CardGraphic, LAYOUT, STARS, profileTagline } from "./Card";
 import { measure, upper } from "./text";
 import { THEMES } from "./themes";
 
@@ -110,9 +110,66 @@ describe("cotes de la fiche", () => {
     expect(L.profileName.y + 4).toBeLessThan(L.tagline.y - L.tagline.size * 0.75);
     expect(taglineBottom).toBeLessThan(L.divider);
     expect(L.divider).toBeLessThan(L.facts.labelY - L.facts.labelSize);
-    expect(L.facts.valueY + 4).toBeLessThan(L.stats.y + 5);
+    expect(L.facts.valueY + 4).toBeLessThan(L.traits.labelY - L.traits.labelSize);
+    expect(L.traits.labelY).toBeLessThan(L.stats.y + 5);
     expect(L.stats.y + 2 * L.stats.rowH + 16).toBeLessThan(L.charges.labelY - L.charges.labelSize);
     expect(L.charges.y + 2 * L.charges.lineH + 4).toBeLessThan(L.footer.y - L.footer.size);
     expect(L.footer.y).toBeLessThan(520 - 6);
+  });
+});
+
+describe("les étoiles, signe majeur de la fiche (§18.48)", () => {
+  /** Les étoiles de la rangée sous la note : leur abscisse, et si elles sont allumées. */
+  const row = (svg: string) => {
+    const g = /<g data-star-row="">(.*?)<\/g><\/g>(?!<g><path)/s.exec(svg)![1];
+    return [...g.matchAll(/<g><path[^>]*translate\(([\d.]+) [^>]*fill="none" stroke="#fff" stroke-opacity="0\.35" stroke-width="[\d.]+"[^>]*><\/path>(<g class="tys-star-on" data-star="(\d)"><path[^>]*fill="(#[0-9a-f]+)")?/g)].map((m) => ({ x: Number(m[1]), on: !!m[2], rank: m[3], fill: m[4] }));
+  };
+
+  it("six emplacements de 22 px sous la note, remplis de gauche à droite", () => {
+    expect(STARS.size).toBe(22);
+    for (const overall of [20, 35, 50, 67, 80, 95]) {
+      for (const lang of LANGS) {
+        const n = starsFor(overall);
+        const stars = row(render({ ...FIXTURES.silver, overall }, lang));
+        expect(stars).toHaveLength(6);
+        for (let i = 1; i < 6; i++) expect(stars[i].x).toBeGreaterThan(stars[i - 1].x);
+        // Les n premières, à gauche, sont allumées ; les autres restent en contour.
+        expect(stars.map((s) => s.on)).toEqual([0, 1, 2, 3, 4, 5].map((i) => i < n));
+        expect(stars.filter((s) => s.on).map((s) => Number(s.rank))).toEqual(Array.from({ length: n }, (_, i) => i));
+      }
+    }
+  });
+
+  it("allumée : crème pleine ; éteinte : contour de 1,5 px, blanc à 35 %, sans remplissage", () => {
+    const stars = row(render({ ...FIXTURES.silver, overall: 50 }, "fr"));
+    for (const s of stars.filter((x) => x.on)) expect(s.fill).toBe("#fff9cb");
+    const svg = render({ ...FIXTURES.silver, overall: 50 }, "fr");
+    const off = /transform="translate\([\d. ]+\) scale\(([\d.]+)\)" fill="none" stroke="#fff" stroke-opacity="0\.35" stroke-width="([\d.]+)"/.exec(svg)!;
+    // Le trait fait 1,5 unité de fiche une fois l'étoile mise à l'échelle.
+    expect(Number(off[1]) * Number(off[2])).toBeCloseTo(1.5, 1);
+  });
+
+  it("la rangée tient à gauche de la photo, sous la note, au-dessus du nom du niveau", () => {
+    const width = 6 * STARS.size + 5 * STARS.gap;
+    expect(20 + width).toBeLessThanOrEqual(178 - 8);
+    for (const lang of LANGS) {
+      for (const overall of [20, 35, 50, 67, 80, 95]) {
+        const svg = render({ ...FIXTURES.silver, overall }, lang);
+        const label = upper(LEVEL_LABELS[starsFor(overall)][lang], lang).replace(/'/g, "&#x27;");
+        expect(svg).toContain(`>${label}<`);
+      }
+    }
+  });
+
+  it("le recto dit que la note ne vient pas des six traits, quand la fiche a sa grille", () => {
+    const grid = { overall: 79, criteria: [] };
+    expect(render({ ...FIXTURES.gold, grid }, "fr")).toContain("PORTRAIT EN SIX TRAITS · LA NOTE : HUIT CRITÈRES");
+    expect(render({ ...FIXTURES.gold, grid }, "en")).toContain("A PORTRAIT IN SIX TRAITS · THE RATING: EIGHT CRITERIA");
+    expect(render({ ...FIXTURES.gold, grid: undefined }, "fr")).toContain(">PORTRAIT EN SIX TRAITS<");
+  });
+
+  it("la part prouvée s'écrit « prouvé à n % » / « n% proven »", () => {
+    expect(render(FIXTURES.gold, "fr")).toContain(`prouvé à ${FIXTURES.gold.reliability} %`);
+    expect(render(FIXTURES.gold, "en")).toContain(`${FIXTURES.gold.reliability}% proven`);
   });
 });

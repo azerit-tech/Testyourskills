@@ -9,7 +9,7 @@ import { FIXTURES } from "../../shared/fixtures";
 import type { CardData } from "../../shared/types";
 import { createApp } from "./app";
 import { joinBand } from "./bands";
-import { bandMeta, bandImageKey } from "./bandPages";
+import { bandMeta, bandImageKey, boardMeta } from "./bandPages";
 import { Store } from "./db";
 import type { Deps, RenderInput } from "./pipeline";
 import { renderSvg } from "./render/index";
@@ -62,17 +62,30 @@ const standing = (o: Partial<BandStanding>): BandStanding => ({
 });
 
 describe("balises d'une bande", () => {
-  it("le nom, le rang, le score ; l'image porte la clé de ce qu'elle dit", () => {
+  it("le nom et le rang dans le titre, les fiches et les étoiles dans la description ; l'image porte la clé de ce qu'elle dit", () => {
     const m = bandMeta(standing({}), BASE);
-    expect(m.title).toBe("CentraleSupélec : 3e des écoles, ★ 74");
-    expect(m.description).toBe("31 dossiers. Viens gonfler la bande : fais ta fiche pour CentraleSupélec.");
+    expect(m.title).toBe("CentraleSupélec, 3e des écoles · Azerit");
+    expect(m.description).toBe("31 fiches, 74 étoiles. Viens grossir les rangs\u00a0: fais ta fiche pour CentraleSupélec.");
     expect(m.url).toBe(`${BASE}/bandes/ecole/centralesupelec`);
     expect(m.image).toMatch(new RegExp(`^${BASE}/og/b/ecole/centralesupelec\\.png\\?v=\\d+&k=[0-9a-f]{10}$`));
-    expect(bandMeta(standing({ rank: 1, ahead: null, gap: null }), BASE).title).toBe("CentraleSupélec : n° 1 des écoles, ★ 74");
+    expect(bandMeta(standing({ rank: 1, ahead: null, gap: null }), BASE).title).toBe("CentraleSupélec, n°\u00a01 des écoles · Azerit");
     const forming = bandMeta(standing({ rank: null, missing: 2, members: 1, score: 5, gap: null, ahead: null }), BASE);
-    expect(forming.title).toBe("CentraleSupélec : bande en formation, ★ 5");
-    expect(forming.description).toBe("Bande en formation : il manque 2 complices. Fais ta fiche pour CentraleSupélec.");
+    expect(forming.title).toBe("CentraleSupélec, bande en formation · Azerit");
+    expect(forming.description).toBe("Bande en formation\u00a0: il manque 2 complices. Fais ta fiche pour CentraleSupélec.");
     expect(bandImageKey(standing({ score: 75 }))).not.toBe(bandImageKey(standing({})));
+  });
+
+  it("en anglais : « crew », « sheets », jamais « gang » ni « file »", () => {
+    const m = bandMeta(standing({}), BASE, "en");
+    expect(m.lang).toBe("en");
+    expect(m.title).toBe("CentraleSupélec, #3 among schools · Azerit");
+    expect(m.description).toBe("31 sheets, 74 stars. Come add your stars: get your rap sheet for CentraleSupélec.");
+    const forming = bandMeta(standing({ rank: null, missing: 1, members: 2, score: 5, gap: null, ahead: null }), BASE, "en");
+    expect(forming.title).toBe("CentraleSupélec, crew forming · Azerit");
+    expect(forming.description).toBe("Crew forming: 1 more accomplice needed. Get your rap sheet for CentraleSupélec.");
+    for (const x of [m, forming, boardMeta(BASE, "en")]) expect(`${x.title} ${x.description} ${x.imageAlt}`).not.toMatch(/gang|\bfiles?\b|Testyourskills/i);
+    expect(boardMeta(BASE, "en").title).toBe("Crews: schools and companies · Azerit");
+    expect(boardMeta(BASE, "fr").title).toBe("Les bandes\u00a0: écoles et boîtes · Azerit");
   });
 
   it("la ligne du rang", () => {
@@ -87,7 +100,13 @@ describe("balises d'une bande", () => {
     const ctx = setup();
     for (let i = 0; i < 3; i++) member(ctx.store, "epitech");
     const html = await (await ctx.app.request("/bandes/ecole/epitech")).text();
-    expect(html).toContain(`<meta property="og:title" content="Epitech : n° 1 des écoles, ★ 12">`);
+    expect(html).toContain(`<meta property="og:title" content="Epitech, n°\u00a01 des écoles · Azerit">`);
+    // La langue des balises : `?lang=` d'abord, puis celle du navigateur ; la réponse le dit aux caches.
+    const en = await ctx.app.request("/bandes/ecole/epitech?lang=en");
+    expect(en.headers.get("Vary")).toMatch(/Accept-Language/);
+    expect(await en.text()).toContain(`<meta property="og:title" content="Epitech, #1 among schools · Azerit">`);
+    const byHeader = await ctx.app.request("/bandes/ecole/epitech", { headers: { "Accept-Language": "en-US,en;q=0.9" } });
+    expect(await byHeader.text()).toContain("#1 among schools");
     expect(html).toContain('<div id="root">');
     const image = /og:image" content="([^"]+)"/.exec(html)![1]!;
     member(ctx.store, "epitech");

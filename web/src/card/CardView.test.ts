@@ -9,13 +9,13 @@ import { CardView, CardViewOptions } from "./CardView";
 const card = { ...FIXTURES.silver, avatarUrl: undefined };
 
 describe("les étoiles s'allument à l'arrivée", () => {
-  it("désactivé par défaut ; activé, chaque étoile allumée porte son rang, de la plus à droite à la dernière", () => {
+  it("désactivé par défaut ; activé, chaque étoile allumée porte son rang, de la plus à gauche à la dernière", () => {
     expect(renderToStaticMarkup(createElement(CardView, { card }))).not.toContain("is-stars-intro");
     const html = renderToStaticMarkup(createElement(CardView, { card, starsIntro: true }));
     expect(html).toContain("is-stars-intro");
-    // silver : 67, quatre étoiles allumées, rangs 0 à 3 de droite à gauche
+    // silver : 67, quatre étoiles allumées, rangs 0 à 3 de gauche à droite
     const ranks = [...html.matchAll(/class="tys-star-on" data-star="(\d)"/g)].map((m) => Number(m[1]));
-    expect(ranks).toEqual([3, 2, 1, 0]);
+    expect(ranks).toEqual([0, 1, 2, 3]);
   });
 });
 
@@ -26,14 +26,21 @@ describe("la fiche se retourne", () => {
     expect(html).not.toContain('data-side="back"');
   });
 
-  it("activé : le dos est là, caché, et le bouton rond se lit en FR et en EN", () => {
+  it("activé : le dos est là, caché, et un lien texte sous la fiche la retourne, en FR et en EN", () => {
     const fr = renderToStaticMarkup(createElement(CardView, { card, lang: "fr", flippable: true }));
     expect(fr).toContain('data-side="back"');
-    expect(fr).toContain('aria-label="Retourner la fiche"');
-    expect(fr).toContain('aria-pressed="false"');
     expect(fr).toMatch(/class="tys-card__face tys-card__back" aria-hidden="true"/);
+    // Un vrai bouton (clavier, lecteur d'écran), qui dit où il mène ; la flèche n'est pas lue.
+    expect(fr).toMatch(/<button type="button" class="tys-card__flip" data-to="back"><span class="tys-card__flip-label">Pièces à conviction<\/span><span aria-hidden="true"> ↻<\/span><\/button>/);
     const en = renderToStaticMarkup(createElement(CardView, { card, lang: "en", flippable: true }));
-    expect(en).toContain('aria-label="Flip the card"');
+    expect(en).toContain('<span class="tys-card__flip-label">Exhibits</span>');
+  });
+
+  it("la fiche reste nue : le lien est hors du cadre qui s'incline, sans pictogramme posé sur elle", () => {
+    const html = renderToStaticMarkup(createElement(CardView, { card, lang: "fr", flippable: true }));
+    const rotator = html.slice(html.indexOf('class="tys-card__rotator"'), html.indexOf('<button type="button" class="tys-card__flip"'));
+    expect(rotator).not.toContain("<button");
+    expect(html.slice(html.indexOf('<button type="button" class="tys-card__flip"'))).not.toContain("<svg");
   });
 
   it("se branche par le contexte, et seulement sur une fiche interactive", () => {

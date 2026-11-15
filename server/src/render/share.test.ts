@@ -65,7 +65,8 @@ describe("lieux du crime des images de partage", () => {
         else expect(s).toMatch(/fill="none" stroke="#ffffff" stroke-opacity="0.35"/);
       });
       expect(row).toContain("scale(1.8333)"); // 44 px dans une boîte de 24
-      expect(svg).toContain(`>${LEVEL_LABELS[n].fr.toLocaleUpperCase("fr-FR")}</text>`);
+      // le rendu échappe l'apostrophe (« Mandat d'arrêt »)
+      expect(svg).toContain(`>${LEVEL_LABELS[n].fr.toLocaleUpperCase("fr-FR").replace(/'/g, "&#x27;")}</text>`);
     }
   });
 

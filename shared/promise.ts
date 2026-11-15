@@ -7,11 +7,10 @@
 //
 // Deux phrases, chacune en deux lignes : la coupure de la ligne est la seule
 // permise dans le héros (insécables ailleurs), et l'image en garde les quatre lignes.
-// Variante en attente de Jacques (rapport « jugé comme par un recruteur ») :
-//   fr : [["Ton LinkedIn,", "ton code."], ["Lus comme par", "un recruteur."]]
-//   en : [["Your LinkedIn,", "your code."], ["Read the way", "a recruiter would."]]
+// Le premier écran dit ce qu'on obtient (§18.48) : une fiche de dev, des étoiles.
 
 import type { Lang } from "./types";
+import { frTypo } from "./typo";
 
 export interface HomePromise {
   /** La première phrase, en deux lignes (crème dans le héros et l'image). */
@@ -24,28 +23,35 @@ export interface HomePromise {
 
 export const HOME_PROMISE: Record<Lang, HomePromise> = {
   fr: {
-    claim: ["Azerit ouvre", "ton dossier."],
-    proof: ["Tu plaides", "quoi ?"],
-    description: "Huit critères de recrutement, chacun sur 10, chacun avec sa preuve. Ta fiche en une minute. Par Azerit.",
+    claim: ["Ta fiche", "de dev."],
+    proof: ["Combien", "d'étoiles ?"],
+    description: "Ta fiche de dev façon avis de recherche, notée de une à six étoiles. LinkedIn ou GitHub, une minute. Par Azerit.",
   },
   en: {
-    claim: ["Azerit opens", "your file."],
-    proof: ["How do", "you plead?"],
-    description: "Eight hiring criteria, each out of 10, each with its proof. Your sheet in a minute. By Azerit.",
+    claim: ["Your dev", "rap sheet."],
+    proof: ["How many", "stars?"],
+    description: "Your dev rap sheet, wanted-poster style, rated one to six stars. LinkedIn or GitHub, one minute. By Azerit.",
   },
 };
 
-/** Une phrase en texte courant : « Azerit ouvre ton dossier. » */
+/** Une phrase en texte courant : « Ta fiche de dev. » */
 export const promiseSentence = (lines: readonly string[]): string => lines.join(" ");
 
-/** Le titre entier : « Azerit ouvre ton dossier. Tu plaides quoi ? » */
+/** Le titre entier : « Ta fiche de dev. Combien d'étoiles ? » (insécable devant le « ? »). */
 export function promiseTitle(lang: Lang): string {
   const p = HOME_PROMISE[lang];
-  return `${promiseSentence(p.claim)} ${promiseSentence(p.proof)}`;
+  const title = `${promiseSentence(p.claim)} ${promiseSentence(p.proof)}`;
+  return lang === "fr" ? frTypo(title) : title;
 }
 
-/** Le titre de l'onglet et des balises : « Testyourskills · Azerit ouvre ton dossier. Tu plaides quoi ? » */
-export const homeTitle = (lang: Lang): string => `Testyourskills · ${promiseTitle(lang)}`;
+/** Le seul nom visible du produit (§18.48). */
+export const SITE_NAME = "Azerit";
+
+/** Le titre de l'onglet et des balises : « Azerit · Ta fiche de dev. Combien d'étoiles ? » */
+export const homeTitle = (lang: Lang): string => `${SITE_NAME} · ${promiseTitle(lang)}`;
+
+/** Le titre d'une page sans fiche : « Les bandes · Azerit ». */
+export const pageTitle = (subject: string): string => `${subject} · ${SITE_NAME}`;
 
 /** Pour le héros : insécables dans chaque ligne, une seule coupure possible par phrase, entre ses deux lignes. */
 export const heroSentence = (lines: readonly string[]): string => lines.map((l) => l.replace(/ /g, " ")).join(" ");

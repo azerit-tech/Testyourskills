@@ -45,7 +45,7 @@ export function PrimeCard({ p }: { p: PrimeView }) {
       </span>
       <span className="prime-card-meta">
         {t.primes.interviews(p.interviews)}
-        {where ? `, ${where}` : ""}
+        {where ? `, ${where.charAt(0).toLowerCase()}${where.slice(1)}` : ""}
       </span>
     </a>
   );

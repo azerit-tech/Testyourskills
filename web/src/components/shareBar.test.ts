@@ -61,30 +61,34 @@ describe("bloc de partage selon l'appareil (§18.27)", () => {
     expect(main(html)).toContain('target="_blank"');
     expect(main(html)).toContain('rel="noopener"');
     expect(ghosts(html)).toHaveLength(3);
-    expect(html).toMatch(/>X<\/button>.*Copier le lien.*<a[^>]*download="testyourskills-[^"]+\.png"/);
+    expect(html).toMatch(/>X<\/button>.*Copier le lien.*<a[^>]*download="azerit-[^"]+\.png"/);
+    // Le fichier porte le seul nom visible du produit.
+    expect(html).not.toMatch(/testyourskills/i);
     // Le dessin en cours dans l'adresse : le cache d'un an ne ressert pas l'ancienne image.
     expect(html).toContain('href="/og/AbCdEf1234-portrait.png?v=7"');
   });
 
-  it("« Format story » : un lien d'appoint après l'image, téléchargé comme elle", () => {
+  it("« Image pour story » : un lien d'appoint après l'image, téléchargé comme elle", () => {
     const html = render({ ua: DESKTOP, touch: false, share: false });
-    expect(html).toMatch(/Télécharger l&#x27;image<\/a><\/div><a class="link-quiet out-story" href="\/og\/AbCdEf1234-story\.png\?v=7" download="testyourskills-[^"]+-story\.png">Format story<\/a>/);
+    expect(html).toMatch(/Télécharger l&#x27;image<\/a><\/div><a class="link-quiet out-story" href="\/og\/AbCdEf1234-story\.png\?v=7" download="azerit-[^"]+-story\.png">Image pour story<\/a>/);
     // Discret : pas une quatrième pilule.
     expect(ghosts(html)).toHaveLength(3);
   });
 
-  it("« Format story » sur téléphone et dans un navigateur intégré, comme l'image", () => {
+  it("« Image pour story » sur téléphone et dans un navigateur intégré, comme l'image", () => {
     const phone = render({ ua: IPHONE, touch: true, share: true });
-    expect(phone).toContain(">Format story</a>");
+    expect(phone).toContain(">Image pour story</a>");
     const inApp = render({ ua: LINKEDIN_ANDROID, touch: true, share: false });
-    expect(inApp).toMatch(/<button type="button" class="link-quiet out-story" aria-haspopup="dialog">Format story<\/button>/);
+    expect(inApp).toMatch(/<button type="button" class="link-quiet out-story" aria-haspopup="dialog">Image pour story<\/button>/);
   });
 
-  it("en anglais : « Story format »", () => {
+  it("en anglais : « Story image », « Share on LinkedIn »", () => {
     const item = stub({ ua: DESKTOP, touch: false, share: false }, "AbCdEf1234");
     vi.stubGlobal("navigator", { userAgent: DESKTOP, language: "en-US" });
     const html = renderToStaticMarkup(createElement(LangProvider, null, createElement(ShareBar, { item, toast: () => undefined })));
-    expect(html).toContain(">Story format</a>");
+    expect(html).toContain(">Story image</a>");
+    expect(main(html)).toContain("Share on LinkedIn");
+    expect(html).toContain("Your text goes to the clipboard: paste it into your LinkedIn post.");
   });
 
   it("téléphone : « Partager » devant, LinkedIn, le lien et l'image derrière, sans X", () => {
@@ -105,11 +109,21 @@ describe("bloc de partage selon l'appareil (§18.27)", () => {
     expect(html).toMatch(/<button[^>]*aria-haspopup="dialog"[^>]*>.*Télécharger l&#x27;image/);
   });
 
-  it("après la copie, le bouton LinkedIn garde « Texte copié »", () => {
+  it("le bouton dit « Partager sur LinkedIn » avant comme après l'appui ; la ligne d'aide dit où part le texte, en permanence", () => {
+    const hint = 'aria-live="polite">Ton texte part dans le presse-papiers\u00a0: colle-le dans ton post LinkedIn.</p>';
+    const before = render({ ua: DESKTOP, touch: false, share: false });
+    expect(main(before)).toContain("<span>Partager sur LinkedIn</span>");
+    expect(main(before)).not.toContain("is-copied");
+    expect(before).toContain(`<p class="out-hint" ${hint}`);
     markTextCopied("CopiedCard1");
     const html = render({ ua: DESKTOP, touch: false, share: false }, "CopiedCard1");
     expect(main(html)).toContain("is-copied");
-    expect(main(html)).toContain("Texte copié · colle-le dans ton post");
+    expect(main(html)).toContain("<span>Partager sur LinkedIn</span>");
+    expect(main(html)).not.toMatch(/Texte copié|·/);
+    expect(html).toContain(`<p class="out-hint is-copied" ${hint}`);
+    // Sur téléphone, LinkedIn passe en second : même libellé entier, même ligne dessous.
+    const phone = render({ ua: IPHONE, touch: true, share: true });
+    expect(phone).toMatch(/class="pill pill-ghost out-second[^"]*"[^>]*>.*?<span>Partager sur LinkedIn<\/span><\/a><p class="out-hint/);
   });
 });
 

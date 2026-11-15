@@ -4,6 +4,9 @@ import { createContext, createElement, useCallback, useContext, useEffect, useMe
 import type { ReactNode } from "react";
 import type { CriterionCode, Lang, Position, StatCode } from "../../shared/types";
 import { showsTotal } from "../../shared/week";
+import { starsLine } from "../../shared/stars";
+import { starsFor } from "../../shared/types";
+import { frTypoDeep } from "../../shared/typo";
 import { HOME_PROMISE, heroSentence, homeTitle } from "../../shared/promise";
 import { BANDS_TEXT } from "./bandsText";
 import { PRIMES_TEXT } from "./primesText";
@@ -11,13 +14,17 @@ import { PRIMES_TEXT } from "./primesText";
 /** L'adresse de contact de la page Confidentialité, aussi le repli d'une demande de retrait. */
 export const CONTACT_EMAIL = "hello@azerit.tech";
 
-const fr = {
+/* Le français passe par frTypoDeep (shared/typo.ts) : les espaces devant « : ; ! ? », dans les guillemets et entre un nombre et son unité sortent insécables. */
+const fr = frTypoDeep({
   meta: {
     /** Le titre de l'accueil vient de shared/promise.ts, sa seule source. */
     title: homeTitle("fr"),
-    titleCard: (name: string, overall: number) => `${name} · ${overall} · Testyourskills`,
+    /** « Léa Martin-Dubois ★★★★★☆ · Azerit » : la note se lit à ses étoiles, le seul nom visible est Azerit (§18.48). */
+    titleCard: (name: string, overall: number) => `${name} ${starsLine(starsFor(overall))} · Azerit`,
     /** Dossier scellé (shared/publicView.ts) : le titre de l'onglet ne dit pas la note. */
-    titleSealed: (name: string) => `${name} · Testyourskills`,
+    titleSealed: (name: string) => `${name} · Azerit`,
+    /** Les pages sans fiche : « Vie privée · Azerit ». */
+    titlePage: (subject: string) => `${subject} · Azerit`,
   },
   common: {
     by: "par",
@@ -26,14 +33,14 @@ const fr = {
     back: "Retour",
     close: "Fermer",
     loading: "Chargement…",
-    demo: "Mode démo · données fictives",
+    demo: "Mode démo : données fictives",
     skipToContent: "Aller au contenu",
   },
   home: {
     /** Le bandeau de saison, dates lues dans data/season.json (web/src/lib/season.ts). */
     season: {
-      soon: (n: number, day: string) => `Saison ${n} · dès le ${day}`,
-      on: (n: number, day: string) => `Saison ${n} · jusqu'au ${day}`,
+      soon: (n: number, day: string) => `Saison ${n} : dès le ${day}`,
+      on: (n: number, day: string) => `Saison ${n} : jusqu'au ${day}`,
       over: (n: number) => `Saison ${n} terminée`,
     },
     /** Le titre, deux phrases de deux lignes chacune (shared/promise.ts, sa seule source).
@@ -42,7 +49,7 @@ const fr = {
     titleProof: heroSentence(HOME_PROMISE.fr.proof),
     /** La ligne sous le titre, choisie par web/src/lib/season.ts : l'entretien seulement si une prime est ouverte. */
     hookPrimes: "Le haut du classement décroche un entretien.",
-    hookPlay: "Fais ta fiche. Fais gagner ta bande.",
+    hookPlay: "De une à six étoiles, en une minute. Sans compte.",
     tabGithub: "Ton GitHub",
     /** Le retour depuis le CV, quand les deux portes existent. */
     tabDoors: "LinkedIn ou GitHub",
@@ -56,27 +63,28 @@ const fr = {
     linkedinPlaceholder: "ton-profil",
     /** Sous le champ, tant qu'il n'y a pas d'erreur : ce que chaque porte sait lire. */
     linkedinHint: "Profil public seulement.",
-    githubHint: "Dépôts publics seulement.",
+    githubHint: "Repos publics seulement.",
     errLinkedin: "Colle le lien de ton profil LinkedIn, ou ce qui suit linkedin.com/in/.",
     linkedinWhere: "Où est mon lien ?",
     linkedinHelp: "Dans l'app LinkedIn : ton profil, ⋯, puis copie le lien.",
-    errLinkedinOff: "Entrée LinkedIn indisponible, tape ton pseudo GitHub.",
+    errLinkedinOff: "LinkedIn ne répond pas pour l'instant. Passe par ton GitHub ou ton CV, ou réessaie dans un moment.",
     errLinkedinCv: "Avec un CV, donne ton pseudo GitHub.",
-    submit: "Ouvrir mon dossier",
-    submitBoth: "Lire les deux",
-    submitting: "Ouverture…",
+    submit: "Faire ma fiche",
+    submitBoth: "Faire ma fiche avec les deux",
+    submitting: "On ouvre ton dossier…",
     bothLink: "ou les deux, au même dossier",
-    bothActive: "Deux pièces au dossier\u00a0: ton CV et ton GitHub",
+    bothActive: "Deux sources au dossier\u00a0: ton CV et ton GitHub",
     bothBack: "une seule source",
     dropTitle: "Glisse ton CV ici",
     /** Au doigt, on ne glisse pas un fichier : on le choisit. */
     dropPick: "Choisis ton CV en PDF",
     dropOr: "ou",
     dropBrowse: "choisis un PDF",
-    dropHint: "PDF · 5 Mo · 10 pages max",
+    dropHint: "5 Mo, 10 pages max",
     sizeUnits: { mb: "Mo", kb: "Ko" },
     dropRemove: "Retirer le fichier",
-    reassure: "Sans compte. Ton CV est lu en mémoire puis jeté.",
+    /* « Sans compte » est déjà dit par la ligne de la promesse, juste au-dessus. */
+    reassure: "Ton CV est lu en mémoire, puis jeté.",
     dropAnywhere: "Lâche ton CV, on s'occupe du reste",
     inlineCv: "ou avec ton CV",
     exampleLabel: "Exemple de fiche",
@@ -87,8 +95,8 @@ const fr = {
       playerPlate: (rank: number, week: number) => `N° ${rank} · SEMAINE ${week}`,
       founderPlate: "FONDATEUR D'AZERIT",
       free: "Ta place",
-      freeLabel: "Ta place : ouvre ton dossier",
-      freePlate: "DOSSIER À OUVRIR",
+      freeLabel: "Ta place : fais ta fiche",
+      freePlate: "TA FICHE ICI",
       /** Un portrait peint : le rôle, jamais un genre, un âge ou une origine. */
       suspect: (profile: string) => `Portrait peint du profil ${profile}`,
       /** La case « Ta place », quand une fiche est en mémoire : sa vignette. */
@@ -110,16 +118,17 @@ const fr = {
     },
     /* Mur des 13 profils (§18.28) */
     wall: {
-      title: "Lequel es-tu ?",
+      title: "Quel profil es-tu ?",
       you: "Et toi ?",
-      cta: "Découvre le tien",
+      cta: "Découvre ton profil",
     },
     /* Top de la semaine (§18.22) */
     top: {
       title: "Top de la semaine",
-      /* Le nombre de dossiers à partir de 20 seulement (§18.27). */
-      meta: (week: number, n: number, left: string) => [`Semaine ${week}`, showsTotal(n) && `${n} dossiers`, `fin dans ${left}`].filter(Boolean).join(" · "),
-      left: (d: number, h: number, m: number) => (d > 0 ? `${d} j ${h} h` : h > 0 ? `${h} h ${m} min` : `${m} min`),
+      /* Le nombre de fiches à partir de 20 seulement (§18.27). */
+      meta: (week: number, n: number, left: string) => [`Semaine ${week}`, showsTotal(n) && `${n} fiches`, `fin dans ${left}`].filter(Boolean).join(", "),
+      /* Jamais une unité à zéro : « 1 j », « 5 h », « 1 j 4 h ». */
+      left: (d: number, h: number, m: number) => (d > 0 ? (h > 0 ? `${d} j ${h} h` : `${d} j`) : h > 0 ? (m > 0 ? `${h} h ${m} min` : `${h} h`) : `${m} min`),
       cut: "Top 5",
       /* Semaine vide : un seul bloc d'invitation ; top 5 incomplet : une seule ligne pour les places libres (§18.48). */
       emptyTitle: "La place n°\u00a01 est libre",
@@ -127,8 +136,8 @@ const fr = {
       freeRange: (from: number, to: number) => (from === to ? `Place ${from} libre` : `Places ${from} à ${to} libres`),
       take: (n: number): string => (n === 1 ? "Prends-la" : "Prends-en une"),
       free: "Place libre",
-      freeLabel: (rank: number) => `Place ${rank} libre : entre ton pseudo GitHub`,
-      rowLabel: (rank: number, login: string, overall: number) => `Place ${rank} : @${login}, note ${overall}`,
+      freeLabel: (rank: number) => `Place ${rank} libre : fais ta fiche`,
+      rowLabel: (rank: number, login: string, overall: number) => `Place ${rank} : @${login}, note ${overall}/100`,
     },
     errLogin: "Ce pseudo ne ressemble pas à un pseudo GitHub.",
     errEmptyLogin: "Donne-nous un pseudo GitHub (ou une URL de profil).",
@@ -153,7 +162,7 @@ const fr = {
     /** L'enquête en direct (§18.26) : le numéro de la trouvaille versée au dossier. */
     piece: (n: number) => `Pièce ${String(n).padStart(2, "0")}`,
     /** Fiche en file d'attente : n fiches passent avant (rang dans la file). */
-    queue: (n: number) => (n === 1 ? "1 dossier devant toi au commissariat" : `${n} dossiers devant toi au commissariat`),
+    queue: (n: number) => (n === 1 ? "1 fiche devant toi au commissariat" : `${n} fiches devant toi au commissariat`),
     /** La fiche est prête, la scène 3D pas encore (§18.27). */
     scene: "La scène se charge",
     progress: {
@@ -162,8 +171,8 @@ const fr = {
       tests: () => "Recherche des tests… toujours en cours",
       readme: () => "Vérification que le README dit autre chose que « TODO »…",
       recruiter: () => "Une lecture pressée prend 30 secondes. Ici, on lit tout.",
-      /** Émis quand les deux pièces se rejoignent (pipeline.ts, comparaison LinkedIn ou CV avec GitHub). */
-      compare: () => "Les deux pièces au même dossier\u00a0: parcours et code, critère par critère…",
+      /** Émis quand les deux sources se rejoignent (pipeline.ts, comparaison LinkedIn ou CV avec GitHub). */
+      compare: () => "Les deux sources au même dossier\u00a0: parcours et code, critère par critère…",
       profile: () => "Profil trouvé. Il existe, c'est un début.",
       linkedin_wait: () => "Lecture du profil LinkedIn public…",
       linkedin: () => "LinkedIn retrouvé. On recompte tes années, poste par poste.",
@@ -179,7 +188,7 @@ const fr = {
       start: () => "Un dossier s'ouvre chez Azerit. Le tien.",
     } as Record<string, (n?: number) => string>,
     fillers: [
-      "Le barème est écrit en dur dans un fichier JSON. Pas de favoritisme.",
+      "La grille est écrite en dur dans un fichier JSON. Pas de favoritisme.",
       "On ignore tes forks. Tout le monde a forké un tutoriel.",
       "Recherche d'un commit « final final v2 »…",
       "Calcul de la fiabilité. Jamais 100 %, personne ne l'est.",
@@ -195,11 +204,14 @@ const fr = {
     /* titre du dossier à l'écran de la cabine, avant l'ouverture */
     packTitle: "DOSSIER",
     /* la pilule de l'attente, quand le son demande un geste pour démarrer (§18.27) */
-    open: "Ouvrir mon dossier",
-    skip: "Passer l'animation",
+    open: "Lancer la poursuite",
+    skip: "Passer",
     mute: "Couper le son",
     unmute: "Activer le son",
-    revealed: (level: string, overall: number) => `Fiche ${level}, note ${overall}.`,
+    /* le film joue une fois (§18.48) : la tête de la fiche le relance, depuis le début */
+    replay: "Revoir ma poursuite",
+    watch: "Voir la poursuite",
+    revealed: (level: string, overall: number) => `Fiche ${level}, ${overall}/100.`,
     revealedSealed: "Dossier scellé\u00a0: le code reste à prouver.",
     fireworks: "Clique ou Espace : feux d'artifice",
     fireworksTouch: "Touche l'écran : feux d'artifice",
@@ -263,30 +275,33 @@ const fr = {
   } satisfies Record<Position, string>,
   result: {
     makeYours: "Fais la tienne",
-    yourTurn: "Et toi, sur ces huit critères\u00a0? Ton LinkedIn ou ton GitHub suffit.",
-    /** Sous la fiche d'un dossier à deux pièces (§18.36) : d'où vient la preuve, une seule note. */
+    yourTurn: "Sur ces huit critères, tu vaux combien d'étoiles\u00a0? Ton LinkedIn ou ton GitHub suffit.",
+    /** Sous la fiche d'un dossier à deux sources (§18.36) : d'où vient la preuve, une seule note. */
     pieces: {
-      line: (labels: string) => `Pièces au dossier\u00a0: ${labels}`,
+      line: (labels: string) => `Sources au dossier\u00a0: ${labels}`,
+      /* « LinkedIn et GitHub » : une phrase, pas un point médian. */
+      pair: (a: string, b: string) => `${a} et ${b}`,
       unproven: "Code à prouver",
-      link: "Lien entre les deux pièces\u00a0: à confirmer",
+      link: "Lien entre les deux sources\u00a0: à confirmer",
     },
     /* en tête d'une fiche partagée (§18.20) */
     wanted: "Avis de recherche",
-    wantedStars: (n: number, level: string) => `${n} étoiles sur 6 · ${level}`,
+    wantedStars: (n: number, level: string) => `${n} ${n > 1 ? "étoiles" : "étoile"} sur 6, ${level}`,
     /** Entre « Avis de recherche » et @login, pour les lecteurs d'écran seulement. */
     wantedSep: "\u00a0: ",
     share: {
       title: "Partage-la",
-      linkedin: "LinkedIn",
+      linkedin: "Partager sur LinkedIn",
       x: "X",
       copy: "Copier le lien",
       download: "Télécharger l'image",
       /** La même image en 9:16, pour Instagram et TikTok : une action discrète sous les boutons. */
-      story: "Format story",
+      story: "Image pour story",
       native: "Partager",
-      /** Le libellé du bouton LinkedIn une fois le texte dans le presse-papier ; `copiedShort` dans la barre du pouce. */
-      linkedinCopied: "Texte copié · colle-le dans ton post",
-      copiedShort: "Texte copié",
+      /** La ligne d'aide sous le bouton LinkedIn, en permanence : vraie avant comme après l'appui. */
+      linkedinCopied: "Ton texte part dans le presse-papiers : colle-le dans ton post LinkedIn.",
+      /** La confirmation, après l'appui, là où la ligne d'aide n'a pas sa place (barre du pouce) : la même partout. */
+      copiedShort: "Texte copié : colle-le dans ton post LinkedIn.",
       copiedLink: "Lien copié.",
       downloadDemo: "Image indisponible en mode démo (rendue par le serveur).",
       /** Sous l'image en plein écran, là où rien ne se télécharge (navigateurs intégrés). */
@@ -295,26 +310,28 @@ const fr = {
       /** Les morceaux du texte de partage, assemblés et raccourcis par lib/shareText.ts (§18.27). */
       words: {
         plea: (pleaded: string, verdict: string) => `Je plaidais ${pleaded}. Verdict : ${verdict}.`,
-        sheet: (stars: string, overall: number) => `Fiche ${stars}, ${overall}`,
+        sheet: (stars: string, overall: number) => `Fiche ${stars}, ${overall}/100`,
         /** Après la ligne du pari : le verdict porte déjà les étoiles. */
-        score: (overall: number) => `Note ${overall}`,
+        score: (overall: number) => `Note : ${overall}/100`,
         /** Fiche notée par la grille (§18.37) : ce qu'est la note, dès la première ligne. `stars` null après le pari. */
-        file: (stars: string | null, overall: number) => `Mon dossier, passé à la grille de recrutement d'Azerit\u00a0: ${stars ? `${stars}, ` : ""}${overall}`,
+        file: (stars: string | null, overall: number) => `Ma fiche de dev, passée à la grille de recrutement d'Azerit\u00a0: ${stars ? `${stars}, ` : ""}${overall}/100`,
+        /** Dans la première ligne, après la note : « , profil « Machine à livrer » ». */
+        profile: (label: string) => `profil « ${label} »`,
         charge: (status: string) => `Chef d'accusation : « ${status} ».`,
         /** Fiche d'avant la grille : le temps de lecture. */
-        ai: (secs: number) => `Dossier lu par Azerit en ${secs} s.`,
+        ai: (secs: number) => `Fiche dressée par Azerit en ${secs} s.`,
         /** Dossier vide fait par un tiers : la note attend la personne fichée. */
-        sealed: "Un dossier ouvert chez Azerit, le code reste à prouver",
-        /** Un dossier à deux pièces (§18.36) : `src` « LinkedIn » ou « CV ». */
-        exhibits: (src: string) => `Deux pièces au dossier\u00a0: ${src} et GitHub.`,
+        sealed: "Une fiche ouverte chez Azerit, le code reste à prouver",
+        /** Un dossier à deux sources (§18.36) : `src` « LinkedIn » ou « CV ». */
+        exhibits: (src: string) => `Deux sources au dossier\u00a0: ${src} et GitHub.`,
         cta: "Fais la tienne :",
       },
     },
     /* Rang de la semaine (§18.22), en tête de l'après-fiche. « n° 1 » plutôt que « 1er » : rien ne s'accorde. */
     week: {
       line: (rank: number, total: number, gap: number) =>
-        `${rank}e${showsTotal(total) ? ` sur ${total}` : ""} cette semaine · ${gap} ${gap > 1 ? "points" : "point"} du top 5`,
-      top5: "Top 5 de la semaine · défends ta place jusqu'à dimanche",
+        `${rank}e${showsTotal(total) ? ` sur ${total}` : ""} cette semaine, à ${gap} ${gap > 1 ? "points" : "point"} du top 5`,
+      top5: "Top 5 de la semaine : défends ta place jusqu'à dimanche",
       closedLine: (rank: number, total: number, week: number) => `${rank}e${showsTotal(total) ? ` sur ${total}` : ""}, semaine ${week}`,
       closedTop5: (week: number) => `Top 5 de la semaine ${week}`,
       share: (rank: number) => `${rank === 1 ? "n° 1" : `${rank}e`} cette semaine`,
@@ -339,24 +356,25 @@ const fr = {
       contest: "Contester",
     },
     why: {
-      overallLine: "Note globale = TEC 30 % · SHIP 20 % · ARCH 20 % · DOC 15 % · XP 15 %.",
-      /** Fiche notée par le barème de recrutement (§18.37) : la note vient des huit critères, pas des barres. */
-      gridLine: "La note est la moyenne pondérée des huit critères du barème, détaillés plus haut. Les barres restent les traits de la fiche.",
+      overallLine: "Note globale = TEC 30 %, SHIP 20 %, ARCH 20 %, DOC 15 %, XP 15 %.",
+      /** Fiche notée par la grille de recrutement (§18.37) : la note vient des huit critères, pas des barres. */
+      gridLine: "La note est la moyenne pondérée des huit critères de la grille, détaillés sur cette page. Les six barres de la fiche sont ses traits : elles font le portrait, pas la note.",
     },
     contest: {
-      button: "Appeler mon avocat",
-      again: "Rappeler mon avocat",
-      title: "Réponse de l'avocat",
+      button: "Faire appel",
+      again: "Refaire appel",
+      title: "Réponse de la défense",
       replies: [
-        "Ton avocat a relu le dossier. Il te conseille de plaider coupable.",
+        "Ta défense a relu le dossier. Elle te conseille de plaider coupable.",
         "Ta réclamation a été transmise au service compétent : un fichier TODO.md qui n'existe pas encore.",
         "On a relu ton code une deuxième fois. Il n'a pas changé entre-temps.",
-        "Contester est une compétence. Elle n'est malheureusement pas dans le barème.",
-        "Le juge a consulté le barème. Le barème ne se laisse pas attendrir : il est écrit en JSON.",
+        "Contester est une compétence. Elle n'est malheureusement pas dans la grille.",
+        "Le tribunal a consulté la grille. La grille ne se laisse pas attendrir : elle est écrite en JSON.",
         "Demande enregistrée. Délai de traitement estimé : le temps que tu ajoutes des tests.",
         "Le jury s'est réuni. Le jury, c'est une fonction pure. Elle a rendu la même note.",
       ],
-      lowest: (code: string, v: number) => `Indice : ta stat la plus basse est ${code} à ${v}. Un commit vaut mieux qu'un recours.`,
+      /** `trait` : le nom du trait en clair (« Communication »), jamais son code. */
+      lowest: (trait: string, v: number) => `Indice : ton trait le plus bas est ${trait}, à ${v}/100. Un commit vaut mieux qu'un recours.`,
     },
     addCv: {
       title: "Ajoute ton CV au dossier",
@@ -365,21 +383,22 @@ const fr = {
     },
     addGithub: { title: "Ajoute ton GitHub au dossier", text: "Ton CV porte le parcours. Ton GitHub porte le code\u00a0: trois critères s'ouvrent.", btn: "Ajouter mon GitHub" },
     /** Fiche LinkedIn seule (§18.24) : un seul appel, relancé en comparaison. */
-    prove: { title: "Ajoute ton GitHub\u00a0: trois critères s'ouvrent", label: "Pseudo GitHub", btn: "Ajouter au dossier" },
+    prove: { title: "Ajoute ton GitHub\u00a0: trois critères s'ouvrent", label: "Pseudo GitHub", btn: "Ajouter à ma fiche" },
     /** Sous une fiche GitHub seule, en miroir : LinkedIn porte le parcours. */
     addLinkedin: {
       title: "Ajoute ton LinkedIn au dossier",
       text: "Ton GitHub porte le code. Ton LinkedIn porte le parcours\u00a0: expérience, employeurs et école entrent au dossier.",
       label: "Lien de ton profil LinkedIn",
-      btn: "Ajouter au dossier",
+      btn: "Ajouter à ma fiche",
     },
     claim: {
-      kicker: "C'est ta fiche ?",
+      /** Pour qui vient de faire sa fiche : le bénéfice d'abord (§18.48). */
+      kicker: "Verrouille ta fiche",
       kickerLawyer: "Avis de recherche à ton nom ?",
-      text: "Prouve que ce compte GitHub est le tien : on lit ton pseudo public, rien d'autre, et on ne garde aucun accès.",
+      text: "Prouve que ce compte GitHub est le tien : tu peux alors masquer ta fiche, la supprimer et entrer dans la course aux primes. On lit ton pseudo public, rien d'autre, et on ne garde aucun accès.",
       textLawyer: "Ce compte GitHub est le tien ? Prouve-le et reprends la main sur ta fiche.",
       btn: "C'est moi",
-      btnLawyer: "Appeler mon avocat",
+      btnLawyer: "C'est moi, je reprends ma fiche",
       owned: "Ta fiche",
       hide: "Masquer",
       unhide: "Rendre visible",
@@ -395,7 +414,7 @@ const fr = {
       failed: "Ça n'a pas marché. Réessaie.",
     },
     withdrawn: {
-      title: "Fiche retirée par son propriétaire",
+      title: "Fiche retirée à la demande de la personne",
       text: "Ce dossier a quitté la ville. Plus rien à voir ici.",
       mine: "C'est ta fiche ? Connecte-toi avec GitHub",
     },
@@ -404,10 +423,11 @@ const fr = {
       placeholder: "toi@exemple.dev",
       btn: "Recevoir",
       sending: "Envoi…",
-      done: "C'est noté. Ta fiche arrive, avec son lien de suppression.",
+      /** Vrai que l'email parte ou non : ce que l'adresse change à coup sûr. */
+      done: "C'est noté. Ta fiche est gardée au-delà de 90 jours.",
       invalid: "Cette adresse ne ressemble pas à un email.",
       error: "L'envoi a échoué. Réessaie plus tard.",
-      note: "Optionnel. Garde aussi ta fiche au-delà de 90 jours.",
+      note: "Facultatif. Ta fiche est alors conservée au-delà de 90 jours.",
     },
     /* le bloc recruteur, en fin de page : on vouvoie qui recrute */
     cta: { title: "Vous recrutez ?", text: "Azerit vous présente des devs lus comme ici : l'expérience d'abord, le code en preuve.", link: "azerit.tech" },
@@ -421,40 +441,41 @@ const fr = {
     },
     again: "Faire une autre fiche",
   },
-  /* Un seul dossier, deux pièces : LinkedIn ou le CV porte le parcours, GitHub porte le code. Jamais « contre ». */
-  /* Le barème de recrutement (docs/bareme-recrutement.md §3, §4, §6 ; SPEC §18.37) : huit critères,
+  /* Un seul dossier, deux sources : LinkedIn ou le CV porte le parcours, GitHub porte le code. Jamais « contre ». */
+  /* La grille de recrutement (docs/bareme-recrutement.md §3, §4, §6 ; SPEC §18.37) : huit critères,
      une note sur 10 chacun, une moyenne pondérée. Jamais un « +n ». Épicène : « tu », « son », sans accord. */
   /** Sous la fiche, avant le pari (§18.37) : la ligne écrite par gabarit (shared/recruiterLine.ts) et les huit tuiles. */
   read: {
     title: "Ce que la grille retient",
     titleThem: (who: string) => `Ce que la grille retient de ${who}`,
     pending: "Pas encore au dossier",
-    hint: "Touche un critère\u00a0: sa pièce s'affiche.",
+    hint: "Touche un critère\u00a0: sa preuve s'affiche.",
     more: "Tout le détail de la grille",
     tile: (name: string, n: number) => `${name}\u00a0: ${n} sur 10`,
     tileNone: (name: string) => `${name}\u00a0: pas encore de note`,
     tileKept: (name: string) => `${name}\u00a0: gardée pour la personne`,
-    /** Un dossier à deux pièces (§18.36) : la tuile dit où la note a été lue, « Expérience : 7 sur 10, lu sur LinkedIn ». */
+    /** Un dossier à deux sources (§18.36) : la tuile dit où la note a été lue, « Expérience : 7 sur 10, lu sur LinkedIn ». */
     tileFrom: (name: string, n: number, from: string) => `${name}\u00a0: ${n} sur 10, ${from}`,
-    /** La provenance sous le nom de la tuile, quand les deux pièces ont parlé : « LinkedIn et GitHub ». */
+    /** La provenance sous le nom de la tuile, quand les deux sources ont parlé : « LinkedIn et GitHub ». */
     fromBoth: (src: string) => `${src} et GitHub`,
-    none: "—",
+    /** La place d'une note absente : jamais un tiret long. */
+    none: "n. c.",
     short: { XP: "Expérience", EMP: "Parcours", STK: "Stack", CODE: "Code", OWN: "Ownership", ACT: "Activité", EDU: "École", OSS: "Open source" } as Record<CriterionCode, string>,
   },
   grid: {
-    title: "Voici comment un recruteur d'Azerit te lit",
+    title: "Voici comment Azerit te lit",
     /** Vue partagée : le détail replié sous les tuiles. */
     fold: "Le détail, critère par critère",
-    titleThem: (who: string) => `Voici comment un recruteur d'Azerit lit ${who}`,
-    /** Les pièces lues : une ligne par source, « pas encore au dossier » pour celle qui manque. */
+    titleThem: (who: string) => `Voici comment Azerit lit ${who}`,
+    /** Les sources lues : une ligne par source, « pas encore au dossier » pour celle qui manque. */
     method: {
       linkedin: "Ton parcours\u00a0: LinkedIn fait foi.",
       cv: "Ton parcours\u00a0: ton CV fait foi.",
       noCareer: "Ton parcours\u00a0: pas encore au dossier.",
       code: "Ton code\u00a0: GitHub fait foi.",
       noCode: "Ton code\u00a0: pas encore au dossier.",
-      check: "On recoupe. Chaque note a sa pièce.",
-      piece: "Chaque note a sa pièce.",
+      check: "On recoupe. Chaque note a sa preuve.",
+      piece: "Chaque note a sa preuve.",
     },
     methodThem: {
       linkedin: "Son parcours\u00a0: LinkedIn fait foi.",
@@ -462,8 +483,8 @@ const fr = {
       noCareer: "Son parcours\u00a0: pas encore au dossier.",
       code: "Son code\u00a0: GitHub fait foi.",
       noCode: "Son code\u00a0: pas encore au dossier.",
-      check: "On recoupe. Chaque note a sa pièce.",
-      piece: "Chaque note a sa pièce.",
+      check: "On recoupe. Chaque note a sa preuve.",
+      piece: "Chaque note a sa preuve.",
     },
     foot: "C'est la lecture qu'Azerit fait pour les équipes qui recrutent.",
     /** Sous la grille, surtout en vue partagée : un jeu, pas un verdict d'embauche. */
@@ -503,7 +524,7 @@ const fr = {
       private: "gardée pour la personne",
     },
     source: { linkedin: "LinkedIn", cv: "CV", github: "GitHub", both: "recoupé" },
-    /** L'étiquette de la pièce : « LinkedIn, postes datés », « GitHub, sequence-mail ». */
+    /** L'étiquette de la preuve : « LinkedIn, postes datés », « GitHub, sequence-mail ». */
     sourceWith: (src: string, what: string) => `${src}, ${what}`,
     detailDeclared: {
       EDU: "formation",
@@ -516,13 +537,13 @@ const fr = {
       OSS: "profil",
     },
     detailGithub: {
-      EDU: "dépôts",
+      EDU: "repos",
       XP: "contributions par année",
       EMP: "profil",
       STK: "langages",
       CODE: "lecture du code",
       ACT: "calendrier",
-      OWN: "dépôts",
+      OWN: "repos",
       OSS: "PR fusionnées",
     },
     proof: "Voir la preuve",
@@ -550,7 +571,7 @@ const fr = {
         [2, "Moins d'un an."],
       ],
       EMP: [
-        [10, "Deux ans ou plus chez un employeur à forte barre d'embauche, et une trajectoire qui monte ou une équipe encadrée."],
+        [10, "Deux ans ou plus chez un employeur très sélectif à l'embauche, et une trajectoire qui monte ou une équipe encadrée."],
         [8, "Deux ans ou plus dans une équipe produit exigeante, ou une entreprise fondée et tenue trois ans."],
         [6, "Un poste tenu deux ans, un an dans une startup de produit, ou une entreprise fondée et tenue un an."],
         [4, "Un vrai poste ou une entreprise fondée, de moins d'un an ; ou deux stages et plus."],
@@ -579,15 +600,15 @@ const fr = {
         [0, "0 à 3 semaines."],
       ],
       OWN: [
-        [10, "Un projet dont beaucoup se servent : 1 000 étoiles ou dix contributeurs externes, et trois releases dans l'année."],
-        [8, "Un projet porté plus d'un an, publié, et utilisé par d'autres (100 étoiles ou trois contributeurs externes)."],
+        [10, "Un projet dont beaucoup se servent : 1\u00a0000\u00a0stars GitHub ou dix comptes externes qui contribuent, et trois releases dans l'année."],
+        [8, "Un projet porté plus d'un an, publié, et utilisé par d'autres (100\u00a0stars GitHub ou trois comptes externes qui contribuent)."],
         [6, "Un projet porté 6 mois ou plus, et de quoi mettre en production : Dockerfile, CI ou release."],
         [4, "Un projet porté 6 mois ou plus (50 commits)."],
-        [2, "Des dépôts, aucun porté dans la durée."],
+        [2, "Des repos, aucun porté dans la durée."],
       ],
       OSS: [
-        [10, "Maintenir un projet de 1 000 étoiles, ou vingt PR fusionnées dans de tels projets."],
-        [8, "Une PR fusionnée dans un projet de 1 000 étoiles, 100 étoiles sur ses dépôts, ou un dépôt avec dix contributeurs externes."],
+        [10, "Maintenir un projet de 1\u00a0000\u00a0stars GitHub, ou vingt PR fusionnées dans de tels projets."],
+        [8, "Une PR fusionnée dans un projet de 1\u00a0000\u00a0stars GitHub, 100\u00a0stars GitHub sur ses repos, ou un repo avec dix comptes externes qui contribuent."],
         [6, "Vingt PR ou plus fusionnées chez les autres."],
         [4, "Cinq à dix-neuf PR."],
         [2, "Une à quatre PR."],
@@ -607,16 +628,16 @@ const fr = {
     } as Partial<Record<CriterionCode, [number, string][]>>,
     /** Sous la table : comment elle se lit. */
     levelNotes: {
-      EDU: "Sans école de tech, pas de note d'école : le critère sort de la moyenne, et se former seul ne coûte rien. Liste française d'abord\u00a0: une école absente s'arrête à B pour l'instant. Une école ne fait jamais baisser la note.",
+      EDU: "Sans école de tech, pas de note d'école : le critère sort de la moyenne, et apprendre en autodidacte ne coûte rien. Liste française d'abord\u00a0: une école absente s'arrête à B pour l'instant. Une école ne fait jamais baisser la note.",
       XP: "Compté poste par poste : stage et alternance pour moitié, association étudiante et bénévolat pour zéro, deux postes en même temps une seule fois. Sans LinkedIn : estimée sur les années actives de GitHub, arrêtée à 8.",
       EMP: "Lu sur LinkedIn ou le CV seulement.",
       STK: "Se lit dans le code public. Sans GitHub au dossier, elle se lit sur LinkedIn et la table s'arrête à 6.",
-      CODE: "Trois dépôts lus : deux fois leur niveau moyen. 9 et 10 demandent des tests dans la moitié des dépôts actifs ; 7 et plus, un dépôt de 20 commits.",
-      ACT: "8 et 10 demandent un dépôt public de 20 commits.",
+      CODE: "Trois repos lus : deux fois leur niveau moyen. 9 et 10 demandent des tests dans la moitié des repos actifs ; 7 et plus, un repo de 20\u00a0commits.",
+      ACT: "8 et 10 demandent un repo public de 20\u00a0commits.",
       OWN: "Se lit sur LinkedIn comme sur GitHub\u00a0: la lecture la plus favorable est gardée.",
       OSS: "Ne fait jamais baisser la note : la plupart des bons profils n'ont pas d'open source.",
     } as Record<CriterionCode, string>,
-    /** Page partagée, vue par quelqu'un d'autre (question 5 du barème) : ni nom d'école, ni nom d'ancien employeur. */
+    /** Page partagée, vue par quelqu'un d'autre (question 5 de la grille) : ni nom d'école, ni nom d'ancien employeur. */
     shared: {
       school: "École gardée pour la personne fichée.",
       xpNone: "Aucun mois compté sur les postes datés.",
@@ -653,19 +674,21 @@ const fr = {
     },
     /** Avec les deux sources : trois colonnes, et les recoupements. */
     compare: {
-      /** Un dossier à deux pièces (§18.36) : la pièce où la note du critère a été lue. */
+      /** Un dossier à deux sources (§18.36) : la source où la note du critère a été lue. */
       keptFrom: {
         linkedin: "lu sur LinkedIn",
         cv: "lu sur le CV",
         github: "lu sur GitHub",
-        both: "lu sur les deux pièces",
+        both: "lu sur les deux sources",
       },
-      none: "—",
+      none: "n. c.",
     },
   },
   /* « Dénonce un complice » (§18.6) et la page partagée (§18.7). Épicène : « dans le viseur », jamais « recherché ». */
   denounce: {
     title: "Dénonce un complice",
+    /** Sous le titre : ce qui va se passer, et ce que l'autre pourra faire. */
+    intro: "Donne son pseudo GitHub : on dresse sa fiche, tu la lui envoies. La personne peut la reprendre ou la supprimer.",
     label: "Pseudo GitHub du complice",
     placeholder: "pseudo",
     btn: "Dénoncer",
@@ -676,10 +699,10 @@ const fr = {
     inSights: "est dans le viseur",
     charge: (status: string) => `Chef d'accusation : ${status}`,
     shareText: (who: string, stars: string, tag: string, status: string | null, url: string) =>
-      `${who} est dans le viseur${stars ? ` ${stars}` : ""} · ${tag}.${status ? ` Chef d'accusation : ${status}.` : ""} Droit de faire appel : ${url}`,
+      `${who} est dans le viseur${stars ? ` ${stars}` : ""}, ${tag}.${status ? ` Chef d'accusation : ${status}.` : ""} Droit de faire appel : ${url}`,
     native: "Partager",
     x: "Poster sur X",
-    linkedin: "LinkedIn",
+    linkedin: "Partager sur LinkedIn",
     linkedinHint: "Texte copié : colle-le dans ton post LinkedIn.",
     see: "Voir sa fiche",
     again: "Dénoncer quelqu'un d'autre",
@@ -687,10 +710,10 @@ const fr = {
     banner: "Avis de recherche à ton nom",
     by: (login: string) => `Dénonciation : @${login}`,
     anonymous: "Dénonciation anonyme",
-    lawyer: "Appeler mon avocat",
-    andYou: "Et toi ?",
+    lawyer: "C'est moi, je reprends ma fiche",
+    andYou: "À ton tour",
     mine: "Ma fiche",
-    versus: (me: number, who: string, them: number, verdict: string) => `Toi ${me} · ${who} ${them} · ${verdict}`,
+    versus: (me: number, who: string, them: number, verdict: string) => `Toi ${me}/100, ${who} ${them}/100 : ${verdict}`,
     starsAhead: (n: number) => (n === 1 ? "une étoile d'avance" : `${n} étoiles d'avance`),
     starsBehind: (n: number) => (n === 1 ? "une étoile de retard" : `${n} étoiles de retard`),
     pointsAhead: (n: number) => (n === 1 ? "1 point d'avance" : `${n} points d'avance`),
@@ -704,8 +727,8 @@ const fr = {
     guilty: "Coupable",
     cleared: "Relaxe",
     /* « votes » plutôt que « jurés », qui s'accorde */
-    tally: (pct: number, n: number) => `${pct}\u00a0% coupable · ${n}\u00a0${n === 1 ? "vote" : "votes"}`,
-    owner: (tally: string) => `Le jury : ${tally}`,
+    tally: (pct: number, n: number) => `${pct}\u00a0% coupable (${n}\u00a0${n === 1 ? "vote" : "votes"})`,
+    owner: (tally: string) => `Jury : ${tally}`,
     failed: "Vote non compté. Réessaie.",
   },
   /* les bandes (§18.38) : bandsText.ts */
@@ -721,8 +744,8 @@ const fr = {
     closed: "Le commissariat est fermé pour ce soir. Reviens demain.",
   },
   footer: {
-    privacy: "Confidentialité",
-    credits3d: "Crédits 3D",
+    privacy: "Vie privée",
+    credits3d: "Crédits",
   },
   /** La barre du haut et le pied de page (Chrome.tsx) : les liens du site. */
   chrome: {
@@ -736,8 +759,8 @@ const fr = {
     seePrimes: "Voir les primes",
   },
   privacy: {
-    title: "Confidentialité",
-    intro: "Court, parce qu'on stocke peu.",
+    title: "Vie privée",
+    intro: "En quatre lignes. On lit ce qui est public : ton profil LinkedIn, ton GitHub, ou le CV que tu donnes. On garde ta fiche 90 jours par défaut, jamais ton CV. Aucun contact n'est affiché, aucun cookie publicitaire, aucun outil tiers de mesure. Tu supprimes ta fiche quand tu veux : le lien est sous ta fiche, et la demande de retrait sous celle qu'on a faite à ta place.",
     sections: [
       {
         h: "Ce qu'on garde",
@@ -757,7 +780,7 @@ const fr = {
       },
       {
         h: "La fiche de quelqu'un d'autre",
-        p: `On peut générer une fiche sur n'importe quel pseudo public : elle repose sur des données publiques et reste en mode taquin. La personne qui détient le pseudo peut la faire supprimer en prouvant son compte GitHub. Une fiche faite par quelqu'un d'autre depuis ton LinkedIn ou ton CV, sans pseudo GitHub : « Demander son retrait » sous la fiche, ou un email à ${CONTACT_EMAIL} avec son lien. On la retire après vérification ; ton email sert seulement à te répondre.`,
+        p: `On peut générer une fiche sur n'importe quel pseudo public : elle repose sur des données publiques et reste sur le ton de la plaisanterie. La personne qui détient le pseudo peut la faire supprimer en prouvant son compte GitHub. Une fiche faite par quelqu'un d'autre depuis ton LinkedIn ou ton CV, sans pseudo GitHub : « Demander son retrait » sous la fiche, ou un email à ${CONTACT_EMAIL} avec son lien. On la retire après vérification ; ton email sert seulement à te répondre.`,
       },
       {
         h: "Revendiquer ta fiche",
@@ -777,7 +800,7 @@ const fr = {
       },
       {
         h: "Les bandes",
-        p: "Rien n'y entre sans ton toucher. Si tu choisis une école ou une boîte sous ta fiche, on garde ce choix avec l'identifiant de la fiche et ses étoiles : une école et une boîte au plus. L'école lue sur ton profil reste privée tant que tu ne la choisis pas. La page d'une bande montre le profil et les étoiles de chaque dossier, jamais un nom ; ton pseudo GitHub seulement si ta fiche est revendiquée. Pour en sortir : « Sortir », sous ta fiche. Supprimer ta fiche t'en retire aussi, la masquer la retire du compte.",
+        p: "Rien n'y entre sans ton accord. Si tu choisis une école ou une boîte sous ta fiche, on garde ce choix avec l'identifiant de la fiche et ses étoiles : une école et une boîte au plus. L'école lue sur ton profil reste privée tant que tu ne la choisis pas. La page d'une bande montre le profil et les étoiles de chaque fiche, jamais un nom ; ton pseudo GitHub seulement si ta fiche est revendiquée. Pour en sortir : « Sortir », sous ta fiche. Supprimer ta fiche t'en retire aussi, la masquer la retire du compte.",
       },
       PRIMES_TEXT.fr.privacy,
       {
@@ -798,17 +821,18 @@ const fr = {
     invalid: "Cet email n'a pas l'air valide.",
     fallback: "Écris-nous avec le lien de cette fiche, on la retire après vérification :",
   },
-  notFound: { title: "Page introuvable", text: "Même GitHub renverrait une 404 ici.", home: "Retour à l'accueil" },
+  notFound: { title: "Page introuvable", text: "Cette adresse n'est dans aucun dossier.", home: "Retour à l'accueil" },
   crash: { title: "La page n'a pas chargé", text: "Le réseau a peut-être coupé, ou le site vient d'être mis à jour.", reload: "Recharger" },
-};
+});
 
 export type Dict = typeof fr;
 
 const en: Dict = {
   meta: {
     title: homeTitle("en"),
-    titleCard: (name, overall) => `${name} · ${overall} · Testyourskills`,
-    titleSealed: (name) => `${name} · Testyourskills`,
+    titleCard: (name, overall) => `${name} ${starsLine(starsFor(overall))} · Azerit`,
+    titleSealed: (name) => `${name} · Azerit`,
+    titlePage: (subject) => `${subject} · Azerit`,
   },
   common: {
     by: "by",
@@ -817,19 +841,19 @@ const en: Dict = {
     back: "Back",
     close: "Close",
     loading: "Loading…",
-    demo: "Demo mode · mock data",
+    demo: "Demo mode: mock data",
     skipToContent: "Skip to content",
   },
   home: {
     season: {
-      soon: (n, day) => `Season ${n} · from ${day}`,
-      on: (n, day) => `Season ${n} · until ${day}`,
+      soon: (n, day) => `Season ${n} starts ${day}`,
+      on: (n, day) => `Season ${n} runs until ${day}`,
       over: (n) => `Season ${n} is over`,
     },
     titleClaim: heroSentence(HOME_PROMISE.en.claim),
     titleProof: heroSentence(HOME_PROMISE.en.proof),
     hookPrimes: "The top of the board lands an interview.",
-    hookPlay: "Get your file. Make your crew win.",
+    hookPlay: "One to six stars, in one minute. No account.",
     tabGithub: "Your GitHub",
     tabDoors: "LinkedIn or GitHub",
     loginLabel: "GitHub username or profile URL",
@@ -844,33 +868,33 @@ const en: Dict = {
     errLinkedin: "Paste your LinkedIn profile link, or what follows linkedin.com/in/.",
     linkedinWhere: "Where's my link?",
     linkedinHelp: "In the LinkedIn app: your profile, ⋯, then copy the link.",
-    errLinkedinOff: "LinkedIn entry unavailable, type your GitHub username.",
+    errLinkedinOff: "LinkedIn isn't answering right now. Use your GitHub or your CV, or try again in a moment.",
     errLinkedinCv: "With a CV, give your GitHub username.",
-    submit: "Open my file",
-    submitBoth: "Read both",
-    submitting: "Opening…",
+    submit: "Get my rap sheet",
+    submitBoth: "Get my rap sheet from both",
+    submitting: "Opening your file…",
     bothLink: "or both, in one file",
-    bothActive: "Two exhibits on file: your CV and your GitHub",
+    bothActive: "Two sources on file: your CV and your GitHub",
     bothBack: "just one source",
     dropTitle: "Drop your CV here",
     dropPick: "Pick your CV as a PDF",
     dropOr: "or",
     dropBrowse: "pick a PDF",
-    dropHint: "PDF · 5 MB · 10 pages max",
+    dropHint: "5 MB, 10 pages max",
     sizeUnits: { mb: "MB", kb: "KB" },
     dropRemove: "Remove file",
-    reassure: "No account. Your CV is read in memory, then thrown away.",
+    reassure: "Your CV is read in memory, then thrown away.",
     dropAnywhere: "Let go of your CV, we'll take it from here",
     inlineCv: "or with your CV",
     exampleLabel: "Example sheet",
-    exampleCaption: "The real sheet of Jacques, Azerit's founder",
+    exampleCaption: "The actual rap sheet of Jacques, founder of Azerit",
     cover: {
       player: (login, rank) => `@${login}, #${rank} this week`,
       playerPlate: (rank, week) => `NO. ${rank} · WEEK ${week}`,
       founderPlate: "AZERIT FOUNDER",
       free: "Your spot",
-      freeLabel: "Your spot: open your file",
-      freePlate: "FILE TO OPEN",
+      freeLabel: "Your spot: get your rap sheet",
+      freePlate: "YOUR SHEET HERE",
       suspect: (profile) => `Painted portrait of the ${profile} profile`,
       mine: "Your sheet",
       mineLabel: (overall) => `Your sheet, ${overall}/100: see it again`,
@@ -885,22 +909,22 @@ const en: Dict = {
       pendingGo: "Go back to it",
     },
     wall: {
-      title: "Which one are you?",
+      title: "Which profile are you?",
       you: "And you?",
-      cta: "Find yours",
+      cta: "Find your profile",
     },
     top: {
-      title: "This week's top",
-      meta: (week, n, left) => [`Week ${week}`, showsTotal(n) && `${n} files`, `ends in ${left}`].filter(Boolean).join(" · "),
-      left: (d, h, m) => (d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m}min` : `${m}min`),
+      title: "Top of the week",
+      meta: (week, n, left) => [`Week ${week}`, showsTotal(n) && `${n} sheets`, `ends in ${left}`].filter(Boolean).join(", "),
+      left: (d, h, m) => (d > 0 ? (h > 0 ? `${d}d ${h}h` : d === 1 ? "1 day" : `${d} days`) : h > 0 ? (m > 0 ? `${h}h ${m}min` : `${h}h`) : `${m}min`),
       cut: "Top 5",
       emptyTitle: "Spot #1 is open",
       emptyText: "This week's first sheet takes it.",
       freeRange: (from, to) => (from === to ? `Spot ${from} is open` : `Spots ${from} to ${to} are open`),
       take: (n) => (n === 1 ? "Take it" : "Take one"),
       free: "Open spot",
-      freeLabel: (rank) => `Spot ${rank} is open: enter your GitHub username`,
-      rowLabel: (rank, login, overall) => `Spot ${rank}: @${login}, rating ${overall}`,
+      freeLabel: (rank) => `Spot ${rank} is open: get your rap sheet`,
+      rowLabel: (rank, login, overall) => `Spot ${rank}: @${login}, rating ${overall}/100`,
     },
     errLogin: "That doesn't look like a GitHub username.",
     errEmptyLogin: "Give us a GitHub username (or profile URL).",
@@ -922,7 +946,7 @@ const en: Dict = {
   waiting: {
     title: "Loading your file",
     piece: (n) => `Exhibit ${String(n).padStart(2, "0")}`,
-    queue: (n) => (n === 1 ? "1 file ahead of you at the station" : `${n} files ahead of you at the station`),
+    queue: (n) => (n === 1 ? "1 sheet ahead of you at the station" : `${n} sheets ahead of you at the station`),
     scene: "Loading the scene",
     progress: {
       lazy_commits: (n) => `Reading your ${n ?? "many"} “wip” commits…`,
@@ -930,7 +954,7 @@ const en: Dict = {
       tests: () => "Looking for tests… still looking",
       readme: () => "Checking the README says more than “TODO”…",
       recruiter: () => "A rushed read takes 30 seconds. We read everything.",
-      compare: () => "Both exhibits in one file: career and code, criterion by criterion…",
+      compare: () => "Both sources in one file: career and code, criterion by criterion…",
       profile: () => "Profile found. It exists, that's a start.",
       linkedin_wait: () => "Reading the public LinkedIn profile…",
       linkedin: () => "LinkedIn found. Recounting your years, role by role.",
@@ -946,7 +970,7 @@ const en: Dict = {
       start: () => "A file just opened at Azerit. Yours.",
     },
     fillers: [
-      "The rubric is hard-coded in a JSON file. No favoritism.",
+      "The scorecard is hard-coded in a JSON file. No favoritism.",
       "Ignoring your forks. Everyone forked a tutorial once.",
       "Looking for a “final final v2” commit…",
       "Computing reliability. Never 100%, nobody is.",
@@ -959,13 +983,15 @@ const en: Dict = {
     ],
   },
   reveal: {
-    packTitle: "CASE FILE",
-    open: "Open my case file",
-    skip: "Skip animation",
+    packTitle: "FILE",
+    open: "Start the chase",
+    skip: "Skip",
     mute: "Mute",
     unmute: "Unmute",
-    revealed: (level, overall) => `${level} sheet, rated ${overall}.`,
-    revealedSealed: "Sealed file: code yet to prove.",
+    replay: "Replay my chase",
+    watch: "Watch the chase",
+    revealed: (level, overall) => `${level} sheet, rated ${overall}/100.`,
+    revealedSealed: "Sealed file: code still unproven.",
     fireworks: "Click or Space: fireworks",
     fireworksTouch: "Tap the screen: fireworks",
     statusLabel: "Status",
@@ -1023,45 +1049,47 @@ const en: Dict = {
     CTO: "CTO",
   },
   result: {
-    makeYours: "Make yours",
-    yourTurn: "And you, on these eight criteria? Your LinkedIn or your GitHub is enough.",
+    makeYours: "Get yours",
+    yourTurn: "On these eight criteria, how many stars are you? Your LinkedIn or your GitHub is all it takes.",
     pieces: {
-      line: (labels) => `Exhibits on file: ${labels}`,
-      unproven: "Code yet to prove",
-      link: "Link between the two exhibits: to confirm",
+      line: (labels) => `Sources on file: ${labels}`,
+      pair: (a, b) => `${a} and ${b}`,
+      unproven: "Code still unproven",
+      link: "Link between the two sources: to be confirmed",
     },
     wanted: "Wanted",
-    wantedStars: (n, level) => `${n} of 6 stars · ${level}`,
+    wantedStars: (n, level) => `${n} of 6 stars, ${level}`,
     wantedSep: ": ",
     share: {
       title: "Share it",
-      linkedin: "LinkedIn",
+      linkedin: "Share on LinkedIn",
       x: "X",
       copy: "Copy link",
       download: "Download image",
-      story: "Story format",
+      story: "Story image",
       native: "Share",
-      linkedinCopied: "Text copied · paste it into your post",
-      copiedShort: "Text copied",
+      linkedinCopied: "Your text goes to the clipboard: paste it into your LinkedIn post.",
+      copiedShort: "Text copied: paste it into your LinkedIn post.",
       copiedLink: "Link copied.",
       downloadDemo: "Image unavailable in demo mode (rendered by the server).",
       holdToSave: "Press and hold to save",
-      imageAlt: "Your sheet",
+      imageAlt: "Your rap sheet",
       words: {
         plea: (pleaded, verdict) => `I pleaded ${pleaded}. Verdict: ${verdict}.`,
-        sheet: (stars, overall) => `${stars} sheet, ${overall}`,
-        score: (overall) => `Score ${overall}`,
-        file: (stars, overall) => `My file, run through Azerit's hiring grid: ${stars ? `${stars}, ` : ""}${overall}`,
+        sheet: (stars, overall) => `${stars} rap sheet, ${overall}/100`,
+        score: (overall) => `Rating: ${overall}/100`,
+        file: (stars, overall) => `My dev rap sheet, run through Azerit's hiring scorecard: ${stars ? `${stars}, ` : ""}${overall}/100`,
+        profile: (label) => `profile “${label}”`,
         charge: (status) => `Charge: “${status}”.`,
-        ai: (secs) => `File read by Azerit in ${secs}s.`,
-        sealed: "A file opened at Azerit, the code yet to prove",
-        exhibits: (src) => `Two exhibits on file: ${src} and GitHub.`,
-        cta: "Make yours:",
+        ai: (secs) => `Rap sheet drawn up by Azerit in ${secs}s.`,
+        sealed: "A rap sheet opened at Azerit, code still unproven",
+        exhibits: (src) => `Two sources on file: ${src} and GitHub.`,
+        cta: "Get yours:",
       },
     },
     week: {
-      line: (rank, total, gap) => `#${rank}${showsTotal(total) ? ` of ${total}` : ""} this week · ${gap} ${gap === 1 ? "point" : "points"} from the top 5`,
-      top5: "This week's top 5 · hold your spot until Sunday",
+      line: (rank, total, gap) => `#${rank}${showsTotal(total) ? ` of ${total}` : ""} this week, ${gap} ${gap === 1 ? "point" : "points"} from the top 5`,
+      top5: "This week's top 5: hold your spot until Sunday",
       closedLine: (rank, total, week) => `#${rank}${showsTotal(total) ? ` of ${total}` : ""}, week ${week}`,
       closedTop5: (week) => `Top 5 of week ${week}`,
       share: (rank) => `#${rank} this week`,
@@ -1074,7 +1102,7 @@ const en: Dict = {
     },
     dossier: {
       title: "Also on file",
-      proof: "Proof",
+      proof: "Evidence",
     },
     rest: {
       why: "Why this rating",
@@ -1083,23 +1111,23 @@ const en: Dict = {
       contest: "Contest it",
     },
     why: {
-      overallLine: "Overall = TEC 30% · SHIP 20% · ARCH 20% · DOC 15% · XP 15%.",
-      gridLine: "The rating is the weighted mean of the eight criteria, detailed above. The bars remain the sheet's traits.",
+      overallLine: "Overall = TEC 30%, SHIP 20%, ARCH 20%, DOC 15%, XP 15%.",
+      gridLine: "The rating is the weighted average of the eight criteria on the scorecard, detailed on this page. The six bars on the sheet are its traits: they paint the portrait, not the rating.",
     },
     contest: {
       button: "Call my lawyer",
-      again: "Call my lawyer (again)",
+      again: "Call my lawyer again",
       title: "Your lawyer says",
       replies: [
         "Your lawyer read the file. They advise you to plead guilty.",
         "Your complaint has been forwarded to the relevant department: a TODO.md that doesn't exist yet.",
         "We read your code a second time. It hadn't changed in the meantime.",
-        "Disputing is a skill. Sadly, it isn't in the rubric.",
-        "The judge checked the rubric. The rubric can't be sweet-talked: it's written in JSON.",
+        "Disputing is a skill. Sadly, it isn't on the scorecard.",
+        "The court checked the scorecard. The scorecard can't be sweet-talked: it's written in JSON.",
         "Request logged. Estimated processing time: however long it takes you to add tests.",
         "The jury met. The jury is a pure function. It returned the same rating.",
       ],
-      lowest: (code, v) => `Hint: your lowest stat is ${code} at ${v}. A commit beats an appeal.`,
+      lowest: (trait, v) => `Hint: your lowest trait is ${trait}, at ${v}/100. A commit beats an appeal.`,
     },
     addCv: {
       title: "Add your CV to the file",
@@ -1107,20 +1135,20 @@ const en: Dict = {
       btn: "Add my CV",
     },
     addGithub: { title: "Add your GitHub to the file", text: "Your CV carries the career. Your GitHub carries the code: three more criteria open.", btn: "Add my GitHub" },
-    prove: { title: "Add your GitHub: three more criteria open", label: "GitHub username", btn: "Add to my file" },
+    prove: { title: "Add your GitHub: three more criteria open", label: "GitHub username", btn: "Add to my sheet" },
     addLinkedin: {
       title: "Add your LinkedIn to your file",
       text: "Your GitHub carries the code. Your LinkedIn carries the career: experience, employers and school go on file.",
       label: "Your LinkedIn profile link",
-      btn: "Add to my file",
+      btn: "Add to my sheet",
     },
     claim: {
-      kicker: "Is this your sheet?",
+      kicker: "Lock your rap sheet",
       kickerLawyer: "Wanted under your name?",
-      text: "Prove this GitHub account is yours: we read your public username, nothing else, and keep no access.",
+      text: "Prove this GitHub account is yours: you can then hide your sheet, delete it and enter the bounty race. We read your public username, nothing else, and keep no access.",
       textLawyer: "Is this GitHub account yours? Prove it and take your sheet back.",
       btn: "That's me",
-      btnLawyer: "Call my lawyer",
+      btnLawyer: "That's me, claim my sheet",
       owned: "Your sheet",
       hide: "Hide",
       unhide: "Make visible",
@@ -1136,7 +1164,7 @@ const en: Dict = {
       failed: "That didn't work. Try again.",
     },
     withdrawn: {
-      title: "Sheet withdrawn by its owner",
+      title: "Taken down at the person's request",
       text: "This dev has left town. Nothing left to see here.",
       mine: "Your sheet? Sign in with GitHub",
     },
@@ -1145,12 +1173,12 @@ const en: Dict = {
       placeholder: "you@example.dev",
       btn: "Send it",
       sending: "Sending…",
-      done: "Done. Your sheet is on its way, with its delete link.",
+      done: "Done. Your rap sheet is kept beyond 90 days.",
       invalid: "That doesn't look like an email address.",
       error: "Sending failed. Try again later.",
-      note: "Optional. Also keeps your sheet beyond 90 days.",
+      note: "Optional. Your sheet is then kept beyond 90 days.",
     },
-    cta: { title: "Hiring?", text: "Azerit introduces you to developers read like this: experience first, code as proof.", link: "azerit.tech" },
+    cta: { title: "Hiring?", text: "Azerit introduces you to devs vetted this way: experience first, code as proof.", link: "azerit.tech" },
     del: {
       link: "Delete my sheet",
       confirm: "Delete for good?",
@@ -1162,46 +1190,46 @@ const en: Dict = {
     again: "Make another sheet",
   },
   read: {
-    title: "What the grid keeps",
-    titleThem: (who: string) => `What the grid keeps of ${who}`,
+    title: "What the scorecard says",
+    titleThem: (who: string) => `What the scorecard says about ${who}`,
     pending: "Not on file yet",
-    hint: "Tap a criterion to see its proof.",
-    more: "The grid in full",
+    hint: "Tap a criterion to see its evidence.",
+    more: "See the full scorecard",
     tile: (name: string, n: number) => `${name}: ${n} out of 10`,
     tileNone: (name: string) => `${name}: no score yet`,
-    tileKept: (name: string) => `${name}: kept for the person`,
+    tileKept: (name: string) => `${name}: kept on the person's side`,
     tileFrom: (name: string, n: number, from: string) => `${name}: ${n} out of 10, ${from}`,
     fromBoth: (src: string) => `${src} and GitHub`,
-    none: "—",
+    none: "n/a",
     short: { XP: "Experience", EMP: "Career", STK: "Stack", CODE: "Code", OWN: "Ownership", ACT: "Activity", EDU: "School", OSS: "Open source" },
   },
   grid: {
-    title: "Here is how an Azerit recruiter reads you",
+    title: "How Azerit reads you",
     fold: "The detail, criterion by criterion",
-    titleThem: (who: string) => `Here is how an Azerit recruiter reads ${who}`,
+    titleThem: (who: string) => `How Azerit reads ${who}`,
     method: {
-      linkedin: "Your career: LinkedIn is the reference.",
-      cv: "Your career: your CV is the reference.",
+      linkedin: "Your career: we go by LinkedIn.",
+      cv: "Your career: we go by your CV.",
       noCareer: "Your career: not on file yet.",
-      code: "Your code: GitHub is the reference.",
+      code: "Your code: we go by GitHub.",
       noCode: "Your code: not on file yet.",
-      check: "We cross-check. Every score has its exhibit.",
-      piece: "Every score has its exhibit.",
+      check: "We cross-check. Every score comes with its evidence.",
+      piece: "Every score comes with its evidence.",
     },
     methodThem: {
-      linkedin: "Their career: LinkedIn is the reference.",
-      cv: "Their career: their CV is the reference.",
+      linkedin: "Their career: we go by LinkedIn.",
+      cv: "Their career: we go by their CV.",
       noCareer: "Their career: not on file yet.",
-      code: "Their code: GitHub is the reference.",
+      code: "Their code: we go by GitHub.",
       noCode: "Their code: not on file yet.",
-      check: "We cross-check. Every score has its exhibit.",
-      piece: "Every score has its exhibit.",
+      check: "We cross-check. Every score comes with its evidence.",
+      piece: "Every score comes with its evidence.",
     },
-    foot: "This is how Azerit reads engineers for hiring teams.",
-    game: "A game built on a real grid. Not a hiring decision: no job, no interview, public data only.",
+    foot: "This is how Azerit reads devs for hiring teams.",
+    game: "A game built on a real scorecard. Not a hiring decision: no job, no interview, public data only.",
     criteriaLabel: "The eight criteria",
     names: {
-      EDU: "School and selection",
+      EDU: "School and selectivity",
       XP: "Experience",
       EMP: "Career path and employers",
       STK: "Tech stack",
@@ -1214,8 +1242,8 @@ const en: Dict = {
     gauge: (n: number) => `${n} out of 10`,
     gaugeNone: "No score",
     tags: {
-      declared: "declared, to confirm",
-      unproven: "yet to prove",
+      declared: "declared, to be confirmed",
+      unproven: "unproven",
       missing: "not on file",
       estimated: "estimated",
       below: "doesn't count against you",
@@ -1223,13 +1251,13 @@ const en: Dict = {
       private: "kept for you",
     },
     tagsThem: {
-      declared: "declared, to confirm",
-      unproven: "yet to prove",
+      declared: "declared, to be confirmed",
+      unproven: "unproven",
       missing: "not on file",
       estimated: "estimated",
       below: "doesn't lower the rating",
       out: "doesn't lower the rating",
-      private: "kept for the person",
+      private: "kept on the person's side",
     },
     source: { linkedin: "LinkedIn", cv: "CV", github: "GitHub", both: "cross-checked" },
     sourceWith: (src: string, what: string) => `${src}, ${what}`,
@@ -1253,15 +1281,15 @@ const en: Dict = {
       OWN: "repos",
       OSS: "merged PRs",
     },
-    proof: "See the proof",
+    proof: "See the evidence",
     levelsTitle: (name: string) => `The levels: ${name}`,
     reached: "Reached",
-    next: "For the next one",
+    next: "Next up",
     levelNo: (n: number) => `${n}/10`,
     levels: {
       EDU: [
         [10, "One of the most selective schools, or an international medal (olympiad, world final of a programming contest)."],
-        [8, "A highly selective school, or a proven selection outside school: a ranking in a coding contest, a hackathon prize, a selective programme."],
+        [8, "A highly selective school, or a proven selection outside school: a ranking in a coding contest, a hackathon prize, a selective program."],
         [6, "A selective school."],
         [4, "Another tech school, or a hackathon or competition, unranked."],
       ],
@@ -1277,16 +1305,16 @@ const en: Dict = {
         [2, "Under a year."],
       ],
       EMP: [
-        [10, "Two years or more at a high-bar employer, and a rising path or a team led."],
+        [10, "Two years or more at an employer with a high hiring bar, and a rising path or a team led."],
         [8, "Two years or more in a demanding product team, or a company founded and run for three years."],
         [6, "A role held for two years, a year in a product startup, or a company founded and run for a year."],
         [4, "A real role or a company founded, under a year; or two internships or more."],
         [2, "A single internship, or a single role under six months."],
       ],
       STK: [
-        [10, "1,000 commits in the main language, practised for 3 years, two other language families, code pushed within 6 months."],
-        [8, "500 commits, practised for 2 years, one other language family, within 6 months."],
-        [6, "200 commits, practised for 1 year, code pushed within a year."],
+        [10, "1,000 commits in the main language, practiced for 3 years, two other language families, code pushed within 6 months."],
+        [8, "500 commits, practiced for 2 years, one other language family, within 6 months."],
+        [6, "200 commits, practiced for 1 year, code pushed within a year."],
         [4, "50 commits, code pushed within 2 years."],
         [2, "Public code, below these thresholds."],
       ],
@@ -1306,15 +1334,15 @@ const en: Dict = {
         [0, "0 to 3 weeks."],
       ],
       OWN: [
-        [10, "A project many people use: 1,000 stars or ten outside contributors, and three releases this year."],
-        [8, "A project carried for over a year, published, and used by others (100 stars or three outside contributors)."],
-        [6, "A project carried for 6 months or more, and what it takes to ship: Dockerfile, CI or release."],
-        [4, "A project carried for 6 months or more (50 commits)."],
-        [2, "Repos, none carried over time."],
+        [10, "A project many people use: 1,000 GitHub stars or ten outside contributors, and three releases this year."],
+        [8, "A project kept alive for over a year, released, and used by others (100 GitHub stars or three outside contributors)."],
+        [6, "A project kept alive for 6 months or more, and what it takes to ship: Dockerfile, CI or release."],
+        [4, "A project kept alive for 6 months or more (50 commits)."],
+        [2, "Repos, none kept alive over time."],
       ],
       OSS: [
-        [10, "Maintainer of a 1,000-star project, or twenty PRs merged into such projects."],
-        [8, "A PR merged into a 1,000-star project, 100 stars on own repos, or a repo with ten outside contributors."],
+        [10, "Maintaining a project with 1,000 GitHub stars, or twenty PRs merged into such projects."],
+        [8, "A PR merged into a project with 1,000 GitHub stars, 100 GitHub stars on your own repos, or a repo with ten outside contributors."],
         [6, "Twenty PRs or more merged into other people's repos."],
         [4, "Five to nineteen PRs."],
         [2, "One to four PRs."],
@@ -1338,8 +1366,8 @@ const en: Dict = {
       STK: "Read in public code. With no GitHub on file, it is read on LinkedIn and the table stops at 6.",
       CODE: "Three repos read: twice their average level. 9 and 10 need tests in half the active repos; 7 and up, a repo with 20 commits.",
       ACT: "8 and 10 need a public repo with 20 commits.",
-      OWN: "Read on LinkedIn and on GitHub alike: the most favourable reading is kept.",
-      OSS: "Never lowers the rating: most good engineers have no open source.",
+      OWN: "Read on LinkedIn and on GitHub alike: the most favorable reading is kept.",
+      OSS: "Never lowers the rating: most good devs have no open source.",
     } as Record<CriterionCode, string>,
     shared: {
       school: "School kept for the person on file.",
@@ -1348,8 +1376,8 @@ const en: Dict = {
     },
     final: {
       title: "The rating out of 100",
-      caseTitle: "The case rating",
-      how: "Weighted mean of the scored criteria, × 10.",
+      caseTitle: "The file's rating",
+      how: "Weighted average of the scored criteria, × 10.",
       term: (name: string, score: number, coef: string) => `${name} ${score} × ${coef}`,
       formula: (terms: string, den: string) => `(${terms}) ÷ ${den}`,
       result: (mean: string) => `= ${mean} out of 10`,
@@ -1360,16 +1388,16 @@ const en: Dict = {
       },
       outList: (label: string, names: string) => `${label}: ${names}.`,
       belowWhy: "School and open source never lower the rating.",
-      capped: "No code proven: the rating cannot go above 85. The sixth star is proven.",
-      cappedHit: (raw: number) => `No code proven: the maths gives ${raw}, the rating stops at 85.`,
+      capped: "No code proven: the rating cannot go above 85. The sixth star has to be proven.",
+      cappedHit: (raw: number) => `No code proven: the math gives ${raw}, the rating stops at 85.`,
       empty: "Empty file: under a quarter of the weights are scored. Floor rating: 20, one star.",
       emptyWhy: "Not proven does not mean bad: the day the code goes public, the criteria open up.",
       score: (n: number) => `${n}`,
       outOf: "out of 100",
       caseUnproven: (src: string, opens: string) =>
-        `Code not proven: your public GitHub shows nothing to judge yet. The case rating rests on your ${src}, capped at 85. What would change it: one real public project on GitHub${opens ? `, which opens ${opens}` : ""}.`,
+        `Code not proven: your public GitHub shows nothing to judge yet. The file's rating rests on your ${src}, capped at 85. What would change it: one real public project on GitHub${opens ? `, which opens ${opens}` : ""}.`,
       caseUnprovenThem: (src: string, opens: string) =>
-        `Code not proven: their public GitHub shows nothing to judge yet. The case rating rests on their ${src}, capped at 85. What would change it: one real public project on GitHub${opens ? `, which opens ${opens}` : ""}.`,
+        `Code not proven: their public GitHub shows nothing to judge yet. The file's rating rests on their ${src}, capped at 85. What would change it: one real public project on GitHub${opens ? `, which opens ${opens}` : ""}.`,
       opensList: (names: string[]) => names.map((n) => n.toLowerCase()).join(", ").replace(/, ([^,]*)$/, " and $1"),
     },
     compare: {
@@ -1377,13 +1405,14 @@ const en: Dict = {
         linkedin: "read on LinkedIn",
         cv: "read on the CV",
         github: "read on GitHub",
-        both: "read on both exhibits",
+        both: "read on both sources",
       },
-      none: "—",
+      none: "n/a",
     },
   },
   denounce: {
     title: "Turn in an accomplice",
+    intro: "Give us their GitHub username: we draw up their rap sheet, you send it to them. They can claim it or delete it.",
     label: "Accomplice's GitHub username",
     placeholder: "username",
     btn: "Turn in",
@@ -1394,20 +1423,20 @@ const en: Dict = {
     inSights: "is in the crosshairs",
     charge: (status) => `Charge: ${status}`,
     shareText: (who, stars, tag, status, url) =>
-      `${who} is in the crosshairs${stars ? ` ${stars}` : ""} · ${tag}.${status ? ` Charge: ${status}.` : ""} Right to appeal: ${url}`,
+      `${who} is in the crosshairs${stars ? ` ${stars}` : ""}, ${tag}.${status ? ` Charge: ${status}.` : ""} Right to appeal: ${url}`,
     native: "Share",
     x: "Post on X",
-    linkedin: "LinkedIn",
+    linkedin: "Share on LinkedIn",
     linkedinHint: "Text copied: paste it into your LinkedIn post.",
     see: "See their sheet",
     again: "Turn in someone else",
     banner: "Wanted: you",
     by: (login) => `Tip-off: @${login}`,
     anonymous: "Anonymous tip-off",
-    lawyer: "Call my lawyer",
-    andYou: "And you?",
+    lawyer: "That's me, claim my sheet",
+    andYou: "Your turn",
     mine: "My sheet",
-    versus: (me, who, them, verdict) => `You ${me} · ${who} ${them} · ${verdict}`,
+    versus: (me, who, them, verdict) => `You ${me}/100, ${who} ${them}/100: ${verdict}`,
     starsAhead: (n) => (n === 1 ? "one star ahead" : `${n} stars ahead`),
     starsBehind: (n) => (n === 1 ? "one star behind" : `${n} stars behind`),
     pointsAhead: (n) => (n === 1 ? "1 point ahead" : `${n} points ahead`),
@@ -1419,8 +1448,8 @@ const en: Dict = {
     titleCharge: (charge) => `Guilty of “${charge}”?`,
     guilty: "Guilty",
     cleared: "Cleared",
-    tally: (pct, n) => `${pct}% guilty · ${n}\u00a0${n === 1 ? "vote" : "votes"}`,
-    owner: (tally) => `The jury: ${tally}`,
+    tally: (pct, n) => `${pct}% guilty (${n}\u00a0${n === 1 ? "vote" : "votes"})`,
+    owner: (tally) => `Jury: ${tally}`,
     failed: "Vote not counted. Try again.",
   },
   bands: BANDS_TEXT.en,
@@ -1435,7 +1464,7 @@ const en: Dict = {
   },
   footer: {
     privacy: "Privacy",
-    credits3d: "3D credits",
+    credits3d: "Credits",
   },
   chrome: {
     home: "Azerit, home",
@@ -1449,7 +1478,7 @@ const en: Dict = {
   },
   privacy: {
     title: "Privacy",
-    intro: "Short, because we keep very little.",
+    intro: "In four lines. We read what is public: your LinkedIn profile, your GitHub, or the CV you give us. We keep your sheet for 90 days by default, never your CV. No contact details are shown, no ad cookies, no third-party tracking tools. You can delete your sheet any time: the link is under your sheet, and the removal request under one made on your behalf.",
     sections: [
       {
         h: "What we keep",
@@ -1469,7 +1498,7 @@ const en: Dict = {
       },
       {
         h: "Someone else's sheet",
-        p: `Anyone can generate a sheet for any public username: it relies on public data and stays in teasing mode. The username's owner can have it deleted by proving the GitHub account is theirs. A sheet someone else made from your LinkedIn or your CV, with no GitHub username: “Ask for its removal” under the sheet, or an email to ${CONTACT_EMAIL} with its link. We remove it after checking; your email is only used to reply.`,
+        p: `Anyone can generate a sheet for any public username: it relies on public data and stays a light-hearted tease. The username's owner can have it deleted by proving the GitHub account is theirs. A sheet someone else made from your LinkedIn or your CV, with no GitHub username: “Ask for its removal” under the sheet, or an email to ${CONTACT_EMAIL} with its link. We remove it after checking; your email is only used to reply.`,
       },
       {
         h: "Claiming your sheet",
@@ -1489,7 +1518,7 @@ const en: Dict = {
       },
       {
         h: "Crews",
-        p: "Nothing goes in without your tap. If you pick a school or a company under your sheet, we keep that choice with the sheet's ID and its stars: one school and one company at most. The school read from your profile stays private until you pick it. A crew's page shows each file's profile and stars, never a name; your GitHub username only if your sheet is claimed. To leave: “Leave”, under your sheet. Deleting your sheet removes you too, hiding it takes it out of the count.",
+        p: "Nothing goes in without your say-so. If you pick a school or a company under your sheet, we keep that choice with the sheet's ID and its stars: one school and one company at most. The school read from your profile stays private until you pick it. A crew's page shows each sheet's profile and stars, never a name; your GitHub username only if your sheet is claimed. To leave: “Leave”, under your sheet. Deleting your sheet removes you too, hiding it takes it out of the count.",
       },
       PRIMES_TEXT.en.privacy,
       {
@@ -1509,7 +1538,7 @@ const en: Dict = {
     invalid: "That email doesn't look valid.",
     fallback: "Write to us with the link to this sheet, we remove it after checking:",
   },
-  notFound: { title: "Page not found", text: "Even GitHub would return a 404 here.", home: "Back to home" },
+  notFound: { title: "Page not found", text: "This address isn't in any file.", home: "Back to home" },
   crash: { title: "The page didn't load", text: "The network may have dropped, or the site was just updated.", reload: "Reload" },
 };
 

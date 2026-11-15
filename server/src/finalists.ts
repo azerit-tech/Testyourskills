@@ -55,7 +55,7 @@ export function finalistsCsv(r: FinalistsReport): string {
 export function finalistsText(r: FinalistsReport): string {
   const lines = [
     `${r.prime.company} (${r.prime.id}) : ${r.finalists.length} finalistes sur ${r.total} inscriptions.`,
-    r.closed ? "Prime close : classement figé." : "Prime encore ouverte : classement provisoire, il bougera jusqu'à la clôture.",
+    r.closed ? "Prime terminée : classement figé." : "Prime encore ouverte : classement provisoire, il bougera jusqu'à la clôture.",
     "",
   ];
   for (const f of r.finalists) {

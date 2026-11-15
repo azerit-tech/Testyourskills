@@ -45,8 +45,8 @@ export function Rules() {
   const [text, setText] = useState<string | null | undefined>(undefined);
 
   useEffect(() => {
-    document.title = tr.title;
-  }, [tr.title]);
+    document.title = t.meta.titlePage(tr.title);
+  }, [t, tr.title]);
 
   useEffect(() => {
     if (isMock()) {
@@ -66,11 +66,11 @@ export function Rules() {
   return (
     <main className="page page-rules" id="main" aria-busy={text === undefined}>
       <article className="rules" lang="fr">
-        {lang === "en" && (
-          <p className="rules-en" lang="en">
-            {tr.enNote}
-          </p>
-        )}
+        {/* En tête, cinq lignes au « tu » : le texte juridique, dessous, garde son « vous ». */}
+        <p className="rules-en" lang={lang}>
+          {tr.brief}
+          {lang === "en" && ` ${tr.enNote}`}
+        </p>
         {text === null && <p className="primes-empty">{tr.error}</p>}
         {text && parseRules(text).map((b, i) => <RulesBlock key={i} b={b} />)}
       </article>
