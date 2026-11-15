@@ -2268,6 +2268,15 @@ button.cover-panel:focus-visible {
 .result-stage .card-slot {
   margin-bottom: 44px;
 }
+/* téléphones courts (375 × 667, 360 × 640) : la fiche rétrécit par sa hauteur pour tenir entière, avec le
+   lien qui la retourne, au-dessus de la barre fixe (128 px d'en-tête, 44 px de lien, 73 px de barre, 5 px
+   d'air). Inchangée à 390 × 844 et au-delà ; jamais sous 248 px de large, où elle ne se lirait plus. */
+@media (max-width: 640px) {
+  .page-result {
+    --card-w: clamp(248px, calc((100vh - 250px) * 0.6923), min(360px, calc(100vw - 32px)));
+    --card-w: clamp(248px, calc((100svh - 250px) * 0.6923), min(360px, calc(100vw - 32px)));
+  }
+}
 .card-slot:not(.show-front) .card-rig {
   opacity: 0;
 }

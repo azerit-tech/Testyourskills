@@ -55,6 +55,21 @@ describe("la barre « Fais la tienne » du visiteur", () => {
     expect(Number(rule![1])).toBeGreaterThan(10 + 52 + 10);
   });
 
+  it("téléphones courts : la fiche rétrécit par sa hauteur, elle et son lien tiennent au-dessus de la barre", () => {
+    const rule = /@media \(max-width: 640px\) \{\s*\.page-result \{[^}]*--card-w: clamp\((\d+)px, calc\(\(100svh - (\d+)px\) \* ([\d.]+)\), min\(360px, calc\(100vw - 32px\)\)\);/.exec(css);
+    expect(rule).not.toBeNull();
+    const [min, chrome, ratio] = rule!.slice(1).map(Number);
+    // 128 px d'en-tête, 44 px de lien, 73 px de barre : à 375 × 667 et 360 × 640, tout tient.
+    for (const [w, h] of [[375, 667], [360, 640], [390, 664]]) {
+      const width = Math.max(min, Math.min((h - chrome) * ratio, 360, w - 32));
+      expect(128 + width / (360 / 520) + 44).toBeLessThanOrEqual(h - 73);
+    }
+    // À 390 × 844, la fiche garde sa pleine largeur.
+    expect(Math.min((844 - chrome) * ratio, 360, 390 - 32)).toBe(358);
+    // À 320 × 568, la fiche au moins tient entière.
+    expect(128 + min / (360 / 520)).toBeLessThanOrEqual(568 - 73);
+  });
+
   it("qui a déjà sa fiche n'a pas de barre : « Ma fiche » est dans la barre du haut", () => {
     expect(page).toMatch(/visitor && settled && !other && <MakeYours/);
   });
