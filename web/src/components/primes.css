@@ -8,8 +8,10 @@
 
 .prime-card {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   align-content: start;
   gap: 8px;
+  min-width: 0;
   height: 100%;
   padding: var(--pad-block);
   border-radius: var(--r-block);
@@ -27,9 +29,10 @@
 }
 .prime-card-top {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+  min-width: 0;
   min-height: 32px;
 }
 .prime-logo {
@@ -42,13 +45,21 @@
   max-width: 200px;
   max-height: 56px;
 }
+/* un nom long revient à la ligne, sur deux lignes au plus : la carte garde sa largeur,
+   l'échéance reste à l'écran */
 .prime-name {
+  display: -webkit-box;
+  min-width: 0;
   overflow: hidden;
+  padding-top: 5px;
   font: var(--font-item);
   text-transform: uppercase;
   color: var(--cream);
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 .prime-when {
   flex: none;
@@ -80,15 +91,31 @@
   color: var(--c-text);
 }
 .prime-card-meta {
-  display: grid;
-  gap: 2px;
   font: var(--font-small);
   color: var(--c-text);
 }
-/* ce qu'on gagne : l'emphase, crème en gras */
+/* ce qu'on gagne : le titre de la carte, comme sur l'image de partage */
 .prime-card-prize {
-  font: 600 var(--t-16) / 1.4 var(--f-text);
+  font: var(--font-item);
+  text-transform: uppercase;
   color: var(--c-emphasis);
+}
+/* la carte entière est un lien ; sa dernière ligne le dit, au bas de la carte */
+.prime-card-go {
+  align-self: end;
+  margin-top: auto;
+  padding-top: 6px;
+  font: 500 var(--t-14) / 1.2 var(--f-text);
+  color: var(--c-action);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-decoration-color: rgba(255, 178, 198, 0.45);
+  text-underline-offset: 4px;
+}
+.prime-card:hover .prime-card-go,
+.prime-card:focus-visible .prime-card-go {
+  color: var(--c-emphasis);
+  text-decoration-color: currentColor;
 }
 
 /* ---------- l'accueil : une rangée qui défile ---------- */
@@ -123,11 +150,12 @@
   display: none;
 }
 .primes-row > li {
+  min-width: 0;
   scroll-snap-align: start;
 }
 /* la liste arrive : une case vide de la hauteur d'une prime tient la rangée */
 .prime-card-wait {
-  min-height: 152px;
+  min-height: 176px;
 }
 .primes-strip > .link-alt {
   justify-self: start;
@@ -233,7 +261,8 @@
 }
 .primes-group {
   display: grid;
-  gap: 10px;
+  gap: 12px;
+  min-width: 0;
   margin-top: 14px;
 }
 .primes-group h2,
@@ -244,8 +273,12 @@
 }
 .primes-grid {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   list-style: none;
+}
+.primes-grid > li {
+  min-width: 0;
 }
 
 .prime-head .prime-logo {
@@ -686,11 +719,25 @@
   .primes-page {
     max-width: var(--page-w);
   }
-  .primes-row {
-    grid-auto-columns: 280px;
-  }
+  /* les cartes remplissent le conteneur : deux primes, deux moitiés ; trois, trois tiers.
+     Une prime seule ne s'étire pas sur toute la page. */
+  .primes-row,
   .primes-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-auto-flow: row;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    overflow: visible;
+  }
+  .primes-row > li:only-child,
+  .primes-grid > li:only-child {
+    max-width: calc((var(--page-w) - 12px) / 2);
+  }
+  /* 20 px entre un titre de section et ses cartes */
+  .primes-strip,
+  .primes-group {
+    gap: 20px;
+  }
+  .primes-group {
+    margin-top: 20px;
   }
   /* la page d'une prime : l'avis et le bloc de la personne à gauche, le classement à droite */
   .page-prime {

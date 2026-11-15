@@ -158,6 +158,8 @@ const fr = {
   /** Le classement d'une prime terminée, et le formulaire. */
   boardFinal: "Classement final",
   addProof: "Ajouter un lien",
+  /** La dernière ligne d'une carte de prime : elle dit que la carte se touche, et où elle mène. */
+  card: { enter: "Entrer dans la course", see: "Voir la prime", board: "Voir le classement" },
   /** /reglement : le résumé en tête (au « tu », repris du texte qui suit, qui garde son « vous »), le sommaire, et la note de la page anglaise. */
   rulesPage: {
     summaryTitle: "En trois lignes",
@@ -310,6 +312,7 @@ const en: PrimesDict = {
   },
   boardFinal: "Final ranking",
   addProof: "Add a link",
+  card: { enter: "Enter the race", see: "See the bounty", board: "See the ranking" },
   rulesPage: {
     summaryTitle: "In three lines",
     summary: [

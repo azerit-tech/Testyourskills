@@ -54,13 +54,15 @@ export function PrimeCard({ p }: { p: PrimeView }) {
         <PrimeMark p={p} />
         <span className={`prime-when is-${p.phase}`}>{withSup(when(p))}</span>
       </span>
+      {/* ce qu'on gagne, en titre, comme sur l'image de partage ; puis le poste, puis où */}
+      <span className="prime-card-prize">{t.primes.interviews(p.interviews)}</span>
       <span className="prime-card-job">
         <span className="prime-tag">{t.primes.contract[p.contract]}</span> {p.positions.map((x) => t.positions[x]).join(", ")}
       </span>
-      {/* deux lignes, pas une phrase collée par une virgule : ce qu'on gagne, puis où */}
-      <span className="prime-card-meta">
-        <span className="prime-card-prize">{t.primes.interviews(p.interviews)}</span>
-        {where && <span>{where}</span>}
+      {where && <span className="prime-card-meta">{where}</span>}
+      {/* la carte entière se touche ; cette ligne le dit */}
+      <span className="prime-card-go">
+        {p.phase === "open" ? t.primes.card.enter : p.phase === "closed" ? t.primes.card.board : t.primes.card.see} <span aria-hidden>→</span>
       </span>
     </a>
   );
