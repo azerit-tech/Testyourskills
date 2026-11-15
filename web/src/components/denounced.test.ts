@@ -55,7 +55,7 @@ describe("le bloc d'une fiche dénoncée", () => {
     expect(html).toContain(">Quelqu'un a dénoncé Camille Ardent</h2>");
     expect(html.match(/pill-big/g)).toHaveLength(1);
     expect(html).toMatch(/class="pill pill-big">Ce n'est pas moi/);
-    expect(html).toMatch(/<p class="removal"><button type="button" class="link-quiet">C'est toi \? Demander le retrait de cette fiche<\/button><\/p><\/section>$/);
+    expect(html).toMatch(/<p class="removal"><button type="button" class="link-alt">C'est toi \? Demander le retrait de cette fiche<\/button><\/p><\/section>$/);
   });
 
   it("qui a déjà sa fiche n'a pas « faire la mienne »", () => {
