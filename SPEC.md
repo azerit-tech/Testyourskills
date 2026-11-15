@@ -1630,3 +1630,16 @@ Cinq critiques ont rejugé sur captures le site fusionné ; trois zones corrigé
 - Film : l'étoile en suspens n'est jamais pleine ; ligne radio 14 px sur téléphone, 16 au-delà ; sur réseau lent, une fiche servie vite garde sa poursuite ; « Voir ma poursuite » tant que le film n'a pas joué ici, mouvement réduit compris.
 - Pari en anglais : “Plea entered.” Fiche scellée : l'annonce dit « Fiche scellée ».
 - `?mock=1` reste la démo même quand le navigateur bloque son stockage.
+
+**Page d'une fiche (deuxième tour, fusionnée après coup)**
+- L'école n'affiche jamais de niveau, ni sur la tuile ni dans le détail ; la formule dit « (comptée) ». Une école absente de la liste s'arrête à 6/10 (plus de lettre).
+- Couleurs des blocs sous la fiche : prune pour partager et dénoncer, marine pour ce qui informe.
+- Le lien de la poursuite (« Voir ma poursuite » puis « Revoir ma poursuite ») est sur sa propre ligne, centré sous la fiche, quand l'en-tête est masqué.
+- « Supprimer ma fiche » n'existe qu'une fois, dans le pli « Fais appel », qui nomme la source qui manque. Les plis sont à l'impératif.
+- L'après-fiche attend le dossier (2,5 s au plus) et les bandes, puis entre d'un seul fondu : plus de décalage au chargement.
+- Email : « Garder ma fiche », « Garde ta fiche au-delà de 90 jours ». En anglais, le CV se dit “résumé”.
+- Le rang s'affiche en texte, et seulement à 10 places au plus du premier.
+- Texte partagé, dans l'ordre : la fiche, le pari, le profil et le rang, le point fort, le lien.
+- Le duel se fait avec la fiche qui t'a amené ; après suppression, « Ma fiche » est oubliée du navigateur.
+- Fiche dénoncée : « C'est moi » pour la personne visée ; pas de partage public après une dénonciation.
+- Bureau : le ciel au-dessus de la fiche se fond avant le décor, limité à 300 px.
