@@ -3566,10 +3566,52 @@ a.dossier-item:hover {
   .page-result.is-visitor .after {
     padding-top: 40px;
   }
-  /* qui a fait la fiche : une seule colonne, l'en-tête centré au-dessus de la fiche */
-  .page-result:not(.is-visitor) .wanted-head {
-    justify-items: center;
-    text-align: center;
+  /* qui a fait la fiche : deux colonnes, comme la vue publique en miroir. L'en-tête sur toute la largeur,
+     puis sa fiche à gauche (c'est son objet, elle suit le défilement) et les blocs à droite. Les mêmes
+     1 080 px que le reste du site : 360 px de fiche, 72 px d'air, 648 px de blocs. La page reste pleine
+     largeur (le ciel va d'un bord à l'autre) : ce sont les pistes de la grille qui centrent. */
+  .page-result:not(.is-visitor) {
+    display: grid;
+    grid-template-columns: minmax(var(--gutter), 1fr) 360px 72px minmax(0, 648px) minmax(var(--gutter), 1fr);
+    align-items: start;
+    align-content: start;
+    padding-top: 24px;
+  }
+  .page-result:not(.is-visitor) > .result-top {
+    display: contents;
+  }
+  /* « Revoir ma poursuite » reste sur la ligne de « AVIS DE RECHERCHE », à droite : la tête n'est plus centrée */
+  .page-result:not(.is-visitor) .wanted .chase-link {
+    position: absolute;
+    display: inline-flex;
+    width: auto;
+    margin: 0;
+  }
+  .page-result:not(.is-visitor) > .hidden-banner {
+    grid-column: 2 / 5;
+    width: auto;
+    margin: 8px 0 0;
+  }
+  .page-result:not(.is-visitor) .wanted {
+    grid-column: 2 / 5;
+    padding-bottom: 24px;
+  }
+  .page-result:not(.is-visitor) .result-stage {
+    grid-column: 2;
+    padding: 0;
+  }
+  .page-result:not(.is-visitor) > .after {
+    grid-column: 4;
+    max-width: none;
+    margin: 0;
+    padding: 0 0 56px;
+  }
+}
+/* la fiche suit le défilement quand l'écran est assez haut pour la montrer entière avec son lien */
+@media (min-width: 900px) and (min-height: 700px) {
+  .page-result:not(.is-visitor) .result-stage {
+    position: sticky;
+    top: 24px;
   }
 }
 

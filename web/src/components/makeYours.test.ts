@@ -38,6 +38,21 @@ describe("la barre « Fais la tienne » du visiteur", () => {
     expect(desktop).toMatch(/\.is-visitor \.result-top > \.you \{\s*grid-column: 2;/);
   });
 
+  it("ordinateur, personne fichée : deux colonnes aussi, sa fiche à gauche qui suit le défilement, les blocs à droite", () => {
+    const desktop = css.slice(css.indexOf("/* ============ ordinateur ============ */"));
+    const own = "\\.page-result:not\\(\\.is-visitor\\)";
+    // 360 px de fiche, 72 px d'air, 648 px de blocs : les 1 080 px du site.
+    expect(desktop).toMatch(new RegExp(`${own} \\{\\s*display: grid;\\s*grid-template-columns: minmax\\(var\\(--gutter\\), 1fr\\) 360px 72px minmax\\(0, 648px\\) minmax\\(var\\(--gutter\\), 1fr\\);`));
+    expect(360 + 72 + 648).toBe(1080);
+    expect(desktop).toMatch(new RegExp(`${own} \\.result-stage \\{\\s*grid-column: 2;`));
+    expect(desktop).toMatch(new RegExp(`${own} > \\.after \\{\\s*grid-column: 4;`));
+    // L'en-tête et le bandeau « fiche cachée » prennent toute la largeur.
+    expect(desktop).toMatch(new RegExp(`${own} \\.wanted \\{\\s*grid-column: 2 / 5;`));
+    expect(desktop).toMatch(new RegExp(`${own} > \\.hidden-banner \\{\\s*grid-column: 2 / 5;`));
+    // La fiche ne colle que sur un écran assez haut pour la montrer entière.
+    expect(desktop).toMatch(new RegExp(`@media \\(min-width: 900px\\) and \\(min-height: 700px\\) \\{\\s*${own} \\.result-stage \\{\\s*position: sticky;`));
+  });
+
   it("plus de pilule flottante : la barre prend toute la largeur, le bouton aussi", () => {
     expect(css).not.toMatch(/\.make-yours\s*\{/);
     expect(css).toMatch(/\.dock \{[^}]*right: 0;[^}]*left: 0;/);
