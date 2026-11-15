@@ -62,7 +62,7 @@
   --cream: #fff9cb;
   --lilac: #e5ddff;
   --lilac-2: #ccc2f5;
-  --lilac-dim: rgba(229, 221, 255, 0.62);
+  --lilac-dim: rgba(229, 221, 255, 0.66); /* 4,8:1 sur prune, le fond de bloc le plus clair */
   --lilac-faint: rgba(229, 221, 255, 0.14);
   --blush: #ffb2c6;
   --peach: #ffd3a5;
@@ -196,6 +196,10 @@ svg {
   outline: 2px solid var(--cream);
   outline-offset: 3px;
   border-radius: 6px;
+}
+/* un titre qui reçoit le focus par le code (fin du film) : le lecteur d'écran repart de là, sans anneau */
+[tabindex="-1"]:focus {
+  outline: none;
 }
 
 .sr-only {
@@ -497,7 +501,8 @@ svg {
 .input:focus,
 .email-form input:focus,
 .prime-input:focus {
-  box-shadow: inset 0 0 0 1.5px var(--c-text-2);
+  /* l'anneau du focus, net comme celui du reste du site : 2 px crème */
+  box-shadow: inset 0 0 0 2px var(--cream);
 }
 .field-prefix {
   color: var(--c-text-2);
@@ -516,7 +521,7 @@ svg {
 .input::placeholder,
 .email-form input::placeholder,
 .prime-input::placeholder {
-  color: rgba(229, 221, 255, 0.38);
+  color: rgba(229, 221, 255, 0.55); /* 4,9:1 sur le fond du champ */
 }
 .field.is-invalid,
 .field:has([aria-invalid="true"]),

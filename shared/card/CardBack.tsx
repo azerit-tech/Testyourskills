@@ -328,7 +328,7 @@ export function CardBackGraphic({ card, lang: langProp, idPrefix, className, x, 
       height={height}
       className={className}
       role="img"
-      aria-label={`${s.back.title} — ${card.name}`}
+      aria-label={`${s.back.title}, ${card.name}`}
       data-side="back"
       style={width === undefined ? { display: "block", width: "100%", height: "auto" } : undefined}
     >

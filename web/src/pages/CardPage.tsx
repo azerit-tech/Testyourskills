@@ -398,6 +398,17 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
     return () => window.removeEventListener("keydown", on);
   }, [animating, skip]);
 
+  // Le film fini ou passé, le focus va au titre de la fiche : le clavier et le lecteur
+  // d'écran reprennent là, pas en haut de la page.
+  const played = useRef(false);
+  useEffect(() => {
+    if (animating) played.current = true;
+    else if (settled && played.current) {
+      played.current = false;
+      document.querySelector<HTMLElement>(".page-result .wanted-head")?.focus({ preventScroll: true });
+    }
+  }, [animating, settled]);
+
   // Un toucher sur le film ne le saute plus (§18.48) : seul « Passer » le fait. L'ascenseur (?scene=walkout) garde son geste.
   const onStageClick = () => {
     if (scene === "film") return;
@@ -607,7 +618,7 @@ export function WantedHead({ card, children }: { card: CardData; children?: Reac
   const { t } = useT();
   return (
     <header className="wanted">
-      <h1 className="wanted-head">
+      <h1 className="wanted-head" tabIndex={-1}>
         <span className="wanted-kicker announce">{t.result.wanted}</span>
         <span className="sr-only">{t.result.wantedSep}</span>
         <span className="wanted-name">{card.login ? `@${card.login}` : card.name}</span>

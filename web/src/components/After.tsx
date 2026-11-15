@@ -446,11 +446,24 @@ function ImageAction({ kit, toast, file, src: server, filename, label, channel, 
 function ImagePanel({ src, onClose }: { src: string; onClose: () => void }) {
   const { t } = useT();
   const closeBtn = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const before = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     closeBtn.current?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
+      // Le focus reste dans le panneau : Tab tourne entre ce qui s'y touche.
+      if (e.key === "Tab" && panel.current) {
+        const items = [...panel.current.querySelectorAll<HTMLElement>("button, a[href], input, [tabindex]:not([tabindex='-1'])")];
+        const first = items[0];
+        const last = items[items.length - 1];
+        const at = document.activeElement;
+        if (!first || !last) return;
+        if (e.shiftKey ? at === first || !panel.current.contains(at) : at === last || !panel.current.contains(at)) {
+          e.preventDefault();
+          (e.shiftKey ? last : first).focus();
+        }
+      }
     };
     window.addEventListener("keydown", onKey);
     // La page ne défile pas derrière le panneau.
@@ -464,7 +477,7 @@ function ImagePanel({ src, onClose }: { src: string; onClose: () => void }) {
     };
   }, [onClose]);
   return createPortal(
-    <div className="out-panel" role="dialog" aria-modal="true" aria-label={t.result.share.download}>
+    <div ref={panel} className="out-panel" role="dialog" aria-modal="true" aria-label={t.result.share.download}>
       <button ref={closeBtn} type="button" className="out-panel-close" onClick={onClose} aria-label={t.common.close}>
         <IconClose />
       </button>

@@ -377,7 +377,7 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
   const stats = STAT_ORDER.map((code) => card.stats.find((st) => st.code === code)).filter((st): st is Stat => !!st);
   // Dossier scellé (shared/publicView.ts) : à la place de la note, du niveau et des étoiles, deux mots mats.
   const sealed = card.sealed ? sealedFace(lang, M.x - LEFT - 8) : null;
-  const ariaLabel = sealed ? `${s.card} — ${s.sealed}, ${s.sealedSub} — ${card.name}` : `${s.card} ${levelLabel} ${card.overall}/100, ${s.stars(n)} — ${card.name}`;
+  const ariaLabel = sealed ? `${s.card}, ${s.sealed}, ${s.sealedSub}, ${card.name}` : `${s.card} ${levelLabel} ${card.overall}/100, ${s.stars(n)}, ${card.name}`;
   // Les six traits ne font pas la note d'une fiche jugée sur la grille : leur étiquette le dit.
   const traitsLabel = card.grid ? s.traitsNote : s.traits;
 
