@@ -123,22 +123,14 @@ function BoardLink() {
   );
 }
 
-/** L'ancre du top de la semaine, sur l'accueil (WeekBoard.tsx). */
-const BOARD_ID = "board-title";
+/** L'ancre du top de la semaine, sur l'accueil (WeekBoard.tsx, WEEK_ANCHOR) : l'accueil y descend une fois posé. */
+const BOARD_ID = "semaine";
 
-/** Vers le top de la semaine : le tableau se charge après l'accueil, on l'attend pour y descendre. */
+/** Vers le top de la semaine : l'adresse garde son ancre, l'accueil attend sa mise en page pour y descendre. */
 function toBoard(e: MouseEvent<HTMLAnchorElement>) {
   if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
   e.preventDefault();
-  navigate("/");
-  let tries = 0;
-  const seek = () => {
-    if (window.location.pathname !== "/") return;
-    const board = document.getElementById(BOARD_ID);
-    if (board) board.scrollIntoView({ block: "center" });
-    else if (++tries < 50) window.setTimeout(seek, 100);
-  };
-  window.setTimeout(seek, 0);
+  navigate(`/#${BOARD_ID}`);
 }
 
 /* ---------- partage ---------- */

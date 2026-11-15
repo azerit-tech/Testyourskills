@@ -27,9 +27,16 @@ export function usePath(): string {
   );
 }
 
+/** L'adresse d'arrivée : la requête en cours (?mock=1, ?lang=) recopiée, toujours avant l'ancre (« /?mock=1#semaine »). */
+export function withQuery(to: string, search: string): string {
+  if (to.includes("?") || !search) return to;
+  const i = to.indexOf("#");
+  return i < 0 ? to + search : to.slice(0, i) + search + to.slice(i);
+}
+
 export function navigate(to: string, opts: { replace?: boolean; state?: unknown; keepScroll?: boolean } = {}) {
   // On garde la query (?mock=1) pour ne pas perdre le mode démo en route.
-  const url = to.includes("?") ? to : to + window.location.search;
+  const url = withQuery(to, window.location.search);
   if (opts.replace) window.history.replaceState(opts.state ?? null, "", url);
   else window.history.pushState(opts.state ?? null, "", url);
   if (!opts.keepScroll) window.scrollTo({ top: 0 });

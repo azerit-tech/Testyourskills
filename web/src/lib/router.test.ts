@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { isSitePage } from "../../../shared/routes";
-import { routeOf } from "./router";
+import { routeOf, withQuery } from "./router";
+
+describe("withQuery", () => {
+  it("recopie la requête avant l'ancre, jamais après (« /?mock=1#semaine »)", () => {
+    expect(withQuery("/#semaine", "?mock=1")).toBe("/?mock=1#semaine");
+    expect(withQuery("/c/abc", "?mock=1&lang=fr")).toBe("/c/abc?mock=1&lang=fr");
+    expect(withQuery("/?x=1#semaine", "?mock=1")).toBe("/?x=1#semaine");
+    expect(withQuery("/#semaine", "")).toBe("/#semaine");
+  });
+});
 
 describe("routeOf (§18.27)", () => {
   it("une page à venir n'est jamais un pseudo, quelle que soit la casse", () => {

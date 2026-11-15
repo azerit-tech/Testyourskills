@@ -19,7 +19,7 @@ import { CardView } from "../card/CardView";
 import { Cover } from "../components/Cover";
 import { EntryForm } from "../components/EntryForm";
 import { ProfileWall } from "../components/ProfileWall";
-import { WeekBoard } from "../components/WeekBoard";
+import { WEEK_ANCHOR, WeekBoard } from "../components/WeekBoard";
 import { BandsTop } from "../components/BandsTop";
 import { PrimesStrip } from "../components/Primes";
 import { Stars } from "../components/Stars";
@@ -188,6 +188,41 @@ export function ExampleCard({ card, href, pieces }: Showcase) {
 
 const reducedMotion = () => !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
+/** Venu par l'ancre du top (« /#semaine », depuis le partage d'une fiche). */
+const atWeekAnchor = () => window.location.hash.slice(1).split("?")[0] === WEEK_ANCHOR;
+
+/**
+ * L'accueil ouvert sur « /#semaine » : le tableau n'est pas à sa place à la première image (la
+ * couverture et la fiche d'exemple prennent leur hauteur ensuite). On y descend quand le top a
+ * répondu, puis de nouveau quand les polices et la vitrine sont posées, tant que la personne n'a
+ * pas défilé elle-même. Le titre du tableau arrive sous la barre du haut (scroll-margin-top).
+ */
+function useWeekAnchor(topKnown: boolean) {
+  useEffect(() => {
+    if (!topKnown || !atWeekAnchor()) return;
+    let moved = false;
+    const mine = () => {
+      moved = true;
+    };
+    const go = () => {
+      if (moved || !atWeekAnchor()) return;
+      document.getElementById(WEEK_ANCHOR)?.scrollIntoView({ block: "start" });
+    };
+    const opts = { passive: true, once: true } as const;
+    window.addEventListener("wheel", mine, opts);
+    window.addEventListener("touchstart", mine, opts);
+    window.addEventListener("keydown", mine, opts);
+    const timers = [0, 300, 800, 1600].map((ms) => window.setTimeout(go, ms));
+    void document.fonts?.ready.then(go);
+    return () => {
+      timers.forEach((t) => window.clearTimeout(t));
+      window.removeEventListener("wheel", mine);
+      window.removeEventListener("touchstart", mine);
+      window.removeEventListener("keydown", mine);
+    };
+  }, [topKnown]);
+}
+
 export function Home() {
   const { t } = useT();
   const h = t.home;
@@ -199,6 +234,7 @@ export function Home() {
   const hook = homeHook(h, useAppConfig());
   // Revenu en plein film : la fiche existe, sa note attend la poursuite (la case reste « Ta place »).
   const owed = !!mem.mine && filmOwed(mem.mine.id);
+  useWeekAnchor(top !== undefined);
 
   useEffect(() => {
     document.title = t.meta.title;

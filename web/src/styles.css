@@ -1152,6 +1152,11 @@ button.cover-panel:focus-visible {
   padding-top: 0;
   padding-bottom: 0;
 }
+/* venu par « /#semaine » : le titre du tableau s'arrête à 24 px du haut de l'écran
+   (la marge de défilement de la page, 80 px, est faite pour les champs ; ici rien ne la demande) */
+.page-home .board {
+  scroll-margin-top: -56px;
+}
 .home-proof > .board {
   max-width: none;
   margin: 0;
