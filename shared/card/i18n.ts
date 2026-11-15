@@ -10,6 +10,11 @@ export const STRINGS = {
     questioned: (s: number) => `Dossier lu par Azerit en ${s}${NBSP}s`,
     evidence: "preuves",
     percent: (n: number) => `${n}${NBSP}%`,
+    /** La part de la note appuyée sur des preuves : « prouvé à 95 % ». */
+    proven: (n: number) => `prouvé à ${n}${NBSP}%`,
+    /** L'étiquette des six barres du recto (§18.48) : des traits, pas la note. */
+    traits: "Portrait en six traits",
+    traitsNote: `Portrait en six traits · la note${NBSP}: huit critères`,
     ai: "IA",
     cvStamp: "D'APRÈS LE CV",
     linkedinStamp: "D'APRÈS LINKEDIN",
@@ -58,6 +63,9 @@ export const STRINGS = {
     questioned: (s: number) => `File read by Azerit in ${s}${NBSP}s`,
     evidence: "evidence",
     percent: (n: number) => `${n}%`,
+    proven: (n: number) => `${n}% proven`,
+    traits: "A portrait in six traits",
+    traitsNote: "A portrait in six traits · the rating: eight criteria",
     ai: "AI",
     cvStamp: "PER THE CV",
     linkedinStamp: "PER LINKEDIN",

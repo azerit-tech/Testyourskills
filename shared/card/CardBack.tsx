@@ -181,7 +181,7 @@ export function CardBackGraphic({ card, lang: langProp, idPrefix, className, x, 
         <Txt x={LEFT + 17} y={29.5} font="sans-600" size={10} ls={2.2} fill={th.inkSoft} opacity={0.85}>
           AZERIT
         </Txt>
-        {!sealed && <Stars n={n} onSky={false} />}
+        {!sealed && <Stars n={n} x={RIGHT - 94} y={18} size={14} gap={2} />}
 
         <Txt x={LEFT} y={BACK_LAYOUT.title.y - 27} font="mono-400" size={8} ls={0.6} fill={th.inkSoft} opacity={0.6}>
           {sub}

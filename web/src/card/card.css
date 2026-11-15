@@ -154,7 +154,7 @@
 /* ------------------------------------------------------------------ */
 /* Les étoiles s'allument à l'arrivée, option starsIntro de CardView :  */
 /* une à une, 120 ms d'écart, de la première allumée (data-star 0, la   */
-/* plus à droite) à la dernière. Rien en mouvement réduit.              */
+/* plus à gauche) à la dernière. Rien en mouvement réduit.              */
 /* ------------------------------------------------------------------ */
 
 .tys-card.is-stars-intro .tys-card__svg:not([data-side="back"]) .tys-star-on {

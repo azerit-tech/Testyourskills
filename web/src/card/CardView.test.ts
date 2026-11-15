@@ -9,13 +9,13 @@ import { CardView, CardViewOptions } from "./CardView";
 const card = { ...FIXTURES.silver, avatarUrl: undefined };
 
 describe("les étoiles s'allument à l'arrivée", () => {
-  it("désactivé par défaut ; activé, chaque étoile allumée porte son rang, de la plus à droite à la dernière", () => {
+  it("désactivé par défaut ; activé, chaque étoile allumée porte son rang, de la plus à gauche à la dernière", () => {
     expect(renderToStaticMarkup(createElement(CardView, { card }))).not.toContain("is-stars-intro");
     const html = renderToStaticMarkup(createElement(CardView, { card, starsIntro: true }));
     expect(html).toContain("is-stars-intro");
-    // silver : 67, quatre étoiles allumées, rangs 0 à 3 de droite à gauche
+    // silver : 67, quatre étoiles allumées, rangs 0 à 3 de gauche à droite
     const ranks = [...html.matchAll(/class="tys-star-on" data-star="(\d)"/g)].map((m) => Number(m[1]));
-    expect(ranks).toEqual([3, 2, 1, 0]);
+    expect(ranks).toEqual([0, 1, 2, 3]);
   });
 });
 
