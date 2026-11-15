@@ -1163,8 +1163,8 @@ const en: Dict = {
       words: {
         plea: (pleaded, gap) => `I pleaded ${pleaded}: ${{ over: "overconfident", exact: "clear-eyed", under: "too modest" }[gap]}.`,
         sheet: (stars, level, overall) => `My dev rap sheet: ${stars} ${level}, ${overall}/100.`,
-        file: (stars, level, overall) => `My dev rap sheet, by Azerit's hiring scorecard: ${stars} ${level}, ${overall}/100.`,
-        profile: (label) => `The “${label}” profile`,
+        file: (stars, level, overall) => `My dev rap sheet, scored on Azerit's hiring scorecard: ${stars} ${level}, ${overall}/100.`,
+        profile: (label) => `Profile: “${label}”`,
         charge: (status) => `Charge: “${status}”.`,
         ai: (secs) => `Rap sheet drawn up by Azerit in ${secs}s.`,
         sealed: "A rap sheet opened at Azerit, code still unproven",

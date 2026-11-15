@@ -65,10 +65,10 @@ describe("texte de partage d'une fiche", () => {
   it("en anglais", () => {
     const x: CardShare = { ...card, level: "Arsonist", plea: 6, profile: "Undercover", rank: "#7 this week", finding: "61% of recent commits go out between 10 p.m. and 5 a.m." };
     expect(shareText(en, x, URL)).toBe(
-      `My dev rap sheet: ★★★★☆☆ Arsonist, 71/100.\nI pleaded ★★★★★★: overconfident.\nThe “Undercover” profile, #7 this week. 61% of recent commits go out between 10 p.m. and 5 a.m. Rap sheet drawn up by Azerit in 12s. Get yours: ${URL}`,
+      `My dev rap sheet: ★★★★☆☆ Arsonist, 71/100.\nI pleaded ★★★★★★: overconfident.\nProfile: “Undercover”, #7 this week. 61% of recent commits go out between 10 p.m. and 5 a.m. Rap sheet drawn up by Azerit in 12s. Get yours: ${URL}`,
     );
     expect(shareLead(en, { ...x, plea: null, finding: null })).toBe(
-      "My dev rap sheet: ★★★★☆☆ Arsonist, 71/100.\nThe “Undercover” profile, #7 this week. Charge: “Commits de 3 h du matin”. Rap sheet drawn up by Azerit in 12s. Get yours:",
+      "My dev rap sheet: ★★★★☆☆ Arsonist, 71/100.\nProfile: “Undercover”, #7 this week. Charge: “Commits de 3 h du matin”. Rap sheet drawn up by Azerit in 12s. Get yours:",
     );
   });
 });
@@ -122,7 +122,7 @@ describe("texte de partage avec la grille de recrutement (§18.37)", () => {
       `Ma fiche de dev selon la grille de recrutement d'Azerit${N}: ★★★★☆☆ Menace publique, 61/100.\nProfil «${N}Oiseau de nuit${N}». Point fort${N}: niveau du code, 8/10. Fais la tienne${N}:`,
     );
     expect(shareLead(en, { ...graded, level: "Public menace", profile: "Night owl", strong: "Top strength: code level, 8/10." })).toBe(
-      "My dev rap sheet, by Azerit's hiring scorecard: ★★★★☆☆ Public menace, 61/100.\nThe “Night owl” profile. Top strength: code level, 8/10. Get yours:",
+      "My dev rap sheet, scored on Azerit's hiring scorecard: ★★★★☆☆ Public menace, 61/100.\nProfile: “Night owl”. Top strength: code level, 8/10. Get yours:",
     );
     // L'exemple du rapport : la fiche, le pari en chute, le profil et son rang, le point fort.
     expect(shareLead(fr, { ...graded, stars: 5, level: "Menace publique", overall: 79, plea: 3, profile: "Machine à livrer", rank: "4e cette semaine", strong: `Point fort${N}: open source, 10/10.` })).toBe(
@@ -146,7 +146,7 @@ describe("un dossier à deux sources se partage comme une fiche (§18.36)", () =
       `Ma fiche de dev selon la grille de recrutement d'Azerit${N}: ★★★☆☆☆ Pyromane, 57/100.\nProfil «${N}Oiseau de nuit${N}». Point fort${N}: niveau du code, 8/10. Deux sources au dossier${N}: LinkedIn et GitHub. Fais la tienne${N}:`,
     );
     expect(shareLead(en, { ...dossier, level: "Arsonist", profile: "Night owl", strong: "Top strength: code level, 8/10.", exhibits: "résumé" })).toBe(
-      "My dev rap sheet, by Azerit's hiring scorecard: ★★★☆☆☆ Arsonist, 57/100.\nThe “Night owl” profile. Top strength: code level, 8/10. Two sources on file: résumé and GitHub. Get yours:",
+      "My dev rap sheet, scored on Azerit's hiring scorecard: ★★★☆☆☆ Arsonist, 57/100.\nProfile: “Night owl”. Top strength: code level, 8/10. Two sources on file: résumé and GitHub. Get yours:",
     );
     for (const w of [fr, en]) expect(shareLead(w, dossier)).not.toMatch(/sous-vend|annonce \d|en montre plus|undersell|claims \d|shows more/i);
   });
@@ -163,7 +163,7 @@ describe("dossier vide fait par un tiers, non revendiqué : le partage ne dit pa
   it("ni note, ni étoiles, ni pari, pour une fiche comme pour un dossier à deux sources", () => {
     const sealedCard: CardShare = { ...card, overall: 20, stars: 1, plea: 3, sealed: true };
     expect(shareLead(fr, sealedCard)).toBe(`Une fiche ouverte chez Azerit, le code reste à prouver. Profil «${N}Sous couverture${N}». Fais la tienne${N}:`);
-    expect(shareLead(en, sealedCard)).toBe("A rap sheet opened at Azerit, code still unproven. The “Sous couverture” profile. Get yours:");
+    expect(shareLead(en, sealedCard)).toBe("A rap sheet opened at Azerit, code still unproven. Profile: “Sous couverture”. Get yours:");
     const sealedCmp: CardShare = { ...sealedCard, graded: true, exhibits: "LinkedIn" };
     for (const w of [fr, en]) {
       for (const x of [sealedCard, sealedCmp]) {
