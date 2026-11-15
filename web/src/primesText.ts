@@ -69,7 +69,6 @@ const fr = {
     boardEmptyClosed: "Prime terminée sans inscription.",
     total: (k: number) => plural(k, "fiche en course", "fiches en course"),
     totalClosed: (k: number) => plural(k, "fiche classée", "fiches classées"),
-    frozen: "Prime terminée\u00a0: le classement est figé.",
     you: (rank: number, total: number) => `Tu es ${ordFr(rank)} sur ${total}.`,
     would: (rank: number, total: number) => `En t'inscrivant maintenant, tu serais ${ordFr(rank)} sur ${total}.`,
     withdraw: "Me retirer",
@@ -124,6 +123,58 @@ const fr = {
   privacy: {
     h: "Les primes",
     p: "Rien n'est gardé sans «\u00a0Entrer dans la course\u00a0». Si tu entres dans la course, on garde ton pseudo GitHub, la prime, ta fiche, ta ligue, ton email, tes liens de preuves, la date de ton accord, ta réponse sur l'âge et sur le lieu, ta note et l'état de ta candidature. Le classement public montre ton pseudo, ta note et ton rang\u00a0; ton email et tes preuves ne sont jamais publics. L'entreprise de la prime ne reçoit ton profil (pseudo, email, lien de fiche, preuves) que si tu es finaliste, comme tu l'as accepté. «\u00a0Me retirer\u00a0», sur la page de la prime, efface l'inscription tout de suite\u00a0; supprimer ou masquer ta fiche aussi. Sans victoire, tout est effacé 30 jours après la fin de la saison.",
+  },
+  /* --- clés neuves de la revue du 15 novembre (SPEC §18.48), groupées --- */
+  /** La porte d'entrée d'une prime : trois étapes numérotées, cochées selon l'état. */
+  steps: {
+    title: "Entrer dans la course",
+    card: "Ta fiche",
+    proof: "Prouver que c'est toi (GitHub)",
+    enter: "Entrer dans la course",
+    /** Pourquoi GitHub : l'expérience d'abord, le code comme preuve. */
+    why: "Pourquoi GitHub ? Ton parcours compte d'abord, ton code en apporte la preuve : une prime classe les fiches dont le compte GitHub est prouvé.",
+    done: "fait",
+    /** Une fiche LinkedIn ou CV, sans pseudo GitHub. */
+    noGithub: "Ta fiche n'a pas encore de GitHub. Ajoute-le sous ta fiche, puis reviens ici.",
+    openCard: "Ouvrir ma fiche",
+    prove: "Prouver que c'est moi",
+    proveNote: "GitHub confirme ton pseudo, rien d'autre : aucun accès à tes repos.",
+    /** La preuve par GitHub n'est pas branchée sur ce serveur : le geste vit sous la fiche. */
+    proveOnCard: "« C'est moi » est sous ta fiche.",
+  },
+  /** Le bloc de la personne inscrite : en course, puis les états de fin. */
+  mine: {
+    place: (rank: number, total: number) => `${ordFr(rank)} sur ${total}`,
+    moves: "Ton rang bouge avec ta note.",
+    sharePlace: "Partager ma place",
+    sharePlaceText: (rank: number, total: number, job: string, company: string) => `Je suis ${ordFr(rank)} sur ${total} pour ${job} chez ${company}. Fais ta fiche et entre dans la course :`,
+    withdrawAsk: "Te retirer de cette prime ? Ton inscription et tes réponses sont effacées.",
+    stay: "Rester",
+    over: "Prime terminée",
+    final: "Classement final",
+    finalText: "La prime est terminée : ton rang ne bouge plus.",
+    shareFinalText: (rank: number, total: number, job: string, company: string) => `J'ai fini ${ordFr(rank)} sur ${total} pour ${job} chez ${company}. Fais ta fiche :`,
+    finalist: "Tu es finaliste",
+    finalistText: (rank: number, total: number, company: string) => `${ordFr(rank)} sur ${total}. ${company} reçoit ton profil, comme tu l'as accepté.`,
+    shareFinalistText: (job: string, company: string) => `Finaliste pour ${job} chez ${company}. Fais ta fiche :`,
+    winner: "Prime emportée",
+    winnerText: (company: string) => `Tu remportes la prime de ${company} : l'entretien est à toi.`,
+    shareWinnerText: (job: string, company: string) => `Prime emportée : ${job} chez ${company}. Fais ta fiche :`,
+    share: "Partager",
+  },
+  /** Le classement d'une prime terminée, et le formulaire. */
+  boardFinal: "Classement final",
+  addProof: "Ajouter un lien",
+  /** /reglement : le résumé en tête, le sommaire, et la note de la page anglaise. */
+  rulesPage: {
+    summaryTitle: "En trois lignes",
+    summary: [
+      "Gratuit, sans tirage au sort, ouvert à toute personne de 18 ans ou plus.",
+      "Le rang d'une prime dépend de la note globale de la fiche, et d'elle seule. Les dix premières places sont finalistes, puis une relecture humaine choisit.",
+      "Tu te retires quand tu veux, sans raison à donner. Sans victoire, ton inscription est effacée 30 jours après la fin de la saison.",
+    ],
+    toc: "Sommaire",
+    binding: "",
   },
 };
 
@@ -184,7 +235,6 @@ const en: PrimesDict = {
     boardEmptyClosed: "Bounty closed with no entries.",
     total: (k) => pluralEn(k, "sheet in the race", "sheets in the race"),
     totalClosed: (k) => pluralEn(k, "sheet ranked", "sheets ranked"),
-    frozen: "Bounty closed: the ranking is final.",
     you: (rank, total) => `You're ${ordEn(rank)} of ${total}.`,
     would: (rank, total) => `If you entered now, you'd be ${ordEn(rank)} of ${total}.`,
     withdraw: "Withdraw",
@@ -238,6 +288,50 @@ const en: PrimesDict = {
   privacy: {
     h: "Bounties",
     p: "Nothing is kept unless you hit “Enter the race”. If you enter, we keep your GitHub username, the bounty, your sheet, your league, your email, your supporting links, the date of your agreement, your answers on age and location, your rating and your entry's status. The public board shows your username, rating and rank; your email and supporting links are never public. The bounty's company only receives your profile (username, email, sheet link, supporting links) if you're a finalist, as you agreed. “Withdraw”, on the bounty's page, erases the entry at once; deleting or hiding your sheet does too. Without a win, everything is erased 30 days after the season ends.",
+  },
+  steps: {
+    title: "Enter the race",
+    card: "Your sheet",
+    proof: "Prove it's you (GitHub)",
+    enter: "Enter the race",
+    why: "Why GitHub? Your track record comes first, your code is the proof: a bounty ranks the sheets whose GitHub account is proven.",
+    done: "done",
+    noGithub: "Your sheet has no GitHub yet. Add it under your sheet, then come back here.",
+    openCard: "Open my sheet",
+    prove: "That's me: prove it",
+    proveNote: "GitHub confirms your username, nothing else: no access to your repositories.",
+    proveOnCard: "“That's me” is under your sheet.",
+  },
+  mine: {
+    place: (rank, total) => `${ordEn(rank)} of ${total}`,
+    moves: "Your rank moves with your rating.",
+    sharePlace: "Share my spot",
+    sharePlaceText: (rank, total, job, company) => `I'm ${ordEn(rank)} of ${total} for ${job} at ${company}. Make your sheet and enter the race:`,
+    withdrawAsk: "Withdraw from this bounty? Your entry and your answers are erased.",
+    stay: "Stay",
+    over: "Bounty over",
+    final: "Final ranking",
+    finalText: "The bounty is over: your rank no longer moves.",
+    shareFinalText: (rank, total, job, company) => `I finished ${ordEn(rank)} of ${total} for ${job} at ${company}. Make your sheet:`,
+    finalist: "You're a finalist",
+    finalistText: (rank, total, company) => `${ordEn(rank)} of ${total}. ${company} receives your profile, as you agreed.`,
+    shareFinalistText: (job, company) => `Finalist for ${job} at ${company}. Make your sheet:`,
+    winner: "Bounty won",
+    winnerText: (company) => `You win ${company}'s bounty: the interview is yours.`,
+    shareWinnerText: (job, company) => `Bounty won: ${job} at ${company}. Make your sheet:`,
+    share: "Share",
+  },
+  boardFinal: "Final ranking",
+  addProof: "Add a link",
+  rulesPage: {
+    summaryTitle: "In three lines",
+    summary: [
+      "Free, no random draw, open to anyone 18 or older.",
+      "A bounty's rank depends on the sheet's overall rating, and nothing else. The top ten become finalists, then a human review decides.",
+      "You can withdraw any time, no reason needed. Without a win, your entry is erased 30 days after the season ends.",
+    ],
+    toc: "Contents",
+    binding: "These are the season's contest rules. Only the French text below is binding.",
   },
 };
 

@@ -1,22 +1,29 @@
 // Les primes (§18.4) : /primes, le tableau des primes de la saison ;
 // /primes/:id, l'avis de recherche de l'entreprise, son classement (les vingt
-// premiers, par pseudo GitHub), son rang, et « Concourir ». Même système que
-// les bandes : aplats, titres crème, pilules rose poudré, aucune lueur.
-// Sans prime dans la saison, ces pages ramènent à l'accueil (App.tsx).
+// premiers, par pseudo GitHub, avec leur visage), et le bloc de la personne :
+// trois étapes numérotées pour entrer dans la course, puis sa place, à partager,
+// et les états de fin (classement final, finaliste, prime emportée).
+// Même système que les bandes : aplats, titres crème, aucune lueur.
+// Serveur muet : « le commissariat ne répond pas » ; prime inconnue : elle le dit.
 import { useEffect, useId, useState } from "react";
-import type { FormEvent } from "react";
-import type { BoardRow, PrimeMe, PrimePageData, PrimeView } from "../../../shared/primes";
+import type { FormEvent, ReactNode } from "react";
+import type { BoardRow, MyEntry, PrimeMe, PrimePageData, PrimeView } from "../../../shared/primes";
 import { cleanProof, MAX_PROOFS } from "../../../shared/primes";
+import { Avatar } from "../components/Avatar";
+import { BusyDots } from "../components/Busy";
 import { EntryForm } from "../components/EntryForm";
+import { PrimeNotFound, Unreachable } from "../components/ErrorPage";
 import { useToast } from "../components/After";
 import { IconLink, IconShare } from "../components/Icons";
-import { PrimeCard, PrimeMark, usePrimeWhen } from "../components/Primes";
+import { PrimeCard, PrimeMark, usePrimeWhen, withSup } from "../components/Primes";
 import { Stars } from "../components/Stars";
 import { pick, useT } from "../i18n";
 import { api, ApiError } from "../lib/api";
 import { primesApi, type JoinBody } from "../lib/primes";
-import { onLinkClick } from "../lib/router";
+import { useRemote } from "../lib/remote";
+import { navigate, onLinkClick } from "../lib/router";
 import { dayLabel, useAppConfig } from "../lib/season";
+import { myCard, type MyCard } from "../lib/session";
 import { hasNativeShare } from "../lib/sharing";
 import { copyText, isTouch } from "../lib/util";
 import "../components/primes.css";
@@ -26,39 +33,40 @@ import "../components/primes.css";
 export function PrimesList() {
   const { t } = useT();
   const tl = t.primes.list;
-  const [primes, setPrimes] = useState<PrimeView[] | null>(null);
+  const primes = useRemote<PrimeView[]>(() => primesApi.list(), []);
 
   useEffect(() => {
     document.title = t.meta.titlePage(tl.title);
   }, [tl.title]);
 
+  // Une saison sans prime n'a pas de page des primes : l'accueil, comme le serveur le fait pour l'adresse.
+  const none = primes.s === "ok" && primes.data.length === 0;
   useEffect(() => {
-    let alive = true;
-    void primesApi.list().then((l) => alive && setPrimes(l));
-    return () => {
-      alive = false;
-    };
-  }, []);
+    if (none) navigate("/", { replace: true });
+  }, [none]);
 
-  const groups: [string, PrimeView[]][] = primes
-    ? ([
-        [tl.open, primes.filter((p) => p.phase === "open")],
-        [tl.later, primes.filter((p) => p.phase === "soon")],
-        [tl.done, primes.filter((p) => p.phase === "closed")],
-      ] as [string, PrimeView[]][]).filter(([, l]) => l.length > 0)
-    : [];
+  if (primes.s === "down" || primes.s === "none") return <Unreachable />;
+  if (primes.s === "wait" || none) return <main className="page page-primes" id="main" aria-busy />;
+
+  const list = primes.data;
+  const groups = (
+    [
+      [tl.open, list.filter((p) => p.phase === "open")],
+      [tl.later, list.filter((p) => p.phase === "soon")],
+      [tl.done, list.filter((p) => p.phase === "closed")],
+    ] as [string, PrimeView[]][]
+  ).filter(([, l]) => l.length > 0);
 
   return (
-    <main className="page page-primes" id="main" aria-busy={primes === null}>
+    <main className="page page-primes" id="main">
       <section className="primes-page">
         <h1>{tl.title}</h1>
         <p className="primes-intro">{tl.intro}</p>
-        {primes && primes.length === 0 && <p className="primes-empty">{tl.empty}</p>}
-        {groups.map(([title, list]) => (
+        {groups.map(([title, group]) => (
           <div key={title} className="primes-group">
             <h2>{title}</h2>
             <ul className="primes-grid">
-              {list.map((p) => (
+              {group.map((p) => (
                 <li key={p.id}>
                   <PrimeCard p={p} />
                 </li>
@@ -73,6 +81,7 @@ export function PrimesList() {
 
 /* ---------- /primes/:id ---------- */
 
+/** Une ligne du classement : la même grille que le top de la semaine, visage compris. */
 function Row({ r, me }: { r: BoardRow; me: boolean }) {
   const { t } = useT();
   const href = `/c/${r.cardId}`;
@@ -80,6 +89,7 @@ function Row({ r, me }: { r: BoardRow; me: boolean }) {
     <li>
       <a className={`board-row prime-row${me ? " is-me" : ""}`} href={href} onClick={(e) => onLinkClick(e, href)} aria-label={t.home.top.rowLabel(r.rank, r.login, r.overall)}>
         <span className="board-rank">{r.rank}</span>
+        <Avatar login={r.login} />
         <span className="board-login">@{r.login}</span>
         <Stars n={r.stars} size={14} />
         <span className="board-score">{r.overall}</span>
@@ -88,13 +98,13 @@ function Row({ r, me }: { r: BoardRow; me: boolean }) {
   );
 }
 
+/** Le partage d'une prime ou de sa place : la feuille du téléphone, sinon le texte et le lien au presse-papier. */
 function usePrimeShare(toast: (m: string) => void) {
   const { t, lang } = useT();
   const native = hasNativeShare() && isTouch();
-  const share = async (p: PrimeView, job: string) => {
+  const share = async (p: PrimeView, text: string) => {
     // Partagé depuis le site en anglais, le lien le dit : son aperçu sort en anglais.
     const url = `${window.location.origin}/primes/${p.id}${lang === "en" ? "?lang=en" : ""}`;
-    const text = t.primes.page.shareText(p.company, job);
     if (native) {
       try {
         await navigator.share({ title: "Azerit", text, url });
@@ -108,6 +118,190 @@ function usePrimeShare(toast: (m: string) => void) {
   return { share, native };
 }
 
+interface MineProps {
+  prime: PrimeView;
+  entry: MyEntry;
+  job: string;
+  native: boolean;
+  onShare: (text: string) => void;
+  onWithdraw: () => Promise<void>;
+}
+
+/** Le bloc de la personne inscrite : sa place à partager, puis les états de fin. Le retrait se confirme sur place. */
+function Mine({ prime, entry, job, native, onShare, onWithdraw }: MineProps) {
+  const { t } = useT();
+  const tm = t.primes.mine;
+  const [asking, setAsking] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const closed = prime.phase === "closed";
+
+  // Une prime terminée ne parle plus au présent : classement final, finaliste, prime emportée.
+  const view =
+    entry.state === "winner"
+      ? { label: tm.over, title: tm.winner, text: tm.winnerText(prime.company), button: tm.share, share: tm.shareWinnerText(job, prime.company) }
+      : entry.state === "finalist"
+        ? { label: closed ? tm.over : t.primes.race.title, title: tm.finalist, text: tm.finalistText(entry.rank, entry.total, prime.company), button: tm.share, share: tm.shareFinalistText(job, prime.company) }
+        : closed
+          ? { label: tm.final, title: tm.place(entry.rank, entry.total), text: tm.finalText, button: tm.share, share: tm.shareFinalText(entry.rank, entry.total, job, prime.company) }
+          : { label: t.primes.race.title, title: tm.place(entry.rank, entry.total), text: tm.moves, button: tm.sharePlace, share: tm.sharePlaceText(entry.rank, entry.total, job, prime.company) };
+
+  const withdraw = async () => {
+    if (busy) return;
+    setBusy(true);
+    await onWithdraw();
+    setBusy(false);
+    setAsking(false);
+  };
+
+  return (
+    <section className={`block prime-mine is-${entry.state}${closed ? " is-over" : ""}`} aria-labelledby="prime-mine-title">
+      <p className="label">{view.label}</p>
+      <h2 className="t-block" id="prime-mine-title">
+        {view.title}
+      </h2>
+      <p>{view.text}</p>
+      <button type="button" className="btn-primary prime-mine-share" onClick={() => onShare(view.share)}>
+        {native ? <IconShare /> : <IconLink />}
+        {view.button}
+      </button>
+      {/* une prime emportée ne se retire pas d'un toucher : l'adresse de contact est là pour ça */}
+      {entry.state === "winner" ? null : asking ? (
+        <div className="prime-ask" role="group" aria-labelledby="prime-ask-text">
+          <p id="prime-ask-text">{tm.withdrawAsk}</p>
+          <div className="prime-ask-actions">
+            <button type="button" className={`pill prime-withdraw-yes${busy ? " is-busy" : ""}`} onClick={() => void withdraw()} aria-busy={busy}>
+              {t.primes.page.withdraw}
+              {busy && <BusyDots />}
+            </button>
+            {/* le choix sans risque reçoit le clavier */}
+            <button type="button" className="link-quiet" autoFocus onClick={() => setAsking(false)}>
+              {tm.stay}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button type="button" className="link-quiet prime-withdraw" onClick={() => setAsking(true)}>
+          {t.primes.page.withdraw}
+        </button>
+      )}
+    </section>
+  );
+}
+
+export type StepState = "done" | "now" | "todo";
+
+/**
+ * Où en est la personne devant une prime : sa fiche, la preuve par GitHub, l'entrée.
+ * `proven` : connectée par GitHub ; `localCard` : une fiche gardée par ce navigateur.
+ */
+export function stepStates(me: Pick<PrimeMe, "login" | "gate"> | null, localCard: boolean): [StepState, StepState, StepState] {
+  const proven = !!me?.login;
+  // Connectée : le serveur dit si une fiche lisible porte son pseudo ; sinon, celle de ce navigateur.
+  const hasCard = proven ? me!.gate !== "nocard" && me!.gate !== "degraded" : localCard;
+  return [hasCard ? "done" : "now", proven ? "done" : hasCard ? "now" : "todo", hasCard && proven ? "now" : "todo"];
+}
+
+function Step({ n, state, title, children }: { n: number; state: StepState; title: string; children?: ReactNode }) {
+  const { t } = useT();
+  return (
+    <li className={`prime-step is-${state}`} aria-current={state === "now" ? "step" : undefined}>
+      <span className="prime-step-n" aria-hidden>
+        {state === "done" ? (
+          <svg viewBox="0 0 16 16" focusable="false">
+            <path d="M3.2 8.4l3.1 3.1 6.5-6.9" />
+          </svg>
+        ) : (
+          n
+        )}
+      </span>
+      <div className="prime-step-body">
+        <p className="prime-step-title">
+          <span className="sr-only">{n}. </span>
+          {title}
+          {state === "done" && <span className="sr-only"> ({t.primes.steps.done})</span>}
+        </p>
+        {children}
+      </div>
+    </li>
+  );
+}
+
+interface StepsProps {
+  prime: PrimeView;
+  me: PrimeMe | null;
+  mine: MyCard | null;
+  positions: string;
+  claimOn: boolean;
+  rulesLink: boolean;
+  onDone: (m: PrimeMe) => void;
+}
+
+/**
+ * La porte d'entrée d'une prime : trois étapes numérotées, cochées selon l'état.
+ * 1. Ta fiche. 2. Prouver que c'est toi (GitHub). 3. Entrer dans la course.
+ * Seule l'étape en cours se déplie : un seul bouton principal à l'écran.
+ */
+function Steps({ prime, me, mine, positions, claimOn, rulesLink, onDone }: StepsProps) {
+  const { t, lang } = useT();
+  const ts = t.primes.steps;
+  const tg = t.primes.page.gate;
+  const gate = me?.gate ?? "claim";
+  const [s1, s2, s3] = stepStates(me, !!mine);
+  const soon = prime.phase === "soon";
+  const cardHref = mine ? `/c/${mine.id}` : null;
+
+  return (
+    <section className="block prime-join" id="concourir" aria-labelledby="prime-join-title">
+      <h2 className="t-block" id="prime-join-title">
+        {ts.title}
+      </h2>
+      <ol className="prime-steps">
+        <Step n={1} state={s1} title={ts.card}>
+          {s1 === "now" && (
+            <>
+              {(gate === "degraded" || gate === "nocard") && <p>{gate === "degraded" ? tg.degraded : tg.nocard}</p>}
+              <EntryForm variant="inline" />
+            </>
+          )}
+        </Step>
+        <Step n={2} state={s2} title={ts.proof}>
+          {s2 !== "done" && <p className="prime-step-why">{ts.why}</p>}
+          {s2 === "now" &&
+            (mine?.login && claimOn ? (
+              <>
+                <button type="button" className="btn-primary" onClick={() => api.startClaim(mine.id, mine.login ?? undefined, `/primes/${prime.id}#concourir`)}>
+                  {ts.prove}
+                </button>
+                <p className="prime-note">{ts.proveNote}</p>
+              </>
+            ) : (
+              <>
+                <p>{mine && !mine.login ? ts.noGithub : ts.proveOnCard}</p>
+                {cardHref && (
+                  <a className="btn-primary" href={cardHref} onClick={(e) => onLinkClick(e, cardHref)}>
+                    {ts.openCard}
+                  </a>
+                )}
+              </>
+            ))}
+        </Step>
+        <Step n={3} state={s3} title={ts.enter}>
+          {soon ? (
+            <p>{withSup(t.primes.opens(dayLabel(prime.from, lang)))}</p>
+          ) : s3 === "now" && gate === "ok" ? (
+            <>
+              {me?.wouldBe && <p className="prime-would">{t.primes.page.would(me.wouldBe.rank, me.wouldBe.total)}</p>}
+              <JoinForm prime={prime} rulesLink={rulesLink} onDone={onDone} />
+            </>
+          ) : s3 === "now" && gate === "position" && me?.card ? (
+            <p>{tg.position(t.positions[me.card.position], positions)}</p>
+          ) : null}
+        </Step>
+      </ol>
+    </section>
+  );
+}
+
 export function PrimePage({ id }: { id: string }) {
   const { t, lang } = useT();
   const tp = t.primes.page;
@@ -115,23 +309,26 @@ export function PrimePage({ id }: { id: string }) {
   const cfg = useAppConfig();
   const when = usePrimeWhen();
   const { share, native } = usePrimeShare(toast.show);
-  const [data, setData] = useState<PrimePageData | null | undefined>(undefined);
-  const [me, setMe] = useState<PrimeMe | null>(null);
   const [nonce, setNonce] = useState(0);
+  const page = useRemote<PrimePageData>(() => primesApi.page(id, nonce > 0), [id, nonce]);
+  // La dernière page lue reste à l'écran pendant qu'on la relit (après une inscription, un retrait).
+  const [last, setLast] = useState<PrimePageData | null>(null);
+  const [me, setMe] = useState<PrimeMe | null>(null);
+  const [mine] = useState<MyCard | null>(() => myCard());
+
+  useEffect(() => {
+    if (page.s === "ok") setLast(page.data);
+  }, [page]);
 
   useEffect(() => {
     let alive = true;
-    primesApi
-      .page(id, nonce > 0)
-      .then((p) => alive && setData(p))
-      .catch(() => alive && setData(null));
     void primesApi.me(id).then((m) => alive && setMe(m));
     return () => {
       alive = false;
     };
-  }, [id, nonce]);
+  }, [id]);
 
-  // Retour de GitHub (« Concourir » passe par « C'est moi ») : on prévient, on nettoie l'adresse.
+  // Retour de GitHub (« Prouver que c'est moi ») : on prévient, on nettoie l'adresse.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const claim = params.get("claim");
@@ -146,6 +343,7 @@ export function PrimePage({ id }: { id: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const data = page.s === "ok" ? page.data : last;
   const prime = data?.prime;
   useEffect(() => {
     if (!prime) return;
@@ -160,31 +358,27 @@ export function PrimePage({ id }: { id: string }) {
       /* stockage bloqué : une fois par page */
     }
     api.track("prime_view", null, { prime: prime.id });
-  }, [prime, t.primes.contract]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prime?.id, prime?.company, prime?.contract, t.primes.contract]);
 
-  // « Concourir » depuis la fiche : on descend au formulaire une fois la page là.
+  // Arrivée sur « #concourir » (depuis la fiche, au retour de GitHub) : on descend au bloc une fois la page là.
+  const ready = !!prime && !!me;
   useEffect(() => {
-    if (!prime || !me || window.location.hash !== "#concourir") return;
+    if (!ready || window.location.hash !== "#concourir") return;
     window.setTimeout(() => document.getElementById("concourir")?.scrollIntoView({ block: "start" }), 50);
-  }, [prime, me]);
+  }, [ready]);
 
-  if (data === undefined) return <main className="page page-prime" id="main" aria-busy />;
   if (!data || !prime) {
-    return (
-      <main className="page page-prime" id="main">
-        <section className="prime-head">
-          <h1>{tp.notFound}</h1>
-          <a className="link-alt" href="/primes" onClick={(e) => onLinkClick(e, "/primes")}>
-            {tp.all}
-          </a>
-        </section>
-      </main>
-    );
+    if (page.s === "down") return <Unreachable />;
+    if (page.s === "none") return <PrimeNotFound listed={!!cfg?.primesListed} />;
+    return <main className="page page-prime" id="main" aria-busy />;
   }
 
   const positions = prime.positions.map((x) => t.positions[x]).join(", ");
   const job = t.primes.job(prime.contract, positions);
-  const entry = me?.entry ?? null;
+  const closed = prime.phase === "closed";
+  // Une inscription retirée n'en est plus une.
+  const entry = me?.entry && me.entry.state !== "withdrawn" ? me.entry : null;
   // « À Ville Démo, télétravail possible » : la seconde moitié sans majuscule.
   const remote = t.primes.remote;
   const where = prime.place ? `${t.primes.onSite(prime.place)}${prime.remote ? `, ${remote.charAt(0).toLowerCase()}${remote.slice(1)}` : ""}` : prime.remote ? remote : "";
@@ -201,106 +395,95 @@ export function PrimePage({ id }: { id: string }) {
 
   return (
     <main className="page page-prime" id="main">
-      <section className="prime-head">
-        <a className="link-alt prime-back" href="/primes" onClick={(e) => onLinkClick(e, "/primes")}>
-          {tp.all}
-        </a>
-        <p className="surtitre">
-          {t.primes.contract[prime.contract]}, {t.primes.interviews(prime.interviews)}
-        </p>
-        {prime.logo && <PrimeMark p={prime} big />}
-        <h1>{prime.company}</h1>
-        <p className="prime-pitch">{pick(prime.pitch, lang)}</p>
-        <dl className="prime-facts">
-          <div>
-            <dt>{tp.positions}</dt>
-            <dd>{positions}</dd>
-          </div>
-          {prime.languages.length > 0 && (
+      <div className="prime-side">
+        <section className="prime-head">
+          <a className="link-back" href="/primes" onClick={(e) => onLinkClick(e, "/primes")}>
+            ← {tp.all}
+          </a>
+          <p className="label">
+            {t.primes.contract[prime.contract]}, {t.primes.interviews(prime.interviews)}
+          </p>
+          {prime.logo && <PrimeMark p={prime} big />}
+          <h1>{prime.company}</h1>
+          <p className="prime-pitch">{pick(prime.pitch, lang)}</p>
+          <dl className="prime-facts">
             <div>
-              <dt>{tp.languages}</dt>
+              <dt>{tp.positions}</dt>
+              <dd>{positions}</dd>
+            </div>
+            {prime.languages.length > 0 && (
+              <div>
+                <dt>{tp.languages}</dt>
+                <dd>
+                  {prime.languages.join(", ")} <span className="prime-facts-note">({tp.languagesNote})</span>
+                </dd>
+              </div>
+            )}
+            {where && (
+              <div>
+                <dt>{tp.place}</dt>
+                <dd>{where}</dd>
+              </div>
+            )}
+            <div>
+              <dt>{tp.period}</dt>
               <dd>
-                {prime.languages.join(", ")} <span className="prime-facts-note">({tp.languagesNote})</span>
+                {withSup(tp.dates(dayLabel(prime.from, lang), dayLabel(prime.to, lang)))} <span className={`prime-when is-${prime.phase}`}>{withSup(when(prime))}</span>
               </dd>
             </div>
-          )}
-          {where && (
-            <div>
-              <dt>{tp.place}</dt>
-              <dd>{where}</dd>
-            </div>
-          )}
-          <div>
-            <dt>{tp.period}</dt>
-            <dd>
-              {tp.dates(dayLabel(prime.from, lang), dayLabel(prime.to, lang))} <span className={`prime-when is-${prime.phase}`}>{when(prime)}</span>
-            </dd>
-          </div>
-        </dl>
-        <button type="button" className="pill pill-ghost prime-share" onClick={() => void share(prime, job)}>
-          {native ? <IconShare /> : <IconLink />}
-          {tp.share}
-        </button>
-      </section>
-
-      {entry && (
-        <section className="after-block prime-mine" aria-live="polite">
-          <h2>{tp.you(entry.rank, entry.total)}</h2>
-          <button type="button" className="link-danger" onClick={() => void withdraw()}>
-            {tp.withdraw}
+          </dl>
+          <button type="button" className="pill prime-share" onClick={() => void share(prime, tp.shareText(prime.company, job))}>
+            {native ? <IconShare /> : <IconLink />}
+            {tp.share}
           </button>
         </section>
-      )}
 
-      {/* Close : plus de formulaire, le classement dit tout. */}
-      {!entry && prime.phase !== "closed" && (
-        <section className="after-block prime-join" id="concourir" aria-labelledby="prime-join-title">
-          <h2 id="prime-join-title">{t.primes.form.title}</h2>
-          {prime.phase === "soon" ? (
-            <p>{t.primes.opens(dayLabel(prime.from, lang))}</p>
-          ) : me?.gate === "ok" ? (
-            <>
-              {me.wouldBe && <p className="prime-would">{tp.would(me.wouldBe.rank, me.wouldBe.total)}</p>}
-              <JoinForm prime={prime} rulesLink={!!cfg?.rulesPublished} onDone={(m) => {
+        {entry ? (
+          <Mine prime={prime} entry={entry} job={job} native={native} onShare={(text) => void share(prime, text)} onWithdraw={withdraw} />
+        ) : (
+          /* Terminée : plus d'entrée, le classement dit tout. */
+          !closed && (
+            <Steps
+              prime={prime}
+              me={me}
+              mine={mine}
+              positions={positions}
+              claimOn={!!cfg?.claim}
+              rulesLink={!!cfg?.rulesPublished}
+              onDone={(m) => {
                 setMe(m);
                 toast.show(t.primes.form.done);
                 setNonce((n) => n + 1);
-              }} />
-            </>
-          ) : me?.gate === "position" && me.card ? (
-            <p>{tp.gate.position(t.positions[me.card.position], positions)}</p>
-          ) : (
-            <>
-              <p>{me?.gate === "degraded" ? tp.gate.degraded : me?.gate === "nocard" ? tp.gate.nocard : tp.gate.claim}</p>
-              <EntryForm variant="inline" />
-            </>
-          )}
-        </section>
-      )}
-
-      <section className="prime-board" aria-labelledby="prime-board-title">
-        <h2 id="prime-board-title">{tp.board}</h2>
-        {/* À zéro, pas de compte : la phrase suffit. */}
-        {data.total > 0 && <p className="board-meta">{prime.phase === "closed" ? `${tp.frozen} ${tp.totalClosed(data.total)}` : tp.total(data.total)}</p>}
-        {data.board.length === 0 ? (
-          <p className="primes-empty">{prime.phase === "closed" ? tp.boardEmptyClosed : tp.boardEmpty}</p>
-        ) : (
-          <ol className="board-list is-top">
-            {data.board.map((r) => (
-              <Row key={r.login} r={r} me={!!me?.login && me.login === r.login.toLowerCase()} />
-            ))}
-          </ol>
+              }}
+            />
+          )
         )}
-        <div className="prime-rule">
-          <h3>{tp.rule}</h3>
-          <p>{tp.ruleText}</p>
-          {cfg?.rulesPublished && (
-            <a className="link-alt" href="/reglement" onClick={(e) => onLinkClick(e, "/reglement")}>
-              {tp.rules}
-            </a>
+      </div>
+
+      <div className="prime-main">
+        <section className="prime-board" aria-labelledby="prime-board-title">
+          <h2 id="prime-board-title">{closed ? t.primes.boardFinal : tp.board}</h2>
+          {data.total > 0 && <p className="board-meta">{closed ? tp.totalClosed(data.total) : tp.total(data.total)}</p>}
+          {data.board.length === 0 ? (
+            <p className="primes-empty">{closed ? tp.boardEmptyClosed : tp.boardEmpty}</p>
+          ) : (
+            <ol className="board-list is-top">
+              {data.board.map((r) => (
+                <Row key={r.login} r={r} me={!!me?.login && me.login === r.login.toLowerCase()} />
+              ))}
+            </ol>
           )}
-        </div>
-      </section>
+          <div className="prime-rule">
+            <h3>{tp.rule}</h3>
+            <p>{tp.ruleText}</p>
+            {cfg?.rulesPublished && (
+              <a className="link-alt" href="/reglement" onClick={(e) => onLinkClick(e, "/reglement")}>
+                {tp.rules}
+              </a>
+            )}
+          </div>
+        </section>
+      </div>
       {toast.node}
     </main>
   );
@@ -329,7 +512,8 @@ function JoinForm({ prime, rulesLink, onDone }: { prime: PrimeView; rulesLink: b
   const uid = useId().replace(/:/g, "");
   const [email, setEmail] = useState("");
   const [placeOk, setPlaceOk] = useState<boolean | null>(null);
-  const [proofs, setProofs] = useState<string[]>(() => Array.from({ length: MAX_PROOFS }, () => ""));
+  // Une preuve est facultative : un champ, et un lien pour en ajouter (MAX_PROOFS au plus).
+  const [proofs, setProofs] = useState<string[]>([""]);
   const [consent, setConsent] = useState(false);
   const [adult, setAdult] = useState(false);
   const [errors, setErrors] = useState<Field[]>([]);
@@ -366,7 +550,7 @@ function JoinForm({ prime, rulesLink, onDone }: { prime: PrimeView; rulesLink: b
 
   const err = (f: Field) =>
     has(f) ? (
-      <p className="prime-field-error" id={`${uid}-${f}-err`} role="alert">
+      <p className="field-error" id={`${uid}-${f}-err`} role="alert">
         {tf.errors[f]}
       </p>
     ) : null;
@@ -451,6 +635,11 @@ function JoinForm({ prime, rulesLink, onDone }: { prime: PrimeView; rulesLink: b
           />
         ))}
         {err("proofs")}
+        {proofs.length < MAX_PROOFS && (
+          <button type="button" className="link-alt prime-add-proof" onClick={() => setProofs((l) => [...l, ""])}>
+            + {t.primes.addProof}
+          </button>
+        )}
       </fieldset>
 
       <div className="prime-field">
@@ -492,11 +681,12 @@ function JoinForm({ prime, rulesLink, onDone }: { prime: PrimeView; rulesLink: b
         {err("adult")}
       </div>
 
-      <button type="submit" className="pill pill-big" disabled={busy}>
-        {busy ? tf.sending : tf.submit}
+      <button type="submit" className={`btn-primary${busy ? " is-busy" : ""}`} aria-busy={busy}>
+        {tf.submit}
+        {busy && <BusyDots />}
       </button>
       {failed && (
-        <p className="prime-field-error" role="alert">
+        <p className="field-error" role="alert">
           {failed}
         </p>
       )}

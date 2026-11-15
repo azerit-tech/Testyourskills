@@ -11,7 +11,6 @@
   align-content: start;
   gap: 8px;
   height: 100%;
-  min-height: 132px;
   padding: var(--pad-block);
   border-radius: var(--r-block);
   background: var(--s-info);
@@ -81,8 +80,15 @@
   color: var(--c-text);
 }
 .prime-card-meta {
+  display: grid;
+  gap: 2px;
   font: var(--font-small);
   color: var(--c-text);
+}
+/* ce qu'on gagne : l'emphase, crème en gras */
+.prime-card-prize {
+  font: 600 var(--t-16) / 1.4 var(--f-text);
+  color: var(--c-emphasis);
 }
 
 /* ---------- l'accueil : une rangée qui défile ---------- */
@@ -177,20 +183,32 @@
 
 /* ---------- /primes et la page d'une prime ---------- */
 
+/* la page tient la marge ; ses blocs s'alignent sur une colonne de lecture, puis sur le
+   conteneur du bureau (comme les bandes) */
+.page-primes,
+.page-prime {
+  padding: 24px var(--gutter) 56px;
+}
+.primes-page,
+.prime-side,
+.prime-main {
+  width: 100%;
+  max-width: calc(var(--measure) - 2 * var(--gutter));
+  margin: 0 auto;
+}
 .primes-page,
 .prime-head,
-.page-prime > .after-block,
 .prime-board {
   display: grid;
   gap: 10px;
-  width: 100%;
-  max-width: var(--measure);
-  margin: 0 auto;
-  padding: 24px var(--gutter) 0;
 }
-.page-primes,
-.page-prime {
-  padding-bottom: 56px;
+.prime-side,
+.prime-main {
+  display: grid;
+  gap: 28px;
+}
+.prime-main {
+  margin-top: 32px;
 }
 .primes-page h1,
 .prime-head h1 {
@@ -202,6 +220,7 @@
 }
 .primes-intro,
 .prime-pitch {
+  max-width: var(--measure);
   font: var(--font-body);
   color: var(--c-text);
 }
@@ -229,9 +248,6 @@
   list-style: none;
 }
 
-.prime-back {
-  justify-self: start;
-}
 .prime-head .prime-logo {
   margin: 4px 0;
 }
@@ -268,36 +284,140 @@
   color: var(--c-text-2);
   font-size: var(--t-14);
 }
+/* « 1er » : l'exposant ne pousse pas la ligne */
+.prime-card sup,
+.page-prime sup {
+  font-size: 0.7em;
+  line-height: 0;
+}
 .prime-share {
   justify-self: start;
   margin-top: 4px;
 }
 
-/* le rang et le formulaire : des blocs prune, comme sous la fiche */
-.page-prime > .after-block {
-  width: min(calc(100% - 2 * var(--gutter)), calc(var(--measure) - 2 * var(--gutter)));
-  margin-top: 24px;
-  padding: var(--pad-block);
+/* ---------- le bloc de la personne : sa place, les états de fin ---------- */
+
+.prime-mine,
+.prime-join {
   scroll-margin-top: 16px;
 }
-.prime-mine .link-danger {
-  justify-self: start;
+.prime-mine p,
+.prime-join p {
+  color: var(--c-text);
+}
+.prime-mine .btn-primary,
+.prime-join .btn-primary {
+  width: 100%;
+}
+.prime-mine .btn-primary {
+  margin-top: 4px;
+}
+.prime-withdraw {
+  justify-self: center;
+}
+/* la confirmation du retrait, sur place : la phrase, le geste en contour, « Rester » en lien */
+.prime-ask {
+  display: grid;
+  gap: 10px;
+  margin-top: 4px;
+  padding: 16px;
+  border-radius: var(--r-item);
+  background: var(--s-item);
+}
+.prime-ask-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 20px;
+}
+
+/* ---------- la porte d'entrée : trois étapes numérotées ---------- */
+
+.prime-steps {
+  display: grid;
+  list-style: none;
+}
+.prime-step {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 10px 12px;
+  padding: 14px 0;
+}
+.prime-step + .prime-step {
+  box-shadow: inset 0 1px 0 var(--c-line);
+}
+.prime-step:first-child {
+  padding-top: 4px;
+}
+.prime-step:last-child {
+  padding-bottom: 0;
+}
+/* la pastille : le chiffre ; faite, une coche crème pleine ; à venir, en retrait */
+.prime-step-n {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--s-item);
+  font: var(--font-item);
+  color: var(--c-emphasis);
+  font-variant-numeric: tabular-nums;
+}
+.prime-step.is-done .prime-step-n {
+  background: var(--cream);
+}
+.prime-step-n svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--ink-0);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.prime-step.is-todo .prime-step-n {
+  background: none;
+  box-shadow: inset 0 0 0 1.5px var(--c-line);
+  color: var(--c-text-2);
+}
+/* l'intitulé à côté de la pastille ; le contenu de l'étape en cours dessous, sur toute la largeur du bloc */
+.prime-step-body {
+  display: contents;
+}
+.prime-step-body > :not(.prime-step-title) {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+.prime-join .prime-step-title {
+  min-height: 28px;
+  padding-top: 3px;
+  font: 600 var(--t-16) / 1.4 var(--f-text);
+  color: var(--c-emphasis);
+}
+.prime-join .is-todo .prime-step-title,
+.prime-join .is-done .prime-step-title {
+  color: var(--c-text);
+}
+.prime-join .prime-step-why {
+  font: var(--font-small);
+  color: var(--c-text);
+}
+.prime-join .is-todo .prime-step-why {
+  color: var(--c-text-2);
 }
 /* le rang qu'on aurait : l'emphase, crème en gras */
-.after-block .prime-would {
+.prime-join .prime-would {
   font: 700 var(--t-16) / 1.4 var(--f-text);
   color: var(--c-emphasis);
 }
 
-.prime-board {
-  padding-top: 32px;
-}
+/* ---------- le classement ---------- */
+
 .prime-board .board-meta {
   margin-bottom: 4px;
 }
-.board-row.prime-row {
-  grid-template-columns: 24px minmax(0, 1fr) auto 30px;
-}
+/* la grille du top de la semaine (rang, visage, pseudo, étoiles, note) : rien à redire ici */
 .board-row.prime-row.is-me {
   background: var(--s-call);
 }
@@ -346,7 +466,8 @@
   margin-bottom: 8px;
 }
 /* .prime-input : le champ commun (styles.css, « le champ ») ; son erreur : .field-error */
-.after-block .prime-note {
+.after-block .prime-note,
+.prime-join .prime-note {
   font: var(--font-small);
   color: var(--c-text-2);
 }
@@ -431,27 +552,100 @@
   justify-self: start;
   margin: -10px 0 0 36px;
 }
-.prime-form > .pill {
-  width: 100%;
+.prime-add-proof {
+  justify-self: start;
 }
 
 /* ---------- /reglement ---------- */
 
+/* une colonne de lecture (66 caractères au plus), un résumé et un sommaire en tête ;
+   au bureau, le sommaire suit la lecture dans une colonne à gauche */
 .page-rules {
-  padding-bottom: 56px;
+  padding: 8px var(--gutter) 56px;
+}
+.rules-page {
+  display: grid;
+  gap: 20px;
+  width: 100%;
+  max-width: calc(var(--measure) - 2 * var(--gutter));
+  margin: 0 auto;
+}
+.rules-top {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.rules-top .link-back {
+  justify-self: start;
+  margin: 0;
+}
+.rules-top h1 {
+  font: var(--font-page);
+  text-transform: uppercase;
+  color: var(--cream);
+  text-wrap: balance;
+}
+.rules-summary ol,
+.rules-toc ol {
+  display: grid;
+  list-style: none;
+}
+.rules-summary ol {
+  gap: 10px;
+  counter-reset: rules-line;
+}
+.rules-summary li {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 8px;
+  font: var(--font-body);
+  color: var(--c-text);
+  counter-increment: rules-line;
+}
+.rules-summary li::before {
+  content: counter(rules-line);
+  font: var(--font-item);
+  line-height: 1.1;
+  color: var(--c-emphasis);
+}
+.rules-binding {
+  font: var(--font-small);
+  color: var(--c-text-2);
+}
+.rules-toc {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.rules-toc a {
+  display: flex;
+  align-items: center;
+  min-height: var(--h-tap);
+  padding: 6px 0;
+  font: 500 var(--t-16) / 1.2 var(--f-text);
+  color: var(--c-action);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-decoration-color: rgba(255, 178, 198, 0.45);
+  text-underline-offset: 4px;
+}
+.rules-toc li + li {
+  box-shadow: inset 0 1px 0 var(--c-line);
+}
+.rules-toc a:hover {
+  color: var(--cream);
 }
 .rules {
   display: grid;
   gap: 12px;
-  width: 100%;
-  max-width: var(--measure);
-  margin: 0 auto;
-  padding: 24px var(--gutter) 0;
+  min-width: 0;
+  max-width: 66ch;
   font: 400 var(--t-16) / 1.6 var(--f-text);
   color: var(--c-text);
 }
 .rules h1 {
-  font: var(--font-page);
+  margin-top: 20px;
+  font: var(--font-block);
   text-transform: uppercase;
   color: var(--cream);
   text-wrap: balance;
@@ -462,6 +656,7 @@
   text-transform: uppercase;
   color: var(--cream);
   text-wrap: balance;
+  scroll-margin-top: 16px;
 }
 .rules h3 {
   margin-top: 6px;
@@ -481,27 +676,65 @@
   color: var(--cream);
   font-weight: 600;
 }
-.rules-en {
-  padding: var(--pad-block);
-  border-radius: var(--r-block);
-  background: var(--s-info);
-  font: var(--font-small);
-  color: var(--c-text);
-}
 
 @media (min-width: 900px) {
-  .primes-page,
-  .prime-head {
+  .page-primes,
+  .page-prime {
     padding-top: 40px;
+    padding-bottom: 80px;
+  }
+  .primes-page {
+    max-width: var(--page-w);
   }
   .primes-row {
     grid-auto-columns: 280px;
   }
   .primes-grid {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
-  .prime-form > .pill {
-    width: auto;
-    justify-self: start;
+  /* la page d'une prime : l'avis et le bloc de la personne à gauche, le classement à droite */
+  .page-prime {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 0 56px;
+    max-width: var(--page-max);
+    margin: 0 auto;
+  }
+  .prime-side,
+  .prime-main {
+    max-width: none;
+    margin: 0;
+  }
+  .prime-main {
+    padding-top: 44px;
+  }
+  /* le règlement : le sommaire à gauche, collé, le texte à droite */
+  .page-rules {
+    padding-top: 24px;
+    padding-bottom: 80px;
+  }
+  .rules-page {
+    grid-template-columns: 300px minmax(0, 1fr);
+    align-items: start;
+    gap: 24px 56px;
+    max-width: var(--page-w);
+  }
+  .rules-top {
+    grid-column: 1 / -1;
+    max-width: var(--measure);
+  }
+  /* plus haut que l'écran, il défile sur lui-même : le dernier article reste à portée */
+  .rules-toc {
+    position: sticky;
+    top: 24px;
+    max-height: calc(100vh - 48px);
+    overflow-y: auto;
+  }
+  .rules-toc a {
+    min-height: 36px;
+  }
+  .rules > h2:first-child {
+    margin-top: 0;
   }
 }

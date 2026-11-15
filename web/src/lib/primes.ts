@@ -50,12 +50,10 @@ export interface JoinBody {
 const enc = encodeURIComponent;
 
 export const primesApi = {
-  /** Toutes les primes de la saison, ouvertes d'abord ; vide si le serveur ne répond pas. */
+  /** Toutes les primes de la saison, ouvertes d'abord. Une panne remonte en ApiError. */
   async list(): Promise<PrimeView[]> {
     if (isMock()) return [];
-    return getJson<{ primes: PrimeView[] }>("/api/primes")
-      .then((r) => r.primes)
-      .catch(() => []);
+    return (await getJson<{ primes: PrimeView[] }>("/api/primes")).primes;
   },
   /**
    * La page d'une prime ; null si elle n'existe pas. Une panne réseau remonte en ApiError.

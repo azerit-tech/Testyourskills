@@ -3,6 +3,7 @@
 // l'après-fiche avec la question de ligue. Rien ne s'affiche tant qu'aucune
 // prime n'est ouverte : la configuration du serveur le dit (primesOpen).
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import type { League, PrimeView, Race, RaceLine } from "../../../shared/primes";
 import { LEAGUES, primePath } from "../../../shared/primes";
 import type { CardData } from "../../../shared/types";
@@ -15,6 +16,19 @@ import { setPrefill } from "../lib/session";
 import "./primes.css";
 
 /* ---------- la carte d'une prime ---------- */
+
+/** « 1er novembre » : l'exposant, comme on l'écrit. */
+export function withSup(text: string): ReactNode[] {
+  return text.split(/\b(1er)\b/).map((part, i) =>
+    part === "1er" ? (
+      <span key={i}>
+        1<sup>er</sup>
+      </span>
+    ) : (
+      part
+    ),
+  );
+}
 
 /** Le logo, ou le nom de l'entreprise en lettres. */
 export function PrimeMark({ p, big = false }: { p: Pick<PrimeView, "company" | "logo">; big?: boolean }) {
@@ -38,14 +52,15 @@ export function PrimeCard({ p }: { p: PrimeView }) {
     <a className={`prime-card is-${p.phase}`} href={href} onClick={(e) => onLinkClick(e, href)}>
       <span className="prime-card-top">
         <PrimeMark p={p} />
-        <span className={`prime-when is-${p.phase}`}>{when(p)}</span>
+        <span className={`prime-when is-${p.phase}`}>{withSup(when(p))}</span>
       </span>
       <span className="prime-card-job">
         <span className="prime-tag">{t.primes.contract[p.contract]}</span> {p.positions.map((x) => t.positions[x]).join(", ")}
       </span>
+      {/* deux lignes, pas une phrase collée par une virgule : ce qu'on gagne, puis où */}
       <span className="prime-card-meta">
-        {t.primes.interviews(p.interviews)}
-        {where ? `, ${where.charAt(0).toLowerCase()}${where.slice(1)}` : ""}
+        <span className="prime-card-prize">{t.primes.interviews(p.interviews)}</span>
+        {where && <span>{where}</span>}
       </span>
     </a>
   );
@@ -62,7 +77,11 @@ export function PrimesStrip() {
   useEffect(() => {
     if (!open) return;
     let alive = true;
-    void primesApi.list().then((l) => alive && setPrimes(l.filter((p) => p.phase === "open")));
+    // En panne, la rangée ne s'affiche pas : l'accueil reste entier sans elle.
+    void primesApi
+      .list()
+      .catch(() => [])
+      .then((l) => alive && setPrimes(l.filter((p) => p.phase === "open")));
     return () => {
       alive = false;
     };
