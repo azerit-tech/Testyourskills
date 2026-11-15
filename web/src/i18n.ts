@@ -238,6 +238,8 @@ const fr = frTypoDeep({
     /* le film joue une fois (§18.48) : la tête de la fiche le relance, depuis le début */
     replay: "Revoir ma poursuite",
     watch: "Voir la poursuite",
+    /** Sa propre poursuite, jamais vue ici (repliée faute de réseau, ou mouvement réduit). */
+    watchMine: "Voir ma poursuite",
     revealed: (level: string, overall: number) => `Fiche ${level}, ${overall}/100.`,
     revealedSealed: "Dossier scellé\u00a0: le code reste à prouver.",
     fireworks: "Clique ou Espace : feux d'artifice",
@@ -1019,6 +1021,7 @@ const en: Dict = {
     unmute: "Unmute",
     replay: "Replay my chase",
     watch: "Watch the chase",
+    watchMine: "Watch my chase",
     revealed: (level, overall) => `${level} sheet, rated ${overall}/100.`,
     revealedSealed: "Sealed file: code still unproven.",
     fireworks: "Click or Space: fireworks",

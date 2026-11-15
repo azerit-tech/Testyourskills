@@ -16,6 +16,7 @@ import { JuryLine } from "../components/Jury";
 import { tokens } from "../lib/api";
 import { githubGridMock } from "../lib/mockGrid";
 import { setPlea } from "../lib/plea";
+import { markChaseWatched } from "../lib/session";
 import { Result, type ResultProps } from "./CardPage";
 
 const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1";
@@ -102,8 +103,12 @@ describe("page partagée, vue par un visiteur", () => {
     expect(head.replace(/<[^>]+>/g, "")).toContain("Voir la poursuite");
     expect(html).not.toContain("<video");
     expect(html).not.toContain("film-stage");
+    // Sa propre fiche : « Voir ma poursuite » tant que le film n'a pas joué ici, « Revoir » ensuite.
     const mine = renderResult(card(), { owner: true, lang: "en-US" });
-    expect(/<header class="wanted">.*?<\/header>/.exec(mine)?.[0]).toContain("Replay my chase");
+    expect(/<header class="wanted">.*?<\/header>/.exec(mine)?.[0]).toContain("Watch my chase");
+    markChaseWatched("SeenCard01");
+    const seen = renderResult(card({ id: "SeenCard01" }), { owner: true, lang: "en-US" });
+    expect(/<header class="wanted">.*?<\/header>/.exec(seen)?.[0]).toContain("Replay my chase");
   });
 
   it("la peine, en texte sous la fiche : l'image du profil est en ciel de page, plus en tuile", () => {

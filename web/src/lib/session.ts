@@ -126,6 +126,36 @@ export function markFilmSeen(id: string) {
   if (readSession(OWED_KEY) === id) removeSession(OWED_KEY);
 }
 
+// --- La poursuite vue (§18.48) -----------------------------------------------
+// Le film d'une fiche a-t-il vraiment joué dans ce navigateur ? Non s'il a été
+// replié (réseau trop lent) ou jamais proposé (mouvement réduit) : le lien de la
+// fiche dit alors « Voir ma poursuite », pas « Revoir ». localStorage, repli en RAM.
+
+const WATCHED_KEY = "tys_watched";
+const memWatched = new Set<string>();
+
+export function markChaseWatched(id: string) {
+  memWatched.add(id);
+  try {
+    const list = JSON.parse(localStorage.getItem(WATCHED_KEY) ?? "[]") as unknown;
+    const ids = Array.isArray(list) ? list.filter((x): x is string => typeof x === "string") : [];
+    if (!ids.includes(id)) ids.push(id);
+    localStorage.setItem(WATCHED_KEY, JSON.stringify(ids.slice(-50)));
+  } catch {
+    /* la RAM suffit */
+  }
+}
+
+export function chaseWatched(id: string): boolean {
+  if (memWatched.has(id)) return true;
+  try {
+    const list = JSON.parse(localStorage.getItem(WATCHED_KEY) ?? "[]") as unknown;
+    return Array.isArray(list) && list.includes(id);
+  } catch {
+    return false;
+  }
+}
+
 /** Le pseudo GitHub tapé pour cette fiche dans cet onglet, ou null. */
 export function freshLogin(id: string): string | null {
   return freshLogins.get(id) ?? storedSource(id)?.login ?? null;

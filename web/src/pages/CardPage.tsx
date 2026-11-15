@@ -38,7 +38,7 @@ import { REMOTE_PATIENCE_MS } from "../lib/remote";
 import { filmTrace } from "../film/trace";
 import { ChaseLink } from "../film/ChaseLink";
 import { navigate, onLinkClick } from "../lib/router";
-import { filmOwed, freshCv, freshLogin, freshSince, freshSlug, iDenounced, markFilmSeen, myCard, prefillFromLast, rememberMine, type MyCard } from "../lib/session";
+import { chaseWatched, filmOwed, freshCv, markChaseWatched, freshLogin, freshSince, freshSlug, iDenounced, markFilmSeen, myCard, prefillFromLast, rememberMine, type MyCard } from "../lib/session";
 import { revealScene, revealToPlay } from "../lib/revealScene";
 import { useReducedMotion } from "../lib/util";
 
@@ -415,7 +415,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
   const { phase, open, skip, replay, stage, staged, handoff, finish, animating, settled } = useReveal(animate, start, scene === "film" ? 0 : undefined);
   // Revoir le film (§18.48) : depuis la tête de la fiche, pour tout le monde, jamais en lecture automatique.
   // Le film se charge au toucher ; la page remonte en haut, la fiche se remonte sous l'arrêt sur image.
-  const reduced = useReducedMotion();
+  // En mouvement réduit aussi : le film ne part jamais seul, mais il se joue sur ce geste.
   const [replayed, setReplayed] = useState(false);
   const playChase = () => {
     setReplayed(true);
@@ -433,6 +433,10 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
   useEffect(() => {
     if (settled) markFilmSeen(id);
   }, [settled, id]);
+  // Le film a vraiment joué : le lien dira « Revoir », plus « Voir ma poursuite ».
+  useEffect(() => {
+    if (scene === "film" && phase === "playing") markChaseWatched(id);
+  }, [scene, phase, id]);
   const toast = useToast();
   const tracked = useRef(false);
   const stageRef = useRef<HTMLElement>(null);
@@ -541,7 +545,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
 
       <div className="result-top">
         {/* L'en-tête posé sur le ciel, puis la fiche entière au-dessus de la ligne de flottaison (§18.7, §18.29). */}
-        <WantedHead card={main}>{scene === "film" && !reduced && settled && <ChaseLink mine={!visitor} onPlay={playChase} />}</WantedHead>
+        <WantedHead card={main}>{scene === "film" && settled && <ChaseLink mine={!visitor} seen={chaseWatched(id)} onPlay={playChase} />}</WantedHead>
 
         {animating && (
           // Morceau 3D introuvable : même repli que sans WebGL, la fiche sort sans révélation.
