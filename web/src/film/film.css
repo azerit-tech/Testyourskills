@@ -185,28 +185,50 @@
   bottom: 0;
   height: calc(12cqh + env(safe-area-inset-bottom, 0px));
 }
-/* la radio : une seule ligne, coupée au-delà de 350 px, au-dessus de « Passer » */
+/* la radio : une seule ligne, coupée au-delà de 360 px, centrée dans la bande
+   entre l'image et les boutons (--radio-zone : la bande sans les boutons ; au
+   bureau, les boutons sortent de la colonne, la bande entière) ; le chef
+   d'accusation porte son étiquette au-dessus, en petit */
+.film-band-bottom {
+  --radio-zone: max(28px, calc(12cqh - 56px));
+}
 .film-radio {
   position: absolute;
-  top: 8px;
+  top: 0;
   left: 50%;
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
   width: max-content;
-  max-width: min(350px, calc(100% - 32px));
+  max-width: min(360px, calc(100% - 24px));
+  height: var(--radio-zone);
   margin: 0;
   transform: translateX(-50%);
-  font: 500 13px/16px var(--f-mono);
+  font: 500 14px/18px var(--f-mono);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: #fff9cb;
   white-space: nowrap;
 }
-.film-radio span {
+.film-radio-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.film-radio-text,
+.film-radio-kicker {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* l'étiquette, alignée sur le texte (après le carré et son espace) */
+.film-radio-kicker {
+  padding-left: 14px;
+  font: 500 12px/14px var(--f-mono);
+  letter-spacing: 0.08em;
+  color: rgb(255 249 203 / 0.62);
 }
 .film-square {
   flex: none;

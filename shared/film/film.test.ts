@@ -181,19 +181,23 @@ describe("hudAt (§2.2, §5.2)", () => {
     expect(hudAt(p, at(SHOT_START.P1), "en").radio?.text).toBe(p.radio.en.beats[0]);
   });
 
-  it("la radio cite la fiche : « Véhicule en fuite · Backend », annonce l'interception, puis la fin de course au gel", () => {
+  it("la radio cite la fiche : « Véhicule en fuite : Backend », annonce l'interception, puis la fin de course au gel", () => {
     const p = filmPlan(cardAt(4));
-    expect(hudAt(p, at(SHOT_START.P1 + 6), "fr").radio?.text).toBe("Véhicule en fuite · Backend");
-    expect(hudAt(p, at(SHOT_START.P2 + 8), "fr").radio?.text).toBe("Arme signalée : Python");
+    expect(hudAt(p, at(SHOT_START.P1 + 6), "fr").radio?.text).toBe("Véhicule en fuite\u00a0: Backend");
+    expect(hudAt(p, at(SHOT_START.P2 + 8), "fr").radio?.text).toBe("Arme signalée\u00a0: Python");
+    expect(hudAt(p, at(SHOT_START.P1 + 6), "fr").radio?.kicker).toBeNull();
     expect(hudAt(p, at(p.cut - 13), "fr").radio?.text).toBe(p.radio.fr.beats[3]);
-    expect(hudAt(p, at(p.cut - 12), "fr").radio?.text).toBe("Interception · barrage en place");
-    expect(hudAt(p, at(p.cut + 3), "fr").radio?.text).toBe("Interception · barrage en place");
-    expect(hudAt(p, at(p.freeze - 1), "en").radio?.text).toBe("Intercept · roadblock in place");
+    expect(hudAt(p, at(p.cut - 12), "fr").radio?.text).toBe("Interception\u00a0: barrage en place");
+    expect(hudAt(p, at(p.cut + 3), "fr").radio?.text).toBe("Interception\u00a0: barrage en place");
+    expect(hudAt(p, at(p.cut + 3), "fr").radio?.kicker).toBeNull();
+    expect(hudAt(p, at(p.freeze - 1), "en").radio?.text).toBe("Intercept: roadblock in place");
     // six étoiles : pas d'interception, la dernière ligne tient jusqu'au gel
     const p6 = filmPlan(cardAt(6));
     expect(hudAt(p6, at(p6.cut + 3), "fr").radio?.text).toBe(p6.radio.fr.beats[5]);
-    expect(hudAt(p, at(p.freeze), "fr").radio?.text).toBe("Fin de course · Haute surveillance");
-    expect(hudAt(p, at(p.freeze), "en").radio?.text).toBe("End of the line · High surveillance");
+    // au gel, la fin de course sans le niveau : il est écrit en grand juste au-dessus
+    expect(hudAt(p, at(p.freeze), "fr").radio).toMatchObject({ text: "Fin de course\u00a0: dossier ouvert", kicker: null });
+    expect(hudAt(p, at(p.freeze), "en").radio?.text).toBe("End of the line: file opened");
+    expect(hudAt(p, at(p.freeze), "fr").radio?.text).not.toContain(p.title.fr);
     const squares = new Set(Array.from({ length: FPS }, (_, i) => hudAt(p, at(SHOT_START.P1 + 6 + i), "fr").radio?.square));
     expect(squares).toEqual(new Set(["coral", "lilac"]));
   });
@@ -281,6 +285,24 @@ describe("radioLines", () => {
     expect(fr.beats[4]).toContain(FIXTURES.silver.profile!.label.fr);
     expect(radioLines({ ...FIXTURES.silver, club: null }, "en").beats[3]).toContain("Lone wolf");
     for (const l of [...fr.beats, fr.intercept, fr.end]) expect(l.length).toBeGreaterThan(0);
-    expect(radioLines(FIXTURES.silver, "en").intercept).toBe("Intercept · roadblock in place");
+    expect(radioLines(FIXTURES.silver, "en").intercept).toBe("Intercept: roadblock in place");
+  });
+
+  it("le chef d'accusation : son étiquette au-dessus de la ligne, jamais deux deux-points ni de point médian", () => {
+    const card = { ...FIXTURES.silver, statuses: [{ id: "gh_lazy_commits", tone: "negative" as const, label: { fr: "Commits : fix, fix2, final fix", en: "Commits: fix, fix2, final fix" }, rule: { fr: "", en: "" } }] };
+    for (const lang of ["fr", "en"] as const) {
+      const r = radioLines(card, lang);
+      expect(r.kickers).toHaveLength(6);
+      expect(r.kickers.filter(Boolean)).toEqual([lang === "fr" ? "Chef d'accusation" : "Charge"]);
+      expect(r.beats[2]).toBe(card.statuses[0].label[lang]);
+      for (const l of [...r.beats, r.intercept, r.end, ...r.kickers.filter((k): k is string => !!k)]) {
+        expect(l.split(":").length).toBeLessThanOrEqual(2);
+        expect(l).not.toContain("·");
+        expect(l).not.toMatch(/motif/i);
+      }
+    }
+    const p = filmPlan({ ...cardAt(3), statuses: card.statuses });
+    const h = hudAt(p, at(SHOT_START.P3 + 4), "fr");
+    expect(h.radio).toMatchObject({ kicker: "Chef d'accusation", text: "Commits : fix, fix2, final fix" });
   });
 });

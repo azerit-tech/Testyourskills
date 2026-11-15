@@ -28,8 +28,8 @@ export interface Hud {
   stars: StarHud[];
   /** Étoiles allumées par la poursuite (jamais plus que le niveau). */
   lit: number;
-  /** La ligne de radio, et la couleur de son carré ; null pendant l'ouverture. */
-  radio: { text: string; square: "coral" | "lilac" } | null;
+  /** La ligne de radio, son étiquette au-dessus (le chef d'accusation) et la couleur de son carré ; null pendant l'ouverture. */
+  radio: { text: string; kicker: string | null; square: "coral" | "lilac" } | null;
   /** Fermeture des bandes d'encre : 0 ouvertes, 1 fermées. */
   bands: number;
   /** Les deux images de l'éclair de la bascule vers la fin (le nom vient de l'encre qui les couvrait d'abord). */
@@ -87,8 +87,10 @@ export function hudAt(plan: FilmPlan, t: number, lang: Lang): Hud {
   // avant la coupe (une à cinq étoiles) et pendant la fin, puis la fin de course au gel.
   const r = plan.radio[lang];
   const intercepted = plan.intercept !== null && frame >= plan.intercept;
-  const text = phase === "chase" || phase === "ending" ? (intercepted ? r.intercept : lit > 0 ? r.beats[lit - 1] : null) : r.end;
-  const radio = text ? { text, square: (Math.floor(frame / SQUARE_STEP) % 2 === 0 ? "coral" : "lilac") as "coral" | "lilac" } : null;
+  const beat = (phase === "chase" || phase === "ending") && !intercepted && lit > 0 ? lit - 1 : -1;
+  const text = phase === "chase" || phase === "ending" ? (intercepted ? r.intercept : beat >= 0 ? r.beats[beat] : null) : r.end;
+  const kicker = beat >= 0 ? (r.kickers[beat] ?? null) : null;
+  const radio = text ? { text, kicker, square: (Math.floor(frame / SQUARE_STEP) % 2 === 0 ? "coral" : "lilac") as "coral" | "lilac" } : null;
 
   // Les bandes se ferment à l'ouverture, s'ouvrent après le sommet du flash.
   const bands = landed ? 1 - clamp01((f - flash.peak) / (flash.to - flash.peak)) : clamp01(f / BANDS_CLOSE);

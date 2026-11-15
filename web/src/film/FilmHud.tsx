@@ -1,5 +1,7 @@
 // Ce que le site pose sur le film (§18.36, docs/cinematique-poursuite.md §2.2,
-// §3.3) : deux bandes d'encre, les six étoiles, la radio, la plaque et le
+// §3.3) : deux bandes d'encre, les six étoiles (la règle unique du §18.48 :
+// remplies de gauche à droite, crème pleine, éteintes en contour), la radio
+// (le chef d'accusation porte son étiquette au-dessus de la ligne), la plaque et le
 // niveau de l'arrêt sur image (son image en deux tons, toise comprise, est
 // tirée par freeze.ts), les deux images d'encre de la coupe, le grain et la
 // vignette. Tout vient de hudAt : aucun état, aucune animation CSS qui
@@ -76,8 +78,11 @@ export function FilmHud({ plan, hud, lang }: { plan: FilmPlan; hud: Hud; lang: L
       <div className="film-band film-band-bottom" style={{ transform: `translateY(${(1 - hud.bands) * 100}%)` }}>
         {hud.radio && (
           <p className="film-radio">
-            <i className={`film-square is-${hud.radio.square}`} />
-            <span>{hud.radio.text}</span>
+            {hud.radio.kicker && <small className="film-radio-kicker">{hud.radio.kicker}</small>}
+            <span className="film-radio-line">
+              <i className={`film-square is-${hud.radio.square}`} />
+              <span className="film-radio-text">{hud.radio.text}</span>
+            </span>
           </p>
         )}
       </div>
