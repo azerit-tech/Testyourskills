@@ -14,7 +14,7 @@ import type { DeclaredSource, Grid, GridCriterion } from "../../../shared/types"
 import { RECRUITER_ORDER } from "../../../shared/recruiterLine";
 import { declaredOf } from "../../../shared/types";
 import { pick, useT, type Dict } from "../i18n";
-import { finalLines, GRID_WEIGHTS, keptFrom, levelTable, reachedRow, rowText, stateTags } from "../lib/grid";
+import { finalLines, GRID_WEIGHTS, keptFrom, levelTable, reachedRow, rowText, schoolKept, stateTags } from "../lib/grid";
 import type { Shareable } from "./After";
 
 type G = Dict["grid"];
@@ -55,7 +55,9 @@ function Row({ c, grid, declared, shared, isCase }: RowProps) {
   const text = rowText(c, { g, pick: (f) => pick(f, lang), declared, shared });
   const tags = stateTags(c, grid);
   const table = levelTable(c, g);
-  const row = reachedRow(c, table);
+  // L'école comptée : ni note, ni jauge, ni palier surligné, ni « pour le suivant » (qui dirait le palier).
+  const kept = schoolKept(c);
+  const row = kept ? -1 : reachedRow(c, table);
   const name = g.names[c.code];
   const coef = g.coef(dec(GRID_WEIGHTS[c.code], lang));
   const none = g.compare.none;
@@ -67,11 +69,17 @@ function Row({ c, grid, declared, shared, isCase }: RowProps) {
       <h3 className="rg-head">
         <button type="button" className="rg-toggle" aria-expanded={open} aria-controls={panel} onClick={() => setOpen((o) => !o)}>
           <span className="rg-name">{name}</span>
-          <span className="rg-score" aria-hidden>
-            {c.score ?? none}
-            {c.score !== null && <small>/10</small>}
-          </span>
-          <Gauge c={c} g={g} />
+          {kept ? (
+            <span className="rg-score rg-counted">{t.read.counted}</span>
+          ) : (
+            <>
+              <span className="rg-score" aria-hidden>
+                {c.score ?? none}
+                {c.score !== null && <small>/10</small>}
+              </span>
+              <Gauge c={c} g={g} />
+            </>
+          )}
           <span className="rg-meta">
             <span className="rg-coef">{coef}</span>
             {isCase && c.score !== null && !c.private && <span className="rg-kept">{keptFrom(c, g, declared)}</span>}
@@ -96,7 +104,7 @@ function Row({ c, grid, declared, shared, isCase }: RowProps) {
           <a className={`rg-src${cross ? " is-both" : ""}`} href={text.href} target="_blank" rel="noopener noreferrer">
             {text.label}
             <span aria-hidden> ↗</span>
-            <span className="sr-only">, {g.proof}</span>
+            <span className="sr-only">, {g.proof.toLowerCase()}</span>
           </a>
         ) : (
           <span className={`rg-src${cross ? " is-both" : ""}`}>{text.label}</span>
@@ -109,7 +117,7 @@ function Row({ c, grid, declared, shared, isCase }: RowProps) {
         </ul>
       )}
       <div id={panel} className="rg-levels" hidden={!open}>
-        {text.reached && (
+        {text.reached && !kept && (
           <p className="rg-reached">
             <b>{g.reached}</b> {text.reached}
           </p>
@@ -126,7 +134,7 @@ function Row({ c, grid, declared, shared, isCase }: RowProps) {
             </li>
           ))}
         </ol>
-        {text.next && (
+        {text.next && !kept && (
           <p className="rg-next">
             <b>{g.next}</b> {text.next}
           </p>

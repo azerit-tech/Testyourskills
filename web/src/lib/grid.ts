@@ -19,6 +19,14 @@ export type Tag = keyof G["tags"];
  * sur GitHub), « hors moyenne » (l'école ou l'open source sous la moyenne des
  * autres). Un critère noté sur sa source de preuve n'en a aucune (§3).
  */
+/**
+ * L'école comptée (SPEC §18.48) : son niveau ne s'affiche nulle part, ni pour la personne fichée ni en
+ * public. La note reste dans la moyenne ; la tuile, la ligne du détail et la formule disent « comptée ».
+ */
+export function schoolKept(c: Pick<GridCriterion, "code" | "score" | "private">): boolean {
+  return c.code === "EDU" && c.score !== null && !c.private;
+}
+
 export function stateTags(c: GridCriterion, grid?: Pick<Grid, "rule">): Tag[] {
   // Page partagée : l'école hors moyenne est gardée pour la personne fichée (shared/publicView.ts).
   if (c.private) return ["private"];
@@ -200,7 +208,7 @@ export function finalLines(grid: Grid, g: G, lang: Lang, unprovenCase?: { src: s
   if (m.rule === "empty_file" || m.mean === null) {
     return { formula: null, result: null, out: [], rule: F.empty, overall: grid.overall };
   }
-  const terms = m.terms.map((x) => F.term(g.names[x.code], x.score, dec(x.weight, lang))).join(" + ");
+  const terms = m.terms.map((x) => (x.code === "EDU" ? F.termCounted(g.names[x.code], dec(x.weight, lang)) : F.term(g.names[x.code], x.score, dec(x.weight, lang)))).join(" + ");
   const out: string[] = [];
   for (const why of ["unproven", "missing", "below"] as const) {
     const names = m.excluded.filter((x) => x.why === why).map((x) => g.names[x.code]);

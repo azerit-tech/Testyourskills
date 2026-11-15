@@ -183,7 +183,9 @@ describe("« recoupé » : de la sortie du moteur à l'étiquette affichée", ()
       expect(cls).toContain("has-from");
       expect(allowed).toContain(from);
       expect(from).toBe(c.source === "both" ? "LinkedIn et GitHub" : c.source === "github" ? "GitHub" : "LinkedIn");
-      expect(aria.replace(/&#x27;/g, "'")).toBe(`${name}\u00a0: ${c.score} sur 10, ${keptFrom(c, DICTS.fr.grid, "linkedin")}`);
+      // L'école comptée ne dit jamais son niveau (§18.48) : « comptée au dossier ».
+      if (c.code === "EDU") expect(aria.replace(/&#x27;/g, "'")).toBe(R.tileCounted(name));
+      else expect(aria.replace(/&#x27;/g, "'")).toBe(`${name}\u00a0: ${c.score} sur 10, ${keptFrom(c, DICTS.fr.grid, "linkedin")}`);
     }
     // En anglais : « LinkedIn and GitHub », « read on … ».
     const en = renderNode(createElement(RecruiterRead, { item, shared: false, who: "@dev" }), "en-US");
@@ -284,6 +286,13 @@ describe("une vraie grille du serveur, à travers le bloc : les deux profils d'e
     const formula = textOf(/<p class="rg-formula">([^<]+)<\/p>/.exec(html)![1]);
     const num = (s: string) => Number(s.replace(",", "."));
     const terms = [...formula.matchAll(/(\d+)\s×\s(\d+(?:[,.]\d+)?)/g)].map((m) => [Number(m[1]), num(m[2])] as const);
+    // L'école comptée entre dans la formule sans sa note (§18.48) : « École et sélection (comptée) × 1 ».
+    const edu = grid.criteria.find((c) => c.code === "EDU" && c.counted && c.score !== null);
+    if (edu) {
+      expect(formula).toMatch(/\((comptée|on file)\) × 1\b/);
+      expect(formula).not.toMatch(new RegExp(`(École et sélection|School and selection) ${edu.score} ×`));
+      terms.push([edu.score!, 1]);
+    }
     expect(terms.length).toBe(grid.criteria.filter((c) => c.counted && c.score !== null).length);
     const den2 = terms.reduce((s, [, w]) => s + Math.round(w * 2), 0);
     expect(num(/÷\s(\d+(?:[,.]\d+)?)/.exec(formula)![1]) * 2).toBe(den2);

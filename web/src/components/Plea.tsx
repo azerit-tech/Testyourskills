@@ -61,7 +61,10 @@ interface PleaVerdictProps {
   shown: boolean;
 }
 
-/** Sous la fiche : « Tu plaidais ★★★★★☆ », « Verdict : ★★★★☆☆ » (sans point après les étoiles) et le mot de l'écart. Rien sans pari. */
+/**
+ * Sous la fiche : un tableau de deux lignes, « Tu plaidais ★★★★★☆ » puis « Verdict ★★★★☆☆ », libellés
+ * sans deux-points alignés à droite, étoiles sur la même verticale ; puis le mot de l'écart. Rien sans pari.
+ */
 export function PleaVerdict({ cardId, overall, shown }: PleaVerdictProps) {
   const { t } = useT();
   const p = t.plea;
@@ -85,15 +88,17 @@ export function PleaVerdict({ cardId, overall, shown }: PleaVerdictProps) {
 
   if (!v) return null;
   return (
-    <section className="plea-verdict" aria-label={p.verdict.replace(/\s*:$/, "")}>
-      <p className="plea-said">
-        <span>
-          {p.pleaded} <Stars n={v.pleaded} size={22} label={p.count(v.pleaded)} />
-        </span>{" "}
-        <span>
-          {p.verdict} <Stars n={v.actual} size={22} label={p.count(v.actual)} />
-        </span>
-      </p>
+    <section className="plea-verdict" aria-label={p.verdict}>
+      <dl className="plea-said">
+        <dt>{p.pleaded}</dt>
+        <dd>
+          <Stars n={v.pleaded} size={22} label={p.count(v.pleaded)} />
+        </dd>
+        <dt>{p.verdict}</dt>
+        <dd>
+          <Stars n={v.actual} size={22} label={p.count(v.actual)} />
+        </dd>
+      </dl>
       <p className="plea-word">{p.gap[v.gap]}</p>
     </section>
   );

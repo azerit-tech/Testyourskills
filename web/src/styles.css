@@ -358,6 +358,13 @@ svg {
   box-shadow: none;
   color: var(--c-on-action);
 }
+/* au survol, le rose s'éclaircit de 6 % en plus du décalage : le bouton répond */
+@media (hover: hover) {
+  .btn-primary:not(:disabled):hover,
+  .pill-big:not(.pill-ghost):not(:disabled):not(.is-busy):hover {
+    background: color-mix(in srgb, var(--c-action) 94%, #fff);
+  }
+}
 /* désactivé : un contour discret, jamais de rose terne */
 .pill:disabled,
 .btn-primary:disabled,
@@ -2298,12 +2305,23 @@ button.cover-panel:focus-visible {
   gap: 6px;
   text-align: center;
 }
+/* le pari contre le verdict, en tableau de deux lignes : libellés à droite, étoiles sur la même verticale,
+   au téléphone comme au bureau */
 .plea-said {
-  font: 500 var(--t-16) / 1.75 var(--f-text);
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  gap: 4px 12px;
+  font: 500 var(--t-16) / 1.4 var(--f-text);
   color: var(--c-text);
 }
-.plea-said > span {
+.plea-said dt {
+  justify-self: end;
   white-space: nowrap;
+}
+.plea-said dd {
+  display: flex;
+  margin: 0;
 }
 .plea-word {
   font: var(--font-block);
@@ -2353,7 +2371,7 @@ button.cover-panel:focus-visible {
   display: flex;
   justify-content: center;
 }
-/* Un dossier à deux pièces (§18.36) : une seule fiche, ses pièces dessous, en petites capitales. */
+/* Un dossier à deux pièces (§18.36) : une seule fiche, ses pièces dessous. */
 .single-stage:has(.pieces) {
   flex-direction: column;
   align-items: center;
@@ -2367,12 +2385,11 @@ button.cover-panel:focus-visible {
   text-align: center;
   animation: pieces-in 0.5s ease both;
 }
+/* une ligne discrète en bas de casse, centrée sur l'axe de la fiche : le tampon de la fiche dit déjà la source */
 .pieces-line,
 .pieces-note {
   margin: 0;
-  font: var(--font-label);
-  letter-spacing: var(--ls-label);
-  text-transform: uppercase;
+  font: 500 var(--t-12) / 1.4 var(--f-text);
   color: var(--c-text);
 }
 .pieces-note {
@@ -2815,12 +2832,12 @@ button.cover-panel:focus-visible {
 .after-head:empty {
   display: none;
 }
-.after-head .plea-verdict {
-  justify-items: start;
-  text-align: left;
+.after-head {
+  justify-items: center;
+  text-align: center;
 }
 .after-head .jury-line {
-  text-wrap: pretty;
+  text-wrap: balance;
 }
 /* la peine et la caution : deux lignes discrètes sous le verdict, séparées de lui par un filet */
 .after-head .penalty {
@@ -2890,8 +2907,21 @@ button.cover-panel:focus-visible {
 
 /* partage (classes « out » : les bloqueurs masquent les « share ») : un bouton rose (« Partager » sur téléphone,
    LinkedIn ailleurs), LinkedIn en contour quand il passe second, le reste en liens */
-/* marine : la fiche au-dessus est souvent prune */
+/* Le sens des couleurs sous la fiche : prune pour les deux blocs qui servent le partage (« Partage-la »,
+   « Dénoncer »), marine pour ce qui informe (bandes, primes, critères, duel, source à ajouter, recrutement),
+   la troisième surface pour le verdict et les plis. Jamais deux prunes à la suite : sans bloc des bandes
+   entre eux, « Dénoncer » passe en marine. */
 .out {
+  background: var(--s-call);
+}
+.after-block.bands-pick,
+.after-block.prime-race,
+.after-block.rr,
+.after-block.duel,
+.after-block.hire {
+  background: var(--s-info);
+}
+.after-block.out + .after-block.denounce {
   background: var(--s-info);
 }
 
@@ -3272,10 +3302,9 @@ a.dossier-item:hover {
   color: var(--c-error) !important;
 }
 
-/* le bloc recruteur, en fin de page : un aplat relevé, discret à côté des cartes du jeu */
+/* le bloc recruteur, en fin de page : un bloc d'information, marine (règle des couleurs plus haut) */
 .hire {
   gap: 10px;
-  background: var(--s-item);
 }
 .hire p {
   max-width: 34ch;
@@ -4323,11 +4352,23 @@ a.rg-src.is-both {
   color: var(--cream);
   text-wrap: pretty;
 }
+/* dense : la pièce d'une tuile touchée s'insère sous sa rangée, la tuile voisine reste à côté d'elle */
 .rr-tiles {
   list-style: none;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-flow: row dense;
   gap: 8px;
+}
+.rr-piece {
+  grid-column: 1 / -1;
+  padding: 4px 4px 6px;
+  font: var(--font-small);
+  color: var(--c-text);
+  scroll-margin-bottom: 96px;
+}
+.rr-piece b {
+  color: var(--cream);
 }
 .rr-tile {
   display: grid;
@@ -4347,9 +4388,9 @@ a.rg-src.is-both {
   text-align: left;
   cursor: pointer;
 }
-/* la tuile ouverte : un contour crème (un état, pas un appel) */
+/* la tuile ouverte : un contour crème de 2 px (un état, pas un appel) */
 .rr-tile[aria-expanded="true"] {
-  box-shadow: inset 0 0 0 1.5px var(--cream);
+  box-shadow: inset 0 0 0 2px var(--cream);
 }
 /* Un dossier à deux pièces (§18.36) : la pièce où la note a été lue, sous le nom
    et sur toute la largeur de la tuile, pour ne serrer ni le nom ni la note. */
@@ -4396,6 +4437,12 @@ a.rg-src.is-both {
 .rr-tile.is-none .rr-score,
 .rr-tile.is-private .rr-score {
   color: var(--c-text-2);
+}
+/* l'école comptée : un mot à la place de la note, sans jauge */
+.rr-score.rr-counted,
+.rg-score.rg-counted {
+  font: 600 var(--t-12) / 1.2 var(--f-text);
+  color: var(--c-text);
 }
 .rr-gauge {
   grid-area: gauge;
