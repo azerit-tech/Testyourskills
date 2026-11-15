@@ -36,6 +36,7 @@ export function pageModule(path: string, status: number): string | null {
   if (/^\/primes(\/|$)/.test(p)) return "src/pages/Primes.tsx";
   if (/^\/reglement\/?$/.test(p)) return "src/pages/Rules.tsx";
   if (/^\/(confidentialite|privacy)\/?$/.test(p)) return "src/pages/Privacy.tsx";
+  if (/^\/credits\/?$/.test(p)) return "src/pages/Credits.tsx";
   // La page introuvable (components/ErrorPage.tsx) est dans le paquet de départ : rien à précharger.
   if (status === 404) return null;
   // /{pseudo} : le formulaire de l'accueil, prérempli.

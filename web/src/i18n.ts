@@ -801,6 +801,8 @@ const fr = frTypoDeep({
     rules: "Règlement",
     credits: "Crédits",
     seePrimes: "Voir les primes",
+    /** La signature du pied de page : qui fait le site. */
+    sign: "Azerit recrute des devs sur preuves : l'expérience d'abord, le code comme preuve.",
   },
   privacy: {
     title: "Vie privée",
@@ -1495,6 +1497,7 @@ const en: Dict = {
     rules: "Rules",
     credits: "Credits",
     seePrimes: "See the bounties",
+    sign: "Azerit hires devs on evidence: experience first, code as proof.",
   },
   privacy: {
     title: "Privacy",

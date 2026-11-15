@@ -24,6 +24,7 @@ const PrimesList = lazy(() => import("./pages/Primes").then((m) => ({ default: m
 const PrimePage = lazy(() => import("./pages/Primes").then((m) => ({ default: m.PrimePage })));
 const Rules = lazy(() => import("./pages/Rules").then((m) => ({ default: m.Rules })));
 const Privacy = lazy(() => import("./pages/Privacy").then((m) => ({ default: m.Privacy })));
+const Credits = lazy(() => import("./pages/Credits").then((m) => ({ default: m.Credits })));
 
 /** Les téléphones de l'aperçu : le plus courant, le plus étroit. */
 const DEVICES = [
@@ -64,6 +65,8 @@ function Routes() {
       return <Home />;
     case "privacy":
       return <Privacy />;
+    case "credits":
+      return <Credits />;
     case "bands":
       return <Bands />;
     case "band":

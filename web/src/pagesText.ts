@@ -12,6 +12,183 @@ export interface ProseSection {
   blocks: ProseBlock[];
 }
 
+/* ---------- les crédits (/credits) : le contenu de web/public/credits.txt, en lignes lisibles ---------- */
+
+/** Une ligne des crédits : ce que c'est, puis ses auteurs, chacun un lien vers son modèle (l'adresse ne s'affiche pas). */
+export interface CreditLine {
+  what: string;
+  by: { name: string; href: string }[];
+}
+export interface CreditGroup {
+  h: string;
+  lines: CreditLine[];
+}
+
+type Two = [fr: string, en: string];
+type Line = [Two, [name: string, href: string][]];
+const SK = "https://sketchfab.com/3d-models/";
+/** Les modèles du film, CC BY 4.0 : un groupe par décor, une ligne par élément (tools/film3d/CREDITS.md). */
+const FILM_MODELS: { h: Two; lines: Line[] }[] = [
+  {
+    h: ["Les voitures", "The cars"],
+    lines: [
+      [["Coupé", "Coupe"], [["MMC Works", `${SK}generic-sport-coupe-car-820a13c4831c41959ce75e6c2014e882`]]],
+      [["Berline des années 60", "1960s sedan"], [["Elements Creative Studio", `${SK}b1bb1e82fe394153932ba1c2a341dded`]]],
+      [["Coupé des années 70", "1970s coupe"], [["Iv4sHka", `${SK}79612cb9ee714df9967c6d6c4fc967b1`]]],
+      [["Rétroviseur intérieur", "Rear-view mirror"], [["movemama", `${SK}rear-view-mirror-72f3ac9e3ff5423f823841b3c801d0c1`]]],
+      [["Fourgonnettes garées", "Parked station wagons"], [["Martin Trafas", `${SK}2b734bf738dc405998c2074953965cc6`]]],
+    ],
+  },
+  {
+    h: ["Les poursuivants", "The pursuers"],
+    lines: [
+      [
+        ["Patrouilles", "Patrol cars"],
+        [
+          ["Mateusz Woliński", `${SK}police-car-9166b13b6ae341f4bfc093edb71d74f4`],
+          ["L95XP", `${SK}ford-crown-victoria-free-b1615ed43a5443a2876c8020a734cf6e`],
+          ["Daniel Zhabotinsky", `${SK}fairheaven-lt-80-cop-cruiser-low-poly-model-61766c1e6e1e4b2b803c174f33433a74`],
+        ],
+      ],
+      [["Fourgon", "Van"], [["bunny", `${SK}gmc-vandura1976-van-40cf97bc0f7d4bdb8135c4e9d2264923`]]],
+      [["Hélicoptère", "Helicopter"], [["solid3DDD", `${SK}eurocopter-ec135-politia-high-poly-02373bff3f7f48bf8649805455fe4260`]]],
+      [["Avion de chasse", "Jet"], [["Gabriel", `${SK}concept-jet-69012312f3ab4f13b637b6a188aa3d4c`]]],
+      [
+        ["Avions de chasse, de près", "Jets, up close"],
+        [
+          ["Tim Samedov", `${SK}7a13c91f07e042a685b4d265644fdc06`],
+          ["Tim Samedov", `${SK}b9e7a67cf726485da1493545fccce557`],
+        ],
+      ],
+    ],
+  },
+  {
+    h: ["Les personnes", "The people"],
+    lines: [
+      [["Conducteur", "Driver"], [["Jules Winnfield", `${SK}low-poly-character-0e95ddfd01ed4d23aeb1d9b7fe79ea26`]]],
+      [["Capuche", "Hood"], [["Tijerín Art Studio", `${SK}balaclava-scarf-as-a-hood-3d-scan-5c037f1a66634c5ea25ad8e87a4c3923`]]],
+      [
+        ["Agents", "Officers"],
+        [
+          ["SPP Animation Studio", `${SK}policeman-d47bb1f61fa340588b5801cdb63812c8`],
+          ["TUZZY--", `${SK}police-character-fuse-made-98f6136cc24f41f1bb1b1f3262bde2ff`],
+        ],
+      ],
+      [["Casquette", "Cap"], [["Aramuor", `${SK}officer-police-captain-pilot-hat-cap-whatever-9697ef10105a4e02a6074bc9bca464bd`]]],
+      [["Arme inventée", "Fictional handgun"], [["4d_Bob", `${SK}t77-handgun-7e6a5ffc9deb4994a4092ccdba85c965`]]],
+    ],
+  },
+  {
+    h: ["Le barrage", "The roadblock"],
+    lines: [
+      [["Barrière", "Fence barricade"], [["Rocz3D", `${SK}fence-barricade-03-2a09091d4e7b4539abe03f6a50762409`]]],
+      [["Cône", "Traffic cone"], [["Kuutti Siitonen", `${SK}worn-traffic-cone-1cbffb4169684e5a84ba186882bd55d7`]]],
+      [["Cônes, balises, panneaux", "Cones, beacons, boards"], [["NotAnotherApocalypticCo.", `${SK}e03b1d2dfdc0416bb8324d15573ea60c`]]],
+      [["Barrière de foule", "Crowd barrier"], [["Gianluca Gatto", `${SK}438c36d48ab04ec4b5178c6989d3ab3b`]]],
+      [["Herse", "Spike strip"], [["Eric", `${SK}spike-strip-2c8370fccfbf4a7f9b9d9729112b8e61`]]],
+      [["Mât d'éclairage", "Light tower"], [["krambulini", `${SK}light-tower-9addea6a4129438b83a1fc3ed4a784ec`]]],
+    ],
+  },
+  {
+    h: ["La rue", "The street"],
+    lines: [
+      [["Cocotiers", "Coconut palms"], [["Next Spring", `${SK}realistic-palm-tree-2-free-d05c8ffb6ec64a7184c4b673e21f7224`]]],
+      [["Palmiers royaux", "Royal palms"], [["PlantCatalog", `${SK}realistic-hd-royal-palm-325-3113aadb615e432f934ec5d3407d11ce`]]],
+      [
+        ["Lampadaires", "Street lights"],
+        [
+          ["KMB3D", `${SK}various-low-poly-street-lights-1173b0c4d9b0400bbeaafbee0e94ca59`],
+          ["Mercuri-sodyum", `${SK}e72cababe3094faa93544727b77ff2cf`],
+          ["Mercuri-sodyum", `${SK}c4471f470a56422d804b279cfddb4b27`],
+          ["StratoArt", `${SK}d0f6ca0318c044d6a99ac5e376b8ceca`],
+        ],
+      ],
+      [["Feux de circulation", "Traffic light"], [["evgenymur", `${SK}nyc-80s-traffic-light-bad8aa4988474919be8f48920dde7e3d`]]],
+      [["Panneaux", "Road signs"], [["FrodoUndead", `${SK}c39bf97110494b5db3de84165211f592`]]],
+      [["Glissière", "Guardrail"], [["xplanepilot", `${SK}693dee3dc6a1495f90ab0ba1f8237cb4`]]],
+      [["Réservoirs de toit", "Rooftop water tanks"], [["Username.blend", `${SK}water-tank-aff4e9fd3f7042d5855fade7411df4df`]]],
+      [["Lettres néon", "Neon letters"], [["danny_p3d", `${SK}a88035b37ba4498b8d7fe9cfbc0dccc8`]]],
+      [
+        ["Enseignes", "Signs"],
+        [
+          ["Black vizual", `${SK}794708f56b4e454caec677701781bca0`],
+          ["plaggy", `${SK}9a924db296cf4a1eb12991702ab48da5`],
+          ["plaggy", `${SK}ba11464601794316a2351d150774f10d`],
+        ],
+      ],
+      [["Store", "Awning"], [["plaggy", `${SK}47e5fd8a6b194b48aad20425869d15ba`]]],
+      [["Intérieurs de boutique", "Storefront interiors"], [["99.Miles", `${SK}348da01c195d46eca29e478e98aab16c`]]],
+      [["Fenêtres", "Windows"], [["hnanw", `${SK}e8a3914fb654483790abc0cd72fb7099`]]],
+      [["Portes vitrées", "Glass doors"], [["carlcapu9", `${SK}e0ff1a543cb34979999d2fd87843203e`]]],
+      [["Climatiseurs", "Air conditioners"], [["Khoa Nguyen", `${SK}3b930497c77f47269847e75b9ee85b20`]]],
+      [["Garde-corps", "Railings"], [["Owen.Barden", `${SK}b5b629702e814263816769db0ee660cc`]]],
+      [["Parcmètre", "Parking meter"], [["sixonetwo", `${SK}c0f5e3e1c8a64ab3b64d4b077bd09210`]]],
+      [["Distributeur de journaux", "Newspaper box"], [["chrisg4919", `${SK}29cca5a8e99e438c8fb644d1aea3587e`]]],
+      [["Mobilier de rue", "Street furniture"], [["Dominik Biały", `${SK}9752f598cc5541acb3de07150d1a4ae4`]]],
+    ],
+  },
+  {
+    h: ["Le port et la marina", "The harbor and the marina"],
+    lines: [
+      [
+        ["Conteneurs", "Containers"],
+        [
+          ["Invictus fulgur", `${SK}ac9356745e9a43d6b5cb7d53d8f26008`],
+          ["Aidan Callaghan", `${SK}f555ce5532d84cac8ad963dec5833934`],
+          ["Sebastian Webster", `${SK}772f4be391a245f699c54e6cf157c58d`],
+        ],
+      ],
+      [
+        ["Grues", "Cranes"],
+        [
+          ["jhervianto", `${SK}ae2b1da54f6a4e28ba5f7daa1c6dc5b8`],
+          ["MisterH", `${SK}d4d582ebd707426f93f1f5a9cdd0ce03`],
+          ["Randonavt", `${SK}965188af6132410189a2eb1210f9095c`],
+        ],
+      ],
+      [
+        ["Navires", "Ships"],
+        [
+          ["RM02", `${SK}aaa41cca946b4a08bc08cf692b7757be`],
+          ["hungry_drifter", `${SK}b7c97df584824ca682d26daabf401f87`],
+          ["Moon Moon", `${SK}fd28c35b76754c9386b32aa281a0e238`],
+        ],
+      ],
+      [["Chariot élévateur", "Forklift"], [["louis-muir", `${SK}060f3f8bc7de4e6ca2f348d414702e9d`]]],
+      [["Bitte d'amarrage", "Bollard"], [["henkei", `${SK}d62977f75f2d49688fd0094fbf5b1d41`]]],
+      [["Palettes", "Pallets"], [["Anna Denisova", `${SK}18fbfb830f294b44aa8dff530cc2ea12`]]],
+      [
+        ["Bateaux de plaisance", "Pleasure boats"],
+        [
+          ["Taldinc", `${SK}d59913994a44444b8d054f4de5f519bc`],
+          ["Miguelangelo Rosario", `${SK}09a9fc4a0061464fba1bc3ba76848869`],
+          ["BoatUS Foundation", `${SK}14564c5ec6ee4f11a3ea8e213b981cb1`],
+          ["Sergei", `${SK}0dd451f295d049cea20c17d3ffa87ee3`],
+        ],
+      ],
+    ],
+  },
+];
+
+/** Le reste : textures et ciel (CC0), icônes, polices. */
+const OTHER_LINES: Line[] = [
+  [["Ciel, textures, petits objets de rue (CC0)", "Sky, textures, small street props (CC0)"], [["Poly Haven", "https://polyhaven.com/license"]]],
+  [["Textures de murs et de sols (CC0)", "Wall and ground textures (CC0)"], [["ambientCG", "https://ambientcg.com"]]],
+  [["Icônes des langages (CC0)", "Language icons (CC0)"], [["Simple Icons", "https://simpleicons.org"]]],
+  [
+    ["Polices (SIL Open Font License 1.1)", "Fonts (SIL Open Font License 1.1)"],
+    [
+      ["Outfit", "https://github.com/Outfitio/Outfit-Fonts"],
+      ["Barlow Condensed", "https://github.com/jpt/barlow"],
+      ["JetBrains Mono", "https://github.com/JetBrains/JetBrainsMono"],
+    ],
+  ],
+];
+
+const toLines = (lines: Line[], i: 0 | 1): CreditLine[] => lines.map(([what, by]) => ({ what: what[i], by: by.map(([name, href]) => ({ name, href })) }));
+/** Les crédits dans une langue : les groupes de modèles du film, puis le reste. */
+const creditLines = (i: 0 | 1): { groups: CreditGroup[]; rest: CreditLine[] } => ({ groups: FILM_MODELS.map((g) => ({ h: g.h[i], lines: toLines(g.lines, i) })), rest: toLines(OTHER_LINES, i) });
+
 const fr = {
   /** Une seule mise en page d'erreur (components/ErrorPage.tsx) : la toise, le tampon, une sortie utile. */
   error: {
@@ -183,6 +360,24 @@ const fr = {
       },
     ],
   },
+  /** /credits : un résumé, puis les modèles du film par décor, puis le reste ; chaque auteur en lien vers son modèle. */
+  credits: {
+    title: "Crédits",
+    summaryTitle: "En deux lignes",
+    summary: [
+      "Le film, la fiche et leurs images s'appuient sur des modèles 3D, des textures, des polices et des icônes d'autres auteurs, sous licence CC0 ou CC BY 4.0.",
+      "Les modèles CC BY ont été modifiés pour le film : échelle, peinture, marques et inscriptions retirées, éclairage.",
+    ],
+    film: "Le film de la poursuite",
+    filmText: "Rendu dans Blender pour Azerit. La ville, les immeubles, la route et l'éclairage sont écrits en code, sans aucun lieu réel. Le son est synthétisé dans le navigateur.",
+    filmLicense: "Les modèles 3D qui suivent sont sous licence",
+    restTitle: "La fiche, les images, le reste",
+    restText: "Les illustrations des profils et des personnages sont faites pour Azerit.",
+    former: "L'ancienne révélation en 3D",
+    formerText: "La scène de l'ascenseur ne fait plus partie du parcours. Ses modèles, ses textures et les données OpenStreetMap (© OpenStreetMap contributors, ODbL) restent crédités dans",
+    raw: "Le même contenu, en texte brut :",
+    ...creditLines(0),
+  },
 };
 
 export type PagesDict = typeof fr;
@@ -351,6 +546,23 @@ const en: PagesDict = {
         ],
       },
     ],
+  },
+  credits: {
+    title: "Credits",
+    summaryTitle: "In two lines",
+    summary: [
+      "The film, the sheet and their images rely on 3D models, textures, fonts and icons by other authors, under CC0 or CC BY 4.0.",
+      "The CC BY models were modified for the film: scale, paint, badges and lettering removed, lighting.",
+    ],
+    film: "The chase film",
+    filmText: "Rendered in Blender for Azerit. The city, buildings, road and lighting are written in code, with no real place. The sound is synthesized in the browser.",
+    filmLicense: "The 3D models below are under",
+    restTitle: "The sheet, the images, the rest",
+    restText: "The profile and character illustrations are made for Azerit.",
+    former: "The former 3D reveal",
+    formerText: "The elevator scene is no longer part of the flow. Its models, textures and OpenStreetMap data (© OpenStreetMap contributors, ODbL) stay credited in",
+    raw: "The same content, as plain text:",
+    ...creditLines(1),
   },
 };
 

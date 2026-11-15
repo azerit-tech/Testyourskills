@@ -158,7 +158,9 @@ export function staticPageMeta(baseUrl: string, path: string, lang: Lang): PageM
         ? { lang: "en" as Lang, title: "Privacy" }
         : p === "/reglement"
           ? { lang, title: lang === "fr" ? "Règlement de la saison" : "Season rules" }
-          : null;
+          : p === "/credits"
+            ? { lang, title: lang === "fr" ? "Crédits" : "Credits" }
+            : null;
   if (!page) return null;
   return { ...genericMeta(baseUrl, p, page.lang), title: pageTitle(page.title), image: `${baseUrl}${HOME_IMAGE_PATH}` };
 }

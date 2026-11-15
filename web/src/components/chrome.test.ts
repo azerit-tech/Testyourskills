@@ -75,29 +75,32 @@ describe("le bandeau de saison", () => {
 
 describe("le pied de page", () => {
   // Le mot de la vie privée appartient au dictionnaire : le test lit le sien.
-  it("par défaut : Bandes, vie privée, Crédits, azerit.tech", () => {
-    expect(links(render(createElement(Footer)))).toEqual([
+  it("par défaut : qui fait le site et azerit.tech, puis Bandes, vie privée, Crédits", () => {
+    const html = render(createElement(Footer));
+    expect(html).toContain("Azerit recrute des devs sur preuves");
+    expect(links(html)).toEqual([
+      ["https://azerit.tech", "azerit.tech ↗"],
       ["/bandes", "Bandes"],
       ["/confidentialite", DICTS.fr.footer.privacy],
-      ["/credits.txt", "Crédits"],
-      ["https://azerit.tech", "azerit.tech"],
+      ["/credits", "Crédits"],
     ]);
   });
 
   it("primes listées et règlement publié : leurs liens s'ajoutent, dans l'ordre", () => {
     const html = render(createElement(Footer), { config: { primesOpen: true, primesListed: true, rulesPublished: true, season: SEASON } });
-    expect(links(html).map((l) => l[0])).toEqual(["/bandes", "/primes", "/reglement", "/confidentialite", "/credits.txt", "https://azerit.tech"]);
+    expect(links(html).map((l) => l[0])).toEqual(["https://azerit.tech", "/bandes", "/primes", "/reglement", "/confidentialite", "/credits"]);
   });
 
   it("en anglais", () => {
     const html = render(createElement(Footer), { lang: "en", config: { primesListed: true, rulesPublished: true } });
+    expect(html).toContain("Azerit hires devs on evidence: experience first, code as proof.");
     expect(links(html)).toEqual([
+      ["https://azerit.tech", "azerit.tech ↗"],
       ["/bandes", "Crews"],
       ["/primes", "Bounties"],
       ["/reglement", "Rules"],
       ["/privacy", DICTS.en.footer.privacy],
-      ["/credits.txt", "Credits"],
-      ["https://azerit.tech", "azerit.tech"],
+      ["/credits", "Credits"],
     ]);
   });
 });

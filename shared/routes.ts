@@ -5,7 +5,7 @@
 export const UPCOMING_PAGES = ["vs", "badge", "u"] as const;
 
 /** Routes qui existent déjà, côté front ou serveur. */
-const SITE_ROUTES = ["c", "bandes", "primes", "reglement", "api", "og", "auth", "avatar", "assets", "3d", "privacy", "confidentialite", "__devices"] as const;
+const SITE_ROUTES = ["c", "bandes", "primes", "reglement", "api", "og", "auth", "avatar", "assets", "3d", "privacy", "confidentialite", "credits", "__devices"] as const;
 
 export const RESERVED_SEGMENTS: ReadonlySet<string> = new Set<string>([...UPCOMING_PAGES, ...SITE_ROUTES]);
 
@@ -36,7 +36,7 @@ const LOGIN_RE = /^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$/;
 export function isSitePage(path: string): boolean {
   if (path === "/" || path === "") return true;
   if (/^\/c\/[A-Za-z0-9_-]+\/?$/.test(path)) return true;
-  if (/^\/(confidentialite|privacy)\/?$/.test(path)) return true;
+  if (/^\/(confidentialite|privacy|credits)\/?$/.test(path)) return true;
   if (/^\/bandes\/?$/i.test(path) || /^\/bandes\/(ecole|boite)\/[a-z0-9]+(?:-[a-z0-9]+)*\/?$/.test(path)) return true;
   if (/^\/primes(?:\/|$)/i.test(path) || /^\/reglement\/?$/i.test(path) || isUpcomingPath(path)) return true;
   // /{pseudo} : l'accueil, le champ prérempli.

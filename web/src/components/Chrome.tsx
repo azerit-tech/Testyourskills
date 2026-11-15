@@ -6,7 +6,7 @@ import { api, isMock } from "../lib/api";
 import { onLinkClick, usePath } from "../lib/router";
 import { seasonLine, useAppConfig } from "../lib/season";
 import { MINE_EVENT, myCard } from "../lib/session";
-import { Brand } from "./Brand";
+import { AzeritMark, Brand } from "./Brand";
 
 /** La langue en deux mots, « FR · EN » : l'active soulignée, chacune sur 44 px de zone tactile. */
 export function LangToggle() {
@@ -117,7 +117,10 @@ export function TopBar() {
   );
 }
 
-/** Le pied de page : les liens du site (primes et règlement seulement quand ils sont ouverts), puis azerit.tech. */
+/**
+ * Le pied de page : qui fait le site, en une phrase, et azerit.tech ; puis les liens du site
+ * (primes et règlement seulement quand ils sont ouverts), la vie privée et les crédits.
+ */
 export function Footer() {
   const { t, lang } = useT();
   const cfg = useAppConfig();
@@ -125,22 +128,27 @@ export function Footer() {
   const inner: [string, string][] = [["/bandes", t.chrome.bands]];
   if (cfg?.primesListed) inner.push(["/primes", t.chrome.primes]);
   if (cfg?.rulesPublished) inner.push(["/reglement", t.chrome.rules]);
-  inner.push([privacy, t.footer.privacy]);
+  inner.push([privacy, t.footer.privacy], ["/credits", t.chrome.credits]);
   return (
     <footer className="footer">
-      <nav className="footer-links" aria-label={t.chrome.nav}>
-        {inner.map(([href, label]) => (
-          <a key={href} href={href} onClick={(e) => onLinkClick(e, href)}>
-            {label}
-          </a>
-        ))}
-        <a href="/credits.txt" target="_blank" rel="noopener">
-          {t.chrome.credits}
-        </a>
-        <a className="is-out" href="https://azerit.tech" target="_blank" rel="noopener" onClick={() => api.track("cta_azerit_clicked", null, { from: "footer" })}>
-          azerit.tech
-        </a>
-      </nav>
+      <div className="footer-in">
+        <p className="footer-sign">
+          <AzeritMark size={16} className="footer-mark" />
+          <span>
+            {t.chrome.sign}{" "}
+            <a className="footer-azerit" href="https://azerit.tech" target="_blank" rel="noopener" onClick={() => api.track("cta_azerit_clicked", null, { from: "footer" })}>
+              azerit.tech<span aria-hidden> ↗</span>
+            </a>
+          </span>
+        </p>
+        <nav className="footer-links" aria-label={t.chrome.nav}>
+          {inner.map(([href, label]) => (
+            <a key={href} href={href} onClick={(e) => onLinkClick(e, href)}>
+              {label}
+            </a>
+          ))}
+        </nav>
+      </div>
     </footer>
   );
 }

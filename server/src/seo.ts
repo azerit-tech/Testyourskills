@@ -15,9 +15,9 @@ export function robotsTxt(baseUrl: string): string {
   return `User-agent: *\nAllow: /\n\nSitemap: ${baseUrl}/sitemap.xml\n`;
 }
 
-/** Les pages publiques du site : l'accueil, les bandes, les primes et le règlement quand ils existent, la vie privée. */
+/** Les pages publiques du site : l'accueil, les bandes, les primes et le règlement quand ils existent, la vie privée, les crédits. */
 export function sitemapPaths(o: { primesListed: boolean; rulesPublished: boolean }): string[] {
-  return ["/", "/bandes", ...(o.primesListed ? ["/primes"] : []), ...(o.rulesPublished ? ["/reglement"] : []), "/confidentialite", "/privacy"];
+  return ["/", "/bandes", ...(o.primesListed ? ["/primes"] : []), ...(o.rulesPublished ? ["/reglement"] : []), "/confidentialite", "/privacy", "/credits"];
 }
 
 export function sitemapXml(baseUrl: string, paths: string[]): string {
@@ -26,7 +26,7 @@ export function sitemapXml(baseUrl: string, paths: string[]): string {
 }
 
 /** La description propre au règlement et à la vie privée, au lieu de celle de l'accueil. Leur titre vient de html.ts. */
-export const PAGE_DESCRIPTIONS: Record<"rules" | "privacy", Record<Lang, string>> = {
+export const PAGE_DESCRIPTIONS: Record<"rules" | "privacy" | "credits", Record<Lang, string>> = {
   rules: {
     fr: "Le règlement des primes de la saison : entrée gratuite dès 18 ans, fiches classées par leur seule note, les dix premières finalistes.",
     en: "The season's bounty rules: free entry from age 18, sheets ranked by their rating alone, the top ten become finalists.",
@@ -34,6 +34,10 @@ export const PAGE_DESCRIPTIONS: Record<"rules" | "privacy", Record<Lang, string>
   privacy: {
     fr: "Ce qu'Azerit garde de ta fiche, pourquoi, et comment tout effacer. Court, parce qu'on stocke peu.",
     en: "What Azerit keeps from your sheet, why, and how to erase it all. Short, because we keep very little.",
+  },
+  credits: {
+    fr: "Les auteurs des modèles 3D, des textures, des polices et des icônes du film et de la fiche, avec leurs licences.",
+    en: "The authors of the 3D models, textures, fonts and icons in the film and the sheet, with their licenses.",
   },
 };
 
@@ -45,7 +49,7 @@ export const PAGE_DESCRIPTIONS: Record<"rules" | "privacy", Record<Lang, string>
 export function sitePageMeta(path: string, baseUrl: string, lang: Lang): PageMeta | null {
   const own = staticPageMeta(baseUrl, path, lang);
   if (!own) return null;
-  const page = /^\/reglement/i.test(path) ? "rules" : "privacy";
+  const page = /^\/reglement/i.test(path) ? "rules" : /^\/credits/i.test(path) ? "credits" : "privacy";
   return { ...own, description: PAGE_DESCRIPTIONS[page][own.lang] };
 }
 

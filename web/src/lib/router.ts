@@ -47,6 +47,7 @@ export type Route =
   | { kind: "home" }
   | { kind: "card"; id: string }
   | { kind: "privacy" }
+  | { kind: "credits" }
   /** Les bandes (§18.38) : les deux tableaux, puis la page d'une bande. */
   | { kind: "bands" }
   | { kind: "band"; type: BandType; id: string }
@@ -73,6 +74,7 @@ export function routeOf(path: string): Route {
   if (card) return { kind: "card", id: card[1] };
   if (path === "/" || path === "") return { kind: "home" };
   if (/^\/(confidentialite|privacy)\/?$/.test(path)) return { kind: "privacy" };
+  if (/^\/credits\/?$/.test(path)) return { kind: "credits" };
   if (/^\/bandes\/?$/i.test(path)) return { kind: "bands" };
   const band = /^\/bandes\/(ecole|boite)\/([a-z0-9]+(?:-[a-z0-9]+)*)\/?$/.exec(path);
   if (band) return { kind: "band", type: band[1] as BandType, id: band[2] };
