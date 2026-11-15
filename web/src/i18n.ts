@@ -169,7 +169,7 @@ const fr = {
     /* titre du dossier à l'écran de la cabine, avant l'ouverture */
     packTitle: "DOSSIER",
     /* la pilule de l'attente, quand le son demande un geste pour démarrer (§18.27) */
-    open: "Ouvrir mon dossier",
+    open: "Lancer la poursuite",
     skip: "Passer",
     mute: "Couper le son",
     unmute: "Activer le son",
@@ -919,7 +919,7 @@ const en: Dict = {
   },
   reveal: {
     packTitle: "CASE FILE",
-    open: "Open my case file",
+    open: "Start the chase",
     skip: "Skip",
     mute: "Mute",
     unmute: "Unmute",
