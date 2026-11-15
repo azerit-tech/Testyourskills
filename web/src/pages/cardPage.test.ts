@@ -150,11 +150,23 @@ describe("après-fiche, vue par qui a fait la fiche (§18.27)", () => {
     const rows = [...rest.matchAll(/<details class="fold ([a-z- ]+)"( open="")?><summary class="fold-row"><span>([^<]+)<\/span><svg class="fold-chevron"/g)];
     // Fiche seule : « Pourquoi cette note » est au dos de la fiche, plus dans les lignes.
     expect(rows.map((r) => r[1])).toEqual(["dossier", "add-source", "email", "contest"]);
-    expect(rows.map((r) => r[3])).toEqual(["Aussi au dossier", "Ajoute ton CV au dossier", "Recevoir ma fiche par email", "Contester"]);
+    expect(rows.map((r) => r[3])).toEqual(["Aussi au dossier", "Ajoute ton CV au dossier", "Recevoir ma fiche par email", "Pas d&#x27;accord avec la note ?"]);
     // toutes fermées au départ
     expect(rows.every((r) => !r[2])).toBe(true);
     // le contenu reste monté, fermé : le formulaire d'email est là
     expect(rest).toContain('id="email-input"');
+  });
+
+  it("« Pas d'accord avec la note ? » : d'où vient la note, puis de vraies sorties, dont supprimer sa fiche (§18.48)", () => {
+    const html = renderResult(mine("OwnCard0005"), { owner: true, token: "tok" }).replace(/&#x27;/g, "'");
+    const fold = /<details class="fold contest">.*?<\/details>/.exec(html)?.[0] ?? "";
+    expect(fold).toContain('<p class="contest-real">Pour de vrai : la note sort de la grille');
+    // La blague reste, en lien ; la suppression est dans le pli, et toujours en pied de page.
+    expect(fold).toMatch(/<div class="contest-exits"><button type="button" class="link-alt">Faire appel<\/button><\/div>/);
+    expect(fold).toMatch(/<div class="delete-card"><button type="button" class="link-danger">Supprimer ma fiche<\/button><\/div>/);
+    expect(html.match(/class="delete-card"/g)).toHaveLength(2);
+    expect(DICTS.fr.result.contest.addSource).toBe("Ajouter une source");
+    expect(DICTS.en.result.rest.contest).toBe("Disagree with the rating?");
   });
 
   it("sans jeton de cette fiche, pas de ligne d'email ; fiche LinkedIn seule, « Ajoute ton GitHub » en bloc, hors des lignes", () => {

@@ -2997,6 +2997,13 @@ a.dossier-item:hover {
   font: 400 var(--t-12) / 1.4 var(--f-mono);
   color: var(--c-text-2) !important;
 }
+/* après la blague, les vraies sorties : ajouter une source, refaire appel, supprimer sa fiche */
+.contest-exits {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 20px;
+}
 
 /* fiche LinkedIn seule : « Ajoute ton GitHub pour prouver », en bloc */
 .after-block.add-source {

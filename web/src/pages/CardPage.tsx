@@ -653,7 +653,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
             <LinkedInPhoto cardId={id} hasAvatar={item.kind === "card" ? !!item.card.avatarUrl : !!item.comparison.cv.avatarUrl} />
             {item.kind === "card" && !proveFirst && <AddSource card={item.card} />}
             <EmailForm cardId={id} />
-            <Contest card={main} />
+            <Contest card={main} cardId={id} onDeleted={onDeleted} />
           </div>
         )}
         <Hiring cardId={id} />

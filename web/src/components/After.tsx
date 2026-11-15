@@ -14,7 +14,7 @@ import { getPlea } from "../lib/plea";
 import { setPrefill } from "../lib/session";
 import { flatteringRank, shareLead, shareText, type ShareInput } from "../lib/shareText";
 import { canShareFile, hasNativeShare, imageFile, inAppBrowser, markTextCopied, portraitFile, preloadImage, preloadPortrait, shareFile, shareSheet, useTextCopied } from "../lib/sharing";
-import { copyText, isTouch, shareUrl } from "../lib/util";
+import { copyText, isTouch, shareUrl, useReducedMotion } from "../lib/util";
 import { IconClose, IconLinkedIn, IconShare } from "./Icons";
 import { ProveGithub } from "./ProveGithub";
 
@@ -625,12 +625,31 @@ export function Why({ item, withSentence = true }: { item: Shareable; withSenten
 
 /* ---------- contester ---------- */
 
-export function Contest({ card }: { card: CardData }) {
+/**
+ * « Pas d'accord avec la note ? » (§18.48) : une ligne d'humour, puis de vraies sorties. Qui ouvre ce pli
+ * se sent mal noté : on lui dit d'où vient la note, comment elle bouge (une source de plus), et sa fiche
+ * se supprime d'ici.
+ */
+export function Contest({ card, cardId, onDeleted }: { card: CardData; cardId: string; onDeleted: () => void }) {
   const { t } = useT();
   const c = t.result.contest;
+  const reduced = useReducedMotion();
   const [reply, setReply] = useState<number | null>(null);
   const [round, setRound] = useState(0);
   const lowest = card.stats.filter((s) => s.code !== "BUZZ").sort((a, b) => a.value - b.value)[0];
+  // Une source manque-t-elle encore au dossier ? Son bloc ou son pli est alors dans la page.
+  const SOURCE = ".after-block.add-source, details.fold.add-source";
+  const [canAdd, setCanAdd] = useState(false);
+  useEffect(() => setCanAdd(!!document.querySelector(SOURCE)), []);
+
+  const toSource = () => {
+    const el = document.querySelector<HTMLElement>(SOURCE);
+    if (!el) return;
+    if (el instanceof HTMLDetailsElement) el.open = true;
+    const target = el.querySelector<HTMLElement>("input, .fold-body button") ?? el;
+    target.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "center" });
+    target.focus({ preventScroll: true });
+  };
 
   const ask = () => {
     let next = Math.floor(Math.random() * c.replies.length);
@@ -649,9 +668,18 @@ export function Contest({ card }: { card: CardData }) {
           {lowest && <p className="var-hint">{c.lowest(t.stats[lowest.code].name, lowest.value)}</p>}
         </div>
       )}
-      <button type="button" className="pill pill-ghost" onClick={ask}>
-        {reply === null ? c.button : c.again}
-      </button>
+      <p className="contest-real">{canAdd ? c.real : c.realNoSource}</p>
+      <div className="contest-exits">
+        {canAdd && (
+          <button type="button" className="pill" onClick={toSource}>
+            {c.addSource}
+          </button>
+        )}
+        <button type="button" className="link-alt" onClick={ask}>
+          {reply === null ? c.button : c.again}
+        </button>
+      </div>
+      <DeleteCard cardId={cardId} onDeleted={onDeleted} />
     </Fold>
   );
 }

@@ -372,7 +372,7 @@ const fr = frTypoDeep({
       why: "Pourquoi cette note",
       photo: "Ma photo LinkedIn",
       email: "Recevoir ma fiche par email",
-      contest: "Contester",
+      contest: "Pas d'accord avec la note ?",
     },
     why: {
       overallLine: "Note globale = TEC 30 %, SHIP 20 %, ARCH 20 %, DOC 15 %, XP 15 %.",
@@ -394,6 +394,10 @@ const fr = frTypoDeep({
       ],
       /** `trait` : le nom du trait en clair (« Communication »), jamais son code. */
       lowest: (trait: string, v: number) => `Indice : ton trait le plus bas est ${trait}, à ${v}/100. Un commit vaut mieux qu'un recours.`,
+      /* après la blague, les vraies sorties (§18.48) : ajouter une source, supprimer la fiche */
+      real: "Pour de vrai : la note sort de la grille et bouge avec ton dossier. Une source de plus (LinkedIn, CV, GitHub) et elle est recalculée.",
+      realNoSource: "Pour de vrai : la note sort de la grille, avec tout ton dossier. Si elle te gêne, ta fiche se supprime d'ici.",
+      addSource: "Ajouter une source",
     },
     addCv: {
       title: "Ajoute ton CV au dossier",
@@ -1107,7 +1111,7 @@ const en: Dict = {
       why: "Why this rating",
       photo: "My LinkedIn photo",
       email: "Get my sheet by email",
-      contest: "Contest it",
+      contest: "Disagree with the rating?",
     },
     why: {
       overallLine: "Overall = TEC 30%, SHIP 20%, ARCH 20%, DOC 15%, XP 15%.",
@@ -1127,6 +1131,9 @@ const en: Dict = {
         "The jury met. The jury is a pure function. It returned the same rating.",
       ],
       lowest: (trait, v) => `Hint: your lowest trait is ${trait}, at ${v}/100. A commit beats an appeal.`,
+      real: "For real: the rating comes from the scorecard and moves with your file. Add a source (LinkedIn, CV, GitHub) and it's recalculated.",
+      realNoSource: "For real: the rating comes from the scorecard, with your whole file. If it bothers you, you can delete your sheet right here.",
+      addSource: "Add a source",
     },
     addCv: {
       title: "Add your CV to the file",
