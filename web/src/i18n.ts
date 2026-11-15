@@ -124,6 +124,9 @@ const fr = frTypoDeep({
       /** Retour arrière en plein film : la note attend la poursuite. */
       owed: "Ta poursuite t'attend.",
       owedGo: "La voir",
+      /** Qui a déjà sa fiche (§18.52) : le bouton principal y ramène, le formulaire se replie dessous. */
+      see: "Voir ma fiche",
+      another: "Faire une autre fiche",
     },
     /* Mur des 13 profils (§18.28) */
     wall: {
@@ -958,6 +961,8 @@ const en: Dict = {
       pendingGo: "Go back to it",
       owed: "Your chase is waiting.",
       owedGo: "Watch it",
+      see: "See my sheet",
+      another: "Make another sheet",
     },
     wall: {
       title: "Which profile are you?",
@@ -1639,16 +1644,17 @@ export function cardLangOf(doc: Pick<Document, "documentElement" | "querySelecto
 }
 
 function initialLang(): Lang {
-  if (typeof window === "undefined") return "fr";
   let stored: string | null = null;
   try {
     stored = localStorage.getItem(STORAGE_KEY);
   } catch {
     /* stockage indisponible */
   }
-  const query = new URLSearchParams(window.location.search).get("lang");
-  const path = window.location.pathname;
-  const lang = chooseLang({ query, stored, path, card: cardLangOf(document, path), nav: typeof navigator !== "undefined" ? navigator.language : "fr" });
+  const loc = typeof window !== "undefined" ? window.location : undefined;
+  const query = new URLSearchParams(loc?.search ?? "").get("lang");
+  const path = loc?.pathname ?? "";
+  const card = typeof document !== "undefined" ? cardLangOf(document, path) : null;
+  const lang = chooseLang({ query, stored, path, card, nav: typeof navigator !== "undefined" ? navigator.language : "fr" });
   // Un `?lang=` vaut un choix : il est retenu pour la suite de la visite et les suivantes.
   if (asLang(query)) {
     try {
