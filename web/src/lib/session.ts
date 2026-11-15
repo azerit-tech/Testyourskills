@@ -33,9 +33,25 @@ export function prefillFromLast(error: Fact | string | null) {
   const { login, file } = lastInput;
   // Le dossier vient d'échouer : l'accueil n'a plus à y ramener.
   clearPending();
-  prefill ={ login, file: file ?? null, mode: login && file ? "both" : "single", tab: file && !login ? "cv" : "github", error };
+  prefill = { login, file: file ?? null, mode: login && file ? "both" : "single", tab: file && !login ? "cv" : "github", error };
 }
 
+/**
+ * Le préremplissage en attente, sans le consommer : un rendu peut être jeté
+ * avant d'être affiché (page chargée à la demande, rendu repris), et le
+ * formulaire qui reste à l'écran doit encore le trouver (`/<pseudo>`, §18.48).
+ * Le formulaire affiché le retire ensuite (`dropPrefill`).
+ */
+export function peekPrefill(): Prefill | null {
+  return prefill;
+}
+
+/** Le formulaire affiché a repris ce préremplissage : il ne sert plus. */
+export function dropPrefill(p: Prefill | null) {
+  if (p && prefill === p) prefill = null;
+}
+
+/** Lit et retire le préremplissage d'un coup (hors d'un rendu React). */
 export function takePrefill(): Prefill | null {
   const p = prefill;
   prefill = null;

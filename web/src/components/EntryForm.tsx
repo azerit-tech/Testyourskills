@@ -18,7 +18,7 @@ import { loadCardPage } from "../pages/cardPageLoader";
 import { unlockAudio } from "../lib/audio";
 import { unlockFilm } from "../film/unlock";
 import { prefetchScene, revealScene } from "../lib/revealScene";
-import { markFresh, rememberDoor, rememberInput, sessionDoor, setPrefill, takePrefill } from "../lib/session";
+import { dropPrefill, markFresh, peekPrefill, rememberDoor, rememberInput, sessionDoor, setPrefill } from "../lib/session";
 import type { Mode, Tab } from "../lib/session";
 import { checkPdf, isTouch, parseLogin } from "../lib/util";
 import type { PdfCheck } from "../lib/util";
@@ -94,7 +94,10 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
   const inline = variant === "inline";
   const { t, lang } = useT();
   const h = t.home;
-  const [init] = useState(() => (inline || secondary ? null : takePrefill()));
+  // Lu sans être consommé : un premier rendu peut être jeté (page chargée à la demande) ; le
+  // formulaire affiché le retire au montage (/<pseudo> préremplit, §18.48).
+  const [init] = useState(() => (inline || secondary ? null : peekPrefill()));
+  useEffect(() => dropPrefill(init), [init]);
   const [first] = useState(() => initialEntry(init?.login));
   const [mode, setMode] = useState<Mode>(init?.mode ?? "single");
   const [tab, setTab] = useState<Tab>(init?.tab ?? "github");
