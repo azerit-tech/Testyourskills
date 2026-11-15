@@ -21,7 +21,7 @@ import { createFilmSound } from "../lib/filmSound";
 import { buzz } from "../lib/haptics";
 import { inAppBrowser } from "../lib/sharing";
 import { canPlayFilm, createFilmPlayer, type FilmPlayer, type FilmStats } from "../film/player";
-import { FilmHud } from "../film/FilmHud";
+import { FilmHud, FilmRadio } from "../film/FilmHud";
 import { filmVideos } from "../film/unlock";
 import { ensureStill, paintStill } from "../film/freeze";
 import type { FileId } from "../film/files";
@@ -398,6 +398,10 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
               <i />
             </div>
           )}
+        </div>
+        {/* téléphone couché : la radio sur toute la largeur de la bande d'encre, hors de la colonne (film.css) */}
+        <div className="film-radio-wide" style={{ transform: `translateY(${(1 - hud.bands) * 100}%)` }}>
+          <FilmRadio radio={hud.radio} />
         </div>
         {hud.flash > 0 && <div className="film-flash" style={{ opacity: hud.flash }} />}
       </div>

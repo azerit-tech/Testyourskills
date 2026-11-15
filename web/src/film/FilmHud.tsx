@@ -50,6 +50,20 @@ function grainTile(): string {
   return tile;
 }
 
+/** La ligne de radio, son étiquette au-dessus ; posée dans la bande de la colonne, ou sur toute la largeur (téléphone couché). */
+export function FilmRadio({ radio }: { radio: Hud["radio"] }) {
+  if (!radio) return null;
+  return (
+    <p className="film-radio">
+      {radio.kicker && <small className="film-radio-kicker">{radio.kicker}</small>}
+      <span className="film-radio-line">
+        <i className={`film-square is-${radio.square}`} />
+        <span className="film-radio-text">{radio.text}</span>
+      </span>
+    </p>
+  );
+}
+
 export function FilmHud({ plan, hud, lang }: { plan: FilmPlan; hud: Hud; lang: Lang }) {
   const grain = grainTile();
   return (
@@ -87,15 +101,7 @@ export function FilmHud({ plan, hud, lang }: { plan: FilmPlan; hud: Hud; lang: L
         </div>
       </div>
       <div className="film-band film-band-bottom" style={{ transform: `translateY(${(1 - hud.bands) * 100}%)` }}>
-        {hud.radio && (
-          <p className="film-radio">
-            {hud.radio.kicker && <small className="film-radio-kicker">{hud.radio.kicker}</small>}
-            <span className="film-radio-line">
-              <i className={`film-square is-${hud.radio.square}`} />
-              <span className="film-radio-text">{hud.radio.text}</span>
-            </span>
-          </p>
-        )}
+        <FilmRadio radio={hud.radio} />
       </div>
     </>
   );

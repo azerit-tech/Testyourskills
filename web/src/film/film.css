@@ -253,12 +253,12 @@
     --band-b: max(12cqh, min(86px, 15cqh));
   }
 }
-/* la radio : une seule ligne, coupée au-delà de 360 px, centrée dans la bande
-   entre l'image et les boutons (--radio-zone : la bande sans les boutons ; au
-   bureau, les boutons sortent de la colonne, la bande entière) ; le chef
-   d'accusation porte son étiquette au-dessus, en petit */
+/* la radio, seul texte du film qui parle de la personne : une seule ligne en 14 px
+   (16 au-delà de 768 px de large), à 16 px au moins des bords de l'image, centrée
+   dans la bande entre l'image et les boutons (--radio-zone : la bande sans les
+   boutons) ; le chef d'accusation porte son étiquette au-dessus, en petit */
 .film-band-bottom {
-  --radio-zone: max(28px, calc(var(--band-b) - 56px));
+  --radio-zone: max(32px, calc(var(--band-b) - 56px));
 }
 .film-radio {
   position: absolute;
@@ -269,7 +269,7 @@
   justify-content: center;
   gap: 2px;
   width: max-content;
-  max-width: min(360px, calc(100% - 24px));
+  max-width: min(360px, calc(100% - 32px));
   height: var(--radio-zone);
   margin: 0;
   transform: translateX(-50%);
@@ -298,20 +298,32 @@
   letter-spacing: 0.08em;
   color: rgb(255 249 203 / 0.62);
 }
-/* téléphone dont le film fait 700 px de haut ou moins (320 × 568, 375 × 667,
-   paysage) : la radio et son étiquette tiennent en 28 px, au-dessus des boutons */
+/* téléphone dont le film fait 700 px de haut ou moins (320 × 568, 375 × 667) : la
+   radio garde ses 14 px, interligne serré, et son étiquette tient avec elle en 32 px */
 @media (max-width: 999px) {
   @container (max-height: 700px) {
     .film-radio {
-      gap: 1px;
-      font-size: 12px;
-      line-height: 15px;
-    }
-    .film-radio-kicker {
-      font-size: 11px;
-      line-height: 12px;
+      line-height: 16px;
     }
   }
+}
+/* image étroite (320 px) : sans approche, la ligne d'interception tient entière en 14 px */
+@container (max-width: 359px) {
+  .film-radio {
+    letter-spacing: 0;
+  }
+}
+@media (min-width: 768px) {
+  .film-radio {
+    max-width: min(480px, calc(100% - 32px));
+    font-size: 16px;
+    line-height: 20px;
+  }
+}
+/* la radio du téléphone couché : sur toute la largeur de la bande d'encre, hors de la
+   colonne étroite (Film.tsx la pose sur la scène) ; cachée ailleurs */
+.film-radio-wide {
+  display: none;
 }
 .film-square {
   flex: none;
@@ -407,24 +419,8 @@
     opacity 0.15s ease,
     visibility 0s 0.15s;
 }
-/* au bureau (la colonne laisse au moins 247 px de chaque côté), les boutons
-   sortent de la colonne : à droite de l'écran, à 48 px du bord, centrés dans la
-   bande d'encre du bas ; la radio a toute la bande de la colonne pour elle */
-@media (min-width: 1000px) {
-  .page-result:has(.film-stage) .skip-btn,
-  .film-sound {
-    bottom: calc(var(--film-y) + (var(--film-h) * 0.12 - 44px) / 2);
-  }
-  .film-sound {
-    right: 48px;
-  }
-  .page-result:has(.film-stage) .skip-btn {
-    right: calc(48px + 44px + 12px);
-  }
-  .film-band-bottom {
-    --radio-zone: 12cqh;
-  }
-}
+/* au bureau aussi, « Passer » et le son restent dans la colonne du film, à 16 px de
+   son bord droit, sous la radio : l'œil ne quitte pas l'image pour les trouver */
 
 /* un toucher sur l'image ne fait rien (§18.48) : pas de main au survol */
 .film-stage,
@@ -447,26 +443,32 @@
     right: max(16px, env(safe-area-inset-right, 0px));
   }
   /* la colonne n'a que 220 px environ : la bande du bas descend jusqu'aux 15 % que
-     l'image laisse libres, toute à la radio, et sa ligne passe sur deux lignes en 12 px
-     au lieu d'être coupée */
+     l'image laisse libres, et la radio quitte la colonne pour toute la largeur de la
+     bande d'encre, sur une ligne, entre la marge gauche et les boutons de droite */
   .film-band-bottom {
     height: max(15cqh, calc(12cqh + env(safe-area-inset-bottom, 0px)));
-    --radio-zone: max(12cqh, calc(15cqh - env(safe-area-inset-bottom, 0px)));
   }
   /* la bande d'encre des marges reste au niveau de celle de la colonne */
   .film-wide-bottom {
     height: max(calc(var(--film-h) * 0.15), calc(var(--film-h) * 0.12 + env(safe-area-inset-bottom, 0px)));
   }
-  .film-radio {
-    white-space: normal;
+  .film-band-bottom .film-radio {
+    display: none;
   }
-  .film-radio-kicker {
-    white-space: nowrap;
+  .film-radio-wide {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: var(--film-y);
+    z-index: 3;
+    display: block;
+    height: max(calc(var(--film-h) * 0.15), calc(var(--film-h) * 0.12 + env(safe-area-inset-bottom, 0px)));
+    pointer-events: none;
   }
-  .film-radio-text {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
+  .film-radio-wide .film-radio {
+    top: auto;
+    bottom: max(16px, env(safe-area-inset-bottom, 0px));
+    height: 44px;
+    max-width: calc(100% - 2 * (max(16px, env(safe-area-inset-right, 0px)) + 44px + 8px + 96px + 16px));
   }
 }
