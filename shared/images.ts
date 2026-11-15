@@ -13,8 +13,12 @@
 // les compositions d'une fiche seule, celle du dossier (shared/caseFile.ts) ; les fiches seules ne changent pas.
 // v6 (12 novembre 2026) : le profil « Sous couverture » (forger) perd le décor de l'atelier de faux
 // diplômes et prend `default` (shared/scenes.ts) : ses images se redessinent, ciel de l'heure bleue.
+// v7 (15 novembre 2026) : la revue du site (§18.48). Chaque image se lit à 360 px de large : sur
+// l'aperçu d'une fiche, le titre d'affiche, la rangée d'étoiles et le niveau, le décor en bandeau ;
+// l'appel en pilule sur toutes, et sur le portrait avec ce que c'est en une ligne ; sous trois
+// étoiles, la phrase du profil à la place du chef d'accusation ; la bande, la prime et l'accueil refaits.
 
-export const IMAGE_DESIGN = 6;
+export const IMAGE_DESIGN = 7;
 
 /** Dossier du cache disque, sous og/. */
 export const IMAGE_DESIGN_DIR = `v${IMAGE_DESIGN}`;
