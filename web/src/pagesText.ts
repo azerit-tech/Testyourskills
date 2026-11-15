@@ -36,7 +36,7 @@ const FILM_MODELS: { h: Two; lines: Line[] }[] = [
       [["Berline des années 60", "1960s sedan"], [["Elements Creative Studio", `${SK}b1bb1e82fe394153932ba1c2a341dded`]]],
       [["Coupé des années 70", "1970s coupe"], [["Iv4sHka", `${SK}79612cb9ee714df9967c6d6c4fc967b1`]]],
       [["Rétroviseur intérieur", "Rear-view mirror"], [["movemama", `${SK}rear-view-mirror-72f3ac9e3ff5423f823841b3c801d0c1`]]],
-      [["Fourgonnettes garées", "Parked station wagons"], [["Martin Trafas", `${SK}2b734bf738dc405998c2074953965cc6`]]],
+      [["Breaks garés", "Parked station wagons"], [["Martin Trafas", `${SK}2b734bf738dc405998c2074953965cc6`]]],
     ],
   },
   {

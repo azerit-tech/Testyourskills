@@ -1,4 +1,4 @@
-Testyourskills — 3D scene asset credits
+Azerit: 3D scene asset credits (the former reveal, the elevator to the office)
 
 developer-v4.glb
 "Balthazar (rigged & animated)" by Jungle Jim, CC BY 4.0.
@@ -92,7 +92,7 @@ All models above: textures converted to WebP, meshopt compression
 (tools/bake/prepare.py). CC BY 4.0: https://creativecommons.org/licenses/by/4.0/
 
 office.glb, office-lm-*.webp
-Original work for Testyourskills: open-space set modelled and lit in Blender
+Original work for Azerit: open-space set modelled and lit in Blender
 (tools/bake/office.py), lighting baked with Cycles. Contains the chair above
 and casts shadows from the plant below.
 
