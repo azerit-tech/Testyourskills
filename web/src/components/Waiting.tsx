@@ -145,6 +145,11 @@ export function Waiting({ cardId, progress, startedAt, queue, findings = [], log
     },
     [],
   );
+  // La plaque porte dès le début le nom qu'aura la fiche, et n'en change plus en route (§18.52) :
+  // le premier nom connu (pseudo tapé, nom du lien LinkedIn, « TON CV », ou celui de la fiche) reste.
+  const who = useRef<{ login?: string | null; slug?: string | null; cv: boolean; name?: string | null; initials?: string | null } | null>(null);
+  if (!who.current && (login || slug || cv || name)) who.current = { login, slug, cv, name: login || slug || cv ? null : name, initials: login || slug || cv ? null : initials };
+  const plate = who.current ?? { login, slug, cv, name, initials };
   const [lines, setLines] = useState<Line[]>([]);
   const [now, setNow] = useState(() => Date.now());
   const consumed = useRef(0);
@@ -300,7 +305,7 @@ export function Waiting({ cardId, progress, startedAt, queue, findings = [], log
             {t.waiting.title}
           </h1>
         </header>
-        <Mugshot cardId={cardId} login={login} slug={slug} cv={cv} name={name} initials={initials} src={avatarUrl} createdAt={createdAt ?? startedAt} />
+        <Mugshot cardId={cardId} login={plate.login} slug={plate.slug} cv={plate.cv} name={plate.name} initials={plate.initials} src={avatarUrl} createdAt={createdAt ?? startedAt} />
         {/* le pari a sa place dès la première image : la question, puis la ligne, sans rien pousser */}
         <div className="load-plea">{plea && <PleaPrompt cardId={cardId} />}</div>
         <div className="load-dossier" aria-hidden>
