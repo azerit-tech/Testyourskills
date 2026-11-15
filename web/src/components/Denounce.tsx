@@ -179,18 +179,7 @@ export function Denounce({ cardId, selfLogin, toast }: Props) {
                 {shown.map((a) => (
                   <li key={a.login}>
                     <button type="button" className="pill pill-ghost denounce-who" onClick={() => void run(a.login)}>
-                      <img
-                        src={a.avatarUrl}
-                        alt=""
-                        width={28}
-                        height={28}
-                        loading="lazy"
-                        referrerPolicy="no-referrer"
-                        // Avatar injoignable : un rond vide plutôt qu'une image cassée.
-                        onError={(e) => {
-                          e.currentTarget.removeAttribute("src");
-                        }}
-                      />
+                      <WhoFace src={a.avatarUrl} login={a.login} />
                       <span>@{a.login}</span>
                     </button>
                   </li>
@@ -276,4 +265,17 @@ export function Wanted({ card, x, toast, onAgain }: { card: CardData; x: string 
       </div>
     </section>
   );
+}
+
+/** La pastille d'un complice : son avatar ; sans image, ou si elle ne charge pas, son initiale (comme au top de la semaine). */
+function WhoFace({ src, login }: { src?: string | null; login: string }) {
+  const [broken, setBroken] = useState(false);
+  useEffect(() => setBroken(false), [src]);
+  if (!src || broken)
+    return (
+      <i className="denounce-who-initial" aria-hidden>
+        {[...login.replace(/[^\p{L}\p{N}]/gu, "")][0]?.toUpperCase() ?? "?"}
+      </i>
+    );
+  return <img src={src} alt="" width={28} height={28} loading="lazy" referrerPolicy="no-referrer" onError={() => setBroken(true)} />;
 }

@@ -35,6 +35,19 @@
   background: var(--s-item);
   object-fit: cover;
 }
+/* sans image : l'initiale, crème sur un rond d'encre */
+.denounce-who-initial {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: 50%;
+  background: #1f1f38;
+  font: 700 16px/1 var(--f-name);
+  font-style: normal;
+  color: var(--cream);
+}
 .denounce-who span {
   overflow: hidden;
   text-overflow: ellipsis;
