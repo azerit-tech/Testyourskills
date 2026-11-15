@@ -197,6 +197,8 @@ const fr = {
     /** La plaque de la toise, sous la silhouette. */
     plate: { none: "Inconnu", down: "Hors ligne", crash: "Hors ligne" },
     plateSub: "N° ?????? · ??.??.??",
+    /** Le titre de l'onglet, propre à chaque page d'erreur. */
+    tab: { card: "Fiche introuvable", band: "Bande introuvable", prime: "Prime introuvable", down: "Commissariat injoignable", crash: "Page interrompue" },
     /** Le serveur ne répond pas : jamais « introuvable », toujours « Réessayer ». */
     down: {
       title: "Le commissariat ne répond pas",
@@ -212,7 +214,7 @@ const fr = {
     card: {
       title: "Cette fiche n'existe pas, ou plus",
       text: "Elle a peut-être été supprimée.",
-      action: "Faire la mienne",
+      action: "Faire ma fiche",
     },
     band: {
       title: "Cette bande n'est pas au tableau",
@@ -387,6 +389,7 @@ const en: PagesDict = {
     stamp: { none: "Not found", down: "No answer", crash: "Cut off" },
     plate: { none: "Unknown", down: "Offline", crash: "Offline" },
     plateSub: "No. ?????? · ??.??.??",
+    tab: { card: "Sheet not found", band: "Crew not found", prime: "Bounty not found", down: "Station not answering", crash: "Page cut off" },
     down: {
       title: "The station is not answering",
       text: "Nothing is lost. Try again in a moment.",
@@ -396,17 +399,17 @@ const en: PagesDict = {
     page: {
       title: "This page is not on file",
       text: "This address isn't in any file.",
-      action: "Make my sheet",
+      action: "Get my rap sheet",
     },
     card: {
       title: "This sheet doesn't exist, or no longer does",
       text: "It may have been deleted.",
-      action: "Make mine",
+      action: "Get my rap sheet",
     },
     band: {
       title: "This crew is not on the board",
       text: "Three sheets from the same school or company are enough to start it.",
-      action: "Make my sheet",
+      action: "Get my rap sheet",
       alt: "All crews",
     },
     prime: {

@@ -3,7 +3,7 @@ import { createElement, isValidElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { LangProvider } from "../i18n";
-import { Crash, ErrorBoundary } from "./ErrorBoundary";
+import { Crash, ErrorBoundary, isChunkError, reloadOnce } from "./ErrorBoundary";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -49,3 +49,30 @@ describe("ErrorBoundary", () => {
     expect(log).toHaveBeenCalled();
   });
 });
+
+describe("après un déploiement : un morceau introuvable recharge la page, une fois", () => {
+  it("reconnaît un morceau introuvable, pas une autre panne", () => {
+    expect(isChunkError(new TypeError("Failed to fetch dynamically imported module: https://x/assets/Bands-1.js"))).toBe(true);
+    expect(isChunkError(new TypeError("Importing a module script failed."))).toBe(true);
+    expect(isChunkError(new Error("Cannot read properties of undefined"))).toBe(false);
+  });
+
+  it("recharge une fois, puis plus avant une minute : jamais de boucle", () => {
+    const store: Record<string, string> = {};
+    const reload = vi.fn();
+    vi.stubGlobal("sessionStorage", { getItem: (k: string) => store[k] ?? null, setItem: (k: string, v: string) => (store[k] = v) });
+    vi.stubGlobal("window", { location: { reload } });
+    expect(reloadOnce(1_000_000)).toBe(true);
+    expect(reloadOnce(1_010_000)).toBe(false);
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(reloadOnce(1_000_000 + 61_000)).toBe(true);
+  });
+
+  it("le filet garde la marque, un vrai lien vers l'accueil, et le retour sous « Recharger »", () => {
+    vi.stubGlobal("localStorage", { getItem: () => "fr", setItem: () => undefined });
+    const html = renderToStaticMarkup(createElement(LangProvider, null, createElement(Crash)));
+    expect(html).toMatch(/<a href="\/" class="topbar-brand"/);
+    expect(html).toContain(`<a class="link-alt" href="/">Retour à l&#x27;accueil</a>`);
+  });
+});
+

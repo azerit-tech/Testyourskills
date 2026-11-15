@@ -41,7 +41,7 @@ describe("la mise en page d'erreur", () => {
   });
 
   it("introuvable : une fiche mène à l'accueil, une bande à l'accueil et au tableau, une prime aux primes", () => {
-    expect(render(createElement(CardNotFound))).toContain('<a class="btn-primary err-action" href="/">Faire la mienne</a>');
+    expect(render(createElement(CardNotFound))).toContain('<a class="btn-primary err-action" href="/">Faire ma fiche</a>');
     const band = render(createElement(BandNotFound));
     expect(band).toContain("Introuvable");
     expect(band).toContain('<a class="link-alt" href="/bandes">Toutes les bandes</a>');

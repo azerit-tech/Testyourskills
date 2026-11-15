@@ -930,7 +930,8 @@ export function createApp(opts: AppOptions) {
     app.use("*", serveStatic({ root }));
     app.get("*", async (c) => {
       const p = c.req.path;
-      if (/^\/(api|og|c|auth|avatar)\//.test(p)) return c.notFound();
+      // Un fichier absent (un morceau d'une version passée, après un déploiement) : un 404 nu, jamais la page du site.
+      if (/^\/(api|og|c|auth|avatar|assets|3d)\//.test(p)) return c.notFound();
       // Une adresse que le front ne sait pas afficher : sa page introuvable, en 404.
       if (!isSitePage(p)) return pageNotFound(c);
       return (await frontPage(c)) ?? c.notFound();

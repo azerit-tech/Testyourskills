@@ -18,7 +18,17 @@ export interface ErrorAction {
   label: string;
   /** Un lien du site ; sans lui, un bouton. */
   href?: string;
+  /** Un lien qui recharge tout (le filet : l'application elle-même a cassé). */
+  hard?: boolean;
   onClick?: () => void;
+}
+
+/** Le titre de l'onglet d'une page d'erreur : le sien, dans la langue du site. */
+export function useTabTitle(title: string) {
+  const { t } = useT();
+  useEffect(() => {
+    document.title = t.meta.titlePage(title);
+  }, [t, title]);
 }
 
 export interface ErrorPanelProps {
@@ -41,7 +51,7 @@ function Action({ a, className }: { a: ErrorAction; className: string }) {
         href={href}
         onClick={(e) => {
           a.onClick?.();
-          onLinkClick(e, href);
+          if (!a.hard) onLinkClick(e, href);
         }}
       >
         {a.label}
@@ -106,6 +116,7 @@ interface Preset {
 export function Unreachable({ bare }: Preset) {
   const { t } = useT();
   const d = t.pages.error.down;
+  useTabTitle(t.pages.error.tab.down);
   return <ErrorPage bare={bare} stamp="down" title={d.title} text={d.text} action={{ label: d.retry, onClick: () => window.location.reload() }} alt={{ label: d.home, href: "/" }} />;
 }
 
@@ -113,9 +124,7 @@ export function Unreachable({ bare }: Preset) {
 export function NotFound({ bare }: Preset) {
   const { t } = useT();
   const p = t.pages.error.page;
-  useEffect(() => {
-    document.title = t.meta.titlePage(t.notFound.title);
-  }, [t]);
+  useTabTitle(t.notFound.title);
   return <ErrorPage bare={bare} stamp="none" title={p.title} text={p.text} action={{ label: p.action, href: "/" }} />;
 }
 
@@ -123,6 +132,7 @@ export function NotFound({ bare }: Preset) {
 export function CardNotFound({ bare, onMake }: Preset & { onMake?: () => void }) {
   const { t } = useT();
   const c = t.pages.error.card;
+  useTabTitle(t.pages.error.tab.card);
   return <ErrorPage bare={bare} stamp="none" title={c.title} text={c.text} action={{ label: c.action, href: "/", onClick: onMake }} />;
 }
 
@@ -130,6 +140,7 @@ export function CardNotFound({ bare, onMake }: Preset & { onMake?: () => void })
 export function BandNotFound({ bare }: Preset) {
   const { t } = useT();
   const b = t.pages.error.band;
+  useTabTitle(t.pages.error.tab.band);
   return <ErrorPage bare={bare} stamp="none" title={b.title} text={b.text} action={{ label: b.action, href: "/" }} alt={{ label: b.alt, href: "/bandes" }} />;
 }
 
@@ -137,6 +148,7 @@ export function BandNotFound({ bare }: Preset) {
 export function PrimeNotFound({ bare, listed }: Preset & { listed: boolean }) {
   const { t } = useT();
   const p = t.pages.error.prime;
+  useTabTitle(t.pages.error.tab.prime);
   if (!listed) return <ErrorPage bare={bare} stamp="none" title={p.title} text={p.text} action={{ label: t.pages.error.page.action, href: "/" }} />;
   return <ErrorPage bare={bare} stamp="none" title={p.title} text={p.text} action={{ label: p.action, href: "/primes" }} alt={{ label: p.alt, href: "/" }} />;
 }

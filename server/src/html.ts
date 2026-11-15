@@ -258,23 +258,25 @@ export function langOfRequest(acceptLanguage: string | undefined | null): Lang {
 
 export type MessageKey = "deleted" | "badDeleteLink" | "cardNotFound" | "withdrawn" | "pageNotFound";
 
-/** Les textes de ces pages : un titre court, une phrase. */
-export const SERVER_PAGES: Record<Lang, Record<MessageKey, { title: string; text: string }> & { home: string }> = {
+/** Les textes de ces pages : un titre court, une phrase, et le tampon posé sur la toise. */
+export const SERVER_PAGES: Record<Lang, Record<MessageKey, { title: string; text: string; stamp: string }> & { home: string; plate: string }> = {
   fr: frTypoDeep({
-    deleted: { title: "Fiche supprimée", text: "Ta fiche et ses images sont effacées." },
-    badDeleteLink: { title: "Lien non valide", text: "Ce lien de suppression n'est pas valide : ta fiche n'a pas bougé." },
-    cardNotFound: { title: "Fiche introuvable", text: "Elle a expiré, ou elle a été supprimée." },
-    withdrawn: { title: "Fiche retirée", text: "La personne fichée l'a retirée." },
-    pageNotFound: { title: "Page introuvable", text: "Cette adresse ne mène à aucune page." },
+    deleted: { title: "Fiche supprimée", text: "Ta fiche et ses images sont effacées.", stamp: "Effacée" },
+    badDeleteLink: { title: "Lien non valide", text: "Ce lien de suppression n'est pas valide : ta fiche n'a pas bougé.", stamp: "Non valide" },
+    cardNotFound: { title: "Fiche introuvable", text: "Elle a expiré, ou elle a été supprimée.", stamp: "Introuvable" },
+    withdrawn: { title: "Fiche retirée", text: "La personne fichée l'a retirée.", stamp: "Retirée" },
+    pageNotFound: { title: "Page introuvable", text: "Cette adresse ne mène à aucune page.", stamp: "Introuvable" },
     home: "Retour à l'accueil",
+    plate: "Inconnu",
   }),
   en: {
-    deleted: { title: "Sheet deleted", text: "Your rap sheet and its images are erased." },
-    badDeleteLink: { title: "Invalid link", text: "This delete link isn't valid: your sheet hasn't changed." },
-    cardNotFound: { title: "Sheet not found", text: "It expired, or it was deleted." },
-    withdrawn: { title: "Sheet withdrawn", text: "The person on file withdrew it." },
-    pageNotFound: { title: "Page not found", text: "This address doesn't lead to any page." },
+    deleted: { title: "Sheet deleted", text: "Your rap sheet and its images are erased.", stamp: "Erased" },
+    badDeleteLink: { title: "Invalid link", text: "This delete link isn't valid: your sheet hasn't changed.", stamp: "Invalid" },
+    cardNotFound: { title: "Sheet not found", text: "It expired, or it was deleted.", stamp: "Not found" },
+    withdrawn: { title: "Sheet withdrawn", text: "The person on file withdrew it.", stamp: "Withdrawn" },
+    pageNotFound: { title: "Page not found", text: "This address doesn't lead to any page.", stamp: "Not found" },
     home: "Back to home",
+    plate: "Unknown",
   },
 };
 
@@ -284,23 +286,34 @@ export function siteStylesheets(template: string | null | undefined): string {
   return (template.match(/<link\b[^>]*\brel=["']stylesheet["'][^>]*>/gi) ?? []).join("\n    ");
 }
 
-/** La gemme d'Azerit (web/src/components/Brand.tsx), en clair. */
-const MARK = `<svg width="13" height="15" viewBox="0 0 104 120" fill="none" aria-hidden="true"><path d="M52 8 L14 50 L37 102 Z" fill="#c9d67c" stroke="#c9d67c" stroke-width="9" stroke-linejoin="round"/><path d="M63 10 L92 42 L85 80 L47 112 Z" fill="#6fb2a8" stroke="#6fb2a8" stroke-width="9" stroke-linejoin="round"/></svg>`;
+/** La gemme d'Azerit (web/src/components/Brand.tsx), en clair, à la taille de la barre du site. */
+const MARK = `<svg width="18" height="21" viewBox="0 0 104 120" fill="none" aria-hidden="true"><path d="M52 8 L14 50 L37 102 Z" fill="#c9d67c" stroke="#c9d67c" stroke-width="9" stroke-linejoin="round"/><path d="M63 10 L92 42 L85 80 L47 112 Z" fill="#6fb2a8" stroke="#6fb2a8" stroke-width="9" stroke-linejoin="round"/></svg>`;
 
-/** Le gabarit du site (web/src/styles.css) : encre, crème, lilas, rose pour ce qui se touche. */
+/**
+ * Le gabarit du site (web/src/styles.css) : encre, crème, lilas, rose pour ce qui se touche.
+ * La page de message reprend la page d'erreur du site (components/ErrorPage.tsx) : la case
+ * de la toise avec la silhouette au point d'interrogation, le tampon incliné, le titre à la
+ * taille d'un bloc, la phrase, le bouton pleine largeur, le tout au milieu de l'écran.
+ */
 const SHELL_CSS = `:root{color-scheme:dark}
 *{box-sizing:border-box}
 html,body{margin:0;background:#0c0d1b}
-body{min-height:100vh;min-height:100svh;display:flex;flex-direction:column;color:#e5ddff;font:400 16px/1.5 "Outfit",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
-.m-top{width:100%;max-width:1180px;height:64px;margin:0 auto;padding:0 16px;display:flex;align-items:center}
-.m-brand{display:inline-flex;align-items:center;gap:8px;min-height:44px;font:700 12px/1 "Outfit",system-ui,sans-serif;letter-spacing:.24em;color:#ccc2f5;text-decoration:none}
-.m-main{flex:1;width:100%;max-width:540px;margin:0 auto;padding:48px 16px 80px;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center}
-.m-main h1{margin:0;font:700 44px/.92 "Barlow Condensed","Arial Narrow",sans-serif;text-transform:uppercase;color:#fff9cb}
-.m-main p{margin:0 0 8px;color:#ccc2f5}
+body{min-height:100vh;min-height:100svh;display:flex;flex-direction:column;color:#e5ddff;font:400 16px/1.4 "Outfit",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.m-top{width:100%;max-width:1112px;height:52px;margin:0 auto;padding:0 16px;display:flex;align-items:center}
+.m-brand{display:inline-flex;align-items:center;gap:8px;min-height:44px;font:700 14px/1 "Outfit",system-ui,sans-serif;letter-spacing:.2em;color:#fff9cb;text-decoration:none}
+.m-main{flex:1;width:100%;max-width:432px;margin:0 auto;padding:32px 16px 64px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:12px;text-align:center}
+.m-main h1{margin:0;font:700 28px/.95 "Barlow Condensed","Arial Narrow",sans-serif;text-transform:uppercase;color:#fff9cb;text-wrap:balance}
+.m-main p{margin:0;color:#e5ddff;text-wrap:pretty}
 .m-main img{max-width:100%;height:auto;border-radius:24px}
-.m-btn{display:inline-flex;align-items:center;justify-content:center;min-height:52px;padding:0 24px;border-radius:999px;background:#ffb2c6;color:#0c0d1b;font:600 16px/1.1 "Outfit",system-ui,sans-serif;text-decoration:none}
+.m-btn{display:flex;align-items:center;justify-content:center;width:100%;min-height:52px;margin-top:8px;padding:0 24px;border-radius:999px;background:#ffb2c6;color:#0c0d1b;font:600 16px/1.1 "Outfit",system-ui,sans-serif;text-decoration:none}
+.m-frame{position:relative;width:172px;height:200px;margin-bottom:12px;border:6px solid #241a3a;border-radius:6px;background:#241a3a}
+.m-face{position:absolute;inset:0;overflow:hidden;border-radius:3px;background:#ccc2f5 repeating-linear-gradient(to bottom,transparent 0 25px,rgba(75,47,84,.22) 25px 26px)}
+.m-face svg{position:absolute;left:0;top:12%;width:100%;height:88%;fill:#4b2f54}
+.m-mark{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);font:700 64px/1 "Barlow Condensed","Arial Narrow",sans-serif;color:#fff9cb}
+.m-plate{position:absolute;left:50%;bottom:6%;padding:5px 9px 6px;border-radius:3px;background:#111;transform:translateX(-50%) rotate(-1.5deg);font:700 16px/1 "Barlow Condensed","Arial Narrow",sans-serif;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;color:#fff9cb}
+.m-stamp{position:absolute;z-index:3;left:50%;top:7%;padding:3px 10px 4px;border:2.5px solid currentColor;border-radius:3px;font:700 22px/1 "Barlow Condensed","Arial Narrow",sans-serif;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;color:#c8283a;transform:translateX(-50%) rotate(-7deg)}
 a:focus-visible{outline:2px solid #fff9cb;outline-offset:3px}
-@media (min-width:900px){.m-top{height:76px}.m-main h1{font-size:64px}}`;
+@media (min-width:900px){.m-top{height:64px;padding:0 32px}}`;
 
 function shell(lang: Lang, head: string, main: string, styles: string): string {
   return `<!doctype html>
@@ -335,8 +348,10 @@ export function standalonePage(m: PageMeta): string {
  */
 export function messagePage(key: MessageKey, lang: Lang, styles = ""): string {
   const t = SERVER_PAGES[lang];
-  const { title, text } = t[key];
-  const head = `<meta name="robots" content="noindex">\n    <title>${escapeHtml(pageTitle(title))}</title>`;
-  const main = `<h1>${escapeHtml(title)}</h1>\n      <p>${escapeHtml(text)}</p>\n      <a class="m-btn" href="/">${escapeHtml(t.home)}</a>`;
+  const { title, text, stamp } = t[key];
+  const e = escapeHtml;
+  const head = `<meta name="robots" content="noindex">\n    <title>${e(pageTitle(title))}</title>`;
+  const frame = `<div class="m-frame" aria-hidden="true"><span class="m-face"><svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMax meet"><circle cx="50" cy="42" r="19"/><path d="M8 100c0-27 18-44 42-44s42 17 42 44z"/></svg><span class="m-mark">?</span><span class="m-plate">${e(t.plate)}</span></span><span class="m-stamp">${e(stamp)}</span></div>`;
+  const main = `${frame}\n      <h1>${e(title)}</h1>\n      <p>${e(text)}</p>\n      <a class="m-btn" href="/">${e(t.home)}</a>`;
   return shell(lang, head, main, styles);
 }

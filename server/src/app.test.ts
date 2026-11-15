@@ -561,6 +561,17 @@ describe("image d'aperçu de l'accueil (/og/home.png)", () => {
     expect(await (await ctx.app.request("/api/config")).json()).toMatchObject({ interviews: 3 });
   });
 
+  it("un morceau du front absent sous /assets : un vrai 404 en texte, pas la page du site", async () => {
+    const root = mkdtempSync(join(tmpdir(), "tys-web-"));
+    writeFileSync(join(root, "index.html"), INDEX);
+    const ctx = setup({}, { staticRoot: root, indexHtml: async () => INDEX });
+    for (const path of ["/assets/Bands-abc123.js", "/assets/x/y.css", "/3d/nope.glb"]) {
+      const res = await ctx.app.request(path);
+      expect(res.status, path).toBe(404);
+      expect(res.headers.get("content-type") ?? "", path).toMatch(/^text\/plain/);
+    }
+  });
+
   it("la vie privée a son propre titre, sa description et son adresse, avec l'image de l'accueil", async () => {
     const root = mkdtempSync(join(tmpdir(), "tys-web-"));
     writeFileSync(join(root, "index.html"), INDEX);

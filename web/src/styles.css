@@ -3183,10 +3183,16 @@ a.dossier-item:hover {
   width: 100%;
   margin-top: 8px;
 }
-/* Le filet (ErrorBoundary) : seul à l'écran, sans barre ni pied de page, sur l'encre. */
+/* Le filet (ErrorBoundary) : la marque en haut, le panneau au milieu, sans pied, sur l'encre. */
 .crash {
+  display: grid;
+  grid-template-rows: auto 1fr;
   min-height: 100svh;
   background: var(--s-page);
+}
+/* la plaque de la toise, en capitales comme toutes les plaques (« INCONNU », « HORS LIGNE ») */
+.err .cover-plate b {
+  text-transform: uppercase;
 }
 .deleted-msg {
   font: var(--font-page) !important;
