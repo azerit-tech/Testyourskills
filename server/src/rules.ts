@@ -2,16 +2,27 @@
 // commence par les points à relire, réservés à l'équipe : seul ce qui suit le
 // repère RULES_MARK est servi, et seulement quand data/season.json dit
 // rulesPublished. Fichier absent, sans repère, ou avec un champ encore entre
-// crochets (« [raison sociale] ») : pas de règlement, 404.
+// crochets (« [raison sociale] ») : pas de règlement, 404, et les primes restent
+// éteintes (app.ts, gateSeason). Une saison posée ailleurs par SEASON_FILE (la
+// démonstration) porte son règlement à côté d'elle : season-demo.json lit
+// season-demo.reglement.md, sauf si RULES_FILE en désigne un autre.
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const RULES_MARK = "<!-- règlement -->";
 
 export const DEFAULT_RULES_FILE = join(dirname(fileURLToPath(import.meta.url)), "../../docs/reglement-saison-1.md");
-export const RULES_FILE = process.env.RULES_FILE?.trim() ? resolve(process.env.RULES_FILE.trim()) : DEFAULT_RULES_FILE;
+
+/** Le règlement posé à côté d'un fichier de saison (« x.json » → « x.reglement.md »), s'il existe. */
+export function rulesBeside(seasonFile: string | undefined): string | null {
+  if (!seasonFile?.trim()) return null;
+  const beside = `${resolve(seasonFile.trim()).replace(/\.json$/i, "")}.reglement.md`;
+  return existsSync(beside) ? beside : null;
+}
+
+export const RULES_FILE = process.env.RULES_FILE?.trim() ? resolve(process.env.RULES_FILE.trim()) : (rulesBeside(process.env.SEASON_FILE) ?? DEFAULT_RULES_FILE);
 
 /** Le texte public : tout ce qui suit le repère, sans rien de ce qui le précède. Null sans repère. */
 export function publicRules(raw: string): string | null {

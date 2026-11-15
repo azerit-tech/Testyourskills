@@ -298,7 +298,7 @@ describe("/api/config : la saison et les primes (data/season.json)", () => {
 
   it("une prime ouverte le dit ; sans saison, ni dates ni prime", async () => {
     const p1 = { id: "p1", company: "Entreprise Démo", contract: "stage" as const, positions: ["BE" as const], languages: [], interviews: 1, remote: true, pitch: { fr: "a", en: "b" } };
-    const open = setup({}, { season: { number: 2, start: "2020-01-01", end: "2099-12-31", primes: [p1], rulesPublished: false } });
+    const open = setup({}, { season: { number: 2, start: "2020-01-01", end: "2099-12-31", primes: [p1], rulesPublished: true }, rules: "# Règlement\n\nArticle 1." });
     expect(await (await open.app.request("/api/config")).json()).toMatchObject({ primesOpen: true, season: { number: 2, start: "2020-01-01", end: "2099-12-31" } });
     expect(JSON.stringify(await (await open.app.request("/api/config")).json())).not.toContain("p1");
     const none = setup({}, { season: null });
@@ -550,7 +550,7 @@ describe("image d'aperçu de l'accueil (/og/home.png)", () => {
     const root = mkdtempSync(join(tmpdir(), "tys-web-"));
     writeFileSync(join(root, "index.html"), INDEX);
     const p1 = { id: "p1", company: "Entreprise Démo", contract: "stage" as const, positions: ["BE" as const], languages: [], interviews: 3, remote: true, pitch: { fr: "a", en: "b" } };
-    const ctx = setup({}, { staticRoot: root, indexHtml: async () => INDEX, season: { number: 2, start: "2020-01-01", end: "2099-12-31", primes: [p1], rulesPublished: false } });
+    const ctx = setup({}, { staticRoot: root, indexHtml: async () => INDEX, season: { number: 2, start: "2020-01-01", end: "2099-12-31", primes: [p1], rulesPublished: true }, rules: "# Règlement\n\nArticle 1." });
     for (const path of ["/", "/bandes", "/privacy"]) {
       const html = await (await ctx.app.request(path)).text();
       const raw = /<script id="tys-config" type="application\/json">(.*?)<\/script>/.exec(html)?.[1];

@@ -28,7 +28,7 @@ const prime = (over: Partial<Prime> = {}): Prime => ({
   pitch: { fr: "Démo.", en: "Demo." },
   ...over,
 });
-const season = (primes: Prime[]): Season => ({ number: 1, start: day(-30), end: day(60), primes, rulesPublished: false });
+const season = (primes: Prime[]): Season => ({ number: 1, start: day(-30), end: day(60), primes, rulesPublished: true });
 
 const view = (over: Partial<PrimeView> = {}): PrimeView => ({ ...prime(), from: day(-30), to: day(12), phase: "open", daysLeft: 12, entrants: 4, ...over });
 
@@ -64,7 +64,7 @@ function setup(s: Season | null) {
   } as unknown as Deps;
   const index = `<html><head><title>x</title></head><body><div id="root"></div></body></html>`;
   writeFileSync(join(root, "index.html"), index);
-  const { app } = createApp({ store, deps, githubToken: "t", baseUrl: "https://skills.test", ogDir, season: s, staticRoot: root, indexHtml: async () => index });
+  const { app } = createApp({ store, deps, githubToken: "t", baseUrl: "https://skills.test", ogDir, season: s, rules: "# Règlement\n\nArticle 1.", staticRoot: root, indexHtml: async () => index });
   return { app, calls };
 }
 

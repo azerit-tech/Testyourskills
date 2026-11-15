@@ -3,7 +3,7 @@
 
 import { mkdirSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FIXTURES } from "../../shared/fixtures";
 import type { PrimeMe, PrimePageData, Race } from "../../shared/primes";
@@ -14,7 +14,7 @@ import { SESSION_COOKIE, signSession } from "./auth";
 import { Store } from "./db";
 import type { Deps } from "./pipeline";
 import { purgeEntries } from "./primes";
-import { publicRules, rulesBlanks, RULES_MARK } from "./rules";
+import { loadRules, publicRules, rulesBeside, rulesBlanks, RULES_MARK } from "./rules";
 
 const BASE = "https://skills.test";
 const SECRET = "s".repeat(40);
@@ -41,14 +41,16 @@ const prime = (over: Partial<Prime> = {}): Prime => ({
   ...over,
 });
 
-const seasonWith = (primes: Prime[], extra: Partial<Season> = {}): Season => ({ number: 1, start: day(-30), end: day(60), primes, rulesPublished: false, ...extra });
+const seasonWith = (primes: Prime[], extra: Partial<Season> = {}): Season => ({ number: 1, start: day(-30), end: day(60), primes, rulesPublished: true, ...extra });
+/** Un règlement servable : sans lui, les primes restent éteintes (§18.52). */
+const RULES = "# Règlement\n\nArticle 1.";
 
 const stores: Store[] = [];
 afterEach(() => {
   while (stores.length) stores.pop()!.close();
 });
 
-function setup(season: Season | null = seasonWith([prime()]), rules: string | null = null) {
+function setup(season: Season | null = seasonWith([prime()]), rules: string | null = RULES) {
   const store = new Store(":memory:");
   stores.push(store);
   const ogDir = join(mkdtempSync(join(tmpdir(), "tys-primes-")), "og");
@@ -122,7 +124,7 @@ async function enter(ctx: Ctx, login: string, o: CardOpts = {}) {
 describe("sans prime, rien ne change", () => {
   for (const season of [seasonWith([]), null]) {
     it(`saison ${season ? "sans prime" : "absente"} : ni page, ni route, ni collecte`, async () => {
-      const ctx = setup(season);
+      const ctx = setup(season, null);
       const cfg = (await call<Record<string, unknown>>(ctx, "/api/config")).json;
       expect(cfg).toMatchObject({ primesOpen: false, primesListed: false, rulesPublished: false });
       expect((await call<{ primes: unknown[] }>(ctx, "/api/primes")).json.primes).toEqual([]);
@@ -314,7 +316,7 @@ describe("le règlement (/reglement)", () => {
     expect((await call<Record<string, unknown>>(missing, "/api/config")).json).toMatchObject({ rulesPublished: false });
     expect((await missing.app.request("/Reglement/")).status).toBe(404);
     // Texte présent mais pas publié : fermé.
-    const off = setup(seasonWith([prime()]), text);
+    const off = setup(seasonWith([prime()], { rulesPublished: false }), text);
     expect((await call(off, "/api/rules")).status).toBe(404);
     expect((await off.app.request("/reglement")).status).toBe(404);
   });
@@ -332,6 +334,40 @@ describe("le règlement (/reglement)", () => {
       const filled = setup(seasonWith([prime()], { rulesPublished: true }), "# Règlement\n\nVoir [la CNIL](https://cnil.fr).");
       expect((await call<Record<string, unknown>>(filled, "/api/config")).json).toMatchObject({ rulesPublished: true });
       expect((await call(filled, "/api/rules")).status).toBe(200);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("la saison de démonstration porte un règlement servable à côté d'elle", () => {
+    const path = rulesBeside(resolve(import.meta.dirname, "../../scripts/demo/season-demo.json"));
+    expect(path).toMatch(/season-demo\.reglement\.md$/);
+    expect(loadRules(path!)).toBeTruthy();
+    expect(rulesBeside(resolve(import.meta.dirname, "../../data/season.json"))).toBeNull();
+  });
+
+  it("sans règlement servi, les primes restent éteintes, quoi que dise la saison (§18.52)", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const closed = [
+        setup(seasonWith([prime()], { rulesPublished: false }), RULES),
+        setup(seasonWith([prime()]), null),
+        setup(seasonWith([prime()]), "# Règlement\n\nOrganisé par [raison sociale]."),
+      ];
+      expect(warn.mock.calls.flat().join(" ")).toMatch(/règlement fermé : primes éteintes/);
+      for (const ctx of closed) {
+        const cfg = (await call<Record<string, unknown>>(ctx, "/api/config")).json;
+        expect(cfg).toMatchObject({ primesOpen: false, primesListed: false, rulesPublished: false, interviews: 0 });
+        expect((await call<{ primes: unknown[] }>(ctx, "/api/primes")).json.primes).toEqual([]);
+        expect((await ctx.app.request("/primes/demo-stage")).status).toBe(302);
+        expect((await call(ctx, "/api/primes/demo-stage")).status).toBe(404);
+        insert(ctx.store, { login: "presse" });
+        expect((await join_(ctx, owner(ctx.store, "presse"))).status).toBe(404);
+        expect(ctx.store.db.prepare(`SELECT COUNT(*) AS n FROM entries`).get()).toEqual({ n: 0 });
+      }
+      // Le même fichier, règlement servi : la prime s'ouvre.
+      const open = setup(seasonWith([prime()]), RULES);
+      expect((await call<Record<string, unknown>>(open, "/api/config")).json).toMatchObject({ primesOpen: true, primesListed: true, rulesPublished: true });
     } finally {
       warn.mockRestore();
     }

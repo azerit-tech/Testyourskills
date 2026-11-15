@@ -225,6 +225,16 @@ export async function purge(store: Store, ogDir: string, now = Date.now(), avata
   return ids.length;
 }
 
+/**
+ * La saison telle que le site la sert : sans règlement publié, sans prime
+ * (SPEC §18.52). Le journal le dit au démarrage.
+ */
+export function gateSeason(season: Season | null, rules: string | null): Season | null {
+  if (!season || rules || !season.primes.length) return season;
+  console.warn(`[saison] ${season.primes.length} prime(s) dans la saison mais règlement fermé : primes éteintes.`);
+  return { ...season, primes: [] };
+}
+
 // --- Application ------------------------------------------------------------
 
 export function createApp(opts: AppOptions) {
@@ -366,9 +376,12 @@ export function createApp(opts: AppOptions) {
   // Ce que le front doit afficher ou masquer.
   // linkedinEntry : le champ de l'accueil accepte une adresse LinkedIn (§18.24).
   // season, primesOpen : les dates de la saison et si une prime est ouverte (data/season.json).
-  const season = opts.season === undefined ? loadSeason() : opts.season;
+  const seasonFile = opts.season === undefined ? loadSeason() : opts.season;
   // Le règlement n'existe que publié par la saison, présent sur le disque et sans champ à remplir (rules.ts).
-  const rules = season?.rulesPublished ? servableRules(opts.rules === undefined ? loadRules() : opts.rules) : null;
+  const rules = seasonFile?.rulesPublished ? servableRules(opts.rules === undefined ? loadRules() : opts.rules) : null;
+  // Pas de règlement servi, pas de prime (SPEC §18.52) : quoi que dise la saison,
+  // ses primes restent éteintes (ni page, ni inscription) ; ses dates restent.
+  const season = gateSeason(seasonFile, rules);
   // La même réponse est écrite dans chaque page servie (injectConfig, plus haut).
   const appConfig = () => {
     const now = Date.now();
