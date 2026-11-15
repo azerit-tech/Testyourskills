@@ -21,10 +21,11 @@ function body(css: string): string {
 }
 
 describe("les jetons", () => {
-  it("sept tailles de texte, le titre de page à 64 au bureau", () => {
-    expect(["--t-12", "--t-14", "--t-16", "--t-22", "--t-28", "--t-44", "--t-60"].map(token)).toEqual(["12px", "14px", "16px", "22px", "28px", "44px", "60px"]);
+  it("sept tailles de texte en rem (elles suivent la taille choisie dans le navigateur), le titre de page à 64 au bureau", () => {
+    expect(["--t-12", "--t-14", "--t-16", "--t-22", "--t-28", "--t-44", "--t-60"].map(token)).toEqual(["0.75rem", "0.875rem", "1rem", "1.375rem", "1.75rem", "2.75rem", "3.75rem"]);
+    expect(site).toMatch(/html \{[^}]*font-size: 100%;/);
     expect(token("--t-page")).toBe("var(--t-44)");
-    expect(site).toMatch(/@media \(min-width: 900px\) \{\s*:root \{[^}]*--t-page: 64px;/);
+    expect(site).toMatch(/@media \(min-width: 900px\) \{\s*:root \{[^}]*--t-page: 4rem;/);
   });
 
   it("trois rayons, deux hauteurs tactiles, les marges", () => {

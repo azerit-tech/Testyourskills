@@ -6,7 +6,8 @@
    Tout passe par les jetons de :root, ci-dessous. Une taille de texte, un rayon
    ou une couleur de rôle écrits en dur dans une feuille du site sont une erreur.
 
-   TEXTE : sept crans, rien d'autre. Aucun texte sous 12 px.
+   TEXTE : sept crans, rien d'autre. Aucun texte sous 12 px. Les crans sont en rem
+   (12 px = 0,75 rem à la taille par défaut) : le texte suit la taille choisie dans le navigateur.
      --t-12   étiquette, mentions            --t-22   titre d'élément, chiffre d'une ligne
      --t-14   texte secondaire               --t-28   titre de bloc
      --t-16   corps, boutons, champs         --t-44   grand titre     --t-60   grande note
@@ -92,13 +93,13 @@
   --f-name: "Barlow Condensed", "Arial Narrow", sans-serif;
   --f-text: "Outfit", system-ui, sans-serif;
   --f-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
-  --t-12: 12px;
-  --t-14: 14px;
-  --t-16: 16px;
-  --t-22: 22px;
-  --t-28: 28px;
-  --t-44: 44px;
-  --t-60: 60px;
+  --t-12: 0.75rem;
+  --t-14: 0.875rem;
+  --t-16: 1rem;
+  --t-22: 1.375rem;
+  --t-28: 1.75rem;
+  --t-44: 2.75rem;
+  --t-60: 3.75rem;
   --t-page: var(--t-44);
   --t-section: var(--t-28);
   --font-page: 700 var(--t-page) / 0.95 var(--f-name);
@@ -132,7 +133,7 @@
 }
 @media (min-width: 900px) {
   :root {
-    --t-page: 64px;
+    --t-page: 4rem;
     --t-section: var(--t-44);
     --gutter: max(32px, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
     --pad-block: 28px;
@@ -146,6 +147,8 @@
 }
 
 html {
+  /* la taille de texte choisie dans le navigateur : tous les jetons --t-* sont en rem */
+  font-size: 100%;
   background: var(--s-page);
   overflow-x: clip;
   -webkit-text-size-adjust: 100%;
