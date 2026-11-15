@@ -24,9 +24,12 @@ export function PleaPrompt({ cardId }: { cardId: string }) {
 
   if (stars) {
     return (
-      <p className="plea plea-line">
-        {p.pleading} <Stars n={stars} size={14} label={p.count(stars)} />
-      </p>
+      <div className="plea">
+        <p className="plea-line">
+          {p.pleading} <Stars n={stars} size={14} label={p.count(stars)} />
+        </p>
+        <p className="plea-noted">{p.noted}</p>
+      </div>
     );
   }
   const choose = (n: number) => {

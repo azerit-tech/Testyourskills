@@ -159,13 +159,16 @@ const fr = frTypoDeep({
   /* Niveaux de recherche (§18.18) : Bronze couvre ★ à ★★★, on garde le premier. */
   tierCard: (level: string) => `Fiche ${level}`,
   waiting: {
-    title: "Chargement du dossier",
+    /** Le titre de l'attente, sous la marque, au-dessus de la photo d'identité. */
+    title: "Un dossier s'ouvre. Le tien.",
     /** L'enquête en direct (§18.26) : le numéro de la trouvaille versée au dossier. */
     piece: (n: number) => `Pièce ${String(n).padStart(2, "0")}`,
     /** Fiche en file d'attente : n fiches passent avant (rang dans la file). */
     queue: (n: number) => (n === 1 ? "1 fiche devant toi au commissariat" : `${n} fiches devant toi au commissariat`),
-    /** La fiche est prête, la scène 3D pas encore (§18.27). */
-    scene: "La scène se charge",
+    /** La fiche est prête, le film pas encore (§18.27). */
+    scene: "La poursuite se prépare…",
+    /** Sous « Lancer la poursuite » : la fiche est prête, le film attend un toucher. */
+    ready: "Ta fiche est prête.",
     progress: {
       lazy_commits: (n?: number) => `Lecture de tes ${n ?? "nombreux"} commits « wip »…`,
       buzzwords: (n?: number) => `Comptage des buzzwords… ${n ?? 0} pour l'instant`,
@@ -186,7 +189,7 @@ const fr = frTypoDeep({
       scoring: () => "Huit critères, une note sur 10 chacun. Aucune IA ne touche aux chiffres.",
       statuses: () => "Choix des statuts dans la liste fermée…",
       render: () => "Impression de la fiche…",
-      start: () => "Un dossier s'ouvre chez Azerit. Le tien.",
+      start: () => "On réunit les premières pièces…",
     } as Record<string, (n?: number) => string>,
     fillers: [
       "La grille est écrite en dur dans un fichier JSON. Pas de favoritisme.",
@@ -256,6 +259,8 @@ const fr = frTypoDeep({
     star: (n: number) => (n === 1 ? "Plaider 1 étoile" : `Plaider ${n} étoiles`),
     count: (n: number) => (n === 1 ? "1 étoile sur 6" : `${n} étoiles sur 6`),
     pleading: "Tu plaides",
+    /** Sous le pari fait, pendant l'attente : quand tombe le verdict. */
+    noted: "Pari noté. Verdict après la poursuite.",
     pleaded: "Tu plaidais",
     verdict: "Verdict :",
     gap: { over: "Excès de confiance", exact: "Lucide", under: "Trop modeste" },
@@ -896,10 +901,11 @@ const en: Dict = {
   },
   tierCard: (level) => `${level} sheet`,
   waiting: {
-    title: "Loading your file",
+    title: "A file just opened. Yours.",
     piece: (n) => `Exhibit ${String(n).padStart(2, "0")}`,
     queue: (n) => (n === 1 ? "1 sheet ahead of you at the station" : `${n} sheets ahead of you at the station`),
-    scene: "Loading the scene",
+    scene: "Getting the chase ready…",
+    ready: "Your sheet is ready.",
     progress: {
       lazy_commits: (n) => `Reading your ${n ?? "many"} “wip” commits…`,
       buzzwords: (n) => `Counting buzzwords… ${n ?? 0} so far`,
@@ -919,7 +925,7 @@ const en: Dict = {
       scoring: () => "Eight criteria, one score out of 10 each. No AI touches the numbers.",
       statuses: () => "Picking statuses from the closed list…",
       render: () => "Printing the sheet…",
-      start: () => "A file just opened at Azerit. Yours.",
+      start: () => "Gathering the first exhibits…",
     },
     fillers: [
       "The scorecard is hard-coded in a JSON file. No favoritism.",
@@ -982,6 +988,7 @@ const en: Dict = {
     star: (n) => (n === 1 ? "Plead 1 star" : `Plead ${n} stars`),
     count: (n) => (n === 1 ? "1 of 6 stars" : `${n} of 6 stars`),
     pleading: "You plead",
+    noted: "Bet placed. Verdict after the chase.",
     pleaded: "You pleaded",
     verdict: "Verdict:",
     gap: { over: "Overconfidence", exact: "Clear-eyed", under: "Too modest" },

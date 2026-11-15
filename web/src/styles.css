@@ -1788,15 +1788,17 @@ button.cover-panel:focus-visible {
 
 /* ============ attente : la photo d'identité (§18.27) ============ */
 
-/* fond d'encre plat ; en colonne : la photo, le pari, les pièces, puis la barre
-   en bas. Reste par-dessus la fiche tant que la scène 3D n'est pas prête. */
+/* fond d'encre plat ; un groupe centré dans la hauteur (la marque et le titre,
+   la photo, le pari, la pile des pièces), puis en bas, à une place fixe, la barre
+   et sa ligne. Chaque emplacement a sa hauteur réservée : rien ne bouge d'une
+   étape à l'autre. Reste par-dessus la fiche tant que le film n'est pas prêt. */
 .loadscreen {
   position: fixed;
   inset: 0;
   z-index: 30;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
   padding: max(20px, env(safe-area-inset-top)) var(--gutter) max(16px, env(safe-area-inset-bottom));
   background: var(--s-page);
   overflow: hidden;
@@ -1815,15 +1817,49 @@ button.cover-panel:focus-visible {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
   width: 100%;
   max-width: var(--w-form);
   margin: 0 auto;
+}
+/* centré dans la hauteur, sans jamais couper le haut si la place manque */
+.load-main > :first-child {
+  margin-top: auto;
+}
+.load-main > :last-child {
+  margin-bottom: auto;
+}
+/* la marque, puis le titre de l'écran */
+.load-head {
+  flex: none;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  text-align: center;
+}
+.load-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.load-title {
+  font: var(--font-block);
+  text-transform: uppercase;
+  color: var(--c-emphasis);
+  text-wrap: balance;
 }
 /* le cadre de la fiche (toise et plaque) ; il cède de la place sur un écran bas */
 .load-mug {
   flex: none;
   width: clamp(124px, 27vh, 208px);
+}
+/* le pari : sa place est réservée, question ou ligne */
+.load-plea {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 72px;
 }
 .load-mug svg {
   width: 100%;
@@ -1833,16 +1869,25 @@ button.cover-panel:focus-visible {
 .load-mug-photo {
   animation: fade-in 0.2s ease-out both;
 }
+/* écran bas (petit téléphone) : le titre s'efface, la photo, le pari et les pièces d'abord */
+@media (max-height: 680px) {
+  .load-head {
+    display: none;
+  }
+  .load-main {
+    gap: 12px;
+  }
+}
 /* écran très bas (téléphone couché) : les pièces et la barre d'abord */
 @media (max-height: 480px) {
   .load-mug {
     display: none;
   }
 }
-/* ordinateur : la colonne descend un peu, la photo garde sa taille de fiche */
+/* ordinateur : le bas remonte un peu, la photo garde sa taille de fiche */
 @media (min-width: 900px) and (min-height: 760px) {
   .loadscreen {
-    padding-top: 9vh;
+    padding-top: 6vh;
     padding-bottom: 6vh;
   }
 }
@@ -1866,44 +1911,42 @@ button.cover-panel:focus-visible {
     display: none;
   }
 }
+/* le bas : une rangée de la hauteur d'un bouton principal (la barre, ou le bouton
+   qui la remplace), puis la ligne sur deux rangs réservés */
 .load-foot {
   flex: none;
   position: relative;
   z-index: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  display: grid;
+  gap: 8px;
   width: 100%;
   max-width: var(--w-form);
   margin: 0 auto;
   background: var(--s-page);
 }
+/* la barre se pose au bas de sa rangée, juste au-dessus de la ligne */
+.load-act {
+  display: grid;
+  align-items: end;
+  height: var(--h-main);
+}
 /* le son demande un geste : la pilule, à portée de pouce */
-.load-open {
+.load-act-btn {
   width: 100%;
   animation: line-in 0.4s var(--ease-out);
 }
-.load-lines {
-  order: 2;
-  min-height: 2.6em;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  gap: 4px;
-}
 .load-line {
-  font: var(--font-item);
-  text-transform: uppercase;
-  color: var(--cream);
-  text-wrap: balance;
-}
-.load-line.is-current {
-  animation: line-in 0.4s var(--ease-out);
-}
-.load-line.is-prev {
   font: var(--font-small);
-  text-transform: none;
   color: var(--c-text-2);
+  text-align: center;
+  text-wrap: balance;
+  /* deux rangs, toujours : la barre ne bouge pas avec la longueur du texte */
+  height: 2.8em;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  animation: line-in 0.4s var(--ease-out);
 }
 @keyframes line-in {
   from {
@@ -1912,7 +1955,6 @@ button.cover-panel:focus-visible {
   }
 }
 .load-bar {
-  order: 3;
   height: 6px;
   border-radius: var(--r-pill);
   background: var(--c-line);
@@ -1942,10 +1984,12 @@ button.cover-panel:focus-visible {
 }
 
 /* l'enquête en direct (§18.26) : une pièce versée au dossier toutes les 2,5 s,
-   sous la photo, les précédentes en pile dessous ; la progression passe en petit */
+   sous la photo, les précédentes en pile dessous. La place est réservée dès la
+   première image ; une pièce plus longue déborde vers le bas, sans rien pousser. */
 .load-dossier {
+  flex: none;
   width: 100%;
-  padding-top: 4px;
+  height: 168px;
   pointer-events: none;
 }
 .pile {
@@ -1998,14 +2042,32 @@ button.cover-panel:focus-visible {
   font-weight: 700;
   color: var(--c-emphasis);
 }
-.load-foot.is-quiet .load-lines {
-  order: 4;
-  min-height: 0;
+/* avant la première pièce : la feuille vierge, en pointillé, ses lignes à venir qui respirent */
+.piece.is-blank {
+  border-style: dashed;
+  background: transparent;
+  animation: none;
 }
-.load-foot.is-quiet .load-line {
-  font: var(--font-small);
-  text-transform: none;
-  color: var(--c-text-2);
+.piece-skel {
+  display: block;
+  height: 14px;
+  border-radius: var(--r-pill);
+  background: var(--c-line);
+  animation: skel-breathe 1.6s ease-in-out infinite;
+}
+.piece-skel.is-short {
+  width: 62%;
+  animation-delay: 0.2s;
+}
+@keyframes skel-breathe {
+  50% {
+    opacity: 0.45;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .piece-skel {
+    animation: none;
+  }
 }
 
 /* le pari (§18.27) : « Tu plaides combien d'étoiles ? », six étoiles à toucher
@@ -2064,6 +2126,12 @@ button.cover-panel:focus-visible {
   font: 500 var(--t-14) / 24px var(--f-text);
   color: var(--c-text);
   animation: line-in 0.4s var(--ease-out);
+}
+/* sous le pari fait : quand tombe le verdict */
+.plea-noted {
+  font: var(--font-small);
+  color: var(--c-text-2);
+  animation: line-in 0.4s var(--ease-out) 0.15s both;
 }
 .plea-verdict {
   display: grid;

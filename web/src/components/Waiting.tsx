@@ -1,23 +1,29 @@
-// Attente (§18.27) : la photo d'identité. Sur un fond d'encre plat, le cadre de
-// la fiche (toise et plaque, Mugshot.tsx) avec l'avatar du pseudo dès la
-// première seconde ; dessous, le pari (« Tu plaides combien d'étoiles ? »,
-// Plea.tsx) ; en bas, la barre qui avance sur la durée estimée et les messages
-// du §6.2, nourris par les ProgressEvent quand il y en a, sinon par du
-// remplissage. En file d'attente, une seule ligne dit combien de fiches passent
+// Attente (§18.27, §18.48) : la photo d'identité. Sur un fond d'encre plat, un
+// groupe centré dans la hauteur : la marque et le titre (« Un dossier s'ouvre.
+// Le tien. »), le cadre de la fiche (toise et plaque, Mugshot.tsx) avec l'avatar
+// du pseudo dès la première seconde, le pari (« Tu plaides combien d'étoiles ? »,
+// Plea.tsx), puis la pile des pièces. En bas, à une place fixe, la barre qui
+// avance sur la durée estimée et, dessous, une ligne sur deux rangs réservés :
+// les messages du §6.2, nourris par les ProgressEvent quand il y en a, sinon par
+// du remplissage. En file d'attente, la ligne dit combien de fiches passent
 // avant, et la barre attend.
 //
-// L'enquête en direct (§18.26) : dès que la collecte a parlé, les trouvailles
-// tombent une à une sous la photo, toutes les 2,5 s, comme des pièces versées
-// au dossier ; la dernière reste. Les messages de progression passent alors en
-// petit, sous la barre. Fiche prête avant la fin : `ready`, et on rend la main
-// (`onRelease`) une fois au moins trois pièces versées et lues.
+// Rien ne bouge d'une étape à l'autre : chaque emplacement (pari, pile, barre,
+// ligne) a sa hauteur réservée dès la première image, quel que soit le texte.
 //
-// Plus d'écran noir (§18.27) : l'attente reste à l'écran tant que la scène 3D
-// n'est pas prête (`scene="loading"`, « La scène se charge »), et porte la
-// pilule « Ouvrir mon dossier » quand le son demande un geste (`scene="tap"`).
-import { useEffect, useMemo, useRef, useState } from "react";
+// L'enquête en direct (§18.26) : dès que la collecte a parlé, les trouvailles
+// tombent une à une dans la pile, toutes les 2,5 s, comme des pièces versées au
+// dossier ; la dernière reste. Avant la première, une feuille vierge attend à sa
+// place. Fiche prête avant la fin : `ready`, et on rend la main (`onRelease`) une
+// fois au moins trois pièces versées et lues.
+//
+// Plus d'écran noir (§18.27) : l'attente reste à l'écran tant que le film n'est
+// pas prêt (`scene="loading"`, « La poursuite se prépare »), et porte la pilule
+// « Lancer la poursuite » quand le son demande un geste (`scene="tap"`).
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Finding, ProgressEvent } from "../../../shared/types";
 import { useT } from "../i18n";
+import { AzeritMark } from "./Brand";
 import { FindingText } from "./Findings";
 import { Mugshot } from "./Mugshot";
 import { PleaPrompt } from "./Plea";
@@ -58,9 +64,9 @@ interface WaitingProps {
   /** La fiche est prête : rendre la main dès que les trouvailles minimales sont lues. */
   ready?: boolean;
   onRelease?: () => void;
-  /** La fiche est prête, la scène 3D pas encore (« loading »), ou elle attend un geste pour le son (« tap »). */
+  /** La fiche est prête, le film pas encore (« loading »), ou il attend un geste pour le son (« tap »). */
   scene?: "loading" | "tap";
-  /** Le geste de la pilule « Ouvrir mon dossier ». */
+  /** Le geste de la pilule « Lancer la poursuite ». */
   onOpen?: () => void;
   /** L'écran se lève : il s'efface en fondu sur la scène (ou la fiche) déjà dessous. */
   leaving?: boolean;
@@ -70,6 +76,10 @@ const idOf = (f: Finding) => `${f.source}:${f.kind}`;
 
 export function Waiting({ cardId, progress, startedAt, queue, findings = [], login, avatarUrl, slug, createdAt, plea = false, ready = false, onRelease, scene, onOpen, leaving = false }: WaitingProps) {
   const { t, lang } = useT();
+  // L'attente s'ouvre en haut de la page, avant sa première image : jamais à la hauteur où l'accueil était défilé.
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
   const [lines, setLines] = useState<Line[]>([]);
   const [now, setNow] = useState(() => Date.now());
   const consumed = useRef(0);
@@ -153,13 +163,16 @@ export function Waiting({ cardId, progress, startedAt, queue, findings = [], log
   // En file d'attente, une seule ligne : combien passent avant toi.
   const queued = queue !== undefined && queue > 0;
   const queueLine: Line | undefined = queued ? { uid: -(queue ?? 1), key: "queue" } : undefined;
-  // La scène 3D se charge : c'est la seule chose qui reste à dire.
-  const sceneLine: Line | undefined = scene === "loading" ? { uid: -1000, key: "scene" } : undefined;
-  const current = sceneLine ?? queueLine ?? lines[lines.length - 1];
-  // L'enquête a commencé : la progression passe en une petite ligne, les pièces prennent la place.
+  // Le film se prépare : c'est la seule chose qui reste à dire, jusqu'au fondu compris.
+  const sceneSaid = useRef(false);
+  if (scene === "loading") sceneSaid.current = true;
+  const sceneOn = scene === "loading" || (leaving && sceneSaid.current);
+  const sceneLine: Line | undefined = sceneOn ? { uid: -1000, key: "scene" } : undefined;
+  // La pilule du geste : la fiche est prête, la ligne le dit (plus de progression périmée dessous).
+  const tapLine: Line | undefined = scene === "tap" ? { uid: -3000, key: "ready" } : undefined;
+  const current = tapLine ?? sceneLine ?? queueLine ?? lines[lines.length - 1];
   const piece = pieces[pieces.length - 1];
-  const previous = sceneLine || queued || piece ? undefined : lines[lines.length - 2];
-  const lineText = (l: Line) => (l.key === "scene" ? t.waiting.scene : l.key === "queue" ? t.waiting.queue(queue ?? 1) : textOf(l));
+  const lineText = (l: Line) => (l.key === "ready" ? t.waiting.ready : l.key === "scene" ? t.waiting.scene : l.key === "queue" ? t.waiting.queue(queue ?? 1) : textOf(l));
 
   // La barre reste au départ tant que la fiche est en file, et part quand elle passe.
   const barFrom = useRef(startedAt);
@@ -173,57 +186,63 @@ export function Waiting({ cardId, progress, startedAt, queue, findings = [], log
     return Math.round(linear + tail);
   }, [barElapsed, ready]);
 
+  // Ce qui tient la place de la barre : la pilule du geste, ou la barre elle-même.
+  const act =
+    scene === "tap" ? (
+      // Le son demande un geste : une pilule à portée de pouce, jamais un texte gris.
+      <button type="button" className="pill pill-big load-act-btn" onClick={onOpen}>
+        {t.reveal.open}
+      </button>
+    ) : (
+      <div className={`load-bar${sceneOn ? " is-busy" : ""}`} aria-hidden>
+        <span style={{ width: `${pct}%` }} />
+      </div>
+    );
+
   return (
     <section className={`loadscreen${leaving ? " is-leaving" : ""}`} aria-labelledby="waiting-title" inert={leaving ? true : undefined}>
-      <h1 id="waiting-title" className="sr-only">
-        {t.waiting.title}
-      </h1>
-
       <div className="load-main">
+        <header className="load-head">
+          <p className="load-brand label" aria-hidden>
+            <AzeritMark size={12} />
+            Azerit
+          </p>
+          <h1 id="waiting-title" className="load-title">
+            {t.waiting.title}
+          </h1>
+        </header>
         <Mugshot cardId={cardId} login={login} slug={slug} src={avatarUrl} createdAt={createdAt ?? startedAt} />
-        {plea && <PleaPrompt cardId={cardId} />}
-        {piece && (
-          <div className="load-dossier" aria-hidden>
-            {/* les pièces d'avant, en pile sous la dernière */}
-            <div className="pile">
-              {pieces.length > 2 && <span className="pile-sheet is-2" />}
-              {pieces.length > 1 && <span className="pile-sheet is-1" />}
+        {/* le pari a sa place dès la première image : la question, puis la ligne, sans rien pousser */}
+        <div className="load-plea">{plea && <PleaPrompt cardId={cardId} />}</div>
+        <div className="load-dossier" aria-hidden>
+          {/* les pièces d'avant, en pile sous la dernière ; avant la première, une feuille vierge à sa place */}
+          <div className="pile">
+            {pieces.length > 2 && <span className="pile-sheet is-2" />}
+            {pieces.length > 1 && <span className="pile-sheet is-1" />}
+            {piece ? (
               <article className="piece" key={idOf(piece)}>
                 <p className="piece-no">{t.waiting.piece(pieces.length)}</p>
                 <p className="piece-text">
                   <FindingText finding={piece} lang={lang} />
                 </p>
               </article>
-            </div>
+            ) : (
+              <article className="piece is-blank">
+                <p className="piece-no">{t.waiting.piece(1)}</p>
+                <span className="piece-skel" />
+                <span className="piece-skel is-short" />
+              </article>
+            )}
           </div>
-        )}
+        </div>
       </div>
 
-      <div className={`load-foot${piece ? " is-quiet" : ""}`}>
-        {scene === "tap" ? (
-          // Le son demande un geste : une pilule à portée de pouce, jamais un texte gris.
-          <button type="button" className="pill pill-big load-open" onClick={onOpen}>
-            {t.reveal.open}
-          </button>
-        ) : (
-          <>
-            <div className="load-lines" aria-hidden>
-              {previous && (
-                <p className="load-line is-prev" key={previous.uid}>
-                  {textOf(previous)}
-                </p>
-              )}
-              {current && (
-                <p className="load-line is-current" key={current.uid}>
-                  {lineText(current)}
-                </p>
-              )}
-            </div>
-            <div className={`load-bar${scene === "loading" ? " is-busy" : ""}`} aria-hidden>
-              <span style={{ width: `${pct}%` }} />
-            </div>
-          </>
-        )}
+      {/* En bas, à une place fixe : la barre (ou le bouton qui la remplace), puis la ligne sur deux rangs réservés. */}
+      <div className="load-foot">
+        <div className="load-act">{act}</div>
+        <p className="load-line" aria-hidden key={current?.uid}>
+          {current ? lineText(current) : ""}
+        </p>
         {/* Une seule annonce à la fois pour les lecteurs d'écran. */}
         <p className="sr-only" aria-live="polite">
           {sceneLine ? t.waiting.scene : piece ? `${t.waiting.piece(pieces.length)} : ${piece.text[lang]}` : current ? lineText(current) : ""}
