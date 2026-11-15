@@ -513,8 +513,8 @@ describe("la lecture du recruteur (§18.37)", () => {
 
   it("« Voir le top de la semaine » mène à /#semaine, la query (?mock=1) avant l'ancre (parcours 6)", () => {
     const after = readFileSync(join(__dirname, "../components/After.tsx"), "utf8");
-    expect(after).toContain('const WEEK_ANCHOR = "semaine";');
-    expect(after).toContain("navigate(`/${window.location.search}#${WEEK_ANCHOR}`);");
+    expect(after).toContain('const BOARD_ID = "semaine";');
+    expect(after).toContain("navigate(`/${window.location.search}#${BOARD_ID}`);");
     expect(readFileSync(join(__dirname, "../components/WeekBoard.tsx"), "utf8")).toContain('export const WEEK_ANCHOR = "semaine";');
   });
 
