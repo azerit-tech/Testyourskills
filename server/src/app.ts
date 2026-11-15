@@ -36,6 +36,7 @@ import { mountFilmTrace } from "./filmTrace";
 import { mountPrimes, purgeEntries } from "./primes";
 import { mountPrimePages } from "./primePages";
 import { loadRules, servableRules } from "./rules";
+import { readManifest, withPreloads } from "./assets";
 
 export interface AppOptions {
   store: Store;
@@ -250,6 +251,20 @@ export function createApp(opts: AppOptions) {
   const aiStatus = opts.aiStatus ?? budgetAiStatus;
 
   const app = new Hono();
+
+  // Prod : chaque page du front annonce ses morceaux, qui partent avec le paquet de départ (assets.ts).
+  const manifest = opts.staticRoot ? readManifest(opts.staticRoot) : null;
+  if (manifest) {
+    app.use("*", async (c, next) => {
+      if (c.req.path.startsWith("/.vite/")) return c.text("Not found", 404);
+      await next();
+      if (c.req.method !== "GET" || !(c.res.headers.get("content-type") ?? "").startsWith("text/html")) return;
+      const html = withPreloads(await c.res.text(), manifest, c.req.path, c.res.status);
+      const headers = new Headers(c.res.headers);
+      headers.delete("content-length");
+      c.res = new Response(html, { status: c.res.status, headers });
+    });
+  }
 
   app.onError((err, c) => {
     console.error("[api]", err);

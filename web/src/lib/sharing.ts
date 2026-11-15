@@ -1,8 +1,7 @@
 // Le partage côté navigateur (§18.27) : les images portrait et story préchargées en fichier,
 // la feuille de partage du système, et ce qu'on sait du navigateur intégré.
 import { useSyncExternalStore } from "react";
-import { images, isMock } from "./api";
-import { mockApi } from "./mock";
+import { demoApi, images, isMock } from "./api";
 import { copyText } from "./util";
 
 /**
@@ -44,7 +43,7 @@ export function preloadImage(id: string, kind: ShareImage, filename: string): Pr
   if (known) return known;
   const p = (async () => {
     try {
-      const blob = isMock() ? await mockApi.portrait(kind) : await fetchPng(images[kind](id));
+      const blob = isMock() ? await (await demoApi()).portrait(kind) : await fetchPng(images[kind](id));
       if (!blob) return null;
       const file = new File([blob], filename, { type: "image/png" });
       files.set(key, file);

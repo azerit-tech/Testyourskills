@@ -4,7 +4,8 @@ import { IMAGE_QUERY } from "../../../shared/images";
 import { parseSeason, seasonDates, type SeasonDates } from "../../../shared/season";
 import seasonJson from "../../../data/season.json";
 import type { CardData, JobState, Lang, Piece, WeekRank, WeekTop } from "../../../shared/types";
-import { mockApi } from "./mock";
+/** La maquette (mock.ts), chargée seulement en mode démo : le site réel ne la télécharge jamais. */
+export const demoApi = () => import("./mock").then((m) => m.mockApi);
 import { mockTop, mockWeekRank } from "./mockTop";
 import { ApiError } from "./errors";
 import { currentRef } from "./session";
@@ -180,10 +181,12 @@ function knownConfig(): AppConfig | null {
 /** Démarre la connexion LinkedIn pour poser la photo sur la carte. `token` null : la session du propriétaire fait foi. */
 function startLinkedInPhoto(id: string, token: string | null) {
   if (isMock()) {
-    mockApi.setPhoto(id);
-    // Simule le retour du serveur après l'autorisation.
-    window.history.replaceState(window.history.state, "", `/c/${id}?photo=linkedin`);
-    window.dispatchEvent(new PopStateEvent("popstate"));
+    void demoApi().then((mock) => {
+      mock.setPhoto(id);
+      // Simule le retour du serveur après l'autorisation.
+      window.history.replaceState(window.history.state, "", `/c/${id}?photo=linkedin`);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
     return;
   }
   window.location.href = `/auth/linkedin/start?card=${encodeURIComponent(id)}${token ? `&token=${encodeURIComponent(token)}` : ""}`;
@@ -278,7 +281,7 @@ export function browserId(): string {
 }
 
 async function createCard(input: CreateInput): Promise<CreateResult> {
-  if (isMock()) return mockApi.createCard(input);
+  if (isMock()) return (await demoApi()).createCard(input);
   let res: Response;
   // Fiche d'origine si on est arrivé par un lien partagé (§18.0) ; le serveur l'ignore si elle n'existe pas.
   const ref = currentRef() ?? undefined;
@@ -346,7 +349,7 @@ async function getJob(id: string): Promise<JobState> {
 }
 
 async function fetchJob(id: string): Promise<JobState> {
-  if (isMock()) return mockApi.getJob(id, mockMe?.login ?? null);
+  if (isMock()) return (await demoApi()).getJob(id, mockMe?.login ?? null);
   let res: Response;
   try {
     // Le jeton de la fiche, s'il est sur cet appareil : le serveur rend alors la grille entière, sinon la version publique.
@@ -362,7 +365,7 @@ async function fetchJob(id: string): Promise<JobState> {
 /** Dénonciation et complices d'une fiche ; une fiche sans rien en cas d'erreur, jamais d'exception. */
 async function getCase(id: string): Promise<CaseInfo> {
   const none: CaseInfo = { denounced: false, by: null, x: null, accomplices: [], jury: NO_JURY };
-  if (isMock()) return mockApi.getCase(id);
+  if (isMock()) return (await demoApi()).getCase(id);
   try {
     const res = await fetch(`/api/card/${encodeURIComponent(id)}/case`, { headers: { Accept: "application/json" } });
     if (!res.ok) return none;
@@ -381,7 +384,7 @@ async function getCase(id: string): Promise<CaseInfo> {
 
 /** POST /api/vote (§18.27) : pose le vote et rend le décompte ; déjà voté depuis cette adresse, le premier vote reste. */
 async function vote(cardId: string, verdict: Verdict): Promise<Jury> {
-  if (isMock()) return mockApi.vote(cardId, verdict);
+  if (isMock()) return (await demoApi()).vote(cardId, verdict);
   let res: Response;
   try {
     res = await fetch("/api/vote", {
@@ -397,7 +400,7 @@ async function vote(cardId: string, verdict: Verdict): Promise<Jury> {
 }
 
 async function sendEmail(cardId: string, email: string): Promise<void> {
-  if (isMock()) return mockApi.sendEmail(cardId, email);
+  if (isMock()) return (await demoApi()).sendEmail(cardId, email);
   const res = await fetch("/api/email", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -427,7 +430,7 @@ async function requestRemoval(cardId: string, email: string): Promise<"sent" | "
 
 /** `token` null : la session du propriétaire revendiqué (cookie) fait foi. */
 async function deleteCard(id: string, token: string | null): Promise<void> {
-  if (isMock()) return mockApi.deleteCard(id, token ?? "");
+  if (isMock()) return (await demoApi()).deleteCard(id, token ?? "");
   const qs = token ? `?token=${encodeURIComponent(token)}` : "";
   const res = await fetch(`/api/card/${encodeURIComponent(id)}${qs}`, { method: "DELETE" });
   if (!res.ok) throw await readError(res);
@@ -467,7 +470,7 @@ const PIECES: readonly Piece[] = ["linkedin", "cv", "github"];
 
 /** La vitrine de l'accueil ; null tant que le serveur ne l'a pas calculée. */
 async function getShowcase(): Promise<Showcase | null> {
-  if (isMock()) return mockApi.getShowcase();
+  if (isMock()) return (await demoApi()).getShowcase();
   const res = await fetch("/api/showcase", { headers: { Accept: "application/json" } });
   if (!res.ok) return null;
   const body = (await res.json()) as Partial<Showcase> & { card?: CardData | null };

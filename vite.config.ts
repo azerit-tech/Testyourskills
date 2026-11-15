@@ -5,7 +5,8 @@ export default defineConfig({
   root: "web",
   publicDir: "public",
   plugins: [react()],
-  build: { outDir: "../dist/web", emptyOutDir: true },
+  // Le manifeste (dist/web/.vite/manifest.json) dit au serveur quels morceaux précharger pour chaque page.
+  build: { outDir: "../dist/web", emptyOutDir: true, manifest: true },
   server: {
     port: 5180,
     proxy: {

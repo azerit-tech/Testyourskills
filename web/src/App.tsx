@@ -1,18 +1,24 @@
 // Racine : langue, routes, barre du haut et pied de page.
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Footer, SeasonBand, SkipLink, TopBar } from "./components/Chrome";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { LangProvider } from "./i18n";
 import { isMock } from "./lib/api";
 import { navigate, routeOf, usePath } from "./lib/router";
 import { useAppConfig } from "./lib/season";
-import { BandPage, Bands } from "./pages/Bands";
-import { CardPage } from "./pages/CardPage";
 import { DirectCard } from "./pages/DirectCard";
-import { Home } from "./pages/Home";
-import { PrimePage, PrimesList } from "./pages/Primes";
-import { Rules } from "./pages/Rules";
-import { NotFound, Privacy } from "./pages/Privacy";
+
+// Chaque page est chargée à la demande : l'accueil ne paie pas la page d'une fiche, ni l'inverse.
+// Le serveur précharge celle de l'adresse demandée (server/src/assets.ts), sans attendre ce paquet.
+const Home = lazy(() => import("./pages/Home").then((m) => ({ default: m.Home })));
+const CardPage = lazy(() => import("./pages/CardPage").then((m) => ({ default: m.CardPage })));
+const Bands = lazy(() => import("./pages/Bands").then((m) => ({ default: m.Bands })));
+const BandPage = lazy(() => import("./pages/Bands").then((m) => ({ default: m.BandPage })));
+const PrimesList = lazy(() => import("./pages/Primes").then((m) => ({ default: m.PrimesList })));
+const PrimePage = lazy(() => import("./pages/Primes").then((m) => ({ default: m.PrimePage })));
+const Rules = lazy(() => import("./pages/Rules").then((m) => ({ default: m.Rules })));
+const Privacy = lazy(() => import("./pages/Privacy").then((m) => ({ default: m.Privacy })));
+const NotFound = lazy(() => import("./pages/Privacy").then((m) => ({ default: m.NotFound })));
 
 /** Mode démo uniquement : aperçu du site dans des cadres de téléphone (360 et 390 px). */
 function Devices() {
@@ -93,8 +99,11 @@ export function App() {
         <div className="shell">
           {(path === "/" || path === "") && <SeasonBand />}
           <TopBar />
-          <Routes />
-          <Footer />
+          {/* Le pied attend la page : il ne saute pas du bas de l'écran vers le bas de la page. */}
+          <Suspense fallback={<main className="page" id="main" aria-busy />}>
+            <Routes />
+            <Footer />
+          </Suspense>
         </div>
       </ErrorBoundary>
     </LangProvider>
