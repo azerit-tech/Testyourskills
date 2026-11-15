@@ -21,6 +21,15 @@ export function MakeYours({ watch = false }: Props) {
 
 const isField = (el: Element | null) => !!el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName);
 
+/** Vers le champ de « À ton tour » : la barre, le jury après le vote et le bloc d'une fiche dénoncée y mènent. */
+export function toYourTurn(reduced: boolean) {
+  const you = document.getElementById("you");
+  const input = you?.querySelector<HTMLInputElement>("input:not([type='file'])");
+  (input ?? you)?.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "center" });
+  // Dans le geste, sinon le clavier ne s'ouvre pas sur iPhone.
+  input?.focus({ preventScroll: true });
+}
+
 function Bar({ watch }: { watch: boolean }) {
   const { t } = useT();
   const reduced = useReducedMotion();
@@ -61,18 +70,10 @@ function Bar({ watch }: { watch: boolean }) {
     return () => root.classList.remove("has-dock");
   }, []);
 
-  const toField = () => {
-    const you = document.getElementById("you");
-    const input = you?.querySelector<HTMLInputElement>("input:not([type='file'])");
-    (input ?? you)?.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "center" });
-    // Dans le geste, sinon le clavier ne s'ouvre pas sur iPhone.
-    input?.focus({ preventScroll: true });
-  };
-
   const on = seen === false && !typing;
   return (
     <div className={`dock make-yours${on ? " is-on" : ""}`} role="region" aria-label={t.result.makeYours} inert={on ? undefined : true}>
-      <button type="button" className="pill pill-big dock-main" onClick={toField}>
+      <button type="button" className="pill pill-big dock-main" onClick={() => toYourTurn(reduced)}>
         {t.result.makeYours}
       </button>
     </div>

@@ -9,6 +9,7 @@ import { AddSource, Claim, Contest, DeleteCard, EmailForm, Hiring, LinkedInPhoto
 import type { Shareable } from "../components/After";
 import { BandPick } from "../components/BandPick";
 import { Denounce } from "../components/Denounce";
+import { Duel } from "../components/Duel";
 import { EntryForm } from "../components/EntryForm";
 import { PrimeRace } from "../components/Primes";
 import { ErrorBoundary } from "../components/ErrorBoundary";
@@ -39,7 +40,6 @@ import { navigate, onLinkClick } from "../lib/router";
 import { filmOwed, freshLogin, freshSince, freshSlug, iDenounced, markFilmSeen, myCard, prefillFromLast, rememberMine, type MyCard } from "../lib/session";
 import { revealScene, revealToPlay } from "../lib/revealScene";
 import { useReducedMotion } from "../lib/util";
-import { verdict } from "../lib/versus";
 
 /** La révélation 3D et Three.js, hors du bundle de l'accueil. */
 const loadWalkout = () => import("../components/Walkout3D");
@@ -585,7 +585,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
             {/* Fiche dénoncée (§18.6) : « Avis de recherche à ton nom », juste sous la fiche. */}
             {wantedYou && <Denounced by={kase?.by ?? null} onLawyer={claimOn && cardLogin ? () => api.startClaim(id, cardLogin) : null} />}
             {/* Le jury (§18.27) : un geste à un toucher ; la peine et la caution dans son bloc. */}
-            <Jury cardId={id} card={main} jury={kase?.jury ?? null} toast={toast.show}>
+            <Jury cardId={id} card={main} jury={kase?.jury ?? null} toast={toast.show} turn={other ? null : who}>
               <Penalty card={main} />
             </Jury>
             {/* Les critères (§18.37, §18.48) : la ligne du recruteur, les huit tuiles, le détail replié ; ni nom d'école ni d'ancien employeur. */}
@@ -599,25 +599,17 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
           </div>
         )}
         {/* « À ton tour » : en fin de page sur téléphone (la barre fixe y mène), sous la fiche dans la colonne de droite au bureau. */}
-        {visitor && (
-          <section className="you" id="you" aria-labelledby="you-title">
-            <h2 id="you-title">{t.denounce.andYou}</h2>
-            {other ? (
-              <>
-                {/* Dossier scellé : sa note ne se dit pas, même face à la sienne. */}
-                {!main.sealed && <p className="versus-line">{versusLine(t.denounce, other, main)}</p>}
-                <a className="pill pill-peach" href={`/c/${other.id}`} onClick={(e) => onLinkClick(e, `/c/${other.id}`)}>
-                  {t.denounce.mine}
-                </a>
-              </>
-            ) : (
-              <>
-                <p>{t.result.yourTurn}</p>
-                <EntryForm variant="inline" />
-              </>
-            )}
-          </section>
-        )}
+        {/* Qui a déjà sa fiche : le duel à la place, avec le score à envoyer. */}
+        {visitor &&
+          (other ? (
+            <Duel mine={other} card={main} toast={toast.show} />
+          ) : (
+            <section className="you" id="you" aria-labelledby="you-title">
+              <h2 id="you-title">{t.denounce.andYou}</h2>
+              <p>{t.result.yourTurn}</p>
+              <EntryForm variant="inline" />
+            </section>
+          ))}
         {/* Sans pseudo GitHub, ni revendication ni masquage : la personne fichée demande le retrait. */}
         {visitor && !cardLogin && <RemovalRequest cardId={id} />}
       </div>
@@ -675,16 +667,6 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
       {toast.node}
     </main>
   );
-}
-
-type Dict = ReturnType<typeof useT>["t"];
-
-/** « Toi 78 · @X 71 · une étoile d'avance » (§18.7). */
-function versusLine(d: Dict["denounce"], mine: MyCard, card: CardData): string {
-  const v = verdict(mine.overall, card.overall);
-  const said =
-    v.by === "tie" ? d.tie : v.by === "stars" ? (v.ahead ? d.starsAhead(v.n) : d.starsBehind(v.n)) : v.ahead ? d.pointsAhead(v.n) : d.pointsBehind(v.n);
-  return d.versus(mine.overall, card.login ? `@${card.login}` : card.name, card.overall, said);
 }
 
 /**

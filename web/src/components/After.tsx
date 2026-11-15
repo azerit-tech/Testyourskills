@@ -204,8 +204,8 @@ function useManual(id: string): Manual | null {
   return m && m.id === id ? m : null;
 }
 
-/** Le champ en lecture seule, sélectionné d'office, et sa consigne. */
-function ManualCopy({ m }: { m: Manual }) {
+/** Le champ en lecture seule, sélectionné d'office, et sa consigne. Le duel et la dénonciation s'en servent aussi. */
+export function ManualCopy({ m }: { m: { kind: Manual["kind"] | "message"; value: string } }) {
   const { t } = useT();
   const ts = t.result.share;
   const field = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
@@ -220,11 +220,11 @@ function ManualCopy({ m }: { m: Manual }) {
       /* champ non sélectionnable : l'appui long reste possible */
     }
   }, [m]);
-  const hold = m.kind === "link" ? ts.holdLink : ts.holdText;
+  const hold = m.kind === "link" ? ts.holdLink : m.kind === "text" ? ts.holdText : ts.holdMessage;
   const props = { ref: field, className: "out-manual-field", readOnly: true, value: m.value, "aria-label": hold };
   return (
     <div className="out-manual" role="status">
-      {m.kind === "link" ? <input type="text" {...props} /> : <textarea rows={6} {...props} />}
+      {m.kind === "link" ? <input type="text" {...props} /> : <textarea rows={m.kind === "text" ? 6 : 4} {...props} />}
       <p>{hold}</p>
     </div>
   );

@@ -146,14 +146,15 @@
   justify-self: start;
 }
 
-/* la ligne de comparaison, dans « Et toi ? » */
-.you .versus-line {
-  font: var(--font-block);
-  text-transform: uppercase;
-  color: var(--cream);
+/* le duel : la ligne de comparaison en titre du bloc, puis « Lui envoyer le score » et « Ma fiche » */
+.duel h2 {
   overflow-wrap: anywhere;
+  text-wrap: balance;
 }
-.you > .pill {
-  justify-self: start;
+.duel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 20px;
 }
 

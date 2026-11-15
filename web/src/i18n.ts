@@ -321,6 +321,8 @@ const fr = frTypoDeep({
       /** Le presse-papiers refusé (navigateurs intégrés) : le lien ou le texte s'affiche, sélectionné, dans le bloc de partage. */
       holdLink: "Appuie longuement pour copier ton lien.",
       holdText: "Appuie longuement pour copier ton texte, puis colle-le dans ton post LinkedIn.",
+      /* hors du partage LinkedIn : le score d'un duel, le message d'une dénonciation */
+      holdMessage: "Appuie longuement pour copier ton message.",
       /** La durée de vie du lien, dite là où on le partage (§18.48). */
       keep: "Ton lien reste en ligne 90 jours.",
       imageAlt: "Ta fiche",
@@ -735,6 +737,11 @@ const fr = frTypoDeep({
     pointsAhead: (n: number) => (n === 1 ? "1 point d'avance" : `${n} points d'avance`),
     pointsBehind: (n: number) => (n === 1 ? "1 point de retard" : `${n} points de retard`),
     tie: "à égalité",
+    /* le duel s'envoie : le score, puis le lien de sa propre fiche */
+    sendScore: "Lui envoyer le score",
+    duelText: (me: number, them: number, verdict: string, who: string, rel: "ahead" | "behind" | "tie") =>
+      `${me}/100 contre ${them}/100 : ${verdict} ${rel === "tie" ? "avec" : "sur"} ${who}. Verdict d'Azerit :`,
+    scoreCopied: "Score copié : colle-le dans ton message.",
   },
   /* le jury de la page partagée (§18.27) : on vote sur le chef d'accusation, jamais sur la personne */
   jury: {
@@ -746,6 +753,9 @@ const fr = frTypoDeep({
     tally: (pct: number, n: number) => `${pct}\u00a0% coupable (${n}\u00a0${n === 1 ? "vote" : "votes"})`,
     owner: (tally: string) => `Jury : ${tally}`,
     failed: "Vote non compté. Réessaie.",
+    /* après le vote : la suite, vers « À ton tour » */
+    judged: (who: string) => `Tu as jugé ${who}.`,
+    turn: "À ton tour",
   },
   /* les bandes (§18.38) : bandsText.ts */
   bands: BANDS_TEXT.fr,
@@ -1047,6 +1057,7 @@ const en: Dict = {
       holdToSave: "Press and hold to save",
       holdLink: "Press and hold to copy your link.",
       holdText: "Press and hold to copy your text, then paste it into your LinkedIn post.",
+      holdMessage: "Press and hold to copy your message.",
       keep: "Your link stays up for 90 days.",
       imageAlt: "Your rap sheet",
       words: {
@@ -1415,6 +1426,9 @@ const en: Dict = {
     pointsAhead: (n) => (n === 1 ? "1 point ahead" : `${n} points ahead`),
     pointsBehind: (n) => (n === 1 ? "1 point behind" : `${n} points behind`),
     tie: "dead heat",
+    sendScore: "Send them the score",
+    duelText: (me, them, verdict, who, rel) => `${me}/100 vs ${them}/100: ${verdict}${rel === "ahead" ? " of" : rel === "tie" ? " with" : ""} ${who}. Azerit's verdict:`,
+    scoreCopied: "Score copied: paste it into your message.",
   },
   jury: {
     title: "Guilty or cleared?",
@@ -1424,6 +1438,8 @@ const en: Dict = {
     tally: (pct, n) => `${pct}% guilty (${n}\u00a0${n === 1 ? "vote" : "votes"})`,
     owner: (tally) => `Jury: ${tally}`,
     failed: "Vote not counted. Try again.",
+    judged: (who) => `You judged ${who}.`,
+    turn: "Your turn",
   },
   bands: BANDS_TEXT.en,
   primes: PRIMES_TEXT.en,

@@ -1,16 +1,15 @@
 // Le jury de la page partagée (SPEC §18.27) : « Coupable ou relaxe ? ». Un geste
-// à un toucher pour le visiteur, avant « Et toi ? ». Le vote porte sur le chef
+// à un toucher pour le visiteur, avant « À ton tour ». Le vote porte sur le chef
 // d'accusation de la fiche, jamais sur la personne (principe 4) : deux boutons,
-// un décompte, aucun autre texte. Le serveur garde un vote par fiche et par IP.
-import { useEffect, useRef, useState } from "react";
+// un décompte. Le vote posé, une ligne et un bouton mènent à « À ton tour » (§18.48) :
+// la page ne défile plus toute seule. Le serveur garde un vote par fiche et par IP.
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import type { CardData, Lang } from "../../../shared/types";
 import { pick, useT } from "../i18n";
 import { api, ApiError, type Jury as Tally, type Verdict } from "../lib/api";
 import { useReducedMotion } from "../lib/util";
-
-/** Le temps de lire le décompte avant que la page ne descende vers « Et toi ? ». */
-const SCROLL_AFTER_MS = 1100;
+import { toYourTurn } from "./MakeYours";
 
 /** Le chef d'accusation le plus parlant : un écart ou un négatif d'abord. */
 function topCharge(card: CardData, lang: Lang): string | null {
@@ -62,19 +61,19 @@ interface Props {
   /** Décompte lu avec /case ; null tant qu'il charge. */
   jury: Tally | null;
   toast: (m: string) => void;
+  /** Qui n'a pas encore sa fiche : après son vote, « Tu as jugé @x. » et le bouton « À ton tour ». */
+  turn?: string | null;
   /** Au pied du bloc : la peine et la caution de la fiche. */
   children?: ReactNode;
 }
 
-export function Jury({ cardId, card, jury, toast, children }: Props) {
+export function Jury({ cardId, card, jury, toast, turn = null, children }: Props) {
   const { t, lang } = useT();
   const reduced = useReducedMotion();
   const [tally, setTally] = useState<Tally | null>(jury);
   const [busy, setBusy] = useState(false);
-  const timer = useRef(0);
 
   useEffect(() => setTally(jury), [jury]);
-  useEffect(() => () => window.clearTimeout(timer.current), []);
 
   const charge = topCharge(card, lang);
   const shown = useTally(tally);
@@ -90,9 +89,6 @@ export function Jury({ cardId, card, jury, toast, children }: Props) {
       const next = await api.vote(cardId, verdict);
       setTally(next);
       rememberVote(cardId, next.mine ?? verdict);
-      timer.current = window.setTimeout(() => {
-        document.getElementById("you")?.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "center" });
-      }, SCROLL_AFTER_MS);
     } catch (e) {
       setTally(before);
       toast(e instanceof ApiError && e.fact ? pick(e.fact, lang) : t.jury.failed);
@@ -116,6 +112,14 @@ export function Jury({ cardId, card, jury, toast, children }: Props) {
           </button>
           <button type="button" className="pill pill-ghost" disabled={busy || !tally} onClick={() => void onVote("cleared")}>
             {t.jury.cleared}
+          </button>
+        </div>
+      )}
+      {voted && turn && (
+        <div className="jury-next">
+          <p>{t.jury.judged(turn)}</p>
+          <button type="button" className="pill" onClick={() => toYourTurn(reduced)}>
+            {t.jury.turn}
           </button>
         </div>
       )}

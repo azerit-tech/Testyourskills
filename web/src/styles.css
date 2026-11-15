@@ -2532,6 +2532,18 @@ button.cover-panel:focus-visible {
   font: 600 var(--t-16) / 1.2 var(--f-text);
   color: var(--cream);
 }
+/* le vote posé : « Tu as jugé @x. » et le bouton qui mène à « À ton tour » */
+.jury-next {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+.jury-next p {
+  font: 500 var(--t-16) / 1.4 var(--f-text);
+  color: var(--cream);
+}
 /* pour qui a fait la fiche : le décompte, en texte courant, sous le pari */
 .jury-line {
   font: 500 var(--t-14) / 1.4 var(--f-text);
@@ -2749,7 +2761,8 @@ a.dossier-item:hover {
   -webkit-user-select: text;
   user-select: text;
 }
-.out .out-manual p {
+.after-block .out-manual p,
+.you .out-manual p {
   font: var(--font-small);
   color: var(--c-emphasis);
 }
