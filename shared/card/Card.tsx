@@ -14,7 +14,7 @@ import { fontAttrs, type FontKey } from "./fonts";
 import { CARD_H, CARD_R, CARD_W } from "./geometry";
 import { t } from "./i18n";
 import { langIcon } from "./languages";
-import { MUG_PHOTO, Plate, Silhouette, Toise, caseLabel, caseNumber, plateName, plateSub, toiseCover } from "./mug";
+import { MUG_PHOTO, Plate, Silhouette, Toise, caseLabel, caseNumber, plateInitials, plateName, plateSub, toiseCover } from "./mug";
 import { fit, fitLines, measure, upper, type FittedLines } from "./text";
 import { PALETTE, themeOf, type CardTheme } from "./themes";
 
@@ -57,7 +57,14 @@ const NOTE_Y = 128;
 /** Les étoiles, signe majeur de la fiche (§18.48) : une rangée de six sous la note,
  *  de la largeur de la colonne à gauche de la photo ; le nom du niveau dessous. */
 export const STARS = { y: 139, size: 22, gap: 3 } as const;
-const LEVEL = { y: 178, size: 15, minSize: 11 };
+const LEVEL = { y: 178, size: 15, minSize: 12 };
+
+/**
+ * Le plus petit corps de la fiche, en unités du viewBox : 12, soit 11 px quand
+ * la fiche fait 334 px de large (390 × 664, la hauteur utile d'un téléphone).
+ * Aucun texte du recto ne descend en dessous, étiquettes en capitales comprises.
+ */
+export const MIN_TEXT = 12;
 
 /**
  * Hiérarchie de lecture (de la plus forte à la plus faible) : la note, le nom
@@ -68,14 +75,15 @@ export const LAYOUT = {
   profileName: { y: 270, size: 30, minSize: 20 },
   /** La phrase du profil : une ou deux lignes, jamais coupée (tests). */
   tagline: { y: 292, size: 18, minSize: 15, lineH: 21 },
-  divider: 323,
-  facts: { labelY: 334, valueY: 348, labelSize: 7.5 },
+  divider: 322,
+  facts: { labelY: 337, valueY: 354, labelSize: MIN_TEXT },
   /** Les six traits : leur étiquette dit que la note ne vient pas d'eux. */
-  traits: { labelY: 363, labelSize: 7.5 },
-  stats: { y: 367, rowH: 19.5 },
-  charges: { labelY: 437, y: 455, size: 14, minSize: 12, lineH: 19, labelSize: 7.5 },
-  /** La signature, en 10 : lisible à 390 px de large sans peser (revue §18.48). */
-  footer: { y: 510, size: 10, minSize: 8.5 },
+  traits: { labelY: 372, labelSize: MIN_TEXT },
+  stats: { y: 376, rowH: 17 },
+  /** Trois chefs d'accusation en 14 ; un ou deux, en 16, le bloc centré entre les traits et le pied. */
+  charges: { labelY: 442, y: 459, size: 14, minSize: MIN_TEXT, lineH: 17.5, labelSize: MIN_TEXT, roomy: { size: 16, lineH: 22 }, zone: { top: 432, bottom: 501 } },
+  /** La signature, en 12 comme les étiquettes (revue §18.48). */
+  footer: { y: 511, size: MIN_TEXT, minSize: MIN_TEXT },
 } as const;
 
 /** Le tampon « D'après LinkedIn » : sur le haut de la photo ; sans photo, plus haut, et la silhouette descend d'autant. */
@@ -173,10 +181,10 @@ export function Stars({ n, x = LEFT, y = STARS.y, size = STARS.size, gap = STARS
 }
 
 /** Pastille d'un chef d'accusation : un pictogramme par ton. */
-function Pastille({ tone, cx, cy, th }: { tone: StatusTone; cx: number; cy: number; th: CardTheme }) {
+function Pastille({ tone, cx, cy, th, scale = 1.1 }: { tone: StatusTone; cx: number; cy: number; th: CardTheme; scale?: number }) {
   const ink = tone === "negative" ? "#fff" : PALETTE.ink0;
   return (
-    <g transform={`translate(${cx} ${cy}) scale(1.1)`}>
+    <g transform={`translate(${cx} ${cy}) scale(${+scale.toFixed(3)})`}>
       <circle r={5.6} fill={th.tones[tone]} />
       {tone === "negative" && (
         <>
@@ -196,12 +204,13 @@ function StatRow({ stat, x, y, th }: { stat: Stat; x: number; y: number; th: Car
   const weak = !stat.sufficient;
   const col = stat.code === "BUZZ" ? th.buzz : th.bar;
   const v = Math.max(0, Math.min(99, stat.value));
-  const bx = x + 40;
-  const bw = 153 - 40 - 28;
+  const bx = x + 42;
+  // La barre s'arrête avant le « ? » d'une valeur fragile, en mono 12 lui aussi.
+  const bw = 153 - 42 - 37;
   const seg = (bw - 9 * 2) / 10;
   return (
     <g>
-      <Txt x={x} y={y + 13} font="sans-600" size={10} ls={0.6} fill={th.inkSoft} opacity={0.75}>
+      <Txt x={x} y={y + 13} font="sans-600" size={MIN_TEXT} ls={0.4} fill={th.inkSoft} opacity={0.8}>
         {stat.code}
       </Txt>
       {Array.from({ length: 10 }, (_, j) => {
@@ -218,7 +227,7 @@ function StatRow({ stat, x, y, th }: { stat: Stat; x: number; y: number; th: Car
         {stat.value}
       </Txt>
       {weak && (
-        <Txt x={x + 153 - 25} y={y + 14} font="mono-700" size={9} anchor="end" fill={th.inkSoft} opacity={0.6}>
+        <Txt x={x + 153 - 25} y={y + 14} font="mono-700" size={MIN_TEXT} anchor="end" fill={th.inkSoft} opacity={0.6}>
           ?
         </Txt>
       )}
@@ -226,27 +235,49 @@ function StatRow({ stat, x, y, th }: { stat: Stat; x: number; y: number; th: Car
   );
 }
 
+/**
+ * Où poser les chefs d'accusation : trois en 14, sous leur étiquette ; un ou deux
+ * en 16, le bloc (étiquette comprise) centré entre les traits et le pied, pour
+ * ne pas laisser de bande vide au-dessus de la signature.
+ */
+export function chargesPlan(count: number): { labelY: number; y: number; size: number; lineH: number } {
+  const C = LAYOUT.charges;
+  if (count >= 3) return { labelY: C.labelY, y: C.y, size: C.size, lineH: C.lineH };
+  const { size, lineH } = C.roomy;
+  const n = Math.max(count, 0);
+  // Du haut des capitales de l'étiquette au bas des lettres de la dernière ligne.
+  const cap = C.labelSize * 0.72;
+  const gap = size + 5;
+  const height = cap + (n ? gap + (n - 1) * lineH + size * 0.22 : 0);
+  const top = C.zone.top + (C.zone.bottom - C.zone.top - height) / 2;
+  const labelY = +(top + cap).toFixed(2);
+  return { labelY, y: +(labelY + gap).toFixed(2), size, lineH };
+}
+
 function Charges({ statuses, th, lang }: { statuses: StatusInstance[]; th: CardTheme; lang: Lang }) {
   const s = t(lang);
   const C = LAYOUT.charges;
+  const shown = statuses.slice(0, 3);
+  const plan = chargesPlan(shown.length);
+  const k = plan.size / C.size;
   return (
     <g>
-      <Txt x={LEFT} y={C.labelY} font="sans-600" size={C.labelSize} ls={1.1} fill={th.inkSoft} opacity={0.62}>
+      <Txt x={LEFT} y={plan.labelY} font="sans-600" size={C.labelSize} ls={0.8} fill={th.inkSoft} opacity={0.7}>
         {upper(s.charges, lang)}
       </Txt>
-      {statuses.slice(0, 3).map((st, i) => {
-        const y = C.y + i * C.lineH;
+      {shown.map((st, i) => {
+        const y = +(plan.y + i * plan.lineH).toFixed(2);
         const tag = st.byAI ? ` · ${s.ai}` : "";
-        const tagW = st.byAI ? measure(tag, "mono-400", 9) : 0;
-        const label = fit(st.label[lang] ?? st.label.fr, { font: "sans-500", size: C.size, minSize: C.minSize, maxWidth: FW - 18 - tagW });
+        const tagW = st.byAI ? measure(tag, "mono-400", MIN_TEXT) : 0;
+        const label = fit(st.label[lang] ?? st.label.fr, { font: "sans-500", size: plan.size, minSize: C.minSize, maxWidth: FW - 20 * k - tagW });
         return (
           <g key={st.id + i}>
-            <Pastille tone={st.tone} cx={LEFT + 6.2} cy={y - 4.9} th={th} />
-            <Txt x={LEFT + 18} y={y} font="sans-500" size={label.size} fill={th.ink}>
+            <Pastille tone={st.tone} cx={+(LEFT + 6.2 * k).toFixed(2)} cy={+(y - 4.9 * k).toFixed(2)} th={th} scale={1.1 * k} />
+            <Txt x={+(LEFT + 18 * k).toFixed(2)} y={y} font="sans-500" size={label.size} fill={th.ink}>
               {label.text}
             </Txt>
             {st.byAI && (
-              <Txt x={LEFT + 18 + label.width + 2} y={y} font="mono-400" size={9} fill={th.inkSoft} opacity={0.55}>
+              <Txt x={+(LEFT + 18 * k + label.width + 2).toFixed(2)} y={y} font="mono-400" size={MIN_TEXT} fill={th.inkSoft} opacity={0.6}>
                 {tag}
               </Txt>
             )}
@@ -303,7 +334,7 @@ export function sealedFace(lang: Lang, maxWidth: number): { title: FittedLines; 
   const s = t(lang);
   return {
     title: fitLines(upper(s.sealed, lang), { font: "display-700", size: 36, minSize: 22, maxWidth, letterSpacing: 0.4 }),
-    sub: fitLines(upper(s.sealedSub, lang), { font: "sans-600", size: 11, minSize: 9, maxWidth, letterSpacing: 1.2 }),
+    sub: fitLines(upper(s.sealedSub, lang), { font: "sans-600", size: MIN_TEXT, minSize: MIN_TEXT, maxWidth, letterSpacing: 0.8 }),
   };
 }
 
@@ -320,7 +351,7 @@ function SealedMark({ sealed, ink, inkSoft }: { sealed: { title: FittedLines; su
         </Txt>
       ))}
       {sub.lines.map((line, i) => (
-        <Txt key={`s${i}`} x={LEFT} y={157 + i * 14} font="sans-600" size={sub.size} ls={1.2} fill={inkSoft}>
+        <Txt key={`s${i}`} x={LEFT} y={158 + i * 16} font="sans-600" size={sub.size} ls={0.8} fill={inkSoft}>
           {line}
         </Txt>
       ))}
@@ -352,7 +383,7 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
   const bigLevel = card.profile ? null : fitLines(upper(levelLabel, lang), { font: "display-700", size: BIG_LEVEL.size, minSize: BIG_LEVEL.minSize, maxWidth: M.x - LEFT - 10, letterSpacing: 0.4 });
   // La pilule des spéciales : sous le nom du niveau, ou sous les étoiles quand le niveau est en grand plus bas.
   const badgeY = card.profile ? LEVEL.y + 8 : STARS.y + STARS.size + 9;
-  const badge = th.badge ? fit(upper(th.label[lang], lang), { font: "sans-600", size: 8.5, minSize: 7.5, maxWidth: M.x - LEFT - 8 - 18, letterSpacing: 1.2, minLetterSpacing: 0.4 }) : null;
+  const badge = th.badge ? fit(upper(th.label[lang], lang), { font: "sans-600", size: MIN_TEXT, minSize: MIN_TEXT, maxWidth: M.x - LEFT - 6 - 14, letterSpacing: 0.8, minLetterSpacing: 0 }) : null;
 
   // Le numéro de dossier, en haut à droite, à la place des étoiles d'avant
   const caseNo = caseLabel(card.id, lang);
@@ -362,25 +393,28 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
     ? fit(upper(card.profile.label[lang] ?? card.profile.label.fr, lang), { font: "display-700", size: LAYOUT.profileName.size, minSize: LAYOUT.profileName.minSize, maxWidth: FW, letterSpacing: 0.4, minLetterSpacing: 0 })
     : null;
   const tagline = card.profile ? profileTagline(card.profile.tagline[lang] ?? card.profile.tagline.fr) : null;
+  // Accroche sur une ligne : le nom et l'accroche descendent d'une demi-ligne, centrés au-dessus du filet.
+  const nameDrop = tagline && tagline.lines.length === 1 ? Math.round(LAYOUT.tagline.lineH / 2) : 0;
 
   // Spécialité / arme / affiliation
   const unit = (FW - 20) / 3.3;
   const icon = langIcon(card.mainLanguage);
   const cols = [
     { x: LEFT, w: unit, label: s.specialty, value: s.positions[card.position] ?? card.position },
-    { x: LEFT + unit + 10, w: unit, label: s.weapon, value: card.mainLanguage ? prettyLanguage(card.mainLanguage, icon?.title) : "—" },
+    { x: LEFT + unit + 10, w: unit, label: s.weapon, value: card.mainLanguage ? prettyLanguage(card.mainLanguage, icon?.title) : "–" },
     { x: LEFT + 2 * unit + 20, w: unit * 1.3, label: s.affiliation, value: card.club ?? s.loneWolf },
   ];
 
-  // Pied, en procès-verbal
-  const footerFit = fit(`${s.questioned(card.judgedInSeconds)} · ${s.proven(card.reliability)}`, { font: "mono-400", size: LAYOUT.footer.size, minSize: LAYOUT.footer.minSize, maxWidth: FW - 30, letterSpacing: 0, minLetterSpacing: 0 });
+  // Pied, en procès-verbal ; s'il ne tient pas en mono 12, « Fiche » tombe (« Lue par Azerit en 12 s · … »).
+  const footerText = [s.questioned, s.questionedShort].map((q) => `${q(card.judgedInSeconds)} · ${s.proven(card.reliability)}`).find((x) => measure(x, "mono-400", LAYOUT.footer.size) <= FW) ?? `${s.questionedShort(card.judgedInSeconds)} · ${s.proven(card.reliability)}`;
+  const footerFit = fit(footerText, { font: "mono-400", size: LAYOUT.footer.size, minSize: LAYOUT.footer.minSize, maxWidth: FW, letterSpacing: 0, minLetterSpacing: 0 });
 
   const stats = STAT_ORDER.map((code) => card.stats.find((st) => st.code === code)).filter((st): st is Stat => !!st);
   // Dossier scellé (shared/publicView.ts) : à la place de la note, du niveau et des étoiles, deux mots mats.
   const sealed = card.sealed ? sealedFace(lang, M.x - LEFT - 8) : null;
   const ariaLabel = sealed ? `${s.card}, ${s.sealed}, ${s.sealedSub}, ${card.name}` : `${s.card} ${levelLabel} ${card.overall}/100, ${s.stars(n)}, ${card.name}`;
   // Les six traits ne font pas la note d'une fiche jugée sur la grille : leur étiquette le dit.
-  const traitsLabel = card.grid ? s.traitsNote : s.traits;
+  const traits = fit(upper(card.grid ? s.traitsNote : s.traits, lang), { font: "sans-600", size: LAYOUT.traits.labelSize, minSize: LAYOUT.traits.labelSize, maxWidth: FW, letterSpacing: 0.8, minLetterSpacing: 0 });
 
   return (
     <svg
@@ -480,20 +514,20 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
         <rect width={CARD_W} height={CARD_H} filter={u("grain")} opacity={0.05} />
 
         {/* Haut : la marque à gauche, le numéro de dossier à droite */}
-        <AzeritGem x={LEFT} y={18} h={13} />
-        <Txt x={LEFT + 17} y={29.5} font="sans-600" size={10} ls={2.2} fill={th.inkSoft} opacity={0.85}>
+        <AzeritGem x={LEFT} y={17.5} h={14} />
+        <Txt x={LEFT + 18} y={30.5} font="sans-600" size={MIN_TEXT} ls={1.8} fill={th.inkSoft} opacity={0.85}>
           AZERIT
         </Txt>
-        <Txt x={RIGHT} y={29.5} font="mono-500" size={9} ls={0.7} anchor="end" fill={th.inkSoft} opacity={0.75}>
+        <Txt x={RIGHT} y={30.5} font="mono-500" size={MIN_TEXT} ls={0.4} anchor="end" fill={th.inkSoft} opacity={0.8}>
           {caseNo}
         </Txt>
 
-        {/* La note : crème plat, ou le seul dégradé de la fiche ; dessous, les six étoiles */}
+        {/* La note : crème plat sur toutes les fiches (le rose dit « ça se touche ») ; dessous, les six étoiles */}
         {sealed ? (
           <SealedMark sealed={sealed} ink={th.ink} inkSoft={th.inkSoft} />
         ) : (
           <>
-            <text x={16} y={NOTE_Y} {...fontAttrs("display-800")} fontSize={overallSize} letterSpacing={-2.4} fill={th.grad === "num" ? u("g") : th.ink}>
+            <text x={16} y={NOTE_Y} {...fontAttrs("display-800")} fontSize={overallSize} letterSpacing={-2.4} fill={th.ink}>
               {card.overall}
             </text>
             <Stars n={n} />
@@ -512,8 +546,8 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
         )}
         {badge && th.badge && (
           <g>
-            <rect x={LEFT} y={badgeY} width={+(badge.width + 18).toFixed(2)} height={20} rx={10} fill={th.badge.bg} />
-            <Txt x={LEFT + 9} y={badgeY + 13.2} font="sans-600" size={badge.size} ls={badge.letterSpacing} fill={th.badge.ink}>
+            <rect x={LEFT} y={badgeY} width={+(badge.width + 14).toFixed(2)} height={22} rx={11} fill={th.badge.bg} />
+            <Txt x={LEFT + 7} y={badgeY + 15.3} font="sans-600" size={badge.size} ls={badge.letterSpacing} fill={th.badge.ink}>
               {badge.text}
             </Txt>
           </g>
@@ -526,14 +560,14 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
             <image href={avatar} x={M.x + MUG_PHOTO.inset} y={M.y + M.h - MUG_PHOTO.h} width={MUG_PHOTO.w} height={MUG_PHOTO.h} preserveAspectRatio="xMidYMin slice" filter={u("photo")} />
           ) : (
             // Sous le tampon (fiche lue sur LinkedIn ou un CV), la silhouette descend : le tampon ne couvre pas les initiales.
-            <Silhouette x={M.x} y={M.y + (stamped ? STAMP.drop : 0)} w={M.w} h={M.h} gray={th.gray} initials={card.initials} />
+            <Silhouette x={M.x} y={M.y + (stamped ? STAMP.drop : 0)} w={M.w} h={M.h} gray={th.gray} initials={plateInitials(card) || card.initials} />
           )}
           {stamped && (
             <g transform={`translate(${M.x + M.w / 2} ${M.y + (avatar ? STAMP.y : STAMP.yBare)}) rotate(-9)`} opacity={0.88}>
               <rect x={-64} y={-16} width={128} height={32} rx={3} fill="none" stroke="#a3261b" strokeWidth={2.2} />
               <rect x={-60} y={-12} width={120} height={24} rx={1.5} fill="none" stroke="#a3261b" strokeWidth={0.8} />
               <Txt x={0} y={5.4} font="display-800" size={15.5} ls={1.4} anchor="middle" fill="#a3261b">
-                {fit(card.declaredSource === "linkedin" ? s.linkedinStamp : s.cvStamp, { font: "display-800", size: 15.5, minSize: 11, maxWidth: 108, letterSpacing: 1.4, minLetterSpacing: 0.4 }).text}
+                {fit(card.declaredSource === "linkedin" ? s.linkedinStamp : s.cvStamp, { font: "display-800", size: 15.5, minSize: MIN_TEXT, maxWidth: 108, letterSpacing: 1.4, minLetterSpacing: 0.4 }).text}
               </Txt>
             </g>
           )}
@@ -541,15 +575,15 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
         </g>
         <rect x={M.x + 0.5} y={M.y + 0.5} width={M.w - 1} height={M.h - 1} rx={M.r} fill="none" stroke="#fff" strokeOpacity={0.14} />
 
-        {/* Profil criminel : le nom d'une page personnage, puis l'accroche rose */}
+        {/* Profil criminel : le nom d'une page personnage, puis l'accroche en lilas (le rose ne décore pas) */}
         {profileName && (
-          <Txt x={LEFT - 1} y={LAYOUT.profileName.y} font="display-700" size={profileName.size} ls={profileName.letterSpacing} fill={th.ink}>
+          <Txt x={LEFT - 1} y={LAYOUT.profileName.y + nameDrop} font="display-700" size={profileName.size} ls={profileName.letterSpacing} fill={th.ink}>
             {profileName.text}
           </Txt>
         )}
         {tagline &&
           tagline.lines.map((line, i) => (
-            <Txt key={i} x={LEFT} y={LAYOUT.tagline.y + i * LAYOUT.tagline.lineH} font="sans-600" size={tagline.size} fill={PALETTE.blush}>
+            <Txt key={i} x={LEFT} y={LAYOUT.tagline.y + nameDrop + i * LAYOUT.tagline.lineH} font="sans-600" size={tagline.size} fill={th.inkSoft}>
               {line}
             </Txt>
           ))}
@@ -557,11 +591,12 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
         {/* Spécialité, arme, affiliation */}
         <rect x={LEFT} y={LAYOUT.divider} width={FW} height={1} fill="#fff" fillOpacity={0.12} />
         {cols.map((c) => {
-          const v = fit(c.value, { font: "sans-600", size: 12.5, minSize: 10, maxWidth: c.w });
+          const v = fit(c.value, { font: "sans-600", size: 13, minSize: MIN_TEXT, maxWidth: c.w });
+          const label = fit(upper(c.label, lang), { font: "sans-600", size: LAYOUT.facts.labelSize, minSize: LAYOUT.facts.labelSize, maxWidth: c.w, letterSpacing: 0.8, minLetterSpacing: 0 });
           return (
             <g key={c.label}>
-              <Txt x={c.x} y={LAYOUT.facts.labelY} font="sans-600" size={LAYOUT.facts.labelSize} ls={1} fill={th.inkSoft} opacity={0.62}>
-                {upper(c.label, lang)}
+              <Txt x={c.x} y={LAYOUT.facts.labelY} font="sans-600" size={label.size} ls={label.letterSpacing} fill={th.inkSoft} opacity={0.7}>
+                {label.text}
               </Txt>
               <Txt x={c.x} y={LAYOUT.facts.valueY} font="sans-600" size={v.size} fill={th.ink}>
                 {v.text}
@@ -571,8 +606,8 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
         })}
 
         {/* Six traits en barres de dix segments */}
-        <Txt x={LEFT} y={LAYOUT.traits.labelY} font="sans-600" size={LAYOUT.traits.labelSize} ls={1.1} fill={th.inkSoft} opacity={0.62}>
-          {upper(traitsLabel, lang)}
+        <Txt x={LEFT} y={LAYOUT.traits.labelY} font="sans-600" size={traits.size} ls={traits.letterSpacing} fill={th.inkSoft} opacity={0.7}>
+          {traits.text}
         </Txt>
         {stats.map((st, i) => (
           <StatRow key={st.code} stat={st} x={LEFT + (i < 3 ? 0 : 169)} y={LAYOUT.stats.y + (i % 3) * LAYOUT.stats.rowH} th={th} />

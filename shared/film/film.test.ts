@@ -129,7 +129,7 @@ describe("filmPlan (§2.1)", () => {
     expect(filmPlan(cardAt(3)).plate).toBe("@camroux");
     expect(filmPlan(cardAt(3, { login: undefined })).plate).toBe("Camille Roux");
     // La seconde ligne de la plaque est celle de la fiche : le numéro et le jour du dossier.
-    expect(filmPlan(cardAt(3, { createdAt: "2026-10-14T12:00:00Z" })).plateSub).toEqual({ fr: "N° F3 · 14.10.26", en: "No. F3 · 14.10.26" });
+    expect(filmPlan(cardAt(3, { createdAt: "2026-10-14T12:00:00Z" })).plateSub).toEqual({ fr: "N° 355806 · 14.10.26", en: "No. 355806 · 14.10.26" });
     expect(filmPlan(cardAt(4)).title.fr).toBe("Haute surveillance");
     expect(filmPlan(cardAt(6)).title.en).toBe("Top priority");
   });

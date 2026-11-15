@@ -17,7 +17,7 @@ const back = (card: CardData, lang: Lang) => renderToStaticMarkup(createElement(
 const BIG_NOTE = /font-size="(118|92)"/;
 
 describe("dossier scellé", () => {
-  it("la face : ni note, ni niveau, ni étoiles ; « Dossier scellé », « Le code reste à prouver »", () => {
+  it("la face : ni note, ni niveau, ni étoiles ; « Fiche scellée », « Le code reste à prouver »", () => {
     for (const lang of LANGS) {
       const svg = face(sealed, lang);
       expect(svg).not.toMatch(BIG_NOTE);
@@ -35,7 +35,7 @@ describe("dossier scellé", () => {
       const svg = back(sealed, lang);
       expect(svg).not.toContain("= 20");
       expect(svg).not.toContain("tys-star-on");
-      expect(svg).toContain(lang === "fr" ? "Le code reste à prouver" : "Code yet to prove");
+      expect(svg).toContain(lang === "fr" ? "Le code reste à prouver" : "Code still unproven");
     }
   });
 

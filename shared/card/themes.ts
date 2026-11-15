@@ -15,13 +15,16 @@ export const PALETTE = {
   navy: "#243152",
   navyLow: "#131a30",
   indigo: "#2c3868",
+  indigoLow: "#151b38",
+  violet: "#3d3478",
+  violetLow: "#1d1838",
   plum: "#4b2f54",
   plumLow: "#24172f",
   moss: "#162623",
   mossLow: "#0c1614",
   cold: "#2b3540",
   coldLow: "#161c23",
-  /* --dusk : la note de ★★★★ et de la spéciale « Top 5 » */
+  /* --dusk : l'ancien dégradé de la note de ★★★★ (la note est crème partout depuis la revue, §18.48) ; teintes de la révélation */
   duskA: "#6f7cf0",
   duskB: "#b05ad8",
   duskC: "#f0589a",
@@ -134,17 +137,19 @@ export const THEMES: Record<ThemeKey, CardTheme> = {
     grad: "bg", bg: [PALETTE.slate, PALETTE.slateLow], bar: PALETTE.lilac2, palm: null,
     horizon: { color: "#2c2d50", scale: 0.55, palms: 0 },
   }),
+  // Le rose poudré dit « ça se touche » (§18.48) : jamais sur une barre, une phrase ou une note de la fiche.
   s2: theme("s2", { fr: "Délit", en: "Misdemeanor" }, {
-    grad: "bg", bg: [PALETTE.navy, PALETTE.navyLow], bar: PALETTE.blush, palm: "#2c3a60",
+    grad: "bg", bg: [PALETTE.navy, PALETTE.navyLow], bar: PALETTE.lilac2, palm: "#2c3a60",
     horizon: { color: "#2b385c", scale: 0.7, palms: 1 },
   }),
   s3: theme("s3", { fr: "Mandat d'arrêt", en: "Warrant out" }, {
-    grad: "bg", bg: [PALETTE.plum, PALETTE.plumLow], bar: PALETTE.blush, palm: "#3a2442",
+    grad: "bg", bg: [PALETTE.plum, PALETTE.plumLow], bar: PALETTE.lilac2, palm: "#3a2442",
     horizon: { color: "#4a2e55", scale: 0.85, palms: 2 },
   }),
+  // ★★★★ : la note est crème comme partout ; le seul dégradé passe au fond, violet de nuit.
   s4: theme("s4", { fr: "Haute surveillance", en: "Under surveillance" }, {
-    grad: "num", bg: [PALETTE.plum, PALETTE.plum], bar: PALETTE.peach, palm: "#5a3a64", accent2: PALETTE.duskC,
-    horizon: { color: "#5a3a64", scale: 1, palms: 3 },
+    grad: "bg", bg: [PALETTE.violet, PALETTE.violetLow], bar: PALETTE.peach, palm: "#4a4088", accent2: PALETTE.duskC,
+    horizon: { color: "#4a4088", scale: 1, palms: 3 },
   }),
   s5: theme("s5", { fr: "Menace publique", en: "Public menace" }, {
     grad: "sky", bg: [PALETTE.duskGround, PALETTE.duskGround], bar: PALETTE.peach, palm: "#35244a",
@@ -167,7 +172,7 @@ export const THEMES: Record<ThemeKey, CardTheme> = {
     horizon: { color: "#2d3945", scale: 0.7, palms: 1 },
   }),
   totw: theme("totw", { fr: "Top 5 de la semaine", en: "This week's top 5" }, {
-    grad: "num", bg: [PALETTE.indigo, PALETTE.indigo], bar: PALETTE.peach, palm: "#34407a",
+    grad: "bg", bg: [PALETTE.indigo, PALETTE.indigoLow], bar: PALETTE.peach, palm: "#34407a",
     badge: { bg: PALETTE.cream, ink: PALETTE.ink0 }, accent2: PALETTE.duskC,
     horizon: { color: "#34407a", scale: 1, palms: 3 },
   }),

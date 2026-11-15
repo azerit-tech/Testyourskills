@@ -10,7 +10,7 @@ import { fontFiles } from "../../server/src/render/fonts";
 import { FIXTURES } from "../fixtures";
 import type { CardData, CriterionCode, Grid, GridCriterion, Lang } from "../types";
 import { STAT_CODES } from "../types";
-import { BACK_LAYOUT, CardBackGraphic, OVERALL_WEIGHTS, backCriteria, clipProof, formulaTerms, gridFormula, packTerms, placeCriteria, resultWidth, strongestFact } from "./CardBack";
+import { BACK_LAYOUT, CardBackGraphic, OVERALL_WEIGHTS, backCriteria, clipProof, formulaRule, formulaTerms, gridFormula, packTerms, placeCriteria, strongestFact } from "./CardBack";
 import { measure } from "./text";
 
 const FW = 360 - 18 - 20;
@@ -44,14 +44,13 @@ describe("dos de la fiche", () => {
     });
   }
 
-  it("la formule tient en trois lignes à côté de la note, aucun terme coupé", () => {
+  it("la formule tient en trois lignes sous la note, aucun terme coupé", () => {
     for (const card of Object.values(FIXTURES) as CardData[]) {
       for (const lang of ["fr", "en"] as Lang[]) {
         const F = BACK_LAYOUT.formula;
-        const resultW = resultWidth(card.overall);
-        const p = packTerms(formulaTerms(card, lang), F.size, FW - resultW);
+        const p = packTerms(formulaTerms(card, lang), F.size, FW);
         expect(p.lines.length).toBeLessThanOrEqual(F.maxLines);
-        for (const line of p.lines) expect(measure(line, "sans-500", p.size)).toBeLessThanOrEqual(FW - resultW);
+        for (const line of p.lines) expect(measure(line, "sans-500", p.size)).toBeLessThanOrEqual(FW);
         expect(p.lines.join(" ").replace(/ \+/g, "")).toBe(formulaTerms(card, lang).join(" "));
       }
     }
@@ -63,7 +62,7 @@ describe("dos de la fiche", () => {
     expect(back(card, "en")).toContain("No fact on file");
   });
 
-  it("avec la grille du barème : les critères notés et leurs coefficients, sans « + n », en trois lignes", () => {
+  it("avec la grille du barème : les critères notés et leurs coefficients, sans « + n », en trois lignes ; l'école comptée, la moyenne seule", () => {
     const crit = (code: CriterionCode, score: number | null, counted = score !== null): GridCriterion => ({
       code,
       score,
@@ -73,7 +72,8 @@ describe("dos de la fiche", () => {
       reached: { fr: "", en: "" },
       flags: [],
     });
-    const full: Grid = { overall: 57, criteria: [crit("EDU", 6), crit("XP", 3), crit("EMP", 4), crit("STK", 6), crit("CODE", 7), crit("ACT", 8), crit("OWN", 6), crit("OSS", 6)] };
+    const full: Grid = { overall: 57, criteria: [crit("XP", 3), crit("EMP", 4), crit("STK", 6), crit("CODE", 7), crit("ACT", 8), crit("OWN", 6), crit("OSS", 6)] };
+    const school: Grid = { overall: 57, criteria: [crit("EDU", 6), ...full.criteria] };
     const capped: Grid = { overall: 85, rule: "capped_unproven", criteria: [crit("XP", 9), crit("EMP", 9), crit("CODE", null)] };
     const empty: Grid = { overall: 20, rule: "empty_file", criteria: [crit("STK", 2, false), crit("CODE", null)] };
     const F = BACK_LAYOUT.formula;
@@ -81,18 +81,23 @@ describe("dos de la fiche", () => {
       for (const grid of [full, capped, empty]) {
         const card = { ...FIXTURES.gold, grid, overall: grid.overall };
         const f = gridFormula(card, lang)!;
-        const resultW = resultWidth(card.overall);
-        const p = packTerms(f.terms, F.size, FW - resultW, f.tail);
+        const p = packTerms(f.terms, F.size, FW, f.tail);
         expect(p.lines.length).toBeLessThanOrEqual(F.maxLines);
         const text = p.lines.join(" ");
         expect(text).not.toMatch(/[+−]\s?\d/);
         const svg = back(card, lang);
-        expect(svg).toContain(lang === "fr" ? "MOYENNE PONDÉRÉE" : "WEIGHTED AVERAGE");
+        expect(svg).toContain(lang === "fr" ? ">LA NOTE<" : ">THE RATING<");
         expect(svg).toContain(`= ${grid.overall}`);
         if (grid === empty) expect(f.tail).toBeUndefined();
         else expect(f.tail).toContain("÷");
       }
-      expect(gridFormula({ ...FIXTURES.gold, grid: full }, lang)!.terms[0]).toBe("Code 7 × 2");
+      expect(gridFormula({ ...FIXTURES.gold, grid: full }, lang)!.terms[0]).toBe("(Code 7\u00a0×\u00a02");
+      // L'école comptée : ni sa note ni les autres termes, on en tirerait la sienne ; la moyenne seule, en une phrase.
+      const sf = gridFormula({ ...FIXTURES.gold, grid: school }, lang)!;
+      expect(sf.sentence).toBe(true);
+      expect(sf.tail).toBeUndefined();
+      expect(sf.terms.join(" ")).toContain(lang === "fr" ? "Moyenne pondérée des 8 critères notés, école comprise" : "Weighted average of the 8 scored criteria, school included");
+      expect(sf.terms.join(" ")).not.toMatch(/×\s?\d,?\d?\s?\+/);
       expect(gridFormula({ ...FIXTURES.gold, grid: capped }, lang)!.tail).toContain("85");
     }
     expect(gridFormula(FIXTURES.gold, "fr")).toBeNull();
@@ -137,13 +142,13 @@ describe("dos de la fiche : la note vient des huit critères (§18.48)", () => {
   const card: CardData = { ...FIXTURES.gold, grid, overall: grid.overall };
   const cmpCard: CardData = { ...card, pieces: ["linkedin", "github"] };
 
-  it("les huit critères dans l'ordre du recruteur, chacun avec sa note sur 10, puis la formule : plus les six traits", () => {
+  it("les huit critères dans l'ordre du recruteur, chacun avec sa note sur 10 (sauf l'école), puis la note : plus les six traits", () => {
     for (const lang of ["fr", "en"] as Lang[]) {
       const svg = back(card, lang);
       const order = [...svg.matchAll(/data-criterion="([A-Z]+)"/g)].map((m) => m[1]);
       expect(order).toEqual(["XP", "EMP", "STK", "CODE", "OWN", "ACT", "EDU", "OSS"]);
       expect(svg.match(/>\/10</g)!.length).toBeGreaterThanOrEqual(6);
-      expect(svg).toContain(lang === "fr" ? "MOYENNE PONDÉRÉE DES CRITÈRES NOTÉS" : "WEIGHTED AVERAGE OF THE SCORED CRITERIA");
+      expect(svg).toContain(lang === "fr" ? "Moyenne pondérée des 7 critères notés" : "Weighted average of the 7 scored");
       expect(svg).toContain("= 67");
       expect(svg).toContain(">/100<");
       // Les critères viennent avant la formule ; les codes des six traits ne reviennent pas.
@@ -152,13 +157,16 @@ describe("dos de la fiche : la note vient des huit critères (§18.48)", () => {
     }
   });
 
-  it("le dos se montre à tout le monde : jamais le nom de l'école ; sa note seulement si elle compte, sinon « hors moyenne »", () => {
+  it("le dos se montre à tout le monde : jamais le nom de l'école, jamais sa note ; comptée, elle le dit ; sinon « hors moyenne »", () => {
     const out: Grid = { ...grid, criteria: grid.criteria.map((c) => (c.code === "EDU" ? { ...c, counted: false } : c)) };
     for (const lang of ["fr", "en"] as Lang[]) {
       const svg = back(card, lang);
       expect(svg).not.toMatch(/Secr[eè]te|Secret School/);
-      expect(svg).toContain(lang === "fr" ? "Gardée pour la personne fichée." : "Kept for the person on file.");
-      expect(backCriteria(card, lang).find((c) => c.code === "EDU")!).toMatchObject({ score: 8, counted: true });
+      expect(svg).toContain(lang === "fr" ? "Comptée au dossier, sa note reste privée." : "On file, its score stays private.");
+      expect(backCriteria(card, lang).find((c) => c.code === "EDU")!).toMatchObject({ score: null, hidden: true, counted: true });
+      const eduRow = /data-criterion="EDU">(.*?)<\/g>/.exec(svg)![1];
+      expect(eduRow).not.toContain("/10");
+      expect(eduRow).not.toContain(">8<");
       const edu = backCriteria({ ...card, grid: out }, lang).find((c) => c.code === "EDU")!;
       expect(edu).toMatchObject({ score: null, counted: false, tag: lang === "fr" ? "hors moyenne" : "not averaged" });
       expect(back({ ...card, grid: out }, lang)).not.toMatch(/Secr[eè]te|Secret School/);
@@ -186,14 +194,14 @@ describe("dos de la fiche : la note vient des huit critères (§18.48)", () => {
     expect(backCriteria(card, "en").find((c) => c.code === "ACT")!.proof).toBe("Level reached ACT.");
   });
 
-  it("tout tient entre le titre et la formule : deux lignes de pièce au plus, des phrases entières plutôt qu'une phrase coupée", () => {
+  it("tout tient entre le titre et la formule : une ligne de pièce, des phrases entières plutôt qu'une phrase coupée", () => {
     const C = BACK_LAYOUT.criteria;
     for (const lang of ["fr", "en"] as Lang[]) {
       const rows = placeCriteria(backCriteria(card, lang));
       expect(rows).toHaveLength(8);
       expect(rows[0].y).toBe(C.top);
       const last = rows[rows.length - 1];
-      expect(last.y + last.h).toBeLessThanOrEqual(C.bottom + 0.01);
+      expect(last.y + last.h).toBeLessThanOrEqual(formulaRule(3) - C.gap + 0.01);
       for (const r of rows) {
         expect(r.lines.length).toBeGreaterThanOrEqual(1);
         expect(r.lines.length).toBeLessThanOrEqual(C.maxLines);
@@ -201,7 +209,9 @@ describe("dos de la fiche : la note vient des huit critères (§18.48)", () => {
       }
     }
     const long = "TypeScript : 734 commits dans 14 dépôts depuis juin 2023, dernier push aujourd'hui. Rust aussi dans le code. Une troisième phrase qui ne tiendra pas sur deux lignes de la fiche, c'est certain.";
-    expect(clipProof(long, FW, 2).join(" ")).toBe("TypeScript : 734 commits dans 14 dépôts depuis juin 2023, dernier push aujourd'hui. Rust aussi dans le code.");
+    expect(clipProof(long, FW, 2).join(" ")).toBe("TypeScript : 734 commits dans 14 dépôts depuis juin 2023, dernier push aujourd'hui.");
+    // Sur une ligne, la coupe tombe entre deux mots, jamais au milieu d'un mot.
+    expect(clipProof(long, FW, 1)).toEqual(["TypeScript : 734 commits dans 14 dépôts depuis…"]);
     // Une seule phrase trop longue : elle est coupée, et le dit par « … ».
     const one = clipProof("Une seule phrase beaucoup trop longue pour tenir sur une ligne de la fiche sans être coupée quelque part", FW, 1);
     expect(one).toHaveLength(1);

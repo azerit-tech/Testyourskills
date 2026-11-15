@@ -13,8 +13,9 @@ import { fit, upper } from "./text";
 export const MUG_SIZE = { w: 164, h: 192, r: 6 } as const;
 /** La photo dans le cadre : en retrait de 12, haute de 168, calée en bas. */
 export const MUG_PHOTO = { inset: 12, w: 140, h: 168 } as const;
-/** La plaque : centrée, à 10 du bas du cadre. */
-export const PLACARD = { w: 136, h: 44, bottom: 10 } as const;
+/** La plaque : centrée, à 10 du bas du cadre. Assez large pour « N° 482917 · 14.10.26 » en mono 12,
+ *  le plus petit corps de la fiche (aucun texte sous 11 px quand elle fait 334 px de large). */
+export const PLACARD = { w: 154, h: 48, bottom: 10 } as const;
 
 /** Le gabarit de la plaque, partout où elle est dessinée (fiche, attente, couverture, film). */
 export const PLATE = {
@@ -36,10 +37,19 @@ const INK = "#141c28";
 /** Les graduations : une tous les 53, la première à 21 du haut. */
 const TICKS = ["190", "180", "170", "160"];
 
-/** Numéro de dossier : l'id court de la fiche, en majuscules, 4 à 6 signes. */
+/**
+ * Numéro de dossier : un matricule de six chiffres tiré de l'id de la fiche,
+ * toujours le même pour une fiche. Jamais les lettres de l'id : « N° JMOUGE » se
+ * lisait comme un pseudo coupé.
+ */
 export function caseNumber(id: string): string {
-  const clean = id.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-  return (clean || "0000").slice(0, 6);
+  // FNV-1a sur 32 bits, ramené à six chiffres.
+  let h = 0x811c9dc5;
+  for (const ch of id) {
+    h ^= ch.codePointAt(0)!;
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return String(h % 1_000_000).padStart(6, "0");
 }
 
 /** « 14.10.26 » : le jour de la fiche (UTC), vide si la date ne se lit pas. */
@@ -50,12 +60,12 @@ export function caseDate(iso: string | number | Date): string {
   return `${p(d.getUTCDate())}.${p(d.getUTCMonth() + 1)}.${String(d.getUTCFullYear()).slice(2)}`;
 }
 
-/** « N° MGOLDB », seul : le coin haut droit de la fiche. */
+/** « N° 482917 », seul : le coin haut droit de la fiche. */
 export function caseLabel(id: string, lang: Lang): string {
   return `${t(lang).caseNo} ${caseNumber(id)}`;
 }
 
-/** La seconde ligne de la plaque : « N° MGOLDB · 14.10.26 ». */
+/** La seconde ligne de la plaque : « N° 482917 · 14.10.26 ». */
 export function plateSub(id: string, createdAt: string | number | Date, lang: Lang): string {
   const date = caseDate(createdAt);
   return date ? `${caseLabel(id, lang)} · ${date}` : caseLabel(id, lang);
@@ -71,12 +81,23 @@ export function plateName(who: { login?: string | null; name?: string | null; sl
   return raw ? upper(raw, lang) : null;
 }
 
-/** Deux initiales tirées d'un pseudo ou d'un nom de lien : « camille-ardent » → « CA », « leamd » → « LE ». */
+/** Deux initiales tirées d'un pseudo, d'un nom ou d'un nom de lien : « camille-ardent » → « CA », « leamd » → « LE ». */
 export function initialsOf(handle: string | null | undefined): string {
   const parts = (handle ?? "").replace(/^@/, "").replace(/[^\p{L}\p{N}]+/gu, " ").trim().split(" ").filter(Boolean);
   const first = [...(parts[0] ?? "")];
   const second = parts[1] ? [...parts[1]][0] : first[1];
   return ((first[0] ?? "") + (second ?? "")).toUpperCase();
+}
+
+/**
+ * La seule règle d'initiales du portrait, partout où la silhouette remplace la
+ * photo (fiche, attente, couverture) : les initiales suivent la plaque. Un pseudo
+ * GitHub sur la plaque donne les siennes (« @LEAMD » → « LE ») ; sinon le nom
+ * (« Léa Martin » → « LM ») ; sinon le nom du lien LinkedIn. L'attente, qui ne
+ * connaît que le pseudo ou le lien, montre donc déjà celles de la fiche.
+ */
+export function plateInitials(who: { login?: string | null; name?: string | null; slug?: string | null }): string {
+  return initialsOf(who.login || who.name?.trim() || who.slug);
 }
 
 /**
@@ -95,7 +116,7 @@ export function Toise({ x = 0, y = 0, w = MUG_SIZE.w, h = MUG_SIZE.h, gray = fal
         const base = 21 + i * 53;
         if (base + 2 > coverTop) return null;
         return (
-          <text key={tick} x={x + 6} y={y + base} {...fontAttrs("mono-700")} fontSize={8} fill={INK} fillOpacity={0.6}>
+          <text key={tick} x={x + 6} y={y + base} {...fontAttrs("mono-700")} fontSize={12} fill={INK} fillOpacity={0.45}>
             {tick}
           </text>
         );
@@ -142,17 +163,18 @@ export function Plate({ x = 0, y = 0, w = MUG_SIZE.w, h = MUG_SIZE.h, name, sub 
   const py = y + h - PLACARD.bottom - PLACARD.h;
   const cx = px + PLACARD.w / 2;
   const n = name ? fit(name, { font: "display-700", size: 20, minSize: 12, maxWidth: PLACARD.w - 16, letterSpacing: 20 * PLATE.nameSpacing, minLetterSpacing: 0.3 }) : null;
-  const subSize = n ? 8.5 : 10;
-  const s = fit(sub, { font: "mono-400", size: subSize, minSize: 7, maxWidth: PLACARD.w - 12, letterSpacing: subSize * PLATE.subSpacing, minLetterSpacing: 0.2 });
+  // La seconde ligne en mono 12, serrée sous un nom pour tenir dans la plaque ; seule, elle respire.
+  const subSize = n ? 12 : 13;
+  const s = fit(sub, { font: "mono-400", size: subSize, minSize: 12, maxWidth: PLACARD.w - 4, letterSpacing: n ? -0.35 : subSize * PLATE.subSpacing, minLetterSpacing: -0.5 });
   return (
     <g data-plate="" transform={`rotate(${PLATE.tilt} ${cx} ${py + PLACARD.h / 2})`}>
       <rect x={px} y={py} width={PLACARD.w} height={PLACARD.h} rx={3} fill={PLATE.bg} />
       {n && (
-        <text x={+(cx + n.letterSpacing / 2).toFixed(2)} y={py + 22} {...fontAttrs("display-700")} fontSize={n.size} letterSpacing={+n.letterSpacing.toFixed(2)} textAnchor="middle" fill={PLATE.ink}>
+        <text x={+(cx + n.letterSpacing / 2).toFixed(2)} y={py + 21} {...fontAttrs("display-700")} fontSize={n.size} letterSpacing={+n.letterSpacing.toFixed(2)} textAnchor="middle" fill={PLATE.ink}>
           {n.text}
         </text>
       )}
-      <text x={cx} y={py + (n ? 35 : 27)} {...fontAttrs("mono-400")} fontSize={s.size} letterSpacing={+s.letterSpacing.toFixed(2)} textAnchor="middle" fill={PLATE.ink} fillOpacity={n ? PLATE.subOpacity : undefined}>
+      <text x={cx} y={py + (n ? 39 : 29)} {...fontAttrs("mono-400")} fontSize={s.size} letterSpacing={+s.letterSpacing.toFixed(2)} textAnchor="middle" fill={PLATE.ink} fillOpacity={n ? PLATE.subOpacity : undefined}>
         {s.text}
       </text>
     </g>

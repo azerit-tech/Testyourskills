@@ -8,7 +8,8 @@ import profilesJson from "../../data/profiles.json";
 import { FIXTURES } from "../fixtures";
 import type { CardData, Lang } from "../types";
 import { LEVEL_LABELS, starsFor } from "../types";
-import { CardGraphic, LAYOUT, STARS, profileTagline } from "./Card";
+import { CardGraphic, LAYOUT, MIN_TEXT, STARS, profileTagline } from "./Card";
+import { BACK_MIN_TEXT, CardBackGraphic } from "./CardBack";
 import { measure, upper } from "./text";
 import { THEMES } from "./themes";
 
@@ -163,13 +164,41 @@ describe("les étoiles, signe majeur de la fiche (§18.48)", () => {
 
   it("le recto dit que la note ne vient pas des six traits, quand la fiche a sa grille", () => {
     const grid = { overall: 79, criteria: [] };
-    expect(render({ ...FIXTURES.gold, grid }, "fr")).toContain("PORTRAIT EN SIX TRAITS · LA NOTE : HUIT CRITÈRES");
-    expect(render({ ...FIXTURES.gold, grid }, "en")).toContain("A PORTRAIT IN SIX TRAITS · THE RATING: EIGHT CRITERIA");
+    expect(render({ ...FIXTURES.gold, grid }, "fr")).toContain("SIX TRAITS · LA NOTE\u00a0: 8 CRITÈRES, AU DOS");
+    expect(render({ ...FIXTURES.gold, grid }, "en")).toContain("SIX TRAITS · RATING: 8 CRITERIA ON THE BACK");
     expect(render({ ...FIXTURES.gold, grid: undefined }, "fr")).toContain(">PORTRAIT EN SIX TRAITS<");
   });
 
   it("la part prouvée s'écrit « prouvé à n % » / « n% proven »", () => {
-    expect(render(FIXTURES.gold, "fr")).toContain(`prouvé à ${FIXTURES.gold.reliability} %`);
+    expect(render(FIXTURES.gold, "fr")).toContain(`prouvé à ${FIXTURES.gold.reliability}\u00a0%`);
     expect(render(FIXTURES.gold, "en")).toContain(`${FIXTURES.gold.reliability}% proven`);
+  });
+});
+
+describe("lisibilité sur un téléphone (§18.50)", () => {
+  // La fiche fait 334 px de large sur un téléphone de 390 : 12 unités du viewBox
+  // font 11 px au recto, 13 en font 12 au dos. Aucun texte en dessous, capitales mono comprises.
+  const sizes = (svg: string) => [...svg.matchAll(/<text[^>]*font-size="([\d.]+)"/g)].map((m) => Number(m[1]));
+  const grid = { overall: 79, criteria: [] };
+  const cards = (Object.values(FIXTURES) as CardData[]).flatMap((c) => [c, { ...c, grid }, { ...c, sealed: true }]);
+
+  it("recto : aucun texte sous 12 unités", () => {
+    for (const card of cards) {
+      for (const lang of LANGS) {
+        for (const avatarHref of ["", "data:image/png;base64,AAAA"]) {
+          const svg = renderToStaticMarkup(createElement(CardGraphic, { card, lang, avatarHref }));
+          expect(Math.min(...sizes(svg)), `${card.id} ${lang}`).toBeGreaterThanOrEqual(MIN_TEXT);
+        }
+      }
+    }
+  });
+
+  it("verso : aucun texte sous 13 unités", () => {
+    for (const card of cards) {
+      for (const lang of LANGS) {
+        const svg = renderToStaticMarkup(createElement(CardBackGraphic, { card, lang }));
+        expect(Math.min(...sizes(svg)), `${card.id} ${lang}`).toBeGreaterThanOrEqual(BACK_MIN_TEXT);
+      }
+    }
   });
 });

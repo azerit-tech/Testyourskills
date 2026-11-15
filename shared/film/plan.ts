@@ -69,7 +69,7 @@ export interface FilmPlan {
   stageAt: number;
   /** « @pseudo » (ou le nom, sans pseudo) sur la plaque de l'arrêt sur image. */
   plate: string;
-  /** La seconde ligne de la plaque, celle de la fiche : « N° MGOLDB · 14.10.26 ». */
+  /** La seconde ligne de la plaque, celle de la fiche : « N° 482917 · 14.10.26 ». */
   plateSub: Fact;
   /** Le niveau, qui claque sur l'arrêt sur image. */
   title: Fact;

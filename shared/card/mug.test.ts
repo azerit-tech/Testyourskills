@@ -7,11 +7,11 @@ import { describe, expect, it } from "vitest";
 import { FIXTURES } from "../fixtures";
 import type { CardData, Lang } from "../types";
 import { CardGraphic } from "./Card";
-import { MUG_PHOTO, MUG_SIZE, PLACARD, PLATE, Plate, Silhouette, Toise, caseDate, caseLabel, caseNumber, initialsOf, plateName, plateSub, toiseCover } from "./mug";
+import { MUG_PHOTO, MUG_SIZE, PLACARD, PLATE, Plate, Silhouette, Toise, caseDate, caseLabel, caseNumber, initialsOf, plateInitials, plateName, plateSub, toiseCover } from "./mug";
 
 const face = (card: CardData, lang: Lang, avatarHref?: string) => renderToStaticMarkup(createElement(CardGraphic, { card, lang, avatarHref }));
-/** Les graduations dessinées : les nombres à trois chiffres de la toise, en mono 8. */
-const ticks = (svg: string) => [...svg.matchAll(/font-size="8"[^>]*>(1\d0)</g)].map((m) => m[1]);
+/** Les graduations dessinées : les nombres à trois chiffres de la toise, en mono 12. */
+const ticks = (svg: string) => [...svg.matchAll(/font-size="12"[^>]*>(1\d0)</g)].map((m) => m[1]);
 
 describe("la toise", () => {
   it("un nombre entier ou pas de nombre : rien sous la photo, rien sous la plaque", () => {
@@ -22,7 +22,7 @@ describe("la toise", () => {
   });
 
   it("la photo commence sous le premier nombre, la plaque sous le dernier", () => {
-    // Un nombre de 8 px posé sur sa ligne de base : il finit 2 px plus bas au plus.
+    // Un nombre posé sur sa ligne de base (des chiffres, sans jambage) : il finit 2 unités plus bas au plus.
     expect(21 + 2).toBeLessThanOrEqual(MUG_SIZE.h - MUG_PHOTO.h);
     expect(21 + 2 * 53 + 2).toBeLessThanOrEqual(MUG_SIZE.h - PLACARD.bottom - PLACARD.h - 3);
   });
@@ -39,7 +39,8 @@ describe("sans photo : la silhouette à initiales", () => {
   it("la fiche montre la silhouette et les initiales, jamais une image vide", () => {
     const svg = face(FIXTURES.gold, "fr", "");
     expect(svg).toContain("data-silhouette");
-    expect(svg).toContain(`>${FIXTURES.gold.initials}<`);
+    // Les initiales suivent la plaque : « @LEAMD » donne « LE ».
+    expect(svg).toContain(">LE<");
     expect(svg).not.toContain("<image");
     const withPhoto = face(FIXTURES.gold, "fr", "data:image/png;base64,AAAA");
     expect(withPhoto).not.toContain("data-silhouette");
@@ -50,6 +51,13 @@ describe("sans photo : la silhouette à initiales", () => {
     const svg = renderToStaticMarkup(createElement(Silhouette, { initials: "lm" }));
     expect(svg).toContain(">LM<");
     expect(renderToStaticMarkup(createElement(Silhouette, { initials: "" }))).not.toContain("<text");
+  });
+
+  it("plateInitials : une seule règle, celle de la plaque (pseudo, sinon nom, sinon lien)", () => {
+    expect(plateInitials({ login: "leamd", name: "Léa Martin" })).toBe("LE");
+    expect(plateInitials({ name: "Léa Martin", slug: "camille-ardent" })).toBe("LM");
+    expect(plateInitials({ slug: "camille-ardent-4b2a" })).toBe("CA");
+    expect(plateInitials({})).toBe("");
   });
 
   it("initialsOf : d'un pseudo ou d'un nom de lien", () => {
@@ -70,33 +78,35 @@ describe("la plaque d'identité, un seul gabarit", () => {
     expect(plateName({}, "fr")).toBeNull();
   });
 
-  it("seconde ligne : « N° MGOLDB · 14.10.26 », le numéro et le jour de la fiche", () => {
-    expect(caseNumber("m-gold-b7k2")).toBe("MGOLDB");
-    expect(caseNumber("")).toBe("0000");
+  it("seconde ligne : « N° 164958 · 14.10.26 », un matricule à six chiffres et le jour de la fiche", () => {
+    // Six chiffres tirés de l'id, stables : jamais les lettres de l'id, qui se lisaient comme un pseudo coupé.
+    expect(caseNumber("m-gold-b7k2")).toBe("164958");
+    for (const id of ["m-gold-b7k2", "jmougeot", "", "Ab3xY9qZ1k"]) expect(caseNumber(id)).toMatch(/^\d{6}$/);
+    expect(caseNumber("jmougeot")).not.toBe(caseNumber("jmougeoT"));
     expect(caseDate("2026-10-14T12:00:00Z")).toBe("14.10.26");
     expect(caseDate("n'importe quoi")).toBe("");
-    expect(caseLabel("m-gold-b7k2", "fr")).toBe("N° MGOLDB");
-    expect(plateSub("m-gold-b7k2", "2026-10-14T12:00:00Z", "fr")).toBe("N° MGOLDB · 14.10.26");
-    expect(plateSub("m-gold-b7k2", "2026-10-14T12:00:00Z", "en")).toBe("No. MGOLDB · 14.10.26");
+    expect(caseLabel("m-gold-b7k2", "fr")).toBe("N° 164958");
+    expect(plateSub("m-gold-b7k2", "2026-10-14T12:00:00Z", "fr")).toBe("N° 164958 · 14.10.26");
+    expect(plateSub("m-gold-b7k2", "2026-10-14T12:00:00Z", "en")).toBe("No. 164958 · 14.10.26");
     // Un horodatage (l'attente, avant la fiche) donne le même jour que la date ISO de la fiche.
     expect(plateSub("abc123", Date.UTC(2026, 10, 19, 8), "fr")).toBe(plateSub("abc123", "2026-11-19T23:10:00Z", "fr"));
   });
 
   it("crème sur #111, inclinée de 1,5°, le nom en Barlow 700 espacé de 0,06 em", () => {
-    const svg = renderToStaticMarkup(createElement(Plate, { name: "@LEAMD", sub: "N° MGOLDB · 14.10.26" }));
+    const svg = renderToStaticMarkup(createElement(Plate, { name: "@LEAMD", sub: "N° 164958 · 14.10.26" }));
     expect(PLATE).toMatchObject({ bg: "#111111", ink: "#fff9cb", tilt: -1.5, nameSpacing: 0.06 });
     expect(svg).toContain('rotate(-1.5 ');
     expect(svg).toContain('fill="#111111"');
     expect(svg).toMatch(/font-size="20" letter-spacing="1\.2"[^>]*fill="#fff9cb">@LEAMD</);
-    expect(svg).toContain(">N° MGOLDB · 14.10.26<");
+    expect(svg).toContain(">N° 164958 · 14.10.26<");
   });
 
   it("un pseudo long rétrécit sans sortir de la plaque ; sans nom, le numéro tient seul", () => {
-    const long = renderToStaticMarkup(createElement(Plate, { name: "@UN-PSEUDO-VRAIMENT-TRES-LONG-39", sub: "N° ABCDEF · 14.10.26" }));
+    const long = renderToStaticMarkup(createElement(Plate, { name: "@UN-PSEUDO-VRAIMENT-TRES-LONG-39", sub: "N° 482917 · 14.10.26" }));
     expect(long).toContain("@UN-PSEUDO");
-    const alone = renderToStaticMarkup(createElement(Plate, { name: null, sub: "N° ABCDEF · 14.10.26" }));
-    // Seul sur la plaque, le numéro est plus grand que sous un nom (8,5).
-    expect(Number(/font-size="([\d.]+)"/.exec(alone)![1])).toBeGreaterThan(8.5);
+    const alone = renderToStaticMarkup(createElement(Plate, { name: null, sub: "N° 482917 · 14.10.26" }));
+    // Seul sur la plaque, le numéro est plus grand que sous un nom (12).
+    expect(Number(/font-size="([\d.]+)"/.exec(alone)![1])).toBeGreaterThan(12);
     expect(alone.match(/<text/g)).toHaveLength(1);
   });
 
