@@ -178,8 +178,11 @@ export function suggestedPills(type: BandType, mb: MyBands, hint: BandRef | null
   return out;
 }
 
-/** Les étoiles pleines seulement, comme la ligne du §18.38 (« ★★★★ »). */
-export const filledStars = (n: number) => "★".repeat(Math.max(0, Math.min(6, n)));
+/** Les étoiles sur leur échelle de six, pour un texte de partage (« ★★★★☆☆ », §18.48 : toute note a son échelle). */
+export const starLine = (n: number) => {
+  const k = Math.max(0, Math.min(6, n));
+  return "★".repeat(k) + "☆".repeat(6 - k);
+};
 
 export const bandUrl = (b: Pick<BandRef, "type" | "id">) => `${window.location.origin}/bandes/${b.type}/${b.id}`;
 

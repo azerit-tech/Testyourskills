@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { BandStanding, MyBands } from "../../../shared/bands";
 import { DICTS } from "../i18n";
-import { BAND_HINT_MS, bandHint, filledStars, rememberBandHint, rememberBandJoin, suggestedPills, takeBandJoin } from "./bands";
+import { BAND_HINT_MS, bandHint, starLine, rememberBandHint, rememberBandJoin, suggestedPills, takeBandJoin } from "./bands";
 import { routeOf } from "./router";
 
 const { fr, en } = DICTS;
@@ -38,17 +38,18 @@ describe("la ligne du rang", () => {
     expect(fr.bands.rank(b({ gap: 1 }))).toBe("3e des écoles, à 1 étoile de la 2e.");
     expect(fr.bands.rank(b({ rank: 2, gap: 0, ahead: { id: "x", label: "X", rank: 1 } }))).toBe("2e des écoles, à égalité avec la tête.");
     expect(fr.bands.rank(b({ type: "boite", rank: 1, gap: null, ahead: null }))).toBe("N°\u00a01 des boîtes.");
-    expect(fr.bands.rank(b({ rank: null, missing: 2, gap: null, ahead: null }))).toBe("Bande en formation\u00a0: il manque 2\u00a0complices.");
+    expect(fr.bands.rank(b({ rank: null, missing: 2, gap: null, ahead: null }))).toBe("Bande en formation\u00a0: encore 2\u00a0fiches.");
   });
 
   it("en anglais", () => {
     expect(en.bands.rank(b({}))).toBe("#3 among schools, 6 stars behind #2.");
-    expect(en.bands.rank(b({ rank: null, missing: 1, gap: null, ahead: null }))).toBe("Crew forming: 1 more accomplice needed.");
+    expect(en.bands.rank(b({ rank: null, missing: 1, gap: null, ahead: null }))).toBe("Crew forming: 1 more sheet needed.");
   });
 
   it("les étoiles pleines seulement", () => {
-    expect(filledStars(4)).toBe("★★★★");
-    expect(filledStars(9)).toBe("★★★★★★");
+    expect(starLine(4)).toBe("★★★★☆☆");
+    expect(starLine(9)).toBe("★★★★★★");
+    expect(starLine(0)).toBe("☆☆☆☆☆☆");
   });
 });
 

@@ -9,7 +9,7 @@ import type { BandRef, BandStanding, BandType, MyBands } from "../../../shared/b
 import { BAND_TYPES, bandPath, COMPANY_INPUT_MAX, searchSchools } from "../../../shared/bands";
 import { pick, useT } from "../i18n";
 import { api } from "../lib/api";
-import { bandHint, bandsApi, bandUrl, filledStars, suggestedPills, takeBandJoin } from "../lib/bands";
+import { bandHint, bandsApi, bandUrl, starLine, suggestedPills, takeBandJoin } from "../lib/bands";
 import { onLinkClick } from "../lib/router";
 import { hasNativeShare } from "../lib/sharing";
 import { copyText, isTouch } from "../lib/util";
@@ -226,7 +226,7 @@ function Joined({ b, stars, head, busy, error, native, onLeave, onShare }: Joine
   const p = t.bands.pick;
   // Sans page publique (boîte au nom libre, moins de trois dossiers) : ni lien, et le partage dit quoi taper.
   const href = b.hasPage ? bandPath(b) : null;
-  const glyphs = filledStars(stars);
+  const glyphs = starLine(stars);
   const rank = t.bands.rank(b);
   const text = b.hasPage ? p.shareText(glyphs, b.label, rank) : p.shareTextNoPage(glyphs, b.label, rank);
   return (

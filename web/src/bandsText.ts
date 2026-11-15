@@ -11,9 +11,9 @@ const nEn = (k: number, one: string, many: string) => `${k}\u00a0${k === 1 ? one
 const lowerFirst = (s: string) => `${s.charAt(0).toLowerCase()}${s.slice(1)}`;
 
 const fr = {
-  /** « 3e des écoles, à 6 étoiles de la 2e. » ; « N° 1 des boîtes. » ; « Bande en formation : il manque 2 complices. » Une phrase : elle commence par une majuscule. */
+  /** « 3e des écoles, à 6 étoiles de la 2e. » ; « N° 1 des boîtes. » ; « Bande en formation : encore 2 fiches. » Une phrase : elle commence par une majuscule. */
   rank(b: Rank): string {
-    if (!b.rank) return `Bande en formation : il manque ${n(b.missing, "complice", "complices")}.`;
+    if (!b.rank) return `Bande en formation : encore ${n(b.missing, "fiche", "fiches")}.`;
     const ord = `${b.rank === 1 ? "N° 1" : `${b.rank}e`} des ${b.type === "ecole" ? "écoles" : "boîtes"}`;
     if (!b.ahead || b.gap === null) return `${ord}.`;
     const ahead = b.ahead.rank === 1 ? "la tête" : `la ${b.ahead.rank}e`;
@@ -43,14 +43,14 @@ const fr = {
     shareLabel: (label: string) => `Partager la bande ${label}`,
     shareText: (stars: string, label: string, rank: string) => `Je rapporte ${stars} à ${label}. ${rank} Viens grossir les rangs :`,
     /** Une boîte au nom libre sans page publique : le lien mène à l'accueil. */
-    shareTextNoPage: (stars: string, label: string, rank: string) => `Je rapporte ${stars} à ${label}. ${rank} Fais ta fiche et tape « ${label} » dessous :`,
+    shareTextNoPage: (stars: string, label: string, rank: string) => `Je rapporte ${stars} à ${label}. ${rank} Fais ta fiche et tape « ${label} » juste sous elle :`,
     noPage: "Sa page publique s'ouvre à la troisième fiche.",
     linkedinHint: "Texte copié : colle-le dans ton post LinkedIn.",
     failed: "Ça n'a pas pris. Réessaie.",
   },
   board: {
     title: "Les bandes",
-    intro: "Chaque fiche rapporte ses étoiles à son école et à sa boîte. Les vingt meilleures comptent, trois suffisent pour entrer au tableau.",
+    intro: "Chaque fiche peut rapporter ses étoiles à une école et à une boîte, au choix de la personne. Les vingt meilleures fiches d'une bande comptent ; trois suffisent pour entrer au tableau.",
     tabs: "Tableau",
     yours: "Ta bande",
     /** L'unité des notes de bande, une fois en tête du tableau. */
@@ -58,11 +58,11 @@ const fr = {
     rowLabel: (rank: number | null, label: string, score: number, dossiers: number) =>
       `${rank ? (rank === 1 ? "n° 1" : `${rank}e`) : "En formation"}, ${label}, ${n(score, "étoile", "étoiles")}, ${n(dossiers, "fiche", "fiches")}`,
     makeTitle: "Fais gagner ta bande",
-    make: "Fais ta fiche, puis choisis ton école et ta boîte dessous : tes étoiles comptent pour elles.",
+    make: "Fais ta fiche, puis choisis ton école et ta boîte juste sous elle : tes étoiles comptent pour elles.",
   },
   page: {
     make: (label: string) => `Fais ta fiche pour ${label}`,
-    makeNote: "Une fois ta fiche faite, un geste dessous et tes étoiles comptent pour la bande.",
+    makeNote: "Une fois ta fiche faite, un geste juste sous elle et tes étoiles comptent pour la bande.",
     roster: "Les fiches",
     rosterNone: "Personne pour l'instant. La place est libre.",
     unnamed: "Fiche sans profil",
@@ -94,10 +94,10 @@ const fr = {
     /** Déjà dans une autre bande de la même ligue : une école, une boîte au plus. */
     moving: (label: string) => `Tu roules pour ${label} : rejoindre ici t'en fait sortir.`,
     /** La fiche n'est plus à portée de ce navigateur (jeton perdu, session finie). */
-    lost: "Ta fiche ne répond pas depuis ce navigateur. Ouvre-la, puis choisis ta bande dessous.",
+    lost: "Ta fiche ne répond pas depuis ce navigateur. Ouvre-la, puis choisis ta bande juste sous elle.",
     seeCard: "Voir ma fiche",
     /** /bandes, avec une fiche : le choix se fait sous elle. */
-    pickUnder: "Tu as déjà ta fiche : choisis ton école et ta boîte dessous.",
+    pickUnder: "Tu as déjà ta fiche : ouvre-la, ton école et ta boîte se choisissent juste sous elle.",
     /** La fiche vient de se poser, sa bande l'attendait (message éphémère sous la fiche). */
     landed: (label: string) => `Tu roules pour ${label}.`,
     /** Les trois emplacements d'une bande en formation, pour un lecteur d'écran. */
@@ -120,7 +120,7 @@ export type BandsDict = typeof fr;
 
 const en: BandsDict = {
   rank(b: Rank): string {
-    if (!b.rank) return `Crew forming: ${nEn(b.missing, "more accomplice", "more accomplices")} needed.`;
+    if (!b.rank) return `Crew forming: ${nEn(b.missing, "more sheet", "more sheets")} needed.`;
     const ord = `#${b.rank} among ${b.type === "ecole" ? "schools" : "companies"}`;
     if (!b.ahead || b.gap === null) return `${ord}.`;
     const ahead = b.ahead.rank === 1 ? "the leader" : `#${b.ahead.rank}`;
@@ -147,25 +147,25 @@ const en: BandsDict = {
     share: "Share",
     shareLabel: (label: string) => `Share the ${label} crew`,
     shareText: (stars: string, label: string, rank: string) => `I'm adding ${stars} to ${label}. ${rank} Come add your stars:`,
-    shareTextNoPage: (stars: string, label: string, rank: string) => `I'm adding ${stars} to ${label}. ${rank} Get your rap sheet and type “${label}” below it:`,
+    shareTextNoPage: (stars: string, label: string, rank: string) => `I'm adding ${stars} to ${label}. ${rank} Get your rap sheet and type “${label}” right under it:`,
     noPage: "Its public page opens at the third sheet.",
     linkedinHint: "Text copied: paste it into your LinkedIn post.",
     failed: "That didn't take. Try again.",
   },
   board: {
     title: "The crews",
-    intro: "Every sheet brings its stars to its school and its company. The best twenty count, three are enough to make the board.",
+    intro: "Every sheet can bring its stars to one school and one company, its owner's choice. A crew's top 20 sheets count; three are enough to make the board.",
     tabs: "Board",
     yours: "Your crew",
     scale: "Stars",
     rowLabel: (rank: number | null, label: string, score: number, dossiers: number) =>
       `${rank ? `#${rank}` : "Forming"}, ${label}, ${nEn(score, "star", "stars")}, ${nEn(dossiers, "sheet", "sheets")}`,
     makeTitle: "Put your crew on top",
-    make: "Get your rap sheet, then pick your school and your company below it: your stars count for them.",
+    make: "Get your rap sheet, then pick your school and your company right under it: your stars count for them.",
   },
   page: {
     make: (label: string) => `Get your rap sheet for ${label}`,
-    makeNote: "Once your sheet is out, one tap below it and your stars count for the crew.",
+    makeNote: "Once your sheet is out, one tap right under it and your stars count for the crew.",
     roster: "The sheets",
     rosterNone: "Nobody yet. The spot is open.",
     unnamed: "Sheet without a profile",
@@ -190,9 +190,9 @@ const en: BandsDict = {
     joinText: "One tap, and its stars count for this crew.",
     join: "Join with my sheet",
     moving: (label: string) => `You ride for ${label}: joining here takes you out of it.`,
-    lost: "Your sheet isn't answering from this browser. Open it, then pick your crew below it.",
+    lost: "Your sheet isn't answering from this browser. Open it, then pick your crew right under it.",
     seeCard: "See my sheet",
-    pickUnder: "You already have your sheet: pick your school and your company below it.",
+    pickUnder: "You already have your sheet: open it, your school and your company are picked right under it.",
     landed: (label: string) => `You ride for ${label}.`,
     slots: (k: number) => `${k} of 3`,
     anonymous: (k: number, named: number) => {
