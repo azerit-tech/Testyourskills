@@ -2,13 +2,15 @@
 // séparées par des joints d'encre, qui remplace le ciel en fondu du §18.29.
 // Des lieux du crime (§18.28), et des visages : les suspects peints quand ils
 // existent, le top de la semaine devant la toise, la fiche de Jacques, et
-// toujours, en dernier, la place libre qui ramène au champ.
+// toujours, en dernier, la place libre qui ramène au champ ; ou, si le visiteur
+// a déjà sa fiche (§18.48), la vignette de cette fiche, qui y mène.
 // Les grilles et le choix des décors sont dans lib/cover.ts ; la feuille
 // (styles.css, « la couverture ») lit les grilles par variables.
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import type { CardData, WeekTop } from "../../../shared/types";
 import profilesJson from "../../../data/profiles.json";
+import { CardView } from "../card/CardView";
 import { pick, useT } from "../i18n";
 import { isMock } from "../lib/api";
 import { DESKTOP, PHONE, SLOTS, areasCss, bigAvatar, colsCss, coverPanels, firstRow, pickSeed, slotsIn, widthShare } from "../lib/cover";
@@ -30,6 +32,9 @@ export interface CoverProps {
   suspects?: string[];
   /** La graine de la distribution ; par défaut celle de la visite. */
   seed?: number;
+  /** La fiche faite dans ce navigateur (§18.48) : la case « Ta place » devient sa vignette.
+   * `card` : la fiche entière, dès qu'elle est connue ; avant, la silhouette tient la case. */
+  mine?: { href: string; overall: number; card: CardData | null } | null;
 }
 
 /** La graine de la visite, tirée une fois au chargement de la page : la couverture ne se
@@ -47,14 +52,14 @@ const ON_PHONE = slotsIn(PHONE);
 const EAGER = new Set([...firstRow(PHONE), ...firstRow(DESKTOP)].filter((id) => ON_PHONE.has(id)));
 /** La plus grande case du premier rang : en priorité haute. */
 const HERO = "s1";
-/** Largeur intérieure de la couverture sur ordinateur, au plus. */
-const WIDE_INNER = 1060;
+/** Largeur intérieure de la couverture sur ordinateur, au plus : la colonne de droite du héros (§18.48). */
+const WIDE_INNER = 504;
 
-/** La largeur affichée d'une case, pour choisir entre -s.jpg et le grand fichier. */
+/** La largeur affichée d'une case, pour choisir entre -s.jpg et le grand fichier.
+ * La grille du téléphone sert à toutes les largeurs : une bande sur téléphone, une colonne au bureau. */
 function sizes(id: string): string {
-  const wide = Math.ceil(widthShare(DESKTOP, id) * WIDE_INNER);
-  const phone = widthShare(PHONE, id);
-  return `(min-width: 900px) ${wide}px, ${Math.ceil((phone || widthShare(DESKTOP, id)) * 92)}vw`;
+  const share = widthShare(PHONE, id) || widthShare(DESKTOP, id);
+  return `(min-width: 900px) ${Math.ceil(share * WIDE_INNER)}px, ${Math.ceil(share * 92)}vw`;
 }
 
 /** Le nom de chaque profil, pour le texte de remplacement d'un portrait. */
@@ -136,7 +141,7 @@ function Face({ src, name, sub, mark, tint }: { src?: string | null; name: strin
   );
 }
 
-export function Cover({ onPlay, top, founder, suspects = SUSPECTS, seed = seedOfVisit() }: CoverProps) {
+export function Cover({ onPlay, top, founder, suspects = SUSPECTS, seed = seedOfVisit(), mine = null }: CoverProps) {
   const { t, lang } = useT();
   const c = t.home.cover;
   // tirée pendant le rendu, avant la première image : pas de saut, et les deux images
@@ -185,6 +190,26 @@ export function Cover({ onPlay, top, founder, suspects = SUSPECTS, seed = seedOf
           </a>
         );
       case "free":
+        // Une fiche en mémoire : la place est prise, la case montre le haut de la fiche et y mène.
+        if (mine)
+          return (
+            <a key={`${slot.id}-mine`} {...common} className={`${cls} cover-mine`} href={mine.href} onClick={(ev) => onLinkClick(ev, mine.href)} aria-label={c.mineLabel(mine.overall)}>
+              <span className="cover-face" style={{ "--tint": "#ffb2c6" } as CSSProperties} aria-hidden>
+                {mine.card ? (
+                  <CardView card={mine.card} lang={lang} interactive={false} idPrefix="cover-mine" />
+                ) : (
+                  <svg className="cover-face-shape" viewBox="0 0 100 100" preserveAspectRatio="xMidYMax meet">
+                    <circle cx="50" cy="42" r="19" />
+                    <path d="M8 100c0-27 18-44 42-44s42 17 42 44z" />
+                  </svg>
+                )}
+                <span className="cover-plate">
+                  <b>{upper(c.mine, lang)}</b>
+                  <i>{mine.overall}/100</i>
+                </span>
+              </span>
+            </a>
+          );
         return (
           <button key={key} {...common} type="button" onClick={onPlay} aria-label={c.freeLabel}>
             <Face name={c.free} sub={c.freePlate} mark="?" tint="#ffb2c6" />

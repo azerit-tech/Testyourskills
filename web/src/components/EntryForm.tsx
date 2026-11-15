@@ -28,8 +28,11 @@ interface Props {
   inputRef?: React.RefObject<HTMLInputElement | null>;
   /** « inline » : sans onglets ni CV, pour le bandeau d'une carte partagée. */
   variant?: "full" | "inline";
-  /** Une ligne posée entre la pilule et les liens du pied (la promesse de l'accueil, sur téléphone). */
+  /** Une ligne posée entre la pilule et les liens du pied (ce qu'il faut faire ensuite, sur la page d'une bande). */
   note?: ReactNode;
+  /** Un second formulaire sur la même page (le bas de l'accueil) : ni focus d'emblée, ni
+   * raccourcis de page (collage, dépôt de PDF), que le premier porte déjà. */
+  secondary?: boolean;
 }
 
 const DOORS: Door[] = ["linkedin", "github"];
@@ -84,11 +87,11 @@ function initialEntry(raw: string | undefined): { door: Door; login: string } {
   return { door: sessionDoor(), login: s };
 }
 
-export function EntryForm({ inputRef, variant = "full", note }: Props) {
+export function EntryForm({ inputRef, variant = "full", note, secondary = false }: Props) {
   const inline = variant === "inline";
   const { t, lang } = useT();
   const h = t.home;
-  const [init] = useState(() => (inline ? null : takePrefill()));
+  const [init] = useState(() => (inline || secondary ? null : takePrefill()));
   const [first] = useState(() => initialEntry(init?.login));
   const [mode, setMode] = useState<Mode>(init?.mode ?? "single");
   const [tab, setTab] = useState<Tab>(init?.tab ?? "github");
@@ -99,6 +102,8 @@ export function EntryForm({ inputRef, variant = "full", note }: Props) {
   const [error, setError] = useState<string | null>(init?.error ? (typeof init.error === "string" ? init.error : pick(init.error, lang)) : null);
   const [busy, setBusy] = useState(false);
   const [drag, setDrag] = useState(false);
+  // Au doigt, on ne glisse pas un fichier : la zone du CV le dit autrement.
+  const [touch] = useState(() => isTouch());
   const fileInput = useRef<HTMLInputElement>(null);
   const localLoginRef = useRef<HTMLInputElement>(null);
   const loginRef = inputRef ?? localLoginRef;
@@ -136,7 +141,7 @@ export function EntryForm({ inputRef, variant = "full", note }: Props) {
       return;
     }
     // Sur desktop, le champ a le focus d'emblée. Pas sur mobile : le clavier cacherait la carte.
-    if (!inline && !isTouch()) loginRef.current?.focus({ preventScroll: true });
+    if (!inline && !secondary && !isTouch()) loginRef.current?.focus({ preventScroll: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -238,6 +243,7 @@ export function EntryForm({ inputRef, variant = "full", note }: Props) {
 
   // Dépôt n'importe où sur la page, avec un voile pendant le survol.
   useEffect(() => {
+    if (secondary) return;
     let depth = 0;
     const onEnter = (e: DragEvent) => {
       if (!hasFiles(e.dataTransfer)) return;
@@ -282,6 +288,7 @@ export function EntryForm({ inputRef, variant = "full", note }: Props) {
 
   // Collage n'importe où : une URL GitHub, un lien LinkedIn ou un PDF.
   useEffect(() => {
+    if (secondary) return;
     const onPaste = (e: ClipboardEvent) => {
       const dt = e.clipboardData;
       if (!dt || busyRef.current) return;
@@ -448,7 +455,7 @@ export function EntryForm({ inputRef, variant = "full", note }: Props) {
         if (p && p !== login) setLogin(p);
       }}
       aria-invalid={!!error && showGithub && !file}
-      aria-describedby={`${uid}-err ${uid}-hint`}
+      aria-describedby={`${uid}-err ${uid}-note ${uid}-hint`}
     />
   );
 
@@ -458,6 +465,12 @@ export function EntryForm({ inputRef, variant = "full", note }: Props) {
     </p>
   );
 
+  /** Sous le champ seul, tant qu'il n'y a pas d'erreur (elle prend sa place) : ce que la porte sait lire. */
+  const hintLine = mode === "single" && tab === "github" && !error && (
+    <p id={`${uid}-note`} className="entry-hint">
+      {fieldDoor === "linkedin" ? h.linkedinHint : h.githubHint}
+    </p>
+  );
 
   /** Le champ, en pilule (maquette validée de l'accueil) : « @ » devant un pseudo GitHub,
    * « linkedin.com/in/ » devant un profil, sauf quand on y tape une adresse entière. */
@@ -548,7 +561,8 @@ export function EntryForm({ inputRef, variant = "full", note }: Props) {
     );
   }
 
-  // Un seul chemin à l'écran : le pseudo d'abord ; le CV, puis la comparaison, à un lien de là.
+  // Un seul chemin à l'écran : le lien ou le pseudo d'abord ; le CV à un lien de là, un seul
+  // niveau. Les deux sources ensemble : en déposant un PDF avec un pseudo saisi, ou depuis une fiche.
   return (
     <form className={`entry mode-${mode}${doorsOn ? " has-doors" : ""}`} onSubmit={submit} onInput={prefetchReveal} onPointerDown={prefetchReveal} onDragEnter={prefetchReveal} noValidate>
       {mode === "both" && <p className="entry-both-head">{h.bothActive}</p>}
@@ -579,6 +593,11 @@ export function EntryForm({ inputRef, variant = "full", note }: Props) {
                 <IconClose />
               </button>
             </div>
+          ) : touch ? (
+            <label htmlFor={`${uid}-file`} className="drop-empty">
+              <span className="drop-title">{h.dropPick}</span>
+              <span className="drop-sub">{h.dropHint}</span>
+            </label>
           ) : (
             <label htmlFor={`${uid}-file`} className="drop-empty">
               <span className="drop-title">{h.dropTitle}</span>
@@ -591,6 +610,7 @@ export function EntryForm({ inputRef, variant = "full", note }: Props) {
       )}
 
       {errorLine}
+      {hintLine}
 
       <button type="submit" className={`pill pill-big entry-submit${busy ? " is-busy" : ""}`} disabled={busy}>
         {busy ? busyLabel(h.submitting) : mode === "both" ? h.submitBoth : h.submit}
@@ -614,16 +634,6 @@ export function EntryForm({ inputRef, variant = "full", note }: Props) {
           <>
             <button type="button" className="link-alt" onClick={() => switchTab("github")}>
               ← {liOn ? h.tabDoors : h.tabGithub}
-            </button>
-            <button
-              type="button"
-              className="link-alt"
-              onClick={() => {
-                setMode("both");
-                setError(null);
-              }}
-            >
-              {h.bothLink}
             </button>
           </>
         )}

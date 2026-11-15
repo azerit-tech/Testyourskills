@@ -61,6 +61,9 @@ const fr = frTypoDeep({
     doorGithub: "GitHub",
     linkedinLabel: "Lien de ton profil LinkedIn",
     linkedinPlaceholder: "ton-profil",
+    /** Sous le champ, tant qu'il n'y a pas d'erreur : ce que chaque porte sait lire. */
+    linkedinHint: "Profil public seulement.",
+    githubHint: "Repos publics seulement.",
     errLinkedin: "Colle le lien de ton profil LinkedIn, ou ce qui suit linkedin.com/in/.",
     linkedinWhere: "Où est mon lien ?",
     linkedinHelp: "Dans l'app LinkedIn : ton profil, ⋯, puis copie le lien.",
@@ -73,6 +76,8 @@ const fr = frTypoDeep({
     bothActive: "Deux sources au dossier\u00a0: ton CV et ton GitHub",
     bothBack: "une seule source",
     dropTitle: "Glisse ton CV ici",
+    /** Au doigt, on ne glisse pas un fichier : on le choisit. */
+    dropPick: "Choisis ton CV en PDF",
     dropOr: "ou",
     dropBrowse: "choisis un PDF",
     dropHint: "5 Mo, 10 pages max",
@@ -94,9 +99,23 @@ const fr = frTypoDeep({
       freePlate: "TA FICHE ICI",
       /** Un portrait peint : le rôle, jamais un genre, un âge ou une origine. */
       suspect: (profile: string) => `Portrait peint du profil ${profile}`,
+      /** La case « Ta place », quand une fiche est en mémoire : sa vignette. */
+      mine: "Ta fiche",
+      mineLabel: (overall: number) => `Ta fiche, ${overall}/100 : la revoir`,
     },
     /** La flèche sous le héros, sur ordinateur. */
     next: "Voir la suite",
+    /** Le dernier formulaire de l'accueil, avant le pied de page (§18.48). */
+    lastTitle: "À toi.",
+    /** Au-dessus du tableau des bandes : pourquoi une bande. */
+    bandsLead: "Fais ta fiche. Fais gagner ta bande.",
+    /** L'accueil se souvient (§18.48) : la fiche déjà faite, ou le dossier encore en cours. */
+    back: {
+      mine: "Ta fiche\u00a0:",
+      mineGo: "La revoir",
+      pending: "Ton dossier s'ouvre encore.",
+      pendingGo: "Y retourner",
+    },
     /* Mur des 13 profils (§18.28) */
     wall: {
       title: "Quel profil es-tu ?",
@@ -111,6 +130,11 @@ const fr = frTypoDeep({
       /* Jamais une unité à zéro : « 1 j », « 5 h », « 1 j 4 h ». */
       left: (d: number, h: number, m: number) => (d > 0 ? (h > 0 ? `${d} j ${h} h` : `${d} j`) : h > 0 ? (m > 0 ? `${h} h ${m} min` : `${h} h`) : `${m} min`),
       cut: "Top 5",
+      /* Semaine vide : un seul bloc d'invitation ; top 5 incomplet : une seule ligne pour les places libres (§18.48). */
+      emptyTitle: "La place n°\u00a01 est libre",
+      emptyText: "La première fiche de la semaine la prend.",
+      freeRange: (from: number, to: number) => (from === to ? `Place ${from} libre` : `Places ${from} à ${to} libres`),
+      take: (n: number): string => (n === 1 ? "Prends-la" : "Prends-en une"),
       free: "Place libre",
       freeLabel: (rank: number) => `Place ${rank} libre : fais ta fiche`,
       rowLabel: (rank: number, login: string, overall: number) => `Place ${rank} : @${login}, note ${overall}/100`,
@@ -839,6 +863,8 @@ const en: Dict = {
     doorGithub: "GitHub",
     linkedinLabel: "Your LinkedIn profile link",
     linkedinPlaceholder: "your-profile",
+    linkedinHint: "Public profile only.",
+    githubHint: "Public repos only.",
     errLinkedin: "Paste your LinkedIn profile link, or what follows linkedin.com/in/.",
     linkedinWhere: "Where's my link?",
     linkedinHelp: "In the LinkedIn app: your profile, ⋯, then copy the link.",
@@ -851,6 +877,7 @@ const en: Dict = {
     bothActive: "Two sources on file: your CV and your GitHub",
     bothBack: "just one source",
     dropTitle: "Drop your CV here",
+    dropPick: "Pick your CV as a PDF",
     dropOr: "or",
     dropBrowse: "pick a PDF",
     dropHint: "5 MB, 10 pages max",
@@ -869,8 +896,18 @@ const en: Dict = {
       freeLabel: "Your spot: get your rap sheet",
       freePlate: "YOUR SHEET HERE",
       suspect: (profile) => `Painted portrait of the ${profile} profile`,
+      mine: "Your sheet",
+      mineLabel: (overall) => `Your sheet, ${overall}/100: see it again`,
     },
     next: "See more",
+    lastTitle: "Your turn.",
+    bandsLead: "Get your rap sheet. Make your crew win.",
+    back: {
+      mine: "Your sheet:",
+      mineGo: "See it again",
+      pending: "Your file is still opening.",
+      pendingGo: "Go back to it",
+    },
     wall: {
       title: "Which profile are you?",
       you: "And you?",
@@ -881,6 +918,10 @@ const en: Dict = {
       meta: (week, n, left) => [`Week ${week}`, showsTotal(n) && `${n} sheets`, `ends in ${left}`].filter(Boolean).join(", "),
       left: (d, h, m) => (d > 0 ? (h > 0 ? `${d}d ${h}h` : d === 1 ? "1 day" : `${d} days`) : h > 0 ? (m > 0 ? `${h}h ${m}min` : `${h}h`) : `${m}min`),
       cut: "Top 5",
+      emptyTitle: "Spot #1 is open",
+      emptyText: "This week's first sheet takes it.",
+      freeRange: (from, to) => (from === to ? `Spot ${from} is open` : `Spots ${from} to ${to} are open`),
+      take: (n) => (n === 1 ? "Take it" : "Take one"),
       free: "Open spot",
       freeLabel: (rank) => `Spot ${rank} is open: get your rap sheet`,
       rowLabel: (rank, login, overall) => `Spot ${rank}: @${login}, rating ${overall}/100`,

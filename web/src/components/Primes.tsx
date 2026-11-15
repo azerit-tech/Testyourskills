@@ -68,16 +68,21 @@ export function PrimesStrip() {
     };
   }, [open]);
 
-  if (!open || !primes || primes.length === 0) return null;
+  if (!open || (primes && primes.length === 0)) return null;
   return (
-    <section className="primes-strip" aria-labelledby="primes-strip-title">
+    <section className="primes-strip" aria-labelledby="primes-strip-title" aria-busy={primes ? undefined : true}>
       <h2 id="primes-strip-title">{t.primes.strip.title}</h2>
       <ul className="primes-row">
-        {primes.map((p) => (
-          <li key={p.id}>
-            <PrimeCard p={p} />
-          </li>
-        ))}
+        {primes ? (
+          primes.map((p) => (
+            <li key={p.id}>
+              <PrimeCard p={p} />
+            </li>
+          ))
+        ) : (
+          // La saison est ouverte, la liste arrive : la rangée tient sa place, rien ne saute dessous.
+          <li className="prime-card prime-card-wait" aria-hidden />
+        )}
       </ul>
       <a className="link-alt" href="/primes" onClick={(e) => onLinkClick(e, "/primes")}>
         {t.primes.strip.all}
