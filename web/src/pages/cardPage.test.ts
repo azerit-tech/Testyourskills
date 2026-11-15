@@ -232,9 +232,9 @@ describe("demander le retrait d'une fiche sans pseudo GitHub", () => {
   const linkedin = () => card({ id: "LinkedIn001", login: undefined, source: "cv", declaredSource: "linkedin" } as Partial<CardData>);
   it("sur la page partagée d'une fiche LinkedIn ou CV, après « Et toi ? », un lien discret", () => {
     const html = renderResult(linkedin(), { owner: false });
-    expect(html).toContain("Ce n&#x27;est pas toi qui as fait cette fiche\u00a0? Demander son retrait");
+    expect(html).toContain("C&#x27;est toi sur cette fiche, et tu ne l&#x27;as pas faite\u00a0? Demander son retrait");
     expect(html.indexOf('class="removal"')).toBeGreaterThan(html.indexOf('id="you"'));
-    expect(renderResult(linkedin(), { owner: false, lang: "en-US" })).toContain("Didn&#x27;t make this sheet yourself? Ask for its removal");
+    expect(renderResult(linkedin(), { owner: false, lang: "en-US" })).toContain("On this sheet and didn&#x27;t make it? Ask us to take it down");
   });
 
   it("jamais pour qui a fait la fiche, ni sur une fiche qui a un pseudo GitHub (« C'est moi » y suffit)", () => {

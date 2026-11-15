@@ -809,7 +809,7 @@ const fr = frTypoDeep({
   },
   /** Fiche sans pseudo GitHub vue par un tiers (LinkedIn, CV) : la personne fichée demande son retrait. */
   removal: {
-    link: "Ce n'est pas toi qui as fait cette fiche ? Demander son retrait",
+    link: "C'est toi sur cette fiche, et tu ne l'as pas faite ? Demander son retrait",
     /* dans le bloc d'une fiche dénoncée : le titre a déjà dit qui l'a faite */
     linkShort: "C'est toi ? Demander le retrait de cette fiche",
     label: "Retrait de cette fiche : ton email, pour te répondre",
@@ -1503,9 +1503,9 @@ const en: Dict = {
     title: "Privacy",
   },
   removal: {
-    link: "Didn't make this sheet yourself? Ask for its removal",
-    linkShort: "That's you? Ask for this sheet's removal",
-    label: "Removing this sheet: your email, so we can reply",
+    link: "On this sheet and didn't make it? Ask us to take it down",
+    linkShort: "Is this you? Ask us to take it down",
+    label: "Your email, so we can get back to you",
     placeholder: "you@email.com",
     send: "Send",
     invalid: "That email doesn't look valid.",

@@ -261,7 +261,7 @@ const fr = {
           [
             "Les faits tirés de tes sources, les constats de l'IA, les notes de la fiche.",
             "Le profil LinkedIn lu, 30 jours, pour ne pas le relire.",
-            "Ton email, seulement si tu le donnes.",
+            "Ton email, seulement si tu le laisses : il garde ta fiche en ligne au-delà de 90 jours et rejoint les contacts d'Azerit, qui peut t'écrire pour un poste. Tu le retires par la demande de retrait.",
             "Si tu viens du lien d'une fiche partagée, l'identifiant de cette fiche.",
             "Pour une fiche née d'une dénonciation, l'identifiant de la fiche qui a dénoncé, et son pseudo seulement si elle est revendiquée.",
           ],
@@ -275,7 +275,7 @@ const fr = {
         h: "Combien de temps",
         blocks: [
           "90 jours, puis la fiche et ses images sont supprimées automatiquement.",
-          "Deux exceptions : si tu as laissé ton email sous ta fiche, ou si tu l'as revendiquée avec « C'est moi », elle reste en ligne jusqu'à ce que tu la supprimes. Ton email est seulement enregistré.",
+          "Deux exceptions : si tu as laissé ton email sous ta fiche, ou si tu l'as revendiquée avec « C'est moi », elle reste en ligne jusqu'à ce que tu la supprimes.",
         ],
       },
       {
@@ -426,8 +426,8 @@ const en: PagesDict = {
   privacy: {
     summaryTitle: "In four lines",
     summary: [
-      "We read what is public: your LinkedIn profile, your GitHub, or the CV you give us.",
-      "We keep your sheet for 90 days by default, never your CV.",
+      "We read what is public: your LinkedIn profile, your GitHub, or the résumé you give us.",
+      "We keep your sheet for 90 days by default, never your résumé.",
       "No contact details are shown, no data is sold, no ad cookies, no third-party tracking tools.",
       "You can delete your sheet any time. For a sheet someone made about you: “That's me”, or a removal request.",
     ],
@@ -439,7 +439,7 @@ const en: PagesDict = {
           [
             "Your public LinkedIn profile, if you give its link or your GitHub shows it: headline, summary, positions, education, skills. No photo, location or contact details. A third-party service that collects public profiles reads it for us.",
             "Your public GitHub: your repositories, your activity, and a few code files read by the AI.",
-            "Your CV, if you give it: read in memory, then thrown away.",
+            "Your résumé, if you give it: read in memory, then thrown away.",
           ],
         ],
       },
@@ -449,7 +449,7 @@ const en: PagesDict = {
           [
             "The facts drawn from your sources, the AI's findings, the sheet's scores.",
             "The LinkedIn profile we read, for 30 days, so we don't read it twice.",
-            "Your email, only if you give it.",
+            "Your email, only if you leave it: it keeps your sheet up past 90 days and joins Azerit's contacts, who may reach out about a job. You can remove it with a removal request.",
             "If you arrived through a shared sheet's link, that sheet's ID.",
             "For a sheet born from a tip-off, the ID of the sheet that turned it in, and its username only if that sheet is claimed.",
           ],
@@ -457,13 +457,13 @@ const en: PagesDict = {
       },
       {
         h: "What we never keep",
-        blocks: [["Your CV: the file and its text are thrown away as soon as the findings are drawn from it.", "The code files read by the AI."]],
+        blocks: [["Your résumé: the file and its text are thrown away as soon as the findings are drawn from it.", "The code files read by the AI."]],
       },
       {
         h: "How long",
         blocks: [
           "90 days, then the sheet and its images are deleted automatically.",
-          "Two exceptions: if you left your email under your sheet, or claimed it with “That's me”, it stays online until you delete it. Your email is only stored.",
+          "Two exceptions: if you left your email under your sheet, or claimed it with “That's me”, it stays online until you delete it.",
         ],
       },
       {
@@ -479,7 +479,7 @@ const en: PagesDict = {
           "Anyone can make a sheet from any public profile: it relies on public data and stays a light-hearted tease.",
           [
             "It carries your GitHub username: “That's me” proves your account, then you hide it or delete it.",
-            `It comes from your LinkedIn or your CV, with no GitHub username: “Ask for its removal” under the sheet, or an email to ${email} with its link. We remove it after checking; your email is only used to reply.`,
+            `It comes from your LinkedIn or your résumé, with no GitHub username: “Ask us to take it down” under the sheet, or an email to ${email} with its link. We remove it after checking; your email is only used to reply.`,
           ],
         ],
       },
