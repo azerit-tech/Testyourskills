@@ -115,9 +115,6 @@ const fr = {
   },
   rules: {
     title: "Règlement de la saison",
-    /** En tête du règlement, au « tu » : l'essentiel en cinq lignes, repris du texte qui suit. */
-    brief: "En bref. C'est gratuit, pour les 18 ans et plus. Tu entres dans la course avec ta fiche revendiquée. Le rang, c'est ta note, sans bonus. Les dix fiches les mieux classées sont finalistes\u00a0: leur profil part à l'entreprise de la prime, comme elles l'ont accepté. Tu te retires quand tu veux.",
-    enNote: "",
     error: "Le règlement n'est pas disponible pour l'instant.",
   },
   privacy: {
@@ -165,13 +162,13 @@ const fr = {
   /** Le classement d'une prime terminée, et le formulaire. */
   boardFinal: "Classement final",
   addProof: "Ajouter un lien",
-  /** /reglement : le résumé en tête, le sommaire, et la note de la page anglaise. */
+  /** /reglement : le résumé en tête (au « tu », repris du texte qui suit, qui garde son « vous »), le sommaire, et la note de la page anglaise. */
   rulesPage: {
     summaryTitle: "En trois lignes",
     summary: [
-      "Gratuit, sans tirage au sort, ouvert à toute personne de 18 ans ou plus.",
-      "Le rang d'une prime dépend de la note globale de la fiche, et d'elle seule. Les dix premières places sont finalistes, puis une relecture humaine choisit.",
-      "Tu te retires quand tu veux, sans raison à donner. Sans victoire, ton inscription est effacée 30 jours après la fin de la saison.",
+      "C'est gratuit, pour les 18 ans et plus. Tu entres dans la course avec ta fiche revendiquée.",
+      "Le rang, c'est ta note, sans bonus. Les dix fiches les mieux classées sont finalistes\u00a0: leur profil part à l'entreprise de la prime, comme elles l'ont accepté.",
+      "Tu te retires quand tu veux.",
     ],
     toc: "Sommaire",
     binding: "",
@@ -281,8 +278,6 @@ const en: PrimesDict = {
   },
   rules: {
     title: "Season rules",
-    brief: "In short. It's free, for people 18 or older. You enter the race with your claimed rap sheet. Your rank is your rating, no bonus. The ten top-ranked sheets are finalists: their profile goes to the bounty's company, as they agreed. You can withdraw any time.",
-    enNote: "Only the French text below is binding.",
     error: "The rules aren't available yet.",
   },
   privacy: {
@@ -326,12 +321,12 @@ const en: PrimesDict = {
   rulesPage: {
     summaryTitle: "In three lines",
     summary: [
-      "Free, no random draw, open to anyone 18 or older.",
-      "A bounty's rank depends on the sheet's overall rating, and nothing else. The top ten become finalists, then a human review decides.",
-      "You can withdraw any time, no reason needed. Without a win, your entry is erased 30 days after the season ends.",
+      "It's free, for people 18 or older. You enter the race with your claimed rap sheet.",
+      "Your rank is your rating, no bonus. The ten top-ranked sheets are finalists: their profile goes to the bounty's company, as they agreed.",
+      "You can withdraw any time.",
     ],
     toc: "Contents",
-    binding: "These are the season's contest rules. Only the French text below is binding.",
+    binding: "Only the French text below is binding.",
   },
 };
 

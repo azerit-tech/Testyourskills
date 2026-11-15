@@ -6,7 +6,6 @@ import { NotFound } from "./components/ErrorPage";
 import { LangProvider } from "./i18n";
 import { isMock } from "./lib/api";
 import { navigate, routeOf, usePath } from "./lib/router";
-import { useAppConfig } from "./lib/season";
 import { DirectCard } from "./pages/DirectCard";
 
 // Chaque page est chargée à la demande : l'accueil ne paie pas la page d'une fiche, ni l'inverse.
@@ -39,20 +38,6 @@ function BackHome() {
   return null;
 }
 
-/** Les primes n'existent que si la saison en porte une (data/season.json) : sinon, l'accueil. */
-function PrimesGate({ children }: { children: React.ReactNode }) {
-  const cfg = useAppConfig();
-  if (!cfg) return <main className="page" id="main" aria-busy />;
-  return cfg.primesListed ? <>{children}</> : <BackHome />;
-}
-
-/** Le règlement n'existe que publié (data/season.json, rulesPublished) : sinon, page introuvable. */
-function RulesGate() {
-  const cfg = useAppConfig();
-  if (!cfg) return <main className="page" id="main" aria-busy />;
-  return cfg.rulesPublished ? <Rules /> : <NotFound />;
-}
-
 function Routes() {
   const route = routeOf(usePath());
   switch (route.kind) {
@@ -66,20 +51,14 @@ function Routes() {
       return <Bands />;
     case "band":
       return <BandPage key={`${route.type}/${route.id}`} type={route.type} id={route.id} />;
+    // Les primes et le règlement lisent eux-mêmes le serveur : une saison sans prime ramène
+    // à l'accueil, une prime inconnue ou un règlement non publié le disent, une panne aussi.
     case "primes":
-      return (
-        <PrimesGate>
-          <PrimesList />
-        </PrimesGate>
-      );
+      return <PrimesList />;
     case "prime":
-      return (
-        <PrimesGate key={route.id}>
-          <PrimePage id={route.id} />
-        </PrimesGate>
-      );
+      return <PrimePage key={route.id} id={route.id} />;
     case "rules":
-      return <RulesGate />;
+      return <Rules />;
     case "direct":
       return <DirectCard key={route.login} login={route.login} />;
     case "upcoming":
