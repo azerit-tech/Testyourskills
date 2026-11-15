@@ -1,6 +1,7 @@
 // Route /c/:id : attente, révélation puis résultat pour une carte fraîche ;
 // affichage direct (sans pack) pour un lien partagé.
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { fileOf } from "../../../shared/caseFile";
 import type { CardData, Fact, Finding, JobState, ProgressEvent } from "../../../shared/types";
 import { declaredOf, LEVEL_LABELS, starsFor } from "../../../shared/types";
@@ -32,6 +33,7 @@ import { isClosed } from "../lib/errors";
 import { useHold, type SceneState } from "../lib/hold";
 import { gaveUp, nextPatience, type Patience } from "../lib/patience";
 import { filmTrace } from "../film/trace";
+import { ChaseLink } from "../film/ChaseLink";
 import { navigate, onLinkClick } from "../lib/router";
 import { filmOwed, freshLogin, freshSince, iDenounced, markFilmSeen, myCard, prefillFromLast, rememberMine, type MyCard } from "../lib/session";
 import { revealScene, revealToPlay } from "../lib/revealScene";
@@ -343,7 +345,16 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
   const main: CardData = useMemo(() => (item.kind === "card" ? item.card : fileOf(item.comparison)), [item]);
   const [scene] = useState(revealScene);
   // Le film part dès que l'attente se lève : sa première image est déjà à l'écran.
-  const { phase, open, skip, stage, staged, handoff, finish, animating, settled } = useReveal(animate, start, scene === "film" ? 0 : undefined);
+  const { phase, open, skip, replay, stage, staged, handoff, finish, animating, settled } = useReveal(animate, start, scene === "film" ? 0 : undefined);
+  // Revoir le film (§18.48) : depuis la tête de la fiche, pour tout le monde, jamais en lecture automatique.
+  // Le film se charge au toucher ; la page remonte en haut, la fiche se remonte sous l'arrêt sur image.
+  const reduced = useReducedMotion();
+  const [replayed, setReplayed] = useState(false);
+  const playChase = () => {
+    setReplayed(true);
+    window.scrollTo(0, 0);
+    replay();
+  };
   // La scène ne viendra pas (délai dépassé, WebGL absent, animation passée) : l'attente n'a plus à la guetter.
   useEffect(() => {
     if (abort) skip();
@@ -442,14 +453,14 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
 
       <div className="result-top">
         {/* L'en-tête posé sur le ciel, puis la fiche entière au-dessus de la ligne de flottaison (§18.7, §18.29). */}
-        <WantedHead card={main} />
+        <WantedHead card={main}>{scene === "film" && !reduced && settled && <ChaseLink mine={!visitor} onPlay={playChase} />}</WantedHead>
 
         {animating && (
           // Morceau 3D introuvable : même repli que sans WebGL, la fiche sort sans révélation.
           <ErrorBoundary fallback={null} onError={finish}>
             <Suspense fallback={null}>
               {scene === "film" ? (
-                <Film card={main} lang={lang} phase={phase} onReady={() => onScene("ready")} onGesture={() => onScene("gesture")} onStage={stage} onHandoff={handoff} onDone={finish} />
+                <Film card={main} lang={lang} phase={phase} onReady={() => onScene("ready")} onGesture={() => onScene("gesture")} onStage={stage} onHandoff={handoff} onDone={finish} replay={replayed} />
               ) : (
                 <Walkout3D card={main} lang={lang} declared={declaredOf(item.kind === "comparison" ? item.comparison : item.card)} phase={phase} anchorRef={stageRef} controlRef={walkoutCtl} onReady={() => onScene("ready")} onHandoff={handoff} onDone={finish} />
               )}
@@ -460,7 +471,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
           <div className="single-stage">
             {/* La fiche se retourne (§18.27). Les étoiles ne s'allument ici que sans révélation 3D : sinon elles se rallumeraient sur la carte posée. */}
             {/* Un dossier à deux pièces : une seule fiche, et ses pièces dessous (§18.36). */}
-            <CardViewOptions.Provider value={{ flippable: true, starsIntro: !animate }}>
+            <CardViewOptions.Provider value={{ flippable: true, starsIntro: !animate && !replayed }}>
               <RevealCard card={main} lang={lang} phase={phase} idPrefix="result" staged={staged} />
             </CardViewOptions.Provider>
             {item.kind === "comparison" && settled && <Pieces cmp={item.comparison} />}
@@ -590,7 +601,7 @@ function versusLine(d: Dict["denounce"], mine: MyCard, card: CardData): string {
  * En tête d'une fiche, posé sur le ciel : « AVIS DE RECHERCHE » dans la voix qui annonce, puis « @LOGIN ».
  * La fiche dit le reste (étoiles, profil, note) ; le texte sous la fiche, la peine. Lu « Avis de recherche : @x ».
  */
-export function WantedHead({ card }: { card: CardData }) {
+export function WantedHead({ card, children }: { card: CardData; children?: ReactNode }) {
   const { t } = useT();
   return (
     <header className="wanted">
@@ -599,6 +610,8 @@ export function WantedHead({ card }: { card: CardData }) {
         <span className="sr-only">{t.result.wantedSep}</span>
         <span className="wanted-name">{card.login ? `@${card.login}` : card.name}</span>
       </h1>
+      {/* « Revoir ma poursuite » (§18.48), sur la ligne de « Avis de recherche » */}
+      {children}
     </header>
   );
 }

@@ -74,10 +74,21 @@ describe("page partagée, vue par un visiteur", () => {
   it("un seul h1, lu « Avis de recherche : @login », sans étoiles, profil ni peine dans l'en-tête", () => {
     const html = renderResult(card(), { owner: false });
     expect(html.match(/<h1/g)).toHaveLength(1);
-    const head = /<header class="wanted">.*?<\/header>/.exec(html)?.[0] ?? "";
+    const head = /<h1 class="wanted-head">.*?<\/h1>/.exec(html)?.[0] ?? "";
     const text = head.replace(/<[^>]+>/g, "");
     expect(text).toBe(`Avis de recherche : @${FIXTURES.gold.login}`);
     expect(head).not.toContain("svg");
+  });
+
+  it("« Voir la poursuite » dans l'en-tête, hors du titre, sans rien charger du film (§18.48)", () => {
+    const html = renderResult(card(), { owner: false });
+    const head = /<header class="wanted">.*?<\/header>/.exec(html)?.[0] ?? "";
+    expect(head).toContain('class="chase-link"');
+    expect(head.replace(/<[^>]+>/g, "")).toContain("Voir la poursuite");
+    expect(html).not.toContain("<video");
+    expect(html).not.toContain("film-stage");
+    const mine = renderResult(card(), { owner: true, lang: "en-US" });
+    expect(/<header class="wanted">.*?<\/header>/.exec(mine)?.[0]).toContain("Replay my chase");
   });
 
   it("la peine, en texte sous la fiche : l'image du profil est en ciel de page, plus en tuile", () => {

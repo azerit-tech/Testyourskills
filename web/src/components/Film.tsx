@@ -59,6 +59,8 @@ interface Props {
   onStage?: () => void;
   onHandoff: () => void;
   onDone: () => void;
+  /** Rejoué depuis la tête de la fiche (§18.48) : la révélation a eu son événement `film`, celui-ci n'en envoie pas. */
+  replay?: boolean;
 }
 
 declare global {
@@ -93,7 +95,7 @@ function useFilmPlan(card: CardData): FilmPlan {
   return kept.current.plan;
 }
 
-function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, onDone, onFail }: Props & { onFail: () => void }) {
+function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, onDone, replay = false, onFail }: Props & { onFail: () => void }) {
   const { t: tr } = useT();
   const plan = useFilmPlan(card);
   const planRef = useRef(plan);
@@ -124,7 +126,8 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
     const p = player.current;
     if (r.sent || !p) return;
     r.sent = true;
-    filmTrace("issue", { outcome, gesture: r.gesture, started: r.started });
+    filmTrace("issue", { outcome, gesture: r.gesture, started: r.started, replay });
+    if (replay) return;
     const s = p.stats();
     const net = filmNet();
     api.track("film", null, {
@@ -345,6 +348,14 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
           {/* l'arrêt sur image en deux tons, tiré pendant l'attente (freeze.ts) */}
           <canvas ref={stillRef} className="film-video film-still" />
           <FilmHud plan={plan} hud={hud} lang={lang} />
+          {/* rejoué depuis la fiche, le film se charge au toucher : trois points tant qu'il n'est pas prêt */}
+          {!prepared && phase === "playing" && (
+            <div className="film-loading">
+              <i />
+              <i />
+              <i />
+            </div>
+          )}
         </div>
         {hud.flash > 0 && <div className="film-flash" style={{ opacity: hud.flash }} />}
       </div>

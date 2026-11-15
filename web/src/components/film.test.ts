@@ -177,13 +177,13 @@ function fakeDom() {
 }
 
 /** Le film monté dans une racine React, rejouable avec d'autres propriétés. */
-async function mountFilm() {
+async function mountFilm(opts: { replay?: boolean } = {}) {
   const doc = fakeDom();
   const [{ act }, { createRoot }, { Film }] = await Promise.all([import("react"), import("react-dom/client"), import("./Film")]);
   const host = doc.body.appendChild(doc.createElement("div"));
   const root = createRoot(host as unknown as HTMLElement);
   const render = (card: CardData, phase: Phase) =>
-    act(() => root.render(createElement(Film, { card, lang: "fr", phase, onHandoff: () => undefined, onDone: () => undefined })));
+    act(() => root.render(createElement(Film, { card, lang: "fr", phase, onHandoff: () => undefined, onDone: () => undefined, replay: opts.replay })));
   return { act, render, unmount: () => act(() => root.unmount()) };
 }
 
@@ -233,5 +233,16 @@ describe("le film et l'identité de la fiche", () => {
     expect(h.tracked).toEqual([]);
     await unmount();
     expect(h.tracked).toEqual(["film"]);
+  });
+
+  it("rejoué depuis la fiche (§18.48) : lancé en « playing » avant d'être prêt, il part dès qu'il l'est, sans événement de révélation", async () => {
+    const { act, render, unmount } = await mountFilm({ replay: true });
+    await render(FIXTURES.gold, "playing");
+    expect(h.players).toHaveLength(1);
+    expect(h.players[0].plays).toBe(0);
+    await act(async () => h.players[0].ready());
+    expect(h.players[0].plays).toBe(1);
+    await unmount();
+    expect(h.tracked).toEqual([]);
   });
 });

@@ -1,0 +1,52 @@
+/* « Revoir ma poursuite » / « Voir la poursuite » (ChaseLink.tsx, §18.48) : un
+   lien texte, rose parce qu'il se touche, posé dans la tête de la fiche sur la
+   ligne de « AVIS DE RECHERCHE », à droite : il n'ajoute pas de hauteur, la
+   fiche reste entière sous la tête à 390 × 844. La zone de toucher dépasse le
+   texte (44 px de haut) sans le décaler. */
+.wanted:has(.chase-link) {
+  position: relative;
+}
+.chase-link {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 14px 8px 14px 12px;
+  border: 0;
+  background: none;
+  font: 500 14px/16px var(--f-text);
+  color: var(--blush);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.chase-link svg {
+  flex: none;
+}
+.chase-link:hover,
+.chase-link:active {
+  color: var(--cream);
+}
+.chase-link:focus-visible {
+  outline: 2px solid var(--blush);
+  outline-offset: -6px;
+  border-radius: 999px;
+}
+/* ciel clair (heure rose) : à l'encre, comme la tête */
+.page-result:has(> .card-sky.sky-light.is-in) .chase-link {
+  color: var(--ink-0);
+}
+/* au bureau, la tête de qui a fait la fiche est centrée : le lien se centre dessous */
+@media (min-width: 900px) {
+  .page-result:not(.is-visitor) .chase-link {
+    position: static;
+    display: flex;
+    width: max-content;
+    margin: 2px auto -14px;
+  }
+}

@@ -251,6 +251,45 @@
   background: #8d8cf0;
 }
 
+/* le film rejoué depuis la fiche (§18.48) se charge au toucher : trois points crème au centre */
+.film-loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  gap: 8px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.film-loading i {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #fff9cb;
+  animation: film-dot 1.2s ease-in-out infinite;
+}
+.film-loading i:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.film-loading i:nth-child(3) {
+  animation-delay: 0.4s;
+}
+@keyframes film-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+/* pendant le film, rien de la page ne passe devant : la colonne du visiteur (sa fiche rejouée) attend la fiche */
+.page-result:has(.film-stage:not(.is-landed)) .visitor-col {
+  visibility: hidden;
+}
+
 /* le flash crème, plein écran : la fiche se pose à son sommet */
 .film-flash {
   position: absolute;

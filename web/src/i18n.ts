@@ -173,6 +173,9 @@ const fr = {
     skip: "Passer",
     mute: "Couper le son",
     unmute: "Activer le son",
+    /* le film joue une fois (§18.48) : la tête de la fiche le relance, depuis le début */
+    replay: "Revoir ma poursuite",
+    watch: "Voir la poursuite",
     revealed: (level: string, overall: number) => `Fiche ${level}, note ${overall}.`,
     revealedSealed: "Dossier scellé\u00a0: le code reste à prouver.",
     fireworks: "Clique ou Espace : feux d'artifice",
@@ -920,6 +923,8 @@ const en: Dict = {
     skip: "Skip",
     mute: "Mute",
     unmute: "Unmute",
+    replay: "Replay my chase",
+    watch: "Watch the chase",
     revealed: (level, overall) => `${level} sheet, rated ${overall}.`,
     revealedSealed: "Sealed file: code yet to prove.",
     fireworks: "Click or Space: fireworks",
