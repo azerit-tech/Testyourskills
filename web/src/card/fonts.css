@@ -1,11 +1,11 @@
 /* Polices de la carte : les mêmes TTF que le rendu serveur (server/fonts),
    sous les noms de famille que le SVG référence (cf. shared/card/fonts.ts).
-   Une face par fichier : « Barlow Condensed SemiBold » et « ExtraBold », que le
-   SVG nomme en premier pour resvg, retombent ici sur « Barlow Condensed » 600
-   et 800, le même fichier. Le navigateur ne télécharge que les faces affichées ;
-   Barlow 700 et Outfit 400, celles du premier écran, sont préchargées (index.html). */
+   Une face par fichier : « Barlow Condensed ExtraBold », que le SVG nomme en
+   premier pour resvg, retombe ici sur « Barlow Condensed » 800, le même fichier.
+   Aucune face déclarée sans usage : Barlow 600 ne sert ni à la fiche ni au site.
+   Le navigateur ne télécharge que les faces affichées ; Barlow 700 et Outfit 400,
+   celles du premier écran, sont préchargées (index.html). */
 
-@font-face { font-family: "Barlow Condensed"; font-weight: 600; font-display: swap; src: url("../../../server/fonts/barlow-condensed-600.ttf") format("truetype"); }
 @font-face { font-family: "Barlow Condensed"; font-weight: 700; font-display: swap; src: url("../../../server/fonts/barlow-condensed-700.ttf") format("truetype"); }
 @font-face { font-family: "Barlow Condensed"; font-weight: 800; font-display: swap; src: url("../../../server/fonts/barlow-condensed-800.ttf") format("truetype"); }
 
