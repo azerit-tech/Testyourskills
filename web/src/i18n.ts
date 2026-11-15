@@ -725,10 +725,13 @@ const fr = frTypoDeep({
     see: "Voir sa fiche",
     again: "Dénoncer quelqu'un d'autre",
     /* à l'arrivée de la cible */
-    banner: "Avis de recherche à ton nom",
+    /* un titre qui vaut pour la personne visée comme pour un tiers (§18.48) */
+    banner: (who: string) => `Quelqu'un a dénoncé ${who}`,
     by: (login: string) => `Dénonciation : @${login}`,
     anonymous: "Dénonciation anonyme",
     lawyer: "C'est moi, je reprends ma fiche",
+    lawyerHint: "Connexion GitHub : on lit ton pseudo public, rien d'autre. Ta fiche reprise, tu peux la masquer ou la supprimer.",
+    notMe: "Ce n'est pas moi : faire la mienne",
     andYou: "À ton tour",
     mine: "Ma fiche",
     versus: (me: number, who: string, them: number, verdict: string) => `Toi ${me}/100, ${who} ${them}/100 : ${verdict}`,
@@ -791,6 +794,8 @@ const fr = frTypoDeep({
   /** Fiche sans pseudo GitHub vue par un tiers (LinkedIn, CV) : la personne fichée demande son retrait. */
   removal: {
     link: "Ce n'est pas toi qui as fait cette fiche ? Demander son retrait",
+    /* dans le bloc d'une fiche dénoncée : le titre a déjà dit qui l'a faite */
+    linkShort: "C'est toi ? Demander le retrait de cette fiche",
     label: "Retrait de cette fiche : ton email, pour te répondre",
     placeholder: "ton@email.fr",
     send: "Envoyer",
@@ -1414,10 +1419,12 @@ const en: Dict = {
     linkedinHint: "Text copied: paste it into your LinkedIn post.",
     see: "See their sheet",
     again: "Turn in someone else",
-    banner: "Wanted: you",
+    banner: (who) => `Someone turned in ${who}`,
     by: (login) => `Tip-off: @${login}`,
     anonymous: "Anonymous tip-off",
     lawyer: "That's me, claim my sheet",
+    lawyerHint: "GitHub sign-in: we read your public username, nothing else. Once claimed, you can hide or delete your sheet.",
+    notMe: "Not me: get mine",
     andYou: "Your turn",
     mine: "My sheet",
     versus: (me, who, them, verdict) => `You ${me}/100, ${who} ${them}/100: ${verdict}`,
@@ -1470,6 +1477,7 @@ const en: Dict = {
   },
   removal: {
     link: "Didn't make this sheet yourself? Ask for its removal",
+    linkShort: "That's you? Ask for this sheet's removal",
     label: "Removing this sheet: your email, so we can reply",
     placeholder: "you@email.com",
     send: "Send",

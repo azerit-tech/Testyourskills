@@ -13,7 +13,8 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type State = "closed" | "open" | "sending" | "invalid" | "sent" | "fallback";
 
-export function RemovalRequest({ cardId }: { cardId: string }) {
+/** `short` : dans le bloc d'une fiche dénoncée, dont le titre a déjà dit qui l'a faite. */
+export function RemovalRequest({ cardId, short = false }: { cardId: string; short?: boolean }) {
   const { t, lang } = useT();
   const r = t.removal;
   const [state, setState] = useState<State>("closed");
@@ -38,7 +39,7 @@ export function RemovalRequest({ cardId }: { cardId: string }) {
     return (
       <p className="removal">
         <button type="button" className="link-alt" onClick={() => setState("open")}>
-          {r.link}
+          {short ? r.linkShort : r.link}
         </button>
       </p>
     );

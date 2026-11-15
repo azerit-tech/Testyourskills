@@ -142,8 +142,25 @@
   font: 500 var(--t-14) / 1.2 var(--f-mono);
   color: var(--c-text);
 }
+/* les deux sorties, empilées pleine largeur sur téléphone ; ce que fait la première, dit dessous */
 .denounced .pill {
-  justify-self: start;
+  width: 100%;
+}
+.denounced-hint {
+  font: var(--font-small);
+  color: var(--c-text);
+}
+.denounced .denounced-hint + .pill {
+  margin-top: 2px;
+}
+.denounced .removal {
+  margin: 0;
+}
+@media (min-width: 561px) {
+  .denounced .pill {
+    width: auto;
+    justify-self: start;
+  }
 }
 
 /* le duel : la ligne de comparaison en titre du bloc, puis « Lui envoyer le score » et « Ma fiche » */

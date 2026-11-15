@@ -9,6 +9,7 @@ import { AddSource, Claim, Contest, DeleteCard, EmailForm, Hiring, LinkedInPhoto
 import type { Shareable } from "../components/After";
 import { BandPick } from "../components/BandPick";
 import { Denounce } from "../components/Denounce";
+import { Denounced } from "../components/Denounced";
 import { Duel } from "../components/Duel";
 import { EntryForm } from "../components/EntryForm";
 import { PrimeRace } from "../components/Primes";
@@ -582,8 +583,12 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
               {t.result.lead(who)}
               {!other && <> {t.result.leadYours}</>}
             </p>
-            {/* Fiche dénoncée (§18.6) : « Avis de recherche à ton nom », juste sous la fiche. */}
-            {wantedYou && <Denounced by={kase?.by ?? null} onLawyer={claimOn && cardLogin ? () => api.startClaim(id, cardLogin) : null} />}
+            {/* Fiche dénoncée (§18.6, §18.48) : qui l'a dénoncée, « C'est moi », « Ce n'est pas moi », la demande de retrait, en un bloc. */}
+            {wantedYou && (
+              <Denounced who={who} by={kase?.by ?? null} onLawyer={claimOn && cardLogin ? () => api.startClaim(id, cardLogin) : null} notMe={!other}>
+                {!cardLogin && <RemovalRequest cardId={id} short />}
+              </Denounced>
+            )}
             {/* Le jury (§18.27) : un geste à un toucher ; la peine et la caution dans son bloc. */}
             <Jury cardId={id} card={main} jury={kase?.jury ?? null} toast={toast.show} turn={other ? null : who}>
               <Penalty card={main} />
@@ -611,7 +616,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
             </section>
           ))}
         {/* Sans pseudo GitHub, ni revendication ni masquage : la personne fichée demande le retrait. */}
-        {visitor && !cardLogin && <RemovalRequest cardId={id} />}
+        {/* Fiche dénoncée : la demande est déjà dans son bloc, sous la fiche. */}
+        {visitor && !cardLogin && !wantedYou && <RemovalRequest cardId={id} />}
       </div>
 
       <div className={`after${settled ? " is-in" : ""}`} aria-hidden={!settled} inert={!settled ? true : undefined}>
@@ -685,33 +691,6 @@ export function WantedHead({ card, children }: { card: CardData; children?: Reac
       {/* « Revoir ma poursuite » (§18.48), sur la ligne de « Avis de recherche » */}
       {children}
     </header>
-  );
-}
-
-interface DenouncedProps {
-  /** Le dénonciateur, nommé s'il a revendiqué sa fiche ; sinon « Dénonciation anonyme ». */
-  by: string | null;
-  /** Revendication par GitHub ; null si elle est désactivée : le bouton mène alors à « Fais la tienne ». */
-  onLawyer: (() => void) | null;
-}
-
-/** Fiche dénoncée (§18.6), vue par sa cible : « Avis de recherche à ton nom », juste sous la fiche. */
-function Denounced({ by, onLawyer }: DenouncedProps) {
-  const { t } = useT();
-  const d = t.denounce;
-  const toForm = () => {
-    const input = document.querySelector<HTMLInputElement>("#you input");
-    input?.scrollIntoView({ behavior: "smooth", block: "center" });
-    input?.focus({ preventScroll: true });
-  };
-  return (
-    <div className="denounced" role="note">
-      <p className="denounced-title">{d.banner}</p>
-      <p className="denounced-by">{by ? d.by(by) : d.anonymous}</p>
-      <button type="button" className="pill" onClick={onLawyer ?? toForm}>
-        {onLawyer ? d.lawyer : t.result.makeYours}
-      </button>
-    </div>
   );
 }
 
