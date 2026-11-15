@@ -36,6 +36,38 @@
   pointer-events: none;
 }
 
+/* Au bureau, la colonne ne flotte plus dans le noir (§18.48) : derrière elle,
+   l'image du film tirée sur une toile de 18 × 32 points (Film.tsx, paintBack),
+   agrandie par le navigateur, ce qui la floute, et assombrie dans la toile ;
+   les deux bandes d'encre continuent sur toute la largeur, comme au cinéma.
+   Sur téléphone, la colonne couvre tout : rien de cela ne se voit. */
+.film-back {
+  position: absolute;
+  inset: -6%;
+  width: 112%;
+  height: 112%;
+  object-fit: cover;
+  pointer-events: none;
+}
+.film-wide {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: #0c0d1b;
+  pointer-events: none;
+}
+.film-wide-top {
+  top: var(--film-y);
+  height: calc(var(--film-h) * 0.09);
+}
+.film-wide-bottom {
+  bottom: var(--film-y);
+  height: calc(var(--film-h) * 0.12);
+}
+.film-stage.is-landed .film-back {
+  visibility: hidden;
+}
+
 .film-frame {
   position: relative;
   width: var(--film-w);
@@ -333,6 +365,25 @@
     opacity 0.15s ease,
     visibility 0s 0.15s;
 }
+/* au bureau (la colonne laisse au moins 247 px de chaque côté), les boutons
+   sortent de la colonne : à droite de l'écran, à 48 px du bord, centrés dans la
+   bande d'encre du bas ; la radio a toute la bande de la colonne pour elle */
+@media (min-width: 1000px) {
+  .page-result:has(.film-stage) .skip-btn,
+  .film-sound {
+    bottom: calc(var(--film-y) + (var(--film-h) * 0.12 - 44px) / 2);
+  }
+  .film-sound {
+    right: 48px;
+  }
+  .page-result:has(.film-stage) .skip-btn {
+    right: calc(48px + 44px + 12px);
+  }
+  .film-band-bottom {
+    --radio-zone: 12cqh;
+  }
+}
+
 /* un toucher sur l'image ne fait rien (§18.48) : pas de main au survol */
 .film-stage,
 .page-result:has(.film-stage) .result-stage {
