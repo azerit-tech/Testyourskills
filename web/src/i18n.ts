@@ -303,7 +303,7 @@ const fr = frTypoDeep({
     OPS: "DevOps",
     SEC: "Sécurité",
     EMB: "Embarqué",
-    PM: "Product",
+    PM: "Produit",
     DESIGN: "Design",
     CTO: "CTO",
   } satisfies Record<Position, string>,
@@ -1001,7 +1001,7 @@ const en: Dict = {
     meanwhileBands: "Meanwhile: the crews",
   },
   stats: {
-    TEC: { name: "Technique", what: "How deep the written or described work goes." },
+    TEC: { name: "Tech skill", what: "How deep the written or described work goes." },
     SHIP: { name: "Shipping", what: "Real consistency, week after week." },
     ARCH: { name: "Rigor", what: "Tests, CI, tooling." },
     DOC: { name: "Communication", what: "READMEs, commit messages, résumé clarity." },
