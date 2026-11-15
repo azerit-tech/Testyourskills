@@ -98,7 +98,8 @@ export function AddLinkedin({ login }: { login: string }) {
             aria-describedby={`${uid}-err`}
           />
         </div>
-        <button type="submit" className="pill pill-big entry-submit" disabled={busy}>
+        {/* Secondaire : le rose de la page reste au partage (§18.48). */}
+        <button type="submit" className="pill pill-big pill-ghost entry-submit" disabled={busy}>
           {busy ? t.home.submitting : p.btn}
         </button>
         <p id={`${uid}-err`} className={`entry-error${error ? " is-on" : ""}`} role="alert">

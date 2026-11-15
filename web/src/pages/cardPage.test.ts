@@ -9,7 +9,7 @@ import { FIXTURE_COMPARISON, FIXTURES } from "../../../shared/fixtures";
 import { tileOrder } from "../../../shared/recruiterLine";
 import { DICTS } from "../i18n";
 import { LangProvider } from "../i18n";
-import { Fold, type Shareable } from "../components/After";
+import { Fold, WeekLine, type Shareable } from "../components/After";
 import { linkedinFromField } from "../components/AddLinkedin";
 import { skyOf } from "../components/ProfileTile";
 import { JuryLine } from "../components/Jury";
@@ -347,6 +347,32 @@ describe("la lecture du recruteur (§18.37)", () => {
     expect(own).toMatch(/<section class="after-block add-source add-linkedin"[^>]*><h2[^>]*>Ajoute ton LinkedIn au dossier<\/h2>/);
     expect(own.indexOf("add-linkedin")).toBeLessThan(own.indexOf('class="rest"'));
     expect(renderResult(card({ grid, overall: grid.overall }), { owner: false })).not.toContain("add-linkedin");
+  });
+
+  it("sous trois étoiles : la source qui manque remonte sous le verdict, avant le partage ; à trois et plus, sous les critères (§18.48)", () => {
+    const low = githubGridMock("unknownLang", "x")!;
+    const one = renderResult(card({ id: "LowCard0001", grid: low, overall: low.overall }), { owner: true, token: "tok", plea: 3 });
+    const order = at(one, ['class="after-head"', 'class="after-block add-source add-linkedin"', 'class="after-block out"', 'class="after-block rr"']);
+    expect(ascending(order), JSON.stringify(order)).toBe(true);
+    const five = renderResult(card({ id: "HighCard001", grid, overall: grid.overall }), { owner: true, token: "tok" });
+    const high = at(five, ['class="after-block out"', 'class="after-block rr"', 'class="after-block add-source add-linkedin"', 'class="rest"']);
+    expect(ascending(high), JSON.stringify(high)).toBe(true);
+    // Fiche LinkedIn seule sous trois étoiles : « Ajoute ton GitHub » remonte de même.
+    const li = renderResult(card({ id: "LowCard0002", overall: 30, source: "cv", declaredSource: "linkedin", linkedinUrl: "https://www.linkedin.com/in/x" }), { owner: true });
+    expect(li.indexOf('class="after-block add-source"')).toBeLessThan(li.indexOf('class="after-block out"'));
+    // Le bouton de la source reste secondaire : le rose de la page est au partage.
+    expect(one).toMatch(/<button type="submit" class="pill pill-big pill-ghost entry-submit"/);
+  });
+
+  it("sous trois étoiles, le rang ne s'affiche que dans le top 10 ; au-delà de trois étoiles, toujours", () => {
+    const week = (rank: number) => ({ week: 46, rank, total: 40, gapToTop5: 12, inTop5: false, closed: false });
+    const line = (rank: number, low: boolean) => {
+      stub("fr-FR");
+      return renderToStaticMarkup(createElement(LangProvider, null, createElement(WeekLine, { week: week(rank), low })));
+    };
+    expect(line(14, true)).toBe("");
+    expect(line(8, true)).toContain("8e");
+    expect(line(14, false)).toContain("14e");
   });
 
   it("le champ LinkedIn : le lien entier, ou ce qui suit linkedin.com/in/", () => {

@@ -516,6 +516,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
     ) : item.card.source === "github" && item.card.login ? (
       <AddLinkedin login={item.card.login} />
     ) : null;
+  // Sous trois étoiles (§18.48) : la source qui manque est le remède, elle remonte sous le verdict.
+  const low = starsFor(main.overall) < 3;
 
   return (
     <main className={`page page-card page-result${animating ? " is-animating" : ""}${visitor ? " is-visitor" : ""}`} id="main">
@@ -618,6 +620,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
             <Penalty card={main} />
           </div>
         )}
+        {/* Sous trois étoiles : « Ajoute ton LinkedIn » (ou ton GitHub) tout de suite, avant le partage. */}
+        {low && missing}
         {/* Fiche masquée : /og/* et /c/:id répondent 404 / 410 à tous, l'image ne se télécharge pas et le lien ne montre rien. */}
         {!visitor && !(claimed && me?.hidden) && <ShareBar item={item} toast={toast.show} />}
         {/* Tu roules pour qui ? (§18.38) : l'école et la boîte, la raison de partager, juste après le partage. */}
@@ -629,7 +633,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
         {/* Les critères (§18.37, §18.48) : un seul bloc, la ligne du recruteur, les huit tuiles, le détail replié. */}
         {!visitor && <RecruiterRead item={item} shared={false} who={main.login ? `@${main.login}` : main.name} />}
         {/* La source qui manque, sous les critères qu'elle ouvre : « Ajoute ton GitHub » (§18.24) ou, en miroir, « Ajoute ton LinkedIn » (§18.37). */}
-        {missing}
+        {!low && missing}
         <div className="rest">
           {/* L'enquête en direct (§18.26) : les trois trouvailles les plus fortes, chacune vers sa preuve, en ligne repliée. */}
           {!visitor && <Dossier card={main} />}

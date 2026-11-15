@@ -88,11 +88,14 @@ export function Fold({ name, title, attention = false, onOpen, children }: FoldP
 
 /* ---------- rang de la semaine (§18.22) ---------- */
 
-/** Une ligne, en tête de l'après-fiche : le rang, puis ce qui manque (ou la place à défendre). Hors classement : rien. */
-function WeekLine({ week }: { week: WeekRank | null }) {
+/**
+ * Une ligne, en tête du partage : le rang, puis ce qui manque (ou la place à défendre). Hors classement : rien.
+ * `low` : sous trois étoiles, le rang ne s'affiche que s'il flatte (top 10, §18.48).
+ */
+export function WeekLine({ week, low }: { week: WeekRank | null; low: boolean }) {
   const { t } = useT();
   const w = t.result.week;
-  if (!week) return null;
+  if (!week || (low && !flatteringRank(week.rank))) return null;
   const text = week.closed
     ? week.inTop5
       ? w.closedTop5(week.week)
@@ -279,7 +282,7 @@ export function ShareBar({ item, toast }: { item: Shareable; toast: (m: string) 
 
   return (
     <section className="after-block out" aria-labelledby="out-title">
-      <WeekLine week={weekOf(id)} />
+      <WeekLine week={weekOf(id)} low={kit.input.stars < 3} />
       <h2 id="out-title">{ts.title}</h2>
       <ShareMain kit={kit} className="out-main" />
       {/* Trois boutons secondaires au plus. Sur téléphone, X passe par la feuille de partage. */}
