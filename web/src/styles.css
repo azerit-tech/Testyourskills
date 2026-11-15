@@ -4054,6 +4054,9 @@ a.dossier-item:hover {
 .card-sky.is-in {
   opacity: 1;
 }
+.card-sky picture {
+  display: block;
+}
 .card-sky img {
   width: 100%;
   max-width: none;

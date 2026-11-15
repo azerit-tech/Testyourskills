@@ -47,7 +47,7 @@ describe("le ciel de page (§18.29)", () => {
   it("l'image du profil, cachée tant qu'elle ne s'est pas chargée", () => {
     const html = render(createElement(ProfileSky, { card: FIXTURES.gold, shown: true }));
     expect(html).toContain(
-      `<div class="card-sky sky-light" aria-hidden="true"><img src="/profiles/${FIXTURES.gold.profile!.id}.jpg" width="1152" height="768" alt="" decoding="async" fetchPriority="high"/></div>`,
+      `<div class="card-sky sky-light" aria-hidden="true"><picture><source media="(max-width: 640px)" srcSet="/profiles/${FIXTURES.gold.profile!.id}-s.jpg" width="576" height="384"/><img src="/profiles/${FIXTURES.gold.profile!.id}.jpg" width="1152" height="768" alt="" decoding="async" fetchPriority="high"/></picture></div>`,
     );
   });
 

@@ -269,9 +269,11 @@ describe("le ciel de la page (§18.29)", () => {
   it("l'illustration du profil en premier, derrière la barre, chargée en priorité, muette pour les lecteurs d'écran", () => {
     for (const owner of [false, true]) {
       const html = renderResult(card({ id: owner ? "SkyCard0002" : "SkyCard0001" }), { owner });
-      const sky = /<div class="card-sky[^"]*" aria-hidden="true"><img[^>]*><\/div>/.exec(html)?.[0] ?? "";
+      const sky = /<div class="card-sky[^"]*" aria-hidden="true"><picture>.*?<\/picture><\/div>/.exec(html)?.[0] ?? "";
       expect(html).toContain(`id="main">${sky}`);
       expect(sky).toContain(`src="/profiles/${FIXTURES.gold.profile!.id}.jpg"`);
+      // Au téléphone, la variante -s (exécution 13).
+      expect(sky).toContain(`<source media="(max-width: 640px)" srcSet="/profiles/${FIXTURES.gold.profile!.id}-s.jpg" width="576" height="384"/>`);
       expect(sky).toMatch(/width="1152" height="768" alt="" decoding="async" fetchpriority="high"/i);
       // pas encore chargée : le texte reste crème sur l'encre
       expect(sky).not.toContain("is-in");
@@ -285,7 +287,7 @@ describe("le ciel de la page (§18.29)", () => {
     expect(skyOf("../x").src).toBe("/profiles/default.jpg");
     const { profile: _p, ...bare } = FIXTURES.gold;
     const html = renderResult({ kind: "card", card: { ...(bare as CardData), id: "SkyCard0003" } }, { owner: false });
-    expect(html).toContain('<div class="card-sky sky-dark" aria-hidden="true"><img src="/profiles/default.jpg"');
+    expect(html).toContain('<div class="card-sky sky-dark" aria-hidden="true"><picture><source media="(max-width: 640px)" srcSet="/profiles/default-s.jpg" width="576" height="384"/><img src="/profiles/default.jpg"');
   });
 
   it("dossier à deux pièces : le même ciel qu'une fiche seule", () => {

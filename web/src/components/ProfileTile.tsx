@@ -35,17 +35,21 @@ export function ProfileSky({ card, shown, tall = false }: { card: CardData; show
   if (state === "failed") return null;
   return (
     <div className={`card-sky sky-${tone}${tall ? " is-tall" : ""}${shown && state === "loaded" ? " is-in" : ""}`} aria-hidden="true">
-      <img
-        ref={img}
-        src={src}
-        width={1152}
-        height={768}
-        alt=""
-        decoding="async"
-        fetchPriority="high"
-        onLoad={() => setState("loaded")}
-        onError={() => setState("failed")}
-      />
+      {/* Au téléphone, la variante -s (576 × 384, quatre fois plus légère) : un ciel fondu dans l'encre n'a pas besoin du grand fichier. */}
+      <picture>
+        <source media="(max-width: 640px)" srcSet={src.replace(/\.jpg$/, "-s.jpg")} width={576} height={384} />
+        <img
+          ref={img}
+          src={src}
+          width={1152}
+          height={768}
+          alt=""
+          decoding="async"
+          fetchPriority="high"
+          onLoad={() => setState("loaded")}
+          onError={() => setState("failed")}
+        />
+      </picture>
     </div>
   );
 }
