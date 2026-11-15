@@ -208,7 +208,8 @@ describe("couverture (§18.31)", () => {
     expect(img("f2")).toContain('loading="lazy"');
     expect(img("s1")).toContain('alt=""');
     expect(img("s1")).toMatch(/srcSet="\/profiles\/[a-z_]+-s\.jpg 576w, \/profiles\/[a-z_]+\.jpg 1152w"/);
-    expect(img("s1")).toMatch(/sizes="\(min-width: 900px\) \d+px, \d+vw"/);
+    // Bureau : la colonne de droite ; téléphone couché : un peu moins de la moitié ; téléphone : la page moins ses marges.
+    expect(img("s1")).toMatch(/sizes="\(min-width: 900px\) \d+px, \(min-width: 640px\) and \(max-height: 520px\) calc\([\d.]+ \* 100vw\), calc\([\d.]+ \* \(100vw - 52px\)\)"/);
   });
 
   it("portraits : ceux de f1 et s2 tout de suite, ceux de l'ordinateur seul paresseux", () => {

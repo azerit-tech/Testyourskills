@@ -56,10 +56,18 @@ const HERO = "s1";
 const WIDE_INNER = 504;
 
 /** La largeur affichée d'une case, pour choisir entre -s.jpg et le grand fichier.
- * La grille du téléphone sert à toutes les largeurs : une bande sur téléphone, une colonne au bureau. */
+ * La grille du téléphone sert à toutes les largeurs : une bande sur téléphone, une colonne au bureau.
+ * Sur téléphone, la couverture fait la page moins ses marges (2 × 16 px) et son cadre (2 × 4 px),
+ * joints compris (12 px de plus) : 92vw surestimait la case et faisait prendre le grand fichier.
+ * Téléphone couché : la colonne de droite du héros (styles.css), un peu moins de la moitié. */
 function sizes(id: string): string {
   const share = widthShare(PHONE, id) || widthShare(DESKTOP, id);
-  return `(min-width: 900px) ${Math.ceil(share * WIDE_INNER)}px, ${Math.ceil(share * 92)}vw`;
+  const r = (n: number) => Math.round(n * 1000) / 1000;
+  return [
+    `(min-width: 900px) ${Math.ceil(share * WIDE_INNER)}px`,
+    `(min-width: 640px) and (max-height: 520px) calc(${r(share * 0.44)} * 100vw)`,
+    `calc(${r(share)} * (100vw - 52px))`,
+  ].join(", ");
 }
 
 /** Le nom de chaque profil, pour le texte de remplacement d'un portrait. */
