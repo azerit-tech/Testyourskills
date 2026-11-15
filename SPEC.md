@@ -1643,3 +1643,40 @@ Cinq critiques ont rejugé sur captures le site fusionné ; trois zones corrigé
 - Le duel se fait avec la fiche qui t'a amené ; après suppression, « Ma fiche » est oubliée du navigateur.
 - Fiche dénoncée : « C'est moi » pour la personne visée ; pas de partage public après une dénonciation.
 - Bureau : le ciel au-dessus de la fiche se fond avant le décor, limité à 300 px.
+
+### 18.52 Revue complète : le troisième et dernier tour (15 novembre, fin d'après-midi)
+
+Jacques : « ça commence à être pas mal, on fait un dernier round et stop ». Cinq critiques ont rejugé le site ; ce tour corrige les bloquants et les forts, puis la revue s'arrête.
+
+**La fiche et ses mots**
+- L'école ne montre jamais de chiffre, à personne, comptée ou non : ni au dos, ni dans la formule, ni dans « sous la moyenne des autres ». Deux mots seulement : « comptée » ou « hors moyenne ». Pas de « coef. » pour une école hors moyenne.
+- L'attente ne dit plus que l'IA ne note pas : l'IA lit le code et en donne le niveau ; la note sur 100, c'est la grille qui la calcule.
+- « Fais appel » désigne le critère le plus faible de la note, avec le nom qu'il porte au dos.
+- En anglais, “résumé” partout où on le lit (données, messages du serveur, texte partagé) ; le lien qui retourne la fiche dit “See the exhibits”.
+- Une donnée manquante au dos dit « peu de données » / “thin data”, jamais un mot coupé.
+- On dit « note » / “rating”, jamais « score » ; « le code comme preuve » partout.
+
+**La page d'une fiche**
+- La barre fixe ne couvre jamais la fiche ni « Voir les pièces à conviction », quelle que soit la hauteur ; le clavier non plus (`scroll-padding-bottom`). À 320 px le bouton de partage tient entier.
+- Fiche dénoncée : elle attend ses données avant d'entrer (plus de saut) ; « C'est moi » est dans le premier écran ; la phrase n'est dite qu'une fois ; un bouton par intention.
+- « C'est moi » réussi : la page remonte, dit que la fiche est à ton nom, propose « Voir ma poursuite ».
+- Sous trois étoiles, quand une source manque, le bouton rose est « Ajouter mon LinkedIn » (ou GitHub) ; le partage passe en contour.
+- Le rang ne s'affiche que s'il est dans le top 10 et dans la moitié haute de la semaine ; l'écran et le texte partagé disent le même rang.
+- Juste après le film, le verdict du pari est dans le premier écran, même à 390 × 664.
+- Un jury vide ne dit pas « pas encore de vote » : il invite à partager.
+- Une seule couleur par rôle de bloc (prune, marine) et des liens de preuve roses.
+
+**Avant la fiche**
+- Langue : `?lang=` d'abord (et retenu), puis le choix enregistré, puis sur une fiche la langue de la fiche, puis le navigateur.
+- Accueil pour qui a déjà sa fiche : bouton rose « Voir ma fiche », le formulaire replié sous « Faire une autre fiche ».
+- Attente : la plaque porte dès le début le nom qu'aura la fiche, sans changer en route ; marque et titre restent visibles sur les écrans courts.
+- Film : jamais d'écran noir d'attente ; s'il n'est pas prêt quand la fiche l'est, la fiche arrive avec « Voir ma poursuite ». La ligne radio garde 12 px au moins sous elle.
+- Serveur injoignable : un état d'attente tout de suite, l'erreur ensuite ; la plaque décorative n'est pas lue.
+
+**Autour**
+- Les primes ne peuvent être ouvertes que si le règlement est publié : sinon le serveur les garde éteintes.
+- Cartes de prime : le lot en titre, les contrats en pastilles ; une prime terminée propose « Faire ma fiche » et ne montre pas de classement vide ; le bouton rose d'une prime tient dans le premier écran à 390 × 664.
+- À 320 px, un nom d'école ne se coupe jamais au milieu d'un mot et un pseudo du top garde au moins dix caractères.
+- Un rang s'écrit d'une seule façon : « 3e » (exposant à l'écran).
+
+**À fournir par Jacques** : les mentions légales (éditeur, responsable du traitement, hébergeur), qu'aucune page ne donne encore. À vérifier au déploiement : la porte LinkedIn est allumée dans la configuration de production.
