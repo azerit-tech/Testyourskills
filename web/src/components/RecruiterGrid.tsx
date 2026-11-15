@@ -163,7 +163,7 @@ function Row({ c, grid, declared, shared, isCase }: RowProps) {
  * la moyenne. `unproven` : la note du dossier face à un GitHub « dossier vide »,
  * la dernière ligne dit que le code n'est pas prouvé et ce qui changerait la note.
  */
-function Final({ grid, isCase, unproven }: { grid: Grid; isCase: boolean; unproven: { src: string; shared: boolean } | undefined }) {
+function Final({ grid, unproven }: { grid: Grid; unproven: { src: string; shared: boolean } | undefined }) {
   const { t, lang } = useT();
   const g = t.grid;
   const F = g.final;
@@ -171,7 +171,8 @@ function Final({ grid, isCase, unproven }: { grid: Grid; isCase: boolean; unprov
   const empty = grid.rule === "empty_file";
   return (
     <div className="rg-final">
-      <h3 className="rg-final-title">{isCase ? F.caseTitle : F.title}</h3>
+      {/* Un seul titre, fiche seule ou dossier (§18.52) : « La note de la fiche ». */}
+      <h3 className="rg-final-title">{F.caseTitle}</h3>
       {!empty && <p className="rg-final-how">{F.how}</p>}
       {f.formula && <p className="rg-formula">{f.formula}</p>}
       <p className="rg-overall">
@@ -232,7 +233,7 @@ export function RecruiterGrid({ item, shared }: Props) {
           return c ? <Row key={code} c={c} grid={grid} declared={declared} shared={shared} isCase={item.kind === "comparison"} /> : null;
         })}
       </ol>
-      <Final grid={grid} isCase={item.kind === "comparison"} unproven={unproven} />
+      <Final grid={grid} unproven={unproven} />
       {redacted && <p className="rg-hidden">{g.shared.hidden}</p>}
     </>
   );

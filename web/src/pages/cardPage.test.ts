@@ -382,6 +382,9 @@ describe("la lecture du recruteur (§18.37)", () => {
     expect(html).not.toContain('class="after-block rg"');
     expect(html).not.toContain("Ce que la grille retient");
     expect(html).not.toContain("rr-more");
+    // Le bloc de la note : « La note de la fiche », fiche seule comme dossier (§18.52).
+    expect(html).toContain('<h3 class="rg-final-title">La note de la fiche</h3>');
+    expect(html).not.toContain("La note sur 100");
   });
 
   it("vue par un visiteur : le titre à la troisième personne", () => {
