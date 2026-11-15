@@ -436,15 +436,24 @@ describe("la lecture du recruteur (§18.37)", () => {
     expect(one).toMatch(/<button type="submit" class="pill pill-ghost entry-submit"/);
   });
 
-  it("sous trois étoiles, le rang ne s'affiche que dans le top 10 ; au-delà de trois étoiles, toujours", () => {
-    const week = (rank: number) => ({ week: 46, rank, total: 40, gapToTop5: 12, inTop5: false, closed: false });
-    const line = (rank: number, low: boolean) => {
-      stub("fr-FR");
-      return renderToStaticMarkup(createElement(LangProvider, null, createElement(WeekLine, { week: week(rank), low })));
+  it("le rang ne s'affiche que s'il flatte (top 10 et première moitié), écrit comme dans le texte partagé (§18.52)", () => {
+    const week = (rank: number, total = 40, closed = false) => ({ week: 46, rank, total, gapToTop5: 12, inTop5: rank <= 5, closed });
+    const line = (rank: number, low: boolean, total?: number, lang = "fr-FR", closed = false) => {
+      stub(lang);
+      return renderToStaticMarkup(createElement(LangProvider, null, createElement(WeekLine, { week: week(rank, total, closed), low }))).replace(/ /g, " ");
     };
     expect(line(14, true)).toBe("");
+    expect(line(14, false)).toBe("");
     expect(line(8, true)).toContain("8e");
-    expect(line(14, false)).toContain("14e");
+    // Le lancement : « 8e » sur huit, c'est la dernière place ; rien.
+    expect(line(8, false, 8)).toBe("");
+    expect(line(4, false, 8)).toContain("4e cette semaine");
+    expect(line(9, false, 12, "fr-FR", true)).toBe("");
+    // Le top 5 dit son rang, comme le texte partagé (« n° 1 cette semaine »).
+    expect(line(1, false)).toBe('<p class="week-rank">N° 1 cette semaine : défends ta place jusqu&#x27;à dimanche</p>');
+    expect(line(3, false)).toContain("3e cette semaine : défends ta place");
+    expect(line(1, false, 40, "en-US")).toContain("#1 this week: hold your spot until Sunday");
+    expect(DICTS.fr.result.week.share(1).replace(/ /g, " ")).toBe("n° 1 cette semaine");
   });
 
   it("le rang : du texte au-dessus du bouton, jamais un lien ; l'écart seulement s'il encourage (parcours 14 et 22, textes 18)", () => {

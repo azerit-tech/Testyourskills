@@ -105,10 +105,15 @@ describe("le texte qu'on signe de son nom (§18.48)", () => {
     for (const x of cases) expect(shareLead(en, x)).not.toMatch(/Make yours|\bMy file\b|hiring grid|yet to prove/);
   });
 
-  it("le rang ne part que s'il flatte : le top 10 de la semaine", () => {
+  it("le rang ne part que s'il flatte : le top 10 de la semaine, et la première moitié des fiches (§18.52)", () => {
     expect(SHARE_RANK_MAX).toBe(10);
-    expect([1, 4, 10].every(flatteringRank)).toBe(true);
-    expect([0, 11, 37, 412].some(flatteringRank)).toBe(false);
+    expect([1, 4, 10].every((r) => flatteringRank(r, 400))).toBe(true);
+    expect([0, 11, 37, 412].some((r) => flatteringRank(r, 400))).toBe(false);
+    // Le jour du lancement, avec huit fiches : « 4e » flatte, « 7e » ou « 8e » non.
+    expect(flatteringRank(4, 8)).toBe(true);
+    expect([5, 7, 8].some((r) => flatteringRank(r, 8))).toBe(false);
+    expect(flatteringRank(1, 1)).toBe(false);
+    expect(flatteringRank(1, 2)).toBe(true);
     // Sans rang, la phrase s'arrête au profil.
     expect(shareLead(fr, { ...card, rank: null })).toContain(`Profil «${N}Sous couverture${N}». `);
   });

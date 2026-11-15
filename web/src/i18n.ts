@@ -389,7 +389,8 @@ const fr = frTypoDeep({
     rank: (rank: number, total: number) => `${rank}e${showsTotal(total) ? ` sur ${total}` : ""} cette semaine`,
     /** Sous les liens du partage : vers le top de la semaine, sur l'accueil. */
     board: "Voir le top de la semaine",
-      top5: "Top 5 de la semaine : défends ta place jusqu'à dimanche",
+      /** Le rang du top 5, écrit comme dans le texte partagé (« n° 1 cette semaine »). */
+      top5: (rank: number) => `${rank === 1 ? "N° 1" : `${rank}e`} cette semaine : défends ta place jusqu'à dimanche`,
       closedLine: (rank: number, total: number, week: number) => `${rank}e${showsTotal(total) ? ` sur ${total}` : ""}, semaine ${week}`,
       closedTop5: (week: number) => `Top 5 de la semaine ${week}`,
       share: (rank: number) => `${rank === 1 ? "n° 1" : `${rank}e`} cette semaine`,
@@ -1176,7 +1177,7 @@ const en: Dict = {
       line: (rank, total, gap) => `#${rank}${showsTotal(total) ? ` of ${total}` : ""} this week, ${gap} ${gap === 1 ? "point" : "points"} from the top 5`,
       rank: (rank, total) => `#${rank}${showsTotal(total) ? ` of ${total}` : ""} this week`,
       board: "See this week's top",
-      top5: "This week's top 5: hold your spot until Sunday",
+      top5: (rank) => `#${rank} this week: hold your spot until Sunday`,
       closedLine: (rank, total, week) => `#${rank}${showsTotal(total) ? ` of ${total}` : ""}, week ${week}`,
       closedTop5: (week) => `Top 5 of week ${week}`,
       share: (rank) => `#${rank} this week`,

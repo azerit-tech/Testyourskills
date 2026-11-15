@@ -47,9 +47,10 @@ export type ShareInput = CardShare;
 
 export { starsLine };
 
-/** Le rang ne part dans le texte que s'il flatte : le top 10 de la semaine (§18.48). */
+/** Le rang ne s'affiche et ne part dans le texte que s'il flatte : le top 10 de la semaine (§18.48),
+ *  et la première moitié des fiches (§18.52) : « 8e » sur huit, le jeudi du lancement, c'est la dernière place. */
 export const SHARE_RANK_MAX = 10;
-export const flatteringRank = (rank: number): boolean => rank >= 1 && rank <= SHARE_RANK_MAX;
+export const flatteringRank = (rank: number, total: number): boolean => rank >= 1 && rank <= SHARE_RANK_MAX && rank <= total / 2;
 
 /** X plafonne un post à 280 caractères et compte tout lien pour 23. */
 export const X_MAX = 280;

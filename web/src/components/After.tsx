@@ -101,13 +101,14 @@ export const GAP_SHOWN_MAX = 10;
 export function WeekLine({ week, low }: { week: WeekRank | null; low: boolean }) {
   const { t } = useT();
   const w = t.result.week;
-  if (!week || (low && !flatteringRank(week.rank))) return null;
+  // Le rang ne se montre que s'il flatte, comme dans le texte partagé (§18.52) : même seuil, même rang écrit.
+  if (!week || !flatteringRank(week.rank, week.total)) return null;
   const text = week.closed
     ? week.inTop5
       ? w.closedTop5(week.week)
       : w.closedLine(week.rank, week.total, week.week)
     : week.inTop5
-      ? w.top5
+      ? w.top5(week.rank)
       : !low && week.gapToTop5 <= GAP_SHOWN_MAX
         ? w.line(week.rank, week.total, week.gapToTop5)
         : w.rank(week.rank, week.total);
@@ -243,7 +244,7 @@ export function useSharing(item: Shareable, toast: (m: string) => void) {
   const url = shareUrl(id);
   const week = weekOf(id);
   // Le rang n'entre dans le texte que pendant sa semaine, et seulement s'il flatte (top 10) : « 7e cette semaine ».
-  const rank = week && !week.closed && flatteringRank(week.rank) ? t.result.week.share(week.rank) : null;
+  const rank = week && !week.closed && flatteringRank(week.rank, week.total) ? t.result.week.share(week.rank) : null;
   const input = shareInput(item, lang, rank);
   const named = item.kind === "card" ? item.card : fileOf(item.comparison);
   const filename = `azerit-${named.login ?? named.initials}.png`;
