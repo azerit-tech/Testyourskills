@@ -568,10 +568,16 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
   // Dénonciation (§18.6) et page partagée (§18.7).
   // La configuration est déjà dans la page (ou en mémoire) : « C'est moi » est là dès la première image, rien ne pousse le bloc.
   const [claimOn, setClaimOn] = useState(() => api.knownConfig()?.claim ?? false);
+  // Le serveur lit LinkedIn : « Ajoute ton LinkedIn » existe (AddLinkedin.tsx lit la même valeur).
+  const [liOn, setLiOn] = useState(() => api.knownConfig()?.linkedinEntry ?? true);
   const [mine] = useState<MyCard | null>(() => myCard());
   useEffect(() => {
     let alive = true;
-    void api.getConfig().then((c) => alive && setClaimOn(c.claim));
+    void api.getConfig().then((c) => {
+      if (!alive) return;
+      setClaimOn(c.claim);
+      setLiOn(c.linkedinEntry);
+    });
     return () => {
       alive = false;
     };
@@ -603,15 +609,19 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
   const who = main.login ? `@${main.login}` : main.name;
   // Au-dessus de la fiche, sur téléphone : « @pseudo », ou le prénom seul.
   const whoShort = main.login ? `@${main.login}` : (main.name.split(/\s+/)[0] ?? main.name);
-  // La source qui manque au dossier, en bloc : le GitHub d'une fiche LinkedIn seule, le LinkedIn d'une fiche GitHub seule.
-  const missing =
-    visitor || item.kind !== "card" ? null : proveFirst ? (
-      <AddSource card={main} />
-    ) : item.card.source === "github" && item.card.login ? (
-      <AddLinkedin login={item.card.login} />
-    ) : null;
   // Sous trois étoiles (§18.48) : la source qui manque est le remède, elle remonte sous le verdict.
   const low = starsFor(main.overall) < 3;
+  // Laquelle manque : le GitHub d'une fiche LinkedIn seule, le LinkedIn d'une fiche GitHub seule.
+  const lacks: "github" | "linkedin" | null =
+    visitor || item.kind !== "card" ? null : proveFirst ? (main.linkedinUrl ? "github" : null) : item.card.source === "github" && item.card.login && liOn ? "linkedin" : null;
+  // Sous trois étoiles, son bouton prend le rose, de la barre comme du bloc ; le partage passe en contour (§18.52).
+  const addFirst = low && lacks !== null ? lacks : null;
+  const missing =
+    visitor || item.kind !== "card" ? null : proveFirst ? (
+      <AddSource card={main} strong={!!addFirst} />
+    ) : item.card.source === "github" && item.card.login ? (
+      <AddLinkedin login={item.card.login} strong={!!addFirst} />
+    ) : null;
 
   // « Revoir ma poursuite » : dans la tête de la fiche ; sur un téléphone court, la tête se masque
   // et le lien descend sous la fiche, à côté de « Pièces à conviction » (le CSS choisit).
@@ -768,7 +778,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
         {low && missing}
         {/* Fiche masquée : /og/* et /c/:id répondent 404 / 410 à tous, l'image ne se télécharge pas et le lien ne montre rien. */}
         {fromRival && <Duel mine={own} card={fromRival} duel={fromDuel} from />}
-        {!visitor && !(claimed && me?.hidden) && <ShareBar item={item} toast={toast.show} />}
+        {!visitor && !(claimed && me?.hidden) && <ShareBar item={item} toast={toast.show} second={!!addFirst} />}
         {/* Tu roules pour qui ? (§18.38) : l'école et la boîte, la raison de partager, juste après le partage. */}
         {!visitor && <BandPick cardId={id} toast={toast.show} />}
         {/* Dénonce un complice (§18.6). */}
@@ -802,7 +812,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
         )}
       </div>
       {/* La barre du pouce (§18.27) : mêmes conditions que le bloc de partage, une fois la fiche posée. Avant le toast, qui se cale dessus. */}
-      {!visitor && !(claimed && me?.hidden) && <ShareDock item={item} ready={settled} toast={toast.show} />}
+      {!visitor && !(claimed && me?.hidden) && <ShareDock item={item} ready={settled} toast={toast.show} add={addFirst} />}
       {/* La barre fixe du visiteur sur téléphone (§18.48) : « Faire ma fiche », « C'est moi » sur une fiche dénoncée, ou « Lui envoyer mon score ». */}
       {visitor && settled && (!other || duel.send) && <MakeYours watch={wantedYou} onLawyer={lawyer} onSend={other ? duel.send : null} />}
       {toast.node}

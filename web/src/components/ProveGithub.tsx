@@ -11,7 +11,8 @@ import { unlockAudio } from "../lib/audio";
 import { markFresh, rememberInput } from "../lib/session";
 import { parseLogin } from "../lib/util";
 
-export function ProveGithub({ linkedinUrl }: { linkedinUrl: string }) {
+/** `strong` : sous trois étoiles, ajouter la source est le remède (§18.52) : le bouton passe en rose, le partage en contour. */
+export function ProveGithub({ linkedinUrl, strong = false }: { linkedinUrl: string; strong?: boolean }) {
   const { t, lang } = useT();
   const p = t.result.prove;
   const uid = useId().replace(/:/g, "");
@@ -76,8 +77,8 @@ export function ProveGithub({ linkedinUrl }: { linkedinUrl: string }) {
             aria-describedby={`${uid}-err`}
           />
         </div>
-        {/* Secondaire : le rose de la page reste au partage (§18.48). */}
-        <button type="submit" className="pill pill-ghost entry-submit" disabled={busy}>
+        {/* Secondaire : le rose de la page reste au partage (§18.48) ; sous trois étoiles, c'est lui le rose (§18.52). */}
+        <button type="submit" className={`pill ${strong ? "pill-big" : "pill-ghost"} entry-submit`} disabled={busy}>
           {busy ? t.home.submitting : p.btn}
         </button>
         <p id={`${uid}-err`} className={`entry-error${error ? " is-on" : ""}`} role="alert">

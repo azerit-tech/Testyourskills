@@ -3226,9 +3226,19 @@ a.dossier-item:hover {
 }
 /* sous 360 px, « Partager sur LinkedIn » prend toute la barre : le second bouton a son bloc plus bas */
 @media (max-width: 359px) {
-  .dock:has(> a.dock-main) > .pill-ghost {
+  .dock:has(> a.dock-main) > .pill-ghost,
+  .dock.is-add > .pill-ghost {
     display: none;
   }
+}
+/* sous trois étoiles, « Partager » passe en contour à côté d'« Ajouter mon LinkedIn », à sa taille ; sous 360 px,
+   ou quand c'est « Partager sur LinkedIn » (trop long pour deux), il a son bloc plus bas */
+.dock.is-add > .pill-ghost {
+  flex: none;
+  padding: 0 18px;
+}
+.dock.is-add > a.pill-ghost {
+  display: none;
 }
 /* le toast passe au-dessus de la barre (10 + 52 + 10 px) */
 .dock.is-on ~ .toast {

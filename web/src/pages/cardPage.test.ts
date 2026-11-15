@@ -445,8 +445,14 @@ describe("la lecture du recruteur (§18.37)", () => {
     // Fiche LinkedIn seule sous trois étoiles : « Ajoute ton GitHub » remonte de même.
     const li = renderResult(card({ id: "LowCard0002", overall: 30, source: "cv", declaredSource: "linkedin", linkedinUrl: "https://www.linkedin.com/in/x" }), { owner: true });
     expect(li.indexOf('class="after-block add-source"')).toBeLessThan(li.indexOf('class="after-block out"'));
-    // Le bouton de la source reste secondaire : le rose de la page est au partage.
-    expect(one).toMatch(/<button type="submit" class="pill pill-ghost entry-submit"/);
+    // Sous trois étoiles, le bouton de la source prend le rose, le partage passe en contour (§18.52).
+    expect(one).toMatch(/<button type="submit" class="pill pill-big entry-submit"/);
+    expect(one).toMatch(/class="pill pill-big out-main pill-ghost"/);
+    expect(li).toMatch(/<button type="submit" class="pill pill-big entry-submit"/);
+    expect(li).toMatch(/class="pill pill-big out-main pill-ghost"/);
+    // À trois étoiles et plus, rien ne change : la source en contour, le partage en rose.
+    expect(five).toMatch(/<button type="submit" class="pill pill-ghost entry-submit"/);
+    expect(five).toMatch(/class="pill pill-big out-main"/);
   });
 
   it("le rang ne s'affiche que s'il flatte (top 10 et première moitié), écrit comme dans le texte partagé (§18.52)", () => {

@@ -19,7 +19,8 @@ export function linkedinFromField(raw: string): string | null {
   return normalizeLinkedinUrl(/linkedin\.com/i.test(s) ? s : `linkedin.com/in/${s.replace(/^@/, "")}`);
 }
 
-export function AddLinkedin({ login }: { login: string }) {
+/** `strong` : sous trois étoiles, ajouter la source est le remède (§18.52) : le bouton passe en rose, le partage en contour. */
+export function AddLinkedin({ login, strong = false }: { login: string; strong?: boolean }) {
   const { t, lang } = useT();
   const p = t.result.addLinkedin;
   const uid = useId().replace(/:/g, "");
@@ -98,8 +99,8 @@ export function AddLinkedin({ login }: { login: string }) {
             aria-describedby={`${uid}-err`}
           />
         </div>
-        {/* Secondaire : le rose de la page reste au partage (§18.48). */}
-        <button type="submit" className="pill pill-ghost entry-submit" disabled={busy}>
+        {/* Secondaire : le rose de la page reste au partage (§18.48) ; sous trois étoiles, c'est lui le rose (§18.52). */}
+        <button type="submit" className={`pill ${strong ? "pill-big" : "pill-ghost"} entry-submit`} disabled={busy}>
           {busy ? t.home.submitting : p.btn}
         </button>
         <p id={`${uid}-err`} className={`entry-error${error ? " is-on" : ""}`} role="alert">

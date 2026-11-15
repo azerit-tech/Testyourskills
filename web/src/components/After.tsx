@@ -348,7 +348,8 @@ export function ShareMain({ kit, className = "", from }: { kit: Sharing; classNa
   return <LinkedInLink kit={kit} className={`pill pill-big ${className}`} from={from} />;
 }
 
-export function ShareBar({ item, toast }: { item: Shareable; toast: (m: string) => void }) {
+/** `second` : sous trois étoiles, une source à ajouter passe devant (§18.52) : le partage en contour. */
+export function ShareBar({ item, toast, second = false }: { item: Shareable; toast: (m: string) => void; second?: boolean }) {
   const { t } = useT();
   const ts = t.result.share;
   const kit = useSharing(item, toast);
@@ -367,7 +368,7 @@ export function ShareBar({ item, toast }: { item: Shareable; toast: (m: string) 
       <h2 id="out-title">{ts.title}</h2>
       <WeekLine week={weekOf(id)} low={kit.input.stars < 3} />
       {/* Un bouton rose (« Partager » sur téléphone, LinkedIn ailleurs), LinkedIn en contour quand il passe second. */}
-      <ShareMain kit={kit} className="out-main" />
+      <ShareMain kit={kit} className={`out-main${second ? " pill-ghost" : ""}`} />
       {kit.native && <LinkedInLink kit={kit} className="pill pill-ghost out-second" />}
       {/* En permanence, sous le bouton LinkedIn : où part le texte, avant comme après l'appui. */}
       <p className={`out-hint${kit.textCopied ? " is-copied" : ""}`} aria-live="polite">
@@ -659,10 +660,10 @@ export function Contest({ card, cardId, onDeleted }: { card: CardData; cardId: s
 
 /* ---------- ajouter l'autre source ---------- */
 
-export function AddSource({ card }: { card: CardData }) {
+export function AddSource({ card, strong = false }: { card: CardData; strong?: boolean }) {
   const { t } = useT();
   // Fiche LinkedIn seule (§18.24) : un seul appel, « Ajoute ton GitHub pour prouver ».
-  if (declaredOf(card) === "linkedin") return card.linkedinUrl ? <ProveGithub linkedinUrl={card.linkedinUrl} /> : null;
+  if (declaredOf(card) === "linkedin") return card.linkedinUrl ? <ProveGithub linkedinUrl={card.linkedinUrl} strong={strong} /> : null;
   const fromGithub = card.source === "github";
   const copy = fromGithub ? t.result.addCv : t.result.addGithub;
   return (

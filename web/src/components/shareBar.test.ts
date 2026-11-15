@@ -172,7 +172,21 @@ describe("barre du pouce (§18.27)", () => {
   it("le bloc « Dénonce un complice » à l'écran : « Dénoncer » quitte la barre, jamais deux fois le même geste", () => {
     const src = readFileSync(join(__dirname, "ShareDock.tsx"), "utf8");
     expect(src).toContain('setDenounceSeen(all.some((el) => el.matches(".after-block.denounce")))');
-    expect(src).toMatch(/\{!denounceSeen && \(\s*<button type="button" className="pill pill-big pill-ghost" onClick=\{toDenounce\}>/);
+    expect(src).toMatch(/\{!denounceSeen && \(\s*<button type="button" className="pill pill-big pill-ghost" onClick=\{\(\) => toField\("\.after-block\.denounce"\)\}>/);
+  });
+
+  it("sous trois étoiles, une source à ajouter : « Ajouter mon LinkedIn » en rose, « Partager » en contour, pas de « Dénoncer » (§18.52)", () => {
+    for (const [add, label] of [["linkedin", "Ajouter mon LinkedIn"], ["github", "Ajouter mon GitHub"]] as const) {
+      const item = stub(phone, "AbCdEf1234");
+      const html = renderToStaticMarkup(createElement(LangProvider, null, createElement(ShareDock, { item, ready: true, toast: () => undefined, add })));
+      expect(pinks(html)).toEqual(['class="pill pill-big dock-main"']);
+      expect(html).toContain(`>${label}</button>`);
+      expect(html.match(/class="pill pill-big pill-ghost"/g)).toHaveLength(1);
+      expect(html).toContain("Partager");
+      expect(html).not.toContain("Dénoncer");
+    }
+    // La barre s'efface aussi devant le bloc de la source, dont le bouton est le rose.
+    expect(readFileSync(join(__dirname, "ShareDock.tsx"), "utf8")).toContain('".after-block.out, .after-block.denounce.is-done, .after-block.add-source .entry-submit"');
   });
 
   it("pas pendant la révélation, pas sur ordinateur", () => {
