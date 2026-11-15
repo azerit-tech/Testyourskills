@@ -2560,14 +2560,18 @@ button.cover-panel:focus-visible {
 .result-stage .card-slot {
   margin-bottom: 44px;
 }
-/* téléphones : la fiche garde au moins 92 % de la largeur (§18.51) ; elle est l'objet qu'on lit et qu'on
-   capture. Sur un écran court (Safari, navigateur de LinkedIn : 390 × 664), elle dépasse sous la barre fixe
-   de quelques dizaines de pixels et l'on fait défiler, plutôt que de la réduire en vignette illisible.
-   Inchangée à 390 × 844 et au-delà. */
+/* téléphones (§18.52) : la barre fixe ne couvre jamais la fiche ni « Voir les pièces à conviction ». La fiche
+   se taille dans ce qui reste sous ce qui la précède (`--stage-top`, mesuré par la page : barre du haut, tête,
+   phrase du visiteur) et au-dessus de la barre : 8 px de marge haute, 44 px de lien, 12 px d'air, 73 px de
+   barre. Toute la largeur à 390 × 844 ; 240 px au moins (douze unités du dessin y font 8 px). */
 @media (max-width: 640px) {
   .page-result {
-    --card-w: clamp(calc((100vw - 32px) * 0.92), calc((100vh - 182px) * 0.6923), min(360px, calc(100vw - 32px)));
-    --card-w: clamp(calc((100vw - 32px) * 0.92), calc((100svh - 182px) * 0.6923), min(360px, calc(100vw - 32px)));
+    --card-w: clamp(240px, calc((100vh - var(--stage-top, 60px) - 137px) * 0.6923), min(360px, calc(100vw - 32px)));
+    --card-w: clamp(240px, calc((100svh - var(--stage-top, 60px) - 137px - env(safe-area-inset-bottom, 0px)) * 0.6923), min(360px, calc(100vw - 32px)));
+  }
+  /* au clavier, le champ ou le lien qui prend le focus s'arrête au-dessus de la barre fixe (WCAG 2.4.11) */
+  html.has-dock {
+    scroll-padding-bottom: calc(85px + env(safe-area-inset-bottom, 0px));
   }
 }
 /* « Revoir ma poursuite » sous la fiche quand la tête est masquée : une seconde ligne centrée, sous
@@ -2754,6 +2758,21 @@ button.cover-panel:focus-visible {
 @media (max-width: 359px) {
   .visitor-lead {
     font-size: var(--t-14);
+  }
+}
+/* téléphone court : la phrase se resserre, la fiche garde la place ; sous 620 px de haut, la seconde
+   phrase (« La tienne prend une minute ») laisse la place à la fiche, la barre fixe la porte déjà */
+@media (max-width: 640px) and (max-height: 759px) {
+  .visitor-lead {
+    padding: 6px 0 2px;
+    font-size: var(--t-14);
+    line-height: 1.3;
+  }
+}
+@media (max-width: 640px) and (max-height: 619px) {
+  .visitor-lead br,
+  .visitor-lead .lead-yours {
+    display: none;
   }
 }
 /* « À ton tour » : la phrase entière au bureau, en tête de la colonne de droite ; la question sur téléphone */
@@ -3192,6 +3211,17 @@ a.dossier-item:hover {
 .dock .dock-main {
   flex: 1;
   min-width: 0;
+}
+/* le second bouton de la barre est secondaire : 44 px (§18.48), centré face au rose de 52 */
+.dock > .pill-ghost {
+  align-self: center;
+  min-height: var(--h-tap);
+}
+/* sous 360 px, « Partager sur LinkedIn » prend toute la barre : le second bouton a son bloc plus bas */
+@media (max-width: 359px) {
+  .dock:has(> a.dock-main) > .pill-ghost {
+    display: none;
+  }
 }
 /* le toast passe au-dessus de la barre (10 + 52 + 10 px) */
 .dock.is-on ~ .toast {

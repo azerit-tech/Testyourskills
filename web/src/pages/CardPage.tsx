@@ -1,7 +1,7 @@
 // Route /c/:id : attente, révélation puis résultat pour une carte fraîche ;
 // affichage direct (sans pack) pour un lien partagé.
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode, RefObject } from "react";
 import { fileOf } from "../../../shared/caseFile";
 import { usableGrid } from "../../../shared/gridText";
 import type { CardData, Fact, Finding, JobState, ProgressEvent } from "../../../shared/types";
@@ -49,6 +49,31 @@ const Walkout3D = lazy(() => loadWalkout().then((m) => ({ default: m.Walkout3D }
 /** Le film (§18.36) : deux balises vidéo, ni Three.js ni WebGL. Les vidéos se chargent dès l'attente. */
 const loadFilm = () => import("../components/Film");
 const Film = lazy(() => loadFilm().then((m) => ({ default: m.Film })));
+
+/**
+ * La hauteur de ce qui est au-dessus de la fiche (bandeau, barre du haut, tête, phrase du visiteur),
+ * mesurée et posée en `--stage-top` sur la page : sur téléphone, la fiche se taille dans ce qui reste
+ * au-dessus de la barre fixe (§18.52), quelle que soit la hauteur de l'écran ou la taille du texte.
+ * Posée avant la première image (layout effect) : la fiche ne change pas de taille sous les yeux.
+ */
+function useStageTop(page: RefObject<HTMLElement | null>, stage: RefObject<HTMLElement | null>) {
+  useLayoutEffect(() => {
+    const el = page.current;
+    const st = stage.current;
+    if (!el || !st) return;
+    const set = () => el.style.setProperty("--stage-top", `${Math.round(st.getBoundingClientRect().top + window.scrollY)}px`);
+    set();
+    const ro = typeof ResizeObserver === "function" ? new ResizeObserver(set) : null;
+    const siblings = [...(st.parentElement?.children ?? [])];
+    const above = siblings.slice(0, siblings.indexOf(st));
+    [document.querySelector(".topbar"), document.querySelector(".season-band"), ...above].forEach((n) => n && ro?.observe(n));
+    window.addEventListener("resize", set);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener("resize", set);
+    };
+  });
+}
 
 const POLL_MS = 600;
 /** Échecs réseau d'affilée avant que l'attente dise que le commissariat ne répond pas (environ 5 s). */
@@ -447,6 +472,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
   const toast = useToast();
   const tracked = useRef(false);
   const stageRef = useRef<HTMLElement>(null);
+  const pageRef = useRef<HTMLElement>(null);
+  useStageTop(pageRef, stageRef);
   const walkoutCtl = useRef<WalkoutControl | null>(null);
 
   useEffect(() => {
@@ -566,7 +593,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
   const fromDuel = useDuelSend(fromRival && !main.sealed ? own : null, fromRival ?? main, toast.show);
 
   return (
-    <main className={`page page-card page-result${animating ? " is-animating" : ""}${visitor ? " is-visitor" : ""}${wantedYou ? " is-wanted" : ""}`} id="main">
+    <main ref={pageRef} className={`page page-card page-result${animating ? " is-animating" : ""}${visitor ? " is-visitor" : ""}${wantedYou ? " is-wanted" : ""}`} id="main">
       {/* Le ciel de la page (§18.29) : derrière la barre du haut, une fois la fiche posée. */}
       {/* Le film se pose sur ce ciel : il entre sous le flash, au passage de relais. */}
       <ProfileSky card={main} shown={settled || (scene === "film" && phase === "handoff")} />
@@ -591,7 +618,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
                 {!other && (
                   <>
                     <br />
-                    {t.result.leadYours}
+                    <span className="lead-yours">{t.result.leadYours}</span>
                   </>
                 )}
               </>

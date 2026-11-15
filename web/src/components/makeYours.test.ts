@@ -82,15 +82,20 @@ describe("la barre « Faire ma fiche » du visiteur", () => {
     expect(Number(rule![1])).toBeGreaterThan(10 + 52 + 10);
   });
 
-  it("téléphones : la fiche garde au moins 92 % de la largeur, on fait défiler plutôt que de la réduire", () => {
-    const rule = /@media \(max-width: 640px\) \{\s*\.page-result \{[^}]*--card-w: clamp\(calc\(\(100vw - 32px\) \* ([\d.]+)\), calc\(\(100svh - (\d+)px\) \* ([\d.]+)\), min\(360px, calc\(100vw - 32px\)\)\);/.exec(css);
+  it("téléphones (§18.52) : la fiche se taille au-dessus de la barre fixe, « Voir les pièces à conviction » compris", () => {
+    const rule = /@media \(max-width: 640px\) \{\s*\.page-result \{[^}]*--card-w: clamp\((\d+)px, calc\(\(100svh - var\(--stage-top, 60px\) - (\d+)px - env\(safe-area-inset-bottom, 0px\)\) \* ([\d.]+)\), min\(360px, calc\(100vw - 32px\)\)\);/.exec(css);
     expect(rule).not.toBeNull();
     const [floor, chrome, ratio] = rule!.slice(1).map(Number);
-    const width = (w: number, h: number) => Math.max(floor * (w - 32), Math.min((h - chrome) * ratio, 360, w - 32));
-    // Les hauteurs réelles (Safari, navigateur de LinkedIn) : jamais sous 92 %.
-    for (const [w, h] of [[390, 664], [375, 667], [360, 640], [320, 568]]) expect(width(w, h) / (w - 32)).toBeGreaterThanOrEqual(0.92);
-    // À 390 × 844, pleine largeur.
-    expect(Math.round(width(390, 844))).toBe(358);
+    const width = (w: number, h: number, top: number) => Math.max(floor, Math.min((h - top - chrome) * ratio, 360, w - 32));
+    // `top` : le haut de la fiche mesuré par la page (barre du haut, puis la phrase du visiteur, resserrée sur un écran court).
+    // Bas du lien des pièces : 8 px de marge, la fiche, 44 px de lien ; il reste au moins 8 px d'air au-dessus des 73 px de barre.
+    for (const [w, h, top] of [[390, 664, 96], [375, 667, 96], [360, 640, 96], [320, 568, 78], [390, 664, 52], [320, 568, 52]]) {
+      const bottom = top + 8 + (width(w, h, top) * 520) / 360 + 44;
+      expect(bottom, `${w} × ${h}`).toBeLessThanOrEqual(h - 73 - 8);
+    }
+    // À 390 × 844, pleine largeur, phrase du visiteur comprise.
+    expect(Math.round(width(390, 844, 113))).toBe(358);
+    expect(page).toMatch(/useStageTop\(pageRef, stageRef\)/);
     // Sous 760 px de haut, la tête se masque (la plaque de la fiche dit la même chose) ; « Revoir ma poursuite » passe sous la fiche.
     expect(css).toMatch(/@media \(max-width: 640px\) and \(max-height: 759px\) \{\s*\.page-result > \.result-top > \.wanted \{[^}]*clip-path: inset\(50%\);/);
     expect(page).toMatch(/\{chase && <div className="stage-chase">\{chase\}<\/div>\}/);
