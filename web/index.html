@@ -25,7 +25,16 @@
     <meta property="og:image:alt" content="Azerit : Ta fiche de dev. Combien d'étoiles ?" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="https://skills.azerit.tech/og/home.png" />
+    <!-- Icônes de la gemme (scripts/icons.ts) : ancien navigateur, onglet, écran d'accueil du téléphone, manifeste. -->
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <!-- Adresse de l'accueil ; le serveur la remplace par celle de la page servie (server/src/seo.ts). -->
+    <link rel="canonical" href="https://skills.azerit.tech/" />
+    <meta property="og:url" content="https://skills.azerit.tech/" />
+    <meta property="og:locale" content="fr_FR" />
+    <meta property="og:locale:alternate" content="en_US" />
     <!-- Les deux polices du premier écran (titres, texte courant), demandées sans attendre la feuille. -->
     <link rel="preload" as="font" type="font/ttf" crossorigin href="../server/fonts/barlow-condensed-700.ttf" />
     <link rel="preload" as="font" type="font/ttf" crossorigin href="../server/fonts/outfit-400.ttf" />

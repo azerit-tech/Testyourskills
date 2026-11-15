@@ -498,7 +498,7 @@ describe("image d'aperçu de l'accueil (/og/home.png)", () => {
     const root = mkdtempSync(join(tmpdir(), "tys-web-"));
     writeFileSync(join(root, "index.html"), INDEX);
     const ctx = setup({}, { staticRoot: root, indexHtml: async () => INDEX });
-    for (const path of ["/", "/privacy"]) {
+    for (const path of ["/", "/torvalds"]) {
       const res = await ctx.app.request(path);
       expect(res.status).toBe(200);
       const html = await res.text();
@@ -509,11 +509,26 @@ describe("image d'aperçu de l'accueil (/og/home.png)", () => {
       expect(count(html, /property="og:image"/g)).toBe(1);
       expect(count(html, /name="twitter:image"/g)).toBe(1);
       expect(html).not.toContain("skills.azerit.tech/og/home.png");
-      // À l'accueil, le reste du index.html ne bouge pas ; la vie privée porte son titre.
-      if (path === "/") expect(html).toContain(`<meta name="twitter:card" content="summary_large_image" />`);
-      else expect(html).toContain("<title>Privacy · Azerit</title>");
+      // Le reste du index.html ne bouge pas.
+      expect(html).toContain(`<meta name="twitter:card" content="summary_large_image" />`);
       expect(html).toContain(`<div id="root">`);
+      // L'adresse canonique est celle de l'accueil, à l'adresse du serveur (seo.ts).
+      expect(html).toContain(`<link rel="canonical" href="https://skills.test/">`);
+      expect(count(html, /property="og:url"/g)).toBe(1);
     }
+  });
+
+  it("la vie privée a son propre titre, sa description et son adresse, avec l'image de l'accueil", async () => {
+    const root = mkdtempSync(join(tmpdir(), "tys-web-"));
+    writeFileSync(join(root, "index.html"), INDEX);
+    const ctx = setup({}, { staticRoot: root, indexHtml: async () => INDEX });
+    const html = await (await ctx.app.request("/privacy")).text();
+    expect(html).toContain("<title>Privacy · Azerit</title>");
+    expect(html).toContain('<html lang="en"');
+    expect(html).toContain(`<meta property="og:url" content="https://skills.test/privacy">`);
+    expect(html).toContain(`<meta property="og:image" content="https://skills.test/og/home.png">`);
+    expect(count(html, /<title>/g)).toBe(1);
+    expect(count(html, /name="description"/g)).toBe(1);
   });
 
   it("la page d'une fiche garde sa propre image", async () => {

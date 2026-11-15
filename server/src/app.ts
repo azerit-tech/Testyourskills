@@ -15,7 +15,7 @@ import { isSitePage, isUpcomingPath } from "../../shared/routes";
 import type { CardData, ComparisonData, ErrorCode, Fact, JobState, Lang } from "../../shared/types";
 import { stripToken, type CardRow, type Store } from "./db";
 import { buildLead, clientEventSchema, sendLead } from "./events";
-import { genericMeta, HOME_IMAGE_PATH, injectHomeImage, injectMeta, langOfRequest, messagePage, metaFor, requestLang, siteStylesheets, standalonePage, staticPageMeta, type MessageKey } from "./html";
+import { genericMeta, HOME_IMAGE_PATH, injectHomeImage, injectMeta, langOfRequest, messagePage, metaFor, requestLang, siteStylesheets, standalonePage, type MessageKey } from "./html";
 import { ID_RE, MAX_PDF_BYTES, MESSAGES, Pipeline, type Deps, type RenderInput } from "./pipeline";
 import { CARDS_PER_BROWSER, CARDS_PER_DAY, RateLimiter, browserId, clientIp } from "./ratelimit";
 import { inlineAvatar, mountLinkedin, removeAvatars, type LinkedinConfig } from "./linkedin";
@@ -37,7 +37,7 @@ import { mountPrimes, purgeEntries } from "./primes";
 import { mountPrimePages } from "./primePages";
 import { loadRules, servableRules } from "./rules";
 import { compressHtml, readManifest, StaticCompressor, withPreloads } from "./assets";
-import { NOINDEX, robotsTxt, sitemapPaths, sitemapXml } from "./seo";
+import { NOINDEX, robotsTxt, sitemapPaths, sitemapXml, sitePageMeta, withPageUrl } from "./seo";
 
 export interface AppOptions {
   store: Store;
@@ -855,13 +855,13 @@ export function createApp(opts: AppOptions) {
       const template = opts.indexHtml ? await opts.indexHtml().catch(() => null) : null;
       if (!template) return null;
       c.header("Cache-Control", "no-cache");
-      // Les balises suivent la langue demandée ; la vie privée et le règlement ont leur titre.
+      // Les balises suivent la langue demandée ; la vie privée et le règlement (publié) ont leur titre ; l'accueil, son adresse canonique (seo.ts).
       c.header("Vary", "Accept-Language");
       const lang = requestLang(c.req.query("lang"), c.req.header("Accept-Language"));
-      const own = staticPageMeta(baseUrl, c.req.path, lang);
+      const own = /^\/reglement\/?$/i.test(c.req.path) && !rules ? null : sitePageMeta(c.req.path, baseUrl, lang);
       if (own) return c.html(injectMeta(template, own));
       if (lang === "en" && c.req.path === "/") return c.html(injectMeta(template, { ...genericMeta(baseUrl, "/", "en"), image: `${baseUrl}${HOME_IMAGE_PATH}` }));
-      return c.html(injectHomeImage(template, baseUrl));
+      return c.html(withPageUrl(injectHomeImage(template, baseUrl), `${baseUrl}/`));
     };
     // Avant le statique, qui servirait le fichier tel quel.
     app.get("/", async (c, next) => {
