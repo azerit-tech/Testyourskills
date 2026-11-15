@@ -424,11 +424,14 @@ export function CtaLine({ x, y, lang }: { x: number; y: number; lang: Lang }) {
 /* ------------------------------------------------------------------ */
 
 /** La promesse, le titre de l'accueil (shared/promise.ts, sa seule source) : deux
- *  phrases de deux lignes, la première en crème, la seconde en rose. */
+ *  phrases de deux lignes, la première en crème, la seconde en pêche. */
 const PROMISE = (lang: Lang): [string[], string[]] => [HOME_PROMISE[lang].claim, HOME_PROMISE[lang].proof];
 
 /** Même mise en page que l'aperçu d'une fiche : la fiche de la vitrine à gauche,
- *  et à droite la promesse en grand à la place du nom. */
+ *  et à droite le titre d'affiche, la promesse en grand à la place du nom, puis
+ *  l'appel. Le front de mer dessiné reste un liseré au pied de l'image, sous
+ *  l'appel : ni le titre ni l'appel ne se posent sur un immeuble ou une fenêtre,
+ *  et le soleil reste derrière la fiche. */
 export function HomeOg({ card, lang, avatars }: { card: CardData; lang: Lang; avatars: Avatars }) {
   const W = 1200;
   const H = 630;
@@ -438,21 +441,26 @@ export function HomeOg({ card, lang, avatars }: { card: CardData; lang: Lang; av
   const cy = 32;
   const tx = 560;
   const maxW = W - tx - 64;
+  const horizon = 590;
+  const skyline = 56;
   const [claim, proof] = PROMISE(lang);
   const lines = [...claim, ...proof].map((l) => upper(l, lang));
   // Une seule taille pour les quatre lignes : celle que la plus longue permet.
-  const size = Math.min(...lines.map((l) => fit(l, { font: "display-700", size: 112, minSize: 60, maxWidth: maxW, letterSpacing: 0.5 }).size));
+  const size = Math.min(...lines.map((l) => fit(l, { font: "display-700", size: 96, minSize: 56, maxWidth: maxW, letterSpacing: 0.5 }).size));
+  const titleTop = 102;
+  // L'appel au-dessus des toits, quelle que soit la taille du titre.
+  const ctaBottom = horizon - skyline - 12;
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
-      <Scene w={W} h={H} horizon={556} sun={{ x: cx + cw / 2, y: 470, r: 300 }} maxH={120} palms={[{ x: W - 170, y: 300, k: 1.6, flip: true }]} />
+      <Scene w={W} h={H} horizon={horizon} sun={{ x: cx + cw / 2, y: 470, r: 258 }} maxH={skyline} palms={[]} />
       <Placed card={card} lang={lang} avatars={avatars} id="home" x={cx} y={cy} w={cw} />
-      <Poster x={tx} y={118} size={22} lang={lang} anchor="start" />
+      <PosterTitle x={tx} y={cy + 35} size={50} lang={lang} />
       {lines.map((l, i) => (
-        <text key={i} x={tx - 2} y={136 + (i + 1) * size * 0.94} {...fontAttrs("display-700")} fontSize={size} letterSpacing={0.5} fill={i >= claim.length ? PALETTE.blush : PALETTE.cream}>
+        <text key={i} x={tx - 2} y={Math.round(titleTop + size * 0.72 + i * size * 0.94)} {...fontAttrs("display-700")} fontSize={size} letterSpacing={0.5} fill={i >= claim.length ? PALETTE.peach : PALETTE.cream}>
           {l}
         </text>
       ))}
-      <CtaLine x={tx} y={604} lang={lang} />
+      <CtaPill x={tx} bottom={ctaBottom} label={IMAGE_WORDS[lang].home} lang={lang} size={28} maxW={maxW} />
     </svg>
   );
 }
