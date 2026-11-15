@@ -51,6 +51,8 @@ LEADS_ENDPOINT=…                 # relais des emails laissés sous la carte
 LINKEDIN_CLIENT_ID=…             # redirect URL : https://skills.azerit.tech/auth/linkedin/callback
 LINKEDIN_CLIENT_SECRET=…
 IP_SALT=…                        # openssl rand -hex 32 : sinon le sel par défaut, public
+HIGH_BAR_EMPLOYERS_FILE=/data/employers.json   # listes privées : voir « Les listes privées »
+SCHOOL_TIERS_FILE=/data/schools.json
 ```
 
 `NODE_ENV`, `PORT` et `DB_PATH` sont aussi posés par `docker-compose.yml` ; les
@@ -103,6 +105,42 @@ il ne touche jamais `.env` (ni aucun `.env*`), `.deployed_commit`,
 `.deployed_commit.precedent`. Codes de sortie : `0` déployé · `1` arrêt avant la
 bascule, rien de ce qui sert n'a bougé · `2` la nouvelle version tourne mais n'est
 pas saine, les 80 dernières lignes de `docker logs testyourskills` sont affichées.
+
+## Les listes privées (employeurs, écoles)
+
+Deux listes ne sont pas dans le dépôt public (SPEC §18.37, §18.50) : les
+employeurs à forte barre d'embauche (`data/employers.json`) et les écoles avec
+leur rang (`data/schools.json`). Elles vivent dans le clone principal du Mac,
+ignorées par git ; le dépôt n'en garde que les exemples
+(`data/employers.example.json`, `data/schools.example.json`). `scripts/deploy.sh`
+ne les envoie pas (seuls les fichiers versionnés partent) : elles se posent à la
+main dans le volume `/data`, à côté de la base, où aucun déploiement ne les
+efface.
+
+Sans elles, rien ne plante, mais les notes changent : aucun employeur à forte
+barre, et chaque école prend le rang lu par l'IA, plafonné à B. Le démarrage le
+dit (`docker logs testyourskills`), et `scripts/deploy.sh` affiche une ligne
+`ATTENTION : liste privée non posée` tant que l'une manque.
+
+À faire une fois, **avant** le déploiement qui les lit, puis à chaque changement
+d'une liste (depuis le clone principal, conteneur en marche) :
+
+```bash
+ssh azerit 'docker exec -i testyourskills sh -c "cat > /data/employers.json"' < data/employers.json
+ssh azerit 'docker exec -i testyourskills sh -c "cat > /data/schools.json"' < data/schools.json
+ssh azerit                       # dans /opt/testyourskills/.env :
+                                 #   HIGH_BAR_EMPLOYERS_FILE=/data/employers.json
+                                 #   SCHOOL_TIERS_FILE=/data/schools.json
+```
+
+Puis `scripts/deploy.sh` (la nouvelle image lit le `.env` et les fichiers). Pour
+une liste changée sans nouveau commit, relancer le conteneur, qui les lit au
+démarrage :
+
+```bash
+ssh azerit 'cd /opt/testyourskills && docker compose up -d --no-build --force-recreate'
+ssh azerit 'docker logs testyourskills 2>&1 | grep -E "^(Écoles|Employeurs)|_FILE"'   # « Écoles : … rangs lus dans /data/schools.json. »
+```
 
 ## Revenir au commit précédent
 

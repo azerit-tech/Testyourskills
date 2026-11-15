@@ -139,6 +139,8 @@ announce() {
   [ "$(state_value network)" = "ok" ] || die "réseau docker ruby_default absent sur le VPS : ruby-caddy ne joindrait pas l'app"
   [ "$(state_value lock)" = "free" ] || die "un déploiement de Testyourskills est en cours sur le VPS (verrou $(state_value lock))"
   [ -z "$(state_value env_missing)" ] || log "    ATTENTION : variables vides dans .env : $(state_value env_missing)"
+  [ -z "$(state_value lists_missing)" ] \
+    || log "    ATTENTION : liste privée non posée (variable vide, ou fichier absent du conteneur) : $(state_value lists_missing) ; sans elle les notes changent, voir ops/DEPLOY.md"
   log "    conteneur $CONTAINER : $(state_value container), santé $(state_value health) ; disque libre : $(state_value disk_free)"
   deployed="$(state_value commit)"
   if [ -z "$deployed" ]; then

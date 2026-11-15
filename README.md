@@ -53,6 +53,7 @@ La liste commentée fait foi dans `.env.example`.
 | `LINKEDIN_DAILY_PROFILES` | profils LinkedIn lus par jour | `300` |
 | `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET` | photo LinkedIn sur la fiche (voir plus bas) | désactivée si absentes |
 | `HIGH_BAR_EMPLOYERS_FILE` | fichier du serveur, hors du dépôt, de la forme de `data/employers.example.json` (SPEC §18.37) | liste vide |
+| `SCHOOL_TIERS_FILE` | les écoles et leur rang : fichier du serveur, hors du dépôt, de la forme de `data/schools.example.json` (SPEC §18.50) | liste vide : le rang de l'IA, plafonné à B |
 | `SHOWCASE_LOGIN`, `SHOWCASE_PHOTO`, `SHOWCASE_LINKEDIN` | la fiche d'exemple de l'accueil (SPEC §18.35) | voir `.env.example` |
 | `LEADS_ENDPOINT` | webhook qui reçoit les emails laissés | aucun |
 | `IP_SALT` | sel du hachage des IP et des identifiants de navigateur pour les limites par jour ; une valeur aléatoire en production | constante |
@@ -77,7 +78,7 @@ En local : `npx vite build && npm start` sert le front de `dist/web` et l'API su
 
 Sur le VPS partagé : pas de Caddy propre, le Caddy commun route `skills.azerit.tech` vers le conteneur `testyourskills`. Première mise en ligne, mises à jour et retour arrière : [`ops/DEPLOY.md`](ops/DEPLOY.md). Ensuite, depuis le Mac, sur `master` à jour : `scripts/deploy.sh --plan`, puis `scripts/deploy.sh`.
 
-La base et les PNG sont dans le volume monté sur `/data`. Les fiches de plus de 90 jours, ni revendiquées ni liées à un email, sont purgées au démarrage puis toutes les heures, avec leurs images.
+La base et les PNG sont dans le volume monté sur `/data`, comme les deux listes privées, ignorées par git (`data/employers.json`, `data/schools.json`) : elles se posent à la main, voir [`ops/DEPLOY.md`](ops/DEPLOY.md). Les fiches de plus de 90 jours, ni revendiquées ni liées à un email, sont purgées au démarrage puis toutes les heures, avec leurs images.
 
 ## Architecture
 

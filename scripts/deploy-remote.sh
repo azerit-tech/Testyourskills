@@ -47,6 +47,19 @@ state() {
     grep -qE "^${key}=.+" "$APP_DIR/.env" 2>/dev/null || missing="$missing $key"
   done
   echo "env_missing=${missing# }"
+  # les deux listes privées, hors du dépôt (SPEC §18.37, §18.50) : variable posée
+  # dans .env, et fichier lisible dans le conteneur s'il tourne (ops/DEPLOY.md)
+  local lists="" path
+  for key in HIGH_BAR_EMPLOYERS_FILE SCHOOL_TIERS_FILE; do
+    path="$(sed -n "s/^${key}=//p" "$APP_DIR/.env" 2>/dev/null | tail -1 || true)"
+    path="${path%\"}"; path="${path#\"}"
+    if [ -z "$path" ]; then
+      lists="$lists $key"
+    elif [ "$(container_state)" = "running" ] && ! docker exec "$CONTAINER" test -r "$path" 2>/dev/null; then
+      lists="$lists $key"
+    fi
+  done
+  echo "lists_missing=${lists# }"
   if docker network inspect "$NETWORK" >/dev/null 2>&1; then echo "network=ok"; else echo "network=absent"; fi
   echo "container=$(container_state)"
   echo "health=$(container_health)"
