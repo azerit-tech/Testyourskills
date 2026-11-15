@@ -114,6 +114,13 @@ export function Waiting({ cardId, progress, startedAt, queue, findings = [], log
   offlineRef.current = offline;
 
   const known = t.waiting.progress;
+  // Le remplissage ne parle que de ce qu'on lit : le parcours (LinkedIn, CV), GitHub, ou les deux.
+  const f = t.waiting.fillers;
+  const fromGithub = !!login;
+  const fromPath = !!slug || cv || !login;
+  const fillers = useMemo(() => [...f.all, ...(fromPath ? f.path : []), ...(fromGithub ? f.github : [])], [f, fromPath, fromGithub]);
+  const fillersRef = useRef(fillers);
+  fillersRef.current = fillers;
 
   useEffect(() => {
     const tick = () => {
@@ -159,7 +166,7 @@ export function Waiting({ cardId, progress, startedAt, queue, findings = [], log
         lastAt.current = ts;
         setLines([{ uid: uid.current++, key: "start" }]);
       } else if (ts - lastAt.current >= FILL_AFTER) {
-        const total = t.waiting.fillers.length;
+        const total = fillersRef.current.length;
         let idx = Math.floor(Math.random() * total);
         for (let i = 0; i < total && usedFillers.current.has(idx); i++) idx = (idx + 1) % total;
         if (usedFillers.current.size >= total) usedFillers.current.clear();
@@ -174,7 +181,7 @@ export function Waiting({ cardId, progress, startedAt, queue, findings = [], log
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const textOf = (l: Line) => (l.filler !== undefined ? t.waiting.fillers[l.filler] : known[l.key]?.(l.n) ?? "");
+  const textOf = (l: Line) => (l.filler !== undefined ? fillers[l.filler] ?? "" : known[l.key]?.(l.n) ?? "");
   // En file d'attente, une seule ligne : combien passent avant toi.
   const queued = queue !== undefined && queue > 0;
   const queueLine: Line | undefined = queued ? { uid: -(queue ?? 1), key: "queue" } : undefined;

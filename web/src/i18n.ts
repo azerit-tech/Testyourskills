@@ -208,18 +208,24 @@ const fr = frTypoDeep({
       render: () => "Impression de la fiche…",
       start: () => "On réunit les premières pièces…",
     } as Record<string, (n?: number) => string>,
-    fillers: [
-      "La grille est écrite en dur dans un fichier JSON. Pas de favoritisme.",
-      "On ignore tes forks. Tout le monde a forké un tutoriel.",
-      "Recherche d'un commit « final final v2 »…",
-      "Calcul de la fiabilité. Jamais 100 %, personne ne l'est.",
-      "On ne lit pas tes repos privés. Promis.",
-      "Calibrage du tampon…",
-      "Vérification que node_modules n'est pas commité…",
-      "Un stage compte pour moitié. Une asso étudiante, pour zéro.",
-      "Sans école de tech, pas de note d'école. Ça ne coûte rien.",
-      "Un GitHub vide n'est pas un mauvais code.",
-    ],
+    /** Le remplissage, tiré selon les sources de la demande : on ne parle que de ce qu'on lit. */
+    fillers: {
+      all: ["La grille est écrite en dur dans un fichier JSON. Pas de favoritisme.", "Calibrage du tampon…", "Calcul de la part prouvée. Jamais 100 %, personne ne l'est."],
+      /** Le parcours : LinkedIn ou CV. */
+      path: [
+        "Un stage compte pour moitié. Une asso étudiante, pour zéro.",
+        "Sans école de tech, pas de note d'école. Ça ne coûte rien.",
+        "Deux postes en même temps ne comptent qu'une fois.",
+        "On recompte tes années, poste par poste. Les titres ne comptent pas, les dates si.",
+      ],
+      github: [
+        "On ignore tes forks. Tout le monde a forké un tutoriel.",
+        "Recherche d'un commit « final final v2 »…",
+        "On ne lit pas tes repos privés. Promis.",
+        "Vérification que node_modules n'est pas commité…",
+        "Un GitHub vide n'est pas un mauvais code.",
+      ],
+    },
   },
   reveal: {
     /* titre du dossier à l'écran de la cabine, avant l'ouverture */
@@ -988,18 +994,22 @@ const en: Dict = {
       render: () => "Printing the sheet…",
       start: () => "Gathering the first exhibits…",
     },
-    fillers: [
-      "The scorecard is hard-coded in a JSON file. No favoritism.",
-      "Ignoring your forks. Everyone forked a tutorial once.",
-      "Looking for a “final final v2” commit…",
-      "Computing reliability. Never 100%, nobody is.",
-      "We don't read your private repos. Promise.",
-      "Calibrating the stamp…",
-      "Checking node_modules isn't committed…",
-      "An internship counts for half. A student club, for zero.",
-      "No tech school, no school score. It costs nothing.",
-      "An empty GitHub is not bad code.",
-    ],
+    fillers: {
+      all: ["The scorecard is hard-coded in a JSON file. No favoritism.", "Calibrating the stamp…", "Working out how much is proven. Never 100%, nobody is."],
+      path: [
+        "An internship counts for half. A student club, for zero.",
+        "No tech school, no school score. It costs nothing.",
+        "Two jobs at once only count once.",
+        "Recounting your years, role by role. Titles don't count, dates do.",
+      ],
+      github: [
+        "Ignoring your forks. Everyone forked a tutorial once.",
+        "Looking for a “final final v2” commit…",
+        "We don't read your private repos. Promise.",
+        "Checking node_modules isn't committed…",
+        "An empty GitHub is not bad code.",
+      ],
+    },
   },
   reveal: {
     packTitle: "FILE",
