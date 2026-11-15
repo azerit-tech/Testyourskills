@@ -138,7 +138,7 @@ export function Waiting({ cardId, progress, startedAt, queue, findings = [], log
   // dépassé) : le focus va à son titre, comme après le film. Pendant un film, la page le donnera à la fin.
   useEffect(
     () => () => {
-      const head = document.querySelector<HTMLElement>(".page-result:not(.is-animating) .wanted-head, #main .error-panel h1");
+      const head = document.querySelector<HTMLElement>(".page-result:not(.is-animating) .wanted-head, #main .error-panel h1, #main .err h1");
       if (!head || (document.activeElement && document.activeElement !== document.body)) return;
       if (!head.hasAttribute("tabindex")) head.setAttribute("tabindex", "-1");
       head.focus({ preventScroll: true });

@@ -8,7 +8,7 @@
 // <BandNotFound />, <PrimeNotFound />, et <Unreachable /> quand le serveur ne
 // répond pas (jamais « introuvable » : « Réessayer »). Avec `bare`, le panneau
 // seul, à poser dans son propre <main>.
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useT } from "../i18n";
 import { onLinkClick } from "../lib/router";
 
@@ -69,6 +69,15 @@ function Action({ a, className }: { a: ErrorAction; className: string }) {
 export function ErrorPanel({ stamp, title, text, action, alt }: ErrorPanelProps) {
   const { t } = useT();
   const te = t.pages.error;
+  const head = useRef<HTMLHeadingElement>(null);
+  // Une panne arrivée sans geste (serveur injoignable, l'application cassée) : le focus va au
+  // titre, sauf si la personne l'a déjà posé ailleurs.
+  useEffect(() => {
+    if (stamp === "none") return;
+    const at = document.activeElement;
+    if (at && at !== document.body) return;
+    head.current?.focus({ preventScroll: true });
+  }, [stamp]);
   return (
     <div className="err" role={stamp === "none" ? undefined : "alert"}>
       {/* le dessin de la case « ta place » de la couverture (styles.css, .cover-face) */}
@@ -86,7 +95,9 @@ export function ErrorPanel({ stamp, title, text, action, alt }: ErrorPanelProps)
         </span>
         <span className={`err-stamp is-${stamp}`}>{te.stamp[stamp]}</span>
       </div>
-      <h1 className="t-block">{title}</h1>
+      <h1 ref={head} className="t-block" tabIndex={stamp === "none" ? undefined : -1}>
+        {title}
+      </h1>
       <p className="err-text">{text}</p>
       <Action a={action} className="btn-primary err-action" />
       {alt && <Action a={alt} className="link-alt" />}
