@@ -1400,7 +1400,7 @@ const en: Dict = {
     } as Partial<Record<CriterionCode, [number, string][]>>,
     levelNotes: {
       EDU: "No tech school, no school score: the criterion leaves the average, and being self-taught costs nothing. French schools first for now: a school missing from the list stops at B. A school never lowers the rating.",
-      XP: "Counted role by role: internships and work-study at half, student associations and volunteering at zero, overlapping roles once. Without LinkedIn: estimated from active years on GitHub, capped at 8.",
+      XP: "Counted role by role: internships and apprenticeships at half, student associations and volunteering at zero, overlapping roles once. Without LinkedIn: estimated from active years on GitHub, capped at 8.",
       EMP: "Read on LinkedIn or the CV only.",
       STK: "Read in public code. With no GitHub on file, it is read on LinkedIn and the table stops at 6.",
       CODE: "Three repos read: twice their average level. 9 and 10 need tests in half the active repos; 7 and up, a repo with 20 commits.",

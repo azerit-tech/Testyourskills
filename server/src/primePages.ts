@@ -62,7 +62,7 @@ export function primeImageKey(p: PrimeView): string {
 export const primeImagePath = (p: PrimeView): string => `/og/p/${p.id}.png?${IMAGE_QUERY}&k=${primeImageKey(p)}`;
 
 const CONTRACT_FR: Record<PrimeView["contract"], string> = { stage: "stage", alternance: "alternance", cdi: "CDI" };
-const CONTRACT_EN: Record<PrimeView["contract"], string> = { stage: "internship", alternance: "work-study", cdi: "full-time job" };
+const CONTRACT_EN: Record<PrimeView["contract"], string> = { stage: "internship", alternance: "apprenticeship", cdi: "full-time job" };
 
 /** « J-12 » reste tel quel ; « Dernier jour », « Ouvre le 19 novembre » perdent leur majuscule au milieu d'une phrase. */
 const inSentence = (s: string) => (/^[A-Z]-/.test(s) ? s : `${s.charAt(0).toLowerCase()}${s.slice(1)}`);

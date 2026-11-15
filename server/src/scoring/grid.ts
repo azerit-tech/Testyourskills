@@ -464,7 +464,7 @@ export function xpDeclared(d: DeclaredInput): Draft {
   };
   const interns = infos.filter((r) => r.kind === "internship");
   const im = unionMonths(interns);
-  if (im) both(f(`${im} mois de stage ou d'alternance comptés pour moitié.`, `${im} month${im === 1 ? "" : "s"} of internship or work-study counted at half.`));
+  if (im) both(f(`${im} mois de stage ou d'alternance comptés pour moitié.`, `${im} month${im === 1 ? "" : "s"} of internship or apprenticeship counted at half.`));
   const fulls = infos.filter((r) => r.kind === "full" && r.months > 0).sort((a, b) => (b.start ?? 0) - (a.start ?? 0));
   for (const r of fulls.slice(0, 2)) {
     const mo = `${r.months} month${r.months === 1 ? "" : "s"}`;
@@ -539,7 +539,7 @@ function managementQuote(r: CvReading): string {
 const roleHead = (r: RoleInfo) => [r.role.title, r.role.company].filter(Boolean).join(", ");
 /** La nature d'un poste, sans nom ni intitulé : ce qu'une page partagée peut dire. */
 const roleWhat = (r: RoleInfo): Fact =>
-  r.kind === "internship" ? f("Stage ou alternance", "Internship or work-study") : r.founder ? f("Entreprise fondée", "Company founded") : f("Poste", "Role");
+  r.kind === "internship" ? f("Stage ou alternance", "Internship or apprenticeship") : r.founder ? f("Entreprise fondée", "Company founded") : f("Poste", "Role");
 /** « depuis avril 2026 », « février 2025 – novembre 2025 » (poste daté). */
 const roleWhen = (r: RoleInfo): Fact =>
   r.role.end === null
