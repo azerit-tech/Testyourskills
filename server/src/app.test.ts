@@ -1381,6 +1381,23 @@ describe("divers", () => {
     const old = await ctx.app.request("/film/poursuite-720.mp4");
     expect(old.headers.get("content-type") ?? "").toMatch(/text\/html/);
   });
+
+  it("prod : un fichier texte servi brut annonce quand même Vary: Accept-Encoding", async () => {
+    const root = mkdtempSync(join(tmpdir(), "tys-web-"));
+    mkdirSync(join(root, "assets"));
+    const index = "<!doctype html><html><head><title>T</title></head><body>SPA</body></html>";
+    writeFileSync(join(root, "index.html"), index);
+    writeFileSync(join(root, "assets", "app.js"), "console.log(1);\n".repeat(200));
+    const ctx = setup({}, { staticRoot: root, indexHtml: async () => index });
+    const raw = await ctx.app.request("/assets/app.js");
+    expect(raw.headers.get("content-encoding")).toBeNull();
+    expect(raw.headers.get("vary")).toBe("Accept-Encoding");
+    const br = await ctx.app.request("/assets/app.js", { headers: { "Accept-Encoding": "br" } });
+    expect(br.headers.get("content-encoding")).toBe("br");
+    expect(br.headers.get("vary")).toBe("Accept-Encoding");
+    const page = await ctx.app.request("/");
+    expect(page.headers.get("vary")).toBe("Accept-Language, Accept-Encoding");
+  });
 });
 
 describe("file d'attente (MAX_CONCURRENT_CARDS)", () => {

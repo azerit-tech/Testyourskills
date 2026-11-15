@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { brotliDecompressSync, gunzipSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
-import { compressHtml, pageModule, pickEncoding, preloadTags, StaticCompressor, withPreloads, type Manifest } from "./assets";
+import { addVary, compressHtml, pageModule, pickEncoding, preloadTags, StaticCompressor, withPreloads, type Manifest } from "./assets";
 
 describe("compression", () => {
   const root = mkdtempSync(join(tmpdir(), "tys-assets-"));
@@ -49,6 +49,29 @@ describe("compression", () => {
     expect(res.headers.get("cache-control")).toBe("no-cache");
     expect(res.headers.get("content-encoding")).toBe("gzip");
     expect(gunzipSync(Buffer.from(await res.arrayBuffer())).toString()).toBe(html);
+  });
+
+  it("annonce Vary: Accept-Encoding sur le HTML, compressé ou non, à côté de Accept-Language", async () => {
+    const html = `<!doctype html><html><body>${"<p>fiche</p>".repeat(200)}</body></html>`;
+    const page = (vary?: string) => new Response(html, { headers: { "Content-Type": "text/html", ...(vary ? { Vary: vary } : {}) } });
+    expect((await compressHtml(page("Accept-Language"), "br")).headers.get("vary")).toBe("Accept-Language, Accept-Encoding");
+    const raw = await compressHtml(page("Accept-Language"), undefined);
+    expect(raw.headers.get("vary")).toBe("Accept-Language, Accept-Encoding");
+    expect(raw.headers.get("content-encoding")).toBeNull();
+    expect(await raw.text()).toBe(html);
+    expect((await compressHtml(page(), "identity")).headers.get("vary")).toBe("Accept-Encoding");
+    expect((await compressHtml(new Response("<p>court</p>", { headers: { "Content-Type": "text/html" } }), "gzip")).headers.get("vary")).toBe("Accept-Encoding");
+  });
+
+  it("ajoute un nom à Vary une seule fois", () => {
+    const h = new Headers({ Vary: "accept-encoding" });
+    addVary(h, "Accept-Encoding");
+    expect(h.get("vary")).toBe("accept-encoding");
+    addVary(h, "Accept-Language");
+    expect(h.get("vary")).toBe("accept-encoding, Accept-Language");
+    const star = new Headers({ Vary: "*" });
+    addVary(star, "Accept-Encoding");
+    expect(star.get("vary")).toBe("*");
   });
 });
 

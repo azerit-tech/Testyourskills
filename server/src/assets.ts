@@ -183,13 +183,26 @@ export class StaticCompressor {
   }
 }
 
+/**
+ * Ajoute un en-tête à `Vary` sans doublon. Toute réponse que le serveur peut
+ * compresser le porte, compressée ou non : un cache intermédiaire ne doit jamais
+ * resservir la version brotli à qui ne la lit pas, ni l'inverse.
+ */
+export function addVary(headers: Headers, name: string): void {
+  const current = headers.get("vary");
+  const names = (current ?? "").split(",").map((n) => n.trim().toLowerCase());
+  if (names.includes("*") || names.includes(name.toLowerCase())) return;
+  headers.set("Vary", current ? `${current}, ${name}` : name);
+}
+
 /** Le HTML d'une page, compressé si le navigateur l'accepte (à la volée, compression rapide). */
 export async function compressHtml(res: Response, acceptEncoding: string | null | undefined): Promise<Response> {
   const encoding = pickEncoding(acceptEncoding);
-  if (!encoding || res.headers.has("content-encoding")) return res;
-  const raw = new Uint8Array(await res.arrayBuffer());
+  if (res.headers.has("content-encoding")) return res;
   const headers = new Headers(res.headers);
-  headers.append("Vary", "Accept-Encoding");
+  addVary(headers, "Accept-Encoding");
+  if (!encoding) return new Response(res.body, { status: res.status, headers });
+  const raw = new Uint8Array(await res.arrayBuffer());
   if (raw.byteLength < 1024) {
     headers.delete("content-length");
     return new Response(raw, { status: res.status, headers });

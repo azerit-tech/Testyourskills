@@ -36,7 +36,7 @@ import { mountFilmTrace } from "./filmTrace";
 import { mountPrimes, purgeEntries } from "./primes";
 import { mountPrimePages } from "./primePages";
 import { loadRules, servableRules } from "./rules";
-import { compressHtml, readManifest, StaticCompressor, withPreloads } from "./assets";
+import { addVary, compressHtml, isCompressible, readManifest, StaticCompressor, withPreloads } from "./assets";
 import { NOINDEX, robotsTxt, sitemapPaths, sitemapXml, sitePageMeta, withPageUrl } from "./seo";
 
 export interface AppOptions {
@@ -264,7 +264,10 @@ export function createApp(opts: AppOptions) {
       const html = manifest ? withPreloads(await c.res.text(), manifest, c.req.path, c.res.status) : await c.res.text();
       const headers = new Headers(c.res.headers);
       headers.delete("content-length");
-      c.res = await compressHtml(new Response(html, { status: c.res.status, headers }), c.req.header("accept-encoding"));
+      const page = await compressHtml(new Response(html, { status: c.res.status, headers }), c.req.header("accept-encoding"));
+      // Hono recopierait les en-têtes de l'ancienne réponse sur la nouvelle, Vary compris : on la retire d'abord.
+      c.res = undefined;
+      c.res = page;
     });
   }
 
@@ -897,7 +900,13 @@ export function createApp(opts: AppOptions) {
     // /assets sont compressés d'avance, au démarrage (assets.ts).
     const packer = new StaticCompressor(root);
     if (manifest) void packer.warm([...new Set(Object.values(manifest).flatMap((m) => [m.file, ...(m.css ?? [])]))].map((f) => `/${f}`));
-    app.use("*", async (c, next) => (await packer.serve(c.req.method, c.req.path, c.req.header("accept-encoding"))) ?? next());
+    app.use("*", async (c, next) => {
+      const packed = await packer.serve(c.req.method, c.req.path, c.req.header("accept-encoding"));
+      if (packed) return packed;
+      await next();
+      // Servi brut (navigateur sans brotli ni gzip) : la réponse dépend quand même de l'en-tête.
+      if (isCompressible(c.req.path) && c.res.status === 200) addVary(c.res.headers, "Accept-Encoding");
+    });
     app.use("*", serveStatic({ root }));
     app.get("*", async (c) => {
       const p = c.req.path;
