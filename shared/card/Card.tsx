@@ -401,7 +401,7 @@ export function CardGraphic({ card, lang: langProp, avatarHref, idPrefix, classN
   const icon = langIcon(card.mainLanguage);
   const cols = [
     { x: LEFT, w: unit, label: s.specialty, value: s.positions[card.position] ?? card.position },
-    { x: LEFT + unit + 10, w: unit, label: s.weapon, value: card.mainLanguage ? prettyLanguage(card.mainLanguage, icon?.title) : "–" },
+    { x: LEFT + unit + 10, w: unit, label: s.weapon, value: card.mainLanguage ? prettyLanguage(card.mainLanguage, icon?.title) : s.noWeapon },
     { x: LEFT + 2 * unit + 20, w: unit * 1.3, label: s.affiliation, value: card.club ?? s.loneWolf },
   ];
 

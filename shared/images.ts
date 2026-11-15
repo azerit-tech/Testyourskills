@@ -27,6 +27,7 @@
 // v10 (15 novembre 2026) : la prime prend la hiérarchie de sa carte (le lot, l'entreprise, le
 // contrat en pastille devant les postes) ; bande et prime centrent leur colonne de gauche au-dessus
 // de l'appel ; un rang s'écrit « 2ᵉ » ; l'appel n'a plus de double espace après ses deux-points.
+// Toujours v10 : une fiche sans langage écrit « ARME · Non déclarée », plus un tiret.
 
 export const IMAGE_DESIGN = 10;
 

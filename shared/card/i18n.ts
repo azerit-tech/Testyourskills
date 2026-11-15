@@ -22,6 +22,8 @@ export const STRINGS = {
     file: "Dossier",
     specialty: "Spécialité",
     weapon: "Arme",
+    /** Aucun langage lu (fiche LinkedIn ou CV seule) : jamais un tiret. */
+    noWeapon: "Non déclarée",
     affiliation: "Affiliation",
     charges: "Chefs d'accusation",
     caseNo: "N°",
@@ -91,6 +93,7 @@ export const STRINGS = {
     file: "File",
     specialty: "Specialty",
     weapon: "Weapon",
+    noWeapon: "None listed",
     affiliation: "Affiliation",
     charges: "Charges",
     caseNo: "No.",
