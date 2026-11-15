@@ -31,7 +31,7 @@ import type { WalkoutControl } from "../components/Walkout3D";
 import { Waiting } from "../components/Waiting";
 import { pick, useT } from "../i18n";
 import { api, ApiError, tokens, type CaseInfo } from "../lib/api";
-import { isClosed } from "../lib/errors";
+import { isClosed, isInputError } from "../lib/errors";
 import { useHold, type SceneState } from "../lib/hold";
 import { gaveUp, nextPatience, type Patience } from "../lib/patience";
 import { REMOTE_PATIENCE_MS } from "../lib/remote";
@@ -113,6 +113,10 @@ function useJob(id: string, nonce: number) {
         } else if (isClosed(job.code)) {
           // Commissariat fermé : retour à l'entrée, pseudo prérempli, message affiché, bouton en contour.
           prefillFromLast(job.message ?? t.errors.closed, true);
+          navigate("/", { replace: true });
+        } else if (isInputError(job.code) && job.message) {
+          // Pseudo inconnu, organisation : la seule erreur est sous le champ, à corriger.
+          prefillFromLast(job.message);
           navigate("/", { replace: true });
         } else {
           setView({ s: "error", message: job.message });
