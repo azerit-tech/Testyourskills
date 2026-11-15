@@ -25,6 +25,13 @@ const Chevron = () => (
   </svg>
 );
 
+/** La coche de « recoupé » : LinkedIn et GitHub se confirment. */
+const CrossCheck = () => (
+  <svg className="rg-check" viewBox="0 0 12 12" width="11" height="11" aria-hidden>
+    <path d="M2 6.4l2.6 2.6L10 3.4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 /** Dix segments : allumés jusqu'à la note ; au-delà de 6, fermés pour un critère déclaré (« la sixième se prouve »). Lue « 7 sur 10 ». */
 function Gauge({ c, g }: { c: GridCriterion; g: G }) {
   const n = c.score ?? 0;
@@ -100,15 +107,20 @@ function Row({ c, grid, declared, shared, isCase }: RowProps) {
         </p>
       )}
       {/* « recoupé » : la pièce met LinkedIn et GitHub face à face (evidence.source « both »), la démonstration de la méthode. */}
+      {/* Le recoupement se marque d'une coche, pas d'une couleur : tout lien de preuve est rose (§18.52). */}
       {text.label &&
         (text.href ? (
           <a className={`rg-src${cross ? " is-both" : ""}`} href={text.href} target="_blank" rel="noopener noreferrer">
+            {cross && <CrossCheck />}
             {text.label}
             <span aria-hidden> ↗</span>
             <span className="sr-only">, {g.proof.toLowerCase()}</span>
           </a>
         ) : (
-          <span className={`rg-src${cross ? " is-both" : ""}`}>{text.label}</span>
+          <span className={`rg-src${cross ? " is-both" : ""}`}>
+            {cross && <CrossCheck />}
+            {text.label}
+          </span>
         ))}
       {flags.length > 0 && (
         <ul className="rg-flags">

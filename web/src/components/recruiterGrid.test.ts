@@ -144,7 +144,8 @@ describe("« recoupé » : de la sortie du moteur à l'étiquette affichée", ()
       it(`ces quatre lignes portent l'étiquette « ${dict.source.both} », les autres leur source (${lang}${shared ? ", page partagée" : ""})`, () => {
         const rows = rowsOf(render(item, shared, lang));
         // Une étiquette, ou un lien quand la pièce mène à une page publique.
-        const label = new RegExp(`class="rg-src is-both"[^>]*>${dict.source.both}<`);
+        // Une coche devant, la couleur d'un lien (§18.52).
+        const label = new RegExp(`class="rg-src is-both"[^>]*><svg class="rg-check".*?</svg>${dict.source.both}<`);
         for (const code of ["XP", "EMP", "STK", "OWN"] as const) expect(rows.get(dict.names[code]), code).toMatch(label);
         for (const code of ["EDU", "CODE", "ACT", "OSS"] as const) expect(rows.get(dict.names[code]), code).not.toContain("is-both");
       });

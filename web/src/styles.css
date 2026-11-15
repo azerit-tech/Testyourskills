@@ -4338,10 +4338,14 @@ a.rg-src {
 a.rg-src:hover {
   text-decoration: underline;
 }
-/* « recoupé » : LinkedIn et GitHub se confirment, la pièce la plus forte du bloc */
-.rg-src.is-both,
-a.rg-src.is-both {
-  color: var(--lime);
+/* « recoupé » : LinkedIn et GitHub se confirment ; une coche devant, la couleur reste celle d'un lien (rose) ou d'une étiquette */
+.rg-src .rg-check {
+  flex: none;
+  margin-right: 4px;
+  vertical-align: -1px;
+}
+a.rg-src .rg-check {
+  margin-right: -2px;
 }
 .rg-flags {
   list-style: none;
