@@ -32,12 +32,12 @@ const CLEAN_RECORD: StatusInstance = (() => {
 
 export type { Piece };
 
-/** « LinkedIn » ou « CV » (“résumé” en anglais), selon ce que la pièce déclarative a lu (§18.24). */
+/** « LinkedIn » ou « CV » (“Résumé” en anglais : un nom de pièce, comme LinkedIn), selon ce que la pièce déclarative a lu (§18.24). */
 export const declaredLabel = (cmp: Pick<ComparisonData, "declaredSource">, lang: "fr" | "en" = "fr"): string =>
   pieceLabel(declaredOf(cmp) === "linkedin" ? "linkedin" : "cv", lang);
 
-/** Le nom d'une pièce, tel qu'on l'écrit : « LinkedIn », « CV » (“résumé” en anglais), « GitHub ». */
-export const pieceLabel = (p: Piece, lang: "fr" | "en" = "fr"): string => (p === "linkedin" ? "LinkedIn" : p === "cv" ? (lang === "en" ? "résumé" : "CV") : "GitHub");
+/** Le nom d'une pièce, tel qu'on l'écrit : « LinkedIn », « CV » (“Résumé” en anglais), « GitHub ». */
+export const pieceLabel = (p: Piece, lang: "fr" | "en" = "fr"): string => (p === "linkedin" ? "LinkedIn" : p === "cv" ? (lang === "en" ? "Résumé" : "CV") : "GitHub");
 
 /** `["linkedin", "github"]` ou `["cv", "github"]`. */
 export const piecesOf = (cmp: Pick<ComparisonData, "declaredSource">): Piece[] => [declaredOf(cmp), "github"];

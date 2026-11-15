@@ -1158,7 +1158,7 @@ describe("page /c/:id et images", () => {
     const html = await (await ctx.app.request(`/c/${json.id}`)).text();
     // Demandée en anglais (postCv envoie lang=en). L'aperçu d'une fiche, à la troisième personne, une seule note.
     expect(html).toMatch(/<title>@leamd is in the crosshairs ★/);
-    expect(html).toContain("Sources: résumé and GitHub.");
+    expect(html).toContain("Sources: Résumé and GitHub.");
     expect(html).not.toMatch(/shows more|claims \d|Your CV/);
     expect(html).toContain('<meta property="og:locale" content="en_US">');
     expect(html).toContain(`/og/${json.id}.png`);
