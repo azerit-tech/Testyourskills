@@ -349,7 +349,10 @@ export function createApp(opts: AppOptions) {
     const retry = !!row && (row.degraded || (!cmp && !!opts.linkedinProfiles && !!opts.showcaseLinkedin));
     const stale = !row || Date.now() - row.createdAt > (retry ? SHOWCASE_RETRY_MS : SHOWCASE_MS);
     // Jetons GitHub épuisés : la vitrine attendra, elle ne prend pas la place d'une vraie fiche.
-    if (stale && !pipeline.inflightFor(login) && !pipeline.githubBusy()) pipeline.start({ lang: "fr", login });
+    // Commissariat fermé (plafond du jour, crédit) : pas de lecture payante lancée par une visite.
+    const ai = safeAiStatus(aiStatus);
+    const closed = ai === "budget" || ai === "credits";
+    if (stale && !closed && !pipeline.inflightFor(login) && !pipeline.githubBusy()) pipeline.start({ lang: "fr", login });
     if (!row) return c.json({ card: null });
     return c.json({
       card: showcaseCard(row),

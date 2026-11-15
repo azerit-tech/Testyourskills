@@ -413,6 +413,21 @@ describe("carte vitrine de l'accueil (§6.1)", () => {
     expect(ctx.calls.collect).toBe(1);
   });
 
+  it("commissariat fermé (plafond du jour, crédit) : une visite de l'accueil ne lance aucune lecture", async () => {
+    let status: AiStatus = "budget";
+    const ctx = setup({}, { showcaseLogin: "jmougeot", aiStatus: () => status });
+    expect(await (await ctx.app.request("/api/showcase")).json()).toEqual({ card: null });
+    status = "credits";
+    await ctx.app.request("/api/showcase");
+    expect(ctx.pipeline.load()).toEqual({ running: 0, queued: 0 });
+    expect(ctx.calls.collect).toBe(0);
+    // Rouvert : la vitrine se refait à la visite suivante.
+    status = "ok";
+    await ctx.app.request("/api/showcase");
+    await ctx.pipeline.drain();
+    expect(ctx.calls.collect).toBe(1);
+  });
+
   it("sans lecteur LinkedIn, la fiche GitHub seule tient la semaine", async () => {
     const ctx = setup({}, { showcaseLogin: "jmougeot", showcaseLinkedin: "https://www.linkedin.com/in/jacquesmougeot" });
     await ctx.app.request("/api/showcase");
