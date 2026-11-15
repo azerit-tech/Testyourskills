@@ -1,6 +1,6 @@
 // La saison côté front (data/season.json, servi par /api/config) : le seul
 // endroit qui choisit la ligne de l'accueil sous le titre, et le texte du
-// bandeau de saison. Sans prime ouverte, l'accueil ne promet pas d'entretien.
+// bandeau de saison. L'entretien ne se promet que dans le bandeau.
 import { useEffect, useState } from "react";
 import { seasonPhase, type SeasonDates } from "../../../shared/season";
 import type { Lang } from "../../../shared/types";
@@ -20,15 +20,15 @@ export function useAppConfig(): AppConfig | null {
 }
 
 interface HookLines {
-  /** Une prime est ouverte : la ligne de l'entretien. */
-  hookPrimes: string;
-  /** Aucune prime ouverte : une phrase vraie, utile au jeu. */
+  /** Ce qu'on obtient, en combien de temps, sans compte (§18.48). */
   hookPlay: string;
 }
 
-/** La ligne sous le titre de l'accueil. Tant que le serveur n'a pas dit qu'une prime est ouverte, aucune promesse d'entretien. */
-export function homeHook(h: HookLines, cfg: Pick<AppConfig, "primesOpen"> | null): string {
-  return cfg?.primesOpen ? h.hookPrimes : h.hookPlay;
+/** La ligne sous le titre de l'accueil : toujours la promesse du jeu. Primes ouvertes,
+ *  l'entretien est dit par le bandeau de saison juste au-dessus ; le redire ici
+ *  coûterait la promesse et répéterait l'entretien. `cfg` reste pour les appelants. */
+export function homeHook(h: HookLines, _cfg?: Pick<AppConfig, "primesOpen"> | null): string {
+  return h.hookPlay;
 }
 
 interface SeasonLines {

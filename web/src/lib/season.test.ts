@@ -16,9 +16,9 @@ describe("la ligne de l'accueil", () => {
     expect(homeHook(DICTS.en.home, null)).toBe("One to six stars, in one minute. No account.");
   });
 
-  it("une prime ouverte : la ligne de l'entretien", () => {
-    expect(homeHook(DICTS.fr.home, { primesOpen: true })).toBe("Le haut du classement décroche un entretien.");
-    expect(homeHook(DICTS.en.home, { primesOpen: true })).toBe("The top of the board lands an interview.");
+  it("une prime ouverte : la même promesse, l'entretien reste au bandeau de saison", () => {
+    expect(homeHook(DICTS.fr.home, { primesOpen: true })).toBe("De une à six étoiles, en une minute. Sans compte.");
+    expect(homeHook(DICTS.en.home, { primesOpen: true })).toBe("One to six stars, in one minute. No account.");
   });
 
   it("la config du serveur : primesOpen et les dates, tout champ douteux vaut « non »", () => {
