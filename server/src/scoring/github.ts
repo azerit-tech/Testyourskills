@@ -100,7 +100,7 @@ export function docStat(m: GithubMetrics): Stat {
   ];
   if (m.lazyExamples.length)
     facts.push(
-      fact(`Exemples : ${m.lazyExamples.map((e) => `« ${e} »`).join(", ")}`, `Examples: ${m.lazyExamples.map((e) => `"${e}"`).join(", ")}`),
+      fact(`Exemples : ${m.lazyExamples.map((e) => `« ${e} »`).join(", ")}`, `Examples: ${m.lazyExamples.map((e) => `“${e}”`).join(", ")}`),
     );
   return { code: "DOC", value: scoreOn(G.DOC.scale, raw), sufficient: m.readableRepos >= G.DOC.sufficientRepos, facts };
 }

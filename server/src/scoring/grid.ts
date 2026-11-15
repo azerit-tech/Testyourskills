@@ -371,7 +371,7 @@ export function eduDeclared(d: DeclaredInput): Draft {
   const evidence = useSchool
     ? { text: schoolFact!, publicText: SCHOOL_COUNTED, source: "linkedin" as const, ...(d.url ? { proof: d.url } : {}) }
     : {
-        text: f(`« ${best!.quote.slice(0, 120)} »`, `"${best!.quote.slice(0, 120)}"`),
+        text: f(`« ${best!.quote.slice(0, 120)} »`, `“${best!.quote.slice(0, 120)}”`),
         publicText: signalFact!,
         source: "linkedin" as const,
         ...(d.url ? { proof: d.url } : {}),
@@ -415,7 +415,7 @@ export function xpDeclared(d: DeclaredInput): Draft {
     const latest = [...infos].filter((r) => r.kind === "full").sort((a, b) => (b.start ?? -1) - (a.start ?? -1))[0];
     const titled = [...current, ...(latest ? [latest] : [])].find((r) => SENIOR_RE.test(norm(r.role.title)));
     return titled && y < GRID.XP.seniorOnPaperBelowYears
-      ? [f(`Senior à confirmer\u00a0: «\u00a0${titled.role.title}\u00a0», ${years(y).fr} ${counted(y)}.`, `Senior, to confirm: "${titled.role.title}", ${years(y).en} counted.`)]
+      ? [f(`Senior à confirmer\u00a0: «\u00a0${titled.role.title}\u00a0», ${years(y).fr} ${counted(y)}.`, `Senior, to confirm: “${titled.role.title}”, ${years(y).en} counted.`)]
       : [];
   };
 
@@ -483,7 +483,7 @@ export function xpDeclared(d: DeclaredInput): Draft {
     score: lvl.score,
     state: "scored",
     source: "linkedin",
-    reached: f(`${years(y).fr} ${counted(y)} sur les postes datés : le palier « ${lvl.years ? years(lvl.years).fr : "moins d'un an"} ».`, `${years(y).en} counted on the dated roles: the "${lvl.years ? years(lvl.years).en : "under a year"}" step.`),
+    reached: f(`${years(y).fr} ${counted(y)} sur les postes datés : le palier « ${lvl.years ? years(lvl.years).fr : "moins d'un an"} ».`, `${years(y).en} counted on the dated roles: the “${lvl.years ? years(lvl.years).en : "under a year"}” step.`),
     ...(nextLvl
       ? { next: f(`Pour ${nextLvl.score} : ${years(nextLvl.years).fr} ${counted(nextLvl.years)}. Tu en as ${df(y, "fr")}.`, `For ${nextLvl.score}: ${years(nextLvl.years).en} counted. You have ${df(y, "en")}.`) }
       : {}),
@@ -681,7 +681,7 @@ export function empDeclared(d: DeclaredInput): Draft {
     source: "linkedin",
     reached,
     ...(next ? { next } : {}),
-    flags: team ? [f(`Équipe encadrée : « ${team.slice(0, 100)} »`, `Team led: "${team.slice(0, 100)}"`)] : [],
+    flags: team ? [f(`Équipe encadrée : « ${team.slice(0, 100)} »`, `Team led: “${team.slice(0, 100)}”`)] : [],
     evidence: { text: evidenceText, publicText: evidencePublic, source: "linkedin", ...proof },
   });
 }
@@ -970,7 +970,7 @@ export function codeGithub(g: GithubInput): Draft {
     reached,
     ...(next ? { next } : {}),
     evidence: {
-      text: f(`${best.repo}${file} : niveau ${best.level} sur 5.${quote ? ` « ${quote} »` : ""}`, `${best.repo}${file}: level ${best.level} out of 5.${quote ? ` "${quote}"` : ""}`),
+      text: f(`${best.repo}${file} : niveau ${best.level} sur 5.${quote ? ` « ${quote} »` : ""}`, `${best.repo}${file}: level ${best.level} out of 5.${quote ? ` “${quote}”` : ""}`),
       source: "github",
       ...(proof ? { proof } : {}),
     },

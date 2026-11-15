@@ -161,7 +161,7 @@ export function scoreCv(
   ];
   if (mentions[0]) {
     const q = mentions[0].quote.trim().slice(0, 90);
-    archFacts.push(fact(`Par exemple : « ${q} »`, `For example: "${q}"`));
+    archFacts.push(fact(`Par exemple : « ${q} »`, `For example: “${q}”`));
   }
   const ARCH: Stat = { code: "ARCH", value: scoreOn(C.ARCH.scale, mentions.length), sufficient: enoughText, facts: archFacts };
 
@@ -198,7 +198,7 @@ export function scoreCv(
       top.length
         ? fact(
             `Les plus fréquents : ${top.map(([k, n]) => `« ${k} » ×${n}`).join(", ")}`,
-            `Most frequent: ${top.map(([k, n]) => `"${k}" ×${n}`).join(", ")}`,
+            `Most frequent: ${top.map(([k, n]) => `“${k}” ×${n}`).join(", ")}`,
           )
         : fact("Aucun mot creux repéré", "No buzzword spotted"),
     ],
