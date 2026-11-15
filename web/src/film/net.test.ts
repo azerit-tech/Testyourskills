@@ -1,7 +1,7 @@
 // Le film et le réseau (docs/cinematique-poursuite.md §5.3, §5.4).
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FILE_CEILINGS } from "../../../shared/film/budget";
-import { ECO_BELOW_BPS, endingToLoad, filmAssetUrl, initialVariant, PROBE_BYTES, probeVerdict, RateMeter, READY_WAIT_MS, readyVerdict, STALL_MS, VisibleClock } from "./net";
+import { ECO_BELOW_BPS, endingToLoad, filmAssetUrl, initialVariant, PROBE_BYTES, probeVerdict, RateMeter, READY_MAX_MS, READY_WAIT_MS, readyVerdict, STALL_MS, VisibleClock } from "./net";
 
 describe("les adresses du film", () => {
   it("sans base : l'adresse à empreinte donnée par Vite", () => {
@@ -113,10 +113,17 @@ describe("le délai d'abandon, fiche prête", () => {
     expect(readyVerdict({ visibleMs: 2500, remainingBytes: 1_000_000, bps: 10 * MBIT })).toBe("wait");
   });
 
-  it("le reste ne peut pas arriver : la fiche se pose tout de suite, sans attendre 4 s pour rien", () => {
-    // 3 Mo à 2 Mbit/s : 12 s
+  it("réseau lent, fiche servie vite : la fin du téléchargement en vue, on l'attend au-delà de 4 s", () => {
+    // la variante éco (1,7 Mo) à 2 Mbit/s : 6,8 s, 8,9 s avec la marge et le décodage
+    expect(readyVerdict({ visibleMs: 0, remainingBytes: 1_700_000, bps: 2 * MBIT })).toBe("wait");
+    expect(readyVerdict({ visibleMs: 6000, remainingBytes: 500_000, bps: 2 * MBIT })).toBe("wait");
+  });
+
+  it("le reste ne peut pas arriver : la fiche se pose tout de suite, sans attendre pour rien", () => {
+    // 3 Mo à 2 Mbit/s : 12 s, 15,4 s avec la marge et le décodage
     expect(readyVerdict({ visibleMs: 0, remainingBytes: 3_000_000, bps: 2 * MBIT })).toBe("give-up");
-    expect(readyVerdict({ visibleMs: 3000, remainingBytes: 1_000_000, bps: 10 * MBIT })).toBe("give-up");
+    expect(readyVerdict({ visibleMs: 11_000, remainingBytes: 1_000_000, bps: 10 * MBIT })).toBe("give-up");
+    expect(readyVerdict({ visibleMs: READY_MAX_MS, remainingBytes: 1000, bps: 10 * MBIT })).toBe("give-up");
   });
 
   it("réseau coupé (débit nul) : tout de suite ; sans mesure : à l'aveugle jusqu'au délai", () => {

@@ -149,13 +149,23 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
   // Verrou immédiat : deux départs rapprochés (collage puis dépôt) n'en font qu'un.
   const busyRef = useRef(false);
 
+  /** Le focus donné par la page elle-même, à l'ouverture : il ne vaut pas un premier contact. */
+  const quietFocus = useRef(false);
+  /** Un champ qui prend le focus (clavier, toucher) : le film commence à se charger (§18.36). */
+  const onFocus = () => {
+    if (!quietFocus.current) prefetchReveal();
+  };
+
   useEffect(() => {
+    quietFocus.current = true;
     if (init?.mode === "both" || init?.login) {
       loginRef.current?.focus();
+      quietFocus.current = false;
       return;
     }
     // Sur desktop, le champ a le focus d'emblée. Pas sur mobile : le clavier cacherait la carte.
     if (!inline && !secondary && !isTouch()) loginRef.current?.focus({ preventScroll: true });
+    quietFocus.current = false;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -570,7 +580,7 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
 
   if (inline) {
     return (
-      <form className={`entry entry-inline${doorsOn ? " has-doors" : ""}`} onSubmit={submit} onInput={prefetchReveal} onPointerDown={prefetchReveal} noValidate>
+      <form className={`entry entry-inline${doorsOn ? " has-doors" : ""}`} onSubmit={submit} onInput={prefetchReveal} onPointerDown={prefetchReveal} onFocus={onFocus} noValidate>
         {doorsSwitch}
         {loginField}
         {errorLine}
@@ -601,7 +611,7 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
   // Un seul chemin à l'écran : le lien ou le pseudo d'abord ; le CV à un lien de là, un seul
   // niveau. Les deux sources ensemble : en déposant un PDF avec un pseudo saisi, ou depuis une fiche.
   return (
-    <form className={`entry mode-${mode}${doorsOn ? " has-doors" : ""}`} onSubmit={submit} onInput={prefetchReveal} onPointerDown={prefetchReveal} onDragEnter={prefetchReveal} noValidate>
+    <form className={`entry mode-${mode}${doorsOn ? " has-doors" : ""}`} onSubmit={submit} onInput={prefetchReveal} onPointerDown={prefetchReveal} onFocus={onFocus} onDragEnter={prefetchReveal} noValidate>
       {mode === "both" && <p className="entry-both-head">{h.bothActive}</p>}
 
       {doorsSwitch}

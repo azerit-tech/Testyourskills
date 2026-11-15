@@ -127,8 +127,14 @@ export function endingToLoad(level?: number): { load: EndingId; drop: EndingId |
   return level === 6 ? { load: "fin6", drop: "fin" } : { load: "fin", drop: "fin6" };
 }
 
-/** Fiche prête : le film a au plus ce temps d'onglet visible pour être prêt, sinon la fiche se pose sans lui. */
+/** Fiche prête, sans mesure du débit (ou tout reçu, en décodage) : le film a ce temps d'onglet visible pour être prêt. */
 export const READY_WAIT_MS = 4000;
+/**
+ * Fiche prête, débit mesuré : tant que la fin du téléchargement est en vue avant ce
+ * temps, on l'attend (« La poursuite se prépare… »). Une fiche servie vite sur un réseau
+ * lent garde ainsi sa révélation (§18.39) ; l'attente elle-même plafonne à 20 s (hold.ts).
+ */
+export const READY_MAX_MS = 12_000;
 /** Après le dernier octet : la balise charge, peint sa première image, essaie de jouer. */
 export const DECODE_MS = 400;
 /** Le reste estimé est gonflé d'autant : le débit d'un téléphone varie. */
@@ -144,17 +150,18 @@ export interface ReadyFacts {
 }
 
 /**
- * Attendre le film ou poser la fiche tout de suite. Le reste arrive avant la
- * fin du délai (temps visible, marge et décodage compris) : on attend ; sinon
- * on n'attend pas pour rien. Tout est là : on attend le décodage, jusqu'au
- * délai. Sans mesure (pas de flux, rien reçu) : à l'aveugle, jusqu'au délai.
+ * Attendre le film ou poser la fiche tout de suite. Le reste arrive avant
+ * READY_MAX_MS (temps visible, marge et décodage compris) : on attend ; sinon
+ * on n'attend pas pour rien. Tout est là : on attend le décodage, jusqu'à
+ * READY_WAIT_MS. Sans mesure (pas de flux, rien reçu) : à l'aveugle, jusqu'à
+ * READY_WAIT_MS.
  */
 export function readyVerdict(f: ReadyFacts): "wait" | "give-up" {
-  if (f.visibleMs >= READY_WAIT_MS) return "give-up";
-  if (f.remainingBytes <= 0 || f.bps === null) return "wait";
+  if (f.visibleMs >= READY_MAX_MS) return "give-up";
+  if (f.remainingBytes <= 0 || f.bps === null) return f.visibleMs < READY_WAIT_MS ? "wait" : "give-up";
   if (f.bps <= 0) return "give-up";
   const eta = ((f.remainingBytes * 8 * 1000) / f.bps) * ETA_MARGIN + DECODE_MS;
-  return f.visibleMs + eta <= READY_WAIT_MS ? "wait" : "give-up";
+  return f.visibleMs + eta <= READY_MAX_MS ? "wait" : "give-up";
 }
 
 /** Le temps écoulé, onglet visible seulement (comme l'attente, web/src/lib/hold.ts). */
