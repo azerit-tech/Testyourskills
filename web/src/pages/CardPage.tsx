@@ -501,12 +501,16 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
   const [kase, setKase] = useState<CaseInfo | null>(null);
   const [claimOn, setClaimOn] = useState(false);
   const [mine] = useState<MyCard | null>(() => myCard());
+  // Le dossier tarde : l'après-fiche se montre quand même, sans sa ligne du jury.
+  const [caseLate, setCaseLate] = useState(false);
   useEffect(() => {
     let alive = true;
     void api.getCase(id).then((c) => alive && setKase(c));
     void api.getConfig().then((c) => alive && setClaimOn(c.claim));
+    const late = window.setTimeout(() => alive && setCaseLate(true), 2500);
     return () => {
       alive = false;
+      window.clearTimeout(late);
     };
   }, [id]);
   // Sa propre fiche, faite ou revendiquée ici : la référence des comparaisons à venir.
@@ -680,7 +684,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
         {visitor && !cardLogin && !wantedYou && <RemovalRequest cardId={id} />}
       </div>
 
-      <div className={`after${settled ? " is-in" : ""}`} aria-hidden={!settled} inert={!settled ? true : undefined}>
+      {/* L'après-fiche entre en une fois, le dossier lu (ligne du jury) : rien ne pousse les blocs sous les yeux (CLS). */}
+      <div className={`after${settled && (kase !== null || caseLate) ? " is-in" : ""}`} aria-hidden={!settled} inert={!settled ? true : undefined}>
         {/* L'après-fiche dans l'ordre de §18.48 : le verdict, le partage, la bande, dénoncer, la course aux primes, les critères, puis le reste replié. */}
         {/* Le verdict : le pari, le jury, la peine et la caution, un seul bloc aligné à gauche. Vide, il ne s'affiche pas. */}
         {!visitor && (

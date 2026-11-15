@@ -52,7 +52,8 @@ export function BandPick({ cardId, toast }: { cardId: string; toast: Toast }) {
   const { t } = useT();
   const p = t.bands.pick;
   const uid = useId().replace(/:/g, "");
-  const [mb, setMb] = useState<MyBands | null>(null);
+  // undefined : on lit encore ; null : pas de bandes pour cette fiche.
+  const [mb, setMb] = useState<MyBands | null | undefined>(undefined);
   const [hint] = useState(() => bandHint());
   const say = useRef({ toast, landed: t.bands.states.landed });
   say.current = { toast, landed: t.bands.states.landed };
@@ -81,6 +82,8 @@ export function BandPick({ cardId, toast }: { cardId: string; toast: Toast }) {
     };
   }, [cardId]);
 
+  // En lecture : une marque, sans hauteur ; l'après-fiche attend qu'elle parte pour entrer (CLS).
+  if (mb === undefined) return <section className="after-block bands-pick is-loading" aria-hidden />;
   if (!mb) return null;
 
   return (

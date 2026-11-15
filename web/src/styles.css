@@ -2867,6 +2867,19 @@ button.cover-panel:focus-visible {
   opacity: 1;
   transform: none;
 }
+/* tant que l'après-fiche n'est pas entrée, ou que les bandes se lisent encore, rien n'est visible :
+   les blocs se placent hors de la vue, puis entrent en une fois, sans décalage sous les yeux */
+.after:not(.is-in),
+.after:has(> .bands-pick.is-loading) {
+  visibility: hidden;
+}
+.after:has(> .bands-pick.is-loading) > * {
+  opacity: 0;
+  transform: translateY(14px);
+}
+.after-block.bands-pick.is-loading {
+  display: none;
+}
 .after.is-in > :nth-child(2) {
   transition-delay: 0.08s;
 }
