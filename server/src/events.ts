@@ -76,7 +76,7 @@ export const filmMetaSchema = z.strictObject({
   kbps: z.number().int().min(0).max(10_000_000).nullable(),
   /** Navigateur intégré d'une application (LinkedIn, Instagram…). */
   inApp: z.boolean(),
-  /** La lecture a demandé un geste (la pilule « Ouvrir mon dossier »). */
+  /** La lecture a demandé un geste (la pilule « Lancer la poursuite »). */
   gesture: z.boolean(),
 });
 export type FilmMeta = z.infer<typeof filmMetaSchema>;

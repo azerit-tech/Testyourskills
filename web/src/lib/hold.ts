@@ -3,7 +3,7 @@
 // et que la scène 3D n'a pas rendu sa première image. Il se lève alors et la
 // révélation part seule ; si le son demande encore un geste, ou si le film
 // (§18.36) ne peut pas se lancer sans geste (iPhone en économie d'énergie), il
-// montre d'abord la pilule « Ouvrir mon dossier ». Au bout de 20 s sans scène,
+// montre d'abord la pilule « Lancer la poursuite ». Au bout de 20 s sans scène,
 // la fiche sort sans révélation.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { soundNeedsGesture, unlockAudio } from "./audio";

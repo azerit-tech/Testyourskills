@@ -1,6 +1,6 @@
 // Les deux balises vidéo du film (§18.36, docs/cinematique-poursuite.md §5.4),
 // créées et débloquées dans un geste : l'envoi du formulaire (EntryForm, à côté
-// de unlockAudio), sinon la pilule « Ouvrir mon dossier » de l'attente. Un
+// de unlockAudio), sinon la pilule « Lancer la poursuite » de l'attente. Un
 // navigateur qui refuse la lecture sans geste (iPhone en économie d'énergie)
 // garde la permission sur la balise touchée ; le lecteur (player.ts) joue donc
 // ces deux-là, jamais d'autres. Quelques lignes, dans le paquet de l'accueil :
