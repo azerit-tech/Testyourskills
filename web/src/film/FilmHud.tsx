@@ -9,6 +9,7 @@
 import type { CSSProperties } from "react";
 import type { Lang } from "../../../shared/types";
 import type { FilmPlan, Hud } from "../../../shared/film";
+import { upper } from "../../../shared/card/text";
 
 /** Tirage pseudo-aléatoire déterministe (mulberry32). */
 function rng(seed: number): () => number {
@@ -59,7 +60,10 @@ export function FilmHud({ plan, hud, lang }: { plan: FilmPlan; hud: Hud; lang: L
 
       {hud.freeze && (
         <div className="film-mug">
-          <span className="film-plate">{plan.plate}</span>
+          <span className="film-plate">
+            <b>{upper(plan.plate, lang)}</b>
+            <i>{plan.plateSub[lang]}</i>
+          </span>
           <span className="film-level" style={{ transform: `scale(${hud.freeze.titleScale})`, "--n": plan.title[lang].length } as CSSProperties}>
             {plan.title[lang]}
           </span>

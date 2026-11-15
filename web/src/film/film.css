@@ -157,18 +157,32 @@
   gap: 0.9cqh;
   pointer-events: none;
 }
+/* la plaque de la fiche (§18.48, shared/card/mug.tsx) : « @PSEUDO » en capitales,
+   puis « N° · date » en mono, crème sur #111, inclinée de 1,5° */
 .film-plate {
+  display: grid;
+  justify-items: center;
+  gap: 0.55cqh;
   max-width: calc(100% - 48px);
-  padding: 0.8cqh 1.4cqh 0.9cqh;
+  padding: 0.8cqh 1.5cqh 0.85cqh;
   border-radius: 3px;
-  background: #0c0d1b;
+  background: #111;
   color: #fff9cb;
-  font: 600 min(22px, 2.5cqh)/1 var(--f-name);
-  letter-spacing: 0.02em;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
-  transform: rotate(-1.2deg);
+  transform: rotate(-1.5deg);
+}
+.film-plate b {
+  max-width: 100%;
+  overflow: hidden;
+  font: 700 min(22px, 2.5cqh)/1 var(--f-name);
+  letter-spacing: 0.06em;
+  text-overflow: ellipsis;
+}
+.film-plate i {
+  font: 400 min(9.5px, 1.1cqh)/1 var(--f-mono);
+  font-style: normal;
+  letter-spacing: 0.08em;
+  opacity: 0.7;
 }
 .film-level {
   max-width: calc(100% - 24px);
