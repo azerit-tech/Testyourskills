@@ -299,7 +299,7 @@ function declaredDrafts(src: "LinkedIn" | "CV", proof?: string, ghRepos?: number
       next: EDU_NEXT[8],
       evidence: { text: schoolCounted("École Halbrune"), publicText: SCHOOL_COUNTED, source: "linkedin", ...p },
     }),
-    c("XP", 9, "scored", "linkedin", f("8,4 ans comptés sur les postes datés : le palier « 8 ans ».", `8.4 years counted on the dated roles: the "8 years" step.`), {
+    c("XP", 9, "scored", "linkedin", f("8,4 ans comptés sur les postes datés : le palier « 8 ans ».", `8.4 years counted on the dated roles: the “8 years” step.`), {
       next: f("Pour 10 : 10 ans comptés. Tu en as 8,4.", "For 10: 10 years counted. You have 8.4."),
       evidence: {
         text: f(
@@ -316,7 +316,7 @@ function declaredDrafts(src: "LinkedIn" | "CV", proof?: string, ghRepos?: number
     }),
     c("EMP", 8, "scored", "linkedin", f("Stealth Startup fondée et tenue 3,4 ans.", "Stealth Startup founded and run for 3.4 years."), {
       next: f("Pour 10 : deux ans chez un employeur à forte barre d'embauche, et une trajectoire qui monte ou une équipe encadrée.", "For 10: two years at a high-bar employer, and a rising path or a team led."),
-      flags: [f("Équipe encadrée : « recrutement et encadrement d'une équipe de six personnes chez Banque Orsay »", `Team led: "hired and led a team of six at Banque Orsay"`)],
+      flags: [f("Équipe encadrée : « recrutement et encadrement d'une équipe de six personnes chez Banque Orsay »", `Team led: “hired and led a team of six at Banque Orsay”`)],
       evidence: {
         text: f(
           "CTO et cofondation, Stealth Startup : depuis juin 2023, 41 mois. Lead developer, Banque Orsay : janvier 2019 – août 2023, 4,6 ans.",
@@ -346,7 +346,7 @@ function declaredDrafts(src: "LinkedIn" | "CV", proof?: string, ghRepos?: number
       next: f("Au-delà de 6 : un projet porté et utilisé, sur GitHub.", "Beyond 6: a project carried and used, on GitHub."),
       evidence: { text: f("4 résultats datés et chiffrés.", "4 dated and quantified outcomes."), publicText: f("4 résultats datés et chiffrés.", "4 dated and quantified outcomes."), source: "linkedin", ...p },
     }),
-    c("OSS", null, "unproven", "linkedin", f(fr("Une mention « open source » sur {src} ne donne rien sans trace."), `An "open source" mention on ${src} gives nothing without a trace.`)),
+    c("OSS", null, "unproven", "linkedin", f(fr("Une mention « open source » sur {src} ne donne rien sans trace."), `An “open source” mention on ${src} gives nothing without a trace.`)),
   ];
 }
 
