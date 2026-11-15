@@ -378,7 +378,9 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
     return () => window.removeEventListener("keydown", on);
   }, [animating, skip]);
 
+  // Un toucher sur le film ne le saute plus (§18.48) : seul « Passer » le fait. L'ascenseur (?scene=walkout) garde son geste.
   const onStageClick = () => {
+    if (scene === "film") return;
     if (phase === "ready") open();
     else if (animating && !walkoutCtl.current?.interact()) skip();
   };
@@ -440,14 +442,14 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
           <ErrorBoundary fallback={null} onError={finish}>
             <Suspense fallback={null}>
               {scene === "film" ? (
-                <Film card={main} lang={lang} phase={phase} onReady={() => onScene("ready")} onGesture={() => onScene("gesture")} onStage={stage} onHandoff={handoff} onDone={finish} onTap={onStageClick} />
+                <Film card={main} lang={lang} phase={phase} onReady={() => onScene("ready")} onGesture={() => onScene("gesture")} onStage={stage} onHandoff={handoff} onDone={finish} />
               ) : (
                 <Walkout3D card={main} lang={lang} declared={declaredOf(item.kind === "comparison" ? item.comparison : item.card)} phase={phase} anchorRef={stageRef} controlRef={walkoutCtl} onReady={() => onScene("ready")} onHandoff={handoff} onDone={finish} />
               )}
             </Suspense>
           </ErrorBoundary>
         )}
-        <section ref={stageRef} className="result-stage" onClick={animating ? onStageClick : undefined}>
+        <section ref={stageRef} className="result-stage" onClick={animating && scene !== "film" ? onStageClick : undefined}>
           <div className="single-stage">
             {/* La fiche se retourne (§18.27). Les étoiles ne s'allument ici que sans révélation 3D : sinon elles se rallumeraient sur la carte posée. */}
             {/* Un dossier à deux pièces : une seule fiche, et ses pièces dessous (§18.36). */}

@@ -170,7 +170,7 @@ const fr = {
     packTitle: "DOSSIER",
     /* la pilule de l'attente, quand le son demande un geste pour démarrer (§18.27) */
     open: "Ouvrir mon dossier",
-    skip: "Passer l'animation",
+    skip: "Passer",
     mute: "Couper le son",
     unmute: "Activer le son",
     revealed: (level: string, overall: number) => `Fiche ${level}, note ${overall}.`,
@@ -917,7 +917,7 @@ const en: Dict = {
   reveal: {
     packTitle: "CASE FILE",
     open: "Open my case file",
-    skip: "Skip animation",
+    skip: "Skip",
     mute: "Mute",
     unmute: "Unmute",
     revealed: (level, overall) => `${level} sheet, rated ${overall}.`,

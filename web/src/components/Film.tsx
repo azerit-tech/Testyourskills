@@ -59,8 +59,6 @@ interface Props {
   onStage?: () => void;
   onHandoff: () => void;
   onDone: () => void;
-  /** Un toucher sur la scène (CardPage : passer). */
-  onTap?: () => void;
 }
 
 declare global {
@@ -95,7 +93,7 @@ function useFilmPlan(card: CardData): FilmPlan {
   return kept.current.plan;
 }
 
-function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, onDone, onTap, onFail }: Props & { onFail: () => void }) {
+function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, onDone, onFail }: Props & { onFail: () => void }) {
   const { t: tr } = useT();
   const plan = useFilmPlan(card);
   const planRef = useRef(plan);
@@ -320,14 +318,14 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
     sound.current?.setMuted(m);
   };
 
-  const onTapTraced = () => {
-    filmTrace("toucher", { phase });
-    onTap?.();
-  };
+  // Un toucher sur l'image ne fait rien (§18.48) : seul « Passer » saute le film. Il reste noté dans la trace.
+  const onTapTraced = () => filmTrace("toucher", { phase });
 
   const hud = hudAt(plan, time, lang);
   const landed = hud.video === null;
   const frozen = hud.freeze !== null;
+  /** L'arrêt sur image et l'éclair : plus rien à passer ni à régler, les boutons s'effacent. */
+  const quiet = hud.phase === "freeze" || hud.phase === "flash" || hud.phase === "over";
   useEffect(() => {
     if (frozen) ensureStill(stillRef.current, plan.tone);
   }, [frozen, plan]);
@@ -340,7 +338,7 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
 
   return (
     <>
-      <div className={`film-stage${landed ? " is-landed" : ""}`} style={vars} aria-hidden="true" onClick={landed ? undefined : onTapTraced}>
+      <div className={`film-stage${landed ? " is-landed" : ""}${quiet ? " is-quiet" : ""}`} style={vars} aria-hidden="true" onClick={landed ? undefined : onTapTraced}>
         <div ref={frameRef} className={`film-frame${hud.freeze ? " is-frozen" : ""}`} data-frame={hud.frame} data-shot={hud.shot}>
           {/* les deux balises vidéo sont posées ici par le lecteur */}
           <div ref={coverRef} className="film-cover" />
