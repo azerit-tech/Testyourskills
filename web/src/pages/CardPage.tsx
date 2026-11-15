@@ -19,7 +19,7 @@ import { CardNotFound, Unreachable } from "../components/ErrorPage";
 import { Dossier } from "../components/Findings";
 import { Jury, JuryLine } from "../components/Jury";
 import { MakeYours } from "../components/MakeYours";
-import { PleaVerdict } from "../components/Plea";
+import { PleaStrip, PleaVerdict } from "../components/Plea";
 import { RecruiterRead } from "../components/RecruiterRead";
 import { RemovalRequest } from "../components/Removal";
 import { AddLinkedin } from "../components/AddLinkedin";
@@ -484,6 +484,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
   // Calculée une fois par dossier : un objet neuf à chaque rendu recréait le film en route (lecteur, son, gel).
   const main: CardData = useMemo(() => (item.kind === "card" ? item.card : fileOf(item.comparison)), [item]);
   const [scene] = useState(revealScene);
+  // Arrivé par le film de sa fiche toute neuve : lu une fois, le film fini ne le retire pas.
+  const [pleaTop] = useState(fresh);
   // Le film part dès que l'attente se lève : sa première image est déjà à l'écran.
   const { phase, open, skip, replay, stage, staged, handoff, finish, animating, settled } = useReveal(animate, start, scene === "film" ? 0 : undefined);
   // Revoir le film (§18.48) : depuis la tête de la fiche, pour tout le monde, jamais en lecture automatique.
@@ -677,6 +679,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
             )}
           </p>
         )}
+        {/* Au retour du film, sur téléphone : le verdict du pari au-dessus de la fiche (§18.52). */}
+        {!visitor && pleaTop && <PleaStrip cardId={id} overall={main.overall} shown={settled} />}
 
         {animating && (
           // Morceau 3D introuvable : même repli que sans WebGL, la fiche sort sans révélation.

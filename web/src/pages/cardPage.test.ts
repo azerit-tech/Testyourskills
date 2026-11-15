@@ -37,7 +37,7 @@ function stub(lang: string) {
   vi.stubGlobal("document", { documentElement: { dataset: {}, classList: { add: () => undefined, remove: () => undefined } }, querySelector: () => null, getElementById: () => null });
 }
 
-function renderResult(item: Shareable, opts: { owner: boolean; lang?: string; token?: string; plea?: number; me?: ResultProps["me"]; claimedAs?: string }): string {
+function renderResult(item: Shareable, opts: { owner: boolean; lang?: string; token?: string; plea?: number; me?: ResultProps["me"]; claimedAs?: string; fresh?: boolean }): string {
   stub(opts.lang ?? "fr-FR");
   const id = item.kind === "card" ? item.card.id : item.comparison.id;
   if (opts.token) tokens.set(id, opts.token);
@@ -49,7 +49,7 @@ function renderResult(item: Shareable, opts: { owner: boolean; lang?: string; to
     abort: false,
     onScene: () => undefined,
     owner: opts.owner,
-    fresh: false,
+    fresh: opts.fresh ?? false,
     kase: null,
     caseLate: false,
     claimedAs: opts.claimedAs ?? null,
@@ -183,6 +183,18 @@ describe("après-fiche, vue par qui a fait la fiche (§18.27)", () => {
     expect(html.indexOf('class="wanted"')).toBeLessThan(html.indexOf('class="result-stage"'));
     expect(html.match(/<h1/g)).toHaveLength(1);
     expect(html).not.toContain('id="you"');
+  });
+
+  it("au retour du film, le verdict du pari au-dessus de la fiche, place tenue, une seule fois (parcours 2)", () => {
+    const fresh = renderResult(mine("PleaCard001"), { owner: true, token: "tok", plea: 6, fresh: true }).replace(/ /g, " ");
+    const strip = /<p class="plea-strip[^"]*"[^>]*>.*?<\/p>/.exec(fresh)?.[0] ?? "";
+    expect(strip.replace(/<[^>]+>/g, "")).toMatch(/^(Excès de confiance|Lucide|Trop modeste)\. Tu plaidais 6 étoiles, verdict : \d\.$/);
+    expect(fresh.indexOf("plea-strip")).toBeLessThan(fresh.indexOf('class="result-stage"'));
+    // Sans film tout juste vu, ou pour un visiteur : rien au-dessus de la fiche.
+    expect(renderResult(mine("PleaCard002"), { owner: true, token: "tok", plea: 6 })).not.toContain("plea-strip");
+    expect(renderResult(card({ id: "PleaCard003" }), { owner: false, plea: 6, fresh: true })).not.toContain("plea-strip");
+    const en = renderResult(mine("PleaCard004"), { owner: true, token: "tok", plea: 1, fresh: true, lang: "en-US" });
+    expect(en).toMatch(/You pleaded 1 star, verdict: \d\./);
   });
 
   it("le reste : des lignes repliées, chacune un vrai titre et un chevron", () => {

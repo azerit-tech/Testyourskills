@@ -292,6 +292,8 @@ const fr = frTypoDeep({
     pleaded: "Tu plaidais",
     verdict: "Verdict",
     gap: { over: "Excès de confiance", exact: "Lucide", under: "Trop modeste" },
+    /** Au-dessus de la fiche, après le film, sur téléphone : après le mot du verdict. */
+    strip: (pleaded: number, actual: number) => `Tu plaidais ${pleaded === 1 ? "1 étoile" : `${pleaded} étoiles`}, verdict : ${actual}.`,
   },
   positions: {
     FS: "Full-stack",
@@ -1109,6 +1111,7 @@ const en: Dict = {
     pleaded: "You pleaded",
     verdict: "Verdict",
     gap: { over: "Overconfidence", exact: "Clear-eyed", under: "Too modest" },
+    strip: (pleaded, actual) => `You pleaded ${pleaded === 1 ? "1 star" : `${pleaded} stars`}, verdict: ${actual}.`,
   },
   positions: {
     FS: "Full-stack",

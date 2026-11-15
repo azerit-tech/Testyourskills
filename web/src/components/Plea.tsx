@@ -65,6 +65,24 @@ interface PleaVerdictProps {
  * Sous la fiche : un tableau de deux lignes, « Tu plaidais ★★★★★☆ » puis « Verdict ★★★★☆☆ », libellés
  * sans deux-points alignés à droite, étoiles sur la même verticale ; puis le mot de l'écart. Rien sans pari.
  */
+/**
+ * Au retour du film, sur téléphone (§18.52) : le verdict du pari en une ligne au-dessus de la fiche,
+ * dans le premier écran même à 390 × 664. Sa place est tenue dès le début (la fiche se taille
+ * dessous) ; il ne paraît qu'une fois la fiche posée. Le bloc du verdict, plus bas, ne le répète pas.
+ */
+export function PleaStrip({ cardId, overall, shown }: PleaVerdictProps) {
+  const { t } = useT();
+  const p = t.plea;
+  const pleaded = getPlea(cardId);
+  const v = pleaded ? pleaVerdict(pleaded, overall) : null;
+  if (!v) return null;
+  return (
+    <p className={`plea-strip${shown ? " is-on" : ""}`} aria-hidden={shown ? undefined : true}>
+      <b>{p.gap[v.gap]}.</b> {p.strip(v.pleaded, v.actual)}
+    </p>
+  );
+}
+
 export function PleaVerdict({ cardId, overall, shown }: PleaVerdictProps) {
   const { t } = useT();
   const p = t.plea;

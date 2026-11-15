@@ -2397,6 +2397,41 @@ button.cover-panel:focus-visible {
   display: flex;
   margin: 0;
 }
+/* au retour du film, sur téléphone : le verdict du pari au-dessus de la fiche, une ligne (deux à 320 px).
+   Sa place est tenue pendant le film (la fiche se taille dessous), il paraît quand la fiche est posée (§18.52). */
+.plea-strip {
+  display: none;
+}
+@media (max-width: 640px) {
+  .plea-strip {
+    display: block;
+    margin: 0 auto;
+    padding: 2px var(--gutter) 6px;
+    max-width: var(--measure);
+    font: 500 var(--t-14) / 1.35 var(--f-text);
+    text-align: center;
+    color: var(--cream);
+    text-wrap: balance;
+    visibility: hidden;
+  }
+  .plea-strip b {
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+  /* ciel clair (heure rose) : à l'encre, comme l'en-tête */
+  .page-result:has(> .card-sky.sky-light.is-in) .plea-strip {
+    color: var(--ink-0);
+  }
+  .plea-strip.is-on {
+    visibility: visible;
+    animation: line-in 0.4s var(--ease-out);
+  }
+  /* le bloc du verdict, sous la fiche, ne répète pas la ligne */
+  .page-result:has(.plea-strip) .after-head .plea-verdict {
+    display: none;
+  }
+}
 .plea-word {
   font: var(--font-block);
   text-transform: uppercase;
