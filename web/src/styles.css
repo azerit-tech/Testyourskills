@@ -1647,6 +1647,15 @@ button.cover-panel:focus-visible {
 .entry-error {
   display: none;
 }
+/* ce que la porte sait lire : à la place de l'erreur tant qu'il n'y en a pas, alignée
+   comme elle sur le texte du champ, et serrée contre lui */
+.entry-hint {
+  margin-top: -4px;
+  padding-left: 20px;
+  font: 500 var(--t-14) / 1.4 var(--f-text);
+  color: var(--c-text-2);
+  text-align: left;
+}
 .entry-error.is-on {
   display: flex;
 }

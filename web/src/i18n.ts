@@ -44,6 +44,8 @@ const fr = {
     hookPrimes: "Le haut du classement décroche un entretien.",
     hookPlay: "Fais ta fiche. Fais gagner ta bande.",
     tabGithub: "Ton GitHub",
+    /** Le retour depuis le CV, quand les deux portes existent. */
+    tabDoors: "LinkedIn ou GitHub",
     loginLabel: "Pseudo GitHub ou URL du profil",
     loginPlaceholder: "ton-pseudo",
     /** Les deux portes, quand le serveur lit LinkedIn (§18.24) : LinkedIn d'abord. */
@@ -52,6 +54,9 @@ const fr = {
     doorGithub: "GitHub",
     linkedinLabel: "Lien de ton profil LinkedIn",
     linkedinPlaceholder: "ton-profil",
+    /** Sous le champ, tant qu'il n'y a pas d'erreur : ce que chaque porte sait lire. */
+    linkedinHint: "Profil public seulement.",
+    githubHint: "Dépôts publics seulement.",
     errLinkedin: "Colle le lien de ton profil LinkedIn, ou ce qui suit linkedin.com/in/.",
     linkedinWhere: "Où est mon lien ?",
     linkedinHelp: "Dans l'app LinkedIn : ton profil, ⋯, puis copie le lien.",
@@ -64,6 +69,8 @@ const fr = {
     bothActive: "Deux pièces au dossier\u00a0: ton CV et ton GitHub",
     bothBack: "une seule source",
     dropTitle: "Glisse ton CV ici",
+    /** Au doigt, on ne glisse pas un fichier : on le choisit. */
+    dropPick: "Choisis ton CV en PDF",
     dropOr: "ou",
     dropBrowse: "choisis un PDF",
     dropHint: "PDF · 5 Mo · 10 pages max",
@@ -824,6 +831,7 @@ const en: Dict = {
     hookPrimes: "The top of the board lands an interview.",
     hookPlay: "Get your file. Make your crew win.",
     tabGithub: "Your GitHub",
+    tabDoors: "LinkedIn or GitHub",
     loginLabel: "GitHub username or profile URL",
     loginPlaceholder: "your-username",
     doorsLabel: "Source",
@@ -831,6 +839,8 @@ const en: Dict = {
     doorGithub: "GitHub",
     linkedinLabel: "Your LinkedIn profile link",
     linkedinPlaceholder: "your-profile",
+    linkedinHint: "Public profile only.",
+    githubHint: "Public repos only.",
     errLinkedin: "Paste your LinkedIn profile link, or what follows linkedin.com/in/.",
     linkedinWhere: "Where's my link?",
     linkedinHelp: "In the LinkedIn app: your profile, ⋯, then copy the link.",
@@ -843,6 +853,7 @@ const en: Dict = {
     bothActive: "Two exhibits on file: your CV and your GitHub",
     bothBack: "just one source",
     dropTitle: "Drop your CV here",
+    dropPick: "Pick your CV as a PDF",
     dropOr: "or",
     dropBrowse: "pick a PDF",
     dropHint: "PDF · 5 MB · 10 pages max",

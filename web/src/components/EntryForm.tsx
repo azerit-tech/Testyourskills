@@ -102,6 +102,8 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false 
   const [error, setError] = useState<string | null>(init?.error ? (typeof init.error === "string" ? init.error : pick(init.error, lang)) : null);
   const [busy, setBusy] = useState(false);
   const [drag, setDrag] = useState(false);
+  // Au doigt, on ne glisse pas un fichier : la zone du CV le dit autrement.
+  const [touch] = useState(() => isTouch());
   const fileInput = useRef<HTMLInputElement>(null);
   const localLoginRef = useRef<HTMLInputElement>(null);
   const loginRef = inputRef ?? localLoginRef;
@@ -453,7 +455,7 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false 
         if (p && p !== login) setLogin(p);
       }}
       aria-invalid={!!error && showGithub && !file}
-      aria-describedby={`${uid}-err ${uid}-hint`}
+      aria-describedby={`${uid}-err ${uid}-note ${uid}-hint`}
     />
   );
 
@@ -463,6 +465,12 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false 
     </p>
   );
 
+  /** Sous le champ seul, tant qu'il n'y a pas d'erreur (elle prend sa place) : ce que la porte sait lire. */
+  const hintLine = mode === "single" && tab === "github" && !error && (
+    <p id={`${uid}-note`} className="entry-hint">
+      {fieldDoor === "linkedin" ? h.linkedinHint : h.githubHint}
+    </p>
+  );
 
   /** Le champ, en pilule (maquette validée de l'accueil) : « @ » devant un pseudo GitHub,
    * « linkedin.com/in/ » devant un profil, sauf quand on y tape une adresse entière. */
@@ -553,7 +561,8 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false 
     );
   }
 
-  // Un seul chemin à l'écran : le pseudo d'abord ; le CV, puis la comparaison, à un lien de là.
+  // Un seul chemin à l'écran : le lien ou le pseudo d'abord ; le CV à un lien de là, un seul
+  // niveau. Les deux sources ensemble : en déposant un PDF avec un pseudo saisi, ou depuis une fiche.
   return (
     <form className={`entry mode-${mode}${doorsOn ? " has-doors" : ""}`} onSubmit={submit} onInput={prefetchReveal} onPointerDown={prefetchReveal} onDragEnter={prefetchReveal} noValidate>
       {mode === "both" && <p className="entry-both-head">{h.bothActive}</p>}
@@ -584,6 +593,11 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false 
                 <IconClose />
               </button>
             </div>
+          ) : touch ? (
+            <label htmlFor={`${uid}-file`} className="drop-empty">
+              <span className="drop-title">{h.dropPick}</span>
+              <span className="drop-sub">{h.dropHint}</span>
+            </label>
           ) : (
             <label htmlFor={`${uid}-file`} className="drop-empty">
               <span className="drop-title">{h.dropTitle}</span>
@@ -596,6 +610,7 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false 
       )}
 
       {errorLine}
+      {hintLine}
 
       <button type="submit" className={`pill pill-big entry-submit${busy ? " is-busy" : ""}`} disabled={busy}>
         {busy ? busyLabel(h.submitting) : mode === "both" ? h.submitBoth : h.submit}
@@ -618,17 +633,7 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false 
         {mode === "single" && tab === "cv" && (
           <>
             <button type="button" className="link-alt" onClick={() => switchTab("github")}>
-              ← {h.tabGithub}
-            </button>
-            <button
-              type="button"
-              className="link-alt"
-              onClick={() => {
-                setMode("both");
-                setError(null);
-              }}
-            >
-              {h.bothLink}
+              ← {liOn ? h.tabDoors : h.tabGithub}
             </button>
           </>
         )}
