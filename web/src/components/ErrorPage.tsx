@@ -76,7 +76,10 @@ export function ErrorPanel({ stamp, title, text, action, alt }: ErrorPanelProps)
     if (stamp === "none") return;
     const at = document.activeElement;
     if (at && at !== document.body) return;
-    head.current?.focus({ preventScroll: true });
+    const h = head.current;
+    if (!h) return;
+    h.setAttribute("tabindex", "-1");
+    h.focus({ preventScroll: true });
   }, [stamp]);
   return (
     <div className="err" role={stamp === "none" ? undefined : "alert"}>
@@ -95,7 +98,7 @@ export function ErrorPanel({ stamp, title, text, action, alt }: ErrorPanelProps)
         </span>
         <span className={`err-stamp is-${stamp}`}>{te.stamp[stamp]}</span>
       </div>
-      <h1 ref={head} className="t-block" tabIndex={stamp === "none" ? undefined : -1}>
+      <h1 ref={head} className="t-block">
         {title}
       </h1>
       <p className="err-text">{text}</p>

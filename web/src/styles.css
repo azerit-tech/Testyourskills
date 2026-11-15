@@ -2428,7 +2428,7 @@ button.cover-panel:focus-visible {
   width: 8px;
   height: 8px;
   margin: -4px 0 0 -4px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: var(--cream);
   box-shadow:
     -16px 0 0 var(--cream),
