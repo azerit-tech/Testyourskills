@@ -2002,7 +2002,7 @@ button.cover-panel:focus-visible {
   z-index: 2;
   display: flex;
   justify-content: center;
-  padding: 8px 0 28px;
+  padding: 8px 0;
 }
 .page-result.is-animating .result-stage {
   cursor: pointer;
@@ -2027,7 +2027,7 @@ button.cover-panel:focus-visible {
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  margin-top: 14px;
+  margin-top: 4px;
   text-align: center;
   animation: pieces-in 0.5s ease both;
 }
@@ -2081,6 +2081,11 @@ button.cover-panel:focus-visible {
 .card-rig {
   position: absolute;
   inset: 0;
+}
+/* sous la fiche de la page, 44 px pour le lien qui la retourne (card.css) :
+   gardés dès l'arrivée, rien ne bouge quand la fiche se pose */
+.result-stage .card-slot {
+  margin-bottom: 44px;
 }
 .card-slot:not(.show-front) .card-rig {
   opacity: 0;

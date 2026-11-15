@@ -58,7 +58,6 @@ export const STRINGS = {
       rating: "La note",
       /** Un poids de la formule : « 30 % ». */
       weight: (w: number) => `${Math.round(w * 100)}${NBSP}%`,
-      flip: "Retourner la fiche",
       /** La grille de recrutement (§18.37) : la note est la moyenne pondérée des critères notés, × 10. */
       gridRating: "La note · moyenne pondérée des critères notés × 10",
       criteria: { EDU: "École", XP: "Expérience", EMP: "Parcours", STK: "Stack", CODE: "Code", ACT: "Activité", OWN: "Ownership", OSS: "Open source" },
@@ -112,7 +111,6 @@ export const STRINGS = {
       noFact: "No fact on file",
       rating: "The rating",
       weight: (w: number) => `${Math.round(w * 100)}%`,
-      flip: "Flip the card",
       gridRating: "The rating · weighted mean of the scored criteria × 10",
       criteria: { EDU: "School", XP: "Experience", EMP: "Career", STK: "Stack", CODE: "Code", ACT: "Activity", OWN: "Ownership", OSS: "Open source" },
       term: (name: string, score: number, coef: string) => `${name} ${score}${NBSP}×${NBSP}${coef}`,
