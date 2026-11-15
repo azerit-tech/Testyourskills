@@ -63,17 +63,39 @@ export interface CreateResult {
 
 const MOCK_KEY = "tys_mock";
 
-/** Le mode démo est collant pendant la session, pour survivre aux navigations. */
+/** Le choix de la démo dans cette page, quand le stockage de session est bloqué (navigation privée stricte). */
+let memMock: boolean | null = null;
+
+/**
+ * Le mode démo est collant pendant la session, pour survivre aux navigations.
+ * `?mock=1` dans l'adresse vaut démo avant toute écriture : un stockage bloqué ne
+ * fait jamais basculer la démo dans le mode réel (et ses appels payants) ; la RAM
+ * garde alors le choix pour la page.
+ */
 export function isMock(): boolean {
   if (import.meta.env.VITE_MOCK === "1") return true;
+  let q: string | null = null;
   try {
-    const q = new URLSearchParams(window.location.search).get("mock");
-    if (q === "1") sessionStorage.setItem(MOCK_KEY, "1");
-    if (q === "0") sessionStorage.removeItem(MOCK_KEY);
-    return sessionStorage.getItem(MOCK_KEY) === "1";
+    q = new URLSearchParams(window.location.search).get("mock");
   } catch {
-    return false;
+    /* hors navigateur */
   }
+  if (q === "1" || q === "0") {
+    memMock = q === "1";
+    try {
+      if (q === "1") sessionStorage.setItem(MOCK_KEY, "1");
+      else sessionStorage.removeItem(MOCK_KEY);
+    } catch {
+      /* stockage bloqué : la RAM suffit */
+    }
+    return memMock;
+  }
+  try {
+    if (sessionStorage.getItem(MOCK_KEY) === "1") return true;
+  } catch {
+    /* stockage bloqué */
+  }
+  return memMock === true;
 }
 
 async function readError(res: Response): Promise<ApiError> {
