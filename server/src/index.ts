@@ -94,7 +94,7 @@ startCreditsWatch();
 const linkedinProfiles = linkedinProfilesFromEnv(process.env, store.db) ?? undefined;
 if (linkedinProfiles) console.log(`LinkedIn : profils lus par ${linkedinProfiles.providerName}.`);
 else console.warn("Fournisseur LinkedIn sans jeton : LinkedIn contre GitHub et l'entrée LinkedIn désactivés.");
-const { app, pipeline } = createApp({
+const { app, pipeline, refreshShowcase } = createApp({
   linkedinProfiles,
   store,
   deps: realDeps,
@@ -134,6 +134,20 @@ void pruneStaleImages(ogRoot, IMAGE_DESIGN_DIR)
 const purgeTimer = setInterval(runPurge, 3600_000);
 purgeTimer.unref();
 
+// La vitrine de l'accueil se refait ici, au démarrage puis tous les quarts d'heure,
+// jamais à la visite : une seule à la fois, sous le plafond du jour (app.ts, refreshShowcase).
+const runShowcase = () => {
+  try {
+    const id = refreshShowcase();
+    if (id) console.log(`[vitrine] jugement relancé : ${id}`);
+  } catch (err) {
+    console.error("[vitrine]", err);
+  }
+};
+runShowcase();
+const showcaseTimer = setInterval(runShowcase, 15 * 60_000);
+showcaseTimer.unref();
+
 const server = serve({ fetch: app.fetch, port }, (info) => {
   console.log(`Testyourskills API sur http://localhost:${info.port} (${prod ? "production" : "dev"}), base ${baseUrl}`);
 });
@@ -141,6 +155,7 @@ const server = serve({ fetch: app.fetch, port }, (info) => {
 // Arrêt propre : on laisse 8 s aux cartes en cours, sous les 10 s de Docker.
 const shutdown = async () => {
   server.close();
+  clearInterval(showcaseTimer);
   stopCreditsWatch();
   await Promise.race([pipeline.drain(), new Promise((r) => setTimeout(r, 8000))]);
   useBudgetDb(null);

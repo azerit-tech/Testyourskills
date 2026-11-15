@@ -380,25 +380,37 @@ export function createApp(opts: AppOptions) {
     return c.body(sitemapXml(baseUrl, paths), 200, { "Content-Type": "application/xml; charset=utf-8" });
   });
 
+  /**
+   * Refait la vitrine si elle est périmée (une semaine ; une heure si elle est sortie
+   * sans lecture IA ou sans son LinkedIn). Appelé par la minuterie du serveur
+   * (index.ts), jamais par une visite : une lecture payante ne part que d'ici.
+   * Renvoie l'id du jugement lancé, ou null.
+   */
+  const refreshShowcase = (): string | null => {
+    const login = opts.showcaseLogin;
+    if (!login || store.isHidden(login)) return null;
+    const row = store.findLatestShowcase(login);
+    // Sortie sans lecture IA, ou sans son LinkedIn alors qu'on sait le lire (lecture
+    // en échec ou trop lente) : on la retente au bout d'une heure, pas d'une semaine.
+    const retry = !!row && (row.degraded || (row.kind !== "comparison" && !!opts.linkedinProfiles && !!opts.showcaseLinkedin));
+    const stale = !row || Date.now() - row.createdAt > (retry ? SHOWCASE_RETRY_MS : SHOWCASE_MS);
+    // Jamais deux à la fois ; jetons GitHub épuisés : la vitrine attendra, elle ne prend
+    // pas la place d'une vraie fiche. Commissariat fermé (plafond du jour, crédit) : rien.
+    const ai = safeAiStatus(aiStatus);
+    const closed = ai === "budget" || ai === "credits";
+    if (!stale || closed || pipeline.inflightFor(login) || pipeline.githubBusy()) return null;
+    return pipeline.start({ lang: "fr", login }).id;
+  };
+
   // GET /api/showcase : le vrai jugement du pseudo vitrine, pour l'accueil (§6.1,
   // §18.35) : sa fiche (celle de son dossier s'il a deux pièces, §18.36), le lien
-  // vers elle et ses pièces. Hors quota. Null tant qu'aucun n'existe ; on
-  // en lance un si le dernier date de plus d'une semaine.
+  // vers elle et ses pièces. Lecture seule de la base : null tant qu'aucun n'existe.
   app.get("/api/showcase", (c) => {
     c.header("Cache-Control", "public, max-age=300");
     const login = opts.showcaseLogin;
     if (!login || store.isHidden(login)) return c.json({ card: null });
     const row = store.findLatestShowcase(login);
     const cmp = row?.kind === "comparison" ? (row.data as ComparisonData) : null;
-    // Sortie sans lecture IA, ou sans son LinkedIn alors qu'on sait le lire (lecture
-    // en échec ou trop lente) : on la retente au bout d'une heure, pas d'une semaine.
-    const retry = !!row && (row.degraded || (!cmp && !!opts.linkedinProfiles && !!opts.showcaseLinkedin));
-    const stale = !row || Date.now() - row.createdAt > (retry ? SHOWCASE_RETRY_MS : SHOWCASE_MS);
-    // Jetons GitHub épuisés : la vitrine attendra, elle ne prend pas la place d'une vraie fiche.
-    // Commissariat fermé (plafond du jour, crédit) : pas de lecture payante lancée par une visite.
-    const ai = safeAiStatus(aiStatus);
-    const closed = ai === "budget" || ai === "credits";
-    if (stale && !closed && !pipeline.inflightFor(login) && !pipeline.githubBusy()) pipeline.start({ lang: "fr", login });
     if (!row) return c.json({ card: null });
     return c.json({
       card: showcaseCard(row),
@@ -896,7 +908,7 @@ export function createApp(opts: AppOptions) {
     });
   }
 
-  return { app, pipeline };
+  return { app, pipeline, refreshShowcase };
 }
 
 function safeAiStatus(status: () => AiStatus): AiStatus | null {

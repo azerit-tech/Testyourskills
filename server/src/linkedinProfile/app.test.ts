@@ -118,7 +118,7 @@ function setup(finder: FinderImpl | null, over: Partial<Deps> = {}, appOver: Par
         },
       }
     : undefined;
-  const { app, pipeline } = createApp({
+  const { app, pipeline, refreshShowcase } = createApp({
     store,
     deps,
     githubToken: "t",
@@ -127,7 +127,7 @@ function setup(finder: FinderImpl | null, over: Partial<Deps> = {}, appOver: Par
     linkedinProfiles,
     ...appOver,
   });
-  return { app, pipeline, store, calls };
+  return { app, pipeline, refreshShowcase, store, calls };
 }
 
 type Ctx = ReturnType<typeof setup>;
@@ -258,7 +258,7 @@ describe("la vitrine : le serveur se porte garant de son LinkedIn (§18.35)", ()
 
   it("la carte vitrine lit ce LinkedIn : comparaison prouvée", async () => {
     const ctx = setup({ forGithub: reads }, {}, VITRINE);
-    await ctx.app.request("/api/showcase");
+    ctx.refreshShowcase();
     await ctx.pipeline.drain();
     expect(ctx.calls.forGithub.map((c) => c.url)).toEqual([JACQUES]);
     const row = latest(ctx, "jmougeot");
@@ -333,6 +333,7 @@ describe("la vitrine : le serveur se porte garant de son LinkedIn (§18.35)", ()
       { ...VITRINE, showcasePhoto: "/jmougeot-linkedin.jpg" },
     );
     expect(await showcase(ctx)).toEqual({ card: null });
+    ctx.refreshShowcase();
     await ctx.pipeline.drain();
     const root = latest(ctx, "jmougeot")!;
     const cmp = root.data as ComparisonData;
@@ -343,7 +344,7 @@ describe("la vitrine : le serveur se porte garant de son LinkedIn (§18.35)", ()
     expect(json.card).toMatchObject({ id: root.id, overall: file.overall, pieces: ["linkedin", "github"], avatarUrl: "/jmougeot-linkedin.jpg", photoSource: "linkedin" });
     expect(json.card?.deleteToken).toBeUndefined();
     // Comparaison sortie : rien n'est relancé avant la semaine.
-    await showcase(ctx);
+    expect(ctx.refreshShowcase()).toBeNull();
     expect(ctx.calls.collect).toEqual(["jmougeot"]);
     await ctx.app.request("/og/home.png");
     expect(homes.map((c) => c.id)).toEqual([root.id]);
@@ -352,18 +353,21 @@ describe("la vitrine : le serveur se porte garant de son LinkedIn (§18.35)", ()
   it("le LinkedIn n'est pas sorti : la fiche GitHub seule, retentée au bout d'une heure", async () => {
     let up = false;
     const ctx = setup({ forGithub: async (f, o) => (up ? reads(f, o) : null) }, {}, VITRINE);
-    await showcase(ctx);
+    ctx.refreshShowcase();
     await ctx.pipeline.drain();
     const alone = await showcase(ctx);
     expect(alone.card).toMatchObject({ source: "github", login: "jmougeot" });
     expect(alone.href).toBe(`/c/${alone.card!.id}`);
     expect(alone.pieces).toBeUndefined();
     // Moins d'une heure : on attend.
-    await ctx.pipeline.drain();
+    expect(ctx.refreshShowcase()).toBeNull();
     expect(ctx.calls.collect).toHaveLength(1);
     ctx.store.db.prepare("UPDATE cards SET created_at = created_at - ?").run(61 * 60 * 1000);
     up = true;
+    // Une visite ne relance rien ; la minuterie, si.
     await showcase(ctx);
+    expect(ctx.calls.collect).toHaveLength(1);
+    ctx.refreshShowcase();
     await ctx.pipeline.drain();
     expect(ctx.calls.collect).toHaveLength(2);
     const json = await showcase(ctx);

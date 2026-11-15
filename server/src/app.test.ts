@@ -111,9 +111,9 @@ function setup(over: Partial<Deps> = {}, appOver: Partial<AppOptions> = {}) {
     },
     ...over,
   };
-  const { app, pipeline } = createApp({ store, deps, githubToken: "t", baseUrl: "https://skills.test", ogDir, ...appOver });
+  const { app, pipeline, refreshShowcase } = createApp({ store, deps, githubToken: "t", baseUrl: "https://skills.test", ogDir, ...appOver });
   stores.push(store);
-  return { app, pipeline, store, calls, ogDir };
+  return { app, pipeline, refreshShowcase, store, calls, ogDir };
 }
 
 type ApiJson = { id: string; deleteToken?: string; cached?: boolean; state?: string; code?: string; message?: Fact };
@@ -396,10 +396,12 @@ describe("cache 24 h et déduplication", () => {
 });
 
 describe("carte vitrine de l'accueil (§6.1)", () => {
-  it("lance la carte du pseudo vitrine au premier appel, puis la renvoie sans jeton", async () => {
+  it("la minuterie du serveur lance la carte du pseudo vitrine ; l'accueil la renvoie sans jeton", async () => {
     const ctx = setup({}, { showcaseLogin: "jmougeot" });
-    const first = await ctx.app.request("/api/showcase");
-    expect(await first.json()).toEqual({ card: null });
+    expect(await (await ctx.app.request("/api/showcase")).json()).toEqual({ card: null });
+    expect(ctx.refreshShowcase()).toEqual(expect.any(String));
+    // Jamais deux à la fois.
+    expect(ctx.refreshShowcase()).toBeNull();
     await ctx.pipeline.drain();
     const res = await ctx.app.request("/api/showcase");
     const json = (await res.json()) as { card: CardData | null; href?: string; declared?: unknown };
@@ -409,31 +411,56 @@ describe("carte vitrine de l'accueil (§6.1)", () => {
     expect(json.href).toBe(`/c/${json.card?.id}`);
     expect(json.declared).toBeUndefined();
     expect(ctx.calls.collect).toBe(1);
+    // Fraîche : la minuterie ne la refait pas avant la semaine.
+    expect(ctx.refreshShowcase()).toBeNull();
+    ctx.store.db.prepare("UPDATE cards SET created_at = created_at - ?").run(8 * 24 * 3600 * 1000);
+    expect(ctx.refreshShowcase()).toEqual(expect.any(String));
+    await ctx.pipeline.drain();
+    expect(ctx.calls.collect).toBe(2);
+  });
+
+  it("une visite de l'accueil ne lance jamais de lecture, même vitrine absente ou périmée", async () => {
+    const ctx = setup({}, { showcaseLogin: "jmougeot" });
     await ctx.app.request("/api/showcase");
+    expect(ctx.pipeline.load()).toEqual({ running: 0, queued: 0 });
+    ctx.refreshShowcase();
+    await ctx.pipeline.drain();
+    ctx.store.db.prepare("UPDATE cards SET created_at = created_at - ?").run(8 * 24 * 3600 * 1000);
+    const json = (await (await ctx.app.request("/api/showcase")).json()) as { card: CardData | null };
+    expect(json.card?.login).toBe("jmougeot");
+    expect(ctx.pipeline.load()).toEqual({ running: 0, queued: 0 });
     expect(ctx.calls.collect).toBe(1);
   });
 
-  it("commissariat fermé (plafond du jour, crédit) : une visite de l'accueil ne lance aucune lecture", async () => {
+  it("commissariat fermé (plafond du jour, crédit) : la minuterie ne lance aucune lecture", async () => {
     let status: AiStatus = "budget";
     const ctx = setup({}, { showcaseLogin: "jmougeot", aiStatus: () => status });
-    expect(await (await ctx.app.request("/api/showcase")).json()).toEqual({ card: null });
+    expect(ctx.refreshShowcase()).toBeNull();
     status = "credits";
-    await ctx.app.request("/api/showcase");
+    expect(ctx.refreshShowcase()).toBeNull();
     expect(ctx.pipeline.load()).toEqual({ running: 0, queued: 0 });
     expect(ctx.calls.collect).toBe(0);
-    // Rouvert : la vitrine se refait à la visite suivante.
+    // Rouvert : la vitrine se refait au passage suivant de la minuterie.
     status = "ok";
-    await ctx.app.request("/api/showcase");
+    ctx.refreshShowcase();
     await ctx.pipeline.drain();
     expect(ctx.calls.collect).toBe(1);
+  });
+
+  it("vitrine masquée par son propriétaire : la minuterie ne fait rien", () => {
+    const ctx = setup({}, { showcaseLogin: "jmougeot" });
+    ctx.store.claimOwner("jmougeot", 7);
+    ctx.store.setOwnerHidden("jmougeot", true);
+    expect(ctx.refreshShowcase()).toBeNull();
+    expect(ctx.calls.collect).toBe(0);
   });
 
   it("sans lecteur LinkedIn, la fiche GitHub seule tient la semaine", async () => {
     const ctx = setup({}, { showcaseLogin: "jmougeot", showcaseLinkedin: "https://www.linkedin.com/in/jacquesmougeot" });
-    await ctx.app.request("/api/showcase");
+    ctx.refreshShowcase();
     await ctx.pipeline.drain();
     ctx.store.db.prepare("UPDATE cards SET created_at = created_at - ?").run(2 * 3600 * 1000);
-    await ctx.app.request("/api/showcase");
+    expect(ctx.refreshShowcase()).toBeNull();
     expect(ctx.pipeline.load()).toEqual({ running: 0, queued: 0 });
     expect(ctx.calls.collect).toBe(1);
   });
@@ -471,12 +498,13 @@ describe("carte vitrine de l'accueil (§6.1)", () => {
     const ctx = setup();
     const res = await ctx.app.request("/api/showcase");
     expect(await res.json()).toEqual({ card: null });
+    expect(ctx.refreshShowcase()).toBeNull();
     expect(ctx.calls.collect).toBe(0);
   });
 
   it("remplace l'avatar GitHub par la photo vitrine", async () => {
     const ctx = setup({}, { showcaseLogin: "jmougeot", showcasePhoto: "/jmougeot-linkedin.jpg" });
-    await ctx.app.request("/api/showcase");
+    ctx.refreshShowcase();
     await ctx.pipeline.drain();
     const json = (await (await ctx.app.request("/api/showcase")).json()) as { card: CardData | null };
     expect(json.card).toMatchObject({ avatarUrl: "/jmougeot-linkedin.jpg", photoSource: "linkedin" });
