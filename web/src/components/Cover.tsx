@@ -15,7 +15,9 @@ import { DESKTOP, PHONE, SLOTS, areasCss, bigAvatar, colsCss, coverPanels, first
 import type { Panel, Slot } from "../lib/cover";
 import { onLinkClick } from "../lib/router";
 import { SUSPECTS, suspectSrc } from "../lib/suspects";
+import { initialsOf } from "../../../shared/card/mug";
 import { upper } from "../../../shared/card/text";
+import { isDefaultAvatar } from "../card/avatar";
 
 export interface CoverProps {
   /** La place libre : retour au champ, prêt à taper. */
@@ -81,8 +83,9 @@ const TINTS = ["#ccc2f5", "#ffd9c2", "#f3b6cf", "#c9d4ff"];
 /**
  * Un visage de la couverture : la photo en pleine case, en deux tons (prune
  * dans les ombres, la teinte du mur dans les lumières), les traits de la toise
- * par-dessus, la plaque en bas. Sans photo, ou si elle ne charge pas : une
- * silhouette prune devant le mur.
+ * par-dessus, la plaque en bas (le gabarit de la fiche, §18.48). Sans photo, si
+ * elle ne charge pas ou si c'est l'avatar généré par GitHub : une silhouette
+ * prune devant le mur, les initiales dans la tête (la place libre garde son « ? »).
  */
 function Face({ src, name, sub, mark, tint }: { src?: string | null; name: string; sub: string; mark?: string; tint: string }) {
   const { lang } = useT();
@@ -92,8 +95,11 @@ function Face({ src, name, sub, mark, tint }: { src?: string | null; name: strin
   useEffect(() => {
     // Une photo déjà en cache a pu finir avant que l'écouteur soit posé.
     const el = img.current;
-    if (el?.complete) setShot(el.naturalWidth > 0 ? "ok" : "broken");
+    if (el?.complete) setShot(seen(el));
   }, [src]);
+  // Une image vide, ou l'avatar généré (jamais agrandi : il passe pour une image cassée), ne se montre pas.
+  const seen = (el: HTMLImageElement) => (el.naturalWidth > 0 && !(src && isDefaultAvatar(src, el.naturalWidth, el.naturalHeight)) ? "ok" : "broken");
+  const initials = mark ? "" : initialsOf(name);
   const photo = src && shot !== "broken" ? src : null;
   const shown = !!photo && shot === "ok";
   return (
@@ -102,6 +108,11 @@ function Face({ src, name, sub, mark, tint }: { src?: string | null; name: strin
         <svg className="cover-face-shape" viewBox="0 0 100 100" preserveAspectRatio="xMidYMax meet">
           <circle cx="50" cy="42" r="19" />
           <path d="M8 100c0-27 18-44 42-44s42 17 42 44z" />
+          {initials && (
+            <text className="cover-face-initials" x="50" y="49.5" textAnchor="middle">
+              {initials}
+            </text>
+          )}
         </svg>
       )}
       {photo && (
@@ -112,7 +123,7 @@ function Face({ src, name, sub, mark, tint }: { src?: string | null; name: strin
           alt=""
           loading="lazy"
           decoding="async"
-          onLoad={() => setShot("ok")}
+          onLoad={(e) => setShot(seen(e.currentTarget))}
           onError={() => setShot("broken")}
         />
       )}
