@@ -122,9 +122,11 @@ describe("la composition", () => {
   it("dit le nom, le score, les dossiers et le rang ; jamais un rang d'école", async () => {
     const svg = await renderSvg({ format: "band", band: standing({}), lang: "fr" });
     expect(svg).toContain("CENTRALESUPÉLEC");
-    expect(svg).toContain(">74<");
-    expect(svg).toContain("31 dossiers");
-    expect(svg).toContain("3e des écoles, à 6 étoiles de la 2e");
+    // Chaque nombre avec son mot, l'accroche au premier rang, puis ce qui sépare de la bande de devant.
+    expect(svg).toMatch(/>74<\/text><text[^>]*>ÉTOILES</);
+    expect(svg).toMatch(/>31<\/text><text[^>]*>FICHES</);
+    expect(svg).toContain(">3E DES ÉCOLES<");
+    expect(svg).toContain(">À 6 étoiles de la 2e<");
     expect(svg).not.toMatch(/rang [SABC]\b|tier/i);
   });
 });
