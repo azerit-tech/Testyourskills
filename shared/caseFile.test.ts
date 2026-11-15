@@ -85,14 +85,16 @@ describe("la fiche du dossier", () => {
   });
 
   it("aucun chef d'accusation de ton « écart »", () => {
-    const base = lumine();
+    // Un statut d'écart d'avant (retiré du moteur), posé à la main : la fiche du dossier l'écarte.
+    const gap = { id: "cv_senior_from_cv", tone: "gap" as const, label: { fr: "Senior, à prouver", en: "Senior, still unproven" }, rule: { fr: "", en: "" } };
+    const base = { ...lumine(), cv: { ...lumine().cv, statuses: [...lumine().cv.statuses, gap] } };
     expect(base.cv.statuses.some((s) => s.tone === "gap")).toBe(true);
     expect(caseCard(base).statuses.some((s) => s.tone === "gap")).toBe(false);
     expect(caseCard(jacques()).statuses.every((s) => s.tone !== "gap")).toBe(true);
   });
 
   it("une caution qui citait un statut d'écart retiré passe à la suivante, ou part", () => {
-    const gap = { id: "cv_senior_from_cv", tone: "gap" as const, label: { fr: "Senior, à prouver", en: "Senior, yet to prove" }, rule: { fr: "", en: "" } };
+    const gap = { id: "cv_senior_from_cv", tone: "gap" as const, label: { fr: "Senior, à prouver", en: "Senior, still unproven" }, rule: { fr: "", en: "" } };
     const neg = (id: string) => ({ id, tone: "negative" as const, label: { fr: id, en: id }, rule: { fr: "", en: "" } });
     const oldBail = { fr: "Caution : des dates exactes sur le profil LinkedIn", en: "Bail: exact dates on the LinkedIn profile" };
     const sentence = { label: { fr: "Peine : 4 mois de tests unitaires", en: "Sentence: 4 months of unit tests" }, bail: oldBail };
