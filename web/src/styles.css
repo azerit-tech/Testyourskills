@@ -1129,17 +1129,24 @@ button.cover-panel:focus-visible {
   }
 }
 
-/* la fiche de Jacques : sa propre section, centrée, sous le héros */
+/* la fiche de Jacques, tout de suite après le formulaire : pleine largeur sur téléphone
+   (358 px à 390), 400 × 576 au bureau. Son cadre a sa taille dès le premier rendu. */
 .home-example {
   display: grid;
   justify-items: center;
+  min-width: 0;
   padding: 8px var(--gutter) 56px;
 }
 .showcase {
   display: grid;
   justify-items: center;
   gap: 4px;
+  width: 100%;
+  max-width: 400px;
   min-width: 0;
+}
+.showcase .tys-card {
+  width: 100%;
 }
 /* la légende, puis ses pièces (§18.36) : deux liens discrets vers le même dossier */
 .showcase figcaption {
@@ -1166,12 +1173,6 @@ button.cover-panel:focus-visible {
   margin-top: -10px; /* les deux liens mènent au même endroit : leurs zones de 44 px peuvent se toucher */
   white-space: nowrap;
   text-decoration: none;
-}
-
-@media (min-width: 900px) {
-  .home-example {
-    padding: 40px var(--gutter) 72px;
-  }
 }
 
 /* --- mur des 13 profils (§18.28) : téléphone, un rail aimanté qui sort du bord
