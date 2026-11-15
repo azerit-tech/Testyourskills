@@ -46,6 +46,32 @@ export function rememberInput(i: { login?: string; file?: File | null }) {
 export function markFresh(id: string, login?: string | null) {
   fresh.set(id, Date.now());
   if (login) freshLogins.set(id, login);
+  seen.delete(id);
+  writeSession(OWED_KEY, id);
+}
+
+// --- Le film joue une fois (§18.48) ------------------------------------------
+// Une fiche demandée ici a droit à son film tant qu'il ne s'est pas posé (vu en
+// entier, passé, ou replié faute de pouvoir jouer) ; ensuite, revenir sur la
+// fiche ne le relance plus, seul « Revoir ma poursuite » le fait. La marque
+// « fraîche » elle-même reste (elle dit aussi à qui est la fiche). La dette est
+// recopiée dans sessionStorage : une page rechargée en plein film le rejoue,
+// depuis le début, la personne ne l'ayant pas vu.
+
+const OWED_KEY = "tys_film_owed";
+/** Les fiches dont le film s'est posé dans cet onglet. */
+const seen = new Set<string>();
+
+/** Le film de cette fiche reste à voir : demandée ici (ou rechargée en plein film), pas encore posée. */
+export function filmOwed(id: string): boolean {
+  if (seen.has(id)) return false;
+  return fresh.has(id) || readSession(OWED_KEY) === id;
+}
+
+/** Le film s'est posé (vu, passé ou replié) : il ne rejouera plus seul. */
+export function markFilmSeen(id: string) {
+  seen.add(id);
+  if (readSession(OWED_KEY) === id) removeSession(OWED_KEY);
 }
 
 /** Le pseudo GitHub tapé pour cette fiche dans cet onglet, ou null. */
@@ -174,6 +200,14 @@ function writeSession(key: string, value: string) {
     sessionStorage.setItem(key, value);
   } catch {
     /* stockage bloqué : la RAM suffit pour cette page */
+  }
+}
+
+function removeSession(key: string) {
+  try {
+    sessionStorage.removeItem(key);
+  } catch {
+    /* rien */
   }
 }
 

@@ -33,7 +33,7 @@ import { useHold, type SceneState } from "../lib/hold";
 import { gaveUp, nextPatience, type Patience } from "../lib/patience";
 import { filmTrace } from "../film/trace";
 import { navigate, onLinkClick } from "../lib/router";
-import { freshLogin, freshSince, iDenounced, myCard, prefillFromLast, rememberMine, type MyCard } from "../lib/session";
+import { filmOwed, freshLogin, freshSince, iDenounced, markFilmSeen, myCard, prefillFromLast, rememberMine, type MyCard } from "../lib/session";
 import { revealScene, revealToPlay } from "../lib/revealScene";
 import { useReducedMotion } from "../lib/util";
 import { verdict } from "../lib/versus";
@@ -115,6 +115,9 @@ export function CardPage({ id }: { id: string }) {
   const { view, setView, sawPending } = useJob(id, nonce);
   const fresh = freshSince(id) !== null;
   const owner = fresh || tokens.get(id) !== null;
+  // Le film joue une fois (§18.48) : dû à une fiche demandée ici (ou rechargée en plein film)
+  // tant qu'il ne s'est pas posé. Lu à l'arrivée sur la fiche : la page ne bascule pas quand il se pose.
+  const [owed] = useState(() => filmOwed(id));
   const reduced = useReducedMotion();
   const [startedAt] = useState(() => freshSince(id) ?? Date.now());
   const [meNonce, setMeNonce] = useState(0);
@@ -182,12 +185,12 @@ export function CardPage({ id }: { id: string }) {
   // fiche prête, le niveau est connu : seule la fin utile se charge (fin6 à six étoiles).
   useEffect(() => {
     const scene = revealToPlay(revealScene(), reduced);
-    if (scene === "film" && view.s === "done" && (fresh || sawPending)) {
+    if (scene === "film" && view.s === "done" && (owed || sawPending)) {
       const main = view.item.kind === "card" ? view.item.card : fileOf(view.item.comparison);
       loadFilm()
         .then((m) => m.preloadFilm(starsFor(main.overall)))
         .catch(() => undefined);
-    } else if (scene && (view.s === "pending" || (view.s === "loading" && fresh))) {
+    } else if (scene && (view.s === "pending" || (view.s === "loading" && owed))) {
       if (scene === "film")
         loadFilm()
           .then((m) => m.preloadFilm())
@@ -206,7 +209,7 @@ export function CardPage({ id }: { id: string }) {
   // Vaut pour une fiche fraîche servie du cache, qui n'a ni pièces ni pari.
   const lastPending = useRef<{ progress: ProgressEvent[]; queue?: number; findings?: Finding[] }>({ progress: [] });
   if (view.s === "pending") lastPending.current = view;
-  const animate = view.s === "done" && (fresh || sawPending) && !reduced;
+  const animate = view.s === "done" && (owed || sawPending) && !reduced;
   const hold = useHold({ active: view.s === "done" && (animate || sawPending), animate });
 
   // La photo d'identité : l'avatar du pseudo tapé dès la première seconde ; sinon, fiche prête, sa photo.
@@ -215,7 +218,7 @@ export function CardPage({ id }: { id: string }) {
   const w = view.s === "pending" ? view : lastPending.current;
   // L'attente garde la même instance de bout en bout (clé fixe) : la photo, le pari et les pièces restent en place.
   const waiting =
-    view.s === "pending" || (view.s === "loading" && fresh) || hold.show ? (
+    view.s === "pending" || (view.s === "loading" && owed) || hold.show ? (
       <Waiting
         key="waiting"
         cardId={id}
@@ -305,7 +308,7 @@ export function CardPage({ id }: { id: string }) {
         abort={hold.abort}
         onScene={hold.onScene}
         owner={owner}
-        fresh={fresh}
+        fresh={fresh && owed}
         notice={notice}
         me={me}
         onMe={setMe}
@@ -348,6 +351,10 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
   useEffect(() => {
     if (animate && phase === "done") onScene("off");
   }, [animate, phase, onScene]);
+  // La fiche posée (film vu, passé ou replié) : revenir ici ne relance plus le film (§18.48).
+  useEffect(() => {
+    if (settled) markFilmSeen(id);
+  }, [settled, id]);
   const toast = useToast();
   const tracked = useRef(false);
   const stageRef = useRef<HTMLElement>(null);

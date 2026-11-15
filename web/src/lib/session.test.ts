@@ -24,6 +24,10 @@ function browser(href: string, opts: { blocked?: boolean } = {}) {
       if (opts.blocked) throw new Error("SecurityError");
       store.set(k, v);
     },
+    removeItem: (k: string) => {
+      if (opts.blocked) throw new Error("SecurityError");
+      store.delete(k);
+    },
   };
   vi.stubGlobal("window", { location: loc, history });
   vi.stubGlobal("sessionStorage", sessionStorage);
@@ -89,5 +93,44 @@ describe("captureRef", () => {
     // Même page, second appel : pas de seconde visite.
     b.go("https://skills.test/?r=AbCdEf1234");
     expect(s.captureRef()).toBeNull();
+  });
+});
+
+describe("le film joue une fois (§18.48)", () => {
+  it("dû à la fiche demandée ici, plus dû une fois posé ; la fiche reste fraîche (elle dit à qui elle est)", async () => {
+    browser("https://skills.test/");
+    const s = await fresh();
+    expect(s.filmOwed("AbCdEf1234")).toBe(false);
+    s.markFresh("AbCdEf1234", "leamd");
+    expect(s.filmOwed("AbCdEf1234")).toBe(true);
+    s.markFilmSeen("AbCdEf1234");
+    expect(s.filmOwed("AbCdEf1234")).toBe(false);
+    expect(s.freshSince("AbCdEf1234")).not.toBeNull();
+    // une autre fiche de l'onglet garde son film
+    s.markFresh("ZyXwVu9876");
+    expect(s.filmOwed("ZyXwVu9876")).toBe(true);
+  });
+
+  it("une page rechargée en plein film le rejoue ; une fois posé, plus après rechargement", async () => {
+    const b = browser("https://skills.test/");
+    const s = await fresh();
+    s.markFresh("AbCdEf1234");
+    // rechargement : la RAM repart de zéro, sessionStorage reste
+    const again = await fresh();
+    expect(again.freshSince("AbCdEf1234")).toBeNull();
+    expect(again.filmOwed("AbCdEf1234")).toBe(true);
+    again.markFilmSeen("AbCdEf1234");
+    expect(b.store.size).toBe(0);
+    const third = await fresh();
+    expect(third.filmOwed("AbCdEf1234")).toBe(false);
+  });
+
+  it("stockage bloqué : la RAM suffit pour l'onglet", async () => {
+    browser("https://skills.test/", { blocked: true });
+    const s = await fresh();
+    s.markFresh("AbCdEf1234");
+    expect(s.filmOwed("AbCdEf1234")).toBe(true);
+    s.markFilmSeen("AbCdEf1234");
+    expect(s.filmOwed("AbCdEf1234")).toBe(false);
   });
 });
