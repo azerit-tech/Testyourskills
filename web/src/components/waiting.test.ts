@@ -58,3 +58,15 @@ describe("la démo hors ligne", () => {
     await expect(mockApi.getJob("m-gold-x")).rejects.toThrow(TypeError);
   });
 });
+
+// §18.52 : l'IA lit le code et en donne le niveau ; la note sur 100, c'est la grille qui la calcule.
+describe("les lignes de l'attente disent vrai sur la méthode", () => {
+  it("aucune ne dit que l'IA ne note pas ; la grille calcule la note", () => {
+    for (const lang of ["fr", "en"] as const) {
+      const lines = Object.values(DICTS[lang].waiting.progress).map((fn) => fn());
+      for (const line of lines) expect(line).not.toMatch(/ne note pas|touche aux chiffres|doesn't score|touches the numbers|30 secondes|30 seconds/);
+      expect(DICTS[lang].waiting.progress.code()).toMatch(lang === "fr" ? /niveau, de 1 à 5/ : /level, from 1 to 5/);
+      expect(DICTS[lang].waiting.progress.scoring()).toMatch(lang === "fr" ? /c'est la grille qui la calcule/ : /scorecard works out the rating/);
+    }
+  });
+});
