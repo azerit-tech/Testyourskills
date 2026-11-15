@@ -19,6 +19,8 @@ export interface PageMeta {
   /** Image 1200×630 ; absente pour une carte inconnue (pas d'image générique pour l'instant). */
   image?: string;
   imageAlt: string;
+  /** Page hors des index de recherche (une fiche nominative) : <meta name="robots" content="noindex">. */
+  noindex?: boolean;
 }
 
 const SPECIAL_NAMES: Record<Lang, Record<Special, string>> = {
@@ -190,6 +192,7 @@ export function metaTags(m: PageMeta): string {
     `<title>${e(m.title)}</title>`,
     `<meta name="description" content="${e(m.description)}">`,
     `<link rel="canonical" href="${e(m.url)}">`,
+    ...(m.noindex ? [`<meta name="robots" content="noindex, noimageindex">`] : []),
     `<meta property="og:type" content="website">`,
     `<meta property="og:site_name" content="${e(SITE)}">`,
     `<meta property="og:locale" content="${m.lang === "fr" ? "fr_FR" : "en_US"}">`,
@@ -219,7 +222,7 @@ export function metaTags(m: PageMeta): string {
 export function injectMeta(template: string, m: PageMeta): string {
   const cleaned = template
     .replace(/<title>[\s\S]*?<\/title>\s*/i, "")
-    .replace(/<meta\s+(?:property|name)=["'](?:og:[^"']*|twitter:[^"']*|description)["'][^>]*>\s*/gi, "")
+    .replace(/<meta\s+(?:property|name)=["'](?:og:[^"']*|twitter:[^"']*|description|robots)["'][^>]*>\s*/gi, "")
     .replace(/<link\s+rel=["']canonical["'][^>]*>\s*/gi, "")
     .replace(/<html([^>]*)\blang=["'][^"']*["']/i, `<html$1lang="${m.lang}"`);
   const tags = metaTags(m);

@@ -1079,6 +1079,36 @@ describe("page /c/:id et images", () => {
     expect(ctx.calls.render).toEqual(["portrait:card", "story:card"]);
   });
 
+  it("une fiche et son image restent hors des index de recherche : balise et en-tête noindex", async () => {
+    const template = `<!doctype html><html lang="fr"><head><title>x</title><meta name="robots" content="index"></head><body></body></html>`;
+    const ctx = setup({}, { indexHtml: async () => template });
+    const { id } = await generate(ctx);
+    const res = await ctx.app.request(`/c/${id}`);
+    expect(res.headers.get("x-robots-tag")).toBe("noindex, noimageindex");
+    const html = await res.text();
+    expect(html.match(/name="robots"/g)).toHaveLength(1);
+    expect(html).toContain('<meta name="robots" content="noindex, noimageindex">');
+    expect((await ctx.app.request(`/og/${id}.png`)).headers.get("x-robots-tag")).toBe("noindex, noimageindex");
+    expect((await ctx.app.request(`/c/AAAAAAAAAA`)).headers.get("x-robots-tag")).toBe("noindex, noimageindex");
+  });
+
+  it("robots.txt et sitemap.xml sont de vrais fichiers, sans les fiches", async () => {
+    const ctx = setup({}, { season: null });
+    const robots = await ctx.app.request("/robots.txt");
+    expect(robots.status).toBe(200);
+    expect(robots.headers.get("content-type")).toContain("text/plain");
+    const txt = await robots.text();
+    expect(txt).toContain("Sitemap: https://skills.test/sitemap.xml");
+    expect(txt).not.toMatch(/Disallow/);
+    const map = await ctx.app.request("/sitemap.xml");
+    expect(map.headers.get("content-type")).toContain("application/xml");
+    const xml = await map.text();
+    expect(xml).toContain("<loc>https://skills.test/</loc>");
+    expect(xml).toContain("<loc>https://skills.test/bandes</loc>");
+    expect(xml).not.toContain("/primes");
+    expect(xml).not.toContain("/c/");
+  });
+
   it("carte inconnue : 404 avec balises génériques", async () => {
     const ctx = setup();
     const res = await ctx.app.request(`/c/AAAAAAAAAA`);

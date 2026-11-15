@@ -37,6 +37,7 @@ import { mountPrimes, purgeEntries } from "./primes";
 import { mountPrimePages } from "./primePages";
 import { loadRules, servableRules } from "./rules";
 import { compressHtml, readManifest, StaticCompressor, withPreloads } from "./assets";
+import { NOINDEX, robotsTxt, sitemapPaths, sitemapXml } from "./seo";
 
 export interface AppOptions {
   store: Store;
@@ -367,6 +368,17 @@ export function createApp(opts: AppOptions) {
       season: season ? seasonDates(season) : null,
     }),
   );
+
+  // Les moteurs de recherche : de vrais fichiers, sans les fiches (seo.ts).
+  app.get("/robots.txt", (c) => {
+    c.header("Cache-Control", "public, max-age=86400");
+    return c.text(robotsTxt(baseUrl));
+  });
+  app.get("/sitemap.xml", (c) => {
+    const paths = sitemapPaths({ primesListed: !!season && season.primes.length > 0, rulesPublished: !!rules });
+    c.header("Cache-Control", "public, max-age=3600");
+    return c.body(sitemapXml(baseUrl, paths), 200, { "Content-Type": "application/xml; charset=utf-8" });
+  });
 
   // GET /api/showcase : le vrai jugement du pseudo vitrine, pour l'accueil (§6.1,
   // §18.35) : sa fiche (celle de son dossier s'il a deux pièces, §18.36), le lien
@@ -744,6 +756,8 @@ export function createApp(opts: AppOptions) {
     }
     return c.body(new Uint8Array(png), 200, {
       "Content-Type": "image/png",
+      // L'image d'une fiche porte un nom, comme sa page : hors des index (seo.ts).
+      "X-Robots-Tag": NOINDEX,
       // Spéciale portée pendant la semaine en cours : elle peut encore partir, cache court.
       // Sinon cache long ; si elle arrive plus tard, og:image change d'adresse (?s=totw).
       // Faite par un tiers : l'image change à la revendication, cache court aussi.
@@ -757,17 +771,20 @@ export function createApp(opts: AppOptions) {
     const row = ID_RE.test(id) ? store.getCard(id) : null;
     const template = opts.indexHtml ? await opts.indexHtml().catch(() => null) : null;
     const login = row ? store.loginOf(row) : null;
+    // Une fiche porte un nom : jamais dans un index de recherche (balise et en-tête, seo.ts).
+    c.header("X-Robots-Tag", NOINDEX);
     if (row && store.isHidden(login)) {
       // Masquée (§18.1) : balises génériques, sans image de la fiche ; 410 pour
       // tous, sauf le propriétaire, à qui le front montre la fiche et le bandeau.
-      const generic = genericMeta(baseUrl, `/c/${id}`);
+      const generic = { ...genericMeta(baseUrl, `/c/${id}`), noindex: true };
       const mine = !hiddenFrom(c, login);
       const page = template ?? messagePage("withdrawn", langOfRequest(c.req.header("accept-language")));
       c.header("Cache-Control", "private, no-store");
       return c.html(injectMeta(page, generic), mine ? 200 : 410);
     }
     // L'aperçu est lu par tout le monde : la version publique (shared/publicView.ts).
-    const meta = row ? metaFor(publicView(withWeekSpecial(store.db, row.data).data, { thirdParty: thirdParty(row) }), baseUrl) : genericMeta(baseUrl, `/c/${id}`);
+    const found = row ? metaFor(publicView(withWeekSpecial(store.db, row.data).data, { thirdParty: thirdParty(row) }), baseUrl) : genericMeta(baseUrl, `/c/${id}`);
+    const meta = { ...found, noindex: true };
     const html = template ? injectMeta(template, meta) : standalonePage(meta);
     c.header("Cache-Control", "public, max-age=300");
     return c.html(html, row ? 200 : 404);
