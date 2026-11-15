@@ -1,5 +1,5 @@
 // Racine : langue, routes, barre du haut et pied de page.
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Footer, SeasonBand, SkipLink, TopBar } from "./components/Chrome";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { NotFound } from "./components/ErrorPage";
@@ -7,11 +7,17 @@ import { LangProvider } from "./i18n";
 import { isMock } from "./lib/api";
 import { navigate, routeOf, usePath } from "./lib/router";
 import { DirectCard } from "./pages/DirectCard";
+import { loadCardPage, loadedCardPage } from "./pages/cardPageLoader";
 
 // Chaque page est chargée à la demande : l'accueil ne paie pas la page d'une fiche, ni l'inverse.
 // Le serveur précharge celle de l'adresse demandée (server/src/assets.ts), sans attendre ce paquet.
 const Home = lazy(() => import("./pages/Home").then((m) => ({ default: m.Home })));
-const CardPage = lazy(() => import("./pages/CardPage").then((m) => ({ default: m.CardPage })));
+const CardPageLazy = lazy(() => loadCardPage().then((m) => ({ default: m.CardPage })));
+/** Préchargée par le formulaire, la page d'une fiche se rend sans repli vide entre l'accueil et l'attente. */
+function CardPage({ id }: { id: string }) {
+  const [mod] = useState(loadedCardPage);
+  return mod ? <mod.CardPage id={id} /> : <CardPageLazy id={id} />;
+}
 const Bands = lazy(() => import("./pages/Bands").then((m) => ({ default: m.Bands })));
 const BandPage = lazy(() => import("./pages/Bands").then((m) => ({ default: m.BandPage })));
 const PrimesList = lazy(() => import("./pages/Primes").then((m) => ({ default: m.PrimesList })));

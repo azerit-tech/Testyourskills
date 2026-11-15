@@ -14,6 +14,7 @@ import { pick, useT } from "../i18n";
 import { api, tokens } from "../lib/api";
 import { errorFact } from "../lib/errors";
 import { navigate } from "../lib/router";
+import { loadCardPage } from "../pages/cardPageLoader";
 import { unlockAudio } from "../lib/audio";
 import { unlockFilm } from "../film/unlock";
 import { prefetchScene, revealScene } from "../lib/revealScene";
@@ -160,8 +161,11 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
     if (revealScene() === "film") unlockFilm();
     setError(null);
     setBusy(true);
+    // La page de l'attente se charge pendant la demande : entre l'accueil et l'attente, aucune image vide.
+    const page = loadCardPage().catch(() => undefined);
     try {
       const res = await api.createCard({ login: input.login, linkedin: input.linkedin, cv: input.file ?? undefined, lang });
+      await page;
       if (res.deleteToken) tokens.set(res.id, res.deleteToken);
       // « Réessayer » remet le lien LinkedIn dans le champ unique.
       rememberInput({ login: input.login ?? input.linkedin, file: input.file ?? null });
