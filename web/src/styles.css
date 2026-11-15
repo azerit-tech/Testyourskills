@@ -2643,8 +2643,8 @@ button.cover-panel:focus-visible {
   justify-self: start;
 }
 
-/* partage (classes « out » : les bloqueurs masquent les « share ») : un bouton en grand (« Partager » sur téléphone,
-   LinkedIn ailleurs), trois pilules à contour au plus */
+/* partage (classes « out » : les bloqueurs masquent les « share ») : un bouton rose (« Partager » sur téléphone,
+   LinkedIn ailleurs), LinkedIn en contour quand il passe second, le reste en liens */
 /* marine : la fiche au-dessus est souvent prune */
 .out {
   background: var(--s-info);
@@ -2702,20 +2702,25 @@ a.dossier-item:hover {
   color: var(--c-text);
 }
 
-/* rang de la semaine (§18.22) : une ligne forte, en tête du partage */
+/* rang de la semaine (§18.22) : une ligne sous le titre du partage, et un lien vers le top de la semaine.
+   Crème soulignée de rose : une information qui se touche, pas un second titre. Pas de capitales : « 6e » resterait « 6E ». */
 .after-block .week-rank {
-  display: grid;
-  gap: 4px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--c-line);
-  /* pas de capitales : « 6e » resterait « 6E » */
-  font: 700 var(--t-28) / 1 var(--f-name);
-  color: var(--cream);
+  justify-self: start;
+  margin: -4px 0;
+  padding: 10px 0;
+  font: 600 var(--t-16) / 1.4 var(--f-text);
+  color: var(--c-emphasis);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-decoration-color: rgba(255, 178, 198, 0.45);
+  text-underline-offset: 4px;
   text-wrap: balance;
 }
-.week-rank-next {
-  font: 500 var(--t-16) / 1.2 var(--f-text);
-  color: var(--c-text);
+.after-block .week-rank:hover {
+  text-decoration-color: var(--c-action);
+}
+.week-rank > span {
+  color: var(--c-action);
 }
 .out .out-main,
 .out .out-second {
@@ -2731,23 +2736,42 @@ a.dossier-item:hover {
 .out .out-hint.is-copied {
   color: var(--c-emphasis);
 }
+/* le reste du partage en liens, sur une ligne qui passe à la suivante sans rien couper :
+   le lien, l'image, l'image pour story */
 .out-more {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 24px;
+  margin: -4px 0;
+}
+/* la durée de vie du lien : la ligne la plus discrète du bloc */
+.out .out-keep {
+  font: var(--font-small);
+  color: var(--c-text-2);
+}
+/* presse-papiers refusé (navigateurs intégrés) : le lien ou le texte, sélectionné, pour un appui long */
+.out-manual {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
-.out-more .pill {
-  padding: 0 12px;
-  font-size: var(--t-14);
+.out-manual-field {
+  width: 100%;
+  min-height: var(--h-main);
+  padding: 14px 16px;
+  border: 0;
+  border-radius: var(--r-item);
+  background: var(--s-field);
+  box-shadow: inset 0 0 0 1.5px var(--c-emphasis);
+  /* 16 px : en dessous, iOS agrandit la page au focus */
+  font: 500 var(--t-16) / 1.4 var(--f-text);
+  color: var(--c-emphasis);
+  resize: none;
+  -webkit-user-select: text;
+  user-select: text;
 }
-/* un bouton seul sur sa ligne la prend toute */
-.out-more > :last-child:nth-child(odd) {
-  grid-column: 1 / -1;
-}
-/* « Format story » : un lien d'appoint sous l'image, calé à droite comme elle ; pas une quatrième pilule */
-.out .out-story {
-  justify-self: end;
-  margin-top: -6px;
+.out .out-manual p {
+  font: var(--font-small);
+  color: var(--c-emphasis);
 }
 
 /* la barre du pouce (§18.27) : téléphone seulement (ShareDock ne la rend pas au-delà de 640 px), fond d'encre plat.
@@ -3289,15 +3313,6 @@ a.dossier-item:hover {
 @media (min-width: 561px) {
   .demo-pill {
     display: inline;
-  }
-  /* une seule rangée, autant de colonnes que de boutons */
-  .out-more {
-    grid-template-columns: none;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(0, 1fr);
-  }
-  .out-more > :last-child:nth-child(odd) {
-    grid-column: auto;
   }
   .email-form {
     grid-template-columns: minmax(0, 1fr) auto;

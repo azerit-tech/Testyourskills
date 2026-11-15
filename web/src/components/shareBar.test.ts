@@ -47,12 +47,19 @@ function renderDock(env: Env, ready: boolean): string {
 
 /** Les pilules à contour : les boutons secondaires. */
 const ghosts = (html: string) => html.match(/class="pill pill-ghost[^"]*"/g) ?? [];
+/** Les boutons roses pleins : un seul par bloc. */
+const pinks = (html: string) => (html.match(/class="pill pill-big[^"]*"/g) ?? []).filter((c) => !c.includes("pill-ghost"));
+/** Les liens du bas du bloc, dans l'ordre. */
+const links = (html: string) => {
+  const more = /<div class="out-more">(.*?)<\/div>/.exec(html)?.[1] ?? "";
+  return [...more.matchAll(/<(a|button)[^>]*class="link-alt"[^>]*>([^<]+)<\/\1>/g)].map((m) => m[2].replace(/&#x27;/g, "'"));
+};
 const main = (html: string) => /<(a|button)[^>]*class="pill pill-big out-main[^"]*"[^>]*>.*?<\/\1>/.exec(html)?.[0] ?? "";
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe("bloc de partage selon l'appareil (§18.27)", () => {
-  it("ordinateur : LinkedIn en vrai lien, puis X, le lien, l'image à télécharger", () => {
+  it("ordinateur : LinkedIn en vrai lien, seul bouton ; le lien et les images en liens, plus de X (§18.48)", () => {
     const html = render({ ua: DESKTOP, touch: false, share: false });
     expect(main(html)).toMatch(/^<a /);
     // L'adresse de LinkedIn n'est jamais dans la page : un bloqueur de contenu masquerait le bouton.
@@ -60,26 +67,37 @@ describe("bloc de partage selon l'appareil (§18.27)", () => {
     expect(html).not.toContain("linkedin.com");
     expect(main(html)).toContain('target="_blank"');
     expect(main(html)).toContain('rel="noopener"');
-    expect(ghosts(html)).toHaveLength(3);
-    expect(html).toMatch(/>X<\/button>.*Copier le lien.*<a[^>]*download="azerit-[^"]+\.png"/);
+    expect(pinks(html)).toHaveLength(1);
+    expect(ghosts(html)).toHaveLength(0);
+    expect(links(html)).toEqual(["Copier le lien", "Télécharger l'image", "Image pour story"]);
+    expect(html).not.toMatch(/>X<|x\.com/);
+    expect(html).toMatch(/<a class="link-alt"[^>]*download="azerit-[^"]+\.png"/);
+    // La durée de vie du lien, dite là où on le partage.
+    expect(html).toMatch(/<p class="out-keep">Ton lien reste en ligne 90.jours\.<\/p><\/section>$/);
     // Le fichier porte le seul nom visible du produit.
     expect(html).not.toMatch(/testyourskills/i);
     // Le dessin en cours dans l'adresse : le cache d'un an ne ressert pas l'ancienne image.
     expect(html).toContain('href="/og/AbCdEf1234-portrait.png?v=8"');
   });
 
-  it("« Image pour story » : un lien d'appoint après l'image, téléchargé comme elle", () => {
+  it("« Image pour story » : un lien après l'image, téléchargé comme elle", () => {
     const html = render({ ua: DESKTOP, touch: false, share: false });
-    expect(html).toMatch(/Télécharger l&#x27;image<\/a><\/div><a class="link-quiet out-story" href="\/og\/AbCdEf1234-story\.png\?v=8" download="azerit-[^"]+-story\.png">Image pour story<\/a>/);
-    // Discret : pas une quatrième pilule.
-    expect(ghosts(html)).toHaveLength(3);
+    expect(html).toMatch(/Télécharger l&#x27;image<\/a><a class="link-alt" href="\/og\/AbCdEf1234-story\.png\?v=8" download="azerit-[^"]+-story\.png">Image pour story<\/a><\/div>/);
   });
 
   it("« Image pour story » sur téléphone et dans un navigateur intégré, comme l'image", () => {
     const phone = render({ ua: IPHONE, touch: true, share: true });
     expect(phone).toContain(">Image pour story</a>");
     const inApp = render({ ua: LINKEDIN_ANDROID, touch: true, share: false });
-    expect(inApp).toMatch(/<button type="button" class="link-quiet out-story" aria-haspopup="dialog">Image pour story<\/button>/);
+    expect(inApp).toMatch(/<button type="button" class="link-alt" aria-haspopup="dialog">Image pour story<\/button>/);
+  });
+
+  it("en anglais : la durée de vie du lien", () => {
+    const item = stub({ ua: DESKTOP, touch: false, share: false }, "AbCdEf1234");
+    vi.stubGlobal("navigator", { userAgent: DESKTOP, language: "en-US" });
+    const html = renderToStaticMarkup(createElement(LangProvider, null, createElement(ShareBar, { item, toast: () => undefined })));
+    expect(html).toContain('<p class="out-keep">Your link stays up for 90 days.</p>');
+    expect(links(html)).toEqual(["Copy link", "Download image", "Story image"]);
   });
 
   it("en anglais : « Story image », « Share on LinkedIn »", () => {
@@ -95,17 +113,22 @@ describe("bloc de partage selon l'appareil (§18.27)", () => {
     const html = render({ ua: IPHONE, touch: true, share: true });
     expect(main(html)).toMatch(/^<button /);
     expect(main(html)).toContain("Partager");
-    expect(ghosts(html)).toHaveLength(3);
+    // Un bouton rose, LinkedIn seul en contour, le reste en liens.
+    expect(pinks(html)).toHaveLength(1);
+    expect(ghosts(html)).toHaveLength(1);
     expect(html).toMatch(/<a class="pill pill-ghost out-second" href="https:\/\/skills\.test\/c\//);
     expect(html).not.toContain(">X</button>");
     expect(html).toMatch(/LinkedIn.*Copier le lien.*Télécharger l&#x27;image/);
+    expect(links(html)).toEqual(["Copier le lien", "Télécharger l'image", "Image pour story"]);
   });
 
   it("navigateur intégré sans feuille de partage : LinkedIn devant, l'image s'ouvre en panneau", () => {
     const html = render({ ua: LINKEDIN_ANDROID, touch: true, share: false });
     expect(main(html)).toMatch(/^<a /);
-    expect(ghosts(html)).toHaveLength(3);
+    expect(ghosts(html)).toHaveLength(0);
     expect(html).not.toContain("download=");
+    // Rien à copier à la main tant qu'aucune copie n'a échoué.
+    expect(html).not.toContain("out-manual");
     expect(html).toMatch(/<button[^>]*aria-haspopup="dialog"[^>]*>.*Télécharger l&#x27;image/);
   });
 

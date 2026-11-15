@@ -1,6 +1,6 @@
 // Tout ce qui vient sous la carte (§6.4), dans l'ordre de la spec.
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { FormEvent, ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import type { FormEvent, MouseEvent, ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { CardData, ComparisonData, Lang, WeekRank } from "../../../shared/types";
 import { declaredOf, STAT_CODES, starsFor } from "../../../shared/types";
@@ -12,10 +12,10 @@ import { api, hasGithub, images, isMine, isMock, tokens, weekOf } from "../lib/a
 import { navigate } from "../lib/router";
 import { getPlea } from "../lib/plea";
 import { setPrefill } from "../lib/session";
-import { flatteringRank, shareLead, shareText, shareTextX, type ShareInput } from "../lib/shareText";
+import { flatteringRank, shareLead, shareText, type ShareInput } from "../lib/shareText";
 import { canShareFile, hasNativeShare, imageFile, inAppBrowser, markTextCopied, portraitFile, preloadImage, preloadPortrait, shareFile, shareSheet, useTextCopied } from "../lib/sharing";
 import { copyText, isTouch, shareUrl } from "../lib/util";
-import { IconClose, IconDownload, IconLink, IconLinkedIn, IconShare, IconX } from "./Icons";
+import { IconClose, IconLinkedIn, IconShare } from "./Icons";
 import { ProveGithub } from "./ProveGithub";
 
 /* ---------- petit toast partagé ---------- */
@@ -103,17 +103,31 @@ export function WeekLine({ week, low }: { week: WeekRank | null; low: boolean })
     : week.inTop5
       ? w.top5
       : w.line(week.rank, week.total, week.gapToTop5);
-  // « 7e cette semaine, à 3 points du top 5 » : le rang en grand, l'écart dessous, sans la virgule.
-  // Une semaine close (« 8e, semaine 45 ») ou le top 5 restent d'un seul tenant.
-  const cut = week.closed || week.inTop5 ? -1 : text.indexOf(", ");
-  const head = cut < 0 ? text : text.slice(0, cut);
-  const next = cut < 0 ? "" : text.slice(cut + 2);
+  // Une ligne, et un lien : le rang mène au top de la semaine, sur l'accueil (§18.48).
   return (
-    <p className="week-rank" role="status">
-      <span>{head}</span>
-      {next && <span className="week-rank-next">{next}</span>}
-    </p>
+    <a className="week-rank" href={`/#${BOARD_ID}`} onClick={toBoard}>
+      {text}
+      <span aria-hidden> →</span>
+    </a>
   );
+}
+
+/** L'ancre du top de la semaine, sur l'accueil (WeekBoard.tsx). */
+const BOARD_ID = "board-title";
+
+/** Vers le top de la semaine : le tableau se charge après l'accueil, on l'attend pour y descendre. */
+function toBoard(e: MouseEvent<HTMLAnchorElement>) {
+  if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  e.preventDefault();
+  navigate("/");
+  let tries = 0;
+  const seek = () => {
+    if (window.location.pathname !== "/") return;
+    const board = document.getElementById(BOARD_ID);
+    if (board) board.scrollIntoView({ block: "center" });
+    else if (++tries < 50) window.setTimeout(seek, 100);
+  };
+  window.setTimeout(seek, 0);
 }
 
 /* ---------- partage ---------- */
@@ -156,6 +170,66 @@ export function shareInput(item: Shareable, lang: Lang, rank: string | null): Sh
   };
 }
 
+/* ---------- copie à la main ---------- */
+
+/**
+ * Le presse-papiers refusé (navigateurs intégrés de LinkedIn, d'Instagram) : le lien ou le texte
+ * s'affiche dans le bloc de partage, sélectionné, pour un appui long. Un message éphémère ne se
+ * laisse ni toucher ni copier. La barre du pouce passe par ici aussi : le bloc est le seul à l'afficher.
+ */
+interface Manual {
+  id: string;
+  kind: "link" | "text";
+  value: string;
+}
+let manual: Manual | null = null;
+const manualSubs = new Set<() => void>();
+
+function askManual(next: Manual) {
+  manual = next;
+  manualSubs.forEach((f) => f());
+  // Le bloc de partage vient à l'écran (depuis la barre du pouce, il est plus bas).
+  window.setTimeout(() => document.querySelector(".after-block.out .out-manual")?.scrollIntoView({ block: "center", behavior: "smooth" }), 80);
+}
+
+function useManual(id: string): Manual | null {
+  const m = useSyncExternalStore(
+    (cb) => {
+      manualSubs.add(cb);
+      return () => manualSubs.delete(cb);
+    },
+    () => manual,
+    () => null,
+  );
+  return m && m.id === id ? m : null;
+}
+
+/** Le champ en lecture seule, sélectionné d'office, et sa consigne. */
+function ManualCopy({ m }: { m: Manual }) {
+  const { t } = useT();
+  const ts = t.result.share;
+  const field = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = field.current;
+    if (!el) return;
+    try {
+      el.focus({ preventScroll: true });
+      el.select();
+      el.setSelectionRange(0, m.value.length);
+    } catch {
+      /* champ non sélectionnable : l'appui long reste possible */
+    }
+  }, [m]);
+  const hold = m.kind === "link" ? ts.holdLink : ts.holdText;
+  const props = { ref: field, className: "out-manual-field", readOnly: true, value: m.value, "aria-label": hold };
+  return (
+    <div className="out-manual" role="status">
+      {m.kind === "link" ? <input type="text" {...props} /> : <textarea rows={6} {...props} />}
+      <p>{hold}</p>
+    </div>
+  );
+}
+
 /** Ce qu'un bouton de partage sait d'une fiche : le bloc sous la fiche et la barre du pouce s'en servent. */
 export function useSharing(item: Shareable, toast: (m: string) => void) {
   const { t, lang } = useT();
@@ -189,7 +263,7 @@ export function useSharing(item: Shareable, toast: (m: string) => void) {
   const share = (from?: string) => {
     void shareSheet({ title: "Azerit", text: shareLead(ts.words, input), url, file }).then((r) => {
       if (r === null) return;
-      if (r === "copy_failed") return toast(url);
+      if (r === "copy_failed") return askManual({ id, kind: "link", value: url });
       if (r === "copy") toast(ts.copiedLink);
       track(r, from);
     });
@@ -202,8 +276,10 @@ export function useSharing(item: Shareable, toast: (m: string) => void) {
    * presse-papier, dans le geste et avant que l'onglet s'ouvre (Safari refuse une copie tardive).
    */
   const onLinkedIn = (from?: string) => {
-    void copyText(shareText(ts.words, input, url)).then((ok) => {
-      if (!ok) return;
+    const text = shareText(ts.words, input, url);
+    void copyText(text).then((ok) => {
+      // Copie refusée : le texte attend dans le bloc de partage, au retour de LinkedIn.
+      if (!ok) return askManual({ id, kind: "text", value: text });
       markTextCopied(id);
       // La barre du pouce n'a pas la ligne d'aide : la confirmation y passe en message.
       if (from === "dock") toast(ts.copiedShort);
@@ -272,53 +348,42 @@ export function ShareBar({ item, toast }: { item: Shareable; toast: (m: string) 
   const kit = useSharing(item, toast);
   const { id, url, track } = kit;
 
+  const manualCopy = useManual(id);
+
   const onCopy = async () => {
-    const ok = await copyText(url);
-    toast(ok ? ts.copiedLink : url);
+    if (await copyText(url)) toast(ts.copiedLink);
+    else askManual({ id, kind: "link", value: url });
     track("copy");
   };
 
-  const xHref = `https://x.com/intent/post?text=${encodeURIComponent(shareTextX(ts.words, kit.input))}&url=${encodeURIComponent(url)}`;
-
   return (
     <section className="after-block out" aria-labelledby="out-title">
-      <WeekLine week={weekOf(id)} low={kit.input.stars < 3} />
       <h2 id="out-title">{ts.title}</h2>
+      <WeekLine week={weekOf(id)} low={kit.input.stars < 3} />
+      {/* Un bouton rose (« Partager » sur téléphone, LinkedIn ailleurs), LinkedIn en contour quand il passe second. */}
       <ShareMain kit={kit} className="out-main" />
-      {/* Trois boutons secondaires au plus. Sur téléphone, X passe par la feuille de partage. */}
       {kit.native && <LinkedInLink kit={kit} className="pill pill-ghost out-second" />}
       {/* En permanence, sous le bouton LinkedIn : où part le texte, avant comme après l'appui. */}
       <p className={`out-hint${kit.textCopied ? " is-copied" : ""}`} aria-live="polite">
         {ts.linkedinCopied}
       </p>
+      {manualCopy && <ManualCopy m={manualCopy} />}
+      {/* Le reste en liens : le lien, l'image, l'image pour story. X passe par la feuille de partage du téléphone. */}
       <div className="out-more">
-        {!kit.native && (
-          <button
-            type="button"
-            className="pill pill-ghost"
-            onClick={() => {
-              window.open(xHref, "_blank", "noopener");
-              track("x");
-            }}
-          >
-            <IconX />
-            {ts.x}
-          </button>
-        )}
-        <button type="button" className="pill pill-ghost" onClick={onCopy}>
-          <IconLink />
+        <button type="button" className="link-alt" onClick={onCopy}>
           {ts.copy}
         </button>
         <SaveImage kit={kit} toast={toast} />
+        <SaveStory kit={kit} toast={toast} />
       </div>
-      <SaveStory kit={kit} toast={toast} />
+      <p className="out-keep">{ts.keep}</p>
     </section>
   );
 }
 
 /**
- * « Format story » : la même image en 9:16 (Instagram, TikTok), une action discrète sous
- * les boutons, qui part comme « Télécharger l'image ». Sur téléphone, le fichier se charge
+ * « Image pour story » : la même image en 9:16 (Instagram, TikTok), un lien à côté de
+ * « Télécharger l'image », qui part comme elle. Sur téléphone, le fichier se charge
  * après le portrait, pour ne pas le retarder.
  */
 function SaveStory({ kit, toast }: { kit: Sharing; toast: (m: string) => void }) {
@@ -337,7 +402,7 @@ function SaveStory({ kit, toast }: { kit: Sharing; toast: (m: string) => void })
       alive = false;
     };
   }, [id, filename, kit.filename, native]);
-  return <ImageAction kit={kit} toast={toast} file={file} src={isMock() ? null : images.story(id)} filename={filename} label={ts.story} channel="story" className="link-quiet out-story" />;
+  return <ImageAction kit={kit} toast={toast} file={file} src={isMock() ? null : images.story(id)} filename={filename} label={ts.story} channel="story" className="link-alt" />;
 }
 
 /** Une adresse `blob:` pour un fichier, rendue à la mémoire quand il change ou que le bloc part. */
@@ -367,13 +432,7 @@ function useObjectUrl(file: File | null): string | null {
  */
 function SaveImage({ kit, toast }: { kit: Sharing; toast: (m: string) => void }) {
   const { t } = useT();
-  const label = (
-    <>
-      <IconDownload />
-      {t.result.share.download}
-    </>
-  );
-  return <ImageAction kit={kit} toast={toast} file={kit.file} src={isMock() ? null : images.portrait(kit.id)} filename={kit.filename} label={label} channel="download" className="pill pill-ghost" />;
+  return <ImageAction kit={kit} toast={toast} file={kit.file} src={isMock() ? null : images.portrait(kit.id)} filename={kit.filename} label={t.result.share.download} channel="download" className="link-alt" />;
 }
 
 interface ImageActionProps {

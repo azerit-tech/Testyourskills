@@ -302,7 +302,6 @@ const fr = frTypoDeep({
     share: {
       title: "Partage-la",
       linkedin: "Partager sur LinkedIn",
-      x: "X",
       copy: "Copier le lien",
       download: "Télécharger l'image",
       /** La même image en 9:16, pour Instagram et TikTok : une action discrète sous les boutons. */
@@ -316,6 +315,11 @@ const fr = frTypoDeep({
       downloadDemo: "Image indisponible en mode démo (rendue par le serveur).",
       /** Sous l'image en plein écran, là où rien ne se télécharge (navigateurs intégrés). */
       holdToSave: "Appui long pour enregistrer",
+      /** Le presse-papiers refusé (navigateurs intégrés) : le lien ou le texte s'affiche, sélectionné, dans le bloc de partage. */
+      holdLink: "Appuie longuement pour copier ton lien.",
+      holdText: "Appuie longuement pour copier ton texte, puis colle-le dans ton post LinkedIn.",
+      /** La durée de vie du lien, dite là où on le partage (§18.48). */
+      keep: "Ton lien reste en ligne 90 jours.",
       imageAlt: "Ta fiche",
       /** Les morceaux du texte de partage, assemblés et raccourcis par lib/shareText.ts (§18.27). */
       words: {
@@ -1027,7 +1031,6 @@ const en: Dict = {
     share: {
       title: "Share it",
       linkedin: "Share on LinkedIn",
-      x: "X",
       copy: "Copy link",
       download: "Download image",
       story: "Story image",
@@ -1037,6 +1040,9 @@ const en: Dict = {
       copiedLink: "Link copied.",
       downloadDemo: "Image unavailable in demo mode (rendered by the server).",
       holdToSave: "Press and hold to save",
+      holdLink: "Press and hold to copy your link.",
+      holdText: "Press and hold to copy your text, then paste it into your LinkedIn post.",
+      keep: "Your link stays up for 90 days.",
       imageAlt: "Your rap sheet",
       words: {
         plea: (pleaded, verdict) => `I pleaded ${pleaded}. Verdict: ${verdict}.`,
