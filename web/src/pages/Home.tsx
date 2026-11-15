@@ -10,7 +10,8 @@
 // L'exemple est la vraie fiche de Jacques (fondateur d'Azerit) : la maquette
 // s'affiche d'abord, la fiche calculée par le serveur la remplace dès qu'elle existe.
 // Aucun dégradé dans la page : seuls ceux de la fiche et des illustrations.
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import type { CardData, WeekTop } from "../../../shared/types";
 import { LEVEL_LABELS, starsFor } from "../../../shared/types";
 import { fileOf, pieceLabel } from "../../../shared/caseFile";
@@ -27,7 +28,10 @@ import { useT } from "../i18n";
 import { ApiError, api, type Showcase } from "../lib/api";
 import { onLinkClick } from "../lib/router";
 import { homeHook, useAppConfig } from "../lib/season";
-import { clearPending, filmOwed, myCard, pendingFile, type MyCard } from "../lib/session";
+import { clearPending, dropPrefill, filmOwed, myCard, peekPrefill, pendingFile, type MyCard } from "../lib/session";
+
+/** Dénoncer depuis l'accueil (/<pseudo> d'un autre) : le bloc de la fiche, chargé seulement ce jour-là. */
+const Denounce = lazy(() => import("../components/Denounce").then((m) => ({ default: m.Denounce })));
 
 /** Au-delà, le top est tenu pour absent : la couverture ne garde pas ses cases prunes. */
 const TOP_WAIT_MS = 3000;
@@ -167,6 +171,50 @@ export function BackLine({ mine, pending, owed = false }: Pick<Memory, "mine" | 
 }
 
 /**
+ * Qui revient avec sa fiche (§18.52) : la ligne de sa fiche, le bouton rose « Voir ma fiche », et
+ * dessous le lien qui ouvre le formulaire. Revenir sert d'abord à retrouver sa fiche, son rang, son partage.
+ */
+export function ReturnCall({ mine, onAnother }: { mine: MyCard; onAnother: () => void }) {
+  const { t } = useT();
+  const b = t.home.back;
+  const href = `/c/${mine.id}`;
+  const stars = starsFor(mine.overall);
+  return (
+    <div className="home-return">
+      <p className="home-back">
+        <span>
+          {b.mine} <Stars n={stars} label={t.plea.count(stars)} /> {mine.overall}/100.
+        </span>
+      </p>
+      <a className="pill pill-big home-see" href={href} onClick={(e) => onLinkClick(e, href)}>
+        {b.see}
+      </a>
+      <button type="button" className="link-alt home-another" aria-expanded={false} onClick={onAnother}>
+        {b.another}
+      </button>
+    </div>
+  );
+}
+
+/** Un message bref en bas de l'écran (la dénonciation copiée), sans emporter l'après-fiche dans l'accueil. */
+function useMiniToast() {
+  const [msg, setMsg] = useState<string | null>(null);
+  const timer = useRef(0);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+  const show = (m: string) => {
+    setMsg(m);
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setMsg(null), 3200);
+  };
+  const node = (
+    <div className={`toast${msg ? " is-on" : ""}`} role="status" aria-live="polite">
+      {msg}
+    </div>
+  );
+  return { show, node };
+}
+
+/**
  * La fiche de Jacques : s'incline sous le pointeur, mène à sa page. Jugée avec son
  * LinkedIn (§18.35) : une note, celle de la fiche, et ses pièces dessous (§18.36).
  */
@@ -240,10 +288,35 @@ export function Home() {
     document.title = t.meta.title;
   }, [t]);
 
+  // Qui a déjà sa fiche (§18.52) : « Voir ma fiche » en rose, le formulaire replié sous « Faire une
+  // autre fiche ». Il s'ouvre d'emblée quand un préremplissage l'attend (« Réessayer », pseudo inconnu).
+  const [prefill] = useState(peekPrefill);
+  const mineLogin = mem.mine?.login?.toLowerCase() ?? null;
+  const direct = prefill?.direct && prefill.login ? prefill.login : null;
+  const directIsMine = !!direct && direct.toLowerCase() === mineLogin;
+  const [open, setOpen] = useState(() => !!prefill && !directIsMine);
+  const returning = !!mem.mine && !owed && !mem.pending;
+  // /<pseudo> d'un autre, pour qui a sa fiche : c'est une dénonciation (§18.52), avec ses gardes
+  // (pas soi-même, la fiche part au nom du dénonciateur, aucun partage public), pas « Faire ma fiche ».
+  const denounce = returning && !!direct && !!mineLogin && !directIsMine ? direct : null;
+  useEffect(() => {
+    // Le formulaire ne s'affiche pas pour ce pseudo-là : son préremplissage ne sert plus.
+    if (prefill?.direct && (denounce || directIsMine)) dropPrefill(prefill);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const toast = useMiniToast();
+
+  /** « Faire une autre fiche » : le formulaire s'ouvre sur place, le champ prend le focus dans le geste. */
+  const openForm = () => {
+    flushSync(() => setOpen(true));
+    inputRef.current?.focus({ preventScroll: true });
+  };
+
   /** Une place libre, « Découvre le tien » : retour au champ du pseudo,
    * prêt à taper. Le focus se donne dans le geste, sinon l'iPhone n'ouvre pas le clavier. */
   const play = () => {
     const behavior: ScrollBehavior = reducedMotion() ? "auto" : "smooth";
+    if (returning && !open && !denounce) flushSync(() => setOpen(true));
     const input = inputRef.current;
     if (!input) {
       window.scrollTo({ top: 0, behavior });
@@ -266,9 +339,25 @@ export function Home() {
           {/* La promesse, sous le titre : ce qu'on obtient, avant de demander quoi que ce soit. */}
           {/* L'accueil se souvient : qui a déjà sa fiche (ou un dossier en cours) connaît la
               promesse ; la ligne qui y ramène prend sa place, le bouton ne descend pas. */}
-          {mem.mine || mem.pending ? <BackLine mine={mem.mine} pending={mem.pending} owed={owed} /> : <p className="hero-hook">{hook}</p>}
-          <EntryForm inputRef={inputRef} />
+          {denounce && mem.mine ? (
+            <>
+              <BackLine mine={mem.mine} pending={null} />
+              <div className="home-denounce">
+                <Suspense fallback={null}>
+                  <Denounce cardId={mem.mine.id} selfLogin={mem.mine.login ?? undefined} toast={toast.show} initial={denounce} />
+                </Suspense>
+              </div>
+            </>
+          ) : returning && !open && mem.mine ? (
+            <ReturnCall mine={mem.mine} onAnother={openForm} />
+          ) : (
+            <>
+              {mem.mine || mem.pending ? <BackLine mine={mem.mine} pending={mem.pending} owed={owed} /> : <p className="hero-hook">{hook}</p>}
+              <EntryForm inputRef={inputRef} />
+            </>
+          )}
         </section>
+        {toast.node}
       </div>
       {/* Le produit, puis la preuve que d'autres y sont : côte à côte au bureau. */}
       <div className="home-proof">

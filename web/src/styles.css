@@ -1312,6 +1312,34 @@ button.cover-panel:focus-visible {
 .hero .entry {
   margin-top: 8px;
 }
+/* qui revient avec sa fiche (§18.52) : sa ligne, « Voir ma fiche » en rose pleine largeur,
+   puis « Faire une autre fiche » qui déplie le formulaire sur place */
+.home-return {
+  display: grid;
+  gap: 8px;
+  max-width: 440px;
+}
+.home-return .home-back {
+  margin: 0;
+}
+.home-see {
+  width: 100%;
+  margin-top: 8px;
+}
+.home-another {
+  justify-self: center;
+}
+/* /<pseudo> d'un autre, fiche déjà faite : le bloc « Dénonce un complice », son bouton en rose (le seul ici) */
+.home-denounce {
+  max-width: 440px;
+  margin-top: 8px;
+}
+.home-denounce .denounce-form .pill {
+  min-height: var(--h-main);
+  background: var(--c-action);
+  box-shadow: none;
+  color: var(--c-on-action);
+}
 
 @media (min-width: 900px) {
   .home-top {

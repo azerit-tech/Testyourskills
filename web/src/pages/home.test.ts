@@ -7,7 +7,7 @@ import { Cover } from "../components/Cover";
 import { LangProvider } from "../i18n";
 import type { Showcase } from "../lib/api";
 import { MOCK_SHOWCASE_ID, mockApi } from "../lib/mock";
-import { ExampleCard } from "./Home";
+import { ExampleCard, ReturnCall } from "./Home";
 
 const card = { ...FIXTURES.jmougeot, id: "Gh12345678", overall: 71 };
 const COMPARED: Showcase = { card, href: "/c/Cmp1234567", pieces: ["linkedin", "github"] };
@@ -52,6 +52,23 @@ describe("la fiche de Jacques sous le titre", () => {
   it("la case du fondateur sur la couverture mène au même endroit", () => {
     const html = render(createElement(Cover, { onPlay: () => undefined, top: null, founder: COMPARED, suspects: [] }));
     expect(html).toMatch(/<a[^>]*class="cover-panel cover-founder[^"]*"[^>]*href="\/c\/Cmp1234567"/);
+  });
+});
+
+describe("l'accueil de qui a déjà sa fiche (§18.52)", () => {
+  const mine = { id: "Card000001", login: "kevin-dev42", overall: 68 };
+  it("« Voir ma fiche » en rose vers elle, puis « Faire une autre fiche » en lien", () => {
+    const html = render(createElement(ReturnCall, { mine, onAnother: () => undefined }));
+    expect(html).toMatch(/<a class="pill pill-big home-see" href="\/c\/Card000001">Voir ma fiche<\/a>/);
+    expect(html).toMatch(/<button type="button" class="link-alt home-another"[^>]*>Faire une autre fiche<\/button>/);
+    expect(html).toContain("68/100.");
+    expect(html.indexOf("Voir ma fiche")).toBeLessThan(html.indexOf("Faire une autre fiche"));
+  });
+
+  it("en anglais", () => {
+    const html = render(createElement(ReturnCall, { mine, onAnother: () => undefined }), "en-US");
+    expect(html).toContain(">See my sheet<");
+    expect(html).toContain(">Make another sheet<");
   });
 });
 
