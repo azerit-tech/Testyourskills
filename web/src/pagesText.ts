@@ -241,7 +241,7 @@ const fr = {
       "On lit ce qui est public : ton profil LinkedIn, ton GitHub, ou le CV que tu donnes.",
       "On garde ta fiche 90 jours par défaut, jamais ton CV.",
       "Aucun contact n'est affiché, aucune donnée n'est vendue, aucun cookie publicitaire, aucun outil tiers de mesure.",
-      "Tu supprimes ta fiche quand tu veux. Pour celle qu'on a faite sur toi : « C'est moi », ou la demande de retrait.",
+      "Tu supprimes ta fiche quand tu veux. Pour celle qu'on a faite sur toi : « C'est moi », ou « Demander son retrait » sous la fiche.",
     ],
     contact: "Une question ?",
     sections: (email: string): ProseSection[] => [
@@ -261,7 +261,7 @@ const fr = {
           [
             "Les faits tirés de tes sources, les constats de l'IA, les notes de la fiche.",
             "Le profil LinkedIn lu, 30 jours, pour ne pas le relire.",
-            "Ton email, seulement si tu le laisses : il garde ta fiche en ligne au-delà de 90 jours et rejoint les contacts d'Azerit, qui peut t'écrire pour un poste. Tu le retires par la demande de retrait.",
+            `Ton email, seulement si tu le laisses : il garde ta fiche en ligne au-delà de 90 jours et rejoint les contacts d'Azerit, qui peut alors t'écrire pour un poste. Pour le retirer : « Supprimer ma fiche », sous ta fiche, ou un email à ${email}.`,
             "Si tu viens du lien d'une fiche partagée, l'identifiant de cette fiche.",
             "Pour une fiche née d'une dénonciation, l'identifiant de la fiche qui a dénoncé, et son pseudo seulement si elle est revendiquée.",
           ],
@@ -429,7 +429,7 @@ const en: PagesDict = {
       "We read what is public: your LinkedIn profile, your GitHub, or the résumé you give us.",
       "We keep your sheet for 90 days by default, never your résumé.",
       "No contact details are shown, no data is sold, no ad cookies, no third-party tracking tools.",
-      "You can delete your sheet any time. For a sheet someone made about you: “That's me”, or a removal request.",
+      "You can delete your sheet any time. For a sheet someone made about you: “That's me”, or “Ask us to take it down” under the sheet.",
     ],
     contact: "Questions?",
     sections: (email) => [
@@ -447,9 +447,9 @@ const en: PagesDict = {
         h: "What we keep",
         blocks: [
           [
-            "The facts drawn from your sources, the AI's findings, the sheet's scores.",
+            "The facts drawn from your sources, the AI's findings, the sheet's ratings.",
             "The LinkedIn profile we read, for 30 days, so we don't read it twice.",
-            "Your email, only if you leave it: it keeps your sheet up past 90 days and joins Azerit's contacts, who may reach out about a job. You can remove it with a removal request.",
+            `Your email, only if you leave it: it keeps your sheet up past 90 days and joins Azerit's contacts, so Azerit may reach out about a job. To remove it: “Delete my sheet”, under your sheet, or an email to ${email}.`,
             "If you arrived through a shared sheet's link, that sheet's ID.",
             "For a sheet born from a tip-off, the ID of the sheet that turned it in, and its username only if that sheet is claimed.",
           ],
