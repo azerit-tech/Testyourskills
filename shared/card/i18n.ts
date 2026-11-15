@@ -39,17 +39,28 @@ export const STRINGS = {
       FS: "Full-stack", BE: "Backend", FE: "Frontend", MOB: "Mobile", DATA: "Data", ML: "Machine learning",
       OPS: "Ops", SEC: "Sécurité", EMB: "Embarqué", PM: "Produit", DESIGN: "Design", CTO: "CTO",
     } as Record<string, string>,
-    /** Dos de la fiche (§18.27) : chaque axe, son fait le plus fort, puis la formule. */
+    /** Dos de la fiche (§18.27, §18.48) : les huit critères et leur pièce, puis la formule. */
     back: {
       title: "Pièces à conviction",
+      /** Le lien sous la fiche qui la retourne, et celui qui revient au recto. */
+      toBack: "Pièces à conviction",
+      toFront: "Retour à la fiche",
+      /** L'état d'un critère sans note, ou noté hors de la moyenne. */
+      unproven: "non prouvé",
+      missing: "sans objet",
+      outOfMean: "hors moyenne",
+      /** Repli d'une pièce qui ne se montre pas en public : d'où elle vient. */
+      readOn: (src: string) => `Lu sur ${src}.`,
+      /** Fiche sans grille rangée (dénoncée, pas encore reprise) : d'où vient la note, sans formule. */
+      fromGrid: "Note lue sur la grille de recrutement : huit critères, chacun noté sur 10.",
       axes: { TEC: "Technique", SHIP: "Livraison", ARCH: "Rigueur", DOC: "Communication", XP: "Expérience", BUZZ: "Buzzwords" },
       noFact: "Aucun fait relevé",
       rating: "La note",
       /** Un poids de la formule : « 30 % ». */
       weight: (w: number) => `${Math.round(w * 100)}${NBSP}%`,
       flip: "Retourner la fiche",
-      /** Le barème de recrutement (§18.37) : la note est la moyenne pondérée des critères notés, × 10. */
-      gridRating: "La note · moyenne pondérée × 10",
+      /** La grille de recrutement (§18.37) : la note est la moyenne pondérée des critères notés, × 10. */
+      gridRating: "La note · moyenne pondérée des critères notés × 10",
       criteria: { EDU: "École", XP: "Expérience", EMP: "Parcours", STK: "Stack", CODE: "Code", ACT: "Activité", OWN: "Ownership", OSS: "Open source" },
       /** « Code 7 × 2 » : la note sur 10 et son coefficient, jamais un « + n ». */
       term: (name: string, score: number, coef: string) => `${name} ${score}${NBSP}×${NBSP}${coef}`,
@@ -90,12 +101,19 @@ export const STRINGS = {
     } as Record<string, string>,
     back: {
       title: "Exhibits",
+      toBack: "Exhibits",
+      toFront: "Back to the sheet",
+      unproven: "unproven",
+      missing: "not applicable",
+      outOfMean: "not averaged",
+      readOn: (src: string) => `Read on ${src}.`,
+      fromGrid: "Rating read from the hiring scorecard: eight criteria, each scored out of 10.",
       axes: { TEC: "Technique", SHIP: "Shipping", ARCH: "Rigor", DOC: "Communication", XP: "Experience", BUZZ: "Buzzwords" },
       noFact: "No fact on file",
       rating: "The rating",
       weight: (w: number) => `${Math.round(w * 100)}%`,
       flip: "Flip the card",
-      gridRating: "The rating · weighted mean × 10",
+      gridRating: "The rating · weighted mean of the scored criteria × 10",
       criteria: { EDU: "School", XP: "Experience", EMP: "Career", STK: "Stack", CODE: "Code", ACT: "Activity", OWN: "Ownership", OSS: "Open source" },
       term: (name: string, score: number, coef: string) => `${name} ${score}${NBSP}×${NBSP}${coef}`,
       divide: (den: string) => `÷${NBSP}${den}`,
