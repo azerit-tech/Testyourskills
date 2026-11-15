@@ -12,6 +12,7 @@ import { Denounce } from "../components/Denounce";
 import { EntryForm } from "../components/EntryForm";
 import { PrimeRace } from "../components/Primes";
 import { ErrorBoundary } from "../components/ErrorBoundary";
+import { CardNotFound, Unreachable } from "../components/ErrorPage";
 import { Dossier } from "../components/Findings";
 import { Jury, JuryLine } from "../components/Jury";
 import { MakeYours } from "../components/MakeYours";
@@ -32,6 +33,7 @@ import { api, ApiError, tokens, type CaseInfo } from "../lib/api";
 import { isClosed } from "../lib/errors";
 import { useHold, type SceneState } from "../lib/hold";
 import { gaveUp, nextPatience, type Patience } from "../lib/patience";
+import { REMOTE_PATIENCE_MS } from "../lib/remote";
 import { filmTrace } from "../film/trace";
 import { ChaseLink } from "../film/ChaseLink";
 import { navigate, onLinkClick } from "../lib/router";
@@ -53,7 +55,10 @@ type View =
   | { s: "loading" }
   | { s: "pending"; progress: ProgressEvent[]; queue?: number; findings?: Finding[] }
   | { s: "done"; item: Shareable }
-  | { s: "error"; message: Fact | string; notFound?: boolean }
+  | { s: "error"; message: Fact | string }
+  /** Fiche inconnue (404) ; serveur injoignable (toute autre panne, lib/remote.ts). */
+  | { s: "none" }
+  | { s: "down" }
   /** Masquée par son propriétaire revendiqué (§18.1) : 410 de l'API. */
   | { s: "withdrawn" }
   | { s: "deleted" };
@@ -69,10 +74,12 @@ function useJob(id: string, nonce: number) {
     // Le temps passé en file d'attente ne compte pas : le serveur coupe lui-même au bout de 3 min.
     // En traitement, on attend le délai que le serveur annonce, rallonge LinkedIn comprise (lib/patience.ts).
     let patience: Patience = { started: freshSince(id) ?? Date.now(), giveUpAt: null };
+    let downSince = 0;
     const poll = async () => {
       try {
         const job: JobState = await api.getJob(id);
         if (!alive) return;
+        downSince = 0;
         if (job.state === "pending") {
           setSawPending(true);
           setView({ s: "pending", progress: job.progress ?? [], queue: job.queue, findings: job.findings });
@@ -93,10 +100,14 @@ function useJob(id: string, nonce: number) {
         }
       } catch (e) {
         if (!alive) return;
-        if (e instanceof ApiError && e.status === 404) setView({ s: "error", message: t.errors.notFound, notFound: true });
+        if (e instanceof ApiError && e.status === 404) setView({ s: "none" });
         else if (e instanceof ApiError && e.status === 410) setView({ s: "withdrawn" });
-        else if (e instanceof ApiError && e.fact) setView({ s: "error", message: e.fact });
-        else timer = window.setTimeout(poll, POLL_MS * 3); // réseau capricieux : on retente
+        else {
+          // Réseau capricieux, serveur en panne : on retente en silence, puis la page le dit.
+          downSince ||= Date.now();
+          if (Date.now() - downSince >= REMOTE_PATIENCE_MS) setView({ s: "down" });
+          else timer = window.setTimeout(poll, POLL_MS * 3);
+        }
       }
     };
     void poll();
@@ -279,6 +290,14 @@ export function CardPage({ id }: { id: string }) {
     );
   }
 
+  if (view.s === "none" || view.s === "down") {
+    return (
+      <main className="page page-error" id="main">
+        {view.s === "none" ? <CardNotFound bare onMake={() => prefillFromLast(null)} /> : <Unreachable bare />}
+      </main>
+    );
+  }
+
   if (view.s === "error") {
     const msg = typeof view.message === "string" ? view.message : pick(view.message, lang);
     return (
@@ -290,11 +309,11 @@ export function CardPage({ id }: { id: string }) {
             type="button"
             className="btn-primary"
             onClick={() => {
-              prefillFromLast(view.notFound ? null : view.message);
+              prefillFromLast(view.message);
               navigate("/");
             }}
           >
-            {view.notFound ? t.result.makeYours : t.errors.retry}
+            {t.errors.retry}
           </button>
         </div>
       </main>
