@@ -252,6 +252,11 @@ svg {
   flex: 1;
   width: 100%;
 }
+/* une page qui attend sa réponse (bandes, primes, règlement) garde un écran de
+   haut : le pied reste sous le pli au lieu de remonter puis de redescendre */
+.page[aria-busy="true"] {
+  min-height: 100svh;
+}
 
 /* ============ composants communs (SPEC §18.48) ============ */
 
