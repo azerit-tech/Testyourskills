@@ -25,3 +25,29 @@ export function isReservedSegment(segment: string): boolean {
 export function isUpcomingPath(path: string): boolean {
   return UPCOMING.has(firstSegment(path));
 }
+
+const LOGIN_RE = /^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$/;
+
+/**
+ * Un chemin que le site sait afficher (le routeur du front, web/src/lib/router.ts).
+ * Les autres reçoivent la page introuvable du site, en 404 pour les robots. La
+ * fiche, la bande et la prime inconnues ont leur propre 404 (app.ts, bandPages.ts, primePages.ts).
+ */
+export function isSitePage(path: string): boolean {
+  if (path === "/" || path === "") return true;
+  if (/^\/c\/[A-Za-z0-9_-]+\/?$/.test(path)) return true;
+  if (/^\/(confidentialite|privacy)\/?$/.test(path)) return true;
+  if (/^\/bandes\/?$/i.test(path) || /^\/bandes\/(ecole|boite)\/[a-z0-9]+(?:-[a-z0-9]+)*\/?$/.test(path)) return true;
+  if (/^\/primes(?:\/|$)/i.test(path) || /^\/reglement\/?$/i.test(path) || isUpcomingPath(path)) return true;
+  // /{pseudo} : l'accueil, le champ prérempli.
+  const one = /^\/([^/]+)\/?$/.exec(path)?.[1];
+  if (!one) return false;
+  let seg = one;
+  try {
+    seg = decodeURIComponent(one);
+  } catch {
+    /* gardé tel quel */
+  }
+  seg = seg.trim().replace(/^@/, "");
+  return LOGIN_RE.test(seg) && !isReservedSegment(seg);
+}

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { isSitePage } from "../../../shared/routes";
 import { routeOf } from "./router";
 
 describe("routeOf (§18.27)", () => {
@@ -25,5 +26,14 @@ describe("routeOf (§18.27)", () => {
     expect(routeOf("/usain")).toEqual({ kind: "direct", login: "usain" });
     expect(routeOf("/badger/")).toEqual({ kind: "direct", login: "badger" });
     expect(routeOf("/%40octocat")).toEqual({ kind: "direct", login: "octocat" });
+  });
+
+  it("le serveur répond 200 aux pages que le front sait afficher, 404 aux autres (shared/routes.ts)", () => {
+    const paths = [
+      "/", "/c/abc_12", "/c/abc/def", "/privacy", "/confidentialite/", "/bandes", "/Bandes/", "/bandes/ecole/epitech", "/bandes/boite/x-y",
+      "/bandes/zzz/zzz", "/bandes/ecole/Mauvais_Id", "/primes", "/primes/demo", "/primes/a/b", "/reglement", "/vs/a/b", "/u",
+      "/usain", "/badger/", "/%40octocat", "/kevin-dev42", "/api", "/og", "/assets", "/__devices", "/zzz/zzz", "/un.point", "/-tiret", "/%E0%A4%A",
+    ];
+    for (const p of paths) expect(isSitePage(p), p).toBe(routeOf(p).kind !== "notFound");
   });
 });

@@ -197,42 +197,99 @@ export function injectMeta(template: string, m: PageMeta): string {
   return `<!doctype html><html lang="${m.lang}"><head><meta charset="utf-8">${tags}</head><body>${cleaned}</body></html>`;
 }
 
-/** Repli sans index.html du front : les balises pour les robots, un lien pour les humains. */
-export function standalonePage(m: PageMeta): string {
+// --- Les pages servies sans le site ------------------------------------------------
+// Lien de suppression ouvert depuis un email, fiche retirée ou page introuvable
+// quand le front n'est pas là : une langue (celle du navigateur), le gabarit du
+// site (l'encre, la crème, la marque en haut à gauche, un bouton de retour).
+
+/** La langue d'une requête, d'après Accept-Language : le français s'il vient en tête, sinon l'anglais. */
+export function langOfRequest(acceptLanguage: string | undefined | null): Lang {
+  const first = (acceptLanguage ?? "").split(",")[0]?.trim().toLowerCase() ?? "";
+  if (!first) return "fr";
+  return first.startsWith("fr") ? "fr" : "en";
+}
+
+export type MessageKey = "deleted" | "badDeleteLink" | "cardNotFound" | "withdrawn" | "pageNotFound";
+
+/** Les textes de ces pages : un titre court, une phrase. */
+export const SERVER_PAGES: Record<Lang, Record<MessageKey, { title: string; text: string }> & { home: string }> = {
+  fr: {
+    deleted: { title: "Fiche supprimée", text: "Ta fiche et ses images sont effacées." },
+    badDeleteLink: { title: "Lien non valide", text: "Ce lien de suppression n'est pas valide : ta fiche n'a pas bougé." },
+    cardNotFound: { title: "Fiche introuvable", text: "Elle a expiré, ou elle a été supprimée." },
+    withdrawn: { title: "Fiche retirée", text: "La personne fichée l'a retirée." },
+    pageNotFound: { title: "Page introuvable", text: "Cette adresse ne mène à aucune page." },
+    home: "Retour à l'accueil",
+  },
+  en: {
+    deleted: { title: "Sheet deleted", text: "Your rap sheet and its images are erased." },
+    badDeleteLink: { title: "Invalid link", text: "This delete link isn't valid: your sheet hasn't changed." },
+    cardNotFound: { title: "Sheet not found", text: "It expired, or it was deleted." },
+    withdrawn: { title: "Sheet withdrawn", text: "The person on file withdrew it." },
+    pageNotFound: { title: "Page not found", text: "This address doesn't lead to any page." },
+    home: "Back to home",
+  },
+};
+
+/** Les feuilles de style du front (ses polices) lues dans son index.html ; aucune sans lui. */
+export function siteStylesheets(template: string | null | undefined): string {
+  if (!template) return "";
+  return (template.match(/<link\b[^>]*\brel=["']stylesheet["'][^>]*>/gi) ?? []).join("\n    ");
+}
+
+/** La gemme d'Azerit (web/src/components/Brand.tsx), en clair. */
+const MARK = `<svg width="13" height="15" viewBox="0 0 104 120" fill="none" aria-hidden="true"><path d="M52 8 L14 50 L37 102 Z" fill="#c9d67c" stroke="#c9d67c" stroke-width="9" stroke-linejoin="round"/><path d="M63 10 L92 42 L85 80 L47 112 Z" fill="#6fb2a8" stroke="#6fb2a8" stroke-width="9" stroke-linejoin="round"/></svg>`;
+
+/** Le gabarit du site (web/src/styles.css) : encre, crème, lilas, rose pour ce qui se touche. */
+const SHELL_CSS = `:root{color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0;background:#0c0d1b}
+body{min-height:100vh;min-height:100svh;display:flex;flex-direction:column;color:#e5ddff;font:400 16px/1.5 "Outfit",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.m-top{width:100%;max-width:1180px;height:64px;margin:0 auto;padding:0 16px;display:flex;align-items:center}
+.m-brand{display:inline-flex;align-items:center;gap:8px;min-height:44px;font:700 12px/1 "Outfit",system-ui,sans-serif;letter-spacing:.24em;color:#ccc2f5;text-decoration:none}
+.m-main{flex:1;width:100%;max-width:540px;margin:0 auto;padding:48px 16px 80px;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center}
+.m-main h1{margin:0;font:700 44px/.92 "Barlow Condensed","Arial Narrow",sans-serif;text-transform:uppercase;color:#fff9cb}
+.m-main p{margin:0 0 8px;color:#ccc2f5}
+.m-main img{max-width:100%;height:auto;border-radius:24px}
+.m-btn{display:inline-flex;align-items:center;justify-content:center;min-height:52px;padding:0 24px;border-radius:999px;background:#ffb2c6;color:#0c0d1b;font:600 16px/1.1 "Outfit",system-ui,sans-serif;text-decoration:none}
+a:focus-visible{outline:2px solid #fff9cb;outline-offset:3px}
+@media (min-width:900px){.m-top{height:76px}.m-main h1{font-size:64px}}`;
+
+function shell(lang: Lang, head: string, main: string, styles: string): string {
   return `<!doctype html>
-<html lang="${m.lang}">
+<html lang="${lang}">
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    ${metaTags(m)}
-    <style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0a0f16;color:#e6ecf2;font-family:Inter,system-ui,sans-serif}a{color:#52d0bd}</style>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0c0d1b">
+    ${head}
+    ${styles}
+    <style>${SHELL_CSS}</style>
   </head>
   <body>
-    <main style="text-align:center;padding:16px">
-      ${m.image ? `<img src="${escapeHtml(m.image)}" alt="${escapeHtml(m.imageAlt)}" style="max-width:100%;height:auto;border-radius:12px">` : ""}
-      <p><a href="/">${m.lang === "fr" ? "Fais la tienne" : "Make yours"}</a></p>
+    <header class="m-top"><a class="m-brand" href="/" aria-label="Azerit">${MARK}AZERIT</a></header>
+    <main class="m-main" id="main">
+      ${main}
     </main>
   </body>
 </html>`;
 }
 
-/** Page de confirmation du lien « Supprimer ma fiche » (GET, depuis un email). */
-export function messagePage(fr: string, en: string): string {
-  return `<!doctype html>
-<html lang="fr">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="robots" content="noindex">
-    <title>Testyourskills</title>
-    <style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0a0f16;color:#e6ecf2;font-family:Inter,system-ui,sans-serif;padding:16px;box-sizing:border-box}p{max-width:32rem}.en{color:#8494a5}a{color:#52d0bd}</style>
-  </head>
-  <body>
-    <main>
-      <p>${escapeHtml(fr)}</p>
-      <p class="en" lang="en">${escapeHtml(en)}</p>
-      <p><a href="/">skills.azerit.tech</a></p>
-    </main>
-  </body>
-</html>`;
+/** Repli sans index.html du front : les balises pour les robots, l'image et un bouton pour les humains. */
+export function standalonePage(m: PageMeta): string {
+  const img = m.image ? `<img src="${escapeHtml(m.image)}" alt="${escapeHtml(m.imageAlt)}" width="1200" height="630">` : "";
+  return shell(m.lang, metaTags(m), `${img}\n      <a class="m-btn" href="/">${m.lang === "fr" ? "Fais la tienne" : "Make yours"}</a>`, "");
+}
+
+/**
+ * Page de message servie sans le site : lien de suppression ouvert depuis un
+ * email, fiche retirée ou page introuvable quand le front manque. `styles` :
+ * les feuilles du front (siteStylesheets), pour ses polices.
+ */
+export function messagePage(key: MessageKey, lang: Lang, styles = ""): string {
+  const t = SERVER_PAGES[lang];
+  const { title, text } = t[key];
+  const head = `<meta name="robots" content="noindex">\n    <title>${escapeHtml(title)} · Azerit</title>`;
+  const main = `<h1>${escapeHtml(title)}</h1>\n      <p>${escapeHtml(text)}</p>\n      <a class="m-btn" href="/">${escapeHtml(t.home)}</a>`;
+  return shell(lang, head, main, styles);
 }

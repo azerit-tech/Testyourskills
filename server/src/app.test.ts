@@ -1468,6 +1468,62 @@ describe("pages à venir (§18.27)", () => {
   });
 });
 
+describe("pages servies sans le site, et code HTTP des adresses inconnues (§18.48)", () => {
+  it("le lien de suppression : une langue, celle du navigateur, au gabarit du site, avec un bouton de retour", async () => {
+    const ctx = setup();
+    const { id, deleteToken } = await generate(ctx);
+    const bad = await ctx.app.request(`/api/card/${id}/delete?token=x`, { headers: { "accept-language": "en-US,en;q=0.9,fr;q=0.8" } });
+    expect(bad.status).toBe(403);
+    const badHtml = await bad.text();
+    expect(badHtml).toContain('<html lang="en">');
+    expect(badHtml).toContain("<h1>Invalid link</h1>");
+    expect(badHtml).not.toMatch(/Ce lien|Testyourskills/);
+    const ok = await ctx.app.request(`/api/card/${id}/delete?token=${deleteToken}`, { headers: { "accept-language": "fr-FR,fr;q=0.9,en;q=0.8" } });
+    expect(ok.status).toBe(200);
+    const html = await ok.text();
+    expect(html).toContain('<html lang="fr">');
+    expect(html).toContain("<h1>Fiche supprimée</h1>");
+    expect(html).toContain('<a class="m-btn" href="/">Retour à l&#39;accueil</a>');
+    expect(html).toContain("background:#0c0d1b");
+    expect(html).not.toMatch(/lang="en"|#0a0f16|#52d0bd|deleted/);
+    // Déjà supprimée : introuvable, en 404.
+    const gone = await ctx.app.request(`/api/card/${id}/delete?token=${deleteToken}`);
+    expect(gone.status).toBe(404);
+    expect(await gone.text()).toContain("<h1>Fiche introuvable</h1>");
+  });
+
+  it("les polices du front, lues dans son index.html", async () => {
+    const index = `<html><head><link rel="stylesheet" crossorigin href="/assets/index-abc.css"></head><body><div id="root"></div></body></html>`;
+    const ctx = setup({}, { indexHtml: async () => index });
+    const res = await ctx.app.request(`/api/card/Inconnue01/delete?token=x`);
+    expect(res.status).toBe(404);
+    expect(await res.text()).toContain('<link rel="stylesheet" crossorigin href="/assets/index-abc.css">');
+  });
+
+  it("une fiche, une bande, une prime, une adresse inexistantes : 404 ; les pages du site : 200", async () => {
+    const root = mkdtempSync(join(tmpdir(), "tys-web-"));
+    const index = `<html><head></head><body><div id="root"></div></body></html>`;
+    writeFileSync(join(root, "index.html"), index);
+    const ctx = setup({}, { staticRoot: root, indexHtml: async () => index });
+    const { id } = await generate(ctx);
+    for (const path of ["/c/Inconnue01", "/bandes/ecole/nexistepas", "/bandes/zzz/zzz", "/zzz/zzz", "/c/abc/def", "/un.point.dans.le.nom", "/reglement"]) {
+      const res = await ctx.app.request(path);
+      expect(res.status, path).toBe(404);
+      // Le front, qui dessine sa page introuvable.
+      expect(await res.text(), path).toContain('<div id="root">');
+    }
+    for (const path of ["/", "/confidentialite", "/privacy", "/bandes", `/c/${id}`, "/kevin-dev42", "/%40octocat"]) {
+      expect((await ctx.app.request(path)).status, path).toBe(200);
+    }
+    // Sans le front : la page de message du serveur, dans la langue du navigateur.
+    const bare = setup();
+    const res = await bare.app.request("/zzz/zzz", { headers: { "accept-language": "en" } });
+    expect(res.status).toBe(404);
+    expect(await res.text()).toContain("<h1>Page not found</h1>");
+    expect((await bare.app.request("/og/inconnue.png")).status).toBe(404);
+  });
+});
+
 describe("le rang d'une école ne part dans aucune réponse (§18.48)", () => {
   /** Le critère École d'une grille rangée avant la règle : la lettre dans la pièce, sa version publique et la suite. */
   const legacyGrid = () => ({

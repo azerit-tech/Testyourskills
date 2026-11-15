@@ -596,13 +596,13 @@ describe("masquer", () => {
     expect(((await api.json()) as JobState).state).toBe("done");
   });
 
-  it("sans front buildé : la page dit « Fiche retirée par son propriétaire »", async () => {
+  it("sans front buildé : la page dit « Fiche retirée », au gabarit du site", async () => {
     const ctx = setup();
     await hidden(ctx);
     const page = await ctx.app.request("/c/CardAAAA01");
     expect(page.status).toBe(410);
     const html = await page.text();
-    expect(html).toContain("Fiche retirée par son propriétaire.");
+    expect(html).toContain("<h1>Fiche retirée</h1>");
     expect(html).toContain("og:title");
     expect(html).not.toContain("og:image");
   });

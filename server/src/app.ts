@@ -11,11 +11,11 @@ import { z } from "zod";
 import { FIXTURES } from "../../shared/fixtures";
 import { fileOf, piecesOf } from "../../shared/caseFile";
 import { publicView } from "../../shared/publicView";
-import { isUpcomingPath } from "../../shared/routes";
+import { isSitePage, isUpcomingPath } from "../../shared/routes";
 import type { CardData, ComparisonData, ErrorCode, Fact, JobState, Lang } from "../../shared/types";
 import { stripToken, type CardRow, type Store } from "./db";
 import { buildLead, clientEventSchema, sendLead } from "./events";
-import { genericMeta, HOME_IMAGE_PATH, injectHomeImage, injectMeta, messagePage, metaFor, standalonePage } from "./html";
+import { genericMeta, HOME_IMAGE_PATH, injectHomeImage, injectMeta, langOfRequest, messagePage, metaFor, siteStylesheets, standalonePage, type MessageKey } from "./html";
 import { ID_RE, MAX_PDF_BYTES, MESSAGES, Pipeline, type Deps, type RenderInput } from "./pipeline";
 import { CARDS_PER_BROWSER, CARDS_PER_DAY, RateLimiter, browserId, clientIp } from "./ratelimit";
 import { inlineAvatar, mountLinkedin, removeAvatars, type LinkedinConfig } from "./linkedin";
@@ -267,6 +267,24 @@ export function createApp(opts: AppOptions) {
     fetchImpl,
     removeImages: (ids) => removeImages(ogDir, ids),
   });
+
+  /** Le index.html du front, s'il est là. */
+  const siteTemplate = async (): Promise<string | null> => (opts.indexHtml ? await opts.indexHtml().catch(() => null) : null);
+
+  /** Une page de message servie sans le site (html.ts) : la langue du navigateur, les polices du front. */
+  const serverPage = async (c: Context, key: MessageKey): Promise<string> =>
+    messagePage(key, langOfRequest(c.req.header("accept-language")), siteStylesheets(await siteTemplate()));
+
+  /**
+   * Page introuvable, en 404 : le front, qui dessine la sienne (et la fiche, la
+   * bande ou la prime inconnue), sinon la page de message du serveur.
+   */
+  const pageNotFound = async (c: Context): Promise<Response> => {
+    const template = await siteTemplate();
+    c.header("Cache-Control", "no-cache");
+    if (template) return c.html(injectHomeImage(template, baseUrl), 404);
+    return c.html(await serverPage(c, "pageNotFound"), 404);
+  };
 
   /** Login masqué par son propriétaire, vu par quelqu'un d'autre que lui (§18.1). */
   const hiddenFrom = (c: Context, login: string | null | undefined): boolean => {
@@ -614,11 +632,9 @@ export function createApp(opts: AppOptions) {
   // Le lien GET ne vaut que par son jeton : un cookie de session part aussi sur un simple clic venu d'ailleurs.
   app.get("/api/card/:id/delete", async (c) => {
     const r = await deleteCard(c);
-    if (r.status === 200)
-      return c.html(messagePage("Ta fiche et ses images sont supprimées.", "Your sheet and its images are deleted."));
-    if (r.status === 403)
-      return c.html(messagePage("Ce lien de suppression n'est pas valide.", "This deletion link is not valid."), 403);
-    return c.html(messagePage(MESSAGES.not_found.fr, MESSAGES.not_found.en), 404);
+    const key = r.status === 200 ? "deleted" : r.status === 403 ? "badDeleteLink" : "cardNotFound";
+    c.header("Cache-Control", "no-store");
+    return c.html(await serverPage(c, key), r.status);
   });
 
   // POST /api/event : mesure sans outil d'analytics (§16).
@@ -730,7 +746,7 @@ export function createApp(opts: AppOptions) {
       // tous, sauf le propriétaire, à qui le front montre la fiche et le bandeau.
       const generic = genericMeta(baseUrl, `/c/${id}`);
       const mine = !hiddenFrom(c, login);
-      const page = template ?? messagePage(MESSAGES.withdrawn.fr, MESSAGES.withdrawn.en);
+      const page = template ?? messagePage("withdrawn", langOfRequest(c.req.header("accept-language")));
       c.header("Cache-Control", "private, no-store");
       return c.html(injectMeta(page, generic), mine ? 200 : 410);
     }
@@ -789,9 +805,13 @@ export function createApp(opts: AppOptions) {
     return c.redirect(`/${new URL(c.req.url).search}`, 302);
   });
 
+  // Une adresse inconnue : du JSON sous /api, un 404 nu pour un fichier (image,
+  // script), sinon la page introuvable du site, en 404 pour les robots.
   app.notFound((c) => {
-    if (c.req.path.startsWith("/api/")) return c.json({ ok: false, message: MESSAGES.not_found }, 404);
-    return c.text("Not found", 404);
+    const p = c.req.path;
+    if (p.startsWith("/api/")) return c.json({ ok: false, message: MESSAGES.not_found }, 404);
+    if (/^\/(og|avatar|assets|3d|auth)\//.test(p) || /\.[A-Za-z0-9]{1,8}$/.test(p)) return c.text("Not found", 404);
+    return pageNotFound(c);
   });
 
   // Prod : front statique, puis repli SPA sur index.html hors /api, /og, /c.
@@ -826,6 +846,8 @@ export function createApp(opts: AppOptions) {
     app.get("*", async (c) => {
       const p = c.req.path;
       if (/^\/(api|og|c|auth|avatar)\//.test(p)) return c.notFound();
+      // Une adresse que le front ne sait pas afficher : sa page introuvable, en 404.
+      if (!isSitePage(p)) return pageNotFound(c);
       return (await frontPage(c)) ?? c.notFound();
     });
   }
