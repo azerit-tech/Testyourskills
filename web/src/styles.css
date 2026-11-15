@@ -2860,13 +2860,13 @@ button.cover-panel:focus-visible {
   }
 }
 
-/* « Fais la tienne » : la carte marine du visiteur */
+/* « À ton tour » : la carte prune du visiteur, une action comme « Partage-la » (§18.52) */
 .you {
   display: grid;
   gap: 10px;
   padding: var(--pad-block);
   border-radius: var(--r-block);
-  background: var(--s-info);
+  background: var(--s-call);
 }
 .you h2 {
   font: var(--font-block);
@@ -2963,7 +2963,7 @@ button.cover-panel:focus-visible {
   gap: 10px;
   padding: var(--pad-block);
   border-radius: var(--r-block);
-  background: var(--s-item);
+  background: var(--s-info);
 }
 .after-head:empty {
   display: none;
@@ -3057,8 +3057,8 @@ button.cover-panel:focus-visible {
 /* partage (classes « out » : les bloqueurs masquent les « share ») : un bouton rose (« Partager » sur téléphone,
    LinkedIn ailleurs), LinkedIn en contour quand il passe second, le reste en liens */
 /* Le sens des couleurs sous la fiche : prune pour les deux blocs qui servent le partage (« Partage-la »,
-   « Dénoncer »), marine pour ce qui informe (bandes, primes, critères, duel, source à ajouter, recrutement),
-   la troisième surface pour le verdict et les plis. Jamais deux prunes à la suite : sans bloc des bandes
+   « Dénoncer », et « À ton tour » du visiteur), marine pour ce qui informe (verdict, bandes, primes, critères,
+   duel, source à ajouter, recrutement, plis) : deux couleurs de bloc, pas trois (§18.52). Jamais deux prunes à la suite : sans bloc des bandes
    entre eux, « Dénoncer » passe en marine. */
 .out {
   background: var(--s-call);
@@ -3278,12 +3278,12 @@ a.dossier-item:hover {
   color: var(--cream);
 }
 
-/* « Le reste » (§18.27) : des lignes de 52 px sur un aplat relevé, chacune s'ouvre sur place */
+/* « Le reste » (§18.27) : des lignes de 52 px sur le marine de ce qui informe, chacune s'ouvre sur place */
 .rest {
   display: grid;
   overflow: hidden;
   border-radius: var(--r-block);
-  background: var(--s-item);
+  background: var(--s-info);
 }
 .rest:empty {
   display: none;
