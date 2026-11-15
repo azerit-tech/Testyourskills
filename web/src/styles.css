@@ -2935,12 +2935,68 @@ a.dossier-item:hover {
   font-size: var(--t-16);
   color: var(--c-text);
 }
-/* Le filet (ErrorBoundary) : seul à l'écran, centré, sur l'encre. */
+/* --- la page d'erreur (components/ErrorPage.tsx) : une seule mise en page pour une fiche,
+   une bande, une prime ou une adresse inconnue, et pour le serveur qui ne répond pas.
+   La case « place libre » de la couverture dans son cadre, un tampon incliné, le titre à
+   la taille d'un bloc, la sortie en bouton pleine largeur, un lien d'appoint dessous. --- */
+.page-error {
+  display: grid;
+  align-content: center;
+  padding: 32px var(--gutter) 64px;
+}
+.err {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
+  text-align: center;
+}
+.err-frame {
+  position: relative;
+  width: 172px;
+  aspect-ratio: 172 / 200;
+  margin-bottom: 12px;
+  border: 6px solid var(--cover-frame);
+  border-radius: 6px;
+  background: var(--cover-frame);
+}
+.err-frame .cover-face {
+  border-radius: 3px;
+}
+/* le tampon : en travers du haut du mur, au-dessus de la silhouette */
+.err-stamp {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  top: 7%;
+  padding: 3px 10px 4px;
+  border: 2.5px solid currentColor;
+  border-radius: 3px;
+  font: 700 var(--t-22) / 1 var(--f-name);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--siren);
+  transform: translateX(-50%) rotate(-7deg);
+}
+/* injoignable, interrompu : le mur passe au pêche, la personne existe peut-être */
+.err-frame:has(.err-stamp.is-down, .err-stamp.is-crash) .cover-face {
+  --tint: var(--c-reserve);
+}
+.err-text {
+  font: var(--font-body);
+  color: var(--c-text);
+  text-wrap: pretty;
+}
+.err-action {
+  width: 100%;
+  margin-top: 8px;
+}
+/* Le filet (ErrorBoundary) : seul à l'écran, sans barre ni pied de page, sur l'encre. */
 .crash {
   min-height: 100svh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   background: var(--s-page);
 }
 .deleted-msg {

@@ -1,9 +1,10 @@
 // Le filet (§18.27) : un morceau du site qui ne se charge pas (réseau coupé,
 // déploiement entre deux pages) ne laisse plus un écran blanc.
-// Sans `fallback`, l'écran « Recharger » ; avec, ce repli (ex. `null` pour la
+// Sans `fallback`, l'écran « Recharger » (la mise en page d'erreur commune) ; avec, ce repli (ex. `null` pour la
 // scène 3D, dont l'échec fait sortir la fiche sans révélation via `onError`).
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { useT } from "../i18n";
+import { ErrorPanel } from "./ErrorPage";
 
 interface Props {
   children: ReactNode;
@@ -35,18 +36,12 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 }
 
-/** L'écran de repli : une phrase et « Recharger ». */
+/** L'écran de repli : la mise en page d'erreur du site, tampon « Interrompu », et « Recharger ». */
 export function Crash() {
   const { t } = useT();
   return (
-    <main className="page crash" id="main">
-      <div className="panel-center">
-        <h1>{t.crash.title}</h1>
-        <p>{t.crash.text}</p>
-        <button type="button" className="pill" onClick={() => window.location.reload()}>
-          {t.crash.reload}
-        </button>
-      </div>
+    <main className="page page-error crash" id="main">
+      <ErrorPanel stamp="crash" title={t.crash.title} text={t.crash.text} action={{ label: t.crash.reload, onClick: () => window.location.reload() }} />
     </main>
   );
 }

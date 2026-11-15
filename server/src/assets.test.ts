@@ -70,7 +70,7 @@ describe("préchargement des pages du front", () => {
     expect(pageModule("/primes", 200)).toBe("src/pages/Primes.tsx");
     expect(pageModule("/reglement", 200)).toBe("src/pages/Rules.tsx");
     expect(pageModule("/privacy", 200)).toBe("src/pages/Privacy.tsx");
-    expect(pageModule("/nimporte/quoi", 404)).toBe("src/pages/Privacy.tsx");
+    expect(pageModule("/nimporte/quoi", 404)).toBeNull();
     expect(pageModule("/torvalds", 200)).toBe("src/pages/Home.tsx");
   });
 

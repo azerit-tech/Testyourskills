@@ -10,6 +10,7 @@ import { frTypoDeep } from "../../shared/typo";
 import { HOME_PROMISE, heroSentence, homeTitle } from "../../shared/promise";
 import { BANDS_TEXT } from "./bandsText";
 import { PRIMES_TEXT } from "./primesText";
+import { PAGES_TEXT } from "./pagesText";
 
 /** L'adresse de contact de la page Confidentialité, aussi le repli d'une demande de retrait. */
 export const CONTACT_EMAIL = "hello@azerit.tech";
@@ -735,6 +736,8 @@ const fr = frTypoDeep({
   bands: BANDS_TEXT.fr,
   /* les primes (§18.4, §18.5) : primesText.ts */
   primes: PRIMES_TEXT.fr,
+  /* les pages autour de la fiche (erreurs, vie privée, retrait) : pagesText.ts */
+  pages: PAGES_TEXT.fr,
   errors: {
     title: "Pas de fiche cette fois",
     retry: "Réessayer",
@@ -1454,6 +1457,7 @@ const en: Dict = {
   },
   bands: BANDS_TEXT.en,
   primes: PRIMES_TEXT.en,
+  pages: PAGES_TEXT.en,
   errors: {
     title: "No sheet this time",
     retry: "Try again",

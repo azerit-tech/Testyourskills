@@ -2,6 +2,7 @@
 import { lazy, Suspense, useEffect } from "react";
 import { Footer, SeasonBand, SkipLink, TopBar } from "./components/Chrome";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { NotFound } from "./components/ErrorPage";
 import { LangProvider } from "./i18n";
 import { isMock } from "./lib/api";
 import { navigate, routeOf, usePath } from "./lib/router";
@@ -18,7 +19,6 @@ const PrimesList = lazy(() => import("./pages/Primes").then((m) => ({ default: m
 const PrimePage = lazy(() => import("./pages/Primes").then((m) => ({ default: m.PrimePage })));
 const Rules = lazy(() => import("./pages/Rules").then((m) => ({ default: m.Rules })));
 const Privacy = lazy(() => import("./pages/Privacy").then((m) => ({ default: m.Privacy })));
-const NotFound = lazy(() => import("./pages/Privacy").then((m) => ({ default: m.NotFound })));
 
 /** Mode démo uniquement : aperçu du site dans des cadres de téléphone (360 et 390 px). */
 function Devices() {

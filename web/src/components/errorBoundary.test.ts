@@ -32,7 +32,9 @@ describe("ErrorBoundary", () => {
       vi.stubGlobal("localStorage", { getItem: () => lang, setItem: () => undefined });
       const html = renderToStaticMarkup(createElement(LangProvider, null, createElement(Crash)));
       expect(html).toContain(title);
-      expect(html).toContain(`<button type="button" class="pill">${button}</button>`);
+      expect(html).toContain(`<button type="button" class="btn-primary err-action">${button}</button>`);
+      // la mise en page d'erreur commune : la toise, le tampon « Interrompu »
+      expect(html).toContain(`class="err-stamp is-crash"`);
     }
   });
 
