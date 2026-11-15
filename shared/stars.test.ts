@@ -24,7 +24,7 @@ describe("six étoiles", () => {
   it("six libellés épicènes, en français et en anglais", () => {
     expect(Object.keys(LEVEL_LABELS)).toHaveLength(6);
     expect(LEVEL_LABELS[1]).toEqual({ fr: "Petit délit", en: "Petty crime" });
-    expect(LEVEL_LABELS[3]).toEqual({ fr: "Avis de recherche", en: "Wanted" });
+    expect(LEVEL_LABELS[3]).toEqual({ fr: "Mandat d'arrêt", en: "Warrant out" });
     expect(LEVEL_LABELS[6]).toEqual({ fr: "Priorité absolue", en: "Top priority" });
   });
 

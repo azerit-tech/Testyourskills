@@ -138,11 +138,11 @@ export const THEMES: Record<ThemeKey, CardTheme> = {
     grad: "bg", bg: [PALETTE.navy, PALETTE.navyLow], bar: PALETTE.blush, palm: "#2c3a60",
     horizon: { color: "#2b385c", scale: 0.7, palms: 1 },
   }),
-  s3: theme("s3", { fr: "Avis de recherche", en: "Wanted" }, {
+  s3: theme("s3", { fr: "Mandat d'arrêt", en: "Warrant out" }, {
     grad: "bg", bg: [PALETTE.plum, PALETTE.plumLow], bar: PALETTE.blush, palm: "#3a2442",
     horizon: { color: "#4a2e55", scale: 0.85, palms: 2 },
   }),
-  s4: theme("s4", { fr: "Haute surveillance", en: "High surveillance" }, {
+  s4: theme("s4", { fr: "Haute surveillance", en: "Under surveillance" }, {
     grad: "num", bg: [PALETTE.plum, PALETTE.plum], bar: PALETTE.peach, palm: "#5a3a64", accent2: PALETTE.duskC,
     horizon: { color: "#5a3a64", scale: 1, palms: 3 },
   }),
