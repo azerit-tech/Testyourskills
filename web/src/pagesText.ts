@@ -52,8 +52,8 @@ const fr = {
   },
   /** Une demande de retrait partie : un accusé qui a une forme. */
   removal: {
-    doneTitle: "Demande envoyée",
-    doneText: "On vérifie, on retire la fiche et on te répond à cette adresse.",
+    doneTitle: "Demande reçue",
+    doneText: "On vérifie, on retire la fiche et on te répond par email.",
   },
   /** La vie privée : un résumé en tête, puis des sections courtes (paragraphes et listes). */
   privacy: {
@@ -222,8 +222,8 @@ const en: PagesDict = {
     },
   },
   removal: {
-    doneTitle: "Request sent",
-    doneText: "We check, remove the sheet and reply to that address.",
+    doneTitle: "Request received",
+    doneText: "We check, remove the sheet and reply by email.",
   },
   privacy: {
     summaryTitle: "In four lines",
