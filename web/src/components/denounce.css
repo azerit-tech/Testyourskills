@@ -44,7 +44,7 @@
   flex: none;
   border-radius: 50%;
   background: #1f1f38;
-  font: 700 16px/1 var(--f-name);
+  font: 700 var(--t-16) / 1 var(--f-name);
   font-style: normal;
   color: var(--cream);
 }
