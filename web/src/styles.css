@@ -1110,6 +1110,10 @@ button.cover-panel:focus-visible {
 .home-last .entry {
   margin-top: 0;
 }
+/* entre le téléphone et le bureau, un formulaire ne s'étire pas sur toute la page */
+.page-home .entry {
+  max-width: var(--w-form);
+}
 @media (min-width: 900px) {
   .page-home {
     --home-gap: 88px;
