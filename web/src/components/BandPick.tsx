@@ -3,13 +3,13 @@
 // y entrer (pastille proposée, recherche d'école, nom de boîte), puis la ligne
 // « Tu rapportes ★★★★ à … 3e des écoles, à 6 étoiles de la 2e. » et son
 // partage. Rien ne s'affiche si la fiche n'y a pas droit (dénoncée, pas à elle).
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import type { BandRef, BandStanding, BandType, MyBands } from "../../../shared/bands";
 import { BAND_TYPES, bandPath, COMPANY_INPUT_MAX, searchSchools } from "../../../shared/bands";
 import { pick, useT } from "../i18n";
 import { api } from "../lib/api";
-import { bandHint, bandsApi, bandUrl, filledStars, suggestedPills } from "../lib/bands";
+import { bandHint, bandsApi, bandUrl, filledStars, suggestedPills, takeBandJoin } from "../lib/bands";
 import { onLinkClick } from "../lib/router";
 import { hasNativeShare } from "../lib/sharing";
 import { copyText, isTouch } from "../lib/util";
@@ -54,10 +54,28 @@ export function BandPick({ cardId, toast }: { cardId: string; toast: Toast }) {
   const uid = useId().replace(/:/g, "");
   const [mb, setMb] = useState<MyBands | null>(null);
   const [hint] = useState(() => bandHint());
+  const say = useRef({ toast, landed: t.bands.states.landed });
+  say.current = { toast, landed: t.bands.states.landed };
 
   useEffect(() => {
     let alive = true;
-    void bandsApi.mine(cardId).then((v) => alive && setMb(v));
+    void (async () => {
+      const mine = await bandsApi.mine(cardId);
+      if (!alive) return;
+      setMb(mine);
+      if (!mine) return;
+      // La bande choisie sur sa page avant de faire la fiche (SPEC §18.48) : la fiche posée, elle y entre.
+      const pending = takeBandJoin(cardId);
+      if (!pending || mine[pending.type]) return;
+      try {
+        const next = await bandsApi.join(cardId, pending.type, { id: pending.id, name: pending.label });
+        if (!alive) return;
+        setMb(next);
+        say.current.toast(say.current.landed(pending.label));
+      } catch {
+        /* refusée (quota, bande fermée) : sa pastille reste en tête, un toucher suffit */
+      }
+    })();
     return () => {
       alive = false;
     };
@@ -150,7 +168,7 @@ function League({ type, cardId, mb, hint, onChange, toast }: LeagueProps) {
             type={type === "ecole" ? "search" : "text"}
             autoComplete={type === "ecole" ? "off" : "organization"}
             maxLength={COMPANY_INPUT_MAX}
-            placeholder={type === "ecole" ? p.schoolPlaceholder : p.companyPlaceholder}
+            placeholder={type === "ecole" ? p.schoolLabel : p.companyLabel}
             value={value}
             onChange={(e) => {
               setValue(e.target.value);
@@ -161,8 +179,9 @@ function League({ type, cardId, mb, hint, onChange, toast }: LeagueProps) {
             aria-controls={type === "ecole" ? `${uid}-list` : undefined}
           />
         </div>
-        {type === "boite" && (
-          <button type="submit" className="pill" disabled={busy || !value.trim()}>
+        {/* le bouton ne vient qu'avec un nom tapé : une pastille proposée se touche directement */}
+        {type === "boite" && value.trim() && (
+          <button type="submit" className="pill" disabled={busy}>
             {p.join}
           </button>
         )}
@@ -229,11 +248,12 @@ function Joined({ b, stars, head, busy, error, native, onLeave, onShare }: Joine
       </p>
       {!b.hasPage && <p className="bp-nopage">{p.noPage}</p>}
       <div className="bp-actions">
+        {/* secondaire : le seul bouton principal de l'écran reste le partage de la fiche */}
         <button type="button" className="pill" onClick={() => onShare(text)} aria-label={p.shareLabel(b.label)}>
           {native ? <IconShare /> : <IconLinkedIn />}
-          {p.share}
+          {t.bands.page.share}
         </button>
-        <button type="button" className="link-alt" disabled={busy} onClick={onLeave} aria-label={p.leaveLabel(b.label)}>
+        <button type="button" className="link-quiet bp-leave" disabled={busy} onClick={onLeave} aria-label={p.leaveLabel(b.label)}>
           {p.leave}
         </button>
       </div>
