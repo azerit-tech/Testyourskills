@@ -1935,6 +1935,8 @@ button.cover-panel:focus-visible {
   flex-direction: column;
   gap: 16px;
   padding: max(20px, env(safe-area-inset-top)) var(--gutter) max(16px, env(safe-area-inset-bottom));
+  /* un seul groupe centré : la photo, le pari, la pile, puis la barre et sa ligne juste dessous */
+  justify-content: safe center;
   background: var(--s-page);
   overflow: hidden;
   /* un glissement du doigt ne fait pas défiler la page restée dessous */
@@ -1947,7 +1949,7 @@ button.cover-panel:focus-visible {
   transition: opacity 0.26s ease-out;
 }
 .load-main {
-  flex: 1;
+  flex: 0 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -2056,7 +2058,9 @@ button.cover-panel:focus-visible {
   gap: 8px;
   width: 100%;
   max-width: var(--w-form);
-  margin: 0 auto;
+  /* remonte dans le blanc réservé sous la pile : la rangée du bouton (52 px) ne laisse plus un
+     trou entre la pièce et la barre, et le bouton qui la remplace ne touche pas une pièce de deux lignes */
+  margin: -32px auto 0;
   background: var(--s-page);
 }
 /* la barre se pose au bas de sa rangée, juste au-dessus de la ligne */
@@ -2081,7 +2085,8 @@ button.cover-panel:focus-visible {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  animation: line-in 0.4s var(--ease-out);
+  /* une ligne nouvelle apparaît sur place, sans glisser : rien ne bouge sous la barre */
+  animation: fade-in 0.4s var(--ease-out);
 }
 /* le commissariat ne répond pas : la ligne passe en crème, une phrase par rang ;
    la feuille vierge cesse de respirer, rien ne fait croire que ça avance */
@@ -2180,6 +2185,16 @@ button.cover-panel:focus-visible {
   font: 500 var(--t-22) / 1.2 var(--f-text);
   color: var(--c-text);
   text-wrap: balance;
+}
+/* un nom de dépôt (« todo-app-v3 ») : d'un seul tenant, jamais coupé à son trait d'union ;
+   trop long pour la ligne, il finit en points de suspension */
+.piece-ident {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
 }
 /* le chiffre clé d'une pièce : l'emphase, crème en gras */
 .finding-key {

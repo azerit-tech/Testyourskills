@@ -25,10 +25,9 @@
 // ne répond pas, et « Réessayer » prend la place de la barre. Il ne fait que
 // relire l'état de la fiche (`onRetry`), jamais une nouvelle demande.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { Finding, ProgressEvent } from "../../../shared/types";
-import { useT } from "../i18n";
+import type { Finding, Lang, ProgressEvent } from "../../../shared/types";
+import { pick, useT } from "../i18n";
 import { AzeritMark } from "./Brand";
-import { FindingText } from "./Findings";
 import { Mugshot } from "./Mugshot";
 import { PleaPrompt } from "./Plea";
 
@@ -86,6 +85,37 @@ interface WaitingProps {
 }
 
 const idOf = (f: Finding) => `${f.source}:${f.kind}`;
+
+/** Un nom de dépôt ou de lien (« todo-app-v3 », « org/repo ») : un seul mot, jamais coupé à son trait d'union. */
+const IDENT = /([\p{L}\p{N}]+(?:[-_/.][\p{L}\p{N}]+)+)/u;
+
+/** Les noms d'un morceau de phrase, chacun d'un seul tenant (points de suspension s'il déborde). */
+function words(text: string, k: string) {
+  return text.split(IDENT).map((part, i) =>
+    i % 2 ? (
+      <span className="piece-ident" key={`${k}${i}`}>
+        {part}
+      </span>
+    ) : (
+      part
+    ),
+  );
+}
+
+/** La phrase d'une pièce, son chiffre clé en avant (comme FindingText), ses noms d'un seul tenant. */
+function PieceText({ finding, lang }: { finding: Finding; lang: Lang }) {
+  const text = pick(finding.text, lang);
+  const key = finding.key ? pick(finding.key, lang) : "";
+  const i = key ? text.indexOf(key) : -1;
+  if (i < 0) return <>{words(text, "t")}</>;
+  return (
+    <>
+      {words(text.slice(0, i), "a")}
+      <strong className="finding-key">{key}</strong>
+      {words(text.slice(i + key.length), "b")}
+    </>
+  );
+}
 
 export function Waiting({ cardId, progress, startedAt, queue, findings = [], login, avatarUrl, slug, cv = false, name, initials, createdAt, plea = false, ready = false, onRelease, scene, onOpen, leaving = false, offline = false, onRetry }: WaitingProps) {
   const { t, lang } = useT();
@@ -185,10 +215,11 @@ export function Waiting({ cardId, progress, startedAt, queue, findings = [], log
   // En file d'attente, une seule ligne : combien passent avant toi.
   const queued = queue !== undefined && queue > 0;
   const queueLine: Line | undefined = queued ? { uid: -(queue ?? 1), key: "queue" } : undefined;
-  // Le film se prépare : c'est la seule chose qui reste à dire, jusqu'au fondu compris.
+  // Le film se prépare : c'est la seule chose qui reste à dire, jusqu'au fondu compris. Une fois
+  // dite, la ligne ne revient jamais à une étape d'avant (elle ne recule pas avant le film).
   const sceneSaid = useRef(false);
   if (scene === "loading") sceneSaid.current = true;
-  const sceneOn = scene === "loading" || (leaving && sceneSaid.current);
+  const sceneOn = scene === "loading" || sceneSaid.current;
   const sceneLine: Line | undefined = sceneOn ? { uid: -1000, key: "scene" } : undefined;
   // Réseau coupé pendant la préparation : le commissariat ne répond pas.
   const offLine: Line | undefined = offline && !ready ? { uid: -2000, key: "offline" } : undefined;
@@ -259,11 +290,12 @@ export function Waiting({ cardId, progress, startedAt, queue, findings = [], log
               <article className="piece" key={idOf(piece)}>
                 <p className="piece-no">{t.waiting.piece(pieces.length)}</p>
                 <p className="piece-text">
-                  <FindingText finding={piece} lang={lang} />
+                  <PieceText finding={piece} lang={lang} />
                 </p>
               </article>
             ) : (
-              <article className="piece is-blank">
+              // Fiche prête sans pièce (servie du cache) : pas de feuille vierge qui promet une pièce à venir.
+              !ready && <article className="piece is-blank">
                 <p className="piece-no">{t.waiting.piece(1)}</p>
                 <span className="piece-skel" />
                 <span className="piece-skel is-short" />
@@ -281,7 +313,7 @@ export function Waiting({ cardId, progress, startedAt, queue, findings = [], log
         </p>
         {/* Une seule annonce à la fois pour les lecteurs d'écran. */}
         <p className="sr-only" aria-live="polite">
-          {offLine ? t.waiting.offline : sceneLine ? t.waiting.scene : piece ? `${t.waiting.piece(pieces.length)} : ${piece.text[lang]}` : current ? lineText(current) : ""}
+          {offLine ? t.waiting.offline : sceneLine ? t.waiting.scene : piece ? `${t.waiting.piece(pieces.length)}${lang === "fr" ? "\u00a0: " : ": "}${piece.text[lang]}` : current ? lineText(current) : ""}
         </p>
       </div>
     </section>
