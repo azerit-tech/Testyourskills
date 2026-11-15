@@ -3756,6 +3756,8 @@ a.dossier-item:hover {
 a.rg-src {
   display: inline-flex;
   align-items: center;
+  /* la flèche du lien ne colle pas au texte (l'espace d'un élément flex ne compte pas) */
+  gap: 6px;
   min-height: var(--h-tap);
   margin: -12px 0 -10px;
   color: var(--c-action);
