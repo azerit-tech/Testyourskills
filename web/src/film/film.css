@@ -237,15 +237,23 @@
   stroke: none;
 }
 .film-band-bottom {
+  /* 12 % de l'image ; sur un téléphone court (320 × 568), jusqu'à 84 px sans
+     passer les 15 % que l'image laisse libres : 28 px de radio au-dessus des boutons */
+  --band-b: 12cqh;
   bottom: 0;
-  height: calc(12cqh + env(safe-area-inset-bottom, 0px));
+  height: calc(var(--band-b) + env(safe-area-inset-bottom, 0px));
+}
+@media (max-width: 999px) {
+  .film-band-bottom {
+    --band-b: max(12cqh, min(86px, 15cqh));
+  }
 }
 /* la radio : une seule ligne, coupée au-delà de 360 px, centrée dans la bande
    entre l'image et les boutons (--radio-zone : la bande sans les boutons ; au
    bureau, les boutons sortent de la colonne, la bande entière) ; le chef
    d'accusation porte son étiquette au-dessus, en petit */
 .film-band-bottom {
-  --radio-zone: max(28px, calc(12cqh - 56px));
+  --radio-zone: max(28px, calc(var(--band-b) - 56px));
 }
 .film-radio {
   position: absolute;
@@ -284,6 +292,21 @@
   font: 500 12px/14px var(--f-mono);
   letter-spacing: 0.08em;
   color: rgb(255 249 203 / 0.62);
+}
+/* téléphone dont le film fait 700 px de haut ou moins (320 × 568, 375 × 667,
+   paysage) : la radio et son étiquette tiennent en 28 px, au-dessus des boutons */
+@media (max-width: 999px) {
+  @container (max-height: 700px) {
+    .film-radio {
+      gap: 1px;
+      font-size: 12px;
+      line-height: 15px;
+    }
+    .film-radio-kicker {
+      font-size: 11px;
+      line-height: 12px;
+    }
+  }
 }
 .film-square {
   flex: none;
