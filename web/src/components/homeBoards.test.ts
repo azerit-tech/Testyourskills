@@ -10,7 +10,7 @@ import { LangProvider } from "../i18n";
 import { BackLine } from "../pages/Home";
 import { BandsTopView } from "./BandsTop";
 import { Cover } from "./Cover";
-import { WeekBoardView } from "./WeekBoard";
+import { WeekBoard, WeekBoardView } from "./WeekBoard";
 
 function render(el: ReactElement, language = "fr-FR"): string {
   vi.stubGlobal("localStorage", { getItem: () => null, setItem: () => undefined });
@@ -54,6 +54,17 @@ describe("le top de la semaine sur l'accueil", () => {
     const html = board(7);
     expect(count(html, 'class="board-row"')).toBe(7);
     expect(html).toContain("is-rest");
+  });
+});
+
+describe("le top de la semaine avant la réponse du serveur", () => {
+  it("le titre, l'ancre et la place du top 5 sont là dès le premier rendu", () => {
+    const html = render(createElement(WeekBoard, { onPlay: () => undefined }));
+    expect(html).toContain('<section class="board" id="semaine"');
+    expect(html).toContain('aria-busy="true"');
+    expect(html).toContain("Top de la semaine");
+    expect(count(html, "board-wait")).toBe(1);
+    expect(html).not.toContain("board-row");
   });
 });
 

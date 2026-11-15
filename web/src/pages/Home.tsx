@@ -32,8 +32,9 @@ import { clearPending, myCard, pendingFile, type MyCard } from "../lib/session";
 /** Au-delà, le top est tenu pour absent : la couverture ne garde pas ses cases prunes. */
 const TOP_WAIT_MS = 3000;
 
-/** La maquette, tant que le serveur n'a pas jugé la vitrine. */
-const SHOWCASE_MOCKUP: Showcase = { card: FIXTURES.jmougeot, href: `/${FIXTURES.jmougeot.login ?? "jmougeot"}` };
+/** La maquette, tant que le serveur n'a pas jugé la vitrine. Avec ses deux pièces, comme la
+ * vraie (§18.35) : la légende a ses deux lignes dès le premier rendu, rien ne saute dessous. */
+const SHOWCASE_MOCKUP: Showcase = { card: FIXTURES.jmougeot, href: `/${FIXTURES.jmougeot.login ?? "jmougeot"}`, pieces: ["linkedin", "github"] };
 
 /** La fiche de Jacques : la maquette d'abord, la vraie dès que le serveur l'a. */
 function useShowcase(): Showcase {

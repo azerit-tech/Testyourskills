@@ -119,6 +119,10 @@
 .primes-row > li {
   scroll-snap-align: start;
 }
+/* la liste arrive : une case vide de la hauteur d'une prime tient la rangée */
+.prime-card-wait {
+  min-height: 152px;
+}
 .primes-strip > .link-alt {
   justify-self: start;
   margin-left: var(--gutter);

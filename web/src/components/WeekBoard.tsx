@@ -85,15 +85,37 @@ function Empty({ onPlay }: { onPlay: () => void }) {
   );
 }
 
+/** Tant que le top n'a pas répondu : le titre et la place du top 5, pour que rien ne saute dessous. */
+function Wait() {
+  const { t } = useT();
+  const tt = t.home.top;
+  return (
+    <section className="board" id={WEEK_ANCHOR} aria-labelledby="board-title" aria-busy="true">
+      <h2 id="board-title">{tt.title}</h2>
+      <p className="board-meta" aria-hidden>
+        {"\u00a0"}
+      </p>
+      <div className="board-top">
+        <p className="board-tag">{tt.cut}</p>
+        <div className="board-list is-top board-wait" />
+      </div>
+    </section>
+  );
+}
+
 export function WeekBoard({ onPlay }: { onPlay: () => void }) {
-  const [top, setTop] = useState<WeekTop | null>(null);
+  // `undefined` : pas encore répondu (la place est tenue) ; `null` : le serveur ne répond pas (rien).
+  const [top, setTop] = useState<WeekTop | null | undefined>(undefined);
   const now = useMinute();
 
   // Chargé à l'ouverture, puis de nouveau quand la semaine tourne.
-  const ended = top !== null && now >= top.endsAt;
+  const ended = !!top && now >= top.endsAt;
   useEffect(() => {
     let alive = true;
-    void api.getTop().then((t) => alive && setTop(t));
+    api
+      .getTop()
+      .then((t) => alive && setTop(t))
+      .catch(() => alive && setTop((cur) => cur ?? null));
     return () => {
       alive = false;
     };
@@ -102,6 +124,7 @@ export function WeekBoard({ onPlay }: { onPlay: () => void }) {
   // La fiche en mémoire, lue une fois : sa ligne est mise en évidence.
   const [mine] = useState(() => myCard());
 
+  if (top === undefined) return <Wait />;
   if (!top) return null;
   return <WeekBoardView top={top} now={now} onPlay={onPlay} mine={mine} />;
 }

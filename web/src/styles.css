@@ -1521,6 +1521,10 @@ button.cover-panel:focus-visible {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+/* le top n'a pas encore répondu : la place du top 5 (cinq lignes de 52 px), vide */
+.board-wait {
+  min-height: 268px;
+}
 /* ma ligne (la fiche en mémoire) : sur l'aplat d'appel, le pseudo en crème et en gras */
 .board-row.is-me {
   background: var(--s-call);
