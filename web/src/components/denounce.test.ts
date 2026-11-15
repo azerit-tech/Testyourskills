@@ -20,13 +20,17 @@ describe("Dénoncer : la fiche du complice", () => {
     const html = renderToStaticMarkup(
       createElement(LangProvider, null, createElement(Wanted, { card, x: null, toast: () => undefined, onAgain: () => undefined })),
     );
-    expect(html).toContain(`>${six}</span>`);
+    // Le dessin commun du site (SPEC §18.48) : six formes, les allumées d'abord, plus de glyphes dans le titre.
+    const shapes = [...html.matchAll(/class="star-shape( on)?"/g)].map((m) => (m[1] ? "★" : "☆")).join("");
+    expect(shapes).toBe(six);
+    expect(html).toContain('class="stars stars-22"');
+    expect(html).not.toMatch(/[★☆]/);
     // Dossier vide, pas encore revendiqué : aucune étoile.
     const sealed = renderToStaticMarkup(
       createElement(LangProvider, null, createElement(Wanted, { card: { ...card, sealed: true }, x: null, toast: () => undefined, onAgain: () => undefined })),
     );
     expect(sealed).not.toMatch(/[★☆]/);
-    expect(sealed).not.toContain("denounce-stars");
+    expect(sealed).not.toContain("star-shape");
   });
 
   it("le texte partagé porte les six étoiles", () => {

@@ -14,6 +14,7 @@ import { onLinkClick } from "../lib/router";
 import { hasNativeShare } from "../lib/sharing";
 import { copyText, isTouch } from "../lib/util";
 import { IconLinkedIn, IconShare } from "./Icons";
+import { Stars } from "./Stars";
 import "./bands.css";
 
 type Toast = (m: string) => void;
@@ -213,9 +214,7 @@ function Joined({ b, stars, head, busy, error, native, onLeave, onShare }: Joine
       <p className="surtitre">{head}</p>
       <p className="bp-line">
         {p.line[0]}{" "}
-        <span className="bp-stars" role="img" aria-label={t.bands.score(stars)}>
-          {glyphs}
-        </span>{" "}
+        <Stars n={stars} total={stars} size={14} label={t.bands.score(stars)} />{" "}
         {p.line[1]}{" "}
         {href ? (
           <a href={href} onClick={(e) => onLinkClick(e, href)}>

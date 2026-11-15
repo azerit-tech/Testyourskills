@@ -4,15 +4,8 @@ import type { BandStanding } from "../../../shared/bands";
 import { bandPath } from "../../../shared/bands";
 import { useT } from "../i18n";
 import { onLinkClick } from "../lib/router";
+import { StarMark } from "./Stars";
 import "./bands.css";
-
-const STAR = "M12 2.6l2.9 6.1 6.7.8-4.9 4.6 1.3 6.6L12 17.4l-6 3.3 1.3-6.6L2.4 9.5l6.7-.8z";
-
-export const Star = ({ className }: { className?: string }) => (
-  <svg viewBox="0 0 24 24" className={className} aria-hidden>
-    <path d={STAR} />
-  </svg>
-);
 
 export function BandRow({ b }: { b: BandStanding }) {
   const { t } = useT();
@@ -26,7 +19,7 @@ export function BandRow({ b }: { b: BandStanding }) {
           <span className="band-count">{b.rank ? t.bands.dossiers(b.members) : `${t.bands.forming}, ${t.bands.dossiers(b.members)}`}</span>
         </span>
         <span className="band-score">
-          <Star />
+          <StarMark />
           {b.score}
         </span>
       </a>

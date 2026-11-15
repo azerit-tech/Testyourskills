@@ -15,6 +15,7 @@ import { onLinkClick } from "../lib/router";
 import { rememberDenounced } from "../lib/session";
 import { copyText, isTouch, parseLogin, shareUrl } from "../lib/util";
 import { IconLinkedIn, IconShare, IconX } from "./Icons";
+import { Stars } from "./Stars";
 import "./denounce.css";
 
 const POLL_MS = 700;
@@ -249,9 +250,7 @@ export function Wanted({ card, x, toast, onAgain }: { card: CardData; x: string 
         <span className="denounce-who-name">@{login}</span> {d.inSights}{" "}
         {!sealed && (
           <>
-            <span className="denounce-stars" role="img" aria-label={t.result.wantedStars(n, pick(LEVEL_LABELS[n], lang))}>
-              {stars}
-            </span>{" "}
+            <Stars n={n} size={22} label={t.result.wantedStars(n, pick(LEVEL_LABELS[n], lang))} />{" "}
           </>
         )}
         · {tag}

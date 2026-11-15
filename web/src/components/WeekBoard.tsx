@@ -7,23 +7,10 @@ import type { TopEntry, WeekTop } from "../../../shared/types";
 import { useT } from "../i18n";
 import { api } from "../lib/api";
 import { onLinkClick } from "../lib/router";
+import { Stars } from "./Stars";
 
 const SIZE = 10;
 const TOP = 5;
-const STAR = "M12 2.6l2.9 6.1 6.7.8-4.9 4.6 1.3 6.6L12 17.4l-6 3.3 1.3-6.6L2.4 9.5l6.7-.8z";
-
-/** Six étoiles comme sur la fiche : les allumées à droite, blanches et mates. */
-function Stars({ n }: { n: number }) {
-  return (
-    <span className="board-stars" aria-hidden>
-      {Array.from({ length: 6 }, (_, i) => (
-        <svg key={i} viewBox="0 0 24 24" className={i >= 6 - n ? "on" : undefined}>
-          <path d={STAR} />
-        </svg>
-      ))}
-    </span>
-  );
-}
 
 /** L'heure, relue chaque minute, pour le compte à rebours. */
 function useMinute(): number {
@@ -52,7 +39,7 @@ function Row({ e }: { e: TopEntry }) {
           )}
         </span>
         <span className="board-login">@{e.login}</span>
-        <Stars n={e.stars} />
+        <Stars n={e.stars} size={14} />
         <span className="board-score">{e.overall}</span>
       </a>
     </li>

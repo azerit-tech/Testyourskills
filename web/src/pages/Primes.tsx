@@ -11,7 +11,7 @@ import { EntryForm } from "../components/EntryForm";
 import { useToast } from "../components/After";
 import { IconLink, IconShare } from "../components/Icons";
 import { PrimeCard, PrimeMark, usePrimeWhen } from "../components/Primes";
-import { Star } from "../components/BandRow";
+import { Stars } from "../components/Stars";
 import { pick, useT } from "../i18n";
 import { api, ApiError } from "../lib/api";
 import { primesApi, type JoinBody } from "../lib/primes";
@@ -73,8 +73,6 @@ export function PrimesList() {
 
 /* ---------- /primes/:id ---------- */
 
-const STARS = 6;
-
 function Row({ r, me }: { r: BoardRow; me: boolean }) {
   const { t } = useT();
   const href = `/c/${r.cardId}`;
@@ -83,11 +81,7 @@ function Row({ r, me }: { r: BoardRow; me: boolean }) {
       <a className={`board-row prime-row${me ? " is-me" : ""}`} href={href} onClick={(e) => onLinkClick(e, href)} aria-label={t.home.top.rowLabel(r.rank, r.login, r.overall)}>
         <span className="board-rank">{r.rank}</span>
         <span className="board-login">@{r.login}</span>
-        <span className="board-stars" aria-hidden>
-          {Array.from({ length: STARS }, (_, i) => (
-            <Star key={i} className={i >= STARS - r.stars ? "on" : undefined} />
-          ))}
-        </span>
+        <Stars n={r.stars} size={14} />
         <span className="board-score">{r.overall}</span>
       </a>
     </li>

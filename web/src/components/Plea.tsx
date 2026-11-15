@@ -9,25 +9,12 @@ import { useT } from "../i18n";
 import { api } from "../lib/api";
 import { getPlea, setPlea } from "../lib/plea";
 import { firstVerdict, pleaVerdict } from "../lib/pleaVerdict";
+import { Stars, StarShape } from "./Stars";
 
-const STAR = "M12 2.6l2.9 6.1 6.7.8-4.9 4.6 1.3 6.6L12 17.4l-6 3.3 1.3-6.6L2.4 9.5l6.7-.8z";
 const SIX = [1, 2, 3, 4, 5, 6] as const;
 
 /** Le pari vient d'être fait : le verdict, déjà monté sous l'attente, le relit. */
 const listeners = new Set<() => void>();
-
-/** Six étoiles en ligne : les n premières allumées, blanches et mates ; les autres pleines et sombres. */
-function Stars({ n, label }: { n: number; label: string }) {
-  return (
-    <span className="plea-row" role="img" aria-label={label}>
-      {SIX.map((i) => (
-        <svg key={i} viewBox="0 0 24 24" className={i <= n ? "on" : undefined} aria-hidden>
-          <path d={STAR} />
-        </svg>
-      ))}
-    </span>
-  );
-}
 
 /** Pendant l'attente : la question et six étoiles, puis une ligne. Le pari ne se reprend pas. */
 export function PleaPrompt({ cardId }: { cardId: string }) {
@@ -38,7 +25,7 @@ export function PleaPrompt({ cardId }: { cardId: string }) {
   if (stars) {
     return (
       <p className="plea plea-line">
-        {p.pleading} <Stars n={stars} label={p.count(stars)} />
+        {p.pleading} <Stars n={stars} size={14} label={p.count(stars)} />
       </p>
     );
   }
@@ -55,9 +42,7 @@ export function PleaPrompt({ cardId }: { cardId: string }) {
       <div className="plea-stars">
         {SIX.map((n) => (
           <button key={n} type="button" className="plea-star" aria-label={p.star(n)} onClick={() => choose(n)}>
-            <svg viewBox="0 0 24 24" aria-hidden>
-              <path d={STAR} />
-            </svg>
+            <StarShape />
           </button>
         ))}
       </div>
@@ -100,10 +85,10 @@ export function PleaVerdict({ cardId, overall, shown }: PleaVerdictProps) {
     <section className="plea-verdict" aria-label={p.verdict.replace(/\s*:$/, "")}>
       <p className="plea-said">
         <span>
-          {p.pleaded} <Stars n={v.pleaded} label={p.count(v.pleaded)} />
+          {p.pleaded} <Stars n={v.pleaded} size={22} label={p.count(v.pleaded)} />
         </span>{" "}
         <span>
-          {p.verdict} <Stars n={v.actual} label={p.count(v.actual)} />
+          {p.verdict} <Stars n={v.actual} size={22} label={p.count(v.actual)} />
         </span>
       </p>
       <p className="plea-word">{p.gap[v.gap]}</p>

@@ -6,7 +6,8 @@ import { useEffect, useRef, useState } from "react";
 import type { BandBoard, BandMember, BandPage as BandPageData, BandType } from "../../../shared/bands";
 import { BAND_TYPES, bandPath } from "../../../shared/bands";
 import { useBandShare } from "../components/BandPick";
-import { BandRow, Star } from "../components/BandRow";
+import { BandRow } from "../components/BandRow";
+import { StarMark, Stars } from "../components/Stars";
 import { EntryForm } from "../components/EntryForm";
 import { useToast } from "../components/After";
 import { IconLinkedIn, IconShare } from "../components/Icons";
@@ -110,11 +111,7 @@ function Member({ m }: { m: BandMember }) {
   const href = m.cardId ? `/c/${m.cardId}` : null;
   return (
     <li className="band-member">
-      <span className="board-stars" role="img" aria-label={t.bands.score(m.stars)}>
-        {Array.from({ length: 6 }, (_, i) => (
-          <Star key={i} className={i >= 6 - m.stars ? "on" : undefined} />
-        ))}
-      </span>
+      <Stars n={m.stars} size={14} label={t.bands.score(m.stars)} />
       <span className="band-member-profile">
         {profile}
         {position && <span className="band-member-position">{position}</span>}
@@ -191,7 +188,7 @@ export function BandPage({ type, id }: { type: BandType; id: string }) {
         <h1>{band.label}</h1>
         <p className="band-total">
           <span className="band-total-score" role="img" aria-label={t.bands.score(band.score)}>
-            <Star />
+            <StarMark />
             {band.score}
           </span>
           <span className="band-total-count">{t.bands.dossiers(band.members)}</span>
