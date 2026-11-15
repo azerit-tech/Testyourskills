@@ -57,7 +57,7 @@ describe("mur des profils (§18.28)", () => {
     const byId = new Map(catalog.map((p) => [p.id, p]));
     expect(names(html)).toEqual([...ids.map((id) => byId.get(id)!.label.fr), "Et toi\u00a0?"]);
     for (const id of ids) expect(html).toContain(byId.get(id)!.tagline.fr.replace(/'/g, "&#x27;"));
-    expect(html).toMatch(/<button type="button" class="pill">Découvre ton profil<\/button><\/li><\/ul>/);
+    expect(html).toMatch(/<button type="button" class="pill">Faire ma fiche<\/button><\/li><\/ul>/);
   });
 
   it("anglais : mêmes tuiles, textes anglais", () => {
@@ -68,7 +68,7 @@ describe("mur des profils (§18.28)", () => {
     const byId = new Map(catalog.map((p) => [p.id, p]));
     expect(names(html)).toEqual([...ids.map((id) => byId.get(id)!.label.en), "And you?"]);
     for (const id of ids) expect(html).toContain(byId.get(id)!.tagline.en.replace(/'/g, "&#x27;"));
-    expect(html).toContain(">Find your profile</button>");
+    expect(html).toContain(">Get my rap sheet</button>");
   });
 
   it("une liste au clavier, nommée par le titre", () => {

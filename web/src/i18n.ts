@@ -126,7 +126,7 @@ const fr = frTypoDeep({
     wall: {
       title: "Quel profil es-tu ?",
       you: "Et toi ?",
-      cta: "Découvre ton profil",
+      cta: "Faire ma fiche",
     },
     /* Top de la semaine (§18.22) */
     top: {
@@ -914,7 +914,7 @@ const en: Dict = {
     wall: {
       title: "Which profile are you?",
       you: "And you?",
-      cta: "Find your profile",
+      cta: "Get my rap sheet",
     },
     top: {
       title: "Top of the week",
