@@ -138,10 +138,15 @@ function JuryBar({ jury }: { jury: Tally }) {
   );
 }
 
-/** Pour qui a fait la fiche : « Le jury : 73 % coupable · 41 votes », à partir d'un vote. */
+/** Sous ce nombre de votes, le décompte ne dit rien : l'invitation à partager le remplace. */
+export const JURY_SHOWN_MIN = 3;
+
+/** Pour qui a fait la fiche : « Jury : 73 % coupable (41 votes) » dès trois votes ; avant, et tant
+ *  que le décompte charge, une invitation à partager plutôt qu'un vide (§18.52). */
 export function JuryLine({ jury }: { jury: Tally | null }) {
   const { t } = useT();
   const shown = useTally(jury);
-  if (!shown) return null;
+  const total = jury ? jury.guilty + jury.cleared : 0;
+  if (!shown || total < JURY_SHOWN_MIN) return <p className="jury-line">{t.jury.ownerNone}</p>;
   return <p className="jury-line">{t.jury.owner(shown.text)}</p>;
 }

@@ -828,8 +828,8 @@ const fr = frTypoDeep({
     /* « votes » plutôt que « jurés », qui s'accorde */
     tally: (pct: number, n: number) => `${pct}\u00a0% coupable (${n}\u00a0${n === 1 ? "vote" : "votes"})`,
     owner: (tally: string) => `Jury : ${tally}`,
-    /** Pour qui a fait la fiche, avant tout vote : la ligne garde sa place, rien ne saute. */
-    ownerNone: "Jury : pas encore de vote.",
+    /** Pour qui a fait la fiche, avant trois votes : une invitation plutôt qu'un vide ; la ligne garde sa place. */
+    ownerNone: "Jury : ton réseau vote coupable ou relaxe dès que tu partages.",
     failed: "Vote non compté. Réessaie.",
     /* après le vote : la suite, vers « À ton tour » */
     judged: (who: string) => `Tu as jugé ${who}.`,
@@ -1559,7 +1559,7 @@ const en: Dict = {
     cleared: "Cleared",
     tally: (pct, n) => `${pct}% guilty (${n}\u00a0${n === 1 ? "vote" : "votes"})`,
     owner: (tally) => `Jury: ${tally}`,
-    ownerNone: "Jury: no votes yet.",
+    ownerNone: "Jury: your network votes guilty or cleared once you share.",
     failed: "Vote not counted. Try again.",
     judged: (who) => `You judged ${who}.`,
     turn: "Your turn",

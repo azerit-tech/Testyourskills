@@ -176,7 +176,8 @@ describe("après-fiche, vue par qui a fait la fiche (§18.27)", () => {
     const order = at(html, ['class="after-head"', 'class="plea-verdict"', 'class="penalty"', 'class="after-block out"', 'class="after-block denounce"', 'class="rest"', 'class="fold dossier"', 'class="after-foot"']);
     expect(ascending(order), JSON.stringify(order)).toBe(true);
     // La peine vit dans le bloc du verdict : plus de ligne flottante entre deux blocs.
-    expect(html).toMatch(/<div class="after-head"><section class="plea-verdict".*?<\/section><p class="penalty">/);
+    // Entre les deux, la ligne du jury (une invitation à partager tant qu'il a moins de trois votes).
+    expect(html).toMatch(/<div class="after-head"><section class="plea-verdict".*?<\/section><p class="jury-line">[^<]*<\/p><p class="penalty">/);
     expect(html).not.toContain('class="after-block dossier"');
     // l'en-tête sur le ciel, en tête de page, et un seul h1 ; pas de « Et toi ? »
     expect(html.indexOf('class="wanted"')).toBeLessThan(html.indexOf('class="result-stage"'));
@@ -238,6 +239,15 @@ describe("après-fiche, vue par qui a fait la fiche (§18.27)", () => {
     stub("fr-FR");
     const html = renderToStaticMarkup(createElement(LangProvider, null, createElement(JuryLine, { jury: { guilty: 3, cleared: 1, mine: null } })));
     expect(html).toBe('<p class="jury-line">Jury\u00a0: 75\u00a0% coupable (4\u00a0votes)</p>');
+    // Avant trois votes, et tant que le d\u00e9compte charge : une invitation \u00e0 partager, pas un vide (parcours 12).
+    const few = (jury: { guilty: number; cleared: number; mine: null } | null, lang = "fr-FR") => {
+      stub(lang);
+      return renderToStaticMarkup(createElement(LangProvider, null, createElement(JuryLine, { jury }))).replace(/\u00a0/g, " ");
+    };
+    expect(few({ guilty: 0, cleared: 0, mine: null })).toBe('<p class="jury-line">Jury : ton r\u00e9seau vote coupable ou relaxe d\u00e8s que tu partages.</p>');
+    expect(few({ guilty: 1, cleared: 1, mine: null })).toContain("ton r\u00e9seau vote");
+    expect(few(null)).toContain("ton r\u00e9seau vote");
+    expect(few(null, "en-US")).toBe('<p class="jury-line">Jury: your network votes guilty or cleared once you share.</p>');
     // Une phrase, sans point médian.
     expect(html).not.toContain("·");
   });
