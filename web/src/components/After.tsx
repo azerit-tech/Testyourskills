@@ -132,7 +132,7 @@ const BOARD_ID = "semaine";
 function toBoard(e: MouseEvent<HTMLAnchorElement>) {
   if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
   e.preventDefault();
-  navigate(`/#${BOARD_ID}`);
+  navigate(`/${window.location.search}#${BOARD_ID}`);
 }
 
 /* ---------- partage ---------- */
