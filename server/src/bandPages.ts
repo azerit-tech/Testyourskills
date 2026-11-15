@@ -28,9 +28,9 @@ export function rankFr(b: Pick<BandStanding, "rank" | "type">): string | null {
   return `${b.rank === 1 ? "n° 1" : `${b.rank}e`} ${LEAGUE_FR[b.type]}`;
 }
 
-/** « Bande en formation : il manque 2 complices ». */
+/** « Bande en formation : encore 2 fiches », les mots de la page d’une bande. */
 export function formingFr(missing: number): string {
-  return `Bande en formation : il manque ${missing} ${missing > 1 ? "complices" : "complice"}`;
+  return `Bande en formation : encore ${missing} ${missing > 1 ? "fiches" : "fiche"}`;
 }
 
 /** « 3 fiches » : le compte d'une bande dit « fiche », jamais « dossier ». */
@@ -39,8 +39,8 @@ export const dossiersFr = (n: number): string => `${n} ${n > 1 ? "fiches" : "fic
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 const starsFr = (n: number) => `${n} ${n > 1 ? "étoiles" : "étoile"}`;
 
-/** Le dessin de l'image d'une bande (2 : le décor à son format et les places de la bande). */
-export const BAND_IMAGE_DESIGN = 2;
+/** Le dessin de l'image d'une bande (2 : le décor à son format et les places de la bande ; 3 : « encore 2 fiches » au lieu de « il manque 2 complices »). */
+export const BAND_IMAGE_DESIGN = 3;
 
 /** La clé de l'image d'une bande : elle change avec tout ce que l'image dit, et avec son dessin. */
 export function bandImageKey(b: BandStanding): string {
@@ -65,7 +65,7 @@ export function bandMeta(b: BandStanding, baseUrl: string, lang: Lang = "fr"): P
       title: pageTitle(`${b.label}, ${where}`),
       description: b.rank
         ? `${plural(b.members, "sheet", "sheets")}, ${plural(b.score, "star", "stars")}. Come add your stars: get your rap sheet for ${b.label}.`
-        : `Crew forming: ${plural(b.missing, "more accomplice", "more accomplices")} needed. Get your rap sheet for ${b.label}.`,
+        : `Crew forming: ${plural(b.missing, "more sheet", "more sheets")} needed. Get your rap sheet for ${b.label}.`,
       imageAlt: `${b.label}, ${plural(b.score, "star", "stars")}, ${plural(b.members, "sheet", "sheets")}`,
     };
   }

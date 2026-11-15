@@ -24,9 +24,9 @@ describe("l'accroche d'une bande", () => {
     expect(bandHook(second, "fr")).toEqual({ head: "2e des boîtes", sub: "À 5 étoiles de la tête" });
     expect(bandHook(band({ rank: 3, gap: 1, ahead: { id: "x", label: "X", rank: 2 } }), "fr")).toEqual({ head: "3e des écoles", sub: "À 1 étoile de la 2e" });
     expect(bandHook(band({ rank: 14, gap: 0, ahead: { id: "x", label: "X", rank: 13 } }), "fr").sub).toBe("À égalité avec la 13e");
-    expect(bandHook(forming, "fr")).toEqual({ head: "Bande en formation", sub: "Il manque 2 complices" });
+    expect(bandHook(forming, "fr")).toEqual({ head: "Bande en formation", sub: "Encore 2 fiches" });
     expect(bandHook(second, "en")).toEqual({ head: "#2 among companies", sub: "5 stars behind #1" });
-    expect(bandHook(forming, "en")).toEqual({ head: "Crew forming", sub: "2 more accomplices needed" });
+    expect(bandHook(forming, "en")).toEqual({ head: "Crew forming", sub: "2 more sheets needed" });
     // Les deux temps disent la même chose que la ligne des balises.
     for (const b of [second, band({ rank: 3, gap: 1, ahead: { id: "x", label: "X", rank: 2 } })]) {
       const h = bandHook(b, "fr");
@@ -72,7 +72,7 @@ describe("l'image d'une bande", () => {
   it("en formation : trois places, pleines ou libres, et ce qui manque", async () => {
     const svg = await renderSvg({ format: "band", band: forming, lang: "fr" });
     expect(svg).toContain(">BANDE EN FORMATION</text>");
-    expect(svg).toContain(">Il manque 2 complices</text>");
+    expect(svg).toContain(">Encore 2 fiches</text>");
     // Une fiche présente porte son étoile crème, deux places libres en pointillé.
     expect(svg.match(/<path d="M12 2\.6[^"]*" fill="#fff9cb"/g)).toHaveLength(1);
     expect(svg.match(/stroke-dasharray="8 8"/g)).toHaveLength(2);
@@ -86,7 +86,7 @@ describe("l'image d'une bande", () => {
       expect(svg).not.toContain('<path d="M12 2.6');
       expect(svg).not.toMatch(/>0[ <]/);
     }
-    expect(await renderSvg({ format: "band", band: empty, lang: "fr" })).toContain(">Il manque 3 complices</text>");
+    expect(await renderSvg({ format: "band", band: empty, lang: "fr" })).toContain(">Encore 3 fiches</text>");
   });
 
   it("un nom long passe sur deux lignes, entier", async () => {

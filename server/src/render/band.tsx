@@ -26,12 +26,12 @@ const LEAGUE: Record<Lang, Record<BandStanding["type"], { kicker: string; of: st
 export function bandRankLine(b: BandStanding, lang: Lang): string {
   const l = LEAGUE[lang][b.type];
   if (lang === "en") {
-    if (!b.rank) return `Crew forming: ${b.missing} more ${b.missing > 1 ? "accomplices" : "accomplice"} needed`;
+    if (!b.rank) return `Crew forming: ${b.missing} more ${b.missing > 1 ? "sheets" : "sheet"} needed`;
     const ord = `#${b.rank} ${l.of}`;
     if (!b.ahead || b.gap === null) return ord;
     return b.gap > 0 ? `${ord}, ${b.gap} ${b.gap > 1 ? "stars" : "star"} behind #${b.ahead.rank}` : `${ord}, level with #${b.ahead.rank}`;
   }
-  if (!b.rank) return `Bande en formation : il manque ${b.missing} ${b.missing > 1 ? "complices" : "complice"}`;
+  if (!b.rank) return `Bande en formation : encore ${b.missing} ${b.missing > 1 ? "fiches" : "fiche"}`;
   const ord = `${b.rank === 1 ? "n° 1" : `${b.rank}e`} ${l.of}`;
   if (!b.ahead || b.gap === null) return ord;
   const ahead = b.ahead.rank === 1 ? "la tête" : `la ${b.ahead.rank}e`;
@@ -46,12 +46,12 @@ export function bandRankLine(b: BandStanding, lang: Lang): string {
 export function bandHook(b: BandStanding, lang: Lang): { head: string; sub: string | null } {
   const l = LEAGUE[lang][b.type];
   if (lang === "en") {
-    if (!b.rank) return { head: "Crew forming", sub: `${b.missing} more ${b.missing > 1 ? "accomplices" : "accomplice"} needed` };
+    if (!b.rank) return { head: "Crew forming", sub: `${b.missing} more ${b.missing > 1 ? "sheets" : "sheet"} needed` };
     const head = `#${b.rank} ${l.of}`;
     if (!b.ahead || b.gap === null) return { head, sub: null };
     return { head, sub: b.gap > 0 ? `${b.gap} ${b.gap > 1 ? "stars" : "star"} behind #${b.ahead.rank}` : `Level with #${b.ahead.rank}` };
   }
-  if (!b.rank) return { head: "Bande en formation", sub: `Il manque ${b.missing} ${b.missing > 1 ? "complices" : "complice"}` };
+  if (!b.rank) return { head: "Bande en formation", sub: `Encore ${b.missing} ${b.missing > 1 ? "fiches" : "fiche"}` };
   const head = `${b.rank === 1 ? "N° 1" : `${b.rank}e`} ${l.of}`;
   if (!b.ahead || b.gap === null) return { head, sub: null };
   const ahead = b.ahead.rank === 1 ? "la tête" : `la ${b.ahead.rank}e`;

@@ -71,7 +71,7 @@ describe("balises d'une bande", () => {
     expect(bandMeta(standing({ rank: 1, ahead: null, gap: null }), BASE).title).toBe("CentraleSupélec, n°\u00a01 des écoles · Azerit");
     const forming = bandMeta(standing({ rank: null, missing: 2, members: 1, score: 5, gap: null, ahead: null }), BASE);
     expect(forming.title).toBe("CentraleSupélec, bande en formation · Azerit");
-    expect(forming.description).toBe("Bande en formation\u00a0: il manque 2 complices. Fais ta fiche pour CentraleSupélec.");
+    expect(forming.description).toBe("Bande en formation\u00a0: encore 2 fiches. Fais ta fiche pour CentraleSupélec.");
     expect(bandImageKey(standing({ score: 75 }))).not.toBe(bandImageKey(standing({})));
   });
 
@@ -82,7 +82,7 @@ describe("balises d'une bande", () => {
     expect(m.description).toBe("31 sheets, 74 stars. Come add your stars: get your rap sheet for CentraleSupélec.");
     const forming = bandMeta(standing({ rank: null, missing: 1, members: 2, score: 5, gap: null, ahead: null }), BASE, "en");
     expect(forming.title).toBe("CentraleSupélec, crew forming · Azerit");
-    expect(forming.description).toBe("Crew forming: 1 more accomplice needed. Get your rap sheet for CentraleSupélec.");
+    expect(forming.description).toBe("Crew forming: 1 more sheet needed. Get your rap sheet for CentraleSupélec.");
     for (const x of [m, forming, boardMeta(BASE, "en")]) expect(`${x.title} ${x.description} ${x.imageAlt}`).not.toMatch(/gang|\bfiles?\b|Testyourskills/i);
     expect(boardMeta(BASE, "en").title).toBe("Crews: schools and companies · Azerit");
     expect(boardMeta(BASE, "fr").title).toBe("Les bandes\u00a0: écoles et boîtes · Azerit");
@@ -92,7 +92,7 @@ describe("balises d'une bande", () => {
     expect(bandRankLine(standing({}), "fr")).toBe("3e des écoles, à 6 étoiles de la 2e");
     expect(bandRankLine(standing({ rank: 2, ahead: { id: "x", label: "X", rank: 1 }, gap: 0 }), "fr")).toBe("2e des écoles, à égalité avec la tête");
     expect(bandRankLine(standing({ type: "boite", rank: 1, ahead: null, gap: null }), "fr")).toBe("n° 1 des boîtes");
-    expect(bandRankLine(standing({ rank: null, missing: 1, gap: null, ahead: null }), "fr")).toBe("Bande en formation : il manque 1 complice");
+    expect(bandRankLine(standing({ rank: null, missing: 1, gap: null, ahead: null }), "fr")).toBe("Bande en formation : encore 1 fiche");
     expect(bandRankLine(standing({}), "en")).toBe("#3 among schools, 6 stars behind #2");
   });
 
