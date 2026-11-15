@@ -9,8 +9,8 @@ import { AddSource, Claim, Contest, DeleteCard, EmailForm, Hiring, LinkedInPhoto
 import type { Shareable } from "../components/After";
 import { BandPick } from "../components/BandPick";
 import { Denounce } from "../components/Denounce";
-import { Denounced } from "../components/Denounced";
-import { Duel } from "../components/Duel";
+import { Denounced, useRemake } from "../components/Denounced";
+import { Duel, useDuelSend } from "../components/Duel";
 import { EntryForm } from "../components/EntryForm";
 import { PrimeRace } from "../components/Primes";
 import { ErrorBoundary } from "../components/ErrorBoundary";
@@ -537,7 +537,13 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
   // « Revoir ma poursuite » : dans la tête de la fiche ; sur un téléphone court, la tête se masque
   // et le lien descend sous la fiche, à côté de « Pièces à conviction » (le CSS choisit).
   const chase = scene === "film" && settled ? <ChaseLink mine={!visitor} seen={chaseWatched(id)} onPlay={playChase} /> : null;
-  const lawyer = wantedYou && claimOn && cardLogin ? () => api.startClaim(id, cardLogin) : null;
+  // Fiche dénoncée : « C'est moi » reprend par GitHub, ou refait la fiche depuis son lien LinkedIn.
+  // Le bloc le montre à tous (en contour pour qui a déjà sa fiche) ; la barre, seulement à qui n'a pas de fiche.
+  const remake = useRemake(wantedYou && !cardLogin && main.linkedinUrl ? main.linkedinUrl : null, toast.show);
+  const claimHere = wantedYou && claimOn && cardLogin ? () => api.startClaim(id, cardLogin) : null;
+  const lawyer = other ? null : (claimHere ?? remake?.go ?? null);
+  // Qui a sa fiche : le duel, et le même envoi dans la barre fixe.
+  const duel = useDuelSend(visitor ? other : null, main, toast.show);
 
   return (
     <main className={`page page-card page-result${animating ? " is-animating" : ""}${visitor ? " is-visitor" : ""}${wantedYou ? " is-wanted" : ""}`} id="main">
@@ -618,7 +624,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
           <div className="visitor-col">
             {/* Fiche dénoncée (§18.6, §18.48) : qui l'a dénoncée, « C'est moi », « Ce n'est pas moi », la demande de retrait, en un bloc. */}
             {wantedYou && (
-              <Denounced who={who} by={kase?.by ?? null} onLawyer={lawyer} notMe={!other}>
+              <Denounced who={who} by={kase?.by ?? null} onLawyer={claimHere} onRemake={remake} notMe={!other} quiet={!!other}>
                 {!cardLogin && <RemovalRequest cardId={id} short />}
               </Denounced>
             )}
@@ -641,7 +647,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
         {/* Qui a déjà sa fiche : le duel à la place, avec le score à envoyer. */}
         {visitor &&
           (other ? (
-            <Duel mine={other} card={main} toast={toast.show} />
+            <Duel mine={other} card={main} duel={duel} strong />
           ) : (
             <section className="you" id="you" aria-labelledby="you-title">
               <h2 id="you-title">{t.denounce.andYou}</h2>
@@ -705,8 +711,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, not
       </div>
       {/* La barre du pouce (§18.27) : mêmes conditions que le bloc de partage, une fois la fiche posée. Avant le toast, qui se cale dessus. */}
       {!visitor && !(claimed && me?.hidden) && <ShareDock item={item} ready={settled} toast={toast.show} />}
-      {/* « Fais la tienne » : la barre fixe du visiteur sur téléphone (§18.48). Qui a déjà sa fiche a « Ma fiche » dans la barre du haut. */}
-      {visitor && settled && !other && <MakeYours watch={wantedYou} onLawyer={lawyer} />}
+      {/* La barre fixe du visiteur sur téléphone (§18.48) : « Faire ma fiche », « C'est moi » sur une fiche dénoncée, ou « Lui envoyer mon score ». */}
+      {visitor && settled && (!other || duel.send) && <MakeYours watch={wantedYou} onLawyer={lawyer} onSend={other ? duel.send : null} />}
       {toast.node}
     </main>
   );

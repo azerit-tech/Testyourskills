@@ -1,6 +1,8 @@
 // La barre du pouce (§18.27) : sur téléphone, dès que la fiche est posée, « Partager »
 // et « Dénoncer » restent sous le pouce. Elle s'efface quand le bloc de partage ou la
 // fiche d'un complice prête à envoyer est à l'écran, et pendant qu'on écrit dans un champ.
+// Tant que le bloc « Dénonce un complice » est à l'écran, « Dénoncer » quitte la barre :
+// « Partager » reste seul, pleine largeur.
 import { useEffect, useState } from "react";
 import { useT } from "../i18n";
 import { useMediaQuery } from "../lib/util";
@@ -27,6 +29,7 @@ function Dock({ item, toast }: { item: Shareable; toast: (m: string) => void }) 
   const kit = useSharing(item, toast);
   // null : on ne sait pas encore si le bloc de partage est à l'écran, la barre attend.
   const [blockSeen, setBlockSeen] = useState<boolean | null>(null);
+  const [denounceSeen, setDenounceSeen] = useState(false);
   const [typing, setTyping] = useState(false);
 
   // Un seul bouton rose par écran : la barre s'efface devant le bloc de partage, et devant la fiche
@@ -39,19 +42,22 @@ function Dock({ item, toast }: { item: Shareable; toast: (m: string) => void }) 
         if (e.isIntersecting) seen.add(e.target);
         else seen.delete(e.target);
       }
-      setBlockSeen(seen.size > 0);
+      const all = [...seen];
+      setBlockSeen(all.some((el) => el.matches(".after-block.out, .after-block.denounce.is-done")));
+      setDenounceSeen(all.some((el) => el.matches(".after-block.denounce")));
     });
     const scan = () => {
       io.disconnect();
       seen.clear();
-      const marks = document.querySelectorAll(".after-block.out, .after-block.denounce.is-done");
-      if (!marks.length) setBlockSeen(false);
+      const marks = document.querySelectorAll(".after-block.out, .after-block.denounce");
+      if (!document.querySelector(".after-block.out, .after-block.denounce.is-done")) setBlockSeen(false);
+      setDenounceSeen(false);
       marks.forEach((m) => io.observe(m));
     };
     scan();
     const after = document.querySelector(".page-result .after");
     const mo = after && typeof MutationObserver === "function" ? new MutationObserver(scan) : null;
-    if (after) mo?.observe(after, { childList: true });
+    if (after) mo?.observe(after, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
     return () => {
       io.disconnect();
       mo?.disconnect();
@@ -90,9 +96,11 @@ function Dock({ item, toast }: { item: Shareable; toast: (m: string) => void }) 
   return (
     <div className={`dock${on ? " is-on" : ""}`} role="region" aria-label={t.result.share.title} inert={on ? undefined : true}>
       <ShareMain kit={kit} className="dock-main" from="dock" />
-      <button type="button" className="pill pill-big pill-ghost" onClick={toDenounce}>
-        {t.denounce.btn}
-      </button>
+      {!denounceSeen && (
+        <button type="button" className="pill pill-big pill-ghost" onClick={toDenounce}>
+          {t.denounce.btn}
+        </button>
+      )}
     </div>
   );
 }

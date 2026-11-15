@@ -18,7 +18,7 @@ import { rememberDenounced } from "../lib/session";
 import { hasNativeShare } from "../lib/sharing";
 import { copyText, isTouch, shareUrl } from "../lib/util";
 import { ManualCopy } from "./After";
-import { IconLinkedIn, IconShare } from "./Icons";
+import { IconShare } from "./Icons";
 import { Stars } from "./Stars";
 import "./denounce.css";
 
@@ -192,7 +192,7 @@ export function Denounce({ cardId, selfLogin, toast }: Props) {
                 {shown.map((a) => (
                   <li key={a.login}>
                     <button type="button" className="pill pill-ghost denounce-who" onClick={() => void run(a.login)}>
-                      <WhoFace src={a.avatarUrl} login={a.login} />
+                      <WhoFace login={a.login} />
                       <span>@{a.login}</span>
                     </button>
                   </li>
@@ -208,13 +208,14 @@ export function Denounce({ cardId, selfLogin, toast }: Props) {
 
 /**
  * Ce que le dénonciateur reçoit : la fiche du complice résumée, prête à envoyer. Dénoncer s'adresse à une
- * personne : le premier bouton lui envoie le lien (§18.48), LinkedIn vient en second, X n'est plus un bouton.
+ * personne : un seul bouton, qui lui envoie le lien (§18.48), et « Copier le lien ». Aucun partage public :
+ * la fiche d'un tiers ne part pas dans un post ; une fois reprise, c'est la personne qui la partage.
  */
 export function Wanted({ card, toast, onAgain }: { card: CardData; toast: (m: string) => void; onAgain: () => void }) {
   const { t, lang } = useT();
   const d = t.denounce;
   // Presse-papiers refusé : le message ou le texte s'affiche, sélectionné, pour un appui long.
-  const [manual, setManual] = useState<{ kind: "message" | "text"; value: string } | null>(null);
+  const [manual, setManual] = useState<{ kind: "message" | "link"; value: string } | null>(null);
   // « @pseudo », ou le nom d'une fiche tirée d'un LinkedIn.
   const who = card.login ? `@${card.login}` : card.name;
   const n = starsFor(card.overall);
@@ -224,6 +225,7 @@ export function Wanted({ card, toast, onAgain }: { card: CardData; toast: (m: st
   const stars = sealed ? "" : starsLine(n);
   const tag = tagOf(card, lang);
   const status = bestStatus(card, lang);
+  const level = pick(LEVEL_LABELS[n], lang);
   const url = shareUrl(card.id);
   const canNative = isTouch() && hasNativeShare();
   const track = (channel: string) => api.track("card_shared", card.id, { channel, kind: "denounce" });
@@ -246,39 +248,34 @@ export function Wanted({ card, toast, onAgain }: { card: CardData; toast: (m: st
     track("copy");
   };
 
-  const onLinkedIn = async () => {
-    window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`, "_blank", "noopener");
-    // LinkedIn n'accepte pas de texte prérempli : il part dans le presse-papier.
-    const text = d.shareText(who, stars, tag, status, url);
-    if (await copyText(text)) toast(d.linkedinHint);
-    else setManual({ kind: "text", value: text });
-    track("linkedin");
+  const onCopy = async () => {
+    if (await copyText(url)) toast(d.linkCopied);
+    else setManual({ kind: "link", value: url });
+    track("copy_link");
   };
 
   return (
     <section className="after-block denounce is-done" aria-live="polite">
+      {/* Le titre seul ; les étoiles et le profil sur leur ligne, jamais mêlés au texte. */}
       <h2 className="denounce-head">
-        <span className="denounce-who-name">{who}</span> {d.inSights}{" "}
-        {!sealed && (
-          <>
-            <Stars n={n} size={22} label={t.result.wantedStars(n, pick(LEVEL_LABELS[n], lang))} />{" "}
-          </>
-        )}
-        <span className="denounce-tag">{tag}</span>
+        <span className="denounce-who-name">{who}</span> {d.inSights}
       </h2>
+      <p className="denounce-level">
+        {!sealed && <Stars n={n} size={22} label={t.result.wantedStars(n, level)} />}
+        <span className="denounce-tag">{tag}</span>
+      </p>
       {status && <p>{d.charge(status)}</p>}
       <div className="denounce-actions">
         <button type="button" className="pill pill-big" onClick={() => void onSend()}>
           <IconShare />
           <span className="denounce-send">{d.send(who)}</span>
         </button>
-        <button type="button" className="pill" onClick={() => void onLinkedIn()}>
-          <IconLinkedIn />
-          {d.linkedin}
-        </button>
       </div>
       {manual && <ManualCopy m={manual} />}
       <div className="denounce-links">
+        <button type="button" className="link-alt" onClick={() => void onCopy()}>
+          {d.copyLink}
+        </button>
         <a className="link-alt" href={`/c/${card.id}`} onClick={(e) => onLinkClick(e, `/c/${card.id}`)}>
           {d.see}
         </a>
@@ -290,15 +287,11 @@ export function Wanted({ card, toast, onAgain }: { card: CardData; toast: (m: st
   );
 }
 
-/** La pastille d'un complice : son avatar ; sans image, ou si elle ne charge pas, son initiale (comme au top de la semaine). */
-function WhoFace({ src, login }: { src?: string | null; login: string }) {
-  const [broken, setBroken] = useState(false);
-  useEffect(() => setBroken(false), [src]);
-  if (!src || broken)
-    return (
-      <i className="denounce-who-initial" aria-hidden>
-        {[...login.replace(/[^\p{L}\p{N}]/gu, "")][0]?.toUpperCase() ?? "?"}
-      </i>
-    );
-  return <img src={src} alt="" width={28} height={28} loading="lazy" referrerPolicy="no-referrer" onError={() => setBroken(true)} />;
+/** La pastille d'un complice : son initiale, comme le portrait de repli de la fiche ; jamais l'identicône de GitHub. */
+function WhoFace({ login }: { login: string }) {
+  return (
+    <i className="denounce-who-initial" aria-hidden>
+      {[...login.replace(/[^\p{L}\p{N}]/gu, "")][0]?.toUpperCase() ?? "?"}
+    </i>
+  );
 }

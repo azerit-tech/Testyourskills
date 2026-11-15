@@ -43,11 +43,14 @@ describe("Dénoncer : la fiche du complice", () => {
       renderToStaticMarkup(createElement(LangProvider, null, createElement(Wanted, { card, toast: () => undefined, onAgain: () => undefined })));
     const html = wanted({ ...FIXTURES.silver, login: "camroux" });
     const buttons = [...html.matchAll(/<button type="button" class="(pill[^"]*)">(.*?)<\/button>/g)].map((m) => [m[1], m[2].replace(/<svg.*?<\/svg>/g, "").replace(/<[^>]+>/g, "")]);
-    expect(buttons).toEqual([
-      ["pill pill-big", "Envoyer à @camroux"],
-      ["pill", "Partager sur LinkedIn"],
-    ]);
-    expect(html).not.toMatch(/Poster sur X|x\.com/);
+    // Un seul bouton, à la personne : aucun partage public de la fiche d'un tiers.
+    expect(buttons).toEqual([["pill pill-big", "Envoyer à @camroux"]]);
+    expect(html).not.toMatch(/Poster sur X|x\.com|LinkedIn/);
+    expect(html).toContain('<button type="button" class="link-alt">Copier le lien</button>');
+    // Le titre seul ; les étoiles et le profil sur leur ligne.
+    expect(html).toMatch(/<h2 class="denounce-head"><span class="denounce-who-name">@camroux<\/span> est dans le viseur<\/h2><p class="denounce-level"><span[^>]*role="img"/);
+    // Les complices : l'initiale, jamais l'identicône.
+    expect(readFileSync(join(__dirname, "Denounce.tsx"), "utf8")).not.toContain("<img");
     // Une fiche tirée d'un LinkedIn n'a pas de pseudo : son nom, sans « @ ».
     const { login: _l, ...noLogin } = FIXTURES.silver;
     const li = wanted({ ...(noLogin as CardData), name: "Camille Ardent" });
@@ -55,10 +58,13 @@ describe("Dénoncer : la fiche du complice", () => {
     expect(li).toContain('<span class="denounce-who-name">Camille Ardent</span>');
   });
 
-  it("le message envoyé à la personne : sa fiche, ses étoiles, son droit de faire appel", () => {
-    expect(DICTS.fr.denounce.sendText("@camroux", starsLine(4), "Pyromane")).toBe("@camroux, Azerit a dressé ta fiche de dev : ★★★★☆☆, Pyromane. Droit de faire appel :");
-    expect(DICTS.fr.denounce.sendText("@camroux", "", "Sous couverture")).toBe("@camroux, Azerit a dressé ta fiche de dev : Sous couverture. Droit de faire appel :");
-    expect(DICTS.en.denounce.sendText("@camroux", starsLine(4), "Arsonist")).toBe("@camroux, Azerit drew up your dev rap sheet: ★★★★☆☆, Arsonist. Right to appeal:");
+  it("le message envoyé à la personne : sa fiche, ses étoiles, et « Reprends-la », comme le bloc qui l'attend", () => {
+    const fr = (s: string) => s.replace(/\u00a0/g, " ");
+    expect(fr(DICTS.fr.denounce.sendText("@camroux", starsLine(4), "Pyromane"))).toBe("@camroux, Azerit a dressé ta fiche de dev : ★★★★☆☆, Pyromane. C'est toi ? Reprends-la :");
+    expect(fr(DICTS.fr.denounce.sendText("@camroux", "", "Sous couverture"))).toBe("@camroux, Azerit a dressé ta fiche de dev : Sous couverture. C'est toi ? Reprends-la :");
+    expect(DICTS.en.denounce.sendText("@camroux", starsLine(4), "Arsonist")).toBe("@camroux, Azerit drew up your dev rap sheet: ★★★★☆☆, Arsonist. That's you? Take it back:");
+    expect(fr(DICTS.fr.denounce.lawyerLinkedinHint)).toMatch(/^Reprends-la : /);
+    expect(DICTS.en.denounce.lawyerLinkedinHint).toMatch(/^Take it back: /);
   });
 
   it("le champ : un lien LinkedIn ou un pseudo GitHub quand le serveur lit LinkedIn, sinon le pseudo seul, et il le dit", () => {
@@ -71,18 +77,8 @@ describe("Dénoncer : la fiche du complice", () => {
     expect(DICTS.fr.denounce.githubOnly).toBe("Pour l'instant, par pseudo GitHub seulement.");
   });
 
-  it("le texte partagé porte les six étoiles", () => {
-    expect(DICTS.fr.denounce.shareText("@leamd", starsLine(5), "Sous couverture", null, "https://x.test")).toBe(
-      "@leamd est dans le viseur ★★★★★☆, Sous couverture. Droit de faire appel\u00a0: https://x.test",
-    );
-  });
-
-  it("dossier scellé : ni étoiles dans le titre, ni dans le texte partagé", () => {
-    expect(DICTS.fr.denounce.shareText("@camroux", "", "Sous couverture", null, "https://x.test")).toBe(
-      "@camroux est dans le viseur, Sous couverture. Droit de faire appel\u00a0: https://x.test",
-    );
-    expect(DICTS.en.denounce.shareText("@camroux", "", "Undercover", null, "https://x.test")).toBe(
-      "@camroux is in the crosshairs, Undercover. Right to appeal: https://x.test",
-    );
+  it("« Droit de faire appel » ne s'écrit plus nulle part : faire appel, c'est contester la note", () => {
+    expect(JSON.stringify(DICTS.fr.denounce)).not.toContain("Droit de faire appel");
+    expect(JSON.stringify(DICTS.en.denounce)).not.toContain("Right to appeal");
   });
 });

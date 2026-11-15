@@ -7,8 +7,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { FIXTURES } from "../../../shared/fixtures";
 import type { CardData } from "../../../shared/types";
 import { DICTS, LangProvider } from "../i18n";
-import { Duel } from "./Duel";
+import { Duel, useDuelSend } from "./Duel";
 import { Jury } from "./Jury";
+import type { MyCard } from "../lib/session";
+
+/** Le duel tel que la page le monte pour un visiteur : l'envoi en crochet, le bouton en rose. */
+function DuelWith({ mine, card: c }: { mine: MyCard; card: CardData }) {
+  return createElement(Duel, { mine, card: c, duel: useDuelSend(mine, c, () => undefined), strong: true });
+}
 
 const jurySrc = readFileSync(join(__dirname, "Jury.tsx"), "utf8");
 
@@ -49,20 +55,22 @@ describe("le jury, une fois le vote posé", () => {
 
 describe("le duel de qui a déjà sa fiche", () => {
   const duel = (overall: number, over: Partial<CardData> = {}, lang?: string) =>
-    render(createElement(Duel, { mine: { id: "MyCard00001", login: "leamd", overall }, card: { ...card, ...over }, toast }), lang);
+    render(createElement(DuelWith, { mine: { id: "MyCard00001", login: "leamd", overall }, card: { ...card, ...over } }), lang);
 
-  it("la ligne de comparaison en titre, « Lui envoyer le score » en contour, « Ma fiche » en lien", () => {
-    const html = duel(83);
-    expect(html).toContain('<h2 id="you-title">Toi 83/100, @camroux 68/100 : une étoile d\'avance</h2>');
-    expect(html).toMatch(/<button type="button" class="pill">Lui envoyer le score<\/button><a class="link-alt" href="\/c\/MyCard00001">Ma fiche<\/a>/);
-    expect(html).not.toContain("pill-big");
-    expect(duel(83, {}, "en-US")).toContain(">Send them the score</button>");
+  it("les deux notes en titre, l'écart ensuite ; « Lui envoyer mon score » en rose (le visiteur n'a que ce geste), « Ma fiche » en lien", () => {
+    const html = duel(83).replace(/\u00a0/g, " ");
+    expect(html).toContain('<h2 id="you-title">83/100 contre 68/100 : une étoile d\'avance</h2>');
+    expect(html).toMatch(/<button type="button" class="pill pill-big">Lui envoyer mon score<\/button><a class="link-alt" href="\/c\/MyCard00001">Ma fiche<\/a>/);
+    const en = duel(83, {}, "en-US");
+    expect(en).toContain(">83/100 vs 68/100: one star ahead</h2>");
+    expect(en).toContain(">Send them my score</button>");
   });
 
   it("un dossier scellé : ni note, ni score à envoyer", () => {
     const html = duel(83, { sealed: true });
     expect(html).not.toContain("68");
     expect(html).not.toContain("Lui envoyer");
+    expect(html).not.toContain("<button");
     expect(html).toContain(">Ma fiche</a>");
   });
 

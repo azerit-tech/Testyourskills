@@ -1,4 +1,6 @@
 // Le bloc de partage et la barre du pouce selon l'appareil (§18.27) : rendus en chaîne, sans navigateur.
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -162,6 +164,12 @@ describe("barre du pouce (§18.27)", () => {
   it("sans feuille de partage : le même lien LinkedIn que le bouton principal", () => {
     const html = renderDock({ ua: LINKEDIN_ANDROID, touch: true, share: false, narrow: true }, true);
     expect(html).toMatch(/<a class="pill pill-big dock-main" href="https:\/\/skills\.test\/c\//);
+  });
+
+  it("le bloc « Dénonce un complice » à l'écran : « Dénoncer » quitte la barre, jamais deux fois le même geste", () => {
+    const src = readFileSync(join(__dirname, "ShareDock.tsx"), "utf8");
+    expect(src).toContain('setDenounceSeen(all.some((el) => el.matches(".after-block.denounce")))');
+    expect(src).toMatch(/\{!denounceSeen && \(\s*<button type="button" className="pill pill-big pill-ghost" onClick=\{toDenounce\}>/);
   });
 
   it("pas pendant la révélation, pas sur ordinateur", () => {

@@ -27,15 +27,7 @@
   padding: 0 16px 0 8px;
   max-width: 100%;
 }
-.denounce-who img {
-  width: 28px;
-  height: 28px;
-  flex: none;
-  border-radius: 50%;
-  background: var(--s-item);
-  object-fit: cover;
-}
-/* sans image : l'initiale, crème sur un rond d'encre */
+/* l'initiale, crème sur un rond d'encre (jamais l'identicône) */
 .denounce-who-initial {
   display: grid;
   place-items: center;
@@ -95,12 +87,21 @@
   font: 400 var(--t-14) / 1.45 var(--f-text);
   color: var(--c-text);
 }
-/* le profil sur sa ligne : jamais un séparateur en début de ligne */
-.denounce-tag {
-  display: block;
-}
 .denounce-head {
   overflow-wrap: anywhere;
+}
+/* sous le titre, sa ligne : les étoiles (22 px) puis le profil */
+.denounce-level {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin: 0;
+}
+.denounce-tag {
+  font: 700 var(--t-16) / 1.2 var(--f-name);
+  text-transform: uppercase;
+  color: var(--cream);
 }
 .denounce-actions {
   display: grid;
@@ -130,7 +131,7 @@
     width: auto;
   }
   .denounce-actions {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    justify-items: start;
   }
 }
 
@@ -173,6 +174,16 @@
 }
 .denounced .removal {
   margin: 0;
+}
+/* Bureau : le bloc dénoncé et « À ton tour » tiennent dans le même écran ; « C'est moi » (ou « Ce n'est pas moi »)
+   y est le seul rose, le bouton du formulaire passe en contour (44 px). */
+@media (min-width: 900px) {
+  .page-result.is-wanted .you .entry-submit:not(:disabled):not(.is-busy) {
+    min-height: var(--h-tap);
+    background: transparent;
+    box-shadow: inset 0 0 0 1.5px var(--cream);
+    color: var(--cream);
+  }
 }
 @media (min-width: 561px) {
   .denounced .pill {
