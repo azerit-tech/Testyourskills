@@ -4,7 +4,11 @@
 // manifeste de Vite (dist/web/.vite/manifest.json).
 
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readFile, stat } from "node:fs/promises";
+import { join, normalize, sep } from "node:path";
+import { promisify } from "node:util";
+import { brotliCompress, constants as zc, gzip } from "node:zlib";
+import { getMimeType } from "hono/utils/mime";
 
 interface ManifestChunk {
   file: string;
@@ -63,4 +67,134 @@ export function withPreloads(html: string, manifest: Manifest, path: string, sta
   const tags = key ? preloadTags(manifest, key) : "";
   if (!tags || !/<\/head>/i.test(html)) return html;
   return html.replace(/<\/head>/i, `    ${tags}\n  </head>`);
+}
+
+// --- La compression ----------------------------------------------------------
+// Les fichiers texte du front (JS, CSS, SVG, polices, manifeste) partent en
+// brotli ou en gzip. Ceux de /assets portent leur empreinte et ne changent
+// jamais : leurs versions compressées sont faites une fois et gardées en
+// mémoire. Le HTML, petit et propre à chaque page, est compressé à la volée.
+
+export type Encoding = "br" | "gzip";
+
+const brotli = promisify(brotliCompress);
+const gz = promisify(gzip);
+
+/** L'encodage préféré que le navigateur accepte : brotli d'abord, puis gzip. */
+export function pickEncoding(acceptEncoding: string | null | undefined): Encoding | null {
+  const accepted = new Map<string, number>();
+  for (const part of (acceptEncoding ?? "").toLowerCase().split(",")) {
+    const [name, ...params] = part.trim().split(";");
+    if (!name) continue;
+    const q = params.map((p) => /^\s*q=([\d.]+)/.exec(p)?.[1]).find(Boolean);
+    accepted.set(name.trim(), q === undefined ? 1 : Number(q));
+  }
+  const ok = (name: string) => (accepted.get(name) ?? accepted.get("*") ?? 0) > 0;
+  if (ok("br")) return "br";
+  if (ok("gzip")) return "gzip";
+  return null;
+}
+
+/** Un fichier qui gagne à être compressé (images, vidéos et WOFF2 le sont déjà). */
+export function isCompressible(path: string): boolean {
+  return /\.(js|mjs|css|svg|json|webmanifest|txt|xml|ttf|otf|ico|map)$/i.test(path);
+}
+
+/** Compresse un contenu ; `heavy` : le meilleur taux (fichiers immuables, faits une fois). */
+export async function compress(data: Uint8Array, encoding: Encoding, heavy = false): Promise<Buffer> {
+  if (encoding === "br") {
+    return brotli(data, { params: { [zc.BROTLI_PARAM_QUALITY]: heavy ? 11 : 5, [zc.BROTLI_PARAM_SIZE_HINT]: data.byteLength } });
+  }
+  return gz(data, { level: heavy ? 9 : 6 });
+}
+
+interface Packed {
+  type: string;
+  size: number;
+  mtimeMs: number;
+  raw: Buffer;
+  encoded: Partial<Record<Encoding, Promise<Buffer>>>;
+}
+
+/**
+ * Les fichiers statiques compressibles du front, servis compressés depuis la
+ * mémoire. `serve` rend null pour ce qu'il ne prend pas (le statique de Hono
+ * s'en charge alors) : autre méthode, fichier absent ou trop petit, type non
+ * compressible, navigateur sans brotli ni gzip.
+ */
+export class StaticCompressor {
+  private readonly cache = new Map<string, Packed>();
+  constructor(private readonly root: string) {}
+
+  /** Le fichier sous la racine, ou null s'il en sort. */
+  private fileOf(urlPath: string): string | null {
+    let p: string;
+    try {
+      p = decodeURIComponent(urlPath);
+    } catch {
+      return null;
+    }
+    if (p.includes("\0")) return null;
+    const root = normalize(this.root);
+    const file = normalize(join(root, p));
+    return file.startsWith(root.endsWith(sep) ? root : root + sep) ? file : null;
+  }
+
+  private async packed(file: string): Promise<Packed | null> {
+    const st = await stat(file).catch(() => null);
+    if (!st?.isFile()) return null;
+    const hit = this.cache.get(file);
+    if (hit && hit.size === st.size && hit.mtimeMs === st.mtimeMs) return hit;
+    const raw = await readFile(file).catch(() => null);
+    if (!raw) return null;
+    const entry: Packed = { type: getMimeType(file) ?? "application/octet-stream", size: st.size, mtimeMs: st.mtimeMs, raw, encoded: {} };
+    this.cache.set(file, entry);
+    return entry;
+  }
+
+  /** Prépare d'avance les versions compressées (au démarrage, sans bloquer les requêtes). */
+  async warm(urlPaths: string[]): Promise<void> {
+    for (const u of urlPaths) {
+      const file = isCompressible(u) ? this.fileOf(u) : null;
+      const entry = file ? await this.packed(file) : null;
+      if (!entry || entry.raw.byteLength < 1024) continue;
+      for (const enc of ["br", "gzip"] as const) await (entry.encoded[enc] ??= compress(entry.raw, enc, true));
+    }
+  }
+
+  async serve(method: string, urlPath: string, acceptEncoding: string | null | undefined): Promise<Response | null> {
+    if ((method !== "GET" && method !== "HEAD") || !isCompressible(urlPath)) return null;
+    const encoding = pickEncoding(acceptEncoding);
+    if (!encoding) return null;
+    const file = this.fileOf(urlPath);
+    const entry = file ? await this.packed(file) : null;
+    if (!entry || entry.raw.byteLength < 1024) return null;
+    const body = await (entry.encoded[encoding] ??= compress(entry.raw, encoding, true));
+    return new Response(method === "HEAD" ? null : new Uint8Array(body), {
+      status: 200,
+      headers: {
+        "Content-Type": entry.type,
+        "Content-Encoding": encoding,
+        "Content-Length": String(body.byteLength),
+        Vary: "Accept-Encoding",
+      },
+    });
+  }
+}
+
+/** Le HTML d'une page, compressé si le navigateur l'accepte (à la volée, compression rapide). */
+export async function compressHtml(res: Response, acceptEncoding: string | null | undefined): Promise<Response> {
+  const encoding = pickEncoding(acceptEncoding);
+  if (!encoding || res.headers.has("content-encoding")) return res;
+  const raw = new Uint8Array(await res.arrayBuffer());
+  const headers = new Headers(res.headers);
+  headers.append("Vary", "Accept-Encoding");
+  if (raw.byteLength < 1024) {
+    headers.delete("content-length");
+    return new Response(raw, { status: res.status, headers });
+  }
+  const body = await compress(raw, encoding);
+  headers.set("Content-Encoding", encoding);
+  headers.set("Content-Length", String(body.byteLength));
+  return new Response(new Uint8Array(body), { status: res.status, headers });
 }

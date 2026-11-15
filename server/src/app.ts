@@ -36,7 +36,7 @@ import { mountFilmTrace } from "./filmTrace";
 import { mountPrimes, purgeEntries } from "./primes";
 import { mountPrimePages } from "./primePages";
 import { loadRules, servableRules } from "./rules";
-import { readManifest, withPreloads } from "./assets";
+import { compressHtml, readManifest, StaticCompressor, withPreloads } from "./assets";
 
 export interface AppOptions {
   store: Store;
@@ -252,17 +252,18 @@ export function createApp(opts: AppOptions) {
 
   const app = new Hono();
 
-  // Prod : chaque page du front annonce ses morceaux, qui partent avec le paquet de départ (assets.ts).
+  // Prod : chaque page du front annonce ses morceaux, qui partent avec le paquet de
+  // départ, et son HTML part compressé (assets.ts).
   const manifest = opts.staticRoot ? readManifest(opts.staticRoot) : null;
-  if (manifest) {
+  if (opts.staticRoot) {
     app.use("*", async (c, next) => {
       if (c.req.path.startsWith("/.vite/")) return c.text("Not found", 404);
       await next();
       if (c.req.method !== "GET" || !(c.res.headers.get("content-type") ?? "").startsWith("text/html")) return;
-      const html = withPreloads(await c.res.text(), manifest, c.req.path, c.res.status);
+      const html = manifest ? withPreloads(await c.res.text(), manifest, c.req.path, c.res.status) : await c.res.text();
       const headers = new Headers(c.res.headers);
       headers.delete("content-length");
-      c.res = new Response(html, { status: c.res.status, headers });
+      c.res = await compressHtml(new Response(html, { status: c.res.status, headers }), c.req.header("accept-encoding"));
     });
   }
 
@@ -863,6 +864,11 @@ export function createApp(opts: AppOptions) {
       await next();
       if (c.res.status === 200) c.res.headers.set("Cache-Control", "public, max-age=604800");
     });
+    // Les fichiers texte du front en brotli ou gzip, depuis la mémoire ; ceux de
+    // /assets sont compressés d'avance, au démarrage (assets.ts).
+    const packer = new StaticCompressor(root);
+    if (manifest) void packer.warm([...new Set(Object.values(manifest).flatMap((m) => [m.file, ...(m.css ?? [])]))].map((f) => `/${f}`));
+    app.use("*", async (c, next) => (await packer.serve(c.req.method, c.req.path, c.req.header("accept-encoding"))) ?? next());
     app.use("*", serveStatic({ root }));
     app.get("*", async (c) => {
       const p = c.req.path;
