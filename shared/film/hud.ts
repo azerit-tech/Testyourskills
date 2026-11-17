@@ -3,9 +3,10 @@
 // temps de la vidéo : le HUD ne peut pas se décaler de l'image. Sans DOM :
 // testé sans navigateur, et rendu tel quel côté serveur pour le clip (§18.8).
 import type { Lang } from "../types";
-import { BANDS_CLOSE, CUT_INK, FPS, GRAIN_STEP, SQUARE_STEP, STAR_POP, TITLE_FROM, TITLE_POP, chaseShotAt, ENDINGS, type ShotId } from "./cut";
+import { BANDS_CLOSE, FPS, GRAIN_STEP, SQUARE_STEP, STAR_POP, TITLE_FROM, TITLE_POP, shotAt, type ShotId } from "./cut";
 import type { FilmPlan } from "./plan";
 
+/** « ending » : à six étoiles, FIN6, de l'entrée de la pointe au gel (la musique s'est arrêtée, la berline freine). */
 export type FilmPhase = "chase" | "ending" | "freeze" | "flash" | "over";
 
 export interface StarHud {
@@ -21,11 +22,11 @@ export interface Hud {
   /** L'image du film (entière). */
   frame: number;
   phase: FilmPhase;
-  /** Le plan à l'écran. */
+  /** Le tronçon à l'écran. */
   shot: ShotId;
-  /** La balise vidéo visible : la poursuite, la fin, ou aucune (la fiche est posée). */
-  video: "chase" | "ending" | null;
-  /** L'image dans le fichier de cette balise. */
+  /** La vidéo visible (un seul fichier, une seule balise), ou aucune : la fiche est posée. */
+  video: "chase" | null;
+  /** L'image du fichier à l'écran. */
   videoFrame: number;
   /** Les six étoiles. */
   stars: StarHud[];
@@ -35,8 +36,6 @@ export interface Hud {
   radio: { text: string; kicker: string | null; square: "coral" | "lilac" } | null;
   /** Fermeture des bandes d'encre : 0 ouvertes, 1 fermées. */
   bands: number;
-  /** Les deux images de l'éclair de la bascule vers la fin, à six étoiles (le nom vient de l'encre qui les couvrait d'abord). */
-  ink: boolean;
   /** L'arrêt sur image : deux tons, plaque et titre (échelle du claquement, 1,2 à 1). */
   freeze: { titleScale: number } | null;
   /** Opacité du flash crème. */
@@ -59,13 +58,12 @@ function grainAt(step: number): [number, number] {
 export function hudAt(plan: FilmPlan, t: number, lang: Lang): Hud {
   const f = Math.max(0, t * FPS);
   const frame = Math.floor(f + 1e-6);
-  const { cut, freeze, flash } = plan;
-  // De une à cinq étoiles, pas de fin tournée : le gel (cut - 1) suit la poursuite, sans phase « ending ».
-  const phase: FilmPhase = frame >= flash.to ? "over" : frame >= flash.from ? "flash" : frame >= freeze ? "freeze" : frame < cut ? "chase" : "ending";
-  const onEnding = plan.ending !== null && frame >= cut;
+  const { cut, chaseEnd, freeze, flash } = plan;
+  // Le gel (cut - 1) suit la vidéo, sur place ; à six étoiles, FIN6 (de chaseEnd au gel) est la phase « ending ».
+  const phase: FilmPhase = frame >= flash.to ? "over" : frame >= flash.from ? "flash" : frame >= freeze ? "freeze" : frame < chaseEnd ? "chase" : "ending";
   const landed = frame >= flash.peak;
 
-  // Les étoiles de la poursuite, chacune sur sa coupe : elle claque (son « pop »), l'image ne bouge pas.
+  // Les étoiles, chacune à son instant du trajet : elle claque (son « pop »), l'image ne bouge pas.
   let lit = 0;
   for (const s of plan.stars) if (frame >= s.frame) lit = s.star;
   const stars: StarHud[] = [];
@@ -102,16 +100,14 @@ export function hudAt(plan: FilmPlan, t: number, lang: Lang): Hud {
   return {
     frame,
     phase,
-    shot: onEnding && plan.ending ? ENDINGS[plan.ending].shot : chaseShotAt(Math.min(frame, cut - 1)),
-    video: landed ? null : onEnding ? "ending" : "chase",
-    // gelée sur place, la poursuite reste sur la dernière image de son dernier plan
-    videoFrame: onEnding ? Math.min(frame - cut, plan.endVideo - 1) : Math.min(frame, cut - 1),
+    shot: shotAt(Math.min(frame, cut - 1)),
+    video: landed ? null : "chase",
+    // gelée sur place, la vidéo reste sur la dernière image de son dernier tronçon
+    videoFrame: Math.min(frame, cut - 1),
     stars,
     lit,
     radio,
     bands,
-    // l'éclair de la coupe vers la fin : six étoiles seulement, de une à cinq il n'y a pas de coupe
-    ink: plan.ending !== null && frame >= cut - 1 && frame < cut - 1 + CUT_INK,
     freeze: frozen ? { titleScale: frame - freeze < TITLE_POP ? TITLE_FROM - ((TITLE_FROM - 1) * (frame - freeze)) / TITLE_POP : 1 } : null,
     flash: flashOpacity,
     grain: grainAt(Math.floor(frame / GRAIN_STEP)),

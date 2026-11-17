@@ -70,7 +70,6 @@ export function FilmHud({ plan, hud, lang }: { plan: FilmPlan; hud: Hud; lang: L
     <>
       {grain && <div className="film-grain" style={{ backgroundImage: `url(${grain})`, transform: `translate(${hud.grain[0]}px, ${hud.grain[1]}px)` }} />}
       <div className="film-vignette" />
-      {hud.ink && <div className="film-ink" />}
 
       {hud.freeze && (
         <div className="film-mug">

@@ -1,6 +1,6 @@
 // Le film de la poursuite (§18.36), joué : même contrat que Walkout3D
-// envers CardPage. « ready » : les deux balises sont chargées et posées sur
-// leur première image (l'attente peut se lever, onReady) ; si la lecture
+// envers CardPage. « ready » : la balise est chargée et posée sur sa
+// première image (l'attente peut se lever, onReady) ; si la lecture
 // demande un geste, onGesture (l'attente montre la pilule). « playing » : la
 // vidéo joue, le HUD suit son horloge. Au sommet du flash, la fiche se pose
 // (onHandoff) ; à la fin du flash, la scène s'efface (onDone). Onglet caché :
@@ -22,7 +22,7 @@ import { buzz } from "../lib/haptics";
 import { inAppBrowser } from "../lib/sharing";
 import { canPlayFilm, createFilmPlayer, type FilmPlayer, type FilmStats } from "../film/player";
 import { FilmHud, FilmRadio } from "../film/FilmHud";
-import { filmVideos } from "../film/unlock";
+import { filmVideo } from "../film/unlock";
 import { ensureStill, paintStill, stillShot } from "../film/freeze";
 import type { FileId } from "../film/files";
 import { filmLoadMs, filmNet, filmRemaining } from "../film/loader";
@@ -35,8 +35,8 @@ import "../film/film.css";
 
 export { preloadFilm } from "../film/player";
 
-/** Les fichiers que joue un plan : la poursuite, et la fin tournée à six étoiles. */
-const filmFiles = (plan: FilmPlan): FileId[] => (plan.ending ? ["poursuite", plan.ending] : ["poursuite"]);
+/** Le fichier que joue le film : un seul, la poursuite et FIN6, à tous les niveaux (§18.56). */
+const FILM_FILES: FileId[] = ["poursuite"];
 
 /** Fiche prête, film pas encore prêt : l'avancement du chargement est relu à ce rythme (§5.5, net.ts readyVerdict). */
 const READY_CHECK_MS = 100;
@@ -105,8 +105,7 @@ function paintBack(back: HTMLCanvasElement | null, still: HTMLCanvasElement | nu
   backAt = now;
   const g = back.getContext("2d");
   if (!g) return;
-  const [a, b] = filmVideos();
-  const src = frozen && still?.dataset.ready !== undefined ? still : a.style.visibility === "visible" ? a : b;
+  const src = frozen && still?.dataset.ready !== undefined ? still : filmVideo();
   try {
     g.filter = "blur(1.5px)";
     g.drawImage(src, -2, -2, BACK_W + 4, BACK_H + 4);
@@ -147,10 +146,7 @@ function useFilmPlan(card: CardData): FilmPlan {
 function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, onDone, replay = false, onFail }: Props & { onFail: () => void }) {
   const { t: tr } = useT();
   const plan = useFilmPlan(card);
-  const planRef = useRef(plan);
-  planRef.current = plan;
   const frameRef = useRef<HTMLDivElement>(null);
-  const coverRef = useRef<HTMLDivElement>(null);
   const stillRef = useRef<HTMLCanvasElement>(null);
   const backRef = useRef<HTMLCanvasElement>(null);
   /** Le dernier lecteur créé (ses mesures servent à l'événement, même libéré). */
@@ -185,7 +181,7 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
         outcome,
         variant: s.quality,
         bytes: net.bytes,
-        loadMs: filmLoadMs(filmFiles(planRef.current)),
+        loadMs: filmLoadMs(FILM_FILES),
         startMs: s.startMs,
         dropped: r.started ? s.dropped : null,
         switchMs: s.switchMs,
@@ -252,13 +248,11 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
   // Un par plan : le plan ne change que si la fiche joue un autre film (useFilmPlan).
   useEffect(() => {
     const host = frameRef.current;
-    const cover = coverRef.current;
-    if (!host || !cover) return;
+    if (!host) return;
     cues.current = { star: 0, staged: false, handed: false, done: false };
     const p = createFilmPlayer({
       plan,
       host,
-      cover,
       still: stillRef.current,
       onTime: (t) => {
         // rendu tout de suite, dans le rafraîchissement de l'image : le HUD ne retarde pas d'un cran
@@ -269,9 +263,8 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
       onStill: (v) => paintStill(v, stillRef.current, plan.tone, stillShot(plan)),
     });
     player.current = p;
-    const untrace = filmTraceMount({ stats: p.stats, plan: { duration: plan.duration, cut: plan.cut, endVideo: plan.endVideo, level: plan.level } });
+    const untrace = filmTraceMount({ stats: p.stats, plan: { duration: plan.duration, cut: plan.cut, level: plan.level } });
     let settled = false;
-    const needed = filmFiles(plan);
     const r = reading.current;
     // Le délai d'abandon (§5.5) : en temps d'onglet visible seulement, et sur
     // l'avancement réel du chargement. Le reste arrive à temps : on attend ;
@@ -294,7 +287,7 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
       const visibleMs = clock.at(performance.now(), !document.hidden);
       // onglet caché : rien ne se décide dans le dos de la personne
       if (document.hidden) return;
-      const facts = { visibleMs, remainingBytes: filmRemaining(needed), bps: filmNet().bps };
+      const facts = { visibleMs, remainingBytes: filmRemaining(FILM_FILES), bps: filmNet().bps };
       if (readyVerdict(facts) === "give-up") {
         filmTrace("délai", { visible: Math.round(visibleMs), reste: facts.remainingBytes, bps: facts.bps === null ? null : Math.round(facts.bps) });
         fail("timeout");
@@ -401,8 +394,7 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
         <div className="film-wide film-wide-top" style={{ transform: `translateY(${(hud.bands - 1) * 100}%)` }} />
         <div className="film-wide film-wide-bottom" style={{ transform: `translateY(${(1 - hud.bands) * 100}%)` }} />
         <div ref={frameRef} className={`film-frame${hud.freeze ? " is-frozen" : ""}`} data-frame={hud.frame} data-shot={hud.shot}>
-          {/* les deux balises vidéo sont posées ici par le lecteur */}
-          <div ref={coverRef} className="film-cover" />
+          {/* la balise vidéo est posée ici par le lecteur */}
           {/* l'arrêt sur image en deux tons, tiré pendant l'attente (freeze.ts) */}
           <canvas ref={stillRef} className="film-video film-still" />
           <FilmHud plan={plan} hud={hud} lang={lang} />

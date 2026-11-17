@@ -1,10 +1,11 @@
-// Le film (§18.36) : les durées viennent du découpage, le film s'arrête au
-// niveau, le HUD est une fonction pure de l'instant et ne montre jamais une
-// étoile de trop.
+// Le film (§18.36, §18.56) : les durées viennent du parcours (parcours.json),
+// le film s'arrête au niveau et gèle sur place, le HUD est une fonction pure de
+// l'instant et ne montre jamais une étoile de trop.
 import { describe, expect, it } from "vitest";
 import { FIXTURES } from "../fixtures";
 import type { CardData, Stars } from "../types";
-import { CHASE_FRAMES, CHASE_SHOTS, ENDINGS, FPS, IN_PLACE, SHOT_FRAMES, SHOT_START, TITLE_POP, chaseShotAt, endingFrames, filmPlan, hudAt } from "./index";
+import { CHASE_FRAMES, CHASE_SHOTS, FILM_FRAMES, FILM_SHOTS, FINALE, FPS, IN_PLACE, SHOT_FRAMES, SHOT_START, STAR_FRAMES, STOP_FRAME, TITLE_POP, filmPlan, holdOf, hudAt, shotAt } from "./index";
+import PARCOURS from "./parcours.json";
 import { radioLines } from "./radio";
 
 const OVERALL: Record<Stars, number> = { 1: 12, 2: 33, 3: 50, 4: 66, 5: 80, 6: 93 };
@@ -13,78 +14,93 @@ const LEVELS: Stars[] = [1, 2, 3, 4, 5, 6];
 /** Milieu d'une image : l'instant que `seek` vise. */
 const at = (frame: number) => (frame + 0.5) / FPS;
 
-describe("le découpage (docs/cinematique-decoupage-v3.md §7)", () => {
-  it("OUV 40, P1 48, P2 110, P3 et P4 48, P5 et P6 60 : la poursuite fait 414 images ; FIN6 104 (80 de vidéo) ; sur place, 14 + 10", () => {
-    expect(SHOT_FRAMES).toEqual({ OUV: 40, P1: 48, P2: 110, P3: 48, P4: 48, P5: 60, P6: 60 });
-    expect(CHASE_FRAMES).toBe(414);
-    expect(endingFrames("fin6")).toBe(104);
-    expect(ENDINGS.fin6.video).toBe(80);
-    expect(Object.keys(ENDINGS)).toEqual(["fin6"]);
-    expect(IN_PLACE).toEqual({ freeze: 14, flash: 10, rise: 4 });
-    expect(SHOT_START).toEqual({ OUV: 0, P1: 40, P2: 88, P3: 198, P4: 246, P5: 294, P6: 354 });
+describe("le découpage, lu dans le parcours (§18.56)", () => {
+  it("les tronçons et les étoiles sont ceux de parcours.json, sans recopie", () => {
+    expect(Object.entries(SHOT_FRAMES)).toEqual(PARCOURS.troncons);
+    expect(STAR_FRAMES).toEqual(PARCOURS.etoiles);
+    expect(STOP_FRAME).toBe(PARCOURS.arret);
+    expect(PARCOURS.fps).toBe(FPS);
   });
 
-  it("chaque image de la poursuite appartient à un seul plan, dans l'ordre", () => {
+  it("le trajet roulé du 17 novembre : OUV 75, P1 33, P2 107, P3 103, P4 108, P5 60, P6 133, FIN6 101 : 720 images, 30 s ; sur place 14 + 10, à six étoiles 12 + 12", () => {
+    expect(SHOT_FRAMES).toEqual({ OUV: 75, P1: 33, P2: 107, P3: 103, P4: 108, P5: 60, P6: 133, FIN6: 101 });
+    expect(SHOT_START).toEqual({ OUV: 0, P1: 75, P2: 108, P3: 215, P4: 318, P5: 426, P6: 486, FIN6: 619 });
+    expect(CHASE_FRAMES).toBe(619);
+    expect(FILM_FRAMES).toBe(720);
+    expect(FILM_FRAMES / FPS).toBe(30);
+    expect(STAR_FRAMES).toEqual([77, 153, 255, 375, 453, 567]);
+    // la berline s'arrête sur la pointe, dans FIN6, avant la dernière image
+    expect(STOP_FRAME).toBeGreaterThan(SHOT_START.FIN6);
+    expect(STOP_FRAME).toBeLessThan(FILM_FRAMES - 1);
+    expect(IN_PLACE).toEqual({ freeze: 14, flash: 10, rise: 4 });
+    expect(FINALE).toEqual({ freeze: 12, flash: 12, rise: 4 });
+    expect(holdOf(5)).toBe(IN_PLACE);
+    expect(holdOf(6)).toBe(FINALE);
+  });
+
+  it("chaque image du fichier appartient à un seul tronçon, dans l'ordre ; l'étoile k tombe dans Pk", () => {
     let i = 0;
-    for (let f = 0; f < CHASE_FRAMES; f++) {
-      const s = chaseShotAt(f);
-      const j = CHASE_SHOTS.indexOf(s);
+    for (let f = 0; f < FILM_FRAMES; f++) {
+      const s = shotAt(f);
+      const j = FILM_SHOTS.indexOf(s);
       expect(j === i || j === i + 1).toBe(true);
       i = j;
       expect(f).toBeGreaterThanOrEqual(SHOT_START[s]);
       expect(f).toBeLessThan(SHOT_START[s] + SHOT_FRAMES[s]);
     }
+    for (const [k, f] of STAR_FRAMES.entries()) expect(shotAt(f)).toBe(CHASE_SHOTS[k + 1]);
   });
 });
 
 describe("filmPlan (§2.1)", () => {
-  it("les durées (§18.53) : 111, 221, 269, 317, 377 et 518 images ; 4,6 s, 11,2 s et 21,6 s à une, trois et six étoiles", () => {
+  it("les durées (§18.56) : 131, 238, 341, 449, 509 et 743 images ; 5,5 s, 14,2 s et 31,0 s à une, trois et six étoiles", () => {
     const frames = LEVELS.map((n) => filmPlan(cardAt(n)).frames);
-    expect(frames).toEqual([111, 221, 269, 317, 377, 518]);
-    // une à cinq : la poursuite jusqu'à la fin de son dernier plan, dont la dernière image gèle sur place ; six : FIN6 entière
+    expect(frames).toEqual([131, 238, 341, 449, 509, 743]);
+    // la vidéo jusqu'à la fin du tronçon de la dernière étoile (FIN6 comprise à six), dont la dernière image gèle sur place
     for (const n of LEVELS) {
-      const last = CHASE_SHOTS[n];
+      const last = n === 6 ? "FIN6" : CHASE_SHOTS[n];
       const end = SHOT_START[last] + SHOT_FRAMES[last];
-      expect(frames[n - 1]).toBe(n === 6 ? end + endingFrames("fin6") : end - 1 + IN_PLACE.freeze + IN_PLACE.flash);
+      const hold = n === 6 ? FINALE : IN_PLACE;
+      expect(frames[n - 1]).toBe(end - 1 + hold.freeze + hold.flash);
     }
-    expect(filmPlan(cardAt(1)).duration).toBeCloseTo(4.6, 1);
-    expect(filmPlan(cardAt(3)).duration).toBeCloseTo(11.2, 1);
-    expect(filmPlan(cardAt(6)).duration).toBeCloseTo(21.6, 1);
+    expect(filmPlan(cardAt(1)).duration).toBeCloseTo(5.46, 2);
+    expect(filmPlan(cardAt(3)).duration).toBeCloseTo(14.21, 2);
+    expect(filmPlan(cardAt(6)).duration).toBeCloseTo(30.96, 2);
     for (const n of LEVELS) {
       const p = filmPlan(cardAt(n));
       expect(Math.abs(p.duration - p.frames / FPS)).toBeLessThan(1e-9);
     }
   });
 
-  it("une étoile par plan, sur sa coupe : la première image de P1 à P6", () => {
+  it("une étoile par tronçon, à son instant du trajet (parcours.ETOILES), pas sur un bord", () => {
     const p = filmPlan(cardAt(6));
-    expect(p.stars.map((s) => s.frame)).toEqual(CHASE_SHOTS.slice(1).map((s) => SHOT_START[s]));
+    expect(p.stars.map((s) => s.frame)).toEqual([...STAR_FRAMES]);
     expect(p.stars.map((s) => s.star)).toEqual(LEVELS);
     for (const s of p.stars) expect(s.at).toBeCloseTo(s.frame / FPS, 9);
     for (const n of LEVELS) expect(filmPlan(cardAt(n)).stars).toHaveLength(n);
   });
 
-  it("la coupe tombe à la fin du dernier plan du niveau, jamais dans le plan suivant", () => {
+  it("la vidéo s'arrête à la fin du tronçon de la dernière étoile, jamais dans le suivant ; à six étoiles, au bout du fichier", () => {
     for (const n of LEVELS) {
       const p = filmPlan(cardAt(n));
-      const last = CHASE_SHOTS[n];
+      const last = n === 6 ? "FIN6" : CHASE_SHOTS[n];
       expect(p.cut).toBe(SHOT_START[last] + SHOT_FRAMES[last]);
-      expect(chaseShotAt(p.cut - 1)).toBe(last);
-      // une seule fin tournée, à six étoiles ; de une à cinq, la fin se joue sur place
-      expect(p.ending).toBe(n === 6 ? "fin6" : null);
-      expect(p.endVideo).toBe(n === 6 ? ENDINGS.fin6.video : 0);
+      expect(shotAt(p.cut - 1)).toBe(last);
+      // la musique s'arrête avec la vidéo de une à cinq étoiles ; à six, à l'entrée de la pointe
+      expect(p.chaseEnd).toBe(n === 6 ? SHOT_START.FIN6 : p.cut);
+      expect(p).not.toHaveProperty("ending");
     }
     expect(filmPlan(cardAt(1)).cut).toBe(SHOT_START.P2);
     expect(filmPlan(cardAt(3)).cut).toBe(SHOT_START.P4);
-    expect(filmPlan(cardAt(6)).cut).toBe(CHASE_FRAMES);
+    expect(filmPlan(cardAt(6)).cut).toBe(FILM_FRAMES);
   });
 
-  it("le gel, puis le flash : sur place 14 + 10, FIN6 80 + 12 + 12 ; la fiche se pose au sommet, 4 images après le début du flash", () => {
+  it("le gel, puis le flash : 14 + 10 de une à cinq étoiles, 12 + 12 à six ; la fiche se pose au sommet, 4 images après le début du flash", () => {
     for (const n of LEVELS) {
       const p = filmPlan(cardAt(n));
-      const e = p.ending ? ENDINGS[p.ending] : IN_PLACE;
-      // sur place, le gel prend la dernière image du dernier plan joué
-      expect(p.freeze).toBe(p.ending ? p.cut + ENDINGS[p.ending].video : p.cut - 1);
+      const e = holdOf(n);
+      // le gel prend la dernière image jouée, sur place
+      expect(p.freeze).toBe(p.cut - 1);
       expect(p.flash).toEqual({ from: p.freeze + e.freeze, peak: p.freeze + e.freeze + e.rise, to: p.freeze + e.freeze + e.flash });
       expect(p.handoffAt).toBeCloseTo(p.flash.peak / FPS, 9);
     }
@@ -95,11 +111,13 @@ describe("filmPlan (§2.1)", () => {
       expect(p.stageAt * FPS).toBeLessThanOrEqual(p.flash.from - 6);
     }
     const p1 = filmPlan(cardAt(1));
-    expect(p1.freeze).toBe(87);
-    expect(p1.flash).toEqual({ from: 87 + 14, peak: 101 + 4, to: 111 });
+    expect(p1.freeze).toBe(107);
+    expect(p1.flash).toEqual({ from: 107 + 14, peak: 121 + 4, to: 131 });
+    // les images gelées : la dernière de P1 à P5, puis celle de FIN6
+    expect(LEVELS.map((n) => filmPlan(cardAt(n)).freeze)).toEqual([107, 214, 317, 425, 485, 719]);
     const p6 = filmPlan(cardAt(6));
-    expect(p6.freeze).toBe(414 + 80);
-    expect(p6.flash).toEqual({ from: 506, peak: 510, to: 518 });
+    expect(p6.freeze).toBe(719);
+    expect(p6.flash).toEqual({ from: 731, peak: 735, to: 743 });
   });
 
   it("l'interception : l'étoile suivante clignote deux fois juste avant le gel, dans le dernier plan joué ; à six étoiles, rien", () => {
@@ -184,39 +202,40 @@ describe("hudAt (§2.2, §5.2)", () => {
       expect(hudAt(p, at(s.frame + 5), "fr").stars[s.star - 1]).toEqual({ on: true, scale: 1 });
     }
     expect(hudAt(p, at(0), "fr").radio).toBeNull();
-    expect(hudAt(p, at(SHOT_START.P1 - 1), "fr").radio).toBeNull();
-    expect(hudAt(p, at(SHOT_START.P1), "en").radio?.text).toBe(p.radio.en.beats[0]);
+    expect(hudAt(p, at(STAR_FRAMES[0] - 1), "fr").radio).toBeNull();
+    expect(hudAt(p, at(STAR_FRAMES[0]), "en").radio?.text).toBe(p.radio.en.beats[0]);
   });
 
   it("la radio cite la fiche : « Véhicule en fuite : Backend », annonce l'interception, puis la fin de course au gel", () => {
     const p = filmPlan(cardAt(4));
-    expect(hudAt(p, at(SHOT_START.P1 + 6), "fr").radio?.text).toBe("Véhicule en fuite\u00a0: Backend");
-    expect(hudAt(p, at(SHOT_START.P2 + 8), "fr").radio?.text).toBe("Arme signalée\u00a0: Python");
-    expect(hudAt(p, at(SHOT_START.P1 + 6), "fr").radio?.kicker).toBeNull();
+    expect(hudAt(p, at(STAR_FRAMES[0] + 6), "fr").radio?.text).toBe("Véhicule en fuite\u00a0: Backend");
+    expect(hudAt(p, at(STAR_FRAMES[1] + 8), "fr").radio?.text).toBe("Arme signalée\u00a0: Python");
+    expect(hudAt(p, at(STAR_FRAMES[0] + 6), "fr").radio?.kicker).toBeNull();
     expect(hudAt(p, at(p.cut - 13), "fr").radio?.text).toBe(p.radio.fr.beats[3]);
     expect(hudAt(p, at(p.cut - 12), "fr").radio?.text).toBe("Interception\u00a0: barrage en place");
     expect(hudAt(p, at(p.cut - 2), "fr").radio?.text).toBe("Interception\u00a0: barrage en place");
     expect(hudAt(p, at(p.cut - 2), "fr").radio?.kicker).toBeNull();
     expect(hudAt(p, at(p.freeze - 1), "en").radio?.text).toBe("Intercept: roadblock in place");
-    // six étoiles : pas d'interception, la dernière ligne tient jusqu'au gel
+    // six étoiles : pas d'interception, la dernière ligne tient jusqu'au gel, FIN6 comprise
     const p6 = filmPlan(cardAt(6));
-    expect(hudAt(p6, at(p6.cut + 3), "fr").radio?.text).toBe(p6.radio.fr.beats[5]);
+    expect(hudAt(p6, at(p6.chaseEnd + 3), "fr").radio?.text).toBe(p6.radio.fr.beats[5]);
+    expect(hudAt(p6, at(p6.freeze - 1), "fr").radio?.text).toBe(p6.radio.fr.beats[5]);
     // au gel, la fin de course sans le niveau : il est écrit en grand juste au-dessus
     expect(hudAt(p, at(p.freeze), "fr").radio).toMatchObject({ text: "Fin de course\u00a0: dossier ouvert", kicker: null });
     expect(hudAt(p, at(p.freeze), "en").radio?.text).toBe("End of the line: file opened");
     expect(hudAt(p, at(p.freeze), "fr").radio?.text).not.toContain(p.title.fr);
-    const squares = new Set(Array.from({ length: FPS }, (_, i) => hudAt(p, at(SHOT_START.P1 + 6 + i), "fr").radio?.square));
+    const squares = new Set(Array.from({ length: FPS }, (_, i) => hudAt(p, at(STAR_FRAMES[0] + i), "fr").radio?.square));
     expect(squares).toEqual(new Set(["coral", "lilac"]));
   });
 
-  it("une à cinq étoiles, le gel sur place : la poursuite jusqu'à la dernière image du dernier plan joué, gelée ; ni éclair, ni fin, ni image du plan suivant", () => {
+  it("une à cinq étoiles, le gel sur place : la vidéo jusqu'à la dernière image du dernier tronçon joué, gelée ; ni FIN6, ni image du tronçon suivant", () => {
     for (const n of [1, 2, 3, 4, 5] as const) {
       const p = filmPlan(cardAt(n));
-      expect(hudAt(p, at(p.cut - 2), "fr")).toMatchObject({ phase: "chase", video: "chase", videoFrame: p.cut - 2, ink: false, shot: CHASE_SHOTS[n], freeze: null });
-      expect(hudAt(p, at(p.cut - 1), "fr")).toMatchObject({ phase: "freeze", video: "chase", videoFrame: p.cut - 1, ink: false, shot: CHASE_SHOTS[n], freeze: { titleScale: 1.2 } });
+      expect(hudAt(p, at(p.cut - 2), "fr")).toMatchObject({ phase: "chase", video: "chase", videoFrame: p.cut - 2, shot: CHASE_SHOTS[n], freeze: null });
+      expect(hudAt(p, at(p.cut - 1), "fr")).toMatchObject({ phase: "freeze", video: "chase", videoFrame: p.cut - 1, shot: CHASE_SHOTS[n], freeze: { titleScale: 1.2 } });
       for (let f = 0; f < p.frames; f++) {
         const h = hudAt(p, at(f), "fr");
-        expect(h.ink).toBe(false);
+        expect(h).not.toHaveProperty("ink");
         expect(h.phase).not.toBe("ending");
         expect(h.shot).not.toBe("FIN6");
         if (h.video !== null) expect(h).toMatchObject({ video: "chase" });
@@ -226,20 +245,12 @@ describe("hudAt (§2.2, §5.2)", () => {
     }
   });
 
-  it("six étoiles, la bascule : la poursuite jusqu'à la coupe, deux images d'éclair (la dernière de P6, la première de FIN6), puis la fin", () => {
-    for (const n of [6] as const) {
-      const p = filmPlan(cardAt(n));
-      expect(hudAt(p, at(p.cut - 2), "fr")).toMatchObject({ phase: "chase", video: "chase", videoFrame: p.cut - 2, ink: false, shot: CHASE_SHOTS[n] });
-      expect(hudAt(p, at(p.cut - 1), "fr")).toMatchObject({ phase: "chase", video: "chase", videoFrame: p.cut - 1, ink: true, shot: CHASE_SHOTS[n] });
-      expect(hudAt(p, at(p.cut), "fr")).toMatchObject({ phase: "ending", video: "ending", videoFrame: 0, ink: true });
-      expect(hudAt(p, at(p.cut + 1), "fr")).toMatchObject({ ink: false, videoFrame: 1 });
-      expect(Array.from({ length: p.frames }, (_, f) => hudAt(p, at(f), "fr").ink).filter(Boolean)).toHaveLength(2);
-      for (let f = 0; f < p.frames; f++) {
-        const h = hudAt(p, at(f), "fr");
-        if (h.video === "chase") expect(h.videoFrame).toBeLessThan(p.cut);
-        if (h.video === "ending") expect(h.videoFrame).toBeLessThan(p.endVideo);
-      }
-    }
+  it("six étoiles, d'un seul tenant : P6 continue dans FIN6 sans coupe ni éclair, la même vidéo, l'image suit l'horloge jusqu'au gel", () => {
+    const p = filmPlan(cardAt(6));
+    expect(hudAt(p, at(p.chaseEnd - 1), "fr")).toMatchObject({ phase: "chase", video: "chase", videoFrame: p.chaseEnd - 1, shot: "P6" });
+    expect(hudAt(p, at(p.chaseEnd), "fr")).toMatchObject({ phase: "ending", video: "chase", videoFrame: p.chaseEnd, shot: "FIN6", freeze: null });
+    for (let f = 0; f < p.freeze; f++) expect(hudAt(p, at(f), "fr")).toMatchObject({ video: "chase", videoFrame: f });
+    for (let f = 0; f < p.frames; f++) expect(hudAt(p, at(f), "fr").videoFrame).toBeLessThan(FILM_FRAMES);
   });
 
   it("l'arrêt sur image : la dernière image jouée, gelée (du dernier plan sur place, de FIN6 à six étoiles) ; le titre claque de 1,2 à 1", () => {
@@ -250,8 +261,8 @@ describe("hudAt (§2.2, §5.2)", () => {
     expect(hudAt(p, at(p.freeze + 4), "fr").freeze).toEqual({ titleScale: 1 });
     expect(hudAt(p, at(p.flash.from + 1), "fr").videoFrame).toBe(p.cut - 1);
     const p6 = filmPlan(cardAt(6));
-    expect(hudAt(p6, at(p6.freeze), "fr")).toMatchObject({ phase: "freeze", video: "ending", videoFrame: p6.endVideo - 1, shot: "FIN6", freeze: { titleScale: 1.2 } });
-    expect(hudAt(p6, at(p6.flash.from + 1), "fr").videoFrame).toBe(p6.endVideo - 1);
+    expect(hudAt(p6, at(p6.freeze), "fr")).toMatchObject({ phase: "freeze", video: "chase", videoFrame: FILM_FRAMES - 1, shot: "FIN6", freeze: { titleScale: 1.2 } });
+    expect(hudAt(p6, at(p6.flash.from + 1), "fr").videoFrame).toBe(FILM_FRAMES - 1);
   });
 
   it("le clignotement, à chaque niveau de une à cinq étoiles : l'étoile suivante bat deux fois en contour avant le gel, jamais pleine, et finit éteinte", () => {
@@ -336,7 +347,7 @@ describe("radioLines", () => {
       }
     }
     const p = filmPlan({ ...cardAt(3), statuses: card.statuses });
-    const h = hudAt(p, at(SHOT_START.P3 + 4), "fr");
+    const h = hudAt(p, at(STAR_FRAMES[2] + 4), "fr");
     expect(h.radio).toMatchObject({ kicker: "Chef d'accusation", text: "Commits : fix, fix2, final fix" });
   });
 });

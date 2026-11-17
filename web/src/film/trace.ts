@@ -2,8 +2,8 @@
 // (en production comme en `?mock=1`), lu au chargement de la page et gardé pour
 // l'onglet (`?filmtrace=0` l'éteint). Ce module est dans le paquet de l'accueil
 // et ne fait rien sans le paramètre : ni écouteur, ni requête. Avec lui,
-// l'enregistreur (traceRecorder.ts) se charge à part : les événements des deux
-// balises, un instantané toutes les 250 ms tant que le film est monté, les
+// l'enregistreur (traceRecorder.ts) se charge à part : les événements de la
+// balise, un instantané toutes les 250 ms tant que le film est monté, les
 // étapes de Film.tsx, un calque à l'écran, et l'envoi par lots à
 // POST /api/film-trace (le serveur avec FILM_TRACE=1). Rien de la fiche ni de
 // la personne n'y entre.
@@ -15,7 +15,7 @@ const KEY = "tys-filmtrace";
 export interface FilmProbe {
   stats(): FilmStats;
   /** Le plan joué : durées seulement (images), jamais la fiche. */
-  plan: { duration: number; cut: number; endVideo: number; level: number };
+  plan: { duration: number; cut: number; level: number };
 }
 
 export interface TraceRecorder {

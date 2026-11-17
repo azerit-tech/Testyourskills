@@ -4,15 +4,14 @@
 // jamais en image figée.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FIXTURES } from "../../../shared/fixtures";
-import { filmPlan, FPS } from "../../../shared/film";
+import { FILM_FRAMES, filmPlan, FPS } from "../../../shared/film";
 
 vi.mock("./loader", () => ({
   canPlayFilm: () => true,
   debugFlag: () => null,
-  dropFilmFile: () => undefined,
   filmNet: () => ({ bytes: 0, bps: null, firstStart: null }),
   filmVariant: () => "720",
-  loadFilmFiles: async () => ({ urls: ["blob:a", "blob:b"], quality: "720" }),
+  loadFilmFiles: async () => ({ urls: ["blob:a"], quality: "720" }),
   preloadFilm: () => undefined,
 }));
 
@@ -22,7 +21,8 @@ const videos: FakeVideo[] = [];
 class FakeVideo extends EventTarget {
   paused = true;
   currentTime = 0;
-  duration = 10;
+  /** Le fichier `poursuite` entier : 720 images, 30 s (§18.56). */
+  duration = 30;
   readyState = 0;
   seeking = false;
   ended = false;
@@ -119,7 +119,6 @@ async function started(level = 3, paints = true) {
   const p = createFilmPlayer({
     plan,
     host: div() as unknown as HTMLElement,
-    cover: div() as unknown as HTMLElement,
     still: still as unknown as HTMLCanvasElement,
     onTime: (t) => (last = t),
     onStill: () => {
@@ -130,39 +129,35 @@ async function started(level = 3, paints = true) {
   await vi.advanceTimersByTimeAsync(200);
   expect(await ready).toBe("ready");
   p.play();
-  const [a, b] = videos;
-  return { p, plan, a, b, still, now: () => last };
+  // une seule balise, un seul fichier (§18.56)
+  expect(videos).toHaveLength(1);
+  const [a] = videos;
+  return { p, plan, a, still, now: () => last };
 }
 
 describe("l'arrêt sur image, tiré pendant la préparation", () => {
-  it.each([
-    [1, 0],
-    [3, 0],
-    [6, 1],
-  ])("%i étoile(s) : la balise est montrée sur l'image à geler, puis remise au début", async (level, which) => {
+  it.each([1, 3, 6])("%i étoile(s) : la balise est montrée sur l'image à geler, puis remise au début", async (level) => {
     const { createFilmPlayer } = await import("./player");
     const plan = filmPlan({ ...FIXTURES.silver, id: "f", overall: OVERALL[level] });
     const seen: [number, number][] = [];
     const p = createFilmPlayer({
       plan,
       host: div() as unknown as HTMLElement,
-      cover: div() as unknown as HTMLElement,
       onTime: () => undefined,
       onStill: (v) => seen.push([videos.indexOf(v as unknown as FakeVideo), Math.floor(v.currentTime * FPS)]),
     });
     const ready = p.prepare();
     await vi.advanceTimersByTimeAsync(200);
     expect(await ready).toBe("ready");
-    // six étoiles : la dernière image de FIN6, sur la seconde balise ; sur place : la dernière du dernier plan joué
-    expect(seen).toEqual([[which, which === 1 ? plan.endVideo - 1 : plan.cut - 1]]);
-    expect(Math.floor(videos[which].currentTime * FPS)).toBe(0);
+    // la dernière image du dernier tronçon joué ; à six étoiles, la dernière de FIN6, la fin du fichier
+    expect(seen).toEqual([[0, level === 6 ? FILM_FRAMES - 1 : plan.cut - 1]]);
+    expect(Math.floor(videos[0].currentTime * FPS)).toBe(0);
   });
 });
 
-describe("le gel sur place, de une à cinq étoiles", () => {
-  it.each([1, 3])("%i étoile(s) : la poursuite s'arrête avant la frontière, tient la dernière image du plan, la toile passe devant au gel ; la fin ne joue pas", async (level) => {
-    const { p, plan, a, b, still, now } = await started(level);
-    expect(b.getAttribute("src")).toBeNull();
+describe("le gel sur place, à toutes les étoiles", () => {
+  it.each([1, 3, 6])("%i étoile(s) : la balise s'arrête avant la frontière, tient la dernière image du tronçon, la toile passe devant au gel", async (level) => {
+    const { p, plan, a, still, now } = await started(level);
     await vi.advanceTimersByTimeAsync(((plan.cut - 4) / FPS) * 1000);
     expect(a.paused).toBe(false);
     expect(still.style.visibility).not.toBe("visible");
@@ -172,12 +167,11 @@ describe("le gel sur place, de une à cinq étoiles", () => {
     expect(Math.floor(a.currentTime * FPS)).toBe(plan.cut - 1);
     expect(now()).toBeLessThan(plan.freeze / FPS);
     expect(still.style.visibility).not.toBe("visible");
-    // le gel : la toile devant, et jamais une image du plan suivant
+    // le gel : la toile devant, et jamais une image du tronçon suivant
     await vi.advanceTimersByTimeAsync((3 / FPS) * 1000);
     expect(now()).toBeGreaterThanOrEqual(plan.freeze / FPS);
     expect(still.style.visibility).toBe("visible");
     expect(Math.floor(a.currentTime * FPS)).toBe(plan.cut - 1);
-    expect(b.plays).toBe(0);
     await vi.advanceTimersByTimeAsync(plan.duration * 1000);
     expect(now()).toBe(plan.duration);
     expect(a.currentTime).toBeLessThan(plan.cut / FPS);
@@ -259,11 +253,13 @@ describe("le chien de garde, branché sur le lecteur", () => {
     expect(now()).toBeGreaterThanOrEqual(plan.flash.from / FPS);
   });
 
-  it("six étoiles, figée pendant la fin, après la bascule : le chien de garde suit la seconde balise", async () => {
-    const { p, plan, b, now } = await started(6);
-    await vi.advanceTimersByTimeAsync((plan.cut / FPS) * 1000 + 200);
-    expect(now()).toBeGreaterThan(plan.cut / FPS);
-    b.frozen = true;
+  it("six étoiles, P6 continue dans FIN6 sans bascule ; figée sur la pointe : une relance, puis le flash", async () => {
+    const { p, plan, a, now } = await started(6);
+    await vi.advanceTimersByTimeAsync((plan.chaseEnd / FPS) * 1000 + 200);
+    expect(now()).toBeGreaterThan(plan.chaseEnd / FPS);
+    expect(a.paused).toBe(false);
+    expect(videos).toHaveLength(1);
+    a.frozen = true;
     await vi.advanceTimersByTimeAsync(3300);
     expect(p.stats().retries).toBe(1);
     expect(now()).toBeGreaterThanOrEqual(plan.flash.from / FPS);

@@ -1,46 +1,42 @@
-// Le lecteur du film (§18.36, docs/cinematique-poursuite.md §5.2 à §5.6) : deux
-// balises <video muted playsinline> (unlock.ts), A pour la poursuite (toujours
-// le fichier entier, six étoiles), B pour la fin à six étoiles (`fin6`),
-// chargées en entier avant de jouer (fetch puis Blob, loader.ts, dans la
-// variante que le débit mesuré a choisie). L'horloge du film est celle de la
-// vidéo : t = image présentée de A, puis coupe + image présentée de B, puis
-// l'horloge du navigateur pour le gel et le flash. Le HUD ne peut pas se
-// décaler de l'image.
-// De une à cinq étoiles, la fin se joue sur place (§18.53) : B ne sert pas.
-// A s'arrête un peu avant la frontière (APPROACH), pas dessus : la balise
-// garde une image d'avance, même en pause, et un téléphone chargé saute des
-// images ; attendre la dernière image du plan laissait passer le plan suivant
-// (mesuré : une image). Arrêtée, A est replacée sur la dernière image du plan,
-// puis, à l'instant du gel, l'arrêt sur image (la toile tirée de cette même
-// image pendant la préparation, freeze.ts) passe devant.
-// À six étoiles, la coupe : quand A présente la dernière image de P6, le cache
-// la couvre (l'éclair crème de la coupe, §18.39 ; « l'encre » dans ce
-// fichier), A s'arrête, B part et passe devant ; le cache reste jusqu'à la
-// première image de B (deux images au plus).
+// Le lecteur du film (§18.36, docs/cinematique-poursuite.md §5.2 à §5.6) : une
+// balise <video muted playsinline> (unlock.ts), le fichier `poursuite` entier
+// (la poursuite et FIN6, un seul trajet d'un seul tenant, §18.56), chargé en
+// entier avant de jouer (fetch puis Blob, loader.ts, dans la variante que le
+// débit mesuré a choisie). L'horloge du film est celle de la vidéo : t = image
+// présentée, puis l'horloge du navigateur pour le gel et le flash. Le HUD ne
+// peut pas se décaler de l'image.
+// À toutes les étoiles, la fin se joue sur place (§18.53, §18.56) : l'arrêt sur
+// image gèle la dernière image du dernier tronçon joué (Pk ; à six étoiles, la
+// dernière de FIN6, la fin du fichier). La balise s'arrête un peu avant la
+// frontière (APPROACH), pas dessus : elle garde une image d'avance, même en
+// pause, et un téléphone chargé saute des images ; attendre la dernière image du
+// tronçon laissait passer le suivant (mesuré : une image). Arrêtée, elle est
+// replacée sur la dernière image du tronçon, puis, à l'instant du gel, l'arrêt
+// sur image (la toile tirée de cette même image pendant la préparation,
+// freeze.ts) passe devant.
 // Le chien de garde (watchdog.ts, §5.5) : une erreur de balise, une pause non
 // demandée ou une horloge figée plus de 1,5 s pendant la lecture : une
 // relance, puis le flash et la fiche. Jamais d'image figée ni d'écran noir.
 import { FPS, type FilmPlan } from "../../../shared/film";
 import type { Quality } from "./files";
-import { canPlayFilm, debugFlag, dropFilmFile, filmNet, filmVariant, loadFilmFiles } from "./loader";
-import { endingToLoad } from "./net";
+import { canPlayFilm, debugFlag, filmNet, filmVariant, loadFilmFiles } from "./loader";
 import { PlaybackWatchdog } from "./watchdog";
-import { filmUnlocks, filmVideos } from "./unlock";
+import { filmUnlocks, filmVideo } from "./unlock";
 
 export type { Quality } from "./files";
 export { canPlayFilm, preloadFilm } from "./loader";
 
 export interface FilmStats {
-  /** Images perdues par le décodeur (getVideoPlaybackQuality), les deux balises. */
+  /** Images perdues par le décodeur (getVideoPlaybackQuality). */
   dropped: number;
   /** Images décodées. */
   decoded: number;
   /** Images sautées à l'affichage pendant la lecture (trous dans les images présentées). */
   skipped: number;
-  /** Images de A au-delà de la coupe présentées avant l'encre (0 attendu). */
+  /** Images au-delà de la dernière jouée présentées avant le gel (0 attendu). */
   leaked: number;
-  /** Bascule poursuite → fin : de l'encre (à la dernière image de A) à la première image de B (ms). */
-  switchMs: number | null;
+  /** La bascule d'une balise à l'autre : il n'y en a plus (un seul fichier, §18.56), toujours null. */
+  switchMs: null;
   /** De l'ordre de lecture à la première image qui bouge (ms). */
   startMs: number | null;
   /** Octets chargés par le film sur cette page. */
@@ -57,7 +53,7 @@ export interface FilmStats {
 }
 
 export interface FilmPlayer {
-  /** Charge, place les deux balises sur leur première image, et dit si la lecture demande un geste. */
+  /** Charge, place la balise sur sa première image, et dit si la lecture demande un geste. */
   prepare(): Promise<"ready" | "gesture">;
   /** Lance ou reprend la lecture (sans effet si tenu, onglet caché ou film fini). */
   play(): void;
@@ -72,42 +68,33 @@ export interface FilmPlayer {
 
 interface Options {
   plan: FilmPlan;
-  /** Le cadre du film : les deux balises y sont posées. */
+  /** Le cadre du film : la balise y est posée. */
   host: HTMLElement;
-  /** Le cache de la bascule (l'éclair crème), piloté sans attendre React. */
-  cover: HTMLElement;
-  /**
-   * L'arrêt sur image (la toile de freeze.ts) : de une à cinq étoiles, le
-   * lecteur le montre lui-même, sans attendre React, à l'instant du gel.
-   */
+  /** L'arrêt sur image (la toile de freeze.ts) : le lecteur le montre lui-même, sans attendre React, à l'instant du gel. */
   still?: HTMLCanvasElement | null;
   /** À chaque rafraîchissement pendant la lecture, et à chaque seek. */
   onTime(t: number): void;
   /**
-   * Pendant la préparation, la balise posée sur l'image à geler (la dernière
-   * de la fin à six étoiles, la dernière du dernier plan joué de une à cinq) :
-   * l'arrêt sur image se tire là, hors de la lecture. Rappelé au gel sur place
-   * si la toile n'a pas pu se tirer avant.
+   * Pendant la préparation, la balise posée sur l'image à geler (la dernière du
+   * dernier tronçon joué) : l'arrêt sur image se tire là, hors de la lecture.
+   * Rappelé au gel si la toile n'a pas pu se tirer avant.
    */
   onStill?(video: HTMLVideoElement): void;
 }
 
-type Mode = "chase" | "ending" | "tail";
+type Mode = "chase" | "tail";
 type FrameMeta = { mediaTime: number; expectedDisplayTime: number };
 type FrameVideo = HTMLVideoElement & {
   requestVideoFrameCallback(cb: (now: number, meta: FrameMeta) => void): number;
   cancelVideoFrameCallback(id: number): void;
 };
 
-const FRAME_MS = 1000 / FPS;
 /**
- * Gel sur place : A s'arrête dès cette image-là avant la dernière du plan, et
- * tient la dernière. Deux images (83 ms) : une image d'avance de la balise,
- * plus une image sautée ; la dernière est tenue un instant de plus en couleur.
+ * Le gel sur place : la balise s'arrête dès cette image-là avant la dernière du
+ * tronçon, et tient la dernière. Deux images (83 ms) : une image d'avance de la
+ * balise, plus une image sautée ; la dernière est tenue un instant de plus en couleur.
  */
 const APPROACH = 2;
-/** Six étoiles : le gel part un peu avant la fin prévue de la dernière image de FIN6 : elle reste à l'écran. */
-const TAIL_LEAD_MS = 12;
 
 const once = (v: HTMLVideoElement, ok: string, ms = 8000) =>
   new Promise<void>((resolve, reject) => {
@@ -131,18 +118,14 @@ const once = (v: HTMLVideoElement, ok: string, ms = 8000) =>
 
 const twoFrames = () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
 
-export function createFilmPlayer({ plan, host, cover, still = null, onTime, onStill }: Options): FilmPlayer {
-  const [a, b] = filmVideos() as [FrameVideo, FrameVideo];
+export function createFilmPlayer({ plan, host, still = null, onTime, onStill }: Options): FilmPlayer {
+  const a = filmVideo() as FrameVideo;
   let q: Quality = filmVariant();
   const rvfc = typeof a.requestVideoFrameCallback === "function";
   const simulateRefusal = debugFlag() === "gesture";
   const unlocksAtStart = filmUnlocks();
-  const cutT = plan.cut / FPS;
-  const tailFromT = (plan.cut + plan.endVideo) / FPS;
-  /** Une à cinq étoiles : pas de fin tournée, le gel se fait sur place, sur A. */
-  const inPlace = plan.ending === null;
-  /** Les balises qui jouent. */
-  const used: FrameVideo[] = inPlace ? [a] : [a, b];
+  /** La dernière image jouée, celle qui gèle. */
+  const last = plan.cut - 1;
 
   let mode: Mode = "chase";
   let running = false;
@@ -151,75 +134,59 @@ export function createFilmPlayer({ plan, host, cover, still = null, onTime, onSt
   let over = false;
   /** L'instant affiché quand rien ne tourne. */
   let pinned = 0;
-  /** Image présentée (arrondie à l'image) de chaque balise. */
+  /** Image présentée (arrondie à l'image). */
   let aShown = 0;
-  let bShown = 0;
   let aLastK = -1;
-  let bLastK = -1;
   let skipped = 0;
-  /** Images de A au-delà de la coupe présentées avant la bascule (doit rester 0). */
+  /** Images au-delà de la dernière jouée présentées avant le gel (doit rester 0). */
   let leaked = 0;
-  /** Horloge de l'écran (ms) : quand geler. */
-  let tailAt = 0;
-  let tailBase = tailFromT;
+  /** L'horloge du gel et du flash : depuis cet instant du film, à cette heure de l'écran (ms). */
+  let tailBase = 0;
   let tailSince = 0;
   let raf = 0;
   let aCb = 0;
-  let bCb = 0;
-  let switchFrom = 0;
-  let switchMs: number | null = null;
   let playFrom = 0;
   let playK = 0;
   let startMs: number | null = null;
-  /** Le chien de garde, armé tant qu'une balise doit avancer. */
+  /** Le chien de garde, armé tant que la balise doit avancer. */
   const dog = new PlaybackWatchdog();
-  /** Les balises que le lecteur a lui-même mises en pause (leur événement « pause » est attendu). */
-  const asked = new Set<HTMLVideoElement>();
-  /** Les deux balises sont chargées et posées : leurs erreurs sont désormais des erreurs de lecture. */
+  /** La balise mise en pause par le lecteur lui-même (son événement « pause » est attendu). */
+  let asked = false;
+  /** La balise est chargée et posée : ses erreurs sont désormais des erreurs de lecture. */
   let prepared = false;
   /** Le flash est parti sur une erreur. */
   let aborted = false;
 
-  for (const v of [a, b]) {
-    v.className = "film-video";
-    v.style.visibility = "hidden";
-  }
-  host.prepend(a, b);
+  a.className = "film-video";
+  // cachée pendant la préparation (elle passe par l'image à geler), montrée posée sur la première
+  a.style.visibility = "hidden";
+  host.prepend(a);
   // la toile d'un film précédent ne sert pas à celui-ci
   if (still) {
     delete still.dataset.ready;
     still.style.visibility = "";
   }
 
-  const show = (which: "chase" | "ending") => {
-    a.style.visibility = which === "chase" ? "visible" : "hidden";
-    b.style.visibility = which === "ending" ? "visible" : "hidden";
-  };
-  const place = (v: HTMLVideoElement, frame: number) => {
+  const place = (frame: number) => {
     // le milieu de l'image : jamais d'ambiguïté sur l'image affichée
-    v.currentTime = (Math.max(0, frame) + 0.5) / FPS;
+    a.currentTime = (Math.max(0, frame) + 0.5) / FPS;
   };
-  const coverOn = (on: boolean) => {
-    cover.style.opacity = on ? "1" : "0";
-  };
-  /** L'arrêt sur image posé par le lecteur (gel sur place) ; sinon, la feuille de style le montre au gel du HUD. */
+  /** L'arrêt sur image posé par le lecteur ; sinon, la feuille de style le montre au gel du HUD. */
   const stillOn = (on: boolean) => {
     if (still) still.style.visibility = on ? "visible" : "";
   };
   const stillReady = () => !!still && still.dataset.ready !== undefined;
   /** Une pause demandée par le lecteur : le chien de garde ne la prend pas pour un incident. */
-  const halt = (v: HTMLVideoElement) => {
-    if (!v.paused) asked.add(v);
-    v.pause();
+  const halt = () => {
+    if (!a.paused) asked = true;
+    a.pause();
   };
-  /** La balise qui doit avancer, ou aucune (gel et flash). */
-  const active = (): HTMLVideoElement | null => (mode === "chase" ? a : mode === "ending" ? b : null);
 
-  const tryPlay = (v: HTMLVideoElement): Promise<void> => {
+  const tryPlay = (): Promise<void> => {
     if (simulateRefusal && filmUnlocks() === unlocksAtStart) {
       return Promise.reject(Object.assign(new Error("lecture refusée (simulée)"), { name: "NotAllowedError" }));
     }
-    return v.play();
+    return a.play();
   };
 
   /** Erreur de lecture en cours de film (§5.5) : flash immédiat, la fiche se pose. */
@@ -228,26 +195,24 @@ export function createFilmPlayer({ plan, host, cover, still = null, onTime, onSt
     dog.disarm();
     aborted = true;
     mode = "tail";
-    halt(a);
-    halt(b);
-    coverOn(false);
+    halt();
     tailBase = Math.max(time(), plan.flash.from / FPS);
     tailSince = performance.now();
     if (!running) pinned = tailBase;
   };
-  const playVideo = (v: HTMLVideoElement) => {
-    tryPlay(v).catch((e: unknown) => {
+  const playVideo = () => {
+    tryPlay().catch((e: unknown) => {
       if (disposed || (e as { name?: string })?.name === "AbortError") return;
       flashNow();
     });
   };
   /** La relance : la balise est replacée sur son image et relancée. */
-  const retry = (v: HTMLVideoElement) => {
-    place(v, Math.floor(v.currentTime * FPS));
-    playVideo(v);
+  const retry = () => {
+    place(Math.floor(a.currentTime * FPS));
+    playVideo();
   };
-  const react = (action: "ok" | "retry" | "fail", v: HTMLVideoElement) => {
-    if (action === "retry") retry(v);
+  const react = (action: "ok" | "retry" | "fail") => {
+    if (action === "retry") retry();
     else if (action === "fail") flashNow();
   };
 
@@ -259,18 +224,13 @@ export function createFilmPlayer({ plan, host, cover, still = null, onTime, onSt
       if (running && mode === "chase") {
         if (aLastK >= 0 && k > aLastK + 1) skipped += k - aLastK - 1;
         if (startMs === null && playFrom && k > playK) startMs = Math.max(0, md.expectedDisplayTime - playFrom);
-        // Dès que la dernière image du plan est présentée : le gel sur place (une
-        // à cinq étoiles) ou l'encre de la coupe (six), posés dans ce même
-        // rafraîchissement, avant que A n'ait pu présenter le plan suivant (A en
-        // garde une image d'avance, même en pause).
-        if (k >= plan.cut - 1 - (inPlace ? APPROACH : 0)) {
-          if (k >= plan.cut) leaked++;
+        // Dès que l'approche du gel est présentée : l'arrêt, posé dans ce même
+        // rafraîchissement, avant que la balise n'ait pu présenter le tronçon
+        // suivant (elle en garde une image d'avance, même en pause).
+        if (k >= last - APPROACH) {
+          if (k > last) leaked++;
           aLastK = k;
-          if (inPlace) toFreeze(k, performance.now());
-          else {
-            aShown = (plan.cut - 1) / FPS;
-            toEnding(md.expectedDisplayTime);
-          }
+          toFreeze(k, performance.now());
           watchA();
           return;
         }
@@ -280,102 +240,48 @@ export function createFilmPlayer({ plan, host, cover, still = null, onTime, onSt
       watchA();
     });
   };
-  const watchB = () => {
-    if (!rvfc || disposed) return;
-    bCb = b.requestVideoFrameCallback((_now, md) => {
-      if (disposed) return;
-      const k = Math.round(md.mediaTime * FPS);
-      if (running && mode === "ending") {
-        if (bLastK >= 0 && k > bLastK + 1) skipped += k - bLastK - 1;
-        if (switchMs === null && switchFrom) {
-          switchMs = Math.max(0, md.expectedDisplayTime - switchFrom);
-          coverOn(false);
-        }
-        if (!tailAt && k >= plan.endVideo - 1) tailAt = md.expectedDisplayTime + FRAME_MS;
-      }
-      bLastK = k;
-      bShown = k / FPS;
-      watchB();
-    });
-  };
 
   function time(now = performance.now()): number {
     if (!running) return pinned;
     if (mode === "chase") return rvfc ? aShown : a.currentTime;
-    if (mode === "ending") return cutT + (rvfc ? bShown : b.currentTime);
     return tailBase + (now - tailSince) / 1000;
   }
 
   /**
-   * L'approche du gel sur place (une à cinq étoiles), `k` : l'image à l'écran.
-   * A s'arrête et se replace sur la dernière image du dernier plan joué ;
-   * l'horloge continue depuis `k`, et la toile passera devant au gel (tick).
+   * L'approche du gel, `k` : l'image à l'écran. La balise s'arrête et se replace
+   * sur la dernière image jouée ; l'horloge continue depuis `k`, et la toile
+   * passera devant au gel (tick).
    */
   const toFreeze = (k: number, now: number) => {
     dog.disarm();
-    halt(a);
-    place(a, plan.cut - 1);
+    halt();
+    place(last);
     mode = "tail";
-    tailBase = Math.min(k, plan.cut - 1) / FPS;
+    tailBase = Math.min(k, last) / FPS;
     tailSince = now;
   };
   /**
-   * Au gel sur place, la toile passe devant A, sans attendre React. Pas tirée
-   * pendant la préparation : elle se tire ici, sur A posée sur l'image à geler ;
-   * sinon A reste sur cette image, en couleur.
+   * Au gel, la toile passe devant la balise, sans attendre React. Pas tirée
+   * pendant la préparation : elle se tire ici, sur la balise posée sur l'image à
+   * geler ; sinon la balise reste sur cette image, en couleur.
    */
   const freezeInPlace = () => {
     if (!stillReady() && !a.seeking) onStill?.(a);
     if (stillReady()) stillOn(true);
-  };
-  /** La coupe (`from` : l'instant où l'encre paraît) : l'encre d'abord, A s'arrête, B part et passe devant. */
-  const toEnding = (from: number) => {
-    coverOn(true);
-    halt(a);
-    mode = "ending";
-    bShown = 0;
-    bLastK = -1;
-    switchFrom = from;
-    show("ending");
-    playVideo(b);
-    dog.arm(performance.now(), b.currentTime);
-    if (!rvfc) {
-      const onPlaying = () =>
-        requestAnimationFrame(() => {
-          if (switchMs === null) switchMs = performance.now() - switchFrom;
-          coverOn(false);
-        });
-      b.addEventListener("playing", onPlaying, { once: true });
-    }
-  };
-  const toTail = (now: number) => {
-    dog.disarm();
-    mode = "tail";
-    halt(b);
-    if (b.currentTime > (plan.endVideo - 0.5) / FPS) place(b, plan.endVideo - 1);
-    tailBase = tailFromT;
-    tailSince = rvfc && tailAt ? Math.min(now, tailAt) : now;
-    coverOn(false);
   };
 
   const tick = (now: number) => {
     raf = 0;
     if (!running || disposed) return;
     if (mode === "chase") {
-      if (inPlace) {
-        // l'horloge de A, relue à chaque rafraîchissement : le filet si des images ont sauté sans rappel
-        const k = Math.floor(a.currentTime * FPS);
-        if (a.ended || k >= plan.cut - 1 - APPROACH) toFreeze(k, now);
-      } else if (a.ended || (!rvfc && a.currentTime >= (plan.cut - 1) / FPS)) toEnding(now);
-    } else if (mode === "ending") {
-      const due = rvfc ? tailAt > 0 && now >= tailAt - TAIL_LEAD_MS : b.currentTime >= (plan.endVideo - 0.5) / FPS;
-      if (due || b.ended) toTail(now);
+      // l'horloge de la balise, relue à chaque rafraîchissement : le filet si des images ont sauté sans rappel
+      const k = Math.floor(a.currentTime * FPS);
+      if (a.ended || k >= last - APPROACH) toFreeze(k, now);
     }
-    // l'horloge de la balise active doit avancer
-    const v = active();
-    if (v && dog.watching) react(dog.check(now, v.currentTime), v);
+    // l'horloge de la balise doit avancer
+    if (mode === "chase" && dog.watching) react(dog.check(now, a.currentTime));
     const t = time(now);
-    if (inPlace && mode === "tail" && !aborted && t >= plan.freeze / FPS - 1e-6 && still?.style.visibility !== "visible") freezeInPlace();
+    if (mode === "tail" && !aborted && t >= plan.freeze / FPS - 1e-6 && still?.style.visibility !== "visible") freezeInPlace();
     if (t >= plan.duration) {
       over = true;
       running = false;
@@ -392,8 +298,7 @@ export function createFilmPlayer({ plan, host, cover, still = null, onTime, onSt
     pinned = time();
     running = false;
     dog.disarm();
-    halt(a);
-    halt(b);
+    halt();
     if (mode === "tail") tailBase = pinned;
     if (raf) cancelAnimationFrame(raf);
     raf = 0;
@@ -409,82 +314,70 @@ export function createFilmPlayer({ plan, host, cover, still = null, onTime, onSt
         playFrom = now;
         playK = Math.round(a.currentTime * FPS);
       }
-      playVideo(a);
-    } else if (mode === "ending") playVideo(b);
-    else tailSince = now;
-    const v = active();
-    if (v) dog.arm(now, v.currentTime);
+      playVideo();
+      dog.arm(now, a.currentTime);
+    } else tailSince = now;
     if (!raf) raf = requestAnimationFrame(tick);
   }
 
-  // Les incidents signalés par les balises, une fois le film prêt (§5.5).
+  // Les incidents signalés par la balise, une fois le film prêt (§5.5).
   const onError = () => {
     if (prepared && !disposed) flashNow();
   };
-  const onPause = (e: Event) => {
-    const v = e.currentTarget as HTMLVideoElement;
-    if (asked.delete(v)) return;
+  const onPause = () => {
+    if (asked) {
+      asked = false;
+      return;
+    }
     // la fin du fichier, l'onglet caché (le lecteur s'arrête de lui-même), ou déjà repartie : rien à faire
-    const atEnd = v.ended || (Number.isFinite(v.duration) && v.currentTime >= v.duration - 0.05);
-    if (!prepared || disposed || !running || document.hidden || v !== active() || !v.paused || atEnd) return;
-    react(dog.incident(performance.now()), v);
+    const atEnd = a.ended || (Number.isFinite(a.duration) && a.currentTime >= a.duration - 0.05);
+    if (!prepared || disposed || !running || document.hidden || mode !== "chase" || !a.paused || atEnd) return;
+    react(dog.incident(performance.now()));
   };
-  const onStalled = (e: Event) => {
-    const v = e.currentTarget as HTMLVideoElement;
+  const onStalled = () => {
     // une relance douce ; si l'horloge reste figée, le chien de garde tranche
-    if (prepared && !disposed && running && v === active()) playVideo(v);
+    if (prepared && !disposed && running && mode === "chase") playVideo();
   };
-  for (const v of [a, b]) {
-    v.addEventListener("error", onError);
-    v.addEventListener("pause", onPause);
-    v.addEventListener("stalled", onStalled);
-  }
+  a.addEventListener("error", onError);
+  a.addEventListener("pause", onPause);
+  a.addEventListener("stalled", onStalled);
 
   return {
     async prepare() {
       if (!canPlayFilm()) throw new Error("film: H.264 illisible");
-      // la fin qui ne jouera pas cède la place, même chargée en avance pendant l'attente
-      const { drop } = endingToLoad(plan.level);
-      if (drop) dropFilmFile(drop);
-      const loaded = await loadFilmFiles(plan.ending ? ["poursuite", plan.ending] : ["poursuite"]);
+      const loaded = await loadFilmFiles(["poursuite"]);
       q = loaded.quality;
       if (disposed) throw new Error("film: abandonné");
-      used.forEach((v, i) => {
-        const src = loaded.urls[i];
-        if (v.getAttribute("src") !== src) {
-          v.src = src;
-          v.load();
-        }
-      });
-      await Promise.all(used.map((v) => (v.readyState >= 2 ? Promise.resolve() : once(v, "loadeddata"))));
+      const src = loaded.urls[0];
+      if (a.getAttribute("src") !== src) {
+        a.src = src;
+        a.load();
+      }
+      if (a.readyState < 2) await once(a, "loadeddata");
       // La lecture sans geste est-elle permise ? (iPhone en économie d'énergie : non.)
       let gesture = false;
-      for (const v of used) {
-        try {
-          await tryPlay(v);
-        } catch (e) {
-          if ((e as { name?: string })?.name !== "NotAllowedError") throw e;
-          gesture = true;
-        }
-        halt(v);
+      try {
+        await tryPlay();
+      } catch (e) {
+        if ((e as { name?: string })?.name !== "NotAllowedError") throw e;
+        gesture = true;
       }
+      halt();
       if (disposed) throw new Error("film: abandonné");
       if (onStill) {
-        // l'image à geler : la dernière de la fin, ou la dernière du dernier plan joué
-        const [v, frame] = inPlace ? [a, plan.cut - 1] : [b, plan.endVideo - 1];
+        // l'image à geler : la dernière du dernier tronçon joué
         try {
-          place(v, frame);
-          if (v.seeking) await once(v, "seeked", 3000);
-          if (!disposed) onStill(v);
+          place(last);
+          if (a.seeking) await once(a, "seeked", 3000);
+          if (!disposed) onStill(a);
         } catch {
           /* l'arrêt sur image se tirera au gel, sur l'image à l'écran */
         }
       }
-      for (const v of used) place(v, 0);
-      await Promise.all(used.map((v) => (v.seeking ? once(v, "seeked") : Promise.resolve())));
-      show("chase");
+      place(0);
+      if (a.seeking) await once(a, "seeked");
+      a.style.visibility = "visible";
       watchA();
-      if (!inPlace) watchB();
       await twoFrames();
       prepared = true;
       return gesture ? "gesture" : "ready";
@@ -494,52 +387,29 @@ export function createFilmPlayer({ plan, host, cover, still = null, onTime, onSt
     seek(t: number) {
       const T = Math.min(Math.max(0, t), plan.duration);
       const f = Math.floor(T * FPS + 1e-6);
-      tailAt = 0;
       over = false;
-      coverOn(false);
       stillOn(false);
-      if (f < Math.min(plan.cut, plan.freeze)) {
+      if (f < plan.freeze) {
         mode = "chase";
-        if (!inPlace) {
-          halt(b);
-          place(b, 0);
-        }
-        place(a, f);
+        place(f);
         aShown = f / FPS;
         aLastK = -1;
-        show("chase");
-      } else if (inPlace) {
-        // le gel sur place : A sur la dernière image du dernier plan joué, la toile devant
+      } else {
+        // le gel : la balise sur la dernière image jouée, la toile devant
         mode = "tail";
-        halt(a);
-        place(a, plan.cut - 1);
+        halt();
+        place(last);
         tailBase = T;
         tailSince = performance.now();
         stillOn(stillReady());
-        show("chase");
-      } else if (f < plan.cut + plan.endVideo) {
-        mode = "ending";
-        halt(a);
-        place(b, f - plan.cut);
-        bShown = (f - plan.cut) / FPS;
-        bLastK = -1;
-        show("ending");
-      } else {
-        mode = "tail";
-        halt(a);
-        halt(b);
-        place(b, plan.endVideo - 1);
-        tailBase = T;
-        tailSince = performance.now();
-        show("ending");
       }
       pinned = T;
       dog.disarm();
       if (running) {
-        if (mode === "chase") playVideo(a);
-        else if (mode === "ending") playVideo(b);
-        const v = active();
-        if (v) dog.arm(performance.now(), v.currentTime);
+        if (mode === "chase") {
+          playVideo();
+          dog.arm(performance.now(), a.currentTime);
+        }
         if (!raf) raf = requestAnimationFrame(tick);
       }
       onTime(running ? time() : T);
@@ -551,37 +421,39 @@ export function createFilmPlayer({ plan, host, cover, still = null, onTime, onSt
     },
     time: () => time(),
     stats() {
-      let dropped = 0;
-      let decoded = 0;
-      for (const v of [a, b]) {
-        const s = v.getVideoPlaybackQuality?.();
-        dropped += s?.droppedVideoFrames ?? 0;
-        decoded += s?.totalVideoFrames ?? 0;
-      }
-      return { dropped, decoded, skipped, leaked, switchMs, startMs, bytes: filmNet().bytes, quality: q, frameCallbacks: rvfc, retries: dog.retries, aborted, t: time() };
+      const s = a.getVideoPlaybackQuality?.();
+      return {
+        dropped: s?.droppedVideoFrames ?? 0,
+        decoded: s?.totalVideoFrames ?? 0,
+        skipped,
+        leaked,
+        switchMs: null,
+        startMs,
+        bytes: filmNet().bytes,
+        quality: q,
+        frameCallbacks: rvfc,
+        retries: dog.retries,
+        aborted,
+        t: time(),
+      };
     },
     dispose() {
       disposed = true;
       running = false;
       dog.disarm();
       if (raf) cancelAnimationFrame(raf);
-      if (rvfc) {
-        a.cancelVideoFrameCallback(aCb);
-        b.cancelVideoFrameCallback(bCb);
-      }
-      for (const v of [a, b]) {
-        v.removeEventListener("error", onError);
-        v.removeEventListener("pause", onPause);
-        v.removeEventListener("stalled", onStalled);
-        v.pause();
-        v.remove();
-        // libère le décodeur ; les blobs restent pour une autre fiche de la page
-        v.removeAttribute("src");
-        try {
-          v.load();
-        } catch {
-          /* déjà libérée */
-        }
+      if (rvfc) a.cancelVideoFrameCallback(aCb);
+      a.removeEventListener("error", onError);
+      a.removeEventListener("pause", onPause);
+      a.removeEventListener("stalled", onStalled);
+      a.pause();
+      a.remove();
+      // libère le décodeur ; le blob reste pour une autre fiche de la page
+      a.removeAttribute("src");
+      try {
+        a.load();
+      } catch {
+        /* déjà libérée */
       }
     },
   };

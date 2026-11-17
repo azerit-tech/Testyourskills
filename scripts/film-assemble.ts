@@ -1,7 +1,7 @@
 // Le montage du film (docs/cinematique-poursuite.md §5.1, §6 T2) : chaque plan est
 // coupé à son nombre exact d'images, étalonné, mis au 9:16, puis les plans sont
-// recollés et encodés en poursuite / fin6, en 720p et 540p, avec l'affiche. De
-// une à cinq étoiles, la fin se joue sur place (SPEC §18.53) : pas de fichier.
+// recollés et encodés en un seul fichier, `poursuite` (la poursuite et FIN6, le
+// trajet roulé d'un seul tenant, SPEC §18.56), en 720p et 540p, avec l'affiche.
 // Une prise absente est remplacée par son carton (aplat, nom du plan, numéro d'image,
 // zones du §7.3), sans erreur. Le script vérifie ensuite chaque fichier par ffprobe
 // et tient les plafonds de poids du §4.1 en baissant la qualité s'il le faut ;
@@ -105,7 +105,7 @@ for (const shot of SHOTS) {
   console.log(`  ${shot.padEnd(4)} ${String(n).padStart(2)} images  ${source[shot]}`);
 }
 
-// 2. Les quatre fichiers, sous leurs plafonds : au-delà du CRF 28, le montage échoue.
+// 2. Les fichiers (un par taille), sous leurs plafonds : au-delà du CRF 28, le montage échoue.
 const crf: Record<string, number> = {};
 const sizes: Record<string, number> = {};
 const outName = (film: FilmId, size: SizeId) => `${film}-${size}.mp4`;
@@ -156,7 +156,7 @@ for (const size of [720, 540] as SizeId[]) {
       `  ${basename(out).padEnd(18)} ${v?.nb_read_frames} images  ${v?.width} × ${v?.height}  ${v?.r_frame_rate}  ${kb(sizes[out]).padStart(8)} / ${kb(CEILINGS[size][film])}  CRF ${crf[out]}  ${errs.length ? "ÉCHEC : " + errs.join(" ; ") : "ok"}`,
     );
   }
-  const person = personBytes({ poursuite: sizes[resolve(OUT, outName("poursuite", size))], fin6: sizes[resolve(OUT, outName("fin6", size))] });
+  const person = personBytes({ poursuite: sizes[resolve(OUT, outName("poursuite", size))] });
   const personOk = person <= TOTAL_CEILINGS[size];
   failed ||= !personOk;
   console.log(`  ${`personne ${size}p`.padEnd(18)} ${kb(person)} / ${kb(TOTAL_CEILINGS[size])}  ${personOk ? "ok" : "ÉCHEC"}`);

@@ -34,7 +34,7 @@ import {
   windowFits,
   type ProbeStream,
 } from "./film-lib";
-import { CHASE_FRAMES, ENDINGS, SHOT_START } from "../shared/film/cut";
+import { FILM_FRAMES, SHOT_START } from "../shared/film/cut";
 
 const shots = Object.fromEntries(SHOTS.map((s) => [s, { take: null, in: 0, speed: 1, crop: null }]));
 
@@ -65,13 +65,13 @@ describe("la liste de montage", () => {
 });
 
 describe("l'arithmétique des images", () => {
-  it("lit les durées de shared/film/cut.ts : la poursuite, les vidéos des deux fins, les premières images", () => {
-    expect(filmFrames("poursuite")).toBe(CHASE_FRAMES);
-    expect(filmFrames("fin6")).toBe(ENDINGS.fin6.video);
+  it("lit les durées de shared/film/cut.ts (parcours.json) : un seul fichier, la poursuite et FIN6, les premières images", () => {
+    expect(filmFrames("poursuite")).toBe(FILM_FRAMES);
+    expect(filmFrames("poursuite")).toBe(720);
     expect(shotStarts("poursuite")).toEqual(SHOT_START);
-    expect(shotStarts("fin6")).toEqual({ FIN6: 0 });
-    // la fin une à cinq étoiles se joue sur place (§18.53) : plus de fichier, plus de plan
-    expect(Object.keys(FILMS)).toEqual(["poursuite", "fin6"]);
+    // un seul fichier depuis le trajet roulé d'un seul tenant (§18.56) ; la fin une à cinq étoiles se joue sur place (§18.53)
+    expect(Object.keys(FILMS)).toEqual(["poursuite"]);
+    expect(SHOTS).toContain("FIN6");
     expect(SHOTS).not.toContain("FIN");
   });
 
@@ -115,11 +115,11 @@ describe("les arguments de ffmpeg", () => {
 
   it("encode en H.264 Main, 24 i/s, images clés sur les coupes, couleurs bt709, +faststart, sans son", () => {
     const keys = keyframePlan("poursuite");
-    const a = encodeArgs({ list: "l.txt", out: "o.mp4", size: 540, crf: 25, frames: CHASE_FRAMES, keys }).join(" ");
-    for (const part of ["-profile:v main", "-r 24", `-frames:v ${CHASE_FRAMES}`, "-g 48", "-sc_threshold 0", "-forced-idr 1", "-movflags +faststart", "-an", "-crf 25", "scale=540:960"])
+    const a = encodeArgs({ list: "l.txt", out: "o.mp4", size: 540, crf: 25, frames: FILM_FRAMES, keys }).join(" ");
+    for (const part of ["-profile:v main", "-r 24", `-frames:v ${FILM_FRAMES}`, "-g 48", "-sc_threshold 0", "-forced-idr 1", "-movflags +faststart", "-an", "-crf 25", "scale=540:960"])
       expect(a).toContain(part);
     expect(a).toContain(`-force_key_frames ${forceKeyframesExpr(keys)}`);
-    expect(a).toContain("-force_key_frames expr:eq(n,0)+eq(n,40)+eq(n,88)+eq(n,136)+eq(n,184)+eq(n,198)+eq(n,246)+eq(n,294)+eq(n,342)+eq(n,354)+eq(n,402)");
+    expect(a).toContain("-force_key_frames expr:eq(n,0)+eq(n,48)+eq(n,75)+eq(n,108)+eq(n,156)+eq(n,204)+eq(n,215)+eq(n,263)+eq(n,311)+eq(n,318)+eq(n,366)+eq(n,414)+eq(n,426)+eq(n,474)+eq(n,486)+eq(n,534)+eq(n,582)+eq(n,619)+eq(n,667)+eq(n,715)");
     for (const tag of ["-colorspace bt709", "-color_primaries bt709", "-color_trc bt709", "-color_range tv"]) expect(a).toContain(tag);
     expect(a).not.toContain("-g 12");
     expect(encodeArgs({ list: "l.txt", out: "o.mp4", size: 720, crf: 23, frames: 36, keys: [0] }).join(" ")).not.toContain("scale=");
@@ -139,33 +139,27 @@ describe("les arguments de ffmpeg", () => {
     expect(nextCrf(28)).toBeNull();
   });
 
-  it("tient les plafonds du §4.1 : 5,48 / 1,4 Mo en 720p, 2,57 Mo pour une personne en 540p", () => {
-    // la poursuite au poids par image du premier découpage (4,5 Mo pour 340 images), rapporté aux 414 de cut.ts
-    expect(filmFrames("poursuite")).toBe(414);
-    expect(CEILINGS[720]).toEqual({ poursuite: 5_479_412, fin6: 1_400_000 });
-    expect(TOTAL_CEILINGS[720]).toBe(6_879_412);
+  it("tient les plafonds du §4.1 : 9,53 Mo en 720p, 3,55 Mo en 540p, pour le fichier entier", () => {
+    // le poids par image du premier découpage (4,5 Mo pour 340 images), rapporté aux 720 du trajet roulé
+    expect(CEILINGS[720]).toEqual({ poursuite: 9_529_412 });
+    expect(TOTAL_CEILINGS[720]).toBe(9_529_412);
     // l'éco garde le rapport 2,2 / 5,9 du premier découpage
-    expect(TOTAL_CEILINGS[540]).toBe(2_565_204);
-    // une personne charge au plus la poursuite et la fin à six étoiles
+    expect(TOTAL_CEILINGS[540]).toBe(3_553_340);
+    // une personne charge le fichier entier
     expect(personBytes(CEILINGS[720])).toBe(TOTAL_CEILINGS[720]);
-    expect(personBytes(CEILINGS[540])).toBeLessThanOrEqual(TOTAL_CEILINGS[540]);
-    expect(personBytes(CEILINGS[540])).toBeGreaterThan(TOTAL_CEILINGS[540] - 10);
-    for (const f of ["poursuite", "fin6"] as const) expect(CEILINGS[540][f]).toBeLessThan(CEILINGS[720][f]);
+    expect(personBytes(CEILINGS[540])).toBe(TOTAL_CEILINGS[540]);
+    expect(CEILINGS[540].poursuite).toBeLessThan(CEILINGS[720].poursuite);
   });
 });
 
 describe("les images clés", () => {
-  it("sur chaque coupe entre plans, plus une toutes les 48 images au plus", () => {
+  it("sur chaque bord de tronçon, plus une toutes les 48 images au plus", () => {
     expect(MAX_GOP).toBe(48);
-    // les coupes de cut.ts ; P2 (110 images) en reçoit deux de plus, 48 et 96 images après la sienne, P5 (60), P6 (60),
-    // et FIN6 (80) une, 48 images après la leur
+    // les bords des tronçons (parcours.json), FIN6 comprise ; chaque tronçon plus long que 48 images en reçoit d'autres
     for (const k of Object.values(SHOT_START)) expect(keyframePlan("poursuite")).toContain(k);
-    expect(keyframePlan("poursuite")).toEqual([0, 40, 88, 136, 184, 198, 246, 294, 342, 354, 402]);
-    expect(keyframePlan("fin6")).toEqual([0, 48]);
-    for (const film of ["poursuite", "fin6"] as const) {
-      const k = [...keyframePlan(film), filmFrames(film)];
-      for (let i = 1; i < k.length; i++) expect(k[i] - k[i - 1]).toBeLessThanOrEqual(MAX_GOP);
-    }
+    expect(keyframePlan("poursuite")).toEqual([0, 48, 75, 108, 156, 204, 215, 263, 311, 318, 366, 414, 426, 474, 486, 534, 582, 619, 667, 715]);
+    const k = [...keyframePlan("poursuite"), filmFrames("poursuite")];
+    for (let i = 1; i < k.length; i++) expect(k[i] - k[i - 1]).toBeLessThanOrEqual(MAX_GOP);
     expect(forceKeyframesExpr([0, 48])).toBe("expr:eq(n,0)+eq(n,48)");
   });
 });
@@ -177,24 +171,24 @@ describe("tenir les plafonds", () => {
     return Math.round(at20[film] * 0.85 ** (crf - 20));
   };
 
-  it("chaque fichier sous son plafond, au meilleur CRF qui y tient", () => {
+  it("le fichier sous son plafond, au meilleur CRF qui y tient", () => {
     const seen: string[] = [];
-    const r = fitCeilings(720, fake({ poursuite: 6_000_000, fin6: 800_000 }, seen));
-    expect(r.crf).toEqual({ poursuite: 22, fin6: 20 });
-    expect(seen).toEqual(["poursuite@20", "poursuite@22", "fin6@20"]);
+    const r = fitCeilings(720, fake({ poursuite: 11_000_000 }, seen));
+    expect(r.crf).toEqual({ poursuite: 22 });
+    expect(seen).toEqual(["poursuite@20", "poursuite@22"]);
   });
 
-  it("le total d'une personne, la poursuite et la fin à six étoiles, tient sous son plafond : rien ne baisse pour rien", () => {
-    // 5,4 + 1,39 = 6,79 Mo : sous les 6,88 Mo
-    const r = fitCeilings(720, fake({ poursuite: 5_400_000, fin6: 1_390_000 }));
-    expect(r.crf).toEqual({ poursuite: 20, fin6: 20 });
+  it("sous son plafond dès le départ : rien ne baisse pour rien", () => {
+    // 9,4 Mo : sous les 9,53 Mo
+    const r = fitCeilings(720, fake({ poursuite: 9_400_000 }));
+    expect(r.crf).toEqual({ poursuite: 20 });
     expect(personBytes(r.bytes)).toBeLessThanOrEqual(TOTAL_CEILINGS[720]);
   });
 
   it("il faudrait dépasser le CRF 28 : le montage échoue au lieu d'avertir", () => {
     const log: string[] = [];
-    expect(() => fitCeilings(720, fake({ poursuite: 30_000_000, fin6: 800_000 }), (m) => log.push(m))).toThrow(CeilingError);
-    expect(() => fitCeilings(720, fake({ poursuite: 30_000_000, fin6: 800_000 }))).toThrow(/dépasser le CRF 28/);
+    expect(() => fitCeilings(720, fake({ poursuite: 50_000_000 }), (m) => log.push(m))).toThrow(CeilingError);
+    expect(() => fitCeilings(720, fake({ poursuite: 50_000_000 }))).toThrow(/dépasser le CRF 28/);
     // il est passé par 22, 24, 26 et 28 avant d'échouer
     expect(log.map((m) => m.match(/CRF (\d+)$/)?.[1])).toEqual(["22", "24", "26", "28"]);
   });
@@ -202,18 +196,18 @@ describe("tenir les plafonds", () => {
 
 describe("la vérification", () => {
   const ok: ProbeStream = {
-    codec_type: "video", codec_name: "h264", profile: "Main", width: 720, height: 1280, r_frame_rate: "24/1", avg_frame_rate: "24/1", nb_read_frames: String(ENDINGS.fin6.video),
+    codec_type: "video", codec_name: "h264", profile: "Main", width: 720, height: 1280, r_frame_rate: "24/1", avg_frame_rate: "24/1", nb_read_frames: String(FILM_FRAMES),
     color_space: "bt709", color_primaries: "bt709", color_transfer: "bt709",
   };
-  const exp = { frames: ENDINGS.fin6.video, width: 720, height: 1280, keys: keyframePlan("fin6") };
-  const keys = Array.from({ length: ENDINGS.fin6.video }, (_, i) => i === 0 || i === 48);
+  const exp = { frames: FILM_FRAMES, width: 720, height: 1280, keys: keyframePlan("poursuite") };
+  const keys = Array.from({ length: FILM_FRAMES }, (_, i) => keyframePlan("poursuite").includes(i));
 
   it("accepte un fichier conforme", () => {
     expect(checkProbe([ok], keys, exp)).toEqual([]);
   });
 
   it("refuse le son, une image de trop, la mauvaise cadence, des couleurs sans étiquette bt709", () => {
-    const one = ENDINGS.fin6.video + 1;
+    const one = FILM_FRAMES + 1;
     const errs = checkProbe([{ ...ok, nb_read_frames: String(one), r_frame_rate: "25/1", color_space: undefined }, { codec_type: "audio" }], keys, exp);
     expect(errs.join(" | ")).toMatch(new RegExp(`piste son.*cadence.*${one} images.*couleurs \\?/bt709/bt709`));
   });
@@ -231,7 +225,7 @@ describe("la vérification", () => {
 
 describe("les cartons", () => {
   it("portent le nom du plan et le numéro d'image", () => {
-    const svg = slateSvg({ shot: "P2", local: 3, fileFrame: 55, fileFrames: CHASE_FRAMES });
+    const svg = slateSvg({ shot: "P2", local: 3, fileFrame: 55, fileFrames: FILM_FRAMES });
     expect(svg).toContain(">P2<");
     expect(svg).toContain(">055<");
     expect(svg).toContain(`PLAN 4 / ${SHOT_FRAMES.P2}`);

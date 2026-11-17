@@ -1,27 +1,28 @@
 // Les fichiers du film (web/src/film/media/) ont-ils les durées du découpage
-// (shared/film/cut.ts) ? Chaque mp4 est compté image par image par ffprobe et
-// comparé à filmFrames() : 414 images pour la poursuite, 80 pour la fin à six
-// étoiles, à 24 i/s. La fin une à cinq étoiles n'existe plus (§18.53) : un
-// fichier `fin-*.mp4` resté là fait échouer le contrôle.
+// (shared/film/cut.ts, lu dans shared/film/parcours.json) ? Chaque mp4 est
+// compté image par image par ffprobe et comparé à filmFrames() : 720 images pour
+// `poursuite` (la poursuite et FIN6, un seul fichier depuis le trajet roulé
+// d'un seul tenant, §18.56), à 24 i/s. Un autre mp4 resté là (`fin6-*`, `fin-*`)
+// fait échouer le contrôle.
 //
-// Sans ffprobe, le contrôle se saute en le disant. L'écart des cartons (204,
-// 36 et 56 images, d'avant le découpage v3) est résolu le 14 novembre 2026 :
-// le brouillon éclairé est monté, GAP_EXPECTED vaut false et tout écart est
-// bloquant. Le remettre à true n'affiche plus l'écart qu'en avertissement
-// (tests « skipped » avec la raison) ; FILM_MEDIA_STRICT=1 le rend alors
-// bloquant (FILM_MEDIA_STRICT=1 npx vitest run scripts/film-media.test.ts).
+// Sans ffprobe, le contrôle se saute en le disant. GAP_EXPECTED vaut true sur
+// la branche film/site-v5, tant que le rendu éclairé du trajet roulé n'est pas
+// monté : les fichiers sont encore ceux de l'ancien découpage (414 images),
+// l'écart ne s'affiche qu'en avertissement (tests « skipped » avec la raison) ;
+// FILM_MEDIA_STRICT=1 le rend bloquant (FILM_MEDIA_STRICT=1 npx vitest run
+// scripts/film-media.test.ts). Le rendu monté : GAP_EXPECTED à false.
 
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { CHASE_SHOTS, ENDINGS, FPS, SHOT_START } from "../shared/film/cut";
-import type { StillShot } from "../web/src/film/freeze";
+import { FILM_FRAMES, FILM_SHOTS, FPS, SHOT_FRAMES, SHOT_START } from "../shared/film/cut";
+import { STILL_TRACED_FRAMES, type StillShot } from "../web/src/film/freeze";
 import { FFMPEG, FFPROBE, ROOT, probeTake } from "./film-io";
 import { FILMS, SIZES, filmFrames, type FilmId } from "./film-lib";
 
-/** Un écart entre les fichiers et le découpage est-il attendu ? Non depuis le montage du brouillon éclairé. */
-const GAP_EXPECTED = false;
+/** Un écart entre les fichiers et le découpage est-il attendu ? Oui, jusqu'au montage du rendu éclairé du trajet roulé. */
+const GAP_EXPECTED = true;
 const strict = !GAP_EXPECTED || process.env.FILM_MEDIA_STRICT === "1";
 
 const MEDIA = resolve(ROOT, "web/src/film/media");
@@ -33,7 +34,7 @@ const sec = (frames: number) => `${(frames / FPS).toFixed(2).replace(".", ",")} 
 let gaps = 0;
 
 describe.skipIf(!hasFfprobe)("film : les fichiers ont les durées du découpage", () => {
-  it("les quatre fichiers attendus, et aucun autre mp4", () => {
+  it("les deux fichiers attendus, et aucun autre mp4", () => {
     const present = readdirSync(MEDIA).filter((f) => f.endsWith(".mp4")).sort();
     expect(present).toEqual(expected.map((e) => e.file).sort());
   });
@@ -64,18 +65,20 @@ describe.skipIf(!hasFfprobe)("film : les fichiers ont les durées du découpage"
 /**
  * Les images gelées sur lesquelles la berline est détourée (STILL_CARS,
  * web/src/film/freeze.ts, §18.54) : l'empreinte (dHash, 8 × 16) de chacune,
- * relevée le 17 novembre 2026 sur `*-720.mp4`. Un nouveau rendu change l'image :
- * le contour ne tient plus la voiture. Il faut alors le retracer, puis relever
- * l'empreinte ici.
+ * relevée sur `poursuite-720.mp4`. Un nouveau rendu change l'image : le contour
+ * ne tient plus la voiture. Il faut alors le retracer, puis relever l'empreinte ici.
+ *
+ * TODO (§18.56) : null jusqu'au rendu éclairé du trajet roulé. Les fichiers de
+ * 720 images montés, le test échoue sur chaque image gelée en donnant son
+ * empreinte : retracer STILL_CARS sur ces images, passer STILL_TRACED_FRAMES à
+ * 720 (freeze.ts), puis recopier les empreintes ici. Celles de l'ancien
+ * découpage (17 novembre, fichiers de 414 et 80 images) : P1 02030105…, P2
+ * 80918a80…, P3 59c046c4…, P4 d5d5cd9d…, P5 00000844…, FIN6 00000080….
  */
-const STILL_PRINTS: Record<StillShot, string> = {
-  P1: "02030105310a1527b01754f392d258c9",
-  P2: "80918a80a5cdc888301050484d050722",
-  P3: "59c046c45142e0f2f0d49088989a5e1f",
-  P4: "d5d5cd9d89aa5afb3535b03748a18029",
-  P5: "00000844070747c71311317101414006",
-  FIN6: "000000808011341595c1e0c881408000",
-};
+const STILL_PRINTS: Record<StillShot, string | null> = { P1: null, P2: null, P3: null, P4: null, P5: null, FIN6: null };
+
+/** L'image gelée de chaque tronçon : sa dernière dans `poursuite` (pour FIN6, la dernière du fichier). */
+const stillFrame = (shot: StillShot): number => SHOT_START[shot] + SHOT_FRAMES[shot] - 1;
 
 /** L'image `frame` de `file`, réduite à 9 × 16 en gris, puis chaque pixel comparé à son voisin de droite. */
 function dHash(file: string, frame: number): string {
@@ -103,18 +106,32 @@ const bitsApart = (a: string, b: string): number => {
 
 /**
  * Chaque test décode la vidéo depuis le début jusqu'à l'image gelée (jusqu'à
- * 354 images en 720p) : 1 à 5 s sur un Mac libre, 16 s mesurées sur un Mac
- * chargé avec deux workers. D'où un délai à part, bien au-delà des 5 s par défaut.
+ * 720 images en 720p) : quelques secondes sur un Mac libre, 16 s mesurées pour
+ * 354 images sur un Mac chargé avec deux workers. D'où un délai à part, bien
+ * au-delà des 5 s par défaut.
  */
-const DECODE_TIMEOUT = 60_000;
+const DECODE_TIMEOUT = 120_000;
+
+/** Le fichier haute monté : son nombre d'images (null sans ffprobe ou sans fichier). */
+const STILL_FILE = "poursuite-720.mp4";
+const mounted = hasFfprobe && existsSync(resolve(MEDIA, STILL_FILE)) ? probeTake(resolve(MEDIA, STILL_FILE)).frames : null;
+/** Les fichiers de l'ancien découpage sont encore là : les images gelées du site n'y sont pas, le contrôle attend le rendu. */
+const pending = mounted !== FILM_FRAMES;
 
 describe.skipIf(!hasFfprobe)("film : la berline détourée tient encore les images gelées", { timeout: DECODE_TIMEOUT }, () => {
-  for (const shot of Object.keys(STILL_PRINTS) as StillShot[]) {
-    // P1 à P5 : la dernière image du plan dans la poursuite ; FIN6 : la dernière de la fin
-    const [file, frame] = shot === "FIN6" ? ["fin6-720.mp4", ENDINGS.fin6.video - 1] : ["poursuite-720.mp4", SHOT_START[CHASE_SHOTS[CHASE_SHOTS.indexOf(shot) + 1]] - 1];
-    it(`${shot} : ${file}, image ${frame}, inchangée depuis le tracé`, () => {
-      const print = dHash(resolve(MEDIA, file), frame);
-      const apart = bitsApart(print, STILL_PRINTS[shot]);
+  for (const shot of FILM_SHOTS.filter((s): s is StillShot => s in STILL_PRINTS)) {
+    const frame = stillFrame(shot);
+    it(`${shot} : ${STILL_FILE}, image ${frame}, inchangée depuis le tracé`, (ctx) => {
+      if (pending) {
+        const msg = `${STILL_FILE} a ${mounted} images, le découpage en attend ${FILM_FRAMES} : STILL_CARS.${shot} se retrace sur le rendu éclairé (image ${frame})`;
+        if (process.env.FILM_MEDIA_STRICT === "1") throw new Error(msg);
+        ctx.skip(msg);
+      }
+      const print = dHash(resolve(MEDIA, STILL_FILE), frame);
+      const want = STILL_PRINTS[shot];
+      if (want === null || STILL_TRACED_FRAMES !== FILM_FRAMES)
+        throw new Error(`${shot} pas encore tracé sur le fichier de ${FILM_FRAMES} images : retracer STILL_CARS.${shot} (web/src/film/freeze.ts) sur l'image ${frame}, passer STILL_TRACED_FRAMES à ${FILM_FRAMES}, puis relever l'empreinte ${print} dans STILL_PRINTS`);
+      const apart = bitsApart(print, want);
       if (apart > 12) throw new Error(`${shot} a changé (${apart} bits sur 128, empreinte ${print}) : retracer STILL_CARS.${shot} dans web/src/film/freeze.ts, puis relever l'empreinte`);
     });
   }

@@ -9,7 +9,7 @@
 import { FILE_CEILINGS } from "../../../shared/film/budget";
 import { isMock } from "../lib/api";
 import { filmFileUrl, type FileId, type Quality } from "./files";
-import { endingToLoad, initialVariant, probeVerdict, RateMeter } from "./net";
+import { initialVariant, probeVerdict, RateMeter } from "./net";
 
 interface NetInfo {
   saveData?: boolean;
@@ -114,7 +114,7 @@ async function download(j: Job): Promise<string> {
       const chunks: Uint8Array[] = [];
       for (;;) {
         const { done, value } = await reader.read();
-        // abandonné (la fin qui ne jouera pas) : la file passe au suivant sans attendre la fin du flux
+        // abandonné : la file passe au suivant sans attendre la fin du flux
         if (j.ctrl.signal.aborted) {
           void reader.cancel().catch(() => undefined);
           throw new DOMException("film: abandonné", "AbortError");
@@ -155,7 +155,7 @@ function fetchOne(id: FileId, q: Quality): Promise<string> {
   const had = jobs.get(key);
   if (had) return had.promise;
   const j: Job = { id, q, loaded: 0, total: null, done: false, startedAt: null, doneAt: null, ctrl: new AbortController(), promise: Promise.resolve("") };
-  // un à la fois : la poursuite d'abord, elle a toute la bande
+  // un à la fois : chacun a toute la bande
   const run = queue.then(() => download(j));
   queue = run.catch(() => undefined);
   j.promise = run;
@@ -182,16 +182,6 @@ export async function loadFilmFiles(ids: FileId[]): Promise<{ urls: string[]; qu
     } catch (e) {
       if (!(e instanceof VariantSwitch) && variant === q) throw e;
     }
-  }
-}
-
-/** Arrête et oublie un fichier devenu inutile (la fin qui ne jouera pas). */
-export function dropFilmFile(id: FileId): void {
-  for (const q of ["720", "540"] as Quality[]) {
-    const j = jobs.get(keyOf(id, q));
-    if (!j || j.done) continue;
-    j.ctrl.abort();
-    jobs.delete(keyOf(id, q));
   }
 }
 
@@ -235,12 +225,9 @@ export function filmNet(): { bytes: number; bps: number | null; firstStart: numb
 
 /**
  * Dès le premier contact avec le formulaire, puis pendant l'attente (§5.4) :
- * la poursuite, en basse priorité ; la fin de six étoiles seulement quand le
- * niveau la demande (de une à cinq, la fin se joue sur place, §18.53).
+ * le film, en basse priorité. Un seul fichier pour tous les niveaux (§18.56).
  */
-export function preloadFilm(level?: number): void {
+export function preloadFilm(): void {
   if (!canPlayFilm()) return;
-  const { load, drop } = endingToLoad(level);
-  if (drop) dropFilmFile(drop);
-  void loadFilmFiles(load ? ["poursuite", load] : ["poursuite"]).catch(() => undefined);
+  void loadFilmFiles(["poursuite"]).catch(() => undefined);
 }

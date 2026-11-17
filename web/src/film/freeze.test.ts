@@ -5,7 +5,8 @@
 // au sol restent dans l'ombre. Même verdict sur un rendu plus contrasté ou plus
 // sombre.
 import { describe, expect, it } from "vitest";
-import { DECOR_TINT, RULE_STEP, STILL_CARS, duotone, stillShot, type StillShot } from "./freeze";
+import { DECOR_TINT, RULE_STEP, STILL_CARS, STILL_TRACED_FRAMES, duotone, stillShot, type StillShot } from "./freeze";
+import { FILM_FRAMES } from "../../../shared/film";
 
 const W = 180;
 const H = 320;
@@ -175,8 +176,14 @@ describe("les contours de la berline (STILL_CARS)", () => {
     });
   }
 
-  it("l'image gelée : le dernier plan joué, ou la fin à six étoiles", () => {
-    for (let level = 1; level <= 5; level++) expect(stillShot({ level: level as 1, ending: null })).toBe(`P${level}`);
-    expect(stillShot({ level: 6, ending: "fin6" })).toBe("FIN6");
+  it("l'image gelée : le dernier tronçon joué, ou FIN6 à six étoiles", () => {
+    for (let level = 1; level <= 5; level++) expect(stillShot({ level: level as 1 })).toBe(`P${level}`);
+    expect(stillShot({ level: 6 })).toBe("FIN6");
+  });
+
+  // TODO (§18.56) : les contours sont tracés sur l'ancien découpage (414 images) ; ce test attend le rendu éclairé
+  // du trajet roulé. Les retracer, passer STILL_TRACED_FRAMES à FILM_FRAMES : il tourne alors et doit passer.
+  it.skipIf(STILL_TRACED_FRAMES !== FILM_FRAMES)("les contours sont tracés sur le fichier de 720 images du trajet roulé", () => {
+    expect(STILL_TRACED_FRAMES).toBe(FILM_FRAMES);
   });
 });

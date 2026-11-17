@@ -1,6 +1,6 @@
 // L'enregistreur de la trace du film (trace.ts), chargé seulement avec
 // `?filmtrace=1`. Il observe de l'extérieur, sans rien piloter : les événements
-// des deux balises (filmVideos, A la poursuite, B la fin), ses propres rappels
+// de la balise (filmVideo, « A » : la poursuite et FIN6), ses propres rappels
 // d'image (à côté de ceux du lecteur), un instantané toutes les 250 ms tant que
 // le film est monté (balises, `player.stats()`, onglet, contexte audio), les
 // étapes que Film.tsx lui passe et les événements de la fenêtre. Un calque à
@@ -11,7 +11,7 @@
 import { peekAudio } from "../lib/audio";
 import type { FilmProbe, TraceRecorder } from "./trace";
 import { TraceBuffer, type TraceLine } from "./traceBuffer";
-import { filmUnlocks, filmVideos } from "./unlock";
+import { filmUnlocks, filmVideo } from "./unlock";
 
 const ENDPOINT = "/api/film-trace";
 const SNAP_MS = 250;
@@ -128,13 +128,10 @@ export function startRecorder(t0: number): TraceRecorder {
     vis: document.visibilityState,
   });
 
-  // ---- les deux balises ----------------------------------------------------
-  const [a, b] = filmVideos() as [FrameVideo, FrameVideo];
-  const tags = new Map<HTMLVideoElement, "A" | "B">([
-    [a, "A"],
-    [b, "B"],
-  ]);
-  const frames = { A: { n: 0, mt: null as number | null, pf: null as number | null }, B: { n: 0, mt: null as number | null, pf: null as number | null } };
+  // ---- la balise -----------------------------------------------------------
+  const a = filmVideo() as FrameVideo;
+  const tags = new Map<FrameVideo, "A">([[a, "A"]]);
+  const frames = { A: { n: 0, mt: null as number | null, pf: null as number | null } };
   for (const [v, tag] of tags) {
     for (const e of VIDEO_EVENTS) {
       v.addEventListener(e, () => {
@@ -264,9 +261,9 @@ export function startRecorder(t0: number): TraceRecorder {
       return v ? `${v.ct} ${v.p ? "pause" : "joue"} rs${v.rs}` : "-";
     };
     const st = last?.st as { t?: number; retries?: number; aborted?: boolean } | undefined;
-    const fc = last?.fc as { A: number; B: number } | undefined;
+    const fc = last?.fc as { A: number } | undefined;
     const head = last
-      ? `A ${vs(last.A)} img${fc?.A ?? "-"} | B ${vs(last.B)} img${fc?.B ?? "-"} | t=${st?.t?.toFixed?.(2) ?? "-"} relances=${st?.retries ?? "-"}${st?.aborted ? " AVORTÉ" : ""}`
+      ? `A ${vs(last.A)} img${fc?.A ?? "-"} | t=${st?.t?.toFixed?.(2) ?? "-"} relances=${st?.retries ?? "-"}${st?.aborted ? " AVORTÉ" : ""}`
       : "";
     const lines = buf.shown().map(fmt);
     overlay.textContent = [`trace ${session} · ${sent} envoyées${status ? ` · ${status}` : ""}`, head, ...lines].filter(Boolean).join("\n");
@@ -310,17 +307,15 @@ export function startRecorder(t0: number): TraceRecorder {
       t: rel(performance.now()),
       k: "snap",
       A: videoState(a),
-      B: videoState(b),
-      fc: { A: frames.A.n, B: frames.B.n },
-      mt: { A: frames.A.mt, B: frames.B.mt },
-      pf: { A: frames.A.pf, B: frames.B.pf },
+      fc: { A: frames.A.n },
+      mt: { A: frames.A.mt },
+      pf: { A: frames.A.pf },
       st,
       vis: document.visibilityState,
       au: peekAudio(),
       un: filmUnlocks(),
     };
     frames.A.n = 0;
-    frames.B.n = 0;
     last = line;
     add(line);
     paint();
