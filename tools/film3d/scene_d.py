@@ -1382,7 +1382,9 @@ def plan_P6(scene, hidden, palier="socle"):
     import p6_jetee as P6
     lamp_src = panorama(scene, hidden, all_lit=True, haubans=(palier in ("haubans", "complet")))
     build_jetty(hidden, lamp_src)
-    build_pointe(hidden, lamp_src, far=True, marina=(palier in ("marina", "complet")))
+    # en ville, la conduite unique roule jusqu'à la pointe derrière la berline, à 2,4 m : la pointe et la marina de
+    # près (garde-corps, chaînes, vrais bateaux), comme FIN les montre ; le lieu autonome garde sa vue lointaine
+    build_pointe(hidden, lamp_src, far=not L.ville_on(), marina=(palier in ("marina", "complet")))
     # le phare (lieux.panorama) : ses pinceaux, relevés de 1° seulement et vus de la jetée sous la lanterne, barrent
     # le cadre en passant par elle ; aucune phase ni vitesse ne l'évite de la jetée (rendus e3, e4, f1, f2). Gelés,
     # l'un fuit vers le large, l'autre est caché à la caméra (P6_PHARE_PHASE) : la lanterne se lit, pas la barre
@@ -1463,7 +1465,10 @@ def plan_P6(scene, hidden, palier="socle"):
                       if o.type == "LIGHT" and o.name.endswith("searchlight_spot")])
     p6_beam0_haze(hs[0], frames, hero)
     p6_foreground(hidden)
-    p6_phare_clear(scene)
+    if not L.ville_on():
+        # (en ville, la jetée garde ses lampadaires tous les 20 m des deux côtés jusqu'à la pointe, la logique du pont
+        # et de toute la ville : la caméra roule désormais derrière la berline, le phare au-dessus des têtes)
+        p6_phare_clear(scene)
     # la berline à 7 m de l'objectif : ses textures gardent leur pleine définition, le reste est loin
     L.cap_images(1024, keep_objects=[hero])
     c = P6.camera(P6.T_STILL)
