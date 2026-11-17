@@ -3234,6 +3234,36 @@ def flash_bars(roots, frames, period=12, shift=0):
     return n
 
 
+# La phase des rampes d'un tronçon à l'autre (audit des mouvements, 18 novembre). Une patrouille qui passe une
+# jonction (la même place, la même vitesse des deux côtés) doit battre dans la même phase ; ses rangs dans les meutes
+# de P4, P5 et P6 diffèrent (la patrouille 1 de P5 est la 0 de P6) et chaque tronçon décalait les siennes de cinq
+# images par rang : la rampe sautait d'un temps à la jonction. BAR_SAME : (tronçon, véhicule) -> son aîné dans le
+# tronçon d'avant ; les autres gardent leur phase d'avant (cinq images par rang, comptées dans le tronçon).
+BAR_SAME = {("P5", "van_2"): ("P4", "van"), ("P5", "patrol_3"): ("P4", "patrol_7"),
+            ("P6", "patrol_0"): ("P5", "patrol_1"), ("P6", "van_1"): ("P5", "van_2"),
+            ("P6", "patrol_2"): ("P5", "patrol_3")}
+BAR_RANK = {("P4", "van"): 9}           # le fourgon de P4 vient après les neuf patrouilles de p4_pont.PACK
+
+
+def bar_film_offset(plan, name, period=12):
+    """Le décalage de rampe d'un véhicule compté en images du film (bar_level(image du film, …, ce décalage)) : celui
+    de son aîné (BAR_SAME) s'il en a un, sinon cinq images par rang dans son tronçon (le suffixe de son nom)."""
+    import parcours as PC
+    while (plan, name) in BAR_SAME:
+        plan, name = BAR_SAME[(plan, name)]
+    rank = BAR_RANK.get((plan, name))
+    if rank is None:
+        rank = int(name.rsplit("_", 1)[1]) if name.rsplit("_", 1)[-1].isdigit() else 0
+    return (5 * rank - PC.START[plan]) % period
+
+
+def bar_shift(plan, name, period=12):
+    """Le `shift` de flash_bars([rig], images, shift=…) qui met le véhicule `name` du tronçon `plan` dans la phase de
+    bar_film_offset (le rig seul dans la liste)."""
+    import parcours as PC
+    return (bar_film_offset(plan, name, period) + PC.START[plan]) % period
+
+
 def bars_spare_car(name="coupe"):
     """Les lueurs des rampes n'éclairent pas les vitres de la berline (lumière v3.1) : ses vitres (propriété
     « vitre ») entrent dans chaque collection « _glow_exclude » (celle que cast_vehicles.lightbar_lights donne à ses

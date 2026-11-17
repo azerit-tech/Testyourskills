@@ -1509,7 +1509,8 @@ def plan_P6(scene, hidden, palier="socle"):
         M.key_vehicle(r, ps, wheels=wh, ground=p6_ground, pivot=(0.0, 0.0, 0.36))
         M.wheel_marks(wh, wr, axis="Y")
         rigs.append(r)
-    n = M.flash_bars(rigs, frames)
+    # (chacun dans la phase de son aîné de P5, motion.bar_shift : la rampe ne saute pas à la jonction)
+    n = sum(M.flash_bars([r], frames, shift=M.bar_shift("P6", f"{P6.COLUMN[i][0]}_{i}")) for i, r in enumerate(rigs))
     print(f"[P6] meute de {len(rigs)} véhicules, {n} lumières de rampe clignotantes", flush=True)
 
     # l'hélicoptère de la prise (helicos.py : un seul, helicos.N) : celui de P5, qui quitte son stationnaire pour sa

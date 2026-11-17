@@ -1741,7 +1741,9 @@ def plan_P5(scene, hidden, palier="conteneurs"):
                       wheelbase=body.get("wheelbase", 2.9), front=body.get("front_axle"))
         M.key_vehicle(r, ps, wheels=wh, ground=deck_ground, pivot=(0.0, 0.0, 0.36))
         M.wheel_marks(wh, wr, axis="Y")
-    n = M.flash_bars(rigs, FRAMES)
+    # (chacune dans la phase de son aînée de P4, motion.bar_shift : la rampe ne saute pas à la jonction)
+    n = sum(M.flash_bars([r], FRAMES, shift=M.bar_shift("P5", f"{P5.PACK_START[i][0]}_{i}"))
+            for i, r in enumerate(rigs))
     print(f"[P5] {n} lueurs de rampe clignotantes", flush=True)
     # (plus de tour d'éclairage : 50 kW crème posés pour l'ancienne caméra de face, ils faisaient à droite de la
     # berline une nappe claire plus grande qu'elle, qui sortait du cadre (lumière v3.1, règles B et E). Le virage

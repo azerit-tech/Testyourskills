@@ -2160,8 +2160,40 @@ def test_entrees():
           not seen[0] and first is not None and first >= P4.F0 + 6, f"première image dans le cadre : {first}")
 
 
+def test_rampes():
+    """Les rampes d'une jonction à l'autre (audit des mouvements, 18 novembre) : P5 et P6 nomment leurs véhicules
+    comme leurs scènes les rangent (« kind_i ») ; chaque véhicule qui passe une jonction de P4 à P6 (ses deux
+    places à moins de ville.JUMEAU_M à la coupe) bat dans la phase de son aîné (motion.bar_film_offset), et le
+    décalage de motion.bar_shift redonne cette phase."""
+    import p4_pont as P4
+    import p5_virage as P5
+    import p6_jetee as P6
+    import parcours as PC
+    names = (list(P5.tracks()) == ["hero"] + [f"{k}_{i}" for i, (k, *_r) in enumerate(P5.PACK_START)] and
+             list(P6.tracks()) == ["hero"] + [f"{k}_{i}" for i, (k, *_r) in enumerate(P6.COLUMN)] and
+             len(P4.PACK) == M.BAR_RANK[("P4", "van")])
+    data = {p: _vehicle_rows(p) for p in ("P4", "P5", "P6")}
+    bad, pairs = [], 0
+    for a, b in (("P4", "P5"), ("P5", "P6")):
+        va, _sa, ma = data[a]
+        vb, _sb, mb = data[b]
+        for nb, rb in vb.items():
+            r = [q for q in rb if q[0] == mb.F0][0]
+            for na, ra in va.items():
+                e = [q for q in ra if q[0] == ma.F0 + ma.FRAMES][0]
+                if math.dist((e[1], e[2]), (r[1], r[2])) < POURSUITE_TWIN:
+                    pairs += 1
+                    if M.bar_film_offset(a, na) != M.bar_film_offset(b, nb):
+                        bad.append(f"{a} {na} → {b} {nb}")
+    back = all((M.bar_shift(p, n) - PC.START[p]) % 12 == M.bar_film_offset(p, n)
+               for p in ("P5", "P6") for n in data[p][0])
+    check("rampes : chaque patrouille qui passe une jonction de P4 à P6 bat dans la même phase des deux côtés",
+          names and back and not bad and pairs >= 5, f"{pairs} jonctions, " + (", ".join(bad) or "aucun saut"))
+
+
 if __name__ == "__main__":
     test_poursuivants()
+    test_rampes()
     test_entrees()
     test_cut_pose()
     test_straight()
