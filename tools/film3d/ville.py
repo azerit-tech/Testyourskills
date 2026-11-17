@@ -451,9 +451,52 @@ def selftest_helico():
         qa = H.to_ville(a, H.in_scene(a, 0)(n / FPS))
         qb = H.to_ville(b, H.in_scene(b, 0)(0.0))
         assert math.dist(qa[:3], qb[:3]) < 1e-6 and abs(qa[3] - qb[3]) < 1e-6, (a, b, qa, qb)
-    # FIN6 : en stationnaire à sa place (fin6_orbite.HELI) dès FIN6/1
-    q = H.in_scene("FIN6", 0, dyn=False)(0.0)
-    assert math.dist(q[:3], F6.HELI) < 1e-6, (q, F6.HELI)
+    # la poursuite (helicos.chase) : assiette de la physique, bornée, sans à-coup, à bonne hauteur, sans rien heurter
+    _ = F6
+    ws = [H.attitude(0)[f] for f in fs]
+    for k, lim, rate in ((4, H.ATT_LIM, 40.0), (5, H.ATT_LIM, 40.0), (3, None, 60.0)):   # °, °/s
+        if lim is not None:
+            assert max(abs(w[k]) for w in ws) <= lim + 1e-6, (k, max(abs(w[k]) for w in ws))
+        r = max(abs(b[k] - a[k]) * FPS for a, b in zip(ws, ws[1:]))
+        assert r <= rate, f"axe {k} : {r:.1f}°/s (au plus {rate})"
+    for f in fs[1:-1]:
+        T = (f - 1) / FPS
+        v, al, at = H.chase_kin(T)
+        p, r = ws[fs.index(f)][4:6]
+        if abs(at) > 1.0:                       # penché du côté où il tourne (à droite : roulis positif)
+            assert r * at > 0, (f, r, at)
+        if al > 1.0:                            # il accélère : nez bas
+            assert p < 0, (f, p, al)
+        if v > 8.0 and abs(al) < 0.5:           # vol d'avance régulier : nez bas
+            assert p < 0, (f, p, al)
+        if abs(at) < 0.3:                       # pas de roulis sans virage
+            assert abs(r) < 6.0, (f, r, at)
+        assert 20.0 <= ws[fs.index(f)][2] <= 55.0, (f, ws[fs.index(f)][2])     # m au-dessus de l'eau (sol à 0..3)
+        cx, cy = H.car(T)
+        d = math.dist((cx, cy, 1.0), ws[fs.index(f)][:3])
+        assert d > 25.0, (f, d)                                                  # jamais sur la berline
+    # le pylône du pont (x ±11, y −263,5 dans la ville, 48 m de haut) et ses haubans (de la tête à ±53 m sur le
+    # tablier) : à 12 m au moins ; lampadaires (10 m) : sous lui de 10 m au moins (hauteur ≥ 20 m, contrôlée)
+    import motion as MO
+    pr = MO.pont_profil(True)
+    yc, top = pr["crest"], MO._bridge_z(pr["crest"], ville=True) + 45.0
+
+    def seg(p, a, b):
+        ab = [b[j] - a[j] for j in range(3)]
+        u = max(0.0, min(1.0, sum((p[j] - a[j]) * ab[j] for j in range(3)) / sum(c * c for c in ab)))
+        return math.dist(p, [a[j] + u * ab[j] for j in range(3)])
+    segs = []
+    for sx in (-11.0, 11.0):
+        segs.append(((sx, yc, -4.0), (sx, yc, top)))
+        for sgn in (-1, 1):
+            for dd in (10.0, 30.0, 49.0):
+                ya = yc + sgn * dd
+                segs.append(((sx, yc, top), (sx, ya, MO._bridge_z(ya, ville=True))))
+    dmin = min(seg(w[:3], a, b) for w in ws for a, b in segs)
+    assert dmin > 12.0, f"hélicoptère à {dmin:.1f} m du pylône ou d'un hauban"
+    # la fin : il a freiné, il finit son arc lent devant elle (moins de 4 m/s)
+    vE = H.chase_kin((fs[-2] - 1) / FPS)[0]
+    assert vE < 4.0, vE
     # P4 n'en a pas : à P5/1, l'appareil est hors du cadre de P5 (il entre par le bord, il ne surgit pas)
     m = _angle_cadre(P5.camera(0.0), H.in_scene("P5", 0)(0.0)[:2] + (H.in_scene("P5", 0)(0.0)[2] + P5.HELI_BODY,),
                      6.0)

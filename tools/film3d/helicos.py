@@ -114,10 +114,151 @@ def _hermite(p0, p1, v1, a1, D, u):
     return [h0 * p0[j] + h1 * p1[j] + hv * D * v1[j] + ha * D * D * a1[j] for j in range(3)]
 
 
+# ---- la poursuite (17 novembre, 23 h : « les mouvements de l'hélicoptère ne sont pas bons ») : l'appareil 0 vole une
+# seule courbe lisse en temps du film, de P5/1 à la fin de FIN6, tirée de la berline (parcours.DRIVE) : CHASE_Z m
+# au-dessus de l'eau, CHASE_BACK m derrière elle et CHASE_SIDE m sur sa droite, sur sa route lissée (il coupe le
+# virage du port, y prend du retard, le rattrape sur la jetée) ; quand elle freine vers le phare, il la dépasse,
+# freine nez haut et se pose en stationnaire HOVER devant elle (en avant, à droite, hauteur), le faisceau sur elle.
+# L'assiette vient de la physique de cette courbe, pas de clés : cap sur la vitesse ; tangage = le nez bas du vol
+# d'avance (CRUISE_PITCH à CRUISE_V) plus atan(accélération avant / g) ; roulis = atan(accélération latérale / g)
+# (penché dans le virage, à droite positif) ; dérivées par différences finies sur la courbe, lissées, bornées en
+# douceur à ATT_LIM. ville.selftest_helico vérifie vitesses angulaires, angles, signes, hauteurs et distances.
+# sa place par rapport à elle (m devant, m à droite, m au-dessus de l'eau), clés en temps du film, interpolées puis
+# lissées : à P5/1 haut derrière la caméra (hors du cadre, P4 n'en a pas) ; quand elle freine pour le virage du port,
+# il garde son élan et passe devant, entre par le haut du cadre ; puis il tient sa place haut devant elle, sur sa
+# droite (au 24 mm, à 2,4 m de haut et 9° de site, le tiers haut du cadre 9:16 demande 60 à 100 m de recul pour 30 m)
+CHASE_KEYS = ((16.8, 30.0, 38.0, 30.0), (19.6, 84.0, 5.0, 25.0), (25.5, 82.0, 9.0, 26.0))
+HOVER_D, HOVER_UP, HOVER_SIDE = 88.0, 24.0, -6.0  # le stationnaire de la fin, posé dans le cadre de FIN6/fin : m devant
+#                                                  la caméra, ° au-dessus de son axe (tiers haut), ° sur le côté
+HOVER_T = (25.5, 29.2)         # s du film : de la poursuite au stationnaire (elle s'arrête vers 28,5 s)
+CAR_SIGMA, PATH_SIGMA, ACC_SIGMA = 0.8, 1.4, 0.3     # s : lissages (route de la berline, courbe, accélération)
+CRUISE_PITCH, CRUISE_V = -7.0, 25.0                    # ° de nez bas à 25 m/s (90 km/h) et plus
+ATT_LIM = 22.0                 # ° : tangage et roulis, repliés en douceur au-delà de 16°
+G = 9.81
+_DT = 1.0 / 96.0
+_CHASE = {}
+
+
+def _gauss(vals, sigma):
+    """Lissage gaussien d'une liste, bords prolongés."""
+    k = max(1, int(3 * sigma / _DT))
+    w = [math.exp(-0.5 * (j * _DT / sigma) ** 2) for j in range(-k, k + 1)]
+    sw = sum(w)
+    n = len(vals)
+    return [sum(w[j + k] * vals[min(n - 1, max(0, i + j))] for j in range(-k, k + 1)) / sw for i in range(n)]
+
+
+def _soft_lim(a, knee=16.0, lim=ATT_LIM):
+    m = abs(a)
+    if m <= knee:
+        return a
+    return math.copysign(knee + (lim - knee) * math.tanh((m - knee) / (lim - knee)), a)
+
+
+def _hover():
+    """Le stationnaire de la fin, dans la ville : HOVER_D m devant la caméra de la dernière image de FIN6, HOVER_UP°
+    au-dessus de son axe, HOVER_SIDE° sur le côté (le tiers haut du cadre, à l'écart de la berline)."""
+    import fin6_orbite as F6
+    x, y, z, yaw, pitch = F6.camera((PC.FIN6_FRAMES - 1) / FPS)[:5]
+    a, e = math.radians(yaw + HOVER_SIDE), math.radians(pitch + HOVER_UP)
+    p = (x - HOVER_D * math.sin(a) * math.cos(e), y - HOVER_D * math.cos(a) * math.cos(e), z + HOVER_D * math.sin(e))
+    return to_ville("FIN6", p)
+
+
+def _chase():
+    """La courbe et son assiette sur une grille de _DT s : {T0, x, y, z, cap, tangage, roulis, v, al, at}."""
+    if _CHASE:
+        return _CHASE
+    T0, T1 = T5 - 4.0, PC.t_of("FIN6", PC.FIN6_FRAMES) + 4.0
+    n = int((T1 - T0) / _DT) + 1
+    Ts = [T0 + i * _DT for i in range(n)]
+    cx, cy = zip(*[car(T) for T in Ts])
+    cx, cy = _gauss(list(cx), CAR_SIGMA), _gauss(list(cy), CAR_SIGMA)
+    # son cap lissé (gardé quand elle est arrêtée)
+    hd, last = [], None
+    for i in range(n):
+        a, b = max(0, i - 12), min(n - 1, i + 12)
+        vx, vy = cx[b] - cx[a], cy[b] - cy[a]
+        if math.hypot(vx, vy) / ((b - a) * _DT) > 1.0 or last is None:
+            last = M.heading_of(vx, vy) if last is None else M._unwrap(last, M.heading_of(vx, vy))
+        hd.append(last)
+    hd = _gauss(hd, 0.8)
+    hv = _hover()
+    px, py, pz = [], [], []
+    for i, T in enumerate(Ts):
+        k = CHASE_KEYS
+        if T <= k[0][0]:
+            fwd, side, z = k[0][1:]
+        elif T >= k[-1][0]:
+            fwd, side, z = k[-1][1:]
+        else:
+            j = max(m for m in range(len(k) - 1) if k[m][0] <= T)
+            u = M.smoothstep(k[j][0], k[j + 1][0], T)
+            fwd, side, z = (a + (b - a) * u for a, b in zip(k[j][1:], k[j + 1][1:]))
+        a = math.radians(hd[i])
+        fx, fy, rx, ry = -math.sin(a), math.cos(a), math.cos(a), math.sin(a)
+        q = (cx[i] + fwd * fx + side * rx, cy[i] + fwd * fy + side * ry, z)
+        w = _quintic((T - HOVER_T[0]) / (HOVER_T[1] - HOVER_T[0]))
+        px.append(q[0] + (hv[0] - q[0]) * w)
+        py.append(q[1] + (hv[1] - q[1]) * w)
+        pz.append(q[2] + (hv[2] - q[2]) * w)
+    px, py, pz = _gauss(px, PATH_SIGMA), _gauss(py, PATH_SIGMA), _gauss(pz, PATH_SIGMA)
+
+    def der(v):
+        return [(v[min(n - 1, i + 1)] - v[max(0, i - 1)]) / ((min(n - 1, i + 1) - max(0, i - 1)) * _DT)
+                for i in range(n)]
+    vx, vy = der(px), der(py)
+    ax, ay = _gauss(der(vx), ACC_SIGMA), _gauss(der(vy), ACC_SIGMA)
+    # le cap : sur la vitesse en vol ; au pas (sous 6 m/s), il le garde (pas de demi-tour en stationnaire)
+    cap, last = [], None
+    for i in range(n):
+        v = math.hypot(vx[i], vy[i])
+        hv_ = M.heading_of(vx[i], vy[i]) if v > 0.5 else (last if last is not None else 0.0)
+        base = hv_ if last is None else M._unwrap(last, hv_)
+        h = base if last is None else last + (base - last) * M.smoothstep(1.0, 6.0, v)
+        last = h if last is None else M._unwrap(last, h)
+        cap.append(last)
+    cap = _gauss(cap, 0.5)
+    pit, rol, al, at, sp = [], [], [], [], []
+    for i in range(n):
+        a = math.radians(cap[i])
+        fx, fy, rx, ry = -math.sin(a), math.cos(a), math.cos(a), math.sin(a)
+        a_long = ax[i] * fx + ay[i] * fy
+        a_lat = ax[i] * rx + ay[i] * ry
+        v = math.hypot(vx[i], vy[i])
+        pit.append(CRUISE_PITCH * min(1.0, v / CRUISE_V) - math.degrees(math.atan(a_long / G)))
+        rol.append(math.degrees(math.atan(a_lat / G)))
+        al.append(a_long)
+        at.append(a_lat)
+        sp.append(v)
+    pit = [_soft_lim(p) for p in _gauss(pit, 0.3)]
+    rol = [_soft_lim(r) for r in _gauss(rol, 0.3)]
+    _CHASE.update(T0=T0, n=n, x=px, y=py, z=pz, cap=cap, tangage=pit, roulis=rol, v=sp, al=al, at=at)
+    return _CHASE
+
+
+def chase(T):
+    """(x, y, z, cap, tangage, roulis) de l'appareil 0 au temps du film T, dans la ville (assiette comprise)."""
+    c = _chase()
+    u = (T - c["T0"]) / _DT
+    i = min(c["n"] - 2, max(0, int(math.floor(u))))
+    f = min(1.0, max(0.0, u - i))
+    return tuple(c[k][i] + (c[k][i + 1] - c[k][i]) * f for k in ("x", "y", "z", "cap", "tangage", "roulis"))
+
+
+def chase_kin(T):
+    """(vitesse m/s, accélération avant, latérale m/s²) de l'appareil 0 au temps T (pour les contrôles)."""
+    c = _chase()
+    i = min(c["n"] - 1, max(0, int(round((T - c["T0"]) / _DT))))
+    return c["v"][i], c["al"][i], c["at"][i]
+
+
 def state(i, T):
     """L'appareil i à l'instant T du film, dans la ville : (x, y, z, cap, tangage, roulis), sans l'assiette de
     l'accélération (motion.aircraft_attitude l'ajoute : attitude)."""
     if i == 0:
+        return chase(T)
+    if i == -1:                                    # l'ancienne arrivée de P5 (plus posée)
         if T <= T5_END:
             return to_ville("P5", P5.heli_arrival(T - T5))
         u = (T - T5_END) / JOIN_A
@@ -166,6 +307,8 @@ def _soft(a):
 def attitude(i):
     """{image du film: (x, y, z, cap, tangage, roulis)} dans la ville, l'assiette de l'accélération comprise,
     tangage et roulis sous ATT_MAX."""
+    if i == 0 and i not in _ATT:                   # la poursuite porte déjà son assiette physique
+        _ATT[0] = {f: chase((f - 1) / FPS) for f in range(F_FIRST, F_LAST + 1)}
     if i not in _ATT:
         raw = M.aircraft_attitude(lambda T: state(i, T), range(F_FIRST, F_LAST + 1), "heli", f0=1, fps=FPS,
                                   seed=SEEDS[i])

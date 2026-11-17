@@ -724,7 +724,7 @@ def test_p6():
 
 # la mise en scène des aéronefs sur la jetée (film éclairé du 13 novembre : des jouets, à hauteur de lampadaire, piqués
 # en apparence, l'un sur l'autre et sur les mâts ; les avions en travers du cadre, frôlant un hélicoptère)
-AIR_ATT_MAX = 15.0            # ° : tangage et roulis des hélicoptères (assiette de l'accélération comprise)
+AIR_ATT_MAX = 22.0            # ° : tangage et roulis des hélicoptères (assiette de l'accélération comprise, helicos.ATT_LIM)
 AIR_HELI_LAMPS = (1.5, 2.0)   # hauteurs de lampadaire au-dessus de la jetée : l'appareil 0 (faisceau sur elle), les autres
 AIR_SEP = 25.0                # m entre deux hélicoptères
 AIR_OVERLAP = 6               # images au plus où deux boîtes projetées se recouvrent (appareils, mâts)
