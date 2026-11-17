@@ -663,7 +663,7 @@ def assemble(a, plans, cut):
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
         sys.exit("[film] ffmpeg introuvable")
-    essais = parse_essais(a.essai)
+    essais = with_ville(parse_essais(a.essai), a)       # --ville : les images de <PLAN>+ville
     made, drafts = [], []
     for plan in plans:
         d = os.path.join(a.out, plan_dirname(plan, essais))
