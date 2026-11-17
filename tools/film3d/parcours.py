@@ -5,7 +5,10 @@
 # dos, à 2,4 m. Le rendu le découpe en tronçons (SHOTS : une scène par lieu, ses voisins chargés par ville.py) ; à
 # chaque raccord la berline et la caméra ont exactement le même état des deux côtés : ce ne sont pas des coupes. Les
 # six étoiles sont des instants de la conduite (ETOILES), pas des coupes. Python pur.
+import json
 import math
+import os
+import sys
 
 import motion as M
 
@@ -556,7 +559,70 @@ def mesures():
     return out
 
 
-if __name__ == "__main__":         # python3 tools/film3d/parcours.py : les tronçons, les étoiles, les raccords
+# ---- ce que le site lit du parcours (shared/film/parcours.json) : la seule source de ses durées. Le site
+# (shared/film/cut.ts) en tire les tronçons, les étoiles et la fin du fichier ; sa bande-son (shared/film/sound.ts) la
+# vitesse, la glisse et l'accélération de la berline. `python3 tools/film3d/parcours.py --export` l'écrit ;
+# `--check` (et render_film.py --selftest) échoue s'il ne suit plus le parcours : un rendu ne peut plus partir avec
+# des durées que le site ne connaît pas.
+SITE_JSON = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "shared", "film", "parcours.json")
+# les écarts tolérés en simplifiant les courbes (Ramer-Douglas-Peucker) : inaudibles, et quelques Ko de moins
+SITE_TOL = {"vitesse": 0.15, "glisse": 0.4, "acceleration": 0.25}
+
+
+def _simplifie(pts, tol):
+    """Les points (image, valeur) utiles : une courbe linéaire par morceaux qui reste à `tol` de tous les autres."""
+    if len(pts) < 3:
+        return list(pts)
+    (x0, y0), (x1, y1) = pts[0], pts[-1]
+    i, d = 0, -1.0
+    for k in range(1, len(pts) - 1):
+        x, y = pts[k]
+        e = abs(y - (y0 + (y1 - y0) * (x - x0) / (x1 - x0)))
+        if e > d:
+            i, d = k, e
+    if d <= tol:
+        return [pts[0], pts[-1]]
+    return _simplifie(pts[:i + 1], tol)[:-1] + _simplifie(pts[i:], tol)
+
+
+def site():
+    """Le parcours tel que le site le lit : tronçons (images), étoiles (images globales), arrêt, courbes de conduite."""
+    n = TOTAL + FIN6_FRAMES
+    out = {"//": "Écrit par python3 tools/film3d/parcours.py --export (SPEC §18.56) : ne pas modifier à la main.",
+           "fps": int(FPS), "troncons": [[a, k] for a, k in SHOTS + (("FIN6", FIN6_FRAMES),)],
+           "etoiles": [ETOILES[k] for k in sorted(ETOILES)], "arret": round(T_ARRET * FPS, 1)}
+    for nom, f, r in (("vitesse", DRIVE.speed, 2), ("glisse", lambda t: abs(DRIVE.slip(t)), 1),
+                      ("acceleration", DRIVE.along, 2)):
+        pts = [(k, round(f(k / FPS), r) + 0.0) for k in range(n)]
+        out[nom] = [[k, v] for k, v in _simplifie(pts, SITE_TOL[nom])]
+    return out
+
+
+def site_json():
+    """Le texte de shared/film/parcours.json : un champ par ligne, stable d'un export à l'autre."""
+    d = site()
+    rows = [f"  {json.dumps(k)}: {json.dumps(v, ensure_ascii=False, separators=(', ', ': '))}" for k, v in d.items()]
+    return "{\n" + ",\n".join(rows) + "\n}\n"
+
+
+def site_a_jour(path=SITE_JSON):
+    """Vrai si shared/film/parcours.json est celui qu'écrirait --export."""
+    try:
+        return open(path, encoding="utf-8").read() == site_json()
+    except OSError:
+        return False
+
+
+if __name__ == "__main__" and ("--export" in sys.argv or "--check" in sys.argv):
+    if "--export" in sys.argv:
+        open(SITE_JSON, "w", encoding="utf-8").write(site_json())
+        print(f"[parcours] {os.path.normpath(SITE_JSON)} écrit : {TOTAL + FIN6_FRAMES} images, étoiles {ETOILES}")
+    elif not site_a_jour():
+        sys.exit(f"[parcours] {os.path.normpath(SITE_JSON)} ne suit plus le parcours : "
+                 "python3 tools/film3d/parcours.py --export")
+    else:
+        print("[parcours] shared/film/parcours.json suit le parcours : ok")
+elif __name__ == "__main__":         # python3 tools/film3d/parcours.py : les tronçons, les étoiles, les raccords
     m = mesures()
     print(f"trajet {m['longueur']:.1f} m jusqu'à l'arrêt ({m['arret']:.2f} s), poursuite {m['longueur_poursuite']:.1f} m "
           f"en {m['images']} images ({m['secondes']:.2f} s) ; moyenne {m['moyenne'] * 3.6:.1f} km/h, pointe "
