@@ -451,20 +451,18 @@ camera.bras_commun = "P5"      # motion.camera_operator : vibration sur le temps
 
 def project(p, t):
     """Le point monde p (x, y, z) dans le cadre de la caméra à l'instant t, sans le tremblé : (x %, y %, distance)
-    comptés depuis la gauche et depuis le bas ; None s'il est derrière l'objectif."""
-    cx, cy, cz, yaw, pitch, _, _ = camera_rail(t)
-    a, b = math.radians(yaw), math.radians(pitch)
-    f = (-math.sin(a) * math.cos(b), -math.cos(a) * math.cos(b), math.sin(b))
-    r = (f[1], -f[0], 0.0)                         # f × z
-    n = math.hypot(r[0], r[1])
-    r = (r[0] / n, r[1] / n, 0.0)
-    u = (r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0])
-    v = (p[0] - cx, p[1] - cy, p[2] - cz)
-    zc = sum(v[i] * f[i] for i in range(3))
-    if zc <= 0.05:
+    comptés depuis la gauche et depuis le bas ; None s'il est derrière l'objectif. La focale et le roulis sont ceux
+    de la caméra (le bras commun s'ouvre avec la vitesse et penche dans le virage : parcours.rig)."""
+    cam = camera_rail(t)
+    q = M.screen_point(cam, p)
+    if q is None:
         return None
-    xc, yc = sum(v[i] * r[i] for i in range(3)), sum(v[i] * u[i] for i in range(3))
-    return 50.0 + 50.0 * xc / zc / TAN_H, 50.0 + 50.0 * yc / zc / TAN_V, math.sqrt(sum(c * c for c in v))
+    a, b = math.radians(cam[3]), math.radians(cam[4])
+    f = (-math.sin(a) * math.cos(b), -math.cos(a) * math.cos(b), math.sin(b))
+    v = (p[0] - cam[0], p[1] - cam[1], p[2] - cam[2])
+    if sum(v[i] * f[i] for i in range(3)) <= 0.05:
+        return None
+    return 100.0 * q[0], 100.0 * (1.0 - q[1]), math.sqrt(sum(c * c for c in v))
 
 
 def car_box(pose, dims=CAR_DIMS):

@@ -380,6 +380,118 @@ def cam_cap(shot, frame):
     return _CAM[k] + (_CAM[k + 1] - _CAM[k]) * f - placer(shot)[1]
 
 
+# ---- la vitesse à l'image (18 novembre : « 0 impression de vitesse ») : le bras commun vit avec la berline. Il était
+# rivé à elle (même distance, même hauteur, même focale, visée exacte, horizon immobile) : la berline restait figée
+# au centre du cadre et rien ne disait 107 km/h. Le même bras partout, sur le temps du film (donc le même des deux
+# côtés de chaque jonction), avec, tout en douceur :
+#  - la vitesse : la focale s'ouvre de 24 à RIG_LENS_PEAK mm et le bras se rapproche de RIG_BACK_SPEED m et descend de
+#    RIG_DZ m (2,4 → 2,15 m) à la pointe ; la berline garde presque sa taille à l'écran, le sol et les bords du cadre
+#    défilent plus vite (plus d'angle, plus près) ;
+#  - l'accélération : le bras a du retard (RIG_TAU) ; aux gaz la berline s'échappe un peu (RIG_ACC[1] m par m/s²),
+#    au freinage le bras la rattrape (RIG_ACC[0]) ;
+#  - le virage : le bras penche dans le virage (RIG_ROLL ° par m/s² de latérale, retardée) ;
+#  - la route : un flottement lent de 0,2 à 0,6 Hz (RIG_FLOAT), éteint à l'arrêt ; la vibration fine, au carré de
+#    la vitesse, est celle de l'opérateur (motion.OPERATOR["vib_bras"]).
+# Hauteur, distance et focale restent celles de Jacques (2,4 m, 7,5 m, 24 mm) au pas et à l'arrêt (FIN6).
+# FILM3D_VITESSE=0 rend le bras d'avant, rivé (pour comparer).
+RIG_V = (12.5, 29.8)              # m/s : 45 km/h (rien ne change dessous) → 107 km/h (la pointe, tout l'effet)
+# la focale ne s'ouvre qu'au-dessus de 72 km/h (RIG_V_FOCALE) et jusqu'à 22 mm : à l'entrée du port (P5/1, 68 km/h
+# au gros freinage) elle doit être revenue à 24 mm, sans quoi l'hélicoptère, posé juste hors du bord droit du
+# cadre, y entrerait d'un coup à la jonction P4 → P5 (ville.selftest_helico : P4 n'en a pas)
+RIG_V_FOCALE = (20.0, 29.8)
+RIG_LENS_PEAK = 22.0              # mm à la pointe
+RIG_LENS_FREIN = 0.4              # au gros freinage (6 m/s² et plus, retardé), la focale rend 70 % de son ouverture
+RIG_BACK_SPEED = 0.35             # m : le bras plus court à la pointe (la berline garde sa largeur à l'écran, à 4 % près)
+RIG_DZ = -0.25                    # m : le bras plus bas à la pointe
+RIG_ACC = (0.07, 0.13)            # m de distance par m/s² : au freinage (le bras se rapproche), aux gaz (elle s'échappe)
+RIG_TAU = 0.60                    # s : le retard du bras sur l'accélération (deux pôles de RIG_TAU / 2)
+RIG_ROLL = 0.25                   # ° de roulis par m/s² de latérale (penché dans le virage)
+RIG_ROLL_TAU = 0.25
+RIG_GATE = 12.0                   # m/s : sous cette vitesse, retard, roulis et flottement s'éteignent doucement (l'arrêt)
+RIG_SPEED_TAU = 0.6               # s : la vitesse lissée qui règle focale, distance et hauteur
+# flottement : (lacet, site, roulis en °, côté, hauteur en m), de 0,2 à 0,6 Hz, la moitié au pas, entier à la pointe.
+# La vibration fine de la route est celle de l'opérateur (motion.camera_operator, OPERATOR["vib_bras"]) : elle
+# reste hors de la trajectoire « lissée » que mesurent les plafonds des caméras.
+RIG_FLOAT = (0.10, 0.12, 0.25, 0.04, 0.04)
+RIG_FLOAT_HZ = (0.23, 0.37, 0.53)
+RIG_FLOAT_SEED = 20.0             # les phases du flottement (fixes, sur le temps du film) : à P5/1 il écarte
+                                  # l'hélicoptère du bord droit (ville.selftest_helico : 0,72° hors du cadre)
+_RIG = {}
+
+
+def vitesse_on():
+    import os
+    return os.environ.get("FILM3D_VITESSE", "1").strip().lower() not in ("0", "off", "non", "false", "no")
+
+
+def _rig_table():
+    """Sur la grille du bras (_T0, _H) : la vitesse lissée, l'accélération longitudinale et latérale retardées."""
+    if _RIG:
+        return _RIG
+    t_end = (TOTAL + FIN6_FRAMES) / FPS + 1.0
+    n = int((t_end - _T0) / _H)
+    v1 = v2 = DRIVE.speed(_T0)
+    a1 = a2 = DRIVE.along(_T0)
+    l1 = l2 = DRIVE.alat(_T0)
+    out = []
+    for k in range(n):
+        t = _T0 + k * _H
+        v, a, l = DRIVE.speed(t), DRIVE.along(t), DRIVE.alat(t)
+        g = _H / (RIG_SPEED_TAU / 2.0)
+        v1 += (v - v1) * g
+        v2 += (v1 - v2) * g
+        g = _H / (RIG_TAU / 2.0)
+        a1 += (a - a1) * g
+        a2 += (a1 - a2) * g
+        g = _H / (RIG_ROLL_TAU / 2.0)
+        l1 += (l - l1) * g
+        l2 += (l1 - l2) * g
+        out.append((v2, a2, l2))
+    _RIG["tab"] = out
+    return _RIG
+
+
+def _rig_at(t):
+    tab = _rig_table()["tab"]
+    u = (t - _T0) / _H
+    k = max(0, min(len(tab) - 2, int(math.floor(u))))
+    f = max(0.0, min(1.0, u - k))
+    return tuple(tab[k][j] + (tab[k + 1][j] - tab[k][j]) * f for j in range(3))
+
+
+def _waves(t, hz, seed, amp=1.0):
+    """Une somme de trois sinus aux fréquences hz (phases fixes, tirées de seed), d'amplitude crête ≈ amp."""
+    ph = [(seed * 2.399 + i * 1.913) % (2 * math.pi) for i in range(3)]
+    w = (0.5, 0.3, 0.2)
+    return amp * sum(w[i] * math.sin(2 * math.pi * hz[i] * t + ph[i]) for i in range(3))
+
+
+def rig(shot, frame):
+    """Le bras commun à l'image `frame` du tronçon (décimale admise) : dict(back, left, z (au-dessus de la
+    chaussée), lens, roll (° dans le virage), q (0 au pas, 1 à la pointe), speed (lissée), along, alat (retardées))."""
+    t = t_of(shot, frame)
+    if not vitesse_on():
+        return dict(back=CAM_BACK, left=CAM_LEFT, z=CAM_Z, lens=VISEE_LENS, roll=0.0, q=0.0, speed=DRIVE.speed(t),
+                    along=0.0, alat=0.0, t=t)
+    v, a, l = _rig_at(t)
+    q = M.smoothstep(RIG_V[0], RIG_V[1], v)
+    k = RIG_ACC[0] + (RIG_ACC[1] - RIG_ACC[0]) * 0.5 * (1.0 + math.tanh(a / 1.0))
+    gate = M.smoothstep(0.0, RIG_GATE, v)                  # à l'arrêt, le bras d'origine
+    back = CAM_BACK - RIG_BACK_SPEED * q + k * a * gate
+    wide = M.smoothstep(RIG_V_FOCALE[0], RIG_V_FOCALE[1], v) * (1.0 - RIG_LENS_FREIN * M.smoothstep(0.5, 6.0, -a))
+    return dict(back=back, left=CAM_LEFT, z=CAM_Z + RIG_DZ * q, lens=VISEE_LENS + (RIG_LENS_PEAK - VISEE_LENS) * wide,
+                roll=RIG_ROLL * l * gate, q=q, speed=v, along=a, alat=l, t=t)
+
+
+def tremble(shot, frame):
+    """Le flottement lent du bras : (dlacet, dsite, droulis en °, dcôté, dz en m) ; nul à l'arrêt."""
+    if not vitesse_on():
+        return 0.0, 0.0, 0.0, 0.0, 0.0
+    r = rig(shot, frame)
+    flo = M.smoothstep(0.0, RIG_GATE, r["speed"]) * (0.5 + 0.5 * r["q"])
+    return tuple(_waves(r["t"], RIG_FLOAT_HZ, RIG_FLOAT_SEED + i, RIG_FLOAT[i] * flo) for i in range(5))
+
+
 def sol_ville(x, y):
     """La hauteur de la chaussée au point (x, y) de la ville : le tablier du pont (motion._bridge_z, la copie de
     scene_c.deck_z) sur son emprise, 0 ailleurs (tout le reste de la ville est à z = 0)."""
@@ -391,9 +503,17 @@ def sol(shot, x, y):
     return sol_ville(*vers_ville(shot)[0](x, y))
 
 
-def camera(shot, frame, back=CAM_BACK, left=CAM_LEFT, z=CAM_Z):
+def camera(shot, frame, back=None, left=None, z=None):
     """La position de la caméra dans la scène : `back` derrière le centre de la berline le long du bras, `left` à sa
-    gauche, `z` au-dessus de la chaussée (le tronçon y ajoute la hauteur de son sol)."""
+    gauche, `z` au-dessus de la chaussée (le tronçon y ajoute la hauteur de son sol). Sans valeurs données : le bras
+    commun vivant (rig : distance, hauteur selon la vitesse et l'accélération ; tremble : le flottement de côté et en
+    hauteur)."""
+    if back is None or left is None or z is None:
+        r = rig(shot, frame)
+        dside, dz = tremble(shot, frame)[3:]
+        back = r["back"] if back is None else back
+        left = r["left"] + dside if left is None else left
+        z = r["z"] + dz if z is None else z
     x, y = hero(shot)["pos"](frame)
     a = math.radians(cam_cap(shot, frame))
     fx, fy = -math.sin(a), math.cos(a)             # l'avant du bras ; sa gauche : (-fy, fx)
@@ -422,13 +542,14 @@ def _visee_exacte(shot, frame):
     head = h["heading"](frame)
     yaw = math.degrees(math.atan2(-(hx - x), -(hy - y)))
     pitch = math.degrees(math.atan2(hz + M.HERO_BOX[2] / 2.0 - z, math.hypot(hx - x, hy - y)))
+    lens = rig(shot, frame)["lens"]
     for _ in range(8):
-        cam = (x, y, z, yaw, pitch, 0.0, VISEE_LENS)
+        cam = (x, y, z, yaw, pitch, 0.0, lens)
         b0 = M.hero_screen(cam, hx, hy, hz, head)
         if not b0:
             break
-        bu = M.hero_screen((x, y, z, yaw + 0.05, pitch, 0.0, VISEE_LENS), hx, hy, hz, head)
-        bv = M.hero_screen((x, y, z, yaw, pitch + 0.05, 0.0, VISEE_LENS), hx, hy, hz, head)
+        bu = M.hero_screen((x, y, z, yaw + 0.05, pitch, 0.0, lens), hx, hy, hz, head)
+        bv = M.hero_screen((x, y, z, yaw, pitch + 0.05, 0.0, lens), hx, hy, hz, head)
         eu, ev = VISEE_U - b0["u"], VISEE_V - b0["v"]
         if abs(eu) < 1e-7 and abs(ev) < 1e-7:
             break
@@ -471,11 +592,14 @@ def visee(shot, frame):
 
 
 def chase(shot, frame):
-    """(x, y, z, lacet, site, roulis, focale) : LA caméra du film à l'image `frame` du tronçon, le bras commun (CAM_Z
-    au-dessus de la chaussée, sol() : le tablier du pont) visé par la visée commune."""
+    """(x, y, z, lacet, site, roulis, focale) : LA caméra du film à l'image `frame` du tronçon, le bras commun (rig :
+    CAM_Z au-dessus de la chaussée au pas, sol() : le tablier du pont) visé par la visée commune, avec ce que la
+    vitesse lui donne (focale, roulis dans le virage, vibration et flottement de la route)."""
     x, y, z = camera(shot, frame)
     yaw, pitch = visee(shot, frame)
-    return x, y, z + sol(shot, x, y), yaw, pitch, 0.0, VISEE_LENS
+    r = rig(shot, frame)
+    dyaw, dpitch, droll = tremble(shot, frame)[:3]
+    return x, y, z + sol(shot, x, y), yaw + dyaw, pitch + dpitch, r["roll"] + droll, r["lens"]
 
 
 RACCORDS = tuple((a, b) for (a, _), (b, _) in zip(SHOTS, SHOTS[1:])) + (("P6", "FIN6"),)
