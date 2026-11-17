@@ -7,11 +7,13 @@
 # Repère du pont (scene_c.py), qui est celui de la ville : l'axe x = 0, la poursuite roule vers +y (cap 0), la crête
 # en y = -130, le pied de la rampe en y = -5. t = 0 à la première image, 24 images par seconde.
 #
-# Dans la ville (FILM3D_VILLE, « 1 » par défaut ; docs/cinematique-plan-de-ville.md §2.5, « Pont ») : la berline se
-# lit dans le parcours unique (parcours.py, fenêtre « P4 », ancrée au pied de la rampe, voie x 1,80 : le tablier
-# ouvert de part et d'autre) ; P4/49 est P5/1, la coupe vers P5 n'est qu'un changement de caméra. La caméra, sur le
-# terre-plein du port, devant ses séparateurs : (1,20 ; 31,60 ; 1,2), 163 mm. « 0 » : le plan autonome d'avant,
-# inchangé (33,3 m/s, caméra en y 10, 200 mm).
+# Dans la ville (FILM3D_VILLE, « 1 » par défaut) : depuis le 17 novembre (SPEC §18.53) le pont est roulé en entier,
+# du joint de la rue (y −328) au pied de la rampe (y −5) : la fenêtre « P4 » du parcours unique (parcours.py), 249
+# images, la montée, la crête à 130 km/h, la descente et le freinage du port. La caméra est LA caméra du film, le bras
+# commun de poursuite (parcours.chase, sur le tablier) : plus de plan de face, plus de caméra fixe ni de zoom. La
+# patrouille 1 remonte la berline par la gauche pendant la montée, la dépasse et freine vers le port ; la meute
+# suit, derrière la caméra, et se range à la file pour P5. « 0 » : le plan autonome d'avant, inchangé (33,3 m/s,
+# caméra fixe en y 10, 200 mm).
 import math
 import os
 
@@ -24,7 +26,7 @@ F0 = 1
 Y_REF = 45.0                  # l'ancienne caméra (brouillon) : les trajectoires d'avant restent comptées d'elle
 Y_CREST = -130.0
 SITE_AIM = (0.545, 0.545)     # le centre de la berline à 54,5 % de la hauteur depuis le haut (52 à 56)
-PORT_FRAMES = (34, 42)        # la lumière ambre du port monte sur sa calandre (lumière v3.1, P4 : images 36 à 48)
+PORT_FRAMES = (34, 42)        # la lumière ambre du port monte sur sa calandre (lumière v3.1 ; en ville : la fin)
 ZOOM = 0.06                   # le zoom avant : 200 mm à l'image 1, 212 mm à la dernière (rampes de 10 images)
 BAR_H = 1.7                   # la rampe d'une patrouille au-dessus du tablier
 
@@ -83,14 +85,12 @@ if VILLE:
         """Les feux stop (images du plan) : ceux du parcours, l'entrée du virage du port."""
         return PC.brake_windows("P4")
 
-    HERO_X = hero_pos(0.0)[0]
+    HERO_X = hero_pos(T_END)[0]           # la voie du pont (x 1,80) : la berline y entre sur le plat
     _END = hero_pos(T_END)
-    # la caméra (porte 2 du plan de ville, section 7) : devant les séparateurs du port (y 34,3 de la ville), rien à
-    # retirer ; 0,6 m à gauche de la voie de la berline, CAM_AHEAD m devant sa dernière image, à 163 mm : la berline
-    # garde à la dernière image la taille qu'elle avait au 212 mm à 45,7 m
-    CAM_AHEAD, LENS = 37.29, 163.0
-    CAM = (HERO_X - 0.6, _END[1] + CAM_AHEAD, 1.2)
-    STILL_FRAME = 24
+    PORT_FRAMES = (FRAMES - 14, FRAMES - 6)     # la lumière ambre du port sur sa calandre : les dernières images
+    LENS = PC.VISEE_LENS
+    CAM = PC.chase("P4", F0)[:3]                # la caméra à la première image (scene_c l'y pose avant les clés)
+    STILL_FRAME = PC.ETOILES[4] - PC.START["P4"] + 1      # la crête, l'étoile 4
     T_STILL = M.t_of(STILL_FRAME)
     SPEED = hero_speed(0.0)
     LAG = (0.3, 0.012, 1.5)   # s : chacune reprend la conduite de la berline en retard, 0,3 s plus 0,012 s par
@@ -100,14 +100,14 @@ if VILLE:
 
     # La meute (« le nombre qui écrase »), sur toute la largeur du tablier au début. Chacune suit la conduite de la
     # berline, en retard selon sa distance (LAG), à sa distance, avec ses louvoiements de 3 à 3,6 s et 0,4 m (v3.1).
-    # Quatre et le fourgon déjà sur la descente à l'image 1 (la crête est à 86 m derrière la berline) ; quatre de
-    # plus, 3 m/s plus vite, passent la crête : leur rampe se découvre aux images CREST_FRAMES. P4 → P5 est continu
+    # En ville, le pont roulé en entier (17 novembre) : la meute roule derrière la caméra, hors champ ; quatre de
+    # plus, 1,5 m/s plus vite, à CREST_GAPS m derrière (le plan de face les découvrait à la crête). P4 → P5 est continu
     # (P4/49 = P5/1) : la patrouille 1 roule devant la berline, à sa gauche (en amorce au bord droit du cadre, qu'elle
     # quitte seule), et freine pour s'arrêter tout droit au port ; derrière la berline, deux patrouilles et le fourgon
     # se resserrent à la file dans sa voie, à FILE_S secondes d'elle à P5/1 (ce que la caméra de P5 attend).
     # (genre, x au début, x à la fin, retard, vitesse en plus en m/s, louvoiement en m, sa période en s, phase) ;
     # retard : en m derrière la berline à t = 0, None (déduit de CREST_FRAMES) ou ("file", s) (à la file à P5/1)
-    CREST_FRAMES = (8, 18, 28, 38)
+    CREST_GAPS = (100.0, 125.0, 150.0, 175.0)    # m derrière la berline à P4/1 : les quatre plus rapides
     FILE_S = (1.6, 2.5, 3.4)
     T49 = M.t_of(F0 + FRAMES)           # P5/1
     PACK = [("patrol", None, None, None, 0.0, 0.0, 3.0, 0.3),                # la patrouille 1 : patrol1_pos
@@ -115,10 +115,10 @@ if VILLE:
             ("patrol", -2.6, HERO_X, ("file", FILE_S[1]), 0.0, 0.40, 3.2, 4.0),
             ("patrol", -5.0, -4.6, 54.0, 0.0, 0.40, 3.6, 4.25),
             ("patrol", 4.4, 4.6, 78.0, 0.0, 0.35, 3.1, 5.0),
-            ("patrol", 4.4, 4.4, None, 3.0, 0.40, 3.3, 2.6),          # sa rampe passe la crête à l'image 8
-            ("patrol", -4.6, -4.6, None, 3.0, 0.40, 3.5, 0.8),        # 18
-            ("patrol", 1.0, 1.0, None, 3.0, 0.35, 3.0, 3.3),          # 28
-            ("patrol", -1.6, -1.6, None, 3.0, 0.40, 3.2, 4.4)]        # 38
+            ("patrol", 4.4, 4.4, None, 1.5, 0.40, 3.3, 2.6),          # en ville : CREST_GAPS m derrière, 1,5 m/s
+            ("patrol", -4.6, -4.6, None, 1.5, 0.40, 3.5, 0.8),        # plus vite que la berline
+            ("patrol", 1.0, 1.0, None, 1.5, 0.35, 3.0, 3.3),
+            ("patrol", -1.6, -1.6, None, 1.5, 0.40, 3.2, 4.4)]
     VAN = ("van", 5.6, HERO_X, ("file", FILE_S[2]), 0.0, 0.3, 3.3, 1.7)   # le fourgon ferme la file
 
     # la patrouille 1 : P1_SIDE m à gauche de la berline, P1_LEAD m devant elle à P5/1, à P1_V m/s, en freinage
@@ -162,18 +162,52 @@ if VILLE:
     P1_T1, _P1_TAB = _p1_tables()
     _P1_Y1 = hero_pos(T49)[1] + P1_LEAD - _P1_TAB[-1][2]       # sa place au début de son freinage
 
+    # En ville (17 novembre), la loi ci-dessus ne sert plus : la berline freine déjà à 6,44 m/s² quand la patrouille
+    # devrait commencer son freinage. Sa place se donne par son avance sur la berline : à P4/1 elle roule P1_BEHIND m
+    # derrière elle, à sa gauche (devant la caméra de 1,5 m, mais à 64° de son axe : hors champ, comme dans les
+    # dernières images de P3), la remonte par la gauche pendant toute la montée et la descente, et entre dans P5 dans
+    # l'état que P5 attend (p5_virage.PATROL_IN : 7 m devant, à sa vitesse d'entrée, freinage de 6,4 m/s²). Une
+    # quintique d'Hermite de P1_FROM à P5/1 (avance, vitesse et accélération relatives continues aux deux bouts).
+    P1_BEHIND, P1_FROM = -7.5, -1.5
+
+    def _p1_keys():
+        """Les nœuds (t, avance, vitesse et accélération relatives) : P1_FROM ; le début du freinage de la berline
+        (T_BRAKE), où elle roule à sa vitesse ; P5/1. Entre les deux derniers, son freinage est plus fort que celui
+        de la berline d'une part constante (6,9 m/s² contre 6,44)."""
+        import p5_virage as P5
+        tb = PC.t_of("P4", brake_windows()[-1][0]) - PC.t_of("P4", 1)
+        dv = P5.PATROL_V0 - hero_speed(T49)
+        da = -P5.PATROL_IN["decel"] - _hero_acc(T49)
+        rel = dv / (T49 - tb)
+        mid = P5.PATROL_IN["lead"] - dv * (T49 - tb) / 2.0
+        return ([(P1_FROM, P1_BEHIND, 0.0, 0.0), (tb, mid, 0.0, rel), (T49, P5.PATROL_IN["lead"], dv, da)],
+                P5.PATROL_V0, P5.PATROL_IN)
+
+    _P1_KEYS, _P1_V49, _P1_IN = _p1_keys()
+
+    def _p1_lead(t):
+        if t <= P1_FROM:
+            return P1_BEHIND
+        if t >= T49:
+            return _P1_KEYS[-1][1]
+        return M._hermite5(_P1_KEYS, t - 1e-12) if t < _P1_KEYS[-1][0] else _P1_KEYS[-1][1]
+
+    # pendant qu'elle la remonte, côte à côte, elle passe P1_PASS m à gauche d'elle (1,5 m d'air entre les caisses),
+    # et se rabat à P1_SIDE une fois devant (P1_TUCK, en images du plan), l'état que P5 attend
+    P1_PASS, P1_TUCK = 3.6, (150, 238)
+
+    def _p1_side(t):
+        return P1_PASS + (P1_SIDE - P1_PASS) * M.smoothstep(M.t_of(P1_TUCK[0]), M.t_of(P1_TUCK[1]), t)
+
     def patrol1_pos(t):
         hx, hy = hero_pos(t)
-        x = hx - P1_SIDE
-        if t <= P1_T1:
-            return x, hy - hero_pos(P1_T1)[1] + _P1_Y1
-        if t >= T49:
-            # au-delà de P5/1 (les ressorts de M.sample) : son freinage tenu
-            dt = t - T49
-            return x, _P1_Y1 + _P1_TAB[-1][2] + _P1_TAB[-1][1] * dt - 0.5 * P1_BRAKE * dt * dt
-        k = min(len(_P1_TAB) - 2, int((t - P1_T1) / (T49 - P1_T1) * (len(_P1_TAB) - 1)))
-        (ta, _, sa), (tb, _, sb) = _P1_TAB[k], _P1_TAB[k + 1]
-        return x, _P1_Y1 + sa + (sb - sa) * (t - ta) / (tb - ta)
+        x = hx - _p1_side(t)
+        if t <= T49:
+            return x, hy + _p1_lead(t)
+        # au-delà de P5/1 (les ressorts de M.sample) : son freinage tenu
+        dt = t - T49
+        y49 = hero_pos(T49)[1] + _P1_IN["lead"]
+        return hero_pos(T49)[0] - P1_SIDE, y49 + _P1_V49 * dt - 0.5 * _P1_IN["decel"] * dt * dt
 
     def _follow(gap, dv, t):
         """y d'un véhicule qui suit la conduite de la berline en retard (LAG), `gap` m derrière elle à t = 0, dv
@@ -181,6 +215,8 @@ if VILLE:
         lag = min(LAG[2], LAG[0] + LAG[1] * gap)
         y0 = hero_pos(0.0)[1]
         return hero_pos(t - lag)[1] + (y0 - hero_pos(-lag)[1]) - gap + dv * t
+
+    _TB = M.t_of(brake_windows()[-1][0])          # le freinage du port (la berline)
 
     def _pack_fn(x0, x1, gap, dv, amp, per, ph):
         if isinstance(gap, tuple):
@@ -197,7 +233,8 @@ if VILLE:
             # à la file, rangée dans la voie de la berline à la dernière image, sans louvoiement ; sinon un glissement
             # commencé avant le plan, fini après
             u = M.smoothstep(-0.5, T_END if x1 == HERO_X else T_END + 0.5, t)
-            y = _follow(gap, dv, t) + SURGE * math.sin(w)                  # elle se jette, elle lâche
+            # elle se jette, elle lâche (pas pendant le freinage du port : il reste sous les 7 m/s²)
+            y = _follow(gap, dv, t) + SURGE * math.sin(w) * (1.0 - M.smoothstep(_TB - 1.0, _TB, t))
             sway = amp * math.sin(1.25 * w + 0.7 * ph) * (1.0 - u if x1 == HERO_X else 1.0)
             return x0 + (x1 - x0) * u + sway, y
         return fn
@@ -222,8 +259,8 @@ if VILLE:
                 hi = mid
         return (lo + hi) / 2
 
-    for _k, _fr in zip(range(len(PACK) - len(CREST_FRAMES), len(PACK)), CREST_FRAMES):
-        PACK[_k] = PACK[_k][:3] + (round(_solve_gap(PACK[_k], _fr) + 0.3, 2),) + PACK[_k][4:]
+    for _k, _g in zip(range(len(PACK) - len(CREST_GAPS), len(PACK)), CREST_GAPS):
+        PACK[_k] = PACK[_k][:3] + (_g,) + PACK[_k][4:]
 
     def pack_pos(i):
         if i == 0:
@@ -302,10 +339,13 @@ def tracks():
 
 
 def camera_rail(t):
-    """(x, y, z, lacet, site, roulis, focale), sans tremblé : fixe, le lacet qui suit la berline (0,6 m à droite de
+    """(x, y, z, lacet, site, roulis, focale), sans tremblé. En ville : LA caméra du film (parcours.chase, le bras
+    commun sur le tablier). Hors ville : fixe, le lacet qui suit la berline (0,6 m à droite de
     l'objectif : 0,3 à 0,8°) ; le site qui la suit aussi, à SITE_AIM de la hauteur, sur le tablier (v3.1 :
     le trapèze d'avant la laissait dériver de 2 points au milieu et repartir en fin de plan) ; le zoom de 200 à
     212 mm, aux rampes de 10 images (départ et arrivée progressifs)."""
+    if VILLE:
+        return PC.chase("P4", F0 + t * M.FPS)
     lens = LENS * (1.0 + ZOOM * zoom_e(t))
     hx, hy = hero_pos(t)
     yaw = math.degrees(math.atan2(-(hx - CAM[0]), CAM[1] - hy))
@@ -332,6 +372,10 @@ def site_aim(t, aim):
 def camera(t):
     """La caméra rendue : camera_rail, sans tremblé écrit (v3.1 ; l'opérateur commun de motion.py fait le reste)."""
     return camera_rail(t)
+
+
+if VILLE:
+    camera.bras_commun = "P4"      # motion.camera_operator : la vibration du bras commun, sur le temps du film
 
 
 def bars_seen(f):

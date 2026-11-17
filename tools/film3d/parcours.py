@@ -196,6 +196,13 @@ CONTINU = {(a, b): True for (a, _), (b, _) in zip(SHOTS, SHOTS[1:])}
 # elle-même : son axe sur l'axe du pont, son mur de quai (s = 181) sur la rive du pont (y = −325) ; MONTEE et LANE
 # sont réglés pour cela (plan de ville, section (b)) ; test_motion le vérifie à 1 cm.
 B_VILLE = (0.0, -506.0)
+# plus d'ellipse (17 novembre) : rien de sauté entre deux tronçons (gardés pour ville.py, qui les lit encore)
+SAUT = {}
+
+
+def _saut(a, b):
+    """(m le long, m en travers) sautés entre A prolongé d'une image et B/1 : nuls partout."""
+    return 0.0, 0.0
 
 
 def _to_route(shot):
@@ -328,6 +335,17 @@ def cam_cap(shot, frame):
     return _CAM[k] + (_CAM[k + 1] - _CAM[k]) * f - placer(shot)[1]
 
 
+def sol_ville(x, y):
+    """La hauteur de la chaussée au point (x, y) de la ville : le tablier du pont (motion._bridge_z, la copie de
+    scene_c.deck_z) sur son emprise, 0 ailleurs (tout le reste de la ville est à z = 0)."""
+    return M._bridge_z(y) if -330.0 < y < 12.0 and abs(x) < 12.0 else 0.0
+
+
+def sol(shot, x, y):
+    """La hauteur de la chaussée au point (x, y) de la scène du tronçon."""
+    return sol_ville(*vers_ville(shot)[0](x, y))
+
+
 def camera(shot, frame, back=CAM_BACK, left=CAM_LEFT, z=CAM_Z):
     """La position de la caméra dans la scène : `back` derrière le centre de la berline le long du bras, `left` à sa
     gauche, `z` au-dessus de la chaussée (le tronçon y ajoute la hauteur de son sol)."""
@@ -354,16 +372,18 @@ def _visee_exacte(shot, frame):
     h = hero(shot)
     x, y, z = camera(shot, frame)
     hx, hy = h["pos"](frame)
+    z += sol(shot, x, y)
+    hz = sol(shot, hx, hy)
     head = h["heading"](frame)
     yaw = math.degrees(math.atan2(-(hx - x), -(hy - y)))
-    pitch = math.degrees(math.atan2(M.HERO_BOX[2] / 2.0 - z, math.hypot(hx - x, hy - y)))
+    pitch = math.degrees(math.atan2(hz + M.HERO_BOX[2] / 2.0 - z, math.hypot(hx - x, hy - y)))
     for _ in range(8):
         cam = (x, y, z, yaw, pitch, 0.0, VISEE_LENS)
-        b0 = M.hero_screen(cam, hx, hy, 0.0, head)
+        b0 = M.hero_screen(cam, hx, hy, hz, head)
         if not b0:
             break
-        bu = M.hero_screen((x, y, z, yaw + 0.05, pitch, 0.0, VISEE_LENS), hx, hy, 0.0, head)
-        bv = M.hero_screen((x, y, z, yaw, pitch + 0.05, 0.0, VISEE_LENS), hx, hy, 0.0, head)
+        bu = M.hero_screen((x, y, z, yaw + 0.05, pitch, 0.0, VISEE_LENS), hx, hy, hz, head)
+        bv = M.hero_screen((x, y, z, yaw, pitch + 0.05, 0.0, VISEE_LENS), hx, hy, hz, head)
         eu, ev = VISEE_U - b0["u"], VISEE_V - b0["v"]
         if abs(eu) < 1e-7 and abs(ev) < 1e-7:
             break
@@ -405,12 +425,12 @@ def visee(shot, frame):
     return tuple(tab[k][j] + (tab[k + 1][j] - tab[k][j]) * f for j in range(2))
 
 
-def chase(shot, frame, ground=0.0):
-    """(x, y, z, lacet, site, roulis, focale) : LA caméra du film à l'image `frame` du tronçon, le bras commun visé
-    par la visée commune ; `ground` : la hauteur du sol sous la caméra (le pont)."""
+def chase(shot, frame):
+    """(x, y, z, lacet, site, roulis, focale) : LA caméra du film à l'image `frame` du tronçon, le bras commun (CAM_Z
+    au-dessus de la chaussée, sol() : le tablier du pont) visé par la visée commune."""
     x, y, z = camera(shot, frame)
     yaw, pitch = visee(shot, frame)
-    return x, y, z + ground, yaw, pitch, 0.0, VISEE_LENS
+    return x, y, z + sol(shot, x, y), yaw, pitch, 0.0, VISEE_LENS
 
 
 RACCORDS = tuple((a, b) for (a, _), (b, _) in zip(SHOTS, SHOTS[1:])) + (("P6", "FIN6"),)
