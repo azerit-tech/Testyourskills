@@ -138,7 +138,7 @@ def dyn_on():
 # les ressauts que la scène passe à key_vehicle restent.
 CHASSIS = {
     # une grosse berline des années 60 : souple, lente, elle s'assoit
-    "hero": dict(roll_per_g=6.0, roll_max=4.0, pitch_per_g=2.8, pitch_max=2.0, roll_hz=1.1, roll_zeta=0.7,
+    "hero": dict(roll_per_g=7.2, roll_max=5.0, pitch_per_g=2.8, pitch_max=2.0, roll_hz=1.1, roll_zeta=0.5,
                  pitch_hz=1.4, pitch_zeta=0.5, corner_hz=1.25, corner_zeta=0.5, road=0.0, driver=0.0,
                  squat=0.006, heave_up=0.05, heave_down=0.03, arch=(0.055, 0.06), ext=0.12, track=1.55, jitter=0.0, steer_lag=0.07),
     # la patrouille : plus ferme, plus vive
@@ -224,12 +224,49 @@ def sample(pos, frames=range(0, 30), slip=None, heading=None, wheel_r=0.33, whee
     out.hist = hist
     out.meta = dict(want=want, dt=dt, seed=seed, wheel_r=wheel_r, wheelbase=wheelbase, front=front, noise=noise,
                     steer_fn=steer)
-    for (k, t, x, y, head, travel, speed, a_long, a_lat, curv, dist, steer) in hist:
+    spin_f, spin_r, slip_r = axle_spins(hist, front, wheelbase - front, wheel_r, steer)
+    for i, (k, t, x, y, head, travel, speed, a_long, a_lat, curv, dist, steer_) in enumerate(hist):
         if k in want:
             out.append(dict(frame=want[k], t=t, x=x, y=y, heading=head, travel=travel, speed=speed, a_long=a_long,
-                            a_lat=a_lat, curvature=curv, dist=dist, spin=dist / wheel_r, steer=steer, roll=0.0,
-                            pitch=0.0, heave=0.0))
+                            a_lat=a_lat, curvature=curv, dist=dist, spin=dist / wheel_r, steer=steer_, roll=0.0,
+                            pitch=0.0, heave=0.0, spin_f=spin_f[i], spin_r=spin_r[i], rear_slip=slip_r[i]))
     return rebody(out, chassis or "hero")
+
+
+WHEELSPIN = 0.45            # en glisse franche, les roues arrière (propulsion, gaz tenus) tournent 45 % plus vite
+WHEELSPIN_SLIP = (4.0, 14.0)  # ° de dérive de l'essieu arrière : de rien à tout le patinage
+
+
+def axle_spins(hist, front, rear, wheel_r, steer_fn=None):
+    """Les rotations (rad, cumulées) des roues avant et arrière, et la dérive de l'essieu arrière (°), pas à pas de
+    l'historique de sample(). Une roue avant roule librement : sa rotation suit le déplacement de son essieu le long
+    du plan de la roue (braquée). Une roue arrière roule le long de la caisse et, quand l'arrière glisse (dérive de
+    l'essieu au-delà de WHEELSPIN_SLIP), patine : une propulsion tient sa glisse aux gaz, ses roues tournent plus
+    vite que le sol ne défile (jusqu'à WHEELSPIN de plus)."""
+    sf = sr = 0.0
+    out_f, out_r, out_s = [], [], []
+    prev = None
+    for (k, t, x, y, head, travel, speed, a_long, a_lat, curv, dist, steer) in hist:
+        h = math.radians(head)
+        fx, fy = -math.sin(h), math.cos(h)
+        pf, pr = (x + fx * front, y + fy * front), (x - fx * rear, y - fy * rear)
+        alpha = 0.0
+        if prev is not None:
+            (qf, qr, dtt) = prev
+            dfx, dfy = pf[0] - qf[0], pf[1] - qf[1]
+            drx, dry = pr[0] - qr[0], pr[1] - qr[1]
+            st = math.radians(steer_fn(t) if steer_fn else steer)
+            wf = (-math.sin(h + st), math.cos(h + st))
+            sf += (dfx * wf[0] + dfy * wf[1]) / wheel_r
+            lon, lat_ = drx * fx + dry * fy, drx * -fy + dry * fx
+            alpha = math.degrees(math.atan2(lat_, abs(lon))) if math.hypot(lon, lat_) > 1e-5 else 0.0
+            kick = 1.0 + WHEELSPIN * smoothstep(*WHEELSPIN_SLIP, abs(alpha))
+            sr += lon * kick / wheel_r
+        prev = (pf, pr, t)
+        out_f.append(sf)
+        out_r.append(sr)
+        out_s.append(alpha)
+    return out_f, out_r, out_s
 
 
 def _jit(rng, j):
@@ -791,6 +828,84 @@ def _hermite5(keys, t):
     return 0.0
 
 
+def _trap(t, a, b, e):
+    """Une impulsion lissée : 0 avant a, 1 de a + e à b − e, 0 après b (bords en smoothstep : C¹)."""
+    return smoothstep(a, a + e, t) * (1.0 - smoothstep(b - e, b, t))
+
+
+def _solve(rows, rhs):
+    """Un petit système linéaire (Gauss, pivot partiel)."""
+    n = len(rhs)
+    A = [list(r) + [v] for r, v in zip(rows, rhs)]
+    for c in range(n):
+        p = max(range(c, n), key=lambda r: abs(A[r][c]))
+        A[c], A[p] = A[p], A[c]
+        for r in range(n):
+            if r != c and A[r][c]:
+                f = A[r][c] / A[c][c]
+                A[r] = [x - f * z for x, z in zip(A[r], A[c])]
+    return [A[i][n] / A[i][i] for i in range(n)]
+
+
+DERAP_DT = 1.0 / 960.0
+_IMPULS = {}
+
+
+def impulsions(pulses, cibles, dt=DERAP_DT):
+    """La glisse d'un dérapage tirée de ses impulsions de lacet (« le dérapage est vraiment pas naturel », 17 novembre
+    2026). Une voiture ne pivote pas : la caisse tourne sous des couples (le coup de volant, l'arrière qui décroche, le
+    contre-braquage qui rattrape), bornés par l'adhérence du mouillé. La glisse a donc pour dérivée seconde une somme
+    d'impulsions lissées, β'' = Σ A_i · _trap(t, a_i, b_i, e_i) (°/s², dérivée seconde continue, à-coup borné), dont
+    les amplitudes A_i sont résolues pour passer par les cibles : [(« v » ou « d », t, valeur)], la glisse (°) ou sa
+    vitesse (°/s) à l'instant t (s depuis le passage de l'abscisse). Autant de cibles que d'impulsions.
+    Rend (t0, pas, table des glisses, table des vitesses, table des accélérations, amplitudes), mis en cache."""
+    key = (tuple(map(tuple, pulses)), tuple(map(tuple, cibles)), dt)
+    if key in _IMPULS:
+        return _IMPULS[key]
+    t0 = min(p[0] for p in pulses) - 0.02
+    t1 = max(max(p[1] for p in pulses), max(c[1] for c in cibles)) + 0.02
+    n = int(math.ceil((t1 - t0) / dt)) + 1
+    unit = []
+    for a, b, e in pulses:
+        acc = [_trap(t0 + k * dt, a, b, e) for k in range(n)]
+        V, X = [0.0] * n, [0.0] * n
+        for k in range(1, n):
+            V[k] = V[k - 1] + 0.5 * (acc[k] + acc[k - 1]) * dt
+            X[k] = X[k - 1] + 0.5 * (V[k] + V[k - 1]) * dt
+        unit.append((acc, V, X))
+
+    def at(tab, t):
+        u = (t - t0) / dt
+        k = max(0, min(n - 2, int(math.floor(u))))
+        return tab[k] + (tab[k + 1] - tab[k]) * (u - k)
+    rows = [[at(u[2] if kind == "v" else u[1], t) for u in unit] for kind, t, _v in cibles]
+    amps = _solve(rows, [c[2] for c in cibles])
+    tabs = tuple([sum(A * u[j][k] for A, u in zip(amps, unit)) for k in range(n)] for j in (2, 1, 0))
+    out = (t0, dt) + tabs + (amps,)
+    _IMPULS[key] = out
+    return out
+
+
+def _impulsion_at(ev, t):
+    """La glisse dessinée par impulsions (ev["pulses"], ev["cibles"]) à l'instant t (s depuis son départ) ; nulle
+    avant la première impulsion et après la dernière (les cibles finales la ramènent à zéro, au repos)."""
+    tab = ev.get("_table")
+    if tab is None:
+        tab = ev["_table"] = impulsions(ev["pulses"], ev["cibles"])
+    t0, dt, X = tab[:3]
+    u = (t - t0) / dt
+    if u <= 0.0 or u >= len(X) - 1:
+        return 0.0
+    k = int(math.floor(u))
+    return X[k] + (X[k + 1] - X[k]) * (u - k)
+
+
+def derap_slip(ev, t):
+    """La glisse dessinée d'un dérapage (lim["derapages"]) à t s de son départ, avant le signe `side` : par
+    impulsions de lacet (`pulses`, `cibles`) ou, à défaut, par les nœuds d'Hermite d'avant (`keys`)."""
+    return _impulsion_at(ev, t) if "pulses" in ev else _hermite5(ev["keys"], t)
+
+
 def drive(route, speed, t0=0.0, stop=False, kind="hero", drift=1.0, ease=None, lim=None, t_span=(-2.0, 12.0)):
     """Une conduite qui tient les limites v3.1 (DRIVE, DRIVE_KINDS) : rend un Drive (pos, heading, slip, steer,
     speed, brake_windows).
@@ -936,18 +1051,22 @@ def drive(route, speed, t0=0.0, stop=False, kind="hero", drift=1.0, ease=None, l
         # freinage (drag m/s² par degré, slip_drag par défaut) et la part des gaz gardée en glisse (gas : 0, pied levé
         # comme dans le modèle ; une propulsion tient son dérapage aux gaz)
         ev_drag, ev_lift, model_slip = [0.0] * N, [1.0] * N, list(out_slip)
+        ev_times = []
         for ev in L.get("derapages") or ():
             k1 = next((k for k in range(1, N) if st[k] >= ev["s"] > st[k - 1]), None)
             if k1 is None:
                 continue
             t_ev = grid[k1 - 1] + (ev["s"] - st[k1 - 1]) / max(1e-9, st[k1] - st[k1 - 1]) * dt
+            ev_times.append((t_ev, ev))
             dk, gas = ev.get("drag", L["slip_drag"]), ev.get("gas", 0.0)
+            # ev["trainee"] : les nœuds d'Hermite dont la glisse règle le freinage et les gaz (sinon la glisse elle-même)
             for k in range(N):
-                d = ev["side"] * _hermite5(ev["keys"], grid[k] - t_ev)
+                d = ev["side"] * derap_slip(ev, grid[k] - t_ev)
                 out_slip[k] += d
                 out_head[k] += d
-                ev_drag[k] += dk * abs(d)
-                ev_lift[k] = min(ev_lift[k], 1.0 - (1.0 - gas) * min(1.0, abs(d) / 3.0))
+                dd = _hermite5(ev["trainee"], grid[k] - t_ev) if "trainee" in ev else d
+                ev_drag[k] += dk * abs(dd)
+                ev_lift[k] = min(ev_lift[k], 1.0 - (1.0 - gas) * min(1.0, abs(dd) / 3.0))
         # 4. les limites tiennent-elles après lissage ? sinon raboter là où elles cèdent et recommencer
         new_drag, slid, gas_i = [0.0] * n, [0.0] * n, [1.0] * n
         for k in range(N):
@@ -975,9 +1094,19 @@ def drive(route, speed, t0=0.0, stop=False, kind="hero", drift=1.0, ease=None, l
     # 5. la table : position, vitesse, caps, braquage
     tab = {k: [] for k in ("t", "x", "y", "vx", "vy", "v", "travel", "slip", "head", "steer", "along", "alat")}
     prev_h = None
+    # lim["pivot"] (m, 0 par défaut) : la caisse ne tourne plus autour de son centre (une platine). En glisse, le
+    # centre part vers l'extérieur de pivot × sin(glisse), filtré par deux pôles de pivot_tau s (il dérive, il ne
+    # saute pas : sa latérale reste dans l'adhérence du mouillé) : l'arrière part large, l'avant reste près de sa
+    # ligne, la voiture sort un peu large et rejoint sa route en ligne droite. Le cap de la vitesse (travel) est celui
+    # du centre réel et la caisse le devance exactement de la glisse dessinée ; la vitesse le long de la route (v)
+    # reste celle qui règle le temps.
+    q = float(L.get("pivot", 0.0))
     for k in range(N):
         x, y, trav, kap = geo[k]
         h = math.radians(trav)
+        hd = trav + out_head[k]
+        hd = hd if prev_h is None else _unwrap(prev_h, hd)
+        prev_h = hd
         tab["t"].append(grid[k] + t0)
         tab["x"].append(x)
         tab["y"].append(y)
@@ -986,18 +1115,74 @@ def drive(route, speed, t0=0.0, stop=False, kind="hero", drift=1.0, ease=None, l
         tab["v"].append(vt[k])
         tab["travel"].append(trav)
         tab["slip"].append(out_head[k])
-        hd = trav + out_head[k]
-        hd = hd if prev_h is None else _unwrap(prev_h, hd)
-        prev_h = hd
         tab["head"].append(hd)
         tab["along"].append(along[k])
         tab["alat"].append(alat[k])
+    if q:
+        # les constantes du filtre : celles de LIM, ou celles du dérapage le plus proche (ev["pivot_tau"] : attaque,
+        # relâché ; ev["pivot_smooth"]) : au rond-point la berline doit avoir rejoint sa voie avant les plots de P3,
+        # au port elle la rejoint sans hâte
+        def _taus(src):
+            ta = src.get("pivot_tau", L.get("pivot_tau", 0.2))
+            ta, tr = (ta if isinstance(ta, (tuple, list)) else (ta, ta))
+            return float(ta), float(tr), float(src.get("pivot_smooth", L.get("pivot_smooth", tr)))
+        base = _taus({})
+
+        def _end(ev):
+            return max(p[1] for p in ev["pulses"]) if "pulses" in ev else ev["keys"][-1][0]
+        d1 = d2 = 0.0
+        drift_off = []
+        for k in range(N):
+            near = min(ev_times, key=lambda e: abs(grid[k] - e[0] - 1.5), default=None)
+            tau_a, tau_r, tau_s = _taus(near[1]) if near else base
+            goal = -q * math.sin(math.radians(out_head[k]))
+            tau = tau_a if abs(goal) > abs(d1) and goal * d1 >= 0.0 else tau_r
+            d1 += (goal - d1) * dt / tau
+            d2 += (d1 - d2) * dt / tau_s
+            # la queue du filtre fondue à zéro, de 1 à 4 s après la fin du dérapage (quelques centimètres) : sinon,
+            # au pas d'homme avant l'arrêt, un écart de 0,3 mm penche encore le cap de la vitesse (écart / vitesse),
+            # puis saute à l'arrêt
+            fade = 1.0 - smoothstep(near[0] + _end(near[1]) + 1.0, near[0] + _end(near[1]) + 4.0, grid[k]) \
+                if near and grid[k] > near[0] else 1.0
+            drift_off.append(d2 * fade)
+        X, Y = tab["x"], tab["y"]
+        moved = [k for k in range(N) if abs(drift_off[k]) > 1e-5]
+        for k in moved:
+            h = math.radians(geo[k][2])
+            X[k] = geo[k][0] - math.cos(h) * drift_off[k]
+            Y[k] = geo[k][1] - math.sin(h) * drift_off[k]
+        if moved:
+            # le cap de la vitesse : celui de la route, corrigé de l'écart entre la vitesse du centre et celle du point
+            # de route (toutes deux en différences : la correction s'éteint avec l'écart, sans marche)
+            for k in range(max(1, moved[0] - 2), min(N - 1, moved[-1] + 3)):
+                vx, vy = (X[k + 1] - X[k - 1]) / (2 * dt), (Y[k + 1] - Y[k - 1]) / (2 * dt)
+                rx, ry = (geo[k + 1][0] - geo[k - 1][0]) / (2 * dt), (geo[k + 1][1] - geo[k - 1][1]) / (2 * dt)
+                if math.hypot(vx, vy) > 0.3 and math.hypot(rx, ry) > 0.3:
+                    dh = _unwrap(0.0, heading_of(vx, vy) - heading_of(rx, ry))
+                    tab["travel"][k] = geo[k][2] + dh
+                    tab["vx"][k], tab["vy"][k] = vx, vy
+                    tab["head"][k] = tab["travel"][k] + out_head[k]
+            for k in range(1, N):
+                tab["head"][k] = _unwrap(tab["head"][k - 1], tab["head"][k])
     steer_prev = 0.0
+    geo_steer = L.get("steer_geo", False)
     for k in range(N):
         a, b = max(0, k - 1), min(N - 1, k + 1)
         om = math.radians(tab["head"][b] - tab["head"][a]) / ((b - a) * dt)
         sp = vt[k]
-        if sp > 0.5:
+        if sp > 0.5 and geo_steer:
+            # les roues avant visent la vitesse de l'essieu avant vue de la caisse (le centre, plus le lacet × front)
+            # et la devancent de la dérive qui porte l'effort latéral de l'avant (front_slip ° à la latérale du
+            # mouillé, vers l'intérieur) : en glisse, c'est le contre-braquage, sans gain dessiné
+            g = math.radians(tab["head"][k])
+            fx, fy, lx, ly = -math.sin(g), math.cos(g), -math.cos(g), -math.sin(g)
+            vx, vy = tab["vx"][k], tab["vy"][k]
+            lon, lat_ = vx * fx + vy * fy, vx * lx + vy * ly + om * L["front"]
+            ax_ = (tab["vx"][b] - tab["vx"][a]) / ((b - a) * dt)
+            ay_ = (tab["vy"][b] - tab["vy"][a]) / ((b - a) * dt)
+            alf = L.get("front_slip", 4.0) * max(-1.5, min(1.5, (ax_ * lx + ay_ * ly) / L["lat"]))
+            steer_prev = max(-STEER_MAX, min(STEER_MAX, math.degrees(math.atan2(lat_, lon)) + alf))
+        elif sp > 0.5:
             be = math.radians(-out_head[k])
             geo_s = math.degrees(math.atan2(sp * math.sin(be) + om * L["front"], sp * math.cos(be)))
             wcs = smoothstep(2.0, 6.0, abs(out_head[k]))
@@ -1005,10 +1190,12 @@ def drive(route, speed, t0=0.0, stop=False, kind="hero", drift=1.0, ease=None, l
         tab["steer"].append(steer_prev)
     if L.get("derapages"):
         # un dérapage dessiné passe du braquage d'entrée au contre-braquage en un quart de seconde : les mains au
-        # volant tiennent STEER_RATE (60 °/s aux roues, comme la caisse refaite par rebody), lissées sur 0,1 s
+        # volant tiennent STEER_RATE (60 °/s aux roues, comme la caisse refaite par rebody ; lim["steer_rate"]),
+        # lissées sur 0,1 s
         st_ = tab["steer"]
+        rate = L.get("steer_rate", STEER_RATE) * dt
         for k in range(1, N):
-            st_[k] = st_[k - 1] + max(-STEER_RATE * dt, min(STEER_RATE * dt, st_[k] - st_[k - 1]))
+            st_[k] = st_[k - 1] + max(-rate, min(rate, st_[k] - st_[k - 1]))
         tab["steer"] = _box(_box(st_, int(0.05 / dt) | 1), int(0.05 / dt) | 1)
     t_stop = None
     if stop:
@@ -1216,13 +1403,17 @@ def key_vehicle(root, poses, wheels=(), ground=None, pivot=(0.0, 0.0, 0.5), body
         body.keyframe_insert("location", frame=f)
         body.keyframe_insert("rotation_euler", frame=f)
         Mb_inv = Mb.inverted()
-        n = spin_steps(ps["spin"] - prev_ps["spin"]) if prev_ps else 1
+        # chaque essieu sa rotation (motion.axle_spins : l'avant roule, l'arrière patine en glisse) ; des poses sans
+        # elle (faites à la main) gardent celle du centre
+        sk = {True: "spin_f" if "spin_f" in ps else "spin", False: "spin_r" if "spin_r" in ps else "spin"}
+        n = max(spin_steps(ps[key] - prev_ps[key]) for key in set(sk.values())) if prev_ps else 1
         for w, p_b, is_front in info:
+            key_s = sk[is_front]
             for k in range(1, n + 1):
                 # les pas intermédiaires (n > 1) : la rotation seule, sur la caisse de l'image (écart de l'ordre du mm)
                 u = k / n
-                q = ps if k == n else {key: prev_ps[key] + (ps[key] - prev_ps[key]) * u for key in ("spin", "steer")}
-                R = Matrix.Rotation(q["spin"], 4, axle)
+                q = ps if k == n else {key: prev_ps[key] + (ps[key] - prev_ps[key]) * u for key in (key_s, "steer")}
+                R = Matrix.Rotation(q[key_s], 4, axle)
                 if is_front:
                     R = Matrix.Rotation(math.radians(q["steer"]), 4, "Z") @ R
                 Mw = Mb_inv @ B0 @ Matrix.Translation(p_b) @ R
@@ -2775,9 +2966,19 @@ def plan_checks31(d, lim, own):
             on[0] <= lim["slip_on"] + 1e-9 and off[0] <= lim["slip_off"] + 1e-9,
             f"installation {max(0.0, on[0]):.0f}°/s ({on[1]}), retour {max(0.0, off[0]):.0f}°/s ({off[1]})")
         # une glisse qui croît sous l'adhérence est une erreur, sauf jusqu'à slip_back : l'appel du conducteur avant
-        # un dérapage (1 à 2° du mauvais côté) et le seul retour de l'autre côté après (l'élan de la caisse)
+        # un dérapage (1 à 2° du mauvais côté) et le seul retour de l'autre côté après (l'élan de la caisse) ; et sauf
+        # dans une glisse déjà franche (au-delà de 10° du même côté depuis son début : l'arrière glisse déjà, le pied
+        # dose l'angle pendant la tenue, et la latérale du centre baisse quand il part vers l'extérieur)
+        def sliding(f):
+            sg = 1.0 if s[f] >= 0 else -1.0
+            g = f
+            while g - 1 in s and s[g - 1] * sg > 0.0:
+                g -= 1
+                if s[g] * sg > 10.0:
+                    return True
+            return False
         early = [f for f, v in grow.items() if v > 2.0 and abs(s[f]) > max(1.0, lim["slip_back"])
-                 and max(hero["acc"].get(g, 0.0) for g in range(f - 6, f + 1)) < lim["slip_acc"]]
+                 and max(hero["acc"].get(g, 0.0) for g in range(f - 6, f + 1)) < lim["slip_acc"] and not sliding(f)]
         add(f"glisse nulle sous {lim['slip_acc']:g} m/s² d'accélération combinée", not early,
             f"elle croît sans adhérence dépassée : images {early[:8]}" if early else "tient")
         runs = _runs_signed(s, 1.0)
@@ -2793,7 +2994,10 @@ def plan_checks31(d, lim, own):
             more = len(nxt) > 1 and max(abs(s[f]) for f in nxt[1][1]) > 1.0
             st = [f for f in fr if abs(s[f]) >= 5.0 and f in d["steer"]]
             counter = sum(d["steer"][f] * s[f] < 0 for f in st) / max(1, len(st))
-            good = loss >= lim["slip_loss"] - 1e-9 and back <= lim["slip_back"] + 1e-9 and not more
+            # une glisse déjà en cours à la première image (la fin d'un dérapage du tronçon d'avant) a perdu sa
+            # vitesse avant : elle ne se juge ici que sur son retour
+            cont = fr[0] <= frames[0] + 1 and abs(s[fr[0]]) >= 5.0
+            good = (cont or loss >= lim["slip_loss"] - 1e-9) and back <= lim["slip_back"] + 1e-9 and not more
             ok = ok and good
             msgs.append(f"images {fr[0]}–{fr[-1]} : crête {peak:.0f}°, vitesse {-loss * 100:+.0f} %, retour {back:.1f}°"
                         f"{', puis encore' if more else ''}, contre-braquage {counter * 100:.0f} % des images")
