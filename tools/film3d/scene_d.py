@@ -1086,6 +1086,47 @@ def fin_pack_lights(frames, hero):
 FIN6_HELI_CAR_W = 35000.0
 
 
+# les phares de l'anneau sur la berline (brouillon éclairé v6, images 684–719 : la berline arrêtée n'était plus
+# qu'une silhouette noire de profil, l'anneau qui lui fait face n'éclairait rien d'elle) : un spot par véhicule, au
+# milieu de ses deux phares, visé sur la berline à l'arrêt, à la puissance d'une paire de codes (celle des phares qui
+# roulent dans le film), ouvert de 40° (la berline fait ~20° à 14 m) ; il n'éclaire qu'elle (liaison de lumière,
+# sans les vitres) : ni ovale au sol ni reflet de miroir, invisible à la caméra et à la brume
+ANNEAU_PHARES_W = 6000.0
+ANNEAU_PHARES_CONE = 40.0
+
+
+def anneau_phares_berline(rigs, hero, stop, energy=ANNEAU_PHARES_W, cone=ANNEAU_PHARES_CONE):
+    """Les phares des véhicules de l'anneau (FIN6, et P6 qui pose le même anneau) sur la berline seule. Renvoie les
+    lampes posées et imprime leur table (position, puissance, cible)."""
+    bpy.context.view_layer.update()
+    _, in_c = _car_collections(hero)
+    target = Vector((stop.x, stop.y, 0.7))
+    made = []
+    for r in rigs:
+        heads = _phares(r)
+        if heads:
+            p = sum((o.matrix_world.translation for o in heads), Vector()) / len(heads)
+        else:
+            p = r.matrix_world.translation + Vector((0.0, 0.0, 0.7))
+        d = bpy.data.lights.new(f"{r.name}_phares_berline", "SPOT")
+        d.energy = energy
+        d.color = L.lin("#f4ecdc")[:3]                # halogène/LED de patrouille, chaud-neutre
+        d.spot_size = math.radians(cone)
+        d.spot_blend = 0.35
+        d.shadow_soft_size = 0.15
+        lo = bpy.data.objects.new(d.name, d)
+        bpy.context.scene.collection.objects.link(lo)
+        lo.matrix_world = Matrix.Translation(p) @ (target - p).normalized().to_track_quat("-Z", "Y").to_matrix().to_4x4()
+        lo.visible_camera = False
+        lo.visible_volume_scatter = False
+        lo.light_linking.receiver_collection = in_c
+        made.append(lo)
+        print(f"[FIN6] phares→berline {lo.name:28s} pos ({p.x:8.2f}, {p.y:8.2f}, {p.z:5.2f})  {energy:6.0f} W  "
+              f"cône {cone:.0f}°  cible ({target.x:8.2f}, {target.y:8.2f}, {target.z:4.2f})  "
+              f"{(target - p).length:5.1f} m", flush=True)
+    return made
+
+
 def fin6_pointe(frames, hero, shift=0):
     """Ce que FIN6 pose autour de son point d'arrêt : l'anneau qui l'attendait (fin6_orbite.RING_KEEP, trois
     patrouilles et le fourgon, tournés vers le point d'arrêt, rampes battantes ; la berline ne reçoit pas leurs
@@ -1116,6 +1157,7 @@ def fin6_pointe(frames, hero, shift=0):
     n = M.flash_bars(rigs, frames, shift=shift)
     print(f"[FIN6] anneau : {len(rigs)} véhicules, {n} lumières de rampe clignotantes ; berline exclue de "
           f"{car_out_of_rigs(rigs, hero)} lumières", flush=True)
+    anneau_phares_berline(rigs, hero, stop)
     try:
         for k, (a, r, pz, st) in enumerate(F6.COPS):
             o = L.officer(pz, style=st, name=f"officer_{k}_{pz}")
