@@ -101,7 +101,14 @@ const bitsApart = (a: string, b: string): number => {
   return n;
 };
 
-describe.skipIf(!hasFfprobe)("film : la berline détourée tient encore les images gelées", () => {
+/**
+ * Chaque test décode la vidéo depuis le début jusqu'à l'image gelée (jusqu'à
+ * 354 images en 720p) : 1 à 5 s sur un Mac libre, 16 s mesurées sur un Mac
+ * chargé avec deux workers. D'où un délai à part, bien au-delà des 5 s par défaut.
+ */
+const DECODE_TIMEOUT = 60_000;
+
+describe.skipIf(!hasFfprobe)("film : la berline détourée tient encore les images gelées", { timeout: DECODE_TIMEOUT }, () => {
   for (const shot of Object.keys(STILL_PRINTS) as StillShot[]) {
     // P1 à P5 : la dernière image du plan dans la poursuite ; FIN6 : la dernière de la fin
     const [file, frame] = shot === "FIN6" ? ["fin6-720.mp4", ENDINGS.fin6.video - 1] : ["poursuite-720.mp4", SHOT_START[CHASE_SHOTS[CHASE_SHOTS.indexOf(shot) + 1]] - 1];
