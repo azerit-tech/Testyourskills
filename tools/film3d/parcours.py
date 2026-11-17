@@ -16,16 +16,22 @@ FPS = 24.0
 # l'ancienne ouverture (la berline part de plus loin, déjà lancée) ; MONTEE, la montée du pont, autrefois sautée
 # (l'ellipse de 329,89 m de P3 à P4), que la berline roule maintenant. Les abscisses d'avant se lisent donc s − AV_AVANT
 # côté ville (l'avenue, le rond-point, la rue) et s − AV_AVANT − MONTEE côté eau (le pont, le port, la jetée).
-AV_AVANT = 90.0
-MONTEE = 329.913205                         # réglée pour que la rue tombe sur le quai (B_VILLE, test à 1 cm)
+# Le 17 novembre au soir (« 30 s déjà long », SPEC §18.53) : la berline part 39 m plus loin sur l'avenue (AV_AVANT
+# 90 → 51), et le pont est raccourci de motion.PONT_RACCOURCI (205 m) : la montée se raccourcit d'autant, le port et
+# la jetée se rapprochent de la ville (l'ancre de P4 recule d'autant dans le repère du pont, donc leurs poses).
+AV_AVANT = 51.0
+PONT_RACCOURCI = M.PONT_RACCOURCI
+MONTEE = 329.913205 - PONT_RACCOURCI        # réglée pour que la rue tombe sur le quai (B_VILLE, test à 1 cm)
 LANE = 1.45                                 # m : de l'axe de la rue (x 0,35) à la voie intérieure du pont (x 1,80)
 # le rond-point (à gauche) : début nominal, rayon, angle. 90° : ses branches sont à angle droit (plan de ville)
 S_ARC2, R2, A2 = 65.0 + AV_AVANT, 30.0, 90.0
 L_ARC2 = R2 * math.radians(A2)
-# la droite du rond-point au port : la rue (71 m), le boulevard du quai, le pont (320 m) jusqu'à son pied, le
+# la droite du rond-point au port : la rue (71 m), le boulevard du quai, le pont (110 m) jusqu'à son pied, le
 # terre-plein ; la voie change de LANE m sur le plat du pont, de son début (y −320) à 70 m plus loin (LANE_S, LANE_L)
 L_MID = 83.49 + MONTEE
-S_DECK = 181.156654 - 314.31 + AV_AVANT + MONTEE     # l'abscisse du début du tablier (y −320 du pont)
+S_PIED = 181.156654 + AV_AVANT + MONTEE              # l'abscisse de l'ancre de P4, au pied de la rampe côté port
+Y_PIED = -5.69 - PONT_RACCOURCI                      # sa place sur le pont (x 1,80), 0,69 m avant le pied du tablier
+S_DECK = S_PIED - (Y_PIED - M.PONT_Y_START)          # l'abscisse du début du tablier (y −320 du pont)
 LANE_S, LANE_L = S_DECK + 3.0, 35.0                  # où la voie change, la longueur de chacun de ses deux arcs
 S_ARC5, R5, A5 = S_ARC2 + L_ARC2 + L_MID, 22.0, 50.0   # le virage du port (à droite)
 L_ARC5 = R5 * math.radians(A5)
@@ -42,8 +48,10 @@ S_ARRET = S_JETEE_FIN + L_ARR + ARR_END              # le bout de la route : l'a
 # franc avant le rond-point et le virage du port, l'arrêt sur la pointe. motion.drive tient les limites de la berline
 # sur route mouillée (latérale 6,5, freinage 7, accélération 3, cercle 7,5 m/s², à-coup 12 m/s³) : là où la vitesse
 # voulue dépasse l'adhérence, elle freine plus tôt et plus fort, jamais l'inverse.
-V_LANCEE = 100.0 / 3.6                      # la première image : déjà lancée
-V_MAX = 130.0 / 3.6                         # la vitesse voulue en ligne droite (atteinte seulement sur le pont)
+# L'avenue (17 novembre au soir) : une croisière tenue à 85 km/h, l'ouverture calme (SPEC §18.36), sans la relance à
+# 121 km/h d'avant : le freinage du rond-point ne commence qu'à 3,4 s, l'étoile 1 tombe juste avant, en croisière.
+V_LANCEE = 85.0 / 3.6                       # la première image : déjà lancée, et toute l'avenue
+V_MAX = 130.0 / 3.6                         # la vitesse voulue en ligne droite après le rond-point
 # le rond-point : vitesse d'arc, où elle la demande et où elle remet les gaz (m après S_ARC2, sortie de l'anneau)
 VA2, B2, G2 = 13.4556, 10.0, 56.2252
 # le port (à droite) : 22 m de rayon (feuille §9.1)
@@ -108,8 +116,7 @@ def _drive():
     route = _route([(S_ARC2, 0.0, 0.0), (L_ARC2, 1.0 / R2, e2), (a_mid, 0.0, 0.0), (LANE_L, -k_lane, 15.0),
                     (LANE_L, k_lane, 15.0), (L_MID - a_mid - 2 * LANE_L, 0.0, 0.0), (L_ARC5, -1.0 / R5, e5),
                     (S_JETEE_FIN - S_ARC5 - L_ARC5, 0.0, 0.0), (L_ARR, 1.0 / ARR_R, 8.0), (ARR_END, 0.0, 0.0)])
-    speed = [(0.0, V_LANCEE), (0.1, V_MAX),
-             (S_ARC2 + B2 - 0.1, V_MAX), (S_ARC2 + B2, VA2), (S_ARC2 + G2, VA2), (S_ARC2 + G2 + 0.1, V_MAX),
+    speed = [(0.0, V_LANCEE), (S_ARC2 + B2 - 0.1, V_LANCEE), (S_ARC2 + B2, VA2), (S_ARC2 + G2, VA2), (S_ARC2 + G2 + 0.1, V_MAX),
              (S_ARC5 + B5 - 0.1, V_MAX), (S_ARC5 + B5, VA5), (S_ARC5 + G5, VA5), (S_ARC5 + G5 + 0.1, V_MAX),
              (S_JETEE_FIN - 0.1, V_MAX), (S_JETEE_FIN, V_POINTE)]
     return route, M.drive(route, speed, t0=0.0, stop=True, kind="hero", drift=0.0, lim=LIM,
@@ -121,29 +128,67 @@ T_ARRET = DRIVE.t_stop                      # s : l'instant où elle s'arrête s
 
 # ---- les tronçons du rendu : une scène par lieu, sa fenêtre de la conduite (images). Leurs raccords tombent aux
 # joints des lieux, là où la berline passe d'une scène à la suivante ; aucun n'est une coupe (même état des deux
-# côtés, même monde : ville.py charge les voisins). Mesurés sur la conduite (python3 tools/film3d/parcours.py) ;
-# test_motion.test_parcours vérifie qu'ils tombent où ils doivent.
-SHOTS = (("OUV", 87), ("P1", 31), ("P2", 108), ("P3", 102), ("P4", 249), ("P5", 60), ("P6", 133))
-START, _f = {}, 0                 # première image globale de chaque tronçon (0 = OUV/1)
-for _n, _d in SHOTS:
-    START[_n] = _f
-    _f += _d
-TOTAL = _f                        # la poursuite, jusqu'à l'entrée de la pointe
-# la fin à six étoiles (fin6_orbite) prolonge la conduite sans coupe : le freinage, l'arrêt, puis l'orbite
-START["FIN6"] = TOTAL
-FIN6_FRAMES = 122
+# côtés, même monde : ville.py charge les voisins). Calculés sur la conduite depuis les joints (JOINTS, abscisses de
+# la route : côté ville comptées depuis AV_AVANT, côté eau depuis le pied du pont) ; test_motion.test_parcours
+# vérifie qu'ils tombent où ils doivent (python3 tools/film3d/parcours.py les imprime).
+JOINTS = (("P1", 22.501 + AV_AVANT),                  # l'avenue, avant son freinage d'avant (OUV et P1 : scène A)
+          ("P2", 53.263 + AV_AVANT),                  # l'avenue contre le rond-point (y_F −19)
+          ("P3", 112.968 + AV_AVANT),                 # dans la rue, 11 m après le rond-point
+          ("P4", 188.563 + AV_AVANT),                 # la tête de pont (y −328)
+          ("P5", S_PIED + 0.39),                      # le pied de la rampe
+          ("P6", S_PIED + 33.03),                     # le terre-plein du port contre la jetée
+          ("FIN6", S_PIED + 119.07))                  # l'entrée de la pointe
+_TS = []
+
+
+def _t_at(s):
+    """L'instant (s) où la berline passe l'abscisse s (sa vitesse intégrée au 1/240 de seconde)."""
+    if not _TS:
+        h, acc, k = 1.0 / 240.0, 0.0, 0
+        while k * h < T_ARRET + 1.0:
+            _TS.append(acc)
+            acc += 0.5 * (DRIVE.speed(k * h) + DRIVE.speed((k + 1) * h)) * h
+            k += 1
+    lo, hi = 0, len(_TS) - 1
+    while hi - lo > 1:
+        mid = (lo + hi) // 2
+        lo, hi = (mid, hi) if _TS[mid] < s else (lo, mid)
+    return (lo + (s - _TS[lo]) / max(1e-9, _TS[hi] - _TS[lo])) / 240.0
+
+
+START = {"OUV": 0}                # première image globale de chaque tronçon (0 = OUV/1)
+START.update({n: int(round(_t_at(s) * FPS)) for n, s in JOINTS})
+_NOMS = ("OUV",) + tuple(n for n, _ in JOINTS)
+SHOTS = tuple((a, START[b] - START[a]) for a, b in zip(_NOMS, _NOMS[1:-1] + ("FIN6",)))
+TOTAL = START["FIN6"]             # la poursuite, jusqu'à l'entrée de la pointe
+# la fin à six étoiles (fin6_orbite) prolonge la conduite sans coupe : le freinage, l'arrêt, puis l'orbite, et
+# FIN6_TENUE images après l'arrêt (les mains levées, l'image posée) ; le film entier tient sous 30 s
+FIN6_TENUE = 27
+FIN6_FRAMES = int(math.ceil(T_ARRET * FPS)) + FIN6_TENUE - TOTAL
 
 # ---- les six étoiles : des instants de la conduite (images globales, 0 = la première ; temps = image / 24). Le site
 # les lit ici (une à cinq étoiles : l'image gelée sur place à l'instant de la dernière étoile gagnée ; six : la fin
-# FIN6 prolonge la conduite). Chacune à un moment lisible de la route, test_motion.test_parcours les vérifie.
-ETOILES = {
-    1: 96,     # l'avenue, lancée (91 km/h), le rond-point en vue : 4,0 s
-    2: 162,    # le rond-point, au plus fort du dérapage (29°) : 6,75 s
-    3: 265,    # la rue des enseignes, la berline passe le barrage (s_B 126) : 11,0 s
-    4: 478,    # le pont, la crête (130 km/h) : 19,9 s
-    5: 604,    # le port, au plus fort du dérapage (36°) : 25,2 s
-    6: 718,    # la jetée, l'eau des deux côtés (y_D 360) : 29,9 s
-}
+# FIN6 prolonge la conduite). Chacune à un moment lisible de la route, calculée sur la conduite ;
+# test_motion.test_parcours les vérifie (dans leur tronçon, l'étoile 1 hors de tout freinage, 3 à 5 s d'écart).
+
+
+def _etoiles():
+    pas = [k / 240.0 for k in range(int(T_ARRET * 240))]
+    frein = next(t for t in pas if DRIVE.along(t) < -0.3)                  # le freinage du rond-point
+    d2 = max((abs(DRIVE.slip(t)), t) for t in pas if t < frein + 6.0)[1]
+    d5 = max((abs(DRIVE.slip(t)), t) for t in pas if t > frein + 8.0)[1]
+    y_crete = M.PONT_Y_CREST
+    return {
+        1: int(math.floor(frein * FPS)) - 4,                   # l'avenue, en croisière, le rond-point en vue
+        2: int(round(d2 * FPS)),                               # le rond-point, au plus fort du dérapage
+        3: int(round(_t_at(136.741 + AV_AVANT) * FPS)),        # la rue, la berline passe le barrage (s_B 126)
+        4: int(round(_t_at(S_DECK + y_crete - M.PONT_Y_START) * FPS)),   # le pont, la crête
+        5: int(round(d5 * FPS)),                               # le port, au plus fort du dérapage
+        6: int(round(_t_at(S_P6_ANCRE + 360.0 - 344.42) * FPS)),         # la jetée, l'eau des deux côtés (y_D 360)
+    }
+
+
+ETOILES = _etoiles()
 ETOILE_LIEUX = {1: "avenue", 2: "rond-point", 3: "barrage", 4: "pont", 5: "port", 6: "jetée"}
 
 
@@ -168,7 +213,7 @@ ANCHOR = {
     "P1": (("s", 23.148148 + AV_AVANT), (1.75, 288.0), 0.0),
     "P2": (("s", S_ARC2 - 20.0), (1.75, 0.35 - (_Y_EXIT2 - (S_ARC2 - 20.0))), 0.0),          # (1,75 ; −49,81)
     "P3": (("s", 134.040859 + AV_AVANT), (0.35, 123.30), CAP_B),
-    "P4": (("s", 181.156654 + AV_AVANT + MONTEE), (1.80, -5.69), CAP_B),
+    "P4": (("s", S_PIED), (1.80, Y_PIED), CAP_B),
     "P5": (("s", S_ARC5 - 20.0), (5.25, 35.066), CAP_B),
     "P6": (("s", S_P6_ANCRE), (81.75, 344.42), CAP_D),
 }
@@ -338,7 +383,7 @@ def cam_cap(shot, frame):
 def sol_ville(x, y):
     """La hauteur de la chaussée au point (x, y) de la ville : le tablier du pont (motion._bridge_z, la copie de
     scene_c.deck_z) sur son emprise, 0 ailleurs (tout le reste de la ville est à z = 0)."""
-    return M._bridge_z(y) if -330.0 < y < 12.0 and abs(x) < 12.0 else 0.0
+    return M._bridge_z(y, ville=True) if -330.0 < y < 12.0 and abs(x) < 12.0 else 0.0
 
 
 def sol(shot, x, y):

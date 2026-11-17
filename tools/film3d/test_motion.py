@@ -23,10 +23,8 @@ CAM_LIMITS_PLAN = {
     "P1": {"front_max": 0.0},                                 # jamais de face (2.2)
     "P3": {"gap": 0.3},     # la trouée : 0,65 m entre les boîtes de la berline et du barrage (0,35 au moins) ; la patrouille 1
                              # à 1,5 m au moins de la berline : test_p3
-    # le pont roulé en entier sur le bras commun (17 novembre) : la caméra suit le tablier (scene_c.deck_z), dont la
-    # crête (raccords verticaux de 12 et 20 m) se prend à 130 km/h : 7,8 m/s² de grue au plus fort, tant que le
-    # décor n'allonge pas ces raccords (à reprendre dans scene_c et motion._bridge_z)
-    "P4": {"crane_acc": 8.5, "arel": 8.5},
+    # (le pont roulé, 17 novembre au soir : ses raccords verticaux allongés à 22, 48 et 24 m, motion.pont_profil, la
+    # crête se prend sous les plafonds communs ; plus de plafond propre à P4)
     # v3.1 : la berline vire sur le mouillé (route jusqu'à 36°/s, mise en virage en 20 images) et la caméra la suit à
     # 7,6 m dans l'axe de sa vitesse : sa visée accélère comme ce cap (≈ 65°/s², la largeur de cadre 1,2 en vaut 55)
     # et, à 7,6 m de rayon, elle tire 7,5 m/s² par rapport à la berline (4 demanderaient 1,6 s de mise en virage, plus
@@ -464,8 +462,9 @@ def test_p4():
         hx, hy = PC.hero("P4")["pos"](P.FRAMES)
         nx, ny = P.hero_pos(M.t_of(P.FRAMES + 1))
         p5 = PC.vers_ville("P5")[0](*PC.hero("P5")["pos"](1))
-        check("P4 : la fenêtre du parcours, P4/249 sur P5/1", abs(x1 - hx) < 1e-6 and abs(y1 - hy) < 1e-6
-              and math.dist((nx, ny), p5) < 0.02 and y1 - y0 > 300.0, f"({x0:.2f} ; {y0:.2f}) à ({x1:.2f} ; {y1:.2f}), "
+        # (le pont de la ville, 110 m de tablier depuis le 17 novembre au soir : de la tête de pont au pied, 117 m)
+        check(f"P4 : la fenêtre du parcours, P4/{P.FRAMES} sur P5/1", abs(x1 - hx) < 1e-6 and abs(y1 - hy) < 1e-6
+              and math.dist((nx, ny), p5) < 0.02 and y1 - y0 > 115.0, f"({x0:.2f} ; {y0:.2f}) à ({x1:.2f} ; {y1:.2f}), "
               f"P4/{P.FRAMES} à {math.dist((nx, ny), p5) * 100:.1f} cm de P5/1")
         worst = max(max(abs(u - w) for u, w in zip(P.camera(M.t_of(g)), PC.chase("P4", g)))
                     for g in range(1, P.FRAMES + 1))
@@ -1405,13 +1404,10 @@ def test_arches():
 
 
 def _deck(y):
-    """Le profil du pont (scene_c.py, recopié sans Blender) : crête en -130, raccords paraboliques."""
-    def ramp(y, a, t):
-        return min(1.0, max(0.0, (y - (a - t / 2)) / t))
+    """Le profil du pont (motion.pont_pente, celui de scene_c.py), intégré ici à part : raccords paraboliques."""
     z, yy, step = 0.0, -1010.0, 0.25
     while yy < y:
-        z += 0.06 * (ramp(yy + step / 2, -255.0, 12.0) - 2 * ramp(yy + step / 2, -130.0, 20.0)
-                     + ramp(yy + step / 2, -5.0, 12.0)) * step
+        z += M.pont_pente(yy + step / 2) * step
         yy += step
     return max(0.0, z)
 
@@ -1436,7 +1432,8 @@ def test_pack():
         # en ville (le pont roulé, 17 novembre), la 0 est la patrouille 1 et les 1 et 2 se rangent à la file : deux
         # de la meute libre, jusqu'au freinage du port (il fait plonger toutes les caisses ensemble)
         i0, i1 = (3, 4) if P.VILLE else (0, 1)
-        fp = range(P.F0 - 1, P.brake_windows()[-1][0] - 24) if P.VILLE else fr
+        # (le pont de 110 m : 42 images avant ce freinage ; la fenêtre remonte 3 s dans la rue, où elles roulent déjà)
+        fp = range(P.F0 - 73, P.brake_windows()[-1][0] - 24) if P.VILLE else fr
         a = M.rebody(M.sample(P.pack_pos(i0), fp, seed=1.0), "patrol")
         b = M.rebody(M.sample(P.pack_pos(i1), fp, seed=2.0), "patrol")
         a2 = M.rebody(M.sample(P.pack_pos(i0), fp, seed=1.0), "patrol")
@@ -1461,7 +1458,7 @@ def test_pack():
         fn, kind = (P.van_pos, "van") if not P.VILLE else (P.pack_pos(len(P.PACK) - 4), "patrol")
         van = M.rebody(M.sample(fn, fr, seed=4.0, noise=0.0), kind, ground=deck_ground)
         flat = M.rebody(M.sample(fn, fr, seed=4.0, noise=0.0), kind)
-        up = max(p["heave"] - q["heave"] for p, q in zip(van, flat) if abs(p["y"] + 130.0) < 10.0)
+        up = max(p["heave"] - q["heave"] for p, q in zip(van, flat) if abs(p["y"] - M.pont_profil()["crest"]) < 10.0)
         check(f"P4 : {'le fourgon' if kind == 'van' else 'la patrouille'} s'allège sur la crête", up > 0.01,
               f"{up * 100:.1f} cm de plus qu'à plat")
         # un ressaut en travers : la caisse pompe, puis se repose
@@ -1768,12 +1765,15 @@ def test_parcours():
     les plafonds CUT_* contre l'entrée du suivant ; les feux stop sont dans le même état ; tout le parcours tient les
     limites de la voiture (CAR31_HERO, glisse) image par image."""
     import parcours as PC
-    # le trajet roulé (17 novembre, SPEC §18.53) : sept tronçons de la poursuite, 770 images (32,1 s), puis FIN6
-    # sur la pointe, sans saut : la berline roule de l'avenue à l'arrêt
-    check("parcours : sept tronçons, 770 images, FIN6 à la suite", [n for n, _ in PC.SHOTS] ==
-          ["OUV", "P1", "P2", "P3", "P4", "P5", "P6"] and PC.TOTAL == sum(n for _, n in PC.SHOTS) == 770
+    # le trajet roulé (17 novembre, SPEC §18.53) : sept tronçons de la poursuite, puis FIN6 sur la pointe, sans
+    # saut : la berline roule de l'avenue à l'arrêt ; le film à six étoiles, FIN6 comprise, en 30 s au plus (720
+    # images), l'arrêt tenu une seconde à la fin
+    check("parcours : sept tronçons, FIN6 à la suite, 30 s au plus, l'arrêt tenu une seconde",
+          [n for n, _ in PC.SHOTS] == ["OUV", "P1", "P2", "P3", "P4", "P5", "P6"]
+          and PC.TOTAL == sum(n for _, n in PC.SHOTS) and PC.TOTAL + PC.FIN6_FRAMES <= 30 * PC.FPS
           and PC.START["FIN6"] == PC.TOTAL and PC.t_of("FIN6", 1) * PC.FPS < PC.T_ARRET * PC.FPS
-          < PC.TOTAL + PC.FIN6_FRAMES - 24, f"{PC.TOTAL} images, arrêt à l'image {PC.T_ARRET * PC.FPS:.1f}")
+          < PC.TOTAL + PC.FIN6_FRAMES - 24, f"{PC.TOTAL} + {PC.FIN6_FRAMES} images "
+          f"({(PC.TOTAL + PC.FIN6_FRAMES) / PC.FPS:.2f} s), arrêt à l'image {PC.T_ARRET * PC.FPS:.1f}")
     route_cap = PC.ROUTE.at(PC.S_ARC5 - 20.0)[2]
     check("parcours : le rond-point à angle droit (CAP_B = 90° exacts, la route les tient)",
           PC.CAP_B == 90.0 and abs(route_cap - 90.0) < 1e-6 and abs(PC.ROUTE.at(PC.S_P6_ANCRE)[2] - PC.CAP_D) < 1e-6,
@@ -1781,13 +1781,19 @@ def test_parcours():
     check("parcours : aucune ellipse, toutes les jonctions continues", all(PC.CONTINU.values())
           and len(PC.CONTINU) == 6 and not PC.SAUT, str(PC.CONTINU))
     # les six étoiles : des instants du trajet, dans l'ordre, chacune dans son tronçon, la première l'avenue lancée
-    # (4 à 5 s), la sixième sur la jetée avant FIN6
+    # (3 à 5 s), jamais pendant un freinage, la sixième sur la jetée avant FIN6 ; 5 s au plus de l'une à l'autre
     win = {n: (PC.START[n] + 1, PC.START[n] + k) for n, k in PC.SHOTS}
     where = {1: ("OUV", "P1"), 2: ("P2",), 3: ("P3",), 4: ("P4",), 5: ("P5",), 6: ("P6",)}
     bad = [k for k, f in PC.ETOILES.items() if not any(win[n][0] <= f <= win[n][1] for n in where[k])]
-    check("parcours : six étoiles en instants, chacune dans son tronçon", sorted(PC.ETOILES) == [1, 2, 3, 4, 5, 6]
-          and list(PC.ETOILES.values()) == sorted(PC.ETOILES.values()) and not bad
-          and 4.0 <= PC.ETOILES[1] / PC.FPS <= 5.0 and PC.ETOILES[6] <= PC.TOTAL, f"{PC.ETOILES}, hors : {bad}")
+    t1 = PC.t_of("OUV", PC.ETOILES[1])
+    gaps = [(b - a) / PC.FPS for a, b in zip(list(PC.ETOILES.values()), list(PC.ETOILES.values())[1:])]
+    check("parcours : six étoiles en instants, chacune dans son tronçon, 5 s au plus entre deux",
+          sorted(PC.ETOILES) == [1, 2, 3, 4, 5, 6] and list(PC.ETOILES.values()) == sorted(PC.ETOILES.values())
+          and not bad and 3.0 <= PC.ETOILES[1] / PC.FPS <= 5.0 and PC.ETOILES[6] <= PC.TOTAL
+          and max(gaps) <= 5.0 + 1e-9, f"{PC.ETOILES}, hors : {bad}, écarts {', '.join(f'{g:.2f}' for g in gaps)} s")
+    check("parcours : l'étoile 1 hors du freinage (la berline lancée, pas sur les freins)",
+          all(PC.DRIVE.along(t1 + k / 24.0) > -0.3 for k in range(-6, 4)), f"{t1:.2f} s, freinage à {next(
+              k / 240.0 for k in range(2400) if PC.DRIVE.along(k / 240.0) < -0.3):.2f} s")
     for (a, na), (b, _) in zip(PC.SHOTS, PC.SHOTS[1:]):
         ha, hb = PC.hero(a), PC.hero(b)
         (fa, ra), (fb, rb) = PC.vers_ville(a), PC.vers_ville(b)

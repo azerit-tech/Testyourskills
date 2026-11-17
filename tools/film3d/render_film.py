@@ -53,9 +53,10 @@ SOURCES = {
 }
 # (repli seulement si shared/film/cut.ts manque : il reste la seule source des durées ; découpage v3)
 # Depuis le 17 novembre (SPEC §18.53, le trajet roulé) les durées du film sont celles du parcours unique
-# (parcours.SHOTS, FIN6_FRAMES) : 770 images de poursuite et 122 de FIN6. cut.ts (le site) les reprendra ; tant
-# qu'il garde le découpage v3, plan_frames rend la longueur des modules et le journal le dit.
-FALLBACK_FRAMES = {"OUV": 87, "P1": 31, "P2": 108, "P3": 102, "P4": 249, "P5": 60, "P6": 133, "FIN": 52, "FIN6": 122}
+# (parcours.SHOTS, FIN6_FRAMES) : 619 images de poursuite et 101 de FIN6, 30 s (17 novembre au soir, le pont de
+# 110 m). cut.ts (le site) les reprendra ; tant qu'il garde le découpage v3, plan_frames rend la longueur des
+# modules et le journal le dit.
+FALLBACK_FRAMES = {"OUV": 75, "P1": 33, "P2": 107, "P3": 103, "P4": 108, "P5": 60, "P6": 133, "FIN": 52, "FIN6": 101}
 # Le module de trajectoire de chaque plan (sans Blender) : son FRAMES est la longueur que sa scène sait animer. Un
 # plan pas encore migré au découpage de cut.ts se rend à la longueur de son module, et le journal le dit.
 TRAJ = {"OUV": "ouv_avenue", "P1": "p1_avenue", "P2": "p2_arc", "P3": "p3_enseignes", "P4": "p4_pont",

@@ -51,10 +51,20 @@ def _hero_acc(t):
 # Sa conduite : trois nœuds d'avance raccordés en quintiques d'Hermite (le premier, hors champ ; le deuxième, à sa
 # hauteur, EARLY s avant que la berline ne freine : elle freine avant elle, en flic qui voit le rond-point ; _TK),
 # puis, de _TK à la coupe et au-delà, son freinage établi de PATROL_BRAKE m/s² (P2 le reprend là).
-_TB = OUV.p1_time(M.t_of(OUV.brake_windows()[0][0]))
+# (le freinage de la berline : dans OUV avant le 17 novembre au soir ; depuis, la croisière d'avenue le repousse dans P1)
+_TB = (OUV.p1_time(M.t_of(OUV.brake_windows()[0][0])) if OUV.brake_windows()
+       else M.t_of(PC.brake_windows("P1")[0][0]))
 EARLY, LEAD_PEAK = 1.6, -1.5
-_T1 = _TB - EARLY
-_TK = _TC - 0.5                     # s : son freinage établi, avant la coupe
+# son freinage établi, avant la coupe ; depuis la croisière d'avenue (17 novembre au soir) la berline ne freine
+# plus que 0,8 s avant P2/1 : la patrouille, 3,5 m derrière elle 5 s avant, lève le pied avant elle, se laisse
+# glisser lentement (l'à-coup sous 10 m/s³), et n'établit son freinage que 0,15 s avant la coupe
+_TK = _TC - (0.5 if _TB < _TC - 1.5 else 0.15)
+if _TB < _TC - 1.5:
+    _T1 = _TB - EARLY
+else:
+    # (à sa hauteur 3,5 m derrière, 5 s avant : elle décroche lentement, l'à-coup sous 10 m/s³)
+    LEAD_PEAK = -3.5
+    _T1 = _TK - 5.0
 
 
 def _hero_y(t):

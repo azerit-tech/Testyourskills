@@ -201,9 +201,11 @@ def chase_heading(t):
 
 # l'orbite : la caméra du bras commun, tournée autour du centre de la berline de SWEEP × w(t) (vers sa gauche), de
 # l'image ORBIT[0] (elle freine encore) à ORBIT[1], où elle se pose ; vitesse en cloche (RAMP_IN, RAMP_OUT s)
-SWEEP = -55.0
-ORBIT = (34, FRAMES - 3)
-RAMP_IN, RAMP_OUT = 1.3, 1.5
+# (17 novembre au soir, le film sous 30 s : FIN6 ne tient plus que 27 images après l'arrêt ; l'orbite part plus tôt,
+# pendant le freinage (image 23 au lieu de 34), sur 54° ; sa rampe d'entrée, longue, pendant le freinage)
+SWEEP = -54.0
+ORBIT = (23, FRAMES - 3)
+RAMP_IN, RAMP_OUT = 1.45, 1.1
 _DTP = 1.0 / 2400.0
 _TO0, _TO1 = M.t_of(ORBIT[0]), M.t_of(ORBIT[1])
 

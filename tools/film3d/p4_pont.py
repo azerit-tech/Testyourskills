@@ -5,12 +5,14 @@
 # roues, braquage et transfert de masse.
 #
 # Repère du pont (scene_c.py), qui est celui de la ville : l'axe x = 0, la poursuite roule vers +y (cap 0), la crête
-# en y = -130, le pied de la rampe en y = -5. t = 0 à la première image, 24 images par seconde.
+# en y = -130, le pied de la rampe en y = -5 (le plan autonome ; dans la ville, motion.pont_profil : crête en y
+# −263,5, pied en y −210). t = 0 à la première image, 24 images par seconde.
 #
 # Dans la ville (FILM3D_VILLE, « 1 » par défaut) : depuis le 17 novembre (SPEC §18.53) le pont est roulé en entier,
-# du joint de la rue (y −328) au pied de la rampe (y −5) : la fenêtre « P4 » du parcours unique (parcours.py), 249
-# images, la montée, la crête à 130 km/h, la descente et le freinage du port. La caméra est LA caméra du film, le bras
-# commun de poursuite (parcours.chase, sur le tablier) : plus de plan de face, plus de caméra fixe ni de zoom. La
+# du joint de la rue (y −328) au pied de la rampe (y −210, le pont de 110 m depuis le 17 novembre au soir) : la
+# fenêtre « P4 » du parcours unique (parcours.py), 108 images, la montée, la crête à 107 km/h, la descente et le
+# freinage du port. La caméra est LA caméra du film, le bras commun de poursuite (parcours.chase, sur le tablier) :
+# plus de plan de face, plus de caméra fixe ni de zoom. La
 # patrouille 1 remonte la berline par la gauche pendant la montée, la dépasse et freine vers le port ; la meute
 # suit, derrière la caméra, et se range à la file pour P5. « 0 » : le plan autonome d'avant, inchangé (33,3 m/s,
 # caméra fixe en y 10, 200 mm).
@@ -24,7 +26,7 @@ V3 = True
 V31 = True
 F0 = 1
 Y_REF = 45.0                  # l'ancienne caméra (brouillon) : les trajectoires d'avant restent comptées d'elle
-Y_CREST = -130.0
+Y_CREST = M.pont_profil()["crest"]   # la crête : -130 (autonome), -263,5 (la ville, le pont de 110 m)
 SITE_AIM = (0.545, 0.545)     # le centre de la berline à 54,5 % de la hauteur depuis le haut (52 à 56)
 PORT_FRAMES = (34, 42)        # la lumière ambre du port monte sur sa calandre (lumière v3.1 ; en ville : la fin)
 ZOOM = 0.06                   # le zoom avant : 200 mm à l'image 1, 212 mm à la dernière (rampes de 10 images)
@@ -107,7 +109,10 @@ if VILLE:
     # se resserrent à la file dans sa voie, à FILE_S secondes d'elle à P5/1 (ce que la caméra de P5 attend).
     # (genre, x au début, x à la fin, retard, vitesse en plus en m/s, louvoiement en m, sa période en s, phase) ;
     # retard : en m derrière la berline à t = 0, None (déduit de CREST_FRAMES) ou ("file", s) (à la file à P5/1)
-    CREST_GAPS = (110.0, 135.0, 160.0, 185.0)    # m derrière la berline à P4/1 : les quatre plus rapides
+    # m derrière la berline à P4/1 : les quatre plus rapides (le pont de 110 m, 17 novembre au soir : sur la rue et le
+    # boulevard du quai à P4/1, intercalés entre les trois qui se rangent à la file, ils passent la crête pendant le
+    # tronçon)
+    CREST_GAPS = (44.0, 72.0, 94.0, 86.0)
     FILE_S = (1.6, 2.5, 3.4)
     T49 = M.t_of(F0 + FRAMES)           # P5/1
     PACK = [("patrol", None, None, None, 0.0, 0.0, 3.0, 0.3),                # la patrouille 1 : patrol1_pos
@@ -115,7 +120,7 @@ if VILLE:
             ("patrol", -2.6, HERO_X, ("file", FILE_S[1]), 0.0, 0.40, 3.2, 4.0),
             ("patrol", -5.0, -4.6, 58.0, 0.0, 0.40, 3.6, 4.25),
             ("patrol", 4.4, 4.6, 78.0, 0.0, 0.35, 3.1, 5.0),
-            ("patrol", 4.4, 4.4, None, 1.5, 0.40, 3.3, 2.6),          # en ville : CREST_GAPS m derrière, 1,5 m/s
+            ("patrol", 4.4, 5.4, None, 1.5, 0.40, 3.3, 2.6),          # en ville : CREST_GAPS m derrière, 1,5 m/s
             ("patrol", -4.6, -4.6, None, 1.5, 0.40, 3.5, 0.8),        # plus vite que la berline
             ("patrol", 1.0, 1.0, None, 1.5, 0.35, 3.0, 3.3),
             ("patrol", -1.6, -1.6, None, 1.5, 0.40, 3.2, 4.4)]
@@ -195,10 +200,13 @@ if VILLE:
 
     # pendant qu'elle la remonte, côte à côte, elle passe P1_PASS m à gauche d'elle (1,5 m d'air entre les caisses),
     # et se rabat à P1_SIDE une fois devant (P1_TUCK, en images du plan), l'état que P5 attend
-    P1_PASS, P1_TUCK = 3.6, (150, 238)
+    # (P1_TUCK : de 35 % du tronçon à 11 images de sa fin ; 150 et 238 sur les 249 images du pont d'avant)
+    P1_PASS, P1_TUCK = 3.6, (int(round(0.35 * FRAMES)), FRAMES - 11)
 
     def _p1_side(t):
-        return P1_PASS + (P1_SIDE - P1_PASS) * M.smoothstep(M.t_of(P1_TUCK[0]), M.t_of(P1_TUCK[1]), t)
+        # (une quintique : sur le pont court, la rabattue ne dure que 2,5 s ; l'à-coup reste sous 12 m/s³)
+        u = min(1.0, max(0.0, (t - M.t_of(P1_TUCK[0])) / (M.t_of(P1_TUCK[1]) - M.t_of(P1_TUCK[0]))))
+        return P1_PASS + (P1_SIDE - P1_PASS) * u * u * u * (10.0 + u * (6.0 * u - 15.0))
 
     def patrol1_pos(t):
         hx, hy = hero_pos(t)
