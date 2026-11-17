@@ -19,7 +19,7 @@
 #   -5, puis le plat jusqu'au mur du port (y -20) et le terre-plein (scene_e)
 #
 # Le profil en travers est celui de lieux.roadway : chaussée de 14 m bombée, trottoirs de 2 m, glissière en W,
-# parapet en béton et garde-corps à 1,1 m, poutre de rive et caisson ; lampadaires des deux côtés tous les 30 m.
+# parapet en béton et garde-corps à 1,1 m, poutre de rive et caisson ; lampadaires des deux côtés tous les 20 m.
 # Paliers : « socle » ; « haubans », le pylône en H à la crête et ses quatre éventails de câbles, sans rien
 # changer au tablier (build_bridge(haubans=True), build_haubans).
 import math
@@ -74,8 +74,9 @@ T_SAG, T_CREST = _PROFIL["t_sag"], _PROFIL["t_crest"]     # longueurs des raccor
 HALF = 7.0
 WALK = 2.0
 CITY_SHORE = L.CITY_SHORE_Y   # -325 : le mur du quai de la ville (scene_b, s 181 posé en y -325)
-# les lampadaires tous les 30 m du quai au pied ; les piles tous les 35 m (la dernière, la culée, n'est pas posée)
-LAMP_YS = [Y_START + 10.0 + 30.0 * k for k in range(int((Y_FOOT - Y_START - 10.0) / 30.0) + 1)]
+# les lampadaires tous les 20 m du quai au pied (comme la jetée, scene_d.J_LAMPS ; 30 m laissaient l'enrobé noir devant
+# la berline au haut de la rampe, brouillon v6 images 306–330) ; les piles tous les 35 m (la dernière, la culée, n'est pas posée)
+LAMP_YS = [Y_START + 10.0 + 20.0 * k for k in range(int((Y_FOOT - Y_START - 10.0) / 20.0) + 1)]
 PIERS = [Y_START + 20.0 + 35.0 * k for k in range(int((Y_FOOT - Y_START - 20.0) / 35.0) + 2)]
 
 
