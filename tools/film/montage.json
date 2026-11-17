@@ -19,7 +19,6 @@
     "P4": { "take": "P4-1.mp4", "in": 0, "speed": 1, "crop": null },
     "P5": { "take": "P5-1.mp4", "in": 0, "speed": 1, "crop": null },
     "P6": { "take": "P6-1.mp4", "in": 0, "speed": 1, "crop": null },
-    "FIN": { "take": "FIN-1.mp4", "in": 0, "speed": 1, "crop": null },
     "FIN6": { "take": "FIN6-1.mp4", "in": 0, "speed": 1, "crop": null }
   }
 }

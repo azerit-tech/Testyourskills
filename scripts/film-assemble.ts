@@ -1,6 +1,7 @@
 // Le montage du film (docs/cinematique-poursuite.md §5.1, §6 T2) : chaque plan est
 // coupé à son nombre exact d'images, étalonné, mis au 9:16, puis les plans sont
-// recollés et encodés en poursuite / fin / fin6, en 720p et 540p, avec l'affiche.
+// recollés et encodés en poursuite / fin6, en 720p et 540p, avec l'affiche. De
+// une à cinq étoiles, la fin se joue sur place (SPEC §18.53) : pas de fichier.
 // Une prise absente est remplacée par son carton (aplat, nom du plan, numéro d'image,
 // zones du §7.3), sans erreur. Le script vérifie ensuite chaque fichier par ffprobe
 // et tient les plafonds de poids du §4.1 en baissant la qualité s'il le faut ;
@@ -10,7 +11,7 @@
 //   --plans  : les prises (défaut ~/Desktop/Azerit/design/film/plans, hors du dépôt)
 //   --slates : ignore les prises, tout en cartons
 //   --out    : les fichiers du site (défaut web/src/film/media, importés par Vite)
-// Intermédiaires et planche des neuf plans dans var/film/ (ignoré par git).
+// Intermédiaires et planche des huit plans dans var/film/ (ignoré par git).
 import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, resolve } from "node:path";
@@ -104,7 +105,7 @@ for (const shot of SHOTS) {
   console.log(`  ${shot.padEnd(4)} ${String(n).padStart(2)} images  ${source[shot]}`);
 }
 
-// 2. Les six films, sous leurs plafonds : au-delà du CRF 28, le montage échoue.
+// 2. Les quatre fichiers, sous leurs plafonds : au-delà du CRF 28, le montage échoue.
 const crf: Record<string, number> = {};
 const sizes: Record<string, number> = {};
 const outName = (film: FilmId, size: SizeId) => `${film}-${size}.mp4`;
@@ -155,7 +156,7 @@ for (const size of [720, 540] as SizeId[]) {
       `  ${basename(out).padEnd(18)} ${v?.nb_read_frames} images  ${v?.width} × ${v?.height}  ${v?.r_frame_rate}  ${kb(sizes[out]).padStart(8)} / ${kb(CEILINGS[size][film])}  CRF ${crf[out]}  ${errs.length ? "ÉCHEC : " + errs.join(" ; ") : "ok"}`,
     );
   }
-  const person = personBytes({ poursuite: sizes[resolve(OUT, outName("poursuite", size))], fin: sizes[resolve(OUT, outName("fin", size))], fin6: sizes[resolve(OUT, outName("fin6", size))] });
+  const person = personBytes({ poursuite: sizes[resolve(OUT, outName("poursuite", size))], fin6: sizes[resolve(OUT, outName("fin6", size))] });
   const personOk = person <= TOTAL_CEILINGS[size];
   failed ||= !personOk;
   console.log(`  ${`personne ${size}p`.padEnd(18)} ${kb(person)} / ${kb(TOTAL_CEILINGS[size])}  ${personOk ? "ok" : "ÉCHEC"}`);
@@ -165,9 +166,9 @@ const posterOk = posterProbe?.width === 720 && posterProbe?.height === 1280 && s
 failed ||= !posterOk;
 console.log(`  ${"affiche.jpg".padEnd(18)} ${posterProbe?.width} × ${posterProbe?.height}  ${kb(sizes[poster])} / ${kb(POSTER_CEILING)}  q ${q}  ${posterOk ? "ok" : "ÉCHEC"}`);
 
-// 5. La planche des neuf plans, côte à côte (même nuit ?), à l'image du milieu.
+// 5. La planche des huit plans, côte à côte (même nuit ?), à l'image du milieu.
 const cells = SHOTS.map((s) => ({ href: frameDataUri(resolve(SEG, `${s}.mkv`), Math.floor(SHOT_FRAMES[s] / 2), 200), label: s }));
-writeFileSync(resolve(WORK, "planche-plans.png"), svgToPng(sheetSvg(cells, { cols: 9, cellW: 200, title: ["Les neuf plans, image du milieu"] })));
+writeFileSync(resolve(WORK, "planche-plans.png"), svgToPng(sheetSvg(cells, { cols: SHOTS.length, cellW: 200, title: ["Les huit plans, image du milieu"] })));
 console.log(`\nPlanche des plans : ${resolve(WORK, "planche-plans.png")}`);
 
 console.log(`Montage en ${((Date.now() - t0) / 1000).toFixed(1)} s${warnings.length ? `, ${warnings.length} avertissement(s)` : ""}.`);

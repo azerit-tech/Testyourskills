@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   CEILINGS,
   CeilingError,
+  FILMS,
   MAX_CRF,
   MAX_GOP,
   NEUTRAL_GRADE,
@@ -66,10 +67,12 @@ describe("la liste de montage", () => {
 describe("l'arithmétique des images", () => {
   it("lit les durées de shared/film/cut.ts : la poursuite, les vidéos des deux fins, les premières images", () => {
     expect(filmFrames("poursuite")).toBe(CHASE_FRAMES);
-    expect(filmFrames("fin")).toBe(ENDINGS.fin.video);
     expect(filmFrames("fin6")).toBe(ENDINGS.fin6.video);
     expect(shotStarts("poursuite")).toEqual(SHOT_START);
-    expect(shotStarts("fin")).toEqual({ FIN: 0 });
+    expect(shotStarts("fin6")).toEqual({ FIN6: 0 });
+    // la fin une à cinq étoiles se joue sur place (§18.53) : plus de fichier, plus de plan
+    expect(Object.keys(FILMS)).toEqual(["poursuite", "fin6"]);
+    expect(SHOTS).not.toContain("FIN");
   });
 
   it("compte les images de prise à consommer", () => {
@@ -136,18 +139,18 @@ describe("les arguments de ffmpeg", () => {
     expect(nextCrf(28)).toBeNull();
   });
 
-  it("tient les plafonds du §4.1 : 5,48 / 0,9 / 1,4 Mo en 720p, 2,57 Mo pour une personne en 540p", () => {
+  it("tient les plafonds du §4.1 : 5,48 / 1,4 Mo en 720p, 2,57 Mo pour une personne en 540p", () => {
     // la poursuite au poids par image du premier découpage (4,5 Mo pour 340 images), rapporté aux 414 de cut.ts
     expect(filmFrames("poursuite")).toBe(414);
-    expect(CEILINGS[720]).toEqual({ poursuite: 5_479_412, fin: 900_000, fin6: 1_400_000 });
+    expect(CEILINGS[720]).toEqual({ poursuite: 5_479_412, fin6: 1_400_000 });
     expect(TOTAL_CEILINGS[720]).toBe(6_879_412);
     // l'éco garde le rapport 2,2 / 5,9 du premier découpage
     expect(TOTAL_CEILINGS[540]).toBe(2_565_204);
-    // une personne charge la poursuite et une seule fin
+    // une personne charge au plus la poursuite et la fin à six étoiles
     expect(personBytes(CEILINGS[720])).toBe(TOTAL_CEILINGS[720]);
     expect(personBytes(CEILINGS[540])).toBeLessThanOrEqual(TOTAL_CEILINGS[540]);
     expect(personBytes(CEILINGS[540])).toBeGreaterThan(TOTAL_CEILINGS[540] - 10);
-    for (const f of ["poursuite", "fin", "fin6"] as const) expect(CEILINGS[540][f]).toBeLessThan(CEILINGS[720][f]);
+    for (const f of ["poursuite", "fin6"] as const) expect(CEILINGS[540][f]).toBeLessThan(CEILINGS[720][f]);
   });
 });
 
@@ -155,12 +158,11 @@ describe("les images clés", () => {
   it("sur chaque coupe entre plans, plus une toutes les 48 images au plus", () => {
     expect(MAX_GOP).toBe(48);
     // les coupes de cut.ts ; P2 (110 images) en reçoit deux de plus, 48 et 96 images après la sienne, P5 (60), P6 (60),
-    // FIN (52) et FIN6 (80) une, 48 images après la leur
+    // et FIN6 (80) une, 48 images après la leur
     for (const k of Object.values(SHOT_START)) expect(keyframePlan("poursuite")).toContain(k);
     expect(keyframePlan("poursuite")).toEqual([0, 40, 88, 136, 184, 198, 246, 294, 342, 354, 402]);
-    expect(keyframePlan("fin")).toEqual([0, 48]);
     expect(keyframePlan("fin6")).toEqual([0, 48]);
-    for (const film of ["poursuite", "fin", "fin6"] as const) {
+    for (const film of ["poursuite", "fin6"] as const) {
       const k = [...keyframePlan(film), filmFrames(film)];
       for (let i = 1; i < k.length; i++) expect(k[i] - k[i - 1]).toBeLessThanOrEqual(MAX_GOP);
     }
@@ -177,22 +179,22 @@ describe("tenir les plafonds", () => {
 
   it("chaque fichier sous son plafond, au meilleur CRF qui y tient", () => {
     const seen: string[] = [];
-    const r = fitCeilings(720, fake({ poursuite: 6_000_000, fin: 500_000, fin6: 800_000 }, seen));
-    expect(r.crf).toEqual({ poursuite: 22, fin: 20, fin6: 20 });
-    expect(seen).toEqual(["poursuite@20", "poursuite@22", "fin@20", "fin6@20"]);
+    const r = fitCeilings(720, fake({ poursuite: 6_000_000, fin6: 800_000 }, seen));
+    expect(r.crf).toEqual({ poursuite: 22, fin6: 20 });
+    expect(seen).toEqual(["poursuite@20", "poursuite@22", "fin6@20"]);
   });
 
-  it("le total compte la poursuite et une seule fin, pas les trois fichiers : rien ne baisse pour rien", () => {
-    // 5,4 + 0,88 + 1,39 = 7,67 Mo à trois, mais 6,79 Mo pour une personne : sous les 6,88 Mo
-    const r = fitCeilings(720, fake({ poursuite: 5_400_000, fin: 880_000, fin6: 1_390_000 }));
-    expect(r.crf).toEqual({ poursuite: 20, fin: 20, fin6: 20 });
+  it("le total d'une personne, la poursuite et la fin à six étoiles, tient sous son plafond : rien ne baisse pour rien", () => {
+    // 5,4 + 1,39 = 6,79 Mo : sous les 6,88 Mo
+    const r = fitCeilings(720, fake({ poursuite: 5_400_000, fin6: 1_390_000 }));
+    expect(r.crf).toEqual({ poursuite: 20, fin6: 20 });
     expect(personBytes(r.bytes)).toBeLessThanOrEqual(TOTAL_CEILINGS[720]);
   });
 
   it("il faudrait dépasser le CRF 28 : le montage échoue au lieu d'avertir", () => {
     const log: string[] = [];
-    expect(() => fitCeilings(720, fake({ poursuite: 30_000_000, fin: 500_000, fin6: 800_000 }), (m) => log.push(m))).toThrow(CeilingError);
-    expect(() => fitCeilings(720, fake({ poursuite: 30_000_000, fin: 500_000, fin6: 800_000 }))).toThrow(/dépasser le CRF 28/);
+    expect(() => fitCeilings(720, fake({ poursuite: 30_000_000, fin6: 800_000 }), (m) => log.push(m))).toThrow(CeilingError);
+    expect(() => fitCeilings(720, fake({ poursuite: 30_000_000, fin6: 800_000 }))).toThrow(/dépasser le CRF 28/);
     // il est passé par 22, 24, 26 et 28 avant d'échouer
     expect(log.map((m) => m.match(/CRF (\d+)$/)?.[1])).toEqual(["22", "24", "26", "28"]);
   });

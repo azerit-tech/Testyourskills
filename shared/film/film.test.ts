@@ -14,13 +14,13 @@ const LEVELS: Stars[] = [1, 2, 3, 4, 5, 6];
 const at = (frame: number) => (frame + 0.5) / FPS;
 
 describe("le découpage (docs/cinematique-decoupage-v3.md §7)", () => {
-  it("OUV 40, P1 48, P2 110, P3 et P4 48, P5 et P6 60 : la poursuite fait 414 images ; FIN 76 (52 de vidéo), FIN6 104 (80 de vidéo)", () => {
+  it("OUV 40, P1 48, P2 110, P3 et P4 48, P5 et P6 60 : la poursuite fait 414 images ; FIN6 104 (80 de vidéo) ; sur place, 14 + 10", () => {
     expect(SHOT_FRAMES).toEqual({ OUV: 40, P1: 48, P2: 110, P3: 48, P4: 48, P5: 60, P6: 60 });
     expect(CHASE_FRAMES).toBe(414);
-    expect(endingFrames("fin")).toBe(76);
     expect(endingFrames("fin6")).toBe(104);
-    expect(ENDINGS.fin.video).toBe(52);
     expect(ENDINGS.fin6.video).toBe(80);
+    expect(Object.keys(ENDINGS)).toEqual(["fin6"]);
+    expect(IN_PLACE).toEqual({ freeze: 14, flash: 10, rise: 4 });
     expect(SHOT_START).toEqual({ OUV: 0, P1: 40, P2: 88, P3: 198, P4: 246, P5: 294, P6: 354 });
   });
 
@@ -218,7 +218,7 @@ describe("hudAt (§2.2, §5.2)", () => {
         const h = hudAt(p, at(f), "fr");
         expect(h.ink).toBe(false);
         expect(h.phase).not.toBe("ending");
-        expect(h.shot).not.toBe("FIN");
+        expect(h.shot).not.toBe("FIN6");
         if (h.video !== null) expect(h).toMatchObject({ video: "chase" });
         expect(h.videoFrame).toBeLessThan(p.cut);
         if (f >= p.freeze) expect(h.videoFrame).toBe(p.cut - 1);

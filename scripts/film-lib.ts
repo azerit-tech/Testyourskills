@@ -8,26 +8,25 @@ import { ENDINGS, SHOT_FRAMES as CHASE_SHOT_FRAMES } from "../shared/film/cut";
 export const FPS = 24;
 
 /** L'ordre des plans. */
-export const SHOTS = ["OUV", "P1", "P2", "P3", "P4", "P5", "P6", "FIN", "FIN6"] as const;
+export const SHOTS = ["OUV", "P1", "P2", "P3", "P4", "P5", "P6", "FIN6"] as const;
 export type ShotId = (typeof SHOTS)[number];
 
 /**
  * Les images de VIDÉO de chaque plan (§2.1, §6 T2 critère 1).
- * FIN dure 76 images au film, mais seules les 52 du dérapage sont dans le fichier :
- * l'arrêt sur image (14) et le flash (10) sont dessinés par le site. De même FIN6 :
- * 80 images d'orbite en vidéo, puis 12 d'arrêt et 12 de flash dessinées en direct.
- * Lues dans shared/film/cut.ts, la seule source des durées.
+ * FIN6 : 80 images d'orbite en vidéo, puis 12 d'arrêt et 12 de flash dessinées
+ * en direct par le site. Lues dans shared/film/cut.ts, la seule source des durées.
+ * La fin à la pointe de une à cinq étoiles (FIN) n'est plus montée depuis le
+ * 17 novembre 2026 (SPEC §18.53) : la fin se joue sur place, sur la dernière
+ * image du dernier plan joué.
  */
 export const SHOT_FRAMES: Record<ShotId, number> = {
   ...CHASE_SHOT_FRAMES,
-  FIN: ENDINGS.fin.video,
   FIN6: ENDINGS.fin6.video,
 };
 
-/** Les trois films et leurs plans, dans l'ordre. */
+/** Les deux films et leurs plans, dans l'ordre. */
 export const FILMS = {
   poursuite: ["OUV", "P1", "P2", "P3", "P4", "P5", "P6"],
-  fin: ["FIN"],
   fin6: ["FIN6"],
 } as const satisfies Record<string, readonly ShotId[]>;
 export type FilmId = keyof typeof FILMS;
@@ -38,8 +37,8 @@ export type SizeId = keyof typeof SIZES;
 /**
  * Plafonds de poids (§4.1), en octets (1 Mo = 10^6 octets, lecture stricte),
  * lus dans shared/film/budget.ts : le lecteur s'en sert aussi. Par fichier, et
- * pour une personne (la poursuite et la plus lourde des deux fins, car on ne
- * charge que la fin utile) : 6,88 Mo en 720p, 2,57 Mo en 540p.
+ * pour une personne (la poursuite et, à six étoiles, sa fin) : 6,88 Mo en 720p,
+ * 2,57 Mo en 540p.
  */
 export const CEILINGS: Record<SizeId, Record<FilmId, number>> = { 720: FILE_CEILINGS["720"], 540: FILE_CEILINGS["540"] };
 export const TOTAL_CEILINGS: Record<SizeId, number> = { 720: PERSON_CEILINGS["720"], 540: PERSON_CEILINGS["540"] };
@@ -58,7 +57,6 @@ export const SLATE_COLORS: Record<ShotId, string> = {
   P4: "#4b2f54", // prune
   P5: "#ff6a3d", // corail
   P6: "#fff9cb", // crème
-  FIN: "#ccc2f5", // lavande
   FIN6: "#8d8cf0", // lilas
 };
 export const INK = "#0c0d1b";
@@ -383,9 +381,9 @@ export interface Fit {
 }
 
 /**
- * Les trois fichiers d'une taille sous leurs plafonds : chacun part de
+ * Les deux fichiers d'une taille sous leurs plafonds : chacun part de
  * START_CRF et monte de 2 tant qu'il dépasse le sien ; puis, tant que la
- * personne charge trop (poursuite et plus lourde des fins), le plus lourd des
+ * personne charge trop (poursuite et fin à six étoiles), le plus lourd des
  * deux monte encore. Il faudrait passer CRF 28 : CeilingError, le montage échoue.
  * `encodeAt` encode un fichier à un CRF et rend son poids en octets.
  */
@@ -407,8 +405,7 @@ export function fitCeilings(size: SizeId, encodeAt: (film: FilmId, crf: number) 
     while (bytes[film] > CEILINGS[size][film]) raise(film, `${bytes[film]} octets, au-dessus du plafond de ${CEILINGS[size][film]}`);
   }
   while (personBytes(bytes) > TOTAL_CEILINGS[size]) {
-    const ending: FilmId = bytes.fin6 >= bytes.fin ? "fin6" : "fin";
-    const heavy: FilmId = bytes.poursuite >= bytes[ending] ? "poursuite" : ending;
+    const heavy: FilmId = bytes.poursuite >= bytes.fin6 ? "poursuite" : "fin6";
     raise(heavy, `${personBytes(bytes)} octets pour une personne, au-dessus de ${TOTAL_CEILINGS[size]}`);
   }
   return { crf, bytes };
@@ -587,7 +584,6 @@ export function checklist(take: string, info: string): string {
     "une roue se déforme, une voiture en traverse une autre, glisse sans tourner ou roule à l'envers",
     "deux véhicules se percutent",
     "OUV n'est pas calme, ou un plan est moins agité que celui d'avant",
-    "dans FIN, plus d'une patrouille ou plus d'une silhouette est visible (la fin doit rester vraie à une étoile)",
     "le ciel n'est plus à l'heure bleue, ou le sol est sec",
     "l'action sort de la zone centrale, ou quelque chose d'essentiel est dans les bandes",
     "un filigrane, une bande noire ou un sous-titre est incrusté",

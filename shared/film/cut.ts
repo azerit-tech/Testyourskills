@@ -8,38 +8,42 @@ export const FPS = 24;
 /** Les plans de la poursuite, dans l'ordre du fichier `poursuite` : l'ouverture, puis un plan par étoile. */
 export const CHASE_SHOTS = ["OUV", "P1", "P2", "P3", "P4", "P5", "P6"] as const;
 export type ChaseShot = (typeof CHASE_SHOTS)[number];
-/** Les fins tournées : `fin6` (six étoiles, l'orbite) ; `fin`, l'ancienne fin à la pointe, n'est plus jouée (17 novembre 2026). */
-export type EndingId = "fin" | "fin6";
-export type ShotId = ChaseShot | "FIN" | "FIN6";
+/**
+ * La seule fin tournée : `fin6` (six étoiles, l'orbite sur la pointe). De une
+ * à cinq étoiles, la fin se joue sur place, sans fichier (IN_PLACE) ; l'ancienne
+ * fin à la pointe (FIN) a quitté le film le 17 novembre 2026 (§18.53).
+ */
+export type EndingId = "fin6";
+export type ShotId = ChaseShot | "FIN6";
 
 /** Durée de chaque plan de la poursuite, en images. */
 export const SHOT_FRAMES: Record<ChaseShot, number> = { OUV: 40, P1: 48, P2: 110, P3: 48, P4: 48, P5: 60, P6: 60 };
 
 /** Une fin : la vidéo (dérapage ou orbite), l'arrêt sur image sur sa dernière image, puis le flash. */
 export interface EndingCut {
-  shot: "FIN" | "FIN6";
+  shot: "FIN6";
   /** Images de vidéo du fichier de fin. */
   video: number;
   /** Arrêt sur image : la dernière image gelée, en deux tons. */
   freeze: number;
   /** Flash crème : il monte en `rise` images (la fiche se pose à son sommet), puis s'efface. */
   flash: number;
-  /** Images de montée du flash (FIN : les quatre images de silence). */
+  /** Images de montée du flash. */
   rise: number;
 }
 
 export const ENDINGS: Record<EndingId, EndingCut> = {
-  fin: { shot: "FIN", video: 52, freeze: 14, flash: 10, rise: 4 },
   fin6: { shot: "FIN6", video: 80, freeze: 12, flash: 12, rise: 4 },
 };
 
-/** Total d'une fin, en images : 76 pour FIN, 104 pour FIN6. */
+/** Total d'une fin, en images : 104 pour FIN6. */
 export const endingFrames = (e: EndingId): number => ENDINGS[e].video + ENDINGS[e].freeze + ENDINGS[e].flash;
 
 /**
  * La fin sur place, de une à cinq étoiles (17 novembre 2026) : pas de vidéo de
  * fin, l'arrêt sur image se fait sur la dernière image du dernier plan joué,
- * là où est la berline. Mêmes gel et flash que l'ancienne fin à la pointe.
+ * là où est la berline. Mêmes gel et flash que l'ancienne fin à la pointe
+ * (FIN : 52 images de vidéo, 14 de gel, 10 de flash).
  */
 export const IN_PLACE = { freeze: 14, flash: 10, rise: 4 } as const;
 

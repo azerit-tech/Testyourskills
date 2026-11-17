@@ -1,7 +1,8 @@
 // Les fichiers du film (web/src/film/media/) ont-ils les durées du découpage
 // (shared/film/cut.ts) ? Chaque mp4 est compté image par image par ffprobe et
-// comparé à filmFrames() : 414 images pour la poursuite, 52 pour la fin, 80
-// pour la fin à six étoiles, à 24 i/s.
+// comparé à filmFrames() : 414 images pour la poursuite, 80 pour la fin à six
+// étoiles, à 24 i/s. La fin une à cinq étoiles n'existe plus (§18.53) : un
+// fichier `fin-*.mp4` resté là fait échouer le contrôle.
 //
 // Sans ffprobe, le contrôle se saute en le disant. L'écart des cartons (204,
 // 36 et 56 images, d'avant le découpage v3) est résolu le 14 novembre 2026 :
@@ -31,7 +32,7 @@ const sec = (frames: number) => `${(frames / FPS).toFixed(2).replace(".", ",")} 
 let gaps = 0;
 
 describe.skipIf(!hasFfprobe)("film : les fichiers ont les durées du découpage", () => {
-  it("les six fichiers attendus, et aucun autre mp4", () => {
+  it("les quatre fichiers attendus, et aucun autre mp4", () => {
     const present = readdirSync(MEDIA).filter((f) => f.endsWith(".mp4")).sort();
     expect(present).toEqual(expected.map((e) => e.file).sort());
   });

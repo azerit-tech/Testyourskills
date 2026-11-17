@@ -6,7 +6,7 @@ import { ECO_BELOW_BPS, endingToLoad, filmAssetUrl, initialVariant, PROBE_BYTES,
 describe("les adresses du film", () => {
   it("sans base : l'adresse à empreinte donnée par Vite", () => {
     expect(filmAssetUrl("", "/assets/poursuite-720-AbC123.mp4")).toBe("/assets/poursuite-720-AbC123.mp4");
-    expect(filmAssetUrl("  ", "/assets/fin-540-x.mp4")).toBe("/assets/fin-540-x.mp4");
+    expect(filmAssetUrl("  ", "/assets/fin6-540-x.mp4")).toBe("/assets/fin6-540-x.mp4");
   });
 
   it("avec une base : le même nom à empreinte sous l'autre hôte, barre finale ou non", () => {
@@ -165,10 +165,10 @@ describe("le chargement en flux (loader.ts)", () => {
       return /-720/.test(url) ? slowResponse(20, 50_000, 100) : slowResponse(4, 50_000, 0);
     });
     const { loadFilmFiles, filmVariant } = await import("./loader");
-    const r = await loadFilmFiles(["poursuite", "fin"]);
+    const r = await loadFilmFiles(["poursuite", "fin6"]);
     expect(r.quality).toBe("540");
     expect(filmVariant()).toBe("540");
-    expect(asked.map((u) => u.replace(/^.*\/(\w+-\d+).*$/, "$1"))).toEqual(["poursuite-720", "poursuite-540", "fin-540"]);
+    expect(asked.map((u) => u.replace(/^.*\/(\w+-\d+).*$/, "$1"))).toEqual(["poursuite-720", "poursuite-540", "fin6-540"]);
     expect(r.urls.every((u) => u.startsWith("blob:"))).toBe(true);
   });
 
@@ -188,7 +188,7 @@ describe("le chargement en flux (loader.ts)", () => {
       return slowResponse(2, 1000, 0);
     });
     const { loadFilmFiles } = await import("./loader");
-    expect((await loadFilmFiles(["poursuite", "fin"])).quality).toBe("540");
+    expect((await loadFilmFiles(["poursuite", "fin6"])).quality).toBe("540");
     expect(asked.some((u) => /-720/.test(u))).toBe(false);
   });
 
@@ -202,7 +202,7 @@ describe("le chargement en flux (loader.ts)", () => {
       blob: async () => new Blob([new Uint8Array(500_000)], { type: "video/mp4" }),
     }));
     const { loadFilmFiles, filmNet } = await import("./loader");
-    const r = await loadFilmFiles(["poursuite", "fin"]);
+    const r = await loadFilmFiles(["poursuite", "fin6"]);
     expect(r.quality).toBe("720");
     expect(filmNet().bytes).toBe(1_000_000);
   });
@@ -240,9 +240,9 @@ describe("le chargement en flux (loader.ts)", () => {
     vi.stubGlobal("navigator", {});
     vi.stubGlobal("fetch", async () => slowResponse(8, 50_000, 0));
     const { loadFilmFiles, filmRemaining } = await import("./loader");
-    expect(filmRemaining(["poursuite", "fin"])).toBe(FILE_CEILINGS["720"].poursuite + FILE_CEILINGS["720"].fin);
+    expect(filmRemaining(["poursuite", "fin6"])).toBe(FILE_CEILINGS["720"].poursuite + FILE_CEILINGS["720"].fin6);
     await loadFilmFiles(["poursuite"]);
-    expect(filmRemaining(["poursuite", "fin"])).toBe(FILE_CEILINGS["720"].fin);
+    expect(filmRemaining(["poursuite", "fin6"])).toBe(FILE_CEILINGS["720"].fin6);
     expect(filmRemaining(["poursuite"])).toBe(0);
   });
 });

@@ -1,6 +1,6 @@
 # Le montage du film
 
-`montage.json` dit, pour chacun des neuf plans, quelle prise prendre et quelle fenêtre en garder. `scripts/film-assemble.ts` en tire `web/src/film/media/`, importé par Vite avec une empreinte dans chaque nom (§4.1 et §6 T2 de `docs/cinematique-poursuite.md`).
+`montage.json` dit, pour chacun des huit plans, quelle prise prendre et quelle fenêtre en garder. `scripts/film-assemble.ts` en tire `web/src/film/media/`, importé par Vite avec une empreinte dans chaque nom (§4.1 et §6 T2 de `docs/cinematique-poursuite.md`).
 
 ## Déposer une prise
 
@@ -23,7 +23,7 @@ donne dans `var/film/contact/` une planche (une image sur quatre, numérotée da
 | `speed` | 1 = vitesse de la prise ; 0,5 = deux fois plus lent ; 2 = deux fois plus vite |
 | `crop` | `null` = image entière ; sinon `{ "x", "y", "w", "h" }` en fractions de la source (0 à 1). Le script recadre ensuite toujours au centre en 9:16 |
 
-La longueur de chaque plan (40, 48 ou 60 images, 52 pour FIN, 80 pour FIN6 : `shared/film/cut.ts`) est fixée par le film, pas par cette liste : le plan prend `longueur × speed` secondes à 24 i/s à partir de `in`. Si la prise est trop courte, la dernière image est tenue et le script le dit.
+La longueur de chaque plan (40, 48 ou 60 images, 80 pour FIN6 : `shared/film/cut.ts`) est fixée par le film, pas par cette liste : le plan prend `longueur × speed` secondes à 24 i/s à partir de `in`. Si la prise est trop courte, la dernière image est tenue et le script le dit.
 
 `grade` est l'étalonnage commun, appliqué aux prises seulement : `eq` de ffmpeg (`contrast`, `brightness`, `saturation`, `gamma`), `colorbalance` (`shadows`, `midtones`, `highlights`, trois nombres r, v, b de -1 à 1), et en option une LUT `.cube` posée dans ce dossier (`lut`). Les clés qui commencent par `//` sont des commentaires.
 
@@ -35,4 +35,4 @@ npx tsx scripts/film-assemble.ts --slates   # tout en cartons
 npx tsx scripts/film-assemble.ts --plans=autre/dossier
 ```
 
-Moins de deux minutes. Le script vérifie chaque fichier par ffprobe (images, taille, 24 i/s, images clés, aucune piste son) et les plafonds de poids ; s'il en dépasse un, il baisse la qualité et le dit. `var/film/planche-plans.png` montre les neuf plans côte à côte pour juger la même nuit.
+Moins de deux minutes. Le script vérifie chaque fichier par ffprobe (images, taille, 24 i/s, images clés, aucune piste son) et les plafonds de poids ; s'il en dépasse un, il baisse la qualité et le dit. `var/film/planche-plans.png` montre les huit plans côte à côte pour juger la même nuit.
