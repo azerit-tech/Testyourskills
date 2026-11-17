@@ -910,6 +910,27 @@ def deck_sweep(name, x0, x1, dz0, dz1, mat, ss):
     return ob
 
 
+def boulevard_markings(ya, yb, z, paint):
+    """En ville, le boulevard du quai que la conduite unique traverse vers le pont : un vrai boulevard à deux fois une
+    voie, axe en tirets (3 m peints, 6 m vides) et rives continues, interrompus dans le carrefour (la bouche de la rue
+    au sud, la tête de pont au nord, plus 1,5 m) ; peinture au ras de l'enrobé, à plat comme lui."""
+    y_s = ya - 3.2 + 0.25                  # la rive sud, 25 cm devant la bordure du trottoir de la rue
+    y_n = yb + 0.25                        # la rive nord, devant le trottoir du quai
+    y_c = (ya - 3.2 + yb) / 2              # l'axe
+    n = 0
+    for side in (-1, 1):
+        for y, x_in in ((y_s, HALF + road.KERB + 1.5), (y_n, QUAY_HALF + 1.5)):
+            x0, x1 = x_in, 100.0
+            road.plane(f"bd_rive_{side}_{n}", side * (x0 + x1) / 2, y, z, x1 - x0, 0.15, paint)
+            n += 1
+        x = QUAY_HALF + 1.5
+        while x + 3.0 <= 100.0:
+            road.plane(f"bd_axe_{side}_{n}", side * (x + 1.5), y_c, z, 3.0, 0.15, paint)
+            x += 9.0
+            n += 1
+    log(f"boulevard du quai : {n} marquages (axe en tirets, rives), interrompus dans le carrefour")
+
+
 def build_street_end(hidden):
     """Ce que la caméra regarde au-delà du barrage (de 40 à 500 m) : le boulevard du quai en travers et ses
     trottoirs, le quai et son garde-corps, l'eau, le pont qui part dans l'axe de la rue et monte, ses lampadaires
@@ -926,10 +947,18 @@ def build_street_end(hidden):
     paint = bpy.data.materials["rue_paint"]
     ya, yb = vw(0.0, S_STREET)[1], vw(0.0, S_QUAY)[1]
     # le boulevard (son enrobé sans marquage, au niveau du bord de la rue) et le passage piéton dans l'axe
-    road.plane("bd_asphalt", 0.0, (ya + yb) / 2, -road.CROWN - 0.002, 200.0, ya - yb, plaza)
+    z_bd = -road.CROWN - 0.002
+    road.plane("bd_asphalt", 0.0, (ya + yb) / 2, z_bd, 200.0, ya - yb, plaza)
     for k in range(8):
         x = -HALF + 0.55 + k * 0.98
-        road.decal_strip(f"bd_zebra_{k}", x, x + 0.5, ya - 3.4, ya - 0.6, paint)
+        if VILLE:
+            # (à plat sur le boulevard : bombées comme la rue, les bandes flottaient de 3 cm au milieu, sous la caméra
+            # qui les passe désormais à 4 m)
+            road.plane(f"bd_zebra_{k}", x + 0.25, ya - 2.0, z_bd + 0.002, 0.5, 2.8, paint)
+        else:
+            road.decal_strip(f"bd_zebra_{k}", x, x + 0.5, ya - 3.4, ya - 0.6, paint)
+    if VILLE:
+        boulevard_markings(ya, yb, z_bd + 0.002, paint)
     # les trottoirs du boulevard : devant les immeubles d'angle (le côté de la rue) et le long du quai
     for side in (-1, 1):
         x0, x1 = sorted((side * (HALF + road.KERB), side * 100.0))
