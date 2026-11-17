@@ -361,7 +361,9 @@ def mat_asphalt(st, name, force_patch=False, layout=None, uv=False):
     # --- marquages : double axe de 15 cm (écart 15 cm), tirets, rives ; ébréchés et usés
     xw = N.math("ADD", ax, N.math("MULTIPLY", N.math("SUBTRACT", noise(N, P, 7.0, 3.0), 0.5), 0.018))
     yj = N.math("ADD", ly, N.math("MULTIPLY", N.math("SUBTRACT", noise(N, P, 5.0, 2.0), 0.5), 0.05))
-    dm = N.math("FLOORED_MODULO", N.math("ADD", yj, 1.3), 12.0)
+    # tirets de 3 m au pas de 9 m (12 m avant le 18 novembre : à 100 km/h, 3 par seconde au lieu de 2 sous la
+    # caméra ; le pas du boulevard du quai et du port), comme plots et catadioptres (reperes.py) : la vitesse au sol
+    dm = N.math("FLOORED_MODULO", N.math("ADD", yj, 1.3), 9.0)
     dash = N.math("MULTIPLY", smooth(N, dm, 0.0, 0.03), inv(N, smooth(N, dm, 3.0, 3.03)))
     marks = []
     if lay["centre"] is not None:
