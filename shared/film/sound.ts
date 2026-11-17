@@ -358,14 +358,18 @@ export function filmScore(plan: FilmPlan): FilmScore {
     }
   }
 
-  // ---- chaque étoile : le coup sourd, la cymbale (dès la deuxième), le tintement, la radio
+  // ---- chaque étoile : le coup sourd, la cymbale (dès la deuxième), le tintement, la radio. Le canal se
+  // referme 28 images après l'étoile, sauf si l'interception (ou le gel) a déjà pris la radio : l'étoile 1
+  // tombe 19 images avant l'interception à une étoile, l'étoile 5 21 images avant à cinq (§18.56) ; sa
+  // fermeture grésillerait au milieu de « Interception : barrage en place ».
+  const lineEnd = plan.intercept ?? plan.freeze;
   for (const s of plan.stars) {
     push("boom", s.frame, { vel: 0.55 + 0.07 * s.star, dur: 0.7, layer: 0 });
     if (s.star >= 2) push("crash", s.frame, { vel: 0.8, layer: 2 });
     push("chime", s.frame, { notes: [CHIMES[s.star - 1]], vel: 0.8, dur: 1.3 });
     push("radio", s.frame + 2, { dur: 0.34, vel: 0.7 });
     push("beep", s.frame + 5, { vel: 0.7 });
-    push("radio", s.frame + 28, { dur: 0.12, vel: 0.45 });
+    if (s.frame + 28 < lineEnd) push("radio", s.frame + 28, { dur: 0.12, vel: 0.45 });
   }
 
   // ---- l'interception (une à cinq étoiles) : la radio grésille sur sa ligne ; l'étoile suivante clignote deux

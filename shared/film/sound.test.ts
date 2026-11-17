@@ -91,8 +91,16 @@ describe("les repères", () => {
     const intercept = plan.intercept === null ? 0 : 1;
     expect(intercept).toBe(n < 6 ? 1 : 0);
     expect(of("beep")).toHaveLength(n + 1 + intercept);
-    expect(of("radio")).toHaveLength(2 * n + 1 + intercept);
-    if (plan.intercept !== null) expect(of("radio").map((e) => e.frame)).toContain(plan.intercept);
+    // le canal d'une étoile se referme avant l'interception, jamais pendant : à une et cinq étoiles, la
+    // dernière étoile tombe moins de 28 images avant elle, sa fermeture saute
+    const closes = plan.stars.filter((s) => s.frame + 28 < (plan.intercept ?? plan.freeze)).length;
+    expect(closes).toBe(n === 1 || n === 5 ? n - 1 : n);
+    expect(of("radio")).toHaveLength(n + closes + 1 + intercept);
+    if (plan.intercept !== null) {
+      expect(of("radio").map((e) => e.frame)).toContain(plan.intercept);
+      // rien ne grésille sur la ligne d'interception, de son ouverture au gel
+      expect(of("radio").filter((e) => e.frame > plan.intercept! && e.frame <= plan.freeze)).toHaveLength(0);
+    }
     // plus de coupe, plus de claquement de coupe (§18.56) : un seul coup, une image après le gel
     expect(of("snap")).toHaveLength(0);
     const impact = plan.freeze + 1;
