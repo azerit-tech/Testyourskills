@@ -235,12 +235,12 @@ export function filmNet(): { bytes: number; bps: number | null; firstStart: numb
 
 /**
  * Dès le premier contact avec le formulaire, puis pendant l'attente (§5.4) :
- * la poursuite, puis la fin la plus probable, en basse priorité. Avec le
- * niveau (la fiche est prête) : seule la fin utile, l'autre est abandonnée.
+ * la poursuite, en basse priorité ; la fin de six étoiles seulement quand le
+ * niveau la demande (de une à cinq, la fin se joue sur place, §18.53).
  */
 export function preloadFilm(level?: number): void {
   if (!canPlayFilm()) return;
   const { load, drop } = endingToLoad(level);
   if (drop) dropFilmFile(drop);
-  void loadFilmFiles(["poursuite", load]).catch(() => undefined);
+  void loadFilmFiles(load ? ["poursuite", load] : ["poursuite"]).catch(() => undefined);
 }

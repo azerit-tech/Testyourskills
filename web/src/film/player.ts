@@ -1,14 +1,22 @@
 // Le lecteur du film (§18.36, docs/cinematique-poursuite.md §5.2 à §5.6) : deux
 // balises <video muted playsinline> (unlock.ts), A pour la poursuite (toujours
-// le fichier entier, six étoiles), B pour la fin (`fin` ou `fin6`), chargées en
-// entier avant de jouer (fetch puis Blob, loader.ts, dans la variante que le
-// débit mesuré a choisie). L'horloge du film est celle de la
+// le fichier entier, six étoiles), B pour la fin à six étoiles (`fin6`),
+// chargées en entier avant de jouer (fetch puis Blob, loader.ts, dans la
+// variante que le débit mesuré a choisie). L'horloge du film est celle de la
 // vidéo : t = image présentée de A, puis coupe + image présentée de B, puis
 // l'horloge du navigateur pour le gel et le flash. Le HUD ne peut pas se
-// décaler de l'image. La coupe au niveau : quand A présente la dernière image
-// du dernier plan joué, le cache la couvre (l'éclair crème de la coupe, §18.39 ;
-// « l'encre » dans ce fichier), A s'arrête, B part et passe devant ; le cache
-// reste jusqu'à la première image de B (deux images au plus).
+// décaler de l'image.
+// De une à cinq étoiles, la fin se joue sur place (§18.53) : B ne sert pas.
+// A s'arrête un peu avant la frontière (APPROACH), pas dessus : la balise
+// garde une image d'avance, même en pause, et un téléphone chargé saute des
+// images ; attendre la dernière image du plan laissait passer le plan suivant
+// (mesuré : une image). Arrêtée, A est replacée sur la dernière image du plan,
+// puis, à l'instant du gel, l'arrêt sur image (la toile tirée de cette même
+// image pendant la préparation, freeze.ts) passe devant.
+// À six étoiles, la coupe : quand A présente la dernière image de P6, le cache
+// la couvre (l'éclair crème de la coupe, §18.39 ; « l'encre » dans ce
+// fichier), A s'arrête, B part et passe devant ; le cache reste jusqu'à la
+// première image de B (deux images au plus).
 // Le chien de garde (watchdog.ts, §5.5) : une erreur de balise, une pause non
 // demandée ou une horloge figée plus de 1,5 s pendant la lecture : une
 // relance, puis le flash et la fiche. Jamais d'image figée ni d'écran noir.
@@ -68,9 +76,19 @@ interface Options {
   host: HTMLElement;
   /** Le cache de la bascule (l'éclair crème), piloté sans attendre React. */
   cover: HTMLElement;
+  /**
+   * L'arrêt sur image (la toile de freeze.ts) : de une à cinq étoiles, le
+   * lecteur le montre lui-même, sans attendre React, à l'instant du gel.
+   */
+  still?: HTMLCanvasElement | null;
   /** À chaque rafraîchissement pendant la lecture, et à chaque seek. */
   onTime(t: number): void;
-  /** Pendant la préparation, la balise de fin posée sur sa dernière image : l'arrêt sur image se tire là, hors de la lecture. */
+  /**
+   * Pendant la préparation, la balise posée sur l'image à geler (la dernière
+   * de la fin à six étoiles, la dernière du dernier plan joué de une à cinq) :
+   * l'arrêt sur image se tire là, hors de la lecture. Rappelé au gel sur place
+   * si la toile n'a pas pu se tirer avant.
+   */
   onStill?(video: HTMLVideoElement): void;
 }
 
@@ -82,7 +100,13 @@ type FrameVideo = HTMLVideoElement & {
 };
 
 const FRAME_MS = 1000 / FPS;
-/** Le gel part un peu avant la fin prévue de la dernière image de la fin : elle reste à l'écran. */
+/**
+ * Gel sur place : A s'arrête dès cette image-là avant la dernière du plan, et
+ * tient la dernière. Deux images (83 ms) : une image d'avance de la balise,
+ * plus une image sautée ; la dernière est tenue un instant de plus en couleur.
+ */
+const APPROACH = 2;
+/** Six étoiles : le gel part un peu avant la fin prévue de la dernière image de FIN6 : elle reste à l'écran. */
 const TAIL_LEAD_MS = 12;
 
 const once = (v: HTMLVideoElement, ok: string, ms = 8000) =>
@@ -107,7 +131,7 @@ const once = (v: HTMLVideoElement, ok: string, ms = 8000) =>
 
 const twoFrames = () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
 
-export function createFilmPlayer({ plan, host, cover, onTime, onStill }: Options): FilmPlayer {
+export function createFilmPlayer({ plan, host, cover, still = null, onTime, onStill }: Options): FilmPlayer {
   const [a, b] = filmVideos() as [FrameVideo, FrameVideo];
   let q: Quality = filmVariant();
   const rvfc = typeof a.requestVideoFrameCallback === "function";
@@ -115,6 +139,10 @@ export function createFilmPlayer({ plan, host, cover, onTime, onStill }: Options
   const unlocksAtStart = filmUnlocks();
   const cutT = plan.cut / FPS;
   const tailFromT = (plan.cut + plan.endVideo) / FPS;
+  /** Une à cinq étoiles : pas de fin tournée, le gel se fait sur place, sur A. */
+  const inPlace = plan.ending === null;
+  /** Les balises qui jouent. */
+  const used: FrameVideo[] = inPlace ? [a] : [a, b];
 
   let mode: Mode = "chase";
   let running = false;
@@ -157,6 +185,11 @@ export function createFilmPlayer({ plan, host, cover, onTime, onStill }: Options
     v.style.visibility = "hidden";
   }
   host.prepend(a, b);
+  // la toile d'un film précédent ne sert pas à celui-ci
+  if (still) {
+    delete still.dataset.ready;
+    still.style.visibility = "";
+  }
 
   const show = (which: "chase" | "ending") => {
     a.style.visibility = which === "chase" ? "visible" : "hidden";
@@ -169,6 +202,11 @@ export function createFilmPlayer({ plan, host, cover, onTime, onStill }: Options
   const coverOn = (on: boolean) => {
     cover.style.opacity = on ? "1" : "0";
   };
+  /** L'arrêt sur image posé par le lecteur (gel sur place) ; sinon, la feuille de style le montre au gel du HUD. */
+  const stillOn = (on: boolean) => {
+    if (still) still.style.visibility = on ? "visible" : "";
+  };
+  const stillReady = () => !!still && still.dataset.ready !== undefined;
   /** Une pause demandée par le lecteur : le chien de garde ne la prend pas pour un incident. */
   const halt = (v: HTMLVideoElement) => {
     if (!v.paused) asked.add(v);
@@ -221,14 +259,18 @@ export function createFilmPlayer({ plan, host, cover, onTime, onStill }: Options
       if (running && mode === "chase") {
         if (aLastK >= 0 && k > aLastK + 1) skipped += k - aLastK - 1;
         if (startMs === null && playFrom && k > playK) startMs = Math.max(0, md.expectedDisplayTime - playFrom);
-        // La coupe dès que la dernière image du plan est présentée : l'encre est
-        // posée dans ce même rafraîchissement, avant que A n'ait pu présenter le
-        // plan suivant (A en garde une image d'avance, même en pause).
-        if (k >= plan.cut - 1) {
+        // Dès que la dernière image du plan est présentée : le gel sur place (une
+        // à cinq étoiles) ou l'encre de la coupe (six), posés dans ce même
+        // rafraîchissement, avant que A n'ait pu présenter le plan suivant (A en
+        // garde une image d'avance, même en pause).
+        if (k >= plan.cut - 1 - (inPlace ? APPROACH : 0)) {
           if (k >= plan.cut) leaked++;
           aLastK = k;
-          aShown = (plan.cut - 1) / FPS;
-          toEnding(md.expectedDisplayTime);
+          if (inPlace) toFreeze(k, performance.now());
+          else {
+            aShown = (plan.cut - 1) / FPS;
+            toEnding(md.expectedDisplayTime);
+          }
           watchA();
           return;
         }
@@ -264,6 +306,28 @@ export function createFilmPlayer({ plan, host, cover, onTime, onStill }: Options
     return tailBase + (now - tailSince) / 1000;
   }
 
+  /**
+   * L'approche du gel sur place (une à cinq étoiles), `k` : l'image à l'écran.
+   * A s'arrête et se replace sur la dernière image du dernier plan joué ;
+   * l'horloge continue depuis `k`, et la toile passera devant au gel (tick).
+   */
+  const toFreeze = (k: number, now: number) => {
+    dog.disarm();
+    halt(a);
+    place(a, plan.cut - 1);
+    mode = "tail";
+    tailBase = Math.min(k, plan.cut - 1) / FPS;
+    tailSince = now;
+  };
+  /**
+   * Au gel sur place, la toile passe devant A, sans attendre React. Pas tirée
+   * pendant la préparation : elle se tire ici, sur A posée sur l'image à geler ;
+   * sinon A reste sur cette image, en couleur.
+   */
+  const freezeInPlace = () => {
+    if (!stillReady() && !a.seeking) onStill?.(a);
+    if (stillReady()) stillOn(true);
+  };
   /** La coupe (`from` : l'instant où l'encre paraît) : l'encre d'abord, A s'arrête, B part et passe devant. */
   const toEnding = (from: number) => {
     coverOn(true);
@@ -298,8 +362,11 @@ export function createFilmPlayer({ plan, host, cover, onTime, onStill }: Options
     raf = 0;
     if (!running || disposed) return;
     if (mode === "chase") {
-      // sans suivi image par image : au début de la dernière image du plan
-      if (a.ended || (!rvfc && a.currentTime >= (plan.cut - 1) / FPS)) toEnding(now);
+      if (inPlace) {
+        // l'horloge de A, relue à chaque rafraîchissement : le filet si des images ont sauté sans rappel
+        const k = Math.floor(a.currentTime * FPS);
+        if (a.ended || k >= plan.cut - 1 - APPROACH) toFreeze(k, now);
+      } else if (a.ended || (!rvfc && a.currentTime >= (plan.cut - 1) / FPS)) toEnding(now);
     } else if (mode === "ending") {
       const due = rvfc ? tailAt > 0 && now >= tailAt - TAIL_LEAD_MS : b.currentTime >= (plan.endVideo - 0.5) / FPS;
       if (due || b.ended) toTail(now);
@@ -308,6 +375,7 @@ export function createFilmPlayer({ plan, host, cover, onTime, onStill }: Options
     const v = active();
     if (v && dog.watching) react(dog.check(now, v.currentTime), v);
     const t = time(now);
+    if (inPlace && mode === "tail" && !aborted && t >= plan.freeze / FPS - 1e-6 && still?.style.visibility !== "visible") freezeInPlace();
     if (t >= plan.duration) {
       over = true;
       running = false;
@@ -378,20 +446,20 @@ export function createFilmPlayer({ plan, host, cover, onTime, onStill }: Options
       // la fin qui ne jouera pas cède la place, même chargée en avance pendant l'attente
       const { drop } = endingToLoad(plan.level);
       if (drop) dropFilmFile(drop);
-      const loaded = await loadFilmFiles(["poursuite", plan.ending]);
-      const [srcA, srcB] = loaded.urls;
+      const loaded = await loadFilmFiles(plan.ending ? ["poursuite", plan.ending] : ["poursuite"]);
       q = loaded.quality;
       if (disposed) throw new Error("film: abandonné");
-      for (const [v, src] of [[a, srcA], [b, srcB]] as const) {
+      used.forEach((v, i) => {
+        const src = loaded.urls[i];
         if (v.getAttribute("src") !== src) {
           v.src = src;
           v.load();
         }
-      }
-      await Promise.all([a, b].map((v) => (v.readyState >= 2 ? Promise.resolve() : once(v, "loadeddata"))));
+      });
+      await Promise.all(used.map((v) => (v.readyState >= 2 ? Promise.resolve() : once(v, "loadeddata"))));
       // La lecture sans geste est-elle permise ? (iPhone en économie d'énergie : non.)
       let gesture = false;
-      for (const v of [a, b]) {
+      for (const v of used) {
         try {
           await tryPlay(v);
         } catch (e) {
@@ -402,20 +470,21 @@ export function createFilmPlayer({ plan, host, cover, onTime, onStill }: Options
       }
       if (disposed) throw new Error("film: abandonné");
       if (onStill) {
+        // l'image à geler : la dernière de la fin, ou la dernière du dernier plan joué
+        const [v, frame] = inPlace ? [a, plan.cut - 1] : [b, plan.endVideo - 1];
         try {
-          place(b, plan.endVideo - 1);
-          if (b.seeking) await once(b, "seeked", 3000);
-          if (!disposed) onStill(b);
+          place(v, frame);
+          if (v.seeking) await once(v, "seeked", 3000);
+          if (!disposed) onStill(v);
         } catch {
           /* l'arrêt sur image se tirera au gel, sur l'image à l'écran */
         }
       }
-      place(a, 0);
-      place(b, 0);
-      await Promise.all([a, b].map((v) => (v.seeking ? once(v, "seeked") : Promise.resolve())));
+      for (const v of used) place(v, 0);
+      await Promise.all(used.map((v) => (v.seeking ? once(v, "seeked") : Promise.resolve())));
       show("chase");
       watchA();
-      watchB();
+      if (!inPlace) watchB();
       await twoFrames();
       prepared = true;
       return gesture ? "gesture" : "ready";
@@ -428,13 +497,25 @@ export function createFilmPlayer({ plan, host, cover, onTime, onStill }: Options
       tailAt = 0;
       over = false;
       coverOn(false);
-      if (f < plan.cut) {
+      stillOn(false);
+      if (f < Math.min(plan.cut, plan.freeze)) {
         mode = "chase";
-        halt(b);
-        place(b, 0);
+        if (!inPlace) {
+          halt(b);
+          place(b, 0);
+        }
         place(a, f);
         aShown = f / FPS;
         aLastK = -1;
+        show("chase");
+      } else if (inPlace) {
+        // le gel sur place : A sur la dernière image du dernier plan joué, la toile devant
+        mode = "tail";
+        halt(a);
+        place(a, plan.cut - 1);
+        tailBase = T;
+        tailSince = performance.now();
+        stillOn(stillReady());
         show("chase");
       } else if (f < plan.cut + plan.endVideo) {
         mode = "ending";

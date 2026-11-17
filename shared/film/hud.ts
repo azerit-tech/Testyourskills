@@ -12,7 +12,7 @@ export interface StarHud {
   on: boolean;
   /** 1,5 au claquement, puis 1. */
   scale: number;
-  /** L'étoile en suspens, juste avant la coupe : jamais pleine, son contour seul, à cette
+  /** L'étoile en suspens, juste avant le gel : jamais pleine, son contour seul, à cette
    * opacité (0,6 au battement, 0,25 entre deux). Absente le reste du film. */
   pending?: number;
 }
@@ -35,7 +35,7 @@ export interface Hud {
   radio: { text: string; kicker: string | null; square: "coral" | "lilac" } | null;
   /** Fermeture des bandes d'encre : 0 ouvertes, 1 fermées. */
   bands: number;
-  /** Les deux images de l'éclair de la bascule vers la fin (le nom vient de l'encre qui les couvrait d'abord). */
+  /** Les deux images de l'éclair de la bascule vers la fin, à six étoiles (le nom vient de l'encre qui les couvrait d'abord). */
   ink: boolean;
   /** L'arrêt sur image : deux tons, plaque et titre (échelle du claquement, 1,2 à 1). */
   freeze: { titleScale: number } | null;
@@ -62,7 +62,9 @@ export function hudAt(plan: FilmPlan, t: number, lang: Lang): Hud {
   const f = Math.max(0, t * FPS);
   const frame = Math.floor(f + 1e-6);
   const { cut, freeze, flash } = plan;
-  const phase: FilmPhase = frame < cut ? "chase" : frame < freeze ? "ending" : frame < flash.from ? "freeze" : frame < flash.to ? "flash" : "over";
+  // De une à cinq étoiles, pas de fin tournée : le gel (cut - 1) suit la poursuite, sans phase « ending ».
+  const phase: FilmPhase = frame >= flash.to ? "over" : frame >= flash.from ? "flash" : frame >= freeze ? "freeze" : frame < cut ? "chase" : "ending";
+  const onEnding = plan.ending !== null && frame >= cut;
   const landed = frame >= flash.peak;
 
   // Les étoiles de la poursuite, chacune sur sa coupe.
@@ -91,7 +93,7 @@ export function hudAt(plan: FilmPlan, t: number, lang: Lang): Hud {
   }
 
   // La radio : muette à l'ouverture, une ligne par étoile, l'interception juste
-  // avant la coupe (une à cinq étoiles) et pendant la fin, puis la fin de course au gel.
+  // avant le gel (une à cinq étoiles), puis la fin de course au gel.
   const r = plan.radio[lang];
   const intercepted = plan.intercept !== null && frame >= plan.intercept;
   const beat = (phase === "chase" || phase === "ending") && !intercepted && lit > 0 ? lit - 1 : -1;
@@ -110,14 +112,16 @@ export function hudAt(plan: FilmPlan, t: number, lang: Lang): Hud {
   return {
     frame,
     phase,
-    shot: phase === "chase" ? chaseShotAt(frame) : ENDINGS[plan.ending].shot,
-    video: landed ? null : phase === "chase" ? "chase" : "ending",
-    videoFrame: phase === "chase" ? frame : Math.min(frame - cut, plan.endVideo - 1),
+    shot: onEnding && plan.ending ? ENDINGS[plan.ending].shot : chaseShotAt(Math.min(frame, cut - 1)),
+    video: landed ? null : onEnding ? "ending" : "chase",
+    // gelée sur place, la poursuite reste sur la dernière image de son dernier plan
+    videoFrame: onEnding ? Math.min(frame - cut, plan.endVideo - 1) : Math.min(frame, cut - 1),
     stars,
     lit,
     radio,
     bands,
-    ink: frame >= cut - 1 && frame < cut - 1 + CUT_INK,
+    // l'éclair de la coupe vers la fin : six étoiles seulement, de une à cinq il n'y a pas de coupe
+    ink: plan.ending !== null && frame >= cut - 1 && frame < cut - 1 + CUT_INK,
     freeze: frozen ? { titleScale: frame - freeze < TITLE_POP ? TITLE_FROM - ((TITLE_FROM - 1) * (frame - freeze)) / TITLE_POP : 1 } : null,
     flash: flashOpacity,
     shake,

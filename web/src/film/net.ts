@@ -118,13 +118,15 @@ export class RateMeter {
 }
 
 /**
- * La fin à charger. Niveau inconnu (l'attente) : `fin`, la plus probable,
- * après la poursuite. Niveau connu : seule la fin utile ; l'autre, si elle est
- * en cours ou en file, est abandonnée (`drop`).
+ * La fin à charger après la poursuite. De une à cinq étoiles, aucune : la fin
+ * se joue sur place (§18.53). Niveau inconnu (l'attente) : aucune non plus,
+ * six étoiles est rare. Six étoiles : `fin6`. Une à cinq étoiles connues :
+ * `fin6`, si elle est en cours ou en file (une fiche à six étoiles plus tôt
+ * dans la page), est abandonnée (`drop`).
  */
-export function endingToLoad(level?: number): { load: EndingId; drop: EndingId | null } {
-  if (level === undefined) return { load: "fin", drop: null };
-  return level === 6 ? { load: "fin6", drop: "fin" } : { load: "fin", drop: "fin6" };
+export function endingToLoad(level?: number): { load: EndingId | null; drop: EndingId | null } {
+  if (level === 6) return { load: "fin6", drop: null };
+  return { load: null, drop: level === undefined ? null : "fin6" };
 }
 
 /** Fiche prête, sans mesure du débit (ou tout reçu, en décodage) : le film a ce temps d'onglet visible pour être prêt. */

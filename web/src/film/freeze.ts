@@ -1,5 +1,6 @@
 // L'arrêt sur image en deux tons (§18.36, docs/cinematique-poursuite.md §3.3) :
-// la dernière image de la fin, tirée comme une affiche sérigraphiée. La berline
+// la dernière image de la fin (six étoiles) ou du dernier plan joué (une à
+// cinq, le gel sur place du §18.53), tirée comme une affiche sérigraphiée. La berline
 // sort en teinte claire, le fond s'efface dans la teinte d'ombre, la toise
 // passe derrière elle.
 //
@@ -201,10 +202,14 @@ export function paintStill(video: HTMLVideoElement, canvas: HTMLCanvasElement | 
   }
 }
 
-/** Au gel : si l'arrêt sur image n'a pas été préparé pendant l'attente, il se fait sur l'image à l'écran. */
-export function ensureStill(canvas: HTMLCanvasElement | null, tone: FreezeTone): void {
+/**
+ * Au gel : si l'arrêt sur image n'a pas été préparé pendant l'attente, il se
+ * fait sur l'image à l'écran, celle de la poursuite pour le gel sur place
+ * (`inPlace`), celle de la fin sinon.
+ */
+export function ensureStill(canvas: HTMLCanvasElement | null, tone: FreezeTone, inPlace = false): void {
   if (!canvas || canvas.dataset.ready !== undefined) return;
-  const v = filmVideos()[1];
+  const v = filmVideos()[inPlace ? 0 : 1];
   if (v.seeking) v.addEventListener("seeked", () => paintStill(v, canvas, tone), { once: true });
   else paintStill(v, canvas, tone);
 }

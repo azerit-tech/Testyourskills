@@ -8,7 +8,7 @@ export const FPS = 24;
 /** Les plans de la poursuite, dans l'ordre du fichier `poursuite` : l'ouverture, puis un plan par étoile. */
 export const CHASE_SHOTS = ["OUV", "P1", "P2", "P3", "P4", "P5", "P6"] as const;
 export type ChaseShot = (typeof CHASE_SHOTS)[number];
-/** Les deux fins : `fin` (une à cinq étoiles), `fin6` (six étoiles, l'orbite). */
+/** Les fins tournées : `fin6` (six étoiles, l'orbite) ; `fin`, l'ancienne fin à la pointe, n'est plus jouée (17 novembre 2026). */
 export type EndingId = "fin" | "fin6";
 export type ShotId = ChaseShot | "FIN" | "FIN6";
 
@@ -35,6 +35,13 @@ export const ENDINGS: Record<EndingId, EndingCut> = {
 
 /** Total d'une fin, en images : 76 pour FIN, 104 pour FIN6. */
 export const endingFrames = (e: EndingId): number => ENDINGS[e].video + ENDINGS[e].freeze + ENDINGS[e].flash;
+
+/**
+ * La fin sur place, de une à cinq étoiles (17 novembre 2026) : pas de vidéo de
+ * fin, l'arrêt sur image se fait sur la dernière image du dernier plan joué,
+ * là où est la berline. Mêmes gel et flash que l'ancienne fin à la pointe.
+ */
+export const IN_PLACE = { freeze: 14, flash: 10, rise: 4 } as const;
 
 /** Première image de chaque plan dans le fichier `poursuite`. */
 export const SHOT_START: Record<ChaseShot, number> = (() => {
@@ -65,13 +72,13 @@ export const SHAKE: readonly (readonly [number, number])[] = [
   [-1, 0],
 ];
 /**
- * Les deux images qui couvrent la bascule de la poursuite à la fin : la
- * dernière image du dernier plan joué et la première de la fin. Elles partent
- * de la dernière image de la poursuite : la balise en a toujours une d'avance,
- * et le plan suivant ne doit jamais paraître. Couvertes d'abord d'encre, elles
- * sont un éclair crème depuis le 14 novembre (§18.39) : deux images sombres
- * dans un film de nuit se lisaient comme une image perdue, l'éclair assume la
- * coupe (le champ `ink` du HUD garde son nom).
+ * Les deux images qui couvrent la bascule de la poursuite à la fin, à six
+ * étoiles seulement (de une à cinq, il n'y a plus de coupe : la fin se joue sur
+ * place) : la dernière image de P6 et la première de FIN6. Elles partent de la
+ * dernière image de la poursuite : la balise en a toujours une d'avance.
+ * Couvertes d'abord d'encre, elles sont un éclair crème depuis le 14 novembre
+ * (§18.39) : deux images sombres dans un film de nuit se lisaient comme une
+ * image perdue (le champ `ink` du HUD garde son nom).
  */
 export const CUT_INK = 2;
 /** Le grain bouge douze fois par seconde : une nouvelle position toutes les deux images. */
@@ -79,15 +86,15 @@ export const GRAIN_STEP = 2;
 /** Le carré de la radio alterne corail et lilas toutes les six images (deux fois par seconde chacun). */
 export const SQUARE_STEP = 6;
 /**
- * L'interception, de une à cinq étoiles (§18.39) : la ville est continue, le
- * saut du dernier plan joué à la pointe se voit ; il est assumé. Tant
- * d'images avant la coupe vers la fin, la radio annonce l'interception et
- * l'étoile suivante clignote ; elle s'éteint avant l'éclair de la coupe.
+ * L'interception, de une à cinq étoiles (§18.39) : tant d'images avant la fin
+ * du dernier plan joué, la radio annonce l'interception et l'étoile suivante
+ * clignote ; elle s'éteint avant l'arrêt sur image, posé sur place.
  */
 export const INTERCEPT_LEAD = 12;
 /**
  * L'étoile suivante clignote deux fois et reste éteinte : allumée sur ces
- * intervalles d'images, comptés depuis la coupe (négatifs : avant elle).
+ * intervalles d'images, comptés depuis la fin du dernier plan joué (négatifs :
+ * avant elle).
  */
 export const FLICKER_ON: readonly (readonly [number, number])[] = [
   [-12, -9],

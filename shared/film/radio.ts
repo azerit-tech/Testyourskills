@@ -52,7 +52,7 @@ export interface Radio {
   beats: string[];
   /** L'étiquette posée au-dessus de chaque ligne, ou null : seul le chef d'accusation en porte une. */
   kickers: (string | null)[];
-  /** L'interception, juste avant la coupe vers la fin (une à cinq étoiles, §18.39). */
+  /** L'interception, juste avant le gel sur place (une à cinq étoiles, §18.39, §18.53). */
   intercept: string;
   /** La ligne du gel : la course est finie, le dossier s'ouvre (le niveau est déjà écrit en grand). */
   end: string;

@@ -98,10 +98,12 @@
 }
 
 /* L'arrêt sur image en deux tons (le traitement des visages de la couverture) :
-   une toile tirée de la dernière image de la fin pendant l'attente (freeze.ts),
-   cadrée comme la vidéo. La berline en teinte claire, le fond dans la teinte
-   d'ombre, la toise derrière elle. Sans toile (lecture refusée), l'image reste
-   en couleur. Ni vignette par-dessus : deux tons, pas trois. */
+   une toile tirée pendant l'attente (freeze.ts) de la dernière image jouée : celle
+   du dernier plan de une à cinq étoiles (le lecteur la pose lui-même, au gel sur
+   place, §18.53), celle de FIN6 à six. Cadrée comme la vidéo. La berline en
+   teinte claire, le fond dans la teinte d'ombre, la toise derrière elle. Sans
+   toile (lecture refusée), l'image reste en couleur. Ni vignette par-dessus :
+   deux tons, pas trois. */
 .film-still {
   visibility: hidden;
 }
@@ -128,7 +130,7 @@
 .film-vignette {
   background: radial-gradient(120% 90% at 50% 50%, transparent 55%, rgb(12 13 27 / 0.5) 100%);
 }
-/* l'éclair de la coupe vers la fin (HUD, deux images, §18.39), et le cache du
+/* l'éclair de la coupe vers FIN6 (HUD, deux images, six étoiles, §18.39), et le cache du
    lecteur si la fin tarde : la même couleur, pour que l'attente d'une image
    prolonge l'éclair au lieu de tomber au noir. Sous les bandes : les étoiles et
    la radio restent lisibles. */

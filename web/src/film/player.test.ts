@@ -85,6 +85,8 @@ class FakeVideo extends EventTarget {
 }
 
 const div = () => ({ style: {} as Record<string, string>, prepend: () => undefined });
+/** La toile de l'arrêt sur image : `dataset.ready` posé quand elle est tirée. */
+const canvas = () => ({ style: {} as Record<string, string>, dataset: {} as Record<string, string> });
 
 beforeEach(() => {
   videos.length = 0;
@@ -107,37 +109,98 @@ afterEach(() => {
   vi.resetModules();
 });
 
-async function started(level = 3) {
+const OVERALL: Record<number, number> = { 1: 12, 3: 50, 6: 93 };
+
+async function started(level = 3, paints = true) {
   const { createFilmPlayer } = await import("./player");
-  const overall = { 1: 12, 3: 50, 6: 93 }[level] ?? 50;
-  const plan = filmPlan({ ...FIXTURES.silver, id: "f", overall });
+  const plan = filmPlan({ ...FIXTURES.silver, id: "f", overall: OVERALL[level] ?? 50 });
   let last = 0;
-  const p = createFilmPlayer({ plan, host: div() as unknown as HTMLElement, cover: div() as unknown as HTMLElement, onTime: (t) => (last = t) });
+  const still = canvas();
+  const p = createFilmPlayer({
+    plan,
+    host: div() as unknown as HTMLElement,
+    cover: div() as unknown as HTMLElement,
+    still: still as unknown as HTMLCanvasElement,
+    onTime: (t) => (last = t),
+    onStill: () => {
+      if (paints) still.dataset.ready = "";
+    },
+  });
   const ready = p.prepare();
   await vi.advanceTimersByTimeAsync(200);
   expect(await ready).toBe("ready");
   p.play();
   const [a, b] = videos;
-  return { p, plan, a, b, now: () => last };
+  return { p, plan, a, b, still, now: () => last };
 }
 
 describe("l'arrêt sur image, tiré pendant la préparation", () => {
-  it("la balise de fin est montrée sur sa dernière image, puis remise au début", async () => {
+  it.each([
+    [1, 0],
+    [3, 0],
+    [6, 1],
+  ])("%i étoile(s) : la balise est montrée sur l'image à geler, puis remise au début", async (level, which) => {
     const { createFilmPlayer } = await import("./player");
-    const plan = filmPlan({ ...FIXTURES.silver, id: "f", overall: 50 });
-    const seen: number[] = [];
+    const plan = filmPlan({ ...FIXTURES.silver, id: "f", overall: OVERALL[level] });
+    const seen: [number, number][] = [];
     const p = createFilmPlayer({
       plan,
       host: div() as unknown as HTMLElement,
       cover: div() as unknown as HTMLElement,
       onTime: () => undefined,
-      onStill: (v) => seen.push(Math.floor(v.currentTime * FPS)),
+      onStill: (v) => seen.push([videos.indexOf(v as unknown as FakeVideo), Math.floor(v.currentTime * FPS)]),
     });
     const ready = p.prepare();
     await vi.advanceTimersByTimeAsync(200);
     expect(await ready).toBe("ready");
-    expect(seen).toEqual([plan.endVideo - 1]);
-    expect(Math.floor(videos[1].currentTime * FPS)).toBe(0);
+    // six étoiles : la dernière image de FIN6, sur la seconde balise ; sur place : la dernière du dernier plan joué
+    expect(seen).toEqual([[which, which === 1 ? plan.endVideo - 1 : plan.cut - 1]]);
+    expect(Math.floor(videos[which].currentTime * FPS)).toBe(0);
+  });
+});
+
+describe("le gel sur place, de une à cinq étoiles", () => {
+  it.each([1, 3])("%i étoile(s) : la poursuite s'arrête avant la frontière, tient la dernière image du plan, la toile passe devant au gel ; la fin ne joue pas", async (level) => {
+    const { p, plan, a, b, still, now } = await started(level);
+    expect(b.getAttribute("src")).toBeNull();
+    await vi.advanceTimersByTimeAsync(((plan.cut - 4) / FPS) * 1000);
+    expect(a.paused).toBe(false);
+    expect(still.style.visibility).not.toBe("visible");
+    // l'approche : A s'arrête deux images avant la dernière et se replace sur elle
+    await vi.advanceTimersByTimeAsync((1.5 / FPS) * 1000);
+    expect(a.paused).toBe(true);
+    expect(Math.floor(a.currentTime * FPS)).toBe(plan.cut - 1);
+    expect(now()).toBeLessThan(plan.freeze / FPS);
+    expect(still.style.visibility).not.toBe("visible");
+    // le gel : la toile devant, et jamais une image du plan suivant
+    await vi.advanceTimersByTimeAsync((3 / FPS) * 1000);
+    expect(now()).toBeGreaterThanOrEqual(plan.freeze / FPS);
+    expect(still.style.visibility).toBe("visible");
+    expect(Math.floor(a.currentTime * FPS)).toBe(plan.cut - 1);
+    expect(b.plays).toBe(0);
+    await vi.advanceTimersByTimeAsync(plan.duration * 1000);
+    expect(now()).toBe(plan.duration);
+    expect(a.currentTime).toBeLessThan(plan.cut / FPS);
+    expect(p.stats()).toMatchObject({ retries: 0, aborted: false, switchMs: null });
+  });
+
+  it("sans toile tirée : la poursuite est replacée sur la dernière image du dernier plan joué", async () => {
+    const { plan, a, still, now } = await started(1, false);
+    await vi.advanceTimersByTimeAsync((plan.cut / FPS) * 1000 + 200);
+    expect(now()).toBeGreaterThan(plan.freeze / FPS);
+    expect(still.style.visibility).not.toBe("visible");
+    expect(a.paused).toBe(true);
+    expect(Math.floor(a.currentTime * FPS)).toBe(plan.cut - 1);
+  });
+
+  it("seek : avant le gel, la poursuite sans toile ; au gel, la toile devant la dernière image jouée", async () => {
+    const { p, plan, a, still } = await started(3);
+    p.seek((plan.freeze + 2) / FPS);
+    expect(still.style.visibility).toBe("visible");
+    expect(Math.floor(a.currentTime * FPS)).toBe(plan.cut - 1);
+    p.seek(1);
+    expect(still.style.visibility).toBe("");
+    expect(Math.floor(a.currentTime * FPS)).toBe(FPS);
   });
 });
 
@@ -196,8 +259,8 @@ describe("le chien de garde, branché sur le lecteur", () => {
     expect(now()).toBeGreaterThanOrEqual(plan.flash.from / FPS);
   });
 
-  it("figée pendant la fin, après la bascule : le chien de garde suit la seconde balise", async () => {
-    const { p, plan, b, now } = await started(1);
+  it("six étoiles, figée pendant la fin, après la bascule : le chien de garde suit la seconde balise", async () => {
+    const { p, plan, b, now } = await started(6);
     await vi.advanceTimersByTimeAsync((plan.cut / FPS) * 1000 + 200);
     expect(now()).toBeGreaterThan(plan.cut / FPS);
     b.frozen = true;

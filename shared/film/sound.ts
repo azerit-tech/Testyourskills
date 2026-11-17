@@ -6,10 +6,11 @@
 // La musique : 120 à la noire, un temps = 12 images. Elle part sur la première
 // étoile (P1) ; chaque plan de la poursuite contient un nombre entier de temps
 // (P2, 110 images, en compte neuf : 117,8 à la noire, l'écart ne s'entend pas),
-// si bien que chaque coupe, chaque étoile et la coupe vers la fin tombent sur
+// si bien que chaque coupe, chaque étoile et la fin de la poursuite tombent sur
 // un temps. Une couche de plus par étoile, comme les renforts à l'image : nue
-// à une étoile, pleine à six. La coupe vers la fin l'arrête net sur un temps,
-// puis une nappe tient l'arrestation.
+// à une étoile, pleine à six. La fin de la poursuite l'arrête net sur un temps
+// (le gel sur place de une à cinq étoiles, la coupe vers FIN6 à six), puis une
+// nappe tient l'arrestation.
 //
 // Les bruitages : le moteur, les pneus et les deux dérapages suivent la conduite
 // de la berline (vitesses et glisses relevées sur tools/film3d/parcours.py, la
@@ -126,7 +127,7 @@ export const CURVES: readonly Curve[] = [
 export interface FilmScore {
   level: number;
   bpm: number;
-  /** La coupe vers la fin : la musique s'y arrête, sur un temps. */
+  /** La fin de la poursuite jouée (le temps qui suit le gel sur place, ou la coupe vers FIN6) : la musique s'y arrête. */
   cut: number;
   /** L'arrêt sur image : l'impact ; les bruits de la scène s'y taisent. */
   freeze: number;
@@ -347,17 +348,23 @@ export function filmScore(plan: FilmPlan): FilmScore {
   };
   if (plan.flicker) for (const [a] of plan.flicker.frames) push("deny", onGrid(a), { notes: [CHIMES[plan.flicker.star - 1]], vel: 0.5 });
 
-  // ---- la coupe vers la fin : un claquement sur l'éclair crème (sa première image, cut - 1), puis la musique
-  // s'arrête net sur le temps de la coupe et la nappe prend le relais
-  push("snap", cut - 1, { vel: 1 });
+  // ---- la fin de la poursuite : la musique s'arrête net sur le temps qui suit son dernier plan, la nappe prend le
+  // relais. Six étoiles : un claquement sur l'éclair crème de la coupe (sa première image, cut - 1), puis l'impact
+  // au gel de FIN6. Une à cinq : pas de coupe, l'image gèle sur place (freeze = cut - 1) ; un seul coup, l'impact,
+  // sur ce temps, une image après le gel (le son ne devance jamais l'image).
+  const inPlace = plan.ending === null;
+  if (!inPlace) push("snap", cut - 1, { vel: 1 });
   push("kick", cut, { vel: 1, layer: 0 });
   push("boom", cut, { vel: 1, dur: 1.4, layer: 0 });
   push("crash", cut, { vel: 1, layer: 0 });
+  if (inPlace) push("slam", cut, { vel: 1 });
   push("nappe", cut, { notes: level === 6 ? NAPPE_FIN6 : NAPPE_FIN, dur: (flash.peak - cut) / FPS, release: (flash.to - flash.peak) / FPS, vel: 1 });
 
-  // ---- l'arrêt sur image : l'impact, la radio de fin
-  push("boom", freeze, { vel: 1, dur: 1.2 });
-  push("slam", freeze, { vel: 1 });
+  // ---- l'arrêt sur image : l'impact (six étoiles ; sur place, il a sonné ci-dessus), la radio de fin
+  if (!inPlace) {
+    push("boom", freeze, { vel: 1, dur: 1.2 });
+    push("slam", freeze, { vel: 1 });
+  }
   push("radio", freeze + 3, { dur: 0.3, vel: 0.6 });
   push("beep", freeze + 6, { vel: 0.6 });
 
@@ -367,12 +374,11 @@ export function filmScore(plan: FilmPlan): FilmScore {
 
   events.sort((a, b) => a.frame - b.frame);
 
-  // ---- les courbes : la poursuite jusqu'à la coupe, la fin ensuite, le silence de la scène au gel
+  // ---- les courbes : la poursuite jusqu'au gel sur place (une à cinq étoiles) ou jusqu'à la coupe (six), le
+  // silence de la scène ensuite
   const V = plan.endVideo;
   const at = (keys: Keys) => (f: number) => keyAt(keys, f);
-  const rpmCut = keyAt(RPM, cut - 1);
-  const speedCut = keyAt(SPEED, cut - 1);
-  /** Le ralenti de l'arrestation : tout descend un peu, de la coupe au gel. */
+  /** Le temps qui ralentit dans l'orbite de FIN6 : les fréquences descendent un peu, de la coupe au gel. */
   const slow = (r: number) => keyAt([[0, 1], [14, 0.97], [V - 1, 0.8]], r);
   const chase: Record<Curve, (f: number) => number> = {
     rpm: at(RPM),
@@ -396,44 +402,38 @@ export function filmScore(plan: FilmPlan): FilmScore {
     rainTone: () => 9000,
     sfxTone: () => 18000,
   };
-  // L'arrestation (une à cinq étoiles) : la berline finit de freiner et cale au ralenti, les poursuivants restent
-  // autour, hors champ, selon le niveau. À six étoiles le temps est gelé : la scène se tait dès la coupe.
-  const frozen = level === 6;
-  const ending: Record<Curve, (r: number) => number> = {
+  // À six étoiles le temps est gelé dès la coupe : la scène se tait, seules les courbes posées (filtres,
+  // fréquences) suivent l'orbite. De une à cinq, elles restent sur la dernière image jouée.
+  const rpmCut = keyAt(RPM, cut - 1);
+  const ending: Record<Kept, (r: number) => number> = {
     rpm: (r) => keyAt([[0, rpmCut * 0.9], [8, 2600], [26, 950], [V - 1, 850]], r) * slow(r),
     load: () => 0.1,
-    engine: (r) => keyAt([[0, 0.75], [V - 1, 0.5]], r),
-    speed: (r) => keyAt([[0, speedCut], [24, 0]], r),
-    slip: (r) => keyAt([[0, 12], [5, 20], [16, 12], [26, 2], [32, 0]], r),
-    siren1: () => 0.5,
-    siren2: () => (level >= 2 ? 0.35 : 0),
-    siren3: () => (level >= 4 ? 0.3 : 0),
     siren1Hz: (r) => sirenHz(0, cut + r) * slow(r),
     siren2Hz: (r) => sirenHz(1, cut + r) * slow(r),
     siren3Hz: (r) => sirenHz(2, cut + r) * slow(r),
     sirenTone: () => 1400,
-    rotor: () => (level >= 4 ? 0.3 : 0),
-    rotor2: () => 0,
     rotorRate: (r) => 11 * slow(r),
-    jet: () => 0,
     jetTone: () => 500,
-    rain: (r) => keyAt([[0, 0.9], [V - 1, 0.65]], r),
     rainTone: (r) => keyAt([[0, 9000], [V - 1, 1500]], r),
     sfxTone: (r) => keyAt([[0, 18000], [12, 8000], [V - 1, 1300]], r),
   };
-  /** Les courbes qui restent posées quand la scène se tait (filtres, fréquences) ; les autres tombent à zéro. */
-  const KEEP = new Set<Curve>(["rpm", "load", "siren1Hz", "siren2Hz", "siren3Hz", "sirenTone", "rotorRate", "jetTone", "rainTone", "sfxTone"]);
+  /** La poursuite s'arrête : au gel sur place, ou à la coupe vers FIN6. */
+  const stop = Math.min(cut, freeze);
   const curve = (name: Curve, frame: number): number => {
     const f = Math.floor(frame);
-    if (f < cut) return chase[name](f);
-    const silent = f >= freeze || frozen;
-    if (silent && !KEEP.has(name)) return 0;
-    return ending[name](Math.min(f, freeze - 1) - cut);
+    if (f < stop) return chase[name](f);
+    if (!isKept(name)) return 0;
+    return inPlace ? chase[name](stop - 1) : ending[name](Math.min(f, freeze - 1) - cut);
   };
 
   const layers = plan.stars.map((s) => ({ layer: s.star, from: s.frame, to: cut }));
   return { level, bpm: BPM, cut, freeze, frames: end, duration: end / FPS, beats, events, layers, curve };
 }
+
+/** Les courbes qui restent posées quand la scène se tait (filtres, fréquences) ; les autres tombent à zéro. */
+const KEPT = ["rpm", "load", "siren1Hz", "siren2Hz", "siren3Hz", "sirenTone", "rotorRate", "jetTone", "rainTone", "sfxTone"] as const;
+type Kept = (typeof KEPT)[number];
+const isKept = (c: Curve): c is Kept => (KEPT as readonly Curve[]).includes(c);
 
 /** Les événements d'une fenêtre [from, to) en secondes du film. */
 export function eventsBetween(score: FilmScore, from: number, to: number): SoundEvent[] {

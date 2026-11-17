@@ -35,6 +35,9 @@ import "../film/film.css";
 
 export { preloadFilm } from "../film/player";
 
+/** Les fichiers que joue un plan : la poursuite, et la fin tournée à six étoiles. */
+const filmFiles = (plan: FilmPlan): FileId[] => (plan.ending ? ["poursuite", plan.ending] : ["poursuite"]);
+
 /** Fiche prête, film pas encore prêt : l'avancement du chargement est relu à ce rythme (§5.5, net.ts readyVerdict). */
 const READY_CHECK_MS = 100;
 
@@ -182,7 +185,7 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
         outcome,
         variant: s.quality,
         bytes: net.bytes,
-        loadMs: filmLoadMs(["poursuite", planRef.current.ending]),
+        loadMs: filmLoadMs(filmFiles(planRef.current)),
         startMs: s.startMs,
         dropped: r.started ? s.dropped : null,
         switchMs: s.switchMs,
@@ -256,6 +259,7 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
       plan,
       host,
       cover,
+      still: stillRef.current,
       onTime: (t) => {
         // rendu tout de suite, dans le rafraîchissement de l'image : le HUD ne retarde pas d'un cran
         flushSync(() => setTime(t));
@@ -267,7 +271,7 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
     player.current = p;
     const untrace = filmTraceMount({ stats: p.stats, plan: { duration: plan.duration, cut: plan.cut, endVideo: plan.endVideo, level: plan.level } });
     let settled = false;
-    const needed: FileId[] = ["poursuite", plan.ending];
+    const needed = filmFiles(plan);
     const r = reading.current;
     // Le délai d'abandon (§5.5) : en temps d'onglet visible seulement, et sur
     // l'avancement réel du chargement. Le reste arrive à temps : on attend ;
@@ -382,7 +386,7 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
   /** L'arrêt sur image et l'éclair : plus rien à passer ni à régler, les boutons s'effacent. */
   const quiet = hud.phase === "freeze" || hud.phase === "flash" || hud.phase === "over";
   useEffect(() => {
-    if (frozen) ensureStill(stillRef.current, plan.tone);
+    if (frozen) ensureStill(stillRef.current, plan.tone, plan.ending === null);
   }, [frozen, plan]);
   const vars = {
     "--film-light": plan.tone.light,

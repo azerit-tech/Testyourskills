@@ -1,7 +1,7 @@
 // La partition du film (§18.39) : juste à chaque niveau. Les coupes et les
 // étoiles tombent sur des temps, une couche de musique par étoile, l'arrêt net
-// à la coupe vers la fin, rien après la fin du film, les dérapages et les
-// hélicoptères seulement quand on les voit.
+// à la fin de la poursuite (un seul coup au gel sur place, §18.53), rien après
+// la fin du film, les dérapages et les hélicoptères seulement quand on les voit.
 import { describe, expect, it } from "vitest";
 import { FIXTURES } from "../fixtures";
 import type { CardData, Stars } from "../types";
@@ -56,10 +56,12 @@ describe("les couches", () => {
     expect(score.layers.map((l) => l.layer)).toEqual(plan.stars.map((s) => s.star));
   });
 
-  it.each(LEVELS)("%i étoile(s) : l'arrêt sur le temps de la coupe, puis la nappe jusqu'au sommet du flash", (n) => {
+  it.each(LEVELS)("%i étoile(s) : l'arrêt sur le temps qui suit le dernier plan joué, puis la nappe jusqu'au sommet du flash", (n) => {
     const { plan, score } = scoreAt(n);
     const atCut = score.events.filter((e) => e.frame === plan.cut).map((e) => e.voice).sort();
-    expect(atCut).toEqual(["boom", "crash", "kick", "nappe"]);
+    // sur place, l'impact du gel tombe sur ce temps, une image après l'image gelée ; à six étoiles, il attend le gel de FIN6
+    expect(atCut).toEqual(n === 6 ? ["boom", "crash", "kick", "nappe"] : ["boom", "crash", "kick", "nappe", "slam"]);
+    if (n < 6) expect(plan.cut).toBe(plan.freeze + 1);
     const nappe = score.events.find((e) => e.voice === "nappe")!;
     expect(nappe.at + nappe.dur).toBeCloseTo(plan.flash.peak / FPS, 9);
     expect(nappe.at + nappe.dur + nappe.release).toBeCloseTo(plan.flash.to / FPS, 9);
@@ -78,10 +80,13 @@ describe("les repères", () => {
     expect(of("beep")).toHaveLength(n + 1 + intercept);
     expect(of("radio")).toHaveLength(2 * n + 1 + intercept);
     if (plan.intercept !== null) expect(of("radio").map((e) => e.frame)).toContain(plan.intercept);
-    // l'éclair crème de la coupe (sa première image, cut - 1) a son claquement, à chaque niveau
-    expect(of("snap").map((e) => e.frame)).toEqual([plan.cut - 1]);
-    expect(of("slam").map((e) => e.frame)).toEqual([plan.freeze]);
-    expect(of("boom").map((e) => e.frame)).toContain(plan.freeze);
+    // l'éclair crème de la coupe (sa première image, cut - 1) a son claquement, à six étoiles seulement : de une à
+    // cinq, pas de coupe, un seul coup, sur le temps qui suit le gel
+    expect(of("snap").map((e) => e.frame)).toEqual(n === 6 ? [plan.cut - 1] : []);
+    const impact = n === 6 ? plan.freeze : plan.freeze + 1;
+    expect(of("slam").map((e) => e.frame)).toEqual([impact]);
+    expect(of("boom").map((e) => e.frame)).toContain(impact);
+    if (n < 6) expect(of("boom").filter((e) => e.frame >= plan.freeze)).toHaveLength(1);
     const whoosh = of("whoosh");
     expect(whoosh).toHaveLength(1);
     expect(whoosh[0].frame).toBeGreaterThan(plan.freeze);
@@ -135,9 +140,13 @@ describe("la scène", () => {
     for (const c of ["engine", "speed", "slip", "siren1", "siren2", "siren3", "rotor", "rotor2", "jet", "rain"] as const) {
       expect(maxCurve(score, c, from, plan.frames)).toBe(0);
     }
-    // avant la coupe, la pluie et le moteur sont là
-    expect(score.curve("rain", plan.cut - 1)).toBeGreaterThan(0);
-    expect(score.curve("engine", plan.cut - 1)).toBeGreaterThan(0);
+    // jusqu'à l'image d'avant, la pluie et le moteur sont là
+    expect(score.curve("rain", from - 1)).toBeGreaterThan(0);
+    expect(score.curve("engine", from - 1)).toBeGreaterThan(0);
+    // les réglages (filtres, fréquences) restent posés, jamais à zéro ni infinis
+    for (const c of ["rpm", "siren1Hz", "sfxTone", "rainTone"] as const) {
+      for (let f = from; f < plan.frames; f++) expect(Number.isFinite(score.curve(c, f)) && score.curve(c, f) > 0).toBe(true);
+    }
   });
 
   it("la même fiche, la même partition", () => {

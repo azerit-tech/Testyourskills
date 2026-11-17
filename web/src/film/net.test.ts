@@ -52,10 +52,10 @@ describe("le choix de la variante", () => {
 });
 
 describe("la fin à charger (six étoiles)", () => {
-  it("niveau inconnu : la fin la plus probable ; niveau connu : la seule fin utile, l'autre abandonnée", () => {
-    expect(endingToLoad()).toEqual({ load: "fin", drop: null });
-    expect(endingToLoad(6)).toEqual({ load: "fin6", drop: "fin" });
-    for (const l of [1, 2, 3, 4, 5]) expect(endingToLoad(l)).toEqual({ load: "fin", drop: "fin6" });
+  it("de une à cinq étoiles, la fin se joue sur place : aucune fin à charger ; six étoiles : `fin6`", () => {
+    expect(endingToLoad()).toEqual({ load: null, drop: null });
+    expect(endingToLoad(6)).toEqual({ load: "fin6", drop: null });
+    for (const l of [1, 2, 3, 4, 5]) expect(endingToLoad(l)).toEqual({ load: null, drop: "fin6" });
   });
 });
 
@@ -214,7 +214,7 @@ describe("le chargement en flux (loader.ts)", () => {
     await expect(loadFilmFiles(["poursuite"])).rejects.toThrow(/film/);
   });
 
-  it("six étoiles connues pendant le chargement de `fin` : elle est abandonnée, `fin6` se charge dans la même variante", async () => {
+  it("l'attente ne charge que la poursuite ; six étoiles connues : `fin6` suit, dans la même variante", async () => {
     const asked: string[] = [];
     const aborted: string[] = [];
     vi.stubGlobal("navigator", {});
@@ -223,17 +223,17 @@ describe("le chargement en flux (loader.ts)", () => {
       const name = url.replace(/^.*\/(\w+-\d+).*$/, "$1");
       asked.push(name);
       init.signal?.addEventListener("abort", () => aborted.push(name));
-      // la poursuite vite (la haute reste), la fin lentement
-      return name.startsWith("fin-") ? slowResponse(40, 50_000, 50) : slowResponse(8, 50_000, 0);
+      return slowResponse(8, 50_000, 0);
     });
     const { loadFilmFiles, preloadFilm } = await import("./loader");
     preloadFilm();
     await new Promise((r) => setTimeout(r, 120));
+    expect(asked).toEqual(["poursuite-720"]);
     preloadFilm(6);
     const r = await loadFilmFiles(["poursuite", "fin6"]);
     expect(r.quality).toBe("720");
-    expect(asked).toEqual(["poursuite-720", "fin-720", "fin6-720"]);
-    expect(aborted).toEqual(["fin-720"]);
+    expect(asked).toEqual(["poursuite-720", "fin6-720"]);
+    expect(aborted).toEqual([]);
   });
 
   it("ce qui reste à charger : la taille annoncée moins le reçu, sinon le plafond du fichier", async () => {
