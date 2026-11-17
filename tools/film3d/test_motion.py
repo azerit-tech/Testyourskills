@@ -2083,6 +2083,34 @@ def test_derapage_physique():
               f"{roll:+.2f}° à l'image {fpk}, latérale {al:+.2f} m/s²")
 
 
+def test_reaction():
+    """L'opérateur qui réagit aux dérapages (parcours.reaction, 17 novembre) : nul hors des glisses ; au décrochage
+    la visée suit la berline en retard (de signe contraire au mouvement que la glisse donne à la visée), puis la
+    dépasse un peu ; borné (0,3 à 2,5°), sans à-coup d'une image à l'autre ; une fonction du temps du film : la
+    même des deux côtés de chaque raccord (test_cut_pose le vérifie sur la pose)."""
+    import parcours as PC
+    for (g_a, out), ev in zip(PC._reaction_tables(), PC.LIM["derapages"]):
+        g_b = g_a + (len(out) - 1) / PC._VQ
+        gs = [g_a + k / 4.0 for k in range(int((g_b - g_a) * 4.0))]
+        r = [PC.reaction(g) for g in gs]
+        amp = max(map(abs, r))
+        step = max(abs(PC.reaction(g + 1.0) - PC.reaction(g)) for g in gs)
+        outside = max(abs(PC.reaction(g_a - 3.0)), abs(PC.reaction(g_b + 3.0)), abs(PC.reaction(g_b)))
+        # le sens du retard : là où la glisse fait tourner la visée le plus vite, la réaction est de signe contraire
+        ref = max((n for n, _ in PC.SHOTS if PC.START[n] <= gs[len(gs) // 2]), key=lambda n: PC.START[n])
+
+        def dvis(g):
+            fr = g - PC.START[ref] + 1.0
+            return PC._visee_exacte(ref, fr)[0] - PC._visee_exacte(ref, fr, glisse=False)[0]
+        rates = [(dvis(g + 0.5) - dvis(g - 0.5), g) for g in gs[:len(gs) // 2]]
+        dv, gm = max(rates, key=lambda x: abs(x[0]))
+        lag = PC.reaction(gm) * dv < 0.0
+        check(f"réaction au dérapage (s {ev['s']:.0f}) : en retard au décrochage, 0,3 à 2,5°, sans à-coup, nulle "
+              "hors de la glisse", lag and 0.3 <= amp <= 2.5 and step <= 0.3 and outside < 1e-9,
+              f"retard {'oui' if lag else 'non'} à l'image {gm:.0f}, {amp:.2f}° au plus, {step:.3f}°/image, "
+              f"{outside:.1e}° hors")
+
+
 def test_cut_pose():
     for a, b, dp, dy, ds, dr, (la, lb) in cut_pose_rows():
         check(f"coupe {a} → {b} : même pose de caméra (position ≤ {CUT_POSE_DPOS * 100:.0f} cm, lacet, site, roulis "
@@ -2100,6 +2128,7 @@ if __name__ == "__main__":
     test_p2()
     test_derapages()
     test_derapage_physique()
+    test_reaction()
     test_p4()
     test_p3()
     test_p6()
