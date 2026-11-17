@@ -49,7 +49,7 @@ vi.mock("../lib/filmSound", () => ({
 }));
 vi.mock("../lib/api", () => ({ isMock: () => false, api: { track: (event: string) => void h.tracked.push(event) } }));
 vi.mock("../film/loader", () => ({ filmLoadMs: () => null, filmNet: () => ({ bytes: 0, bps: null, firstStart: null }), filmRemaining: () => 0 }));
-vi.mock("../film/freeze", () => ({ ensureStill: () => undefined, paintStill: () => undefined }));
+vi.mock("../film/freeze", () => ({ ensureStill: () => undefined, paintStill: () => undefined, stillShot: () => "P1" }));
 vi.mock("../film/FilmHud", () => ({ FilmHud: () => null, FilmRadio: () => null }));
 vi.mock("../i18n", async (orig) => {
   const m = await orig<typeof import("../i18n")>();

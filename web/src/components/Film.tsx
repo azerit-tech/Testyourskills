@@ -23,7 +23,7 @@ import { inAppBrowser } from "../lib/sharing";
 import { canPlayFilm, createFilmPlayer, type FilmPlayer, type FilmStats } from "../film/player";
 import { FilmHud, FilmRadio } from "../film/FilmHud";
 import { filmVideos } from "../film/unlock";
-import { ensureStill, paintStill } from "../film/freeze";
+import { ensureStill, paintStill, stillShot } from "../film/freeze";
 import type { FileId } from "../film/files";
 import { filmLoadMs, filmNet, filmRemaining } from "../film/loader";
 import { readyVerdict, VisibleClock } from "../film/net";
@@ -266,7 +266,7 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
         cue.current(t);
         paintBack(backRef.current, stillRef.current, t >= plan.freeze / FPS);
       },
-      onStill: (v) => paintStill(v, stillRef.current, plan.tone),
+      onStill: (v) => paintStill(v, stillRef.current, plan.tone, stillShot(plan)),
     });
     player.current = p;
     const untrace = filmTraceMount({ stats: p.stats, plan: { duration: plan.duration, cut: plan.cut, endVideo: plan.endVideo, level: plan.level } });
@@ -386,7 +386,7 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
   /** L'arrêt sur image et l'éclair : plus rien à passer ni à régler, les boutons s'effacent. */
   const quiet = hud.phase === "freeze" || hud.phase === "flash" || hud.phase === "over";
   useEffect(() => {
-    if (frozen) ensureStill(stillRef.current, plan.tone, plan.ending === null);
+    if (frozen) ensureStill(stillRef.current, plan.tone, stillShot(plan));
   }, [frozen, plan]);
   const vars = {
     "--film-light": plan.tone.light,
