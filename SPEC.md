@@ -1680,3 +1680,15 @@ Jacques : « ça commence à être pas mal, on fait un dernier round et stop ».
 - Un rang s'écrit d'une seule façon : « 3e » (exposant à l'écran).
 
 **À fournir par Jacques** : les mentions légales (éditeur, responsable du traitement, hébergeur), qu'aucune page ne donne encore. À vérifier au déploiement : la porte LinkedIn est allumée dans la configuration de production.
+
+### 18.53 Le film roulé d'un seul trajet (17 novembre 2026)
+
+Jacques : « Il y a des coupes de plan en plein milieu, c'est pas fluide. » Le film devient un seul trajet roulé, de l'avenue à l'arrêt sur la pointe, sans saut ni ellipse ; tout se règle dans `tools/film3d/parcours.py`, le détail dans `docs/cinematique-plan-de-ville.md` (« Le trajet roulé en entier »).
+
+- **Le trajet** : avenue → rond-point → rue des enseignes → quai → pont → port → jetée → pointe, 742,5 m, une seule conduite (motion.drive, limites du mouillé inchangées : freinage 7, accélération 3, latérale 6,5 m/s²). Lancée à 100 km/h dès la première image, 130 km/h au plus (sur le pont), gros freinages avant le rond-point et le port, 40 km/h au plus bas dans le rond-point et 37 dans le virage du port ; les deux dérapages dessinés gardés (29° et 36°).
+- **La durée** : 770 images de poursuite (32,1 s, 80,8 km/h de moyenne), puis FIN6 (122 images) qui la continue jusqu'à l'arrêt (35,15 s) et l'orbite. Les 25 à 28 s voulues ne tiennent pas avec ces limites : on garde la physique.
+- **Une caméra** : le bras commun de poursuite, 2,4 m au-dessus de la chaussée, 7,5 m derrière, 24 mm, d'un bout à l'autre ; plus de caméra fixe sur le pont, plus de grue à la fin de la jetée. FIN6 tourne ce même bras autour de la berline arrêtée (55° par sa gauche).
+- **Les jonctions** : les sept tronçons (OUV 87, P1 31, P2 108, P3 102, P4 249, P5 60, P6 133 images) restent des fichiers de scène différents, mais chaque jonction a exactement le même état de berline et de caméra (test strict). Aucune coupe visible de la caméra ; ce qui reste à raccorder est le décor et la distribution d'une scène à l'autre.
+- **Les étoiles** deviennent des instants du trajet (`parcours.ETOILES`, images du film) : 1 l'avenue lancée (4,0 s), 2 le rond-point (6,75 s), 3 le barrage de la rue (11,0 s), 4 la crête du pont (19,9 s), 5 le port (25,2 s), 6 la jetée (29,9 s), puis FIN6 sur la pointe. Le site les relit (`shared/film/cut.ts`, à recaler par lui).
+- **La patrouille 1** n'essaie plus de doubler avant le rond-point : à côté de la berline dans l'avenue, elle freine avant elle et s'arrête à l'entrée de l'anneau ; sur le pont, une autre la remonte par la gauche et l'attend au port.
+- **À reprendre** : le décor des morceaux jamais filmés (autre agent) ; la crête du pont (raccords verticaux de 20 m pris à 130 km/h : 0,8 g d'allègement, la caméra le subit) à allonger dans `scene_c.deck_z` et `motion._bridge_z` ; la meute et l'anneau de FIN6, absents de la scène de P6, à poser aussi dans P6 pour qu'ils ne surgissent pas à la jonction.
