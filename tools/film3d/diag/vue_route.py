@@ -4,7 +4,7 @@
 #
 #   python3 tools/film3d/ville.py --cache --out VILLE [--lieux …]          # les lieux en cache, d'abord
 #   blender -b --factory-startup -P tools/film3d/diag/vue_route.py -- --ville VILLE --out DIR --tag avant \
-#     [--vues pt1,pt2] [--groupe pont]
+#     [--vues f001,f025] [--groupe eau] [--pas 12]
 #
 # Écrit DIR/<vue>-<tag>.png. Chaque vue a son lieu « propre » : comme render_film --ville, ses faux lointains restent
 # (ceux des autres lieux sont cachés), puis la seule mer et le seul ciel de la ville (ville.mer). Les vues d'un même
@@ -20,47 +20,26 @@ HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if HERE not in sys.path:
     sys.path.insert(0, HERE)
 
-# Les groupes : (lieux chargés). Les vues : (nom, groupe, lieu propre, x, y, cap) dans la ville (repère du pont ; cap
-# 0 vers +y, positif vers −x, comme lieux.put), le point de la route où serait la berline. Les points filmés par le
-# bras commun viennent de ville.route_at ; la montée du pont, qu'aucun plan ne roulait, suit l'axe de la voie de P4.
+# Les groupes : (lieux chargés), et le groupe de chaque tronçon (ce que CHARGE lui donne, réuni en trois chargements).
+# Les vues (le trajet roulé, 17 novembre au soir : une vue toutes les `pas` images du film, nommée fNNN) : (nom,
+# groupe, lieu propre, x, y, cap) dans la ville (repère du pont ; cap 0 vers +y, positif vers −x, comme lieux.put),
+# la berline à cette image (ville.hero_city) et le cap du bras commun (ville.cam_cap_city).
 GROUPES = {
-    "ville": ("avenue", "rond-point", "rue", "pont"),
-    "quai": ("rue", "pont", "port"),
+    "ville": ("avenue", "rond-point", "rue", "pont", "port"),
+    "quai": ("rue", "pont", "port", "jetee"),
     "eau": ("pont", "port", "jetee"),
 }
+GROUPE_PLAN = {"OUV": "ville", "P1": "ville", "P2": "ville", "P3": "ville", "P4": "quai", "P5": "eau", "P6": "eau"}
 
 
-def vues():
+def vues(pas=24):
+    import parcours as P
     import ville as V
     out = []
-
-    def route(nom, groupe, propre, s, shot):
-        x, y, cap = V.route_at(s, shot)
-        out.append((nom, groupe, propre, x, y, cap))
-
-    # l'avenue avant OUV (son début, 30 m avant), après P1 (vers le rond-point), et les sorties de l'anneau
-    x0, y0, cap0 = V.route_at(0.0, "OUV")
-    out.append(("av1", "ville", "avenue", x0 - 30.0, y0, cap0))
-    route("av2", "ville", "avenue", 58.0, "P1")
-    route("rp1", "ville", "rond-point", 80.0, "P2")
-    route("rp2", "ville", "rond-point", 100.0, "P2")
-    # la rue après le barrage, le bout de rue entre les immeubles du quai, le boulevard, le quai et la tête de pont
-    for nom, y in (("ru1", -366.0), ("ru2", -352.0), ("ru3", -338.0), ("ru4", -324.0)):
-        out.append((nom, "quai", "rue", 0.35 + (1.8 - 0.35) * max(0.0, min(1.0, (y + 366.0) / 46.0)), y, 0.0))
-    # le pont : le plat, le pied de la rampe, la montée, la crête, la descente, le pied côté port
-    for nom, y in (("pt1", -300.0), ("pt2", -255.0), ("pt3", -205.0), ("pt4", -160.0), ("pt5", -128.0),
-                   ("pt6", -90.0), ("pt7", -45.0), ("pt8", -8.0)):
-        out.append((nom, "eau" if y > -280.0 else "quai", "pont", 1.8, y, 0.0))
-    # le terre-plein du port (avant, pendant, après le virage), la jetée jusqu'à la pointe
-    route("po1", "eau", "port", 192.0, "P4")
-    route("po2", "eau", "port", 203.0, "P5")
-    route("po3", "eau", "port", 216.0, "P5")
-    route("je1", "eau", "jetee", 232.0, "P6")
-    route("je2", "eau", "jetee", 256.0, "P6")
-    route("je3", "eau", "jetee", 280.0, "P6")
-    x, y, cap = V.route_at(294.0, "P6")
-    a = math.radians(cap)
-    out.append(("je4", "eau", "jetee", x - 16.0 * math.sin(a), y + 16.0 * math.cos(a), cap))
+    for f in sorted(set(range(1, P.TOTAL + 1, pas)) | {P.TOTAL}):
+        shot, _fr = V.shot_of(f)
+        x, y = V.hero_city(f)[:2]
+        out.append((f"f{f:03d}", GROUPE_PLAN[shot], V.lieu_of_shot(shot)[0], x, y, V.cam_cap_city(f)))
     return out
 
 
@@ -104,12 +83,14 @@ def main():
     ap.add_argument("--tag", default="avant")
     ap.add_argument("--groupe", default=None)
     ap.add_argument("--vues", default=None)
+    ap.add_argument("--pas", type=int, default=24, help="une vue toutes les N images du film")
     ap.add_argument("--sonde", action="store_true", help="les objets vus, par bande de l'image (lancers de rayons)")
     ap.add_argument("--cycles", type=int, default=0,
                     help="N : en éclairé, Cycles à N échantillons sur la carte graphique (machine louée seulement)")
     a = ap.parse_args(argv)
     os.makedirs(a.out, exist_ok=True)
-    todo = [v for v in vues() if (a.groupe is None or v[1] == a.groupe) and (a.vues is None or v[0] in a.vues.split(","))]
+    todo = [v for v in vues(a.pas)
+            if (a.groupe is None or v[1] == a.groupe) and (a.vues is None or v[0] in a.vues.split(","))]
     groupes = sorted({v[1] for v in todo}, key=list(GROUPES).index)
     for g in groupes:
         t0 = time.time()
@@ -169,7 +150,6 @@ def main():
                        [(0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3)])
         car = bpy.data.objects.new("berline_reperee", me)
         scene.collection.objects.link(car)
-        import scene_c as C
         print(f"[vue] groupe {g} : {', '.join(noms)} posés en {time.time() - t0:.0f} s", flush=True)
         for nom, _g, propre, hx, hy, cap in [v for v in todo if v[1] == g]:
             # les faux lointains du lieu propre restent (son plan les rend), ceux des autres lieux sont cachés
@@ -186,7 +166,7 @@ def main():
             cy = hy - P.CAM_BACK * fy + P.CAM_LEFT * fx
 
             def sol(x, y):
-                guess = C.deck_z(y) if (-330.0 < y < 2.0 and abs(x) < 10.0) else 0.0
+                guess = P.sol_ville(x, y)              # le tablier du pont sur son emprise (motion.pont_profil)
                 hit = V._cast_down(scene, dg, x, y, guess + 3.0, depth=12.0)
                 return hit[0] if hit else guess
 
