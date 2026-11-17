@@ -1748,9 +1748,9 @@ def plan_P5(scene, hidden, palier="conteneurs"):
     # est éclairé par les mâts du port, des lampadaires de 25 m, KEY_MAST compris)
     # --- l'hélicoptère : il arrive de l'est au ras des piles, vire sur la berline ; son faisceau court sur la voie
     # du pont derrière elle et la rattrape (p5_virage.beam_target)
-    # les trois appareils de la distribution commune à P5 et P6 (helicos.py) : celui du plan, son ailier qui arrive
-    # avec lui et celui qui attend sur la jetée ; clés en temps du film (assiette comprise), rotors sur l'image du
-    # film, les mêmes feux. Les deux autres portent la lumière qu'ils ont dans P6 (scene_d.helis_P6_light)
+    # l'appareil de la prise (helicos.py : un seul, helicos.N, de P5 à la fin de FIN6) ; clés en temps du film
+    # (assiette comprise), rotors sur l'image du film, les mêmes feux. S'il y en avait d'autres, ils porteraient la
+    # lumière qu'ils ont dans P6 (scene_d.helis_P6_light)
     import helicos
     import scene_d
     heli, h = L.helicopter("heli")
@@ -1769,7 +1769,8 @@ def plan_P5(scene, hidden, palier="conteneurs"):
         "trace_p5")))]
     beam_lights(h["searchlight"], hero, swept, ground_w=helicos.BEAM0_SOL, car_w=helicos.BEAM0_BERLINE)
     M.key_searchlight(h, FRAMES, helicos.beam_in_scene("P5", 0))
-    scene_d.helis_P6_light(others, range(1, helicos.N), hero, "P5", FRAMES)
+    if others:
+        scene_d.helis_P6_light(others, range(1, helicos.N), hero, "P5", FRAMES)
     beams = {h["searchlight"]} | {o for r in others for o in r.children_recursive
                                   if o.type == "LIGHT" and "searchlight_spot" in o.name}
     # la brume ne prend corps que dans les faisceaux : toute autre lampe (rampes à 20 kW, tour, feux, lampadaires)

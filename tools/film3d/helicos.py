@@ -15,7 +15,10 @@ import parcours as PC
 import p5_virage as P5
 import p6_jetee as P6
 
-N = 3
+# Un seul appareil dans toute la prise (17 novembre, rendus éclairés v5 : P5 en montrait deux l'un sur l'autre, P6
+# deux ou trois) : le 0, de P5 à la fin de FIN6, sur une seule trajectoire en temps du film ; ses ailiers 1 et 2
+# (APPROACH, p6_jetee.HELIS[1:]) restent décrits mais ne sont plus posés.
+N = 1
 FPS = PC.FPS
 T5 = PC.t_of("P5", P5.F0)                      # P5/1, en temps du film
 T5_END = PC.t_of("P5", P5.F0 + P5.FRAMES - 1)  # P5/60
@@ -142,7 +145,9 @@ def state(i, T):
 # ---- l'assiette, calculée une fois sur les deux plans en temps du film : la même aux deux bords de la coupe
 
 F_FIRST = PC.START["P5"] + P5.F0 - 1          # image du film (1 = OUV/1) une image avant P5/1
-F_LAST = PC.START["P6"] + P6.F0 + P6.FRAMES   # une image après P6/60
+# une image après la dernière de FIN6 : FIN6 continue P6 sans coupe et garde le même appareil (fin6_orbite.HELI,
+# où p6_jetee.heli_slot(0) le pose), ses clés lues ici comme celles de P5 et P6
+F_LAST = PC.START["FIN6"] + PC.FIN6_FRAMES + 1
 _ATT = {}
 
 

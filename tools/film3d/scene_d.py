@@ -1196,9 +1196,14 @@ def plan_FIN6(scene, hidden, palier="socle"):
     # la meute de FIN : rien que ses phares, derrière la caméra
     fin_pack_lights(frames, hero)
     fin_fill(hero)
-    # l'hélicoptère de FIN, son projecteur qui la cherche puis se pose sur elle à l'arrêt
+    # l'hélicoptère : l'appareil 0 de la prise (helicos.py), le même que P5 et P6, sur la même trajectoire en temps
+    # du film (en stationnaire à fin6_orbite.HELI, où p6_jetee.heli_slot(0) le pose à FIN6/1), assiette comprise et
+    # rotors sur l'image du film : ni saut de place ni d'assiette à la jonction P6 → FIN6 ; son projecteur la cherche
+    # puis se pose sur elle à l'arrêt
+    import helicos
     heli, _ = L.helicopter("heli")
-    L.put(heli, *F6.HELI, heading=F6.HELI_HEADING, pitch=-6.0, roll=0.0)
+    helicos.key(heli, "FIN6", 0, frames)
+    heli_feux(heli)
     aim = Vector((F6.CX, F6.CY, 0.8))
     # à 28 kW, le faisceau prend corps dans la brume et sa tache tombe sur la berline, qui la cache : pas de plaque au
     # sol (lumière v3.1, contrôlé aux images 20, 50, 80) ; à 6 kW, le faisceau disparaissait de l'air
@@ -1441,9 +1446,9 @@ def plan_P6(scene, hidden, palier="socle"):
     n = M.flash_bars(rigs, frames)
     print(f"[P6] meute de {len(rigs)} véhicules, {n} lumières de rampe clignotantes", flush=True)
 
-    # les trois hélicoptères de la distribution commune à P5 et P6 (helicos.py) : le 0 est celui de P5, qui quitte
-    # son stationnaire pour sa place ; le 1, son ailier, arrive de la droite ; le 2 est déjà sur la sienne. Clés en
-    # temps du film (assiette comprise), rotors sur l'image du film, les feux de P5 sur chacun
+    # l'hélicoptère de la prise (helicos.py : un seul, helicos.N) : celui de P5, qui quitte son stationnaire pour sa
+    # place devant elle, puis la quitte pour celui de FIN6. Clés en temps du film (assiette comprise), rotors sur
+    # l'image du film, les feux de P5
     import helicos
     first, _ = L.helicopter("heli")
     hs = [first] + [L.clone(first, f"heli_{i}") for i in range(1, helicos.N)]

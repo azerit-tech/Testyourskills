@@ -371,8 +371,95 @@ def selftest():
     assert debit.env_key({"FILM3D_VILLE": "1", "FILM3D_HERO": "w111"}) == debit.env_key({"FILM3D_HERO": "w111"})
     assert debit.env_key({"FILM3D_VILLE": "0"}) != debit.env_key({})
     selftest_voisins()
+    selftest_helico()
     print("[ville] selftest : poses de parcours, un lieu une place, prises sans saut, conduite des prises, route sous "
-          "la berline, fenêtres, chargement, clé FILM3D_VILLE, voisins : ok")
+          "la berline, fenêtres, chargement, clé FILM3D_VILLE, voisins, hélicoptère de la prise : ok")
+
+
+# Les hélicoptères que la scène de chaque tronçon pose elle-même (scene_e.plan_P5, scene_d.plan_P6 : helicos.N
+# appareils ; scene_d.plan_FIN6 : l'appareil 0) ; les voisins n'en apportent aucun (heli_voisin)
+HELIS_PROPRES = {"P5": "helicos.N", "P6": "helicos.N", "FIN6": 1}
+HELI_SAUT_ACC = 3.0     # m/s² : l'accélération d'une image à la jonction ne dépasse pas celle d'à côté de plus que ça
+
+
+def _angle_cadre(cam, p, rayon):
+    """La marge (°) d'un objet de rayon `rayon` (m) au centre p au bord du cadre 9:16 de la caméra cam = (x, y, z,
+    lacet, tangage, roulis, focale) (motion.key_camera ; capteur de 36 mm sur la hauteur, sensor_fit AUTO) :
+    positive dans le cadre, négative hors du cadre."""
+    x, y, z, yaw, pitch, _roll, lens = cam[:7]
+    a, b = math.radians(yaw), math.radians(pitch)
+    d = (-math.sin(a) * math.cos(b), -math.cos(a) * math.cos(b), math.sin(b))
+    r = (math.cos(a), -math.sin(a), 0.0)                       # la droite de l'image
+    u = (r[1] * d[2] - r[2] * d[1], r[2] * d[0] - r[0] * d[2], r[0] * d[1] - r[1] * d[0])
+    v = (p[0] - x, p[1] - y, p[2] - z)
+    fwd = sum(i * j for i, j in zip(v, d))
+    dist = math.sqrt(sum(i * i for i in v))
+    if fwd <= 0:
+        return -90.0
+    h = math.degrees(math.atan2(abs(sum(i * j for i, j in zip(v, r))), fwd))
+    w = math.degrees(math.atan2(abs(sum(i * j for i, j in zip(v, u))), fwd))
+    half_v = math.degrees(math.atan(18.0 / lens))
+    half_h = math.degrees(math.atan(18.0 * 9.0 / 16.0 / lens))
+    pad = math.degrees(math.atan(rayon / max(dist, 1e-6)))
+    return min(half_h + pad - h, half_v + pad - w)
+
+
+def helico_par_troncon():
+    """{tronçon: hélicoptères dans la scène rendue} : ceux que sa scène pose (HELIS_PROPRES), plus ceux des voisins
+    qu'elle garde (aucun : heli_voisin). Sans Blender."""
+    import helicos
+    out = {}
+    for s in [n for n, _ in P.SHOTS] + ["FIN6"]:
+        own = HELIS_PROPRES.get(s, 0)
+        own = helicos.N if own == "helicos.N" else own
+        kept = [nm for nm in ("heli", "heli_1", "heli_2", "heli.001") if not heli_voisin(nm)]
+        out[s] = own + len(kept)
+    return out
+
+
+def selftest_helico():
+    """Un seul hélicoptère dans la prise, une seule trajectoire continue de P5 à la fin de FIN6, qui n'apparaît ni ne
+    disparaît dans le cadre à une jonction. Sans Blender."""
+    import helicos as H
+    import p5_virage as P5
+    import p6_jetee as P6
+    import fin6_orbite as F6
+    assert H.N == 1, H.N
+    assert all(heli_voisin(n) for n in ("heli", "heli_1", "heli_2", "heli.001", "heli_2.003"))
+    assert not any(heli_voisin(n) for n in ("helipad", "heli_body", "helico_x", "phare"))
+    par = helico_par_troncon()
+    assert all(v <= 1 for v in par.values()), par
+    assert par["P5"] == par["P6"] == par["FIN6"] == 1, par
+    # la trajectoire, aux images du film (assiette comprise), dans la ville : pas de saut de place ni d'accélération
+    att = H.attitude(0)
+    fs = sorted(att)
+    assert fs[0] <= P.START["P5"] + 1 and fs[-1] >= P.START["FIN6"] + P.FIN6_FRAMES, (fs[0], fs[-1])
+    acc = {}
+    for f in fs[1:-1]:
+        a, b, c = att[f - 1], att[f], att[f + 1]
+        acc[f] = math.sqrt(sum(((c[k] - 2 * b[k] + a[k]) * FPS * FPS) ** 2 for k in range(3)))
+    for s in ("P6", "FIN6"):
+        j = P.START[s] + 1                              # l'image du film de s/1
+        near = [acc[f] for f in range(j - 8, j + 9) if f in acc and abs(f - j) > 1]
+        assert acc[j] <= max(near) + HELI_SAUT_ACC and acc[j - 1] <= max(near) + HELI_SAUT_ACC, (s, acc[j], near)
+        da = max(abs((att[j][k] - att[j - 1][k] + 180) % 360 - 180) for k in (3, 4, 5))
+        assert da < 1.0, (s, da)                          # ° : cap, tangage, roulis d'une image à l'autre
+    # chaque scène lit la même trajectoire : la dernière image d'un tronçon prolongée d'une image est la première du
+    # suivant, dans la ville (FIN6 a la pose de P6)
+    for a, b in (("P5", "P6"), ("P6", "FIN6")):
+        n = P.frames(a)
+        qa = H.to_ville(a, H.in_scene(a, 0)(n / FPS))
+        qb = H.to_ville(b, H.in_scene(b, 0)(0.0))
+        assert math.dist(qa[:3], qb[:3]) < 1e-6 and abs(qa[3] - qb[3]) < 1e-6, (a, b, qa, qb)
+    # FIN6 : en stationnaire à sa place (fin6_orbite.HELI) dès FIN6/1
+    q = H.in_scene("FIN6", 0, dyn=False)(0.0)
+    assert math.dist(q[:3], F6.HELI) < 1e-6, (q, F6.HELI)
+    # P4 n'en a pas : à P5/1, l'appareil est hors du cadre de P5 (il entre par le bord, il ne surgit pas)
+    m = _angle_cadre(P5.camera(0.0), H.in_scene("P5", 0)(0.0)[:2] + (H.in_scene("P5", 0)(0.0)[2] + P5.HELI_BODY,),
+                     6.0)
+    assert m < 0.0, f"l'hélicoptère est dans le cadre à P5/1 ({m:.1f}°) : il surgirait à la jonction P4 → P5"
+    _ = P6
+    return par
 
 
 def selftest_voisins():
@@ -801,6 +888,16 @@ def is_cast(ob):
 # décide après la pose : les jumeaux d'un acteur d'un plan voisin sortent même immobiles, l'entrant du plan suivant
 # reste (voir JUMEAU_M).
 TRACES = re.compile(r"^(wake|traces?|repere)([_.:]|$)")
+# L'hélicoptère est à la prise, pas aux lieux (rendus éclairés v5 du 17 novembre : P5 en montrait deux l'un sur
+# l'autre, P6 deux ou trois) : un seul appareil (helicos.N), sur une seule trajectoire en temps du film (helicos.state),
+# que la scène du tronçon rendu pose et clé elle-même (P5, P6, FIN6). Aucun voisin n'en apporte, même de la même prise
+# et même jumeau : on ne compte pas sur la règle des jumeaux pour l'ôter.
+HELICO = re.compile(r"^heli(_\d+)?([.:]|$)")
+
+
+def heli_voisin(nom):
+    """Une famille d'un lieu voisin est-elle un hélicoptère (retiré d'office, sans Blender) ?"""
+    return bool(HELICO.match(nom))
 
 
 def _bouge(o):
@@ -1064,7 +1161,7 @@ def assembler(scene, infos, noms, base=None, plan=None, own=None, own_objs=None)
         # comparent dans la scène, à la coupe, et le champ du voisin se lit depuis sa caméra
         suit = prise and P.START[nb_plan] > P.START[plan]
         for top in _tops(objs):
-            if (suit and TRACES.match(top.name)) if prise else is_cast(top):
+            if ((suit and TRACES.match(top.name)) if prise else is_cast(top)) or heli_voisin(top.name):
                 gone.update(_family(top))
         names_gone = sorted(o.name for o in _tops(gone))
         for ob in gone:

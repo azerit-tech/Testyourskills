@@ -244,7 +244,8 @@ def aircraft():
     """{nom: pos(t) -> (x, y, z)} : les hélicoptères, au milieu de leur cellule (celui du plan, « heli », et les deux
     qui attendent sur la jetée, helicos.py)."""
     out = {}
-    for i, k in enumerate(("heli", "heli_1", "heli_2")):
+    import helicos
+    for i, k in enumerate(("heli", "heli_1", "heli_2")[:helicos.N]):
         fn = heli if i == 0 else heli_n(i)
         out[k] = (lambda fn: lambda t: (*fn(t)[:2], fn(t)[2] + HELI_BODY))(fn)
     return out

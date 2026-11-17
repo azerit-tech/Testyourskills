@@ -781,10 +781,11 @@ def test_p6_air():
         low = min(s[2] for s in hel[i])
         check(f"P6 : l'hélicoptère {i} au-dessus de {need / P.LAMP_H:g} hauteurs de lampadaire", low >= need,
               f"{low:.1f} m au plus bas, {need:.1f} m demandés")
-    sep = min((math.dist(hel[a][k][:3], hel[b][k][:3]), a, b, k + P.F0) for k in range(len(cams))
-              for a in hel for b in hel if a < b)
+    # (un seul appareil depuis les rendus éclairés v5, helicos.N : l'écart ne se mesure qu'à deux)
+    sep = min([(math.dist(hel[a][k][:3], hel[b][k][:3]), a, b, k + P.F0) for k in range(len(cams))
+               for a in hel for b in hel if a < b] or [(math.inf, 0, 0, 0)])
     check(f"P6 : les hélicoptères à {AIR_SEP:g} m les uns des autres", sep[0] >= AIR_SEP,
-          f"{sep[0]:.1f} m entre {sep[1]} et {sep[2]} à l'image {sep[3]}")
+          f"{sep[0]:.1f} m entre {sep[1]} et {sep[2]} à l'image {sep[3]}" if H.N > 1 else "un seul appareil")
     lamp = P.LAMP_H / 2
     masts = {f"lampadaire_{y:.0f}_d": ((P.JX + 5.5, y, lamp), (0.6, 0.3, lamp)) for y in (315.0, 335.0, 355.0, 375.0, 395.0)}
     masts["lampadaire_pointe"] = ((P.JX + 5.5, P.POINTE_Y - 5.8, lamp), (0.6, 0.6, lamp))
@@ -1573,13 +1574,17 @@ def test_cut_p5_p6():
         check(f"P5 → P6 : l'hélicoptère {i} à la même place à l'écran (± {CUT_AIR_SCREEN:g} %)",
               q5 is not None and q6 is not None and du <= CUT_AIR_SCREEN,
               f"x {100 * q5[0]:.0f} → {100 * q6[0]:.0f} %, y {100 * q5[1]:.0f} → {100 * q6[1]:.0f} % depuis le haut")
-    # les deux de la jetée : dans P5 sa dernière seconde (le 2 dans le cadre, le 1 au bord droit, il y entre en P6)
-    seen = {i: [f for f in range(n5 - 23, n5 + 1)
-                if (lambda q: q is not None and -0.05 <= q[0] <= 1.05 and 0.0 <= q[1] <= 1.0)(
-                    M.screen_point(P5.camera_rail(M.t_of(f)), fn5[i](M.t_of(f))[:3]))] for i in (1, 2)}
-    check("P5 : les hélicoptères de la jetée déjà là sa dernière seconde (à 5 % du cadre au plus)",
-          all(seen[i] and seen[i][-1] == n5 for i in (1, 2)),
-          ", ".join(f"{i} : images {s[0]}–{s[-1]}" if s else f"{i} : jamais" for i, s in seen.items()))
+    # les deux de la jetée : dans P5 sa dernière seconde (le 2 dans le cadre, le 1 au bord droit, il y entre en P6).
+    # Depuis les rendus éclairés v5 (17 novembre), un seul appareil dans la prise (helicos.N, ville.selftest_helico)
+    if H.N > 2:
+        seen = {i: [f for f in range(n5 - 23, n5 + 1)
+                    if (lambda q: q is not None and -0.05 <= q[0] <= 1.05 and 0.0 <= q[1] <= 1.0)(
+                        M.screen_point(P5.camera_rail(M.t_of(f)), fn5[i](M.t_of(f))[:3]))] for i in (1, 2)}
+        check("P5 : les hélicoptères de la jetée déjà là sa dernière seconde (à 5 % du cadre au plus)",
+              all(seen[i] and seen[i][-1] == n5 for i in (1, 2)),
+              ", ".join(f"{i} : images {s[0]}–{s[-1]}" if s else f"{i} : jamais" for i, s in seen.items()))
+    else:
+        check("P5, P6, FIN6 : un seul hélicoptère dans la prise", H.N == 1, f"{H.N} appareil(s)")
     # les rotors : l'image du film, pas celle du plan (cast_vehicles.spin_rotors pilote sur « frame »)
 
     class _Drv:

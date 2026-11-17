@@ -280,7 +280,8 @@ def tracks():
 
 def aircraft():
     """Les aéronefs, {nom: pos(t)} (pour les contrôles du haut du cadre de motion.py)."""
-    out = {f"heli_{i}": heli(i) for i in range(len(HELIS))}
+    import helicos
+    out = {f"heli_{i}": heli(i) for i in range(helicos.N)}
     out.update({f"jet_{i}": jet(i) for i in range(len(JETS))})
     return out
 
