@@ -364,8 +364,9 @@
   }
 }
 
-/* pendant le film, rien de la page ne passe devant : la colonne du visiteur (sa fiche rejouée) attend la fiche */
-.page-result:has(.film-stage:not(.is-landed)) .visitor-col {
+/* pendant le film, rien de la page ne passe devant : la colonne du visiteur (sa fiche rejouée) attend la fiche,
+   et « À ton tour » (ou le duel), hors de cette colonne au bureau et au-dessus du film (z 2), aussi */
+.page-result:has(.film-stage:not(.is-landed)) :is(.visitor-col, .you) {
   visibility: hidden;
 }
 
