@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { FIXTURES } from "../fixtures";
 import type { CardData, Stars } from "../types";
-import { CHASE_FRAMES, CHASE_SHOTS, FILM_FRAMES, FILM_SHOTS, FINALE, FPS, IN_PLACE, SHOT_FRAMES, SHOT_START, STAR_FRAMES, STOP_FRAME, TITLE_POP, filmPlan, holdOf, hudAt, shotAt } from "./index";
+import { CHASE_FRAMES, CHASE_SHOTS, FILM_FRAMES, FILM_SHOTS, FINALE, FPS, IN_PLACE, SHOT_FRAMES, SHOT_START, STAR_FRAMES, STAR_READ, STOP_FRAME, TITLE_POP, filmPlan, holdOf, hudAt, shotAt } from "./index";
 import PARCOURS from "./parcours.json";
 import { radioLines } from "./radio";
 
@@ -207,11 +207,15 @@ describe("hudAt (§2.2, §5.2)", () => {
   });
 
   it("la radio cite la fiche : « Véhicule en fuite : Backend », annonce l'interception, puis la fin de course au gel", () => {
-    const p = filmPlan(cardAt(4));
+    // trois étoiles : la ligne de l'étoile 3 se lit seule plus de deux secondes, l'interception la remplace
+    const p = filmPlan(cardAt(3));
+    expect(p.keepLine).toBe(false);
     expect(hudAt(p, at(STAR_FRAMES[0] + 6), "fr").radio?.text).toBe("Véhicule en fuite\u00a0: Backend");
     expect(hudAt(p, at(STAR_FRAMES[1] + 8), "fr").radio?.text).toBe("Arme signalée\u00a0: Python");
     expect(hudAt(p, at(STAR_FRAMES[0] + 6), "fr").radio?.kicker).toBeNull();
-    expect(hudAt(p, at(p.cut - 13), "fr").radio?.text).toBe(p.radio.fr.beats[3]);
+    expect(hudAt(p, at(p.cut - 13), "fr").radio).toMatchObject({ text: p.radio.fr.beats[2], kicker: "Chef d'accusation", below: null });
+    expect(hudAt(p, at(p.cut - 12), "fr").radio?.below).toBeNull();
+    expect(hudAt(p, at(p.freeze), "fr").radio?.below).toBeNull();
     expect(hudAt(p, at(p.cut - 12), "fr").radio?.text).toBe("Interception\u00a0: barrage en place");
     expect(hudAt(p, at(p.cut - 2), "fr").radio?.text).toBe("Interception\u00a0: barrage en place");
     expect(hudAt(p, at(p.cut - 2), "fr").radio?.kicker).toBeNull();
@@ -226,6 +230,50 @@ describe("hudAt (§2.2, §5.2)", () => {
     expect(hudAt(p, at(p.freeze), "fr").radio?.text).not.toContain(p.title.fr);
     const squares = new Set(Array.from({ length: FPS }, (_, i) => hudAt(p, at(STAR_FRAMES[0] + i), "fr").radio?.square));
     expect(squares).toEqual(new Set(["coral", "lilac"]));
+  });
+
+  it("la ligne de chaque étoile se lit : 1,5 s seule au moins, ou gardée jusqu'à la fiche, l'interception puis la fin de course dessous ; 1,8 s en tout avant la fiche", () => {
+    expect(STAR_READ).toBe(44);
+    expect(STAR_READ / FPS).toBeGreaterThanOrEqual(1.8);
+    // une étoile : 19 images de l'étoile 1 à l'interception ; quatre : 39 ; cinq : 21 ; deux et trois : 50 et 51
+    expect(LEVELS.map((n) => filmPlan(cardAt(n)).keepLine)).toEqual([true, false, false, true, true, false]);
+    for (const n of LEVELS) {
+      for (const lang of ["fr", "en"] as const) {
+        const p = filmPlan(cardAt(n));
+        const r = p.radio[lang];
+        for (const s of p.stars) {
+          const line = r.beats[s.star - 1];
+          // les images où la ligne de l'étoile est à l'écran (la ligne principale), avant la fiche (sommet du flash)
+          const shown: number[] = [];
+          let alone = 0;
+          for (let f = s.frame; f < p.flash.peak; f++) {
+            const radio = hudAt(p, at(f), lang).radio;
+            if (radio?.text !== line) continue;
+            shown.push(f);
+            if (radio.below === null) alone++;
+            else expect(radio.kicker).toBeNull();
+          }
+          // d'un seul tenant, dès son étoile : elle ne revient pas après avoir disparu
+          expect(shown[0]).toBe(s.frame);
+          expect(shown[shown.length - 1] - shown[0]).toBe(shown.length - 1);
+          expect(shown.length).toBeGreaterThanOrEqual(1.8 * FPS);
+          const kept = p.keepLine && s.star === n;
+          if (kept) {
+            // gardée jusqu'à la fiche : l'interception dessous dès son image, puis la fin de course au gel
+            expect(shown[shown.length - 1]).toBe(p.flash.peak - 1);
+            expect(alone).toBe(p.intercept! - s.frame);
+            expect(hudAt(p, at(p.intercept!), lang).radio).toMatchObject({ text: line, below: r.intercept });
+            expect(hudAt(p, at(p.freeze - 1), lang).radio).toMatchObject({ text: line, below: r.intercept });
+            expect(hudAt(p, at(p.freeze), lang).radio).toMatchObject({ text: line, below: r.end, kicker: null });
+          } else {
+            expect(alone).toBe(shown.length);
+            expect(alone).toBeGreaterThanOrEqual(1.5 * FPS);
+          }
+        }
+        // sans ligne gardée, jamais de seconde ligne
+        if (!p.keepLine) for (let f = 0; f < p.frames; f++) expect(hudAt(p, at(f), lang).radio?.below ?? null).toBeNull();
+      }
+    }
   });
 
   it("une à cinq étoiles, le gel sur place : la vidéo jusqu'à la dernière image du dernier tronçon joué, gelée ; ni FIN6, ni image du tronçon suivant", () => {

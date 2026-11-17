@@ -249,7 +249,8 @@
 /* la radio, seul texte du film qui parle de la personne : une seule ligne en 14 px
    (16 au-delà de 768 px de large), à 16 px au moins des bords de l'image, centrée
    dans la bande entre l'image et les boutons (--radio-zone : la bande sans les
-   boutons) ; le chef d'accusation porte son étiquette au-dessus, en petit */
+   boutons) ; le chef d'accusation porte son étiquette au-dessus, en petit ; la ligne
+   d'une étoile gardée jusqu'à la fiche porte la suivante dessous, en petit */
 .film-band-bottom {
   --radio-zone: max(32px, calc(var(--band-b) - 62px));
 }
@@ -279,17 +280,25 @@
   min-width: 0;
 }
 .film-radio-text,
-.film-radio-kicker {
+.film-radio-kicker,
+.film-radio-below {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 /* l'étiquette, alignée sur le texte (après le carré et son espace) */
-.film-radio-kicker {
+.film-radio-kicker,
+.film-radio-below {
   padding-left: 14px;
   font: 500 12px/14px var(--f-mono);
   letter-spacing: 0.08em;
   color: rgb(255 249 203 / 0.62);
+}
+/* la ligne qui suit celle d'une étoile gardée jusqu'à la fiche (l'interception, la
+   fin de course) : en petit dessous, plus claire que l'étiquette, elle se lit sans
+   passer devant la fiche de la personne ; avec elle, 32 px tiennent encore */
+.film-radio-below {
+  color: rgb(255 249 203 / 0.8);
 }
 /* téléphone dont le film fait 700 px de haut ou moins (320 × 568, 375 × 667) : la
    radio garde ses 14 px, interligne serré, et son étiquette tient avec elle en 32 px */

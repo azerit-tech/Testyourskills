@@ -10,7 +10,7 @@ import { LEVEL_LABELS, starsFor } from "../types";
 import { SCENE_LIGHT, sceneOf, type Light } from "../scenes";
 import { plateSub } from "../card/mug";
 import { radioLines, type Radio, type RadioCard } from "./radio";
-import { CHASE_FRAMES, FLICKER_ON, FPS, INTERCEPT_LEAD, STAR_FRAMES, TITLE_POP, holdOf, playEnd } from "./cut";
+import { CHASE_FRAMES, FLICKER_ON, FPS, INTERCEPT_LEAD, STAR_FRAMES, STAR_READ, TITLE_POP, holdOf, playEnd } from "./cut";
 
 /** La fiche se monte deux images après le claquement du titre : l'image est fixe, rien ne bouge à l'écran. */
 const STAGE_AFTER = TITLE_POP + 2;
@@ -61,6 +61,12 @@ export interface FilmPlan {
   freeze: number;
   /** L'interception (une à cinq étoiles) : la radio l'annonce dès cette image, avant le gel ; absente à six étoiles. */
   intercept: number | null;
+  /**
+   * La ligne de la dernière étoile reste à l'écran jusqu'à la fiche, l'interception
+   * puis la fin de course en dessous, en petit : l'interception la suivrait de moins
+   * de STAR_READ images (une, quatre et cinq étoiles), elle ne se lirait pas.
+   */
+  keepLine: boolean;
   /** L'étoile suivante clignote deux fois juste avant le gel, puis s'éteint ; absent à six étoiles. */
   flicker: { star: Stars; frames: [number, number][] } | null;
   /** Le flash : début, sommet (la fiche se pose : passage de relais), fin du film. */
@@ -110,6 +116,7 @@ export function filmPlan(card: FilmCard): FilmPlan {
   const freeze = cut - 1;
   const from = freeze + hold.freeze;
   const flash = { from, peak: from + hold.rise, to: from + hold.flash };
+  const intercept = level < 6 ? cut - INTERCEPT_LEAD : null;
   return {
     id: card.id,
     level,
@@ -120,7 +127,8 @@ export function filmPlan(card: FilmCard): FilmPlan {
     cut,
     chaseEnd: level === 6 ? CHASE_FRAMES : cut,
     freeze,
-    intercept: level < 6 ? cut - INTERCEPT_LEAD : null,
+    intercept,
+    keepLine: intercept !== null && intercept - STAR_FRAMES[level - 1] < STAR_READ,
     flicker: level < 6 ? { star: (level + 1) as Stars, frames: FLICKER_ON.map(([a, b]) => [cut + a, cut + b] as [number, number]) } : null,
     flash,
     frames: flash.to,

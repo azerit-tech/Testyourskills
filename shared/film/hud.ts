@@ -32,8 +32,12 @@ export interface Hud {
   stars: StarHud[];
   /** Étoiles allumées par la poursuite (jamais plus que le niveau). */
   lit: number;
-  /** La ligne de radio, son étiquette au-dessus (le chef d'accusation) et la couleur de son carré ; null pendant l'ouverture. */
-  radio: { text: string; kicker: string | null; square: "coral" | "lilac" } | null;
+  /**
+   * La ligne de radio, son étiquette au-dessus (le chef d'accusation) et la couleur de son carré ; null pendant l'ouverture.
+   * `below` : la ligne suivante, en petit dessous, quand celle de la dernière étoile reste à l'écran (`plan.keepLine`) :
+   * l'interception, puis la fin de course. L'étiquette tombe alors : deux lignes seulement tiennent dans la bande.
+   */
+  radio: { text: string; kicker: string | null; below: string | null; square: "coral" | "lilac" } | null;
   /** Fermeture des bandes d'encre : 0 ouvertes, 1 fermées. */
   bands: number;
   /** L'arrêt sur image : deux tons, plaque et titre (échelle du claquement, 1,2 à 1). */
@@ -83,13 +87,18 @@ export function hudAt(plan: FilmPlan, t: number, lang: Lang): Hud {
   }
 
   // La radio : muette à l'ouverture, une ligne par étoile, l'interception juste
-  // avant le gel (une à cinq étoiles), puis la fin de course au gel.
+  // avant le gel (une à cinq étoiles), puis la fin de course au gel. Quand
+  // l'interception suit de trop près la dernière étoile (plan.keepLine), la ligne
+  // de l'étoile reste jusqu'à la fiche, les deux autres passent dessous, en petit.
   const r = plan.radio[lang];
+  const live = phase === "chase" || phase === "ending";
   const intercepted = plan.intercept !== null && frame >= plan.intercept;
-  const beat = (phase === "chase" || phase === "ending") && !intercepted && lit > 0 ? lit - 1 : -1;
-  const text = phase === "chase" || phase === "ending" ? (intercepted ? r.intercept : beat >= 0 ? r.beats[beat] : null) : r.end;
-  const kicker = beat >= 0 ? (r.kickers[beat] ?? null) : null;
-  const radio = text ? { text, kicker, square: (Math.floor(frame / SQUARE_STEP) % 2 === 0 ? "coral" : "lilac") as "coral" | "lilac" } : null;
+  const news = live ? (intercepted ? r.intercept : null) : r.end;
+  const beat = lit > 0 && (news === null || plan.keepLine) ? lit - 1 : -1;
+  const below = beat >= 0 ? news : null;
+  const text = beat >= 0 ? r.beats[beat] : news;
+  const kicker = beat >= 0 && below === null ? (r.kickers[beat] ?? null) : null;
+  const radio = text ? { text, kicker, below, square: (Math.floor(frame / SQUARE_STEP) % 2 === 0 ? "coral" : "lilac") as "coral" | "lilac" } : null;
 
   // Les bandes se ferment à l'ouverture, s'ouvrent après le sommet du flash.
   const bands = landed ? 1 - clamp01((f - flash.peak) / (flash.to - flash.peak)) : clamp01(f / BANDS_CLOSE);

@@ -108,6 +108,13 @@ export const SQUARE_STEP = 6;
  */
 export const INTERCEPT_LEAD = 12;
 /**
+ * La ligne de radio d'une étoile porte la fiche (la spécialité, l'arme…) : elle
+ * se lit au moins tant d'images (1,83 s) avant la fiche. Quand l'interception
+ * la suivrait plus tôt (une, quatre et cinq étoiles), elle reste à l'écran
+ * jusqu'à la fiche, l'interception puis la fin de course en dessous (§18.56).
+ */
+export const STAR_READ = 44;
+/**
  * L'étoile suivante clignote deux fois et reste éteinte : allumée sur ces
  * intervalles d'images, comptés depuis la fin du dernier tronçon joué (négatifs :
  * avant elle).
