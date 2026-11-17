@@ -6,6 +6,16 @@ Conventions. Repère de ville : celui du pont (`scene_c.py`, `lieux.py`), z = 0 
 
 **`FILM3D_VILLE`** (variable d'environnement, défaut « 1 ») : à « 1 », chaque lieu se construit rogné pour la ville, comme décrit en 2.5 ; à « 0 », l'ancien lieu autonome, avec ses faux lointains.
 
+## Le trajet roulé en entier (17 novembre 2026, SPEC §18.53)
+
+Ce qui suit remplace l'ellipse de la montée du pont et le découpage en sept plans de deux secondes : la berline roule réellement de l'avenue à la pointe, une seule conduite (`parcours.py`), une seule caméra (le bras commun de poursuite, de dos, 2,4 m), aucun saut. Les lieux gardent leurs poses (2.2) ; la route s'allonge pour les relier : 90 m d'avenue avant l'ancienne ouverture (`AV_AVANT`), la montée du pont roulée (`MONTEE` = 329,91 m, réglée pour que la rue tombe sur le quai à 0,5 mm près), un changement de voie de 1,45 m sur le plat du pont (de l'axe de la rue à la voie x 1,80), l'arrivée sur la pointe (arc à gauche de 25° sur 40 m, arrêt 3 m plus loin).
+
+- **Le trajet** : 742,5 m jusqu'à l'arrêt ; la poursuite (OUV/1 à l'entrée de la pointe) 720,4 m en 770 images (32,08 s), l'arrêt à 35,15 s. Moyenne 80,8 km/h, pointe 130 km/h (sur le pont, crête comprise), 39,9 km/h au plus lent du rond-point, 36,6 au port. Glisses : 29,0° au rond-point, 36,0° au port (les dérapages dessinés du 13 novembre, inchangés).
+- **Pourquoi pas 25 à 28 s** : sur 742 m, deux virages à 40 km/h et un arrêt sous les limites de la berline sur le mouillé (accélération 2,8 m/s² utiles, freinage 6,4, latérale 6,0) ne laissent pas plus de 81 km/h de moyenne. Le pont seul (de la rue au port, 323 m) prend 10,4 s à 130 km/h de pointe.
+- **Les tronçons du rendu** (images globales, 0 = OUV/1) : OUV 0 + 87 (avenue), P1 87 + 31 (avenue, freinage), P2 118 + 108 (rond-point), P3 226 + 102 (rue des enseignes jusqu'au joint du pont), P4 328 + 249 (le pont entier), P5 577 + 60 (port), P6 637 + 133 (jetée jusqu'à la pointe), FIN6 770 + 122 (freinage, arrêt à l'image 843,6, orbite). Chaque raccord est continu (même instant, même point de la ville, même caméra) : ce ne sont plus des coupes.
+- **Les six étoiles, des instants** (`parcours.ETOILES`, images globales ; le site les lit là) : 1 = 96 (4,00 s, l'avenue lancée, 91 km/h, le rond-point en vue) ; 2 = 162 (6,75 s, le rond-point au plus fort du dérapage) ; 3 = 265 (11,04 s, la berline passe le barrage) ; 4 = 478 (19,92 s, la crête du pont à 130 km/h) ; 5 = 604 (25,17 s, le port au plus fort du dérapage) ; 6 = 718 (29,92 s, la jetée, l'eau des deux côtés) ; puis FIN6 à partir de 770.
+- **Ce que cela rend caduc plus bas** : l'ellipse de P3 à P4 (0, 2.3, 3.2, 6), le plan de face de P4 et sa caméra fixe (2.5 « Pont », 3.2 : le 200 mm ne regarde plus la ville quittée), les durées de 414 images et les seuils d'étoiles aux débuts de plans (6), « trois conduites » (0). La géographie, les poses, les joints et les rognages restent valables.
+
 ## 0. En bref
 
 - **La route du module fait 295 m, la vraie chaussée des lieux construits environ 1 200.** Un monde continu ne s'obtient donc pas en posant les lieux tels quels : on rogne les lieux à leurs jonctions et on les rapproche.
