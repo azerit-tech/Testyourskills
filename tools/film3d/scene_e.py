@@ -1779,7 +1779,10 @@ PLANS = {"P5": plan_P5}
 
 
 PLAN_PALIER = {"P5": "conteneurs"}  # le palier de décor de chaque plan (render_film.py n'en passe pas)
-P5_HAZE = 0.0016                    # la brume du port (la lampe de l'appareil 0 s'y règle : helicos.beam0)
+# la brume du port (la lampe de l'appareil 0 s'y règle : helicos.beam0) ; dans la ville (17 novembre au soir), celle
+# de la prise entière (ville.BRUME_VILLE) : ville.brume la remplace sans changer la densité où le pinceau se règle
+import ville as V  # noqa: E402  (Python pur : la brume de la prise)
+P5_HAZE = V.BRUME_VILLE if L.ville_on() else 0.0016
 P5_BEAM_CAR_W = 5.0e4               # la jumelle du faisceau sur la berline (à 1,2e5 puis 7e4 elle sortait rose et brûlée)
 
 

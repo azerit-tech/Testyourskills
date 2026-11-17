@@ -2,8 +2,9 @@
 # scène et son repère, posés dans un seul repère de ville (celui du pont), le long de la seule route de la berline.
 #
 # Rien n'est écrit en dur : parcours.vers_ville(plan) pose la scène d'un plan dans la ville, parcours.pose_ville(plan)
-# en donne (rot, tx, ty), parcours.CONTINU dit quelles coupes sont continues (toutes sauf l'ellipse P3 → P4). Un
-# changement de route ou d'ancre s'y répercute seul.
+# en donne (rot, tx, ty), parcours.CONTINU dit quelles coupes sont continues (toutes depuis le trajet roulé du 17
+# novembre : une seule prise, OUV à P6, que FIN6 prolonge sans coupe). Un changement de route ou d'ancre s'y répercute
+# seul.
 #
 # L'assemblage (voie choisie) : chaque lieu est construit par sa propre scène, une fois, dans son propre Blender, et
 # mis en cache comme pour un rendu (debit.cached_build : le même .blend que render_film, partagé) ; la ville est
@@ -20,8 +21,8 @@
 #   python3 tools/film3d/ville.py --carte --out DIR    # les lieux en cache, la ville assemblée (DIR/ville.blend), la
 #                                                      # carte vue de dessus (portrait, nord en haut), les tableaux
 #                                                      # d'emprises, de chevauchements et de jonctions
-#   python3 tools/film3d/ville.py --prise --out DIR    # les prises continues grises (Workbench 360 × 640) de
-#                                                      # ville.blend : prise-1.mp4 (OUV à P3), prise-2.mp4 (P4 à P6)
+#   python3 tools/film3d/ville.py --prise --out DIR    # la prise continue grise (Workbench 360 × 640) de
+#                                                      # ville.blend : prise-1.mp4 (OUV à P6)
 #   options : --lieux avenue,pont… ; --lointains (garder les faux lointains) ; --blender PATH
 #   render_film.py --ville DIR                         # un plan rendu avec ses voisins de la ville (voisins, CHARGE) ;
 #                                                      # un voisin plus ancien que son code est refusé, sauf
@@ -64,13 +65,16 @@ WATER_WORLD = ("pont", "port", "jetee")
 # « près » : le lieu entier ; « loin » : le lieu pour ce qui dépasse dans le champ (aujourd'hui le lieu entier, ses
 # versions « loin » viendront) ; la ville lointaine (lieux.distant_city) seulement pour les plans sur l'eau, jamais
 # avec l'avenue, le rond-point ni la rue. Une prise charge l'union de ses plans.
+# Le trajet roulé (17 novembre au soir, le pont de 110 m) : une seule prise, chaque tronçon charge ce que sa caméra
+# voit devant elle, les lieux voisins posés avec lui (rien n'apparaît à une jonction) : la rue voit le pont et le
+# port au bout du boulevard du quai, le pont voit la rue derrière lui, le port et la jetée devant.
 CHARGE = {
     "OUV": (("avenue", "rond-point"), ("rue",), False),
     "P1": (("avenue", "rond-point", "rue"), ("pont",), False),
     "P2": (("avenue", "rond-point", "rue"), ("pont",), False),
-    "P3": (("avenue", "rond-point", "rue"), ("pont",), False),
-    "P4": (("pont",), ("port", "rue"), True),
-    "P5": (("port", "jetee"), ("pont",), True),
+    "P3": (("avenue", "rond-point", "rue"), ("pont", "port"), False),
+    "P4": (("rue", "pont"), ("port", "jetee"), True),
+    "P5": (("pont", "port", "jetee"), (), True),
     "P6": (("port", "jetee"), ("pont",), True),
     "FIN": (("jetee",), ("port", "pont"), True),
     "FIN6": (("jetee",), ("port", "pont"), True),
@@ -421,13 +425,19 @@ def selftest_voisins():
         if BRUME_PRISE[ps[0]]:
             lx = {lieu_of_shot(s)[0] for s in ps}
             assert not [k for k, r in BRUMES.items() if k[0] in lx and r == "porteuse"], ps
+    # le trajet roulé : une seule prise, de l'avenue à la jetée, une seule brume, que FIN6 prolonge
+    tout = ("OUV", "P1", "P2", "P3", "P4", "P5", "P6")
+    assert [p for _a, _b, p in prises()] == [tout], prises()
     ps, cfg = brume_prise("P2")
-    assert ps == ("OUV", "P1", "P2", "P3") and cfg["densite"] == 0.0006
-    assert brume_prise("P5") == (("P4", "P5", "P6"), None) and brume_prise("FIN") == (None, None)
+    assert ps == tout and cfg["densite"] == 0.0006 == BRUME_VILLE
+    assert brume_prise("P5") == (tout, cfg) and brume_prise("FIN6") == (tout, cfg)
+    assert brume_prise("FIN") == (None, None)
     # même densité des deux côtés de chaque coupe continue : la brume vient de la prise, pas du lieu
-    for (a, b), ok in P.CONTINU.items():
+    for (a, b), ok in list(P.CONTINU.items()) + [(("P6", "FIN6"), True)]:
         if ok:
             assert brume_prise(a)[1] is brume_prise(b)[1], (a, b)
+    # chaque lieu de la prise a son air en « fond » (remplacé), aucune brume porteuse ne reste
+    assert all(BRUMES[(n, "haze")] == "fond" for n in ("avenue", "rue", "pont", "port", "jetee"))
     # ce que devient chaque brume (rôle, la prise a sa brume, du plan, de la prise)
     assert sort_brume("fond", True, True, True) == "cachee"            # l'avenue en P1 : la brume de la prise
     assert sort_brume("fond", True, False, True) == "cachee"           # l'avenue voisine de P2
@@ -445,18 +455,21 @@ def selftest_voisins():
         pass
     # la boîte de la prise couvre la berline de chaque image, marge comprise, au-dessus de l'eau
     x0, x1, y0, y1, z0, z1 = boite_brume(ps, 100.0, 40.0)
-    for f in range(1, P.START["P4"] + 1):
+    for f in range(1, P.TOTAL + 1):
         hx, hy = hero_city(f)[:2]
         assert x0 + 100.0 <= hx + 1e-6 and hx <= x1 - 100.0 + 1e-6 and y0 + 100.0 <= hy + 1e-6, f
         assert hy <= y1 - 100.0 + 1e-6, f
     assert -1.5 < z0 < 0.0 < z1 == 40.0
     # (d) les acteurs des voisins de la même prise
-    assert prise_de("P2") == ("OUV", "P1", "P2", "P3") and prise_de("P6") == ("P4", "P5", "P6")
-    assert prise_de("FIN") is None and suivant("P1") == "P2" and suivant("P3") is None and suivant("FIN") is None
+    assert prise_de("P2") == tout and prise_de("P6") == tout
+    assert prise_de("FIN") is None and suivant("P1") == "P2" and suivant("P3") == "P4" and suivant("P6") is None
+    assert suivant("FIN") is None
     assert [classer_ecart(d) for d in (0.0, 0.004, 2.49, 2.5, 3.45, 7.9, 8.0, 86.0)] == \
         ["jumeau"] * 3 + ["douteux"] * 3 + ["distinct"] * 2          # 3,45 m : la patrouille à côté de la berline
-    # les images : la dernière de P1 dans la scène de P1 (qui commence à 1) est 48 ; la première de P2, 49
-    assert image_scene("P1", 1, derniere("P1")) == 48 and image_scene("P1", 1, P.START["P2"]) == 49
+    # les images : la dernière de P1 dans la scène de P1 (qui commence à 1) est sa longueur ; la première de P2, la
+    # suivante
+    n1 = dict(P.SHOTS)["P1"]
+    assert image_scene("P1", 1, derniere("P1")) == n1 and image_scene("P1", 1, P.START["P2"]) == n1 + 1
     assert image_scene("P2", 1, derniere("P1")) == 0 and image_scene("P3", 1, derniere("P2")) == 0
     # les coupes comparées : celles dont les deux plans sont dans la scène (OUV ne charge pas l'avenue de P1)
     assert paires_prise("P1", {"P1", "P2", "P3"}) == [("P1", "P2"), ("P2", "P3")]
@@ -526,8 +539,8 @@ def selftest_voisins():
     assert drapeau_voisin("pont", "phare", True, True, {"pont", "port", "rue"}, True) == (False, "")
     assert drapeau_voisin("jetee", "phare", False, True, take2, True) == (False, "")
     # les boîtes qui cachent les faux lointains du plan : celles des voisins hors de sa prise seulement
-    assert voisins_hors_prise("P2", ["avenue", "rue", "pont"]) == ["pont"]
-    assert voisins_hors_prise("P4", ["port", "rue"]) == ["rue"]
+    assert voisins_hors_prise("P2", ["avenue", "rue", "pont"]) == []      # une seule prise : le pont en est
+    assert voisins_hors_prise("P4", ["port", "rue"]) == []
     assert voisins_hors_prise("FIN", ["port", "pont"]) == ["port", "pont"]       # FIN n'est dans aucune prise
     assert voisins_hors_prise(None, ["port"]) == ["port"]
 
@@ -686,25 +699,26 @@ BRUMES = {
     ("rue", "haze_barrage"): "locale",        # scene_b : 0,0015 devant le barrage
     ("rue", "haze_lamps"): "portee",          # scene_b : 0,004 devant la berline, enfant de son rig
     ("pont", "haze"): "fond",                 # scene_c : 0,0002 (au 200 mm, 300 m d'air), aucun pinceau
-    ("port", "haze"): "porteuse",             # scene_e : P5_HAZE 0,0016, le pinceau de l'appareil 0
-    ("jetee", "haze"): "porteuse",            # scene_d : P6_HAZE 0,0012 (FIN, FIN6 : 0,0005), le même pinceau
+    # (le port et la jetée : « porteuse » jusqu'au 17 novembre ; dans la ville, P5_HAZE = P6_HAZE = la densité de la
+    # prise, leur pinceau s'y règle, et brume() étend leurs lampes liées à la brume de la prise)
+    ("port", "haze"): "fond",                 # scene_e : P5_HAZE, le pinceau de l'appareil 0
+    ("jetee", "haze"): "fond",                # scene_d : P6_HAZE (FIN : 0,0005), le même pinceau
     ("jetee", "haze_pointe"): "locale",       # scene_d, FIN et FIN6 : 0,0025 sur la pointe
 }
 # La brume de chaque prise continue (par son premier plan) : densité, marge autour de la conduite (m), haut (m).
-#   OUV à P3 : 0,0006, la valeur commune de l'avenue et de la rue (son quai : 0,0005 ; le rond-point : aucune) ; la
-#     boîte couvre la berline de toute la prise et 100 m autour (la brume du quai de la rue allait à ±100 m), de 30 cm
-#     au-dessus de l'eau (lieux.haze) à 40 m (celle de l'avenue, la plus longue de la prise).
-#   P4 à P6 : aucune pour l'instant. P5 et P6 portent le pinceau de l'appareil 0, réglé sur leurs densités
-#     différentes (0,0016 et 0,0012 : la coupe P5 → P6 change déjà de brume), et P4 regarde au 200 mm à travers
-#     0,0002. Valeur proposée : 0,0012 (celle de la jetée ; helicos.beam0 recale seul la lampe de brume sur la
-#     densité qu'on lui passe). À poser d'abord dans les scènes (P5_HAZE = P6_HAZE = 0,0012, P4 rejugé au 200 mm, les
-#     lampes liées à la brume de leur scène étendues à celle de la prise : brume() le fait pour une brume « fond »),
-#     puis ici : les trois brumes en « fond » et la ligne P4 remplie.
+# Depuis le trajet roulé (17 novembre au soir) une seule prise, OUV à P6, et FIN6 la prolonge sans coupe (SUITE) :
+# une seule brume de l'avenue à l'arrêt sur la pointe, sans saut. 0,0006, la valeur commune de l'avenue et de la rue
+# (le quai : 0,0005 ; le rond-point : aucune ; FIN : 0,0005) ; le port et la jetée y règlent leur pinceau
+# (scene_e.P5_HAZE, scene_d.P6_HAZE dans la ville : helicos.beam0 recale seul la lampe de brume sur la densité). La
+# boîte couvre la berline de toute la prise et 100 m autour (la pointe de FIN6 comprise), de 30 cm au-dessus de l'eau
+# (lieux.haze) à 40 m.
 BRUME_PRISE = {
     "OUV": dict(densite=0.0006, marge=100.0, haut=40.0),
-    # (17 novembre, le trajet roulé : une seule prise, OUV à P6 ; la ligne « P4 » de l'ancienne prise du pont tombe,
-    # au décor de rejuger la brume de la prise entière)
 }
+BRUME_VILLE = BRUME_PRISE["OUV"]["densite"]     # la densité que les scènes de l'eau prennent dans la ville
+# Les plans qui prolongent une prise sans coupe, hors de parcours.SHOTS : FIN6 suit P6 (parcours.START["FIN6"] ==
+# TOTAL) ; il prend la brume de la prise (pas ses acteurs : FIN6 n'est le voisin de personne)
+SUITE = {"FIN6": "P6"}
 BRUME_Z0 = -1.2          # m : le bas de la boîte, 30 cm au-dessus de l'eau (lieux.WATER_Z = −1,5 ; lieux.haze)
 
 
@@ -723,7 +737,9 @@ def role_brume(lieu_nom, nom):
 
 
 def brume_prise(plan):
-    """(plans de la prise, réglage de sa brume) pour le plan rendu ; (None, None) hors de toute prise (FIN, FIN6)."""
+    """(plans de la prise, réglage de sa brume) pour le plan rendu, ou pour le plan qu'il prolonge (SUITE : FIN6) ;
+    (None, None) hors de toute prise (FIN)."""
+    plan = SUITE.get(plan, plan)
     for _a, _b, ps in prises():
         if plan in ps:
             return ps, BRUME_PRISE.get(ps[0])

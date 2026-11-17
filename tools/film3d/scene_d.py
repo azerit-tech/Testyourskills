@@ -1220,7 +1220,10 @@ def p6_ground(x, y):
     return scene_e.deck_ground(x, y)
 
 
-P6_HAZE = 0.0012
+# la brume de la jetée (le pinceau de l'appareil 0 s'y règle : helicos.beam0) ; dans la ville (17 novembre au soir),
+# celle de la prise entière (ville.BRUME_VILLE), que FIN6 prolonge : ville.brume la remplace sans saut
+import ville as V  # noqa: E402  (Python pur : la brume de la prise)
+P6_HAZE = V.BRUME_VILLE if L.ville_on() else 0.0012
 
 
 def helis_sans_tache(spots):
