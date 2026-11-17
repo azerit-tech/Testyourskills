@@ -2124,6 +2124,56 @@ def test_poursuivants():
           not bad, ", ".join(bad) or "aucun")
 
 
+def test_agents():
+    """Les agents vivants (motion.agent_yaws) : ceux de la pointe sont dans le même état des deux côtés de la jonction
+    P6 → FIN6 (même cible, même départ du ressort, en temps du film) ; le corps tourne au plus de AGENT_TURN_MAX,
+    sans volte-face (≤ AGENT_TURN_RATE_MAX °/s), la tête au plus de AGENT_HEAD_RATE_MAX °/s, même quand la berline
+    passe à 2 m à 90 km/h (le barrage de P3) ; les poses de FIN6 viennent avant l'arrêt, celles de P3 après l'image
+    fixe."""
+    import fin6_orbite as F6
+    import p3_enseignes as P3
+    import p6_jetee as P6
+    import parcours as PC
+    join, rate_b, rate_h, span = 0.0, 0.0, 0.0, 0.0
+    for k, (a, r, _pz, _st) in enumerate(F6.COPS):
+        at = F6.polar(a, r)
+        base = M.face_yaw(at, (F6.CX, F6.CY))
+
+        def run(shift, frames):
+            return M.agent_yaws(at, base, lambda f: F6.hero_film(f + shift), frames, warm=frames[0] + shift - F6.COP_FROM)
+        y6 = run(PC.START["P6"], range(P6.F0 - 1, P6.F0 + P6.FRAMES + 1))
+        yf = run(PC.START["FIN6"], range(F6.F0 - 1, F6.F0 + F6.FRAMES + 1))
+        for g in (PC.START["FIN6"], PC.START["FIN6"] + 1):
+            for i in (0, 1):
+                join = max(join, abs(y6[g - PC.START["P6"]][i] - yf[g - PC.START["FIN6"]][i]))
+        for ys in (y6, yf):
+            seq = [ys[f] for f in sorted(ys)]
+            rate_b = max([rate_b] + [abs(q[0] - p[0]) * M.FPS for p, q in zip(seq, seq[1:])])
+            rate_h = max([rate_h] + [abs(q[1] - p[1]) * M.FPS for p, q in zip(seq, seq[1:])])
+            span = max([span] + [abs(M._wrap(q[0] - base)) for q in seq])
+    # le barrage : la berline passe à 2 m d'un agent qui lui fait face, à 25 m/s
+    pass_y = M.agent_yaws((2.0, 0.0), 0.0, lambda f: (0.0, -40.0 + 25.0 * f / M.FPS), range(0, 72))
+    seq = [pass_y[f] for f in sorted(pass_y)]
+    rate_b = max([rate_b] + [abs(q[0] - p[0]) * M.FPS for p, q in zip(seq, seq[1:])])
+    rate_h = max([rate_h] + [abs(q[1] - p[1]) * M.FPS for p, q in zip(seq, seq[1:])])
+    span = max([span] + [abs(q[0]) for q in seq])
+    check("agents : la pointe dans le même état des deux côtés de la jonction P6 → FIN6", join < 0.01,
+          f"écart {join:.4f}°")
+    check(f"agents : le corps tourne de {M.AGENT_TURN_MAX:g}° au plus, ≤ {M.AGENT_TURN_RATE_MAX:g} °/s ; la tête "
+          f"≤ {M.AGENT_HEAD_RATE_MAX:g} °/s",
+          span <= M.AGENT_TURN_MAX + 0.5 and rate_b <= M.AGENT_TURN_RATE_MAX and rate_h <= M.AGENT_HEAD_RATE_MAX,
+          f"corps {span:.1f}°, {rate_b:.0f} °/s ; tête {rate_h:.0f} °/s")
+    stop_g = PC.START["FIN6"] + F6.F_STOP
+    last = max(F6.cop_keys(k)[-1][0] for k in range(len(F6.COPS)))
+    first = min(F6.cop_keys(k)[1][0] for k in range(len(F6.COPS)))
+    dive = min(P3.COVER[k][1][0] for k in P3.COVER)
+    rise = min(P3.COVER[k][-1][0] - P3.COVER[k][1][0] for k in P3.COVER)
+    check("agents : à la pointe, les poses prises une seconde avant l'arrêt, l'une après l'autre ; au barrage, "
+          "la plongée après l'image fixe, en cinq images",
+          stop_g - 30 <= first < last <= stop_g and dive > P3.STILL_FRAME and rise >= 5,
+          f"pointe {first}→{last} (arrêt {stop_g}) ; barrage {dive} (image fixe {P3.STILL_FRAME}), {rise} images")
+
+
 def test_entrees():
     """Les patrouilles qu'on voit vraiment (audit des mouvements, 18 novembre) : à l'ouverture, la patrouille 1 roule
     à la hauteur de la berline, son capot dans le quart gauche du cadre, puis décroche avant le rond-point ; sur le
@@ -2195,6 +2245,7 @@ if __name__ == "__main__":
     test_poursuivants()
     test_rampes()
     test_entrees()
+    test_agents()
     test_cut_pose()
     test_straight()
     test_braking()

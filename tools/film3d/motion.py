@@ -3169,6 +3169,80 @@ def _main(argv):
     return 2
 
 
+# ---------------------------------------------------------------- les agents vivants (audit des mouvements, 18 novembre)
+#
+# Les agents étaient des statues : un maillage figé (lieux.officer) ou une pose tenue trente images puis basculée en
+# trois. Un agent vivant (lieux.officer_alive) : son corps se tourne vers la berline (un ressort amorti, en retard sur
+# elle, borné), sa tête fait le reste du chemin, il respire et se balance un peu. Ici le calcul, sans Blender ; les
+# lacets suivent la convention de lieux.face (l'armature regarde −y au repos : lacet = atan2(dx, −dy), en degrés).
+AGENT_TURN_MAX = 35.0      # ° : le corps tourné au plus de ça depuis sa pose (pieds posés)
+AGENT_HEAD_MAX = 30.0      # ° : la tête, en plus du corps
+AGENT_BODY_SHARE = 0.6     # la part de l'écart que prend le corps (la tête prend le reste)
+AGENT_HZ, AGENT_ZETA = 0.9, 0.85      # le ressort du corps (un demi-tour d'épaules en 0,4 s, sans rebond)
+AGENT_HEAD_HZ = 1.8                   # la tête, plus vive
+AGENT_TURN_RATE_MAX = 120.0           # °/s : ce que le test borne pour le corps (pieds posés)
+AGENT_HEAD_RATE_MAX = 260.0           # °/s : la tête qui suit une voiture qui passe à 1,5 m (un réflexe)
+
+
+def _wrap(a):
+    return (a + 180.0) % 360.0 - 180.0
+
+
+def face_yaw(at, target):
+    """Le lacet (degrés, lieux.face) qui tourne vers `target` une armature posée en `at` (x, y)."""
+    return math.degrees(math.atan2(target[0] - at[0], -(target[1] - at[1])))
+
+
+def agent_yaws(at, base, target_fn, frames, turn_max=AGENT_TURN_MAX, head_max=AGENT_HEAD_MAX,
+               share=AGENT_BODY_SHARE, warm=24):
+    """{image: (lacet du corps, lacet de la tête par rapport au corps)} en degrés, d'un agent posé en `at`, tourné de
+    `base` au repos, qui suit la berline target_fn(image) -> (x, y) : le corps prend `share` de l'écart (borné à
+    turn_max), la tête le reste (borné à head_max), chacun derrière un ressort amorti (pas de 1/240 s), parti au repos
+    sur sa cible `warm` images avant la première. La berline dans son dos (au-delà de 150°) : il garde le côté par
+    lequel il la regardait (pas de volte-face d'un côté à l'autre)."""
+    frames = list(frames)
+    sub = 10
+    dt = 1.0 / (FPS * sub)
+    side = [0.0]
+
+    def want(f):
+        d = _wrap(face_yaw(at, target_fn(f)) - base)
+        if abs(d) > 150.0 and side[0] and d * side[0] < 0:
+            d = math.copysign(180.0, side[0])
+        elif abs(d) <= 150.0:
+            side[0] = d
+        body = max(-turn_max, min(turn_max, share * d))
+        head = max(-head_max, min(head_max, d - body))
+        return body, head
+    f0 = frames[0] - warm
+    b0, h0 = want(f0)
+    sb, sh = _Spring(AGENT_HZ, AGENT_ZETA, b0), _Spring(AGENT_HEAD_HZ, AGENT_ZETA, h0)
+    out = {}
+    f = f0
+    while f <= frames[-1]:
+        if f >= frames[0]:
+            out[f] = (base + sb.x, sh.x)
+        for k in range(sub):
+            ff = f + k / sub
+            tb, th = want(ff)
+            sb.step(tb, dt)
+            sh.step(th, dt)
+        f += 1
+    return out
+
+
+def agent_idle(frame, seed=0.0, amp=1.0):
+    """(respiration, balancement, hochement) en degrés à l'image `frame` : le buste qui respire (0,27 Hz, 1°), le
+    poids qui passe d'une jambe à l'autre (0,11 Hz, 1,2° de torsion), la tête qui bouge à peine (0,19 Hz, 1,5°) ;
+    des sinus de périodes premières entre elles, la phase tirée de `seed`. `amp` : 0,5 en visée (les bras tiennent
+    l'arme)."""
+    t = frame / FPS
+    p = seed * 2.399
+    return (amp * 1.0 * math.sin(2 * math.pi * 0.27 * t + p),
+            amp * 1.2 * math.sin(2 * math.pi * 0.11 * t + 1.7 * p) + amp * 0.4 * math.sin(2 * math.pi * 0.31 * t + p),
+            amp * 1.5 * math.sin(2 * math.pi * 0.19 * t + 2.3 * p))
+
+
 def key_searchlight(heli_dict, frames, target_fn, f0=F0, fps=FPS):
     """Le projecteur d'hélicoptère (cast_vehicles.load_helicopter) qui vise target_fn(t) -> (x, y, z) monde à
     chaque image ; l'hélicoptère doit déjà avoir ses clés (son pivot suit sa cellule)."""

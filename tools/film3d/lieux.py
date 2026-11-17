@@ -43,7 +43,7 @@ import sys
 
 import bmesh
 import bpy
-from mathutils import Matrix, Vector
+from mathutils import Matrix, Quaternion, Vector
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 LAB = os.path.join(HERE, "lab")
@@ -1522,6 +1522,70 @@ def officer_rig(keys, style=0, name="officer", gun=True):
             cp.attach_handgun(arm, cp.load_handgun("service"))   # posé dans la main de la première pose
         key_pose(arm, frame)
     return arm
+
+
+def track_xy(ob):
+    """(image) -> (x, y) monde d'un objet clé (le rig de la berline) : ses courbes de position lues directement (plus
+    rapide que frame_set sur la ville entière), passées par la matrice de son parent s'il en a un."""
+    import motion as M
+    curves = {fc.array_index: fc for fc in M.fcurves(ob) if fc.data_path == "location"}
+    pm = ob.parent.matrix_world.copy() if ob.parent else Matrix.Identity(4)
+
+    def at(f):
+        p = Vector([curves[i].evaluate(f) if i in curves else ob.location[i] for i in range(3)])
+        q = pm @ p
+        return q.x, q.y
+    return at
+
+
+def officer_alive(arm, frames, target, seed=0, idle=1.0, aim_frames=(), film0=0, warm=24):
+    """Un agent vivant (audit des mouvements, 18 novembre : les agents étaient des statues). `arm` : une armature de
+    officer_rig, ses poses déjà clées, posée et tournée (rotation_euler.z, le lacet de lieux.face) ; `target` : le
+    rig clé de la berline, ou une fonction (image de la scène) -> (x, y). Sur `frames` : le corps se tourne vers elle
+    (motion.agent_yaws : en retard, borné, parti `warm` images avant), la tête fait le reste, le buste respire et le
+    poids se balance (motion.agent_idle sur l'image du film, image + film0 ; moitié moins aux images `aim_frames`, où
+    il tient l'arme en joue). Deux tronçons qui posent le même agent (P6 et FIN6) passent la même cible en temps du
+    film et le même départ du ressort : il est dans le même état des deux côtés de la jonction. Les rotations
+    s'ajoutent aux poses clées (os Spine2 et Head, dans leur repère de repos) : les bascules d'une pose à l'autre
+    restent celles de officer_rig. Renvoie le nombre d'images clées."""
+    import cast_people as cp
+    import motion as M
+    frames = list(frames)
+    at_xy = (arm.location.x, arm.location.y)
+    base = math.degrees(arm.rotation_euler.z)
+    car = target if callable(target) else track_xy(target)
+    yaws = M.agent_yaws(at_xy, base, car, frames, warm=warm)
+    arm.rotation_mode = "XYZ"
+    for f in frames:
+        arm.rotation_euler.z = math.radians(yaws[f][0])
+        arm.keyframe_insert("rotation_euler", index=2, frame=f)
+    bm = cp.bone_map(arm)
+    aim = set(aim_frames)
+    up, side = Vector((0.0, 0.0, 1.0)), Vector((1.0, 0.0, 0.0))     # repère de l'armature : debout sur z, face à −y
+    for role in ("Spine2", "Head"):
+        if role not in bm:
+            continue
+        pb = arm.pose.bones[bm[role]]
+        pb.rotation_mode = "QUATERNION"
+        rest = pb.bone.matrix_local.to_3x3().inverted()
+        ax_up, ax_side = (rest @ up).normalized(), (rest @ side).normalized()
+        path = f'pose.bones["{pb.name}"].rotation_quaternion'
+        fcs = {fc.array_index: fc for fc in M.fcurves(arm) if fc.data_path == path}
+        base_q = {f: Quaternion([fcs[i].evaluate(f) if i in fcs else pb.rotation_quaternion[i] for i in range(4)])
+                  for f in frames}
+        for fc in fcs.values():
+            fc.keyframe_points.clear()
+        for f in frames:
+            breath, sway, nod = M.agent_idle(f + film0, seed, idle * (0.5 if f in aim else 1.0))
+            if role == "Spine2":
+                d = Quaternion(ax_side, math.radians(breath)) @ Quaternion(ax_up, math.radians(sway))
+            else:
+                d = Quaternion(ax_up, math.radians(yaws[f][1] + 0.4 * nod)) @ Quaternion(ax_side, math.radians(0.5 * nod))
+            q = d @ base_q[f]
+            q.normalize()
+            pb.rotation_quaternion = q
+            pb.keyframe_insert("rotation_quaternion", frame=f)
+    return len(frames)
 
 
 def cabin_light(root, energy=6.0, color="#ffcf9a", dash=60.0, dash_color="#ffb070", dash_loc=(0.3, -0.8, 0.98),

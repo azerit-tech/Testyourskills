@@ -184,6 +184,40 @@ COPS = tuple((a + ROT, r, pose, k) for a, r, pose, k in
              ((22.0, 10.5, "guard", 0), (32.0, 9.0, "crouch", 1), (42.0, 10.0, "aim", 0),
               (54.0, 9.0, "aim", 2), (64.0, 10.0, "stop", 1), (84.0, 9.5, "guard", 2)))
 
+# les agents vivants (audit des mouvements, 18 novembre) : l'arme basse (« guard ») tant que la berline arrive, puis
+# chacun prend sa pose de COPS quand elle freine sur la pointe, une seconde environ avant l'arrêt, l'un après l'autre
+# (COP_ORDER, COP_STAGGER images d'écart), en COP_RISE images (la visée, le bras tendu ; l'accroupi en prend plus) ;
+# en images du film (image f d'un plan = START[plan] + f), que P6 et FIN6 clent pareil (scene_d.fin6_pointe)
+COP_REACT = PC.START["FIN6"] + F_STOP - 26            # la première réaction, 26 images avant l'arrêt
+COP_FROM = PC.START["P6"] - 30                         # le départ de leurs clés et de leur ressort
+COP_ORDER = (2, 4, 0, 3, 1, 5)                         # le rang de réaction de chaque agent
+COP_STAGGER = 3
+COP_RISE = {"aim": 8, "stop": 7, "crouch": 12, "guard": 8}
+
+
+def cop_keys(k):
+    """[(image du film, pose)] de l'agent k : la garde, tenue, puis sa pose de COPS."""
+    pose = COPS[k][2]
+    g0 = COP_REACT + COP_ORDER[k] * COP_STAGGER
+    return [(COP_FROM, "guard"), (g0, "guard"), (g0 + COP_RISE[pose], pose)]
+
+
+def cop_aiming(k, g):
+    """L'agent k tient-il l'arme en joue à l'image g du film (sa pose prise, en visée ou accroupi) ?"""
+    g1 = cop_keys(k)[-1][0]
+    return g >= g1 and COPS[k][2] in ("aim", "crouch")
+
+
+def hero_film(g):
+    """(x, y) de la berline à l'image g du film (fractionnaire) sur la jetée et la pointe : la trajectoire de P6
+    jusqu'à la jonction, celle de FIN6 après (elles coïncident à la jonction) ; la cible des agents, la même dans les
+    deux tronçons."""
+    import p6_jetee as P6
+    if g > PC.START["FIN6"]:
+        return tuple(hero_pos(M.t_of(g - PC.START["FIN6"])))[:2]
+    return tuple(P6.hero_pos(M.t_of(g - PC.START["P6"])))[:2]
+
+
 # --- la caméra : le bras commun, puis l'orbite
 LENS = PC.VISEE_LENS
 AIM_Z = HERO_BOX[2] / 2.0

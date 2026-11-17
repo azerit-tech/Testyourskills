@@ -403,8 +403,17 @@ STILL_FRAME = int(round(F_GAP)) - STILL_BEFORE
 T_STILL = M.t_of(STILL_FRAME)
 SHOTS = {0: tuple(STILL_FRAME - SHOT_EVERY * k for k in (3, 2, 1, 0))}
 # les poses des agents (lieux.officer_rig, lab/cast_people.pose_officer) : (image, pose), puis à couvert
-COVER = {0: ((1, "aim"), (STILL_FRAME + 1, "aim"), (STILL_FRAME + 4, "crouch")),
-         1: ((1, "stop"), (STILL_FRAME + 2, "stop"), (STILL_FRAME + 5, "crouch"))}
+# (audit des mouvements, 18 novembre : la plongée en trois images basculait d'un coup ; elle en prend cinq, amortie,
+# celle qui fait « stop » partie la première, l'autre après sa dernière balle ; entre les clés, lieux.officer_alive
+# les fait respirer et suivre la berline du corps et de la tête)
+COVER_DIVE = 5
+COVER = {0: ((1, "aim"), (STILL_FRAME + 1, "aim"), (STILL_FRAME + 1 + COVER_DIVE, "crouch")),
+         1: ((1, "stop"), (STILL_FRAME + 2, "stop"), (STILL_FRAME + 2 + COVER_DIVE, "crouch"))}
+
+
+def aiming(k, frame):
+    """L'agent k tient-il l'arme en joue (en visée debout, ou à couvert) à l'image `frame` du plan ?"""
+    return k == 0 or frame >= COVER[k][-1][0]
 
 
 def firing(k, frame):
