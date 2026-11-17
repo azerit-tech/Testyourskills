@@ -62,9 +62,12 @@ _TK = _TC - (0.5 if _TB < _TC - 1.5 else 0.15)
 if _TB < _TC - 1.5:
     _T1 = _TB - EARLY
 else:
-    # (à sa hauteur 3,5 m derrière, 5 s avant : elle décroche lentement, l'à-coup sous 10 m/s³)
-    LEAD_PEAK = -3.5
-    _T1 = _TK - 5.0
+    # (audit des mouvements, 18 novembre : à 3,5 m derrière, 5 s avant P2/1, elle n'entrait jamais dans le cadre, à
+    # peine son pare-chocs les vingt premières images d'OUV. Elle est à la hauteur de la berline à l'ouverture, 0,75 m
+    # derrière, son capot et sa portière dans le quart gauche du cadre ; elle lève le pied dès qu'elle voit le
+    # rond-point et sort du cadre par la gauche vers OUV/50 ; l'accélération sous 2,2 m/s², l'à-coup sous 12 m/s³)
+    LEAD_PEAK = -0.75
+    _T1 = -3.2
 
 
 def _hero_y(t):

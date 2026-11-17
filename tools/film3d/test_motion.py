@@ -2124,8 +2124,45 @@ def test_poursuivants():
           not bad, ", ".join(bad) or "aucun")
 
 
+def test_entrees():
+    """Les patrouilles qu'on voit vraiment (audit des mouvements, 18 novembre) : à l'ouverture, la patrouille 1 roule
+    à la hauteur de la berline, son capot dans le quart gauche du cadre, puis décroche avant le rond-point ; sur le
+    pont, la patrouille 0 n'est pas dans le cadre à P4/1 (elle arrive de derrière la caméra) et y entre ensuite."""
+    import ouv_avenue as O
+    import p4_pont as P4
+    spec = M.shot_specs()
+    sp = spec["OUV"]
+    cam = sp.get("rail") or sp["cam"]
+    us = {}
+    for f in range(1, O.FRAMES + 1):
+        t = M.t_of(f)
+        with M.handheld_off():
+            c = tuple(cam(t))
+        px, py = sp["named"]["patrol"](t)[:2]
+        us[f] = M.hero_screen(c, px, py, 0.0, 0.0, box=(5.1, 1.95, 1.5))["u1"]
+    early = min(us[f] for f in range(1, 31))
+    check("OUV : la patrouille 1 à la hauteur de la berline à l'ouverture (capot dans le cadre, images 1 à 30), "
+          "sortie par la gauche avant la fin", early >= 0.12 and us[O.FRAMES] < 0.0,
+          f"bord droit de sa boîte ≥ {early:.2f} (images 1 à 30), {us[O.FRAMES]:.2f} à la dernière")
+    sp = spec["P4"]
+    cam = sp.get("rail") or sp["cam"]
+    heads = sp["module"].tracks_heading() if hasattr(sp["module"], "tracks_heading") else {}
+    seen = []
+    for f in range(P4.F0, P4.F0 + 30):
+        t = M.t_of(f)
+        with M.handheld_off():
+            c = tuple(cam(t))
+        x, y = sp["named"]["patrol_0"](t)[:2]
+        h = heads.get("patrol_0")
+        seen.append(_box_in_frame(c, x, y, h(t) if h else 0.0, M._dims_of("patrol_0")))
+    first = seen.index(True) + P4.F0 if True in seen else None
+    check("P4 : la patrouille 0 hors du cadre à P4/1, puis y entre (arrivée de derrière la caméra)",
+          not seen[0] and first is not None and first >= P4.F0 + 6, f"première image dans le cadre : {first}")
+
+
 if __name__ == "__main__":
     test_poursuivants()
+    test_entrees()
     test_cut_pose()
     test_straight()
     test_braking()
