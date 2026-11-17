@@ -17,7 +17,8 @@ import { existsSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { FILM_FRAMES, FILM_SHOTS, FPS, SHOT_FRAMES, SHOT_START } from "../shared/film/cut";
-import { STILL_TRACED_FRAMES, type StillShot } from "../web/src/film/freeze";
+import { STILL_AT, STILL_TRACED_FRAMES, type StillShot } from "../web/src/film/freeze";
+import STILL from "../shared/film/still-cars.json";
 import { FFMPEG, FFPROBE, ROOT, probeTake } from "./film-io";
 import { FILMS, SIZES, filmFrames, type FilmId } from "./film-lib";
 
@@ -64,18 +65,17 @@ describe.skipIf(!hasFfprobe)("film : les fichiers ont les durées du découpage"
 
 /**
  * Les images gelées sur lesquelles la berline est détourée (STILL_CARS,
- * web/src/film/freeze.ts, §18.54) : l'empreinte (dHash, 8 × 16) de chacune,
- * relevée sur `poursuite-720.mp4`. Un nouveau rendu change l'image : le contour
- * ne tient plus la voiture. Il faut alors le retracer, puis relever l'empreinte ici.
- *
- * TODO (§18.56) : null jusqu'au rendu éclairé du trajet roulé. Les fichiers de
- * 720 images montés, le test échoue sur chaque image gelée en donnant son
- * empreinte : retracer STILL_CARS sur ces images, passer STILL_TRACED_FRAMES à
- * 720 (freeze.ts), puis recopier les empreintes ici. Celles de l'ancien
- * découpage (17 novembre, fichiers de 414 et 80 images) : P1 02030105…, P2
- * 80918a80…, P3 59c046c4…, P4 d5d5cd9d…, P5 00000844…, FIN6 00000080….
+ * web/src/film/freeze.ts, §18.54) : l'empreinte (dHash, 8 × 16) de chacune
+ * dans `poursuite-720.mp4`, relevée avec les contours dans
+ * shared/film/still-cars.json (§18.57). Un nouveau rendu change l'image : les
+ * contours sont alors à recalculer sur la scène qui l'a rendue, puis
+ * l'empreinte à relever, deux commandes et rien à la main :
+ *   python3 tools/film3d/render_film.py --still-cars   (fait par --assemble à chaque prise)
+ *   python3 tools/film3d/render_film.py --empreintes web/src/film/media/poursuite-720.mp4
  */
-const STILL_PRINTS: Record<StillShot, string | null> = { P1: null, P2: null, P3: null, P4: null, P5: null, FIN6: null };
+const STILL_PRINTS = Object.fromEntries(Object.entries(STILL.berlines).map(([shot, b]) => [shot, b.empreinte])) as Record<StillShot, string | null>;
+const REDO = "python3 tools/film3d/render_film.py --still-cars";
+const REPRINT = "python3 tools/film3d/render_film.py --empreintes web/src/film/media/poursuite-720.mp4";
 
 /** L'image gelée de chaque tronçon : sa dernière dans `poursuite` (pour FIN6, la dernière du fichier). */
 const stillFrame = (shot: StillShot): number => SHOT_START[shot] + SHOT_FRAMES[shot] - 1;
@@ -123,16 +123,18 @@ describe.skipIf(!hasFfprobe)("film : la berline détourée tient encore les imag
     const frame = stillFrame(shot);
     it(`${shot} : ${STILL_FILE}, image ${frame}, inchangée depuis le tracé`, (ctx) => {
       if (pending) {
-        const msg = `${STILL_FILE} a ${mounted} images, le découpage en attend ${FILM_FRAMES} : STILL_CARS.${shot} se retrace sur le rendu éclairé (image ${frame})`;
+        const msg = `${STILL_FILE} a ${mounted} images, le découpage en attend ${FILM_FRAMES} : l'empreinte de ${shot} (image ${frame}) se relève sur le rendu éclairé monté (${REPRINT})`;
         if (process.env.FILM_MEDIA_STRICT === "1") throw new Error(msg);
         ctx.skip(msg);
       }
+      if (STILL_TRACED_FRAMES !== FILM_FRAMES || STILL_AT[shot] !== frame)
+        throw new Error(`${shot} : contour calculé pour l'image ${STILL_AT[shot]} d'un fichier de ${STILL_TRACED_FRAMES} images, le découpage gèle l'image ${frame} sur ${FILM_FRAMES} : ${REDO}`);
       const print = dHash(resolve(MEDIA, STILL_FILE), frame);
       const want = STILL_PRINTS[shot];
-      if (want === null || STILL_TRACED_FRAMES !== FILM_FRAMES)
-        throw new Error(`${shot} pas encore tracé sur le fichier de ${FILM_FRAMES} images : retracer STILL_CARS.${shot} (web/src/film/freeze.ts) sur l'image ${frame}, passer STILL_TRACED_FRAMES à ${FILM_FRAMES}, puis relever l'empreinte ${print} dans STILL_PRINTS`);
+      if (!want) throw new Error(`${shot} : pas d'empreinte dans shared/film/still-cars.json (celle du fichier : ${print}) : ${REPRINT}`);
       const apart = bitsApart(print, want);
-      if (apart > 12) throw new Error(`${shot} a changé (${apart} bits sur 128, empreinte ${print}) : retracer STILL_CARS.${shot} dans web/src/film/freeze.ts, puis relever l'empreinte`);
+      if (apart > 12)
+        throw new Error(`${shot} a changé depuis l'export des contours (${apart} bits sur 128, empreinte ${print}) : ${REDO} sur la scène de ce rendu, puis ${REPRINT}`);
     });
   }
 });

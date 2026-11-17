@@ -5,8 +5,8 @@
 // au sol restent dans l'ombre. Même verdict sur un rendu plus contrasté ou plus
 // sombre.
 import { describe, expect, it } from "vitest";
-import { DECOR_TINT, RULE_STEP, STILL_CARS, STILL_TRACED_FRAMES, duotone, stillShot, type StillShot } from "./freeze";
-import { FILM_FRAMES } from "../../../shared/film";
+import { DECOR_TINT, RULE_STEP, STILL_AT, STILL_CARS, STILL_TRACED_FRAMES, duotone, stillShot, type StillShot } from "./freeze";
+import { FILM_FRAMES, SHOT_FRAMES, SHOT_START } from "../../../shared/film";
 
 const W = 180;
 const H = 320;
@@ -156,14 +156,30 @@ describe("arrêt sur image en deux tons", () => {
   });
 });
 
-describe("les contours de la berline (STILL_CARS)", () => {
+describe("les contours de la berline (STILL_CARS, shared/film/still-cars.json)", () => {
   const shots: StillShot[] = ["P1", "P2", "P3", "P4", "P5", "FIN6"];
+  const redo = "python3 tools/film3d/render_film.py --still-cars";
 
   it("chaque image gelée, P1 à P5 et FIN6, a son contour", () => {
     expect(Object.keys(STILL_CARS).sort()).toEqual([...shots].sort());
   });
 
+  it(`les contours sont calculés pour le fichier de ${FILM_FRAMES} images du découpage (sinon : ${redo})`, () => {
+    expect(STILL_TRACED_FRAMES).toBe(FILM_FRAMES);
+  });
+
+  /** Le double de l'aire signée : positif dans le sens des aiguilles d'une montre à l'écran (y vers le bas). */
+  const turn = (car: readonly (readonly [number, number])[]) =>
+    car.reduce((s, [x, y], i) => {
+      const [x2, y2] = car[(i + 1) % car.length];
+      return s + x * y2 - x2 * y;
+    }, 0);
+
   for (const shot of shots) {
+    it(`${shot} : lu sur l'image gelée du découpage, la dernière du tronçon (sinon : ${redo})`, () => {
+      expect(STILL_AT[shot]).toBe(SHOT_START[shot] + SHOT_FRAMES[shot] - 1);
+    });
+
     it(`${shot} : la voiture entière dans l'image, au-dessus de la plaque (73 % de la hauteur)`, () => {
       const car = STILL_CARS[shot];
       expect(car.length).toBeGreaterThanOrEqual(4);
@@ -174,16 +190,20 @@ describe("les contours de la berline (STILL_CARS)", () => {
         expect(y).toBeLessThan(0.73 * 1280);
       }
     });
+
+    it(`${shot} : dans le sens des aiguilles d'une montre, depuis le haut du toit, à la taille d'une voiture`, () => {
+      const car = STILL_CARS[shot];
+      expect(turn(car)).toBeGreaterThan(0);
+      expect(car[0][1]).toBe(Math.min(...car.map(([, y]) => y)));
+      // la berline de dos au bras commun : entre 2 % et 25 % de l'image (les contours de l'ancien découpage : 5 à 9 %)
+      const share = turn(car) / 2 / (720 * 1280);
+      expect(share).toBeGreaterThan(0.02);
+      expect(share).toBeLessThan(0.25);
+    });
   }
 
   it("l'image gelée : le dernier tronçon joué, ou FIN6 à six étoiles", () => {
     for (let level = 1; level <= 5; level++) expect(stillShot({ level: level as 1 })).toBe(`P${level}`);
     expect(stillShot({ level: 6 })).toBe("FIN6");
-  });
-
-  // TODO (§18.56) : les contours sont tracés sur l'ancien découpage (414 images) ; ce test attend le rendu éclairé
-  // du trajet roulé. Les retracer, passer STILL_TRACED_FRAMES à FILM_FRAMES : il tourne alors et doit passer.
-  it.skipIf(STILL_TRACED_FRAMES !== FILM_FRAMES)("les contours sont tracés sur le fichier de 720 images du trajet roulé", () => {
-    expect(STILL_TRACED_FRAMES).toBe(FILM_FRAMES);
   });
 });

@@ -7,10 +7,10 @@
 // Pourquoi un contour et pas une clé seule : les six images gelées sont des
 // images fixes du film, et sur l'avenue (P1) la carrosserie, de nuit et sous le
 // ciel violet, a la couleur du bitume. Aucun seuil ne l'en sépare : le tirage
-// par la clé rouge faisait une tache. La berline est donc détourée une fois pour
-// toutes sur chaque image gelée (STILL_CARS, à retracer quand le film est
-// rendu à nouveau ; scripts/film-media.test.ts vérifie que le contour tient
-// encore la voiture). Le reste est lu sur l'image :
+// par la clé rouge faisait une tache. La berline est donc détourée sur chaque
+// image gelée (STILL_CARS, lu dans la scène du film par render_film.py
+// --still-cars, §18.57 ; scripts/film-media.test.ts vérifie que l'image n'a
+// pas changé depuis). Le reste est lu sur l'image :
 //
 // - **Dans le contour**, une clé « rouge de la carrosserie + luminance », seuillée
 //   à la moitié du seuil d'Otsu : la caisse sort en clair, même dans l'ombre ;
@@ -25,6 +25,7 @@
 // Pur sur les pixels (testé sans navigateur) ; `paintStill` le pose sur une
 // toile, une fois, pendant l'attente.
 import { CHASE_SHOTS, type FilmPlan, type FreezeTone, type ShotId } from "../../../shared/film";
+import STILL_JSON from "../../../shared/film/still-cars.json";
 import { filmVideo } from "./unlock";
 
 type Rgb = [number, number, number];
@@ -32,34 +33,38 @@ type Outline = readonly (readonly [number, number])[];
 /** Les images qui peuvent geler : la dernière de P1 à P5 (une à cinq étoiles), celle de FIN6 (six). */
 export type StillShot = Exclude<ShotId, "OUV" | "P6">;
 
-/** Les contours sont tracés sur l'image du fichier 720 × 1280 ; ils valent pour toutes les tailles. */
-const TRACED = { w: 720, h: 1280 };
+/** Les contours de shared/film/still-cars.json, écrits par `render_film.py --still-cars` (§18.57). */
+interface StillFile {
+  taille: [number, number];
+  images: number;
+  berlines: Record<string, { image: number; empreinte: string | null; contour: [number, number][] }>;
+}
+const STILL = STILL_JSON as unknown as StillFile;
+
+/** Les contours sont en pixels de l'image du fichier 720 × 1280 ; ils valent pour toutes les tailles. */
+const TRACED = { w: STILL.taille[0], h: STILL.taille[1] };
 
 /**
  * La berline sur chaque image gelée, en pixels de l'image 720 × 1280, dans le
  * sens des aiguilles d'une montre depuis le haut du toit (§18.54). P1 à P5 :
  * la dernière image du tronçon dans `poursuite` ; FIN6 : la dernière du fichier.
- * À retracer à chaque nouveau rendu de ces images.
- *
- * TODO (§18.56, au rendu éclairé du trajet roulé) : ces contours sont ceux de
- * l'ancien découpage (fichier de 414 images, P4 de face, FIN6 dans `fin6`) ;
- * aucun ne tient la berline des nouvelles images gelées (les images 107, 214,
- * 317, 425, 485 et 719 du fichier de 720 images, toutes de dos au bras commun).
- * Les retracer sur `poursuite-720.mp4`, passer STILL_TRACED_FRAMES à 720, puis
- * relever les empreintes dans scripts/film-media.test.ts (STILL_PRINTS), qui
- * échoue tant que ce n'est pas fait.
+ * Plus tracés à la main (§18.57) : `python3 tools/film3d/render_film.py
+ * --still-cars` les lit dans la scène du film (la berline seule, rendue en
+ * Workbench avec la caméra du film, son masque détouré) et les écrit dans
+ * shared/film/still-cars.json ; `--assemble` le refait de lui-même à chaque
+ * prise d'un de ces plans.
  */
-/** La longueur du fichier `poursuite` sur lequel STILL_CARS a été tracé : 414, l'ancien découpage (TODO ci-dessus). */
-export const STILL_TRACED_FRAMES = 414;
+export const STILL_CARS: Record<StillShot, Outline> = Object.fromEntries(
+  Object.entries(STILL.berlines).map(([shot, b]) => [shot, b.contour]),
+) as unknown as Record<StillShot, Outline>;
 
-export const STILL_CARS: Record<StillShot, Outline> = {
-  P1: [[300, 612], [420, 612], [440, 624], [462, 700], [494, 728], [502, 815], [490, 836], [232, 836], [220, 815], [226, 728], [246, 700], [268, 624], [280, 614]],
-  P2: [[242, 615], [275, 603], [385, 606], [412, 625], [436, 700], [482, 740], [488, 778], [488, 820], [478, 834], [218, 834], [210, 820], [214, 750], [222, 705], [236, 655]],
-  P3: [[278, 614], [424, 614], [438, 634], [452, 705], [486, 728], [496, 785], [501, 830], [492, 841], [225, 841], [216, 830], [222, 785], [230, 725], [246, 705], [262, 634]],
-  P4: [[245, 598], [460, 598], [476, 614], [486, 672], [504, 698], [504, 780], [507, 800], [500, 822], [196, 822], [189, 800], [196, 780], [201, 700], [216, 675], [227, 616]],
-  P5: [[335, 606], [455, 606], [470, 634], [488, 685], [502, 715], [507, 760], [507, 825], [496, 842], [242, 842], [234, 810], [234, 745], [247, 720], [274, 708], [290, 672], [306, 630]],
-  FIN6: [[265, 667], [340, 658], [420, 662], [482, 673], [535, 718], [600, 725], [648, 731], [652, 780], [654, 797], [640, 822], [598, 856], [440, 864], [300, 840], [190, 818], [140, 803], [108, 785], [104, 745], [110, 718], [155, 700], [250, 690]],
-};
+/** L'image du fichier (comptée de 0) sur laquelle chaque contour a été lu : la dernière du tronçon au moment de l'export. */
+export const STILL_AT: Record<StillShot, number> = Object.fromEntries(
+  Object.entries(STILL.berlines).map(([shot, b]) => [shot, b.image]),
+) as unknown as Record<StillShot, number>;
+
+/** La longueur du fichier `poursuite` pour laquelle STILL_CARS a été calculé (le découpage du moment de l'export). */
+export const STILL_TRACED_FRAMES: number = STILL.images;
 
 /**
  * La teinte qui compte, en degrés autour du rouge pur : le cramoisi de la
