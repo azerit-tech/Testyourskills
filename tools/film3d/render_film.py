@@ -31,6 +31,9 @@
 #   vernis=<0..1>         FILM3D_PAINT_COAT (facteur du poids du vernis)
 #   vernis_rugosite=<0..1>  FILM3D_PAINT_COAT_ROUGH (rugosité ajoutée au vernis)
 #
+# --ville DIR (le film se rend toujours ainsi, SPEC §18.55) : chaque plan avec ses voisins de la ville, images dans
+# <out>/<PLAN>+ville/ ; ce n'est pas un essai, une pleine taille en Cycles y devient une prise du montage.
+#
 # Sur le Mac (règle machine) : jamais la carte graphique, -t 2, sous le verrou commun et nice ; --dry seulement.
 import argparse
 import json
@@ -165,8 +168,20 @@ def is_draft():
 
 
 def with_ville(essais, a):
-    """--ville DIR : les images vont dans <PLAN>+ville, à part des prises du montage."""
+    """--ville DIR : les images vont dans <PLAN>+ville, à part de celles d'un plan rendu seul (sans ses voisins). Ce
+    n'est pas un essai : le film se rend toujours avec --ville (SPEC §18.55), une image pleine taille de <PLAN>+ville
+    devient une prise du montage (is_take)."""
     return dict(essais, ville="") if getattr(a, "ville", None) else essais
+
+
+def is_take(size, info, essais, draft=None):
+    """Une prise du montage : pleine taille, Cycles, sans essai de lumière (« ville » n'en est pas un), ni brouillon
+    FILM3D_DRAFT, ni débit de brouillon de la scène. Sinon un brouillon, à côté des images."""
+    draft = is_draft() if draft is None else int(draft)
+    w, h = size
+    real = {k: v for k, v in essais.items() if k != "ville"}
+    return (w >= FULL[0] and h >= FULL[1] and info.get("engine") == "cycles" and not real and not draft
+            and not info.get("draft_mode"))
 
 
 def plan_dirname(plan, essais, draft=None):
@@ -659,7 +674,8 @@ def bench_summary(a, plans, peaks):
 
 def assemble(a, plans, cut):
     """Les images de chaque plan -> une prise mp4 (24 i/s, H.264 quasi sans perte, bt709) : dans le dossier des prises
-    du montage si elle est complète, en pleine taille et sans essai ; sinon un brouillon à côté des images."""
+    du montage si elle est complète, en pleine taille et sans essai (--ville compris, is_take) ; sinon un brouillon à
+    côté des images."""
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
         sys.exit("[film] ffmpeg introuvable")
@@ -688,8 +704,7 @@ def assemble(a, plans, cut):
             log(f"! {plan} : {last} images sur {n} (plan court ou --frames) : la prise est courte, le montage tiendra "
                 f"la dernière")
         w, h = sizes[0]
-        full = (w >= FULL[0] and h >= FULL[1] and info.get("engine") == "cycles" and not essais and not is_draft()
-                and not info.get("draft_mode"))
+        full = is_take((w, h), info, essais)
         if full:
             os.makedirs(a.plans, exist_ok=True)
             dest = os.path.join(a.plans, f"{plan}-{a.take}.mp4")
@@ -751,6 +766,13 @@ def selftest():
     assert plan_dirname("P3", {"rugosite": "0.5"}, False) == "P3+rugosite0.5" and plan_dirname("P3", {}, False) == "P3"
     assert plan_dirname("P3", {}, 1) == "P3+brouillon" and plan_dirname("P3", {"brume": "1"}, 2) == "P3+brume1+brouillon2"
     assert parse_essais(["rugosite"]) == {"rugosite": "0.5"} and parse_essais(["peinture=#4e0a28"])["peinture"]
+    # --ville n'est pas un essai : le film se rend toujours ainsi, sa pleine taille en Cycles est une prise
+    cyc, ville = {"engine": "cycles"}, with_ville({}, argparse.Namespace(ville="/v"))
+    assert ville == {"ville": ""} and plan_dirname("P3", ville, 0) == "P3+ville"
+    assert is_take(FULL, cyc, ville, 0) and is_take(FULL, cyc, {}, 0)
+    assert not is_take(FULL, cyc, dict(ville, rugosite="0.5"), 0)              # un vrai essai : brouillon
+    assert not is_take(DRAFT, cyc, ville, 0) and not is_take(FULL, {"engine": "workbench"}, ville, 0)
+    assert not is_take(FULL, cyc, ville, 1) and not is_take(FULL, dict(cyc, draft_mode=True), ville, 0)
     for bad in (["peinture"], ["inconnu=1"]):
         try:
             parse_essais(bad)
@@ -787,7 +809,8 @@ def selftest():
         assert debit.deps_match(deps, root=d)
         open(os.path.join(d, "m.py"), "w").write("A = 2\n")
         assert not debit.deps_match(deps, root=d)
-    print("[film] selftest : durées (celles du parcours, plans pas encore migrés compris), --frames, essais, reprise "
+    print("[film] selftest : durées (celles du parcours, plans pas encore migrés compris), --frames, essais, prise "
+          "--ville, reprise "
           "(absente, tronquée, autre taille), clé du cache de scène : ok")
 
 
