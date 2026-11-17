@@ -3,7 +3,7 @@
 // temps de la vidéo : le HUD ne peut pas se décaler de l'image. Sans DOM :
 // testé sans navigateur, et rendu tel quel côté serveur pour le clip (§18.8).
 import type { Lang } from "../types";
-import { BANDS_CLOSE, CUT_INK, FPS, GRAIN_STEP, SHAKE, SQUARE_STEP, STAR_POP, TITLE_FROM, TITLE_POP, chaseShotAt, ENDINGS, type ShotId } from "./cut";
+import { BANDS_CLOSE, CUT_INK, FPS, GRAIN_STEP, SQUARE_STEP, STAR_POP, TITLE_FROM, TITLE_POP, chaseShotAt, ENDINGS, type ShotId } from "./cut";
 import type { FilmPlan } from "./plan";
 
 export type FilmPhase = "chase" | "ending" | "freeze" | "flash" | "over";
@@ -41,8 +41,6 @@ export interface Hud {
   freeze: { titleScale: number } | null;
   /** Opacité du flash crème. */
   flash: number;
-  /** La secousse de l'image (px). */
-  shake: [number, number];
   /** La position de la tuile de grain (px, 0 à 127). */
   grain: [number, number];
 }
@@ -67,15 +65,9 @@ export function hudAt(plan: FilmPlan, t: number, lang: Lang): Hud {
   const onEnding = plan.ending !== null && frame >= cut;
   const landed = frame >= flash.peak;
 
-  // Les étoiles de la poursuite, chacune sur sa coupe.
+  // Les étoiles de la poursuite, chacune sur sa coupe : elle claque (son « pop »), l'image ne bouge pas.
   let lit = 0;
-  let last = -Infinity;
-  for (const s of plan.stars) {
-    if (frame >= s.frame) {
-      lit = s.star;
-      last = s.frame;
-    }
-  }
+  for (const s of plan.stars) if (frame >= s.frame) lit = s.star;
   const stars: StarHud[] = [];
   for (let k = 1; k <= 6; k++) {
     const s = plan.stars[k - 1];
@@ -105,8 +97,6 @@ export function hudAt(plan: FilmPlan, t: number, lang: Lang): Hud {
   const bands = landed ? 1 - clamp01((f - flash.peak) / (flash.to - flash.peak)) : clamp01(f / BANDS_CLOSE);
   const flashOpacity = frame < flash.from ? 0 : f < flash.peak ? clamp01((f - flash.from) / (flash.peak - flash.from)) : 1 - clamp01((f - flash.peak) / (flash.to - flash.peak));
 
-  const age = frame - last;
-  const shake: [number, number] = phase === "chase" && age >= 0 && age < SHAKE.length ? [SHAKE[age][0], SHAKE[age][1]] : [0, 0];
   const frozen = phase === "freeze" || (phase === "flash" && !landed);
 
   return {
@@ -124,7 +114,6 @@ export function hudAt(plan: FilmPlan, t: number, lang: Lang): Hud {
     ink: plan.ending !== null && frame >= cut - 1 && frame < cut - 1 + CUT_INK,
     freeze: frozen ? { titleScale: frame - freeze < TITLE_POP ? TITLE_FROM - ((TITLE_FROM - 1) * (frame - freeze)) / TITLE_POP : 1 } : null,
     flash: flashOpacity,
-    shake,
     grain: grainAt(Math.floor(frame / GRAIN_STEP)),
   };
 }

@@ -391,8 +391,6 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
   const vars = {
     "--film-light": plan.tone.light,
     "--film-shadow": plan.tone.shadow,
-    "--sx": `${hud.shake[0]}px`,
-    "--sy": `${hud.shake[1]}px`,
   } as CSSProperties;
 
   return (

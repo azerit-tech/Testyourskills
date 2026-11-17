@@ -168,7 +168,7 @@ describe("hudAt (§2.2, §5.2)", () => {
     }
   });
 
-  it("aux instants des étoiles : la bonne étoile, le bon plan, la bonne ligne de radio", () => {
+  it("aux instants des étoiles : la bonne étoile (son claquement), le bon plan, la bonne ligne de radio ; l'image ne bouge pas", () => {
     const p = filmPlan(cardAt(6));
     const r = p.radio.fr;
     for (const s of p.stars) {
@@ -179,7 +179,8 @@ describe("hudAt (§2.2, §5.2)", () => {
       expect(on.shot).toBe(CHASE_SHOTS[s.star]);
       expect(on.stars[s.star - 1]).toEqual({ on: true, scale: 1.5 });
       expect(on.radio?.text).toBe(r.beats[s.star - 1]);
-      expect(on.shake).not.toEqual([0, 0]);
+      // plus de secousse (§18.53) : le HUD ne déplace jamais la vidéo
+      expect(on).not.toHaveProperty("shake");
       expect(hudAt(p, at(s.frame + 5), "fr").stars[s.star - 1]).toEqual({ on: true, scale: 1 });
     }
     expect(hudAt(p, at(0), "fr").radio).toBeNull();

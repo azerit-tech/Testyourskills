@@ -64,13 +64,6 @@ export const STAR_POP = 5;
 /** Le titre de l'arrêt sur image claque en tant d'images, de cette échelle à 1 (il reste dans l'écran). */
 export const TITLE_POP = 4;
 export const TITLE_FROM = 1.2;
-/** La secousse de l'image à chaque étoile : 3 px, sur quatre images. */
-export const SHAKE: readonly (readonly [number, number])[] = [
-  [3, -1],
-  [-3, 1],
-  [2, 1],
-  [-1, 0],
-];
 /**
  * Les deux images qui couvrent la bascule de la poursuite à la fin, à six
  * étoiles seulement (de une à cinq, il n'y a plus de coupe : la fin se joue sur

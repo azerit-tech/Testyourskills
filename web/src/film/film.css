@@ -87,8 +87,6 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  /* la secousse de chaque étoile, sans laisser voir le bord */
-  transform: translate3d(var(--sx, 0px), var(--sy, 0px), 0) scale(1.016);
   pointer-events: none;
 }
 .film-stage.is-landed .film-video,
