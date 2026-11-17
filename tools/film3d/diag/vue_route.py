@@ -105,6 +105,8 @@ def main():
     ap.add_argument("--groupe", default=None)
     ap.add_argument("--vues", default=None)
     ap.add_argument("--sonde", action="store_true", help="les objets vus, par bande de l'image (lancers de rayons)")
+    ap.add_argument("--cycles", type=int, default=0,
+                    help="N : en éclairé, Cycles à N échantillons sur la carte graphique (machine louée seulement)")
     a = ap.parse_args(argv)
     os.makedirs(a.out, exist_ok=True)
     todo = [v for v in vues() if (a.groupe is None or v[1] == a.groupe) and (a.vues is None or v[0] in a.vues.split(","))]
@@ -133,6 +135,29 @@ def main():
         sh.light, sh.color_type, sh.show_shadows, sh.show_cavity = "STUDIO", "RANDOM", False, False
         sh.show_object_outline = False
         scene.compositing_node_group = None
+        if a.cycles:
+            # l'éclairé : les réglages de rendu du film (scene_a.render_settings : AgX, rebonds, débruiteur), les
+            # lampes des lieux, le ciel et la mer de la ville (ville.mer), sans brume (comme le gris)
+            import scene_a as SA
+            SA.render_settings(scene)
+            r.resolution_x, r.resolution_y, r.resolution_percentage = 360, 640, 100
+            r.threads_mode = "AUTO"
+            c = scene.cycles
+            c.samples = a.cycles
+            if sys.platform != "darwin":                # jamais la carte graphique du Mac (règle machine)
+                prefs = bpy.context.preferences.addons["cycles"].preferences
+                for kind in ("OPTIX", "CUDA"):
+                    try:
+                        prefs.compute_device_type = kind
+                    except TypeError:
+                        continue
+                    prefs.get_devices()
+                    if any(d.type == kind for d in prefs.devices):
+                        for d in prefs.devices:
+                            d.use = d.type == kind
+                        c.device = "GPU"
+                        break
+            r.use_persistent_data = True
         cam_d = bpy.data.cameras.new("vue")
         cam_d.lens, cam_d.sensor_fit, cam_d.sensor_width = O.LENS, "AUTO", 36.0
         cam_d.clip_start, cam_d.clip_end = 0.05, 12000.0
