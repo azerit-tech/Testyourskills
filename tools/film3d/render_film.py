@@ -8,6 +8,10 @@
 #     du plan (banc/P3+rugosite0.5.png, à comparer à banc/P3.png)
 #   python3 tools/film3d/render_film.py --assemble        # les images -> une prise par plan (plans/<PLAN>-1.mp4)
 #   python3 tools/film3d/render_film.py --list            # construit sans rendre : la liste des assets chargés
+#   python3 tools/film3d/render_film.py --still-cars      # les contours de la berline sur les six images gelées
+#     (Workbench, la berline seule) -> shared/film/still-cars.json, que lit le site (web/src/film/freeze.ts)
+#   python3 tools/film3d/render_film.py --empreintes web/src/film/media/poursuite-720.mp4   # leurs empreintes, relevées
+#     sur le fichier monté, sans Blender
 #   python3 tools/film3d/render_film.py --selftest        # la reprise, les cadences, les noms : sans Blender
 #
 # Options : --plan P3,P4 ; --frames a-b ou 9,13,17-19 (comptées dans le plan, de 1 à sa longueur) ; --samples N (sinon ceux de la
@@ -33,6 +37,12 @@
 #
 # --ville DIR (le film se rend toujours ainsi, SPEC §18.55) : chaque plan avec ses voisins de la ville, images dans
 # <out>/<PLAN>+ville/ ; ce n'est pas un essai, une pleine taille en Cycles y devient une prise du montage.
+#
+# --still-cars (SPEC §18.57) : pour P1 à P5 et FIN6, la dernière image du tronçon (celle qui gèle sur le site), la
+# berline seule rendue en Workbench à 720 × 1280 avec la caméra du film, son masque détouré (still_cars.py) ; écrit
+# shared/film/still-cars.json. Sans lumière ni noyau, sans la ville (elle ne bouge ni la berline ni la caméra) : la
+# scène du cache et quelques secondes par plan. --assemble le lance de lui-même dès qu'il fait une prise d'un de ces
+# plans ; l'empreinte de chaque image gelée est alors relevée sur l'image rendue, sinon par --empreintes MP4.
 #
 # Sur le Mac (règle machine) : jamais la carte graphique, -t 2, sous le verrou commun et nice ; --dry seulement.
 import argparse
@@ -240,7 +250,9 @@ def worker(a):
     cut_n = read_cut()[plan]
     n = plan_frames({plan: cut_n}, (plan,))[plan]     # un plan pas encore migré garde le FRAMES de son module
     essais = with_ville(parse_essais(a.essai), a)
-    out_dir = os.path.join(a.out, plan_dirname(plan, essais))
+    cars = a.mode == "cars"
+    # --still-cars n'écrit rien dans le dossier d'images du plan (son plan.json dit ce qu'est le rendu)
+    out_dir = os.path.join(a.out, "berlines" if cars else plan_dirname(plan, essais))
     os.makedirs(out_dir, exist_ok=True)
     ASSETS = os.path.realpath(assets_dir())
     info = dict(plan=plan, frames=n, cut_frames=cut_n, migrated=n == cut_n, essais=essais, mode=a.mode)
@@ -256,7 +268,7 @@ def worker(a):
             os.environ[env] = essais[k]
     mod_name, arg = SOURCES[plan]
     # les scènes qui s'écrivent en .blend l'écrivent ici, jamais dans les assets
-    os.environ["FILM3D_BLEND"] = os.path.join(out_dir, "scene.blend")
+    os.environ["FILM3D_BLEND"] = os.path.join(out_dir, f"{plan}.blend" if cars else "scene.blend")
     if mod_name == "scene_b":
         os.environ["FILM3D_PLAN"] = plan
     # ce que la construction lit dans les assets (le pilote en fait la liste à emporter)
@@ -275,14 +287,15 @@ def worker(a):
     if not known:
         log(f"! {plan} : {mod_name}.build ne connaît pas encore ce plan ; rien n'est rendu, le montage posera son "
             f"carton (à reprendre quand {mod_name} le construira)")
-        write_info(skipped=f"{mod_name} ne construit pas {plan}")
+        if not cars:
+            write_info(skipped=f"{mod_name} ne construit pas {plan}")
         return
     import debit
     scene, how, t_build, read = debit.cached_build(
         plan, arg, lambda: mod.build(arg) if arg and inspect.signature(mod.build).parameters else mod.build(),
         ASSETS, blend_out=os.environ["FILM3D_BLEND"], use=False if a.mode == "list" else None)
     seen.update(read)
-    if a.ville:
+    if a.ville and not cars:
         # la ville autour du plan (ville.voisins) : après le cache, qui garde la scène du plan seule
         import ville
         ville.voisins(scene, plan, os.path.abspath(a.ville))
@@ -295,6 +308,9 @@ def worker(a):
     log(f"{plan} {'repris du cache' if how == 'cache' else 'construit par ' + mod_name} en {hms(t_build)} : " + (
         f"animé, images {first} à {first + min(span, n) - 1} de la scène" if animated else
         f"PAS ANIMÉ (plage {scene.frame_start}-{scene.frame_end}) : son image fixe {still} sera répétée {n} fois"))
+    if cars:
+        still_car(a, plan, scene, cut_n, min(span, n) if animated else n, first if animated else None, still, out_dir)
+        return
 
     # la liste des assets chargés : fichiers ouverts, images, polices, bibliothèques
     for coll in (bpy.data.images, bpy.data.fonts, bpy.data.libraries, bpy.data.sounds, bpy.data.movieclips,
@@ -414,6 +430,27 @@ def worker(a):
     jf.close()
     write_info(rendered=len(left), complete=not todo(out_dir, idxs, res))
     log(f"{plan} : {len(idxs)} image(s) dans {out_dir}")
+
+
+def still_car(a, plan, scene, cut_n, rendered_n, first, still, out_dir):
+    """--still-cars, dans Blender : la berline sur l'image gelée du plan (la dernière du tronçon, ou la dernière rendue
+    si la scène est plus courte), détourée sur son masque Workbench ; écrit <out>/berlines/<PLAN>.json et le masque."""
+    import bpy
+
+    import still_cars as SC
+    i = SC.plan_index(cut_n, rendered_n)
+    f = first + i - 1 if first is not None else still
+    t0 = time.time()
+    rows, w, h, count = SC.render_mask(bpy, scene, f, os.path.join(out_dir, f"{plan}-masque.png"))
+    pts, info = SC.outline(rows, w, h)
+    xs, ys = [p[0] for p in pts], [p[1] for p in pts]
+    rep = dict(plan=plan, plan_image=i, scene_image=f, contour=pts, objets=count, camera=scene.camera.name, **info)
+    with open(os.path.join(out_dir, f"{plan}.json"), "w", encoding="utf-8") as fh:
+        json.dump(rep, fh, ensure_ascii=False)
+    log(f"{plan} : berline détourée sur l'image {i} du plan (scène {f}, caméra {scene.camera.name}), {count} objets, "
+        f"{info['sommets']} sommets, boîte x {min(xs)}-{max(xs)} y {min(ys)}-{max(ys)}, {info['aire']} px"
+        + (f" ; {info['autres']} px hors de la tache principale, écartés" if info["autres"] else "")
+        + f" ({time.time() - t0:.1f} s)")
 
 
 def setup_render(bpy, scene, a):
@@ -577,12 +614,14 @@ def hollow_haze(bpy, scene):
 
 # ---------------------------------------------------------------- le pilote, sans Blender
 
-def find_blender(path):
+def find_blender(path, required=True):
     for p in (path, os.environ.get("BLENDER"), shutil.which("blender"),
               "/Applications/Blender.app/Contents/MacOS/Blender" if sys.platform == "darwin" else None):
         if p and os.path.exists(p):
             return p
-    sys.exit("[film] Blender introuvable : --blender CHEMIN ou BLENDER=…")
+    if required:
+        sys.exit("[film] Blender introuvable : --blender CHEMIN ou BLENDER=…")
+    return None
 
 
 def vram_used():
@@ -674,7 +713,7 @@ def assemble(a, plans, cut):
     if not ffmpeg:
         sys.exit("[film] ffmpeg introuvable")
     essais = with_ville(parse_essais(a.essai), a)       # --ville : les images de <PLAN>+ville
-    made, drafts = [], []
+    made, drafts, takes = [], [], []
     for plan in plans:
         d = os.path.join(a.out, plan_dirname(plan, essais))
         n = cut[plan]
@@ -717,6 +756,8 @@ def assemble(a, plans, cut):
             cmd[1:1] = ["-threads", str(a.threads)]
         subprocess.run(cmd, check=True)
         made.append(dest)
+        if full:
+            takes.append(plan)
         if not full:
             drafts.append((dest, n - last, (w, h)))
         log(f"{plan} : {last} images {w}×{h} -> {dest}" + ("" if full else " (BROUILLON : pas une prise du montage)")
@@ -734,10 +775,108 @@ def assemble(a, plans, cut):
                 "-an", dest]
         subprocess.run(cmd, check=True)
         log(f"bout-à-bout des brouillons ({len(drafts)} plans) -> {dest}")
+    # une prise d'une image gelée : ses contours de berline suivent (quelques secondes par plan, la scène du cache)
+    frozen = [p for p in takes if p in STILL_SHOTS]
+    if frozen and not getattr(a, "no_still_cars", False):
+        blender = find_blender(a.blender, required=False)
+        if blender:
+            log(f"prises de {', '.join(frozen)} : la berline se détoure sur leurs images gelées (--still-cars)")
+            export_still_cars(a, frozen, blender)
+        else:
+            log(f"! prises de {', '.join(frozen)} : pas de Blender pour détourer la berline, à faire : "
+                f"render_film.py --still-cars")
     if made:
         log("ensuite, sur le Mac : npx tsx scripts/film-contact.ts <prise> (planche-contact), puis "
-            "npx tsx scripts/film-assemble.ts (les six mp4 du site et l'affiche)")
+            "npx tsx scripts/film-assemble.ts (les six mp4 du site et l'affiche), puis render_film.py --empreintes "
+            "web/src/film/media/poursuite-720.mp4 si une empreinte manque")
     return made
+
+
+# ---------------------------------------------------------------- les contours de la berline (--still-cars)
+
+STILL_SHOTS = ("P1", "P2", "P3", "P4", "P5", "FIN6")       # still_cars.SHOTS
+
+
+def site_frames(cut=None):
+    """({plan: image gelée du film}, images du film) selon le découpage du site (shared/film/parcours.json)."""
+    import still_cars as SC
+    cut = cut or read_cut()
+    return SC.freeze_frames(cut, ORDER), sum(cut[p] for p in ORDER)
+
+
+def export_still_cars(a, plans, blender):
+    """Les contours de la berline des plans gelés de `plans` (un Blender par plan, en Workbench), puis
+    shared/film/still-cars.json. Faux si un plan a échoué (le fichier garde alors son contour d'avant)."""
+    import still_cars as SC
+    plans = [p for p in plans if p in STILL_SHOTS]
+    a.mode = "cars"
+    failed = []
+    for plan in plans:
+        try:
+            os.remove(os.path.join(a.out, "berlines", f"{plan}.json"))
+        except OSError:
+            pass
+        ok, _ = run_worker(a, plan, blender)
+        if not ok or not os.path.exists(os.path.join(a.out, "berlines", f"{plan}.json")):
+            failed.append(plan)
+    frames, total = site_frames()
+    old = (SC.read_json() or {}).get("berlines") or {}
+    data = {"//": SC.HEADER, "taille": list(SC.TAILLE), "images": total, "marge": SC.MARGE, "berlines": dict(old)}
+    essais = with_ville(parse_essais(a.essai), a)
+    for plan in plans:
+        if plan in failed:
+            continue
+        got = json.load(open(os.path.join(a.out, "berlines", f"{plan}.json"), encoding="utf-8"))
+        prev = old.get(plan) or {}
+        # l'empreinte : celle de l'image rendue si c'est une prise (le fichier monté en sera tiré) ; celle d'avant si
+        # le contour n'a pas bougé ; sinon à relever sur le fichier monté (--empreintes)
+        d = os.path.join(a.out, plan_dirname(plan, essais))
+        png = frame_path(d, got["plan_image"])
+        info = {}
+        if os.path.exists(os.path.join(d, "plan.json")):
+            info = json.load(open(os.path.join(d, "plan.json"), encoding="utf-8"))
+        mark = None
+        if png_size(png) == FULL and is_take(FULL, info, essais):
+            mark = SC.dhash(png)
+        elif prev.get("contour") == got["contour"] and prev.get("image") == frames[plan]:
+            mark = prev.get("empreinte")
+        data["berlines"][plan] = {"image": frames[plan], "empreinte": mark, "contour": got["contour"]}
+    for plan in [p for p in list(data["berlines"]) if p not in STILL_SHOTS]:
+        del data["berlines"][plan]
+    SC.write_json(data)
+    bad = SC.check(data, frames, total)
+    missing = [p for p, b in data["berlines"].items() if not b.get("empreinte")]
+    log(f"{os.path.relpath(SC.SITE_JSON, ROOT)} : berlines {', '.join(p for p in plans if p not in failed) or 'aucune'} "
+        f"détourées ; images gelées {', '.join(f'{p} {frames[p]}' for p in STILL_SHOTS)} sur {total}")
+    if missing:
+        log(f"empreintes à relever ({', '.join(missing)}) une fois le film monté : python3 tools/film3d/render_film.py "
+            f"--empreintes web/src/film/media/poursuite-720.mp4")
+    for b in bad:
+        log(f"! still-cars.json : {b}")
+    if failed:
+        log(f"ÉCHEC du détourage : {', '.join(failed)} (voir <out>/<PLAN>/blender.log) ; leur contour d'avant reste")
+    return not failed
+
+
+def record_prints(mp4):
+    """--empreintes MP4 : l'empreinte de chaque image gelée, relevée sur le fichier monté, dans still-cars.json (celle
+    que vérifie scripts/film-media.test.ts)."""
+    import still_cars as SC
+    data = SC.read_json()
+    if not data:
+        sys.exit(f"[film] {SC.SITE_JSON} manque : render_film.py --still-cars d'abord")
+    frames, total = site_frames()
+    bad = SC.check(data, frames, total)
+    if bad:
+        sys.exit("[film] still-cars.json ne suit plus le découpage (" + " ; ".join(bad) + ") : render_film.py --still-cars")
+    for plan, b in data["berlines"].items():
+        e = SC.dhash(os.path.abspath(mp4), frame=b["image"])
+        log(f"{plan} : image {b['image']} de {os.path.basename(mp4)}, empreinte {e}"
+            + ("" if not b.get("empreinte") else " (inchangée)" if b["empreinte"] == e else
+               f" (était {b['empreinte']}, {SC.bits_apart(e, b['empreinte'])} bits d'écart)"))
+        b["empreinte"] = e
+    SC.write_json(data)
+    log(f"{os.path.relpath(SC.SITE_JSON, ROOT)} : six empreintes relevées sur {mp4}")
 
 
 def selftest():
@@ -807,10 +946,17 @@ def selftest():
         assert debit.deps_match(deps, root=d)
         open(os.path.join(d, "m.py"), "w").write("A = 2\n")
         assert not debit.deps_match(deps, root=d)
+    # les contours de la berline : le module (sans Blender), et le fichier du site calé sur les images gelées du découpage
+    import still_cars as SC
+    assert STILL_SHOTS == SC.SHOTS
+    SC.selftest()
+    frames, total = site_frames(cut)
+    bad = SC.check(SC.read_json(), frames, total)
+    assert not bad, "shared/film/still-cars.json : " + " ; ".join(bad) + " (render_film.py --still-cars)"
     print("[film] selftest : durées (celles du parcours, lues par le site dans parcours.json, plans pas encore migrés "
           "compris), --frames, essais, prise "
           "--ville, reprise "
-          "(absente, tronquée, autre taille), clé du cache de scène : ok")
+          "(absente, tronquée, autre taille), clé du cache de scène, contours de la berline (still-cars.json) : ok")
 
 
 def main():
@@ -831,6 +977,11 @@ def main():
     ap.add_argument("--bench", action="store_true")
     ap.add_argument("--list", action="store_true", help="construit sans rendre : assets.txt par plan")
     ap.add_argument("--assemble", action="store_true", help="les images -> une prise mp4 par plan")
+    ap.add_argument("--still-cars", action="store_true",
+                    help="les contours de la berline sur les images gelées -> shared/film/still-cars.json")
+    ap.add_argument("--no-still-cars", action="store_true", help="--assemble sans le détourage de la berline")
+    ap.add_argument("--empreintes", default=None, metavar="MP4",
+                    help="relève les empreintes des images gelées sur le fichier monté (poursuite-720.mp4)")
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--out", default=None)
     ap.add_argument("--plans", default=None, help="le dossier des prises du montage (design/film/plans)")
@@ -853,6 +1004,9 @@ def main():
     if a.worker:
         worker(a)
         return
+    if a.empreintes:
+        record_prints(a.empreintes)
+        return
     parse_essais(a.essai)
     plans = [p.strip() for p in a.plan.split(",") if p.strip()]
     for p in plans:
@@ -864,6 +1018,9 @@ def main():
     if a.assemble:
         assemble(a, plans, cut)
         return
+    if a.still_cars:
+        ok = export_still_cars(a, plans, find_blender(a.blender))
+        sys.exit(0 if ok else 1)
     a.mode = "bench" if a.bench else "list" if a.list else "render"
     blender = find_blender(a.blender)
     log(f"{a.mode} de {', '.join(plans)} ({sum(cut[p] for p in plans)} images) ; assets {a.assets} ; images {a.out}")
