@@ -2,8 +2,9 @@
 # scène et son repère, posés dans un seul repère de ville (celui du pont), le long de la seule route de la berline.
 #
 # Rien n'est écrit en dur : parcours.vers_ville(plan) pose la scène d'un plan dans la ville, parcours.pose_ville(plan)
-# en donne (rot, tx, ty), parcours.CONTINU dit quelles coupes sont continues (toutes sauf l'ellipse P3 → P4). Un
-# changement de route ou d'ancre s'y répercute seul.
+# en donne (rot, tx, ty), parcours.CONTINU dit quelles coupes sont continues (toutes depuis le trajet roulé du 17
+# novembre : une seule prise, OUV à P6, que FIN6 prolonge sans coupe). Un changement de route ou d'ancre s'y répercute
+# seul.
 #
 # L'assemblage (voie choisie) : chaque lieu est construit par sa propre scène, une fois, dans son propre Blender, et
 # mis en cache comme pour un rendu (debit.cached_build : le même .blend que render_film, partagé) ; la ville est
@@ -20,10 +21,12 @@
 #   python3 tools/film3d/ville.py --carte --out DIR    # les lieux en cache, la ville assemblée (DIR/ville.blend), la
 #                                                      # carte vue de dessus (portrait, nord en haut), les tableaux
 #                                                      # d'emprises, de chevauchements et de jonctions
-#   python3 tools/film3d/ville.py --prise --out DIR    # les prises continues grises (Workbench 360 × 640) de
-#                                                      # ville.blend : prise-1.mp4 (OUV à P3), prise-2.mp4 (P4 à P6)
+#   python3 tools/film3d/ville.py --prise --out DIR    # la prise continue grise (Workbench 360 × 640) de
+#                                                      # ville.blend : prise-1.mp4 (OUV à P6)
 #   options : --lieux avenue,pont… ; --lointains (garder les faux lointains) ; --blender PATH
-#   render_film.py --ville DIR                         # un plan rendu avec ses voisins de la ville (voisins, CHARGE)
+#   render_film.py --ville DIR                         # un plan rendu avec ses voisins de la ville (voisins, CHARGE) ;
+#                                                      # un voisin plus ancien que son code est refusé, sauf
+#                                                      # VILLE_VOISINS_PERIMES=1 (essais, signalé au journal)
 #
 # Les drapeaux des objets de la ville (propriétés) : ville_lieu (le nom du lieu), ville_lointain (1 : un faux lointain
 # de ce lieu, un décor qui imite un autre lieu ou l'horizon ; lointains(scene, False) les cache tous).
@@ -62,13 +65,16 @@ WATER_WORLD = ("pont", "port", "jetee")
 # « près » : le lieu entier ; « loin » : le lieu pour ce qui dépasse dans le champ (aujourd'hui le lieu entier, ses
 # versions « loin » viendront) ; la ville lointaine (lieux.distant_city) seulement pour les plans sur l'eau, jamais
 # avec l'avenue, le rond-point ni la rue. Une prise charge l'union de ses plans.
+# Le trajet roulé (17 novembre au soir, le pont de 110 m) : une seule prise, chaque tronçon charge ce que sa caméra
+# voit devant elle, les lieux voisins posés avec lui (rien n'apparaît à une jonction) : la rue voit le pont et le
+# port au bout du boulevard du quai, le pont voit la rue derrière lui, le port et la jetée devant.
 CHARGE = {
     "OUV": (("avenue", "rond-point"), ("rue",), False),
     "P1": (("avenue", "rond-point", "rue"), ("pont",), False),
     "P2": (("avenue", "rond-point", "rue"), ("pont",), False),
-    "P3": (("avenue", "rond-point", "rue"), ("pont",), False),
-    "P4": (("pont",), ("port", "rue"), True),
-    "P5": (("port", "jetee"), ("pont",), True),
+    "P3": (("avenue", "rond-point", "rue"), ("pont", "port"), False),
+    "P4": (("rue", "pont"), ("port", "jetee"), True),
+    "P5": (("pont", "port", "jetee"), (), True),
     "P6": (("port", "jetee"), ("pont",), True),
     "FIN": (("jetee",), ("port", "pont"), True),
     "FIN6": (("jetee",), ("port", "pont"), True),
@@ -364,8 +370,179 @@ def selftest():
     import debit
     assert debit.env_key({"FILM3D_VILLE": "1", "FILM3D_HERO": "w111"}) == debit.env_key({"FILM3D_HERO": "w111"})
     assert debit.env_key({"FILM3D_VILLE": "0"}) != debit.env_key({})
+    selftest_voisins()
     print("[ville] selftest : poses de parcours, un lieu une place, prises sans saut, conduite des prises, route sous "
-          "la berline, fenêtres, chargement, clé FILM3D_VILLE : ok")
+          "la berline, fenêtres, chargement, clé FILM3D_VILLE, voisins : ok")
+
+
+def selftest_voisins():
+    """Les décisions de voisins(), sans Blender, sur les vrais noms des scènes."""
+    take1 = {"avenue", "rond-point", "rue", "pont"}
+    # (a) le fond nord du rond-point (scene_f.build_backdrop) hors de sa zone : gardé dans la prise, caché au-delà
+    for nom in ("av_walk_w", "av_block_w", "av_royal_3", "lamp_av_4", "prom_royal_7", "beach_n"):
+        assert drapeau_voisin("rond-point", nom, True, False, take1, True) == (False, ""), nom
+    assert drapeau_voisin("rond-point", "av_walk_w", True, False, take1, False) == (True, "hors zone")
+    assert drapeau_voisin("rue", "patrol_a", False, False, take1, True) == (False, "")
+    # les lointains de nom restent cachés partout
+    for nom in ("lagune", "ville_b12", "autre_rive_relief", "phare_lointain", "sea"):
+        assert drapeau_voisin("rond-point", nom, False, False, take1, True)[0], nom
+    # (b) les noms posés par les scènes : les vraies mers et les lointains, pas le mur de promenade
+    for nom in ("sea", "sea.001", "sea_far", "sea_far.002", "lagune", "lagune.001", "phare_lointain",
+                "phare_lointain_tour", "ville_b12", "ville_enseignes_ff3d7f", "ville_lampes", "ville_quai",
+                "autre_rive_relief", "autre_rive_lampes", "rive_est", "rive_est_lampes", "haze", "haze.001",
+                "haze_quai", "haze_barrage"):
+        assert re.match(LOINTAIN_NOMS, nom), nom
+    for nom in ("sea_wall", "sea_wall.001", "sea_wall_cap", "sea_wall_retour", "sea_wall_retour_cap", "sea_wall_e",
+                "sea_wall_n", "sea_wall_av", "sea_wall_cap_av", "sea_wall_cap_e", "seat", "seat_back", "searchlight",
+                "searchlight_spot", "beach", "beach_e", "wet_sand", "rue_eau", "phare", "phare_lanterne", "patrol_a",
+                "av_walk_w", "lamp_prom_3"):
+        assert not re.match(LOINTAIN_NOMS, nom), nom
+    assert drapeau_voisin("avenue", "sea_wall", False, False, take1, True) == (False, "")
+    # (c) chaque brume posée par une scène (relevée dans le source) a son rôle ; une inconnue arrête tout
+    fichiers = {"scene_a.py": "avenue", "scene_f.py": "rond-point", "scene_carrefour.py": "rond-point",
+                "scene_b.py": "rue", "scene_c.py": "pont", "scene_e.py": "port", "scene_d.py": "jetee"}
+    vues = set()
+    for fn, nom_l in fichiers.items():
+        with open(os.path.join(HERE, fn), encoding="utf-8") as fh:
+            for line in fh:
+                code = line.split("#")[0]
+                for m in re.finditer(r"(?:\bhaze|\bbox)\(\s*\"(haze\w*)\"", code):          # scene_b.haze, scene_a.box
+                    vues.add((nom_l, m.group(1)))
+                if re.search(r"\bL\.haze\(", code):                                           # lieux.haze
+                    m = re.search(r"name=\"(haze\w*)\"", code)
+                    vues.add((nom_l, m.group(1) if m else "haze"))
+    assert vues and not vues - set(BRUMES), sorted(vues - set(BRUMES))
+    assert {("avenue", "haze"), ("rue", "haze_barrage"), ("port", "haze"), ("jetee", "haze_pointe")} <= vues, vues
+    assert role_brume("rue", "haze_quai.001") == "fond" and role_brume("avenue", "haze") == "fond"
+    try:
+        role_brume("rond-point", "haze")
+        raise AssertionError("une brume inconnue doit arrêter")
+    except ValueError:
+        pass
+    # une prise a sa brume ou n'en a pas ; une prise qui a la sienne ne compte aucune brume porteuse de pinceau
+    assert set(BRUME_PRISE) == {ps[0] for _a, _b, ps in prises()}
+    for _a, _b, ps in prises():
+        if BRUME_PRISE[ps[0]]:
+            lx = {lieu_of_shot(s)[0] for s in ps}
+            assert not [k for k, r in BRUMES.items() if k[0] in lx and r == "porteuse"], ps
+    # le trajet roulé : une seule prise, de l'avenue à la jetée, une seule brume, que FIN6 prolonge
+    tout = ("OUV", "P1", "P2", "P3", "P4", "P5", "P6")
+    assert [p for _a, _b, p in prises()] == [tout], prises()
+    ps, cfg = brume_prise("P2")
+    assert ps == tout and cfg["densite"] == 0.0006 == BRUME_VILLE
+    assert brume_prise("P5") == (tout, cfg) and brume_prise("FIN6") == (tout, cfg)
+    assert brume_prise("FIN") == (None, None)
+    # même densité des deux côtés de chaque coupe continue : la brume vient de la prise, pas du lieu
+    for (a, b), ok in list(P.CONTINU.items()) + [(("P6", "FIN6"), True)]:
+        if ok:
+            assert brume_prise(a)[1] is brume_prise(b)[1], (a, b)
+    # chaque lieu de la prise a son air en « fond » (remplacé), aucune brume porteuse ne reste
+    assert all(BRUMES[(n, "haze")] == "fond" for n in ("avenue", "rue", "pont", "port", "jetee"))
+    # ce que devient chaque brume (rôle, la prise a sa brume, du plan, de la prise)
+    assert sort_brume("fond", True, True, True) == "cachee"            # l'avenue en P1 : la brume de la prise
+    assert sort_brume("fond", True, False, True) == "cachee"           # l'avenue voisine de P2
+    assert sort_brume("locale", True, False, True) == "montree"        # le barrage de la rue vu de P2
+    assert sort_brume("locale", True, True, True) == "montree"
+    assert sort_brume("portee", True, True, True) == "intacte"         # haze_lamps dans P3
+    assert sort_brume("portee", True, False, True) == "cachee"
+    assert sort_brume(None, True, False, False) == "cachee"            # le pont, chargé loin de P1 à P3
+    assert sort_brume(None, False, True, True) == "intacte"            # P5 : sa brume porteuse
+    assert sort_brume(None, False, False, True) == "cachee"            # P6 voisine de P5 : comme avant
+    try:
+        sort_brume("porteuse", True, True, True)
+        raise AssertionError("une brume porteuse dans une prise qui a sa brume doit arrêter")
+    except ValueError:
+        pass
+    # la boîte de la prise couvre la berline de chaque image, marge comprise, au-dessus de l'eau
+    x0, x1, y0, y1, z0, z1 = boite_brume(ps, 100.0, 40.0)
+    for f in range(1, P.TOTAL + 1):
+        hx, hy = hero_city(f)[:2]
+        assert x0 + 100.0 <= hx + 1e-6 and hx <= x1 - 100.0 + 1e-6 and y0 + 100.0 <= hy + 1e-6, f
+        assert hy <= y1 - 100.0 + 1e-6, f
+    assert -1.5 < z0 < 0.0 < z1 == 40.0
+    # (d) les acteurs des voisins de la même prise
+    assert prise_de("P2") == tout and prise_de("P6") == tout
+    assert prise_de("FIN") is None and suivant("P1") == "P2" and suivant("P3") == "P4" and suivant("P6") is None
+    assert suivant("FIN") is None
+    assert [classer_ecart(d) for d in (0.0, 0.004, 2.49, 2.5, 3.45, 7.9, 8.0, 86.0)] == \
+        ["jumeau"] * 3 + ["douteux"] * 3 + ["distinct"] * 2          # 3,45 m : la patrouille à côté de la berline
+    # les images : la dernière de P1 dans la scène de P1 (qui commence à 1) est sa longueur ; la première de P2, la
+    # suivante
+    n1 = dict(P.SHOTS)["P1"]
+    assert image_scene("P1", 1, derniere("P1")) == n1 and image_scene("P1", 1, P.START["P2"]) == n1 + 1
+    assert image_scene("P2", 1, derniere("P1")) == 0 and image_scene("P3", 1, derniere("P2")) == 0
+    # les coupes comparées : celles dont les deux plans sont dans la scène (OUV ne charge pas l'avenue de P1)
+    assert paires_prise("P1", {"P1", "P2", "P3"}) == [("P1", "P2"), ("P2", "P3")]
+    assert paires_prise("OUV", {"OUV", "P2", "P3"}) == [("P2", "P3")]
+    assert paires_prise("P5", {"P4", "P5", "P6"}) == [("P4", "P5"), ("P5", "P6")]
+    assert paires_prise("FIN", {"FIN", "P5", "P6"}) == []
+    # qui perd ses jumeaux : le voisin ; entre deux voisins, le plus loin du plan rendu
+    assert cote_retire("P1", "P1", "P2") == "P2" and cote_retire("P3", "P2", "P3") == "P2"
+    assert cote_retire("P1", "P2", "P3") == "P3"       # rig_patrol_c (P3) sort : la patrouille 1 de P2 la précède
+    assert cote_retire("OUV", "P2", "P3") == "P3" and cote_retire("P6", "P4", "P5") == "P4"
+    # sans jumeau : immobile, il reste ; mobile, il sort, sauf l'entrant du plan suivant dans le champ à son image 1
+    assert sort_acteur("P1", "P2", True, True) == (True, "entrant, dans le champ à P2/1")    # la patrouille 2
+    assert sort_acteur("P1", "P2", True, False)[0] is False
+    assert sort_acteur("OUV", "P2", True, True) == (False, "mobile")                        # P1 est entre les deux
+    assert sort_acteur("P5", "P6", True, False)[0] is False                                 # les avions de P6
+    assert sort_acteur("P2", "P3", False, None) == (True, "immobile")                       # le barrage
+    assert sort_acteur("P3", "P2", True, None) == (False, "mobile")
+    assert sort_acteur("P3", "P2", False, None) == (True, "immobile")
+    # (e) les liaisons de lumière d'un voisin qui ont perdu des objets
+    ici = {"lamp_light_3", "island_up_2", "ring_road", "haze.001", "sol_a", "sol_b"}
+    berline = [("coupe.001", "EXCLUDE"), ("door_FL.001", "EXCLUDE"), ("wheel_FL.001", "EXCLUDE")]
+    assert liaison_perdue("receiver_collection", berline, ici) == ("retirer", [n for n, _ in berline])  # rond-point
+    jumelle = [("coupe.002", "INCLUDE"), ("door_FL.002", "INCLUDE")]
+    assert liaison_perdue("receiver_collection", jumelle, ici)[0] == "eteindre"   # la jumelle sur la berline de P5
+    assert liaison_perdue("blocker_collection", jumelle, ici)[0] == "retirer"
+    assert liaison_perdue("receiver_collection", [("haze.001", "INCLUDE")], ici) == ("rien", [])   # brume cachée
+    sol = [("sol_a", "INCLUDE"), ("sol_b", "INCLUDE"), ("coupe.002", "INCLUDE")]
+    assert liaison_perdue("receiver_collection", sol, ici) == ("garder", ["coupe.002"])
+    assert liaison_perdue("receiver_collection", [], ici) == ("rien", [])
+    # (f) l'empreinte d'un voisin en cache : à jour, variables, Blender, code changé, absent
+    import tempfile
+    import debit
+    with tempfile.TemporaryDirectory() as d:
+        os.makedirs(os.path.join(d, "lieux"))
+        blend = os.path.join(d, "P2-abc-def.blend")
+        open(blend, "wb").close()
+        rel = "tools/film3d/parcours.py"
+        sha = debit.sha1(os.path.join(debit.ROOT, rel))
+
+        def poser(env, code, blender="5.2.2"):
+            with open(os.path.join(d, "lieux", "rond-point.json"), "w", encoding="utf-8") as fh:
+                json.dump(dict(nom="rond-point", blend=blend), fh)
+            with open(blend[:-6] + ".json", "w", encoding="utf-8") as fh:
+                json.dump(dict(head=dict(plan="P2", arg="P2", blender=blender, env=env), deps=dict(code={rel: code}),
+                               made=0), fh)
+        poser({}, sha)
+        assert empreinte_voisin(d, "rond-point", environ={}, blender="5.2.2")["ok"]
+        e = empreinte_voisin(d, "rond-point", environ={"FILM3D_HERO": "w111"})
+        assert not e["ok"] and "FILM3D_HERO" in e["raison"] and e["attendu"] == "FILM3D_HERO=w111", e
+        assert e["trouve"] == "FILM3D_HERO=(absente)", e
+        assert empreinte_voisin(d, "rond-point", environ={VOISINS_PERIMES: "1"})["ok"]   # hors de la clé
+        e = empreinte_voisin(d, "rond-point", environ={}, blender="5.3.0")
+        assert not e["ok"] and e["raison"] == "version de Blender" and e["trouve"] == "5.2.2", e
+        poser({}, "0" * 40)
+        e = empreinte_voisin(d, "rond-point", environ={})
+        assert not e["ok"] and rel in e["raison"] and e["attendu"] == f"sha1 {sha[:12]}", e
+        assert e["trouve"] == "sha1 000000000000", e
+        # la rue : FILM3D_PLAN entre dans sa clé (env_for), celle du plan rendu n'y entre pas
+        assert debit.env_key(env_for("rue", {"FILM3D_PLAN": "P2"})) == {"FILM3D_PLAN": "P3"}
+        assert debit.env_key(env_for("rond-point", {"FILM3D_PLAN": "P3"})) == {}
+        assert not empreinte_voisin(d, "pont", environ={})["ok"]                             # pas d'inventaire
+        os.remove(blend)
+        assert empreinte_voisin(d, "rond-point", environ={})["raison"] == "le .blend a quitté le cache"
+    # un seul phare : celui de la jetée ; celui du pont (P4 ne charge pas la jetée) est un doublon en P5 et P6
+    take2 = {"pont", "port", "jetee"}
+    assert drapeau_voisin("pont", "phare", True, True, take2, True) == (True, "doublon du phare de la jetée")
+    assert drapeau_voisin("pont", "phare", True, True, {"pont", "port", "rue"}, True) == (False, "")
+    assert drapeau_voisin("jetee", "phare", False, True, take2, True) == (False, "")
+    # les boîtes qui cachent les faux lointains du plan : celles des voisins hors de sa prise seulement
+    assert voisins_hors_prise("P2", ["avenue", "rue", "pont"]) == []      # une seule prise : le pont en est
+    assert voisins_hors_prise("P4", ["port", "rue"]) == []
+    assert voisins_hors_prise("FIN", ["port", "pont"]) == ["port", "pont"]       # FIN n'est dans aucune prise
+    assert voisins_hors_prise(None, ["port"]) == ["port"]
 
 
 # ---------------------------------------------------------------- dans Blender : chaque lieu en cache
@@ -455,8 +632,22 @@ CAST = re.compile(r"^(hero|coupe|police|patrol|van|heli|jet|officer|agent|focus|
 # Les faux lointains de chaque lieu : ce qui imite un autre lieu ou l'horizon. Deux règles, sur l'objet de tête :
 # son nom (le panorama de lieux.panorama, le phare lointain, les brumes), puis sa place dans la scène du lieu (le
 # centre de sa boîte hors de la zone propre du lieu, zones() : le fond de rue de la rue, le rond-point au bout de
-# l'avenue nord, et dans le monde de l'eau le pont, le port ou la jetée vus depuis un autre de ces trois lieux).
-LOINTAIN_NOMS = r"^(phare_lointain|lagune|ville_|autre_rive|rive_|sea$|sea[._]|haze)"
+# l'avenue nord, et dans le monde de l'eau le pont, le port ou la jetée vus depuis un autre de ces trois lieux). La
+# seconde ne vaut plus pour un voisin de la même prise continue (drapeau_voisin) : ces faux lieux n'existent plus en
+# ville, et ce qu'elle cachait était à son lieu.
+# Ce que chaque motif attrape dans les scènes (relevé sur les noms posés par les modules, 13 novembre) :
+#   phare_lointain    le phare loin des scènes A, F, B (lieux.phare_lointain) et ses pièces phare_lointain_*
+#   lagune            l'eau du panorama des scènes de l'eau (lieux.panorama : water("lagune"))
+#   ville_            la ville lointaine (lieux.distant_city : ville_b*, ville_enseignes_*, ville_quai, ville_sol,
+#                     ville_lampes, ville_balises)
+#   autre_rive, rive_ l'autre rive (lieux.far_shore) et la rive est du port autonome (rive_est*, hors ville)
+#   sea, sea_far      la mer de l'avenue (scene_a, scene_carrefour) et du rond-point (scene_f), la baie lointaine de
+#                     l'avenue autonome ; deux boîtes au même niveau (−1,7 à −1,6 m) qui se recouvrent : une seule
+#                     par scène (sea.001 : la copie renommée au chargement)
+#   haze              les brumes des voisins (puis décidées une à une par brume(), dans voisins : BRUMES)
+# et pas sea_wall*, le mur de promenade de l'avenue et du rond-point (sea_wall, sea_wall_cap, sea_wall_retour*,
+# sea_wall_e/n/av, sea_wall_cap_*) : « sea[._] » l'attrapait, visible en P1 et caché en P2 ; ni searchlight*, ni seat*.
+LOINTAIN_NOMS = r"^(phare_lointain|lagune|ville_|autre_rive|rive_|sea(\.\d+)?$|sea_far(\.\d+)?$|haze)"
 
 
 def zones():
@@ -486,6 +677,102 @@ def zones():
 
 # Les volumes (brumes, fumées, gerbes) : cachés au rendu gris, comme render_film --dry
 VOLUMES = ("haze", "fumee", "spray_")
+
+# La brume : une seule par prise continue (SPEC §18.36), posée par voisins() (brume), de même densité des deux côtés
+# de chaque coupe continue. Chaque lieu pose la sienne dans sa scène ; jusqu'ici, celle du lieu du plan restait et
+# celles des voisins étaient cachées par leur nom : l'avenue (0,0006) en P1, aucune en P2 (le rond-point n'en a pas).
+# Le rôle de chaque brume des scènes, par (lieu, nom sans le suffixe de copie), relevé dans les modules :
+#   fond      l'air du lieu : remplacé par la brume de la prise quand la prise en a une (BRUME_PRISE)
+#   locale    une nappe propre à un endroit du lieu (le barrage de la rue : ses phares et gyrophares y prennent corps ;
+#             la pointe de FIN) : un objet du décor comme un autre, montré chez le voisin de la même prise comme dans
+#             son plan, par-dessus la brume de la prise (en P3, la rue posait déjà la sienne par-dessus son fond)
+#   portee    portée par la berline (scene_b « haze_lamps », enfant de son rig) : elle part avec la berline d'un
+#             voisin ; dans son plan, elle est à la lumière de la berline, pas à ville.py
+#   porteuse  elle porte un pinceau d'hélicoptère réglé sur sa densité (helicos.beam0(T, densité) : la lampe de brume
+#             vaut BEAM0_PINCEAU / densité) et reçoit des lampes liées à elle seule (scene_e._twin, scene_d.helis_sans_tache
+#             et p6_beam0_haze) : ni remplacée ni retouchée ; une prise qui en compte une n'a pas de brume de prise
+BRUMES = {
+    ("avenue", "haze"): "fond",               # scene_a : 0,0006, −60 à 60 m sur 490 m, jusqu'à 40 m
+    ("rue", "haze"): "fond",                  # scene_b : 0,0006 le long de la rue, jusqu'à 30 m
+    ("rue", "haze_quai"): "fond",             # scene_b : 0,0005, le boulevard et le quai, ±100 m
+    ("rue", "haze_end"): "fond",              # scene_b, rue autonome seulement (FILM3D_VILLE=0) : 0,001
+    ("rue", "haze_barrage"): "locale",        # scene_b : 0,0015 devant le barrage
+    ("rue", "haze_lamps"): "portee",          # scene_b : 0,004 devant la berline, enfant de son rig
+    ("pont", "haze"): "fond",                 # scene_c : 0,0002 (au 200 mm, 300 m d'air), aucun pinceau
+    # (le port et la jetée : « porteuse » jusqu'au 17 novembre ; dans la ville, P5_HAZE = P6_HAZE = la densité de la
+    # prise, leur pinceau s'y règle, et brume() étend leurs lampes liées à la brume de la prise)
+    ("port", "haze"): "fond",                 # scene_e : P5_HAZE, le pinceau de l'appareil 0
+    ("jetee", "haze"): "fond",                # scene_d : P6_HAZE (FIN : 0,0005), le même pinceau
+    ("jetee", "haze_pointe"): "locale",       # scene_d, FIN et FIN6 : 0,0025 sur la pointe
+}
+# La brume de chaque prise continue (par son premier plan) : densité, marge autour de la conduite (m), haut (m).
+# Depuis le trajet roulé (17 novembre au soir) une seule prise, OUV à P6, et FIN6 la prolonge sans coupe (SUITE) :
+# une seule brume de l'avenue à l'arrêt sur la pointe, sans saut. 0,0006, la valeur commune de l'avenue et de la rue
+# (le quai : 0,0005 ; le rond-point : aucune ; FIN : 0,0005) ; le port et la jetée y règlent leur pinceau
+# (scene_e.P5_HAZE, scene_d.P6_HAZE dans la ville : helicos.beam0 recale seul la lampe de brume sur la densité). La
+# boîte couvre la berline de toute la prise et 100 m autour (la pointe de FIN6 comprise), de 30 cm au-dessus de l'eau
+# (lieux.haze) à 40 m.
+BRUME_PRISE = {
+    "OUV": dict(densite=0.0006, marge=100.0, haut=40.0),
+}
+BRUME_VILLE = BRUME_PRISE["OUV"]["densite"]     # la densité que les scènes de l'eau prennent dans la ville
+# Les plans qui prolongent une prise sans coupe, hors de parcours.SHOTS : FIN6 suit P6 (parcours.START["FIN6"] ==
+# TOTAL) ; il prend la brume de la prise (pas ses acteurs : FIN6 n'est le voisin de personne)
+SUITE = {"FIN6": "P6"}
+BRUME_Z0 = -1.2          # m : le bas de la boîte, 30 cm au-dessus de l'eau (lieux.WATER_Z = −1,5 ; lieux.haze)
+
+
+def _nom_source(nom):
+    """Le nom d'un objet sans le suffixe de copie que Blender ajoute au chargement d'un voisin (haze.001 : haze)."""
+    return re.sub(r"\.\d{3}$", "", nom)
+
+
+def role_brume(lieu_nom, nom):
+    """Le rôle d'une brume (BRUMES) ; une brume inconnue arrête tout : elle doit être classée avant le rendu."""
+    k = (lieu_nom, _nom_source(nom))
+    if k not in BRUMES:
+        raise ValueError(f"[ville] brume inconnue : « {nom} » du lieu {lieu_nom} ; la classer dans ville.BRUMES "
+                         f"(fond, locale, portee ou porteuse) avant de rendre ce plan dans la ville")
+    return BRUMES[k]
+
+
+def brume_prise(plan):
+    """(plans de la prise, réglage de sa brume) pour le plan rendu, ou pour le plan qu'il prolonge (SUITE : FIN6) ;
+    (None, None) hors de toute prise (FIN)."""
+    plan = SUITE.get(plan, plan)
+    for _a, _b, ps in prises():
+        if plan in ps:
+            return ps, BRUME_PRISE.get(ps[0])
+    return None, None
+
+
+def sort_brume(role, prise_a_brume, propre, meme_prise):
+    """Ce que devient une brume dans la scène d'un plan : « intacte » (rien ne change), « cachee » ou « montree ».
+    `propre` : du lieu du plan ; `meme_prise` : d'un lieu de la prise du plan. Sans brume de prise, comme avant :
+    celle du plan reste, celles des voisins sont cachées."""
+    if not prise_a_brume or not (propre or meme_prise):
+        return "intacte" if propre else "cachee"
+    if role == "porteuse":
+        raise ValueError("[ville] une brume porteuse de pinceau dans une prise qui a sa brume : BRUME_PRISE et BRUMES "
+                         "se contredisent")
+    if role == "fond":
+        return "cachee"
+    if role == "locale":
+        return "montree"
+    if role == "portee":
+        return "intacte" if propre else "cachee"
+    raise ValueError(f"[ville] rôle de brume inconnu : {role!r}")
+
+
+def boite_brume(ps, marge, haut):
+    """(x0, x1, y0, y1, z0, z1) dans la ville : la boîte de la brume de la prise faite des plans `ps`, la berline de
+    toutes ses images et `marge` m autour."""
+    fs = [f for a, b, pp in prises() if tuple(pp) == tuple(ps) for f in range(a, b + 1)]
+    if not fs:
+        raise ValueError(f"[ville] {ps} n'est pas une prise continue")
+    pts = [hero_city(f)[:2] for f in fs]
+    return (min(p[0] for p in pts) - marge, max(p[0] for p in pts) + marge,
+            min(p[1] for p in pts) - marge, max(p[1] for p in pts) + marge, BRUME_Z0, haut)
 COULEURS = {"avenue": (0.95, 0.55, 0.15), "rond-point": (0.35, 0.8, 0.3), "rue": (0.85, 0.3, 0.75),
             "pont": (0.3, 0.55, 0.95), "port": (0.95, 0.85, 0.2), "jetee": (0.2, 0.85, 0.85)}
 SHOT_COL = {"OUV": (1, 1, 1), "P1": (0.1, 0.1, 0.1), "P2": (1, 1, 1), "P3": (0.1, 0.1, 0.1), "P4": (1, 1, 1),
@@ -509,7 +796,10 @@ def is_cast(ob):
 
 # Ce qui sort d'un lieu voisin (SPEC §18.36 : ce qui se voit des deux côtés d'une coupe continue est le même objet,
 # au même endroit, dans le même état) : seulement les acteurs animés de son plan (ce qui se déplace : une clé de
-# position qui varie, ou un chemin suivi), la caméra et les traces que laisse sa berline. Les voitures garées, le barrage et ses agents immobiles, les cônes, les lampes, les émissifs restent.
+# position qui varie, ou un chemin suivi), la caméra et les traces que laisse sa berline. Les voitures garées, le
+# barrage et ses agents immobiles, les cônes, les lampes, les émissifs restent. Dans la même prise, acteurs() en
+# décide après la pose : les jumeaux d'un acteur d'un plan voisin sortent même immobiles, l'entrant du plan suivant
+# reste (voir JUMEAU_M).
 TRACES = re.compile(r"^(wake|traces?|repere)([_.:]|$)")
 
 
@@ -584,16 +874,135 @@ def meme_prise(a, b):
     return any(a in ps and b in ps for _a, _b, ps in prises())
 
 
-def is_lointain(nom, top, zone):
-    """Le drapeau d'une famille (son objet de tête, avant la pose dans la ville) : 0 si elle est cachée de toute
-    façon (les sources), 1 si son nom est celui d'un lointain ou si son centre sort de la zone du lieu ; une famille
-    qui contient le centre du lieu (un grand sol) reste au lieu."""
+def prise_de(plan):
+    """Les plans de la prise continue du plan, None hors de toute prise (FIN, FIN6)."""
+    return next((ps for _a, _b, ps in prises() if plan in ps), None)
+
+
+# Les acteurs d'un voisin de la même prise (SPEC §18.36 : ce qui se voit des deux côtés d'une coupe continue est le
+# même objet, au même endroit, dans le même état et le même mouvement). Deux règles, décidées après la pose (acteurs) :
+# 1. Les jumeaux : à chaque coupe continue dont les deux plans sont dans la scène, un acteur d'un côté et un acteur de
+#    même nature de l'autre, à moins de JUMEAU_M l'un de l'autre à la dernière image avant la coupe, sont le même
+#    (la patrouille de P1, « rig_police1 », et celle de P2, « rig_patrol_1 » ; la patrouille 1 de P2 et
+#    « rig_patrol_c », arrêtée là où P2 la laisse et immobile tout P3 ; la patrouille 2 de P2 et de P3 ; la meute et
+#    les hélicoptères de P5 et P6). Un seul reste : celui du plan rendu, sinon celui du plan le plus proche de lui. Entre
+#    JUMEAU_M et DOUTE_M, un jumeau mal raccordé ou un voisin serré : retiré quand même (jamais de doublon), signalé.
+# 2. Les autres : un acteur immobile reste (le barrage, ses agents, les voitures garées) ; un acteur qui se déplace
+#    sort, sauf celui du plan qui suit le plan rendu, visible à son image 1 depuis sa caméra et sans jumeau dans le
+#    plan rendu (la patrouille 2 de P2, à 86 m devant la berline, phares face caméra, absente de P1) : il existe à la
+#    dernière image du plan rendu, à la place et dans l'état de ses clés décalées.
+JUMEAU_M = 2.5          # m (en trois dimensions, origines des objets de tête : le rig au sol sous la caisse)
+DOUTE_M = 8.0
+
+
+def classer_ecart(d):
+    """« jumeau », « douteux » ou « distinct » : deux acteurs de même nature à d m l'un de l'autre à une coupe."""
+    return "jumeau" if d < JUMEAU_M else "douteux" if d < DOUTE_M else "distinct"
+
+
+def image_scene(plan, frame_start, g):
+    """L'image de la scène du plan rendu (sa première : frame_start) qui montre l'image g de la ville (0 : OUV/1) :
+    celle où les clés décalées d'un voisin de la prise montrent cette image."""
+    return frame_start + g - P.START[plan]
+
+
+def derniere(plan):
+    """L'image de la ville (0 : OUV/1) de la dernière image du plan."""
+    return P.START[plan] + dict(P.SHOTS)[plan] - 1
+
+
+def paires_prise(plan, presents):
+    """Les coupes continues de la prise du plan dont les deux plans sont dans la scène (le plan rendu, les plans des
+    voisins de la prise), dans l'ordre de la prise : [(a, b)]."""
+    ps = prise_de(plan) or ()
+    return [(a, b) for a, b in zip(ps, ps[1:]) if a in presents and b in presents]
+
+
+def cote_retire(plan, a, b):
+    """Le plan, a ou b, dont les jumeaux sortent de la scène du plan rendu à la coupe a → b : l'autre que le plan
+    rendu s'il en est ; sinon le plus loin de lui (deux plans après lui : b ; deux plans avant : a)."""
+    if plan == a:
+        return b
+    if plan == b:
+        return a
+    ps = prise_de(plan)
+    return b if ps.index(a) > ps.index(plan) else a
+
+
+def suivant(plan):
+    """Le plan qui suit le plan dans sa prise, None au bout."""
+    ps = prise_de(plan) or ()
+    i = ps.index(plan) if plan in ps else -1
+    return ps[i + 1] if 0 <= i < len(ps) - 1 else None
+
+
+def sort_acteur(plan, plan_v, bouge, visible):
+    """(gardé ?, raison) d'un acteur sans jumeau d'un voisin de la même prise : plan_v, le plan du voisin ; bouge, il
+    se déplace ; visible, il est dans le champ de plan_v à son image 1 (None : pas regardé)."""
+    if not bouge:
+        return True, "immobile"
+    if plan_v == suivant(plan):
+        if visible:
+            return True, f"entrant, dans le champ à {plan_v}/1"
+        return False, f"mobile, hors du champ à {plan_v}/1"
+    return False, "mobile"
+
+
+def liaison_perdue(attr, membres, presents):
+    """Ce que devient la liaison de lumière d'une lampe d'un voisin dont des objets ont quitté la scène (sans
+    Blender). `attr` : « receiver_collection » (ce qu'elle éclaire) ou « blocker_collection » (ce qui porte son
+    ombre) ; `membres` : [(nom, état)] relevés au chargement, état INCLUDE ou EXCLUDE ; `presents` : les noms des objets
+    de la scène après l'assemblage. Rend (action, absents) :
+      « rien »      aucun absent ;
+      « retirer »   la collection retirée, la lampe rendue à tout le monde : il ne reste aucune inclusion présente
+                    (une exclusion de la berline du voisin, partie : les lampadaires du rond-point, berline_sans_ambre ;
+                    une ombre réservée à des absents) ;
+      « eteindre »  une lampe qui n'éclairait que des absents (sa jumelle sur la berline du voisin, partie avec elle) :
+                    rendue à tout le monde, elle poserait ses 50 kW sur toute la scène (Blender éclaire tout le monde
+                    par une collection vide) ; éteinte ;
+      « garder »    des inclusions restent : la collection ne garde que ses présents (Blender a ôté les absents)."""
+    absents = [n for n, _e in membres if n not in presents]
+    if not absents:
+        return "rien", []
+    inclus = [n for n, e in membres if e == "INCLUDE" and n in presents]
+    if inclus:
+        return "garder", absents
+    if attr == "receiver_collection" and any(e == "INCLUDE" for _n, e in membres):
+        return "eteindre", absents
+    return "retirer", absents
+
+
+# Le phare : un seul, celui de la jetée (SPEC §18.36). Un autre lieu qui en pose un (le pont : lieux.panorama,
+# lieu="pont", pour P4 qui ne charge pas la jetée) le cache, lui et ses lampes (ses enfants), dès que la jetée est là.
+PHARE_LIEU = "jetee"
+
+
+def drapeau_voisin(lieu_nom, nom, hors_zone, phare, presents, prise):
+    """(caché ?, raison) d'une famille d'un lieu voisin, sans Blender. `nom` : son objet de tête ; `hors_zone` : le
+    centre de sa boîte sort de la zone du lieu (zones()) ; `phare` : c'est un phare (lieux.phare, propriété « phare ») ;
+    `presents` : les lieux de la scène (le lieu du plan et ses voisins) ; `prise` : le voisin est de la même prise
+    continue que le plan rendu.
+    Un lointain de nom (LOINTAIN_NOMS) reste caché partout. Un phare d'un autre lieu que la jetée est un vrai doublon
+    quand la jetée est chargée. La règle de zone ne vaut plus dans une même prise : en ville (FILM3D_VILLE), chaque
+    scène est rognée à ses jonctions et ne pose plus aucun faux lieu (scene_a.ville_crop, scene_f « rond-point rogné »,
+    scene_b, et lieux.panorama sans pont, port ni jetée « loin » dans les scènes de l'eau) ; ce qui sort de la zone
+    d'un lieu est à lui (le fond nord du rond-point : l'avenue nord, ses immeubles, ses palmiers, ses trottoirs), et ce
+    qui se voit en P2 doit se voir de P1 et de P3. Hors de la prise (un lieu « loin » au-delà de l'ellipse), elle
+    reste : on n'y regarde que ce qui dépasse dans le champ."""
+    if re.match(LOINTAIN_NOMS, nom):
+        return True, "lointain"
+    if phare and lieu_nom != PHARE_LIEU and PHARE_LIEU in presents:
+        return True, "doublon du phare de la jetée"
+    if hors_zone and not prise:
+        return True, "hors zone"
+    return False, ""
+
+
+def _hors_zone(top, zone):
+    """Le centre de la boîte de la famille (ses maillages) sort-il de la zone du lieu ? (repère de la scène du lieu ;
+    une famille sans maillage n'en sort jamais)"""
     from mathutils import Vector
     fam = [o for o in _family(top) if o.type in ("MESH", "CURVE", "FONT")]
-    if all(_hidden(o) for o in _family(top)):
-        return False
-    if re.match(LOINTAIN_NOMS, top.name):
-        return True
     if not fam:
         return False
     pts = [o.matrix_world @ Vector(c) for o in fam for c in o.bound_box]
@@ -602,15 +1011,30 @@ def is_lointain(nom, top, zone):
     return not zone((x0 + x1) / 2, (y0 + y1) / 2)
 
 
-def assembler(scene, infos, noms, base=None, plan=None):
+def is_lointain(nom, top, zone):
+    """Le drapeau d'une famille (son objet de tête, avant la pose dans la ville) : 0 si elle est cachée de toute
+    façon (les sources), 1 si son nom est celui d'un lointain ou si son centre sort de la zone du lieu ; une famille
+    qui contient le centre du lieu (un grand sol) reste au lieu."""
+    if all(_hidden(o) for o in _family(top)):
+        return False
+    if re.match(LOINTAIN_NOMS, top.name):
+        return True
+    return _hors_zone(top, zone)
+
+
+def assembler(scene, infos, noms, base=None, plan=None, own=None, own_objs=None):
     """Ajoute chaque lieu à la scène de ville : sa collection, sa racine (la transformation de placement), ses
     objets parentés à la racine, ses drapeaux. `base` (4 × 4, lignes) : le repère de la scène, s'il n'est pas celui de
     la ville (voisins : la scène d'un plan). `plan` (voisins) : le plan rendu ; un lieu de la même prise n'y perd que
-    ses acteurs animés (is_acteur), et ses clés passent dans la numérotation du plan (la même image de la prise, le
-    même état : lampes, rampes, enseignes). Rend {nom: dict(racine, collection, objets, retirés, lointains)}."""
+    sa caméra, les traces de sa berline s'il suit, et les acteurs que acteurs() lui retire (jumeaux, acteurs qui se
+    déplacent), et ses clés passent dans la numérotation du plan (la même image de la prise, le même état : lampes,
+    rampes, enseignes) ; il ne perd rien par la règle de zone (drapeau_voisin). `own`, `own_objs` (voisins) : le lieu
+    du plan rendu et les objets de sa scène. Rend {nom: dict(racine, collection, objets, retirés, lointains)}."""
     import bpy
     from mathutils import Matrix
     out = {}
+    cams, releves = {}, {}
+    presents = set(noms) | ({own} if own else set())
     for nom in noms:
         info = infos[nom]
         t0 = time.time()
@@ -627,15 +1051,20 @@ def assembler(scene, infos, noms, base=None, plan=None):
         for ob in list(sc.collection.objects):
             coll.objects.link(ob)
         objs = set(sc.objects)
+        releves[nom] = _releve_liaisons(objs)     # (avant toute sortie : liaisons() compare après l'assemblage)
+        if prise:
+            cams[nb_plan] = sc.camera             # (pour acteurs : le champ du voisin à son image 1)
         world = sc.world
         bpy.data.scenes.remove(sc)
         if world is not None and world.users == 0:
             bpy.data.worlds.remove(world)
         gone = set()
-        # les traces d'un voisin dont le plan précède restent (la berline y est passée) ; s'il suit, elles sortent
+        # les traces d'un voisin dont le plan précède restent (la berline y est passée) ; s'il suit, elles sortent.
+        # Dans la prise, la caméra et les acteurs attendent la pose de tous les lieux (acteurs) : les jumeaux se
+        # comparent dans la scène, à la coupe, et le champ du voisin se lit depuis sa caméra
         suit = prise and P.START[nb_plan] > P.START[plan]
         for top in _tops(objs):
-            if (is_acteur(top, traces=suit) if prise else is_cast(top)):
+            if (suit and TRACES.match(top.name)) if prise else is_cast(top):
                 gone.update(_family(top))
         names_gone = sorted(o.name for o in _tops(gone))
         for ob in gone:
@@ -646,8 +1075,8 @@ def assembler(scene, infos, noms, base=None, plan=None):
             # l'image F du plan rendu est l'image de prise START[plan] + F − frame_start ; celle du voisin, la sienne
             shift = (P.START[plan] - scene.frame_start) - (P.START[nb_plan] - nb_fs)
             nk = _decaler(_blocs(objs), -shift) if shift else 0
-            log(f"{nom} ({nb_plan}) dans la prise de {plan} : entier hors acteurs animés, clés décalées de "
-                f"{-shift:+d} images ({nk} courbes)")
+            log(f"{nom} ({nb_plan}) dans la prise de {plan} : clés décalées de {-shift:+d} images ({nk} courbes), "
+                f"caméra et acteurs décidés après la pose de tous les lieux")
         bpy.context.view_layer.update()
         zone = zones()[nom]
         root = bpy.data.objects.new(f"ville_{nom}_racine", None)
@@ -655,10 +1084,18 @@ def assembler(scene, infos, noms, base=None, plan=None):
         coll.objects.link(root)
         root.matrix_world = (Matrix(base) if base else Matrix.Identity(4)) @ Matrix(matrice(lieu(nom)["plan"]))
         far = 0
+        doubles = []
         for top in _tops(objs):
-            # un véhicule ou un figurant gardé (immobile, d'un lieu de la même prise) est à son lieu, où qu'il soit
-            # posé : le barrage au bout de la rue n'imite aucun autre lieu
-            flag = False if (prise and is_cast(top)) else is_lointain(nom, top, zone)
+            # (les sources cachées d'origine n'ont pas de drapeau : elles restent cachées de toute façon)
+            if all(_hidden(o) for o in _family(top)):
+                flag, why = False, ""
+            else:
+                # (dans une même prise, la zone ne compte plus : un véhicule ou un figurant gardé, le barrage au
+                # bout de la rue, le fond nord du rond-point sont à leur lieu, où qu'ils soient posés)
+                flag, why = drapeau_voisin(nom, top.name, (not prise) and _hors_zone(top, zone),
+                                           bool(top.get("phare")), presents, prise)
+            if why.startswith("doublon"):
+                doubles.append(f"{top.name} ({why}, {len(_family(top))} objets, lampes comprises)")
             for o in _family(top):
                 o["ville_lieu"] = nom
                 o["ville_lointain"] = int(flag)
@@ -666,6 +1103,8 @@ def assembler(scene, infos, noms, base=None, plan=None):
                 far += flag
             top.parent = root
             top.matrix_parent_inverse = Matrix.Identity(4)
+        if doubles:
+            log(f"{nom} : doublons réels cachés avec leurs lampes : {', '.join(doubles)}")
         root["ville_lieu"] = nom
         root["ville_lointain"] = 0
         root["ville_cache0"] = 0
@@ -673,13 +1112,225 @@ def assembler(scene, infos, noms, base=None, plan=None):
                         load_s=round(time.time() - t0, 1))
         log(f"{nom} : {len(objs)} objets ajoutés ({far} faux lointains), {len(gone)} retirés "
             f"({', '.join(names_gone[:12])}{'…' if len(names_gone) > 12 else ''}) en {time.time() - t0:.1f} s")
+    if plan is not None and own_objs is not None:
+        acteurs(scene, plan, out, own_objs, cams)
+    liaisons(scene, releves)
     return out
+
+
+LIAISONS = ("receiver_collection", "blocker_collection")
+
+
+def _membres_liaison(c):
+    """[(nom, état)] d'une collection de liaison de lumière : ses objets, puis ceux de ses sous-collections à l'état
+    de la sous-collection (Blender range collection_objects dans l'ordre de objects, collection_children dans celui
+    de children)."""
+    out = [(o.name, co.light_linking.link_state) for o, co in zip(c.objects, c.collection_objects)]
+    for ch, cc in zip(c.children, c.collection_children):
+        out += [(o.name, cc.light_linking.link_state) for o in ch.all_objects]
+    return out
+
+
+def _releve_liaisons(objs):
+    """{(objet, attribut): (collection, membres)} : les liaisons de lumière de ces objets, au chargement."""
+    out = {}
+    for o in objs:
+        ll = getattr(o, "light_linking", None)
+        for attr in LIAISONS:
+            c = getattr(ll, attr, None) if ll is not None else None
+            if c is not None:
+                out[(o.name, attr)] = (c.name, _membres_liaison(c))
+    return out
+
+
+def liaisons(scene, releves):
+    """Après l'assemblage : chaque lampe (ou émissif) d'un voisin dont la collection de liaison a perdu des objets
+    (retirés : acteurs, caméras, traces ; ou jamais dans la scène) est traitée (liaison_perdue) et nommée au journal.
+    Puis le contrôle : aucune lampe d'un voisin ne garde une liaison vers un objet absent de la scène ; sinon tout
+    s'arrête. `releves` : {lieu: _releve_liaisons(ses objets au chargement)}."""
+    import bpy
+    presents = {o.name for o in scene.objects}
+    lignes = []
+    for nom_l, rel in releves.items():
+        for (em_name, attr), (cname, membres) in sorted(rel.items()):
+            em = bpy.data.objects.get(em_name)
+            if em is None or em.name not in presents:
+                continue
+            action, absents = liaison_perdue(attr, membres, presents)
+            if action == "rien":
+                continue
+            c = getattr(em.light_linking, attr)
+            if action in ("retirer", "eteindre"):
+                setattr(em.light_linking, attr, None)
+                if c is not None and c.users == 0:
+                    bpy.data.collections.remove(c)
+            if action == "eteindre":
+                if em.type == "LIGHT":
+                    em.hide_render = True
+                    em["ville_cache0"] = 1
+                else:                                   # (un émissif reste visible : il éclaire tout le monde)
+                    action = "retirer, émissif à vérifier"
+            if action == "garder" and c is not None:
+                for ch in [c] + list(c.children_recursive):
+                    for o in [o for o in ch.objects if o.name not in presents]:
+                        ch.objects.unlink(o)
+            quoi = {"retirer": "liaison retirée, rendue à tout le monde", "eteindre": "éteinte (n'éclairait que des "
+                    "absents)", "garder": "liaison gardée sur ses présents"}.get(action, action)
+            lignes.append(f"{em_name} ({nom_l}, {'ombres' if attr == 'blocker_collection' else 'éclairage'} : {cname}, "
+                          f"{len(absents)} absents dont {', '.join(absents[:3])}) : {quoi}")
+    for ln in lignes:
+        log(f"liaison de lumière : {ln}")
+    bad = []
+    for o in scene.objects:
+        if o.get("ville_lieu") not in NOMS:
+            continue
+        ll = getattr(o, "light_linking", None)
+        for attr in LIAISONS:
+            c = getattr(ll, attr, None) if ll is not None else None
+            if c is not None:
+                bad += [f"{o.name} -> {m.name} ({c.name})" for m in c.all_objects if m.name not in presents]
+    if bad:
+        raise RuntimeError(f"[ville] {len(bad)} liaisons de lumière de voisins vers des objets absents : "
+                           f"{', '.join(bad[:8])}")
+    return lignes
+
+
+def _nature(top):
+    """« personne » (une armature dans la famille) ou « engin » : deux jumeaux sont de même nature."""
+    return "personne" if any(o.type == "ARMATURE" for o in _family(top)) else "engin"
+
+
+def _liste_acteurs(tops):
+    """[(objet de tête, nature, se déplace ?)] : les acteurs parmi ces familles, véhicules, personnages, appareils
+    (is_cast) et tout ce qui se déplace ; ni caméra, ni trace, ni source cachée d'origine (les modèles des
+    collections « sources »)."""
+    out = []
+    for top in tops:
+        if top.type == "CAMERA" or TRACES.match(top.name) or all(_hidden(o) for o in _family(top)):
+            continue
+        mv = any(_bouge(o) for o in _family(top))
+        if mv or is_cast(top):
+            out.append((top, _nature(top), mv))
+    return out
+
+
+def _vu(scene, cam, top):
+    """La famille est-elle dans le champ de la caméra `cam` (un coin de la boîte d'un de ses maillages rendus, devant
+    l'objectif, dans le cadre) ? Sans occultation. Le cadre est celui des réglages de rendu de la scène (9:16 partout)."""
+    from bpy_extras.object_utils import world_to_camera_view
+    from mathutils import Vector
+    if cam is None or cam.type != "CAMERA":
+        return False
+    near, far = cam.data.clip_start, cam.data.clip_end
+    for o in _family(top):
+        if o.type != "MESH" or o.hide_render:
+            continue
+        mw = o.matrix_world
+        for c in list(o.bound_box) + [tuple(sum(v[i] for v in o.bound_box) / 8.0 for i in range(3))]:
+            p = world_to_camera_view(scene, cam, mw @ Vector(c))
+            if 0.0 <= p.x <= 1.0 and 0.0 <= p.y <= 1.0 and near < p.z < far:
+                return True
+    return False
+
+
+def _premiere_cle(top):
+    """(image, pas) : l'image de la scène (clés décalées) de la première clé de position de la famille, et le
+    déplacement d'une image à la suivante à cette clé (m, le plus grand des axes et des objets) ; (None, 0) sans clé.
+    Un acteur qui part déjà lancé à sa première clé est figé avant elle (l'extrapolation constante de Blender)."""
+    import motion as M
+    k0, pas = None, 0.0
+    curves = []
+    for o in _family(top):
+        try:
+            fcs = M.fcurves(o)
+        except Exception:
+            fcs = []
+        curves += [fc for fc in fcs if fc.data_path in ("location", "delta_location") and len(fc.keyframe_points)]
+    if not curves:
+        return None, 0.0
+    k0 = min(min(k.co[0] for k in fc.keyframe_points) for fc in curves)
+    for fc in curves:
+        pas = max(pas, abs(fc.evaluate(k0 + 1.0) - fc.evaluate(k0)))
+    return k0, pas
+
+
+def acteurs(scene, plan, built, own_objs, cams):
+    """Les acteurs des voisins de la même prise que le plan rendu (voir JUMEAU_M) : les jumeaux comparés à chaque
+    coupe dont les deux plans sont dans la scène (à la dernière image avant elle), les entrants regardés depuis la
+    caméra du plan suivant à son image 1, puis les sorties (sort_acteur) ; les caméras des voisins sortent. Après la
+    pose de tous les lieux (assembler), avant le rendu. Met à jour built[nom] (objets, retirés). Rend {nom: [(objet,
+    gardé ?, raison)]}."""
+    import bpy
+    ps = prise_de(plan)
+    lieux_p = {lieu(n)["plan"]: n for n in built if ps and lieu(n)["plan"] in ps and lieu(n)["plan"] != plan}
+    if not lieux_p:
+        return {}
+    groupes = {plan: _liste_acteurs(_tops(set(own_objs)))}
+    for p, n in lieux_p.items():
+        groupes[p] = _liste_acteurs(list(built[n]["racine"].children))
+    cur, fs = scene.frame_current, scene.frame_start
+    jumeaux = {}
+    try:
+        for a, b in paires_prise(plan, set(groupes)):
+            scene.frame_set(image_scene(plan, fs, derniere(a)))
+            side = cote_retire(plan, a, b)
+            other = b if side == a else a
+            ref = [(t.name, nat, t.matrix_world.translation.copy()) for t, nat, _mv in groupes[other]]
+            for top, nat, _mv in groupes[side]:
+                p = top.matrix_world.translation
+                cands = sorted(((p - q).length, nm) for nm, n2, q in ref if n2 == nat)
+                if cands and classer_ecart(cands[0][0]) != "distinct":
+                    jumeaux[top] = (classer_ecart(cands[0][0]), cands[0][0], other, cands[0][1])
+        vus = {}
+        nxt = suivant(plan)
+        if nxt in lieux_p:
+            scene.frame_set(image_scene(plan, fs, P.START[nxt]))
+            for top, _nat, mv in groupes[nxt]:
+                if mv and top not in jumeaux:
+                    vus[top] = _vu(scene, cams.get(nxt), top)
+    finally:
+        scene.frame_set(cur)
+    rapport = {}
+    for p, n in lieux_p.items():
+        gone, lignes, rows = set(), [], []
+        for top, _nat, mv in groupes[p]:
+            if top in jumeaux:
+                c, d, other, tw = jumeaux[top]
+                ok, why = False, f"{c} de {tw} ({other}) à {d:.2f} m"
+                if c == "douteux":
+                    log(f"! {plan} : {top.name} ({n}, {p}) à {d:.2f} m de {tw} ({other}) à la coupe : ni jumeau sûr "
+                        f"(< {JUMEAU_M} m) ni distinct (≥ {DOUTE_M} m) ; retiré, à vérifier (raccord ou voisin serré)")
+            else:
+                ok, why = sort_acteur(plan, p, mv, vus.get(top))
+            if ok and why.startswith("entrant"):
+                k0, pas = _premiere_cle(top)
+                if k0 is not None and k0 > fs and pas > 0.01:
+                    log(f"! {plan} : {top.name} ({n}) entre de {p} déjà lancé ({pas * FPS:.1f} m/s à sa première clé, "
+                        f"image {k0 - fs + 1:.0f} de {plan}) : il y est figé avant ; à demander à {p} : ses clés dès "
+                        f"son image {P.START[plan] - P.START[p] + 1}")
+            if not ok:
+                gone.update(_family(top))
+            rows.append((top.name, ok, why))
+            lignes.append(f"{top.name} {'gardé' if ok else 'retiré'} ({why})")
+        for o in [o for o in scene.objects if o.get("ville_lieu") == n and o.type == "CAMERA"]:
+            gone.update(_family(o))
+            lignes.append(f"{o.name} retiré (caméra)")
+        names = sorted(o.name for o in gone if o.parent is None or o.parent not in gone)
+        for ob in gone:
+            bpy.data.objects.remove(ob, do_unlink=True)
+        built[n]["objets"] -= len(gone)
+        built[n]["retires"] = sorted(set(built[n]["retires"]) | set(names))
+        rapport[n] = rows
+        log(f"{plan} : acteurs de {n} ({p}) : {'; '.join(lignes) or 'aucun'}")
+    return rapport
 
 
 def voisins(scene, plan, ville_dir):
     """render_film --ville DIR : autour de la scène du plan (son lieu, sa berline, sa caméra, son ciel), les autres
     lieux que CHARGE lui donne, pris des .blend de DIR/lieux (ville.py --cache), posés dans le repère du lieu du plan,
-    sans leurs faux lointains. Un lieu absent de DIR est signalé et sauté."""
+    sans leurs faux lointains. Un lieu absent de DIR est signalé et sauté ; un lieu dont le .blend est plus ancien
+    que son code (empreinte_voisin) est refusé : tout s'arrête, sauf VILLE_VOISINS_PERIMES=1 (signalé)."""
+    import bpy
     from mathutils import Matrix
     own = lieu_of_shot(plan)[0]
     infos = {}
@@ -696,27 +1347,46 @@ def voisins(scene, plan, ville_dir):
         if not os.path.exists(info["blend"]):
             log(f"! {plan} : {n}, son .blend a quitté le cache ({info['blend']}), pas posé")
             continue
+        e = empreinte_voisin(ville_dir, n, blender=bpy.app.version_string)
+        if not e["ok"]:
+            msg = (f"{plan} : le voisin {n} n'est plus la construction de son code ({e['raison']}) : attendu "
+                   f"{e['attendu']}, trouvé {e['trouve']} ({info['blend']}) ; à refaire : python3 "
+                   f"tools/film3d/ville.py --cache --lieux {n} --out {ville_dir}")
+            if os.environ.get(VOISINS_PERIMES) != "1":
+                raise RuntimeError(f"[ville] {msg} (refusé ; {VOISINS_PERIMES}=1 pour le charger quand même pendant "
+                                   f"les essais)")
+            log(f"! {msg} ; CHARGÉ QUAND MÊME ({VOISINS_PERIMES}=1) : ce rendu ne vaut pas contrôle")
         infos[n] = info
-    import bpy
     own_objs = [o for o in scene.objects if o.get("ville_lieu") is None]
     base = Matrix(matrice(lieu(own)["plan"])).inverted()
-    built = assembler(scene, infos, list(infos), base=[list(r) for r in base], plan=plan)
+    built = assembler(scene, infos, list(infos), base=[list(r) for r in base], plan=plan, own=own, own_objs=own_objs)
     lointains(scene, False)
     bpy.context.view_layer.update()
-    doubles = doublons(scene, own, own_objs, built)
+    doubles = doublons(scene, own, own_objs, built, plan=plan)
+    brume(scene, plan, own, [list(r) for r in base])
     poses = ", ".join("%s (%d objets)" % (n, b["objets"]) for n, b in built.items()) or "aucun voisin"
     log(f"{plan} dans la ville : {poses} autour de {own} ; {len(doubles)} faux lointains de {own} cachés sous un "
         f"voisin chargé ({', '.join(sorted(doubles)[:8])}{'…' if len(doubles) > 8 else ''})")
     return built
 
 
-def doublons(scene, own, own_objs, built):
-    """Les faux lointains de la scène du plan (hors de la zone de son lieu) qui imitent un voisin chargé : le centre
-    de leur boîte dans la boîte d'un voisin. Cachés : le vrai lieu est là, et c'est lui qu'on voit des deux côtés de
-    la coupe. Les lointains de nom (ciel, mer, brume, phare lointain) restent. Rend leurs noms."""
+def voisins_hors_prise(plan, noms):
+    """Les lieux de `noms` qui ne sont pas de la prise continue du plan (sans Blender) : les seuls dont la boîte peut
+    cacher un faux lointain du plan (doublons). Un lieu de la même prise ne cache rien du plan : il ne perd lui-même
+    rien par la règle de zone (drapeau_voisin), le plan ne perd rien sous lui, et le même objet se voit des deux côtés
+    de la coupe (la boîte d'un voisin, alignée sur les axes, couvrait large : celle de la rue, son eau de 5 km
+    comprise, recouvrait l'avenue nord du rond-point)."""
+    return [n for n in noms if plan is None or not meme_prise(plan, lieu(n)["plan"])]
+
+
+def doublons(scene, own, own_objs, built, plan=None):
+    """Les faux lointains de la scène du plan (hors de la zone de son lieu) qui imitent un voisin chargé hors de sa
+    prise (voisins_hors_prise) : le centre de leur boîte dans la boîte de ce voisin. Cachés : le vrai lieu est là, et
+    c'est lui qu'on voit des deux côtés de la coupe. Les lointains de nom (ciel, mer, brume, phare lointain) restent.
+    Rend leurs noms."""
     from mathutils import Vector
     boxes = []
-    for n in built:
+    for n in voisins_hors_prise(plan, built):
         pts = []
         for o in scene.objects:
             if o.get("ville_lieu") == n and not o.get("ville_lointain") and o.type == "MESH" and not o.hide_render:
@@ -769,6 +1439,92 @@ def volumes(scene, show):
     for ob in scene.objects:
         if ob.type == "MESH" and ob.name.startswith(VOLUMES):
             ob.hide_render = ob.hide_viewport = (not show) or bool(ob.get("ville_cache0"))
+
+
+def _densite(ob):
+    """La densité d'une brume (son volume principiel), None si elle est pilotée par des nœuds."""
+    for s in getattr(ob, "material_slots", ()):
+        m = s.material
+        if m is None or m.node_tree is None:
+            continue
+        for nd in m.node_tree.nodes:
+            if nd.type == "PRINCIPLED_VOLUME":
+                d = nd.inputs["Density"]
+                return None if d.links else round(d.default_value, 5)
+    return None
+
+
+def brume(scene, plan, own, base):
+    """La brume de la scène d'un plan dans la ville (voisins, après lointains) : une seule par prise continue
+    (BRUME_PRISE), posée dans le repère de la ville et ramenée dans celui de la scène (`base`, 4 × 4 lignes : ville ->
+    scène) ; les brumes « fond » des lieux de la prise cachées (le plan compris), les « locales » montrées des deux
+    côtés, les « portees » et les « porteuses » laissées (sort_brume). Une lampe liée à une brume « fond » cachée (sa
+    collection de liaison la contient) reçoit la brume de la prise au même état de liaison. Rend la brume posée ou
+    None."""
+    import bpy
+    from mathutils import Matrix
+    ps, cfg = brume_prise(plan)
+    faits = {"intacte": [], "cachee": [], "montree": []}
+    fonds = []
+    for o in [o for o in scene.objects if o.type == "MESH" and o.name.startswith("haze")]:
+        n = o.get("ville_lieu")
+        propre = n is None
+        nom_l = own if propre else n
+        if nom_l not in NOMS:
+            continue
+        meme = propre or (ps is not None and lieu(nom_l)["plan"] in ps)
+        role = role_brume(nom_l, o.name) if (cfg and meme) else None
+        d = sort_brume(role, cfg is not None, propre, meme)
+        if d == "cachee":
+            o.hide_render = o.hide_viewport = True
+            if role == "fond":
+                fonds.append(o)
+        elif d == "montree":
+            o.hide_render = o.hide_viewport = bool(o.get("ville_cache0"))
+            o["ville_lointain"] = 0
+        faits[d].append(f"{o.name} ({nom_l}, {_densite(o)})")
+    if not cfg:
+        log(f"{plan} : pas de brume de prise ({'hors prise' if ps is None else 'BRUME_PRISE[' + ps[0] + '] vide'}) : "
+            f"brumes du plan gardées ({', '.join(faits['intacte']) or 'aucune'}), celles des voisins cachées "
+            f"({', '.join(faits['cachee']) or 'aucune'})")
+        return None
+    import lieux as L
+    x0, x1, y0, y1, z0, z1 = boite_brume(ps, cfg["marge"], cfg["haut"])
+    ob = L.haze((x0, x1), (y0, y1), (z0, z1), cfg["densite"], name=f"haze_prise_{ps[0]}")
+    if ob.name not in scene.collection.objects:
+        scene.collection.objects.link(ob)
+    for c in list(ob.users_collection):
+        if c != scene.collection:
+            c.objects.unlink(ob)
+    ob.matrix_world = Matrix(base) @ ob.matrix_world
+    ob["ville_lieu"], ob["ville_lointain"], ob["ville_cache0"] = "prise", 0, 0
+    # les lampes liées à une brume « fond » cachée : la brume de la prise dans la même collection, au même état
+    # (Blender range collection_objects dans l'ordre de collection.objects)
+    relie = []
+    for em in scene.objects:
+        ll = getattr(em, "light_linking", None)
+        for attr in ("receiver_collection", "blocker_collection"):
+            c = getattr(ll, attr, None) if ll is not None else None
+            if c is None:
+                continue
+            etats = [co.light_linking.link_state for o, co in zip(c.objects, c.collection_objects) if o in fonds]
+            if not etats:
+                continue
+            if ob.name not in c.objects:
+                c.objects.link(ob)
+            for o, co in zip(c.objects, c.collection_objects):
+                if o == ob:
+                    co.light_linking.link_state = etats[0]
+            relie.append(f"{em.name} ({c.name}, {etats[0]})")
+    if _densite(ob) != round(cfg["densite"], 5):
+        raise RuntimeError(f"[ville] la brume de la prise n'a pas sa densité : {_densite(ob)} au lieu de "
+                           f"{cfg['densite']} (lieux.haze a changé ?)")
+    bpy.context.view_layer.update()
+    log(f"{plan} : brume de la prise {'+'.join(ps)} : {ob.name}, densité {cfg['densite']}, ville x {x0:.0f} à "
+        f"{x1:.0f}, y {y0:.0f} à {y1:.0f}, z {z0:.1f} à {z1:.0f} ; cachées : {', '.join(faits['cachee']) or 'aucune'} ; "
+        f"montrées : {', '.join(faits['montree']) or 'aucune'} ; laissées : {', '.join(faits['intacte']) or 'aucune'}"
+        f" ; lampes liées étendues : {', '.join(relie) or 'aucune'}")
+    return ob
 
 
 def mer(scene):
@@ -2041,24 +2797,86 @@ def run_blender(blender, out, args, env=None, tag="ville"):
     return p.returncode == 0
 
 
+# Passer outre un voisin périmé (render_film --ville, voisins), en connaissance de cause, pendant les essais :
+# VILLE_VOISINS_PERIMES=1, signalé au journal. (Pas FILM3D_… : debit.env_key la mettrait dans la clé de toutes les
+# scènes, et dans l'empreinte attendue de chaque voisin.)
+VOISINS_PERIMES = "VILLE_VOISINS_PERIMES"
+
+
+def _ecart_deps(deps, root=None):
+    """Le premier fichier lu par la construction qui a changé depuis : (fichier, attendu, trouvé), « attendu » étant
+    ce que le dépôt porte aujourd'hui et « trouvé » ce que la construction a lu (code : sha1 ; assets : taille et
+    date) ; None si rien n'a changé (la règle de debit.deps_match)."""
+    import debit
+    root = root or debit.ROOT
+    for rel, want in sorted(deps.get("code", {}).items()):
+        try:
+            cur = debit.sha1(os.path.join(root, rel))
+        except OSError:
+            cur = "absent"
+        if cur != want:
+            return rel, f"sha1 {cur[:12]}", f"sha1 {want[:12]}"
+    for p, (size, mtime) in sorted(deps.get("assets", {}).items()):
+        try:
+            st = os.stat(p)
+            cur = (st.st_size, int(st.st_mtime))
+        except OSError:
+            cur = None
+        if cur != (size, mtime):
+            return (p, "absent" if cur is None else f"{cur[0]} o du {time.strftime('%d/%m %H:%M', time.localtime(cur[1]))}",
+                    f"{size} o du {time.strftime('%d/%m %H:%M', time.localtime(mtime))}")
+    return None
+
+
+def empreinte_voisin(out, nom, environ=None, blender=None):
+    """Le .blend du lieu (DIR/lieux/<nom>.json, ville.py --cache) est-il toujours celui de son code ? Sans Blender.
+    Rend dict(ok, raison, attendu, trouve) : la clé du cache de debit (variables FILM3D_*, version de Blender si
+    `blender` est donnée, fichiers lus par la construction) recalculée pour le dépôt d'aujourd'hui (« attendu ») et
+    lue dans la construction (« trouvé ») ; le premier écart seulement."""
+    import debit
+    info_p = os.path.join(out, "lieux", f"{nom}.json")
+    try:
+        with open(info_p, encoding="utf-8") as f:
+            info = json.load(f)
+        blend = info["blend"]
+    except (OSError, ValueError, KeyError) as e:
+        return dict(ok=False, raison=f"inventaire illisible ({info_p} : {e.__class__.__name__})", attendu="un "
+                    "inventaire de ville.py --cache", trouve="rien")
+    if not os.path.isfile(blend):
+        return dict(ok=False, raison="le .blend a quitté le cache", attendu=blend, trouve="rien")
+    try:
+        with open(blend[:-6] + ".json", encoding="utf-8") as f:
+            meta = json.load(f)
+        head = meta["head"]
+    except (OSError, ValueError, KeyError) as e:
+        return dict(ok=False, raison=f"pas de clé de cache à côté du .blend ({e.__class__.__name__})",
+                    attendu=blend[:-6] + ".json", trouve="rien")
+    want = debit.env_key(env_for(nom, environ))
+    got = head.get("env", {})
+    if got != want:
+        ks = sorted(k for k in set(want) | set(got) if want.get(k) != got.get(k))
+        return dict(ok=False, raison=f"variables de construction ({', '.join(ks)})",
+                    attendu=", ".join(f"{k}={want.get(k, '(absente)')}" for k in ks),
+                    trouve=", ".join(f"{k}={got.get(k, '(absente)')}" for k in ks))
+    if blender is not None and head.get("blender") != blender:
+        return dict(ok=False, raison="version de Blender", attendu=blender, trouve=str(head.get("blender")))
+    ec = _ecart_deps(meta.get("deps", {}))
+    if ec:
+        made = time.strftime("%d/%m %H:%M", time.localtime(meta.get("made", 0)))
+        return dict(ok=False, raison=f"{ec[0]} a changé depuis la construction du {made}", attendu=ec[1],
+                    trouve=ec[2])
+    return dict(ok=True, raison="", attendu=os.path.basename(blend), trouve=os.path.basename(blend))
+
+
 def still_cached(out, nom):
     """Le lieu a-t-il déjà son inventaire, et le .blend du cache est-il toujours celui de son code (debit) ?"""
-    import debit
-    try:
-        with open(os.path.join(out, "lieux", f"{nom}.json"), encoding="utf-8") as f:
-            info = json.load(f)
-        with open(info["blend"][:-6] + ".json", encoding="utf-8") as f:
-            meta = json.load(f)
-    except (OSError, ValueError, KeyError):
-        return False
-    return (os.path.isfile(info["blend"]) and meta["head"]["env"] == debit.env_key(env_for(nom))
-            and debit.deps_match(meta.get("deps", {})))
+    return empreinte_voisin(out, nom)["ok"]
 
 
-def env_for(nom):
+def env_for(nom, environ=None):
     """L'environnement de render_film pour le plan du lieu : FILM3D_PLAN pour la rue seulement (il entre dans la clé
     du cache), rien d'autre."""
-    env = os.environ.copy()
+    env = dict(os.environ if environ is None else environ)
     env.pop("FILM3D_PLAN", None)
     plan = lieu(nom)["plan"]
     if source(plan)[0] == "scene_b":

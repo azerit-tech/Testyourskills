@@ -1782,18 +1782,57 @@ def shot_metrics(cam, hero, frames, heading=None, slip=None, ground=None, tracks
                 fin=hero_screen(final[last], *hp[last], hh[last], box))
 
 
-def _bridge_z(y, _tab={}):
-    """La hauteur du tablier de P4 (scene_c.deck_z, recopiée sans Blender) : crête en -130, pied en -5, 6 %.
-    Intégrée par pas de 0,25 m de -1010 à 110, puis lue en interpolation linéaire entre deux pas, comme deck_z :
-    un arrondi au quart de mètre ferait des marches de 7 mm sur la pente (des à-coups à 200 mm)."""
-    if not _tab:
-        def ramp(y, a, t):
-            return min(1.0, max(0.0, (y - (a - t / 2)) / t))
+# Le profil en long du pont, la seule source (scene_c le lit, _bridge_z l'intègre, parcours en tire la pose du port).
+# Depuis le 17 novembre au soir (SPEC §18.55, « 30 s déjà long ») le pont est raccourci de PONT_RACCOURCI m : le
+# port et la jetée sont rapprochés de la ville d'autant (leur pose suit l'ancre de P4, parcours.ANCHOR), le tablier
+# part toujours du quai de la ville (y -320) et son pied côté port recule de -5 à -5 - PONT_RACCOURCI. Sa crête est
+# prise à 107 km/h : des raccords longs (PONT_T_CREST) la tiennent sous 3 m/s² d'accélération verticale (le plafond
+# de grue de la caméra), une pente de 7,5 % tient la vitesse verticale sous 2,5 m/s ; la crête monte donc à 3,1 m
+# seulement. Repère du pont (= de la ville) : y vers le port.
+PONT_RACCOURCI = 205.0
+PONT_Y_START = -320.0                                   # le tablier quitte le quai de la ville
+PONT_Y_FOOT = -5.0 - PONT_RACCOURCI                     # le pied de la rampe côté port (-210)
+PONT_GRADE = 0.075
+PONT_T_SAG_CITY, PONT_T_CREST, PONT_T_SAG = 22.0, 48.0, 24.0   # m : les raccords (pied ville, crête, pied port)
+PONT_Y_FOOT_CITY = PONT_Y_START + 3.0                   # le pied de la rampe côté ville, 3 m après le quai
+PONT_Y_CREST = 0.5 * (PONT_Y_FOOT_CITY + PONT_Y_FOOT)   # -263,5
+# le pont d'avant (FILM3D_VILLE=0, le lieu autonome et son plan de face) : crête 7,2 m en -130, 6 %, raccords 12 et 20
+PONT_AUTONOME = dict(grade=0.06, foot_city=-255.0, crest=-130.0, foot=-5.0, t_sag_city=12.0, t_crest=20.0,
+                     t_sag=12.0)
+
+
+def pont_profil(ville=None):
+    """Les cotes du profil en long du pont (dict) : celui de la ville, ou l'autonome si FILM3D_VILLE=0 ; ville=True
+    force celui de la ville (le parcours unique est toujours la ville)."""
+    if not ville and os.environ.get("FILM3D_VILLE", "1").strip().lower() in ("0", "non", "no", "false", "off"):
+        return dict(PONT_AUTONOME)
+    return dict(grade=PONT_GRADE, foot_city=PONT_Y_FOOT_CITY, crest=PONT_Y_CREST, foot=PONT_Y_FOOT,
+                t_sag_city=PONT_T_SAG_CITY, t_crest=PONT_T_CREST, t_sag=PONT_T_SAG)
+
+
+def pont_pente(y, p=None):
+    """La pente du tablier en y : raccords linéaires en pente (paraboliques en hauteur)."""
+    p = p or pont_profil()
+
+    def ramp(y, a, t):
+        return min(1.0, max(0.0, (y - (a - t / 2)) / t))
+    return p["grade"] * (ramp(y, p["foot_city"], p["t_sag_city"]) - 2 * ramp(y, p["crest"], p["t_crest"])
+                         + ramp(y, p["foot"], p["t_sag"]))
+
+
+def _bridge_z(y, ville=None, _tabs={}):
+    """La hauteur du tablier (scene_c.deck_z, le même profil : pont_profil(ville)) : intégrée par pas de 0,25 m de
+    -1010 à 110, puis lue en interpolation linéaire entre deux pas, comme deck_z : un arrondi au quart de mètre ferait
+    des marches de 7 mm sur la pente (des à-coups à 200 mm)."""
+    key = bool(ville) or os.environ.get("FILM3D_VILLE", "1").strip().lower() not in ("0", "non", "no", "false", "off")
+    _tab = _tabs.get(key)
+    if _tab is None:
+        p = pont_profil(key)
+        _tab = _tabs[key] = {}
         z, yy, step = 0.0, -1010.0, 0.25
         while yy <= 110.0:
             _tab[round(yy * 4)] = z
-            z += 0.06 * (ramp(yy + step / 2, -255.0, 12.0) - 2 * ramp(yy + step / 2, -130.0, 20.0)
-                         + ramp(yy + step / 2, -5.0, 12.0)) * step
+            z += pont_pente(yy + step / 2, p) * step
             yy += step
     k = y * 4
     k0 = math.floor(k)
@@ -1815,6 +1854,7 @@ def shot_specs():
     import p4_pont as P4
     import p5_virage as P5
     import p6_jetee as P6
+    import parcours as PC
 
     def seed(name):
         return sum(map(ord, name)) % 97
@@ -1835,7 +1875,9 @@ def shot_specs():
         "P2": plan(P2, P2.camera, "cam", hero=P2.hero_pos, heading=P2.hero_heading),
         "P3": plan(P3, P3.camera, "cam", hero=P3.hero_pos, heading=P3.hero_heading),
         "P4": plan(P4, P4.camera, "cam_P4", hero=P4.hero_pos, ground=lambda x, y: (_bridge_z(y),)),
-        "P5": plan(P5, P5.camera, "cam_P5", hero=P5.hero_pos, slip=P5.hero_slip),
+        # le pied de la rampe du pont (parcours.sol : le tablier) sous la caméra des premières images de P5
+        "P5": plan(P5, P5.camera, "cam_P5", hero=P5.hero_pos, slip=P5.hero_slip,
+                   ground=lambda x, y: (PC.sol("P5", x, y),)),
         "P6": plan(P6, P6.camera, "cam_P6", hero=P6.hero_pos, heading=P6.hero_heading),
         "FIN": plan(F, F.camera, "cam_FIN", hero=F.hero_pos, heading=F.hero_heading),
         "FIN6": plan(F6, F6.camera, "cam_FIN6", hero=getattr(F6, "hero_pos", lambda t: (F6.CX, F6.CY)),
@@ -2139,7 +2181,9 @@ def plan_checks(d, base, own):
         import render_film as RF
         cut, fb = RF.read_cut().get(plan), RF.FALLBACK_FRAMES.get(plan)
         n = getattr(mod, "FRAMES", len(frames))
-        add(f"durée {n} images = cut.ts ({cut}) = FALLBACK_FRAMES ({fb})", n == cut == fb, "")
+        # le trajet roulé (17 novembre) : la durée est celle du parcours (FALLBACK_FRAMES la suit) ; cut.ts, au site,
+        # la reprendra (dit, pas contrôlé)
+        add(f"durée {n} images = FALLBACK_FRAMES ({fb}) (cut.ts : {cut})", n == fb, "")
     except ImportError as e:
         add("durée contre cut.ts", False, f"render_film illisible ({e})")
     # 2. derrière, de face

@@ -126,23 +126,21 @@ def hero_s(t):
 
 # ---------------------------------------------------------------- la patrouille 1
 
-# Elle entre comme elle sort de P1 (p1_avenue, lu à l'image qui suit sa dernière) : 3,45 m à gauche, 3,0 m devant,
-# à la vitesse de la berline, en freinage établi de 7 m/s² (elle l'a dépassée et pile en voyant le rond-point). Elle
-# ne tient pas à côté de la berline dans l'anneau : au plus près de l'îlot, la berline passe à 11,3 m de son centre,
-# la bordure extérieure est à 15 m, et 1,5 m d'air plus une caisse de 1,95 m n'y tiennent pas ; elle ne peut pas
-# non plus passer devant (il lui faudrait 6,2 m d'avance avant le virage). Elle tient donc son freinage (P1_HOLD0 s,
-# puis P1_BRAKE m/s² pour rester dans le cercle d'adhérence quand elle tourne, relâché à l'à-coup P1_JERK pour finir
-# arrêtée) ; elle s'écarte un peu à gauche (P1_WIDE) le temps que la berline la déborde en glissant, et cesse de
-# tourner (P1_STRAIGHT) : elle s'arrête rampe allumée à l'entrée de l'anneau, hors du coin. Sa route : la ligne
+# Elle entre comme elle sort de P1 (p1_avenue, lu à l'image qui suit sa dernière) : 3,45 m à gauche, 7 m derrière
+# (à côté de la caméra, hors du cadre), à la vitesse de la berline, en freinage établi de 6,95 m/s². Depuis le
+# 17 novembre (le trajet roulé : la berline arrive au rond-point à 70 km/h, en plein freinage), elle a freiné avant
+# elle et ne la suit pas dans l'anneau : 2 m devant, la berline lancée la percutait en dérapant ; à côté d'elle
+# dans l'anneau, elle tournait à plus de 7,5 m/s² combinés. Elle tient son freinage (P1_BRAKE) dans sa voie, cesse
+# de tourner (P1_STRAIGHT) et s'arrête rampe allumée à l'entrée de l'anneau, derrière nous. Sa route : la ligne
 # décalée du parcours, puis sa courbure qui s'éteint ; son profil, celui de sa vitesse vraie le long de cette route.
 _P1T = P1.T_END + 1.0 / FPS                    # P2/1 est l'image qui suit P1/FRAMES
 P1_SIDE = P1.hero_pos(_P1T)[0] - P1.patrol_pos(_P1T)[0]                  # 3,45 m
 P1_LEAD0 = P1.patrol_pos(_P1T)[1] - P1.hero_pos(_P1T)[1]                 # 3,0 m
 P1_V0 = P1.patrol_speed(_P1T)
 P1_A0 = (P1.patrol_speed(_P1T + 1.0 / 96.0) - P1.patrol_speed(_P1T - 1.0 / 96.0)) * 48.0
-P1_WIDE, P1_WIDE_S = 4.0, (3.0, 26.0)            # m à gauche ; m après la coupe (abscisses du parcours)
+P1_WIDE, P1_WIDE_S = P1_SIDE, (-2.0, 40.0)     # (17 novembre : elle reste dans sa voie, derrière la berline)
 P1_STRAIGHT = (13.0, 21.0)                       # m de sa route après la coupe : elle cesse de tourner
-P1_HOLD0, P1_BRAKE, P1_JERK = 0.3, 6.5, 10.0      # s, m/s², m/s³
+P1_HOLD0, P1_BRAKE, P1_JERK = 0.0, 6.9, 10.0      # s, m/s², m/s³
 
 
 def _smoother(a, b, x):
@@ -574,9 +572,7 @@ def _aim_smooth(t):
 
 def camera_rail(t):
     """La caméra sans tremblé : (x, y, z, lacet, site, roulis, focale), dans la scène (motion.key_camera)."""
-    x, y, z = chase_pos(t)
-    yaw, pitch = _aim_smooth(t)
-    return PC.raccord("P2", _f(t), (x, y, z, yaw, pitch, 0.0, CHASE_LENS))   # la visée commune aux deux bouts
+    return PC.chase("P2", _f(t))       # LA caméra du film : le bras commun à la visée commune (17 novembre)
 
 
 def camera(t):

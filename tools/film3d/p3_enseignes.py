@@ -450,8 +450,7 @@ def aim(x, y, z, hx, hy, heading, u=CAM_U, v=CAM_V):
 
 def camera_rail(t):
     """La caméra : (x, y, z, lacet, site, roulis, focale)."""
-    x, y = hero_pos(t)
-    return PC.raccord("P3", _f(t), aim(*PC.camera("P3", _f(t)), x, y, hero_heading(t)))   # visée commune aux bouts
+    return PC.chase("P3", _f(t))       # LA caméra du film : le bras commun à la visée commune (17 novembre)
 
 
 def camera(t):

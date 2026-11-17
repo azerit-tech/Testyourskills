@@ -11,11 +11,12 @@
 #
 # Repère : le monde de l'eau de lieux.py. Axe du pont x = 0, la poursuite roule vers +y, de la ville vers le port.
 #
-#   y -420..-320   la rue de la ville, sur la promenade (lieux.distant_city laisse l'ouverture)
-#   y -320..-255   le plat côté ville (60 m, le pied de la rampe en -255)
-#   y -255..-130   la rampe à 6 %, crête arrondie sur 20 m en -130, à 7,2 m
-#   y -130..  -5   la descente à 6 % (vue de P4), le pied en -5
-#   y   -5.. 100   le plat : le tablier jusqu'au mur du port (y -20), puis le terre-plein (scene_e)
+#   Dans la ville (FILM3D_VILLE, le défaut ; motion.pont_profil, 17 novembre au soir : 110 m au lieu de 315) :
+#   y -328..-320   la tête de pont, contre le boulevard du quai de la rue
+#   y -320..-263,5 la rampe à 7,5 % dès le quai, crête arrondie sur 48 m en -263,5, à 3,1 m
+#   y -263,5..-210 la descente, le pied en -210 ; le terre-plein du port passe dessous dès son mur sud (-271,3)
+#   Autonome (FILM3D_VILLE=0), le pont d'avant : plat de -320 à -255, rampe à 6 %, crête à 7,2 m en -130, pied en
+#   -5, puis le plat jusqu'au mur du port (y -20) et le terre-plein (scene_e)
 #
 # Le profil en travers est celui de lieux.roadway : chaussée de 14 m bombée, trottoirs de 2 m, glissière en W,
 # parapet en béton et garde-corps à 1,1 m, poutre de rive et caisson ; lampadaires des deux côtés tous les 30 m.
@@ -42,40 +43,45 @@ S, road = L.S, L.road
 # 680 m, son sol, ses faux lointains, le tablier arrêté au mur du port d'avant en y -20).
 VILLE = L.ville_on()
 
-Y_START = -320.0      # le tablier quitte le quai de la ville
-Y_FOOT_CITY = -255.0
-Y_CREST = -130.0
-Y_FOOT = -5.0         # pied de la rampe côté port
+import motion as MO  # noqa: E402  (le profil en long : motion.pont_profil, la seule source, que _bridge_z intègre aussi)
+
+# Le profil en long vient de motion.pont_profil : dans la ville (17 novembre au soir), le pont raccourci de
+# motion.PONT_RACCOURCI m (110 m de tablier, crête de 3,1 m à 7,5 %, raccords de 22, 48 et 24 m) ; autonome
+# (FILM3D_VILLE=0), le pont d'avant (crête de 7,2 m en -130, pied en -5).
+_PROFIL = MO.pont_profil()
+Y_START = MO.PONT_Y_START      # le tablier quitte le quai de la ville
+Y_FOOT_CITY = _PROFIL["foot_city"]
+Y_CREST = _PROFIL["crest"]
+Y_FOOT = _PROFIL["foot"]       # pied de la rampe côté port
 if VILLE:
     # la tête de pont : 8 m de chaussée sans enrobé entre le boulevard du quai de la rue (y -328, scene_b) et le
     # tablier ; l'ouverture du quai de la rue fait ±9,7 m, le bord extérieur du parapet
     Y_CITY_END = -328.0
-    # le pied : parapets jusqu'au pied de la rampe (y -5) ; le port, avancé de 46,3 m (sa pose dans parcours.py),
-    # passe dessous depuis son mur sud et prend la suite : de ce mur au pied, des murs de soutènement sous les rives
-    # remplacent les piles de -55 et -20. La chaussée seule descend encore jusqu'à la fin du raccord (Y_TOE, z = 0)
+    # le pied : parapets jusqu'au pied de la rampe (Y_FOOT) ; le port (sa pose dans parcours.py) passe dessous depuis
+    # son mur sud et prend la suite : de ce mur au pied, des murs de soutènement sous les rives remplacent les piles.
+    # La chaussée seule descend encore jusqu'à la fin du raccord (Y_TOE, z = 0)
     Y_PORT = Y_FOOT
-    Y_TOE = Y_FOOT + 6.0
-    Y_PORT_WALL = L.PORT_YS[0] + L.pose_ville("port")[2]       # -66,3 : le mur sud du port, dans la ville
+    Y_TOE = Y_FOOT + 0.5 * _PROFIL["t_sag"]
+    Y_PORT_WALL = L.PORT_YS[0] + L.pose_ville("port")[2]       # -271,3 : le mur sud du port, dans la ville
 else:
     Y_CITY_END = -1000.0  # l'avenue continue dans la ville, dans l'axe du pont (le fond de P4)
     Y_PORT = -20.0        # le mur du quai du port : le tablier s'arrête là, le terre-plein prend la suite
     Y_TOE = Y_PORT_WALL = None
-Y_END = 100.0
-GRADE = 0.06
-T_SAG, T_CREST = 12.0, 20.0     # longueurs des raccords (pied, crête) : 6 % × (125 − 20/4) = 7,2 m
+Y_END = Y_FOOT + 105.0
+GRADE = _PROFIL["grade"]
+T_SAG, T_CREST = _PROFIL["t_sag"], _PROFIL["t_crest"]     # longueurs des raccords (pied port, crête)
 
 HALF = 7.0
 WALK = 2.0
 CITY_SHORE = L.CITY_SHORE_Y   # -325 : le mur du quai de la ville (scene_b, s 181 posé en y -325)
-LAMP_YS = [Y_START + 10.0 + 30.0 * k for k in range(11)]     # -310 .. -10
-PIERS = [Y_START + 20.0 + 35.0 * k for k in range(9)]        # -300 .. -20 : la dernière est la culée du port
+# les lampadaires tous les 30 m du quai au pied ; les piles tous les 35 m (la dernière, la culée, n'est pas posée)
+LAMP_YS = [Y_START + 10.0 + 30.0 * k for k in range(int((Y_FOOT - Y_START - 10.0) / 30.0) + 1)]
+PIERS = [Y_START + 20.0 + 35.0 * k for k in range(int((Y_FOOT - Y_START - 20.0) / 35.0) + 2)]
 
 
 def _grade(y):
-    """La pente du tablier, raccords adoucis (linéaires en pente, donc paraboliques en hauteur)."""
-    def ramp(y, a, t):
-        return min(1.0, max(0.0, (y - (a - t / 2)) / t))
-    return GRADE * (ramp(y, Y_FOOT_CITY, T_SAG) - 2 * ramp(y, Y_CREST, T_CREST) + ramp(y, Y_FOOT, T_SAG))
+    """La pente du tablier, raccords adoucis (linéaires en pente, donc paraboliques en hauteur) : motion.pont_pente."""
+    return MO.pont_pente(y, _PROFIL)
 
 
 _Z = {}
@@ -104,7 +110,7 @@ def samples(y0, y1, fine=1.0, coarse=4.0):
     out, y = [], y0
     while y < y1:
         out.append(y)
-        curv = any(abs(y - c) < t * 0.7 for c, t in ((Y_FOOT_CITY, T_SAG), (Y_CREST, T_CREST), (Y_FOOT, T_SAG)))
+        curv = any(abs(y - c) < t * 0.7 for c, t in ((Y_FOOT_CITY, _PROFIL["t_sag_city"]), (Y_CREST, T_CREST), (Y_FOOT, T_SAG)))
         y += fine if curv else coarse
     out.append(y1)
     return out
@@ -163,7 +169,8 @@ def build_bridge(hidden, lamp_src, far=False, haubans=False):
         joint = S.mat_plain("joint_dilatation", (0.42, 0.42, 0.44, 1), 0.22, 1.0)
         bm = L.bmesh.new()
         xs = [-HALF + 0.5 + (2 * HALF - 1.0) * k / 40 for k in range(41)]
-        for yj in (Y_START + 1.0, -282.5, -177.5, -72.5, Y_PORT + 0.5):
+        for yj in [Y_START + 1.0] + [y for y in (-282.5, -177.5, -72.5) if Y_START + 5.0 < y < Y_PORT - 5.0] + \
+                [Y_PORT + 0.5]:
             row = [(bm.verts.new((x, yj - 0.12, deck_z(yj - 0.12) + road.road_z(x) + 0.003)),
                     bm.verts.new((x, yj + 0.12, deck_z(yj + 0.12) + road.road_z(x) + 0.003))) for x in xs]
             for (a0, a1), (b0, b1) in zip(row, row[1:]):
@@ -205,7 +212,10 @@ def build_retaining(edge, conc):
 PY_X = 11.0           # les deux jambes de part et d'autre du tablier (entraxe 22 m), 3 × 2 m
 PY_H = 45.0           # hauteur au-dessus de la chaussée de crête
 PY_BEAMS = (28.0, PY_H)                                   # les traverses
-STAY_D = [16.0 + 12.0 * k for k in range(8)]              # les ancrages sur le tablier, 16 .. 100 m du pylône
+# les ancrages sur le tablier : de 16 à 100 m du pylône ; dans la ville, le pont de 110 m n'a que 53 m de chaque côté
+# de sa crête : de 10 à 49 m
+STAY_D = [16.0 + 12.0 * k for k in range(8)] if not VILLE else \
+    [10.0 + (min(Y_CREST - Y_START, Y_FOOT - Y_CREST) - 4.5 - 10.0) * k / 7.0 for k in range(8)]
 STAY_R = 0.1
 
 

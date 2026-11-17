@@ -1086,6 +1086,54 @@ def fin_pack_lights(frames, hero):
 FIN6_HELI_CAR_W = 35000.0
 
 
+def fin6_pointe(frames, hero, shift=0):
+    """Ce que FIN6 pose autour de son point d'arrêt : l'anneau qui l'attendait (fin6_orbite.RING_KEEP, trois
+    patrouilles et le fourgon, tournés vers le point d'arrêt, rampes battantes ; la berline ne reçoit pas leurs
+    lumières), ses six agents (fin6_orbite.COPS), le lampadaire de la pointe rangé à fin6_orbite.LAMP_AT et la nappe
+    de brume de la pointe. FIN6 le pose ; dans la ville, P6 aussi, aux mêmes places (le trajet roulé, 17 novembre au
+    soir : FIN6 suit P6 sans coupe, rien ne doit apparaître à la jonction). `shift` : l'image du film qui précède la
+    première du plan (parcours.START), la phase des rampes continue d'un plan à l'autre. Rend les rigs de l'anneau."""
+    import fin_pointe as F
+    import fin6_orbite as F6
+    stop = Vector((F6.CX, F6.CY, 0.0))
+    rnd = random.Random(6)
+    first, rigs = {}, []
+    for i in F6.RING_KEEP:
+        x, y = F6.polar(F6.RING[i], F6.RING_R)
+        kind = "van" if i == F6.RING_VAN else "patrol"
+        r = first.get(kind)
+        if r is None:
+            r = first[kind] = (L.patrol("patrol_anneau") if kind == "patrol" else L.van("van_anneau"))
+        else:
+            r = L.clone(r, f"{kind}_anneau_{i}")
+        h = L.heading_to((stop.x - x, stop.y - y)) + rnd.uniform(-28, 28)
+        L.put(r, x, y, 0.0, heading=h)
+        rigs.append(r)
+    # l'anneau est à l'arrêt : feux de position, pas les codes (à 6 kW, des ovales clairs au sol devant chaque voiture)
+    for r in rigs:
+        phares_arret(r)
+    import motion as M
+    n = M.flash_bars(rigs, frames, shift=shift)
+    print(f"[FIN6] anneau : {len(rigs)} véhicules, {n} lumières de rampe clignotantes ; berline exclue de "
+          f"{car_out_of_rigs(rigs, hero)} lumières", flush=True)
+    try:
+        for k, (a, r, pz, st) in enumerate(F6.COPS):
+            o = L.officer(pz, style=st, name=f"officer_{k}_{pz}")
+            x, y = F6.polar(a, r)
+            o.location = (x, y, 0.0)
+            L.face(o, (stop.x, stop.y))
+    except Exception as e:
+        print(f"[FIN6] agents non posés : {e!r}", flush=True)
+    # le lampadaire de la pointe, celui de FIN (le lampadaire commun, lieux.lamp : ambre), rangé à fin6_orbite.LAMP_AT :
+    # sa tête et son reflet hors du cadre de FIN6 à toutes les images (règle E)
+    shift_l = Vector((F6.LAMP_AT[0] - LAMP_AT[0], F6.LAMP_AT[1] - LAMP_AT[1], 0.0))
+    for ob in (bpy.data.objects.get("lamp_pointe"), bpy.data.objects.get("lamp_pointe_light")):
+        if ob is not None:
+            ob.location += shift_l
+    L.haze((CX - 35, CX + 35), (F.SY - 3, CY + 40), (L.WATER_Z, 30), 0.0025, name="haze_pointe")
+    return rigs
+
+
 def plan_FIN6(scene, hidden, palier="socle"):
     """FIN6, la fin à six étoiles (découpage v3.1, 80 images, fin6_orbite.py) : elle suit P6 et raconte l'arrivée
     et l'arrêt à la pointe comme FIN, puis l'encerclement. La berline entre à 24 km/h en plein freinage (feux stop),
@@ -1141,46 +1189,13 @@ def plan_FIN6(scene, hidden, palier="socle"):
     M.key_vehicle(p1, ps, wheels=wh, pivot=(0.0, 0.0, 0.36))
     M.wheel_marks(wh, wr, axis="Y")
     M.flash_bars([p1], frames)
-    # l'anneau qui l'attendait (fin6_orbite.RING_KEEP), tourné vers le point d'arrêt, rampes battantes ; la berline
-    # ne reçoit pas leurs lumières (à 14 m, elles la passaient au rose)
-    rnd = random.Random(6)
-    first, rigs = {}, []
-    for i in F6.RING_KEEP:
-        x, y = F6.polar(F6.RING[i], F6.RING_R)
-        kind = "van" if i == F6.RING_VAN else "patrol"
-        r = first.get(kind)
-        if r is None:
-            r = first[kind] = L.patrol("patrol") if kind == "patrol" else L.van("van")
-        else:
-            r = L.clone(r, f"{kind}_{i}")
-        h = L.heading_to((stop.x - x, stop.y - y)) + rnd.uniform(-28, 28)
-        L.put(r, x, y, 0.0, heading=h)
-        rigs.append(r)
-    # l'anneau est à l'arrêt : feux de position, pas les codes (à 6 kW, des ovales clairs au sol devant chaque voiture)
-    for r in rigs:
-        phares_arret(r)
-    n = M.flash_bars(rigs, frames)
-    print(f"[FIN6] {n} lumières de rampe clignotantes", flush=True)
-    print(f"[FIN6] berline exclue de {car_out_of_rigs(rigs, hero)} lumières de l'anneau", flush=True)
-    # six agents, six modèles (fin6_orbite.COPS), face au point d'arrêt
-    try:
-        for k, (a, r, pz, st) in enumerate(F6.COPS):
-            o = L.officer(pz, style=st, name=f"officer_{k}_{pz}")
-            x, y = F6.polar(a, r)
-            o.location = (x, y, 0.0)
-            L.face(o, (stop.x, stop.y))
-    except Exception as e:
-        print(f"[FIN6] agents non posés : {e!r}", flush=True)
+    # l'anneau qui l'attendait, ses agents, le lampadaire rangé et la brume de la pointe (fin6_pointe, que P6 pose
+    # aussi dans la ville), la phase des rampes comptée en images du film
+    import parcours as PC
+    fin6_pointe(frames, hero, shift=PC.START["FIN6"])
     # la meute de FIN : rien que ses phares, derrière la caméra
     fin_pack_lights(frames, hero)
     fin_fill(hero)
-    # le lampadaire de la pointe, celui de FIN (le lampadaire commun, lieux.lamp : ambre), rangé à fin6_orbite.LAMP_AT :
-    # sa tête et son reflet hors du cadre à toutes les images (règle E)
-    lp = bpy.data.objects.get("lamp_pointe_light")
-    shift = Vector((F6.LAMP_AT[0] - LAMP_AT[0], F6.LAMP_AT[1] - LAMP_AT[1], 0.0))
-    for ob in (bpy.data.objects.get("lamp_pointe"), lp):
-        if ob is not None:
-            ob.location += shift
     # l'hélicoptère de FIN, son projecteur qui la cherche puis se pose sur elle à l'arrêt
     heli, _ = L.helicopter("heli")
     L.put(heli, *F6.HELI, heading=F6.HELI_HEADING, pitch=-6.0, roll=0.0)
@@ -1191,9 +1206,9 @@ def plan_FIN6(scene, hidden, palier="socle"):
     beam_cones([heli], aim, strength=0.8)
     piv = next(o for o in heli.children_recursive if o.name.endswith("searchlight_pivot"))
     M.key_searchlight({"searchlight_pivot": piv}, frames, F6.beam_target)
-    # la brume de FIN
+    # la brume de FIN (dans la ville, ville.brume la remplace par celle de la prise, que FIN6 prolonge ; la nappe de
+    # la pointe est posée par fin6_pointe)
     L.haze((CX - 80, CX + 80), (CY - 470, CY + 60), (L.WATER_Z, 50), 0.0005)
-    L.haze((CX - 35, CX + 35), (F.SY - 3, CY + 40), (L.WATER_Z, 30), 0.0025, name="haze_pointe")
     c0 = F6.camera(M.t_of(F6.F0))
     cam_loc = Vector(c0[:3])
     yaw, pitch = math.radians(c0[3]), math.radians(c0[4])
@@ -1220,7 +1235,10 @@ def p6_ground(x, y):
     return scene_e.deck_ground(x, y)
 
 
-P6_HAZE = 0.0012
+# la brume de la jetée (le pinceau de l'appareil 0 s'y règle : helicos.beam0) ; dans la ville (17 novembre au soir),
+# celle de la prise entière (ville.BRUME_VILLE), que FIN6 prolonge : ville.brume la remplace sans saut
+import ville as V  # noqa: E402  (Python pur : la brume de la prise)
+P6_HAZE = V.BRUME_VILLE if L.ville_on() else 0.0012
 
 
 def helis_sans_tache(spots):
@@ -1382,7 +1400,9 @@ def plan_P6(scene, hidden, palier="socle"):
     import p6_jetee as P6
     lamp_src = panorama(scene, hidden, all_lit=True, haubans=(palier in ("haubans", "complet")))
     build_jetty(hidden, lamp_src)
-    build_pointe(hidden, lamp_src, far=True, marina=(palier in ("marina", "complet")))
+    # en ville, la conduite unique roule jusqu'à la pointe derrière la berline, à 2,4 m : la pointe et la marina de
+    # près (garde-corps, chaînes, vrais bateaux), comme FIN les montre ; le lieu autonome garde sa vue lointaine
+    build_pointe(hidden, lamp_src, far=not L.ville_on(), marina=(palier in ("marina", "complet")))
     # le phare (lieux.panorama) : ses pinceaux, relevés de 1° seulement et vus de la jetée sous la lanterne, barrent
     # le cadre en passant par elle ; aucune phase ni vitesse ne l'évite de la jetée (rendus e3, e4, f1, f2). Gelés,
     # l'un fuit vers le large, l'autre est caché à la caméra (P6_PHARE_PHASE) : la lanterne se lit, pas la barre
@@ -1458,12 +1478,20 @@ def plan_P6(scene, hidden, palier="socle"):
     # la brume seulement en couloir sur la jetée, sous la caméra : sur toute la lagune, vue de 35 m, elle diffusait
     # le ciel en un voile rose qui noyait l'eau noire et ses reflets (rendus du 12 novembre)
     L.haze((JX - 30, JX + 30), (JY0 - 20, JY1), (L.WATER_Z, 28), P6_HAZE)
+    if L.ville_on():
+        # FIN6 suit P6 sans coupe (le trajet roulé, 17 novembre au soir) : l'anneau qui attend sur la pointe, ses
+        # agents, le lampadaire rangé et la nappe de brume de la pointe sont déjà là, aux places de FIN6
+        import parcours as PC
+        fin6_pointe(frames, hero, shift=PC.START["P6"])
     p6_clean_haze(scene, hero)
     helis_sans_tache([o for r in hs for o in r.children_recursive
                       if o.type == "LIGHT" and o.name.endswith("searchlight_spot")])
     p6_beam0_haze(hs[0], frames, hero)
     p6_foreground(hidden)
-    p6_phare_clear(scene)
+    if not L.ville_on():
+        # (en ville, la jetée garde ses lampadaires tous les 20 m des deux côtés jusqu'à la pointe, la logique du pont
+        # et de toute la ville : la caméra roule désormais derrière la berline, le phare au-dessus des têtes)
+        p6_phare_clear(scene)
     # la berline à 7 m de l'objectif : ses textures gardent leur pleine définition, le reste est loin
     L.cap_images(1024, keep_objects=[hero])
     c = P6.camera(P6.T_STILL)
@@ -1476,7 +1504,7 @@ def plan_P6(scene, hidden, palier="socle"):
     return cam
 
 
-STILL = {"P6": 21, "FIN6": 80, "FIN": 36}                        # l'image fixe d'essai des plans animés (STILL_FRAME)
+STILL = {"P6": 21, "FIN": 36}            # l'image fixe d'essai des plans animés (STILL_FRAME) ; FIN6 : la dernière
 
 
 PLANS = {"FIN": plan_FIN, "FIN6": plan_FIN6, "P6": plan_P6}
@@ -1489,5 +1517,5 @@ def build(plan, palier="complet"):
     cam = PLANS[plan](scene, hidden, palier=palier)
     scene.camera = cam
     __import__("fx").dress(plan, scene)                 # les interactions (fx.py ; FILM3D_FX=0 les retire)
-    scene.frame_set(STILL.get(plan, 2))
+    scene.frame_set(STILL.get(plan) or (__import__("fin6_orbite").STILL_FRAME if plan == "FIN6" else 2))
     return scene

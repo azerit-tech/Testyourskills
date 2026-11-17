@@ -118,7 +118,7 @@ def column_pos(i):
 # trois quarts (cap de 20 à 25° sur leur route, en crabe, le projecteur sur elle). Ce sont leurs places (heli_slot) ;
 # leurs trajectoires sont celles de la distribution commune à P5 et P6 (helicos.py) : le 0 quitte son stationnaire
 # de P5/60 pour sa place ; 1 et 2 arrivent sur la leur pendant P5.
-HELIS = [(80.5, 45.0, 14.0, -20.0), (58.0, 70.0, 21.5, -25.0), (102.0, 140.0, 46.0, 25.0)]
+HELIS = [(80.5, 45.0, 14.0, -20.0), (58.0, 70.0, 21.5, -25.0), (115.0, 140.0, 46.0, 25.0)]
 HELI_DROP = [0.5, 0.5, 2.0]
 HELI_PITCH = -5.0           # le nez bas du vol d'avance (l'accélération y ajoute au plus 9°, motion.AIR)
 LAMP_H = 4.68 * 1.75        # la hauteur des lampadaires de la jetée (lieux.lamp, LAMP_S)
@@ -131,6 +131,13 @@ def heli(i):
     return helicos.in_scene("P6", i, dyn=False)
 
 
+# la fin de P6 (17 novembre : FIN6 continue le trajet sans coupe) : pendant HELI_LEAVE s, l'appareil 0 quitte sa
+# place devant elle pour le stationnaire de FIN6 (fin6_orbite.HELI, où il reste), le 1 et le 2 s'écartent et
+# montent hors du cadre (HELI_AWAY : m vers l'extérieur de l'axe, m de montée), FIN6 ne les a plus
+HELI_LEAVE = 3.0
+HELI_AWAY = [None, (-90.0, 12.0), (110.0, 8.0)]
+
+
 def heli_slot(i):
     """La place de l'appareil i devant la berline, fn(t), t en s depuis P6/1 (négatif admis : P5)."""
     x0, ahead, z0, cap = HELIS[i]
@@ -138,9 +145,31 @@ def heli_slot(i):
     def fn(t):
         _, y = hero_pos(t)
         bob = 0.35 * math.sin(2 * math.pi * 0.6 * t + 1.7 * i)
-        z = z0 - HELI_DROP[i] * M.smoothstep(M.t_of(CRANE_F0 - 10), T_END, t)
-        return x0, y + ahead, z + bob, cap, HELI_PITCH, 2.0 * math.sin(2 * math.pi * 0.4 * t + i)
+        z = z0 - HELI_DROP[i] * M.smoothstep(M.t_of(STILL_FRAME - 10), T_END, t)
+        out = [x0, y + ahead, z + bob, cap, HELI_PITCH, 2.0 * math.sin(2 * math.pi * 0.4 * t + i)]
+        u = (t - (T_END + 1.0 / M.FPS - HELI_LEAVE)) / HELI_LEAVE
+        if u <= 0.0:
+            return tuple(out)
+        k = _quintic(u)
+        if i == 0:
+            import fin6_orbite as F6
+            hx, hy, hz = F6.HELI
+            out[0] += (hx - out[0]) * k
+            out[1] += (hy - out[1]) * k
+            out[2] += (hz - out[2]) * k
+            out[3] += (M._unwrap(out[3], F6.HELI_HEADING) - out[3]) * k
+            out[5] *= 1.0 - k
+        else:
+            side, up = HELI_AWAY[i]
+            out[0] += side * k
+            out[2] += up * k
+        return tuple(out)
     return fn
+
+
+def _quintic(u):
+    u = min(1.0, max(0.0, u))
+    return u * u * u * (10.0 - 15.0 * u + 6.0 * u * u)
 
 
 def beam_target(t):
@@ -212,7 +241,7 @@ def _rail(t, du=0.0):
 
 def camera_rail(t):
     """La caméra sans tremblé : (x, y, z, lacet, site, roulis, focale)."""
-    return PC.raccord("P6", _f(t), _rail(t))
+    return PC.chase("P6", _f(t))       # LA caméra du film : le bras commun, plus de grue (17 novembre)
 
 
 def camera(t):

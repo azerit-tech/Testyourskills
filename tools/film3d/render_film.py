@@ -52,7 +52,11 @@ SOURCES = {
     "FIN6": ("scene_d", "FIN6"),
 }
 # (repli seulement si shared/film/cut.ts manque : il reste la seule source des durées ; découpage v3)
-FALLBACK_FRAMES = {"OUV": 40, "P1": 48, "P2": 110, "P3": 48, "P4": 48, "P5": 60, "P6": 60, "FIN": 52, "FIN6": 80}
+# Depuis le 17 novembre (SPEC §18.55, le trajet roulé) les durées du film sont celles du parcours unique
+# (parcours.SHOTS, FIN6_FRAMES) : 619 images de poursuite et 101 de FIN6, 30 s (17 novembre au soir, le pont de
+# 110 m). cut.ts (le site) les reprendra ; tant qu'il garde le découpage v3, plan_frames rend la longueur des
+# modules et le journal le dit.
+FALLBACK_FRAMES = {"OUV": 75, "P1": 33, "P2": 107, "P3": 103, "P4": 108, "P5": 60, "P6": 133, "FIN": 52, "FIN6": 101}
 # Le module de trajectoire de chaque plan (sans Blender) : son FRAMES est la longueur que sa scène sait animer. Un
 # plan pas encore migré au découpage de cut.ts se rend à la longueur de son module, et le journal le dit.
 TRAJ = {"OUV": "ouv_avenue", "P1": "p1_avenue", "P2": "p2_arc", "P3": "p3_enseignes", "P4": "p4_pont",
@@ -659,7 +663,7 @@ def assemble(a, plans, cut):
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
         sys.exit("[film] ffmpeg introuvable")
-    essais = parse_essais(a.essai)
+    essais = with_ville(parse_essais(a.essai), a)       # --ville : les images de <PLAN>+ville
     made, drafts = [], []
     for plan in plans:
         d = os.path.join(a.out, plan_dirname(plan, essais))
@@ -730,12 +734,15 @@ def assemble(a, plans, cut):
 def selftest():
     import tempfile
     cut = read_cut()
-    assert cut == FALLBACK_FRAMES and sum(cut.values()) == 546, cut          # cut.ts et le repli : le découpage v3
+    import parcours as PC                                                      # le repli : le trajet roulé
+    assert FALLBACK_FRAMES == dict(PC.SHOTS, FIN=52, FIN6=PC.FIN6_FRAMES), FALLBACK_FRAMES
+    assert set(cut) == set(ORDER), cut
     # un plan pas encore migré (son module a encore FRAMES = 28) garde sa longueur ; les autres suivent cut.ts
     old = {"P3": 28, "FIN": 36}
     eff = plan_frames(cut, ORDER, frames_of=lambda p: old.get(p, cut[p]))
     assert eff == dict(cut, P3=28, FIN=36), eff
-    assert plan_frames(cut, ("P4",), frames_of=lambda p: None) == {"P4": 48}  # pas de module lisible : cut.ts
+    assert plan_frames(cut, ("P4",), frames_of=lambda p: None) == {"P4": cut["P4"]}  # pas de module lisible : cut.ts
+    assert plan_frames(cut, ("P4",)) == {"P4": dict(PC.SHOTS)["P4"]}          # le module (le parcours) fait foi
     real = plan_frames(cut)                                                    # les vrais modules, sans Blender
     assert set(real) == set(ORDER) and all(n > 0 for n in real.values()), real
     assert parse_frames("3-5", 28) == [3, 4, 5] and parse_frames("17", 28) == [17] and parse_frames(None, 3) == [1, 2, 3]
@@ -780,7 +787,7 @@ def selftest():
         assert debit.deps_match(deps, root=d)
         open(os.path.join(d, "m.py"), "w").write("A = 2\n")
         assert not debit.deps_match(deps, root=d)
-    print("[film] selftest : durées (546 images, plans pas encore migrés compris), --frames, essais, reprise "
+    print("[film] selftest : durées (celles du parcours, plans pas encore migrés compris), --frames, essais, reprise "
           "(absente, tronquée, autre taille), clé du cache de scène : ok")
 
 

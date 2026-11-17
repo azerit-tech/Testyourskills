@@ -1464,8 +1464,32 @@ def build_east(hidden):
     drums.color = (*L.lin("#3a4656")[:3], 1.0)
     for i, (x, y, a) in enumerate(PALLETS):
         S.instance(pallet, f"palettes_{i}", (x, y, 0.0), a)
+    if VILLE:
+        build_quay_north(hidden, srcs, pallet, paint)
     print(f"[port] côté est : {n_boxes} conteneurs, {len(PORTAL_CRANES)} grues à portail, cargo, "
           f"chaîne ({links} maillons), caisses, {len(DRUMS)} fûts", flush=True)
+
+
+# Le quai nord, dans la ville (le trajet roulé, 17 novembre au soir) : de la sortie du virage à l'entrée de la jetée,
+# la caméra de poursuite regarde vers le nord-est ; à droite du cadre, la voie du quai (fermée par les séparateurs,
+# aucune voiture n'y roule) et son bord jusqu'au garde-corps étaient un aplat nu. Une file de conteneurs à un ou deux
+# niveaux rangée le long du bord nord de la voie, à 9 m au moins du flanc droit de la jetée, et un chariot élévateur
+# (bibliothèque, CC BY : CREDITS.md) au bout de la file, une palette devant ses fourches. Rien sous la berline.
+QUAY_ROW = (74.4, 38.0, ["20", "40", "40", "20", "40"], (1, 2))     # (y, x de départ, baies, niveaux), le long de x
+FORKLIFT_AT, FORKLIFT_YAW = (33.6, 73.9), 90.0                        # en long, le long de la voie
+
+
+def build_quay_north(hidden, srcs, pallet, paint):
+    yd = Yard(srcs, seed=37, colors=BOX_MUTED)
+    yd.n = 1500                                    # les noms suivent ceux de build_east
+    y, x, keys, tiers = QUAY_ROW
+    yd.row(x, y, keys, tiers, along_x=True, top_gaps=0.35)
+    lift, fs = _lib(os.path.join("lieux", "port", "forklift", "model.glb"), "src_chariot", hidden, paint, height=2.2)
+    a = math.radians(FORKLIFT_YAW)
+    S.instance(lift, "chariot_elevateur", (*FORKLIFT_AT, 0.0), a).color = (*L.lin("#b08a2e")[:3], 1.0)
+    S.instance(pallet, "palettes_chariot", (FORKLIFT_AT[0] - fs.y / 2 - 1.4, FORKLIFT_AT[1] + 0.2, 0.0), a)
+    print(f"[port] quai nord : {yd.n - 1500} conteneurs, un chariot élévateur ({fs.x:.1f} × {fs.y:.1f} × "
+          f"{fs.z:.1f} m)", flush=True)
 
 
 def build_port(hidden, lamp_src, far=False, palier=None):
@@ -1779,7 +1803,10 @@ PLANS = {"P5": plan_P5}
 
 
 PLAN_PALIER = {"P5": "conteneurs"}  # le palier de décor de chaque plan (render_film.py n'en passe pas)
-P5_HAZE = 0.0016                    # la brume du port (la lampe de l'appareil 0 s'y règle : helicos.beam0)
+# la brume du port (la lampe de l'appareil 0 s'y règle : helicos.beam0) ; dans la ville (17 novembre au soir), celle
+# de la prise entière (ville.BRUME_VILLE) : ville.brume la remplace sans changer la densité où le pinceau se règle
+import ville as V  # noqa: E402  (Python pur : la brume de la prise)
+P5_HAZE = V.BRUME_VILLE if L.ville_on() else 0.0016
 P5_BEAM_CAR_W = 5.0e4               # la jumelle du faisceau sur la berline (à 1,2e5 puis 7e4 elle sortait rose et brûlée)
 
 

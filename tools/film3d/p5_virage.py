@@ -436,9 +436,7 @@ def camera_aim(t):
 
 def camera_rail(t):
     """La caméra sans tremblé : (x, y, z, lacet, site, roulis, focale)."""
-    x, y, z = cam_pos(t)
-    yaw, pitch = camera_aim(t)
-    return PC.raccord("P5", _f(t), (x, y, z, yaw, pitch, 0.0, LENS))     # la visée commune aux deux bouts
+    return PC.chase("P5", _f(t))       # LA caméra du film : le bras commun à la visée commune (17 novembre)
 
 
 def camera(t):
