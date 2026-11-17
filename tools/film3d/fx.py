@@ -1918,7 +1918,9 @@ def hooked(build, plans):
 
 def dress(plan, scene=None, **opt):
     """Pose les interactions du plan (OUV, P1… FIN6), sur la trajectoire de la scène telle qu'elle est. Sans
-    berline lisible, ou FILM3D_FX=0, ne fait rien."""
+    berline lisible, ou FILM3D_FX=0, ne fait rien. Les plots de la route (reperes.py, par lieu) se posent avant, effets
+    actifs ou non."""
+    __import__("reperes").poser(plan, scene)
     if not enabled():
         log(f"{plan} : effets inactifs (FILM3D_FX=1 les active)")
         return None
