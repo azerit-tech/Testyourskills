@@ -2411,8 +2411,11 @@ def build(plan=None, palier=None):
     hidden.objects.link(lamp)
     S = 1.75
     k = 0
+    # tous les 20 m de chaque côté, en quinconce (un lampadaire tous les 10 m le long de la route), comme le pont et la
+    # jetée : à 30 m, la berline vue de dos passait entre deux nappes et n'était qu'une silhouette noire, ses feux
+    # arrière seuls lisibles (brouillon éclairé v6, images 0–140, OUV et P1)
     for side in (-1, 1):
-        yy = 14.0 if side < 0 else 28.0
+        yy = 14.0 if side < 0 else 24.0
         while yy < 700:
             if in_street(yy, 3.0):
                 yy += 8.0
@@ -2431,7 +2434,7 @@ def build(plan=None, palier=None):
             lo = bpy.data.objects.new(f"lamp_light_{k}", L)
             scene.collection.objects.link(lo)
             lo.location = Vector((x, yy, 0.15)) + head - Vector((0, 0, 0.12))
-            yy += 30.0
+            yy += 20.0
             k += 1
     # --- la ville unique : rien au-delà du joint avec le rond-point ni du bord du boulevard du quai ; le mur de promenade revient le
     # long du joint jusqu'à celui du rond-point (la plage s'arrête à ce retour)
