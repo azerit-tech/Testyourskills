@@ -371,14 +371,14 @@ Ce qui attache le film au site : la palette, les bandes de la couleur de la page
 | Grain | une tuile de bruit de 128 px, déplacée 12 fois par seconde, opacité 7 % |
 | Vignette | un dégradé radial fixe |
 | Secousse à chaque étoile | translation de l'image sur quatre images |
-| Deux tons de l'arrêt sur image | une toile tirée de la dernière image de la fin pendant l'attente (`web/src/film/freeze.ts`), posée au gel ; à défaut, au gel même |
+| Deux tons de l'arrêt sur image | une toile tirée pendant l'attente de l'image qui gèlera (la dernière du dernier plan joué, ou de FIN6), la berline détourée (`web/src/film/freeze.ts`), posée au gel ; à défaut, au gel même |
 | Flash | un aplat crème en opacité ; il part aussi tout de suite sur une erreur de lecture (§5.5) |
 | Cache de la bascule | un aplat crème (la couleur de l'éclair) posé par le lecteur, sans attendre React, tant que la fin n'a pas peint sa première image |
 | Vibration | une impulsion par étoile (`web/src/lib/haptics.ts`, Android) |
 
 Le grain n'est pas gravé dans les fichiers : il gonflerait le débit pour rien.
 
-**Le deux-tons de l'arrêt sur image** ne seuille pas la luminance : de nuit, la carrosserie rouge est aussi sombre que le bitume, et un seuil en gris garde le ciel et perd la voiture. Il seuille une clé : la pureté du rouge cramoisi de la carrosserie (même dans l'ombre), plus les lumières vives (feux, phares, lampes). Le bitume brun, les reflets orangés au sol, le ciel bleu et violet restent dans l'ombre. Les deux seuils sont lus sur chaque image (Otsu à trois classes sur la zone d'action) : un rendu final plus contrasté ou plus sombre donne le même tirage. La clé suppose la berline rouge : si sa teinte change au rendu final, régler `HUE_FULL` et `HUE_ZERO` dans `freeze.ts` et revoir les deux fins. La toise, un trait tous les 7 % de la hauteur, ne passe que sur la teinte d'ombre. Ni vignette pendant le gel : deux tons, pas trois.
+**Le deux-tons de l'arrêt sur image** (§18.54) est une affiche : la berline en silhouette claire, cernée d'ombre, le décor derrière en trame. Un seuil lu sur l'image ne suffit pas : sur l'avenue, de nuit sous le ciel violet, la carrosserie a la couleur du bitume. La berline est donc détourée une fois pour toutes sur chacune des six images qui peuvent geler (`STILL_CARS` dans `freeze.ts`, en pixels de l'image 720 × 1280). Dans le contour, une clé « rouge cramoisi de la carrosserie + luminance », seuillée à la moitié du seuil d'Otsu : la caisse sort en clair, même dans l'ombre ; la lunette, la plaque, la calandre et le dessous restent dans l'ombre ; feux et phares sont cernés d'un trait d'ombre. Hors du contour, les grandes masses claires (la luminance lissée, où les blocs du codec se fondent, seuillée un quart au-dessus d'Otsu) et les lampes nettes passent en trame, la teinte claire à 32 % sur l'ombre ; le reste dans l'ombre ; autour de la voiture, un liseré d'ombre la détache. Un nouveau rendu de ces images défait le tracé : `scripts/film-media.test.ts` garde l'empreinte de chacune et dit quel contour retracer. La clé suppose la berline rouge : si sa teinte change au rendu final, régler `HUE_FULL` et `HUE_ZERO`. La toise, un trait tous les 7 % de la hauteur, ne passe que sur l'ombre. Ni vignette pendant le gel : les deux tons, l'un d'eux tramé, rien d'autre.
 
 ---
 
@@ -423,7 +423,7 @@ web/src/film/
   media/          les mp4 et l'affiche, écrits par le montage
   unlock.ts       les deux balises, débloquées par le geste qui lance la fiche
   FilmHud.tsx     bandes, étoiles, radio, arrêt sur image, flash, grain, vignette
-  freeze.ts       l'arrêt sur image en deux tons : la clé, les seuils, la toise, tirés sur une toile
+  freeze.ts       l'arrêt sur image en deux tons : le contour de la berline, la clé, la trame du décor, la toise, tirés sur une toile
   film.css
 shared/film/budget.ts           les plafonds de poids, lus par le montage et le lecteur
 web/src/components/Film.tsx     même contrat que Walkout3D envers la page d'une fiche ; délai d'abandon, événement
