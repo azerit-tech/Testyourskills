@@ -1,5 +1,5 @@
 {
-  "//": "Liste de montage du film. Mode d'emploi : tools/film/README.md. Les durées des plans ne se règlent pas ici (scripts/film-lib.ts, puis shared/film/cut.ts).",
+  "//": "Liste de montage du film. Mode d'emploi : tools/film/README.md. Les durées des plans ne se règlent pas ici : tools/film3d/parcours.py les exporte dans shared/film/parcours.json (SPEC §18.56), que lisent shared/film/cut.ts et scripts/film-lib.ts.",
   "grade": {
     "//": "Étalonnage commun aux prises, neutre : les plans rendus en 3D sortent déjà étalonnés, plan par plan (tools/film3d/). L'ancien point de départ (contraste 0,97, ombres vers la prune, lumières vers le crème) ternissait le ciel du brouillon éclairé. À ne régler que pour une prise qui ne sort pas du rendu.",
     "contrast": 1,
