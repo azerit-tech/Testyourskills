@@ -381,7 +381,13 @@ def plan_P4(scene, hidden, haubans=False):
     # douce de face, à 8 m devant elle, accrochée à son rig (elle suit les clés), qui n'éclaire qu'elle (le sol
     # mouillé ne la reçoit pas). C'est la bande corail du ciel, derrière la caméra, sur sa calandre : à 500 W la
     # caisse restait à 10 % (lumière v3.1, P4 : 12 à 16 %, dans la suite de P3 et P5)
-    L.car_fill(hero, loc=(0.4, 8.0, 2.2), energy=P4_FACE_W)
+    # Ville (le trajet roulé) : la caméra la suit de dos au bras commun, l'appoint de face n'éclairait plus qu'une
+    # calandre hors champ et la caisse passait au noir à la jonction P3 → P4 (fixes éclairés v5) : l'appoint de
+    # poursuite commun, le même qu'en P3 et P5 (lieux.chase_fill)
+    if VILLE:
+        L.chase_fill(hero)
+    else:
+        L.car_fill(hero, loc=(0.4, 8.0, 2.2), energy=P4_FACE_W)
     port_glow(hero, P4.PORT_FRAMES)
     y_hero = P4.hero_pos(P4.T_STILL)[1]
     entries = [(e[0], *P4.pack_pos(i)(P4.T_STILL), 0.0) for i, e in enumerate(P4.PACK)] + \

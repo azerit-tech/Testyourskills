@@ -1195,7 +1195,12 @@ def plan_FIN6(scene, hidden, palier="socle"):
     fin6_pointe(frames, hero, shift=PC.START["FIN6"])
     # la meute de FIN : rien que ses phares, derrière la caméra
     fin_pack_lights(frames, hero)
-    fin_fill(hero)
+    if L.ville_on():
+        # FIN6 continue P6 sans coupe : son appoint de poursuite, le commun (lieux.chase_fill), et non celui de FIN
+        # (1,9 kW lavande : la caisse sautait du bordeaux au rouge vif à la jonction, fixes éclairés v5)
+        L.chase_fill(hero)
+    else:
+        fin_fill(hero)
     # l'hélicoptère : l'appareil 0 de la prise (helicos.py), le même que P5 et P6, sur la même trajectoire en temps
     # du film (en stationnaire à fin6_orbite.HELI, où p6_jetee.heli_slot(0) le pose à FIN6/1), assiette comprise et
     # rotors sur l'image du film : ni saut de place ni d'assiette à la jonction P6 → FIN6 ; son projecteur la cherche
@@ -1205,15 +1210,32 @@ def plan_FIN6(scene, hidden, palier="socle"):
     helicos.key(heli, "FIN6", 0, frames)
     heli_feux(heli)
     aim = Vector((F6.CX, F6.CY, 0.8))
-    # à 28 kW, le faisceau prend corps dans la brume et sa tache tombe sur la berline, qui la cache : pas de plaque au
-    # sol (lumière v3.1, contrôlé aux images 20, 50, 80) ; à 6 kW, le faisceau disparaissait de l'air
-    aim_helis([heli], aim, energy=28000.0, car=hero, car_energy=FIN6_HELI_CAR_W, cone=5.0)
-    beam_cones([heli], aim, strength=0.8)
+    if L.ville_on():
+        # sa lampe continue celle de la fin de P6 (scene_d.p6_beam0_haze, helicos.beam0 éteint) : BEAM0_FIN dans la
+        # brume de la prise, cône de BEAM0_CONE[1]°, sans tache au sol ni jumelle sur la berline (helis_sans_tache) ;
+        # à 28 kW, sa tache au sol sautait à la jonction (une traînée blanche à droite de la caisse à FIN6/1, une
+        # tache à sa gauche, puis une ellipse blanche sous elle à l'arrêt : fixes éclairés v5) ; ni cône peint
+        import helicos
+        aim_helis([heli], aim, energy=helicos.BEAM0_FIN, car=hero, car_energy=helicos.BEAM0_BERLINE,
+                  cone=helicos.BEAM0_CONE[1])
+        for o in heli.children_recursive:
+            if o.type == "LIGHT" and o.name.endswith("searchlight_spot"):
+                o.data.shadow_soft_size = 1.5            # la source des lampes de la jetée (helis_P6_light)
+    else:
+        # à 28 kW, le faisceau prend corps dans la brume et sa tache tombe sur la berline, qui la cache : pas de
+        # plaque au sol (lumière v3.1, contrôlé aux images 20, 50, 80) ; à 6 kW, le faisceau disparaissait de l'air
+        aim_helis([heli], aim, energy=28000.0, car=hero, car_energy=FIN6_HELI_CAR_W, cone=5.0)
+        beam_cones([heli], aim, strength=0.8)
     piv = next(o for o in heli.children_recursive if o.name.endswith("searchlight_pivot"))
     M.key_searchlight({"searchlight_pivot": piv}, frames, F6.beam_target)
     # la brume de FIN (dans la ville, ville.brume la remplace par celle de la prise, que FIN6 prolonge ; la nappe de
     # la pointe est posée par fin6_pointe)
     L.haze((CX - 80, CX + 80), (CY - 470, CY + 60), (L.WATER_Z, 50), 0.0005)
+    if L.ville_on():
+        # la lampe de l'hélicoptère n'éclaire que la brume, comme à la fin de P6 (ville.brume étend la liaison à la
+        # brume de la prise)
+        helis_sans_tache([o for o in heli.children_recursive
+                          if o.type == "LIGHT" and o.name.endswith("searchlight_spot")])
     c0 = F6.camera(M.t_of(F6.F0))
     cam_loc = Vector(c0[:3])
     yaw, pitch = math.radians(c0[3]), math.radians(c0[4])
@@ -1325,6 +1347,8 @@ def p6_clean_haze(scene, hero):
             n += 1
     scene.cycles.volume_biased = True
     L.car_fill(hero, loc=(0.4, 7.0, 1.4), energy=250.0)
+    if L.ville_on():
+        L.chase_fill(hero)          # l'appoint de poursuite commun, de P3 à FIN6 (fixes éclairés v5)
     print(f"[P6] {n} lampadaires hors brume, volumes biaisés", flush=True)
 
 

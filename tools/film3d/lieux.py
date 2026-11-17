@@ -97,6 +97,13 @@ def new_scene():
 # sont celles de scene_a.render_settings, appelée par toutes les scènes.
 MER = 0.0              # l'azimut de la bande corail (convention de put : 0 vers +y, pi/2 vers -x), en radians
 CIEL_FORCE = 0.65      # la force du fond de monde : le ciel bas à 37 à 41 % (10 à 25° de hauteur), la lumière principale
+# La lueur du couchant (fixes éclairés v5, 17 novembre : le pont et le port, à 70° de la bande, montraient le côté nuit,
+# marine, entre une rue et une jetée violettes ; la berline y passait au noir). Le ciel reste un seul ciel, posé dans
+# la ville : la bande corail serrée (cos³ de l'écart à la bande), et une lueur large qui tient CIEL_LUEUR de la
+# teinte du couchant jusqu'à 70° de la bande, s'éteint vers 120°, l'opposé de la bande inchangé. À moins de 23° de la
+# bande (l'avenue, la jetée) rien ne change ; le pont et le port prennent le ciel de l'avenue à 25° de la bande.
+CIEL_LUEUR = 0.75
+CIEL_LUEUR_COS = (-0.5, 0.35)       # le cosinus de l'écart à la bande : lueur éteinte, lueur pleine (lissé)
 
 
 def ciel(scene, mer=MER, force=CIEL_FORCE):
@@ -127,7 +134,12 @@ def ciel(scene, mer=MER, force=CIEL_FORCE):
     dxyz = N.sep(d)
     elev = N.math("MAXIMUM", dxyz[2], 0.0)
     # la bande corail n'existe que du côté de la mer
-    toward = N.math("POWER", N.math("MAXIMUM", dxyz[1], 0.0), 3.0)
+    band = N.math("POWER", N.math("MAXIMUM", dxyz[1], 0.0), 3.0)
+    glow = N.new("ShaderNodeMapRange", _interpolation_type="SMOOTHSTEP")
+    glow.inputs["From Min"].default_value, glow.inputs["From Max"].default_value = CIEL_LUEUR_COS
+    glow.inputs["To Min"].default_value, glow.inputs["To Max"].default_value = 0.0, CIEL_LUEUR
+    N.link(dxyz[1], glow.inputs["Value"])
+    toward = N.math("MAXIMUM", band, glow.outputs["Result"])
     dusk = N.ramp(elev, [(0.0, lin(CORAL)), (0.03, lin("#b9586f")), (0.08, lin(INDIGO)), (0.3, lin("#34418a")), (0.8, lin(NAVY))])
     night = N.ramp(elev, [(0.0, lin("#3c3f86")), (0.1, lin("#2f3a78")), (0.6, lin(NAVY))])
     tint = N.mix(toward, night, dusk)
@@ -1707,6 +1719,20 @@ def car_parts(car, glass=False):
     hero_cars.split_glass) sauf glass=True. Une lumière qui n'éclaire que la voiture les écarte : elles la
     renverraient en miroir (la lunette en aplat blanc de P3) ; une lumière qui l'exclut la prend entière."""
     return [o for o in [car] + list(car.children_recursive) if o.type == "MESH" and (glass or not o.get("vitre"))]
+
+
+# L'appoint de poursuite commun (plan de lumière v3.1, 2.5) : 4 m derrière la berline, 6 m au-dessus, crème, lié à
+# elle seule. Le même de P3 à FIN6 (scene_b, scene_e : leurs valeurs ; scene_c P4, scene_d P6 et FIN6 : chase_fill) ;
+# fixes éclairés v5 : P4 n'avait qu'un appoint de face (l'ancienne caméra fixe, de face) et passait au noir à la
+# jonction P3 → P4, FIN6 un appoint lavande de 1,9 kW et sautait du bordeaux au rouge vif à la jonction P6 → FIN6
+CHASE_FILL = dict(loc=(0.0, -4.0, 6.0), energy=900.0, color="#ffd4b4", size=6.0)
+
+
+def chase_fill(car):
+    """L'appoint de poursuite commun (CHASE_FILL) sur la berline. Renvoie la lumière."""
+    lo = car_fill(car, **CHASE_FILL)
+    lo.name = lo.data.name = f"{car.name}_poursuite"
+    return lo
 
 
 def car_fill(car, loc=(0.4, 8.0, 2.2), energy=500.0, color="#f2e4d4", size=4.0):
