@@ -1815,6 +1815,7 @@ def shot_specs():
     import p4_pont as P4
     import p5_virage as P5
     import p6_jetee as P6
+    import parcours as PC
 
     def seed(name):
         return sum(map(ord, name)) % 97
@@ -1835,7 +1836,9 @@ def shot_specs():
         "P2": plan(P2, P2.camera, "cam", hero=P2.hero_pos, heading=P2.hero_heading),
         "P3": plan(P3, P3.camera, "cam", hero=P3.hero_pos, heading=P3.hero_heading),
         "P4": plan(P4, P4.camera, "cam_P4", hero=P4.hero_pos, ground=lambda x, y: (_bridge_z(y),)),
-        "P5": plan(P5, P5.camera, "cam_P5", hero=P5.hero_pos, slip=P5.hero_slip),
+        # le pied de la rampe du pont (parcours.sol : le tablier) sous la caméra des premières images de P5
+        "P5": plan(P5, P5.camera, "cam_P5", hero=P5.hero_pos, slip=P5.hero_slip,
+                   ground=lambda x, y: (PC.sol("P5", x, y),)),
         "P6": plan(P6, P6.camera, "cam_P6", hero=P6.hero_pos, heading=P6.hero_heading),
         "FIN": plan(F, F.camera, "cam_FIN", hero=F.hero_pos, heading=F.hero_heading),
         "FIN6": plan(F6, F6.camera, "cam_FIN6", hero=getattr(F6, "hero_pos", lambda t: (F6.CX, F6.CY)),
@@ -2139,7 +2142,9 @@ def plan_checks(d, base, own):
         import render_film as RF
         cut, fb = RF.read_cut().get(plan), RF.FALLBACK_FRAMES.get(plan)
         n = getattr(mod, "FRAMES", len(frames))
-        add(f"durée {n} images = cut.ts ({cut}) = FALLBACK_FRAMES ({fb})", n == cut == fb, "")
+        # le trajet roulé (17 novembre) : la durée est celle du parcours (FALLBACK_FRAMES la suit) ; cut.ts, au site,
+        # la reprendra (dit, pas contrôlé)
+        add(f"durée {n} images = FALLBACK_FRAMES ({fb}) (cut.ts : {cut})", n == fb, "")
     except ImportError as e:
         add("durée contre cut.ts", False, f"render_film illisible ({e})")
     # 2. derrière, de face
