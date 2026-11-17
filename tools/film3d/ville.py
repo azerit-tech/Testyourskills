@@ -702,7 +702,8 @@ BRUMES = {
 #     puis ici : les trois brumes en « fond » et la ligne P4 remplie.
 BRUME_PRISE = {
     "OUV": dict(densite=0.0006, marge=100.0, haut=40.0),
-    "P4": None,
+    # (17 novembre, le trajet roulé : une seule prise, OUV à P6 ; la ligne « P4 » de l'ancienne prise du pont tombe,
+    # au décor de rejuger la brume de la prise entière)
 }
 BRUME_Z0 = -1.2          # m : le bas de la boîte, 30 cm au-dessus de l'eau (lieux.WATER_Z = −1,5 ; lieux.haze)
 

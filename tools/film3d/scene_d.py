@@ -1476,7 +1476,7 @@ def plan_P6(scene, hidden, palier="socle"):
     return cam
 
 
-STILL = {"P6": 21, "FIN6": 80, "FIN": 36}                        # l'image fixe d'essai des plans animés (STILL_FRAME)
+STILL = {"P6": 21, "FIN6": 122, "FIN": 36}                        # l'image fixe d'essai des plans animés (STILL_FRAME)
 
 
 PLANS = {"FIN": plan_FIN, "FIN6": plan_FIN6, "P6": plan_P6}

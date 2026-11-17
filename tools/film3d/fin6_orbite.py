@@ -95,20 +95,42 @@ def from_fin(x, y):
     return CX + dx * math.cos(a) - dy * math.sin(a), CY + dx * math.sin(a) + dy * math.cos(a)
 
 
+P1_LEAD_IN = 20.0                  # m de ligne droite avant son arc (dans FIN, l'arc commençait hors du plan)
+
+
+def _route(start):
+    r = F._p1_route(start)
+    return dict(r, pieces=[M.line(P1_LEAD_IN)] + list(r["pieces"]))
+
+
+def _p1_drive():
+    """La conduite de la patrouille 1 de FIN (fin_pointe._p1_drive), sa table tenue 4 s plus tôt : décalée de SHIFT
+    images, elle roule déjà pendant les premières images de FIN6 (au bord de la table de FIN, son cap sautait)."""
+    lim = dict(slip_per=F.P1_SLIP_PER)
+    d = M.drive(_route((0.0, 0.0, F.P1_CAP0)), F.P1_V, stop=True, kind="patrol", lim=lim, t_span=(-4.0, 10.0))
+    ex, ey = d.pos(d.t_stop + 1.0)
+    t0 = M.t_of(F.F_P1_STOP) - d.t_stop
+    return M.drive(_route((F.P1_STOP[0] - ex, F.P1_STOP[1] - ey, F.P1_CAP0)), F.P1_V, t0=t0, stop=True,
+                   kind="patrol", lim=lim, t_span=(t0 - 4.0, t0 + 10.0))
+
+
+P1_DRIVE = _p1_drive()
+
+
 def patrol1_pos(t):
-    return from_fin(*F.patrol1_pos(t - _DT))
+    return from_fin(*P1_DRIVE.pos(t - _DT))
 
 
 def patrol1_heading(t):
-    return F.patrol1_heading(t - _DT) + ROT
+    return P1_DRIVE.heading(t - _DT) + ROT
 
 
 def patrol1_slip(t):
-    return F.patrol1_slip(t - _DT)
+    return P1_DRIVE.slip(t - _DT)
 
 
 def patrol1_steer(t):
-    return F.patrol1_steer(t - _DT)
+    return P1_DRIVE.steer(t - _DT)
 
 
 PATROL1 = F.PATROL1
@@ -117,7 +139,7 @@ DRIVER_KEYS, DRIVER_OUT = (F.DRIVER_KEYS[0] + SHIFT, F.DRIVER_KEYS[1] + SHIFT), 
 # l'hélicoptère de FIN, en stationnaire devant elle, à la hauteur où P6 le laisse (helicos.py : l'appareil 0 le
 # rejoint pendant la fin de P6) : une hauteur et demie de lampadaire de la jetée au moins
 HELI_Z = 12.4
-HELI_RIGHT = 3.0                   # m plus à droite que dans FIN : il ne passe pas devant le phare
+HELI_RIGHT = 5.0                   # m plus à droite que dans FIN : il ne passe pas devant le phare
 HELI = from_fin(F.HELI[0] + HELI_RIGHT, F.HELI[1]) + (HELI_Z,)
 HELI_HEADING = F.HELI_HEADING + ROT
 # le lampadaire de la pointe, rangé comme dans FIN, un mètre plus en arrière : sa tête et son reflet sur l'enrobé

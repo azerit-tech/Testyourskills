@@ -107,13 +107,13 @@ if VILLE:
     # se resserrent à la file dans sa voie, à FILE_S secondes d'elle à P5/1 (ce que la caméra de P5 attend).
     # (genre, x au début, x à la fin, retard, vitesse en plus en m/s, louvoiement en m, sa période en s, phase) ;
     # retard : en m derrière la berline à t = 0, None (déduit de CREST_FRAMES) ou ("file", s) (à la file à P5/1)
-    CREST_GAPS = (100.0, 125.0, 150.0, 175.0)    # m derrière la berline à P4/1 : les quatre plus rapides
+    CREST_GAPS = (110.0, 135.0, 160.0, 185.0)    # m derrière la berline à P4/1 : les quatre plus rapides
     FILE_S = (1.6, 2.5, 3.4)
     T49 = M.t_of(F0 + FRAMES)           # P5/1
     PACK = [("patrol", None, None, None, 0.0, 0.0, 3.0, 0.3),                # la patrouille 1 : patrol1_pos
             ("patrol", 4.6, HERO_X, ("file", FILE_S[0]), 0.0, 0.35, 3.4, 6.0),
             ("patrol", -2.6, HERO_X, ("file", FILE_S[1]), 0.0, 0.40, 3.2, 4.0),
-            ("patrol", -5.0, -4.6, 54.0, 0.0, 0.40, 3.6, 4.25),
+            ("patrol", -5.0, -4.6, 58.0, 0.0, 0.40, 3.6, 4.25),
             ("patrol", 4.4, 4.6, 78.0, 0.0, 0.35, 3.1, 5.0),
             ("patrol", 4.4, 4.4, None, 1.5, 0.40, 3.3, 2.6),          # en ville : CREST_GAPS m derrière, 1,5 m/s
             ("patrol", -4.6, -4.6, None, 1.5, 0.40, 3.5, 0.8),        # plus vite que la berline
@@ -168,7 +168,7 @@ if VILLE:
     # dernières images de P3), la remonte par la gauche pendant toute la montée et la descente, et entre dans P5 dans
     # l'état que P5 attend (p5_virage.PATROL_IN : 7 m devant, à sa vitesse d'entrée, freinage de 6,4 m/s²). Une
     # quintique d'Hermite de P1_FROM à P5/1 (avance, vitesse et accélération relatives continues aux deux bouts).
-    P1_BEHIND, P1_FROM = -7.5, -1.5
+    P1_BEHIND, P1_FROM = -11.0, -3.0
 
     def _p1_keys():
         """Les nœuds (t, avance, vitesse et accélération relatives) : P1_FROM ; le début du freinage de la berline
@@ -178,9 +178,10 @@ if VILLE:
         tb = PC.t_of("P4", brake_windows()[-1][0]) - PC.t_of("P4", 1)
         dv = P5.PATROL_V0 - hero_speed(T49)
         da = -P5.PATROL_IN["decel"] - _hero_acc(T49)
-        rel = dv / (T49 - tb)
-        mid = P5.PATROL_IN["lead"] - dv * (T49 - tb) / 2.0
-        return ([(P1_FROM, P1_BEHIND, 0.0, 0.0), (tb, mid, 0.0, rel), (T49, P5.PATROL_IN["lead"], dv, da)],
+        # pendant le freinage du port, son écart de vitesse est déjà celui de P5/1 : elle freine comme la berline,
+        # puis à peine plus fort à la toute fin (da)
+        mid = P5.PATROL_IN["lead"] - dv * (T49 - tb)
+        return ([(P1_FROM, P1_BEHIND, 0.0, 0.0), (tb, mid, dv, 0.0), (T49, P5.PATROL_IN["lead"], dv, da)],
                 P5.PATROL_V0, P5.PATROL_IN)
 
     _P1_KEYS, _P1_V49, _P1_IN = _p1_keys()
@@ -234,7 +235,7 @@ if VILLE:
             # commencé avant le plan, fini après
             u = M.smoothstep(-0.5, T_END if x1 == HERO_X else T_END + 0.5, t)
             # elle se jette, elle lâche (pas pendant le freinage du port : il reste sous les 7 m/s²)
-            y = _follow(gap, dv, t) + SURGE * math.sin(w) * (1.0 - M.smoothstep(_TB - 1.0, _TB, t))
+            y = _follow(gap, dv, t) + SURGE * math.sin(w) * (1.0 - M.smoothstep(_TB - 3.0, _TB, t))
             sway = amp * math.sin(1.25 * w + 0.7 * ph) * (1.0 - u if x1 == HERO_X else 1.0)
             return x0 + (x1 - x0) * u + sway, y
         return fn
