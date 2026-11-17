@@ -46,15 +46,26 @@ HALF_W = math.atan(10.125 / LENS)            # demi-champ horizontal (capteur de
 HALF_H = math.atan(18.0 / LENS)              # demi-champ vertical
 FOCUS_F = 4.0                 # ouverture ; le point sur la berline
 Y0 = HERO["pos"](F0)[1]  # la berline à la première image (parcours : 20 m avant la patrouille, qu'elle dépasse à 40)
-# la rue transversale de la patrouille (découpage v2, P1 option A, 12 novembre) : 22 m devant la première image,
-# y 286,85 depuis que l'ancre d'OUV touche P1 (y 266 quand OUV/1 était en 244)
-STREET = Y0 + 22.0
+# la rue transversale de la patrouille (découpage v2, P1 option A, 12 novembre) : y 286,85 de l'avenue, l'angle de
+# la rue qui débouche sur le boulevard du quai (le décor ; depuis le 17 novembre la berline part 90 m plus tôt)
+STREET = 286.85
 PATROL = (-5.9, STREET - 2.0, 180.0)  # x, y, cap (lieux : 0 vers +y) : garée le long de la bordure côté ville, avant vers -y
-# la patrouille garée qui s'éveille : ses phares à WAKE (on la voit de face, à 25 m), sa rampe à BARS_ON (hors champ)
-WAKE = 14
+
+
+def _frame_where(cond):
+    """La première image (comptée dans OUV, au-delà de sa fin si besoin) où cond(t) devient vraie."""
+    f = F0
+    while not cond(M.t_of(f)) and f < 400:
+        f += 1
+    return f
+
+
+# la patrouille garée qui s'éveille : ses phares à WAKE (on la voit de face, à 25 m de la berline), sa rampe à
+# BARS_ON (hors champ, quand la caméra la passe) ; en images d'OUV, au-delà de sa fin si la berline la passe en P1
+WAKE = _frame_where(lambda t: PATROL[1] - HERO["pos"](_f(t))[1] < 25.0)
 WAKE_LENS = 0.4                      # la force des verres maillés, en part de celle du modèle (les verres peints dans
                                      # l'atlas suivent l'énergie des spots : cast_vehicles.lamp_drivers, ici un tiers)
-BARS_ON = 34
+BARS_ON = _frame_where(lambda t: PC.camera("OUV", _f(t))[1] > PATROL[1] + 3.0)
 
 
 def hero_pos(t):
@@ -139,10 +150,9 @@ SIDE_FROM = 22                # l'image où le bras commence à glisser vers la 
 
 
 def camera_rail(t):
-    """Le cadre commun : le bras du parcours (parcours.camera), visé sur la berline, à la visée commune aux deux
-    bouts (parcours.raccord)."""
-    x, y = hero_pos(t)
-    return PC.raccord("OUV", _f(t), aim(*PC.camera("OUV", _f(t), left=cam_side(t)), x, y))
+    """Le cadre commun : LA caméra du film (parcours.chase), le bras commun à la visée commune, de la première à la
+    dernière image (17 novembre : plus de glissement du bras propre à l'ouverture)."""
+    return PC.chase("OUV", _f(t))
 
 
 def camera(t):
