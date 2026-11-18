@@ -305,7 +305,11 @@ if VILLE:
         return hero_pos(T49)[0] - P1_SIDE, y49 + _P1_V49 * dt - 0.5 * _P1_IN["decel"] * dt * dt
 
     # sa ligne, avec le contact du pont (contacts.py, SPEC §18.68 : elle ferme la porte, la berline la tape)
-    patrol1_pos = C.Patrouille(_patrol1_ligne, "P4", (("P4", "patrol_0"),))
+    # (v11, SPEC §18.71 : avant l'image 340 du film, c'est la suiveuse de police.py, la patrouille 1 venue de
+    # l'avenue derrière la berline par le rond-point, la rue et la trouée du barrage, qui rejoint cette loi en
+    # place, en vitesse et en accélération ; elle ne surgit plus à 118 km/h à P4/1)
+    import police as _police
+    patrol1_pos = C.Patrouille(_police.avant_pont(_patrol1_ligne), "P4", (("P4", "patrol_0"),))
     hero_pos.choc = C.choc_berline("P4")          # (ce que motion.sample retire avant de coucher la caisse)
 
     HERO0 = PC.hero("P4", chocs=False)     # (contacts.py : la meute rejoue la conduite de la berline, pas ses chocs)

@@ -641,12 +641,16 @@ def test_p2():
     check("P2 : la patrouille 1 à 1,5 m de la berline, 0,3 m des bordures, 0,8 m de l'objectif", air[0] >= 1.5
           and kerb[0] >= 0.3 and isl[0] >= 0.3 and lens[0] >= 0.8, f"air {air[0]:.2f} (image {air[1]:.2f}), bordure "
           f"{kerb[0]:.2f}, îlot {isl[0]:.2f}, objectif {lens[0]:.2f} m")
+    # (v11, SPEC §18.71 : elle ne s'arrête plus à l'entrée de l'anneau, elle est la suiveuse de police.py)
     acc = [(P.patrol1_speed(P.t_of(f + 0.5)) - P.patrol1_speed(P.t_of(f - 0.5))) * M.FPS for f in range(P.F0, P.F0 + P.FRAMES)]
-    f_stop = P._f(P.P1_STOP)
-    check("P2 : la patrouille 1 freine à 7 m/s² au plus et s'arrête dans le plan, avant le coin",
-          min(acc) >= -7.05 and f_stop < P.F0 + P.FRAMES - 24 and P.patrol1_speed(P.P1_STOP + 0.5) < 1e-4
-          and P.patrol1_pos(P.T_END)[1] < -8.0, f"{min(acc):.2f} m/s², arrêtée à l'image {f_stop:.0f} en "
-          f"({P.patrol1_pos(P.T_END)[0]:.2f}, {P.patrol1_pos(P.T_END)[1]:.2f})")
+    vs = [(P.patrol1_speed(P.t_of(f)), f) for f in range(P.F0, P.F0 + P.FRAMES)]
+    check("P2 : la patrouille 1 freine à 7 m/s² au plus, ne s'arrête pas (3 m/s au moins) et repart derrière la "
+          "berline (4,3 m/s² au plus), sur sa ligne à la fin du plan",
+          min(acc) >= -7.05 and max(acc) <= 4.3 and min(vs)[0] >= 3.0 and vs[-1][0] > 11.0
+          and abs(P.p1_side(P.T_END)) < 1.0 and -30.0 < P.patrol1_lead(P.T_END) < -12.0,
+          f"{min(acc):.2f} à {max(acc):.2f} m/s², {min(vs)[0]:.1f} m/s au plus bas (image {min(vs)[1]}), "
+          f"{vs[-1][0]:.1f} m/s à la fin, {-P.patrol1_lead(P.T_END):.1f} m derrière la berline, à "
+          f"{P.p1_side(P.T_END):+.2f} m de sa ligne")
     seen = [f for f in range(P.F0, P.F0 + P.FRAMES)
             if (lambda b: b and b["u1"] > 0 and b["u0"] < 1)(P.patrol_screen(P.t_of(f), 0))]
     # le trajet roulé : elle a freiné avant la berline et reste derrière, à côté de la caméra (hors du cadre)
@@ -671,9 +675,10 @@ def test_p2():
     yaw = math.radians(c[3])
     ahead = (x - c[0]) * -math.sin(yaw) + (y - c[1]) * -math.cos(yaw)       # le long de la visée (motion.key_camera)
     v = math.dist(P.patrol2_pos(t + 0.05), P.patrol2_pos(t - 0.05)) / 0.1
-    check("P2 : à la dernière image, la patrouille 2 derrière la caméra, lancée derrière la berline",
-          ahead < 0 and v > 5.0 and P.hero_pos(t)[0] < x, f"({x:.1f}, {y:.1f}), {-ahead:.1f} m derrière l'objectif, "
-          f"{v:.1f} m/s")
+    # (v11 : elle ne vire plus derrière la berline, la suiveuse lui coupe la route ; elle pile à la bouche de l'anneau)
+    check("P2 : à la dernière image, la patrouille 2 derrière la caméra, arrêtée à la bouche de l'anneau",
+          ahead < 0 and v < 1e-6 and P.P2_STOP < t, f"({x:.1f}, {y:.1f}), {-ahead:.1f} m derrière l'objectif, "
+          f"{v:.1f} m/s, arrêtée à l'image {P._f(P.P2_STOP):.0f}")
     tt = M.t_of(20)
     check("P2 : camera(t) = camera_rail(t) (aucun tremblé écrit)", P.camera(tt) == P.camera_rail(tt))
     # la caméra de poursuite : la berline au point de coupe à la première et à la dernière image
@@ -843,7 +848,8 @@ def test_p3():
     check("P3 : le point de coupe à la première et à la dernière image (x 50 ± 6, y 58 ± 4 depuis le haut)",
           all(abs(x - 50) <= 6 and abs(y - 58) <= 4 for x, y, w in cut),
           " ; ".join(f"x {x:.0f} y {y:.0f} l {w:.0f}" for x, y, w in cut))
-    # la patrouille 1 n'entre pas dans P3 : arrêtée dans le rond-point à sa place de P2/111, hors du cadre
+    # (v11, SPEC §18.71) la patrouille 1 est la suiveuse de police.py : elle reprend P2/111, remonte la rue derrière
+    # la caméra sur la ligne de la berline, passe la trouée du barrage à sa suite et déboîte à gauche
     import p2_arc as P2
     hl, hw = P.CHASE_HALF
     t2 = P2.T_END + 1.0 / M.FPS
@@ -856,57 +862,47 @@ def test_p3():
         qs = [P.project(c, (kx + sx * hw, ky + sy * hl, z)) for sx in (-1, 1) for sy in (-1, 1) for z in (0.3, 1.62)]
         if any(q and -1 <= q[0] <= 1 and 0 <= q[1] <= 1 for q in qs):
             inn.append(f)
-    still = all(P.chase_pos(M.t_of(f)) == P.chase_pos(0.0) and P.chase_speed(M.t_of(f)) == 0.0
-                for f in range(P.F0 - 24, P.F0 + P.FRAMES + 24))
-    front = P.chase_pos(P.CHASE_STOP + 1.0)[1] + hl
-    panel = min(y for _, y in P.PANELS) - 0.32 - P.CHASE_AIR
-    check("P3 : la patrouille 1 reste où P2 la laisse (arrêtée, même place, même cap), hors du cadre tout le plan",
-          still and math.dist(at, P.chase_pos(0.0)) < 1e-3 and abs(P.chase_heading(0.0) - (P2.patrol1_heading(t2)
-          + PC.ANCHOR["P2"][2] - PC.ANCHOR["P3"][2])) < 1e-6 and not inn,
-          f"({P.chase_pos(0.0)[0]:.2f}, {P.chase_pos(0.0)[1]:.2f}), cap {P.chase_heading(0.0):.1f}°, "
-          f"dans le cadre aux images {inn[:6]}")
-    check("P3 : la patrouille 1 arrêtée avant le barrage, 1,2 m d'air au moins", front <= panel,
-          f"l'avant à y {front:.2f} (panneaux moins {P.CHASE_AIR} m d'air : {panel:.2f})")
-    # la patrouille 2 poursuit la berline depuis son état exact de P2/111, derrière la caméra, et s'arrête devant le
-    # barrage (le trou des plots laisse 0,36 m d'air de chaque côté de sa caisse)
-    D = P2._p2()
-    rot = PC.ANCHOR["P2"][2] - PC.ANCHOR["P3"][2]
-    gap = []
-    for f in (P.F0 - 1, P.F0):
-        t = M.t_of(f)
-        x2, y2 = PC.placer("P3")[0](*PC._to_route("P2")(*D.pos(t2 + t)))
-        gap.append(max(math.dist((x2, y2), P.patrol2_pos(t)), abs(P.patrol2_heading(t) - D.heading(t2 + t) - rot),
-                       abs(P.patrol2_speed(t) - D.speed(t2 + t)), abs(P.patrol2_accel(t) - D.along(t2 + t))))
-    check("P3 : la patrouille 2 reprend P2/111 exactement (place, cap glisse comprise, vitesse, accélération)",
-          max(gap) < 1e-9, f"écart {max(gap):.1e}")
+    check("P3 : la patrouille 1 reprend P2/111 (place, cap, vitesse), derrière la caméra tout le plan",
+          math.dist(at, P.chase_pos(0.0)) < 5e-3 and abs(P.chase_heading(0.0) - (P2.patrol1_heading(t2)
+          + PC.ANCHOR["P2"][2] - PC.ANCHOR["P3"][2])) < 0.05 and abs(P.chase_speed(0.0) - P2.patrol1_speed(t2)) < 1e-6
+          and not inn, f"écart {math.dist(at, P.chase_pos(0.0)) * 1000:.1f} mm, cap {P.chase_heading(0.0):.1f}°, "
+          f"{P.chase_speed(0.0):.1f} m/s, dans le cadre aux images {inn[:6]}")
+    # elle passe la trouée des plots comme la berline (2,66 m entre les plots pour 1,95 m de caisse : 0,3 m d'air au
+    # moins de chaque côté, 0,45 m des patrouilles du barrage), ne touche à rien d'autre, double la caméra à 0,8 m
+    air = {}
+    for f4 in range(4 * P.F0, 4 * (P.F0 + P.FRAMES)):
+        t = M.t_of(f4 / 4)
+        car = P._car_box(*P.chase_pos(t), P.chase_heading(t), *P.CHASE_HALF)
+        items = [(n, P._poly_dist(car, poly)) for n, poly in P.OBSTACLES.items()
+                 if not n.startswith("garee") or min(y for _, y in poly) > P.STREET_Y0]
+        items += [("caisses", P._poly_dist(car, P._rect(*P.CRATES))), ("berline", P._poly_dist(car, P.hero_box(t))),
+                  ("patrouille_2", P._poly_dist(car, P.patrol2_box(t)))]
+        items += [("plots", min(P._seg_dist(q, car[j], car[(j + 1) % 4]) for j in range(4)) - P.CONE_R) for q in P.CONES]
+        for n, d in items:
+            n = "barrage" if n.startswith(("patrol_", "agent_", "panneau_")) else "garées" if n.startswith("garee") else n
+            if n not in air or d < air[n][0]:
+                air[n] = (d, f4 / 4)
+    lens = P.cam_clearances()["patrouille_1"]
+    check("P3 : la patrouille 1 passe la trouée (0,3 m des plots, 0,45 m du barrage), 1 m de tout le reste, 3 m de la "
+          "berline, 0,8 m de l'objectif",
+          air["plots"][0] >= 0.3 and air["barrage"][0] >= 0.45 and lens[0] >= 0.8 and air["berline"][0] >= 3.0
+          and all(air[k][0] >= 1.0 for k in ("caisses", "garées", "patrouille_2")),
+          ", ".join(f"{k} {d:.2f} m (image {f:.2f})" for k, (d, f) in sorted(air.items(), key=lambda kv: kv[1][0]))
+          + f", objectif {lens[0]:.2f} m (image {lens[1]:.2f})")
+    # la patrouille 2 n'entre pas dans P3 : arrêtée à la bouche de l'anneau à sa place de P2/111, hors du cadre
+    at = PC.placer("P3")[0](*PC._to_route("P2")(*P2.patrol2_pos(t2)))
     inn = P.patrol2_in_frame(range(P.F0 - 24, P.F0 + P.FRAMES + 24))
-    p2c = P.patrol2_clearances(range(P.F0 - 1, int(P.P2_STOP * M.FPS) + P.F0 + 13))   # jusqu'à son arrêt
+    still = all(P.patrol2_pos(M.t_of(f)) == P.patrol2_pos(0.0) and P.patrol2_speed(M.t_of(f)) == 0.0
+                for f in range(P.F0 - 24, P.F0 + P.FRAMES + 24))
+    p2c = P.patrol2_clearances(range(P.F0 - 1, P.F0 + P.FRAMES))
     lens = p2c.pop("objectif")
-    check("P3 : la patrouille 2 hors du cadre tout le plan, 4,5 m au moins de l'objectif",
-          not inn and lens[0] >= P.P2_LENS, f"images {inn[:6]}, {lens[0]:.2f} m à l'image {lens[1]:.2f}")
-    n, (dm, fm) = min(p2c.items(), key=lambda kv: kv[1][0])
-    check("P3 : la patrouille 2 à 1,2 m au moins de tout (barrage, plots, caisses, garées, patrouille 1, bordures)",
-          dm >= P.P2_AIR, f"{dm:.2f} m de {n} à l'image {fm:.2f}")
-    dt = 1.0 / 480
-    ts = [k * dt for k in range(int(round((P.P2_STOP + 0.5) / dt)))]
-    acc = [P.patrol2_accel(t) for t in ts]
-    jerk = max(abs(b - a) / dt for a, b in zip(acc, acc[1:]))
-    ps = [P.patrol2_pos(t) for t in ts[::4]]
-    lat = 0.0
-    for a, b, c in zip(ps, ps[1:], ps[2:]):
-        u, w = (b[0] - a[0], b[1] - a[1]), (c[0] - b[0], c[1] - b[1])
-        nu, nw = math.hypot(*u), math.hypot(*w)
-        if min(nu, nw) * M.FPS * 5 > 0.5:                          # v > 0,5 m/s (pas de 1/120 s)
-            turn = math.asin(max(-1.0, min(1.0, (u[0] * w[1] - u[1] * w[0]) / (nu * nw))))
-            lat = max(lat, abs(turn) * (nw * 120.0) ** 2 / nw)
-    check("P3 : la conduite de la patrouille 2 dans les limites (accélération 3, freinage 7, à-coup 12, latérale 6,5)",
-          max(acc) <= 3.0 and min(acc) >= -7.0 and jerk <= 12.0 and lat <= 6.5,
-          f"{max(acc):.2f} / {min(acc):.2f} m/s², à-coup {jerk:.1f} m/s³, latérale {lat:.2f} m/s²")
-    stop = P.patrol2_pos(P.P2_STOP + 1.0)
-    still = all(P.patrol2_pos(P.P2_STOP + k * 0.25) == stop for k in range(1, 9))
-    check("P3 : la patrouille 2 s'arrête devant le barrage et y reste",
-          still and stop[1] + P.P2_HALF[0] + P.P2_AIR <= P.CONE_LINE,
-          f"centre à y {stop[1]:.2f}, à l'image {P.P2_STOP * M.FPS + P.F0:.1f}, l'avant à y {stop[1] + P.P2_HALF[0]:.2f}")
+    n, (dm, fm) = min(((k, v) for k, v in p2c.items() if not k.startswith("garee")), key=lambda kv: kv[1][0])
+    check("P3 : la patrouille 2 reste où P2 la laisse (arrêtée, même place, même cap), hors du cadre tout le plan, "
+          "1,2 m au moins de tout, 4,5 m de l'objectif",
+          still and math.dist(at, P.patrol2_pos(0.0)) < 1e-6 and abs(P.patrol2_heading(0.0) - (P2.patrol2_heading(t2)
+          + PC.ANCHOR["P2"][2] - PC.ANCHOR["P3"][2])) < 1e-6 and not inn and dm >= P.P2_AIR and lens[0] >= P.P2_LENS,
+          f"({P.patrol2_pos(0.0)[0]:.2f}, {P.patrol2_pos(0.0)[1]:.2f}), cap {P.patrol2_heading(0.0):.1f}°, dans le "
+          f"cadre aux images {inn[:6]}, {dm:.2f} m de {n}, objectif à {lens[0]:.2f} m")
     lamps = P.brake_windows()
     on = {f for a, b in lamps for f in range(a, b + 1)}
     hard = {f for f in shown if P._accel(M.t_of(f)) < -2.0}

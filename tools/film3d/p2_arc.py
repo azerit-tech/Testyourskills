@@ -131,139 +131,32 @@ def hero_s(t):
 
 # ---------------------------------------------------------------- la patrouille 1
 
-# Elle entre comme elle sort de P1 (p1_avenue, lu à l'image qui suit sa dernière) : 3,45 m à gauche, 7 m derrière
-# (à côté de la caméra, hors du cadre), à la vitesse de la berline, en freinage établi de 6,95 m/s². Depuis le
-# 17 novembre (le trajet roulé : la berline arrive au rond-point à 70 km/h, en plein freinage), elle a freiné avant
-# elle et ne la suit pas dans l'anneau : 2 m devant, la berline lancée la percutait en dérapant ; à côté d'elle
-# dans l'anneau, elle tournait à plus de 7,5 m/s² combinés. Elle tient son freinage (P1_BRAKE) dans sa voie, cesse
-# de tourner (P1_STRAIGHT) et s'arrête rampe allumée à l'entrée de l'anneau, derrière nous. Sa route : la ligne
-# décalée du parcours, puis sa courbure qui s'éteint ; son profil, celui de sa vitesse vraie le long de cette route.
-_P1T = P1.T_END + 1.0 / FPS                    # P2/1 est l'image qui suit P1/FRAMES
-# (son écart à la ROUTE : la berline simulée n'est pas sur la route au millimètre, 13 mm à droite en sortant du
-# slalom de l'avenue ; lu sur la berline, la patrouille sautait d'autant à la coupe)
-P1_SIDE = (P1.hero_pos(_P1T)[0] + PC.DRIVE.lat_err(PC.START["P2"] / PC.FPS)
-           - P1.patrol_pos(_P1T)[0])                                     # 3,45 m
-P1_LEAD0 = P1.patrol_pos(_P1T)[1] - P1.hero_pos(_P1T)[1]                 # 3,0 m
-P1_V0 = P1.patrol_speed(_P1T)
-P1_A0 = (P1.patrol_speed(_P1T + 1.0 / 96.0) - P1.patrol_speed(_P1T - 1.0 / 96.0)) * 48.0
-P1_WIDE, P1_WIDE_S = P1_SIDE, (-2.0, 40.0)     # (17 novembre : elle reste dans sa voie, derrière la berline)
-P1_STRAIGHT = (13.0, 21.0)                       # m de sa route après la coupe : elle cesse de tourner
-P1_HOLD0, P1_BRAKE, P1_JERK = 0.0, 6.9, 10.0      # s, m/s², m/s³
-
-
-def _smoother(a, b, x):
-    u = min(1.0, max(0.0, (x - a) / (b - a)))
-    return u * u * u * (u * (6.0 * u - 15.0) + 10.0)
-
-
-def _p1_side_s(s):
-    """Son écart à gauche de la route à l'abscisse s : P1_SIDE, élargi à P1_WIDE entre les abscisses P1_WIDE_S
-    (comptées depuis la coupe ; quintique : ni la latérale ni l'à-coup ne sautent), le temps que la berline la
-    déborde (sa glisse rapproche son avant)."""
-    a, b = (hero_s(0.0) + x for x in P1_WIDE_S)
-    return P1_SIDE + (P1_WIDE - P1_SIDE) * _smoother(a, b, s)
-
-
-def _p1_line(s):
-    x, y = _route_xy(s)
-    h = math.radians(_route_cap(s))
-    d = _p1_side_s(s)
-    return x - d * math.cos(h), y - d * math.sin(h)
-
-
-_S0 = hero_s(0.0) + P1_LEAD0
-_LDS = 0.02
-
-
-def _p1_dside(s):
-    """La dérivée de son écart le long du parcours (m/m)."""
-    a, b = (hero_s(0.0) + x for x in P1_WIDE_S)
-    u = min(1.0, max(0.0, (s - a) / (b - a)))
-    return (P1_WIDE - P1_SIDE) * 30.0 * u * u * (1.0 - u) * (1.0 - u) / (b - a)
-
-
-def _p1_line_heading(s):
-    """Le cap de la ligne décalée (radians) et sa longueur par mètre de parcours : sa tangente est
-    T (1 − d κ) − d' N (T le cap du parcours, N sa droite, κ sa courbure)."""
-    d, dd = _p1_side_s(s), _p1_dside(s)
-    k = PC.ROUTE.at(s)[3]
-    return math.radians(_route_cap(s)) + math.atan2(dd, 1.0 - d * k), math.hypot(1.0 - d * k, dd)
-
-
-def _p1_path():
-    """Sa route, [(x, y, cap)] tous les _LDS m de sa longueur vraie depuis 20 m avant la coupe : la ligne décalée
-    (_p1_line) jusqu'à P1_STRAIGHT[0] m après la coupe, puis elle cesse peu à peu de tourner (le virage de la ligne
-    s'éteint jusqu'à P1_STRAIGHT[1]) : elle pile droit devant elle, hors du coin de l'anneau. Caps et longueurs
-    analytiques (aucune différence finie : le lacet reste lisse)."""
-    la, lb = P1_STRAIGHT
-    ds = 0.01
-    s = _S0 - 20.0
-    px, py = _p1_line(s)
-    hl, g = _p1_line_heading(s)
-    hp, L = hl, -20.0
-    out = [(px, py, math.degrees(hp))]
-    while s < _S0 + 120.0:
-        h2, g2 = _p1_line_heading(s + ds)
-        dl = 0.5 * (g + g2) * ds
-        hm = hp + (h2 - hl) * (1.0 - _smoother(la, lb, L + dl / 2)) * 0.5
-        hp += (h2 - hl) * (1.0 - _smoother(la, lb, L + dl / 2))
-        qx, qy = px - math.sin(hm) * dl, py + math.cos(hm) * dl
-        while L + dl >= -20.0 + len(out) * _LDS:
-            u = (-20.0 + len(out) * _LDS - L) / dl
-            out.append((px + (qx - px) * u, py + (qy - py) * u, math.degrees(hp - (h2 - hl) * (1 - u))))
-        s, hl, g, px, py, L = s + ds, h2, g2, qx, qy, L + dl
-    return out
-
-
-_P1P = _p1_path()
-
-
-def _p1_at(L):
-    u = (L + 20.0) / _LDS
-    k = max(0, min(len(_P1P) - 2, int(math.floor(u))))
-    w = u - k
-    return tuple(a + (b - a) * w for a, b in zip(_P1P[k], _P1P[k + 1]))
-
-
-def _p1_keys():
-    """Les sommets (t, accélération) de son freinage, linéaire entre eux : P1_A0 à la coupe, tenue P1_HOLD0 s, puis
-    P1_BRAKE (moins fort dans l'anneau : sa latérale et son freinage restent dans le cercle d'adhérence), tenu,
-    relâché pour finir à vitesse nulle (la tenue s'en déduit)."""
-    t0 = P1_HOLD0
-    t1 = t0 + abs(P1_BRAKE + P1_A0) / P1_JERK
-    t3 = P1_BRAKE / P1_JERK
-    v1 = P1_V0 + P1_A0 * t0 + (P1_A0 - P1_BRAKE) / 2.0 * (t1 - t0)
-    hold = max(0.0, (v1 - P1_BRAKE * t3 / 2.0) / P1_BRAKE)
-    return [(0.0, P1_A0), (t0, P1_A0), (t1, -P1_BRAKE), (t1 + hold, -P1_BRAKE), (t1 + hold + t3, 0.0)]
-
-
-def _p1_accel(t):
-    ks = _P1K
-    if t <= 0.0:
-        return P1_A0
-    for (ta, aa), (tb, ab) in zip(ks, ks[1:]):
-        if t <= tb:
-            return aa + (ab - aa) * (t - ta) / max(1e-9, tb - ta)
-    return 0.0
-
-
-_P1K = _p1_keys()
-_P1 = M.Profile(P1_V0, _p1_accel, t0=-2.0, t1=T_END + 2.0)
-P1_STOP = _P1K[-1][0]              # l'instant où elle s'arrête
+# Elle entre comme elle sort de P1 (p1_avenue) : 3,4 m à gauche, 7 m derrière (à côté de la caméra, hors du cadre),
+# à la vitesse de la berline, en freinage établi de 6,95 m/s². Jusqu'à v10 elle tenait ce freinage, cessait de
+# tourner et s'arrêtait rampe allumée à l'entrée de l'anneau : le film perdait sa poursuivante, et celle du pont
+# surgissait de nulle part à 118 km/h. Depuis v11 (SPEC §18.71) elle est la suiveuse de police.py : elle freine
+# dans sa voie jusqu'à l'entrée de l'anneau (5 m/s au plus bas, là où elle s'arrêtait), se rabat sur la ligne de la
+# berline et remet les gaz derrière elle, par l'anneau et la rue des enseignes, jusqu'à sa place du pont. Une seule
+# voiture, une seule loi, écrite en ville et en temps du film ; ici, sa lecture dans le repère de ce tronçon.
+import police as _police  # noqa: E402
 
 
 def patrol1_pos(t):
-    return _p1_at(_P1.s(t))[:2]
+    return _police.suiveuse_scene("P2", t)
 
 
 def patrol1_heading(t):
-    """Le cap de sa caisse, celui de sa route là où elle est (arrêtée comprise)."""
-    return _p1_at(_P1.s(t))[2]
+    """Le cap de sa caisse, celui de sa course."""
+    return _police.suiveuse_cap_scene("P2", t)
+
+
+def patrol1_speed(t):
+    return _police.suiveuse_vitesse(_police.g_de("P2", t))
 
 
 def p1_s(t):
     """L'abscisse du parcours à côté d'elle (m)."""
-    return route_s(*patrol1_pos(t), _S0 + _P1.s(t))
+    return route_s(*patrol1_pos(t))
 
 
 def p1_side(t):
@@ -273,10 +166,6 @@ def p1_side(t):
     rx, ry = _route_xy(s)
     h = math.radians(_route_cap(s))
     return -((x - rx) * math.cos(h) + (y - ry) * math.sin(h))
-
-
-def patrol1_speed(t):
-    return _P1.v(t)
 
 
 def patrol1_lead(t):
@@ -311,13 +200,32 @@ def _p2():
     return _P2D
 
 
+# Depuis v11 (SPEC §18.71) elle ne vire plus derrière la berline : la patrouille 1, la suiveuse (police.py), lui
+# coupe la route dans l'anneau, sur la ligne de la berline. Elle pile : dès P2_PILE[0] s du plan elle laisse tomber
+# son allure à zéro en P2_PILE[1] s, sur la trace de sa conduite (place, cap, glisse lus à son horloge ralentie), et
+# s'arrête rampe allumée à la bouche est de l'anneau, avant la fin du plan. Jusqu'à v10 elle entrait dans la rue sur
+# la ligne de la berline et s'arrêtait devant la trouée du barrage : la suiveuse la percutait.
+P2_PILE = ((124 - PC.START["P2"]) / FPS, 3.5)
+
+
+def _p2_horloge(t):
+    """L'instant de sa conduite (motion.drive) qu'elle occupe à l'instant t du plan : le même jusqu'à P2_PILE[0],
+    puis son horloge ralentit jusqu'à l'arrêt (allure × 1 - (3u² - 2u³), u de 0 à 1 sur P2_PILE[1] s)."""
+    tb, d = P2_PILE
+    u = min(1.0, max(0.0, (t - tb) / d))
+    return t if u <= 0.0 else tb + d * (u - u ** 3 + 0.5 * u ** 4)
+
+
+P2_STOP = P2_PILE[0] + P2_PILE[1]           # s : elle est arrêtée
+
+
 def patrol2_pos(t):
-    return tuple(_p2().pos(t))[:2]
+    return tuple(_p2().pos(_p2_horloge(t)))[:2]
 
 
 def patrol2_heading(t):
     """Le cap de sa caisse (glisse comprise)."""
-    return _p2().heading(t)
+    return _p2().heading(_p2_horloge(t))
 
 
 # Les clés posées avant l'image 1, en images (audit des mouvements, 18 novembre) : la patrouille 2 est dans le cadre

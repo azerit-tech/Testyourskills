@@ -174,188 +174,76 @@ PUDDLES = [("flaque_entree", -1.05, 97.5, 0.55, 2.4), ("flaque_feinte", 1.15, 10
            ("flaque_arret", -2.3, 118.9, 0.4, 1.4), ("flaque_trottoir", 3.2, 117.0, 0.5, 2.6)]
 
 
-# --- la patrouille 1 (celle de P1 et P2) : elle n'entre pas dans P3. Débordée par la berline dans le rond-point,
-# elle s'y est arrêtée, rampe allumée, avant le coin de la rue (p2_arc.patrol1_pos) ; P3 la garde là, immobile, à sa
-# place de P2/110 passée dans ce repère par le parcours (derrière la caméra et à gauche, hors du cadre tout le plan).
-# Les noms CHASE_* restent ceux que scene_b et les tests lisent ; CHASE_STOP = 0 : elle est déjà arrêtée.
-CHASE_AIR = 1.2                    # m d'air au moins entre l'avant de sa caisse arrêtée et les panneaux
+# --- la patrouille 1 (celle de P1 et P2). Jusqu'à v10 elle n'entrait pas dans P3 : arrêtée dans le rond-point, et la
+# poursuivante du pont surgissait de nulle part à P4/1. Depuis v11 (SPEC §18.71) elle est la suiveuse de police.py :
+# elle sort de l'anneau derrière la berline, remonte la rue des enseignes sur sa ligne, passe la trouée du barrage à
+# sa suite, déboîte à gauche et la rattrape, jusqu'à sa place du pont (p4_pont, image 340 du film). Une seule
+# voiture, une seule loi, écrite en ville et en temps du film ; ici, sa lecture dans le repère de ce tronçon.
+# Les noms CHASE_* restent ceux que scene_b et les tests lisent.
 CHASE_HALF = (2.6, 0.96)           # demi-longueur et demi-largeur de sa caisse (relevées sur scene-b.blend)
-
-
-def _chase_parked():
-    import p2_arc as P2
-    t = P2.T_END + 1.0 / M.FPS                                   # P2/111 = P3/1
-    x, y = PC.placer("P3")[0](*PC._to_route("P2")(*P2.patrol1_pos(t)))
-    return x, y, P2.patrol1_heading(t) + PC.ANCHOR["P2"][2] - PC.ANCHOR["P3"][2], P2.patrol1_speed(t)
-
-
-CHASE_X, CHASE_Y, CHASE_CAP, _CV = _chase_parked()
-assert abs(_CV) < 1e-4, "la patrouille 1 roule encore à la fin de P2"
-CHASE_STOP = 0.0                   # l'instant où elle s'arrête : avant P3
-
-
-def chase_accel(t):
-    return 0.0
-
-
-def chase_speed(t):
-    return 0.0
+import police as _police  # noqa: E402
 
 
 def chase_pos(t):
-    return CHASE_X, CHASE_Y
+    return _police.suiveuse_scene("P3", t)
 
 
 def chase_heading(t, h=0.05):
-    """Son cap (degrés, 0 = +y, positif à gauche), celui de son arrêt dans le rond-point."""
-    return CHASE_CAP
+    """Son cap (degrés, 0 = +y, positif à gauche), celui de sa course."""
+    return _police.suiveuse_cap_scene("P3", t)
 
 
+def chase_speed(t):
+    return _police.suiveuse_vitesse(_police.g_de("P3", t))
+
+
+def chase_accel(t):
+    return _police.suiveuse_accel(_police.g_de("P3", t))
+
+
+CHASE_X, CHASE_Y = chase_pos(0.0)
+CHASE_CAP = chase_heading(0.0)
 CHASE = (CHASE_X, CHASE_Y - hero_pos(0.0)[1], CHASE_CAP)   # (x, avance sur la berline, cap) à l'image 1
-CHASE_FRONT_STOP = chase_pos(CHASE_STOP + 1.0)[1] + CHASE_HALF[0]   # l'avant de sa caisse, arrêtée
 
 
-# --- la patrouille 2 (celle de P2) : elle a viré derrière la berline à travers l'anneau et entre dans la rue en
-# sortie de glisse, relancée. Jusqu'à P3/1 (P2/111), c'est la conduite même de p2_arc (motion.drive), passée dans ce
-# repère par le parcours : la coupe est continue par construction (place, cap, glisse, vitesse, accélération). Après,
-# elle garde la trace de cette conduite (sa ligne dans la rue, sa glisse qui retombe, lues à l'abscisse) et sa propre
-# allure : elle relance jusqu'à P2_A1 (P2_JUP d'à-coup ; p2_arc irait à 3,05 m/s², au-delà des 3 de la berline), puis
-# elle voit le barrage et freine (P2_B, P2_JDN d'à-coup), relâché pour s'arrêter son centre à P2_STOP_Y. Elle ne passe
-# pas le trou des plots : 2,66 m entre les plots pour 1,95 m de caisse, 0,36 m d'air de chaque côté, quand il en faut
-# 1,2 ; elle s'arrête donc devant, 1,2 m au moins de chaque plot et des panneaux. Elle ne rattrape jamais la caméra
-# (la berline et le bras accélèrent plus fort) : derrière l'objectif tout le plan, jamais dans le cadre ; sa rampe et
-# ses phares, allumés, l'y font exister. P2_HALF : les demi-mesures de sa caisse (p2_arc.PATROL_L, PATROL_W)
+# --- la patrouille 2 (celle de P2) : elle n'entre pas dans P3. La suiveuse lui a coupé la route dans l'anneau, elle
+# y a pilé, rampe allumée, à sa bouche est (p2_arc.patrol2_pos) ; P3 la garde là, immobile, à sa place de P2/111
+# passée dans ce repère par le parcours (derrière la caméra, hors du cadre tout le plan). Jusqu'à v10 elle entrait
+# dans la rue derrière la berline et s'arrêtait devant la trouée du barrage : c'est la suiveuse (la patrouille 1,
+# plus haut) qui fait maintenant ce chemin, et passe la trouée. P2_STOP = 0 : elle est déjà arrêtée.
 P2_FRAMES = dict(PC.SHOTS)["P2"]   # la phase de sa rampe continue à la coupe (scene_b.plan_P3)
-P2_A1, P2_JUP = 2.5, 2.0
-P2_B, P2_JDN = 6.0, 9.0
-P2_STOP_Y = 118.9
 P2_AIR = 1.2
 P2_LENS = 4.5                      # m au moins entre l'objectif et son centre
-_P2_DT, _P2_BACK, _P2_AHEAD = 1.0 / 480.0, 1.2, 8.0
 
 
-def _p2_setup():
-    """La conduite de p2_arc passée dans ce repère : (fonction du temps du plan -> pos, cap, vitesse, accélération,
-    glisse), la trace [(s, x, y, cap)] de t = -_P2_BACK à +_P2_AHEAD et l'indice de t = 0."""
+def _p2_parked():
     import p2_arc as P2
-    fwd, back = PC.placer("P3")[0], PC._to_route("P2")
-    rot = PC.ANCHOR["P2"][2] - PC.ANCHOR["P3"][2]
-    D, t0 = P2._p2(), P2.T_END + 1.0 / M.FPS                    # P2/111 = P3/1
-    half = (P2.PATROL_L / 2, P2.PATROL_W / 2)
-
-    def at(t):
-        x, y = fwd(*back(*D.pos(t0 + t)))
-        return x, y, D.heading(t0 + t) + rot, D.speed(t0 + t), D.along(t0 + t), D.slip(t0 + t)
-    path, s, prev = [], 0.0, None
-    n0 = int(round(_P2_BACK / _P2_DT))
-    for k in range(-n0, int(round(_P2_AHEAD / _P2_DT)) + 1):
-        x, y, h = at(k * _P2_DT)[:3]
-        if prev:
-            s += math.hypot(x - prev[0], y - prev[1])
-        path.append((s, x, y, h))
-        prev = (x, y)
-    return at, path, n0, half
+    t = P2.T_END + 1.0 / M.FPS                                   # P2/111 = P3/1
+    x, y = PC.placer("P3")[0](*PC._to_route("P2")(*P2.patrol2_pos(t)))
+    v = math.dist(P2.patrol2_pos(t), P2.patrol2_pos(t - 1.0 / M.FPS)) * M.FPS
+    return x, y, P2.patrol2_heading(t) + PC.ANCHOR["P2"][2] - PC.ANCHOR["P3"][2], v, (P2.PATROL_L / 2, P2.PATROL_W / 2)
 
 
-_P2_AT, _P2_PATH, _P2_I0, P2_HALF = _p2_setup()
-_P2_S0 = _P2_PATH[_P2_I0][0]
-_P2_V0, _P2_A0 = _P2_AT(0.0)[3], _P2_AT(0.0)[4]
-
-
-def _p2_path_at(s):
-    """(x, y, cap) sur la trace, à l'abscisse s (interpolation linéaire au 1/480 s)."""
-    P = _P2_PATH
-    if s >= P[-1][0]:
-        s0, x, y, h = P[-1]
-        a = math.radians(h)
-        return x - math.sin(a) * (s - s0), y + math.cos(a) * (s - s0), h
-    lo, hi = 0, len(P) - 1
-    while hi - lo > 1:
-        mid = (lo + hi) // 2
-        lo, hi = (mid, hi) if P[mid][0] <= s else (lo, mid)
-    (sa, xa, ya, ha), (sb, xb, yb, hb) = P[lo], P[hi]
-    w = (s - sa) / max(1e-12, sb - sa)
-    return xa + (xb - xa) * w, ya + (yb - ya) * w, ha + (hb - ha) * w
-
-
-def _p2_profile(tb):
-    """Les sommets (t, accélération) de son allure après P3/1, linéaire entre eux : P2_A1 atteint, tenu jusqu'à tb,
-    -P2_B atteint, tenu, relâché pour finir à vitesse nulle."""
-    t1 = abs(P2_A1 - _P2_A0) / P2_JUP
-    tb = max(tb, t1)
-    t2 = tb + (P2_A1 + P2_B) / P2_JDN
-    t3 = P2_B / P2_JDN
-    # la vitesse à t2, puis la tenue qui la ramène à zéro à la fin du relâchement
-    v2 = _P2_V0 + (_P2_A0 + P2_A1) / 2 * t1 + P2_A1 * (tb - t1) + (P2_A1 - P2_B) / 2 * (t2 - tb)
-    hold = max(0.0, (v2 - 0.5 * P2_B * t3) / P2_B)
-    return [(0.0, _P2_A0), (t1, P2_A1), (tb, P2_A1), (t2, -P2_B), (t2 + hold, -P2_B), (t2 + hold + t3, 0.0)]
-
-
-def _p2_accel(t, prof):
-    if t <= prof[0][0]:
-        return prof[0][1]
-    for (ta, aa), (tb, ab) in zip(prof, prof[1:]):
-        if t <= tb:
-            return aa + (ab - aa) * (t - ta) / (tb - ta)
-    return 0.0
-
-
-def _p2_table(prof):
-    """[(s, v)] au 1/480 s depuis P3/1 (s depuis l'abscisse de P3/1 sur la trace)."""
-    stop = prof[-1][0]
-    v, s, out, t = _P2_V0, 0.0, [(0.0, _P2_V0)], 0.0
-    while t < max(T_END, stop) + 1.0:
-        v1 = 0.0 if t + _P2_DT >= stop else max(0.0, v + 0.5 * (_p2_accel(t, prof) + _p2_accel(t + _P2_DT, prof)) * _P2_DT)
-        s += 0.5 * (v + v1) * _P2_DT
-        v, t = v1, t + _P2_DT
-        out.append((s, v))
-    return out
-
-
-def _p2_solve():
-    """L'instant où elle se met à freiner, pour que son centre s'arrête à P2_STOP_Y (bissection)."""
-    lo, hi = 0.0, 6.0
-    for _ in range(50):
-        mid = (lo + hi) / 2
-        tab = _p2_table(_p2_profile(mid))
-        y = _p2_path_at(_P2_S0 + tab[-1][0])[1]
-        lo, hi = (mid, hi) if y < P2_STOP_Y else (lo, mid)
-    prof = _p2_profile(lo)
-    return prof, _p2_table(prof)
-
-
-_P2_PROF, _P2_TAB = _p2_solve()
-P2_BRAKE_AT = _P2_PROF[2][0]       # s (temps du plan) : elle se met à freiner
-P2_STOP = _P2_PROF[-1][0]          # s : elle s'arrête
-
-
-def _p2_tab_at(t):
-    u = t / _P2_DT
-    k = min(len(_P2_TAB) - 2, int(u))
-    w = min(1.0, u - k)
-    return tuple(a + (b - a) * w for a, b in zip(_P2_TAB[k], _P2_TAB[k + 1]))
+P2_PX, P2_PY, P2_PCAP, _P2V, P2_HALF = _p2_parked()
+assert abs(_P2V) < 1e-6, "la patrouille 2 roule encore à la fin de P2"
+P2_STOP = 0.0                      # s : elle s'arrête avant P3
 
 
 def patrol2_pos(t):
-    """Sa place (repère de la scène) : la conduite de p2_arc jusqu'à P3/1, sa trace à sa propre allure ensuite."""
-    if t <= 0.0:
-        return _P2_AT(t)[:2]
-    return _p2_path_at(_P2_S0 + _p2_tab_at(t)[0])[:2]
+    return P2_PX, P2_PY
 
 
 def patrol2_heading(t):
-    """Le cap de sa caisse (glisse comprise, degrés, 0 = +y, positif à gauche)."""
-    if t <= 0.0:
-        return _P2_AT(t)[2]
-    return _p2_path_at(_P2_S0 + _p2_tab_at(t)[0])[2]
+    """Le cap de sa caisse (degrés, 0 = +y, positif à gauche), celui de son arrêt dans le rond-point."""
+    return P2_PCAP
 
 
 def patrol2_speed(t):
-    return _P2_AT(t)[3] if t <= 0.0 else _p2_tab_at(t)[1]
+    return 0.0
 
 
 def patrol2_accel(t):
-    return _P2_AT(t)[4] if t <= 0.0 else (_p2_accel(t, _P2_PROF) if t < P2_STOP else 0.0)
+    return 0.0
 
 
 def _centroid(poly):
@@ -614,7 +502,6 @@ def patrol2_clearances(frames=None, sub=4):
     frames = frames or range(F0 - 1, F0 + FRAMES + 1)
     fixed = dict(OBSTACLES)
     fixed["caisses"] = _rect(*CRATES)
-    fixed["patrouille_1"] = _car_box(CHASE_X, CHASE_Y, CHASE_CAP, *CHASE_HALF)
     out = {}
     for f in frames:
         for k in range(sub):
@@ -622,6 +509,7 @@ def patrol2_clearances(frames=None, sub=4):
             car = patrol2_box(t)
             polys = dict(fixed)
             polys["berline"] = hero_box(t)
+            polys["patrouille_1"] = _car_box(*chase_pos(t), chase_heading(t), *CHASE_HALF)
             items = [(n, _poly_dist(car, P)) for n, P in polys.items()]
             items += [(f"plot_{i}", 0.0 if _inside(c, car) else
                        max(0.0, min(_seg_dist(c, car[j], car[(j + 1) % 4]) for j in range(4)) - CONE_R))
@@ -687,9 +575,7 @@ if __name__ == "__main__":
               f"({50 * (uc + 1):3.0f}, {100 * (1 - vc):3.0f} du haut) | trou ({50 * (g[0] + 1):3.0f}, {100 * g[1]:3.0f}) | "
               f"patrouille 1 ({kx:5.2f}, {ky:6.1f}) {chase_speed(t) * 3.6:3.0f} km/h {chase_accel(t):+5.1f} m/s², "
               f"rampe ({50 * (r[0] + 1):3.0f}, {100 * (1 - r[1]):3.0f} du haut)")
-    print(f"agents : F_GAP {F_GAP:.2f}, tirs {SHOTS}, à couvert {COVER} ; patrouille 1 arrêtée à "
-          f"{CHASE_STOP * M.FPS + F0:.1f}, avant à y {CHASE_FRONT_STOP:.2f} (panneaux à "
-          f"{min(y for _, y in PANELS) - 0.32:.2f})")
+    print(f"agents : F_GAP {F_GAP:.2f}, tirs {SHOTS}, à couvert {COVER}")
     for n, (d, f) in sorted(clearances().items(), key=lambda kv: kv[1][0]):
         print(f"  {n:10s} {d:5.2f} m (image {f:.2f})")
     for n, (d, f) in sorted(cam_clearances().items(), key=lambda kv: kv[1][0])[:4]:

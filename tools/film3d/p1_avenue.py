@@ -113,6 +113,9 @@ def _w(t):
 def patrol_accel(t):
     """Son accélération (m/s²)."""
     h = 1e-3
+    if PC.START["P1"] + t * M.FPS > 60:                 # (v11 : police.DEPART, la suiveuse)
+        import police
+        return police.suiveuse_accel(police.g_de("P1", t))
     if t >= _TK:
         return -PATROL_BRAKE
     return _hero_acc(t) + (_w(t + h) - _w(t - h)) / (2 * h)
@@ -167,11 +170,16 @@ def _patrol_ligne(t):
 
 
 # sa ligne, avec le contact de l'ouverture (contacts.py, SPEC §18.68 : elle serre la berline, la tape, rebondit)
-patrol_pos = C.Patrouille(_patrol_ligne, "P1", (("OUV", "patrol"), ("P1", "patrol")))
+# (v11, SPEC §18.71 : après l'image 60 du film, c'est la suiveuse de police.py, la même voiture, qui ne s'arrête plus
+# au rond-point : elle tient sa vitesse quand la berline freine, remonte à sa hauteur, freine à son tour et la suit
+# jusqu'au pont. Rien de changé de 0 à 60.)
+import police as _police  # noqa: E402
+patrol_pos = C.Patrouille(_police.apres_avenue(_patrol_ligne), "P1", (("OUV", "patrol"), ("P1", "patrol")))
 
 
 def patrol_speed(t):
-    return hero_speed(t) + _w(t)
+    g = _police.g_de("P1", t)
+    return _police.suiveuse_vitesse(g) if g > _police.DEPART else hero_speed(t) + _w(t)
 
 
 def patrol_heading(t):
