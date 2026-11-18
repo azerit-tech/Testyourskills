@@ -276,7 +276,7 @@ if VILLE:
     # reste dans le cadre, à 1,9 m de la file d'en face au plus juste (diag/audit_trafic.py)
     # (fusion v10 : 0,6, 0,5 avant. La voiture simulée déboîte de 3,85 m ; à 0,5 la patrouille n'entrait dans le
     # cadre qu'à P4/32, deux images après la fenêtre de test_entrees ; à 0,6 : P4/27)
-    # (v11, SPEC §18.71 : 0. La berline tient la voie intérieure ; quand B1 déboîte, elle s'écarte d'un mètre à
+    # (v11, SPEC §18.74 : 0. La berline tient la voie intérieure ; quand B1 déboîte, elle s'écarte d'un mètre à
     # gauche, vers la patrouille, qui garde sa voie : l'air entre elles tombe de 1,7 à 0,7 m, puis la patrouille
     # la tape et la renvoie à droite. À 0,6 la patrouille suivait la berline revenue à droite et restait collée
     # à elle 21 images)

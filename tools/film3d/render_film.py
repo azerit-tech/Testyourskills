@@ -27,6 +27,8 @@
 # essai vont dans <out>/<PLAN>+<essai>/ et ne deviennent jamais une prise du montage) :
 #   rugosite[=0.5]        la rugosité de la chaussée (Roughness des matières rue_asphalt*, rue_gutter) × 0,5
 #   brume[=1]             la brume creusée entre la caisse de la berline et l'objectif (et autour de la caisse)
+#   etat                  aucun rendu : l'état de la scène aux images des coupes du plan, <out>/etat/g<image>-<PLAN>.json
+#                         (diag/etat_coupes.py les compare des deux côtés de chaque coupe)
 #   peinture=<hex>        FILM3D_PAINT        metal=<0..1>   FILM3D_PAINT_METAL
 #   vernis=<0..1>         FILM3D_PAINT_COAT (facteur du poids du vernis)
 #   vernis_rugosite=<0..1>  FILM3D_PAINT_COAT_ROUGH (rugosité ajoutée au vernis)
@@ -60,6 +62,11 @@ SOURCES = {
 # 110 m). cut.ts (le site) les reprendra ; tant qu'il garde le découpage v3, plan_frames rend la longueur des
 # modules et le journal le dit.
 FALLBACK_FRAMES = {"OUV": 75, "P1": 33, "P2": 107, "P3": 103, "P4": 108, "P5": 60, "P6": 133, "FIN": 52, "FIN6": 101}
+# Les plans que le site ne joue plus et que cut.ts ne nomme donc plus, mais que l'atelier sait encore rendre : FIN,
+# l'ancienne fin à la pointe (SPEC §18.53). Leur durée est celle du repli, sans alerte. (Jusqu'à v10, l'absence de
+# FIN dans cut.ts faisait dire « plans manquants ['FIN'], durées de repli » à chaque lancement et jetait TOUTES les
+# durées de cut.ts pour celles du repli ; le rendu n'en changeait pas, les modules font foi : plan_frames.)
+HORS_SITE = ("FIN",)
 # Le module de trajectoire de chaque plan (sans Blender) : son FRAMES est la longueur que sa scène sait animer. Un
 # plan pas encore migré au découpage de cut.ts se rend à la longueur de son module, et le journal le dit.
 TRAJ = {"OUV": "ouv_avenue", "P1": "p1_avenue", "P2": "p2_arc", "P3": "p3_enseignes", "P4": "p4_pont",
@@ -67,7 +74,9 @@ TRAJ = {"OUV": "ouv_avenue", "P1": "p1_avenue", "P2": "p2_arc", "P3": "p3_enseig
 FULL = (720, 1280)
 DRAFT = (360, 640)
 ESSAIS = {"rugosite": 0.5, "brume": 1.0, "peinture": None, "metal": None, "vernis": None, "vernis_rugosite": None,
-          "audit": 1.0, "sol_gris": 1.0}      # audit, sol_gris : diag/audit_sol.py (le bas du cadre aux coupes)
+          "audit": 1.0, "sol_gris": 1.0,      # audit, sol_gris : diag/audit_sol.py (le bas du cadre aux coupes)
+          "bras": None, "obturateur": None,   # bras=A|B|C : la caméra d'un réglage de bras.py ; obturateur=0..1
+          "etat": 1.0}                        # etat : diag/etat_coupes.py (l'état de la scène aux coupes, sans rendu)
 PAINT_ENV = {"peinture": "FILM3D_PAINT", "metal": "FILM3D_PAINT_METAL", "vernis": "FILM3D_PAINT_COAT",
              "vernis_rugosite": "FILM3D_PAINT_COAT_ROUGH"}
 
@@ -100,9 +109,10 @@ def read_cut(root=ROOT):
         out = {k: int(v) for k, v in re.findall(r"(\w+)\s*:\s*(\d+)", body)}
         for shot, n in re.findall(r'shot\s*:\s*"(\w+)"\s*,\s*video\s*:\s*(\d+)', src):
             out[shot] = int(n)
-        if set(out) >= set(ORDER):
-            return {p: out[p] for p in ORDER}
-        log(f"! {path} : plans manquants {sorted(set(ORDER) - set(out))}, durées de repli")
+        manque = sorted(set(ORDER) - set(out) - set(HORS_SITE))
+        if not manque:
+            return {p: out.get(p, FALLBACK_FRAMES[p]) for p in ORDER}
+        log(f"! {path} : plans manquants {manque}, durées de repli")
     except (OSError, AttributeError) as e:
         log(f"! {path} illisible ({e}), durées de repli")
     return dict(FALLBACK_FRAMES)
@@ -124,13 +134,18 @@ def module_frames(plan):
 def plan_frames(cut, plans=ORDER, frames_of=module_frames):
     """Les images à rendre par plan : celles de cut.ts, sauf pour un plan dont le module a encore un autre FRAMES (pas
     encore migré) : il garde le sien, dit dans le journal ; le montage tiendra sa dernière image."""
-    out = {}
+    out, autres = {}, []
     for plan in plans:
         n, m = cut[plan], frames_of(plan)
         if m is not None and m != n:
-            log(f"! {plan} : {m} images, cut.ts en attend {n}, plan pas encore migré ({TRAJ[plan]}.FRAMES = {m})")
+            autres.append(f"{plan} {m} (cut.ts : {n})")
             n = m
         out[plan] = n
+    if autres:
+        # une ligne pour tous : depuis le trajet roulé (§18.55) le site garde l'ancien découpage tant que le film
+        # n'est pas livré, chaque plan le redisait
+        log(f"durées des modules de trajectoire, pas celles de cut.ts (le site les reprendra à la livraison) : "
+            f"{', '.join(autres)}")
     return out
 
 
@@ -289,6 +304,8 @@ def worker(a):
         plan, arg, lambda: mod.build(arg) if arg and inspect.signature(mod.build).parameters else mod.build(),
         ASSETS, blend_out=os.environ["FILM3D_BLEND"], use=False if a.mode == "list" else None)
     seen.update(read)
+    if "bras" in essais or "obturateur" in essais:
+        poser_bras(bpy, scene, plan, mod, essais)
     if a.ville:
         # la ville autour du plan (ville.voisins) : après le cache, qui garde la scène du plan seule
         import ville
@@ -301,6 +318,8 @@ def worker(a):
         vie.poser_plan(scene, plan)
         import clins            # les clins d'œil (SPEC §18.65), par-dessus la vie ; FILM3D_CLINS=0 les ôte
         clins.poser_plan(scene, plan)
+        # les vitres de la berline hors des lampadaires (SPEC §18.73) : toutes les lampes de la prise sont posées
+        ville.vitres_hors_lampadaires(scene, plan)
     still = scene.frame_current
     span = scene.frame_end - scene.frame_start + 1
     animated = span > 3
@@ -347,6 +366,13 @@ def worker(a):
                res=list(res), engine=engine, device=device, samples=samples, build_s=round(t_build, 1), scene_src=how,
                draft_mode=draft_mode)
     if a.mode == "list":
+        return
+    if "etat" in essais:
+        # l'état de la scène aux images de ses coupes (diag/etat_coupes.py, SPEC §18.73) : relevé, rien n'est rendu
+        sys.path.insert(0, os.path.join(HERE, "diag"))
+        import etat_coupes
+        faits = etat_coupes.releve_plan(bpy, scene, plan, a.out)
+        log(f"{plan} : état de la scène relevé aux images {faits} du film ({os.path.join(a.out, 'etat')}), rien de rendu")
         return
 
     r = scene.render
@@ -464,6 +490,10 @@ def setup_render(bpy, scene, a):
         r.use_simplify, r.simplify_subdivision_render = True, 0     # (les personnages lissés : 48 s sur P3, mesuré)
         return res, "workbench", "-", 0
     r.engine = "CYCLES"
+    # les volumes « biaisés » de Cycles (les pinceaux dans la brume lissés) pour tout le film : P6 seul les avait
+    # (scene_d.p6_clean_haze), la brume et le pinceau de l'hélicoptère changeaient de grain à 485 | 486 et à
+    # 618 | 619 (diag/etat_coupes.py : le seul réglage de rendu qui différait d'un tronçon à l'autre, SPEC §18.73)
+    c.volume_biased = True
     c.device = "CPU"
     device = "CPU"
     if not a.cpu and sys.platform != "darwin":       # jamais la carte graphique du Mac (règle machine)
@@ -492,6 +522,44 @@ def setup_render(bpy, scene, a):
         log(f"seuil adaptatif {a.adaptive} (au lieu de celui de la scène)")
     r.use_persistent_data = not a.no_persistent      # les textures et la scène gardées d'une image à l'autre
     return res, "cycles", device, c.samples
+
+
+def poser_bras(bpy, scene, plan, mod, essais):
+    """--essai bras=A|B|C : la caméra du plan reposée au réglage de bras.py, APRÈS la construction (ou la reprise du
+    cache). La scène est toujours celle du bras A : bras.py n'est importé qu'ici, il n'entre ni dans la clé du cache
+    ni dans celle des voisins, et les trois réglages se rendent sur la même ville sans rien reconstruire. A : la
+    scène telle quelle (le témoin). B, C : bras.installer remplace la caméra de parcours (la circulation et les
+    clins d'œil, posés ensuite, suivent la nouvelle), puis les clés de la caméra sont refaites par motion.key_camera
+    sur les images de la scène (une de part et d'autre du plan). Ce qui reste de la construction, réglé sur le bras
+    A : les effets de fx.py lus sur la caméra, les places des patrouilles. --essai obturateur=<0..1> : le temps de
+    pose du flou de bougé (0,5 dans les scènes ; un réglage peut porter le sien, l'essai passe devant)."""
+    import importlib
+
+    import bras
+    import motion as M
+    nom = bras.nom_regle(essais.get("bras", "A"))
+    if nom != "A":
+        bras.installer(nom)
+        traj = importlib.import_module(TRAJ[plan])
+        fn = traj.camera
+        pose = getattr(mod, "POSE", None)
+        if pose is not None and hasattr(traj, "to_scene"):      # le rond-point : son repère dans la scène
+            def fn(t, f=traj.camera):
+                x, y, z, yaw, pitch, roll, lens = f(t)
+                x, y, yaw = traj.to_scene(pose, x, y, yaw)
+                return x, y, z, yaw, pitch, roll, lens
+        fn.bras_commun = plan                                   # (motion.camera_operator : la vibration du bras)
+        cam = scene.camera
+        frames = range(traj.F0 - 1, traj.F0 + traj.FRAMES + 1)
+        M.key_camera(cam, frames, fn)
+        scene.frame_set(scene.frame_current)
+        log(f"essai bras {nom} : caméra reposée sur {len(frames)} images ({cam.name})")
+    else:
+        log("essai bras A : la caméra de la scène, telle que construite")
+    k = essais.get("obturateur") or bras.obturateur(nom)
+    if k:
+        scene.render.motion_blur_shutter = float(k)
+        log(f"obturateur du flou de bougé : {float(k):.2f}")
 
 
 def apply_essais(bpy, scene, essais):
@@ -768,6 +836,7 @@ def selftest():
     import parcours as PC                                                      # le repli : le trajet roulé
     assert FALLBACK_FRAMES == dict(PC.SHOTS, FIN=52, FIN6=PC.FIN6_FRAMES), FALLBACK_FRAMES
     assert set(cut) == set(ORDER), cut
+    assert all(p in ORDER for p in HORS_SITE) and cut["FIN6"] > 0, cut       # FIN n'est plus dans cut.ts : repli muet
     # un plan pas encore migré (son module a encore FRAMES = 28) garde sa longueur ; les autres suivent cut.ts
     old = {"P3": 28, "FIN": 36}
     eff = plan_frames(cut, ORDER, frames_of=lambda p: old.get(p, cut[p]))

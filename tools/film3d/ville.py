@@ -593,12 +593,91 @@ def projecteur_sols(scene, plan):
     return fautes
 
 
+# La lunette de la berline et les lampadaires (SPEC §18.73). Vue de la caméra de poursuite (derrière, 2,4 m de haut),
+# la lunette couchée renvoie ce qui est à la verticale de la voiture : chaque lampadaire qui passe au-dessus y posait
+# une tache jaune clair d'une à quatre images (brouillon éclairé v10 : 48, 68, 96–98, 118–124, 337, 497, 532–535,
+# 564–566, 592, 612–616), malgré le verre mouillé (rugosité 0,24) et le reflet retiré aux quatre cinquièmes
+# (hero_cars.REAR_REFL_CUT). La tache n'est pas l'image de la tête de la lampe (un petit maillage, que le lobe étalé
+# éteint) mais le reflet direct de sa lampe ponctuelle, de rayon presque nul : E·D/(4·cos) reste de l'ordre de 1 en
+# lumière de scène à 8 m sous 1,2 kW. Les vitres de la berline (propriété « vitre », hero_cars.split_glass) sortent
+# donc des receveurs des lampes de voirie : elles gardent le reflet du ciel, des façades, des phares et de la tête
+# éclairée du lampadaire, et leur transparence ; la tôle garde ses éclats. Une lampe de voirie : un projecteur
+# (SPOT) fixe, tourné vers le sol, à 5 m au moins au-dessus de la chaussée (parcours.sol_ville : la même décision
+# dans tous les tronçons), que rien ne lie déjà (les projecteurs de l'hélicoptère, des panneaux et des appoints ont
+# leurs receveurs : ils ne changent pas ; les appliques des façades, à 4,3 m, non plus).
+LUNETTE_COLL = "vitres_hors_lampadaires"
+LAMPE_BAS = 0.5             # la part vers le bas de l'axe de la lampe, au moins
+LAMPE_HAUT = 5.0            # m au-dessus de la chaussée, au moins
+
+
+def lampadaire(kind, bas, dz, liee, portee):
+    """Cette lampe est-elle une lampe de voirie pour les vitres ? kind : le type de lampe ; bas : la part vers le
+    bas de son axe (1 : à la verticale) ; dz : sa hauteur au-dessus de la chaussée (m) ; liee : elle a déjà ses
+    receveurs ; portee : un objet la porte (un véhicule, un hélicoptère)."""
+    return kind == "SPOT" and not liee and not portee and bas >= LAMPE_BAS and dz >= LAMPE_HAUT
+
+
+def vitres_hors_lampadaires(scene, plan=""):
+    """render_film --ville, la prise assemblée (voisins, vie, clins posés) : les vitres de la berline hors des
+    receveurs de chaque lampe de voirie (lampadaire). Renvoie le nombre de lampes ; VILLE_VITRES_LAMPADAIRES=0 ne
+    fait rien (l'image d'avant, pour comparer)."""
+    import bpy
+    from mathutils import Matrix, Vector
+    import parcours as PC
+    if os.environ.get("VILLE_VITRES_LAMPADAIRES", "1") == "0":
+        log(f"! {plan} : vitres de la berline laissées sous les lampadaires (VILLE_VITRES_LAMPADAIRES=0)")
+        return 0
+    vitres = [o for o in scene.objects if o.type == "MESH" and o.get("vitre")]
+    if not vitres:
+        log(f"! {plan} : aucune vitre marquée (propriété « vitre ») : les lampadaires s'y refléteront")
+        return 0
+    bpy.context.view_layer.update()
+    vers_ville = Matrix(matrice(lieu(lieu_of_shot(plan)[0])["plan"]))
+    col = bpy.data.collections.get(LUNETTE_COLL) or bpy.data.collections.new(LUNETTE_COLL)
+    for o in vitres:
+        if o.name not in col.objects:
+            col.objects.link(o)
+    for co in col.collection_objects:
+        co.light_linking.link_state = "EXCLUDE"
+    def portee(o):                      # un objet animé la porte (une voiture, un hélicoptère), ou elle bouge
+        while o is not None:
+            if o.animation_data is not None and o.animation_data.action is not None:
+                return True
+            o = o.parent
+        return False
+
+    n = 0
+    for lt in scene.objects:
+        if lt.type != "LIGHT" or lt.hide_render:
+            continue
+        mw = lt.matrix_world
+        bas = (mw.to_3x3() @ Vector((0.0, 0.0, -1.0))).normalized().z * -1.0
+        p = vers_ville @ mw.translation
+        if lampadaire(lt.data.type, bas, p.z - PC.sol_ville(p.x, p.y),
+                      lt.light_linking.receiver_collection is not None, portee(lt)):
+            lt.light_linking.receiver_collection = col
+            n += 1
+    log(f"{plan} : les {len(vitres)} vitre(s) de la berline hors des receveurs de {n} lampe(s) de voirie (les "
+        f"lampadaires ne s'y reflètent plus en tache)")
+    return n
+
+
 def selftest_voisins():
     """Les décisions de voisins(), sans Blender, sur les vrais noms des scènes."""
+    # les lampes de voirie que les vitres de la berline ne reçoivent plus (lampadaire) : un lampadaire, un mât du
+    # port ; pas un phare (à l'horizontale), ni une lampe déjà liée (le projecteur), ni une lampe portée, ni une
+    # lampe au sol tournée vers une façade, ni une nappe
+    assert lampadaire("SPOT", 1.0, 6.5, False, False) and lampadaire("SPOT", 0.62, 23.0, False, False)
+    assert not lampadaire("SPOT", 0.05, 0.0, False, False) and not lampadaire("SPOT", 1.0, 30.0, True, False)
+    assert not lampadaire("SPOT", 0.9, 12.0, False, True) and not lampadaire("SPOT", -0.9, -1.0, False, False)
+    assert not lampadaire("AREA", 1.0, 8.0, False, False) and not lampadaire("POINT", 1.0, 8.0, False, False)
     take1 = {"avenue", "rond-point", "rue", "pont"}
     # les effets d'un voisin sortent toujours (§18.60 : les embruns de la meute de P6 sous la lampe de P5)
     assert all(fx_voisin(n) for n in ("fx_embruns_meute_P6", "fx_gouttes_P5", "fx_brume_glisse_P2", "fx_lame_P6"))
     assert not any(fx_voisin(n) for n in ("fxa", "port_fx", "fx", "lampe_fx_1"))
+    # les flaques des scènes restent (des pièces du sol) ; celles de fx.py sous une roue et les rides partent
+    assert not any(fx_voisin(n) for n in ("fx_flaque_0", "fx_flaque_5", "fx_flaque_3.001"))
+    assert all(fx_voisin(n) for n in ("fx_flaque_BL_12", "fx_rides_fx_flaque_0", "fx_flaque_P6", "fx_flaque"))
     # (a) le fond nord du rond-point (scene_f.build_backdrop) hors de sa zone : gardé dans la prise, caché au-delà
     for nom in ("av_walk_w", "av_block_w", "av_royal_3", "lamp_av_4", "prom_royal_7", "beach_n"):
         assert drapeau_voisin("rond-point", nom, True, False, take1, True) == (False, ""), nom
@@ -1039,7 +1118,11 @@ def heli_voisin(nom):
 # lampes. Le brouillon v10 au port : les embruns de la meute de P6, chargés avec la jetée dans la scène de P5, y
 # prenaient la lampe principale de l'hélicoptère (4 MW) : les paquets blancs de P5/27–60. L'eau que le plan rendu voit
 # encore d'un plan voisin, il la tire lui-même sur le temps du film (fx.EAU_PREROLL, fx.EAU_AFTER).
-FX_VOISIN = re.compile(r"^fx_")
+# Sauf les flaques posées par les scènes sur la ligne des roues (« fx_flaque_<n> », scene_d.p6_foreground et la
+# recette de P2 et P3) : ce sont des pièces du sol, pas des effets tirés. Retirées avec le reste, les six flaques de
+# la jetée manquaient à P5 et apparaissaient d'un coup à 485 | 486, à 16–32 m devant la berline (diag/etat_coupes.py,
+# SPEC §18.73). Les flaques que fx.py pose sous une roue (« fx_flaque_<roue>_<image> ») et les rides restent des effets.
+FX_VOISIN = re.compile(r"^fx_(?!flaque_\d+(\.\d+)?$)")
 
 
 def fx_voisin(nom):

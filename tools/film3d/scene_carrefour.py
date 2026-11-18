@@ -426,6 +426,10 @@ def chase_camera(scene, pose=POSE):
         x, y, z, yaw, pitch, roll, lens = P.camera(t)
         x, y, yaw = P.to_scene(pose, x, y, yaw)
         return x, y, z, yaw, pitch, roll, lens
+    # (fusion v11 : `at` cachait à motion.camera_operator que P2 est un plan du bras commun ; sa vibration était
+    # tirée par plan, pas sur le temps du film : 0,08° de lacet d'écart à 107 | 108 et à 214 | 215, P2 seul)
+    if getattr(P.camera, "bras_commun", None):
+        at.bras_commun = P.camera.bras_commun
     M.key_camera(co, range(P.F0 - 1, P.F0 + P.FRAMES + 1), at)
     scene.frame_set(scene.frame_current)
     return co

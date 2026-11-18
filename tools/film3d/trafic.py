@@ -75,7 +75,7 @@ def vehicules():
         out.append(("trafic_" + nom, modele, teinte, course, kw))
 
     # ------------------------------------------------------------ l'avenue (OUV, P1) : s 0 à 105
-    # v11 (SPEC §18.71) : la berline sur E1 (n 0). La patrouille 1 la remonte par la voie d'en face, la tape à
+    # v11 (SPEC §18.74) : la berline sur E1 (n 0). La patrouille 1 la remonte par la voie d'en face, la tape à
     # l'image 30 (contacts.CHOCS) et la jette d'une demi-voie à droite, vers le bus qui déboîte de son arrêt dans
     # la voie E2 (clignotants, 16 km/h) : elle revient à gauche devant lui au dernier moment et longe son flanc
     # jusqu'au gel de l'image 107. B roule au pas sur E2 loin devant, freine et s'arrête à l'entrée de l'anneau (le
@@ -88,7 +88,7 @@ def vehicules():
     add("av_b", "fairheaven", "ciel", Course(av_e2, AV_B_V, s0=40.0 + AV_B, g0=0))
 
     # ------------------------------------------------------------ le rond-point (P2)
-    # v11 (SPEC §18.71) : le taxi qui attendait, arrêté, à l'entrée de l'avenue nord (vie.py) y arrive maintenant
+    # v11 (SPEC §18.74) : le taxi qui attendait, arrêté, à l'entrée de l'avenue nord (vie.py) y arrive maintenant
     # en roulant, voie O2, et freine au « cédez le passage » pendant que la berline dérape devant lui : une voiture
     # qui roule dans le cadre pendant la glisse, un repère pour sa rotation. La patrouille 2 le longe dans la voie
     # O1. Rien d'autre ne tient entre l'anneau et le barrage : la meute de P4 y roule en deux files (p4_pont.RUE_X),
@@ -240,7 +240,7 @@ def _s_at(pts, y):
 
 # ---- les réglages (images du film g, m/s ; places en m)
 # l'avenue : A et B, leur avance sur la berline à l'image 0 (m) et leurs vitesses
-# v11 (SPEC §18.71) : chaque obstacle d'une esquive se place depuis la berline. *_G : l'image du film où le nez de
+# v11 (SPEC §18.74) : chaque obstacle d'une esquive se place depuis la berline. *_G : l'image du film où le nez de
 # la berline serait sur lui si elle gardait sa ligne, comptée depuis le départ de son écart (parcours.SLALOM_SIMULE)
 # plus le temps avant contact voulu (0,8 à 1,3 s) ; sa place à cette image s'en déduit. Un horaire qui change
 # (l'adhérence, les virages) déplace donc les obstacles avec la berline.

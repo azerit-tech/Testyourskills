@@ -6,6 +6,9 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import motion as M  # noqa: E402
+import bras  # noqa: E402
+
+BRAS = bras.installer()      # BRAS_FILM=B|C : la caméra du réglage (bras.py) ; sans : celle du film v10
 
 FRAMES = range(0, 30)
 FAIL = []
@@ -172,7 +175,12 @@ CAM_LIMITS_PLAN = {
     # orbite (30°/s) ; elle commence pendant le dernier freinage de la berline (6,4 m/s²), que la caméra suit
     # (18 novembre : 9,5 ; le bras commun, rapproché au freinage, revient à 7,5 m pendant qu'elle s'arrête, parcours.rig)
     # (conduite simulée : l'orbite tourne autour d'une berline qui s'arrête comme une voiture, 40,1 °/s² ; 39,7 avant)
-    "FIN6": {"behind": 0.0, "orbit": CAM_ORBIT_MAX, "orbit_acc": 41.0, "arel": 6.0, "accel": 9.5},
+    # (fusion v11 : 31 °/s et 43 °/s², 30 et 41 avant. La loi de l'orbite n'a pas changé (SWEEP, ORBIT, rampes) ; ce
+    # qui s'y ajoute est le bras lui-même, qui tourne encore de 1,3 °/s (0,6 en v10) pendant que la berline finit de
+    # s'arrêter : le freinage adouci de la v11 (dynamique.DRIVER arret_a 5,4) la laisse rouler au pas une image de
+    # plus (0,7 km/h à FIN6/72, 0,5 en v10). Mesuré : 30,6 °/s à FIN6/72, 42,6 °/s² à FIN6/76 ; le bras seul prend
+    # 18 °/s² au plus, sans saut : rien ne s'en voit)
+    "FIN6": {"behind": 0.0, "orbit": 31.0, "orbit_acc": 43.0, "arel": 6.0, "accel": 9.5},
     # la patrouille 1 double la berline sur le pont : 1,5 m entre les caisses sur leurs routes, 1,4 avec ce que le
     # conducteur de la berline et celle qui roule dans son sillage tiennent de leur ligne (mesuré : 1,48)
     "P4": {"gap": 1.4},
@@ -256,9 +264,11 @@ CAM31_CUT_DH, CAM31_CUT_DD = 0.3, 0.8                     # m, aux coupes entre 
 # v11 (SPEC §18.70) : la berline roule sur μ 1,0 au lieu de 0,70, ses plafonds suivent (mesuré sur le film : latérale
 # 9,24, freinage 8,53, accélération 3,68, cercle 9,30 m/s², à-coup 70 m/s³ quand il la jette et la rattrape). Ceux
 # des patrouilles (CAR31_PATROL, POURSUITE_*) restaient ceux du mouillé.
-# (SPEC §18.71 : toutes les voitures roulent sur μ 1,0. Les plafonds d'adhérence des patrouilles et des poursuivants
+# (SPEC §18.74 : toutes les voitures roulent sur μ 1,0. Les plafonds d'adhérence des patrouilles et des poursuivants
 # (latérale, freinage, cercle) se relèvent du seul rapport des adhérences, parcours.ADHERENCE = 1 / 0,70, pas au cas
-# par cas ; l'accélération, que le moteur borne, l'à-coup et le lacet ne bougent pas. test_p1 contrôle le rapport)
+# par cas ; l'accélération, que le moteur borne, l'à-coup de conduite (40) et le lacet ne bougent pas : ce sont eux
+# qui montrent les suiveurs qui rejouent le rattrapage du port sans glisser. test_p1 contrôle le rapport. Seul
+# l'à-coup de freinage des poursuivants, POURSUITE_JERK, suit le rapport : SPEC §18.72)
 ADHERENCE = 1.0 / 0.70
 CAR31_HERO = dict(lat=9.5, brake=8.8, acc=3.8, circle=9.6, jerk=72.0, yaw_acc=120.0)
 CAR31_PATROL = dict(lat=round(7.0 * ADHERENCE, 1), brake=round(7.2 * ADHERENCE, 1), acc=4.0,
@@ -328,7 +338,8 @@ BODY31_ROLL, BODY31_PITCH = 5.0, 2.0
 # fusion v10 : Δ² 0,18 (0,15). Dans le S de l'avenue (0,8 g d'un côté puis de l'autre en 1,5 s, SPEC §18.62) la caisse
 # simulée passe de −4° à +3° de roulis ; c'est le roulis voulu des changements de voie (mesuré : 0,166)
 # v11 : quand il la jette à 68 km/h la caisse prend 5° de roulis en 8 images (Δ² 0,87 au rond-point, 0,75 au port)
-BODY31_ROLL_D2, BODY31_NOISE = 0.90, 0.02
+# fusion v11 : 0,95. Sur la ligne des esquives (elle entre dans l'anneau depuis sa demi-voie de droite), 0,92 à P2/25
+BODY31_ROLL_D2, BODY31_NOISE = 0.95, 0.02
 # §18.36, la continuité aux coupes (motion.cut_state_rows) : l'état de mouvement de la berline et de la caméra à la
 # sortie de A contre l'entrée de B. Points de départ ; informatifs tant que CUT_STATE_STRICT est faux.
 CUT_STATE_STRICT = True
@@ -420,7 +431,73 @@ def _franc(base, plans, v2, plan_min):
     return base, out
 
 
+# Les contrôles que le parti pris d'un réglage du bras (bras.py, BRAS_FILM=B|C) contredit : ils décrivent le bras A
+# (le cadre de Jacques du 12 novembre : 2,4 m, 7,5 m, 24 mm, la berline visée exactement, l'horizon à plat) ou ce
+# qui a été placé pour lui. Sous B ou C un tel contrôle qui échoue est imprimé « écart » avec sa raison, il ne
+# compte pas ; tout autre échec compte, et test_bras pose à leur place les bornes qui protègent le spectateur
+# (berline dans le cadre, bas de la berline au-dessus du texte, hauteur, raccords, à-coups, FIN6). Sous A rien ne
+# change : chaque contrôle garde sa borne. (motif du nom, raison)
+ECARTS_BRAS = (
+    (r"le cadre commun \(2,4 m, 7,5 m, 24 mm|distance au centre de la berline 5\.5|focale 18 à 24 mm|"
+     r"hauteur de la caméra 1\.6|à la hauteur du bras tout le plan|à la pointe 1\.6 m au plus bas|"
+     r"passe la ligne des plots à sa suite",
+     "la géométrie du bras A ; B et C descendent, se rapprochent et s'ouvrent avec l'élan (test_bras : jamais sous "
+     "1,5 m ni plus près que BACK_MIN, 15 mm au plus large)"),
+    (r"décalage à gauche",
+     "le cap du bras est une remorque : dans un virage il traîne à l'extérieur, de plus que les 1,5 m du bras A"),
+    (r"FILM3D_VITESSE=0 rend le bras rivé",
+     "FILM3D_VITESSE règle le bras A ; un réglage B ou C a ses propres doses (bras.REGLAGES)"),
+    (r"centre de la berline x 50|la berline à x 50|point de coupe|tiers central|dans le cadre utile \(5 à 95",
+     "la berline n'est plus visée exactement au centre à 58 % de la hauteur : l'opérateur la laisse partir du côté "
+     "où elle tourne, et c'est son bas qui est tenu, à 70 % (test_bras : boîte entière de 5 à 95 %, bas de 67 à "
+     "73 %)"),
+    (r"centre de la berline : Δ² ≤ 0\.3|accélération de panoramique ≤|continuité aux coupes \(stricte\)|"
+     r"continuité \w+ → \w+ : vitesse à l'écran",
+     "même cause : la berline bouge dans le cadre, donc sa vitesse à l'écran change d'une image à la suivante, "
+     "coupe ou pas (la pose du bras est la même des deux côtés de chaque raccord : test_bras) ; borne de "
+     "test_bras : Δ² ≤ 1,5 % de largeur par image²"),
+    (r"roulis de la caméra ≤ 3|vitesse de roulis ≤ 6|horizon à plat|sans à-coup \(≤ 10\.5",
+     "le bras penche vers le virage (ROLL, ROLL_MAX) ; test_bras : roulis ≤ ROLL_MAX + 1°, sa vitesse ≤ 9 °/s (B) "
+     "ou 15 °/s (C), et la même accélération qu'ici (≤ 10,5 m/s²), à-coup ≤ 60 m/s³, hors des chocs"),
+    (r"bascule ≤ 12|accélération de bascule ≤ 25",
+     "plus près de la berline, le bras bascule plus pour la même bosse (le dos du pont, l'entrée du port) ; "
+     "test_bras : bascule ≤ 16 °/s (B) ou 22 °/s (C)"),
+    (r"focale ≤ 18 %/s",
+     "la focale suit l'élan (24 mm au pas, 17,5 ou 15 mm lancé) : elle varie plus vite qu'avec le bras A, sans "
+     "saut (test_bras : ≤ 25 %/s)"),
+    (r"largeur de la berline ±",
+     "la boîte de la berline grandit quand le bras se rapproche avec l'élan ou montre son flanc (le rattrapage du "
+     "port, à cheval sur 485 | 486 : 67 % à P6/1, 43 % à P6/14) et se réduit dans le cadre à deux voitures d'un choc "
+     "(l'avenue, choc à l'image 30 : 32 %) ; en continu, sans saut (test_bras : focale ≤ 25 %/s, à-coups, la même "
+     "pose des deux côtés des raccords)"),
+    (r"28 à 35° entre la caisse et le bras|35 à 45° entre la caisse et le bras",
+     "voulu : le bras en remorque montre plus de flanc dans le dérapage (verdict du 13 novembre : « le dérapage "
+     "est mou », flanc visible)"),
+    (r"coupe P\d → FIN :",
+     "FIN (la pointe à caméra fixe) n'est plus montée depuis le 17 novembre (les fins 1 à 5 étoiles gèlent sur "
+     "place) ; sa coupe comparait la largeur de la berline à celle du bras A"),
+    (r"le phare dans x 5|la patrouille 1 entière dans le cadre|le cadre final, l'hélicoptère|"
+     r"la patrouille 2 hors du cadre|le barrage dans le cadre",
+     "À REPRENDRE À L'ADOPTION : la place du phare de l'hélicoptère, des patrouilles et du barrage a été réglée "
+     "sur le cadre du bras A ; avec un autre cadre elle est à régler de nouveau (helicos.py, trafic.py), pas le "
+     "bras"),
+)
+ECARTS = []
+# Les plans que le film ne monte plus (render_film.HORS_SITE) : leurs coupes ne sont plus jouées, pour aucun bras.
+# P5 → FIN (fusion v11) : la berline glisse encore de 17° à la dernière image de P5 (3° en v10 : le dérapage du port
+# de la v11 se rattrape à cheval sur 485 | 486), sa boîte y est plus large à l'écran, d'où « largeurs ×0,66 ».
+HORS_MONTAGE = {"FIN": "FIN, la pointe à caméra fixe, n'est plus montée depuis le 17 novembre (SPEC §18.53) : cette "
+                       "coupe n'existe pas dans le film"}
+
+
 def check(name, ok, detail=""):
+    if not ok and BRAS != "A":
+        import re
+        for motif, raison in ECARTS_BRAS:
+            if re.search(motif, name):
+                print(f"écart {name}{' : ' + detail if detail else ''}\n      (bras {BRAS} : {raison})")
+                ECARTS.append(name)
+                return
     print(f"{'ok  ' if ok else 'ÉCHEC'} {name}{' : ' + detail if detail else ''}")
     if not ok:
         FAIL.append(name)
@@ -2069,13 +2146,35 @@ def test_cut_habitacle_phare():
     }
     check("coupes : l'habitacle allumé à 25 W dans les huit tronçons (OUV à FIN6)", w == 25.0 and all(poses.values()),
           ", ".join(f"{k} {'oui' if v else 'NON'}" for k, v in poses.items()))
-    # la nappe de P2 au-dessus de la berline (scene_carrefour.hero_fill) n'éclaire qu'elle : sur la chaussée, elle
-    # éclaircissait le bas du cadre de P2 seul (107 | 108 +24 %, 214 | 215 −10 %, brouillon décor-coupes)
+    # la nappe de P2 au-dessus de la berline (scene_carrefour.hero_fill) est retirée : sur la chaussée, elle
+    # éclaircissait le bas du cadre de P2 seul (107 | 108 +24 %, 214 | 215 −10 %, brouillon décor-coupes) ; liée à
+    # la berline, elle doublait l'appoint commun
     kp = src("scene_f.py").split("def keep_paint(")[1].split("\ndef ")[0]
-    lie = ('bpy.data.objects.get("hero_fill")' in kp and "hf.light_linking.receiver_collection = avec" in kp
-           and kp.index("hero_fill") > kp.index('avec = bpy.data.collections.new'))
-    check("107 | 108, 214 | 215 : la nappe hero_fill de P2 liée à la seule berline (pas de flaque de lumière à P2)",
-          lie and 'A.add_light("hero_fill"' in src("scene_carrefour.py"), f"liée {lie}")
+    lie = 'bpy.data.objects.get("hero_fill")' in kp and "bpy.data.objects.remove(hf" in kp
+    check("107 | 108, 214 | 215 : la nappe hero_fill de P2 retirée (pas de flaque de lumière à P2)",
+          lie and 'A.add_light("hero_fill"' in src("scene_carrefour.py"), f"retirée {lie}")
+    # l'appoint de poursuite commun (lieux.CHASE_FILL, 900 W) sur la berline dans les huit tronçons : OUV et P1 ne
+    # l'avaient pas, elle y était bordeaux sombre (brouillon éclairé v10, SPEC §18.73) ; P2 l'a aussi, son complément
+    # de flanc nul aux deux coupes
+    sa, sdd = src("scene_a.py"), src("scene_d.py")
+    commun = {
+        "OUV, P1": sa.count("    chase_fill(rig)\n") == 2 and "return L.chase_fill(rig)" in sa,
+        "P2": "lieux.chase_fill(rig)" in kp and "(f0, 0.0)" in kp and "(f1, 0.0)" in kp,
+        "P3": "lieux.car_fill(rig, loc=(0.0, -4.0, 6.0), energy=900.0" in src("scene_b.py"),
+        "P4": "L.chase_fill(hero)" in src("scene_c.py"),
+        "P5": "L.car_fill(hero, loc=(0.0, -4.0, 6.0), energy=900.0" in src("scene_e.py"),
+        "P6, FIN6": sdd.count("L.chase_fill(hero)") >= 2,
+    }
+    check("berline : l'appoint de poursuite commun (900 W, 4 m derrière, 6 m au-dessus) dans les huit tronçons",
+          all(commun.values()) and "CHASE_FILL = dict(loc=(0.0, -4.0, 6.0), energy=900.0" in lieux_src,
+          ", ".join(f"{k} {'oui' if v else 'NON'}" for k, v in commun.items()))
+    # P2 posé comme les autres tronçons, sur le bras commun (fusion v11) : scene_carrefour.chase_camera enveloppait
+    # p2_arc.camera sans lui laisser sa marque, motion.camera_operator tirait donc sa vibration par plan : 0,08° de
+    # lacet d'écart à 107 | 108 et à 214 | 215, que les contrôles de pose (parcours.chase) ne voient pas
+    cam_p2 = src("scene_carrefour.py").split("def chase_camera(")[1].split("\ndef ")[0]
+    check("107 | 108, 214 | 215 : la caméra de P2 posée sur le bras commun (la même vibration des deux côtés)",
+          "at.bras_commun = P.camera.bras_commun" in cam_p2
+          and cam_p2.index("at.bras_commun") < cam_p2.index("M.key_camera("))
     # le phare, une seule loi de P6 à FIN6 (p6_jetee.phare_azimut, fusion v10 §18.67) : gelé pendant P6, il repart de
     # cette place à FIN6/1 ; les deux plans de la ville la lisent, avec les mêmes pinceaux. (Deux branches l'avaient
     # raccordé en sens inverse, chacune verte contre ses propres constantes : il sautait à 618 | 619, film gris v10.)
@@ -2407,8 +2506,13 @@ def test_v3():
                 check(f"v3 {p} : {name}", ok, detail)
     for a, b, fa, fb, ma, mb, ta, tb, chk in rep["cuts"]:
         if chk is not None:
-            check(f"v3 coupe {a} → {b} : |Δx| ≤ {CAM_CUT_DX:g}, |Δy| ≤ {CAM_CUT_DY:g}"
-                  + ("" if (a, b) in M.CUT_XY_ONLY else ", largeurs ×0,75 à ×1,33"), chk[0], chk[1])
+            nom = (f"v3 coupe {a} → {b} : |Δx| ≤ {CAM_CUT_DX:g}, |Δy| ≤ {CAM_CUT_DY:g}"
+                   + ("" if (a, b) in M.CUT_XY_ONLY else ", largeurs ×0,75 à ×1,33"))
+            if b in HORS_MONTAGE and not chk[0]:
+                # (fusion v11 : une coupe que le film ne joue pas ne fait pas un rouge ; elle reste imprimée)
+                print(f"écart {nom} : {chk[1]}\n      ({HORS_MONTAGE[b]})")
+                continue
+            check(nom, chk[0], chk[1])
     for name, ok, detail in rep["films"]:
         check(f"v3 {name}", ok, detail)
     # v3.1 : seulement les plans qui portent V31 = True
@@ -2733,7 +2837,10 @@ POURSUITE_BRAKE, POURSUITE_ACC, POURSUITE_LAT = 7.3 * ADHERENCE, 4.3, 7.6 * ADHE
 # motion.DRIVE_KINDS sur le mouillé, relevés du rapport des adhérences)
 # (conduite simulée, 18 novembre : 25, les poursuivants roulent dans le sillage de la berline, dont les pédales
 # ont la course d'un pied ; mesuré 20,6 au fourgon de P6, sur le coup de frein de sortie du port)
-POURSUITE_JERK = 25.0      # m/s³ (différences finies sur 1/24 s)
+# (fusion v11, SPEC §18.72 : le même pied, dans le même temps, enfoncé jusqu'à un freinage que des pneus à μ 1,0
+# portent 1,43 fois plus haut : 35,7. Mesuré 35,4 à la meute qui freine pour le port derrière la berline, au bout
+# du pont (P4/97 ; la berline elle-même : 38 m/s³ au même freinage) ; pas de départ ni d'arrêt sec)
+POURSUITE_JERK = 25.0 * ADHERENCE      # m/s³ (différences finies sur 1/24 s)
 POURSUITE_SLIP = 20.0      # ° entre la caisse et la route (les glisses voulues : 15° au plus)
 POURSUITE_GAP = 1.0        # m d'air entre deux caisses
 POURSUITE_TWIN = 2.5       # m : ville.JUMEAU_M
@@ -2820,7 +2927,7 @@ def test_poursuivants():
           worst["brake"][0] <= POURSUITE_BRAKE and worst["acc"][0] <= POURSUITE_ACC and worst["lat"][0] <= POURSUITE_LAT,
           f"freinage {worst['brake'][0]:.2f} ({worst['brake'][1]}), accélération {worst['acc'][0]:.2f} "
           f"({worst['acc'][1]}), latérale {worst['lat'][0]:.2f} ({worst['lat'][1]})")
-    check(f"poursuivants : à-coup ≤ {POURSUITE_JERK} m/s³ (pas de départ ni d'arrêt sec)", worst["jerk"][0] <= POURSUITE_JERK,
+    check(f"poursuivants : à-coup ≤ {POURSUITE_JERK:.1f} m/s³ (pas de départ ni d'arrêt sec)", worst["jerk"][0] <= POURSUITE_JERK,
           f"{worst['jerk'][0]:.1f} ({worst['jerk'][1]})")
     check(f"poursuivants : la caisse suit sa route (≤ {POURSUITE_SLIP:g}° hors glisse voulue, aucune roue qui glisse)",
           worst["slip"][0] <= POURSUITE_SLIP, f"{worst['slip'][0]:.1f}° ({worst['slip'][1]})")
@@ -3039,6 +3146,91 @@ def test_clins():
     check("clins : aucun texte pris au jeu", not pris, ", ".join(pris))
 
 
+def _pose_ville(shot, f, nom=None):
+    """La caméra du bras à l'image f du tronçon, dans le repère de la ville : (x, y, z, cos et sin du lacet, site,
+    roulis, focale)."""
+    import parcours as PC
+    c = bras.chase(shot, f, nom)
+    to, rot = PC.vers_ville(shot)
+    x, y = to(c[0], c[1])
+    a = math.radians(c[3] - rot)
+    return (x, y, c[2], math.cos(a), math.sin(a), c[4], c[5], c[6])
+
+
+def test_bras():
+    """Le bras d'un réglage de bras.py (BRAS_FILM=B|C) : ce qui protège le spectateur, quel que soit le parti pris.
+    Sous A : le module posé ne change rien à la caméra du film, et chaque réglage tient ses raccords."""
+    import parcours as PC
+    shots = [s for s, _ in PC.SHOTS] + ["FIN6"]
+
+    def raccords(nom=None):
+        return max(abs(u - v) for a, b in PC.RACCORDS
+                   for u, v in zip(_pose_ville(a, PC.frames(a) + 1, nom), _pose_ville(b, 1, nom)))
+    if BRAS == "A":
+        orig = bras._A["chase"]
+        d = max(abs(u - v) for s in shots for f in range(1, PC.frames(s) + 1, 5)
+                for u, v in zip(PC.chase(s, f), orig(s, f)))
+        check("bras A : la caméra du film telle quelle (bras.installer ne touche à rien)", d == 0.0, f"{d:.1e}")
+        for nom in sorted(k for k, v in bras.REGLAGES.items() if v):
+            d = raccords(nom)
+            check(f"bras {nom} : la même pose des deux côtés des {len(PC.RACCORDS)} raccords", d < 1e-6, f"{d:.1e}")
+        return
+    R = bras.REGLAGES[BRAS]
+    rows = []                                   # (g, plan, f, pose en ville, boîte de la berline, distance, hauteur)
+    for s in shots:
+        h = PC.hero(s)
+        for f in range(1, PC.frames(s) + 1):
+            c = PC.chase(s, f)
+            hx, hy = h["pos"](f)
+            b = M.hero_screen(c, hx, hy, PC.sol(s, hx, hy), h["heading"](f))
+            rows.append((PC.START[s] + f - 1, s, f, _pose_ville(s, f), b, math.dist(c[:2], (hx, hy)),
+                         c[2] - PC.sol(s, c[0], c[1])))
+    hors = [not _choc(r[1], r[2], "camera") for r in rows]              # (les images des chocs : _choc)
+    bad = [r[0] for r in rows if not r[4] or r[4]["u0"] < 0.05 or r[4]["u1"] > 0.95 or r[4]["v0"] < 0.12
+           or r[4]["v1"] > 0.85]
+    check(f"bras {BRAS} : la berline entière dans le cadre (5 à 95 % de large, 12 à 85 % de haut), tout le film",
+          not bad, f"images {bad[:8]}" if bad else
+          f"u {100 * min(r[4]['u0'] for r in rows):.0f} à {100 * max(r[4]['u1'] for r in rows):.0f} %")
+    v1 = [r[4]["v1"] for r, h in zip(rows, hors) if h and r[4]]
+    check(f"bras {BRAS} : le bas de la berline entre 67 et 73 % de la hauteur (la ligne de texte du site est à 72 %)",
+          min(v1) >= 0.67 and max(v1) <= 0.73, f"{100 * min(v1):.1f} à {100 * max(v1):.1f} %")
+    zs = [r[6] for r, h in zip(rows, hors) if h]
+    ds, ls = [r[5] for r in rows], [r[3][7] for r in rows]
+    check(f"bras {BRAS} : jamais sous 1,5 m, jamais à moins de {R['BACK_MIN'] - 0.3:.1f} m du centre de la berline, "
+          f"15 à 24 mm", min(zs) >= 1.5 and min(ds) >= R["BACK_MIN"] - 0.3 and 14.9 <= min(ls) and max(ls) <= 24.1,
+          f"{min(zs):.2f} m ; {min(ds):.2f} m ; {min(ls):.1f} à {max(ls):.1f} mm")
+    d = raccords()
+    check(f"bras {BRAS} : la même pose des deux côtés des {len(PC.RACCORDS)} raccords", d < 1e-6, f"{d:.1e}")
+    # d'une image à la suivante sur tout le film (un seul temps, coupes comprises), dans le repère de la ville
+    pv, fps, n = [r[3] for r in rows], PC.FPS, len(rows)
+    lim = dict(B=(9.0, 16.0), C=(15.0, 22.0)).get(BRAS, (9.0, 16.0))
+    rmax = max(abs(p[6]) for p in pv)
+    roul = max(abs(pv[i + 1][6] - pv[i][6]) * fps for i in range(n - 1) if hors[i])
+    basc = max(abs(pv[i + 1][5] - pv[i][5]) * fps for i in range(n - 1) if hors[i])
+    foc = max(abs(pv[i + 1][7] / pv[i][7] - 1.0) * fps for i in range(n - 1))
+    check(f"bras {BRAS} : roulis ≤ {R['ROLL_MAX'] + 1.0:.1f}°, sa vitesse ≤ {lim[0]:.0f} °/s, bascule ≤ {lim[1]:.0f} "
+          f"°/s hors des chocs, focale ≤ 25 %/s", rmax <= R["ROLL_MAX"] + 1.0 and roul <= lim[0] and basc <= lim[1]
+          and foc <= 0.25, f"{rmax:.2f}° ; {roul:.1f} °/s ; {basc:.1f} °/s ; {100 * foc:.1f} %/s")
+    acc = [math.hypot(*[(pv[i + 1][k] - 2 * pv[i][k] + pv[i - 1][k]) * fps ** 2 for k in range(3)])
+           for i in range(1, n - 1) if hors[i]]
+    jerk = [math.hypot(*[(pv[i + 2][k] - 3 * pv[i + 1][k] + 3 * pv[i][k] - pv[i - 1][k]) * fps ** 3 for k in range(3)])
+            for i in range(1, n - 2) if hors[i]]
+    amax = v3_limits()[0]["accel"]
+    check(f"bras {BRAS} : la caméra sans à-coup hors des chocs (≤ {amax:g} m/s², à-coup ≤ 60 m/s³)",
+          max(acc) <= amax and max(jerk) <= 60.0, f"{max(acc):.2f} m/s², {max(jerk):.1f} m/s³")
+    us = [r[4]["u"] if r[4] else 0.5 for r in rows]
+    d2 = max(abs(us[i + 1] - 2 * us[i] + us[i - 1]) for i in range(1, n - 1) if hors[i])
+    # (1,5 % : le pivot de la berline à l'entrée du port, image 432 ; le bras A y marque déjà 0,8 %, de plus loin)
+    check(f"bras {BRAS} : à l'écran, le centre de la berline Δ² ≤ 1,5 % de largeur par image² hors des chocs",
+          d2 <= 0.015, f"{100 * d2:.2f} %")
+    # la fin : le cadre du film v10, tel quel, dès la fin du fondu (l'arrêt, les étoiles, l'orbite)
+    g0 = int(math.ceil((PC.T_ARRET - R["FIN"][1]) * fps)) + 1
+    d = max(abs(a - b) for r in rows if r[0] >= g0 for a, b in zip(r[3], _pose_ville(r[1], r[2], "A")))
+    arret = PC.T_ARRET * fps
+    check(f"bras {BRAS} : dès l'image {g0} du film la caméra du film v10, deux secondes avant l'arrêt et l'orbite de "
+          f"FIN6", d < 1e-9 and g0 <= arret - 2.0 * fps, f"écart {d:.1e} ; arrêt à l'image {arret:.0f}")
+
+
 if __name__ == "__main__":
     test_poursuivants()
     test_rampes()
@@ -3082,5 +3274,8 @@ if __name__ == "__main__":
     test_v3()
     test_vie()
     test_clins()
+    test_bras()
+    if ECARTS:
+        print(f"\nbras {BRAS} : {len(ECARTS)} contrôle(s) du bras A en écart assumé (raisons ci-dessus, ECARTS_BRAS)")
     print(f"\n{'tout passe' if not FAIL else str(len(FAIL)) + ' échec(s)'}")
     sys.exit(1 if FAIL else 0)

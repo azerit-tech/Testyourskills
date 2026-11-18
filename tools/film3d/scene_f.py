@@ -64,8 +64,10 @@ POSE = (0.0, 0.0, 0.0)
 # les flaques de la voie extérieure (degré, rayon, taille, allongement), faites pour la caméra à 9 m : la caméra A2
 # roule dessus (r 12,5 à 13 de l'îlot, 215 à 235°), elles faisaient le miroir noir du bas du cadre ; retirées
 OUTER_PUDDLES = ()           # v2 : ((240, 13.4, 1.2, 2.0), (228, 14.0, 0.9, 1.7), (216, 13.2, 1.3, 2.2))
-CAR_FILL_W = 800.0           # W, l'appoint lié à la berline (keep_paint) : à 260, la porte à (55, 16, 30) puis
-                             # (57, 6, 17) à l'image 28, le bon bordeaux mais plus sombre qu'OUV (73, 29, 26)
+CAR_FILL_W = 500.0           # W, le complément de flanc lié à la berline (keep_paint) : le même éclairement sur
+                             # la porte que les 800 W d'avant, posés 2 m plus haut (31 contre 30 en relatif)
+CAR_FILL_RAMPE = 16          # images : le complément monte après la première image du plan et redescend avant la
+                             # dernière ; aux deux coupes il est nul, la berline n'a que l'appoint commun
 
 # La ville (SPEC §18.36, docs/cinematique-plan-de-ville.md §4, « Rond-point rogné ») : FILM3D_VILLE = « 1 » (défaut),
 # le rond-point rogné à ses deux jonctions, ses bords ouverts sur le vide là où se posent ses voisins ; « 0 »,
@@ -724,16 +726,32 @@ def keep_paint():
     # (sans reflet : vu de 5 m, celui d'une source de 3 m posait une tache rose blanc sur les portes ; chaude et
     # haute : neutre, de 2,8 m, elle sortait la seule porte avant framboise, (82, 20, 50), le reste de la caisse noir)
     # (de 5 m et large de 8 : de 3,4 m, l'aile avant restait 19 % plus sombre que la porte au même galbe)
-    fill = lieux.car_fill(car, loc=(5.0, 0.0, 3.0), energy=CAR_FILL_W, color="#ffc89a", size=8.0)
+    # (à 1 m du sol, à la hauteur des flancs : à 3 m il donnait aussi au toit et au coffre presque autant que
+    # l'appoint commun, qui les éclaire maintenant)
+    fill = lieux.car_fill(car, loc=(5.0, 0.0, 1.0), energy=CAR_FILL_W, color="#ffc89a", size=8.0)
     fill.visible_glossy = False
-    # la nappe de scene_carrefour (hero_fill, 260 W à 7 m au-dessus de la berline, qui la suit) n'éclaire plus que la
-    # berline, comme l'appoint commun : elle posait sur la chaussée une flaque de lumière que seul P2 avait (la rue
-    # l'a ôtée, scene_b), le bas du cadre plus clair de 24 % à 107 | 108 et de 10 % à 214 | 215 (brouillon
-    # décor-coupes, diag/coupes.py ; diag/audit_sol.py : la seule lampe propre à P2 sous la caméra). La caisse la
-    # reçoit comme avant
+    f0, f1 = bpy.context.scene.frame_start, bpy.context.scene.frame_end
+    if f1 - f0 > 2 * CAR_FILL_RAMPE + 2:
+        for f, w in ((f0 - 1, 0.0), (f0, 0.0), (f0 + CAR_FILL_RAMPE, CAR_FILL_W), (f1 - CAR_FILL_RAMPE, CAR_FILL_W),
+                     (f1, 0.0), (f1 + 1, 0.0)):
+            fill.data.energy = w
+            fill.data.keyframe_insert("energy", frame=f)
+        fill.data.energy = CAR_FILL_W
+    # l'appoint de poursuite commun (lieux.chase_fill), le même que dans les sept autres tronçons, sur le rig (+y
+    # vers l'avant) : le toit, le coffre et l'arrière de la caisse ont la même lumière des deux côtés de 107 | 108
+    # et de 214 | 215 (SPEC §18.73)
+    rig = bpy.data.objects.get("rig_berline")
+    if rig is not None:
+        lieux.chase_fill(rig)
+    else:                                          # (image fixe sans rig : la caisse, l'avant vers -y)
+        lieux.car_fill(car, **dict(lieux.CHASE_FILL, loc=(0.0, 4.0, 6.0)))
+    # la nappe de scene_carrefour (hero_fill, 260 W à 7 m au-dessus de la berline, qui la suit) est retirée :
+    # l'appoint commun éclaire le dessus de la caisse, comme partout. (Elle posait sur la chaussée une flaque de
+    # lumière que seul P2 avait, le bas du cadre plus clair de 24 % à 107 | 108 et de 10 % à 214 | 215 ; liée à la
+    # seule berline depuis le brouillon décor-coupes, elle doublait l'appoint commun.)
     hf = bpy.data.objects.get("hero_fill")
     if hf is not None:
-        hf.light_linking.receiver_collection = avec
+        bpy.data.objects.remove(hf, do_unlink=True)
     # les phares : 1400 W et 50° étaient faits pour le drone ; de face et à ras du sol, ils mangeaient la caisse
     # (image 8 de l'essai 1) ; ceux de P3, de face eux aussi
     for lo in [c for c in car.children_recursive if c.type == "LIGHT" and c.data.type == "SPOT"]:
@@ -742,8 +760,8 @@ def keep_paint():
     # l'habitacle allumé, comme dans tous les tronçons (lieux.hero_cabin) : sans lui, la lunette passait au noir à
     # la coupe P1 → P2 (107 | 108, brouillon éclairé v9)
     lieux.hero_cabin({"body": car.name})
-    log(f"berline : {len(whole)} pièces, {n} lumières chaudes exclues, appoint lié de {CAR_FILL_W:.0f} W, "
-        f"phares à 400 W")
+    log(f"berline : {len(whole)} pièces, {n} lumières chaudes exclues, appoint de poursuite commun, complément de "
+        f"flanc de {CAR_FILL_W:.0f} W (nul aux coupes), phares à 400 W")
 
 
 def build(plan=None, palier=None):

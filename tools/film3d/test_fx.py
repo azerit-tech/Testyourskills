@@ -223,6 +223,36 @@ def test_sparks():
     assert all(fx.ballistic(q.p, q.v, q.life, q.drag)[2] > -0.03 for q in sp)
 
 
+def test_choc():
+    """La gerbe d'un contact se voit (SPEC §18.73) : des points d'un centimètre au moins, au point de contact, du
+    côté de la patrouille, courts ; leur lueur est nulle avant et après, à son plus fort dans les trois premières
+    images, et reste dans le nuage."""
+    tr = line_track(17.0)
+    touche = (20.0, 25.0)
+    sp = fx.choc_sparks(tr, R, (0.4, 1.0), touche, h=0.55)
+    assert 200 <= len(sp) <= 900, len(sp)
+    assert min(q.size0 for q in sp) >= 0.007 and max(q.size0 for q in sp) <= 0.03          # 1 à 3 cm de rayon
+    assert all(q.birth >= touche[0] for q in sp) and max(q.life for q in sp) <= 0.76
+    nes = [q for q in sp if q.p[2] > 0.3]                                                  # (hors rebonds)
+    assert nes and all(q.birth <= touche[1] + 1e-6 for q in nes)
+    pos = fx.pose_at(tr, 20.0)[0]
+    assert all(0.6 < fx._dot(fx._sub(q.p, pos), (-fx.pose_at(tr, q.birth)[1][1], fx.pose_at(tr, q.birth)[1][0], 0.0)) < 1.4
+               for q in nes if abs(q.birth - 20.0) < 0.05), "au point de contact, à gauche"
+    assert sum(q.birth <= touche[0] + 2.0 for q in nes) >= fx.CHOC["n"]                    # la gerbe de l'impact
+    assert fx.choc_sparks(tr, R, (0.4, 1.0), touche)[0].p == sp[0].p                       # tirage reproductible
+    rows = fx.choc_lueur(sp)
+    ks = [k for _, _, k in rows]
+    assert ks[0] == 0.0 and ks[-1] == 0.0 and abs(max(ks) - 1.0) < 1e-9
+    top = rows[ks.index(max(ks))][0]
+    assert touche[0] <= top <= touche[0] + 3.0, top
+    assert rows[0][0] < touche[0] and rows[-1][0] - touche[0] <= 0.76 * fx.FPS + 9.0 + 2.0
+    for f, c, k in rows:
+        if k > 0.05:                               # la lampe reste dans la gerbe : derrière le contact, près du sol
+            pp = fx.pose_at(tr, f)[0]
+            assert fx._len(fx._sub(c, pp)) < 6.0 and -0.05 < c[2] < 1.2, (f, c)
+    assert fx.choc_lueur([]) == []
+
+
 def test_drips():
     d = fx.drips([(0, 0, 0.3), (1, 0, 0.3)], (10, 40), 0.0)
     assert len(d) >= 4 and all(10 <= q.birth < 40 for q in d)

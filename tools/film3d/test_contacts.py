@@ -17,6 +17,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import contacts as C  # noqa: E402
 import dynamique as D  # noqa: E402
 import parcours as P  # noqa: E402
+import bras  # noqa: E402
+
+BRAS = bras.installer()      # BRAS_FILM=B|C : la caméra du réglage (bras.py) ; sans : celle du film v10
 
 FAILS = []
 FPS = 24.0
@@ -26,7 +29,7 @@ ENFONCE_MAX = 0.05                          # m
 LIGNE, REPRISE = 0.3, 1.5                   # m, s
 BORDURE, CIRCULATION = 0.9, 1.0             # m
 # m/s² : l'adhérence du mouillé (0,7 g) et le freinage des patrouilles, relevés du rapport des adhérences depuis que
-# toutes les voitures roulent sur μ 1,0 (parcours.ADHERENCE, SPEC §18.71)
+# toutes les voitures roulent sur μ 1,0 (parcours.ADHERENCE, SPEC §18.74)
 PATROUILLE_LAT, PATROUILLE_LONG = 6.5 * P.ADHERENCE, 7.2 * P.ADHERENCE
 CADRE_PART = 0.80                           # la part de la patrouille dans le cadre avant un choc (SPEC §18.69)
 

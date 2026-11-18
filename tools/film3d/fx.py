@@ -17,7 +17,8 @@
 # SPEC §18.68), sur les plans OUV et P4 ; à ajouter à FILM3D_FX_ONLY là où il est posé, sinon elle ne sort pas.
 # Les sprites et gouttes ne sont vus que par la caméra (ni ombre, ni rebond
 # diffus, ni reflet sur la caisse) et n'émettent rien : aucune lumière ajoutée, la berline ne change pas de teinte.
-# Les étincelles émettent, sans échantillonnage d'émission (elles n'éclairent rien).
+# Les étincelles émettent, sans échantillonnage d'émission (elles n'éclairent rien) ; celles d'un choc ont leur
+# lueur, une lampe au cœur de la gerbe le temps qu'elle brûle (choc) : la seule lumière que les effets ajoutent.
 #
 # Repère : celui des scènes (z en haut). Le temps en images Blender ; FPS = 24.
 import math
@@ -1053,6 +1054,98 @@ def sparks(track, frame, wheel_r, n=260, dur=3.0, seed=17, front=1.25):
     return out
 
 
+# ---------------------------------------------------------------- le choc (tôle contre tôle)
+# La gerbe d'un contact de la poursuite (contacts.CHOCS : l'image, le point, la durée du frottement viennent de là).
+# Brouillon éclairé v10 : elle ne se voyait à aucune image, ni à l'avenue ni au pont : 150 points de 4 à 8 mm de
+# rayon à 9 m de l'objectif, un tiers de pixel du brouillon, éteints en 0,1 à 0,4 s, et rien autour d'eux ne
+# s'éclairait. Ici : des points de 1 à 3 cm (2 à 6 pixels de la prise, que le flou de bougé tire en traits : ils
+# reculent de 1 à 9 m/s dans le repère de la caméra), plus nombreux, plus vifs (mat_spark(strength)), qui vivent 0,2
+# à 0,6 s, quelques braises plus grosses et plus lentes ; et leur lueur sur les deux caisses et la chaussée
+# (choc_lueur : une lampe au cœur du nuage, dont la force suit ce qui brûle encore).
+CHOC = dict(
+    n=230,                     # étincelles de l'impact (deux images)
+    par_image=30,              # puis tant que les caisses frottent (moins : le plus fort reste l'impact)
+    images=9.0,                # images de frottement comptées, au plus
+    vie=(0.18, 0.60),          # s
+    taille=(0.009, 0.018),     # m, rayon à la naissance
+    braises=0.12,              # part des grosses (rayon × 1,6, moins vite, plus longtemps)
+    force=260.0,               # émission à la naissance (mat_spark : 70 pour la gerbe sous la caisse)
+    lueur=140.0,               # W, la lampe au plus fort de la gerbe
+    lueur_rayon=0.22,          # m : le nuage n'est pas un point (pas de point chaud sur la tôle)
+    lueur_couleur="#ffb46e",
+)
+
+
+def choc_sparks(track, wheel_r, point, touche, h=0.55, seed=41, P=None):
+    """Les étincelles d'un contact : [Particle]. `point` : (m devant le centre de la berline, m à sa gauche),
+    `touche` : (première, dernière image du plan où les caisses se touchent), h : la hauteur du contact. Une gerbe à
+    l'impact (P["n"] points en deux images), puis P["par_image"] tant que la tôle frotte. Lancées à la vitesse des
+    voitures moins ce que le frottement leur prend : elles partent en arrière dans le repère des caisses, s'ouvrent
+    peu, retombent, rebondissent une fois sur la chaussée."""
+    P = P or CHOC
+    rng = random.Random(seed + int(touche[0]))
+    f0, f1 = touche
+    f1 = min(f1, f0 + P["images"])
+    births = [f0 + 2.0 * rng.random() ** 1.6 for _ in range(P["n"])]
+    births += [f0 + 2.0 + (f1 - f0 - 2.0) * rng.random() for _ in range(int(P["par_image"] * max(0.0, f1 - f0 - 2.0)))]
+    out = []
+    for f in births:
+        pos, fwd, vel, wh, wv, slip, speed = pose_at(track, f)
+        left = (-fwd[1], fwd[0], 0.0)
+        ground = min(q[2] for q in wh.values()) - wheel_r
+        u = point[0] + rng.uniform(-0.45, 0.45)
+        p = (pos[0] + fwd[0] * u + left[0] * point[1], pos[1] + fwd[1] * u + left[1] * point[1],
+             ground + h + rng.uniform(-0.14, 0.10))
+        gros = rng.random() < P["braises"]
+        carry = rng.uniform(0.70, 0.97) if gros else rng.uniform(0.45, 0.95)
+        lat = rng.uniform(-1.5, 1.5)
+        v = (vel[0] * carry + left[0] * lat, vel[1] * carry + left[1] * lat, rng.uniform(-1.0, 3.0))
+        life = rng.uniform(*P["vie"]) * (1.25 if gros else 1.0)
+        drag = rng.uniform(0.8, 1.6)
+        sz = rng.uniform(*P["taille"]) * (1.6 if gros else 1.0)
+        tl = land_time(p, v, drag, ground, life)
+        out.append(Particle(f, p, v, min(life, tl), drag, 1.0, sz, sz * 0.5, 1.0, rng.random()))
+        if tl < life - 0.05:                       # un rebond sur la chaussée, moins vif
+            q, w = ballistic(p, v, tl, drag), ballistic_vel(v, tl, drag)
+            out.append(Particle(f + tl * FPS, (q[0], q[1], ground + 0.005),
+                                (w[0] * 0.6, w[1] * 0.6, abs(w[2]) * 0.3 + 0.2), life - tl, drag, 1.0, sz * 0.8,
+                                sz * 0.4, 0.7, rng.random()))
+    return out
+
+
+def choc_lueur(parts, pas=0.5):
+    """La lueur de la gerbe, image par image : [(image, (x, y, z), part 0..1)]. À chaque instant, ce que les
+    étincelles vivantes émettent (comme la matière : surface × (1 − âge)^0,7 × opacité), rapporté au plus fort de
+    la gerbe, et le centre de ce qui brûle. Nulle avant la première étincelle et après la dernière : les clés de la
+    lampe commencent et finissent à zéro."""
+    if not parts:
+        return []
+    f0 = min(q.birth for q in parts)
+    f1 = max(q.birth + q.life * FPS for q in parts)
+    rows = []
+    n = int(math.ceil((f1 - f0) / pas)) + 1
+    for i in range(-1, n + 1):
+        f = f0 + i * pas
+        w = 0.0
+        c = [0.0, 0.0, 0.0]
+        for q in parts:
+            r = q.at(f)
+            if r is None:
+                continue
+            pp, u = r
+            k = (q.size0 + (q.size1 - q.size0) * u) ** 2 * max(0.0, 1.0 - u) ** 0.7 * q.alpha
+            w += k
+            c = [c[j] + pp[j] * k for j in range(3)]
+        rows.append((f, tuple(x / w for x in c) if w > 0.0 else None, w))
+    top = max(r[2] for r in rows) or 1.0
+    first = next(c for _, c, _ in rows if c is not None)
+    out, last = [], first
+    for f, c, w in rows:
+        last = c or last
+        out.append((f, last, w / top))
+    return out
+
+
 # ---------------------------------------------------------------- l'arrêt
 
 def drips(points, frames, ground, seed=19, every=0.6):
@@ -1351,9 +1444,9 @@ def mat_drop(name="fx_goutte"):
     return m
 
 
-def mat_spark(name="fx_etincelle"):
+def mat_spark(name="fx_etincelle", strength=70.0):
     """Une étincelle : émission blanc-jaune qui vire à l'orange et s'éteint avec l'âge (fx_u) ; elle n'éclaire
-    rien (échantillonnage d'émission coupé)."""
+    rien (échantillonnage d'émission coupé : ce que la gerbe d'un choc éclaire, c'est sa lampe, choc())."""
     bpy = _bpy()
     m = bpy.data.materials.get(name)
     if m:
@@ -1368,7 +1461,7 @@ def mat_spark(name="fx_etincelle"):
     mix.inputs["B"].default_value = _lin("#ff6a1a")
     em = N.new("ShaderNodeEmission")
     nt.links.new(mix.outputs["Result"], em.inputs["Color"])
-    nt.links.new(_math(nt, "MULTIPLY", _math(nt, "POWER", _math(nt, "SUBTRACT", 1.0, u, clamp=True), 0.7), 70.0),
+    nt.links.new(_math(nt, "MULTIPLY", _math(nt, "POWER", _math(nt, "SUBTRACT", 1.0, u, clamp=True), 0.7), strength),
                  em.inputs["Strength"])
     nt.links.new(em.outputs[0], out.inputs["Surface"])
     try:
@@ -2427,6 +2520,56 @@ def etincelles(ctx, frame, joint=True, n=260, seed=17):
     return ob
 
 
+def choc(ctx, P=None):
+    """La gerbe de chaque contact du plan (contacts.contacts_de : l'image du choc, la patrouille, le point, les
+    images où les caisses se touchent) et sa lueur. Un objet fx_choc_<nom> (les étincelles, vues par la caméra et
+    dans les reflets : la chaussée mouillée, les tôles) et une lampe fx_choc_<nom>_lueur au cœur du nuage, sans
+    liaison : elle éclaire ce qui est là, les deux caisses et la chaussée, le temps de la gerbe (clés de position
+    et de force, nulles avant et après). Tous deux dans la collection des effets : ville.fx_voisin les écarte des
+    lieux voisins, comme le reste. Renvoie les objets."""
+    import contacts as CT
+    import motion as MO
+    import parcours as PC
+    bpy = _bpy()
+    P = P or CHOC
+    obs = []
+    for c, f in CT.contacts_de(ctx.plan):
+        pat = CT.patrouille_de(c)
+        t = pat.touche(c)
+        if t is None:
+            log(f"choc « {c['nom']} » : les caisses ne se touchent pas, aucune gerbe")
+            continue
+        d = 1.0 - PC.START[ctx.plan]
+        parts = choc_sparks(ctx.track, ctx.wheel_r, pat.point(c), (t[0] + d, t[1] + d), h=CT.H_CHOC, P=P)
+        ob = emit(ctx, f"fx_choc_{c['nom']}", parts, "drops", mat_spark("fx_etincelle_choc", P["force"]), glossy=True)
+        if not ob:
+            continue
+        ob.visible_transmission = True
+        obs.append(ob)
+        rows = choc_lueur(parts)
+        ld = bpy.data.lights.new(f"fx_choc_{c['nom']}_lueur", "POINT")
+        ld.color = _lin(P["lueur_couleur"])[:3]
+        ld.shadow_soft_size = P["lueur_rayon"]
+        lo = bpy.data.objects.new(ld.name, ld)
+        ctx.coll.objects.link(lo)
+        lo.visible_camera = False                 # la lampe n'est pas un objet : on voit les étincelles
+        lo.visible_volume_scatter = False         # ni halo dans la brume
+        for fr, pos, k in rows:
+            lo.location = pos
+            lo.keyframe_insert("location", frame=fr)
+            ld.energy = P["lueur"] * k
+            ld.keyframe_insert("energy", frame=fr)
+        for idb in (lo, ld):
+            for fc in MO.fcurves(idb):
+                for kp in fc.keyframe_points:
+                    kp.interpolation = "LINEAR"
+        obs.append(lo)
+        vif = [fr for fr, _, k in rows if k > 0.25]
+        log(f"choc « {c['nom']} » : {len(parts)} étincelles, images {t[0] + d:.1f} à {t[1] + d:.1f} du plan ; lueur "
+            f"de {P['lueur']:.0f} W au plus, au-dessus du quart des images {min(vif):.1f} à {max(vif):.1f}")
+    return obs
+
+
 def arret(ctx, stop_frame=None, drip=True, smoke=True, mask=0.55):
     """FIN : la fumée du freinage, emportée sur sa lancée, rattrape la voiture arrêtée et passe devant elle (légère,
     creusée devant la caisse) ; les gouttes qui tombent du bas de caisse une fois l'arrêt."""
@@ -2565,8 +2708,8 @@ def dress(plan, scene=None, **opt):
         log(f"{plan} : aucune recette")
         return ctx
     recipe(ctx, **opt)
-    if enabled("choc"):                     # la gerbe des contacts du plan (contacts.py, SPEC §18.68)
-        __import__("contacts").habiller(ctx)
+    if enabled("choc"):                     # la gerbe des contacts du plan et sa lueur (contacts.CHOCS, SPEC §18.68)
+        choc(ctx)
     beam_links(ctx)
     _budget(ctx.scene)
     ctx.scene.frame_set(ctx.scene.frame_current)

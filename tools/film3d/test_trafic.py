@@ -13,7 +13,11 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import dynamique as D  # noqa: E402
 import parcours as P  # noqa: E402
+import bras  # noqa: E402
+
+BRAS = bras.installer()      # BRAS_FILM=B|C : la caméra du réglage (bras.py) ; sans : celle du film v10
 import trafic as T  # noqa: E402
 
 FAILS = []

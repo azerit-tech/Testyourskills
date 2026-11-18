@@ -67,7 +67,7 @@ else:
     # peine son pare-chocs les vingt premières images d'OUV. Elle est à la hauteur de la berline à l'ouverture, 0,75 m
     # derrière, son capot et sa portière dans le quart gauche du cadre ; elle lève le pied dès qu'elle voit le
     # rond-point et sort du cadre par la gauche vers OUV/50 ; l'accélération sous 2,2 m/s², l'à-coup sous 12 m/s³)
-    # (v11, SPEC §18.71 : le critique du brouillon éclairé v10 lisait « deux voitures côte à côte » : le film
+    # (v11, SPEC §18.74 : le critique du brouillon éclairé v10 lisait « deux voitures côte à côte » : le film
     # s'ouvrait patrouille déjà au contact. Elle arrive maintenant de derrière : W0 m/s plus vite que la berline
     # avant l'ouverture, LEAD0 m derrière elle à l'image G0 du film, elle la remonte en levant le pied, culmine à
     # l'image G1, LEAD1 m derrière sa hauteur, détachée d'elle de 1,5 m, et retombe jusqu'à la coupe : pas de palier

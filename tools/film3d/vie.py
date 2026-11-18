@@ -339,7 +339,7 @@ def vehicules():
                    n_lisse=3)
     add("rond_b", "chapman", "corail", Course(b_pts, [(0, _v(30))], s0=284.0 + 31.2 - _v(30) * 60 / FPS, g0=0),
         phares=True)
-    # (v11, SPEC §18.71 : le taxi qui attendait à l'entrée nord y arrive en roulant et cède : trafic.py, rond_cede)
+    # (v11, SPEC §18.74 : le taxi qui attendait à l'entrée nord y arrive en roulant et cède : trafic.py, rond_cede)
     add("rond_nord_rangee", "riverside", "bordeaux", Fixe(36.0, AV_GARE_MER, -90.0), phares=True, warning=0)
     for x in (52.0, 58.5, 65.0, 78.0, 84.5):
         garee("rond_nord_garee", x, AV_GARE_MER, -90.0)
@@ -393,7 +393,9 @@ def vehicules():
     # -- le port (P5) : des camions garés au nord du virage, à l'extérieur, là où regarde la caméra pendant la
     # descente du pont et le dérapage ; phares éteints
     add("port_camion_0", "camion", None, Fixe(2.5, -160.5, -90.0))
-    add("port_camion_1", "camion", None, Fixe(9.5, -158.0, -95.0))
+    # (fusion v11 : à x 9,5 il avait trois coins au-dessus de l'eau, l'encoche du quai commence à x 6,6 de la ville
+    # (scene_e.NOTCH_X) ; reculé sur le terre-plein, à 0,9 m du bord, 1,1 m au nord du camion 0)
+    add("port_camion_1", "camion", None, Fixe(2.5, -156.5, -95.0))
     add("port_pickup", "pickup", "blanc", Fixe(-11.0, -166.0, 0.0))
     # la circulation de la poursuite, dans sa voie (SPEC §18.62) : celle qu'elle double, celle qui la croise
     import trafic

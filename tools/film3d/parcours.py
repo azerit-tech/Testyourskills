@@ -202,7 +202,7 @@ def voie_dessinee(s):
 # l'image 723 ; à l'heure, image 692,7, sans slalom). Aucun des 50 dosages essayés de la jetée ne l'évite (0,45 à
 # 0,9 g : arrêt entre 711 et 786) : à caler dans le freinage final de la simulation (SPEC §18.62).
 #
-# v11 (SPEC §18.71, 18 novembre 2026). Jacques, sur le brouillon éclairé v10 : « je trouve les coups de volant pas
+# v11 (SPEC §18.74, 18 novembre 2026). Jacques, sur le brouillon éclairé v10 : « je trouve les coups de volant pas
 # super pertinents, genre la personne donne des coups brusques mais y a plein de place devant, ou même parfois rien à
 # éviter il me semble ». Mesuré (diag/audit_esquives.py) : deux manœuvres sur sept n'évitaient rien, les autres
 # partaient 1,5 à 2,75 s avant le contact sur un obstacle de 1,3 à 3 % du cadre et passaient à 1,4–1,7 m. Chaque
@@ -284,7 +284,7 @@ voie = voie_simulee
 LIM = dict(slip_drag=0.07, counter=0.78, derapages=[DERAP2, DERAP5], pivot=1.4, pivot_tau=(0.6, 0.35),
            pivot_smooth=0.45, steer_geo=True, front_slip=4.0, steer_rate=90.0)
 JERK = 12.0 * 0.72
-# (v11, SPEC §18.70 et 18.71 : toutes les voitures roulent sur μ 1,0, le mouillé en tenait 0,70. Les plafonds
+# (v11, SPEC §18.70 et 18.74 : toutes les voitures roulent sur μ 1,0, le mouillé en tenait 0,70. Les plafonds
 # « du mouillé » des contrôles se relèvent de ce seul rapport, 1,43, pas au cas par cas)
 MOUILLE = 0.70
 ADHERENCE = D.CAR["mu"] / MOUILLE
@@ -1096,7 +1096,7 @@ CAM_DEPORT = 0.018
 # côté du choc ; fondus en entrée et en sortie (quintique : ni vitesse ni accélération aux bouts), nuls bien avant
 # chaque raccord et dans les dérapages (test_contacts.test_cadre). Le choc ne bouge pas.
 # `images` : par rapport à l'image du choc (début du fondu d'entrée, plein, fin du plein, fin du fondu de sortie).
-# - avenue : le choc est à l'image 30 du film (14 dans le v10 : SPEC §18.71), la patrouille arrive de derrière ; le
+# - avenue : le choc est à l'image 30 du film (14 dans le v10 : SPEC §18.74), la patrouille arrive de derrière ; le
 #   cadre est déporté dès la première image (un plan à deux voitures), plein jusqu'à l'image 31, puis il se
 #   recentre sur la berline qui s'échappe (fini à l'image 70). La visée seule ne suffit pas : la berline doit
 #   rester entière dans le cadre utile (bord droit ≤ 95 %), ce qui borne le déport à 0,20. Avec 1,5 m de recul

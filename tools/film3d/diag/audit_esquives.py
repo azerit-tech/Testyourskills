@@ -1,4 +1,4 @@
-# Chaque coup de volant a-t-il une cause que le spectateur voit ? (SPEC §18.71.) Sans Blender.
+# Chaque coup de volant a-t-il une cause que le spectateur voit ? (SPEC §18.74.) Sans Blender.
 #
 # Jacques, le 18 novembre, sur le brouillon éclairé v10 : « je trouve les coups de volant pas super pertinents, genre
 # la personne donne des coups brusques mais y a plein de place devant, ou même parfois rien à éviter il me semble ».
