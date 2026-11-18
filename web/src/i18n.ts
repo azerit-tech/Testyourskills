@@ -338,6 +338,8 @@ const fr = frTypoDeep({
     share: {
       title: "Partage-la",
       linkedin: "Partager sur LinkedIn",
+      /** Le formulaire « Licences et certifications » prérempli (§18.75) : une ligne, rien de plus. */
+      addProfile: "Ajouter à mon profil LinkedIn",
       copy: "Copier le lien",
       download: "Télécharger l'image",
       /** Les trois liens sous les boutons, sur une ligne à 390 px : libellés courts (le long reste lu). */
@@ -1147,6 +1149,7 @@ const en: Dict = {
     share: {
       title: "Share it",
       linkedin: "Share on LinkedIn",
+      addProfile: "Add to my LinkedIn profile",
       copy: "Copy link",
       download: "Download image",
       copyShort: "Copy link",

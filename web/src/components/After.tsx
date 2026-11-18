@@ -4,6 +4,7 @@ import type { FormEvent, MouseEvent, ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { CardData, ComparisonData, Lang, WeekRank } from "../../../shared/types";
 import { declaredOf, LEVEL_LABELS, starsFor } from "../../../shared/types";
+import { addToProfileUrl } from "../../../shared/addToProfile";
 import { declaredLabel, fileOf } from "../../../shared/caseFile";
 import { usableGrid } from "../../../shared/gridText";
 import { recruiterRead, weakestCriterion } from "../../../shared/recruiterLine";
@@ -293,7 +294,16 @@ export function useSharing(item: Shareable, toast: (m: string) => void) {
     track("linkedin", from);
   };
 
-  return { id, url, input, filename, native, file, track, share, liHref, onLinkedIn, textCopied };
+  // « Ajouter à mon profil LinkedIn » (§18.75) : la note de la fiche, sa date, son adresse sans renvoi.
+  const profileHref = addToProfileUrl({
+    stars: input.stars,
+    lang,
+    createdAt: item.kind === "card" ? item.card.createdAt : item.comparison.createdAt,
+    certUrl: `${window.location.origin}/c/${id}`,
+    certId: id,
+  });
+
+  return { id, url, input, filename, native, file, track, share, liHref, onLinkedIn, textCopied, profileHref };
 }
 
 export type Sharing = ReturnType<typeof useSharing>;
@@ -331,6 +341,30 @@ function LinkedInLink({ kit, className, from }: { kit: Sharing; className: strin
     >
       <IconLinkedIn />
       <span>{ts.linkedin}</span>
+    </a>
+  );
+}
+
+/**
+ * « Ajouter à mon profil LinkedIn » (§18.75) : la fiche dans « Licences et certifications », par le
+ * lien « Add to Profile » de LinkedIn. Même ruse que le partage contre les bloqueurs de contenu.
+ */
+function AddToProfileLink({ kit }: { kit: Sharing }) {
+  const { t } = useT();
+  return (
+    <a
+      className="pill pill-ghost out-second out-profile"
+      href={kit.url}
+      target="_blank"
+      rel="noopener"
+      onClick={(e) => {
+        aimAt(e.currentTarget, kit.profileHref, kit.url);
+        kit.track("linkedin_profile");
+      }}
+      onAuxClick={(e) => aimAt(e.currentTarget, kit.profileHref, kit.url)}
+    >
+      <IconLinkedIn />
+      <span>{t.result.share.addProfile}</span>
     </a>
   );
 }
@@ -375,6 +409,8 @@ export function ShareBar({ item, toast, second = false }: { item: Shareable; toa
         {ts.linkedinCopied}
       </p>
       {manualCopy && <ManualCopy m={manualCopy} />}
+      {/* Le bloc ne paraît qu'à qui a fait ou revendiqué la fiche ; une fiche scellée n'a pas de note à poser. */}
+      {!kit.input.sealed && <AddToProfileLink kit={kit} />}
       {/* Le reste en liens : le lien, l'image, l'image pour story. X passe par la feuille de partage du téléphone. */}
       <div className="out-more">
         <button type="button" className="link-alt" onClick={onCopy}>
