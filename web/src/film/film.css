@@ -2,8 +2,10 @@
    Plein écran sur téléphone (l'image remplit l'écran, object-fit: cover) ; sur
    ordinateur, une colonne 9:16 centrée, haute comme la fenêtre (900 px au plus),
    sur l'encre. Tout ce que le site pose dessus est mat : aplats d'encre, crème,
-   marine, prune ; ni halo ni ombre lumineuse. Les tailles des bandes suivent la
-   hauteur du film (unités cqh). Chargé avec le film seulement. */
+   marine, prune ; ni halo ni ombre lumineuse. L'image reste entière : les
+   étoiles sont posées sur le ciel, la ligne sous la berline, sans bande d'encre
+   (une seule, en bas, sur le téléphone couché). Les mesures suivent la hauteur
+   du film (unités cqh). Chargé avec le film seulement. */
 
 .page-result:has(.film-stage) {
   --film-h: min(100vh, 900px);
@@ -38,8 +40,7 @@
 
 /* Au bureau, la colonne ne flotte plus dans le noir (§18.48) : derrière elle,
    l'image du film tirée sur une toile de 18 × 32 points (Film.tsx, paintBack),
-   agrandie par le navigateur, ce qui la floute, et assombrie dans la toile ;
-   les deux bandes d'encre continuent sur toute la largeur, comme au cinéma.
+   agrandie par le navigateur, ce qui la floute, et assombrie dans la toile.
    Sur téléphone, la colonne couvre tout : rien de cela ne se voit. */
 .film-back {
   position: absolute;
@@ -49,16 +50,14 @@
   object-fit: cover;
   pointer-events: none;
 }
+/* la bande d'encre du bas, sur toute la largeur : téléphone couché seulement (plus bas) */
 .film-wide {
   position: absolute;
   left: 0;
   right: 0;
+  display: none;
   background: #0c0d1b;
   pointer-events: none;
-}
-.film-wide-top {
-  top: var(--film-y);
-  height: calc(var(--film-h) * 0.09);
 }
 .film-wide-bottom {
   bottom: var(--film-y);
@@ -76,6 +75,19 @@
   isolation: isolate;
   container-type: size;
   background: #0c0d1b;
+  /* Ce que le site pose sur l'image, en part de la hauteur (lu sur le film) :
+     de 0 à 14 %, le ciel : la rangée d'étoiles, sous l'encoche ; de 14 à 30 %,
+     le ciel encore : l'étoile qui tombe ; de 30 à 44 %, l'horizon : rien ; de
+     44 à 68 %, la berline, la police : jamais rien ; de 72 à 80 %, la
+     chaussée : la ligne ; en bas, « Passer » et le son.
+     L'étoile fait 34 px (moins dans la colonne étroite du téléphone couché),
+     celle qui tombe trois fois plus. */
+  --star: min(34px, 12cqw);
+  --star-gap: calc(var(--star) * 0.3);
+  --row-top: max(5.9cqh, calc(env(safe-area-inset-top, 0px) + 10px));
+  --stamp-k: 3.06;
+  --stamp-y: 25cqh;
+  --line-top: 71.8cqh;
 }
 .film-stage.is-landed .film-frame {
   background: transparent;
@@ -91,7 +103,8 @@
 }
 .film-stage.is-landed .film-video,
 .film-stage.is-landed .film-grain,
-.film-stage.is-landed .film-vignette {
+.film-stage.is-landed .film-vignette,
+.film-stage.is-landed .film-shade {
   visibility: hidden !important;
 }
 
@@ -108,11 +121,13 @@
 .film-frame.is-frozen .film-still[data-ready] {
   visibility: visible;
 }
-.film-frame.is-frozen .film-vignette {
+.film-frame.is-frozen .film-vignette,
+.film-frame.is-frozen .film-shade {
   display: none;
 }
 .film-grain,
-.film-vignette {
+.film-vignette,
+.film-shade {
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -126,17 +141,22 @@
 .film-vignette {
   background: radial-gradient(120% 90% at 50% 50%, transparent 55%, rgb(12 13 27 / 0.5) 100%);
 }
-/* La plaque « @pseudo » et le niveau, sous la voiture : entre le bas de la
-   berline (70 % de la hauteur dans les deux fins, docs §7.3) et les 15 % du bas
-   réservés à la radio et à « Passer ». Le titre tient sur une ligne, à toutes
-   les étoiles et dans les deux langues : sa taille suit sa longueur (--n,
-   0,47 em par caractère au plus dans la police du titre) ; tout suit la hauteur
-   du film (cqh), du petit téléphone à la colonne de l'ordinateur. */
+/* deux ombres d'encre à la place des bandes : en haut sous les étoiles (15 % de la
+   hauteur), en bas sous « Passer » et le son (20 %) ; le milieu de l'image est intact */
+.film-shade {
+  background: linear-gradient(to bottom, rgb(12 13 27 / 0.5) 0%, rgb(12 13 27 / 0) 15%, rgb(12 13 27 / 0) 80%, rgb(12 13 27 / 0.55) 100%);
+}
+/* La plaque « @pseudo », le niveau, puis la ligne de l'étoile refusée, sous la
+   voiture : à partir du bas de la berline (70 % de la hauteur dans les deux
+   fins, docs §7.3). Le titre tient sur une ligne, à toutes les étoiles et dans
+   les deux langues : sa taille suit sa longueur (--n, 0,47 em par caractère au
+   plus dans la police du titre) ; tout suit la hauteur du film (cqh), du petit
+   téléphone à la colonne de l'ordinateur. */
 .film-mug {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: max(15cqh, calc(12cqh + env(safe-area-inset-bottom, 0px) + 1.5cqh));
+  top: 70cqh;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -183,160 +203,233 @@
   transform-origin: 50% 60%;
 }
 
-/* les deux bandes d'encre, de la couleur exacte de la page */
+/* la ligne de l'étoile refusée, sous le niveau : « 3ᵉ étoile : à 7 points », crème sur
+   l'encre, lue sur l'image fixe ; son corps suit sa longueur */
+.film-verdict {
+  max-width: calc(100% - 32px);
+  padding: 0.2em 0.5em 0.28em;
+  background: #0c0d1b;
+  color: #fff9cb;
+  font: 700 max(15px, min(24px, 3cqh, (100cqw - 56px) / (var(--n, 24) * 0.4)))/1.1 var(--f-name);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.film-verdict sup {
+  font-size: 0.62em;
+  line-height: 0;
+  vertical-align: 0.52em;
+}
+
+/* Les six étoiles du site (§18.48), en 34 px, posées sur le ciel et cernées
+   d'encre : elles tiennent sur le rose du couchant comme sous le pinceau de
+   l'hélicoptère. Remplies de gauche à droite ; allumée, crème pleine ; éteinte,
+   la même en contour 1,5 px blanc à 35 %. */
+.film-stars {
+  position: absolute;
+  top: var(--row-top);
+  left: 0;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  gap: var(--star-gap);
+  pointer-events: none;
+}
+.film-star {
+  position: relative;
+  flex: none;
+  width: var(--star);
+  height: var(--star);
+  transform-origin: 50% 55%;
+}
+.film-star svg,
+.film-stamp {
+  display: block;
+  overflow: visible;
+}
+.film-star > svg {
+  width: 100%;
+  height: 100%;
+}
+.film-star path,
+.film-stamp path {
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+/* le cerne d'encre, sous le dessin */
+.film-star-rim {
+  fill: none;
+  stroke: #0c0d1b;
+  stroke-width: 4.5px;
+  stroke-opacity: 0.28;
+}
+.film-star-body {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 1.5px;
+  stroke-opacity: 0.35;
+}
+.film-star.is-on .film-star-rim {
+  stroke-opacity: 0.5;
+}
+.film-star.is-on .film-star-body {
+  fill: #fff9cb;
+  stroke: none;
+}
+/* l'étoile en jeu (la suivante, ou celle qui tombe et n'est pas encore posée) : un peu
+   plus grande, son contour crème ; elle se remplit de bas en haut, en demi-teinte,
+   jamais pleine avant son coup */
+.film-star.is-live,
+.film-star.is-flying,
+.film-star.is-pending {
+  transform: scale(1.14);
+}
+.film-star.is-live .film-star-body,
+.film-star.is-flying .film-star-body {
+  stroke: #fff9cb;
+  stroke-opacity: 0.9;
+}
+/* l'étoile refusée, au gel : son contour crème bat deux fois (FilmHud), puis elle se vide */
+.film-star.is-pending .film-star-body {
+  stroke: #fff9cb;
+}
+.film-star-gauge {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+}
+.film-star-gauge svg {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: var(--star);
+  height: var(--star);
+}
+.film-star-gauge path {
+  fill: #fff9cb;
+  fill-opacity: 0.55;
+}
+
+/* L'étoile qui tombe : le même dessin, trois fois plus grand, sur le ciel
+   au-dessus de la berline. Elle claque (--slap, de 2,1 à 1), tient une
+   demi-seconde, puis vole vers sa place dans la rangée (--fly, de 0 à 1 ;
+   --slot, de -2,5 à 2,5) en reprenant sa taille. Ni éclair ni secousse. */
+.film-stamp {
+  position: absolute;
+  top: var(--stamp-y);
+  left: 50%;
+  z-index: 2;
+  width: calc(var(--star) * var(--stamp-k));
+  height: calc(var(--star) * var(--stamp-k));
+  margin: calc(var(--star) * var(--stamp-k) / -2) 0 0 calc(var(--star) * var(--stamp-k) / -2);
+  pointer-events: none;
+  transform: translate(calc(var(--fly) * var(--slot) * (var(--star) + var(--star-gap))), calc(var(--fly) * (var(--row-top) + var(--star) / 2 - var(--stamp-y))))
+    scale(calc(var(--slap) * (1 - var(--fly) * (1 - 1 / var(--stamp-k)))));
+}
+/* film de 700 px de haut ou moins (360 × 640, 375 × 667) : l'étoile qui tombe garde sa part de
+   la hauteur (un huitième), elle ne touche ni la rangée en claquant ni l'horizon */
+@container (max-height: 700px) {
+  .film-stamp {
+    --stamp-k: 2.4;
+  }
+}
+.film-stamp .film-star-rim {
+  stroke-width: 9px;
+  stroke-opacity: 0.9;
+}
+.film-stamp .film-star-body {
+  fill: #fff9cb;
+  stroke: none;
+}
+
+/* La ligne sous la berline, sur la chaussée : une étiquette en mono 12 px, puis
+   une ligne en 28 px dans la police du titre, crème sur un aplat d'encre, comme
+   le niveau au gel. Un bloc étroit et centré, pas un bandeau : la chaussée
+   porte la vitesse. Le corps de la ligne suit sa longueur (--n : 32 signes
+   tiennent en 28 px à 390 px de large, 0,37 em par signe au plus) et la hauteur
+   du film ; il ne coupe qu'en dernier recours. Elle monte de 10 px en entrant
+   (--enter, FilmHud). Au coup de l'étoile, l'étiquette s'inverse. */
+.film-line {
+  position: absolute;
+  top: var(--line-top);
+  left: 0;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  opacity: var(--enter, 1);
+  pointer-events: none;
+  transform: translateY(calc((1 - var(--enter, 1)) * 10px));
+}
+.film-line-label,
+.film-line-text {
+  max-width: calc(100% - 32px);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.film-line-label {
+  padding: 3px 8px;
+  border-radius: 2px;
+  background: rgb(12 13 27 / 0.86);
+  color: #fff9cb;
+  font: 500 12px/16px var(--f-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.film-line.is-hit .film-line-label {
+  background: #fff9cb;
+  color: #0c0d1b;
+}
+.film-line-text {
+  padding: 0.18em 0.43em 0.25em;
+  background: #0c0d1b;
+  color: #fff9cb;
+  font: 700 max(15px, min(28px, 4cqh, (100cqw - 56px) / (var(--n, 24) * 0.37)))/1.1 var(--f-name);
+  letter-spacing: 0.01em;
+}
+/* la ligne du téléphone couché : sur la bande d'encre du bas, hors de la colonne
+   étroite (Film.tsx la pose sur la scène) ; cachée ailleurs, comme la bande */
+.film-line-wide {
+  display: none;
+}
 .film-band {
   position: absolute;
   left: 0;
   right: 0;
   z-index: 2;
+  display: none;
   box-sizing: border-box;
   background: #0c0d1b;
 }
-.film-band-top {
-  top: 0;
-  height: calc(9cqh + env(safe-area-inset-top, 0px));
-  padding-top: env(safe-area-inset-top, 0px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.film-stars {
-  display: flex;
-  gap: 8px;
-}
-/* les étoiles du site (§18.48), en 26 px : remplies de gauche à droite ;
-   allumée, crème pleine ; éteinte, la même en contour 1,5 px blanc à 35 % */
-.film-star {
-  display: block;
-  overflow: visible;
-  fill: none;
-  stroke: rgb(255 255 255 / 0.35);
-  stroke-width: 1.5px;
-  stroke-linejoin: round;
-  transform-origin: 50% 55%;
-}
-.film-star path {
-  vector-effect: non-scaling-stroke;
-}
-.film-star.is-on {
-  fill: #fff9cb;
-  stroke: none;
-}
-/* l'étoile en suspens, juste avant la coupe : le contour crème seul, son opacité bat
-   entre 25 et 60 % (FilmHud) ; jamais pleine */
-.film-star.is-pending {
-  stroke: #fff9cb;
-}
-.film-band-bottom {
-  /* 12 % de l'image ; sur un téléphone court, 94 px au moins (jusqu'à 17 % de l'image,
-     à 320 × 568) : 32 px de radio, 12 px d'air, puis « Passer » (44 px, à 6 px du bas) */
-  --band-b: 12cqh;
-  bottom: 0;
-  height: calc(var(--band-b) + env(safe-area-inset-bottom, 0px));
-}
-@media (max-width: 999px) {
-  .film-band-bottom {
-    --band-b: max(12cqh, min(94px, 17cqh));
+
+/* mouvement réduit : le film ne joue pas par défaut ; demandé, l'étoile s'allume à
+   sa place dès son coup, sans tomber ni voler, et rien ne grossit ni ne monte */
+@media (prefers-reduced-motion: reduce) {
+  .film-stamp {
+    display: none;
   }
-}
-/* téléphone debout : la plaque reste posée sur la bande du bas, même quand celle-ci
-   passe les 15 % (320 × 568) */
-@media (max-width: 999px) and (orientation: portrait) {
-  .film-mug {
-    bottom: max(15cqh, min(94px, 17cqh), calc(12cqh + env(safe-area-inset-bottom, 0px) + 1.5cqh));
+  .film-star {
+    transform: none !important;
   }
-}
-/* la radio, seul texte du film qui parle de la personne : une seule ligne en 14 px
-   (16 au-delà de 768 px de large), à 16 px au moins des bords de l'image, centrée
-   dans la bande entre l'image et les boutons (--radio-zone : la bande sans les
-   boutons) ; le chef d'accusation porte son étiquette au-dessus, en petit ; la ligne
-   d'une étoile gardée jusqu'à la fiche porte la suivante dessous, en petit */
-.film-band-bottom {
-  --radio-zone: max(32px, calc(var(--band-b) - 62px));
-}
-.film-radio {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 2px;
-  width: max-content;
-  max-width: min(360px, calc(100% - 32px));
-  height: var(--radio-zone);
-  margin: 0;
-  transform: translateX(-50%);
-  font: 500 14px/18px var(--f-mono);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #fff9cb;
-  white-space: nowrap;
-}
-.film-radio-line {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-.film-radio-text,
-.film-radio-kicker,
-.film-radio-below {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-/* l'étiquette, alignée sur le texte (après le carré et son espace) */
-.film-radio-kicker,
-.film-radio-below {
-  padding-left: 14px;
-  font: 500 12px/14px var(--f-mono);
-  letter-spacing: 0.08em;
-  color: rgb(255 249 203 / 0.62);
-}
-/* la ligne qui suit celle d'une étoile gardée jusqu'à la fiche (l'interception, la
-   fin de course) : en petit dessous, plus claire que l'étiquette, elle se lit sans
-   passer devant la fiche de la personne ; avec elle, 32 px tiennent encore */
-.film-radio-below {
-  color: rgb(255 249 203 / 0.8);
-}
-/* téléphone dont le film fait 700 px de haut ou moins (320 × 568, 375 × 667) : la
-   radio garde ses 14 px, interligne serré, et son étiquette tient avec elle en 32 px */
-@media (max-width: 999px) {
-  @container (max-height: 700px) {
-    .film-radio {
-      line-height: 16px;
-    }
+  .film-star.is-flying .film-star-rim {
+    stroke-opacity: 0.5;
   }
-}
-/* image étroite (320 px) : sans approche, la ligne d'interception tient entière en 14 px */
-@container (max-width: 359px) {
-  .film-radio {
-    letter-spacing: 0;
+  .film-star.is-flying .film-star-body {
+    fill: #fff9cb;
+    stroke: none;
   }
-}
-@media (min-width: 768px) {
-  .film-radio {
-    max-width: min(480px, calc(100% - 32px));
-    font-size: 16px;
-    line-height: 20px;
+  .film-star.is-flying .film-star-gauge {
+    display: none;
   }
-}
-/* la radio du téléphone couché : sur toute la largeur de la bande d'encre, hors de la
-   colonne étroite (Film.tsx la pose sur la scène) ; cachée ailleurs */
-.film-radio-wide {
-  display: none;
-}
-.film-square {
-  flex: none;
-  width: 6px;
-  height: 6px;
-}
-.film-square.is-coral {
-  background: #ff6a3d;
-}
-.film-square.is-lilac {
-  background: #8d8cf0;
+  .film-line {
+    transform: none;
+  }
 }
 
 /* le film rejoué depuis la fiche (§18.48) se charge au toucher : trois points crème au centre */
@@ -387,15 +480,15 @@
   background: #fff9cb;
   pointer-events: none;
 }
-/* la fiche posée, les bandes d'encre s'ouvrent vides : ni étoiles ni radio coupées au bord */
-.film-stage.is-landed .film-stars,
-.film-stage.is-landed .film-radio {
+/* la fiche posée, plus rien du film devant elle */
+.film-stage.is-landed :is(.film-stars, .film-stamp, .film-line, .film-verdict) {
   visibility: hidden;
 }
 
-/* « Passer » (CardPage) et le son, en bas à droite de la bande du bas, 44 px :
-   un contour discret, moins lourds que la radio. Ils s'effacent à l'arrêt sur
-   image et pendant l'éclair (il n'y a plus rien à passer). */
+/* « Passer » (CardPage) et le son, en bas à droite de l'image, 44 px : un fond
+   d'encre à 60 % et un contour discret, moins lourds que la ligne. Ils
+   s'effacent à l'arrêt sur image et pendant l'éclair (il n'y a plus rien à
+   passer). */
 .page-result:has(.film-stage) .skip-btn,
 .film-sound {
   bottom: calc(var(--film-y) + env(safe-area-inset-bottom, 0px) + 6px);
@@ -428,7 +521,7 @@
     visibility 0s 0.15s;
 }
 /* au bureau aussi, « Passer » et le son restent dans la colonne du film, à 16 px de
-   son bord droit, sous la radio : l'œil ne quitte pas l'image pour les trouver */
+   son bord droit, sous la ligne : l'œil ne quitte pas l'image pour les trouver */
 
 /* un toucher sur l'image ne fait rien (§18.48) : pas de main au survol */
 .film-stage,
@@ -436,9 +529,12 @@
   cursor: default;
 }
 
-/* Téléphone en paysage : la colonne du film est étroite et sa bande du bas basse ;
-   « Passer » et le son vont dans la marge d'encre à droite, hors de l'encoche,
-   et laissent la radio lisible sous l'image. */
+/* Téléphone en paysage : la colonne du film est étroite (220 px environ), une
+   ligne de 28 px n'y tient pas. Une bande d'encre revient en bas, sur les 15 %
+   que l'image laisse libres, prolongée sur toute la largeur ; la ligne et celle
+   de l'étoile refusée s'y posent, sur un rang, entre la marge gauche et les
+   boutons ; « Passer » et le son vont dans la marge d'encre à droite, hors de
+   l'encoche. Les étoiles restent sur l'image, plus petites. */
 @media (orientation: landscape) and (max-height: 500px) and (min-aspect-ratio: 16/9) {
   .page-result:has(.film-stage) .skip-btn,
   .film-sound {
@@ -450,20 +546,26 @@
   .film-sound {
     right: max(16px, env(safe-area-inset-right, 0px));
   }
-  /* la colonne n'a que 220 px environ : la bande du bas descend jusqu'aux 15 % que
-     l'image laisse libres, et la radio quitte la colonne pour toute la largeur de la
-     bande d'encre, sur une ligne, entre la marge gauche et les boutons de droite */
   .film-band-bottom {
+    bottom: 0;
+    display: block;
     height: max(15cqh, calc(12cqh + env(safe-area-inset-bottom, 0px)));
   }
   /* la bande d'encre des marges reste au niveau de celle de la colonne */
   .film-wide-bottom {
+    display: block;
     height: max(calc(var(--film-h) * 0.15), calc(var(--film-h) * 0.12 + env(safe-area-inset-bottom, 0px)));
   }
-  .film-band-bottom .film-radio {
+  /* la plaque et le niveau restent posés sur la bande */
+  .film-mug {
+    top: auto;
+    bottom: max(15cqh, calc(12cqh + env(safe-area-inset-bottom, 0px) + 1.5cqh));
+  }
+  .film-frame .film-line,
+  .film-frame .film-verdict {
     display: none;
   }
-  .film-radio-wide {
+  .film-line-wide {
     position: absolute;
     left: 0;
     right: 0;
@@ -473,10 +575,34 @@
     height: max(calc(var(--film-h) * 0.15), calc(var(--film-h) * 0.12 + env(safe-area-inset-bottom, 0px)));
     pointer-events: none;
   }
-  .film-radio-wide .film-radio {
+  .film-line-wide .film-line,
+  .film-line-wide .film-verdict {
+    position: absolute;
     top: auto;
+    right: auto;
     bottom: max(16px, env(safe-area-inset-bottom, 0px));
+    left: 50%;
     height: 44px;
     max-width: calc(100% - 2 * (max(16px, env(safe-area-inset-right, 0px)) + 44px + 8px + 96px + 16px));
+    transform: translateX(-50%);
+  }
+  .film-line-wide .film-line {
+    flex-direction: row;
+    gap: 10px;
+    width: max-content;
+  }
+  .film-line-wide .film-line-label {
+    flex: none;
+    max-width: none;
+  }
+  .film-line-wide .film-line-text {
+    min-width: 0;
+    max-width: none;
+    font-size: 22px;
+  }
+  .film-line-wide .film-verdict {
+    height: auto;
+    bottom: calc(max(16px, env(safe-area-inset-bottom, 0px)) + 6px);
+    font-size: 22px;
   }
 }

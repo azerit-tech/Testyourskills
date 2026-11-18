@@ -372,25 +372,12 @@ export function filmScore(plan: FilmPlan): FilmScore {
     if (s.frame + 28 < lineEnd) push("radio", s.frame + 28, { dur: 0.12, vel: 0.45 });
   }
 
-  // ---- l'interception (une à cinq étoiles) : la radio grésille sur sa ligne ; l'étoile suivante clignote deux
-  // fois, un tintement étouffé qui ne s'allume pas, calé sur la double croche la plus proche
+  // ---- l'interception (une à cinq étoiles) : la radio grésille juste avant le gel, sans ligne à l'écran (la
+  // jauge de l'étoile suivante monte encore, elle va se figer)
   if (plan.intercept !== null) {
     push("radio", plan.intercept, { dur: 0.4, vel: 0.85 });
     push("beep", plan.intercept + 3, { vel: 0.8 });
   }
-  // la double croche la plus proche (les temps étirés n'ont plus 12 images : au plus un huitième de temps d'écart)
-  const onGrid = (f: number) => {
-    let best = f;
-    let gap = Infinity;
-    for (const b of beats) {
-      for (let j = 0; j < 4; j++) {
-        const g = b.frame + (j * b.len) / 4;
-        if (Math.abs(g - f) < gap) [best, gap] = [g, Math.abs(g - f)];
-      }
-    }
-    return gap <= 0.5 + beats[0].len / 8 ? best : f;
-  };
-  if (plan.flicker) for (const [a] of plan.flicker.frames) push("deny", onGrid(a), { notes: [CHIMES[plan.flicker.star - 1]], vel: 0.5 });
 
   // ---- la fin de la poursuite : la musique s'arrête net sur le temps qui suit son dernier tronçon, la nappe prend le
   // relais. Une à cinq étoiles : l'image gèle sur place (freeze = cut - 1), l'arrêt et l'impact sur ce temps, une
@@ -402,11 +389,17 @@ export function filmScore(plan: FilmPlan): FilmScore {
   push("crash", chaseEnd, { vel: 1, layer: 0 });
   push("nappe", chaseEnd, { notes: level === 6 ? NAPPE_FIN6 : NAPPE_FIN, dur: (flash.peak - chaseEnd) / FPS, release: (flash.to - flash.peak) / FPS, vel: 1 });
 
-  // ---- l'arrêt sur image : l'impact (sur place, il tombe avec l'arrêt de la musique), la radio de fin
+  // ---- l'arrêt sur image : l'impact (sur place, il tombe avec l'arrêt de la musique). De une à cinq étoiles,
+  // l'étoile refusée clignote deux fois, la musique arrêtée : deux tintements étouffés, sa note, à l'image de
+  // chaque battement (après le coup du gel, qu'ils ne couvrent pas), puis elle se vide en silence. À six
+  // étoiles, il n'y en a pas : la radio se referme
   if (cut !== chaseEnd) push("boom", cut, { vel: 1, dur: 1.2 });
   push("slam", cut, { vel: 1 });
-  push("radio", freeze + 3, { dur: 0.3, vel: 0.6 });
-  push("beep", freeze + 6, { vel: 0.6 });
+  if (plan.verdict) for (const [a] of plan.verdict.blinks) push("deny", a, { notes: [CHIMES[plan.verdict.star - 1]], vel: 0.5 });
+  else {
+    push("radio", freeze + 3, { dur: 0.3, vel: 0.6 });
+    push("beep", freeze + 6, { vel: 0.6 });
+  }
 
   // ---- l'éclair : un souffle qui monte pendant le gel et culmine quand la fiche se pose
   const pre = Math.max(freeze + 1, flash.from - 8);

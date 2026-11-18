@@ -21,7 +21,7 @@ import { createFilmSound } from "../lib/filmSound";
 import { buzz } from "../lib/haptics";
 import { inAppBrowser } from "../lib/sharing";
 import { canPlayFilm, createFilmPlayer, type FilmPlayer, type FilmStats } from "../film/player";
-import { FilmHud, FilmRadio } from "../film/FilmHud";
+import { FilmHud, FilmLine, FilmVerdict } from "../film/FilmHud";
 import { filmVideo } from "../film/unlock";
 import { ensureStill, paintStill, stillShot } from "../film/freeze";
 import type { FileId } from "../film/files";
@@ -389,9 +389,8 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
   return (
     <>
       <div className={`film-stage${landed ? " is-landed" : ""}${quiet ? " is-quiet" : ""}`} style={vars} aria-hidden="true" onClick={landed ? undefined : onTapTraced}>
-        {/* au bureau, autour de la colonne : l'image du film floutée et assombrie, et les bandes d'encre sur toute la largeur */}
+        {/* au bureau, autour de la colonne : l'image du film floutée et assombrie ; téléphone couché : la bande d'encre du bas sur toute la largeur */}
         <canvas ref={backRef} className="film-back" width={18} height={32} />
-        <div className="film-wide film-wide-top" style={{ transform: `translateY(${(hud.bands - 1) * 100}%)` }} />
         <div className="film-wide film-wide-bottom" style={{ transform: `translateY(${(1 - hud.bands) * 100}%)` }} />
         <div ref={frameRef} className={`film-frame${hud.freeze ? " is-frozen" : ""}`} data-frame={hud.frame} data-shot={hud.shot}>
           {/* la balise vidéo est posée ici par le lecteur */}
@@ -407,9 +406,10 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
             </div>
           )}
         </div>
-        {/* téléphone couché : la radio sur toute la largeur de la bande d'encre, hors de la colonne (film.css) */}
-        <div className="film-radio-wide" style={{ transform: `translateY(${(1 - hud.bands) * 100}%)` }}>
-          <FilmRadio radio={hud.radio} />
+        {/* téléphone couché : la ligne, puis celle de l'étoile refusée, sur toute la largeur de la bande d'encre, hors de la colonne (film.css) */}
+        <div className="film-line-wide" style={{ transform: `translateY(${(1 - hud.bands) * 100}%)` }}>
+          <FilmLine line={hud.line} />
+          <FilmVerdict plan={plan} hud={hud} lang={lang} />
         </div>
         {flashLook(hud.flash, landed) > 0 && <div className="film-flash" style={{ opacity: flashLook(hud.flash, landed) }} />}
       </div>
