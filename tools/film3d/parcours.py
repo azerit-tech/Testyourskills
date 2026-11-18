@@ -170,8 +170,39 @@ SLALOM = (
 
 def voie(s):
     """L'écart latéral (m, positif à gauche) de la trajectoire voulue de la berline à la route, à l'abscisse s : la
-    somme des manœuvres de SLALOM. La seule entrée du slalom, pour la conduite cinématique comme pour la physique."""
+    somme des manœuvres de SLALOM. La seule entrée du slalom de la conduite dessinée (celle de cette branche)."""
     return sum(m[2] * bascule((s - m[0]) / m[1], len(m) > 3 and m[3] == "doux") for m in SLALOM)
+
+
+# Le même slalom, dosé pour la conduite simulée (branche film/physique, dynamique.Plan(..., voie=voie_simulee)) : là,
+# la voiture glisse, et la demande (2π × écart / durée²) peut passer l'adhérence. Mesuré par l'agent de la simulation
+# à 80 km/h sur le mouillé : 0,65 g → 3,8° de glisse, à peine lisible ; 0,8 à 0,9 g → 6 à 8°, la glisse légère voulue ;
+# 1,05 g → 12° et 0,8 m hors de la ligne ; jamais au-dessus de 1,0 g. La conduite dessinée, elle, ne glisse pas : à
+# ces demandes elle prendrait 8 m/s² de latérale sans broncher et son roulis claquerait (Δ² 0,36 à 0,60°/image² pour
+# 0,15, la coupe OUV → P1 à 1,07° de roulis d'écart) ; elle garde SLALOM, borné à 5 m/s².
+# Chaque ligne est passée dans dynamique.simulate sur le film entier (diag/audit_trafic_sim.py, film/physique
+# 0003718) et retenue là où ses voisines tiennent aussi (le dérapage du port bascule sinon : le déboîtement du pont
+# pris 2 m plus tard l'ouvre de 0,6 à 1,6 m hors de la route, 3 m plus tard et 2 m plus court à 3,2 m) :
+#  - l'avenue, vitesse tenue : 3 m à 0,82 et 0,75 g, glisse 6,5° et 5,9°, 0,17 m hors de la ligne au plus ;
+#  - la rue et le pont, où le plan accélère à 2,8 m/s² : les roues arrière poussent déjà, la même glisse vient à
+#    0,65 à 0,7 g (1,5 m en 1,25 s : 4,2° ; 3,8 m en 1,85 s : 6,4°, 0,15 m) ; plus sec, la berline prend du retard
+#    sur l'horaire, entre trop vite dans le port et son dérapage s'ouvre ;
+#  - la jetée : après s 402 (la berline simulée sort du dérapage du port 1 m large), retour fini avant le freinage
+#    de la pointe (s 459) ; 0,63 et 0,71 g, glisse 4,5° et 6,3°.
+# Reste à la simulation : sur la jetée le plan accélère à 2,8 m/s², le S coûte 2 à 3 m d'horaire et la berline
+# arrive en retard dans le freinage de la pointe : elle passe l'arrêt de 0,66 m au pas (1 à 3 km/h de l'image 690 à
+# l'image 723 ; à l'heure, image 692,7, sans slalom). Aucun des 50 dosages essayés de la jetée ne l'évite (0,45 à
+# 0,9 g : arrêt entre 711 et 786) : à caler dans le freinage final de la simulation (SPEC §18.62).
+SLALOM_SIMULE = (
+    (8.0, 36.0, -3.0), (52.0, 40.0, 3.0, "doux"),
+    (190.6, 23.5, -1.5), (216.6, 46.0, -2.3), (257.0, 52.0, 3.8),
+    (402.5, 24.0, 2.8), (430.0, 29.0, -2.8),
+)
+
+
+def voie_simulee(s):
+    """voie(s) pour la conduite simulée : la somme des manœuvres de SLALOM_SIMULE (l'entrée de dynamique.Plan.voie)."""
+    return sum(m[2] * bascule((s - m[0]) / m[1], len(m) > 3 and m[3] == "doux") for m in SLALOM_SIMULE)
 
 
 LIM = dict(slip_drag=0.07, counter=0.78, derapages=[DERAP2, DERAP5], pivot=1.4, pivot_tau=(0.6, 0.35),

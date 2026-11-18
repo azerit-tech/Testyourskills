@@ -101,11 +101,12 @@ CAM31_CUT_DH, CAM31_CUT_DD = 0.3, 0.8                     # m, aux coupes entre 
 # L'à-coup (18 novembre, SPEC §18.62 : « 12 m/s³, un seuil trop prudent ») : 12 était le lissé de la conduite dessinée,
 # pas une limite de la voiture. La limite est l'adhérence du mouillé (latérale, cercle : inchangés). Un changement de
 # voie d'esquive de latérale a en T secondes a un à-coup de 2π a / T : 5 m/s² en 1,3 s font 24 m/s³ ; la conduite
-# simulée de film/physique en suit 40. Plafond : 25, pour la berline et pour ceux qui suivent son chemin. Et
+# simulée de film/physique en suit 40 (mesuré 38,6) : plafond 40, celui de film/physique, pour la berline et pour
+# ceux qui suivent son chemin (la conduite dessinée de cette branche en fait 23 au plus). Et
 # l'accélération : le slalom allonge le chemin sans toucher à l'horaire (étoiles et gels figés), d'où 3,5 m/s² au
 # plus fort sur le pont au lieu de 2,8 (le plafond de film/physique).
-CAR31_HERO = dict(lat=6.5, brake=7.0, acc=3.5, circle=7.5, jerk=25.0, yaw_acc=120.0)
-CAR31_PATROL = dict(lat=7.0, brake=7.0, acc=4.0, circle=7.5, jerk=25.0, yaw_acc=120.0)
+CAR31_HERO = dict(lat=6.5, brake=7.0, acc=3.5, circle=7.5, jerk=40.0, yaw_acc=120.0)
+CAR31_PATROL = dict(lat=7.0, brake=7.0, acc=4.0, circle=7.5, jerk=40.0, yaw_acc=120.0)
 CAR31_STOP_LAMP = 2.0         # m/s² de freinage : fenêtres des feux stop (hero_cars.stop_lamps)
 # la glisse (cap de la caisse moins cap de la vitesse). Les plafonds d'avant (18°, 40 et 30 °/s, 4° de retour, lacet
 # de caisse ≤ 120 °/s²) faisaient une trajectoire propre, pas un dérapage (« le dérapage est mou ») : depuis la
