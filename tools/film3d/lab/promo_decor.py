@@ -28,6 +28,8 @@ def _hero_center(bpy):
     if hero is None:
         return None
     objs = [o for o in [hero, *hero.children_recursive] if o.type == "MESH" and not o.hide_render]
+    # la caisse et ses roues seulement (ni gerbes ni fumées parentées au rig)
+    objs = [o for o in objs if o.name.startswith(("coupe", "wheel_", "hero_"))] or objs
     if not objs:
         return hero.matrix_world.translation.copy()
     pts = [o.matrix_world @ Vector(c) for o in objs for c in o.bound_box]
