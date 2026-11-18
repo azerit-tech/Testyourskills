@@ -134,3 +134,12 @@ Sur le Mac, seulement l'essai à blanc, sous le verrou : `lockf -k <verrou> nice
 6. La scène de chaque plan est en cache (`~/film/cache`, partagé par toutes les copies) : la construction (40 à 107 s de Python sur un cœur) n'a lieu qu'une fois par état du code ; ensuite « repris du cache en 1 s ». Retoucher un module ne reconstruit que les plans qui l'importent ; `iter_diag.py` s'en sert aussi.
 7. `FILM3D_PHASES=1` ajoute à chaque image le temps de chaque phase de Cycles (synchro, lumières, échantillons…) : savoir où part le temps.
 8. À ne pas faire : lancer `blender.real` hors de la file ; effacer `~/film/cache` pendant les rendus des autres ; modifier un asset sur place (le cache ne voit que taille et date des fichiers lus par Python) ; poser `FILM3D_DRAFT` pour une prise (ses images vont dans `<PLAN>+brouillon/` et ne deviennent jamais une prise) ; `FILM3D_CACHE=0` sans raison (il force la reconstruction).
+
+## Le bras de la caméra (v11) : trois réglages à comparer
+
+`bras.py` porte la loi du bras de poursuite et ses réglages : A (le bras du film v10, le défaut), B « nerveux », C « poussé » (SPEC §18.70). Le choix ne touche pas à la clé du cache des lieux.
+
+- Mesurer, sans Blender : `python3 tools/film3d/diag/audit_bras.py --bras A,B,C` (par tronçon : défilement du sol, balayage du décor, flanc, taille et place de la berline, distance, hauteur, focale, roulis, à-coups) ; `--images 125-200` image par image ; `--gels` aux six gels et aux étoiles.
+- Contrôler : `BRAS_FILM=B python3 tools/film3d/test_motion.py` (de même `test_contacts.py`, `test_trafic.py`, `diag/audit_cadre.py --chocs`, `diag/audit_trafic.py`). Les contrôles du bras A que le réglage contredit sortent en « écart », avec leur raison.
+- Rendre : `python3 tools/film3d/render_film.py --draft --ville DIR --out DIR --plan P2 --frames 18-93 --essai bras=B`. La scène vient du cache (construite au bras A), sa caméra seule est reposée ; les images vont dans `P2+brasB+ville+brouillon`. `--essai obturateur=0.7` règle le flou de bougé.
+- Adopter un réglage : faire de `bras.chase` la caméra de `parcours.py` (les lieux se reconstruisent), puis reprendre ce que `ECARTS_BRAS` marque « à reprendre à l'adoption ».
