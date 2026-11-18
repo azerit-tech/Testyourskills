@@ -90,6 +90,67 @@ CAS = (("3 m en %.2f s" % T30, [(S0, T30 * V, 3.0)], True),
        ("3,5 m en 1 s", [(S0, 1.0 * V, 3.5)], False),
        ("slalom 3,5 m, 2 × 1,5 s", [(S0, 1.5 * V, 3.5), (S0 + 1.5 * V, 1.5 * V, -3.5)], False))
 
+# ---- la même question par l'autre entrée : une route droite et un écart latéral voulu, Plan.voie (parcours.voie de
+# film/trafic : la somme de manœuvres (début m, longueur m, écart m[, "doux"]), profil u − sin(2πu)/2π ou septique)
+def bascule(u, doux=False):
+    if u <= 0.0:
+        return 0.0
+    if u >= 1.0:
+        return 1.0
+    if doux:
+        return u ** 4 * (35.0 + u * (-84.0 + u * (70.0 - 20.0 * u)))
+    return u - math.sin(2.0 * math.pi * u) / (2.0 * math.pi)
+
+
+def essai_voie(nom, manoeuvres, v=80.0 / 3.6, driver=None, verbose=False):
+    """Une ligne droite à v m/s, l'écart voulu = somme des manœuvres. Rend (mesures, conduite)."""
+    def y_of(s):
+        return sum(m[2] * bascule((s - m[0]) / m[1], len(m) > 3 and m[3] == "doux") for m in manoeuvres)
+    fin = max(m[0] + m[1] for m in manoeuvres)
+    R = M.Route(0.0, 0.0, 0.0, [0.0] * int((fin + 200.0) / DS), DS)
+    plan = D.Plan(R, lambda t: v * t, lambda t: v, lambda t: 0.0, voie=y_of)
+    T = (fin + 120.0) / v
+    dr = D.simulate(plan, (), t_span=(0.0, T), driver=driver)
+    ts = [k / 240.0 for k in range(int(T * 240))]
+    t_fin = fin / v
+    apres = [dr.voie_err(t) for t in ts if t > t_fin]
+    pose = next((t - t_fin for t in ts if t > t_fin and all(abs(dr.voie_err(q)) < 0.10 and abs(dr.slip(q)) < 1.0
+                                                           for q in (t, t + 0.25, t + 0.5, t + 1.0))), None)
+    m = dict(ecart=max(abs(dr.voie_err(t)) for t in ts), ecart_apres=max(abs(x) for x in apres),
+             arriere=max(abs(dr.rear_slip(t)) for t in ts), glisse=max(abs(dr.slip(t)) for t in ts),
+             roulis=max(abs(dr.roll(t)) for t in ts), lat_g=max(abs(dr.alat(t)) for t in ts) / D.G,
+             lacet=max(abs(dr.yaw_rate(t)) for t in ts), volant=max(abs(dr.steer(t)) for t in ts),
+             contre=sum(1 for t in ts if abs(dr.slip(t)) > 2.0 and dr.steer(t) * dr.slip(t) < 0) / 240.0,
+             retard=max(abs(v * t - dr.s(t)) for t in ts), v_min=min(dr.speed(t) for t in ts), pose=pose,
+             fin=abs(dr.voie_err(ts[-1])), glisse_fin=abs(dr.slip(ts[-1])))
+    print("%-30s écart à la ligne %.2f m (après : %.2f) ; dérive arrière %.1f°, glisse %.1f°, roulis %.1f°, "
+          "latérale %.2f g, lacet %.0f °/s, roues %.1f°, contre-braquage %.2f s ; horaire %.2f m, ≥ %.1f km/h ; "
+          "posée %s après ; à la fin %.2f m, %.1f°"
+          % (nom, m["ecart"], m["ecart_apres"], m["arriere"], m["glisse"], m["roulis"], m["lat_g"], m["lacet"],
+             m["volant"], m["contre"], m["retard"], m["v_min"] * 3.6, "jamais" if pose is None else "%.2f s" % pose,
+             m["fin"], m["glisse_fin"]))
+    if verbose:
+        print("     t    voulu   fait  glisse arrière roulis  lat   lacet roues  gaz")
+        for k in range(int(manoeuvres[0][0] / v * 24) - 2, int(fin / v * 24) + 36, 2):
+            t = k / 24
+            print("  %5.2f %6.2f %6.2f %5.1f %5.1f %5.1f %5.1f %5.0f %5.1f %4.2f"
+                  % (t, y_of(dr.s(t)), y_of(dr.s(t)) + dr.voie_err(t), dr.slip(t), dr.rear_slip(t), dr.roll(t),
+                     dr.alat(t), dr.yaw_rate(t), dr.steer(t), dr.throttle(t)))
+    return m, dr
+
+
+def aller_retour(w, T, v):
+    """Deux manœuvres : w m à gauche en T s, puis retour en T s (longueurs à la vitesse v)."""
+    return [(S0, T * v, w), (S0 + T * v, T * v, -w)]
+
+
 if __name__ == "__main__":
-    for nom, dec, _ok in CAS:
-        essai(nom, dec, "-v" in sys.argv)
+    if "voie" in sys.argv:
+        v80 = 80.0 / 3.6
+        for w, T, v in ((3.0, 1.5, v80), (3.0, 2.0, v80), (2.5, 1.2, v80), (3.5, 1.2, 85.0 / 3.6), (3.5, 2.0, 70.0 / 3.6),
+                        (2.5, 2.0, 70.0 / 3.6)):
+            essai_voie("%g m en %g s puis retour, %.0f km/h" % (w, T, v * 3.6), aller_retour(w, T, v), v,
+                       verbose="-v" in sys.argv)
+    else:
+        for nom, dec, _ok in CAS:
+            essai(nom, dec, "-v" in sys.argv)

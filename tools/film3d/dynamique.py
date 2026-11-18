@@ -425,7 +425,8 @@ class PhysDrive(M.Drive):
     along, alat, brake_windows, t_stop), plus ce que la simulation sait : roll, pitch (°, la caisse sur ses ressorts),
     yaw_rate (°/s), throttle, brake, handbrake (0..1), wheelspin (rapport de la vitesse des roues arrière à celle du
     sol sous elles : 0 bloquées, 1 qui roulent, plus : qui patinent), s (abscisse de la projection sur la route),
-    lat_err (m, à gauche de la route), slip_ref (la glisse que le conducteur vise, °)."""
+    lat_err (m, à gauche de la route), voie_err (m, à gauche de la ligne visée : la route décalée de Plan.voie),
+    rear_slip (°, la dérive de l'essieu arrière), slip_ref (la glisse que le conducteur vise, °)."""
 
     def roll(self, t):
         return self._at("roll", t)
@@ -454,6 +455,14 @@ class PhysDrive(M.Drive):
     def lat_err(self, t):
         return self._at("e", t)
 
+    def voie_err(self, t):
+        """L'écart (m, à gauche) à la ligne visée : la route décalée de Plan.voie (lat_err sans voie)."""
+        return self._at("e_voie", t)
+
+    def rear_slip(self, t):
+        """La dérive de l'essieu arrière (°) : au-delà de 5 à 6° sur le mouillé, l'arrière glisse."""
+        return self._at("alpha_r", t)
+
     def slip_ref(self, t):
         return self._at("slip_ref", t)
 
@@ -468,10 +477,15 @@ class PhysDrive(M.Drive):
 
 class Plan:
     """Le plan du conducteur : la route (motion.Route) et le profil de vitesse au temps : s_ref(t), v_ref(t),
-    a_ref(t) (m, m/s, m/s²), et l'abscisse de l'arrêt (None : il roule)."""
+    a_ref(t) (m, m/s, m/s²), et l'abscisse de l'arrêt (None : il roule). voie(s) : l'écart latéral voulu à la route
+    (m, positif à gauche) à l'abscisse s de la route, None : il roule sur la route. C'est l'entrée du slalom
+    (parcours.voie de film/trafic) : le conducteur vise cette ligne, la voiture fait ce que ses pneus permettent
+    (roulis, quelques degrés de glisse, contre-braquage quand l'arrière décroche) ; trop vif pour le mouillé, le
+    changement de voie se fait en retard, sans tête-à-queue. L'horaire reste compté le long de la route."""
 
-    def __init__(self, route, s_ref, v_ref, a_ref, s_stop=None):
+    def __init__(self, route, s_ref, v_ref, a_ref, s_stop=None, voie=None):
         self.route, self.s_ref, self.v_ref, self.a_ref, self.s_stop = route, s_ref, v_ref, a_ref, s_stop
+        self.voie = voie
 
 
 def _project(route, s, x, y):
@@ -619,7 +633,7 @@ def simulate(plan, events=(), t_span=(-2.0, 40.0), car=None, driver=None):
     rdes_prev = None
     keys = ("t", "x", "y", "vx", "vy", "v", "travel", "slip", "head", "steer", "along", "alat", "roll", "pitch", "r",
             "throttle", "brake", "hb", "spin", "s", "e", "alpha_f", "alpha_r", "Fyf", "Fyr", "Fxr", "fz_fl", "fz_fr",
-            "fz_rl", "fz_rr", "kap", "steer_cmd", "r_des", "slip_ref", "drift_w", "kap_cmd")
+            "fz_rl", "fz_rr", "kap", "steer_cmd", "r_des", "slip_ref", "drift_w", "kap_cmd", "e_voie")
     tab = {k: [] for k in keys}
     n = int(round((t_span[1] - t_span[0]) / DT)) + 1
     stopped = False
@@ -652,6 +666,15 @@ def simulate(plan, events=(), t_span=(-2.0, 40.0), car=None, driver=None):
         kpre = R.at(s + Vc * d["preview"])[3]
         wn = d["wn"] + (evd.get("wn_drift", d["wn_drift"]) - d["wn"]) * wd
         chi_err = _wrap(chi - hp)
+        e_route = e
+        if plan.voie is not None:
+            # la ligne visée : la route décalée de voie(s). Son écart, sa pente (elle tourne le cap voulu) et sa
+            # courbure un peu devant (lue comme celle de la route), par différences sur 0,5 m
+            hv, sp_ = 0.25, s + Vc * d["preview"]
+            y_v = plan.voie(s)
+            e = e - y_v
+            chi_err = _wrap(chi_err - math.atan((plan.voie(s + hv) - plan.voie(s - hv)) / (2.0 * hv)))
+            kpre += (plan.voie(sp_ + hv) - 2.0 * plan.voie(sp_) + plan.voie(sp_ - hv)) / (hv * hv)
         # il revient vers la route à une vitesse en travers qu'il saura arrêter en y arrivant (√(2 a |e|) : loin
         # d'elle, il ne fonce pas dessus ; près d'elle, c'est un rappel amorti ordinaire), et ne demande jamais à la
         # voiture de virer plus que ses pneus ne tiennent (sur ses roues : alat_max ; en travers : alat_drift)
@@ -691,7 +714,7 @@ def simulate(plan, events=(), t_span=(-2.0, 40.0), car=None, driver=None):
         lent = any(g_.actif(t) for g_ in gestes)
         v_r0 = v_r
         v_r -= sum(g_.lent(t) for g_ in gestes)
-        v_along = V * math.cos(chi - hp) / max(0.2, 1.0 - kp * e)
+        v_along = V * math.cos(chi - hp) / max(0.2, 1.0 - kp * e_route)
         es = s_r - s
         integ_s += max(-d["es_max"], min(d["es_max"], es)) * DT * (1.0 - wd) * (0.0 if lent else 1.0)
         integ_s = max(-3.0, min(3.0, integ_s))
@@ -807,7 +830,7 @@ def simulate(plan, events=(), t_span=(-2.0, 40.0), car=None, driver=None):
         row = dict(t=t + DT, x=car_.X, y=car_.Y, vx=vx, vy=vy, v=V, travel=trav, slip=psi_d - trav, head=psi_d,
                    steer=math.degrees(delta), along=car_.ax * cb + car_.ay * sb,
                    alat=-car_.ax * sb + car_.ay * cb, roll=math.degrees(car_.phi), pitch=math.degrees(car_.th),
-                   r=math.degrees(r), throttle=thr, brake=brk, hb=hb, spin=spin, s=s, e=e,
+                   r=math.degrees(r), throttle=thr, brake=brk, hb=hb, spin=spin, s=s, e=e_route, e_voie=e,
                    alpha_f=math.degrees(out.get("a_f", 0.0)), alpha_r=math.degrees(out.get("a_r", 0.0)),
                    Fyf=out.get("Fyf", 0.0), Fyr=out.get("Fyr", 0.0), Fxr=out.get("Fxr", 0.0),
                    fz_fl=fz[0], fz_fr=fz[1], fz_rl=fz[2], fz_rr=fz[3], kap=out.get("kap", 0.0),
