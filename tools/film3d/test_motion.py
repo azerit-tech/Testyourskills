@@ -253,8 +253,16 @@ CAM31_CUT_DH, CAM31_CUT_DD = 0.3, 0.8                     # m, aux coupes entre 
 #   l'adhérence, pas l'à-coup ; les poursuivants qui refont le chemin de la berline montent avec elle.
 # - fusion v10 : latérale 6,6 (6,5). Le slalom décale la berline de 5 m sur son horaire à l'entrée du port, le
 #   dérapage y prend 6,51 m/s² au centre ; les pneus tiennent 6,87 (μ 0,70), 0,01 m/s² ne se voit pas.
-CAR31_HERO = dict(lat=6.6, brake=7.2, acc=3.5, circle=7.5, jerk=40.0, yaw_acc=120.0)
-CAR31_PATROL = dict(lat=7.0, brake=7.2, acc=4.0, circle=7.5, jerk=40.0, yaw_acc=120.0)
+# v11 (SPEC §18.70) : la berline roule sur μ 1,0 au lieu de 0,70, ses plafonds suivent (mesuré sur le film : latérale
+# 9,24, freinage 8,53, accélération 3,68, cercle 9,30 m/s², à-coup 70 m/s³ quand il la jette et la rattrape). Ceux
+# des patrouilles (CAR31_PATROL, POURSUITE_*) restaient ceux du mouillé.
+# (SPEC §18.71 : toutes les voitures roulent sur μ 1,0. Les plafonds d'adhérence des patrouilles et des poursuivants
+# (latérale, freinage, cercle) se relèvent du seul rapport des adhérences, parcours.ADHERENCE = 1 / 0,70, pas au cas
+# par cas ; l'accélération, que le moteur borne, l'à-coup et le lacet ne bougent pas. test_p1 contrôle le rapport)
+ADHERENCE = 1.0 / 0.70
+CAR31_HERO = dict(lat=9.5, brake=8.8, acc=3.8, circle=9.6, jerk=72.0, yaw_acc=120.0)
+CAR31_PATROL = dict(lat=round(7.0 * ADHERENCE, 1), brake=round(7.2 * ADHERENCE, 1), acc=4.0,
+                    circle=round(7.5 * ADHERENCE, 1), jerk=40.0, yaw_acc=120.0)     # 10,0 ; 10,3 ; 10,7
 CAR31_STOP_LAMP = 2.0         # m/s² de freinage : fenêtres des feux stop (hero_cars.stop_lamps)
 # la glisse (cap de la caisse moins cap de la vitesse). Les plafonds d'avant (18°, 40 et 30 °/s, 4° de retour, lacet
 # de caisse ≤ 120 °/s²) faisaient une trajectoire propre, pas un dérapage (« le dérapage est mou ») : depuis la
@@ -268,8 +276,8 @@ CAR31_STOP_LAMP = 2.0         # m/s² de freinage : fenêtres des feux stop (her
 # Le 18 novembre (« il n'y a pas une façon sûre de le faire ? », SPEC §18.61) : les dérapages ne sont plus dessinés,
 # un conducteur les fait sur une voiture simulée (dynamique.py : frein à main sur le frein, contre-braquage, gaz).
 # Les fourchettes ci-dessous ne décrivent plus une courbe voulue mais ce qu'une berline de 1,7 t fait sur le mouillé.
-SLIP31_MAX = 40.0             # °
-SLIP31_ON, SLIP31_OFF = 85.0, 60.0    # °/s, installation et retour
+SLIP31_MAX = 42.0             # ° (v11 : 38 à 42° au port)
+SLIP31_ON, SLIP31_OFF = 85.0, 70.0    # °/s, installation et retour (v11 : rattrapée plus vite, 62 à 68 °/s)
 SLIP31_ACC = 5.5              # m/s² d'accélération combinée : dessous, elle ne naît pas (au-delà de SLIP31_BACK)
 SLIP31_LOSS = 0.10            # la vitesse perd au moins 10 % pendant une glisse de plus de 5°
 SLIP31_VOIE = 8.5             # ° : jusque-là une glisse est la dérive d'un changement de voie, pas un dérapage (6 à
@@ -278,18 +286,20 @@ SLIP31_BACK = 6.0             # ° au plus de retour de l'autre côté, une fois
 SLIP31_YAW_ACC = 260.0        # °/s², lacet de la caisse aux images où elle glisse (ailleurs : CAR31_*, 120)
 # les dérapages lisibles (test_derapages) : crête, tenue, montée de 5° à la crête, vitesse de la glisse au plus fort,
 # rattrapage, contre-braquage des roues avant, angle à l'écran entre la caisse et le bras
-DERAP31 = {"P2": dict(crest=(28.0, 32.0), hold=22.0, screen=(28.0, 35.0)),
-           "P5": dict(crest=(35.0, 40.0), hold=28.0, screen=(35.0, 45.0))}
-DERAP31_HOLD_S = (0.9, 1.45)      # s au-dessus du seuil de tenue (« environ une seconde »)
+# v11 : les crêtes de parcours.CRETES (32 à 36°, 38 à 42°), la glisse tenue plus longtemps au rond-point (1,85 s
+# au-dessus de 22°) ; l'angle à l'écran (screen) est l'affaire du bras : inchangé
+DERAP31 = {"P2": dict(crest=(32.0, 36.0), hold=22.0, screen=(28.0, 35.0)),
+           "P5": dict(crest=(38.0, 42.0), hold=28.0, screen=(35.0, 45.0))}
+DERAP31_HOLD_S = (0.9, 2.0)      # s au-dessus du seuil de tenue (« environ une seconde »)
 # la montée : l'arrière bloqué, la caisse pivote sur son avant, qui doit en même temps tenir le virage (0,6 g) ; il
 # reste à l'avant de quoi donner 45 à 55 °/s de glisse (mesuré : 52 et 53 °/s), soit 30 à 37° en 0,9 à 1 s. Les
 # 60 à 85 °/s en 0,45 à 0,7 s d'avant demandaient un couple que l'avant n'a pas sur le mouillé (la courbe dessinée)
 DERAP31_RISE_S = (0.7, 1.2)       # s de 5° à la crête
-DERAP31_RATE = (40.0, 70.0)       # °/s au plus fort de la montée
+DERAP31_RATE = (40.0, 95.0)       # °/s au plus fort de la montée (v11 : 70 et 80 °/s, une montée plus sèche)
 # le rattrapage : les gaz rendus peu à peu, l'arrière reprend, 40 à 45 °/s (mesuré : 0,94 et 1,04 s) ; plus court, il
 # fouetterait de l'autre côté (le retour reste borné : SLIP31_BACK, DERAP31_BACK_P2)
 # (fusion v10 : 1,25 s, 1,2 avant ; le port se rattrape en 1,23 s derrière le slalom du pont, une image de plus)
-DERAP31_RECOVER_S = (0.7, 1.25)   # s : de 80 % de la crête, en redescendant, à moins de 2°
+DERAP31_RECOVER_S = (0.5, 1.25)   # s : de 80 % de la crête, en redescendant, à moins de 2° (v11 : 0,6 à 0,7 s)
 # le contre-braquage : les roues avant visent la vitesse de leur essieu, à la glisse près de leur dérive (elles
 # travaillent à 8 à 10°) : 27,6° pour 30,5° de glisse, 33,6° pour 36,7° ; la butée est à 40° (dynamique.CAR)
 DERAP31_COUNTER = (20.0, 38.0)    # ° de contre-braquage des roues avant au plus fort
@@ -302,8 +312,11 @@ DERAP31_BACK_P2 = 2.0             # ° : le petit retour de l'autre côté au ro
 # C 1,6, E 0,2, donne son maximum vers 9 à 10° : l'avant y travaille pendant qu'il fait pivoter la caisse, mesuré
 # 10,1 et 10,2° ; au-delà de 12° il labourerait) ; l'arrière part large jusqu'à 2 m au port (mesuré : 1,65 m ; la
 # glisse tenue aux gaz ne ralentit pas comme le plan, elle élargit sa sortie de 1,6 m et la rejoint)
-DERAP_PHYS = dict(yaw_rate=100.0, yaw_acc=260.0, front_slip=12.0, lat=CAR31_HERO["lat"], circle=7.5, spin=(1.15, 1.6),
-                  roll=(3.0, 5.0), rear_out=(0.9, 2.0))
+# v11 : le cercle de CAR31_HERO ; l'arrière part large de 3,15 m au rond-point (elle y entre à 68 km/h et prend la
+# corde large) et de 0,25 à 0,65 m au port ; au port il tient le frein traîné 0,2 s après la crête (gaz_avant −0,2) :
+# les roues arrière n'y patinent qu'à ×1,12
+DERAP_PHYS = dict(yaw_rate=100.0, yaw_acc=260.0, front_slip=12.0, lat=CAR31_HERO["lat"], circle=CAR31_HERO["circle"],
+                  spin=(1.05, 1.6), roll=(3.0, 5.0), rear_out=(0.2, 3.3))
 DERAP_TIMING = dict(START={"OUV": 0, "P1": 75, "P2": 108, "P3": 215, "P4": 318, "P5": 426, "P6": 486, "FIN6": 619},
                     ETOILES={1: 77, 2: 153, 3: 255, 4: 375, 5: 453, 6: 567}, FIN6_FRAMES=101)
 # la fluidité à l'écran (le centre de la berline vu par les clés finales, % de la largeur du cadre par image² et
@@ -314,7 +327,8 @@ SCREEN31_D2, SCREEN31_D3 = 0.20, 0.20     # tremblés v3.1 : 0,04 à 0,16 sur le
 BODY31_ROLL, BODY31_PITCH = 5.0, 2.0
 # fusion v10 : Δ² 0,18 (0,15). Dans le S de l'avenue (0,8 g d'un côté puis de l'autre en 1,5 s, SPEC §18.62) la caisse
 # simulée passe de −4° à +3° de roulis ; c'est le roulis voulu des changements de voie (mesuré : 0,166)
-BODY31_ROLL_D2, BODY31_NOISE = 0.18, 0.02
+# v11 : quand il la jette à 68 km/h la caisse prend 5° de roulis en 8 images (Δ² 0,87 au rond-point, 0,75 au port)
+BODY31_ROLL_D2, BODY31_NOISE = 0.90, 0.02
 # §18.36, la continuité aux coupes (motion.cut_state_rows) : l'état de mouvement de la berline et de la caméra à la
 # sortie de A contre l'entrée de B. Points de départ ; informatifs tant que CUT_STATE_STRICT est faux.
 CUT_STATE_STRICT = True
@@ -597,8 +611,9 @@ def test_p2():
           peak["roll"] > 2.0 and peak["steer"] < -5.0, f"roulis {peak['roll']:.2f}°, braquage {peak['steer']:.2f}°")
     check(f"P2 : roulis ≤ {BODY31_ROLL:g}°", max(abs(p["roll"]) for p in ps) <= BODY31_ROLL,
           f"{max(abs(p['roll']) for p in ps):.2f}°")
-    check("P2 : les feux stop du parcours, au freinage d'avant l'îlot", P.brake_windows() == PC.brake_windows("P2")
-          and P.brake_windows()[0][0] <= 15, f"{P.brake_windows()}")
+    # (v11 : le freinage d'avant l'îlot finit sur l'avenue, avant P2 ; reste le frein traîné quand il la jette)
+    check("P2 : les feux stop du parcours, au frein traîné quand il la jette", P.brake_windows() == PC.brake_windows("P2")
+          and P.brake_windows()[0][0] <= 22, f"{P.brake_windows()}")
     # la berline sur l'enrobé : ses quatre roues (empreintes de 0,66 × 0,24 m) hors des cunettes (0,5 m devant le nez
     # des bordures) et sa caisse sans bordure dessous, glisse comprise, de l'avenue sud à s 110 de la rue (x −37)
     x110 = PC.placer("P2")[0](*PC._to_route("P3")(0.0, 110.0))[0]
@@ -964,7 +979,8 @@ def test_p6():
             v = math.hypot(vx, vy)
             lat.append(abs(vx * ay - vy * ax) / v)
             lon.append((vx * ax + vy * ay) / v)
-        check(f"P6 : {k} roule vrai", max(lat) <= 6.5 * 1.01 and min(lon) >= -7.0 and max(lon) <= CAR31_HERO["acc"],
+        check(f"P6 : {k} roule vrai", max(lat) <= 6.5 * ADHERENCE * 1.01 and min(lon) >= -7.0 * ADHERENCE
+              and max(lon) <= CAR31_HERO["acc"],
               f"latérale {max(lat):.2f}, de {min(lon):+.2f} à {max(lon):+.2f} m/s²")
     # le bras commun (7,5 m, 0,3 m à gauche, 2,4 m) de la première à la dernière image (17 novembre : plus de grue)
     worst = max(max(abs(u - w) for u, w in zip(P.camera_rail(T(g)), PC.chase("P6", g))) for g in frames)
@@ -1520,11 +1536,12 @@ def test_p1():
     check("P1 : la berline à x 50 ± 6 (visée voulue, parcours.visee_u), y 58 ± 4", not bad, f"images {bad[:6]}")
     dt = 1.0 / 96.0
     ts = [i * dt for i in range(int(P.T_END / dt) + 1)]
-    for name, v, amax in (("berline", P.hero_speed, 3.0), ("patrouille", P.patrol_speed, 4.0)):
+    # (v11 : la berline freine franchement pour le rond-point, 6,5 m/s² installés en 16 images : à-coup 29 m/s³)
+    for name, v, amax, jmax in (("berline", P.hero_speed, 3.0, 30.0), ("patrouille", P.patrol_speed, 4.0, 12.0)):
         acc = [(v(t + dt) - v(t - dt)) / (2 * dt) for t in ts]
         jerk = max(abs(acc[i + 1] - acc[i]) / dt for i in range(len(acc) - 1))
-        check(f"P1 : la {name} roule vrai (freinage ≤ 7, accélération ≤ {amax:g} m/s², à-coup ≤ 12 m/s³)",
-              -7.0 - 1e-3 <= min(acc) and max(acc) <= amax + 1e-3 and jerk <= 12.5,
+        check(f"P1 : la {name} roule vrai (freinage ≤ 7, accélération ≤ {amax:g} m/s², à-coup ≤ {jmax:g} m/s³)",
+              -7.0 - 1e-3 <= min(acc) and max(acc) <= amax + 1e-3 and jerk <= jmax + 0.5,
               f"{min(acc):.2f} à {max(acc):.2f} m/s², à-coup {jerk:.1f} m/s³")
     d = max(math.dist(P.hero_pos(M.t_of(f)), PC.hero("P1")["pos"](f)) for f in frames)
     check("P1 : la berline sur la fenêtre du parcours", d < 1e-9, f"{d:.1e} m")
@@ -1538,8 +1555,12 @@ def test_p1():
     lead, left = P.patrol_pos(t)[1] - P.hero_pos(t)[1], P.hero_pos(t)[0] - P.patrol_pos(t)[0]
     dv = P.patrol_speed(t) - P.hero_speed(t)
     a = (P.patrol_speed(t + dt) - P.patrol_speed(t - dt)) / (2 * dt)
-    check(f"P1 : la patrouille 1 à sa place de la coupe vers P2 (gauche 3,45 m, {P.LEAD_END:+.1f} m, même vitesse, "
-          "freinage établi)", abs(left - 3.45) < 0.05 and abs(lead - P.LEAD_END) < 0.05 and abs(dv) < 0.05
+    check("plafonds : le rapport des adhérences des contrôles est celui du parcours", abs(ADHERENCE - PC.ADHERENCE) < 1e-9,
+          f"{ADHERENCE:.3f} et {PC.ADHERENCE:.3f}")
+    # (v11 : la berline entre dans P2 à vitesse tenue, la patrouille freine déjà pour le rond-point : elle roule
+    # p1_avenue.DV_END m/s moins vite qu'elle à la coupe, « même vitesse » avant)
+    check(f"P1 : la patrouille 1 à sa place de la coupe vers P2 (gauche 3,45 m, {P.LEAD_END:+.1f} m, {P.DV_END:+.1f} m/s, "
+          "freinage établi)", abs(left - 3.45) < 0.05 and abs(lead - P.LEAD_END) < 0.05 and abs(dv - P.DV_END) < 0.05
           and abs(a + P.PATROL_BRAKE) < 0.05 and abs(P.patrol_accel(t - 1.0 / M.FPS) + P.PATROL_BRAKE) < 1e-9,
           f"gauche {left:.2f} m, avance {lead:+.2f} m, écart de vitesse {dv:+.2f} m/s, {a:+.2f} m/s²")
 
@@ -2348,10 +2369,11 @@ def test_parcours():
     h2 = PC.hero("P2")
     near = min(math.hypot(*h2["pos"](f / 4.0)) for f in range(4, 4 * dict(PC.SHOTS)["P2"] + 1)) - 6.0
     end = h2["pos"](dict(PC.SHOTS)["P2"] + 24)
-    check("parcours : P2 entre en x 1,75, sort sur y 0,35, à plus de 4 m de l'îlot",
+    # (v11 : à 55 km/h à la crête elle passe à 3,26 m de la bordure de l'îlot, 4 m et plus avant)
+    check("parcours : P2 entre en x 1,75, sort sur y 0,35, à plus de 3 m de l'îlot",
           # (entrée à 10 cm près comme la sortie, fusion v10 : la voiture simulée sort du slalom de l'avenue à 1 cm
           # de sa voie ; au micron près, c'était la courbe dessinée)
-          abs(h2["pos"](1)[0] - 1.75) < 0.10 and abs(end[1] - 0.35) < 0.10 and near > 4.0,
+          abs(h2["pos"](1)[0] - 1.75) < 0.10 and abs(end[1] - 0.35) < 0.10 and near > 3.0,
           f"entrée x {h2['pos'](1)[0]:.2f}, sortie y {end[1]:.3f}, {near:.2f} m de la bordure")
     lims = dict(along=CUT_ALONG, alat=CUT_ALAT, yaw=CUT_YAW, slip=CUT_SLIP, steer=CUT_STEER, roll=CUT_ROLL,
                 pitch=CUT_PITCH, pan=CUT_PAN)
@@ -2711,7 +2733,8 @@ def test_cut_pose():
 # entre lancé dans le cadre sans avoir roulé dans le tronçon d'avant : ville.py le figerait à sa place de première
 # clé pendant tout le tronçon précédent (la patrouille du pont, arrêtée au milieu du tablier pendant la fin de P3).
 POURSUITE_PLANS = ("OUV", "P1", "P2", "P3", "P4", "P5", "P6", "FIN6")
-POURSUITE_BRAKE, POURSUITE_ACC, POURSUITE_LAT = 7.3, 4.3, 7.6     # m/s² (7, 4 et 7,5 de motion.DRIVE_KINDS)
+POURSUITE_BRAKE, POURSUITE_ACC, POURSUITE_LAT = 7.3 * ADHERENCE, 4.3, 7.6 * ADHERENCE     # m/s² (7, 4 et 7,5 de
+# motion.DRIVE_KINDS sur le mouillé, relevés du rapport des adhérences)
 # (conduite simulée, 18 novembre : 25, les poursuivants roulent dans le sillage de la berline, dont les pédales
 # ont la course d'un pied ; mesuré 20,6 au fourgon de P6, sur le coup de frein de sortie du port)
 POURSUITE_JERK = 25.0      # m/s³ (différences finies sur 1/24 s)
@@ -2796,8 +2819,8 @@ def test_poursuivants():
                                  ("slip", slip or 0.0)):
                     if val > worst[key][0]:
                         worst[key] = (val, f"{p} {name} image {f}")
-    check(f"poursuivants : freinage ≤ {POURSUITE_BRAKE} m/s², accélération ≤ {POURSUITE_ACC}, latérale ≤ "
-          f"{POURSUITE_LAT} (les plafonds des patrouilles sur le mouillé)",
+    check(f"poursuivants : freinage ≤ {POURSUITE_BRAKE:.1f} m/s², accélération ≤ {POURSUITE_ACC}, latérale ≤ "
+          f"{POURSUITE_LAT:.1f} (les plafonds des patrouilles sur le mouillé × le rapport des adhérences)",
           worst["brake"][0] <= POURSUITE_BRAKE and worst["acc"][0] <= POURSUITE_ACC and worst["lat"][0] <= POURSUITE_LAT,
           f"freinage {worst['brake'][0]:.2f} ({worst['brake'][1]}), accélération {worst['acc'][0]:.2f} "
           f"({worst['acc'][1]}), latérale {worst['lat'][0]:.2f} ({worst['lat'][1]})")

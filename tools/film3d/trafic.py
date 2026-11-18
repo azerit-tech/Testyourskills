@@ -75,7 +75,7 @@ def vehicules():
         out.append(("trafic_" + nom, modele, teinte, course, kw))
 
     # ------------------------------------------------------------ l'avenue (OUV, P1) : s 0 à 105
-    # v11 (SPEC §18.70) : la berline sur E1 (n 0). La patrouille 1 la remonte par la voie d'en face, la tape à
+    # v11 (SPEC §18.71) : la berline sur E1 (n 0). La patrouille 1 la remonte par la voie d'en face, la tape à
     # l'image 30 (contacts.CHOCS) et la jette d'une demi-voie à droite, vers le bus qui déboîte de son arrêt dans
     # la voie E2 (clignotants, 16 km/h) : elle revient à gauche devant lui au dernier moment et longe son flanc
     # jusqu'au gel de l'image 107. B roule au pas sur E2 loin devant, freine et s'arrête à l'entrée de l'anneau (le
@@ -231,7 +231,7 @@ def _s_at(pts, y):
 
 # ---- les réglages (images du film g, m/s ; places en m)
 # l'avenue : A et B, leur avance sur la berline à l'image 0 (m) et leurs vitesses
-# v11 (SPEC §18.70) : chaque obstacle d'une esquive se place depuis la berline. *_G : l'image du film où le nez de
+# v11 (SPEC §18.71) : chaque obstacle d'une esquive se place depuis la berline. *_G : l'image du film où le nez de
 # la berline serait sur lui si elle gardait sa ligne, comptée depuis le départ de son écart (parcours.SLALOM_SIMULE)
 # plus le temps avant contact voulu (0,8 à 1,3 s) ; sa place à cette image s'en déduit. Un horaire qui change
 # (l'adhérence, les virages) déplace donc les obstacles avec la berline.
@@ -239,7 +239,7 @@ HERO_L = 2.45                                            # la demi-longueur de l
 _ESQ = P.SLALOM_SIMULE
 # l'avenue : le bus (demi-longueur 6 m) déboîte de son arrêt dans la voie E2, de AV_BUS_SORT[2] m vers E1 ; la
 # berline, jetée à droite par la patrouille, revient devant lui
-AV_BUS_G = image_de(_ESQ[P.ESQ_AVENUE[1]][0]) + 1.05 * FPS
+AV_BUS_G = image_de(_ESQ[P.ESQ_AVENUE[1]][0]) + 1.0 * FPS
 AV_BUS = s_hero(AV_BUS_G) + HERO_L + 6.0
 AV_BUS_V = [(0, 1.5), (AV_BUS_G - 20, 4.5), (AV_BUS_G - 6, 4.5), (AV_BUS_G + 30, 0.0)]
 AV_BUS_SORT = (AV_BUS_G - 74, AV_BUS_G - 2, 0.33)
@@ -252,7 +252,7 @@ AV_B, AV_B_V = 106.0, [(0, 4.0), (40, 4.0), (90, 0.0)]
 # patrouille 1 tape la berline, serre la glissière (B1_RANGE) et s'arrête derrière B2. B1_FREINE : (début, fin) de
 # son freinage en images après B1_G : la patrouille 5 de la meute la suit dans sa voie, à 8 m au moins à la fin
 # du tronçon (elle freinait à B1_G + 9 : rattrapée à l'image 410)
-B1_G = image_de(_ESQ[P.ESQ_PONT[0]][0]) + 1.05 * FPS
+B1_G = image_de(_ESQ[P.ESQ_PONT[0]][0]) + 1.0 * FPS
 B1_Y = point(s_hero(B1_G) + HERO_L + 2.5)[1]
 B1_VC, B1_LANCE, B1_FREINE = _v(70), 133, (29.0, 121.5)
 B1_SORT, B1_RENTRE, B1_RANGE = (B1_G - 47, B1_G - 9, 1.7), (B1_G - 4, B1_G + 32, -1.7), (B1_G + 39, B1_G + 70, -0.35)
@@ -293,10 +293,10 @@ FACE_ECART, FACE_SORT, FACE_RENTRE = 2.15, (-226.0, -256.0), (-268.0, -298.0)
 J1_G = image_de(_ESQ[P.ESQ_JETEE[0]][0]) + 1.3 * FPS
 J1_S = s_hero(J1_G) + HERO_L + 2.5
 J1_V = [(0, 0.0), (J1_G - 170, 0.0), (J1_G - 140, _v(20)), (J1_G - 36, _v(20)), (J1_G + 12, 0.0)]
-J1_SERRE, J1_WARN = (J1_G - 36, J1_G, -0.5), int(J1_G)
+J1_SERRE, J1_WARN = (J1_G - 36, J1_G, -0.7), int(J1_G)
 J3_S, J3_V = 400.0, [(0, 0.0), (280, 0.0), (330, _v(30)), (470, _v(30)), (516, 0.0)]
-J2_G = image_de(_ESQ[P.ESQ_JETEE[1]][0]) + 1.25 * FPS
-J2_S, J2_N = s_hero(J2_G) + HERO_L + 2.5, 2.85
+J2_G = image_de(_ESQ[P.ESQ_JETEE[1]][0]) + 1.15 * FPS
+J2_S, J2_N = s_hero(J2_G) + HERO_L + 2.5, 2.66
 J2_V = [(0, 0.0), (J2_G - 186, 0.0), (J2_G - 126, _v(30)), (J2_G - 44, _v(30)), (J2_G, 0.0)]
 J2_APPELS = (int(J2_G - 60), int(J2_G - 16))
 

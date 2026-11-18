@@ -202,7 +202,7 @@ def voie_dessinee(s):
 # l'image 723 ; à l'heure, image 692,7, sans slalom). Aucun des 50 dosages essayés de la jetée ne l'évite (0,45 à
 # 0,9 g : arrêt entre 711 et 786) : à caler dans le freinage final de la simulation (SPEC §18.62).
 #
-# v11 (SPEC §18.70, 18 novembre 2026). Jacques, sur le brouillon éclairé v10 : « je trouve les coups de volant pas
+# v11 (SPEC §18.71, 18 novembre 2026). Jacques, sur le brouillon éclairé v10 : « je trouve les coups de volant pas
 # super pertinents, genre la personne donne des coups brusques mais y a plein de place devant, ou même parfois rien à
 # éviter il me semble ». Mesuré (diag/audit_esquives.py) : deux manœuvres sur sept n'évitaient rien, les autres
 # partaient 1,5 à 2,75 s avant le contact sur un obstacle de 1,3 à 3 % du cadre et passaient à 1,4–1,7 m. Chaque
@@ -210,16 +210,21 @@ def voie_dessinee(s):
 # nouvelle voie tant que rien ne l'en chasse :
 #  - l'avenue : la patrouille 1 la tape (contacts.CHOCS) et la jette d'une demi-voie à droite, vers le bus qui
 #    déboîte de son arrêt ; elle revient à gauche devant lui, au dernier moment, avant le freinage du rond-point ;
-#  - la rue : S arrive en face, au milieu de la rue (elle contourne D, en double file) ; la berline s'écarte à droite
-#    de LANE m dès la sortie du trou du barrage, et ne revient pas : cette ligne est la voie intérieure du pont
+#  - la rue : S arrive en face, presque au milieu de la rue, appels de phares ; la berline s'écarte à droite de
+#    LANE m dès la sortie du trou du barrage, et ne revient pas : cette ligne est la voie intérieure du pont
 #    (x 1,80), que la route ne rejoint que sur le tablier (decalage_pont, plus bas) ;
-#  - le pont : aucun changement de voie, elle tient la voie intérieure et double la file de droite de près ;
+#  - le pont : elle tient la voie intérieure ; B1 déboîte vers elle, elle s'écarte d'un mètre à gauche, vers la
+#    patrouille 1, qui la tape (contacts.CHOCS) et la renvoie dans sa voie ;
 #  - la jetée : J1 freine devant elle, elle déboîte ; J2 arrive en face, appels de phares, elle se rabat.
+# Dosé sur μ 1,0 (film/v11-virages) : un écart tardif demande 0,8 à 0,9 g et ne glisse presque plus (2 à 4° de
+# dérive arrière, 0,1 à 0,25 m hors de la ligne) ; il se lit par le roulis, le lacet et la proximité de l'obstacle.
+# Les abscisses des deux écarts que lancent les chocs suivent l'horaire : 2 m avant le lieu du choc de l'avenue
+# (image 30), au lieu de celui du pont (image 365).
 SLALOM_SIMULE = (
-    (27.5, 28.0, -1.6), (66.0, 28.0, 1.6),
-    (190.6, 24.5, -LANE),
-    (247.6, 29.0, 1.0), (290.3, 30.0, -1.0),
-    (402.5, 24.0, 2.8), (433.0, 29.0, -2.8),
+    (26.3, 26.0, -1.6), (63.0, 24.5, 1.6),
+    (190.6, 20.0, -LANE),
+    (247.6, 24.5, 1.0), (290.3, 27.0, -1.0),
+    (403.0, 21.5, 2.25), (432.0, 26.5, -2.25),
 )
 # les rangs des manœuvres dans la table, par lieu (SLALOM_ZONES, les audits)
 ESQ_AVENUE, ESQ_RUE, ESQ_PONT, ESQ_JETEE = (0, 1), (2, 2), (3, 4), (5, 6)
@@ -279,6 +284,10 @@ voie = voie_simulee
 LIM = dict(slip_drag=0.07, counter=0.78, derapages=[DERAP2, DERAP5], pivot=1.4, pivot_tau=(0.6, 0.35),
            pivot_smooth=0.45, steer_geo=True, front_slip=4.0, steer_rate=90.0)
 JERK = 12.0 * 0.72
+# (v11, SPEC §18.70 et 18.71 : toutes les voitures roulent sur μ 1,0, le mouillé en tenait 0,70. Les plafonds
+# « du mouillé » des contrôles se relèvent de ce seul rapport, 1,43, pas au cas par cas)
+MOUILLE = 0.70
+ADHERENCE = D.CAR["mu"] / MOUILLE
 T_SPAN = (-2.0, 40.0)                       # s : la table de la conduite (au-delà de l'arrêt, elle reste arrêtée)
 
 
@@ -322,7 +331,132 @@ def _drive():
                           ease=max(e2, e5), t_span=T_SPAN)
 
 
-ROUTE, PLAN = _drive()                      # le plan du conducteur : la conduite dessinée d'avant (vitesse, horaire)
+ROUTE, PLAN_DESSINE = _drive()              # la route, et la conduite dessinée d'avant : l'horaire jusqu'à la v10
+
+# ---- l'horaire du conducteur depuis la v11 (SPEC §18.70) : celui de la conduite dessinée, sauf dans les deux virages
+# où il est re-résolu pour qu'elle y entre plus vite (68 et 66 km/h au lieu de 48 et 53). Une fenêtre par virage, de
+# l'image f0 à l'image f1, faite de nœuds (instant, vitesse, accélération) reliés par des quintiques (à-coup nul aux
+# nœuds) : la croisière d'entrée (v_in ; None : la relance du plan d'avant, prolongée), le freinage b (m/s²) dès
+# l'image fb, la vitesse d'entrée ve tenue jusqu'à ce qu'il jette la berline (fs), ce que la glisse lui prend (a_s),
+# puis la relance (a_c, sans palier) jusqu'au plan d'avant, retrouvé à f1 avec sa vitesse et son accélération.
+# L'image fm où la glisse cesse de ralentir est résolue (dichotomie) pour que la fenêtre couvre exactement la distance
+# du plan d'avant : hors des fenêtres rien ne bouge, ni une image ni un lieu (étoiles 3, 4 et 6, arrêt). Ce que les
+# virages gagnent, l'avenue le rend (81,6 km/h au lieu de 85) et, au port, la tenue à 66 km/h avant le virage.
+# Ce qui ne se gagne pas : la crête du rond-point (image 153, dans l'arc) et le barrage (image 255, lieu figé) fixent
+# 48 km/h de moyenne entre les deux ; sortie plein gaz, la berline arriverait 6 m trop tôt au barrage.
+V_AVENUE = 81.6 / 3.6                       # l'avenue de la v11 (85 km/h avant : V_LANCEE, la conduite dessinée)
+VIRAGES = (
+    dict(f0=T_SPAN[0] * FPS, f1=255.0, v_in=V_AVENUE, fb=79.4, b=6.5, ve=68.0 / 3.6, fs=128.0, a_s=-3.2, a_c=2.0),
+    dict(f0=356.0, f1=567.0, v_in=None, fb=371.0, b=8.0, ve=66.0 / 3.6, fs=428.0, a_s=-3.2, a_c=2.0),
+)
+VIRAGE_RAMPES = (8.0, 4.0)                  # demi-images de mise en place : du freinage, des autres changements
+
+
+def _h5(k0, k1, t):
+    """(v, a) à l'instant t entre deux nœuds (t, v, a) : la quintique d'Hermite à à-coup nul aux deux nœuds."""
+    T = k1[0] - k0[0]
+    u = (t - k0[0]) / T
+    u2 = u * u
+    u3, u4, u5 = u2 * u, u2 * u2, u2 * u2 * u
+    v = ((1 - 10 * u3 + 15 * u4 - 6 * u5) * k0[1] + (u - 6 * u3 + 8 * u4 - 3 * u5) * T * k0[2]
+         + (10 * u3 - 15 * u4 + 6 * u5) * k1[1] + (-4 * u3 + 7 * u4 - 3 * u5) * T * k1[2])
+    a = ((-30 * u2 + 60 * u3 - 30 * u4) * k0[1] / T + (1 - 18 * u2 + 32 * u3 - 15 * u4) * k0[2]
+         + (30 * u2 - 60 * u3 + 30 * u4) * k1[1] / T + (-12 * u2 + 28 * u3 - 15 * u4) * k1[2])
+    return v, a
+
+
+def _noeuds(base, fm, f0, f1, v_in, fb, b, ve, fs, a_s, a_c):
+    """Les nœuds (t s, v m/s, a m/s²) de la fenêtre d'un virage (VIRAGES) dont la glisse ralentit jusqu'à l'image fm."""
+    rb, rr = VIRAGE_RAMPES
+    v0, a0 = (base.speed(f0 / FPS), base.along(f0 / FPS)) if v_in is None else (v_in, 0.0)
+    v1 = v0 + a0 * (fb - f0) / FPS
+    k = [(f0, v0, a0), (fb, v1, a0)]
+    f2, v2 = fb + 2 * rb, v1 + 0.5 * (a0 - b) * (2 * rb / FPS)
+    k.append((f2, v2, -b))                              # le freinage installé
+    v3 = ve + b * rr / FPS
+    f3 = f2 + (v2 - v3) / b * FPS
+    k.append((f3, v3, -b))
+    k.append((f3 + 2 * rr, ve, 0.0))                    # la vitesse d'entrée
+    f5 = max(f3 + 2 * rr + 0.5, fs - rr)
+    k.append((f5, ve, 0.0))
+    f6, v6 = f5 + 2 * rr, ve + 0.5 * a_s * (2 * rr / FPS)
+    k.append((f6, v6, a_s))                             # il la jette : la glisse ralentit
+    v7 = v6 + a_s * (fm - rr - f6) / FPS
+    k.append((fm - rr, v7, a_s))
+    k.append((fm + rr, v7 + 0.5 * (a_s + a_c) * (2 * rr / FPS), a_c))      # la relance
+    k.append((f1, base.speed(f1 / FPS), base.along(f1 / FPS)))
+    return [(f / FPS, v, a) for f, v, a in k]
+
+
+class Horaire:
+    """La vitesse et l'accélération du plan au fil du temps (tables au 1/240 de seconde sur T_SPAN) : celles de la
+    conduite dessinée, les fenêtres des virages posées dessus. speed(t), along(t), t_stop : ce que le reste en lit."""
+    H = 1.0 / 240.0
+
+    def __init__(self, base):
+        self.t_stop = base.t_stop
+        self.k0 = int(round(T_SPAN[0] / self.H))
+        n = int(round((T_SPAN[1] - T_SPAN[0]) / self.H)) + 1
+        self.v = [base.speed((self.k0 + k) * self.H) for k in range(n)]
+        self.a = [base.along((self.k0 + k) * self.H) for k in range(n)]
+        self.fm = []
+
+    def pose(self, noeuds, v, a):
+        """Écrit la fenêtre (ses nœuds) dans les tables v, a."""
+        j = 0
+        for k in range(max(0, int(math.ceil(noeuds[0][0] / self.H - 1e-9)) - self.k0), len(v)):
+            t = (self.k0 + k) * self.H
+            if t > noeuds[-1][0] + 1e-9:
+                break
+            while j < len(noeuds) - 2 and t > noeuds[j + 1][0]:
+                j += 1
+            v[k], a[k] = _h5(noeuds[j], noeuds[j + 1], t)
+
+    def distance(self, v, ta, tb):
+        """Les mètres parcourus de ta à tb (s) à la vitesse de la table v."""
+        ka, kb = int(round(ta / self.H)) - self.k0, int(round(tb / self.H)) - self.k0
+        return sum(0.5 * (v[k] + v[k + 1]) for k in range(ka, kb)) * self.H
+
+    def _lit(self, tab, t):
+        u = t / self.H - self.k0
+        k = int(math.floor(u))
+        if k < 0:
+            return tab[0]
+        if k >= len(tab) - 1:
+            return tab[-1]
+        return tab[k] + (tab[k + 1] - tab[k]) * (u - k)
+
+    def speed(self, t):
+        return self._lit(self.v, t)
+
+    def along(self, t):
+        return self._lit(self.a, t)
+
+
+def _horaire():
+    """L'horaire de la v11 : chaque fenêtre de VIRAGES résolue sur la distance du plan d'avant (de l'image 0 du film,
+    ou du début de la fenêtre, jusqu'à sa fin)."""
+    h = Horaire(PLAN_DESSINE)
+    for p in VIRAGES:
+        ta, tb = max(0.0, p["f0"]) / FPS, p["f1"] / FPS
+        but = h.distance(h.v, ta, tb)
+
+        def ecart(fm):
+            v, a = list(h.v), list(h.a)
+            h.pose(_noeuds(PLAN_DESSINE, fm, **p), v, a)
+            return h.distance(v, ta, tb) - but
+        lo, hi = p["fs"] + 10.0, p["f1"] - 30.0
+        if not ecart(lo) > 0.0 > ecart(hi):
+            raise ValueError(f"l'horaire du virage {p['f1']:g} n'a pas de solution : {ecart(lo):+.2f} m, {ecart(hi):+.2f} m")
+        for _ in range(40):
+            mid = 0.5 * (lo + hi)
+            lo, hi = (mid, hi) if ecart(mid) > 0.0 else (lo, mid)
+        h.fm.append(0.5 * (lo + hi))
+        h.pose(_noeuds(PLAN_DESSINE, h.fm[-1], **p), h.v, h.a)
+    return h
+
+
+PLAN = _horaire()                           # le plan du conducteur : l'horaire (vitesse, accélération, arrêt)
 T_PLAN = PLAN.t_stop                        # s : l'arrêt du plan sur la pointe (la durée de FIN6 en sort, figée)
 
 # ---- les tronçons du rendu : une scène par lieu, sa fenêtre de la conduite (images). Leurs raccords tombent aux
@@ -330,13 +464,16 @@ T_PLAN = PLAN.t_stop                        # s : l'arrêt du plan sur la pointe
 # côtés, même monde : ville.py charge les voisins). Calculés sur la conduite depuis les joints (JOINTS, abscisses de
 # la route : côté ville comptées depuis AV_AVANT, côté eau depuis le pied du pont) ; test_motion.test_parcours
 # vérifie qu'ils tombent où ils doivent (python3 tools/film3d/parcours.py les imprime).
-JOINTS = (("P1", 22.501 + AV_AVANT),                  # l'avenue, avant son freinage d'avant (OUV et P1 : scène A)
-          ("P2", 53.263 + AV_AVANT),                  # l'avenue contre le rond-point (y_F −19)
-          ("P3", 112.968 + AV_AVANT),                 # dans la rue, 11 m après le rond-point
-          ("P4", 188.563 + AV_AVANT),                 # la tête de pont (y −328)
-          ("P5", S_PIED + 0.39),                      # le pied de la rampe
-          ("P6", S_PIED + 33.03),                     # le terre-plein du port contre la jetée
-          ("FIN6", S_PIED + 119.07))                  # l'entrée de la pointe
+# Depuis la v11 l'horaire change dans les deux virages mais pas le montage : les raccords gardent leurs images (celles
+# que ces joints donnaient sur l'horaire d'avant, FIGE) et tombent là où la berline se trouve alors, à quelques mètres
+# des joints d'avant sur la même route (JOINTS, plus bas : les abscisses qui en sortent).
+RACCORD_IMAGES = (("P1", 75),          # l'avenue (OUV et P1 : scène A)
+                  ("P2", 108),          # l'avenue contre le rond-point
+                  ("P3", 215),          # dans la rue, après le rond-point
+                  ("P4", 318),          # la tête de pont (y −328)
+                  ("P5", 426),          # le pied de la rampe
+                  ("P6", 486),          # le terre-plein du port contre la jetée
+                  ("FIN6", 619))        # l'entrée de la pointe
 _TS = []
 
 
@@ -356,8 +493,8 @@ def _t_at(s):
 
 
 START = {"OUV": 0}                # première image globale de chaque tronçon (0 = OUV/1)
-START.update({n: int(round(_t_at(s) * FPS)) for n, s in JOINTS})
-_NOMS = ("OUV",) + tuple(n for n, _ in JOINTS)
+START.update(RACCORD_IMAGES)
+_NOMS = ("OUV",) + tuple(n for n, _ in RACCORD_IMAGES)
 SHOTS = tuple((a, START[b] - START[a]) for a, b in zip(_NOMS, _NOMS[1:-1] + ("FIN6",)))
 TOTAL = START["FIN6"]             # la poursuite, jusqu'à l'entrée de la pointe
 # la fin à six étoiles (fin6_orbite) prolonge la conduite sans coupe : le freinage, l'arrêt, puis l'orbite, et
@@ -387,6 +524,8 @@ def _s_plan(t, _tab={}):
     return a + (b - a) * (u - k)
 
 
+JOINTS = tuple((n, _s_plan(f / FPS)) for n, f in RACCORD_IMAGES)   # les abscisses des raccords sur la route
+
 # ---- la berline simulée (dynamique.simulate) sur la route du plan (SPEC §18.61). PLAN, la conduite dessinée d'avant,
 # n'est plus que l'horaire du conducteur (vitesse au fil du temps : tronçons, étoiles et durée en sortent, inchangés) ;
 # ses dérapages dessinés (LIM["derapages"]) ne servent plus qu'à cet horaire. Les deux dérapages du film sont des
@@ -402,10 +541,10 @@ def _s_plan(t, _tab={}):
 # Le reste sort de la simulation : la montée de la glisse, le contre-braquage, le lacet, le patinage, la ligne, le
 # roulis. python3 tools/film3d/lab/dynamique/voir.py P2|P5 clé=valeur… pour essayer un geste, bilan.py pour le film.
 DERAPAGES = [
-    dict(side=1.0, t=153 / 24, peak=31.0, sag=3.0, tenue=0.35, gaz_avant=0.2, frein_jet=0.4, dv=1.2, dv_t=2.6,
-         reaction=3.0),
-    dict(side=-1.0, t=453 / 24, peak=40.5, sag=5.0, tenue=0.4, gaz_avant=0.0, frein_jet=0.4, dv=2.0, dv_t=4.0,
-         reaction=0.4),
+    dict(side=1.0, t=153 / 24, peak=36.0, sag=3.0, tenue=0.8, gaz_avant=-0.5, frein_jet=0.4, dv=0.0,
+         montee=(180.0, 75.0, 110.0), reaction=3.0),
+    dict(side=-1.0, t=453 / 24, peak=47.0, sag=5.0, tenue=0.6, gaz_avant=-0.2, frein_jet=0.4, dv=0.0,
+         montee=(260.0, 100.0, 150.0), reaction=0.4),
 ]
 # Le slalom (voie, SPEC §18.62) est la ligne que vise le conducteur : roulis, dérive arrière et contre-braquage des
 # changements de voie sortent de la simulation comme ceux des dérapages (DRIVE.voie_err, DRIVE.rear_slip).
@@ -957,16 +1096,17 @@ CAM_DEPORT = 0.018
 # côté du choc ; fondus en entrée et en sortie (quintique : ni vitesse ni accélération aux bouts), nuls bien avant
 # chaque raccord et dans les dérapages (test_contacts.test_cadre). Le choc ne bouge pas.
 # `images` : par rapport à l'image du choc (début du fondu d'entrée, plein, fin du plein, fin du fondu de sortie).
-# - avenue : le choc est à l'image 14 du film, le cadre est donc déporté dès la première image (un plan à deux
-#   voitures), puis il se recentre sur la berline qui s'échappe (fini à l'image 51). La visée seule ne suffit pas :
-#   la berline doit rester entière dans le cadre utile (bord droit ≤ 95 %), ce qui borne le déport à 0,20 et laisse
-#   la patrouille à 69–88 % des images 6 à 12. Avec 1,1 m de recul (7,3 m, dans les 5,5–10 m du bras) et 0,17 de
-#   déport, elle est à 84 % au moins de l'image 6 au choc, entière de 12 à 19, et la berline tient de 49 à 88 % de
-#   la largeur. Le recul allonge l'écart de côté que le bras prend quand la berline roule en biais après le choc
-#   (6° : 10 cm par mètre de recul, −1,15 m pour −1,1 permis) : le bras, que la ligne droite décale de 0,7 m vers
-#   la bordure, revient de 0,2 m vers la patrouille (−0,97 m).
-#   Ce que ça coûte : le phare lointain de l'ouverture (14° à droite de l'avenue, à 87–94 % de la largeur avant)
-#   est hors du bord droit jusqu'à l'image 27 et sous 95 % à la 31 (motion.PHARE_FRAMES : contrôlé de 33 à 75).
+# - avenue : le choc est à l'image 30 du film (14 dans le v10 : SPEC §18.71), la patrouille arrive de derrière ; le
+#   cadre est déporté dès la première image (un plan à deux voitures), plein jusqu'à l'image 31, puis il se
+#   recentre sur la berline qui s'échappe (fini à l'image 70). La visée seule ne suffit pas : la berline doit
+#   rester entière dans le cadre utile (bord droit ≤ 95 %), ce qui borne le déport à 0,20. Avec 1,5 m de recul
+#   (dans les 5,5–10 m du bras) la patrouille est à 83 % au moins dans le cadre les huit images d'avant le choc,
+#   entière au choc, et la berline tient de 53 à 89 % de la largeur. Le recul allonge l'écart de côté que le bras
+#   prend quand la berline roule en biais après le choc : le bras, que la ligne droite décale vers la bordure,
+#   revient de 0,2 m vers la patrouille. Un fondu de sortie plus court (21 images) ou un recul de 1,8 m demandait
+#   13 m/s² au bras entre les images 42 et 49.
+#   Ce que ça coûte : le phare lointain de l'ouverture (14° à droite de l'avenue) est hors du bord droit tant que
+#   le cadre est déporté (motion.PHARE_FRAMES : contrôlé de 52 à 75, de 33 à 75 dans le v10).
 # - pont : la patrouille double par la gauche et se rabat ; 0,11 de déport pendant qu'elle entre, sans recul
 #   (91 % au moins des images 357 à 364, 58 avant).
 CADRE_CHOCS = {
@@ -1243,7 +1383,7 @@ def mesures():
 # (shared/film/parcours.json, s'il existe) doit les porter aussi.
 FIGE = dict(START={"OUV": 0, "P1": 75, "P2": 108, "P3": 215, "P4": 318, "P5": 426, "P6": 486, "FIN6": 619},
             ETOILES={1: 77, 2: 153, 3: 255, 4: 375, 5: 453, 6: 567}, FIN6_FRAMES=101, IMAGES=720)
-CRETES = ((28.0, 32.0), (34.0, 38.0))        # ° : la crête de la glisse au rond-point, au port
+CRETES = ((32.0, 36.0), (38.0, 42.0))        # ° : la crête de la glisse au rond-point, au port (v11)
 SITE_JSON = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "shared", "film", "parcours.json")
 
 
