@@ -475,6 +475,10 @@ def setup_render(bpy, scene, a):
         r.use_simplify, r.simplify_subdivision_render = True, 0     # (les personnages lissés : 48 s sur P3, mesuré)
         return res, "workbench", "-", 0
     r.engine = "CYCLES"
+    # les volumes « biaisés » de Cycles (les pinceaux dans la brume lissés) pour tout le film : P6 seul les avait
+    # (scene_d.p6_clean_haze), la brume et le pinceau de l'hélicoptère changeaient de grain à 485 | 486 et à
+    # 618 | 619 (diag/etat_coupes.py : le seul réglage de rendu qui différait d'un tronçon à l'autre, SPEC §18.70)
+    c.volume_biased = True
     c.device = "CPU"
     device = "CPU"
     if not a.cpu and sys.platform != "darwin":       # jamais la carte graphique du Mac (règle machine)
