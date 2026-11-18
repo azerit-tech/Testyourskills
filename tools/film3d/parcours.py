@@ -487,11 +487,12 @@ def s_of_t(t):
 
 
 def vitesse_voie(t):
-    """La vitesse latérale du slalom à l'instant t (m/s, positive vers la gauche) : la pente de voie(s) fois la
-    vitesse de la berline."""
-    s = s_of_t(t)
-    dn = (voie(s + 0.05) - voie(s - 0.05)) / 0.1
-    return dn * DRIVE.speed(t) if dn else 0.0
+    """La vitesse latérale de la berline dans le slalom à l'instant t (m/s, positive vers la gauche) : celle de la
+    voiture simulée, mesurée (sa vitesse en travers du cap de la route), nulle hors des tronçons du slalom
+    (slalom_w). (Avant la fusion v10 : la pente de voie(s) fois la vitesse, que la voiture simulée ne suit qu'en
+    retard.)"""
+    w = slalom_w(t)
+    return w * DRIVE.speed(t) * math.sin(math.radians(ecart_cap(t))) if w else 0.0
 
 
 def pos_route(t):
@@ -544,16 +545,46 @@ def _smooth_sigma(t):
 # diag/audit_trafic.py : cette part ne change que l'angle sous lequel on voit la caisse, 16° au plus ; ce qui déplace
 # la berline dans le cadre est la visée, CAM_DEPORT plus bas.)
 CAM_VOIE, CAM_VOIE_RETARD = 0.65, 0.25
+# Fusion v10 (SPEC §18.67) : la berline est simulée, elle ne suit la ligne du slalom qu'en retard (0,1 à 0,2 s, 0,2 m).
+# Ôter la pente de voie(s) au cap de sa vitesse laissait donc au bras jusqu'à 6° de va-et-vient à chaque changement
+# de voie (14 m/s² par rapport à la berline au bout de ses 7 m). Dans les tronçons du slalom (SLALOM_ZONES, où la
+# route est droite ou presque), le bras suit le cap de la ROUTE à l'abscisse de la berline, plus CAM_VOIE de l'écart
+# MESURÉ entre le cap de sa vitesse et celui de la route, pris CAM_VOIE_RETARD plus tôt ; ailleurs (les deux
+# dérapages, la sortie du port où elle revient d'un mètre au large) il suit comme avant le cap de sa vitesse.
+# (s où le fondu commence, s où le bras est tout à la route, s où il l'est encore, s où le fondu finit)
+SLALOM_ZONES = (
+    (SLALOM_SIMULE[0][0] - 10.0, SLALOM_SIMULE[0][0],
+     SLALOM_SIMULE[1][0] + SLALOM_SIMULE[1][1], SLALOM_SIMULE[1][0] + SLALOM_SIMULE[1][1] + 12.0),     # l'avenue
+    (SLALOM_SIMULE[2][0] - 10.0, SLALOM_SIMULE[2][0],
+     SLALOM_SIMULE[4][0] + SLALOM_SIMULE[4][1], SLALOM_SIMULE[4][0] + SLALOM_SIMULE[4][1] + 12.0),     # la rue, le pont
+    # la jetée : la berline y arrive en revenant du large du port (4,5° d'écart à s 400) ; le fondu se fait sur ce
+    # retour et le début du premier changement de voie (plus tôt ou plus court : 10,5 à 11,4 m/s² au bras ; ici 7,2)
+    (SLALOM_SIMULE[5][0] - 6.5, SLALOM_SIMULE[5][0] + 13.5,
+     SLALOM_SIMULE[6][0] + SLALOM_SIMULE[6][1], SLALOM_SIMULE[6][0] + SLALOM_SIMULE[6][1] + 12.0))
+
+
+def slalom_w(t):
+    """1 quand la berline est dans un tronçon du slalom (SLALOM_ZONES), 0 ailleurs, fondu en quintique : la part de ses changements de voie que le bras (cap, roulis, côté) ne lit pas sur elle."""
+    s = s_of_t(t)
+    w = 0.0
+    for a0, a1, b1, b0 in SLALOM_ZONES:
+        u = max(0.0, min(1.0, (s - a0) / (a1 - a0), (b0 - s) / (b0 - b1)))
+        w = max(w, u * u * u * (10.0 + u * (6.0 * u - 15.0)))
+    return w
+
+
+def ecart_cap(t):
+    """Le cap de la vitesse de la berline moins celui de la route à son abscisse (degrés, positif à gauche)."""
+    return (DRIVE.travel(t) - ROUTE.at(s_of_t(t))[2] + 180.0) % 360.0 - 180.0
 
 
 def travel_route(t):
-    """La direction de route de la berline à l'instant t (degrés) sans son slalom : DRIVE.travel moins la pente de
-    voie(s). Le bras la suit (SPEC §18.62) : il se déporte avec elle quand elle change de voie, sans tourner avec
-    elle ; la ville glisse de côté dans le cadre, la berline garde sa place."""
-    def pente(s):
-        dn = (voie(s + 0.05) - voie(s - 0.05)) / 0.1
-        return math.degrees(math.atan(dn)) if dn else 0.0
-    return DRIVE.travel(t) - pente(s_of_t(t)) + CAM_VOIE * pente(s_of_t(t - CAM_VOIE_RETARD))
+    """La direction que suit le bras à l'instant t (degrés) : le cap de la vitesse de la berline ; dans le slalom,
+    celui de la route, plus CAM_VOIE de l'écart de la berline à ce cap CAM_VOIE_RETARD plus tôt (SPEC §18.62 : le
+    bras se déporte avec elle quand elle change de voie et tourne un peu après elle ; la ville glisse de côté dans
+    le cadre)."""
+    tr = t - CAM_VOIE_RETARD
+    return DRIVE.travel(t) - slalom_w(t) * ecart_cap(t) + slalom_w(tr) * CAM_VOIE * ecart_cap(tr)
 
 
 def _cam_table():
@@ -632,6 +663,7 @@ RIG_LENS_FREIN_A = (0.5, 4.0)     # m/s² de freinage : la focale rendue (LENS_F
 RIG_LENS_SIGMA = 0.7              # s
 RIG_SIDE_SIGMA = 0.45             # s : le passage ligne droite ↔ virage lissé d'une gaussienne centrée (il anticipe)
 RIG_FLOAT_HZ = (0.23, 0.37, 0.53)
+RIG_VOIE = 0.5                    # la part de la latérale d'un changement de voie que prend le roulis du bras
 # les clés de la version 1, gardées sous leur nom (les essais, test_motion)
 RIG_V = RIG_LEVELS[1]["V"]
 _RIG = {}
@@ -676,6 +708,13 @@ def _rig_table(level):
     for k in range(n):
         t = _T0 + k * _H
         v, a, l = DRIVE.speed(t), DRIVE.along(t), DRIVE.alat(t)
+        # dans le slalom, le bras lit le virage de la ROUTE (v² κ), pas les changements de voie de la berline
+        # (0,7 à 0,8 g alternés en 1,5 s : son roulis passait 8 °/s, il quittait sa bordure et reculait à chaque
+        # déboîtement) ; il n'en prend que RIG_VOIE pour son roulis
+        sw = slalom_w(t)
+        l_route = v * v * ROUTE.at(s_of_t(t))[3]
+        l_cote = l + sw * (l_route - l)
+        l += sw * (1.0 - RIG_VOIE) * (l_route - l)
         c = _H / (P["SPEED_TAU"] / 2.0)
         v1 += (v - v1) * c
         v2 += (v1 - v2) * c
@@ -695,7 +734,7 @@ def _rig_table(level):
             d += dv * _H
         # la ligne droite : ni virage, ni gros freinage (la meute qui remonte la berline à sa gauche reste à côté
         # d'elle à l'écran, pas derrière elle)
-        turn = M.smoothstep(RIG_SIDE_LAT[0], RIG_SIDE_LAT[1], abs(l))
+        turn = M.smoothstep(RIG_SIDE_LAT[0], RIG_SIDE_LAT[1], abs(l_cote))
         brake = M.smoothstep(RIG_SIDE_FREIN[0], RIG_SIDE_FREIN[1], -a)
         out.append([v2, a2, l2, d, (1.0 - turn) * (1.0 - brake), turn, brake,
                     M.smoothstep(RIG_LENS_FREIN_A[0], RIG_LENS_FREIN_A[1], -a)])
@@ -823,7 +862,9 @@ VISEE_SIGMA = 0.25                # s : la visée exacte lissée (les coins de l
 # 0,022 : 6,5 % de la largeur au milieu d'un changement de voie de 2,7 m (2,9 m/s). La berline tient 47 % de la
 # largeur du cadre vertical : au-delà, le phare de l'ouverture sort du cadre utile (x 95 %, test_motion v3 OUV, dès
 # 0,023) ; à 0, la patrouille 1 sortait du cadre à l'ouverture (OUV/30) avec l'écart de 2,7 m.
-CAM_DEPORT = 0.022
+# Fusion v10 : la vitesse latérale est celle de la voiture simulée (3,2 m/s au plus fort de l'avenue, 2,7 sur la
+# jetée) ; 0,018 garde le déport sous les 6 % de test_motion (5,8 %) et le phare de l'ouverture dans le cadre utile.
+CAM_DEPORT = 0.018
 
 
 def visee_u(t):
@@ -876,7 +917,9 @@ def _visee_exacte(shot, frame, glisse=True):
 # centre de la berline à 50 ± 6 %, la patrouille 1 vue) ; au rond-point
 # (3 : environ 1°), la berline vue de dos déplace peu la visée en glissant. Borné aussi par l'accélération de
 # panoramique des plans (test_v3).
-CAM_REACT = dict(hz=0.5, zeta=0.65, gain=0.5, avant=0.8, apres=2.4, fondu=0.6)
+# (avant 0,5 s, 0,8 avant la fusion v10 : la fenêtre du rond-point s'ouvrait sur la dérive que la berline garde en
+# sortant du slalom de l'avenue, 1,26 largeur/s² de panoramique à P2/2 ; à 1,2 s : 1,56)
+CAM_REACT = dict(hz=0.5, zeta=0.65, gain=0.5, avant=0.5, apres=2.4, fondu=0.6)
 _REACT = {}
 
 
@@ -915,7 +958,10 @@ def _reaction_tables():
             acc = w * w * (d - x) - 2.0 * CAM_REACT["zeta"] * w * v
             v += acc * dt
             x += v * dt
-            u = min(1.0, (n - 1 - i) / nf)
+            # (fondu aux deux bouts. À l'entrée aussi depuis la fusion v10 : la berline sort du slalom de l'avenue
+            # avec 1 à 4° de dérive qui s'éteint, le retard partait de 0,44° d'un coup à la première image de la
+            # fenêtre, soit 276 °/s² de panoramique à P1/31)
+            u = min(1.0, (n - 1 - i) / nf, i / nf)
             out.append(ev.get("reaction", CAM_REACT["gain"]) * (x - d) * u * u * (3.0 - 2.0 * u))
         tables.append((g_a, out))
     return tables
