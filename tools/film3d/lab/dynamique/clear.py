@@ -1,3 +1,5 @@
+"""Le jeu de la berline simulée contre les bordures et l'îlot du rond-point (P2), comme test_motion.test_p2 :
+python3 lab/dynamique/clear.py."""
 import sys, math
 import os; sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 import parcours as PC
@@ -30,8 +32,5 @@ def p2_clear(dr):
 
 
 if __name__ == "__main__":
-    print("old", p2_clear(PC.DRIVE))
-    # le chemin : écart à gauche de la route, de chaque côté, pour voir la place
-    for f in range(110, 215, 8):
-        t = f / 24
-        print(f, [round(v, 2) for v in (PC.DRIVE.pos(t))])
+    (gw, fw), (gb, fb) = p2_clear(PC.DRIVE)
+    print("jeu des roues %.2f m (image %.0f), de la caisse %.2f m (image %.0f)" % (gw, fw, gb, fb))

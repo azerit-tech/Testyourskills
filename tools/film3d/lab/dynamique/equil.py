@@ -1,3 +1,5 @@
+"""Les équilibres de dérive de la berline simulée (Goh et Gerdes) : pour un rayon et une glisse tenus, la vitesse, le
+contre-braquage, le patinage et la latérale. python3 lab/dynamique/equil.py : ce que la voiture peut tenir."""
 import sys, math
 import os; sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 import dynamique as D
@@ -48,7 +50,11 @@ def solve(R, beta, V0=12.0):
 
 
 for R, beta in ((30, 20), (30, 25), (30, 30), (30, 35), (22, 30), (22, 36), (22, 38)):
-    (V, d, k), f, det = solve(R, beta)
-    print(f"R {R} beta {beta}: V {V:.2f} m/s ({V*3.6:.1f} km/h) steer {math.degrees(d):.1f} kap {k:.3f} "
-          f"a_f {math.degrees(det['a_f']):.1f} a_r {math.degrees(det['a_r']):.1f} Fxr {det['Fxr']:.0f} res {max(map(abs,f)):.1e} "
-          f"alat {V*V/R:.2f}")
+    try:
+        (V, d, k), f, det = solve(R, beta)
+    except ZeroDivisionError:
+        print(f"R {R} glisse {beta} : pas d'équilibre trouvé")
+        continue
+    print(f"R {R} glisse {beta} : V {V:.2f} m/s ({V*3.6:.1f} km/h), braquage {math.degrees(d):.1f}°, patinage {k:.3f}, "
+          f"dérives avant {math.degrees(det['a_f']):.1f}° arrière {math.degrees(det['a_r']):.1f}°, poussée "
+          f"{det['Fxr']:.0f} N, latérale {V*V/R:.2f} m/s² (résidu {max(map(abs,f)):.1e})")
