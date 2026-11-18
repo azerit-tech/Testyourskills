@@ -6,7 +6,7 @@
 #
 # Variantes : base ; sans_gouttes (sphères cachées) ; sans_brume (sprites cachés) ; sans_eau ; sans_brume_ciel (la
 # brume de la scène, « haze », cachée) ; sans_faisceau (la lampe principale de l'hélicoptère éteinte) ; verre_v9 (les
-# gouttes en verre de v9, 45 % de verre) ; reflet (les gouttes en reflet seul, sans réfraction) ; sans_debruit ;
+# gouttes en verre de v9, 45 % de verre) ; sans_traces (les traces des pneus cachées) ; reflet (les gouttes en reflet seul, sans réfraction) ; sans_debruit ;
 # ech256 (256 échantillons). Écrit <out>/<PLAN>-<image>-<variante>.png et un tableau des luminances (luma.tsv) :
 # moyenne de l'image, et celles d'une boîte autour de la berline (le bas du cadre).
 import argparse
@@ -126,6 +126,8 @@ def variant(name):
         return hide(water)
     if name == "sans_brume_ciel":
         return hide(haze)
+    if name == "sans_traces":
+        return hide([o for o in scene.objects if __import__("re").match(r"^(wake|traces?)([_.:]|$)", o.name)])
     if name == "sans_faisceau":
         return hide(beam)
     if name == "verre_v9":

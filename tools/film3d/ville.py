@@ -508,6 +508,9 @@ def selftest_helico():
 def selftest_voisins():
     """Les décisions de voisins(), sans Blender, sur les vrais noms des scènes."""
     take1 = {"avenue", "rond-point", "rue", "pont"}
+    # les effets d'un voisin sortent toujours (§18.60 : les embruns de la meute de P6 sous la lampe de P5)
+    assert all(fx_voisin(n) for n in ("fx_embruns_meute_P6", "fx_gouttes_P5", "fx_brume_glisse_P2", "fx_lame_P6"))
+    assert not any(fx_voisin(n) for n in ("fxa", "port_fx", "fx", "lampe_fx_1"))
     # (a) le fond nord du rond-point (scene_f.build_backdrop) hors de sa zone : gardé dans la prise, caché au-delà
     for nom in ("av_walk_w", "av_block_w", "av_royal_3", "lamp_av_4", "prom_royal_7", "beach_n"):
         assert drapeau_voisin("rond-point", nom, True, False, take1, True) == (False, ""), nom
@@ -943,6 +946,19 @@ def heli_voisin(nom):
     return bool(HELICO.match(nom))
 
 
+# Les effets d'un voisin (fx.py : l'eau, la brume, les gerbes de la meute) sortent aussi, toujours (SPEC §18.60) :
+# ils sont tirés sur l'horloge de la scène de leur plan, pas sur celle du plan rendu, et hors des liaisons de ses
+# lampes. Le brouillon v10 au port : les embruns de la meute de P6, chargés avec la jetée dans la scène de P5, y
+# prenaient la lampe principale de l'hélicoptère (4 MW) : les paquets blancs de P5/27–60. L'eau que le plan rendu voit
+# encore d'un plan voisin, il la tire lui-même sur le temps du film (fx.EAU_PREROLL, fx.EAU_AFTER).
+FX_VOISIN = re.compile(r"^fx_")
+
+
+def fx_voisin(nom):
+    """Une famille d'un lieu voisin est-elle un effet de fx.py (retiré d'office, sans Blender) ?"""
+    return bool(FX_VOISIN.match(nom))
+
+
 def _bouge(o):
     import motion as M
     if any(c.type == "FOLLOW_PATH" and not c.mute for c in o.constraints):
@@ -1204,7 +1220,8 @@ def assembler(scene, infos, noms, base=None, plan=None, own=None, own_objs=None)
         # comparent dans la scène, à la coupe, et le champ du voisin se lit depuis sa caméra
         suit = prise and P.START[nb_plan] > P.START[plan]
         for top in _tops(objs):
-            if ((suit and TRACES.match(top.name)) if prise else is_cast(top)) or heli_voisin(top.name):
+            if ((suit and TRACES.match(top.name)) if prise else is_cast(top)) or heli_voisin(top.name) \
+                    or fx_voisin(top.name):
                 gone.update(_family(top))
         names_gone = sorted(o.name for o in _tops(gone))
         for ob in gone:
