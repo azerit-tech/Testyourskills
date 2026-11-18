@@ -168,35 +168,75 @@ if VILLE:
     _P1_Y1 = hero_pos(T49)[1] + P1_LEAD - _P1_TAB[-1][2]       # sa place au début de son freinage
 
     # En ville (17 novembre), la loi ci-dessus ne sert plus : la berline freine déjà à 6,44 m/s² quand la patrouille
-    # devrait commencer son freinage. Sa place se donne par son avance sur la berline : à P4/1 elle roule P1_BEHIND m
-    # derrière elle, à sa gauche (devant la caméra de 1,5 m, mais à 64° de son axe : hors champ, comme dans les
-    # dernières images de P3), la remonte par la gauche pendant toute la montée et la descente, et entre dans P5 dans
-    # l'état que P5 attend (p5_virage.PATROL_IN : 7 m devant, à sa vitesse d'entrée, freinage de 6,4 m/s²). Une
-    # quintique d'Hermite de P1_FROM à P5/1 (avance, vitesse et accélération relatives continues aux deux bouts).
-    P1_BEHIND, P1_FROM = -11.0, -3.0
+    # devrait commencer son freinage. Le 18 novembre (audit des mouvements) : elle n'est plus dans le cadre à P4/1.
+    # Avant, à P4/1 elle roulait déjà à côté de la berline, au bord gauche du cadre : ville.py la gardait donc dans
+    # P3 comme « entrante », figée à sa place de P4/0 (ses clés ne commencent qu'à P4/0) ; on voyait une patrouille
+    # arrêtée au milieu du pont pendant toute la fin de P3, qui partait d'un coup à 110 km/h à P4/1. Elle arrive
+    # maintenant de derrière la caméra, lancée (elle débouche du boulevard du quai, comme la meute) : à P4/1, P1_BEHIND m
+    # derrière la berline (à côté de l'objectif, hors champ), à P1_V0 km/h environ ; elle lève le pied (P1_COAST m/s²),
+    # entre dans le cadre par la gauche vers l'image 10 et double ; puis elle freine pour le port (P1_BRAKE_J d'à-coup
+    # jusqu'au freinage de P5) et entre dans P5 dans l'état qu'il attend (p5_virage.PATROL_IN : 7 m devant, à sa
+    # vitesse d'entrée, freinage de 6,4 m/s²). Une vraie conduite : sa vitesse s'intègre à rebours depuis P5/1, une
+    # accélération à à-coup borné ; l'instant de son freinage est celui qui la met à P1_BEHIND m à P4/1.
+    P1_BEHIND, P1_COAST, P1_BRAKE_J = -8.0, -0.5, 10.0
+    _P1_DT = 1.0 / 240.0
 
-    def _p1_keys():
-        """Les nœuds (t, avance, vitesse et accélération relatives) : P1_FROM ; le début du freinage de la berline
-        (T_BRAKE), où elle roule à sa vitesse ; P5/1. Entre les deux derniers, son freinage est plus fort que celui
-        de la berline d'une part constante (6,9 m/s² contre 6,44)."""
+    def _p1_accel(t, tb, a49):
+        """Son accélération : P1_COAST, puis le freinage établi de P5 (a49) à partir de tb, la rampe entre les deux à
+        P1_BRAKE_J m/s³."""
+        tr = (P1_COAST - a49) / P1_BRAKE_J
+        if t >= tb:
+            return a49
+        if t >= tb - tr:
+            return P1_COAST + (a49 - P1_COAST) * (t - (tb - tr)) / tr
+        return P1_COAST
+
+    def _p1_table(tb, v49, a49, y49, t0=-2.0):
+        """[(y, v)] au 1/240 s, de t0 à P5/1, intégrés à rebours depuis l'état de P5/1."""
+        n = int(round((T49 - t0) / _P1_DT))
+        y, v, out = y49, v49, [(y49, v49)]
+        for k in range(n):
+            t = T49 - k * _P1_DT
+            a0, a1 = _p1_accel(t, tb, a49), _p1_accel(t - _P1_DT, tb, a49)
+            v1 = v - 0.5 * (a0 + a1) * _P1_DT
+            y -= 0.5 * (v + v1) * _P1_DT
+            y, v = y, v1
+            out.append((y, v))
+        out.reverse()
+        return t0, out
+
+    def _p1_solve():
+        """(t0, table, v49, état de P5/1) : l'instant de son freinage qui la met à P1_BEHIND m à P4/1 (bissection)."""
         import p5_virage as P5
-        tb = PC.t_of("P4", brake_windows()[-1][0]) - PC.t_of("P4", 1)
-        dv = P5.PATROL_V0 - hero_speed(T49)
-        da = -P5.PATROL_IN["decel"] - _hero_acc(T49)
-        # pendant le freinage du port, son écart de vitesse est déjà celui de P5/1 : elle freine comme la berline,
-        # puis à peine plus fort à la toute fin (da)
-        mid = P5.PATROL_IN["lead"] - dv * (T49 - tb)
-        return ([(P1_FROM, P1_BEHIND, 0.0, 0.0), (tb, mid, dv, 0.0), (T49, P5.PATROL_IN["lead"], dv, da)],
-                P5.PATROL_V0, P5.PATROL_IN)
+        v49, a49 = P5.PATROL_V0, -P5.PATROL_IN["decel"]
+        y49 = hero_pos(T49)[1] + P5.PATROL_IN["lead"]
+        lo, hi = 0.8, T49
+        for _ in range(40):
+            mid = (lo + hi) / 2
+            t0, tab = _p1_table(mid, v49, a49, y49)
+            y0 = tab[int(round(-t0 / _P1_DT))][0]
+            if y0 - hero_pos(0.0)[1] < P1_BEHIND:
+                lo = mid          # trop loin derrière : freiner plus tard
+            else:
+                hi = mid
+        t0, tab = _p1_table((lo + hi) / 2, v49, a49, y49)
+        return t0, tab, (lo + hi) / 2, v49, P5.PATROL_IN
 
-    _P1_KEYS, _P1_V49, _P1_IN = _p1_keys()
+    _P1_T0, _P1_YV, P1_BRAKE_AT, _P1_V49, _P1_IN = _p1_solve()
+    P1_V0 = _P1_YV[int(round(-_P1_T0 / _P1_DT))][1] * 3.6
+
+    def _p1_y(t):
+        """Sa place le long du pont (y), table au 1/240 s ; avant la table, sa vitesse de t0 tenue."""
+        u = (t - _P1_T0) / _P1_DT
+        if u <= 0.0:
+            y, v = _P1_YV[0]
+            return y + v * (t - _P1_T0)
+        k = min(len(_P1_YV) - 2, int(u))
+        w = min(1.0, u - k)
+        return _P1_YV[k][0] + (_P1_YV[k + 1][0] - _P1_YV[k][0]) * w
 
     def _p1_lead(t):
-        if t <= P1_FROM:
-            return P1_BEHIND
-        if t >= T49:
-            return _P1_KEYS[-1][1]
-        return M._hermite5(_P1_KEYS, t - 1e-12) if t < _P1_KEYS[-1][0] else _P1_KEYS[-1][1]
+        return _p1_y(min(t, T49)) - hero_pos(min(t, T49))[1]
 
     # pendant qu'elle la remonte, côte à côte, elle passe P1_PASS m à gauche d'elle (1,5 m d'air entre les caisses),
     # et se rabat à P1_SIDE une fois devant (P1_TUCK, en images du plan), l'état que P5 attend

@@ -312,6 +312,13 @@ def patrol2_heading(t):
     return _p2().heading(t)
 
 
+# Les clés posées avant l'image 1, en images (audit des mouvements, 18 novembre) : la patrouille 2 est dans le cadre
+# de P2/1, déjà lancée (de face, au fond de l'avenue nord) ; ville.py la garde donc dans P1, à la place et dans l'état
+# de ses clés. Sans clés avant P2/1, elle y restait figée à sa première clé pendant tout P1, puis partait d'un coup :
+# la scène la clé depuis P1/1 (sa conduite, motion.drive, roule déjà tout droit dans l'avenue nord avant le plan).
+CLES_AVANT = {"patrol_2": dict(PC.SHOTS)["P1"]}
+
+
 def patrol_pos(i):
     return patrol1_pos if i == 0 else patrol2_pos
 

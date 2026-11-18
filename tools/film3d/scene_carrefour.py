@@ -359,13 +359,20 @@ def animate(scene, car, fill, patrols, pose=POSE):
         # le roulis et le tangage ne dépendent pas du rayon ni de l'empattement)
         wh, wr = M.wheels_of(body), body.get("wheel_r", 0.36)
         hd = P.patrol_heading(i)
-        ps = M.sample(in_scene(P.patrol_pos(i)), frames, slip=P.patrol_slip(i), wheel_r=wr, seed=float(i + 1),
+        # (une patrouille déjà dans le cadre à P2/1 est clée depuis le tronçon d'avant, p2_arc.CLES_AVANT : dans la
+        # ville, P1 la montre qui roule au lieu de la figer à sa première clé)
+        kf = range(frames[0] - getattr(P, "CLES_AVANT", {}).get(key, 0), frames[-1] + 1)
+        ps = M.sample(in_scene(P.patrol_pos(i)), kf, slip=P.patrol_slip(i), wheel_r=wr, seed=float(i + 1),
                       heading=(lambda t, hd=hd: P.to_scene(pose, 0.0, 0.0, hd(t))[2]) if hd else None,
                       wheelbase=body.get("wheelbase", 2.9), front=body.get("front_axle"))
         M.key_vehicle(r, ps, wheels=wh, pivot=(0.0, 0.0, 0.36), body=body)
         M.wheel_marks(wh, wr, axis="Y")
         rigs.append(r)
-    n = M.flash_bars(rigs, frames)
+    # les rampes, cinq images de décalage par patrouille (comme avant), sur toutes leurs clés
+    n = 0
+    for i, (r, key) in enumerate(zip(rigs, ("patrol_1", "patrol_2"))):
+        kf = range(frames[0] - getattr(P, "CLES_AVANT", {}).get(key, 0), frames[-1] + 1)
+        n += M.flash_bars([r], kf, shift=5 * i)
     scene.render.use_motion_blur = True
     scene.render.motion_blur_shutter = 0.5
     scene.frame_set(int(round(P.F0 + t0 * P.FPS)))

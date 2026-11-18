@@ -1743,6 +1743,12 @@ def plan_P3(scene):
                       wheel_r=body.get("wheel_r", 0.31), wheelbase=wb, front=front)
     MO.key_vehicle(rig, poses, wheels=wheels)
     MO.wheel_marks(wheels, body.get("wheel_r", 0.31))
+    # les agents du barrage, vivants (audit des mouvements, 18 novembre) : entre leurs poses clées
+    # (p3_enseignes.COVER), le corps et la tête suivent la berline qui arrive, le buste respire (lieux.officer_alive)
+    for k in range(2):
+        a = ob.get(f"agent_{k}_rig")
+        if a is not None and a.type == "ARMATURE":
+            lieux.officer_alive(a, frames, rig, seed=k + 7, aim_frames=[f for f in frames if P3.aiming(k, f)])
     # les feux stop là où elle freine à plus de 2 m/s² (après les clés de la caisse)
     import hero_cars
     for first, last in P3.brake_windows():

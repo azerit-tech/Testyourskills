@@ -1987,7 +1987,265 @@ def test_cut_pose():
               f"Δ {dp * 100:.2f} cm, lacet {dy:+.3f}°, site {ds:+.3f}°, roulis {dr:+.3f}°, focales {la:g}/{lb:g} mm")
 
 
+# ---------------------------------------------------------------- les poursuivants (audit des mouvements, 18 novembre)
+#
+# Tout ce qui roule à côté de la berline, plan par plan, dans le film à six étoiles : une conduite de voiture sur le
+# mouillé (les plafonds des patrouilles de motion.DRIVE_KINDS, plus la tolérance des différences finies), un cap qui
+# suit la route (pas de caisse qui glisse sans dérapage), jamais de choc, et à chaque jonction aucun véhicule qui
+# entre lancé dans le cadre sans avoir roulé dans le tronçon d'avant : ville.py le figerait à sa place de première
+# clé pendant tout le tronçon précédent (la patrouille du pont, arrêtée au milieu du tablier pendant la fin de P3).
+POURSUITE_PLANS = ("OUV", "P1", "P2", "P3", "P4", "P5", "P6", "FIN6")
+POURSUITE_BRAKE, POURSUITE_ACC, POURSUITE_LAT = 7.3, 4.3, 7.6     # m/s² (7, 4 et 7,5 de motion.DRIVE_KINDS)
+POURSUITE_JERK = 15.0      # m/s³ (12 voulus, différences finies sur 1/24 s)
+POURSUITE_SLIP = 20.0      # ° entre la caisse et la route (les glisses voulues : 15° au plus)
+POURSUITE_GAP = 1.0        # m d'air entre deux caisses
+POURSUITE_TWIN = 2.5       # m : ville.JUMEAU_M
+
+
+def _vehicle_rows(plan):
+    """{nom: [(image, x, y, cap ou None)]} des véhicules du plan autres que la berline, dans le repère de ville, une
+    image de plus de chaque côté, et les modules du plan."""
+    import parcours as PC
+    spec = M.shot_specs()[plan]
+    mod = spec["module"]
+    heads = mod.tracks_heading() if hasattr(mod, "tracks_heading") else {}
+    tov, rot = PC.vers_ville(plan)
+    out = {}
+    for name, fn in spec["named"].items():
+        if name == "hero":
+            continue
+        rows = []
+        for f in range(mod.F0 - 3, mod.F0 + mod.FRAMES + 3):
+            t = M.t_of(f)
+            x, y = fn(t)[:2]
+            X, Y = tov(x, y)
+            rows.append((f, X, Y, heads[name](t) + rot if name in heads else None, x, y,
+                         heads[name](t) if name in heads else None))
+        out[name] = rows
+    return out, spec, mod
+
+
+def _kin(rows):
+    """[(image, v, a_long, a_lat, jerk, glisse)] aux images du plan (différences centrées)."""
+    h = 1.0 / M.FPS
+    v, trav = {}, {}
+    for (f0, x0, y0, *_), (f1, x1, y1, *_), (f2, x2, y2, *_) in zip(rows, rows[1:], rows[2:]):
+        vx, vy = (x2 - x0) / (2 * h), (y2 - y0) / (2 * h)
+        v[f1] = math.hypot(vx, vy)
+        trav[f1] = M.heading_of(vx, vy) if v[f1] > 0.5 else None
+    head = {r[0]: r[3] for r in rows}
+    out, al = [], {}
+    fs = sorted(v)
+    for f in fs[1:-1]:
+        al[f] = (v[f + 1] - v[f - 1]) / (2 * h)
+    for f in fs[1:-1]:
+        lat = 0.0
+        if trav.get(f - 1) is not None and trav.get(f + 1) is not None:
+            d = (trav[f + 1] - trav[f - 1] + 180.0) % 360.0 - 180.0
+            lat = v[f] * math.radians(d) / (2 * h)
+        jerk = (al[f + 1] - al[f - 1]) / (2 * h) if f - 1 in al and f + 1 in al else 0.0
+        slip = None
+        if head.get(f) is not None and trav.get(f) is not None:
+            slip = abs((head[f] - trav[f] + 180.0) % 360.0 - 180.0)
+        out.append((f, v[f], al[f], lat, jerk, slip))
+    return out
+
+
+def _box_in_frame(cam, x, y, heading, dims):
+    """Un coin de la boîte du véhicule (repère de la scène) est-il dans le cadre, devant l'objectif ?"""
+    h = math.radians(heading or 0.0)
+    fx, fy = -math.sin(h), math.cos(h)
+    l, w, ht = dims
+    for a in (-0.5, 0.5):
+        for b in (-0.5, 0.5):
+            for z in (0.0, ht):
+                q = M.screen_point(cam, (x + fx * l * a + fy * w * b, y + fy * l * a - fx * w * b, z))
+                if q and 0.0 <= q[0] <= 1.0 and 0.0 <= q[1] <= 1.0:
+                    return True
+    return False
+
+
+def test_poursuivants():
+    data = {p: _vehicle_rows(p) for p in POURSUITE_PLANS}
+    worst = dict(brake=(0, ""), acc=(0, ""), lat=(0, ""), jerk=(0, ""), slip=(0, ""))
+    for p, (vehs, spec, mod) in data.items():
+        for name, rows in vehs.items():
+            for f, v, al, lat, jerk, slip in _kin(rows):
+                if not (mod.F0 <= f < mod.F0 + mod.FRAMES):
+                    continue
+                for key, val in (("brake", -al), ("acc", al), ("lat", abs(lat)), ("jerk", abs(jerk) if v > 1.0 else 0.0),
+                                 ("slip", slip or 0.0)):
+                    if val > worst[key][0]:
+                        worst[key] = (val, f"{p} {name} image {f}")
+    check(f"poursuivants : freinage ≤ {POURSUITE_BRAKE} m/s², accélération ≤ {POURSUITE_ACC}, latérale ≤ "
+          f"{POURSUITE_LAT} (les plafonds des patrouilles sur le mouillé)",
+          worst["brake"][0] <= POURSUITE_BRAKE and worst["acc"][0] <= POURSUITE_ACC and worst["lat"][0] <= POURSUITE_LAT,
+          f"freinage {worst['brake'][0]:.2f} ({worst['brake'][1]}), accélération {worst['acc'][0]:.2f} "
+          f"({worst['acc'][1]}), latérale {worst['lat'][0]:.2f} ({worst['lat'][1]})")
+    check(f"poursuivants : à-coup ≤ {POURSUITE_JERK} m/s³ (pas de départ ni d'arrêt sec)", worst["jerk"][0] <= POURSUITE_JERK,
+          f"{worst['jerk'][0]:.1f} ({worst['jerk'][1]})")
+    check(f"poursuivants : la caisse suit sa route (≤ {POURSUITE_SLIP:g}° hors glisse voulue, aucune roue qui glisse)",
+          worst["slip"][0] <= POURSUITE_SLIP, f"{worst['slip'][0]:.1f}° ({worst['slip'][1]})")
+    gaps = []
+    for p, (vehs, spec, mod) in data.items():
+        fr = range(mod.F0, mod.F0 + mod.FRAMES)
+        named = dict(spec["named"])
+        g = M.min_gap(named, fr)
+        gaps.append((g[0], p, g[1], g[2], g[3]))
+    g = min(gaps)
+    check(f"poursuivants : aucun choc (≥ {POURSUITE_GAP} m d'air en travers : {POURSUITE_GAP + 1.95:g} m de centre à "
+          f"centre au plus près)", g[0] >= POURSUITE_GAP + 1.95, f"{g[0]:.2f} m de centre à centre, {g[1]} image {g[2]} ({g[3]}, {g[4]})")
+    # les entrants lancés : vus à B/1, sans jumeau à A/fin + 1
+    bad = []
+    for a, b in zip(POURSUITE_PLANS, POURSUITE_PLANS[1:]):
+        va, _sa, ma = data[a]
+        vb, sb, mb = data[b]
+        ends = []
+        for rows in va.values():
+            r = [q for q in rows if q[0] == ma.F0 + ma.FRAMES][0]
+            ends.append((r[1], r[2]))
+        cam = sb.get("rail") or sb["cam"]
+        with M.handheld_off():
+            c = tuple(cam(M.t_of(mb.F0)))
+        for name, rows in vb.items():
+            kin = {k[0]: k[1] for k in _kin(rows)}
+            r = [q for q in rows if q[0] == mb.F0][0]
+            moving = kin.get(mb.F0, 0.0) > 1.0
+            heading = r[6]
+            if heading is None:
+                r2 = [q for q in rows if q[0] == mb.F0 + 1][0]
+                heading = M.heading_of(r2[4] - r[4], r2[5] - r[5])
+            seen = _box_in_frame(c, r[4], r[5], heading, M._dims_of(name))
+            twin = any(math.dist(e, (r[1], r[2])) < POURSUITE_TWIN for e in ends)
+            keyed = getattr(mb, "CLES_AVANT", {}).get(name, 0) >= ma.FRAMES      # clé depuis le début de A
+            if moving and seen and not twin and not keyed:
+                bad.append(f"{b} {name} ({kin[mb.F0] * 3.6:.0f} km/h)")
+    check("jonctions : aucun véhicule n'entre lancé dans le cadre sans avoir roulé avant (ville.py le figerait)",
+          not bad, ", ".join(bad) or "aucun")
+
+
+def test_agents():
+    """Les agents vivants (motion.agent_yaws) : ceux de la pointe sont dans le même état des deux côtés de la jonction
+    P6 → FIN6 (même cible, même départ du ressort, en temps du film) ; le corps tourne au plus de AGENT_TURN_MAX,
+    sans volte-face (≤ AGENT_TURN_RATE_MAX °/s), la tête au plus de AGENT_HEAD_RATE_MAX °/s, même quand la berline
+    passe à 2 m à 90 km/h (le barrage de P3) ; les poses de FIN6 viennent avant l'arrêt, celles de P3 après l'image
+    fixe."""
+    import fin6_orbite as F6
+    import p3_enseignes as P3
+    import p6_jetee as P6
+    import parcours as PC
+    join, rate_b, rate_h, span = 0.0, 0.0, 0.0, 0.0
+    for k, (a, r, _pz, _st) in enumerate(F6.COPS):
+        at = F6.polar(a, r)
+        base = M.face_yaw(at, (F6.CX, F6.CY))
+
+        def run(shift, frames):
+            return M.agent_yaws(at, base, lambda f: F6.hero_film(f + shift), frames, warm=frames[0] + shift - F6.COP_FROM)
+        y6 = run(PC.START["P6"], range(P6.F0 - 1, P6.F0 + P6.FRAMES + 1))
+        yf = run(PC.START["FIN6"], range(F6.F0 - 1, F6.F0 + F6.FRAMES + 1))
+        for g in (PC.START["FIN6"], PC.START["FIN6"] + 1):
+            for i in (0, 1):
+                join = max(join, abs(y6[g - PC.START["P6"]][i] - yf[g - PC.START["FIN6"]][i]))
+        for ys in (y6, yf):
+            seq = [ys[f] for f in sorted(ys)]
+            rate_b = max([rate_b] + [abs(q[0] - p[0]) * M.FPS for p, q in zip(seq, seq[1:])])
+            rate_h = max([rate_h] + [abs(q[1] - p[1]) * M.FPS for p, q in zip(seq, seq[1:])])
+            span = max([span] + [abs(M._wrap(q[0] - base)) for q in seq])
+    # le barrage : la berline passe à 2 m d'un agent qui lui fait face, à 25 m/s
+    pass_y = M.agent_yaws((2.0, 0.0), 0.0, lambda f: (0.0, -40.0 + 25.0 * f / M.FPS), range(0, 72))
+    seq = [pass_y[f] for f in sorted(pass_y)]
+    rate_b = max([rate_b] + [abs(q[0] - p[0]) * M.FPS for p, q in zip(seq, seq[1:])])
+    rate_h = max([rate_h] + [abs(q[1] - p[1]) * M.FPS for p, q in zip(seq, seq[1:])])
+    span = max([span] + [abs(q[0]) for q in seq])
+    check("agents : la pointe dans le même état des deux côtés de la jonction P6 → FIN6", join < 0.01,
+          f"écart {join:.4f}°")
+    check(f"agents : le corps tourne de {M.AGENT_TURN_MAX:g}° au plus, ≤ {M.AGENT_TURN_RATE_MAX:g} °/s ; la tête "
+          f"≤ {M.AGENT_HEAD_RATE_MAX:g} °/s",
+          span <= M.AGENT_TURN_MAX + 0.5 and rate_b <= M.AGENT_TURN_RATE_MAX and rate_h <= M.AGENT_HEAD_RATE_MAX,
+          f"corps {span:.1f}°, {rate_b:.0f} °/s ; tête {rate_h:.0f} °/s")
+    stop_g = PC.START["FIN6"] + F6.F_STOP
+    last = max(F6.cop_keys(k)[-1][0] for k in range(len(F6.COPS)))
+    first = min(F6.cop_keys(k)[1][0] for k in range(len(F6.COPS)))
+    dive = min(P3.COVER[k][1][0] for k in P3.COVER)
+    rise = min(P3.COVER[k][-1][0] - P3.COVER[k][1][0] for k in P3.COVER)
+    check("agents : à la pointe, les poses prises une seconde avant l'arrêt, l'une après l'autre ; au barrage, "
+          "la plongée après l'image fixe, en cinq images",
+          stop_g - 30 <= first < last <= stop_g and dive > P3.STILL_FRAME and rise >= 5,
+          f"pointe {first}→{last} (arrêt {stop_g}) ; barrage {dive} (image fixe {P3.STILL_FRAME}), {rise} images")
+
+
+def test_entrees():
+    """Les patrouilles qu'on voit vraiment (audit des mouvements, 18 novembre) : à l'ouverture, la patrouille 1 roule
+    à la hauteur de la berline, son capot dans le quart gauche du cadre, puis décroche avant le rond-point ; sur le
+    pont, la patrouille 0 n'est pas dans le cadre à P4/1 (elle arrive de derrière la caméra) et y entre ensuite."""
+    import ouv_avenue as O
+    import p4_pont as P4
+    spec = M.shot_specs()
+    sp = spec["OUV"]
+    cam = sp.get("rail") or sp["cam"]
+    us = {}
+    for f in range(1, O.FRAMES + 1):
+        t = M.t_of(f)
+        with M.handheld_off():
+            c = tuple(cam(t))
+        px, py = sp["named"]["patrol"](t)[:2]
+        us[f] = M.hero_screen(c, px, py, 0.0, 0.0, box=(5.1, 1.95, 1.5))["u1"]
+    early = min(us[f] for f in range(1, 31))
+    check("OUV : la patrouille 1 à la hauteur de la berline à l'ouverture (capot dans le cadre, images 1 à 30), "
+          "sortie par la gauche avant la fin", early >= 0.12 and us[O.FRAMES] < 0.0,
+          f"bord droit de sa boîte ≥ {early:.2f} (images 1 à 30), {us[O.FRAMES]:.2f} à la dernière")
+    sp = spec["P4"]
+    cam = sp.get("rail") or sp["cam"]
+    heads = sp["module"].tracks_heading() if hasattr(sp["module"], "tracks_heading") else {}
+    seen = []
+    for f in range(P4.F0, P4.F0 + 30):
+        t = M.t_of(f)
+        with M.handheld_off():
+            c = tuple(cam(t))
+        x, y = sp["named"]["patrol_0"](t)[:2]
+        h = heads.get("patrol_0")
+        seen.append(_box_in_frame(c, x, y, h(t) if h else 0.0, M._dims_of("patrol_0")))
+    first = seen.index(True) + P4.F0 if True in seen else None
+    check("P4 : la patrouille 0 hors du cadre à P4/1, puis y entre (arrivée de derrière la caméra)",
+          not seen[0] and first is not None and first >= P4.F0 + 6, f"première image dans le cadre : {first}")
+
+
+def test_rampes():
+    """Les rampes d'une jonction à l'autre (audit des mouvements, 18 novembre) : P5 et P6 nomment leurs véhicules
+    comme leurs scènes les rangent (« kind_i ») ; chaque véhicule qui passe une jonction de P4 à P6 (ses deux
+    places à moins de ville.JUMEAU_M à la coupe) bat dans la phase de son aîné (motion.bar_film_offset), et le
+    décalage de motion.bar_shift redonne cette phase."""
+    import p4_pont as P4
+    import p5_virage as P5
+    import p6_jetee as P6
+    import parcours as PC
+    names = (list(P5.tracks()) == ["hero"] + [f"{k}_{i}" for i, (k, *_r) in enumerate(P5.PACK_START)] and
+             list(P6.tracks()) == ["hero"] + [f"{k}_{i}" for i, (k, *_r) in enumerate(P6.COLUMN)] and
+             len(P4.PACK) == M.BAR_RANK[("P4", "van")])
+    data = {p: _vehicle_rows(p) for p in ("P4", "P5", "P6")}
+    bad, pairs = [], 0
+    for a, b in (("P4", "P5"), ("P5", "P6")):
+        va, _sa, ma = data[a]
+        vb, _sb, mb = data[b]
+        for nb, rb in vb.items():
+            r = [q for q in rb if q[0] == mb.F0][0]
+            for na, ra in va.items():
+                e = [q for q in ra if q[0] == ma.F0 + ma.FRAMES][0]
+                if math.dist((e[1], e[2]), (r[1], r[2])) < POURSUITE_TWIN:
+                    pairs += 1
+                    if M.bar_film_offset(a, na) != M.bar_film_offset(b, nb):
+                        bad.append(f"{a} {na} → {b} {nb}")
+    back = all((M.bar_shift(p, n) - PC.START[p]) % 12 == M.bar_film_offset(p, n)
+               for p in ("P5", "P6") for n in data[p][0])
+    check("rampes : chaque patrouille qui passe une jonction de P4 à P6 bat dans la même phase des deux côtés",
+          names and back and not bad and pairs >= 5, f"{pairs} jonctions, " + (", ".join(bad) or "aucun saut"))
+
+
 if __name__ == "__main__":
+    test_poursuivants()
+    test_rampes()
+    test_entrees()
+    test_agents()
     test_cut_pose()
     test_straight()
     test_braking()

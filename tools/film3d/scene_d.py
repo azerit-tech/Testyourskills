@@ -1158,12 +1158,22 @@ def fin6_pointe(frames, hero, shift=0):
     print(f"[FIN6] anneau : {len(rigs)} véhicules, {n} lumières de rampe clignotantes ; berline exclue de "
           f"{car_out_of_rigs(rigs, hero)} lumières", flush=True)
     anneau_phares_berline(rigs, hero, stop)
+    # les six agents, vivants (audit des mouvements, 18 novembre : des statues jusque-là) : l'arme basse tant qu'elle
+    # arrive, chacun prend sa pose (fin6_orbite.COP_KEYS, en images du film, décalées d'un agent à l'autre) quand elle
+    # freine sur la pointe ; le corps et la tête la suivent, ils respirent (lieux.officer_alive). P6 et FIN6 les
+    # clent sur le même temps du film : rien ne saute à la jonction.
     try:
+        n = 0
         for k, (a, r, pz, st) in enumerate(F6.COPS):
-            o = L.officer(pz, style=st, name=f"officer_{k}_{pz}")
+            keys = [(g - shift, p) for g, p in F6.cop_keys(k)]
+            o = L.officer_rig(keys, style=st, name=f"officer_{k}_{pz}")
             x, y = F6.polar(a, r)
             o.location = (x, y, 0.0)
             L.face(o, (stop.x, stop.y))
+            aim = [f for f in frames if F6.cop_aiming(k, f + shift)]
+            n += L.officer_alive(o, frames, lambda f: F6.hero_film(f + shift), seed=k + 1, aim_frames=aim,
+                                 film0=shift, warm=frames[0] + shift - F6.COP_FROM)
+        print(f"[FIN6] agents vivants : {len(F6.COPS)}, {n} images clées", flush=True)
     except Exception as e:
         print(f"[FIN6] agents non posés : {e!r}", flush=True)
     # le lampadaire de la pointe, celui de FIN (le lampadaire commun, lieux.lamp : ambre), rangé à fin6_orbite.LAMP_AT :
@@ -1509,7 +1519,8 @@ def plan_P6(scene, hidden, palier="socle"):
         M.key_vehicle(r, ps, wheels=wh, ground=p6_ground, pivot=(0.0, 0.0, 0.36))
         M.wheel_marks(wh, wr, axis="Y")
         rigs.append(r)
-    n = M.flash_bars(rigs, frames)
+    # (chacun dans la phase de son aîné de P5, motion.bar_shift : la rampe ne saute pas à la jonction)
+    n = sum(M.flash_bars([r], frames, shift=M.bar_shift("P6", f"{P6.COLUMN[i][0]}_{i}")) for i, r in enumerate(rigs))
     print(f"[P6] meute de {len(rigs)} véhicules, {n} lumières de rampe clignotantes", flush=True)
 
     # l'hélicoptère de la prise (helicos.py : un seul, helicos.N) : celui de P5, qui quitte son stationnaire pour sa
