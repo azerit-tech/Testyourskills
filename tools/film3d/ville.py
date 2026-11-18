@@ -2837,6 +2837,8 @@ def worker_prise(a):
     scene = bpy.data.scenes["ville"]
     lointains(scene, a.lointains)
     volumes(scene, False)
+    import vie                                   # la vie de la ville (SPEC §18.56) : la scène est la ville, f = g + 1
+    vie.poser(scene, plan="prise", images=list(range(0, P.TOTAL + 2)))
     r = scene.render
     r.engine = "BLENDER_WORKBENCH"
     r.resolution_x, r.resolution_y, r.resolution_percentage = 360, 640, 100

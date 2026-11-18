@@ -4,7 +4,10 @@
 #
 #   python3 tools/film3d/ville.py --cache --out VILLE [--lieux …]          # les lieux en cache, d'abord
 #   blender -b --factory-startup -P tools/film3d/diag/vue_route.py -- --ville VILLE --out DIR --tag avant \
-#     [--vues f001,f025] [--groupe eau] [--pas 12]
+#     [--vues f001,f025] [--groupe eau] [--pas 12] [--vie]
+#
+# --vie : la vie de la ville (vie.py : circulation, garées, passants, palmiers, bateaux) posée à l'image du film de
+# chaque vue (la scène est la ville, son image f est l'image f du film).
 #
 # Écrit DIR/<vue>-<tag>.png. Chaque vue a son lieu « propre » : comme render_film --ville, ses faux lointains restent
 # (ceux des autres lieux sont cachés), puis la seule mer et le seul ciel de la ville (ville.mer). Les vues d'un même
@@ -85,6 +88,9 @@ def main():
     ap.add_argument("--vues", default=None)
     ap.add_argument("--pas", type=int, default=24, help="une vue toutes les N images du film")
     ap.add_argument("--sonde", action="store_true", help="les objets vus, par bande de l'image (lancers de rayons)")
+    ap.add_argument("--vie", action="store_true", help="la vie de la ville (vie.py), à l'image de chaque vue")
+    ap.add_argument("--avant", default=None,
+                    help="avec --vie : rend aussi chaque vue sans la vie d'abord, sous ce tag (un seul chargement)")
     ap.add_argument("--cycles", type=int, default=0,
                     help="N : en éclairé, Cycles à N échantillons sur la carte graphique (machine louée seulement)")
     a = ap.parse_args(argv)
@@ -151,40 +157,47 @@ def main():
         car = bpy.data.objects.new("berline_reperee", me)
         scene.collection.objects.link(car)
         print(f"[vue] groupe {g} : {', '.join(noms)} posés en {time.time() - t0:.0f} s", flush=True)
-        for nom, _g, propre, hx, hy, cap in [v for v in todo if v[1] == g]:
-            # les faux lointains du lieu propre restent (son plan les rend), ceux des autres lieux sont cachés
-            for ob in scene.objects:
-                if ob.get("ville_lointain"):
-                    hide = ob.get("ville_lieu") != propre or bool(ob.get("ville_cache0"))
-                    ob.hide_render = ob.hide_viewport = hide
-            V.volumes(scene, False)                     # (les brumes sont des lointains de nom : cachées après)
-            bpy.context.view_layer.update()
-            dg = bpy.context.evaluated_depsgraph_get()
-            ca = math.radians(cap)
-            fx, fy = -math.sin(ca), math.cos(ca)
-            cx = hx - P.CAM_BACK * fx - P.CAM_LEFT * fy
-            cy = hy - P.CAM_BACK * fy + P.CAM_LEFT * fx
+        passes = [(a.avant, False), (a.tag, True)] if (a.vie and a.avant) else [(a.tag, a.vie)]
+        for tag, avec_vie in passes:
+            if avec_vie:
+                import vie
+                fs = sorted({int(v[0][1:]) + d for v in todo if v[1] == g for d in (-1, 0, 1)})
+                vie.poser(scene, plan=f"vues {g}", presents=set(noms), images=fs)
+            for nom, _g, propre, hx, hy, cap in [v for v in todo if v[1] == g]:
+                scene.frame_set(int(nom[1:]))
+                # les faux lointains du lieu propre restent (son plan les rend), ceux des autres lieux sont cachés
+                for ob in scene.objects:
+                    if ob.get("ville_lointain"):
+                        hide = ob.get("ville_lieu") != propre or bool(ob.get("ville_cache0"))
+                        ob.hide_render = ob.hide_viewport = hide
+                V.volumes(scene, False)                     # (les brumes sont des lointains de nom : cachées après)
+                bpy.context.view_layer.update()
+                dg = bpy.context.evaluated_depsgraph_get()
+                ca = math.radians(cap)
+                fx, fy = -math.sin(ca), math.cos(ca)
+                cx = hx - P.CAM_BACK * fx - P.CAM_LEFT * fy
+                cy = hy - P.CAM_BACK * fy + P.CAM_LEFT * fx
 
-            def sol(x, y):
-                guess = P.sol_ville(x, y)              # le tablier du pont sur son emprise (motion.pont_profil)
-                hit = V._cast_down(scene, dg, x, y, guess + 3.0, depth=12.0)
-                return hit[0] if hit else guess
+                def sol(x, y):
+                    guess = P.sol_ville(x, y)              # le tablier du pont sur son emprise (motion.pont_profil)
+                    hit = V._cast_down(scene, dg, x, y, guess + 3.0, depth=12.0)
+                    return hit[0] if hit else guess
 
-            gc, gh = sol(cx, cy), sol(hx, hy)
-            car.location = (hx, hy, gh)
-            car.rotation_euler = (0.0, 0.0, ca)
-            out = O.aim(cx, cy, P.CAM_Z + gc - gh, hx, hy)
-            yaw, pitch = math.radians(out[3]), math.radians(out[4])
-            d = Vector((-math.sin(yaw) * math.cos(pitch), -math.cos(yaw) * math.cos(pitch), math.sin(pitch)))
-            cam.location = (cx, cy, gc + P.CAM_Z)
-            cam.rotation_mode = "QUATERNION"
-            cam.rotation_quaternion = d.to_track_quat("-Z", "Y")
-            r.filepath = os.path.join(a.out, f"{nom}-{a.tag}.png")
-            if a.sonde:
-                sonde(scene, cam, nom)
-            bpy.ops.render.render(write_still=True)
-            print(f"[vue] {nom} ({propre}) : berline ({hx:.1f} ; {hy:.1f} ; {gh:.2f}) cap {cap:.0f}°, caméra "
-                  f"({cx:.1f} ; {cy:.1f} ; {gc + P.CAM_Z:.2f}) -> {r.filepath}", flush=True)
+                gc, gh = sol(cx, cy), sol(hx, hy)
+                car.location = (hx, hy, gh)
+                car.rotation_euler = (0.0, 0.0, ca)
+                out = O.aim(cx, cy, P.CAM_Z + gc - gh, hx, hy)
+                yaw, pitch = math.radians(out[3]), math.radians(out[4])
+                d = Vector((-math.sin(yaw) * math.cos(pitch), -math.cos(yaw) * math.cos(pitch), math.sin(pitch)))
+                cam.location = (cx, cy, gc + P.CAM_Z)
+                cam.rotation_mode = "QUATERNION"
+                cam.rotation_quaternion = d.to_track_quat("-Z", "Y")
+                r.filepath = os.path.join(a.out, f"{nom}-{tag}.png")
+                if a.sonde:
+                    sonde(scene, cam, nom)
+                bpy.ops.render.render(write_still=True)
+                print(f"[vue] {nom} ({propre}) : berline ({hx:.1f} ; {hy:.1f} ; {gh:.2f}) cap {cap:.0f}°, caméra "
+                      f"({cx:.1f} ; {cy:.1f} ; {gc + P.CAM_Z:.2f}) -> {r.filepath}", flush=True)
         print(f"[vue] groupe {g} en {time.time() - t0:.0f} s", flush=True)
 
 
