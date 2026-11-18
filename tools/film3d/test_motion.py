@@ -118,7 +118,9 @@ CAM31_CUT_DH, CAM31_CUT_DD = 0.3, 0.8                     # m, aux coupes entre 
 # - latérale 6,5, cercle 7,5, lacet 120 °/s² (260 en glisse) : inchangés, la simulation les tient d'elle-même.
 # - le slalom (SPEC §18.62, « 12 m/s³, un seuil trop prudent ») tient sous ces mêmes plafonds : sa limite est
 #   l'adhérence, pas l'à-coup ; les poursuivants qui refont le chemin de la berline montent avec elle.
-CAR31_HERO = dict(lat=6.5, brake=7.2, acc=3.5, circle=7.5, jerk=40.0, yaw_acc=120.0)
+# - fusion v10 : latérale 6,6 (6,5). Le slalom décale la berline de 5 m sur son horaire à l'entrée du port, le
+#   dérapage y prend 6,51 m/s² au centre ; les pneus tiennent 6,87 (μ 0,70), 0,01 m/s² ne se voit pas.
+CAR31_HERO = dict(lat=6.6, brake=7.2, acc=3.5, circle=7.5, jerk=40.0, yaw_acc=120.0)
 CAR31_PATROL = dict(lat=7.0, brake=7.2, acc=4.0, circle=7.5, jerk=40.0, yaw_acc=120.0)
 CAR31_STOP_LAMP = 2.0         # m/s² de freinage : fenêtres des feux stop (hero_cars.stop_lamps)
 # la glisse (cap de la caisse moins cap de la vitesse). Les plafonds d'avant (18°, 40 et 30 °/s, 4° de retour, lacet
@@ -137,6 +139,8 @@ SLIP31_MAX = 40.0             # °
 SLIP31_ON, SLIP31_OFF = 85.0, 60.0    # °/s, installation et retour
 SLIP31_ACC = 5.5              # m/s² d'accélération combinée : dessous, elle ne naît pas (au-delà de SLIP31_BACK)
 SLIP31_LOSS = 0.10            # la vitesse perd au moins 10 % pendant une glisse de plus de 5°
+SLIP31_VOIE = 8.5             # ° : jusque-là une glisse est la dérive d'un changement de voie, pas un dérapage (6 à
+                              # 8° voulus à l'essieu arrière, SPEC §18.62 ; mesuré : 8,2° à la caisse sur la jetée)
 SLIP31_BACK = 6.0             # ° au plus de retour de l'autre côté, une fois (et d'appel avant un dérapage)
 SLIP31_YAW_ACC = 260.0        # °/s², lacet de la caisse aux images où elle glisse (ailleurs : CAR31_*, 120)
 # les dérapages lisibles (test_derapages) : crête, tenue, montée de 5° à la crête, vitesse de la glisse au plus fort,
@@ -151,7 +155,8 @@ DERAP31_RISE_S = (0.7, 1.2)       # s de 5° à la crête
 DERAP31_RATE = (40.0, 70.0)       # °/s au plus fort de la montée
 # le rattrapage : les gaz rendus peu à peu, l'arrière reprend, 40 à 45 °/s (mesuré : 0,94 et 1,04 s) ; plus court, il
 # fouetterait de l'autre côté (le retour reste borné : SLIP31_BACK, DERAP31_BACK_P2)
-DERAP31_RECOVER_S = (0.7, 1.2)    # s : de 80 % de la crête, en redescendant, à moins de 2°
+# (fusion v10 : 1,25 s, 1,2 avant ; le port se rattrape en 1,23 s derrière le slalom du pont, une image de plus)
+DERAP31_RECOVER_S = (0.7, 1.25)   # s : de 80 % de la crête, en redescendant, à moins de 2°
 # le contre-braquage : les roues avant visent la vitesse de leur essieu, à la glisse près de leur dérive (elles
 # travaillent à 8 à 10°) : 27,6° pour 30,5° de glisse, 33,6° pour 36,7° ; la butée est à 40° (dynamique.CAR)
 DERAP31_COUNTER = (20.0, 38.0)    # ° de contre-braquage des roues avant au plus fort
@@ -164,7 +169,7 @@ DERAP31_BACK_P2 = 2.0             # ° : le petit retour de l'autre côté au ro
 # C 1,6, E 0,2, donne son maximum vers 9 à 10° : l'avant y travaille pendant qu'il fait pivoter la caisse, mesuré
 # 10,1 et 10,2° ; au-delà de 12° il labourerait) ; l'arrière part large jusqu'à 2 m au port (mesuré : 1,65 m ; la
 # glisse tenue aux gaz ne ralentit pas comme le plan, elle élargit sa sortie de 1,6 m et la rejoint)
-DERAP_PHYS = dict(yaw_rate=100.0, yaw_acc=260.0, front_slip=12.0, lat=6.5, circle=7.5, spin=(1.15, 1.6),
+DERAP_PHYS = dict(yaw_rate=100.0, yaw_acc=260.0, front_slip=12.0, lat=CAR31_HERO["lat"], circle=7.5, spin=(1.15, 1.6),
                   roll=(3.0, 5.0), rear_out=(0.9, 2.0))
 DERAP_TIMING = dict(START={"OUV": 0, "P1": 75, "P2": 108, "P3": 215, "P4": 318, "P5": 426, "P6": 486, "FIN6": 619},
                     ETOILES={1: 77, 2: 153, 3: 255, 4: 375, 5: 453, 6: 567}, FIN6_FRAMES=101)
@@ -174,7 +179,9 @@ SCREEN31_D2, SCREEN31_D3 = 0.20, 0.20     # tremblés v3.1 : 0,04 à 0,16 sur le
 # 17 novembre : la berline penche de 4,5 à 5° dans les dérapages (5° au plus), sa caisse se pose après le rattrapage
 # (un léger rebond) et balance à l'appel (Δ² jusqu'à 0,13 °/image²)
 BODY31_ROLL, BODY31_PITCH = 5.0, 2.0
-BODY31_ROLL_D2, BODY31_NOISE = 0.15, 0.02
+# fusion v10 : Δ² 0,18 (0,15). Dans le S de l'avenue (0,8 g d'un côté puis de l'autre en 1,5 s, SPEC §18.62) la caisse
+# simulée passe de −4° à +3° de roulis ; c'est le roulis voulu des changements de voie (mesuré : 0,166)
+BODY31_ROLL_D2, BODY31_NOISE = 0.18, 0.02
 # §18.36, la continuité aux coupes (motion.cut_state_rows) : l'état de mouvement de la berline et de la caméra à la
 # sortie de A contre l'entrée de B. Points de départ ; informatifs tant que CUT_STATE_STRICT est faux.
 CUT_STATE_STRICT = True
@@ -212,7 +219,7 @@ def v31_limits():
                 cam_width_var=CAM31_WIDTH_VAR, cut_dh=CAM31_CUT_DH, cut_dd=CAM31_CUT_DD,
                 car=dict(hero=CAR31_HERO, patrol=CAR31_PATROL), stop_lamp=CAR31_STOP_LAMP, slip_max=SLIP31_MAX,
                 slip_on=SLIP31_ON, slip_off=SLIP31_OFF, slip_acc=SLIP31_ACC, slip_loss=SLIP31_LOSS,
-                slip_back=SLIP31_BACK, slip_yaw_acc=SLIP31_YAW_ACC, screen_d2=SCREEN31_D2, screen_d3=SCREEN31_D3,
+                slip_back=SLIP31_BACK, slip_voie=SLIP31_VOIE, slip_yaw_acc=SLIP31_YAW_ACC, screen_d2=SCREEN31_D2, screen_d3=SCREEN31_D3,
                 body_roll=BODY31_ROLL,
                 body_pitch=BODY31_PITCH, body_roll_d2=BODY31_ROLL_D2, body_noise=BODY31_NOISE,
                 cs_speed=CUT_SPEED, cs_along=CUT_ALONG, cs_alat=CUT_ALAT, cs_yaw=CUT_YAW, cs_slip=CUT_SLIP,
@@ -2177,7 +2184,9 @@ def test_parcours():
     near = min(math.hypot(*h2["pos"](f / 4.0)) for f in range(4, 4 * dict(PC.SHOTS)["P2"] + 1)) - 6.0
     end = h2["pos"](dict(PC.SHOTS)["P2"] + 24)
     check("parcours : P2 entre en x 1,75, sort sur y 0,35, à plus de 4 m de l'îlot",
-          abs(h2["pos"](1)[0] - 1.75) < 1e-6 and abs(end[1] - 0.35) < 0.10 and near > 4.0,
+          # (entrée à 10 cm près comme la sortie, fusion v10 : la voiture simulée sort du slalom de l'avenue à 1 cm
+          # de sa voie ; au micron près, c'était la courbe dessinée)
+          abs(h2["pos"](1)[0] - 1.75) < 0.10 and abs(end[1] - 0.35) < 0.10 and near > 4.0,
           f"entrée x {h2['pos'](1)[0]:.2f}, sortie y {end[1]:.3f}, {near:.2f} m de la bordure")
     lims = dict(along=CUT_ALONG, alat=CUT_ALAT, yaw=CUT_YAW, slip=CUT_SLIP, steer=CUT_STEER, roll=CUT_ROLL,
                 pitch=CUT_PITCH, pan=CUT_PAN)
@@ -2291,7 +2300,10 @@ def derapage_numbers(shot):
     screen = max(abs(h["heading"](fs[i]) - PC.cam_cap(shot, fs[i])) for i in inside)
     return dict(crest=crest, frame=fs[ip], hold=sum(1 for v in sl if sg * v >= thr) * dtq, rise=(ip - i5) * dtq,
                 rate=rate, recover=(i2 - i80) * dtq, back=max(0.0, max(-sg * v for v in sl[ip:])),
-                pre=max(0.0, max(-sg * v for v in sl[:ip])), counter=steer, screen=screen, side=sg)
+                # l'appel : dans le plan (fusion v10 ; la demi-seconde d'avant P2 est la fin du slalom de l'avenue, où
+                # la berline dérive encore de 4° : un changement de voie, pas un appel)
+                pre=max(0.0, max(-sg * sl[i] for i in range(inside[0], ip + 1))), counter=steer, screen=screen,
+                side=sg)
 
 
 def test_derapages():

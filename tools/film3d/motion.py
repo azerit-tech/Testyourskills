@@ -2097,11 +2097,15 @@ def shot_specs():
                     frames=rng(mod), tracks=list(named.values()), named=named, seed=seed(name), **kw)
 
     return {
-        "OUV": plan(OUV, OUV.camera, "cam", hero=OUV.hero_pos),
-        "P1": plan(P1, P1.camera, "cam", hero=P1.hero_pos),
+        # (le cap de la caisse partout, depuis la fusion v10 : dans le slalom la berline simulée dérive de 4 à 8° ;
+        # sans lui les mesures de OUV, P1 et P4 la croyaient dans l'axe de sa vitesse, 3° d'écart de glisse à la
+        # coupe P3 → P4 pour une seule et même voiture)
+        "OUV": plan(OUV, OUV.camera, "cam", hero=OUV.hero_pos, heading=OUV.hero_heading),
+        "P1": plan(P1, P1.camera, "cam", hero=P1.hero_pos, heading=P1.hero_heading),
         "P2": plan(P2, P2.camera, "cam", hero=P2.hero_pos, heading=P2.hero_heading),
         "P3": plan(P3, P3.camera, "cam", hero=P3.hero_pos, heading=P3.hero_heading),
-        "P4": plan(P4, P4.camera, "cam_P4", hero=P4.hero_pos, ground=lambda x, y: (_bridge_z(y),)),
+        "P4": plan(P4, P4.camera, "cam_P4", hero=P4.hero_pos, heading=P4.hero_heading,
+                   ground=lambda x, y: (_bridge_z(y),)),
         # le pied de la rampe du pont (parcours.sol : le tablier) sous la caméra des premières images de P5
         "P5": plan(P5, P5.camera, "cam_P5", hero=P5.hero_pos, slip=P5.hero_slip,
                    ground=lambda x, y: (PC.sol("P5", x, y),)),
@@ -3014,8 +3018,15 @@ def plan_checks31(d, lim, own):
                 if s[g] * sg > 10.0:
                     return True
             return False
+        # (ni au frein à main : roues arrière bloquées dans les huit images d'avant, l'arrière glisse sans que le
+        # centre de la caisse dépasse l'adhérence ; fusion v10, le jeté du rond-point à 5,48 m/s² pour 5,5)
+        spin = getattr(d["module"], "hero_spin", None)
+
+        def locked(f):
+            return spin is not None and min(spin(t_of(g, d["f0"], fps)) for g in range(f - 8, f + 1)) < 0.3
         early = [f for f, v in grow.items() if v > 2.0 and abs(s[f]) > max(1.0, lim["slip_back"])
-                 and max(hero["acc"].get(g, 0.0) for g in range(f - 6, f + 1)) < lim["slip_acc"] and not sliding(f)]
+                 and max(hero["acc"].get(g, 0.0) for g in range(f - 6, f + 1)) < lim["slip_acc"] and not sliding(f)
+                 and not locked(f)]
         add(f"glisse nulle sous {lim['slip_acc']:g} m/s² d'accélération combinée", not early,
             f"elle croît sans adhérence dépassée : images {early[:8]}" if early else "tient")
         runs = _runs_signed(s, 1.0)
@@ -3034,9 +3045,15 @@ def plan_checks31(d, lim, own):
             # une glisse déjà en cours à la première image (la fin d'un dérapage du tronçon d'avant) a perdu sa
             # vitesse avant : elle ne se juge ici que sur son retour
             cont = fr[0] <= frames[0] + 1 and abs(s[fr[0]]) >= 5.0
-            good = (cont or loss >= lim["slip_loss"] - 1e-9) and back <= lim["slip_back"] + 1e-9 and not more
+            # un changement de voie (crête ≤ slip_voie) : la dérive du slalom, 6 à 8° voulus à l'essieu arrière
+            # (SPEC §18.62), gaz tenus : pas un dérapage, elle ne se juge ni sur la vitesse perdue ni sur son retour
+            # (le changement de voie suivant, de l'autre côté)
+            lane = not cont and peak <= lim.get("slip_voie", 0.0) + 1e-9
+            good = lane or ((cont or loss >= lim["slip_loss"] - 1e-9) and back <= lim["slip_back"] + 1e-9
+                            and not more)
             ok = ok and good
-            msgs.append(f"images {fr[0]}–{fr[-1]} : crête {peak:.0f}°, vitesse {-loss * 100:+.0f} %, retour {back:.1f}°"
+            msgs.append(f"images {fr[0]}–{fr[-1]} : " + ("changement de voie, " if lane else "")
+                        + f"crête {peak:.0f}°, vitesse {-loss * 100:+.0f} %, retour {back:.1f}°"
                         f"{', puis encore' if more else ''}, contre-braquage {counter * 100:.0f} % des images")
         add(f"glisse : vitesse −{lim['slip_loss'] * 100:.0f} % au moins, un seul retour ≤ {lim['slip_back']:g}°, "
             f"contre-braquage", ok, " ; ".join(msgs) if msgs else "aucune glisse de plus de 5°")
