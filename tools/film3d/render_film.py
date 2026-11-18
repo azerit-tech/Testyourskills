@@ -67,7 +67,8 @@ TRAJ = {"OUV": "ouv_avenue", "P1": "p1_avenue", "P2": "p2_arc", "P3": "p3_enseig
 FULL = (720, 1280)
 DRAFT = (360, 640)
 ESSAIS = {"rugosite": 0.5, "brume": 1.0, "peinture": None, "metal": None, "vernis": None, "vernis_rugosite": None,
-          "audit": 1.0, "sol_gris": 1.0}      # audit, sol_gris : diag/audit_sol.py (le bas du cadre aux coupes)
+          "audit": 1.0, "sol_gris": 1.0,      # audit, sol_gris : diag/audit_sol.py (le bas du cadre aux coupes)
+          "bras": None, "obturateur": None}   # bras=A|B|C : la caméra d'un réglage de bras.py ; obturateur=0..1
 PAINT_ENV = {"peinture": "FILM3D_PAINT", "metal": "FILM3D_PAINT_METAL", "vernis": "FILM3D_PAINT_COAT",
              "vernis_rugosite": "FILM3D_PAINT_COAT_ROUGH"}
 
@@ -289,6 +290,8 @@ def worker(a):
         plan, arg, lambda: mod.build(arg) if arg and inspect.signature(mod.build).parameters else mod.build(),
         ASSETS, blend_out=os.environ["FILM3D_BLEND"], use=False if a.mode == "list" else None)
     seen.update(read)
+    if "bras" in essais or "obturateur" in essais:
+        poser_bras(bpy, scene, plan, mod, essais)
     if a.ville:
         # la ville autour du plan (ville.voisins) : après le cache, qui garde la scène du plan seule
         import ville
@@ -492,6 +495,44 @@ def setup_render(bpy, scene, a):
         log(f"seuil adaptatif {a.adaptive} (au lieu de celui de la scène)")
     r.use_persistent_data = not a.no_persistent      # les textures et la scène gardées d'une image à l'autre
     return res, "cycles", device, c.samples
+
+
+def poser_bras(bpy, scene, plan, mod, essais):
+    """--essai bras=A|B|C : la caméra du plan reposée au réglage de bras.py, APRÈS la construction (ou la reprise du
+    cache). La scène est toujours celle du bras A : bras.py n'est importé qu'ici, il n'entre ni dans la clé du cache
+    ni dans celle des voisins, et les trois réglages se rendent sur la même ville sans rien reconstruire. A : la
+    scène telle quelle (le témoin). B, C : bras.installer remplace la caméra de parcours (la circulation et les
+    clins d'œil, posés ensuite, suivent la nouvelle), puis les clés de la caméra sont refaites par motion.key_camera
+    sur les images de la scène (une de part et d'autre du plan). Ce qui reste de la construction, réglé sur le bras
+    A : les effets de fx.py lus sur la caméra, les places des patrouilles. --essai obturateur=<0..1> : le temps de
+    pose du flou de bougé (0,5 dans les scènes ; un réglage peut porter le sien, l'essai passe devant)."""
+    import importlib
+
+    import bras
+    import motion as M
+    nom = bras.nom_regle(essais.get("bras", "A"))
+    if nom != "A":
+        bras.installer(nom)
+        traj = importlib.import_module(TRAJ[plan])
+        fn = traj.camera
+        pose = getattr(mod, "POSE", None)
+        if pose is not None and hasattr(traj, "to_scene"):      # le rond-point : son repère dans la scène
+            def fn(t, f=traj.camera):
+                x, y, z, yaw, pitch, roll, lens = f(t)
+                x, y, yaw = traj.to_scene(pose, x, y, yaw)
+                return x, y, z, yaw, pitch, roll, lens
+        fn.bras_commun = plan                                   # (motion.camera_operator : la vibration du bras)
+        cam = scene.camera
+        frames = range(traj.F0 - 1, traj.F0 + traj.FRAMES + 1)
+        M.key_camera(cam, frames, fn)
+        scene.frame_set(scene.frame_current)
+        log(f"essai bras {nom} : caméra reposée sur {len(frames)} images ({cam.name})")
+    else:
+        log("essai bras A : la caméra de la scène, telle que construite")
+    k = essais.get("obturateur") or bras.obturateur(nom)
+    if k:
+        scene.render.motion_blur_shutter = float(k)
+        log(f"obturateur du flou de bougé : {float(k):.2f}")
 
 
 def apply_essais(bpy, scene, essais):
