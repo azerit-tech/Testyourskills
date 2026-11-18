@@ -30,6 +30,8 @@ def main():
     ap.add_argument("--gros", action="store_true")
     ap.add_argument("--couleur", default="TEXTURE")
     ap.add_argument("--carte", default="", help="x0,x1,y0,y1,pas : le sol en caractères (ville, m)")
+    ap.add_argument("--camera", default="cache", choices=("cache", "clins"),
+                    help="cache : la caméra du cache ; clins : clins.camera, le bras d'aujourd'hui (render_film --ville)")
     a = ap.parse_args(argv)
     os.makedirs(a.out, exist_ok=True)
     import clins
@@ -107,9 +109,27 @@ def main():
                 x += pas
             print(f"[carte] {y:7.1f} {row}", flush=True)
             y -= pas
+    if a.camera == "clins":
+        # la caméra de clins.camera (celle que render_film --ville rend avec le code d'aujourd'hui), à la place de
+        # celle du cache, qui peut dater d'un bras plus ancien
+        scene.camera.animation_data_clear()
+        scene.camera.data.animation_data_clear()
     for gs in [s for s in a.g.split(",") if s]:
         g = int(gs)
         scene.frame_set(fs + g - g0)
+        if a.camera == "clins":
+            from mathutils import Matrix
+            x, y, z, yaw, pitch, roll, lens = clins.camera(g)[:7]
+            ya, pa = math.radians(yaw), math.radians(pitch)
+            dv = Vector((-math.sin(ya) * math.cos(pa), -math.cos(ya) * math.cos(pa), math.sin(pa)))
+            q = dv.to_track_quat("-Z", "Y") @ Matrix.Rotation(math.radians(roll), 4, "Z").to_quaternion()
+            M = root.matrix_world
+            cam = scene.camera
+            cam.matrix_world = M @ (Matrix.Translation((x, y, z)) @ q.to_matrix().to_4x4())
+            cam.data.lens = lens
+            cam.data.sensor_fit = "VERTICAL"
+            cam.data.sensor_height = 36.0
+            bpy.context.view_layer.update()
         # la caméra du plan en ville, et où tombe chaque clin dans l'image (pixels, 360 × 640)
         from bpy_extras.object_utils import world_to_camera_view
         cm = inv @ scene.camera.matrix_world
