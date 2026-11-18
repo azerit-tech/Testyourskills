@@ -1,11 +1,10 @@
 // Le décor du profil sur la page d'une fiche (SPEC §18.28, §18.29) : son « lieu du
 // crime » (`/profiles/{id}.jpg`, 1152 × 768) en ciel de page, derrière la barre du
-// haut ; sous la fiche, la peine et la caution en texte. Le nom du profil et sa phrase
+// haut. Le nom du profil et sa phrase
 // sont sur la fiche : ils ne se répètent pas ici.
 import { useEffect, useRef, useState } from "react";
 import type { CardData } from "../../../shared/types";
 import { sceneOf, skyTone, type SkyTone } from "../../../shared/scenes";
-import { pick, useT } from "../i18n";
 
 export type { SkyTone };
 
@@ -51,18 +50,5 @@ export function ProfileSky({ card, shown, tall = false }: { card: CardData; show
         />
       </picture>
     </div>
-  );
-}
-
-/** Sous la fiche : la peine, puis la caution. Rien si la fiche n'a pas de peine. */
-export function Penalty({ card }: { card: CardData }) {
-  const { lang } = useT();
-  const sentence = card.sentence;
-  if (!sentence) return null;
-  return (
-    <p className="penalty">
-      <span>{pick(sentence.label, lang)}</span>
-      {sentence.bail && <span>{pick(sentence.bail, lang)}</span>}
-    </p>
   );
 }

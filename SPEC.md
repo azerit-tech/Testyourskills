@@ -2162,6 +2162,20 @@ Le verdict du brouillon éclairé v10 : « je trouve les coups de volant pas sup
 - **Le nom** : « Dev 5 étoiles » (« 5-star dev »), d'après les étoiles de la fiche, dans la langue de la page. Le seul nom visible reste Azerit (§18.48) : « Testyourskills » n'entre pas dans le nom, Azerit est l'organisme.
 - **Contre les bloqueurs** : comme le partage, le lien porte l'adresse de la fiche et ne vise LinkedIn que le temps du clic. Le clic compte en `card_shared`, canal `linkedin_profile`.
 
+### 18.76 La fiche épurée : frapper, puis partager (18 novembre 2026)
+
+Verdict de Jacques sur le site en ligne : « trop d'info, trop de justification, épure ». La page d'une fiche se lisait comme un rapport. Règle : chaque bloc restant sert le partage ou la fierté ; ce qui explique la note tient dans un seul pli fermé. Rien ne change au calcul ni à la grille (`docs/bareme-recrutement.md`) : seulement l'affichage.
+
+- **En haut, à 390 px** : la fiche, le verdict en une ligne (le jury : « Jury : 73 % coupable », ou « ton réseau vote dès que tu partages » ; le pari au bureau s'il y en a un), puis « Partage-la » ; la barre du pouce garde « Partager ». Le verdict n'a plus de cadre : une ligne, pas un bloc.
+- **Retiré** : la peine et la caution, sous la fiche comme sous le jury du visiteur (elles s'empilaient) ; dans le partage, la ligne d'aide permanente (elle ne paraît qu'après l'appui sur LinkedIn : « Texte copié : colle-le dans ton post LinkedIn. »), « Voir le top de la semaine » et « Ton lien reste en ligne 90 jours » (le pli « Garde ta fiche au-delà de 90 jours » le dit) ; le pli « Vois les autres pièces » (elles sont au dos de la fiche) ; « Touche un critère : sa preuve s'affiche » ; « Vous recrutez ? » pour la personne fichée (le pied de page le dit ; le visiteur, qui peut être un recruteur, le garde) ; les phrases de justification des bandes (« Personne ne t'y inscrit à ta place »), de la dénonciation (« La personne peut la reprendre… ») et de « C'est moi » (« Ta fiche reprise, tu peux… »).
+- **Replié** : « Voici comment Azerit te lit » devient le pli « Comment c'est noté » (« How it's scored »), fermé, le premier des plis, pour la personne fichée comme pour le visiteur : la ligne du recruteur, les tuiles, « Le détail, critère par critère » replié dedans, la mention « Un jeu… ». « À ton tour » ne parle plus de « ces huit critères ».
+- **Gardé** : la rangée du partage entière (Partager, Partager sur LinkedIn, Ajouter à mon profil LinkedIn, Copier le lien, Image, Story) et le rang de la semaine qui flatte ; les bandes, la dénonciation, la course aux primes ; la source qui manque (elle fait monter la note) ; le vote du jury ; les plis d'action (verrouiller, CV, email, faire appel et supprimer).
+- Page de la personne fichée à 390 px : environ 3 980 px de haut avant, 2 830 après ; celle du visiteur, 2 650 avant, 1 870 après.
+
+### 18.77 Le titre de l'attente (18 novembre 2026)
+
+Demandé par Jacques : sous la marque, l'attente dit « Découvre à quel point ton profil est recherché. » (« See how in-demand your profile is. ») au lieu de « Un dossier s'ouvre. Le tien. ». Deux lignes à 390 px, en français comme en anglais ; le pari « Tu plaides combien d'étoiles ? » reste dans l'écran (son bas à 500 px sur 844).
+
 ### 18.78 Le film final dans le site, muet, et le score qui monte (18 novembre 2026, branche `site/film-v11`)
 
 Le rendu définitif v11 (bras B, 256 échantillons, débruiteur ; `design/film/ref/iter/v11-final/`) est le film du lancement. Branche `site/film-v11`, partie de `master` (e8de088), poussée, pas fusionnée ni déployée. Le numéro 18.77 est pris par `site/fiche-epuree` : celui-ci est le 18.78.

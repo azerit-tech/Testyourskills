@@ -135,10 +135,10 @@ describe("les libellés qui tranchent (§18.48)", () => {
     expect(Object.values(DICTS.en.result.email).join(" ")).not.toMatch(/send|sending/i);
   });
 
-  it("un seul libellé pour LinkedIn, et la ligne d'aide qui dit où part le texte", () => {
+  it("un seul libellé pour LinkedIn, et la ligne qui dit, après l'appui, où est parti le texte (§18.76)", () => {
     expect(DICTS.fr.result.share.linkedin).toBe("Partager sur LinkedIn");
     expect(DICTS.en.result.share.linkedin).toBe("Share on LinkedIn");
-    expect(DICTS.fr.result.share.linkedinCopied).toBe("Ton texte part dans le presse-papiers : colle-le dans ton post LinkedIn.");
+    expect(DICTS.fr.result.share.copiedShort.replace(/[\u00a0\u202f]/g, " ")).toBe("Texte copié : colle-le dans ton post LinkedIn.");
   });
 
   it("la 404 ne nomme aucune marque", () => {

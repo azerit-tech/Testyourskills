@@ -3,7 +3,6 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import { fileOf } from "../../../shared/caseFile";
-import { usableGrid } from "../../../shared/gridText";
 import type { CardData, Fact, Finding, JobState, ProgressEvent } from "../../../shared/types";
 import { declaredOf, LEVEL_LABELS, starsFor } from "../../../shared/types";
 import { AddSource, Claim, Contest, EmailForm, Hiring, LinkedInPhoto, ShareBar, useMe, useToast } from "../components/After";
@@ -16,7 +15,6 @@ import { EntryForm } from "../components/EntryForm";
 import { PrimeRace } from "../components/Primes";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { CardNotFound, Unreachable } from "../components/ErrorPage";
-import { Dossier } from "../components/Findings";
 import { Jury, JuryLine } from "../components/Jury";
 import { MakeYours } from "../components/MakeYours";
 import { PleaStrip, PleaVerdict } from "../components/Plea";
@@ -24,7 +22,7 @@ import { RecruiterRead } from "../components/RecruiterRead";
 import { RemovalRequest } from "../components/Removal";
 import { AddLinkedin } from "../components/AddLinkedin";
 import { Pieces } from "../components/Pieces";
-import { Penalty, ProfileSky } from "../components/ProfileTile";
+import { ProfileSky } from "../components/ProfileTile";
 import { CardViewOptions } from "../card/CardView";
 import { RevealCard, useReveal } from "../components/Reveal";
 import { ShareDock } from "../components/ShareDock";
@@ -645,8 +643,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
       <p className="you-lead">
         {t.result.lead(who)} {t.result.leadYours}
       </p>
-      {/* Sans bloc des critères au-dessus, la question ne parle pas de « ces huit critères ». */}
-      <p className="you-turn">{usableGrid(item.kind === "card" ? item.card.grid : item.comparison.grid) ? t.result.yourTurn : t.result.yourTurnBare}</p>
+      {/* Les critères sont repliés (§18.76) : la question ne parle pas de « ces huit critères ». */}
+      <p className="you-turn">{t.result.yourTurnBare}</p>
       <EntryForm variant="inline" />
     </section>
   );
@@ -751,15 +749,11 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
                 {!cardLogin && <RemovalRequest cardId={id} short />}
               </Denounced>
             )}
-            {/* Le jury (§18.27) : un geste à un toucher ; la peine et la caution dans son bloc. */}
-            <Jury cardId={id} card={main} jury={kase?.jury ?? null} toast={toast.show} turn={other ? null : who}>
-              <Penalty card={main} />
-            </Jury>
-            {/* Les critères (§18.37, §18.48) : la ligne du recruteur, les huit tuiles, le détail replié ; ni nom d'école ni d'ancien employeur. */}
-            <RecruiterRead item={item} shared who={who} />
+            {/* Le jury (§18.27) : un geste à un toucher, sans peine ni caution dessous (§18.76). */}
+            <Jury cardId={id} card={main} jury={kase?.jury ?? null} toast={toast.show} turn={other ? null : who} />
             <div className="rest">
-              {/* L'enquête en direct (§18.26) : les trois trouvailles les plus fortes, chacune vers sa preuve, en ligne repliée. */}
-              <Dossier card={main} />
+              {/* « Comment c'est noté » (§18.37, §18.76) : un pli fermé ; ni nom d'école ni d'ancien employeur. */}
+              <RecruiterRead item={item} shared />
               {/* Fiche dénoncée : « C'est moi » est déjà sous la fiche. */}
               {!(wantedYou && claimOn) && <Claim cardId={id} login={cardLogin} lawyer me={me} onMe={onMe} toast={toast.show} />}
             </div>
@@ -773,13 +767,12 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
 
       {/* L'après-fiche entre en une fois, le dossier lu (ligne du jury) : rien ne pousse les blocs sous les yeux (CLS). */}
       <div className={`after${settled && (kase !== null || caseLate) ? " is-in" : ""}`} aria-hidden={!settled} inert={!settled ? true : undefined}>
-        {/* L'après-fiche dans l'ordre de §18.48 : le verdict, le partage, la bande, dénoncer, la course aux primes, les critères, puis le reste replié. */}
-        {/* Le verdict : le pari, le jury, la peine et la caution, un seul bloc aligné à gauche. Vide, il ne s'affiche pas. */}
+        {/* L'après-fiche (§18.48, épurée en §18.76) : le verdict, le partage, la bande, dénoncer, la course aux primes, puis les plis. */}
+        {/* Le verdict en une ligne (§18.76) : le jury, et le pari s'il y en a un. Ni peine ni caution. */}
         {!visitor && (
           <div className="after-head">
             <PleaVerdict cardId={id} overall={main.overall} shown={settled} />
             <JuryLine jury={kase?.jury ?? null} />
-            <Penalty card={main} />
           </div>
         )}
         {/* Sous trois étoiles : « Ajoute ton LinkedIn » (ou ton GitHub) tout de suite, avant le partage. */}
@@ -793,14 +786,12 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
         {!visitor && <Denounce cardId={id} selfLogin={cardLogin} toast={toast.show} />}
         {/* « Tu es en course » (§18.5) : seulement si une prime est ouverte, après le partage. */}
         {!visitor && <PrimeRace cardId={id} card={main} />}
-        {/* Les critères (§18.37, §18.48) : un seul bloc, la ligne du recruteur, les huit tuiles, le détail replié. */}
-        {!visitor && <RecruiterRead item={item} shared={false} who={who} />}
-        {/* La source qui manque, sous les critères qu'elle ouvre : « Ajoute ton GitHub » (§18.24) ou, en miroir, « Ajoute ton LinkedIn » (§18.37). */}
+        {/* La source qui manque, ce qui fait monter la note : « Ajoute ton GitHub » (§18.24) ou, en miroir, « Ajoute ton LinkedIn » (§18.37). */}
         {!low && missing}
         {!visitor && (
           <div className="rest">
-            {/* L'enquête en direct (§18.26) : les trois trouvailles les plus fortes, chacune vers sa preuve, en ligne repliée. */}
-            <Dossier card={main} />
+            {/* « Comment c'est noté » (§18.37, §18.76) : le seul pli qui explique la note, fermé. */}
+            <RecruiterRead item={item} shared={false} />
             {/* Ses pièces à conviction sont au dos de la fiche (§18.27), dossier à deux pièces compris. */}
             <Claim cardId={id} login={cardLogin} lawyer={!owner} me={me} onMe={onMe} toast={toast.show} />
             <LinkedInPhoto cardId={id} hasAvatar={item.kind === "card" ? !!item.card.avatarUrl : !!item.comparison.cv.avatarUrl} />
@@ -809,7 +800,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
             <Contest card={main} cardId={id} onDeleted={onDeleted} />
           </div>
         )}
-        <Hiring cardId={id} />
+        {/* « Vous recrutez ? » : au visiteur seulement (§18.76) ; à la personne fichée, le pied de page le dit. */}
+        {visitor && <Hiring cardId={id} />}
         {/* « Supprimer ma fiche » n'est que dans le pli « Fais appel » : une action, un endroit. */}
         {!visitor && (
           <div className="after-foot">

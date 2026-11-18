@@ -49,7 +49,7 @@ describe("le bloc d'une fiche dénoncée", () => {
       ["link-alt denounced-notme", "Ce n'est pas moi : faire la mienne"],
     ]);
     // Ce que fait le premier bouton, dit dessous.
-    expect(html).toMatch(/<\/button><p class="denounced-hint">Connexion GitHub : [^<]+masquer ou la supprimer\.<\/p>/);
+    expect(html).toMatch(/<\/button><p class="denounced-hint">Connexion GitHub : [^<]+rien d.{1,6}autre\.<\/p>/);
     const css = readFileSync(join(__dirname, "denounce.css"), "utf8");
     expect(css).toMatch(/@media \(max-width: 899px\) \{\s*\.denounced-by \{\s*display: none;/);
   });

@@ -174,7 +174,7 @@ const fr = frTypoDeep({
   tierCard: (level: string) => `Fiche ${level}`,
   waiting: {
     /** Le titre de l'attente, sous la marque, au-dessus de la photo d'identité. */
-    title: "Un dossier s'ouvre. Le tien.",
+    title: "Découvre à quel point ton profil est recherché.",
     /** L'enquête en direct (§18.26) : le numéro de la trouvaille versée au dossier. */
     piece: (n: number) => `Pièce ${String(n).padStart(2, "0")}`,
     /** La plaque de l'attente par la porte CV, tant que le nom n'est pas lu. */
@@ -319,7 +319,6 @@ const fr = frTypoDeep({
     leadShort: (who: string) => `La fiche de dev de ${who}.`,
     /** Au-dessus d'une fiche dénoncée, sur téléphone : ce qui arrive, en une ligne. */
     leadDenounced: (who: string, by: string | null) => (by ? `@${by} a dénoncé ${who}.` : `Quelqu'un a dénoncé ${who}.`),
-    yourTurn: "Sur ces huit critères, tu vaux combien d'étoiles\u00a0? Ton LinkedIn ou ton GitHub suffit.",
     /** Sans bloc des critères au-dessus (fiche dénoncée sans grille) : la même question, sans « ces huit critères ». */
     yourTurnBare: "Et toi, tu vaux combien d'étoiles\u00a0? Ton LinkedIn ou ton GitHub suffit.",
     /** Sous la fiche d'un dossier à deux sources (§18.36) : d'où vient la preuve, une seule note. */
@@ -349,9 +348,7 @@ const fr = frTypoDeep({
       story: "Image pour story",
       storyShort: "Story",
       native: "Partager",
-      /** La ligne d'aide sous le bouton LinkedIn, en permanence : vraie avant comme après l'appui. */
-      linkedinCopied: "Ton texte part dans le presse-papiers : colle-le dans ton post LinkedIn.",
-      /** La confirmation, après l'appui, là où la ligne d'aide n'a pas sa place (barre du pouce) : la même partout. */
+      /** La confirmation, après l'appui (§18.76) : sous le bouton du bloc de partage, en message depuis la barre du pouce. */
       copiedShort: "Texte copié : colle-le dans ton post LinkedIn.",
       copiedLink: "Lien copié.",
       downloadDemo: "Image indisponible en mode démo (rendue par le serveur).",
@@ -362,8 +359,6 @@ const fr = frTypoDeep({
       holdText: "Appuie longuement pour copier ton texte, puis colle-le dans ton post LinkedIn.",
       /* hors du partage LinkedIn : le score d'un duel, le message d'une dénonciation */
       holdMessage: "Appuie longuement pour copier ton message.",
-      /** La durée de vie du lien, dite là où on le partage (§18.48). */
-      keep: "Ton lien reste en ligne 90 jours.",
       imageAlt: "Ta fiche",
       /** Les morceaux du texte de partage, assemblés et raccourcis par lib/shareText.ts (§18.27). */
       words: {
@@ -391,8 +386,6 @@ const fr = frTypoDeep({
         `${rank}e${showsTotal(total) ? ` sur ${total}` : ""} cette semaine, à ${gap} ${gap > 1 ? "points" : "point"} du top 5`,
     /** L'écart ne se dit que s'il encourage (10 points au plus, trois étoiles au moins) : sinon le rang seul. */
     rank: (rank: number, total: number) => `${rank}e${showsTotal(total) ? ` sur ${total}` : ""} cette semaine`,
-    /** Sous les liens du partage : vers le top de la semaine, sur l'accueil. */
-    board: "Voir le top de la semaine",
       /** Le rang du top 5, écrit comme dans le texte partagé (« n° 1 cette semaine »). */
       top5: (rank: number) => `${rank === 1 ? "N° 1" : `${rank}e`} cette semaine : défends ta place jusqu'à dimanche`,
       closedLine: (rank: number, total: number, week: number) => `${rank}e${showsTotal(total) ? ` sur ${total}` : ""}, semaine ${week}`,
@@ -536,10 +529,10 @@ const fr = frTypoDeep({
     short: { XP: "Expérience", EMP: "Parcours", STK: "Stack", CODE: "Code", OWN: "Ownership", ACT: "Activité", EDU: "École", OSS: "Open source" } as Record<CriterionCode, string>,
   },
   grid: {
-    title: "Voici comment Azerit te lit",
+    /** Le seul pli qui explique la note, fermé par défaut (§18.76). */
+    title: "Comment c'est noté",
     /** Le détail replié sous les tuiles, pour tout le monde (§18.48). */
     fold: "Le détail, critère par critère",
-    titleThem: (who: string) => `Voici comment Azerit lit ${who}`,
     /** Les sources lues : une ligne par source, « pas encore au dossier » pour celle qui manque. */
     method: {
       linkedin: "Ton parcours\u00a0: LinkedIn fait foi.",
@@ -772,11 +765,11 @@ const fr = frTypoDeep({
   denounce: {
     title: "Dénonce un complice",
     /** Sous le titre : ce qui va se passer, et ce que l'autre pourra faire. */
-    intro: "Donne son pseudo GitHub : on dresse sa fiche, tu la lui envoies. La personne peut la reprendre ou la supprimer.",
+    intro: "Donne son pseudo GitHub : on dresse sa fiche, tu la lui envoies.",
     label: "Pseudo GitHub du complice",
     placeholder: "pseudo",
     /* quand le serveur lit LinkedIn (§18.48) : le champ prend un lien de profil ou un pseudo */
-    introBoth: "Donne son lien LinkedIn ou son pseudo GitHub : on dresse sa fiche, tu la lui envoies. La personne peut la reprendre ou la faire retirer.",
+    introBoth: "Donne son lien LinkedIn ou son pseudo GitHub : on dresse sa fiche, tu la lui envoies.",
     labelBoth: "Lien LinkedIn ou pseudo GitHub du complice",
     placeholderBoth: "Lien LinkedIn ou pseudo GitHub",
     invalidBoth: "Colle un lien linkedin.com/in/… ou un pseudo GitHub.",
@@ -802,7 +795,7 @@ const fr = frTypoDeep({
     lawyer: "C'est moi, je reprends ma fiche",
     /** Le même geste, dans la barre fixe du téléphone. */
     lawyerShort: "C'est moi",
-    lawyerHint: "Connexion GitHub : on lit ton pseudo public, rien d'autre. Ta fiche reprise, tu peux la masquer ou la supprimer.",
+    lawyerHint: "Connexion GitHub : on lit ton pseudo public, rien d'autre.",
     /** Fiche dénoncée par un lien LinkedIn (pas de GitHub à prouver) : la personne la refait elle-même, la nouvelle est la sienne. */
     lawyerLinkedin: "C'est moi : faire ma fiche moi-même",
     lawyerLinkedinHint: "Reprends-la : refais-la depuis ton LinkedIn, en une minute. La nouvelle fiche est à toi, tu la partages ou tu la supprimes.",
@@ -1015,7 +1008,7 @@ const en: Dict = {
   },
   tierCard: (level) => `${level} sheet`,
   waiting: {
-    title: "A file just opened. Yours.",
+    title: "See how in-demand your profile is.",
     piece: (n) => `Exhibit ${String(n).padStart(2, "0")}`,
     yourCv: "Your résumé",
     queue: (n) => (n === 1 ? "1 sheet ahead of you at the station" : `${n} sheets ahead of you at the station`),
@@ -1135,7 +1128,6 @@ const en: Dict = {
     leadYours: "Yours takes one minute, no account.",
     leadShort: (who) => `${who}'s dev rap sheet.`,
     leadDenounced: (who, by) => (by ? `@${by} turned in ${who}.` : `Someone turned in ${who}.`),
-    yourTurn: "On these eight criteria, how many stars are you? Your LinkedIn or your GitHub is all it takes.",
     yourTurnBare: "What about you, how many stars? Your LinkedIn or your GitHub is all it takes.",
     pieces: {
       line: (labels) => `Sources on file: ${labels}`,
@@ -1157,7 +1149,6 @@ const en: Dict = {
       story: "Story image",
       storyShort: "Story",
       native: "Share",
-      linkedinCopied: "Your text goes to the clipboard: paste it into your LinkedIn post.",
       copiedShort: "Text copied: paste it into your LinkedIn post.",
       copiedLink: "Link copied.",
       downloadDemo: "Image unavailable in demo mode (rendered by the server).",
@@ -1165,7 +1156,6 @@ const en: Dict = {
       holdLink: "Press and hold to copy your link.",
       holdText: "Press and hold to copy your text, then paste it into your LinkedIn post.",
       holdMessage: "Press and hold to copy your message.",
-      keep: "Your link stays up for 90 days.",
       imageAlt: "Your rap sheet",
       words: {
         plea: (pleaded, gap) => `I pleaded ${pleaded}: ${{ over: "overconfident", exact: "clear-eyed", under: "too modest" }[gap]}.`,
@@ -1182,7 +1172,6 @@ const en: Dict = {
     week: {
       line: (rank, total, gap) => `#${rank}${showsTotal(total) ? ` of ${total}` : ""} this week, ${gap} ${gap === 1 ? "point" : "points"} from the top 5`,
       rank: (rank, total) => `#${rank}${showsTotal(total) ? ` of ${total}` : ""} this week`,
-      board: "See this week's top",
       top5: (rank) => `#${rank} this week: hold your spot until Sunday`,
       closedLine: (rank, total, week) => `#${rank}${showsTotal(total) ? ` of ${total}` : ""}, week ${week}`,
       closedTop5: (week) => `Top 5 of week ${week}`,
@@ -1301,9 +1290,8 @@ const en: Dict = {
     short: { XP: "Experience", EMP: "Career", STK: "Stack", CODE: "Code", OWN: "Ownership", ACT: "Activity", EDU: "School", OSS: "Open source" },
   },
   grid: {
-    title: "How Azerit reads you",
+    title: "How it's scored",
     fold: "The detail, criterion by criterion",
-    titleThem: (who: string) => `How Azerit reads ${who}`,
     method: {
       linkedin: "Your career: we go by LinkedIn.",
       cv: "Your career: we go by your résumé.",
@@ -1516,10 +1504,10 @@ const en: Dict = {
   },
   denounce: {
     title: "Turn in an accomplice",
-    intro: "Give us their GitHub username: we draw up their rap sheet, you send it to them. They can claim it or delete it.",
+    intro: "Give us their GitHub username: we draw up their rap sheet, you send it to them.",
     label: "Accomplice's GitHub username",
     placeholder: "username",
-    introBoth: "Give us their LinkedIn link or GitHub username: we draw up their rap sheet, you send it to them. They can claim it or have it removed.",
+    introBoth: "Give us their LinkedIn link or GitHub username: we draw up their rap sheet, you send it to them.",
     labelBoth: "Accomplice's LinkedIn link or GitHub username",
     placeholderBoth: "LinkedIn link or GitHub username",
     invalidBoth: "Paste a linkedin.com/in/… link or a GitHub username.",
@@ -1541,7 +1529,7 @@ const en: Dict = {
     isYou: "Is this you?",
     lawyer: "That's me, claim my sheet",
     lawyerShort: "That's me",
-    lawyerHint: "GitHub sign-in: we read your public username, nothing else. Once claimed, you can hide or delete your sheet.",
+    lawyerHint: "GitHub sign-in: we read your public username, nothing else.",
     lawyerLinkedin: "That's me: make it myself",
     lawyerLinkedinHint: "Take it back: redo it from your LinkedIn in one minute. The new sheet is yours to share or delete.",
     notMe: "Not me: get mine",

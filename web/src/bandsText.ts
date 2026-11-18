@@ -28,7 +28,7 @@ const fr = {
   forming: "En formation",
   pick: {
     title: "Tu roules pour qui ?",
-    intro: "Tes étoiles comptent pour l'école et la boîte que tu choisis. Personne ne t'y inscrit à ta place.",
+    intro: "Tes étoiles comptent pour l'école et la boîte que tu choisis.",
     school: "Ton école",
     company: "Ta boîte",
     schoolLabel: "Cherche ton école",
@@ -136,7 +136,7 @@ const en: BandsDict = {
   forming: "Forming",
   pick: {
     title: "Who do you ride for?",
-    intro: "Your stars count for the school and the company you pick. Nobody signs you up but you.",
+    intro: "Your stars count for the school and the company you pick.",
     school: "Your school",
     company: "Your company",
     schoolLabel: "Find your school",

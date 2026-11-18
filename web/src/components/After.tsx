@@ -1,6 +1,6 @@
 // Tout ce qui vient sous la carte (§6.4), dans l'ordre de la spec.
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import type { FormEvent, MouseEvent, ReactNode } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { CardData, ComparisonData, Lang, WeekRank } from "../../../shared/types";
 import { declaredOf, LEVEL_LABELS, starsFor } from "../../../shared/types";
@@ -114,26 +114,6 @@ export function WeekLine({ week, low }: { week: WeekRank | null; low: boolean })
         ? w.line(week.rank, week.total, week.gapToTop5)
         : w.rank(week.rank, week.total);
   return <p className="week-rank">{text}</p>;
-}
-
-/** « Voir le top de la semaine » : sous les liens du partage, quand la fiche est classée. */
-function BoardLink() {
-  const { t } = useT();
-  return (
-    <a className="link-alt out-board" href={`/#${BOARD_ID}`} onClick={toBoard}>
-      {t.result.week.board}
-    </a>
-  );
-}
-
-/** L'ancre du top de la semaine, sur l'accueil (WeekBoard.tsx, WEEK_ANCHOR) : l'accueil y descend une fois posé. */
-const BOARD_ID = "semaine";
-
-/** Vers le top de la semaine : l'adresse garde son ancre, l'accueil attend sa mise en page pour y descendre. */
-function toBoard(e: MouseEvent<HTMLAnchorElement>) {
-  if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-  e.preventDefault();
-  navigate(`/${window.location.search}#${BOARD_ID}`);
 }
 
 /* ---------- partage ---------- */
@@ -404,9 +384,9 @@ export function ShareBar({ item, toast, second = false }: { item: Shareable; toa
       {/* Un bouton rose (« Partager » sur téléphone, LinkedIn ailleurs), LinkedIn en contour quand il passe second. */}
       <ShareMain kit={kit} className={`out-main${second ? " pill-ghost" : ""}`} />
       {kit.native && <LinkedInLink kit={kit} className="pill pill-ghost out-second" />}
-      {/* En permanence, sous le bouton LinkedIn : où part le texte, avant comme après l'appui. */}
+      {/* Après l'appui seulement (§18.76) : où est parti le texte. La ligne reste montée, vide, pour être lue quand elle se remplit. */}
       <p className={`out-hint${kit.textCopied ? " is-copied" : ""}`} aria-live="polite">
-        {ts.linkedinCopied}
+        {kit.textCopied ? ts.copiedShort : ""}
       </p>
       {manualCopy && <ManualCopy m={manualCopy} />}
       {/* Le bloc ne paraît qu'à qui a fait ou revendiqué la fiche ; une fiche scellée n'a pas de note à poser. */}
@@ -419,8 +399,6 @@ export function ShareBar({ item, toast, second = false }: { item: Shareable; toa
         <SaveImage kit={kit} toast={toast} />
         <SaveStory kit={kit} toast={toast} />
       </div>
-      {weekOf(id) && <BoardLink />}
-      <p className="out-keep">{ts.keep}</p>
     </section>
   );
 }
