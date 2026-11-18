@@ -152,7 +152,7 @@ describe("l'encart", () => {
 
   it("sur l'accueil, sous la fiche d'exemple, jamais au-dessus du champ ; l'accueil n'a pas de film", () => {
     expect(home.match(/<Spin /g)).toHaveLength(1);
-    expect(home).toMatch(/<ExampleCard \{\.\.\.showcase\} \/>\n[^\n]*§18\.79[^\n]*\n\s*<Spin ready place="home" \/>/);
+    expect(home).toMatch(/<ExampleCard \{\.\.\.showcase\} \/>\n\s*<\/section>\n[^\n]*§18\.79[^\n]*\n\s*<Spin ready place="home" \/>\n\s*<WeekBoard /);
     expect(home.indexOf("<Spin ")).toBeGreaterThan(home.indexOf("<EntryForm inputRef"));
   });
 

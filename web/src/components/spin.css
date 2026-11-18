@@ -54,11 +54,9 @@
 .spin-title {
   padding-left: 4px;
 }
-/* sur l'accueil, sous la fiche d'exemple : sa largeur (.showcase, styles.css) */
+/* sur l'accueil : sa place et sa largeur sont dans la grille de .home-proof (styles.css) */
 .spin-wrap.is-home {
   width: 100%;
-  max-width: 400px;
-  margin-top: 16px;
 }
 .spin-hint {
   position: absolute;

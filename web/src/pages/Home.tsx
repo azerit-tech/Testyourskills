@@ -364,9 +364,9 @@ export function Home() {
       <div className="home-proof">
         <section className="home-example">
           <ExampleCard {...showcase} />
-          {/* La caisse de la poursuite (§18.79) : la berline du film, sous la fiche d'exemple ; l'accueil n'a pas de film. */}
-          <Spin ready place="home" />
         </section>
+        {/* La caisse de la poursuite (§18.79) : la berline du film, sous la fiche d'exemple sur téléphone, sous le top de la semaine au bureau ; l'accueil n'a pas de film. */}
+        <Spin ready place="home" />
         <WeekBoard onPlay={play} />
       </div>
       {/* Les primes ouvertes (§18.4) : rien tant que la saison n'en porte pas. */}

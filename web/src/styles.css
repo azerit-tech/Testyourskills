@@ -1162,6 +1162,12 @@ button.cover-panel:focus-visible {
   margin: 0;
   padding: 0;
 }
+/* la berline (§18.79) : sur téléphone sous la fiche d'exemple, à 16 px, à sa largeur (400 px) */
+.home-proof > .spin-wrap.is-home {
+  justify-self: center;
+  max-width: 400px;
+  margin-top: calc(16px - var(--home-gap));
+}
 /* le dernier formulaire : le bloc d'appel des bandes et des primes, sur le conteneur */
 .home-last {
   gap: 16px;
@@ -1190,9 +1196,29 @@ button.cover-panel:focus-visible {
   }
   .home-proof {
     grid-template-columns: 400px minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
     column-gap: 80px;
+    row-gap: 40px;
     align-items: start;
     margin-top: calc(40px - var(--home-gap));
+  }
+  /* la fiche à gauche sur toute la hauteur ; à droite le top de la semaine, puis la berline
+     dessous, dans le blanc qu'il laissait */
+  .home-proof > .home-example {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+  }
+  .home-proof > .board {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .home-proof > .spin-wrap.is-home {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: start;
+    align-self: start;
+    max-width: 600px;
+    margin-top: 0;
   }
   /* les tableaux de l'accueil : à gauche comme tout le reste, sur toute leur colonne */
   .page-home .board {
@@ -1204,11 +1230,6 @@ button.cover-panel:focus-visible {
   }
   .page-home .board > .bands-top-all {
     justify-self: start;
-  }
-  /* la semaine vide (une seule carte « La place n° 1 est libre ») : à mi-hauteur de la fiche,
-     pas collée en haut d'une colonne vide */
-  .home-proof > .board:has(.board-empty) {
-    align-self: center;
   }
   /* le dernier formulaire : une seule colonne centrée de 560 px, le titre en grand */
   .home-last {
