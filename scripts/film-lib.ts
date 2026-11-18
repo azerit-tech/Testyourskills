@@ -383,9 +383,10 @@ export interface Fit {
  * monte de 2 tant qu'il dépasse le sien ; puis, tant que la personne charge
  * trop, le plus lourd monte encore. Il faudrait passer CRF 28 : CeilingError,
  * le montage échoue.
- * `encodeAt` encode un fichier à un CRF et rend son poids en octets.
+ * `encodeAt` encode un fichier à un CRF et rend son poids en octets ; `start`
+ * remplace START_CRF (film-assemble.ts --crf).
  */
-export function fitCeilings(size: SizeId, encodeAt: (film: FilmId, crf: number) => number, log: (m: string) => void = () => undefined): Fit {
+export function fitCeilings(size: SizeId, encodeAt: (film: FilmId, crf: number) => number, log: (m: string) => void = () => undefined, start: number = START_CRF[size]): Fit {
   const films = Object.keys(FILMS) as FilmId[];
   const crf = {} as Record<FilmId, number>;
   const bytes = {} as Record<FilmId, number>;
@@ -398,7 +399,7 @@ export function fitCeilings(size: SizeId, encodeAt: (film: FilmId, crf: number) 
     bytes[film] = encodeAt(film, next);
   };
   for (const film of films) {
-    crf[film] = START_CRF[size];
+    crf[film] = start;
     bytes[film] = encodeAt(film, crf[film]);
     while (bytes[film] > CEILINGS[size][film]) raise(film, `${bytes[film]} octets, au-dessus du plafond de ${CEILINGS[size][film]}`);
   }

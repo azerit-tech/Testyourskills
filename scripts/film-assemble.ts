@@ -11,6 +11,10 @@
 //   --plans  : les prises (défaut ~/Desktop/Azerit/design/film/plans, hors du dépôt)
 //   --slates : ignore les prises, tout en cartons
 //   --out    : les fichiers du site (défaut web/src/film/media, importés par Vite)
+//   --crf    : le CRF de départ par taille, « 720:28,540:28 » (défaut START_CRF) : le poids visé
+//              sous les plafonds (SPEC §18.77 : le film final sous le poids des fichiers d'avant)
+//   --threads: les fils de ffmpeg (défaut 2 : la machine reste utilisable)
+//   --sizes  : les tailles à encoder, « 720,540 » par défaut
 // Intermédiaires et planche des huit plans dans var/film/ (ignoré par git).
 import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -53,6 +57,12 @@ const OUT = resolve(opt("out") ?? resolve(ROOT, "web/src/film/media"));
 const WORK = resolve(ROOT, "var/film");
 const SEG = resolve(WORK, "seg");
 const ONLY_SLATES = args.includes("--slates");
+const THREADS = opt("threads") ?? "2";
+/** Les tailles à encoder (--sizes=540 : l'autre fichier est gardé tel quel, et vérifié). */
+const ENCODE = (opt("sizes") ?? "720,540").split(",").map(Number) as SizeId[];
+const START = Object.fromEntries((opt("crf") ?? "").split(",").filter(Boolean).map((kv) => kv.split(":").map(Number))) as Partial<Record<SizeId, number>>;
+/** ffmpeg avec ses fils bornés : l'option se pose juste avant le fichier de sortie. */
+const ff = (a: string[]) => run(FFMPEG, [...a.slice(0, -1), "-threads", THREADS, a[a.length - 1]]);
 mkdirSync(OUT, { recursive: true });
 mkdirSync(SEG, { recursive: true });
 
@@ -94,7 +104,7 @@ for (const shot of SHOTS) {
     const fit = windowFits(edit, n, p.fps, p.frames);
     if (!fit.ok) warn(`${shot} : ${edit.take} n'a que ${fit.available} images après l'image ${edit.in}, il en faut ${fit.needed} ; la dernière est tenue`);
     if (Math.abs(p.width / p.height - 9 / 16) > 0.01 && !edit.crop) warn(`${shot} : ${edit.take} est en ${p.width} × ${p.height}, recadré au centre en 9:16`);
-    run(FFMPEG, takeSegmentArgs(takePath, seg, edit, n, montage.grade, lutPath));
+    ff(takeSegmentArgs(takePath, seg, edit, n, montage.grade, lutPath));
     source[shot] = `${edit.take} dès l'image ${edit.in}, vitesse ${edit.speed} (${p.width} × ${p.height}, ${p.fps.toFixed(3)} i/s, ${p.frames} images)`;
   } else {
     if (takePath) warn(`${shot} : ${edit.take} absente, carton à la place`);
@@ -114,15 +124,15 @@ function encode(film: FilmId, size: SizeId, at: number): number {
   const list = resolve(WORK, `${film}.txt`);
   writeFileSync(list, concatList(FILMS[film].map((s) => resolve(SEG, `${s}.mkv`))));
   const out = resolve(OUT, outName(film, size));
-  run(FFMPEG, encodeArgs({ list, out, size, crf: at, frames: filmFrames(film), keys: keyframePlan(film) }));
+  ff(encodeArgs({ list, out, size, crf: at, frames: filmFrames(film), keys: keyframePlan(film) }));
   crf[out] = at;
   sizes[out] = statSync(out).size;
   return sizes[out];
 }
 
-for (const size of [720, 540] as SizeId[]) {
+for (const size of ENCODE) {
   try {
-    fitCeilings(size, (film, at) => encode(film, size, at), warn);
+    fitCeilings(size, (film, at) => encode(film, size, at), warn, START[size]);
   } catch (e) {
     if (!(e instanceof CeilingError)) throw e;
     console.error(`\nÉCHEC du montage : ${e.message}`);
@@ -147,6 +157,7 @@ console.log("\nVérification ffprobe");
 for (const size of [720, 540] as SizeId[]) {
   for (const film of Object.keys(FILMS) as FilmId[]) {
     const out = resolve(OUT, outName(film, size));
+    sizes[out] ??= statSync(out).size; // gardé tel quel (--sizes)
     const p = probeOutput(out);
     const errs = checkProbe(p.streams, p.keyframes, { frames: filmFrames(film), width: SIZES[size][0], height: SIZES[size][1], keys: keyframePlan(film) });
     if (sizes[out] > CEILINGS[size][film]) errs.push(`au-dessus du plafond de ${kb(CEILINGS[size][film])}`);
