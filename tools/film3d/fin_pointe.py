@@ -32,7 +32,7 @@ STOP_BACK = 8.0
 SX, SY = CX, CY - STOP_BACK
 HERO_BOX = (4.9, 1.9)              # la berline au sol : longueur, largeur (m)
 PATROL_BOX = (5.1, 2.0)
-PHARE_AT = (75.0, 458.3, 16.8)     # lieux.PHARE_AT et la hauteur de sa lanterne (lieux.PHARE_FEU)
+PHARE_AT = (75.19, 457.28, 16.8)     # lieux.PHARE_AT et la hauteur de sa lanterne (lieux.PHARE_FEU)
 
 
 def ease5(a, b, x):

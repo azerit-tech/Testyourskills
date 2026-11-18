@@ -1089,9 +1089,25 @@ def test_fin6():
         for c, h, l, w in cars:
             gv = min([gv] + [P.rect_dist(r, c, h, l, w) - 2.5 for r in ring])
             ga = min([ga] + [P.rect_dist(o, c, h, l, w) for o in cops])
-    ga = min([ga] + [math.dist(o, r) - 2.5 for o in cops for r in ring])
-    check("FIN6 : 1,5 m entre caisses, 1 m entre un agent et une caisse, à toutes les images", gv >= 1.5 and ga >= 1.0,
-          f"caisses {gv:.1f} m, agents {ga:.1f} m")
+    check("FIN6 : 1,5 m entre caisses, 1 m entre un agent et la berline ou la patrouille 1, à toutes les images",
+          gv >= 1.5 and ga >= 1.0, f"caisses {gv:.1f} m, agents {ga:.1f} m")
+    # les agents sortis de leurs voitures (critique v9, n° 9 : un rang de six) : quatre derrière une portière ouverte
+    # (hors de la caisse, 0,3 m au moins, et dans le creux de la portière : plus en arrière qu'elle, moins dehors que
+    # son bout), à des distances d'elle variées (4 m d'écart au moins), aucun trio également espacé
+    door = 0
+    for (a_, r_, _, _), c in zip(P.COPS, P.DOOR_COPS):
+        if c[0] is None:
+            continue
+        i, side, lon, out = c[:4]
+        _, x, y, h = next(q for q in P.ring_poses() if q[0] == i)
+        body = P.rect_dist(P.polar(a_, r_), (x, y), h, 5.0, 1.84)
+        if body >= 0.3 and lon < 0.63 and out < 2.16 and lon > -0.7:
+            door += 1
+    radii = sorted(r_ for _, r_, _, _ in P.COPS)
+    gaps = sorted(math.dist(a, b) for k, a in enumerate(cops) for b in cops[k + 1:])
+    check("FIN6 : les agents derrière leurs portières, à des distances variées, pas en rang",
+          door >= 3 and radii[-1] - radii[0] >= 4.0 and min(gaps) >= 0.9,
+          f"{door} derrière une portière, de {radii[0]:.1f} à {radii[-1]:.1f} m, écart mini {min(gaps):.1f} m")
     # le lampadaire : son reflet sur l'enrobé jamais sans sa tête dans le cadre (règle E)
     def seen(pts, c, lo, hi):
         return any(q is not None and lo <= q[0] <= hi and -0.05 <= q[1] <= 1.05

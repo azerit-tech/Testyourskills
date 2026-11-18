@@ -491,9 +491,11 @@ def gens():
         x, y = jetee(u, n)
         cap = -50.0 + (90.0 if n > 0 else -90.0) + 10 * (k % 3 - 1)     # face à l'eau
         debout(f"jetee_peche_{k}", MOD[k % 5], x, y, cap, phase=61 * k)
+    # (le dernier partait de la pointe, u 55 : il traversait le périmètre de police de FIN6, une silhouette blanche
+    # entre les agents, images 621–640 du brouillon éclairé v9 ; il part de u 30, la pointe reste à la police)
     for k, (u0, u1, n, g, v) in enumerate([(40.0, -60.0, -5.0, 470, 0.95), (-30.0, 60.0, 5.0, 420, 1.0),
                                            (20.0, -60.0, 4.6, 440, 1.05), (-45.0, 45.0, -4.6, 480, 0.9),
-                                           (55.0, -40.0, -4.8, 500, 1.0)]):
+                                           (30.0, -40.0, -4.8, 500, 1.0)]):
         marche(f"jetee_marche_{k}", MARCHEURS[k % 4], jetee(u0, n), jetee(u1, n), g, v=v)
     return out
 
