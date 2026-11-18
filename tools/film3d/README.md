@@ -137,7 +137,7 @@ Sur le Mac, seulement l'essai à blanc, sous le verrou : `lockf -k <verrou> nice
 
 ## Le bras de la caméra (v11) : trois réglages à comparer
 
-`bras.py` porte la loi du bras de poursuite et ses réglages : A (le bras du film v10, le défaut), B « nerveux », C « poussé » (SPEC §18.70). Le choix ne touche pas à la clé du cache des lieux.
+`bras.py` porte la loi du bras de poursuite et ses réglages : A (le bras du film v10, le défaut), B « nerveux », C « poussé » (SPEC §18.71). Le choix ne touche pas à la clé du cache des lieux.
 
 - Mesurer, sans Blender : `python3 tools/film3d/diag/audit_bras.py --bras A,B,C` (par tronçon : défilement du sol, balayage du décor, flanc, taille et place de la berline, distance, hauteur, focale, roulis, à-coups) ; `--images 125-200` image par image ; `--gels` aux six gels et aux étoiles.
 - Contrôler : `BRAS_FILM=B python3 tools/film3d/test_motion.py` (de même `test_contacts.py`, `test_trafic.py`, `diag/audit_cadre.py --chocs`, `diag/audit_trafic.py`). Les contrôles du bras A que le réglage contredit sortent en « écart », avec leur raison.
