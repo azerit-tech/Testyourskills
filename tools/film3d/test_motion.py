@@ -2052,13 +2052,28 @@ def test_cut_habitacle_phare():
     }
     check("coupes : l'habitacle allumé à 25 W dans les huit tronçons (OUV à FIN6)", w == 25.0 and all(poses.values()),
           ", ".join(f"{k} {'oui' if v else 'NON'}" for k, v in poses.items()))
-    # la nappe de P2 au-dessus de la berline (scene_carrefour.hero_fill) n'éclaire qu'elle : sur la chaussée, elle
-    # éclaircissait le bas du cadre de P2 seul (107 | 108 +24 %, 214 | 215 −10 %, brouillon décor-coupes)
+    # la nappe de P2 au-dessus de la berline (scene_carrefour.hero_fill) est retirée : sur la chaussée, elle
+    # éclaircissait le bas du cadre de P2 seul (107 | 108 +24 %, 214 | 215 −10 %, brouillon décor-coupes) ; liée à
+    # la berline, elle doublait l'appoint commun
     kp = src("scene_f.py").split("def keep_paint(")[1].split("\ndef ")[0]
-    lie = ('bpy.data.objects.get("hero_fill")' in kp and "hf.light_linking.receiver_collection = avec" in kp
-           and kp.index("hero_fill") > kp.index('avec = bpy.data.collections.new'))
-    check("107 | 108, 214 | 215 : la nappe hero_fill de P2 liée à la seule berline (pas de flaque de lumière à P2)",
-          lie and 'A.add_light("hero_fill"' in src("scene_carrefour.py"), f"liée {lie}")
+    lie = 'bpy.data.objects.get("hero_fill")' in kp and "bpy.data.objects.remove(hf" in kp
+    check("107 | 108, 214 | 215 : la nappe hero_fill de P2 retirée (pas de flaque de lumière à P2)",
+          lie and 'A.add_light("hero_fill"' in src("scene_carrefour.py"), f"retirée {lie}")
+    # l'appoint de poursuite commun (lieux.CHASE_FILL, 900 W) sur la berline dans les huit tronçons : OUV et P1 ne
+    # l'avaient pas, elle y était bordeaux sombre (brouillon éclairé v10, SPEC §18.70) ; P2 l'a aussi, son complément
+    # de flanc nul aux deux coupes
+    sa, sdd = src("scene_a.py"), src("scene_d.py")
+    commun = {
+        "OUV, P1": sa.count("    chase_fill(rig)\n") == 2 and "return L.chase_fill(rig)" in sa,
+        "P2": "lieux.chase_fill(rig)" in kp and "(f0, 0.0)" in kp and "(f1, 0.0)" in kp,
+        "P3": "lieux.car_fill(rig, loc=(0.0, -4.0, 6.0), energy=900.0" in src("scene_b.py"),
+        "P4": "L.chase_fill(hero)" in src("scene_c.py"),
+        "P5": "L.car_fill(hero, loc=(0.0, -4.0, 6.0), energy=900.0" in src("scene_e.py"),
+        "P6, FIN6": sdd.count("L.chase_fill(hero)") >= 2,
+    }
+    check("berline : l'appoint de poursuite commun (900 W, 4 m derrière, 6 m au-dessus) dans les huit tronçons",
+          all(commun.values()) and "CHASE_FILL = dict(loc=(0.0, -4.0, 6.0), energy=900.0" in lieux_src,
+          ", ".join(f"{k} {'oui' if v else 'NON'}" for k, v in commun.items()))
     # le phare, une seule loi de P6 à FIN6 (p6_jetee.phare_azimut, fusion v10 §18.67) : gelé pendant P6, il repart de
     # cette place à FIN6/1 ; les deux plans de la ville la lisent, avec les mêmes pinceaux. (Deux branches l'avaient
     # raccordé en sens inverse, chacune verte contre ses propres constantes : il sautait à 618 | 619, film gris v10.)
