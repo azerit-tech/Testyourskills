@@ -1,0 +1,15 @@
+[
+ {
+  "nom": "decor-pont",
+  "i": 108,
+  "zoom": 1.2
+ },
+ {
+  "nom": "decor-pont-bas",
+  "i": 85,
+  "dz": -0.8,
+  "zoom": 1.5,
+  "pitch": 4,
+  "fstop": 5.6
+ }
+]

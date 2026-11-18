@@ -1,0 +1,21 @@
+[
+ {
+  "nom": "decor-fin",
+  "i": 101,
+  "zoom": 1.1
+ },
+ {
+  "nom": "decor-fin-bas",
+  "i": 101,
+  "back": 2.0,
+  "dz": -0.9,
+  "zoom": 1.0,
+  "pitch": 7,
+  "fstop": 5.6
+ },
+ {
+  "nom": "decor-fin-690",
+  "i": 72,
+  "zoom": 1.1
+ }
+]

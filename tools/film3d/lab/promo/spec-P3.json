@@ -1,0 +1,20 @@
+[
+ {
+  "nom": "decor-enseignes",
+  "i": 11,
+  "zoom": 1.2
+ },
+ {
+  "nom": "decor-barrage",
+  "i": 36,
+  "zoom": 1.2
+ },
+ {
+  "nom": "decor-barrage-bas",
+  "i": 36,
+  "dz": -1.0,
+  "zoom": 1.4,
+  "pitch": 5,
+  "fstop": 5.6
+ }
+]

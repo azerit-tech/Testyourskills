@@ -1,0 +1,12 @@
+[
+ {
+  "nom": "decor-jetee-tele",
+  "i": 115,
+  "back": 6.0,
+  "dz": -0.8,
+  "aim": true,
+  "aim_dz": 2.2,
+  "lens": 40,
+  "fstop": 5.6
+ }
+]

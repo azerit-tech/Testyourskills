@@ -1,0 +1,26 @@
+[
+ {
+  "nom": "decor-jetee-phare",
+  "i": 115,
+  "zoom": 1.15
+ },
+ {
+  "nom": "decor-jetee-phare-bas",
+  "i": 115,
+  "back": 3.0,
+  "dz": -0.8,
+  "zoom": 1.35,
+  "pitch": 6,
+  "fstop": 5.6
+ },
+ {
+  "nom": "decor-jetee-560",
+  "i": 75,
+  "zoom": 1.15
+ },
+ {
+  "nom": "decor-jetee-515",
+  "i": 30,
+  "zoom": 1.15
+ }
+]

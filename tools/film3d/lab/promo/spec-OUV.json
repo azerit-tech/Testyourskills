@@ -1,0 +1,21 @@
+[
+ {
+  "nom": "decor-avenue-flamant",
+  "i": 29,
+  "zoom": 1.2
+ },
+ {
+  "nom": "decor-avenue-flamant-bas",
+  "i": 29,
+  "back": 2.0,
+  "dz": -0.9,
+  "zoom": 1.5,
+  "pitch": 4,
+  "fstop": 5.6
+ },
+ {
+  "nom": "decor-avenue-41",
+  "i": 41,
+  "zoom": 1.2
+ }
+]
