@@ -131,13 +131,15 @@ DERAP5 = dict(s=S_ARC5 - 10.6138898, side=-1.0, reaction=0.4,
 #
 # SLALOM : (début s, longueur m, écart m) ; chaque manœuvre déplace la cible de `écart` en `longueur` mètres, les
 # manœuvres s'additionnent. Le profil (bascule) est la latérale en une période de sinus : elle part de zéro, monte,
-# s'inverse, revient à zéro (latérale nulle aux deux bouts, à-coup borné). Latérale de crête VOIE_K × écart × v² /
-# longueur² (VOIE_K = 2π), à-coup de crête VOIE_J × écart × v³ / longueur³ (VOIE_J = 4π²) : les longueurs sont
-# choisies pour un à-coup de 10 m/s³ au plus (la conduite en tient 12, test_motion v3.1), la latérale reste sous 2,5.
-# Un changement de voie entier (3,5 m) demanderait 50 à 70 m à ces vitesses : les écarts sont de 0,35 à 0,8 m.
+# s'inverse, revient à zéro (latérale nulle aux deux bouts). Latérale de crête VOIE_K × écart × v² / longueur²
+# (VOIE_K = 2π), à-coup de crête VOIE_J × écart × v³ / longueur³ (VOIE_J = 4π²).
+# La limite est l'adhérence du mouillé, pas l'à-coup (18 novembre au soir, Jacques : « 12 m/s³, un seuil trop
+# prudent ») : chaque changement de voie tient 5 m/s² de latérale au plus (μ 0,7 : 6,9 m/s² au cercle), et le cercle
+# avec le freinage ou les gaz reste sous 6,5 ; l'à-coup monte à 17 m/s³ (23 dans la rue), le plafond des tests à 25.
+# D'où des écarts de 2,6 à 3,8 m en 1,9 à 2,3 s (2π × écart / durée² : 3 m à 5 m/s² demandent 1,9 s), 1,2 m en
+# 1,4 s dans la rue (8 m entre bordures).
 # Zéro dans les deux dérapages (le rond-point de S_ARC2 − 15 à la sortie, le port de DERAP5 à la jetée) et dans le
-# trou du barrage (s 184 à 191, les plots et les agents à 0,5 m de la caisse) ; aucune latérale aux coupes (les
-# manœuvres tiennent dans un tronçon, ou l'écart est tenu à la coupe).
+# trou du barrage (s 184 à 191, les plots et les agents à 0,5 m de la caisse).
 VOIE_K = 2.0 * math.pi
 VOIE_J = 4.0 * math.pi ** 2
 
@@ -156,24 +158,65 @@ def bascule(u, doux=False):
 
 
 SLALOM = (
-    # l'avenue, un S à droite : A roule à 35 km/h devant elle sur E1 ; elle déboîte sur E2 (la patrouille 1 tient la
-    # voie d'en face, à sa gauche ; pas avant s 8 : la patrouille sortirait du cadre), la double, et revient sur E1
-    # avant la coupe de P2 (doux : la caisse ne garde pas de roulis à l'entrée du dérapage du rond-point)
-    (8.0, 44.0, -1.8), (52.0, 48.0, 1.8, "doux"),
-    # la rue (étroite, garées des deux côtés : 0,75 m au plus) : un écart à droite de D qui déboîte ; puis le pont :
-    # la patrouille 1 la remonte par la gauche pour l'enfermer, elle se jette dans la voie de droite, derrière B1
-    # (70 km/h), et revient à gauche avant de l'atteindre, dans le freinage du port
-    (190.6, 22.0, -0.4), (213.0, 59.0, -1.5), (272.0, 87.0, 1.9),
-    # la jetée, un S à droite : J1 roule au milieu ; elle la passe par la droite, contre la rambarde, et revient
-    # dans le freinage de la pointe
-    (394.0, 34.0, -2.2), (428.0, 46.0, 2.2),
+    # l'avenue, un S à droite : A roule à 35 km/h devant elle sur E1 ; elle déboîte sur E2 (2,7 m ; la patrouille 1
+    # tient la voie d'en face, à sa gauche), la double par la droite, et revient sur E1 avant le freinage du
+    # rond-point (doux, fini à s 100 : la caisse ne garde pas de roulis à l'entrée du dérapage ; à s 102 le Δ² du
+    # roulis de P2 passait 0,15°/image²)
+    (8.0, 44.0, -2.7), (52.0, 48.0, 2.7, "doux"),
+    # la rue (8 m entre bordures) : D déboîte de la gauche, le nez dans sa voie ; elle s'écarte à droite (1,2 m) et
+    # garde la droite : elle prend la voie de droite du pont (2,6 m de plus, sans obstacle : un choix de voie,
+    # pas une esquive), derrière B1 qui y roule à 70 km/h. Elle la rattrape, déboîte à gauche (3,8 m contre la
+    # route, qui se décale elle-même de 1,3 m à droite : 2,5 m de vrai) et la double avant le freinage du port
+    (190.6, 26.0, -1.2), (216.6, 46.0, -2.6), (263.0, 65.0, 3.8),
+    # la jetée, un S à gauche (la chaussée ne laisse que 1 m à droite de sa voie) : J1 roule à 20 km/h devant elle ;
+    # elle la double par la voie d'en face (2,8 m), J2 arrive en face, appels de phares, elle se rabat (2,8 m) dans
+    # le freinage de la pointe
+    (396.5, 30.0, 2.8), (432.0, 38.0, -2.8),
 )
 
 
-def voie(s):
-    """L'écart latéral (m, positif à gauche) de la trajectoire voulue de la berline à la route, à l'abscisse s : la
-    somme des manœuvres de SLALOM. La seule entrée du slalom, pour la conduite cinématique comme pour la physique."""
+def voie_dessinee(s):
+    """L'écart latéral (m, positif à gauche) à la route, à l'abscisse s, du slalom de la conduite dessinée : la somme
+    des manœuvres de SLALOM. Gardé pour mémoire et pour diag/audit_trafic.py : la berline ne le suit plus."""
     return sum(m[2] * bascule((s - m[0]) / m[1], len(m) > 3 and m[3] == "doux") for m in SLALOM)
+
+
+# Le même slalom, dosé pour la conduite simulée (branche film/physique, dynamique.Plan(..., voie=voie_simulee)) : là,
+# la voiture glisse, et la demande (2π × écart / durée²) peut passer l'adhérence. Mesuré par l'agent de la simulation
+# à 80 km/h sur le mouillé : 0,65 g → 3,8° de glisse, à peine lisible ; 0,8 à 0,9 g → 6 à 8°, la glisse légère voulue ;
+# 1,05 g → 12° et 0,8 m hors de la ligne ; jamais au-dessus de 1,0 g. La conduite dessinée, elle, ne glisse pas : à
+# ces demandes elle prendrait 8 m/s² de latérale sans broncher et son roulis claquerait (Δ² 0,36 à 0,60°/image² pour
+# 0,15, la coupe OUV → P1 à 1,07° de roulis d'écart) ; elle garde SLALOM, borné à 5 m/s².
+# Chaque ligne est passée dans dynamique.simulate sur le film entier (diag/audit_trafic_sim.py, film/physique
+# 0003718) et retenue là où ses voisines tiennent aussi (le dérapage du port bascule sinon : le déboîtement du pont
+# pris 2 m plus tard l'ouvre de 0,6 à 1,6 m hors de la route, 3 m plus tard et 2 m plus court à 3,2 m) :
+#  - l'avenue, vitesse tenue : 3 m à 0,82 et 0,75 g, glisse 6,5° et 5,9°, 0,17 m hors de la ligne au plus ;
+#  - la rue et le pont, où le plan accélère à 2,8 m/s² : les roues arrière poussent déjà, la même glisse vient à
+#    0,65 à 0,7 g (1,5 m en 1,25 s : 4,2° ; 3,8 m en 1,85 s : 6,4°, 0,15 m) ; plus sec, la berline prend du retard
+#    sur l'horaire, entre trop vite dans le port et son dérapage s'ouvre ;
+#  - la jetée : après s 402 (la berline simulée sort du dérapage du port 1 m large), retour fini avant le freinage
+#    de la pointe (s 459) ; 0,63 et 0,71 g, glisse 4,5° et 6,3°.
+# Reste à la simulation : sur la jetée le plan accélère à 2,8 m/s², le S coûte 2 à 3 m d'horaire et la berline
+# arrive en retard dans le freinage de la pointe : elle passe l'arrêt de 0,66 m au pas (1 à 3 km/h de l'image 690 à
+# l'image 723 ; à l'heure, image 692,7, sans slalom). Aucun des 50 dosages essayés de la jetée ne l'évite (0,45 à
+# 0,9 g : arrêt entre 711 et 786) : à caler dans le freinage final de la simulation (SPEC §18.62).
+SLALOM_SIMULE = (
+    (8.0, 36.0, -3.0), (52.0, 40.0, 3.0, "doux"),
+    (190.6, 23.5, -1.5), (216.6, 46.0, -2.3), (257.0, 52.0, 3.8),
+    (402.5, 24.0, 2.8), (430.0, 29.0, -2.8),
+)
+
+
+def voie_simulee(s):
+    """voie(s) pour la conduite simulée : la somme des manœuvres de SLALOM_SIMULE (l'entrée de dynamique.Plan.voie)."""
+    return sum(m[2] * bascule((s - m[0]) / m[1], len(m) > 3 and m[3] == "doux") for m in SLALOM_SIMULE)
+
+
+# Fusion v10 (SPEC §18.67) : la berline est la voiture simulée, il n'y a plus de conduite dessinée à l'image. LA ligne
+# du slalom est donc celle dosée pour la simulation, pour tout ce qui la lit : le conducteur (dynamique.Plan.voie), le
+# bras (travel_route, visee_u), l'hélicoptère (pos_route), la patrouille 1 du pont (p4_pont._voie_x), les contrôles
+# (check, test_trafic). SLALOM et voie_dessinee restent la trace du dosage borné à 5 m/s² de film/trafic-audit.
+voie = voie_simulee
 
 
 # (fusion v10, SPEC §18.67 : pas de voie dans LIM. Ce plan dessiné n'est plus que l'horaire du conducteur, compté le
@@ -443,6 +486,26 @@ def s_of_t(t):
     return DRIVE.s(t)
 
 
+def vitesse_voie(t):
+    """La vitesse latérale du slalom à l'instant t (m/s, positive vers la gauche) : la pente de voie(s) fois la
+    vitesse de la berline."""
+    s = s_of_t(t)
+    dn = (voie(s + 0.05) - voie(s - 0.05)) / 0.1
+    return dn * DRIVE.speed(t) if dn else 0.0
+
+
+def pos_route(t):
+    """La berline sans son slalom à l'instant t (repère du parcours) : sa place moins voie(s) en travers de la
+    route. Ce que suit ce qui ne slalome pas avec elle (l'hélicoptère de la poursuite, helicos.car)."""
+    x, y = DRIVE.pos(t)
+    s = s_of_t(t)
+    n = voie(s)
+    if not n:
+        return x, y
+    h = math.radians(ROUTE.at(s)[2])
+    return x + n * math.cos(h), y + n * math.sin(h)
+
+
 def t_of_s(s):
     """L'instant (s) où la berline passe l'abscisse s (dichotomie sur s_of_t)."""
     lo, hi = T_SPAN[0], T_ARRET
@@ -477,7 +540,9 @@ def _smooth_sigma(t):
 
 
 # le bras tourne avec une part du slalom, en retard : une caméra de poursuite qui suit la voiture (la berline reste
-# dans le cadre commun, test_motion « décalage à gauche »), la ville glisse encore de côté
+# dans le cadre commun, test_motion « décalage à gauche »), la ville glisse encore de côté. (Mesuré le 18 novembre,
+# diag/audit_trafic.py : cette part ne change que l'angle sous lequel on voit la caisse, 16° au plus ; ce qui déplace
+# la berline dans le cadre est la visée, CAM_DEPORT plus bas.)
 CAM_VOIE, CAM_VOIE_RETARD = 0.65, 0.25
 
 
@@ -750,6 +815,23 @@ def camera(shot, frame, back=None, left=None, z=None):
 VISEE_U, VISEE_V, VISEE_LENS = 0.50, 0.58, 24.0
 RACCORD_IMAGES = 18.0             # (gardé pour les modules qui le citent : plus d'écart propre à fondre)
 VISEE_SIGMA = 0.25                # s : la visée exacte lissée (les coins de la boîte changent pendant une glisse)
+# le slalom à l'écran (SPEC §18.62, l'audit du 18 novembre : rivée à VISEE_U, la berline ne bougeait que de 2 à 6 %
+# de la largeur pendant un changement de voie, l'écart ne se lisait que par la route qui glisse) : la visée est en
+# retard sur le slalom, comme un opérateur. La berline se déporte dans le cadre du côté où elle va, de CAM_DEPORT
+# largeur de cadre par m/s de vitesse latérale, et revient au centre quand elle se pose dans sa voie. Nul hors du
+# slalom (dérapages, coupes de P2 et de P5, FIN6).
+# 0,022 : 6,5 % de la largeur au milieu d'un changement de voie de 2,7 m (2,9 m/s). La berline tient 47 % de la
+# largeur du cadre vertical : au-delà, le phare de l'ouverture sort du cadre utile (x 95 %, test_motion v3 OUV, dès
+# 0,023) ; à 0, la patrouille 1 sortait du cadre à l'ouverture (OUV/30) avec l'écart de 2,7 m.
+CAM_DEPORT = 0.022
+
+
+def visee_u(t):
+    """La place voulue du centre de la berline dans le cadre (fraction de la largeur depuis la gauche) à l'instant
+    t du film : VISEE_U, déportée du côté de son changement de voie."""
+    return VISEE_U - CAM_DEPORT * vitesse_voie(t)
+
+
 _VQ = 4                           # échantillons par image
 _VISEE = {}
 
@@ -766,6 +848,7 @@ def _visee_exacte(shot, frame, glisse=True):
     yaw = math.degrees(math.atan2(-(hx - x), -(hy - y)))
     pitch = math.degrees(math.atan2(hz + M.HERO_BOX[2] / 2.0 - z, math.hypot(hx - x, hy - y)))
     lens = rig(shot, frame)["lens"]
+    cible_u = visee_u(t_of(shot, frame))
     for _ in range(8):
         cam = (x, y, z, yaw, pitch, 0.0, lens)
         b0 = M.hero_screen(cam, hx, hy, hz, head)
@@ -773,7 +856,7 @@ def _visee_exacte(shot, frame, glisse=True):
             break
         bu = M.hero_screen((x, y, z, yaw + 0.05, pitch, 0.0, lens), hx, hy, hz, head)
         bv = M.hero_screen((x, y, z, yaw, pitch + 0.05, 0.0, lens), hx, hy, hz, head)
-        eu, ev = VISEE_U - b0["u"], VISEE_V - b0["v"]
+        eu, ev = cible_u - b0["u"], VISEE_V - b0["v"]
         if abs(eu) < 1e-7 and abs(ev) < 1e-7:
             break
         yaw += 0.05 * eu / (bu["u"] - b0["u"])

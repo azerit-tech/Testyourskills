@@ -62,8 +62,9 @@ def local(shot, T):
 
 
 def car(T):
-    """(x, y) de la berline dans la ville."""
-    return PC.placer("P4")[0](*PC.DRIVE.pos(T))
+    """(x, y) de la berline dans la ville, sans son slalom (SPEC §18.62) : l'appareil suit la route de la poursuite,
+    pas ses changements de voie."""
+    return PC.placer("P4")[0](*PC.pos_route(T))
 
 
 # ---- les trajectoires dans la ville : (x, y, z, cap, tangage, roulis), z au-dessus de l'eau du monde de l'eau

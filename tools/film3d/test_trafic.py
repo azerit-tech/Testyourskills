@@ -54,6 +54,27 @@ def test_adherence():
           f"latérale {worst_lat[0]:.2f} (image {worst_lat[1]}), cercle {worst_comb[0]:.2f} (image {worst_comb[1]})")
 
 
+def test_slalom_simule():
+    """Le dosage de la conduite simulée (parcours.SLALOM_SIMULE, l'entrée de dynamique.Plan.voie sur film/physique) :
+    la demande reste sous 0,9 g (au-dessus, la berline simulée sort de sa ligne : 0,8 m à 1,05 g), l'à-coup demandé
+    sous 40 m/s³ (le plafond de film/physique), rien dans les dérapages ni dans le trou du barrage, et la jetée ne
+    commence qu'après s 402 (la berline simulée sort du dérapage du port 1 m large)."""
+    pire_a = pire_j = (0.0, None)
+    for m in P.SLALOM_SIMULE:
+        ka, kj = (7.51, 52.5) if len(m) > 3 else (P.VOIE_K, P.VOIE_J)
+        v = max(P.DRIVE.speed(P.t_of_s(m[0] + u * m[1])) for u in (0.0, 0.25, 0.5, 0.75, 1.0))
+        pire_a = max(pire_a, (ka * abs(m[2]) * v * v / m[1] ** 2 / 9.81, m[0]))
+        pire_j = max(pire_j, (kj * abs(m[2]) * v ** 3 / m[1] ** 3, m[0]))
+    check("slalom simulé : demande ≤ 0,9 g, à-coup demandé ≤ 40 m/s³", pire_a[0] <= 0.9 and pire_j[0] <= 40.0,
+          f"{pire_a[0]:.2f} g (s {pire_a[1]:g}), {pire_j[0]:.1f} m/s³ (s {pire_j[1]:g})")
+    nul = max(abs(P.voie_simulee(P.s_of_t(g / P.FPS))) for a, b in P.VOIE_NULLE for g in range(a, b + 1))
+    trou = max(abs(P.voie_simulee(P.VOIE_BARRAGE[0] + (P.VOIE_BARRAGE[1] - P.VOIE_BARRAGE[0]) * i / 60))
+               for i in range(61))
+    jetee = min(m[0] for m in P.SLALOM_SIMULE if m[0] > 380.0)
+    check("slalom simulé : nul dans les dérapages et le trou du barrage, la jetée après s 402",
+          nul < 1e-6 and trou < 1e-6 and jetee >= 402.0, f"{nul:.1e} m, {trou:.1e} m, jetée à s {jetee:g}")
+
+
 def test_objectif():
     d, g, nom = T.objectif()
     check("objectif : la circulation à 1,2 m au moins de la lentille", d >= 1.2, f"{d:.2f} m de {nom} à l'image {g}")
@@ -74,6 +95,7 @@ if __name__ == "__main__":
     test_parcours()
     test_contacts()
     test_adherence()
+    test_slalom_simule()
     test_objectif()
     test_cadre()
     print(f"\n{len(FAILS)} échec(s)" if FAILS else "\ntout passe")
