@@ -617,6 +617,14 @@ def mat_tyre(name, r_rim=0.19, r_out=0.31, wear=0.0):
 # ni voile d'essuyage, qui la ternissaient en gris devant l'habitacle
 REAR_WINDOW = "lunette"
 REAR_REFL_CUT = 0.6
+# Le verre un peu dépoli et teinté (brouillon éclairé v9, SPEC §18.63) : sur la jetée, le reflet des globes des
+# lampadaires traversait la lunette en tache blanc pur, deux ou trois images, quatre fois en trois secondes (531–534,
+# 560–564, 586–588, 612), le reste du vitrage en miroir noir. Le reflet d'une petite source s'étale (rugosité : de 0
+# à GLASS_ROUGH, GLASS_ROUGH_REAR sur la lunette) et perd de sa force (GLASS_REFL_TINT, un verre trempé d'époque
+# légèrement vert gris) : il reste sous l'écrêtage, la transparence et donc l'habitacle ne changent pas.
+GLASS_ROUGH = 0.035
+GLASS_ROUGH_REAR = 0.14
+GLASS_REFL_TINT = (0.62, 0.66, 0.65, 1.0)
 
 
 def mat_window(name, tint=(0.80, 0.86, 0.84, 1), dark=0.0, wear=0.0):
@@ -637,12 +645,15 @@ def mat_window(name, tint=(0.80, 0.86, 0.84, 1), dark=0.0, wear=0.0):
     fr = _node(nt, "ShaderNodeFresnel", IOR=_mix(nt, 1.52, 1.0 / 1.52, bf))
     tr = _node(nt, "ShaderNodeBsdfTransparent", Color=tuple(c * (1 - dark) for c in tint[:3]) + (1,))
     gl = _glossy(nt)
-    gl.inputs["Roughness"].default_value = 0.0
+    gl.inputs["Color"].default_value = GLASS_REFL_TINT
     mix = nt.nodes.new("ShaderNodeMixShader")
     rw = nt.nodes.new("ShaderNodeAttribute")
     rw.attribute_type = "GEOMETRY"
     rw.attribute_name = REAR_WINDOW
     clear = cv._math(nt, "SUBTRACT", 1.0, rw.outputs["Fac"])        # 0 sur la lunette, 1 ailleurs
+    # le dépoli : GLASS_ROUGH partout, GLASS_ROUGH_REAR sur la lunette
+    rough0 = cv._math(nt, "ADD", GLASS_ROUGH, cv._math(nt, "MULTIPLY", rw.outputs["Fac"], GLASS_ROUGH_REAR - GLASS_ROUGH))
+    nt.links.new(rough0, gl.inputs["Roughness"])
     # un plancher de reflet : la vitre reste lisible de face
     floor = 0.04
     if wear > 0:
@@ -650,7 +661,7 @@ def mat_window(name, tint=(0.80, 0.86, 0.84, 1), dark=0.0, wear=0.0):
         haze = _imperfection(nt, rest, "SurfaceImperfections003", 0.8, 0.04, 0.4)
         spots = _imperfection(nt, rest, "SurfaceImperfections013", 0.4, 0.08, 0.6)
         veil = cv._math(nt, "MULTIPLY", cv._math(nt, "MAXIMUM", haze, spots), clear)
-        nt.links.new(cv._math(nt, "MULTIPLY", veil, 0.10 * wear), gl.inputs["Roughness"])
+        nt.links.new(cv._math(nt, "ADD", rough0, cv._math(nt, "MULTIPLY", veil, 0.10 * wear)), gl.inputs["Roughness"])
         floor = cv._math(nt, "ADD", 0.04, cv._math(nt, "MULTIPLY", veil, 0.07 * wear))
         up = _up(nt, 0.25, 0.65)
         dens = min(1.0, 1.4 * wear)
