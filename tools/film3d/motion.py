@@ -2165,7 +2165,10 @@ PHARE_AT = (75.0, 458.3, 16.8)       # la lanterne du phare de la pointe (lieux.
 PHARE_WORLD = ("P4", "P5", "P6", "FIN", "FIN6")     # les scènes où il est à sa vraie place (C, D, E)
 # le tableau 3 : les images où il doit se voir (None : toutes ; () : absent du plan). Dans la ville (plan de ville,
 # 3.3), le phare est derrière les immeubles du rond-point et de la rue : absent de P2 (110 images) et de P3
-PHARE_FRAMES = {"OUV": None, "P1": None, "P2": (), "P3": (), "P4": (), "P5": (1, 20), "P6": None,
+# (OUV : à partir de l'image 33. Le choc de l'avenue est à l'image 14 du film : le cadre s'ouvre déporté vers la
+# patrouille qui serre la berline, parcours.CADRE_CHOCS ; le phare lointain, à 14° à droite de l'avenue, est alors
+# hors du bord droit, il entre à l'image 28 et passe sous 95 % à la 31, quand le cadre se recentre.)
+PHARE_FRAMES = {"OUV": (33, 75), "P1": None, "P2": (), "P3": (), "P4": (), "P5": (1, 20), "P6": None,
                 "FIN": None, "FIN6": (1, 15)}
 # le tableau 5 : (sortant, entrant, berline visée à la sortie, à l'entrée : centre x, centre y, largeur en %)
 CUTS = [("OUV", "P1", (50, 54, 34), (52, 54, 44)), ("P1", "P2", (58, 54, 38), (50, 55, 40)),

@@ -859,8 +859,9 @@ def camera(shot, frame, back=None, left=None, z=None):
     if back is None or left is None or z is None:
         r = rig(shot, frame)
         dside, dz = tremble(shot, frame)[3:]
-        back = r["back"] if back is None else back
-        left = r["left"] + dside if left is None else left
+        _, recul, gauche = cadre_choc(t_of(shot, frame))             # un choc à montrer : le bras recule
+        back = r["back"] + recul if back is None else back
+        left = r["left"] + dside + gauche if left is None else left
         z = r["z"] + dz if z is None else z
     x, y = hero(shot)["pos"](frame)
     a = math.radians(cam_cap(shot, frame))
@@ -889,10 +890,63 @@ VISEE_SIGMA = 0.25                # s : la visée exacte lissée (les coins de l
 CAM_DEPORT = 0.018
 
 
+# les chocs dans le cadre (SPEC §18.69). Mesuré sur la tête des contacts (diag/audit_cadre.py --chocs, la silhouette
+# de la boîte de la patrouille coupée au cadre) : dans les 8 images avant le choc de l'avenue, la patrouille 1 n'avait
+# que 34 à 55 % de sa silhouette à l'image (collée au bord gauche, 58 % au choc) ; avant celui du pont, 58 à 100 %.
+# Le bras franc est à 6,2 m derrière la berline au 18,5 mm : une voiture portière contre portière déborde le cadre.
+# Autour de chaque contact, la visée se déporte donc du côté opposé au choc (la berline glisse de `du` largeur de
+# cadre, la patrouille entre) et, si ça ne suffit pas, le bras recule de `recul` m et revient de `gauche` m vers le
+# côté du choc ; fondus en entrée et en sortie (quintique : ni vitesse ni accélération aux bouts), nuls bien avant
+# chaque raccord et dans les dérapages (test_contacts.test_cadre). Le choc ne bouge pas.
+# `images` : par rapport à l'image du choc (début du fondu d'entrée, plein, fin du plein, fin du fondu de sortie).
+# - avenue : le choc est à l'image 14 du film, le cadre est donc déporté dès la première image (un plan à deux
+#   voitures), puis il se recentre sur la berline qui s'échappe (fini à l'image 51). La visée seule ne suffit pas :
+#   la berline doit rester entière dans le cadre utile (bord droit ≤ 95 %), ce qui borne le déport à 0,20 et laisse
+#   la patrouille à 69–88 % des images 6 à 12. Avec 1,1 m de recul (7,3 m, dans les 5,5–10 m du bras) et 0,17 de
+#   déport, elle est à 84 % au moins de l'image 6 au choc, entière de 12 à 19, et la berline tient de 49 à 88 % de
+#   la largeur. Le recul allonge l'écart de côté que le bras prend quand la berline roule en biais après le choc
+#   (6° : 10 cm par mètre de recul, −1,15 m pour −1,1 permis) : le bras, que la ligne droite décale de 0,7 m vers
+#   la bordure, revient de 0,2 m vers la patrouille (−0,97 m).
+#   Ce que ça coûte : le phare lointain de l'ouverture (14° à droite de l'avenue, à 87–94 % de la largeur avant)
+#   est hors du bord droit jusqu'à l'image 27 et sous 95 % à la 31 (motion.PHARE_FRAMES : contrôlé de 33 à 75).
+# - pont : la patrouille double par la gauche et se rabat ; 0,11 de déport pendant qu'elle entre, sans recul
+#   (91 % au moins des images 357 à 364, 58 avant).
+CADRE_CHOCS = {
+    "avenue": dict(du=0.17, recul=1.1, gauche=0.2, images=(-60.0, -30.0, 1.0, 37.0)),
+    "pont": dict(du=0.11, recul=0.0, images=(-36.0, -12.0, -5.0, 16.0)),
+}
+
+
+def _fondu5(a, b, x):
+    if b == a:
+        return 1.0 if x >= b else 0.0
+    u = min(1.0, max(0.0, (x - a) / (b - a)))
+    return u * u * u * (10.0 - 15.0 * u + 6.0 * u * u)
+
+
+def cadre_choc(t):
+    """(déport de la visée voulue (largeur de cadre, positif : la berline vers la droite), recul du bras (m), son
+    décalage (m, positif à gauche)) que les contacts demandent à l'instant t du film : CADRE_CHOCS autour de chaque
+    choc de contacts.CHOCS."""
+    du = recul = gauche = 0.0
+    g = t * FPS
+    for c in C.CHOCS:
+        k = CADRE_CHOCS.get(c["nom"])
+        if not k:
+            continue
+        a, b, d, e = (c["image"] + x for x in k["images"])
+        w = _fondu5(a, b, g) * (1.0 - _fondu5(d, e, g))
+        du += c["cote"] * k["du"] * w
+        recul += k["recul"] * w
+        gauche += c["cote"] * k.get("gauche", 0.0) * w
+    return du, recul, gauche
+
+
 def visee_u(t):
     """La place voulue du centre de la berline dans le cadre (fraction de la largeur depuis la gauche) à l'instant
-    t du film : VISEE_U, déportée du côté de son changement de voie."""
-    return VISEE_U - CAM_DEPORT * vitesse_voie(t)
+    t du film : VISEE_U, déportée du côté de son changement de voie, et à l'opposé de la patrouille autour d'un
+    choc (cadre_choc)."""
+    return VISEE_U - CAM_DEPORT * vitesse_voie(t) + cadre_choc(t)[0]
 
 
 _VQ = 4                           # échantillons par image

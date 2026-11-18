@@ -7,6 +7,7 @@
 #     trajectoire d'avant en moins de 1,5 s, sur la chaussée (0,9 m de la bordure), à 1 m de la circulation ;
 #   - le film n'a pas bougé : durées, étoiles (parcours.check), crêtes des deux dérapages, arrêt de la pointe ;
 #   - la quantité de mouvement est conservée ; la caméra a son à-coup, court ; la gerbe est là, courte.
+#   - le choc se voit : la patrouille dans le cadre avant lui, le point de contact aussi (diag/audit_cadre.py).
 #   python3 tools/film3d/test_contacts.py
 import math
 import os
@@ -25,6 +26,7 @@ ENFONCE_MAX = 0.05                          # m
 LIGNE, REPRISE = 0.3, 1.5                   # m, s
 BORDURE, CIRCULATION = 0.9, 1.0             # m
 PATROUILLE_LAT, PATROUILLE_LONG = 6.5, 7.2  # m/s² : l'adhérence du mouillé (0,7 g), le freinage des patrouilles
+CADRE_PART = 0.80                           # la part de la patrouille dans le cadre avant un choc (SPEC §18.69)
 
 
 def check(name, ok, detail=""):
@@ -254,7 +256,32 @@ def test_gerbe():
               f"{len(parts)} points, images {min(nais):.1f} à {max(nais):.1f}, {haut:.2f} m au plus haut")
 
 
+def test_cadre():
+    """Les chocs se voient (SPEC §18.69) : avec la caméra du film, la patrouille a 80 % au moins de sa silhouette
+    dans le cadre pendant les 8 images qui précèdent chaque contact, le point de contact y est, la berline reste
+    entière dans le cadre utile ; le déport et le recul qui le permettent sont nuls à chaque raccord et dans les
+    dérapages."""
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "diag"))
+    import audit_cadre as AC
+    for c in C.CHOCS:
+        rows = AC.lignes_choc(c, avant=8, apres=6)
+        mini, au, dans = AC.bilan_choc(c, rows)
+        check(f"{c['nom']} : la patrouille à {CADRE_PART * 100:.0f} % au moins dans le cadre les 8 images d'avant le "
+              "choc, entière au choc, le point de contact dans le cadre",
+              mini >= CADRE_PART and au >= 0.99 and dans, f"{mini * 100:.1f} % au moins, {au * 100:.1f} % au choc")
+        hors = [r["g"] for r in rows if not (0.05 <= r["hero"][0] and r["hero"][1] <= 0.95)]
+        check(f"{c['nom']} : la berline entière dans le cadre utile (5 à 95 % de large) autour du choc", not hors,
+              f"images {hors}" if hors else
+              f"de {min(r['hero'][0] for r in rows) * 100:.0f} à {max(r['hero'][1] for r in rows) * 100:.0f} %")
+    bords = sorted({g for n, _ in P.SHOTS for g in (P.START[n] - 1, P.START[n])} | {P.TOTAL - 1, P.TOTAL})
+    pire = max(max(abs(x) for x in P.cadre_choc(g / FPS)) for g in bords if g > 0)
+    glisse = max(max(abs(x) for x in P.cadre_choc(g / FPS)) for a, b in DERAPAGES for g in range(a, b + 1))
+    check("le cadre des chocs : nul à chaque raccord et dans les dérapages", pire < 1e-9 and glisse < 1e-9,
+          f"{pire:.1e} aux raccords, {glisse:.1e} dans les dérapages")
+
+
 if __name__ == "__main__":
+    test_cadre()
     test_places()
     test_choc()
     test_caisses()
