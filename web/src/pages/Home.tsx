@@ -20,6 +20,7 @@ import { CardView } from "../card/CardView";
 import { Cover } from "../components/Cover";
 import { EntryForm } from "../components/EntryForm";
 import { ProfileWall } from "../components/ProfileWall";
+import { Spin } from "../components/Spin";
 import { WEEK_ANCHOR, WeekBoard } from "../components/WeekBoard";
 import { BandsTop } from "../components/BandsTop";
 import { PrimesStrip } from "../components/Primes";
@@ -363,6 +364,8 @@ export function Home() {
       <div className="home-proof">
         <section className="home-example">
           <ExampleCard {...showcase} />
+          {/* La caisse de la poursuite (§18.79) : la berline du film, sous la fiche d'exemple ; l'accueil n'a pas de film. */}
+          <Spin ready place="home" />
         </section>
         <WeekBoard onPlay={play} />
       </div>

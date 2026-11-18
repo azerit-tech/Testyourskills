@@ -11,6 +11,7 @@ import { coast, COAST_MAX, dragTo, FRAMES, loadOrder, Lru, nearest, POSTER, pxPe
 const dir = join(__dirname, "spin");
 const css = readFileSync(join(__dirname, "spin.css"), "utf8");
 const page = readFileSync(join(__dirname, "../pages/CardPage.tsx"), "utf8");
+const home = readFileSync(join(__dirname, "../pages/Home.tsx"), "utf8");
 
 function render(ready: boolean, lang = "fr-FR", place: "card" | "home" = "card"): string {
   vi.stubGlobal("window", {
@@ -139,6 +140,20 @@ describe("l'encart", () => {
     const html = render(true);
     expect(html).toMatch(/^<figure class="spin-wrap is-card"><figcaption class="spin-title announce" aria-hidden="true">La caisse du suspect<\/figcaption><div[^>]* class="spin"/);
     expect(css).not.toMatch(/\.spin-title \{[^}]*position: absolute/);
+  });
+
+  it("sur l'accueil : « La caisse de la poursuite », sans fiche, en français et en anglais", () => {
+    const fr = render(true, "fr-FR", "home");
+    expect(fr).toContain('class="spin-wrap is-home"');
+    expect(fr).toContain(">La caisse de la poursuite</figcaption>");
+    expect(fr).not.toContain("suspect");
+    expect(render(true, "en-US", "home")).toContain(">The getaway car</figcaption>");
+  });
+
+  it("sur l'accueil, sous la fiche d'exemple, jamais au-dessus du champ ; l'accueil n'a pas de film", () => {
+    expect(home.match(/<Spin /g)).toHaveLength(1);
+    expect(home).toMatch(/<ExampleCard \{\.\.\.showcase\} \/>\n[^\n]*§18\.79[^\n]*\n\s*<Spin ready place="home" \/>/);
+    expect(home.indexOf("<Spin ")).toBeGreaterThan(home.indexOf("<EntryForm inputRef"));
   });
 
   it("en anglais", () => {
