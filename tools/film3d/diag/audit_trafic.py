@@ -22,6 +22,8 @@ ap.add_argument("--src", default=os.path.dirname(os.path.dirname(os.path.abspath
 ap.add_argument("--out", default=None)
 ap.add_argument("--sub", type=int, default=4, help="pas des contacts : sous-images par image")
 ap.add_argument("--sans", default="", help="sections à sauter : contacts,passages,circulation,ecran,raccords")
+ap.add_argument("--hero", default=None, help="la berline simulée à la place de la conduite dessinée : le JSON de "
+                "diag/audit_trafic_sim.py --traj (sa boîte contre la chaussée et les autres ; caméra, meute : inchangées)")
 A = ap.parse_args()
 sys.path.insert(0, os.path.abspath(A.src))
 import motion as M  # noqa: E402
@@ -41,20 +43,55 @@ def titre(s):
 
 
 # ---------------------------------------------------------------- la berline
+class Table:
+    """La berline simulée (film/physique), lue dans la table de audit_trafic_sim.py --traj : pos, heading, speed, s."""
+
+    def __init__(self, chemin):
+        d = json.load(open(chemin, encoding="utf-8"))
+        self.hz, self.rows = d["hz"], d["rows"]         # rows : [x, y, cap, v, s]
+        print(f"berline simulée : {chemin} ({d.get('physique', '?')}, slalom {d.get('slalom', '?')})")
+
+    def _at(self, k, t):
+        u = max(0.0, min(len(self.rows) - 1.001, t * self.hz))
+        i = int(u)
+        a, b = self.rows[i][k], self.rows[i + 1][k]
+        return a + (b - a) * (u - i)
+
+    def pos(self, t):
+        return self._at(0, t), self._at(1, t)
+
+    def heading(self, t):
+        u = max(0.0, min(len(self.rows) - 1.001, t * self.hz))
+        i = int(u)
+        a, b = self.rows[i][2], self.rows[i + 1][2]
+        return a + ((b - a + 180.0) % 360.0 - 180.0) * (u - i)
+
+    def speed(self, t):
+        return self._at(3, t)
+
+    def s(self, t):
+        return self._at(4, t)
+
+
+HERO = Table(A.hero) if A.hero else P.DRIVE
+if A.hero and hasattr(P, "SLALOM_SIMULE"):
+    P.SLALOM = P.SLALOM_SIMULE          # les manœuvres et leurs causes se lisent sur la table de la conduite simulée
+
+
 def hero_route(t):
-    return P.DRIVE.pos(t)
+    return HERO.pos(t)
 
 
 def hero_city(t):
-    x, y = TO_CITY(*P.DRIVE.pos(t))
-    return x, y, P.DRIVE.heading(t) - CAP_CITY
+    x, y = TO_CITY(*HERO.pos(t))
+    return x, y, HERO.heading(t) - CAP_CITY
 
 
 def ecart_route(t):
     """L'écart latéral mesuré de la berline à la route (m, positif à gauche) à l'instant t."""
-    s = P.s_of_t(t)
+    s = HERO.s(t) if A.hero else P.s_of_t(t)
     rx, ry, rh, _k = P.ROUTE.at(s)
-    x, y = P.DRIVE.pos(t)
+    x, y = HERO.pos(t)
     c = math.radians(rh)
     # la route et la berline ne sont pas à la même abscisse à 1e-3 près : on projette sur la normale
     return (x - rx) * -math.cos(c) + (y - ry) * -math.sin(c)
@@ -62,7 +99,7 @@ def ecart_route(t):
 
 def cinematique(t, h=1.0 / 48.0):
     """(v, latérale, longitudinale) m/s, m/s² : dérivées centrées des positions."""
-    p0, p1, p2 = P.DRIVE.pos(t - h), P.DRIVE.pos(t), P.DRIVE.pos(t + h)
+    p0, p1, p2 = HERO.pos(t - h), HERO.pos(t), HERO.pos(t + h)
     vx, vy = (p2[0] - p0[0]) / (2 * h), (p2[1] - p0[1]) / (2 * h)
     ax, ay = (p2[0] - 2 * p1[0] + p0[0]) / h / h, (p2[1] - 2 * p1[1] + p0[1]) / h / h
     v = math.hypot(vx, vy)
@@ -344,7 +381,7 @@ def passages():
                     else:
                         d0 = d
                     sans = min(sans, (d0, gg))
-                v_h = P.DRIVE.speed(t)
+                v_h = HERO.speed(t)
                 v_o = course.vit(g)
                 meme = math.cos(math.radians(pc - hc)) > 0
                 s_o, n_o, cap_r = route_sn(px, py, P.s_of_t(t))
@@ -529,7 +566,7 @@ def ecran():
         g = r["g_max"]
         hc = hero_city(g / FPS)[2]
         pc = course.pose(g)[2]
-        v_rel = P.DRIVE.speed(g / FPS) - course.vit(g) * math.cos(math.radians(pc - hc))
+        v_rel = HERO.speed(g / FPS) - course.vit(g) * math.cos(math.radians(pc - hc))
         r2 = dict(nom=nom, g0=r["images"][0], g1=r["images"][-1], n=len(r["images"]), roule=r["roule"],
                   haut=r["haut"], large=r["large"], g_max=g, v_rel=v_rel, u0=r["u"][0], u1=r["u"][-1])
         rows.append(r2)

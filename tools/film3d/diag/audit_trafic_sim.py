@@ -19,6 +19,9 @@ ap.add_argument("--physique", required=True)
 ap.add_argument("--slalom", default=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "parcours.py"))
 ap.add_argument("--echelle", type=float, default=1.0)
 ap.add_argument("--jeu", default=None, help="un SLALOM de remplacement : '(s0,L,dn[,doux]);...'")
+ap.add_argument("--table", default="SLALOM_SIMULE", help="la table lue dans le parcours : SLALOM_SIMULE (le dosage "
+                "de la conduite simulée, défaut ; SLALOM s'il manque) ou SLALOM (celui de la conduite dessinée)")
+ap.add_argument("--traj", default=None, help="écrit la berline simulée (96 Hz : x, y, cap, v, s) pour audit_trafic.py --hero")
 A = ap.parse_args()
 sys.path.insert(0, os.path.abspath(A.physique))
 import dynamique as D  # noqa: E402
@@ -32,8 +35,11 @@ ns = {"math": math}
 for node in src.body:
     nom = getattr(node, "name", None) or (node.targets[0].id if isinstance(node, ast.Assign) and
                                           isinstance(node.targets[0], ast.Name) else None)
-    if nom in ("bascule", "SLALOM", "voie"):
+    if nom in ("bascule", "SLALOM", "SLALOM_SIMULE", "voie"):
         exec(compile(ast.Module([node], []), A.slalom, "exec"), ns)
+if A.table in ns:
+    ns["SLALOM"] = ns[A.table]
+print("table du slalom :", A.jeu or (A.table if A.table in ns else "SLALOM"))
 if A.jeu:
     ns["SLALOM"] = tuple(tuple(float(x) if x.strip() != "doux" else "doux" for x in m.strip("() ").split(","))
                          for m in A.jeu.split(";"))
@@ -64,7 +70,15 @@ for i in range(0, len(kap), 20):
 print(f"route du slalom (κ + voie″) contre route décalée de voie(s) : {worst[0]:.3f} m au pire (s {worst[1]:.0f}) ; "
       f"bout de route décalé de {math.dist(R0.at(PP.S_ARRET)[:2], R1.at(PP.S_ARRET)[:2]):.3f} m")
 
-plan = D.Plan(R1, PP._s_plan, PP.PLAN.speed, PP.PLAN.along, PP.S_ARRET)
+# depuis film/physique 0003718, le slalom est une entrée du plan (Plan.voie : le conducteur vise la route décalée,
+# l'horaire reste compté le long de la route) ; avant, la route recevait la courbure du slalom (κ + voie″)
+import inspect  # noqa: E402
+PAR_VOIE = "voie" in inspect.signature(D.Plan.__init__).parameters
+if PAR_VOIE:
+    plan = D.Plan(R0, PP._s_plan, PP.PLAN.speed, PP.PLAN.along, PP.S_ARRET, voie=voie)
+    print("le slalom entre par Plan.voie (route inchangée)")
+else:
+    plan = D.Plan(R1, PP._s_plan, PP.PLAN.speed, PP.PLAN.along, PP.S_ARRET)
 dr = D.simulate(plan, PP.DERAPAGES, t_span=PP.T_SPAN)
 base = PP.DRIVE
 FPS = 24.0
@@ -75,7 +89,13 @@ def col(d, k, t):
     return d._at(k, t)
 
 
-print(f"dérive de crête des pneus : {A_PIC:.1f}° ; arrêt simulé {dr.t_stop:.2f} s (sans slalom {base.t_stop:.2f} s)")
+def suivi(d, t):
+    """L'écart (m) à la ligne visée : voie_err si la physique le rend, sinon l'écart à la route du slalom."""
+    return d.voie_err(t) if PAR_VOIE and d is dr else d.lat_err(t)
+
+
+print(f"dérive de crête des pneus : {A_PIC:.1f}° ; arrêt simulé {dr.t_stop:.2f} s, image {dr.t_stop * FPS:.1f} "
+      f"(sans slalom {base.t_stop:.2f} s, image {base.t_stop * FPS:.1f})")
 print("manœuvre            images      écart suivi  glisse   dérive av/ar   latérale  roulis  volant  lacet    "
       "retard horaire   (sans slalom : glisse, dérive ar, écart, latérale)")
 for i, m in enumerate(SLALOM):
@@ -86,7 +106,9 @@ for i, m in enumerate(SLALOM):
     tb = next(t for t in ts if dr.s(t) >= s0 + L) + 0.6
     # hors des deux dérapages (images 120 à 205, 428 à 492 : le slalom y est nul, la glisse est celle du geste)
     w = [t for t in ts if ta <= t <= tb and not (120 <= t * FPS <= 205 or 428 <= t * FPS <= 492)]
-    e = max(abs(dr.lat_err(t)) for t in w)
+    e = max(abs(suivi(dr, t)) for t in w)
+    v0 = dr.speed(ta)
+    dem = 2.0 * math.pi * abs(dn) / (L / max(1.0, 0.5 * (v0 + dr.speed(tb - 0.6)))) ** 2 * (7.51 / 6.283 if len(m) > 3 else 1.0)
     sl = max(abs(dr.slip(t)) for t in w)
     af = max(abs(col(dr, "alpha_f", t)) for t in w)
     ar = max(abs(col(dr, "alpha_r", t)) for t in w)
@@ -101,7 +123,8 @@ for i, m in enumerate(SLALOM):
     al0 = max(abs(base.alat(t)) for t in w)
     print(f"  {i} {dn:+5.2f} m sur {L:4.0f} m  {ta * FPS:5.1f}→{tb * FPS:5.1f}   {e:5.2f} m    {sl:5.1f}°   "
           f"{af:4.1f}° / {ar:4.1f}°   {al:5.2f}     {ro:4.1f}°   {st:4.1f}°  {yr:4.0f}°/s   {late:5.2f} m          "
-          f"({sl0:.1f}°, {ar0:.1f}°, écart {e0:.2f} m, latérale {al0:.2f}){'   SATURÉ' if max(af, ar) > A_PIC else ''}")
+          f"({sl0:.1f}°, {ar0:.1f}°, écart {e0:.2f} m, latérale {al0:.2f}) ; demandé {dem / 9.81:.2f} g"
+          f"{'   SATURÉ' if max(af, ar) > A_PIC else ''}")
 print("les deux dérapages (crête de glisse, image) et l'horaire aux étoiles, avec / sans slalom :")
 for g0, g1 in ((120, 205), (428, 492)):
     a = max((abs(dr.slip(g / FPS)), g) for g in range(g0, g1))
@@ -117,3 +140,15 @@ for k, g in sorted(PP.ETOILES.items()):
 print("aux frontières des tronçons (image, retard horaire avec / sans) : " + ", ".join(
     f"{n} {g} : {dr.s(g / FPS) - PP._s_plan(g / FPS):+.2f} / {base.s(g / FPS) - PP._s_plan(g / FPS):+.2f}"
     for n, g in PP.START.items()))
+
+if A.traj:
+    import json
+    HZ = 96
+    rows = []
+    for k in range(int(31 * HZ)):
+        t = k / HZ
+        x, y = dr.pos(t)
+        rows.append([round(x, 4), round(y, 4), round(dr.heading(t), 4), round(dr.speed(t), 4), round(dr.s(t), 4)])
+    json.dump(dict(hz=HZ, rows=rows, physique=os.path.abspath(A.physique), slalom=A.jeu or A.slalom),
+              open(A.traj, "w", encoding="utf-8"))
+    print("écrit", A.traj)
