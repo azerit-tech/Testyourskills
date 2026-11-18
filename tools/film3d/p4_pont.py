@@ -318,6 +318,9 @@ if VILLE:
             # elle se jette, elle lâche (pas pendant le freinage du port : il reste sous les 7 m/s²)
             y = _follow(gap, dv, t) + SURGE * math.sin(w) * (1.0 - M.smoothstep(_TB - 3.0, _TB, t))
             sway = amp * math.sin(1.25 * w + 0.7 * ph) * (1.0 - u if x1 == HERO_X else 1.0)
+            # (fusion v10 : le louvoiement réduit de moitié pendant le freinage du port ; la berline simulée y freine
+            # à 6,8 m/s², la patrouille 6 qui la suit louvoyait à 3,3 m/s² en même temps : 7,6 sur le cercle)
+            sway *= 1.0 - 0.5 * M.smoothstep(_TB - 1.5, _TB, t)
             x = x0 + (x1 - x0) * u + sway
             if xr is not None:          # dans la rue : sa file, un louvoiement réduit (SPEC §18.62)
                 xs = xr + RUE_SWAY * sway
