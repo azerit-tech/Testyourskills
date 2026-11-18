@@ -66,7 +66,8 @@ TRAJ = {"OUV": "ouv_avenue", "P1": "p1_avenue", "P2": "p2_arc", "P3": "p3_enseig
         "P5": "p5_virage", "P6": "p6_jetee", "FIN": "fin_pointe", "FIN6": "fin6_orbite"}
 FULL = (720, 1280)
 DRAFT = (360, 640)
-ESSAIS = {"rugosite": 0.5, "brume": 1.0, "peinture": None, "metal": None, "vernis": None, "vernis_rugosite": None}
+ESSAIS = {"rugosite": 0.5, "brume": 1.0, "peinture": None, "metal": None, "vernis": None, "vernis_rugosite": None,
+          "audit": 1.0, "sol_gris": 1.0}      # audit, sol_gris : diag/audit_sol.py (le bas du cadre aux coupes)
 PAINT_ENV = {"peinture": "FILM3D_PAINT", "metal": "FILM3D_PAINT_METAL", "vernis": "FILM3D_PAINT_COAT",
              "vernis_rugosite": "FILM3D_PAINT_COAT_ROUGH"}
 
@@ -395,6 +396,13 @@ def worker(a):
 
     def render_to(path, f):
         scene.frame_set(f)
+        if "audit" in essais or "sol_gris" in essais:
+            sys.path.insert(0, os.path.join(HERE, "diag"))
+            import audit_sol
+            rs = audit_sol.releve(bpy, scene, f, os.path.join(out_dir, f"audit-{os.path.basename(path)[:-4]}.json"),
+                                  plan=plan)
+            if "sol_gris" in essais:
+                audit_sol.sol_gris(bpy, scene, rs)
         tmp = path[:-4] + ".part.png"
         r.filepath = tmp
         t1 = time.time()

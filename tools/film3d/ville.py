@@ -1178,6 +1178,27 @@ def is_lointain(nom, top, zone):
     return _hors_zone(top, zone)
 
 
+# La place de chaque objet d'un lieu dans le repère de sa scène (SPEC §18.63) : les matières de chaussée, de
+# terre-plein et de jetée (road.coords) lisent leur dessin en coordonnées d'objet plus la position de l'objet. Posé
+# sous la racine du lieu, l'objet change de position dans le monde : tout le dessin (lignes, flaques, zones sèches,
+# grain) glissait de la translation du lieu, et le même sol changeait à chaque coupe où son lieu passe de « chez lui »
+# à « voisin ». Ses matières lisent cette propriété à la place (road.lieu_location).
+LOC_LIEU, LOC_LIEU_OK = "loc_lieu", "loc_lieu_ok"
+
+
+def noter_place(objs):
+    """Note sur chaque objet sa position dans le repère de la scène de son lieu (avant la pose sous la racine),
+    sans écraser une place déjà notée. Rend le nombre d'objets notés."""
+    n = 0
+    for o in objs:
+        if o.get(LOC_LIEU_OK):
+            continue
+        o[LOC_LIEU] = [float(c) for c in o.matrix_world.translation]
+        o[LOC_LIEU_OK] = 1.0
+        n += 1
+    return n
+
+
 def assembler(scene, infos, noms, base=None, plan=None, own=None, own_objs=None):
     """Ajoute chaque lieu à la scène de ville : sa collection, sa racine (la transformation de placement), ses
     objets parentés à la racine, ses drapeaux. `base` (4 × 4, lignes) : le repère de la scène, s'il n'est pas celui de
@@ -1235,6 +1256,7 @@ def assembler(scene, infos, noms, base=None, plan=None, own=None, own_objs=None)
             log(f"{nom} ({nb_plan}) dans la prise de {plan} : clés décalées de {-shift:+d} images ({nk} courbes), "
                 f"caméra et acteurs décidés après la pose de tous les lieux")
         bpy.context.view_layer.update()
+        n_loc = noter_place(objs)
         zone = zones()[nom]
         root = bpy.data.objects.new(f"ville_{nom}_racine", None)
         root.empty_display_size = 10.0
@@ -1267,6 +1289,7 @@ def assembler(scene, infos, noms, base=None, plan=None, own=None, own_objs=None)
         root["ville_cache0"] = 0
         out[nom] = dict(racine=root, collection=coll, objets=len(objs), retires=names_gone, lointains=far,
                         load_s=round(time.time() - t0, 1))
+        log(f"{nom} : place dans le lieu notée sur {n_loc} objets (le dessin de leurs matières ne glisse pas)")
         log(f"{nom} : {len(objs)} objets ajoutés ({far} faux lointains), {len(gone)} retirés "
             f"({', '.join(names_gone[:12])}{'…' if len(names_gone) > 12 else ''}) en {time.time() - t0:.1f} s")
     if plan is not None and own_objs is not None:

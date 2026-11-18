@@ -1809,6 +1809,7 @@ def plan_P5(scene, hidden, palier="conteneurs"):
     # au-dessus, dans le repère de son rig. (Plus d'appoint porté par la caméra, 1400 W, ni d'ambre de flanc,
     # 3000 W : le faisceau et les mâts du port la posent dans le lieu)
     L.car_fill(hero, loc=(0.0, -4.0, 6.0), energy=900.0, color="#ffd4b4", size=6.0)
+    L.hero_cabin(hero)              # l'habitacle allumé, comme dans tous les tronçons (SPEC §18.63)
     scene.render.use_motion_blur = True
     scene.render.motion_blur_shutter = 0.5
     last = poses[-2]

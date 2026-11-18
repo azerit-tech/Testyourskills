@@ -123,9 +123,92 @@ def build_jetty(hidden, lamp_src, far=False):
     out = L.roadway("jetee", ys, jetty_z, x0=JX, half=J_HALF, walk=J_WALK, rail="quai", lamp_src=lamp_src,
                     lamp_ys=J_LAMPS, far=far, rail_ys=(y0, CY - math.sqrt(R * R - J_EDGE * J_EDGE)))
     gone = _drop_lamps(out, far) if L.ville_on() else 0
+    if L.ville_on() and not far:
+        build_jetty_gear(y0)
     print(f"[jetee] {JY1 - y0:.0f} m en x {JX:.0f} depuis y {y0:.1f}, chaussée {2 * J_HALF:.0f} m, "
           f"{len(out['lamps'])} lampadaires ({gone} retirés avant le port)", flush=True)
     return out
+
+
+# Le bord de la voie sur la jetée (brouillon éclairé v9, SPEC §18.63) : de la caméra à 2,4 m, à 100 km/h, les 70 m de
+# jetée en ville ne montraient qu'un trottoir nu, rien ne défilait près de la voie. Une barrière de trottoir
+# galvanisée (poteaux tous les J_BARRIERE_PAS m, main courante et lisse) juste derrière la bordure, des bittes
+# d'amarrage en fonte sur le trottoir côté eau, et le matériel des pêcheurs de vie.py (cannes appuyées sur la
+# rambarde, seaux, glacières) à côté de chacun d'eux. Aucune lumière ajoutée.
+J_BARRIERE_N = 4.34          # m de l'axe : la bordure finit à 4,2 ; les promeneurs de vie.py passent à 4,6 et plus
+J_BARRIERE_PAS = 2.5
+J_BARRIERE_H = 0.9
+J_BITTES_N, J_BITTES_PAS = 5.95, 14.4
+# les pêcheurs de vie.py (u le long de la jetée depuis vie.JETEE_O, n à gauche), et le passage de ce repère à celui
+# de la jetée : y = J_VIE_Y + u, x = JX − n (ville.placement("P6"))
+J_PECHEURS = ((-30.0, 5.7), (-12.0, 5.6), (-4.0, -5.7), (8.0, -5.6), (15.0, 5.7), (22.0, 5.5), (33.0, -5.7), (41.0, 5.6))
+J_VIE_Y = 364.92
+
+
+def build_jetty_gear(y0):
+    rail = bpy.data.materials.get("barriere_trottoir") or L.mat_steel("barriere_trottoir", color=(0.52, 0.54, 0.55),
+                                                                       rough=0.32, rust=0.12)
+    iron = bpy.data.materials.get("fonte_bornes") or L.mat_steel("fonte_bornes", color=(0.05, 0.05, 0.055), rough=0.45,
+                                                                 rust=0.45, paint=True)
+    rod = S.mat_plain("canne_carbone", (0.02, 0.02, 0.022, 1), 0.25, 0.0)
+    cork = S.mat_plain("canne_liege", (0.42, 0.30, 0.18, 1), 0.7, 0.0)
+    plast = [S.mat_plain("seau_orange", (0.62, 0.20, 0.04, 1), 0.45, 0.0),
+             S.mat_plain("glaciere_blanc", (0.62, 0.62, 0.60, 1), 0.5, 0.0),
+             S.mat_plain("glaciere_bleu", (0.03, 0.12, 0.32, 1), 0.45, 0.0)]
+    y_end = CY - math.sqrt(R * R - J_EDGE * J_EDGE) - 1.0
+    z = road.WALK_Z
+    # --- la barrière de trottoir : poteaux, main courante, lisse
+    bm = L.bmesh.new()
+    nposts = 0
+    for side in (-1, 1):
+        x = JX + side * J_BARRIERE_N
+        y = y0 + 2.0
+        while y < y_end:
+            L.tube_bm(bm, (x, y, z), (x, y, z + J_BARRIERE_H), 0.03, seg=8)
+            nposts += 1
+            y += J_BARRIERE_PAS
+        y1 = y - J_BARRIERE_PAS
+        for h, r in ((J_BARRIERE_H, 0.024), (0.5, 0.016)):
+            L.tube_bm(bm, (x, y0 + 2.0, z + h), (x, y1, z + h), r, seg=8)
+    L.mesh_object("jetee_barriere_trottoir", bm, [rail])
+    # --- les bittes d'amarrage, à l'écart des pêcheurs
+    fish = [(JX - n, J_VIE_Y + u) for u, n in J_PECHEURS]
+    bm = L.bmesh.new()
+    nb = 0
+    for side in (-1, 1):
+        y = y0 + 7.2
+        while y < y_end - 1.0:
+            if all(abs(y - fy) > 2.5 for fx, fy in fish if (fx - JX) * side > 0):
+                bollard_bm(bm, JX + side * J_BITTES_N, y, z)
+                nb += 1
+            y += J_BITTES_PAS
+    L.mesh_object("jetee_bittes", bm, [iron])
+    # --- le matériel des pêcheurs : deux cannes sur la rambarde, un seau, une glacière
+    rng = random.Random(61)
+    br, bc, bp = L.bmesh.new(), L.bmesh.new(), L.bmesh.new()
+    for k, (fx, fy) in enumerate(fish):
+        if not y0 < fy < y_end:
+            continue
+        side = 1 if fx > JX else -1
+        for dy in (-0.7, 0.55):
+            yb = fy + dy + rng.uniform(-0.1, 0.1)
+            base = Vector((JX + side * 6.05, yb, z + 0.02))
+            rest = Vector((JX + side * 6.45, yb + rng.uniform(-0.15, 0.15), 1.24))      # sur la main courante
+            d = (rest - base).normalized()
+            tip = rest + d * rng.uniform(2.2, 2.9)
+            L.tube_bm(bc, base, base + d * 0.55, 0.019, seg=8)
+            L.tube_bm(br, base + d * 0.55, rest, 0.013, seg=6)
+            L.tube_bm(br, rest, tip, 0.006, seg=5)
+        yb = fy - 1.15
+        L.tube_bm(bp, (JX + side * 5.95, yb, z), (JX + side * 5.95, yb, z + 0.3), 0.15, seg=14, mat=0)
+        yc = fy + 1.3
+        L.box_bm(bp, (JX + side * 5.95 - 0.19, yc - 0.28, z), (JX + side * 5.95 + 0.19, yc + 0.28, z + 0.32), mat=2)
+        L.box_bm(bp, (JX + side * 5.95 - 0.2, yc - 0.29, z + 0.32), (JX + side * 5.95 + 0.2, yc + 0.29, z + 0.39), mat=1)
+    L.mesh_object("jetee_cannes", br, [rod])
+    L.mesh_object("jetee_cannes_poignees", bc, [cork])
+    L.mesh_object("jetee_peche", bp, plast)
+    print(f"[jetee] bord de voie : {nposts} poteaux de barrière, {nb} bittes, le matériel de {len(fish)} pêcheurs",
+          flush=True)
 
 
 # ---------------------------------------------------------------- la pointe
@@ -1448,6 +1531,34 @@ P6_LAMPS_FAR = (10, 11, 12, 13, 14)     # J_LAMPS[10:] : y 315 à 395, tous les 
 P6_PHARE_PHASE, P6_PHARE_VITESSE = 272.2 - 180.0 + 12.0, 0.0
 
 
+# le phare de FIN6 (plan_FIN6 : lieux.phare_tourne, pilote sur l'image de la scène ; phare_pinceaux) : P6 le pose déjà
+# tel quel, sur le temps du film (SPEC §18.63) : l'azimut, la phase, la vitesse et les pinceaux dans p6_jetee
+# (phare_azimut, FIN6_PHARE_*), sans Blender
+
+
+def phare_film(ph, shot, frames):
+    """Le phare de `shot` tourné comme dans FIN6, en clés linéaires prolongées (et non par un pilote sur l'image de la
+    scène) : la ville décale les clés d'un voisin de la même prise (ville.assembler), le port de P5 voit donc la même
+    lanterne au même angle que P6. Mêmes pinceaux que FIN6 (relevé, portée)."""
+    import p6_jetee as P6
+    phare_azimut = P6.phare_azimut
+    FIN6_PHARE_RELEVE, FIN6_PHARE_PORTEE, FIN6_PHARE_VITESSE = (P6.FIN6_PHARE_RELEVE, P6.FIN6_PHARE_PORTEE,
+                                                                P6.FIN6_PHARE_VITESSE)
+    piv = L.phare_tourne(ph, phase=phare_azimut(shot, frames[0]), vitesse=0.0)
+    for f in (frames[0], frames[-1]):
+        piv.rotation_euler.z = math.radians(phare_azimut(shot, f))
+        piv.keyframe_insert("rotation_euler", index=2, frame=f)
+    import motion as M
+    for fc in M.fcurves(piv):
+        fc.extrapolation = "LINEAR"
+        for k in fc.keyframe_points:
+            k.interpolation = "LINEAR"
+    L.phare_pinceaux(ph, releve=FIN6_PHARE_RELEVE, portee=FIN6_PHARE_PORTEE)
+    print(f"[{shot}] phare tourné comme dans FIN6 : {phare_azimut(shot, frames[0]):.1f}° à l'image {frames[0]}, "
+          f"{FIN6_PHARE_VITESSE:.0f} °/s", flush=True)
+    return piv
+
+
 def p6_phare_clear(scene):
     """Retire ou baisse les lampadaires de la jetée et de la pointe sur l'azimut du phare."""
     head = bpy.data.materials.get("lamp_head")
@@ -1499,13 +1610,18 @@ def plan_P6(scene, hidden, palier="socle"):
     # le phare (lieux.panorama) : ses pinceaux, relevés de 1° seulement et vus de la jetée sous la lanterne, barrent
     # le cadre en passant par elle ; aucune phase ni vitesse ne l'évite de la jetée (rendus e3, e4, f1, f2). Gelés,
     # l'un fuit vers le large, l'autre est caché à la caméra (P6_PHARE_PHASE) : la lanterne se lit, pas la barre
-    L.phare_tourne(bpy.data.objects["phare"], phase=P6_PHARE_PHASE, vitesse=P6_PHARE_VITESSE)
-    vers_nous = bpy.data.objects.get("phare_pinceau_1")
-    if vers_nous is not None:
-        vers_nous.visible_camera = False
-        vers_nous.visible_glossy = False         # ni son reflet sur l'enrobé mouillé
     scene.frame_start, scene.frame_end = P6.F0, P6.F0 + P6.FRAMES - 1
     frames = range(P6.F0 - 1, P6.F0 + P6.FRAMES + 1)      # une image de part et d'autre : l'obturateur du flou
+    if L.ville_on():
+        # en ville, FIN6 suit P6 sans coupe : le phare tourne déjà comme dans FIN6, sur le temps du film (gelé ici,
+        # son trait d'éclat surgissait à 618 | 619, brouillon éclairé v9)
+        phare_film(bpy.data.objects["phare"], "P6", frames)
+    else:
+        L.phare_tourne(bpy.data.objects["phare"], phase=P6_PHARE_PHASE, vitesse=P6_PHARE_VITESSE)
+        vers_nous = bpy.data.objects.get("phare_pinceau_1")
+        if vers_nous is not None:
+            vers_nous.visible_camera = False
+            vers_nous.visible_glossy = False         # ni son reflet sur l'enrobé mouillé
     hero = L.hero()
     wheels = L.hero_wheels(hero)
     poses = M.sample(P6.hero_pos, frames, heading=P6.hero_heading, steer=P6.hero_steer, spin=P6.hero_spin, wheel_r=hero["wheel_r"])
@@ -1514,6 +1630,7 @@ def plan_P6(scene, hidden, palier="socle"):
     for a, b in P6.brake_windows():        # les feux stop du parcours (aucun en P6 : elle accélère)
         import hero_cars
         hero_cars.stop_lamps(M.body_of(hero), a, b)
+    L.hero_cabin(hero)              # l'habitacle allumé, comme dans tous les tronçons (FIN6 compris, SPEC §18.63)
 
     src, rigs = {}, []
     for i, (kind, _) in enumerate(P6.COLUMN):

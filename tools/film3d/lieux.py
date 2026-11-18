@@ -745,7 +745,7 @@ def wbeam_profile(side, x0, z0):
 
 
 def roadway(name, ys, zfun=None, x0=0.0, half=7.0, walk=2.0, rail="parapet", glissiere=False, under=None,
-            lamp_src=None, lamp_ys=(), far=False, M=None, rail_ys=None):
+            lamp_src=None, lamp_ys=(), far=False, M=None, rail_ys=None, lamp_quinconce=0.0):
     """Une chaussée droite le long de y, en x0, à la hauteur zfun(y) : le profil de l'avenue (enrobé bombé,
     cunettes, bordures de road.py) à la demi-largeur `half`, trottoirs de `walk` m en dalles, puis au bord :
       rail « parapet » : parapet en béton à larmier et garde-corps tubulaire dessus (1,1 m, le pont) ;
@@ -754,7 +754,8 @@ def roadway(name, ys, zfun=None, x0=0.0, half=7.0, walk=2.0, rail="parapet", gli
       rail None        : rien (la voie continue sur un terre-plein).
     `glissiere` : une glissière en W au bord des voies ; `under` « caisson » : la poutre de rive et le dessous du
     tablier (le pont). `rail_ys` : (y0, y1), où poser le bord (par défaut toute la longueur).
-    Les lampadaires (`lamp_src`, aux `lamp_ys`) des deux côtés, bras vers les voies.
+    Les lampadaires (`lamp_src`, aux `lamp_ys`) des deux côtés, bras vers les voies ; `lamp_quinconce` (m) décale
+    la file de gauche (en quinconce, dans les limites de `ys`).
     `far` : la version vue de loin, sans montants, poteaux ni lisses (les grandes formes et les lumières).
     Renvoie dict(M, lamps : [(mât, lumière, tête)], edge : x du bord extérieur)."""
     zfun = zfun or (lambda y: 0.0)
@@ -848,7 +849,10 @@ def roadway(name, ys, zfun=None, x0=0.0, half=7.0, walk=2.0, rail="parapet", gli
         lx = half + KERB + walk - 0.55
         for k, y in enumerate(lamp_ys):
             for side in (-1, 1):
-                lamps.append(lamp(lamp_src, (side * lx, y, zfun(y) + WALK_Z), arm=(-side, 0.0),
+                yl = y + (lamp_quinconce if side < 0 else 0.0)      # la file de gauche décalée (en quinconce)
+                if side < 0 and lamp_quinconce and not ys[0] + 1.0 <= yl <= ys[-1] - 1.0:
+                    continue
+                lamps.append(lamp(lamp_src, (side * lx, yl, zfun(yl) + WALK_Z), arm=(-side, 0.0),
                                   name=f"lamp_{name}_{k}_{'g' if side < 0 else 'd'}"))
         if far and lamps:
             # vue de loin, la tête du lampadaire fait moins d'un pixel : un halo émissif la rend lisible (la file
@@ -1634,6 +1638,18 @@ def cabin_light(root, energy=6.0, color="#ffcf9a", dash=60.0, dash_color="#ffb07
         lo.visible_volume_scatter = False
         ob["planche"] = lo.name
     return ob
+
+
+# L'habitacle allumé, le même dans les huit tronçons (SPEC §18.63) : OUV, P1, P3 et FIN6 le posaient à 25 W, P2, P4,
+# P5 et P6 pas ; vue de dos, la lunette passait d'un habitacle chaud au noir à 107 | 108 et 317 | 318, et l'inverse
+# à 618 | 619.
+CABIN_W = 25.0
+
+
+def hero_cabin(root):
+    """L'habitacle de la berline allumé à CABIN_W (cabin_light) : de dos, par la lunette, la capuche et les épaules du
+    conducteur se découpent sur un habitacle chaud, dans tous les tronçons."""
+    return cabin_light(root, energy=CABIN_W)
 
 
 def jet(name="jet"):

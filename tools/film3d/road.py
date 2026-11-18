@@ -101,15 +101,43 @@ def road_z(x):
 
 # ---------------------------------------------------------------- petits outils de nœuds
 
-def coords(N, uv=False):
-    """Coordonnées d'objet (alignées sur la rue, même tournée de 90°) + la position de l'objet. uv : les
-    coordonnées viennent de la carte UV, en mètres (u en travers de la chaussée, v le long) : une chaussée courbe,
-    l'anneau d'un rond-point, garde ainsi ses voies, ses tirets et ses traces de roues."""
-    tc = N.new("ShaderNodeTexCoord")
+# La place de l'objet dans le repère de son lieu (SPEC §18.63) : un lieu posé en voisin par ville.py (sous une racine
+# tournée et déplacée) garde la position qu'il avait dans sa scène. Sans elle, la position du monde (Object Info)
+# décalait tout le dessin de la chaussée de la translation du lieu : à 485 | 486, le terre-plein du port vu de P6
+# perdait ses lignes et ses flaques (décalé de 290 m), à 107 | 108 et 317 | 318 l'enrobé changeait de grain et d'eau.
+# ville.assembler la note sur chaque objet d'un voisin (LOC_LIEU, et LOC_LIEU_OK = 1) ; sans elle (la scène du lieu
+# lui-même), la position du monde, qui y est la même.
+LOC_LIEU = "loc_lieu"
+LOC_LIEU_OK = "loc_lieu_ok"
+
+
+def lieu_location(N):
+    """La position de l'objet dans le repère de son lieu : la propriété LOC_LIEU si ville.assembler l'a posée (un
+    voisin), sinon celle du monde (Object Info)."""
     oi = N.new("ShaderNodeObjectInfo")
+    at = N.new("ShaderNodeAttribute", _attribute_type="OBJECT", _attribute_name=LOC_LIEU)
+    ok = N.new("ShaderNodeAttribute", _attribute_type="OBJECT", _attribute_name=LOC_LIEU_OK)
+    d = N.new("ShaderNodeVectorMath", _operation="SUBTRACT")
+    N.link(at.outputs["Vector"], d.inputs[0])
+    N.link(oi.outputs["Location"], d.inputs[1])
+    k = N.new("ShaderNodeVectorMath", _operation="SCALE")
+    N.link(d.outputs[0], k.inputs[0])
+    N.link(ok.outputs["Fac"], k.inputs["Scale"])
+    v = N.new("ShaderNodeVectorMath", _operation="ADD")
+    N.link(oi.outputs["Location"], v.inputs[0])
+    N.link(k.outputs[0], v.inputs[1])
+    return v.outputs[0]
+
+
+def coords(N, uv=False):
+    """Coordonnées d'objet (alignées sur la rue, même tournée de 90°) + la position de l'objet dans le repère de
+    son lieu (lieu_location). uv : les coordonnées viennent de la carte UV, en mètres (u en travers de la chaussée,
+    v le long) : une chaussée courbe, l'anneau d'un rond-point, garde ainsi ses voies, ses tirets et ses traces de
+    roues."""
+    tc = N.new("ShaderNodeTexCoord")
     v = N.new("ShaderNodeVectorMath", _operation="ADD")
     N.link(tc.outputs["UV" if uv else "Object"], v.inputs[0])
-    N.link(oi.outputs["Location"], v.inputs[1])
+    N.link(lieu_location(N), v.inputs[1])
     return v.outputs[0], tc.outputs["UV" if uv else "Object"]
 
 
@@ -444,11 +472,26 @@ def mat_paint_decal(st, name="road_paint"):
     m, N, out = S.material(name)
     P, _ = coords(N)
     d2 = tex(N, os.path.join(S.ASSETS, "asphalt_02", "disp_2k.png"), mapping(N, P, scale=(1 / 3.0,) * 3), color=False)
-    keep = paint_wear(N, P, d2, 0.0, None)
+    # usée comme au passage des roues partout (DECAL_USURE) et plus sombre (DECAL_CLAIR × le blanc de chaussée), le
+    # vernis d'eau un peu plus mat : au rond-point (148–160, l'étoile 2 du brouillon éclairé v9), sous le lampadaire
+    # proche, les bandes du passage piéton sortaient blanc pur sur le tiers bas du cadre et tiraient l'œil au sol
+    keep = paint_wear(N, P, d2, DECAL_USURE, None)
     geo = N.new("ShaderNodeNewGeometry").outputs["Normal"]
     n = bump(N, noise(N, P, 30.0, 3.0), geo, 0.15, 0.002)
-    wet_shader(N, out, paint_colour(N, P), 0.5, n, st["cr"][0] + 0.02, n, alpha=keep)
+    col = mix_mul(N, paint_colour(N, P), DECAL_CLAIR)
+    wet_shader(N, out, col, 0.55, n, st["cr"][0] + 0.08, n, alpha=keep)
     return m
+
+
+# (brouillon décor-coupes : à 0,8 et 0,62, P2/43, le passage piéton sous le lampadaire restait en traînées blanches :
+# une stop plus sombre, une bonne part de la peinture partie)
+DECAL_USURE = 1.6            # la part d'usure des roues ajoutée partout (paint_wear : seuil + 0,22)
+DECAL_CLAIR = 0.32           # le blanc des bandes : 0,45 × 0,32 ≈ 0,14 d'albédo propre, un blanc sale et gris
+
+
+def mix_mul(N, col, k):
+    """La couleur `col` multipliée par le gris `k`."""
+    return N.mix(1.0, col, (k, k, k, 1), "MULTIPLY")
 
 
 # ---------------------------------------------------------------- cunette, bordure, trottoir
