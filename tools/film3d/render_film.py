@@ -315,6 +315,8 @@ def worker(a):
         vie.poser_plan(scene, plan)
         import clins            # les clins d'œil (SPEC §18.65), par-dessus la vie ; FILM3D_CLINS=0 les ôte
         clins.poser_plan(scene, plan)
+        # les vitres de la berline hors des lampadaires (SPEC §18.70) : toutes les lampes de la prise sont posées
+        ville.vitres_hors_lampadaires(scene, plan)
     still = scene.frame_current
     span = scene.frame_end - scene.frame_start + 1
     animated = span > 3
