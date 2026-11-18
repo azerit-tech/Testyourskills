@@ -251,6 +251,7 @@ def separation(A, B):
     return best
 
 
+GLISSE_FRANCHE = 10.0                   # ° : au-delà, la berline dérape (verifier : marge de flanc tout autour)
 MARGE_COTE, MARGE_LONG = 0.6, 3.0       # m : de flanc à flanc en passant, de pare-chocs à pare-chocs à la file
 VU = 160.0                              # m : au-delà de la berline, rien ne compte (vie.VU)
 
@@ -341,6 +342,7 @@ def verifier(g0=0, g1=None, pas=1, poursuite=None):
         bs = boites(g, pours, veh)
         hx, hy = bs[0][2], bs[0][3]
         bs = [b for b in bs if math.hypot(b[2] - hx, b[3] - hy) < VU]
+        glisse = abs(P.DRIVE.slip(g / P.FPS)) > GLISSE_FRANCHE
         for i, a in enumerate(bs):
             for b in bs[i + 1:]:
                 if not (a[7] or b[7]):
@@ -355,6 +357,11 @@ def verifier(g0=0, g1=None, pas=1, poursuite=None):
                 vie_ = (a[1] == "vie", b[1] == "vie")
                 marge = poursuite_ and any(vie_)
                 mw, ml = (MARGE_COTE / 2, MARGE_LONG / 2) if marge else (0.0, 0.0)
+                # (la berline en dérapage, fusion v10 : sa caisse est en travers de sa route, elle n'est « à la file »
+                # de rien ; la paire garde la marge de flanc tout autour, 0,6 m entre les caisses. Au port elle passe
+                # l'angle arrière du camion rangé du pont à 0,69 m, glisse de 22°.)
+                if marge and glisse and "hero" in (a[1], b[1]):
+                    ml = mw
                 A = a[8] or _coins(a[2], a[3], a[4], a[5] + mw, a[6] + ml)
                 B = b[8] or _coins(b[2], b[3], b[4], b[5] + mw, b[6] + ml)
                 d = separation(A, B)

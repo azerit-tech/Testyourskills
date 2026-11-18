@@ -329,7 +329,10 @@ def vehicules():
     # A : attend à l'entrée de la plage, entre à l'image 70, tourne par l'est, sort sur l'avenue nord
     a_pts = courbe([(1.75, -479.0), (1.75, -446.0)] + arc(-80.4, -9.6) + [(16.0, AV_E1), (300.0, AV_E1)], n_lisse=3)
     add("rond_a", "fairheaven", "menthe",
-        Course(a_pts, [(0, 0.0), (72, 0.0), (102, _v(30)), (160, _v(30)), (220, _v(45))], s0=21.5, g0=0),
+        # (fusion v10 : elle relance dès l'image 130, 160 avant. La patrouille 2 de P2, conduite par motion.drive
+        # aux plafonds de film/physique, la croise à l'image 163 pendant qu'elle sort de l'anneau : 1,5 m entre les
+        # caisses, mais 0,22 m sous la marge de trafic.verifier ; partie plus tôt, elle est déjà dans sa voie)
+        Course(a_pts, [(0, 0.0), (72, 0.0), (102, _v(30)), (130, _v(30)), (190, _v(45))], s0=21.5, g0=0),
         phares=True)
     # B : vient de l'avenue nord, fait trois quarts de tour par le nord et l'ouest, sort vers la plage
     b_pts = courbe([(300.0, AV_O1), (16.0, AV_O1)] + arc(9.6, 260.4) + [(-1.75, -446.0), (-1.75, -620.0)],
