@@ -45,7 +45,9 @@ CAR = dict(
     R=0.335,                # m, rayon sous charge (7.35-14)
     Iw=2.4,                 # kg·m², l'essieu arrière : deux roues, freins, arbres et la transmission ramenée
     # le pneu, Formule magique de Pacejka (latéral et longitudinal, glissement combiné isotrope), sur le mouillé
-    mu=0.70,                # adhérence de crête à la charge nominale
+    mu=1.0,                 # adhérence de crête à la charge nominale. Le mouillé en tient 0,70 : depuis la v11 le
+                            # film roule sur 1,0, un seul μ du début à la fin (l'accéléré des films de poursuite :
+                            # la route reste mouillée à l'image, SPEC §18.69)
     B=10.0, C=1.6, E=0.2,   # crête à 9°, 80 % de la crête à 35° de dérive (la gomme mouillée qui glisse)
     kx=1.6,                 # raideur longitudinale / raideur de dérive (crête en glissement à κ ≈ 0,1)
     load_sens=0.10,         # l'adhérence baisse de 10 % quand la charge d'une roue double
@@ -99,8 +101,9 @@ DRIVER = dict(
     tau_r=0.06,             # s : le lacet voulu, filtré (les mains)
     fb_max=25.0,            # °/s : hors glisse, la correction de trajectoire bornée (il revient sans brusquer)
     a_rappel=3.0,           # m/s² : la latérale qu'il se garde pour arrêter son retour vers la route
-    alat_max=7.5,           # m/s² : le lacet qu'il demande au plus sur ses quatre roues, en latérale (le mouillé en
-                            # tient 6,5 ; le lacet d'un changement de voie dépasse un instant celui de sa trajectoire)
+    alat_max=10.7,          # m/s² : le lacet qu'il demande au plus sur ses quatre roues, en latérale (1,09 μ g : il
+                            # suit μ, 7,5 à μ 0,70 ; le lacet d'un changement de voie dépasse un instant celui de
+                            # sa trajectoire)
     tc_kap=0.05, tc_alpha=5.0,   # le patinage et la dérive arrière qu'il tolère hors glisse
     v_avance=3.0, a_droit=3.0,   # m/s, m/s² : l'avance de vitesse qu'il se permet pour rattraper l'horaire, en ligne
                             # droite seulement (nulle dès que le plan vire à a_droit m/s² de latérale)
@@ -109,18 +112,23 @@ DRIVER = dict(
     # (m/s² : en ligne ; le cercle avec la latérale de la route), le rappel sur cette vitesse (1/s) ; la fin du
     # freinage (_pose_arret) : sous arret_v m/s il relâche avec la vitesse, jusqu'à arret_fin m/s² à l'arrêt (pas de
     # coup de frein : 0,8 m/s² lâchés en une image font 19 m/s³)
-    arret_a=6.2, arret_cercle=6.5, k_arret=6.0, arret_v=1.0, arret_fin=0.8,
+    # (arret_a valait 6,2 : à μ 1,0 la berline ne traîne plus 2,8 m derrière son horaire et s'arrêtait 4 images
+    # plus tôt ; à 5,4 elle freine un peu plus tôt, plus doux, et s'arrête à la même image qu'avant, 692)
+    arret_a=5.4, arret_cercle=6.5, k_arret=6.0, arret_v=1.0, arret_fin=0.8,
     arret_seul=(3.0, 8.0),  # m avant le point : sous 3 m l'enveloppe seule le conduit, au-delà de 8 m l'horaire
     grip=0.93,              # la part de l'adhérence des roues arrière qu'il ose demander en relançant dans un virage
     # le dérapage (_repartit)
     k_g=25.0,               # 1/s² : le rappel sur l'écart de glisse (avec k_r : 5 rad/s, amorti à 0,9)
-    W=(60.0, 1.0, 0.05, 1.2e5), # les poids : lacet, force centripète, vitesse, et la douceur du pied (N² par unité)
+    W=(60.0, 1.0, 1.0, 1.2e5),  # les poids : lacet, force centripète, vitesse, et la douceur du pied (N² par unité).
+                            # La vitesse pesait 0,05 : à μ 1,0 il sortait de la glisse plein gaz, 10 km/h au-dessus
+                            # de l'horaire, puis freinait pour l'attendre ; à 1,0 la sortie suit l'horaire
     kap_max=0.7,            # le patinage au plus (les roues arrière à 1,7 fois la vitesse du sol)
     k_w=25.0,               # 1/s : le pied suit le régime des roues arrière (il l'entend)
     at_min=6.0, at_max=3.0,   # m/s² : ce que la vitesse peut demander en glisse (freiner, relancer)
     horizon=0.1,            # s : ce que le volant peut atteindre d'ici là borne ce qu'il attend de l'avant
-    alat_drift=5.6,         # m/s² : en glisse, il ne demande pas à la voiture de tourner plus que ses pneus en
-                            # travers ne le peuvent (sinon le rappel vers la route se battrait avec la glisse)
+    alat_drift=8.0,         # m/s² : en glisse, il ne demande pas à la voiture de tourner plus que ses pneus en
+                            # travers ne le peuvent (sinon le rappel vers la route se battrait avec la glisse) ;
+                            # 0,82 μ g : il suit μ (5,6 à μ 0,70)
     vue=0.15,               # s : son lacet voulu a de l'avance sur la consigne de glisse (il sait ce qu'il va faire)
     lead=0.06,           # s : il braque vers où la roue avant ira (le volant a du retard)
     fb_drift=30.0,          # °/s : en glisse, la correction de trajectoire bornée
@@ -882,7 +890,9 @@ def simulate(plan, events=(), t_span=(-2.0, 40.0), car=None, driver=None, chocs=
         hb += max(-hr, min(hr, hb_s - hb))
         # (avec l'enveloppe d'arrêt elle se pose à V_POSE : 0,08 m/s coupés d'un coup à la fin d'un freinage qui se
         # relâche font, selon l'image où ça tombe, 25 à 53 m/s³ d'à-coup aux images rendues ; 0,03 : 21 à 25)
-        if plan.s_stop is not None and s > plan.s_stop - 0.5 and (V < V_POSE if env is not None
+        # (posée : ses roues ne roulent plus. Compter sa vitesse en travers la laissait pivoter sur place à μ 1,0 :
+        # 0,03 à 0,14 m/s de bruit de pneu, 2° de cap en une demi-seconde après l'arrêt)
+        if plan.s_stop is not None and s > plan.s_stop - 0.5 and (abs(car_.u) < V_POSE if env is not None
                                                                   else V < V_ARRET and v_r < V_ARRET):
             stopped = True
         # ---- la physique, SUB pas
