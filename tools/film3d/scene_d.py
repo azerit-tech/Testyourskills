@@ -123,9 +123,92 @@ def build_jetty(hidden, lamp_src, far=False):
     out = L.roadway("jetee", ys, jetty_z, x0=JX, half=J_HALF, walk=J_WALK, rail="quai", lamp_src=lamp_src,
                     lamp_ys=J_LAMPS, far=far, rail_ys=(y0, CY - math.sqrt(R * R - J_EDGE * J_EDGE)))
     gone = _drop_lamps(out, far) if L.ville_on() else 0
+    if L.ville_on() and not far:
+        build_jetty_gear(y0)
     print(f"[jetee] {JY1 - y0:.0f} m en x {JX:.0f} depuis y {y0:.1f}, chaussée {2 * J_HALF:.0f} m, "
           f"{len(out['lamps'])} lampadaires ({gone} retirés avant le port)", flush=True)
     return out
+
+
+# Le bord de la voie sur la jetée (brouillon éclairé v9, SPEC §18.63) : de la caméra à 2,4 m, à 100 km/h, les 70 m de
+# jetée en ville ne montraient qu'un trottoir nu, rien ne défilait près de la voie. Une barrière de trottoir
+# galvanisée (poteaux tous les J_BARRIERE_PAS m, main courante et lisse) juste derrière la bordure, des bittes
+# d'amarrage en fonte sur le trottoir côté eau, et le matériel des pêcheurs de vie.py (cannes appuyées sur la
+# rambarde, seaux, glacières) à côté de chacun d'eux. Aucune lumière ajoutée.
+J_BARRIERE_N = 4.34          # m de l'axe : la bordure finit à 4,2 ; les promeneurs de vie.py passent à 4,6 et plus
+J_BARRIERE_PAS = 2.5
+J_BARRIERE_H = 0.9
+J_BITTES_N, J_BITTES_PAS = 5.95, 14.4
+# les pêcheurs de vie.py (u le long de la jetée depuis vie.JETEE_O, n à gauche), et le passage de ce repère à celui
+# de la jetée : y = J_VIE_Y + u, x = JX − n (ville.placement("P6"))
+J_PECHEURS = ((-30.0, 5.7), (-12.0, 5.6), (-4.0, -5.7), (8.0, -5.6), (15.0, 5.7), (22.0, 5.5), (33.0, -5.7), (41.0, 5.6))
+J_VIE_Y = 364.92
+
+
+def build_jetty_gear(y0):
+    rail = bpy.data.materials.get("barriere_trottoir") or L.mat_steel("barriere_trottoir", color=(0.52, 0.54, 0.55),
+                                                                       rough=0.32, rust=0.12)
+    iron = bpy.data.materials.get("fonte_bornes") or L.mat_steel("fonte_bornes", color=(0.05, 0.05, 0.055), rough=0.45,
+                                                                 rust=0.45, paint=True)
+    rod = S.mat_plain("canne_carbone", (0.02, 0.02, 0.022, 1), 0.25, 0.0)
+    cork = S.mat_plain("canne_liege", (0.42, 0.30, 0.18, 1), 0.7, 0.0)
+    plast = [S.mat_plain("seau_orange", (0.62, 0.20, 0.04, 1), 0.45, 0.0),
+             S.mat_plain("glaciere_blanc", (0.62, 0.62, 0.60, 1), 0.5, 0.0),
+             S.mat_plain("glaciere_bleu", (0.03, 0.12, 0.32, 1), 0.45, 0.0)]
+    y_end = CY - math.sqrt(R * R - J_EDGE * J_EDGE) - 1.0
+    z = road.WALK_Z
+    # --- la barrière de trottoir : poteaux, main courante, lisse
+    bm = L.bmesh.new()
+    nposts = 0
+    for side in (-1, 1):
+        x = JX + side * J_BARRIERE_N
+        y = y0 + 2.0
+        while y < y_end:
+            L.tube_bm(bm, (x, y, z), (x, y, z + J_BARRIERE_H), 0.03, seg=8)
+            nposts += 1
+            y += J_BARRIERE_PAS
+        y1 = y - J_BARRIERE_PAS
+        for h, r in ((J_BARRIERE_H, 0.024), (0.5, 0.016)):
+            L.tube_bm(bm, (x, y0 + 2.0, z + h), (x, y1, z + h), r, seg=8)
+    L.mesh_object("jetee_barriere_trottoir", bm, [rail])
+    # --- les bittes d'amarrage, à l'écart des pêcheurs
+    fish = [(JX - n, J_VIE_Y + u) for u, n in J_PECHEURS]
+    bm = L.bmesh.new()
+    nb = 0
+    for side in (-1, 1):
+        y = y0 + 7.2
+        while y < y_end - 1.0:
+            if all(abs(y - fy) > 2.5 for fx, fy in fish if (fx - JX) * side > 0):
+                bollard_bm(bm, JX + side * J_BITTES_N, y, z)
+                nb += 1
+            y += J_BITTES_PAS
+    L.mesh_object("jetee_bittes", bm, [iron])
+    # --- le matériel des pêcheurs : deux cannes sur la rambarde, un seau, une glacière
+    rng = random.Random(61)
+    br, bc, bp = L.bmesh.new(), L.bmesh.new(), L.bmesh.new()
+    for k, (fx, fy) in enumerate(fish):
+        if not y0 < fy < y_end:
+            continue
+        side = 1 if fx > JX else -1
+        for dy in (-0.7, 0.55):
+            yb = fy + dy + rng.uniform(-0.1, 0.1)
+            base = Vector((JX + side * 6.05, yb, z + 0.02))
+            rest = Vector((JX + side * 6.45, yb + rng.uniform(-0.15, 0.15), 1.24))      # sur la main courante
+            d = (rest - base).normalized()
+            tip = rest + d * rng.uniform(2.2, 2.9)
+            L.tube_bm(bc, base, base + d * 0.55, 0.019, seg=8)
+            L.tube_bm(br, base + d * 0.55, rest, 0.013, seg=6)
+            L.tube_bm(br, rest, tip, 0.006, seg=5)
+        yb = fy - 1.15
+        L.tube_bm(bp, (JX + side * 5.95, yb, z), (JX + side * 5.95, yb, z + 0.3), 0.15, seg=14, mat=0)
+        yc = fy + 1.3
+        L.box_bm(bp, (JX + side * 5.95 - 0.19, yc - 0.28, z), (JX + side * 5.95 + 0.19, yc + 0.28, z + 0.32), mat=2)
+        L.box_bm(bp, (JX + side * 5.95 - 0.2, yc - 0.29, z + 0.32), (JX + side * 5.95 + 0.2, yc + 0.29, z + 0.39), mat=1)
+    L.mesh_object("jetee_cannes", br, [rod])
+    L.mesh_object("jetee_cannes_poignees", bc, [cork])
+    L.mesh_object("jetee_peche", bp, plast)
+    print(f"[jetee] bord de voie : {nposts} poteaux de barrière, {nb} bittes, le matériel de {len(fish)} pêcheurs",
+          flush=True)
 
 
 # ---------------------------------------------------------------- la pointe

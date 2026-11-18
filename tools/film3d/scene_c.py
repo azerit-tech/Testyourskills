@@ -127,7 +127,7 @@ def build_bridge(hidden, lamp_src, far=False, haubans=False):
     et E) sans les petites pièces. Rien ne change quand on ajoute le pylône (`haubans`, palier suivant)."""
     ys = samples(Y_START, Y_PORT)
     out = L.roadway("pont", ys, deck_z, half=HALF, walk=WALK, rail="parapet", glissiere=True, under="caisson",
-                    lamp_src=lamp_src, lamp_ys=LAMP_YS, far=far)
+                    lamp_src=lamp_src, lamp_ys=LAMP_YS, far=far, lamp_quinconce=LAMP_QUINCONCE if VILLE else 0.0)
     M = out["M"]
     edge = out["edge"]
     # (le tablier a l'humidité de tout le film, road.HUMIDITE : plus de vernis propre au pont, lumière v3.1 règle B)
@@ -181,18 +181,65 @@ def build_bridge(hidden, lamp_src, far=False, haubans=False):
         joint = S.mat_plain("joint_dilatation", (0.16, 0.16, 0.17, 1), 0.3, 1.0)
         bm = L.bmesh.new()
         xs = [-HALF + 0.5 + (2 * HALF - 1.0) * k / 40 for k in range(41)]
-        for yj in [Y_START + 1.0] + [y for y in (-282.5, -177.5, -72.5) if Y_START + 5.0 < y < Y_PORT - 5.0] + \
-                [Y_PORT + 0.5]:
+        old = [y for y in (-282.5, -177.5, -72.5) if Y_START + 5.0 < y < Y_PORT - 5.0]
+        for yj in [Y_START + 1.0] + old + [Y_PORT + 0.5]:
             row = [(bm.verts.new((x, yj - 0.12, deck_z(yj - 0.12) + road.road_z(x) + 0.003)),
                     bm.verts.new((x, yj + 0.12, deck_z(yj + 0.12) + road.road_z(x) + 0.003))) for x in xs]
             for (a0, a1), (b0, b1) in zip(row, row[1:]):
                 bm.faces.new((a0, b0, b1, a1))
         L.mesh_object("pont_joints", bm, [joint])
+        if VILLE:
+            build_joint_rhythm(xs, old)
     if haubans:
         build_haubans(out)
     print(f"[pont] tablier {Y_START:.0f}..{Y_PORT:.0f} m, crête {deck_z(Y_CREST):.2f} m en y {Y_CREST:.0f}, "
           f"{len(out['lamps'])} lampadaires, {'vu de loin' if far else 'complet'}", flush=True)
     return out
+
+
+# La vitesse sur le pont (brouillon éclairé v9, SPEC §18.63) : à 107 km/h, le bas du cadre n'était qu'un enrobé sombre
+# et lisse, les images successives presque identiques. Des joints de chaussée à lèvres d'acier galvanisé tous les
+# JOINT_PAS m (un tiers de la portée des piles) rythment le sol au bas du cadre : 2,6 par seconde en pointe ; les
+# lèvres, claires et métalliques, prennent la lumière des lampadaires sans s'éclairer elles-mêmes. Et la file de
+# lampadaires de gauche en quinconce (LAMP_QUINCONCE) : une tête tous les 10 m au lieu de 20, alternée, dont la lumière
+# passe sur le toit de la berline (les mêmes lampadaires, motivés, sans tache ajoutée).
+JOINT_PAS = 35.0 / 3.0
+JOINT_LEVRE = 0.05          # m, la largeur de chaque lèvre d'acier
+JOINT_JOINT = 0.07          # m, le joint d'élastomère noir entre elles
+LAMP_QUINCONCE = 10.0
+
+
+def joint_rhythm_ys(old=()):
+    """Les y des joints rythmés : tous les JOINT_PAS m du tablier, à plus de 3 m de ses bouts et des joints d'origine."""
+    out, y = [], Y_START + JOINT_PAS
+    while y < Y_PORT - 3.0:
+        if all(abs(y - o) > 3.0 for o in old):
+            out.append(y)
+        y += JOINT_PAS
+    return out
+
+
+def build_joint_rhythm(xs, old=()):
+    """Les joints rythmés : deux lèvres d'acier galvanisé et un joint noir, qui épousent le bombé (3 mm au-dessus)."""
+    acier = L.mat_steel("joint_levre", color=(0.32, 0.32, 0.33), rough=0.35, rust=0.1)
+    noir = S.mat_plain("joint_elastomere", (0.025, 0.025, 0.027, 1), 0.6, 0.0)
+    bl, bj = L.bmesh.new(), L.bmesh.new()
+
+    def band(bm, y0, y1):
+        row = [(bm.verts.new((x, y0, deck_z(y0) + road.road_z(x) + 0.003)),
+                bm.verts.new((x, y1, deck_z(y1) + road.road_z(x) + 0.003))) for x in xs]
+        for (a0, a1), (b0, b1) in zip(row, row[1:]):
+            bm.faces.new((a0, b0, b1, a1))
+    ys = joint_rhythm_ys(old)
+    h = JOINT_JOINT / 2
+    for y in ys:
+        band(bl, y - h - JOINT_LEVRE, y - h)
+        band(bj, y - h, y + h)
+        band(bl, y + h, y + h + JOINT_LEVRE)
+    L.mesh_object("pont_joints_levres", bl, [acier])
+    L.mesh_object("pont_joints_elastomere", bj, [noir])
+    print(f"[pont] {len(ys)} joints rythmés tous les {JOINT_PAS:.1f} m", flush=True)
+    return ys
 
 
 def build_retaining(edge, conc):
