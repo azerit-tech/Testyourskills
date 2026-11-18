@@ -128,7 +128,9 @@ def vehicules():
     # J1 roule à 20 km/h dans la voie de la berline, sortie du terre-plein avant le virage : aux sirènes elle serre
     # sa bordure (0,6 m à droite), freine et s'arrête, warnings ; la berline la double par la voie d'en face (SLALOM :
     # 2,8 m ; à droite la chaussée ne laisse que 1 m, la berline y montait sur le trottoir). J3 descend la jetée en
-    # face, croise la berline à l'entrée de la jetée, avant son écart, et s'arrête contre sa bordure, warnings. Au
+    # face, croise la berline à l'entrée de la jetée, avant son écart, et s'arrête contre sa bordure, warnings (à
+    # 4,0 m de la route, 0,85 m de sa bordure : la berline simulée sort du dérapage du port 0,8 m plus large que
+    # la dessinée, elle la passe à 1,0 m, 0,6 m quand J3 roulait à 3,6 m). Au
     # bout, J2 revient en face dans la voie que la berline a prise : appels de phares, elle freine et se range ; la
     # berline se rabat devant J1 et la croise à 3 m de l'objectif. La meute de P6 suit le chemin de la berline
     # (p6_jetee.column_pos) : elle les passe comme elle.
@@ -136,7 +138,7 @@ def vehicules():
     add("jetee_j1", "sialia", "menthe",
         Course(V.courbe(j1, pas=0.5, n_lisse=6), J1_V, s0=0.0, g0=0, ecart=bascule_g(*J1_SERRE, -0.6)),
         warning=J1_WARN)
-    j3 = ligne(496.0, J3_S, 3.6)
+    j3 = ligne(496.0, J3_S, 4.0)
     add("jetee_j3", "taxi", None, Course(j3, J3_V, s0=496.0 - J3_S, g0=J3_V[-1][0]), warning=J3_V[-1][0])
     j2 = ligne(496.0, J2_S, 3.4)
     add("jetee_j2", "fairheaven", "rose", Course(j2, J2_V, s0=496.0 - J2_S, g0=J2_V[-1][0]), warning=J2_V[-1][0],
