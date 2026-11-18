@@ -10,6 +10,132 @@ import motion as M  # noqa: E402
 FRAMES = range(0, 30)
 FAIL = []
 
+# Les contacts déclarés (contacts.py, SPEC §18.68) : la patrouille 1 serre la berline et la tape, exprès, sur
+# l'avenue et sur le pont. Les contrôles d'écart entre caisses laissent de côté cette paire seule (contacts.paire)
+# sur les images de sa manœuvre (contacts.images_manoeuvre) ; ceux de conduite, de caisse et de caméra, les images du
+# choc seules (contacts.images_choc : de CHOC_AVANT images avant l'impulsion à CHOC_APRES après, la portée des
+# différences finies des contrôles), pour la berline, la patrouille du contact et la caméra. Tout le reste (les
+# autres véhicules, les autres paires, les autres images) garde ses seuils.
+CHOC_AVANT, CHOC_APRES = 2, 3
+_CONTACTS = {}
+
+
+def _contacts(plan, avant=CHOC_AVANT, apres=CHOC_APRES):
+    """(paire, images du choc, images de la manœuvre) des contacts du plan (images du plan, 1 = la première)."""
+    if (plan, avant, apres) not in _CONTACTS:
+        import contacts as CT
+        pair = CT.paire(plan)
+        _CONTACTS[(plan, avant, apres)] = (pair, CT.images_choc(plan, avant, apres),
+                                           CT.images_manoeuvre(plan) if pair else set())
+    return _CONTACTS[(plan, avant, apres)]
+
+
+def _choc(plan, f, nom="hero", avant=CHOC_AVANT, apres=CHOC_APRES):
+    """L'image f du plan est-elle une image de choc pour nom (« hero », « camera » ou la clé d'une patrouille) ?"""
+    pair, choc, _ = _contacts(plan, avant, apres)
+    return (nom == "camera" or nom in pair) and f in choc
+
+
+def _hors_choc(plan, series, nom="hero"):
+    """{grandeur: {image: valeur}} sans les images de choc du plan pour nom."""
+    return {k: {f: v for f, v in s.items() if not _choc(plan, f, nom)} for k, s in series.items()}
+
+
+def _chocs_film(f0=0):
+    """Les images de choc de la berline sur tout le film (f0 : le numéro de sa première image)."""
+    import contacts as CT
+    import parcours as PC
+    return {PC.START[p] + f - 1 + f0 for p in {c["plan"] for c in CT.CHOCS} for f in _contacts(p)[1]}
+
+
+def _min_gap(plan, tracks, frames):
+    """motion.min_gap, sans la paire d'un contact du plan sur les images de sa manœuvre : les autres paires sur
+    toutes les images, la paire hors de sa manœuvre."""
+    pair, _, man = _contacts(plan)
+    if not pair or not pair <= set(tracks):
+        return M.min_gap(tracks, frames)
+    pats, frames = pair - {"hero"}, list(frames)
+    parts = [({n: fn for n, fn in tracks.items() if n not in pats}, frames),
+             ({n: fn for n, fn in tracks.items() if n != "hero"}, frames)]
+    parts += [({n: tracks[n] for n in ("hero", p)}, [f for f in frames if f not in man]) for p in pats]
+    return min((M.min_gap(tr, fr) for tr, fr in parts), key=lambda g: g[0])
+
+
+class _SansContacts:
+    """Les contrôles de motion.v3_report (plan_checks, plan_checks31), le temps d'un appel, sans les contacts
+    déclarés : les accélérations de la caméra sans tremblé (rail_rates) et le lisse à l'écran et de la caisse
+    (fluidity : jumps) sans les images du choc ; la conduite (car_series) de la berline et de la patrouille du
+    contact, de même ; les écarts entre caisses (plan_checks) remesurés par plan_checks lui-même sur les autres
+    paires et sur la paire hors de sa manœuvre."""
+    CAM = ("pan_acc", "tilt_acc", "roll_rate", "arel", "accel", "crane_acc", "orbit_acc")      # (la secousse du bras)
+    CAR = ("along", "alat", "jerk", "yaw_acc")
+
+    def __init__(self):
+        self.orig, self.cars, self.fluid = {}, {}, None
+
+    def __call__(self, fn, *a, **kw):
+        names = ("rail_rates", "car_series", "jumps", "fluidity", "plan_checks", "plan_checks31")
+        self.orig = {n: getattr(M, n) for n in names}
+        try:
+            for n in names:
+                setattr(M, n, getattr(self, n))
+            return fn(*a, **kw)
+        finally:
+            for n, f in self.orig.items():
+                setattr(M, n, f)
+
+    def rail_rates(self, d):
+        r = self.orig["rail_rates"](d)
+        return dict(r, **_hors_choc(d["plan"], {k: r[k] for k in self.CAM}, "camera"))
+
+    def car_series(self, fn, *a, **kw):
+        s = self.orig["car_series"](fn, *a, **kw)
+        if id(fn) not in self.cars:
+            return s
+        plan, nom = self.cars[id(fn)]
+        return dict(s, **_hors_choc(plan, {k: s[k] for k in self.CAR}, nom))
+
+    def fluidity(self, d):
+        self.fluid = d["plan"]
+        try:
+            return self.orig["fluidity"](d)
+        finally:
+            self.fluid = None
+
+    def jumps(self, s, frames):
+        d2, d3 = self.orig["jumps"](s, frames)
+        if self.fluid is None:
+            return d2, d3
+        return tuple({f: v for f, v in x.items() if not _choc(self.fluid, f, "camera")} for x in (d2, d3))
+
+    def plan_checks31(self, d, lim, own):
+        named = d["spec"].get("named") or {}
+        self.cars = {id(fn): (d["plan"], "hero" if n in ("hero", "berline") else n) for n, fn in named.items()}
+        self.cars[id(d["spec"]["hero"])] = (d["plan"], "hero")
+        try:
+            return self.orig["plan_checks31"](d, lim, own)
+        finally:
+            self.cars = {}
+
+    def plan_checks(self, d, base, own):
+        out = self.orig["plan_checks"](d, base, own)
+        pair, _, man = _contacts(d["plan"])
+        named = d["spec"].get("named") or {}
+        if not pair or not pair <= set(named):
+            return out
+        pats, keep = pair - {"hero"}, [f for f in d["frames"] if f not in man]
+        parts = [(set(named) - pats, d["frames"]), (set(named) - {"hero"}, d["frames"])]
+        parts += [({"hero", p}, keep) for p in pats]
+        gaps = []
+        for noms, frames in parts:
+            if len(noms) < 2 or len(frames) < 3:
+                continue
+            sub = dict(d, frames=frames, spec=dict(d["spec"], named={n: named[n] for n in noms}))
+            gaps += [(float(det.split(" m ")[0]), (nom, ok, det))
+                     for nom, ok, det in self.orig["plan_checks"](sub, base, own) if nom.startswith("écarts entre caisses")]
+        gap = min(gaps, key=lambda g: g[0])[1]
+        return [gap if c[0].startswith("écarts entre caisses") else c for c in out]
+
 # Les plafonds des caméras du découpage v3 (docs/cinematique-decoupage-v3.md, 2.4 et 6), mesurés par
 # python3 tools/film3d/motion.py mesure --v3 sur la caméra sans tremblé (camera_rail), en différences centrées
 # sur trois images. Ils ne s'appliquent qu'aux plans qui portent V3 = True. None : pas de contrôle.
@@ -564,7 +690,7 @@ def test_p4():
     l'image 1, dix à la fin, les quatre nouvelles qui se découvrent aux images 8, 18, 28 et 38."""
     import p4_pont as P
     frames = range(P.F0 - 1, P.F0 + P.FRAMES + 1)
-    d, f, a, b = M.min_gap(P.tracks(), frames)
+    d, f, a, b = _min_gap("P4", P.tracks(), frames)
     need = 3.5 if P.VILLE else 6.0
     check(f"P4 : distances gardées ({need:g} m de centre à centre)", d >= need, f"{d:.1f} m entre {a} et {b} à l'image {f}")
     behind = range(1 if P.VILLE else 0, len(P.PACK))        # dans la ville, la patrouille 1 la remonte
@@ -994,13 +1120,13 @@ def test_ouv():
         bx = M.hero_screen(c, *P.chaser_pos(M.t_of(f)), 0.0, 0.0, box=(5.1, 1.95, 1.5))
         if bx and bx["u1"] > 0.0:
             seen.append(f)
-            if bx["u1"] > car["u0"]:
+            if bx["u1"] > car["u0"] and f not in _contacts("OUV")[2]:      # (contre elle pendant le contact)
                 over.append(f)
     check("OUV : la patrouille 1 sur la loi de P1, au bord gauche, jamais sur la berline, hors champ à la coupe",
           gap < 1e-9 and seen and seen[0] == P.F0 and not over and seen[-1] < P.F0 + P.FRAMES - 1,
           f"{gap:.1e} m ; dans le cadre des images {seen[0] if seen else None} à {seen[-1] if seen else None}, "
           f"sur la berline {over[:5]}")
-    d, f, a, b = M.min_gap(P.tracks(), range(P.F0, P.F0 + P.FRAMES))
+    d, f, a, b = _min_gap("OUV", P.tracks(), range(P.F0, P.F0 + P.FRAMES))
     check("OUV : 1,5 m d'air au moins entre les trois voitures", d - 2 * 0.95 > 1.5, f"{d - 1.9:.2f} m ({a}, {b}, {f})")
     last = None
     for f in range(P.F0, P.F0 + P.FRAMES):
@@ -2055,8 +2181,9 @@ def test_operator():
 
 
 
-def _drive_numbers(d, frames):
+def _drive_numbers(d, frames, sauf=()):
     s = M.car_series(d.pos, frames, heads={f: d.heading(M.t_of(f)) for f in frames})
+    s = {k: {f: v for f, v in x.items() if f not in sauf} for k, x in s.items()}      # (sauf : les chocs)
     sl = {f: d.slip(M.t_of(f)) for f in frames}
     rate = {f: (sl[f + 1] - sl[f - 1]) * M.FPS / 2 for f in frames[1:-1]}
     grow = [r * (1 if sl[f] >= 0 else -1) for f, r in rate.items()]
@@ -2217,7 +2344,7 @@ def test_parcours():
         check(f"parcours, coupe {a} → {b} : l'état de la berline et du bras dans les plafonds CUT_*", not bad,
               ", ".join(bad) or f"v {sa['speed']:.2f} → {sb['speed']:.2f} m/s, pire {worst[1]} à "
               f"{worst[0] * 100:.0f} % du plafond")
-    n = _drive_numbers(PC.DRIVE, list(range(1, PC.TOTAL + PC.FIN6_FRAMES + 1)))
+    n = _drive_numbers(PC.DRIVE, list(range(1, PC.TOTAL + PC.FIN6_FRAMES + 1)), _chocs_film(1))
     bad = [k for k in ("lat", "brake", "acc", "circle", "jerk", "yaw_acc") if n[k] > CAR31_HERO[k] + 1e-9]
     check(f"parcours : les limites de la voiture sur les {PC.TOTAL + PC.FIN6_FRAMES} images", not bad and n["slip"] <= SLIP31_MAX
           and n["on"] <= SLIP31_ON and n["off"] <= SLIP31_OFF and n["yaw_slip"] <= SLIP31_YAW_ACC,
@@ -2230,7 +2357,7 @@ def test_v3():
     écarts, hauts de cadre, raccords du tableau 5 entre deux plans migrés, films entiers. Les plans v2 ne sont que
     mesurés (python3 tools/film3d/motion.py mesure --v3)."""
     base, per_plan = v3_limits()
-    rep = M.v3_report(base, per_plan, v31=v31_limits())
+    rep = _SansContacts()(M.v3_report, base, per_plan, v31=v31_limits())
     v3 = [p for p, (on, _) in rep["plans"].items() if on]
     check("v3 : plans migrés", True, ", ".join(v3) if v3 else "aucun encore")
     for p, (on, checks) in rep["plans"].items():
@@ -2508,12 +2635,13 @@ def test_vitesse():
           f"{min(w['lens'] for w in rg):.1f}–{max(w['lens'] for w in rg):.1f} mm, roulis "
           f"{max(abs(w['roll']) for w in rg):.2f}°")
     pts, fps = [w["p"] for w in rows], PC.FPS
+    hors = [not _choc(w["shot"], w["f"], "camera") for w in rows]       # (les images des chocs : _choc)
     acc = [math.dist((0, 0, 0), [(pts[i + 1][k] - 2 * pts[i][k] + pts[i - 1][k]) * fps ** 2 for k in range(3)])
-           for i in range(1, len(pts) - 1)]
+           for i in range(1, len(pts) - 1) if hors[i]]
     jerk = [math.dist((0, 0, 0), [(pts[i + 2][k] - 3 * pts[i + 1][k] + 3 * pts[i][k] - pts[i - 1][k]) * fps ** 3
-                                  for k in range(3)]) for i in range(1, len(pts) - 2)]
+                                  for k in range(3)]) for i in range(1, len(pts) - 2) if hors[i]]
     rolls = [w["cam"][5] for w in rows]
-    rr = [abs(rolls[i + 1] - rolls[i]) * fps for i in range(len(rolls) - 1)]
+    rr = [abs(rolls[i + 1] - rolls[i]) * fps for i in range(len(rolls) - 1) if hors[i]]
     amax = v3_limits()[0]["accel"]
     check(f"vitesse : la caméra sans à-coup (≤ {amax:g} m/s², à-coup ≤ {VITESSE_JERK:g} m/s³, roulis ≤ "
           f"{CAM_ROLL_RATE_MAX:g} °/s), jonctions comprises",
@@ -2638,7 +2766,8 @@ def test_poursuivants():
     for p, (vehs, spec, mod) in data.items():
         for name, rows in vehs.items():
             for f, v, al, lat, jerk, slip in _kin(rows):
-                if not (mod.F0 <= f < mod.F0 + mod.FRAMES):
+                # (l'à-coup de _kin, trois différences centrées, porte à trois images : une de plus avant le choc)
+                if not (mod.F0 <= f < mod.F0 + mod.FRAMES) or _choc(p, f - mod.F0 + 1, name, avant=CHOC_AVANT + 1):
                     continue
                 for key, val in (("brake", -al), ("acc", al), ("lat", abs(lat)), ("jerk", abs(jerk) if v > 1.0 else 0.0),
                                  ("slip", slip or 0.0)):
@@ -2657,7 +2786,7 @@ def test_poursuivants():
     for p, (vehs, spec, mod) in data.items():
         fr = range(mod.F0, mod.F0 + mod.FRAMES)
         named = dict(spec["named"])
-        g = M.min_gap(named, fr)
+        g = _min_gap(p, named, fr)
         gaps.append((g[0], p, g[1], g[2], g[3]))
     g = min(gaps)
     check(f"poursuivants : aucun choc (≥ {POURSUITE_GAP} m d'air en travers : {POURSUITE_GAP + 1.95:g} m de centre à "

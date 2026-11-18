@@ -23,6 +23,14 @@ def check(name, ok, detail=""):
         FAILS.append(name)
 
 
+def _chocs():
+    """Les images du film autour des contacts déclarés (contacts.py, SPEC §18.68 : contacts.images_choc) : la
+    berline y prend un choc, pas une manœuvre ; les contrôles de sa conduite les laissent de côté (les écarts entre
+    caisses, eux, trafic.verifier les règle)."""
+    import contacts as CT
+    return {P.START[c["plan"]] + f - 1 for c in CT.CHOCS for f in CT.images_choc(c["plan"])}
+
+
 def test_parcours():
     for nom, ok, det in P.check():
         check(f"parcours : {nom}", ok, det)
@@ -38,7 +46,8 @@ def test_contacts():
 def test_adherence():
     h = 1.0 / 48.0
     worst_lat = worst_comb = (0.0, -1)
-    for g in range(0, P.TOTAL):
+    chocs = _chocs()
+    for g in sorted(set(range(0, P.TOTAL)) - chocs):
         t = g / P.FPS
         if not any(abs(P.voie(P.s_of_t(t + d))) > 1e-6 for d in (-0.5, 0.0, 0.5)):
             continue

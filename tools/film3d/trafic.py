@@ -329,14 +329,28 @@ def _garees_scenes():
 GAREES_SCENES = _garees_scenes()
 
 
+def _contacts_voulus():
+    """{(patrouille, image du film)} : les contacts déclarés (contacts.py, SPEC §18.68), la patrouille du contact
+    (sa clé dans boites : « plan:nom ») sur les images de sa manœuvre, où elle serre et touche la berline exprès."""
+    import contacts as CT
+    out = set()
+    for plan in {c["plan"] for c in CT.CHOCS}:
+        for nom in CT.paire(plan) - {"hero"}:
+            out.update((f"{plan}:{nom}", P.START[plan] + f - 1) for f in CT.images_manoeuvre(plan))
+    return out
+
+
 def verifier(g0=0, g1=None, pas=1, poursuite=None):
     """Les contacts sur le film : [(écart, image, a, b, exigé)] au plus juste par paire, triés. Une paire dont l'un
     au moins est de la vie qui roule doit tenir MARGE_COTE de flanc et MARGE_LONG à la file (boîtes grandies de la
-    moitié de chaque marge) ; berline et patrouilles entre elles, et tout le reste : aucun chevauchement."""
+    moitié de chaque marge) ; berline et patrouilles entre elles, et tout le reste : aucun chevauchement. Seule
+    exception, les contacts déclarés (contacts.py, SPEC §18.68) : la berline et la patrouille du contact, sur les
+    images de sa manœuvre (toutes les autres paires, et celle-ci hors de sa manœuvre, gardent leurs marges)."""
     import vie as V
     g1 = V.G_FIN if g1 is None else g1
     pours = _poursuite() if poursuite is None else poursuite
     veh = V.vehicules()
+    voulus = _contacts_voulus()
     pires = {}
     for g in range(g0, g1 + 1, pas):
         bs = boites(g, pours, veh)
@@ -350,6 +364,8 @@ def verifier(g0=0, g1=None, pas=1, poursuite=None):
                 if math.hypot(a[2] - b[2], a[3] - b[3]) > a[6] + b[6] + 4.0:
                     continue
                 if a[4] is None or b[4] is None:
+                    continue
+                if (a[0] == "hero" and (b[0], g) in voulus) or (b[0] == "hero" and (a[0], g) in voulus):
                     continue
                 # les marges : entre la poursuite et la vie (circulation, garées de vie.py) ; entre deux voitures de
                 # la vie, ou avec les garées des scènes : aucun chevauchement
