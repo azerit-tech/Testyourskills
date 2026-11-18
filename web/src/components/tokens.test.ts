@@ -10,6 +10,7 @@ const SHEETS: Record<string, string> = {
   "bands.css": read("./bands.css"),
   "primes.css": read("./primes.css"),
   "denounce.css": read("./denounce.css"),
+  "spin.css": read("./spin.css"),
 };
 
 /** La valeur d'un jeton dans le premier :root. */

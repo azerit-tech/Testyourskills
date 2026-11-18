@@ -1,0 +1,86 @@
+/* La caisse du suspect (SPEC §18.79) : la berline qu'on fait tourner au doigt, sous la fiche.
+   Le fond est le noir pur des images : le disque de bitume s'y fond sans bord. */
+.spin {
+  position: relative;
+  aspect-ratio: 2 / 1;
+  overflow: hidden;
+  border-radius: var(--r-block);
+  background: #000;
+  /* seul le geste horizontal est pris : le défilement vertical de la page reste au navigateur */
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.spin.is-live {
+  cursor: grab;
+}
+.spin.is-live:active {
+  cursor: grabbing;
+}
+.spin:focus-visible {
+  outline: 2px solid var(--c-emphasis);
+  outline-offset: 3px;
+  border-radius: var(--r-block);
+}
+.spin picture,
+.spin-still,
+.spin-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.spin-still {
+  object-fit: cover;
+  pointer-events: none;
+}
+.spin-canvas {
+  opacity: 0;
+  pointer-events: none;
+}
+.spin.is-live .spin-canvas {
+  opacity: 1;
+}
+/* le titre en légende au-dessus de l'image, jamais sur la voiture (l'antenne monte haut) */
+.spin-wrap {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  min-width: 0;
+}
+.spin-title {
+  padding-left: 4px;
+}
+/* sur l'accueil, sous la fiche d'exemple : sa largeur (.showcase, styles.css) */
+.spin-wrap.is-home {
+  width: 100%;
+  max-width: 400px;
+  margin-top: 16px;
+}
+.spin-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transform: translateX(-50%);
+  font: var(--font-label);
+  letter-spacing: var(--ls-label);
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--c-text-2);
+  pointer-events: none;
+  transition: opacity 0.4s var(--ease-out);
+}
+.spin-hint.is-gone {
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .spin-hint {
+    transition: none;
+  }
+}
