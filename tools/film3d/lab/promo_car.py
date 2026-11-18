@@ -49,6 +49,9 @@ def _args():
     ap.add_argument("--shots", default=",".join(list(FULL) + ["calandre", "phare", "roue", "conducteur", "feu"]))
     ap.add_argument("--stop", type=float, default=0.0)
     ap.add_argument("--cabin", type=float, default=4.0)
+    ap.add_argument("--disc", default="", help="rotation sur fond noir : le bitume en disque autour de la berline, "
+                    "fondu au noir pur de r0 à r1 m (ex. 2.7,3.8) ; le ciel et les lampes invisibles à la caméra "
+                    "(ils éclairent et se reflètent toujours)")
     ap.add_argument("--workbench", action="store_true", help="contrôle de cadrage sur le Mac (ni lumière ni matière)")
     return ap.parse_args(argv)
 
@@ -87,7 +90,57 @@ def _setup(a):
         scene.cycles.denoiser = "OPTIX"
     except TypeError:
         pass
+    if a.disc:
+        black_stage(bpy, scene, car, *(float(v) for v in a.disc.split(",")))
     return bpy, scene, car, parts
+
+
+def black_stage(bpy, scene, car, r0, r1):
+    """La berline sur un disque de bitume qui se fond au noir pur (encart sur fond sombre) : au-delà de r0 la matière
+    du sol glisse vers une émission nulle (ni diffus ni reflet), noire à r1 ; le ciel vu directement par la caméra est
+    noir (ses reflets sur la caisse restent) ; les néons et lampes ne se voient plus en direct."""
+    g = bpy.data.objects.get("wet_asphalt")
+    keep = {car, *car.children_recursive}
+    if g is not None:
+        for m in g.data.materials:
+            nt = m.node_tree
+            out = next(n for n in nt.nodes if n.type == "OUTPUT_MATERIAL" and n.is_active_output)
+            src = out.inputs["Surface"].links[0].from_socket
+            geo = nt.nodes.new("ShaderNodeNewGeometry")
+            sep = nt.nodes.new("ShaderNodeSeparateXYZ")
+            nt.links.new(geo.outputs["Position"], sep.inputs[0])
+            hyp = nt.nodes.new("ShaderNodeVectorMath")
+            hyp.operation = "LENGTH"
+            comb = nt.nodes.new("ShaderNodeCombineXYZ")
+            nt.links.new(sep.outputs[0], comb.inputs[0])
+            nt.links.new(sep.outputs[1], comb.inputs[1])
+            nt.links.new(comb.outputs[0], hyp.inputs[0])
+            mr = nt.nodes.new("ShaderNodeMapRange")
+            mr.interpolation_type = "SMOOTHSTEP"
+            mr.inputs["From Min"].default_value, mr.inputs["From Max"].default_value = r0, r1
+            nt.links.new(hyp.outputs["Value"], mr.inputs["Value"])
+            black = nt.nodes.new("ShaderNodeEmission")
+            black.inputs["Strength"].default_value = 0.0
+            mix = nt.nodes.new("ShaderNodeMixShader")
+            nt.links.new(mr.outputs["Result"], mix.inputs[0])
+            nt.links.new(src, mix.inputs[1])
+            nt.links.new(black.outputs[0], mix.inputs[2])
+            nt.links.new(mix.outputs[0], out.inputs["Surface"])
+    w = scene.world.node_tree
+    wout = next(n for n in w.nodes if n.type == "OUTPUT_WORLD" and n.is_active_output)
+    wsrc = wout.inputs["Surface"].links[0].from_socket
+    lp = w.nodes.new("ShaderNodeLightPath")
+    nul = w.nodes.new("ShaderNodeBackground")
+    nul.inputs["Strength"].default_value = 0.0
+    mix = w.nodes.new("ShaderNodeMixShader")
+    nt_l = w.links
+    nt_l.new(lp.outputs["Is Camera Ray"], mix.inputs[0])
+    nt_l.new(wsrc, mix.inputs[1])
+    nt_l.new(nul.outputs[0], mix.inputs[2])
+    nt_l.new(mix.outputs[0], wout.inputs["Surface"])
+    for ob in scene.objects:
+        if ob not in keep and ob is not g and ob.type in ("MESH", "LIGHT"):
+            ob.visible_camera = False
 
 
 def _new_cam(bpy, scene, name, lens):
