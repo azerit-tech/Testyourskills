@@ -97,7 +97,7 @@ NEONS = {"rose": ("#ff5c8a", 5.0), "menthe": ("#3fe0b0", 4.0), "corail": ("#ff6a
 # avant : où regarde l'avant du modèle tel que livré (après l'import glTF), ou « auto:… » pour le trouver ; il est
 # tourné vers +y (la convention de la vie). long / haut : la taille voulue (le plus long côté au sol, ou la hauteur).
 MODELES = {
-    "flamant": dict(f="lieux/clins/flamingo-lawn/model.glb", haut=0.92, avant="+y"),
+    "flamant": dict(f="lieux/clins/flamingo-lawn/model.glb", haut=1.15, avant="+y"),   # un peu grands : lus à 360 px
     "flamant_neon": dict(f="lieux/clins/flamingo-neon/model.glb", haut=3.4, avant="+x"),
     "palmier_neon": dict(f="lieux/clins/palm-neon/model.glb", haut=1.7, avant="debout"),
     "alligator": dict(f="lieux/clins/alligator/model.glb", long=3.4, avant="auto:tete", garder="gros"),
@@ -112,14 +112,16 @@ MODELES = {
 
 # ---------------------------------------------------------------- les cotes (ville, repère du pont, en m)
 
-HOTEL_8 = (-95.8, -73.8, -424.1, -406.7, 14.9)        # le petit hôtel à marquise de l'avenue (scene_a, bld_hotel_8)
+HOTEL_8 = (-95.8, -73.8, -424.1, -406.7, 10.6)        # le petit hôtel à marquise (bld_hotel_8) : son toit (sonde)
 LINER_9 = (-57.4, -26.2, -424.1, -405.1, 14.8)        # le « paquebot » d'angle au rond-point (bld_liner_9)
 ILOT = (0.0, -433.2, 5.8, 0.5)                        # l'îlot du rond-point : centre, rayon du sol, hauteur du sol
-TOUR_D = (-19.0, -5.3, -356.0, -344.0, 21.4)          # les deux tours du bout de la rue (scene_b)
-TOUR_G = (5.3, 19.0, -356.0, -344.0, 21.4)
+TOUR_D = (-19.0, -5.3, -356.0, -344.0, 20.2)          # les deux tours du bout de la rue (scene_b), leur toit (sonde)
+TOUR_G = (5.3, 19.0, -356.0, -344.0, 20.2)
 CAM_AVENUE = (-153.3, -434.6)                         # la caméra au début du film (OUV/1)
 CAM_RUE = (0.1, -400.0)                               # la caméra au milieu de la rue (P3)
 CAM_PONT = (1.0, -300.0)                              # la caméra sur le pont (P4)
+PANNEAU_PORT_Z = 11.5                                 # le bas des panneaux du port (conteneurs : 13,8 m)
+ECHO_P = (19.0, -176.5)                               # le journal du port, sur le terre-plein, à droite du virage
 
 
 def remplace_vie(x, y):
@@ -155,10 +157,10 @@ def _lisse(k):
 
 # le bateau de course : il double la berline le long de la jetée, côté large (à gauche), de P5 à la pointe
 POINTE_VILLE = (97.2, -103.6, 45.0)   # le centre de la pointe en ville et le rayon (quai compris) à tenir
-CIG_G0 = 486                    # il paraît avec P6 (avant : la rive du port, pas d'eau à gauche de la racine)
+CIG_G0 = 486                    # il paraît avec P6, devant la berline, et la distance
 CIG_G1 = 600                    # sorti du cadre vers le large : ôté
 CIG_N = 10.0                    # m à gauche de l'axe de la jetée (5 m de son mur)
-CIG_U0, CIG_V = -6.0, 17.0      # m le long de la jetée à CIG_G0 ; m/s (60 km/h : la berline roule à 55)
+CIG_U0, CIG_V = -25.0, 20.0     # m le long de la jetée à CIG_G0 ; m/s (72 km/h : la berline roule à 55) : à gauche du cadre de 486 à 545
 
 
 def _cig_xy(u):
@@ -178,11 +180,11 @@ def cigarette(g):
 
 
 # l'alligator : il se chauffe sur le quai au bout de la route du port, puis rampe vers l'eau quand la poursuite arrive
-GATOR_P0 = (-10.5, -174.0)      # dans le coin du quai, entre les conteneurs et les séparateurs, hors de la voie
+GATOR_P0 = (11.0, -184.0)       # sur le terre-plein, à droite de la descente du pont, dans le virage (pas derrière la berline)
 GATOR_CAP0 = 160.0              # la tête vers la poursuite qui descend du pont
 GATOR_G = (436, 476)            # il se tourne et rampe vers le quai
 GATOR_V = 0.55                  # m/s
-GATOR_CAP1 = 95.0               # il se détourne et rampe le long des séparateurs, vers l'ouest
+GATOR_CAP1 = 205.0              # il se détourne et rampe vers le sud, loin du virage
 
 
 def alligator(g):
@@ -196,7 +198,7 @@ def alligator(g):
 
 
 # le badaud de la pointe : il tourne pour garder la berline dans son téléphone
-FILMEUR_P = (88.9, -98.0)       # sur la pointe, à gauche du cadre final, hors de la route de la patrouille
+FILMEUR_P = (72.7, -94.5)       # au garde-corps de la pointe, à gauche du cadre final (FIN6, orbite comprise)
 
 
 def filmeur_cap(g):
@@ -240,7 +242,7 @@ def clins():
                     modele="poste", pose=fixe(-44.0, -452.5, -1.5, 180.0 - 15.0)))
     # -- l'îlot du rond-point : sept flamants roses en plastique sur la terre, tournés vers l'avenue
     cx, cy, r, zs = ILOT
-    for k, (a, rr) in enumerate(((188, 4.4), (199, 3.1), (207, 4.7), (219, 3.6), (229, 4.8), (238, 3.3), (247, 4.5))):
+    for k, (a, rr) in enumerate(((188, 4.4), (199, 3.1), (207, 4.7), (219, 3.6), (229, 4.8), (196, 5.0), (247, 4.5))):
         x, y = cx + rr * math.cos(math.radians(a)), cy + rr * math.sin(math.radians(a))
         cap = cap_vers(x, y, -40.0, -434.6) + (zlib.crc32(f"flamant{k}".encode()) % 70 - 35)
         out.append(dict(nom=f"flamant_{k}", quoi="modele", lieu="rond-point", rayon=0.6, classe="passant",
@@ -250,16 +252,16 @@ def clins():
         x, y = (x0 + x1) / 2, (y0 + y1) / 2
         out.append(dict(nom=nom, quoi="panneau", lieu="rue", rayon=6.0, texte=cle, largeur=10.0, hauteur=4.2,
                         pose=fixe(x, y, zt + 1.2, cap_vers(x, y, *CAM_RUE)), sol=zt))
-    # -- le port, face au pont : Azerit à gauche (vu tout le pont, sorti du cadre avant l'arrêt de P4), GATOR SHOW à
-    # droite (au virage du port, dans l'arrêt de P5), au-dessus des conteneurs
-    for nom, (x, y), cle in (("panneau_azerit", (-27.0, -176.0), "azerit"), ("panneau_gator", (27.0, -170.0), "gator")):
+    # -- le port, face au pont, sur le terre-plein (le quai nord est à y -173,75 à l'est de x 5 : sonde du sol,
+    # diag/clins_gris.py --carte) : Azerit à gauche, GATOR SHOW à droite au bout du virage, au-dessus des conteneurs
+    for nom, (x, y), cle in (("panneau_azerit", (-27.0, -176.0), "azerit"), ("panneau_gator", (31.0, -176.0), "gator")):
         out.append(dict(nom=nom, quoi="panneau", lieu="port", rayon=6.0, texte=cle, largeur=11.0, hauteur=4.6,
-                        pose=fixe(x, y, 15.0, cap_vers(x, y, *CAM_PONT)), sol=0.0))
+                        pose=fixe(x, y, PANNEAU_PORT_Z, cap_vers(x, y, *CAM_PONT)), sol=0.0))
     # -- l'alligator du quai
     out.append(dict(nom="alligator", quoi="course", lieu="port", rayon=1.8, classe="vehicule", modele="alligator",
                     pose=alligator))
-    # -- le journal du coin, à l'entrée de la jetée, tourné vers le virage du port
-    x, y = jetee(-22.0, -14.0)
+    # -- le journal du coin, au coin du quai, à l'entrée de la jetée, tourné vers le virage du port
+    x, y = ECHO_P
     out.append(dict(nom="panneau_echo", quoi="panneau", lieu="port", rayon=4.0, texte="echo", largeur=7.0,
                     hauteur=3.6, pose=fixe(x, y, 6.0, cap_vers(x, y, 1.6, -200.0)), sol=0.0))
     # -- la marina : l'hydroglisseur amarré contre le mur droit de la jetée, entre deux lampadaires, l'hélice vers
@@ -339,6 +341,12 @@ def ecarts_vie():
 def camera(g):
     """La caméra du film à l'image g en ville : (x, y, z, lacet, site, roulis, focale) (ville.cam_plan / cam_city)."""
     import ville as V
+    if g >= P.START["FIN6"]:
+        # FIN6 : l'orbite autour de la berline arrêtée (fin6_orbite), dans son repère, posée en ville
+        import fin6_orbite
+        to_v, rot = P.vers_ville("FIN6")
+        c = fin6_orbite.camera((g - P.START["FIN6"]) / FPS)
+        return (*to_v(c[0], c[1]), c[2], c[3] + rot) + tuple(c[4:])
     f = min(max(g + 1, 1), P.TOTAL + P.FIN6_FRAMES)
     c = V.cam_plan(f)
     if c is not None:

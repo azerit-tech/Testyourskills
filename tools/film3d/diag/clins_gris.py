@@ -29,6 +29,7 @@ def main():
     ap.add_argument("--tag", default="clins")
     ap.add_argument("--gros", action="store_true")
     ap.add_argument("--couleur", default="TEXTURE")
+    ap.add_argument("--carte", default="", help="x0,x1,y0,y1,pas : le sol en caractères (ville, m)")
     a = ap.parse_args(argv)
     os.makedirs(a.out, exist_ok=True)
     import clins
@@ -56,6 +57,13 @@ def main():
     sh.color_type = a.couleur
     sh.show_shadows = True
     scene.display.shading.show_cavity = False
+    # les brumes (boîtes de volume) sont des murs gris en Workbench : cachées
+    for ob in scene.objects:
+        mats = [s.material for s in getattr(ob, "material_slots", []) if s.material and s.material.use_nodes]
+        vol = any(n.type in ("PRINCIPLED_VOLUME", "VOLUME_ABSORPTION", "VOLUME_SCATTER")
+                  for m in mats for n in m.node_tree.nodes)
+        if vol or any(k in ob.name.lower() for k in ("haze", "brume", "fog")):
+            ob.hide_render = True
     fs = scene.frame_start
     g0 = P.START[a.plan] if a.blend != "vide" else 0
     root = bpy.data.objects["clins_racine"]
@@ -63,27 +71,57 @@ def main():
     bpy.context.view_layer.update()
     dg = bpy.context.evaluated_depsgraph_get()
     own = {o for o in scene.objects if o.get("clins") or o.name.startswith("vie_") or o.name.startswith("clin")}
+    inv = root.matrix_world.inverted()
+    d = root.matrix_world.to_3x3() @ Vector((0, 0, -1))
+
+    def sol(x, y, z):
+        """Ce qu'il y a sous (x, y) en ville, en descendant de z + 40 : (nom, hauteur) ou None (les clins, la
+        vie et les brumes traversés)."""
+        hit = root.matrix_world @ Vector((x, y, z + 40.0))
+        for _ in range(12):
+            ok, loc, _n, _i, ob, _m = scene.ray_cast(dg, hit, d)
+            if not ok:
+                return None
+            if ob not in own and not any(k in ob.name.lower() for k in ("haze", "brume", "volume")):
+                return ob.name, (inv @ loc).z
+            hit = loc + d * 0.01
+        return None
+
     for c in clins.clins():
         if bpy.data.objects.get(f"clin_{c['nom']}") is None:
             continue
         g = max(g0, (c.get("fenetre") or (0, 0))[0] or 0)
         x, y, z = c["pose"](g)[:3]
-        o = root.matrix_world @ Vector((x, y, z + 40.0))
-        d = root.matrix_world.to_3x3() @ Vector((0, 0, -1))
-        hit, hits = o, []
-        for _ in range(12):
-            ok, loc, _n, _i, ob, _m = scene.ray_cast(dg, hit, d)
-            if not ok:
-                break
-            if ob not in own and not any(k in ob.name.lower() for k in ("haze", "brume", "volume")):
-                hits.append((ob.name, (root.matrix_world.inverted() @ loc).z))
-                break
-            hit = loc + d * 0.01
-        print(f"[sonde] {c['nom']:16} z {z:6.2f} : " + (f"{hits[0][0]} à {hits[0][1]:.2f}" if hits else "rien (eau ?)"),
-              flush=True)
+        h = sol(x, y, z)
+        print(f"[sonde] {c['nom']:16} z {z:6.2f} : " + (f"{h[0]} à {h[1]:.2f}" if h else "rien"), flush=True)
+    if a.carte:
+        # --carte x0,x1,y0,y1,pas : le sol vu de haut en caractères (# : sol, ~ : eau, . : rien), le nord en haut
+        x0, x1, y0, y1, pas = map(float, a.carte.split(","))
+        print(f"[carte] x {x0:g}..{x1:g}, y {y1:g} (haut) .. {y0:g} (bas), pas {pas:g} m", flush=True)
+        y = y1
+        while y >= y0:
+            row, x = "", x0
+            while x <= x1:
+                h = sol(x, y, 30.0)
+                row += "." if h is None else ("~" if h[1] < -0.8 else "#")
+                x += pas
+            print(f"[carte] {y:7.1f} {row}", flush=True)
+            y -= pas
     for gs in [s for s in a.g.split(",") if s]:
         g = int(gs)
         scene.frame_set(fs + g - g0)
+        # la caméra du plan en ville, et où tombe chaque clin dans l'image (pixels, 360 × 640)
+        from bpy_extras.object_utils import world_to_camera_view
+        cm = inv @ scene.camera.matrix_world
+        fwd = cm.to_3x3() @ Vector((0, 0, -1))
+        print(f"[camera] g {g} : ({cm.translation.x:.1f}, {cm.translation.y:.1f}, {cm.translation.z:.1f}), "
+              f"vers ({fwd.x:.2f}, {fwd.y:.2f}, {fwd.z:.2f}), focale {scene.camera.data.lens:.0f}", flush=True)
+        for c in clins.clins():
+            ob = bpy.data.objects.get(f"clin_{c['nom']}")
+            if ob is None:
+                continue
+            q = world_to_camera_view(scene, scene.camera, ob.matrix_world.translation)
+            print(f"[cadre] g {g} {c['nom']:16} u {q.x * 360:6.0f} v {(1 - q.y) * 640:6.0f} à {q.z:5.1f} m", flush=True)
         r.filepath = os.path.join(a.out, f"{a.plan}-g{g:03d}-{a.tag}.png")
         bpy.ops.render.render(write_still=True)
         print(f"[gris] {r.filepath}", flush=True)

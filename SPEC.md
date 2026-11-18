@@ -1806,29 +1806,30 @@ Jacques, la semaine où sort le grand jeu de poursuite en Floride : « je veux p
   - `diag/clins_gris.py` les montre en gris depuis un plan du cache ; `--blend vide` montre les modèles seuls, `--gros` montre chacun de près.
 - **Ce qui se voit vient de bibliothèque** : onze modèles CC BY 4.0, listés dans `fetch.py` (dans `lieux/clins/`) et dans CREDITS.md. Les néons utilisent les lettres A-neon-letters et la gamme de néons des enseignes de la ville. Seuls sont en code le mouvement, les caissons, les cadres et les affiches des panneaux (fond, lignes de texte, liseré). Le dessin des panneaux suit les affiches d'autoroute de Floride ; les textes sont les nôtres.
   - **L'avenue (0–90)**
-    - « HOTEL FLAMINGA » en néon rose et menthe sur le toit du petit hôtel à marquise, avec un flamant de néon, face à la poursuite qui arrive (0–39).
+    - « HOTEL FLAMINGA » en néon rose et menthe sur le toit du petit hôtel à marquise (10,6 m), au bout est, avec un flamant de néon, face à la poursuite qui arrive (0–40).
     - L'enseigne en drapeau « THE CORAL » sur le paquebot d'angle, avec un palmier de néon en tête (0–87).
     - Un coupé blanc des années 80, garé devant l'hôtel (0–54).
     - Une glacière ambulante rose, garée côté plage (0–90).
     - Un poste de secours sur la plage (0–81).
     - Le coupé et la glacière prennent la place exacte d'une garée de la vie (`clins.remplace_vie`), qui est cachée.
-  - **Le rond-point (65–150)** : sept flamants roses en plastique sur l'îlot. Ils sont petits (25–33 px) dans l'arrêt sur image de P1.
-  - **La rue (183–262)** : deux panneaux sur les toits des tours du bout, tournés vers la rue.
+  - **Le rond-point (65–150)** : sept flamants roses en plastique sur l'îlot, un peu grands (1,15 m) pour être lus. Ils sont petits (25–33 px) dans l'arrêt sur image de P1.
+  - **La rue (183–265)** : deux panneaux sur les toits des tours du bout (20,2 m), tournés vers la rue.
     - L'avocat : « ACCIDENT ? / APPELEZ MAÎTRE CASH / 1-800-PAS-MA-FAUTE ».
     - Les cautions : « CAUTION EXPRESS / ON VOUS SORT DE LÀ / 24 H / 24 · 7 J / 7 ».
   - **Le port, vu du pont puis au virage (193–507)** : deux panneaux face au pont, au-dessus des conteneurs.
     - Azerit à gauche : « AZERIT / on recrute sur preuves / azerit.tech », marine et crème, sobre.
     - « GATOR SHOW / LUTTE À MAINS NUES / TOUS LES SOIRS · 20 H » à droite.
-    - Un alligator se chauffe dans le coin du quai, hors de la voie. Quand la poursuite descend du pont (436–476), il se détourne et rampe le long des séparateurs.
-    - À l'entrée de la jetée, la une du journal du port : « L'ÉCHO DU QUAI / L'HOMME DU COIN A ENCORE FRAPPÉ / il volait une glacière ambulante », qui rappelle la glacière de l'avenue.
+    - Un alligator se chauffe sur le terre-plein, à droite de la descente du pont, dans le virage : à droite du cadre, jamais derrière la berline (426–475). Quand la poursuite arrive (436–476), il se détourne et rampe vers le sud.
+    - Au coin du quai, à droite du virage vers la jetée, la une du journal du port : « L'ÉCHO DU QUAI / L'HOMME DU COIN A ENCORE FRAPPÉ / il volait une glacière ambulante », qui rappelle la glacière de l'avenue (470–514).
+    - Les trois panneaux du port sont sur le terre-plein : la sonde du sol (`diag/clins_gris.py --carte`) montre que le quai nord court à y −173,75 à l'est de x 5.
   - **La jetée (469–600)**
     - Un hydroglisseur amarré contre le mur droit, entre deux lampadaires, à 7 m de la file des voiliers. Il tangue comme les bateaux de la vie.
-    - Un bateau de course rouge part avec P6 (486) à 10 m à gauche de l'axe et à 60 km/h. Il double la berline (486–532 dans le cadre), puis s'écarte vers le large avant la pointe (45 m de son centre au moins).
+    - Un bateau de course rouge part avec P6 (486), à 10 m à gauche de l'axe et à 72 km/h. Il prend le large devant la berline, dans le tiers gauche du cadre (486–545, 85 à 125 px), puis s'écarte avant la pointe (45 m de son centre au moins).
     - Il porte des feux de navigation émissifs (bâbord, tribord, poupe) et une nappe d'écume en V, posée sur l'eau.
     - Il est ôté à 600, une fois hors du cadre.
-  - **La pointe (463–719)** : un badaud en chemise hawaïenne lève son téléphone vertical, lampe allumée, et tourne pour garder la berline dans le cadre. Il est dans le gel de FIN6.
+  - **La pointe (671–719)** : un badaud en chemise hawaïenne lève son téléphone vertical, lampe allumée, et tourne pour garder la berline dans le cadre. Il est au garde-corps, à gauche du cadre final (l'orbite de FIN6 l'y amène), dans le gel de FIN6.
     - Le modèle n'a pas de squelette : le bras est levé en code, en tournant les sommets autour de l'épaule.
-    - Il est placé à gauche du cadre final, hors de la route de la patrouille.
+    - La caméra de FIN6 est celle de `fin6_orbite`, posée en ville, et non le bras commun.
 - **Les lumières**
   - Néons : émissifs à la force des enseignes de la ville (rose 5, menthe 4, corail 5).
   - Téléphone : lampe 40 sur 1 cm, écran 3.
