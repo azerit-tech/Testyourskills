@@ -1823,6 +1823,13 @@ def test_cut_habitacle_phare():
     }
     check("coupes : l'habitacle allumé à 25 W dans les huit tronçons (OUV à FIN6)", w == 25.0 and all(poses.values()),
           ", ".join(f"{k} {'oui' if v else 'NON'}" for k, v in poses.items()))
+    # la nappe de P2 au-dessus de la berline (scene_carrefour.hero_fill) n'éclaire qu'elle : sur la chaussée, elle
+    # éclaircissait le bas du cadre de P2 seul (107 | 108 +24 %, 214 | 215 −10 %, brouillon décor-coupes)
+    kp = src("scene_f.py").split("def keep_paint(")[1].split("\ndef ")[0]
+    lie = ('bpy.data.objects.get("hero_fill")' in kp and "hf.light_linking.receiver_collection = avec" in kp
+           and kp.index("hero_fill") > kp.index('avec = bpy.data.collections.new'))
+    check("107 | 108, 214 | 215 : la nappe hero_fill de P2 liée à la seule berline (pas de flaque de lumière à P2)",
+          lie and 'A.add_light("hero_fill"' in src("scene_carrefour.py"), f"liée {lie}")
     a6 = P6.phare_azimut("P6", P6.F0 + P6.FRAMES)          # P6 prolongé d'une image : FIN6/1
     a_fin6 = P6.FIN6_PHARE_PHASE + P6.FIN6_PHARE_VITESSE / 24.0 * F6.F0      # le pilote de FIN6 à son image 1
     d = src("scene_d.py").split("def plan_FIN6(")[1].split("\ndef ")[0]

@@ -726,6 +726,14 @@ def keep_paint():
     # (de 5 m et large de 8 : de 3,4 m, l'aile avant restait 19 % plus sombre que la porte au même galbe)
     fill = lieux.car_fill(car, loc=(5.0, 0.0, 3.0), energy=CAR_FILL_W, color="#ffc89a", size=8.0)
     fill.visible_glossy = False
+    # la nappe de scene_carrefour (hero_fill, 260 W à 7 m au-dessus de la berline, qui la suit) n'éclaire plus que la
+    # berline, comme l'appoint commun : elle posait sur la chaussée une flaque de lumière que seul P2 avait (la rue
+    # l'a ôtée, scene_b), le bas du cadre plus clair de 24 % à 107 | 108 et de 10 % à 214 | 215 (brouillon
+    # décor-coupes, diag/coupes.py ; diag/audit_sol.py : la seule lampe propre à P2 sous la caméra). La caisse la
+    # reçoit comme avant
+    hf = bpy.data.objects.get("hero_fill")
+    if hf is not None:
+        hf.light_linking.receiver_collection = avec
     # les phares : 1400 W et 50° étaient faits pour le drone ; de face et à ras du sol, ils mangeaient la caisse
     # (image 8 de l'essai 1) ; ceux de P3, de face eux aussi
     for lo in [c for c in car.children_recursive if c.type == "LIGHT" and c.data.type == "SPOT"]:
