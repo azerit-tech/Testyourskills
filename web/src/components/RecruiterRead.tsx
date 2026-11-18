@@ -1,10 +1,10 @@
-// Les critères, un seul bloc sous la fiche (SPEC §18.37, §18.48) : ce qu'un
+// Les critères, un seul pli fermé sous la fiche, « Comment c'est noté » (SPEC §18.37, §18.48, §18.76) : ce qu'un
 // recruteur dit en cinq secondes, écrit par gabarit (shared/recruiterLine.ts),
 // puis les huit critères en tuiles, deux colonnes à 390 px : nom court, note
 // sur 10, mini-jauge. L'ordre du recruteur ; les critères sans note en bas,
 // sous « Pas encore au dossier », en une seule ligne dès qu'ils sont plus de
 // deux (jamais un mur de cases vides). Une tuile touchée prend un contour crème
-// et montre sa pièce juste sous sa rangée ; le détail entier se déplie sur place
+// et montre sa pièce juste sous sa rangée ; le détail entier se déplie dans le pli
 // (RecruiterGrid). L'école ne dit jamais de chiffre : « comptée » ou « hors moyenne » (§18.52).
 // Un dossier à deux pièces (§18.36) : chaque tuile notée dit sous son nom où la
 // note a été lue (« LinkedIn », « GitHub », « LinkedIn et GitHub ») ; une fiche
@@ -21,7 +21,7 @@ import { pick, useT } from "../i18n";
 import { keptFrom, rowText } from "../lib/grid";
 import { useAppConfig } from "../lib/season";
 import { useReducedMotion } from "../lib/util";
-import type { Shareable } from "./After";
+import { Fold, type Shareable } from "./After";
 import { RecruiterGrid } from "./RecruiterGrid";
 
 /** Au-delà, les critères sans note tiennent en une ligne. */
@@ -41,12 +41,13 @@ function MiniGauge({ c }: { c: GridCriterion }) {
 
 interface Props {
   item: Shareable;
-  /** Vue par quelqu'un d'autre que la personne fichée : la grille publique, le titre à la troisième personne. */
+  /** Vue par quelqu'un d'autre que la personne fichée : la grille publique. */
   shared: boolean;
-  who: string;
+  /** Le nom de la personne fichée (« @pseudo ») : plus dit depuis que le bloc est un pli (§18.76). */
+  who?: string;
 }
 
-export function RecruiterRead({ item, shared, who }: Props) {
+export function RecruiterRead({ item, shared }: Props) {
   const { t, lang } = useT();
   const [open, setOpen] = useState<CriterionCode | null>(null);
   const panel = useId();
@@ -131,9 +132,9 @@ export function RecruiterRead({ item, shared, who }: Props) {
     ];
   };
 
+  // Un seul pli, fermé pour tout le monde (§18.76) : la ligne du recruteur, les tuiles, le détail replié, la mention du jeu.
   return (
-    <section className="after-block rr" id="grille" aria-labelledby="rr-title">
-      <h2 id="rr-title">{shared ? t.grid.titleThem(who) : t.grid.title}</h2>
+    <Fold name="rr" title={t.grid.title}>
       {read && <p className="rr-line">{read.text}</p>}
       {scored.length > 0 && (
         <ul className="rr-tiles" aria-label={t.grid.criteriaLabel}>
@@ -152,16 +153,10 @@ export function RecruiterRead({ item, shared, who }: Props) {
           </>
         )
       )}
-      {/* Rien de touché : l'invitation, sous les tuiles. */}
-      {!chosen && scored.length + (pending.length > PENDING_TILES ? 0 : pending.length) > 0 && (
-        <p id={panel} className="rr-detail" aria-live="polite">
-          {R.hint}
-        </p>
-      )}
-      {/* Le détail, critère par critère : replié pour tout le monde, déplié sur place. */}
+      {/* Le calcul, critère par critère : un pli dans le pli, fermé (§18.76). */}
       <RecruiterGrid item={item} shared={shared} />
       {/* Une prime ouverte : la note ne décide rien, seules les primes mènent à un entretien. */}
       <p className="rr-game">{cfg?.primesOpen ? t.grid.gamePrimes : t.grid.game}</p>
-    </section>
+    </Fold>
   );
 }

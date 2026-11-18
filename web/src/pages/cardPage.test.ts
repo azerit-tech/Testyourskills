@@ -73,12 +73,14 @@ const card = (over: Partial<CardData> = {}): Shareable => ({ kind: "card", card:
 afterEach(() => vi.unstubAllGlobals());
 
 describe("page partagée, vue par un visiteur", () => {
-  it("l'en-tête, la phrase qui dit ce que c'est, la fiche, le jury et sa peine, le dossier replié, « À ton tour » (§18.48)", () => {
+  it("l'en-tête, la phrase qui dit ce que c'est, la fiche, le jury, les plis, « À ton tour » (§18.48, §18.76)", () => {
     const html = renderResult(card(), { owner: false });
-    const order = at(html, ['class="wanted"', 'class="visitor-lead"', 'class="result-stage"', 'class="jury"', 'class="penalty"', 'class="fold dossier"', 'id="you"']);
+    const order = at(html, ['class="wanted"', 'class="visitor-lead"', 'class="result-stage"', 'class="jury"', 'class="rest"', 'id="you"']);
     expect(ascending(order), JSON.stringify(order)).toBe(true);
-    // La peine est dans le bloc du jury, « À ton tour » hors de la colonne (au bureau, il passe sous la fiche).
-    expect(html).toMatch(/<section class="jury".*?<p class="penalty">.*?<\/p><\/section>/);
+    // Épurée (§18.76) : ni peine ni caution sous le jury, plus de pli « Vois les autres pièces » (elles sont au dos de la fiche).
+    expect(html).not.toContain('class="penalty"');
+    expect(html).not.toContain('class="fold dossier"');
+    // « À ton tour » hors de la colonne (au bureau, il passe sous la fiche).
     expect(html).toMatch(/<\/div><section class="you" id="you"/);
     expect(html).toContain(">À ton tour</h2>");
   });
@@ -155,11 +157,9 @@ describe("page partagée, vue par un visiteur", () => {
     expect(page).toMatch(/if \(visitor && settled && kase && !wantedYou && !main\.sealed\) rememberVisited\(/);
   });
 
-  it("la peine, en texte sous la fiche : l'image du profil est en ciel de page, plus en tuile", () => {
+  it("l'image du profil est en ciel de page, plus en tuile ; la peine n'est plus sous la fiche (§18.76)", () => {
     const html = renderResult(card(), { owner: false });
-    const penalty = html.indexOf('class="penalty"');
-    expect(penalty).toBeGreaterThan(html.indexOf('class="result-stage"'));
-    expect(html.indexOf("Peine")).toBeGreaterThan(penalty);
+    expect(html).not.toContain("Peine");
     expect(html.match(/<img src="\/profiles\//g)).toHaveLength(1);
   });
 
@@ -170,23 +170,24 @@ describe("page partagée, vue par un visiteur", () => {
     expect(html).not.toContain('class="fold why"');
   });
 
-  it("sans profil : la peine reste, le reste en place", () => {
+  it("sans profil : le reste en place", () => {
     const { profile: _p, ...bare } = FIXTURES.gold;
     const html = renderResult({ kind: "card", card: { ...(bare as CardData), id: "VisitCard02" } }, { owner: false });
-    expect(ascending(at(html, ['class="result-stage"', 'class="jury"', 'class="penalty"', 'id="you"']))).toBe(true);
+    expect(ascending(at(html, ['class="result-stage"', 'class="jury"', 'id="you"']))).toBe(true);
   });
 });
 
 describe("après-fiche, vue par qui a fait la fiche (§18.27)", () => {
   const mine = (id: string) => card({ id });
 
-  it("le verdict (pari, peine) en un bloc, le partage, la dénonciation, puis le reste en lignes, « Aussi au dossier » compris (§18.48)", () => {
+  it("le verdict (pari, jury) en une ligne, le partage, la dénonciation, puis le reste en lignes (§18.48, §18.76)", () => {
     const html = renderResult(mine("OwnCard0001"), { owner: true, token: "tok", plea: 6 });
-    const order = at(html, ['class="after-head"', 'class="plea-verdict"', 'class="penalty"', 'class="after-block out"', 'class="after-block denounce"', 'class="rest"', 'class="fold dossier"', 'class="after-foot"']);
+    const order = at(html, ['class="after-head"', 'class="plea-verdict"', 'class="jury-line"', 'class="after-block out"', 'class="after-block denounce"', 'class="rest"', 'class="after-foot"']);
     expect(ascending(order), JSON.stringify(order)).toBe(true);
-    // La peine vit dans le bloc du verdict : plus de ligne flottante entre deux blocs.
-    // Entre les deux, la ligne du jury (une invitation à partager tant qu'il a moins de trois votes).
-    expect(html).toMatch(/<div class="after-head"><section class="plea-verdict".*?<\/section><p class="jury-line">[^<]*<\/p><p class="penalty">/);
+    // Le verdict : le pari, puis la ligne du jury (une invitation à partager tant qu'il a moins de trois votes). Ni peine ni caution (§18.76).
+    expect(html).toMatch(/<div class="after-head"><section class="plea-verdict".*?<\/section><p class="jury-line">[^<]*<\/p><\/div>/);
+    expect(html).not.toContain('class="penalty"');
+    expect(html).not.toContain('class="fold dossier"');
     expect(html).not.toContain('class="after-block dossier"');
     // l'en-tête sur le ciel, en tête de page, et un seul h1 ; pas de « Et toi ? »
     expect(html.indexOf('class="wanted"')).toBeLessThan(html.indexOf('class="result-stage"'));
@@ -211,9 +212,10 @@ describe("après-fiche, vue par qui a fait la fiche (§18.27)", () => {
     const rest = html.slice(html.indexOf('class="rest"'), html.indexOf('class="after-foot"'));
     const rows = [...rest.matchAll(/<details class="fold ([a-z- ]+)"( open="")?><summary class="fold-row"><span>([^<]+)<\/span><svg class="fold-chevron"/g)];
     // Fiche seule : « Pourquoi cette note » est au dos de la fiche, plus dans les lignes.
-    expect(rows.map((r) => r[1])).toEqual(["dossier", "add-source", "email", "contest"]);
+    // Fiche sans grille : pas de « Comment c'est noté » ; plus de « Vois les autres pièces » (§18.76).
+    expect(rows.map((r) => r[1])).toEqual(["add-source", "email", "contest"]);
     // Les titres à l'impératif tutoyé (§18.48).
-    expect(rows.map((r) => r[3].replace(/\u00a0/g, " "))).toEqual(["Vois les autres pièces", "Ajoute ton CV au dossier", "Garde ta fiche au-delà de 90 jours", "Fais appel"]);
+    expect(rows.map((r) => r[3].replace(/\u00a0/g, " "))).toEqual(["Ajoute ton CV au dossier", "Garde ta fiche au-delà de 90 jours", "Fais appel"]);
     // toutes fermées au départ
     expect(rows.every((r) => !r[2])).toBe(true);
     // le contenu reste monté, fermé : le formulaire d'email est là
@@ -246,13 +248,13 @@ describe("après-fiche, vue par qui a fait la fiche (§18.27)", () => {
     expect(html).not.toContain("fold add-source");
   });
 
-  it("la peine est sous la fiche : « Pourquoi cette note » ne la répète pas", () => {
+  it("ni peine ni caution sur la page, fiche seule ou dossier à deux pièces (§18.76)", () => {
     const html = renderResult(mine("OwnCard0004"), { owner: true });
     expect(html).not.toContain("why-sentence");
-    // comparaison sans profil : la peine une fois, sous les fiches, pas dans la ligne repliée
+    expect(html).not.toContain('class="penalty"');
     const { profile: _p, ...gh } = { ...FIXTURE_COMPARISON.github, sentence: FIXTURES.gold.sentence };
     const cmp = renderResult({ kind: "comparison", comparison: { ...FIXTURE_COMPARISON, id: "OwnCmp0001", github: gh as CardData } }, { owner: true });
-    expect(cmp).toContain('class="penalty"');
+    expect(cmp).not.toContain('class="penalty"');
     expect(cmp).not.toContain("why-sentence");
   });
 
@@ -322,12 +324,12 @@ describe("demander le retrait d'une fiche sans pseudo GitHub", () => {
 });
 
 describe("bloc recruteur", () => {
-  it("en fin de page, pour le visiteur comme pour qui a fait la fiche : un titre, une phrase, une pilule vers azerit.tech", () => {
+  it("en fin de page, pour le visiteur seulement (§18.76) : un titre, une phrase, une pilule vers azerit.tech", () => {
     const visitor = renderResult(card({ id: "HireCard001" }), { owner: false });
     const owner = renderResult(card({ id: "HireCard002" }), { owner: true });
     expect(visitor.indexOf('class="after-block hire"')).toBeGreaterThan(visitor.indexOf('id="you"'));
-    expect(owner.indexOf('class="after-block hire"')).toBeGreaterThan(owner.indexOf('class="rest"'));
-    expect(owner.indexOf('class="after-block hire"')).toBeLessThan(owner.indexOf('class="after-foot"'));
+    // La personne fichée a le pied de page, qui dit déjà qu'Azerit recrute.
+    expect(owner).not.toContain('class="after-block hire"');
     const block = /<section class="after-block hire".*?<\/section>/.exec(visitor)?.[0] ?? "";
     expect(block).toContain('<h2 id="hire-title">Vous recrutez ?</h2>');
     expect(block).toMatch(/<a class="pill pill-ghost" href="https:\/\/azerit\.tech" target="_blank" rel="noopener">azerit\.tech/);
@@ -389,39 +391,36 @@ describe("la lecture du recruteur (§18.37)", () => {
     for (const owner of [true, false]) {
       const html = renderResult(card(), { owner, token: owner ? "tok" : undefined });
       expect(html).not.toContain('id="grille"');
-      expect(html).not.toContain('class="after-block rr"');
-      expect(html).not.toContain("Voici comment Azerit");
+      expect(html).not.toContain('class="fold rr"');
+      expect(html).not.toContain("Comment c&#x27;est noté");
     }
   });
 
-  it("avec sa grille : un seul bloc, un seul titre, huit critères, une jauge lue « n sur 10 », la note, aucun « + n »", () => {
+  it("avec sa grille : un seul pli fermé, « Comment c'est noté », huit tuiles notées sur 10, aucun « + n » (§18.76)", () => {
     const html = renderResult(card({ grid, overall: grid.overall }), { owner: true, token: "tok" });
-    expect(html.match(/Voici comment Azerit te lit/g)).toHaveLength(1);
+    const fold = /<details class="fold rr">.*?<\/details>/s.exec(html)![0];
+    expect(fold).toMatch(/^<details class="fold rr"><summary class="fold-row"><span>Comment c&#x27;est noté<\/span>/);
+    expect(fold.match(/class="rr-tile /g)).toHaveLength(8);
+    expect(fold.replace(/<[^>]+>/g, " ")).not.toMatch(/(^|\s)[+−]\s?\d/);
+    // Le détail critère par critère et le calcul : un pli dans le pli, fermé ; plus d'invitation à toucher une tuile (§18.76).
+    expect(fold).toMatch(/<details class="rg rg-fold"><summary class="rg-fold-sum"><span>Le détail, critère par critère<\/span>/);
     expect(html.match(/class="rg-row /g)).toHaveLength(8);
-    expect(html).toMatch(/aria-label="\d+ sur 10"/);
-    const block = /<section class="after-block rr" id="grille".*?<\/section>/s.exec(html)![0].replace(/<[^>]+>/g, " ");
-    expect(block).not.toMatch(/(^|\s)[+−]\s?\d/);
-    // Les deux blocs d'avant n'en font qu'un (§18.48) : plus de second titre, plus de lien vers une ancre.
-    expect(html).not.toContain('class="after-block rg"');
-    expect(html).not.toContain("Ce que la grille retient");
-    expect(html).not.toContain("rr-more");
-    // Le bloc de la note : « La note de la fiche », fiche seule comme dossier (§18.52).
     expect(html).toContain('<h3 class="rg-final-title">La note de la fiche</h3>');
-    expect(html).not.toContain("La note sur 100");
+    expect(html).not.toContain('class="rr-detail"');
+    expect(html).not.toContain("Voici comment Azerit");
+    expect(html).not.toContain('id="grille"');
   });
 
-  it("vue par un visiteur : le titre à la troisième personne", () => {
+  it("vue par un visiteur : le même pli, le même titre", () => {
     const html = renderResult(card({ grid, overall: grid.overall }), { owner: false });
-    expect(html).toContain('id="grille"');
-    expect(html).not.toContain("te lit");
+    expect(html).toMatch(/<details class="fold rr"><summary class="fold-row"><span>Comment c&#x27;est noté<\/span>/);
+    expect(html).not.toContain("lit @");
   });
 
-  it("la ligne du recruteur et les huit tuiles : après le verdict, le partage et la dénonciation, avant le reste replié (§18.48)", () => {
+  it("la ligne du recruteur et les huit tuiles : le premier des plis, après le verdict, le partage et la dénonciation (§18.48, §18.76)", () => {
     const html = renderResult(card({ grid, overall: grid.overall }), { owner: true, token: "tok", plea: 4 });
-    const rr = html.indexOf('class="after-block rr"');
-    const order = at(html, ['class="result-stage"', 'class="after-head"', 'class="after-block out"', 'class="after-block denounce"', 'class="after-block rr"', 'class="rest"']);
+    const order = at(html, ['class="result-stage"', 'class="after-head"', 'class="after-block out"', 'class="after-block denounce"', 'add-linkedin', 'class="rest"', 'class="fold rr"', 'class="fold email"']);
     expect(ascending(order), JSON.stringify(order)).toBe(true);
-    expect(rr).toBeLessThan(html.indexOf("add-linkedin"));
     expect(html.match(/class="rr-tile /g)).toHaveLength(8);
     expect(html).toMatch(/<p class="rr-line">[^<]+, [^<]+\. Point fort\u00a0: [^<]+, \d+\/10\./);
     // Les tuiles dans l'ordre du recruteur, les critères sans note en bas (deux au plus en tuiles).
@@ -431,9 +430,6 @@ describe("la lecture du recruteur (§18.37)", () => {
     expect(names).toEqual([...scored, ...pending].map((c) => DICTS.fr.read.short[c.code]));
     expect(names[0]).toBe("Expérience");
     if (pending.length) expect(html).toContain('<p class="rr-pending">Pas encore au dossier</p>');
-    // Le détail de la grille : replié pour la personne fichée aussi (§18.48), dans le même bloc.
-    const block = /<section class="after-block rr" id="grille".*?<\/section>/s.exec(html)![0];
-    expect(block).toMatch(/<details class="rg rg-fold"><summary class="rg-fold-sum"><span>Le détail, critère par critère<\/span>/);
   });
 
   it("plus de deux critères sans note : une ligne, pas un mur de cases vides (§18.48)", () => {
@@ -446,8 +442,6 @@ describe("la lecture du recruteur (§18.37)", () => {
     expect(line).toBe(DICTS.fr.read.pendingLine(pending.map((c) => DICTS.fr.read.short[c.code]).join(", ")));
     expect(line).toMatch(/^Pas encore au dossier.: /);
     expect(html).not.toContain('class="rr-pending"');
-    // Le détail garde les huit lignes, repliées.
-    expect(html.match(/class="rg-row /g)).toHaveLength(8);
   });
 
   it("fiche GitHub seule : « Ajoute ton LinkedIn au dossier », en miroir de l'ajout du GitHub ; jamais pour un visiteur", () => {
@@ -457,13 +451,13 @@ describe("la lecture du recruteur (§18.37)", () => {
     expect(renderResult(card({ grid, overall: grid.overall }), { owner: false })).not.toContain("add-linkedin");
   });
 
-  it("sous trois étoiles : la source qui manque remonte sous le verdict, avant le partage ; à trois et plus, sous les critères (§18.48)", () => {
+  it("sous trois étoiles : la source qui manque remonte sous le verdict, avant le partage ; à trois et plus, avant les plis (§18.48, §18.76)", () => {
     const low = githubGridMock("unknownLang", "x")!;
     const one = renderResult(card({ id: "LowCard0001", grid: low, overall: low.overall }), { owner: true, token: "tok", plea: 3 });
-    const order = at(one, ['class="after-head"', 'class="after-block add-source add-linkedin"', 'class="after-block out"', 'class="after-block rr"']);
+    const order = at(one, ['class="after-head"', 'class="after-block add-source add-linkedin"', 'class="after-block out"', 'class="fold rr"']);
     expect(ascending(order), JSON.stringify(order)).toBe(true);
     const five = renderResult(card({ id: "HighCard001", grid, overall: grid.overall }), { owner: true, token: "tok" });
-    const high = at(five, ['class="after-block out"', 'class="after-block rr"', 'class="after-block add-source add-linkedin"', 'class="rest"']);
+    const high = at(five, ['class="after-block out"', 'class="after-block add-source add-linkedin"', 'class="rest"', 'class="fold rr"']);
     expect(ascending(high), JSON.stringify(high)).toBe(true);
     // Fiche LinkedIn seule sous trois étoiles : « Ajoute ton GitHub » remonte de même.
     const li = renderResult(card({ id: "LowCard0002", overall: 30, source: "cv", declaredSource: "linkedin", linkedinUrl: "https://www.linkedin.com/in/x" }), { owner: true });
@@ -511,11 +505,10 @@ describe("la lecture du recruteur (§18.37)", () => {
     expect(page).not.toMatch(/<a className="week-rank"/);
   });
 
-  it("« Voir le top de la semaine » mène à /#semaine, la query (?mock=1) avant l'ancre (parcours 6)", () => {
+  it("plus de « Voir le top de la semaine » dans le bloc de partage (§18.76) : le rang reste, la sortie part", () => {
     const after = readFileSync(join(__dirname, "../components/After.tsx"), "utf8");
-    expect(after).toContain('const BOARD_ID = "semaine";');
-    expect(after).toContain("navigate(`/${window.location.search}#${BOARD_ID}`);");
-    expect(readFileSync(join(__dirname, "../components/WeekBoard.tsx"), "utf8")).toContain('export const WEEK_ANCHOR = "semaine";');
+    expect(after).not.toContain("BOARD_ID");
+    expect(after).not.toContain("out-board");
   });
 
   it("le champ LinkedIn : le lien entier, ou ce qui suit linkedin.com/in/", () => {
@@ -525,13 +518,13 @@ describe("la lecture du recruteur (§18.37)", () => {
     expect(linkedinFromField("https://github.com/x")).toBeNull();
   });
 
-  it("vue par un visiteur : les tuiles juste sous la fiche, le détail de la grille replié, le jeu dit", () => {
+  it("vue par un visiteur : le pli dans la colonne, sous le jury, le jeu dit dedans", () => {
     const html = renderResult(card({ grid, overall: grid.overall }), { owner: false });
     const col = html.slice(html.indexOf('class="visitor-col"'));
-    expect(col.indexOf('class="after-block rr"')).toBeGreaterThan(-1);
-    expect(html).toMatch(/<details class="rg rg-fold"><summary class="rg-fold-sum"><span>Le détail, critère par critère<\/span>/);
-    expect(html).toContain("Pas une décision d&#x27;embauche");
-    expect(html.match(/Voici comment Azerit lit @/g)).toHaveLength(1);
+    expect(col.indexOf('class="fold rr"')).toBeGreaterThan(col.indexOf('class="jury"'));
+    // Le jeu dit, dans le pli : la dernière ligne avant sa fermeture.
+    const fold = html.slice(html.indexOf('class="fold rr"'), html.indexOf("</details></div>", html.indexOf('class="fold rr"')));
+    expect(fold).toContain("Pas une décision d&#x27;embauche");
   });
 });
 

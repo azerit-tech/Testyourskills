@@ -76,8 +76,10 @@ describe("bloc de partage selon l'appareil (§18.27)", () => {
     expect(html).toContain('aria-label="Télécharger l&#x27;image"');
     expect(html).not.toMatch(/>X<|x\.com/);
     expect(html).toMatch(/<a class="link-alt"[^>]*download="azerit-[^"]+\.png"/);
-    // La durée de vie du lien, dite là où on le partage.
-    expect(html).toMatch(/<p class="out-keep">Ton lien reste en ligne 90.jours\.<\/p><\/section>$/);
+    // Épuré (§18.76) : ni la durée de vie du lien (le pli « Garde ta fiche au-delà de 90 jours » la dit), ni « Voir le top de la semaine ».
+    expect(html).toMatch(/<\/div><\/section>$/);
+    expect(html).not.toContain("out-keep");
+    expect(html).not.toContain("out-board");
     // Le fichier porte le seul nom visible du produit.
     expect(html).not.toMatch(/testyourskills/i);
     // Le dessin en cours dans l'adresse : le cache d'un an ne ressert pas l'ancienne image.
@@ -97,11 +99,11 @@ describe("bloc de partage selon l'appareil (§18.27)", () => {
     expect(inApp).toMatch(/<button type="button" class="link-alt" aria-label="Image pour story" aria-haspopup="dialog">Story<\/button>/);
   });
 
-  it("en anglais : la durée de vie du lien", () => {
+  it("en anglais : les trois liens", () => {
     const item = stub({ ua: DESKTOP, touch: false, share: false }, "AbCdEf1234");
     vi.stubGlobal("navigator", { userAgent: DESKTOP, language: "en-US" });
     const html = renderToStaticMarkup(createElement(LangProvider, null, createElement(ShareBar, { item, toast: () => undefined })));
-    expect(html).toContain('<p class="out-keep">Your link stays up for 90 days.</p>');
+    expect(html).not.toContain("90 days");
     expect(links(html)).toEqual(["Copy link", "Image", "Story"]);
   });
 
@@ -111,7 +113,7 @@ describe("bloc de partage selon l'appareil (§18.27)", () => {
     const html = renderToStaticMarkup(createElement(LangProvider, null, createElement(ShareBar, { item, toast: () => undefined })));
     expect(html).toContain('aria-label="Story image"');
     expect(main(html)).toContain("Share on LinkedIn");
-    expect(html).toContain("Your text goes to the clipboard: paste it into your LinkedIn post.");
+    expect(html).not.toContain("clipboard");
   });
 
   it("téléphone : « Partager » devant, LinkedIn, le lien et l'image derrière, sans X", () => {
@@ -137,12 +139,13 @@ describe("bloc de partage selon l'appareil (§18.27)", () => {
     expect(html).toMatch(/<button[^>]*aria-label="Télécharger l&#x27;image" aria-haspopup="dialog"[^>]*>Image</);
   });
 
-  it("le bouton dit « Partager sur LinkedIn » avant comme après l'appui ; la ligne d'aide dit où part le texte, en permanence", () => {
-    const hint = 'aria-live="polite">Ton texte part dans le presse-papiers\u00a0: colle-le dans ton post LinkedIn.</p>';
+  it("le bouton dit « Partager sur LinkedIn » avant comme après l'appui ; la ligne d'aide ne se remplit qu'après (§18.76)", () => {
+    const hint = 'aria-live="polite">Texte copié\u00a0: colle-le dans ton post LinkedIn.</p>';
     const before = render({ ua: DESKTOP, touch: false, share: false });
     expect(main(before)).toContain("<span>Partager sur LinkedIn</span>");
     expect(main(before)).not.toContain("is-copied");
-    expect(before).toContain(`<p class="out-hint" ${hint}`);
+    // Avant l'appui : la ligne est montée (lue quand elle se remplit), vide.
+    expect(before).toContain('<p class="out-hint" aria-live="polite"></p>');
     markTextCopied("CopiedCard1");
     const html = render({ ua: DESKTOP, touch: false, share: false }, "CopiedCard1");
     expect(main(html)).toContain("is-copied");

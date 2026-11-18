@@ -2824,13 +2824,6 @@ button.cover-panel:focus-visible {
   color: var(--c-emphasis);
   text-wrap: pretty;
 }
-/* la peine et la caution, au pied du bloc du jury : deux lignes discrètes sous un filet */
-.jury .penalty {
-  padding-top: 12px;
-  border-top: 1px solid var(--c-line);
-  font: var(--font-small);
-  color: var(--c-text);
-}
 /* « À ton tour » et la demande de retrait suivent la colonne, au même pas que ses blocs */
 .result-top > .you {
   margin-top: 16px;
@@ -2991,14 +2984,12 @@ button.cover-panel:focus-visible {
   color: var(--c-text);
   text-wrap: balance;
 }
-/* en tête de l'après-fiche, le verdict : le pari, le jury, la peine et la caution dans un même bloc,
-   alignés à gauche sur le contenu des autres blocs */
+/* en tête de l'après-fiche, le verdict en une ligne (§18.76) : le jury, et le pari s'il y en a un.
+   Sans cadre : une ligne posée entre la fiche et le partage, pas un bloc de plus */
 .after-head {
   display: grid;
   gap: 10px;
-  padding: var(--pad-block);
-  border-radius: var(--r-block);
-  background: var(--s-info);
+  padding: 0 var(--pad-block);
 }
 .after-head:empty {
   display: none;
@@ -3009,15 +3000,6 @@ button.cover-panel:focus-visible {
 }
 .after-head .jury-line {
   text-wrap: balance;
-}
-/* la peine et la caution : deux lignes discrètes sous le verdict, séparées de lui par un filet */
-.after-head .penalty {
-  font: var(--font-small);
-  color: var(--c-text);
-}
-.after-head > :not(.penalty) + .penalty {
-  padding-top: 10px;
-  border-top: 1px solid var(--c-line);
 }
 
 /* « Fais la tienne » toujours sous le pouce (§18.48) : la barre fixe du visiteur est la même pièce
@@ -3147,20 +3129,6 @@ a.dossier-item:hover {
   text-wrap: pretty;
 }
 
-/* sous la fiche (§18.29) : la peine, puis la caution, en texte, sans cadre ; l'image est en ciel de page */
-.penalty {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-  font: 600 var(--t-16) / 1.4 var(--f-text);
-  color: var(--cream);
-  text-wrap: pretty;
-}
-.penalty span + span {
-  font: var(--font-small);
-  color: var(--c-text);
-}
-
 /* rang de la semaine (§18.22) : une ligne sous le titre du partage, juste au-dessus du bouton.
    Crème, sans lien : un argument pour partager, pas une sortie ; « Voir le top de la semaine » est sous les liens.
    Pas de capitales : « 6e » resterait « 6E ». */
@@ -3170,15 +3138,11 @@ a.dossier-item:hover {
   color: var(--c-emphasis);
   text-wrap: balance;
 }
-.out .out-board {
-  justify-self: start;
-  margin: -8px 0 -4px;
-}
 .out .out-main,
 .out .out-second {
   width: 100%;
 }
-/* la ligne d'aide sous le bouton LinkedIn, en permanence : où part le texte du post */
+/* sous le bouton LinkedIn, après l'appui seulement (§18.76) : où est parti le texte du post ; vide, elle ne prend pas de place */
 .out .out-hint {
   margin: -4px 0 0;
   font: 400 var(--t-14) / 1.4 var(--f-text);
@@ -3187,6 +3151,9 @@ a.dossier-item:hover {
 }
 .out .out-hint.is-copied {
   color: var(--c-emphasis);
+}
+.out .out-hint:empty {
+  display: none;
 }
 /* le reste du partage en liens, sur une seule ligne dès 320 px : « Copier le lien », « Image », « Story » */
 /* « Ajouter à mon profil LinkedIn » (§18.75) : un lien comme ceux du dessous, sur sa ligne juste au-dessus */
@@ -3199,11 +3166,6 @@ a.dossier-item:hover {
   flex-wrap: wrap;
   gap: 0 20px;
   margin: -4px 0;
-}
-/* la durée de vie du lien : la ligne la plus discrète du bloc */
-.out .out-keep {
-  font: var(--font-small);
-  color: var(--c-text-2);
 }
 /* presse-papiers refusé (navigateurs intégrés) : le lien ou le texte, sélectionné, pour un appui long */
 .out-manual {
