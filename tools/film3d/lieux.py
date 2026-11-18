@@ -1121,7 +1121,13 @@ def hero(lights_on=True):
     return root
 
 
-HERO_CABIN_W = 25.0     # W, la lampe de lecture de la berline (la planche de bord garde ses 60 W)
+HERO_CABIN_W = 25.0     # W demandés pour le plafonnier de la berline (60 W pour la planche de bord)
+# Ce que cabin_light garde de la puissance demandée, plafonnier et planche de bord. À 1 (25 W et 60 W), la lunette
+# montrait tout l'habitacle en ambre clair sur la jetée, le point le plus clair de la voiture (rendus du second tour,
+# P6/47, 75, 76, 102). À 0,4 (10 W et 24 W) l'habitacle se lit à l'heure bleue sans luire. Le facteur est ici et non
+# dans les scènes parce que chacune rappelle cabin_light avec ses 25 W (scene_a, scene_b, scene_d) : un seul réglage
+# pour tous les plans (SPEC §18.66)
+CABIN_GAIN = 0.4
 
 
 def hero_look(root):
@@ -1627,7 +1633,8 @@ def cabin_light(root, energy=6.0, color="#ffcf9a", dash=60.0, dash_color="#ffb07
     la silhouette, le dos du conducteur restant dans l'ombre. Renvoie la lampe de lecture (la planche de bord est
     sa fille, `hero_planche`).
     Une seule par voiture : lieux.hero() la pose (HERO_CABIN_W) ; rappelée, elle règle la lampe déjà là (puissances,
-    teintes) sans en ajouter une seconde."""
+    teintes) sans en ajouter une seconde. Les puissances demandées sont multipliées par CABIN_GAIN."""
+    energy, dash = energy * CABIN_GAIN, dash * CABIN_GAIN
     body = bpy.data.objects[root["body"]]
     have = next((o for o in body.children if o.type == "LIGHT" and o.name.startswith("hero_habitacle")), None)
     if have is not None:

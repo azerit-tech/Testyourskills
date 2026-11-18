@@ -699,8 +699,10 @@ def mat_tyre(name, r_rim=0.19, r_out=0.31, wear=0.0, wet=WET_TREAD, white=None):
 # ni voile d'essuyage, qui la ternissaient en gris devant l'habitacle
 REAR_WINDOW = "lunette"
 # 0,6 jusqu'au 18 novembre ; avec le reflet étalé du verre mouillé (GLASS_ROUGH_REAR), 0,7 : à 0,6 la lunette entière
-# prenait un voile ambre sous les lampes de la jetée (rendus d'après, P6/47)
-REAR_REFL_CUT = 0.7
+# prenait un voile ambre sous les lampes de la jetée (rendus d'après, P6/47) ; à 0,7 la lueur de chaque lampadaire
+# restait, avec l'habitacle, le point le plus clair de la voiture (second tour, P6/102) : 0,82, la lueur à 0,6 de ce
+# qu'elle était
+REAR_REFL_CUT = 0.82
 # Le verre après la pluie (SPEC §18.66). Un verre lisse (rugosité 0) renvoyait chaque lampadaire en image nette : sur
 # la jetée, la tête de chaque lampe qui passe au-dessus de la berline traversait la lunette en tache blanc pur
 # (brouillon éclairé v9, images 531–534, 560–564, 586–588, 612). Le reflet d'une petite source de luminance L et
