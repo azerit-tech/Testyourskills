@@ -124,6 +124,18 @@ def vehicules():
         add(nom, mod, tnt, Course(pts, keys, s0=_s_at(pts, y_ref), g0=g_ref, ecart=bascule_g(*ec) if ec else None),
             warning=wn)
 
+    # ------------------------------------------------------------ le pont, en face (P3 et P4, SPEC §18.69)
+    # Le film gris de la fusion : de l'image 318 à la 353 la chaussée du pont est vide devant la berline (B1 est
+    # cachée derrière elle, la file d'en face de vie.py ne part qu'à 330 du haut du pont). Quatre voitures de plus,
+    # en tête de cette file : elles descendent le pont vers la ville dans la voie d'en face (x −5,25, à 7,5 à 9,5 m
+    # de la berline : aucune esquive), contournent la voiture arrêtée de vie.py (y −262) par la voie du milieu, libre
+    # tant que la poursuite n'est pas sur le pont, croisent la berline au pied du pont, freinent et tournent à droite
+    # sur le boulevard (la rue est à la meute), vers l'ouest. Elles restent à l'ouest de x −4,3 : la patrouille 1 et
+    # les deux files de la meute passent à 1,7 m au moins.
+    face = _face_pont()
+    for nom, mod, tnt, y0, g_t in FACE:
+        add(nom, mod, tnt, Course(face, _face_cles(face, y0, g_t), s0=_s_at(face, y0), g0=0))
+
     # ------------------------------------------------------------ la jetée (P6) : s 390 à 476
     # J1 roule à 20 km/h dans la voie de la berline, sortie du terre-plein avant le virage : aux sirènes elle serre
     # sa bordure (0,6 m à droite), freine et s'arrête, warnings ; la berline la double par la voie d'en face (SLALOM :
@@ -144,6 +156,50 @@ def vehicules():
     add("jetee_j2", "fairheaven", "rose", Course(j2, J2_V, s0=496.0 - J2_S, g0=J2_V[-1][0]), warning=J2_V[-1][0],
         appels=J2_APPELS)
     return out
+
+
+def _face_pont():
+    """La voie d'en face du pont, du port à la ville, puis le boulevard vers l'ouest : x −5,25, un écart de
+    FACE_ECART vers le milieu autour de la voiture arrêtée de vie.py (−6,05, −262), puis le virage à droite au pied
+    du pont : un arc de FACE_RAYON qui se pose dans la voie ouest du boulevard, à 0,25 m de son axe côté chaussée
+    (1,1 m des garées du trottoir nord)."""
+    import vie as V
+    y_bd = V.BD_O - 0.25
+    pts = []
+    y = -150.0
+    while y > FACE_Y_VIRAGE(y_bd) + 1e-9:
+        e = FACE_ECART * (P.bascule((FACE_SORT[0] - y) / (FACE_SORT[0] - FACE_SORT[1]))
+                          - P.bascule((FACE_RENTRE[0] - y) / (FACE_RENTRE[0] - FACE_RENTRE[1])))
+        pts.append((-5.25 + e, y))
+        y -= 0.5
+    cx, cy = -5.25 - FACE_RAYON, y_bd + FACE_RAYON
+    pts += [(cx + FACE_RAYON * math.cos(math.radians(a)), cy - FACE_RAYON * math.sin(math.radians(a)))
+            for a in range(0, 91, 3)]
+    pts.append((-300.0, y_bd))
+    return V.courbe(pts, pas=0.5, n_lisse=2)
+
+
+def FACE_Y_VIRAGE(y_bd=None):
+    """L'ordonnée où la file d'en face entre dans son virage."""
+    import vie as V
+    return (V.BD_O - 0.25 if y_bd is None else y_bd) + FACE_RAYON
+
+
+def _face_cles(pts, y0, g_t):
+    """Les clés de vitesse d'une voiture de la file d'en face : arrêtée en y0 (la file du port), elle part, roule à
+    FACE_V, freine et entre dans le virage du boulevard à l'image g_t à FACE_V_VIRAGE, le tient, puis repart."""
+    v, vt = FACE_V, FACE_V_VIRAGE
+    d = _s_at(pts, FACE_Y_VIRAGE()) - _s_at(pts, y0)
+    t_acc, t_dec = v / FACE_ACC, (v - vt) / FACE_DEC
+    d_acc, d_dec = v * t_acc / 2.0, (v + vt) * t_dec / 2.0
+    t_cr = (d - d_acc - d_dec) / v
+    g_dec = g_t - t_dec * FPS
+    g_cr = g_dec - t_cr * FPS
+    g_dep = g_cr - t_acc * FPS
+    if t_cr < 0.0 or g_dep < 0.0:
+        raise ValueError(f"file d'en face : pas le temps d'arriver au virage à l'image {g_t} depuis y {y0}")
+    g_fin = g_t + (math.pi / 2.0 * FACE_RAYON + 1.0) / vt * FPS
+    return [(0, 0.0), (g_dep, 0.0), (g_cr, v), (g_dec, v), (g_t, vt), (g_fin, vt), (g_fin + 40, _v(36))]
 
 
 def _s_at(pts, y):
@@ -178,6 +234,19 @@ PONT = [
     ("pont_b3", "break84", "blanc", 5.25, -237.0, 318,
      [(0, 6.0), (110, 6.0), (150, _v(35)), (350, _v(35)), (400, 0.0)], None, 396),
 ]
+# le pont, en face : (nom, modèle, teinte, y de sa place dans la file du port, image où elle entre dans le virage du
+# boulevard). Croisière, départ et freinage (m/s²), vitesse dans le virage et son rayon (4,5 m/s sur 5 m : 4,1 m/s²
+# de latérale, le coin du trottoir à 0,8 m du flanc) ; l'écart autour de la voiture arrêtée : m vers le milieu
+# (1,0 m entre les caisses), (y où il commence, y où il est plein), (y où il se rend, y où il est nul) : 30 m
+# chacun, 3,5 m/s² de latérale à 55 km/h
+FACE = [
+    ("pont_f1", "sialia", "creme", -223.5, 302),
+    ("pont_f2", "pickup", "sable", -216.0, 342),
+    ("pont_f3", "fairheaven", "marine", -208.5, 383),
+    ("pont_f4", "riverside", "blanc", -201.0, 426),
+]
+FACE_V, FACE_ACC, FACE_DEC, FACE_V_VIRAGE, FACE_RAYON = _v(55), 3.0, 4.5, 4.5, 5.0
+FACE_ECART, FACE_SORT, FACE_RENTRE = 2.15, (-226.0, -256.0), (-268.0, -298.0)
 # la jetée : J1 (vitesses depuis le terre-plein, serre, warnings) ; J2 (abscisse de route où elle s'arrête, vitesses,
 # appel de phares)
 J1_V = [(0, 0.0), (340, 0.0), (370, _v(20)), (524, _v(20)), (566, 0.0)]

@@ -4,7 +4,8 @@
 #   - la circulation passe à 1,2 m au moins de l'objectif ;
 #   - le slalom tient l'adhérence du mouillé (latérale 6,5 m/s², cercle 7,5) et ne touche ni aux durées, ni aux
 #     étoiles, ni aux dérapages, ni au trou du barrage (parcours.check) ;
-#   - dans chaque ligne droite, des voitures qui roulent dans le cadre.
+#   - dans chaque ligne droite, des voitures qui roulent dans le cadre ;
+#   - la file d'en face du pont (SPEC §18.69) : phares, accélérations, 1 m de la poursuite au quart d'image.
 #   python3 tools/film3d/test_trafic.py
 import math
 import os
@@ -100,7 +101,56 @@ def test_cadre():
               f"{part:.0%} du temps, {min(n)} à {max(n)} voitures")
 
 
+def test_face():
+    """La file d'en face du pont (trafic.FACE, SPEC §18.69) : phares allumés, accélération d'une voiture (départ,
+    freinage, virage, écart : 5,6 m/s² au plus, au quart d'image), 1 m au moins de la berline, des patrouilles et de
+    la meute au quart d'image, et toujours à l'ouest de la voie de la patrouille 1."""
+    import vie as V
+    face = {"trafic_" + r[0] for r in T.FACE}
+    veh = [v for v in V.vehicules() if v[0] in face]
+    check("face : quatre voitures, phares allumés", len(veh) == len(T.FACE) == 4 and all(v[4].get("phares") for v in veh),
+          f"{len(veh)} voitures")
+    pire, lim = (0.0, None, 0), 5.6
+    h = 3.0
+    dt = h / T.FPS
+    for nom, _m, _t, c, _kw in veh:
+        for k in range(4, 640 * 4):
+            g = k / 4.0
+            a, b, d = c.pose(g - h), c.pose(g), c.pose(g + h)
+            acc = math.hypot(a[0] - 2 * b[0] + d[0], a[1] - 2 * b[1] + d[1]) / dt ** 2
+            if acc > pire[0]:
+                pire = (acc, nom, g)
+    check(f"face : accélération ≤ {lim:g} m/s² (départ, freinage, virage, écart)", pire[0] <= lim,
+          f"{pire[0]:.2f} m/s², {pire[1]} à l'image {pire[2]:g}")
+    pours = T._poursuite()
+    juste, est = (99.0, None, None, 0), (-99.0, None, 0)
+    for k in range(240 * 4, 470 * 4 + 1):
+        g = k / 4.0
+        bs = T.boites(g, pours, veh)
+        miens = [b for b in bs if b[0] in face]
+        for b in bs:
+            if b[1] not in ("hero", "patrol", "van") or b[4] is None:
+                continue
+            B = T._coins(b[2], b[3], b[4], b[5], b[6])
+            for m in miens:
+                if math.hypot(m[2] - b[2], m[3] - b[3]) > 12.0:
+                    continue
+                d = T.separation(T._coins(m[2], m[3], m[4], m[5], m[6]), B)
+                if d < juste[0]:
+                    juste = (d, m[0], b[0], g)
+        for m in miens:
+            if m[3] > -326.0:                               # sur le pont, avant le virage du boulevard
+                x = max(q[0] for q in T._coins(m[2], m[3], m[4], m[5], m[6]))
+                if x > est[0]:
+                    est = (x, m[0], g)
+    check("face : 1 m au moins de la berline, des patrouilles et de la meute (au quart d'image)", juste[0] >= 1.0,
+          f"{juste[0]:.2f} m, {juste[1]} / {juste[2]} à l'image {juste[3]:g}")
+    check("face : sur le pont, à l'ouest de x −2 (la voie d'en face et, autour de la voiture arrêtée, celle du milieu)",
+          est[0] <= -2.0, f"x {est[0]:+.2f} au plus à l'est, {est[1]} à l'image {est[2]:g}")
+
+
 if __name__ == "__main__":
+    test_face()
     test_parcours()
     test_contacts()
     test_adherence()

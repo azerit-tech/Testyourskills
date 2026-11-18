@@ -7,7 +7,8 @@
 #   à la silhouette entière), la place du point de contact, celle de la berline ; et la patrouille 1 dans P1.
 # --dense : image par image de la poursuite (0 à 618), les voitures de la vie qui ROULENT, à moins de 40 m devant
 #   l'objectif, et lisibles : la moitié au moins de leur rectangle dans le cadre et hors de celui de la berline quand
-#   elles sont derrière elle, 4 % de la hauteur du cadre au moins (51 px sur 1280). Les trous de plus de 1,5 s, le
+#   elles sont derrière elle, 3 % de la hauteur du cadre au moins (38 px sur 1280 : une voiture à 24 m). Les trous de
+#   plus de 1,5 s, le
 #   compte par seconde. Les patrouilles sont comptées à part (elles roulent avec la berline : pas un repère).
 # Le rectangle est celui des huit coins de la boîte : il déborde un peu la caisse. Les décors ne masquent rien ici.
 import argparse
@@ -32,7 +33,8 @@ import vie as V  # noqa: E402
 FPS = P.FPS
 H_BOITE = 1.45
 PATROL = (2 * C.PATROL[1], 2 * C.PATROL[0], H_BOITE)
-PORTEE, MOITIE, HAUT_MIN, TROU = 40.0, 0.5, 0.04, 1.5
+PORTEE, MOITIE, HAUT_MIN, TROU = 40.0, 0.5, 0.03, 1.5
+HAUTEUR = {"bus": 3.0, "camion": 2.6}          # m, estimées (les autres : H_BOITE)
 OUT = {}
 _POURS = T._poursuite()
 _VEH = [v for v in V.vehicules() if not isinstance(v[3], V.Fixe)]
@@ -227,7 +229,7 @@ def dense():
             if not 0.5 < d <= PORTEE:
                 continue
             w, l = V.DEMI.get(modele, V.DEMI_DEFAUT)
-            r = rect(cam, sh, x, y, cap, (2 * l, 2 * w, H_BOITE))
+            r = rect(cam, sh, x, y, cap, (2 * l, 2 * w, HAUTEUR.get(modele, H_BOITE)))
             if not r or aire(r) <= 0:
                 continue
             vis = aire(coupe(r))
