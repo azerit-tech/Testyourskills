@@ -2156,7 +2156,7 @@ def test_cut_habitacle_phare():
     check("107 | 108, 214 | 215 : la nappe hero_fill de P2 retirée (pas de flaque de lumière à P2)",
           lie and 'A.add_light("hero_fill"' in src("scene_carrefour.py"), f"retirée {lie}")
     # l'appoint de poursuite commun (lieux.CHASE_FILL, 900 W) sur la berline dans les huit tronçons : OUV et P1 ne
-    # l'avaient pas, elle y était bordeaux sombre (brouillon éclairé v10, SPEC §18.70) ; P2 l'a aussi, son complément
+    # l'avaient pas, elle y était bordeaux sombre (brouillon éclairé v10, SPEC §18.73) ; P2 l'a aussi, son complément
     # de flanc nul aux deux coupes
     sa, sdd = src("scene_a.py"), src("scene_d.py")
     commun = {

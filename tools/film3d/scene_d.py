@@ -1575,7 +1575,7 @@ def p6_beam0_haze(heli0, frames, hero):
 def p6_clean_haze(scene, hero):
     """P6 au ras du sol (découpage v2) : les lampadaires de la jetée passent tout près de l'objectif ; leurs spots
     n'éclairent plus la brume (le nuage de grains qu'ils y semaient, comme celui de la pointe).
-    Deux réglages que P6 était seul à avoir sont sortis d'ici (diag/etat_coupes.py, SPEC §18.70 : ils changeaient
+    Deux réglages que P6 était seul à avoir sont sortis d'ici (diag/etat_coupes.py, SPEC §18.73 : ils changeaient
     l'image aux deux coupes du tronçon, 485 | 486 et 618 | 619) : le rendu « biaisé » des volumes, qui lisse les
     faisceaux des hélicoptères, est maintenant celui de tout le film (render_film.setup_render) ; l'appoint de face
     de 250 W sur la calandre (l'ancienne caméra de face) est retiré, la berline n'a que l'appoint commun."""

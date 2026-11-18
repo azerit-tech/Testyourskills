@@ -224,7 +224,7 @@ def test_sparks():
 
 
 def test_choc():
-    """La gerbe d'un contact se voit (SPEC §18.70) : des points d'un centimètre au moins, au point de contact, du
+    """La gerbe d'un contact se voit (SPEC §18.73) : des points d'un centimètre au moins, au point de contact, du
     côté de la patrouille, courts ; leur lueur est nulle avant et après, à son plus fort dans les trois premières
     images, et reste dans le nuage."""
     tr = line_track(17.0)

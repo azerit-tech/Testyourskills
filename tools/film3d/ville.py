@@ -593,7 +593,7 @@ def projecteur_sols(scene, plan):
     return fautes
 
 
-# La lunette de la berline et les lampadaires (SPEC §18.70). Vue de la caméra de poursuite (derrière, 2,4 m de haut),
+# La lunette de la berline et les lampadaires (SPEC §18.73). Vue de la caméra de poursuite (derrière, 2,4 m de haut),
 # la lunette couchée renvoie ce qui est à la verticale de la voiture : chaque lampadaire qui passe au-dessus y posait
 # une tache jaune clair d'une à quatre images (brouillon éclairé v10 : 48, 68, 96–98, 118–124, 337, 497, 532–535,
 # 564–566, 592, 612–616), malgré le verre mouillé (rugosité 0,24) et le reflet retiré aux quatre cinquièmes
@@ -1121,7 +1121,7 @@ def heli_voisin(nom):
 # Sauf les flaques posées par les scènes sur la ligne des roues (« fx_flaque_<n> », scene_d.p6_foreground et la
 # recette de P2 et P3) : ce sont des pièces du sol, pas des effets tirés. Retirées avec le reste, les six flaques de
 # la jetée manquaient à P5 et apparaissaient d'un coup à 485 | 486, à 16–32 m devant la berline (diag/etat_coupes.py,
-# SPEC §18.70). Les flaques que fx.py pose sous une roue (« fx_flaque_<roue>_<image> ») et les rides restent des effets.
+# SPEC §18.73). Les flaques que fx.py pose sous une roue (« fx_flaque_<roue>_<image> ») et les rides restent des effets.
 FX_VOISIN = re.compile(r"^fx_(?!flaque_\d+(\.\d+)?$)")
 
 

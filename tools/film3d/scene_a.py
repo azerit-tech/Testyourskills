@@ -2035,7 +2035,7 @@ def chase_fill(rig):
     elle seule, sans reflet, la chaussée ne le reçoit pas), sur le rig (+y vers l'avant). OUV et P1 ne l'avaient
     pas : tous les autres tronçons l'ont, et la berline y est rouge ; ici elle n'avait que le ciel et l'ambre des
     lampadaires, bordeaux sombre, presque brune, pendant les 4,5 premières secondes, le gel de la première étoile
-    compris (brouillon éclairé v10, images 0 à 107 ; SPEC §18.70). Le même appoint dans les huit tronçons : la
+    compris (brouillon éclairé v10, images 0 à 107 ; SPEC §18.73). Le même appoint dans les huit tronçons : la
     peinture ne change pas d'un lieu à l'autre."""
     import lieux as L
     return L.chase_fill(rig)

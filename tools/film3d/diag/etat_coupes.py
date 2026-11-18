@@ -1,4 +1,4 @@
-# L'état de la scène des deux côtés de chaque coupe, sans rendu (SPEC §18.70). Le film est une seule prise rendue
+# L'état de la scène des deux côtés de chaque coupe, sans rendu (SPEC §18.73). Le film est une seule prise rendue
 # par tronçons : à la même image du film, les deux tronçons qui se suivent doivent montrer la même ville. Ce contrôle
 # relève, dans le Blender de chaque tronçon, tel que render_film le rend (scène du cache, voisins de la ville, vie,
 # clins, effets), ce que la caméra voit aux images de la coupe, et compare les deux relevés :

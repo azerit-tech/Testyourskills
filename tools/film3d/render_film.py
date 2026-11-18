@@ -318,7 +318,7 @@ def worker(a):
         vie.poser_plan(scene, plan)
         import clins            # les clins d'œil (SPEC §18.65), par-dessus la vie ; FILM3D_CLINS=0 les ôte
         clins.poser_plan(scene, plan)
-        # les vitres de la berline hors des lampadaires (SPEC §18.70) : toutes les lampes de la prise sont posées
+        # les vitres de la berline hors des lampadaires (SPEC §18.73) : toutes les lampes de la prise sont posées
         ville.vitres_hors_lampadaires(scene, plan)
     still = scene.frame_current
     span = scene.frame_end - scene.frame_start + 1
@@ -368,7 +368,7 @@ def worker(a):
     if a.mode == "list":
         return
     if "etat" in essais:
-        # l'état de la scène aux images de ses coupes (diag/etat_coupes.py, SPEC §18.70) : relevé, rien n'est rendu
+        # l'état de la scène aux images de ses coupes (diag/etat_coupes.py, SPEC §18.73) : relevé, rien n'est rendu
         sys.path.insert(0, os.path.join(HERE, "diag"))
         import etat_coupes
         faits = etat_coupes.releve_plan(bpy, scene, plan, a.out)
@@ -492,7 +492,7 @@ def setup_render(bpy, scene, a):
     r.engine = "CYCLES"
     # les volumes « biaisés » de Cycles (les pinceaux dans la brume lissés) pour tout le film : P6 seul les avait
     # (scene_d.p6_clean_haze), la brume et le pinceau de l'hélicoptère changeaient de grain à 485 | 486 et à
-    # 618 | 619 (diag/etat_coupes.py : le seul réglage de rendu qui différait d'un tronçon à l'autre, SPEC §18.70)
+    # 618 | 619 (diag/etat_coupes.py : le seul réglage de rendu qui différait d'un tronçon à l'autre, SPEC §18.73)
     c.volume_biased = True
     c.device = "CPU"
     device = "CPU"

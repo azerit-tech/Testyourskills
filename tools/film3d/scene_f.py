@@ -739,7 +739,7 @@ def keep_paint():
         fill.data.energy = CAR_FILL_W
     # l'appoint de poursuite commun (lieux.chase_fill), le même que dans les sept autres tronçons, sur le rig (+y
     # vers l'avant) : le toit, le coffre et l'arrière de la caisse ont la même lumière des deux côtés de 107 | 108
-    # et de 214 | 215 (SPEC §18.70)
+    # et de 214 | 215 (SPEC §18.73)
     rig = bpy.data.objects.get("rig_berline")
     if rig is not None:
         lieux.chase_fill(rig)
