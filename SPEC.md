@@ -1784,3 +1784,8 @@ Jacques, sur le brouillon éclairé v7 : « il manque des éléments sur la rout
 - **La vie lente** : les palmiers des lieux balancent (0,9°, 4 s environ, phase tirée de leur place), les bateaux de la marina tanguent (4,5 cm, 1,4° de roulis), six mouettes tournent au-dessus du port et de la marina.
 - **Les lumières** : rien que des optiques émissives (phares 6, feux arrière 1,5, stop +5, warnings 5 à 1,5 Hz, plafonnier du bus 2) ; aucune lampe ajoutée, aucune tache au sol.
 - **Les écarts** (`test_motion.test_vie`) : sur la fenêtre de chaque tronçon, aucun véhicule de la vie à moins de 3,4 m (centres) de la berline ou d'une patrouille, aucun passant ni mobilier à moins de 1,75 m ; entre deux véhicules de la vie dont l'un roule, 0,5 m de jour au moins (carrosseries en capsules) à moins de 160 m de la berline. Ni la conduite de la berline, ni le bras de caméra, ni les repères de vitesse, ni la police, ni l'hélicoptère ne changent.
+
+### 18.59 Le brouillon éclairé v8 : l'eau, les raccords, la pointe (18 novembre 2026)
+
+Le brouillon éclairé v8 (720 images, 360 × 640) relu image par image, la luminance mesurée à chaque jonction. Décidé, sans toucher à la conduite (durées et étoiles de `parcours.json`, `parcours.py --check`) ni au bras de caméra :
+- **Python 3.10 sur la machine louée** : `test_motion.py` y tombait sur une f-chaîne écrite sur plusieurs lignes (permise à partir de 3.12). Tout `tools/film3d` se lit en 3.10 ; le contrôle se fait avec un vrai `python3.10` (`ast.parse(feature_version=(3, 10))` sous 3.12 et plus ne voit pas ces f-chaînes).

@@ -1888,9 +1888,10 @@ def test_parcours():
           sorted(PC.ETOILES) == [1, 2, 3, 4, 5, 6] and list(PC.ETOILES.values()) == sorted(PC.ETOILES.values())
           and not bad and 3.0 <= PC.ETOILES[1] / PC.FPS <= 5.0 and PC.ETOILES[6] <= PC.TOTAL
           and max(gaps) <= 5.0 + 1e-9, f"{PC.ETOILES}, hors : {bad}, écarts {', '.join(f'{g:.2f}' for g in gaps)} s")
+    # (une f-chaîne sur plusieurs lignes ne passe qu'à partir de Python 3.12 : la machine louée a 3.10)
+    frein = next(k / 240.0 for k in range(2400) if PC.DRIVE.along(k / 240.0) < -0.3)
     check("parcours : l'étoile 1 hors du freinage (la berline lancée, pas sur les freins)",
-          all(PC.DRIVE.along(t1 + k / 24.0) > -0.3 for k in range(-6, 4)), f"{t1:.2f} s, freinage à {next(
-              k / 240.0 for k in range(2400) if PC.DRIVE.along(k / 240.0) < -0.3):.2f} s")
+          all(PC.DRIVE.along(t1 + k / 24.0) > -0.3 for k in range(-6, 4)), f"{t1:.2f} s, freinage à {frein:.2f} s")
     for (a, na), (b, _) in zip(PC.SHOTS, PC.SHOTS[1:]):
         ha, hb = PC.hero(a), PC.hero(b)
         (fa, ra), (fb, rb) = PC.vers_ville(a), PC.vers_ville(b)
