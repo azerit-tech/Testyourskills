@@ -28,6 +28,9 @@ A = ap.parse_args()
 sys.path.insert(0, os.path.abspath(A.src))
 import motion as M  # noqa: E402
 import parcours as P  # noqa: E402
+import bras  # noqa: E402
+
+BRAS = bras.installer()      # BRAS_FILM=B|C : la caméra du réglage (bras.py) ; sans : celle du film v10
 import trafic as T  # noqa: E402
 import vie as V  # noqa: E402
 

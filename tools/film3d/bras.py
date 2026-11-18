@@ -47,7 +47,7 @@ DEFAUT = "A"
 # V : m/s, de rien à tout l'élan de vitesse ; LAT : m/s² de virage de la route ; SLIP : ° de glisse ; SIGMA : s ;
 # Z, BACK, LENS : (au pas, à plein élan) ; TURN : m de recul dans le virage ; BACK_MIN : m, jamais plus près ;
 # LV : m de timon, VMIN : m/s (sous elle le bras tourne encore), TAU2 : s, second pôle ; AIM : (Hz, amortissement),
-# AIM_MAX : largeur de cadre ; SPRING : (rad/s, amortissement, m rattrapés à 7 m/s² de freinage, m lâchés à 3 m/s² de
+# AIM_MAX : largeur de cadre, MARGE : le cadre utile (la boîte de la berline n'en sort pas) ; SPRING : (rad/s, amortissement, m rattrapés à 7 m/s² de freinage, m lâchés à 3 m/s² de
 # gaz) ; ROLL : ° par m/s², ROLL_MAX ° ; VOIE : la part d'un changement de voie dans le roulis ; SIDE : m vers la
 # bordure (négatif) en ligne droite ; DEPORT : largeur de cadre par m/s de vitesse de côté dans le slalom ; FLOAT : le
 # gain du flottement de parcours ; VIB : (° de roulis, ° de site) de vibration fine ajoutée à pleine vitesse ; FIN : s
@@ -56,17 +56,17 @@ DEFAUT = "A"
 REGLAGES = {
     "A": None,
     "B": dict(V=(8.0, 22.0), LAT=(1.2, 4.0), SLIP=(5.0, 15.0), GATE=(3.0, 9.0), SIGMA=0.40,
-              Z=(2.4, 1.80), BACK=(7.5, 5.0), LENS=(24.0, 17.5), LENS_SIGMA=0.55, TURN=1.5, BACK_MIN=4.4,
-              LV=7.0, VMIN=7.0, TAU2=0.10, AIM=(0.80, 0.75), AIM_MAX=0.09,
+              Z=(2.4, 2.05), BACK=(7.5, 5.2), LENS=(24.0, 17.5), LENS_SIGMA=0.55, TURN=1.5, BACK_MIN=4.4,
+              LV=7.0, VMIN=7.0, TAU2=0.10, AIM=(0.80, 0.75), AIM_MAX=0.09, MARGE=0.085,
               SPRING=(1.3, 0.65, 0.9, 1.6), SPRING_TAU=0.30,
               ROLL=0.85, ROLL_MAX=5.0, ROLL_TAU=0.35, VOIE=0.6, SIDE=-1.0, DEPORT=0.018, FLOAT=1.0, VIB=(0.0, 0.0),
               FIN=(4.6, 2.3), OBTURATEUR=None),
     "C": dict(V=(8.0, 22.0), LAT=(1.0, 3.5), SLIP=(4.0, 13.0), GATE=(3.0, 9.0), SIGMA=0.40,
-              Z=(2.4, 1.58), BACK=(7.5, 4.5), LENS=(24.0, 15.0), LENS_SIGMA=0.55, TURN=1.4, BACK_MIN=4.1,
-              LV=10.0, VMIN=7.0, TAU2=0.10, AIM=(0.62, 0.70), AIM_MAX=0.10,
+              Z=(2.4, 1.58), BACK=(7.5, 4.5), LENS=(24.0, 15.0), LENS_SIGMA=0.80, TURN=1.4, BACK_MIN=4.1,
+              LV=8.0, VMIN=7.0, TAU2=0.10, AIM=(0.70, 0.75), AIM_MAX=0.08, MARGE=0.105,
               SPRING=(1.5, 0.55, 0.8, 2.2), SPRING_TAU=0.30,
-              ROLL=1.25, ROLL_MAX=7.5, ROLL_TAU=0.35, VOIE=0.7, SIDE=-1.0, DEPORT=0.018, FLOAT=1.3, VIB=(0.12, 0.03),
-              FIN=(4.6, 2.3), OBTURATEUR=0.7),
+              ROLL=1.25, ROLL_MAX=7.5, ROLL_TAU=0.35, VOIE=0.7, SIDE=-0.6, DEPORT=0.018, FLOAT=1.3, VIB=(0.12, 0.03),
+              FIN=(6.2, 2.3), OBTURATEUR=0.7),
 }
 
 _H, _T0 = P._H, P._T0             # la grille du bras de parcours : 1/240 s depuis −1,5 s
@@ -77,11 +77,11 @@ _H, _T0 = P._H, P._T0             # la grille du bras de parcours : 1/240 s depu
 CHOC_FENETRE = (-36.0, -14.0, 1.0, 20.0)
 CHOC_BOITE = (1.0, 1.2)
 CHOC_LARGE = 0.86
-CHOC_GARDE = 0.02                 # la garde de la berline au bord du cadre utile pendant un choc (slalom compris)
-CHOC_SIGMA = 0.20                 # s : le lissage du cadre à deux voitures
-CHOC_RECUL = 1.45                 # le bras recule au plus de ce facteur (une voiture à sa hauteur ne se cadre pas)
+CHOC_GARDE = 0.085                # la berline reste à cette part de largeur du bord pendant un choc (slalom compris)
+CHOC_SIGMA = 0.25                 # s : le lissage du cadre à deux voitures
+CHOC_RECUL = 1.45                 # le bras recule au plus de ce facteur (une voiture à la hauteur de l'objectif ne se cadre pas)
+SITE_SIGMA = 0.33                 # s : le lissage du site (plus près, le bras bascule plus pour la même bosse)
 V_BAS = 0.70                      # le bas de la boîte de la berline dans le cadre : au-dessus de la ligne de texte (72 %)
-MARGE = 0.085                     # le cadre utile en largeur (7 à 93 %) : la boîte de la berline n'en sort pas
 _Q = 4                            # échantillons de visée par image
 _K0 = -36 * _Q                    # la visée commence 36 images avant le film
 _TAB = {}
@@ -197,11 +197,11 @@ def _deux_voitures(R, t, hx, hy, head, psi, back, left, zr, lens):
         if not b0 or not b1:
             continue
         u0, u1 = min(b0["u0"], b1["u0"]), max(b0["u1"], b1["u1"])
-        k = min(CHOC_RECUL, max(1.0, (u1 - u0) / CHOC_LARGE))        # le bras recule de ce facteur
+        k = min(R.get("CHOC_RECUL", CHOC_RECUL), max(1.0, (u1 - u0) / CHOC_LARGE))        # le bras recule de ce facteur
         # la réunion au centre, la berline d'abord : sa boîte reste dans le cadre utile (une patrouille à la
         # hauteur de l'objectif ne se cadre pas entière)
         hw = 0.5 * (b0["u1"] - b0["u0"]) / k
-        lim = max(0.0, 0.5 - MARGE - CHOC_GARDE - hw)
+        lim = max(0.0, 0.5 - CHOC_GARDE - hw)
         d = -(0.5 * (u0 + u1) - 0.5) / k
         d = lim * math.tanh(d / lim) if lim > 1e-3 else 0.0          # (borne douce : pas de coin dans la visée)
         du += w * d
@@ -300,7 +300,7 @@ def _table(nom):
         exact.append((cap,) + e[1:])
     # le site : le bas de la boîte à V_BAS, lissé d'une gaussienne centrée (les coins de la boîte changent pendant une
     # glisse) ; le lacet : l'opérateur
-    sites = _gauss([e[1] for e in exact], P.VISEE_SIGMA, 1.0 / (_Q * P.FPS))
+    sites = _gauss([e[1] for e in exact], SITE_SIGMA, 1.0 / (_Q * P.FPS))
     # (le lacet exact aussi, de la même gaussienne que la visée du bras A : au bord du cadre l'opérateur est borné
     # à zéro et rend le lacet exact, avec ses coins — fenêtre du slalom, coins de la boîte)
     caps = _gauss([e[0] for e in exact], P.VISEE_SIGMA, 1.0 / (_Q * P.FPS))
@@ -318,7 +318,7 @@ def _table(nom):
         # par ce qui reste entre la boîte de la berline et le cadre utile (MARGE) : il ne la laisse jamais sortir
         k_u = lens / 20.25
         du = math.tan(math.radians(max(-60.0, min(60.0, y - cap)))) * k_u
-        du = _borne(du, -_reste(u0 - MARGE, R["AIM_MAX"]), _reste(1.0 - MARGE - u1, R["AIM_MAX"]))
+        du = _borne(du, -_reste(u0 - R["MARGE"], R["AIM_MAX"]), _reste(1.0 - R["MARGE"] - u1, R["AIM_MAX"]))
         out.append((cap + math.degrees(math.atan(du / k_u)), site))
     tab["visee"] = out
     return tab
@@ -513,8 +513,8 @@ def installe():
 
 def installer(nom=None):
     """Remplace la caméra de parcours (chase, rig, cam_cap, camera, visee, tremble, visee_u) par celle du réglage
-    `nom` (sinon BRAS_FILM, sinon DEFAUT) ; A : la remet telle qu'elle était. Rend le nom du réglage en vigueur."""
-    nom = nom_regle(nom if nom else (os.environ.get(ENV, "").strip().upper() or DEFAUT))
+    `nom` (sinon celui déjà posé, sinon BRAS_FILM, sinon DEFAUT) ; A : la remet telle qu'elle était. Rend le nom du réglage en vigueur."""
+    nom = nom_regle(nom)             # (sans nom : le réglage déjà posé, sinon BRAS_FILM, sinon DEFAUT)
     if REGLAGES[nom] is None:
         _FORCE[0] = None
         for k, f in _A.items():

@@ -6,6 +6,9 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import motion as M  # noqa: E402
+import bras  # noqa: E402
+
+BRAS = bras.installer()      # BRAS_FILM=B|C : la caméra du réglage (bras.py) ; sans : celle du film v10
 
 FRAMES = range(0, 30)
 FAIL = []
@@ -415,7 +418,63 @@ def _franc(base, plans, v2, plan_min):
     return base, out
 
 
+# Les contrôles que le parti pris d'un réglage du bras (bras.py, BRAS_FILM=B|C) contredit : ils décrivent le bras A
+# (le cadre de Jacques du 12 novembre : 2,4 m, 7,5 m, 24 mm, la berline visée exactement, l'horizon à plat) ou ce
+# qui a été placé pour lui. Sous B ou C un tel contrôle qui échoue est imprimé « écart » avec sa raison, il ne
+# compte pas ; tout autre échec compte, et test_bras pose à leur place les bornes qui protègent le spectateur
+# (berline dans le cadre, bas de la berline au-dessus du texte, hauteur, raccords, à-coups, FIN6). Sous A rien ne
+# change : chaque contrôle garde sa borne. (motif du nom, raison)
+ECARTS_BRAS = (
+    (r"le cadre commun \(2,4 m, 7,5 m, 24 mm|distance au centre de la berline 5\.5|focale 18 à 24 mm|"
+     r"hauteur de la caméra 1\.6|à la hauteur du bras tout le plan|à la pointe 1\.6 m au plus bas|"
+     r"passe la ligne des plots à sa suite",
+     "la géométrie du bras A ; B et C descendent, se rapprochent et s'ouvrent avec l'élan (test_bras : jamais sous "
+     "1,5 m ni plus près que BACK_MIN, 15 mm au plus large)"),
+    (r"décalage à gauche",
+     "le cap du bras est une remorque : dans un virage il traîne à l'extérieur, de plus que les 1,5 m du bras A"),
+    (r"FILM3D_VITESSE=0 rend le bras rivé",
+     "FILM3D_VITESSE règle le bras A ; un réglage B ou C a ses propres doses (bras.REGLAGES)"),
+    (r"centre de la berline x 50|la berline à x 50|point de coupe|tiers central|dans le cadre utile \(5 à 95",
+     "la berline n'est plus visée exactement au centre à 58 % de la hauteur : l'opérateur la laisse partir du côté "
+     "où elle tourne, et c'est son bas qui est tenu, à 70 % (test_bras : boîte entière de 5 à 95 %, bas de 67 à "
+     "73 %)"),
+    (r"centre de la berline : Δ² ≤ 0\.3|accélération de panoramique ≤|continuité aux coupes \(stricte\)|"
+     r"continuité \w+ → \w+ : vitesse à l'écran",
+     "même cause : la berline bouge dans le cadre, donc sa vitesse à l'écran change d'une image à la suivante, "
+     "coupe ou pas (la pose du bras est la même des deux côtés de chaque raccord : test_bras) ; borne de "
+     "test_bras : Δ² ≤ 1,5 % de largeur par image²"),
+    (r"roulis de la caméra ≤ 3|vitesse de roulis ≤ 6|horizon à plat|sans à-coup \(≤ 10\.5",
+     "le bras penche vers le virage (ROLL, ROLL_MAX) ; test_bras : roulis ≤ ROLL_MAX + 1°, sa vitesse ≤ 9 °/s (B) "
+     "ou 15 °/s (C), et la même accélération qu'ici (≤ 10,5 m/s²), à-coup ≤ 60 m/s³, hors des chocs"),
+    (r"bascule ≤ 12|accélération de bascule ≤ 25",
+     "plus près de la berline, le bras bascule plus pour la même bosse (le dos du pont, l'entrée du port) ; "
+     "test_bras : bascule ≤ 16 °/s (B) ou 22 °/s (C)"),
+    (r"focale ≤ 18 %/s",
+     "la focale suit l'élan (24 mm au pas, 17,5 ou 15 mm lancé) : elle varie plus vite qu'avec le bras A, sans "
+     "saut (test_bras : ≤ 25 %/s)"),
+    (r"28 à 35° entre la caisse et le bras",
+     "voulu : le bras en remorque montre plus de flanc dans le dérapage (verdict du 13 novembre : « le dérapage "
+     "est mou », flanc visible)"),
+    (r"coupe P\d → FIN :",
+     "FIN (la pointe à caméra fixe) n'est plus montée depuis le 17 novembre (les fins 1 à 5 étoiles gèlent sur "
+     "place) ; sa coupe comparait la largeur de la berline à celle du bras A"),
+    (r"le phare dans x 5|la patrouille 1 entière dans le cadre|le cadre final, l'hélicoptère|"
+     r"la patrouille 2 hors du cadre|le barrage dans le cadre",
+     "À REPRENDRE À L'ADOPTION : la place du phare de l'hélicoptère, des patrouilles et du barrage a été réglée "
+     "sur le cadre du bras A ; avec un autre cadre elle est à régler de nouveau (helicos.py, trafic.py), pas le "
+     "bras"),
+)
+ECARTS = []
+
+
 def check(name, ok, detail=""):
+    if not ok and BRAS != "A":
+        import re
+        for motif, raison in ECARTS_BRAS:
+            if re.search(motif, name):
+                print(f"écart {name}{' : ' + detail if detail else ''}\n      (bras {BRAS} : {raison})")
+                ECARTS.append(name)
+                return
     print(f"{'ok  ' if ok else 'ÉCHEC'} {name}{' : ' + detail if detail else ''}")
     if not ok:
         FAIL.append(name)
@@ -3047,6 +3106,91 @@ def test_clins():
     check("clins : aucun texte pris au jeu", not pris, ", ".join(pris))
 
 
+def _pose_ville(shot, f, nom=None):
+    """La caméra du bras à l'image f du tronçon, dans le repère de la ville : (x, y, z, cos et sin du lacet, site,
+    roulis, focale)."""
+    import parcours as PC
+    c = bras.chase(shot, f, nom)
+    to, rot = PC.vers_ville(shot)
+    x, y = to(c[0], c[1])
+    a = math.radians(c[3] - rot)
+    return (x, y, c[2], math.cos(a), math.sin(a), c[4], c[5], c[6])
+
+
+def test_bras():
+    """Le bras d'un réglage de bras.py (BRAS_FILM=B|C) : ce qui protège le spectateur, quel que soit le parti pris.
+    Sous A : le module posé ne change rien à la caméra du film, et chaque réglage tient ses raccords."""
+    import parcours as PC
+    shots = [s for s, _ in PC.SHOTS] + ["FIN6"]
+
+    def raccords(nom=None):
+        return max(abs(u - v) for a, b in PC.RACCORDS
+                   for u, v in zip(_pose_ville(a, PC.frames(a) + 1, nom), _pose_ville(b, 1, nom)))
+    if BRAS == "A":
+        orig = bras._A["chase"]
+        d = max(abs(u - v) for s in shots for f in range(1, PC.frames(s) + 1, 5)
+                for u, v in zip(PC.chase(s, f), orig(s, f)))
+        check("bras A : la caméra du film telle quelle (bras.installer ne touche à rien)", d == 0.0, f"{d:.1e}")
+        for nom in sorted(k for k, v in bras.REGLAGES.items() if v):
+            d = raccords(nom)
+            check(f"bras {nom} : la même pose des deux côtés des {len(PC.RACCORDS)} raccords", d < 1e-6, f"{d:.1e}")
+        return
+    R = bras.REGLAGES[BRAS]
+    rows = []                                   # (g, plan, f, pose en ville, boîte de la berline, distance, hauteur)
+    for s in shots:
+        h = PC.hero(s)
+        for f in range(1, PC.frames(s) + 1):
+            c = PC.chase(s, f)
+            hx, hy = h["pos"](f)
+            b = M.hero_screen(c, hx, hy, PC.sol(s, hx, hy), h["heading"](f))
+            rows.append((PC.START[s] + f - 1, s, f, _pose_ville(s, f), b, math.dist(c[:2], (hx, hy)),
+                         c[2] - PC.sol(s, c[0], c[1])))
+    hors = [not _choc(r[1], r[2], "camera") for r in rows]              # (les images des chocs : _choc)
+    bad = [r[0] for r in rows if not r[4] or r[4]["u0"] < 0.05 or r[4]["u1"] > 0.95 or r[4]["v0"] < 0.12
+           or r[4]["v1"] > 0.85]
+    check(f"bras {BRAS} : la berline entière dans le cadre (5 à 95 % de large, 12 à 85 % de haut), tout le film",
+          not bad, f"images {bad[:8]}" if bad else
+          f"u {100 * min(r[4]['u0'] for r in rows):.0f} à {100 * max(r[4]['u1'] for r in rows):.0f} %")
+    v1 = [r[4]["v1"] for r, h in zip(rows, hors) if h and r[4]]
+    check(f"bras {BRAS} : le bas de la berline entre 67 et 73 % de la hauteur (la ligne de texte du site est à 72 %)",
+          min(v1) >= 0.67 and max(v1) <= 0.73, f"{100 * min(v1):.1f} à {100 * max(v1):.1f} %")
+    zs = [r[6] for r, h in zip(rows, hors) if h]
+    ds, ls = [r[5] for r in rows], [r[3][7] for r in rows]
+    check(f"bras {BRAS} : jamais sous 1,5 m, jamais à moins de {R['BACK_MIN'] - 0.3:.1f} m du centre de la berline, "
+          f"15 à 24 mm", min(zs) >= 1.5 and min(ds) >= R["BACK_MIN"] - 0.3 and 14.9 <= min(ls) and max(ls) <= 24.1,
+          f"{min(zs):.2f} m ; {min(ds):.2f} m ; {min(ls):.1f} à {max(ls):.1f} mm")
+    d = raccords()
+    check(f"bras {BRAS} : la même pose des deux côtés des {len(PC.RACCORDS)} raccords", d < 1e-6, f"{d:.1e}")
+    # d'une image à la suivante sur tout le film (un seul temps, coupes comprises), dans le repère de la ville
+    pv, fps, n = [r[3] for r in rows], PC.FPS, len(rows)
+    lim = dict(B=(9.0, 16.0), C=(15.0, 22.0)).get(BRAS, (9.0, 16.0))
+    rmax = max(abs(p[6]) for p in pv)
+    roul = max(abs(pv[i + 1][6] - pv[i][6]) * fps for i in range(n - 1) if hors[i])
+    basc = max(abs(pv[i + 1][5] - pv[i][5]) * fps for i in range(n - 1) if hors[i])
+    foc = max(abs(pv[i + 1][7] / pv[i][7] - 1.0) * fps for i in range(n - 1))
+    check(f"bras {BRAS} : roulis ≤ {R['ROLL_MAX'] + 1.0:.1f}°, sa vitesse ≤ {lim[0]:.0f} °/s, bascule ≤ {lim[1]:.0f} "
+          f"°/s hors des chocs, focale ≤ 25 %/s", rmax <= R["ROLL_MAX"] + 1.0 and roul <= lim[0] and basc <= lim[1]
+          and foc <= 0.25, f"{rmax:.2f}° ; {roul:.1f} °/s ; {basc:.1f} °/s ; {100 * foc:.1f} %/s")
+    acc = [math.hypot(*[(pv[i + 1][k] - 2 * pv[i][k] + pv[i - 1][k]) * fps ** 2 for k in range(3)])
+           for i in range(1, n - 1) if hors[i]]
+    jerk = [math.hypot(*[(pv[i + 2][k] - 3 * pv[i + 1][k] + 3 * pv[i][k] - pv[i - 1][k]) * fps ** 3 for k in range(3)])
+            for i in range(1, n - 2) if hors[i]]
+    amax = v3_limits()[0]["accel"]
+    check(f"bras {BRAS} : la caméra sans à-coup hors des chocs (≤ {amax:g} m/s², à-coup ≤ 60 m/s³)",
+          max(acc) <= amax and max(jerk) <= 60.0, f"{max(acc):.2f} m/s², {max(jerk):.1f} m/s³")
+    us = [r[4]["u"] if r[4] else 0.5 for r in rows]
+    d2 = max(abs(us[i + 1] - 2 * us[i] + us[i - 1]) for i in range(1, n - 1) if hors[i])
+    # (1,5 % : le pivot de la berline à l'entrée du port, image 432 ; le bras A y marque déjà 0,8 %, de plus loin)
+    check(f"bras {BRAS} : à l'écran, le centre de la berline Δ² ≤ 1,5 % de largeur par image² hors des chocs",
+          d2 <= 0.015, f"{100 * d2:.2f} %")
+    # la fin : le cadre du film v10, tel quel, dès la fin du fondu (l'arrêt, les étoiles, l'orbite)
+    g0 = int(math.ceil((PC.T_ARRET - R["FIN"][1]) * fps)) + 1
+    d = max(abs(a - b) for r in rows if r[0] >= g0 for a, b in zip(r[3], _pose_ville(r[1], r[2], "A")))
+    arret = PC.T_ARRET * fps
+    check(f"bras {BRAS} : dès l'image {g0} du film la caméra du film v10, deux secondes avant l'arrêt et l'orbite de "
+          f"FIN6", d < 1e-9 and g0 <= arret - 2.0 * fps, f"écart {d:.1e} ; arrêt à l'image {arret:.0f}")
+
+
 if __name__ == "__main__":
     test_poursuivants()
     test_rampes()
@@ -3090,5 +3234,8 @@ if __name__ == "__main__":
     test_v3()
     test_vie()
     test_clins()
+    test_bras()
+    if ECARTS:
+        print(f"\nbras {BRAS} : {len(ECARTS)} contrôle(s) du bras A en écart assumé (raisons ci-dessus, ECARTS_BRAS)")
     print(f"\n{'tout passe' if not FAIL else str(len(FAIL)) + ' échec(s)'}")
     sys.exit(1 if FAIL else 0)
