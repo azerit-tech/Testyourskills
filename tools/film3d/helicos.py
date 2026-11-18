@@ -127,7 +127,24 @@ def _hermite(p0, p1, v1, a1, D, u):
 # lissées : à P5/1 haut derrière la caméra (hors du cadre, P4 n'en a pas) ; quand elle freine pour le virage du port,
 # il garde son élan et passe devant, entre par le haut du cadre ; puis il tient sa place haut devant elle, sur sa
 # droite (au 24 mm, à 2,4 m de haut et 9° de site, le tiers haut du cadre 9:16 demande 60 à 100 m de recul pour 30 m)
-CHASE_KEYS = ((16.0, 58.0, 43.0, 27.0), (19.6, 84.0, 5.0, 25.0), (25.5, 82.0, 9.0, 26.0))
+# (brouillon éclairé v9, critique n° 5 : tenu à 82–84 m devant elle et 5 à 9 m de côté, il restait cinq secondes dans
+# une boîte de 80 × 50 px en haut au centre du cadre, vu de dos et de dessous, un bâton sombre ; « collé à l'écran ».)
+# Plus bas (20,5 m au-dessus de l'eau : selftest_helico garde 20, dix mètres au-dessus des lampadaires) et plus près (46
+# à 68 m devant elle : 54 à 75 m de la caméra au lieu de 85 à 94, il paraît 1,4 fois plus grand ; le cadre final de P5
+# le veut sous les 82 % de la hauteur, d'où le recul au port), il entre par la droite
+# pendant le dérapage du port (vers P5/40), traverse le cadre vers la gauche, le dépasse à la sortie du port (l'élan
+# du virage, au quart gauche vers P6/25–37), puis revient lentement vers la droite sur la jetée (aux trois cinquièmes à
+# P6/109), avant le stationnaire de FIN6. Il garde le faisceau sur elle (beam).
+CHASE_KEYS = ((16.0, 58.0, 43.0, 24.0), (19.2, 68.0, 26.0, 20.6), (20.5, 66.0, 6.0, 20.4), (22.0, 54.0, -16.0, 20.4),
+              (24.3, 46.0, 16.0, 20.6), (25.5, 46.0, 8.0, 21.0))
+# le crabe : en poursuite, son nez s'écarte de CHASE_CRAB° à droite de sa trajectoire, le flanc gauche (sa porte, son
+# projecteur) tourné vers elle, comme un appareil de police qui garde la berline sous sa porte : on le voit de trois
+# quarts arrière (rotor et cellule, 20 à 48° entre son cap et la visée sur la jetée) au lieu de dos (0 à 10° avant).
+# Fondu à son arrivée (P5) et dans le stationnaire ; l'assiette passe dans le repère de la cellule : le disque penche
+# vers sa trajectoire, pas vers son nez (selftest_helico contrôle la physique dans le repère de la trajectoire).
+# CRAB_SIDE (m) : un crabe qui suit le côté où il est (tanh(côté / CRAB_SIDE)) ; None : toujours à droite (gardé :
+# sur la gauche du cadre, le crabe suivant le côté ramenait le cap sur la visée).
+CHASE_CRAB, CRAB_SIDE = 28.0, None
 HOVER_D, HOVER_UP, HOVER_SIDE = 88.0, 24.0, -14.0  # le stationnaire de la fin, posé dans le cadre de FIN6/fin : m devant
 #                                                  la caméra, ° au-dessus de son axe (tiers haut), ° sur le côté
 HOVER_T = (25.5, 29.2)         # s du film : de la poursuite au stationnaire (elle s'arrête vers 28,5 s)
@@ -184,7 +201,7 @@ def _chase():
         hd.append(last)
     hd = _gauss(hd, 0.8)
     hv = _hover()
-    px, py, pz = [], [], []
+    px, py, pz, crab = [], [], [], []
     for i, T in enumerate(Ts):
         k = CHASE_KEYS
         if T <= k[0][0]:
@@ -199,6 +216,7 @@ def _chase():
         fx, fy, rx, ry = -math.sin(a), math.cos(a), math.cos(a), math.sin(a)
         q = (cx[i] + fwd * fx + side * rx, cy[i] + fwd * fy + side * ry, z)
         w = _quintic((T - HOVER_T[0]) / (HOVER_T[1] - HOVER_T[0]))
+        crab.append(-CHASE_CRAB * (math.tanh(side / CRAB_SIDE) if CRAB_SIDE else 1.0) * M.smoothstep(T5, T5 + 1.5, T) * (1.0 - w))
         px.append(q[0] + (hv[0] - q[0]) * w)
         py.append(q[1] + (hv[1] - q[1]) * w)
         pz.append(q[2] + (hv[2] - q[2]) * w)
@@ -233,7 +251,18 @@ def _chase():
         sp.append(v)
     pit = [_soft_lim(p) for p in _gauss(pit, 0.3)]
     rol = [_soft_lim(r) for r in _gauss(rol, 0.3)]
-    _CHASE.update(T0=T0, n=n, x=px, y=py, z=pz, cap=cap, tangage=pit, roulis=rol, v=sp, al=al, at=at)
+    # le crabe : le cap de la cellule s'écarte de celui de la trajectoire ; le disque garde son inclinaison dans le
+    # monde (vers l'avant de la trajectoire, Tf, et sa droite, Tr), lue dans le repère de la cellule tournée de c
+    crab = _gauss(crab, 0.5)
+    body_cap, body_p, body_r = [], [], []
+    for i in range(n):
+        c = math.radians(crab[i])
+        tf, tr = -pit[i], rol[i]
+        body_cap.append(cap[i] + crab[i])
+        body_p.append(_soft_lim(-(tf * math.cos(c) - tr * math.sin(c))))
+        body_r.append(_soft_lim(tf * math.sin(c) + tr * math.cos(c)))
+    _CHASE.update(T0=T0, n=n, x=px, y=py, z=pz, cap=body_cap, tangage=body_p, roulis=body_r, v=sp, al=al, at=at,
+                  cap_trajet=cap, tangage_trajet=pit, roulis_trajet=rol, crabe=crab)
     return _CHASE
 
 
@@ -244,6 +273,16 @@ def chase(T):
     i = min(c["n"] - 2, max(0, int(math.floor(u))))
     f = min(1.0, max(0.0, u - i))
     return tuple(c[k][i] + (c[k][i + 1] - c[k][i]) * f for k in ("x", "y", "z", "cap", "tangage", "roulis"))
+
+
+def chase_trajet(T):
+    """(cap, tangage, roulis) de l'appareil 0 au temps T dans le repère de sa trajectoire (sans le crabe) : la
+    physique que contrôle ville.selftest_helico (penché du côté où il tourne, nez bas quand il accélère)."""
+    c = _chase()
+    u = (T - c["T0"]) / _DT
+    i = min(c["n"] - 2, max(0, int(math.floor(u))))
+    f = min(1.0, max(0.0, u - i))
+    return tuple(c[k][i] + (c[k][i + 1] - c[k][i]) * f for k in ("cap_trajet", "tangage_trajet", "roulis_trajet"))
 
 
 def chase_kin(T):

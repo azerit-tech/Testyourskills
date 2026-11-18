@@ -462,7 +462,7 @@ def selftest_helico():
     for f in fs[1:-1]:
         T = (f - 1) / FPS
         v, al, at = H.chase_kin(T)
-        p, r = ws[fs.index(f)][4:6]
+        p, r = H.chase_trajet(T)[1:3]           # la physique, dans le repère de la trajectoire (sans le crabe)
         if abs(at) > 1.0:                       # penché du côté où il tourne (à droite : roulis positif)
             assert r * at > 0, (f, r, at)
         if al > 1.0:                            # il accélère : nez bas
