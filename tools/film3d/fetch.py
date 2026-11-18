@@ -169,6 +169,12 @@ POLYHAVEN = [
     ("potted_plant_02", "model", "1k"),
     ("rollershutter_door", "model", "1k"),
     ("bar_chair_round_01", "model", "1k"),
+    # l'intérieur des boutiques (facade_kit.py : le vase ; facade_mix.py : tabouret, étagères, suspension, vase) :
+    # lus par les deux fichiers et absents d'ici jusqu'à v10, il fallait les poser à la main sur une machine neuve
+    ("ceramic_vase_03", "model", "1k"),
+    ("metal_stool_02", "model", "1k"),
+    ("modern_ceiling_lamp_01", "model", "1k"),
+    ("steel_frame_shelves_03", "model", "1k"),
     # la distribution (cast.py) : (asset, type, résolution, dossier)
     ("concrete_road_barrier", "model", "1k", "cast/barrier-ph01"),
     ("concrete_road_barrier_02", "model", "1k", "cast/barrier-ph02"),
@@ -296,6 +302,12 @@ def fetch_sketchfab(name, uid):
 def fetch_polyhaven(asset, kind, res, dest=None):
     """Un HDRI, une matière ou un modèle Poly Haven, dans assets/<asset>/ ou, avec dest,
     dans assets/<dest>/ (la distribution : cast/<rôle>)."""
+    # (un HDRI ou un modèle déjà là : pas même la liste de ses fichiers n'est demandée, une machine déjà servie
+    # ne dépend plus du réseau)
+    done = (os.path.join(ASSETS, f"{asset}_{res}.exr") if kind == "hdri" else
+            os.path.join(ASSETS, dest or asset, f"{asset}.gltf") if kind == "model" else None)
+    if done and os.path.exists(done):
+        return done
     files = get(f"https://api.polyhaven.com/files/{asset}")
     if kind == "hdri":
         path = os.path.join(ASSETS, f"{asset}_{res}.exr")
