@@ -1,4 +1,4 @@
-# Chaque coup de volant a-t-il une cause que le spectateur voit ? (SPEC §18.70.) Sans Blender.
+# Chaque coup de volant a-t-il une cause que le spectateur voit ? (SPEC §18.74.) Sans Blender.
 #
 # Jacques, le 18 novembre, sur le brouillon éclairé v10 : « je trouve les coups de volant pas super pertinents, genre
 # la personne donne des coups brusques mais y a plein de place devant, ou même parfois rien à éviter il me semble ».
@@ -311,6 +311,9 @@ def fenetres():
                 g += 1
             out.append((a, g, "virage"))
         g += 1
+    # l'entrée d'un dérapage : le coup de volant qui le lance, 30 m avant son abscisse
+    for ev in (P.DERAP2, P.DERAP5):
+        out.append((P.t_of_s(ev["s"] - 30.0) * FPS, P.t_of_s(ev["s"]) * FPS, "entrée de dérapage"))
     for c in CT.CHOCS:
         g = CT.instant(c) * FPS
         out.append((g - 3, g + CT.REJOINT[1] * FPS, "choc"))
@@ -342,10 +345,19 @@ def calme():
         vl = [(P.DRIVE.lat_err(t + h) - P.DRIVE.lat_err(t - h)) / (2 * h) for t in ts]
         vs = [(P.DRIVE.steer(t + h) - P.DRIVE.steer(t - h)) / (2 * h) for t in ts]
         st = [P.DRIVE.steer(t) for t in ts]
+        # ce qui se voit : le déplacement de côté par rapport à sa ligne (la route décalée de sa voie) et le lacet
+        # de la caisse par rapport à cette ligne, en amplitude sur la fenêtre
+        ve = [P.DRIVE.voie_err(t) for t in ts]
+
+        def lacet(t):
+            sa = P.DRIVE.s(t)
+            pente = math.degrees(math.atan((P.voie(sa + 0.25) - P.voie(sa - 0.25)) / 0.5))
+            return (P.DRIVE.heading(t) - P.ROUTE.at(sa)[2] - pente + 180.0) % 360.0 - 180.0
+        lc = [lacet(t) for t in ts]
         res.append(dict(images=(a, b), travers_max=max(abs(x) for x in vl),
                         travers_rms=math.sqrt(sum(x * x for x in vl) / len(vl)),
                         volant_max=max(abs(x) for x in vs), volant_rms=math.sqrt(sum(x * x for x in vs) / len(vs)),
-                        braquage=(min(st), max(st)),
+                        braquage=(min(st), max(st)), cote=max(ve) - min(ve), lacet=max(lc) - min(lc),
                         ecart=(min(P.DRIVE.lat_err(t) for t in ts), max(P.DRIVE.lat_err(t) for t in ts))))
     OUT["calme"] = res
     n = sum(r["images"][1] - r["images"][0] + 1 for r in res)
@@ -354,7 +366,8 @@ def calme():
     for r in res:
         print(f"     {r['images'][0]:3d} → {r['images'][1]:3d}     max {r['travers_max']:.2f}  rms {r['travers_rms']:.2f}"
               f"            max {r['volant_max']:5.1f}  rms {r['volant_rms']:5.1f}     {r['braquage'][0]:+.1f} à {r['braquage'][1]:+.1f}"
-              f"     {r['ecart'][0]:+.2f} à {r['ecart'][1]:+.2f}")
+              f"     {r['ecart'][0]:+.2f} à {r['ecart'][1]:+.2f}   | de côté {r['cote']:.2f} m, lacet {r['lacet']:.1f}°"
+              + ("  VISIBLE" if r["cote"] > 0.15 or r["lacet"] > 1.0 else ""))
     if res:
         tot = sum((r["images"][1] - r["images"][0] + 1) for r in res)
         OUT["calme_bilan"] = dict(

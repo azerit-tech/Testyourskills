@@ -46,7 +46,7 @@ SUITE = 0.15                 # s : le plus fort du choc se cherche jusque-là ap
 # elle décroche d'abord (sinon retour) ; vmax : m/s, sa vitesse de côté au plus pendant le retour (sinon libre) ;
 # rejoint : (début, fin) en s après l'impulsion du fondu de la berline dans sa conduite d'avant (Conduite).
 CHOCS = (
-    # l'avenue. v11 (SPEC §18.70) : le critique du brouillon éclairé v10 ne lisait pas le choc de l'image 14 (« le
+    # l'avenue. v11 (SPEC §18.74) : le critique du brouillon éclairé v10 ne lisait pas le choc de l'image 14 (« le
     # film s'ouvre patrouille déjà au contact, les deux voitures restent soudées de 13 à 25, la berline ne dévie
     # pas »). Il est à l'image 30 : la patrouille 1 arrive de derrière par la voie d'en face (p1_avenue), roule une
     # demi-seconde détachée, 1,5 m d'air, se rabat en une seconde et tape, portière avant contre portière arrière ;

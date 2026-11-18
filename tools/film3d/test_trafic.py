@@ -21,7 +21,7 @@ BRAS = bras.installer()      # BRAS_FILM=B|C : la caméra du réglage (bras.py) 
 import trafic as T  # noqa: E402
 
 FAILS = []
-DENSE_ADMIS = (150, 262)                    # images : le dérapage du rond-point, l'approche du barrage
+DENSE_ADMIS = (160, 230)                    # images : le dérapage du rond-point, la rue jusqu'à la sortie du barrage
 
 
 def check(name, ok, detail=""):
@@ -65,11 +65,10 @@ def test_adherence():
         lat, lon = (vx * ay - vy * ax) / v, (vx * ax + vy * ay) / v
         worst_lat = max(worst_lat, (abs(lat), g))
         worst_comb = max(worst_comb, (math.hypot(lat, lon), g))
-    # (fusion v11 : 6,5 et 7,5 m/s² étaient l'adhérence du mouillé ; relevés du rapport des μ, dynamique.K_MU)
-    k = D.K_MU
-    check(f"slalom : latérale ≤ {6.5 * k:.1f} m/s², cercle ≤ {7.5 * k:.1f} (ceux du mouillé, 6,5 et 7,5, relevés de "
-          "dynamique.K_MU)",
-          worst_lat[0] <= 6.5 * k and worst_comb[0] <= 7.5 * k,
+    # (v11 : 6,5 et 7,5 m/s² sur le mouillé, relevés du rapport des adhérences, parcours.ADHERENCE)
+    lat_max, cercle_max = 6.5 * P.ADHERENCE, 7.5 * P.ADHERENCE
+    check(f"slalom : latérale ≤ {lat_max:.1f} m/s², cercle ≤ {cercle_max:.1f} (6,5 et 7,5 du mouillé × parcours.ADHERENCE)",
+          worst_lat[0] <= lat_max and worst_comb[0] <= cercle_max,
           f"latérale {worst_lat[0]:.2f} (image {worst_lat[1]}), cercle {worst_comb[0]:.2f} (image {worst_comb[1]})")
 
 
@@ -84,7 +83,9 @@ def test_slalom_simule():
         v = max(P.DRIVE.speed(P.t_of_s(m[0] + u * m[1])) for u in (0.0, 0.25, 0.5, 0.75, 1.0))
         pire_a = max(pire_a, (ka * abs(m[2]) * v * v / m[1] ** 2 / 9.81, m[0]))
         pire_j = max(pire_j, (kj * abs(m[2]) * v ** 3 / m[1] ** 3, m[0]))
-    check("slalom simulé : demande ≤ 0,9 g, à-coup demandé ≤ 40 m/s³", pire_a[0] <= 0.9 and pire_j[0] <= 40.0,
+    # (v11 : 55 m/s³, 40 avant. À μ 1,0 un écart tardif, 1,5 m en une seconde, demande 9 m/s² et 50 à 55 m/s³ ;
+    # le tableau de dosage de film/v11-virages le mesure à 2,7° de glisse et 0,17 m hors de la ligne à 10 m/s²)
+    check("slalom simulé : demande ≤ 0,9 g, à-coup demandé ≤ 55 m/s³", pire_a[0] <= 0.9 and pire_j[0] <= 55.0,
           f"{pire_a[0]:.2f} g (s {pire_a[1]:g}), {pire_j[0]:.1f} m/s³ (s {pire_j[1]:g})")
     nul = max(abs(P.voie_simulee(P.s_of_t(g / P.FPS))) for a, b in P.VOIE_NULLE for g in range(a, b + 1))
     trou = max(abs(P.voie_simulee(P.VOIE_BARRAGE[0] + (P.VOIE_BARRAGE[1] - P.VOIE_BARRAGE[0]) * i / 60))

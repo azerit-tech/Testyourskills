@@ -28,9 +28,9 @@ AVANT_GEL = 12                              # ni dans les douze images d'avant u
 ENFONCE_MAX = 0.05                          # m
 LIGNE, REPRISE = 0.3, 1.5                   # m, s
 BORDURE, CIRCULATION = 0.9, 1.0             # m
-# m/s² : l'adhérence du mouillé (0,7 g) et le freinage des patrouilles, 6,5 et 7,2, relevés du rapport des μ depuis
-# que toutes les voitures roulent sur celui de la berline (fusion v11, dynamique.K_MU : 9,3 et 10,3)
-PATROUILLE_LAT, PATROUILLE_LONG = round(6.5 * D.K_MU, 1), round(7.2 * D.K_MU, 1)
+# m/s² : l'adhérence du mouillé (0,7 g) et le freinage des patrouilles, relevés du rapport des adhérences depuis que
+# toutes les voitures roulent sur μ 1,0 (parcours.ADHERENCE, SPEC §18.74)
+PATROUILLE_LAT, PATROUILLE_LONG = 6.5 * P.ADHERENCE, 7.2 * P.ADHERENCE
 CADRE_PART = 0.80                           # la part de la patrouille dans le cadre avant un choc (SPEC §18.69)
 
 

@@ -68,12 +68,6 @@ CAR = dict(
     hb_max=2600.0,          # N·m à l'essieu arrière : le frein à main (hydraulique, de cascade), de quoi le bloquer
     hb_rate=8.0,            # course du levier par seconde
 )
-# Fusion v11 (SPEC §18.72) : jusqu'à la v10 tout était réglé pour le mouillé, μ 0,70. Toutes les voitures du film
-# roulent maintenant sur le μ de la berline (les patrouilles et la meute rejouent sa conduite, sur la même chaussée) :
-# les plafonds d'adhérence écrits « pour le mouillé » dans les contrôles (patrouilles, poursuivants, slalom) sont
-# relevés de ce seul rapport, ici et nulle part ailleurs (1,43 à μ 1,0 ; 1 si μ revient à 0,70).
-MU_MOUILLE = 0.70
-K_MU = CAR["mu"] / MU_MOUILLE
 
 
 

@@ -202,7 +202,7 @@ def voie_dessinee(s):
 # l'image 723 ; à l'heure, image 692,7, sans slalom). Aucun des 50 dosages essayés de la jetée ne l'évite (0,45 à
 # 0,9 g : arrêt entre 711 et 786) : à caler dans le freinage final de la simulation (SPEC §18.62).
 #
-# v11 (SPEC §18.70, 18 novembre 2026). Jacques, sur le brouillon éclairé v10 : « je trouve les coups de volant pas
+# v11 (SPEC §18.74, 18 novembre 2026). Jacques, sur le brouillon éclairé v10 : « je trouve les coups de volant pas
 # super pertinents, genre la personne donne des coups brusques mais y a plein de place devant, ou même parfois rien à
 # éviter il me semble ». Mesuré (diag/audit_esquives.py) : deux manœuvres sur sept n'évitaient rien, les autres
 # partaient 1,5 à 2,75 s avant le contact sur un obstacle de 1,3 à 3 % du cadre et passaient à 1,4–1,7 m. Chaque
@@ -210,16 +210,21 @@ def voie_dessinee(s):
 # nouvelle voie tant que rien ne l'en chasse :
 #  - l'avenue : la patrouille 1 la tape (contacts.CHOCS) et la jette d'une demi-voie à droite, vers le bus qui
 #    déboîte de son arrêt ; elle revient à gauche devant lui, au dernier moment, avant le freinage du rond-point ;
-#  - la rue : S arrive en face, au milieu de la rue (elle contourne D, en double file) ; la berline s'écarte à droite
-#    de LANE m dès la sortie du trou du barrage, et ne revient pas : cette ligne est la voie intérieure du pont
+#  - la rue : S arrive en face, presque au milieu de la rue, appels de phares ; la berline s'écarte à droite de
+#    LANE m dès la sortie du trou du barrage, et ne revient pas : cette ligne est la voie intérieure du pont
 #    (x 1,80), que la route ne rejoint que sur le tablier (decalage_pont, plus bas) ;
-#  - le pont : aucun changement de voie, elle tient la voie intérieure et double la file de droite de près ;
+#  - le pont : elle tient la voie intérieure ; B1 déboîte vers elle, elle s'écarte d'un mètre à gauche, vers la
+#    patrouille 1, qui la tape (contacts.CHOCS) et la renvoie dans sa voie ;
 #  - la jetée : J1 freine devant elle, elle déboîte ; J2 arrive en face, appels de phares, elle se rabat.
+# Dosé sur μ 1,0 (film/v11-virages) : un écart tardif demande 0,8 à 0,9 g et ne glisse presque plus (2 à 4° de
+# dérive arrière, 0,1 à 0,25 m hors de la ligne) ; il se lit par le roulis, le lacet et la proximité de l'obstacle.
+# Les abscisses des deux écarts que lancent les chocs suivent l'horaire : 2 m avant le lieu du choc de l'avenue
+# (image 30), au lieu de celui du pont (image 365).
 SLALOM_SIMULE = (
-    (27.5, 28.0, -1.6), (66.0, 28.0, 1.6),
-    (190.6, 24.5, -LANE),
-    (247.6, 29.0, 1.0), (290.3, 30.0, -1.0),
-    (402.5, 24.0, 2.8), (433.0, 29.0, -2.8),
+    (26.3, 26.0, -1.6), (63.0, 24.5, 1.6),
+    (190.6, 20.0, -LANE),
+    (247.6, 24.5, 1.0), (290.3, 27.0, -1.0),
+    (403.0, 21.5, 2.25), (432.0, 26.5, -2.25),
 )
 # les rangs des manœuvres dans la table, par lieu (SLALOM_ZONES, les audits)
 ESQ_AVENUE, ESQ_RUE, ESQ_PONT, ESQ_JETEE = (0, 1), (2, 2), (3, 4), (5, 6)
@@ -279,6 +284,10 @@ voie = voie_simulee
 LIM = dict(slip_drag=0.07, counter=0.78, derapages=[DERAP2, DERAP5], pivot=1.4, pivot_tau=(0.6, 0.35),
            pivot_smooth=0.45, steer_geo=True, front_slip=4.0, steer_rate=90.0)
 JERK = 12.0 * 0.72
+# (v11, SPEC §18.70 et 18.74 : toutes les voitures roulent sur μ 1,0, le mouillé en tenait 0,70. Les plafonds
+# « du mouillé » des contrôles se relèvent de ce seul rapport, 1,43, pas au cas par cas)
+MOUILLE = 0.70
+ADHERENCE = D.CAR["mu"] / MOUILLE
 T_SPAN = (-2.0, 40.0)                       # s : la table de la conduite (au-delà de l'arrêt, elle reste arrêtée)
 
 
@@ -1087,16 +1096,17 @@ CAM_DEPORT = 0.018
 # côté du choc ; fondus en entrée et en sortie (quintique : ni vitesse ni accélération aux bouts), nuls bien avant
 # chaque raccord et dans les dérapages (test_contacts.test_cadre). Le choc ne bouge pas.
 # `images` : par rapport à l'image du choc (début du fondu d'entrée, plein, fin du plein, fin du fondu de sortie).
-# - avenue : le choc est à l'image 14 du film, le cadre est donc déporté dès la première image (un plan à deux
-#   voitures), puis il se recentre sur la berline qui s'échappe (fini à l'image 51). La visée seule ne suffit pas :
-#   la berline doit rester entière dans le cadre utile (bord droit ≤ 95 %), ce qui borne le déport à 0,20 et laisse
-#   la patrouille à 69–88 % des images 6 à 12. Avec 1,1 m de recul (7,3 m, dans les 5,5–10 m du bras) et 0,17 de
-#   déport, elle est à 84 % au moins de l'image 6 au choc, entière de 12 à 19, et la berline tient de 49 à 88 % de
-#   la largeur. Le recul allonge l'écart de côté que le bras prend quand la berline roule en biais après le choc
-#   (6° : 10 cm par mètre de recul, −1,15 m pour −1,1 permis) : le bras, que la ligne droite décale de 0,7 m vers
-#   la bordure, revient de 0,2 m vers la patrouille (−0,97 m).
-#   Ce que ça coûte : le phare lointain de l'ouverture (14° à droite de l'avenue, à 87–94 % de la largeur avant)
-#   est hors du bord droit jusqu'à l'image 27 et sous 95 % à la 31 (motion.PHARE_FRAMES : contrôlé de 33 à 75).
+# - avenue : le choc est à l'image 30 du film (14 dans le v10 : SPEC §18.74), la patrouille arrive de derrière ; le
+#   cadre est déporté dès la première image (un plan à deux voitures), plein jusqu'à l'image 31, puis il se
+#   recentre sur la berline qui s'échappe (fini à l'image 70). La visée seule ne suffit pas : la berline doit
+#   rester entière dans le cadre utile (bord droit ≤ 95 %), ce qui borne le déport à 0,20. Avec 1,5 m de recul
+#   (dans les 5,5–10 m du bras) la patrouille est à 83 % au moins dans le cadre les huit images d'avant le choc,
+#   entière au choc, et la berline tient de 53 à 89 % de la largeur. Le recul allonge l'écart de côté que le bras
+#   prend quand la berline roule en biais après le choc : le bras, que la ligne droite décale vers la bordure,
+#   revient de 0,2 m vers la patrouille. Un fondu de sortie plus court (21 images) ou un recul de 1,8 m demandait
+#   13 m/s² au bras entre les images 42 et 49.
+#   Ce que ça coûte : le phare lointain de l'ouverture (14° à droite de l'avenue) est hors du bord droit tant que
+#   le cadre est déporté (motion.PHARE_FRAMES : contrôlé de 52 à 75, de 33 à 75 dans le v10).
 # - pont : la patrouille double par la gauche et se rabat ; 0,11 de déport pendant qu'elle entre, sans recul
 #   (91 % au moins des images 357 à 364, 58 avant).
 CADRE_CHOCS = {
