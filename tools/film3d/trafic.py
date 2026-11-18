@@ -87,6 +87,15 @@ def vehicules():
         Course(av_e2, AV_BUS_V, s0=40.0 + AV_BUS, g0=AV_BUS_G, ecart=bascule_g(*AV_BUS_SORT)), warning=0)
     add("av_b", "fairheaven", "ciel", Course(av_e2, AV_B_V, s0=40.0 + AV_B, g0=0))
 
+    # ------------------------------------------------------------ le rond-point (P2)
+    # v11 (SPEC §18.71) : le taxi qui attendait, arrêté, à l'entrée de l'avenue nord (vie.py) y arrive maintenant
+    # en roulant, voie O2, et freine au « cédez le passage » pendant que la berline dérape devant lui : une voiture
+    # qui roule dans le cadre pendant la glisse, un repère pour sa rotation. La patrouille 2 le longe dans la voie
+    # O1. Rien d'autre ne tient entre l'anneau et le barrage : la meute de P4 y roule en deux files (p4_pont.RUE_X),
+    # la patrouille 2 s'y arrête en travers, la berline y sort de sa glisse le nez à gauche.
+    rc = V.courbe([(120.0, V.AV_O2 + 0.3), (0.0, V.AV_O2 + 0.3)], pas=1.0)
+    add("rond_cede", "taxi", None, Course(rc, ROND_C_V, s0=120.0 - ROND_C_X, g0=ROND_C_G))
+
     # ------------------------------------------------------------ la rue des enseignes (P3) : s 164 à 226
     # B1, garée contre le trottoir de droite après le barrage, déboîte avant l'entrée de la poursuite dans la rue,
     # la remonte devant elle, traverse le boulevard et prend la voie de droite du pont (la suite au pont).
@@ -95,7 +104,7 @@ def vehicules():
     # le trou du barrage et la croise à 0,6 m ; S se jette contre le trottoir de gauche et s'y arrête, warnings,
     # avant la meute de P4, qui passe en deux files (p4_pont.RUE_X). (La voiture D du v10, qui sortait le nez de sa
     # place, n'y est plus : la berline la frôlait à 0,5 m sans s'écarter.)
-    nord = V.courbe([(3.25, -367.0), (3.2, -364.0), (2.6, -360.0), (2.15, -355.0), (2.1, -350.0), (2.1, -345.0),
+    nord = V.courbe([(3.25, B1_DEPART), (3.25, -367.0), (3.2, -364.0), (2.6, -360.0), (2.15, -355.0), (2.1, -350.0), (2.1, -345.0),
                      (2.2, -340.0), (2.9, -330.0), (4.0, -318.0), (4.9, -306.0), (5.2, -298.0), (5.25, -292.0),
                      (5.25, -150.0)], pas=0.5, n_lisse=6)
     add("pont_b1", "riverside", "argent",
@@ -244,6 +253,10 @@ AV_BUS = s_hero(AV_BUS_G) + HERO_L + 6.0
 AV_BUS_V = [(0, 1.5), (AV_BUS_G - 20, 4.5), (AV_BUS_G - 6, 4.5), (AV_BUS_G + 30, 0.0)]
 AV_BUS_SORT = (AV_BUS_G - 74, AV_BUS_G - 2, 0.33)
 AV_B, AV_B_V = 106.0, [(0, 4.0), (40, 4.0), (90, 0.0)]
+# le rond-point (v11) : le taxi qui cède, où (x) et quand il s'arrête à l'entrée de l'avenue nord, ses vitesses
+# (25 km/h, freinage de 2,5 m/s²)
+ROND_C_X, ROND_C_G = 18.5, 172.0
+ROND_C_V = [(0, 7.0), (ROND_C_G - 67, 7.0), (ROND_C_G, 0.0)]
 # la rue et le pont : B1 (vitesses depuis sa place, serre la glissière de, à, warnings dès) ; S (y où elle s'arrête,
 # vitesses jusqu'à l'arrêt) ; D (vitesses : déboîte, s'arrête, recule ; warnings). Départs et arrêts à 3,5 à 5 m/s²
 # (18 novembre, l'audit : 10 à 17 m/s² avant, et un changement de voie de B1 à 22 m/s² de latérale)
@@ -255,6 +268,9 @@ AV_B, AV_B_V = 106.0, [(0, 4.0), (40, 4.0), (90, 0.0)]
 B1_G = image_de(_ESQ[P.ESQ_PONT[0]][0]) + 1.0 * FPS
 B1_Y = point(s_hero(B1_G) + HERO_L + 2.5)[1]
 B1_VC, B1_LANCE, B1_FREINE = _v(70), 133, (29.0, 121.5)
+# (v11 : sa place, 2 m derrière la voiture du barrage au lieu de 8,7 : elle roule devant la berline 6,5 m plus près
+# et se lit à l'image une seconde plus tôt, dès la sortie du rond-point)
+B1_DEPART = -373.5
 B1_SORT, B1_RENTRE, B1_RANGE = (B1_G - 47, B1_G - 9, 1.7), (B1_G - 4, B1_G + 32, -1.7), (B1_G + 39, B1_G + 70, -0.35)
 B1_WARN = int(B1_G - 47)
 # S (v11) : l'axe où elle descend la rue (x), sa place (y) à l'image RUE_S_G (son nez au nez de la berline si
@@ -265,7 +281,7 @@ RUE_S_G = image_de(_ESQ[P.ESQ_RUE[0]][0]) + 1.0 * FPS
 RUE_S_Y = point(s_hero(RUE_S_G) + HERO_L + 2.5)[1]
 RUE_S_V = [(0, 0.0), (RUE_S_G - 100, 0.0), (RUE_S_G - 70, 4.5), (RUE_S_G + 14, 4.5), (RUE_S_G + 58, 0.0)]
 RUE_S_RANGE = (RUE_S_G - 16, RUE_S_G + 46, -2.3)
-RUE_S_WARN, RUE_S_APPELS = int(RUE_S_G + 14), (int(RUE_S_G - 34), int(RUE_S_G - 2))
+RUE_S_WARN, RUE_S_APPELS = int(RUE_S_G + 14), (int(RUE_S_G - 60), int(RUE_S_G - 20))
 # le pont : (nom, modèle, teinte, x de sa voie, y à l'image g, g, vitesses, (serre de, à, m) ou None, warnings dès)
 PONT = [
     ("pont_b2", "chapman", "sarcelle", 5.25, -255.4, 318,
@@ -298,7 +314,7 @@ J3_S, J3_V = 400.0, [(0, 0.0), (280, 0.0), (330, _v(30)), (470, _v(30)), (516, 0
 J2_G = image_de(_ESQ[P.ESQ_JETEE[1]][0]) + 1.15 * FPS
 J2_S, J2_N = s_hero(J2_G) + HERO_L + 2.5, 2.66
 J2_V = [(0, 0.0), (J2_G - 186, 0.0), (J2_G - 126, _v(30)), (J2_G - 44, _v(30)), (J2_G, 0.0)]
-J2_APPELS = (int(J2_G - 60), int(J2_G - 16))
+J2_APPELS = (int(J2_G - 64), int(J2_G - 24))
 
 
 # ---------------------------------------------------------------- les véhicules de la poursuite, en ville
