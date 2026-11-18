@@ -465,6 +465,11 @@ ECARTS_BRAS = (
     (r"focale ≤ 18 %/s",
      "la focale suit l'élan (24 mm au pas, 17,5 ou 15 mm lancé) : elle varie plus vite qu'avec le bras A, sans "
      "saut (test_bras : ≤ 25 %/s)"),
+    (r"largeur de la berline ±",
+     "la boîte de la berline grandit quand le bras se rapproche avec l'élan ou montre son flanc (le rattrapage du "
+     "port, à cheval sur 485 | 486 : 67 % à P6/1, 43 % à P6/14) et se réduit dans le cadre à deux voitures d'un choc "
+     "(l'avenue, choc à l'image 30 : 32 %) ; en continu, sans saut (test_bras : focale ≤ 25 %/s, à-coups, la même "
+     "pose des deux côtés des raccords)"),
     (r"28 à 35° entre la caisse et le bras|35 à 45° entre la caisse et le bras",
      "voulu : le bras en remorque montre plus de flanc dans le dérapage (verdict du 13 novembre : « le dérapage "
      "est mou », flanc visible)"),
