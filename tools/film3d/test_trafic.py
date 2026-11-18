@@ -6,6 +6,7 @@
 #     étoiles, ni aux dérapages, ni au trou du barrage (parcours.check) ;
 #   - dans chaque ligne droite, des voitures qui roulent dans le cadre ;
 #   - la file d'en face du pont (SPEC §18.69) : phares, accélérations, 1 m de la poursuite au quart d'image.
+#   - pas de rue vide : aucun trou de plus de 1,5 s sans voiture qui roule à l'image, hors rond-point et barrage.
 #   python3 tools/film3d/test_trafic.py
 import math
 import os
@@ -16,6 +17,7 @@ import parcours as P  # noqa: E402
 import trafic as T  # noqa: E402
 
 FAILS = []
+DENSE_ADMIS = (150, 255)                    # images : le dérapage du rond-point, l'approche du barrage
 
 
 def check(name, ok, detail=""):
@@ -149,7 +151,27 @@ def test_face():
           est[0] <= -2.0, f"x {est[0]:+.2f} au plus à l'est, {est[1]} à l'image {est[2]:g}")
 
 
+def test_dense():
+    """Pas de rue vide (SPEC §18.69) : à l'image, une voiture de la vie qui roule, lisible, à moins de 40 m de
+    l'objectif (diag/audit_cadre.py), sans trou de plus de 1,5 s dans la poursuite. Un seul trou admis, et connu :
+    le dérapage du rond-point puis les 25 m de rue fermés par le barrage (images 158 à 248), où rien ne peut rouler
+    sans gêner."""
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "diag"))
+    import audit_cadre as AC
+    AC.dense(silence=True)
+    trous = AC.OUT["trous"]
+    hors = [t for t in trous if not (DENSE_ADMIS[0] <= t[0] and t[1] <= DENSE_ADMIS[1])]
+    n = sum(k > 0 for k in AC.OUT["n_vie"])
+    check("dense : aucun trou de plus de 1,5 s sans voiture qui roule à l'image, hors rond-point et barrage "
+          f"(images {DENSE_ADMIS[0]} à {DENSE_ADMIS[1]})", not hors,
+          f"trous {trous} ; {n} images sur {P.TOTAL} avec une voiture lisible")
+    pont = AC.OUT["n_vie"][290:354]
+    check("dense : du boulevard au milieu du pont (images 290 à 353), une voiture lisible la moitié du temps au moins",
+          sum(k > 0 for k in pont) >= len(pont) / 2, f"{sum(k > 0 for k in pont)} images sur {len(pont)}")
+
+
 if __name__ == "__main__":
+    test_dense()
     test_face()
     test_parcours()
     test_contacts()

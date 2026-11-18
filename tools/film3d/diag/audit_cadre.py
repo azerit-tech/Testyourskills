@@ -7,9 +7,9 @@
 #   à la silhouette entière), la place du point de contact, celle de la berline ; et la patrouille 1 dans P1.
 # --dense : image par image de la poursuite (0 à 618), les voitures de la vie qui ROULENT, à moins de 40 m devant
 #   l'objectif, et lisibles : la moitié au moins de leur rectangle dans le cadre et hors de celui de la berline quand
-#   elles sont derrière elle, 3 % de la hauteur du cadre au moins (38 px sur 1280 : une voiture à 24 m). Les trous de
-#   plus de 1,5 s, le
-#   compte par seconde. Les patrouilles sont comptées à part (elles roulent avec la berline : pas un repère).
+#   elles sont derrière elle, 3 % de la hauteur du cadre au moins (38 px sur 1280 : mesuré, une voiture à 30 m
+#   environ sur le pont, objectif à 19–22 mm, à 37 m au 24 mm). Les trous de plus de 1,5 s, le compte par seconde.
+#   Les patrouilles sont comptées à part (elles roulent avec la berline : pas un repère).
 # Le rectangle est celui des huit coins de la boîte : il déborde un peu la caisse. Les décors ne masquent rien ici.
 import argparse
 import json
@@ -212,8 +212,10 @@ def chocs():
     OUT["p1_patrouille"] = parts
 
 
-def dense():
-    print("======== les voitures qui roulent devant l'objectif (≤ 40 m, lisibles), image par image")
+def dense(silence=False):
+    """Remplit OUT (n_vie, n_patrouilles, noms : par image ; trous : [(première, dernière image)]) et l'affiche."""
+    dit = (lambda *a: None) if silence else print
+    dit("======== les voitures qui roulent devant l'objectif (≤ 40 m, lisibles), image par image")
     n_vie, n_pat, noms = [], [], []
     for g in range(0, P.TOTAL):
         sh, f = T._plan(g)
@@ -258,16 +260,16 @@ def dense():
                 trous.append((a, g - 1))
             a = None
     OUT["trous"] = trous
-    print(f"  images avec une voiture au moins : {sum(n > 0 for n in n_vie)} sur {P.TOTAL} "
+    dit(f"  images avec une voiture au moins : {sum(n > 0 for n in n_vie)} sur {P.TOTAL} "
           f"({100 * sum(n > 0 for n in n_vie) / P.TOTAL:.0f} %) ; deux au moins : {sum(n > 1 for n in n_vie)}")
-    print("  trous de plus de 1,5 s (aucune voiture qui roule, lisible, à moins de 40 m) : "
+    dit("  trous de plus de 1,5 s (aucune voiture qui roule, lisible, à moins de 40 m) : "
           + (", ".join(f"{a}→{b} ({(b - a + 1) / FPS:.1f} s)" for a, b in trous) or "aucun"))
-    print("  par seconde (images, moyenne de voitures lisibles, images sans aucune, patrouilles en moyenne) :")
+    dit("  par seconde (images, moyenne de voitures lisibles, images sans aucune, patrouilles en moyenne) :")
     for g0 in range(0, P.TOTAL, 24):
         seg = n_vie[g0:g0 + 24]
         sh = T._plan(g0)[0]
         qui = sorted({n.replace("trafic_", "") for row in noms[g0:g0 + 24] for n in row})
-        print(f"    {g0:3d}→{min(P.TOTAL, g0 + 24) - 1:3d} {sh:4s} {sum(seg) / len(seg):4.1f}   vides {sum(n == 0 for n in seg):2d}   "
+        dit(f"    {g0:3d}→{min(P.TOTAL, g0 + 24) - 1:3d} {sh:4s} {sum(seg) / len(seg):4.1f}   vides {sum(n == 0 for n in seg):2d}   "
               f"patrouilles {sum(n_pat[g0:g0 + 24]) / len(seg):3.1f}   {' '.join(qui)[:110]}")
 
 

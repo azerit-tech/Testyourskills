@@ -2028,10 +2028,32 @@ Deux reproches au film gris de la fusion (`ref/iter/v10-gris/`, tête 349be9b) :
 
 **Le pont rempli** (`trafic.FACE`, quatre voitures `trafic_pont_f1` à `f4`) :
 
-- **Avant** (seuil de lisibilité 3 % de la hauteur, soit une voiture à 24 m) : aucune voiture qui roule, lisible, à moins de 40 m de l'objectif des images 293 à 333, puis B1 seule, à demi cachée par la berline, jusqu'à 358.
+- **Avant** (seuil de lisibilité 3 % de la hauteur du cadre : une voiture à 30 m environ sur le pont, où l'objectif est à 19–22 mm, à 37 m au 24 mm) : aucune voiture qui roule, lisible, à moins de 40 m de l'objectif des images 293 à 333, puis B1 seule, à demi cachée par la berline, jusqu'à 358.
 - **Ce qui est possible sur ce pont, mesuré** : la berline y entre par la voie de droite (x 3 à 4,3) derrière B1, qu'elle cache ; la voie du milieu à sa gauche est celle par où la patrouille 1 la remonte (x −1,6 à 0,3, de l'image 320 à la 376) ; la rue derrière est à la meute. Il ne reste que la voie d'en face (x −5,25, à 7,5–9,5 m de la berline), et une voiture qui y descend doit s'arrêter ou tourner sur le boulevard au pied du pont.
 - **Le choix** : quatre voitures en tête de la file du port (arrêtées en y −223,5 à −201 devant celles de `vie.py`), lâchées avant elles (images 58 à 147), 55 km/h. Elles contournent la voiture arrêtée de `vie.py` (y −262) par la voie du milieu, libre à ce moment-là (2,15 m d'écart, 1,05 m entre les caisses), reviennent dans leur voie avant y −298, freinent (4,5 m/s²) et tournent à droite sur le boulevard, vers l'ouest (arc de 5 m à 16 km/h, 4,2 m/s² de latérale). Rien ne reste sur le pont. Phares allumés, roues qui tournent (ce sont des `vie.Course`).
-- **Ce que ça donne** : la berline les croise aux images 317, 324, 336 et 352. Vitesse relative : 103 km/h pour la première (elle tourne déjà), 117, 141 et 153 km/h pour la dernière ; les 150 km/h demandés partout ne sont pas possibles, une voiture qui croise la berline à moins de 28 m du pied du pont a déjà freiné pour tourner. Lisibles aux images 294–319, 324–330, 340–347 ; plus de trou de plus de 1,5 s entre 249 et 618. Chacune ne reste lisible que 7 à 12 images (de 24 m à sa sortie du cadre à 13 m, à 40 m/s).
+- **Ce que ça donne** : la berline les croise aux images 317, 324, 336 et 352. Vitesse relative : 103 km/h pour la première (elle tourne déjà), 117, 141 et 153 km/h pour la dernière ; les 150 km/h demandés partout ne sont pas possibles, une voiture qui croise la berline à moins de 28 m du pied du pont a déjà freiné pour tourner. Lisibles aux images 294–319, 324–330, 340–347 ; plus de trou de plus de 1,5 s entre 249 et 618. Chacune reste lisible 7 à 18 images (18, 12, 7 et 8 : de 30 m environ à sa sortie du cadre vers 17 m), et elles se relaient : de l'image 296 à la 348 il y en a toujours une dans le cadre à moins de 50 m, entière.
 - **Pas de voiture lente de plus devant** : la voie de droite a déjà B1 (20 m devant, cachée par la berline jusqu'à ce qu'elle déboîte, image 350), B2 et B3 ; toute autre voie devant la berline est la sienne ou celle de la patrouille 1.
 - **Marges, au quart d'image** : 6,1 m de la berline, 2,0 m de la patrouille 1 (image 322,5), 2,4 m de la meute, 1,05 m de la voiture arrêtée, 1,8 m entre elles. Accélération 4,5 m/s² au plus (`test_trafic.test_face`). Aucune esquive : la berline simulée est la même au quart d'image sur tout le film (empreinte de ses 2 881 poses identique à celle de la tête des contacts ; crêtes 30,52° à 153,2 et 36,92° à 452,1, arrêt 692,1, contacts 12,75 → 14 et 364 → 370,25).
 - **Relevé au passage, pas corrigé** : la file d'en face de `vie.py` (`pont_face_0` à `3`) part à 10 m/s² (45 km/h en 30 images), le camion à 8,9.
+
+**Le reste de la poursuite, mesuré** (`diag/audit_cadre.py --dense`, `test_trafic.test_dense`). Images avec une voiture de la vie qui roule, lisible, à moins de 40 m de l'objectif, avant → après :
+
+| Tronçon | Images | Avec une voiture | Plus long trou (images) |
+|---|---|---|---|
+| OUV 0–74 | 75 | 36 → 37 | 19 → 19 |
+| P1 75–107 | 33 | 13 → 13 | 10 → 10 |
+| P2 108–214 | 107 | 32 → 32 | 57 → 57 |
+| P3 215–317 | 103 | 43 → 67 | 34 → 34 |
+| P4 318–425 | 108 | 67 → 82 | 17 → 11 |
+| P5 426–485 | 60 | 51 → 51 | 9 → 9 |
+| P6 486–618 | 133 | 98 → 98 | 24 → 24 |
+| Poursuite | 619 | 340 → 380 (55 → 61 %) | 91 → 91 |
+
+Du boulevard au milieu du pont (images 290 à 353) : 11 → 50 images sur 64 ; sur le pont seul (318 à 353) : 8 → 23 sur 36.
+
+- **Un seul trou de plus de 1,5 s reste, des images 158 à 248 (3,8 s), et il n'est pas comblé.** Mesuré image par image (objectif à 24 mm sur tout ce passage) : jusqu'à 157 la voiture A sort vers l'est à 30 m ; de 158 à 195 (1,6 s) la caméra balaie le coin nord-est pendant la glisse et aucune voiture de la vie, même arrêtée, n'est dans le cadre à moins de 90 m (la patrouille 2 y est jusqu'à 162, à 34–41 m) ; de 196 à 248, B1 roule dans l'axe de la rue, entière, à 55 puis 46 m (2,1 à 2,4 % de la hauteur, sous le seuil de 3 %), rejointe à 228 par les deux voitures de la rue (66 à 39 m, 1,7 à 2,9 %). Le vide vrai est donc 158–195 ; ensuite il y a des voitures qui roulent, petites. Pas comblé, parce que rien ne peut rouler plus près sans gêner : le bras est porte la patrouille 2 qui arrive et A qui sort, l'anneau est le chemin de la glisse (non essayé : jugé sur le plan), et la rue est fermée à y −380 par le barrage, B1 attendant 13 m derrière ; une voiture à 37 m de l'objectif serait dans le barrage jusqu'à l'image 232.
+- **Trous courts laissés** (moins de 1,5 s, hors demande) : 56–84 et 101–125 sur l'avenue (le freinage du rond-point), 348–358 sur le pont (la patrouille 1 y est, elle arrive pour le contact), 600–618 au bout de la jetée.
+- **Seuil** : « lisible » vaut ici 3 % de la hauteur du cadre (38 px sur 1280) et la moitié de la voiture visible. Le compte en dépend : à 2 %, le trou 196–248 disparaît (B1) ; c'est un choix de mesure, pas un jugement à l'écran.
+- **À refaire** : OUV (le cadre), P3 et P4 (les quatre voitures ; P4 aussi pour le cadre du contact). Ce travail ne change rien à P1, P2, P5, P6 et FIN6.
+- **Vu en gris** (`ref/iter/v10-dense/`, 14 images, tête 3d7b8d6) : à l'ouverture la patrouille 1 est coupée par le bord gauche à l'image 0, presque entière à 6, entière de 10 à 18, et le contact de l'image 14 est dans le cadre ; sur le pont, une voiture d'en face à gauche aux images 318, 324 et 330, petite (3 à 8 % de la hauteur, au bord gauche), puis la patrouille 1 entre par la gauche à 344 et touche la berline, dans le cadre, à 366. Le bas du cadre reste de la chaussée nue : la caméra est à 2,4 m de haut derrière la berline.
+- **Pas vérifié** : aucune image éclairée, aucun mouvement vu (14 images fixes) ; l'effet de vitesse des croisements reste à juger sur le film.
