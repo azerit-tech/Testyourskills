@@ -753,57 +753,88 @@ def mat_lens(name, tint=(1, 1, 1, 1), emit_color=None, strength=0.0, flutes=0.0,
     return m
 
 
-# le feu arrière allumé : émission du cœur du verre et son intensité, calées pour que l'image (AgX, exposition 0,5
-# du laboratoire) lise le corail du film et non un rose saumon (un rouge pur trop fort blanchit dans AgX)
-TAIL_GLOW = ("#ff4a1c", 1.3)
-TAIL_DEEP = "#9c0c06"   # le rouge profond du plastique vu en biais, là où la lumière traverse plus d'épaisseur
+# Le feu arrière (SPEC §18.66) : une ampoule à incandescence à deux filaments (5 W de position, 21 W de stop) derrière
+# un cabochon de plastique rouge moulé. Ce que la caméra en voit : un verre rouge profond, plus chaud et plus clair
+# autour de l'ampoule (son image à travers les prismes), qui retombe vers les bouts ; les autres chambres du même
+# verre (clignotant, catadioptre) restent sombres. Jusqu'au v9 les trois ampoules de chaque côté brillaient ensemble
+# et le verre montait à 2,5 (AgX blanchit un rouge pur dès 1,5 : six fleurs rose saumon à l'image).
+# Les valeurs sont celles du canal rouge en lumière de scène (ce que lit AgX à 0 EV) : TAIL_BODY sur le verre près de
+# l'ampoule, TAIL_FAR aux bouts, TAIL_CORE sur l'image de l'ampoule ; au stop, STOP_BODY, STOP_FAR, STOP_CORE.
+TAIL_GLOW = ("#ff3c14", 1.0)   # (teinte du cœur, facteur d'ensemble de la lueur)
+TAIL_RED = "#ff1c0a"    # le verre éclairé de l'intérieur : rouge de signalisation (620 nm), sans bleu (pas de rose)
+TAIL_HOT = "#ff6a22"    # le cœur au stop : l'orangé du filament de 21 W vu à travers le rouge
+TAIL_DEEP = "#7a0806"   # le rouge profond du plastique vu en biais, là où la lumière traverse plus d'épaisseur
+TAIL_BODY, TAIL_FAR, TAIL_CORE = 0.60, 0.10, 1.7
+STOP_BODY, STOP_FAR, STOP_CORE = 2.3, 0.28, 7.0
 
 # les feux stop : la propriété d'objet « stop » de la caisse (0 éteints, 1 allumés), animable (stop_lamps). Le même
-# verre et les mêmes ampoules que le feu de position (ampoule à deux filaments d'époque : 5 W de position, 21 W de
-# stop) : la lueur du verre, des ampoules, des réflecteurs et des lumières de boîtier est multipliée par 1 + STOP_GAIN
+# verre et la même ampoule que le feu de position : la lueur des ampoules, des réflecteurs et des lumières de boîtier
+# est multipliée par 1 + STOP_GAIN (21 W contre 5 W : × 4,2)
 STOP = "stop"
 STOP_GAIN = 3.0
 # la carte UV des feux : (|y|, z) du sommet au repère de la caisse au chargement, en mètres ; le cœur de chaque feu se
-# calcule dessus, au pixel, autour des ampoules (tail_cores). Elle suit les sommets quand la rue tourne la caisse
+# calcule dessus, au pixel, autour de l'ampoule (tail_cores). Elle suit les sommets quand la rue tourne la caisse
 TAIL_UV = "feu"
-CORE_R = (0.075, 0.05)   # demi-axes du cœur autour d'une ampoule (latéral, vertical), m : le verre fait 40 × 12 cm
+CORE_R = (0.034, 0.026)  # demi-axes de l'image de l'ampoule dans le verre (latéral, vertical), m
+BODY_R = (0.13, 0.075)   # demi-axes de la nappe que les prismes étalent autour d'elle : le verre fait 40 × 12 cm
+TAIL_LEAK = 0.22         # ce qui passe de la lueur dans les chambres voisines, par le verre commun
+TAIL_W = 2.0             # W, la lueur portée d'un feu de position sur le pare-chocs et la chaussée (× 4 au stop)
 
 
 def _stop_gain(nt, gain=STOP_GAIN):
     """1 + gain × la propriété « stop » de l'objet (0 sans la propriété)."""
+    return cv._math(nt, "ADD", 1.0, cv._math(nt, "MULTIPLY", _stop(nt), gain))
+
+
+def _stop(nt):
     at = nt.nodes.new("ShaderNodeAttribute")
     at.attribute_type = "OBJECT"
     at.attribute_name = STOP
-    return cv._math(nt, "ADD", 1.0, cv._math(nt, "MULTIPLY", at.outputs["Fac"], gain))
+    return at.outputs["Fac"]
 
 
-def _tail_core(nt, bulbs):
-    """Le cœur des feux, 1 sur l'ampoule et 0 au-delà de 1,2 fois CORE_R : la plus proche des ampoules `bulbs`
-    ((|y|, z) au repère de la caisse), lue sur la carte TAIL_UV."""
+def _tail_field(nt, bulb, dividers=()):
+    """Autour de l'ampoule `bulb` ((|y|, z) au repère de la caisse, carte TAIL_UV) : (cœur, nappe, anneaux, cloisons).
+    cœur : 1 sur l'image de l'ampoule, 0 au-delà de CORE_R ; nappe : 1 près d'elle, 0 aux bouts du verre (BODY_R), et
+    hors de la chambre de l'ampoule (au-delà d'une paroi) il n'en reste que TAIL_LEAK, ce qui fuit par le verre commun ;
+    anneaux : les prismes concentriques du moulage (0..1, pas de 9 mm) ; cloisons : 0 sur les parois entre chambres
+    (`dividers`, |y| en m), 1 ailleurs."""
     uv = nt.nodes.new("ShaderNodeUVMap")
     uv.uv_map = TAIL_UV
     sep = _node(nt, "ShaderNodeSeparateXYZ", Vector=uv.outputs["UV"])
-    d2 = None
-    for by, bz in bulbs:
-        dy = cv._math(nt, "DIVIDE", cv._math(nt, "SUBTRACT", sep.outputs["X"], by), CORE_R[0])
-        dz = cv._math(nt, "DIVIDE", cv._math(nt, "SUBTRACT", sep.outputs["Y"], bz), CORE_R[1])
-        e = cv._math(nt, "ADD", cv._math(nt, "MULTIPLY", dy, dy), cv._math(nt, "MULTIPLY", dz, dz))
-        d2 = e if d2 is None else cv._math(nt, "MINIMUM", d2, e)
-    r = cv._math(nt, "SQRT", d2)
-    return _ramp(nt, r, 1.2, 0.0)
+    dy = cv._math(nt, "SUBTRACT", sep.outputs["X"], bulb[0])
+    dz = cv._math(nt, "SUBTRACT", sep.outputs["Y"], bulb[1])
+
+    def ell(r):
+        a, b = cv._math(nt, "DIVIDE", dy, r[0]), cv._math(nt, "DIVIDE", dz, r[1])
+        return cv._math(nt, "SQRT", cv._math(nt, "ADD", cv._math(nt, "MULTIPLY", a, a), cv._math(nt, "MULTIPLY", b, b)))
+    core = _ramp(nt, ell(CORE_R), 1.0, 0.25)
+    body = _ramp(nt, ell(BODY_R), 1.6, 0.15)
+    d = cv._math(nt, "SQRT", cv._math(nt, "ADD", cv._math(nt, "MULTIPLY", dy, dy), cv._math(nt, "MULTIPLY", dz, dz)))
+    rings = cv._math(nt, "ADD", 0.5, cv._math(nt, "MULTIPLY", cv._math(nt, "SINE", cv._math(
+        nt, "MULTIPLY", d, 2 * math.pi / 0.009)), 0.5))
+    wall = None
+    for y in dividers:
+        w = _ramp(nt, cv._math(nt, "ABSOLUTE", cv._math(nt, "SUBTRACT", sep.outputs["X"], y)), 0.002, 0.006)
+        wall = w if wall is None else cv._math(nt, "MULTIPLY", wall, w)
+        # du côté de l'ampoule : 1 ; de l'autre côté de la paroi : la fuite
+        side = _ramp(nt, sep.outputs["X"], y - 0.004, y + 0.004) if y < bulb[0] else _ramp(
+            nt, sep.outputs["X"], y + 0.004, y - 0.004)
+        body = cv._math(nt, "MULTIPLY", body, cv._math(nt, "ADD", TAIL_LEAK, cv._math(nt, "MULTIPLY", side, 1.0 - TAIL_LEAK)))
+    return core, body, rings, wall
 
 
-def mat_tail_lens(name, on=True, glow=None, ribs=40.0, bulbs=()):
+def mat_tail_lens(name, on=True, glow=None, ribs=40.0, bulbs=(), dividers=()):
     """Cabochon de feu arrière d'époque : plastique rouge moulé épais (PMMA, IOR 1,49) à stries horizontales.
     Éteint : un rouge profond presque noir où l'on devine le réflecteur, un reflet net qui casse sur les stries.
-    Allumé : un cœur corail qui fonce vers le rouge profond sur les bords vus en biais, une strie sur deux plus claire
-    (les prismes renvoient la lumière de l'ampoule).
 
-    bulbs : les ampoules derrière le verre rouge ((|y|, z) au repère de la caisse, carte TAIL_UV, voir tail_cores).
-    Avec elles, la lueur se ramasse en un cœur corail autour de chaque ampoule et retombe au rouge profond sur le
-    reste du verre (de 6 m, le feu se lisait en aplat corail uniforme). La propriété « stop » de l'objet la multiplie
-    par 1 + STOP_GAIN, le cœur tirant vers l'orangé chaud du filament."""
-    color, strength = glow or TAIL_GLOW
+    bulbs : l'ampoule allumée derrière le verre ((|y|, z) au repère de la caisse, carte TAIL_UV, voir tail_cores ; la
+    première seule compte). Allumé, le verre luit en rouge de signalisation (TAIL_RED) autour d'elle, d'une nappe
+    qui retombe vers les bouts (TAIL_BODY à TAIL_FAR), avec en son milieu l'image plus chaude de l'ampoule
+    (TAIL_CORE) ; les prismes du moulage (anneaux autour de l'ampoule, stries horizontales) et les parois entre
+    chambres (`dividers`) s'y dessinent. La propriété « stop » de l'objet monte le tout (STOP_*), le cœur tirant vers
+    l'orangé du filament de 21 W. Sans `bulbs` (le coupé) : une lueur uniforme TAIL_BODY, foncée sur les bords."""
+    color, k = glow or TAIL_GLOW
     m, nt, out = cv._mat(name)
     tc = nt.nodes.new("ShaderNodeTexCoord")
     wv = nt.nodes.new("ShaderNodeTexWave")
@@ -814,34 +845,36 @@ def mat_tail_lens(name, on=True, glow=None, ribs=40.0, bulbs=()):
     nt.links.new(tc.outputs["Object"], wv.inputs["Vector"])
     bump = _node(nt, "ShaderNodeBump", Height=wv.outputs["Fac"], Strength=0.5, Distance=0.002)
     fr = _node(nt, "ShaderNodeFresnel", IOR=1.49, Normal=bump.outputs[0])
-    tr = _node(nt, "ShaderNodeBsdfTransparent", Color=lin("#4a0302"))
+    tr = _node(nt, "ShaderNodeBsdfTransparent", Color=lin("#3a0202"))
     gl = _glossy(nt)
-    gl.inputs["Roughness"].default_value = 0.04
+    gl.inputs["Roughness"].default_value = 0.06
     nt.links.new(bump.outputs[0], gl.inputs["Normal"])
     mix = nt.nodes.new("ShaderNodeMixShader")
     nt.links.new(cv._math(nt, "ADD", fr.outputs[0], 0.05), mix.inputs[0])
     nt.links.new(tr.outputs[0], mix.inputs[1])
     nt.links.new(gl.outputs[0], mix.inputs[2])
     sh = mix.outputs[0]
-    if on and strength > 0:
+    if on and k > 0:
         lw = _node(nt, "ShaderNodeLayerWeight", Blend=0.45)
         edge = _ramp(nt, lw.outputs["Facing"], 0.15, 0.85)
-        rib = cv._math(nt, "ADD", 0.72, cv._math(nt, "MULTIPLY", wv.outputs["Fac"], 0.28))
-        stop = _stop_gain(nt)
+        rib = cv._math(nt, "ADD", 0.78, cv._math(nt, "MULTIPLY", wv.outputs["Fac"], 0.22))
+        stop = _stop(nt)
         if bulbs:
-            core = _tail_core(nt, bulbs)
-            at = nt.nodes.new("ShaderNodeAttribute")
-            at.attribute_type = "OBJECT"
-            at.attribute_name = STOP
-            hot = _mix_rgb(nt, lin(color), lin("#ff6a30"), at.outputs["Fac"])
-            col = _mix_rgb(nt, _mix_rgb(nt, lin(TAIL_DEEP), hot, core), lin(TAIL_DEEP), cv._math(nt, "MULTIPLY", edge, 0.6))
-            # 0,35 sur le verre loin des ampoules, 1,95 sur elles
-            shape = cv._math(nt, "ADD", 0.35, cv._math(nt, "MULTIPLY", core, 1.6))
-            rib = cv._math(nt, "MULTIPLY", rib, shape)
+            core, body, rings, wall = _tail_field(nt, bulbs[0], dividers)
+            # la nappe et le cœur, en luminance de scène, du feu de position au stop
+            glow_body = cv._math(nt, "ADD", _mix(nt, TAIL_FAR, STOP_FAR, stop),
+                                 cv._math(nt, "MULTIPLY", body, _mix(nt, TAIL_BODY - TAIL_FAR, STOP_BODY - STOP_FAR, stop)))
+            glow_core = cv._math(nt, "MULTIPLY", core, _mix(nt, TAIL_CORE - TAIL_BODY, STOP_CORE - STOP_BODY, stop))
+            prism = cv._math(nt, "MULTIPLY", rib, cv._math(nt, "ADD", 0.80, cv._math(nt, "MULTIPLY", rings, 0.20)))
+            if wall is not None:
+                prism = cv._math(nt, "MULTIPLY", prism, cv._math(nt, "ADD", 0.25, cv._math(nt, "MULTIPLY", wall, 0.75)))
+            s = cv._math(nt, "MULTIPLY", cv._math(nt, "ADD", cv._math(nt, "MULTIPLY", glow_body, prism), glow_core), k)
+            hot = _mix_rgb(nt, lin(color), lin(TAIL_HOT), stop)
+            col = _mix_rgb(nt, _mix_rgb(nt, lin(TAIL_RED), lin(TAIL_DEEP), cv._math(nt, "MULTIPLY", edge, 0.5)), hot, core)
         else:
-            col = _mix_rgb(nt, lin(color), lin(TAIL_DEEP), edge)
-        s = cv._math(nt, "MULTIPLY", cv._math(nt, "MULTIPLY", cv._math(nt, "MULTIPLY", rib, strength), stop),
-                     cv._math(nt, "SUBTRACT", 1.0, cv._math(nt, "MULTIPLY", edge, 0.5)))
+            s = cv._math(nt, "MULTIPLY", cv._math(nt, "MULTIPLY", rib, _mix(nt, TAIL_BODY, STOP_BODY, stop)), k)
+            col = _mix_rgb(nt, lin(TAIL_RED), lin(TAIL_DEEP), edge)
+        s = cv._math(nt, "MULTIPLY", s, cv._math(nt, "SUBTRACT", 1.0, cv._math(nt, "MULTIPLY", edge, 0.5)))
         em = nt.nodes.new("ShaderNodeEmission")
         nt.links.new(col, em.inputs["Color"])
         nt.links.new(s, em.inputs["Strength"])
@@ -1590,9 +1623,13 @@ def _lights(car, lights_on, head_mats, tail_mats):
     # (visible en glossy), banc hero_bench.py --fill on / noglossy
     for i, h in enumerate(heads):
         out.append(point_light(body, f"{body.name}_head_glow_{i}", inv @ (h - Vector((0.05, 0, 0))), LAMP, 1.5, 0.03))
+    # la lueur portée d'un feu de position sur le pare-chocs et la chaussée : TAIL_W, en rouge de signalisation (en
+    # corail à 3 W, elle rosissait le chrome et la chaussée ; un feu de 5 W derrière un verre rouge laisse sortir une
+    # dizaine de lumens, soit 1 W à l'échelle des lampadaires du film), × 4 au stop
     for i, t in enumerate(tails):
-        lo = point_light(body, f"{body.name}_tail_glow_{i}", inv @ (Vector((mn.x - 0.06, t.y, t.z))), TAIL, 3.0, 0.05)
-        _drive_stop(lo.data, "energy", 3.0, body)
+        lo = point_light(body, f"{body.name}_tail_glow_{i}", inv @ (Vector((mn.x - 0.06, t.y, t.z))), TAIL_RED,
+                         TAIL_W, 0.05)
+        _drive_stop(lo.data, "energy", TAIL_W, body)
         out.append(lo)
     return out
 
@@ -1628,11 +1665,28 @@ def stop_lamps(body, first, last, value=1.0):
     body[STOP] = 0.0
 
 
+def _unlit(mat, name):
+    """Une copie éteinte d'une matière à émission (ampoule, réflecteur) : sa lueur à zéro, sans lien au stop."""
+    m = bpy.data.materials.get(name)
+    if m is not None:
+        return m
+    m = mat.copy()
+    m.name = name
+    p = next(n for n in m.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
+    sock = p.inputs["Emission Strength"]
+    for l in list(sock.links):
+        m.node_tree.links.remove(l)
+    sock.default_value = 0.0
+    return m
+
+
 def tail_cores(body, lens="hero_w111_tail_lens", bulb="hero_w111_tail_bulb", reverse="hero_w111_reverse_lens",
-               on=True):
-    """Le cœur des feux arrière : repère les ampoules derrière le verre rouge (îlots de la matière `bulb`, hors de
-    celles du feu de recul, sous le verre `reverse`), écrit la carte TAIL_UV ((|y|, z) de chaque sommet au repère de
-    la caisse) et refait la matière `lens` autour d'elles. Renvoie le compte rendu."""
+               on=True, reflector="hero_w111_tail_reflector"):
+    """Le feu arrière autour de son ampoule : repère les ampoules derrière le verre rouge (îlots de la matière `bulb`,
+    hors de celles du feu de recul, sous le verre `reverse`) ; celle du milieu est l'ampoule de position et de stop,
+    les autres chambres (clignotant, catadioptre) restent éteintes : leurs ampoules et leurs réflecteurs prennent une
+    copie éteinte de leur matière. Écrit la carte TAIL_UV ((|y|, z) de chaque sommet au repère de la caisse) et
+    refait la matière `lens` autour de l'ampoule allumée, parois entre chambres comprises. Renvoie le compte rendu."""
     me = body.data
     mats = {m.name: i for i, m in enumerate(me.materials) if m}
     if lens not in mats or bulb not in mats:
@@ -1660,6 +1714,28 @@ def tail_cores(body, lens="hero_w111_tail_lens", bulb="hero_w111_tail_bulb", rev
         centres = [c for c in centres if not (lo.x <= c.x <= hi.x and lo.y <= c.y <= hi.y)]
     if not centres:
         return "feux : aucune ampoule"
+    centres.sort(key=lambda c: c.x)
+    k = len(centres) // 2
+    lit = centres[k]
+    walls = [(a.x + b.x) / 2 for a, b in zip(centres, centres[1:])]
+    lo_y = walls[k - 1] if k > 0 else -1.0
+    hi_y = walls[k] if k < len(walls) else 1e9
+    # les autres chambres : ampoules et réflecteurs éteints (une copie de la matière, sans lueur)
+    off = {}
+    for key in (bulb, reflector):
+        if key in mats:
+            me.materials.append(_unlit(me.materials[mats[key]], key + "_eteint"))
+            off[mats[key]] = len(me.materials) - 1
+    dark = 0
+    for p in me.polygons:
+        # (les réflecteurs et les ampoules des phares portent d'autres matières : seuls ceux de l'arrière sont ici)
+        if p.material_index not in off:
+            continue
+        y, z = abs(p.center.y), p.center.z
+        recul = bool(rev) and lo.x - 0.01 <= y <= hi.x + 0.01 and lo.y - 0.01 <= z <= hi.y + 0.01
+        if recul or not (lo_y <= y <= hi_y):
+            p.material_index = off[p.material_index]
+            dark += 1
     act = me.uv_layers.active_index
     rend = next((i for i, u in enumerate(me.uv_layers) if u.active_render), 0)
     uv = me.uv_layers.get(TAIL_UV) or me.uv_layers.new(name=TAIL_UV, do_init=False)
@@ -1668,12 +1744,13 @@ def tail_cores(body, lens="hero_w111_tail_lens", bulb="hero_w111_tail_bulb", rev
     me.uv_layers.active_index = act
     me.uv_layers[rend].active_render = True
     old = me.materials[mats[lens]]
-    new = mat_tail_lens(lens, on, bulbs=[(c.x, c.y) for c in centres])
+    old.name = lens + "_avant"
+    new = mat_tail_lens(lens, on, bulbs=[(lit.x, lit.y)], dividers=walls)
     me.materials[mats[lens]] = new
     if old.users == 0:
         bpy.data.materials.remove(old)
-    new.name = lens
-    return "cœurs : " + ", ".join(f"{c.x:.2f}/{c.y:.2f}" for c in centres)
+    return (f"ampoule {lit.x:.2f}/{lit.y:.2f} sur {len(centres)} (" + ", ".join(f"{c.x:.2f}" for c in centres)
+            + f"), parois {', '.join(f'{w:.2f}' for w in walls) or 'aucune'}, {dark} faces éteintes")
 
 
 def load_hero(variant="w111", collection=None, lights_on=True, raw=False):
