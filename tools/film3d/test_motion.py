@@ -248,7 +248,11 @@ V2_LIMITS31 = dict(cam_h=(1.6, 2.7), cam_h_floor=1.55, cam_dist=(5.5, 10.0), cam
                    # la vibration fine doublée, vue à l'écran (sans elle, 0,05 au plus : la trajectoire reste lisse)
                    screen_d2=0.30, screen_d3=0.30)
 V2_PLAN31_MIN = ("cam_width_var",)
-V2_PLAN31 = {"P2": {"cam_width_var": 0.85}}     # l'anneau : le dérapage, puis la berline qui s'échappe à la sortie
+V2_PLAN31 = {"P2": {"cam_width_var": 0.85},     # l'anneau : le dérapage, puis la berline qui s'échappe à la sortie
+             # (fusion v10) l'ouverture : pendant le premier changement de voie la berline simulée roule 6° en biais
+             # de la route, le bras garde le cap de la route (parcours.travel_route) : 7 cm de plus à droite de sa
+             # vitesse, le centre de la berline reste à moins de 6 % de la visée
+             "OUV": {"cam_side": (-1.1, 1.5)}}
 
 
 def _franc(base, plans, v2, plan_min):

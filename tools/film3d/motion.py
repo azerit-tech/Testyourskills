@@ -2935,9 +2935,16 @@ def plan_checks31(d, lim, own):
         boxes = d.get("boxes") or {f: frame_box(d["final"][f], P[f]) for f in frames}
         cs = {f: box_center(boxes[f], dict(y_from_top=True)) for f in frames if boxes[f]}
         (cx, tx), (cy, ty) = lim["cam_center_x"], lim["cam_center_y"]
-        bad = [f for f in frames if f not in cs or abs(cs[f][0] - cx) > tx or abs(cs[f][1] - cy) > ty]
+        # (fusion v10 : dans la ville, la visée voulue se déporte pendant un changement de voie, parcours.visee_u,
+        # SPEC §18.62 ; le centre se juge contre elle, comme test_motion « vitesse : … centrée », et non contre 50 %)
+        vu = {}
+        import parcours as PC
+        if plan in PC.START and getattr(d["module"], "VILLE", True):
+            vu = {f: 100.0 * PC.visee_u(PC.t_of(plan, f - d["f0"] + 1)) for f in frames}
+        bad = [f for f in frames if f not in cs or abs(cs[f][0] - vu.get(f, cx)) > tx or abs(cs[f][1] - cy) > ty]
         xs, ys = [c[0] for c in cs.values()], [c[1] for c in cs.values()]
-        add(f"centre de la berline x {cx:g} ± {tx:g}, y {cy:g} ± {ty:g} % depuis le haut", not bad,
+        add(f"centre de la berline x {cx:g} ± {tx:g}" + (" (visée déportée en changement de voie)" if vu else "")
+            + f", y {cy:g} ± {ty:g} % depuis le haut", not bad,
             f"x {min(xs):.0f}–{max(xs):.0f}, y {min(ys):.0f}–{max(ys):.0f}"
             + (f" ; hors : {len(bad)} images, de {bad[0]} à {bad[-1]}" if bad else ""))
         ws = sorted(cs[f][2] for f in steady if f in cs)
