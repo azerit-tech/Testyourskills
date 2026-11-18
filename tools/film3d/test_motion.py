@@ -1987,6 +1987,26 @@ def test_cut_pose():
               f"Δ {dp * 100:.2f} cm, lacet {dy:+.3f}°, site {ds:+.3f}°, roulis {dr:+.3f}°, focales {la:g}/{lb:g} mm")
 
 
+def test_vie():
+    """La vie de la ville (vie.py, SPEC §18.56) : la circulation, les voitures garées, le bus et les passants tenus à
+    distance de la berline et des patrouilles sur la fenêtre de chaque tronçon, en ville ; les véhicules de la vie
+    jamais l'un dans l'autre ; leurs vitesses de voitures en ville."""
+    import vie
+    veh, pas = vie.ecarts()
+    for shot in veh:
+        d, g, a, b = veh[shot]
+        check(f"vie {shot} : véhicules à {vie.ECART_VEHICULE:g} m de la poursuite ou plus", d >= vie.ECART_VEHICULE,
+              f"{d:.2f} m ({a} / {b}, image {g})")
+    for shot in pas:
+        d, g, a, b = pas[shot]
+        check(f"vie {shot} : passants à {vie.ECART_PASSANT:g} m de la poursuite ou plus", d >= vie.ECART_PASSANT,
+              f"{d:.2f} m ({a} / {b}, image {g})")
+    d, g, a, b = vie.ecarts_entre()
+    check("vie : deux véhicules de la vie à 5 m (centres) ou plus", d >= 5.0, f"{d:.2f} m ({a} / {b}, image {g})")
+    vmax = max(c.vit(g) for _n, _m, _t, c, _kw in vie.vehicules() for g in range(0, vie.G_FIN + 1, 6))
+    check("vie : la circulation à 50 km/h ou moins", vmax <= 50 / 3.6 + 1e-6, f"{vmax * 3.6:.0f} km/h")
+
+
 if __name__ == "__main__":
     test_cut_pose()
     test_straight()
@@ -2017,5 +2037,6 @@ if __name__ == "__main__":
     test_parcours()
     test_camera_measure()
     test_v3()
+    test_vie()
     print(f"\n{'tout passe' if not FAIL else str(len(FAIL)) + ' échec(s)'}")
     sys.exit(1 if FAIL else 0)
