@@ -76,43 +76,48 @@ def vehicules():
 
     # ------------------------------------------------------------ l'avenue (OUV, P1) : s 0 à 105
     # La berline sur E1 (n 0), la patrouille 1 à sa gauche sur la voie d'en face (n +3,5). A roule à 35 km/h sur E1,
-    # 36 m devant : la berline déboîte sur E2 (SLALOM : 1,8 m), la double par la droite pendant
-    # qu'A, aux sirènes, serre vers la ligne du milieu (+0,8 m), freine et s'arrête, warnings ; la berline revient sur
-    # E1 dans le freinage du rond-point. vie.py ne gare plus rien sur E2 le long de la course (le bus est derrière
+    # 36 m devant : la berline déboîte sur E2 (SLALOM : 2,7 m), la double par la droite pendant
+    # qu'A, aux sirènes, serre vers la ligne du milieu (+0,6 m en 1,25 s), freine et s'arrête, warnings ; la berline
+    # revient sur E1 avant le freinage du rond-point. vie.py ne gare plus rien sur E2 le long de la course (le bus est derrière
     # l'ouverture). B roule au pas sur E2 loin devant, freine et s'arrête à l'entrée de l'anneau (le « cédez le
     # passage »), feux stop allumés : la voiture arrêtée à l'entrée du rond-point pendant le premier dérapage.
     av_e1 = ligne(-40.0, 140.0, 0.0)
     av_e2 = ligne(-40.0, 140.0, -3.5)
-    add("av_a", "riverside", "creme", Course(av_e1, AV_A_V, s0=40.0 + AV_A, g0=0, ecart=bascule_g(*AV_A_SERRE, 0.8)),
+    add("av_a", "riverside", "creme", Course(av_e1, AV_A_V, s0=40.0 + AV_A, g0=0, ecart=bascule_g(*AV_A_SERRE, 0.6)),
         warning=AV_A_WARN)
     add("av_b", "fairheaven", "ciel", Course(av_e2, AV_B_V, s0=40.0 + AV_B, g0=0))
 
     # ------------------------------------------------------------ la rue des enseignes (P3) : s 164 à 226
-    # B1, garée contre le trottoir de droite après le barrage, déboîte à l'entrée de la poursuite dans la rue, la
-    # remonte devant elle, traverse le boulevard et prend le pont (la suite au pont). S, garée sur le boulevard à
-    # l'ouest de la rue, déboîte et tourne dans la rue en face de la poursuite, voit les gyrophares, se range contre
-    # le trottoir de gauche et s'arrête, warnings. D, garée à gauche, déboîte le nez dans la voie au moment où la
-    # berline arrive : elle s'en écarte (SLALOM) puis, la poursuite passée, D recule dans sa place. La meute de P4
-    # passe ensuite en deux files (p4_pont.RUE_X) : rien ne reste dans la chaussée.
+    # B1, garée contre le trottoir de droite après le barrage, déboîte avant l'entrée de la poursuite dans la rue
+    # (3,5 m/s² : elle roule déjà quand la caméra y entre), la remonte devant elle, traverse le boulevard et prend
+    # la voie de droite du pont (la suite au pont). S, garée sur le boulevard à l'ouest de la rue, déboîte et tourne
+    # dans la rue en face de la poursuite, voit les gyrophares, se range contre le trottoir de gauche et s'arrête,
+    # warnings. D, garée à gauche derrière elle, déboîte le nez dans la voie de la berline (2,4 m de course : sans
+    # écart, la berline la frôlerait à 0,2 m) : elle s'en écarte à droite (SLALOM : 1,2 m, 1,2 m d'air) puis, la
+    # poursuite passée, D recule dans sa place. La meute de P4 passe ensuite en deux files (p4_pont.RUE_X) : rien
+    # ne reste dans la chaussée.
     nord = V.courbe([(3.25, -367.0), (3.2, -364.0), (2.6, -360.0), (2.15, -355.0), (2.1, -350.0), (2.1, -345.0),
-                     (1.9, -335.0), (1.75, -322.0), (1.75, -150.0)], pas=0.5, n_lisse=6)
+                     (2.2, -340.0), (2.9, -330.0), (4.0, -318.0), (4.9, -306.0), (5.2, -298.0), (5.25, -292.0),
+                     (5.25, -150.0)], pas=0.5, n_lisse=6)
     add("pont_b1", "riverside", "argent",
-        Course(nord, B1_V, s0=0.0, g0=0, ecart=somme(bascule_g(*B1_SERRE, -3.5), bascule_g(*B1_RANGE, -0.35))),
+        Course(nord, B1_V, s0=0.0, g0=0, ecart=bascule_g(*B1_RANGE, -0.35)),
         warning=B1_WARN)
     sud = V.courbe([(-20.0, -340.4), (-8.0, -340.4), (-5.2, -340.7), (-3.0, -342.3), (-2.6, -344.5),
                     (-3.3, -348.0), (-3.3, -352.0), (-3.3, -360.0)], pas=0.5, n_lisse=6)
     add("rue_sud", "chapman", "bordeaux", Course(sud, RUE_S_V, s0=_s_at(sud, RUE_S_Y), g0=RUE_S_V[-1][0]),
         warning=RUE_S_V[-1][0] - 6)
-    sort = V.courbe([(-3.25, -358.0), (-3.25, -360.0), (-3.2, -361.2), (-2.8, -362.6), (-2.2, -363.8),
-                     (-1.8, -365.0), (-1.7, -366.0)], pas=0.2, n_lisse=4)
+    sort = V.courbe([(-3.25, -353.8), (-3.25, -355.8), (-3.2, -357.0), (-2.75, -358.4), (-2.1, -359.6),
+                     (-1.5, -360.8), (-1.2, -361.8), (-1.1, -363.0)], pas=0.2, n_lisse=4)
     add("rue_sort", "negotiator", "sable", Course(sort, RUE_D_V, s0=2.0, g0=0), warning=RUE_D_WARN)
 
     # ------------------------------------------------------------ le pont (P4) : s 242 à 358
-    # B1 (la voiture de la rue) prend le pont dans la voie de droite, à 70 km/h, et s'arrête contre la glissière
-    # derrière B2, warnings. B2 et B3, venues de l'est sur le boulevard, tournent à droite sur le pont, voie de
-    # droite, à 40 et 35 km/h, et s'arrêtent derrière le camion rangé (vie.py). La berline (SLALOM) : quand la
-    # patrouille 1 la remonte par la gauche pour l'enfermer, elle se jette dans la voie de droite (1,9 m), derrière B1,
-    # et revient à gauche avant de l'atteindre, dans le freinage du port. La meute ne double qu'à gauche d'elles.
+    # B1 (la voiture de la rue) entre sur le pont par la voie de droite (sa trajectoire y mène, sans changement de
+    # voie sec), à 70 km/h ; aux sirènes elle serre la glissière (0,35 m), freine (4,5 m/s²) et s'arrête derrière B2,
+    # warnings. B2 et B3, venues de l'est sur le boulevard, tournent à droite sur le pont, voie de droite, à 40 et
+    # 35 km/h, et s'arrêtent derrière le camion rangé (vie.py). La berline (SLALOM) entre sur le pont par la voie de
+    # droite elle aussi, derrière B1 : elle la rattrape, déboîte à gauche et la double (1,3 m d'air), puis B2 et B3,
+    # avant le freinage du port. La patrouille 1 la remonte par la gauche (p4_pont.P1_VOIE). La meute ne double
+    # qu'à gauche d'elles.
     for nom, mod, tnt, x, y_ref, g_ref, keys, ec, wn in PONT:
         pts = V.courbe([(300.0, -331.5), (x + 7.5, -331.5), (x + 2.2, -329.4), (x + 0.2, -325.5), (x, -321.0),
                         (x, -150.0)], pas=0.5, n_lisse=6)
@@ -120,15 +125,16 @@ def vehicules():
             warning=wn)
 
     # ------------------------------------------------------------ la jetée (P6) : s 390 à 476
-    # J1 roule au pas dans la voie de la berline, sortie du terre-plein après le virage : aux sirènes elle s'écarte
-    # vers le milieu de la jetée (à droite, la rambarde) et s'arrête, warnings ; la berline la passe par la droite,
-    # contre la rambarde, en S (SLALOM : 2,2 m). J3 descend la jetée en face, croise la berline à l'entrée de la jetée et s'arrête
-    # contre sa bordure, warnings. Au bout, J2, qui revenait en face, s'est rangée et fait un appel de phares quand
-    # la berline la croise, à 3 m de l'objectif. La meute de P6 suit le chemin de la berline (p6_jetee.column_pos) :
-    # elle les passe comme elle.
+    # J1 roule à 20 km/h dans la voie de la berline, sortie du terre-plein avant le virage : aux sirènes elle serre
+    # sa bordure (0,6 m à droite), freine et s'arrête, warnings ; la berline la double par la voie d'en face (SLALOM :
+    # 2,8 m ; à droite la chaussée ne laisse que 1 m, la berline y montait sur le trottoir). J3 descend la jetée en
+    # face, croise la berline à l'entrée de la jetée, avant son écart, et s'arrête contre sa bordure, warnings. Au
+    # bout, J2 revient en face dans la voie que la berline a prise : appels de phares, elle freine et se range ; la
+    # berline se rabat devant J1 et la croise à 3 m de l'objectif. La meute de P6 suit le chemin de la berline
+    # (p6_jetee.column_pos) : elle les passe comme elle.
     j1 = [point(388.0, -7.5), point(392.0, -5.5)] + ligne(396.0, 480.0, 0.0)
     add("jetee_j1", "sialia", "menthe",
-        Course(V.courbe(j1, pas=0.5, n_lisse=6), J1_V, s0=0.0, g0=0, ecart=bascule_g(*J1_SERRE, 2.1)),
+        Course(V.courbe(j1, pas=0.5, n_lisse=6), J1_V, s0=0.0, g0=0, ecart=bascule_g(*J1_SERRE, -0.6)),
         warning=J1_WARN)
     j3 = ligne(496.0, J3_S, 3.6)
     add("jetee_j3", "taxi", None, Course(j3, J3_V, s0=496.0 - J3_S, g0=J3_V[-1][0]), warning=J3_V[-1][0])
@@ -152,15 +158,16 @@ def _s_at(pts, y):
 # ---- les réglages (images du film g, m/s ; places en m)
 # l'avenue : A et B, leur avance sur la berline à l'image 0 (m) et leurs vitesses
 AV_A, AV_A_V = 36.0, [(0, _v(35)), (40, _v(35)), (56, 6.0), (120, 4.0), (150, 0.0)]
-AV_A_SERRE, AV_A_WARN = (6, 28), 60
+AV_A_SERRE, AV_A_WARN = (4, 34), 60
 AV_B, AV_B_V = 106.0, [(0, 4.0), (40, 4.0), (90, 0.0)]
-# la rue et le pont : B1 (vitesses depuis sa place, se range de, à, warnings dès) ; S (y où elle s'arrête, vitesses
-# jusqu'à l'arrêt) ; D (vitesses : déboîte, s'arrête, recule ; warnings)
-B1_V = [(0, 0.0), (200, 0.0), (210, 4.0), (222, 10.0), (250, 14.0), (285, 19.0), (388, 19.4), (426, 0.0)]
-B1_SERRE, B1_RANGE, B1_WARN = (300, 324), (350, 374), 412
-RUE_S_Y, RUE_S_V = -351.0, [(0, 0.0), (246, 0.0), (254, 5.0), (278, 5.0), (290, 0.0)]
-RUE_D_V = [(0, 0.0), (254, 0.0), (258, 2.4), (270, 2.4), (278, 0.0), (294, 0.0), (298, -2.1), (314, -2.1),
-           (318, 0.0)]
+# la rue et le pont : B1 (vitesses depuis sa place, serre la glissière de, à, warnings dès) ; S (y où elle s'arrête,
+# vitesses jusqu'à l'arrêt) ; D (vitesses : déboîte, s'arrête, recule ; warnings). Départs et arrêts à 3,5 à 5 m/s²
+# (18 novembre, l'audit : 10 à 17 m/s² avant, et un changement de voie de B1 à 22 m/s² de latérale)
+B1_V = [(0, 0.0), (173, 0.0), (306, 19.4), (356, 19.4), (459, 0.0)]
+B1_RANGE, B1_WARN = (346, 376), 400
+RUE_S_Y, RUE_S_V = -349.5, [(0, 0.0), (224, 0.0), (254, 5.0), (268, 5.0), (290, 0.0)]
+RUE_D_V = [(0, 0.0), (228, 0.0), (246, 3.0), (247, 3.0), (265, 0.0), (292, 0.0), (307, -2.5), (315, -2.5),
+           (330, 0.0)]
 RUE_D_WARN = 280
 # le pont : (nom, modèle, teinte, x de sa voie, y à l'image g, g, vitesses, (serre de, à, m) ou None, warnings dès)
 PONT = [
@@ -171,10 +178,10 @@ PONT = [
 ]
 # la jetée : J1 (vitesses depuis le terre-plein, serre, warnings) ; J2 (abscisse de route où elle s'arrête, vitesses,
 # appel de phares)
-J1_V = [(0, 0.0), (392, 0.0), (404, _v(20)), (516, _v(20)), (556, 0.0)]
-J1_SERRE, J1_WARN = (488, 516), 552
-J3_S, J3_V = 400.0, [(0, 0.0), (330, 0.0), (342, _v(30)), (500, _v(30)), (516, 0.0)]
-J2_S, J2_V, J2_APPELS = 462.0, [(0, 0.0), (470, 0.0), (482, _v(30)), (574, _v(30)), (590, 0.0)], (594, 606)
+J1_V = [(0, 0.0), (340, 0.0), (370, _v(20)), (524, _v(20)), (566, 0.0)]
+J1_SERRE, J1_WARN = (500, 540), 560
+J3_S, J3_V = 400.0, [(0, 0.0), (280, 0.0), (330, _v(30)), (470, _v(30)), (516, 0.0)]
+J2_S, J2_V, J2_APPELS = 462.0, [(0, 0.0), (410, 0.0), (470, _v(30)), (552, _v(30)), (596, 0.0)], (556, 572)
 
 
 # ---------------------------------------------------------------- les véhicules de la poursuite, en ville
