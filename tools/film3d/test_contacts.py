@@ -68,9 +68,9 @@ def test_choc():
         f = C.efforts_de([c])
         n = 4000
         t0, h = C.instant(c) - c["duree"], 2.0 * c["duree"] / n
-        s = sum((f(t0 + (k + 0.5) * h) or (0.0, 0.0))[1] for k in range(n)) * h
-        check(f"{c['nom']} : l'impulsion donnée à la simulation est celle du choc", abs(abs(s) - j) < 0.01 * j,
-              f"{abs(s):.0f} N·s pour {j:.0f}")
+        s = math.hypot(*(sum((f(t0 + (k + 0.5) * h) or (0.0, 0.0))[i] for k in range(n)) * h for i in (0, 1)))
+        check(f"{c['nom']} : l'impulsion donnée à la simulation est celle du choc", abs(s - j) < 0.01 * j,
+              f"{s:.0f} N·s pour {j:.0f}")
 
 
 def test_caisses():
@@ -92,7 +92,7 @@ def test_caisses():
         check(f"{c['nom']} : jamais enfoncées de plus de {ENFONCE_MAX * 100:g} cm (au quart d'image)",
               ec[gmin] >= -ENFONCE_MAX, f"{ec[gmin] * 100:+.1f} cm à l'image {gmin:g}")
         if on:
-            seule = all(g2 - g1 <= 0.26 for g1, g2 in zip(on, on[1:]))
+            seule = all(g2 - g1 <= 1.01 for g1, g2 in zip(on, on[1:]))      # (à une image près : ±1 cm au premier appui)
             check(f"{c['nom']} : un seul contact, puis elles se séparent", seule and on[-1] - on[0] <= 10.0,
                   f"{on[-1] - on[0]:g} images l'une contre l'autre")
         # la patrouille : de sa ligne à sa ligne, avant la fin de son plan, à des accélérations de voiture
@@ -120,9 +120,10 @@ def test_caisses():
         h = c["duree"] / 2 + 0.002
         (x0, y0), (x1, y1) = pat.choc(row["tc"] + h + 0.5), pat.choc(row["tc"] + h + 1.5)
         dvp = math.hypot(x1 - x0, y1 - y0)
-        check(f"{c['nom']} : quantité de mouvement conservée (la patrouille rend l'impulsion sur sa masse)",
-              abs(dvp * C.M_PATROL - abs(C.impulsion(c)[1])) < 0.01 * C.norme(c),
-              f"{dvp * C.M_PATROL:.0f} N·s pour {abs(C.impulsion(c)[1]):.0f}")
+        jy, qx = abs(C.impulsion(c)[1]), C.point(c)[1]
+        veut = jy * (1.0 / C.M_PATROL + qx * qx / C.I_PATROL)
+        check(f"{c['nom']} : la patrouille rend l'impulsion (le saut de vitesse de son point de contact : J/m + qx² J/I)",
+              abs(dvp - veut) < 0.01 * veut, f"{dvp:.2f} m/s pour {veut:.2f} ({jy / C.M_PATROL:.2f} à son centre)")
 
 
 def test_berline():
@@ -144,10 +145,10 @@ def test_berline():
                 base01 = t
             if abs(d.voie_err(t)) > LIGNE and t < tc + 2.0:      # (au-delà : le dérapage suivant)
                 hors = t
-            dslip = max(dslip, abs(d.slip(t) - b.slip(t)))
+            dslip = max(dslip, abs((d.heading(t) - d.travel(t)) - (b.heading(t) - b.travel(t))))
             dyaw = max(dyaw, abs(d.yaw_rate(t) - b.yaw_rate(t)))
-        check(f"{c['nom']} : la berline encaisse (une embardée de 0,1 à 0,6 m, 12° de glisse au plus)",
-              0.1 <= abs(dev) <= 0.6 and dslip <= 12.0,
+        check(f"{c['nom']} : la berline encaisse (une embardée de 0,1 à 0,6 m, 4° de glisse en plus au plus fort)",
+              0.1 <= abs(dev) <= 0.6 and dslip <= 4.0,
               f"embardée {dev:+.2f} m, glisse {dslip:.1f}°, lacet {dyaw:.0f}°/s de plus qu'avant")
         check(f"{c['nom']} : revenue à {LIGNE:g} m de sa ligne et sur sa trajectoire d'avant en moins de {REPRISE:g} s",
               hors - tc < REPRISE and base01 - tc < REPRISE,
@@ -221,11 +222,11 @@ def test_camera():
     for c in C.CHOCS:
         tc = C.instant(c)
         avant = C.secousse(tc - c["duree"])
-        apres = C.secousse(tc + 0.5)
+        apres = C.secousse(tc + C.SECOUSSE_S)
         for k in range(0, 200):
             s = C.secousse(tc - 0.1 + k / 400.0)
             pire = [max(pire[0], abs(s[0])), max(pire[1], max(abs(v) for v in s[1:]))]
-        check(f"{c['nom']} : l'à-coup de la caméra, nul avant le choc, éteint 0,5 s après",
+        check(f"{c['nom']} : l'à-coup de la caméra, nul avant le choc, éteint 0,33 s après",
               all(v == 0.0 for v in avant) and all(abs(v) < 1e-3 for v in apres))
     check("caméra : un à-coup de quelques centimètres (1 à 6 cm, moins de 1°)", 0.01 <= pire[0] <= 0.06 and pire[1] < 1.0,
           f"{pire[0] * 100:.1f} cm, {pire[1]:.2f}°")

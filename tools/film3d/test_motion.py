@@ -17,6 +17,9 @@ FAIL = []
 # différences finies des contrôles), pour la berline, la patrouille du contact et la caméra. Tout le reste (les
 # autres véhicules, les autres paires, les autres images) garde ses seuils.
 CHOC_AVANT, CHOC_APRES = 2, 3
+# la caméra : son à-coup (contacts.secousse) dure contacts.SECOUSSE_S (0,33 s, 8 images), plus une image pour les
+# différences. La glisse de la berline est jugée telle quelle, choc compris
+CAM_APRES = 9
 _CONTACTS = {}
 
 
@@ -32,7 +35,7 @@ def _contacts(plan, avant=CHOC_AVANT, apres=CHOC_APRES):
 
 def _choc(plan, f, nom="hero", avant=CHOC_AVANT, apres=CHOC_APRES):
     """L'image f du plan est-elle une image de choc pour nom (« hero », « camera » ou la clé d'une patrouille) ?"""
-    pair, choc, _ = _contacts(plan, avant, apres)
+    pair, choc, _ = _contacts(plan, avant, max(apres, CAM_APRES) if nom == "camera" else apres)
     return (nom == "camera" or nom in pair) and f in choc
 
 
@@ -937,8 +940,12 @@ def test_p6():
     d, f, a, b = M.min_gap(P.tracks(), frames)
     check("P6 : distances gardées", d >= 6.0, f"{d:.1f} m entre {a} et {b} à l'image {f}")
     # la meute à la file : la berline elle-même, son retard plus tôt
-    off = max(math.dist(P.column_pos(i)(T(g)), P.hero_pos(T(g) - tau)) for g in frames
+    # (son chemin d'avant les contacts, contacts.py, SPEC §18.68 : la colonne ne rejoue pas ses chocs ; les deux
+    # chemins à 0,3 m près sur la jetée)
+    h0 = PC.hero("P6", chocs=False)["pos"]
+    off = max(math.dist(P.column_pos(i)(T(g)), h0(g - tau * M.FPS)) for g in frames
               for i, (_, tau) in enumerate(P.COLUMN))
+    off = max(off, max(math.dist(h0(g), PC.hero("P6")["pos"](g)) for g in frames) - 0.3)
     gap = min(math.dist(P.hero_pos(T(f)), P.column_pos(i)(T(f))) for f in frames for i in range(len(P.COLUMN)))
     check("P6 : la meute à la file, sur le chemin de la berline, à 15 m au moins", off < 1e-9 and gap >= 15.0,
           f"{gap:.1f} m au plus près")
