@@ -261,7 +261,7 @@ if VILLE:
 
     # la part du slalom de la berline (parcours.voie, SPEC §18.62) que la patrouille 1 suit : la moitié. La berline
     # prend la voie de droite du pont (3,8 m à droite de la route) : la patrouille qui la remonte par la gauche
-    # reste à 5,5 m d'elle, dans le cadre, sans toucher la file d'en face (2,3 m) ; à 0, elle sortait du cadre
+    # reste dans le cadre, à 1,9 m de la file d'en face au plus juste (diag/audit_trafic.py)
     P1_VOIE = 0.5
 
     def _voie_x(t):
