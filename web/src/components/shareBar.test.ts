@@ -70,8 +70,7 @@ describe("bloc de partage selon l'appareil (§18.27)", () => {
     expect(main(html)).toContain('target="_blank"');
     expect(main(html)).toContain('rel="noopener"');
     expect(pinks(html)).toHaveLength(1);
-    // « Ajouter à mon profil LinkedIn » seul en contour (§18.75).
-    expect(ghosts(html)).toEqual(['class="pill pill-ghost out-second out-profile"']);
+    expect(ghosts(html)).toHaveLength(0);
     // Trois libellés courts, sur une ligne à 390 px ; le libellé entier reste lu.
     expect(links(html)).toEqual(["Copier le lien", "Image", "Story"]);
     expect(html).toContain('aria-label="Télécharger l&#x27;image"');
@@ -119,9 +118,9 @@ describe("bloc de partage selon l'appareil (§18.27)", () => {
     const html = render({ ua: IPHONE, touch: true, share: true });
     expect(main(html)).toMatch(/^<button /);
     expect(main(html)).toContain("Partager");
-    // Un bouton rose, LinkedIn et l'ajout au profil en contour, le reste en liens.
+    // Un bouton rose, LinkedIn seul en contour, le reste en liens (l'ajout au profil aussi, §18.75).
     expect(pinks(html)).toHaveLength(1);
-    expect(ghosts(html)).toEqual(['class="pill pill-ghost out-second"', 'class="pill pill-ghost out-second out-profile"']);
+    expect(ghosts(html)).toHaveLength(1);
     expect(html).toMatch(/<a class="pill pill-ghost out-second" href="https:\/\/skills\.test\/c\//);
     expect(html).not.toContain(">X</button>");
     expect(html).toMatch(/LinkedIn.*Copier le lien.*>Image</);
@@ -131,7 +130,7 @@ describe("bloc de partage selon l'appareil (§18.27)", () => {
   it("navigateur intégré sans feuille de partage : LinkedIn devant, l'image s'ouvre en panneau", () => {
     const html = render({ ua: LINKEDIN_ANDROID, touch: true, share: false });
     expect(main(html)).toMatch(/^<a /);
-    expect(ghosts(html)).toHaveLength(1);
+    expect(ghosts(html)).toHaveLength(0);
     expect(html).not.toContain("download=");
     // Rien à copier à la main tant qu'aucune copie n'a échoué.
     expect(html).not.toContain("out-manual");

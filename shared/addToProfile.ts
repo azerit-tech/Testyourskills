@@ -7,9 +7,8 @@ import type { Lang } from "./types";
 
 /**
  * L'identifiant de la page LinkedIn d'Azerit (linkedin.com/company/azerit-ai), relevé dans le code
- * de la page le 18 novembre 2026, pas confirmé par LinkedIn : à vérifier sur un vrai ajout (le
- * formulaire doit montrer le logo d'Azerit comme organisme). Un seul paramètre, l'id : pas de
- * `organizationName` en secours.
+ * de la page le 18 novembre 2026, confirmé le même jour sur le vrai formulaire (il préremplit
+ * « Azerit » comme organisme). Un seul paramètre, l'id : pas de `organizationName` en secours.
  */
 export const AZERIT_LINKEDIN_ORG_ID = "138413959";
 

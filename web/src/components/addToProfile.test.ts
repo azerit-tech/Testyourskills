@@ -57,17 +57,18 @@ describe("bouton sous la fiche", () => {
     return renderToStaticMarkup(createElement(LangProvider, null, createElement(ShareBar, { item: { kind: "card", card }, toast: () => undefined })));
   }
 
-  it("juste après le partage LinkedIn, une ligne, l'adresse de la fiche tant qu'on ne clique pas", () => {
+  it("un lien texte juste au-dessus de « Copier le lien », sans pilule ni icône, l'adresse de la fiche tant qu'on ne clique pas", () => {
     const html = render();
     expect(html).toMatch(
-      /<span>Partager sur LinkedIn<\/span><\/a><p class="out-hint"[^>]*>[^<]*<\/p><a class="pill pill-ghost out-second out-profile" href="https:\/\/skills\.azerit\.tech\/c\/AbCdEf1234\?r=AbCdEf1234" target="_blank" rel="noopener">.*?<span>Ajouter à mon profil LinkedIn<\/span><\/a><div class="out-more">/,
+      /<span>Partager sur LinkedIn<\/span><\/a><p class="out-hint"[^>]*>[^<]*<\/p><a class="link-alt out-profile" href="https:\/\/skills\.azerit\.tech\/c\/AbCdEf1234\?r=AbCdEf1234" target="_blank" rel="noopener">Ajouter à mon profil LinkedIn<\/a><div class="out-more">/,
     );
+    expect(html).not.toMatch(/class="pill[^"]*out-profile/);
     // Un bloqueur de contenu masquerait un lien vers LinkedIn : l'adresse n'est pas dans la page.
     expect(html).not.toContain("linkedin.com");
   });
 
   it("en anglais", () => {
-    expect(render(gold, "en-US")).toContain("<span>Add to my LinkedIn profile</span>");
+    expect(render(gold, "en-US")).toContain(">Add to my LinkedIn profile</a>");
   });
 
   it("pas de bouton sur une fiche scellée, sans note à poser", () => {

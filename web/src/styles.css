@@ -3189,6 +3189,11 @@ a.dossier-item:hover {
   color: var(--c-emphasis);
 }
 /* le reste du partage en liens, sur une seule ligne dès 320 px : « Copier le lien », « Image », « Story » */
+/* « Ajouter à mon profil LinkedIn » (§18.75) : un lien comme ceux du dessous, sur sa ligne juste au-dessus */
+.out .out-profile {
+  justify-self: start;
+  margin: -4px 0 -10px;
+}
 .out-more {
   display: flex;
   flex-wrap: wrap;

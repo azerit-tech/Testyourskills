@@ -347,13 +347,14 @@ function LinkedInLink({ kit, className, from }: { kit: Sharing; className: strin
 
 /**
  * « Ajouter à mon profil LinkedIn » (§18.75) : la fiche dans « Licences et certifications », par le
- * lien « Add to Profile » de LinkedIn. Même ruse que le partage contre les bloqueurs de contenu.
+ * lien « Add to Profile » de LinkedIn. Un lien texte comme « Copier le lien », sur sa ligne juste
+ * au-dessus d'eux (la rangée ne le tient pas à 320 px). Même ruse que le partage contre les bloqueurs.
  */
 function AddToProfileLink({ kit }: { kit: Sharing }) {
   const { t } = useT();
   return (
     <a
-      className="pill pill-ghost out-second out-profile"
+      className="link-alt out-profile"
       href={kit.url}
       target="_blank"
       rel="noopener"
@@ -363,8 +364,7 @@ function AddToProfileLink({ kit }: { kit: Sharing }) {
       }}
       onAuxClick={(e) => aimAt(e.currentTarget, kit.profileHref, kit.url)}
     >
-      <IconLinkedIn />
-      <span>{t.result.share.addProfile}</span>
+      {t.result.share.addProfile}
     </a>
   );
 }
