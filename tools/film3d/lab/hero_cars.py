@@ -617,6 +617,22 @@ def mat_tyre(name, r_rim=0.19, r_out=0.31, wear=0.0):
 # ni voile d'essuyage, qui la ternissaient en gris devant l'habitacle
 REAR_WINDOW = "lunette"
 REAR_REFL_CUT = 0.6
+# Le verre après la pluie (SPEC §18.66). Un verre lisse (rugosité 0) renvoyait chaque lampadaire en image nette : sur
+# la jetée, la tête de chaque lampe qui passe au-dessus de la berline traversait la lunette en tache blanc pur
+# (brouillon éclairé v9, images 531–534, 560–564, 586–588, 612). Le reflet d'une petite source de luminance L et
+# d'angle solide w vaut F·L·w / (4·pi·a²) pour un lobe GGX (a = rugosité²) : une tête de lampadaire vue à 5 m
+# (w ≈ 0,005 sr) tombe au dixième de son image miroir vers a = 0,06, soit 0,25 de rugosité. La lunette, couchée
+# vers le ciel et les lampes, porte le film d'eau sale de la route (GLASS_ROUGH_REAR) ; les vitres droites, qui ne
+# voient que l'horizon, restent presque nettes (GLASS_ROUGH). La transparence ne passe pas par ce lobe : l'habitacle
+# vu au travers reste net. Le reflet prend la teinte du verre trempé d'époque (GLASS_REFL_TINT).
+GLASS_ROUGH = 0.05
+GLASS_ROUGH_REAR = 0.24
+GLASS_REFL_TINT = (0.78, 0.84, 0.82, 1.0)
+# la poussière des coins : l'attribut de sommet EDGE (mark_glass_edges : 0 au joint, 1 à GLASS_EDGE m du bord de la
+# vitre) ; l'eau chasse la poussière vers les joints, elle y sèche en voile mat (un peu de diffus, GLASS_DUST au plus)
+EDGE = "bord"
+GLASS_EDGE = 0.07
+GLASS_DUST = 0.22
 
 
 def mat_window(name, tint=(0.80, 0.86, 0.84, 1), dark=0.0, wear=0.0):
@@ -637,21 +653,34 @@ def mat_window(name, tint=(0.80, 0.86, 0.84, 1), dark=0.0, wear=0.0):
     fr = _node(nt, "ShaderNodeFresnel", IOR=_mix(nt, 1.52, 1.0 / 1.52, bf))
     tr = _node(nt, "ShaderNodeBsdfTransparent", Color=tuple(c * (1 - dark) for c in tint[:3]) + (1,))
     gl = _glossy(nt)
-    gl.inputs["Roughness"].default_value = 0.0
+    gl.inputs["Color"].default_value = GLASS_REFL_TINT
     mix = nt.nodes.new("ShaderNodeMixShader")
     rw = nt.nodes.new("ShaderNodeAttribute")
     rw.attribute_type = "GEOMETRY"
     rw.attribute_name = REAR_WINDOW
     clear = cv._math(nt, "SUBTRACT", 1.0, rw.outputs["Fac"])        # 0 sur la lunette, 1 ailleurs
+    # le film d'eau de la route : GLASS_ROUGH partout, GLASS_ROUGH_REAR sur la lunette
+    rough = _mix(nt, GLASS_ROUGH, GLASS_ROUGH_REAR, rw.outputs["Fac"])
     # un plancher de reflet : la vitre reste lisible de face
     floor = 0.04
+    dust = None
     if wear > 0:
         rest = _rest(nt)
         haze = _imperfection(nt, rest, "SurfaceImperfections003", 0.8, 0.04, 0.4)
         spots = _imperfection(nt, rest, "SurfaceImperfections013", 0.4, 0.08, 0.6)
         veil = cv._math(nt, "MULTIPLY", cv._math(nt, "MAXIMUM", haze, spots), clear)
-        nt.links.new(cv._math(nt, "MULTIPLY", veil, 0.10 * wear), gl.inputs["Roughness"])
+        rough = cv._math(nt, "ADD", rough, cv._math(nt, "MULTIPLY", veil, 0.10 * wear))
         floor = cv._math(nt, "ADD", 0.04, cv._math(nt, "MULTIPLY", veil, 0.07 * wear))
+        # la poussière des coins (attribut EDGE ; sans lui, 0 partout : la vitre d'un modèle non marqué reste nue)
+        ed = nt.nodes.new("ShaderNodeAttribute")
+        ed.attribute_type = "GEOMETRY"
+        ed.attribute_name = EDGE
+        near = cv._math(nt, "MULTIPLY", cv._math(nt, "SUBTRACT", 1.0, ed.outputs["Fac"]), ed.outputs["Alpha"])
+        grain = _noise(nt, rest, 9.0, 3.0, 0.25, 0.75)
+        dust = cv._math(nt, "MULTIPLY", cv._math(nt, "MULTIPLY", cv._math(nt, "POWER", near, 1.6),
+                                                 cv._math(nt, "ADD", 0.45, cv._math(nt, "MULTIPLY", grain, 0.55))),
+                        GLASS_DUST * min(1.0, 2.0 * wear))
+        rough = cv._math(nt, "ADD", rough, cv._math(nt, "MULTIPLY", dust, 1.2))
         up = _up(nt, 0.25, 0.65)
         dens = min(1.0, 1.4 * wear)
         h1, m1 = _drops(nt, rest, 80.0, 0.34, cv._math(nt, "ADD", cv._math(nt, "MULTIPLY", up, 0.35 * dens), 0.03 * dens))
@@ -660,6 +689,9 @@ def mat_window(name, tint=(0.80, 0.86, 0.84, 1), dark=0.0, wear=0.0):
                   Strength=1.0, Distance=0.0025)
         nt.links.new(b.outputs[0], gl.inputs["Normal"])
         nt.links.new(b.outputs[0], fr.inputs["Normal"])
+        # une goutte est de l'eau lisse : son reflet reste net (hors de la lunette, qui n'en porte pas)
+        rough = _mix(nt, rough, 0.02, cv._math(nt, "MULTIPLY", cv._math(nt, "MAXIMUM", m1, m2), clear))
+    nt.links.new(rough, gl.inputs["Roughness"])
     # la face de dos : la moitié du plancher (la lame a déjà reçu celui de sa face avant)
     f = cv._math(nt, "ADD", cv._math(nt, "MULTIPLY", fr.outputs[0], 0.9),
                  cv._math(nt, "MULTIPLY", floor, cv._math(nt, "SUBTRACT", 1.0, cv._math(nt, "MULTIPLY", bf, 0.5))))
@@ -667,7 +699,16 @@ def mat_window(name, tint=(0.80, 0.86, 0.84, 1), dark=0.0, wear=0.0):
     nt.links.new(f, mix.inputs[0])
     nt.links.new(tr.outputs[0], mix.inputs[1])
     nt.links.new(gl.outputs[0], mix.inputs[2])
-    nt.links.new(mix.outputs[0], out.inputs[0])
+    sh = mix.outputs[0]
+    if dust is not None:
+        # le voile de poussière : un diffus gris chaud qui prend la lumière de la rue et cache un peu l'habitacle
+        df = _node(nt, "ShaderNodeBsdfDiffuse", Color=lin("#8d857a"))
+        dm = nt.nodes.new("ShaderNodeMixShader")
+        nt.links.new(dust, dm.inputs[0])
+        nt.links.new(sh, dm.inputs[1])
+        nt.links.new(df.outputs[0], dm.inputs[2])
+        sh = dm.outputs[0]
+    nt.links.new(sh, out.inputs[0])
     m.use_backface_culling = False
     return m
 
@@ -1078,6 +1119,73 @@ def mark_rear_window(glass):
     vals = [1.0 if (p.center.x < 0.0 and p.normal.x < -0.3 and p.normal.z > 0.2) else 0.0 for p in me.polygons]
     a.data.foreach_set("value", vals)
     return int(sum(vals))
+
+
+def mark_glass_edges(objs, mat_names=("hero_w111_glass",), width=None):
+    """L'attribut de sommet EDGE des vitres (0 au joint, 1 à `width` m du bord, GLASS_EDGE par défaut) : la distance,
+    le long du maillage, au bord de chaque vitre (arête libre, arête vive d'une lame à deux faces, arête voisine
+    d'une autre matière). La matière y lit la poussière des coins. Une pièce de verre sans sommet à plus de `width`
+    de son bord (les petits verres des feux, un carreau fait d'un seul quadrilatère) reste propre partout (1) : on
+    n'y saurait pas faire de dégradé. Renvoie le nombre de vitres marquées."""
+    import heapq
+    width = GLASS_EDGE if width is None else width
+    marked = 0
+    for ob in objs:
+        me = ob.data
+        idx = {i for i, m in enumerate(me.materials) if m and m.name in mat_names}
+        if not idx:
+            continue
+        bm = bmesh.new()
+        bm.from_mesh(me)
+        gset = {f for f in bm.faces if f.material_index in idx}
+        dist = {}
+        for f in gset:
+            for e in f.edges:
+                gf = [x for x in e.link_faces if x in gset]
+                if len(gf) != 2 or len(e.link_faces) != 2 or gf[0].normal.angle(gf[1].normal, 0.0) > math.radians(50.0):
+                    for v in e.verts:
+                        dist[v.index] = 0.0
+        bm.verts.ensure_lookup_table()
+        heap = [(0.0, i) for i in dist]
+        heapq.heapify(heap)
+        while heap:
+            d, i = heapq.heappop(heap)
+            if d > dist.get(i, 1e9) or d > 4.0 * width:
+                continue
+            for e in bm.verts[i].link_edges:
+                if not any(f in gset for f in e.link_faces):
+                    continue
+                j = e.other_vert(bm.verts[i]).index
+                nd = d + e.calc_length()
+                if nd < dist.get(j, 1e9):
+                    dist[j] = nd
+                    heapq.heappush(heap, (nd, j))
+        # par pièce : sans sommet intérieur assez loin du bord, pas de dégradé possible, la pièce reste propre
+        vals = [1.0] * len(bm.verts)
+        seen = set()
+        for f0 in gset:
+            if f0 in seen:
+                continue
+            piece, stack = [], [f0]
+            seen.add(f0)
+            while stack:
+                f = stack.pop()
+                piece.append(f)
+                for e in f.edges:
+                    for g in e.link_faces:
+                        if g in gset and g not in seen:
+                            seen.add(g)
+                            stack.append(g)
+            vs = {v.index for f in piece for v in f.verts}
+            if max(dist.get(i, 1e9) for i in vs) < 1.2 * width:
+                continue
+            for i in vs:
+                vals[i] = min(1.0, dist.get(i, 1e9) / width)
+            marked += 1
+        bm.free()
+        a = me.attributes.get(EDGE) or me.attributes.new(EDGE, "FLOAT", "POINT")
+        a.data.foreach_set("value", vals)
+    return marked
 
 
 def dark_shelf(body, mats=("hero_w111_leather", "hero_w111_carpet"), x_max=-0.85, z_min=0.8):
@@ -1596,6 +1704,8 @@ def load_hero(variant="w111", collection=None, lights_on=True, raw=False):
             car["report"]["vitres"] = "à part" if car["glass"] else "introuvables"
             if car["glass"]:
                 car["report"]["lunette"] = f"{mark_rear_window(car['glass'])} faces"
+            n = mark_glass_edges([o for o in [car["glass"], *car["doors"].values()] if o is not None])
+            car["report"]["coins des vitres"] = f"{n} vitres marquées"
             car["report"]["plage arrière"] = f"{dark_shelf(body)} faces en moquette sombre"
             body[STOP] = 0.0
             body.id_properties_ui(STOP).update(min=0.0, max=1.0, description="feux stop (0 éteints, 1 allumés)")
