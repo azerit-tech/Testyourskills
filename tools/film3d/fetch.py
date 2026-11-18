@@ -111,6 +111,25 @@ SKETCHFAB = {
     "lieux/rue/parking-meter/model.glb": "c0f5e3e1c8a64ab3b64d4b077bd09210",
     "lieux/rue/newspaper-box/model.glb": "29cca5a8e99e438c8fb644d1aea3587e",
     "lieux/rue/street-pack/model.glb": "9752f598cc5541acb3de07150d1a4ae4",
+    # la vie de la ville (vie.py, SPEC §18.58) : la circulation et les garées (années 70-90, Daniel Zhabotinsky),
+    # le bus, les passants (Renderpeople, une marche et une attente animées reprises par les autres), les mouettes
+    "lieux/vie/car-fairheaven-lt80/model.glb": "e2678da920cc4be68dbc193727919ffb",
+    "lieux/vie/car-negotiator80/model.glb": "892b2684fb37442299bfad9222cf331c",
+    "lieux/vie/car-fairheaven-sw84/model.glb": "aa0becb6e854422596cac6b21bf79787",
+    "lieux/vie/car-riverside88/model.glb": "8509a7f82665442592627940b7a1cfab",
+    "lieux/vie/car-sialia-sw68/model.glb": "eea2291a90f04a4b860c9e74be14f2d6",
+    "lieux/vie/car-chapman73/model.glb": "f30b644b59b54e809355009dce463d47",
+    "lieux/vie/taxi-canyon75/model.glb": "9e8f92a215784f3d8aaaaeab1bef54c4",
+    "lieux/vie/truck-lct3000/model.glb": "663a0953c038434a918cb85725c88ffa",
+    "lieux/vie/pickup-doutrive78/model.glb": "30700a84311c4bea9ef722f0773ce92a",
+    "lieux/vie/bus-town/model.glb": "14fe03d792914d51b6c6250b393c44fd",
+    "lieux/vie/people-nathan-walk/model.glb": "143a2b1ea5eb4385ae90a73657aca3bc",
+    "lieux/vie/people-sophia-anim/model.glb": "dc448c3be0e74f96a55fb475a13433cf",
+    "lieux/vie/people-eric-rigged/model.glb": "a46bc9f67aaa415bb4f3241eef900e7f",
+    "lieux/vie/people-carla-rigged/model.glb": "acf520f450d14dd799f98a6fede3edf5",
+    "lieux/vie/people-claudia-rigged/model.glb": "c659bd0accab47c6bbe390cf822a2b92",
+    "lieux/vie/people-man-sitting/model.glb": "d8ca320050c6494581c34292356a280b",
+    "lieux/vie/seagull/model.glb": "dc42ffc81c86480e9e7f7752fa134174",
 }
 
 # Poly Haven : (asset, type, résolution), ou (asset, type, résolution, dossier)

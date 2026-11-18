@@ -2518,6 +2518,27 @@ def test_rampes():
           names and back and not bad and pairs >= 5, f"{pairs} jonctions, " + (", ".join(bad) or "aucun saut"))
 
 
+def test_vie():
+    """La vie de la ville (vie.py, SPEC §18.58) : la circulation, les voitures garées, le bus et les passants tenus à
+    distance de la berline et des patrouilles sur la fenêtre de chaque tronçon, en ville ; les véhicules de la vie
+    jamais l'un dans l'autre ; leurs vitesses de voitures en ville. Le mobilier compte avec les passants."""
+    import vie
+    veh, pas = vie.ecarts()
+    for shot in veh:
+        d, g, a, b = veh[shot]
+        check(f"vie {shot} : véhicules à {vie.ECART_VEHICULE:g} m de la poursuite ou plus", d >= vie.ECART_VEHICULE,
+              f"{d:.2f} m ({a} / {b}, image {g})")
+    for shot in pas:
+        d, g, a, b = pas[shot]
+        check(f"vie {shot} : passants à {vie.ECART_PASSANT:g} m de la poursuite ou plus", d >= vie.ECART_PASSANT,
+              f"{d:.2f} m ({a} / {b}, image {g})")
+    d, g, a, b = vie.ecarts_entre()
+    check("vie : 0,5 m de jour au moins entre deux véhicules de la vie (l'un roule), près de la poursuite", d >= 0.5,
+          f"{d:.2f} m ({a} / {b}, image {g})")
+    vmax = max(c.vit(g) for _n, _m, _t, c, _kw in vie.vehicules() for g in range(0, vie.G_FIN + 1, 6))
+    check("vie : la circulation à 50 km/h ou moins", vmax <= 50 / 3.6 + 1e-6, f"{vmax * 3.6:.0f} km/h")
+
+
 if __name__ == "__main__":
     test_poursuivants()
     test_rampes()
@@ -2555,5 +2576,6 @@ if __name__ == "__main__":
     test_camera_measure()
     test_vitesse()
     test_v3()
+    test_vie()
     print(f"\n{'tout passe' if not FAIL else str(len(FAIL)) + ' échec(s)'}")
     sys.exit(1 if FAIL else 0)

@@ -292,6 +292,10 @@ def worker(a):
         # la ville autour du plan (ville.voisins) : après le cache, qui garde la scène du plan seule
         import ville
         ville.voisins(scene, plan, os.path.abspath(a.ville))
+        # la vie de la ville (vie.py, SPEC §18.58) : en ville et en temps du film, la même des deux côtés de chaque
+        # jonction ; FILM3D_VIE=0 l'ôte
+        import vie
+        vie.poser_plan(scene, plan)
     still = scene.frame_current
     span = scene.frame_end - scene.frame_start + 1
     animated = span > 3
