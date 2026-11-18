@@ -60,13 +60,13 @@ SOURCES = {
 # 110 m). cut.ts (le site) les reprendra ; tant qu'il garde le découpage v3, plan_frames rend la longueur des
 # modules et le journal le dit.
 FALLBACK_FRAMES = {"OUV": 75, "P1": 33, "P2": 107, "P3": 103, "P4": 108, "P5": 60, "P6": 133, "FIN": 52, "FIN6": 101}
-# Le module de trajectoire de chaque plan (sans Blender) : son FRAMES est la longueur que sa scène sait animer. Un
-# plan pas encore migré au découpage de cut.ts se rend à la longueur de son module, et le journal le dit.
 # Les plans que le site ne joue plus et que cut.ts ne nomme donc plus, mais que l'atelier sait encore rendre : FIN,
 # l'ancienne fin à la pointe (SPEC §18.53). Leur durée est celle du repli, sans alerte. (Jusqu'à v10, l'absence de
 # FIN dans cut.ts faisait dire « plans manquants ['FIN'], durées de repli » à chaque lancement et jetait TOUTES les
 # durées de cut.ts pour celles du repli ; le rendu n'en changeait pas, les modules font foi : plan_frames.)
 HORS_SITE = ("FIN",)
+# Le module de trajectoire de chaque plan (sans Blender) : son FRAMES est la longueur que sa scène sait animer. Un
+# plan pas encore migré au découpage de cut.ts se rend à la longueur de son module, et le journal le dit.
 TRAJ = {"OUV": "ouv_avenue", "P1": "p1_avenue", "P2": "p2_arc", "P3": "p3_enseignes", "P4": "p4_pont",
         "P5": "p5_virage", "P6": "p6_jetee", "FIN": "fin_pointe", "FIN6": "fin6_orbite"}
 FULL = (720, 1280)
@@ -137,14 +137,14 @@ def plan_frames(cut, plans=ORDER, frames_of=module_frames):
             autres.append(f"{plan} {m} (cut.ts : {n})")
             n = m
         out[plan] = n
-    return out
-
-
     if autres:
         # une ligne pour tous : depuis le trajet roulé (§18.55) le site garde l'ancien découpage tant que le film
         # n'est pas livré, chaque plan le redisait
         log(f"durées des modules de trajectoire, pas celles de cut.ts (le site les reprendra à la livraison) : "
             f"{', '.join(autres)}")
+    return out
+
+
 def parse_frames(spec, n):
     """« a-b », « a » ou une liste « 9,13,17-19 » (comptées dans le plan, 1 à n) -> liste d'indices triée ; None ->
     tout le plan."""
@@ -779,6 +779,7 @@ def selftest():
     import parcours as PC                                                      # le repli : le trajet roulé
     assert FALLBACK_FRAMES == dict(PC.SHOTS, FIN=52, FIN6=PC.FIN6_FRAMES), FALLBACK_FRAMES
     assert set(cut) == set(ORDER), cut
+    assert all(p in ORDER for p in HORS_SITE) and cut["FIN6"] > 0, cut       # FIN n'est plus dans cut.ts : repli muet
     # un plan pas encore migré (son module a encore FRAMES = 28) garde sa longueur ; les autres suivent cut.ts
     old = {"P3": 28, "FIN": 36}
     eff = plan_frames(cut, ORDER, frames_of=lambda p: old.get(p, cut[p]))
@@ -793,7 +794,6 @@ def selftest():
     assert plan_dirname("P3", {"rugosite": "0.5"}, False) == "P3+rugosite0.5" and plan_dirname("P3", {}, False) == "P3"
     assert plan_dirname("P3", {}, 1) == "P3+brouillon" and plan_dirname("P3", {"brume": "1"}, 2) == "P3+brume1+brouillon2"
     assert parse_essais(["rugosite"]) == {"rugosite": "0.5"} and parse_essais(["peinture=#4e0a28"])["peinture"]
-    assert all(p in ORDER for p in HORS_SITE) and cut["FIN6"] > 0, cut       # FIN n'est plus dans cut.ts : repli muet
     # --ville n'est pas un essai : le film se rend toujours ainsi, sa pleine taille en Cycles est une prise
     cyc, ville = {"engine": "cycles"}, with_ville({}, argparse.Namespace(ville="/v"))
     assert ville == {"ville": ""} and plan_dirname("P3", ville, 0) == "P3+ville"
