@@ -142,8 +142,10 @@ PATROL_YAW, PATROL_YAW_F = -9.0, (24.0, 48.0)       # le nez qui rentre à droit
 # les images où elle est entière dans le cadre, à gauche de la berline (test_motion) : jusqu'à P5/14, quand le grand
 # dérapage (parcours.DERAP5) jette l'arrière de la berline vers la gauche, devant elle à l'écran (P5/23 avant).
 # Depuis le 17 novembre, jusqu'à P5/10 : le dérapage, au lacet d'une berline sur le mouillé, part plus tôt pour la
-# même crête (une montée de 0,67 s au lieu de 0,5) et la boîte qui s'élargit la couvre deux images plus tôt
-PATROL_SEEN = (1, 10)
+# même crête (une montée de 0,67 s au lieu de 0,5) et la boîte qui s'élargit la couvre deux images plus tôt.
+# Depuis film/v8 (18 novembre), jusqu'à P5/9 : le bras franc (FILM3D_VITESSE=2, plus près et plus bas) grandit la
+# berline à l'écran (45 % de large contre 41 %) ; à P5/10 sa boîte couvre 9 % de celle de la patrouille (8 % admis)
+PATROL_SEEN = (1, 9)
 
 
 def patrol_heading(t):
@@ -453,20 +455,18 @@ camera.bras_commun = "P5"      # motion.camera_operator : vibration sur le temps
 
 def project(p, t):
     """Le point monde p (x, y, z) dans le cadre de la caméra à l'instant t, sans le tremblé : (x %, y %, distance)
-    comptés depuis la gauche et depuis le bas ; None s'il est derrière l'objectif."""
-    cx, cy, cz, yaw, pitch, _, _ = camera_rail(t)
-    a, b = math.radians(yaw), math.radians(pitch)
-    f = (-math.sin(a) * math.cos(b), -math.cos(a) * math.cos(b), math.sin(b))
-    r = (f[1], -f[0], 0.0)                         # f × z
-    n = math.hypot(r[0], r[1])
-    r = (r[0] / n, r[1] / n, 0.0)
-    u = (r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0])
-    v = (p[0] - cx, p[1] - cy, p[2] - cz)
-    zc = sum(v[i] * f[i] for i in range(3))
-    if zc <= 0.05:
+    comptés depuis la gauche et depuis le bas ; None s'il est derrière l'objectif. La focale et le roulis sont ceux
+    de la caméra (le bras commun s'ouvre avec la vitesse et penche dans le virage : parcours.rig)."""
+    cam = camera_rail(t)
+    q = M.screen_point(cam, p)
+    if q is None:
         return None
-    xc, yc = sum(v[i] * r[i] for i in range(3)), sum(v[i] * u[i] for i in range(3))
-    return 50.0 + 50.0 * xc / zc / TAN_H, 50.0 + 50.0 * yc / zc / TAN_V, math.sqrt(sum(c * c for c in v))
+    a, b = math.radians(cam[3]), math.radians(cam[4])
+    f = (-math.sin(a) * math.cos(b), -math.cos(a) * math.cos(b), math.sin(b))
+    v = (p[0] - cam[0], p[1] - cam[1], p[2] - cam[2])
+    if sum(v[i] * f[i] for i in range(3)) <= 0.05:
+        return None
+    return 100.0 * q[0], 100.0 * (1.0 - q[1]), math.sqrt(sum(c * c for c in v))
 
 
 def car_box(pose, dims=CAR_DIMS):

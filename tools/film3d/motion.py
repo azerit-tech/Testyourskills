@@ -1622,6 +1622,13 @@ OPERATOR = dict(
     pass_deg=0.275, pass_hz=3.0, pass_tau=0.3,
     max_yaw=0.02, max_pitch=0.012,   # fractions de la largeur et de la hauteur du cadre
     max_roll=0.6,            # degrés
+    # le bras commun de poursuite (18 novembre, « 0 impression de vitesse ») : la route sous la voiture-caméra, en
+    # plus de la vibration ci-dessus, au carré de sa vitesse (rien au pas, entière à vib_bras_v), de 4,8 à 6 Hz
+    # (la moyenne sur cinq images des plafonds l'efface presque : elle ne compte pas comme un mouvement) ; en roulis
+    # (l'horizon et les bords du cadre frémissent, la berline au centre presque pas), à peine en site, rien en lacet :
+    # la berline ne sautille pas à l'écran (SCREEN31_D2, D3 et la vitesse à l'écran aux jonctions, test_motion) ; (lacet, site, roulis) en
+    # degrés, la hauteur en m. Sur le temps du film, aux mêmes phases dans tous les tronçons
+    vib_bras=(0.0, 0.02, 0.08), vib_bras_z=0.002, vib_bras_v=29.8, vib_bras_hz=(4.8, 5.4, 6.0),
 )
 
 
@@ -1656,6 +1663,14 @@ def _decay(t, t0, amp, hz, tau, phase=0.0, rise=0.06):
     return amp * on * math.exp(-u / tau) * math.sin(2 * math.pi * hz * u + phase)
 
 
+def vib_bras_gain():
+    """Le gain de la vibration fine du bras commun selon FILM3D_VITESSE (0 : aucune, 1 : 1, 2 et défaut : 2)."""
+    v = os.environ.get("FILM3D_VITESSE", "2").strip().lower()
+    if v in ("0", "off", "non", "false", "no"):
+        return 0.0
+    return 1.0 if v == "1" else 2.0
+
+
 def camera_operator(fn, frames, f0=F0, fps=FPS, tracks=(), seed=0.0, warmup=0.5, op=None):
     """L'opérateur appliqué à fn(t) -> (x, y, z, lacet, site, roulis, focale) : renvoie {image: (x, y, z, lacet,
     site, roulis, focale)} et, dans « kind », ce qu'il a reconnu. tracks : les véhicules de la scène, [{image: (x,
@@ -1676,6 +1691,8 @@ def camera_operator(fn, frames, f0=F0, fps=FPS, tracks=(), seed=0.0, warmup=0.5,
         ends = lambda t: PC.fenetre(shot, 1.0 + (t + clock) * PC.FPS - PC.START[shot])   # noqa: E731
     rng = random.Random(f"op:{float(seed):.3f}" if shot is None else "op:bras_commun")
     ph = [rng.uniform(0, 2 * math.pi) for _ in range(12)]
+    rb = random.Random("op:vib_bras")
+    phb = [rb.uniform(0, 2 * math.pi) for _ in range(12)]
     dt = 1.0 / (fps * 10)
     t0, t1 = t_of(frames[0], f0, fps), t_of(frames[-1], f0, fps)
     want = {round(t_of(f, f0, fps) / dt): f for f in frames}
@@ -1764,6 +1781,17 @@ def camera_operator(fn, frames, f0=F0, fps=FPS, tracks=(), seed=0.0, warmup=0.5,
             vp = a * hf(5)
             vr = 0.6 * a * hf(6)
             vz = o["vib_z"] * speed * g * hf(7)
+            if shot is not None and o["vib_bras"]:
+                # le bouton FILM3D_VITESSE (parcours.vitesse_niveau) : 0 aucune, 1 celle-ci, 2 (défaut) le double
+                s2 = min(1.3, speed / o["vib_bras_v"]) ** 2 * vib_bras_gain()
+                fb = o["vib_bras_hz"]
+                hb = lambda i: (0.5 * math.sin(2 * math.pi * fb[0] * tc + phb[i])  # noqa: E731
+                                + 0.3 * math.sin(2 * math.pi * fb[1] * tc + phb[i + 1])
+                                + 0.2 * math.sin(2 * math.pi * fb[2] * tc + phb[i + 2]))
+                vy += o["vib_bras"][0] * s2 * hb(0)
+                vp += o["vib_bras"][1] * s2 * hb(3)
+                vr += o["vib_bras"][2] * s2 * hb(6)
+                vz += o["vib_bras_z"] * s2 * hb(9)
             for tj, s in jolts:
                 dp += _decay(t, tj, o["jolt_deg"] * s, o["jolt_hz"], o["jolt_tau"])
                 dr += _decay(t, tj, 0.5 * o["jolt_deg"] * s, o["jolt_hz"] * 0.9, o["jolt_tau"], 1.0)
@@ -2891,8 +2919,9 @@ def plan_checks31(d, lim, own):
         add(f"décalage à gauche {s_lo:g}–{s_hi:g} m", s_lo - 1e-9 <= min(side) and max(side) <= s_hi + 1e-9,
             f"de {min(side):+.2f} à {max(side):+.2f} m")
         lens = [geo[f][3] for f in frames]
-        add(f"focale {lim['cam_lens']:g} mm", all(abs(v - lim["cam_lens"]) <= 0.05 for v in lens),
-            f"{min(lens):.1f} à {max(lens):.1f} mm")
+        lo_l, hi_l = lim["cam_lens"] if isinstance(lim["cam_lens"], tuple) else (lim["cam_lens"],) * 2
+        add(f"focale {lo_l:g} à {hi_l:g} mm" if hi_l > lo_l else f"focale {lo_l:g} mm",
+            all(lo_l - 0.05 <= v <= hi_l + 0.05 for v in lens), f"{min(lens):.1f} à {max(lens):.1f} mm")
         boxes = d.get("boxes") or {f: frame_box(d["final"][f], P[f]) for f in frames}
         cs = {f: box_center(boxes[f], dict(y_from_top=True)) for f in frames if boxes[f]}
         (cx, tx), (cy, ty) = lim["cam_center_x"], lim["cam_center_y"]
@@ -3029,6 +3058,8 @@ def cut_rows31(datas, lim):
     for a, b, _, _ in CUTS:
         if a not in datas or b not in datas or a not in V31_BACK or b not in V31_BACK:
             continue
+        if b == "FIN":              # SPEC §18.53 : plus de FIN dans le film, de une à cinq étoiles l'image gèle sur place
+            continue
         da, db = datas[a], datas[b]
         fa = da["frames"][-2] if b == "FIN" else da["frames"][-1]
         fb = db["frames"][1] if b == "FIN" else db["frames"][0]
@@ -3036,7 +3067,7 @@ def cut_rows31(datas, lim):
         chk = None
         if da.get("v31") and db.get("v31"):
             dh, dd = gb[0] - ga[0], gb[1] - ga[1]
-            ok = abs(dh) <= lim["cut_dh"] + 1e-9 and abs(dd) <= lim["cut_dd"] + 1e-9 and abs(gb[2] - ga[2]) <= 0.05
+            ok = abs(dh) <= lim["cut_dh"] + 1e-9 and abs(dd) <= lim["cut_dd"] + 1e-9 and abs(gb[2] - ga[2]) <= lim.get("cut_dlens", 0.05)
             chk = (ok, f"Δhauteur {dh:+.2f} m, Δdistance {dd:+.2f} m, focales {ga[2]:.0f}/{gb[2]:.0f} mm")
         rows.append((a, b, ga, gb, chk))
     return rows

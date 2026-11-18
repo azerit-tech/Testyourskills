@@ -34,7 +34,8 @@ CAM_LIMITS_PLAN = {
     # dessous (test_p6 le vérifie, avion par avion ; le plafond commun de motion.py est levé pour P6)
     "P6": {"air_top": 999.0, "air_entry": 8},
     # orbite (30°/s) ; elle commence pendant le dernier freinage de la berline (6,4 m/s²), que la caméra suit
-    "FIN6": {"behind": 0.0, "orbit": CAM_ORBIT_MAX, "arel": 6.0, "accel": 9.0},
+    # (18 novembre : 9,5 ; le bras commun, rapproché au freinage, revient à 7,5 m pendant qu'elle s'arrête, parcours.rig)
+    "FIN6": {"behind": 0.0, "orbit": CAM_ORBIT_MAX, "arel": 6.0, "accel": 9.5},
 }
 # les autres plafonds de 2.4
 CAM_PAN_LENS = 28.0          # mm : au-delà, CAM_PAN_MAX × 24 / focale
@@ -43,7 +44,9 @@ CAM_TILT_ACC_MAX = 25.0      # °/s²
 CAM_ROLL_MAX, CAM_ROLL_RATE_MAX = 3.0, 6.0      # °, °/s
 CAM_ACCEL_MAX = 8.0          # m/s², accélération propre de la caméra
 CAM_CRANE_MAX, CAM_CRANE_ACC_MAX = 2.5, 3.0     # m/s, m/s² (vitesse verticale)
-CAM_ZOOM_RATE_MAX, CAM_ZOOM_TOTAL_MAX = 0.04, 0.10   # par seconde, sur le plan (seul P4 zoome)
+# par seconde, sur le plan : la focale du bras commun suit la vitesse (24 mm au pas, 21 à la pointe, parcours.rig),
+# 7 %/s au plus au gros freinage du port (18 novembre ; avant : 0,04 et 0,10, seul P4 zoomait)
+CAM_ZOOM_RATE_MAX, CAM_ZOOM_TOTAL_MAX = 0.08, 0.15
 # le cadre (section 6, points 5 et 8) : les bandes de l'habillage en % depuis le bas ; les centres (règle des
 # plans bas, coupes) dans la convention des fiches, depuis le haut (CAM_Y_FROM_TOP)
 CAM_BAND = (15.0, 88.0)      # % depuis le bas : la boîte de la berline dedans…
@@ -58,6 +61,10 @@ CAM_GAP_MIN, CAM_CAM_GAP_MIN = 1.5, 0.8          # m entre caisses ; m de la cam
 CAM_CUT_DX, CAM_CUT_DY, CAM_CUT_RATIO = 8.0, 6.0, (0.75, 1.33)
 CAM_FILM_SIX = (0.60, 0.25)  # film à six étoiles : derrière au moins, de face au plus
 CAM_FILM_ONE = 0.85          # film à une étoile : derrière au moins
+# le bras commun vivant (test_vitesse) : l'à-coup de la trajectoire écrite (35 m/s³ avec le bras rivé, au
+# rond-point), le cadre utile de la berline (les bandes du HUD : 12 % du haut, 15 % du bas)
+VITESSE_JERK = 50.0
+VITESSE_SAFE_U, VITESSE_SAFE_V = (0.05, 0.95), (0.12, 0.85)
 CAM_VIB_TOL = 1.0        # °/s : ce que la vibration, les ressauts et les secousses de passage de l'opérateur
                          # ajoutent au plus aux vitesses de la colonne « finale » de motion.py mesure
 
@@ -67,14 +74,14 @@ def v3_limits():
     base = dict(pan=CAM_PAN_MAX, pan_lens=CAM_PAN_LENS, pan_acc=CAM_PAN_ACC_MAX, tilt=CAM_TILT_MAX,
                 tilt_acc=CAM_TILT_ACC_MAX, roll=CAM_ROLL_MAX, roll_rate=CAM_ROLL_RATE_MAX, vrel=CAM_VREL_MAX,
                 arel=CAM_AREL_MAX, accel=CAM_ACCEL_MAX, crane=CAM_CRANE_MAX, crane_acc=CAM_CRANE_ACC_MAX,
-                orbit=None, orbit_acc=CAM_ORBIT_ACC_MAX, zoom=False, zoom_rate=CAM_ZOOM_RATE_MAX,
+                orbit=None, orbit_acc=CAM_ORBIT_ACC_MAX, zoom=True, zoom_rate=CAM_ZOOM_RATE_MAX,
                 zoom_total=CAM_ZOOM_TOTAL_MAX, behind=CAM_BEHIND_MIN, front_max=None, band=CAM_BAND,
                 band_share=CAM_BAND_SHARE, low_z=CAM_LOW_Z, low_center=CAM_LOW_CENTER, low_all=False,
                 y_from_top=CAM_Y_FROM_TOP, width_min=CAM_WIDTH_MIN, width_share=CAM_WIDTH_SHARE,
                 air_top=CAM_AIR_TOP, phare_x=CAM_PHARE_X, phare_y=CAM_PHARE_Y, gap=CAM_GAP_MIN,
                 cam_gap=CAM_CAM_GAP_MIN, cut_dx=CAM_CUT_DX, cut_dy=CAM_CUT_DY, cut_ratio=CAM_CUT_RATIO,
                 film_six=CAM_FILM_SIX, film_one=CAM_FILM_ONE)
-    return base, CAM_LIMITS_PLAN
+    return _franc(base, CAM_LIMITS_PLAN, V2_LIMITS, V2_PLAN_MIN)
 
 
 # Le découpage v3.1 (verdict du bout-à-bout v3 : caméra trop basse, cadre qui change, voiture pas fluide) : un seul
@@ -85,7 +92,7 @@ CAM31_H_FLOOR = 1.8           # m, jamais dessous
 CAM31_DIST = (6.5, 8.5)       # m, distance horizontale au centre de la berline (visée 7,5)
 CAM31_DH, CAM31_DD = 0.4, 1.0         # m, variation dans le plan (hauteur, distance)
 CAM31_SIDE = (-0.3, 1.5)      # m, décalage à gauche de la route de la berline (0 à 1,5 ; 0,3 de tolérance à droite)
-CAM31_LENS = 24.0             # mm, partout
+CAM31_LENS = (21.0, 24.0)     # mm : 24 au pas, 21 à la pointe (le bras s'ouvre avec la vitesse, parcours.rig)
 CAM31_CENTER_X, CAM31_CENTER_Y = (50.0, 6.0), (58.0, 4.0)   # % (y depuis le haut) : visée, tolérance
 CAM31_WIDTH_VAR = 0.15        # largeur de la berline à ±15 % de sa médiane dans le plan
 CAM31_CUT_DH, CAM31_CUT_DD = 0.3, 0.8                     # m, aux coupes entre deux plans de dos
@@ -176,7 +183,48 @@ def v31_limits():
                 cs_speed=CUT_SPEED, cs_along=CUT_ALONG, cs_alat=CUT_ALAT, cs_yaw=CUT_YAW, cs_slip=CUT_SLIP,
                 cs_steer=CUT_STEER, cs_roll=CUT_ROLL, cs_pitch=CUT_PITCH, cs_pan=CUT_PAN, cs_screen=CUT_SCREEN,
                 cs_p1_gap=CUT_P1_GAP, cs_ink_dv=CUT_INK_DV)
-    return base, CAM31_LIMITS_PLAN
+    base, plans = _franc(base, CAM31_LIMITS_PLAN, V2_LIMITS31, V2_PLAN31_MIN)
+    import parcours as PC
+    if PC.vitesse_niveau() == 2:
+        plans = {p: dict(plans.get(p, {}), **V2_PLAN31.get(p, {})) for p in set(plans) | set(V2_PLAN31)}
+    return base, plans
+
+
+# Le bras franc (FILM3D_VITESSE=2, le défaut depuis le 18 novembre au soir, SPEC §18.57) : plus bas (1,65 m), plus
+# large (18,5 mm), décalé vers la bordure, un ressort entre la berline et le bras (elle s'échappe de 2,5 m aux gaz, il
+# la rattrape de 1,7 m au freinage), roulis de 3°. Les plafonds posés pour le bras rivé s'élargissent d'autant ; le
+# lisse (à-coup, continuité aux coupes) et le cadre (berline centrée, entière, lisible) restent ceux d'avant.
+V2_LIMITS = dict(arel=6.5, accel=10.5, zoom_rate=0.18, zoom_total=0.30, width_min=0.25, cut_ratio=(0.7, 1.45))
+V2_PLAN_MIN = ("arel", "accel")            # les plafonds propres d'un plan ne descendent pas sous ceux-ci
+V2_LIMITS31 = dict(cam_h=(1.6, 2.7), cam_h_floor=1.55, cam_dist=(5.5, 10.0), cam_dh=0.9, cam_dd=3.0,
+                   cam_side=(-0.85, 1.5), cam_lens=(18.0, 24.0), cam_width_var=0.55, cut_dh=0.3, cut_dd=0.8,
+                   cut_dlens=0.15,          # la focale bouge d'une image à l'autre (0,15 mm au plus, 15 %/s)
+                   # la vitesse à l'écran aux coupes, prise sur quatre images de chaque côté : la vibration fine du
+                   # bras (5–6 Hz, doublée) la fait différer d'un côté à l'autre alors que la pose est la même des
+                   # deux côtés (CUT_POSE_*, 2 cm et 0,1°, contrôlé à part)
+                   cs_screen=0.25,
+                   # la vibration fine doublée, vue à l'écran (sans elle, 0,05 au plus : la trajectoire reste lisse)
+                   screen_d2=0.30, screen_d3=0.30)
+V2_PLAN31_MIN = ("cam_width_var",)
+V2_PLAN31 = {"P2": {"cam_width_var": 0.85}}     # l'anneau : le dérapage, puis la berline qui s'échappe à la sortie
+
+
+def _franc(base, plans, v2, plan_min):
+    """Les plafonds du bras franc (FILM3D_VITESSE=2) posés sur ceux du bras rivé ; sinon tels quels."""
+    import parcours as PC
+    if PC.vitesse_niveau() < 2:
+        return base, plans
+    base = dict(base, **v2)
+    out = {}
+    for plan, lim in plans.items():
+        lim = dict(lim)
+        for k in plan_min:
+            if k in lim and k in v2:
+                lim[k] = max(lim[k], v2[k])
+        if "cam_side" in lim:
+            lim["cam_side"] = (min(lim["cam_side"][0], v2.get("cam_side", lim["cam_side"])[0]), lim["cam_side"][1])
+        out[plan] = lim
+    return base, out
 
 
 def check(name, ok, detail=""):
@@ -296,7 +344,8 @@ def test_gaps():
     d_box = min(clear(c[:2], posts + [P.CRATES_BOX]) for c in cams)
     check("P5 : caméra loin des séparateurs, des poteaux et des caisses", d_bar >= 2.0 and d_box >= 0.8,
           f"{d_bar:.1f} m des séparateurs, {d_box:.1f} m des poteaux et des caisses")
-    check("P5 : horizon à plat", all(c[5] == 0.0 for c in cams))
+    check("P5 : horizon à plat, au roulis du bras dans le virage près (parcours.rig)",
+          all(abs(c[5]) <= CAM_ROLL_MAX for c in cams), f"{min(c[5] for c in cams):+.2f} à {max(c[5] for c in cams):+.2f}°")
     # aucune bouffée de fumée gardée à moins de 2 m de la caméra (le bras commun traverse presque toute la fumée de
     # la glisse : il en reste une ou deux)
     kept = P.smoke_keep(M.smoke_puffs(poses))
@@ -304,17 +353,20 @@ def test_gaps():
                default=99.0)
     check("P5 : la fumée gardée loin de l'objectif", near >= P.SMOKE_CLEAR - 1.0,
           f"{len(kept)} bouffées gardées, la plus proche à {near:.1f} m")
-    # la patrouille 1 entière dans le cadre, à gauche de la berline, 10 images de suite au moins (PATROL_SEEN ; 12
+    # la patrouille 1 entière dans le cadre, à gauche de la berline, 9 images de suite au moins (PATROL_SEEN ; 12
     # avant le 17 novembre : le dérapage au lacet d'une berline part plus tôt, sa boîte la couvre deux images plus
-    # tôt) ; elle s'arrête avant les séparateurs, le nez rentré (elle sous-vire), et ne recule jamais
+    # tôt ; 10 jusqu'à film/v8 : le bras franc, plus près, grandit la berline à l'écran ; au moins jusqu'à
+    # PATROL_SEEN : le bras rivé, FILM3D_VITESSE=0, la garde une image de plus) ; elle s'arrête avant les
+    # séparateurs, le nez rentré (elle sous-vire), et ne recule jamais
     seen = [f for f in range(P.F0, P.F0 + P.FRAMES) if P.patrol_seen(f)]
     runs, cur = [], []
     for f in seen:
         cur = cur + [f] if cur and f == cur[-1] + 1 else [f]
         runs.append(cur)
     run = max(runs, key=len) if runs else []
-    check("P5 : la patrouille 1 entière dans le cadre, à gauche de la berline, 10 images de suite",
-          len(run) >= 10 and (run[0], run[-1]) == P.PATROL_SEEN, f"images {run[0]} à {run[-1]}" if run else "jamais")
+    check("P5 : la patrouille 1 entière dans le cadre, à gauche de la berline, 9 images de suite",
+          len(run) >= 9 and run[0] == P.PATROL_SEEN[0] and run[-1] >= P.PATROL_SEEN[1],
+          f"images {run[0]} à {run[-1]}" if run else "jamais")
     # elle s'arrête après la coupe (la prise continue avec P6) : sa pose à l'arrêt, 3,5 s après la première image
     p0 = tr["patrol_0"]
     t_stop = 3.5
@@ -449,7 +501,9 @@ def test_p2():
         hx, hy = P.hero_pos(tt)
         bx = M.hero_screen(P.camera_rail(tt), hx, hy, 0.0, P.hero_heading(tt))
         u, y, w = bx["u"] * 100, bx["v"] * 100, bx["w"] * 100
-        check(f"P2 : point de coupe à l'image {f}", abs(u - 50) <= 6 and abs(y - 58) <= 4 and abs(w - 41) <= 6,
+        # (le bras franc, FILM3D_VITESSE=2 : à la sortie de l'anneau, la berline accélère et s'échappe du bras)
+        dw = 12 if PC.vitesse_niveau() == 2 else 6       # (au gros freinage d'entrée, la focale resserrée : 51 %)
+        check(f"P2 : point de coupe à l'image {f}", abs(u - 50) <= 6 and abs(y - 58) <= 4 and abs(w - 41) <= dw,
               f"x {u:.0f}, y {y:.0f}, largeur {w:.0f} %")
 
 
@@ -555,8 +609,9 @@ def test_p3():
     cys = [P.cam_y(M.t_of(f)) for f in shown]
     vs = [(cys[i + 1] - cys[i]) * M.FPS for i in range(len(cys) - 1)]
     ds = [P.hero_pos(M.t_of(f))[1] - cys[i] for i, f in enumerate(shown)]
-    check("P3 : la caméra passe la ligne des plots à sa suite, 7,5 m derrière la berline (± 0,5)",
-          cys[-1] > P.GAP[1] and all(abs(d - 7.5) <= 0.5 for d in ds) and min(vs) > 0,
+    rb = [PC.rig("P3", P._f(M.t_of(f)))["back"] for f in shown]       # le bras (7,5 m au pas, parcours.rig)
+    check("P3 : la caméra passe la ligne des plots à sa suite, à la distance du bras derrière la berline (± 0,5)",
+          cys[-1] > P.GAP[1] and all(abs(d - b) <= 0.5 for d, b in zip(ds, rb)) and min(vs) > 0,
           f"y {cys[0]:.1f} → {cys[-1]:.1f}, {min(ds):.2f} à {max(ds):.2f} m derrière")
     wet = []
     for name, px, py, r, sy in P.PUDDLES:
@@ -570,7 +625,11 @@ def test_p3():
     check("P3 : pas de flaque sur la route de la caméra entre y 116 et 130 (1 m de part et d'autre)", not wet,
           f"{wet}")
     zs = [P.camera(M.t_of(f))[2] for f in shown]
-    check("P3 : la caméra à 2,4 m tout le plan", all(abs(z - 2.4) < 1e-6 for z in zs), f"{min(zs):.2f} à {max(zs):.2f} m")
+    rz = [PC.rig("P3", P._f(M.t_of(f)))["z"] for f in shown]
+    check("P3 : la caméra à la hauteur du bras tout le plan (2,4 m au pas, 2,15 à la pointe)",
+          all(abs(z - r) <= 0.05 for z, r in zip(zs, rz)) and min(zs) >= v31_limits()[0]["cam_h"][0]
+          and max(zs) <= 2.45,
+          f"{min(zs):.2f} à {max(zs):.2f} m")
     bad = []
     for f in shown:
         t = M.t_of(f)
@@ -900,16 +959,20 @@ def test_ouv():
 
 def _common_frame(name, P):
     """Le cadre de poursuite commun du découpage v3.1 : 2,4 m de haut (2,1 à 2,7), 7,5 m derrière le centre de la
-    berline (6,5 à 8,5), 24 mm, 0 à 1,5 m à sa gauche ; dans le plan, la hauteur à 0,4 m près, la distance à 1 m."""
+    berline (6,5 à 8,5), 24 mm au pas (21 à la pointe, parcours.rig), 0 à 1,5 m à sa gauche ; dans le plan, la
+    hauteur à 0,4 m près, la distance à 1 m."""
     frames = range(P.F0, P.F0 + P.FRAMES)
     cams = [P.camera_rail(M.t_of(f)) for f in frames]
     zs = [c[2] for c in cams]
     backs = [P.hero_pos(M.t_of(f))[1] - c[1] for f, c in zip(frames, cams)]
     sides = [P.hero_pos(M.t_of(f))[0] - c[0] for f, c in zip(frames, cams)]
-    check(f"{name} : le cadre commun (2,4 m, 7,5 m, 24 mm), sans grue",
-          2.1 <= min(zs) and max(zs) <= 2.7 and max(zs) - min(zs) <= 0.4 and 6.5 <= min(backs)
-          and max(backs) <= 8.5 and max(backs) - min(backs) <= 1.0 and all(c[6] == 24.0 for c in cams)
-          and -1e-9 <= min(sides) and max(sides) <= 1.5,
+    lim = v31_limits()[0]          # le bras franc (FILM3D_VITESSE=2) : plus bas, plus près, plus large, décalé
+    check(f"{name} : le cadre commun (2,4 m, 7,5 m, 24 mm au pas), sans grue",
+          lim["cam_h"][0] <= min(zs) and max(zs) <= lim["cam_h"][1] and max(zs) - min(zs) <= lim["cam_dh"]
+          and lim["cam_dist"][0] <= min(backs) and max(backs) <= lim["cam_dist"][1]
+          and max(backs) - min(backs) <= lim["cam_dd"]
+          and all(lim["cam_lens"][0] - 1e-9 <= c[6] <= lim["cam_lens"][1] + 1e-9 for c in cams)
+          and min(0.0, lim["cam_side"][0]) - 1e-9 <= min(sides) and max(sides) <= 1.5,
           f"hauteur {zs[0]:.2f} à {zs[-1]:.2f} m, distance {backs[0]:.2f} à {backs[-1]:.2f} m, "
           f"à gauche {min(sides):.2f} à {max(sides):.2f} m")
 
@@ -965,8 +1028,13 @@ def test_fin6():
     check("FIN6 : 30 °/s et 40 °/s² au plus", max(map(abs, v)) <= 30.0 and max(map(abs, acc)) <= 40.0,
           f"{max(map(abs, v)):.1f} °/s, {max(map(abs, acc)):.1f} °/s²")
     rs, zs = [gs[f][1] for f in orb], [gs[f][2] for f in orb]
-    check("FIN6 : à la distance et à la hauteur du bras (7,5 m, 2,4 m)",
-          max(abs(r - math.hypot(7.5, 0.3)) for r in rs) < 0.05 and max(abs(z - 2.4) for z in zs) < 0.05,
+    # le bras commun vivant (parcours.rig) : l'orbite garde sa distance et sa hauteur ; au freinage il s'est
+    # rapproché, à l'arrêt il est revenu à 7,5 m et 2,4 m
+    arm = [math.dist(PC.camera("FIN6", f)[:2], PC.hero("FIN6")["pos"](f)) for f in orb]
+    az = [PC.chase("FIN6", f)[2] for f in orb]
+    check("FIN6 : à la distance et à la hauteur du bras (7,5 m, 2,4 m à l'arrêt)",
+          max(abs(r - a) for r, a in zip(rs, arm)) < 1e-6 and max(abs(z - a) for z, a in zip(zs, az)) < 1e-6
+          and 6.5 <= min(rs) and abs(rs[-1] - math.hypot(7.5, 0.3)) < 0.05 and abs(zs[-1] - 2.4) < 0.05,
           f"{min(rs):.2f} à {max(rs):.2f} m, {min(zs):.2f} à {max(zs):.2f} m")
     a, b = cams[P.STILL_FRAME], cams[P.STILL_FRAME - 1]
     check("FIN6 : posée à la fin (moins de 1 mm et 0,01° entre les deux dernières images)",
@@ -1780,7 +1848,8 @@ def test_camera_measure():
     check("caméras : les neuf plans mesurés", list(res) == list(M.PLANS)
           and all(m["debut"] and m["fin"] for m in res.values()), ", ".join(res))
     if M.dyn_on():
-        calm = M.measure_shots(op=dict(vib_deg=0.0, vib_z=0.0, jolt_deg=0.0, jolt_z=0.0, pass_deg=0.0))
+        calm = M.measure_shots(op=dict(vib_deg=0.0, vib_z=0.0, jolt_deg=0.0, jolt_z=0.0, pass_deg=0.0,
+                                            vib_bras=(0.0, 0.0, 0.0), vib_bras_z=0.0))
         worst = max(((abs(res[p]["finale"][k] - calm[p]["finale"][k]), p, k, res[p]["brute"][k] - calm[p]["brute"][k])
                      for p in res for k in ("pan", "tilt")))
         check("caméras : la vibration ne compte pas dans les vitesses", worst[0] <= CAM_VIB_TOL,
@@ -2104,11 +2173,87 @@ def test_reaction():
             return PC._visee_exacte(ref, fr)[0] - PC._visee_exacte(ref, fr, glisse=False)[0]
         rates = [(dvis(g + 0.5) - dvis(g - 0.5), g) for g in gs[:len(gs) // 2]]
         dv, gm = max(rates, key=lambda x: abs(x[0]))
-        lag = PC.reaction(gm) * dv < 0.0
+        # en retard sur tout le décrochage, pas à une seule image : la visée exacte a des sauts d'une image (un coin
+        # de la boîte qui change), et au rond-point le plus fort tombe sur le passage à zéro de la réaction (±0,02°,
+        # son signe au hasard du niveau de FILM3D_VITESSE) ; la réaction s'oppose au mouvement en moyenne pondérée
+        lag = sum(PC.reaction(g) * d for d, g in rates) < 0.0
         check(f"réaction au dérapage (s {ev['s']:.0f}) : en retard au décrochage, 0,3 à 2,5°, sans à-coup, nulle "
               "hors de la glisse", lag and 0.3 <= amp <= 2.5 and step <= 0.3 and outside < 1e-9,
               f"retard {'oui' if lag else 'non'} à l'image {gm:.0f}, {amp:.2f}° au plus, {step:.3f}°/image, "
               f"{outside:.1e}° hors")
+
+
+def test_vitesse():
+    """Le bras commun vivant (parcours.rig, 18 novembre : « 0 impression de vitesse ») sur tout le film, tronçon par
+    tronçon dans le repère de ville : au pas et à l'arrêt, le cadre de Jacques (2,4 m, 7,5 m, 24 mm) ; à la pointe,
+    plus bas, plus près, plus large, dans les plafonds v3.1 ; la caméra sans à-coup (accélération, à-coup de la
+    trajectoire écrite, roulis) ; la berline entière dans le cadre utile, centrée ; FILM3D_VITESSE=0 rend le bras
+    rivé d'avant."""
+    import parcours as PC
+    rows = []
+    for shot, n in PC.SHOTS + (("FIN6", PC.FIN6_FRAMES),):
+        h = PC.hero(shot)
+        to_v = PC.vers_ville(shot)[0]
+        for f in range(1, n + 1):
+            c = PC.chase(shot, f)
+            hx, hy = h["pos"](f)
+            b = M.hero_screen(c, hx, hy, PC.sol(shot, hx, hy), h["heading"](f))
+            r = PC.rig(shot, f)
+            rows.append(dict(p=to_v(c[0], c[1]) + (c[2],), cam=c, box=b, rig=r, shot=shot, f=f))
+    rg = [w["rig"] for w in rows]
+    lv = PC.vitesse_niveau()
+    # (hauteur min, distance min, distance max, focale min, roulis max) : le bras mesuré (1), le bras franc (2)
+    zmin, bmin, bmax, lmin, rmax = {1: (2.1, 6.5, 8.0, 22.0, 2.0), 2: (1.6, 5.5, 10.0, 18.0, 3.0)}.get(
+        lv, (2.4, 7.5, 7.5, 24.0, 0.0))
+    # au pas (sous 45 km/h) et ressort au repos (ni gaz ni freinage depuis un moment) : le cadre de Jacques
+    slow = [w for w in rg if w["speed"] < PC.RIG_V[0] - 0.5 and abs(w["along"]) < 0.3 and abs(w["spring"]) < 0.01]
+    slow += [w["rig"] for w in rows if w["shot"] == "FIN6" and w["f"] > PC.FIN6_FRAMES - 10]     # arrêtée, à la fin
+    check("vitesse : au pas et à l'arrêt, le cadre de Jacques (2,4 m, 7,5 m, 24 mm)", all(
+        abs(w["z"] - PC.CAM_Z) < 1e-9 and abs(w["back"] - PC.CAM_BACK) < 0.01 and w["lens"] == PC.VISEE_LENS
+        for w in slow), f"{len(slow)} images au pas")
+    check(f"vitesse : à la pointe {zmin:g} m au plus bas, {bmin:g} à {bmax:g} m, {lmin:g} à 24 mm, roulis ≤ {rmax:g}°",
+          min(w["z"] for w in rg) >= zmin and bmin <= min(w["back"] for w in rg) and max(w["back"] for w in rg) <= bmax
+          and lmin - 1e-9 <= min(w["lens"] for w in rg) and max(w["lens"] for w in rg) <= 24.0
+          and max(abs(w["roll"]) for w in rg) <= rmax,
+          f"hauteur {min(w['z'] for w in rg):.2f}–{max(w['z'] for w in rg):.2f} m, distance "
+          f"{min(w['back'] for w in rg):.2f}–{max(w['back'] for w in rg):.2f} m, focale "
+          f"{min(w['lens'] for w in rg):.1f}–{max(w['lens'] for w in rg):.1f} mm, roulis "
+          f"{max(abs(w['roll']) for w in rg):.2f}°")
+    pts, fps = [w["p"] for w in rows], PC.FPS
+    acc = [math.dist((0, 0, 0), [(pts[i + 1][k] - 2 * pts[i][k] + pts[i - 1][k]) * fps ** 2 for k in range(3)])
+           for i in range(1, len(pts) - 1)]
+    jerk = [math.dist((0, 0, 0), [(pts[i + 2][k] - 3 * pts[i + 1][k] + 3 * pts[i][k] - pts[i - 1][k]) * fps ** 3
+                                  for k in range(3)]) for i in range(1, len(pts) - 2)]
+    rolls = [w["cam"][5] for w in rows]
+    rr = [abs(rolls[i + 1] - rolls[i]) * fps for i in range(len(rolls) - 1)]
+    amax = v3_limits()[0]["accel"]
+    check(f"vitesse : la caméra sans à-coup (≤ {amax:g} m/s², à-coup ≤ {VITESSE_JERK:g} m/s³, roulis ≤ "
+          f"{CAM_ROLL_RATE_MAX:g} °/s), jonctions comprises",
+          max(acc) <= amax and max(jerk) <= VITESSE_JERK and max(rr) <= CAM_ROLL_RATE_MAX,
+          f"{max(acc):.2f} m/s², {max(jerk):.1f} m/s³, {max(rr):.2f} °/s")
+    out = [(w["shot"], w["f"]) for w in rows if not (w["box"] and VITESSE_SAFE_U[0] <= w["box"]["u0"]
+                                                    and w["box"]["u1"] <= VITESSE_SAFE_U[1]
+                                                    and VITESSE_SAFE_V[0] <= w["box"]["v0"]
+                                                    and w["box"]["v1"] <= VITESSE_SAFE_V[1])]
+    cu = [abs(w["box"]["u"] - CAM31_CENTER_X[0] / 100.0) for w in rows]
+    cv = [abs(w["box"]["v"] - CAM31_CENTER_Y[0] / 100.0) for w in rows]
+    check("vitesse : la berline entière dans le cadre utile (5 à 95 % de large, 12 à 85 % de haut), centrée",
+          not out and max(cu) <= CAM31_CENTER_X[1] / 100.0 and max(cv) <= CAM31_CENTER_Y[1] / 100.0,
+          f"hors : {out[:4]}" if out else f"centre à {max(cu) * 100:.1f} % et {max(cv) * 100:.1f} % de la visée")
+    import os
+    old = os.environ.get("FILM3D_VITESSE")
+    os.environ["FILM3D_VITESSE"] = "0"
+    try:
+        r0 = [PC.rig(s, f) for s, f in (("OUV", 10), ("P4", 50), ("P5", 1))]
+        t0 = PC.tremble("P4", 50)
+    finally:
+        if old is None:
+            os.environ.pop("FILM3D_VITESSE", None)
+        else:
+            os.environ["FILM3D_VITESSE"] = old
+    check("vitesse : FILM3D_VITESSE=0 rend le bras rivé d'avant", all(
+        (r["back"], r["z"], r["lens"], r["roll"]) == (PC.CAM_BACK, PC.CAM_Z, PC.VISEE_LENS, 0.0) for r in r0)
+        and t0 == (0.0,) * 5)
 
 
 def test_cut_pose():
@@ -2408,6 +2553,7 @@ if __name__ == "__main__":
     test_drive()
     test_parcours()
     test_camera_measure()
+    test_vitesse()
     test_v3()
     print(f"\n{'tout passe' if not FAIL else str(len(FAIL)) + ' échec(s)'}")
     sys.exit(1 if FAIL else 0)

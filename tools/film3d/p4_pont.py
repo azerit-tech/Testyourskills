@@ -177,8 +177,9 @@ if VILLE:
     # entre dans le cadre par la gauche vers l'image 10 et double ; puis elle freine pour le port (P1_BRAKE_J d'à-coup
     # jusqu'au freinage de P5) et entre dans P5 dans l'état qu'il attend (p5_virage.PATROL_IN : 7 m devant, à sa
     # vitesse d'entrée, freinage de 6,4 m/s²). Une vraie conduite : sa vitesse s'intègre à rebours depuis P5/1, une
-    # accélération à à-coup borné ; l'instant de son freinage est celui qui la met à P1_BEHIND m à P4/1.
-    P1_BEHIND, P1_COAST, P1_BRAKE_J = -8.0, -0.5, 10.0
+    # accélération à à-coup borné ; l'instant de son freinage est celui qui la met à P1_BEHIND m à P4/1. Depuis film/v8,
+    # 10 m (8 avant) : le bras franc (FILM3D_VITESSE=2), plus près et au 19 mm, la faisait entrer dès l'image 6.
+    P1_BEHIND, P1_COAST, P1_BRAKE_J = -10.0, -0.5, 10.0
     _P1_DT = 1.0 / 240.0
 
     def _p1_accel(t, tb, a49):

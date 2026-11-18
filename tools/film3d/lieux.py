@@ -823,14 +823,23 @@ def roadway(name, ys, zfun=None, x0=0.0, half=7.0, walk=2.0, rail="parapet", gli
             xg = side * (wi + 0.18)
             sweep(f"{name}_glissiere_{tag}", wbeam_profile(-side, xg, 0.5), rys, zfun, M["wbeam"], smooth=True)
             if not far:
+                import reperes
                 bm = bmesh.new()
+                cat = bmesh.new() if reperes.on() else None
                 y = rys[0] + 2.0
                 while y < rys[-1]:
                     z = zfun(y) + WALK_Z
                     box_bm(bm, (xg + side * 0.02, y - 0.04, z), (xg + side * 0.14, y + 0.04, z + 0.78))
                     box_bm(bm, (xg + side * 0.004, y - 0.09, z + 0.52), (xg + side * 0.05, y + 0.09, z + 0.76))
+                    if cat is not None:
+                        # le catadioptre en tête de poteau (reperes.py) : 6 × 4 cm, tourné vers la chaussée et
+                        # vers l'arrivée ; un tous les 4 m, ils défilent sur le bord du cadre
+                        box_bm(cat, (xg + side * 0.03, y - 0.05, z + 0.78), (xg + side * 0.13, y - 0.04, z + 0.85))
                     y += 4.0
                 mesh_object(f"{name}_poteaux_{tag}", bm, [M["wbeam"]])
+                if cat is not None:
+                    mesh_object(f"{name}_catadioptres_{tag}", cat,
+                                [reperes.catadioptre("catadioptre_ambre", reperes.AMBRE)])
     if under == "caisson":
         u = [(-edge + 0.9, -0.3), (-edge + 0.9, -1.3), (-4.5, -1.9), (4.5, -1.9), (edge - 0.9, -1.3), (edge - 0.9, -0.3)]
         sweep(f"{name}_caisson", u, rys, zfun, M["concrete"])

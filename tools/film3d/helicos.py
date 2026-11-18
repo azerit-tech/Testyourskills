@@ -127,7 +127,7 @@ def _hermite(p0, p1, v1, a1, D, u):
 # lissées : à P5/1 haut derrière la caméra (hors du cadre, P4 n'en a pas) ; quand elle freine pour le virage du port,
 # il garde son élan et passe devant, entre par le haut du cadre ; puis il tient sa place haut devant elle, sur sa
 # droite (au 24 mm, à 2,4 m de haut et 9° de site, le tiers haut du cadre 9:16 demande 60 à 100 m de recul pour 30 m)
-CHASE_KEYS = ((16.0, 58.0, 42.0, 27.0), (19.6, 84.0, 5.0, 25.0), (25.5, 82.0, 9.0, 26.0))
+CHASE_KEYS = ((16.0, 58.0, 43.0, 27.0), (19.6, 84.0, 5.0, 25.0), (25.5, 82.0, 9.0, 26.0))
 HOVER_D, HOVER_UP, HOVER_SIDE = 88.0, 24.0, -14.0  # le stationnaire de la fin, posé dans le cadre de FIN6/fin : m devant
 #                                                  la caméra, ° au-dessus de son axe (tiers haut), ° sur le côté
 HOVER_T = (25.5, 29.2)         # s du film : de la poursuite au stationnaire (elle s'arrête vers 28,5 s)
