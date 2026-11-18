@@ -1470,6 +1470,14 @@ def _decay(t, t0, amp, hz, tau, phase=0.0, rise=0.06):
     return amp * on * math.exp(-u / tau) * math.sin(2 * math.pi * hz * u + phase)
 
 
+def vib_bras_gain():
+    """Le gain de la vibration fine du bras commun selon FILM3D_VITESSE (0 : aucune, 1 : 1, 2 et défaut : 2)."""
+    v = os.environ.get("FILM3D_VITESSE", "2").strip().lower()
+    if v in ("0", "off", "non", "false", "no"):
+        return 0.0
+    return 1.0 if v == "1" else 2.0
+
+
 def camera_operator(fn, frames, f0=F0, fps=FPS, tracks=(), seed=0.0, warmup=0.5, op=None):
     """L'opérateur appliqué à fn(t) -> (x, y, z, lacet, site, roulis, focale) : renvoie {image: (x, y, z, lacet,
     site, roulis, focale)} et, dans « kind », ce qu'il a reconnu. tracks : les véhicules de la scène, [{image: (x,
@@ -1581,7 +1589,8 @@ def camera_operator(fn, frames, f0=F0, fps=FPS, tracks=(), seed=0.0, warmup=0.5,
             vr = 0.6 * a * hf(6)
             vz = o["vib_z"] * speed * g * hf(7)
             if shot is not None and o["vib_bras"]:
-                s2 = min(1.3, speed / o["vib_bras_v"]) ** 2
+                # le bouton FILM3D_VITESSE (parcours.vitesse_niveau) : 0 aucune, 1 celle-ci, 2 (défaut) le double
+                s2 = min(1.3, speed / o["vib_bras_v"]) ** 2 * vib_bras_gain()
                 fb = o["vib_bras_hz"]
                 hb = lambda i: (0.5 * math.sin(2 * math.pi * fb[0] * tc + phb[i])  # noqa: E731
                                 + 0.3 * math.sin(2 * math.pi * fb[1] * tc + phb[i + 1])
@@ -2852,7 +2861,7 @@ def cut_rows31(datas, lim):
         chk = None
         if da.get("v31") and db.get("v31"):
             dh, dd = gb[0] - ga[0], gb[1] - ga[1]
-            ok = abs(dh) <= lim["cut_dh"] + 1e-9 and abs(dd) <= lim["cut_dd"] + 1e-9 and abs(gb[2] - ga[2]) <= 0.05
+            ok = abs(dh) <= lim["cut_dh"] + 1e-9 and abs(dd) <= lim["cut_dd"] + 1e-9 and abs(gb[2] - ga[2]) <= lim.get("cut_dlens", 0.05)
             chk = (ok, f"Δhauteur {dh:+.2f} m, Δdistance {dd:+.2f} m, focales {ga[2]:.0f}/{gb[2]:.0f} mm")
         rows.append((a, b, ga, gb, chk))
     return rows

@@ -383,80 +383,139 @@ def cam_cap(shot, frame):
 # ---- la vitesse à l'image (18 novembre : « 0 impression de vitesse ») : le bras commun vit avec la berline. Il était
 # rivé à elle (même distance, même hauteur, même focale, visée exacte, horizon immobile) : la berline restait figée
 # au centre du cadre et rien ne disait 107 km/h. Le même bras partout, sur le temps du film (donc le même des deux
-# côtés de chaque jonction), avec, tout en douceur :
-#  - la vitesse : la focale s'ouvre de 24 à RIG_LENS_PEAK mm et le bras se rapproche de RIG_BACK_SPEED m et descend de
-#    RIG_DZ m (2,4 → 2,15 m) à la pointe ; la berline garde presque sa taille à l'écran, le sol et les bords du cadre
-#    défilent plus vite (plus d'angle, plus près) ;
-#  - l'accélération : le bras a du retard (RIG_TAU) ; aux gaz la berline s'échappe un peu (RIG_ACC[1] m par m/s²),
-#    au freinage le bras la rattrape (RIG_ACC[0]) ;
-#  - le virage : le bras penche dans le virage (RIG_ROLL ° par m/s² de latérale, retardée) ;
-#  - la route : un flottement lent de 0,2 à 0,6 Hz (RIG_FLOAT), éteint à l'arrêt ; la vibration fine, au carré de
-#    la vitesse, est celle de l'opérateur (motion.OPERATOR["vib_bras"]).
+# côtés de chaque jonction) :
+#  - la vitesse (q, de 45 à 107 km/h) : le bras descend (DZ), se rapproche (BACK_SPEED), s'ouvre (LENS_PEAK, au-dessus
+#    de V_FOCALE) ; au gros freinage la focale se resserre (LENS_FREIN, lissée : la ville se tasse) ;
+#  - l'accélération : version 1, un retard filtré (ACC, TAU) ; version 2, un ressort amorti (SPRING) entre la
+#    berline et le bras, qui respire ; il se relâche et se fond avant l'arrêt de la pointe (RIG_SPRING_*) ;
+#  - le côté (version 2) : vers la bordure dans les lignes droites (SIDE), sur l'axe dans les virages et au gros
+#    freinage, le passage lissé d'une gaussienne centrée ; le bras recule dans les virages (TURN_BACK) ;
+#  - le virage : le bras penche (ROLL ° par m/s² de latérale, retardée) ;
+#  - la route : un flottement lent de 0,2 à 0,6 Hz (FLOAT), éteint à l'arrêt ; la vibration fine, au carré de la
+#    vitesse, est celle de l'opérateur (motion.OPERATOR["vib_bras"], motion.vib_bras_gain : VIB).
 # Hauteur, distance et focale restent celles de Jacques (2,4 m, 7,5 m, 24 mm) au pas et à l'arrêt (FIN6).
-# FILM3D_VITESSE=0 rend le bras d'avant, rivé (pour comparer).
-RIG_V = (12.5, 29.8)              # m/s : 45 km/h (rien ne change dessous) → 107 km/h (la pointe, tout l'effet)
-# la focale ne s'ouvre qu'au-dessus de 72 km/h (RIG_V_FOCALE) et jusqu'à 22 mm : à l'entrée du port (P5/1, 68 km/h
-# au gros freinage) elle doit être revenue à 24 mm, sans quoi l'hélicoptère, posé juste hors du bord droit du
-# cadre, y entrerait d'un coup à la jonction P4 → P5 (ville.selftest_helico : P4 n'en a pas)
-RIG_V_FOCALE = (20.0, 29.8)
-RIG_LENS_PEAK = 22.0              # mm à la pointe
-RIG_LENS_FREIN = 0.4              # au gros freinage (6 m/s² et plus, retardé), la focale rend 70 % de son ouverture
-RIG_BACK_SPEED = 0.35             # m : le bras plus court à la pointe (la berline garde sa largeur à l'écran, à 4 % près)
-RIG_DZ = -0.25                    # m : le bras plus bas à la pointe
-RIG_ACC = (0.07, 0.13)            # m de distance par m/s² : au freinage (le bras se rapproche), aux gaz (elle s'échappe)
-RIG_TAU = 0.60                    # s : le retard du bras sur l'accélération (deux pôles de RIG_TAU / 2)
-RIG_ROLL = 0.25                   # ° de roulis par m/s² de latérale (penché dans le virage)
-RIG_ROLL_TAU = 0.25
-RIG_GATE = 12.0                   # m/s : sous cette vitesse, retard, roulis et flottement s'éteignent doucement (l'arrêt)
-RIG_SPEED_TAU = 0.6               # s : la vitesse lissée qui règle focale, distance et hauteur
-# flottement : (lacet, site, roulis en °, côté, hauteur en m), de 0,2 à 0,6 Hz, la moitié au pas, entier à la pointe.
-# La vibration fine de la route est celle de l'opérateur (motion.camera_operator, OPERATOR["vib_bras"]) : elle
-# reste hors de la trajectoire « lissée » que mesurent les plafonds des caméras.
-RIG_FLOAT = (0.10, 0.12, 0.25, 0.04, 0.04)
+# FILM3D_VITESSE est un seul bouton : 0 le bras rivé d'avant, 1 la première version (mesurée, 18 novembre midi),
+# 2 (le défaut) la version franche demandée le 18 novembre au soir (« presque identiques » en gris) : à la pointe le
+# bras à 1,65 m et 6,2 m, au 18,5 mm, décalé de 0,7 m vers la bordure dans les lignes droites ; un ressort amorti
+# entre la berline et le bras (aux gaz elle s'échappe de 2 à 3 m, au freinage il la rattrape de 1,5 à 2 m, et ça
+# respire) ; roulis jusqu'à 3° dans les virages, vibration fine deux fois plus forte (motion.camera_operator).
+RIG_LEVELS = {
+    1: dict(V=(12.5, 29.8), V_FOCALE=(20.0, 29.8), LENS_PEAK=22.0, LENS_FREIN=0.4, BACK_SPEED=0.35, DZ=-0.25,
+            ACC=(0.07, 0.13), TAU=0.60, ROLL=0.25, ROLL_TAU=0.25, SPEED_TAU=0.6,
+            FLOAT=(0.10, 0.12, 0.25, 0.04, 0.04), FLOAT_SEED=20.0, SIDE=0.0, TURN_BACK=0.0, BRAKE_LEFT=0.0, SPRING=None, VIB=1.0),
+    2: dict(V=(12.5, 29.8), V_FOCALE=(15.0, 29.8), LENS_PEAK=17.5, LENS_FREIN=1.0, BACK_SPEED=1.9, DZ=-0.75,
+            ACC=None, TAU=0.60, ROLL=0.50, ROLL_TAU=0.35, SPEED_TAU=0.8,
+            FLOAT=(0.15, 0.15, 0.35, 0.06, 0.05), FLOAT_SEED=20.0, SIDE=-1.0, TURN_BACK=1.2, BRAKE_LEFT=0.0,
+            # le ressort : pulsation (rad/s), amortissement, gain au freinage, gain aux gaz
+            # ω 0,75 rad/s (une respiration de 8 s), ζ 0,7 : 2,5 m de retard à 3 m/s² de gaz, 1,6 m d'avance à
+            # 7 m/s² de freinage, en régime ; plus vif (ω ≥ 0,9), le bras rattrape la berline à l'entrée du port et
+            # cache la patrouille 1 qui la remonte à sa gauche (p5_virage.PATROL_SEEN)
+            SPRING=(0.75, 0.7, 1.6 * 0.5625 / 7.0, 2.5 * 0.5625 / 3.0), VIB=2.0),
+}
+RIG_SPRING_STOP = (6.0, 1.0)      # s avant l'arrêt : l'entrée du ressort s'éteint
+RIG_SPRING_FADE = (7.0, 1.5)      # s avant l'arrêt : son écart se fond
+RIG_GATE = 12.0                   # m/s : sous cette vitesse, retard, roulis, décalage et flottement s'éteignent
+RIG_SIDE_LAT = (0.5, 3.0)         # m/s² de latérale : la ligne droite (décalage vers la bordure entier) → le virage
+RIG_SIDE_FREIN = (1.5, 5.0)       # m/s² de freinage (retardé) : le décalage de côté rendu à l'axe
+RIG_LENS_FREIN_A = (0.5, 4.0)     # m/s² de freinage : la focale rendue (LENS_FREIN), lissée sur RIG_LENS_SIGMA
+RIG_LENS_SIGMA = 0.7              # s
+RIG_SIDE_SIGMA = 0.45             # s : le passage ligne droite ↔ virage lissé d'une gaussienne centrée (il anticipe)
 RIG_FLOAT_HZ = (0.23, 0.37, 0.53)
-RIG_FLOAT_SEED = 20.0             # les phases du flottement (fixes, sur le temps du film) : à P5/1 il écarte
-                                  # l'hélicoptère du bord droit (ville.selftest_helico : 0,72° hors du cadre)
+# les clés de la version 1, gardées sous leur nom (les essais, test_motion)
+RIG_V = RIG_LEVELS[1]["V"]
 _RIG = {}
 
 
-def vitesse_on():
+def vitesse_niveau():
+    """FILM3D_VITESSE : 0, 1 ou 2 (défaut 2) ; « off », « non »… valent 0."""
     import os
-    return os.environ.get("FILM3D_VITESSE", "1").strip().lower() not in ("0", "off", "non", "false", "no")
+    v = os.environ.get("FILM3D_VITESSE", "2").strip().lower()
+    if v in ("0", "off", "non", "false", "no"):
+        return 0
+    return 1 if v == "1" else 2
 
 
-def _rig_table():
-    """Sur la grille du bras (_T0, _H) : la vitesse lissée, l'accélération longitudinale et latérale retardées."""
-    if _RIG:
-        return _RIG
+def vitesse_on():
+    return vitesse_niveau() > 0
+
+
+def rig_params(level=None):
+    return RIG_LEVELS[vitesse_niveau() if level is None else level]
+
+
+def _rig_table(level):
+    """Sur la grille du bras (_T0, _H) : la vitesse lissée, l'accélération longitudinale et latérale retardées, et
+    l'écart du ressort berline-bras (m, positif quand elle s'échappe)."""
+    if level in _RIG:
+        return _RIG[level]
+    P = RIG_LEVELS[level]
     t_end = (TOTAL + FIN6_FRAMES) / FPS + 1.0
     n = int((t_end - _T0) / _H)
     v1 = v2 = DRIVE.speed(_T0)
     a1 = a2 = DRIVE.along(_T0)
     l1 = l2 = DRIVE.alat(_T0)
+    sp = P["SPRING"]
+    t_stop = next((_T0 + k * _H for k in range(n) if DRIVE.speed(_T0 + k * _H) < 0.05 and _T0 + k * _H > 1.0), 1e9)
+
+    def g(a):
+        return (sp[3] if len(sp) > 3 else 1.0) * a if a > 0 else sp[2] * a
+    d = g(a1) / sp[0] ** 2 if sp else 0.0
+    dv = 0.0
     out = []
     for k in range(n):
         t = _T0 + k * _H
         v, a, l = DRIVE.speed(t), DRIVE.along(t), DRIVE.alat(t)
-        g = _H / (RIG_SPEED_TAU / 2.0)
-        v1 += (v - v1) * g
-        v2 += (v1 - v2) * g
-        g = _H / (RIG_TAU / 2.0)
-        a1 += (a - a1) * g
-        a2 += (a1 - a2) * g
-        g = _H / (RIG_ROLL_TAU / 2.0)
-        l1 += (l - l1) * g
-        l2 += (l1 - l2) * g
-        out.append((v2, a2, l2))
-    _RIG["tab"] = out
-    return _RIG
+        c = _H / (P["SPEED_TAU"] / 2.0)
+        v1 += (v - v1) * c
+        v2 += (v1 - v2) * c
+        c = _H / (P["TAU"] / 2.0)
+        a1 += (a - a1) * c
+        a2 += (a1 - a2) * c
+        c = _H / (P["ROLL_TAU"] / 2.0)
+        l1 += (l - l1) * c
+        l2 += (l1 - l2) * c
+        if sp:
+            # d'' = g(a) − 2ζω d' − ω² d (l'entrée lissée a1 : pas d'à-coup de l'accélération brute)
+            w, z = sp[0], sp[1]
+            # avant l'arrêt de la pointe (RIG_SPRING_STOP s avant), l'entrée s'éteint : le ressort se relâche
+            # pendant le dernier freinage, et le bras retrouve 7,5 m à l'arrêt
+            gin = 1.0 - M.smoothstep(t_stop - RIG_SPRING_STOP[0], t_stop - RIG_SPRING_STOP[1], t)
+            dv += (g(a1) * gin - 2.0 * z * w * dv - w * w * d) * _H
+            d += dv * _H
+        # la ligne droite : ni virage, ni gros freinage (la meute qui remonte la berline à sa gauche reste à côté
+        # d'elle à l'écran, pas derrière elle)
+        turn = M.smoothstep(RIG_SIDE_LAT[0], RIG_SIDE_LAT[1], abs(l))
+        brake = M.smoothstep(RIG_SIDE_FREIN[0], RIG_SIDE_FREIN[1], -a)
+        out.append([v2, a2, l2, d, (1.0 - turn) * (1.0 - brake), turn, brake,
+                    M.smoothstep(RIG_LENS_FREIN_A[0], RIG_LENS_FREIN_A[1], -a)])
+    # la ligne droite (1) ou le virage (0), lissée d'une gaussienne centrée, au pas de 1/48 s : le bras quitte la
+    # bordure avant le virage et y revient après, sans à-coup
+    st = 5
+    # la ligne droite (le côté), le virage (le recul), le gros freinage (le côté), le freinage (la focale, plus lent)
+    for col, sigma in ((4, RIG_SIDE_SIGMA), (5, RIG_SIDE_SIGMA), (6, RIG_SIDE_SIGMA), (7, RIG_LENS_SIGMA)):
+        sg = sigma / (_H * st)
+        m = int(3 * sg)
+        w = [math.exp(-0.5 * (j / sg) ** 2) for j in range(-m, m + 1)]
+        sw = sum(w)
+        raw = [out[k][col] for k in range(0, n, st)]
+        sm = [sum(w[j + m] * raw[max(0, min(len(raw) - 1, i + j))] for j in range(-m, m + 1)) / sw
+              for i in range(len(raw))]
+        for k in range(n):
+            u = k / st
+            i = min(len(sm) - 2, int(u))
+            out[k][col] = sm[i] + (sm[i + 1] - sm[i]) * (u - i)
+    out = [tuple(r) for r in out]
+    _RIG[level] = out
+    _RIG["stop"] = t_stop
+    return out
 
 
-def _rig_at(t):
-    tab = _rig_table()["tab"]
+def _rig_at(t, level):
+    tab = _rig_table(level)
     u = (t - _T0) / _H
     k = max(0, min(len(tab) - 2, int(math.floor(u))))
     f = max(0.0, min(1.0, u - k))
-    return tuple(tab[k][j] + (tab[k + 1][j] - tab[k][j]) * f for j in range(3))
+    return tuple(tab[k][j] + (tab[k + 1][j] - tab[k][j]) * f for j in range(8))
 
 
 def _waves(t, hz, seed, amp=1.0):
@@ -468,28 +527,45 @@ def _waves(t, hz, seed, amp=1.0):
 
 def rig(shot, frame):
     """Le bras commun à l'image `frame` du tronçon (décimale admise) : dict(back, left, z (au-dessus de la
-    chaussée), lens, roll (° dans le virage), q (0 au pas, 1 à la pointe), speed (lissée), along, alat (retardées))."""
+    chaussée), lens, roll (° dans le virage), q (0 au pas, 1 à la pointe), speed (lissée), along, alat (retardées),
+    spring (l'écart du ressort, m))."""
     t = t_of(shot, frame)
-    if not vitesse_on():
+    level = vitesse_niveau()
+    if not level:
         return dict(back=CAM_BACK, left=CAM_LEFT, z=CAM_Z, lens=VISEE_LENS, roll=0.0, q=0.0, speed=DRIVE.speed(t),
-                    along=0.0, alat=0.0, t=t)
-    v, a, l = _rig_at(t)
-    q = M.smoothstep(RIG_V[0], RIG_V[1], v)
-    k = RIG_ACC[0] + (RIG_ACC[1] - RIG_ACC[0]) * 0.5 * (1.0 + math.tanh(a / 1.0))
+                    along=0.0, alat=0.0, spring=0.0, t=t)
+    P = RIG_LEVELS[level]
+    v, a, l, d, straight, turn, brake, frein = _rig_at(t, level)
+    q = M.smoothstep(P["V"][0], P["V"][1], v)
     gate = M.smoothstep(0.0, RIG_GATE, v)                  # à l'arrêt, le bras d'origine
-    back = CAM_BACK - RIG_BACK_SPEED * q + k * a * gate
-    wide = M.smoothstep(RIG_V_FOCALE[0], RIG_V_FOCALE[1], v) * (1.0 - RIG_LENS_FREIN * M.smoothstep(0.5, 6.0, -a))
-    return dict(back=back, left=CAM_LEFT, z=CAM_Z + RIG_DZ * q, lens=VISEE_LENS + (RIG_LENS_PEAK - VISEE_LENS) * wide,
-                roll=RIG_ROLL * l * gate, q=q, speed=v, along=a, alat=l, t=t)
+    # vers l'arrêt de la pointe, l'écart du ressort et le recul du virage se fondent (RIG_SPRING_FADE s avant) : le
+    # bras est revenu à sa place quand la caméra passe le lampadaire de la pointe et tourne autour de la berline
+    fin = 1.0 - M.smoothstep(_RIG["stop"] - RIG_SPRING_FADE[0], _RIG["stop"] - RIG_SPRING_FADE[1], t)
+    if P["SPRING"]:
+        lag = d * gate * fin
+    else:
+        k = P["ACC"][0] + (P["ACC"][1] - P["ACC"][0]) * 0.5 * (1.0 + math.tanh(a / 1.0))
+        lag = k * a * gate
+    # dans le virage, le bras recule (TURN_BACK) : la glisse élargit la berline à l'écran
+    back = CAM_BACK - P["BACK_SPEED"] * q + lag + P["TURN_BACK"] * turn * gate * fin
+    wide = M.smoothstep(P["V_FOCALE"][0], P["V_FOCALE"][1], v) * (1.0 - P["LENS_FREIN"] * frein)
+    # le côté : vers la bordure (à droite) dans les lignes droites, sur l'axe dans les virages
+    # au gros freinage, le bras passe à gauche (BRAKE_LEFT) : la berline qui pique du nez se voit de trois quarts, et
+    # la meute qui la remonte à sa gauche se détache d'elle à l'écran (P5 : la patrouille 1, p5_virage.PATROL_SEEN)
+    left = CAM_LEFT + P["SIDE"] * q * straight + P["BRAKE_LEFT"] * brake * gate
+    return dict(back=back, left=left, z=CAM_Z + P["DZ"] * q, lens=VISEE_LENS + (P["LENS_PEAK"] - VISEE_LENS) * wide,
+                roll=P["ROLL"] * l * gate, q=q, speed=v, along=a, alat=l, spring=lag, t=t)
 
 
 def tremble(shot, frame):
     """Le flottement lent du bras : (dlacet, dsite, droulis en °, dcôté, dz en m) ; nul à l'arrêt."""
-    if not vitesse_on():
+    level = vitesse_niveau()
+    if not level:
         return 0.0, 0.0, 0.0, 0.0, 0.0
+    P = RIG_LEVELS[level]
     r = rig(shot, frame)
     flo = M.smoothstep(0.0, RIG_GATE, r["speed"]) * (0.5 + 0.5 * r["q"])
-    return tuple(_waves(r["t"], RIG_FLOAT_HZ, RIG_FLOAT_SEED + i, RIG_FLOAT[i] * flo) for i in range(5))
+    return tuple(_waves(r["t"], RIG_FLOAT_HZ, P["FLOAT_SEED"] + i, P["FLOAT"][i] * flo) for i in range(5))
 
 
 def sol_ville(x, y):
@@ -564,7 +640,8 @@ def visee(shot, frame):
     centrée de VISEE_SIGMA sur le temps du film. Elle ne dépend que du bras et de la berline (tous deux posés par une
     rotation et une translation du parcours) et sa grille tombe sur les images : la même pose, au lacet de la
     rotation du lieu près, des deux côtés d'un raccord."""
-    if shot not in _VISEE:
+    key = (shot, vitesse_niveau())
+    if key not in _VISEE:
         n = frames(shot)
         k0 = -40 * _VQ
         raw, prev = [], None
@@ -583,8 +660,8 @@ def visee(shot, frame):
                 r = raw[max(0, min(len(raw) - 1, i + j))]
                 sy, sp, sw = sy + w * r[0], sp + w * r[1], sw + w
             tab.append((sy / sw, sp / sw))
-        _VISEE[shot] = (k0, tab)
-    k0, tab = _VISEE[shot]
+        _VISEE[key] = (k0, tab)
+    k0, tab = _VISEE[key]
     u = (frame - 1.0) * _VQ - k0
     k = max(0, min(len(tab) - 2, int(math.floor(u))))
     f = min(1.0, max(0.0, u - k))
