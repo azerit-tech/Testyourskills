@@ -527,6 +527,11 @@ def _mat_paint_worn(name, color, metal, rough, flake, peel, w, axles, coat=(1.0,
     return m
 
 
+CHROME_HAZE = 0.55                     # la part gardée du voile des chromes (zones, essuyage)
+CHROME_PITS = 0.5                      # la densité des piqûres (× l'usure) ; 0 : aucune
+BUMPER_CREASE = (0.362, 0.050, 0.007)  # l'arête des pare-chocs : hauteur (m), demi-largeur du V, saillie
+
+
 def mat_chrome(name, color=(0.92, 0.92, 0.93, 1), rough=0.05, wear=0.0):
     """Chrome poli d'époque. Avec wear : jamais un miroir parfait sur les grandes surfaces : rugosité qui varie par
     zones, traces d'essuyage (003) et micro-rayures fines le long des pièces, léger ternissement dans les creux
@@ -546,16 +551,32 @@ def mat_chrome(name, color=(0.92, 0.92, 0.93, 1), rough=0.05, wear=0.0):
     x, _, z = _xyz(nt, rest)
     low = cv._math(nt, "MULTIPLY", _ramp(nt, z, 0.42, 0.12),
                    _imperfection(nt, rest, "SurfaceImperfections017", 0.6, 0.1, 0.55))
+    # le voile : CHROME_HAZE fois les zones et les traces d'essuyage (1 jusqu'au 18 novembre : 0,16 et 0,30, le
+    # pare-chocs ne renvoyait plus qu'une lueur des feux ; un chrome d'époque entretenu reste un miroir, un peu trouble)
     r = cv._math(nt, "ADD", rough, cv._math(nt, "MULTIPLY", wear, cv._math(
-        nt, "ADD", cv._math(nt, "ADD", cv._math(nt, "MULTIPLY", zones, 0.16), cv._math(nt, "MULTIPLY", wipe, 0.30)),
+        nt, "ADD", cv._math(nt, "ADD", cv._math(nt, "MULTIPLY", zones, 0.16 * CHROME_HAZE),
+                            cv._math(nt, "MULTIPLY", wipe, 0.30 * CHROME_HAZE)),
         cv._math(nt, "ADD", cv._math(nt, "MULTIPLY", hair, 0.16),
                  cv._math(nt, "ADD", cv._math(nt, "MULTIPLY", tarnish, 0.35), cv._math(nt, "MULTIPLY", low, 0.6))))))
     # le chrome terni tire vers un gris chaud, plus sombre ; le placage n'est pas tout à fait uniforme
     dull = cv._math(nt, "MINIMUM", cv._math(nt, "MULTIPLY", cv._math(nt, "ADD", tarnish, low), 1.0 * wear), 0.7)
     col = _mix_rgb(nt, color, (0.50, 0.47, 0.43, 1), dull)
     col = _mix_rgb(nt, col, cv._math(nt, "ADD", 0.82, cv._math(nt, "MULTIPLY", zones, 0.18)), 1.0, "MULTIPLY")
+    # les piqûres : le placage percé par points (un demi-millimètre), plus nombreuses en bas ; sombres et mates
+    _pit_h, pit = _drops(nt, rest, 520.0, 0.28, cv._math(nt, "MULTIPLY", cv._math(nt, "ADD", 0.25, cv._math(
+        nt, "MULTIPLY", _ramp(nt, z, 0.9, 0.3), 0.75)), CHROME_PITS * wear))
+    col = _mix_rgb(nt, col, (0.10, 0.085, 0.07, 1), pit)
+    r = _mix(nt, r, 0.7, pit)
+    # l'arête des pare-chocs (BUMPER_CREASE) : la lame emboutie porte une arête vive à mi-hauteur, le modèle a une
+    # face plate ; un toit en V de quelques millimètres casse le reflet en deux, celui du ciel et celui de la route
+    z0, half, tall = BUMPER_CREASE
+    ridge = cv._math(nt, "MAXIMUM", cv._math(nt, "SUBTRACT", 1.0, cv._math(
+        nt, "DIVIDE", cv._math(nt, "ABSOLUTE", cv._math(nt, "SUBTRACT", z, z0)), half)), 0.0)
+    ridge = cv._math(nt, "MULTIPLY", ridge, _ramp(nt, cv._math(nt, "ABSOLUTE", x), 1.95, 2.10))
+    crease = _node(nt, "ShaderNodeBump", Height=ridge, Strength=1.0, Distance=tall)
     rip = _node(nt, "ShaderNodeTexNoise", Vector=rest, Scale=4.0, Detail=2.0)
-    bump = _node(nt, "ShaderNodeBump", Height=rip.outputs["Fac"], Strength=0.9 * wear, Distance=0.03)
+    bump = _node(nt, "ShaderNodeBump", Height=rip.outputs["Fac"], Strength=0.9 * wear, Distance=0.03,
+                 Normal=crease.outputs[0])
     hb = _node(nt, "ShaderNodeBump", Height=hair, Strength=0.15 * wear, Distance=0.0003, Normal=bump.outputs[0])
     p = cv._principled(nt, **{"Metallic": 1.0})
     nt.links.new(col, p.inputs["Base Color"])
