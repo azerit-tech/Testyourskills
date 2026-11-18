@@ -1,11 +1,13 @@
 // Ce que le site pose sur le film (§18.36, docs/cinematique-poursuite.md §2.2,
-// §3.3) : deux bandes d'encre, les six étoiles (la règle unique du §18.48 :
-// remplies de gauche à droite, crème pleine, éteintes en contour), la radio
-// (le chef d'accusation porte son étiquette au-dessus de la ligne), la plaque et le
-// niveau de l'arrêt sur image (son image en deux tons, toise comprise, est
-// tirée par freeze.ts), les deux images d'encre de la coupe, le grain et la
-// vignette. Tout vient de hudAt : aucun état, aucune animation CSS qui
-// dériverait de l'image. Mat : aplats, ni halo ni ombre lumineuse.
+// §3.3), par-dessus l'image, rien n'étant gravé dans la vidéo : la rangée des
+// six étoiles en haut, sur le ciel (la règle unique du §18.48 : remplies de
+// gauche à droite, crème pleine, éteintes en contour), la jauge de l'étoile
+// suivante, l'étoile qui tombe en grand puis rejoint sa place, une ligne sous
+// la berline (une étiquette, une ligne), la plaque, le niveau et la ligne de
+// l'étoile refusée à l'arrêt sur image (son image en deux tons, toise comprise,
+// est tirée par freeze.ts), le grain, la vignette et deux ombres d'encre. Tout
+// vient de hudAt : aucun état, aucune animation CSS qui dériverait de l'image.
+// Mat : aplats, ni halo ni ombre lumineuse.
 import type { CSSProperties } from "react";
 import type { Lang } from "../../../shared/types";
 import type { FilmPlan, Hud } from "../../../shared/film";
@@ -51,29 +53,47 @@ function grainTile(): string {
 }
 
 /**
- * La ligne de radio, son étiquette au-dessus, ou la ligne suivante en petit dessous (la ligne d'une étoile
- * gardée jusqu'à la fiche) ; posée dans la bande de la colonne, ou sur toute la largeur (téléphone couché).
+ * La ligne sous la berline : son étiquette, puis le texte, sur une ligne dont le corps suit la longueur
+ * (--n) ; posée sur l'image, ou sur la bande d'encre du bas (téléphone couché, Film.tsx).
  */
-export function FilmRadio({ radio }: { radio: Hud["radio"] }) {
-  if (!radio) return null;
+export function FilmLine({ line }: { line: Hud["line"] }) {
+  if (!line) return null;
   return (
-    <p className="film-radio">
-      {radio.kicker && <small className="film-radio-kicker">{radio.kicker}</small>}
-      <span className="film-radio-line">
-        <i className={`film-square is-${radio.square}`} />
-        <span className="film-radio-text">{radio.text}</span>
-      </span>
-      {radio.below && <small className="film-radio-below">{radio.below}</small>}
+    <p className={`film-line${line.hit ? " is-hit" : ""}`} style={{ "--enter": line.enter, "--n": line.text.length } as CSSProperties}>
+      <small className="film-line-label">{line.label}</small>
+      <span className="film-line-text">{line.text}</span>
     </p>
   );
 }
 
+/** La ligne de l'étoile refusée, à l'arrêt sur image : « 3ᵉ étoile : à 7 points ». */
+export function FilmVerdict({ plan, hud, lang }: { plan: FilmPlan; hud: Hud; lang: Lang }) {
+  if (!plan.verdict || !hud.freeze) return null;
+  const l = plan.verdict.line[lang];
+  return (
+    <span className="film-verdict" style={{ opacity: hud.freeze.verdict, "--n": l.ord.length + l.sup.length + l.rest.length } as CSSProperties}>
+      {l.ord}
+      {l.sup && <sup>{l.sup}</sup>}
+      {l.rest}
+    </span>
+  );
+}
+
+/**
+ * La part de la boîte de l'étoile (24 unités) que la jauge découvre, depuis le bas : le dessin va de 1,6 à 21,
+ * la jauge vide s'arrête sous sa pointe basse, pleine elle le couvre entier.
+ */
+const gaugeHeight = (fill: number) => `${((3 + 19.4 * fill) / 24) * 100}%`;
+
 export function FilmHud({ plan, hud, lang }: { plan: FilmPlan; hud: Hud; lang: Lang }) {
   const grain = grainTile();
+  const stamp = hud.stamp;
   return (
     <>
       {grain && <div className="film-grain" style={{ backgroundImage: `url(${grain})`, transform: `translate(${hud.grain[0]}px, ${hud.grain[1]}px)` }} />}
       <div className="film-vignette" />
+      {/* deux ombres d'encre, en haut sous les étoiles, en bas sous « Passer » : l'image reste entière */}
+      <div className="film-shade" style={{ opacity: hud.bands }} />
 
       {hud.freeze && (
         <div className="film-mug">
@@ -84,28 +104,43 @@ export function FilmHud({ plan, hud, lang }: { plan: FilmPlan; hud: Hud; lang: L
           <span className="film-level" style={{ transform: `scale(${hud.freeze.titleScale})`, "--n": plan.title[lang].length } as CSSProperties}>
             {plan.title[lang]}
           </span>
+          <FilmVerdict plan={plan} hud={hud} lang={lang} />
         </div>
       )}
 
-      <div className="film-band film-band-top" style={{ transform: `translateY(${(hud.bands - 1) * 100}%)` }}>
-        <div className="film-stars">
-          {hud.stars.map((s, i) => (
-            <svg
-              key={i}
-              className={`film-star${s.on ? " is-on" : ""}${s.pending !== undefined ? " is-pending" : ""}`}
-              viewBox="0 0 24 24"
-              width="26"
-              height="26"
-              style={s.pending !== undefined ? { opacity: s.pending } : s.scale !== 1 ? { transform: `scale(${s.scale})` } : undefined}
-            >
-              <path d={STAR} />
-            </svg>
-          ))}
-        </div>
+      <div className="film-stars" style={{ opacity: hud.bands }}>
+        {hud.stars.map((s, i) => {
+          const live = !s.on && s.fill !== undefined && s.pending === undefined;
+          const cls = `film-star${s.on && !s.flying ? " is-on" : ""}${s.flying ? " is-flying" : ""}${live ? " is-live" : ""}${s.pending !== undefined ? " is-pending" : ""}`;
+          return (
+            <span key={i} className={cls} style={s.scale !== 1 ? { transform: `scale(${s.scale})` } : undefined}>
+              <svg viewBox="0 0 24 24">
+                <path className="film-star-rim" d={STAR} />
+                <path className="film-star-body" d={STAR} style={s.pending !== undefined ? { strokeOpacity: s.pending } : undefined} />
+              </svg>
+              {s.fill !== undefined && (
+                <span className="film-star-gauge" style={{ height: gaugeHeight(s.fill) }}>
+                  <svg viewBox="0 0 24 24">
+                    <path d={STAR} />
+                  </svg>
+                </span>
+              )}
+            </span>
+          );
+        })}
       </div>
-      <div className="film-band film-band-bottom" style={{ transform: `translateY(${(1 - hud.bands) * 100}%)` }}>
-        <FilmRadio radio={hud.radio} />
-      </div>
+
+      {stamp && (
+        <svg className="film-stamp" viewBox="0 0 24 24" style={{ opacity: stamp.opacity, "--fly": stamp.fly, "--slap": stamp.scale, "--slot": stamp.star - 3.5 } as CSSProperties}>
+          <path className="film-star-rim" d={STAR} />
+          <path className="film-star-body" d={STAR} />
+        </svg>
+      )}
+
+      <FilmLine line={hud.line} />
+
+      {/* téléphone couché : la bande d'encre du bas, sous la colonne étroite ; la ligne s'y pose (Film.tsx) */}
+      <div className="film-band film-band-bottom" style={{ transform: `translateY(${(1 - hud.bands) * 100}%)` }} />
     </>
   );
 }

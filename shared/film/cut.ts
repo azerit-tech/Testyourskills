@@ -83,45 +83,90 @@ export interface Hold {
 }
 /**
  * De une à cinq étoiles, la fin sur place (§18.53) : l'arrêt sur image gèle la
- * dernière image du dernier tronçon joué, 14 images, puis 10 de flash.
+ * dernière image du dernier tronçon joué, 36 images (1,5 s), puis 10 de flash.
+ * C'est le seul moment immobile du film : la ligne de l'étoile refusée s'y lit
+ * (« 3ᵉ étoile : à 7 points »).
  */
-export const IN_PLACE: Hold = { freeze: 14, flash: 10, rise: 4 };
+export const IN_PLACE: Hold = { freeze: 36, flash: 10, rise: 4 };
 /** À six étoiles, la dernière image de FIN6 (la berline arrêtée, l'orbite finie) : 12 images de gel, 12 de flash. */
 export const FINALE: Hold = { freeze: 12, flash: 12, rise: 4 };
 export const holdOf = (level: number): Hold => (level >= 6 ? FINALE : IN_PLACE);
 
 /** Les bandes d'encre se ferment en tant d'images, à l'ouverture. */
 export const BANDS_CLOSE = 8;
-/** Une étoile qui s'allume passe de 1,5 à 1 en tant d'images. */
+/** Une étoile qui se pose dans la rangée passe de 1,5 à 1 en tant d'images. */
 export const STAR_POP = 5;
+/**
+ * L'étoile tombe en grand sur le ciel, au-dessus de la berline : elle claque de
+ * STAMP_FROM à 1 en STAMP_SLAP images, tient jusqu'à STAMP_HOLD images après le
+ * coup, puis vole vers sa place dans la rangée, où elle se pose STAR_LAND
+ * images après le coup. Ni éclair ni secousse (§18.53).
+ */
+export const STAR_LAND = 19;
+export const STAMP_SLAP = 3;
+export const STAMP_FROM = 2.1;
+export const STAMP_HOLD = 11;
+/**
+ * La jauge : l'étoile suivante se remplit de bas en haut, en demi-teinte, jusqu'à
+ * l'instant où elle tombe. La première commence à l'image GAUGE_OPEN, les autres
+ * GAUGE_AFTER images après l'étoile d'avant. Lente au début, elle finit vite
+ * (puissance GAUGE_EASE) : elle n'est pleine qu'à l'image de l'étoile.
+ */
+export const GAUGE_OPEN = 6;
+export const GAUGE_AFTER = 4;
+export const GAUGE_EASE = 1.5;
+/**
+ * L'étoile refusée (une à cinq étoiles) : sa jauge monte jusqu'à la part vraie
+ * de la note entre deux seuils, bornée pour se lire (ni vide, ni presque pleine),
+ * se fige avec l'image, puis se vide entre ces deux images comptées depuis la
+ * fin du dernier tronçon joué.
+ */
+export const DENIED_MIN = 0.1;
+export const DENIED_MAX = 0.92;
+export const DENIED_DRAIN: readonly [number, number] = [14, 24];
+/** La ligne de l'étoile refusée paraît tant d'images après le gel (le titre a claqué), en VERDICT_IN images. */
+export const VERDICT_AT = 6;
+export const VERDICT_IN = 3;
+/**
+ * La ligne sous la berline (une étiquette, une ligne) : elle arrive LINE_LEAD
+ * images avant son étoile (1,75 s : on lit quand la route est calme), reste
+ * LINE_TAIL images après (1,25 s) et s'efface au gel. Elle entre en LINE_IN
+ * images, sort en LINE_OUT ; au coup de l'étoile, son étiquette s'inverse
+ * pendant LINE_HIT images. Trois secondes par ligne, jamais deux à la fois.
+ */
+export const LINE_LEAD = 42;
+export const LINE_TAIL = 30;
+export const LINE_IN = 5;
+export const LINE_OUT = 3;
+export const LINE_HIT = 9;
+/**
+ * Le budget de texte du film : une étiquette de 22 signes au plus, une ligne
+ * de 32 signes au plus (elle se lit en trois secondes), une ligne de gel de 26
+ * signes au plus. Au-delà, l'écran réduit le corps ; il ne coupe qu'en dernier
+ * recours.
+ */
+export const LINE_LABEL_MAX = 22;
+export const LINE_TEXT_MAX = 32;
+export const VERDICT_MAX = 26;
 /** Le titre de l'arrêt sur image claque en tant d'images, de cette échelle à 1 (il reste dans l'écran). */
 export const TITLE_POP = 4;
 export const TITLE_FROM = 1.2;
 /** Le grain bouge douze fois par seconde : une nouvelle position toutes les deux images. */
 export const GRAIN_STEP = 2;
-/** Le carré de la radio alterne corail et lilas toutes les six images (deux fois par seconde chacun). */
-export const SQUARE_STEP = 6;
 /**
  * L'interception, de une à cinq étoiles (§18.39) : tant d'images avant la fin
- * du dernier tronçon joué, la radio annonce l'interception et l'étoile suivante
- * clignote ; elle s'éteint avant l'arrêt sur image, posé sur place.
+ * du dernier tronçon joué, la radio grésille (le son seul : plus de ligne à
+ * l'écran, la jauge de l'étoile suivante dit la même chose).
  */
 export const INTERCEPT_LEAD = 12;
 /**
- * La ligne de radio d'une étoile porte la fiche (la spécialité, l'arme…) : elle
- * se lit au moins tant d'images (1,83 s) avant la fiche. Quand l'interception
- * la suivrait plus tôt (une, quatre et cinq étoiles), elle reste à l'écran
- * jusqu'à la fiche, l'interception puis la fin de course en dessous (§18.56).
- */
-export const STAR_READ = 44;
-/**
- * L'étoile suivante clignote deux fois et reste éteinte : allumée sur ces
- * intervalles d'images, comptés depuis la fin du dernier tronçon joué (négatifs :
- * avant elle).
+ * L'étoile refusée clignote deux fois au gel, puis se vide : son contour est
+ * vif sur ces intervalles d'images, comptés depuis la fin du dernier tronçon
+ * joué (l'arrêt sur image a claqué, son coup est passé).
  */
 export const FLICKER_ON: readonly (readonly [number, number])[] = [
-  [-12, -9],
-  [-6, -3],
+  [3, 6],
+  [9, 12],
 ];
 
 /** Le tronçon à l'image `frame` du fichier `poursuite` (FIN6 comprise). */

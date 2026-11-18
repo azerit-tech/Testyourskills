@@ -82,24 +82,26 @@ describe("les couches", () => {
 });
 
 describe("les repères", () => {
-  it.each(LEVELS)("%i étoile(s) : un tintement par étoile qui monte, une radio par ligne, l'impact au gel, le souffle au flash", (n) => {
+  it.each(LEVELS)("%i étoile(s) : un tintement par étoile qui monte, une radio par étoile, l'impact au gel, l'étoile refusée, le souffle au flash", (n) => {
     const { plan, score } = scoreAt(n);
     const of = (v: string) => score.events.filter((e) => e.voice === v);
     expect(of("chime").map((e) => e.frame)).toEqual(plan.stars.map((s) => s.frame));
     expect(of("chime").map((e) => e.notes[0])).toEqual(CHIMES.slice(0, n));
-    // la radio : ouverture et fermeture du canal à chaque étoile, l'interception (une à cinq étoiles), la ligne de fin
+    // la radio : ouverture et fermeture du canal à chaque étoile, puis l'interception (une à cinq étoiles) ou, à six
+    // étoiles, la radio qui se referme au gel (de une à cinq, le gel est à l'étoile refusée)
     const intercept = plan.intercept === null ? 0 : 1;
     expect(intercept).toBe(n < 6 ? 1 : 0);
-    expect(of("beep")).toHaveLength(n + 1 + intercept);
+    expect(of("beep")).toHaveLength(n + 1);
     // le canal d'une étoile se referme avant l'interception, jamais pendant : à une et cinq étoiles, la
     // dernière étoile tombe moins de 28 images avant elle, sa fermeture saute
     const closes = plan.stars.filter((s) => s.frame + 28 < (plan.intercept ?? plan.freeze)).length;
     expect(closes).toBe(n === 1 || n === 5 ? n - 1 : n);
-    expect(of("radio")).toHaveLength(n + closes + 1 + intercept);
+    expect(of("radio")).toHaveLength(n + closes + 1);
     if (plan.intercept !== null) {
       expect(of("radio").map((e) => e.frame)).toContain(plan.intercept);
-      // rien ne grésille sur la ligne d'interception, de son ouverture au gel
-      expect(of("radio").filter((e) => e.frame > plan.intercept! && e.frame <= plan.freeze)).toHaveLength(0);
+      // rien ne grésille après l'interception : ni avant le gel, ni pendant (l'étoile refusée s'entend seule)
+      expect(of("radio").filter((e) => e.frame > plan.intercept!)).toHaveLength(0);
+      expect(of("beep").filter((e) => e.frame > plan.intercept! + 3)).toHaveLength(0);
     }
     // plus de coupe, plus de claquement de coupe (§18.56) : un seul coup, une image après le gel
     expect(of("snap")).toHaveLength(0);
@@ -111,14 +113,15 @@ describe("les repères", () => {
     expect(whoosh).toHaveLength(1);
     expect(whoosh[0].frame).toBeGreaterThan(plan.freeze);
     expect(whoosh[0].at + whoosh[0].dur).toBeCloseTo(plan.flash.peak / FPS, 9);
-    // l'étoile suivante clignote deux fois sans s'allumer, avant le gel et sur la grille (la double croche la plus
-    // proche du battement à l'image) ; à six étoiles il n'y en a plus
-    const blinks = plan.flicker ? plan.flicker.frames.map(([a]) => a) : [];
-    expect(of("deny")).toHaveLength(blinks.length);
-    for (const [i, e] of of("deny").entries()) {
-      expect(Math.abs(e.frame - blinks[i])).toBeLessThanOrEqual(0.5 + score.beats[0].len / 8);
-      expect(e.frame).toBeLessThan(plan.cut);
-      expect(score.beats.some((x) => [0, 1, 2, 3].some((j) => Math.abs(x.frame + (j * x.len) / 4 - e.frame) < 1e-9))).toBe(true);
+    // l'étoile refusée bat deux fois au gel sans s'allumer : un tintement étouffé à l'image de chaque battement, sa
+    // note, après le coup du gel (la musique est arrêtée, plus de grille) ; à six étoiles il n'y en a pas
+    const blinks = plan.verdict ? plan.verdict.blinks.map(([a]) => a) : [];
+    expect(blinks).toHaveLength(n < 6 ? 2 : 0);
+    expect(of("deny").map((e) => e.frame)).toEqual(blinks);
+    for (const e of of("deny")) {
+      expect(e.frame).toBeGreaterThan(impact);
+      expect(e.frame).toBeLessThan(plan.flash.from);
+      expect(e.notes).toEqual([CHIMES[plan.verdict!.star - 1]]);
     }
   });
 
