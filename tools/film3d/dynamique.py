@@ -243,8 +243,10 @@ class Car:
         """L'effort latéral de l'essieu avant (N) à la dérive alpha (sans frein)."""
         return self.front(alpha, 0.0, self.loads())[1]
 
-    def step(self, h, delta, T_drive, T_brake_r, F_brake_f):
-        """Un pas semi-implicite : les vitesses d'abord (l'essieu arrière implicite, linéarisé), puis les places."""
+    def step(self, h, delta, T_drive, T_brake_r, F_brake_f, ext=None):
+        """Un pas semi-implicite : les vitesses d'abord (l'essieu arrière implicite, linéarisé), puis les places.
+        ext : un effort extérieur sur la caisse (contacts.py, SPEC §18.68 : une patrouille la tape), dans son repère :
+        (Fx, Fy en N, Mz de lacet, moments directs de roulis et de tangage en N·m)."""
         c = self.c
         Fx, Fy, Mz, Fxr, det = self.forces(delta, T_drive, T_brake_r, F_brake_f)
         # l'essieu arrière : I ω' = T − Tb − R Fx(ω), Euler implicite sur la pente locale de Fx(ω) (raide à basse vitesse)
@@ -255,13 +257,20 @@ class Car:
         w_new = self.w + h * (T_drive - Tb - c["R"] * Fxr) / (c["Iw"] + h * c["R"] * slope)
         self.w = max(0.0, w_new)
         m = c["m"]
+        # ax, ay : ce que les pneus donnent (les reports de charge les lisent) ; un effort extérieur pousse le
+        # centre en plus (ex, ey) et prend la caisse à la hauteur du choc (ses moments directs de roulis, de tangage)
         self.ax, self.ay = Fx / m, Fy / m
-        self.u += h * (Fx / m + self.v * self.r)
-        self.v += h * (Fy / m - self.u * self.r)
+        ex = ey = mphi = mth = 0.0
+        if ext is not None:
+            ex, ey, mphi, mth = ext[0] / m, ext[1] / m, ext[3], ext[4]
+            Mz += ext[2]
+        self.u += h * (Fx / m + ex + self.v * self.r)
+        self.v += h * (Fy / m + ey - self.u * self.r)
         self.r += h * Mz / c["Iz"]
         # la caisse : roulis et tangage sur leurs ressorts, menés par l'accélération du centre
-        ddphi = (c["ms"] * c["h_roll"] * (self.ay + G * self.phi) - c["K_roll"] * self.phi - c["C_roll"] * self.dphi) / c["Ix"]
-        ddth = (c["ms"] * c["h_pitch"] * self.ax - c["K_pitch"] * self.th - c["C_pitch"] * self.dth) / c["Iy"]
+        ddphi = (c["ms"] * c["h_roll"] * (self.ay + ey + G * self.phi) + mphi - c["K_roll"] * self.phi
+                 - c["C_roll"] * self.dphi) / c["Ix"]
+        ddth = (c["ms"] * c["h_pitch"] * (self.ax + ex) + mth - c["K_pitch"] * self.th - c["C_pitch"] * self.dth) / c["Iy"]
         self.dphi += h * ddphi
         self.dth += h * ddth
         self.phi += h * self.dphi
@@ -671,9 +680,11 @@ def _env_at(env, dist):
     return env[k][0] + (env[k + 1][0] - env[k][0]) * f, env[k][1] + (env[k + 1][1] - env[k][1]) * f
 
 
-def simulate(plan, events=(), t_span=(-2.0, 40.0), car=None, driver=None):
+def simulate(plan, events=(), t_span=(-2.0, 40.0), car=None, driver=None, chocs=None):
     """Simule la berline et son conducteur sur la route du plan, de t_span[0] à t_span[1] (s). events : les
-    dérapages (voir Geste). Rend un PhysDrive (table à 240 Hz)."""
+    dérapages (voir Geste). chocs : les contacts (contacts.efforts, SPEC §18.68), chocs(t) -> None ou l'effort
+    extérieur sur la caisse à l'instant t (Car.step, ext), lu à chaque pas de la physique : le conducteur ne le
+    connaît pas, il rattrape ce que la voiture en fait. Rend un PhysDrive (table à 240 Hz)."""
     c = dict(CAR, **(car or {}))
     d = dict(DRIVER, **(driver or {}))
     R = plan.route
@@ -876,7 +887,7 @@ def simulate(plan, events=(), t_span=(-2.0, 40.0), car=None, driver=None):
             stopped = True
         # ---- la physique, SUB pas
         h = DT / SUB
-        for _ in range(SUB):
+        for q in range(SUB):
             sr = math.radians(c["steer_rate"]) * h
             dd = (d_cmd - delta) * min(1.0, h / c["steer_tau"])
             delta += max(-sr, min(sr, dd))
@@ -894,7 +905,7 @@ def simulate(plan, events=(), t_span=(-2.0, 40.0), car=None, driver=None):
             T = thr * car_.T_avail()
             Tb = brk * c["brake_max"] * (1.0 - c["bias"]) * c["R"] + hb * c["hb_max"]
             Ff = brk * c["brake_max"] * c["bias"]
-            car_.step(h, delta, T, Tb, Ff)
+            car_.step(h, delta, T, Tb, Ff, chocs(t + q * h) if chocs is not None else None)
         # ---- la table
         u, v, r = car_.u, car_.v, car_.r
         V = math.hypot(u, v)
