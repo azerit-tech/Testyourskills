@@ -339,7 +339,7 @@ def vehicules():
                    n_lisse=3)
     add("rond_b", "chapman", "corail", Course(b_pts, [(0, _v(30))], s0=284.0 + 31.2 - _v(30) * 60 / FPS, g0=0),
         phares=True)
-    add("rond_nord_attend", "taxi", None, Fixe(26.0, AV_O2 + 0.3, 90.0), phares=True)
+    # (v11, SPEC §18.71 : le taxi qui attendait à l'entrée nord y arrive en roulant et cède : trafic.py, rond_cede)
     add("rond_nord_rangee", "riverside", "bordeaux", Fixe(36.0, AV_GARE_MER, -90.0), phares=True, warning=0)
     for x in (52.0, 58.5, 65.0, 78.0, 84.5):
         garee("rond_nord_garee", x, AV_GARE_MER, -90.0)

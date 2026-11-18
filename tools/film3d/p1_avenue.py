@@ -67,14 +67,22 @@ else:
     # peine son pare-chocs les vingt premières images d'OUV. Elle est à la hauteur de la berline à l'ouverture, 0,75 m
     # derrière, son capot et sa portière dans le quart gauche du cadre ; elle lève le pied dès qu'elle voit le
     # rond-point et sort du cadre par la gauche vers OUV/50 ; l'accélération sous 2,2 m/s², l'à-coup sous 12 m/s³)
-    # (v11, SPEC §18.70 : le critique du brouillon éclairé v10 lisait « deux voitures côte à côte » : le film
+    # (v11, SPEC §18.71 : le critique du brouillon éclairé v10 lisait « deux voitures côte à côte » : le film
     # s'ouvrait patrouille déjà au contact. Elle arrive maintenant de derrière : W0 m/s plus vite que la berline
-    # avant l'ouverture, LEAD0 m derrière elle à l'image G0 du film, elle la remonte en levant le pied (A0 m/s²
-    # de moins qu'elle), culmine vers l'image 26 à 1,2 m derrière sa hauteur, détachée d'elle de 1,5 m, et retombe
-    # jusqu'à sa place de P2/1 : un seul arc, sans palier (avec un palier à sa hauteur, la retombée demandait
-    # 18 m/s³ d'à-coup dans le freinage du rond-point, 12 permis ; balayé, 11,9 ici). contacts.CHOCS la rabat sur
-    # la berline à son sommet)
-    G0, LEAD0, W0, A0 = -6.0, -6.0, 7.0, -4.0
+    # avant l'ouverture, LEAD0 m derrière elle à l'image G0 du film, elle la remonte en levant le pied, culmine à
+    # l'image G1, LEAD1 m derrière sa hauteur, détachée d'elle de 1,5 m, et retombe jusqu'à la coupe : pas de palier
+    # à sa hauteur. contacts.CHOCS la rabat sur la berline à son sommet.
+    # Sur l'horaire de film/v11-virages la berline ne freine plus à travers la coupe : elle freine fort de l'image
+    # 84 à la 102 et entre dans P2 à vitesse tenue. Écrite en avance sur elle, la loi faisait freiner la patrouille
+    # de 13,7 m/s² au choc et la relançait de 5 m/s² pour la rattraper à la coupe. Elle s'écrit donc dans l'absolu,
+    # sa position le long de l'avenue, en deux arcs : l'approche jusqu'au sommet (à la vitesse de la berline, en
+    # levant le pied de A1 m/s²), puis la retombée jusqu'à la coupe, où elle freine déjà pour le rond-point et
+    # roule DV_END m/s moins vite que la berline : elle ne relance jamais. Balayé : freinage 6,9 m/s² au plus,
+    # à-coup 11,6 m/s³ dans OUV, 4,8 dans P1. Elle reste à la portière de la berline plus longtemps que sur
+    # l'horaire d'avant : 2,7 m derrière sa hauteur à l'image 60, 3,4 à la 75, 7 à la coupe)
+    G0, LEAD0, W0, A0 = -12.0, -5.0, 5.0, -5.0
+    G1, LEAD1, A1 = 27.0, -1.25, -5.0
+    DV_END = -4.5
     _T0 = (G0 - PC.START["P1"]) / M.FPS
     _T1 = None
 
@@ -83,13 +91,20 @@ def _hero_y(t):
     return HERO["pos"](_f(t))[1]
 
 
-_VC = _vh(_TC)                      # à la coupe, à la vitesse de la berline
+DV_END = globals().get("DV_END", 0.0)
+_VC = _vh(_TC) + DV_END             # à la coupe, à la vitesse de la berline (DV_END m/s de moins depuis la v11)
 _YC = _hero_y(_TC) + LEAD_END
 _VK = _VC + PATROL_BRAKE * (_TC - _TK)
 _YK = _YC - _VK * (_TC - _TK) + 0.5 * PATROL_BRAKE * (_TC - _TK) ** 2
 W0 = globals().get("W0", 0.0)
 _KEYS = ([(_T0, LEAD0, W0, A0)] if _T1 is None else [(_T0, LEAD0, 0.0, 0.0), (_T1, LEAD_PEAK, 0.0, 0.0)]) + [
          (_TK, _YK - _hero_y(_TK), _VK - _vh(_TK), -PATROL_BRAKE - _hero_acc(_TK))]
+# la loi dans l'absolu (v11) : sa position le long de l'avenue aux trois nœuds, vitesse et accélération vraies
+_ABS = None
+if _T1 is None:
+    _TP = (G1 - PC.START["P1"]) / M.FPS
+    _ABS = [(_T0, _hero_y(_T0) + LEAD0, _vh(_T0) + W0, A0), (_TP, _hero_y(_TP) + LEAD1, _vh(_TP), A1),
+            (_TK, _YK, _VK, -PATROL_BRAKE)]
 
 
 def _lead(t):
@@ -99,6 +114,8 @@ def _lead(t):
     if t >= _TK:
         dt = t - _TK
         return _YK + _VK * dt - 0.5 * PATROL_BRAKE * dt * dt - _hero_y(t)
+    if _ABS:
+        return M._hermite5(_ABS, t) - _hero_y(t)
     return M._hermite5(_KEYS, t)
 
 
