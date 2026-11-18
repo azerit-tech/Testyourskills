@@ -215,10 +215,21 @@ def env_key():
     raise SystemExit("SKETCHFAB_API_KEY manquant (variable d'environnement ou .env)")
 
 
-def get(url, path=None, headers=None):
+def get(url, path=None, headers=None, essais=6):
+    """Un GET ; HTTP 429 (trop de requêtes) : on attend (5, 10, 20… s, ou Retry-After) et on réessaie."""
+    import time
+    import urllib.error
     req = urllib.request.Request(url, headers={"User-Agent": "testyourskills-film3d", **(headers or {})})
-    with urllib.request.urlopen(req) as r:
-        data = r.read()
+    for k in range(essais):
+        try:
+            with urllib.request.urlopen(req) as r:
+                data = r.read()
+            break
+        except urllib.error.HTTPError as e:
+            if e.code != 429 or k == essais - 1:
+                raise
+            wait = e.headers.get("Retry-After")
+            time.sleep(float(wait) if wait and wait.isdigit() else 5.0 * 2 ** k)
     if path is None:
         return json.loads(data)
     with open(path, "wb") as f:
