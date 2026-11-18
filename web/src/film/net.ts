@@ -2,7 +2,6 @@
 // pure, sans DOM, testée par net.test.ts. Les adresses des fichiers, le choix
 // de la variante (haute ou éco) sur le débit mesuré, et le compteur de débit.
 // Le chargement lui-même est dans loader.ts.
-import type { EndingId } from "../../../shared/film/cut";
 
 /** « 720 » : la variante haute ; « 540 » : la variante éco. */
 export type Quality = "720" | "540";
@@ -117,18 +116,6 @@ export class RateMeter {
   }
 }
 
-/**
- * La fin à charger après la poursuite. De une à cinq étoiles, aucune : la fin
- * se joue sur place (§18.53). Niveau inconnu (l'attente) : aucune non plus,
- * six étoiles est rare. Six étoiles : `fin6`. Une à cinq étoiles connues :
- * `fin6`, si elle est en cours ou en file (une fiche à six étoiles plus tôt
- * dans la page), est abandonnée (`drop`).
- */
-export function endingToLoad(level?: number): { load: EndingId | null; drop: EndingId | null } {
-  if (level === 6) return { load: "fin6", drop: null };
-  return { load: null, drop: level === undefined ? null : "fin6" };
-}
-
 /** Fiche prête, sans mesure du débit (ou tout reçu, en décodage) : le film a ce temps d'onglet visible pour être prêt. */
 export const READY_WAIT_MS = 4000;
 /**
@@ -145,7 +132,7 @@ export const ETA_MARGIN = 1.25;
 export interface ReadyFacts {
   /** Le temps d'onglet visible écoulé depuis que la fiche est prête. */
   visibleMs: number;
-  /** Les octets qui manquent encore aux deux fichiers à jouer. */
+  /** Les octets qui manquent encore au fichier à jouer. */
   remainingBytes: number;
   /** Le débit mesuré (RateMeter), null s'il n'y a rien à mesurer. */
   bps: number | null;

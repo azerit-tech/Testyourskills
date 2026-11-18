@@ -3,9 +3,10 @@
 // temps de la vidéo : le HUD ne peut pas se décaler de l'image. Sans DOM :
 // testé sans navigateur, et rendu tel quel côté serveur pour le clip (§18.8).
 import type { Lang } from "../types";
-import { BANDS_CLOSE, CUT_INK, FPS, GRAIN_STEP, SQUARE_STEP, STAR_POP, TITLE_FROM, TITLE_POP, chaseShotAt, ENDINGS, type ShotId } from "./cut";
+import { BANDS_CLOSE, FPS, GRAIN_STEP, SQUARE_STEP, STAR_POP, TITLE_FROM, TITLE_POP, shotAt, type ShotId } from "./cut";
 import type { FilmPlan } from "./plan";
 
+/** « ending » : à six étoiles, FIN6, de l'entrée de la pointe au gel (la musique s'est arrêtée, la berline freine). */
 export type FilmPhase = "chase" | "ending" | "freeze" | "flash" | "over";
 
 export interface StarHud {
@@ -21,22 +22,24 @@ export interface Hud {
   /** L'image du film (entière). */
   frame: number;
   phase: FilmPhase;
-  /** Le plan à l'écran. */
+  /** Le tronçon à l'écran. */
   shot: ShotId;
-  /** La balise vidéo visible : la poursuite, la fin, ou aucune (la fiche est posée). */
-  video: "chase" | "ending" | null;
-  /** L'image dans le fichier de cette balise. */
+  /** La vidéo visible (un seul fichier, une seule balise), ou aucune : la fiche est posée. */
+  video: "chase" | null;
+  /** L'image du fichier à l'écran. */
   videoFrame: number;
   /** Les six étoiles. */
   stars: StarHud[];
   /** Étoiles allumées par la poursuite (jamais plus que le niveau). */
   lit: number;
-  /** La ligne de radio, son étiquette au-dessus (le chef d'accusation) et la couleur de son carré ; null pendant l'ouverture. */
-  radio: { text: string; kicker: string | null; square: "coral" | "lilac" } | null;
+  /**
+   * La ligne de radio, son étiquette au-dessus (le chef d'accusation) et la couleur de son carré ; null pendant l'ouverture.
+   * `below` : la ligne suivante, en petit dessous, quand celle de la dernière étoile reste à l'écran (`plan.keepLine`) :
+   * l'interception, puis la fin de course. L'étiquette tombe alors : deux lignes seulement tiennent dans la bande.
+   */
+  radio: { text: string; kicker: string | null; below: string | null; square: "coral" | "lilac" } | null;
   /** Fermeture des bandes d'encre : 0 ouvertes, 1 fermées. */
   bands: number;
-  /** Les deux images de l'éclair de la bascule vers la fin, à six étoiles (le nom vient de l'encre qui les couvrait d'abord). */
-  ink: boolean;
   /** L'arrêt sur image : deux tons, plaque et titre (échelle du claquement, 1,2 à 1). */
   freeze: { titleScale: number } | null;
   /** Opacité du flash crème. */
@@ -59,13 +62,12 @@ function grainAt(step: number): [number, number] {
 export function hudAt(plan: FilmPlan, t: number, lang: Lang): Hud {
   const f = Math.max(0, t * FPS);
   const frame = Math.floor(f + 1e-6);
-  const { cut, freeze, flash } = plan;
-  // De une à cinq étoiles, pas de fin tournée : le gel (cut - 1) suit la poursuite, sans phase « ending ».
-  const phase: FilmPhase = frame >= flash.to ? "over" : frame >= flash.from ? "flash" : frame >= freeze ? "freeze" : frame < cut ? "chase" : "ending";
-  const onEnding = plan.ending !== null && frame >= cut;
+  const { cut, chaseEnd, freeze, flash } = plan;
+  // Le gel (cut - 1) suit la vidéo, sur place ; à six étoiles, FIN6 (de chaseEnd au gel) est la phase « ending ».
+  const phase: FilmPhase = frame >= flash.to ? "over" : frame >= flash.from ? "flash" : frame >= freeze ? "freeze" : frame < chaseEnd ? "chase" : "ending";
   const landed = frame >= flash.peak;
 
-  // Les étoiles de la poursuite, chacune sur sa coupe : elle claque (son « pop »), l'image ne bouge pas.
+  // Les étoiles, chacune à son instant du trajet : elle claque (son « pop »), l'image ne bouge pas.
   let lit = 0;
   for (const s of plan.stars) if (frame >= s.frame) lit = s.star;
   const stars: StarHud[] = [];
@@ -85,13 +87,18 @@ export function hudAt(plan: FilmPlan, t: number, lang: Lang): Hud {
   }
 
   // La radio : muette à l'ouverture, une ligne par étoile, l'interception juste
-  // avant le gel (une à cinq étoiles), puis la fin de course au gel.
+  // avant le gel (une à cinq étoiles), puis la fin de course au gel. Quand
+  // l'interception suit de trop près la dernière étoile (plan.keepLine), la ligne
+  // de l'étoile reste jusqu'à la fiche, les deux autres passent dessous, en petit.
   const r = plan.radio[lang];
+  const live = phase === "chase" || phase === "ending";
   const intercepted = plan.intercept !== null && frame >= plan.intercept;
-  const beat = (phase === "chase" || phase === "ending") && !intercepted && lit > 0 ? lit - 1 : -1;
-  const text = phase === "chase" || phase === "ending" ? (intercepted ? r.intercept : beat >= 0 ? r.beats[beat] : null) : r.end;
-  const kicker = beat >= 0 ? (r.kickers[beat] ?? null) : null;
-  const radio = text ? { text, kicker, square: (Math.floor(frame / SQUARE_STEP) % 2 === 0 ? "coral" : "lilac") as "coral" | "lilac" } : null;
+  const news = live ? (intercepted ? r.intercept : null) : r.end;
+  const beat = lit > 0 && (news === null || plan.keepLine) ? lit - 1 : -1;
+  const below = beat >= 0 ? news : null;
+  const text = beat >= 0 ? r.beats[beat] : news;
+  const kicker = beat >= 0 && below === null ? (r.kickers[beat] ?? null) : null;
+  const radio = text ? { text, kicker, below, square: (Math.floor(frame / SQUARE_STEP) % 2 === 0 ? "coral" : "lilac") as "coral" | "lilac" } : null;
 
   // Les bandes se ferment à l'ouverture, s'ouvrent après le sommet du flash.
   const bands = landed ? 1 - clamp01((f - flash.peak) / (flash.to - flash.peak)) : clamp01(f / BANDS_CLOSE);
@@ -102,16 +109,14 @@ export function hudAt(plan: FilmPlan, t: number, lang: Lang): Hud {
   return {
     frame,
     phase,
-    shot: onEnding && plan.ending ? ENDINGS[plan.ending].shot : chaseShotAt(Math.min(frame, cut - 1)),
-    video: landed ? null : onEnding ? "ending" : "chase",
-    // gelée sur place, la poursuite reste sur la dernière image de son dernier plan
-    videoFrame: onEnding ? Math.min(frame - cut, plan.endVideo - 1) : Math.min(frame, cut - 1),
+    shot: shotAt(Math.min(frame, cut - 1)),
+    video: landed ? null : "chase",
+    // gelée sur place, la vidéo reste sur la dernière image de son dernier tronçon
+    videoFrame: Math.min(frame, cut - 1),
     stars,
     lit,
     radio,
     bands,
-    // l'éclair de la coupe vers la fin : six étoiles seulement, de une à cinq il n'y a pas de coupe
-    ink: plan.ending !== null && frame >= cut - 1 && frame < cut - 1 + CUT_INK,
     freeze: frozen ? { titleScale: frame - freeze < TITLE_POP ? TITLE_FROM - ((TITLE_FROM - 1) * (frame - freeze)) / TITLE_POP : 1 } : null,
     flash: flashOpacity,
     grain: grainAt(Math.floor(frame / GRAIN_STEP)),

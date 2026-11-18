@@ -3,31 +3,29 @@
 // lecture des sondes ffprobe. Rien ici ne lance de processus : scripts/film-assemble.ts
 // et scripts/film-contact.ts s'en chargent, et film-lib.test.ts teste ce fichier.
 import { FILE_CEILINGS, PERSON_CEILINGS, personBytes } from "../shared/film/budget";
-import { ENDINGS, SHOT_FRAMES as CHASE_SHOT_FRAMES } from "../shared/film/cut";
+import { FILM_SHOTS, SHOT_FRAMES as CUT_SHOT_FRAMES } from "../shared/film/cut";
 
 export const FPS = 24;
 
-/** L'ordre des plans. */
-export const SHOTS = ["OUV", "P1", "P2", "P3", "P4", "P5", "P6", "FIN6"] as const;
+/** L'ordre des plans (les tronçons du trajet roulé, chacun rendu à part : une prise par tronçon). */
+export const SHOTS = FILM_SHOTS;
 export type ShotId = (typeof SHOTS)[number];
 
 /**
- * Les images de VIDÉO de chaque plan (§2.1, §6 T2 critère 1).
- * FIN6 : 80 images d'orbite en vidéo, puis 12 d'arrêt et 12 de flash dessinées
- * en direct par le site. Lues dans shared/film/cut.ts, la seule source des durées.
- * La fin à la pointe de une à cinq étoiles (FIN) n'est plus montée depuis le
- * 17 novembre 2026 (SPEC §18.53) : la fin se joue sur place, sur la dernière
- * image du dernier plan joué.
+ * Les images de VIDÉO de chaque plan (§2.1, §6 T2 critère 1), lues dans
+ * shared/film/cut.ts, qui les lit dans shared/film/parcours.json (exporté par
+ * tools/film3d/parcours.py, la seule source des durées). L'arrêt sur image et
+ * le flash sont dessinés en direct par le site. La fin à la pointe de une à cinq
+ * étoiles (FIN) n'est plus montée depuis le 17 novembre 2026 (SPEC §18.53).
  */
-export const SHOT_FRAMES: Record<ShotId, number> = {
-  ...CHASE_SHOT_FRAMES,
-  FIN6: ENDINGS.fin6.video,
-};
+export const SHOT_FRAMES: Readonly<Record<ShotId, number>> = CUT_SHOT_FRAMES;
 
-/** Les deux films et leurs plans, dans l'ordre. */
+/**
+ * Le film et ses plans, dans l'ordre : un seul fichier depuis le trajet roulé
+ * d'un seul tenant (SPEC §18.56), la poursuite puis FIN6, sans coupe.
+ */
 export const FILMS = {
-  poursuite: ["OUV", "P1", "P2", "P3", "P4", "P5", "P6"],
-  fin6: ["FIN6"],
+  poursuite: SHOTS,
 } as const satisfies Record<string, readonly ShotId[]>;
 export type FilmId = keyof typeof FILMS;
 
@@ -37,8 +35,7 @@ export type SizeId = keyof typeof SIZES;
 /**
  * Plafonds de poids (§4.1), en octets (1 Mo = 10^6 octets, lecture stricte),
  * lus dans shared/film/budget.ts : le lecteur s'en sert aussi. Par fichier, et
- * pour une personne (la poursuite et, à six étoiles, sa fin) : 6,88 Mo en 720p,
- * 2,57 Mo en 540p.
+ * pour une personne (le fichier entier) : 9,53 Mo en 720p, 3,55 Mo en 540p.
  */
 export const CEILINGS: Record<SizeId, Record<FilmId, number>> = { 720: FILE_CEILINGS["720"], 540: FILE_CEILINGS["540"] };
 export const TOTAL_CEILINGS: Record<SizeId, number> = { 720: PERSON_CEILINGS["720"], 540: PERSON_CEILINGS["540"] };
@@ -307,9 +304,10 @@ export function slateSegmentArgs(out: string, frames: number): string[] {
 export const MAX_GOP = 48;
 
 /**
- * Les images clés d'un fichier (§4.1) : la première image de chaque plan (les
- * coupes, lues dans shared/film/cut.ts), plus une dès que MAX_GOP images ont
- * passé sans image clé. Le débit va aux images, pas à des images clés inutiles.
+ * Les images clés d'un fichier (§4.1) : la première image de chaque tronçon
+ * (lues dans shared/film/cut.ts ; ce ne sont plus des coupes, mais le gel sur
+ * place se cale sur leurs bords), plus une dès que MAX_GOP images ont passé sans
+ * image clé. Le débit va aux images, pas à des images clés inutiles.
  */
 export function keyframePlan(film: FilmId): number[] {
   const cuts = new Set(Object.values(shotStarts(film)));
@@ -330,7 +328,7 @@ export function forceKeyframesExpr(keys: number[]): string {
 }
 
 /**
- * L'encodage final (§4.1) : H.264 Main, 24 i/s, images clés sur les coupes
+ * L'encodage final (§4.1) : H.264 Main, 24 i/s, images clés aux tronçons
  * (keyframePlan) et toutes les 48 images au plus, couleurs bt709, +faststart, sans son.
  */
 export function encodeArgs(opts: { list: string; out: string; size: SizeId; crf: number; frames: number; keys: number[] }): string[] {
@@ -381,10 +379,10 @@ export interface Fit {
 }
 
 /**
- * Les deux fichiers d'une taille sous leurs plafonds : chacun part de
- * START_CRF et monte de 2 tant qu'il dépasse le sien ; puis, tant que la
- * personne charge trop (poursuite et fin à six étoiles), le plus lourd des
- * deux monte encore. Il faudrait passer CRF 28 : CeilingError, le montage échoue.
+ * Les fichiers d'une taille sous leurs plafonds : chacun part de START_CRF et
+ * monte de 2 tant qu'il dépasse le sien ; puis, tant que la personne charge
+ * trop, le plus lourd monte encore. Il faudrait passer CRF 28 : CeilingError,
+ * le montage échoue.
  * `encodeAt` encode un fichier à un CRF et rend son poids en octets.
  */
 export function fitCeilings(size: SizeId, encodeAt: (film: FilmId, crf: number) => number, log: (m: string) => void = () => undefined): Fit {
@@ -405,7 +403,7 @@ export function fitCeilings(size: SizeId, encodeAt: (film: FilmId, crf: number) 
     while (bytes[film] > CEILINGS[size][film]) raise(film, `${bytes[film]} octets, au-dessus du plafond de ${CEILINGS[size][film]}`);
   }
   while (personBytes(bytes) > TOTAL_CEILINGS[size]) {
-    const heavy: FilmId = bytes.poursuite >= bytes.fin6 ? "poursuite" : "fin6";
+    const heavy = films.reduce((h, f) => (bytes[f] > bytes[h] ? f : h));
     raise(heavy, `${personBytes(bytes)} octets pour une personne, au-dessus de ${TOTAL_CEILINGS[size]}`);
   }
   return { crf, bytes };

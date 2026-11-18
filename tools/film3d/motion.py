@@ -2421,11 +2421,14 @@ def plan_checks(d, base, own):
         import render_film as RF
         cut, fb = RF.read_cut().get(plan), RF.FALLBACK_FRAMES.get(plan)
         n = getattr(mod, "FRAMES", len(frames))
-        # le trajet roulé (17 novembre) : la durée est celle du parcours (FALLBACK_FRAMES la suit) ; cut.ts, au site,
-        # la reprendra (dit, pas contrôlé)
-        add(f"durée {n} images = FALLBACK_FRAMES ({fb}) (cut.ts : {cut})", n == fb, "")
+        # le trajet roulé (17 novembre) : la durée est celle du parcours, que le site lit dans
+        # shared/film/parcours.json (read_cut) ; FIN (la fin à la pointe) a quitté le film (SPEC §18.53) : pas contrôlée
+        if plan in RF.ORDER:
+            add(f"durée {n} images = parcours.json ({cut}) = FALLBACK_FRAMES ({fb})", n == cut == fb, "")
+        else:
+            add(f"durée {n} images : {plan} hors du film, pas rendu", True, "")
     except ImportError as e:
-        add("durée contre cut.ts", False, f"render_film illisible ({e})")
+        add("durée contre parcours.json", False, f"render_film illisible ({e})")
     # 2. derrière, de face
     ang = {f: behind_angle(F[f], P[f]) for f in frames}
     back = sum(a <= 60.0 for a in ang.values()) / len(frames)

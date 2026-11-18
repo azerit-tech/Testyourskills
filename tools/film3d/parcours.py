@@ -10,6 +10,7 @@
 # (dynamique.simulate : pneus, transferts de charge, conducteur). L'ancienne conduite dessinée (motion.drive et ses
 # dérapages) n'est plus que le PLAN du conducteur : la route, le profil de vitesse et son horaire, dont sortent les
 # tronçons (START, FIN6_FRAMES) et les étoiles 1, 3, 4, 6, figés. DRIVE est la voiture simulée qui le suit.
+import json
 import math
 import os
 import sys
@@ -1433,17 +1434,76 @@ def check():
     return out
 
 
-if __name__ == "__main__" and "--check" in sys.argv:
+# ---- ce que le site lit du parcours (shared/film/parcours.json) : la seule source de ses durées. Le site
+# (shared/film/cut.ts) en tire les tronçons, les étoiles et la fin du fichier ; sa bande-son (shared/film/sound.ts) la
+# vitesse, la glisse et l'accélération de la berline. `python3 tools/film3d/parcours.py --export` l'écrit ;
+# `--check` (et render_film.py --selftest) échoue s'il ne suit plus le parcours : un rendu ne peut plus partir avec
+# des durées que le site ne connaît pas.
+# les écarts tolérés en simplifiant les courbes (Ramer-Douglas-Peucker) : inaudibles, et quelques Ko de moins
+SITE_TOL = {"vitesse": 0.15, "glisse": 0.4, "acceleration": 0.25}
+
+
+def _simplifie(pts, tol):
+    """Les points (image, valeur) utiles : une courbe linéaire par morceaux qui reste à `tol` de tous les autres."""
+    if len(pts) < 3:
+        return list(pts)
+    (x0, y0), (x1, y1) = pts[0], pts[-1]
+    i, d = 0, -1.0
+    for k in range(1, len(pts) - 1):
+        x, y = pts[k]
+        e = abs(y - (y0 + (y1 - y0) * (x - x0) / (x1 - x0)))
+        if e > d:
+            i, d = k, e
+    if d <= tol:
+        return [pts[0], pts[-1]]
+    return _simplifie(pts[:i + 1], tol)[:-1] + _simplifie(pts[i:], tol)
+
+
+def site():
+    """Le parcours tel que le site le lit : tronçons (images), étoiles (images globales), arrêt, courbes de conduite."""
+    n = TOTAL + FIN6_FRAMES
+    out = {"//": "Écrit par python3 tools/film3d/parcours.py --export (SPEC §18.56) : ne pas modifier à la main.",
+           "fps": int(FPS), "troncons": [[a, k] for a, k in SHOTS + (("FIN6", FIN6_FRAMES),)],
+           "etoiles": [ETOILES[k] for k in sorted(ETOILES)], "arret": round(T_ARRET * FPS, 1)}
+    for nom, f, r in (("vitesse", DRIVE.speed, 2), ("glisse", lambda t: abs(DRIVE.slip(t)), 1),
+                      ("acceleration", DRIVE.along, 2)):
+        pts = [(k, round(f(k / FPS), r) + 0.0) for k in range(n)]
+        out[nom] = [[k, v] for k, v in _simplifie(pts, SITE_TOL[nom])]
+    return out
+
+
+def site_json():
+    """Le texte de shared/film/parcours.json : un champ par ligne, stable d'un export à l'autre."""
+    d = site()
+    rows = [f"  {json.dumps(k)}: {json.dumps(v, ensure_ascii=False, separators=(', ', ': '))}" for k, v in d.items()]
+    return "{\n" + ",\n".join(rows) + "\n}\n"
+
+
+def site_a_jour(path=SITE_JSON):
+    """Vrai si shared/film/parcours.json est celui qu'écrirait --export."""
+    try:
+        return open(path, encoding="utf-8").read() == site_json()
+    except OSError:
+        return False
+
+
+if __name__ == "__main__" and ("--export" in sys.argv or "--check" in sys.argv):
+    if "--export" in sys.argv:
+        open(SITE_JSON, "w", encoding="utf-8").write(site_json())
+        print(f"[parcours] {os.path.normpath(SITE_JSON)} écrit : {TOTAL + FIN6_FRAMES} images, étoiles {ETOILES}")
     err = verifie()
     for nom, ok, det in check():
         print(f"{'ok  ' if ok else 'ÉCHEC'} {nom} : {det}")
         if not ok:
             err.append(f"{nom} : {det}")
+    if not site_a_jour():
+        err.append(f"{os.path.normpath(SITE_JSON)} ne suit plus le parcours : python3 tools/film3d/parcours.py --export")
     if err:
         sys.exit("[parcours] " + " ; ".join(err))
     print(f"[parcours] durées et étoiles tenues : {TOTAL + FIN6_FRAMES} images, tronçons {dict(SHOTS)}, FIN6 "
-          f"{FIN6_FRAMES}, étoiles {ETOILES} ; arrêt simulé à l'image {T_ARRET * FPS:.1f} (plan {T_PLAN * FPS:.1f})")
-elif __name__ == "__main__":       # python3 tools/film3d/parcours.py : les tronçons, les étoiles, les raccords
+          f"{FIN6_FRAMES}, étoiles {ETOILES} ; arrêt simulé à l'image {T_ARRET * FPS:.1f} (plan {T_PLAN * FPS:.1f}) ; "
+          "shared/film/parcours.json à jour")
+elif __name__ == "__main__":         # python3 tools/film3d/parcours.py : les tronçons, les étoiles, les raccords
     m = mesures()
     print(f"trajet {m['longueur']:.1f} m jusqu'à l'arrêt ({m['arret']:.2f} s), poursuite {m['longueur_poursuite']:.1f} m "
           f"en {m['images']} images ({m['secondes']:.2f} s) ; moyenne {m['moyenne'] * 3.6:.1f} km/h, pointe "

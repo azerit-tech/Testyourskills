@@ -1,15 +1,16 @@
 // Le plan du film d'une fiche (§18.36, docs/cinematique-poursuite.md §2) :
 // niveau, étoiles et leurs instants, point de coupe, fin à jouer, arrêt sur
 // image, flash, durée, lignes de radio. Tout est compté en images (cut.ts) ;
-// les secondes s'en déduisent. De une à cinq étoiles, la fin se joue sur place
-// (§18.53) : l'arrêt sur image gèle la dernière image du dernier plan joué ;
-// seule une fiche à six étoiles coupe sur une fin tournée (FIN6, sur la jetée).
+// les secondes s'en déduisent. Un seul fichier, un seul trajet (§18.56) : à
+// toutes les étoiles, la fin se joue sur place, l'arrêt sur image gèle la
+// dernière image du dernier tronçon joué (Pk ; FIN6 à six étoiles, la berline
+// arrêtée sur la pointe). Les étoiles sont des instants du trajet (cut.ts).
 import type { CardData, Fact, Lang, Stars } from "../types";
 import { LEVEL_LABELS, starsFor } from "../types";
 import { SCENE_LIGHT, sceneOf, type Light } from "../scenes";
 import { plateSub } from "../card/mug";
 import { radioLines, type Radio, type RadioCard } from "./radio";
-import { ENDINGS, FLICKER_ON, FPS, INTERCEPT_LEAD, IN_PLACE, SHOT_START, CHASE_FRAMES, CHASE_SHOTS, TITLE_POP, type EndingId } from "./cut";
+import { CHASE_FRAMES, FLICKER_ON, FPS, INTERCEPT_LEAD, STAR_FRAMES, STAR_READ, TITLE_POP, holdOf, playEnd } from "./cut";
 
 /** La fiche se monte deux images après le claquement du titre : l'image est fixe, rien ne bouge à l'écran. */
 const STAGE_AFTER = TITLE_POP + 2;
@@ -31,7 +32,7 @@ export const FREEZE_TONES: Record<Light, FreezeTone> = {
 
 export interface FilmStar {
   star: Stars;
-  /** L'image du film où elle s'allume : la coupe franche vers son plan. */
+  /** L'image du film où elle s'allume : un instant du trajet (parcours.json), dans le tronçon Pk. */
   frame: number;
   /** Le même instant, en secondes. */
   at: number;
@@ -44,27 +45,28 @@ export interface FilmPlan {
   tone: FreezeTone;
   /** Le décor du lieu du crime, où la fiche se pose (web/public/profiles/{scene}.jpg). */
   scene: string;
-  /**
-   * La fin jouée par la seconde balise : `fin6` à six étoiles ; null de une à
-   * cinq, où l'arrêt sur image se fait sur place, sans seconde balise.
-   */
-  ending: EndingId | null;
   stars: FilmStar[];
   /**
-   * La dernière image + 1 de la poursuite jouée. À six étoiles, la coupe : la
-   * première image de la fin. De une à cinq, la première image du plan
-   * suivant, qui ne paraît jamais.
+   * La dernière image + 1 de la vidéo jouée : la première du tronçon suivant,
+   * qui ne paraît jamais ; à six étoiles, la fin du fichier (FIN6 comprise).
    */
   cut: number;
-  /** Images de vidéo du fichier de fin (0 sans fin). */
-  endVideo: number;
   /**
-   * Première image de l'arrêt sur image. De une à cinq étoiles, `cut - 1` : la
-   * dernière image du dernier plan joué, gelée sur place.
+   * La fin de la poursuite : la musique s'y arrête. De une à cinq étoiles, `cut` ;
+   * à six, l'entrée de la pointe (la première image de FIN6), où la berline freine
+   * jusqu'à l'arrêt sous la nappe.
    */
+  chaseEnd: number;
+  /** Première image de l'arrêt sur image : `cut - 1`, la dernière image jouée, gelée sur place. */
   freeze: number;
   /** L'interception (une à cinq étoiles) : la radio l'annonce dès cette image, avant le gel ; absente à six étoiles. */
   intercept: number | null;
+  /**
+   * La ligne de la dernière étoile reste à l'écran jusqu'à la fiche, l'interception
+   * puis la fin de course en dessous, en petit : l'interception la suivrait de moins
+   * de STAR_READ images (une, quatre et cinq étoiles), elle ne se lirait pas.
+   */
+  keepLine: boolean;
   /** L'étoile suivante clignote deux fois juste avant le gel, puis s'éteint ; absent à six étoiles. */
   flicker: { star: Stars; frames: [number, number][] } | null;
   /** Le flash : début, sommet (la fiche se pose : passage de relais), fin du film. */
@@ -103,32 +105,30 @@ export function filmPlan(card: FilmCard): FilmPlan {
   const level = starsFor(card.overall);
   const scene = sceneOf(card.profile?.id);
   const light = SCENE_LIGHT[scene];
-  const ending: EndingId | null = level === 6 ? "fin6" : null;
   const stars: FilmStar[] = [];
   for (let k = 1; k <= level; k++) {
-    const frame = SHOT_START[CHASE_SHOTS[k]];
+    const frame = STAR_FRAMES[k - 1];
     stars.push({ star: k as Stars, frame, at: frame / FPS });
   }
-  // La poursuite s'arrête après le dernier plan joué : le plan suivant ne s'ouvre jamais.
-  const cut = level === 6 ? CHASE_FRAMES : SHOT_START[CHASE_SHOTS[level + 1]];
-  // Six étoiles : la coupe sur FIN6, gelée sur sa dernière image. Une à cinq : le gel sur place.
-  const endVideo = ending ? ENDINGS[ending].video : 0;
-  const hold = ending ? ENDINGS[ending] : IN_PLACE;
-  const freeze = ending ? cut + endVideo : cut - 1;
+  // La vidéo s'arrête après le dernier tronçon joué : le suivant ne paraît jamais. Sa dernière image gèle sur place.
+  const cut = playEnd(level);
+  const hold = holdOf(level);
+  const freeze = cut - 1;
   const from = freeze + hold.freeze;
   const flash = { from, peak: from + hold.rise, to: from + hold.flash };
+  const intercept = level < 6 ? cut - INTERCEPT_LEAD : null;
   return {
     id: card.id,
     level,
     light,
     tone: FREEZE_TONES[light],
     scene,
-    ending,
     stars,
     cut,
-    endVideo,
+    chaseEnd: level === 6 ? CHASE_FRAMES : cut,
     freeze,
-    intercept: level < 6 ? cut - INTERCEPT_LEAD : null,
+    intercept,
+    keepLine: intercept !== null && intercept - STAR_FRAMES[level - 1] < STAR_READ,
     flicker: level < 6 ? { star: (level + 1) as Stars, frames: FLICKER_ON.map(([a, b]) => [cut + a, cut + b] as [number, number]) } : null,
     flash,
     frames: flash.to,

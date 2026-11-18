@@ -1,4 +1,4 @@
-# Rend le film entier, plan par plan, dans l'ordre du montage (shared/film/cut.ts) : la machine louée n'a plus qu'à
+# Rend le film entier, plan par plan, dans l'ordre du montage (shared/film/parcours.json) : la machine louée n'a plus qu'à
 # copier et lancer. Deux moitiés dans ce fichier : le pilote (python3, sans Blender) lance un Blender par plan, qui
 # relit ce même fichier en ouvrier (--worker) : il construit la scène du plan, la rend image par image, s'arrête.
 #
@@ -20,8 +20,8 @@
 # <out>/journal.tsv (une ligne par image, temps compris) et <out>/<PLAN>/blender.log. Un plan sans mouvement (la
 # plage d'images de sa scène plus courte que le plan) rend son image fixe une fois et la recopie, et le dit.
 # Un plan qu'aucune scène ne sait encore construire est sauté, et dit : le montage posera son carton.
-# Un plan dont le module de trajectoire (TRAJ) a encore un FRAMES autre que cut.ts (pas encore migré au découpage) se
-# rend à la longueur de son module, et le dit (« P3 : 28 images, cut.ts en attend 48 ») ; le montage tiendra la dernière.
+# Un plan dont le module de trajectoire (TRAJ) a encore un FRAMES autre que le site (pas encore migré au découpage) se
+# rend à la longueur de son module, et le dit (« P3 : 28 images, le site en attend 48 ») ; le montage tiendra la dernière.
 #
 # Les essais de lumière (--essai, éteints par défaut : sans eux les cadres validés ne changent pas ; les images d'un
 # essai vont dans <out>/<PLAN>+<essai>/ et ne deviennent jamais une prise du montage) :
@@ -50,27 +50,20 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 
 # L'ordre du montage (scripts/film-lib.ts SHOTS) et la scène qui construit chaque plan : (module, argument de build).
-ORDER = ("OUV", "P1", "P2", "P3", "P4", "P5", "P6", "FIN", "FIN6")
+# FIN (la fin à la pointe de une à cinq étoiles) a quitté le film le 17 novembre (SPEC §18.53) : elle n'est plus rendue.
+ORDER = ("OUV", "P1", "P2", "P3", "P4", "P5", "P6", "FIN6")
 SOURCES = {
     "OUV": ("scene_a", "OUV"), "P1": ("scene_a", "P1"), "P2": ("scene_f", "P2"), "P3": ("scene_b", None),
-    "P4": ("scene_c", "P4"), "P5": ("scene_e", "P5"), "P6": ("scene_d", "P6"), "FIN": ("scene_d", "FIN"),
-    "FIN6": ("scene_d", "FIN6"),
+    "P4": ("scene_c", "P4"), "P5": ("scene_e", "P5"), "P6": ("scene_d", "P6"), "FIN6": ("scene_d", "FIN6"),
 }
-# (repli seulement si shared/film/cut.ts manque : il reste la seule source des durées ; découpage v3)
-# Depuis le 17 novembre (SPEC §18.55, le trajet roulé) les durées du film sont celles du parcours unique
-# (parcours.SHOTS, FIN6_FRAMES) : 619 images de poursuite et 101 de FIN6, 30 s (17 novembre au soir, le pont de
-# 110 m). cut.ts (le site) les reprendra ; tant qu'il garde le découpage v3, plan_frames rend la longueur des
-# modules et le journal le dit.
-FALLBACK_FRAMES = {"OUV": 75, "P1": 33, "P2": 107, "P3": 103, "P4": 108, "P5": 60, "P6": 133, "FIN": 52, "FIN6": 101}
-# Les plans que le site ne joue plus et que cut.ts ne nomme donc plus, mais que l'atelier sait encore rendre : FIN,
-# l'ancienne fin à la pointe (SPEC §18.53). Leur durée est celle du repli, sans alerte. (Jusqu'à v10, l'absence de
-# FIN dans cut.ts faisait dire « plans manquants ['FIN'], durées de repli » à chaque lancement et jetait TOUTES les
-# durées de cut.ts pour celles du repli ; le rendu n'en changeait pas, les modules font foi : plan_frames.)
-HORS_SITE = ("FIN",)
+# Les durées du film sont celles du parcours unique (SPEC §18.55, §18.56) : parcours.py les exporte dans
+# shared/film/parcours.json, que lisent le site (shared/film/cut.ts) et ce pilote (read_cut). Repli seulement si le
+# fichier manque : les mêmes nombres, 619 images de poursuite et 101 de FIN6, 30 s.
+FALLBACK_FRAMES = {"OUV": 75, "P1": 33, "P2": 107, "P3": 103, "P4": 108, "P5": 60, "P6": 133, "FIN6": 101}
 # Le module de trajectoire de chaque plan (sans Blender) : son FRAMES est la longueur que sa scène sait animer. Un
-# plan pas encore migré au découpage de cut.ts se rend à la longueur de son module, et le journal le dit.
+# plan pas encore migré au découpage du site se rend à la longueur de son module, et le journal le dit.
 TRAJ = {"OUV": "ouv_avenue", "P1": "p1_avenue", "P2": "p2_arc", "P3": "p3_enseignes", "P4": "p4_pont",
-        "P5": "p5_virage", "P6": "p6_jetee", "FIN": "fin_pointe", "FIN6": "fin6_orbite"}
+        "P5": "p5_virage", "P6": "p6_jetee", "FIN6": "fin6_orbite"}
 FULL = (720, 1280)
 DRAFT = (360, 640)
 ESSAIS = {"rugosite": 0.5, "brume": 1.0, "peinture": None, "metal": None, "vernis": None, "vernis_rugosite": None,
@@ -101,19 +94,14 @@ def assets_dir():
 
 
 def read_cut(root=ROOT):
-    """Les images de vidéo de chaque plan, lues dans shared/film/cut.ts (SHOT_FRAMES, ENDINGS.*.video)."""
-    path = os.path.join(root, "shared", "film", "cut.ts")
+    """Les images de vidéo de chaque plan, lues dans shared/film/parcours.json (« troncons »), que lit aussi le site."""
+    path = os.path.join(root, "shared", "film", "parcours.json")
     try:
-        src = open(path, encoding="utf-8").read()
-        body = re.search(r"SHOT_FRAMES\s*:[^=]*=\s*\{([^}]*)\}", src).group(1)
-        out = {k: int(v) for k, v in re.findall(r"(\w+)\s*:\s*(\d+)", body)}
-        for shot, n in re.findall(r'shot\s*:\s*"(\w+)"\s*,\s*video\s*:\s*(\d+)', src):
-            out[shot] = int(n)
-        manque = sorted(set(ORDER) - set(out) - set(HORS_SITE))
-        if not manque:
-            return {p: out.get(p, FALLBACK_FRAMES[p]) for p in ORDER}
-        log(f"! {path} : plans manquants {manque}, durées de repli")
-    except (OSError, AttributeError) as e:
+        out = {k: int(n) for k, n in json.load(open(path, encoding="utf-8"))["troncons"]}
+        if set(out) >= set(ORDER):
+            return {p: out[p] for p in ORDER}
+        log(f"! {path} : plans manquants {sorted(set(ORDER) - set(out))}, durées de repli")
+    except (OSError, ValueError, KeyError, TypeError) as e:
         log(f"! {path} illisible ({e}), durées de repli")
     return dict(FALLBACK_FRAMES)
 
@@ -125,26 +113,26 @@ def module_frames(plan):
         sys.path.insert(0, HERE)
     try:
         n = getattr(importlib.import_module(TRAJ[plan]), "FRAMES", None)
-    except Exception as e:                       # un module en chantier : cut.ts fait foi
-        log(f"! {plan} : {TRAJ[plan]} ne s'importe pas ({e}), durée de cut.ts")
+    except Exception as e:                       # un module en chantier : le site fait foi
+        log(f"! {plan} : {TRAJ[plan]} ne s'importe pas ({e}), durée du site")
         return None
     return n if isinstance(n, int) and n > 0 else None
 
 
 def plan_frames(cut, plans=ORDER, frames_of=module_frames):
-    """Les images à rendre par plan : celles de cut.ts, sauf pour un plan dont le module a encore un autre FRAMES (pas
+    """Les images à rendre par plan : celles du site, sauf pour un plan dont le module a encore un autre FRAMES (pas
     encore migré) : il garde le sien, dit dans le journal ; le montage tiendra sa dernière image."""
     out, autres = {}, []
     for plan in plans:
         n, m = cut[plan], frames_of(plan)
         if m is not None and m != n:
-            autres.append(f"{plan} {m} (cut.ts : {n})")
+            autres.append(f"{plan} {m} (le site : {n})")
             n = m
         out[plan] = n
     if autres:
         # une ligne pour tous : depuis le trajet roulé (§18.55) le site garde l'ancien découpage tant que le film
         # n'est pas livré, chaque plan le redisait
-        log(f"durées des modules de trajectoire, pas celles de cut.ts (le site les reprendra à la livraison) : "
+        log(f"durées des modules de trajectoire, pas celles du site (shared/film/parcours.json) : "
             f"{', '.join(autres)}")
     return out
 
@@ -834,14 +822,17 @@ def selftest():
     import tempfile
     cut = read_cut()
     import parcours as PC                                                      # le repli : le trajet roulé
-    assert FALLBACK_FRAMES == dict(PC.SHOTS, FIN=52, FIN6=PC.FIN6_FRAMES), FALLBACK_FRAMES
-    assert set(cut) == set(ORDER), cut
-    assert all(p in ORDER for p in HORS_SITE) and cut["FIN6"] > 0, cut       # FIN n'est plus dans cut.ts : repli muet
-    # un plan pas encore migré (son module a encore FRAMES = 28) garde sa longueur ; les autres suivent cut.ts
-    old = {"P3": 28, "FIN": 36}
+    assert FALLBACK_FRAMES == dict(PC.SHOTS, FIN6=PC.FIN6_FRAMES), FALLBACK_FRAMES
+    # le site lit les mêmes durées que ce pilote : shared/film/parcours.json, exporté du parcours et à jour
+    assert PC.site_a_jour(), "shared/film/parcours.json ne suit plus le parcours : python3 tools/film3d/parcours.py --export"
+    assert cut == dict(PC.SHOTS, FIN6=PC.FIN6_FRAMES) and tuple(cut) == ORDER, cut
+    with tempfile.TemporaryDirectory() as d:                                  # sans le fichier : le repli
+        assert read_cut(d) == FALLBACK_FRAMES
+    # un plan pas encore migré (son module a encore FRAMES = 28) garde sa longueur ; les autres suivent le site
+    old = {"P3": 28, "FIN6": 36}
     eff = plan_frames(cut, ORDER, frames_of=lambda p: old.get(p, cut[p]))
-    assert eff == dict(cut, P3=28, FIN=36), eff
-    assert plan_frames(cut, ("P4",), frames_of=lambda p: None) == {"P4": cut["P4"]}  # pas de module lisible : cut.ts
+    assert eff == dict(cut, P3=28, FIN6=36), eff
+    assert plan_frames(cut, ("P4",), frames_of=lambda p: None) == {"P4": cut["P4"]}  # pas de module lisible : le site
     assert plan_frames(cut, ("P4",)) == {"P4": dict(PC.SHOTS)["P4"]}          # le module (le parcours) fait foi
     real = plan_frames(cut)                                                    # les vrais modules, sans Blender
     assert set(real) == set(ORDER) and all(n > 0 for n in real.values()), real
@@ -894,7 +885,8 @@ def selftest():
         assert debit.deps_match(deps, root=d)
         open(os.path.join(d, "m.py"), "w").write("A = 2\n")
         assert not debit.deps_match(deps, root=d)
-    print("[film] selftest : durées (celles du parcours, plans pas encore migrés compris), --frames, essais, prise "
+    print("[film] selftest : durées (celles du parcours, lues par le site dans parcours.json, plans pas encore migrés "
+          "compris), --frames, essais, prise "
           "--ville, reprise "
           "(absente, tronquée, autre taille), clé du cache de scène : ok")
 

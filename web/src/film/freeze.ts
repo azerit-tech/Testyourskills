@@ -1,6 +1,6 @@
 // L'arrêt sur image en deux tons (§18.36, §18.54, docs/cinematique-poursuite.md
-// §3.3) : la dernière image de la fin (six étoiles) ou du dernier plan joué (une
-// à cinq, le gel sur place du §18.53), tirée comme une affiche sérigraphiée. La
+// §3.3) : la dernière image du dernier tronçon joué (Pk, FIN6 à six étoiles : le
+// gel sur place des §18.53 et §18.56), tirée comme une affiche sérigraphiée. La
 // berline sort en silhouette claire, cernée d'ombre ; le décor reste derrière,
 // calme, en trame claire ; la toise passe derrière la voiture.
 //
@@ -24,8 +24,8 @@
 //
 // Pur sur les pixels (testé sans navigateur) ; `paintStill` le pose sur une
 // toile, une fois, pendant l'attente.
-import { CHASE_SHOTS, ENDINGS, type FilmPlan, type FreezeTone, type ShotId } from "../../../shared/film";
-import { filmVideos } from "./unlock";
+import { CHASE_SHOTS, type FilmPlan, type FreezeTone, type ShotId } from "../../../shared/film";
+import { filmVideo } from "./unlock";
 
 type Rgb = [number, number, number];
 type Outline = readonly (readonly [number, number])[];
@@ -38,10 +38,20 @@ const TRACED = { w: 720, h: 1280 };
 /**
  * La berline sur chaque image gelée, en pixels de l'image 720 × 1280, dans le
  * sens des aiguilles d'une montre depuis le haut du toit (§18.54). P1 à P5 :
- * la dernière image du plan dans `poursuite` (de dos, de face pour P4) ; FIN6 :
- * la dernière de `fin6` (de trois quarts arrière). À retracer à chaque nouveau
- * rendu de ces images.
+ * la dernière image du tronçon dans `poursuite` ; FIN6 : la dernière du fichier.
+ * À retracer à chaque nouveau rendu de ces images.
+ *
+ * TODO (§18.56, au rendu éclairé du trajet roulé) : ces contours sont ceux de
+ * l'ancien découpage (fichier de 414 images, P4 de face, FIN6 dans `fin6`) ;
+ * aucun ne tient la berline des nouvelles images gelées (les images 107, 214,
+ * 317, 425, 485 et 719 du fichier de 720 images, toutes de dos au bras commun).
+ * Les retracer sur `poursuite-720.mp4`, passer STILL_TRACED_FRAMES à 720, puis
+ * relever les empreintes dans scripts/film-media.test.ts (STILL_PRINTS), qui
+ * échoue tant que ce n'est pas fait.
  */
+/** La longueur du fichier `poursuite` sur lequel STILL_CARS a été tracé : 414, l'ancien découpage (TODO ci-dessus). */
+export const STILL_TRACED_FRAMES = 414;
+
 export const STILL_CARS: Record<StillShot, Outline> = {
   P1: [[300, 612], [420, 612], [440, 624], [462, 700], [494, 728], [502, 815], [490, 836], [232, 836], [220, 815], [226, 728], [246, 700], [268, 624], [280, 614]],
   P2: [[242, 615], [275, 603], [385, 606], [412, 625], [436, 700], [482, 740], [488, 778], [488, 820], [478, 834], [218, 834], [210, 820], [214, 750], [222, 705], [236, 655]],
@@ -92,10 +102,9 @@ export interface FreezeLevels {
   decor: number;
 }
 
-/** L'image gelée d'un plan de film : la dernière du dernier plan joué, ou de la fin à six étoiles. */
-export function stillShot(plan: Pick<FilmPlan, "level" | "ending">): StillShot {
-  // de une à cinq étoiles, le dernier plan joué ; six étoiles ont toujours leur fin
-  return plan.ending ? ENDINGS[plan.ending].shot : (CHASE_SHOTS[plan.level] as StillShot);
+/** L'image gelée d'un plan de film : la dernière du dernier tronçon joué (FIN6 à six étoiles). */
+export function stillShot(plan: Pick<FilmPlan, "level">): StillShot {
+  return plan.level >= 6 ? "FIN6" : (CHASE_SHOTS[plan.level] as StillShot);
 }
 
 function hex(c: string): Rgb {
@@ -358,12 +367,11 @@ export function paintStill(video: HTMLVideoElement, canvas: HTMLCanvasElement | 
 
 /**
  * Au gel : si l'arrêt sur image n'a pas été préparé pendant l'attente, il se
- * fait sur l'image à l'écran, celle de la poursuite pour le gel sur place
- * (P1 à P5), celle de la fin pour FIN6.
+ * fait sur l'image à l'écran (la balise est posée sur la dernière image jouée).
  */
 export function ensureStill(canvas: HTMLCanvasElement | null, tone: FreezeTone, shot: StillShot): void {
   if (!canvas || canvas.dataset.ready !== undefined) return;
-  const v = filmVideos()[shot === "FIN6" ? 1 : 0];
+  const v = filmVideo();
   if (v.seeking) v.addEventListener("seeked", () => paintStill(v, canvas, tone, shot), { once: true });
   else paintStill(v, canvas, tone, shot);
 }

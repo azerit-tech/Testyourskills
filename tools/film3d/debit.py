@@ -4,7 +4,7 @@
 #    (Python, un seul cœur : 107 s pour P3, 39 s pour P6) est faite une fois, la scène enregistrée en .blend
 #    (0,7 s), puis rouverte (1 s) tant que rien de ce qu'elle a lu n'a changé. La clé : le plan et son argument, la
 #    version de Blender, toutes les variables FILM3D_* qui pèsent sur la construction, et l'empreinte (sha1) de
-#    chaque fichier du dépôt que la construction a importé ou ouvert (modules de tools/film3d et lab/, cut.ts),
+#    chaque fichier du dépôt que la construction a importé ou ouvert (modules de tools/film3d et lab/, parcours.json),
 #    plus taille et date des assets ouverts. Une retouche de scene_d.py n'invalide donc que les plans de scene_d.
 #    Le cache est partagé entre les copies du code (dossier FILM3D_CACHE_DIR, sinon <assets>/../cache) : deux
 #    agents au même code pour un plan se le partagent. Écriture atomique, plus ancien supprimé au-delà de
@@ -159,7 +159,7 @@ def collect_deps(reads, root=ROOT):
         f = getattr(m, "__file__", None)
         if f:
             files.add(os.path.realpath(f))
-    cut = os.path.join(root, "shared", "film", "cut.ts")
+    cut = os.path.join(root, "shared", "film", "parcours.json")       # les durées du film (parcours.py --export)
     if os.path.exists(cut):
         files.add(os.path.realpath(cut))
     rroot = os.path.realpath(root)
