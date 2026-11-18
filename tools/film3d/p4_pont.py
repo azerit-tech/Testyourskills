@@ -147,7 +147,7 @@ if VILLE:
     # la patrouille 1 : P1_SIDE m à gauche de la berline, P1_LEAD m devant elle à P5/1, à P1_V m/s, en freinage
     # établi de P1_BRAKE m/s² ; avant son freinage, elle roule comme la berline (même vitesse, avance constante), puis
     # passe de l'accélération de la berline à -P1_BRAKE à l'à-coup constant P1_JERK
-    P1_SIDE, P1_LEAD, P1_V, P1_BRAKE, P1_JERK = 3.1, 7.0, 17.6, 6.4, 10.0
+    P1_SIDE, P1_LEAD, P1_V, P1_BRAKE, P1_JERK = 3.4, 7.0, 17.6, 6.4, 10.0      # (3,4 : p5_virage.PATROL_IN)
 
     def _hero_acc(t):
         h = 1.0 / 240.0

@@ -406,6 +406,7 @@ def test_gaps():
         cur = cur + [f] if cur and f == cur[-1] + 1 else [f]
         runs.append(cur)
     run = max(runs, key=len) if runs else []
+    # (fusion v10 : « entière » tolère PATROL_COVER de sa boîte sous celle de la berline, p5_virage.patrol_seen)
     check("P5 : la patrouille 1 entière dans le cadre, à gauche de la berline, 9 images de suite",
           len(run) >= 9 and run[0] == P.PATROL_SEEN[0] and run[-1] >= P.PATROL_SEEN[1],
           f"images {run[0]} à {run[-1]}" if run else "jamais")
@@ -573,8 +574,9 @@ def test_p4():
         (_, ya), (px, py), (_, yb) = P.patrol1_pos(t - h), P.patrol1_pos(t), P.patrol1_pos(t + h)
         hx, hy = P.hero_pos(t)
         v, a_ = (yb - ya) / (2 * h), (yb - 2 * py + ya) / (h * h)
-        check("P4 : la patrouille 1 à P5/1 (3,1 m à gauche, 7 m devant, à la vitesse de P5, -6,4 m/s²)",
-              abs(hx - px - 3.1) < 0.01 and abs(py - hy - 7.0) < 0.05 and abs(v - P5.PATROL_V0) < 0.05
+        left = P5.PATROL_IN["left"]
+        check(f"P4 : la patrouille 1 à P5/1 ({left:g} m à gauche, 7 m devant, à la vitesse de P5, -6,4 m/s²)",
+              abs(hx - px - left) < 0.01 and abs(py - hy - 7.0) < 0.05 and abs(v - P5.PATROL_V0) < 0.05
               and abs(a_ + 6.4) < 0.2, f"{hx - px:.2f} m, {py - hy:+.2f} m, {v:.2f} m/s, {a_:+.2f} m/s²")
         hx, hy = PC.hero("P4")["pos"](P.FRAMES)
         nx, ny = P.hero_pos(M.t_of(P.FRAMES + 1))

@@ -96,7 +96,12 @@ SKID_FRAMES = (min(f for s, f in _SLIPS if s > 8.0), max(f for s, f in _SLIPS if
 # PATROL_IN : l'état de sortie de P4 (P4/48 prolongé d'une image = P5/1), à confirmer par le portage de P4 : à gauche
 # de la berline (m), son avance (m, centre contre centre, le long de la voie), son freinage (m/s²). Sa vitesse s'en
 # déduit : celle qui l'arrête, freinage tenu, le nez PATROL_STOP m avant les séparateurs.
-PATROL_IN = dict(left=3.1, lead=7.0, decel=6.4)
+# (fusion v10 : 3,4 m à gauche, 3,1 avant. Le dérapage simulé du port met la berline en travers plus tôt : sa boîte
+# tient 43 % de la largeur du cadre à P5/1, 70 % à P5/25, et mord sur celle de la patrouille dès la première image.
+# Balayé de 3,1 à 4,2 m à gauche et de 5 à 11 m d'avance : à 3,7 m les boîtes restent séparées cinq images, mais
+# elle passe à 0,5 m de la chaîne et à 3,37 m de la file d'en face du pont (3,4 voulus) ; au-delà elle sort du
+# cadre ; plus près ou plus loin devant, c'est pire. 3,4 m garde ces marges ; voir patrol_seen.)
+PATROL_IN = dict(left=3.4, lead=7.0, decel=6.4)
 PATROL_STOP = 5.0
 PATROL_RELEASE = 0.9          # s : le freinage relâché jusqu'à l'arrêt (à-coup 7 m/s³)
 BARRIER_Y, BARRIER_X = 80.6, (-7.6, 7.6)    # la file de séparateurs (scene_e.build_barrier)
@@ -151,6 +156,11 @@ PATROL_YAW, PATROL_YAW_F = -9.0, (24.0, 48.0)       # le nez qui rentre à droit
 # Depuis film/v8 (18 novembre), jusqu'à P5/9 : le bras franc (FILM3D_VITESSE=2, plus près et plus bas) grandit la
 # berline à l'écran (45 % de large contre 41 %) ; à P5/10 sa boîte couvre 9 % de celle de la patrouille (8 % admis)
 PATROL_SEEN = (1, 9)
+# la part de la boîte de la patrouille 1 que celle de la berline peut couvrir à l'écran sans qu'elle cesse d'être
+# « vue » (patrol_seen). 0,08 jusqu'à la fusion v10 ; 0,25 depuis : la berline simulée dérape plus tôt, le coin haut
+# gauche de sa boîte (du vide : la boîte englobe la caisse en travers) mord de 8 à 20 % sur le bas de celle de la
+# patrouille pendant les neuf premières images. À CONFIRMER à l'image sur le rendu éclairé (SPEC §18.67).
+PATROL_COVER = 0.25
 
 
 def patrol_heading(t):
@@ -508,7 +518,7 @@ def patrol_box(t):
 
 def patrol_seen(f):
     """Vrai si la patrouille 1 est entière dans le cadre à l'image f : dans x 1–99 %, y 15–88 % du bas (la zone
-    utile), à gauche de la berline (moins de 8 % de sa boîte sous celle de la berline, plus proche)."""
+    utile), à gauche de la berline (moins de PATROL_COVER de sa boîte sous celle de la berline, plus proche)."""
     t = M.t_of(f)
     b = patrol_box(t)
     if b is None or b[0] < 1.0 or b[1] > 99.0 or b[2] < 15.0 or b[3] > 88.0:
@@ -517,7 +527,7 @@ def patrol_seen(f):
     hb = frame_box({"x": hx, "y": hy, "heading": hero_heading(t), "t": t})
     ox = max(0.0, min(b[1], hb[1]) - max(b[0], hb[0]))
     oy = max(0.0, min(b[3], hb[3]) - max(b[2], hb[2]))
-    return (b[0] + b[1]) / 2 < (hb[0] + hb[1]) / 2 and ox * oy <= 0.08 * (b[1] - b[0]) * (b[3] - b[2])
+    return (b[0] + b[1]) / 2 < (hb[0] + hb[1]) / 2 and ox * oy <= PATROL_COVER * (b[1] - b[0]) * (b[3] - b[2])
 
 
 def behind_angle(t):
