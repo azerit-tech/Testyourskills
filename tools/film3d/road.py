@@ -324,8 +324,12 @@ def paint_colour(N, P):
 
 def mat_asphalt(st, name, force_patch=False, layout=None, uv=False):
     """L'enrobé mouillé. force_patch : le carré refait autour d'une plaque, lu dans le monde. layout : le plan des
-    voies (AVENUE par défaut, sinon lane_layout()). uv : coordonnées de la carte UV en mètres (voir coords)."""
+    voies (AVENUE par défaut, sinon lane_layout()). uv : coordonnées de la carte UV en mètres (voir coords).
+    layout["half"] : la demi-largeur d'enrobé de CETTE surface quand elle n'est pas celle de la chaussée du lieu
+    (une place, un boulevard en travers) ; absente, asph(). Le joint de rive au bitume, le creux du bord et les
+    flaques des cunettes se posent à cette distance de l'axe."""
     lay = dict(AVENUE, **(layout or {}))
+    ah = lay.get("half") or asph()
     m, N, out = S.material(name)
     P, O = coords(N, uv)
     ox, oy, _ = N.sep(O)
@@ -385,7 +389,7 @@ def mat_asphalt(st, name, force_patch=False, layout=None, uv=False):
         seal = N.math("MAXIMUM", N.math("MAXIMUM", snake, joint), seal_p)
     else:
         seal = N.math("MAXIMUM", snake, seal_p)
-    seal = N.math("MAXIMUM", seal, smooth(N, ax, asph() - 0.03, asph() - 0.005))
+    seal = N.math("MAXIMUM", seal, smooth(N, ax, ah - 0.03, ah - 0.005))
     # --- marquages : double axe de 15 cm (écart 15 cm), tirets, rives ; ébréchés et usés
     xw = N.math("ADD", ax, N.math("MULTIPLY", N.math("SUBTRACT", noise(N, P, 7.0, 3.0), 0.5), 0.018))
     yj = N.math("ADD", ly, N.math("MULTIPLY", N.math("SUBTRACT", noise(N, P, 5.0, 2.0), 0.5), 0.05))
@@ -410,7 +414,7 @@ def mat_asphalt(st, name, force_patch=False, layout=None, uv=False):
     D = N.math("MULTIPLY", N.math("SUBTRACT", 0.5, meso), 14.0)
     D = N.math("ADD", D, N.math("MULTIPLY", N.math("SUBTRACT", 0.40, d4), 5.0))
     D = N.math("ADD", D, N.math("MULTIPLY", rut, st["rut"]))
-    D = N.math("ADD", D, N.math("MULTIPLY", smooth(N, ax, 5.4, asph() - 0.05), st["edge"]))
+    D = N.math("ADD", D, N.math("MULTIPLY", smooth(N, ax, 5.4, ah - 0.05), st["edge"]))
     D = N.math("ADD", D, N.math("MULTIPLY", N.math("SUBTRACT", region, 0.55), 4.0))
     D = N.math("ADD", D, N.math("MULTIPLY", patch, 0.5))
     D = N.math("ADD", D, st["D_off"])
@@ -420,7 +424,7 @@ def mat_asphalt(st, name, force_patch=False, layout=None, uv=False):
     w = smooth(N, D, p0, p1)                              # 0 : humide, 1 : flaque ; bord adouci
     # les flaques seulement le long des cunettes (HUMIDITE["bord"]), jamais dans les voies
     b = HUMIDITE["bord"]
-    w = N.math("MULTIPLY", w, smooth(N, ax, asph() - b, asph() - 0.5 * b))
+    w = N.math("MULTIPLY", w, smooth(N, ax, ah - b, ah - 0.5 * b))
     deep = smooth(N, D, p1, p1 + 0.9)                     # les flaques profondes : miroir plat
     tipdry = smooth(N, d2, 0.62, 0.85)
     # --- la peinture salie, si le plan des voies le demande (layout["grime"], de 0 à 1 ; absent, comme pour
