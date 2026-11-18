@@ -77,6 +77,8 @@ CITY_SHORE = L.CITY_SHORE_Y   # -325 : le mur du quai de la ville (scene_b, s 18
 # les lampadaires tous les 20 m du quai au pied (comme la jetée, scene_d.J_LAMPS ; 30 m laissaient l'enrobé noir devant
 # la berline au haut de la rampe, brouillon v6 images 306–330) ; les piles tous les 35 m (la dernière, la culée, n'est pas posée)
 LAMP_YS = [Y_START + 10.0 + 20.0 * k for k in range(int((Y_FOOT - Y_START - 10.0) / 20.0) + 1)]
+# la paire de la tête de pont (ville) : sur ses trottoirs, côté pont du mur du quai de la rue (y -325)
+HEAD_LAMP_Y = Y_START - 4.0
 PIERS = [Y_START + 20.0 + 35.0 * k for k in range(int((Y_FOOT - Y_START - 20.0) / 35.0) + 2)]
 
 
@@ -136,15 +138,22 @@ def build_bridge(hidden, lamp_src, far=False, haubans=False):
     ave = [Y_START - 15.0 - 30.0 * k for k in range(int((Y_START - Y_CITY_END) / 30.0))]
     # dans la ville, la tête de pont (y -328 à -320) porte le parapet du tablier, bord extérieur ±9,7 : il vient mourir
     # contre le mur du quai de la rue (de |x| 9,7, jusqu'en y -324,5), sans bande vide entre les deux
-    L.roadway("pont_ville", [Y_CITY_END, Y_START], half=HALF, walk=WALK, rail="parapet" if VILLE else None,
+    # Dans la ville, la tête de pont suit le profil du tablier (deck_z) : le raccord du pied côté ville commence en
+    # y -328, 8 m avant le tablier ; posée à plat, elle laissait en y -320 une marche de 11 cm sur toute la largeur
+    # (chaussée, cunettes, trottoirs), dont la tranche barrait le cadre d'un trait (brouillon éclairé v8, images
+    # 306–330), et la berline, qui suit motion._bridge_z, y flottait de quelques centimètres. Elle porte sa paire de
+    # lampadaires (HEAD_LAMP_Y) : entre ceux du quai (x ±16) et le premier du tablier (y -310), la chaussée au bas du
+    # cadre restait noire à l'entrée du pont.
+    L.roadway("pont_ville", samples(Y_CITY_END, Y_START) if VILLE else [Y_CITY_END, Y_START],
+              deck_z if VILLE else None, half=HALF, walk=WALK, rail="parapet" if VILLE else None,
               under="caisson" if VILLE else None, M=M, far=far,
-              lamp_src=None if (far or VILLE) else lamp_src, lamp_ys=ave)
+              lamp_src=lamp_src if VILLE else (None if far else lamp_src), lamp_ys=[HEAD_LAMP_Y] if VILLE else ave)
     bm = L.bmesh.new()
     if VILLE:
         # la fin du raccord du pied, sans bord, jusqu'à z = 0 (le nom ne commence pas par « pont_port_ » :
         # scene_e._remove_bridge_flat la laisse) ; la culée de la ville, de son mur de quai au tablier
         L.roadway("pont_pied", samples(Y_PORT, Y_TOE), deck_z, half=HALF, walk=WALK, rail=None, M=M, far=far)
-        L.box_bm(bm, (-12.5, CITY_SHORE, L.WATER_Z - 1.5), (12.5, Y_START, -0.01))
+        L.box_bm(bm, (-12.5, CITY_SHORE, L.WATER_Z - 1.5), (12.5, Y_START, -0.08))   # sous les cunettes (-0,05)
     else:
         L.roadway("pont_port", samples(Y_PORT, Y_END), deck_z, half=HALF, walk=WALK, rail=None, M=M, far=far)
         L.box_bm(bm, (-12.5, Y_START - 45.0, L.WATER_Z - 1.5), (12.5, Y_START, -0.01))  # la culée de la ville
@@ -167,7 +176,9 @@ def build_bridge(hidden, lamp_src, far=False, haubans=False):
         # les joints : une bande d'acier mouillé qui épouse le bombé de la chaussée, 3 mm au-dessus. En boîte plate
         # à la hauteur de l'axe, le joint passait sous l'enrobé bombé et barrait tout le cadre de P4 d'un trait
         # noir au 200 mm (une fente dans l'image)
-        joint = S.mat_plain("joint_dilatation", (0.42, 0.42, 0.44, 1), 0.22, 1.0)
+        # (acier mouillé et sale, sombre : à 0,42 de clair, le joint de la tête de pont, à un mètre de la marche,
+        # doublait le trait clair en travers du cadre à l'entrée du pont, brouillon éclairé v8)
+        joint = S.mat_plain("joint_dilatation", (0.16, 0.16, 0.17, 1), 0.3, 1.0)
         bm = L.bmesh.new()
         xs = [-HALF + 0.5 + (2 * HALF - 1.0) * k / 40 for k in range(41)]
         for yj in [Y_START + 1.0] + [y for y in (-282.5, -177.5, -72.5) if Y_START + 5.0 < y < Y_PORT - 5.0] + \
