@@ -5,12 +5,10 @@
 // d'un seul tenant, §18.56), à 24 i/s. Un autre mp4 resté là (`fin6-*`, `fin-*`)
 // fait échouer le contrôle.
 //
-// Sans ffprobe, le contrôle se saute en le disant. GAP_EXPECTED vaut true sur
-// la branche film/site-v5, tant que le rendu éclairé du trajet roulé n'est pas
-// monté : les fichiers sont encore ceux de l'ancien découpage (414 images),
-// l'écart ne s'affiche qu'en avertissement (tests « skipped » avec la raison) ;
-// FILM_MEDIA_STRICT=1 le rend bloquant (FILM_MEDIA_STRICT=1 npx vitest run
-// scripts/film-media.test.ts). Le rendu monté : GAP_EXPECTED à false.
+// Sans ffprobe, le contrôle se saute en le disant. GAP_EXPECTED : true tant
+// que les fichiers ne suivent pas le découpage (l'écart n'est qu'un
+// avertissement, FILM_MEDIA_STRICT=1 le rend bloquant) ; false depuis le rendu
+// final v11 monté (SPEC §18.77) : les contrôles sont bloquants.
 
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
@@ -22,7 +20,7 @@ import { FFMPEG, FFPROBE, ROOT, probeTake } from "./film-io";
 import { FILMS, SIZES, filmFrames, type FilmId } from "./film-lib";
 
 /** Un écart entre les fichiers et le découpage est-il attendu ? Oui, jusqu'au montage du rendu éclairé du trajet roulé. */
-const GAP_EXPECTED = true;
+const GAP_EXPECTED = false;
 const strict = !GAP_EXPECTED || process.env.FILM_MEDIA_STRICT === "1";
 
 const MEDIA = resolve(ROOT, "web/src/film/media");
@@ -68,14 +66,19 @@ describe.skipIf(!hasFfprobe)("film : les fichiers ont les durées du découpage"
  * relevée sur `poursuite-720.mp4`. Un nouveau rendu change l'image : le contour
  * ne tient plus la voiture. Il faut alors le retracer, puis relever l'empreinte ici.
  *
- * TODO (§18.56) : null jusqu'au rendu éclairé du trajet roulé. Les fichiers de
- * 720 images montés, le test échoue sur chaque image gelée en donnant son
- * empreinte : retracer STILL_CARS sur ces images, passer STILL_TRACED_FRAMES à
- * 720 (freeze.ts), puis recopier les empreintes ici. Celles de l'ancien
- * découpage (17 novembre, fichiers de 414 et 80 images) : P1 02030105…, P2
- * 80918a80…, P3 59c046c4…, P4 d5d5cd9d…, P5 00000844…, FIN6 00000080….
+ * Relevées le 18 novembre (SPEC §18.77) sur le rendu final v11, monté en
+ * 720 images. Celles de l'ancien découpage (17 novembre, fichiers de 414 et 80
+ * images) : P1 02030105…, P2 80918a80…, P3 59c046c4…, P4 d5d5cd9d…, P5
+ * 00000844…, FIN6 00000080….
  */
-const STILL_PRINTS: Record<StillShot, string | null> = { P1: null, P2: null, P3: null, P4: null, P5: null, FIN6: null };
+const STILL_PRINTS: Record<StillShot, string | null> = {
+  P1: "00000180a1a58cb1f2f3f1fdbdb6e6d6",
+  P2: "250574554197905163a0206020223018",
+  P3: "0000141408020b539272f1f1f1e1e1c0",
+  P4: "00000000a3a595a22335a0b093810101",
+  P5: "00c202050302032138ece8f82c285891",
+  FIN6: "0000802038383e3ef3f9f87079787e7f",
+};
 
 /** L'image gelée de chaque tronçon : sa dernière dans `poursuite` (pour FIN6, la dernière du fichier). */
 const stillFrame = (shot: StillShot): number => SHOT_START[shot] + SHOT_FRAMES[shot] - 1;
