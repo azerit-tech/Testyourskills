@@ -143,7 +143,8 @@ describe("la scène", () => {
   it.each(LEVELS)("%i étoile(s) : les dérapages ne s'entendent que dans les tronçons joués, à leur plus fort sur leur étoile", (n) => {
     const { plan, score } = scoreAt(n);
     const slip = maxCurve(score, "slip", 0, plan.cut);
-    expect(slip).toBeCloseTo(n === 1 ? 0 : n < 5 ? 29 : 36, 0);
+    // la glisse la plus forte des tronçons joués, celle de parcours.json (v11 : 34° au rond-point, 40,8° au port)
+    expect(slip).toBeCloseTo(Math.max(...PARCOURS.glisse.filter(([f]) => f < plan.cut).map(([, v]) => v)), 0);
     // le rond-point (étoile 2) et le port (étoile 5), au plus fort du dérapage à une image près
     if (n >= 2) expect(score.curve("slip", STAR_FRAMES[1])).toBeGreaterThan(28);
     if (n >= 5) expect(score.curve("slip", STAR_FRAMES[4])).toBeGreaterThan(35);
@@ -153,8 +154,8 @@ describe("la scène", () => {
     const { score } = scoreAt(6);
     for (const [f, v] of PARCOURS.vitesse) expect(score.curve("speed", f)).toBeCloseTo(v, 9);
     for (const [f, v] of PARCOURS.glisse) expect(score.curve("slip", f)).toBeCloseTo(v, 9);
-    // lancée à 85 km/h sur l'avenue, plus vite sur le pont, arrêtée sur la pointe (le ralenti)
-    expect(score.curve("speed", 10) * 3.6).toBeCloseTo(85, 0);
+    // lancée à 82 km/h sur l'avenue (la berline simulée de la v11), plus vite sur le pont, arrêtée sur la pointe
+    expect(score.curve("speed", 10) * 3.6).toBeCloseTo(82, 0);
     expect(score.curve("speed", STAR_FRAMES[3])).toBeGreaterThan(score.curve("speed", 10));
     // arrêtée sur la pointe (parcours.arret), au ralenti
     expect(score.curve("speed", 719)).toBe(0);
