@@ -490,6 +490,14 @@ def _dist(a, b):
     return math.sqrt(sum((x - y) ** 2 for x, y in zip(a, b)))
 
 
+def _angle(a, b):
+    """L'angle (°) entre deux directions relevées. Elles sont arrondies à 4 décimales au relevé, donc plus tout à fait
+    unitaires : acos(a·b) en tirait jusqu'à 0,6° entre deux axes identiques (coupe 317 | 318, fusion v11, où la
+    caméra est la même pose des deux côtés). atan2(|a×b|, a·b) ne dépend pas des normes."""
+    c = (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0])
+    return math.degrees(math.atan2(math.sqrt(sum(x * x for x in c)), sum(x * y for x, y in zip(a, b))))
+
+
 def _apparier(A, B, cle, pos, tol_nom=None):
     """Apparie deux listes d'articles : par nom (le plus proche d'abord quand un nom revient), puis les restes par
     place (JUMEAU). Rend (paires, seuls_a, seuls_b)."""
@@ -551,7 +559,7 @@ def comparer(A, B):
         note("rendu", f"horloge film_image : {A.get('horloge')} | {B.get('horloge')}")
     # la caméra et la berline : le garde-fou du relevé
     d = _dist(A["camera"]["pos"], B["camera"]["pos"])
-    ang = math.degrees(math.acos(max(-1.0, min(1.0, sum(x * y for x, y in zip(A["camera"]["axe"], B["camera"]["axe"]))))))
+    ang = _angle(A["camera"]["axe"], B["camera"]["axe"])
     if d > 0.05 or ang > 0.3 or abs(A["camera"]["focale"] - B["camera"]["focale"]) > 0.05:
         note("caméra", f"{d:.2f} m, {ang:.2f}° et {A['camera']['focale']} | {B['camera']['focale']} mm d'écart")
     if A.get("berline") and B.get("berline"):
@@ -638,7 +646,7 @@ def comparer(A, B):
             if _dist(a["vise"], b["vise"]) > TOL_VISEE:
                 ecarts.append(f"visée au sol {_dist(a['vise'], b['vise']):.2f} m")
         elif a["type"] in ("SPOT", "AREA", "SUN"):
-            ang = math.degrees(math.acos(max(-1.0, min(1.0, sum(x * y for x, y in zip(a["axe"], b["axe"]))))))
+            ang = _angle(a["axe"], b["axe"])
             if ang > TOL_ANGLE:
                 ecarts.append(f"axe {ang:.1f}°")
         for k, nom in (("cone", "cône"), ("fondu", "fondu"), ("source", "source"), ("taille", "taille")):
@@ -671,7 +679,7 @@ def comparer(A, B):
         note("hélicoptère", f"{len(ha)} appareil(s) dans {pa}, {len(hb)} dans {pb}")
     for a, b in zip(ha, hb):
         d = _dist(a["pos"], b["pos"])
-        ang = math.degrees(math.acos(max(-1.0, min(1.0, sum(x * y for x, y in zip(a["cap"], b["cap"]))))))
+        ang = _angle(a["cap"], b["cap"])
         if d > 0.2 or ang > 1.0:
             note("hélicoptère", f"« {a['nom']} » : {d:.2f} m et {ang:.1f}° d'écart")
     # les effets et les brumes
@@ -767,6 +775,9 @@ def selftest():
     B = json.loads(json.dumps(base))
     B["plan"], B["lieu"] = "B", "jetee"
     assert comparer(base, B) == [], comparer(base, B)
+    # deux axes identiques arrondis à 4 décimales (la caméra de 317 | 318) : pas d'écart d'angle
+    assert _angle([-0.0769, 0.9961, -0.0426], [-0.0769, 0.9961, -0.0426]) < 1e-6
+    assert abs(_angle([1, 0, 0], [0, 2, 0]) - 90.0) < 1e-9
     # un objet absent, une lampe de plus, une visée déplacée, une matière et un réglage différents : cinq écarts
     B["familles"] = []
     B["lampes"][0]["vise"] = [2, 9, 0]
