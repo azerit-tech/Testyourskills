@@ -163,9 +163,10 @@ class Poses(list):
 
 def sample(pos, frames=range(0, 30), slip=None, heading=None, wheel_r=0.33, wheelbase=2.9, front=None, f0=F0,
            fps=FPS, noise=1.0, seed=0.0, warmup=0.6, roll_per_g=ROLL_PER_G, pitch_per_g=PITCH_PER_G, chassis=None,
-           steer=None):
+           steer=None, spin=None):
     """Les poses d'un véhicule image par image. steer(t) : le braquage des roues avant à imposer (Drive.steer : le
-    contre-braquage de drive()) ; sinon celui de la géométrie.
+    contre-braquage de drive()) ; sinon celui de la géométrie. spin(t) : le rapport de la vitesse des roues arrière à
+    celle du sol (dynamique.PhysDrive.wheelspin : le patinage simulé) ; sinon l'heuristique de axle_spins.
 
     Dynamique active (dyn_on) : la caisse selon le réglage `chassis` (CHASSIS, la berline par défaut ;
     key_vehicle le refait selon le véhicule) ; x, y, cap, vitesse, roues et braquage sont ceux d'avant.
@@ -226,7 +227,7 @@ def sample(pos, frames=range(0, 30), slip=None, heading=None, wheel_r=0.33, whee
     out.hist = hist
     out.meta = dict(want=want, dt=dt, seed=seed, wheel_r=wheel_r, wheelbase=wheelbase, front=front, noise=noise,
                     steer_fn=steer)
-    spin_f, spin_r, slip_r = axle_spins(hist, front, wheelbase - front, wheel_r, steer)
+    spin_f, spin_r, slip_r = axle_spins(hist, front, wheelbase - front, wheel_r, steer, spin)
     for i, (k, t, x, y, head, travel, speed, a_long, a_lat, curv, dist, steer_) in enumerate(hist):
         if k in want:
             out.append(dict(frame=want[k], t=t, x=x, y=y, heading=head, travel=travel, speed=speed, a_long=a_long,
@@ -239,12 +240,12 @@ WHEELSPIN = 0.45            # en glisse franche, les roues arrière (propulsion,
 WHEELSPIN_SLIP = (4.0, 14.0)  # ° de dérive de l'essieu arrière : de rien à tout le patinage
 
 
-def axle_spins(hist, front, rear, wheel_r, steer_fn=None):
+def axle_spins(hist, front, rear, wheel_r, steer_fn=None, spin_fn=None):
     """Les rotations (rad, cumulées) des roues avant et arrière, et la dérive de l'essieu arrière (°), pas à pas de
     l'historique de sample(). Une roue avant roule librement : sa rotation suit le déplacement de son essieu le long
     du plan de la roue (braquée). Une roue arrière roule le long de la caisse et, quand l'arrière glisse (dérive de
     l'essieu au-delà de WHEELSPIN_SLIP), patine : une propulsion tient sa glisse aux gaz, ses roues tournent plus
-    vite que le sol ne défile (jusqu'à WHEELSPIN de plus)."""
+    vite que le sol ne défile (jusqu'à WHEELSPIN de plus). spin_fn(t) : ce rapport donné (la simulation)."""
     sf = sr = 0.0
     out_f, out_r, out_s = [], [], []
     prev = None
@@ -262,7 +263,7 @@ def axle_spins(hist, front, rear, wheel_r, steer_fn=None):
             sf += (dfx * wf[0] + dfy * wf[1]) / wheel_r
             lon, lat_ = drx * fx + dry * fy, drx * -fy + dry * fx
             alpha = math.degrees(math.atan2(lat_, abs(lon))) if math.hypot(lon, lat_) > 1e-5 else 0.0
-            kick = 1.0 + WHEELSPIN * smoothstep(*WHEELSPIN_SLIP, abs(alpha))
+            kick = spin_fn(t) if spin_fn else 1.0 + WHEELSPIN * smoothstep(*WHEELSPIN_SLIP, abs(alpha))
             sr += lon * kick / wheel_r
         prev = (pf, pr, t)
         out_f.append(sf)

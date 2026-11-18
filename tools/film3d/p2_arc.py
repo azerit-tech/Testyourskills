@@ -66,6 +66,11 @@ def hero_steer(t):
     return HERO["steer"](_f(t))
 
 
+def hero_spin(t):
+    """Le patinage des roues arrière (rapport à la vitesse du sol : 1 roule, plus glisse aux gaz)."""
+    return HERO["spin"](_f(t))
+
+
 def hero_speed(t):
     return HERO["speed"](_f(t))
 

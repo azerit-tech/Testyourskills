@@ -344,7 +344,7 @@ def animate(scene, car, fill, patrols, pose=POSE):
     head = P.to_scene(pose, 0.0, 0.0, P.hero_heading(t0))[2]
     rig = M.rig_up(car, head, "rig_berline", extras=[fill])
     poses = M.sample(in_scene(P.hero_pos), frames, heading=lambda t: P.to_scene(pose, 0.0, 0.0, P.hero_heading(t))[2],
-                     steer=P.hero_steer, wheel_r=car["wheel_r"], wheelbase=wb)
+                     steer=P.hero_steer, spin=getattr(P, "hero_spin", None), wheel_r=car["wheel_r"], wheelbase=wb)
     M.key_vehicle(rig, poses, wheels=wheels, body=car)
     M.wheel_marks(wheels, car["wheel_r"])
     # les feux stop, après la mise en clés : les fenêtres où la berline freine à plus de 2 m/s² (découpage v3.1)

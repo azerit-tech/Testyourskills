@@ -61,6 +61,10 @@ class _Hero:
         return _H["steer"](_f(t))
 
     @staticmethod
+    def spin(t):
+        return _H["spin"](_f(t))
+
+    @staticmethod
     def speed(t):
         return _H["speed"](_f(t))
 
@@ -80,6 +84,7 @@ HERO_STOP = HERO.heading(T_STOP + 1.0)
 CX, CY = HERO.pos(T_STOP + 1.0)
 HERO_BOX = (4.9, 1.9, 1.45)        # la berline : longueur, largeur, hauteur (m)
 hero_pos, hero_heading, hero_slip, hero_steer = HERO.pos, HERO.heading, HERO.slip, HERO.steer
+hero_spin = HERO.spin
 
 # --- ce que FIN posait autour de son point d'arrêt (fin_pointe.SX, SY, cap fin_pointe.HERO_STOP), reporté autour de
 # celui du parcours : tourné de ROT, déplacé ; ses images décalées de SHIFT (l'arrêt à F_STOP au lieu de 36)

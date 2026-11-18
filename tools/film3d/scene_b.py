@@ -1739,7 +1739,7 @@ def plan_P3(scene):
     wheels = [c for c in body.children if c.name.startswith("wheel_")]
     ys = [Vector(w.location).y for w in wheels]
     wb, front = (max(ys) - min(ys)), -min(ys)                 # l'avant vers -y dans la caisse
-    poses = MO.sample(P3.hero_pos, frames, heading=P3.hero_heading, steer=P3.hero_steer,
+    poses = MO.sample(P3.hero_pos, frames, heading=P3.hero_heading, steer=P3.hero_steer, spin=P3.hero_spin,
                       wheel_r=body.get("wheel_r", 0.31), wheelbase=wb, front=front)
     MO.key_vehicle(rig, poses, wheels=wheels)
     MO.wheel_marks(wheels, body.get("wheel_r", 0.31))

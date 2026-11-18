@@ -47,6 +47,11 @@ def hero_steer(t):
     return HERO["steer"](_f(t))
 
 
+def hero_spin(t):
+    """Le patinage des roues arrière (rapport à la vitesse du sol : 1 roule, plus glisse aux gaz)."""
+    return HERO["spin"](_f(t))
+
+
 def hero_speed(t):
     return HERO["speed"](_f(t))
 
@@ -551,7 +556,7 @@ def beam_target(t):
 
 
 if __name__ == "__main__":
-    poses = M.sample(hero_pos, range(F0, F0 + FRAMES), heading=hero_heading, steer=hero_steer)
+    poses = M.sample(hero_pos, range(F0, F0 + FRAMES), heading=hero_heading, steer=hero_steer, spin=hero_spin)
     prev = None
     for p in poses:
         f, t = p["frame"], p["t"]

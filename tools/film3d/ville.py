@@ -2443,7 +2443,7 @@ def poser_berline(scene, sol):
     try:
         for a, b, _ in prises():
             pos, head = prise_pose(a)
-            ps = M.sample(pos, range(a - 1, b + 2), heading=head, steer=P.DRIVE.steer, wheel_r=hero["wheel_r"],
+            ps = M.sample(pos, range(a - 1, b + 2), heading=head, steer=P.DRIVE.steer, spin=getattr(P.DRIVE, "wheelspin", None), wheel_r=hero["wheel_r"],
                           wheelbase=(max(d) - min(d)) if d else 2.9, f0=1)
             poses += [p for p in ps if a <= p["frame"] <= b or (p["frame"] == a - 1 and a == 1)
                       or (p["frame"] == b + 1 and b == P.TOTAL)]
