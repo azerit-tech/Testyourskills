@@ -135,7 +135,9 @@ def dyn_on():
 # v3.1 (« rien d'autre ne la secoue ») : roulis au plus 4° et plongée au plus 2°, en proportion des accélérations
 # (6,5 m/s² latéraux font 4°, 7 m/s² de freinage 2°), filtrés par des ressorts bien amortis (zeta 0,7 : 5 % de
 # dépassement, pas de rebond) ; ni grain de route ni corrections du conducteur (road = driver = 0). Le relief et
-# les ressauts que la scène passe à key_vehicle restent.
+# les ressauts que la scène passe à key_vehicle restent. Le 17 novembre (« le dérapage est vraiment pas naturel ») :
+# la berline penche davantage (7,2° par g, 5° au plus) et sa caisse est moins amortie (zeta 0,5 : elle se pose après
+# le rattrapage, un léger rebond) ; les patrouilles et le fourgon ne changent pas.
 CHASSIS = {
     # une grosse berline des années 60 : souple, lente, elle s'assoit
     "hero": dict(roll_per_g=7.2, roll_max=5.0, pitch_per_g=2.8, pitch_max=2.0, roll_hz=1.1, roll_zeta=0.5,
