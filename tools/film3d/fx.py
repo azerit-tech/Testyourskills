@@ -11,8 +11,9 @@
 #   import fx
 #   fx.dress("P3")                       # en fin de construction du plan, après les clés de motion.py
 #
-# Inactif par défaut (le plan sort comme avant) : FILM3D_FX=1 active les effets, plan par plan à mesure que chaque
-# bande est validée ; FILM3D_FX_ONLY=eau,gomme,vol,tremble,etincelles,arret ne garde que ces familles (le banc).
+# Inactif par défaut (le plan sort comme avant) : FILM3D_FX=1 active les effets, FILM3D_FX=P2,P3,P5,P6 ceux de ces
+# plans seulement, à mesure que chaque bande est validée ; FILM3D_FX_ONLY=eau,gomme,derapage,vol,tremble,etincelles,
+# arret ne garde que ces familles (le banc).
 # Les sprites et gouttes ne sont vus que par la caméra (ni ombre, ni rebond
 # diffus, ni reflet sur la caisse) et n'émettent rien : aucune lumière ajoutée, la berline ne change pas de teinte.
 # Les étincelles émettent, sans échantillonnage d'émission (elles n'éclairent rien).
@@ -24,16 +25,24 @@ import random
 
 FPS = 24.0
 G = 9.81
-FAMILIES = ("eau", "gomme", "vol", "tremble", "etincelles", "arret")
+FAMILIES = ("eau", "gomme", "derapage", "vol", "tremble", "etincelles", "arret")
+_PLAN = [None]          # le plan que dress() habille (FILM3D_FX=P2,P5 : les effets de ces plans seulement)
 
 
 def log(msg):
     print(f"[fx] {msg}", flush=True)
 
 
-def enabled(family=None):
-    if os.environ.get("FILM3D_FX", "0").strip().lower() not in ("1", "oui", "on", "true"):
-        return False
+def enabled(family=None, plan=None):
+    """FILM3D_FX=1 (oui, on, true) : tous les plans ; FILM3D_FX=P2,P3,P5,P6 : ces plans seulement (ceux dont la
+    bande est validée) ; FILM3D_FX_ONLY=eau,derapage… : ces familles seulement."""
+    v = os.environ.get("FILM3D_FX", "0").strip()
+    plan = plan or _PLAN[0]
+    if v.lower() not in ("1", "oui", "on", "true"):
+        plans = [s.strip().upper() for s in v.split(",") if s.strip()]
+        if not plans or any(p in ("0", "NON", "OFF", "FALSE") for p in plans) or plan is None \
+                or plan.upper() not in plans:
+            return False
     only = os.environ.get("FILM3D_FX_ONLY", "").strip()
     if family and only:
         return family in [s.strip() for s in only.split(",")]
@@ -457,6 +466,100 @@ def tyre_smoke(track, wheel_r, slip_min=6.0, rate=100.0, brake=0.0, seed=5, subs
                                         s0, size * rng.uniform(2.6, 3.6), alpha * (0.5 + 0.5 * g) * rng.uniform(0.7, 1.0),
                                         rng.random()))
     return out
+
+
+# ---------------------------------------------------------------- le dérapage sur le mouillé
+
+def wheel_offsets(pose):
+    """{roue: (a, b, dz)} : chaque roue d'une pose, a le long de l'avant, b vers la droite, dz au-dessus du centre."""
+    out = {}
+    r = pose.right
+    for k, c in pose.wheels.items():
+        d = _sub(c, pose.pos)
+        out[k] = (_dot(d, pose.fwd), _dot(d, r), d[2])
+    return out
+
+
+def drive_track(pos, heading, frames, offsets, z=0.0):
+    """La trajectoire d'une berline lue dans une conduite (parcours.hero : pos(image) au sol de la scène, heading
+    en degrés, 0 = +y, positif à gauche), images décimales admises ; offsets : wheel_offsets d'une pose de la
+    scène. Elle déborde la scène vers l'avant (une glisse commencée au tronçon d'avant)."""
+    samples = []
+    for f in frames:
+        x, y = pos(f)
+        h = math.radians(heading(f))
+        fwd = (-math.sin(h), math.cos(h), 0.0)
+        r = (fwd[1], -fwd[0], 0.0)
+        wh = {k: (x + fwd[0] * a + r[0] * b, y + fwd[1] * a + r[1] * b, z + dz) for k, (a, b, dz) in offsets.items()}
+        samples.append((f, (x, y, z), fwd, wh))
+    return build_track(samples)
+
+
+def rear_slip(fwd, V):
+    """La dérive d'une roue (degrés, 0 à 90) : l'angle entre son plan et sa vitesse."""
+    lon = _dot(V, fwd)
+    lat = V[0] * fwd[1] - V[1] * fwd[0]
+    return math.degrees(math.atan2(abs(lat), max(1e-6, abs(lon))))
+
+
+def drift_spray(track, wheel_r, g0=0, seed=23, substeps=4, frames=None, wet=1.0, slip_min=4.0, slip_full=18.0,
+                rate_sheet=1500.0, rate_mist=60.0, mist_size=1.0, mist_alpha=0.5):
+    """L'eau d'une glisse sur le mouillé (pas de fumée : la chaussée est trempée, à la tombée de la nuit) : chaque
+    pneu arrière qui frotte en travers (sa dérive, de slip_min à slip_full degrés) chasse une lame d'eau devant lui,
+    dans le sens où il glisse (l'extérieur du virage), qui monte de 0,3 à 1 m et retombe en une demi-seconde ; et une
+    brume de pulvérisation, plus lente, qui gonfle de 0,3 à 1,6 m et reste dans l'arc de la glisse avant de se
+    dissiper (0,5 à 0,9 s, 1,6 m au plus). Le tirage est fait par sous-image du film (g0 : l'image du film moins celle de la scène) : deux
+    tronçons qui se suivent tirent les mêmes gouttes, et celles nées avant une coupe vivent encore après.
+    Renvoie (gouttes, brume)."""
+    drops, mist = [], []
+    lo, hi = frames if frames else (track[0].frame, track[-1].frame)
+    k0, k1 = int(math.floor(lo * substeps)), int(math.ceil(hi * substeps))
+    g0k = int(round(g0 * substeps))
+    for k in range(k0, k1):
+        rng = random.Random(seed * 1000003 + (k + g0k))
+        f = (k + rng.random()) / substeps
+        if f < track[0].frame or f > track[-1].frame:
+            continue
+        _, fwd, vel, wh, wv, slip, speed = pose_at(track, f)
+        if speed < 2.0:
+            continue
+        right = (fwd[1], -fwd[0], 0.0)
+        for name in ("BL", "BR"):
+            if name not in wh:
+                continue
+            c, V = wh[name], wv.get(name, vel)
+            a = rear_slip(fwd, V)
+            g = smoothstep(slip_min, slip_full, a) * min(1.0, speed / 8.0) * wet
+            # (le tirage reste le même quelle que soit l'intensité : une roue à l'autre, une image à l'autre)
+            r2 = random.Random(rng.random())
+            if g <= 0.01:
+                continue
+            lat = _dot(V, right)
+            slide = _mul(right, 1.0 if lat >= 0 else -1.0)
+            vs = abs(lat)
+            ground = c[2] - wheel_r
+            for _ in range(_poisson(r2, rate_sheet * g / (FPS * substeps))):
+                # la lame : au contact, du côté où glisse le pneu ; emportée à une part de la vitesse de la roue,
+                # chassée en travers à une part de sa glissade, vers le haut
+                u, w = wheel_r * r2.uniform(0.6, 1.0), r2.uniform(-0.1, 0.25)
+                p = (c[0] + slide[0] * u - fwd[0] * w, c[1] + slide[1] * u - fwd[1] * w, ground + r2.uniform(0.02, 0.1))
+                carry, out, up = r2.uniform(0.3, 0.7), vs * r2.uniform(0.25, 0.7), r2.uniform(1.2, 3.6)
+                v = (V[0] * carry + slide[0] * out, V[1] * carry + slide[1] * out, up)
+                drag = r2.uniform(1.0, 2.2)
+                drops.append(Particle(f, p, v, land_time(p, v, drag, ground, 0.7), drag, 1.0,
+                                      r2.uniform(0.006, 0.014), seed=r2.random()))
+            for _ in range(_poisson(r2, rate_mist * g / (FPS * substeps))):
+                u, w = wheel_r * r2.uniform(0.3, 1.0), r2.uniform(0.0, 0.4)
+                p = (c[0] + slide[0] * u - fwd[0] * w, c[1] + slide[1] * u - fwd[1] * w, ground + r2.uniform(0.1, 0.35))
+                # emportée à 40–60 % de la vitesse de la roue : elle reste dans l'arc, près de la voiture (de dos, la
+                # caméra à 7,5 m ne la traverse pas), et s'éteint en 0,5 à 0,9 s
+                carry, out = r2.uniform(0.4, 0.6), vs * r2.uniform(0.15, 0.45) + r2.uniform(0.3, 1.0)
+                v = (V[0] * carry + slide[0] * out, V[1] * carry + slide[1] * out, r2.uniform(0.25, 0.8))
+                s0 = mist_size * r2.uniform(0.25, 0.45)
+                mist.append(Particle(f, p, v, r2.uniform(0.5, 0.9), r2.uniform(1.6, 2.6), 0.02, s0,
+                                     mist_size * r2.uniform(1.1, 1.6), mist_alpha * (0.4 + 0.6 * g) * r2.uniform(0.7, 1.0),
+                                     r2.random()))
+    return drops, mist
 
 
 # ---------------------------------------------------------------- ce qui vole
@@ -1489,6 +1592,50 @@ def gomme(ctx, slip_min=6.0, rate=150.0, brake=0.0, size=1.0, alpha=1.0, mask=0.
     return ob
 
 
+def drift_track(ctx, preroll=48):
+    """La trajectoire de la berline du plan, lue dans la conduite du parcours (parcours.hero) de `preroll` images
+    avant la scène à sa fin : une glisse commencée au tronçon d'avant y est. Les roues : celles de la scène (leur
+    place sur la caisse à la première image). Renvoie (trajectoire, g0 : l'image du film moins celle de la scène),
+    ou (ctx.track, None) si la scène ne suit pas le parcours (hors parcours, ou décalée de plus de 5 cm)."""
+    try:
+        import parcours as PC
+        h = PC.hero(ctx.plan)
+        g0 = PC.START[ctx.plan] - 1
+    except (ImportError, KeyError, AttributeError):
+        return ctx.track, None
+    gap = max(math.dist(h["pos"](p.frame), p.pos[:2]) for p in ctx.track[1:-1])
+    if gap > 0.05:
+        log(f"{ctx.plan} : la scène s'écarte de {gap:.2f} m du parcours, glisse lue dans la scène seule")
+        return ctx.track, None
+    p0 = ctx.track[1]
+    z = p0.pos[2]
+    fr = range(ctx.frames[0] - preroll - 1, ctx.frames[1] + 2)
+    return drive_track(h["pos"], h["heading"], fr, wheel_offsets(p0), z), g0
+
+
+def derapage(ctx, preroll=48, wet=1.0, sheet=1.0, mist=1.0, mask=0.9, near=4.5, mist_near=6.5, seed=23,
+             hide=("fumee_pneus_",)):
+    """L'eau des dérapages (drift_spray) : la lame et la brume des pneus arrière en glisse, tirées sur le temps du
+    film depuis la conduite du parcours, `preroll` images avant la scène (ce qui est né avant la coupe vit après) ;
+    rien à moins de `near` m de l'objectif (le bras commun suit à 7,5 m) ; la brume, plus large, s'efface dès
+    `mist_near` m : derrière la berline elle ne voile pas le bas du cadre au raccord P5 → P6. Le cône caméra-berline
+    est creusé (mask).
+    Les anciennes bouffées de fumée sèche (`hide`) sont retirées : la chaussée est trempée."""
+    for ob in ctx.scene.objects:
+        if ob.name.startswith(tuple(hide)) and ob.type == "MESH":
+            ob.hide_render = True
+    tr, g0 = drift_track(ctx, preroll)
+    d, m = drift_spray(tr, ctx.wheel_r, g0=g0 or 0, seed=seed, wet=wet, rate_sheet=1500.0 * sheet,
+                       rate_mist=60.0 * mist, frames=(tr[0].frame, ctx.frames[1] + 1))
+    od = emit(ctx, f"fx_lame_{ctx.plan}", d, "drops", mat_drop(), glossy=True, near=near)
+    om = emit(ctx, f"fx_brume_glisse_{ctx.plan}", m, "sprites", mat_spray("haut"), mask=mask, near=mist_near,
+              edge=0.25)
+    early = sum(1 for q in d + m if q.birth < ctx.frames[0])
+    log(f"dérapage : {len(d)} gouttes, {len(m)} sprites de brume ({early} nés avant la scène)"
+        + ("" if g0 is not None else ", sans le parcours"))
+    return od, om
+
+
 def _key_transform(ob, keys, frames):
     from mathutils import Euler
     for f in frames:
@@ -1919,8 +2066,9 @@ def hooked(build, plans):
 def dress(plan, scene=None, **opt):
     """Pose les interactions du plan (OUV, P1… FIN6), sur la trajectoire de la scène telle qu'elle est. Sans
     berline lisible, ou FILM3D_FX=0, ne fait rien."""
-    if not enabled():
-        log(f"{plan} : effets inactifs (FILM3D_FX=1 les active)")
+    _PLAN[0] = plan
+    if not enabled(plan=plan):
+        log(f"{plan} : effets inactifs (FILM3D_FX=1, ou FILM3D_FX={plan}, les active)")
         return None
     bpy = _bpy()
     ctx = Ctx(plan, scene)
@@ -1971,8 +2119,9 @@ def r_p2(ctx, **o):
         for ob in ctx.scene.objects:
             if ob.name.startswith("spray_trail_"):
                 ob.hide_render = True
-    if enabled("gomme"):
-        gomme(ctx, slip_min=5.0, size=1.0, mask=1.0, near=4.5)
+    # (17 novembre : de l'eau, pas de la fumée sèche, sur la chaussée trempée : la lame et la brume de la glisse)
+    if enabled("derapage"):
+        derapage(ctx, mask=1.0)
 
 
 def r_p3(ctx, **o):
@@ -1980,6 +2129,8 @@ def r_p3(ctx, **o):
     # s'envolent, les enseignes et les guirlandes tremblent
     if enabled("eau"):
         water(ctx, wet=0.9, mask=0.9, near=1.2)
+    if enabled("derapage"):
+        derapage(ctx, mask=1.0)                      # la brume du rond-point, née en P2, qui retombe
 
 
 def r_p4(ctx, **o):
@@ -1990,11 +2141,12 @@ def r_p4(ctx, **o):
 
 
 def r_p5(ctx, **o):
-    # l'escalade, le ciel s'en mêle : la fumée de la glisse qui se voit, l'eau, le souffle du rotor sur le quai
+    # l'escalade, le ciel s'en mêle : l'eau de la glisse qui se voit (lame et brume, pas de fumée sèche), le souffle
+    # du rotor sur le quai
     if enabled("eau"):
         water(ctx, wet=0.8, mask=0.85, near=1.2)
-    if enabled("gomme"):
-        gomme(ctx, slip_min=5.0, size=1.1)
+    if enabled("derapage"):
+        derapage(ctx, sheet=1.1, mist=1.2)
 
 
 def r_p6(ctx, **o):
@@ -2003,6 +2155,8 @@ def r_p6(ctx, **o):
     if enabled("eau"):
         water(ctx, wet=0.8, mask=0.85, near=1.2)
         pack_spray(ctx, near=2.0)
+    if enabled("derapage"):
+        derapage(ctx, sheet=1.1, mist=1.2)    # la fin du grand dérapage, née en P5
 
 
 def r_fin(ctx, **o):

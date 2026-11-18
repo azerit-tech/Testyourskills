@@ -140,8 +140,10 @@ class PATROL:
 
 PATROL_YAW, PATROL_YAW_F = -9.0, (24.0, 48.0)       # le nez qui rentre à droite (degrés, de l'image à l'image)
 # les images où elle est entière dans le cadre, à gauche de la berline (test_motion) : jusqu'à P5/14, quand le grand
-# dérapage (parcours.DERAP5) jette l'arrière de la berline vers la gauche, devant elle à l'écran (P5/23 avant)
-PATROL_SEEN = (1, 14)
+# dérapage (parcours.DERAP5) jette l'arrière de la berline vers la gauche, devant elle à l'écran (P5/23 avant).
+# Depuis le 17 novembre, jusqu'à P5/10 : le dérapage, au lacet d'une berline sur le mouillé, part plus tôt pour la
+# même crête (une montée de 0,67 s au lieu de 0,5) et la boîte qui s'élargit la couvre deux images plus tôt
+PATROL_SEEN = (1, 10)
 
 
 def patrol_heading(t):

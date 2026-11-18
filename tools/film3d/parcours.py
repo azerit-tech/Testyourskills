@@ -71,14 +71,50 @@ V_POINTE = 50.0 / 3.6                       # la vitesse voulue en arrivant sur 
 # l'accélérateur) contre un frottement plus fort (0,097 m/s² par degré). Les roues avant : contre-braquage de
 # 0,78 × la glisse (motion.drive, counter), 22 à 28° au plus fort. L'appel du rond-point à 5,4 m après le début de
 # l'arc, celui du port 10,6 m avant le sien (le coup de volant avant le virage) : les places d'avant, sur la route.
-DERAP2 = dict(s=S_ARC2 + 5.4, side=1.0, keys=[(0.0, 0.0, 0.0), (0.15, -1.2, 0.0), (0.42, 7.0, 70.0),
-                                               (0.60, 19.6, 70.0), (0.85, 29.0, 0.0, -90.0), (1.50, 25.5, -14.0),
-                                               (1.92, 8.0, -40.0), (2.32, 2.0, -6.0), (2.70, 0.0, 0.0)])
-DERAP5 = dict(s=S_ARC5 - 10.6138898, side=-1.0, keys=[(0.0, 0.0, 0.0), (0.17, -1.6, 0.0), (0.47, 8.0, 80.0),
-                                                       (0.67, 24.0, 80.0), (0.95, 36.0, 0.0, -110.0),
-                                                       (1.62, 30.0, -14.0), (2.24, 9.0, -48.0), (2.70, -4.0, 0.0),
-                                                       (3.22, 0.0, 0.0)], drag=0.0967, gas=0.3333)
-LIM = dict(slip_drag=0.07, counter=0.78, derapages=[DERAP2, DERAP5])
+#
+# Le 17 novembre au soir (« le dérapage est vraiment pas naturel ») : ces nœuds faisaient tourner la caisse comme une
+# platine, autour de son centre resté sur la route, à 400–500 °/s² de lacet (une berline sur le mouillé n'en a pas le
+# couple), la crête du port en pointe, sans tenue, les roues avant à 0,78 × la glisse quel que soit le mouvement.
+# Les deux dérapages sont maintenant tirés d'impulsions de lacet (motion.impulsions : la dérivée seconde de la glisse,
+# 230 °/s² au plus, résolue pour passer par les cibles) :
+#  - l'appel : le coup de volant vers l'extérieur, la caisse part de 1,6 à 1,8° du mauvais côté (le balancier) ;
+#  - le décrochage : l'arrière déchargé part, monte à 70–78 °/s, puis le contre-braquage le cueille à la crête (29° au
+#    rond-point, 36° au port, aux mêmes instants qu'avant : les étoiles 2 et 5 ne bougent pas) ;
+#  - la tenue : une seconde de glisse vivante, le pied qui dose (au rond-point un creux de 1,5°, une reprise ; au
+#    port elle se tasse de 36 à 34,6°, rattrapée assez tôt pour que P6 s'ouvre sur 4° de glisse, comme avant) ;
+#  - le rattrapage : trois quarts de seconde, l'arrière qui revient, passe un peu de l'autre côté (1,6° au rond-point,
+#    3,5° au port) et se pose.
+# pulses : (début, fin, bord) en s depuis le passage de l'abscisse s ; cibles : (« v » glisse ° | « d » vitesse °/s, t,
+# valeur). La glisse est tenue entre la caisse et la vitesse vraie de son centre, qui part vers l'extérieur
+# (LIM["pivot"] × sin glisse, filtré : pivot_tau à l'attaque et au relâché, pivot_smooth) : l'arrière part large
+# (1 à 1,3 m), l'avant revient sur sa ligne pendant la tenue, la voiture sort un peu large et rejoint sa voie en
+# ligne droite, sa latérale dans l'adhérence du mouillé (au rond-point vite, 0,35 s : elle doit passer le trou des
+# plots de P3 ; au port sans hâte, 0,9 s : le bras ne la rattrape pas d'un coup au début de P6). Les roues avant visent la vitesse de leur essieu, plus la
+# dérive de l'effort latéral (LIM["steer_geo"], front_slip ° à la latérale du mouillé, 90 °/s aux mains) : le
+# contre-braquage en découle (22 à 30° au plus fort). trainee : les nœuds d'avant, qui ne règlent plus que le
+# frottement des pneus arrière et les gaz (drag, gas) : la vitesse, donc les raccords, les étoiles et la durée, sont
+# exactement ceux d'avant (test_motion.test_parcours).
+DERAP2 = dict(s=S_ARC2 + 5.4, side=1.0, reaction=3.0,
+              pulses=[(-0.38, -0.06, 0.10), (-0.08, 0.46, 0.14), (0.42, 0.87, 0.14),
+                      (0.87, 1.02, 0.06), (1.00, 1.19, 0.08), (1.17, 1.32, 0.06),
+                      (1.32, 2.10, 0.22), (2.08, 2.86, 0.22), (2.86, 3.10, 0.10), (3.08, 3.34, 0.10)],
+              cibles=[("v", 0.02, -1.6), ("v", 0.87, 29.0), ("d", 0.87, 0.0), ("v", 1.10, 27.5), ("v", 1.32, 28.0),
+                      ("d", 1.32, 0.0), ("v", 2.86, -1.6), ("d", 2.86, 0.0), ("v", 3.34, 0.0), ("d", 3.34, 0.0)],
+              trainee=[(0.0, 0.0, 0.0), (0.15, -1.2, 0.0), (0.42, 7.0, 70.0), (0.60, 19.6, 70.0),
+                       (0.85, 29.0, 0.0, -90.0), (1.50, 25.5, -14.0), (1.92, 8.0, -40.0), (2.32, 2.0, -6.0),
+                       (2.70, 0.0, 0.0)])
+DERAP5 = dict(s=S_ARC5 - 10.6138898, side=-1.0,
+              pulses=[(-0.40, -0.08, 0.10), (-0.10, 0.50, 0.14), (0.46, 0.95, 0.14),
+                      (0.95, 1.13, 0.08), (1.11, 1.29, 0.08),
+                      (1.29, 2.07, 0.22), (2.05, 2.83, 0.22), (2.83, 3.10, 0.10), (3.08, 3.40, 0.10)],
+              cibles=[("v", 0.0, -1.8), ("v", 0.95, 36.0), ("d", 0.95, 0.0), ("v", 1.29, 34.6),
+                      ("d", 1.29, 0.0), ("v", 2.83, -3.5), ("d", 2.83, 0.0), ("v", 3.40, 0.0), ("d", 3.40, 0.0)],
+              trainee=[(0.0, 0.0, 0.0), (0.17, -1.6, 0.0), (0.47, 8.0, 80.0), (0.67, 24.0, 80.0),
+                       (0.95, 36.0, 0.0, -110.0), (1.62, 30.0, -14.0), (2.24, 9.0, -48.0), (2.70, -4.0, 0.0),
+                       (3.22, 0.0, 0.0)],
+              drag=0.0967, gas=0.3333, pivot_tau=(0.6, 0.9), pivot_smooth=0.9)
+LIM = dict(slip_drag=0.07, counter=0.78, derapages=[DERAP2, DERAP5], pivot=1.4, pivot_tau=(0.6, 0.35),
+           pivot_smooth=0.45, steer_geo=True, front_slip=4.0, steer_rate=90.0)
 JERK = 12.0 * 0.72
 T_SPAN = (-2.0, 40.0)                       # s : la table de la conduite (au-delà de l'arrêt, elle reste arrêtée)
 
@@ -412,14 +448,15 @@ _VQ = 4                           # échantillons par image
 _VISEE = {}
 
 
-def _visee_exacte(shot, frame):
-    """(lacet, site) qui posent exactement la boîte de la berline à (VISEE_U, VISEE_V), depuis le bras commun."""
+def _visee_exacte(shot, frame, glisse=True):
+    """(lacet, site) qui posent exactement la boîte de la berline à (VISEE_U, VISEE_V), depuis le bras commun ;
+    glisse=False : la boîte d'une berline sans glisse (sa caisse dans l'axe de sa vitesse)."""
     h = hero(shot)
     x, y, z = camera(shot, frame)
     hx, hy = h["pos"](frame)
     z += sol(shot, x, y)
     hz = sol(shot, hx, hy)
-    head = h["heading"](frame)
+    head = h["heading"](frame) if glisse else h["travel"](frame)
     yaw = math.degrees(math.atan2(-(hx - x), -(hy - y)))
     pitch = math.degrees(math.atan2(hz + M.HERO_BOX[2] / 2.0 - z, math.hypot(hx - x, hy - y)))
     for _ in range(8):
@@ -435,6 +472,69 @@ def _visee_exacte(shot, frame):
         yaw += 0.05 * eu / (bu["u"] - b0["u"])
         pitch += 0.05 * ev / (bv["v"] - b0["v"])
     return yaw, pitch
+
+
+# ---- l'opérateur qui réagit au dérapage (« le dérapage est vraiment pas naturel », 17 novembre) : la visée commune
+# suit la boîte de la berline sans retard (la visée exacte lissée par une gaussienne centrée). Quand l'arrière
+# décroche, un opérateur la rattrape avec un temps de retard et la dépasse un peu avant de se poser. La part de la
+# visée que la glisse seule déplace (visée exacte moins celle d'une berline sans glisse, lissée par la même
+# gaussienne) passe par un second ordre causal (CAM_REACT : fréquence, amortissement) ; son retard (filtré moins
+# lissé, × gain) s'ajoute à la visée commune, fondu à zéro aux bords de la fenêtre. Calculé sur le temps du film, dans
+# le repère d'un tronçon de référence par dérapage (un écart d'angles ne dépend pas du repère) : le même de part et
+# d'autre de chaque raccord. Nul hors des glisses. Le gain : ev["reaction"], sinon CAM_REACT["gain"]. Au port (0,5 :
+# environ 1°), il est borné par le cadre (le centre de la berline à 50 ± 6 %, la patrouille 1 vue) ; au rond-point
+# (3 : environ 1°), la berline vue de dos déplace peu la visée en glissant. Borné aussi par l'accélération de
+# panoramique des plans (test_v3).
+CAM_REACT = dict(hz=0.5, zeta=0.65, gain=0.5, avant=0.8, apres=2.4, fondu=0.6)
+_REACT = []
+
+
+def _reaction_tables():
+    if _REACT:
+        return _REACT
+    q = _VQ
+    dt = 1.0 / (FPS * q)
+    w = 2.0 * math.pi * CAM_REACT["hz"]
+    sg = VISEE_SIGMA * FPS * q
+    m = int(3 * sg)
+    wts = [math.exp(-0.5 * (j / sg) ** 2) for j in range(-m, m + 1)]
+    for ev in LIM["derapages"]:
+        t_ev = _t_at(ev["s"])
+        t1 = M.impulsions(ev["pulses"], ev["cibles"])
+        a = t_ev + t1[0] - CAM_REACT["avant"]
+        b = t_ev + t1[0] + (len(t1[2]) - 1) * t1[1] + CAM_REACT["apres"]
+        ref = max((n for n, _ in SHOTS if START[n] / FPS <= t_ev), key=lambda n: START[n])
+        g_a, g_b = int(math.floor(a * FPS)), int(math.ceil(b * FPS))
+        raw, prev = [], None
+        for k in range(g_a * q - m, g_b * q + m + 1):
+            fr = k / q - START[ref] + 1.0
+            d = (_visee_exacte(ref, fr)[0] - _visee_exacte(ref, fr, glisse=False)[0] + 180.0) % 360.0 - 180.0
+            d = d if prev is None else prev + (d - prev + 180.0) % 360.0 - 180.0
+            prev = d
+            raw.append(d)
+        lis = [sum(wt * raw[i + j] for j, wt in zip(range(-m, m + 1), wts)) / sum(wts)
+               for i in range(m, len(raw) - m)]
+        x, v, out = lis[0], 0.0, []
+        n = len(lis)
+        nf = CAM_REACT["fondu"] * FPS * q
+        for i, d in enumerate(lis):
+            acc = w * w * (d - x) - 2.0 * CAM_REACT["zeta"] * w * v
+            v += acc * dt
+            x += v * dt
+            u = min(1.0, (n - 1 - i) / nf)
+            out.append(ev.get("reaction", CAM_REACT["gain"]) * (x - d) * u * u * (3.0 - 2.0 * u))
+        _REACT.append((g_a, out))
+    return _REACT
+
+
+def reaction(g):
+    """Le retard de l'opérateur sur la glisse (degrés de lacet à ajouter à la visée) à l'image globale g (décimale)."""
+    for g_a, out in _reaction_tables():
+        u = (g - g_a) * _VQ
+        if 0.0 <= u < len(out) - 1:
+            k = int(math.floor(u))
+            return out[k] + (out[k + 1] - out[k]) * (u - k)
+    return 0.0
 
 
 def visee(shot, frame):
@@ -462,6 +562,8 @@ def visee(shot, frame):
                 r = raw[max(0, min(len(raw) - 1, i + j))]
                 sy, sp, sw = sy + w * r[0], sp + w * r[1], sw + w
             tab.append((sy / sw, sp / sw))
+        g0 = START.get(shot, START["FIN6"]) - 1
+        tab = [(yw + reaction((g0 + 1.0 + k / _VQ)), pt) for k, (yw, pt) in zip(range(k0, k0 + len(tab)), tab)]
         _VISEE[shot] = (k0, tab)
     k0, tab = _VISEE[shot]
     u = (frame - 1.0) * _VQ - k0
