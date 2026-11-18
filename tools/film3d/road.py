@@ -472,11 +472,24 @@ def mat_paint_decal(st, name="road_paint"):
     m, N, out = S.material(name)
     P, _ = coords(N)
     d2 = tex(N, os.path.join(S.ASSETS, "asphalt_02", "disp_2k.png"), mapping(N, P, scale=(1 / 3.0,) * 3), color=False)
-    keep = paint_wear(N, P, d2, 0.0, None)
+    # usée comme au passage des roues partout (DECAL_USURE) et plus sombre (DECAL_CLAIR × le blanc de chaussée), le
+    # vernis d'eau un peu plus mat : au rond-point (148–160, l'étoile 2 du brouillon éclairé v9), sous le lampadaire
+    # proche, les bandes du passage piéton sortaient blanc pur sur le tiers bas du cadre et tiraient l'œil au sol
+    keep = paint_wear(N, P, d2, DECAL_USURE, None)
     geo = N.new("ShaderNodeNewGeometry").outputs["Normal"]
     n = bump(N, noise(N, P, 30.0, 3.0), geo, 0.15, 0.002)
-    wet_shader(N, out, paint_colour(N, P), 0.5, n, st["cr"][0] + 0.02, n, alpha=keep)
+    col = mix_mul(N, paint_colour(N, P), DECAL_CLAIR)
+    wet_shader(N, out, col, 0.55, n, st["cr"][0] + 0.08, n, alpha=keep)
     return m
+
+
+DECAL_USURE = 0.8            # la part d'usure des roues ajoutée partout (paint_wear : seuil + 0,11)
+DECAL_CLAIR = 0.62           # le blanc des bandes : 0,45 × 0,62 ≈ 0,28 d'albédo propre
+
+
+def mix_mul(N, col, k):
+    """La couleur `col` multipliée par le gris `k`."""
+    return N.mix(1.0, col, (k, k, k, 1), "MULTIPLY")
 
 
 # ---------------------------------------------------------------- cunette, bordure, trottoir

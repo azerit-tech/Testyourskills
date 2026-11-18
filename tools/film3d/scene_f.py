@@ -537,31 +537,39 @@ SEA_X = 46.0                 # le mur de promenade, au bout de la branche de la 
 AV_WALK = 4.0                # les trottoirs de l'avenue nord prolongée
 
 
-def place_building(protos, kind, x, y0, tint, n, srcs):
+def place_building(protos, kind, x, y0, tint, n, srcs, rot=0.0):
     """Un dessin de la scène A (façade vers +x au pied x, de y0 à y0 + W), ses accessoires et ses lumières de
-    boutique : la recette de scene_a.build_city, réduite à ce que la caméra basse voit."""
+    boutique : la recette de scene_a.build_city, réduite à ce que la caméra basse voit. `rot` (radians, autour de z) :
+    le dessin tourné autour de son pied (−π/2 : façade vers −y, de x à x + W)."""
     ob, props, lts, spec = protos[kind]
-    inst = A.instance(ob, f"{ob.name}_n{n}", (x, y0, 0))
+    inst = A.instance(ob, f"{ob.name}_n{n}", (x, y0, 0), rot)
     inst.color = (*lin(tint)[:3], 1)
-    for j, (pk, (px, py, pz), rot, s) in enumerate(props):
+    c, s_ = math.cos(rot), math.sin(rot)
+
+    def at(px, py, pz):
+        return (x + c * px - s_ * py, y0 + s_ * px + c * py, pz)
+
+    def turn(d):
+        return (c * d[0] - s_ * d[1], s_ * d[0] + c * d[1], d[2])
+    for j, (pk, (px, py, pz), r, s) in enumerate(props):
         src = random.choice(srcs["ac"]) if pk == "ac" else srcs["tank"] if pk == "tank" else bpy.data.objects.get(pk)
         if src is not None:
-            A.instance(src, f"{pk}_n{n}_{j}", (x + px, y0 + py, pz), rot, s)
+            A.instance(src, f"{pk}_n{n}_{j}", at(px, py, pz), r + rot, s)
     warm = lin("#ffd9a8")
     for j, (lk, (lx, ly, lz), w) in enumerate(lts):
-        loc = (x + lx, y0 + ly, lz)
+        loc = at(lx, ly, lz)
         if lk == "shop":
-            A.add_light(f"shop_n{n}_{j}", "AREA", loc, (1, 0, -0.35), lin("#ffcf96"), 90.0 * w / 3, (w, 2.2))
+            A.add_light(f"shop_n{n}_{j}", "AREA", loc, turn((1, 0, -0.35)), lin("#ffcf96"), 90.0 * w / 3, (w, 2.2))
         elif lk == "canopy":
-            A.add_light(f"canopy_n{n}_{j}", "AREA", loc, (0.2, 0, -1), warm, 260.0, (w, 2.2))
+            A.add_light(f"canopy_n{n}_{j}", "AREA", loc, turn((0.2, 0, -1)), warm, 260.0, (w, 2.2))
         elif lk == "wash":
-            A.add_light(f"wash_n{n}_{j}", "SPOT", loc, (-1.5, 0, 2.2), warm, 1800.0, spot=75)
+            A.add_light(f"wash_n{n}_{j}", "SPOT", loc, turn((-1.5, 0, 2.2)), warm, 1800.0, spot=75)
         elif lk == "blade":
-            A.add_light(f"blade_n{n}_{j}", "SPOT", loc, (-0.35, 0, 1), warm, 900.0, spot=28)
+            A.add_light(f"blade_n{n}_{j}", "SPOT", loc, turn((-0.35, 0, 1)), warm, 900.0, spot=28)
         elif lk == "light":
             Ld = dict(kind="POINT", direction=(0, 0, -1), color="#ffd9a8", energy=100.0, size=(0.2, 0.2), spot=60.0)
             Ld.update(w)
-            lo = A.add_light(f"fl_n{n}_{j}", Ld["kind"], loc, Ld["direction"], lin(Ld["color"]), Ld["energy"],
+            lo = A.add_light(f"fl_n{n}_{j}", Ld["kind"], loc, turn(Ld["direction"]), lin(Ld["color"]), Ld["energy"],
                              Ld["size"], Ld["spot"])
             if Ld.get("hide"):
                 lo.visible_camera = lo.visible_glossy = lo.visible_transmission = False
@@ -569,10 +577,47 @@ def place_building(protos, kind, x, y0, tint, n, srcs):
         # les façades éclairées du pied (comme sur l'avenue) : sans elles, des blocs noirs au fond du cadre
         yy, zl = 1.5, (spec.get("gf_h", 4.2) + 0.1 if spec.get("gf", "shops") == "shops" else 0.2)
         while yy < spec["W"] - 1:
-            A.add_light(f"up_n{n}_{int(yy)}", "SPOT", (x + 0.45, y0 + yy, zl), (-0.16, 0, 1), lin("#ffe2bf"),
+            A.add_light(f"up_n{n}_{int(yy)}", "SPOT", at(0.45, yy, zl), turn((-0.16, 0, 1)), lin("#ffe2bf"),
                         700.0 if spec.get("uplight") else 380.0, spot=60)
             yy += 4.0
     return spec["W"]
+
+
+# L'angle de la place (brouillon éclairé v9, SPEC §18.63) : le premier immeuble de l'avenue nord (l'Art déco d'angle,
+# façade vers l'avenue) tourne vers le rond-point son mur sud, aveugle, 16 m sur quatre niveaux ; vu de l'avenue
+# (108–130, à gauche) puis de l'anneau (150–190, à droite de l'immeuble vert de la rue), c'était un grand volume mauve
+# sans fenêtre ni enseigne, au moment du premier dérapage. Un petit hôtel de l'avenue (son dessin, ses boutiques,
+# son pylône HOTEL, ses fenêtres allumées) y est posé, façade vers la place, 8 cm devant ce mur, son corps dans
+# l'immeuble : le mur aveugle ne se voit plus.
+ANGLE_KEY = "angle_place"
+ANGLE_W, ANGLE_FLOORS = 15.5, 4         # dans les 16 m du mur (0,25 m de retrait à chaque bout), sa hauteur
+ANGLE_GAP = 0.08                        # devant le mur sud
+ANGLE_TINT = "#f6d2b0"                  # un abricot pâle : distinct du rose de l'Art déco et du vert de la rue
+
+
+def angle_place(M, protos, srcs, x_front, y_wall, hidden):
+    """Pose l'hôtel d'angle devant le mur sud du premier immeuble de l'avenue nord (façade en x_front, mur en
+    y_wall), façade vers −y. Le hasard commun est gardé : rien d'autre du rond-point ne bouge."""
+    import facade_b
+    import facade_mix
+    keep = random.getstate()
+    deco_d = protos["deco"][3]["D"]
+    spec = dict(protos["hotel"][3])
+    spec.pop("own_uplights", None)
+    spec.update(W=ANGLE_W, floors=ANGLE_FLOORS, nshops=2)
+    facade_mix.PLAN[ANGLE_KEY] = dict(bays=["bar", "lobby"], words={0: ("BAR", "amber")}, open=0, awn={0: 3},
+                                      vacancy=True, wash="#ffe2c4")
+    facade_b.STYLE[ANGLE_KEY] = dict(facade_b.STYLE["hotel"])
+    ob, props, lights = A._maker()(ANGLE_KEY, M, spec)
+    for c in list(ob.users_collection):
+        c.objects.unlink(ob)
+    hidden.objects.link(ob)
+    protos[ANGLE_KEY] = (ob, props, lights, spec)
+    x0 = x_front - deco_d + (deco_d - ANGLE_W) / 2
+    place_building(protos, ANGLE_KEY, x0, y_wall - ANGLE_GAP, ANGLE_TINT, "angle", srcs, rot=-math.pi / 2)
+    random.setstate(keep)
+    log(f"angle de la place : hôtel de {ANGLE_W:g} m sur {ANGLE_FLOORS} niveaux devant le mur sud de l'Art déco "
+        f"(x {x0:.1f} à {x0 + ANGLE_W:.1f}, y {y_wall - ANGLE_GAP:.2f}), {len(props)} accessoires, {len(lights)} lumières")
 
 
 def build_backdrop(hidden):
@@ -618,6 +663,7 @@ def build_backdrop(hidden):
         k = seq[n] if n < len(seq) else rng.choice([kk for kk in protos if kk != "motel"])
         y += place_building(protos, k, -kx - AV_WALK, y, pastels[n % len(pastels)], n, srcs) + rng.choice((0.0, 2.0, 5.0))
         n += 1
+    angle_place(M, protos, srcs, -kx - AV_WALK, 24.0, hidden)
     # --- palmiers royaux côté mer et le long de la promenade, lampadaires des deux côtés
     royal = A.royal_source(hidden)
     sc = 12.0 / max(royal.dimensions.z, 0.1)
