@@ -1103,6 +1103,11 @@ def drive(route, speed, t0=0.0, stop=False, kind="hero", drift=1.0, ease=None, l
     # du centre réel et la caisse le devance exactement de la glisse dessinée ; la vitesse le long de la route (v)
     # reste celle qui règle le temps.
     q = float(L.get("pivot", 0.0))
+    # lim["voie"] (SPEC §18.62) : l'écart latéral (m, positif à gauche) de la trajectoire voulue à la route, fonction de
+    # l'abscisse s (parcours.voie : le slalom dans la circulation). Il s'ajoute à l'écart du pivot ; la vitesse le long
+    # de la route, donc le temps, les raccords et les étoiles, ne bougent pas ; le cap de la vitesse et le braquage en
+    # découlent (différences sur les positions), la caisse aussi (sample) : aucun lacet dessiné.
+    voie = L.get("voie")
     for k in range(N):
         x, y, trav, kap = geo[k]
         h = math.radians(trav)
@@ -1120,7 +1125,7 @@ def drive(route, speed, t0=0.0, stop=False, kind="hero", drift=1.0, ease=None, l
         tab["head"].append(hd)
         tab["along"].append(along[k])
         tab["alat"].append(alat[k])
-    if q:
+    if q or voie:
         # les constantes du filtre : celles de LIM, ou celles du dérapage le plus proche (ev["pivot_tau"] : attaque,
         # relâché ; ev["pivot_smooth"]) : au rond-point la berline doit avoir rejoint sa voie avant les plots de P3,
         # au port elle la rejoint sans hâte
@@ -1146,7 +1151,7 @@ def drive(route, speed, t0=0.0, stop=False, kind="hero", drift=1.0, ease=None, l
             # puis saute à l'arrêt
             fade = 1.0 - smoothstep(near[0] + _end(near[1]) + 1.0, near[0] + _end(near[1]) + 4.0, grid[k]) \
                 if near and grid[k] > near[0] else 1.0
-            drift_off.append(d2 * fade)
+            drift_off.append(d2 * fade * (1.0 if q else 0.0) + (voie(st[k]) if voie else 0.0))
         X, Y = tab["x"], tab["y"]
         moved = [k for k in range(N) if abs(drift_off[k]) > 1e-5]
         for k in moved:
