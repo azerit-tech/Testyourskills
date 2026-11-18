@@ -698,7 +698,9 @@ def mat_tyre(name, r_rim=0.19, r_out=0.31, wear=0.0, wet=WET_TREAD, white=None):
 # couchée vers le ciel, elle en renvoyait un aplat clair où la silhouette du conducteur se perdait ; et sans gouttes
 # ni voile d'essuyage, qui la ternissaient en gris devant l'habitacle
 REAR_WINDOW = "lunette"
-REAR_REFL_CUT = 0.6
+# 0,6 jusqu'au 18 novembre ; avec le reflet étalé du verre mouillé (GLASS_ROUGH_REAR), 0,7 : à 0,6 la lunette entière
+# prenait un voile ambre sous les lampes de la jetée (rendus d'après, P6/47)
+REAR_REFL_CUT = 0.7
 # Le verre après la pluie (SPEC §18.66). Un verre lisse (rugosité 0) renvoyait chaque lampadaire en image nette : sur
 # la jetée, la tête de chaque lampe qui passe au-dessus de la berline traversait la lunette en tache blanc pur
 # (brouillon éclairé v9, images 531–534, 560–564, 586–588, 612). Le reflet d'une petite source de luminance L et
@@ -714,7 +716,7 @@ GLASS_REFL_TINT = (0.78, 0.84, 0.82, 1.0)
 # vitre) ; l'eau chasse la poussière vers les joints, elle y sèche en voile mat (un peu de diffus, GLASS_DUST au plus)
 EDGE = "bord"
 GLASS_EDGE = 0.07
-GLASS_DUST = 0.22
+GLASS_DUST = 0.12       # 0,22 d'abord : une bande claire au bas et sur le côté de la lunette sous l'ambre (banc, coffre)
 
 
 def mat_window(name, tint=(0.80, 0.86, 0.84, 1), dark=0.0, wear=0.0):
@@ -1064,7 +1066,11 @@ def mat_plate(name="hero_plate"):
 PLATE_NUMBER = "KZL 417"
 PLATE_BLACK = "#0c0c0d"
 PLATE_YELLOW = "#b08d22"     # jaune de plaque passé (albédo 0,28) : lisible sous sa lampe, jamais une étiquette claire
-PLATE_LAMP_W = 0.8           # W, les deux ampoules de 5 W de l'éclaireur de plaque, à l'échelle des feux (TAIL_W)
+# W, les deux ampoules de 5 W de l'éclaireur de plaque, à l'échelle des feux (TAIL_W). 0,8 W sans cône d'abord : une
+# tache rouge vif sur la tôle au-dessus de la plaque, sous la poignée (banc, coffre) ; le boîtier réel ne laisse
+# sortir la lumière que vers le bas : un cône de PLATE_LAMP_SPREAD degrés, au ras du bord de la plaque
+PLATE_LAMP_W = 0.35
+PLATE_LAMP_SPREAD = 100.0
 PLATE_LAMP_COLOR = "#ffb062"  # incandescence, 2 700 K
 
 
@@ -1182,8 +1188,9 @@ def plate_lamp(body, plate, energy=PLATE_LAMP_W):
     d.color = lin(PLATE_LAMP_COLOR)[:3]
     lo = bpy.data.objects.new(d.name, d)
     body.users_collection[0].objects.link(lo)
-    top = Vector((mn.x - 0.045, (mn.y + mx.y) / 2, mx.z + 0.03))
-    aim = Vector((mn.x, (mn.y + mx.y) / 2, (mn.z + mx.z) / 2 + 0.01))
+    d.spread = math.radians(PLATE_LAMP_SPREAD)
+    top = Vector((mn.x - 0.035, (mn.y + mx.y) / 2, mx.z + 0.008))
+    aim = Vector((mn.x, (mn.y + mx.y) / 2, (mn.z + mx.z) / 2 - 0.01))
     # la longueur de la nappe (son x local) le long de la plaque (y de la voiture)
     lo.matrix_world = Matrix.Translation(top) @ (aim - top).normalized().to_track_quat("-Z", "Y").to_matrix().to_4x4()
     cv.parent_keep(lo, body)

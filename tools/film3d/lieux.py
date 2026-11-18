@@ -1648,7 +1648,11 @@ def cabin_light(root, energy=6.0, color="#ffcf9a", dash=60.0, dash_color="#ffb07
     ob = bpy.data.objects.new(d.name, d)
     bpy.context.scene.collection.objects.link(ob)
     ob.parent = body
-    ob.location = (0.15, -0.72, 1.08)
+    # le plafonnier, au milieu du pavillon derrière le pare-brise. Jusqu'au 18 novembre la lampe était une lampe de
+    # lecture à (0,15 ; -0,72 ; 1,08), à 30 cm du volant : les gants en sortaient blanc pur, vus de dos par la
+    # lunette comme de face (banc, conducteur). D'ici les mains reçoivent trois fois moins, le pavillon et le haut
+    # des sièges autant (SPEC §18.66)
+    ob.location = (0.0, -0.45, 1.26)
     ob.visible_camera = ob.visible_glossy = ob.visible_transmission = False
     if dash:
         a = bpy.data.lights.new("hero_planche", "AREA")
