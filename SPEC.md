@@ -2149,3 +2149,7 @@ Verdict de Jacques sur le site en ligne : « trop d'info, trop de justification,
 - **Replié** : « Voici comment Azerit te lit » devient le pli « Comment c'est noté » (« How it's scored »), fermé, le premier des plis, pour la personne fichée comme pour le visiteur : la ligne du recruteur, les tuiles, « Le détail, critère par critère » replié dedans, la mention « Un jeu… ». « À ton tour » ne parle plus de « ces huit critères ».
 - **Gardé** : la rangée du partage entière (Partager, Partager sur LinkedIn, Ajouter à mon profil LinkedIn, Copier le lien, Image, Story) et le rang de la semaine qui flatte ; les bandes, la dénonciation, la course aux primes ; la source qui manque (elle fait monter la note) ; le vote du jury ; les plis d'action (verrouiller, CV, email, faire appel et supprimer).
 - Page de la personne fichée à 390 px : environ 3 980 px de haut avant, 2 830 après ; celle du visiteur, 2 650 avant, 1 870 après.
+
+### 18.77 Le titre de l'attente (18 novembre 2026)
+
+Demandé par Jacques : sous la marque, l'attente dit « Découvre à quel point ton profil est recherché. » (« See how in-demand your profile is. ») au lieu de « Un dossier s'ouvre. Le tien. ». Deux lignes à 390 px, en français comme en anglais ; le pari « Tu plaides combien d'étoiles ? » reste dans l'écran (son bas à 500 px sur 844).

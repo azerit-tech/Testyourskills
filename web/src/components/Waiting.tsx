@@ -1,6 +1,6 @@
 // Attente (§18.27, §18.48) : la photo d'identité. Sur un fond d'encre plat, un
-// groupe centré dans la hauteur : la marque et le titre (« Un dossier s'ouvre.
-// Le tien. »), le cadre de la fiche (toise et plaque, Mugshot.tsx) avec l'avatar
+// groupe centré dans la hauteur : la marque et le titre (« Découvre à quel point
+// ton profil est recherché. »), le cadre de la fiche (toise et plaque, Mugshot.tsx) avec l'avatar
 // du pseudo dès la première seconde, le pari (« Tu plaides combien d'étoiles ? »,
 // Plea.tsx), puis la pile des pièces. En bas, à une place fixe, la barre qui
 // avance sur la durée estimée et, dessous, une ligne sur deux rangs réservés :

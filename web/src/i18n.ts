@@ -174,7 +174,7 @@ const fr = frTypoDeep({
   tierCard: (level: string) => `Fiche ${level}`,
   waiting: {
     /** Le titre de l'attente, sous la marque, au-dessus de la photo d'identité. */
-    title: "Un dossier s'ouvre. Le tien.",
+    title: "Découvre à quel point ton profil est recherché.",
     /** L'enquête en direct (§18.26) : le numéro de la trouvaille versée au dossier. */
     piece: (n: number) => `Pièce ${String(n).padStart(2, "0")}`,
     /** La plaque de l'attente par la porte CV, tant que le nom n'est pas lu. */
@@ -1008,7 +1008,7 @@ const en: Dict = {
   },
   tierCard: (level) => `${level} sheet`,
   waiting: {
-    title: "A file just opened. Yours.",
+    title: "See how in-demand your profile is.",
     piece: (n) => `Exhibit ${String(n).padStart(2, "0")}`,
     yourCv: "Your résumé",
     queue: (n) => (n === 1 ? "1 sheet ahead of you at the station" : `${n} sheets ahead of you at the station`),
