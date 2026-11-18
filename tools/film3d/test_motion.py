@@ -1754,7 +1754,7 @@ def test_cut_p4_p5_beam():
 
 def test_projo_tache():
     """Le projecteur de l'appareil 0 (brouillon éclairé v9, critique n° 2) : son pinceau garde la même force de P5 à
-    la fin de FIN6 ; sa tache au sol (helicos.tache) fait TACHE_E W/m² au centre et 10 à 12 m de diamètre au bord
+    la fin de FIN6 ; sa tache au sol (helicos.tache) fait TACHE_E W/m² au centre et 12 à 14 m de diamètre au bord
     quelle que soit la distance ; elle ne saute à aucune coupe (P5 → P6, P6 → FIN6 : la cible et la distance de
     l'appareil, dans le repère de la ville, continues) ; à l'arrêt de FIN6, elle est sur elle ; scene_d.projo_tache
     est posée dans P5, P6 et FIN6."""
@@ -1764,7 +1764,7 @@ def test_projo_tache():
     w5 = H.beam0(H.T5, 0.0006)
     w9 = H.beam0(PC.t_of("FIN6", F6.F0 + F6.FRAMES - 1), 0.0006)
     d_ok = all(abs(H.tache(d)[0] / (4 * math.pi * d * d) - H.TACHE_E) < 1e-9
-               and 10.0 <= 2 * d * math.tan(math.radians(H.tache(d)[1] / 2)) <= 12.0 + 1e-6 for d in (35.0, 60.0, 90.0))
+               and 12.0 <= 2 * d * math.tan(math.radians(H.tache(d)[1] / 2)) <= 14.0 + 1e-6 for d in (35.0, 60.0, 90.0))
 
     def at(shot, f):
         t = M.t_of(f)

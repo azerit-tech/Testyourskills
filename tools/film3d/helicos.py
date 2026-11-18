@@ -398,7 +398,8 @@ def beam(i, T):
 # - il descend jusqu'au sol : un cône étroit (BEAM0_CONE) sur une source large (BEAM0_SOURCE) fait un faisceau presque
 #   parallèle. Sa clarté dans la brume va comme 1 / sa largeur : de 0,24 m de source et 5°, elle tombait de 11 fois de
 #   l'appareil au sol ; de 0,9 m et 3,5°, de 3,5 fois (l'appareil est aussi plus près, 50 à 60 m au lieu de 85) ;
-# - sa tache au sol (TACHE_*, scene_d.projo_tache) : bornée, 12 m de diamètre au bord, bord doux, centrée sur sa
+# - sa tache au sol (TACHE_*, scene_d.projo_tache) : bornée, 14 m de diamètre au bord, fondue du centre au bord (on
+#   en voit 9 à 10 m), centrée sur sa
 #   cible (sur elle), à TACHE_E W/m² quelle que soit la distance de l'appareil (puissance ∝ d², ouverture recalée à
 #   chaque image) ; elle éclaire tout sauf la berline, voisins compris ; la berline reçoit sa propre jumelle
 #   (BERLINE_E W/m², la même règle) ; le reste du terre-plein reste au crépuscule (scene_e.MATS_CREPUSCULE).
@@ -408,8 +409,11 @@ BEAM0_SOL, BEAM0_BERLINE = 8000.0, 5.0e4    # (les jumelles d'avant, gardées po
 BEAM0_FIN = 8000.0                  # la lampe propre des appareils de la jetée (helis_P6_light) ; le reste en jumelle
 BEAM0_CONE = (3.5, 3.5)
 BEAM0_SOURCE = (0.45, 0.4)          # la lampe de brume : rayon de la source (m), bord du cône
-TACHE_E, TACHE_R, TACHE_BLEND, TACHE_SOURCE = 2.5, 6.0, 0.7, 0.45   # W/m², m (rayon au bord), bord, m
-BERLINE_E = 0.6                     # W/m² sur la berline (50 kW à 85 m : ce que P5 lui donnait, ni rose ni brûlée)
+# (brouillon éclairé lumiere-fin, P6/25 et P5/45 : à 0,6 W/m², le toit et le coffre sortaient orange presque blanc,
+# le rouge écrêté, et la tache, fondue sur 70 % seulement, avait un bord dur : la berline à 0,3 W/m², la tache
+# fondue sur tout son cône, plus large, d'une source de 1,2 m)
+TACHE_E, TACHE_R, TACHE_BLEND, TACHE_SOURCE = 2.5, 7.0, 1.0, 1.2    # W/m², m (rayon au bord), bord, m
+BERLINE_E = 0.3                     # W/m² sur la berline : sa peinture garde son rouge sous le faisceau
 
 
 def beam0(T, density):
