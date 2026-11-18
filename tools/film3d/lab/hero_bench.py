@@ -60,6 +60,9 @@ def _args():
     ap.add_argument("--stop", type=float, default=0.0, help="les feux stop (propriété « stop » de la caisse, 0 à 1)")
     ap.add_argument("--fill", default="", help="la source de face de lieux.car_fill (P4) : on, ou noglossy "
                                                "(invisible aux reflets)")
+    ap.add_argument("--engine", default="cycles", help="cycles (le banc de référence, sur la machine louée) ou eevee : "
+                    "un contrôle de pose sur le Mac (teintes des feux sous AgX, plaque, gants) ; ni reflets ni "
+                    "transparences justes, on n'y juge aucune matière")
     ap.add_argument("--compose", default="", help="planche : chemin de sortie, puis les images")
     ap.add_argument("--cols", type=int, default=4)
     ap.add_argument("--cell", default="360x640")
@@ -329,6 +332,16 @@ def build(a):
     scene = bpy.context.scene
     A.render_settings(scene)
     dev = _gpu(scene)
+    if a.engine == "eevee":
+        for name in ("BLENDER_EEVEE", "BLENDER_EEVEE_NEXT"):
+            try:
+                scene.render.engine = name
+                break
+            except TypeError:
+                continue
+        dev = scene.render.engine
+        if hasattr(scene, "eevee"):
+            scene.eevee.taa_render_samples = max(1, a.samples)
     w, h = (int(v) for v in a.res.split("x"))
     scene.render.resolution_x, scene.render.resolution_y = w, h
     scene.cycles.samples = a.samples
