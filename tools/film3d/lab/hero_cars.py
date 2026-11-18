@@ -62,7 +62,9 @@ def usure():
 # couleurs d'époque, choisies sur les nuanciers des photographies : foncées, lisibles à l'heure bleue,
 # distinctes de la patrouille (marine presque noir) et du coupé actuel (prune)
 PAINT = {
-    "w111": "#4e0a18",  # bordeaux profond (rouge rubis foncé du catalogue des années 60), une seule peinture pour
+    "w111": "#460815",  # la même teinte à 0,8 de sa clarté (#4e0a18 jusqu'au 18 novembre) : la peinture unie, sans
+                        # part métallique, renvoie en diffus un quart de lumière de plus (SPEC §18.66). Avant :
+                        # bordeaux profond (rouge rubis foncé du catalogue des années 60), une seule peinture pour
                         # tout le film (lumière v3.1) : la teinte de la rue de P3 (348°, moins de bleu, le plan où
                         # elle était la plus juste) à la clarté d'avant ; #4e0a28 (333°) virait au fuchsia sous le
                         # crème et le froid, et P3 et P4 avaient la leur (#3c0812). Albédo relevé (rouge linéaire
@@ -73,8 +75,14 @@ PAINT = {
                         # pour ne pas virer à l'olive sous les lampadaires ambre
 }
 # la part métallique de la base de la berline (moins que la peinture par défaut : la part diffuse garde le rouge ;
-# 0,38 d'abord, la caisse ne renvoyait que son environnement)
-PAINT_METAL = {"w111": 0.2}
+# 0,38 d'abord, la caisse ne renvoyait que son environnement ; 0,2 jusqu'au 18 novembre).
+# 0 : un rouge uni des années 60 (SPEC §18.66). Les laques de l'époque sont des teintes unies, sans paillettes : un
+# pigment dans une résine, une seule interface brillante. À 0 la base n'a ni métal ni reflet propre (elle n'est que
+# le pigment, diffus) et tout le brillant vient de la couche du dessus (Coat : IOR 1,5 des résines alkydes et
+# acryliques, rugosité 0,03 d'une laque lustrée). La base à paillettes ajoutait sous cette couche un second reflet
+# large (rugosité 0,3) qui prenait la couleur de chaque lampe : un voile clair sur le rouge.
+# FILM3D_PAINT_METAL=0.2 FILM3D_PAINT=4e0a18 rend la peinture d'avant, pour comparer au banc.
+PAINT_METAL = {"w111": 0.0}
 
 
 def w111_paint():
@@ -457,19 +465,25 @@ def _mat_paint_worn(name, color, metal, rough, flake, peel, w, axles, coat=(1.0,
     m, nt, out = cv._mat(name)
     rest = _rest(nt)
     up = _up(nt)
+    solid = metal <= 0.0           # la teinte unie : ni paillettes ni reflet de la base (voir PAINT_METAL)
     # la base : paillettes comme la peinture neuve
     fl = _node(nt, "ShaderNodeTexNoise", Vector=rest, Scale=2600.0, Detail=0.0)
     base_r = _node(nt, "ShaderNodeMapRange", Value=fl.outputs["Fac"], **{"To Min": rough - flake, "To Max": rough + flake})
-    mm = _node(nt, "ShaderNodeMapRange", Value=fl.outputs["Fac"], **{"To Min": metal - 0.25, "To Max": metal + 0.25})
+    mm = None if solid else _node(nt, "ShaderNodeMapRange", Value=fl.outputs["Fac"],
+                                  **{"To Min": metal - 0.25, "To Max": metal + 0.25})
     # le vernis : rugosité qui varie par zones (lustré ici, un peu terne là), micro-rayures circulaires, taches d'eau
     # séchée sur le dessus
     zones = _noise(nt, rest, 1.3, 2.0)
     swirl = _swirls(nt, rest)
     spots = _imperfection(nt, rest, "SurfaceImperfections013", 0.45, 0.08, 0.6)
-    coat_r = cv._math(nt, "ADD", 0.022, cv._math(nt, "MULTIPLY", w, cv._math(
-        nt, "ADD", cv._math(nt, "MULTIPLY", zones, 0.09),
-        cv._math(nt, "ADD", cv._math(nt, "MULTIPLY", swirl, 0.25),
-                 cv._math(nt, "MULTIPLY", cv._math(nt, "MULTIPLY", spots, up), 0.12)))))
+    haze = cv._math(nt, "ADD", cv._math(nt, "MULTIPLY", zones, 0.09),
+                    cv._math(nt, "ADD", cv._math(nt, "MULTIPLY", swirl, 0.25),
+                             cv._math(nt, "MULTIPLY", cv._math(nt, "MULTIPLY", spots, up), 0.12)))
+    if solid:
+        # un soir de pluie : le dessus (toit, capot, coffre) est mouillé, lavé de son voile ; les flancs gardent le
+        # leur (zones ternes, micro-rayures du lustrage). 0,03 : la laque lustrée ; 0,022 : le vernis d'avant
+        haze = cv._math(nt, "MULTIPLY", haze, cv._math(nt, "SUBTRACT", 1.0, cv._math(nt, "MULTIPLY", up, 0.65)))
+    coat_r = cv._math(nt, "ADD", 0.03 if solid else 0.022, cv._math(nt, "MULTIPLY", w, haze))
     # le voile de route en bas de caisse : la poussière ternit le vernis et éclaircit la teinte
     g = cv._math(nt, "MINIMUM", cv._math(nt, "MULTIPLY", _grime(nt, rest, axles), 2.0 * w), 0.8)
     coat_r = _mix(nt, coat_r, 0.42, g)
@@ -496,7 +510,12 @@ def _mat_paint_worn(name, color, metal, rough, flake, peel, w, axles, coat=(1.0,
         p.inputs["Coat Tint"].default_value = (*tint[:3], 1.0)
     nt.links.new(base_col, p.inputs["Base Color"])
     nt.links.new(cv._math(nt, "ADD", base_r.outputs[0], cv._math(nt, "MULTIPLY", g, 0.4)), p.inputs["Roughness"])
-    nt.links.new(mm.outputs[0], p.inputs["Metallic"])
+    if solid:
+        p.inputs["Metallic"].default_value = 0.0
+        # la base n'est que le pigment ; sous la crasse (là où la couche brillante s'efface) elle garde un reflet mat
+        nt.links.new(cv._math(nt, "MULTIPLY", g, 0.5), p.inputs["Specular IOR Level"])
+    else:
+        nt.links.new(mm.outputs[0], p.inputs["Metallic"])
     if coat[1] > 0.0:
         coat_r = cv._math(nt, "ADD", coat_r, coat[1])
     nt.links.new(coat_r, p.inputs["Coat Roughness"])
