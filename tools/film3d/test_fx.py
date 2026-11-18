@@ -234,6 +234,52 @@ def test_particle_at():
     assert q.at(9) is None and q.at(10)[1] == 0.0 and q.at(10 + 0.5 * fx.FPS + 1) is None
 
 
+def test_drift_spray():
+    """L'eau du dérapage : rien sans glisse ; en glisse, la lame chassée du côté où glisse le pneu arrière, sous
+    1,2 m, retombée en 0,7 s ; la brume plus lente, 1,6 m au plus, éteinte en 0,9 s ; jamais sous le sol."""
+    none = fx.drift_spray(line_track(20.0, n=30), R, seed=3)
+    assert not none[0] and not none[1]
+    tr = line_track(20.0, n=30, slip_deg=20.0)
+    d, m = fx.drift_spray(tr, R, seed=3)
+    assert len(d) > 300 and len(m) > 10, (len(d), len(m))
+    # la caisse tournée à gauche de sa vitesse (+y) : les pneus arrière glissent vers +x (sa droite)
+    p = tr[10]
+    slide = 1.0 if fx._dot((0.0, 20.0, 0.0), p.right) >= 0 else -1.0
+    assert sum(1 for q in d if (q.v[0] * p.right[0] + q.v[1] * p.right[1]) * slide > 0) > 0.95 * len(d)
+    for q in d[::5]:
+        top = max(fx.ballistic(q.p, q.v, t / 96, q.drag)[2] for t in range(int(q.life * 96) + 1))
+        assert top < 1.2 and q.life <= 0.7 + 1e-9 and fx.ballistic(q.p, q.v, q.life, q.drag)[2] > -0.02, (top, q.life)
+    assert all(q.size1 <= 1.6 + 1e-9 and q.life <= 0.9 + 1e-9 for q in m)
+    assert all(fx.ballistic(q.p, q.v, q.life, q.drag, q.grav)[2] > -0.02 for q in m)
+    # à 40 km/h (le port) : éteinte avant le bras commun, à 7,5 m derrière le centre (la caméra ne la traverse pas)
+    tr = line_track(11.0, n=40, slip_deg=25.0)
+    d, m = fx.drift_spray(tr, R, seed=3)
+    for L, med, p90 in ((d, 5.0, 6.0), (m, 7.0, 8.5)):
+        b = sorted(11.0 * (q.birth / fx.FPS + q.life) - fx.ballistic(q.p, q.v, q.life, q.drag, q.grav)[1]
+                   for q in L if 8 < q.birth < 30)
+        assert b[len(b) // 2] < med and b[int(len(b) * 0.9)] < p90, (b[len(b) // 2], b[int(len(b) * 0.9)])
+
+
+def test_drift_continuity():
+    """Les gouttes nées avant une coupe vivent après : deux tronçons du parcours (P5 et P6) qui se suivent tirent les
+    mêmes, au même endroit de la ville."""
+    import parcours as PC
+    out = {}
+    for shot in ("P5", "P6"):
+        h = PC.hero(shot)
+        g0 = PC.START[shot] - 1
+        lo = 486 - 30 - g0
+        offs = {n: (a, b, R) for n, a, b in WHEELS}
+        tr = fx.drive_track(h["pos"], h["heading"], range(lo - 1, 486 - g0 + 2), offs)
+        d, m = fx.drift_spray(tr, R, g0=g0, seed=7, frames=(lo, 486 - g0))
+        to_v = PC.vers_ville(shot)[0]
+        out[shot] = sorted((round(q.birth + g0, 4), tuple(round(c, 3) for c in to_v(*q.p[:2]))) for q in d + m
+                           if q.birth + g0 < 485.0)
+    a, b = out["P5"], out["P6"]
+    assert len(a) > 100 and len(a) == len(b), (len(a), len(b))
+    assert all(x[0] == y[0] and math.dist(x[1], y[1]) < 2e-3 for x, y in zip(a, b))
+
+
 def test_switch():
     os.environ.pop("FILM3D_FX", None)
     assert not fx.enabled() and fx.dress("P3") is None          # inactif par défaut
@@ -244,6 +290,11 @@ def test_switch():
     assert fx.enabled("eau") and not fx.enabled("gomme")
     del os.environ["FILM3D_FX_ONLY"]
     assert fx.enabled("gomme")
+    # par plan : ceux dont la bande est validée
+    os.environ["FILM3D_FX"] = "P2,P3,P5,P6"
+    assert fx.enabled("derapage", plan="P5") and fx.enabled(plan="p2") and not fx.enabled(plan="P4")
+    assert not fx.enabled("eau") or fx._PLAN[0] in ("P2", "P3", "P5", "P6")
+    del os.environ["FILM3D_FX"]
 
 
 if __name__ == "__main__":
