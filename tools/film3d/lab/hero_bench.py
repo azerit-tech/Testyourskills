@@ -60,6 +60,9 @@ def _args():
     ap.add_argument("--stop", type=float, default=0.0, help="les feux stop (propriété « stop » de la caisse, 0 à 1)")
     ap.add_argument("--fill", default="", help="la source de face de lieux.car_fill (P4) : on, ou noglossy "
                                                "(invisible aux reflets)")
+    ap.add_argument("--engine", default="cycles", help="cycles (le banc de référence, sur la machine louée) ou eevee : "
+                    "un contrôle de pose sur le Mac (teintes des feux sous AgX, plaque, gants) ; ni reflets ni "
+                    "transparences justes, on n'y juge aucune matière")
     ap.add_argument("--compose", default="", help="planche : chemin de sortie, puis les images")
     ap.add_argument("--cols", type=int, default=4)
     ap.add_argument("--cell", default="360x640")
@@ -197,6 +200,23 @@ def lighting(kind):
         raise SystemExit(f"éclairage inconnu {kind}")
 
 
+def searchlight_off_glass(car):
+    """Le projecteur du banc n'éclaire pas les vitres, comme dans le film : scene_d.split_for_car exclut la berline
+    entière de chaque source séparée et sa jumelle n'éclaire que la caisse sans les vitres (propriété « vitre »).
+    Sans cela la lunette du banc blanchissait en entier sous 1,2 MW, ce que le film ne montre pas."""
+    import bpy
+    lamp = bpy.data.objects.get("bench_searchlight")
+    glass = [o for o in [car, *car.children_recursive] if o.type == "MESH" and o.get("vitre")]
+    if lamp is None or not glass:
+        return
+    col = bpy.data.collections.new("bench_projecteur_sans")
+    for o in glass:
+        col.objects.link(o)
+    for co in col.collection_objects:
+        co.light_linking.link_state = "EXCLUDE"
+    lamp.light_linking.receiver_collection = col
+
+
 def car_fill(car, glossy=True, loc=(0.4, -8.0, 2.2), energy=500.0, size=4.0):
     """La source douce de face de lieux.car_fill (P4 : 500 W, disque de 4 m, 8 m devant, 2,2 m de haut), liée à la
     seule voiture, invisible à la caméra ; glossy=False la retire aussi des reflets."""
@@ -329,6 +349,16 @@ def build(a):
     scene = bpy.context.scene
     A.render_settings(scene)
     dev = _gpu(scene)
+    if a.engine == "eevee":
+        for name in ("BLENDER_EEVEE", "BLENDER_EEVEE_NEXT"):
+            try:
+                scene.render.engine = name
+                break
+            except TypeError:
+                continue
+        dev = scene.render.engine
+        if hasattr(scene, "eevee"):
+            scene.eevee.taa_render_samples = max(1, a.samples)
     w, h = (int(v) for v in a.res.split("x"))
     scene.render.resolution_x, scene.render.resolution_y = w, h
     scene.cycles.samples = a.samples
@@ -340,9 +370,12 @@ def build(a):
     car.rotation_euler = (0, 0, 0)
     if a.steer:
         for k in ("FL", "FR"):
-            w = bpy.data.objects.get(f"wheel_{k}")
-            if w:
-                w.rotation_euler.z += math.radians(a.steer)
+            wh = bpy.data.objects.get(f"wheel_{k}")
+            if wh:
+                wh.rotation_euler.z += math.radians(a.steer)
+        # le conducteur regarde où il braque, comme dans le film (lieux.hero)
+        import lieux as L
+        L.hero_look({"body": car.name})
     if a.stop:
         # par les clés, comme dans le film (hero_cars.stop_lamps) : allumés des images 10 à 12, rendu à l'image 11
         import hero_cars
@@ -369,6 +402,8 @@ def main():
     for kind in [k for k in a.lights.split(",") if k]:
         scene, car, parts = build(a)
         lighting(kind)
+        if kind == "helico":
+            searchlight_off_glass(car)
         if a.fill:
             car_fill(car, glossy=a.fill != "noglossy")
         if a.chase_fill:

@@ -337,13 +337,21 @@ def mat_leather():
     return mat_leather_tex("ppl_leather_black", lin("#0d0d0e"), rough=0.58, coat=0.08)
 
 
+# les gants du conducteur : le pécari des gants de conduite d'époque, un fauve (albédo 0,26 ; #cbab85, 0,42, d'abord :
+# clairs sur la jante ivoire du volant vus de près, second tour du banc). Plus sombres que la jante (0,43), ils s'en
+# détachent. FILM3D_GANTS=<#rrggbb> pour en essayer un autre au banc
+GLOVE = "#ad8558"
+
+
 def mat_glove_driver():
-    """Les gants du conducteur : cuir écru, presque blanc (albédo vers 0,85), mat. Noirs, ils disparaissaient
-    derrière le reflet du ciel dans le pare-brise ; fauves (albédo 0,3), sortis par la vitre dans FIN, ils
-    restaient sombres à 7,5 m (8 px) sous les phares de la meute : les mains levées sont le sens du plan final,
-    seule leur valeur les fait lire sur la nuit (plan de lumière v3.1, fiche FIN : la chose la plus claire près
-    de la berline)."""
-    return mat_leather_tex("ppl_glove_pale", lin("#f3ece0"), rough=0.7, coat=0.0)
+    """Les gants du conducteur : pécari fauve (GLOVE, albédo vers 0,26), mat. Noirs, ils
+    disparaissaient derrière le reflet du ciel dans le pare-brise ; fauves sombres (albédo 0,3), sortis par la vitre
+    dans FIN, ils restaient sombres à 7,5 m (8 px) sous les phares de la meute du plan de lumière v3.1 ; écrus,
+    presque blancs (#f3ece0, albédo 0,85), ils sortaient en blanc pur sous les lumières liées à la berline, réglées
+    pour sa peinture sombre (brouillon éclairé v9, FIN6 : deux taches sans modelé, SPEC §18.66). Les mains levées
+    restent la chose la plus claire près de la berline, avec du modelé : un cuir, plus une étiquette."""
+    return mat_leather_tex("ppl_glove_pale", lin(os.environ.get("FILM3D_GANTS", "").strip() or GLOVE), rough=0.7,
+                           coat=0.0)
 
 
 def mat_navy():
@@ -2264,6 +2272,51 @@ def cast_driver_in_car(body, rim_prefix, wheel_hint, variant="hooded", clench=0.
         f"assise {seat_z:.3f}, dossier {back_y:.3f}, plancher {floor_z:.3f}, bassin {tuple(round(v, 3) for v in hip)}, "
         f"tête {top.z:.3f} (pavillon {roof.z if roof is not None else float('nan'):.3f}), écart des mains {arm['wheel_miss']}")
     return _objects(arm)
+
+
+def driver_look(arm, wheel, gain=(0.30, 0.50), cap=(10.0, 16.0), lock=35.0):
+    """Le conducteur regarde où il braque : le cou et la tête tournent avec la roue avant `wheel` (sa rotation locale
+    autour de z, le braquage posé par motion.key_vehicle), de `gain` (cou, tête) fois l'angle, au plus `cap` degrés
+    (atteints à `lock` degrés de roue au plus tard). En glisse la roue contre-braque vers la route : le regard la
+    suit, vers la sortie du virage. Des contraintes de transformation, sans clé ni Python : elles suivent le
+    mouvement de chaque plan, flou de bougé compris, et s'ajoutent à la pose (mains levées, bras à la vitre).
+    Renvoie les contraintes posées."""
+    _upd()
+    out = []
+    for role, g, c in zip(("Neck", "Head"), gain, cap):
+        try:
+            b = pb(arm, role)
+        except KeyError:
+            continue
+        for old in [k for k in b.constraints if k.name == "regard"]:
+            b.constraints.remove(old)
+        # l'axe local de l'os le plus proche de la verticale, et son sens
+        M = (arm.matrix_world @ b.matrix).to_3x3()
+        dots = [M.col[i].normalized().z for i in range(3)]
+        i = max(range(3), key=lambda k: abs(dots[k]))
+        sgn = 1.0 if dots[i] > 0 else -1.0
+        k = b.constraints.new("TRANSFORM")
+        k.name = "regard"
+        k.target = wheel
+        k.target_space, k.owner_space = "LOCAL", "LOCAL"
+        k.map_from, k.map_to = "ROTATION", "ROTATION"
+        k.from_rotation_mode = "XYZ"
+        k.use_motion_extrapolate = False
+        lim = math.radians(min(lock, c / g))
+        k.from_min_z_rot, k.from_max_z_rot = -lim, lim
+        ax = "xyz"[i]
+        setattr(k, f"map_to_{ax}_from", "Z")
+        setattr(k, f"to_min_{ax}_rot", -sgn * g * lim)
+        setattr(k, f"to_max_{ax}_rot", sgn * g * lim)
+        for other in "xyz".replace(ax, ""):
+            # les deux autres axes : aucune rotation (une source à plage nulle, une sortie nulle)
+            setattr(k, f"map_to_{other}_from", "X")
+            setattr(k, f"to_min_{other}_rot", 0.0)
+            setattr(k, f"to_max_{other}_rot", 0.0)
+        k.from_min_x_rot = k.from_max_x_rot = 0.0
+        k.mix_mode_rot = "AFTER"
+        out.append(k)
+    return out
 
 
 def cast_lineup(driver="hooded", officer="spp", gun="service", gap=1.4):

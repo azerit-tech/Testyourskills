@@ -1118,7 +1118,31 @@ def hero(lights_on=True):
     body.rotation_euler = (0, 0, 0)
     root = rig(body, "hero", yaw=math.pi)            # street_hero la met l'avant vers -y
     root["wheel_r"] = body.get("wheel_r", 0.33)
+    hero_look(root)
+    # l'habitacle éclairé dans tous les plans, au même réglage : sans lui la lunette virait au noir d'un plan à
+    # l'autre (brouillon éclairé v9, raccords 107|108 et 317|318). Un plan qui en veut un autre rappelle cabin_light
+    cabin_light(root, energy=HERO_CABIN_W)
     return root
+
+
+HERO_CABIN_W = 25.0     # W demandés pour le plafonnier de la berline (60 W pour la planche de bord)
+# Ce que cabin_light garde de la puissance demandée, plafonnier et planche de bord. À 1 (25 W et 60 W), la lunette
+# montrait tout l'habitacle en ambre clair sur la jetée, le point le plus clair de la voiture (rendus du second tour,
+# P6/47, 75, 76, 102). À 0,4 (10 W et 24 W) l'habitacle se lit à l'heure bleue sans luire. Le facteur est ici et non
+# dans les scènes parce que chacune rappelle cabin_light avec ses 25 W (scene_a, scene_b, scene_d) : un seul réglage
+# pour tous les plans (SPEC §18.66)
+CABIN_GAIN = 0.4
+
+
+def hero_look(root):
+    """Le conducteur regarde où il braque (cast_people.driver_look, sur la roue avant gauche). Sans conducteur ou
+    sans roue : rien."""
+    arm = hero_driver(root)
+    wheel = next((w for w in hero_wheels(root) if w.name.startswith("wheel_FL")), None)
+    if arm is None or wheel is None:
+        return []
+    import cast_people as cp
+    return cp.driver_look(arm, wheel)
 
 
 def hero_wheels(root):
@@ -1611,8 +1635,23 @@ def cabin_light(root, energy=6.0, color="#ffcf9a", dash=60.0, dash_color="#ffb07
     planche de bord (`dash` W, une bande de surface au pied du pare-brise, tournée vers l'arrière et relevée de
     `dash_tilt` degrés) qui éclaire le pavillon, les montants et le haut des sièges : le fond sur lequel se lit
     la silhouette, le dos du conducteur restant dans l'ombre. Renvoie la lampe de lecture (la planche de bord est
-    sa fille, `hero_planche`)."""
+    sa fille, `hero_planche`).
+    Une seule par voiture : lieux.hero() la pose (HERO_CABIN_W) ; rappelée, elle règle la lampe déjà là (puissances,
+    teintes) sans en ajouter une seconde. Les puissances demandées sont multipliées par CABIN_GAIN."""
+    energy, dash = energy * CABIN_GAIN, dash * CABIN_GAIN
     body = bpy.data.objects[root["body"]]
+    have = next((o for o in body.children if o.type == "LIGHT" and o.name.startswith("hero_habitacle")), None)
+    if have is not None:
+        have.data.energy = energy
+        have.data.color = lin(color)[:3]
+        lo = bpy.data.objects.get(have.get("planche", ""))
+        if lo is not None:
+            lo.data.energy = dash
+            lo.data.color = lin(dash_color)[:3]
+            lo.location = dash_loc
+            lo.rotation_euler = (math.radians(90.0 + dash_tilt), 0.0, 0.0)
+            lo.hide_render = not dash
+        return have
     d = bpy.data.lights.new("hero_habitacle", "POINT")
     d.energy = energy
     d.color = lin(color)[:3]
@@ -1620,7 +1659,11 @@ def cabin_light(root, energy=6.0, color="#ffcf9a", dash=60.0, dash_color="#ffb07
     ob = bpy.data.objects.new(d.name, d)
     bpy.context.scene.collection.objects.link(ob)
     ob.parent = body
-    ob.location = (0.15, -0.72, 1.08)
+    # le plafonnier, au milieu du pavillon derrière le pare-brise. Jusqu'au 18 novembre la lampe était une lampe de
+    # lecture à (0,15 ; -0,72 ; 1,08), à 30 cm du volant : les gants en sortaient blanc pur, vus de dos par la
+    # lunette comme de face (banc, conducteur). D'ici les mains reçoivent trois fois moins, le pavillon et le haut
+    # des sièges autant (SPEC §18.66)
+    ob.location = (0.0, -0.45, 1.26)
     ob.visible_camera = ob.visible_glossy = ob.visible_transmission = False
     if dash:
         a = bpy.data.lights.new("hero_planche", "AREA")
