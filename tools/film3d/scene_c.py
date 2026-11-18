@@ -381,8 +381,9 @@ def plan_P4(scene, hidden, haubans=False):
     hero = L.hero()
     wheels = L.hero_wheels(hero)
     d = [Vector(w.location).y for w in wheels]
-    poses = M.sample(P4.hero_pos, frames, heading=P4.hero_heading, wheel_r=hero["wheel_r"],
-                     wheelbase=(max(d) - min(d)) if d else 2.9)
+    poses = M.sample(P4.hero_pos, frames, heading=P4.hero_heading, steer=getattr(P4, "hero_steer", None),
+                     spin=getattr(P4, "hero_spin", None),
+                     wheel_r=hero["wheel_r"], wheelbase=(max(d) - min(d)) if d else 2.9)
     M.key_vehicle(hero, poses, wheels=wheels, ground=ground)
     M.wheel_marks(wheels, hero["wheel_r"])
     if P4.brake_windows():
