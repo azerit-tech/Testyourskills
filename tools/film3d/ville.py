@@ -675,6 +675,9 @@ def selftest_voisins():
     # les effets d'un voisin sortent toujours (§18.60 : les embruns de la meute de P6 sous la lampe de P5)
     assert all(fx_voisin(n) for n in ("fx_embruns_meute_P6", "fx_gouttes_P5", "fx_brume_glisse_P2", "fx_lame_P6"))
     assert not any(fx_voisin(n) for n in ("fxa", "port_fx", "fx", "lampe_fx_1"))
+    # les flaques des scènes restent (des pièces du sol) ; celles de fx.py sous une roue et les rides partent
+    assert not any(fx_voisin(n) for n in ("fx_flaque_0", "fx_flaque_5", "fx_flaque_3.001"))
+    assert all(fx_voisin(n) for n in ("fx_flaque_BL_12", "fx_rides_fx_flaque_0", "fx_flaque_P6", "fx_flaque"))
     # (a) le fond nord du rond-point (scene_f.build_backdrop) hors de sa zone : gardé dans la prise, caché au-delà
     for nom in ("av_walk_w", "av_block_w", "av_royal_3", "lamp_av_4", "prom_royal_7", "beach_n"):
         assert drapeau_voisin("rond-point", nom, True, False, take1, True) == (False, ""), nom
@@ -1115,7 +1118,11 @@ def heli_voisin(nom):
 # lampes. Le brouillon v10 au port : les embruns de la meute de P6, chargés avec la jetée dans la scène de P5, y
 # prenaient la lampe principale de l'hélicoptère (4 MW) : les paquets blancs de P5/27–60. L'eau que le plan rendu voit
 # encore d'un plan voisin, il la tire lui-même sur le temps du film (fx.EAU_PREROLL, fx.EAU_AFTER).
-FX_VOISIN = re.compile(r"^fx_")
+# Sauf les flaques posées par les scènes sur la ligne des roues (« fx_flaque_<n> », scene_d.p6_foreground et la
+# recette de P2 et P3) : ce sont des pièces du sol, pas des effets tirés. Retirées avec le reste, les six flaques de
+# la jetée manquaient à P5 et apparaissaient d'un coup à 485 | 486, à 16–32 m devant la berline (diag/etat_coupes.py,
+# SPEC §18.70). Les flaques que fx.py pose sous une roue (« fx_flaque_<roue>_<image> ») et les rides restent des effets.
+FX_VOISIN = re.compile(r"^fx_(?!flaque_\d+(\.\d+)?$)")
 
 
 def fx_voisin(nom):
