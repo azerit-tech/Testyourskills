@@ -247,7 +247,7 @@ def _s_plan(t, _tab={}):
 # Le reste sort de la simulation : la montée de la glisse, le contre-braquage, le lacet, le patinage, la ligne, le
 # roulis. python3 tools/film3d/lab/dynamique/voir.py P2|P5 clé=valeur… pour essayer un geste, bilan.py pour le film.
 DERAPAGES = [
-    dict(side=1.0, t=153 / 24, peak=31.0, sag=3.0, tenue=0.35, gaz_avant=0.2, frein_jet=0.4, dv=1.2, dv_t=3.0,
+    dict(side=1.0, t=153 / 24, peak=31.0, sag=3.0, tenue=0.35, gaz_avant=0.2, frein_jet=0.4, dv=1.2, dv_t=2.6,
          reaction=3.0),
     dict(side=-1.0, t=453 / 24, peak=40.5, sag=5.0, tenue=0.4, gaz_avant=0.0, frein_jet=0.4, dv=2.0, dv_t=4.0,
          reaction=0.4),

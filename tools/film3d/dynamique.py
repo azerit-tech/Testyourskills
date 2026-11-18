@@ -123,6 +123,7 @@ DRIVER = dict(
 
 SUB = 4                     # pas de la physique par pas du conducteur (960 Hz)
 DT = 1.0 / 240.0
+V_ARRET = 0.08              # m/s : dessous, au bout de la route, elle est arrêtée (3 mm par image : rien ne se voit)
 
 
 def mf(alpha, D, B, C, E):
@@ -767,7 +768,7 @@ def simulate(plan, events=(), t_span=(-2.0, 40.0), car=None, driver=None):
         brk += max(-pr, min(pr, brk_s - brk))
         hr = c["hb_rate"] * DT
         hb += max(-hr, min(hr, hb_s - hb))
-        if plan.s_stop is not None and s > plan.s_stop - 0.5 and V < 0.05 and v_r < 0.05:
+        if plan.s_stop is not None and s > plan.s_stop - 0.5 and V < V_ARRET and v_r < V_ARRET:
             stopped = True
         # ---- la physique, SUB pas
         h = DT / SUB
@@ -820,5 +821,5 @@ def simulate(plan, events=(), t_span=(-2.0, 40.0), car=None, driver=None):
     tab["t"] = [t_span[0] + k * DT for k in range(len(tab["t"]))]
     t_stop = None
     if plan.s_stop is not None:
-        t_stop = next((tab["t"][k] for k in range(len(tab["t"])) if tab["t"][k] > 0 and tab["v"][k] < 0.05), None)
+        t_stop = next((tab["t"][k] for k in range(len(tab["t"])) if tab["t"][k] > 0 and tab["v"][k] < V_ARRET), None)
     return PhysDrive(tab, DT, t_stop)
