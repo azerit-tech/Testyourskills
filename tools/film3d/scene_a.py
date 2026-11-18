@@ -2030,6 +2030,17 @@ def hero_cabin(coupe):
     return L.cabin_light({"body": coupe.name}, energy=25.0)
 
 
+def chase_fill(rig):
+    """L'appoint de poursuite commun (lieux.chase_fill : 900 W crème, 4 m derrière la berline et 6 m au-dessus, lié à
+    elle seule, sans reflet, la chaussée ne le reçoit pas), sur le rig (+y vers l'avant). OUV et P1 ne l'avaient
+    pas : tous les autres tronçons l'ont, et la berline y est rouge ; ici elle n'avait que le ciel et l'ambre des
+    lampadaires, bordeaux sombre, presque brune, pendant les 4,5 premières secondes, le gel de la première étoile
+    compris (brouillon éclairé v10, images 0 à 107 ; SPEC §18.70). Le même appoint dans les huit tronçons : la
+    peinture ne change pas d'un lieu à l'autre."""
+    import lieux as L
+    return L.chase_fill(rig)
+
+
 def far_lighthouse(P):
     """Le phare lointain du plan P (ouv_avenue ou p1_avenue : PHARE_PIED, PHARE_ECHELLE, PHARE_PHASE), posé par
     lieux.phare_lointain depuis la caméra de la première image, sur un cap sombre (le repli du découpage v3, §3 :
@@ -2117,6 +2128,7 @@ def ouv_motion(scene, coupe, police, cam, focus, chaser):
     import p1_avenue
     p1_props(p1_avenue)
     hero_cabin(coupe)
+    chase_fill(rig)
     if VILLE is None:                    # (en ville : le vrai phare, à la pointe, n'est pas visible d'ici)
         far_lighthouse(OUV)
     bpy.data.objects.remove(focus)
@@ -2219,6 +2231,7 @@ def p1_motion(scene, coupe, police, cam, focus, chaser):
     bpy.data.objects.remove(focus)
     p1_props(P)
     hero_cabin(coupe)
+    chase_fill(rig)
     if VILLE is None:
         far_lighthouse(P)
     scene.frame_set(P.STILL)          # l'image fixe du banc : la rampe allumée

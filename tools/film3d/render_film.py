@@ -60,6 +60,11 @@ SOURCES = {
 # 110 m). cut.ts (le site) les reprendra ; tant qu'il garde le découpage v3, plan_frames rend la longueur des
 # modules et le journal le dit.
 FALLBACK_FRAMES = {"OUV": 75, "P1": 33, "P2": 107, "P3": 103, "P4": 108, "P5": 60, "P6": 133, "FIN": 52, "FIN6": 101}
+# Les plans que le site ne joue plus et que cut.ts ne nomme donc plus, mais que l'atelier sait encore rendre : FIN,
+# l'ancienne fin à la pointe (SPEC §18.53). Leur durée est celle du repli, sans alerte. (Jusqu'à v10, l'absence de
+# FIN dans cut.ts faisait dire « plans manquants ['FIN'], durées de repli » à chaque lancement et jetait TOUTES les
+# durées de cut.ts pour celles du repli ; le rendu n'en changeait pas, les modules font foi : plan_frames.)
+HORS_SITE = ("FIN",)
 # Le module de trajectoire de chaque plan (sans Blender) : son FRAMES est la longueur que sa scène sait animer. Un
 # plan pas encore migré au découpage de cut.ts se rend à la longueur de son module, et le journal le dit.
 TRAJ = {"OUV": "ouv_avenue", "P1": "p1_avenue", "P2": "p2_arc", "P3": "p3_enseignes", "P4": "p4_pont",
@@ -101,9 +106,10 @@ def read_cut(root=ROOT):
         out = {k: int(v) for k, v in re.findall(r"(\w+)\s*:\s*(\d+)", body)}
         for shot, n in re.findall(r'shot\s*:\s*"(\w+)"\s*,\s*video\s*:\s*(\d+)', src):
             out[shot] = int(n)
-        if set(out) >= set(ORDER):
-            return {p: out[p] for p in ORDER}
-        log(f"! {path} : plans manquants {sorted(set(ORDER) - set(out))}, durées de repli")
+        manque = sorted(set(ORDER) - set(out) - set(HORS_SITE))
+        if not manque:
+            return {p: out.get(p, FALLBACK_FRAMES[p]) for p in ORDER}
+        log(f"! {path} : plans manquants {manque}, durées de repli")
     except (OSError, AttributeError) as e:
         log(f"! {path} illisible ({e}), durées de repli")
     return dict(FALLBACK_FRAMES)
@@ -125,13 +131,18 @@ def module_frames(plan):
 def plan_frames(cut, plans=ORDER, frames_of=module_frames):
     """Les images à rendre par plan : celles de cut.ts, sauf pour un plan dont le module a encore un autre FRAMES (pas
     encore migré) : il garde le sien, dit dans le journal ; le montage tiendra sa dernière image."""
-    out = {}
+    out, autres = {}, []
     for plan in plans:
         n, m = cut[plan], frames_of(plan)
         if m is not None and m != n:
-            log(f"! {plan} : {m} images, cut.ts en attend {n}, plan pas encore migré ({TRAJ[plan]}.FRAMES = {m})")
+            autres.append(f"{plan} {m} (cut.ts : {n})")
             n = m
         out[plan] = n
+    if autres:
+        # une ligne pour tous : depuis le trajet roulé (§18.55) le site garde l'ancien découpage tant que le film
+        # n'est pas livré, chaque plan le redisait
+        log(f"durées des modules de trajectoire, pas celles de cut.ts (le site les reprendra à la livraison) : "
+            f"{', '.join(autres)}")
     return out
 
 
@@ -467,6 +478,10 @@ def setup_render(bpy, scene, a):
         r.use_simplify, r.simplify_subdivision_render = True, 0     # (les personnages lissés : 48 s sur P3, mesuré)
         return res, "workbench", "-", 0
     r.engine = "CYCLES"
+    # les volumes « biaisés » de Cycles (les pinceaux dans la brume lissés) pour tout le film : P6 seul les avait
+    # (scene_d.p6_clean_haze), la brume et le pinceau de l'hélicoptère changeaient de grain à 485 | 486 et à
+    # 618 | 619 (diag/etat_coupes.py : le seul réglage de rendu qui différait d'un tronçon à l'autre, SPEC §18.70)
+    c.volume_biased = True
     c.device = "CPU"
     device = "CPU"
     if not a.cpu and sys.platform != "darwin":       # jamais la carte graphique du Mac (règle machine)
@@ -809,6 +824,7 @@ def selftest():
     import parcours as PC                                                      # le repli : le trajet roulé
     assert FALLBACK_FRAMES == dict(PC.SHOTS, FIN=52, FIN6=PC.FIN6_FRAMES), FALLBACK_FRAMES
     assert set(cut) == set(ORDER), cut
+    assert all(p in ORDER for p in HORS_SITE) and cut["FIN6"] > 0, cut       # FIN n'est plus dans cut.ts : repli muet
     # un plan pas encore migré (son module a encore FRAMES = 28) garde sa longueur ; les autres suivent cut.ts
     old = {"P3": 28, "FIN": 36}
     eff = plan_frames(cut, ORDER, frames_of=lambda p: old.get(p, cut[p]))
