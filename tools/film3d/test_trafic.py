@@ -13,6 +13,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import dynamique as D  # noqa: E402
 import parcours as P  # noqa: E402
 import bras  # noqa: E402
 
@@ -64,8 +65,11 @@ def test_adherence():
         lat, lon = (vx * ay - vy * ax) / v, (vx * ax + vy * ay) / v
         worst_lat = max(worst_lat, (abs(lat), g))
         worst_comb = max(worst_comb, (math.hypot(lat, lon), g))
-    check("slalom : latérale ≤ 6,5 m/s², cercle ≤ 7,5 (le mouillé, parcours.LIM)",
-          worst_lat[0] <= 6.5 and worst_comb[0] <= 7.5,
+    # (fusion v11 : 6,5 et 7,5 m/s² étaient l'adhérence du mouillé ; relevés du rapport des μ, dynamique.K_MU)
+    k = D.K_MU
+    check(f"slalom : latérale ≤ {6.5 * k:.1f} m/s², cercle ≤ {7.5 * k:.1f} (ceux du mouillé, 6,5 et 7,5, relevés de "
+          "dynamique.K_MU)",
+          worst_lat[0] <= 6.5 * k and worst_comb[0] <= 7.5 * k,
           f"latérale {worst_lat[0]:.2f} (image {worst_lat[1]}), cercle {worst_comb[0]:.2f} (image {worst_comb[1]})")
 
 
