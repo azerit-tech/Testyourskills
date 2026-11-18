@@ -570,13 +570,28 @@ def mat_rubber(name, color=(0.018, 0.018, 0.02, 1), rough=0.62, grain=0.15):
     return m
 
 
-def mat_tyre(name, r_rim=0.19, r_out=0.31, wear=0.0):
+# le flanc blanc (SPEC §18.66) : le liseré étroit des berlines de l'époque, 22 mm, côté extérieur seulement
+# (l'attribut « rest_wheel » a son y vers l'extérieur de la roue, _stamp_wheel). Éteint par défaut : clair, il prend
+# les appoints liés à la voiture, réglés pour une peinture sombre ; FILM3D_FLANC_BLANC=1 le pose, à juger en Cycles
+WHITEWALL = (0.028, 0.050)      # du talon de la jante, en m : début et fin du liseré
+WET_TREAD = 0.8                 # la bande de roulement qui sort de l'eau : 0 sèche et mate, 1 luisante
+
+
+def whitewall():
+    return os.environ.get("FILM3D_FLANC_BLANC", "0").strip().lower() in ("1", "oui", "yes", "on", "true")
+
+
+def mat_tyre(name, r_rim=0.19, r_out=0.31, wear=0.0, wet=WET_TREAD, white=None):
     """Pneu, dans le repère de la roue (attribut « rest_wheel » : origine sur l'axe, axe selon y ; il reste juste quand
     la rue tourne les maillages d'un quart de tour) : gomme noire, flanc à fines
     stries concentriques, un bandeau de marquages moulés illisibles (relief seul, aucun texte) et le liseré du talon ;
     la bande de roulement reste mate.
 
-    wear : gomme vieillie, flancs mats (le satin du neuf part), poussière grise dans les stries et sur la bande."""
+    wear : gomme vieillie, flancs mats (le satin du neuf part), poussière grise dans les stries et sur la bande.
+    wet : la chaussée est trempée, la bande de roulement et le bas des flancs sortent de l'eau à chaque tour : gomme
+    plus noire, luisante (la bande : rugosité 0,3 à wet = 1), sans poussière. white : le flanc blanc (whitewall() par
+    défaut), une gomme blanche un peu jaunie, salie par la route."""
+    white = whitewall() if white is None else white
     m, nt, out = cv._mat(name)
     at = nt.nodes.new("ShaderNodeAttribute")
     at.attribute_type = "GEOMETRY"
@@ -611,14 +626,28 @@ def mat_tyre(name, r_rim=0.19, r_out=0.31, wear=0.0):
     rough = cv._math(nt, "SUBTRACT", 0.78 + 0.1 * wear, cv._math(nt, "MULTIPLY", cv._math(nt, "ADD", side, marks),
                                                                    0.08 * (1.0 - wear)))
     p = cv._principled(nt, **{"Base Color": (0.018, 0.018, 0.02, 1), "Specular IOR Level": 0.35 - 0.12 * wear})
+    tread = _ramp(nt, r, r_out - 0.045, r_out - 0.02)
+    col = None
     if wear > 0:
-        # la poussière se loge dans les creux (stries, marquages) et couvre la bande de roulement
+        # la poussière se loge dans les creux (stries, marquages) et couvre la bande de roulement ; mouillée, la bande
+        # est lavée à chaque tour
         dust = _imperfection(nt, pos, "SurfaceImperfections017", 0.5, 0.1, 0.55)
-        tread = cv._math(nt, "GREATER_THAN", r, r_out - 0.03)
         f = cv._math(nt, "MULTIPLY", cv._math(nt, "ADD", cv._math(nt, "MULTIPLY", dust, 0.6),
-                                              cv._math(nt, "MULTIPLY", tread, 0.35)), 0.55 * wear)
-        nt.links.new(_mix_rgb(nt, (0.018, 0.018, 0.02, 1), lin("#4a443d"), cv._math(nt, "MINIMUM", f, 0.5)),
-                     p.inputs["Base Color"])
+                                              cv._math(nt, "MULTIPLY", tread, 0.35 * (1.0 - wet))), 0.55 * wear)
+        col = _mix_rgb(nt, (0.018, 0.018, 0.02, 1), lin("#4a443d"), cv._math(nt, "MINIMUM", f, 0.5))
+    if white:
+        # le liseré : côté extérieur seulement (y de « rest_wheel » vers l'extérieur), bords nets sur 1,5 mm
+        a, b = r_rim + WHITEWALL[0], r_rim + WHITEWALL[1]
+        band = cv._math(nt, "MULTIPLY", cv._math(nt, "MULTIPLY", _ramp(nt, r, a - 0.0015, a), _ramp(nt, r, b, b - 0.0015)),
+                        cv._math(nt, "GREATER_THAN", sep.outputs[1], 0.0))
+        soil = _noise(nt, pos, 22.0, 3.0, 0.3, 0.75)
+        wcol = _mix_rgb(nt, lin("#bdb6a4"), lin("#6b6457"), cv._math(nt, "MULTIPLY", soil, 0.35 + 0.5 * wear))
+        col = _mix_rgb(nt, col if col is not None else (0.018, 0.018, 0.02, 1), wcol, band)
+        rough = _mix(nt, rough, 0.55, band)
+    if col is not None:
+        nt.links.new(col, p.inputs["Base Color"])
+    if wet > 0:
+        rough = _mix(nt, rough, 0.30, cv._math(nt, "MULTIPLY", tread, wet))
     nt.links.new(rough, p.inputs["Roughness"])
     nt.links.new(bump.outputs[0], p.inputs["Normal"])
     nt.links.new(p.outputs[0], out.inputs[0])
@@ -1630,13 +1659,15 @@ def _stamp_rest(parts):
         a.data.foreach_set("vector", [c for v in me.vertices for c in (rot @ v.normal).normalized()])
 
 
-def _stamp_wheel(w):
-    """Position dans le repère de la roue (« rest_wheel »), pour le pneu : à poser une fois l'origine sur l'axe."""
+def _stamp_wheel(w, side=1):
+    """Position dans le repère de la roue (« rest_wheel »), pour le pneu : à poser une fois l'origine sur l'axe.
+    side : +1 si l'extérieur de la roue est vers +y, -1 sinon ; l'attribut a toujours son y vers l'extérieur (le
+    flanc blanc ne se pose que de ce côté)."""
     me = w.data
     if REST_WHEEL in me.attributes:
         me.attributes.remove(me.attributes[REST_WHEEL])
     a = me.attributes.new(REST_WHEEL, "FLOAT_VECTOR", "POINT")
-    a.data.foreach_set("vector", [c for v in me.vertices for c in v.co])
+    a.data.foreach_set("vector", [c for v in me.vertices for c in (v.co.x, v.co.y * side, v.co.z)])
 
 
 def _add_valve(w, side, r=0.178, angle=35.0):
@@ -1709,9 +1740,10 @@ def _finish(variant, parts, collection, lights_on, raw, wheel_keys, door_keys, r
         a, b = cv.bbox([w])
         cv.set_origin(w, (a + b) / 2)
         if not raw:
+            out_y = 1 if (a.y + b.y) > 0 else -1
             if variant == "w111":
-                report[f"valve {k}"] = "posée" if _add_valve(w, 1 if (a.y + b.y) > 0 else -1) else "manquée"
-            _stamp_wheel(w)
+                report[f"valve {k}"] = "posée" if _add_valve(w, out_y) else "manquée"
+            _stamp_wheel(w, out_y)
         wheels[k] = w
     doors = {}
     for k, ns in dgroups.items():
