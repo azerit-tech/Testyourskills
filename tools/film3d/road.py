@@ -483,8 +483,10 @@ def mat_paint_decal(st, name="road_paint"):
     return m
 
 
-DECAL_USURE = 0.8            # la part d'usure des roues ajoutée partout (paint_wear : seuil + 0,11)
-DECAL_CLAIR = 0.62           # le blanc des bandes : 0,45 × 0,62 ≈ 0,28 d'albédo propre
+# (brouillon décor-coupes : à 0,8 et 0,62, P2/43, le passage piéton sous le lampadaire restait en traînées blanches :
+# une stop plus sombre, une bonne part de la peinture partie)
+DECAL_USURE = 1.6            # la part d'usure des roues ajoutée partout (paint_wear : seuil + 0,22)
+DECAL_CLAIR = 0.32           # le blanc des bandes : 0,45 × 0,32 ≈ 0,14 d'albédo propre, un blanc sale et gris
 
 
 def mix_mul(N, col, k):
