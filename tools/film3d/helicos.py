@@ -387,25 +387,42 @@ def beam(i, T):
     return tuple(a + (b - a) * w for a, b in zip(p5, p6))
 
 
-# ---- la lampe de l'appareil 0 (lumière v3.1) : une seule définition en temps du film, lue par P5 et P6. Le pinceau
-# visible est la puissance de la lampe de brume fois la densité de la brume du plan (P5 0,0016, P6 0,0012) : le même
-# produit des deux côtés de la coupe ; puis, sur BEAM0_FONDU s de P6, pendant qu'il rejoint sa place, sa lampe de
-# brume s'éteint jusqu'à celle des deux autres (BEAM0_FIN, la lampe de 8 kW de la jetée) et son cône passe de 5 à 4°,
-# sans marche. Au sol 8 kW (à 100 kW, une plaque claire au bas du cadre de P5), sur la berline seule 50 kW, partout
+# ---- la lampe de l'appareil 0 (lumière v3.1) : une seule définition en temps du film, lue par P5, P6 et FIN6. Le
+# pinceau visible est la puissance de la lampe de brume fois la densité de la brume du plan : le même produit des deux
+# côtés de chaque coupe.
+# Brouillon éclairé v9 (critique n° 2) : le pinceau, bleu froid, s'arrêtait en l'air sans toucher le sol, ne posait
+# aucune tache (8 kW à 85 m : 0,09 W/m², rien), puis s'éteignait en 1,75 s dès P6 (BEAM0_FONDU) ; FIN6 n'en avait
+# qu'une lampe de 8 kW, invisible. Maintenant :
+# - le pinceau est gardé plein de P5 à la fin de FIN6 (plus de fondu), d'une seule couleur (BEAM0_COULEUR, blanc
+#   neutre un peu chaud : ni le bleuté qui tourne le bordeaux au lilas, ni le crème des lampadaires) ;
+# - il descend jusqu'au sol : un cône étroit (BEAM0_CONE) sur une source large (BEAM0_SOURCE) fait un faisceau presque
+#   parallèle. Sa clarté dans la brume va comme 1 / sa largeur : de 0,24 m de source et 5°, elle tombait de 11 fois de
+#   l'appareil au sol ; de 0,9 m et 3,5°, de 3,5 fois (l'appareil est aussi plus près, 50 à 60 m au lieu de 85) ;
+# - sa tache au sol (TACHE_*, scene_d.projo_tache) : bornée, 12 m de diamètre au bord, bord doux, centrée sur sa
+#   cible (sur elle), à TACHE_E W/m² quelle que soit la distance de l'appareil (puissance ∝ d², ouverture recalée à
+#   chaque image) ; elle éclaire tout sauf la berline, voisins compris ; la berline reçoit sa propre jumelle
+#   (BERLINE_E W/m², la même règle) ; le reste du terre-plein reste au crépuscule (scene_e.MATS_CREPUSCULE).
 BEAM0_PINCEAU = 1.6e6 * 0.0016      # W × densité : le pinceau de P5
-BEAM0_SOL, BEAM0_BERLINE = 8000.0, 5.0e4
-BEAM0_FIN = 8000.0
-BEAM0_CONE = (5.0, 4.0)
-BEAM0_FONDU = 1.75                  # s depuis P6/1
-BEAM0_SOURCE = (0.12, 0.25)         # la lampe de brume : taille de la source (m), bord du cône (celles de P5 ; à 1,5 m,
-                                    # celle de la jetée, le pinceau de P6 sortait flou et large)
+BEAM0_COULEUR = "#f4f1ea"
+BEAM0_SOL, BEAM0_BERLINE = 8000.0, 5.0e4    # (les jumelles d'avant, gardées pour les appareils 1 et 2 de la jetée)
+BEAM0_FIN = 8000.0                  # la lampe propre des appareils de la jetée (helis_P6_light) ; le reste en jumelle
+BEAM0_CONE = (3.5, 3.5)
+BEAM0_SOURCE = (0.45, 0.4)          # la lampe de brume : rayon de la source (m), bord du cône
+TACHE_E, TACHE_R, TACHE_BLEND, TACHE_SOURCE = 2.5, 6.0, 0.7, 0.45   # W/m², m (rayon au bord), bord, m
+BERLINE_E = 0.6                     # W/m² sur la berline (50 kW à 85 m : ce que P5 lui donnait, ni rose ni brûlée)
 
 
 def beam0(T, density):
-    """(W, degrés) : la lampe de brume de l'appareil 0 au temps du film T, dans une brume de densité `density`."""
-    w = _quintic((T - T6) / BEAM0_FONDU)
-    start = BEAM0_PINCEAU / density
-    return start * (BEAM0_FIN / start) ** w, BEAM0_CONE[0] + (BEAM0_CONE[1] - BEAM0_CONE[0]) * w
+    """(W, degrés) : la lampe de brume de l'appareil 0 au temps du film T, dans une brume de densité `density` ;
+    la même de P5 à la fin de FIN6 (l'allumage de P5 à part : beam0_allume)."""
+    return BEAM0_PINCEAU / density, BEAM0_CONE[0]
+
+
+def tache(dist):
+    """(W, degrés, W) : la jumelle du sol (puissance, ouverture) et celle de la berline pour un projecteur à `dist` m
+    de sa cible : TACHE_E et BERLINE_E W/m² (un spot de P W fait P / 4π d² W/m²), TACHE_R m de rayon au bord."""
+    k = 4.0 * math.pi * dist * dist
+    return TACHE_E * k, 2.0 * math.degrees(math.atan(TACHE_R / dist)), BERLINE_E * k
 
 
 # le projecteur s'allume quand l'appareil arrive sur le port (brouillon éclairé v8 : à la coupe P4 → P5, images 425 |
@@ -418,12 +435,6 @@ BEAM0_ALLUMAGE = 0.75
 def beam0_allume(T):
     """La part allumée du projecteur de l'appareil 0 au temps du film T : 0 jusqu'à P5/1, 1 après BEAM0_ALLUMAGE s."""
     return _quintic((T - T5) / BEAM0_ALLUMAGE)
-
-
-def beam0_sol(T):
-    """La part de sa tache au sol que garde l'appareil 0 au temps T : entière tant que son pinceau se voit (P5, P6/1),
-    éteinte avec lui (une tache au sol n'existe que si son pinceau se voit jusqu'à l'appareil)."""
-    return 1.0 - _quintic((T - T6) / BEAM0_FONDU)
 
 
 def beam_in_scene(shot, i):

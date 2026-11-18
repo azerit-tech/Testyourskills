@@ -150,11 +150,14 @@ LAMP_HEAD = from_fin(F.SX + 11.0 + F.LAMP_HEAD[0] - F.LAMP_FIN[0],
 
 
 def beam_target(t):
-    """Le projecteur de l'hélicoptère : il la cherche pendant le freinage et se pose sur elle à l'arrêt."""
+    """Le projecteur de l'hélicoptère : il continue la visée de la fin de P6 (2 m devant elle, le long de sa route :
+    p6_jetee.beam_target) et glisse sur elle pendant le freinage, posé sur elle à l'arrêt. (Brouillon éclairé v9,
+    critique n° 9 : il battait de 1,1 m à 1,3 Hz en partant de 3,5 m devant elle ; sa tache au sol, désormais
+    bornée et visible, ne doit ni sauter à la jonction ni trembler sur la récompense.)"""
     x, y = hero_pos(t)
     w = 1.0 - M.smoothstep(T_STOP - 1.5, T_STOP, t)
-    sway = 1.1 * w * math.sin(2.0 * math.pi * 1.3 * t + 0.4)
-    return x + sway, y + 3.5 * w, 0.8
+    h = math.radians(hero_heading(t))
+    return x - 2.0 * w * math.sin(h), y + 2.0 * w * math.cos(h), 0.6 + 0.2 * (1.0 - w)
 
 
 def tracks():
