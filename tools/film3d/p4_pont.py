@@ -264,7 +264,7 @@ if VILLE:
     # (fusion v10 : de l'image 70 à l'avant-dernière, 38 à 97 avant. La berline simulée sort du slalom du pont le
     # nez 2,5° à gauche ; rabattue quand elle n'a que 5 m d'avance, la patrouille passait à 1,19 m de son aile
     # avant ; rabattue plus tard, une fois 5,5 m devant : 1,51 m)
-    P1_PASS, P1_TUCK = 3.6, (70, FRAMES - 1)
+    P1_PASS, P1_TUCK = 3.8, (70, FRAMES - 1)
 
     def _p1_side(t):
         # (une quintique : sur le pont court, la rabattue ne dure que 2,5 s ; l'à-coup reste sous 12 m/s³)
@@ -276,15 +276,27 @@ if VILLE:
     # reste dans le cadre, à 1,9 m de la file d'en face au plus juste (diag/audit_trafic.py)
     # (fusion v10 : 0,6, 0,5 avant. La voiture simulée déboîte de 3,85 m ; à 0,5 la patrouille n'entrait dans le
     # cadre qu'à P4/32, deux images après la fenêtre de test_entrees ; à 0,6 : P4/27)
-    P1_VOIE = 0.6
+    # (v11, SPEC §18.70 : 0. La berline tient la voie intérieure ; quand B1 déboîte, elle s'écarte d'un mètre à
+    # gauche, vers la patrouille, qui garde sa voie : l'air entre elles tombe de 1,7 à 0,7 m, puis la patrouille
+    # la tape et la renvoie à droite. À 0,6 la patrouille suivait la berline revenue à droite et restait collée
+    # à elle 21 images)
+    P1_VOIE = 0.0
 
     def _voie_x(t):
         # l'écart du slalom en x de la scène (la voie à gauche de la berline est vers −x)
-        return -PC.voie(PC.s_of_t(PC.t_of("P4", _f(t))))
+        # (v11 : son écart à la voie intérieure du pont ; le changement de voie de la route n'en est pas un)
+        return -PC.voie_pont(PC.s_of_t(PC.t_of("P4", _f(t))))
+
+    X_VOIE = 1.80                    # la voie intérieure du pont, celle de la berline
 
     def _patrol1_ligne(t):
         hx, hy = hero_pos(t)
-        x = hx - (1.0 - P1_VOIE) * _voie_x(t) - _p1_side(t)
+        # (v11 : sa ligne se compte depuis la voie de la berline, plus depuis la berline elle-même : elle ne
+        # reprend ni ses retards sur sa ligne (0,1 à 0,25 m dans un écart) ni ses embardées. Sur sa dernière
+        # seconde elle rejoint la place que P5 attend, comptée depuis la berline)
+        u = min(1.0, max(0.0, t - (T49 - 1.0)))
+        x = (X_VOIE + P1_VOIE * _voie_x(t) + (hero_pos(T49)[0] - X_VOIE) * u * u * (3.0 - 2.0 * u)
+             - _p1_side(t))
         if t <= T49:
             return x, hy + _p1_lead(t)
         # au-delà de P5/1 (les ressorts de M.sample) : son freinage tenu
@@ -293,7 +305,7 @@ if VILLE:
         return hero_pos(T49)[0] - P1_SIDE, y49 + _P1_V49 * dt - 0.5 * _P1_IN["decel"] * dt * dt
 
     # sa ligne, avec le contact du pont (contacts.py, SPEC §18.68 : elle ferme la porte, la berline la tape)
-    patrol1_pos = C.Patrouille(_patrol1_ligne, "P4", (("P4", "patrol_0"),), suit=True)
+    patrol1_pos = C.Patrouille(_patrol1_ligne, "P4", (("P4", "patrol_0"),))
     hero_pos.choc = C.choc_berline("P4")          # (ce que motion.sample retire avant de coucher la caisse)
 
     HERO0 = PC.hero("P4", chocs=False)     # (contacts.py : la meute rejoue la conduite de la berline, pas ses chocs)

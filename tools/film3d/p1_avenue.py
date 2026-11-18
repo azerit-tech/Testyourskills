@@ -67,8 +67,16 @@ else:
     # peine son pare-chocs les vingt premières images d'OUV. Elle est à la hauteur de la berline à l'ouverture, 0,75 m
     # derrière, son capot et sa portière dans le quart gauche du cadre ; elle lève le pied dès qu'elle voit le
     # rond-point et sort du cadre par la gauche vers OUV/50 ; l'accélération sous 2,2 m/s², l'à-coup sous 12 m/s³)
-    LEAD_PEAK = -0.75
-    _T1 = -3.2
+    # (v11, SPEC §18.70 : le critique du brouillon éclairé v10 lisait « deux voitures côte à côte » : le film
+    # s'ouvrait patrouille déjà au contact. Elle arrive maintenant de derrière : W0 m/s plus vite que la berline
+    # avant l'ouverture, LEAD0 m derrière elle à l'image G0 du film, elle la remonte en levant le pied (A0 m/s²
+    # de moins qu'elle), culmine vers l'image 26 à 1,2 m derrière sa hauteur, détachée d'elle de 1,5 m, et retombe
+    # jusqu'à sa place de P2/1 : un seul arc, sans palier (avec un palier à sa hauteur, la retombée demandait
+    # 18 m/s³ d'à-coup dans le freinage du rond-point, 12 permis ; balayé, 11,9 ici). contacts.CHOCS la rabat sur
+    # la berline à son sommet)
+    G0, LEAD0, W0, A0 = -6.0, -6.0, 7.0, -4.0
+    _T0 = (G0 - PC.START["P1"]) / M.FPS
+    _T1 = None
 
 
 def _hero_y(t):
@@ -79,14 +87,15 @@ _VC = _vh(_TC)                      # à la coupe, à la vitesse de la berline
 _YC = _hero_y(_TC) + LEAD_END
 _VK = _VC + PATROL_BRAKE * (_TC - _TK)
 _YK = _YC - _VK * (_TC - _TK) + 0.5 * PATROL_BRAKE * (_TC - _TK) ** 2
-_KEYS = [(_T0, LEAD0, 0.0, 0.0), (_T1, LEAD_PEAK, 0.0, 0.0),
+W0 = globals().get("W0", 0.0)
+_KEYS = ([(_T0, LEAD0, W0, A0)] if _T1 is None else [(_T0, LEAD0, 0.0, 0.0), (_T1, LEAD_PEAK, 0.0, 0.0)]) + [
          (_TK, _YK - _hero_y(_TK), _VK - _vh(_TK), -PATROL_BRAKE - _hero_acc(_TK))]
 
 
 def _lead(t):
     """Son avance sur la berline (m)."""
     if t <= _T0:
-        return LEAD0
+        return LEAD0 + W0 * (t - _T0)
     if t >= _TK:
         dt = t - _TK
         return _YK + _VK * dt - 0.5 * PATROL_BRAKE * dt * dt - _hero_y(t)

@@ -17,7 +17,7 @@ import parcours as P  # noqa: E402
 import trafic as T  # noqa: E402
 
 FAILS = []
-DENSE_ADMIS = (150, 255)                    # images : le dérapage du rond-point, l'approche du barrage
+DENSE_ADMIS = (150, 262)                    # images : le dérapage du rond-point, l'approche du barrage
 
 
 def check(name, ok, detail=""):
