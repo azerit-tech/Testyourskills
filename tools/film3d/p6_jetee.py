@@ -303,19 +303,24 @@ def state_out(f=None):
     return out
 
 
-# Le phare de FIN6 (scene_d.plan_FIN6 : lieux.phare_tourne, pilote sur l'image de la scène, phare_pinceaux), que P6 pose
-# déjà tel quel sur le temps du film (scene_d.phare_film, SPEC §18.63 : gelé en P6, son trait d'éclat surgissait à
-# 618 | 619). Sans Blender : test_motion.test_cut_habitacle_phare.
-FIN6_PHARE_PHASE, FIN6_PHARE_VITESSE = -25.0, 45.0
-FIN6_PHARE_RELEVE, FIN6_PHARE_PORTEE = 8.0, 9.0
+# Le phare de la ville, de P6 à FIN6 : une seule loi sur le temps du film, lue par scene_d des deux côtés de la coupe
+# (fusion v10, SPEC §18.67). Deux branches l'avaient raccordé en sens inverse : §18.63 faisait tourner P6 comme
+# l'ancien FIN6 (−25°, 45 °/s, pinceaux de 9 m), §18.64 faisait repartir FIN6 de la place gelée de P6 (20 °/s, 40 m) ;
+# fusionnées, il sautait à 618 | 619 (film gris v10 : azimut, vitesse et longueur). Retenu, §18.64, jugé à l'image
+# éclairée (la tour à pinceaux de 9 m se lisait comme un lampadaire) : gelé pendant P6, 12° hors de l'axe de la jetée
+# vers le large (tout pinceau qui tourne, vu de la jetée, barre le cadre : scene_d), il balaie le ciel à partir de
+# FIN6/1, mêmes pinceaux des deux côtés. Sans Blender : test_motion.test_cut_habitacle_phare.
+PHARE_GELE = 272.2 - 180.0 + 12.0      # ° depuis +x : l'azimut du premier pinceau pendant P6
+PHARE_BALAYAGE = 20.0                  # °/s, à partir de FIN6/1
+PHARE_RELEVE, PHARE_PORTEE = 8.0, 40.0
 
 
 def phare_azimut(shot, frame):
-    """L'azimut (degrés) du premier pinceau du phare à l'image `frame` de la scène du plan `shot` (P6 ou FIN6) : celui
-    que FIN6 lui donne (phase + vitesse × image de FIN6 / 24), compté sur le temps du film."""
+    """L'azimut (degrés) du premier pinceau du phare à l'image `frame` de la scène du plan `shot` (P6 ou FIN6), compté
+    sur le temps du film : PHARE_GELE jusqu'à FIN6/1 comprise, puis PHARE_BALAYAGE °/s."""
     f0 = {"P6": F0, "FIN6": 1}[shot]                     # fin6_orbite.F0
     g = PC.START[shot] + frame - f0                        # l'image du film (0 : OUV/1)
-    return FIN6_PHARE_PHASE + FIN6_PHARE_VITESSE / 24.0 * (g - PC.START["FIN6"] + 1)
+    return PHARE_GELE + PHARE_BALAYAGE / 24.0 * max(0, g - PC.START["FIN6"])
 
 
 if __name__ == "__main__":
