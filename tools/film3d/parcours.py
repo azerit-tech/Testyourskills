@@ -558,8 +558,9 @@ SLALOM_ZONES = (
     (SLALOM_SIMULE[2][0] - 10.0, SLALOM_SIMULE[2][0],
      SLALOM_SIMULE[4][0] + SLALOM_SIMULE[4][1], SLALOM_SIMULE[4][0] + SLALOM_SIMULE[4][1] + 12.0),     # la rue, le pont
     # la jetée : la berline y arrive en revenant du large du port (4,5° d'écart à s 400) ; le fondu se fait sur ce
-    # retour et le début du premier changement de voie (plus tôt ou plus court : 10,5 à 11,4 m/s² au bras ; ici 7,2)
-    (SLALOM_SIMULE[5][0] - 6.5, SLALOM_SIMULE[5][0] + 13.5,
+    # retour et le début du premier changement de voie : de s 390,5 à s 422,5 (balayé : de −6,5 à +13,5, 7,5 m/s² par
+    # rapport à la berline à P6/30 ; de −4 à +16, 8,3 ; de −10 à +20, 6,8 ; de −12 à +20, 6,3 ; de −13 à +22, 6,2)
+    (SLALOM_SIMULE[5][0] - 12.0, SLALOM_SIMULE[5][0] + 20.0,
      SLALOM_SIMULE[6][0] + SLALOM_SIMULE[6][1], SLALOM_SIMULE[6][0] + SLALOM_SIMULE[6][1] + 12.0))
 
 
