@@ -1708,6 +1708,26 @@ def test_cut_p5_p6():
           'skid_p5(scene, place="P6")' in src_d and PC.LIEU["P5"] == "E")
 
 
+def test_cut_p4_p5_beam():
+    """P4 → P5 : le projecteur de l'appareil 0 ne surgit pas à la coupe (brouillon éclairé v8 : absent de P4, plein
+    à P5/1, 425 | 426). Il s'allume à son arrivée, éteint à P5/1, en fondu doux (sans à-coup d'une image à l'autre),
+    plein BEAM0_ALLUMAGE s plus tard, bien avant P6 ; scene_e en pose les clés sur la lampe et ses deux jumelles."""
+    import helicos as H
+    import parcours as PC
+    import p5_virage as P5
+    ks = [H.beam0_allume(PC.t_of("P5", f)) for f in range(P5.F0, P5.F0 + P5.FRAMES)]
+    steps = [b - a for a, b in zip(ks, ks[1:])]
+    n_full = next(i for i, k in enumerate(ks) if k >= 1.0)
+    here = os.path.dirname(os.path.abspath(__file__))
+    with open(os.path.join(here, "scene_e.py"), encoding="utf-8") as f:
+        src_e = f.read()
+    keyed = re.search(r"allumage\(\[h\[\"searchlight\"\]\] \+ list\(twins\), FRAMES\)", src_e) is not None
+    check("P4 → P5 : le projecteur s'allume à son arrivée (éteint à P5/1, fondu sans à-coup, plein avant P6)",
+          ks[0] == 0.0 and min(steps) >= 0.0 and max(steps) <= 0.12 and ks[-1] == 1.0
+          and PC.t_of("P5", P5.F0 + n_full) - H.T5 <= H.BEAM0_ALLUMAGE + 1e-6 and keyed,
+          f"plein à P5/{P5.F0 + n_full}, pas max {max(steps):.3f}, clés posées {keyed}")
+
+
 def _cam_dev(fn, fr, out):
     yaw = max(abs(out[f][3] - fn(M.t_of(f))[3]) for f in fr)
     pit = max(abs(out[f][4] - fn(M.t_of(f))[4]) for f in fr)
@@ -2571,6 +2591,7 @@ if __name__ == "__main__":
     test_steer_dyn()
     test_aircraft()
     test_cut_p5_p6()
+    test_cut_p4_p5_beam()
     test_operator()
     test_drive()
     test_parcours()

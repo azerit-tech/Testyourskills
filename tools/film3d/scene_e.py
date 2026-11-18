@@ -1623,8 +1623,21 @@ def beam_lights(main, hero, ground, ground_w, car_w):
     for co in sans.collection_objects:
         co.light_linking.link_state = "EXCLUDE"
     main.light_linking.receiver_collection = sans
-    _twin(main, "faisceau_sol", ground_w, "#fff2d6", ground)
-    return _twin(main, "faisceau_berline", car_w, "#fff1e2", body)
+    return (_twin(main, "faisceau_sol", ground_w, "#fff2d6", ground),
+            _twin(main, "faisceau_berline", car_w, "#fff1e2", body))
+
+
+def allumage(lights, frames):
+    """Le projecteur de l'appareil 0 qui s'allume à son arrivée (helicos.beam0_allume) : la puissance de chaque
+    lampe (le pinceau et ses deux jumelles) en clés, de 0 à P5/1 à la sienne BEAM0_ALLUMAGE s plus tard."""
+    import helicos
+    for ob in lights:
+        full = ob.data.energy
+        for f in frames:
+            ob.data.energy = full * helicos.beam0_allume(P5.PC.t_of("P5", f))
+            ob.data.keyframe_insert("energy", frame=f)
+        ob.data.energy = full
+    return len(lights)
 
 
 def skid_p5(scene, width=0.24, place=None):
@@ -1769,8 +1782,9 @@ def plan_P5(scene, hidden, palier="conteneurs"):
     swept = [o for o in bpy.data.objects if o.type == "MESH" and (o.name == "port_terre_plein" or o.name.startswith((
         "conteneur_", "flaque_p5", "chaine", "caisse_", "palettes_", "futs", "separateur_", "port_couronnement",
         "trace_p5")))]
-    beam_lights(h["searchlight"], hero, swept, ground_w=helicos.BEAM0_SOL, car_w=helicos.BEAM0_BERLINE)
+    twins = beam_lights(h["searchlight"], hero, swept, ground_w=helicos.BEAM0_SOL, car_w=helicos.BEAM0_BERLINE)
     M.key_searchlight(h, FRAMES, helicos.beam_in_scene("P5", 0))
+    allumage([h["searchlight"]] + list(twins), FRAMES)
     if others:
         scene_d.helis_P6_light(others, range(1, helicos.N), hero, "P5", FRAMES)
     beams = {h["searchlight"]} | {o for r in others for o in r.children_recursive

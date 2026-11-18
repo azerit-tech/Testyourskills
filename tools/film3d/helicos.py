@@ -369,6 +369,18 @@ def beam0(T, density):
     return start * (BEAM0_FIN / start) ** w, BEAM0_CONE[0] + (BEAM0_CONE[1] - BEAM0_CONE[0]) * w
 
 
+# le projecteur s'allume quand l'appareil arrive sur le port (brouillon éclairé v8 : à la coupe P4 → P5, images 425 |
+# 426, son pinceau entrait d'un coup par le haut du cadre, l'appareil encore hors champ, alors que P4 n'en a pas) :
+# éteint à P5/1, la même image que la dernière de P4 sans lui, il monte en BEAM0_ALLUMAGE s (quintique : ni marche ni
+# à-coup), pinceau, tache au sol et lampe de la berline ensemble ; plein bien avant l'étoile 5 (P5/28)
+BEAM0_ALLUMAGE = 0.75
+
+
+def beam0_allume(T):
+    """La part allumée du projecteur de l'appareil 0 au temps du film T : 0 jusqu'à P5/1, 1 après BEAM0_ALLUMAGE s."""
+    return _quintic((T - T5) / BEAM0_ALLUMAGE)
+
+
 def beam0_sol(T):
     """La part de sa tache au sol que garde l'appareil 0 au temps T : entière tant que son pinceau se voit (P5, P6/1),
     éteinte avec lui (une tache au sol n'existe que si son pinceau se voit jusqu'à l'appareil)."""
