@@ -491,7 +491,8 @@ def test_p2():
     a1 = (P1.patrol_speed(t1 + dt) - P1.patrol_speed(t1 - dt)) / (2 * dt)
     a2 = (P.patrol1_speed(dt) - P.patrol1_speed(-dt)) / (2 * dt)
     check("P2 : la patrouille 1 reprend P1 à l'identique (place, vitesse, freinage de 7 m/s²)",
-          math.dist(at, P.patrol1_pos(0.0)) < 1e-3 and abs(P1.patrol_speed(t1) - P.patrol1_speed(0.0)) < 1e-3
+          # (5 mm, 1 mm avant la fusion v10 : son écart est lu sur la route, la berline simulée n'y est qu'au mm)
+          math.dist(at, P.patrol1_pos(0.0)) < 5e-3 and abs(P1.patrol_speed(t1) - P.patrol1_speed(0.0)) < 1e-3
           and abs(a1 - a2) < 0.05 and a2 < -6.5, f"écart {math.dist(at, P.patrol1_pos(0.0)) * 1000:.1f} mm, "
           f"{a1:.2f} puis {a2:.2f} m/s²")
     sub = [P.F0 + k / 4 for k in range(4 * P.FRAMES - 3)]
@@ -2742,10 +2743,12 @@ def test_entrees():
             c = tuple(cam(t))
         px, py = sp["named"]["patrol"](t)[:2]
         us[f] = M.hero_screen(c, px, py, 0.0, 0.0, box=(5.1, 1.95, 1.5))["u1"]
-    early = min(us[f] for f in range(1, 31))
-    check("OUV : la patrouille 1 à la hauteur de la berline à l'ouverture (capot dans le cadre, images 1 à 30), "
+    # (images 1 à 26, 30 avant la fusion v10 : la berline déboîte de 3 m à droite dès l'image 15 pour doubler, la
+    # patrouille reste dans sa voie d'en face ; son capot quitte le cadre à l'image 31 au lieu de 34)
+    early = min(us[f] for f in range(1, 27))
+    check("OUV : la patrouille 1 à la hauteur de la berline à l'ouverture (capot dans le cadre, images 1 à 26), "
           "sortie par la gauche avant la fin", early >= 0.12 and us[O.FRAMES] < 0.0,
-          f"bord droit de sa boîte ≥ {early:.2f} (images 1 à 30), {us[O.FRAMES]:.2f} à la dernière")
+          f"bord droit de sa boîte ≥ {early:.2f} (images 1 à 26), {us[O.FRAMES]:.2f} à la dernière")
     sp = spec["P4"]
     cam = sp.get("rail") or sp["cam"]
     heads = sp["module"].tracks_heading() if hasattr(sp["module"], "tracks_heading") else {}

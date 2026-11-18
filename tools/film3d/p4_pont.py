@@ -260,7 +260,10 @@ if VILLE:
     # pendant qu'elle la remonte, côte à côte, elle passe P1_PASS m à gauche d'elle (1,5 m d'air entre les caisses),
     # et se rabat à P1_SIDE une fois devant (P1_TUCK, en images du plan), l'état que P5 attend
     # (P1_TUCK : de 35 % du tronçon à 11 images de sa fin ; 150 et 238 sur les 249 images du pont d'avant)
-    P1_PASS, P1_TUCK = 3.6, (int(round(0.35 * FRAMES)), FRAMES - 11)
+    # (fusion v10 : de l'image 70 à l'avant-dernière, 38 à 97 avant. La berline simulée sort du slalom du pont le
+    # nez 2,5° à gauche ; rabattue quand elle n'a que 5 m d'avance, la patrouille passait à 1,19 m de son aile
+    # avant ; rabattue plus tard, une fois 5,5 m devant : 1,51 m)
+    P1_PASS, P1_TUCK = 3.6, (70, FRAMES - 1)
 
     def _p1_side(t):
         # (une quintique : sur le pont court, la rabattue ne dure que 2,5 s ; l'à-coup reste sous 12 m/s³)
@@ -270,7 +273,9 @@ if VILLE:
     # la part du slalom de la berline (parcours.voie, SPEC §18.62) que la patrouille 1 suit : la moitié. La berline
     # prend la voie de droite du pont (3,8 m à droite de la route) : la patrouille qui la remonte par la gauche
     # reste dans le cadre, à 1,9 m de la file d'en face au plus juste (diag/audit_trafic.py)
-    P1_VOIE = 0.5
+    # (fusion v10 : 0,6, 0,5 avant. La voiture simulée déboîte de 3,85 m ; à 0,5 la patrouille n'entrait dans le
+    # cadre qu'à P4/32, deux images après la fenêtre de test_entrees ; à 0,6 : P4/27)
+    P1_VOIE = 0.6
 
     def _voie_x(t):
         # l'écart du slalom en x de la scène (la voie à gauche de la berline est vers −x)

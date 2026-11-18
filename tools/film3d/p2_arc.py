@@ -139,7 +139,10 @@ def hero_s(t):
 # de tourner (P1_STRAIGHT) et s'arrête rampe allumée à l'entrée de l'anneau, derrière nous. Sa route : la ligne
 # décalée du parcours, puis sa courbure qui s'éteint ; son profil, celui de sa vitesse vraie le long de cette route.
 _P1T = P1.T_END + 1.0 / FPS                    # P2/1 est l'image qui suit P1/FRAMES
-P1_SIDE = P1.hero_pos(_P1T)[0] - P1.patrol_pos(_P1T)[0]                  # 3,45 m
+# (son écart à la ROUTE : la berline simulée n'est pas sur la route au millimètre, 13 mm à droite en sortant du
+# slalom de l'avenue ; lu sur la berline, la patrouille sautait d'autant à la coupe)
+P1_SIDE = (P1.hero_pos(_P1T)[0] + PC.DRIVE.lat_err(PC.START["P2"] / PC.FPS)
+           - P1.patrol_pos(_P1T)[0])                                     # 3,45 m
 P1_LEAD0 = P1.patrol_pos(_P1T)[1] - P1.hero_pos(_P1T)[1]                 # 3,0 m
 P1_V0 = P1.patrol_speed(_P1T)
 P1_A0 = (P1.patrol_speed(_P1T + 1.0 / 96.0) - P1.patrol_speed(_P1T - 1.0 / 96.0)) * 48.0
