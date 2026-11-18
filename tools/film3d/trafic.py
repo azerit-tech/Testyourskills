@@ -339,7 +339,7 @@ def _poursuite():
                 continue                # (le barrage : ses enveloppes relevées, GAREES_SCENES)
             hd = heads.get(nom)
 
-            def cap(g, fn=fn, hd=hd, g0=g0):
+            def cap(g, fn=fn, hd=hd, g0=g0, rot=rot):
                 a, b = fn(g - 3), fn(g + 3)
                 if math.dist(a, b) > 0.15:
                     return math.degrees(math.atan2(-(b[0] - a[0]), b[1] - a[1]))
