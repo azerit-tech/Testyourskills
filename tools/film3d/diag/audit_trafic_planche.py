@@ -190,7 +190,7 @@ def gris():
                 items.append((plan, int(f), p))
             else:
                 print("absent", p)
-    cols = min(6, max(1, math.ceil(len(items) / 2)))
+    cols = min(7, max(1, math.ceil(len(items) / 2)))
     rows = math.ceil(len(items) / cols)
     fig, axes = plt.subplots(rows, cols, figsize=(2.9 * cols, 5.5 * rows + 0.6), facecolor=FOND)
     axes = [axes] if rows * cols == 1 else list(getattr(axes, "flat", axes))
