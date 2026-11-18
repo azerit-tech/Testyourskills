@@ -99,22 +99,24 @@ def _sur_chemin(x, y, s0):
 
 # ---------------------------------------------------------------- la suiveuse (la patrouille 1, de 60 à 340)
 
-DEPART = 60                  # l'image où elle quitte la loi de l'avenue (p1_avenue : inchangée de 0 à 60)
+DEPART = 107                 # l'image où elle quitte la loi de l'avenue (p1_avenue : inchangée jusqu'à la coupe P1 | P2)
 RACCORD = 340                # l'image où elle rejoint la loi du pont (p4_pont : de 340 à 385, le contact du pont)
-# Sa ligne se dessine le long du chemin de la berline, par les places où la berline est passée aux images :
-VIRAGE = (69.3, 176)         # m de sa voie tenus tout droit après DEPART ; l'image où la berline est passée là
-#                              où elle rejoint son chemin : entre les deux, un seul virage à gauche dans l'anneau
-TROUEE = (232, 250, 255.4, 0.07)   # la trouée du barrage : de là où la berline est aux images 232 à 250 elle quitte
-#                              son chemin pour la droite qui passe la trouée (la berline y est à l'image 255,4),
-#                              0,07 m à gauche (la patrouille de droite du barrage dépasse des plots)
+# Sa ligne, à elle (la berline glisse, esquive et se déporte : elle ne la copie pas) : sa voie de l'avenue tenue tout
+# droit, un seul virage à gauche à travers l'anneau, la droite qui passe la trouée du barrage, sa voie du pont.
+VIRAGE = (-19.8, -399.0, 22.0, 60.0)  # x de ville où elle quitte sa voie de l'avenue ; y de ville où son virage finit,
+#                              sur la droite de la trouée ; les longueurs de ses tangentes au départ et à l'arrivée
+#                              (courte puis longue : elle tourne serré tant qu'elle est lente, puis ouvre)
+TROUEE = (255.4, 0.07)       # la droite de la trouée : la tangente du chemin de la berline là où elle est à cette
+#                              image, tant de mètres à gauche (la patrouille de droite du barrage dépasse des plots)
 G_DEBOITE = (268, 331)       # là où elle déboîte à gauche, la trouée passée (la berline y est à l'image 268), et là
 #                              où elle est dans sa voie du pont : elle double la caméra à 1 m au moins
 PAS_LIGNE = 0.05             # m : le pas de sa ligne
 # Son allure : elle tient d'abord sa vitesse de l'avenue (la berline freine pour le rond-point : elle remonte à sa
 # hauteur, à gauche dans le cadre), freine à son tour, plus fort et plus tard, jusqu'à l'entrée de l'anneau, puis
 # remet les gaz et les tient jusqu'au pont. L'instant où elle freine est celui qui la met à sa place du pont.
-B_FREIN = 6.6                # m/s² : son freinage (le plafond des patrouilles : 7,2)
-A_GAZ = 3.85                 # m/s² : ses gaz (le plafond : 4, motion.DRIVE_KINDS)
+B_FREIN = 2.5                # m/s² : sa retenue jusqu'à l'anneau, son freinage de l'avenue relâché
+B_MAX = 6.9                  # m/s² : sa retenue au plus fort, si la ligne est trop courte pour B_FREIN
+A_GAZ = 3.9                  # m/s² : ses gaz (le plafond : 4, motion.DRIVE_KINDS)
 J_FREIN, J_GAZ, J_PONT = 10.0, 10.0, 9.0   # m/s³ : les à-coups de son freinage, de ses gaz, de son lever de pied
 
 _BASE_AVENUE = None          # la loi de l'avenue avant le contact, (t du plan P1) -> (x, y) de sa scène
@@ -184,14 +186,14 @@ def _etat(pos, g):
     return s, n, v[1], (v[2] - v[0]) * FPS / 4.0
 
 
-def _profil(ts, e0, e1):
-    """[(t, accélération)] de DEPART à RACCORD (s depuis DEPART), linéaire entre les sommets : son accélération de
-    l'avenue ramenée à zéro, sa vitesse tenue jusqu'à ts, son freinage (B_FREIN) tenu, ses gaz (A_GAZ) tenus, puis
-    l'accélération de la loi du pont. La durée de son freinage est celle qui lui donne la vitesse du pont à RACCORD ;
-    None s'il n'y en a pas."""
+def _profil(ts, e0, e1, b=None):
+    """[(t, accélération)] de DEPART à RACCORD (s depuis DEPART), linéaire entre les sommets : son freinage de
+    l'avenue relâché, sa vitesse tenue jusqu'à ts, sa retenue (b, B_FREIN par défaut) tenue, ses gaz (A_GAZ) tenus,
+    puis l'accélération de la loi du pont. La durée de sa retenue est celle qui lui donne la vitesse du pont à
+    RACCORD ; None s'il n'y en a pas."""
     T = (RACCORD - DEPART) / FPS
     (v0, a0), (v1, a1) = e0[2:], e1[2:]
-    a, b = A_GAZ, B_FREIN
+    a, b = A_GAZ, (B_FREIN if b is None else b)
     t0, tf, tr, te = abs(a0) / J_GAZ, b / J_FREIN, (a + b) / J_GAZ, (a - a1) / J_PONT
     # v1 = v0 + a0 t0 / 2 - b tf / 2 - b th + (a - b) tr / 2 + a (T - te - ts - tf - th - tr) + (a + a1) te / 2
     th = (v0 + a0 * t0 / 2.0 - b * tf / 2.0 + (a - b) * tr / 2.0 + a * (T - te - ts - tf - tr) + (a + a1) * te / 2.0
@@ -225,54 +227,40 @@ def _table(prof, v0):
 
 def _ligne(e0, e1):
     """(points, longueurs) de sa ligne en ville, de sa place de DEPART à celle de RACCORD : sa voie de l'avenue
-    tenue tout droit (la droite de sa course à DEPART) sur VIRAGE[0] m ; un seul virage à gauche jusqu'au chemin de
-    la berline, rejoint là où elle est passée à l'image VIRAGE[1] (quintique d'Hermite : la place, le cap et la
-    courbure raccordés aux deux bouts) ; le chemin de la berline ensuite, quitté à G_DEBOITE[0] pour sa voie du
-    pont (la droite de la loi du pont à RACCORD), où elle est à G_DEBOITE[1]."""
+    tenue tout droit (la droite de sa course à DEPART) jusqu'à x VIRAGE[0] ; un seul virage à gauche jusqu'à la droite
+    de la trouée, rejointe à y VIRAGE[1] (quintique d'Hermite : place et cap raccordés, courbure nulle aux deux
+    bouts) ; cette droite à travers le barrage ; puis, de G_DEBOITE[0] à G_DEBOITE[1], un seul fondu vers sa voie
+    du pont (la droite de la loi du pont à RACCORD)."""
     o = _avenue_ville(DEPART)
     a, b = _avenue_ville(DEPART - 1.0), _avenue_ville(DEPART + 1.0)
     d = math.dist(a, b)
     ux, uy = (b[0] - a[0]) / d, (b[1] - a[1]) / d
-    pts = [(o[0] + ux * k * PAS_LIGNE, o[1] + uy * k * PAS_LIGNE) for k in range(int(VIRAGE[0] / PAS_LIGNE))]
-    A = (o[0] + ux * VIRAGE[0], o[1] + uy * VIRAGE[0])
-    sb = s_berline(VIRAGE[1])
-    B, (tx, ty) = _au_chemin(sb)
-    (_, (t0x, t0y)), (_, (t1x, t1y)) = _au_chemin(sb - 0.5), _au_chemin(sb + 0.5)
-    kap = (tx * (t1y - t0y) - ty * (t1x - t0x))        # sa courbure à l'arrivée (1/m, positive à gauche)
-    L = math.dist(A, B) * 1.08                         # la longueur du virage, à peu près : la vitesse du paramètre
-    n = int(L / PAS_LIGNE)
+    droit = (VIRAGE[0] - o[0]) / ux
+    pts = [(o[0] + ux * k * PAS_LIGNE, o[1] + uy * k * PAS_LIGNE) for k in range(int(droit / PAS_LIGNE))]
+    A = (o[0] + ux * droit, o[1] + uy * droit)
+    # la droite de la trouée
+    D, (dx, dy) = _au_chemin(s_berline(TROUEE[0]))
+    D = (D[0] - dy * TROUEE[1], D[1] + dx * TROUEE[1])
+    mB = (VIRAGE[1] - D[1]) / dy
+    B = (D[0] + dx * mB, D[1] + dy * mB)
+    L0, L1 = VIRAGE[2], VIRAGE[3]
+    n = int(1.3 * math.dist(A, B) / PAS_LIGNE)
     for k in range(n):
         u = k / n
-        u2, u3, u4, u5 = u * u, u ** 3, u ** 4, u ** 5
+        u3, u4, u5 = u ** 3, u ** 4, u ** 5
         h0, h1 = 1 - 10 * u3 + 15 * u4 - 6 * u5, 10 * u3 - 15 * u4 + 6 * u5
         g0, g1 = u - 6 * u3 + 8 * u4 - 3 * u5, -4 * u3 + 7 * u4 - 3 * u5
-        c1 = 0.5 * u3 - u4 + 0.5 * u5
-        pts.append((h0 * A[0] + h1 * B[0] + L * (g0 * ux + g1 * tx) + L * L * c1 * kap * -ty,
-                    h0 * A[1] + h1 * B[1] + L * (g0 * uy + g1 * ty) + L * L * c1 * kap * tx))
-    # la droite qui passe la trouée du barrage : la tangente du chemin de la berline dans la trouée, TROUEE[3] m à
-    # gauche ; elle quitte le chemin pour cette droite avant le barrage (la berline, elle, se déporte à droite après)
-    s1, s2 = s_berline(TROUEE[0]), s_berline(TROUEE[1])
-    D, (dx, dy) = _au_chemin(s_berline(TROUEE[2]))
-    D = (D[0] - dy * TROUEE[3], D[1] + dx * TROUEE[3])
-    n = int(math.ceil((s2 - sb) / PAS_LIGNE))
-    for k in range(n):
-        q = sb + (s2 - sb) * k / n
-        x, y = _au_chemin(q)[0]
-        u = min(1.0, max(0.0, (q - s1) / (s2 - s1)))
-        w = u * u * u * (10.0 - 15.0 * u + 6.0 * u * u)
-        m = (x - D[0]) * dx + (y - D[1]) * dy
-        pts.append((x + (D[0] + dx * m - x) * w, y + (D[1] + dy * m - y) * w))
-    # sa voie du pont : la droite de la loi du pont à RACCORD, prolongée vers l'arrière ; de la droite de la trouée
-    # à cette voie, un seul fondu le long de la voie, de G_DEBOITE[0] à G_DEBOITE[1]
+        pts.append((h0 * A[0] + h1 * B[0] + g0 * L0 * ux + g1 * L1 * dx, h0 * A[1] + h1 * B[1] + g0 * L0 * uy + g1 * L1 * dy))
+    # sa voie du pont : la droite de la loi du pont à RACCORD, prolongée vers l'arrière
     R = _pont_ville(RACCORD)
     ra, rb = _pont_ville(RACCORD - 1.0), _pont_ville(RACCORD + 1.0)
     d = math.dist(ra, rb)
     vx, vy = (rb[0] - ra[0]) / d, (rb[1] - ra[1]) / d
     cs = dx * vx + dy * vy
 
-    def voie(p):
-        return (p[0] - R[0]) * vx + (p[1] - R[1]) * vy
-    v0, va, vc = (voie(_au_chemin(q)[0]) for q in (s2, s_berline(G_DEBOITE[0]), s_berline(G_DEBOITE[1])))
+    def voie(q):
+        return (q[0] - R[0]) * vx + (q[1] - R[1]) * vy
+    v0, va, vc = voie(B), voie(_au_chemin(s_berline(G_DEBOITE[0]))[0]), voie(_au_chemin(s_berline(G_DEBOITE[1]))[0])
     vD = voie(D)
     n = int(math.ceil(-v0 / PAS_LIGNE))
     for k in range(n + 1):
@@ -306,23 +294,39 @@ def _cles():
         e0, e1 = _etat(_avenue_ville, DEPART), _etat(_pont_ville, RACCORD)
         pts, cum = _ligne(e0, e1)
         but = cum[-1]
-        # plus elle freine tard, plus elle fait de chemin : l'instant de son freinage par bissection
-        t0 = abs(e0[3]) / J_GAZ
-        lo, hi = t0, (RACCORD - DEPART) / FPS
-        for _ in range(60):
-            ts = (lo + hi) / 2.0
-            prof = _profil(ts, e0, e1)
-            if prof is None or _table(prof, e0[2])[-1][0] > but:
-                hi = ts
-            else:
-                lo = ts
-        prof = _profil(lo, e0, e1)
-        assert prof is not None, "la suiveuse ne rejoint pas sa place du pont (aucun freinage ne convient)"
+        # plus elle se retient tard, plus elle fait de chemin : l'instant de sa retenue par bissection ; et si, retenue
+        # dès que son freinage de l'avenue est relâché, elle en fait encore trop, elle se retient plus fort (B_MAX)
+        t0 = abs(e0[3]) / J_GAZ + 1e-6
+
+        def chemin(ts, b):
+            prof = _profil(ts, e0, e1, b)
+            return float("inf") if prof is None else _table(prof, e0[2])[-1][0]
+        frein = B_FREIN
+        if chemin(t0, frein) > but:
+            ts, lo, hi = t0, B_FREIN, B_MAX
+            for _ in range(50):
+                frein = (lo + hi) / 2.0
+                if chemin(t0, frein) > but:
+                    lo = frein
+                else:
+                    hi = frein
+            frein = hi
+        else:
+            lo, hi = t0, (RACCORD - DEPART) / FPS
+            for _ in range(50):
+                ts = (lo + hi) / 2.0
+                if chemin(ts, frein) > but:
+                    hi = ts
+                else:
+                    lo = ts
+            ts = lo
+        prof = _profil(ts, e0, e1, frein)
+        assert prof is not None, "la suiveuse ne rejoint pas sa place du pont (aucune retenue ne convient)"
         tab = _table(prof, e0[2])
         assert abs(tab[-1][0] - but) < 0.02 and min(v for _, v in tab) > 1.0, \
             "la suiveuse ne rejoint pas sa place du pont : %.2f m d'écart, %.1f m/s au plus bas" % (
                 tab[-1][0] - but, min(v for _, v in tab))
-        _CLES = dict(ligne=(pts, cum), table=tab, profil=prof, manque=tab[-1][0] - but)
+        _CLES = dict(ligne=(pts, cum), table=tab, profil=prof, frein=frein, manque=tab[-1][0] - but)
     return _CLES
 
 
@@ -417,7 +421,7 @@ def main():
     print("la suiveuse (la patrouille 1) : image, avance, écart à gauche, vitesse, accélération ; la berline")
     c = _cles()
     pr = [DEPART + t * FPS for t, _ in c["profil"]]
-    print(f"  vitesse tenue jusqu'à l'image {pr[2]:.1f}, freinage de {B_FREIN} m/s² tenu de {pr[3]:.1f} à {pr[4]:.1f}, gaz "
+    print(f"  vitesse tenue jusqu'à l'image {pr[2]:.1f}, retenue de {c['frein']:.2f} m/s² tenue de {pr[3]:.1f} à {pr[4]:.1f}, gaz "
           f"de {A_GAZ} m/s² tenus de {pr[5]:.1f} à {pr[6]:.1f} ; {min(v for _, v in c['table']):.1f} m/s au plus bas ; "
           f"écart au but {c['manque'] * 1000:.1f} mm")
     for g in list(range(48, RACCORD + 12, 12)):

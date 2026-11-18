@@ -130,7 +130,7 @@ def _w(t):
 def patrol_accel(t):
     """Son accélération (m/s²)."""
     h = 1e-3
-    if PC.START["P1"] + t * M.FPS > 60:                 # (v11 : police.DEPART, la suiveuse)
+    if PC.START["P1"] + t * M.FPS > 107:                # (v11 : police.DEPART, la suiveuse)
         import police
         return police.suiveuse_accel(police.g_de("P1", t))
     if t >= _TK:
