@@ -106,7 +106,7 @@ export interface ScoreStep {
 export const starThreshold = (k: Stars): number => (k === 1 ? 0 : STAR_THRESHOLDS[k - 2]);
 
 /**
- * Les paliers du score (SPEC §18.77) : au coup de chaque étoile gagnée, la montée jusqu'à son seuil ; puis, juste
+ * Les paliers du score (SPEC §18.78) : au coup de chaque étoile gagnée, la montée jusqu'à son seuil ; puis, juste
  * avant le gel, la dernière jusqu'à la note exacte. Jamais au-delà de la note, toujours croissant.
  */
 export function scoreSteps(stars: FilmStar[], overall: number, freeze: number): ScoreStep[] {

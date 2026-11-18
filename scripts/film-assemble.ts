@@ -12,7 +12,7 @@
 //   --slates : ignore les prises, tout en cartons
 //   --out    : les fichiers du site (défaut web/src/film/media, importés par Vite)
 //   --crf    : le CRF de départ par taille, « 720:28,540:28 » (défaut START_CRF) : le poids visé
-//              sous les plafonds (SPEC §18.77 : le film final sous le poids des fichiers d'avant)
+//              sous les plafonds (SPEC §18.78 : le film final sous le poids des fichiers d'avant)
 //   --threads: les fils de ffmpeg (défaut 2 : la machine reste utilisable)
 //   --sizes  : les tailles à encoder, « 720,540 » par défaut
 // Intermédiaires et planche des huit plans dans var/film/ (ignoré par git).

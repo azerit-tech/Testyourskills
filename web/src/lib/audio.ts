@@ -7,7 +7,7 @@
 // Sans Three.js : ce module vit dans le bundle de l'accueil.
 
 /**
- * Le site joue muet (SPEC §18.77, lancement du 19 novembre) : aucun contexte
+ * Le site joue muet (SPEC §18.78, lancement du 19 novembre) : aucun contexte
  * audio n'est créé, aucun geste n'est demandé pour le son, aucun bouton de son
  * n'est montré. Le code des sons reste, éteint ; le remettre ici rallume tout.
  */

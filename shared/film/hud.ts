@@ -106,7 +106,7 @@ export interface Hud {
    */
   freeze: { titleScale: number; verdict: number } | null;
   /**
-   * Le score qui monte (§18.77), sous la rangée : `value` en montée adoucie, `step` palier par palier (mouvement
+   * Le score qui monte (§18.78), sous la rangée : `value` en montée adoucie, `step` palier par palier (mouvement
    * réduit), entiers, de 0 à la note, atteinte à l'image du gel.
    */
   score: { value: number; step: number };

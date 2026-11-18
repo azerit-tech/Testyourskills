@@ -5,7 +5,7 @@
 // suivante, l'étoile qui tombe en grand puis rejoint sa place, une ligne sous
 // la berline (une étiquette, une ligne), la plaque, le niveau et la ligne de
 // l'étoile refusée à l'arrêt sur image (son image en deux tons, toise comprise,
-// est tirée par freeze.ts), le score qui monte jusqu'à la note (§18.77), le
+// est tirée par freeze.ts), le score qui monte jusqu'à la note (§18.78), le
 // grain, la vignette et deux ombres d'encre. Tout
 // vient de hudAt : aucun état, aucune animation CSS qui dériverait de l'image.
 // Mat : aplats, ni halo ni ombre lumineuse.
@@ -144,7 +144,7 @@ export function FilmHud({ plan, hud, lang }: { plan: FilmPlan; hud: Hud; lang: L
         })}
       </div>
 
-      {/* le score qui monte (§18.77), sous la rangée : la montée adoucie, ou palier par palier en mouvement réduit */}
+      {/* le score qui monte (§18.78), sous la rangée : la montée adoucie, ou palier par palier en mouvement réduit */}
       <p className="film-score" style={{ opacity: hud.bands }} aria-hidden="true">
         <ScoreDigits n={hud.score.value} className="film-score-run" />
         <ScoreDigits n={hud.score.step} className="film-score-step" />

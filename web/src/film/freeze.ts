@@ -41,7 +41,7 @@ const TRACED = { w: 720, h: 1280 };
  * la dernière image du tronçon dans `poursuite` ; FIN6 : la dernière du fichier.
  * À retracer à chaque nouveau rendu de ces images.
  *
- * Tracés le 18 novembre (SPEC §18.77) sur le rendu final v11 (bras B), images
+ * Tracés le 18 novembre (SPEC §18.78) sur le rendu final v11 (bras B), images
  * 107, 214, 317, 425, 485 et 719 de `poursuite-720.mp4` : de dos au bras commun
  * de P1 à P4, de trois quarts arrière dans le dérapage du port (P5), de trois
  * quarts avant arrêtée sur la pointe (FIN6) ; pare-chocs compris, roues

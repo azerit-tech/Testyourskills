@@ -533,7 +533,7 @@ describe("radioLines", () => {
   });
 });
 
-describe("le score qui monte (§18.77)", () => {
+describe("le score qui monte (§18.78)", () => {
   const threshold = (k: Stars) => (k === 1 ? 0 : STAR_THRESHOLDS[k - 2]);
   for (const n of LEVELS) {
     it(`${n} étoile${n > 1 ? "s" : ""} : de 0 à la note, croissant, pile à la note au gel`, () => {

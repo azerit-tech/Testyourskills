@@ -352,7 +352,7 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [phase, prepared]);
 
-  // La bande-son (§18.39, lib/filmSound.ts) : créée avec le plan, libérée au démontage. Site muet (§18.77) : aucune.
+  // La bande-son (§18.39, lib/filmSound.ts) : créée avec le plan, libérée au démontage. Site muet (§18.78) : aucune.
   useEffect(() => {
     if (!SOUND_ON) return;
     const s = createFilmSound(plan);

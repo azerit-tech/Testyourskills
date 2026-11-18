@@ -8,7 +8,7 @@
 // Sans ffprobe, le contrôle se saute en le disant. GAP_EXPECTED : true tant
 // que les fichiers ne suivent pas le découpage (l'écart n'est qu'un
 // avertissement, FILM_MEDIA_STRICT=1 le rend bloquant) ; false depuis le rendu
-// final v11 monté (SPEC §18.77) : les contrôles sont bloquants.
+// final v11 monté (SPEC §18.78) : les contrôles sont bloquants.
 
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
@@ -66,7 +66,7 @@ describe.skipIf(!hasFfprobe)("film : les fichiers ont les durées du découpage"
  * relevée sur `poursuite-720.mp4`. Un nouveau rendu change l'image : le contour
  * ne tient plus la voiture. Il faut alors le retracer, puis relever l'empreinte ici.
  *
- * Relevées le 18 novembre (SPEC §18.77) sur le rendu final v11, monté en
+ * Relevées le 18 novembre (SPEC §18.78) sur le rendu final v11, monté en
  * 720 images. Celles de l'ancien découpage (17 novembre, fichiers de 414 et 80
  * images) : P1 02030105…, P2 80918a80…, P3 59c046c4…, P4 d5d5cd9d…, P5
  * 00000844…, FIN6 00000080….
