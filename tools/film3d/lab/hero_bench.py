@@ -200,6 +200,23 @@ def lighting(kind):
         raise SystemExit(f"éclairage inconnu {kind}")
 
 
+def searchlight_off_glass(car):
+    """Le projecteur du banc n'éclaire pas les vitres, comme dans le film : scene_d.split_for_car exclut la berline
+    entière de chaque source séparée et sa jumelle n'éclaire que la caisse sans les vitres (propriété « vitre »).
+    Sans cela la lunette du banc blanchissait en entier sous 1,2 MW, ce que le film ne montre pas."""
+    import bpy
+    lamp = bpy.data.objects.get("bench_searchlight")
+    glass = [o for o in [car, *car.children_recursive] if o.type == "MESH" and o.get("vitre")]
+    if lamp is None or not glass:
+        return
+    col = bpy.data.collections.new("bench_projecteur_sans")
+    for o in glass:
+        col.objects.link(o)
+    for co in col.collection_objects:
+        co.light_linking.link_state = "EXCLUDE"
+    lamp.light_linking.receiver_collection = col
+
+
 def car_fill(car, glossy=True, loc=(0.4, -8.0, 2.2), energy=500.0, size=4.0):
     """La source douce de face de lieux.car_fill (P4 : 500 W, disque de 4 m, 8 m devant, 2,2 m de haut), liée à la
     seule voiture, invisible à la caméra ; glossy=False la retire aussi des reflets."""
@@ -385,6 +402,8 @@ def main():
     for kind in [k for k in a.lights.split(",") if k]:
         scene, car, parts = build(a)
         lighting(kind)
+        if kind == "helico":
+            searchlight_off_glass(car)
         if a.fill:
             car_fill(car, glossy=a.fill != "noglossy")
         if a.chase_fill:
