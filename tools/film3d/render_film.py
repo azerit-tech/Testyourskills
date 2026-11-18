@@ -27,6 +27,8 @@
 # essai vont dans <out>/<PLAN>+<essai>/ et ne deviennent jamais une prise du montage) :
 #   rugosite[=0.5]        la rugosité de la chaussée (Roughness des matières rue_asphalt*, rue_gutter) × 0,5
 #   brume[=1]             la brume creusée entre la caisse de la berline et l'objectif (et autour de la caisse)
+#   etat                  aucun rendu : l'état de la scène aux images des coupes du plan, <out>/etat/g<image>-<PLAN>.json
+#                         (diag/etat_coupes.py les compare des deux côtés de chaque coupe)
 #   peinture=<hex>        FILM3D_PAINT        metal=<0..1>   FILM3D_PAINT_METAL
 #   vernis=<0..1>         FILM3D_PAINT_COAT (facteur du poids du vernis)
 #   vernis_rugosite=<0..1>  FILM3D_PAINT_COAT_ROUGH (rugosité ajoutée au vernis)
@@ -72,7 +74,8 @@ TRAJ = {"OUV": "ouv_avenue", "P1": "p1_avenue", "P2": "p2_arc", "P3": "p3_enseig
 FULL = (720, 1280)
 DRAFT = (360, 640)
 ESSAIS = {"rugosite": 0.5, "brume": 1.0, "peinture": None, "metal": None, "vernis": None, "vernis_rugosite": None,
-          "audit": 1.0, "sol_gris": 1.0}      # audit, sol_gris : diag/audit_sol.py (le bas du cadre aux coupes)
+          "audit": 1.0, "sol_gris": 1.0,      # audit, sol_gris : diag/audit_sol.py (le bas du cadre aux coupes)
+          "etat": 1.0}                        # etat : diag/etat_coupes.py (l'état de la scène aux coupes, sans rendu)
 PAINT_ENV = {"peinture": "FILM3D_PAINT", "metal": "FILM3D_PAINT_METAL", "vernis": "FILM3D_PAINT_COAT",
              "vernis_rugosite": "FILM3D_PAINT_COAT_ROUGH"}
 
@@ -358,6 +361,13 @@ def worker(a):
                res=list(res), engine=engine, device=device, samples=samples, build_s=round(t_build, 1), scene_src=how,
                draft_mode=draft_mode)
     if a.mode == "list":
+        return
+    if "etat" in essais:
+        # l'état de la scène aux images de ses coupes (diag/etat_coupes.py, SPEC §18.70) : relevé, rien n'est rendu
+        sys.path.insert(0, os.path.join(HERE, "diag"))
+        import etat_coupes
+        faits = etat_coupes.releve_plan(bpy, scene, plan, a.out)
+        log(f"{plan} : état de la scène relevé aux images {faits} du film ({os.path.join(a.out, 'etat')}), rien de rendu")
         return
 
     r = scene.render
