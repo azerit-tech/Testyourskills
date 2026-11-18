@@ -1931,17 +1931,17 @@ def test_cut_p5_p6():
     ph5 = eval(e5, {"frame": n5 + 1})                                       # noqa: S307
     ph6 = eval(e6, {"frame": P6.F0})                                        # noqa: S307
     check("P5 → P6 : les rotors en phase (pilotes sur l'image du film)", abs(ph5 - ph6) < 1e-9, f"{e5} | {e6}")
-    # le phare : celui de la jetée, gelé (P6_PHARE_VITESSE nul), vu par P5 dans la ville ; le port n'en pose pas
+    # le phare : celui de la jetée, gelé pendant P6 (p6_jetee.PHARE_GELE), vu par P5 dans la ville ; le port n'en pose pas
     here = os.path.dirname(os.path.abspath(__file__))
     with open(os.path.join(here, "scene_d.py"), encoding="utf-8") as f:
         src_d = f.read()
     with open(os.path.join(here, "scene_e.py"), encoding="utf-8") as f:
         src_e = f.read()
-    # (depuis le brouillon éclairé v9, il tourne en P6 comme en FIN6, en clés sur le temps du film, que la ville décale
-    # pour P5 : test_cut_habitacle_phare)
-    gele = 'phare_film(bpy.data.objects["phare"], "P6", frames)' in src_d
+    # (fusion v10 : gelé pendant P6, sans pilote ni clé, donc au même angle pour P5 qui le voit en voisin ; FIN6 repart
+    # de là : test_cut_habitacle_phare)
+    gele = "L.phare_tourne(ph6, phase=P6.PHARE_GELE, vitesse=0.0)" in src_d.split("def plan_P6(")[1]
     seul = re.search(r'lieu="port",\s*phare=False\)', src_e) is not None
-    check("P5 → P6 : un seul phare, celui de la jetée, tourné sur le temps du film (le port n'en pose pas en ville)",
+    check("P5 → P6 : un seul phare, celui de la jetée, gelé pendant P6 (le port n'en pose pas en ville)",
           gele and seul, f"temps du film {gele}, port sans phare {seul}")
     check("P5 → P6 : les traces de gomme de P5 posées dans P6 (la ville ne reprend pas celles du port)",
           'skid_p5(scene, place="P6")' in src_d and PC.LIEU["P5"] == "E")
@@ -2030,8 +2030,8 @@ def test_cut_sol_voisin():
 def test_cut_habitacle_phare():
     """Les raccords de lumière de la berline et du phare (brouillon éclairé v9, SPEC §18.63) : l'habitacle allumé,
     le même dans les huit tronçons (P2, P4, P5 et P6 ne le posaient pas : la lunette passait au noir à 107 | 108 et
-    317 | 318, se rallumait à 618 | 619) ; le phare de P6 tourne comme celui de FIN6, au même angle des deux côtés de
-    618 | 619 (gelé en P6, son trait d'éclat surgissait), en clés linéaires que la ville décale pour P5 et P4."""
+    317 | 318, se rallumait à 618 | 619) ; le phare au même angle et aux mêmes pinceaux des deux côtés de 618 | 619 :
+    gelé pendant P6, il balaie à partir de FIN6/1 (fusion v10, SPEC §18.67)."""
     import p6_jetee as P6
     import fin6_orbite as F6
     here = os.path.dirname(os.path.abspath(__file__))
@@ -2059,15 +2059,27 @@ def test_cut_habitacle_phare():
            and kp.index("hero_fill") > kp.index('avec = bpy.data.collections.new'))
     check("107 | 108, 214 | 215 : la nappe hero_fill de P2 liée à la seule berline (pas de flaque de lumière à P2)",
           lie and 'A.add_light("hero_fill"' in src("scene_carrefour.py"), f"liée {lie}")
-    a6 = P6.phare_azimut("P6", P6.F0 + P6.FRAMES)          # P6 prolongé d'une image : FIN6/1
-    a_fin6 = P6.FIN6_PHARE_PHASE + P6.FIN6_PHARE_VITESSE / 24.0 * F6.F0      # le pilote de FIN6 à son image 1
-    d = src("scene_d.py").split("def plan_FIN6(")[1].split("\ndef ")[0]
-    fin6 = (f"L.phare_tourne(ph, phase={P6.FIN6_PHARE_PHASE}, vitesse={P6.FIN6_PHARE_VITESSE})" in d
-            and f"L.phare_pinceaux(ph, releve={P6.FIN6_PHARE_RELEVE}, portee={P6.FIN6_PHARE_PORTEE})" in d)
-    pas = P6.phare_azimut("P6", 2) - P6.phare_azimut("P6", 1)
-    check("618 | 619 : le phare de P6 au même angle que celui de FIN6 (même vitesse, mêmes pinceaux)",
-          abs(a6 - a_fin6) < 1e-9 and fin6 and abs(pas - P6.FIN6_PHARE_VITESSE / 24.0) < 1e-12,
-          f"{a6 % 360:.2f}° | {a_fin6 % 360:.2f}°, FIN6 lu dans scene_d {fin6}")
+    # le phare, une seule loi de P6 à FIN6 (p6_jetee.phare_azimut, fusion v10 §18.67) : gelé pendant P6, il repart de
+    # cette place à FIN6/1 ; les deux plans de la ville la lisent, avec les mêmes pinceaux. (Deux branches l'avaient
+    # raccordé en sens inverse, chacune verte contre ses propres constantes : il sautait à 618 | 619, film gris v10.)
+    sd = src("scene_d.py")
+    d6 = sd.split("def plan_P6(")[1].split("\ndef ")[0]
+    d = sd.split("def plan_FIN6(")[1].split("\ndef ")[0]
+    ville_fin6 = d.split("L.ville_on():")[1].split("elif ph is not None:")[0]      # la branche de la ville
+    a6 = P6.phare_azimut("P6", P6.F0 + P6.FRAMES - 1)      # la dernière image de P6 (618)
+    a_fin6 = P6.phare_azimut("FIN6", F6.F0)                # la première de FIN6 (619)
+    pilote = P6.PHARE_GELE - P6.PHARE_BALAYAGE * F6.F0 / 24.0 + P6.PHARE_BALAYAGE / 24.0 * F6.F0     # plan_FIN6, F0
+    pas6 = P6.phare_azimut("P6", 2) - P6.phare_azimut("P6", 1)
+    pas_fin = P6.phare_azimut("FIN6", F6.F0 + 1) - P6.phare_azimut("FIN6", F6.F0)
+    pinceaux = "L.phare_pinceaux(ph6, releve=P6.PHARE_RELEVE, portee=P6.PHARE_PORTEE)"
+    p6_lit = "L.phare_tourne(ph6, phase=P6.PHARE_GELE, vitesse=0.0)" in d6 and pinceaux in d6
+    fin6 = ("L.phare_tourne(ph, phase=P6.PHARE_GELE - P6.PHARE_BALAYAGE * F6.F0 / 24.0, vitesse=P6.PHARE_BALAYAGE)"
+            in ville_fin6 and pinceaux.replace("ph6", "ph") in ville_fin6)
+    check("618 | 619 : le phare de P6 au même angle que celui de FIN6, mêmes pinceaux (gelé en P6, FIN6 repart de là)",
+          abs(a6 - a_fin6) < 1e-9 and abs(pilote - a_fin6) < 1e-9 and p6_lit and fin6 and pas6 == 0.0
+          and abs(pas_fin - P6.PHARE_BALAYAGE / 24.0) < 1e-12 and "phare_film" not in sd,
+          f"{a6 % 360:.2f}° | {a_fin6 % 360:.2f}°, puis {pas_fin:.2f}° par image ; P6 lu dans scene_d {p6_lit}, "
+          f"FIN6 (ville) {fin6}")
 
 
 def test_cut_p4_p5_beam():
