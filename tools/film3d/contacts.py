@@ -42,18 +42,26 @@ SUITE = 0.15                 # s : le plus fort du choc se cherche jusque-là ap
 # berline) ; plat : flanc contre flanc (sinon un coin d'abord) ; v : la vitesse d'approche le long de la normale
 # (m/s) ; e : la restitution ; frot : la part de l'impulsion le long des caisses (positif, la berline est poussée en
 # avant) ; duree : s, la durée de la force ; serre : s, le temps que la patrouille met à venir sur elle ; retour :
-# m/s², l'accélération de côté (au plus fort) avec laquelle elle reprend sa ligne.
+# m/s², l'accélération de côté (au plus fort) avec laquelle elle reprend sa ligne ; depart : m/s², celle avec laquelle
+# elle décroche d'abord (sinon retour) ; vmax : m/s, sa vitesse de côté au plus pendant le retour (sinon libre) ;
+# rejoint : (début, fin) en s après l'impulsion du fondu de la berline dans sa conduite d'avant (Conduite).
 CHOCS = (
     # l'avenue, 0,6 s après l'ouverture : la patrouille 1, à la hauteur de la berline dès la première image, se
     # rabat sur elle depuis avant l'ouverture ; portière contre portière. La berline part à droite : son changement
     # de voie suit. Plus tard, la voiture A est entre elles (images 30 à 66) et la simulation ne tient pas le choc
     # au milieu du changement de voie (images 28 à 44)
     dict(nom="avenue", image=14.0, plan="OUV", module="p1_avenue", patrouille="patrol", cote=+1, plat=True, avance=-1.0, v=2.0, e=0.3,
-         frot=0.0, duree=0.08, serre=1.2, retour=6.0),
-    # le pont, à la fin du dépassement : la patrouille 1, qui remonte la berline, ferme la porte pendant qu'elle
-    # revient à gauche ; son flanc arrière contre l'aile et la portière avant de la berline
-    dict(nom="pont", image=368.0, plan="P4", module="p4_pont", patrouille="patrol_0", cote=+1, plat=True, avance=2.0, v=2.4, e=0.3,
-         frot=0.0, duree=0.08, serre=2.0, retour=3.0),
+         frot=0.0, duree=0.08, serre=1.2, retour=5.0, rejoint=(1.0, 2.5)),
+    # le pont, à la fin du dépassement de B1, dix images avant la quatrième étoile : la patrouille 1, qui remonte la
+    # berline, ferme la porte pendant qu'elle revient à gauche ; son flanc arrière contre l'aile avant de la berline,
+    # et elle reste appuyée cinq images. Elle décroche vite (depart), avant de freiner pour le port à 6,4 m/s² (dès
+    # l'image 387) : il ne lui reste alors que 3,7 m/s² de côté dans l'adhérence du mouillé, et le retour s'y tient
+    # (vmax, retour). frot : elle va plus vite que la berline, sa tôle l'entraîne un peu (5 % de l'impulsion).
+    # L'image (mesuré, 18 novembre) : à 368 le choc tombe au plus fort de la dérive du changement de voie (6,6°,
+    # 9,2° avec lui, au-delà des 8,5° d'un changement de voie) et la reprise sur le freinage du port (la caméra y
+    # prend 53 m/s³ d'à-coup, 50 au plus) ; à 365, 7,8° et 34 m/s³
+    dict(nom="pont", image=365.0, plan="P4", module="p4_pont", patrouille="patrol_0", cote=+1, plat=True, avance=2.0, v=2.4, e=0.3,
+         frot=0.05, duree=0.08, serre=2.0, depart=3.5, vmax=1.6, retour=2.5, rejoint=(1.0, 2.4)),
 )
 
 
@@ -136,6 +144,51 @@ def efforts(t):
 
 
 _EFFORTS = efforts_de(CHOCS)
+
+
+# ---------------------------------------------------------------- la conduite du film
+REJOINT = (1.0, 2.2)      # s après l'impulsion : la berline, revenue sur sa ligne, rejoint sa conduite d'avant
+
+
+class Conduite:
+    """La conduite du film avec ses contacts. Hors des contacts c'est celle d'avant (`sans`), à l'image près : les
+    dérapages, l'arrêt, les marges à la circulation ne bougent pas. Autour de chaque contact c'est la simulation qui
+    le reçoit (une par contact : elle est celle d'avant jusqu'à l'impulsion) ; une fois la berline revenue sur sa
+    ligne, elle est fondue dans la conduite d'avant (c["rejoint"], sinon REJOINT : début et fin du fondu, s après
+    l'impulsion ; il reste alors entre les deux conduites une ou deux dizaines de centimètres, l'embardée coûte un
+    peu de temps). `simuler(efforts)` rend une conduite (dynamique.simulate)."""
+    TEMPS = ("pos", "heading", "travel", "slip", "steer", "speed", "along", "alat", "roll", "pitch", "yaw_rate",
+             "throttle", "brake", "handbrake", "wheelspin", "s", "lat_err", "voie_err", "rear_slip", "slip_ref")
+    ANGLES = ("heading", "travel", "slip", "steer", "slip_ref")
+
+    def __init__(self, sans, simuler, chocs=None):
+        self.sans, self.fen = sans, []
+        for c in (CHOCS if chocs is None else chocs):
+            a, b = c.get("rejoint", REJOINT)
+            self.fen.append((instant(c) - c["duree"], instant(c) + a, instant(c) + b, simuler(efforts_de([c]))))
+
+    def __getattr__(self, nom):
+        if nom in ("sans", "fen"):
+            raise AttributeError(nom)
+        v = getattr(self.sans, nom)
+        if nom not in self.TEMPS:
+            return v
+        angle = nom in self.ANGLES
+
+        def f(t, *a, **kw):
+            for t0, ta, tb, d in self.fen:
+                if t0 < t < tb:
+                    x = getattr(d, nom)(t, *a, **kw)
+                    if t <= ta:
+                        return x
+                    y = v(t, *a, **kw)
+                    u = (t - ta) / (tb - ta)
+                    w = u * u * u * (10.0 + u * (6.0 * u - 15.0))
+                    if isinstance(x, tuple):
+                        return tuple(p + (q - p) * w for p, q in zip(x, y))
+                    return x + ((((y - x + 180.0) % 360.0) - 180.0) if angle else (y - x)) * w
+            return v(t, *a, **kw)
+        return f
 
 
 # ---------------------------------------------------------------- la patrouille (dessinée)
@@ -236,7 +289,10 @@ class Patrouille:
             tc = instant(c) - t0
             d = c["duree"]
             t1 = tc - 0.5 * d
-            dv = abs(impulsion(c)[1]) / M_PATROL
+            # son saut de vitesse de côté : dessinée sans lacet (son cap est celui de sa route), elle prend celui
+            # de son point de contact, là où les caisses se touchent (son centre : J/m ; le point, à qx de lui :
+            # J/m + qx² J/I, son arrière ou son avant chassé par le choc). Sans lui les boîtes restent appuyées
+            dv = abs(impulsion(c)[1]) * (1.0 / M_PATROL + point(c)[1] ** 2 / I_PATROL)
             row = dict(c=c, tc=tc, t1=t1, t2=tc + 0.5 * d, ta=t1 - c["serre"], tb=tc + 0.5 * d + 1.0, dv=dv,
                        t0=t0, a1=0.0, va=0.0, b=0.0)
             self.rows.append(row)
@@ -263,17 +319,23 @@ class Patrouille:
     @staticmethod
     def _retour(row):
         """Le retour à sa ligne : de l'écart et de la vitesse de côté que le choc lui laisse (x0, v2), à
-        accélération bornée (c["retour"], m/s²) : sa vitesse passe de v2 à −vm puis de −vm à 0, en deux
-        demi-cosinus de même accélération au plus fort. Fixe tb, la fin du retour."""
+        accélération bornée : sa vitesse passe de v2 à −vm (elle décroche : c["depart"] m/s² au plus fort, sinon
+        c["retour"]), tient −vm si c["vmax"] la plafonne, puis revient de −vm à 0 (c["retour"]), en demi-cosinus.
+        Fixe tb, la fin du retour."""
         c = row["c"]
-        a = c["retour"]
+        a2 = c["retour"]
+        a1 = c.get("depart", a2)
         x0 = row["a1"] + row["va"] * c["duree"] - row["dv"] * 0.5 * c["duree"]
         v2 = row["va"] - row["dv"]
-        vm = math.sqrt(max(0.5 * (v2 * v2 + 4.0 * a * max(x0, 0.0) / math.pi), (abs(v2) + 0.05) ** 2))
-        T1, T2 = (v2 + vm) * math.pi / (2.0 * a), vm * math.pi / (2.0 * a)
+        vm = math.sqrt(max((4.0 * max(x0, 0.0) / math.pi + v2 * v2 / a1) / (1.0 / a1 + 1.0 / a2),
+                           (abs(v2) + 0.05) ** 2))
+        vm = min(vm, c.get("vmax", vm))
+        T1, T2 = (v2 + vm) * math.pi / (2.0 * a1), vm * math.pi / (2.0 * a2)
         # (vm relevé au-dessus de |v2| : l'écart ne s'annule plus exactement ; x1 le dit, la fin le rattrape)
         x1 = x0 + v2 * T1 - 0.5 * (v2 + vm) * T1
-        row.update(x0=x0, v2=v2, vm=vm, T1=T1, T2=T2, x1=x1, reste=x1 - 0.5 * vm * T2, tb=row["t2"] + T1 + T2)
+        Tc = max(0.0, (x1 - 0.5 * vm * T2) / vm)                   # (le palier, à −vm)
+        row.update(x0=x0, v2=v2, vm=vm, T1=T1, T2=T2, Tc=Tc, x1=x1, reste=x1 - vm * Tc - 0.5 * vm * T2,
+                   tb=row["t2"] + T1 + Tc + T2)
 
     def _axes(self, t):
         h = 1.0 / 96.0
@@ -299,13 +361,15 @@ class Patrouille:
         if t <= row["t2"]:
             return row["a1"] + row["va"] * (t - row["t1"]) - row["dv"] * _recul(c, t + row["t0"])
         u = t - row["t2"]
-        T1, T2, v2, vm = row["T1"], row["T2"], row["v2"], row["vm"]
+        T1, T2, Tc, v2, vm = row["T1"], row["T2"], row["Tc"], row["v2"], row["vm"]
         if u <= T1:
             x = row["x0"] + v2 * u - 0.5 * (v2 + vm) * (u - T1 / math.pi * math.sin(math.pi * u / T1))
+        elif u <= T1 + Tc:
+            x = row["x1"] - vm * (u - T1)
         else:
-            w = u - T1
-            x = row["x1"] - 0.5 * vm * (w + T2 / math.pi * math.sin(math.pi * w / T2))
-        return x - row["reste"] * (u / (T1 + T2)) ** 3
+            w = u - T1 - Tc
+            x = row["x1"] - vm * Tc - 0.5 * vm * (w + T2 / math.pi * math.sin(math.pi * w / T2))
+        return x - row["reste"] * (u / (T1 + Tc + T2)) ** 3
 
     @staticmethod
     def _lon(row, t):
@@ -511,17 +575,18 @@ def habiller(ctx):
 
 # ---------------------------------------------------------------- la caméra
 SECOUSSE = dict(dz=0.045, lacet=0.22, site=0.16, roulis=0.6, hz=7.5, tau=0.085)
+SECOUSSE_S = 0.33           # s : au-delà, plus rien (8 images ; les contrôles de la caméra laissent ces images de côté)
 
 
 def secousse(t):
     """L'à-coup du bras de la caméra à un contact, à l'instant t du film : (dz en m, dlacet, dsite, droulis en °).
-    Une oscillation amortie (SECOUSSE : quelques centimètres, éteinte en 0,3 s), nulle avant le choc."""
+    Une oscillation amortie (SECOUSSE : quelques centimètres, éteinte en SECOUSSE_S), nulle avant le choc."""
     dz = dyaw = dpitch = droll = 0.0
     for c in CHOCS:
         u = t - instant(c) + 0.25 * c["duree"]
-        if 0.0 < u < 0.45:
+        if 0.0 < u < SECOUSSE_S:
             k = math.exp(-u / SECOUSSE["tau"]) * math.sin(2.0 * math.pi * SECOUSSE["hz"] * u) * norme(c) / 2000.0
-            k *= min(1.0, u / 0.02)
+            k *= min(1.0, u / 0.02) * min(1.0, (SECOUSSE_S - u) / 0.08)
             dz += SECOUSSE["dz"] * k
             dyaw += -c["cote"] * SECOUSSE["lacet"] * k
             dpitch += -SECOUSSE["site"] * k

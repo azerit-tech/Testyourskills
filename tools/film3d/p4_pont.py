@@ -296,23 +296,28 @@ if VILLE:
     patrol1_pos = C.Patrouille(_patrol1_ligne, "P4", (("P4", "patrol_0"),), suit=True)
     hero_pos.choc = C.choc_berline("P4")          # (ce que motion.sample retire avant de coucher la caisse)
 
+    HERO0 = PC.hero("P4", chocs=False)     # (contacts.py : la meute rejoue la conduite de la berline, pas ses chocs)
+
+    def _hero0(t):
+        return HERO0["pos"](_f(t))
+
     def _follow(gap, dv, t):
         """y d'un véhicule qui suit la conduite de la berline en retard (LAG), `gap` m derrière elle à t = 0, dv
         m/s plus vite."""
         lag = min(LAG[2], LAG[0] + LAG[1] * gap)
-        y0 = hero_pos(0.0)[1]
-        return hero_pos(t - lag)[1] + (y0 - hero_pos(-lag)[1]) - gap + dv * t
+        y0 = _hero0(0.0)[1]
+        return _hero0(t - lag)[1] + (y0 - _hero0(-lag)[1]) - gap + dv * t
 
     _TB = M.t_of(brake_windows()[-1][0])          # le freinage du port (la berline)
 
     def _pack_fn(x0, x1, gap, dv, amp, per, ph, xr=None):
         if isinstance(gap, tuple):
             # à la file : la distance à P5/1 vaut s secondes à la vitesse de la berline à P5/1
-            want = gap[1] * hero_speed(T49)
+            want = gap[1] * HERO0["speed"](_f(T49))
             g = want
             for _ in range(30):   # le retard dépend de la distance (LAG) : point fixe
                 surge = SURGE * math.sin(2 * math.pi * T49 / per + ph)
-                g = want - (hero_pos(T49)[1] - (_follow(g, dv, T49) + g + surge))
+                g = want - (_hero0(T49)[1] - (_follow(g, dv, T49) + g + surge))
             gap = g
 
         def fn(t):

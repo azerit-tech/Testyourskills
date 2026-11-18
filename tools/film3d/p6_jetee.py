@@ -108,9 +108,12 @@ def hero_s(t):
 COLUMN = [("patrol", 1.6), ("van", 2.5), ("patrol", 3.4)]
 
 
+HERO0 = PC.hero("P6", chocs=False)    # (contacts.py : la colonne rejoue le chemin de la berline, pas ses chocs)
+
+
 def column_pos(i):
     tau = COLUMN[i][1]
-    return lambda t: hero_pos(t - tau)
+    return lambda t: HERO0["pos"](_f(t - tau))
 
 
 # ---- les hélicoptères : devant la berline, faisceaux tournés vers l'arrière et le bas, sur elle ; (x scène, y devant

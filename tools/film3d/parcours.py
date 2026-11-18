@@ -355,18 +355,22 @@ DERAPAGES = [
 ]
 # Le slalom (voie, SPEC §18.62) est la ligne que vise le conducteur : roulis, dérive arrière et contre-braquage des
 # changements de voie sortent de la simulation comme ceux des dérapages (DRIVE.voie_err, DRIVE.rear_slip).
-# (chocs : les contacts des patrouilles, contacts.py : des impulsions sur la caisse, SPEC §18.68)
-DRIVE = D.simulate(D.Plan(ROUTE, _s_plan, PLAN.speed, PLAN.along, S_ARRET, voie=voie), DERAPAGES, t_span=T_SPAN,
-                   chocs=C.efforts)
+# Les contacts des patrouilles (contacts.py, SPEC §18.68) : des impulsions sur la caisse, chacune dans sa simulation,
+# que contacts.Conduite fond dans la conduite d'avant une fois la berline revenue sur sa ligne.
+def _simule(chocs=None):
+    return D.simulate(D.Plan(ROUTE, _s_plan, PLAN.speed, PLAN.along, S_ARRET, voie=voie), DERAPAGES, t_span=T_SPAN,
+                      chocs=chocs)
 
 
-def sans_chocs(_c=[]):
-    """La même conduite sans les contacts (calculée à la demande) : ce que les chocs lui ajoutent (test_contacts),
-    la ligne d'une patrouille écrite depuis la place de la berline (contacts.Patrouille)."""
-    if not _c:
-        _c.append(D.simulate(D.Plan(ROUTE, _s_plan, PLAN.speed, PLAN.along, S_ARRET, voie=voie), DERAPAGES,
-                             t_span=T_SPAN))
-    return _c[0]
+DRIVE = C.Conduite(_simule(), _simule)
+
+
+def sans_chocs():
+    """La même conduite sans les contacts : ce que les chocs lui ajoutent (test_contacts), la ligne d'une patrouille
+    écrite depuis la place de la berline (contacts.Patrouille), le chemin que rejouent les meutes."""
+    return DRIVE.sans
+
+
 T_ARRET = DRIVE.t_stop                      # s : l'arrêt de la berline simulée sur la pointe
 
 # ---- les six étoiles : des instants de la conduite (images globales, 0 = la première ; temps = image / 24). Le site
