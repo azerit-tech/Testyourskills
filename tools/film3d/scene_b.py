@@ -288,8 +288,12 @@ def build_street(hidden):
     # rond-point sans aucun marquage
     lay = dict(road.lane_layout(HALF, 2), grime=0.6)
     asphalt = road.mat_asphalt(st, "rue_asphalt", layout=lay)
+    # (half : la place et le boulevard font 160 et 200 m de large, pas les 8 m de la rue. Sans elle, tout ce qui
+    # est à plus de 3,5 m de l'axe de la rue y était pris pour la rive de la chaussée : le joint de bitume, noir et
+    # lisse, et les flaques des cunettes sur tout le boulevard. Le lampadaire de la tête du pont s'y reflétait en
+    # tache orange sous la caméra de 316 à 320, arrêt de l'image 317 compris : SPEC §18.70.)
     plaza = road.mat_asphalt(st, "rue_plaza_asphalt",
-                             layout=dict(road.lane_layout(HALF, 2, centre=False), lanes=(60.0,)))
+                             layout=dict(road.lane_layout(HALF, 2, centre=False), lanes=(60.0,), half=1000.0))
     pan, kerb, walk = road.mat_gutter_pan(st, "rue_gutter"), road.mat_kerb(st, "rue_kerb"), road.mat_pavement(st, "rue_walk")
     paint = road.mat_paint_decal(st, "rue_paint")
     # (en ville, la chaussée s'arrête au joint : la branche du rond-point prend la suite, même profil)

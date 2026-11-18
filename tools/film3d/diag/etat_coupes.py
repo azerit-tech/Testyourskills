@@ -309,7 +309,16 @@ def releve(bpy, scene, plan, frame):
     rep["familles"] = sorted(familles, key=lambda f: f["dist"])
 
     # --- la berline et le sol : sous elle, et dans le quart bas du cadre
+    # le rig de la berline : « hero » (lieux.rig) ou, dans les scènes qui le nomment autrement (rig_berline de P2 et
+    # P3, l'avenue), l'ancêtre de tête de ses vitres (propriété « vitre », hero_cars.split_glass) ; +y vers l'avant
     hero = bpy.data.objects.get("hero")
+    if hero is None:
+        for o in scene.objects:
+            if o.type == "MESH" and o.get("vitre") and o.get("ville_lieu") is None:
+                while o.parent is not None:
+                    o = o.parent
+                hero = o
+                break
     if hero is not None:
         hmw = hero.evaluated_get(dg).matrix_world
         rep["berline"] = dict(pos=ville(hmw.translation), cap=cap(hmw.to_3x3() @ Vector((0, 1, 0))))
