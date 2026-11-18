@@ -25,6 +25,11 @@ Rendered in Blender for Azerit. The city, buildings, road and lighting are
 written in code; no real place. The sound is synthesized in the browser: no
 audio file.
 
+Sous la fiche, la berline poursuivie tourne sur elle-même : des images rendues
+dans Blender du même modèle (Elements Creative Studio, CC BY 4.0, ci-dessous).
+Under the sheet, the chased sedan spins: Blender renders of the same model
+(Elements Creative Studio, CC BY 4.0, below).
+
 Modèles 3D, CC BY 4.0 / 3D models, CC BY 4.0
 
 Les voitures / The cars
