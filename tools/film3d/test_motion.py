@@ -1716,6 +1716,86 @@ def test_cut_p5_p6():
           'skid_p5(scene, place="P6")' in src_d and PC.LIEU["P5"] == "E")
 
 
+COUPES = ("OUV", "P1", "P2", "P3", "P4", "P5", "P6", "FIN6")     # les sept coupes du film à six étoiles
+
+
+def test_cut_sol_voisin():
+    """Le sol d'un lieu est le même des deux côtés de chaque coupe (brouillon éclairé v9, SPEC §18.63) : à 485 | 486
+    le terre-plein du port, chez lui en P5 et voisin en P6, perdait ses lignes peintes, ses flaques et ses zones
+    sèches ; à 107 | 108 et 317 | 318 l'enrobé de l'avenue et de la rue changeait de grain et d'eau. Les matières de
+    sol (road.coords) lisent leur dessin en coordonnées d'objet plus la place de l'objet : celle du monde glissait de
+    la translation du lieu posé en voisin. Contrôlé, pour chaque lieu chargé des deux côtés de chaque coupe (OUV à
+    FIN6) : la place lue par la matière est celle du repère du lieu dans les deux scènes (le modèle de
+    road.lieu_location et ville.noter_place, ici en Python), alors que celle du monde, lue jusqu'au v9, s'écarte ;
+    le câblage (road.coords lit lieu_location, ville.assembler note la place avant la pose sous la racine, même nom
+    de propriété) ; le port de P6 est le port proche (celui de P5 en cache : lignes, flaques, zones sèches), sans
+    version lointaine en ville."""
+    import ville as V
+    here = os.path.dirname(os.path.abspath(__file__))
+
+    def src(name):
+        with open(os.path.join(here, name), encoding="utf-8") as f:
+            return f.read()
+
+    def mat(plan):
+        rot, tx, ty = V.placement(plan)
+        c, s = math.cos(math.radians(rot)), math.sin(math.radians(rot))
+        return c, s, tx, ty
+
+    def scene_from_city(plan, x, y):
+        c, s, tx, ty = mat(plan)
+        dx, dy = x - tx, y - ty
+        return c * dx + s * dy, -s * dx + c * dy
+
+    def city_from_lieu(lieu_plan, x, y):
+        c, s, tx, ty = mat(lieu_plan)
+        return c * x - s * y + tx, s * x + c * y + ty
+
+    def world_loc(plan, lieu, loc):
+        """La place du monde, dans la scène du plan, d'un objet du lieu posé à `loc` dans la scène de son lieu."""
+        own = V.lieu_of_shot(plan)[0]
+        if lieu == own:
+            return loc
+        return scene_from_city(plan, *city_from_lieu(V.lieu(lieu)["plan"], *loc))
+
+    def material_loc(plan, lieu, loc):
+        """Ce que lit la matière (road.lieu_location) : la place notée par ville.noter_place pour un voisin (sa place
+        dans la scène de son lieu, avant la pose), la place du monde chez lui (la même)."""
+        own = V.lieu_of_shot(plan)[0]
+        return loc if lieu != own else world_loc(plan, lieu, loc)
+
+    pire, ecarts = 0.0, []
+    for a, b in zip(COUPES, COUPES[1:]):
+        communs = [n for n in V.charge((a,))[0] if n in V.charge((b,))[0]]
+        for n in communs:
+            for loc in ((0.0, 0.0), (25.0, -40.0), (-60.0, 120.0)):
+                la, lb = material_loc(a, n, loc), material_loc(b, n, loc)
+                pire = max(pire, math.dist(la, lb))
+                wa, wb = world_loc(a, n, loc), world_loc(b, n, loc)
+                ecarts.append((math.dist(wa, wb), f"{a}|{b} {n}"))
+    ecarts.sort(reverse=True)
+    check("coupes : le dessin du sol de chaque lieu chargé des deux côtés ne glisse pas (place du lieu, OUV à FIN6)",
+          pire < 1e-9 and ecarts and ecarts[0][0] > 1.0,
+          f"écart {pire:.2e} m ; place du monde (v9) : jusqu'à {ecarts[0][0]:.0f} m ({ecarts[0][1]})")
+    road_src, ville_src = src("road.py"), src("ville.py")
+    coords_body = road_src.split("def coords(")[1].split("\ndef ")[0]
+    lit = "lieu_location(N)" in coords_body and 'ShaderNodeObjectInfo' not in coords_body
+    meme_nom = re.search(r'LOC_LIEU = "(\w+)"', road_src).group(1) == re.search(
+        r'LOC_LIEU, LOC_LIEU_OK = "(\w+)"', ville_src).group(1)
+    asm = ville_src.split("def assembler(")[1].split("\ndef ")[0]
+    avant = 0 <= asm.find("noter_place(objs)") < asm.find("top.parent = root")
+    check("coupes : road.coords lit la place du lieu, ville.assembler la note avant la pose sous la racine",
+          lit and meme_nom and avant, f"coords {lit}, même propriété {meme_nom}, notée avant la pose {avant}")
+    e = src("scene_e.py")
+    proche = "build_port(hidden, lamp_src, far=False, palier=palier)" in e and V.lieu("port")["plan"] == "P5"
+    pres_p6 = "port" in V.CHARGE["P6"][0]
+    d = src("scene_d.py")
+    sans_loin = 'kw.update(bridge=None, port=None' in d
+    check("485 | 486 : le port de P6 est le port proche de P5 (en cache), sans port lointain posé par la jetée",
+          proche and pres_p6 and sans_loin, f"port proche {proche}, chargé près en P6 {pres_p6}, jetée sans port "
+                                            f"lointain {sans_loin}")
+
+
 def test_cut_p4_p5_beam():
     """P4 → P5 : le projecteur de l'appareil 0 ne surgit pas à la coupe (brouillon éclairé v8 : absent de P4, plein
     à P5/1, 425 | 426). Il s'allume à son arrivée, éteint à P5/1, en fondu doux (sans à-coup d'une image à l'autre),
@@ -2600,6 +2680,7 @@ if __name__ == "__main__":
     test_aircraft()
     test_cut_p5_p6()
     test_cut_p4_p5_beam()
+    test_cut_sol_voisin()
     test_operator()
     test_drive()
     test_parcours()

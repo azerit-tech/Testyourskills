@@ -101,15 +101,43 @@ def road_z(x):
 
 # ---------------------------------------------------------------- petits outils de nœuds
 
-def coords(N, uv=False):
-    """Coordonnées d'objet (alignées sur la rue, même tournée de 90°) + la position de l'objet. uv : les
-    coordonnées viennent de la carte UV, en mètres (u en travers de la chaussée, v le long) : une chaussée courbe,
-    l'anneau d'un rond-point, garde ainsi ses voies, ses tirets et ses traces de roues."""
-    tc = N.new("ShaderNodeTexCoord")
+# La place de l'objet dans le repère de son lieu (SPEC §18.63) : un lieu posé en voisin par ville.py (sous une racine
+# tournée et déplacée) garde la position qu'il avait dans sa scène. Sans elle, la position du monde (Object Info)
+# décalait tout le dessin de la chaussée de la translation du lieu : à 485 | 486, le terre-plein du port vu de P6
+# perdait ses lignes et ses flaques (décalé de 290 m), à 107 | 108 et 317 | 318 l'enrobé changeait de grain et d'eau.
+# ville.assembler la note sur chaque objet d'un voisin (LOC_LIEU, et LOC_LIEU_OK = 1) ; sans elle (la scène du lieu
+# lui-même), la position du monde, qui y est la même.
+LOC_LIEU = "loc_lieu"
+LOC_LIEU_OK = "loc_lieu_ok"
+
+
+def lieu_location(N):
+    """La position de l'objet dans le repère de son lieu : la propriété LOC_LIEU si ville.assembler l'a posée (un
+    voisin), sinon celle du monde (Object Info)."""
     oi = N.new("ShaderNodeObjectInfo")
+    at = N.new("ShaderNodeAttribute", _attribute_type="OBJECT", _attribute_name=LOC_LIEU)
+    ok = N.new("ShaderNodeAttribute", _attribute_type="OBJECT", _attribute_name=LOC_LIEU_OK)
+    d = N.new("ShaderNodeVectorMath", _operation="SUBTRACT")
+    N.link(at.outputs["Vector"], d.inputs[0])
+    N.link(oi.outputs["Location"], d.inputs[1])
+    k = N.new("ShaderNodeVectorMath", _operation="SCALE")
+    N.link(d.outputs[0], k.inputs[0])
+    N.link(ok.outputs["Fac"], k.inputs["Scale"])
+    v = N.new("ShaderNodeVectorMath", _operation="ADD")
+    N.link(oi.outputs["Location"], v.inputs[0])
+    N.link(k.outputs[0], v.inputs[1])
+    return v.outputs[0]
+
+
+def coords(N, uv=False):
+    """Coordonnées d'objet (alignées sur la rue, même tournée de 90°) + la position de l'objet dans le repère de
+    son lieu (lieu_location). uv : les coordonnées viennent de la carte UV, en mètres (u en travers de la chaussée,
+    v le long) : une chaussée courbe, l'anneau d'un rond-point, garde ainsi ses voies, ses tirets et ses traces de
+    roues."""
+    tc = N.new("ShaderNodeTexCoord")
     v = N.new("ShaderNodeVectorMath", _operation="ADD")
     N.link(tc.outputs["UV" if uv else "Object"], v.inputs[0])
-    N.link(oi.outputs["Location"], v.inputs[1])
+    N.link(lieu_location(N), v.inputs[1])
     return v.outputs[0], tc.outputs["UV" if uv else "Object"]
 
 
