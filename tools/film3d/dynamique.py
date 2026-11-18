@@ -47,7 +47,7 @@ CAR = dict(
     # le pneu, Formule magique de Pacejka (latéral et longitudinal, glissement combiné isotrope), sur le mouillé
     mu=1.0,                 # adhérence de crête à la charge nominale. Le mouillé en tient 0,70 : depuis la v11 le
                             # film roule sur 1,0, un seul μ du début à la fin (l'accéléré des films de poursuite :
-                            # la route reste mouillée à l'image, SPEC §18.69)
+                            # la route reste mouillée à l'image, SPEC §18.70)
     B=10.0, C=1.6, E=0.2,   # crête à 9°, 80 % de la crête à 35° de dérive (la gomme mouillée qui glisse)
     kx=1.6,                 # raideur longitudinale / raideur de dérive (crête en glissement à κ ≈ 0,1)
     load_sens=0.10,         # l'adhérence baisse de 10 % quand la charge d'une roue double

@@ -324,7 +324,7 @@ def _drive():
 
 ROUTE, PLAN_DESSINE = _drive()              # la route, et la conduite dessinée d'avant : l'horaire jusqu'à la v10
 
-# ---- l'horaire du conducteur depuis la v11 (SPEC §18.69) : celui de la conduite dessinée, sauf dans les deux virages
+# ---- l'horaire du conducteur depuis la v11 (SPEC §18.70) : celui de la conduite dessinée, sauf dans les deux virages
 # où il est re-résolu pour qu'elle y entre plus vite (68 et 66 km/h au lieu de 48 et 53). Une fenêtre par virage, de
 # l'image f0 à l'image f1, faite de nœuds (instant, vitesse, accélération) reliés par des quintiques (à-coup nul aux
 # nœuds) : la croisière d'entrée (v_in ; None : la relance du plan d'avant, prolongée), le freinage b (m/s²) dès
@@ -458,13 +458,13 @@ T_PLAN = PLAN.t_stop                        # s : l'arrêt du plan sur la pointe
 # Depuis la v11 l'horaire change dans les deux virages mais pas le montage : les raccords gardent leurs images (celles
 # que ces joints donnaient sur l'horaire d'avant, FIGE) et tombent là où la berline se trouve alors, à quelques mètres
 # des joints d'avant sur la même route (JOINTS, plus bas : les abscisses qui en sortent).
-RACCORDS = (("P1", 75),           # l'avenue (OUV et P1 : scène A)
-            ("P2", 108),          # l'avenue contre le rond-point
-            ("P3", 215),          # dans la rue, après le rond-point
-            ("P4", 318),          # la tête de pont (y −328)
-            ("P5", 426),          # le pied de la rampe
-            ("P6", 486),          # le terre-plein du port contre la jetée
-            ("FIN6", 619))        # l'entrée de la pointe
+RACCORD_IMAGES = (("P1", 75),          # l'avenue (OUV et P1 : scène A)
+                  ("P2", 108),          # l'avenue contre le rond-point
+                  ("P3", 215),          # dans la rue, après le rond-point
+                  ("P4", 318),          # la tête de pont (y −328)
+                  ("P5", 426),          # le pied de la rampe
+                  ("P6", 486),          # le terre-plein du port contre la jetée
+                  ("FIN6", 619))        # l'entrée de la pointe
 _TS = []
 
 
@@ -484,8 +484,8 @@ def _t_at(s):
 
 
 START = {"OUV": 0}                # première image globale de chaque tronçon (0 = OUV/1)
-START.update(RACCORDS)
-_NOMS = ("OUV",) + tuple(n for n, _ in RACCORDS)
+START.update(RACCORD_IMAGES)
+_NOMS = ("OUV",) + tuple(n for n, _ in RACCORD_IMAGES)
 SHOTS = tuple((a, START[b] - START[a]) for a, b in zip(_NOMS, _NOMS[1:-1] + ("FIN6",)))
 TOTAL = START["FIN6"]             # la poursuite, jusqu'à l'entrée de la pointe
 # la fin à six étoiles (fin6_orbite) prolonge la conduite sans coupe : le freinage, l'arrêt, puis l'orbite, et
@@ -515,7 +515,7 @@ def _s_plan(t, _tab={}):
     return a + (b - a) * (u - k)
 
 
-JOINTS = tuple((n, _s_plan(f / FPS)) for n, f in RACCORDS)      # les abscisses des raccords sur la route
+JOINTS = tuple((n, _s_plan(f / FPS)) for n, f in RACCORD_IMAGES)   # les abscisses des raccords sur la route
 
 # ---- la berline simulée (dynamique.simulate) sur la route du plan (SPEC §18.61). PLAN, la conduite dessinée d'avant,
 # n'est plus que l'horaire du conducteur (vitesse au fil du temps : tronçons, étoiles et durée en sortent, inchangés) ;
@@ -534,7 +534,7 @@ JOINTS = tuple((n, _s_plan(f / FPS)) for n, f in RACCORDS)      # les abscisses 
 DERAPAGES = [
     dict(side=1.0, t=153 / 24, peak=36.0, sag=3.0, tenue=0.8, gaz_avant=-0.5, frein_jet=0.4, dv=0.0,
          montee=(180.0, 75.0, 110.0), reaction=3.0),
-    dict(side=-1.0, t=453 / 24, peak=47.5, sag=5.0, tenue=0.5, gaz_avant=-0.2, frein_jet=0.4, dv=0.0,
+    dict(side=-1.0, t=453 / 24, peak=47.0, sag=5.0, tenue=0.6, gaz_avant=-0.2, frein_jet=0.4, dv=0.0,
          montee=(260.0, 100.0, 150.0), reaction=0.4),
 ]
 # Le slalom (voie, SPEC §18.62) est la ligne que vise le conducteur : roulis, dérive arrière et contre-braquage des
