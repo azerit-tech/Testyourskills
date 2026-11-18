@@ -5,8 +5,16 @@
 # dos, à 2,4 m. Le rendu le découpe en tronçons (SHOTS : une scène par lieu, ses voisins chargés par ville.py) ; à
 # chaque raccord la berline et la caméra ont exactement le même état des deux côtés : ce ne sont pas des coupes. Les
 # six étoiles sont des instants de la conduite (ETOILES), pas des coupes. Python pur.
+#
+# Le 18 novembre (SPEC §18.61, « les dérapages ne sont pas naturels encore ») : la berline est SIMULÉE
+# (dynamique.simulate : pneus, transferts de charge, conducteur). L'ancienne conduite dessinée (motion.drive et ses
+# dérapages) n'est plus que le PLAN du conducteur : la route, le profil de vitesse et son horaire, dont sortent les
+# tronçons (START, FIN6_FRAMES) et les étoiles 1, 3, 4, 6, figés. DRIVE est la voiture simulée qui le suit.
 import math
+import os
+import sys
 
+import dynamique as D
 import motion as M
 
 FPS = 24.0
@@ -159,8 +167,8 @@ def _drive():
                           ease=max(e2, e5), t_span=T_SPAN)
 
 
-ROUTE, DRIVE = _drive()
-T_ARRET = DRIVE.t_stop                      # s : l'instant où elle s'arrête sur la pointe
+ROUTE, PLAN = _drive()                      # le plan du conducteur : la conduite dessinée d'avant (vitesse, horaire)
+T_PLAN = PLAN.t_stop                        # s : l'arrêt du plan sur la pointe (la durée de FIN6 en sort, figée)
 
 # ---- les tronçons du rendu : une scène par lieu, sa fenêtre de la conduite (images). Leurs raccords tombent aux
 # joints des lieux, là où la berline passe d'une scène à la suivante ; aucun n'est une coupe (même état des deux
@@ -178,12 +186,12 @@ _TS = []
 
 
 def _t_at(s):
-    """L'instant (s) où la berline passe l'abscisse s (sa vitesse intégrée au 1/240 de seconde)."""
+    """L'instant (s) où le plan passe l'abscisse s (sa vitesse intégrée au 1/240 de seconde) : les horaires figés."""
     if not _TS:
         h, acc, k = 1.0 / 240.0, 0.0, 0
-        while k * h < T_ARRET + 1.0:
+        while k * h < T_PLAN + 1.0:
             _TS.append(acc)
-            acc += 0.5 * (DRIVE.speed(k * h) + DRIVE.speed((k + 1) * h)) * h
+            acc += 0.5 * (PLAN.speed(k * h) + PLAN.speed((k + 1) * h)) * h
             k += 1
     lo, hi = 0, len(_TS) - 1
     while hi - lo > 1:
@@ -200,7 +208,52 @@ TOTAL = START["FIN6"]             # la poursuite, jusqu'à l'entrée de la point
 # la fin à six étoiles (fin6_orbite) prolonge la conduite sans coupe : le freinage, l'arrêt, puis l'orbite, et
 # FIN6_TENUE images après l'arrêt (les mains levées, l'image posée) ; le film entier tient sous 30 s
 FIN6_TENUE = 27
-FIN6_FRAMES = int(math.ceil(T_ARRET * FPS)) + FIN6_TENUE - TOTAL
+FIN6_FRAMES = int(math.ceil(T_PLAN * FPS)) + FIN6_TENUE - TOTAL
+
+
+def _s_plan(t, _tab={}):
+    """L'abscisse du plan à l'instant t (s) : la vitesse du plan intégrée au 1/240 de seconde."""
+    if not _tab:
+        h, k0 = 1.0 / 240.0, int(T_SPAN[0] * 240.0)
+        s, out = 0.0, {0: 0.0}
+        for k in range(1, int(T_SPAN[1] * 240.0)):
+            s += 0.5 * (PLAN.speed((k - 1) * h) + PLAN.speed(k * h)) * h
+            out[k] = s
+        s = 0.0
+        for k in range(-1, k0 - 1, -1):
+            s -= 0.5 * (PLAN.speed((k + 1) * h) + PLAN.speed(k * h)) * h
+            out[k] = s
+        _tab.update(out)
+    u = t * 240.0
+    k = int(math.floor(u))
+    a, b = _tab.get(k), _tab.get(k + 1)
+    if a is None or b is None:
+        return _tab[max(_tab) if u > 0 else min(_tab)]
+    return a + (b - a) * (u - k)
+
+
+# ---- la berline simulée (dynamique.simulate) sur la route du plan (SPEC §18.61). PLAN, la conduite dessinée d'avant,
+# n'est plus que l'horaire du conducteur (vitesse au fil du temps : tronçons, étoiles et durée en sortent, inchangés) ;
+# ses dérapages dessinés (LIM["derapages"]) ne servent plus qu'à cet horaire. Les deux dérapages du film sont des
+# gestes du conducteur simulé (dynamique.Geste), aux instants des étoiles 2 et 5 :
+#  - t : l'instant de la crête ; peak, sag : la glisse qu'il vise à la crête (°) et ce qu'il en rend pendant la tenue
+#    (la voiture reste 1 à 4° sous sa visée : 30° au rond-point, 36° au port) ; tenue : s de la crête au rattrapage ;
+#  - dv, dv_t : il arrive dv m/s sous l'horaire, pris en freinant dv_t s plus tôt (une berline en travers tient moins
+#    de vitesse dans un virage que sur ses quatre roues) ; il les rend une fois posée, en ligne droite ;
+#  - frein_jet : ce qu'il garde de frein au pied en la jetant (le freinage traîné : l'avant chargé mord, l'arrière
+#    délesté part, aidé du frein à main) ; gaz_avant : s avant la crête où il passe du frein aux gaz (au port il
+#    freine jusqu'à la crête : la berline arrive vite et se pose en travers pour ralentir) ;
+#  - reaction : le gain du retard de l'opérateur (CAM_REACT) sur ce dérapage.
+# Le reste sort de la simulation : la montée de la glisse, le contre-braquage, le lacet, le patinage, la ligne, le
+# roulis. python3 tools/film3d/lab/dynamique/voir.py P2|P5 clé=valeur… pour essayer un geste, bilan.py pour le film.
+DERAPAGES = [
+    dict(side=1.0, t=153 / 24, peak=31.0, sag=3.0, tenue=0.35, gaz_avant=0.2, frein_jet=0.4, dv=1.2, dv_t=2.6,
+         reaction=3.0),
+    dict(side=-1.0, t=453 / 24, peak=40.5, sag=5.0, tenue=0.4, gaz_avant=0.0, frein_jet=0.4, dv=2.0, dv_t=4.0,
+         reaction=0.4),
+]
+DRIVE = D.simulate(D.Plan(ROUTE, _s_plan, PLAN.speed, PLAN.along, S_ARRET), DERAPAGES, t_span=T_SPAN)
+T_ARRET = DRIVE.t_stop                      # s : l'arrêt de la berline simulée sur la pointe
 
 # ---- les six étoiles : des instants de la conduite (images globales, 0 = la première ; temps = image / 24). Le site
 # les lit ici (une à cinq étoiles : l'image gelée sur place à l'instant de la dernière étoile gagnée ; six : la fin
@@ -210,16 +263,14 @@ FIN6_FRAMES = int(math.ceil(T_ARRET * FPS)) + FIN6_TENUE - TOTAL
 
 def _etoiles():
     pas = [k / 240.0 for k in range(int(T_ARRET * 240))]
-    frein = next(t for t in pas if DRIVE.along(t) < -0.3)                  # le freinage du rond-point
-    d2 = max((abs(DRIVE.slip(t)), t) for t in pas if t < frein + 6.0)[1]
-    d5 = max((abs(DRIVE.slip(t)), t) for t in pas if t > frein + 8.0)[1]
+    frein = next(t for t in pas if PLAN.along(t) < -0.3)                   # le freinage du rond-point (le plan)
     y_crete = M.PONT_Y_CREST
     return {
         1: int(math.floor(frein * FPS)) - 4,                   # l'avenue, en croisière, le rond-point en vue
-        2: int(round(d2 * FPS)),                               # le rond-point, au plus fort du dérapage
+        2: int(round(DERAPAGES[0]["t"] * FPS)),                # le rond-point, à la crête du dérapage (le geste)
         3: int(round(_t_at(136.741 + AV_AVANT) * FPS)),        # la rue, la berline passe le barrage (s_B 126)
         4: int(round(_t_at(S_DECK + y_crete - M.PONT_Y_START) * FPS)),   # le pont, la crête
-        5: int(round(d5 * FPS)),                               # le port, au plus fort du dérapage
+        5: int(round(DERAPAGES[1]["t"] * FPS)),                # le port, à la crête du dérapage (le geste)
         6: int(round(_t_at(S_P6_ANCRE + 360.0 - 344.42) * FPS)),         # la jetée, l'eau des deux côtés (y_D 360)
     }
 
@@ -313,13 +364,14 @@ def pose_ville(shot):
 
 def hero(shot):
     """Les fonctions de l'image du tronçon (décimale admise) : pos (scène), heading et travel (degrés, 0 = +y de la
-    scène, positif à gauche), slip, steer, speed, along, alat."""
+    scène, positif à gauche), slip, steer, speed, along, alat, spin (le patinage des roues arrière)."""
     to_scene, cap = placer(shot)
     t = lambda f: t_of(shot, f)                                    # noqa: E731
     return dict(pos=lambda f: to_scene(*DRIVE.pos(t(f))), heading=lambda f: DRIVE.heading(t(f)) - cap,
                 travel=lambda f: DRIVE.travel(t(f)) - cap, slip=lambda f: DRIVE.slip(t(f)),
                 steer=lambda f: DRIVE.steer(t(f)), speed=lambda f: DRIVE.speed(t(f)),
-                along=lambda f: DRIVE.along(t(f)), alat=lambda f: DRIVE.alat(t(f)))
+                along=lambda f: DRIVE.along(t(f)), alat=lambda f: DRIVE.alat(t(f)),
+                spin=lambda f: DRIVE.wheelspin(t(f)))
 
 
 def frames(shot):
@@ -327,25 +379,9 @@ def frames(shot):
     return FIN6_FRAMES if shot == "FIN6" else dict(SHOTS)[shot]
 
 
-def s_of_t(t, _tab={}):
-    """L'abscisse de la berline sur la route à l'instant t (s), au 1/240 de seconde (intégrale de sa vitesse)."""
-    if not _tab:
-        h, k0 = 1.0 / 240.0, int(T_SPAN[0] * 240.0)
-        s, out = 0.0, {0: 0.0}
-        for k in range(1, int(T_SPAN[1] * 240.0)):
-            s += 0.5 * (DRIVE.speed((k - 1) * h) + DRIVE.speed(k * h)) * h
-            out[k] = s
-        s = 0.0
-        for k in range(-1, k0 - 1, -1):
-            s -= 0.5 * (DRIVE.speed((k + 1) * h) + DRIVE.speed(k * h)) * h
-            out[k] = s
-        _tab.update(out)
-    u = t * 240.0
-    k = int(math.floor(u))
-    a, b = _tab.get(k), _tab.get(k + 1)
-    if a is None or b is None:
-        return _tab[max(_tab) if u > 0 else min(_tab)]
-    return a + (b - a) * (u - k)
+def s_of_t(t):
+    """L'abscisse de la berline sur la route à l'instant t (s) : la projection de son centre (la simulation)."""
+    return DRIVE.s(t)
 
 
 def t_of_s(s):
@@ -700,11 +736,10 @@ def _reaction_tables():
     sg = VISEE_SIGMA * FPS * q
     m = int(3 * sg)
     wts = [math.exp(-0.5 * (j / sg) ** 2) for j in range(-m, m + 1)]
-    for ev in LIM["derapages"]:
-        t_ev = _t_at(ev["s"])
-        t1 = M.impulsions(ev["pulses"], ev["cibles"])
-        a = t_ev + t1[0] - CAM_REACT["avant"]
-        b = t_ev + t1[0] + (len(t1[2]) - 1) * t1[1] + CAM_REACT["apres"]
+    for ev in DERAPAGES:
+        t_ev, t_fin = D.fenetre(ev)
+        a = t_ev - CAM_REACT["avant"]
+        b = t_fin + CAM_REACT["apres"]
         ref = max((n for n, _ in SHOTS if START[n] / FPS <= t_ev), key=lambda n: START[n])
         g_a, g_b = int(math.floor(a * FPS)), int(math.ceil(b * FPS))
         raw, prev = [], None
@@ -864,7 +899,49 @@ def mesures():
     return out
 
 
-if __name__ == "__main__":         # python3 tools/film3d/parcours.py : les tronçons, les étoiles, les raccords
+# ---- ce que le reste du film tient pour acquis : les durées des tronçons et les étoiles (le site, la bande-son, les
+# rendus déjà faits). `python3 tools/film3d/parcours.py --check` échoue si la conduite les déplace ; le fichier du site
+# (shared/film/parcours.json, s'il existe) doit les porter aussi.
+FIGE = dict(START={"OUV": 0, "P1": 75, "P2": 108, "P3": 215, "P4": 318, "P5": 426, "P6": 486, "FIN6": 619},
+            ETOILES={1: 77, 2: 153, 3: 255, 4: 375, 5: 453, 6: 567}, FIN6_FRAMES=101, IMAGES=720)
+CRETES = ((28.0, 32.0), (34.0, 38.0))        # ° : la crête de la glisse au rond-point, au port
+SITE_JSON = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "shared", "film", "parcours.json")
+
+
+def verifie():
+    """Les écarts aux durées et aux étoiles figées (liste vide : tout tient)."""
+    out = []
+    if START != FIGE["START"]:
+        out.append(f"tronçons {START} au lieu de {FIGE['START']}")
+    if ETOILES != FIGE["ETOILES"]:
+        out.append(f"étoiles {ETOILES} au lieu de {FIGE['ETOILES']}")
+    if FIN6_FRAMES != FIGE["FIN6_FRAMES"] or TOTAL + FIN6_FRAMES != FIGE["IMAGES"]:
+        out.append(f"FIN6 {FIN6_FRAMES} images, {TOTAL + FIN6_FRAMES} en tout")
+    # les deux dérapages : la crête dans sa plage, et l'étoile sur la crête (la glisse y vaut 97 % du plus fort)
+    for ev, k, (lo, hi) in zip(DERAPAGES, (2, 5), CRETES):
+        a, b = D.fenetre(ev)
+        pk = max(abs(DRIVE.slip(a + q / 240.0)) for q in range(int((b - a) * 240)))
+        ici = ev["side"] * DRIVE.slip(ETOILES[k] / FPS)
+        if not lo <= pk <= hi or ici < 0.97 * pk:
+            out.append(f"dérapage de l'étoile {k} : crête {pk:.1f}° (de {lo:g} à {hi:g}), {ici:.1f}° à l'étoile")
+    if abs(T_ARRET - T_PLAN) * FPS > FIN6_TENUE - 6:
+        out.append(f"l'arrêt simulé à {T_ARRET * FPS:.1f} (le plan : {T_PLAN * FPS:.1f}) : la tenue de FIN6 ne tient plus")
+    if os.path.exists(SITE_JSON):
+        import json
+        d = json.load(open(SITE_JSON, encoding="utf-8"))
+        want = [[a, k] for a, k in SHOTS + (("FIN6", FIN6_FRAMES),)]
+        if d.get("troncons") != want or d.get("etoiles") != [ETOILES[k] for k in sorted(ETOILES)]:
+            out.append(f"{os.path.normpath(SITE_JSON)} : tronçons ou étoiles différents")
+    return out
+
+
+if __name__ == "__main__" and "--check" in sys.argv:
+    err = verifie()
+    if err:
+        sys.exit("[parcours] " + " ; ".join(err))
+    print(f"[parcours] durées et étoiles tenues : {TOTAL + FIN6_FRAMES} images, tronçons {dict(SHOTS)}, FIN6 "
+          f"{FIN6_FRAMES}, étoiles {ETOILES} ; arrêt simulé à l'image {T_ARRET * FPS:.1f} (plan {T_PLAN * FPS:.1f})")
+elif __name__ == "__main__":       # python3 tools/film3d/parcours.py : les tronçons, les étoiles, les raccords
     m = mesures()
     print(f"trajet {m['longueur']:.1f} m jusqu'à l'arrêt ({m['arret']:.2f} s), poursuite {m['longueur_poursuite']:.1f} m "
           f"en {m['images']} images ({m['secondes']:.2f} s) ; moyenne {m['moyenne'] * 3.6:.1f} km/h, pointe "

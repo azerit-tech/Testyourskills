@@ -83,6 +83,14 @@ if VILLE:
     def hero_speed(t):
         return HERO["speed"](_f(t))
 
+    def hero_steer(t):
+        """Les roues avant de la conduite simulée (au bout du pont elle se jette déjà vers le port)."""
+        return HERO["steer"](_f(t))
+
+    def hero_spin(t):
+        """Les roues arrière (rapport à la vitesse du sol : 1 roule, 0 bloquée par le frein à main)."""
+        return HERO["spin"](_f(t))
+
     def brake_windows():
         """Les feux stop (images du plan) : ceux du parcours, l'entrée du virage du port."""
         return PC.brake_windows("P4")

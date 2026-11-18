@@ -1733,7 +1733,7 @@ def plan_P5(scene, hidden, palier="conteneurs"):
     hero = L.hero()
     wheels = L.hero_wheels(hero)
     wb = wheelbase(wheels)
-    poses = M.sample(P5.hero_pos, FRAMES, heading=P5.hero_heading, steer=P5.hero_steer, wheel_r=hero["wheel_r"],
+    poses = M.sample(P5.hero_pos, FRAMES, heading=P5.hero_heading, steer=P5.hero_steer, spin=P5.hero_spin, wheel_r=hero["wheel_r"],
                      wheelbase=wb)
     # en ville, P5/1 est encore sur le raccord du pied de la rampe (z 9 cm, nul vers l'image 9)
     M.key_vehicle(hero, poses, wheels=wheels, ground=deck_ground if VILLE else None)

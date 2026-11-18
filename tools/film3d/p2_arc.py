@@ -66,6 +66,11 @@ def hero_steer(t):
     return HERO["steer"](_f(t))
 
 
+def hero_spin(t):
+    """Le patinage des roues arrière (rapport à la vitesse du sol : 1 roule, plus glisse aux gaz)."""
+    return HERO["spin"](_f(t))
+
+
 def hero_speed(t):
     return HERO["speed"](_f(t))
 
@@ -286,7 +291,7 @@ def patrol1_lead(t):
 # à la dernière image, elle passe derrière la caméra, à 5,9 m, en sortie de glisse et relancée : la poursuivante de
 # P3. Rampe allumée tout le plan.
 P2_X = -1.75
-P2_Y0 = 45.0                # son départ, à l'image 1 (m)
+P2_Y0 = 48.0                # son départ, à l'image 1 (m)
 P2_R = 16.0                 # le rayon de son virage dans l'anneau (m)
 P2_EXIT_Y = 1.0             # sa ligne dans la rue des enseignes, 0,65 m à gauche de celle de la berline
 P2_ROUTE = dict(start=(P2_X, P2_Y0, 180.0),

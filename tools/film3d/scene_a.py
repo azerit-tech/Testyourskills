@@ -2099,7 +2099,7 @@ def ouv_motion(scene, coupe, police, cam, focus, chaser):
     coupe.location = (x0, y0, 0)
     coupe.rotation_euler = (0, 0, math.pi)
     rig = M.rig_up(coupe, 0.0, "rig_berline")
-    poses = M.sample(OUV.hero_pos, keyed, heading=OUV.hero_heading, steer=OUV.hero_steer, wheel_r=coupe["wheel_r"],
+    poses = M.sample(OUV.hero_pos, keyed, heading=OUV.hero_heading, steer=OUV.hero_steer, spin=OUV.hero_spin, wheel_r=coupe["wheel_r"],
                      wheelbase=wb)
     M.key_vehicle(rig, poses, wheels=wheels)
     M.wheel_marks(wheels, coupe["wheel_r"])
@@ -2198,7 +2198,7 @@ def p1_motion(scene, coupe, police, cam, focus, chaser):
     coupe.location = (x0, y0, 0)
     coupe.rotation_euler = (0, 0, math.pi)
     rig = M.rig_up(coupe, 0.0, "rig_berline")
-    poses = M.sample(P.hero_pos, keyed, heading=P.hero_heading, steer=P.hero_steer, wheel_r=coupe["wheel_r"],
+    poses = M.sample(P.hero_pos, keyed, heading=P.hero_heading, steer=P.hero_steer, spin=P.hero_spin, wheel_r=coupe["wheel_r"],
                      wheelbase=wb)
     M.key_vehicle(rig, poses, wheels=wheels)
     M.wheel_marks(wheels, coupe["wheel_r"])

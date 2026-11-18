@@ -1225,7 +1225,7 @@ def plan_FIN6(scene, hidden, palier="socle"):
     # glisse pas
     hero = L.hero()
     wheels = L.hero_wheels(hero)
-    poses = M.sample(F6.hero_pos, frames, heading=F6.hero_heading, steer=F6.hero_steer, wheel_r=hero["wheel_r"])
+    poses = M.sample(F6.hero_pos, frames, heading=F6.hero_heading, steer=F6.hero_steer, spin=F6.hero_spin, wheel_r=hero["wheel_r"])
     M.key_vehicle(hero, poses, wheels=wheels)
     M.wheel_marks(wheels, hero["wheel_r"])
     hero_phares_fin6(hero, frames)
@@ -1508,7 +1508,7 @@ def plan_P6(scene, hidden, palier="socle"):
     frames = range(P6.F0 - 1, P6.F0 + P6.FRAMES + 1)      # une image de part et d'autre : l'obturateur du flou
     hero = L.hero()
     wheels = L.hero_wheels(hero)
-    poses = M.sample(P6.hero_pos, frames, heading=P6.hero_heading, steer=P6.hero_steer, wheel_r=hero["wheel_r"])
+    poses = M.sample(P6.hero_pos, frames, heading=P6.hero_heading, steer=P6.hero_steer, spin=P6.hero_spin, wheel_r=hero["wheel_r"])
     M.key_vehicle(hero, poses, wheels=wheels, ground=p6_ground)
     M.wheel_marks(wheels, hero["wheel_r"])
     for a, b in P6.brake_windows():        # les feux stop du parcours (aucun en P6 : elle accélère)
