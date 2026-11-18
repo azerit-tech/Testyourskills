@@ -100,7 +100,7 @@ MODELES = {
     "flamant": dict(f="lieux/clins/flamingo-lawn/model.glb", haut=1.15, avant="+y"),   # un peu grands : lus à 360 px
     "flamant_neon": dict(f="lieux/clins/flamingo-neon/model.glb", haut=3.4, avant="+x"),
     "palmier_neon": dict(f="lieux/clins/palm-neon/model.glb", haut=1.7, avant="debout"),
-    "alligator": dict(f="lieux/clins/alligator/model.glb", long=3.4, avant="auto:tete", garder="gros"),
+    "alligator": dict(f="lieux/clins/alligator/model.glb", long=4.2, avant="auto:tete", garder="gros"),
     "aeroglisseur": dict(f="lieux/clins/airboat/model.glb", long=4.8, avant="auto:helice", sans=("Registration",)),
     "cigarette": dict(f="lieux/clins/speedboat/model.glb", long=10.5, avant="auto:moteur"),
     "glacier": dict(f="lieux/clins/icecream-truck/model.glb", long=6.0, avant="-y"),
@@ -180,11 +180,11 @@ def cigarette(g):
 
 
 # l'alligator : il se chauffe sur le quai au bout de la route du port, puis rampe vers l'eau quand la poursuite arrive
-GATOR_P0 = (11.0, -184.0)       # sur le terre-plein, à droite de la descente du pont, dans le virage (pas derrière la berline)
-GATOR_CAP0 = 160.0              # la tête vers la poursuite qui descend du pont
+GATOR_P0 = (0.0, -174.0)        # au bord du quai nord, devant les séparateurs : à gauche de la berline, droite de la patrouille (426–452)
+GATOR_CAP0 = 185.0              # la tête vers la poursuite qui descend du pont
 GATOR_G = (436, 476)            # il se tourne et rampe vers le quai
 GATOR_V = 0.55                  # m/s
-GATOR_CAP1 = 205.0              # il se détourne et rampe vers le sud, loin du virage
+GATOR_CAP1 = 100.0              # il se détourne et rampe le long des séparateurs, vers l.ouest
 
 
 def alligator(g):
@@ -198,7 +198,7 @@ def alligator(g):
 
 
 # le badaud de la pointe : il tourne pour garder la berline dans son téléphone
-FILMEUR_P = (72.7, -94.5)       # au garde-corps de la pointe, à gauche du cadre final (FIN6, orbite comprise)
+FILMEUR_P = (91.7, -102.8)      # sur la pointe, à 2,2 m devant la berline arrêtée, à gauche du cadre de FIN6 (660–719)
 
 
 def filmeur_cap(g):
@@ -222,7 +222,7 @@ def clins():
     # -- l'avenue : l'hôtel FLAMINGA, néon sur le toit, face à la poursuite qui arrive
     x0, x1, y0, y1, zt = HOTEL_8
     out.append(dict(nom="hotel_flaminga", quoi="enseigne_toit", lieu="avenue", rayon=7.0,
-                    pose=fixe(x1 - 4.0, (y0 + y1) / 2 + 0.5, zt, cap_vers(x1 - 4.0, (y0 + y1) / 2, *CAM_AVENUE)),
+                    pose=fixe(x0 + 6.0, y0 + 1.5, zt, cap_vers(x0 + 6.0, y0 + 1.5, *CAM_AVENUE)),   # au bord avant du toit, côté ouest (gris : lu de 20 à 40, un cocotier passe devant)
                     mot="FLAMINGA", haut=1.75, neon="rose", petit="HOTEL", petit_neon="menthe", flamant=True))
     # -- l'enseigne en drapeau du paquebot d'angle : THE CORAL, lettres empilées, palmier de néon en tête
     x0, x1, y0, y1, zt = LINER_9
@@ -266,7 +266,7 @@ def clins():
                     hauteur=3.6, pose=fixe(x, y, 6.0, cap_vers(x, y, 1.6, -200.0)), sol=0.0))
     # -- la marina : l'hydroglisseur amarré contre le mur droit de la jetée, entre deux lampadaires, l'hélice vers
     #    la pointe (la file des voiliers commence à 7 m de là, plus au large)
-    x, y = jetee(21.0, -7.4)
+    x, y = jetee(21.0, -10.0)
     out.append(dict(nom="hydroglisseur", quoi="course", lieu="jetee", rayon=2.5, classe="vehicule",
                     modele="aeroglisseur",
                     pose=(lambda x, y: lambda g: (x, y, WATER_Z + 0.12 + tangue(g, x, y)[0], 130.0,
@@ -317,6 +317,27 @@ def ecarts():
     return veh, pas
 
 
+COULOIR = 3.5      # m : les changements de file de la berline (film/trafic, 2,5 à 3,5 m) élargissent sa route d'autant
+
+
+def couloir():
+    """{clin: (distance, image)} au plus près de la berline tant qu'elle roule (OUV à P6), hors des voitures de la vie
+    que les clins remplacent (film/trafic les écarte avec la vie) : chaque clin doit rester à son écart (véhicule 3,4 m,
+    passant 1,75 m) d'un couloir élargi de COULOIR."""
+    import vie
+    rempl = {c["nom"] for c in clins() if c.get("cache")}
+    pist = {k: v for k, v in pistes().items() if k not in rempl}
+    best = {}
+    for _shot, g0, g1, tr in vie.poursuite():
+        for g in range(g0, min(g1, P.START["FIN6"] - 1) + 1):
+            h = tr["hero"](g)
+            for nom, (classe, f) in pist.items():
+                d = math.dist(h, f(g))
+                if nom not in best or d < best[nom][0]:
+                    best[nom] = (d, g, classe)
+    return best
+
+
 def ecarts_vie():
     """Le plus petit écart (m, centres) entre un clin au sol et ce que pose la vie (véhicules, passants, mobilier),
     hors des voitures de la vie que les clins remplacent : (distance, image, clin, vie)."""
@@ -339,20 +360,20 @@ def ecarts_vie():
 
 
 def camera(g):
-    """La caméra du film à l'image g en ville : (x, y, z, lacet, site, roulis, focale) (ville.cam_plan / cam_city)."""
-    import ville as V
+    """La caméra du film à l'image g en ville : (x, y, z, lacet, site, roulis, focale), celle que render_film --ville
+    rend (FILM3D_VITESSE compris) : parcours.chase pour OUV à P6 (p4_pont.camera la rend aussi en ville), l'orbite de
+    fin6_orbite pour FIN6, sans la vibration de l'opérateur (motion.camera_operator, quelques dixièmes de degré).
+    Le lacet compte de -y vers -x (sens horaire, motion.key_camera) et la rotation du lieu en sens trigonométrique :
+    en ville, lacet - rot (lacet + rot tournait OUV à P2 de 180° et P6 / FIN6 de 100° : mesuré contre la caméra des
+    caches dans Blender, diag/clins_gris.py)."""
     if g >= P.START["FIN6"]:
-        # FIN6 : l'orbite autour de la berline arrêtée (fin6_orbite), dans son repère, posée en ville
         import fin6_orbite
-        to_v, rot = P.vers_ville("FIN6")
-        c = fin6_orbite.camera((g - P.START["FIN6"]) / FPS)
-        return (*to_v(c[0], c[1]), c[2], c[3] + rot) + tuple(c[4:])
-    f = min(max(g + 1, 1), P.TOTAL + P.FIN6_FRAMES)
-    c = V.cam_plan(f)
-    if c is not None:
-        return c
-    h = V.hero_city(f)
-    return V.cam_city(f, P.sol_ville(*h[:2]))
+        shot, c = "FIN6", fin6_orbite.camera((g - P.START["FIN6"]) / FPS)
+    else:
+        shot = [s for s, _ in P.SHOTS if P.START[s] <= g][-1]
+        c = P.chase(shot, g - P.START[shot] + 1)
+    to_v, rot = P.vers_ville(shot)
+    return (*to_v(c[0], c[1]), c[2], c[3] - rot) + tuple(c[4:])
 
 
 def projete(cam, p):

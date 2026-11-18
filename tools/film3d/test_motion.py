@@ -2585,6 +2585,10 @@ def test_clins():
               f"{d:.2f} m ({a} / {b}, image {g})")
     d, g, a, b = clins.ecarts_vie()
     check("clins : 2 m au moins de ce que pose la vie", d >= 2.0, f"{d:.2f} m ({a} / {b}, image {g})")
+    for nom, (d, g, classe) in sorted(clins.couloir().items()):     # les changements de file de film/trafic
+        ecart = (vie.ECART_VEHICULE if classe == "vehicule" else vie.ECART_PASSANT) + clins.COULOIR
+        check(f"clins {nom} : à {ecart:g} m de la berline qui roule (couloir élargi de {clins.COULOIR:g} m)",
+              d >= ecart, f"{d:.2f} m (image {g})")
     px, py, pr = clins.POINTE_VILLE
     dmin = min(math.dist(clins.cigarette(g)[:2], (px, py)) for g in range(clins.CIG_G0, clins.CIG_G1 + 1))
     check("clins : le bateau de course reste au large de la pointe", dmin >= pr, f"{dmin:.1f} m")

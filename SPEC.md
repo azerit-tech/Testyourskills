@@ -1803,10 +1803,12 @@ Jacques, la semaine où sort le grand jeu de poursuite en Floride : « je veux p
   - Points d'entrée : `render_film.py --ville` (deux lignes après `vie.poser_plan`), `ville.py --prise` et `diag/vue_route.py --vie` (une ligne chacun).
   - `FILM3D_CLINS=0` l'ôte.
   - `python3 clins.py` dit quand chaque clin est dans le cadre (images du film, taille en pixels) et donne ses écarts.
+  - `diag/clins_gris.py --camera clins` remplace la caméra du cache par celle-ci (un cache plus ancien peut garder un bras d'avant : celui d'OUV sur le Mac, à 24 mm au lieu de 20).
+  - Sa caméra (`clins.camera`) est celle que rend `render_film --ville` : `parcours.chase` (le bras commun, FILM3D_VITESSE compris) d'OUV à P6, l'orbite de `fin6_orbite` pour FIN6, posées en ville avec le lacet moins la rotation du lieu (le lacet compte en sens horaire). La première version prenait `ville.cam_city` et `ville.cam_plan`, avec le lacet plus la rotation : 100° d'erreur en FIN6, quelques degrés au port. Trois clins sortaient ainsi du cadre éclairé (l'alligator, le badaud, le néon de l'hôtel). Les lignes `[camera]` et `[cadre]` de `diag/clins_gris.py` lisent la caméra des caches dans Blender et la recoupent.
   - `diag/clins_gris.py` les montre en gris depuis un plan du cache ; `--blend vide` montre les modèles seuls, `--gros` montre chacun de près.
 - **Ce qui se voit vient de bibliothèque** : onze modèles CC BY 4.0, listés dans `fetch.py` (dans `lieux/clins/`) et dans CREDITS.md. Les néons utilisent les lettres A-neon-letters et la gamme de néons des enseignes de la ville. Seuls sont en code le mouvement, les caissons, les cadres et les affiches des panneaux (fond, lignes de texte, liseré). Le dessin des panneaux suit les affiches d'autoroute de Floride ; les textes sont les nôtres.
   - **L'avenue (0–90)**
-    - « HOTEL FLAMINGA » en néon rose et menthe sur le toit du petit hôtel à marquise (10,6 m), au bout est, avec un flamant de néon, face à la poursuite qui arrive (0–40).
+    - « HOTEL FLAMINGA » en néon rose et menthe sur le toit du petit hôtel à marquise (10,6 m), au bord avant, côté ouest, avec un flamant de néon, face à la poursuite qui arrive (lu de 10 à 40 ; un cocotier du trottoir passe devant le début du mot, comme dans la rue vraie). Au bout est ou au milieu du toit, les immeubles voisins le cachent.
     - L'enseigne en drapeau « THE CORAL » sur le paquebot d'angle, avec un palmier de néon en tête (0–87).
     - Un coupé blanc des années 80, garé devant l'hôtel (0–54).
     - Une glacière ambulante rose, garée côté plage (0–90).
@@ -1819,17 +1821,16 @@ Jacques, la semaine où sort le grand jeu de poursuite en Floride : « je veux p
   - **Le port, vu du pont puis au virage (193–507)** : deux panneaux face au pont, au-dessus des conteneurs.
     - Azerit à gauche : « AZERIT / on recrute sur preuves / azerit.tech », marine et crème, sobre.
     - « GATOR SHOW / LUTTE À MAINS NUES / TOUS LES SOIRS · 20 H » à droite.
-    - Un alligator se chauffe sur le terre-plein, à droite de la descente du pont, dans le virage : à droite du cadre, jamais derrière la berline (426–475). Quand la poursuite arrive (436–476), il se détourne et rampe vers le sud.
+    - Un alligator de 4,2 m se chauffe au bord du quai nord, devant les séparateurs, à gauche de la berline et à droite de la patrouille (426–452). Quand la poursuite arrive (436–476), il se détourne et rampe le long des séparateurs. À droite du cadre, la place manque : c'est la route du virage vers la jetée.
     - Au coin du quai, à droite du virage vers la jetée, la une du journal du port : « L'ÉCHO DU QUAI / L'HOMME DU COIN A ENCORE FRAPPÉ / il volait une glacière ambulante », qui rappelle la glacière de l'avenue (470–514).
     - Les trois panneaux du port sont sur le terre-plein : la sonde du sol (`diag/clins_gris.py --carte`) montre que le quai nord court à y −173,75 à l'est de x 5.
   - **La jetée (469–600)**
-    - Un hydroglisseur amarré contre le mur droit, entre deux lampadaires, à 7 m de la file des voiliers. Il tangue comme les bateaux de la vie.
+    - Un hydroglisseur amarré à 10 m à droite de l'axe, entre deux lampadaires, au large de la file des voiliers. Il tangue comme les bateaux de la vie.
     - Un bateau de course rouge part avec P6 (486), à 10 m à gauche de l'axe et à 72 km/h. Il prend le large devant la berline, dans le tiers gauche du cadre (486–545, 85 à 125 px), puis s'écarte avant la pointe (45 m de son centre au moins).
     - Il porte des feux de navigation émissifs (bâbord, tribord, poupe) et une nappe d'écume en V, posée sur l'eau.
     - Il est ôté à 600, une fois hors du cadre.
-  - **La pointe (671–719)** : un badaud en chemise hawaïenne lève son téléphone vertical, lampe allumée, et tourne pour garder la berline dans le cadre. Il est au garde-corps, à gauche du cadre final (l'orbite de FIN6 l'y amène), dans le gel de FIN6.
+  - **La pointe (660–719)** : un badaud en chemise hawaïenne lève son téléphone vertical, lampe allumée, et tourne pour garder la berline dans le cadre. Il est à 2,2 m devant la berline arrêtée, à gauche du cadre de l'orbite, dans le gel de FIN6.
     - Le modèle n'a pas de squelette : le bras est levé en code, en tournant les sommets autour de l'épaule.
-    - La caméra de FIN6 est celle de `fin6_orbite`, posée en ville, et non le bras commun.
 - **Les lumières**
   - Néons : émissifs à la force des enseignes de la ville (rose 5, menthe 4, corail 5).
   - Téléphone : lampe 40 sur 1 cm, écran 3.
@@ -1839,6 +1840,7 @@ Jacques, la semaine où sort le grand jeu de poursuite en Floride : « je veux p
 - **Les écarts** (`test_motion.test_clins`) :
   - Comme la vie : véhicules à 3,4 m ou plus de la berline et des patrouilles (centres), passants à 1,75 m ou plus.
   - 2 m au moins de ce que pose la vie, sans compter les garées remplacées.
+  - Les changements de file de `film/trafic` (2,5 à 3,5 m) : tant que la berline roule (OUV à P6), chaque clin garde son écart d'un couloir élargi de 3,5 m (`clins.COULOIR`) : 6,9 m pour un véhicule, 5,25 m pour un passant. Le coupé et la glacière sont à la place exacte d'une garée de la vie : `film/trafic` les écarte avec elle (la glacière est à 4,2 m de la berline).
   - Le bateau de course hors de la pointe.
   - Aucun nom ni écran de fin du jeu dans les textes.
   - Ni la conduite, ni le bras de caméra, ni la police, ni l'hélicoptère ne changent.
