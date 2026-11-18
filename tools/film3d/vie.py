@@ -64,9 +64,9 @@ def jetee(u, n):
     return (JETEE_O[0] + u * JETEE_U[0] + n * JETEE_N[0], JETEE_O[1] + u * JETEE_U[1] + n * JETEE_N[1])
 
 
-# le bus arrêté sur E2 (SPEC §18.62 : 6 m plus tôt qu'au §18.58 ; à l'image 107, l'arrêt sur image d'une étoile, il
-# est derrière l'objectif, plus un demi-bus flou au bord droit ; la berline le contourne en se rabattant sur E1)
-AV_BUS_X = -52.0
+# le bus arrêté sur E2, derrière l'ouverture (SPEC §18.62 : la berline roule sur E2 pour doubler A, il y barrait
+# sa route ; à l'image 107 il n'est plus coupé au bord droit)
+AV_BUS_X = -160.0
 
 
 def lieux_de(x, y):
@@ -385,7 +385,7 @@ def vehicules():
     convoi("pont_face_2", "taxi", None, -179.0, -236.5, 362)
     convoi("pont_face_3", "chapman", "ciel", -172.0, -228.0, 378)
     convoi("pont_face_camion", "camion", None, -164.5, -218.5, 396, v=_v(40))
-    add("pont_meme_rangee", "camion", None, Fixe(6.0, -219.5, 0.0), phares=True, warning=0)
+    add("pont_meme_rangee", "camion", None, Fixe(6.0, -207.5, 0.0), phares=True, warning=0)
 
     # -- le port (P5) : des camions garés au nord du virage, à l'extérieur, là où regarde la caméra pendant la
     # descente du pont et le dérapage ; phares éteints

@@ -259,9 +259,10 @@ if VILLE:
         u = min(1.0, max(0.0, (t - M.t_of(P1_TUCK[0])) / (M.t_of(P1_TUCK[1]) - M.t_of(P1_TUCK[0]))))
         return P1_PASS + (P1_SIDE - P1_PASS) * u * u * u * (10.0 + u * (6.0 * u - 15.0))
 
-    # la part du slalom de la berline (parcours.voie, SPEC §18.62) que la patrouille 1 suit : elle garde sa voie
-    # pour moitié quand la berline se glisse vers elle (3,5 m de centre à centre tenus), sans recopier tout l'à-coup
-    P1_VOIE = 0.6
+    # la part du slalom de la berline (parcours.voie, SPEC §18.62) que la patrouille 1 suit : aucune ; la berline se
+    # déporte à droite, loin d'elle, et la patrouille garde sa voie (déportée avec elle, elle touchait B1 ou la file
+    # d'en face)
+    P1_VOIE = 0.0
 
     def _voie_x(t):
         # l'écart du slalom en x de la scène (la voie à gauche de la berline est vers −x)

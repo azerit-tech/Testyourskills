@@ -135,36 +135,38 @@ VOIE_K = 2.0 * math.pi
 VOIE_J = 4.0 * math.pi ** 2
 
 
-def bascule(u):
-    """La marche du slalom : 0 avant u = 0, 1 après u = 1, entre les deux u − sin(2πu) / 2π."""
+def bascule(u, doux=False):
+    """La marche du slalom : 0 avant u = 0, 1 après u = 1, entre les deux u − sin(2πu) / 2π ; doux : la septique
+    35u⁴ − 84u⁵ + 70u⁶ − 20u⁷, à-coup nul aux deux bouts (latérale 7,5 et à-coup 52,5 au lieu de 2π et 4π²), pour
+    une manœuvre qui finit juste avant un dérapage : la caisse n'y garde pas de roulis."""
     if u <= 0.0:
         return 0.0
     if u >= 1.0:
         return 1.0
+    if doux:
+        return u ** 4 * (35.0 + u * (-84.0 + u * (70.0 - 20.0 * u)))
     return u - math.sin(2.0 * math.pi * u) / (2.0 * math.pi)
 
 
 SLALOM = (
-    # l'avenue : A, devant elle sur E1, se jette à droite sur E2 aux sirènes ; elle la passe en s'écartant à droite
-    # de la patrouille 1 qui la serre par la gauche, tient l'écart à la coupe OUV → P1, revient dans le freinage du
-    # rond-point. Pas plus : la patrouille tient la voie d'en face (pas de changement de voie à gauche), l'ouverture
-    # la veut à sa hauteur, capot dans le cadre, jusqu'à l'image 30 (pas d'écart avant)
-    (30.0, 26.0, -0.3), (74.5, 26.0, 0.3),
-    # la rue : après le trou du barrage, elle s'écarte à droite de D qui déboîte, et revient avant le pont
-    (190.6, 22.0, -0.4), (213.0, 26.0, 0.4),
-    # le pont : elle se glisse à gauche dans le trou entre B1, qui se jette à droite, et la patrouille 1 qui la remonte
-    # par la gauche ; de retour dans sa voie avant le freinage du port
-    (240.5, 34.0, 0.3), (274.5, 34.5, -0.3),
-    # la jetée : J1 s'écarte vers le milieu, elle la passe par la droite, contre la rambarde, et revient avant la fin
-    # de l'accélération (s 448)
-    (396.0, 20.0, -0.65), (416.0, 28.0, 0.65),
+    # l'avenue, un S à droite : A roule à 35 km/h devant elle sur E1 ; elle déboîte sur E2 (la patrouille 1 tient la
+    # voie d'en face, à sa gauche ; pas avant s 8 : la patrouille sortirait du cadre), la double, et revient sur E1
+    # avant la coupe de P2 (doux : la caisse ne garde pas de roulis à l'entrée du dérapage du rond-point)
+    (8.0, 44.0, -1.8), (52.0, 48.0, 1.8, "doux"),
+    # la rue (étroite, garées des deux côtés : 0,75 m au plus) : un écart à droite de D qui déboîte ; puis le pont :
+    # la patrouille 1 la remonte par la gauche pour l'enfermer, elle se jette dans la voie de droite, derrière B1
+    # (70 km/h), et revient à gauche avant de l'atteindre, dans le freinage du port
+    (190.6, 22.0, -0.4), (213.0, 59.0, -1.5), (272.0, 87.0, 1.9),
+    # la jetée, un S à droite : J1 roule au milieu ; elle la passe par la droite, contre la rambarde, et revient
+    # dans le freinage de la pointe
+    (394.0, 34.0, -2.2), (428.0, 46.0, 2.2),
 )
 
 
 def voie(s):
     """L'écart latéral (m, positif à gauche) de la trajectoire voulue de la berline à la route, à l'abscisse s : la
     somme des manœuvres de SLALOM. La seule entrée du slalom, pour la conduite cinématique comme pour la physique."""
-    return sum(dn * bascule((s - s0) / L) for s0, L, dn in SLALOM)
+    return sum(m[2] * bascule((s - m[0]) / m[1], len(m) > 3 and m[3] == "doux") for m in SLALOM)
 
 
 LIM = dict(slip_drag=0.07, counter=0.78, derapages=[DERAP2, DERAP5], pivot=1.4, pivot_tau=(0.6, 0.35),
@@ -435,13 +437,19 @@ def _smooth_sigma(t):
     return CAM_SMOOTH_S * M.smoothstep(a, b, s) * (1.0 - M.smoothstep(c, d, s))
 
 
+# le bras tourne avec une part du slalom, en retard : une caméra de poursuite qui suit la voiture (la berline reste
+# dans le cadre commun, test_motion « décalage à gauche »), la ville glisse encore de côté
+CAM_VOIE, CAM_VOIE_RETARD = 0.65, 0.25
+
+
 def travel_route(t):
     """La direction de route de la berline à l'instant t (degrés) sans son slalom : DRIVE.travel moins la pente de
     voie(s). Le bras la suit (SPEC §18.62) : il se déporte avec elle quand elle change de voie, sans tourner avec
     elle ; la ville glisse de côté dans le cadre, la berline garde sa place."""
-    s = s_of_t(t)
-    dn = (voie(s + 0.05) - voie(s - 0.05)) / 0.1
-    return DRIVE.travel(t) - (math.degrees(math.atan(dn)) if dn else 0.0)
+    def pente(s):
+        dn = (voie(s + 0.05) - voie(s - 0.05)) / 0.1
+        return math.degrees(math.atan(dn)) if dn else 0.0
+    return DRIVE.travel(t) - pente(s_of_t(t)) + CAM_VOIE * pente(s_of_t(t - CAM_VOIE_RETARD))
 
 
 def _cam_table():
