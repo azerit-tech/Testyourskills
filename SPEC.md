@@ -1794,3 +1794,53 @@ Le brouillon éclairé v8 (720 images, 360 × 640) relu image par image, la lumi
 - **La tache blanc-jaune de la pointe** (632–638, FIN6/14–20) : le reflet de la tête du lampadaire de la pointe dans les flaques du sol (`scene_d.mat_sol`), quand la caméra de poursuite le passe et que sa tête est déjà sortie du cadre (FIN6/16–22). Déplacer le lampadaire déplace seulement ce passage : le sol n'a plus de flaque là où ce reflet se forme (`fin6_orbite.lamp_dry_spots`, 1,5 m puis fondu à 2,5 m autour des points de reflet, ± 3 images), la pellicule d'eau y reste, satinée. Contrôle dans `test_motion.test_fin6`.
 - **L'eau pulvérisée n'est plus de la neige** (surtout au port, 451–485, +14 de luminance de 451 à 452). Deux causes : le projecteur de l'hélicoptère (4,3 MW en P5, pour que son pinceau se lise dans la brume) exclut le sol et la berline par liaison de lumière, pas l'eau posée après lui : quand il rattrapait la berline, les gouttes et les sprites prenaient ses mégawatts ; et une eau blanche, opaque, en gouttes de 6 à 14 mm. Maintenant : l'eau suit le sol sous le faisceau (`fx.beam_links` : exclue de la lampe principale, éclairée par sa jumelle du sol, 8 kW) ; sprites gris sombre (`SPRAY_ALBEDO` #7b818b), translucides vers l'avant (0,8 : le rouge des feux arrière, l'ambre des lampadaires les traversent), un peu d'ombre (0,35), en lambeaux, sans émission ; gouttes de verre à moitié transparentes, 2,5 à 6 mm (3 à 7 mm aux flaques et aux glisses) ; la brume des dérapages plus petite (0,15 → 1 m au lieu de 0,3 → 1,6 m), plus légère (0,32 au lieu de 0,5), plus brève (0,45 à 0,8 s), qui monte de 4 à 24° de dérive au lieu de 4 à 18° et s'efface dès 8 m de l'objectif (6,5 m : une plaque claire au bas du cadre au décrochage du port).
 - **L'eau des roues d'un seul tenant** (317 | 318, 425 | 426, 485 | 486 : la gerbe repartait de rien à chaque tronçon, la luminance tombait de 75 à 68 en P6/1). Un seul réglage pour tout le film (`fx.EAU` : mouillé 0,8, gouttes 0,7, voile 0,8, opacité 0,55, rien à moins de 4 m de l'objectif) au lieu d'un mouillé de 0,7 à 0,9 par tronçon ; tirée comme les dérapages sur le temps du film depuis la conduite du parcours, `fx.EAU_PREROLL` (32) images avant la scène : par sous-image du film et par roue, l'écart latéral tiré une fois le long de la berline (deux tirages, un par axe de la scène, rendaient la gerbe dépendante de l'orientation du tronçon). Ce qui naît avant une coupe vit après, au même endroit de la ville ; FIN6 la reçoit aussi (elle y arrive à 55 km/h et freine : sans elle, la gerbe de P6 disparaissait à FIN6/1). Contrôle : `test_fx.test_eau_continuity`, les mêmes gouttes des deux côtés de chaque jonction, FIN6 comprise. Sur la conduite (sans les flaques), la couverture du voile vivant passe de 0,87 à 0,79 à 485 | 486 (v8 : 1,46 → 0,03), de 2,51 à 2,55 à 317 | 318 (v8 : 6,84 → 0,42).
+
+### 18.65 Les clins d'œil : la Floride des années 80, rien du jeu (18 novembre 2026)
+
+Jacques, la semaine où sort le grand jeu de poursuite en Floride : « je veux pas recopier mais inclure des refs qui vont parler aux gens ». Ces références viennent de la culture publique de la Floride et du film de poursuite des années 80. Le jeu ne fournit rien : pas de nom (ni le jeu, ni sa ville, ni son État, ni le studio), pas de logo, de police, de personnage, d'écran de fin ni d'image de bande-annonce. Chaque texte est une invention à nous. Décidé :
+
+- **Une couche à part, `tools/film3d/clins.py`**, posée comme la vie (§18.58) et par-dessus elle, en coordonnées de ville et en temps du film. Elle est la même aux deux bords de chaque jonction.
+  - Points d'entrée : `render_film.py --ville` (deux lignes après `vie.poser_plan`), `ville.py --prise` et `diag/vue_route.py --vie` (une ligne chacun).
+  - `FILM3D_CLINS=0` l'ôte.
+  - `python3 clins.py` dit quand chaque clin est dans le cadre (images du film, taille en pixels) et donne ses écarts.
+  - `diag/clins_gris.py` les montre en gris depuis un plan du cache ; `--blend vide` montre les modèles seuls, `--gros` montre chacun de près.
+- **Ce qui se voit vient de bibliothèque** : onze modèles CC BY 4.0, listés dans `fetch.py` (dans `lieux/clins/`) et dans CREDITS.md. Les néons utilisent les lettres A-neon-letters et la gamme de néons des enseignes de la ville. Seuls sont en code le mouvement, les caissons, les cadres et les affiches des panneaux (fond, lignes de texte, liseré). Le dessin des panneaux suit les affiches d'autoroute de Floride ; les textes sont les nôtres.
+  - **L'avenue (0–90)**
+    - « HOTEL FLAMINGA » en néon rose et menthe sur le toit du petit hôtel à marquise, avec un flamant de néon, face à la poursuite qui arrive (0–39).
+    - L'enseigne en drapeau « THE CORAL » sur le paquebot d'angle, avec un palmier de néon en tête (0–87).
+    - Un coupé blanc des années 80, garé devant l'hôtel (0–54).
+    - Une glacière ambulante rose, garée côté plage (0–90).
+    - Un poste de secours sur la plage (0–81).
+    - Le coupé et la glacière prennent la place exacte d'une garée de la vie (`clins.remplace_vie`), qui est cachée.
+  - **Le rond-point (65–150)** : sept flamants roses en plastique sur l'îlot. Ils sont petits (25–33 px) dans l'arrêt sur image de P1.
+  - **La rue (183–262)** : deux panneaux sur les toits des tours du bout, tournés vers la rue.
+    - L'avocat : « ACCIDENT ? / APPELEZ MAÎTRE CASH / 1-800-PAS-MA-FAUTE ».
+    - Les cautions : « CAUTION EXPRESS / ON VOUS SORT DE LÀ / 24 H / 24 · 7 J / 7 ».
+  - **Le port, vu du pont puis au virage (193–507)** : deux panneaux face au pont, au-dessus des conteneurs.
+    - Azerit à gauche : « AZERIT / on recrute sur preuves / azerit.tech », marine et crème, sobre.
+    - « GATOR SHOW / LUTTE À MAINS NUES / TOUS LES SOIRS · 20 H » à droite.
+    - Un alligator se chauffe dans le coin du quai, hors de la voie. Quand la poursuite descend du pont (436–476), il se détourne et rampe le long des séparateurs.
+    - À l'entrée de la jetée, la une du journal du port : « L'ÉCHO DU QUAI / L'HOMME DU COIN A ENCORE FRAPPÉ / il volait une glacière ambulante », qui rappelle la glacière de l'avenue.
+  - **La jetée (469–600)**
+    - Un hydroglisseur amarré contre le mur droit, entre deux lampadaires, à 7 m de la file des voiliers. Il tangue comme les bateaux de la vie.
+    - Un bateau de course rouge part avec P6 (486) à 10 m à gauche de l'axe et à 60 km/h. Il double la berline (486–532 dans le cadre), puis s'écarte vers le large avant la pointe (45 m de son centre au moins).
+    - Il porte des feux de navigation émissifs (bâbord, tribord, poupe) et une nappe d'écume en V, posée sur l'eau.
+    - Il est ôté à 600, une fois hors du cadre.
+  - **La pointe (463–719)** : un badaud en chemise hawaïenne lève son téléphone vertical, lampe allumée, et tourne pour garder la berline dans le cadre. Il est dans le gel de FIN6.
+    - Le modèle n'a pas de squelette : le bras est levé en code, en tournant les sommets autour de l'épaule.
+    - Il est placé à gauche du cadre final, hors de la route de la patrouille.
+- **Les lumières**
+  - Néons : émissifs à la force des enseignes de la ville (rose 5, menthe 4, corail 5).
+  - Téléphone : lampe 40 sur 1 cm, écran 3.
+  - Feux de bord : 12.
+  - Les panneaux reçoivent chacun trois petits projecteurs posés sur leurs consoles, liés par liaison de lumière à la seule affiche, sans tache au sol. Ce sont les seules lampes ajoutées.
+  - Les cartes d'émission livrées avec les modèles (affiche d'origine du panneau, vitres, peau du badaud) sont éteintes.
+- **Les écarts** (`test_motion.test_clins`) :
+  - Comme la vie : véhicules à 3,4 m ou plus de la berline et des patrouilles (centres), passants à 1,75 m ou plus.
+  - 2 m au moins de ce que pose la vie, sans compter les garées remplacées.
+  - Le bateau de course hors de la pointe.
+  - Aucun nom ni écran de fin du jeu dans les textes.
+  - Ni la conduite, ni le bras de caméra, ni la police, ni l'hélicoptère ne changent.
+- **Proposés, pas faits ici** :
+  - Un hélicoptère de télévision « CH 7 NEWS » : il appartient à `helicos.py`.
+  - Une berline qui fait un écart devant l'alligator : il faudrait toucher la trajectoire de la poursuite.
