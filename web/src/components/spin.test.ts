@@ -12,14 +12,14 @@ const dir = join(__dirname, "spin");
 const css = readFileSync(join(__dirname, "spin.css"), "utf8");
 const page = readFileSync(join(__dirname, "../pages/CardPage.tsx"), "utf8");
 
-function render(ready: boolean, lang = "fr-FR"): string {
+function render(ready: boolean, lang = "fr-FR", place: "card" | "home" = "card"): string {
   vi.stubGlobal("window", {
     location: { origin: "https://skills.test", pathname: "/c/x", search: "" },
     matchMedia: () => ({ matches: false, addEventListener: () => undefined, removeEventListener: () => undefined }),
   });
   vi.stubGlobal("localStorage", { getItem: () => null, setItem: () => undefined });
   vi.stubGlobal("navigator", { userAgent: "test", language: lang });
-  return renderToStaticMarkup(createElement(LangProvider, null, createElement(Spin, { ready })));
+  return renderToStaticMarkup(createElement(LangProvider, null, createElement(Spin, { ready, place })));
 }
 
 afterEach(() => vi.unstubAllGlobals());
@@ -133,6 +133,12 @@ describe("l'encart", () => {
     expect(html).toContain('aria-label="La caisse du suspect : une berline rouge des années 60, vue de trois quarts avant."');
     // l'indication ne paraît qu'une fois la rotation prête
     expect(html).not.toContain("spin-hint");
+  });
+
+  it("le titre est une légende au-dessus de l'image, jamais posé sur la voiture", () => {
+    const html = render(true);
+    expect(html).toMatch(/^<figure class="spin-wrap is-card"><figcaption class="spin-title announce" aria-hidden="true">La caisse du suspect<\/figcaption><div[^>]* class="spin"/);
+    expect(css).not.toMatch(/\.spin-title \{[^}]*position: absolute/);
   });
 
   it("en anglais", () => {

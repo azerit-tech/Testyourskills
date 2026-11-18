@@ -44,11 +44,21 @@
 .spin.is-live .spin-canvas {
   opacity: 1;
 }
+/* le titre en légende au-dessus de l'image, jamais sur la voiture (l'antenne monte haut) */
+.spin-wrap {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  min-width: 0;
+}
 .spin-title {
-  position: absolute;
-  top: 14px;
-  left: 16px;
-  pointer-events: none;
+  padding-left: 4px;
+}
+/* sur l'accueil, sous la fiche d'exemple : sa largeur (.showcase, styles.css) */
+.spin-wrap.is-home {
+  width: 100%;
+  max-width: 400px;
+  margin-top: 16px;
 }
 .spin-hint {
   position: absolute;

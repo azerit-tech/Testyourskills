@@ -13,20 +13,38 @@ import posterJpg from "./spin/poster.jpg?no-inline";
 import { coast, DECODED_MAX, dragTo, FRAMES, KEY_STEP, loadOrder, Lru, nearest, POSTER, releaseSpeed, stillOnly, wrap } from "./spinCore";
 import "./spin.css";
 
-export const SPIN_TEXT: Record<Lang, { title: string; hint: string; label: string; still: string; angle: (deg: number) => string }> = {
+/** Où est l'encart : sous une fiche (sa caisse), ou sur l'accueil (la caisse du film). */
+export type SpinPlace = "card" | "home";
+
+type Words = { title: string; label: string; still: string };
+export const SPIN_TEXT: Record<Lang, { hint: string; angle: (deg: number) => string } & Record<SpinPlace, Words>> = {
   fr: {
-    title: "La caisse du suspect",
     hint: "Fais-la tourner",
-    label: "La caisse du suspect, une berline rouge des années 60. Flèches gauche et droite pour la faire tourner.",
-    still: "La caisse du suspect : une berline rouge des années 60, vue de trois quarts avant.",
     angle: (deg) => `${deg} degrés`,
+    card: {
+      title: "La caisse du suspect",
+      label: "La caisse du suspect, une berline rouge des années 60. Flèches gauche et droite pour la faire tourner.",
+      still: "La caisse du suspect : une berline rouge des années 60, vue de trois quarts avant.",
+    },
+    home: {
+      title: "La caisse de la poursuite",
+      label: "La caisse de la poursuite, une berline rouge des années 60. Flèches gauche et droite pour la faire tourner.",
+      still: "La caisse de la poursuite : une berline rouge des années 60, vue de trois quarts avant.",
+    },
   },
   en: {
-    title: "The suspect's ride",
     hint: "Spin it",
-    label: "The suspect's ride, a red 1960s sedan. Left and right arrows to spin it.",
-    still: "The suspect's ride: a red 1960s sedan, front three-quarter view.",
     angle: (deg) => `${deg} degrees`,
+    card: {
+      title: "The suspect's ride",
+      label: "The suspect's ride, a red 1960s sedan. Left and right arrows to spin it.",
+      still: "The suspect's ride: a red 1960s sedan, front three-quarter view.",
+    },
+    home: {
+      title: "The getaway car",
+      label: "The getaway car, a red 1960s sedan. Left and right arrows to spin it.",
+      still: "The getaway car: a red 1960s sedan, front three-quarter view.",
+    },
   },
 };
 
@@ -205,12 +223,14 @@ class Spinner {
 type Mode = "rest" | "live" | "still";
 
 /**
- * L'encart sous la fiche. `ready` : le film de la page est fini ou absent ; tant qu'il est faux,
- * rien ne se télécharge, pas même l'image au repos.
+ * L'encart, sous la fiche ou sur l'accueil. `ready` : le film de la page est fini ou absent ; tant
+ * qu'il est faux, rien ne se télécharge, pas même l'image au repos. Le titre est une légende
+ * au-dessus de l'image : dans l'image, il mordait sur l'antenne de la voiture.
  */
-export function Spin({ ready }: { ready: boolean }) {
+export function Spin({ ready, place = "card" }: { ready: boolean; place?: SpinPlace }) {
   const { lang } = useT();
   const text = SPIN_TEXT[lang];
+  const words = text[place];
   const reduced = useReducedMotion();
   const box = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -357,40 +377,42 @@ export function Spin({ ready }: { ready: boolean }) {
 
   const still = mode === "still";
   return (
-    <div
-      ref={box}
-      className={`spin${live ? " is-live" : ""}`}
-      role={live ? "slider" : "img"}
-      aria-label={live ? text.label : text.still}
-      aria-valuemin={live ? 0 : undefined}
-      aria-valuemax={live ? 359 : undefined}
-      aria-orientation={live ? "horizontal" : undefined}
-      tabIndex={live ? 0 : undefined}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerCancel}
-      onKeyDown={onKeyDown}
-    >
-      {seen && !live && (
-        <picture>
-          <source srcSet={posterAvif} type="image/avif" />
-          <img className="spin-still" src={posterJpg} width={960} height={480} alt="" decoding="async" draggable={false} />
-        </picture>
-      )}
-      {!still && <canvas ref={canvas} className="spin-canvas" aria-hidden="true" />}
-      <span className="spin-title announce" aria-hidden="true">
-        {text.title}
-      </span>
-      {live && (
-        <span className={`spin-hint${hint ? "" : " is-gone"}`} aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 12a9 9 0 0 1 15.5-6.2M21 12a9 9 0 0 1-15.5 6.2" />
-            <path d="M18.5 2v3.8h-3.8M5.5 22v-3.8h3.8" />
-          </svg>
-          {text.hint}
-        </span>
-      )}
-    </div>
+    <figure className={`spin-wrap is-${place}`}>
+      <figcaption className="spin-title announce" aria-hidden="true">
+        {words.title}
+      </figcaption>
+      <div
+        ref={box}
+        className={`spin${live ? " is-live" : ""}`}
+        role={live ? "slider" : "img"}
+        aria-label={live ? words.label : words.still}
+        aria-valuemin={live ? 0 : undefined}
+        aria-valuemax={live ? 359 : undefined}
+        aria-orientation={live ? "horizontal" : undefined}
+        tabIndex={live ? 0 : undefined}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
+        onKeyDown={onKeyDown}
+      >
+        {seen && !live && (
+          <picture>
+            <source srcSet={posterAvif} type="image/avif" />
+            <img className="spin-still" src={posterJpg} width={960} height={480} alt="" decoding="async" draggable={false} />
+          </picture>
+        )}
+        {!still && <canvas ref={canvas} className="spin-canvas" aria-hidden="true" />}
+        {live && (
+          <span className={`spin-hint${hint ? "" : " is-gone"}`} aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 12a9 9 0 0 1 15.5-6.2M21 12a9 9 0 0 1-15.5 6.2" />
+              <path d="M18.5 2v3.8h-3.8M5.5 22v-3.8h3.8" />
+            </svg>
+            {text.hint}
+          </span>
+        )}
+      </div>
+    </figure>
   );
 }
