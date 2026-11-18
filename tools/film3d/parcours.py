@@ -1039,7 +1039,9 @@ def chase(shot, frame):
     yaw, pitch = visee(shot, frame)
     r = rig(shot, frame)
     dyaw, dpitch, droll = tremble(shot, frame)[:3]
-    return x, y, z + sol(shot, x, y), yaw + dyaw, pitch + dpitch, r["roll"] + droll, r["lens"]
+    cz, cyaw, cpitch, croll = C.secousse(t_of(shot, frame))        # un choc (contacts.py) : l'à-coup du bras
+    return (x, y, z + sol(shot, x, y) + cz, yaw + dyaw + cyaw, pitch + dpitch + cpitch, r["roll"] + droll + croll,
+            r["lens"])
 
 
 RACCORDS = tuple((a, b) for (a, _), (b, _) in zip(SHOTS, SHOTS[1:])) + (("P6", "FIN6"),)

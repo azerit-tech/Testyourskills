@@ -294,6 +294,7 @@ if VILLE:
 
     # sa ligne, avec le contact du pont (contacts.py, SPEC §18.68 : elle ferme la porte, la berline la tape)
     patrol1_pos = C.Patrouille(_patrol1_ligne, "P4", (("P4", "patrol_0"),), suit=True)
+    hero_pos.choc = C.choc_berline("P4")          # (ce que motion.sample retire avant de coucher la caisse)
 
     def _follow(gap, dv, t):
         """y d'un véhicule qui suit la conduite de la berline en retard (LAG), `gap` m derrière elle à t = 0, dv

@@ -343,6 +343,15 @@ class Patrouille:
                 x, y = x + o * -ty, y + o * tx
         return x, y
 
+    def touche(self, c, pas=4):
+        """(première, dernière image du film) où les deux boîtes se touchent autour du contact c (au quart
+        d'image), ou None."""
+        self._pret()
+        row = next(r for r in self.rows if r["c"] is c)
+        gs = [c["image"] + k / pas for k in range(-3 * pas, 16 * pas + 1)]
+        on = [g for g in gs if self.ecart(g / FPS - row["t0"]) <= 0.0]
+        return (on[0], on[-1]) if on else None
+
     def boites(self, t):
         """(les coins de la berline, ceux de la patrouille) à l'instant t."""
         self._pret()
@@ -379,18 +388,129 @@ def contacts_de(plan):
     return [(c, c["image"] - PC.START[plan] + 1.0) for c in CHOCS if c["plan"] == plan]
 
 
-def fenetre(g, avant=2.0, apres=None):
-    """Le contact dont l'image g du film (0 = la première) est dans la fenêtre : de `avant` images avant le choc à
-    `apres` images après (par défaut : jusqu'à ce que la patrouille ait repris sa ligne), ou None."""
-    for c in CHOCS:
-        fin = 60.0 if apres is None else apres
-        if c["image"] - avant <= g <= c["image"] + fin:
-            return c
-    return None
+def images_choc(plan, avant=2, apres=3):
+    """Les images du plan (1 = la première) autour de ses chocs : de `avant` images avant l'impulsion à `apres`
+    après. Ce que les contrôles de conduite (accélération, à-coup, lacet) et de caméra laissent de côté : un choc
+    n'est pas une manœuvre."""
+    out = set()
+    for c, f in contacts_de(plan):
+        out.update(range(int(math.floor(f)) - avant, int(math.ceil(f)) + apres + 1))
+    return out
+
+
+def images_manoeuvre(plan):
+    """Les images du plan (1 = la première) où la patrouille d'un de ses contacts a quitté sa ligne : du début de
+    son rabattement à la fin de son retour. Ce que les contrôles d'écart entre caisses laissent de côté, pour cette
+    patrouille et la berline seulement (paire)."""
+    import parcours as PC
+    out = set()
+    for c, f in contacts_de(plan):
+        pat = patrouille_de(c)
+        pat._pret()
+        for row in pat.rows:
+            if row["c"] is c:
+                d = (PC.START[pat.plan] - PC.START[plan])       # (la patrouille de l'ouverture est écrite dans P1)
+                out.update(range(int(math.floor(row["ta"] * FPS + 1 + d)), int(math.ceil(row["tb"] * FPS + 1 + d)) + 1))
+    return out
+
+
+def paire(plan):
+    """Les clés (tracks()) des deux voitures des contacts du plan : la berline et la patrouille."""
+    out = set()
+    for c, _ in contacts_de(plan):
+        out.update(("hero", c["patrouille"]))
+    return out
+
+
+def choc_berline(plan):
+    """t (s du plan) -> le déplacement (x, y, scène du plan) que les impulsions seules ont donné à la berline :
+    motion.sample le retire avant de lire l'accélération qui couche la caisse (voir Patrouille.choc)."""
+    etat = {}
+
+    def dep(t):
+        if not etat:
+            import parcours as PC
+            hero, t0 = PC.hero(plan), PC.START[plan] / FPS
+            etat["t0"], etat["rows"] = t0, []
+            for c, f in contacts_de(plan):
+                a = math.radians(hero["heading"](f - 0.5 * c["duree"] * FPS))
+                jx, jy = impulsion(c)
+                m = D.CAR["m"]
+                # (vers l'avant, vers la gauche) de la caisse -> la scène : l'avant (−sin, cos), la gauche (−cos, −sin)
+                etat["rows"].append((c, (-math.sin(a) * jx - math.cos(a) * jy) / m,
+                                     (math.cos(a) * jx - math.sin(a) * jy) / m))
+        x = y = 0.0
+        for c, vx, vy in etat["rows"]:
+            k = _recul(c, t + etat["t0"])
+            x, y = x + vx * k, y + vy * k
+        return x, y
+    return dep
+
+
+# ---------------------------------------------------------------- la gerbe (fx : la famille « choc »)
+GERBE = dict(n=150, par_image=45, images=7.0, vie=(0.10, 0.38), taille=(0.004, 0.008))
+
+
+def gerbe(c, track, wheel_r, point, touche, seed=41):
+    """Les étincelles d'un contact : [fx.Particle]. Tôle contre tôle, au point de contact (`point` : m devant le
+    centre de la berline, à sa gauche), à la hauteur des ailes ; une gerbe courte à l'impact (GERBE["n"] points en
+    deux images), puis quelques-unes tant que les caisses frottent (`touche` : première et dernière image du plan,
+    GERBE["images"] au plus). Lancées à la vitesse des voitures, moins ce que le frottement leur prend ; elles
+    partent en arrière dans le repère des caisses, s'écartent peu, retombent, s'éteignent en 0,1 à 0,4 s."""
+    import random
+
+    import fx
+    rng = random.Random(seed + int(c["image"]))
+    f0, f1 = touche
+    f1 = min(f1, f0 + GERBE["images"])
+    births = [f0 + 2.0 * rng.random() ** 1.6 for _ in range(GERBE["n"])]
+    births += [f0 + 2.0 + (f1 - f0 - 2.0) * rng.random() for _ in range(int(GERBE["par_image"] * max(0.0, f1 - f0 - 2.0)))]
+    out = []
+    for f in births:
+        pos, fwd, vel, wh, wv, slip, speed = fx.pose_at(track, f)
+        left = (-fwd[1], fwd[0], 0.0)
+        ground = min(q[2] for q in wh.values()) - wheel_r
+        u = point[0] + rng.uniform(-0.45, 0.45)
+        p = (pos[0] + fwd[0] * u + left[0] * point[1], pos[1] + fwd[1] * u + left[1] * point[1],
+             ground + H_CHOC + rng.uniform(-0.14, 0.10))
+        carry = rng.uniform(0.55, 0.96)
+        lat = rng.uniform(-1.0, 1.0)
+        v = (vel[0] * carry + left[0] * lat, vel[1] * carry + left[1] * lat, rng.uniform(-1.6, 2.2))
+        life = rng.uniform(*GERBE["vie"])
+        drag = rng.uniform(0.8, 1.6)
+        sz = rng.uniform(*GERBE["taille"])
+        tl = fx.land_time(p, v, drag, ground, life)
+        out.append(fx.Particle(f, p, v, min(life, tl), drag, 1.0, sz, sz * 0.6, 1.0, rng.random()))
+        if tl < life - 0.05:                       # un rebond sur la chaussée, moins vif
+            q, w = fx.ballistic(p, v, tl, drag), fx.ballistic_vel(v, tl, drag)
+            out.append(fx.Particle(f + tl * FPS, (q[0], q[1], ground + 0.005), (w[0] * 0.6, w[1] * 0.6, abs(w[2]) * 0.3 + 0.2),
+                                   life - tl, drag, 1.0, sz * 0.8, sz * 0.5, 0.7, rng.random()))
+    return out
+
+
+def habiller(ctx):
+    """fx.dress (famille « choc ») : la gerbe de chaque contact du plan, posée dans la collection des effets (un
+    objet fx_choc_<nom> : ville.fx_voisin l'écarte des lieux voisins, fx.beam_links des projecteurs)."""
+    import fx
+    import parcours as PC
+    obs = []
+    for c, f in contacts_de(ctx.plan):
+        pat = patrouille_de(c)
+        t = pat.touche(c)
+        if t is None:
+            continue
+        d = 1.0 - PC.START[ctx.plan]
+        parts = gerbe(c, ctx.track, ctx.wheel_r, pat.point(c), (t[0] + d, t[1] + d))
+        ob = fx.emit(ctx, f"fx_choc_{c['nom']}", parts, "drops", fx.mat_spark(), glossy=True)
+        if ob:
+            ob.visible_transmission = True
+            obs.append(ob)
+        fx.log(f"choc « {c['nom']} » : {len(parts)} étincelles, images {t[0] + d:.1f} à {t[1] + d:.1f} du plan")
+    return obs
 
 
 # ---------------------------------------------------------------- la caméra
-SECOUSSE = dict(dz=0.030, lacet=0.16, site=0.12, roulis=0.45, hz=7.5, tau=0.085)
+SECOUSSE = dict(dz=0.045, lacet=0.22, site=0.16, roulis=0.6, hz=7.5, tau=0.085)
 
 
 def secousse(t):

@@ -187,12 +187,18 @@ def sample(pos, frames=range(0, 30), slip=None, heading=None, wheel_r=0.33, whee
     want = {round(t_of(f, f0, fps) / dt): f for f in frames}
     base_step = round(t / dt)
     hist = []
+    # un choc (contacts.py, SPEC §18.68) : pos.choc(t) est le déplacement que les impulsions seules ont donné à la
+    # voiture. Portées à la hauteur du centre de gravité, elles ne couchent pas la caisse : c'est la réaction des
+    # pneus, après, qui le fait. L'accélération lue par les ressorts est donc celle de la trajectoire sans elles
+    dep = getattr(pos, "choc", None)
     for i in range(n_steps + 1):
         t = (base_step + i) * dt
         p = pos(t)
         dist += math.hypot(*_sub(p, prev_p)) if i else 0.0
         prev_p = p
         (vx, vy), (ax, ay) = kinematics(pos, t)
+        if dep is not None:
+            ax, ay = kinematics(lambda u: _sub(pos(u), dep(u)), t)[1]
         speed = math.hypot(vx, vy)
         if speed > 1e-6:
             ux, uy = vx / speed, vy / speed

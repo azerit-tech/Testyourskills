@@ -13,7 +13,8 @@
 #
 # Inactif par défaut (le plan sort comme avant) : FILM3D_FX=1 active les effets, FILM3D_FX=P2,P3,P5,P6 ceux de ces
 # plans seulement, à mesure que chaque bande est validée ; FILM3D_FX_ONLY=eau,gomme,derapage,vol,tremble,etincelles,
-# arret ne garde que ces familles (le banc).
+# arret,choc ne garde que ces familles (le banc). « choc » : la gerbe des contacts de la poursuite (contacts.py,
+# SPEC §18.68), sur les plans OUV et P4 ; à ajouter à FILM3D_FX_ONLY là où il est posé, sinon elle ne sort pas.
 # Les sprites et gouttes ne sont vus que par la caméra (ni ombre, ni rebond
 # diffus, ni reflet sur la caisse) et n'émettent rien : aucune lumière ajoutée, la berline ne change pas de teinte.
 # Les étincelles émettent, sans échantillonnage d'émission (elles n'éclairent rien).
@@ -25,7 +26,7 @@ import random
 
 FPS = 24.0
 G = 9.81
-FAMILIES = ("eau", "gomme", "derapage", "vol", "tremble", "etincelles", "arret")
+FAMILIES = ("eau", "gomme", "derapage", "vol", "tremble", "etincelles", "arret", "choc")
 _PLAN = [None]          # le plan que dress() habille (FILM3D_FX=P2,P5 : les effets de ces plans seulement)
 
 
@@ -2564,6 +2565,8 @@ def dress(plan, scene=None, **opt):
         log(f"{plan} : aucune recette")
         return ctx
     recipe(ctx, **opt)
+    if enabled("choc"):                     # la gerbe des contacts du plan (contacts.py, SPEC §18.68)
+        __import__("contacts").habiller(ctx)
     beam_links(ctx)
     _budget(ctx.scene)
     ctx.scene.frame_set(ctx.scene.frame_current)

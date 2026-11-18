@@ -116,6 +116,16 @@ def chaser_heading(t):
     return P1.patrol_heading(p1_time(t))
 
 
+def _chaser_choc(t):
+    import p1_avenue as P1
+    return P1.patrol_pos.choc(p1_time(t))
+
+
+# le contact de l'ouverture (contacts.py, SPEC §18.68) : ce que motion.sample retire avant de coucher les caisses
+chaser_pos.choc = _chaser_choc
+hero_pos.choc = __import__("contacts").choc_berline("OUV")
+
+
 def tracks():
     """« patrol » : la patrouille 1 (motion.PATROL1, la même qu'en P1) ; « patrol_garee » : la garée."""
     return {"hero": hero_pos, "patrol": chaser_pos, "patrol_garee": patrol_pos}
