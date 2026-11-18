@@ -299,6 +299,8 @@ def worker(a):
         # jonction ; FILM3D_VIE=0 l'ôte
         import vie
         vie.poser_plan(scene, plan)
+        import clins            # les clins d'œil (SPEC §18.65), par-dessus la vie ; FILM3D_CLINS=0 les ôte
+        clins.poser_plan(scene, plan)
     still = scene.frame_current
     span = scene.frame_end - scene.frame_start + 1
     animated = span > 3

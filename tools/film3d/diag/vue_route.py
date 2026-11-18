@@ -163,6 +163,7 @@ def main():
                 import vie
                 fs = sorted({int(v[0][1:]) + d for v in todo if v[1] == g for d in (-1, 0, 1)})
                 vie.poser(scene, plan=f"vues {g}", presents=set(noms), images=fs)
+                __import__("clins").poser(scene, plan=f"vues {g}", presents=set(noms), images=fs)
             for nom, _g, propre, hx, hy, cap in [v for v in todo if v[1] == g]:
                 scene.frame_set(int(nom[1:]))
                 # les faux lointains du lieu propre restent (son plan les rend), ceux des autres lieux sont cachés

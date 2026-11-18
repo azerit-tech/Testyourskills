@@ -130,6 +130,18 @@ SKETCHFAB = {
     "lieux/vie/people-claudia-rigged/model.glb": "c659bd0accab47c6bbe390cf822a2b92",
     "lieux/vie/people-man-sitting/model.glb": "d8ca320050c6494581c34292356a280b",
     "lieux/vie/seagull/model.glb": "dc42ffc81c86480e9e7f7752fa134174",
+    # les clins d'œil (clins.py, SPEC §18.65) : la Floride des années 80, rien d'un jeu
+    "lieux/clins/flamingo-lawn/model.glb": "41d2173a8d554793b3e8009d9f647804",
+    "lieux/clins/flamingo-neon/model.glb": "20c4121ec33842c79f2cb651e05efdbc",
+    "lieux/clins/palm-neon/model.glb": "f8366d37c75b4a92b784ffbb72f3900a",
+    "lieux/clins/alligator/model.glb": "f0cc55fd5e4448e6bbd2ee65b2f1ea66",
+    "lieux/clins/airboat/model.glb": "9059a19d244a424c8bf60a9314743c8e",
+    "lieux/clins/speedboat/model.glb": "d10195be58b74ba98a047a97c31c446e",
+    "lieux/clins/icecream-truck/model.glb": "b8b1294228044e64af8bfbae82c80ac0",
+    "lieux/clins/billboard/model.glb": "33c164cf9e4346d1b48eb0c49cb2643f",
+    "lieux/clins/lifeguard/model.glb": "8707a73922004d5f8b67088b91a7a393",
+    "lieux/clins/hawaiian/model.glb": "c8558651fead4648a45b662bc1fb5784",
+    "lieux/clins/phone/model.glb": "4ff99cf17b164e7b9790638c5d2ef4ce",
 }
 
 # Poly Haven : (asset, type, résolution), ou (asset, type, résolution, dossier)
@@ -215,10 +227,21 @@ def env_key():
     raise SystemExit("SKETCHFAB_API_KEY manquant (variable d'environnement ou .env)")
 
 
-def get(url, path=None, headers=None):
+def get(url, path=None, headers=None, essais=6):
+    """Un GET ; HTTP 429 (trop de requêtes) : on attend (5, 10, 20… s, ou Retry-After) et on réessaie."""
+    import time
+    import urllib.error
     req = urllib.request.Request(url, headers={"User-Agent": "testyourskills-film3d", **(headers or {})})
-    with urllib.request.urlopen(req) as r:
-        data = r.read()
+    for k in range(essais):
+        try:
+            with urllib.request.urlopen(req) as r:
+                data = r.read()
+            break
+        except urllib.error.HTTPError as e:
+            if e.code != 429 or k == essais - 1:
+                raise
+            wait = e.headers.get("Retry-After")
+            time.sleep(float(wait) if wait and wait.isdigit() else 5.0 * 2 ** k)
     if path is None:
         return json.loads(data)
     with open(path, "wb") as f:

@@ -2802,6 +2802,37 @@ def test_vie():
           vmax <= 50 / 3.6 + 1e-6 and tmax <= 70 / 3.6 + 1e-6, f"{vmax * 3.6:.0f} et {tmax * 3.6:.0f} km/h")
 
 
+def test_clins():
+    """Les clins d'œil (clins.py, SPEC §18.65) : au sol, aux mêmes écarts de la poursuite que la vie (véhicules 3,4 m,
+    passants 1,75 m, centre à centre) ; pas l'un dans l'autre avec la vie ; le bateau de course sur l'eau, hors de la
+    pointe ; aucun texte pris au jeu (ni nom, ni marque, ni écran de fin)."""
+    import clins
+    import vie
+    veh, pas = clins.ecarts()
+    for shot in veh:
+        d, g, a, b = veh[shot]
+        check(f"clins {shot} : véhicules à {vie.ECART_VEHICULE:g} m de la poursuite ou plus", d >= vie.ECART_VEHICULE,
+              f"{d:.2f} m ({a} / {b}, image {g})")
+    for shot in pas:
+        d, g, a, b = pas[shot]
+        check(f"clins {shot} : passants à {vie.ECART_PASSANT:g} m de la poursuite ou plus", d >= vie.ECART_PASSANT,
+              f"{d:.2f} m ({a} / {b}, image {g})")
+    d, g, a, b = clins.ecarts_vie()
+    check("clins : 2 m au moins de ce que pose la vie", d >= 2.0, f"{d:.2f} m ({a} / {b}, image {g})")
+    for nom, (d, g, classe) in sorted(clins.couloir().items()):     # les changements de file de film/trafic
+        ecart = (vie.ECART_VEHICULE if classe == "vehicule" else vie.ECART_PASSANT) + clins.COULOIR
+        check(f"clins {nom} : à {ecart:g} m de la berline qui roule (couloir élargi de {clins.COULOIR:g} m)",
+              d >= ecart, f"{d:.2f} m (image {g})")
+    px, py, pr = clins.POINTE_VILLE
+    dmin = min(math.dist(clins.cigarette(g)[:2], (px, py)) for g in range(clins.CIG_G0, clins.CIG_G1 + 1))
+    check("clins : le bateau de course reste au large de la pointe", dmin >= pr, f"{dmin:.1f} m")
+    textes = " ".join(t for _f, ls, _l in clins.PANNEAUX.values() for t, *_ in ls)
+    textes += " " + " ".join(c.get("mot", "") + " " + c.get("petit", "") for c in clins.clins())
+    interdits = ("GTA", "GRAND THEFT", "VICE", "LEONIDA", "ROCKSTAR", "WASTED", "BUSTED", "LUCIA", "JASON")
+    pris = [w for w in interdits if w in textes.upper()]
+    check("clins : aucun texte pris au jeu", not pris, ", ".join(pris))
+
+
 if __name__ == "__main__":
     test_poursuivants()
     test_rampes()
@@ -2844,5 +2875,6 @@ if __name__ == "__main__":
     test_vitesse()
     test_v3()
     test_vie()
+    test_clins()
     print(f"\n{'tout passe' if not FAIL else str(len(FAIL)) + ' échec(s)'}")
     sys.exit(1 if FAIL else 0)
