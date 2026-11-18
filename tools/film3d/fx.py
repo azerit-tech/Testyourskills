@@ -1613,11 +1613,13 @@ def drift_track(ctx, preroll=48):
     return drive_track(h["pos"], h["heading"], fr, wheel_offsets(p0), z), g0
 
 
-def derapage(ctx, preroll=48, wet=1.0, sheet=1.0, mist=1.0, mask=0.9, near=4.5, seed=23,
+def derapage(ctx, preroll=48, wet=1.0, sheet=1.0, mist=1.0, mask=0.9, near=4.5, mist_near=6.5, seed=23,
              hide=("fumee_pneus_",)):
     """L'eau des dérapages (drift_spray) : la lame et la brume des pneus arrière en glisse, tirées sur le temps du
     film depuis la conduite du parcours, `preroll` images avant la scène (ce qui est né avant la coupe vit après) ;
-    rien à moins de `near` m de l'objectif (le bras commun suit à 7,5 m), le cône caméra-berline creusé (mask).
+    rien à moins de `near` m de l'objectif (le bras commun suit à 7,5 m) ; la brume, plus large, s'efface dès
+    `mist_near` m : derrière la berline elle ne voile pas le bas du cadre au raccord P5 → P6. Le cône caméra-berline
+    est creusé (mask).
     Les anciennes bouffées de fumée sèche (`hide`) sont retirées : la chaussée est trempée."""
     for ob in ctx.scene.objects:
         if ob.name.startswith(tuple(hide)) and ob.type == "MESH":
@@ -1626,7 +1628,8 @@ def derapage(ctx, preroll=48, wet=1.0, sheet=1.0, mist=1.0, mask=0.9, near=4.5, 
     d, m = drift_spray(tr, ctx.wheel_r, g0=g0 or 0, seed=seed, wet=wet, rate_sheet=1500.0 * sheet,
                        rate_mist=60.0 * mist, frames=(tr[0].frame, ctx.frames[1] + 1))
     od = emit(ctx, f"fx_lame_{ctx.plan}", d, "drops", mat_drop(), glossy=True, near=near)
-    om = emit(ctx, f"fx_brume_glisse_{ctx.plan}", m, "sprites", mat_spray("haut"), mask=mask, near=near, edge=0.25)
+    om = emit(ctx, f"fx_brume_glisse_{ctx.plan}", m, "sprites", mat_spray("haut"), mask=mask, near=mist_near,
+              edge=0.25)
     early = sum(1 for q in d + m if q.birth < ctx.frames[0])
     log(f"dérapage : {len(d)} gouttes, {len(m)} sprites de brume ({early} nés avant la scène)"
         + ("" if g0 is not None else ", sans le parcours"))
