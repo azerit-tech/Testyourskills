@@ -201,16 +201,70 @@ def voie_dessinee(s):
 # arrive en retard dans le freinage de la pointe : elle passe l'arrêt de 0,66 m au pas (1 à 3 km/h de l'image 690 à
 # l'image 723 ; à l'heure, image 692,7, sans slalom). Aucun des 50 dosages essayés de la jetée ne l'évite (0,45 à
 # 0,9 g : arrêt entre 711 et 786) : à caler dans le freinage final de la simulation (SPEC §18.62).
+#
+# v11 (SPEC §18.70, 18 novembre 2026). Jacques, sur le brouillon éclairé v10 : « je trouve les coups de volant pas
+# super pertinents, genre la personne donne des coups brusques mais y a plein de place devant, ou même parfois rien à
+# éviter il me semble ». Mesuré (diag/audit_esquives.py) : deux manœuvres sur sept n'évitaient rien, les autres
+# partaient 1,5 à 2,75 s avant le contact sur un obstacle de 1,3 à 3 % du cadre et passaient à 1,4–1,7 m. Chaque
+# écart a maintenant une cause proche et à l'image, part 0,8 à 1,3 s avant le contact, et la berline reste dans sa
+# nouvelle voie tant que rien ne l'en chasse :
+#  - l'avenue : la patrouille 1 la tape (contacts.CHOCS) et la jette d'une demi-voie à droite, vers le bus qui
+#    déboîte de son arrêt ; elle revient à gauche devant lui, au dernier moment, avant le freinage du rond-point ;
+#  - la rue : S arrive en face, au milieu de la rue (elle contourne D, en double file) ; la berline s'écarte à droite
+#    de LANE m dès la sortie du trou du barrage, et ne revient pas : cette ligne est la voie intérieure du pont
+#    (x 1,80), que la route ne rejoint que sur le tablier (decalage_pont, plus bas) ;
+#  - le pont : aucun changement de voie, elle tient la voie intérieure et double la file de droite de près ;
+#  - la jetée : J1 freine devant elle, elle déboîte ; J2 arrive en face, appels de phares, elle se rabat.
 SLALOM_SIMULE = (
-    (8.0, 36.0, -3.0), (52.0, 40.0, 3.0, "doux"),
-    (190.6, 24.5, -1.5), (216.6, 46.0, -2.3), (257.0, 52.0, 3.8),
-    (402.5, 24.0, 2.8), (430.0, 29.0, -2.8),
+    (27.5, 28.0, -1.6), (66.0, 28.0, 1.6),
+    (190.6, 24.5, -LANE),
+    (247.6, 29.0, 1.0), (290.3, 30.0, -1.0),
+    (402.5, 24.0, 2.8), (433.0, 29.0, -2.8),
 )
+# les rangs des manœuvres dans la table, par lieu (SLALOM_ZONES, les audits)
+ESQ_AVENUE, ESQ_RUE, ESQ_PONT, ESQ_JETEE = (0, 1), (2, 2), (3, 4), (5, 6)
+
+_DECALAGE = []
+
+
+def decalage_pont(s):
+    """Ce dont la route s'est déjà déplacée vers la droite à l'abscisse s, dans son changement de voie du pont
+    (0 avant LANE_S, LANE après ses deux arcs) : mesuré sur ROUTE, perpendiculairement à sa direction d'avant."""
+    a, pas = LANE_S - 20.0, 0.1
+    if not _DECALAGE:
+        x0, y0, h0, _k = ROUTE.at(a)
+        c = math.radians(h0)
+        for i in range(int((2.0 * LANE_L + 60.0) / pas) + 1):
+            x, y, _h, _k = ROUTE.at(a + i * pas)
+            _DECALAGE.append((x - x0) * math.cos(c) + (y - y0) * math.sin(c))
+    u = (s - a) / pas
+    if u <= 0.0:
+        return 0.0
+    i = int(u)
+    if i >= len(_DECALAGE) - 1:
+        return _DECALAGE[-1]
+    # (Catmull-Rom : le conducteur lit la pente et la courbure de la ligne par différences sur 0,5 m)
+    p0, p1, p2, p3 = (_DECALAGE[min(max(j, 0), len(_DECALAGE) - 1)] for j in (i - 1, i, i + 1, i + 2))
+    w = u - i
+    return p1 + 0.5 * w * (p2 - p0 + w * (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3 + w * (3.0 * (p1 - p2) + p3 - p0)))
+
+
+def voie_esquives(s):
+    """La somme des manœuvres de SLALOM_SIMULE à l'abscisse s (m, positif à gauche)."""
+    return sum(m[2] * bascule((s - m[0]) / m[1], len(m) > 3 and m[3] == "doux") for m in SLALOM_SIMULE)
 
 
 def voie_simulee(s):
-    """voie(s) pour la conduite simulée : la somme des manœuvres de SLALOM_SIMULE (l'entrée de dynamique.Plan.voie)."""
-    return sum(m[2] * bascule((s - m[0]) / m[1], len(m) > 3 and m[3] == "doux") for m in SLALOM_SIMULE)
+    """voie(s) pour la conduite simulée (l'entrée de dynamique.Plan.voie) : les manœuvres de SLALOM_SIMULE, et le
+    changement de voie de la route sur le pont rendu à mesure (decalage_pont) : écartée de LANE m à droite dans la
+    rue, la berline roule droit jusqu'à la voie intérieure du pont au lieu de suivre le S de la route."""
+    return voie_esquives(s) + decalage_pont(s) * (LANE / decalage_pont(LANE_S + 2.0 * LANE_L + 30.0))
+
+
+def voie_pont(s):
+    """L'écart de la berline à la voie intérieure du pont (x 1,80 ; m, positif à gauche) que sa ligne lui demande :
+    nul tant qu'elle ne s'en écarte pas (ce que suit la patrouille 1, p4_pont)."""
+    return voie_esquives(s) + LANE if s > SLALOM_SIMULE[ESQ_RUE[0]][0] else 0.0
 
 
 # Fusion v10 (SPEC §18.67) : la berline est la voiture simulée, il n'y a plus de conduite dessinée à l'image. LA ligne
@@ -703,16 +757,20 @@ CAM_VOIE, CAM_VOIE_RETARD = 0.65, 0.25
 # MESURÉ entre le cap de sa vitesse et celui de la route, pris CAM_VOIE_RETARD plus tôt ; ailleurs (les deux
 # dérapages, la sortie du port où elle revient d'un mètre au large) il suit comme avant le cap de sa vitesse.
 # (s où le fondu commence, s où le bras est tout à la route, s où il l'est encore, s où le fondu finit)
+def _zone(rangs, avant, apres):
+    (a, b) = (SLALOM_SIMULE[k] for k in rangs)
+    return a[0] - avant[0], a[0] + avant[1], b[0] + b[1], b[0] + b[1] + apres
+
+
 SLALOM_ZONES = (
-    (SLALOM_SIMULE[0][0] - 10.0, SLALOM_SIMULE[0][0],
-     SLALOM_SIMULE[1][0] + SLALOM_SIMULE[1][1], SLALOM_SIMULE[1][0] + SLALOM_SIMULE[1][1] + 12.0),     # l'avenue
-    (SLALOM_SIMULE[2][0] - 10.0, SLALOM_SIMULE[2][0],
-     SLALOM_SIMULE[4][0] + SLALOM_SIMULE[4][1], SLALOM_SIMULE[4][0] + SLALOM_SIMULE[4][1] + 12.0),     # la rue, le pont
+    _zone(ESQ_AVENUE, (10.0, 0.0), 12.0),                                                               # l'avenue
+    # la rue, le pont : jusqu'à la fin du changement de voie de la route (v11 : la berline y roule droit)
+    (SLALOM_SIMULE[ESQ_RUE[0]][0] - 10.0, SLALOM_SIMULE[ESQ_RUE[0]][0],
+     LANE_S + 2.0 * LANE_L, LANE_S + 2.0 * LANE_L + 12.0),
     # la jetée : la berline y arrive en revenant du large du port (4,5° d'écart à s 400) ; le fondu se fait sur ce
     # retour et le début du premier changement de voie : de s 390,5 à s 422,5 (balayé : de −6,5 à +13,5, 7,5 m/s² par
     # rapport à la berline à P6/30 ; de −4 à +16, 8,3 ; de −10 à +20, 6,8 ; de −12 à +20, 6,3 ; de −13 à +22, 6,2)
-    (SLALOM_SIMULE[5][0] - 12.0, SLALOM_SIMULE[5][0] + 20.0,
-     SLALOM_SIMULE[6][0] + SLALOM_SIMULE[6][1], SLALOM_SIMULE[6][0] + SLALOM_SIMULE[6][1] + 12.0))
+    _zone(ESQ_JETEE, (18.0, 30.0), 12.0))
 
 
 def slalom_w(t):
@@ -1042,7 +1100,7 @@ CAM_DEPORT = 0.018
 # - pont : la patrouille double par la gauche et se rabat ; 0,11 de déport pendant qu'elle entre, sans recul
 #   (91 % au moins des images 357 à 364, 58 avant).
 CADRE_CHOCS = {
-    "avenue": dict(du=0.17, recul=1.1, gauche=0.2, images=(-60.0, -30.0, 1.0, 37.0)),
+    "avenue": dict(du=0.20, recul=1.5, gauche=0.2, images=(-60.0, -31.0, 1.0, 40.0)),
     "pont": dict(du=0.11, recul=0.0, images=(-36.0, -12.0, -5.0, 16.0)),
 }
 

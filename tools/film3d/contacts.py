@@ -46,22 +46,24 @@ SUITE = 0.15                 # s : le plus fort du choc se cherche jusque-là ap
 # elle décroche d'abord (sinon retour) ; vmax : m/s, sa vitesse de côté au plus pendant le retour (sinon libre) ;
 # rejoint : (début, fin) en s après l'impulsion du fondu de la berline dans sa conduite d'avant (Conduite).
 CHOCS = (
-    # l'avenue, 0,6 s après l'ouverture : la patrouille 1, à la hauteur de la berline dès la première image, se
-    # rabat sur elle depuis avant l'ouverture ; portière contre portière. La berline part à droite : son changement
-    # de voie suit. Plus tard, la voiture A est entre elles (images 30 à 66) et la simulation ne tient pas le choc
-    # au milieu du changement de voie (images 28 à 44)
-    dict(nom="avenue", image=14.0, plan="OUV", module="p1_avenue", patrouille="patrol", cote=+1, plat=True, avance=-1.0, v=2.0, e=0.3,
-         frot=0.0, duree=0.08, serre=1.2, retour=5.0, rejoint=(1.0, 2.5)),
-    # le pont, à la fin du dépassement de B1, dix images avant la quatrième étoile : la patrouille 1, qui remonte la
-    # berline, ferme la porte pendant qu'elle revient à gauche ; son flanc arrière contre l'aile avant de la berline,
-    # et elle reste appuyée cinq images. Elle décroche vite (depart), avant de freiner pour le port à 6,4 m/s² (dès
-    # l'image 387) : il ne lui reste alors que 3,7 m/s² de côté dans l'adhérence du mouillé, et le retour s'y tient
-    # (vmax, retour). frot : elle va plus vite que la berline, sa tôle l'entraîne un peu (5 % de l'impulsion).
-    # L'image (mesuré, 18 novembre) : à 368 le choc tombe au plus fort de la dérive du changement de voie (6,6°,
-    # 9,2° avec lui, au-delà des 8,5° d'un changement de voie) et la reprise sur le freinage du port (la caméra y
-    # prend 53 m/s³ d'à-coup, 50 au plus) ; à 365, 7,8° et 34 m/s³
-    dict(nom="pont", image=365.0, plan="P4", module="p4_pont", patrouille="patrol_0", cote=+1, plat=True, avance=2.0, v=2.4, e=0.3,
-         frot=0.05, duree=0.08, serre=2.0, depart=3.5, vmax=1.6, retour=2.5, rejoint=(1.0, 2.4)),
+    # l'avenue. v11 (SPEC §18.70) : le critique du brouillon éclairé v10 ne lisait pas le choc de l'image 14 (« le
+    # film s'ouvre patrouille déjà au contact, les deux voitures restent soudées de 13 à 25, la berline ne dévie
+    # pas »). Il est à l'image 30 : la patrouille 1 arrive de derrière par la voie d'en face (p1_avenue), roule une
+    # demi-seconde détachée, 1,5 m d'air, se rabat en une seconde et tape, portière avant contre portière arrière ;
+    # la berline, qui roulait droit, part d'une demi-voie à droite (parcours.SLALOM_SIMULE), la patrouille décroche
+    # à 6 m/s² (depart). v 2,1 : au-delà la glisse du choc passe 4° (4,8° à 2,6 m/s)
+    dict(nom="avenue", image=30.0, plan="OUV", module="p1_avenue", patrouille="patrol", cote=+1, plat=True, avance=-1.25, v=2.1, e=0.3,
+         frot=0.0, duree=0.08, serre=1.0, depart=6.0, retour=5.0, rejoint=(1.0, 2.5)),
+    # le pont, dix images avant la quatrième étoile. v11 : la berline, écartée d'un mètre à gauche par B1 qui
+    # déboîte (trafic.py), est à 0,9 m de la patrouille 1, qui garde sa voie et la remonte : la patrouille ferme
+    # la porte en 1,25 s, son flanc arrière contre l'aile avant de la berline, la renvoie dans sa voie et décroche
+    # (depart) avant de freiner pour le port à 6,4 m/s² (dès l'image 387) : il ne lui reste alors que 3,7 m/s² de
+    # côté dans l'adhérence du mouillé, et le retour s'y tient (vmax, retour). frot : elle va plus vite que la
+    # berline, sa tôle l'entraîne un peu (5 % de l'impulsion). avance 2,3 : sa place sur sa ligne à 0,25 m près
+    # (à 2,0 elle freinait de 0,6 m/s² de plus que sa ligne pour s'y mettre ; à 2,5 le choc, porté plus loin du
+    # centre de la berline, tombait sous 1500 N·s)
+    dict(nom="pont", image=365.0, plan="P4", module="p4_pont", patrouille="patrol_0", cote=+1, plat=True, avance=2.3, v=2.4, e=0.3,
+         frot=0.05, duree=0.08, serre=1.25, depart=3.5, vmax=1.6, retour=2.5, rejoint=(1.0, 2.4)),
 )
 
 

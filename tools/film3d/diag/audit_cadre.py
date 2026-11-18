@@ -228,7 +228,8 @@ def dense(silence=False):
                 continue
             x, y, cap = course.pose(g)
             d = profondeur(cam, sh, x, y)
-            if not 0.5 < d <= PORTEE:
+            # (v11 : la portée d'une voiture ; un bus, deux fois plus haut, se lit deux fois plus loin)
+            if not 0.5 < d <= PORTEE * HAUTEUR.get(modele, H_BOITE) / H_BOITE:
                 continue
             w, l = V.DEMI.get(modele, V.DEMI_DEFAUT)
             r = rect(cam, sh, x, y, cap, (2 * l, 2 * w, HAUTEUR.get(modele, H_BOITE)))
