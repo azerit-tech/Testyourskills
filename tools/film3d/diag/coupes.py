@@ -9,7 +9,7 @@
 #       (à défaut, la seule image de chaque côté : le saut brut)
 #   python3 tools/film3d/diag/coupes.py --film film.mp4
 #       le film assemblé (image 0 = OUV/1), les mêmes images
-#   options : --seuil 3 (en %) ; --bas 0.25 (la part basse du cadre mesurée)
+#   options : --seuil 3 (en %) ; --bas 0.25 (la part basse du cadre mesurée) ; --stat mediane (défaut) ou moyenne
 # Sort 1 si une coupe dépasse le seuil. Les images se rendent sur la machine louée, éclairées (--draft --ville) :
 #   --plan OUV --frames 74-75 ; P1 1-2,32-33 ; P2 1-2,106-107 ; P3 1-2,102-103 ; P4 1-2,107-108 ; P5 1-2,59-60 ;
 #   P6 1-2,132-133 ; FIN6 1-2  (les longueurs : parcours.SHOTS)
@@ -46,10 +46,23 @@ def taille(args):
     return w, h
 
 
-def moyenne_bas(data, w, h, bas):
+def moyenne_bas(data, w, h, bas, stat="mediane"):
+    """La luminance du bas du cadre : la médiane par défaut (le ton de la chaussée, que n'emportent ni une bande de
+    marquage ni un reflet qui entre dans le cadre ; la moyenne faisait passer pour un saut le tireté de P4/1 ou le
+    passage piéton d'OUV/75), ou la moyenne."""
     y0 = int(h * (1.0 - bas))
     zone = data[y0 * w:h * w]
-    return sum(zone) / max(1, len(zone))
+    if stat == "moyenne":
+        return sum(zone) / max(1, len(zone))
+    hist = [0] * 256
+    for v in zone:
+        hist[v] += 1
+    half, acc = len(zone) / 2.0, 0
+    for v, c in enumerate(hist):
+        if acc + c >= half:
+            return v + (half - acc) / max(1, c)         # interpolée dans la case : une médiane continue
+        acc += c
+    return 255.0
 
 
 class Source:
@@ -77,7 +90,7 @@ class Source:
             args = ["-i", p]
             w, h = taille([p])
         data = gris(args)
-        v = moyenne_bas(data, w, h, self.a.bas) if len(data) >= w * h else None
+        v = moyenne_bas(data, w, h, self.a.bas, self.a.stat) if len(data) >= w * h else None
         self.cache[key] = v
         return v
 
@@ -89,14 +102,15 @@ def main():
     ap.add_argument("--film")
     ap.add_argument("--seuil", type=float, default=3.0)
     ap.add_argument("--bas", type=float, default=0.25)
+    ap.add_argument("--stat", choices=("mediane", "moyenne"), default="mediane")
     a = ap.parse_args()
     if not (a.rendu or a.film):
         ap.error("--rendu DIR ou --film MP4")
     s = Source(a)
     n = s.n
     mauvaises = 0
-    print(f"luminance du quart bas ({100 * a.bas:.0f} % du cadre), seuil {a.seuil:g} % (saut à la coupe moins la pente "
-          f"de part et d'autre)")
+    print(f"luminance ({a.stat}) du quart bas ({100 * a.bas:.0f} % du cadre), seuil {a.seuil:g} % (saut à la coupe "
+          f"moins la pente de part et d'autre)")
     for pa, pb in zip(ORDRE, ORDRE[1:]):
         a1, a0 = s.lum(pa, n[pa] - 1), s.lum(pa, n[pa])
         b0, b1 = s.lum(pb, 1), s.lum(pb, 2)
