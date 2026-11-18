@@ -976,6 +976,139 @@ def mat_plate(name="hero_plate"):
     return m
 
 
+# La plaque de la berline (SPEC §18.66) : la plaque américaine des années 60, tôle emboutie de 30,5 × 15,2 cm, fond
+# noir émaillé, caractères et listel jaunes en relief. Un numéro inventé, sans nom d'État ni devise : aucune plaque
+# réelle. De dos, c'est ce que l'œil cherche entre les feux ; vierge, elle se lisait comme un objet pas fini.
+PLATE_NUMBER = "KZL 417"
+PLATE_BLACK = "#0c0c0d"
+PLATE_YELLOW = "#b08d22"     # jaune de plaque passé (albédo 0,28) : lisible sous sa lampe, jamais une étiquette claire
+PLATE_LAMP_W = 0.8           # W, les deux ampoules de 5 W de l'éclaireur de plaque, à l'échelle des feux (TAIL_W)
+PLATE_LAMP_COLOR = "#ffb062"  # incandescence, 2 700 K
+
+
+def _mat_plate_enamel(name, color, rough, dirt_to="#2b2824"):
+    """Émail de plaque : brillant terni, crasse de route en nuages, plus épaisse vers le bas où l'eau la dépose
+    (coordonnées de l'objet : l'origine de la plaque est en son milieu)."""
+    m = bpy.data.materials.get(name)
+    if m is not None:
+        return m
+    m, nt, out = cv._mat(name)
+    tc = nt.nodes.new("ShaderNodeTexCoord").outputs["Object"]
+    dirt = _noise(nt, tc, 28.0, detail=4.0, lo=0.35, hi=0.7)
+    low = _ramp(nt, _xyz(nt, tc)[2], 0.02, -0.07)
+    f = cv._math(nt, "MINIMUM", cv._math(nt, "ADD", cv._math(nt, "MULTIPLY", dirt, 0.45),
+                                         cv._math(nt, "MULTIPLY", low, 0.6)), 0.85)
+    p = cv._principled(nt, **{"Coat Weight": 0.35, "Coat Roughness": 0.25})
+    nt.links.new(_mix_rgb(nt, lin(color), lin(dirt_to), f), p.inputs["Base Color"])
+    nt.links.new(_mix(nt, rough, 0.8, f), p.inputs["Roughness"])
+    nt.links.new(p.outputs[0], out.inputs[0])
+    return m
+
+
+def _text_mesh(text, height, depth, weight=0.012, squeeze=0.78):
+    """Les caractères `text` en maillage (police intégrée de Blender, graissée de `weight` et serrée de `squeeze`
+    comme une police de plaque emboutie), hauts de `height` m, en relief de `depth` m : dans le plan XY, centrés,
+    l'épaisseur de z = 0 à `depth`. None si la police ne donne rien."""
+    cu = bpy.data.curves.new("plaque_texte", "FONT")
+    cu.body = text
+    cu.align_x, cu.align_y = "CENTER", "CENTER"
+    cu.size = 1.0
+    cu.offset = weight
+    cu.extrude = 0.5
+    cu.resolution_u = 3
+    ob = bpy.data.objects.new("plaque_texte", cu)
+    bpy.context.scene.collection.objects.link(ob)
+    bpy.context.view_layer.update()
+    me = bpy.data.meshes.new_from_object(ob.evaluated_get(bpy.context.evaluated_depsgraph_get()))
+    bpy.data.objects.remove(ob)
+    bpy.data.curves.remove(cu)
+    if not me.vertices:
+        bpy.data.meshes.remove(me)
+        return None
+    ys = [v.co.y for v in me.vertices]
+    xs = [v.co.x for v in me.vertices]
+    k = height / (max(ys) - min(ys))
+    cx, cy = (max(xs) + min(xs)) / 2, (max(ys) + min(ys)) / 2
+    me.transform(Matrix.Diagonal((k * squeeze, k, depth, 1.0)) @ Matrix.Translation((-cx, -cy, 0.5)))
+    return me
+
+
+def add_number_plate(name, at, facing, number=PLATE_NUMBER, size=(0.305, 0.152), coll=None):
+    """La plaque emboutie de la berline, posée à `at`, tournée vers +x (facing=1) ou −x (−1) : tôle de 1,5 mm à fond
+    noir, listel et caractères jaunes en relief de 1,5 mm (`number`, hauts de 68 mm), deux têtes de vis en haut.
+    Un seul objet, marqué PLATE_TAG (les appoints liés à la voiture ne l'éclairent pas). Renvoie l'objet."""
+    w, h = size
+    t, rel = 0.0015, 0.0015
+    black = _mat_plate_enamel("hero_plate_fond", PLATE_BLACK, 0.3)
+    yellow = _mat_plate_enamel("hero_plate_jaune", PLATE_YELLOW, 0.35)
+    steel = mat_metal("hero_plate_vis", (0.55, 0.55, 0.56, 1), 0.35)
+    bm = bmesh.new()
+    # le repère de construction : la plaque dans le plan XY, sa face vers +z
+    _box(bm, (-w / 2, -h / 2, 0.0), (w / 2, h / 2, t), 0)
+    lw, e = 0.006, 0.004                                     # le listel : quatre barres à 4 mm du bord
+    for lo, hi in (((-w / 2 + e, -h / 2 + e), (w / 2 - e, -h / 2 + e + lw)),
+                   ((-w / 2 + e, h / 2 - e - lw), (w / 2 - e, h / 2 - e)),
+                   ((-w / 2 + e, -h / 2 + e), (-w / 2 + e + lw, h / 2 - e)),
+                   ((w / 2 - e - lw, -h / 2 + e), (w / 2 - e, h / 2 - e))):
+        _box(bm, (lo[0], lo[1], t), (hi[0], hi[1], t + rel), 1)
+    for sx in (-1, 1):                                       # les vis : entraxe 17,8 cm, sous le bord du haut
+        res = bmesh.ops.create_cone(bm, cap_ends=True, segments=10, radius1=0.006, radius2=0.0045, depth=0.003,
+                                    matrix=Matrix.Translation((sx * 0.089, h / 2 - 0.022, t + 0.0015)))
+        for f in {f for v in res["verts"] for f in v.link_faces}:
+            f.material_index = 2
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    for m in (black, yellow, steel):
+        me.materials.append(m)
+    txt = _text_mesh(number, 0.068, rel)
+    if txt is not None:
+        # joint à la plaque sans opérateur : les caractères prennent la matière jaune (indice 1)
+        txt.transform(Matrix.Translation((0.0, -0.006, t)))
+        bm = bmesh.new()
+        bm.from_mesh(me)
+        n0 = len(bm.faces)
+        bm.from_mesh(txt)
+        bm.faces.ensure_lookup_table()
+        for f in bm.faces[n0:]:
+            f.material_index = 1
+        bm.to_mesh(me)
+        bm.free()
+        bpy.data.meshes.remove(txt)
+    # du plan XY à la voiture : la largeur selon y (lue de gauche à droite depuis l'extérieur), la hauteur selon z, la
+    # face vers `facing` x
+    me.transform(Matrix(((0.0, 0.0, facing, 0.0), (facing, 0.0, 0.0, 0.0), (0.0, 1.0, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0))))
+    me.update()
+    ob = bpy.data.objects.new(name, me)
+    (coll or bpy.context.scene.collection).objects.link(ob)
+    ob.location = Vector(at) + Vector((0.002 * facing, 0.0, 0.0))
+    ob[PLATE_TAG] = True
+    return ob
+
+
+def plate_lamp(body, plate, energy=PLATE_LAMP_W):
+    """L'éclaireur de plaque : une petite nappe chaude au-dessus de la plaque arrière, tournée vers elle (les deux
+    ampoules de 5 W logées sous la poignée du coffre). Elle éclaire la plaque, le haut du pare-chocs et un peu de
+    tôle ; invisible à la caméra et dans les reflets (son verre est caché sous la poignée). Renvoie la lumière."""
+    bpy.context.view_layer.update()
+    mn, mx = cv.bbox([plate])
+    d = bpy.data.lights.new(f"{body.name}_plate_lamp", "AREA")
+    d.shape = "RECTANGLE"
+    d.size, d.size_y = 0.20, 0.02
+    d.energy = energy
+    d.color = lin(PLATE_LAMP_COLOR)[:3]
+    lo = bpy.data.objects.new(d.name, d)
+    body.users_collection[0].objects.link(lo)
+    top = Vector((mn.x - 0.045, (mn.y + mx.y) / 2, mx.z + 0.03))
+    aim = Vector((mn.x, (mn.y + mx.y) / 2, (mn.z + mx.z) / 2 + 0.01))
+    # la longueur de la nappe (son x local) le long de la plaque (y de la voiture)
+    lo.matrix_world = Matrix.Translation(top) @ (aim - top).normalized().to_track_quat("-Z", "Y").to_matrix().to_4x4()
+    cv.parent_keep(lo, body)
+    lo.visible_camera = lo.visible_glossy = False
+    lo.visible_volume_scatter = False
+    return lo
+
+
 # ---------------------------------------------------------------- géométrie
 
 def islands(ob):
@@ -1770,8 +1903,9 @@ def load_hero(variant="w111", collection=None, lights_on=True, raw=False):
             # plaque vierge à l'arrière seulement (format américain 30,5 x 15,2 cm, pas de plaque avant dans l'État
             # du film), dans le logement entre les feux
             rear = ray_x([body], 0.0, 0.60, False)
+            pl = None
             if rear is not None:
-                pl = add_plate(f"{body.name}_plate_rear", rear, -1, size=(0.305, 0.152), coll=body.users_collection[0])
+                pl = add_number_plate(f"{body.name}_plate_rear", rear, -1, coll=body.users_collection[0])
                 cv.parent_keep(pl, body)
             handle = add_trunk_handle(body, bpy.data.materials["hero_w111_chrome"])
             car["report"]["poignée de coffre"] = "posée" if handle else "face arrière introuvable"
@@ -1788,6 +1922,8 @@ def load_hero(variant="w111", collection=None, lights_on=True, raw=False):
             body.id_properties_ui(STOP).update(min=0.0, max=1.0, description="feux stop (0 éteints, 1 allumés)")
             car["report"]["feux"] = tail_cores(body, on=lights_on)
             car["lights"] = _lights(car, lights_on, ("hero_w111_head_lens",), ("hero_w111_tail_lens",))
+            if pl is not None and lights_on:
+                car["lights"].append(plate_lamp(body, pl))
         # repères de l'habitacle (conduite à gauche) : œil du conducteur, centre du volant
         car["cockpit"] = dict(eye=Vector((-0.55, 0.36, 1.22)), wheel=Vector((0.55, 0.42, 0.87)))
         return car
