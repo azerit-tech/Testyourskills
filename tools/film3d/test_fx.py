@@ -307,6 +307,79 @@ def test_eau_continuity():
         assert all(x[0] == y[0] and x[2] == y[2] and math.dist(x[1], y[1]) < 2e-3 for x, y in zip(a, b)), (p0, p1)
 
 
+def test_spray_sim():
+    """L'eau simulée des pneus (SPEC §18.60), contre les valeurs d'une route mouillée : à 90 km/h, la brume reste sous
+    1 m (sous 0,6 m pour l'essentiel) et traîne 3 à 8 m derrière le pare-chocs, vit 0,3 à 0,6 s ; les gouttes
+    retombent au sol, sous 1 m pour l'essentiel ; rien sous le sol ; en glisse, le rideau part du côté où glissent
+    les pneus arrière ; plus de débit à plus de vitesse, rien sur le sec ni à l'arrêt."""
+    V = 25.0
+    tr = line_track(V, n=60)
+    st = {}
+    d, m = fx.spray_sim(tr, R, frames=(5, 40), wet=0.8, stats=st)
+    assert len(d) > 200 and len(m) > 400 and st["brisees"] > 50, st
+
+    def rel(q, u):
+        p = fx.path_at(q.path, u)
+        return V * (q.birth / fx.FPS + u * q.life) - p[1] - 2.45, p[2]
+
+    def pct(a, x):
+        a = sorted(a)
+        return a[int(x * (len(a) - 1))]
+    hm = [max(rel(q, i / 20)[1] for i in range(21)) for q in m]
+    hd = [max(rel(q, i / 20)[1] for i in range(21)) for q in d]
+    assert pct(hm, 0.9) < 0.6 and max(hm) < 1.2, (pct(hm, 0.9), max(hm))
+    assert pct(hd, 0.9) < 1.0, pct(hd, 0.9)
+    back = [rel(q, 1.0)[0] for q in m]
+    assert 3.0 < pct(back, 0.5) < 8.0 and pct(back, 0.1) > 1.0, (pct(back, 0.1), pct(back, 0.5))
+    assert all(0.0 < q.life <= 0.75 for q in m) and 0.3 < pct([q.life for q in m], 0.5) < 0.6   # (brisée : sa vie de brume part du choc)
+    assert all(min(fx.path_at(q.path, i / 20)[2] for i in range(21)) > -0.01 for q in d + m)
+    assert all(math.dist(fx.path_at(q.path, 0.0), q.path[0]) + math.dist(fx.path_at(q.path, 1.0), q.path[-1]) < 1e-9 for q in d[:20])
+    # la brume fine suit l'air : à la moitié de sa vie, elle va presque à la vitesse du sillage (pas balistique)
+    slow = fx.spray_sim(line_track(8.0, n=60), R, frames=(5, 40), wet=0.8)
+    assert len(slow[0]) + len(slow[1]) < 0.45 * (len(d) + len(m))
+    assert fx.spray_sim(line_track(25.0, n=60), R, frames=(5, 40), wet=0.0) == ([], [])
+    # la glisse : un rideau du côté où glissent les pneus arrière (la caisse tournée à gauche : vers +x)
+    tr = line_track(11.0, n=60, slip_deg=25.0)
+    dd, mm = fx.spray_sim(tr, R, frames=(5, 40), roll=0.0, drift=1.0)
+    assert len(dd) > 100 and len(mm) > 50
+    out = [q.path[-1][0] - q.path[0][0] for q in dd]
+    assert sum(1 for o in out if o > 0) > 0.9 * len(out)
+    assert pct([max(fx.path_at(q.path, i / 20)[2] for i in range(21)) for q in dd], 0.9) < 1.0
+    assert fx.spray_sim(line_track(11.0, n=60), R, frames=(5, 40), roll=0.0, drift=1.0) == ([], [])
+    # la traînée d'une goutte : une fine (0,2 mm) rejoint l'air en quelques centièmes de seconde, une grosse (2 mm)
+    # garde sa lancée dix fois plus longtemps
+    assert fx.drag_rate(0.2e-3, 10.0) > max(30.0, 10.0 * fx.drag_rate(2.0e-3, 10.0))
+
+
+def test_spray_sim_continuity():
+    """La gerbe simulée passe les coupes : deux tronçons qui se suivent tirent et intègrent les mêmes paquets, au
+    même endroit de la ville, sur toute leur vie (la conduite lue EAU_AFTER images après la fin de la scène)."""
+    import parcours as PC
+    offs = {n: (a, b, R) for n, a, b in WHEELS}
+    for p0, p1, kw in (("P4", "P5", dict(roll=1.0)), ("P5", "P6", dict(roll=1.0)),
+                       ("P5", "P6", dict(roll=0.0, drift=1.1))):
+        cut = PC.START[p1]
+        out = {}
+        for shot in (p0, p1):
+            h = PC.hero(shot)
+            g0 = PC.START[shot] - 1
+            if shot == p0:
+                lo, hi = cut - 14 - g0, cut - g0
+            else:
+                lo, hi = 1 - fx.EAU_PREROLL, cut - g0
+            tr = fx.drive_track(h["pos"], h["heading"], range(lo - 1, hi + 2 + fx.EAU_AFTER), offs)
+            d, m = fx.spray_sim(tr, R, g0=g0, frames=(lo, hi), wet=0.8, **kw)
+            to_v = PC.vers_ville(shot)[0]
+            out[shot] = sorted((round(q.birth + g0, 4), round(q.life, 4),
+                                tuple(tuple(round(c, 2) for c in to_v(*p[:2])) for p in q.path))
+                               for q in d + m if cut - 12 <= q.birth + g0 < cut - 1)
+        a, b = out[p0], out[p1]
+        assert len(a) > 30 and len(a) == len(b), (p0, p1, kw, len(a), len(b))
+        bad = [(x, y) for x, y in zip(a, b) if x[0] != y[0] or abs(x[1] - y[1]) > 2e-3
+               or any(math.dist(u, v) > 0.03 for u, v in zip(x[2], y[2]))]
+        assert not bad, (p0, p1, kw, len(bad), bad[:1])
+
+
 def test_switch():
     os.environ.pop("FILM3D_FX", None)
     assert not fx.enabled() and fx.dress("P3") is None          # inactif par défaut

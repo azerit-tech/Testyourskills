@@ -128,19 +128,25 @@ class Particle:
     """Une particule : née à l'image `birth` (fractionnaire) en p (m), lancée à v (m/s), vivante `life` s ;
     traînée, pesanteur relative, taille de size0 à size1 (rayon d'une goutte, ou côté d'un sprite), opacité alpha,
     graine 0..1."""
-    __slots__ = ("birth", "p", "v", "life", "drag", "grav", "size0", "size1", "alpha", "seed")
+    __slots__ = ("birth", "p", "v", "life", "drag", "grav", "size0", "size1", "alpha", "seed", "path")
 
-    def __init__(self, birth, p, v, life, drag=1.0, grav=1.0, size0=0.005, size1=None, alpha=1.0, seed=0.0):
+    def __init__(self, birth, p, v, life, drag=1.0, grav=1.0, size0=0.005, size1=None, alpha=1.0, seed=0.0,
+                 path=None):
         self.birth, self.p, self.v, self.life = float(birth), tuple(p), tuple(v), max(0.02, float(life))
         self.drag, self.grav, self.size0 = float(drag), float(grav), float(size0)
         self.size1 = float(size0 if size1 is None else size1)
         self.alpha, self.seed = float(alpha), float(seed)
+        # une trajectoire intégrée (spray_sim) : PATH_K positions aux instants life × (i / (PATH_K − 1))², que les
+        # nœuds interpolent ; sans elle, la balistique à traînée linéaire (p, v, drag, grav)
+        self.path = path
 
     def at(self, frame):
         """(position, âge 0..1) à l'image `frame`, ou None hors de sa vie."""
         age = (frame - self.birth) / FPS
         if age < 0 or age > self.life:
             return None
+        if self.path:
+            return path_at(self.path, age / self.life), age / self.life
         return ballistic(self.p, self.v, age, self.drag, self.grav), age / self.life
 
 
@@ -577,6 +583,306 @@ def drift_spray(track, wheel_r, g0=0, seed=23, substeps=4, frames=None, wet=1.0,
     return drops, mist
 
 
+# ---------------------------------------------------------------- l'eau des pneus, simulée (SPEC §18.60)
+#
+# Le brouillon éclairé v9 : « les gerbes d'eau sont pas très naturelles ». Les gerbes de wheel_spray et drift_spray
+# étaient dessinées (une balistique à traînée linéaire, des lambeaux de 0,3 à 1,6 m, des gouttes de verre de 3 à
+# 14 mm) : des paquets blancs, détachés, hauts. Ici, comme la conduite, l'eau suit la physique, intégrée en Python au
+# 1/240 de seconde sur le temps du film, dans le repère de la scène, sans tirage qui dépende du tronçon :
+# - l'émission : la bande de roulement reprend l'eau du film d'eau (chaussée humide) et la lâche juste après le
+#   contact, tangente au pneu (vitesse de la bande = vitesse de la roue, × 1,25 pour une roue arrière qui patine en
+#   glisse), dans un petit cône ; le débit suit la vitesse et le mouillé. En glisse, le pneu arrière balaie l'eau
+#   devant lui, en travers : un rideau chassé vers l'extérieur à la vitesse de glissade ;
+# - les gouttes de 0,2 à 2 mm (log-uniforme) : pesanteur et traînée quadratique d'une sphère (Schiller–Naumann),
+#   intégrée sans raideur (relaxation exacte sur le pas) : les fines (< 0,5 mm) rejoignent l'air en quelques
+#   centièmes de seconde et deviennent une brume qui pend, les grosses filent et retombent ;
+# - l'air : le sillage de la berline (l'air entraîné derrière elle à une part de sa vitesse, décroissante sur
+#   quelques mètres, plus étroit en bas, avec une descente qui aplatit la brume), l'air sous la caisse entraîné ;
+# - la caisse : une goutte qui monte sous le bas de caisse, le pare-chocs ou dans le passage de roue s'y brise et
+#   devient brume (c'est ce qui garde la gerbe basse) ;
+# - la mort : au sol, au bout de sa vie (la brume, 0,3 à 0,6 s : diluée, invisible), ou à 9 m derrière la berline
+#   (derrière l'objectif du bras commun).
+# Chaque paquet porte sa trajectoire (PATH_K positions) : les nœuds l'interpolent à chaque sous-image (le flou de
+# bougé est juste). Les grosses gouttes sont des sphères d'eau, la brume des sprites plats et doux, sans émission.
+
+SPRAY = dict(
+    hz=240,                    # le pas d'intégration (s⁻¹)
+    rate=520.0,                # paquets/s par roue arrière, à 30 m/s, chaussée trempée (mouillé 1)
+    front=0.45,                # la part d'une roue avant (le passage de roue en garde le reste)
+    theta=(3.0, 28.0),         # l'arc de lâcher après le contact (degrés), tiré vers le bas (au-delà, le passage de
+                               # roue et le pare-chocs prennent l'eau)
+    cone=10.0,                 # le cône aléatoire (degrés)
+    side=0.12,                 # l'écart latéral de la bande (part de sa vitesse, vers l'extérieur)
+    d=(0.2e-3, 2.0e-3),        # le diamètre des gouttes (m), log-uniforme
+    mist_d=0.5e-3,             # en dessous : la brume (sprites) ; au-dessus : les gouttes (sphères)
+    mist_life=(0.3, 0.6),      # la vie de la brume (s), diluée au-delà
+    drop_life=1.0,             # la vie d'une goutte au plus (s), si elle n'a pas touché le sol
+    drift_rate=700.0,          # paquets/s par roue arrière, à 10 m/s de glissade en travers, mouillé 1
+    behind=9.0,                # m derrière le pare-chocs : morte (derrière l'objectif)
+    half=(2.45, 0.9),          # la caisse : demi-longueur, demi-largeur (m)
+    clear=0.26,                # garde au sol du bas de caisse et du pare-chocs (m)
+    wake=0.5,                  # l'air entraîné juste derrière la caisse (part de sa vitesse)
+    wake_len=4.5,              # sa décroissance (m)
+    under=0.4,                 # l'air entraîné sous et le long de la caisse
+    down=0.07,                 # la descente du sillage (part de la vitesse)
+    turb=0.35,                 # la turbulence du sillage : part de l'air entraîné, en travers et en hauteur (+ 0,3 m/s)
+    mist_alpha=0.13,           # l'opacité d'un paquet de brume (au plus)
+    mist_size=((0.06, 0.12), (0.3, 0.5)),   # côté d'un sprite à la naissance, à la fin (m)
+    flat=0.55,                 # la brume aplatie : hauteur / largeur du sprite
+    drop_scale=2.0,            # le rayon rendu d'une goutte (un paquet en porte plusieurs) : × son rayon
+)
+PATH_K = 7
+RHO_AIR, RHO_W, MU_AIR = 1.2, 1000.0, 1.8e-5
+
+
+def path_at(path, u):
+    """La position d'une trajectoire à la fraction de vie u (0..1) : PATH_K points aux instants (i / (K − 1))²,
+    interpolés linéairement en √u (comme les nœuds)."""
+    s = math.sqrt(min(1.0, max(0.0, u))) * (len(path) - 1)
+    i = min(len(path) - 2, int(s))
+    return _lerp(path[i], path[i + 1], s - i)
+
+
+def drag_rate(d, urel):
+    """k (s⁻¹) d'une goutte de diamètre d (m) à la vitesse relative à l'air urel (m/s) : dv/dt = k (u_air − v),
+    traînée quadratique d'une sphère, coefficient de Schiller–Naumann (0,44 au-delà de Re 1000)."""
+    re = max(1e-6, RHO_AIR * urel * d / MU_AIR)
+    cd = 0.44 if re > 1000.0 else 24.0 / re * (1.0 + 0.15 * re ** 0.687)
+    return 3.0 * RHO_AIR * cd * urel / (4.0 * RHO_W * d)
+
+
+def air_wake(rel, fwd, right, vel, speed, S=SPRAY):
+    """La vitesse de l'air (m/s, repère de la scène) au point rel (relatif au centre de la berline, au sol) : entraîné
+    sous et le long de la caisse, puis dans son sillage, qui décroît sur wake_len m, s'élargit, et descend."""
+    if speed < 0.5:
+        return (0.0, 0.0, 0.0)
+    a = rel[0] * fwd[0] + rel[1] * fwd[1]
+    b = rel[0] * right[0] + rel[1] * right[1]
+    z = rel[2]
+    L, W = S["half"]
+    if a > L + 0.5:
+        return (0.0, 0.0, 0.0)
+    xb = max(0.0, -L - a)
+    w = W + 0.15 * xb
+    lat = math.exp(-(max(0.0, abs(b) - 0.3) / w) ** 2)
+    hgt = math.exp(-(z / 1.6) ** 2)
+    if xb <= 0.0:
+        f = S["under"] * (1.0 - smoothstep(L, L + 0.5, a))
+        dz = 0.0
+    else:
+        f = (S["under"] + (S["wake"] - S["under"]) * smoothstep(0.0, 0.8, xb)) * math.exp(-xb / S["wake_len"])
+        dz = -S["down"] * speed * math.exp(-xb / 3.0) * min(1.0, z / 0.3) if z > 0 else 0.0
+    k = f * lat * hgt
+    return (vel[0] * k, vel[1] * k, dz * lat)
+
+
+def _substeps(track, f0, f1, hz):
+    """Les poses de la berline à chaque pas (images f0 → f1, hz par seconde), par indice direct : [(image, centre,
+    avant, droite, vitesse, vitesse scalaire, {roue: centre}, {roue: vitesse})]."""
+    t0 = track[0].frame
+    out = []
+    step = FPS / hz
+    n = int(round((f1 - f0) / step))
+    for j in range(n + 1):
+        f = f0 + j * step
+        i = min(len(track) - 2, max(0, int(math.floor(f - t0))))
+        a, b = track[i], track[i + 1]
+        u = min(1.0, max(0.0, (f - a.frame) / ((b.frame - a.frame) or 1)))
+        fwd = _norm(_lerp(a.fwd, b.fwd, u))
+        out.append((f, _lerp(a.pos, b.pos, u), fwd, (fwd[1], -fwd[0], 0.0), _lerp(a.vel, b.vel, u),
+                    a.speed + (b.speed - a.speed) * u, {k: _lerp(a.wheels[k], b.wheels[k], u) for k in a.wheels},
+                    {k: _lerp(a.wvel[k], b.wvel[k], u) for k in a.wvel}))
+    return out
+
+
+def _cone(rng, v, deg, ref=(1.0, 0.0, 0.0)):
+    """v tourné au hasard dans un cône de demi-angle deg (degrés)."""
+    sp = _len(v)
+    if sp < 1e-9:
+        return v
+    n = _mul(v, 1.0 / sp)
+    # (le repère du cône tourne avec la verticale : le même tirage d'un tronçon à l'autre, quelle que soit son
+    # orientation : une direction presque verticale prend `ref`, l'avant de la berline)
+    a = (0.0, 0.0, 1.0) if abs(n[2]) < 0.9 else ref
+    e1 = _norm((n[1] * a[2] - n[2] * a[1], n[2] * a[0] - n[0] * a[2], n[0] * a[1] - n[1] * a[0]))
+    e2 = (n[1] * e1[2] - n[2] * e1[1], n[2] * e1[0] - n[0] * e1[2], n[0] * e1[1] - n[1] * e1[0])
+    t = math.radians(deg) * math.sqrt(rng.random())
+    ph = rng.random() * math.tau
+    d = _add(_mul(n, math.cos(t)), _add(_mul(e1, math.sin(t) * math.cos(ph)), _mul(e2, math.sin(t) * math.sin(ph))))
+    return _mul(d, sp)
+
+
+def spray_sim(track, wheel_r, g0=0, frames=None, wet=1.0, seed=101, roll=1.0, drift=0.0, S=None, stats=None):
+    """L'eau des pneus, simulée (voir plus haut). roll : la bande de roulement (les quatre roues) ; drift : le rideau
+    des pneus arrière qui glissent en travers. frames (lo, hi) : les images de la scène où naissent les paquets (la
+    trajectoire doit déborder d'une seconde après hi : ceux nés avant la fin de la scène y finissent leur vie, comme
+    au tronçon suivant). Le tirage se fait par pas du film (g0 : l'image du film moins celle de la scène) et par roue :
+    deux tronçons qui se suivent tirent et intègrent les mêmes paquets. stats (dict) reçoit les comptes.
+    Renvoie (gouttes, brume) : deux listes de Particle à trajectoire."""
+    S = dict(SPRAY, **(S or {}))
+    hz = S["hz"]
+    dt = 1.0 / hz
+    step = FPS / hz
+    lo, hi = frames if frames else (track[0].frame, track[-1].frame)
+    t_end = track[-1].frame
+    # les pas du film : la naissance d'un paquet tombe sur un pas global (image du film × hz / FPS)
+    k_lo = int(math.ceil((lo + g0) / step - 1e-9))
+    k_hi = int(math.floor((hi + g0) / step + 1e-9))
+    f_first = k_lo * step - g0
+    poses = _substeps(track, f_first, max(f_first, t_end), hz)
+    L, W = S["half"]
+    names = sorted(track[0].wheels)
+    p0 = track[0]
+    woff = {k: (_dot(_sub(p0.wheels[k], p0.pos), p0.fwd), _dot(_sub(p0.wheels[k], p0.pos), p0.right)) for k in names}
+    lnd = (math.log(S["d"][0]), math.log(S["d"][1]))
+    drops, mist = [], []
+    live = []          # [pos, vel, d, t, tmax, mist?, samples, birth, rng-graine, atomisée]
+    n_atom = n_ground = n_far = 0
+    for j, (f, C, fwd, right, vel, speed, wh, wv) in enumerate(poses):
+        k = k_lo + j
+        if k <= k_hi:
+            for wi, name in enumerate(names):
+                rear = name.endswith(("BL", "BR"))
+                c, V = wh[name], wv.get(name, vel)
+                ground = c[2] - wheel_r
+                vlon = _dot(V, fwd)
+                vlat = _dot(V, right)
+                side = 1.0 if woff[name][1] > 0 else -1.0
+                births = []
+                rng = random.Random((seed * 7919 + wi) * 1000003 + k)
+                if roll > 0 and abs(vlon) > 1.0:
+                    slip = math.degrees(math.atan2(abs(vlat), max(1e-6, abs(vlon))))
+                    spin = abs(vlon) * (1.0 + 0.25 * smoothstep(8.0, 18.0, slip) if rear else 1.0)
+                    lam = S["rate"] * roll * wet * (1.0 if rear else S["front"]) * abs(vlon) / 30.0 * dt
+                    for _ in range(_poisson(rng, lam)):
+                        th = math.radians(S["theta"][0] + (S["theta"][1] - S["theta"][0]) * rng.random() ** 1.6)
+                        # la bande au point de lâcher, et sa vitesse : celle de la roue, plus la rotation (tangente)
+                        # (un seul écart par paquet, le long de la droite de la berline : deux tirages, un par axe
+                        # de la scène, rendraient la gerbe dépendante de l'orientation du tronçon)
+                        lt = side * rng.uniform(-0.06, 0.1)
+                        pos = (c[0] - fwd[0] * wheel_r * math.sin(th) + right[0] * lt,
+                               c[1] - fwd[1] * wheel_r * math.sin(th) + right[1] * lt,
+                               ground + wheel_r * (1.0 - math.cos(th)) + 0.005)
+                        tang = _add(_mul(fwd, -math.cos(th) * spin), (0.0, 0.0, math.sin(th) * spin))
+                        v = _add(_add(_mul(fwd, vlon), _mul(right, vlat)), tang)
+                        v = _add(_cone(rng, v, S["cone"], fwd), _mul(right, side * spin * S["side"] * rng.random()))
+                        births.append((pos, v, rng))
+                if drift > 0 and rear and abs(vlat) > 0.8:
+                    lam = S["drift_rate"] * drift * wet * smoothstep(0.8, 6.0, abs(vlat)) * abs(vlat) / 10.0 * dt
+                    slide = _mul(right, 1.0 if vlat > 0 else -1.0)
+                    for _ in range(_poisson(rng, lam)):
+                        # l'eau devant le pneu qui glisse : balayée en travers à sa vitesse de glissade, un peu
+                        # levée (une vague d'étrave), une part de sa vitesse le long
+                        w = rng.uniform(-0.12, 0.12)
+                        pos = (c[0] + slide[0] * 0.12 - fwd[0] * w, c[1] + slide[1] * 0.12 - fwd[1] * w,
+                               ground + rng.uniform(0.005, 0.03))
+                        vs = abs(vlat) * rng.uniform(1.0, 1.4)
+                        up = vs * math.tan(math.radians(rng.uniform(8.0, 32.0)))
+                        v = _add(_add(_mul(slide, vs), _mul(fwd, vlon * rng.uniform(0.0, 0.3))), (0.0, 0.0, up))
+                        births.append((pos, _cone(rng, v, S["cone"], fwd), rng))
+                for pos, v, r in births:
+                    d = math.exp(r.uniform(*lnd))
+                    is_mist = d < S["mist_d"]
+                    tmax = r.uniform(*S["mist_life"]) if is_mist else S["drop_life"]
+                    live.append([pos, v, d, 0.0, tmax, is_mist, [(0.0, pos)], f, r.random(), False, ground])
+        # un pas : pesanteur, traînée vers l'air local (relaxation exacte), la caisse, le sol
+        nxt = []
+        for q in live:
+            pos, v, d, t, tmax, is_mist, smp, born, sd, atom, ground = q
+            rel = _sub(pos, C)
+            ua = air_wake(rel, fwd, right, vel, speed, S)
+            if d < 1e-3:
+                # la turbulence du sillage (déterministe, propre au paquet) : elle ouvre la brume en éventail
+                amp = S["turb"] * _len(ua) + 0.3
+                ph = math.tau * sd
+                lat = amp * math.sin(9.0 * t + ph)
+                ua = (ua[0] + right[0] * lat, ua[1] + right[1] * lat,
+                      ua[2] + 0.5 * amp * math.sin(13.0 * t + 3.0 * ph))
+            v = (v[0], v[1], v[2] - G * dt)
+            ur = _sub(v, ua)
+            kr = drag_rate(d, _len(ur))
+            e = math.exp(-kr * dt)
+            v = _add(ua, _mul(ur, e))
+            pos = _add(pos, _mul(v, dt))
+            t += dt
+            a = _dot(rel, fwd)
+            b = rel[0] * right[0] + rel[1] * right[1]
+            h = pos[2] - ground
+            dead = False
+            if not is_mist and abs(a) < L and abs(b) < W:
+                # sous la caisse : le bas de caisse, le pare-chocs ; autour de sa roue, le passage de roue
+                lim = S["clear"]
+                for name in names:
+                    wa, wb = woff[name]
+                    if abs(a - wa) < wheel_r + 0.08 and abs(b - wb) < 0.18:
+                        lim = 2 * wheel_r + 0.05
+                if h > lim:
+                    # brisée contre la caisse : une brume fine, emportée par l'air sous la caisse
+                    is_mist, atom, d = True, True, 0.25e-3
+                    v = _add(ua, (0.0, 0.0, -0.3))
+                    tmax = t + 0.3 + 0.3 * sd
+                    n_atom += 1
+            if is_mist and h < 0.02:
+                # la brume ne se dépose pas : l'air la porte au ras du sol (la descente du sillage l'y couche)
+                pos = (pos[0], pos[1], ground + 0.02)
+                v = (v[0], v[1], max(0.0, v[2]))
+                h = 0.02
+            if h <= 0.0:
+                # au sol : l'instant exact du contact
+                prev_h = smp[-1][1][2] - ground
+                u = prev_h / max(1e-9, prev_h - h)
+                t_hit = smp[-1][0] + u * (t - smp[-1][0])
+                smp.append((t_hit, _lerp(smp[-1][1], pos, u)))
+                t, dead = t_hit, True
+                n_ground += 1
+            elif t >= tmax:
+                smp.append((t, pos))
+                dead = True
+            elif -a > L + S["behind"]:
+                smp.append((t, pos))
+                dead = True
+                n_far += 1
+            else:
+                smp.append((t, pos))
+            if dead or j == len(poses) - 1:
+                life = smp[-1][0]
+                if life < 1.5 * dt:
+                    continue
+                path = []
+                ti = 0
+                for i in range(PATH_K):
+                    tt = life * (i / (PATH_K - 1)) ** 2
+                    while ti < len(smp) - 2 and smp[ti + 1][0] < tt:
+                        ti += 1
+                    (ta, pa), (tb, pb) = smp[ti], smp[ti + 1]
+                    path.append(_lerp(pa, pb, min(1.0, max(0.0, (tt - ta) / max(1e-9, tb - ta)))))
+                rr = random.Random(sd)
+                if is_mist:
+                    (a0, a1), (b0, b1) = S["mist_size"]
+                    grow = 1.0 + 0.3 * min(1.0, speed / 30.0)
+                    mist.append(Particle(born, path[0], (0.0, 0.0, 0.0), life, 1.0, 0.0, rr.uniform(a0, a1),
+                                         rr.uniform(b0, b1) * grow, S["mist_alpha"] * rr.uniform(0.6, 1.0), sd,
+                                         path=path))
+                else:
+                    r_ = d * 0.5 * S["drop_scale"]
+                    drops.append(Particle(born, path[0], (0.0, 0.0, 0.0), life, 1.0, 1.0, r_, r_, 1.0, sd,
+                                          path=path))
+                continue
+            nxt.append([pos, v, d, t, tmax, is_mist, smp, born, sd, atom, ground])
+        live = nxt
+    if stats is not None:
+        stats.update(gouttes=len(drops), brume=len(mist), brisees=n_atom, au_sol=n_ground, loin=n_far)
+    return drops, mist
+
+
+def spray_track(ctx, preroll, after=30):
+    """La trajectoire de la simulation : celle du parcours, `preroll` images avant la scène et `after` après sa fin
+    (les paquets nés avant la fin y finissent leur vie, comme au tronçon suivant). (trajectoire, g0) ; g0 None si la
+    scène ne suit pas le parcours (sa trajectoire seule)."""
+    tr, g0 = drift_track(ctx, preroll, after=after)
+    return tr, g0
+
+
 # ---------------------------------------------------------------- ce qui vole
 
 def debris_keys(rest, frames, pass_frame, dist, car_vel, seed=7, kind="papier", ground=None):
@@ -1001,6 +1307,17 @@ def mat_spray(veil="bas"):
                       occlude=SPRAY_OCCLUDE, detail=4.0, power=1.8)
 
 
+# La brume des pneus simulée (SPEC §18.60) : un paquet de gouttelettes fines, doux (pas de lambeaux : un bruit large
+# et peu contrasté, un bord très fondu), sombre et translucide vers l'avant (le rouge des feux, l'ambre des lampes la
+# traversent), sans émission ; plat (le sillage la couche) et peu opaque : c'est leur nombre qui fait le voile
+MIST_ALBEDO = "#6d727b"
+
+
+def mat_mist():
+    return mat_sprite("fx_brume_fine", MIST_ALBEDO, 1.8, 0.15, 0.85, translucent=0.85, occlude=0.3, detail=2.0,
+                      power=2.4, evolve=2.0)
+
+
 def mat_smoke(color="#d6d4da"):
     """La fumée de gomme : des volutes (un bruit large qui roule au fil de la vie du sprite), un bord très fondu
     (aucune silhouette de sprite) ; elle absorbe autant qu'elle diffuse et ne prend que la lumière de la scène
@@ -1125,7 +1442,19 @@ def _gn_maprange(ng, v, a, b, lo=0.0, hi=1.0):
     return n.outputs["Result"]
 
 
-def _gn_particles(name, kind, mat, cam=None, hero=None, mask=0.0, near=0.0, edge=0.4):
+def _gn_path(ng, u, k=PATH_K):
+    """La position d'une trajectoire intégrée (attributs q0 … q{k-1}) à la fraction de vie u : interpolée en √u,
+    comme path_at."""
+    s = _gn_math(ng, "MULTIPLY", _gn_math(ng, "SQRT", u), float(k - 1))
+    pos = None
+    for i in range(k):
+        w = _gn_math(ng, "MAXIMUM", _gn_math(ng, "SUBTRACT", 1.0, _gn_math(ng, "ABSOLUTE", _gn_math(ng, "SUBTRACT", s, float(i)))), 0.0)
+        term = _gn_vec(ng, "SCALE", _gn_attr(ng, f"q{i}", True), scale=w)
+        pos = term if pos is None else _gn_vec(ng, "ADD", pos, term)
+    return pos
+
+
+def _gn_particles(name, kind, mat, cam=None, hero=None, mask=0.0, near=0.0, edge=0.4, path=False, flat=1.0):
     """Le groupe de nœuds qui évalue les particules à l'image (temps de la scène, sous-images comprises : le flou
     de bougé est juste). Chaque point du maillage porte b (naissance), l (vie), p, v, k (traînée), g (pesanteur),
     s0, s1 (taille), a (opacité), r (graine). kind « drops » : un nuage de points (sphères) ; « sprites » : un carré
@@ -1157,6 +1486,8 @@ def _gn_particles(name, kind, mat, cam=None, hero=None, mask=0.0, near=0.0, edge
     Lk(dz, cz.inputs["Z"])
     pos = _gn_vec(ng, "ADD", _gn_vec(ng, "ADD", _gn_attr(ng, "p", True), _gn_vec(ng, "SCALE", _gn_attr(ng, "v", True), scale=e)),
                   cz.outputs[0])
+    if path:
+        pos = _gn_path(ng, u)
     sp = N.new("GeometryNodeSetPosition")
     Lk(pts.outputs["Points"], sp.inputs["Geometry"])
     Lk(pos, sp.inputs["Position"])
@@ -1238,6 +1569,13 @@ def _gn_particles(name, kind, mat, cam=None, hero=None, mask=0.0, near=0.0, edge
             rot.axis = "Z"
             Lk(to_cam, rot.inputs["Vector"])
             rot_out = rot.outputs["Rotation"]
+            if flat != 1.0:
+                # la brume aplatie : la hauteur du sprite (son y) suit la verticale du monde
+                up = N.new("FunctionNodeAlignRotationToVector")
+                up.axis, up.pivot_axis = "Y", "Z"
+                Lk(rot_out, up.inputs["Rotation"])
+                up.inputs["Vector"].default_value = (0.0, 0.0, 1.0)
+                rot_out = up.outputs["Rotation"]
         else:
             rot_out = None
         geo = _gn_store(ng, geo, "fx_a", alpha)
@@ -1255,7 +1593,14 @@ def _gn_particles(name, kind, mat, cam=None, hero=None, mask=0.0, near=0.0, edge
         # un sprite éteint (masqué, trop près, en fin de vie) est ramené à zéro : un carré transparent compte quand
         # même un rebond de transparence, et au-delà du plafond Cycles rend du noir (les grands pavés noirs du banc,
         # vus dans l'axe de la traîne)
-        Lk(_gn_math(ng, "MULTIPLY", size, _gn_math(ng, "GREATER_THAN", alpha, 0.006)), inst.inputs["Scale"])
+        sc = _gn_math(ng, "MULTIPLY", size, _gn_math(ng, "GREATER_THAN", alpha, 0.006))
+        if flat != 1.0:
+            cxyz = N.new("ShaderNodeCombineXYZ")
+            Lk(sc, cxyz.inputs["X"])
+            Lk(_gn_math(ng, "MULTIPLY", sc, flat), cxyz.inputs["Y"])
+            Lk(sc, cxyz.inputs["Z"])
+            sc = cxyz.outputs[0]
+        Lk(sc, inst.inputs["Scale"])
         real = N.new("GeometryNodeRealizeInstances")
         Lk(inst.outputs["Instances"], real.inputs["Geometry"])
         final = real.outputs["Geometry"]
@@ -1266,7 +1611,7 @@ def _gn_particles(name, kind, mat, cam=None, hero=None, mask=0.0, near=0.0, edge
     return ng
 
 
-def emit(ctx, name, parts, kind, mat, mask=0.0, near=0.0, glossy=False, edge=0.4):
+def emit(ctx, name, parts, kind, mat, mask=0.0, near=0.0, glossy=False, edge=0.4, flat=1.0):
     """Pose une liste de Particle dans la scène : un maillage de points (un par particule, ses attributs de
     naissance) et le groupe de nœuds qui les fait vivre. Renvoie l'objet (ou None si la liste est vide)."""
     if not parts:
@@ -1288,11 +1633,15 @@ def emit(ctx, name, parts, kind, mat, mask=0.0, near=0.0, glossy=False, edge=0.4
     put("s1", [q.size1 for q in parts])
     put("a", [q.alpha for q in parts])
     put("r", [q.seed for q in parts])
+    path = all(q.path for q in parts)
+    if path:
+        for i in range(PATH_K):
+            put(f"q{i}", [c for q in parts for c in q.path[i]], True)
     ob = bpy.data.objects.new(name, me)
     ctx.coll.objects.link(ob)
     mod = ob.modifiers.new("fx", "NODES")
     mod.node_group = _gn_particles(name + "_nodes", kind, mat, cam=ctx.cam, hero=ctx.body, mask=mask, near=near,
-                                   edge=edge)
+                                   edge=edge, path=path, flat=flat)
     camera_only(ob, glossy=glossy)
     try:
         ob.cycles.use_motion_blur = True
@@ -1523,8 +1872,12 @@ def ripple_layer(ctx, src):
 # gerbe changeait de densité d'une image à l'autre). Le même réglage partout, tiré sur le temps du film depuis la
 # conduite du parcours, EAU_PREROLL images avant la scène (la gerbe la plus longue, celle d'une flaque, vit 1,2 s) :
 # ce qui naît avant une coupe vit après, au même endroit de la ville.
+# v10 (SPEC §18.60) : la gerbe des roues est simulée (spray_sim) ; drops, mist et mist_alpha ne règlent plus que les
+# gerbes de flaque. EAU_AFTER : la conduite lue au-delà de la fin de la scène, le temps que vivent les paquets nés
+# avant elle (ils y finissent leur vie comme au tronçon suivant)
 EAU = dict(wet=0.8, drops=0.7, mist=0.8, mist_alpha=0.55, mask=0.9, near=4.0)
 EAU_PREROLL = 32
+EAU_AFTER = 30
 
 
 def water(ctx, wet=1.0, puddles=(), drops=1.0, mist=1.0, mask=0.85, near=1.2, hide_old=True, splash=1.0,
@@ -1539,7 +1892,7 @@ def water(ctx, wet=1.0, puddles=(), drops=1.0, mist=1.0, mask=0.85, near=1.2, hi
         for ob in ctx.scene.objects:
             if ob.name.startswith("spray_") and ob.type == "MESH":
                 ob.hide_render = True
-    track, g0 = drift_track(ctx, preroll) if preroll else (ctx.track, None)
+    track, g0 = drift_track(ctx, preroll, after=EAU_AFTER) if preroll else (ctx.track, None)
     if frames is None and g0 is not None:
         frames = (track[0].frame + 1, ctx.frames[1] + 1)
     g0 = g0 or 0
@@ -1550,8 +1903,10 @@ def water(ctx, wet=1.0, puddles=(), drops=1.0, mist=1.0, mask=0.85, near=1.2, hi
         w, f, rx, ry, along = tuple(spec) + (0.9, 0.55, 0.0)[len(spec) - 2:]
         e, ob = add_puddle(ctx, w, f, rx, ry, along, seed=len(ells))
         ells.append((e, ob, True))
-    d_all, m_all = wheel_spray(track, None, ctx.wheel_r, rate_drops=2400.0 * drops, rate_mist=190.0 * mist,
-                               wet=wet, seed=seed, frames=frames, veil=veil, mist_alpha=mist_alpha, g0=g0)
+    st = {}
+    s_drops, s_mist = spray_sim(track, ctx.wheel_r, g0=g0, frames=frames, wet=wet, seed=101 + seed, roll=1.0,
+                                stats=st)
+    d_all, m_all = [], []
     n_cross = 0
     sheets = []
     if ells:
@@ -1572,12 +1927,15 @@ def water(ctx, wet=1.0, puddles=(), drops=1.0, mist=1.0, mask=0.85, near=1.2, hi
         # de dos, la caméra suit à 5-8 m : rien de l'eau ne vient à moins de 3 m de l'objectif (une goutte ou un
         # lambeau de voile y serait une tache floue au bas du cadre, sous le HUD)
         near = max(near, 3.0)
-    od = emit(ctx, f"fx_gouttes_{ctx.plan}", d_all, "drops", mat_drop(), glossy=True, near=near)
-    om = emit(ctx, f"fx_embruns_{ctx.plan}", m_all + sheets, "sprites", mat_spray(veil),
-              mask=mask, near=near)
-    early = sum(1 for q in d_all + m_all + sheets if q.birth < ctx.frames[0])
-    log(f"eau : {len(d_all)} gouttes, {len(m_all)} sprites d'embruns, {len(sheets)} de nappe ({early} nés avant la "
-        f"scène), {n_cross} traversées de flaque sur {len(ells)} flaques"
+    od = emit(ctx, f"fx_gouttes_{ctx.plan}", s_drops, "drops", mat_drop(), glossy=True, near=near)
+    om = emit(ctx, f"fx_brume_{ctx.plan}", s_mist, "sprites", mat_mist(), mask=mask, near=near, flat=SPRAY["flat"])
+    # les gerbes des flaques traversées (balistiques, à part)
+    emit(ctx, f"fx_gerbe_flaque_{ctx.plan}", d_all, "drops", mat_drop(), glossy=True, near=near)
+    emit(ctx, f"fx_embruns_{ctx.plan}", sheets, "sprites", mat_spray(veil), mask=mask, near=near)
+    early = sum(1 for q in s_drops + s_mist if q.birth < ctx.frames[0])
+    log(f"eau : simulée, {len(s_drops)} gouttes, {len(s_mist)} paquets de brume ({early} nés avant la scène, "
+        f"{st.get('brisees', 0)} brisées sous la caisse) ; flaques : {len(d_all)} gouttes, {len(sheets)} de nappe, "
+        f"{n_cross} traversées sur {len(ells)} flaques"
         + (", sur le parcours" if preroll and track is not ctx.track else ""))
     return od, om
 
@@ -1613,12 +1971,13 @@ def pack_spray(ctx, prefixes=("patrol", "van"), drops=0.2, mist=0.4, wet=0.8, ma
         tr = build_track(samples[r.name])
         if max(p.speed for p in tr) < 3.0:
             continue
-        d, m = wheel_spray(tr, None, 0.36, rate_drops=2400.0 * drops, rate_mist=140.0 * mist, wet=wet, seed=seed + k)
+        # la même eau que la berline, simulée (SPEC §18.60), plus légère : `mist` règle le débit
+        d, m = spray_sim(tr, 0.36, wet=wet * mist, seed=seed + k, roll=1.0)
         d_all += d
         m_all += m
     emit(ctx, f"fx_gouttes_meute_{ctx.plan}", d_all, "drops", mat_drop(), glossy=True)
     ob = emit(ctx, f"fx_embruns_meute_{ctx.plan}", m_all, "sprites",
-              mat_spray(), mask=mask, near=near)
+              mat_mist(), mask=mask, near=near, flat=SPRAY["flat"])
     log(f"eau de la meute : {len(rigs)} véhicules, {len(d_all)} gouttes, {len(m_all)} sprites")
     return ob
 
@@ -1641,7 +2000,7 @@ def gomme(ctx, slip_min=6.0, rate=150.0, brake=0.0, size=1.0, alpha=1.0, mask=0.
     return ob
 
 
-def drift_track(ctx, preroll=48):
+def drift_track(ctx, preroll=48, after=0):
     """La trajectoire de la berline du plan, lue dans la conduite du parcours (parcours.hero) de `preroll` images
     avant la scène à sa fin : une glisse commencée au tronçon d'avant y est. Les roues : celles de la scène (leur
     place sur la caisse à la première image). Renvoie (trajectoire, g0 : l'image du film moins celle de la scène),
@@ -1658,7 +2017,7 @@ def drift_track(ctx, preroll=48):
         return ctx.track, None
     p0 = ctx.track[1]
     z = p0.pos[2]
-    fr = range(ctx.frames[0] - preroll - 1, ctx.frames[1] + 2)
+    fr = range(ctx.frames[0] - preroll - 1, ctx.frames[1] + 2 + after)
     return drive_track(h["pos"], h["heading"], fr, wheel_offsets(p0), z), g0
 
 
@@ -1674,12 +2033,14 @@ def derapage(ctx, preroll=48, wet=1.0, sheet=1.0, mist=1.0, mask=0.9, near=4.5, 
     for ob in ctx.scene.objects:
         if ob.name.startswith(tuple(hide)) and ob.type == "MESH":
             ob.hide_render = True
-    tr, g0 = drift_track(ctx, preroll)
-    d, m = drift_spray(tr, ctx.wheel_r, g0=g0 or 0, seed=seed, wet=wet, rate_sheet=1500.0 * sheet,
-                       rate_mist=60.0 * mist, frames=(tr[0].frame, ctx.frames[1] + 1))
+    tr, g0 = drift_track(ctx, preroll, after=EAU_AFTER)
+    # v10 (SPEC §18.60) : le rideau simulé des pneus arrière qui glissent en travers (spray_sim, drift) ; sheet règle
+    # son débit, mist n'agit plus
+    d, m = spray_sim(tr, ctx.wheel_r, g0=g0 or 0, frames=(tr[0].frame, ctx.frames[1] + 1), wet=wet, seed=seed,
+                     roll=0.0, drift=sheet)
     od = emit(ctx, f"fx_lame_{ctx.plan}", d, "drops", mat_drop(), glossy=True, near=near)
-    om = emit(ctx, f"fx_brume_glisse_{ctx.plan}", m, "sprites", mat_spray("haut"), mask=mask, near=mist_near,
-              edge=0.25)
+    om = emit(ctx, f"fx_brume_glisse_{ctx.plan}", m, "sprites", mat_mist(), mask=mask, near=mist_near,
+              edge=0.25, flat=SPRAY["flat"])
     early = sum(1 for q in d + m if q.birth < ctx.frames[0])
     log(f"dérapage : {len(d)} gouttes, {len(m)} sprites de brume ({early} nés avant la scène)"
         + ("" if g0 is not None else ", sans le parcours"))
