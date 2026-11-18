@@ -2615,8 +2615,14 @@ def test_vie():
     d, g, a, b = vie.ecarts_entre()
     check("vie : 0,5 m de jour au moins entre deux véhicules de la vie (l'un roule), près de la poursuite", d >= 0.5,
           f"{d:.2f} m ({a} / {b}, image {g})")
-    vmax = max(c.vit(g) for _n, _m, _t, c, _kw in vie.vehicules() for g in range(0, vie.G_FIN + 1, 6))
-    check("vie : la circulation à 50 km/h ou moins", vmax <= 50 / 3.6 + 1e-6, f"{vmax * 3.6:.0f} km/h")
+    vs = [(c.vit(g), n.startswith("trafic_"))
+          for n, _m, _t, c, _kw in vie.vehicules() for g in range(0, vie.G_FIN + 1, 6)]
+    vmax = max(v for v, t in vs if not t)
+    tmax = max(v for v, t in vs if t)
+    # (la circulation de la poursuite, trafic.py, SPEC §18.62 : 70 km/h au plus, celle du pont ; ses écarts à la
+    # poursuite sont les marges de trafic.verifier, test_trafic.py, et non 3,4 m de centre à centre)
+    check("vie : la circulation à 50 km/h ou moins (70 pour celle de la poursuite)",
+          vmax <= 50 / 3.6 + 1e-6 and tmax <= 70 / 3.6 + 1e-6, f"{vmax * 3.6:.0f} et {tmax * 3.6:.0f} km/h")
 
 
 if __name__ == "__main__":

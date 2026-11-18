@@ -64,6 +64,11 @@ def jetee(u, n):
     return (JETEE_O[0] + u * JETEE_U[0] + n * JETEE_N[0], JETEE_O[1] + u * JETEE_U[1] + n * JETEE_N[1])
 
 
+# le bus arrêté sur E2, derrière l'ouverture (SPEC §18.62 : la berline roule sur E2 pour doubler A, il y barrait
+# sa route ; à l'image 107 il n'est plus coupé au bord droit)
+AV_BUS_X = -160.0
+
+
 def lieux_de(x, y):
     """Le lieu de la ville où se trouve le point (x, y) : celui dont la scène porte le sol à cet endroit."""
     if y < -415.0 or (y < -400.0 and abs(x) > 8.0):
@@ -214,6 +219,15 @@ def arret(g_debut, v, decel=3.0):
     return [(g_debut, v), (g_debut + dur, 0.0)]
 
 
+def appel(g, g0, g1):
+    """L'intensité des phares (1 : croisement) pendant un appel de phares de g0 à g1 : deux éclats à 3, chacun du
+    premier quart et du troisième quart de la fenêtre."""
+    if not g0 <= g < g1:
+        return 1.0
+    u = (g - g0) / (g1 - g0)
+    return 3.0 if (u < 0.3 or 0.5 <= u < 0.8) else 1.0
+
+
 def warning(g):
     """Les feux de détresse : 1,5 Hz, allumés la moitié du temps (en temps du film)."""
     return 1.0 if (g / FPS * 1.5) % 1.0 < 0.5 else 0.0
@@ -299,12 +313,11 @@ def vehicules():
     add("avenue_face_arretee", "break84", "creme", Fixe(-48.5, AV_GARE_VILLE + 0.15, 90.0), phares=True, warning=0)
     # les garées : une tous les 6,5 m le long des deux bordures, quelques trous ; ni sur le passage piéton
     # (x -76,8 à -73,6), ni devant le bus, ni dans la bouche de la rue transversale (x -72,3 à -59,3)
-    for x in (-140.5, -134.0, -127.5, -121.0, -108.0, -101.5, -95.0, -88.5, -82.0, -69.5, -63.0, -56.5, -36.5,
-              -30.0, -23.5):
-        garee("avenue_garee_mer", x, AV_GARE_MER, -90.0)
+    # (SPEC §18.62 : plus de garées côté mer le long de la course de la berline ; la voie E2 roule, la berline y
+    # double, trafic.py ; le bus reste à son arrêt)
     for x in (-119.0, -112.5, -106.0, -93.0, -86.5, -81.0, -55.0):
         garee("avenue_garee_ville", x, AV_GARE_VILLE, 90.0)
-    add("avenue_bus", "bus", None, Fixe(-46.0, AV_Y - 5.45, -90.0), phares=True, warning=None)
+    add("avenue_bus", "bus", None, Fixe(AV_BUS_X, AV_Y - 5.45, -90.0), phares=True, warning=None)
 
     # -- le rond-point (P2) : deux voitures tournent dans l'anneau avant la poursuite (sens trigonométrique, l'axe
     # de l'anneau à 10,5 m de l'îlot), une attend à l'entrée nord, des garées sur l'avenue nord
@@ -316,7 +329,7 @@ def vehicules():
     # A : attend à l'entrée de la plage, entre à l'image 70, tourne par l'est, sort sur l'avenue nord
     a_pts = courbe([(1.75, -479.0), (1.75, -446.0)] + arc(-80.4, -9.6) + [(16.0, AV_E1), (300.0, AV_E1)], n_lisse=3)
     add("rond_a", "fairheaven", "menthe",
-        Course(a_pts, [(0, 0.0), (70, 0.0), (100, _v(30)), (160, _v(30)), (220, _v(45))], s0=21.5, g0=0),
+        Course(a_pts, [(0, 0.0), (72, 0.0), (102, _v(30)), (160, _v(30)), (220, _v(45))], s0=21.5, g0=0),
         phares=True)
     # B : vient de l'avenue nord, fait trois quarts de tour par le nord et l'ouest, sort vers la plage
     b_pts = courbe([(300.0, AV_O1), (16.0, AV_O1)] + arc(9.6, 260.4) + [(-1.75, -446.0), (-1.75, -620.0)],
@@ -366,25 +379,31 @@ def vehicules():
         add(nom, modele, teinte, Course(face, [(0, 0.0), (g_dep, 0.0), (g1, v), (g2, v), (g3, 0.0)], s0=s0, g0=0),
             phares=True, warning=int(g3) - 12)
     add("pont_face_arretee", "sialia", "rose", Fixe(-6.05, -262.0, 180.0), phares=True, warning=0)
-    convoi("pont_face_0", "negotiator", "argent", -193.0, -255.5, 330)
-    convoi("pont_face_1", "break84", "bordeaux", -186.0, -249.0, 346)
-    convoi("pont_face_2", "taxi", None, -179.0, -242.5, 362)
-    convoi("pont_face_3", "chapman", "ciel", -172.0, -236.0, 378)
-    convoi("pont_face_camion", "camion", None, -164.5, -228.5, 396, v=_v(40))
-    add("pont_meme_rangee", "camion", None, Fixe(6.0, -219.5, 0.0), phares=True, warning=0)
+    # (SPEC §18.62 : arrêtées 8,5 m l'une derrière l'autre, et non 6,5 : 3 m entre deux voitures qui freinent)
+    convoi("pont_face_0", "negotiator", "argent", -193.0, -253.5, 330)
+    convoi("pont_face_1", "break84", "bordeaux", -186.0, -245.0, 346)
+    convoi("pont_face_2", "taxi", None, -179.0, -236.5, 362)
+    convoi("pont_face_3", "chapman", "ciel", -172.0, -228.0, 378)
+    convoi("pont_face_camion", "camion", None, -164.5, -218.5, 396, v=_v(40))
+    add("pont_meme_rangee", "camion", None, Fixe(6.0, -207.5, 0.0), phares=True, warning=0)
 
     # -- le port (P5) : des camions garés au nord du virage, à l'extérieur, là où regarde la caméra pendant la
     # descente du pont et le dérapage ; phares éteints
     add("port_camion_0", "camion", None, Fixe(2.5, -160.5, -90.0))
     add("port_camion_1", "camion", None, Fixe(9.5, -158.0, -95.0))
     add("port_pickup", "pickup", "blanc", Fixe(-11.0, -166.0, 0.0))
+    # la circulation de la poursuite, dans sa voie (SPEC §18.62) : celle qu'elle double, celle qui la croise
+    import trafic
+    out += trafic.vehicules()
     return out
 
 
 def chariots():
     """Le chariot élévateur qui fait la navette sur le terre-plein, à 20 m du virage du port : (nom, course).
-    Il va et vient de x 0 à 12 (y -167), devant les camions, 2,2 m/s, s'arrête deux secondes à chaque bout."""
-    a, b = (0.0, -167.0), (12.0, -167.0)
+    Il va et vient de x -24 à -14 (y -158), derrière le pick-up, 2,2 m/s, s'arrête deux secondes à chaque bout.
+    (SPEC §18.62 : de x 0 à 12, devant les camions, il passait juste derrière la berline au dérapage du port, dans
+    l'axe de la caméra.)"""
+    a, b = (-24.0, -158.0), (-14.0, -158.0)
     aller = droite(a, b, 0.5)
     retour = droite(b, a, 0.5)
     pts = aller + retour[1:] + aller[1:] + retour[1:] + aller[1:] + retour[1:] + aller[1:]
@@ -436,10 +455,10 @@ def gens():
                                        (-67.5, "carla", 76, 10), (-59.8, "nathan", 84, 150), (-33.3, "eric", 111, 60)]):
         debout(f"av_bord_{k}", m, x, AV_TROTTOIR_BORD_MER - 0.3, 5.0 * (k % 3 - 1), phase=ph,
                recule=(g - 6, 0.0, -0.7, 35.0 if k % 2 else -30.0, 14))
-    debout("av_bus_0", "sophia", -48.5, -442.3, 0.0, phase=40)
-    debout("av_bus_1", "eric", -44.0, -442.6, 10.0, phase=0)
-    debout("av_bus_2", "claudia", -42.2, -442.4, -20.0, phase=170)
-    debout("av_bus_3", "nathan", -50.3, -442.8, 25.0, phase=230)
+    debout("av_bus_0", "sophia", -54.5, -442.3, 0.0, phase=40)
+    debout("av_bus_1", "eric", -50.0, -442.6, 10.0, phase=0)
+    debout("av_bus_2", "claudia", -48.2, -442.4, -20.0, phase=170)
+    debout("av_bus_3", "nathan", -56.3, -442.8, 25.0, phase=230)
     assis("av_banc_0", -79.7, -443.6, 0.0)
     assis("av_banc_1", -27.7, -443.6, 0.0, phase=60)
     assis("av_banc_2", -105.7, -443.6, 0.0, phase=30)
@@ -460,6 +479,11 @@ def gens():
                                      (-44.5, "carla", 180.0), (-30.5, "nathan", 160.0)]):
         debout(f"av_seuil_{k}", m, x, -422.1, cap, phase=37 * k)
 
+    # -- le rond-point (SPEC §18.62) : deux passants au coin de la promenade, à l'entrée de l'anneau, reculent vers la
+    # mer quand la berline y entre en dérapage
+    debout("rond_promenade_0", "carla", -17.0, -442.6, 20.0, phase=12, recule=(128, 0.3, -1.4, 35.0, 20))
+    debout("rond_promenade_1", "eric", -15.4, -443.9, 40.0, phase=70, recule=(132, 0.5, -1.2, 25.0, 18))
+
     # -- la rue des enseignes : le barrage regardé depuis les vitrines (la meute de P4 roule jusqu'à |x| 5,4 m, sur
     # les trottoirs) ; au bord des trottoirs, à 4,5 m de la route, des passants qui reculent jusqu'aux vitrines quand
     # la poursuite passe (la meute de P4 les trouve adossés)
@@ -478,9 +502,10 @@ def gens():
                                     (1, -347.5, "sophia"), (-1, -348.0, "eric")]):
         debout(f"rue_porte_{k}", m, sx * RUE_VITRINE, y, -100.0 * sx + 15 * (k % 3 - 1), phase=41 * k)
 
-    # -- le port : des dockers autour des camions et du chariot
-    for k, (x, y, m, cap) in enumerate([(6.0, -163.0, "eric", 160.0), (13.0, -161.5, "nathan", -150.0),
-                                        (-1.5, -163.8, "carla", 120.0), (15.2, -163.0, "claudia", 170.0),
+    # -- le port : des dockers aux bouts des camions et près du chariot, hors de l'axe de la caméra au dérapage
+    # (SPEC §18.62 : trois d'entre eux, entre les camions, se tenaient juste derrière la berline de 440 à 470)
+    for k, (x, y, m, cap) in enumerate([(-16.0, -161.5, "eric", 160.0), (-18.5, -163.0, "nathan", -150.0),
+                                        (-1.5, -163.8, "carla", 120.0), (-4.5, -161.0, "claudia", 170.0),
                                         (-8.0, -162.0, "eric", -100.0)]):
         debout(f"port_docker_{k}", m, x, y, cap, phase=53 * k)
     marche("port_marche_0", "nathan", (-14.0, -160.5), (24.0, -159.5), 380, v=1.1)
@@ -492,9 +517,12 @@ def gens():
         cap = -50.0 + (90.0 if n > 0 else -90.0) + 10 * (k % 3 - 1)     # face à l'eau
         debout(f"jetee_peche_{k}", MOD[k % 5], x, y, cap, phase=61 * k)
     for k, (u0, u1, n, g, v) in enumerate([(40.0, -60.0, -5.0, 470, 0.95), (-30.0, 60.0, 5.0, 420, 1.0),
-                                           (20.0, -60.0, 4.6, 440, 1.05), (-45.0, 45.0, -4.6, 480, 0.9),
-                                           (55.0, -40.0, -4.8, 500, 1.0)]):
-        marche(f"jetee_marche_{k}", MARCHEURS[k % 4], jetee(u0, n), jetee(u1, n), g, v=v)
+                                           (20.0, -60.0, 4.9, 440, 1.05), (-45.0, 45.0, -4.9, 480, 0.9),
+                                           (55.0, -40.0, -4.9, 500, 1.0)]):
+        # (SPEC §18.62 : le promeneur que la berline frôle au bout de la jetée, images 616 à 618, s'écarte vers l'eau
+        # et la regarde passer, comme ceux de la rue)
+        kw = dict(recule=(604, 0.39, -0.46, -60.0, 14)) if k == 0 else {}
+        marche(f"jetee_marche_{k}", MARCHEURS[k % 4], jetee(u0, n), jetee(u1, n), g, v=v, **kw)
     return out
 
 
@@ -528,7 +556,7 @@ def mobilier():
     ligne("mob_av_ville", [-141.5 + 11.0 * i for i in range(12)], AV_TROTTOIR_BORD_VILLE, 0.0,
           bords + [(-73.0, -58.6), (-130.0, -115.0)])
     ligne("mob_av_mer", [-137.75 + 11.0 * i for i in range(11)], AV_TROTTOIR_BORD_MER, 180.0,
-          bords + [(-53.5, -38.5)] + [(x - 1.2, x + 1.2) for x in (-130.5, -104.8, -91.8, -67.5, -59.8, -33.3)])
+          bords + [(-59.5, -44.5)] + [(x - 1.2, x + 1.2) for x in (-130.5, -104.8, -91.8, -67.5, -59.8, -33.3)])
     for sx in (-1.0, 1.0):
         ligne("mob_quai_sud", [sx * (12.5 + 11.0 * i) for i in range(5)], BD_BORD_SUD, 180.0, [])
         ligne("mob_quai_nord", [sx * (13.5 + 11.0 * i) for i in range(5)], BD_BORD_NORD, 0.0, [])
@@ -633,6 +661,8 @@ def ecarts():
         for g in range(g0, g1 + 1):
             ps = {k: f(g) for k, f in tr.items()}
             for nom, f in vie.items():
+                if nom.startswith("trafic_"):
+                    continue            # la circulation de la poursuite : ses marges, trafic.verifier (SPEC §18.62)
                 q = f(g)
                 for k, p in ps.items():
                     d = math.dist(p, q)
@@ -1032,10 +1062,20 @@ def poser_voitures(root, images, g_of, cache, presents):
                     body["vie_warning"] = w
                     body.keyframe_insert('["vie_warning"]', frame=f)
                     prev = w
+        ap = kw.get("appels")
+        if ap and kw.get("phares"):
+            # l'appel de phares (SPEC §18.62) : deux éclats des pleins phares entre les images ap[0] et ap[1] du film
+            prev = None
+            for f in images:
+                v = appel(g_of(f), *ap)
+                if v != prev or f == images[-1]:
+                    body["vie_phares"] = v
+                    body.keyframe_insert('["vie_phares"]', frame=f)
+                    prev = v
         for o in [body] + [w for w, _r in ws]:
             if not fixe or o is body:
                 _lineaire(o)
-        _constantes(body, ('["vie_frein"]', '["vie_warning"]'))
+        _constantes(body, ('["vie_frein"]', '["vie_warning"]', '["vie_phares"]'))
         n += 1
     return n
 

@@ -123,16 +123,26 @@ if VILLE:
     CREST_GAPS = (44.0, 72.0, 94.0, 86.0)
     FILE_S = (1.6, 2.5, 3.4)
     T49 = M.t_of(F0 + FRAMES)           # P5/1
+    # SPEC §18.62 (la circulation) : sur le tablier, la meute tient x −2,3 à 2,6 (louvoiement compris, 0,6 m d'air
+    # avec les voitures rangées contre la glissière de droite et la file d'en face) ; avant le pont, dans la rue des
+    # enseignes (8,4 m de bordure à bordure, des garées à gauche), elle roule en deux files, RUE_X, sans louvoyer, et
+    # s'ouvre sur la largeur du tablier en traversant le boulevard du quai (RUE_Y) : avant, elle roulait jusqu'à
+    # |x| 5,4 sur les trottoirs et à travers les garées (hors champ, derrière la caméra)
     PACK = [("patrol", None, None, None, 0.0, 0.0, 3.0, 0.3),                # la patrouille 1 : patrol1_pos
-            ("patrol", 4.6, HERO_X, ("file", FILE_S[0]), 0.0, 0.35, 3.4, 6.0),
-            ("patrol", -2.6, HERO_X, ("file", FILE_S[1]), 0.0, 0.40, 3.2, 4.0),
-            ("patrol", -5.0, -4.6, 58.0, 0.0, 0.40, 3.6, 4.25),
-            ("patrol", 4.4, 4.6, 78.0, 0.0, 0.35, 3.1, 5.0),
+            ("patrol", 2.6, HERO_X, ("file", FILE_S[0]), 0.0, 0.35, 3.4, 6.0),
+            ("patrol", -2.3, HERO_X, ("file", FILE_S[1]), 0.0, 0.40, 3.2, 4.0),
+            ("patrol", -2.3, -2.3, 58.0, 0.0, 0.40, 3.6, 4.25),
+            ("patrol", 2.6, 2.6, 78.0, 0.0, 0.35, 3.1, 5.0),
             ("patrol", 4.4, 5.4, None, 1.5, 0.40, 3.3, 2.6),          # en ville : CREST_GAPS m derrière, 1,5 m/s
-            ("patrol", -4.6, -4.6, None, 1.5, 0.40, 3.5, 0.8),        # plus vite que la berline
+            ("patrol", -2.3, -2.3, None, 1.5, 0.40, 3.5, 0.8),        # plus vite que la berline
             ("patrol", 1.0, 1.0, None, 1.5, 0.35, 3.0, 3.3),
-            ("patrol", -1.6, -1.6, None, 1.5, 0.40, 3.2, 4.4)]
-    VAN = ("van", 5.6, HERO_X, ("file", FILE_S[2]), 0.0, 0.3, 3.3, 1.7)   # le fourgon ferme la file
+            ("patrol", -0.95, -0.95, None, 1.5, 0.40, 3.2, 4.4)]
+    VAN = ("van", 2.6, HERO_X, ("file", FILE_S[2]), 0.0, 0.3, 3.3, 1.7)   # le fourgon ferme la file
+    # les deux files de la rue (x) : à droite 1, 4, 5, 7 et le fourgon ; à gauche 2, 3, 6, 8 ; le passage de la rue au
+    # tablier, de RUE_Y[0] à RUE_Y[1] (y, le boulevard du quai)
+    RUE_X = {1: 3.45, 2: -0.35, 3: -0.35, 4: 3.45, 5: 3.9, 6: -0.35, 7: 3.45, 8: -0.35, "van": 3.45}
+    RUE_Y = (-348.0, -262.0)
+    RUE_SWAY = 0.35
 
     # la patrouille 1 : P1_SIDE m à gauche de la berline, P1_LEAD m devant elle à P5/1, à P1_V m/s, en freinage
     # établi de P1_BRAKE m/s² ; avant son freinage, elle roule comme la berline (même vitesse, avance constante), puis
@@ -257,9 +267,18 @@ if VILLE:
         u = min(1.0, max(0.0, (t - M.t_of(P1_TUCK[0])) / (M.t_of(P1_TUCK[1]) - M.t_of(P1_TUCK[0]))))
         return P1_PASS + (P1_SIDE - P1_PASS) * u * u * u * (10.0 + u * (6.0 * u - 15.0))
 
+    # la part du slalom de la berline (parcours.voie, SPEC §18.62) que la patrouille 1 suit : aucune ; la berline se
+    # déporte à droite, loin d'elle, et la patrouille garde sa voie (déportée avec elle, elle touchait B1 ou la file
+    # d'en face)
+    P1_VOIE = 0.0
+
+    def _voie_x(t):
+        # l'écart du slalom en x de la scène (la voie à gauche de la berline est vers −x)
+        return -PC.voie(PC.s_of_t(PC.t_of("P4", _f(t))))
+
     def patrol1_pos(t):
         hx, hy = hero_pos(t)
-        x = hx - _p1_side(t)
+        x = hx - (1.0 - P1_VOIE) * _voie_x(t) - _p1_side(t)
         if t <= T49:
             return x, hy + _p1_lead(t)
         # au-delà de P5/1 (les ressorts de M.sample) : son freinage tenu
@@ -276,7 +295,7 @@ if VILLE:
 
     _TB = M.t_of(brake_windows()[-1][0])          # le freinage du port (la berline)
 
-    def _pack_fn(x0, x1, gap, dv, amp, per, ph):
+    def _pack_fn(x0, x1, gap, dv, amp, per, ph, xr=None):
         if isinstance(gap, tuple):
             # à la file : la distance à P5/1 vaut s secondes à la vitesse de la berline à P5/1
             want = gap[1] * hero_speed(T49)
@@ -294,7 +313,12 @@ if VILLE:
             # elle se jette, elle lâche (pas pendant le freinage du port : il reste sous les 7 m/s²)
             y = _follow(gap, dv, t) + SURGE * math.sin(w) * (1.0 - M.smoothstep(_TB - 3.0, _TB, t))
             sway = amp * math.sin(1.25 * w + 0.7 * ph) * (1.0 - u if x1 == HERO_X else 1.0)
-            return x0 + (x1 - x0) * u + sway, y
+            x = x0 + (x1 - x0) * u + sway
+            if xr is not None:          # dans la rue : sa file, un louvoiement réduit (SPEC §18.62)
+                xs = xr + RUE_SWAY * sway
+                u = min(1.0, max(0.0, (y - RUE_Y[0]) / (RUE_Y[1] - RUE_Y[0])))
+                x = xs + (x - xs) * u * u * u * (10.0 + u * (6.0 * u - 15.0))    # quintique : à-coup borné
+            return x, y
         return fn
 
     def _first_seen(fn):
@@ -323,9 +347,9 @@ if VILLE:
     def pack_pos(i):
         if i == 0:
             return patrol1_pos
-        return _pack_fn(*PACK[i][1:])
+        return _pack_fn(*PACK[i][1:], xr=RUE_X[i])
 
-    van_pos = _pack_fn(*VAN[1:])
+    van_pos = _pack_fn(*VAN[1:], xr=RUE_X["van"])
 
 else:
     FRAMES = 48

@@ -121,6 +121,63 @@ DERAP5 = dict(s=S_ARC5 - 10.6138898, side=-1.0, reaction=0.4,
                        (0.95, 36.0, 0.0, -110.0), (1.62, 30.0, -14.0), (2.24, 9.0, -48.0), (2.70, -4.0, 0.0),
                        (3.22, 0.0, 0.0)],
               drag=0.0967, gas=0.3333, pivot_tau=(0.6, 0.9), pivot_smooth=0.9)
+# ---- la voie de la berline : le slalom dans la circulation (SPEC §18.62, 18 novembre : « d'autres voitures et un
+# slalom… un peu des mouvements même dans la ligne droite pour esquiver »). LA trajectoire voulue de la berline est la
+# route (ROUTE, ses voies, ses deux dérapages) plus un écart latéral voie(s), en m, positif à gauche, fonction de
+# l'abscisse s de la route. C'est la seule entrée du slalom : la conduite cinématique (motion.drive, lim["voie"])
+# l'ajoute aux positions sans toucher à la vitesse (durées, raccords, étoiles inchangés) ; la conduite physique
+# (branche film/physique) la suit comme cible de son conducteur. Ni lacet ni roulis dessinés : ils découlent du
+# chemin.
+#
+# SLALOM : (début s, longueur m, écart m) ; chaque manœuvre déplace la cible de `écart` en `longueur` mètres, les
+# manœuvres s'additionnent. Le profil (bascule) est la latérale en une période de sinus : elle part de zéro, monte,
+# s'inverse, revient à zéro (latérale nulle aux deux bouts, à-coup borné). Latérale de crête VOIE_K × écart × v² /
+# longueur² (VOIE_K = 2π), à-coup de crête VOIE_J × écart × v³ / longueur³ (VOIE_J = 4π²) : les longueurs sont
+# choisies pour un à-coup de 10 m/s³ au plus (la conduite en tient 12, test_motion v3.1), la latérale reste sous 2,5.
+# Un changement de voie entier (3,5 m) demanderait 50 à 70 m à ces vitesses : les écarts sont de 0,35 à 0,8 m.
+# Zéro dans les deux dérapages (le rond-point de S_ARC2 − 15 à la sortie, le port de DERAP5 à la jetée) et dans le
+# trou du barrage (s 184 à 191, les plots et les agents à 0,5 m de la caisse) ; aucune latérale aux coupes (les
+# manœuvres tiennent dans un tronçon, ou l'écart est tenu à la coupe).
+VOIE_K = 2.0 * math.pi
+VOIE_J = 4.0 * math.pi ** 2
+
+
+def bascule(u, doux=False):
+    """La marche du slalom : 0 avant u = 0, 1 après u = 1, entre les deux u − sin(2πu) / 2π ; doux : la septique
+    35u⁴ − 84u⁵ + 70u⁶ − 20u⁷, à-coup nul aux deux bouts (latérale 7,5 et à-coup 52,5 au lieu de 2π et 4π²), pour
+    une manœuvre qui finit juste avant un dérapage : la caisse n'y garde pas de roulis."""
+    if u <= 0.0:
+        return 0.0
+    if u >= 1.0:
+        return 1.0
+    if doux:
+        return u ** 4 * (35.0 + u * (-84.0 + u * (70.0 - 20.0 * u)))
+    return u - math.sin(2.0 * math.pi * u) / (2.0 * math.pi)
+
+
+SLALOM = (
+    # l'avenue, un S à droite : A roule à 35 km/h devant elle sur E1 ; elle déboîte sur E2 (la patrouille 1 tient la
+    # voie d'en face, à sa gauche ; pas avant s 8 : la patrouille sortirait du cadre), la double, et revient sur E1
+    # avant la coupe de P2 (doux : la caisse ne garde pas de roulis à l'entrée du dérapage du rond-point)
+    (8.0, 44.0, -1.8), (52.0, 48.0, 1.8, "doux"),
+    # la rue (étroite, garées des deux côtés : 0,75 m au plus) : un écart à droite de D qui déboîte ; puis le pont :
+    # la patrouille 1 la remonte par la gauche pour l'enfermer, elle se jette dans la voie de droite, derrière B1
+    # (70 km/h), et revient à gauche avant de l'atteindre, dans le freinage du port
+    (190.6, 22.0, -0.4), (213.0, 59.0, -1.5), (272.0, 87.0, 1.9),
+    # la jetée, un S à droite : J1 roule au milieu ; elle la passe par la droite, contre la rambarde, et revient
+    # dans le freinage de la pointe
+    (394.0, 34.0, -2.2), (428.0, 46.0, 2.2),
+)
+
+
+def voie(s):
+    """L'écart latéral (m, positif à gauche) de la trajectoire voulue de la berline à la route, à l'abscisse s : la
+    somme des manœuvres de SLALOM. La seule entrée du slalom, pour la conduite cinématique comme pour la physique."""
+    return sum(m[2] * bascule((s - m[0]) / m[1], len(m) > 3 and m[3] == "doux") for m in SLALOM)
+
+
+# (fusion v10, SPEC §18.67 : pas de voie dans LIM. Ce plan dessiné n'est plus que l'horaire du conducteur, compté le
+# long de la route ; le slalom entre dans la simulation, dynamique.Plan(..., voie=voie), plus bas.)
 LIM = dict(slip_drag=0.07, counter=0.78, derapages=[DERAP2, DERAP5], pivot=1.4, pivot_tau=(0.6, 0.35),
            pivot_smooth=0.45, steer_geo=True, front_slip=4.0, steer_rate=90.0)
 JERK = 12.0 * 0.72
@@ -252,7 +309,9 @@ DERAPAGES = [
     dict(side=-1.0, t=453 / 24, peak=40.5, sag=5.0, tenue=0.4, gaz_avant=0.0, frein_jet=0.4, dv=2.0, dv_t=4.0,
          reaction=0.4),
 ]
-DRIVE = D.simulate(D.Plan(ROUTE, _s_plan, PLAN.speed, PLAN.along, S_ARRET), DERAPAGES, t_span=T_SPAN)
+# Le slalom (voie, SPEC §18.62) est la ligne que vise le conducteur : roulis, dérive arrière et contre-braquage des
+# changements de voie sortent de la simulation comme ceux des dérapages (DRIVE.voie_err, DRIVE.rear_slip).
+DRIVE = D.simulate(D.Plan(ROUTE, _s_plan, PLAN.speed, PLAN.along, S_ARRET, voie=voie), DERAPAGES, t_span=T_SPAN)
 T_ARRET = DRIVE.t_stop                      # s : l'arrêt de la berline simulée sur la pointe
 
 # ---- les six étoiles : des instants de la conduite (images globales, 0 = la première ; temps = image / 24). Le site
@@ -417,12 +476,27 @@ def _smooth_sigma(t):
     return CAM_SMOOTH_S * M.smoothstep(a, b, s) * (1.0 - M.smoothstep(c, d, s))
 
 
+# le bras tourne avec une part du slalom, en retard : une caméra de poursuite qui suit la voiture (la berline reste
+# dans le cadre commun, test_motion « décalage à gauche »), la ville glisse encore de côté
+CAM_VOIE, CAM_VOIE_RETARD = 0.65, 0.25
+
+
+def travel_route(t):
+    """La direction de route de la berline à l'instant t (degrés) sans son slalom : DRIVE.travel moins la pente de
+    voie(s). Le bras la suit (SPEC §18.62) : il se déporte avec elle quand elle change de voie, sans tourner avec
+    elle ; la ville glisse de côté dans le cadre, la berline garde sa place."""
+    def pente(s):
+        dn = (voie(s + 0.05) - voie(s - 0.05)) / 0.1
+        return math.degrees(math.atan(dn)) if dn else 0.0
+    return DRIVE.travel(t) - pente(s_of_t(t)) + CAM_VOIE * pente(s_of_t(t - CAM_VOIE_RETARD))
+
+
 def _cam_table():
-    a1 = a2 = DRIVE.travel(_T0)
+    a1 = a2 = travel_route(_T0)
     out = []
     t_end = (TOTAL + FIN6_FRAMES) / FPS + 1.0
     for k in range(int((t_end - _T0) / _H)):
-        a = DRIVE.travel(_T0 + k * _H)
+        a = travel_route(_T0 + k * _H)
         a1 += (a - a1) * _H / CAM_TAU
         a2 += (a1 - a2) * _H / CAM_TAU
         out.append(a2)
@@ -935,8 +1009,31 @@ def verifie():
     return out
 
 
+# ---- les invariants du slalom (SPEC §18.62), contrôlés aussi par --check et par test_trafic.py. Le slalom ne touche
+# ni aux durées ni aux étoiles (l'horaire du conducteur reste compté le long de la route, dynamique.Plan), il est nul
+# dans les deux dérapages et dans le trou du barrage.
+VOIE_NULLE = ((120, 205), (428, 492))       # images du film : le rond-point, le port (dérapages, entrée, sortie)
+VOIE_BARRAGE = (184.4, 190.4)               # s : le trou des plots
+
+
+def check():
+    """[(contrôle, bon, détail)] : les invariants du slalom."""
+    out = [("tronçons aux images fixées", START == FIGE["START"], str(START)),
+           ("étoiles aux images fixées", ETOILES == FIGE["ETOILES"], str(ETOILES))]
+    worst = max(abs(voie(s_of_t(g / FPS))) for a, b in VOIE_NULLE for g in range(a, b + 1))
+    out.append(("slalom nul dans les dérapages", worst < 1e-9, f"{worst:.2e} m"))
+    k = 200
+    worst = max(abs(voie(VOIE_BARRAGE[0] + (VOIE_BARRAGE[1] - VOIE_BARRAGE[0]) * i / k)) for i in range(k + 1))
+    out.append(("slalom nul dans le trou du barrage", worst < 1e-9, f"{worst:.2e} m"))
+    return out
+
+
 if __name__ == "__main__" and "--check" in sys.argv:
     err = verifie()
+    for nom, ok, det in check():
+        print(f"{'ok  ' if ok else 'ÉCHEC'} {nom} : {det}")
+        if not ok:
+            err.append(f"{nom} : {det}")
     if err:
         sys.exit("[parcours] " + " ; ".join(err))
     print(f"[parcours] durées et étoiles tenues : {TOTAL + FIN6_FRAMES} images, tronçons {dict(SHOTS)}, FIN6 "
