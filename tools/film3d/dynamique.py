@@ -1,15 +1,25 @@
 # La conduite simulée de la berline (SPEC §18.61, 18 novembre 2026 : « les dérapages ne sont pas naturels encore, y a
 # pas une façon sûre de le faire ? »). La façon sûre est la physique : plus aucune courbe de lacet, de glisse ou de
 # roulis dessinée à la main. Une voiture simulée (modèle bicyclette, pneus de Pacejka, transferts de charge, ellipse
-# d'adhérence, roues arrière motrices, caisse sur ses ressorts) et un conducteur simulé (volant, gaz, frein) qui suit
-# la route et le profil de vitesse du parcours ; aux deux dérapages, il les provoque et les tient comme un pilote :
-# appel (le coup de volant du balancier), transfert de charge au freinage, gaz pour faire sortir l'arrière et le tenir,
-# contre-braquage, rattrapage. Le contre-braquage, la glisse, le lacet, la trajectoire du centre, le roulis, le
-# tangage et le patinage sortent de la simulation.
+# d'adhérence, roues arrière motrices, caisse sur ses ressorts) et un conducteur simulé (volant, gaz, frein, frein à
+# main) qui suit la route et l'horaire du parcours.
 #
-# La route et le profil de vitesse sont des ENTRÉES (simulate(route, plan, …)) : rien n'est écrit en dur ici. Une
-# route qui slalome entre des voitures (branche film/trafic) se suit de la même façon, avec la glisse et le roulis
-# que ses changements de voie demandent.
+# Aux deux dérapages, le conducteur fait le geste d'un pilote, et la voiture en fait ce qu'elle peut :
+#  - il arrive un peu sous l'horaire (il a freiné plus tôt), garde un filet de frein (le freinage traîné : l'avant
+#    chargé mord) et bloque l'arrière d'un coup de frein à main : la berline pivote sur son avant ;
+#  - le volant suit : les roues avant visent la vitesse de leur essieu, il contre-braque dès que l'arrière passe ;
+#  - près de la crête il relâche le frein (l'arrière qui roule de nouveau arrête la rotation) et reprend les gaz :
+#    le patinage des roues arrière tient la glisse, le volant tient le lacet ;
+#  - il rend la main : la glisse revient, il relance une fois la voiture posée.
+# Ses mains et ses pieds ne sont pas écrits : il poursuit une glisse visée (Geste : une consigne faisable, des
+# trapèzes de vitesse de glisse) par la répartition d'efforts du contrôle de dérive de Goh et Gerdes (Stanford,
+# 2016-2020, _repartit) : le couple de lacet d'abord, la force centripète ensuite, la vitesse s'il en reste. Le
+# contre-braquage, la montée de la glisse, le lacet, le patinage, la trajectoire du centre, le roulis et le tangage
+# sortent de la simulation.
+#
+# La route et l'horaire sont des ENTRÉES (simulate(plan, …)) : rien n'est écrit en dur ici. Une route qui slalome
+# entre des voitures (branche film/trafic) se suit de la même façon, avec la glisse et le roulis que ses changements
+# de voie demandent (lab/dynamique/voie.py : 3,5 m à 90 km/h).
 #
 # Python pur (3.10 et plus), déterministe : intégration semi-implicite d'Euler à SUB × 240 Hz, le conducteur à 240 Hz,
 # la table rendue à 240 Hz (échantillonnée à 24 images/s par les scènes).
@@ -53,6 +63,8 @@ CAR = dict(
     steer_rate=95.0,        # °/s aux roues (un contre-braquage vif : 1 600 °/s au volant, rapport 17)
     steer_tau=0.04,         # s, la direction assistée
     pedal_rate=4.0,         # course de pédale par seconde (gaz à fond en 0,25 s)
+    hb_max=2600.0,          # N·m à l'essieu arrière : le frein à main (hydraulique, de cascade), de quoi le bloquer
+    hb_rate=8.0,            # course du levier par seconde
 )
 
 
@@ -84,16 +96,29 @@ DRIVER = dict(
     k_r=9.0,                # 1/s, la boucle de lacet
     preview=0.14,           # s : il lit la courbure un peu devant (la direction et les pneus ont du retard)
     k_v=1.6, k_s=1.1, k_i=0.25,   # la vitesse : écart de vitesse (1/s), d'abscisse (1/s²), intégrale (1/s³)
-    # le dérapage : gaz sur l'écart de glisse
-    kp_b=0.01, kd_b=0.012, ki_b=0.01,   # par °, par °/s, par °·s
-    thr_drift=0.75,         # les gaz au plus en glisse
-    lead=0.3,               # s : en glisse, il anticipe la glisse à venir (le volant et les pneus ont du retard)
     tau_r=0.06,             # s : le lacet voulu, filtré (les mains)
-    k_vd=0.3,              # par m/s : en glisse, les gaz baissent quand elle va plus vite que le plan
     fb_max=25.0,            # °/s : hors glisse, la correction de trajectoire bornée (il revient sans brusquer)
+    a_rappel=3.0,           # m/s² : la latérale qu'il se garde pour arrêter son retour vers la route
+    alat_max=7.5,           # m/s² : le lacet qu'il demande au plus sur ses quatre roues, en latérale (le mouillé en
+                            # tient 6,5 ; le lacet d'un changement de voie dépasse un instant celui de sa trajectoire)
     tc_kap=0.05, tc_alpha=5.0,   # le patinage et la dérive arrière qu'il tolère hors glisse
+    v_avance=3.0, a_droit=3.0,   # m/s, m/s² : l'avance de vitesse qu'il se permet pour rattraper l'horaire, en ligne
+                            # droite seulement (nulle dès que le plan vire à a_droit m/s² de latérale)
+    es_max=1.5,             # m : le retard sur l'horaire qu'il cherche à rattraper d'un coup (au-delà, il patiente)
+    grip=0.93,              # la part de l'adhérence des roues arrière qu'il ose demander en relançant dans un virage
+    # le dérapage (_repartit)
+    k_g=25.0,               # 1/s² : le rappel sur l'écart de glisse (avec k_r : 5 rad/s, amorti à 0,9)
+    W=(60.0, 1.0, 0.05, 1.2e5), # les poids : lacet, force centripète, vitesse, et la douceur du pied (N² par unité)
+    kap_max=0.7,            # le patinage au plus (les roues arrière à 1,7 fois la vitesse du sol)
+    k_w=25.0,               # 1/s : le pied suit le régime des roues arrière (il l'entend)
+    at_min=6.0, at_max=3.0,   # m/s² : ce que la vitesse peut demander en glisse (freiner, relancer)
+    horizon=0.1,            # s : ce que le volant peut atteindre d'ici là borne ce qu'il attend de l'avant
+    alat_drift=5.6,         # m/s² : en glisse, il ne demande pas à la voiture de tourner plus que ses pneus en
+                            # travers ne le peuvent (sinon le rappel vers la route se battrait avec la glisse)
+    vue=0.15,               # s : son lacet voulu a de l'avance sur la consigne de glisse (il sait ce qu'il va faire)
+    lead=0.06,           # s : il braque vers où la roue avant ira (le volant a du retard)
     fb_drift=30.0,          # °/s : en glisse, la correction de trajectoire bornée
-    wn_drift=1.8,           # la boucle de trajectoire, plus lâche en glisse (il laisse la voiture élargir un peu)
+    wn_drift=2.0,          # la boucle de trajectoire en glisse
 )
 
 SUB = 4                     # pas de la physique par pas du conducteur (960 Hz)
@@ -154,6 +179,38 @@ class Car:
         return (max(50.0, q * fzf - 0.5 * dff), max(50.0, q * fzf + 0.5 * dff),
                 max(50.0, q * fzr - 0.5 * dfr), max(50.0, q * fzr + 0.5 * dfr))
 
+    def front(self, a_f, F_brake_f, loads):
+        """L'essieu avant dans le repère de ses roues : (effort longitudinal, latéral) (N) à la dérive a_f (rad), sous
+        un effort de frein avant F_brake_f (N) : le latéral réduit par le freinage (ellipse)."""
+        c = self.c
+        Fx = Fy = 0.0
+        sgn = 1.0 if self.u >= 0 else -1.0
+        for fz in loads[:2]:
+            D = _mu_load(c, fz) * fz
+            fx = -min(0.5 * F_brake_f, 0.98 * D) * sgn
+            Fx += fx
+            Fy += mf(a_f, D, c["B"], c["C"], c["E"]) * math.sqrt(max(0.0, 1.0 - (fx / D) ** 2))
+        return Fx, Fy
+
+    def rear(self, kap, a_r, loads):
+        """L'essieu arrière : (effort longitudinal, latéral) (N) au glissement kap et à la dérive a_r (rad) :
+        glissement combiné, l'effort porté par le vecteur de glissement."""
+        c = self.c
+        sx = kap / (1.0 + kap) if kap > -0.999 else -1e3
+        sy = math.tan(max(-1.45, min(1.45, a_r))) / (1.0 + max(-0.999, kap))
+        sg = math.hypot(c["kx"] * sx, sy)
+        Fx = Fy = 0.0
+        if sg > 1e-9:
+            for fz in loads[2:]:
+                F = mf(sg, _mu_load(c, fz) * fz, c["B"], c["C"], c["E"])
+                Fx += F * c["kx"] * sx / sg
+                Fy += F * sy / sg
+        return Fx, Fy
+
+    def drag(self):
+        c = self.c
+        return 0.5 * c["rho"] * c["CdA"] * self.u * abs(self.u) + c["Crr"] * c["m"] * G * math.tanh(self.u / 0.5)
+
     def forces(self, delta, T_drive, T_brake_r, F_brake_f, w=None):
         """(Fx, Fy, Mz dans la caisse, Fx arrière, détails) pour un braquage `delta` (rad), un couple moteur et de
         frein à l'essieu arrière (N·m), un effort de frein avant (N) ; w : la vitesse de l'essieu arrière."""
@@ -161,43 +218,22 @@ class Car:
         w = self.w if w is None else w
         u, v, r = self.u, self.v, self.r
         ue = max(abs(u), 1.0)
-        fl, fr_, rl, rr = self.loads()
-        # l'avant : dérive, effort latéral réduit par le freinage (ellipse)
+        loads = self.loads()
         a_f = delta - math.atan2(v + c["a"] * r, ue)
-        Fxf = Fyf = 0.0
-        for fz in (fl, fr_):
-            D = _mu_load(c, fz) * fz
-            fx = -min(0.5 * F_brake_f, 0.98 * D) * (1.0 if u >= 0 else -1.0)
-            fy = mf(a_f, D, c["B"], c["C"], c["E"]) * math.sqrt(max(0.0, 1.0 - (fx / D) ** 2))
-            Fxf += fx
-            Fyf += fy
-        # l'arrière : glissement combiné (κ, α), l'effort sur le vecteur de glissement
-        vr = v - c["b"] * r
+        Fxf, Fyf = self.front(a_f, F_brake_f, loads)
         kap = (w * c["R"] - u) / ue
-        a_r = -math.atan2(vr, ue)
-        sx = kap / (1.0 + kap) if kap > -0.999 else -1e3
-        sy = math.tan(max(-1.45, min(1.45, a_r))) / (1.0 + max(-0.999, kap))
-        sg = math.hypot(c["kx"] * sx, sy)
-        Fxr = Fyr = 0.0
-        for fz in (rl, rr):
-            D = _mu_load(c, fz) * fz
-            if sg > 1e-9:
-                F = mf(sg, D, c["B"], c["C"], c["E"])
-                Fxr += F * c["kx"] * sx / sg
-                Fyr += F * sy / sg
+        a_r = -math.atan2(v - c["b"] * r, ue)
+        Fxr, Fyr = self.rear(kap, a_r, loads)
         cd, sd = math.cos(delta), math.sin(delta)
-        drag = 0.5 * c["rho"] * c["CdA"] * u * abs(u) + c["Crr"] * c["m"] * G * math.tanh(u / 0.5)
-        Fx = Fxf * cd - Fyf * sd + Fxr - drag
+        Fx = Fxf * cd - Fyf * sd + Fxr - self.drag()
         Fy = Fxf * sd + Fyf * cd + Fyr
         Mz = c["a"] * (Fxf * sd + Fyf * cd) - c["b"] * Fyr
-        det = dict(a_f=a_f, a_r=a_r, kap=kap, Fyf=Fyf, Fyr=Fyr, Fxf=Fxf, Fxr=Fxr, loads=(fl, fr_, rl, rr))
+        det = dict(a_f=a_f, a_r=a_r, kap=kap, Fyf=Fyf, Fyr=Fyr, Fxf=Fxf, Fxr=Fxr, loads=loads)
         return Fx, Fy, Mz, Fxr, det
 
     def front_force(self, alpha):
         """L'effort latéral de l'essieu avant (N) à la dérive alpha (sans frein)."""
-        c = self.c
-        fl, fr_, _, _ = self.loads()
-        return sum(mf(alpha, _mu_load(c, fz) * fz, c["B"], c["C"], c["E"]) for fz in (fl, fr_))
+        return self.front(alpha, 0.0, self.loads())[1]
 
     def step(self, h, delta, T_drive, T_brake_r, F_brake_f):
         """Un pas semi-implicite : les vitesses d'abord (l'essieu arrière implicite, linéarisé), puis les places."""
@@ -244,55 +280,151 @@ def _smooth01(x):
     return x * x * x * (10.0 - 15.0 * x + 6.0 * x * x)
 
 
-def intention(ev, t):
-    """Ce que le conducteur veut de la glisse au dérapage `ev` à l'instant t (temps du film) : (glisse visée °, signe
-    appliqué ; poids du mode dérapage 0..1). Ce n'est pas la glisse rendue : c'est le but de ses mains et de son pied,
-    qu'il poursuit avec une vitesse de glisse bornée (simulate) ; la voiture y répond avec ses pneus, son inertie et
-    ses retards. ev : side (+1 : à gauche), t_init (s, l'instant où il jette la voiture), flick (° d'appel du mauvais
-    côté, le balancier) pendant flick_t s avant t_init, peak (°), t_catch (s, l'instant où il la rattrape), sag (° que
-    la glisse visée perd pendant la tenue)."""
-    tf = ev["t_init"] - ev["flick_t"]
-    t2 = ev["t_catch"] + ev.get("settle", 1.2)
-    w = _smooth01((t - (tf - 0.3)) / 0.3) * (1.0 - _smooth01((t - t2) / 0.6))
-    if w <= 0.0:
-        return 0.0, 0.0
-    if t < tf:
-        g = 0.0
-    elif t < ev["t_init"]:
-        g = -ev["flick"]
-    elif t < ev["t_catch"]:
-        g = ev["peak"] - ev.get("sag", 0.0) * _smooth01((t - ev["t_init"]) / (ev["t_catch"] - ev["t_init"]))
-    else:
-        g = 0.0
-    return ev["side"] * g, w
+def _trapeze(delta, acc, rate, dec):
+    """Aller de 0 à delta (> 0) : accélérer à `acc` jusqu'à la vitesse `rate` au plus, tenir, freiner à `dec` et
+    s'arrêter pile. Rend (durée, f) où f(τ) est la place à l'instant τ depuis le départ."""
+    w = min(rate, math.sqrt(2.0 * delta / (1.0 / acc + 1.0 / dec)))
+    ta, td = w / acc, w / dec
+    tc = max(0.0, (delta - 0.5 * w * (ta + td)) / w)
+    T = ta + tc + td
+
+    def f(tau):
+        if tau <= 0.0:
+            return 0.0
+        if tau < ta:
+            return 0.5 * acc * tau * tau
+        if tau < ta + tc:
+            return 0.5 * w * ta + w * (tau - ta)
+        if tau < T:
+            return delta - 0.5 * dec * (T - tau) ** 2
+        return delta
+    return T, f
 
 
-def inside(ev, t):
-    """La ligne du pilote (m, à gauche de la route) : avant de jeter la voiture, il prend l'intérieur du virage
-    (ev["inside"] m), parce que la glisse l'emmène dehors ; il le rend pendant la tenue."""
-    b = ev.get("inside", 0.0)
-    if not b:
-        return 0.0
-    ta = ev["t_init"] - ev["flick_t"] - ev.get("inside_t", 0.8)
-    up = _smooth01((t - ta) / ev.get("inside_t", 0.8))
-    down = 1.0 - _smooth01((t - ev["t_init"] - 0.2) / max(0.3, ev["t_catch"] + 0.4 - ev["t_init"]))
-    return ev["side"] * b * up * down
+class Geste:
+    """Le dérapage voulu par le conducteur : la glisse qu'il vise au fil du temps (°, signée), sa vitesse et son
+    accélération. Ce n'est pas une courbe posée sur la voiture : c'est la consigne de ses mains et de ses pieds, que la
+    simulation poursuit avec ses pneus, ses masses et les retards du volant et des pédales. Elle est faisable par
+    construction : chaque phase est un trapèze de vitesse de glisse borné par ce que la berline peut donner en lacet
+    (montee, sortie : accélération °/s², vitesse °/s, freinage °/s²), lissé (lisse s).
+
+    ev : side (+1 : la voiture tourne à gauche, l'arrière part à droite), t (s, l'instant de la crête : l'étoile),
+    peak (°), tenue (s de la crête au rattrapage), sag (° que la glisse visée perd pendant la tenue), appel (° du
+    mauvais côté avant de la jeter, le balancier ; 0 : sans), appel_t (s), retour (° de l'autre côté au rattrapage, le
+    petit retour ; 0 : sans), retour_t (s pour en revenir), avance (s : toute la consigne avancée, le retard de la
+    voiture sur elle)."""
+
+    def __init__(self, ev):
+        self.ev = ev
+        sd, pk = ev["side"], ev["peak"]
+        fl = ev.get("appel", 0.0)
+        sag = ev.get("sag", 0.0)
+        back = ev.get("retour", 0.0)
+        Tm, fm = _trapeze(pk + fl, *ev.get("montee", (120.0, 55.0, 70.0)))
+        Ts, fs = _trapeze(pk - sag + back, *ev.get("sortie", (80.0, 40.0, 60.0)))
+        Tf = ev.get("appel_t", 0.35) if fl else 0.0
+        Tb = ev.get("retour_t", 0.5) if back else 0.0
+        av = ev.get("avance", 0.0)
+        self.t_crete = ev["t"] - av
+        self.t_jet = self.t_crete - Tm                    # il jette la voiture
+        self.t_debut = self.t_jet - Tf                    # le début de l'appel
+        self.t_rattrape = self.t_crete + ev.get("tenue", 1.0)
+        self.t_gaz = self.t_crete - ev.get("gaz_avant", 0.5)    # il lâche les freins et reprend les gaz
+        self.t_pose = self.t_rattrape + Ts + Tb           # la glisse visée revenue à zéro
+        self.t_fin = self.t_pose + ev.get("pose", 0.5)    # il a repris sa conduite
+
+        def brut(t):
+            if t <= self.t_debut:
+                return 0.0
+            if t < self.t_jet:
+                x = (t - self.t_debut) / Tf
+                return -fl * math.sin(0.5 * math.pi * x) ** 2
+            if t < self.t_crete:
+                return -fl + fm(t - self.t_jet)
+            if t < self.t_rattrape:
+                return pk - sag * _smooth01((t - self.t_crete) / (self.t_rattrape - self.t_crete))
+            if t < self.t_rattrape + Ts:
+                return pk - sag - fs(t - self.t_rattrape)
+            if t < self.t_pose:
+                x = (t - self.t_rattrape - Ts) / Tb
+                return -back * math.cos(0.5 * math.pi * x) ** 2
+            return 0.0
+        # la table, lissée par deux moyennes glissantes (l'à-coup borné), puis ses dérivées
+        lis = ev.get("lisse", 0.12)
+        w = max(1, int(round(lis / DT)) | 1)
+        self.t0 = self.t_debut - 2.0 * lis - 0.5
+        n = int(round((self.t_fin + 2.0 * lis + 0.5 - self.t0) / DT)) + 1
+        raw = [sd * brut(self.t0 + k * DT) for k in range(n)]
+        pad = 2 * w
+        g = M._box(M._box([0.0] * pad + raw + [0.0] * pad, w), w)[pad:pad + n]
+        self.g = g
+        self.dg = [0.0] + [(g[k + 1] - g[k - 1]) / (2 * DT) for k in range(1, n - 1)] + [0.0]
+        self.ddg = [0.0] + [(g[k + 1] - 2 * g[k] + g[k - 1]) / (DT * DT) for k in range(1, n - 1)] + [0.0]
+
+    def at(self, t):
+        """(glisse visée °, sa vitesse °/s, son accélération °/s²) à l'instant t."""
+        u = (t - self.t0) / DT
+        k = int(math.floor(u))
+        if k < 0 or k >= len(self.g) - 1:
+            return 0.0, 0.0, 0.0
+        f = u - k
+        return (self.g[k] + (self.g[k + 1] - self.g[k]) * f, self.dg[k] + (self.dg[k + 1] - self.dg[k]) * f,
+                self.ddg[k] + (self.ddg[k + 1] - self.ddg[k]) * f)
+
+    def poids(self, t):
+        """Le poids du mode dérapage (0..1) : il s'y met juste avant de la jeter, le quitte une fois posée."""
+        e = self.ev
+        return (_smooth01((t - (self.t_debut - e.get("fondu_in", 0.2))) / e.get("fondu_in", 0.2))
+                * (1.0 - _smooth01((t - self.t_pose) / max(1e-3, self.t_fin - self.t_pose))))
+
+    def frein(self, t):
+        """Le plus de frein au pied qu'il garde (0..1 de la pédale) : il arrive sur les freins ; pour la jeter il
+        les relâche jusqu'à ev["frein_jet"] (le freinage traîné : l'avant reste chargé, mais ses pneus doivent
+        pouvoir tourner la voiture), puis les lâche quand il reprend les gaz."""
+        e = self.ev
+        fj = e.get("frein_jet", 0.25)
+        cap = 1.0 + (fj - 1.0) * _smooth01((t - (self.t_jet - 0.1)) / 0.2)
+        return cap * (1.0 - _smooth01((t - (self.t_gaz - 0.2)) / 0.2))
+
+    def phase(self, t):
+        """Ce que ses pieds et sa main peuvent faire à l'instant t : « frein » (de l'appel à la reprise des gaz : le
+        frein à main s'il le faut, pas de gaz), « gaz » (ensuite : les gaz seuls)."""
+        return "frein" if t < self.t_gaz else "gaz"
+
+    def main(self, t):
+        """Peut-il tirer le frein à main ? En la jetant seulement (main_t s au plus)."""
+        e = self.ev
+        return e.get("frein_main", True) and self.t_jet <= t < min(self.t_gaz, self.t_jet + e.get("main_t", 9.0))
+
+    def lent(self, t):
+        """Ce qu'il retranche à la vitesse du plan (m/s) pour entrer en glisse (ev["dv"], pris en dv_t s avant de la
+        jeter : il freine plus tôt) : une berline en travers tient moins de vitesse dans le virage que sur ses quatre
+        roues. Rendu une fois la voiture posée (en dv_rendu s) : il ne relance pas avant d'avoir repris sa ligne."""
+        e = self.ev
+        dv = e.get("dv", 0.0)
+        if not dv:
+            return 0.0
+        return dv * (_smooth01((t - (self.t_jet - e.get("dv_t", 1.0))) / e.get("dv_t", 1.0))
+                     * (1.0 - _smooth01((t - self.t_pose) / e.get("dv_rendu", 1.2))))
+
+    def actif(self, t):
+        """Le geste pèse-t-il encore sur la vitesse (de la levée de pied d'avant à la relance d'après) ?"""
+        e = self.ev
+        return self.t_jet - e.get("dv_t", 1.0) < t < self.t_pose + e.get("dv_rendu", 1.2)
 
 
-def slip_rate(ev, goal, slip):
-    """La vitesse de glisse (°/s) que le conducteur demande pour aller de `slip` à `goal` et s'y poser : bornée
-    (rate_on en ouvrant, rate_off en refermant) et freinée à l'approche (une décélération de lacet `acc` °/s²)."""
-    e = goal - slip
-    opening = abs(goal) > abs(slip) and goal * slip >= 0.0
-    cap = ev.get("rate_on", 55.0) if opening else ev.get("rate_off", 45.0)
-    return math.copysign(min(cap, math.sqrt(2.0 * ev.get("acc", 90.0) * abs(e))), e)
+def fenetre(ev):
+    """(début, fin) en s du geste d'un dérapage : du début de l'appel à la reprise de la conduite."""
+    g = Geste(ev)
+    return g.t_debut, g.t_fin
 
 
 class PhysDrive(M.Drive):
     """Le résultat de simulate() : la même interface que motion.Drive (pos, heading, travel, slip, steer, speed,
     along, alat, brake_windows, t_stop), plus ce que la simulation sait : roll, pitch (°, la caisse sur ses ressorts),
-    yaw_rate (°/s), throttle, brake (0..1), wheelspin (rapport de la vitesse des roues arrière à celle du sol sous
-    elles), s (abscisse de la projection sur la route), lat_err (m, à gauche de la route), alpha_f, alpha_r (°)."""
+    yaw_rate (°/s), throttle, brake, handbrake (0..1), wheelspin (rapport de la vitesse des roues arrière à celle du
+    sol sous elles : 0 bloquées, 1 qui roulent, plus : qui patinent), s (abscisse de la projection sur la route),
+    lat_err (m, à gauche de la route), slip_ref (la glisse que le conducteur vise, °)."""
 
     def roll(self, t):
         return self._at("roll", t)
@@ -309,6 +441,9 @@ class PhysDrive(M.Drive):
     def brake(self, t):
         return self._at("brake", t)
 
+    def handbrake(self, t):
+        return self._at("hb", t)
+
     def wheelspin(self, t):
         return self._at("spin", t)
 
@@ -317,6 +452,17 @@ class PhysDrive(M.Drive):
 
     def lat_err(self, t):
         return self._at("e", t)
+
+    def slip_ref(self, t):
+        return self._at("slip_ref", t)
+
+    def brake_windows(self, f0=M.F0, fps=M.FPS, thr=0.06, frames=None):
+        """[(première, dernière image)] où le pied est sur le frein (les feux stop : la pédale, pas la décélération ;
+        une berline en travers ralentit sans que ses feux s'allument)."""
+        if frames is None:
+            frames = range(int(math.ceil(self.t0 * fps)) + f0, int(self.tab["t"][-1] * fps) + f0 + 1)
+        over = [f for f in frames if self.brake(M.t_of(f, f0, fps)) > thr]
+        return [(w[0], w[-1]) for w in M._windows(over)]
 
 
 class Plan:
@@ -343,9 +489,115 @@ def _project(route, s, x, y):
     return s, e, h, k
 
 
+KAP_GRID = (-1.0, -0.6, -0.35, -0.2, -0.12, -0.07, -0.035, 0.0, 0.035, 0.07, 0.12, 0.18, 0.26, 0.36, 0.5, 0.7, 1.0)
+
+
+class _Avant:
+    """L'essieu avant vu de la caisse, pour un pas du conducteur : la table (dérive → effort longitudinal et latéral
+    dans la caisse) entre −crête et +crête, et son inverse (l'effort latéral voulu → la dérive)."""
+
+    def __init__(self, car, theta, F_brake_f, loads, n=17):
+        apk = car.apk
+        self.a = [apk * (2.0 * i / (n - 1) - 1.0) for i in range(n)]
+        self.X, self.Y = [], []
+        for af in self.a:
+            fx, fy = car.front(af, F_brake_f, loads)
+            cd, sd = math.cos(theta + af), math.sin(theta + af)
+            self.X.append(fx * cd - fy * sd)
+            self.Y.append(fx * sd + fy * cd)
+        # la part monotone (braquée loin, la roue pousse moins en travers de la caisse : on ne va pas au-delà)
+        self.i0 = min(range(n), key=lambda i: self.Y[i])
+        self.i1 = max(range(n), key=lambda i: self.Y[i])
+        if self.i0 > self.i1:
+            self.i0, self.i1 = 0, n - 1
+
+    def en(self, af):
+        """(effort longitudinal, effort latéral dans la caisse) à la dérive af."""
+        a = self.a
+        u = (af - a[0]) / (a[1] - a[0])
+        k = max(0, min(len(a) - 2, int(math.floor(u))))
+        f = max(0.0, min(1.0, u - k))
+        return self.X[k] + (self.X[k + 1] - self.X[k]) * f, self.Y[k] + (self.Y[k + 1] - self.Y[k]) * f
+
+    def pour(self, Y, lo=None, hi=None):
+        """(dérive, effort longitudinal, effort latéral dans la caisse) pour l'effort latéral voulu Y, borné par la
+        crête du pneu et, s'ils sont donnés, par les dérives lo et hi que le volant peut atteindre."""
+        a, Xs, Ys, i0, i1 = self.a, self.X, self.Y, self.i0, self.i1
+        if lo is not None:
+            af = self.pour(Y)[0]
+            lo, hi = max(a[i0], min(lo, a[i1])), min(a[i1], max(hi, a[i0]))
+            af = lo if af < lo else hi if af > hi else af
+            return (af,) + self.en(af)
+        if Y <= Ys[i0]:
+            return a[i0], Xs[i0], Ys[i0]
+        if Y >= Ys[i1]:
+            return a[i1], Xs[i1], Ys[i1]
+        lo, hi = i0, i1
+        while hi - lo > 1:
+            mid = (lo + hi) // 2
+            if Ys[mid] <= Y:
+                lo = mid
+            else:
+                hi = mid
+        f = (Y - Ys[lo]) / max(1e-9, Ys[hi] - Ys[lo])
+        return a[lo] + (a[hi] - a[lo]) * f, Xs[lo] + (Xs[hi] - Xs[lo]) * f, Y
+
+
+def _repartit(car, av, af_lo, af_hi, loads, a_r, beta, V, dr_des, dchi_des, at_des, kap_prev, kap_lo, kap_hi, W):
+    """En glisse, le conducteur n'a que deux efforts pour trois envies : l'avant (le volant) et l'arrière (le pied
+    droit, ou le frein à main : le glissement des roues arrière, qui partage leur adhérence entre pousser et tenir en
+    travers). Il les répartit comme le contrôle de dérive de Goh et Gerdes (Stanford, 2016-2020) : le couple de lacet
+    d'abord (tenir la glisse : W[0]), la force centripète ensuite (tenir la route : W[1]), la vitesse s'il en reste
+    (W[2]). Rend le glissement des roues arrière voulu (kap) : celui qui, avec le volant qui tient le lacet, sert le
+    mieux les trois. dr_des : accélération de lacet (rad/s²) ; dchi_des : vitesse du cap de la vitesse (rad/s) ;
+    at_des : accélération le long de la vitesse (m/s²) ; af_lo, af_hi : les dérives avant que le volant peut
+    atteindre bientôt (sa vitesse est bornée : quand il ne suit pas, c'est l'arrière qui doit tenir le lacet)."""
+    c = car.c
+    m, Iz, a, b = c["m"], c["Iz"], c["a"], c["b"]
+    L = a + b
+    drag = car.drag()
+    cb, sb = math.cos(beta), math.sin(beta)
+    w1, w2, w3, w4 = W
+
+    def cout(kap):
+        Fxr, Fyr = car.rear(kap, a_r, loads)
+        _af, Xf, Yf = av.pour((Iz * dr_des + b * Fyr) / a, af_lo, af_hi)
+        r1 = (a * Yf - b * Fyr - Iz * dr_des) / L
+        Fx, Fy = Xf + Fxr - drag, Yf + Fyr
+        r2 = -Fx * sb + Fy * cb - m * V * dchi_des
+        r3 = Fx * cb + Fy * sb - m * at_des
+        dk = kap - kap_prev
+        return w1 * r1 * r1 + w2 * r2 * r2 + w3 * r3 * r3 + w4 * dk * dk
+
+    grid = [k for k in KAP_GRID if kap_lo <= k <= kap_hi]
+    if kap_lo <= kap_prev <= kap_hi:
+        grid.append(kap_prev)
+        grid.sort()
+    js = [cout(k) for k in grid]
+    i = min(range(len(grid)), key=lambda q: js[q])
+    lo, hi = grid[max(0, i - 1)], grid[min(len(grid) - 1, i + 1)]
+    if hi - lo < 1e-9:
+        return grid[i]
+    # section dorée entre les voisins du meilleur point
+    g = 0.6180339887
+    x1, x2 = hi - g * (hi - lo), lo + g * (hi - lo)
+    j1, j2 = cout(x1), cout(x2)
+    for _ in range(9):
+        if j1 < j2:
+            hi, x2, j2 = x2, x1, j1
+            x1 = hi - g * (hi - lo)
+            j1 = cout(x1)
+        else:
+            lo, x1, j1 = x1, x2, j2
+            x2 = lo + g * (hi - lo)
+            j2 = cout(x2)
+    k = 0.5 * (lo + hi)
+    return k if cout(k) <= js[i] else grid[i]
+
+
 def simulate(plan, events=(), t_span=(-2.0, 40.0), car=None, driver=None):
     """Simule la berline et son conducteur sur la route du plan, de t_span[0] à t_span[1] (s). events : les
-    dérapages (voir intention). Rend un PhysDrive (table à 240 Hz)."""
+    dérapages (voir Geste). Rend un PhysDrive (table à 240 Hz)."""
     c = dict(CAR, **(car or {}))
     d = dict(DRIVER, **(driver or {}))
     R = plan.route
@@ -356,23 +608,23 @@ def simulate(plan, events=(), t_span=(-2.0, 40.0), car=None, driver=None):
     car_.X, car_.Y, car_.psi = x, y, math.radians(hd)
     v0 = plan.v_ref(t)
     car_.u, car_.w = v0, v0 / c["R"] * 1.004
-    # régime établi de la caisse et des charges (aucune accélération)
+    gestes = [Geste(dict(ev)) for ev in events]
     delta = 0.0
-    thr = brk = 0.0
+    thr = brk = hb = 0.0
     integ_s = 0.0
-    integ_b = {}
-    phase = {}
+    kap_cmd = 0.0
+    r_f = None
+    th_prev, dth_f = None, 0.0
     rdes_prev = None
     keys = ("t", "x", "y", "vx", "vy", "v", "travel", "slip", "head", "steer", "along", "alat", "roll", "pitch", "r",
-            "throttle", "brake", "spin", "s", "e", "alpha_f", "alpha_r", "Fyf", "Fyr", "Fxr", "fz_fl", "fz_fr",
-            "fz_rl", "fz_rr", "kap", "steer_cmd", "r_des",
-            "slip_goal", "drift_w")
+            "throttle", "brake", "hb", "spin", "s", "e", "alpha_f", "alpha_r", "Fyf", "Fyr", "Fxr", "fz_fl", "fz_fr",
+            "fz_rl", "fz_rr", "kap", "steer_cmd", "r_des", "slip_ref", "drift_w", "kap_cmd")
     tab = {k: [] for k in keys}
     n = int(round((t_span[1] - t_span[0]) / DT)) + 1
     stopped = False
     m, Iz, a, b = c["m"], c["Iz"], c["a"], c["b"]
-    apk = car_.apk
-    prev_head = None
+    a_pousse = c["mu"] * G * a / (a + b - c["mu"] * c["h"])    # m/s² : la relance au plus, en ligne (propulsion)
+    ay_f = 0.0
     for i in range(n):
         t = t_span[0] + i * DT
         u, v, r = car_.u, car_.v, car_.r
@@ -380,107 +632,142 @@ def simulate(plan, events=(), t_span=(-2.0, 40.0), car=None, driver=None):
         beta = math.atan2(v, u) if V > 0.3 else 0.0
         chi = car_.psi + beta
         s, e, hp, kp = _project(R, s, car_.X, car_.Y)
-        # ---- la volonté de glisse (dérapages)
-        slip_t = dslip_t = 0.0
-        wd = 0.0
-        ev_on = None
-        slip_now = -math.degrees(beta)
-        for k_ev, ev in enumerate(events):
-            st_, w_ = intention(ev, t)
+        out_ = car_.out or {}
+        # ---- le dérapage en cours : la glisse visée (°), sa vitesse, son accélération, le poids du mode
+        wd, ge = 0.0, None
+        for g_ in gestes:
+            w_ = g_.poids(t)
             if w_ > wd:
-                slip_t, wd, ev_on = st_, w_, k_ev
-        if ev_on is not None:
-            # il anticipe : la glisse qu'elle aura dans `lead` s, à la vitesse de glisse d'à présent (lacet moins
-            # vitesse du cap de la vitesse)
-            alat_now = -car_.ax * math.sin(beta) + car_.ay * math.cos(beta)
-            rate_now = math.degrees(r - alat_now / max(V, 1.0))
-            dslip_t = slip_rate(events[ev_on], slip_t, slip_now + events[ev_on].get("lead", d["lead"]) * rate_now)
-        # ---- le volant : trajectoire (écart, cap de la vitesse) → lacet voulu → effort avant → braquage
+                wd, ge = w_, g_
+        g_ref = dg_ref = 0.0
+        if ge is not None:
+            g_ref = ge.at(t)[0]
+            # ses mains ont de l'avance sur la consigne : il sait ce qu'il va faire (le volant a une vitesse)
+            dg_ref = ge.at(t + ge.ev.get("vue", d["vue"]))[1]
+        evd = ge.ev if ge is not None else {}
+        slip_now = -math.degrees(beta)
+        # ---- la trajectoire : écart, cap de la vitesse → la vitesse de cap voulue
         Vc = max(V, 3.0)
         kpre = R.at(s + Vc * d["preview"])[3]
-        evd = events[ev_on] if ev_on is not None else {}
         wn = d["wn"] + (evd.get("wn_drift", d["wn_drift"]) - d["wn"]) * wd
         chi_err = _wrap(chi - hp)
-        e_line = e - sum(inside(ev, t) for ev in events)
-        fb = -(wn * wn / Vc) * e_line - 2.0 * d["zeta"] * wn * chi_err
+        # il revient vers la route à une vitesse en travers qu'il saura arrêter en y arrivant (√(2 a |e|) : loin
+        # d'elle, il ne fonce pas dessus ; près d'elle, c'est un rappel amorti ordinaire), et ne demande jamais à la
+        # voiture de virer plus que ses pneus ne tiennent (sur ses roues : alat_max ; en travers : alat_drift)
+        v_e = min(0.5 * wn / d["zeta"] * abs(e), math.sqrt(2.0 * d["a_rappel"] * abs(e)))
+        chi_des = -math.copysign(v_e, e) / Vc
+        fb = 2.0 * d["zeta"] * wn * (chi_des - chi_err)
         cap = math.radians(evd.get("fb_drift", d["fb_drift"]) * wd + d["fb_max"] * (1.0 - wd))
         dchi = Vc * kpre + max(-cap, min(cap, fb))
-        r_raw = dchi + wd * math.radians(dslip_t)
-        r_f = r_raw if rdes_prev is None else r_f + (r_raw - r_f) * min(1.0, DT / d["tau_r"])
-        r_des = r_f
-        dr_ff = 0.0 if rdes_prev is None else (r_des - rdes_prev) / DT
-        rdes_prev = r_des
+        lim = (d["alat_max"] + (evd.get("alat", d["alat_drift"]) - d["alat_max"]) * wd) / Vc
+        dchi = max(-lim, min(lim, dchi))
+        # ---- le lacet voulu : celui de la route, plus la vitesse de glisse du geste ; l'accélération de lacet : sa
+        # dérivée, le rappel sur le lacet, et en glisse le rappel sur l'écart de glisse
+        r_raw = dchi + wd * math.radians(dg_ref)
+        r_f = r_raw if r_f is None else r_f + (r_raw - r_f) * min(1.0, DT / d["tau_r"])
+        dr_ff = 0.0 if rdes_prev is None else (r_f - rdes_prev) / DT
+        rdes_prev = r_f
         dr_ff = max(-6.0, min(6.0, dr_ff))
-        Mz_des = Iz * (dr_ff + d["k_r"] * (r_des - r))
-        Fyr_now = car_.out.get("Fyr", 0.0) if car_.out else 0.0
-        Fyf_des = (Mz_des + b * Fyr_now) / (a * max(0.5, math.cos(delta)))
-        # l'inverse du pneu avant (bissection jusqu'à la crête)
-        Fpk = car_.front_force(apk)
-        target = max(-0.995 * Fpk, min(0.995 * Fpk, Fyf_des))
-        lo, hi = -apk, apk
-        for _ in range(28):
-            mid = 0.5 * (lo + hi)
-            if car_.front_force(mid) < target:
-                lo = mid
-            else:
-                hi = mid
-        a_f_des = 0.5 * (lo + hi)
+        dr_des = dr_ff + d["k_r"] * (r_f - r) + wd * d["k_g"] * math.radians(g_ref - slip_now)
+        # ---- le volant : le couple de lacet voulu → l'effort latéral avant (l'arrière tel qu'il est) → la dérive →
+        # le braquage. Les roues avant visent d'abord la vitesse de leur essieu : en glisse, c'est le contre-braquage.
+        loads = car_.loads()
         theta_vf = math.atan2(v + a * r, max(abs(u), 1.0))
-        d_cmd = theta_vf + a_f_des
+        dth = 0.0 if th_prev is None else (theta_vf - th_prev) / DT
+        th_prev = theta_vf
+        dth_f += (dth - dth_f) * min(1.0, DT / 0.05)
+        av = _Avant(car_, theta_vf, brk * c["brake_max"] * c["bias"], loads)
+        Fyr_now = out_.get("Fyr", 0.0)
+        # sur ses quatre roues, l'avant prend sa part de la force centripète voulue sans attendre que la caisse ait
+        # tourné (la bicyclette inversée) ; en glisse, l'arrière donne ce qu'il donne : l'avant équilibre le lacet
+        Yf_route = (b * m * Vc * dchi + Iz * dr_des) / (a + b)
+        Yf_glisse = (Iz * dr_des + b * Fyr_now) / a
+        a_f_des = av.pour(Yf_route + wd * (Yf_glisse - Yf_route))[0]
+        d_cmd = theta_vf + dth_f * d["lead"] + a_f_des
         d_cmd = max(-math.radians(c["steer_max"]), min(math.radians(c["steer_max"]), d_cmd))
         # ---- la vitesse : suivre l'abscisse et la vitesse du plan
         s_r, v_r, a_r_ = plan.s_ref(t), plan.v_ref(t), plan.a_ref(t)
+        lent = any(g_.actif(t) for g_ in gestes)
+        v_r0 = v_r
+        v_r -= sum(g_.lent(t) for g_ in gestes)
         v_along = V * math.cos(chi - hp) / max(0.2, 1.0 - kp * e)
         es = s_r - s
-        integ_s += es * DT * (1.0 - wd)
+        integ_s += max(-d["es_max"], min(d["es_max"], es)) * DT * (1.0 - wd) * (0.0 if lent else 1.0)
         integ_s = max(-3.0, min(3.0, integ_s))
-        a_cmd = a_r_ + d["k_v"] * (v_r - v_along) + d["k_s"] * es + d["k_i"] * integ_s
+        es_c = max(-d["es_max"], min(d["es_max"], es))
+        a_cmd = a_r_ + d["k_v"] * (v_r - v_along) + (d["k_s"] * es_c + d["k_i"] * integ_s) * (0.0 if lent else 1.0)
+        # en retard sur l'horaire, il ne le rattrape pas dans un virage : il y roule à la vitesse que le plan a à cet
+        # endroit (pas à celle de l'heure qu'il est), et ne prend de l'avance sur elle qu'en ligne droite
+        if es > 0.05:
+            lo_t, hi_t = t - 2.0, t
+            for _ in range(14):
+                mid = 0.5 * (lo_t + hi_t)
+                if plan.s_ref(mid) < s:
+                    lo_t = mid
+                else:
+                    hi_t = mid
+            v_ici, a_ici = plan.v_ref(hi_t), plan.a_ref(hi_t)
+            k_ici = max(abs(R.at(s + q * Vc)[3]) for q in (0.0, 0.3, 0.6))
+            v_cap = v_ici - (v_r0 - v_r) + d["v_avance"] * max(0.0, 1.0 - v_ici * v_ici * k_ici / d["a_droit"])
+            a_cmd = min(a_cmd, a_ici + d["k_v"] * (v_cap - v_along))
+        # il ne relance pas plus fort que ses roues arrière ne tiennent : ce qu'elles donnent déjà en travers (le
+        # virage qu'il sent) est pris sur ce qu'elles peuvent pousser (l'ellipse d'adhérence, le report de charge)
+        ay_f += (abs(car_.ay) - ay_f) * min(1.0, DT / 0.1)
+        a_grip = d["grip"] * a_pousse * math.sqrt(max(0.02, 1.0 - (ay_f / (c["mu"] * G)) ** 2))
+        a_cmd = min(a_cmd, a_grip)
         F_cmd = m * a_cmd + 0.5 * c["rho"] * c["CdA"] * u * abs(u) + c["Crr"] * m * G
         Tav = car_.T_avail()
         if F_cmd >= 0.0:
             thr_s, brk_s = min(1.0, F_cmd * c["R"] / Tav), 0.0
         else:
             thr_s, brk_s = 0.0, min(1.0, -F_cmd / c["brake_max"])
-        # ---- au dérapage, les pieds : l'entrée au frein (le freinage traîné charge l'avant et déleste l'arrière, qui
-        # décroche sous le coup de volant), puis, l'arrière parti (glisse au-delà de gas_at × crête), les gaz tiennent
-        # la glisse (une propulsion se tient en glisse à l'accélérateur), dosés sur l'écart de glisse et la vitesse ;
-        # au rattrapage, le pied se lève et le plan reprend
-        if wd > 0.0:
-            ev = events[ev_on]
-            sd = ev["side"]
-            st = phase.setdefault(ev_on, {"power": False})
-            if not st["power"] and t > ev["t_init"] and sd * slip_now > ev.get("gas_at", 0.0) * ev["peak"]:
-                st["power"] = True
-            eb = sd * (slip_t - slip_now)
-            if st["power"]:
-                ib = integ_b.get(ev_on, ev.get("gas0", 0.3) / d["ki_b"])
-                ib += eb * DT
-                integ_b[ev_on] = ib
-                thr_b = d["kp_b"] * eb + d["ki_b"] * ib
-                # la dérivée : vitesse de glisse voulue moins vraie (°/s) ; la vraie : lacet moins vitesse du cap de
-                # la vitesse (latérale / vitesse)
-                alat_now = -car_.ax * math.sin(beta) + car_.ay * math.cos(beta)
-                dslip_now = math.degrees(r - alat_now / max(V, 1.0))
-                thr_b += d["kd_b"] * sd * (dslip_t - dslip_now)
-                # et la vitesse : plus vite que le plan, moins de gaz (la glisse se tient alors au volant)
-                thr_b -= ev.get("k_vd", d["k_vd"]) * max(0.0, v_along - v_r + ev.get("dv", 0.0))
-                thr_b = max(0.0, min(ev.get("thr", d["thr_drift"]), thr_b))
-                thr_s = (1.0 - wd) * thr_s + wd * thr_b
-                brk_s = brk_s * (1.0 - wd)
-            elif t > ev["t_init"] - ev["flick_t"]:
-                thr_s = thr_s * (1.0 - wd)
-                brk_s = max(brk_s, wd * ev.get("brake_in", 0.3))
         # hors des dérapages, le pied droit sent l'arrière : dès que les roues arrière patinent ou que l'essieu
         # arrière dérive au-delà de ce que le pneu tient, il lève (sinon la propulsion part en tête-à-queue)
-        out_ = car_.out or {}
         tc = (max(0.0, (out_.get("kap", 0.0) - d["tc_kap"]) / d["tc_kap"])
               + max(0.0, (abs(math.degrees(out_.get("a_r", 0.0))) - d["tc_alpha"]) / d["tc_alpha"]))
-        thr_s *= max(0.0, 1.0 - tc * (1.0 - wd))
-        # les pédales ont une course
+        thr_s *= max(0.0, 1.0 - tc)
+        hb_s = 0.0
+        # ---- au dérapage, les pieds et le frein à main : le glissement des roues arrière qui sert le mieux le lacet,
+        # la route et la vitesse (_repartit). Pendant qu'il la jette, il peut bloquer l'arrière (le frein à main : la
+        # berline pivote sur son avant en ralentissant) ; ensuite les gaz seuls tiennent la glisse.
+        if wd > 0.0:
+            ue = max(abs(u), 1.0)
+            a_rear = -math.atan2(v - b * r, ue)
+            frein = ge.phase(t) == "frein"
+            at_des = max(-d["at_min"], min(d["at_max"], a_cmd))
+            af_now = delta - theta_vf
+            sr_, hz = math.radians(c["steer_rate"]), d["horizon"]
+            kap_cmd = _repartit(car_, av, af_now - (sr_ + dth_f) * hz, af_now + (sr_ - dth_f) * hz, loads, a_rear,
+                                beta, max(V, 1.0), dr_des, dchi, at_des, kap_cmd, -1.0 if ge.main(t) else 0.0,
+                                0.0 if frein else evd.get("kap_max", d["kap_max"]), d["W"])
+            w_des = ue * (1.0 + kap_cmd) / c["R"]
+            T_des = c["R"] * car_.rear(kap_cmd, a_rear, loads)[0] + c["Iw"] * d["k_w"] * (w_des - car_.w)
+            brk_d = min(brk_s, ge.frein(t))
+            if frein:
+                # le pied droit est sur le frein : il n'en garde que ce que l'arrière doit freiner (le frein au pied
+                # freine aussi l'arrière : quand il veut que l'arrière roule et tienne, il le relâche), le levier
+                # fait le reste
+                Tb_want = max(0.0, -T_des)
+                k_ar = c["brake_max"] * (1.0 - c["bias"]) * c["R"]
+                if t >= ge.t_jet:
+                    brk_d = min(brk_d, Tb_want / k_ar)
+                thr_d, hb_d = 0.0, min(1.0, max(0.0, Tb_want - brk_d * k_ar) / c["hb_max"])
+            elif T_des >= 0.0:
+                thr_d, hb_d = min(1.0, T_des / Tav), 0.0
+            else:
+                thr_d, hb_d = 0.0, min(1.0, -T_des / c["hb_max"])
+            thr_s = (1.0 - wd) * thr_s + wd * thr_d
+            brk_s = (1.0 - wd) * brk_s + wd * brk_d
+            hb_s = wd * hb_d
+        else:
+            kap_cmd = out_.get("kap", 0.0)
+        # les pédales et le levier ont une course
         pr = c["pedal_rate"] * DT
         thr += max(-pr, min(pr, thr_s - thr))
         brk += max(-pr, min(pr, brk_s - brk))
-        if plan.s_stop is not None and s > plan.s_stop - 0.5 and V < 0.4:
+        hr = c["hb_rate"] * DT
+        hb += max(-hr, min(hr, hb_s - hb))
+        if plan.s_stop is not None and s > plan.s_stop - 0.5 and V < 0.05 and v_r < 0.05:
             stopped = True
         # ---- la physique, SUB pas
         h = DT / SUB
@@ -492,24 +779,24 @@ def simulate(plan, events=(), t_span=(-2.0, 40.0), car=None, driver=None):
                 car_.u = car_.v = car_.r = car_.w = 0.0
                 car_.ax = car_.ay = 0.0
                 # la caisse finit de se poser
-                c_ = c
-                ddphi = (c_["ms"] * c_["h_roll"] * G * car_.phi - c_["K_roll"] * car_.phi - c_["C_roll"] * car_.dphi) / c_["Ix"]
-                ddth = (-c_["K_pitch"] * car_.th - c_["C_pitch"] * car_.dth) / c_["Iy"]
+                ddphi = (c["ms"] * c["h_roll"] * G * car_.phi - c["K_roll"] * car_.phi - c["C_roll"] * car_.dphi) / c["Ix"]
+                ddth = (-c["K_pitch"] * car_.th - c["C_pitch"] * car_.dth) / c["Iy"]
                 car_.dphi += h * ddphi
                 car_.dth += h * ddth
                 car_.phi += h * car_.dphi
                 car_.th += h * car_.dth
                 continue
             T = thr * car_.T_avail()
-            Tb = brk * c["brake_max"] * (1.0 - c["bias"]) * c["R"]
+            Tb = brk * c["brake_max"] * (1.0 - c["bias"]) * c["R"] + hb * c["hb_max"]
             Ff = brk * c["brake_max"] * c["bias"]
             car_.step(h, delta, T, Tb, Ff)
         # ---- la table
         u, v, r = car_.u, car_.v, car_.r
         V = math.hypot(u, v)
-        beta = math.atan2(v, u) if V > 0.05 else (math.atan2(tab["vy"][-1], 1.0) * 0.0 if tab["t"] else 0.0)
+        # (au pas, la vitesse en travers n'est plus que du bruit de pneu : la glisse rendue s'éteint sous 1 m/s)
+        beta = math.atan2(v, u) * _smooth01(V / 1.0) if V > 0.05 else 0.0
         psi_d = math.degrees(car_.psi)
-        trav = psi_d + math.degrees(beta) if V > 0.05 else (tab["travel"][-1] if tab["t"] else psi_d)
+        trav = psi_d + math.degrees(beta)
         cp, sp = math.cos(car_.psi), math.sin(car_.psi)
         vx, vy = -sp * u - cp * v, cp * u - sp * v
         cb, sb = math.cos(beta), math.sin(beta)
@@ -519,13 +806,14 @@ def simulate(plan, events=(), t_span=(-2.0, 40.0), car=None, driver=None):
         row = dict(t=t + DT, x=car_.X, y=car_.Y, vx=vx, vy=vy, v=V, travel=trav, slip=psi_d - trav, head=psi_d,
                    steer=math.degrees(delta), along=car_.ax * cb + car_.ay * sb,
                    alat=-car_.ax * sb + car_.ay * cb, roll=math.degrees(car_.phi), pitch=math.degrees(car_.th),
-                   r=math.degrees(r), throttle=thr, brake=brk, spin=spin, s=s, e=e,
+                   r=math.degrees(r), throttle=thr, brake=brk, hb=hb, spin=spin, s=s, e=e,
                    alpha_f=math.degrees(out.get("a_f", 0.0)), alpha_r=math.degrees(out.get("a_r", 0.0)),
                    Fyf=out.get("Fyf", 0.0), Fyr=out.get("Fyr", 0.0), Fxr=out.get("Fxr", 0.0),
                    fz_fl=fz[0], fz_fr=fz[1], fz_rl=fz[2], fz_rr=fz[3], kap=out.get("kap", 0.0),
-                   steer_cmd=math.degrees(d_cmd), r_des=math.degrees(r_des), slip_goal=slip_t, drift_w=wd)
+                   steer_cmd=math.degrees(d_cmd), r_des=math.degrees(r_f), slip_ref=g_ref, drift_w=wd,
+                   kap_cmd=kap_cmd)
         if stopped:
-            row.update(along=0.0, alat=0.0, slip=tab["slip"][-1] if tab["t"] else 0.0)
+            row.update(along=0.0, alat=0.0, slip=0.0, travel=psi_d)
         for k in keys:
             tab[k].append(row[k])
     # la table commence à t_span[0] + DT : on la recale sur la grille (première ligne = t_span[0])
