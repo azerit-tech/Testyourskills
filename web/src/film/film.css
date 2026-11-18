@@ -408,6 +408,34 @@
   background: #0c0d1b;
 }
 
+/* Le score qui monte (§18.77) : sous la rangée des étoiles, sur le ciel, dans le
+   style des étoiles (crème cerné d'encre, mat) ; chiffres à chasse fixe, il ne
+   tremble pas en montant. Au-dessus de l'étoile qui tombe (25 % de la hauteur). */
+.film-score {
+  position: absolute;
+  top: calc(var(--row-top) + var(--star) * 1.14 + 0.6cqh);
+  left: 0;
+  right: 0;
+  z-index: 2;
+  margin: 0;
+  color: #fff9cb;
+  font: 700 min(46px, 5.4cqh, 13cqw)/1 var(--f-name);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  text-align: center;
+  -webkit-text-stroke: 4px rgb(12 13 27 / 0.5);
+  paint-order: stroke fill;
+  pointer-events: none;
+}
+.film-score i {
+  display: inline-block;
+  width: 0.54em;
+  font-style: normal;
+}
+.film-score-step {
+  display: none;
+}
+
 /* mouvement réduit : le film ne joue pas par défaut ; demandé, l'étoile s'allume à
    sa place dès son coup, sans tomber ni voler, et rien ne grossit ni ne monte */
 @media (prefers-reduced-motion: reduce) {
@@ -429,6 +457,12 @@
   }
   .film-line {
     transform: none;
+  }
+  .film-score-run {
+    display: none;
+  }
+  .film-score-step {
+    display: inline;
   }
 }
 
@@ -481,7 +515,7 @@
   pointer-events: none;
 }
 /* la fiche posée, plus rien du film devant elle */
-.film-stage.is-landed :is(.film-stars, .film-stamp, .film-line, .film-verdict) {
+.film-stage.is-landed :is(.film-stars, .film-score, .film-stamp, .film-line, .film-verdict) {
   visibility: hidden;
 }
 

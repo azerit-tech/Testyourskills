@@ -115,6 +115,17 @@ export const STAMP_HOLD = 11;
 export const GAUGE_OPEN = 6;
 export const GAUGE_AFTER = 4;
 export const GAUGE_EASE = 1.5;
+
+/**
+ * Le score qui monte (SPEC §18.77) : de 0 à la note de la fiche, par paliers
+ * calés sur les étoiles. Au coup de l'étoile k, le chiffre monte en SCORE_RISE
+ * images (montée rapide, adoucie) jusqu'au seuil de cette étoile
+ * (STAR_THRESHOLDS ; 0 pour la première), puis tient. Le dernier palier va du
+ * seuil du niveau à la note exacte, en SCORE_FINAL images au plus, et s'arrête
+ * pile à l'image du gel.
+ */
+export const SCORE_RISE = 12;
+export const SCORE_FINAL = 18;
 /**
  * L'étoile refusée (une à cinq étoiles) : sa jauge monte jusqu'à la part vraie
  * de la note entre deux seuils, bornée pour se lire (ni vide, ni presque pleine),

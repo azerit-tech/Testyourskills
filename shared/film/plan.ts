@@ -10,7 +10,7 @@ import { LEVEL_LABELS, STAR_THRESHOLDS, starsFor } from "../types";
 import { SCENE_LIGHT, sceneOf, type Light } from "../scenes";
 import { plateSub } from "../card/mug";
 import { radioLines, type FilmLine, type RadioCard } from "./radio";
-import { CHASE_FRAMES, DENIED_DRAIN, DENIED_MAX, DENIED_MIN, FLICKER_ON, FPS, INTERCEPT_LEAD, STAR_FRAMES, TITLE_POP, holdOf, playEnd } from "./cut";
+import { CHASE_FRAMES, DENIED_DRAIN, DENIED_MAX, DENIED_MIN, FLICKER_ON, FPS, INTERCEPT_LEAD, SCORE_FINAL, SCORE_RISE, STAR_FRAMES, TITLE_POP, holdOf, playEnd } from "./cut";
 
 /**
  * La fiche se monte quand plus rien ne bouge à l'écran, l'image fixe : deux
@@ -94,6 +94,38 @@ function verdictOf(level: Stars, overall: number, cut: number): FilmVerdict | nu
   };
 }
 
+/** Une montée du score : de `a` à `b`, entre les images `from` et `to`. */
+export interface ScoreStep {
+  from: number;
+  to: number;
+  a: number;
+  b: number;
+}
+
+/** Le seuil de l'étoile k (STAR_THRESHOLDS) : 0 pour la première, qu'on a toujours. */
+export const starThreshold = (k: Stars): number => (k === 1 ? 0 : STAR_THRESHOLDS[k - 2]);
+
+/**
+ * Les paliers du score (SPEC §18.77) : au coup de chaque étoile gagnée, la montée jusqu'à son seuil ; puis, juste
+ * avant le gel, la dernière jusqu'à la note exacte. Jamais au-delà de la note, toujours croissant.
+ */
+export function scoreSteps(stars: FilmStar[], overall: number, freeze: number): ScoreStep[] {
+  const out: ScoreStep[] = [];
+  let at = 0;
+  let end = 0;
+  for (const s of stars) {
+    const b = Math.min(overall, starThreshold(s.star));
+    end = Math.min(s.frame + SCORE_RISE, freeze);
+    if (b > at) out.push({ from: s.frame, to: end, a: at, b });
+    at = Math.max(at, b);
+  }
+  if (overall > at) {
+    const from = Math.max(end, freeze - SCORE_FINAL);
+    out.push({ from: Math.min(from, freeze - 1), to: freeze, a: at, b: overall });
+  }
+  return out;
+}
+
 export interface FilmPlan {
   id: string;
   level: Stars;
@@ -119,6 +151,10 @@ export interface FilmPlan {
   intercept: number | null;
   /** L'étoile refusée et sa ligne, au gel ; absente à six étoiles. */
   verdict: FilmVerdict | null;
+  /** La note de la fiche, où le score s'arrête au gel. */
+  overall: number;
+  /** Les montées du score (scoreSteps), dans l'ordre. */
+  score: ScoreStep[];
   /** Le flash : début, sommet (la fiche se pose : passage de relais), fin du film. */
   flash: { from: number; peak: number; to: number };
   /** Le film entier, en images, puis en secondes. */
@@ -186,6 +222,8 @@ export function filmPlan(card: FilmCard): FilmPlan {
     freeze,
     intercept,
     verdict,
+    overall: card.overall,
+    score: scoreSteps(stars, card.overall, freeze),
     flash,
     frames: flash.to,
     duration: flash.to / FPS,

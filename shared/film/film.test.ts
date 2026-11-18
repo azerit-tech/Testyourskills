@@ -532,3 +532,45 @@ describe("radioLines", () => {
     expect(h.line).toMatchObject({ label: "Chef d'accusation", text: "Commits : fix, fix2, final fix" });
   });
 });
+
+describe("le score qui monte (§18.77)", () => {
+  const threshold = (k: Stars) => (k === 1 ? 0 : STAR_THRESHOLDS[k - 2]);
+  for (const n of LEVELS) {
+    it(`${n} étoile${n > 1 ? "s" : ""} : de 0 à la note, croissant, pile à la note au gel`, () => {
+      const p = filmPlan(cardAt(n));
+      expect(hudAt(p, at(0), "fr").score).toEqual({ value: 0, step: 0 });
+      let prev = 0;
+      for (let f = 0; f < p.freeze; f++) {
+        const s = hudAt(p, at(f), "fr").score;
+        expect(s.value).toBeGreaterThanOrEqual(prev);
+        expect(s.value).toBeLessThanOrEqual(p.overall);
+        prev = s.value;
+      }
+      // au gel, et jusqu'au flash : la note exacte, en montée comme en paliers
+      for (const f of [p.freeze, p.flash.from, p.flash.peak - 1]) expect(hudAt(p, at(f), "fr").score).toEqual({ value: OVERALL[n], step: OVERALL[n] });
+      // deux images avant le gel : pas encore la note (le dernier palier se termine au gel)
+      expect(hudAt(p, at(p.freeze - 2), "fr").score.value).toBeLessThan(OVERALL[n]);
+    });
+  }
+  it("chaque étoile gagnée monte au seuil de cette étoile, puis il tient jusqu'à la suivante", () => {
+    const p = filmPlan(cardAt(6));
+    for (const s of p.stars.slice(1)) {
+      const before = hudAt(p, at(s.frame - 1), "fr").score;
+      const after = hudAt(p, at(s.frame + 14), "fr").score;
+      expect(before.value).toBe(threshold((s.star - 1) as Stars));
+      expect(after).toEqual({ value: threshold(s.star), step: threshold(s.star) });
+      // la montée : ni d'un coup, ni finie avant son palier ; en paliers, le saut tout de suite
+      const mid = hudAt(p, at(s.frame + 3), "fr").score;
+      expect(mid.value).toBeGreaterThan(before.value);
+      expect(mid.value).toBeLessThan(after.value);
+      expect(mid.step).toBe(threshold(s.star));
+    }
+  });
+  it("l'étoile refusée : le score s'arrête sur la note, sous son seuil", () => {
+    const p = filmPlan(cardAt(3, { overall: 53 }));
+    expect(p.verdict?.missing).toBe(7);
+    expect(hudAt(p, at(p.freeze), "fr").score.value).toBe(53);
+    const all = Array.from({ length: p.flash.peak }, (_, f) => hudAt(p, at(f), "fr").score.value);
+    expect(Math.max(...all)).toBe(53);
+  });
+});

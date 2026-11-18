@@ -5,7 +5,8 @@
 // suivante, l'étoile qui tombe en grand puis rejoint sa place, une ligne sous
 // la berline (une étiquette, une ligne), la plaque, le niveau et la ligne de
 // l'étoile refusée à l'arrêt sur image (son image en deux tons, toise comprise,
-// est tirée par freeze.ts), le grain, la vignette et deux ombres d'encre. Tout
+// est tirée par freeze.ts), le score qui monte jusqu'à la note (§18.77), le
+// grain, la vignette et deux ombres d'encre. Tout
 // vient de hudAt : aucun état, aucune animation CSS qui dériverait de l'image.
 // Mat : aplats, ni halo ni ombre lumineuse.
 import type { CSSProperties } from "react";
@@ -85,6 +86,19 @@ export function FilmVerdict({ plan, hud, lang }: { plan: FilmPlan; hud: Hud; lan
  */
 const gaugeHeight = (fill: number) => `${((3 + 19.4 * fill) / 24) * 100}%`;
 
+/** Le score, un chiffre par case de largeur fixe : il ne tremble pas en montant, quelle que soit la police. */
+function ScoreDigits({ n, className }: { n: number; className: string }) {
+  return (
+    <span className={className}>
+      {String(n)
+        .split("")
+        .map((d, i) => (
+          <i key={i}>{d}</i>
+        ))}
+    </span>
+  );
+}
+
 export function FilmHud({ plan, hud, lang }: { plan: FilmPlan; hud: Hud; lang: Lang }) {
   const grain = grainTile();
   const stamp = hud.stamp;
@@ -129,6 +143,12 @@ export function FilmHud({ plan, hud, lang }: { plan: FilmPlan; hud: Hud; lang: L
           );
         })}
       </div>
+
+      {/* le score qui monte (§18.77), sous la rangée : la montée adoucie, ou palier par palier en mouvement réduit */}
+      <p className="film-score" style={{ opacity: hud.bands }} aria-hidden="true">
+        <ScoreDigits n={hud.score.value} className="film-score-run" />
+        <ScoreDigits n={hud.score.step} className="film-score-step" />
+      </p>
 
       {stamp && (
         <svg className="film-stamp" viewBox="0 0 24 24" style={{ opacity: stamp.opacity, "--fly": stamp.fly, "--slap": stamp.scale, "--slot": stamp.star - 3.5 } as CSSProperties}>

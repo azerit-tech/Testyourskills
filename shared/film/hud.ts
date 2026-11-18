@@ -105,6 +105,11 @@ export interface Hud {
    * puis la ligne de l'étoile refusée (`plan.verdict`), à cette opacité ; 0 à six étoiles.
    */
   freeze: { titleScale: number; verdict: number } | null;
+  /**
+   * Le score qui monte (§18.77), sous la rangée : `value` en montée adoucie, `step` palier par palier (mouvement
+   * réduit), entiers, de 0 à la note, atteinte à l'image du gel.
+   */
+  score: { value: number; step: number };
   /** Opacité du flash crème. */
   flash: number;
   /** La position de la tuile de grain (px, 0 à 127). */
@@ -196,6 +201,18 @@ export function hudAt(plan: FilmPlan, t: number, lang: Lang): Hud {
     }
   }
 
+  // Le score : chaque montée part au coup de son étoile, adoucie ; il tient entre deux.
+  let value = 0;
+  let step = 0;
+  for (const s of plan.score) {
+    if (f < s.from) break;
+    step = s.b;
+    // arrondi par défaut : le palier (la note, au gel) n'est atteint qu'à la fin de sa montée
+    const k = clamp01((frame - s.from) / Math.max(1, s.to - s.from));
+    value = k >= 1 ? s.b : Math.floor(s.a + (s.b - s.a) * easeOut(k));
+  }
+  const score = { value: Math.round(value), step: Math.round(step) };
+
   // L'habillage se pose à l'ouverture, se lève après le sommet du flash.
   const bands = landed ? 1 - clamp01((f - flash.peak) / (flash.to - flash.peak)) : clamp01(f / BANDS_CLOSE);
   const flashOpacity = frame < flash.from ? 0 : f < flash.peak ? clamp01((f - flash.from) / (flash.peak - flash.from)) : 1 - clamp01((f - flash.peak) / (flash.to - flash.peak));
@@ -218,6 +235,7 @@ export function hudAt(plan: FilmPlan, t: number, lang: Lang): Hud {
           verdict: verdict ? clamp01((f - freeze - VERDICT_AT) / VERDICT_IN) : 0,
         }
       : null,
+    score,
     flash: flashOpacity,
     grain: grainAt(Math.floor(frame / GRAIN_STEP)),
   };
