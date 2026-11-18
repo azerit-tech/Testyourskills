@@ -14,6 +14,7 @@ import math
 import os
 import sys
 
+import contacts as C
 import dynamique as D
 import motion as M
 
@@ -354,7 +355,18 @@ DERAPAGES = [
 ]
 # Le slalom (voie, SPEC §18.62) est la ligne que vise le conducteur : roulis, dérive arrière et contre-braquage des
 # changements de voie sortent de la simulation comme ceux des dérapages (DRIVE.voie_err, DRIVE.rear_slip).
-DRIVE = D.simulate(D.Plan(ROUTE, _s_plan, PLAN.speed, PLAN.along, S_ARRET, voie=voie), DERAPAGES, t_span=T_SPAN)
+# (chocs : les contacts des patrouilles, contacts.py : des impulsions sur la caisse, SPEC §18.68)
+DRIVE = D.simulate(D.Plan(ROUTE, _s_plan, PLAN.speed, PLAN.along, S_ARRET, voie=voie), DERAPAGES, t_span=T_SPAN,
+                   chocs=C.efforts)
+
+
+def sans_chocs(_c=[]):
+    """La même conduite sans les contacts (calculée à la demande) : ce que les chocs lui ajoutent (test_contacts),
+    la ligne d'une patrouille écrite depuis la place de la berline (contacts.Patrouille)."""
+    if not _c:
+        _c.append(D.simulate(D.Plan(ROUTE, _s_plan, PLAN.speed, PLAN.along, S_ARRET, voie=voie), DERAPAGES,
+                             t_span=T_SPAN))
+    return _c[0]
 T_ARRET = DRIVE.t_stop                      # s : l'arrêt de la berline simulée sur la pointe
 
 # ---- les six étoiles : des instants de la conduite (images globales, 0 = la première ; temps = image / 24). Le site
@@ -464,11 +476,16 @@ def pose_ville(shot):
     return (rot,) + f(0.0, 0.0)
 
 
-def hero(shot):
+def hero(shot, chocs=True):
     """Les fonctions de l'image du tronçon (décimale admise) : pos (scène), heading et travel (degrés, 0 = +y de la
-    scène, positif à gauche), slip, steer, speed, along, alat, spin (le patinage des roues arrière)."""
+    scène, positif à gauche), slip, steer, speed, along, alat, spin (le patinage des roues arrière). chocs=False :
+    la même conduite sans les contacts (sans_chocs) : ce que suit une meute qui rejoue le chemin de la berline en
+    retard, sans rejouer ses chocs."""
     to_scene, cap = placer(shot)
     t = lambda f: t_of(shot, f)                                    # noqa: E731
+    if not chocs:
+        return dict(pos=lambda f: to_scene(*sans_chocs().pos(t(f))), heading=lambda f: sans_chocs().heading(t(f)) - cap,
+                    travel=lambda f: sans_chocs().travel(t(f)) - cap, speed=lambda f: sans_chocs().speed(t(f)))
     return dict(pos=lambda f: to_scene(*DRIVE.pos(t(f))), heading=lambda f: DRIVE.heading(t(f)) - cap,
                 travel=lambda f: DRIVE.travel(t(f)) - cap, slip=lambda f: DRIVE.slip(t(f)),
                 steer=lambda f: DRIVE.steer(t(f)), speed=lambda f: DRIVE.speed(t(f)),

@@ -182,12 +182,15 @@ PACK_IN = [("patrol", 1.6, 0.0), ("van", 2.5, 0.0), ("patrol", 3.4, 0.0)]
 PACK_START = [("patrol", PATROL_X, PATROL_Y0)] + [(k, *hero_pos(-d)) for k, d, _ in PACK_IN]
 
 
+HERO0 = PC.hero("P5", chocs=False)    # (contacts.py : la meute rejoue le chemin de la berline, pas ses chocs)
+
+
 def _follow(delay, left):
     def pos(t):
-        x, y = hero_pos(t - delay)
+        x, y = HERO0["pos"](_f(t - delay))
         if not left:
             return x, y
-        a = math.radians(HERO["travel"](_f(t - delay)))
+        a = math.radians(HERO0["travel"](_f(t - delay)))
         return x - left * math.cos(a), y - left * math.sin(a)
     return pos
 

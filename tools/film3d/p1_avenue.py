@@ -7,6 +7,7 @@
 # La berline et le bras de la caméra se lisent dans le parcours (fenêtre « P1 ») : rien du chemin n'est écrit ici.
 import math
 
+import contacts as C
 import motion as M
 import ouv_avenue as OUV
 import parcours as PC
@@ -151,9 +152,13 @@ def brake_windows():
     return PC.brake_windows("P1")
 
 
-def patrol_pos(t):
+def _patrol_ligne(t):
     """Voie d'en face, _lead(t) devant la berline le long de l'avenue."""
     return LANE_X, hero_pos(t)[1] + _lead(t)
+
+
+# sa ligne, avec le contact de l'ouverture (contacts.py, SPEC §18.68 : elle serre la berline, la tape, rebondit)
+patrol_pos = C.Patrouille(_patrol_ligne, "P1", (("OUV", "patrol"), ("P1", "patrol")))
 
 
 def patrol_speed(t):

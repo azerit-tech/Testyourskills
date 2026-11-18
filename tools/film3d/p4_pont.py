@@ -19,6 +19,7 @@
 import math
 import os
 
+import contacts as C
 import motion as M
 
 VILLE = os.environ.get("FILM3D_VILLE", "1").strip().lower() not in ("0", "non", "no", "false", "off")  # lieux.ville_on
@@ -281,7 +282,7 @@ if VILLE:
         # l'écart du slalom en x de la scène (la voie à gauche de la berline est vers −x)
         return -PC.voie(PC.s_of_t(PC.t_of("P4", _f(t))))
 
-    def patrol1_pos(t):
+    def _patrol1_ligne(t):
         hx, hy = hero_pos(t)
         x = hx - (1.0 - P1_VOIE) * _voie_x(t) - _p1_side(t)
         if t <= T49:
@@ -290,6 +291,9 @@ if VILLE:
         dt = t - T49
         y49 = hero_pos(T49)[1] + _P1_IN["lead"]
         return hero_pos(T49)[0] - P1_SIDE, y49 + _P1_V49 * dt - 0.5 * _P1_IN["decel"] * dt * dt
+
+    # sa ligne, avec le contact du pont (contacts.py, SPEC §18.68 : elle ferme la porte, la berline la tape)
+    patrol1_pos = C.Patrouille(_patrol1_ligne, "P4", (("P4", "patrol_0"),), suit=True)
 
     def _follow(gap, dv, t):
         """y d'un véhicule qui suit la conduite de la berline en retard (LAG), `gap` m derrière elle à t = 0, dv
