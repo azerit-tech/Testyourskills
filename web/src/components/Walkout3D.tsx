@@ -13,7 +13,7 @@ import type { CardData, DeclaredSource, Lang } from "../../../shared/types";
 import { LEVEL_LABELS, starsFor } from "../../../shared/types";
 import { langIcon, langTitle } from "../../../shared/card/languages";
 import { pick, useT } from "../i18n";
-import { readMuted, unlockAudio, writeMuted } from "../lib/audio";
+import { SOUND_ON, readMuted, unlockAudio, writeMuted } from "../lib/audio";
 import { useMediaQuery } from "../lib/util";
 import { preloadWalkoutAssets } from "../three/assets";
 import { loadCardTexture } from "../three/cardTexture";
@@ -233,7 +233,7 @@ export function Walkout3D({ card, lang, declared = "cv", phase, anchorRef, contr
       {/* le canvas du moteur de rendu partagé y est placé (walkout.ts), et le HUD (hud.ts) */}
       <div ref={hostRef} style={{ display: "contents" }} />
       <div ref={hudRef} style={{ display: "contents" }} />
-      {phase === "playing" && (
+      {SOUND_ON && phase === "playing" && (
         <button type="button" className="sound-btn" aria-pressed={!muted} aria-label={muted ? t.reveal.unmute : t.reveal.mute} title={muted ? t.reveal.unmute : t.reveal.mute} onClick={toggleSound}>
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>
             <path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor" />

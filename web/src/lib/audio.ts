@@ -6,6 +6,13 @@
 // sons de la scène (three/elevatorSound.ts, three/radioSound.ts) s'y branchent.
 // Sans Three.js : ce module vit dans le bundle de l'accueil.
 
+/**
+ * Le site joue muet (SPEC §18.77, lancement du 19 novembre) : aucun contexte
+ * audio n'est créé, aucun geste n'est demandé pour le son, aucun bouton de son
+ * n'est montré. Le code des sons reste, éteint ; le remettre ici rallume tout.
+ */
+export const SOUND_ON: boolean = false;
+
 /** Le choix de la personne pour le son, d'une révélation à l'autre. */
 const MUTE_KEY = "tys-walkout-muted";
 /** Stockage bloqué : le choix vaut pour cette page. */
@@ -59,12 +66,12 @@ function wake(): AudioContext | null {
  */
 export function unlockAudio(): void {
   gestured = true;
-  if (!readMuted()) wake();
+  if (SOUND_ON && !readMuted()) wake();
 }
 
 /** Pour les sons de la scène : le contexte partagé, jamais fermé par eux. */
 export function sharedAudio(): AudioContext | null {
-  return wake();
+  return SOUND_ON ? wake() : null;
 }
 
 /**
@@ -73,7 +80,7 @@ export function sharedAudio(): AudioContext | null {
  * coupé, et un navigateur qui sait jouer du son.
  */
 export function soundNeedsGesture(): boolean {
-  return !gestured && !readMuted() && !!ctor();
+  return SOUND_ON && !gestured && !readMuted() && !!ctor();
 }
 
 /** L'état du contexte de la page, sans le créer ni le relancer (la trace du film, film/traceRecorder.ts). */

@@ -16,7 +16,7 @@ import type { CardData, Lang } from "../../../shared/types";
 import { FPS, filmPlan, hudAt, samePlan, type FilmPlan } from "../../../shared/film";
 import { useT } from "../i18n";
 import { api, isMock } from "../lib/api";
-import { readMuted, unlockAudio, writeMuted } from "../lib/audio";
+import { SOUND_ON, readMuted, unlockAudio, writeMuted } from "../lib/audio";
 import { createFilmSound } from "../lib/filmSound";
 import { buzz } from "../lib/haptics";
 import { inAppBrowser } from "../lib/sharing";
@@ -352,8 +352,9 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [phase, prepared]);
 
-  // La bande-son (§18.39, lib/filmSound.ts) : créée avec le plan, libérée au démontage.
+  // La bande-son (§18.39, lib/filmSound.ts) : créée avec le plan, libérée au démontage. Site muet (§18.77) : aucune.
   useEffect(() => {
+    if (!SOUND_ON) return;
     const s = createFilmSound(plan);
     sound.current = s;
     return () => {
@@ -413,7 +414,7 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
         </div>
         {flashLook(hud.flash, landed) > 0 && <div className="film-flash" style={{ opacity: flashLook(hud.flash, landed) }} />}
       </div>
-      {phase === "playing" && (
+      {SOUND_ON && phase === "playing" && (
         <button type="button" className="sound-btn film-sound" aria-pressed={!muted} aria-label={muted ? tr.reveal.unmute : tr.reveal.mute} title={muted ? tr.reveal.unmute : tr.reveal.mute} onClick={toggleSound}>
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>
             <path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor" />

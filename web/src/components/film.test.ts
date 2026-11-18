@@ -206,7 +206,7 @@ describe("le film et l'identité de la fiche", () => {
     await render(sameContent(), "ready");
     for (let i = 0; i < 6; i++) await render(sameContent(), "ready");
     expect(h.players).toHaveLength(1);
-    expect(h.sounds).toBe(1);
+    expect(h.sounds).toBe(0); // site muet (§18.77) : aucune bande-son créée
     await act(async () => h.players[0].ready());
     await render(sameContent(), "playing");
     for (let i = 0; i < 3; i++) await render(sameContent(), "playing");
