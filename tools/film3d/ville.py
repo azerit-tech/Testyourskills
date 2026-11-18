@@ -519,6 +519,13 @@ PROJECTEUR_NOMS = r"(searchlight_spot|^faisceau_)"
 PROJECTEUR_PLANS = ("P5", "P6", "FIN6")
 
 
+def est_sol(nom):
+    """Un maillage de sol d'après son nom (SOLS_NOMS), hors des brumes (« haze_pointe » n'est pas la pointe : c'est
+    l'air au-dessus d'elle, que le pinceau doit traverser)."""
+    n = nom.lower()
+    return not n.startswith("haze") and re.search(SOLS_NOMS, n) is not None
+
+
 def recoit(liaison, nom):
     """Un objet `nom` reçoit-il une lampe dont la liaison de réception est `liaison` : None (tout reçoit) ou la liste
     [(nom, état)] de sa collection (INCLUDE ou EXCLUDE) ? Une collection qui inclut quelqu'un n'éclaire que ceux qu'elle
@@ -547,7 +554,7 @@ def selftest_sols_projecteur():
     assert sols_eclaires([("heli:searchlight_spot", vieille)], sols) == [
         ("heli:searchlight_spot", s) for s in sols if s != "port_terre_plein"]
     assert sols_eclaires([("faisceau_sol", None)], ["jetee_chaussee"]) == [("faisceau_sol", "jetee_chaussee")]
-    assert all(re.search(SOLS_NOMS, s) for s in sols) and not re.search(SOLS_NOMS, "hero_body")
+    assert all(est_sol(s) for s in sols) and not est_sol("hero_body") and not est_sol("haze_pointe")
     print("selftest_sols_projecteur OK")
 
 
@@ -557,8 +564,7 @@ def projecteur_sols(scene, plan):
     VILLE_SOLS_STRICT=1, une faute arrête le rendu."""
     if plan not in PROJECTEUR_PLANS:
         return []
-    sols = sorted(o.name for o in scene.objects if o.type == "MESH" and not o.hide_render
-                  and re.search(SOLS_NOMS, o.name.lower()))
+    sols = sorted(o.name for o in scene.objects if o.type == "MESH" and not o.hide_render and est_sol(o.name))
     lampes = []
     for lt in scene.objects:
         if lt.type != "LIGHT" or lt.hide_render or not re.search(PROJECTEUR_NOMS, lt.name):
