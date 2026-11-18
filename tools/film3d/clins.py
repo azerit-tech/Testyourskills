@@ -15,7 +15,7 @@
 # bibliothèque A-neon-letters déjà dans les enseignes de la ville ; seuls le mouvement, les caissons et les textes des
 # panneaux sont en code) :
 #   l'avenue : l'hôtel FLAMINGA (néon sur le toit, flamant de néon), l'enseigne en drapeau THE CORAL (palmier de
-#     néon), une glacière ambulante rose garée côté plage, un coupé blanc des années 80 devant l'hôtel, un poste de
+#     néon), une glacière ambulante rose garée côté ville, un coupé blanc des années 80 devant l'hôtel, un poste de
 #     secours pastel sur la plage ;
 #   le rond-point : des flamants roses en plastique sur l'îlot ;
 #   la rue : deux panneaux sur les toits des tours du bout, l'avocat (ACCIDENT ?) et les cautions (CAUTION EXPRESS) ;
@@ -233,7 +233,7 @@ def clins():
     nom_v, _m, x, y, cap = remplace_vie(-88.0, -427.3)
     out.append(dict(nom="coupe_blanc", quoi="remplace", lieu="avenue", rayon=2.5, classe="vehicule", cache=nom_v,
                     modele="coupe", pose=fixe(x, y, 0.0, cap), teinte="#eeeae2"))
-    # -- la glacière ambulante rose garée côté plage, en face de la rue transversale (à la place du camion)
+    # -- la glacière ambulante rose garée côté ville, à la place de la garée la plus proche (plus de garées côté mer)
     nom_v, _m, x, y, cap = remplace_vie(-63.0, -439.1)
     out.append(dict(nom="glaciere", quoi="remplace", lieu="avenue", rayon=3.5, classe="vehicule", cache=nom_v,
                     modele="glacier", pose=fixe(x, y, 0.0, cap)))
