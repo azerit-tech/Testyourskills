@@ -1642,7 +1642,7 @@ GRILLE = (0.56, 0.56, 0.57, 1)
 
 
 def _w111_materials(parts, lights_on, tag="hero_w111", paint_color=None, leather=LEATHER["w111"],
-                    wheel_rim="#e6dcc2", wear=0.0):
+                    wheel_rim="#bfae88", wear=0.0):
     """Les matières de la berline ; reprises par le coupé pour l'habitacle emprunté (tag, peinture, cuir, jante).
     wear : l'usure (0..1, voir usure()), la berline seule. Sans paint_color : la peinture de w111_paint()."""
     on = 1.0 if lights_on else 0.0
@@ -1676,7 +1676,8 @@ def _w111_materials(parts, lights_on, tag="hero_w111", paint_color=None, leather
         "Acrylic_Transparent_Orange": mat_lens(f"{tag}_amber", lin("#ff8a1a"), AMBER, 0.0),
         "Walnut_Matte": mat_walnut(f"{tag}_walnut"),
         "Leather_Top_Grain_Beige": mat_leather(f"{tag}_leather", leather),
-        # le volant d'époque : jante ivoire en bakélite (noire sur le coupé)
+        # le volant d'époque : jante ivoire en bakélite (noire sur le coupé). Un ivoire vieilli, albédo 0,43
+        # (#e6dcc2, 0,72, jusqu'au 18 novembre : avec les gants, une seule masse blanche sous la lampe d'habitacle)
         "Leather_Top_Grain_Beige0": mat_plain(f"{tag}_wheel_rim", wheel_rim, rough=0.22, coat=0.6),
         "interior_textured": mat_plain(f"{tag}_dash_face", "#141516", rough=0.4),
         "interior_carpet": mat_rubber(f"{tag}_carpet", lin("#2a1d16"), 0.95, 0.6),

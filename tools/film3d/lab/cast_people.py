@@ -337,13 +337,14 @@ def mat_leather():
     return mat_leather_tex("ppl_leather_black", lin("#0d0d0e"), rough=0.58, coat=0.08)
 
 
-# les gants du conducteur : le pécari naturel des gants de conduite d'époque, un fauve clair (albédo 0,42).
-# FILM3D_GANTS=<#rrggbb> pour en essayer un autre au banc
-GLOVE = "#cbab85"
+# les gants du conducteur : le pécari des gants de conduite d'époque, un fauve (albédo 0,26 ; #cbab85, 0,42, d'abord :
+# clairs sur la jante ivoire du volant vus de près, second tour du banc). Plus sombres que la jante (0,43), ils s'en
+# détachent. FILM3D_GANTS=<#rrggbb> pour en essayer un autre au banc
+GLOVE = "#ad8558"
 
 
 def mat_glove_driver():
-    """Les gants du conducteur : pécari naturel, fauve clair (GLOVE, albédo vers 0,42), mat. Noirs, ils
+    """Les gants du conducteur : pécari fauve (GLOVE, albédo vers 0,26), mat. Noirs, ils
     disparaissaient derrière le reflet du ciel dans le pare-brise ; fauves sombres (albédo 0,3), sortis par la vitre
     dans FIN, ils restaient sombres à 7,5 m (8 px) sous les phares de la meute du plan de lumière v3.1 ; écrus,
     presque blancs (#f3ece0, albédo 0,85), ils sortaient en blanc pur sous les lumières liées à la berline, réglées
