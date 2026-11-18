@@ -238,93 +238,105 @@ def _wake(c0, wake):
 
 
 def wheel_spray(track, wheels, wheel_r, rate_drops=2400.0, rate_mist=190.0, wet=1.0, slip_gain=1.6, seed=1,
-                substeps=4, wet_fn=None, mist_size=1.0, mist_alpha=0.8, frames=None, veil="bas"):
+                substeps=4, wet_fn=None, mist_size=1.0, mist_alpha=0.8, frames=None, veil="bas", g0=0):
     """Le voile d'embruns derrière les roues : à chaque sous-image, pour chaque roue, des gouttes (Poisson de
     moyenne rate × vitesse/30 m/s × mouillé × (1 + glisse)) lancées de l'arrière du pneu, emportées à une fraction
     de la vitesse de la roue, un peu vers le haut ; et des sprites de brume, plus lents, qui gonflent et restent
     derrière. veil « bas » (la caméra derrière, le découpage v3) : des gerbes fines sous le pare-chocs qui s'ouvrent
     en V derrière les roues et retombent avant l'objectif ; « haut » (de côté ou de face) : un voile de 0,6 à 1 m.
+    Le tirage est fait par sous-image du film et par roue (g0 : l'image du film moins celle de la scène), comme
+    drift_spray : deux tronçons qui se suivent tirent les mêmes gouttes, et celles nées avant une coupe vivent encore
+    après, au même endroit de la ville (brouillon éclairé v8 : chaque tronçon tirait les siennes depuis sa première
+    image, la gerbe s'éclaircissait à chaque jonction).
     Renvoie (gouttes, brume) : deux listes de Particle."""
     bas = veil == "bas"
-    rng = random.Random(seed)
     drops, mist = [], []
     f0, f1 = track[0].frame, track[-1].frame
     lo, hi = frames if frames else (f0, f1)
-    for i in range(len(track) - 1):
-        for s in range(substeps):
-            f = track[i].frame + (s + rng.random()) / substeps * (track[i + 1].frame - track[i].frame)
-            if f < lo - 1 or f > hi:
+    g0k = int(round(g0 * substeps))
+    names = sorted(track[0].wheels)
+    for kk in range(int(math.floor((lo - 1) * substeps)), int(math.ceil(hi * substeps)) + 1):
+        r0 = random.Random(seed * 1000003 + kk + g0k)
+        f = (kk + r0.random()) / substeps
+        wseeds = [r0.random() for _ in names]          # (le tirage d'une roue ne dépend pas des autres)
+        if f < f0 or f > f1 or f < lo - 1 or f > hi:
+            continue
+        _, fwd, vel, wh, wv, slip, speed = pose_at(track, f)
+        if speed < 2.0:
+            continue
+        right = (fwd[1], -fwd[0], 0.0)
+        # de dos, la gerbe plafonne à celle de 70 km/h : au-delà, vue de la voiture, elle est la même (même
+        # débit, même hauteur, même largeur, même vitesse relative : l'eau est davantage emportée dans le sillage,
+        # sans quoi le flou de bougé l'étire en deux faisceaux) ; la glisse la renforce moins
+        sp_i = min(speed, 19.4) if bas else speed
+        wake = sp_i / speed
+        gs = 1.0 + (0.6 if bas else slip_gain) * smoothstep(4.0, 25.0, abs(slip))
+        for name, ws in zip(names, wseeds):
+            c = wh[name]
+            rng = random.Random(ws)
+            rear = name.endswith(("BL", "BR"))
+            side = 1.0 if name.endswith(("R",)) else -1.0
+            w = wet * (wet_fn(c[0], c[1]) if wet_fn else 1.0) * (1.0 if rear else 0.45)
+            if w <= 0:
                 continue
-            _, fwd, vel, wh, wv, slip, speed = pose_at(track, f)
-            if speed < 2.0:
-                continue
-            right = (fwd[1], -fwd[0], 0.0)
-            # de dos, la gerbe plafonne à celle de 70 km/h : au-delà, vue de la voiture, elle est la même (même
-            # débit, même hauteur, même largeur, même vitesse relative : l'eau est davantage emportée dans le sillage,
-            # sans quoi le flou de bougé l'étire en deux faisceaux) ; la glisse la renforce moins
-            sp_i = min(speed, 19.4) if bas else speed
-            wake = sp_i / speed
-            gs = 1.0 + (0.6 if bas else slip_gain) * smoothstep(4.0, 25.0, abs(slip))
-            for name, c in wh.items():
-                rear = name.endswith(("BL", "BR"))
-                side = 1.0 if name.endswith(("R",)) else -1.0
-                w = wet * (wet_fn(c[0], c[1]) if wet_fn else 1.0) * (1.0 if rear else 0.45)
-                if w <= 0:
-                    continue
-                k = (sp_i if bas else speed) / 30.0 * w / (FPS * substeps)
-                V = wv.get(name, vel)
-                ground = c[2] - wheel_r
-                for _ in range(_poisson(rng, rate_drops * k * gs)):
-                    a = rng.uniform(0.25, 1.0) * math.pi * 0.5          # sur l'arrière du pneu, du sol au moyeu
-                    p = (c[0] - fwd[0] * wheel_r * math.sin(a) * 1.02 + right[0] * side * rng.uniform(-0.05, 0.12),
-                         c[1] - fwd[1] * wheel_r * math.sin(a) * 1.02 + right[1] * side * rng.uniform(-0.05, 0.12),
-                         ground + wheel_r * (1 - math.cos(a)) * rng.uniform(0.3, 1.0) + 0.02)
-                    c0 = rng.uniform(0.35, 0.65) if bas else rng.uniform(0.15, 0.55)
-                    carry, dw = _wake(c0, wake) if bas else (c0, 1.0)
-                    if bas:                                             # le V, sous le pare-chocs
-                        up = min(1.8, sp_i * rng.uniform(0.03, 0.1))
-                        lat = sp_i * rng.uniform(0.02, 0.16) * side
-                    else:
-                        up = speed * rng.uniform(0.04, 0.16)
-                        lat = speed * rng.uniform(-0.04, 0.10) * side
-                    v = (V[0] * carry + right[0] * lat, V[1] * carry + right[1] * lat, up)
-                    drag = rng.uniform(0.8, 2.2) * dw
-                    # de dos : retombée (ou éteinte) 3 à 5 m derrière la roue, quelle que soit la vitesse
-                    reach = rng.uniform(2.5, 4.0) / max(1.0, (1.0 - carry) * speed)
-                    life = land_time(p, v, drag, ground, min(0.42, reach) if bas else 0.9)
-                    drops.append(Particle(f, p, v, life, drag, 1.0,
-                                          rng.uniform(0.0025, 0.006) if bas else rng.uniform(0.002, 0.005),
-                                          seed=rng.random()))
-                # le voile : continu au-delà de 50 km/h (le débit suit la vitesse), haut de 0,6 à 1 m, long de 4 à
-                # 6 m derrière la roue (vie × vitesse relative), né à l'arrière du pneu sans fondu d'entrée
-                hi_speed = 0.35 + 0.65 * smoothstep(8.0, 14.0, speed)
-                for _ in range(_poisson(rng, rate_mist * k * gs * hi_speed * (2.2 if bas else 1.0))):
-                    p = (c[0] - fwd[0] * wheel_r * 1.1 + right[0] * side * rng.uniform(-0.1, 0.25),
-                         c[1] - fwd[1] * wheel_r * 1.1 + right[1] * side * rng.uniform(-0.1, 0.25),
-                         ground + (rng.uniform(0.06, 0.2) if bas else rng.uniform(0.15, 0.4)))
-                    c0 = rng.uniform(0.4, 0.65) if bas else rng.uniform(0.25, 0.5)
-                    carry, dw = _wake(c0, wake) if bas else (c0, 1.0)
-                    if bas:
-                        # deux traînées qui s'ouvrent en V sur 3 à 5 m : de petits sprites vifs (de la pulvérisation,
-                        # pas une bouffée), écartés vers l'extérieur, le haut sous le bas du coffre
-                        out, up = sp_i * rng.uniform(0.05, 0.14), rng.uniform(0.2, 0.8)
-                        sz = mist_size * (0.16 + 0.2 * min(1.0, sp_i / 28.0))
-                        # la vie suit la vitesse : le voile s'éteint 2,2 à 3,4 m derrière la roue (le flou et la
-                        # taille du sprite l'allongent d'un mètre à l'image)
-                        life = min(0.42, rng.uniform(2.2, 3.4) / max(1.0, (1.0 - carry) * speed))
-                        s0, s1 = sz * rng.uniform(0.5, 0.8), sz * rng.uniform(1.5, 2.1)
-                        # au-delà de 70 km/h, le flou de bougé de la caméra dilue le voile : il garde à l'image
-                        # l'épaisseur de 70
-                        al = 1.0 + 0.5 * smoothstep(19.4, 27.8, speed)
-                    else:
-                        out, up = rng.uniform(0.0, 1.2), rng.uniform(0.5, 1.5)
-                        sz = mist_size * (0.35 + 0.6 * min(1.0, speed / 25.0))
-                        s0, s1, life = sz * rng.uniform(0.6, 0.9), sz * rng.uniform(1.5, 2.1), rng.uniform(0.55, 0.9)
-                        al = 1.0
-                    v = (V[0] * carry + right[0] * side * out, V[1] * carry + right[1] * side * out, up)
-                    mist.append(Particle(f, p, v, life, rng.uniform(2.0, 3.2) * dw, 0.03, s0, s1,
-                                         al * mist_alpha * min(1.0, w) * rng.uniform(0.7, 1.0) * min(1.1 if bas else 1.25, gs),
-                                         rng.random()))
+            k = (sp_i if bas else speed) / 30.0 * w / (FPS * substeps)
+            V = wv.get(name, vel)
+            ground = c[2] - wheel_r
+            for _ in range(_poisson(rng, rate_drops * k * gs)):
+                a = rng.uniform(0.25, 1.0) * math.pi * 0.5          # sur l'arrière du pneu, du sol au moyeu
+                # un seul écart latéral, le long de la droite de la berline (deux tirages, un par axe de la scène,
+                # le faisaient dépendre de son orientation : deux tronçons tournés ne posaient pas la même gerbe)
+                lt = side * rng.uniform(-0.05, 0.12)
+                p = (c[0] - fwd[0] * wheel_r * math.sin(a) * 1.02 + right[0] * lt,
+                     c[1] - fwd[1] * wheel_r * math.sin(a) * 1.02 + right[1] * lt,
+                     ground + wheel_r * (1 - math.cos(a)) * rng.uniform(0.3, 1.0) + 0.02)
+                c0 = rng.uniform(0.35, 0.65) if bas else rng.uniform(0.15, 0.55)
+                carry, dw = _wake(c0, wake) if bas else (c0, 1.0)
+                if bas:                                             # le V, sous le pare-chocs
+                    up = min(1.8, sp_i * rng.uniform(0.03, 0.1))
+                    lat = sp_i * rng.uniform(0.02, 0.16) * side
+                else:
+                    up = speed * rng.uniform(0.04, 0.16)
+                    lat = speed * rng.uniform(-0.04, 0.10) * side
+                v = (V[0] * carry + right[0] * lat, V[1] * carry + right[1] * lat, up)
+                drag = rng.uniform(0.8, 2.2) * dw
+                # de dos : retombée (ou éteinte) 3 à 5 m derrière la roue, quelle que soit la vitesse
+                reach = rng.uniform(2.5, 4.0) / max(1.0, (1.0 - carry) * speed)
+                life = land_time(p, v, drag, ground, min(0.42, reach) if bas else 0.9)
+                drops.append(Particle(f, p, v, life, drag, 1.0,
+                                      rng.uniform(0.0025, 0.006) if bas else rng.uniform(0.002, 0.005),
+                                      seed=rng.random()))
+            # le voile : continu au-delà de 50 km/h (le débit suit la vitesse), haut de 0,6 à 1 m, long de 4 à
+            # 6 m derrière la roue (vie × vitesse relative), né à l'arrière du pneu sans fondu d'entrée
+            hi_speed = 0.35 + 0.65 * smoothstep(8.0, 14.0, speed)
+            for _ in range(_poisson(rng, rate_mist * k * gs * hi_speed * (2.2 if bas else 1.0))):
+                lt = side * rng.uniform(-0.1, 0.25)
+                p = (c[0] - fwd[0] * wheel_r * 1.1 + right[0] * lt,
+                     c[1] - fwd[1] * wheel_r * 1.1 + right[1] * lt,
+                     ground + (rng.uniform(0.06, 0.2) if bas else rng.uniform(0.15, 0.4)))
+                c0 = rng.uniform(0.4, 0.65) if bas else rng.uniform(0.25, 0.5)
+                carry, dw = _wake(c0, wake) if bas else (c0, 1.0)
+                if bas:
+                    # deux traînées qui s'ouvrent en V sur 3 à 5 m : de petits sprites vifs (de la pulvérisation,
+                    # pas une bouffée), écartés vers l'extérieur, le haut sous le bas du coffre
+                    out, up = sp_i * rng.uniform(0.05, 0.14), rng.uniform(0.2, 0.8)
+                    sz = mist_size * (0.16 + 0.2 * min(1.0, sp_i / 28.0))
+                    # la vie suit la vitesse : le voile s'éteint 2,2 à 3,4 m derrière la roue (le flou et la
+                    # taille du sprite l'allongent d'un mètre à l'image)
+                    life = min(0.42, rng.uniform(2.2, 3.4) / max(1.0, (1.0 - carry) * speed))
+                    s0, s1 = sz * rng.uniform(0.5, 0.8), sz * rng.uniform(1.5, 2.1)
+                    # au-delà de 70 km/h, le flou de bougé de la caméra dilue le voile : il garde à l'image
+                    # l'épaisseur de 70
+                    al = 1.0 + 0.5 * smoothstep(19.4, 27.8, speed)
+                else:
+                    out, up = rng.uniform(0.0, 1.2), rng.uniform(0.5, 1.5)
+                    sz = mist_size * (0.35 + 0.6 * min(1.0, speed / 25.0))
+                    s0, s1, life = sz * rng.uniform(0.6, 0.9), sz * rng.uniform(1.5, 2.1), rng.uniform(0.55, 0.9)
+                    al = 1.0
+                v = (V[0] * carry + right[0] * side * out, V[1] * carry + right[1] * side * out, up)
+                mist.append(Particle(f, p, v, life, rng.uniform(2.0, 3.2) * dw, 0.03, s0, s1,
+                                     al * mist_alpha * min(1.0, w) * rng.uniform(0.7, 1.0) * min(1.1 if bas else 1.25, gs),
+                                     rng.random()))
     return drops, mist
 
 
@@ -385,8 +397,8 @@ def puddle_splash(track, crossing, wheel_r, depth=1.0, seed=3, n_burst=900, n_sh
         out_side = 1.0 if name.endswith("R") else -1.0
         side = out_side if rng.random() < 0.72 else -out_side
         ground = c[2] - wheel_r
-        p = (c[0] + fwd[0] * rng.uniform(-0.15, 0.2) + right[0] * side * 0.12,
-             c[1] + fwd[1] * rng.uniform(-0.15, 0.2) + right[1] * side * 0.12, ground + 0.015)
+        lg = rng.uniform(-0.15, 0.2)                            # (un tirage le long de la berline, pas un par axe)
+        p = (c[0] + fwd[0] * lg + right[0] * side * 0.12, c[1] + fwd[1] * lg + right[1] * side * 0.12, ground + 0.015)
         az = math.radians(rng.uniform(-40.0, 25.0))               # autour du flanc, plutôt vers l'avant
         el = math.radians(rng.uniform(12.0, 52.0))
         sp = speed * rng.uniform(0.18, 0.48) * (1.0 if side == out_side else 0.7)
@@ -406,8 +418,8 @@ def puddle_splash(track, crossing, wheel_r, depth=1.0, seed=3, n_burst=900, n_sh
         c = wh[name]
         right = (fwd[1], -fwd[0], 0.0)
         side = 1.0 if name.endswith("R") else -1.0
-        p = (c[0] + right[0] * side * 0.3 - fwd[0] * rng.uniform(0.0, 0.3),
-             c[1] + right[1] * side * 0.3 - fwd[1] * rng.uniform(0.0, 0.3), c[2] - wheel_r + 0.1)
+        lg = rng.uniform(0.0, 0.3)
+        p = (c[0] + right[0] * side * 0.3 - fwd[0] * lg, c[1] + right[1] * side * 0.3 - fwd[1] * lg, c[2] - wheel_r + 0.1)
         if veil == "bas":
             # de dos : une lame qui s'ouvre vers l'extérieur et monte à 0,4-0,5 m (le haut du sprite sous le bas
             # du coffre), 20 à 30 cm au-dessus de la traînée ordinaire
@@ -1506,17 +1518,31 @@ def ripple_layer(ctx, src):
 
 # ---------------------------------------------------------------- les effets
 
+# L'eau des roues, une seule de l'avenue à la jetée (brouillon éclairé v8 : chaque tronçon avait son mouillé, de 0,7
+# à 0,9, ses débits, et tirait ses gouttes depuis sa première image ; aux jonctions P3 → P4, P4 → P5, P5 → P6, la
+# gerbe changeait de densité d'une image à l'autre). Le même réglage partout, tiré sur le temps du film depuis la
+# conduite du parcours, EAU_PREROLL images avant la scène (la gerbe la plus longue, celle d'une flaque, vit 1,2 s) :
+# ce qui naît avant une coupe vit après, au même endroit de la ville.
+EAU = dict(wet=0.8, drops=0.7, mist=0.8, mist_alpha=0.55, mask=0.9, near=4.0)
+EAU_PREROLL = 32
+
+
 def water(ctx, wet=1.0, puddles=(), drops=1.0, mist=1.0, mask=0.85, near=1.2, hide_old=True, splash=1.0,
-          frames=None, seed=1, veil="bas"):
+          frames=None, seed=1, veil="bas", mist_alpha=0.8, preroll=0):
     """L'eau : voile d'embruns (gouttes + brume) derrière les quatre roues, proportionnel à la vitesse, plus dense
     en glisse ; gerbes aux flaques traversées (celles de la scène et celles de `puddles` : [(roue, image, rx, ry,
     décalage)] posées ici sous la roue) ; rides après le passage. hide_old : les anciennes gerbes en volume
-    (« spray_* », sources des taches noires) sont retirées."""
+    (« spray_* », sources des taches noires) sont retirées. `preroll` (images) : tirée sur le temps du film depuis la
+    conduite du parcours (drift_track), ce nombre d'images avant la scène ; 0 : sur la trajectoire de la scène."""
     bpy = _bpy()
     if hide_old:
         for ob in ctx.scene.objects:
             if ob.name.startswith("spray_") and ob.type == "MESH":
                 ob.hide_render = True
+    track, g0 = drift_track(ctx, preroll) if preroll else (ctx.track, None)
+    if frames is None and g0 is not None:
+        frames = (track[0].frame + 1, ctx.frames[1] + 1)
+    g0 = g0 or 0
     ells = []
     for e, ob in scene_puddles(ctx):
         ells.append((e, ob, False))
@@ -1524,18 +1550,21 @@ def water(ctx, wet=1.0, puddles=(), drops=1.0, mist=1.0, mask=0.85, near=1.2, hi
         w, f, rx, ry, along = tuple(spec) + (0.9, 0.55, 0.0)[len(spec) - 2:]
         e, ob = add_puddle(ctx, w, f, rx, ry, along, seed=len(ells))
         ells.append((e, ob, True))
-    d_all, m_all = wheel_spray(ctx.track, None, ctx.wheel_r, rate_drops=2400.0 * drops, rate_mist=190.0 * mist,
-                               wet=wet, seed=seed, frames=frames, veil=veil)
+    d_all, m_all = wheel_spray(track, None, ctx.wheel_r, rate_drops=2400.0 * drops, rate_mist=190.0 * mist,
+                               wet=wet, seed=seed, frames=frames, veil=veil, mist_alpha=mist_alpha, g0=g0)
     n_cross = 0
     sheets = []
     if ells:
-        cross = puddle_crossings(ctx.track, [e for e, _, _ in ells])
+        cross = puddle_crossings(track, [e for e, _, _ in ells])
         for k, c in enumerate(cross):
-            dd, ss = puddle_splash(ctx.track, c, ctx.wheel_r, depth=splash, seed=seed * 31 + k, veil=veil)
+            # la graine de la gerbe : l'image du film où la roue entre dans la flaque (la même d'un tronçon à l'autre)
+            dd, ss = puddle_splash(track, c, ctx.wheel_r, depth=splash,
+                                   seed=seed * 31 + int(round((c[0] + g0) * 4)) * 7 + "FLFRBLBR".find(c[2][-2:]),
+                                   veil=veil)
             d_all += dd
             sheets += ss
             e, ob, mine = ells[c[3]]
-            pos, fwd, vel, wh, wv, slip, speed = pose_at(ctx.track, c[0])
+            pos, fwd, vel, wh, wv, slip, speed = pose_at(track, c[0])
             target = ob if mine else ripple_layer(ctx, ob)
             key_ripples(target, c[0], wh[c[2]], fwd, ctx.frames)
             n_cross += 1
@@ -1546,8 +1575,10 @@ def water(ctx, wet=1.0, puddles=(), drops=1.0, mist=1.0, mask=0.85, near=1.2, hi
     od = emit(ctx, f"fx_gouttes_{ctx.plan}", d_all, "drops", mat_drop(), glossy=True, near=near)
     om = emit(ctx, f"fx_embruns_{ctx.plan}", m_all + sheets, "sprites", mat_spray(veil),
               mask=mask, near=near)
-    log(f"eau : {len(d_all)} gouttes, {len(m_all)} sprites d'embruns, {len(sheets)} de nappe, {n_cross} traversées "
-        f"de flaque sur {len(ells)} flaques")
+    early = sum(1 for q in d_all + m_all + sheets if q.birth < ctx.frames[0])
+    log(f"eau : {len(d_all)} gouttes, {len(m_all)} sprites d'embruns, {len(sheets)} de nappe ({early} nés avant la "
+        f"scène), {n_cross} traversées de flaque sur {len(ells)} flaques"
+        + (", sur le parcours" if preroll and track is not ctx.track else ""))
     return od, om
 
 
@@ -2150,9 +2181,9 @@ def _t(ctx, u):
 def r_ouv(ctx, **o):
     # la menace qui monte : la berline file devant nous, l'eau derrière ses roues
     if enabled("eau"):
-        # de dos à 8 m : le voile est entre l'objectif et elle, il reste bas et léger ; l'ornière de la scène
-        # (fx_flaque) sous les roues gauches
-        water(ctx, wet=0.7, drops=0.7, mist=0.45, mask=0.95, near=2.0)
+        # de dos : le voile est entre l'objectif et elle, il reste bas et léger ; l'ornière de la scène (fx_flaque)
+        # sous les roues gauches. L'eau commune (EAU), sur le temps du film, comme dans tous les tronçons
+        water(ctx, **EAU, preroll=EAU_PREROLL)
 
 
 def r_p1(ctx, **o):
@@ -2160,7 +2191,7 @@ def r_p1(ctx, **o):
     # caméra ; les embruns derrière la berline à contre-jour des phares de la patrouille ; les feuilles de papier
     # (fx_papier_*) levées quand elle les frôle
     if enabled("eau"):
-        water(ctx, wet=0.8, mask=0.85, near=1.4, splash=1.3)
+        water(ctx, **EAU, preroll=EAU_PREROLL, splash=1.3)        # (la profondeur de la flaque de P1)
 
 
 def r_p2(ctx, **o):
@@ -2168,7 +2199,7 @@ def r_p2(ctx, **o):
     # l'eau chassée vers l'extérieur, les flaques de l'anneau, les balises de l'îlot frôlées qui plient, le cocotier
     # penché sous lequel elle passe
     if enabled("eau"):
-        water(ctx, wet=0.9, mist=1.2, mask=0.9, near=1.5)
+        water(ctx, **EAU, preroll=EAU_PREROLL)
         for ob in ctx.scene.objects:
             if ob.name.startswith("spray_trail_"):
                 ob.hide_render = True
@@ -2181,7 +2212,7 @@ def r_p3(ctx, **o):
     # le piège, ça passe de justesse : à 110 km/h l'eau gicle des flaques du premier plan, les plots du trou
     # s'envolent, les enseignes et les guirlandes tremblent
     if enabled("eau"):
-        water(ctx, wet=0.9, mask=0.9, near=1.2)
+        water(ctx, **EAU, preroll=EAU_PREROLL)
     if enabled("derapage"):
         derapage(ctx, mask=1.0)                      # la brume du rond-point, née en P2, qui retombe
 
@@ -2189,7 +2220,7 @@ def r_p3(ctx, **o):
 def r_p4(ctx, **o):
     # le nombre qui écrase : à la longue focale, le voile d'embruns de la berline à contre-jour de la meute
     if enabled("eau"):
-        water(ctx, wet=0.8, mist=1.3, mask=0.8, near=3.0)
+        water(ctx, **EAU, preroll=EAU_PREROLL)
         pack_spray(ctx, near=3.0)
 
 
@@ -2197,7 +2228,7 @@ def r_p5(ctx, **o):
     # l'escalade, le ciel s'en mêle : l'eau de la glisse qui se voit (lame et brume, pas de fumée sèche), le souffle
     # du rotor sur le quai
     if enabled("eau"):
-        water(ctx, wet=0.8, mask=0.85, near=1.2)
+        water(ctx, **EAU, preroll=EAU_PREROLL)
     if enabled("derapage"):
         derapage(ctx, sheet=1.1, mist=1.2)
 
@@ -2206,7 +2237,7 @@ def r_p6(ctx, **o):
     # la démesure, plus d'issue : l'eau à 120 km/h, les rotors rabattent l'eau de la lagune, l'unique gerbe
     # d'étincelles du film au joint d'acier de la jetée
     if enabled("eau"):
-        water(ctx, wet=0.8, mask=0.85, near=1.2)
+        water(ctx, **EAU, preroll=EAU_PREROLL)
         pack_spray(ctx, near=2.0)
     if enabled("derapage"):
         derapage(ctx, sheet=1.1, mist=1.2)    # la fin du grand dérapage, née en P5
@@ -2219,8 +2250,13 @@ def r_fin(ctx, **o):
 
 
 def r_fin6(ctx, **o):
-    # la consécration : les rotors rabattent l'eau autour de la pointe, la fumée résiduelle
-    pass
+    # la consécration : la berline arrive à 55 km/h de P6 et freine jusqu'à l'arrêt ; sa gerbe, la même que celle
+    # de P6 (EAU, sur le temps du film), passe la coupe P6 → FIN6 et s'éteint avec la vitesse (sans elle, la gerbe
+    # de P6 disparaissait à FIN6/1). Les restes de la glisse de P6 aussi.
+    if enabled("eau"):
+        water(ctx, **EAU, preroll=EAU_PREROLL)
+    if enabled("derapage"):
+        derapage(ctx, sheet=1.1, mist=1.2)
 
 
 def r_banc(ctx, puddle_t=0.85, **o):

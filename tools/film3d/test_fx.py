@@ -280,6 +280,33 @@ def test_drift_continuity():
     assert all(x[0] == y[0] and math.dist(x[1], y[1]) < 2e-3 for x, y in zip(a, b))
 
 
+def test_eau_continuity():
+    """L'eau des roues est la même d'un tronçon à l'autre (brouillon éclairé v8 : chaque tronçon avait la sienne,
+    tirée depuis sa première image) : à chaque jonction du parcours (FIN6 comprise), les deux tronçons tirent les mêmes gouttes et
+    les mêmes lambeaux, au même endroit de la ville, sur les EAU_PREROLL images d'avant la coupe ; et un seul réglage
+    (fx.EAU) pour tous."""
+    import parcours as PC
+    plans = ["OUV", "P1", "P2", "P3", "P4", "P5", "P6", "FIN6"]
+    e = fx.EAU
+    offs = {n: (a, b, R) for n, a, b in WHEELS}
+    for p0, p1 in zip(plans, plans[1:]):
+        cut = PC.START[p1]
+        out = {}
+        for shot in (p0, p1):
+            h = PC.hero(shot)
+            g0 = PC.START[shot] - 1
+            lo = cut - fx.EAU_PREROLL - g0
+            tr = fx.drive_track(h["pos"], h["heading"], range(lo - 1, cut - g0 + 2), offs)
+            d, m = fx.wheel_spray(tr, None, R, rate_drops=2400.0 * e["drops"], rate_mist=190.0 * e["mist"],
+                                  wet=e["wet"], seed=1, frames=(lo, cut - g0), mist_alpha=e["mist_alpha"], g0=g0)
+            to_v = PC.vers_ville(shot)[0]
+            out[shot] = sorted((round(q.birth + g0, 4), tuple(round(c, 3) for c in to_v(*q.p[:2])), round(q.life, 6))
+                               for q in d + m if cut - 12 <= q.birth + g0 < cut - 1)
+        a, b = out[p0], out[p1]
+        assert len(a) > 100 and len(a) == len(b), (p0, p1, len(a), len(b))
+        assert all(x[0] == y[0] and x[2] == y[2] and math.dist(x[1], y[1]) < 2e-3 for x, y in zip(a, b)), (p0, p1)
+
+
 def test_switch():
     os.environ.pop("FILM3D_FX", None)
     assert not fx.enabled() and fx.dress("P3") is None          # inactif par défaut
