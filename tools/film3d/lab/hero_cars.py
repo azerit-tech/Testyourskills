@@ -184,7 +184,14 @@ def _rib_mask(nt, sep, ribs):
 REST = "rest"           # position de repos, repère de la voiture
 REST_N = "rest_n"       # normale de repos, même repère
 REST_WHEEL = "rest_wheel"   # position dans le repère de la roue (origine sur l'axe, axe selon y), pour le pneu
-DUST = "#5f564e"        # poussière de route sèche, grise et chaude
+DUST = "#5f564e"        # poussière de route sèche, grise et chaude (les chromes, les pneus)
+# le film de route d'un soir de pluie, sur la peinture : la même poussière, mouillée (plus sombre de moitié, à peine
+# moins saturée). Sèche et claire sur un bordeaux sombre, elle faisait sous les appoints une bande gris rose mate en
+# bas de caisse ; mouillée, elle ternit le vernis sans l'éclaircir.
+SPRAY = "#3d3630"
+# le panneau arrière : le sillage d'une berline rabat l'eau sale de ses roues sur sa poupe (le dessous du coffre, le
+# tour de la plaque, le pare-chocs), en voile et en coulures : REAR_SPRAY au plus, de 0,45 à 1,05 m de haut
+REAR_SPRAY = 0.5
 
 
 def _rest(nt):
@@ -343,9 +350,15 @@ def _grime(nt, rest, axles=None, top=0.6):
     """Voile de route sur le bas de caisse et en gerbe derrière chaque roue (projections) ; renvoie 0..1 avant la dose.
     axles : (x de l'essieu avant, x de l'essieu arrière), des nœuds Valeur nommés « axle_front », « axle_rear »
     que load_hero recale sur la voiture."""
-    x, _, z = _xyz(nt, rest)
+    x, y, z = _xyz(nt, rest)
     low = _ramp(nt, z, top, 0.10)
     mask = cv._math(nt, "MULTIPLY", low, 0.75)
+    if axles and REAR_SPRAY > 0:
+        # la poupe (repère de la voiture : l'arrière vers -x), en coulures verticales (un bruit étiré selon z)
+        back = cv._math(nt, "MULTIPLY", _ramp(nt, x, -2.05, -2.30), _ramp(nt, z, 1.05, 0.45))
+        runs = _noise(nt, _scaled(nt, rest, (1.0, 55.0, 2.5)), 1.0, 2.0, 0.3, 0.75)
+        back = cv._math(nt, "MULTIPLY", back, cv._math(nt, "ADD", 0.45, cv._math(nt, "MULTIPLY", runs, 0.55)))
+        mask = cv._math(nt, "MAXIMUM", mask, cv._math(nt, "MULTIPLY", back, REAR_SPRAY))
     if axles:
         for key, ax in zip(("axle_front", "axle_rear"), axles):
             v = nt.nodes.new("ShaderNodeValue")
@@ -460,7 +473,7 @@ def _mat_paint_worn(name, color, metal, rough, flake, peel, w, axles, coat=(1.0,
     # le voile de route en bas de caisse : la poussière ternit le vernis et éclaircit la teinte
     g = cv._math(nt, "MINIMUM", cv._math(nt, "MULTIPLY", _grime(nt, rest, axles), 2.0 * w), 0.8)
     coat_r = _mix(nt, coat_r, 0.42, g)
-    base_col = _mix_rgb(nt, lin(color), lin(DUST), cv._math(nt, "MULTIPLY", g, 0.8))
+    base_col = _mix_rgb(nt, lin(color), lin(SPRAY), cv._math(nt, "MULTIPLY", g, 0.8))
     # les gouttes : grosses perles sur le dessus, fines gouttelettes, quelques-unes sur les flancs ; un dôme d'eau
     # lisse dans le vernis, et une auréole de calcaire autour des grosses
     dens = min(1.0, 1.4 * w)
