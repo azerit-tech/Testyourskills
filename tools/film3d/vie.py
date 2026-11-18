@@ -393,7 +393,9 @@ def vehicules():
     # -- le port (P5) : des camions garés au nord du virage, à l'extérieur, là où regarde la caméra pendant la
     # descente du pont et le dérapage ; phares éteints
     add("port_camion_0", "camion", None, Fixe(2.5, -160.5, -90.0))
-    add("port_camion_1", "camion", None, Fixe(9.5, -158.0, -95.0))
+    # (fusion v11 : à x 9,5 il avait trois coins au-dessus de l'eau, l'encoche du quai commence à x 6,6 de la ville
+    # (scene_e.NOTCH_X) ; reculé sur le terre-plein, à 0,9 m du bord, 1,1 m au nord du camion 0)
+    add("port_camion_1", "camion", None, Fixe(2.5, -156.5, -95.0))
     add("port_pickup", "pickup", "blanc", Fixe(-11.0, -166.0, 0.0))
     # la circulation de la poursuite, dans sa voie (SPEC §18.62) : celle qu'elle double, celle qui la croise
     import trafic
