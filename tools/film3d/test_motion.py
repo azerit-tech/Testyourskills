@@ -1990,7 +1990,7 @@ def test_cut_pose():
 def test_vie():
     """La vie de la ville (vie.py, SPEC §18.56) : la circulation, les voitures garées, le bus et les passants tenus à
     distance de la berline et des patrouilles sur la fenêtre de chaque tronçon, en ville ; les véhicules de la vie
-    jamais l'un dans l'autre ; leurs vitesses de voitures en ville."""
+    jamais l'un dans l'autre ; leurs vitesses de voitures en ville. Le mobilier compte avec les passants."""
     import vie
     veh, pas = vie.ecarts()
     for shot in veh:
@@ -2002,7 +2002,8 @@ def test_vie():
         check(f"vie {shot} : passants à {vie.ECART_PASSANT:g} m de la poursuite ou plus", d >= vie.ECART_PASSANT,
               f"{d:.2f} m ({a} / {b}, image {g})")
     d, g, a, b = vie.ecarts_entre()
-    check("vie : deux véhicules de la vie à 5 m (centres) ou plus", d >= 5.0, f"{d:.2f} m ({a} / {b}, image {g})")
+    check("vie : 0,5 m de jour au moins entre deux véhicules de la vie (l'un roule), près de la poursuite", d >= 0.5,
+          f"{d:.2f} m ({a} / {b}, image {g})")
     vmax = max(c.vit(g) for _n, _m, _t, c, _kw in vie.vehicules() for g in range(0, vie.G_FIN + 1, 6))
     check("vie : la circulation à 50 km/h ou moins", vmax <= 50 / 3.6 + 1e-6, f"{vmax * 3.6:.0f} km/h")
 

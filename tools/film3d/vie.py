@@ -25,6 +25,7 @@
 import math
 import os
 import sys
+import zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path:
@@ -46,9 +47,12 @@ AV_Y = -433.155            # l'axe de l'avenue (x_A = 0) ; la berline va vers +x
 AV_E1, AV_E2 = AV_Y - 1.75, AV_Y - 5.25         # les voies vers l'est (la berline sur E1)
 AV_O1, AV_O2 = AV_Y + 1.75, AV_Y + 5.25         # les voies vers l'ouest (la patrouille sur O1, la circulation sur O2)
 AV_GARE_MER, AV_GARE_VILLE = AV_Y - 5.9, AV_Y + 5.85
+AV_TROTTOIR_BORD_VILLE, AV_TROTTOIR_BORD_MER = -425.65, -440.65   # le bord des trottoirs, au ras des bordures
 AV_PROMENADE, AV_TROTTOIR = -442.1, -423.6      # les axes de marche (promenade côté mer, trottoir côté ville)
 BD_Y = -334.4              # l'axe du boulevard du quai ; voie vers l'est au sud, vers l'ouest au nord
-BD_E, BD_O = BD_Y - 3.25, BD_Y + 3.25
+BD_E, BD_O = BD_Y - 2.9, BD_Y + 2.9
+BD_GARE_SUD, BD_GARE_NORD = BD_Y - 6.0, BD_Y + 6.0     # les garées, contre les bordures (chaussée de 14 m)
+BD_BORD_SUD, BD_BORD_NORD = BD_Y - 7.45, BD_Y + 7.45
 RUE_VITRINE = 7.25         # |x| d'un passant adossé aux vitrines de la rue des enseignes (trottoirs 4,2 à 7,6)
 JETEE_O = (47.3, -145.45)  # un point de l'axe de la jetée ; son cap -50°
 JETEE_U = (math.sin(math.radians(50.0)), math.cos(math.radians(50.0)))      # le long de la jetée, vers la pointe
@@ -242,6 +246,14 @@ GENS_MODELES = {
 MOUETTE = "lieux/vie/seagull/model.glb"
 CHARIOT = "lieux/port/forklift/model.glb"
 
+GAREES_MODELES = ["fairheaven", "chapman", "taxi", "break84", "pickup", "riverside", "sialia", "negotiator",
+                  "fairheaven", "break84", "camion", "chapman", "sialia"]
+GAREES_TEINTES = ["bordeaux", "ciel", "argent", "menthe", "noir", "sable", "corail", "marine", "creme", "blanc",
+                  "sarcelle", "rose"]
+# les demi-dimensions au sol (demi-largeur, demi-longueur) de chaque modèle : les écarts entre véhicules de la vie
+DEMI = {"bus": (1.46, 6.0), "camion": (1.31, 3.01), "chapman": (1.06, 2.84), "taxi": (1.07, 2.65)}
+DEMI_DEFAUT = (0.95, 2.5)
+
 # les teintes des années 80, sourdes sous le crépuscule (la peinture d'origine reste pour le taxi, le bus, le camion)
 TEINTES = {
     "creme": "#d9ccaa", "blanc": "#d6d3cb", "sarcelle": "#2d7178", "rose": "#c08893", "bordeaux": "#5a2633",
@@ -258,70 +270,114 @@ def _v(kmh):
 
 def vehicules():
     """[(nom, modèle, teinte, course, options)] : options phares (allumés), warning (image du film d'où ils
-    clignotent), lieux (forcés)."""
+    clignotent)."""
     out = []
 
     def add(nom, modele, teinte, course, **kw):
         out.append((nom, modele, teinte, course, kw))
 
-    # -- l'avenue (OUV, P1) : en face, la patrouille roule sur la voie O1 ; la circulation d'en face tient O2
+    rang = [0]
+
+    def garee(prefixe, x, y, cap):
+        k = rang[0]
+        rang[0] += 1
+        add(f"{prefixe}_{k}", GAREES_MODELES[k % len(GAREES_MODELES)], GAREES_TEINTES[(k * 5) % len(GAREES_TEINTES)],
+            Fixe(x, y, cap + (0.6 if k % 3 == 0 else -0.4 if k % 3 == 1 else 0.0)))
+
+    # -- l'avenue (OUV, P1) : en face, la patrouille roule sur la voie O1 ; la circulation d'en face tient O2, que
+    # les garées côté ville bouchent à l'est de x -120 : les deux voitures d'en face croisent la berline au début
     o2 = courbe([(40.0, AV_O2), (-330.0, AV_O2)])
     o2b = courbe([(40.0, AV_O2), (-300.0, AV_O2)])
-    # deux voitures qui croisent la berline et serrent leur bordure (à droite : écart négatif) devant la patrouille
     add("avenue_face_0", "riverside", "blanc",
-        Course(o2, [(0, _v(45))], s0=40.0 + 127.5, g0=0, ecart=bosse(-30, 40, -0.45, 10)), phares=True)
+        Course(o2, [(0, _v(45))], s0=40.0 + 150.0, g0=0, ecart=bosse(-30, 40, -0.45, 10)), phares=True)
     add("avenue_face_1", "sialia", "sarcelle",
-        Course(o2b, [(0, _v(43))], s0=40.0 + 90.0, g0=0, ecart=bosse(10, 75, -0.5, 10)), phares=True)
+        Course(o2b, [(0, _v(43))], s0=40.0 + 127.0, g0=0, ecart=bosse(5, 75, -0.5, 10)), phares=True)
     # une qui sort du rond-point, voit la poursuite, se range contre la bordure derrière une autre et s'arrête
     rangee = courbe([(40.0, AV_O2), (-24.0, AV_O2), (-34.0, AV_GARE_VILLE + 0.15), (-400.0, AV_GARE_VILLE + 0.15)])
     add("avenue_face_rangee", "negotiator", "rose",
         Course(rangee, [(0, _v(40))] + arret(24, _v(40), 3.2), s0=48.0, g0=0), phares=True, warning=100)
-    # déjà rangées : warnings allumés, et une garée devant
     add("avenue_face_arretee", "break84", "creme", Fixe(-48.5, AV_GARE_VILLE + 0.15, 90.0), phares=True, warning=0)
-    add("avenue_garee_ville_0", "chapman", "rose", Fixe(-55.0, AV_GARE_VILLE, 90.0))
-    # les voitures garées côté mer (la voie de droite est la file de stationnement) : x de leur centre
-    teintes = ["bordeaux", "ciel", "argent", "menthe", "noir", "sable", "corail", "marine"]
-    modeles = ["fairheaven", "chapman", "taxi", "break84", "pickup", "riverside", "sialia", "negotiator"]
-    for k, x in enumerate((-134.0, -126.5, -112.5, -99.0, -88.0, -64.5, -27.5)):
-        add(f"avenue_garee_mer_{k}", modeles[k % len(modeles)], teintes[k % len(teintes)],
-            Fixe(x, AV_GARE_MER, -90.0 if k % 3 else -89.0))
-    # le bus à l'arrêt, feux allumés, côté mer
+    # les garées : une tous les 6,5 m le long des deux bordures, quelques trous ; ni sur le passage piéton
+    # (x -76,8 à -73,6), ni devant le bus, ni dans la bouche de la rue transversale (x -72,3 à -59,3)
+    for x in (-140.5, -134.0, -127.5, -121.0, -108.0, -101.5, -95.0, -88.5, -82.0, -69.5, -63.0, -56.5, -36.5,
+              -30.0, -23.5):
+        garee("avenue_garee_mer", x, AV_GARE_MER, -90.0)
+    for x in (-119.0, -112.5, -106.0, -93.0, -86.5, -81.0, -55.0):
+        garee("avenue_garee_ville", x, AV_GARE_VILLE, 90.0)
     add("avenue_bus", "bus", None, Fixe(-46.0, AV_Y - 5.45, -90.0), phares=True, warning=None)
 
-    # -- le rond-point (P2) : on attend aux entrées, on se range
-    add("rond_plage_attend", "fairheaven", "menthe", Fixe(1.75, -457.5, 0.0), phares=True)
-    add("rond_nord_attend", "chapman", "argent", Fixe(26.0, AV_O2 + 0.3, 90.0), phares=True)
-    add("rond_nord_rangee", "riverside", "bordeaux", Fixe(36.0, AV_GARE_MER, -90.0), phares=True, warning=0)
-    add("rond_nord_garee_0", "sialia", "ciel", Fixe(52.0, AV_GARE_MER, -90.0))
-    add("rond_nord_garee_1", "negotiator", "blanc", Fixe(60.5, AV_GARE_MER, -90.0))
+    # -- le rond-point (P2) : deux voitures tournent dans l'anneau avant la poursuite (sens trigonométrique, l'axe
+    # de l'anneau à 10,5 m de l'îlot), une attend à l'entrée nord, des garées sur l'avenue nord
+    c0 = (0.0, AV_Y)
 
-    # -- le boulevard du quai, au bout de la rue (P3) : deux qui traversent, deux qui attendent
+    def arc(a0, a1, r=10.5, n=24):
+        return [(c0[0] + r * math.cos(math.radians(a0 + (a1 - a0) * k / n)),
+                 c0[1] + r * math.sin(math.radians(a0 + (a1 - a0) * k / n))) for k in range(n + 1)]
+    # A : attend à l'entrée de la plage, entre à l'image 70, tourne par l'est, sort sur l'avenue nord
+    a_pts = courbe([(1.75, -479.0), (1.75, -446.0)] + arc(-80.4, -9.6) + [(16.0, AV_E1), (300.0, AV_E1)], n_lisse=3)
+    add("rond_a", "fairheaven", "menthe",
+        Course(a_pts, [(0, 0.0), (70, 0.0), (100, _v(30)), (160, _v(30)), (220, _v(45))], s0=21.5, g0=0),
+        phares=True)
+    # B : vient de l'avenue nord, fait trois quarts de tour par le nord et l'ouest, sort vers la plage
+    b_pts = courbe([(300.0, AV_O1), (16.0, AV_O1)] + arc(9.6, 260.4) + [(-1.75, -446.0), (-1.75, -620.0)],
+                   n_lisse=3)
+    add("rond_b", "chapman", "corail", Course(b_pts, [(0, _v(30))], s0=284.0 + 31.2 - _v(30) * 60 / FPS, g0=0),
+        phares=True)
+    add("rond_nord_attend", "taxi", None, Fixe(26.0, AV_O2 + 0.3, 90.0), phares=True)
+    add("rond_nord_rangee", "riverside", "bordeaux", Fixe(36.0, AV_GARE_MER, -90.0), phares=True, warning=0)
+    for x in (52.0, 58.5, 65.0, 78.0, 84.5):
+        garee("rond_nord_garee", x, AV_GARE_MER, -90.0)
+
+    # -- le boulevard du quai, au bout de la rue (P3) : quatre qui traversent, deux qui attendent ; des garées le
+    # long des deux bordures, pas dans la bouche de la rue ni devant le pont (|x| < 12)
     bd_e = courbe([(-400.0, BD_E), (400.0, BD_E)])          # l'abscisse du point x : x + 400
     bd_o = courbe([(400.0, BD_O), (-400.0, BD_O)])          # l'abscisse du point x : 400 - x
+    add("quai_traverse_e0", "riverside", "ciel", Course(bd_e, [(0, _v(38))], s0=400.0, g0=222), phares=True)
     add("quai_traverse_e", "taxi", None, Course(bd_e, [(0, _v(38))], s0=400.0, g0=245), phares=True)
     add("quai_traverse_o", "break84", "sable", Course(bd_o, [(0, _v(36))], s0=400.0, g0=268), phares=True)
+    add("quai_traverse_o0", "negotiator", "noir", Course(bd_o, [(0, _v(36))], s0=400.0, g0=236), phares=True)
     # elles s'arrêtent à 12 m de la rue, freinage de 2,6 m/s² depuis 30 km/h (13,4 m)
     add("quai_attend_e", "fairheaven", "marine",
         Course(bd_e, [(0, _v(30))] + arret(268, _v(30), 2.6), s0=388.0 - 13.4, g0=268), phares=True)
     add("quai_attend_o", "pickup", "corail",
         Course(bd_o, [(0, _v(30))] + arret(262, _v(30), 2.6), s0=387.5 - 13.4, g0=262), phares=True)
+    for sx in (-1.0, 1.0):
+        for x in (14.5, 21.0, 27.5, 40.5, 47.0, 53.5):
+            garee("quai_garee_sud", sx * x, BD_GARE_SUD, -90.0)
+        for x in (16.0, 22.5, 29.0, 35.5, 48.5, 55.0):
+            garee("quai_garee_nord", sx * x, BD_GARE_NORD, 90.0)
 
-    # -- le pont (P4) : la meute tient les quatre voies du côté ville ; les voitures sont rangées au-delà de la
-    # crête, contre la bordure, warnings allumés (celle d'en face s'arrête en voyant arriver la poursuite)
-    # une voiture quitte le port par le pont, en face : elle démarre à la fin de P3, voit arriver la meute, se range
-    # derrière une autre déjà arrêtée et allume ses warnings
-    face = courbe([(-5.25, -170.0), (-5.25, -228.0), (-6.05, -240.0), (-6.05, -300.0)])
-    add("pont_face_rangee", "negotiator", "argent",
-        Course(face, [(0, 0.0), (290, 0.0), (320, _v(45)), (388, _v(45)), (476, 0.0)], s0=0.0, g0=0),
-        phares=True, warning=440)
-    add("pont_face_arretee", "sialia", "rose", Fixe(-6.05, -246.5, 180.0), phares=True, warning=0)
+    # -- le pont (P4) : en face, la file du port est lâchée par la barrière : cinq véhicules passent la crête vers
+    # la ville, croisent la poursuite, voient la meute, se rangent contre la bordure derrière une voiture déjà
+    # arrêtée (warnings) ; la meute tient toute la largeur au-delà de y -265, la file s'arrête avant
+    face = courbe([(-5.25, -150.0), (-5.25, -238.0), (-6.05, -247.0), (-6.05, -300.0)], n_lisse=3)
+
+    def s_face(y):                                     # l'abscisse de la file en y (avant le coude)
+        return -150.0 - y
+
+    def convoi(nom, modele, teinte, y0, y1, g_dep, v=_v(45), acc=30.0, dec=4.5):
+        s0, s1 = s_face(y0), s_face(y1) + (0.6 if y1 < -247.0 else 0.0)
+        d_acc = v * acc / FPS / 2
+        d_dec = v * v / (2 * dec)
+        croisiere = (s1 - s0 - d_acc - d_dec) / v * FPS
+        g1 = g_dep + acc
+        g2 = g1 + croisiere
+        g3 = g2 + v / dec * FPS
+        add(nom, modele, teinte, Course(face, [(0, 0.0), (g_dep, 0.0), (g1, v), (g2, v), (g3, 0.0)], s0=s0, g0=0),
+            phares=True, warning=int(g3) - 12)
+    add("pont_face_arretee", "sialia", "rose", Fixe(-6.05, -262.0, 180.0), phares=True, warning=0)
+    convoi("pont_face_0", "negotiator", "argent", -193.0, -255.5, 330)
+    convoi("pont_face_1", "break84", "bordeaux", -186.0, -249.0, 346)
+    convoi("pont_face_2", "taxi", None, -179.0, -242.5, 362)
+    convoi("pont_face_3", "chapman", "ciel", -172.0, -236.0, 378)
+    convoi("pont_face_camion", "camion", None, -164.5, -228.5, 396, v=_v(40))
     add("pont_meme_rangee", "camion", None, Fixe(6.0, -219.5, 0.0), phares=True, warning=0)
 
     # -- le port (P5) : des camions garés au nord du virage, à l'extérieur, là où regarde la caméra pendant la
     # descente du pont et le dérapage ; phares éteints
     add("port_camion_0", "camion", None, Fixe(2.5, -160.5, -90.0))
     add("port_camion_1", "camion", None, Fixe(9.5, -158.0, -95.0))
-    add("port_pickup", "pickup", "blanc", Fixe(-3.5, -163.5, 20.0))
+    add("port_pickup", "pickup", "blanc", Fixe(-11.0, -166.0, 0.0))
     return out
 
 
@@ -344,17 +400,20 @@ def chariots():
 
 # ---------------------------------------------------------------- les passants
 
-MARCHE = 1.3      # m/s : le pas de la marche de Nathan (relevé sur le cycle) ; les autres le reprennent
+MARCHE = 1.06     # m/s : la marche de Nathan (deux pas en 27 images, 0,6 m par pas pour 1,74 m, relevé sur l'appui)
+#                   à une autre vitesse, le cycle est joué plus vite ou plus lentement (pas de glisse des pieds)
 
 
 def gens():
     """[(nom, modèle, anim, course ou fixe, options)] : anim « marche », « attente » (debout, en place), « assis ».
-    options : phase (images, décale le cycle), recule (g, dx, dy, dcap) : à l'image g, un pas en arrière et un
-    regard vers la poursuite."""
+    options : phase (images, décale le cycle), recule (g, dx, dy, dcap[, durée]) : à l'image g, un pas de côté ou
+    en arrière et un regard vers la poursuite."""
     out = []
+    MOD = ["eric", "carla", "claudia", "nathan", "sophia"]
+    MARCHEURS = ["nathan", "eric", "carla", "claudia"]
 
     def marche(nom, modele, a, b, g_a, v=MARCHE, **kw):
-        out.append((nom, modele, "marche", Course(droite(a, b, 0.5), [(0, v)], s0=0.0, g0=g_a), kw))
+        out.append((nom, modele, "marche", Course(droite(a, b, 0.5), [(0, v)], s0=0.0, g0=g_a), dict(kw, v=v)))
 
     def debout(nom, modele, x, y, cap, **kw):
         out.append((nom, modele, "attente", Fixe(x, y, cap), kw))
@@ -363,47 +422,116 @@ def gens():
         out.append((nom, "assis", "assis", Fixe(x, y, cap), kw))
 
     # -- l'avenue : la promenade côté mer, le trottoir côté ville, l'arrêt du bus, les terrasses, le passage piéton
-    marche("av_prom_0", "nathan", (-140.0, AV_PROMENADE), (-20.0, AV_PROMENADE), -10)
-    marche("av_prom_1", "carla", (-60.0, AV_PROMENADE + 0.6), (-200.0, AV_PROMENADE + 0.6), -30, v=1.15)
-    marche("av_prom_2", "eric", (-25.0, AV_PROMENADE - 0.5), (-200.0, AV_PROMENADE - 0.5), -20, v=1.35)
-    marche("av_prom_3", "claudia", (-110.0, AV_PROMENADE + 0.4), (-20.0, AV_PROMENADE + 0.4), -60, v=1.2)
+    for k, (x0, x1, dy, g, v) in enumerate([(-140.0, -20.0, 0.0, -10, 1.0), (-60.0, -200.0, 0.6, -30, 0.95),
+                                            (-25.0, -200.0, -0.5, -20, 1.1), (-110.0, -20.0, 0.4, -60, 1.0),
+                                            (-90.0, -10.0, -0.3, 30, 1.05), (-30.0, -200.0, 0.9, 50, 1.0),
+                                            (-160.0, -40.0, 0.2, 0, 1.15), (-70.0, -200.0, -0.7, -80, 0.9)]):
+        marche(f"av_prom_{k}", MARCHEURS[k % 4], (x0, AV_PROMENADE + dy), (x1, AV_PROMENADE + dy), g, v=v)
+    for k, (x0, x1, dy, g, v) in enumerate([(-150.0, -80.0, 0.0, -20, 1.1), (-95.0, -200.0, -0.5, -10, 1.0),
+                                            (-40.0, -200.0, 0.0, 0, 1.15), (-125.0, -20.0, -0.9, -40, 1.0),
+                                            (-58.0, -200.0, -1.2, 10, 0.95), (-100.0, -30.0, 0.6, 20, 1.05)]):
+        marche(f"av_ville_{k}", MARCHEURS[(k + 1) % 4], (x0, AV_TROTTOIR + dy), (x1, AV_TROTTOIR + dy), g, v=v)
+    # au bord du trottoir côté mer, derrière les garées, à 6 m de la caméra : ils reculent et la suivent des yeux
+    for k, (x, m, g, ph) in enumerate([(-130.5, "sophia", 12, 40), (-104.8, "eric", 38, 0), (-91.8, "claudia", 51, 90),
+                                       (-67.5, "carla", 76, 10), (-59.8, "nathan", 84, 150), (-33.3, "eric", 111, 60)]):
+        debout(f"av_bord_{k}", m, x, AV_TROTTOIR_BORD_MER - 0.3, 5.0 * (k % 3 - 1), phase=ph,
+               recule=(g - 6, 0.0, -0.7, 35.0 if k % 2 else -30.0, 14))
     debout("av_bus_0", "sophia", -48.5, -442.3, 0.0, phase=40)
     debout("av_bus_1", "eric", -44.0, -442.6, 10.0, phase=0)
+    debout("av_bus_2", "claudia", -42.2, -442.4, -20.0, phase=170)
+    debout("av_bus_3", "nathan", -50.3, -442.8, 25.0, phase=230)
     assis("av_banc_0", -79.7, -443.6, 0.0)
     assis("av_banc_1", -27.7, -443.6, 0.0, phase=60)
-    marche("av_ville_0", "eric", (-150.0, AV_TROTTOIR), (-80.0, AV_TROTTOIR), -20, v=1.3)
-    marche("av_ville_1", "claudia", (-95.0, AV_TROTTOIR - 0.5), (-200.0, AV_TROTTOIR - 0.5), -10, v=1.2)
-    marche("av_ville_2", "nathan", (-40.0, AV_TROTTOIR), (-200.0, AV_TROTTOIR), 0, v=1.4)
+    assis("av_banc_2", -105.7, -443.6, 0.0, phase=30)
+    assis("av_banc_3", -53.7, -443.6, 0.0, phase=110)
     debout("av_passage_0", "sophia", -78.0, -425.4, 180.0, phase=200, recule=(64, 0.0, 0.75, -35.0))
     debout("av_passage_1", "carla", -72.0, -441.2, 0.0, recule=(70, 0.0, -0.6, 30.0))
+    debout("av_passage_2", "eric", -77.6, -441.0, 10.0, phase=120, recule=(66, 0.0, -0.7, 40.0))
+    # les terrasses : des tables pleines, des gens debout qui parlent au bord
     for k, x in enumerate((-128.7, -123.7, -118.7)):
         assis(f"av_terrasse_{k}a", x - 0.75, -423.3, -90.0, phase=20 * k)
-        if k != 1:
-            assis(f"av_terrasse_{k}b", x + 0.75, -423.3, 90.0, phase=33 * k + 11)
+        assis(f"av_terrasse_{k}b", x + 0.75, -423.3, 90.0, phase=33 * k + 11)
+        assis(f"av_terrasse_{k}c", x, -422.55, 180.0, phase=47 * k + 5)
+    debout("av_terrasse_debout_0", "carla", -126.2, -424.6, 160.0, phase=60)
+    debout("av_terrasse_debout_1", "nathan", -125.4, -425.1, -20.0, phase=0)
+    debout("av_terrasse_debout_2", "claudia", -116.0, -424.8, 100.0, phase=300, recule=(30, 0.0, 0.0, -40.0))
+    # sur les seuils, côté ville
+    for k, (x, m, cap) in enumerate([(-136.0, "eric", 180.0), (-98.5, "sophia", 170.0), (-84.0, "claudia", -170.0),
+                                     (-44.5, "carla", 180.0), (-30.5, "nathan", 160.0)]):
+        debout(f"av_seuil_{k}", m, x, -422.1, cap, phase=37 * k)
 
-    # -- la rue des enseignes : on regarde le barrage, adossé aux vitrines (la meute de P4 roule jusqu'à |x| 5,4 m,
-    # sur les trottoirs) ; deux tournent la tête au passage de la berline
+    # -- la rue des enseignes : le barrage regardé depuis les vitrines (la meute de P4 roule jusqu'à |x| 5,4 m, sur
+    # les trottoirs) ; au bord des trottoirs, à 4,5 m de la route, des passants qui reculent jusqu'aux vitrines quand
+    # la poursuite passe (la meute de P4 les trouve adossés)
     debout("rue_badaud_0", "eric", RUE_VITRINE, -371.5, 110.0, recule=(258, 0.0, 0.0, 30.0))
     debout("rue_badaud_1", "claudia", RUE_VITRINE, -367.5, 100.0, phase=90)
     debout("rue_badaud_2", "sophia", -RUE_VITRINE, -370.0, -100.0, phase=300, recule=(256, 0.0, 0.0, -35.0))
     debout("rue_badaud_3", "carla", -RUE_VITRINE, -366.0, -115.0)
     debout("rue_badaud_4", "nathan", -RUE_VITRINE, -394.0, -150.0)
-    debout("quai_badaud_0", "sophia", RUE_VITRINE, -347.5, 150.0, phase=120)
-    debout("quai_badaud_1", "eric", -RUE_VITRINE, -348.0, -150.0)
+    for k, (sx, y, m, g) in enumerate([(-1, -403.0, "eric", 214), (1, -397.0, "carla", 222), (-1, -391.0, "sophia", 230),
+                                       (1, -359.0, "nathan", 270), (-1, -355.0, "claudia", 274),
+                                       (1, -351.0, "eric", 282)]):
+        debout(f"rue_bord_{k}", m, sx * 4.8, y, -90.0 * sx, phase=29 * k,
+               recule=(g - 10, sx * 2.45, 0.0, -50.0 * sx, 30))
+    for k, (sx, y, m) in enumerate([(1, -409.0, "sophia"), (-1, -399.0, "eric"), (1, -386.0, "claudia"),
+                                    (-1, -378.0, "nathan"), (1, -360.0, "carla"), (-1, -346.5, "sophia"),
+                                    (1, -347.5, "sophia"), (-1, -348.0, "eric")]):
+        debout(f"rue_porte_{k}", m, sx * RUE_VITRINE, y, -100.0 * sx + 15 * (k % 3 - 1), phase=41 * k)
 
-    # -- le port : un docker près des camions
-    debout("port_docker", "eric", 6.0, -163.0, 160.0)
-    debout("port_docker_1", "nathan", 13.0, -161.5, -150.0)
+    # -- le port : des dockers autour des camions et du chariot
+    for k, (x, y, m, cap) in enumerate([(6.0, -163.0, "eric", 160.0), (13.0, -161.5, "nathan", -150.0),
+                                        (-1.5, -163.8, "carla", 120.0), (15.2, -163.0, "claudia", 170.0),
+                                        (-8.0, -162.0, "eric", -100.0)]):
+        debout(f"port_docker_{k}", m, x, y, cap, phase=53 * k)
+    marche("port_marche_0", "nathan", (-14.0, -160.5), (24.0, -159.5), 380, v=1.1)
 
-    # -- la jetée : des pêcheurs à la rambarde, des promeneurs
-    x, y = jetee(-12.0, 5.6)
-    debout("jetee_peche_0", "eric", x, y, 40.0)
-    x, y = jetee(8.0, -5.6)
-    debout("jetee_peche_1", "nathan", x, y, -140.0)
-    x, y = jetee(22.0, 5.5)
-    debout("jetee_peche_2", "sophia", x, y, 30.0, phase=250)
-    marche("jetee_marche_0", "carla", jetee(40.0, -5.0), jetee(-60.0, -5.0), 470, v=1.1)
-    marche("jetee_marche_1", "claudia", jetee(-30.0, 5.0), jetee(60.0, 5.0), 420, v=1.15)
+    # -- la jetée : des pêcheurs à la rambarde (face à l'eau), des promeneurs sur les deux trottoirs
+    for k, (u, n) in enumerate([(-30.0, 5.7), (-12.0, 5.6), (-4.0, -5.7), (8.0, -5.6), (15.0, 5.7), (22.0, 5.5),
+                                (33.0, -5.7), (41.0, 5.6)]):
+        x, y = jetee(u, n)
+        cap = -50.0 + (90.0 if n > 0 else -90.0) + 10 * (k % 3 - 1)     # face à l'eau
+        debout(f"jetee_peche_{k}", MOD[k % 5], x, y, cap, phase=61 * k)
+    for k, (u0, u1, n, g, v) in enumerate([(40.0, -60.0, -5.0, 470, 0.95), (-30.0, 60.0, 5.0, 420, 1.0),
+                                           (20.0, -60.0, 4.6, 440, 1.05), (-45.0, 45.0, -4.6, 480, 0.9),
+                                           (55.0, -40.0, -4.8, 500, 1.0)]):
+        marche(f"jetee_marche_{k}", MARCHEURS[k % 4], jetee(u0, n), jetee(u1, n), g, v=v)
+    return out
+
+
+def pose_passant(course, kw, g):
+    """(x, y, cap) d'un passant à l'image g, son recul compris (recule : g, dx, dy, dcap[, durée en images])."""
+    x, y, cap = course.pose(g)
+    rec = kw.get("recule")
+    if rec:
+        duree = rec[4] if len(rec) > 4 else 12.0
+        k = min(1.0, max(0.0, (g - rec[0]) / duree))
+        k = 3 * k * k - 2 * k * k * k
+        x, y, cap = x + rec[1] * k, y + rec[2] * k, cap + rec[3] * k
+    return x, y, cap
+
+
+def mobilier():
+    """[(nom, objet, x, y, cap)] : le mobilier des trottoirs, tous les 11 m environ au bord des bordures (bornes
+    d'incendie, boîtes à journaux, parcmètres, poubelles, potelets, boîtes aux lettres), hors passages piétons,
+    arrêt du bus et bouches de rues."""
+    out = []
+    TYPES = ["poubelle", "parcmetre", "borne", "potelet", "journaux", "parcmetre", "boite", "poubelle", "potelet"]
+    k = [0]
+
+    def ligne(prefixe, xs, y, cap, interdit):
+        for x in xs:
+            if any(a <= x <= b for a, b in interdit):
+                continue
+            out.append((f"{prefixe}_{k[0]}", TYPES[k[0] % len(TYPES)], x, y, cap))
+            k[0] += 1
+    bords = [(-77.6, -72.8)]
+    ligne("mob_av_ville", [-141.5 + 11.0 * i for i in range(12)], AV_TROTTOIR_BORD_VILLE, 0.0,
+          bords + [(-73.0, -58.6), (-130.0, -115.0)])
+    ligne("mob_av_mer", [-137.75 + 11.0 * i for i in range(11)], AV_TROTTOIR_BORD_MER, 180.0,
+          bords + [(-53.5, -38.5)] + [(x - 1.2, x + 1.2) for x in (-130.5, -104.8, -91.8, -67.5, -59.8, -33.3)])
+    for sx in (-1.0, 1.0):
+        ligne("mob_quai_sud", [sx * (12.5 + 11.0 * i) for i in range(5)], BD_BORD_SUD, 180.0, [])
+        ligne("mob_quai_nord", [sx * (13.5 + 11.0 * i) for i in range(5)], BD_BORD_NORD, 0.0, [])
     return out
 
 
@@ -485,8 +613,10 @@ def pistes():
         out[nom] = (lambda c: lambda g: c.pose(g)[:2])(c)
     for nom, c in chariots():
         out[nom] = (lambda c: lambda g: c.pose(g)[:2])(c)
-    for nom, _m, _a, c, _kw in gens():
-        out["gens:" + nom] = (lambda c: lambda g: c.pose(g)[:2])(c)
+    for nom, _m, _a, c, kw in gens():
+        out["gens:" + nom] = (lambda c, kw: lambda g: pose_passant(c, kw, g)[:2])(c, kw)
+    for nom, _o, x, y, _c in mobilier():
+        out["gens:" + nom] = (lambda p: lambda g: p)((x, y))
     return out
 
 
@@ -496,7 +626,7 @@ ECART_PASSANT = 1.75      # m entre un passant et le centre d'un véhicule de la
 
 def ecarts():
     """{plan: (distance, image du film, nom de la vie, nom de la poursuite)} : au plus près sur la fenêtre de chaque
-    tronçon, véhicules et passants à part. Rend (véhicules, passants)."""
+    tronçon, véhicules et passants (mobilier compris) à part. Rend (véhicules, passants)."""
     vie = pistes()
     veh, pas = {}, {}
     for shot, g0, g1, tr in poursuite():
@@ -512,21 +642,60 @@ def ecarts():
     return veh, pas
 
 
+def _segment(p, demi):
+    """Le segment de l'axe long d'un véhicule posé en (x, y, cap), raccourci de sa demi-largeur (une capsule)."""
+    x, y, cap = p
+    w, lg = demi
+    c = math.radians(cap)
+    fx, fy = -math.sin(c), math.cos(c)
+    h = max(lg - w, 0.0)
+    return (x - h * fx, y - h * fy), (x + h * fx, y + h * fy)
+
+
+def _dist_segments(a, b):
+    """La distance entre deux segments du plan."""
+    def pt_seg(p, s):
+        (x1, y1), (x2, y2) = s
+        dx, dy = x2 - x1, y2 - y1
+        L2 = dx * dx + dy * dy
+        t = 0.0 if L2 < 1e-12 else max(0.0, min(1.0, ((p[0] - x1) * dx + (p[1] - y1) * dy) / L2))
+        return math.dist(p, (x1 + t * dx, y1 + t * dy))
+
+    def croise(s, t):
+        def o(p, q, r):
+            return (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
+        return (o(s[0], s[1], t[0]) * o(s[0], s[1], t[1]) < 0) and (o(t[0], t[1], s[0]) * o(t[0], t[1], s[1]) < 0)
+    if croise(a, b):
+        return 0.0
+    return min(pt_seg(a[0], b), pt_seg(a[1], b), pt_seg(b[0], a), pt_seg(b[1], a))
+
+
+VU = 160.0                # m : au-delà de la berline, rien n'est assez grand dans le cadre pour compter
+
+
 def ecarts_entre():
-    """La plus petite distance entre deux véhicules de la vie qui roulent l'un vers l'autre ou se rangent (hors
-    garées côte à côte) : (distance, image, a, b)."""
+    """Le plus petit jour (m, entre carrosseries vues comme des capsules) entre deux véhicules de la vie dont l'un
+    au moins roule, sur tout le film : (jour, image, a, b)."""
     tr = {}
-    for nom, _m, _t, c, _kw in vehicules():
-        tr[nom] = c
+    for nom, m, _t, c, _kw in vehicules():
+        tr[nom] = (c, DEMI.get(m, DEMI_DEFAUT))
     best = (float("inf"), None, None, None)
     noms = sorted(tr)
-    for g in range(0, G_FIN + 1, 2):
-        ps = {n: tr[n].pose(g)[:2] for n in noms}
-        for i, a in enumerate(noms):
-            for b in noms[i + 1:]:
-                if isinstance(tr[a], Fixe) and isinstance(tr[b], Fixe):
+    mobiles = [n for n in noms if not isinstance(tr[n][0], Fixe)]
+    import ville as V
+    for g in range(-1, G_FIN + 2, 2):
+        ps = {n: tr[n][0].pose(g) for n in noms}
+        cam = V.hero_city(min(max(g + 1, 1), P.TOTAL + P.FIN6_FRAMES))[:2]
+        for a in mobiles:
+            sa = _segment(ps[a], tr[a][1])
+            for b in noms:
+                if b == a or (b in mobiles and b < a):
                     continue
-                d = math.dist(ps[a], ps[b])
+                if math.dist(ps[a][:2], ps[b][:2]) > 14.0:
+                    continue
+                if min(math.dist(ps[a][:2], cam), math.dist(ps[b][:2], cam)) > VU:
+                    continue                           # loin de la poursuite : hors de tout cadre
+                d = _dist_segments(sa, _segment(ps[b], tr[b][1])) - tr[a][1][0] - tr[b][1][0]
                 if d < best[0]:
                     best = (d, g, a, b)
     return best
@@ -835,24 +1004,37 @@ def poser_voitures(root, images, g_of, cache, presents):
             w.location = c
             ws.append((w, r))
         wn = kw.get("warning")
-        for f in images:
+        fixe = isinstance(course, Fixe)
+        for f in (images[:1] if fixe else images):
             g = g_of(f)
             x, y, cap = course.pose(g)
             z = _sol(x, y)
             c = math.radians(cap)
             fx, fy = -math.sin(c), math.cos(c)
             pente = math.atan2(_sol(x + 1.5 * fx, y + 1.5 * fy) - _sol(x - 1.5 * fx, y - 1.5 * fy), 3.0)
+            if fixe:                                   # une garée : posée une fois, sans clé
+                body.location, body.rotation_euler = (x, y, z), (pente, 0.0, c)
+                continue
             _poser_cle(body, f, loc=(x, y, z), rot=(pente, 0.0, c))
-            s = course.s(g) if isinstance(course, Course) else 0.0
+            s = course.s(g)
             for w, r in ws:
                 if r > 0.0:
                     _poser_cle(w, f, rot=(-s / r, 0.0, 0.0))
             body["vie_frein"] = 1.0 if course.freine(g) else 0.0
             body.keyframe_insert('["vie_frein"]', frame=f)
-            body["vie_warning"] = warning(g) if (wn is not None and g >= wn) else 0.0
-            body.keyframe_insert('["vie_warning"]', frame=f)
+        if wn is not None:
+            # les warnings : une clé à chaque bascule (1,5 Hz), en temps du film
+            prev = None
+            for f in images:
+                g = g_of(f)
+                w = warning(g) if g >= wn else 0.0
+                if w != prev or f == images[-1]:
+                    body["vie_warning"] = w
+                    body.keyframe_insert('["vie_warning"]', frame=f)
+                    prev = w
         for o in [body] + [w for w, _r in ws]:
-            _lineaire(o)
+            if not fixe or o is body:
+                _lineaire(o)
         _constantes(body, ('["vie_frein"]', '["vie_warning"]'))
         n += 1
     return n
@@ -864,6 +1046,87 @@ def _constantes(ob, paths):
         if fc.data_path in paths:
             for kp in fc.keyframe_points:
                 kp.interpolation = "CONSTANT"
+
+
+# le mobilier : (fichier, choix des maillages (nom, centre du maillage au monde), hauteur en m)
+MOBILIER = {
+    "borne": ("lieux/rue/fire-hydrant/fire_hydrant.gltf", lambda n, c: c.x < 0, 0.8),
+    "journaux": ("lieux/rue/newspaper-box/model.glb", lambda n, c: True, 1.15),
+    "parcmetre": ("lieux/rue/parking-meter/model.glb", lambda n, c: True, 1.4),
+    "poubelle": ("lieux/rue/street-pack/model.glb", lambda n, c: n.startswith("Bin_lp"), 1.0),
+    "potelet": ("lieux/rue/street-pack/model.glb", lambda n, c: n.startswith("Bollard_lp"), 0.95),
+    "boite": ("lieux/rue/street-pack/model.glb", lambda n, c: n.startswith("post_box_lp"), 1.25),
+}
+
+
+def source_objet(cle, cache):
+    """Un objet de mobilier en un seul maillage, posé au sol en son centre, à sa hauteur : la source des instances."""
+    import bpy
+    from mathutils import Matrix, Vector
+    k = "objet:" + cle
+    if k in cache:
+        return cache[k]
+    rel, choix, haut = MOBILIER[cle]
+    objs = _import(rel)
+    bpy.context.view_layer.update()
+    garde = []
+    for o in objs:
+        if o.type != "MESH" or o.name.startswith("Icosphere"):
+            continue
+        c = o.matrix_world @ (sum((Vector(v) for v in o.bound_box), Vector()) / 8)
+        if choix(o.name, c):
+            garde.append(o)
+    for o in garde:
+        mw = o.matrix_world.copy()
+        o.parent = None
+        o.data = o.data.copy()
+        o.data.transform(mw)
+        o.matrix_world = Matrix.Identity(4)
+    for o in objs:
+        if o not in garde:
+            bpy.data.objects.remove(o, do_unlink=True)
+    if not garde:
+        raise RuntimeError(f"rien de choisi dans {rel}")
+    bpy.ops.object.select_all(action="DESELECT")
+    for o in garde:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = garde[0]
+    if len(garde) > 1:
+        bpy.ops.object.join()
+    ob = bpy.context.view_layer.objects.active
+    mn, mx = _sommets([ob])
+    f = haut / max(mx.z - mn.z, 1e-6)
+    ob.data.transform(Matrix.Scale(f, 4) @ Matrix.Translation(-Vector(((mn.x + mx.x) / 2, (mn.y + mx.y) / 2, mn.z))))
+    ob.name = ob.data.name = f"vie_src_{cle}"
+    for c in list(ob.users_collection):
+        c.objects.unlink(ob)
+    _sources().objects.link(ob)
+    cache[k] = ob
+    return ob
+
+
+def poser_mobilier(root, cache, presents, sol):
+    """Le mobilier des trottoirs : des instances (maillages partagés), fixes."""
+    import bpy
+    n = 0
+    for nom, cle, x, y, cap in mobilier():
+        if presents is not None and lieux_de(x, y) not in presents:
+            continue
+        try:
+            src = source_objet(cle, cache)
+        except Exception as e:
+            _log(f"! mobilier {cle} non chargé ({e!r})")
+            cache["objet:" + cle] = None
+            continue
+        if src is None:
+            continue
+        ob = bpy.data.objects.new(f"vie_{nom}", src.data)
+        _coll().objects.link(ob)
+        ob.parent = root
+        ob.location = (x, y, sol(x, y))
+        ob.rotation_euler = (0.0, 0.0, math.radians(cap + (zlib.crc32(nom.encode()) % 21 - 10)))
+        n += 1
+    return n
 
 
 def poser_chariot(root, images, g_of, presents):
@@ -990,7 +1253,9 @@ def source_gens(cle, cache):
     _sources().objects.link(racine)
     arm.parent = racine
     arm.matrix_parent_inverse = Matrix.Identity(4)
-    arm.matrix_world = Matrix.Scale(k, 4) @ Matrix.Translation(Vector((-cx, -cy, -zmin))) @ mw
+    # les personnages des glb regardent vers -y ; le cap 0 de la ville regarde vers +y : un demi-tour
+    arm.matrix_world = (Matrix.Rotation(math.pi, 4, "Z") @ Matrix.Scale(k, 4)
+                        @ Matrix.Translation(Vector((-cx, -cy, -zmin))) @ mw)
     for o in [arm] + meshes:
         for c in list(o.users_collection):
             c.objects.unlink(o)
@@ -1126,11 +1391,14 @@ def poser_gens(root, images, g_of, f_of, cache, presents, sol=None):
         tr = ad.nla_tracks.new()
         lo, hi = cache["anims"][anim][2]
         duree = hi - lo
-        g_dep = -400 - kw.get("phase", 0) + (hash(nom) % 37)
+        # la phase en temps du film, la même dans tous les tronçons (crc32 : hash() change d'un processus à l'autre)
+        g_dep = -400 - kw.get("phase", 0) + (zlib.crc32(nom.encode()) % 37)
         start = f_of(g_dep)
         st = tr.strips.new(nom, int(start), act)
         st.action_frame_start, st.action_frame_end = lo, hi
-        reps = math.ceil((f1 - start + 2) / max(duree, 1.0)) + 1
+        echelle = MARCHE / kw["v"] if (anim == "marche" and kw.get("v")) else 1.0
+        st.scale = echelle
+        reps = math.ceil((f1 - start + 2) / max(duree * echelle, 1.0)) + 1
         st.repeat = max(1, reps)
         if hasattr(st, "action_slot") and act.slots:
             try:
@@ -1138,16 +1406,15 @@ def poser_gens(root, images, g_of, f_of, cache, presents, sol=None):
             except Exception:
                 pass
         st.extrapolation = "HOLD"
-        rec = kw.get("recule")
-        for f in images:
-            g = g_of(f)
-            x, y, cap = course.pose(g)
-            if rec:
-                k = min(1.0, max(0.0, (g - rec[0]) / 12.0))
-                k = 3 * k * k - 2 * k * k * k
-                x, y, cap = x + rec[1] * k, y + rec[2] * k, cap + rec[3] * k
-            _poser_cle(pivot, f, loc=(x, y, sol(x, y)), rot=(0.0, 0.0, math.radians(cap)))
-        _lineaire(pivot)
+        if isinstance(course, Fixe) and not kw.get("recule"):
+            x, y, cap = course.pose(0)
+            pivot.location, pivot.rotation_euler = (x, y, sol(x, y)), (0.0, 0.0, math.radians(cap))
+        else:
+            for f in images:
+                g = g_of(f)
+                x, y, cap = pose_passant(course, kw, g)
+                _poser_cle(pivot, f, loc=(x, y, sol(x, y)), rot=(0.0, 0.0, math.radians(cap)))
+            _lineaire(pivot)
         n += 1
     return n
 
@@ -1183,7 +1450,7 @@ def poser_mouettes(root, images, g_of, f_of, cache, presents):
     src = bpy.data.objects.new("vie_src_mouette", None)
     _sources().objects.link(src)
     arm.parent = src
-    arm.matrix_world = Matrix.Scale(k, 4) @ mw
+    arm.matrix_world = Matrix.Rotation(math.pi, 4, "Z") @ Matrix.Scale(k, 4) @ mw
     for o in [arm] + meshes:
         for c in list(o.users_collection):
             c.objects.unlink(o)
@@ -1306,7 +1573,9 @@ def poser(scene, plan=None, presents=None, base=None, g_of=None, images=None):
     cache = {}
     nv = poser_voitures(root, images, g_of, cache, presents)
     nc = poser_chariot(root, images, g_of, presents)
-    ng = poser_gens(root, images, g_of, f_of, cache, presents, sol=sol_scene(scene, base))
+    sol = sol_scene(scene, base)
+    ng = poser_gens(root, images, g_of, f_of, cache, presents, sol=sol)
+    nmob = poser_mobilier(root, cache, presents, sol)
     nm = poser_mouettes(root, images, g_of, f_of, cache, presents)
     # ce qu'un import raté a laissé hors des collections de la vie (à l'échelle de son fichier) ne reste pas
     gardes = set(_coll().all_objects) | set(_sources().all_objects)
@@ -1315,9 +1584,9 @@ def poser(scene, plan=None, presents=None, base=None, g_of=None, images=None):
     npal, nbat = animer_lieux(scene, base, images, g_of)
     for o in _coll().all_objects:
         o["vie"] = 1
-    out = dict(vehicules=nv, chariots=nc, passants=ng, mouettes=nm, palmiers=npal, bateaux=nbat,
+    out = dict(vehicules=nv, chariots=nc, passants=ng, mobilier=nmob, mouettes=nm, palmiers=npal, bateaux=nbat,
                secondes=round(time.time() - t0, 1))
-    _log(f"{plan or 'ville'} : {nv} véhicules, {nc} chariot, {ng} passants, {nm} mouettes, {npal} palmiers et {nbat} "
+    _log(f"{plan or 'ville'} : {nv} véhicules, {nc} chariot, {ng} passants, {nmob} mobiliers, {nm} mouettes, {npal} palmiers et {nbat} "
          f"bateaux animés ({', '.join(sorted(presents)) if presents else 'tous les lieux'}) en {out['secondes']} s")
     return out
 
@@ -1345,6 +1614,8 @@ def main():
         par[("véhicules", lieux_de(*c.pose(200)[:2]))] += 1
     for nom, _m, _a, c, _kw in gens():
         par[("passants", lieux_de(*c.pose(200)[:2]))] += 1
+    for nom, _o, x, y, _c in mobilier():
+        par[("mobilier", lieux_de(x, y))] += 1
     for (k, l), n in sorted(par.items()):
         print(f"{k:10} {l:12} {n}")
     veh, pas = ecarts()
@@ -1356,7 +1627,7 @@ def main():
             print(f" ; passants : {d:5.1f} m ({a} / {b}, image {g})")
         else:
             print()
-    print("entre véhicules de la vie : %.1f m (image %s, %s / %s)" % ecarts_entre())
+    print("entre véhicules de la vie : %.2f m de jour (image %s, %s / %s)" % ecarts_entre())
 
 
 if __name__ == "__main__":
