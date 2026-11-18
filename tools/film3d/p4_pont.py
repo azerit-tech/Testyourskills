@@ -198,7 +198,10 @@ if VILLE:
     # vitesse d'entrée, freinage de 6,4 m/s²). Une vraie conduite : sa vitesse s'intègre à rebours depuis P5/1, une
     # accélération à à-coup borné ; l'instant de son freinage est celui qui la met à P1_BEHIND m à P4/1. Depuis film/v8,
     # 10 m (8 avant) : le bras franc (FILM3D_VITESSE=2), plus près et au 19 mm, la faisait entrer dès l'image 6.
-    P1_BEHIND, P1_COAST, P1_BRAKE_J = -10.0, -0.5, 10.0
+    # (v11, SPEC §18.75 : -12. Avant l'image 340 du film elle est la suiveuse de police.py, qui la rejoint en place
+    # et en vitesse ; à -10 elle roulait à 32,3 m/s à l'image 340, ce que la suiveuse, sortie du rond-point à 12 m/s,
+    # n'atteint qu'en restant 25 m derrière la berline dans la rue)
+    P1_BEHIND, P1_COAST, P1_BRAKE_J = -12.0, -1.0, 10.0
     _P1_DT = 1.0 / 240.0
 
     def _p1_accel(t, tb, a49):
