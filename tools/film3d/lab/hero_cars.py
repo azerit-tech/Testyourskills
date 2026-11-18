@@ -1087,14 +1087,15 @@ def _mat_plate_enamel(name, color, rough, dirt_to="#2b2824"):
     return m
 
 
-def _text_mesh(text, height, depth, weight=0.012, squeeze=0.78):
+def _text_mesh(text, height, depth, weight=0.012, squeeze=0.78, spacing=1.0):
     """Les caractères `text` en maillage (police intégrée de Blender, graissée de `weight` et serrée de `squeeze`
-    comme une police de plaque emboutie), hauts de `height` m, en relief de `depth` m : dans le plan XY, centrés,
-    l'épaisseur de z = 0 à `depth`. None si la police ne donne rien."""
+    comme une police de plaque emboutie, espacée de `spacing`), hauts de `height` m, en relief de `depth` m : dans
+    le plan XY, centrés, l'épaisseur de z = 0 à `depth`. None si la police ne donne rien."""
     cu = bpy.data.curves.new("plaque_texte", "FONT")
     cu.body = text
     cu.align_x, cu.align_y = "CENTER", "CENTER"
     cu.size = 1.0
+    cu.space_character = spacing
     cu.offset = weight
     cu.extrude = 0.5
     cu.resolution_u = 3
@@ -1317,6 +1318,41 @@ def add_trunk_handle(body, chrome, z=0.727, width=0.135, height=0.024, depth=0.0
     bmesh.ops.bevel(bm, geom=list(bm.edges), offset=0.45 * min(height, depth), segments=4, affect="EDGES",
                     profile=0.5)
     ob = _mesh_object(f"{body.name}_trunk_handle", bm, [chrome], body.users_collection[0], smooth=True)
+    _stamp_rest([ob])
+    cv.parent_keep(ob, body)
+    return ob
+
+
+# Le monogramme du coffre (SPEC §18.66) : les sigles d'origine sont retirés (_w111_clean), le coffre restait nu. Un nom
+# inventé, aucune marque : des capitales chromées espacées, à droite sur la face arrière, comme une désignation de
+# modèle de l'époque.
+BOOT_NAME = "VELORIA"
+
+
+def add_boot_lettering(body, chrome, text=BOOT_NAME, y=-0.56, z=0.725, height=0.019, depth=0.0025):
+    """Les lettres chromées du coffre : `text` en capitales de `height` m, en relief de `depth` m, centrées en (y, z)
+    sur la face arrière (repère de la voiture : l'arrière vers -x, la droite vers -y), tournées comme la tôle sous
+    elles. None si la face arrière n'est pas trouvée ou si la police ne donne rien."""
+    me = _text_mesh(text, height, depth + 0.001, weight=0.006, squeeze=0.95, spacing=1.35)
+    if me is None:
+        return None
+    half = max(abs(v.co.x) for v in me.vertices)
+    left, right = ray_x([body], y + half, z, False), ray_x([body], y - half, z, False)
+    mid = ray_x([body], y, z, False)
+    if left is None or right is None or mid is None or abs(left.x - right.x) > 0.06:
+        bpy.data.meshes.remove(me)
+        return None
+    u = (right - left).normalized()                      # le sens de lecture, vu de derrière
+    n = u.cross(Vector((0.0, 0.0, 1.0))).normalized()    # vers l'extérieur (-x)
+    up = n.cross(u)
+    M = Matrix((u, up, n)).transposed().to_4x4()
+    M.translation = (left + right) / 2 + n * -0.001      # enfoncées d'un millimètre dans la tôle
+    me.transform(M)
+    me.materials.append(chrome)
+    for pl in me.polygons:
+        pl.use_smooth = False
+    ob = bpy.data.objects.new(f"{body.name}_boot_name", me)
+    body.users_collection[0].objects.link(ob)
     _stamp_rest([ob])
     cv.parent_keep(ob, body)
     return ob
@@ -1993,6 +2029,8 @@ def load_hero(variant="w111", collection=None, lights_on=True, raw=False):
                 pl = add_number_plate(f"{body.name}_plate_rear", rear, -1, coll=body.users_collection[0])
                 cv.parent_keep(pl, body)
             handle = add_trunk_handle(body, bpy.data.materials["hero_w111_chrome"])
+            name = add_boot_lettering(body, bpy.data.materials["hero_w111_chrome"])
+            car["report"]["monogramme du coffre"] = "posé" if name else "manqué"
             car["report"]["poignée de coffre"] = "posée" if handle else "face arrière introuvable"
             ant = add_antenna(body, bpy.data.materials["hero_w111_chrome"])
             car["report"]["antenne"] = "posée" if ant else "aile introuvable"
