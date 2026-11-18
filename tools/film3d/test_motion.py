@@ -159,7 +159,11 @@ CAM_LIMITS_PLAN = {
     # 7,6 m dans l'axe de sa vitesse : sa visée accélère comme ce cap (≈ 65°/s², la largeur de cadre 1,2 en vaut 55)
     # et, à 7,6 m de rayon, elle tire 7,5 m/s² par rapport à la berline (4 demanderaient 1,6 s de mise en virage, plus
     # que le plan n'en laisse) ; en sortie, la berline relancée à 6,8 m/s² et la caméra à l'extérieur, 8,2 en propre
-    "P5": {"pan": 42.0, "pan_acc": 1.4, "arel": 8.0, "accel": 8.5},
+    # (fusion v10 : 8,5, 8 avant. La berline simulée se met en virage en 15 images, P5/25 à 40 : le cap de sa vitesse
+    # passe de 0 à 24°/s, 62°/s² à P5/32 ; le bras, à 7,55 m dans cet axe, tire 8,4 m/s² autour d'elle. À l'écran rien
+    # ne dépasse : panoramique 25°/s, son accélération 0,91 largeur/s² (1,4 permis), centre de la berline x 47–51 %,
+    # Δ² 0,13 % de largeur par image² ; vu sur le film gris, images 450 à 466)
+    "P5": {"pan": 42.0, "pan_acc": 1.4, "arel": 8.5, "accel": 8.5},
     # les avions entrent grands par le haut du cadre : 8 images au plus au-dessus de 88 % à leur entrée, puis
     # dessous (test_p6 le vérifie, avion par avion ; le plafond commun de motion.py est levé pour P6)
     # conduite simulée (18 novembre) : sortie large du port, la berline touche le frein huit images (0,25 de pédale,
