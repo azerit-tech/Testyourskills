@@ -370,7 +370,12 @@ def mat_terre_plein(name="terre_plein_port", far=False):
     w = road.smooth(N, D, 0.5, 1.05)                      # 0 : humide, 1 : flaque
     deep = road.smooth(N, D, 1.1, 2.2)
     # --- couleur
-    col = N.mix(1.0, sc["diff"], (0.5, 0.49, 0.48, 1), "MULTIPLY")
+    # (brouillon éclairé v9, critique n° 2 : sous les mâts ambre, le terre-plein clair et chaud sortait ocre d'un bord
+    # à l'autre du cadre, jetée comprise. Le béton du port, mouillé, la nuit : plus sombre et presque neutre ; la
+    # photo désaturée aux deux cinquièmes, assombrie d'un tiers)
+    hs = N.new("ShaderNodeHueSaturation", Saturation=0.4)
+    N.link(sc["diff"], hs.inputs["Color"])
+    col = N.mix(1.0, hs.outputs[0], (0.34, 0.335, 0.33, 1), "MULTIPLY")
     tint = N.math("ADD", 0.82, N.math("MULTIPLY", v, 0.32))
     col = N.mix(1.0, col, road.combine(N, tint, tint, N.math("ADD", tint, N.math("MULTIPLY", N.math("SUBTRACT", b, 0.5), 0.05))),
                 "MULTIPLY")
@@ -795,6 +800,9 @@ def jetty_clearance(u_range=(-28.8, 71.2), skip=("port_terre_plein", "port_mur",
     return best
 
 
+MAST_CREPUSCULE, MAST_CLE = 0.4, 0.7      # la force des mâts du port (× un lampadaire de 25 m) ; le mât du virage
+
+
 def build_masts(far=False):
     """Les mâts d'éclairage de 25 m : fût conique, couronne de six projecteurs ambre, un spot large par mât."""
     steel = bpy.data.materials.get("mat_port_acier") or L.mat_steel("mat_port_acier", color=(0.42, 0.44, 0.45),
@@ -820,18 +828,22 @@ def build_masts(far=False):
         # P5 sur le virage (la lumière de face de la berline, sinon à contre-jour du projecteur de l'hélicoptère)
         key = (x, y) == KEY_MAST
         Ld = bpy.data.lights.new(f"mat_port_{i}", "SPOT")
-        Ld.energy = L.S.lampe_w(MAST_H)                 # un lampadaire de 25 m (lumière v3.1, règle E)
+        # un lampadaire de 25 m (lumière v3.1, règle E), au crépuscule du port : à pleine force, six mâts ambre de
+        # 125° couvraient le terre-plein d'une nappe ocre uniforme où la tache du projecteur ne se lisait pas
+        # (brouillon éclairé v9, critique n° 2) ; MAST_CREPUSCULE de la force d'un lampadaire, celui du virage à
+        # MAST_CLE (la lumière de face de la berline dans P5)
+        Ld.energy = L.S.lampe_w(MAST_H) * MAST_CREPUSCULE
         if key:
             # le projecteur pointé sur le virage, à 43 m en biais : il y pose l'éclairement d'un lampadaire commun
             # sous sa tête (la distance d, l'incidence cos i : la hauteur équivalente d / √cos i)
             d = math.dist((x, y, MAST_H - 0.5), (*TURN_AIM, 0.0))
-            Ld.energy = L.S.lampe_w(d / math.sqrt((MAST_H - 0.5) / d))
+            Ld.energy = L.S.lampe_w(d / math.sqrt((MAST_H - 0.5) / d)) * MAST_CLE
             print(f"[port] mât clé en ({x:.1f} ; {y:.1f}) : {d:.1f} m du point visé du virage {TURN_AIM}, "
                   f"{Ld.energy:.0f} W", flush=True)
         Ld.color = L.lin(L.S.LAMPE)[:3]
         Ld.spot_size = math.radians(50 if key else 125)
         Ld.spot_blend = 0.45 if key else 0.7
-        Ld.shadow_soft_size = 1.2
+        Ld.shadow_soft_size = 1.6
         lo = bpy.data.objects.new(Ld.name, Ld)
         bpy.context.scene.collection.objects.link(lo)
         lo.location = (x, y, MAST_H - 0.5)
@@ -1801,6 +1813,15 @@ def plan_P5(scene, hidden, palier="conteneurs"):
     # les deux appareils de la jetée : pas de tache au sol sans pinceau visible (scene_d.helis_sans_tache)
     scene_d.helis_sans_tache([o for r in others for o in r.children_recursive
                               if o.type == "LIGHT" and o.name.endswith("searchlight_spot")])
+    # (brouillon éclairé v9, critique n° 2 : la jumelle du sol, 8 kW à 85 m, n'y posait rien, 0,09 W/m², et ne
+    # recevait que le décor de la scène, pas les voisins de la ville ; la lampe principale, des mégawatts, éclairait
+    # tout le reste.) La lampe principale n'éclaire plus que la brume ; sa tache au sol et sa jumelle sur la berline
+    # sont celles de P6 et FIN6 (scene_d.projo_tache : bornée, bord doux, à la même force quelle que soit la distance
+    # de l'appareil), allumées avec elle
+    col, _ = scene_d.helis_sans_tache([h["searchlight"]])
+    scene_d.projo_tache(h["searchlight"], hero, "P5", FRAMES, helicos.beam_in_scene("P5", 0), allume=True,
+                        old=twins)
+    h["searchlight"].data.color = L.lin(helicos.BEAM0_COULEUR)[:3]
     # --- la caméra qui suit la berline (de 8 à 10,3 m), 21 mm, mise au point sur elle
     cam = L.camera("cam_P5", tuple(CAM), (CAM.x + 1.0, CAM.y + 8.0, 0.7), lens=P5.LENS, fstop=4.0)
     M.key_camera(cam, FRAMES, P5.camera)

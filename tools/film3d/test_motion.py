@@ -1135,9 +1135,25 @@ def test_fin6():
         for c, h, l, w in cars:
             gv = min([gv] + [P.rect_dist(r, c, h, l, w) - 2.5 for r in ring])
             ga = min([ga] + [P.rect_dist(o, c, h, l, w) for o in cops])
-    ga = min([ga] + [math.dist(o, r) - 2.5 for o in cops for r in ring])
-    check("FIN6 : 1,5 m entre caisses, 1 m entre un agent et une caisse, à toutes les images", gv >= 1.5 and ga >= 1.0,
-          f"caisses {gv:.1f} m, agents {ga:.1f} m")
+    check("FIN6 : 1,5 m entre caisses, 1 m entre un agent et la berline ou la patrouille 1, à toutes les images",
+          gv >= 1.5 and ga >= 1.0, f"caisses {gv:.1f} m, agents {ga:.1f} m")
+    # les agents sortis de leurs voitures (critique v9, n° 9 : un rang de six) : quatre derrière une portière ouverte
+    # (hors de la caisse, 0,3 m au moins, et dans le creux de la portière : plus en arrière qu'elle, moins dehors que
+    # son bout), à des distances d'elle variées (4 m d'écart au moins), aucun trio également espacé
+    door = 0
+    for (a_, r_, _, _), c in zip(P.COPS, P.DOOR_COPS):
+        if c[0] is None:
+            continue
+        i, side, lon, out = c[:4]
+        _, x, y, h = next(q for q in P.ring_poses() if q[0] == i)
+        body = P.rect_dist(P.polar(a_, r_), (x, y), h, 5.0, 1.84)
+        if body >= 0.3 and lon < 0.63 and out < 2.16 and lon > -0.7:
+            door += 1
+    radii = sorted(r_ for _, r_, _, _ in P.COPS)
+    gaps = sorted(math.dist(a, b) for k, a in enumerate(cops) for b in cops[k + 1:])
+    check("FIN6 : les agents derrière leurs portières, à des distances variées, pas en rang",
+          door >= 3 and radii[-1] - radii[0] >= 4.0 and min(gaps) >= 0.9,
+          f"{door} derrière une portière, de {radii[0]:.1f} à {radii[-1]:.1f} m, écart mini {min(gaps):.1f} m")
     # le lampadaire : son reflet sur l'enrobé jamais sans sa tête dans le cadre (règle E)
     def seen(pts, c, lo, hi):
         return any(q is not None and lo <= q[0] <= hi and -0.05 <= q[1] <= 1.05
@@ -1907,6 +1923,42 @@ def test_cut_p4_p5_beam():
           ks[0] == 0.0 and min(steps) >= 0.0 and max(steps) <= 0.12 and ks[-1] == 1.0
           and PC.t_of("P5", P5.F0 + n_full) - H.T5 <= H.BEAM0_ALLUMAGE + 1e-6 and keyed,
           f"plein à P5/{P5.F0 + n_full}, pas max {max(steps):.3f}, clés posées {keyed}")
+
+
+def test_projo_tache():
+    """Le projecteur de l'appareil 0 (brouillon éclairé v9, critique n° 2) : son pinceau garde la même force de P5 à
+    la fin de FIN6 ; sa tache au sol (helicos.tache) fait TACHE_E W/m² au centre et 12 à 14 m de diamètre au bord
+    quelle que soit la distance ; elle ne saute à aucune coupe (P5 → P6, P6 → FIN6 : la cible et la distance de
+    l'appareil, dans le repère de la ville, continues) ; à l'arrêt de FIN6, elle est sur elle ; scene_d.projo_tache
+    est posée dans P5, P6 et FIN6."""
+    import helicos as H
+    import parcours as PC
+    import fin6_orbite as F6
+    w5 = H.beam0(H.T5, 0.0006)
+    w9 = H.beam0(PC.t_of("FIN6", F6.F0 + F6.FRAMES - 1), 0.0006)
+    d_ok = all(abs(H.tache(d)[0] / (4 * math.pi * d * d) - H.TACHE_E) < 1e-9
+               and 12.0 <= 2 * d * math.tan(math.radians(H.tache(d)[1] / 2)) <= 14.0 + 1e-6 for d in (35.0, 60.0, 90.0))
+
+    def at(shot, f):
+        t = M.t_of(f)
+        tgt = (F6.beam_target(t) if shot == "FIN6" else H.beam_in_scene(shot, 0)(t))
+        hv = H.in_scene(shot, 0)(t)
+        return H.to_ville(shot, tgt)[:2], math.dist(hv[:3], tgt[:3])
+    jumps = []
+    for a, b in (("P5", "P6"), ("P6", "FIN6")):
+        (pa, da), (pb, db) = at(a, PC.frames(a)), at(b, 1)
+        (pa2, _), _ = at(a, PC.frames(a) - 1), None
+        step = math.dist(pa, pa2)
+        jumps.append((a, b, round(math.dist(pa, pb) - step, 2), round(db - da, 2)))
+    cont = all(abs(j) <= 0.6 and abs(dd) <= 1.5 for _, _, j, dd in jumps)
+    t_stop = F6.T_STOP
+    on_her = math.dist(F6.beam_target(t_stop)[:2], F6.hero_pos(t_stop)) < 1e-6
+    here = os.path.dirname(os.path.abspath(__file__))
+    srcs = {n: open(os.path.join(here, n), encoding="utf-8").read() for n in ("scene_d.py", "scene_e.py")}
+    posee = (srcs["scene_e.py"].count("projo_tache(") >= 1 and srcs["scene_d.py"].count("projo_tache(") >= 3)
+    check("projecteur : pinceau gardé de P5 à FIN6, tache bornée à force constante, sans saut aux coupes, sur elle à "
+          "l'arrêt", w5 == w9 and d_ok and cont and on_her and posee,
+          f"pinceau {w5[0]:.0f}→{w9[0]:.0f} W, coupes {jumps}, sur elle {on_her}, posée {posee}")
 
 
 def _cam_dev(fn, fr, out):
@@ -2784,6 +2836,7 @@ if __name__ == "__main__":
     test_cut_p4_p5_beam()
     test_cut_sol_voisin()
     test_cut_habitacle_phare()
+    test_projo_tache()
     test_operator()
     test_drive()
     test_parcours()

@@ -759,10 +759,15 @@ HEAD_CODES = "#fff1dc"   # phares des poursuivants, en codes (la berline : #ffe6
 # un phare en codes (W) : un seul réglage pour toutes les voitures, aucune retouche par plan. Un spot Cycles de P W
 # fait P / 4π W/sr ; un code fait 10 000 à 20 000 cd au point chaud, un lampadaire environ 2 000 cd (1200 W ici) :
 # à 150 W, le cône devant la voiture valait 1/20 de la plage d'un lampadaire et ne se lisait nulle part
-HEAD_W = 6000.0
+# (brouillon éclairé v9, critique n° 13 : à 6 kW, cône de 24° au bord adouci de moitié et source de 5 cm, le phare
+# de la patrouille de l'avenue posait sur la chaussée une virgule blanche à bord net. Deux faisceaux longs à bord
+# doux, moins forts : 4 kW, source de 30 cm, bord fondu sur tout le cône (HEAD_BLEND), plongée de 8° au lieu de 11 :
+# le cône tombe de 3 à 60 m et s'éteint en douceur vers l'avant et sur les côtés)
+HEAD_W = 4000.0
+HEAD_SOURCE, HEAD_BLEND = 0.3, 1.0
 # une voiture arrêtée garde ses feux de position, pas ses codes : à 6 kW, une patrouille à l'arrêt posait devant elle
 # une plaque claire de 2 à 6 m (barrage de P3, anneau de FIN6) ; ses feux de position, un cône court qui se lit
-HEAD_W_ARRET = 0.12 * HEAD_W
+HEAD_W_ARRET = 720.0
 # la nappe diffuse (taille de la source en m, bord adouci) : à 5 cm et bord à 0,5, le cône posait au sol une ellipse
 # à bord net, une tache sans cause lisible (FIN6) ; une source de 30 cm au bord fondu, une nappe qui s'éteint
 HEAD_NAPPE = (0.3, 1.0)
@@ -774,12 +779,12 @@ def phares_nappe(lights, energy=None):
         o.data.shadow_soft_size, o.data.spot_blend = HEAD_NAPPE
         if energy is not None:
             o.data.energy = energy
-HEAD_CONE = 24.0         # ouverture du cône (degrés), bord adouci de moitié
-HEAD_TILT = 11.0         # plongée sous l'horizon (degrés) : le cône tombe sur la chaussée de 2 à 40 m
+HEAD_CONE = 28.0         # ouverture du cône (degrés), bord fondu sur tout le cône (HEAD_BLEND)
+HEAD_TILT = 8.0          # plongée sous l'horizon (degrés) : le cône tombe sur la chaussée de 3 à 60 m
 
 
 def headlight_spots(body, points, on=True, energy=HEAD_W, color=HEAD_CODES, angle=HEAD_CONE, collection=None,
-                    blend=0.5):
+                    blend=HEAD_BLEND):
     """Deux phares en codes vers l'avant (+x), plongeant de HEAD_TILT, aux points donnés (repère du véhicule) : le
     cône blanc chaud sur la chaussée devant la voiture, qui s'éteint avec la distance. Sans reflet propre
     (visible_glossy) : sur le mouillé et les carrosseries, c'est le verre du phare qui se reflète ; le reflet du spot
@@ -794,7 +799,7 @@ def headlight_spots(body, points, on=True, energy=HEAD_W, color=HEAD_CODES, angl
         d.color = lin(color)[:3]
         d.spot_size = math.radians(angle)
         d.spot_blend = blend
-        d.shadow_soft_size = 0.05
+        d.shadow_soft_size = HEAD_SOURCE
         ob = bpy.data.objects.new(d.name, d)
         (collection or body.users_collection[0]).objects.link(ob)
         ob.parent = body

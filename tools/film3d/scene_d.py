@@ -1097,6 +1097,12 @@ def plan_FIN(scene, hidden, palier="socle"):
 PACK_HEAD_W = 550.0
 PACK_CONE = 20.0      # l'ouverture (degrés) : à 18 m, un disque de 6 m centré sur elle, pas de nappe sur la pointe
 PACK_AIM_Z = 1.1      # la hauteur visée sur la berline (m) : le panneau arrière et la vitre du conducteur
+# FIN6 (brouillon éclairé v9, critique n° 9 : le bas du cadre, 40 %, noir) : la nappe au sol des mêmes phares, une
+# jumelle de chacun qui éclaire tout sauf la berline (ses 550 W restent réglés sur les mains du conducteur) : six
+# phares de la meute derrière la caméra, leurs cônes larges et doux qui se recouvrent sur la pointe autour d'elle,
+# 1,5 W/m² environ (la tache du projecteur y ajoute ses 2,5 W/m², un lampadaire en pose 1,4) ; motivés : la meute
+# arrive derrière nous, pleins phares
+PACK_SOL_W, PACK_SOL_CONE = 1000.0, 40.0
 
 
 def _head_w_arret():
@@ -1133,7 +1139,7 @@ def hero_phares_fin6(hero, frames, fondu=12):
           flush=True)
 
 
-def fin_pack_lights(frames, hero):
+def fin_pack_lights(frames, hero, sol=False):
     """FIN : la meute réduite à sa lumière (fin_pointe.PACK) : par voiture, deux spots de phares sur le rail, hors
     champ derrière la caméra, qui avancent, s'allument l'un après l'autre (images 36 à 52) et s'arrêtent. Ce sont
     des pleins phares braqués sur la berline arrêtée (sur son point d'arrêt, à PACK_AIM_Z) : ils éclairent son
@@ -1146,6 +1152,12 @@ def fin_pack_lights(frames, hero):
     ahead, half, z = F.PACK_LAMP
     target = Vector((F.SX, F.SY, PACK_AIM_Z))
     out = []
+    if sol:
+        sans = bpy.data.collections.new("meute_sol_sans_berline")
+        for o in L.car_parts(hero, glass=True):
+            sans.objects.link(o)
+        for co in sans.collection_objects:
+            co.light_linking.link_state = "EXCLUDE"
     for i in range(len(F.PACK)):
         pos = F.pack_pos(i)
         for k, side in enumerate((-1.0, 1.0)):
@@ -1171,7 +1183,21 @@ def fin_pack_lights(frames, hero):
                 d.energy = PACK_HEAD_W * F.pack_level(i, t)
                 d.keyframe_insert("energy", frame=f_)
             out.append(ob)
-    print(f"[FIN] meute : {len(out)} phares derrière la caméra, allumés aux images {[p[2] for p in F.PACK]}",
+            if sol:
+                tw = ob.copy()                       # mêmes clés de place (l'action de l'objet est partagée)
+                tw.data = d.copy()
+                tw.data.animation_data_clear()
+                tw.name = tw.data.name = f"{d.name}_sol"
+                for coll in ob.users_collection:
+                    coll.objects.link(tw)
+                tw.data.spot_size = math.radians(PACK_SOL_CONE)
+                tw.data.spot_blend, tw.data.shadow_soft_size = 1.0, 0.3
+                tw.light_linking.receiver_collection = sans
+                for f_ in frames:
+                    tw.data.energy = PACK_SOL_W * F.pack_level(i, M.t_of(f_))
+                    tw.data.keyframe_insert("energy", frame=f_)
+    print(f"[FIN] meute : {len(out)} phares derrière la caméra, allumés aux images {[p[2] for p in F.PACK]}"
+          + (f" ; leur nappe au sol {PACK_SOL_W:.0f} W, {PACK_SOL_CONE:.0f}°, sans la berline" if sol else ""),
           flush=True)
     return out
 
@@ -1232,17 +1258,19 @@ def fin6_pointe(frames, hero, shift=0):
     import fin_pointe as F
     import fin6_orbite as F6
     stop = Vector((F6.CX, F6.CY, 0.0))
-    rnd = random.Random(6)
     first, rigs = {}, []
-    for i in F6.RING_KEEP:
-        x, y = F6.polar(F6.RING[i], F6.RING_R)
+    for i, x, y, h in F6.ring_poses():
         kind = "van" if i == F6.RING_VAN else "patrol"
         r = first.get(kind)
         if r is None:
             r = first[kind] = (L.patrol("patrol_anneau") if kind == "patrol" else L.van("van_anneau"))
+            if kind == "patrol":
+                # leurs agents en sont sortis : les deux portières avant ouvertes (le maillage, partagé par les
+                # copies de l'anneau), les agents derrière (fin6_orbite.DOOR_COPS)
+                for side in (1, -1):
+                    L.open_door(r, side=side)
         else:
             r = L.clone(r, f"{kind}_anneau_{i}")
-        h = L.heading_to((stop.x - x, stop.y - y)) + rnd.uniform(-28, 28)
         L.put(r, x, y, 0.0, heading=h)
         rigs.append(r)
     # l'anneau est à l'arrêt : feux de position, pas les codes (à 6 kW, des ovales clairs au sol devant chaque voiture)
@@ -1301,7 +1329,18 @@ def plan_FIN6(scene, hidden, palier="socle"):
     # le ciel et le phare de FIN : la bande corail du ciel commun derrière le phare (lieux.ciel, sans rotation ; la
     # boucle qui l'y remettait testait VECT_ROTATE, alors que Blender nomme le nœud VECTOR_ROTATE), un pinceau qui balaie
     ph =bpy.data.objects.get("phare")
-    if ph is not None:
+    if ph is not None and L.ville_on():
+        # (brouillon éclairé v9, critique n° 9 : pinceaux de 9 m, la tour se lisait comme un lampadaire.) Dans la
+        # ville, FIN6 suit P6 sans coupe : le pinceau part de la place où P6 l'a gelé (P6_PHARE_PHASE, même image du
+        # film) et balaie lentement le ciel vers la gauche, du large vers l'ouest (P6_PHARE_BALAYAGE °/s, 84° sur
+        # FIN6) ; long de 40 m, relevé de 8°. L'autre, vers nous, reste caché comme dans P6
+        L.phare_tourne(ph, phase=P6_PHARE_PHASE - P6_PHARE_BALAYAGE * F6.F0 / 24.0, vitesse=P6_PHARE_BALAYAGE)
+        L.phare_pinceaux(ph, releve=8.0, portee=40.0)
+        vers_nous = bpy.data.objects.get("phare_pinceau_1")
+        if vers_nous is not None:
+            vers_nous.visible_camera = False
+            vers_nous.visible_glossy = False
+    elif ph is not None:
         L.phare_tourne(ph, phase=-25.0, vitesse=45.0)
         L.phare_pinceaux(ph, releve=8.0, portee=9.0)
     # la berline : freinage sans glisse jusqu'au point d'arrêt (fin6_orbite.HERO) ; pas de traces de gomme, elle ne
@@ -1340,8 +1379,8 @@ def plan_FIN6(scene, hidden, palier="socle"):
     # aussi dans la ville), la phase des rampes comptée en images du film
     import parcours as PC
     fin6_pointe(frames, hero, shift=PC.START["FIN6"])
-    # la meute de FIN : rien que ses phares, derrière la caméra
-    fin_pack_lights(frames, hero)
+    # la meute de FIN : rien que ses phares, derrière la caméra, et leur nappe au sol dans la ville
+    fin_pack_lights(frames, hero, sol=L.ville_on())
     if L.ville_on():
         # FIN6 continue P6 sans coupe : son appoint de poursuite, le commun (lieux.chase_fill), et non celui de FIN
         # (1,9 kW lavande : la caisse sautait du bordeaux au rouge vif à la jonction, fixes éclairés v5)
@@ -1362,12 +1401,17 @@ def plan_FIN6(scene, hidden, palier="socle"):
         # brume de la prise, cône de BEAM0_CONE[1]°, sans tache au sol ni jumelle sur la berline (helis_sans_tache) ;
         # à 28 kW, sa tache au sol sautait à la jonction (une traînée blanche à droite de la caisse à FIN6/1, une
         # tache à sa gauche, puis une ellipse blanche sous elle à l'arrêt : fixes éclairés v5) ; ni cône peint
+        # (brouillon éclairé v9, critique n° 9 : 8 kW, son pinceau ne se voyait plus et rien ne tombait sur elle ni
+        # au sol : la moitié basse de la récompense était noire.) Maintenant le pinceau de P6, gardé (helicos.beam0 :
+        # même puissance, cône, source, couleur), sa tache bornée au sol et sa jumelle sur elle (projo_tache, après
+        # helis_sans_tache, plus bas)
         import helicos
-        aim_helis([heli], aim, energy=helicos.BEAM0_FIN, car=hero, car_energy=helicos.BEAM0_BERLINE,
-                  cone=helicos.BEAM0_CONE[1])
+        w0, c0 = helicos.beam0(PC.t_of("FIN6", 1), V.BRUME_VILLE)
+        aim_helis([heli], aim, energy=w0, cone=c0)
         for o in heli.children_recursive:
             if o.type == "LIGHT" and o.name.endswith("searchlight_spot"):
-                o.data.shadow_soft_size = 1.5            # la source des lampes de la jetée (helis_P6_light)
+                o.data.color = L.lin(helicos.BEAM0_COULEUR)[:3]
+                o.data.shadow_soft_size, o.data.spot_blend = helicos.BEAM0_SOURCE
     else:
         # à 28 kW, le faisceau prend corps dans la brume et sa tache tombe sur la berline, qui la cache : pas de
         # plaque au sol (lumière v3.1, contrôlé aux images 20, 50, 80) ; à 6 kW, le faisceau disparaissait de l'air
@@ -1381,8 +1425,9 @@ def plan_FIN6(scene, hidden, palier="socle"):
     if L.ville_on():
         # la lampe de l'hélicoptère n'éclaire que la brume, comme à la fin de P6 (ville.brume étend la liaison à la
         # brume de la prise)
-        helis_sans_tache([o for o in heli.children_recursive
-                          if o.type == "LIGHT" and o.name.endswith("searchlight_spot")])
+        sps = [o for o in heli.children_recursive if o.type == "LIGHT" and o.name.endswith("searchlight_spot")]
+        _, old = helis_sans_tache(sps)
+        projo_tache(sps[0], hero, "FIN6", frames, F6.beam_target, old=old)
     c0 = F6.camera(M.t_of(F6.F0))
     cam_loc = Vector(c0[:3])
     yaw, pitch = math.radians(c0[3]), math.radians(c0[4])
@@ -1436,50 +1481,94 @@ def helis_sans_tache(spots):
     return col, off
 
 
+def projo_tache(sp, hero, shot, frames, target_fn, allume=False, old=()):
+    """La tache du projecteur de l'appareil 0 (helicos.tache) : deux jumelles coaxiales de sa lampe `sp` (même parent,
+    même visée), invisibles à la caméra et à la brume, de la couleur du pinceau (helicos.BEAM0_COULEUR) :
+    - « projo_tache_0 » éclaire tout sauf la berline (collection d'exclusion : les voisins posés par la ville après la
+      scène la reçoivent aussi, le port au début de P6 comme la jetée), TACHE_E W/m² au centre, TACHE_R m de rayon au
+      bord, bord doux ;
+    - « projo_berline_0 » n'éclaire que la berline, BERLINE_E W/m².
+    Puissance (∝ d²) et ouverture clées à chaque image `frames` de la scène du plan `shot` sur la distance de la lampe
+    à sa cible `target_fn(t)` (repère de la scène, t en s depuis la première image) : la même tache à P5/60 et P6/1, à
+    P6/133 et FIN6/1. `allume` : multipliée par helicos.beam0_allume (P5). `old` : les jumelles d'avant, éteintes.
+    Renvoie (tache, berline)."""
+    import helicos
+    import motion as M
+    import parcours as PC
+    for o in old:
+        o.hide_render = True
+    body = L.car_parts(hero, glass=True)
+    sans = bpy.data.collections.new("projo_tache_sans_berline")
+    for o in body:
+        sans.objects.link(o)
+    for co in sans.collection_objects:
+        co.light_linking.link_state = "EXCLUDE"
+    avec = bpy.data.collections.new("projo_berline_seule")
+    for o in body:
+        avec.objects.link(o)
+    out = []
+    for nm, col in (("projo_tache_0", sans), ("projo_berline_0", avec)):
+        d = sp.data.copy()
+        d.animation_data_clear()             # (la copie partagerait l'action de la lampe : ses clés d'allumage)
+        d.name = nm
+        d.color = L.lin(helicos.BEAM0_COULEUR)[:3]
+        d.shadow_soft_size = helicos.TACHE_SOURCE
+        d.spot_blend = helicos.TACHE_BLEND
+        c = bpy.data.objects.new(nm, d)
+        for coll in sp.users_collection:
+            coll.objects.link(c)
+        c.parent = sp.parent
+        c.matrix_parent_inverse = sp.matrix_parent_inverse.copy()
+        c.rotation_mode = sp.rotation_mode
+        c.location, c.rotation_euler = sp.location.copy(), sp.rotation_euler.copy()
+        c.rotation_quaternion = sp.rotation_quaternion.copy()
+        c.visible_camera = False
+        c.visible_volume_scatter = False
+        c.light_linking.receiver_collection = col
+        out.append(c)
+    tg, tb = out
+    heli = helicos.in_scene(shot, 0)          # la position de l'appareil, sans frame_set sur la ville entière
+    dmin, dmax = 1e9, 0.0
+    for f in frames:
+        t = M.t_of(f)
+        dist = max(5.0, math.dist(heli(t)[:3], target_fn(t)[:3]))
+        dmin, dmax = min(dmin, dist), max(dmax, dist)
+        w_sol, cone, w_car = helicos.tache(dist)
+        k = helicos.beam0_allume(PC.t_of(shot, f)) if allume else 1.0
+        tg.data.energy, tb.data.energy = w_sol * k, w_car * k
+        tg.data.spot_size = tb.data.spot_size = math.radians(cone)
+        for d in (tg.data, tb.data):
+            d.keyframe_insert("energy", frame=f)
+            d.keyframe_insert("spot_size", frame=f)
+    print(f"[{shot}] tache du projecteur : {helicos.TACHE_E} W/m² au sol, {2 * helicos.TACHE_R:.0f} m, la berline à "
+          f"{helicos.BERLINE_E} W/m² ; l'appareil de {dmin:.0f} à {dmax:.0f} m de sa cible", flush=True)
+    return tg, tb
+
+
 def p6_beam0_haze(heli0, frames, hero):
     """L'appareil 0 arrive de P5 avec son pinceau dans la brume : une jumelle de son projecteur qui n'éclaire que
-    la brume, à la force de P5 à la coupe, éteinte sur helicos.BEAM0_FONDU s (helicos.beam0), cône compris ; sa
-    lampe de 8 kW (celle des trois appareils de la jetée) n'éclaire plus que la brume (helis_sans_tache). Sa tache au
-    sol et son point chaud sur la berline s'éteignent avec son pinceau (helicos.beam0_sol)."""
+    la brume, à la force de P5 (helicos.beam0, gardée jusqu'à la fin), la source et le cône de P5 ; sa lampe de 8 kW
+    (celle des appareils de la jetée) n'éclaire plus que la brume (helis_sans_tache). Sa tache au sol et sa jumelle sur
+    la berline : projo_tache, sur sa cible de P6 (helicos.beam_in_scene)."""
     import helicos
     import parcours as PC
     import scene_e
     sp = next(o for o in heli0.children_recursive if o.type == "LIGHT" and o.name.endswith("searchlight_spot"))
     brume = [o for o in bpy.data.objects if o.type == "MESH" and o.name.startswith("haze")]
-    tw = scene_e._twin(sp, "faisceau_brume_0", 0.0, "#e2eaff", brume)
+    tw = scene_e._twin(sp, "faisceau_brume_0", 0.0, helicos.BEAM0_COULEUR, brume)
     tw.visible_volume_scatter = True
     tw.data.shadow_soft_size, tw.data.spot_blend = helicos.BEAM0_SOURCE
-    # sa jumelle sur la berline (split_for_car, 50 kW) : ses propres données, la source et le cône de beam0 (la
-    # jumelle commune de la jetée, 4° et 1,5 m, ne posait sur le toit qu'une part de la tache de P5 : -28 % à la coupe)
-    cars = [o for o in sp.parent.children if o.type == "LIGHT" and o is not sp and o.name.startswith(sp.name + "_")]
-    for o in cars:
-        o.hide_render = False                                  # éteinte par helis_sans_tache, rallumée en fondu
-        o.data = o.data.copy()
-        o.data.energy = helicos.BEAM0_BERLINE
-        o.data.shadow_soft_size, o.data.spot_blend = helicos.BEAM0_SOURCE
-    berline = list(cars)
-    # sa tache au sol (8 kW, celle de P5) tant que son pinceau se voit, éteinte avec lui ; les projecteurs de la
-    # jetée, eux, n'éclairent plus le sol (helis_sans_tache)
-    sol = [o for o in bpy.data.objects if o.type == "MESH" and not o.name.startswith("haze")
-           and o not in set(L.car_parts(hero, glass=True))]
-    tg = scene_e._twin(sp, "faisceau_sol_0", helicos.BEAM0_SOL, "#fff2d6", sol)
-    tg.data.shadow_soft_size, tg.data.spot_blend = helicos.BEAM0_SOURCE
-    cars.append(tg)
-    for f in frames:
-        w, c = helicos.beam0(PC.t_of("P6", f), P6_HAZE)
-        k = helicos.beam0_sol(PC.t_of("P6", f))
-        tg.data.energy = helicos.BEAM0_SOL * k
-        tg.data.keyframe_insert("energy", frame=f)
-        for o in berline:                                      # pas de point chaud sans pinceau visible
-            o.data.energy = helicos.BEAM0_BERLINE * k
-            o.data.keyframe_insert("energy", frame=f)
-        tw.data.energy = max(0.0, w - helicos.BEAM0_FIN)     # la lampe de 8 kW éclaire déjà la brume
-        for d in [tw.data] + [o.data for o in cars]:
-            d.spot_size = math.radians(c)
-            d.keyframe_insert("spot_size", frame=f)
-        tw.data.keyframe_insert("energy", frame=f)
-    print(f"[P6] pinceau de l'appareil 0 : {helicos.beam0(PC.t_of('P6', frames[0]), P6_HAZE)[0]:.0f} W à la "
-          f"coupe, éteint en {helicos.BEAM0_FONDU} s ; {len(cars)} jumelle(s) sur la berline", flush=True)
+    sp.data.color = L.lin(helicos.BEAM0_COULEUR)[:3]
+    # sa lampe de 8 kW prend la source et le cône du pinceau : à 1,5 m de source (celle des appareils de la jetée),
+    # elle doublait le pinceau d'un cône flou et large
+    sp.data.shadow_soft_size, sp.data.spot_blend = helicos.BEAM0_SOURCE
+    # les jumelles d'avant sur la berline (split_for_car, éteintes par helis_sans_tache) restent éteintes
+    old = [o for o in sp.parent.children if o.type == "LIGHT" and o is not sp and o.name.startswith(sp.name + "_")]
+    w, c = helicos.beam0(PC.t_of("P6", frames[0]), P6_HAZE)
+    tw.data.energy = max(0.0, w - helicos.BEAM0_FIN)     # la lampe de 8 kW éclaire déjà la brume
+    tw.data.spot_size = sp.data.spot_size = math.radians(c)
+    projo_tache(sp, hero, "P6", frames, helicos.beam_in_scene("P6", 0), old=old)
+    print(f"[P6] pinceau de l'appareil 0 : {w:.0f} W, {c:.1f}°, gardé jusqu'à la fin", flush=True)
 
 
 def p6_clean_haze(scene, hero):
@@ -1529,6 +1618,7 @@ P6_LAMPS_FAR = (10, 11, 12, 13, 14)     # J_LAMPS[10:] : y 315 à 395, tous les 
 # vient vers l'objectif en bande large. Le premier est gelé 12° hors de l'axe, vers le large à gauche : un trait
 # court qui monte de la lanterne (17 % de la largeur au plus) ; le second, qui viendrait vers nous, ne se voit pas
 P6_PHARE_PHASE, P6_PHARE_VITESSE = 272.2 - 180.0 + 12.0, 0.0
+P6_PHARE_BALAYAGE = 20.0           # °/s : FIN6 repart de là (plan_FIN6)
 
 
 # le phare de FIN6 (plan_FIN6 : lieux.phare_tourne, pilote sur l'image de la scène ; phare_pinceaux) : P6 le pose déjà

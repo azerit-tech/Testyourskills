@@ -1881,8 +1881,10 @@ def stats():
 # ailleurs (scènes A, F, B), phare_lointain le pose loin, à l'échelle qui donne la hauteur voulue à l'écran.
 # Ni corail ni lilas (les rampes), ni blanc bleuté (les hélicoptères) : crème. Aucune inscription.
 
-PHARE_AT = (POINTE[0] + (POINTE_R - 1.3) * math.cos(math.radians(100.0)),
-            POINTE[1] + (POINTE_R - 1.3) * math.sin(math.radians(100.0)))   # (75,0 ; 458,3), azimut 100°
+# (2,3 m en deçà du bord de la pointe : 1,3 m tant que la tour faisait 1,6 m de diamètre ; à 2,9 m, son socle
+# serait sorti sur le garde-corps)
+PHARE_AT = (POINTE[0] + (POINTE_R - 2.3) * math.cos(math.radians(100.0)),
+            POINTE[1] + (POINTE_R - 2.3) * math.sin(math.radians(100.0)))   # (75,2 ; 457,3), azimut 100°
 PHARE_H = 17.9                     # du pied au sommet du chapeau (m, échelle 1)
 
 PHARE_FEU = 16.8                   # le milieu de la lanterne, l'axe des pinceaux
@@ -2013,11 +2015,13 @@ PINCEAU_L = 100.0                  # la longueur des cônes construits (m, éche
 
 def phare(at=PHARE_AT, scale=1.0, phase=0.0, vitesse=45.0, lanterne=30.0, name="phare", releve=6.0, portee=40.0,
           halo=0.9, halo_force=3.0):
-    """Le phare, posé en `at` ((x, y) ou (x, y, z)), à l'échelle `scale` : tour de béton blanc cassé de 16 m (1,6 m
-    de diamètre au pied, 1,1 m en haut) sur un socle, galerie sombre à 16 m et sa rambarde, lanterne crème de 16,2
-    à 17,4 m (émission `lanterne`), chapeau sombre ; une lumière faible pour son pied et la galerie ; un halo doux
+    """Le phare, posé en `at` ((x, y) ou (x, y, z)), à l'échelle `scale` : tour de béton blanc cassé de 16 m (2,9 m
+    de diamètre au pied, 2,0 m en haut : à 1,6 m, vue de FIN6 à 50 m, elle se lisait comme un lampadaire, brouillon
+    éclairé v9, critique n° 9) sur un socle, galerie sombre à 16 m, large de 3,1 m, et sa rambarde, chambre de
+    lanterne crème de 1,7 m de diamètre, de 16,2 à 17,4 m (émission `lanterne`), entre huit montants, chapeau sombre
+    en dôme ; une lumière faible pour son pied et la galerie ; un halo doux
     autour de la lanterne (sphère de `halo` m de rayon, force `halo_force` au centre ; 0 : sans halo).
-    Deux pinceaux opposés, cônes émissifs fins (0,8° de demi-angle), pleins à la lanterne et éteints au bout de
+    Deux pinceaux opposés, cônes émissifs (1,2° de demi-angle, partis de toute la lanterne), pleins à la lanterne et éteints au bout de
     `portee` m, relevés de `releve` degrés au-dessus de l'horizon (à 1°, vus de loin, ils faisaient une barre
     blanche horizontale d'un bord à l'autre du cadre), qui tournent de `vitesse` °/s (45 : un tour en 8 s ; 0 :
     gelés) ; `phase` : l'azimut du premier pinceau à l'image 0 (degrés depuis +x, sens trigonométrique). Ils ne
@@ -2049,28 +2053,29 @@ def phare(at=PHARE_AT, scale=1.0, phase=0.0, vitesse=45.0, lanterne=30.0, name="
     sombre = bpy.data.materials.get("phare_acier") or mat_steel("phare_acier", color=(0.07, 0.075, 0.08), rough=0.45,
                                                                 rust=0.3, paint=True)
     bm = bmesh.new()
-    _cone_bm(bm, 0.0, 0.45, 0.95, 0.95, seg=32)                    # le socle (dans le couronnement : 10 cm du
-    _cone_bm(bm, 0.45, 16.0, 0.8, 0.55, seg=32)                    # garde-corps), puis la tour
+    _cone_bm(bm, 0.0, 0.45, 1.65, 1.65, seg=40)                    # le socle (dans le couronnement), puis la
+    _cone_bm(bm, 0.45, 16.0, 1.45, 1.0, seg=40)                    # tour, fût conique
     part("tour", bm, [beton])
     bm = bmesh.new()
-    _cone_bm(bm, 15.88, 16.0, 0.98, 0.98, seg=32)                  # la galerie
-    for i in range(16):                                            # sa rambarde : montants et main courante
-        a0, a1 = i * math.tau / 16, (i + 1) * math.tau / 16
-        p0 = (0.93 * math.cos(a0), 0.93 * math.sin(a0))
-        p1 = (0.93 * math.cos(a1), 0.93 * math.sin(a1))
+    _cone_bm(bm, 15.7, 16.0, 1.55, 1.55, seg=40)                   # la galerie, en encorbellement
+    _cone_bm(bm, 15.3, 15.7, 1.05, 1.5, seg=40, cap=False)          # ses consoles, en cône sous elle
+    for i in range(24):                                            # sa rambarde : montants et main courante
+        a0, a1 = i * math.tau / 24, (i + 1) * math.tau / 24
+        p0 = (1.48 * math.cos(a0), 1.48 * math.sin(a0))
+        p1 = (1.48 * math.cos(a1), 1.48 * math.sin(a1))
         tube_bm(bm, (*p0, 16.0), (*p0, 16.55), 0.015, seg=6)
         tube_bm(bm, (*p0, 16.55), (*p1, 16.55), 0.02, seg=6)
-    _cone_bm(bm, 17.4, 17.52, 0.62, 0.62, seg=24)                  # le chapeau : un bord, un dôme, un épi
-    _cone_bm(bm, 17.52, 17.82, 0.6, 0.12, seg=24)
+    _cone_bm(bm, 17.4, 17.52, 1.08, 1.08, seg=32)                   # le chapeau : un bord, un dôme, un épi
+    _cone_bm(bm, 17.52, 17.82, 1.02, 0.2, seg=32)
     tube_bm(bm, (0.0, 0.0, 17.82), (0.0, 0.0, PHARE_H), 0.03, seg=6)
     for i in range(8):                                             # les montants de la lanterne
         a = i * math.tau / 8
-        p = (0.5 * math.cos(a), 0.5 * math.sin(a))
-        tube_bm(bm, (*p, 16.2), (*p, 17.4), 0.025, seg=6)
+        p = (0.87 * math.cos(a), 0.87 * math.sin(a))
+        tube_bm(bm, (*p, 16.2), (*p, 17.4), 0.05, seg=6)
     part("acier", bm, [sombre])
     bm = bmesh.new()
-    _cone_bm(bm, 16.0, 16.2, 0.55, 0.55, seg=24)                   # le pied de la lanterne
-    _cone_bm(bm, 16.2, 17.4, 0.48, 0.48, seg=24)
+    _cone_bm(bm, 16.0, 16.2, 0.95, 0.95, seg=32)                   # le pied de la lanterne
+    _cone_bm(bm, 16.2, 17.4, 0.85, 0.85, seg=32)
     lan = part("lanterne", bm, [emit_mat(f"{name}_lanterne", lin(PHARE_CREME), lanterne)])
     lan.visible_shadow = False
     if halo > 0:
@@ -2098,11 +2103,11 @@ def phare(at=PHARE_AT, scale=1.0, phase=0.0, vitesse=45.0, lanterne=30.0, name="
     piv.rotation_mode = "XYZ"
     piv["phase"], piv["vitesse"] = phase, vitesse
     mp = _mat_pinceau()
-    length, half, seg = PINCEAU_L, math.radians(0.8), 24
+    length, half, seg = PINCEAU_L, math.radians(1.2), 24
     for k, sgn in enumerate((1.0, -1.0)):
         bm = bmesh.new()
         r1 = length * math.tan(half)
-        ring0 = [bm.verts.new((0.0, 0.12 * math.cos(a), 0.12 * math.sin(a))) for a in
+        ring0 = [bm.verts.new((0.0, 0.4 * math.cos(a), 0.4 * math.sin(a))) for a in
                  (i * math.tau / seg for i in range(seg))]
         ring1 = [bm.verts.new((length, r1 * math.cos(a), r1 * math.sin(a))) for a in
                  (i * math.tau / seg for i in range(seg))]

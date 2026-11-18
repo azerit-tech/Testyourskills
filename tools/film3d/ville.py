@@ -372,6 +372,7 @@ def selftest():
     assert debit.env_key({"FILM3D_VILLE": "0"}) != debit.env_key({})
     selftest_voisins()
     selftest_helico()
+    selftest_sols_projecteur()
     print("[ville] selftest : poses de parcours, un lieu une place, prises sans saut, conduite des prises, route sous "
           "la berline, fenêtres, chargement, clé FILM3D_VILLE, voisins, hélicoptère de la prise : ok")
 
@@ -462,7 +463,7 @@ def selftest_helico():
     for f in fs[1:-1]:
         T = (f - 1) / FPS
         v, al, at = H.chase_kin(T)
-        p, r = ws[fs.index(f)][4:6]
+        p, r = H.chase_trajet(T)[1:3]           # la physique, dans le repère de la trajectoire (sans le crabe)
         if abs(at) > 1.0:                       # penché du côté où il tourne (à droite : roulis positif)
             assert r * at > 0, (f, r, at)
         if al > 1.0:                            # il accélère : nez bas
@@ -503,6 +504,82 @@ def selftest_helico():
     assert m < 0.0, f"l'hélicoptère est dans le cadre à P5/1 ({m:.1f}°) : il surgirait à la jonction P4 → P5"
     _ = P6
     return par
+
+
+# ---- le sol sous le projecteur de l'hélicoptère (P5, P6, FIN6). La lampe principale de l'appareil 0 (des mégawatts :
+# la force qu'il faut au pinceau dans la brume) n'éclaire que la brume ; le sol n'est éclairé que par sa tache bornée
+# (scene_d.projo_tache, « projo_tache_0 », exclusion de la seule berline). Brouillon éclairé v9, P5/27 (image 452) :
+# une bande blanche au bas du cadre, `pont_pied_chaussee`, un sol voisin posé par la ville après la scène, hors de
+# la collection d'exclusion de la lampe principale, que le balayage traversait (luminance du bas 100 au lieu de 21).
+# render_film --ville contrôle après la pose des voisins : la liste de tous les sols de la scène, et aucun ne reçoit
+# une lampe de projecteur autre que la tache.
+SOLS_NOMS = (r"(sol|chaussee|chaussée|terre_plein|trottoir|quai|dalle|tablier|jetee|jetée|pointe|route|enrobe|"
+             r"enrobé|parvis|place|rampe|pied|couronnement|bitume|asphalt|road|ground|deck|beach|sand|plage)")
+PROJECTEUR_NOMS = r"(searchlight_spot|^faisceau_)"
+PROJECTEUR_PLANS = ("P5", "P6", "FIN6")
+
+
+def est_sol(nom):
+    """Un maillage de sol d'après son nom (SOLS_NOMS), hors des brumes (« haze_pointe » n'est pas la pointe : c'est
+    l'air au-dessus d'elle, que le pinceau doit traverser)."""
+    n = nom.lower()
+    return not n.startswith("haze") and re.search(SOLS_NOMS, n) is not None
+
+
+def recoit(liaison, nom):
+    """Un objet `nom` reçoit-il une lampe dont la liaison de réception est `liaison` : None (tout reçoit) ou la liste
+    [(nom, état)] de sa collection (INCLUDE ou EXCLUDE) ? Une collection qui inclut quelqu'un n'éclaire que ceux qu'elle
+    inclut ; une collection qui n'a que des exclusions éclaire tout sauf eux (règle de Blender)."""
+    if liaison is None:
+        return True
+    etats = dict(liaison)
+    if any(e == "INCLUDE" for e in etats.values()):
+        return etats.get(nom) == "INCLUDE"
+    return nom not in etats
+
+
+def sols_eclaires(lampes, sols):
+    """[(lampe, sol)] : les sols `sols` (noms) que reçoivent les lampes de projecteur `lampes` [(nom, liaison)]."""
+    return [(lt, s) for lt, li in lampes if re.search(PROJECTEUR_NOMS, lt) for s in sols if recoit(li, s)]
+
+
+def selftest_sols_projecteur():
+    sols = ["pont_pied_chaussee", "port_terre_plein", "jetee_chaussee", "pointe_sol"]
+    brume_seule = [("haze", "INCLUDE"), ("haze_prise_OUV", "INCLUDE")]
+    sans_berline = [("hero_body", "EXCLUDE")]
+    assert not sols_eclaires([("heli:searchlight_spot", brume_seule), ("faisceau_brume_0", brume_seule),
+                              ("projo_tache_0", sans_berline)], sols)
+    # la panne de P5/27 : l'exclusion ne connaissait que le sol du port
+    vieille = [("port_terre_plein", "EXCLUDE"), ("hero_body", "EXCLUDE")]
+    assert sols_eclaires([("heli:searchlight_spot", vieille)], sols) == [
+        ("heli:searchlight_spot", s) for s in sols if s != "port_terre_plein"]
+    assert sols_eclaires([("faisceau_sol", None)], ["jetee_chaussee"]) == [("faisceau_sol", "jetee_chaussee")]
+    assert all(est_sol(s) for s in sols) and not est_sol("hero_body") and not est_sol("haze_pointe")
+    print("selftest_sols_projecteur OK")
+
+
+def projecteur_sols(scene, plan):
+    """render_film --ville, après les voisins : la liste des sols de la scène (SOLS_NOMS, maillages rendus) et ceux
+    qu'une lampe de projecteur (PROJECTEUR_NOMS, allumée) éclaire encore. Rend la liste des fautes ; avec
+    VILLE_SOLS_STRICT=1, une faute arrête le rendu."""
+    if plan not in PROJECTEUR_PLANS:
+        return []
+    sols = sorted(o.name for o in scene.objects if o.type == "MESH" and not o.hide_render and est_sol(o.name))
+    lampes = []
+    for lt in scene.objects:
+        if lt.type != "LIGHT" or lt.hide_render or not re.search(PROJECTEUR_NOMS, lt.name):
+            continue
+        col = lt.light_linking.receiver_collection
+        lampes.append((lt.name, None if col is None else
+                       [(o.name, co.light_linking.link_state) for o, co in zip(col.objects, col.collection_objects)]))
+    fautes = sols_eclaires(lampes, sols)
+    log(f"{plan} : {len(sols)} sols sous le projecteur ({', '.join(sols[:40])}{'…' if len(sols) > 40 else ''}) ; "
+        f"{len(lampes)} lampe(s) de projecteur, {len(fautes)} sol(s) qu'elles éclairent encore")
+    for lt, so in fautes[:30]:
+        log(f"! {plan} : le projecteur {lt} éclaire le sol {so} (seule la tache, projo_tache_0, le doit)")
+    if fautes and os.environ.get("VILLE_SOLS_STRICT") == "1":
+        raise RuntimeError(f"[ville] {plan} : {len(fautes)} sol(s) sous la lampe principale du projecteur")
+    return fautes
 
 
 def selftest_voisins():

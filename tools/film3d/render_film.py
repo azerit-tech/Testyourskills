@@ -293,6 +293,8 @@ def worker(a):
         # la ville autour du plan (ville.voisins) : après le cache, qui garde la scène du plan seule
         import ville
         ville.voisins(scene, plan, os.path.abspath(a.ville))
+        # le sol sous le projecteur : la liste des sols, voisins compris, et aucun sous la lampe principale
+        ville.projecteur_sols(scene, plan)
         # la vie de la ville (vie.py, SPEC §18.58) : en ville et en temps du film, la même des deux côtés de chaque
         # jonction ; FILM3D_VIE=0 l'ôte
         import vie

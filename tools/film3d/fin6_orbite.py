@@ -155,11 +155,14 @@ LAMP_HEAD = from_fin(F.SX + 11.0 + F.LAMP_HEAD[0] - F.LAMP_FIN[0],
 
 
 def beam_target(t):
-    """Le projecteur de l'hélicoptère : il la cherche pendant le freinage et se pose sur elle à l'arrêt."""
+    """Le projecteur de l'hélicoptère : il continue la visée de la fin de P6 (2 m devant elle, le long de sa route :
+    p6_jetee.beam_target) et glisse sur elle pendant le freinage, posé sur elle à l'arrêt. (Brouillon éclairé v9,
+    critique n° 9 : il battait de 1,1 m à 1,3 Hz en partant de 3,5 m devant elle ; sa tache au sol, désormais
+    bornée et visible, ne doit ni sauter à la jonction ni trembler sur la récompense.)"""
     x, y = hero_pos(t)
     w = 1.0 - M.smoothstep(T_STOP - 1.5, T_STOP, t)
-    sway = 1.1 * w * math.sin(2.0 * math.pi * 1.3 * t + 0.4)
-    return x + sway, y + 3.5 * w, 0.8
+    h = math.radians(hero_heading(t))
+    return x - 2.0 * w * math.sin(h), y + 2.0 * w * math.cos(h), 0.6 + 0.2 * (1.0 - w)
 
 
 def tracks():
@@ -183,11 +186,56 @@ RING_R = 14.0
 RING = [-122.7 + ROT + 360.0 / 11 * i for i in range(11)]
 RING_KEEP = [4, 5, 6, 10]
 RING_VAN = 10
-# six agents (azimut, rayon depuis le point d'arrêt, pose, style de lieux.officer), face à elle, à 1 m au moins
-# des caisses ; tous dans l'image posée
-COPS = tuple((a + ROT, r, pose, k) for a, r, pose, k in
-             ((22.0, 10.5, "guard", 0), (32.0, 9.0, "crouch", 1), (42.0, 10.0, "aim", 0),
-              (54.0, 9.0, "aim", 2), (64.0, 10.0, "stop", 1), (84.0, 9.5, "guard", 2)))
+RING_JITTER = 28.0                 # ° : l'écart de chaque véhicule à la visée du point d'arrêt (tiré, graine 6)
+
+
+def ring_poses():
+    """[(i, x, y, cap)] des véhicules de l'anneau (RING_KEEP) : à RING_R du point d'arrêt, tournés vers lui à
+    ± RING_JITTER près (le tirage de scene_d.fin6_pointe, graine 6, dans le même ordre)."""
+    import random
+    rnd = random.Random(6)
+    out = []
+    for i in RING_KEEP:
+        x, y = polar(RING[i], RING_R)
+        out.append((i, x, y, M.heading_of(CX - x, CY - y) + rnd.uniform(-RING_JITTER, RING_JITTER)))
+    return out
+
+
+def ring_point(i, lon, lat):
+    """(x, y) d'un point du repère du véhicule i de l'anneau : `lon` m vers son avant, `lat` m vers sa droite."""
+    _, x, y, h = next(r for r in ring_poses() if r[0] == i)
+    a = math.radians(h)
+    return x - math.sin(a) * lon + math.cos(a) * lat, y + math.cos(a) * lon + math.sin(a) * lat
+
+
+# six agents, face à elle (brouillon éclairé v9, critique n° 9 : six silhouettes en rang à 9–10 m d'elle, également
+# espacées, à la même distance, la même attitude). Maintenant ils sont sortis de leurs voitures : les patrouilles de
+# l'anneau ont leurs deux portières avant ouvertes (scene_d.fin6_pointe, lieux.open_door, 75°) et quatre agents sont
+# derrière elles (deux en visée par-dessus la portière, un accroupi derrière, un en garde un pas en retrait de la
+# portière arrière) ; un cinquième, en avant, fait « halte » de la main entre les deux voitures ; le sixième, en garde,
+# couvre depuis l'arrière de la voiture de droite. Des distances de 8 à 16 m, des écarts inégaux. Le repère d'une
+# portière : côté (+1, la portière du conducteur, à gauche ; -1, à droite), m vers l'avant, m dehors (la portière
+# ouverte va de 0,63 à 0,96 m vers l'avant, de 0,92 à 2,16 m dehors).
+DOOR_COPS = (               # (véhicule, côté, m vers l'avant, m dehors, pose, style) ; véhicule None : (azimut, rayon)
+    (5, 1, -0.05, 1.5, "aim", 0),
+    (5, -1, 0.1, 1.35, "crouch", 1),
+    (6, 1, -0.15, 1.55, "aim", 2),
+    (6, -1, -1.9, 1.75, "guard", 2),
+    (None, 57.0, 8.2, "stop", 1),
+    (5, -1, -3.4, 1.9, "guard", 0),
+)
+
+
+def _cop_polar(c):
+    if c[0] is None:
+        return c[1] + ROT, c[2]
+    i, side, lon, out = c[:4]
+    x, y = ring_point(i, lon, -side * out)
+    return math.degrees(math.atan2(y - CY, x - CX)), math.hypot(x - CX, y - CY)
+
+
+# (azimut, rayon depuis le point d'arrêt, pose, style de lieux.officer), comme avant : lu par scene_d, les tests
+COPS = tuple(_cop_polar(c) + tuple(c[-2:]) for c in DOOR_COPS)
 
 # les agents vivants (audit des mouvements, 18 novembre) : l'arme basse (« guard ») tant que la berline arrive, puis
 # chacun prend sa pose de COPS quand elle freine sur la pointe, une seconde environ avant l'arrêt, l'un après l'autre
@@ -323,9 +371,10 @@ def obstacles(t):
     (un disque de 3 m, quel que soit leur cap), les agents (un disque de 0,4 m), le mât du lampadaire."""
     out = [("berline", lambda p: rect_dist(p, hero_pos(t), hero_heading(t), HERO_BOX[0], HERO_BOX[1])),
            ("patrouille_1", lambda p: rect_dist(p, patrol1_pos(t), patrol1_heading(t), 5.0, 2.0))]
-    for i in RING_KEEP:
-        c = polar(RING[i], RING_R)
-        out.append((f"anneau_{i}", lambda p, c=c: math.dist(p, c) - 3.0))
+    for i, x, y, h in ring_poses():
+        # (le fourgon, ou une patrouille portières avant ouvertes : 2,2 m dehors de chaque côté)
+        w = 2.2 if i == RING_VAN else 4.4
+        out.append((f"anneau_{i}", lambda p, c=(x, y), h=h, w=w: rect_dist(p, c, h, 5.2, w)))
     for i, (a, r, _, _) in enumerate(COPS):
         c = polar(a, r)
         out.append((f"agent_{i}", lambda p, c=c: math.dist(p, c) - 0.4))

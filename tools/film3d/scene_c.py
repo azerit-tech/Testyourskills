@@ -178,7 +178,12 @@ def build_bridge(hidden, lamp_src, far=False, haubans=False):
         # noir au 200 mm (une fente dans l'image)
         # (acier mouillé et sale, sombre : à 0,42 de clair, le joint de la tête de pont, à un mètre de la marche,
         # doublait le trait clair en travers du cadre à l'entrée du pont, brouillon éclairé v8)
-        joint = S.mat_plain("joint_dilatation", (0.16, 0.16, 0.17, 1), 0.3, 1.0)
+        # (brouillon éclairé v9, images 332–333 : deux taches crème au bas du cadre, puis une bande sur toute la
+        # largeur, puis rien. C'était ce joint, en acier (métal 1, rugosité 0,3) : un miroir de 24 cm qui renvoyait à
+        # la caméra la paire de lampadaires du tablier (y −310) pendant les deux images où le point de reflet passe
+        # sur lui, 2 m devant l'objectif ; déjà là en v8. Le joint est maintenant du caoutchouc et de la crasse sur
+        # l'acier : diélectrique, mat, sombre ; il ne renvoie plus que ce que renvoie l'enrobé mouillé autour.)
+        joint = S.mat_plain("joint_dilatation", (0.05, 0.05, 0.055, 1), 0.78, 0.0)
         bm = L.bmesh.new()
         xs = [-HALF + 0.5 + (2 * HALF - 1.0) * k / 40 for k in range(41)]
         old = [y for y in (-282.5, -177.5, -72.5) if Y_START + 5.0 < y < Y_PORT - 5.0]
