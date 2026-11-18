@@ -1115,7 +1115,13 @@ def hero(lights_on=True):
     root = rig(body, "hero", yaw=math.pi)            # street_hero la met l'avant vers -y
     root["wheel_r"] = body.get("wheel_r", 0.33)
     hero_look(root)
+    # l'habitacle éclairé dans tous les plans, au même réglage : sans lui la lunette virait au noir d'un plan à
+    # l'autre (brouillon éclairé v9, raccords 107|108 et 317|318). Un plan qui en veut un autre rappelle cabin_light
+    cabin_light(root, energy=HERO_CABIN_W)
     return root
+
+
+HERO_CABIN_W = 25.0     # W, la lampe de lecture de la berline (la planche de bord garde ses 60 W)
 
 
 def hero_look(root):
@@ -1619,8 +1625,22 @@ def cabin_light(root, energy=6.0, color="#ffcf9a", dash=60.0, dash_color="#ffb07
     planche de bord (`dash` W, une bande de surface au pied du pare-brise, tournée vers l'arrière et relevée de
     `dash_tilt` degrés) qui éclaire le pavillon, les montants et le haut des sièges : le fond sur lequel se lit
     la silhouette, le dos du conducteur restant dans l'ombre. Renvoie la lampe de lecture (la planche de bord est
-    sa fille, `hero_planche`)."""
+    sa fille, `hero_planche`).
+    Une seule par voiture : lieux.hero() la pose (HERO_CABIN_W) ; rappelée, elle règle la lampe déjà là (puissances,
+    teintes) sans en ajouter une seconde."""
     body = bpy.data.objects[root["body"]]
+    have = next((o for o in body.children if o.type == "LIGHT" and o.name.startswith("hero_habitacle")), None)
+    if have is not None:
+        have.data.energy = energy
+        have.data.color = lin(color)[:3]
+        lo = bpy.data.objects.get(have.get("planche", ""))
+        if lo is not None:
+            lo.data.energy = dash
+            lo.data.color = lin(dash_color)[:3]
+            lo.location = dash_loc
+            lo.rotation_euler = (math.radians(90.0 + dash_tilt), 0.0, 0.0)
+            lo.hide_render = not dash
+        return have
     d = bpy.data.lights.new("hero_habitacle", "POINT")
     d.energy = energy
     d.color = lin(color)[:3]
