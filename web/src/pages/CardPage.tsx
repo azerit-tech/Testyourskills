@@ -28,6 +28,7 @@ import { Penalty, ProfileSky } from "../components/ProfileTile";
 import { CardViewOptions } from "../card/CardView";
 import { RevealCard, useReveal } from "../components/Reveal";
 import { ShareDock } from "../components/ShareDock";
+import { Spin } from "../components/Spin";
 import type { WalkoutControl } from "../components/Walkout3D";
 import { Waiting } from "../components/Waiting";
 import { pick, useT } from "../i18n";
@@ -788,6 +789,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
         {/* Fiche masquée : /og/* et /c/:id répondent 404 / 410 à tous, l'image ne se télécharge pas et le lien ne montre rien. */}
         {fromRival && <Duel mine={own} card={fromRival} duel={fromDuel} from />}
         {!visitor && !(claimed && me?.hidden) && <ShareBar item={item} toast={toast.show} second={!!addFirst} />}
+        {/* La caisse du suspect (§18.79) : la berline du film, qu'on fait tourner au doigt, juste après le partage. */}
+        <Spin ready={settled} />
         {/* Tu roules pour qui ? (§18.38) : l'école et la boîte, la raison de partager, juste après le partage. */}
         {!visitor && <BandPick cardId={id} toast={toast.show} />}
         {/* Dénonce un complice (§18.6). */}
