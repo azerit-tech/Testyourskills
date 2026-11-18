@@ -105,6 +105,12 @@ DRIVER = dict(
     v_avance=3.0, a_droit=3.0,   # m/s, m/s² : l'avance de vitesse qu'il se permet pour rattraper l'horaire, en ligne
                             # droite seulement (nulle dès que le plan vire à a_droit m/s² de latérale)
     es_max=1.5,             # m : le retard sur l'horaire qu'il cherche à rattraper d'un coup (au-delà, il patiente)
+    # l'arrêt au bout de la route (_enveloppe_arret) : le freinage qu'il se garde pour s'arrêter au point d'arrêt
+    # (m/s² : en ligne ; le cercle avec la latérale de la route), le rappel sur cette vitesse (1/s) ; la fin du
+    # freinage (_pose_arret) : sous arret_v m/s il relâche avec la vitesse, jusqu'à arret_fin m/s² à l'arrêt (pas de
+    # coup de frein : 0,8 m/s² lâchés en une image font 19 m/s³)
+    arret_a=6.2, arret_cercle=6.5, k_arret=6.0, arret_v=1.0, arret_fin=0.8,
+    arret_seul=(3.0, 8.0),  # m avant le point : sous 3 m l'enveloppe seule le conduit, au-delà de 8 m l'horaire
     grip=0.93,              # la part de l'adhérence des roues arrière qu'il ose demander en relançant dans un virage
     # le dérapage (_repartit)
     k_g=25.0,               # 1/s² : le rappel sur l'écart de glisse (avec k_r : 5 rad/s, amorti à 0,9)
@@ -123,6 +129,7 @@ DRIVER = dict(
 
 SUB = 4                     # pas de la physique par pas du conducteur (960 Hz)
 DT = 1.0 / 240.0
+V_POSE = 0.03               # m/s : la même chose au bout d'un freinage posé sur le point d'arrêt (_pose_arret)
 V_ARRET = 0.08              # m/s : dessous, au bout de la route, elle est arrêtée (3 mm par image : rien ne se voit)
 
 
@@ -610,6 +617,60 @@ def _repartit(car, av, af_lo, af_hi, loads, a_r, beta, V, dr_des, dchi_des, at_d
     return k if cout(k) <= js[i] else grid[i]
 
 
+ENV_DS = 0.05               # m : le pas de l'enveloppe d'arrêt
+ENV_L = 90.0                # m : sa longueur avant le point d'arrêt
+
+
+def _pose_arret(d):
+    """La fin du freinage, sous arret_v m/s : il relâche avec la vitesse, a = arret_fin + c v (c tel que a vaille
+    arret_a à arret_v). Rend (c, la distance que la voiture y parcourt jusqu'à l'arrêt)."""
+    c = (d["arret_a"] - d["arret_fin"]) / d["arret_v"]
+    return c, d["arret_v"] / c - d["arret_fin"] / (c * c) * math.log(1.0 + c * d["arret_v"] / d["arret_fin"])
+
+
+def _enveloppe_arret(plan, d):
+    """La vitesse au plus à chaque distance du point d'arrêt (fusion v10, SPEC §18.67) : celle d'où le conducteur
+    s'arrête encore à plan.s_stop, calculée en remontant la route depuis l'arrêt. Le freinage qu'il s'y garde :
+    arret_a en ligne, moins ce que le virage de la route prend au cercle arret_cercle ; sous arret_v il relâche
+    (_pose_arret : l'enveloppe part de la distance que cette fin de freinage demande). Rend [(v, a)] au pas ENV_DS,
+    de l'arrêt vers l'amont.
+    Sans elle le conducteur suivait un horaire : en retard de 2 à 3 m après le slalom de la jetée, il freinait moins
+    pour le rattraper, roulait encore à 3 km/h à l'heure de l'arrêt, passait le point de 0,7 m et finissait au pas
+    (arrêt à l'image 723 pour 692,8). Avec elle il freine plus tard et plus fort que le plan, et s'arrête au point,
+    quelle que soit la vitesse à laquelle il y arrive (un contact, un écart)."""
+    R = plan.route
+    v0 = d["arret_v"]
+    d0 = _pose_arret(d)[1]
+    # (v, a) à la distance k ENV_DS du point ; sous d0 : la fin du freinage, lue sur la vitesse, pas sur la distance
+    out = []
+    v, dist = v0, d0
+    n0 = int(d0 / ENV_DS) + 1
+    for k in range(n0 + 1):
+        out.append((v0, d["arret_a"]))
+    v = math.sqrt(v0 * v0 + 2.0 * d["arret_a"] * (n0 * ENV_DS - d0))
+    out[n0] = (v, d["arret_a"])
+    for k in range(n0 + 1, int(ENV_L / ENV_DS) + 1):
+        s = plan.s_stop - k * ENV_DS
+        lat = v * v * abs(R.at(s)[3])
+        a = min(d["arret_a"], math.sqrt(max(0.25, d["arret_cercle"] ** 2 - lat * lat)))
+        v = math.sqrt(v * v + 2.0 * a * ENV_DS)
+        out.append((v, a))
+    return out
+
+
+def _env_at(env, dist):
+    """(v, a) de l'enveloppe d'arrêt à `dist` m avant le point d'arrêt ; au-delà du point : (0, la fin du freinage) ;
+    plus loin que l'enveloppe : (None, None)."""
+    if dist <= 0.0:
+        return env[0]
+    u = dist / ENV_DS
+    k = int(u)
+    if k >= len(env) - 1:
+        return None, None
+    f = u - k
+    return env[k][0] + (env[k + 1][0] - env[k][0]) * f, env[k][1] + (env[k + 1][1] - env[k][1]) * f
+
+
 def simulate(plan, events=(), t_span=(-2.0, 40.0), car=None, driver=None):
     """Simule la berline et son conducteur sur la route du plan, de t_span[0] à t_span[1] (s). events : les
     dérapages (voir Geste). Rend un PhysDrive (table à 240 Hz)."""
@@ -640,6 +701,8 @@ def simulate(plan, events=(), t_span=(-2.0, 40.0), car=None, driver=None):
     m, Iz, a, b = c["m"], c["Iz"], c["a"], c["b"]
     a_pousse = c["mu"] * G * a / (a + b - c["mu"] * c["h"])    # m/s² : la relance au plus, en ligne (propulsion)
     ay_f = 0.0
+    env = _enveloppe_arret(plan, d) if plan.s_stop is not None else None
+    c_pose = _pose_arret(d)[0]
     for i in range(n):
         t = t_span[0] + i * DT
         u, v, r = car_.u, car_.v, car_.r
@@ -734,6 +797,21 @@ def simulate(plan, events=(), t_span=(-2.0, 40.0), car=None, driver=None):
             k_ici = max(abs(R.at(s + q * Vc)[3]) for q in (0.0, 0.3, 0.6))
             v_cap = v_ici - (v_r0 - v_r) + d["v_avance"] * max(0.0, 1.0 - v_ici * v_ici * k_ici / d["a_droit"])
             a_cmd = min(a_cmd, a_ici + d["k_v"] * (v_cap - v_along))
+        # le point d'arrêt est un lieu, pas une heure (_enveloppe_arret) : il ne roule jamais plus vite que ce qui lui
+        # laisse de quoi s'y arrêter, quel que soit son retard sur l'horaire
+        if env is not None:
+            d_env = plan.s_stop - s
+            v_env, a_env = _env_at(env, d_env)
+            if v_env is not None:
+                a_env_cmd = -a_env + d["k_arret"] * (v_env - v_along)
+                if v_along < d["arret_v"] and d_env < 2.0:
+                    # la fin du freinage : il relâche avec la vitesse et se pose (_pose_arret)
+                    a_env_cmd = -(d["arret_fin"] + c_pose * max(0.0, v_along))
+                a_cmd = min(a_cmd, a_env_cmd)
+                # dans les derniers mètres il n'y a plus d'horaire : il se pose sur le point (sinon, arrivé sous
+                # la vitesse du plan, il finissait au pas)
+                lo_, hi_ = d["arret_seul"]
+                a_cmd += (1.0 - _smooth01((d_env - lo_) / (hi_ - lo_))) * (a_env_cmd - a_cmd)
         # il ne relance pas plus fort que ses roues arrière ne tiennent : ce qu'elles donnent déjà en travers (le
         # virage qu'il sent) est pris sur ce qu'elles peuvent pousser (l'ellipse d'adhérence, le report de charge)
         ay_f += (abs(car_.ay) - ay_f) * min(1.0, DT / 0.1)
@@ -791,7 +869,10 @@ def simulate(plan, events=(), t_span=(-2.0, 40.0), car=None, driver=None):
         brk += max(-pr, min(pr, brk_s - brk))
         hr = c["hb_rate"] * DT
         hb += max(-hr, min(hr, hb_s - hb))
-        if plan.s_stop is not None and s > plan.s_stop - 0.5 and V < V_ARRET and v_r < V_ARRET:
+        # (avec l'enveloppe d'arrêt elle se pose à V_POSE : 0,08 m/s coupés d'un coup à la fin d'un freinage qui se
+        # relâche font, selon l'image où ça tombe, 25 à 53 m/s³ d'à-coup aux images rendues ; 0,03 : 21 à 25)
+        if plan.s_stop is not None and s > plan.s_stop - 0.5 and (V < V_POSE if env is not None
+                                                                  else V < V_ARRET and v_r < V_ARRET):
             stopped = True
         # ---- la physique, SUB pas
         h = DT / SUB
