@@ -834,11 +834,15 @@ def test_p6():
     cam_v = min(math.dist(P.camera_rail(T(g))[:2], fn(T(g))) - 0.95 for g in frames
                 for k, fn in P.tracks().items() if k != "hero")
     check("P6 : la caméra à 0,8 m au moins des autres véhicules", cam_v >= 0.8, f"{cam_v:.2f} m de leur flanc")
-    air = {f"heli_{i}": P.heli(i) for i in range(len(P.HELIS))}
+    # (les appareils posés : helicos.N, un seul depuis le 17 novembre ; les ailiers 1 et 2 restent décrits mais ne
+    # sont dans aucune scène, l'appareil de la poursuite traverse leur place : 14,7 m, un écart sans objet)
+    import helicos
+    air = {f"heli_{i}": P.heli(i) for i in range(min(helicos.N, len(P.HELIS)))}
     air.update({f"jet_{i}": P.jet(i) for i in range(len(P.JETS))})
-    worst = min((math.dist(air[p](M.t_of(f))[:3], air[q](M.t_of(f))[:3]), p, q, f)
-                for f in frames for p in air for q in air if p < q)
-    check("P6 : les appareils s'évitent (15 m)", worst[0] >= 15.0, f"{worst[0]:.1f} m entre {worst[1]} et {worst[2]}")
+    worst = min(((math.dist(air[p](M.t_of(f))[:3], air[q](M.t_of(f))[:3]), p, q, f)
+                 for f in frames for p in air for q in air if p < q), default=(99.0, "", "", 0))
+    check("P6 : les appareils s'évitent (15 m)", worst[0] >= 15.0,
+          f"{worst[0]:.1f} m entre {worst[1]} et {worst[2]}" if worst[1] else "un seul appareil posé")
     cam = min(math.dist(P.camera(M.t_of(f))[:3], air[k](M.t_of(f))[:3]) for f in frames for k in air)
     check("P6 : rien ne frôle la caméra (20 m)", cam >= 20.0, f"{cam:.1f} m au plus près")
     entry = CAM_LIMITS_PLAN["P6"]["air_entry"]

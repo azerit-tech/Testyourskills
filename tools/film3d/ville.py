@@ -380,6 +380,7 @@ def selftest():
 # Les hélicoptères que la scène de chaque tronçon pose elle-même (scene_e.plan_P5, scene_d.plan_P6 : helicos.N
 # appareils ; scene_d.plan_FIN6 : l'appareil 0) ; les voisins n'en apportent aucun (heli_voisin)
 HELIS_PROPRES = {"P5": "helicos.N", "P6": "helicos.N", "FIN6": 1}
+HELI_SAUT_ATT = 0.3     # ° : le pas d'assiette d'une image à la jonction ne dépasse pas ceux d'à côté de plus que ça
 HELI_SAUT_ACC = 3.0     # m/s² : l'accélération d'une image à la jonction ne dépasse pas celle d'à côté de plus que ça
 
 
@@ -443,8 +444,15 @@ def selftest_helico():
         j = P.START[s] + 1                              # l'image du film de s/1
         near = [acc[f] for f in range(j - 8, j + 9) if f in acc and abs(f - j) > 1]
         assert acc[j] <= max(near) + HELI_SAUT_ACC and acc[j - 1] <= max(near) + HELI_SAUT_ACC, (s, acc[j], near)
-        da = max(abs((att[j][k] - att[j - 1][k] + 180) % 360 - 180) for k in (3, 4, 5))
-        assert da < 1.0, (s, da)                          # ° : cap, tangage, roulis d'une image à l'autre
+        # ° : cap, tangage, roulis d'une image à l'autre : pas de saut à la jonction, c'est-à-dire pas plus que les
+        # images voisines à HELI_SAUT_ATT près. (Fusion v10 : « < 1° » avant ; recalé sur la berline simulée,
+        # l'appareil vire avec elle dans le port à 30 °/s, 1,2 à 1,4° par image des deux côtés de P5 → P6, sans saut ;
+        # sa vitesse de lacet reste bornée plus bas, 60 °/s.)
+        def pas(g):
+            return max(abs((att[g][k] - att[g - 1][k] + 180) % 360 - 180) for k in (3, 4, 5))
+        da = pas(j)
+        assert da <= max(pas(g) for g in range(j - 8, j + 9) if g != j and g - 1 in att and g in att) + HELI_SAUT_ATT, \
+            (s, da)
     # chaque scène lit la même trajectoire : la dernière image d'un tronçon prolongée d'une image est la première du
     # suivant, dans la ville (FIN6 a la pose de P6)
     for a, b in (("P5", "P6"), ("P6", "FIN6")):
@@ -468,7 +476,10 @@ def selftest_helico():
             assert r * at > 0, (f, r, at)
         if al > 1.0:                            # il accélère : nez bas
             assert p < 0, (f, p, al)
-        if v > 8.0 and abs(al) < 0.5:           # vol d'avance régulier : nez bas
+        # vol d'avance régulier : nez bas. (0,3 m/s², 0,5 avant la fusion v10 : à 8 m/s le nez bas du vol d'avance
+        # vaut 2,2° (helicos.CRUISE_PITCH), un freinage de 0,5 m/s² le relève de 2,9° ; le contrôle refusait ce que
+        # le modèle donne, à P5/53 quand l'appareil attend la berline qui dérape à 30 km/h)
+        if v > 8.0 and abs(al) < 0.3:
             assert p < 0, (f, p, al)
         if abs(at) < 0.3:                       # pas de roulis sans virage
             assert abs(r) < 6.0, (f, r, at)

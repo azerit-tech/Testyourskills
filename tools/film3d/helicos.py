@@ -136,8 +136,13 @@ def _hermite(p0, p1, v1, a1, D, u):
 # pendant le dérapage du port (vers P5/40), traverse le cadre vers la gauche, le dépasse à la sortie du port (l'élan
 # du virage, au quart gauche vers P6/25–37), puis revient lentement vers la droite sur la jetée (aux trois cinquièmes à
 # P6/109), avant le stationnaire de FIN6. Il garde le faisceau sur elle (beam).
-CHASE_KEYS = ((16.0, 58.0, 43.0, 24.0), (19.2, 68.0, 26.0, 20.6), (20.5, 66.0, 6.0, 20.4), (22.0, 54.0, -16.0, 20.4),
-              (24.3, 46.0, 16.0, 20.6), (25.5, 46.0, 8.0, 21.0))
+# Fusion v10 (SPEC §18.67), recalé sur la berline simulée (son dérapage du port, 5 m plus tard sur l'horaire derrière
+# le slalom du pont, et le bras qui la suit) : avec les clés d'avant (26, 6 et −16 m de côté à 19,2, 20,5 et 22 s)
+# il n'entrait dans le cadre qu'à P5/50 et finissait P5 à x 78 %. Ici, une clé de plus à P5/1 (17,75 s) le tient
+# hors du cadre à la coupe (x 122 %) ; il entre à P5/41, finit P5 à x 61 %, y 80 % du bas (le cadre final le veut
+# entre 45 et 65), passe au plus à gauche à x 15 % vers P6/31–37, revient à 54 % à P6/109. Il vire à 40 °/s au plus.
+CHASE_KEYS = ((16.0, 58.0, 45.0, 24.0), (17.75, 62.0, 36.0, 22.3), (19.2, 68.0, 12.0, 20.6), (20.5, 66.0, -14.0, 20.4),
+              (22.0, 54.0, -11.0, 20.4), (24.3, 46.0, 16.0, 20.6), (25.5, 46.0, 8.0, 21.0))
 # le crabe : en poursuite, son nez s'écarte de CHASE_CRAB° à droite de sa trajectoire, le flanc gauche (sa porte, son
 # projecteur) tourné vers elle, comme un appareil de police qui garde la berline sous sa porte : on le voit de trois
 # quarts arrière (rotor et cellule, 20 à 48° entre son cap et la visée sur la jetée) au lieu de dos (0 à 10° avant).
