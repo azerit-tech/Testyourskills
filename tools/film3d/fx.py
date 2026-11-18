@@ -293,7 +293,7 @@ def wheel_spray(track, wheels, wheel_r, rate_drops=2400.0, rate_mist=190.0, wet=
                     reach = rng.uniform(2.5, 4.0) / max(1.0, (1.0 - carry) * speed)
                     life = land_time(p, v, drag, ground, min(0.42, reach) if bas else 0.9)
                     drops.append(Particle(f, p, v, life, drag, 1.0,
-                                          rng.uniform(0.006, 0.014) if bas else rng.uniform(0.003, 0.007),
+                                          rng.uniform(0.0025, 0.006) if bas else rng.uniform(0.002, 0.005),
                                           seed=rng.random()))
                 # le voile : continu au-delà de 50 km/h (le débit suit la vitesse), haut de 0,6 à 1 m, long de 4 à
                 # 6 m derrière la roue (vie × vitesse relative), né à l'arrière du pneu sans fondu d'entrée
@@ -395,7 +395,7 @@ def puddle_splash(track, crossing, wheel_r, depth=1.0, seed=3, n_burst=900, n_sh
         v = (d[0] * sp * math.cos(el) + V[0] * carry, d[1] * sp * math.cos(el) + V[1] * carry, sp * math.sin(el))
         drag = rng.uniform(0.4, 1.2)
         life = land_time(p, v, drag, ground, 1.2)
-        drops.append(Particle(f, p, v, life, drag, 1.0, rng.uniform(0.005, 0.012), seed=rng.random()))
+        drops.append(Particle(f, p, v, life, drag, 1.0, rng.uniform(0.003, 0.007), seed=rng.random()))
     # la lame : des sprites lancés vers l'extérieur et vers le haut, qui montent à hauteur de vitre (0,8 à 1,1 m au
     # centre, le haut du sprite plus haut) en 0,2 s et se lisent cinq à six images
     for k in range(int(n_sheet * depth)):
@@ -502,14 +502,17 @@ def rear_slip(fwd, V):
     return math.degrees(math.atan2(abs(lat), max(1e-6, abs(lon))))
 
 
-def drift_spray(track, wheel_r, g0=0, seed=23, substeps=4, frames=None, wet=1.0, slip_min=4.0, slip_full=18.0,
-                rate_sheet=1500.0, rate_mist=60.0, mist_size=1.0, mist_alpha=0.5):
+def drift_spray(track, wheel_r, g0=0, seed=23, substeps=4, frames=None, wet=1.0, slip_min=4.0, slip_full=24.0,
+                rate_sheet=1100.0, rate_mist=60.0, mist_size=1.0, mist_alpha=0.32):
     """L'eau d'une glisse sur le mouillé (pas de fumée : la chaussée est trempée, à la tombée de la nuit) : chaque
     pneu arrière qui frotte en travers (sa dérive, de slip_min à slip_full degrés) chasse une lame d'eau devant lui,
     dans le sens où il glisse (l'extérieur du virage), qui monte de 0,3 à 1 m et retombe en une demi-seconde ; et une
-    brume de pulvérisation, plus lente, qui gonfle de 0,3 à 1,6 m et reste dans l'arc de la glisse avant de se
-    dissiper (0,5 à 0,9 s, 1,6 m au plus). Le tirage est fait par sous-image du film (g0 : l'image du film moins celle de la scène) : deux
-    tronçons qui se suivent tirent les mêmes gouttes, et celles nées avant une coupe vivent encore après.
+    brume de pulvérisation, plus lente, qui gonfle de 0,15 à 1 m et reste dans l'arc de la glisse avant de se
+    dissiper (0,45 à 0,8 s, 1 m au plus). Brouillon éclairé v8 : à 1,6 m et 0,5 d'opacité, gouttes de 6 à 14 mm,
+    elle se lisait comme de la neige au port ; l'intensité monte maintenant de 4 à 24° de dérive (de 4 à 18°, la
+    gerbe sortait pleine en quatre images, +14 de luminance d'une image à l'autre au décrochage). Le tirage est fait
+    par sous-image du film (g0 : l'image du film moins celle de la scène) : deux tronçons qui se suivent tirent les
+    mêmes gouttes, et celles nées avant une coupe vivent encore après.
     Renvoie (gouttes, brume)."""
     drops, mist = [], []
     lo, hi = frames if frames else (track[0].frame, track[-1].frame)
@@ -547,17 +550,17 @@ def drift_spray(track, wheel_r, g0=0, seed=23, substeps=4, frames=None, wet=1.0,
                 v = (V[0] * carry + slide[0] * out, V[1] * carry + slide[1] * out, up)
                 drag = r2.uniform(1.0, 2.2)
                 drops.append(Particle(f, p, v, land_time(p, v, drag, ground, 0.7), drag, 1.0,
-                                      r2.uniform(0.006, 0.014), seed=r2.random()))
+                                      r2.uniform(0.003, 0.007), seed=r2.random()))
             for _ in range(_poisson(r2, rate_mist * g / (FPS * substeps))):
                 u, w = wheel_r * r2.uniform(0.3, 1.0), r2.uniform(0.0, 0.4)
                 p = (c[0] + slide[0] * u - fwd[0] * w, c[1] + slide[1] * u - fwd[1] * w, ground + r2.uniform(0.1, 0.35))
                 # emportée à 40–60 % de la vitesse de la roue : elle reste dans l'arc, près de la voiture (de dos, la
-                # caméra à 7,5 m ne la traverse pas), et s'éteint en 0,5 à 0,9 s
+                # caméra à 7,5 m ne la traverse pas), et s'éteint en 0,45 à 0,8 s
                 carry, out = r2.uniform(0.4, 0.6), vs * r2.uniform(0.15, 0.45) + r2.uniform(0.3, 1.0)
                 v = (V[0] * carry + slide[0] * out, V[1] * carry + slide[1] * out, r2.uniform(0.25, 0.8))
-                s0 = mist_size * r2.uniform(0.25, 0.45)
-                mist.append(Particle(f, p, v, r2.uniform(0.5, 0.9), r2.uniform(1.6, 2.6), 0.02, s0,
-                                     mist_size * r2.uniform(1.1, 1.6), mist_alpha * (0.4 + 0.6 * g) * r2.uniform(0.7, 1.0),
+                s0 = mist_size * r2.uniform(0.15, 0.3)
+                mist.append(Particle(f, p, v, r2.uniform(0.45, 0.8), r2.uniform(1.6, 2.6), 0.02, s0,
+                                     mist_size * r2.uniform(0.6, 1.0), mist_alpha * (0.4 + 0.6 * g) * r2.uniform(0.7, 1.0),
                                      r2.random()))
     return drops, mist
 
@@ -962,15 +965,28 @@ def mat_sprite(name, color="#cfd3de", noise_scale=1.6, lo=0.32, hi=0.78, translu
     return m
 
 
+# L'eau pulvérisée au crépuscule, sur l'enrobé mouillé (brouillon éclairé v8 : blanche et opaque, elle se lisait comme
+# de la neige, surtout au port, images 451–485) : un nuage de gouttelettes fines, translucide, sombre pour l'essentiel ;
+# il ne s'allume que là où une lumière le traverse, le rouge des feux arrière juste derrière la berline, l'ambre des
+# lampadaires au-dessus. D'où : une diffusion faible (SPRAY_ALBEDO, le ciel violet ne le blanchit plus), surtout
+# vers l'avant (SPRAY_TRANSLUCENT : la lumière qui vient de derrière lui, la berline et ses feux), un peu d'ombre sur
+# ce qu'il cache (SPRAY_OCCLUDE), aucune émission, un sprite découpé en lambeaux fins (pas une bouffée).
+SPRAY_ALBEDO = "#7b818b"
+SPRAY_TRANSLUCENT = 0.8
+SPRAY_OCCLUDE = 0.35
+
+
 def mat_spray(veil="bas"):
     """L'eau pulvérisée : de dos (« bas »), un voile déchiré qui prend le rouge des feux, l'ambre des lampes, le
-    corail et le lilas des rampes, sans jamais être plus clair qu'eux ; de côté (« haut »), le voile de brume."""
+    corail et le lilas des rampes, sans jamais être plus clair qu'eux ; de côté (« haut ») et dans les dérapages, la
+    brume de pulvérisation, un peu plus large. Ni l'une ni l'autre n'émet."""
     if veil == "bas":
-        # de l'eau pulvérisée en voile déchiré : un bruit fin et contrasté découpe chaque sprite en lambeaux ;
-        # elle absorbe autant qu'elle diffuse (empilée, elle ne s'additionne pas en faisceau blanc) et ne prend que
-        # la lumière de la scène : gris bleuté sous le ciel, rouge près des feux, ambre sous les lampes
-        return mat_sprite("fx_gerbe", "#c4cad6", 5.0, 0.3, 0.62, translucent=0.7, occlude=0.5, detail=4.0, power=1.3)
-    return mat_sprite("fx_brume_eau", "#c8cedc", 1.8, 0.2, 0.75, detail=3.0, power=2.0)
+        # un bruit fin et contrasté découpe chaque sprite en lambeaux ; elle absorbe autant qu'elle diffuse (empilée,
+        # elle ne s'additionne pas en faisceau blanc)
+        return mat_sprite("fx_gerbe", SPRAY_ALBEDO, 5.0, 0.34, 0.66, translucent=SPRAY_TRANSLUCENT,
+                          occlude=SPRAY_OCCLUDE, detail=4.0, power=1.3)
+    return mat_sprite("fx_brume_eau", SPRAY_ALBEDO, 3.6, 0.3, 0.7, translucent=SPRAY_TRANSLUCENT - 0.05,
+                      occlude=SPRAY_OCCLUDE, detail=4.0, power=1.8)
 
 
 def mat_smoke(color="#d6d4da"):
@@ -981,7 +997,10 @@ def mat_smoke(color="#d6d4da"):
 
 
 def mat_drop(name="fx_goutte"):
-    """Une goutte : verre d'eau et un peu de translucide (elle s'allume à contre-jour d'un phare)."""
+    """Une goutte : de l'eau claire (verre, IOR 1,33), qui ne montre que ce qu'elle réfracte (l'enrobé sombre) et ce
+    qu'elle renvoie (les feux arrière, les lampadaires, un reflet de ciel) ; à moitié transparente, elle couvre moins
+    qu'un pixel. Plus de translucide clair : il diffusait le ciel et faisait des gouttes blanches (des étincelles au
+    port, brouillon éclairé v8)."""
     bpy = _bpy()
     m = bpy.data.materials.get(name)
     if m:
@@ -989,16 +1008,15 @@ def mat_drop(name="fx_goutte"):
     m = bpy.data.materials.new(name)
     nt, N, out = _nodes(m)
     gl = N.new("ShaderNodeBsdfPrincipled")
-    gl.inputs["Base Color"].default_value = (0.9, 0.92, 0.95, 1.0)
-    gl.inputs["Roughness"].default_value = 0.08
+    gl.inputs["Base Color"].default_value = (0.92, 0.94, 0.96, 1.0)
+    gl.inputs["Roughness"].default_value = 0.05
     gl.inputs["IOR"].default_value = 1.33
     gl.inputs["Transmission Weight"].default_value = 1.0
-    tl = N.new("ShaderNodeBsdfTranslucent")
-    tl.inputs["Color"].default_value = (0.85, 0.87, 0.92, 1.0)
+    tr = N.new("ShaderNodeBsdfTransparent")
     mx = N.new("ShaderNodeMixShader")
-    mx.inputs["Fac"].default_value = 0.4
-    nt.links.new(gl.outputs[0], mx.inputs[1])
-    nt.links.new(tl.outputs[0], mx.inputs[2])
+    mx.inputs["Fac"].default_value = 0.55
+    nt.links.new(tr.outputs[0], mx.inputs[1])
+    nt.links.new(gl.outputs[0], mx.inputs[2])
     nt.links.new(mx.outputs[0], out.inputs["Surface"])
     return m
 
@@ -1613,13 +1631,14 @@ def drift_track(ctx, preroll=48):
     return drive_track(h["pos"], h["heading"], fr, wheel_offsets(p0), z), g0
 
 
-def derapage(ctx, preroll=48, wet=1.0, sheet=1.0, mist=1.0, mask=0.9, near=4.5, mist_near=6.5, seed=23,
+def derapage(ctx, preroll=48, wet=1.0, sheet=1.0, mist=1.0, mask=0.9, near=4.5, mist_near=8.0, seed=23,
              hide=("fumee_pneus_",)):
     """L'eau des dérapages (drift_spray) : la lame et la brume des pneus arrière en glisse, tirées sur le temps du
     film depuis la conduite du parcours, `preroll` images avant la scène (ce qui est né avant la coupe vit après) ;
     rien à moins de `near` m de l'objectif (le bras commun suit à 7,5 m) ; la brume, plus large, s'efface dès
-    `mist_near` m : derrière la berline elle ne voile pas le bas du cadre au raccord P5 → P6. Le cône caméra-berline
-    est creusé (mask).
+    `mist_near` m (nulle sous la moitié) : derrière la berline elle ne voile pas le bas du cadre au raccord P5 → P6,
+    ni au décrochage du port, où le bras franc (5,6 m) la rattrape (à 6,5 m, une plaque claire au bas du cadre,
+    brouillon éclairé v8, images 451–453). Le cône caméra-berline est creusé (mask).
     Les anciennes bouffées de fumée sèche (`hide`) sont retirées : la chaussée est trempée."""
     for ob in ctx.scene.objects:
         if ob.name.startswith(tuple(hide)) and ob.type == "MESH":
@@ -2050,6 +2069,37 @@ def _budget(scene):
     c.transparent_max_bounces = max(getattr(c, "transparent_max_bounces", 8), 96)
 
 
+def beam_links(ctx):
+    """L'eau reçoit le projecteur de l'hélicoptère comme le sol qu'elle quitte. Sa lampe principale (P5, plusieurs
+    MW : la force qu'il faut pour que le pinceau se lise dans la brume) exclut le sol, le décor balayé et la berline
+    (scene_e.beam_lights, collection « faisceau_sans_sol* ») ; les gouttes et les sprites, posés après elle, n'y
+    étaient pas : quand le faisceau rattrapait la berline au port, ils prenaient ces mégawatts, blancs et opaques
+    comme de la neige (brouillon éclairé v8, images 451–485 ; et la luminance tombait de 75 à 68 à la coupe P5 → P6,
+    où rien ne les éclaire ainsi). Ils sont ajoutés à ces exclusions, et aux receveurs des jumelles du sol
+    (« faisceau_sol* », 8 kW) : sous le faisceau, l'eau s'allume comme l'enrobé. Renvoie le nombre de lampes."""
+    objs = [o for o in ctx.coll.objects if o.type == "MESH"]
+    if not objs:
+        return 0
+    n = 0
+    for lt in ctx.scene.objects:
+        col = lt.light_linking.receiver_collection if lt.type == "LIGHT" else None
+        if col is None:
+            continue
+        excl = col.name.startswith("faisceau_sans_sol")
+        if not (excl or lt.name.startswith("faisceau_sol")):
+            continue
+        for o in objs:
+            if o.name not in col.objects:
+                col.objects.link(o)
+        if excl:
+            for co in col.collection_objects:
+                co.light_linking.link_state = "EXCLUDE"
+        n += 1
+    if n:
+        log(f"{ctx.plan} : l'eau suit le sol sous le faisceau ({n} lampes liées, {len(objs)} objets)")
+    return n
+
+
 def hooked(build, plans):
     """Enveloppe le build d'une scène qui rend plusieurs plans (scene_a : OUV et P1) : le plan rendu, ses clés
     posées, reçoit ses interactions. Une seule ligne dans la scène, sans toucher à son corps."""
@@ -2082,6 +2132,7 @@ def dress(plan, scene=None, **opt):
         log(f"{plan} : aucune recette")
         return ctx
     recipe(ctx, **opt)
+    beam_links(ctx)
     _budget(ctx.scene)
     ctx.scene.frame_set(ctx.scene.frame_current)
     n = len(ctx.coll.objects)
