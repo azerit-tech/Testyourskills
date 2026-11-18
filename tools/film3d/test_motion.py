@@ -1186,8 +1186,12 @@ def test_fin6():
             and not seen([(hx, hy, hz)], cams[f], 0.02, 0.98)]
     # la caméra de poursuite le passe avant l'orbite : son reflet sort du cadre quelques images après sa tête (comme
     # ceux de la jetée en P6) ; jamais pendant l'orbite
+    # (fusion v10 : « avant l'orbite » = avant qu'elle ait tourné de 0,1°, et non avant l'image ORBIT[0]. La berline
+    # arrêtée sur la distance passe le lampadaire trois images plus tard, images 20 à 26 ; l'orbite, dont la rampe
+    # d'entrée dure 1,45 s, n'a tourné que de 0,03° à l'image 26 : c'est encore le passage du bras de poursuite)
+    turn = max([abs(P._w(M.t_of(f)) * P.SWEEP) for f in lone] or [0.0])
     check("FIN6 : pas de reflet du lampadaire sans sa tête, sauf au passage (8 images au plus, avant l'orbite)",
-          len(lone) <= 8 and all(f < P.ORBIT[0] for f in lone), f"images {lone[:8]}")
+          len(lone) <= 8 and turn < 0.1, f"images {lone[:8]}, orbite {turn:.2f}° au plus")
     # et à ce passage, pas de flaque sous son reflet (la tache blanc-jaune du brouillon éclairé v8, images 632–638) :
     # chaque point du sol où il se forme est dans une zone sèche de lamp_dry_spots (scene_d.mat_sol)
     lone2, rpts = P.lamp_reflets()
