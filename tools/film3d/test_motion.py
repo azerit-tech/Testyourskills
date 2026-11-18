@@ -1708,10 +1708,12 @@ def test_cut_p5_p6():
         src_d = f.read()
     with open(os.path.join(here, "scene_e.py"), encoding="utf-8") as f:
         src_e = f.read()
-    gele = re.search(r"^P6_PHARE_PHASE, P6_PHARE_VITESSE = .*, 0\.0$", src_d, re.M) is not None
+    # (depuis le brouillon éclairé v9, il tourne en P6 comme en FIN6, en clés sur le temps du film, que la ville décale
+    # pour P5 : test_cut_habitacle_phare)
+    gele = 'phare_film(bpy.data.objects["phare"], "P6", frames)' in src_d
     seul = re.search(r'lieu="port",\s*phare=False\)', src_e) is not None
-    check("P5 → P6 : un seul phare, celui de la jetée, gelé (le port n'en pose pas en ville)", gele and seul,
-          f"gelé {gele}, port sans phare {seul}")
+    check("P5 → P6 : un seul phare, celui de la jetée, tourné sur le temps du film (le port n'en pose pas en ville)",
+          gele and seul, f"temps du film {gele}, port sans phare {seul}")
     check("P5 → P6 : les traces de gomme de P5 posées dans P6 (la ville ne reprend pas celles du port)",
           'skid_p5(scene, place="P6")' in src_d and PC.LIEU["P5"] == "E")
 
@@ -1794,6 +1796,42 @@ def test_cut_sol_voisin():
     check("485 | 486 : le port de P6 est le port proche de P5 (en cache), sans port lointain posé par la jetée",
           proche and pres_p6 and sans_loin, f"port proche {proche}, chargé près en P6 {pres_p6}, jetée sans port "
                                             f"lointain {sans_loin}")
+
+
+def test_cut_habitacle_phare():
+    """Les raccords de lumière de la berline et du phare (brouillon éclairé v9, SPEC §18.63) : l'habitacle allumé,
+    le même dans les huit tronçons (P2, P4, P5 et P6 ne le posaient pas : la lunette passait au noir à 107 | 108 et
+    317 | 318, se rallumait à 618 | 619) ; le phare de P6 tourne comme celui de FIN6, au même angle des deux côtés de
+    618 | 619 (gelé en P6, son trait d'éclat surgissait), en clés linéaires que la ville décale pour P5 et P4."""
+    import p6_jetee as P6
+    import fin6_orbite as F6
+    here = os.path.dirname(os.path.abspath(__file__))
+
+    def src(name):
+        with open(os.path.join(here, name), encoding="utf-8") as f:
+            return f.read()
+    lieux_src = src("lieux.py")
+    w = float(re.search(r"^CABIN_W = ([\d.]+)$", lieux_src, re.M).group(1))
+    poses = {
+        "OUV, P1": "return L.cabin_light({\"body\": coupe.name}, energy=25.0)" in src("scene_a.py"),
+        "P2": 'lieux.hero_cabin({"body": car.name})' in src("scene_f.py"),
+        "P3": 'lieux.cabin_light({"body": car.name}, energy=25.0)' in src("scene_b.py"),
+        "P4": "L.hero_cabin(hero)" in src("scene_c.py"),
+        "P5": "L.hero_cabin(hero)" in src("scene_e.py"),
+        "P6": "L.hero_cabin(hero)" in src("scene_d.py").split("def plan_P6(")[1],
+        "FIN6": "L.cabin_light(hero, energy=70.0 if F.FACE else 25.0)" in src("scene_d.py").split("def plan_FIN6(")[1],
+    }
+    check("coupes : l'habitacle allumé à 25 W dans les huit tronçons (OUV à FIN6)", w == 25.0 and all(poses.values()),
+          ", ".join(f"{k} {'oui' if v else 'NON'}" for k, v in poses.items()))
+    a6 = P6.phare_azimut("P6", P6.F0 + P6.FRAMES)          # P6 prolongé d'une image : FIN6/1
+    a_fin6 = P6.FIN6_PHARE_PHASE + P6.FIN6_PHARE_VITESSE / 24.0 * F6.F0      # le pilote de FIN6 à son image 1
+    d = src("scene_d.py").split("def plan_FIN6(")[1].split("\ndef ")[0]
+    fin6 = (f"L.phare_tourne(ph, phase={P6.FIN6_PHARE_PHASE}, vitesse={P6.FIN6_PHARE_VITESSE})" in d
+            and f"L.phare_pinceaux(ph, releve={P6.FIN6_PHARE_RELEVE}, portee={P6.FIN6_PHARE_PORTEE})" in d)
+    pas = P6.phare_azimut("P6", 2) - P6.phare_azimut("P6", 1)
+    check("618 | 619 : le phare de P6 au même angle que celui de FIN6 (même vitesse, mêmes pinceaux)",
+          abs(a6 - a_fin6) < 1e-9 and fin6 and abs(pas - P6.FIN6_PHARE_VITESSE / 24.0) < 1e-12,
+          f"{a6 % 360:.2f}° | {a_fin6 % 360:.2f}°, FIN6 lu dans scene_d {fin6}")
 
 
 def test_cut_p4_p5_beam():
@@ -2681,6 +2719,7 @@ if __name__ == "__main__":
     test_cut_p5_p6()
     test_cut_p4_p5_beam()
     test_cut_sol_voisin()
+    test_cut_habitacle_phare()
     test_operator()
     test_drive()
     test_parcours()

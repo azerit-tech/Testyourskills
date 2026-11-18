@@ -298,6 +298,21 @@ def state_out(f=None):
     return out
 
 
+# Le phare de FIN6 (scene_d.plan_FIN6 : lieux.phare_tourne, pilote sur l'image de la scène, phare_pinceaux), que P6 pose
+# déjà tel quel sur le temps du film (scene_d.phare_film, SPEC §18.63 : gelé en P6, son trait d'éclat surgissait à
+# 618 | 619). Sans Blender : test_motion.test_cut_habitacle_phare.
+FIN6_PHARE_PHASE, FIN6_PHARE_VITESSE = -25.0, 45.0
+FIN6_PHARE_RELEVE, FIN6_PHARE_PORTEE = 8.0, 9.0
+
+
+def phare_azimut(shot, frame):
+    """L'azimut (degrés) du premier pinceau du phare à l'image `frame` de la scène du plan `shot` (P6 ou FIN6) : celui
+    que FIN6 lui donne (phase + vitesse × image de FIN6 / 24), compté sur le temps du film."""
+    f0 = {"P6": F0, "FIN6": 1}[shot]                     # fin6_orbite.F0
+    g = PC.START[shot] + frame - f0                        # l'image du film (0 : OUV/1)
+    return FIN6_PHARE_PHASE + FIN6_PHARE_VITESSE / 24.0 * (g - PC.START["FIN6"] + 1)
+
+
 if __name__ == "__main__":
     for f in (1, 10, 20, 24, 30, 34, 44, 52, 60):
         t = M.t_of(f)

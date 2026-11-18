@@ -1636,6 +1636,18 @@ def cabin_light(root, energy=6.0, color="#ffcf9a", dash=60.0, dash_color="#ffb07
     return ob
 
 
+# L'habitacle allumé, le même dans les huit tronçons (SPEC §18.63) : OUV, P1, P3 et FIN6 le posaient à 25 W, P2, P4,
+# P5 et P6 pas ; vue de dos, la lunette passait d'un habitacle chaud au noir à 107 | 108 et 317 | 318, et l'inverse
+# à 618 | 619.
+CABIN_W = 25.0
+
+
+def hero_cabin(root):
+    """L'habitacle de la berline allumé à CABIN_W (cabin_light) : de dos, par la lunette, la capuche et les épaules du
+    conducteur se découpent sur un habitacle chaud, dans tous les tronçons."""
+    return cabin_light(root, energy=CABIN_W)
+
+
 def jet(name="jet"):
     """L'avion de chasse fictif (cast_vehicles.load_jet « concept »), silhouette lointaine seulement."""
     import cast_vehicles as cv

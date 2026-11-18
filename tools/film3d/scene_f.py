@@ -685,6 +685,9 @@ def keep_paint():
     for lo in [c for c in car.children_recursive if c.type == "LIGHT" and c.data.type == "SPOT"]:
         lo.data.energy = 400.0
         lo.data.spot_size = math.radians(34)
+    # l'habitacle allumé, comme dans tous les tronçons (lieux.hero_cabin) : sans lui, la lunette passait au noir à
+    # la coupe P1 → P2 (107 | 108, brouillon éclairé v9)
+    lieux.hero_cabin({"body": car.name})
     log(f"berline : {len(whole)} pièces, {n} lumières chaudes exclues, appoint lié de {CAR_FILL_W:.0f} W, "
         f"phares à 400 W")
 

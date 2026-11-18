@@ -400,6 +400,9 @@ def plan_P4(scene, hidden, haubans=False):
         L.chase_fill(hero)
     else:
         L.car_fill(hero, loc=(0.4, 8.0, 2.2), energy=P4_FACE_W)
+    # l'habitacle allumé, comme dans tous les tronçons (lieux.hero_cabin) : sans lui, la lunette passait au noir à
+    # la coupe P3 → P4 (317 | 318, brouillon éclairé v9)
+    L.hero_cabin(hero)
     port_glow(hero, P4.PORT_FRAMES)
     y_hero = P4.hero_pos(P4.T_STILL)[1]
     entries = [(e[0], *P4.pack_pos(i)(P4.T_STILL), 0.0) for i, e in enumerate(P4.PACK)] + \

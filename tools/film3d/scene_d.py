@@ -1448,6 +1448,34 @@ P6_LAMPS_FAR = (10, 11, 12, 13, 14)     # J_LAMPS[10:] : y 315 à 395, tous les 
 P6_PHARE_PHASE, P6_PHARE_VITESSE = 272.2 - 180.0 + 12.0, 0.0
 
 
+# le phare de FIN6 (plan_FIN6 : lieux.phare_tourne, pilote sur l'image de la scène ; phare_pinceaux) : P6 le pose déjà
+# tel quel, sur le temps du film (SPEC §18.63) : l'azimut, la phase, la vitesse et les pinceaux dans p6_jetee
+# (phare_azimut, FIN6_PHARE_*), sans Blender
+
+
+def phare_film(ph, shot, frames):
+    """Le phare de `shot` tourné comme dans FIN6, en clés linéaires prolongées (et non par un pilote sur l'image de la
+    scène) : la ville décale les clés d'un voisin de la même prise (ville.assembler), le port de P5 voit donc la même
+    lanterne au même angle que P6. Mêmes pinceaux que FIN6 (relevé, portée)."""
+    import p6_jetee as P6
+    phare_azimut = P6.phare_azimut
+    FIN6_PHARE_RELEVE, FIN6_PHARE_PORTEE, FIN6_PHARE_VITESSE = (P6.FIN6_PHARE_RELEVE, P6.FIN6_PHARE_PORTEE,
+                                                                P6.FIN6_PHARE_VITESSE)
+    piv = L.phare_tourne(ph, phase=phare_azimut(shot, frames[0]), vitesse=0.0)
+    for f in (frames[0], frames[-1]):
+        piv.rotation_euler.z = math.radians(phare_azimut(shot, f))
+        piv.keyframe_insert("rotation_euler", index=2, frame=f)
+    import motion as M
+    for fc in M.fcurves(piv):
+        fc.extrapolation = "LINEAR"
+        for k in fc.keyframe_points:
+            k.interpolation = "LINEAR"
+    L.phare_pinceaux(ph, releve=FIN6_PHARE_RELEVE, portee=FIN6_PHARE_PORTEE)
+    print(f"[{shot}] phare tourné comme dans FIN6 : {phare_azimut(shot, frames[0]):.1f}° à l'image {frames[0]}, "
+          f"{FIN6_PHARE_VITESSE:.0f} °/s", flush=True)
+    return piv
+
+
 def p6_phare_clear(scene):
     """Retire ou baisse les lampadaires de la jetée et de la pointe sur l'azimut du phare."""
     head = bpy.data.materials.get("lamp_head")
@@ -1499,13 +1527,18 @@ def plan_P6(scene, hidden, palier="socle"):
     # le phare (lieux.panorama) : ses pinceaux, relevés de 1° seulement et vus de la jetée sous la lanterne, barrent
     # le cadre en passant par elle ; aucune phase ni vitesse ne l'évite de la jetée (rendus e3, e4, f1, f2). Gelés,
     # l'un fuit vers le large, l'autre est caché à la caméra (P6_PHARE_PHASE) : la lanterne se lit, pas la barre
-    L.phare_tourne(bpy.data.objects["phare"], phase=P6_PHARE_PHASE, vitesse=P6_PHARE_VITESSE)
-    vers_nous = bpy.data.objects.get("phare_pinceau_1")
-    if vers_nous is not None:
-        vers_nous.visible_camera = False
-        vers_nous.visible_glossy = False         # ni son reflet sur l'enrobé mouillé
     scene.frame_start, scene.frame_end = P6.F0, P6.F0 + P6.FRAMES - 1
     frames = range(P6.F0 - 1, P6.F0 + P6.FRAMES + 1)      # une image de part et d'autre : l'obturateur du flou
+    if L.ville_on():
+        # en ville, FIN6 suit P6 sans coupe : le phare tourne déjà comme dans FIN6, sur le temps du film (gelé ici,
+        # son trait d'éclat surgissait à 618 | 619, brouillon éclairé v9)
+        phare_film(bpy.data.objects["phare"], "P6", frames)
+    else:
+        L.phare_tourne(bpy.data.objects["phare"], phase=P6_PHARE_PHASE, vitesse=P6_PHARE_VITESSE)
+        vers_nous = bpy.data.objects.get("phare_pinceau_1")
+        if vers_nous is not None:
+            vers_nous.visible_camera = False
+            vers_nous.visible_glossy = False         # ni son reflet sur l'enrobé mouillé
     hero = L.hero()
     wheels = L.hero_wheels(hero)
     poses = M.sample(P6.hero_pos, frames, heading=P6.hero_heading, steer=P6.hero_steer, wheel_r=hero["wheel_r"])
@@ -1514,6 +1547,7 @@ def plan_P6(scene, hidden, palier="socle"):
     for a, b in P6.brake_windows():        # les feux stop du parcours (aucun en P6 : elle accélère)
         import hero_cars
         hero_cars.stop_lamps(M.body_of(hero), a, b)
+    L.hero_cabin(hero)              # l'habitacle allumé, comme dans tous les tronçons (FIN6 compris, SPEC §18.63)
 
     src, rigs = {}, []
     for i, (kind, _) in enumerate(P6.COLUMN):
