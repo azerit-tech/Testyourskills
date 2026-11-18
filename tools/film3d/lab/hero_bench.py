@@ -340,9 +340,12 @@ def build(a):
     car.rotation_euler = (0, 0, 0)
     if a.steer:
         for k in ("FL", "FR"):
-            w = bpy.data.objects.get(f"wheel_{k}")
-            if w:
-                w.rotation_euler.z += math.radians(a.steer)
+            wh = bpy.data.objects.get(f"wheel_{k}")
+            if wh:
+                wh.rotation_euler.z += math.radians(a.steer)
+        # le conducteur regarde où il braque, comme dans le film (lieux.hero)
+        import lieux as L
+        L.hero_look({"body": car.name})
     if a.stop:
         # par les clés, comme dans le film (hero_cars.stop_lamps) : allumés des images 10 à 12, rendu à l'image 11
         import hero_cars

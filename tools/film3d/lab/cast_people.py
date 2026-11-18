@@ -2273,6 +2273,51 @@ def cast_driver_in_car(body, rim_prefix, wheel_hint, variant="hooded", clench=0.
     return _objects(arm)
 
 
+def driver_look(arm, wheel, gain=(0.30, 0.50), cap=(10.0, 16.0), lock=35.0):
+    """Le conducteur regarde où il braque : le cou et la tête tournent avec la roue avant `wheel` (sa rotation locale
+    autour de z, le braquage posé par motion.key_vehicle), de `gain` (cou, tête) fois l'angle, au plus `cap` degrés
+    (atteints à `lock` degrés de roue au plus tard). En glisse la roue contre-braque vers la route : le regard la
+    suit, vers la sortie du virage. Des contraintes de transformation, sans clé ni Python : elles suivent le
+    mouvement de chaque plan, flou de bougé compris, et s'ajoutent à la pose (mains levées, bras à la vitre).
+    Renvoie les contraintes posées."""
+    _upd()
+    out = []
+    for role, g, c in zip(("Neck", "Head"), gain, cap):
+        try:
+            b = pb(arm, role)
+        except KeyError:
+            continue
+        for old in [k for k in b.constraints if k.name == "regard"]:
+            b.constraints.remove(old)
+        # l'axe local de l'os le plus proche de la verticale, et son sens
+        M = (arm.matrix_world @ b.matrix).to_3x3()
+        dots = [M.col[i].normalized().z for i in range(3)]
+        i = max(range(3), key=lambda k: abs(dots[k]))
+        sgn = 1.0 if dots[i] > 0 else -1.0
+        k = b.constraints.new("TRANSFORM")
+        k.name = "regard"
+        k.target = wheel
+        k.target_space, k.owner_space = "LOCAL", "LOCAL"
+        k.map_from, k.map_to = "ROTATION", "ROTATION"
+        k.from_rotation_mode = "XYZ"
+        k.use_motion_extrapolate = False
+        lim = math.radians(min(lock, c / g))
+        k.from_min_z_rot, k.from_max_z_rot = -lim, lim
+        ax = "xyz"[i]
+        setattr(k, f"map_to_{ax}_from", "Z")
+        setattr(k, f"to_min_{ax}_rot", -sgn * g * lim)
+        setattr(k, f"to_max_{ax}_rot", sgn * g * lim)
+        for other in "xyz".replace(ax, ""):
+            # les deux autres axes : aucune rotation (une source à plage nulle, une sortie nulle)
+            setattr(k, f"map_to_{other}_from", "X")
+            setattr(k, f"to_min_{other}_rot", 0.0)
+            setattr(k, f"to_max_{other}_rot", 0.0)
+        k.from_min_x_rot = k.from_max_x_rot = 0.0
+        k.mix_mode_rot = "AFTER"
+        out.append(k)
+    return out
+
+
 def cast_lineup(driver="hooded", officer="spp", gun="service", gap=1.4):
     """La planche des gens : le conducteur mains levées, puis un policier dans chacune des trois poses,
     arme en main ; côte à côte autour de l'origine, tous face à -Y. Renvoie la liste des objets."""

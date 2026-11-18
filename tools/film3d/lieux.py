@@ -1114,7 +1114,19 @@ def hero(lights_on=True):
     body.rotation_euler = (0, 0, 0)
     root = rig(body, "hero", yaw=math.pi)            # street_hero la met l'avant vers -y
     root["wheel_r"] = body.get("wheel_r", 0.33)
+    hero_look(root)
     return root
+
+
+def hero_look(root):
+    """Le conducteur regarde où il braque (cast_people.driver_look, sur la roue avant gauche). Sans conducteur ou
+    sans roue : rien."""
+    arm = hero_driver(root)
+    wheel = next((w for w in hero_wheels(root) if w.name.startswith("wheel_FL")), None)
+    if arm is None or wheel is None:
+        return []
+    import cast_people as cp
+    return cp.driver_look(arm, wheel)
 
 
 def hero_wheels(root):
