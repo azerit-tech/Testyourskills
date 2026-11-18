@@ -2505,12 +2505,52 @@ def hooked(build, plans):
     return wrapped
 
 
+def film_clock(scene, plan):
+    """L'image du film à chaque image de la scène : la propriété « film_image » de la scène, animée (deux clés,
+    linéaire, prolongée), que les matières lisent par un attribut de calque de vue (la trace des pneus que l'eau
+    recouvre, scene_carrefour.mat_wake). Celle du plan rendu : un lieu voisin la lit dans la scène qui le rend.
+    Renvoie le décalage (image du film − image de la scène), ou None hors du parcours."""
+    try:
+        import parcours as PC
+        g0 = PC.START[plan] - 1
+    except (ImportError, KeyError, AttributeError):
+        return None
+    if scene is None:
+        return g0
+    scene["film_image"] = float(scene.frame_start + g0)
+    for f in (scene.frame_start, scene.frame_start + 100):
+        scene["film_image"] = float(f + g0)
+        scene.keyframe_insert('["film_image"]', frame=f)
+    ad = scene.animation_data
+    fcs = []
+    try:
+        fcs = [fc for fc in ad.action.fcurves if fc.data_path == '["film_image"]']
+    except AttributeError:
+        # (Blender 4.4+ : les courbes d'une action à couches passent par ses tranches)
+        try:
+            from bpy_extras import anim_utils
+            cb = anim_utils.action_get_channelbag_for_slot(ad.action, ad.action_slot)
+            fcs = [fc for fc in cb.fcurves if fc.data_path == '["film_image"]']
+        except Exception:
+            fcs = []
+    for fc in fcs:
+        fc.extrapolation = "LINEAR"
+        for k in fc.keyframe_points:
+            k.interpolation = "LINEAR"
+    return g0
+
+
 def dress(plan, scene=None, **opt):
     """Pose les interactions du plan (OUV, P1… FIN6), sur la trajectoire de la scène telle qu'elle est. Sans
     berline lisible, ou FILM3D_FX=0, ne fait rien. Les plots de la route (reperes.py, par lieu) se posent avant, effets
     actifs ou non."""
     _PLAN[0] = plan
     __import__("reperes").poser(plan, scene)
+    # l'horloge du film, effets actifs ou non : la trace des pneus la lit
+    try:
+        film_clock(scene or _bpy().context.scene, plan)
+    except ImportError:                     # (sans Blender : les contrôles)
+        pass
     if not enabled(plan=plan):
         log(f"{plan} : effets inactifs (FILM3D_FX=1, ou FILM3D_FX={plan}, les active)")
         return None

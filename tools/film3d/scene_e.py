@@ -1646,7 +1646,8 @@ def skid_p5(scene, width=0.24, place=None):
     gomme mate et sombre sur la pellicule d'eau, fondue à son départ (claire, elle renvoyait les lampadaires).
     `place` (ville unique) : le plan d'une autre scène où les poser entières (P6, qui les voit à sa première
     image) : portées par la ville dans son repère, à la hauteur de la dalle (deck_ground), sans dévoilement."""
-    from scene_carrefour import mat_wake
+    from scene_carrefour import mat_wake, set_passage
+    import parcours
     mat = bpy.data.materials.get("tyre_wake") or mat_wake()
     dg = bpy.context.evaluated_depsgraph_get()
 
@@ -1678,6 +1679,8 @@ def skid_p5(scene, width=0.24, place=None):
                 faces.append((2 * i - 2, 2 * i, 2 * i + 1, 2 * i - 1))
         me = bpy.data.meshes.new(f"trace_p5_{tag}")
         me.from_pydata(verts, [], faces)
+        # l'image du film où la roue passe (l'eau recouvre la trace en une seconde : scene_carrefour.mat_wake)
+        set_passage(me, [parcours.START["P5"] + t * M.FPS for t, _, _ in pts])
         uv = me.uv_layers.new(name="UVMap")
         for poly in me.polygons:
             for li in poly.loop_indices:

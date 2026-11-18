@@ -184,24 +184,43 @@ def build_street_life(M, hidden):
     log("palmiers, feux, 5 lampadaires, 5 terrasses, 3 jardinières")
 
 
+# La trace des pneus dans l'eau (SPEC §18.60 ; critique du brouillon éclairé v9 : des rails noirs, épais, uniformes,
+# 160–215, 456–520, 588–594, qui bouclaient au bas du cadre et sur la jetée). Sur une chaussée humide le pneu ne
+# dépose pas de gomme (l'eau ne la prend pas) : il chasse la pellicule d'eau. La bande qu'il laisse est plus mate et
+# un peu plus claire que l'enrobé mouillé autour (elle ne renvoie plus les lampes), irrégulière, à 30 % au plus, et
+# l'eau la recouvre en une seconde environ. TRACE_TENUE / TRACE_FONDU : images du film tenues puis fondues après le
+# passage de la roue (attribut « passage », image du film ; l'image courante du film : la propriété de scène
+# « film_image », posée par fx.film_clock dans chaque plan, lue par un attribut de calque de vue).
+TRACE_TENUE, TRACE_FONDU = 4.0, 24.0
+TRACE_OPACITE = 0.3
+
+
 def mat_wake():
-    """La trace des pneus dans l'eau : la gomme déposée sur l'enrobé chassé de sa pellicule d'eau, mate et plus
-    sombre que la chaussée mouillée, effilochée par un bruit et fondue à son départ (u de 0 au début de la trace à 1
-    sous la roue). (Claire, #8d8781 à 0,45 de rugosité, elle renvoyait les lampadaires : vue du drone, des traits
-    lumineux.)"""
+    """La trace des pneus dans l'eau : l'enrobé chassé de sa pellicule d'eau, mat, un peu plus clair que la chaussée
+    mouillée, en bandes irrégulières (≤ TRACE_OPACITE), fondue à son départ, et que l'eau recouvre en une seconde
+    (TRACE_TENUE puis TRACE_FONDU images du film après le passage de la roue)."""
     m, N, out = A.material("tyre_wake")
     uv = N.new("ShaderNodeTexCoord")
     sep = N.sep(uv.outputs["UV"])
-    no = N.new("ShaderNodeTexNoise", Scale=9.0, Detail=4.0)
+    no = N.new("ShaderNodeTexNoise", Scale=2.6, Detail=3.0)
     N.link(uv.outputs["Object"], no.inputs["Vector"])
     fade = N.math("POWER", N.math("MINIMUM", N.math("MULTIPLY", sep[0], 1.6), 1.0), 1.5)
-    edge = N.math("SUBTRACT", 1.0, N.math("POWER", N.math("ABSOLUTE", N.math("SUBTRACT", N.math("MULTIPLY", sep[1], 2.0), 1.0)), 3.0))
-    # lumière v3.1 : à demi-opacité, la chaussée mouillée transparaît (pleines, ces traces zébraient P2 de noir dur),
-    # et presque unies : le bruit ne module plus que de ±15 %. Écrêté à 1, l'ancien masque (0,6 + 0,8 × bruit) cachait
-    # son bruit ; divisé par deux, il le montrait en gravier sur toute la voie (P5, film éclairé n° 2)
-    grain = N.math("ADD", 0.85, N.math("MULTIPLY", no.outputs["Factor"], 0.3))
-    mask = N.math("MULTIPLY", N.math("MULTIPLY", N.math("MULTIPLY", fade, edge), grain), 0.5, clamp=True)
-    bs = A.principled(N, **{"Base Color": lin("#1d1b1a"), "Roughness": 0.8, "Specular IOR Level": 0.25})
+    edge = N.math("SUBTRACT", 1.0, N.math("POWER", N.math("ABSOLUTE", N.math("SUBTRACT", N.math("MULTIPLY", sep[1], 2.0), 1.0)), 2.0))
+    # des bandes irrégulières : un bruit large, contrasté (là où la bande de roulement a chassé plus d'eau)
+    bands = N.new("ShaderNodeMapRange", _interpolation_type="SMOOTHSTEP", **{"From Min": 0.38, "From Max": 0.62,
+                                                                            "To Min": 0.35, "To Max": 1.0})
+    N.link(no.outputs["Factor"], bands.inputs["Value"])
+    # l'âge de la trace en images du film : l'eau la recouvre
+    passage = N.new("ShaderNodeAttribute", _attribute_type="GEOMETRY", _attribute_name="passage")
+    now = N.new("ShaderNodeAttribute", _attribute_type="VIEW_LAYER", _attribute_name="film_image")
+    age = N.math("SUBTRACT", now.outputs["Fac"], passage.outputs["Fac"])
+    fresh = N.new("ShaderNodeMapRange", _interpolation_type="SMOOTHSTEP", **{"From Min": TRACE_TENUE,
+                                                                            "From Max": TRACE_TENUE + TRACE_FONDU,
+                                                                            "To Min": 1.0, "To Max": 0.0})
+    N.link(age, fresh.inputs["Value"])
+    mask = N.math("MULTIPLY", N.math("MULTIPLY", N.math("MULTIPLY", fade, edge), bands.outputs["Result"]),
+                  N.math("MULTIPLY", fresh.outputs["Result"], TRACE_OPACITE), clamp=True)
+    bs = A.principled(N, **{"Base Color": lin("#4a4744"), "Roughness": 0.85, "Specular IOR Level": 0.3})
     tr = N.new("ShaderNodeBsdfTransparent")
     mx = N.new("ShaderNodeMixShader")
     N.link(mask, mx.inputs["Fac"])
@@ -209,6 +228,12 @@ def mat_wake():
     N.link(bs.outputs[0], mx.inputs[2])
     N.link(mx.outputs[0], out.inputs["Surface"])
     return m
+
+
+def set_passage(me, frames):
+    """L'attribut « passage » (image du film où la roue passe) de chaque sommet d'une trace (deux par pas)."""
+    a = me.attributes.get("passage") or me.attributes.new("passage", "FLOAT", "POINT")
+    a.data.foreach_set("value", [f for f in frames for _ in (0, 1)])
 
 
 # le sol hors du décor du plan (en ville, là où un lieu voisin le pose après coup) : z(x, y), ou None (0)
@@ -267,6 +292,8 @@ def wake(scene, wheels, pose=POSE, anim=False, skip=()):
             for li in poly.loop_indices:
                 vi = me.loops[li].vertex_index
                 uv.data[li].uv = ((vi // 2) / (n - 1), vi % 2)
+        # (l'image du film où la roue passe : P2/1 est l'image START["P2"] du film, l'instant 0 du plan)
+        set_passage(me, [P.PC.START["P2"] + tt * P.FPS for _, _, tt in track])
         me.materials.append(mat)
         ob = bpy.data.objects.new(f"wake_{name}", me)
         scene.collection.objects.link(ob)
