@@ -191,6 +191,18 @@ def mat_sol(name="sol_pointe", st=None):
     D = N.math("ADD", D, N.math("MULTIPLY", patch, -0.6))
     D = N.math("ADD", D, N.math("MULTIPLY", road.inv(N, road.smooth(N, jd, 0.0, 0.6)), 0.8))
     D = N.math("ADD", D, st["D_off"] + 0.25)
+    # pas de flaque là où la caméra de FIN6 voit le reflet du lampadaire de la pointe sans sa tête (fin6_orbite.
+    # lamp_dry_spots : la tache blanc-jaune au bas à droite du brouillon éclairé v8, images 632–638) ; la pellicule
+    # d'eau y reste (comme le terre-plein de P5 sous sa caméra, scene_e.dry_spots)
+    import fin6_orbite
+    dry = None
+    for dcx, dcy, d0, d1 in fin6_orbite.lamp_dry_spots():
+        dd = N.new("ShaderNodeVectorMath", _operation="LENGTH")
+        N.link(road.combine(N, N.math("SUBTRACT", px, dcx), N.math("SUBTRACT", py, dcy)), dd.inputs[0])
+        k = road.inv(N, road.smooth(N, dd.outputs["Value"], d0, d1))
+        dry = k if dry is None else N.math("MAXIMUM", dry, k)
+    if dry is not None:
+        D = N.math("SUBTRACT", D, N.math("MULTIPLY", dry, 5.0))
     p0, p1 = st["puddle"]
     w = road.smooth(N, D, p0, p1)
     deep = road.smooth(N, D, p1, p1 + 0.9)

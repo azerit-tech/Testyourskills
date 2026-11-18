@@ -1103,6 +1103,14 @@ def test_fin6():
     # ceux de la jetée en P6) ; jamais pendant l'orbite
     check("FIN6 : pas de reflet du lampadaire sans sa tête, sauf au passage (8 images au plus, avant l'orbite)",
           len(lone) <= 8 and all(f < P.ORBIT[0] for f in lone), f"images {lone[:8]}")
+    # et à ce passage, pas de flaque sous son reflet (la tache blanc-jaune du brouillon éclairé v8, images 632–638) :
+    # chaque point du sol où il se forme est dans une zone sèche de lamp_dry_spots (scene_d.mat_sol)
+    lone2, rpts = P.lamp_reflets()
+    spots = P.lamp_dry_spots()
+    worst = max((min(math.dist(q, s[:2]) for s in spots) for q in rpts), default=0.0)
+    check("FIN6 : pas de flaque sous le reflet du lampadaire quand sa tête est hors du cadre",
+          lone2 == lone and bool(spots) and worst <= P.LAMP_DRY_R[0] - 0.5,
+          f"{len(spots)} zones sèches, {len(rpts)} points de reflet, le plus loin à {worst:.2f} m d'un centre")
     # l'hélicoptère de FIN, jamais dans les bandes du HUD
     hv = [(f, round(q[1], 2)) for f in frames for q in [M.screen_point(cams[f], P.HELI)]
           if q is not None and 0.0 <= q[0] <= 1.0 and not 0.12 <= q[1] <= 0.85]

@@ -328,6 +328,51 @@ def obstacles(t):
     return out
 
 
+# --- le reflet du lampadaire de la pointe dans les flaques (brouillon éclairé v8, images 632–638 du film, FIN6/14–20 :
+# une tache blanc-jaune au bas à droite, sa traînée orange sur l'enrobé, sa tête déjà sortie du cadre). La caméra de
+# poursuite le passe avant l'orbite : déplacer le lampadaire ne fait que déplacer ce passage. Là où la caméra voit
+# son reflet sans sa tête (± LAMP_DRY_MARGE images), le sol de la pointe n'a pas de flaque (scene_d.mat_sol) : la
+# pellicule d'eau y reste, satinée, son reflet n'est plus qu'une lueur diffuse.
+LAMP_DRY_R = (1.5, 2.5)            # m : sans flaque, puis fondu
+LAMP_DRY_STEP = 0.75               # m entre deux centres
+LAMP_DRY_MARGE = 3                 # images
+
+
+def _in(q, lo, hi, vlo=-0.05, vhi=1.05):
+    return q is not None and lo <= q[0] <= hi and vlo <= q[1] <= vhi
+
+
+def lamp_reflets(frames=None):
+    """Les images où la caméra voit le reflet du lampadaire (son image miroir sous le sol) sans sa tête, et les
+    points du sol où ce reflet se forme (la droite objectif → image miroir, à z = 0), sur ces images et
+    LAMP_DRY_MARGE autour. Renvoie (images seules, [(x, y)])."""
+    hx, hy, hz = LAMP_HEAD
+    frames = list(frames or range(F0, FRAMES + 1))
+    cams = {f: camera(M.t_of(f)) for f in frames}
+    # (le reflet court de l'image miroir de la tête au pied du mât : l'un ou l'autre dans le cadre, comme la règle E
+    # de test_motion)
+    lone = [f for f in frames if any(_in(M.screen_point(cams[f], p), -0.15, 1.15) for p in ((hx, hy, -hz), (hx, hy, 0.0)))
+            and not _in(M.screen_point(cams[f], (hx, hy, hz)), 0.02, 0.98)]
+    near = sorted({g for f in lone for g in range(f - LAMP_DRY_MARGE, f + LAMP_DRY_MARGE + 1) if g in cams})
+    pts = []
+    for f in near:
+        x, y, z = cams[f][:3]
+        k = z / (z + hz)
+        pts.append((x + (hx - x) * k, y + (hy - y) * k))
+    return lone, pts
+
+
+def lamp_dry_spots(step=LAMP_DRY_STEP):
+    """Les centres sans flaque (x, y, r0, r1) le long des points de reflet de lamp_reflets, tous les `step` m."""
+    out, last = [], None
+    pts = lamp_reflets()[1]
+    for k, (x, y) in enumerate(pts):
+        if last is None or math.hypot(x - last[0], y - last[1]) >= step or k == len(pts) - 1:
+            out.append((x, y) + LAMP_DRY_R)
+            last = (x, y)
+    return out
+
+
 if __name__ == "__main__":
     print(f"arrêt à l'image {F_STOP} ({_f(T_STOP):.1f}) en ({CX:.2f}, {CY:.2f}), cap {HERO_STOP:.1f}° ; "
           f"FIN reportée de {ROT:+.2f}°, {SHIFT:+d} images")
