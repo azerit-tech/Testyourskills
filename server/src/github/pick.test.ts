@@ -43,6 +43,38 @@ describe("pickFilesForReading", () => {
     expect(out[0]!.files.map((f) => f.path)).toEqual(["src/app.ts"]);
   });
 
+  it("les fichiers de tous les repos se téléchargent ensemble, sans attendre le repo d'avant (SPEC §18.93)", async () => {
+    const three = facts({
+      repos: [repo("a"), repo("b"), repo("c")],
+      activeRepos: ["a", "b", "c"],
+      trees: ["a", "b", "c"].map((r) => tree(r, { sourceFiles: [{ path: "src/index.ts", size: 2000 }] })),
+      commits: [],
+    });
+    // Aucune réponse tant que les trois téléchargements ne sont pas partis.
+    const asked: string[] = [];
+    let release!: () => void;
+    const all = new Promise<void>((r) => (release = r));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request) => {
+        asked.push(String(input));
+        if (asked.length === 3) release();
+        await all;
+        return new Response("export const x = 1;\n".repeat(40));
+      }),
+    );
+    const out = await pickFilesForReading(three, { token: "" });
+    expect(asked).toHaveLength(3);
+    expect(out.map((r) => r.repo).sort()).toEqual(["a", "b", "c"]);
+  });
+
+  it("les faits donnés en avance par la collecte suffisent : même choix qu'avec les faits entiers", async () => {
+    stubRaw(() => new Response("export const x = 1;\n".repeat(40)));
+    const full = oneRepo();
+    const { repos, activeRepos, trees, commits } = full;
+    expect(await pickFilesForReading({ repos, activeRepos, trees, commits }, { token: "" })).toEqual(await pickFilesForReading(full, { token: "" }));
+  });
+
   it("rien à lire (aucun fichier source) : liste vide, sans erreur ni téléchargement", async () => {
     const fetchMock = stubRaw(() => new Response("x"));
     expect(await pickFilesForReading(oneRepo([]), { token: "" })).toEqual([]);

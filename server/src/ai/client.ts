@@ -20,6 +20,7 @@ import {
   type UsageLike,
 } from "./budget";
 import { refreshCredits } from "./credits";
+import { noteAi } from "../timing";
 
 // ---------------------------------------------------------------------------
 // Transport
@@ -44,8 +45,8 @@ export interface ChatRequest {
     function: { name: string; description: string; parameters: Record<string, unknown>; strict?: boolean };
   }[];
   tool_choice?: { type: "function"; function: { name: string } };
-  provider?: { require_parameters?: boolean };
-  reasoning?: { effort: "minimal" | "low" };
+  provider?: { require_parameters?: boolean; order?: string[] };
+  reasoning?: { effort: "none" | "minimal" | "low" };
 }
 
 export interface ChatResponse {
@@ -58,6 +59,8 @@ export interface ChatResponse {
     error?: { code?: number | string; message?: string };
   }[];
   usage?: UsageLike;
+  /** Le fournisseur qui a répondu (OpenRouter route un même modèle vers plusieurs). */
+  provider?: string;
   error?: { code?: number | string; message?: string };
 }
 
@@ -148,11 +151,31 @@ function supportsTemperature(model: string): boolean {
  * consigne, le raisonnement mange `max_tokens` (réponse vide ou tronquée,
  * `finish_reason: length`) et fait dépasser le délai de la fiche. GLM refuse
  * qu'on le coupe (« Reasoning is mandatory ») : on le réduit au minimum.
- * Mesuré le 10 novembre 2026 sur une vraie lecture de code : Haiku 5.5 passe de
- * 14,5 s (2 313 tokens de raisonnement) à 5,5 s, GLM 5.3 Flash répond en 5,2 s.
+ *
+ * Haiku 5.x : coupé (`effort: "none"`). Au minimum, il raisonnait encore, et
+ * c'était l'essentiel de l'attente (SPEC §18.93, mesuré le 19 novembre 2026 sur
+ * les mêmes entrées) : 1 678 tokens de raisonnement sur une lecture de code
+ * (10,9 s, 3,9 s sans), 4 642 sur un profil LinkedIn (23,8 s, 6,9 s sans), pour
+ * les mêmes niveaux lus. La sortie est une extraction contrainte par schéma, et
+ * `observations` y ancre déjà le niveau. Un fournisseur qui refuserait la coupure
+ * ramène le modèle au minimum (`minimalOnly`).
  */
 function reasoningFor(model: string): ChatRequest["reasoning"] | undefined {
-  return /(^|\/)glm-5|claude-haiku-5/.test(model) ? { effort: "minimal" } : undefined;
+  if (/claude-haiku-5/.test(model)) return { effort: minimalOnly.has(model) ? "minimal" : "none" };
+  return /(^|\/)glm-5/.test(model) ? { effort: "minimal" } : undefined;
+}
+
+/** Modèles pour lesquels un fournisseur a refusé qu'on coupe le raisonnement : ils restent au minimum. */
+const minimalOnly = new Set<string>();
+
+/** L'erreur dit-elle qu'on ne peut pas couper le raisonnement de ce modèle ? */
+function isReasoningRefused(err: unknown, model: string): boolean {
+  return (
+    err instanceof ChatHttpError &&
+    (err.status === 400 || err.status === 404) &&
+    reasoningFor(model)?.effort === "none" &&
+    /reasoning|thinking/i.test(err.message)
+  );
 }
 
 /** Modèles pour lesquels aucun fournisseur n'accepte `response_format` : repli sur un outil forcé. */
@@ -190,6 +213,43 @@ export interface StructuredCall<T> {
 
 const MAX_ATTEMPTS = 2;
 
+/** La nature des refus du validateur, pour le journal : jamais leur texte, qui cite la sortie du modèle. */
+export function issueKinds(issues: string[]): string {
+  const kind = (i: string) =>
+    /not valid JSON/.test(i)
+      ? "JSON"
+      : /provider returned an error/.test(i)
+        ? "fournisseur"
+        : /request was refused/.test(i)
+          ? "refus"
+          : /not one of the repositories/.test(i)
+            ? "dépôt inconnu"
+            : /evidence_file/.test(i)
+              ? "fichier inconnu"
+              : /tries to instruct/.test(i)
+                ? "citation suspecte"
+                : /missing a valid reading/.test(i)
+                  ? "lecture manquante"
+                  : "schéma";
+  return [...new Set(issues.map(kind))].join(", ") || "inconnue";
+}
+
+/**
+ * Les fournisseurs à essayer d'abord, dans l'ordre (`AI_PROVIDER_ORDER`, noms
+ * OpenRouter séparés par des virgules, ex. `Azure,Google`). OpenRouter route un
+ * même modèle vers plusieurs fournisseurs qui ne répondent pas à la même vitesse
+ * (SPEC §18.93) ; les autres restent en repli si ceux-là sont en panne. Vide : le
+ * routage d'OpenRouter.
+ */
+function providerOrder(): { order?: string[] } {
+  const order = (process.env.AI_PROVIDER_ORDER ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => /^[\w .-]{1,40}$/.test(s))
+    .slice(0, 5);
+  return order.length ? { order } : {};
+}
+
 function buildRequest(call: StructuredCall<unknown>, userParts: ChatContentPart[], toolMode: boolean): ChatRequest {
   const body: ChatRequest = {
     model: call.model,
@@ -200,7 +260,7 @@ function buildRequest(call: StructuredCall<unknown>, userParts: ChatContentPart[
       { role: "user", content: userParts },
     ],
     // Ne router que vers un fournisseur qui respecte tous les paramètres (schéma compris).
-    provider: { require_parameters: true },
+    provider: { require_parameters: true, ...providerOrder() },
   };
   if (supportsTemperature(call.model)) body.temperature = 0;
   const reasoning = reasoningFor(call.model);
@@ -270,17 +330,40 @@ export async function callStructured<T>(call: StructuredCall<T>): Promise<T | nu
 
     let toolMode = toolModeModels.has(call.model);
     let res: ChatResponse;
+    const sentAt = performance.now();
+    // Le chronométrage de la fiche (timing.ts) : modèle, tokens, durée. Jamais de contenu.
+    const timed = (usage: UsageLike | undefined, finish: string, provider?: unknown) =>
+      noteAi({
+        label: call.label,
+        model: call.model,
+        ...(typeof provider === "string" && /^[\w .-]{1,40}$/.test(provider) ? { provider } : {}),
+        ms: performance.now() - sentAt,
+        inputTokens: usage?.prompt_tokens ?? 0,
+        outputTokens: usage?.completion_tokens ?? 0,
+        cachedTokens: usage?.prompt_tokens_details?.cached_tokens ?? 0,
+        reasoningTokens: usage?.completion_tokens_details?.reasoning_tokens ?? 0,
+        finish,
+      });
     try {
+      const send = () => client.complete(buildRequest(call, userParts, toolMode), { signal: call.signal });
       try {
-        res = await client.complete(buildRequest(call, userParts, toolMode), { signal: call.signal });
+        res = await send();
       } catch (err) {
-        // Aucun fournisseur n'accepte response_format : on réessaie avec un outil forcé.
-        if (toolMode || !isUnsupportedParams(err)) throw err;
-        toolMode = true;
-        toolModeModels.add(call.model);
-        res = await client.complete(buildRequest(call, userParts, toolMode), { signal: call.signal });
+        if (isReasoningRefused(err, call.model)) {
+          // Le fournisseur refuse qu'on coupe le raisonnement : au minimum, pour cet appel et les suivants.
+          minimalOnly.add(call.model);
+          console.warn(`[ai] ${call.label}: raisonnement impossible à couper sur ${call.model}, réduit au minimum`);
+          res = await send();
+        } else {
+          // Aucun fournisseur n'accepte response_format : on réessaie avec un outil forcé.
+          if (toolMode || !isUnsupportedParams(err)) throw err;
+          toolMode = true;
+          toolModeModels.add(call.model);
+          res = await send();
+        }
       }
     } catch (err) {
+      timed(undefined, call.signal?.aborted ? "aborted" : "error");
       if (call.signal?.aborted) return null;
       if (isCreditError(err)) {
         noteCreditsExhausted();
@@ -294,6 +377,7 @@ export async function callStructured<T>(call: StructuredCall<T>): Promise<T | nu
       return null;
     }
 
+    timed(res.usage, res.choices?.[0]?.finish_reason ?? "error", res.provider);
     if (res.usage) recordUsage(call.model, res.usage);
     else recordUsage(call.model, { prompt_tokens: 0, completion_tokens: 0 });
 
@@ -333,7 +417,8 @@ export async function callStructured<T>(call: StructuredCall<T>): Promise<T | nu
         if (isLast && v.fallback) return v.fallback;
       }
     }
-    console.warn(`[ai] ${call.label}: ${truncated ? "réponse tronquée" : "sortie invalide"} (essai ${attempt + 1}/${MAX_ATTEMPTS})`);
+    // Une relance coûte un appel entier (plusieurs secondes) : le journal dit pourquoi, sans rien citer de la sortie.
+    console.warn(`[ai] ${call.label}: ${truncated ? "réponse tronquée" : `sortie invalide (${issueKinds(issues)})`} (essai ${attempt + 1}/${MAX_ATTEMPTS})`);
     // Une sortie invalide ou tronquée peut cacher un crédit qui fond : on relit le
     // solde (délai borné), et sous le seuil la fiche échoue en `closed`. Sinon,
     // sortie invalide ordinaire : une relance, puis une fiche sans TEC (§12).
@@ -349,6 +434,7 @@ export async function callStructured<T>(call: StructuredCall<T>): Promise<T | nu
 /** Pour les tests uniquement. */
 export function resetToolModeForTests(): void {
   toolModeModels.clear();
+  minimalOnly.clear();
 }
 
 // ---------------------------------------------------------------------------

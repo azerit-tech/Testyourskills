@@ -378,6 +378,7 @@ describe("cache 24 h et déduplication", () => {
     const again = await postLogin(ctx, "leamd");
     expect(again.res.status).toBe(202);
     expect(again.json.id).not.toBe(first.id);
+    await ctx.pipeline.wait(again.json.id); // la fiche finit avant la fermeture de la base
   });
 
   it("déduplique les jobs en cours", async () => {

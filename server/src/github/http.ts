@@ -2,6 +2,7 @@
 // délais par requête, limiteur de concurrence. Les appels à l'API passent par
 // un TokenPool (tokens.ts) : jeton le moins entamé, bascule sur limite secondaire.
 
+import { count } from "../timing";
 import { resourceOfPath, TokenPool, type Lease, type Resource } from "./tokens";
 
 export type EngineErrorCode = "unknown_user" | "organization" | "rate_limited" | "internal";
@@ -28,24 +29,41 @@ export interface Ctx {
   signal?: AbortSignal;
   /** Délai par requête, en ms. */
   timeoutMs: number;
-  limit: <T>(fn: () => Promise<T>) => Promise<T>;
+  /** `urgent` : passe devant les appels en attente (voir `urgent`). */
+  limit: <T>(fn: () => Promise<T>, urgent?: boolean) => Promise<T>;
   /** Compteurs de requêtes, pour le diagnostic. */
   calls: { rest: number; graphql: number; raw: number };
 }
 
+/**
+ * Au plus `max` appels en vol. Les appels urgents en attente passent devant les
+ * autres, dans leur ordre d'arrivée : le débit total ne change pas, seul l'ordre.
+ */
 export function makeLimiter(max: number) {
   let active = 0;
+  const first: (() => void)[] = [];
   const queue: (() => void)[] = [];
-  return async function limit<T>(fn: () => Promise<T>): Promise<T> {
-    if (active >= max) await new Promise<void>((r) => queue.push(r));
-    active++;
+  return async function limit<T>(fn: () => Promise<T>, urgent = false): Promise<T> {
+    // La place libérée est remise à celui qu'on réveille : personne ne la lui prend entre-temps.
+    if (active >= max) await new Promise<void>((r) => (urgent ? first : queue).push(r));
+    else active++;
     try {
       return await fn();
     } finally {
-      active--;
-      queue.shift()?.();
+      const next = first.shift() ?? queue.shift();
+      if (next) next();
+      else active--;
     }
   };
+}
+
+/**
+ * Le même contexte, dont les appels passent devant ceux qui attendent : pour ce
+ * que la suite de la fiche attend (les arbres et les commits, d'où part la
+ * lecture du code, SPEC §18.93), pendant que le reste de la collecte suit.
+ */
+export function urgent(ctx: Ctx): Ctx {
+  return { ...ctx, limit: (fn) => ctx.limit(fn, true) };
 }
 
 export function makeCtx(auth: GithubAuth, signal?: AbortSignal, timeoutMs = 8000): Ctx {
@@ -161,6 +179,7 @@ export async function rest<T>(
     const url = path.startsWith("http") ? path : API + path;
     const { res, body } = await withToken(ctx, resourceOfPath(url), (token) => {
       ctx.calls.rest++;
+      count("rest");
       return fetch(url, {
         headers: {
           // Sans jeton, pas d'en-tête : un « bearer » vide vaut 401, l'anonyme passe (60 requêtes par heure).
@@ -194,6 +213,7 @@ export async function graphql<T>(
       "graphql",
       (token) => {
         ctx.calls.graphql++;
+        count("graphql");
         return fetch(API + "/graphql", {
           method: "POST",
           headers: { authorization: `bearer ${token}`, "content-type": "application/json", "user-agent": UA },
@@ -220,6 +240,7 @@ export async function graphql<T>(
 export async function rawFile(ctx: Ctx, fullName: string, ref: string, path: string, maxBytes = 200_000): Promise<string | null> {
   return ctx.limit(async () => {
     ctx.calls.raw++;
+    count("raw");
     const url = `${RAW}/${fullName}/${encodeURIComponent(ref)}/${path.split("/").map(encodeURIComponent).join("/")}`;
     const res = await fetch(url, { headers: { "user-agent": UA }, signal: signalFor(ctx) });
     if (!res.ok) {
@@ -240,6 +261,7 @@ export async function rawFile(ctx: Ctx, fullName: string, ref: string, path: str
 export async function headOf(ctx: Ctx, url: string, stop: RegExp, maxBytes = 8192): Promise<string | null> {
   return ctx.limit(async () => {
     ctx.calls.raw++;
+    count("raw");
     const ac = new AbortController();
     const signal = AbortSignal.any([signalFor(ctx, 5000), ac.signal]);
     const res = await fetch(url, { headers: { "user-agent": UA }, signal });

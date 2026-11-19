@@ -17,7 +17,8 @@ import {
 import { pickAccomplices, type RawContributor } from "./accomplices";
 import { isDefaultGithubAvatar } from "./avatar";
 import type { CommitFact, ExternalMergedPR, GithubFacts, GithubRepo, RepoTree } from "./facts";
-import { EngineError, graphql, headOf, lastPageOf, makeCtx, rawFile, rest, soft, type Ctx, type GithubAuth } from "./http";
+import { EngineError, graphql, headOf, lastPageOf, makeCtx, rawFile, rest, soft, urgent, type Ctx, type GithubAuth } from "./http";
+import { phase } from "../timing";
 
 export { EngineError } from "./http";
 export type { GithubFacts, GithubRepo, GithubProfile, RepoTree, CommitFact, ExternalMergedPR } from "./facts";
@@ -84,13 +85,40 @@ interface RestRepo {
 
 type Progress = (e: { key: string; n?: number }) => void;
 
-export async function collectGithub(
-  login: string,
-  opts: { token: GithubAuth; onProgress?: Progress; signal?: AbortSignal },
-): Promise<GithubFacts> {
+/** Le profil seul, dès qu'il est lu : ce qu'il faut pour retrouver le LinkedIn que la personne affiche (§18.24). */
+export type ProfileFacts = Pick<GithubFacts, "schema" | "login" | "profile">;
+/** Ce que lit le choix des fichiers (pick.ts) : la liste des repos, leurs arbres et les derniers commits des plus actifs. */
+export type ReadableFacts = Pick<GithubFacts, "repos" | "activeRepos" | "trees" | "commits">;
+
+export interface CollectOptions {
+  token: GithubAuth;
+  onProgress?: Progress;
+  signal?: AbortSignal;
+  /**
+   * Appelé une fois, dès que le profil et ses comptes sociaux sont lus (une
+   * demi-seconde), bien avant la fin de la collecte : la lecture du LinkedIn
+   * peut partir tout de suite (SPEC §18.93). L'avatar par défaut n'y est pas
+   * encore reconnu.
+   */
+  onProfile?: (facts: ProfileFacts) => void;
+  /**
+   * Appelé une fois, dès que les arbres des repos actifs et les derniers commits
+   * sont lus : la lecture du code peut partir sans attendre le reste de la
+   * collecte (années, langages, premier commit…), qui ne lui sert pas.
+   */
+  onReadable?: (facts: ReadableFacts) => void;
+}
+
+export async function collectGithub(login: string, opts: CollectOptions): Promise<GithubFacts> {
   const user = parseLogin(login);
   if (!user) throw new EngineError("unknown_user", `pseudo invalide : ${login}`);
   const ctx = makeCtx(opts.token, opts.signal);
+  // Ce que la suite de la fiche attend passe devant le reste, à plafond d'appels
+  // égal (SPEC §18.93) : le profil, le calendrier et la liste des repos, d'où se
+  // choisissent les repos actifs, puis leurs arbres et leurs commits, d'où part la
+  // lecture du code (`onReadable`). C'est elle, pas le reste de la collecte, que
+  // la fiche attend le plus longtemps.
+  const first = urgent(ctx);
   const emit: Progress = (e) => {
     try {
       opts.onProgress?.(e);
@@ -100,40 +128,51 @@ export async function collectGithub(
   };
   const collectedAt = new Date().toISOString();
   const now = Date.parse(collectedAt);
+  // Chaque étape verse sa durée à la trace de la fiche (timing.ts), sous `gh.<nom>`.
+  const step = <T,>(name: string, p: Promise<T>) => phase(`gh.${name}`, () => p);
 
   // --- Étape 0 : profil, calendrier, PR externes, pages de repos -------------
   // Le profil (REST, rapide) débloque la pagination, l'activité par année et la
   // recherche du premier vrai commit sans attendre le calendrier (GraphQL, plus lent).
-  const userP = rest<RestUser>(ctx, `/users/${user}`).then((res) => {
-    if (res.status === 404) throw new EngineError("unknown_user", `pseudo inconnu : ${user}`);
-    if (!res.data) throw new EngineError("internal", `profil GitHub illisible (${res.status})`);
-    if (res.data.type === "Organization") throw new EngineError("organization", `${res.data.login} est une organisation`);
-    return res.data;
-  });
-  const calP = soft(ctx, () => fetchCalendar(ctx, user));
-  const prsP = soft(ctx, () => fetchExternalPRs(ctx, user));
-  const repoPage = (page: number) => rest<RestRepo[]>(ctx, `/users/${user}/repos?type=owner&sort=pushed&per_page=100&page=${page}`);
+  const userP = step(
+    "profil",
+    rest<RestUser>(first, `/users/${user}`).then((res) => {
+      if (res.status === 404) throw new EngineError("unknown_user", `pseudo inconnu : ${user}`);
+      if (!res.data) throw new EngineError("internal", `profil GitHub illisible (${res.status})`);
+      if (res.data.type === "Organization") throw new EngineError("organization", `${res.data.login} est une organisation`);
+      return res.data;
+    }),
+  );
+  const calP = step("calendrier", soft(first, () => fetchCalendar(first, user)));
+  const prsP = step("prs", soft(ctx, () => fetchExternalPRs(ctx, user)));
+  const repoPage = (page: number) => rest<RestRepo[]>(first, `/users/${user}/repos?type=owner&sort=pushed&per_page=100&page=${page}`);
   const page1P = repoPage(1);
-  const reposP = userP.then(async (u) => {
-    const pages = Math.min(LIMITS.maxRepoPages, Math.ceil(u.public_repos / 100));
-    const [p1, ...more] = await Promise.all([
-      page1P,
-      ...Array.from({ length: Math.max(0, pages - 1) }, (_, i) => soft(ctx, () => repoPage(i + 2))),
-    ]);
-    if (!p1?.data) throw new EngineError("internal", "liste des repos illisible");
-    return [p1.data, ...more.map((r) => r?.data ?? [])].flat().filter((r) => !r.fork).map(toRepo);
-  });
-  const yearsP = userP.then((u) => soft(ctx, () => fetchYears(ctx, user, now, Date.parse(u.created_at))));
+  const reposP = step(
+    "repos",
+    userP.then(async (u) => {
+      const pages = Math.min(LIMITS.maxRepoPages, Math.ceil(u.public_repos / 100));
+      const [p1, ...more] = await Promise.all([
+        page1P,
+        ...Array.from({ length: Math.max(0, pages - 1) }, (_, i) => soft(ctx, () => repoPage(i + 2))),
+      ]);
+      if (!p1?.data) throw new EngineError("internal", "liste des repos illisible");
+      return [p1.data, ...more.map((r) => r?.data ?? [])].flat().filter((r) => !r.fork).map(toRepo);
+    }),
+  );
+  const yearsP = step("annees", userP.then((u) => soft(ctx, () => fetchYears(ctx, user, now, Date.parse(u.created_at)))));
   // Premier vrai commit : parmi les repos les plus anciens, n'attend que la liste.
-  const firstP = Promise.all([userP, reposP]).then(async ([u, repos]) =>
-    withOffset(
-      ctx,
-      repos,
-      await findFirstRealCommit(
+  const firstP = step(
+    "premier_commit",
+    Promise.all([userP, reposP]).then(async ([u, repos]) =>
+      withOffset(
         ctx,
-        [...repos].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).slice(0, LIMITS.oldestCandidates),
-        u.login,
-        u.node_id,
+        repos,
+        await findFirstRealCommit(
+          ctx,
+          [...repos].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).slice(0, LIMITS.oldestCandidates),
+          u.login,
+          u.node_id,
+        ),
       ),
     ),
   );
@@ -142,6 +181,19 @@ export async function collectGithub(
   // Avatar par défaut (identicon) : une requête sur l'image elle-même, hors API,
   // 2 s au plus ; la fiche montre alors les initiales. Dans le doute, on garde l'avatar.
   const defaultAvatarP = userP.then((u) => isDefaultGithubAvatar(u.avatar_url, { signal: opts.signal })).catch(() => false);
+  // Un écouteur défaillant ne casse pas la collecte.
+  const tell = <T,>(fn: ((facts: T) => void) | undefined, facts: T) => {
+    try {
+      fn?.(facts);
+    } catch {
+      /* rien */
+    }
+  };
+  if (opts.onProfile) {
+    Promise.all([userP, socialP.catch(() => null)])
+      .then(([u, social]) => tell(opts.onProfile, { schema: 1, login: u.login, profile: profileOf(u, social?.data, false) }))
+      .catch(() => {});
+  }
   // Évite les rejets non observés si une étape lève avant l'attente finale.
   for (const p of [calP, prsP, page1P, reposP, yearsP, firstP, socialP]) p.catch(() => {});
 
@@ -176,18 +228,24 @@ export async function collectGithub(
     ...[...repos].sort((a, b) => b.sizeKb - a.sizeKb).slice(0, 15),
   ]).slice(0, LIMITS.detailRepos);
 
-  const treesP = Promise.all(active.map((r) => collectTree(ctx, r))).then((trees) => {
-    emit({ key: "tests", n: trees.filter((t) => t.tree.hasTests).length });
-    return trees;
-  });
-  const readmesP = Promise.all(
-    active.map(async (r) => {
-      const res = await soft(ctx, () => rest<string>(ctx, `/repos/${r.fullName}/readme`, { accept: "application/vnd.github.raw", raw: true }));
-      r.readmeWords = res ? (res.data ? countReadmeWords(res.data) : 0) : null;
+  const treesP = step(
+    "arbres",
+    Promise.all(active.map((r) => collectTree(first, r))).then((trees) => {
+      emit({ key: "tests", n: trees.filter((t) => t.tree.hasTests).length });
+      return trees;
     }),
-  ).then(() => emit({ key: "readme", n: active.filter((r) => (r.readmeWords ?? 0) > 0).length }));
-  const detailsP = soft(ctx, () => fetchDetails(ctx, detailTargets));
-  const manifestsP = Promise.all(
+  );
+  const readmesP = step(
+    "readmes",
+    Promise.all(
+      active.map(async (r) => {
+        const res = await soft(ctx, () => rest<string>(ctx, `/repos/${r.fullName}/readme`, { accept: "application/vnd.github.raw", raw: true }));
+        r.readmeWords = res ? (res.data ? countReadmeWords(res.data) : 0) : null;
+      }),
+    ).then(() => emit({ key: "readme", n: active.filter((r) => (r.readmeWords ?? 0) > 0).length })),
+  );
+  const detailsP = step("langages", soft(ctx, () => fetchDetails(ctx, detailTargets)));
+  const manifestsP = step("manifestes", Promise.all(
     repos.slice(active.length, active.length + LIMITS.manifestRepos).map(async (r) => {
       const files = manifestsForLanguage(r.language);
       const texts = await Promise.all(files.map((f) => soft(ctx, () => rawFile(ctx, r.fullName, r.defaultBranch, f))));
@@ -200,17 +258,29 @@ export async function collectGithub(
       });
       r.deps = [...deps].sort();
     }),
-  );
-  const commitsP = Promise.all(top.map((r) => soft(ctx, () => fetchUserCommits(ctx, r, u.login, u.node_id)))).then(async (lists) => {
+  ));
+  const commitListP = Promise.all(top.map((r) => soft(first, () => fetchUserCommits(first, r, u.login, u.node_id)))).then((lists) => {
     const commits = lists.flatMap((l) => l ?? []);
     emit({ key: "lazy_commits", n: commits.filter((c) => isLazyCommit(c.message)).length });
-    const offset = await soft(ctx, () => detectOffset(ctx, commits, byName));
-    return { commits, offset };
+    return commits;
   });
-  const countsP = Promise.all(
-    countTargets.map(async (r) => {
-      r.commitCount = (await soft(ctx, () => commitCount(ctx, r)))?.count ?? null;
-    }),
+  const commitsP = step(
+    "commits",
+    commitListP.then(async (commits) => ({ commits, offset: await soft(ctx, () => detectOffset(ctx, commits, byName)) })),
+  );
+  // De quoi lire le code : les arbres et les commits, sans attendre le reste (décalage horaire, années, langages…).
+  if (opts.onReadable) {
+    Promise.all([treesP, commitListP])
+      .then(([trees, commits]) => tell(opts.onReadable, { repos, activeRepos: active.map((r) => r.name), trees: trees.map((t) => t.tree), commits }))
+      .catch(() => {});
+  }
+  const countsP = step(
+    "comptes",
+    Promise.all(
+      countTargets.map(async (r) => {
+        r.commitCount = (await soft(ctx, () => commitCount(ctx, r)))?.count ?? null;
+      }),
+    ),
   );
   // Une liste de contributeurs par repo, lue une seule fois : elle sert au compte
   // des contributeurs externes (barème) et aux complices suggérés (§18.6).
@@ -224,35 +294,39 @@ export async function collectGithub(
     }
     return p;
   };
-  const contributorsP = Promise.all(
-    [...repos]
-      .sort((a, b) => b.stars - a.stars)
-      .slice(0, LIMITS.contributorRepos)
-      .filter((r) => r.stars > 0)
-      .map(async (r) => {
-        r.externalContributors = await soft(ctx, async () => externalContributors(await contributorsOf(r), u.login));
-      }),
+  const contributorsP = step(
+    "contributeurs",
+    Promise.all(
+      [...repos]
+        .sort((a, b) => b.stars - a.stars)
+        .slice(0, LIMITS.contributorRepos)
+        .filter((r) => r.stars > 0)
+        .map(async (r) => {
+          r.externalContributors = await soft(ctx, async () => externalContributors(await contributorsOf(r), u.login));
+        }),
+    ),
   );
   // Les complices : les repos actifs, pas les plus étoilés. Un repo déjà lu
   // ci-dessus ne coûte rien ; les autres, un appel chacun, en parallèle.
-  const accomplicesP = Promise.all(
-    active.slice(0, LIMITS.accompliceRepos).map((r) => soft(ctx, async () => (await contributorsOf(r)).list)),
-  ).then((lists) => pickAccomplices(lists, u.login));
+  const accomplicesP = step(
+    "complices",
+    Promise.all(active.slice(0, LIMITS.accompliceRepos).map((r) => soft(ctx, async () => (await contributorsOf(r)).list))).then((lists) =>
+      pickAccomplices(lists, u.login),
+    ),
+  );
 
-  const timed = <T,>(label: string, p: Promise<T>) =>
-    process.env.TYS_DEBUG ? p.then((v) => (console.error(`[collect] ${label} ${Date.now() - now} ms`), v)) : p;
   const [trees, , details, , commitsRes, , , years, externalPRs, firstOld, accomplices] = await Promise.all([
-    timed("trees", treesP),
-    timed("readmes", readmesP),
-    timed("details", detailsP),
-    timed("manifests", manifestsP),
-    timed("commits", commitsP),
-    timed("counts", countsP),
-    timed("contributors", contributorsP),
-    timed("years", yearsP),
-    timed("prs", prsP),
-    timed("first", firstP),
-    timed("accomplices", accomplicesP),
+    treesP,
+    readmesP,
+    detailsP,
+    manifestsP,
+    commitsP,
+    countsP,
+    contributorsP,
+    yearsP,
+    prsP,
+    firstP,
+    accomplicesP,
   ]);
   // Repli rare : aucun vieux repo n'a 10 commits, on cherche dans les repos actifs.
   const firstRealCommit =
@@ -285,28 +359,11 @@ export async function collectGithub(
   const weeks = cal?.weeks.slice(-52) ?? [];
   const social = await socialP.catch(() => null);
   const defaultAvatar = await defaultAvatarP;
-  const socialAccounts = Array.isArray(social?.data)
-    ? social.data.filter((a) => typeof a?.provider === "string" && typeof a?.url === "string").slice(0, 10).map((a) => ({ provider: a.provider, url: a.url }))
-    : [];
   return {
     schema: 1,
     login: u.login,
     collectedAt,
-    profile: {
-      login: u.login,
-      name: u.name,
-      // Vide pour l'avatar par défaut : la fiche, le PNG et la texture 3D montrent les initiales.
-      avatarUrl: defaultAvatar ? "" : u.avatar_url,
-      bio: u.bio,
-      blog: u.blog || null,
-      socialAccounts,
-      company: u.company,
-      followers: u.followers,
-      createdAt: u.created_at,
-      publicRepos: u.public_repos,
-      // Le texte de partage d'une dénonciation tague ce compte X (§18.6).
-      twitterUsername: typeof u.twitter_username === "string" && /^[A-Za-z0-9_]{1,15}$/.test(u.twitter_username) ? u.twitter_username : null,
-    },
+    profile: profileOf(u, social?.data, defaultAvatar),
     repoCount: reposTruncated ? Math.max(repos.length, u.public_repos) : repos.length,
     reposTruncated,
     repos,
@@ -326,6 +383,31 @@ export async function collectGithub(
     firstRealCommit,
     trees: trees.map((t) => t.tree),
     accomplices,
+  };
+}
+
+/** Le profil gardé dans les faits. `social` : la réponse de /users/{login}/social_accounts, si elle est venue. */
+function profileOf(u: RestUser, social: unknown, defaultAvatar: boolean): GithubFacts["profile"] {
+  const socialAccounts = Array.isArray(social)
+    ? (social as { provider?: unknown; url?: unknown }[])
+        .filter((a): a is { provider: string; url: string } => typeof a?.provider === "string" && typeof a?.url === "string")
+        .slice(0, 10)
+        .map((a) => ({ provider: a.provider, url: a.url }))
+    : [];
+  return {
+    login: u.login,
+    name: u.name,
+    // Vide pour l'avatar par défaut : la fiche, le PNG et la texture 3D montrent les initiales.
+    avatarUrl: defaultAvatar ? "" : u.avatar_url,
+    bio: u.bio,
+    blog: u.blog || null,
+    socialAccounts,
+    company: u.company,
+    followers: u.followers,
+    createdAt: u.created_at,
+    publicRepos: u.public_repos,
+    // Le texte de partage d'une dénonciation tague ce compte X (§18.6).
+    twitterUsername: typeof u.twitter_username === "string" && /^[A-Za-z0-9_]{1,15}$/.test(u.twitter_username) ? u.twitter_username : null,
   };
 }
 

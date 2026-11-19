@@ -360,14 +360,14 @@ describe("un dossier, une fiche, une note (§18.36)", () => {
         expect(textOf(html)).not.toMatch(VERSUS);
         // L'en-tête d'une fiche seule, au-dessus de la fiche ; les pièces dessous.
         expect(html.indexOf('class="wanted"')).toBeLessThan(html.indexOf('class="result-stage"'));
-        const line = lang === "fr-FR" ? "Sources au dossier\u00a0: LinkedIn et GitHub" : "Sources on file: LinkedIn and GitHub";
+        const line = lang === "fr-FR" ? "D&#x27;après LinkedIn et GitHub" : "Based on LinkedIn and GitHub";
         expect(html).toContain(`<p class="pieces-line">${line}</p>`);
         expect(html.indexOf('class="pieces"')).toBeGreaterThan(html.indexOf('class="tys-card '));
       }
   });
 
   it("un CV au dossier : « CV et GitHub » ; le lien non prouvé et le code à prouver sur leur ligne", () => {
-    expect(renderResult(cmp({ id: "DossierCv01" }), { owner: true })).toContain("Sources au dossier\u00a0: CV et GitHub");
+    expect(renderResult(cmp({ id: "DossierCv01" }), { owner: true })).toContain("D&#x27;après le CV et GitHub");
     const unproven = renderResult(cmp({ id: "DossierLi01", declaredSource: "linkedin", linkUnproven: true }), { owner: false });
     expect(unproven).toContain('<p class="pieces-note">Lien entre les deux sources\u00a0: à confirmer</p>');
     expect(unproven).not.toContain("Code à prouver");
