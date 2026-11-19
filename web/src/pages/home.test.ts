@@ -137,7 +137,7 @@ describe("l'accueil de qui a déjà sa fiche (§18.89)", () => {
     for (const gone of ["hero-title", "hero-hook", "<ExampleCard", "<Spin", "<ProfileWall", "<BandsTop", "home-last", "<BackLine"]) expect(page).not.toContain(gone);
     // un préremplissage (« Réessayer », /<pseudo>), une dénonciation, un film à voir ou un dossier en cours gardent l'accueil du formulaire
     expect(home).toMatch(/const returning = !!mem\.mine && !owed && !mem\.pending;/);
-    expect(home).toMatch(/const mineHome = returning && !denounce && !fromPrefill;/);
+    expect(home).toMatch(/const mineHome = returning && !denounce && !fromPrefill && !returnBack;/);
   });
 
   it("téléphone : une colonne ; bureau : la scène à gauche, les classements à droite", () => {
