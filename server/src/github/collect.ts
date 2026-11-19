@@ -18,6 +18,7 @@ import { pickAccomplices, type RawContributor } from "./accomplices";
 import { isDefaultGithubAvatar } from "./avatar";
 import type { CommitFact, ExternalMergedPR, GithubFacts, GithubRepo, RepoTree } from "./facts";
 import { EngineError, graphql, headOf, lastPageOf, makeCtx, rawFile, rest, soft, type Ctx, type GithubAuth } from "./http";
+import { phase } from "../timing";
 
 export { EngineError } from "./http";
 export type { GithubFacts, GithubRepo, GithubProfile, RepoTree, CommitFact, ExternalMergedPR } from "./facts";
@@ -100,40 +101,51 @@ export async function collectGithub(
   };
   const collectedAt = new Date().toISOString();
   const now = Date.parse(collectedAt);
+  // Chaque étape verse sa durée à la trace de la fiche (timing.ts), sous `gh.<nom>`.
+  const step = <T,>(name: string, p: Promise<T>) => phase(`gh.${name}`, () => p);
 
   // --- Étape 0 : profil, calendrier, PR externes, pages de repos -------------
   // Le profil (REST, rapide) débloque la pagination, l'activité par année et la
   // recherche du premier vrai commit sans attendre le calendrier (GraphQL, plus lent).
-  const userP = rest<RestUser>(ctx, `/users/${user}`).then((res) => {
-    if (res.status === 404) throw new EngineError("unknown_user", `pseudo inconnu : ${user}`);
-    if (!res.data) throw new EngineError("internal", `profil GitHub illisible (${res.status})`);
-    if (res.data.type === "Organization") throw new EngineError("organization", `${res.data.login} est une organisation`);
-    return res.data;
-  });
-  const calP = soft(ctx, () => fetchCalendar(ctx, user));
-  const prsP = soft(ctx, () => fetchExternalPRs(ctx, user));
+  const userP = step(
+    "profil",
+    rest<RestUser>(ctx, `/users/${user}`).then((res) => {
+      if (res.status === 404) throw new EngineError("unknown_user", `pseudo inconnu : ${user}`);
+      if (!res.data) throw new EngineError("internal", `profil GitHub illisible (${res.status})`);
+      if (res.data.type === "Organization") throw new EngineError("organization", `${res.data.login} est une organisation`);
+      return res.data;
+    }),
+  );
+  const calP = step("calendrier", soft(ctx, () => fetchCalendar(ctx, user)));
+  const prsP = step("prs", soft(ctx, () => fetchExternalPRs(ctx, user)));
   const repoPage = (page: number) => rest<RestRepo[]>(ctx, `/users/${user}/repos?type=owner&sort=pushed&per_page=100&page=${page}`);
   const page1P = repoPage(1);
-  const reposP = userP.then(async (u) => {
-    const pages = Math.min(LIMITS.maxRepoPages, Math.ceil(u.public_repos / 100));
-    const [p1, ...more] = await Promise.all([
-      page1P,
-      ...Array.from({ length: Math.max(0, pages - 1) }, (_, i) => soft(ctx, () => repoPage(i + 2))),
-    ]);
-    if (!p1?.data) throw new EngineError("internal", "liste des repos illisible");
-    return [p1.data, ...more.map((r) => r?.data ?? [])].flat().filter((r) => !r.fork).map(toRepo);
-  });
-  const yearsP = userP.then((u) => soft(ctx, () => fetchYears(ctx, user, now, Date.parse(u.created_at))));
+  const reposP = step(
+    "repos",
+    userP.then(async (u) => {
+      const pages = Math.min(LIMITS.maxRepoPages, Math.ceil(u.public_repos / 100));
+      const [p1, ...more] = await Promise.all([
+        page1P,
+        ...Array.from({ length: Math.max(0, pages - 1) }, (_, i) => soft(ctx, () => repoPage(i + 2))),
+      ]);
+      if (!p1?.data) throw new EngineError("internal", "liste des repos illisible");
+      return [p1.data, ...more.map((r) => r?.data ?? [])].flat().filter((r) => !r.fork).map(toRepo);
+    }),
+  );
+  const yearsP = step("annees", userP.then((u) => soft(ctx, () => fetchYears(ctx, user, now, Date.parse(u.created_at)))));
   // Premier vrai commit : parmi les repos les plus anciens, n'attend que la liste.
-  const firstP = Promise.all([userP, reposP]).then(async ([u, repos]) =>
-    withOffset(
-      ctx,
-      repos,
-      await findFirstRealCommit(
+  const firstP = step(
+    "premier_commit",
+    Promise.all([userP, reposP]).then(async ([u, repos]) =>
+      withOffset(
         ctx,
-        [...repos].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).slice(0, LIMITS.oldestCandidates),
-        u.login,
-        u.node_id,
+        repos,
+        await findFirstRealCommit(
+          ctx,
+          [...repos].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).slice(0, LIMITS.oldestCandidates),
+          u.login,
+          u.node_id,
+        ),
       ),
     ),
   );
@@ -176,18 +188,24 @@ export async function collectGithub(
     ...[...repos].sort((a, b) => b.sizeKb - a.sizeKb).slice(0, 15),
   ]).slice(0, LIMITS.detailRepos);
 
-  const treesP = Promise.all(active.map((r) => collectTree(ctx, r))).then((trees) => {
-    emit({ key: "tests", n: trees.filter((t) => t.tree.hasTests).length });
-    return trees;
-  });
-  const readmesP = Promise.all(
-    active.map(async (r) => {
-      const res = await soft(ctx, () => rest<string>(ctx, `/repos/${r.fullName}/readme`, { accept: "application/vnd.github.raw", raw: true }));
-      r.readmeWords = res ? (res.data ? countReadmeWords(res.data) : 0) : null;
+  const treesP = step(
+    "arbres",
+    Promise.all(active.map((r) => collectTree(ctx, r))).then((trees) => {
+      emit({ key: "tests", n: trees.filter((t) => t.tree.hasTests).length });
+      return trees;
     }),
-  ).then(() => emit({ key: "readme", n: active.filter((r) => (r.readmeWords ?? 0) > 0).length }));
-  const detailsP = soft(ctx, () => fetchDetails(ctx, detailTargets));
-  const manifestsP = Promise.all(
+  );
+  const readmesP = step(
+    "readmes",
+    Promise.all(
+      active.map(async (r) => {
+        const res = await soft(ctx, () => rest<string>(ctx, `/repos/${r.fullName}/readme`, { accept: "application/vnd.github.raw", raw: true }));
+        r.readmeWords = res ? (res.data ? countReadmeWords(res.data) : 0) : null;
+      }),
+    ).then(() => emit({ key: "readme", n: active.filter((r) => (r.readmeWords ?? 0) > 0).length })),
+  );
+  const detailsP = step("langages", soft(ctx, () => fetchDetails(ctx, detailTargets)));
+  const manifestsP = step("manifestes", Promise.all(
     repos.slice(active.length, active.length + LIMITS.manifestRepos).map(async (r) => {
       const files = manifestsForLanguage(r.language);
       const texts = await Promise.all(files.map((f) => soft(ctx, () => rawFile(ctx, r.fullName, r.defaultBranch, f))));
@@ -200,17 +218,23 @@ export async function collectGithub(
       });
       r.deps = [...deps].sort();
     }),
-  );
-  const commitsP = Promise.all(top.map((r) => soft(ctx, () => fetchUserCommits(ctx, r, u.login, u.node_id)))).then(async (lists) => {
-    const commits = lists.flatMap((l) => l ?? []);
-    emit({ key: "lazy_commits", n: commits.filter((c) => isLazyCommit(c.message)).length });
-    const offset = await soft(ctx, () => detectOffset(ctx, commits, byName));
-    return { commits, offset };
-  });
-  const countsP = Promise.all(
-    countTargets.map(async (r) => {
-      r.commitCount = (await soft(ctx, () => commitCount(ctx, r)))?.count ?? null;
+  ));
+  const commitsP = step(
+    "commits",
+    Promise.all(top.map((r) => soft(ctx, () => fetchUserCommits(ctx, r, u.login, u.node_id)))).then(async (lists) => {
+      const commits = lists.flatMap((l) => l ?? []);
+      emit({ key: "lazy_commits", n: commits.filter((c) => isLazyCommit(c.message)).length });
+      const offset = await soft(ctx, () => detectOffset(ctx, commits, byName));
+      return { commits, offset };
     }),
+  );
+  const countsP = step(
+    "comptes",
+    Promise.all(
+      countTargets.map(async (r) => {
+        r.commitCount = (await soft(ctx, () => commitCount(ctx, r)))?.count ?? null;
+      }),
+    ),
   );
   // Une liste de contributeurs par repo, lue une seule fois : elle sert au compte
   // des contributeurs externes (barème) et aux complices suggérés (§18.6).
@@ -224,35 +248,39 @@ export async function collectGithub(
     }
     return p;
   };
-  const contributorsP = Promise.all(
-    [...repos]
-      .sort((a, b) => b.stars - a.stars)
-      .slice(0, LIMITS.contributorRepos)
-      .filter((r) => r.stars > 0)
-      .map(async (r) => {
-        r.externalContributors = await soft(ctx, async () => externalContributors(await contributorsOf(r), u.login));
-      }),
+  const contributorsP = step(
+    "contributeurs",
+    Promise.all(
+      [...repos]
+        .sort((a, b) => b.stars - a.stars)
+        .slice(0, LIMITS.contributorRepos)
+        .filter((r) => r.stars > 0)
+        .map(async (r) => {
+          r.externalContributors = await soft(ctx, async () => externalContributors(await contributorsOf(r), u.login));
+        }),
+    ),
   );
   // Les complices : les repos actifs, pas les plus étoilés. Un repo déjà lu
   // ci-dessus ne coûte rien ; les autres, un appel chacun, en parallèle.
-  const accomplicesP = Promise.all(
-    active.slice(0, LIMITS.accompliceRepos).map((r) => soft(ctx, async () => (await contributorsOf(r)).list)),
-  ).then((lists) => pickAccomplices(lists, u.login));
+  const accomplicesP = step(
+    "complices",
+    Promise.all(active.slice(0, LIMITS.accompliceRepos).map((r) => soft(ctx, async () => (await contributorsOf(r)).list))).then((lists) =>
+      pickAccomplices(lists, u.login),
+    ),
+  );
 
-  const timed = <T,>(label: string, p: Promise<T>) =>
-    process.env.TYS_DEBUG ? p.then((v) => (console.error(`[collect] ${label} ${Date.now() - now} ms`), v)) : p;
   const [trees, , details, , commitsRes, , , years, externalPRs, firstOld, accomplices] = await Promise.all([
-    timed("trees", treesP),
-    timed("readmes", readmesP),
-    timed("details", detailsP),
-    timed("manifests", manifestsP),
-    timed("commits", commitsP),
-    timed("counts", countsP),
-    timed("contributors", contributorsP),
-    timed("years", yearsP),
-    timed("prs", prsP),
-    timed("first", firstP),
-    timed("accomplices", accomplicesP),
+    treesP,
+    readmesP,
+    detailsP,
+    manifestsP,
+    commitsP,
+    countsP,
+    contributorsP,
+    yearsP,
+    prsP,
+    firstP,
+    accomplicesP,
   ]);
   // Repli rare : aucun vieux repo n'a 10 commits, on cherche dans les repos actifs.
   const firstRealCommit =

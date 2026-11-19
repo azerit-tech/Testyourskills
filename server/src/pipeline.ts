@@ -22,6 +22,7 @@ import { linkedinFindings } from "./linkedinProfile/findings";
 import { highBarEmployers, type HighBarList } from "./scoring/employers";
 import type { PrimeView } from "../../shared/primes";
 import type { PrimeLogo } from "./render/prime";
+import { phase, phaseSync, Trace, withTrace } from "./timing";
 
 export type CardBody = Omit<CardData, "id" | "createdAt">;
 
@@ -309,6 +310,12 @@ export interface PipelineOptions {
    * pas, et leur comparaison compte comme prouvée.
    */
   vouched?: { login: string; linkedinUrl: string };
+  /**
+   * Où va la ligne de chronométrage de chaque fiche (timing.ts) : une ligne par
+   * fiche sortie ou en échec. Par défaut le journal du serveur (rien sous
+   * vitest) ; `false` la coupe.
+   */
+  timingLog?: ((line: string, trace: Trace) => void) | false;
 }
 
 export const MAX_CONCURRENT_CARDS = 4;
@@ -343,6 +350,8 @@ interface Job {
   findings: Finding[];
   /** Entrée en file, puis début du traitement : les `at` de la progression partent de là. */
   startedAt: number;
+  /** Temps passé en file avant le traitement (ms). */
+  queuedMs?: number;
   /** Fin du délai de traitement (ms epoch), dès que la fiche sort de la file ; repoussée par LinkedIn. */
   deadline?: number;
   finishedAt?: number;
@@ -586,7 +595,9 @@ export class Pipeline {
   private run(job: Job): void {
     clearTimeout(job.queueTimer);
     job.state = "running";
-    job.startedAt = Date.now();
+    const now = Date.now();
+    job.queuedMs = now - job.startedAt;
+    job.startedAt = now;
     this.running++;
     void this.execute(job).finally(() => {
       this.running--;
@@ -657,25 +668,43 @@ export class Pipeline {
       },
     };
 
+    // Le chronométrage de la fiche : tout ce que `work` lance verse ses temps à cette trace.
+    const trace = new Trace();
+    let outcome = "ok";
     try {
       // La course protège aussi des modules qui ignoreraient le signal.
-      const workP = this.work(job.id, deleteToken, input, ctx);
+      const workP = withTrace(trace, () => this.work(job.id, deleteToken, input, ctx));
       workP.catch(() => {}); // rejet tardif après le timeout : déjà traité
       const rows = await Promise.race([workP, timeoutP]);
       if (timedOut) throw new JobError("timeout", MESSAGES.timeout);
       this.opts.store.insertCards(rows);
       const root = rows[0]!;
+      outcome = root.kind === "comparison" ? `dossier ${root.source}` : root.source;
       this.opts.store.recordEvent("card_generated", root.id, { source: root.source, kind: root.kind });
       this.jobs.delete(job.id); // la base fait foi désormais
     } catch (err) {
       const e = timedOut ? new JobError("timeout", MESSAGES.timeout) : classifyError(err);
       if (e.code === "internal" && !(err instanceof JobError)) console.error(`[job ${job.id}] échec :`, err);
+      outcome = `échec ${e.code}`;
       job.state = "error";
       job.error = e;
       job.finishedAt = Date.now();
     } finally {
+      this.logTiming(job, trace, outcome);
       clearTimeout(timer);
       if (!ac.signal.aborted) ac.abort(); // coupe une branche encore en vol
+    }
+  }
+
+  /** Une ligne par fiche : sa durée, ce qu'elle a donné, puis chaque phase (timing.ts). Jamais de pseudo ni d'adresse. */
+  private logTiming(job: Job, trace: Trace, outcome: string): void {
+    const log = this.opts.timingLog ?? (process.env.NODE_ENV === "test" ? false : (line: string) => console.log(line));
+    if (!log) return;
+    const s = (ms: number) => (ms / 1000).toFixed(1);
+    try {
+      log(trace.line(`[fiche ${job.id}] ${s(trace.elapsed())} s · ${outcome} · file ${s(job.queuedMs ?? 0)}`), trace);
+    } catch {
+      /* un journal défaillant ne casse pas la fiche */
     }
   }
 
@@ -736,7 +765,8 @@ export class Pipeline {
     const githubCard = (cardId: string): CardData => {
       if (gh!.cached) return { ...gh!.cached, id: cardId, createdAt };
       const found = foundForGithub();
-      return { ...deps.scoreGithub(gh!.facts, gh!.ai, { lang, judgedInSeconds }), ...(found.length ? { findings: found } : {}), id: cardId, createdAt };
+      const body = phaseSync("barème", () => deps.scoreGithub(gh!.facts, gh!.ai, { lang, judgedInSeconds }));
+      return { ...body, ...(found.length ? { findings: found } : {}), id: cardId, createdAt };
     };
     const githubRow = (card: CardData, parentId: string | null, degraded = gh!.degraded): NewCardRow => ({
       id: card.id,
@@ -787,7 +817,7 @@ export class Pipeline {
     if (!gh || (!reading.is_dev_profile && !linkedinUrl)) {
       const found = linkedinUrl ? strongest(ctx.findings()) : [];
       const card = asDeclared({
-        ...deps.scoreCv(reading, declared.counts, { lang, judgedInSeconds, ...declaredOpts }),
+        ...phaseSync("barème", () => deps.scoreCv(reading, declared.counts, { lang, judgedInSeconds, ...declaredOpts })),
         ...(found.length ? { findings: found } : {}),
         ...(linkedinUrl ? { linkedinUrl } : {}),
         id,
@@ -808,7 +838,9 @@ export class Pipeline {
     // Le dossier : un seul calcul sur les deux pièces, une grille, une note (SPEC §18.84).
     // Trois lignes : le dossier, qui porte la note, et ses deux pièces, qui n'en ont pas à elles.
     ctx.emit("compare");
-    const scored = deps.scoreDossier({ reading, counts: declared.counts, ...declaredOpts }, { facts: gh.facts, ai: gh.ai }, { lang, judgedInSeconds });
+    const scored = phaseSync("barème", () =>
+      deps.scoreDossier({ reading, counts: declared.counts, ...declaredOpts }, { facts: gh.facts, ai: gh.ai }, { lang, judgedInSeconds }),
+    );
     const found = foundForGithub();
     const pieces = asPieces(scored, { cv: { id: newId(), createdAt }, github: { id: newId(), createdAt, ...(found.length ? { findings: found } : {}) } });
     const cmp = linkedinUrl ? asLinkedinComparison(pieces) : pieces;
@@ -875,7 +907,7 @@ export class Pipeline {
     let reading: CvReading | null = null;
     if (deps.aiAvailable()) {
       try {
-        reading = await deps.readCv(text, { signal: ctx.signal });
+        reading = await phase("parcours", () => deps.readCv(text, { signal: ctx.signal }));
       } catch (err) {
         if (!soft && (ctx.signal.aborted || isAiClosed(err))) throw err;
         console.warn("[linkedin] lecture IA échouée :", (err as Error).message);
@@ -897,11 +929,13 @@ export class Pipeline {
         return { facts: row.facts, ai: row.ai as CodeReadingResult | null, degraded: false, cached: row.data as CardData };
       }
     }
-    const facts = await deps.collectGithub(login, {
-      token: this.github,
-      signal: ctx.signal,
-      onProgress: (e) => ctx.emit(e.key, e.n),
-    });
+    const facts = await phase("faits", () =>
+      deps.collectGithub(login, {
+        token: this.github,
+        signal: ctx.signal,
+        onProgress: (e) => ctx.emit(e.key, e.n),
+      }),
+    );
     onFacts?.(facts);
     ctx.emit("recruiter");
     // L'enquête en direct (§18.26) : les trouvailles sortent avant la lecture IA, pour l'attente.
@@ -914,9 +948,9 @@ export class Pipeline {
     let degraded = !deps.aiAvailable();
     if (deps.aiAvailable()) {
       try {
-        const files = await deps.pickFilesForReading(facts, { token: this.github, signal: ctx.signal });
+        const files = await phase("fichiers", () => deps.pickFilesForReading(facts, { token: this.github, signal: ctx.signal }));
         if (files.length) {
-          ai = await deps.readCode(files, { signal: ctx.signal });
+          ai = await phase("code", () => deps.readCode(files, { signal: ctx.signal }));
           degraded = ai === null;
         }
       } catch (err) {
@@ -933,7 +967,7 @@ export class Pipeline {
   private async cvBranch(pdf: Uint8Array, ctx: Ctx): Promise<CvResult> {
     const { deps } = this.opts;
     // Le PDF ne vit qu'en mémoire (§2.6) ; le texte n'existe que dans cette fonction.
-    let { text, pages } = await deps.extractPdfText(pdf);
+    let { text, pages } = await phase("pdf", () => deps.extractPdfText(pdf));
     try {
       pdf.fill(0);
     } catch {
@@ -948,7 +982,7 @@ export class Pipeline {
     let reading: CvReading | null = null;
     if (deps.aiAvailable()) {
       try {
-        reading = await deps.readCv(text, { signal: ctx.signal });
+        reading = await phase("parcours", () => deps.readCv(text, { signal: ctx.signal }));
       } catch (err) {
         if (ctx.signal.aborted || isAiClosed(err)) throw err;
         console.warn("[cv] lecture IA échouée :", (err as Error).message);

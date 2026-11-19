@@ -20,6 +20,7 @@ import {
   type UsageLike,
 } from "./budget";
 import { refreshCredits } from "./credits";
+import { noteAi } from "../timing";
 
 // ---------------------------------------------------------------------------
 // Transport
@@ -190,6 +191,27 @@ export interface StructuredCall<T> {
 
 const MAX_ATTEMPTS = 2;
 
+/** La nature des refus du validateur, pour le journal : jamais leur texte, qui cite la sortie du modèle. */
+export function issueKinds(issues: string[]): string {
+  const kind = (i: string) =>
+    /not valid JSON/.test(i)
+      ? "JSON"
+      : /provider returned an error/.test(i)
+        ? "fournisseur"
+        : /request was refused/.test(i)
+          ? "refus"
+          : /not one of the repositories/.test(i)
+            ? "dépôt inconnu"
+            : /evidence_file/.test(i)
+              ? "fichier inconnu"
+              : /tries to instruct/.test(i)
+                ? "citation suspecte"
+                : /missing a valid reading/.test(i)
+                  ? "lecture manquante"
+                  : "schéma";
+  return [...new Set(issues.map(kind))].join(", ") || "inconnue";
+}
+
 function buildRequest(call: StructuredCall<unknown>, userParts: ChatContentPart[], toolMode: boolean): ChatRequest {
   const body: ChatRequest = {
     model: call.model,
@@ -270,6 +292,19 @@ export async function callStructured<T>(call: StructuredCall<T>): Promise<T | nu
 
     let toolMode = toolModeModels.has(call.model);
     let res: ChatResponse;
+    const sentAt = performance.now();
+    // Le chronométrage de la fiche (timing.ts) : modèle, tokens, durée. Jamais de contenu.
+    const timed = (usage: UsageLike | undefined, finish: string) =>
+      noteAi({
+        label: call.label,
+        model: call.model,
+        ms: performance.now() - sentAt,
+        inputTokens: usage?.prompt_tokens ?? 0,
+        outputTokens: usage?.completion_tokens ?? 0,
+        cachedTokens: usage?.prompt_tokens_details?.cached_tokens ?? 0,
+        reasoningTokens: usage?.completion_tokens_details?.reasoning_tokens ?? 0,
+        finish,
+      });
     try {
       try {
         res = await client.complete(buildRequest(call, userParts, toolMode), { signal: call.signal });
@@ -281,6 +316,7 @@ export async function callStructured<T>(call: StructuredCall<T>): Promise<T | nu
         res = await client.complete(buildRequest(call, userParts, toolMode), { signal: call.signal });
       }
     } catch (err) {
+      timed(undefined, call.signal?.aborted ? "aborted" : "error");
       if (call.signal?.aborted) return null;
       if (isCreditError(err)) {
         noteCreditsExhausted();
@@ -294,6 +330,7 @@ export async function callStructured<T>(call: StructuredCall<T>): Promise<T | nu
       return null;
     }
 
+    timed(res.usage, res.choices?.[0]?.finish_reason ?? "error");
     if (res.usage) recordUsage(call.model, res.usage);
     else recordUsage(call.model, { prompt_tokens: 0, completion_tokens: 0 });
 
@@ -333,7 +370,8 @@ export async function callStructured<T>(call: StructuredCall<T>): Promise<T | nu
         if (isLast && v.fallback) return v.fallback;
       }
     }
-    console.warn(`[ai] ${call.label}: ${truncated ? "réponse tronquée" : "sortie invalide"} (essai ${attempt + 1}/${MAX_ATTEMPTS})`);
+    // Une relance coûte un appel entier (plusieurs secondes) : le journal dit pourquoi, sans rien citer de la sortie.
+    console.warn(`[ai] ${call.label}: ${truncated ? "réponse tronquée" : `sortie invalide (${issueKinds(issues)})`} (essai ${attempt + 1}/${MAX_ATTEMPTS})`);
     // Une sortie invalide ou tronquée peut cacher un crédit qui fond : on relit le
     // solde (délai borné), et sous le seuil la fiche échoue en `closed`. Sinon,
     // sortie invalide ordinaire : une relance, puis une fiche sans TEC (§12).

@@ -2,6 +2,7 @@
 // délais par requête, limiteur de concurrence. Les appels à l'API passent par
 // un TokenPool (tokens.ts) : jeton le moins entamé, bascule sur limite secondaire.
 
+import { count } from "../timing";
 import { resourceOfPath, TokenPool, type Lease, type Resource } from "./tokens";
 
 export type EngineErrorCode = "unknown_user" | "organization" | "rate_limited" | "internal";
@@ -161,6 +162,7 @@ export async function rest<T>(
     const url = path.startsWith("http") ? path : API + path;
     const { res, body } = await withToken(ctx, resourceOfPath(url), (token) => {
       ctx.calls.rest++;
+      count("rest");
       return fetch(url, {
         headers: {
           // Sans jeton, pas d'en-tête : un « bearer » vide vaut 401, l'anonyme passe (60 requêtes par heure).
@@ -194,6 +196,7 @@ export async function graphql<T>(
       "graphql",
       (token) => {
         ctx.calls.graphql++;
+        count("graphql");
         return fetch(API + "/graphql", {
           method: "POST",
           headers: { authorization: `bearer ${token}`, "content-type": "application/json", "user-agent": UA },
@@ -220,6 +223,7 @@ export async function graphql<T>(
 export async function rawFile(ctx: Ctx, fullName: string, ref: string, path: string, maxBytes = 200_000): Promise<string | null> {
   return ctx.limit(async () => {
     ctx.calls.raw++;
+    count("raw");
     const url = `${RAW}/${fullName}/${encodeURIComponent(ref)}/${path.split("/").map(encodeURIComponent).join("/")}`;
     const res = await fetch(url, { headers: { "user-agent": UA }, signal: signalFor(ctx) });
     if (!res.ok) {
@@ -240,6 +244,7 @@ export async function rawFile(ctx: Ctx, fullName: string, ref: string, path: str
 export async function headOf(ctx: Ctx, url: string, stop: RegExp, maxBytes = 8192): Promise<string | null> {
   return ctx.limit(async () => {
     ctx.calls.raw++;
+    count("raw");
     const ac = new AbortController();
     const signal = AbortSignal.any([signalFor(ctx, 5000), ac.signal]);
     const res = await fetch(url, { headers: { "user-agent": UA }, signal });
