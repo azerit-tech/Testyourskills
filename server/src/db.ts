@@ -375,6 +375,17 @@ export class Store {
   }
 
   /**
+   * « Ajoute ton GitHub », « Ajoute ton LinkedIn » : la personne complète sa fiche (elle en
+   * tient le jeton, ou elle est connectée) et obtient son dossier à deux pièces. Sa fiche
+   * à une pièce est remplacée par ce dossier : la même adresse, la note recalculée.
+   */
+  completedBy(old: CardRow, dossier: CardRow) {
+    if (old.id === dossier.id || old.parentId || dossier.parentId || old.kind !== "card" || dossier.kind !== "comparison") return;
+    this.db.prepare(`UPDATE cards SET superseded_by = ? WHERE id = ? AND created_at <= ?`).run(dossier.id, old.id, dossier.createdAt);
+    forgetWeekRanks(this.db);
+  }
+
+  /**
    * La fiche qui se montre à cette adresse : le dossier. L'id d'une pièce donne son
    * dossier (une pièce n'a pas de note à elle, rien ne la montre seule) ; l'id d'une
    * fiche remplacée donne le dossier qui l'a remplacée, tant qu'il est en ligne et

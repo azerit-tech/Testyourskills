@@ -5,6 +5,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { FIXTURES } from "../../../shared/fixtures";
+import { fakeDossier } from "../__fixtures__/fakeDossier";
 import type { CvReading } from "../../../shared/readings";
 import type { CardData, JobState } from "../../../shared/types";
 import { createApp, type AppOptions } from "../app";
@@ -96,8 +97,9 @@ export function setupEntry(o: EntrySetup = {}) {
     scoreCv(_r, _c, { lang, judgedInSeconds }) {
       return { ...body(FIXTURES.cv), lang, judgedInSeconds };
     },
-    compareCards(cv, github) {
-      return { cv, github };
+    // Comme le moteur (scoring/compare.ts) : les deux pièces et la seule note du dossier.
+    scoreDossier(declared, github, o) {
+      return fakeDossier(this, declared, github, o);
     },
     async renderImage() {
       return new Uint8Array([0x89, 0x50, 0x4e, 0x47]);

@@ -743,6 +743,8 @@ export function createApp(opts: AppOptions) {
         const completed = prevRoot && personOf(c, prevRoot, ownedBy(c, prevRoot)) ? prevRoot : null;
         void pipeline.wait(id).then(() => {
           const row = store.getCard(id);
+          // La fiche complétée devient ce dossier : une personne, une note (SPEC §18.82).
+          if (row && completed) store.completedBy(completed, row);
           if (row) autoJoinBands(store, row, { from: completed });
         });
       }

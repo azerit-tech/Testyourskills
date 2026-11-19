@@ -4,7 +4,7 @@
 //
 // GitHub : collect → (lecture IA si dispo : pickFilesForReading → readCode) → scoreGithub
 // CV     : extractPdfText → cvTextCounts → readCv → scoreCv
-// Les deux : branches en parallèle, puis scoreCv avec les faits GitHub, puis compareCards.
+// Les deux : branches en parallèle, puis scoreDossier : un calcul sur les deux pièces, une note.
 
 import { randomBytes, randomInt } from "node:crypto";
 import type { CardData, ComparisonData, ErrorCode, Fact, Finding, Grid, JobState, Lang, ProgressEvent } from "../../shared/types";

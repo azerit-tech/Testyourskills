@@ -1,6 +1,7 @@
 // L'entrée d'office dans les bandes (§18.82), avec un moteur factice : la fiche
 // posée entre dans la bande de son école et de sa boîte, sans toucher.
 
+import { fakeDossier } from "./__fixtures__/fakeDossier";
 import { mkdirSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -53,8 +54,9 @@ const deps = {
   scoreCv(_r: unknown, _c: unknown, { lang, judgedInSeconds }: { lang: "fr" | "en"; judgedInSeconds: number }) {
     return { ...body(FIXTURES.cv), club: "Doctolib", school: "centrale-mediterranee", lang, judgedInSeconds };
   },
-  compareCards(cv: CardData, github: CardData) {
-    return { cv, github };
+  // Comme le moteur (scoring/compare.ts) : les deux pièces et la seule note du dossier.
+  scoreDossier(this: Deps, declared: Parameters<Deps["scoreDossier"]>[0], github: Parameters<Deps["scoreDossier"]>[1], o: Parameters<Deps["scoreDossier"]>[2]) {
+    return fakeDossier(this, declared, github, o);
   },
 } as unknown as Deps;
 
@@ -295,6 +297,8 @@ describe("un dossier à deux pièces : une personne, une entrée", () => {
       { person: "gh:leamd", kind: "ecole", band: "epita", card: dossier.id, stars },
     ]);
     expect(bandStanding(ctx.store.db, "boite", "doctolib")).toMatchObject({ members: 1, score: stars });
+    // Une personne, une note (SPEC §18.82) : l'adresse de sa fiche LinkedIn sert maintenant son dossier.
+    expect(ctx.store.fileRow(li.id)!.id).toBe(dossier.id);
     // Sa fiche GitHub refaite seule ne prend pas la place du dossier.
     const alone = insert(ctx.store, { login: "leamd", overall: 20 });
     autoJoinBands(ctx.store, ctx.store.getCard(alone)!);
@@ -308,6 +312,8 @@ describe("un dossier à deux pièces : une personne, une entrée", () => {
     const ctx = setup();
     const li = await make(ctx, { linkedin: LINKEDIN });
     await make(ctx, { login: "leamd", linkedin: LINKEDIN, from: li.id }, { "x-card-token": "pas-le-bon" });
+    // Ni son adresse : la fiche reste la sienne.
+    expect(ctx.store.fileRow(li.id)!.id).toBe(li.id);
     expect(members(ctx.store).filter((m) => m.person === `li:${LINKEDIN}`)).toMatchObject([
       { kind: "boite", band: "doctolib", card: li.id },
       { kind: "ecole", band: "centrale-mediterranee", card: li.id },
