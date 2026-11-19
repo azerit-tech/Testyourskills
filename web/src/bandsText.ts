@@ -56,7 +56,7 @@ const fr = {
   },
   board: {
     title: "Les bandes",
-    intro: "Chaque fiche peut rapporter ses étoiles à une école et à une boîte, au choix de la personne. Les vingt meilleures fiches d'une bande comptent ; trois suffisent pour entrer au tableau.",
+    intro: "Tes étoiles comptent pour ton école et ta boîte. Trois fiches pour entrer au tableau. Les vingt meilleures comptent.",
     tabs: "Tableau",
     yours: "Ta bande",
     /** L'onglet des bandes classées ; celui des bandes en formation est `forming`. */
@@ -173,7 +173,7 @@ const en: BandsDict = {
   },
   board: {
     title: "The crews",
-    intro: "Every sheet can bring its stars to one school and one company, its owner's choice. A crew's top 20 sheets count; three are enough to make the board.",
+    intro: "Your stars count for your school and your company. Three sheets to make the board. The top twenty count.",
     tabs: "Board",
     yours: "Your crew",
     ranked: "On the board",
