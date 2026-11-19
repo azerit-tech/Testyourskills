@@ -138,6 +138,22 @@ describe("rankFor", () => {
     expect(rankFor(card(), t2)!.group).toEqual({ kind: "language", key: "python" });
   });
 
+  it("barème 0.5.0 : d'abord parmi les profils du même niveau d'expérience, quand la table a ce groupe", () => {
+    // Les débuts de carrière : notes basses ; tout le monde : notes de 1 à 99.
+    const student = group(150, (i) => 20 + (i % 50));
+    const python = group(500);
+    const t = table({ overall: { all: group(1000), language: { python }, position: {}, seniority: { student } } });
+    const levelled = (code: "student" | "senior") => ({ ...card(), grid: { seniority: { code, months: 4, source: "linkedin" as const } } });
+    const r = rankFor(levelled("student"), t)!;
+    expect(r).toEqual({ percent: percentIn(student, 70), group: { kind: "seniority", key: "student" } });
+    expect(r.percent).toBeGreaterThan(percentIn(python, 70));
+    // Un niveau sans groupe dans la table, une fiche sans niveau, un groupe trop petit : comme avant.
+    expect(rankFor(levelled("senior"), t)!.group).toEqual({ kind: "language", key: "python" });
+    expect(rankFor(card(), t)!.group).toEqual({ kind: "language", key: "python" });
+    const small = table({ overall: { all: group(1000), language: { python }, position: {}, seniority: { student: group(MIN_GROUP - 1) } } });
+    expect(rankFor(levelled("student"), small)!.group).toEqual({ kind: "language", key: "python" });
+  });
+
   it("à égalité de rang entre les deux groupes : le langage", () => {
     const g = group(150);
     const t = table({ overall: { all: group(1000), language: { python: g }, position: { BE: { ...g } } } });
@@ -235,5 +251,8 @@ describe("chargement de data/percentiles.json", () => {
     expect(parsePercentileTable(null)).toBeNull();
     expect(parsePercentileTable({ scoringVersion: V })).toBeNull();
     expect(parsePercentileTable(table())).not.toBeNull();
+    // Les groupes par niveau sont facultatifs (tables d'avant 0.5.0), et vérifiés comme les autres.
+    expect(parsePercentileTable(table({ overall: { all: group(1000), language: {}, position: {}, seniority: { junior: group(200) } } }))).not.toBeNull();
+    expect(parsePercentileTable(table({ overall: { all: group(1000), language: {}, position: {}, seniority: { junior: { n: 3, centiles: [1] } } } }))).toBeNull();
   });
 });

@@ -244,7 +244,8 @@ export interface CardData {
   /** Les trois trouvailles les plus fortes de l'enquête (§18.26), la plus forte d'abord. Absentes des fiches d'avant. */
   findings?: Finding[];
   /** « Plus recherché que `percent` % » des profils sourcés par Azerit, dans le groupe dit (§18.3). Absent sans table de référence. */
-  rank?: { percent: number; group: { kind: "language" | "position" | "all"; key?: string } };
+  /** `seniority` (0.5.0) : parmi les profils du même niveau d'expérience, quand la table de référence a ce groupe. */
+  rank?: { percent: number; group: { kind: "language" | "position" | "all" | "seniority"; key?: string } };
   /** Le barème de recrutement (0.4.0) : huit critères sur 10, dont `overall` est la moyenne. Absent des fiches d'avant. */
   grid?: Grid;
   /**

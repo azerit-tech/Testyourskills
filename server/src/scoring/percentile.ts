@@ -22,7 +22,7 @@
 // - Table absente, ou version du barème différente de celle de la carte : pas de
 //   rang ni de rareté. Un rang calculé sur un autre barème mentirait.
 
-import type { CardData, Source } from "../../../shared/types";
+import type { CardData, Grid, SeniorityCode, Source } from "../../../shared/types";
 
 /** Taille minimale d'un groupe de référence pour afficher un rang (§18.3). */
 export const MIN_GROUP = 100;
@@ -62,6 +62,8 @@ export interface PercentileTable {
     language: Record<string, CentileGroup>;
     /** Par poste (`CardData.position`). */
     position: Record<string, CentileGroup>;
+    /** Par niveau d'expérience (`Grid.seniority.code`, barème 0.5.0). Absent des tables d'avant. */
+    seniority?: Partial<Record<SeniorityCode, CentileGroup>>;
   };
   /** Part des fiches qui portent chaque statut, en %, à une décimale. */
   statuses: Record<string, number>;
@@ -69,7 +71,7 @@ export interface PercentileTable {
 
 export type CardRank = NonNullable<CardData["rank"]>;
 
-type RankedCard = Pick<CardData, "overall" | "scoringVersion" | "source" | "mainLanguage" | "position">;
+type RankedCard = Pick<CardData, "overall" | "scoringVersion" | "source" | "mainLanguage" | "position"> & { grid?: Pick<Grid, "seniority"> };
 
 /** Les 99 centiles d'une liste de notes (non vide), selon la définition en tête de fichier. */
 export function centilesOf(values: number[]): number[] {
@@ -100,12 +102,17 @@ function sameReference(card: Pick<CardData, "scoringVersion" | "source">, table:
 }
 
 /**
- * « Plus recherché que X % » : le meilleur des groupes langage et poste qui
- * comptent au moins 100 profils (le langage à égalité), sinon le global.
+ * « Plus recherché que X % ». D'abord parmi les profils du même niveau d'expérience
+ * (barème 0.5.0 : un junior se compare aux juniors), quand la table a ce groupe et
+ * qu'il compte au moins 100 profils. Sinon comme avant : le meilleur des groupes
+ * langage et poste assez grands (le langage à égalité), sinon le global.
  * null sans table, sur un autre barème, ou sans groupe assez grand.
  */
 export function rankFor(card: RankedCard, table: PercentileTable | null | undefined): CardRank | null {
   if (!sameReference(card, table)) return null;
+  const level = card.grid?.seniority?.code;
+  const peers = level ? table.overall.seniority?.[level] : undefined;
+  if (level && usable(peers)) return { percent: percentIn(peers, card.overall), group: { kind: "seniority", key: level } };
   const lang = card.mainLanguage ? table.overall.language[card.mainLanguage] : undefined;
   const pos = table.overall.position[card.position];
   let best: CardRank | null = null;
@@ -152,7 +159,8 @@ export function parsePercentileTable(json: unknown): PercentileTable | null {
   const o = t.overall;
   if (!o || typeof o !== "object" || typeof o.language !== "object" || typeof o.position !== "object") return null;
   if (!t.statuses || typeof t.statuses !== "object") return null;
-  const groups = [o.all, ...Object.values(o.language ?? {}), ...Object.values(o.position ?? {})].filter(Boolean) as CentileGroup[];
+  if (o.seniority !== undefined && (!o.seniority || typeof o.seniority !== "object")) return null;
+  const groups = [o.all, ...Object.values(o.language ?? {}), ...Object.values(o.position ?? {}), ...Object.values(o.seniority ?? {})].filter(Boolean) as CentileGroup[];
   const ok = groups.every(
     (g) => typeof g.n === "number" && Array.isArray(g.centiles) && g.centiles.length === 99 && g.centiles.every((c) => typeof c === "number"),
   );

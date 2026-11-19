@@ -337,4 +337,18 @@ describe("aggregate", () => {
     expect(Object.keys(t.overall.language)).toEqual(["go"]);
     expect(aggregate(lines, { minGroup: 6 })).toBeNull();
   });
+
+  it("barème 0.5.0 : un groupe par niveau d'expérience, les lignes sans niveau n'en font aucun", () => {
+    const lines = [
+      ...[40, 50, 60].map((overall) => line({ overall, seniority: "junior" })),
+      ...[70, 80].map((overall) => line({ overall, seniority: "senior" })),
+      line({ overall: 30, seniority: "student" }),
+      line({ overall: 55 }),
+    ];
+    const t = aggregate(lines, { minGroup: 2 })!;
+    expect(Object.keys(t.overall.seniority!)).toEqual(["junior", "senior"]);
+    expect(t.overall.seniority!.junior!.n).toBe(3);
+    expect(t.overall.seniority!.senior!.centiles[98]).toBe(80);
+    expect(t.overall.all!.n).toBe(7);
+  });
 });

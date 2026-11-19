@@ -13,7 +13,7 @@ import { createHmac, randomBytes } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type { CodeReadingResult } from "../../shared/readings";
-import type { StatCode } from "../../shared/types";
+import type { SeniorityCode, StatCode } from "../../shared/types";
 import { parseLogin } from "./github/detect";
 import type { TokenPool } from "./github/tokens";
 import { CARD_GITHUB_NEED, isAiClosed, type Deps } from "./pipeline";
@@ -88,6 +88,8 @@ export interface CardLine {
   tecReal: boolean;
   language: string | null;
   position: string;
+  /** Le niveau d'expérience auquel la fiche a été lue (barème 0.5.0) ; absent : inconnu, ou ligne d'avant. */
+  seniority?: SeniorityCode;
   statuses: string[];
   /** Dépense IA de ce profil, en dollars. */
   usd: number;
@@ -220,6 +222,8 @@ export function aggregate(lines: CardLine[], opts: { minGroup?: number; now?: ()
       ...(all ? { all } : {}),
       language: byKey((l) => l.language),
       position: byKey((l) => l.position),
+      // Un rang se lit d'abord parmi les profils du même niveau d'expérience (scoring/percentile.ts).
+      seniority: byKey((l) => l.seniority ?? null),
     },
     statuses,
   };
@@ -440,6 +444,7 @@ export async function runPercentiles(opts: RunOptions): Promise<RunResult> {
       tecReal: (ai?.readings.length ?? 0) > 0,
       language: card.mainLanguage ?? null,
       position: card.position,
+      ...(card.grid?.seniority ? { seniority: card.grid.seniority.code } : {}),
       statuses: card.statuses.map((s) => s.id),
       usd: cost,
     };
