@@ -1,9 +1,12 @@
 // La fiche de Jacques sur l'accueil (§18.35) : rendue en chaîne, sans navigateur.
+import { readFileSync } from "node:fs";
 import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FIXTURES } from "../../../shared/fixtures";
 import { Cover } from "../components/Cover";
+import { Sunset } from "../components/Sunset";
+import { SUNSET } from "../../../shared/sunset";
 import { LangProvider } from "../i18n";
 import type { Showcase } from "../lib/api";
 import { MOCK_SHOWCASE_ID, mockApi } from "../lib/mock";
@@ -52,6 +55,38 @@ describe("la fiche de Jacques sous le titre", () => {
   it("la case du fondateur sur la couverture mène au même endroit", () => {
     const html = render(createElement(Cover, { onPlay: () => undefined, top: null, founder: COMPARED, suspects: [] }));
     expect(html).toMatch(/<a[^>]*class="cover-panel cover-founder[^"]*"[^>]*href="\/c\/Cmp1234567"/);
+  });
+});
+
+describe("la scène du premier écran (§18.81)", () => {
+  const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), "utf8");
+  const home = read("./Home.tsx");
+  const css = read("../styles.css");
+
+  it("la fiche d'exemple est dans le héros, après le formulaire, sur le crépuscule ; plus de couverture", () => {
+    expect(home).not.toContain("<Cover");
+    const top = home.slice(home.indexOf('<div className="home-top">'), home.indexOf('<div className="home-proof">'));
+    expect(top.indexOf("<EntryForm inputRef")).toBeGreaterThan(0);
+    expect(top).toMatch(/<\/section>\n[^\n]*§18\.81[^\n]*\n\s*<div className="home-stage">\n\s*<div className="home-stage-in">\n\s*<Sunset \/>\n\s*<ExampleCard \{\.\.\.showcase\} \/>/);
+    expect(home.match(/<ExampleCard /g)).toHaveLength(1);
+  });
+
+  it("le décor de l'aperçu de lien, en aplats, caché des lecteurs d'écran", () => {
+    const html = render(createElement(Sunset));
+    expect(html).toMatch(/^<div class="sunset" style="[^"]*" aria-hidden="true">/);
+    for (const tint of [SUNSET.sky, SUNSET.sun, SUNSET.ground]) expect(html).toContain(tint);
+    // les deux rangées d'immeubles de l'image, les fenêtres allumées sur la plus proche
+    expect(html).toContain(`fill="${SUNSET.far}"`);
+    expect(html).toContain(`fill="${SUNSET.near}"`);
+    expect(html).toContain(`fill="${SUNSET.window}"`);
+    expect(html).not.toMatch(/gradient/i);
+  });
+
+  it("à droite du héros au bureau, de bord à bord sur téléphone ; la fiche donne la mesure", () => {
+    expect(css).toMatch(/\.home-stage \{[^}]*margin: 8px calc\(-1 \* var\(--gutter\)\) 0;[^}]*container-type: inline-size;/);
+    expect(css).toMatch(/@media \(min-width: 900px\) \{\s*\.home-stage \{\s*grid-column: 2;\s*grid-row: 1;\s*margin: 0;/);
+    expect(css).toMatch(/\.home-stage \.showcase \{[^}]*width: var\(--stage-card\);/);
+    expect(css).not.toMatch(/\.sunset[^{]*\{[^}]*gradient/);
   });
 });
 
