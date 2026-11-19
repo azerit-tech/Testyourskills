@@ -36,6 +36,8 @@ import type { LinkedinPeople } from "./linkedinProfile/search";
 import { mountLinkedinSearch } from "./entry/linkedinSearch";
 import { mountGithubSearch, type GithubSearchRoutesOptions } from "./entry/githubSearch";
 import { createLinkedinEnter, type LinkedinEnterOptions } from "./entry/linkedinLogin";
+import type { RegistryPort } from "./registry/index";
+import { CLAIM_SIGNAL, signInSignal } from "./registry/signals";
 import { mountGithubEnter, type GithubLoginConfig } from "./entry/githubLogin";
 import { primePhase, primesOpen, seasonDates, type Season } from "../../shared/season";
 import { loadSeason } from "./season";
@@ -106,11 +108,14 @@ export interface AppOptions {
   linkedinProfiles?: LinkedinFinder;
   /** La recherche d'un profil LinkedIn par nom (§18.80). Absent : le champ « Ton nom » reste un champ où l'on colle un lien. */
   linkedinPeople?: LinkedinPeople;
+  /** Le registre GitHub ↔ LinkedIn de l'App Azerit (§18.95). Absent : rien n'est lu ni écrit chez elle. */
+  registry?: RegistryPort;
   /** La recherche de comptes GitHub des suggestions (§18.80). Absent : la vraie (github/searchUsers.ts). */
   githubUserSearch?: GithubSearchRoutesOptions["search"];
   /** Le GitHub d'après l'identité LinkedIn, et « même photo ? » (§18.80). Absents : les vrais (github/identity.ts, entry/photoHash.ts). */
   githubIdentity?: LinkedinEnterOptions["resolveGithub"];
   samePhoto?: LinkedinEnterOptions["samePhoto"];
+  samePhotoBytes?: LinkedinEnterOptions["samePhotoBytes"];
   /** Attente d'une demande de /api/entry/linkedin avant « pending » (tests). */
   entryPollWaitMs?: number;
   /** La trace du film (FILM_TRACE=1, filmTrace.ts) : le fichier où l'écrire. Absent : pas de route. */
@@ -347,6 +352,11 @@ export function createApp(opts: AppOptions) {
     limiter,
     fetchImpl,
     removeImages: (ids) => removeImages(ogDir, ids),
+    // « C'est moi » sur une fiche qui porte un LinkedIn : la personne prouve son GitHub et désigne ce profil (§18.95).
+    onClaimed: (row, login) => {
+      const url = ((store.fileRow(row.id) ?? row).facts as { linkedinUrl?: unknown } | null | undefined)?.linkedinUrl;
+      if (typeof url === "string") opts.registry?.recordLink({ login, url, ...CLAIM_SIGNAL });
+    },
     removeDuels: (ids) => removeDuels(ogDir, ids),
     account,
     // Le repli de `tys_who` (§18.90), créé plus bas : lu à la demande.
@@ -379,6 +389,8 @@ export function createApp(opts: AppOptions) {
           github: opts.githubPool ?? opts.githubToken,
           resolveGithub: opts.githubIdentity,
           samePhoto: opts.samePhoto,
+          samePhotoBytes: opts.samePhotoBytes,
+          storedPhoto: opts.registry ? (url) => opts.registry!.photoOf(url) : undefined,
         })
       : null;
 
@@ -681,6 +693,8 @@ export function createApp(opts: AppOptions) {
       // connectée (le profil sûr, ou l'un des homonymes proposés). Sa fiche reçoit le
       // GitHub retrouvé d'après son identité, et son email vérifié comme contact.
       const who = linkedinUrl && !login && !pdf && !denounce ? (linkedinEnter?.identityFor(c, linkedinUrl) ?? null) : null;
+      // Le registre de l'App (§18.95) : le lien que la connexion LinkedIn établit.
+      if (who?.github && linkedinUrl) opts.registry?.recordLink({ login: who.github.login, url: linkedinUrl, ...signInSignal(who.profileHow, who.github.how) });
       /** L'email de la personne connectée, posé sur sa fiche dès qu'elle existe ; jamais sur une fiche qui en porte déjà un. */
       const lead = (id: string) => {
         if (!denounce) linkedinEnter?.rememberCard(c, id, linkedinUrl, !!who);
@@ -785,6 +799,15 @@ export function createApp(opts: AppOptions) {
       });
       denounced(id, true);
       lead(id);
+      // Les comptes d'une fiche sortie vont au registre de l'App (§18.95) : jamais un pseudo qui n'existe pas.
+      const registry = opts.registry;
+      if (registry && !pdf) {
+        void pipeline.wait(id).then(() => {
+          const row = store.getCard(id);
+          const url = (row?.facts as { linkedinUrl?: unknown } | null | undefined)?.linkedinUrl;
+          if (row) registry.recordAccounts({ github: store.loginOf(row), linkedin: typeof url === "string" ? url : null });
+        });
+      }
       linkGithub(id);
       // L'entrée d'office dans les bandes (§18.82), dès que la fiche est posée : seulement pour une
       // fiche que sa personne fait elle-même (elle reçoit le jeton), jamais pour une dénonciation,

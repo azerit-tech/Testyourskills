@@ -233,6 +233,8 @@ export interface AuthRoutesOptions {
   fetchImpl: typeof fetch;
   /** Invalide les PNG en cache des ids donnés (fiches masquées). */
   removeImages(ids: string[]): Promise<void>;
+  /** Une fiche vient d'être revendiquée par le GitHub `login` (registre de l'App, §18.95). */
+  onClaimed?(row: CardRow, login: string): void;
   /** Efface les duels en cache de ces fiches (§18.94) : revendiquée, une fiche n'est plus scellée. */
   removeDuels?(ids: string[]): Promise<void>;
   /** Le compte léger (§18.91). Absent : /api/me ne parle que de la revendication. */
@@ -383,6 +385,7 @@ export function mountAuth(app: Hono, o: AuthRoutesOptions) {
     // La fiche revendiquée entre d'office dans la bande de son école et de sa boîte (§18.82) : une
     // fiche née d'une dénonciation attendait sa personne. Rien pour une fiche masquée ou sans lecture IA.
     if (row) autoJoinBands(o.store, row);
+    if (row) o.onClaimed?.(row, user.login);
     setCookie(c, SESSION_COOKIE, signSession(cfg.sessionSecret, owner), { ...cookieBase, path: "/", maxAge: SESSION_TTL_MS / 1000 });
     return c.redirect(back(st.r, "ok", owner.login), 302);
   });

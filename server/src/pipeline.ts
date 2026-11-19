@@ -767,7 +767,8 @@ export class Pipeline {
     // Le LinkedIn se lit en parallèle de la lecture du code : dès l'entrée, ou
     // dès que les faits GitHub disent où il est (entrée GitHub).
     const lk: { p?: Promise<LinkedinResult | null> } = {};
-    if (entry) lk.p = this.linkedinBranch(Promise.resolve({ profile: entry.profile, proven: false }), ctx, false);
+    // Le GitHub que le registre de l'App lie à ce profil (force 2 ou plus) prouve la comparaison (§18.95).
+    if (entry) lk.p = this.linkedinBranch(Promise.resolve({ profile: entry.profile, proven: !!entry.githubProven && login === entry.githubLogin }), ctx, false);
     const finder = !pdf ? this.opts.linkedin : undefined;
     const slow = linkedinSlow(ctx);
     const onFacts =

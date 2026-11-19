@@ -111,6 +111,8 @@ export interface EntryIdentity {
   github: GithubIdentity | null;
   /** Le profil lancé est le profil sûr (email ou photo), pas un choix parmi des homonymes. */
   sureProfile: boolean;
+  /** Comment ce profil est le sien : l'email, la photo, le seul au nom et à l'employeur, ou choisi par elle dans « C'est toi ? ». */
+  profileHow: "email" | "photo" | "employer" | "picked";
   /** Le compte de la personne connectée (§18.91), sinon absent. */
   accountId?: string;
 }
@@ -130,6 +132,10 @@ export interface LinkedinEnterOptions {
   peek?: (url: string, opts: { spend: () => boolean; signal?: AbortSignal }) => Promise<ProfilePeek | null>;
   /** « Même photo ? » ; les tests en donnent un faux. */
   samePhoto?: (a: string, b: string) => Promise<boolean>;
+  /** La photo que l'App Azerit garde d'un profil (§18.95) ; absent : aucune. */
+  storedPhoto?: (url: string) => Promise<StoredPhoto | null>;
+  /** « Même photo ? » entre la photo rendue par LinkedIn et une photo gardée ; les tests en donnent un faux. */
+  samePhotoBytes?: (picture: string, photo: StoredPhoto) => Promise<boolean>;
   /** La fiche de qui s'est connecté : celle du cookie si elle existe encore, sinon la dernière de son profil. */
   knownCard?: (who: Who) => KnownCard | null;
   /** Attente d'une demande du front avant « pending » (les tests la raccourcissent). */
@@ -155,6 +161,28 @@ export function photoMatcher(fetchImpl: typeof fetch): (a: string, b: string) =>
     if (ia && ia === licdnImageId(b)) return true;
     const [ha, hb] = await Promise.all([hashOf(a), hashOf(b)]);
     return samePhotoHash(ha, hb);
+  };
+}
+
+/** Une photo déjà en main (celle que l'App Azerit garde d'un profil, §18.95). */
+export interface StoredPhoto {
+  bytes: Uint8Array;
+  ext: "jpg" | "png";
+}
+
+/** La photo rendue par LinkedIn et une photo déjà en main montrent-elles la même personne ? Même empreinte. */
+export function storedPhotoMatcher(fetchImpl: typeof fetch): (picture: string, photo: StoredPhoto) => Promise<boolean> {
+  const pictures = new Map<string, Promise<Uint8Array | null>>();
+  return async (picture, photo) => {
+    let h = pictures.get(picture);
+    if (!h) {
+      h = downloadPhoto(picture, fetchImpl)
+        .then((p) => photoHash(p.bytes, p.ext))
+        .catch(() => null);
+      pictures.set(picture, h);
+    }
+    const [a, b] = await Promise.all([h, photoHash(photo.bytes, photo.ext)]);
+    return samePhotoHash(a, b);
   };
 }
 
@@ -228,10 +256,25 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
       if (found.status === "off") out.off = true;
       const all = found.status === "ok" ? found.results : [];
       let same = all.filter((c) => samePublicFullName(who.name, c.name));
+      // La photo que l'App Azerit garde déjà d'un de ces profils (§18.95) : la sienne,
+      // et elle seule, le désigne tout de suite, sans lire aucun profil (quatre secondes et
+      // une lecture payée de moins). Sinon, rien ne change.
+      const storedPhoto = o.storedPhoto;
+      if (storedPhoto && who.picture && same.length) {
+        const picture = who.picture;
+        const sameStored = o.samePhotoBytes ?? storedPhotoMatcher(o.fetchImpl);
+        const firsts = same.slice(0, PHOTOS_COMPARED);
+        const photos = await Promise.all(firsts.map((c) => storedPhoto(c.url).catch(() => null)));
+        const hits = (await Promise.all(photos.map((p) => (p ? sameStored(picture, p).catch(() => false) : false)))).flatMap((ok, i) => (ok ? [firsts[i]!] : []));
+        if (hits.length === 1) {
+          out.sure = hits[0]!;
+          out.how = "photo";
+        }
+      }
       // Un index web ne donne pas de photo : les premiers profils à ce nom sont lus, ensemble.
       // Leur lecture entre au cache : la fiche qui part ensuite ne la repaie pas.
       const peek = o.peek;
-      if (peek) {
+      if (peek && !out.sure) {
         const signal = AbortSignal.timeout(PEEK_WAIT_MS);
         const read = await Promise.all(
           same.map((c, i) =>
@@ -245,7 +288,7 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
           return p ? { ...c, headline: c.headline || p.headline, ...(p.photoUrl ? { photoUrl: p.photoUrl } : {}) } : c;
         });
       }
-      if (who.picture && same.length) {
+      if (who.picture && same.length && !out.sure) {
         const samePhoto = o.samePhoto ?? photoMatcher(o.fetchImpl);
         const picture = who.picture;
         const withPhoto = same.filter((c) => c.photoUrl).slice(0, PHOTOS_COMPARED);
@@ -348,6 +391,7 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
       github: r.github,
       // Le profil au seul nom et employeur fait partir la fiche, sans valoir la preuve d'un email ou d'une photo.
       sureProfile: sure && r.how !== "employer",
+      profileHow: sure && r.how ? r.how : "picked",
       ...(found.session.accountId ? { accountId: found.session.accountId } : {}),
       used() {
         sessions.delete(found.id);

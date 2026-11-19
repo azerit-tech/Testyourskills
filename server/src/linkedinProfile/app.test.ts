@@ -303,6 +303,15 @@ describe("la vitrine : le serveur se porte garant de son LinkedIn (§18.35)", ()
     expect(await post(ctx, { login: "jmougeot" })).toMatchObject({ status: 200, json: { id: json.id, cached: true } });
   });
 
+  it("entrée LinkedIn, GitHub lié par le registre de l'App : prouvé en force 2, pas en force 1 (§18.95)", async () => {
+    const proven = setup({ forUrl: async () => ({ status: "found", profile: PROFILE, githubLogin: "camille-ardent", githubProven: true }) });
+    const a = await post(proven, { linkedin: URL_ });
+    expect(proven.store.getCard(a.json.id)).toMatchObject({ kind: "comparison", login: "camille-ardent", facts: { linkedinUrl: URL_, linkedinProven: true } });
+    const found = setup({ forUrl: async () => ({ status: "found", profile: PROFILE, githubLogin: "camille-ardent", githubProven: false }) });
+    const b = await post(found, { linkedin: URL_ });
+    expect(found.store.getCard(b.json.id)).toMatchObject({ kind: "comparison", facts: { linkedinProven: false } });
+  });
+
   it("entrée LinkedIn par un autre profil qui donne ce GitHub : pas prouvée", async () => {
     const ctx = setup({ forUrl: async () => ({ status: "found", profile: PROFILE, githubLogin: "jmougeot" }) }, {}, VITRINE);
     const { json } = await post(ctx, { linkedin: URL_ });

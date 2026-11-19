@@ -58,6 +58,7 @@ LINKEDIN_DAILY_SEARCHES=2000     # plafond du jour des recherches par nom (10 $ 
 IP_SALT=…                        # openssl rand -hex 32 : sinon le sel par défaut, public
 HIGH_BAR_EMPLOYERS_FILE=/data/employers.json   # listes privées : voir « Les listes privées »
 SCHOOL_TIERS_FILE=/data/schools.json
+AZERIT_DB_URL=postgres://testyourskills:…@azerit-postgres:5432/azerit   # registre de l'App : voir « Le registre de l'App Azerit » ; absent, rien ne change
 ```
 
 `NODE_ENV`, `PORT` et `DB_PATH` sont aussi posés par `docker-compose.yml` ; les
@@ -110,6 +111,44 @@ il ne touche jamais `.env` (ni aucun `.env*`), `.deployed_commit`,
 `.deployed_commit.precedent`. Codes de sortie : `0` déployé · `1` arrêt avant la
 bascule, rien de ce qui sert n'a bougé · `2` la nouvelle version tourne mais n'est
 pas saine, les 80 dernières lignes de `docker logs testyourskills` sont affichées.
+
+## Le registre de l'App Azerit
+
+Le jeu lit et enrichit la base de l'App (SPEC §18.95) : `azerit-postgres`, base
+`azerit`, sur le même réseau docker `ruby_default`. Il y entre sous un rôle à
+lui, `testyourskills`, jamais le superutilisateur : lecture de `accounts`,
+`account_links`, `cvs`, `photos`, `photo_profiles` ; ajout seul dans `accounts`,
+`account_links`, `cvs`. Une fois, à la main :
+
+```bash
+PW=$(openssl rand -hex 24); echo "$PW"      # à garder pour le .env, nulle part ailleurs
+scp ops/registre-role.sql azerit:/tmp/registre-role.sql
+ssh azerit "docker exec -i azerit-postgres psql -U postgres -d azerit -v ON_ERROR_STOP=1 -v pw='$PW' < /tmp/registre-role.sql && rm /tmp/registre-role.sql"
+```
+
+La dernière requête du fichier affiche `t | t | f | f | f | f` (insérer un lien,
+lire un CV : oui ; modifier un lien, supprimer un compte, lire `people`, ajouter
+une photo : non). Puis, dans `/opt/testyourskills/.env` :
+
+```dotenv
+AZERIT_DB_URL=postgres://testyourskills:<le mot de passe>@azerit-postgres:5432/azerit
+```
+
+et `ssh azerit 'cd /opt/testyourskills && docker compose up -d'` (un `.env`
+changé demande de recréer le conteneur ; le prochain `scripts/deploy.sh` le fait
+aussi). Au démarrage, le journal dit `Registre de l'App Azerit : branché`.
+
+Vérifier, sans rien écrire :
+
+```bash
+ssh azerit "docker exec azerit-postgres psql -U postgres -d azerit -c \"SELECT updated_by, count(*) FROM account_links WHERE source = 'testyourskills' GROUP BY 1\""
+ssh azerit 'docker logs --tail 200 testyourskills | grep registre'   # une panne : « [registre] … indisponible »
+```
+
+Couper : retirer `AZERIT_DB_URL` du `.env` et recréer le conteneur. Retirer le
+rôle (il ne possède aucun objet : `DROP OWNED` ne fait que lui reprendre ses
+droits) : `DROP OWNED BY testyourskills; DROP ROLE testyourskills;`. Les lignes
+déjà écrites restent à l'App (elles sont à elle).
 
 ## Les listes privées (employeurs, écoles)
 

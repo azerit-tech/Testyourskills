@@ -79,7 +79,7 @@ export class ApifyProvider implements LinkedinProvider {
     const item = Array.isArray(items) ? items.find((x) => x && typeof x === "object" && !(x as { error?: unknown }).error) : null;
     if (!item) return { profile: null, githubLogin: null, githubChecked: true };
     const profile = profileFromApifyItem(url, item);
-    return { profile, githubLogin: profile ? githubFromApifyItem(item) : null, githubChecked: true };
+    return { profile, githubLogin: profile ? githubFromApifyItem(item) : null, githubChecked: true, ...(profile ? { raw: item } : {}) };
   }
 }
 

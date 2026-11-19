@@ -21,6 +21,9 @@ import { LinkedinCache } from "./store";
 import { githubDeclaredOf, linkedinFromGithub, normalizeLinkedinUrl } from "./url";
 import { tokensFromEnv } from "../github/tokens";
 import { readmeSignal, type GithubSignal } from "./githubSignals";
+import { isProven, type RegistryPort } from "../registry/index";
+import { githubDeclaredSignal, LINKEDIN_PROFILE_SIGNAL, README_SIGNAL, SEARCH_SIGNAL, type LinkSignal } from "../registry/signals";
+import type { ProviderResult } from "./profile";
 import { count, phase } from "../timing";
 
 export type { LinkedinProfile, LinkedinProvider } from "./profile";
@@ -40,7 +43,8 @@ export interface LookupOptions {
 }
 
 export type UrlLookup =
-  | { status: "found"; profile: LinkedinProfile; githubLogin: string | null }
+  /** `githubProven` : le GitHub vient du registre de l'App, lien de force 2 ou plus (§18.95). */
+  | { status: "found"; profile: LinkedinProfile; githubLogin: string | null; githubProven?: boolean }
   | { status: "not_found" }
   /** Plafond du jour atteint, limite de l'IP atteinte, fournisseur en panne ou trop lent. */
   | { status: "unavailable" };
@@ -80,6 +84,8 @@ export interface LinkedinProfilesOptions {
   search?: Pick<CrustdataClient, "searchByGithub">;
   /** Signal gratuit quand le profil GitHub n'affiche aucun LinkedIn : le README de profil (§18.90). */
   signal?: GithubSignal;
+  /** Le registre GitHub ↔ LinkedIn de l'App Azerit (§18.95) : lu avant tout appel payant, enrichi de ce qui est lu. */
+  registry?: RegistryPort;
   now?: () => number;
 }
 
@@ -105,7 +111,7 @@ export class LinkedinProfiles implements LinkedinFinder {
   }
 
   async forGithub(facts: unknown, opts: LookupOptions & { url?: string } = {}): Promise<GithubLookup | null> {
-    const { cache, provider, search, signal: free } = this.opts;
+    const { cache, provider, search, signal: free, registry } = this.opts;
     const gh = githubDeclaredOf(facts);
     if (!gh) return null;
     const explicit = opts.url ? normalizeLinkedinUrl(opts.url) : null;
@@ -114,6 +120,15 @@ export class LinkedinProfiles implements LinkedinFinder {
     // un GitHub : seuls ce que GitHub affiche (cette même adresse) et la recherche le font.
     let url = explicit ?? declared;
     let proves = !!declared && (!explicit || explicit === declared);
+    /** Le lien que ce jeu établit lui-même, versé au registre de l'App (§18.95). */
+    let signal: LinkSignal | null = declared && proves ? githubDeclaredSignal(gh, declared) : null;
+    // Le registre de l'App d'abord (300 ms au plus) : un lien prouvé y dispense du
+    // README et de la recherche ; un lien trouvé passe avant la recherche payante.
+    const known = !url && registry ? await registry.linkedinOf(gh.login) : null;
+    if (known && isProven(known.strength)) {
+      url = known.url;
+      proves = true;
+    }
     if (!url && (free || search)) {
       const prev = cache.getLookup(gh.login, this.now());
       if (prev !== undefined) url = prev;
@@ -130,12 +145,16 @@ export class LinkedinProfiles implements LinkedinFinder {
         if (readme) {
           cache.putLookup(gh.login, readme, this.now());
           url = readme;
+          signal = README_SIGNAL;
+        } else if (known) {
+          // Trouvé par l'App, pas prouvé : rien à payer.
         } else if (search) {
           if (this.take(opts)) {
             try {
               const r = await phase("linkedin_recherche", () => search.searchByGithub({ login: gh.login, name: gh.name, createdAt: gh.createdAt }, opts.signal));
               cache.putLookup(gh.login, r.url, this.now());
               url = r.url;
+              signal = SEARCH_SIGNAL;
             } catch (err) {
               warn("recherche", err);
               return null;
@@ -145,7 +164,12 @@ export class LinkedinProfiles implements LinkedinFinder {
       }
       proves = !!url;
     }
+    if (!url && known) {
+      url = known.url;
+      proves = false;
+    }
     if (!url) return null;
+    if (signal) registry?.recordLink({ login: gh.login, url, ...signal });
 
     const hit = cache.getProfile(url, this.now());
     if (hit) {
@@ -154,17 +178,29 @@ export class LinkedinProfiles implements LinkedinFinder {
       if (proves && hit.githubLogin == null) cache.linkGithub(url, gh.login);
       return { profile: hit.profile, proven: proves };
     }
+    // Un CV que l'App a déjà lu : le jugement le prend, sans payer ni attendre Apify.
+    const stored = registry ? await registry.profileOf(url) : null;
+    if (stored) return { profile: stored, proven: proves };
     if (!this.take(opts)) return null;
     try {
       opts.onSlow?.(provider.timeoutMs);
       const r = await phase("linkedin", () => provider.fetchProfile(url, { signal: opts.signal }));
       const link = proves ? gh.login : r.githubChecked ? r.githubLogin : undefined;
       cache.putProfile(url, r.profile, r.profile ? link : undefined, this.now());
+      this.keep(url, r, proves ? gh.login : undefined);
       return r.profile ? { profile: r.profile, proven: proves } : null;
     } catch (err) {
       warn("profil", err);
       return null;
     }
+  }
+
+  /** Un profil payé : son CV au registre de l'App, et le GitHub que ses liens donnent. */
+  private keep(url: string, r: ProviderResult, login?: string) {
+    const registry = this.opts.registry;
+    if (!registry || !r.profile) return;
+    if (r.raw !== undefined) registry.recordProfile(url, r.raw, login ? { login } : {});
+    if (r.githubChecked && r.githubLogin) registry.recordLink({ login: r.githubLogin, url, ...LINKEDIN_PROFILE_SIGNAL });
   }
 
   /**
@@ -182,6 +218,7 @@ export class LinkedinProfiles implements LinkedinFinder {
       const r = await provider.fetchProfile(url, { withGithub: true, signal: opts.signal });
       // Un profil déjà gardé garde son lien avec un GitHub, que cette lecture ne sait pas prouver.
       if (!hit) cache.putProfile(url, r.profile, r.profile ? r.githubLogin : undefined, this.now());
+      this.keep(url, r);
       const p = r.profile;
       return p ? { name: p.name, headline: p.headline, ...(p.photoUrl ? { photoUrl: p.photoUrl } : {}) } : null;
     } catch (err) {
@@ -191,19 +228,33 @@ export class LinkedinProfiles implements LinkedinFinder {
   }
 
   async forUrl(raw: string, opts: LookupOptions = {}): Promise<UrlLookup> {
-    const { cache, provider } = this.opts;
+    const { cache, provider, registry } = this.opts;
     const url = normalizeLinkedinUrl(raw);
     if (!url) return { status: "not_found" };
     const hit = cache.getProfile(url, this.now());
     if ((hit && !hit.found) || (hit?.found && hit.githubLogin !== undefined)) count("linkedin_cache");
     if (hit && !hit.found) return { status: "not_found" };
-    if (hit?.found && hit.githubLogin !== undefined) return { status: "found", profile: hit.profile, githubLogin: hit.githubLogin };
+    // Le registre de l'App, en parallèle : le GitHub lié à ce profil, et son CV s'il n'est pas déjà ici.
+    const knownP = registry ? registry.githubOf(url) : Promise.resolve(null);
+    const storedP = registry && !hit ? registry.profileOf(url) : Promise.resolve(null);
+    /** Le GitHub des liens du profil d'abord ; sinon celui du registre, prouvé s'il est de force 2 ou plus. */
+    const found = async (profile: LinkedinProfile, githubLogin: string | null): Promise<UrlLookup> => {
+      if (githubLogin) return { status: "found", profile, githubLogin };
+      const known = await knownP;
+      return known ? { status: "found", profile, githubLogin: known.login, githubProven: isProven(known.strength) } : { status: "found", profile, githubLogin: null };
+    };
+    if (hit?.found && hit.githubLogin !== undefined) return found(hit.profile, hit.githubLogin);
+    // Profil gardé sans ses liens : le registre peut donner le GitHub sans relire le profil.
+    if (hit?.found && (await knownP)) return found(hit.profile, null);
+    const stored = await storedP;
+    if (stored) return found(stored, null);
     if (!this.take(opts)) return { status: "unavailable" };
     try {
       opts.onSlow?.(provider.timeoutMs);
       const r = await phase("linkedin", () => provider.fetchProfile(url, { withGithub: true, signal: opts.signal }));
       cache.putProfile(url, r.profile, r.profile ? r.githubLogin : undefined, this.now());
-      return r.profile ? { status: "found", profile: r.profile, githubLogin: r.githubLogin } : { status: "not_found" };
+      this.keep(url, r);
+      return r.profile ? found(r.profile, r.githubLogin) : { status: "not_found" };
     } catch (err) {
       warn("profil", err);
       return { status: "unavailable" };
@@ -256,8 +307,11 @@ export function linkedinEnv(env: NodeJS.ProcessEnv): LinkedinEnv | null {
   };
 }
 
-/** Le service branché sur la base du serveur, ou null si le fournisseur n'a pas de jeton. */
-export function linkedinProfilesFromEnv(env: NodeJS.ProcessEnv, db: Database.Database, fetchImpl?: typeof fetch): LinkedinProfiles | null {
+/**
+ * Le service branché sur la base du serveur, ou null si le fournisseur n'a pas de jeton.
+ * `registry` : le registre de l'App Azerit (§18.95), s'il est branché.
+ */
+export function linkedinProfilesFromEnv(env: NodeJS.ProcessEnv, db: Database.Database, fetchImpl?: typeof fetch, registry?: RegistryPort): LinkedinProfiles | null {
   const cfg = linkedinEnv(env);
   if (!cfg) return null;
   const provider =
@@ -270,5 +324,6 @@ export function linkedinProfilesFromEnv(env: NodeJS.ProcessEnv, db: Database.Dat
     dailyProfiles: cfg.dailyProfiles,
     search: cfg.searchKey ? new CrustdataClient({ apiKey: cfg.searchKey, fetchImpl }) : undefined,
     signal: readmeSignal({ token: () => tokensFromEnv(env)[0], fetchImpl }),
+    registry,
   });
 }
