@@ -33,6 +33,7 @@ import type { LinkedinPeople } from "./linkedinProfile/search";
 import { mountLinkedinSearch } from "./entry/linkedinSearch";
 import { mountGithubSearch, type GithubSearchRoutesOptions } from "./entry/githubSearch";
 import { createLinkedinEnter, type LinkedinEnterOptions } from "./entry/linkedinLogin";
+import { mountGithubEnter, type GithubLoginConfig } from "./entry/githubLogin";
 import { primePhase, primesOpen, seasonDates, type Season } from "../../shared/season";
 import { loadSeason } from "./season";
 import { mountRemoval } from "./removal";
@@ -79,6 +80,8 @@ export interface AppOptions {
   linkedin?: LinkedinConfig;
   /** « C'est moi » par GitHub OAuth (§18.1). Absent : fonctionnalité désactivée, bouton caché. */
   githubAuth?: GithubAuthConfig;
+  /** « Continuer avec GitHub » (§18.80). Absent : bouton caché. */
+  githubLogin?: GithubLoginConfig;
   /** Cookies de session en Secure. Défaut : si baseUrl est en https. */
   secureCookies?: boolean;
   /** Photos LinkedIn sur disque. Défaut : à côté de ogDir, dans avatars/. */
@@ -308,6 +311,18 @@ export function createApp(opts: AppOptions) {
     return c.json(errorBody("internal", MESSAGES.internal), 500);
   });
 
+  // « Continuer avec GitHub » (§18.80), avant la revendication : les deux partagent
+  // /auth/github/callback, et l'entrée ne prend que ses propres retours.
+  mountGithubEnter(app, {
+    store,
+    config: opts.githubLogin,
+    claim: opts.githubAuth,
+    baseUrl,
+    secure: opts.secureCookies ?? baseUrl.startsWith("https://"),
+    limiter,
+    fetchImpl,
+  });
+
   // Revendication GitHub (§18.1), montée en tête : son middleware doit passer
   // avant les routes qui demandent ownerFromRequest (fiches masquées).
   mountAuth(app, {
@@ -421,6 +436,8 @@ export function createApp(opts: AppOptions) {
       linkedinSearch: !!opts.linkedinProfiles && !!opts.linkedinPeople,
       // linkedinLogin : le bouton « Continuer avec LinkedIn » (§18.80).
       linkedinLogin: !!linkedinEnter,
+      // githubLogin : le bouton « Continuer avec GitHub » (§18.80).
+      githubLogin: !!opts.githubLogin,
       primesOpen: primesOpen(season, now),
       // primesListed : la saison porte au moins une prime (ouverte, à venir ou close) : /primes existe.
       primesListed: !!season && season.primes.length > 0,

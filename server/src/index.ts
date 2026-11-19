@@ -15,6 +15,7 @@ import { linkedinFromEnv } from "./linkedin";
 import { linkedinProfilesFromEnv, normalizeLinkedinUrl } from "./linkedinProfile/index";
 import { linkedinSearchFromEnv } from "./linkedinProfile/search";
 import { githubAuthFromEnv } from "./auth";
+import { githubLoginFromEnv } from "./entry/githubLogin";
 import { Store } from "./db";
 import { CARDS_PER_BROWSER, CARDS_PER_DAY, limitFromEnv } from "./ratelimit";
 import { realDeps } from "./deps";
@@ -48,6 +49,9 @@ const showcaseLinkedinRaw = process.env.SHOWCASE_LINKEDIN ?? (process.env.SHOWCA
 const showcaseLinkedin = showcaseLinkedinRaw?.trim() ? (normalizeLinkedinUrl(showcaseLinkedinRaw) ?? undefined) : undefined;
 if (showcaseLinkedinRaw?.trim() && !showcaseLinkedin) console.warn("SHOWCASE_LINKEDIN n'est pas une adresse de profil (linkedin.com/in/…) : vitrine sans LinkedIn.");
 const githubAuth = githubAuthFromEnv(process.env);
+// « Continuer avec GitHub » (§18.80) : GITHUB_OAUTH_CLIENT_ID / _SECRET, sinon l'application de « C'est moi ».
+const githubLogin = githubLoginFromEnv(process.env);
+if (!githubLogin) console.warn("GITHUB_OAUTH_CLIENT_ID / GITHUB_OAUTH_CLIENT_SECRET absents (et pas de GITHUB_CLIENT_ID / _SECRET) : bouton « Continuer avec GitHub » caché.");
 // La trace du film (FILM_TRACE=1) : à côté de la base, var/film-trace.log en local.
 const filmTraceFile = process.env.FILM_TRACE === "1" ? join(dirname(dbPath), "film-trace.log") : undefined;
 if (filmTraceFile) console.log(`Trace du film : POST /api/film-trace écrit dans ${filmTraceFile}.`);
@@ -135,6 +139,7 @@ const { app, pipeline, refreshShowcase } = createApp({
   indexHtml,
   linkedin,
   githubAuth,
+  githubLogin,
   secureCookies: prod,
   avatarDir,
   filmTraceFile,
