@@ -3,6 +3,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { GithubIdentity } from "../github/identity";
+import type { RegistryPort } from "../registry/index";
 import { AUTHORIZE_URL, LI_STATE_COOKIE, TOKEN_URL, USERINFO_URL } from "../linkedin";
 import { ENTER_COOKIE, ENTER_STARTS_PER_DAY, KNOWN_COOKIE, PEEKS_PER_IP, WHO_COOKIE, WHO_TTL_MS, employerFromEmail } from "./linkedinLogin";
 import { CAMILLE, CAMILLE_URL, HOMONYM, cardState, cookiesOf, postCard, setupEntry, type EntryCtx, type EntrySetup } from "./testing";
@@ -535,5 +536,49 @@ describe("qui s'est connecté : le navigateur s'en souvient (SPEC §18.90)", () 
     const { json, res } = await postCard(ctx, { linkedin: CAMILLE_URL }, jar);
     jar = cookiesOf(res, jar);
     expect((await me(ctx, jar)).card).toMatchObject({ id: json.id, login: "camille-vitrine" });
+  });
+});
+
+describe("le registre de l'App Azerit (§18.91)", () => {
+  /** Un registre factice : une photo gardée par profil. */
+  function fakeRegistry(photos: Record<string, Uint8Array> = {}) {
+    const registry: RegistryPort = {
+      linkedinOf: async () => null,
+      githubOf: async () => null,
+      profileOf: async () => null,
+      photoOf: async (url) => (photos[url] ? { bytes: photos[url]!, ext: "jpg" } : null),
+      recordLink: () => {},
+      recordAccounts: () => {},
+      recordProfile: () => {},
+    };
+    return { registry };
+  }
+
+  it("la photo que l'App garde désigne le profil sans en lire aucun", async () => {
+    const bare = (n: number) => ({ url: `https://www.linkedin.com/in/camille-ardent-${n}`, name: "Camille Ardent", headline: "", score: 0.6 });
+    const kept = new Uint8Array([0xff, 0xd8, 0xff, 2]);
+    const r = fakeRegistry({ [bare(2).url]: kept, [bare(1).url]: new Uint8Array([0xff, 0xd8, 0xff, 1]) });
+    const { ctx } = setup({
+      people: { byName: () => ({ status: "ok", results: [bare(1), bare(2), bare(3)] }) },
+      peek: () => ({ name: "Camille Ardent", headline: "lu", photoUrl: CAMILLE.photoUrl }),
+      app: { registry: r.registry, samePhotoBytes: async (picture, photo) => picture === PICTURE && photo.bytes === kept },
+    });
+    const got = await entry(ctx, (await signIn(ctx)).jar);
+    expect(got.auto?.url).toBe(bare(2).url);
+    expect(ctx.calls.peek).toEqual([]);
+  });
+
+  it("aucune photo gardée ne concorde : les profils sont lus comme avant", async () => {
+    const bare = (n: number) => ({ url: `https://www.linkedin.com/in/camille-ardent-${n}`, name: "Camille Ardent", headline: "", score: 0.6 });
+    const r = fakeRegistry({ [bare(1).url]: new Uint8Array([0xff, 0xd8, 0xff, 1]) });
+    const { ctx } = setup({
+      people: { byName: () => ({ status: "ok", results: [bare(1), bare(2)] }) },
+      peek: (url) => ({ name: "Camille Ardent", headline: "lu", photoUrl: `https://media.licdn.com/dms/image/v2/p${url.slice(-1)}/p/0/1` }),
+      samePhoto: () => false,
+      app: { registry: r.registry, samePhotoBytes: async () => false },
+    });
+    const got = await entry(ctx, (await signIn(ctx)).jar);
+    expect(got.auto).toBeUndefined();
+    expect(ctx.calls.peek).toEqual([bare(1).url, bare(2).url]);
   });
 });

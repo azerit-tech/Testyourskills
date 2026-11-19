@@ -13,6 +13,7 @@ import { useBudgetDb } from "./ai/budget";
 import { startCreditsWatch, stopCreditsWatch } from "./ai/credits";
 import { linkedinFromEnv } from "./linkedin";
 import { linkedinProfilesFromEnv, normalizeLinkedinUrl } from "./linkedinProfile/index";
+import { registryFromEnv } from "./registry/index";
 import { linkedinSearchFromEnv } from "./linkedinProfile/search";
 import { githubAuthFromEnv } from "./auth";
 import { githubLoginFromEnv } from "./entry/githubLogin";
@@ -109,7 +110,10 @@ useBudgetDb(store.db);
 startCreditsWatch();
 // LinkedIn contre GitHub (§18.24) : sans jeton du fournisseur (APIFY_TOKEN, ou
 // CRUSTDATA_API_KEY avec LINKEDIN_PROVIDER=crustdata), la fonctionnalité est absente.
-const linkedinProfiles = linkedinProfilesFromEnv(process.env, store.db) ?? undefined;
+// Le registre GitHub ↔ LinkedIn de l'App Azerit (§18.91) : AZERIT_DB_URL, sinon rien ne change.
+const registry = registryFromEnv(process.env) ?? undefined;
+if (registry) console.log("Registre de l'App Azerit : branché (lu avant toute recherche payante, enrichi en ajout seul).");
+const linkedinProfiles = linkedinProfilesFromEnv(process.env, store.db, undefined, registry) ?? undefined;
 if (linkedinProfiles) console.log(`LinkedIn : profils lus par ${linkedinProfiles.providerName}.`);
 else console.warn("Fournisseur LinkedIn sans jeton : LinkedIn contre GitHub et l'entrée LinkedIn désactivés.");
 // La recherche d'un profil par nom (§18.80, §18.90) : un index web, Brave puis Serper.
@@ -119,6 +123,7 @@ else if (linkedinProfiles) console.warn("Recherche LinkedIn par nom sans clé (B
 const { app, pipeline, refreshShowcase } = createApp({
   linkedinProfiles,
   linkedinPeople,
+  registry,
   store,
   deps: realDeps,
   githubToken,
@@ -182,6 +187,7 @@ const shutdown = async () => {
   clearInterval(showcaseTimer);
   stopCreditsWatch();
   await Promise.race([pipeline.drain(), new Promise((r) => setTimeout(r, 8000))]);
+  await registry?.close().catch(() => {});
   useBudgetDb(null);
   store.close();
   process.exit(0);

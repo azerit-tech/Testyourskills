@@ -33,6 +33,7 @@ import type { LinkedinPeople } from "./linkedinProfile/search";
 import { mountLinkedinSearch } from "./entry/linkedinSearch";
 import { mountGithubSearch, type GithubSearchRoutesOptions } from "./entry/githubSearch";
 import { createLinkedinEnter, type LinkedinEnterOptions } from "./entry/linkedinLogin";
+import type { RegistryPort } from "./registry/index";
 import { mountGithubEnter, type GithubLoginConfig } from "./entry/githubLogin";
 import { primePhase, primesOpen, seasonDates, type Season } from "../../shared/season";
 import { loadSeason } from "./season";
@@ -101,11 +102,14 @@ export interface AppOptions {
   linkedinProfiles?: LinkedinFinder;
   /** La recherche d'un profil LinkedIn par nom (§18.80). Absent : le champ « Ton nom » reste un champ où l'on colle un lien. */
   linkedinPeople?: LinkedinPeople;
+  /** Le registre GitHub ↔ LinkedIn de l'App Azerit (§18.91). Absent : rien n'est lu ni écrit chez elle. */
+  registry?: RegistryPort;
   /** La recherche de comptes GitHub des suggestions (§18.80). Absent : la vraie (github/searchUsers.ts). */
   githubUserSearch?: GithubSearchRoutesOptions["search"];
   /** Le GitHub d'après l'identité LinkedIn, et « même photo ? » (§18.80). Absents : les vrais (github/identity.ts, entry/photoHash.ts). */
   githubIdentity?: LinkedinEnterOptions["resolveGithub"];
   samePhoto?: LinkedinEnterOptions["samePhoto"];
+  samePhotoBytes?: LinkedinEnterOptions["samePhotoBytes"];
   /** Attente d'une demande de /api/entry/linkedin avant « pending » (tests). */
   entryPollWaitMs?: number;
   /** La trace du film (FILM_TRACE=1, filmTrace.ts) : le fichier où l'écrire. Absent : pas de route. */
@@ -362,6 +366,8 @@ export function createApp(opts: AppOptions) {
           github: opts.githubPool ?? opts.githubToken,
           resolveGithub: opts.githubIdentity,
           samePhoto: opts.samePhoto,
+          samePhotoBytes: opts.samePhotoBytes,
+          storedPhoto: opts.registry ? (url) => opts.registry!.photoOf(url) : undefined,
         })
       : null;
 
