@@ -4,12 +4,10 @@ import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { BandStanding } from "../../../shared/bands";
-import { FIXTURES } from "../../../shared/fixtures";
 import type { TopEntry, WeekTop } from "../../../shared/types";
 import { LangProvider } from "../i18n";
 import { BackLine } from "../pages/Home";
 import { BandsTopView } from "./BandsTop";
-import { Cover } from "./Cover";
 import { WeekBoard, WeekBoardView } from "./WeekBoard";
 
 function render(el: ReactElement, language = "fr-FR"): string {
@@ -110,24 +108,6 @@ describe("la ligne de mémoire au-dessus du formulaire", () => {
 
   it("rien en mémoire : pas de ligne", () => {
     expect(render(createElement(BackLine, { mine: null, pending: null }))).toBe("");
-  });
-});
-
-describe("la case « Ta place » de la couverture", () => {
-  const founder = { card: FIXTURES.jmougeot, href: "/jmougeot" };
-  const cover = (mine?: { href: string; overall: number; card: null }) => render(createElement(Cover, { onPlay: () => undefined, top: null, founder, seed: 7, mine }));
-
-  it("sans fiche en mémoire : la place libre, un bouton", () => {
-    const html = cover();
-    expect(html).toContain("TA PLACE");
-    expect(html).not.toContain("cover-mine");
-  });
-
-  it("une fiche en mémoire : la case y mène et le dit, la place libre a disparu", () => {
-    const html = cover({ href: "/c/Card000001", overall: 79, card: null });
-    expect(html).toMatch(/<a class="cover-panel cover-free cover-mine" [^>]*href="\/c\/Card000001"[^>]*aria-label="Ta fiche, 79\/100[ \u00a0]: la revoir"/);
-    expect(html).toContain("TA FICHE");
-    expect(html).not.toContain("TA PLACE");
   });
 });
 

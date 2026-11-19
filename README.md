@@ -11,7 +11,7 @@ L'univers est celui d'un jeu de crime en monde ouvert sorti le 19 novembre 2026 
 | `SPEC.md` | la spécification de référence ; la saison 1, en cours, est au §18 |
 | `docs/bareme-recrutement.md` | la grille de recrutement : huit critères notés sur 10 (SPEC §18.37) |
 | `docs/cinematique-poursuite.md` | la direction du film de révélation, rendu en 3D (SPEC §18.36) |
-| `docs/brief-personnages.md` | le brief des portraits de suspects encore à générer (SPEC §18.31) |
+| `docs/brief-personnages.md` | le brief des portraits de suspects de l'ancienne couverture (SPEC §18.31), retirés de l'accueil (§18.81) |
 | `docs/inspiration-gta6.md` | l'étude de style : palette mate, typographie, interdits (SPEC §18.18) |
 | `ops/DEPLOY.md` | la mise en ligne, les mises à jour, le retour arrière |
 | `tools/film/README.md`, `tools/film3d/README.md` | le montage et le rendu du film |
@@ -85,7 +85,7 @@ La base et les PNG sont dans le volume monté sur `/data`, comme les deux listes
 - `web/` : front Vite et React 19 (accueil, attente, révélation, fiche, partage).
   - `web/src/three/`, `web/public/3d/` : la révélation par défaut, un ascenseur en 3D (Three.js) ; crédits des modèles dans `web/public/3d/CREDITS.txt`. Elle part quand le film est validé (SPEC §18.36).
   - `web/src/film/`, `web/src/film/media/` : le lecteur du film et ses fichiers (importés par Vite, à empreinte).
-  - `web/public/profiles/`, `web/public/characters/` : les décors peints des profils et les portraits de suspects.
+  - `web/public/profiles/` : les décors peints des profils.
 - `shared/` : types, composant SVG de la fiche (`card/`), découpage et HUD du film (`film/`), textes et routes communs au front et au serveur.
 - `data/` : barème, grille de recrutement, profils, peines, statuts, mots creux. Des données, séparées de la logique.
 - `server/src/` : l'API Hono.

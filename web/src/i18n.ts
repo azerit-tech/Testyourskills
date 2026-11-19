@@ -95,20 +95,6 @@ const fr = frTypoDeep({
     exampleCaption: "La vraie fiche de Jacques, fondateur d'Azerit",
     /** Après la légende, en texte : d'où vient la preuve (« d'après LinkedIn et GitHub »). */
     exampleFrom: (labels: string) => `d'après ${labels}`,
-    /* La couverture (§18.31) : les plaques des photos d'identité, en capitales mono. */
-    cover: {
-      player: (login: string, rank: number) => `@${login}, n° ${rank} de la semaine`,
-      playerPlate: (rank: number, week: number) => `N° ${rank} · SEMAINE ${week}`,
-      founderPlate: "FONDATEUR D'AZERIT",
-      free: "Ta place",
-      freeLabel: "Ta place : fais ta fiche",
-      freePlate: "TA FICHE ICI",
-      /** Un portrait peint : le rôle, jamais un genre, un âge ou une origine. */
-      suspect: (profile: string) => `Portrait peint du profil ${profile}`,
-      /** La case « Ta place », quand une fiche est en mémoire : sa vignette. */
-      mine: "Ta fiche",
-      mineLabel: (overall: number) => `Ta fiche, ${overall}/100 : la revoir`,
-    },
     /** La flèche sous le héros, sur ordinateur. */
     next: "Voir la suite",
     /** Le dernier formulaire de l'accueil, avant le pied de page (§18.48). */
@@ -946,17 +932,6 @@ const en: Dict = {
     exampleLabel: "Example sheet",
     exampleCaption: "The actual rap sheet of Jacques, founder of Azerit",
     exampleFrom: (labels) => `based on ${labels}`,
-    cover: {
-      player: (login, rank) => `@${login}, #${rank} this week`,
-      playerPlate: (rank, week) => `NO. ${rank} · WEEK ${week}`,
-      founderPlate: "AZERIT FOUNDER",
-      free: "Your spot",
-      freeLabel: "Your spot: get your rap sheet",
-      freePlate: "YOUR SHEET HERE",
-      suspect: (profile) => `Painted portrait of the ${profile} profile`,
-      mine: "Your sheet",
-      mineLabel: (overall) => `Your sheet, ${overall}/100: see it again`,
-    },
     next: "See more",
     lastTitle: "Your turn.",
     bandsLead: "Get your rap sheet. Make your crew win.",

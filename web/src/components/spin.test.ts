@@ -150,9 +150,9 @@ describe("l'encart", () => {
     expect(render(true, "en-US", "home")).toContain(">The getaway car</figcaption>");
   });
 
-  it("sur l'accueil, sous la fiche d'exemple, jamais au-dessus du champ ; l'accueil n'a pas de film", () => {
+  it("sur l'accueil, sous la fiche d'exemple (la scène, §18.81), jamais au-dessus du champ ; l'accueil n'a pas de film", () => {
     expect(home.match(/<Spin /g)).toHaveLength(1);
-    expect(home).toMatch(/<ExampleCard \{\.\.\.showcase\} \/>\n\s*<\/section>\n[^\n]*§18\.79[^\n]*\n\s*<Spin ready place="home" \/>\n\s*<WeekBoard /);
+    expect(home).toMatch(/<ExampleCard \{\.\.\.showcase\} \/>\n(?:\s*<\/div>\n){2}[^\n]*\n\s*<\/div>\n[^\n]*\n\s*<div className="home-proof">\n[^\n]*§18\.79[^\n]*\n\s*<Spin ready place="home" \/>\n\s*<WeekBoard /);
     expect(home.indexOf("<Spin ")).toBeGreaterThan(home.indexOf("<EntryForm inputRef"));
   });
 

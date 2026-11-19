@@ -83,7 +83,7 @@ export function ErrorPanel({ stamp, title, text, action, alt }: ErrorPanelProps)
   }, [stamp]);
   return (
     <div className="err" role={stamp === "none" ? undefined : "alert"}>
-      {/* le dessin de la case « ta place » de la couverture (styles.css, .cover-face) */}
+      {/* le visage sans nom : une silhouette, un « ? », la plaque (styles.css, .cover-face) */}
       <div className="err-frame" aria-hidden>
         <span className="cover-face">
           <svg className="cover-face-shape" viewBox="0 0 100 100" preserveAspectRatio="xMidYMax meet">

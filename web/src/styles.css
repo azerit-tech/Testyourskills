@@ -918,69 +918,14 @@ svg {
 
 /* ============ accueil ============ */
 
-/* --- la couverture (§18.31, §18.48) ---
-   Une mosaïque encadrée (Cover.tsx) : un cadre prune foncé plat, des cases
-   séparées par des joints d'encre (le fond du cadre), autant de marge que de
-   joint. Les grilles viennent de lib/cover.ts par variables (--cover-*-s pour
-   le téléphone, --cover-*-l pour l'ordinateur) : une seule source pour la
-   feuille et pour le test des lumières voisines. Ni lueur, ni ombre, ni dégradé.
-   Elle garde ses angles de planche (6 px, 3 px par case). Les cinq cases du
-   téléphone à toutes les largeurs : une bande sous la barre sur téléphone, la
-   colonne de droite du héros au bureau (les cases « is-wide » restent cachées). */
+/* --- le visage sans nom (ErrorPage.tsx) : la silhouette prune devant le mur, les
+   traits de la toise par-dessus, la plaque en bas. Le dessin de la case « Ta place »
+   de l'ancienne couverture (§18.31, retirée au §18.81) ; les tailles suivent la case
+   (unités cq). Ni lueur, ni ombre, ni dégradé d'ambiance. --- */
 :root {
+  /* le cadre prune foncé de la page d'erreur (.err-frame) */
   --cover-frame: #241a3a;
 }
-.cover {
-  --cover-gap: 4px;
-  display: grid;
-  grid-template-columns: var(--cover-cols-s);
-  grid-template-rows: repeat(2, minmax(0, 1fr));
-  grid-template-areas: var(--cover-areas-s);
-  gap: var(--cover-gap);
-  width: 100%;
-  height: clamp(128px, 38vw, 300px);
-  padding: var(--cover-gap);
-  border-radius: 6px;
-  background: var(--cover-frame);
-}
-.cover-panel {
-  position: relative;
-  display: block;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  padding: 0;
-  border: 0;
-  border-radius: 3px;
-  /* la teinte de la case tant que l'image se charge : rien ne bouge à l'arrivée */
-  background: var(--s-call);
-  animation: cover-in 0.3s var(--ease-out) both;
-  animation-delay: calc(var(--i, 0) * 40ms);
-}
-.cover-panel.is-wide {
-  display: none;
-}
-.cover-panel img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-/* un portrait peint : la tête est dans le haut de l'image (docs/brief-personnages.md §3).
-   Assez haut pour que la tête ne touche pas le bord dans une case plus large que haute
-   (s2 sur ordinateur, 310 × 255 px) ; le bas coupé est l'ombre prune, sans détail. */
-.cover-suspect img {
-  object-position: 50% 12%;
-}
-/* les bras croisés, plus bas : dans s2 sur ordinateur, la case descend un peu pour les
-   garder, quitte à rogner le haut des cheveux. Sans effet ailleurs : les autres cases
-   montrent presque toute la hauteur. */
-.cover-suspect[data-suspect="kingpin"] img {
-  object-position: 50% 20%;
-}
-/* un visage (joueur du top, Jacques, place libre) : la photo en pleine case et
-   en deux tons, prune dans les ombres et la teinte du mur dans les lumières ;
-   les traits de la toise par-dessus ; la plaque en bas. Les tailles suivent la
-   case (unités cq). */
 .cover-face {
   position: absolute;
   inset: 0;
@@ -990,19 +935,7 @@ svg {
   isolation: isolate;
   background: var(--tint, #ccc2f5);
 }
-.cover-face-photo {
-  position: absolute;
-  inset: 0;
-  object-position: 50% 22%;
-  filter: grayscale(1) contrast(1.3) brightness(1.08);
-  mix-blend-mode: multiply;
-  /* cachée tant qu'elle charge : la silhouette tient la case */
-  opacity: 0;
-}
-.cover-face-photo.is-on {
-  opacity: 1;
-}
-/* les ombres de la photo remontent au prune : jamais de noir */
+/* les ombres remontent au prune : jamais de noir */
 .cover-face::after {
   content: "";
   position: absolute;
@@ -1026,13 +959,6 @@ svg {
   width: 100%;
   height: 88%;
   fill: var(--s-call);
-}
-/* les initiales, dans la tête de la silhouette : la couleur du mur (la taille est en
-   unités du dessin, 100 de large) */
-.cover-face-initials {
-  font: 800 var(--t-22) / 1 var(--f-name);
-  letter-spacing: 0.02em;
-  fill: var(--tint, #ccc2f5);
 }
 .cover-face-mark {
   position: absolute;
@@ -1089,41 +1015,6 @@ svg {
     line-height: 1.05;
   }
 }
-/* « Ta place », quand une fiche est en mémoire : sa vignette. Le haut de la fiche (la note,
-   les étoiles, le portrait) en pleine case, sans toise ni deux tons, la plaque par-dessus. */
-.cover-mine .cover-face::before,
-.cover-mine .cover-face::after {
-  content: none;
-}
-.cover-mine .tys-card {
-  position: absolute;
-  top: 5cqw;
-  left: 5cqw;
-  width: 90cqw;
-}
-a.cover-panel:focus-visible,
-button.cover-panel:focus-visible {
-  border-radius: 3px;
-}
-@keyframes cover-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-}
-@media (min-width: 900px) {
-  .cover {
-    --cover-gap: 8px;
-  }
-  .cover-panel {
-    border-radius: 4px;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .cover-panel {
-    animation: none;
-  }
-}
 
 /* --- la page (§18.48) : un seul rythme vertical entre les sections (56 px, 88 au
    bureau), un seul conteneur, tous les blocs sur les mêmes bords, titres à gauche.
@@ -1135,8 +1026,8 @@ button.cover-panel:focus-visible {
   gap: var(--home-gap);
   padding-bottom: var(--home-gap);
 }
-/* la fiche d'exemple, puis le top de la semaine : l'une sous l'autre sur téléphone,
-   côte à côte au bureau. Collées au héros : le haut de la fiche se devine dès le premier écran. */
+/* sous la scène (§18.81) : la berline, puis le top de la semaine ; l'une sous l'autre
+   sur téléphone, côte à côte au bureau. La berline reste à 16 px de la fiche d'exemple (§18.79). */
 .home-proof {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -1166,7 +1057,6 @@ button.cover-panel:focus-visible {
 .home-proof > .spin-wrap.is-home {
   justify-self: center;
   max-width: 400px;
-  margin-top: calc(16px - var(--home-gap));
 }
 /* le dernier formulaire : le bloc d'appel des bandes et des primes, sur le conteneur */
 .home-last {
@@ -1194,31 +1084,23 @@ button.cover-panel:focus-visible {
   .page-home {
     --home-gap: 88px;
   }
+  /* les deux colonnes du héros, prolongées : le top de la semaine sous le titre et le
+     formulaire, la berline sous la fiche d'exemple, sur toute sa colonne (520 px au plus) */
   .home-proof {
-    grid-template-columns: 400px minmax(0, 1fr);
-    grid-template-rows: auto 1fr;
-    column-gap: 80px;
-    row-gap: 40px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 40px;
     align-items: start;
-    margin-top: calc(40px - var(--home-gap));
-  }
-  /* la fiche à gauche sur toute la hauteur ; à droite le top de la semaine, puis la berline
-     dessous, dans le blanc qu'il laissait */
-  .home-proof > .home-example {
-    grid-column: 1;
-    grid-row: 1 / span 2;
+    margin-top: calc(56px - var(--home-gap));
   }
   .home-proof > .board {
-    grid-column: 2;
+    grid-column: 1;
     grid-row: 1;
   }
   .home-proof > .spin-wrap.is-home {
     grid-column: 2;
-    grid-row: 2;
-    justify-self: start;
-    align-self: start;
-    max-width: 600px;
-    margin-top: 0;
+    grid-row: 1;
+    justify-self: stretch;
+    max-width: none;
   }
   /* les tableaux de l'accueil : à gauche comme tout le reste, sur toute leur colonne */
   .page-home .board {
@@ -1263,14 +1145,13 @@ button.cover-panel:focus-visible {
   }
 }
 
-/* --- le héros (§18.48) : le premier écran dit ce qu'on obtient ---
-   Téléphone, de haut en bas : la couverture en bande (38 % de la largeur, 148 px
-   à 390), le titre à la taille du jeton, la promesse dessous, puis les portes,
-   le champ, sa ligne et le bouton. À 390 px, le bas du bouton reste au-dessus
-   de 600 px, bandeau de saison compris.
+/* --- le héros (§18.48, §18.81) : le premier écran dit ce qu'on obtient ---
+   Téléphone, de haut en bas : le titre à la taille du jeton, la promesse dessous,
+   les portes, le champ, sa ligne et le bouton, puis la scène, dont le haut (le
+   ciel, le haut de la fiche d'exemple) dépasse du premier écran à 390 × 700.
    Bureau : deux colonnes dans le conteneur de la page. À gauche le titre, la
-   promesse et le formulaire empilés sur 440 px ; à droite la couverture, de la
-   hauteur de la colonne. */
+   promesse et le formulaire empilés sur 440 px ; à droite la scène, la fiche
+   d'exemple debout, entière dans le premier écran. */
 .home-top {
   display: grid;
   gap: 16px;
@@ -1376,12 +1257,6 @@ button.cover-panel:focus-visible {
     gap: 12px;
     padding: 24px 0;
   }
-  .home-top .cover {
-    grid-column: 2;
-    grid-row: 1;
-    height: auto;
-    min-height: 440px;
-  }
   .hero .entry {
     margin-top: 12px;
   }
@@ -1393,9 +1268,8 @@ button.cover-panel:focus-visible {
     font-size: var(--t-28);
   }
 }
-/* téléphone couché (640 à 899 px de large, peu de hauteur) : le premier écran n'est plus
-   la seule couverture. Le titre et le formulaire à gauche, la couverture à droite, de la
-   hauteur de la colonne. */
+/* téléphone couché (640 à 899 px de large, peu de hauteur) : le titre et le formulaire à
+   gauche, la scène à droite ; le haut de la fiche d'exemple est dans le premier écran. */
 @media (min-width: 640px) and (max-width: 899px) and (max-height: 520px) {
   .home-top {
     grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr);
@@ -1410,21 +1284,98 @@ button.cover-panel:focus-visible {
   .hero-title {
     font-size: var(--t-28);
   }
-  .home-top .cover {
+}
+
+/* --- la scène (§18.81) : la fiche d'exemple debout sur le crépuscule de l'aperçu de
+   lien (/og/home.png). Un ciel en aplat, le soleil derrière la fiche, deux rangées
+   d'immeubles, et le sol, où se pose la légende. Aucun dégradé. Tout se place d'après
+   la largeur de la fiche (--stage-card), dans les proportions de l'image : le soleil
+   centré aux 77 % de la hauteur de la fiche, large de 1,31 fois la fiche ; l'horizon
+   8 px au-dessus de son bas.
+   Téléphone : de bord à bord sous le formulaire, la fiche à 28 px des bords (334 px à
+   390). Bureau : la colonne de droite du héros, la fiche à 380 px au plus. La hauteur
+   de la scène ne dépend que de la largeur : rien ne saute quand la vraie fiche arrive. */
+.home-stage {
+  position: relative;
+  /* la scène peut être plus haute que la fiche (un titre sur quatre lignes à côté d'elle) : le sol va jusqu'en bas */
+  display: grid;
+  overflow: hidden;
+  min-width: 0;
+  margin: 8px calc(-1 * var(--gutter)) 0;
+  container-type: inline-size;
+}
+.home-stage-in {
+  --stage-card: min(100cqw - 56px, 400px);
+  --stage-top: 24px;
+  /* le bas de la fiche (360 × 520) et l'horizon, depuis le haut de la scène */
+  --stage-foot: calc(var(--stage-top) + var(--stage-card) * 520 / 360);
+  --stage-horizon: calc(var(--stage-foot) - 8px);
+  position: relative;
+  display: grid;
+  justify-items: center;
+  padding: var(--stage-top) 0 12px;
+}
+.home-stage .showcase {
+  position: relative;
+  width: var(--stage-card);
+  max-width: none;
+}
+/* la légende sur le sol : deux lignes réservées, la scène garde sa hauteur */
+.home-stage .showcase figcaption {
+  min-height: 2.8em;
+}
+.sunset {
+  position: absolute;
+  inset: 0;
+  background: var(--sunset-sky);
+}
+.sunset-sun {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--stage-top) + var(--stage-card) * 520 / 360 * 0.774);
+  width: calc(var(--stage-card) * 1.312);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--sunset-sun);
+  transform: translate(-50%, -50%);
+}
+.sunset-city {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--stage-horizon) - var(--sunset-city));
+  max-width: none;
+  transform: translateX(-50%);
+}
+.sunset-ground {
+  position: absolute;
+  inset: var(--stage-horizon) 0 0;
+  background: var(--sunset-ground);
+}
+@media (min-width: 900px) {
+  .home-stage {
     grid-column: 2;
     grid-row: 1;
-    height: auto;
-    min-height: 0;
+    margin: 0;
+    border-radius: var(--r-block);
+  }
+  .home-stage-in {
+    --stage-card: min(100cqw - 64px, 380px);
+    --stage-top: 28px;
+  }
+}
+@media (min-width: 640px) and (max-width: 899px) and (max-height: 520px) {
+  .home-stage {
+    grid-column: 2;
+    grid-row: 1;
+    margin: 0;
+    border-radius: var(--r-block);
+  }
+  .home-stage-in {
+    --stage-card: min(100cqw - 40px, 400px);
   }
 }
 
-/* la fiche de Jacques, tout de suite après le formulaire : pleine largeur sur téléphone
-   (358 px à 390), 400 × 576 au bureau. Son cadre a sa taille dès le premier rendu. */
-.home-example {
-  display: grid;
-  justify-items: center;
-  min-width: 0;
-}
+/* la fiche de Jacques : son cadre a sa taille dès le premier rendu */
 .showcase {
   display: grid;
   justify-items: center;

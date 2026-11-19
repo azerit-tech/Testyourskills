@@ -1,10 +1,11 @@
 // Le mur des 13 profils de l'accueil (§18.28) : rendu en chaîne, sans navigateur.
+import { existsSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import profilesJson from "../../../data/profiles.json";
 import { LangProvider } from "../i18n";
-import { sceneOf } from "../../../shared/scenes";
+import { SCENE_LIGHT, sceneOf } from "../../../shared/scenes";
 import { ProfileWall, WALL_PROFILES } from "./ProfileWall";
 
 function render(language: string): string {
@@ -34,6 +35,13 @@ describe("mur des profils (§18.28)", () => {
     expect(srcs(html)[3]).toBe("default");
     expect(names(html)[3]).toBe("Sous couverture");
     expect(html).not.toContain("forger");
+  });
+
+  it("chaque décor à l'affiche existe en deux tailles", () => {
+    for (const id of Object.keys(SCENE_LIGHT)) {
+      expect(existsSync(`web/public/profiles/${id}.jpg`), id).toBe(true);
+      expect(existsSync(`web/public/profiles/${id}-s.jpg`), id).toBe(true);
+    }
   });
 
   it("images en -s.jpg, paresseuses, dimensionnées, sans texte de remplacement", () => {
