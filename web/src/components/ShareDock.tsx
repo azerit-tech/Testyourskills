@@ -1,20 +1,28 @@
-// La barre du pouce (§18.27) : sur téléphone, dès que la fiche est posée, « Partager »
-// et « Dénoncer » restent sous le pouce. Elle s'efface quand le bouton rose du bloc de partage
-// ou la fiche d'un complice prête à envoyer est à l'écran, et pendant qu'on écrit dans un champ.
-// Tant que le bloc « Dénonce un complice » est à l'écran, « Dénoncer » quitte la barre :
-// « Partager » reste seul, pleine largeur.
+// La barre du pouce (§18.27, §18.81) : sur téléphone, dès que la fiche est posée, deux rangs
+// sous le pouce. En haut, « Dénonce un complice », dessiné comme un champ : un toucher mène au
+// champ du bloc, juste sous la fiche, clavier ouvert. Dessous, « Partager », le rose.
+// Elle s'efface quand le bouton rose du bloc de partage ou la fiche d'un complice prête à
+// envoyer est à l'écran, et pendant qu'on écrit dans un champ. Dès que le champ du bloc
+// « Dénonce un complice » est à l'écran, au-dessus de la barre, son rang la quitte :
+// « Partager » reste seul.
 import { useEffect, useState } from "react";
 import { useT } from "../i18n";
 import { useMediaQuery } from "../lib/util";
 import { ShareMain, useSharing } from "./After";
 import type { Shareable } from "./After";
+import { IconArrow } from "./Icons";
+
+/** Le champ du bloc « Dénonce un complice », ou son attente : ce qui rend le rang de la barre inutile. */
+const DENOUNCE_MARKS = ".after-block.denounce .denounce-form .field, .after-block.denounce.is-pending";
+/** La hauteur de la barre à deux rangs : ce qui est derrière elle n'est pas « à l'écran ». */
+const DOCK_PX = 124;
 
 interface Props {
   item: Shareable;
   /** La fiche est posée : jamais pendant la révélation. */
   ready: boolean;
   toast: (m: string) => void;
-  /** Sous trois étoiles, la source qui manque (§18.52) : « Ajouter mon LinkedIn » (ou GitHub) en rose, « Partager » en contour, pas de « Dénoncer ». */
+  /** Sous trois étoiles, la source qui manque (§18.52) : « Ajouter mon LinkedIn » (ou GitHub) en rose, « Partager » en contour. */
   add?: "linkedin" | "github" | null;
 }
 
@@ -26,13 +34,17 @@ export function ShareDock({ item, ready, toast, add = null }: Props) {
 
 const isField = (el: Element | null) => !!el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName);
 
-/** Descend au champ d'un bloc et l'active, dans le geste (sinon le clavier ne s'ouvre pas sur iPhone). */
-function toField(selector: string) {
+/**
+ * Descend au champ d'un bloc et l'active, dans le geste (sinon le clavier ne s'ouvre pas sur iPhone).
+ * `top` : le bloc entier monte au haut de l'écran, son titre et son champ au-dessus du clavier.
+ */
+function toField(selector: string, top = false) {
   const block = document.querySelector<HTMLElement>(selector);
   if (!block) return;
   const input = block.querySelector<HTMLInputElement>("input");
   const calm = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-  (input ?? block).scrollIntoView({ behavior: calm ? "auto" : "smooth", block: "center" });
+  if (top) block.scrollIntoView({ behavior: calm ? "auto" : "smooth", block: "start" });
+  else (input ?? block).scrollIntoView({ behavior: calm ? "auto" : "smooth", block: "center" });
   input?.focus({ preventScroll: true });
 }
 
@@ -60,24 +72,45 @@ function Dock({ item, toast, add }: { item: Shareable; toast: (m: string) => voi
         if (e.isIntersecting) seen.add(e.target);
         else seen.delete(e.target);
       }
-      const all = [...seen];
-      setBlockSeen(all.some((el) => el.matches(hides)));
-      setDenounceSeen(all.some((el) => el.matches(".after-block.denounce")));
+      setBlockSeen(seen.size > 0);
     });
+    // Le champ du bloc ne compte qu'au-dessus de la barre : derrière elle, on ne le voit pas.
+    const above = new Set<Element>();
+    const ioWho = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) above.add(e.target);
+          else above.delete(e.target);
+        }
+        setDenounceSeen(above.size > 0);
+      },
+      { rootMargin: `0px 0px -${DOCK_PX}px 0px` },
+    );
+    // Seuls les blocs qui arrivent ou repartent relancent le guet : les lignes de suggestions sous un champ n'y touchent pas.
+    let marks: Element[] = [];
     const scan = () => {
+      const pinks = [...document.querySelectorAll(hides)];
+      const whos = [...document.querySelectorAll(DENOUNCE_MARKS)];
+      const next = [...pinks, ...whos];
+      if (next.length === marks.length && next.every((m, i) => m === marks[i])) return;
+      marks = next;
       io.disconnect();
+      ioWho.disconnect();
       seen.clear();
-      const marks = document.querySelectorAll(`${hides}, .after-block.denounce`);
-      if (!document.querySelector(hides)) setBlockSeen(false);
-      setDenounceSeen(false);
-      marks.forEach((m) => io.observe(m));
+      above.clear();
+      if (!pinks.length) setBlockSeen(false);
+      if (!whos.length) setDenounceSeen(false);
+      pinks.forEach((m) => io.observe(m));
+      whos.forEach((m) => ioWho.observe(m));
     };
     scan();
+    if (!marks.length) setBlockSeen(false);
     const after = document.querySelector(".page-result .after");
     const mo = after && typeof MutationObserver === "function" ? new MutationObserver(scan) : null;
     if (after) mo?.observe(after, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
     return () => {
       io.disconnect();
+      ioWho.disconnect();
       mo?.disconnect();
     };
   }, [hides]);
@@ -101,9 +134,17 @@ function Dock({ item, toast, add }: { item: Shareable; toast: (m: string) => voi
   }, []);
 
   const on = blockSeen === false && !typing;
+  // « Dénonce un complice », en tête de la barre : il a l'air d'un champ, il mène au vrai, dans le geste.
+  const who = !denounceSeen && (
+    <button type="button" className="dock-who" onClick={() => toField(".after-block.denounce", true)}>
+      <span>{t.denounce.title}</span>
+      <IconArrow />
+    </button>
+  );
   if (add)
     return (
       <div className={`dock is-add${on ? " is-on" : ""}`} role="region" aria-label={t.result.share.title} inert={on ? undefined : true}>
+        {who}
         <button type="button" className="pill pill-big dock-main" onClick={() => toField(".after-block.add-source")}>
           {add === "linkedin" ? t.result.addLinkedin.btn : t.result.prove.btn}
         </button>
@@ -112,12 +153,8 @@ function Dock({ item, toast, add }: { item: Shareable; toast: (m: string) => voi
     );
   return (
     <div className={`dock${on ? " is-on" : ""}`} role="region" aria-label={t.result.share.title} inert={on ? undefined : true}>
+      {who}
       <ShareMain kit={kit} className="dock-main" from="dock" />
-      {!denounceSeen && (
-        <button type="button" className="pill pill-big pill-ghost" onClick={() => toField(".after-block.denounce")}>
-          {t.denounce.btn}
-        </button>
-      )}
     </div>
   );
 }

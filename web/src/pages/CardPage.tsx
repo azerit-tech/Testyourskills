@@ -768,7 +768,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
 
       {/* L'après-fiche entre en une fois, le dossier lu (ligne du jury) : rien ne pousse les blocs sous les yeux (CLS). */}
       <div className={`after${settled && (kase !== null || caseLate) ? " is-in" : ""}`} aria-hidden={!settled} inert={!settled ? true : undefined}>
-        {/* L'après-fiche (§18.48, épurée en §18.76) : le verdict, le partage, la bande, dénoncer, la course aux primes, puis les plis. */}
+        {/* L'après-fiche (§18.48, épurée en §18.76, §18.81) : le verdict, dénoncer, le partage, la bande, la course aux primes, puis les plis. */}
         {/* Le verdict en une ligne (§18.76) : le jury, et le pari s'il y en a un. Ni peine ni caution. */}
         {!visitor && (
           <div className="after-head">
@@ -778,6 +778,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
         )}
         {/* Sous trois étoiles : « Ajoute ton LinkedIn » (ou ton GitHub) tout de suite, avant le partage. */}
         {low && missing}
+        {/* Dénonce un complice (§18.6), le premier bloc sous le verdict (§18.81) : au bureau, dans le premier écran avec le partage. */}
+        {!visitor && <Denounce cardId={id} selfLogin={cardLogin} toast={toast.show} />}
         {/* Fiche masquée : /og/* et /c/:id répondent 404 / 410 à tous, l'image ne se télécharge pas et le lien ne montre rien. */}
         {fromRival && <Duel mine={own} card={fromRival} duel={fromDuel} from />}
         {!visitor && !(claimed && me?.hidden) && <ShareBar item={item} toast={toast.show} second={!!addFirst} />}
@@ -785,8 +787,6 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
         <Spin ready={settled} />
         {/* Tu roules pour qui ? (§18.38) : l'école et la boîte, la raison de partager, juste après le partage. */}
         {!visitor && <BandPick cardId={id} toast={toast.show} />}
-        {/* Dénonce un complice (§18.6). */}
-        {!visitor && <Denounce cardId={id} selfLogin={cardLogin} toast={toast.show} />}
         {/* « Tu es en course » (§18.5) : seulement si une prime est ouverte, après le partage. */}
         {!visitor && <PrimeRace cardId={id} card={main} />}
         {/* La source qui manque, ce qui fait monter la note : « Ajoute ton GitHub » (§18.24) ou, en miroir, « Ajoute ton LinkedIn » (§18.37). */}

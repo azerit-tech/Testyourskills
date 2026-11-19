@@ -161,10 +161,17 @@ describe("bloc de partage selon l'appareil (§18.27)", () => {
 describe("barre du pouce (§18.27)", () => {
   const phone: Env = { ua: IPHONE, touch: true, share: true, narrow: true };
 
-  it("écran étroit, fiche posée : « Partager » et « Dénoncer », cachée tant qu'on ne sait pas où est le bloc de partage", () => {
+  it("écran étroit, fiche posée : « Dénonce un complice » en tête, « Partager » dessous, cachée tant qu'on ne sait pas où est le bloc de partage (§18.81)", () => {
     const html = renderDock(phone, true);
     expect(html).toMatch(/^<div class="dock"[^>]* inert=""/);
-    expect(html).toMatch(/<button[^>]*class="pill pill-big dock-main"[^>]*>.*Partager<\/button><button[^>]*>Dénoncer<\/button>/);
+    // Deux rangs : le champ à toucher, puis le seul rose de la barre. Plus de bouton « Dénoncer ».
+    expect(html).toMatch(/<button type="button" class="dock-who"><span>Dénonce un complice<\/span><svg.*?<\/svg><\/button><button[^>]*class="pill pill-big dock-main"[^>]*>.*Partager<\/button><\/div>$/);
+    expect(pinks(html)).toEqual(['class="pill pill-big dock-main"']);
+    expect(html).not.toContain(">Dénoncer<");
+    // Un toucher mène au champ du bloc, monté au haut de l'écran, dans le geste (le clavier s'ouvre).
+    const src = readFileSync(join(__dirname, "ShareDock.tsx"), "utf8");
+    expect(src).toContain('onClick={() => toField(".after-block.denounce", true)}');
+    expect(src).toContain("input?.focus({ preventScroll: true })");
   });
 
   it("sans feuille de partage : le même lien LinkedIn que le bouton principal", () => {
@@ -172,13 +179,16 @@ describe("barre du pouce (§18.27)", () => {
     expect(html).toMatch(/<a class="pill pill-big dock-main" href="https:\/\/skills\.test\/c\//);
   });
 
-  it("le bloc « Dénonce un complice » à l'écran : « Dénoncer » quitte la barre, jamais deux fois le même geste", () => {
+  it("le champ du bloc « Dénonce un complice » à l'écran, au-dessus de la barre : son rang la quitte, jamais deux fois le même geste", () => {
     const src = readFileSync(join(__dirname, "ShareDock.tsx"), "utf8");
-    expect(src).toContain('setDenounceSeen(all.some((el) => el.matches(".after-block.denounce")))');
-    expect(src).toMatch(/\{!denounceSeen && \(\s*<button type="button" className="pill pill-big pill-ghost" onClick=\{\(\) => toField\("\.after-block\.denounce"\)\}>/);
+    // Le champ (ou l'attente) du bloc, pas son titre : derrière la barre, il ne compte pas.
+    expect(src).toContain('const DENOUNCE_MARKS = ".after-block.denounce .denounce-form .field, .after-block.denounce.is-pending";');
+    expect(src).toContain("{ rootMargin: `0px 0px -${DOCK_PX}px 0px` }");
+    expect(src).toContain("setDenounceSeen(above.size > 0)");
+    expect(src).toMatch(/const who = !denounceSeen && \(\s*<button type="button" className="dock-who"/);
   });
 
-  it("sous trois étoiles, une source à ajouter : « Ajouter mon LinkedIn » en rose, « Partager » en contour, pas de « Dénoncer » (§18.52)", () => {
+  it("sous trois étoiles, une source à ajouter : « Ajouter mon LinkedIn » en rose, « Partager » en contour, « Dénonce un complice » au-dessus (§18.52, §18.81)", () => {
     for (const [add, label] of [["linkedin", "Ajouter mon LinkedIn"], ["github", "Ajouter mon GitHub"]] as const) {
       const item = stub(phone, "AbCdEf1234");
       const html = renderToStaticMarkup(createElement(LangProvider, null, createElement(ShareDock, { item, ready: true, toast: () => undefined, add })));
@@ -186,7 +196,8 @@ describe("barre du pouce (§18.27)", () => {
       expect(html).toContain(`>${label}</button>`);
       expect(html.match(/class="pill pill-big pill-ghost"/g)).toHaveLength(1);
       expect(html).toContain("Partager");
-      expect(html).not.toContain("Dénoncer");
+      expect(html).not.toContain(">Dénoncer<");
+      expect(html).toMatch(/^<div class="dock is-add"[^>]*><button type="button" class="dock-who">/);
     }
     // La barre s'efface aussi devant le bloc de la source, dont le bouton est le rose.
     expect(readFileSync(join(__dirname, "ShareDock.tsx"), "utf8")).toContain('".after-block.out .out-main, .after-block.denounce.is-done, .after-block.add-source .entry-submit"');
