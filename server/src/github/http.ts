@@ -60,7 +60,7 @@ export function makeLimiter(max: number) {
 /**
  * Le même contexte, dont les appels passent devant ceux qui attendent : pour ce
  * que la suite de la fiche attend (les arbres et les commits, d'où part la
- * lecture du code, SPEC §18.92), pendant que le reste de la collecte suit.
+ * lecture du code, SPEC §18.93), pendant que le reste de la collecte suit.
  */
 export function urgent(ctx: Ctx): Ctx {
   return { ...ctx, limit: (fn) => ctx.limit(fn, true) };

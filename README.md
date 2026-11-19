@@ -43,7 +43,7 @@ La liste commentée fait foi dans `.env.example`.
 | `GITHUB_TOKENS`, `GITHUB_TOKEN` | jetons serveur pour l'API GitHub ; plusieurs jetons en rotation, séparés par des virgules | obligatoire en prod |
 | `OPENROUTER_API_KEY` | lecture du code, du CV et du profil LinkedIn par l'IA, via OpenRouter | sans IA si absente |
 | `AI_MODEL_CODE`, `AI_MODEL_CV` | modèles OpenRouter | `z-ai/glm-5.3-flash` |
-| `AI_PROVIDER_ORDER` | fournisseurs OpenRouter à essayer d'abord, séparés par des virgules (ex. `Azure`) ; les autres restent en repli (SPEC §18.92) | routage d'OpenRouter |
+| `AI_PROVIDER_ORDER` | fournisseurs OpenRouter à essayer d'abord, séparés par des virgules (ex. `Azure`) ; les autres restent en repli (SPEC §18.93) | routage d'OpenRouter |
 | `AI_DAILY_BUDGET_USD` | budget IA par jour ; au-delà, « commissariat fermé », aucune fiche sans lecture | `5` |
 | `AI_MIN_CREDIT_USD` | solde OpenRouter sous lequel l'IA ferme de même | `0.5` (`.env.example` : `0.05`) |
 | `MAX_CONCURRENT_CARDS` | fiches traitées en même temps ; les suivantes attendent en file | `4` |

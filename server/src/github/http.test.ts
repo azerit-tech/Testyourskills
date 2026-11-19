@@ -1,5 +1,5 @@
 // Le limiteur de concurrence des appels à GitHub : jamais plus de `max` en vol,
-// et les appels urgents passent devant ceux qui attendent (SPEC §18.92).
+// et les appels urgents passent devant ceux qui attendent (SPEC §18.93).
 
 import { describe, expect, it } from "vitest";
 import { makeCtx, makeLimiter, urgent } from "./http";

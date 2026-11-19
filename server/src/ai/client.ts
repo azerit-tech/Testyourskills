@@ -153,7 +153,7 @@ function supportsTemperature(model: string): boolean {
  * qu'on le coupe (« Reasoning is mandatory ») : on le réduit au minimum.
  *
  * Haiku 5.x : coupé (`effort: "none"`). Au minimum, il raisonnait encore, et
- * c'était l'essentiel de l'attente (SPEC §18.92, mesuré le 19 novembre 2026 sur
+ * c'était l'essentiel de l'attente (SPEC §18.93, mesuré le 19 novembre 2026 sur
  * les mêmes entrées) : 1 678 tokens de raisonnement sur une lecture de code
  * (10,9 s, 3,9 s sans), 4 642 sur un profil LinkedIn (23,8 s, 6,9 s sans), pour
  * les mêmes niveaux lus. La sortie est une extraction contrainte par schéma, et
@@ -238,7 +238,7 @@ export function issueKinds(issues: string[]): string {
  * Les fournisseurs à essayer d'abord, dans l'ordre (`AI_PROVIDER_ORDER`, noms
  * OpenRouter séparés par des virgules, ex. `Azure,Google`). OpenRouter route un
  * même modèle vers plusieurs fournisseurs qui ne répondent pas à la même vitesse
- * (SPEC §18.92) ; les autres restent en repli si ceux-là sont en panne. Vide : le
+ * (SPEC §18.93) ; les autres restent en repli si ceux-là sont en panne. Vide : le
  * routage d'OpenRouter.
  */
 function providerOrder(): { order?: string[] } {

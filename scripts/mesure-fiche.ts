@@ -1,4 +1,4 @@
-// Mesure d'une vraie fiche, phase par phase (SPEC §18.92) : le pipeline du serveur,
+// Mesure d'une vraie fiche, phase par phase (SPEC §18.93) : le pipeline du serveur,
 // ses vrais modules, une base en mémoire. Rien n'est écrit sur le disque, sauf --json.
 //
 // Usage : npx tsx --env-file=.env scripts/mesure-fiche.ts <pseudo GitHub | lien LinkedIn>… [options]

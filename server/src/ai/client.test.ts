@@ -1,4 +1,4 @@
-// Le raisonnement des modèles qui raisonnent d'office (SPEC §18.32, §18.92) :
+// Le raisonnement des modèles qui raisonnent d'office (SPEC §18.32, §18.93) :
 // coupé sur Haiku 5.x, au minimum sur GLM, et le repli si la coupure est refusée.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

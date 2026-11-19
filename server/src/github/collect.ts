@@ -97,7 +97,7 @@ export interface CollectOptions {
   /**
    * Appelé une fois, dès que le profil et ses comptes sociaux sont lus (une
    * demi-seconde), bien avant la fin de la collecte : la lecture du LinkedIn
-   * peut partir tout de suite (SPEC §18.92). L'avatar par défaut n'y est pas
+   * peut partir tout de suite (SPEC §18.93). L'avatar par défaut n'y est pas
    * encore reconnu.
    */
   onProfile?: (facts: ProfileFacts) => void;
@@ -114,7 +114,7 @@ export async function collectGithub(login: string, opts: CollectOptions): Promis
   if (!user) throw new EngineError("unknown_user", `pseudo invalide : ${login}`);
   const ctx = makeCtx(opts.token, opts.signal);
   // Ce que la suite de la fiche attend passe devant le reste, à plafond d'appels
-  // égal (SPEC §18.92) : le profil, le calendrier et la liste des repos, d'où se
+  // égal (SPEC §18.93) : le profil, le calendrier et la liste des repos, d'où se
   // choisissent les repos actifs, puis leurs arbres et leurs commits, d'où part la
   // lecture du code (`onReadable`). C'est elle, pas le reste de la collecte, que
   // la fiche attend le plus longtemps.

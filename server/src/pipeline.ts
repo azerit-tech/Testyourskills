@@ -6,7 +6,7 @@
 // CV     : extractPdfText → cvTextCounts → readCv → scoreCv
 // Les deux : branches en parallèle, puis scoreDossier : un calcul sur les deux pièces, une note.
 //
-// Rien n'attend ce qui ne lui sert pas (SPEC §18.92) : la lecture du LinkedIn part
+// Rien n'attend ce qui ne lui sert pas (SPEC §18.93) : la lecture du LinkedIn part
 // dès que le profil GitHub est lu, la lecture du code dès que les arbres et les
 // commits le sont, pendant que la collecte finit ; à l'entrée LinkedIn, le GitHub
 // déjà connu par l'identité se collecte pendant la lecture du profil.

@@ -43,7 +43,7 @@ describe("pickFilesForReading", () => {
     expect(out[0]!.files.map((f) => f.path)).toEqual(["src/app.ts"]);
   });
 
-  it("les fichiers de tous les repos se téléchargent ensemble, sans attendre le repo d'avant (SPEC §18.92)", async () => {
+  it("les fichiers de tous les repos se téléchargent ensemble, sans attendre le repo d'avant (SPEC §18.93)", async () => {
     const three = facts({
       repos: [repo("a"), repo("b"), repo("c")],
       activeRepos: ["a", "b", "c"],
