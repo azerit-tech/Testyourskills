@@ -28,7 +28,7 @@ import { aiStatus as budgetAiStatus, type AiStatus } from "./ai/budget";
 import type { TokenPool } from "./github/tokens";
 import { weekTop, withWeekSpecial } from "./top";
 import { normalizeLinkedinUrl, PAID_CALLS_PER_IP, type LinkedinFinder } from "./linkedinProfile/index";
-import { forgetLinkedinOfCard, recentLinkedinCard } from "./linkedinProfile/cards";
+import { forgetLinkedinOfCard, latestLinkedinCard, recentLinkedinCard } from "./linkedinProfile/cards";
 import type { LinkedinPeople } from "./linkedinProfile/search";
 import { mountLinkedinSearch } from "./entry/linkedinSearch";
 import { mountGithubSearch, type GithubSearchRoutesOptions } from "./entry/githubSearch";
@@ -38,7 +38,7 @@ import { primePhase, primesOpen, seasonDates, type Season } from "../../shared/s
 import { loadSeason } from "./season";
 import { mountRemoval } from "./removal";
 import { mountFilmTrace } from "./filmTrace";
-import { mountPrimes, purgeEntries } from "./primes";
+import { mainCard, mountPrimes, purgeEntries } from "./primes";
 import { mountPrimePages } from "./primePages";
 import { loadRules, servableRules } from "./rules";
 import { addVary, compressHtml, isCompressible, readManifest, StaticCompressor, withPreloads } from "./assets";
@@ -344,6 +344,16 @@ export function createApp(opts: AppOptions) {
           people: opts.linkedinPeople,
           peek: opts.linkedinProfiles.peek ? (url, o) => opts.linkedinProfiles!.peek!(url, o) : undefined,
           pollWaitMs: opts.entryPollWaitMs,
+          // « Voir ma fiche » : la fiche retenue si elle existe encore, sinon la dernière de ce profil ;
+          // le dossier qui l'a remplacée (§18.84), jamais une fiche masquée par sa personne.
+          knownCard: (who) => {
+            const id = (who.cardId && store.getCard(who.cardId)?.id) || (who.url ? latestLinkedinCard(store.db, who.url) : null);
+            const row = id ? store.fileRow(id) : null;
+            if (!row) return null;
+            // La personne de la vitrine sous son propre pseudo : la fiche vitrine est aussi la sienne.
+            const login = store.loginOf(row) ?? (who.url && who.url === opts.showcaseLinkedin ? (opts.showcaseLogin ?? null) : null);
+            return store.isHidden(login) ? null : { id: row.id, login: login?.toLowerCase() ?? null, overall: mainCard(row).overall };
+          },
           limiter,
           baseUrl,
           secure: opts.secureCookies ?? baseUrl.startsWith("https://"),
@@ -654,6 +664,7 @@ export function createApp(opts: AppOptions) {
       const who = linkedinUrl && !login && !pdf && !denounce ? (linkedinEnter?.identityFor(c, linkedinUrl) ?? null) : null;
       /** L'email de la personne connectée, posé sur sa fiche dès qu'elle existe ; jamais sur une fiche qui en porte déjà un. */
       const lead = (id: string) => {
+        if (!denounce) linkedinEnter?.rememberCard(c, id, linkedinUrl, !!who);
         who?.used();
         const email = who?.email;
         if (!email) return;
@@ -797,8 +808,11 @@ export function createApp(opts: AppOptions) {
     if (!row) return { status: 404 };
     if (!tokenMatches(c.req.query("token"), row.deleteToken) && !(bySession && ownedBy(c, row))) return { status: 403 };
     // Fiche LinkedIn supprimée : le profil en cache part avec elle (§18.24).
-    forgetLinkedinOfCard(store.db, (row.parentId ? store.getCard(row.parentId) : row)?.facts);
+    const facts = (row.parentId ? store.getCard(row.parentId) : row)?.facts;
+    forgetLinkedinOfCard(store.db, facts);
     const ids = store.deleteGroup(id);
+    const gone = (facts as { linkedinUrl?: unknown } | null)?.linkedinUrl;
+    linkedinEnter?.forgetCard(c, ids, typeof gone === "string" ? gone : undefined);
     await Promise.all([removeImages(ogDir, ids), removeAvatars(avatarDir, ids)]);
     return { status: 200, ids };
   };

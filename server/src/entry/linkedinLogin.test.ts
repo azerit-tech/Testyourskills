@@ -4,7 +4,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { GithubIdentity } from "../github/identity";
 import { AUTHORIZE_URL, LI_STATE_COOKIE, TOKEN_URL, USERINFO_URL } from "../linkedin";
-import { ENTER_COOKIE, ENTER_STARTS_PER_DAY, PEEKS_PER_IP, employerFromEmail } from "./linkedinLogin";
+import { ENTER_COOKIE, ENTER_STARTS_PER_DAY, KNOWN_COOKIE, PEEKS_PER_IP, WHO_COOKIE, WHO_TTL_MS, employerFromEmail } from "./linkedinLogin";
 import { CAMILLE, CAMILLE_URL, HOMONYM, cardState, cookiesOf, postCard, setupEntry, type EntryCtx, type EntrySetup } from "./testing";
 
 const BASE = "https://skills.test";
@@ -420,5 +420,120 @@ describe("la fiche de la personne connectée", () => {
     const { json } = await postCard(ctx, { linkedin: CAMILLE_URL, denouncedBy: mine.json.id }, jar);
     expect(ctx.calls.collect).toEqual(["moi"]);
     expect(ctx.store.getCard(json.id)?.email ?? null).toBeNull();
+  });
+});
+
+describe("qui s'est connecté : le navigateur s'en souvient (SPEC §18.85)", () => {
+  const me = async (ctx: EntryCtx, jar: string) => {
+    const res = await ctx.app.request("/api/entry/me", { headers: jar ? { cookie: jar } : {} });
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    return (await res.json()) as { card: { id: string; login: string | null; overall: number } | null };
+  };
+  const whoLine = (res: Response) => res.headers.getSetCookie().find((l) => l.startsWith(`${WHO_COOKIE}=`));
+
+  it("dès le retour : un cookie httpOnly signé de 90 jours, avec le nom, sans email, photo ni jeton", async () => {
+    const { ctx } = setup();
+    const { back, jar } = await signIn(ctx);
+    const set = whoLine(back)!;
+    expect(set).toMatch(/HttpOnly/i);
+    expect(set).toMatch(/Secure/i);
+    expect(set).toContain(`Max-Age=${WHO_TTL_MS / 1000}`);
+    const clear = Buffer.from(decodeURIComponent(set.split(";")[0]!.slice(WHO_COOKIE.length + 1)).split(".")[0]!, "base64url").toString("utf8");
+    expect(clear).toContain("Camille Ardent");
+    for (const secret of [EMAIL, "ardent.dev", ACCESS_TOKEN, PICTURE, "licdn"]) expect(clear).not.toContain(secret);
+    // Le témoin que le front peut lire ne dit rien : « 1 ».
+    const known = back.headers.getSetCookie().find((l) => l.startsWith(`${KNOWN_COOKIE}=`))!;
+    expect(known.split(";")[0]).toBe(`${KNOWN_COOKIE}=1`);
+    expect(known).not.toMatch(/HttpOnly/i);
+    // Un nom seul ne désigne aucune fiche.
+    expect(await me(ctx, jar)).toEqual({ card: null });
+  });
+
+  it("le profil sûr retrouve la fiche déjà faite de ce profil, sans nouvelle fiche", async () => {
+    const { ctx } = setup();
+    const made = await postCard(ctx, { linkedin: CAMILLE_URL });
+    let { jar } = await signIn(ctx);
+    const res = await ctx.app.request("/api/entry/linkedin", { headers: { cookie: jar } });
+    expect(((await res.json()) as { auto?: { url: string } }).auto?.url).toBe(CAMILLE_URL);
+    jar = cookiesOf(res, jar);
+    const got = await me(ctx, jar);
+    expect(got.card).toMatchObject({ id: made.json.id });
+    expect(typeof got.card!.overall).toBe("number");
+    expect(JSON.stringify(got)).not.toContain(EMAIL);
+  });
+
+  it("la fiche lancée par la personne connectée : retenue après que la session est partie, et rendue à chaque visite", async () => {
+    const { ctx } = setup();
+    let { jar } = await signIn(ctx);
+    const found = await ctx.app.request("/api/entry/linkedin", { headers: { cookie: jar } });
+    jar = cookiesOf(found, jar);
+    const { json, res } = await postCard(ctx, { linkedin: CAMILLE_URL }, jar);
+    jar = cookiesOf(res, jar);
+    expect(jar).not.toContain(ENTER_COOKIE);
+    expect(await entry(ctx, jar)).toEqual({ signedIn: false });
+    expect(await me(ctx, jar)).toEqual({ card: { id: json.id, login: "camille-dev", overall: expect.any(Number) } });
+  });
+
+  it("sans cookie, cookie trafiqué ou expiré : personne", async () => {
+    const { ctx } = setup();
+    let { jar } = await signIn(ctx);
+    jar = cookiesOf(await ctx.app.request("/api/entry/linkedin", { headers: { cookie: jar } }), jar);
+    const { res } = await postCard(ctx, { linkedin: CAMILLE_URL }, jar);
+    jar = cookiesOf(res, jar);
+    expect((await me(ctx, jar)).card).not.toBeNull();
+    expect(await me(ctx, "")).toEqual({ card: null });
+    const forged = jar.replace(new RegExp(`${WHO_COOKIE}=([^.;]+)\\.`), (_m, body: string) => `${WHO_COOKIE}=${body.slice(0, -2)}AA.`);
+    expect(forged).not.toBe(jar);
+    expect(await me(ctx, forged)).toEqual({ card: null });
+    vi.spyOn(Date, "now").mockReturnValue(Date.now() + WHO_TTL_MS + 60_000);
+    expect(await me(ctx, jar)).toEqual({ card: null });
+  });
+
+  it("un autre profil que ceux proposés : seule la première fiche de la personne connectée est retenue", async () => {
+    const { ctx } = setup({ people: { byName: () => ({ status: "ok", results: [] }) } });
+    let { jar } = await signIn(ctx);
+    jar = cookiesOf(await ctx.app.request("/api/entry/linkedin", { headers: { cookie: jar } }), jar);
+    // Pas retrouvée : elle colle son lien.
+    const mine = await postCard(ctx, { linkedin: CAMILLE_URL }, jar);
+    jar = cookiesOf(mine.res, jar);
+    expect((await me(ctx, jar)).card?.id).toBe(mine.json.id);
+    expect(ctx.store.getCard(mine.json.id)?.email ?? null).toBeNull();
+    // La fiche suivante, celle d'un autre : la sienne reste la sienne.
+    const friend = await postCard(ctx, { login: "un-ami" }, jar);
+    jar = cookiesOf(friend.res, jar);
+    expect((await me(ctx, jar)).card?.id).toBe(mine.json.id);
+  });
+
+  it("une dénonciation n'est jamais retenue comme la fiche de qui dénonce", async () => {
+    const { ctx } = setup({ people: { byName: () => ({ status: "ok", results: [] }) } });
+    const first = await postCard(ctx, { login: "moi" });
+    let { jar } = await signIn(ctx);
+    jar = cookiesOf(await ctx.app.request("/api/entry/linkedin", { headers: { cookie: jar } }), jar);
+    const { res } = await postCard(ctx, { linkedin: CAMILLE_URL, denouncedBy: first.json.id }, jar);
+    expect(whoLine(res)).toBeUndefined();
+    expect(await me(ctx, cookiesOf(res, jar))).toEqual({ card: null });
+  });
+
+  it("sa fiche supprimée : le navigateur l'oublie", async () => {
+    const { ctx } = setup();
+    let { jar } = await signIn(ctx);
+    jar = cookiesOf(await ctx.app.request("/api/entry/linkedin", { headers: { cookie: jar } }), jar);
+    const { json, res } = await postCard(ctx, { linkedin: CAMILLE_URL }, jar);
+    jar = cookiesOf(res, jar);
+    const del = await ctx.app.request(`/api/card/${json.id}?token=${json.deleteToken}`, { method: "DELETE", headers: { cookie: jar, origin: BASE } });
+    expect(del.status).toBe(200);
+    jar = cookiesOf(del, jar);
+    expect(jar).not.toContain(WHO_COOKIE);
+    expect(jar).not.toContain(KNOWN_COOKIE);
+    expect(await me(ctx, jar)).toEqual({ card: null });
+  });
+
+  it("la personne de la vitrine : sa fiche porte le pseudo vitrine, la fiche vitrine est reconnue comme la sienne", async () => {
+    const { ctx } = setup({ github: null, app: { showcaseLogin: "Camille-Vitrine", showcaseLinkedin: CAMILLE_URL } });
+    let { jar } = await signIn(ctx);
+    jar = cookiesOf(await ctx.app.request("/api/entry/linkedin", { headers: { cookie: jar } }), jar);
+    const { json, res } = await postCard(ctx, { linkedin: CAMILLE_URL }, jar);
+    jar = cookiesOf(res, jar);
+    expect((await me(ctx, jar)).card).toMatchObject({ id: json.id, login: "camille-vitrine" });
   });
 });

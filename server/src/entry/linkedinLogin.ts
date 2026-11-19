@@ -20,6 +20,14 @@
 // la photo et l'email vivent quinze minutes en mémoire, liés au navigateur par
 // un cookie httpOnly signé (`tys_enter`). L'email ne quitte cette mémoire que
 // pour la fiche que la personne lance (app.ts), jamais vers le front.
+//
+// Qui s'est connecté (§18.85) : un second cookie httpOnly signé, `tys_who`, 90
+// jours, garde dans le navigateur le nom, puis l'adresse du profil sûr et
+// l'identifiant de la fiche. Il ne donne aucun droit : il sert à montrer « Voir
+// ma fiche » à la place des boutons de connexion (GET /api/entry/me), même quand
+// le navigateur a vidé sa mémoire. Ni email, ni photo, rien côté serveur. À côté,
+// `tys_known=1`, lisible par le front : il ne demande /api/entry/me que s'il est là.
+// Sa fiche supprimée, les deux cookies partent.
 
 import { randomBytes } from "node:crypto";
 import type { Context, Hono } from "hono";
@@ -39,6 +47,9 @@ import { licdnImageId, photoHash, samePhotoHash } from "./photoHash";
 
 export const ENTER_COOKIE = "tys_enter";
 export const ENTER_TTL_MS = 15 * 60_000;
+export const WHO_COOKIE = "tys_who";
+export const KNOWN_COOKIE = "tys_known";
+export const WHO_TTL_MS = 90 * 24 * 3600_000;
 /** Connexions lancées par IP et par jour. */
 export const ENTER_STARTS_PER_DAY = 20;
 /** Candidats montrés par « C'est toi ? ». */
@@ -77,6 +88,20 @@ interface Session {
   resolved?: Resolution;
 }
 
+/** Ce que `tys_who` retient : le nom, puis le profil sûr et la fiche. */
+export interface Who {
+  name?: string;
+  url?: string;
+  cardId?: string;
+}
+
+/** La fiche de la personne, telle que le front la garde (« Ma fiche »). */
+export interface KnownCard {
+  id: string;
+  login: string | null;
+  overall: number;
+}
+
 /** Ce que la fiche lancée reçoit de la personne connectée (app.ts). */
 export interface EntryIdentity {
   /** Email vérifié par LinkedIn : le contact de la fiche, rien d'autre. */
@@ -101,6 +126,8 @@ export interface LinkedinEnterOptions {
   peek?: (url: string, opts: { spend: () => boolean; signal?: AbortSignal }) => Promise<ProfilePeek | null>;
   /** « Même photo ? » ; les tests en donnent un faux. */
   samePhoto?: (a: string, b: string) => Promise<boolean>;
+  /** La fiche de qui s'est connecté : celle du cookie si elle existe encore, sinon la dernière de son profil. */
+  knownCard?: (who: Who) => KnownCard | null;
   /** Attente d'une demande du front avant « pending » (les tests la raccourcissent). */
   pollWaitMs?: number;
   now?: () => number;
@@ -151,11 +178,25 @@ export function employerFromEmail(email: string | undefined, name?: string): str
 
 export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
   const secret = o.secret ?? randomBytes(32).toString("base64url");
-  const now = o.now ?? Date.now;
+  const now = o.now ?? (() => Date.now());
   const sessions = new Map<string, Session>();
   const cookieBase = { httpOnly: true, secure: o.secure, sameSite: "Lax" as const, path: "/" };
   const resolveGithub = o.resolveGithub ?? resolveGithubIdentity;
   const pollWait = o.pollWaitMs ?? POLL_WAIT_MS;
+
+  const str = (v: unknown, max: number): string | undefined => (typeof v === "string" && v.length > 0 && v.length <= max ? v : undefined);
+  const whoOf = (c: Context): Who | null => {
+    const p = unsign(secret, "who", getCookie(c, WHO_COOKIE));
+    if (!p || typeof p.e !== "number" || p.e < now()) return null;
+    return { name: str(p.n, 120), url: str(p.u, 200), cardId: str(p.c, 40) };
+  };
+  /** Écrit `tys_who` : ce qu'on sait déjà de cette personne, complété. Une nouvelle connexion (`fresh`) repart de son seul nom. */
+  const remember = (c: Context, patch: Who, fresh = false) => {
+    const w = { ...(fresh ? {} : whoOf(c)), ...patch };
+    const age = { maxAge: WHO_TTL_MS / 1000 };
+    setCookie(c, WHO_COOKIE, sign(secret, "who", { n: w.name?.slice(0, 120), u: w.url, c: w.cardId, e: now() + WHO_TTL_MS }), { ...cookieBase, ...age });
+    setCookie(c, KNOWN_COOKIE, "1", { ...cookieBase, httpOnly: false, ...age });
+  };
 
   const sweep = () => {
     for (const [k, s] of sessions) if (s.exp < now()) sessions.delete(k);
@@ -244,6 +285,7 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
       void session.resolving.then((r) => (session.resolved = r));
       sessions.set(id, session);
       setCookie(c, ENTER_COOKIE, sign(secret, "enter", { i: id, e: session.exp }), { ...cookieBase, maxAge: ENTER_TTL_MS / 1000 });
+      remember(c, { name: who.name }, true);
       const u = new URL(returnPath, o.baseUrl);
       u.searchParams.set("li", "1");
       return c.redirect(`${o.baseUrl}${u.pathname}${u.search}`, 302);
@@ -264,6 +306,8 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
     clearTimeout(timer);
     const show = (x: LinkedinCandidate): LinkedinSuggestion => toSuggestion(x);
     if (!r) return c.json({ signedIn: true, name: session.name, candidates: [], pending: true });
+    // Le profil est sûr : le navigateur s'en souvient, sa fiche se retrouvera sans nouvelle connexion.
+    if (r.sure) remember(c, { name: session.name, url: r.sure.url });
     return c.json({
       signedIn: true,
       name: session.name,
@@ -271,6 +315,15 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
       candidates: r.sure ? [] : r.candidates.map(show),
       ...(r.off ? { off: true } : {}),
     });
+  });
+
+  // GET /api/entry/me : la fiche de qui s'est connecté dans ce navigateur, pour « Voir ma fiche ».
+  // Rien d'autre que ce que la fiche montre déjà à tous.
+  app.get("/api/entry/me", (c) => {
+    c.header("Cache-Control", "no-store");
+    const w = whoOf(c);
+    const card = w && (w.url || w.cardId) ? (o.knownCard?.(w) ?? null) : null;
+    return c.json({ card });
   });
 
   /**
@@ -297,5 +350,26 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
     };
   };
 
-  return { hook, identityFor };
+  /**
+   * Une fiche vient de partir de ce navigateur (jamais une dénonciation). `own` : c'est le profil
+   * de la personne connectée (`identityFor`), le navigateur retient son profil et sa fiche. Sinon,
+   * connectée mais pas retrouvée, elle a collé son lien ou tapé son pseudo : sa première fiche
+   * est retenue comme la sienne, les suivantes non.
+   */
+  const rememberCard = (c: Context, cardId: string, linkedinUrl: string | undefined, own: boolean) => {
+    if (own && linkedinUrl) return remember(c, { url: linkedinUrl, cardId });
+    const w = whoOf(c);
+    if (!w || w.cardId || !sessionOf(c)) return;
+    remember(c, { cardId, ...(linkedinUrl && !w.url ? { url: linkedinUrl } : {}) });
+  };
+
+  /** Fiche supprimée : si c'est celle que ce navigateur retient (ou celle de son profil), il l'oublie. */
+  const forgetCard = (c: Context, ids: string[], linkedinUrl?: string) => {
+    const w = whoOf(c);
+    if (!w || !((w.cardId && ids.includes(w.cardId)) || (w.url && w.url === linkedinUrl))) return;
+    deleteCookie(c, WHO_COOKIE, cookieBase);
+    deleteCookie(c, KNOWN_COOKIE, { ...cookieBase, httpOnly: false });
+  };
+
+  return { hook, identityFor, rememberCard, forgetCard };
 }

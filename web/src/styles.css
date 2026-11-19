@@ -1228,6 +1228,13 @@ svg {
 .home-another {
   justify-self: center;
 }
+/* sous la fiche de sa propre personne (§18.85) : « Voir ma fiche », puis la dénonciation */
+.you-mine .home-return {
+  max-width: none;
+}
+.you-mine + .after-block {
+  margin-top: 16px;
+}
 /* /<pseudo> d'un autre, fiche déjà faite : le bloc « Dénonce un complice », son bouton en rose (le seul ici) */
 .home-denounce {
   max-width: 440px;

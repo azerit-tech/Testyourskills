@@ -30,7 +30,10 @@ import { ApiError, api, type Showcase } from "../lib/api";
 import { onLinkClick } from "../lib/router";
 import { homeHook, useAppConfig } from "../lib/season";
 import { returnPending } from "../lib/entryApi";
-import { clearPending, dropPrefill, filmOwed, myCard, peekPrefill, pendingFile, type MyCard } from "../lib/session";
+import { MINE_EVENT, clearPending, dropPrefill, filmOwed, myCard, peekPrefill, pendingFile, type MyCard } from "../lib/session";
+import { ReturnCall } from "../components/ReturnCall";
+
+export { ReturnCall };
 
 /** Dénoncer depuis l'accueil (/<pseudo> d'un autre) : le bloc de la fiche, chargé seulement ce jour-là. */
 const Denounce = lazy(() => import("../components/Denounce").then((m) => ({ default: m.Denounce })));
@@ -131,8 +134,12 @@ function useMemory(): Memory {
       }
     };
     void check();
+    // La fiche de qui s'est connecté ici, rendue par le serveur après le premier rendu (§18.85).
+    const on = () => setMem((m) => ({ ...m, mine: myCard() }));
+    window.addEventListener(MINE_EVENT, on);
     return () => {
       alive = false;
+      window.removeEventListener(MINE_EVENT, on);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -165,32 +172,6 @@ export function BackLine({ mine, pending, owed = false }: Pick<Memory, "mine" | 
         <span className="link-alt">{pending ? b.pendingGo : owed ? b.owedGo : b.mineGo}</span>
       </a>
     </p>
-  );
-}
-
-/**
- * Qui revient avec sa fiche (§18.52) : la ligne de sa fiche, le bouton rose « Voir ma fiche », et
- * dessous le lien qui ouvre le formulaire. Revenir sert d'abord à retrouver sa fiche, son rang, son partage.
- */
-export function ReturnCall({ mine, onAnother }: { mine: MyCard; onAnother: () => void }) {
-  const { t } = useT();
-  const b = t.home.back;
-  const href = `/c/${mine.id}`;
-  const stars = starsFor(mine.overall);
-  return (
-    <div className="home-return">
-      <p className="home-back">
-        <span>
-          {b.mine} <Stars n={stars} label={t.plea.count(stars)} /> {mine.overall}/100.
-        </span>
-      </p>
-      <a className="pill pill-big home-see" href={href} onClick={(e) => onLinkClick(e, href)}>
-        {b.see}
-      </a>
-      <button type="button" className="link-alt home-another" aria-expanded={false} onClick={onAnother}>
-        {b.another}
-      </button>
-    </div>
   );
 }
 

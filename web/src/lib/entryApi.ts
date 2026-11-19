@@ -4,6 +4,7 @@
 // champ reste celui où un lien ou un pseudo se tape.
 import type { GithubSuggestion, LinkedinSuggestion } from "../../../shared/entry";
 import { isMock } from "./api";
+import { MINE_EVENT, myCard, rememberMine, type MyCard } from "./session";
 
 // --- Mode démo -----------------------------------------------------------------
 
@@ -241,8 +242,54 @@ export function releaseReturn(owner: object): void {
 
 /** Pour les tests : comme une page qui vient de se charger. */
 export function resetReturn(): void {
+  mineAsked = null;
   phase = null;
   started = false;
   leader = null;
   listeners.clear();
+}
+
+// --- Qui s'est connecté ici (SPEC §18.85) ---
+// Le serveur garde dans un cookie httpOnly le profil et la fiche de qui s'est connecté. Le
+// témoin `tys_known=1`, lisible ici, dit qu'il y a quelque chose à demander : sans lui, rien
+// ne part. La fiche rendue devient « Ma fiche » si le navigateur n'en retient aucune.
+
+const knownHere = (): boolean => {
+  try {
+    return /(?:^|;\s*)tys_known=1(?:;|$)/.test(document.cookie);
+  } catch {
+    return false;
+  }
+};
+
+function knownCardOf(body: unknown): MyCard | null {
+  const c = (body as { card?: Partial<MyCard> | null } | null)?.card;
+  if (!c || typeof c.id !== "string" || typeof c.overall !== "number" || !Number.isFinite(c.overall)) return null;
+  return { id: c.id, login: typeof c.login === "string" ? c.login : null, overall: c.overall };
+}
+
+let mineAsked: Promise<void> | null = null;
+
+/** Une fois par page : demande au serveur la fiche de qui s'est connecté dans ce navigateur. */
+export function syncMine(): Promise<void> {
+  mineAsked ??= (async () => {
+    if (isMock() || !knownHere()) return;
+    try {
+      const res = await fetch("/api/entry/me", { headers: { Accept: "application/json" } });
+      const card = res.ok ? knownCardOf(await res.json()) : null;
+      if (!card) return;
+      const mine = myCard();
+      // Celle que le navigateur retient déjà passe devant ; la même fiche y gagne son pseudo.
+      if (!mine || (mine.id === card.id && !mine.login && card.login)) rememberMine(card);
+    } catch {
+      /* réseau : la mémoire du navigateur suffit */
+    }
+  })();
+  return mineAsked;
+}
+
+/** Abonnement à « Ma fiche » (useSyncExternalStore n'en veut pas : chaque lecture rend un nouvel objet). */
+export function onMine(listener: () => void): () => void {
+  window.addEventListener(MINE_EVENT, listener);
+  return () => window.removeEventListener(MINE_EVENT, listener);
 }
