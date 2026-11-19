@@ -3,11 +3,15 @@
    aucune lueur, aucun dégradé (celui de la fiche suffit). Tailles, rayons et
    couleurs de rôle : les jetons de styles.css. Téléphone d'abord ; 44 px à toucher. */
 
-/* ---------- le bloc sous le partage ---------- */
+/* ---------- le bloc, premier sous le verdict (§18.81) ---------- */
 
 .denounce-form {
   display: grid;
   gap: 8px;
+}
+/* le champ monte au haut de l'écran quand ses suggestions s'ouvrent au doigt : un peu d'air au-dessus */
+.denounce-form .field-who {
+  scroll-margin-top: 16px;
 }
 .denounce-form .pill {
   width: 100%;
@@ -45,14 +49,14 @@
   text-overflow: ellipsis;
 }
 
-/* attente : une ligne et une barre plate, dans le bloc */
+/* attente : sous « @x est dans le viseur », une ligne et une barre plate qui avance (--p), dans le bloc */
 .denounce-pending {
   display: grid;
   gap: 12px;
 }
 .denounce .denounce-pending p {
   font: 500 var(--t-16) / 1.4 var(--f-text);
-  color: var(--cream);
+  color: var(--c-text);
 }
 .denounce-bar {
   position: relative;
@@ -66,18 +70,10 @@
   content: "";
   position: absolute;
   inset: 0 auto 0 0;
-  width: 35%;
+  width: var(--p, 0%);
   border-radius: inherit;
   background: var(--cream);
-  animation: denounce-bar 1.4s var(--ease-out) infinite;
-}
-@keyframes denounce-bar {
-  from {
-    transform: translateX(-100%);
-  }
-  to {
-    transform: translateX(290%);
-  }
+  transition: width 0.5s linear;
 }
 
 /* prêt à partager (prune, comme le bloc qu'il remplace : le partage au-dessus est marine) */
@@ -121,6 +117,13 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0 16px;
+}
+/* une fiche de complice prête à envoyer : « Envoyer à @x » est le rose de l'écran ; le partage, juste dessous
+   depuis le §18.81, passe en contour tant qu'elle est là (§18.48, un seul rose par écran) */
+.after-block.denounce.is-done ~ .after-block.out .out-main {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--cream);
+  color: var(--cream);
 }
 
 @media (min-width: 561px) {
