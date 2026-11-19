@@ -64,6 +64,8 @@ interface Session {
   exp: number;
   resolving: Promise<Resolution>;
   resolved?: Resolution;
+  /** Le compte de la personne connectée (§18.85) : la fiche qu'elle lance y sera liée. */
+  accountId?: string;
 }
 
 /** Ce que la fiche lancée reçoit de la personne connectée (app.ts). */
@@ -73,6 +75,8 @@ export interface EntryIdentity {
   github: GithubIdentity | null;
   /** Le profil lancé est le profil sûr (email ou photo), pas un choix parmi des homonymes. */
   sureProfile: boolean;
+  /** Le compte de la personne connectée (§18.85), sinon absent. */
+  accountId?: string;
 }
 
 export interface LinkedinEnterOptions {
@@ -164,7 +168,7 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
 
   const hook: LinkedinEnterHook = {
     allow: (c) => o.limiter.take("li-enter", clientIp(c), ENTER_STARTS_PER_DAY),
-    finish(c, returnPath, profile) {
+    finish(c, returnPath, profile, accountId) {
       sweep();
       const id = randomBytes(18).toString("base64url");
       const who = { ...profile, name: profile.name ?? "" };
@@ -175,6 +179,7 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
         exp: now() + ENTER_TTL_MS,
         // La recherche part tout de suite : elle tourne pendant que la page se recharge.
         resolving: resolve(who, clientIp(c)).catch((): Resolution => ({ sure: null, how: null, candidates: [], github: null, off: true })),
+        ...(accountId ? { accountId } : {}),
       };
       void session.resolving.then((r) => (session.resolved = r));
       sessions.set(id, session);
@@ -223,6 +228,7 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
       email: found.session.email,
       github: r.github,
       sureProfile: sure,
+      ...(found.session.accountId ? { accountId: found.session.accountId } : {}),
       used() {
         sessions.delete(found.id);
         deleteCookie(c, ENTER_COOKIE, cookieBase);

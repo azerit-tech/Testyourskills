@@ -35,9 +35,12 @@
 import { randomBytes } from "node:crypto";
 import type { Context, Hono } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
+import { fileOf } from "../../shared/caseFile";
+import type { CardData, ComparisonData } from "../../shared/types";
+import type { AccountKit } from "./account";
 import { sameString, sign, unsign } from "./signing";
 import { autoJoinBands } from "./bands";
-import type { Store } from "./db";
+import type { CardRow, Store } from "./db";
 import { ID_RE } from "./pipeline";
 import { clientIp, type RateLimiter } from "./ratelimit";
 
@@ -225,6 +228,16 @@ export interface AuthRoutesOptions {
   fetchImpl: typeof fetch;
   /** Invalide les PNG en cache des ids donnés (fiches masquées). */
   removeImages(ids: string[]): Promise<void>;
+  /** Le compte léger (§18.85). Absent : /api/me ne parle que de la revendication. */
+  account?: AccountKit | null;
+}
+
+/** Ce que /api/me dit du compte : sa fiche, et de quoi la montrer dans la barre du haut (photo ou initiale). */
+function accountCard(row: CardRow | null): { cardId: string | null; avatarUrl: string | null; initial: string | null } {
+  if (!row) return { cardId: null, avatarUrl: null, initial: null };
+  const main = row.kind === "comparison" ? fileOf(row.data as ComparisonData) : (row.data as CardData);
+  const initial = (main.name || main.login || "").trim().charAt(0).toLocaleUpperCase("fr") || null;
+  return { cardId: row.id, avatarUrl: main.avatarUrl || null, initial };
 }
 
 type ClaimResult = "ok" | "mismatch" | "error" | "limited";
@@ -251,11 +264,25 @@ export function mountAuth(app: Hono, o: AuthRoutesOptions) {
     return c.json({ ok: true });
   });
 
+  // Qui est connecté : le propriétaire revendiqué (login, hidden, comme avant), et le compte
+  // (§18.85) : sa fiche et ses sources. Non nul dès qu'un compte est valide, LinkedIn seul compris.
   app.get("/api/me", (c) => {
     c.header("Cache-Control", "no-store");
     const owner = ownerFromRequest(c);
-    if (!owner) return c.json(null);
-    return c.json({ login: owner.login, hidden: o.store.isHidden(owner.login) });
+    const kit = o.account ?? null;
+    const account = kit?.fromRequest(c) ?? null;
+    if (!owner && !account) return c.json(null);
+    if (account) kit!.accounts.touch(account);
+    const sources: ("linkedin" | "github")[] = [];
+    if (account?.linkedinKey) sources.push("linkedin");
+    if (owner || (account && account.githubId !== null)) sources.push("github");
+    const card = account ? kit!.cardOf(account) : owner && kit ? kit.cardOfLogin(owner.login) : null;
+    return c.json({
+      login: owner?.login ?? null,
+      hidden: owner ? o.store.isHidden(owner.login) : false,
+      ...accountCard(card),
+      sources,
+    });
   });
 
   if (!cfg) return;
@@ -323,6 +350,9 @@ export function mountAuth(app: Hono, o: AuthRoutesOptions) {
       console.warn(`[claim ${st.c}] revendication impossible :`, (err as Error).message);
       return c.redirect(back(st.r, "error"), 302);
     }
+
+    // Connexion = compte (§18.85) : le GitHub vient d'être prouvé, quelle que soit la fiche.
+    o.account?.signIn(c, { githubId: user.githubId });
 
     if (user.login !== cardLogin.toLowerCase()) return c.redirect(back(st.r, "mismatch", user.login), 302);
 

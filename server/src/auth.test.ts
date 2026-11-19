@@ -147,9 +147,11 @@ async function claim(ctx: Ctx, card = "CardAAAA01") {
 
 const asOwner = (session: string, extra: Record<string, string> = {}) => ({ cookie: `${SESSION_COOKIE}=${encodeURIComponent(session)}`, ...extra });
 
+/** Ce que /api/me dit de la revendication : ses deux champs d'avant (le compte, §18.85, en ajoute d'autres, accountLogin.test.ts). */
 async function me(ctx: Ctx, session?: string) {
   const res = await ctx.app.request("/api/me", session ? { headers: asOwner(session) } : {});
-  return res.json() as Promise<{ login: string; hidden: boolean } | null>;
+  const body = (await res.json()) as { login: string; hidden: boolean } | null;
+  return body && { login: body.login, hidden: body.hidden };
 }
 
 describe("configuration", () => {
