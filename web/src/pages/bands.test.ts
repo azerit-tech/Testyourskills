@@ -1,12 +1,13 @@
 // /bandes : une ligue rendue en chaîne (sa bande en formation, le tableau, les bandes en
-// formation, §18.85). La page d'une bande : les fiches anonymes comptées et réparties par
-// étoiles, dans le même bloc que les fiches nommées.
+// formation, §18.85). La page d'une bande : le classement de sa ligue, sa ligne marquée
+// (§18.87) ; les fiches anonymes comptées et réparties par étoiles, dans le même bloc que
+// les fiches nommées.
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { BandBoard, BandStanding } from "../../../shared/bands";
 import { LangProvider } from "../i18n";
-import { BoardPanel, starSpread } from "./Bands";
+import { BandBoardSection, boardAround, BoardPanel, PAGE_BOARD_ROWS, PAGE_FORMING_ROWS, starSpread } from "./Bands";
 
 const band = (id: string, label: string, members: number, score: number, rank: number | null = null): BandStanding => ({
   type: "ecole",
@@ -96,6 +97,91 @@ describe("une ligue de /bandes", () => {
     expect(html).toContain('aria-label="1 of 3 sheets"');
     expect(html).toContain('aria-label="ESIEA, forming, 2 of 3 sheets"');
     expect(html).toContain("1\u00a0more sheet<");
+  });
+});
+
+describe("le classement sur la page d'une bande", () => {
+  const league = (n: number) => Array.from({ length: n }, (_, i) => band(`b${i + 1}`, `Bande ${i + 1}`, 20 - i, 100 - i, i + 1));
+  const full = (board: Partial<BandBoard>): BandBoard => ({ type: "ecole", total: board.entries?.length ?? 0, entries: [], forming: [], extra: null, ...board });
+  const section = (board: Partial<BandBoard> | null, b: BandStanding, language = "fr-FR") => {
+    vi.stubGlobal("localStorage", { getItem: () => null, setItem: () => undefined });
+    vi.stubGlobal("navigator", { language });
+    return renderToStaticMarkup(createElement(LangProvider, null, createElement(BandBoardSection, { board: board ? full(board) : null, band: b })));
+  };
+
+  it("dans les dix premières : sa ligne à sa place, les dix lignes, pas de bloc à part", () => {
+    const all = league(14);
+    const lists = boardAround(full({ entries: all, forming: [ESIEA, CM] }), all[6]!);
+    expect(lists.entries.map((b) => b.rank)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(lists.entries).toHaveLength(PAGE_BOARD_ROWS);
+    expect(lists.lower).toBeNull();
+    expect(lists.forming.map((b) => b.id)).toEqual(["esiea", "centrale-mediterranee"]);
+  });
+
+  it("plus bas que les dix premières : seule sous son étiquette, qu'elle vienne du tableau ou de `extra`", () => {
+    const all = league(14);
+    expect(boardAround(full({ entries: all }), all[12]!).lower?.id).toBe("b13");
+    const far = band("utc", "UTC", 3, 9, 24);
+    const lists = boardAround(full({ entries: all, extra: far }), far);
+    expect(lists.entries).toHaveLength(10);
+    expect(lists.lower).toBe(far);
+  });
+
+  it("sa propre place vient de la page, plus fraîche que le tableau", () => {
+    const all = league(3);
+    const fresh = { ...all[1]!, score: 150, members: 30 };
+    expect(boardAround(full({ entries: all }), fresh).entries[1]).toBe(fresh);
+    // Le tableau la dit encore en formation, la page la dit classée : une seule ligne, classée.
+    const up = band("esiea", "ESIEA", 3, 12, 4);
+    const lists = boardAround(full({ entries: all, forming: [ESIEA, CM] }), up);
+    expect(lists.lower).toBe(up);
+    expect(lists.forming.map((b) => b.id)).toEqual(["centrale-mediterranee"]);
+  });
+
+  it("en formation : à sa place parmi les bandes en formation, toujours dans la liste, cinq au plus", () => {
+    expect(boardAround(full({ forming: [ESIEA, CM], extra: CS }), CS).forming.map((b) => b.id)).toEqual(["esiea", "centralesupelec", "centrale-mediterranee"]);
+    const many = Array.from({ length: 10 }, (_, i) => band(`f${i}`, `F${i}`, 2, 12 - i));
+    const lists = boardAround(full({ forming: many, extra: CS }), CS);
+    expect(lists.forming).toHaveLength(PAGE_FORMING_ROWS);
+    expect(lists.forming.at(-1)).toBe(CS);
+    // Une école de la liste sans fiche : le tableau ne la rend pas, la page si.
+    const none = band("epita", "EPITA", 0, 0);
+    expect(boardAround(full({ forming: [CM] }), none).forming.map((b) => b.id)).toEqual(["centrale-mediterranee", "epita"]);
+  });
+
+  it("la section : sa ligne marquée, sans lien vers elle-même, puis « Toutes les bandes » sur sa ligue", () => {
+    const all = league(12);
+    const html = section({ entries: all, forming: [ESIEA] }, all[6]!);
+    expect(html).toContain("Le classement");
+    expect(html).toContain("Au tableau");
+    expect(count(html, 'aria-current="page"')).toBe(1);
+    expect(count(html, "is-current")).toBe(1);
+    expect(html).not.toContain('href="/bandes/ecole/b7"');
+    expect(html).toContain('<span class="sr-only">7e, Bande 7, 94\u00a0étoiles, 14\u00a0fiches</span>');
+    expect(count(html, "<a ")).toBe(9 + 1 + 1);
+    expect(html).toContain('href="/bandes?t=ecole"');
+    expect(html).not.toContain("Trois fiches pour entrer");
+    expect(html).not.toContain("Cette bande");
+  });
+
+  it("rien au tableau, elle seule en formation : la règle, sa ligne, aucune phrase « Aucune … »", () => {
+    const html = section({ extra: CS }, CS);
+    expect(html).toContain("Trois fiches pour entrer au tableau.");
+    expect(html).toContain("En formation");
+    expect(html).toContain("is-forming is-current");
+    expect(html).not.toContain("Aucune");
+    expect(html).not.toContain("Étoiles");
+    expect(html).not.toContain("Au tableau<");
+    expect(section({ extra: CS }, CS, "en-US")).toContain("Three sheets to make the board.");
+  });
+
+  it("plus bas : « Cette bande » ; le tableau pas encore lu : le titre et le lien seuls", () => {
+    const all = league(14);
+    expect(section({ entries: all }, all[12]!)).toContain("Cette bande");
+    const waiting = section(null, CS);
+    expect(waiting).toContain("Le classement");
+    expect(waiting).toContain('aria-busy="true"');
+    expect(waiting).not.toContain("board-row");
   });
 });
 

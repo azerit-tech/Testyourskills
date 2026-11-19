@@ -142,6 +142,15 @@
   gap: 12px;
   padding: 0 16px;
 }
+/* la bande de la page où l'on est : la ligne « à moi » du top de la semaine (aplat d'appel, nom en
+   gras), et elle ne se touche pas */
+.board-row.band-row.is-current {
+  background: var(--s-call);
+  cursor: default;
+}
+.band-row.is-current .board-login {
+  font-weight: 700;
+}
 .band-score {
   display: inline-flex;
   align-items: center;
@@ -176,6 +185,22 @@
 .band-roster {
   display: grid;
   gap: 10px;
+}
+/* le classement de sa ligue, sous les fiches : le titre, ses listes, le lien vers tous les tableaux */
+.band-board {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+.band-board h2 {
+  margin-bottom: -2px;
+}
+.band-board-note {
+  font: var(--font-body);
+  color: var(--c-text);
+}
+.band-board .link-alt {
+  justify-self: start;
 }
 .bands h1,
 .band h1 {
@@ -393,12 +418,13 @@
 .band-mine .stars {
   vertical-align: -2px;
 }
-.band-roster h2 {
+.band-roster h2,
+.band-board h2 {
   font: var(--font-section);
   text-transform: uppercase;
   color: var(--cream);
 }
-/* une fiche revendiquée : visage, pseudo et profil, étoiles ; la ligne mène à la fiche */
+/* un membre (§18.88) : visage, nom et profil, étoiles ; la ligne mène à sa fiche */
 .board-row.band-member {
   grid-template-columns: 32px minmax(0, 1fr) auto;
   gap: 12px;
@@ -409,13 +435,17 @@
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-/* téléphone étroit : le profil et le poste reviennent à la ligne plutôt que d'être coupés */
+/* téléphone étroit : le nom, puis le profil et le poste, reviennent à la ligne plutôt que d'être coupés */
 @media (max-width: 399px) {
+  .band-member .board-login,
   .band-member .band-count {
     display: -webkit-box;
     white-space: normal;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
+  }
+  .band-member .board-login {
+    line-height: 1.25;
   }
 }
 /* les fiches anonymes : la dernière ligne du bloc, une pile de silhouettes puis leur nombre */
@@ -543,27 +573,30 @@
     grid-column: 2;
     grid-row: 1 / span 2;
   }
-  /* la page d'une bande : la bande et l'appel à gauche (ils suivent la lecture), les fiches à droite */
+  /* la page d'une bande : la bande à gauche et l'appel à droite ; dessous, les fiches et le
+     classement de la ligue côte à côte, alignés en haut */
   .page-band {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: start;
-    gap: 0 56px;
     max-width: var(--page-max);
     margin: 0 auto;
   }
   .band-side,
   .band-main {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 40px 56px;
     max-width: none;
     margin: 0;
   }
-  .band-side {
-    position: sticky;
-    top: 24px;
-  }
-  /* le haut des fiches s'aligne sur le surtitre de gauche (« Bande d'école »), sous le lien de retour */
   .band-main {
-    padding-top: 66px;
+    margin-top: 56px;
+  }
+  /* l'appel s'aligne sur le surtitre de gauche (« Bande d'école »), sous le lien de retour */
+  .band-side > .band-call {
+    margin-top: 66px;
+  }
+  /* le bloc recruteur d'une boîte : sous les deux colonnes, sur toute la largeur */
+  .band-main > .band-hire {
+    grid-column: 1 / -1;
   }
   .board > .bands-top-cols {
     grid-template-columns: 1fr 1fr;
