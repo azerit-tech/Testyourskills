@@ -27,7 +27,7 @@ export function recentLinkedinCard(db: Database.Database, by: { url?: string; lo
 }
 
 /**
- * La dernière fiche tirée de ce profil LinkedIn, quel que soit son âge (§18.85,
+ * La dernière fiche tirée de ce profil LinkedIn, quel que soit son âge (§18.89,
  * « Voir ma fiche ») : jugée avec la lecture IA de préférence. L'id, ou null.
  */
 export function latestLinkedinCard(db: Database.Database, url: string): string | null {

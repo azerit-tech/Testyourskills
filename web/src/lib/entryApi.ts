@@ -84,7 +84,7 @@ export function startGithubLogin(): void {
   window.location.assign(`/auth/github/enter?return=${encodeURIComponent(here())}`);
 }
 
-// --- Le retour d'une connexion (§18.85) --------------------------------------------
+// --- Le retour d'une connexion (§18.89) --------------------------------------------
 // `?li=` ou `?gh=` dans l'adresse au chargement de la page. Ce qui se passe ensuite
 // vit ici, hors des composants : un formulaire remonté, ou monté après coup (le
 // bloc « À ton tour » d'une fiche arrive avec la fiche), retrouve l'état où il en
@@ -249,7 +249,7 @@ export function resetReturn(): void {
   listeners.clear();
 }
 
-// --- Qui s'est connecté ici (SPEC §18.85) ---
+// --- Qui s'est connecté ici (SPEC §18.89) ---
 // Le serveur garde dans un cookie httpOnly le profil et la fiche de qui s'est connecté. Le
 // témoin `tys_known=1`, lisible ici, dit qu'il y a quelque chose à demander : sans lui, rien
 // ne part. La fiche rendue devient « Ma fiche » si le navigateur n'en retient aucune.

@@ -572,7 +572,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
   const [claimOn, setClaimOn] = useState(() => api.knownConfig()?.claim ?? false);
   // Le serveur lit LinkedIn : « Ajoute ton LinkedIn » existe (AddLinkedin.tsx lit la même valeur).
   const [liOn, setLiOn] = useState(() => api.knownConfig()?.linkedinEntry ?? true);
-  // Relue quand elle change : le serveur peut la rendre après le premier rendu (qui s'est connecté ici, §18.85).
+  // Relue quand elle change : le serveur peut la rendre après le premier rendu (qui s'est connecté ici, §18.89).
   const [mine, setMine] = useState<MyCard | null>(() => myCard());
   useEffect(() => onMine(() => setMine(myCard())), []);
   useEffect(() => {
@@ -610,7 +610,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
   }, [visitor, settled, kase, wantedYou, main.id, main.login, main.name, main.sealed, main.overall]);
   const other = mine && mine.id !== id && !(mine.login && main.login && mine.login === main.login.toLowerCase()) ? mine : null;
   // La fiche de sa propre personne, regardée sans le jeton de cet appareil (la vitrine sous son pseudo,
-  // sa fiche faite par un autre) : « Voir ma fiche » et la dénonciation, pas les boutons de connexion (§18.85).
+  // sa fiche faite par un autre) : « Voir ma fiche » et la dénonciation, pas les boutons de connexion (§18.89).
   const self = visitor && mine && !other ? mine : null;
   const [another, setAnother] = useState(false);
   const proveFirst = item.kind === "card" && declaredOf(item.card) === "linkedin";

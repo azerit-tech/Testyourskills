@@ -1,4 +1,4 @@
-// Retrouver un profil par un index web (SPEC §18.85), sans un seul appel réel :
+// Retrouver un profil par un index web (SPEC §18.89), sans un seul appel réel :
 // les réponses rejouées ont la forme de celles de Brave, de Serper et de l'acteur
 // Apify de Google (relevées le 19 novembre 2026), les personnes sont inventées.
 

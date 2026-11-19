@@ -1,4 +1,4 @@
-// Le retour d'une connexion LinkedIn ou GitHub (SPEC §18.85) : jamais muet. Sans
+// Le retour d'une connexion LinkedIn ou GitHub (SPEC §18.89) : jamais muet. Sans
 // navigateur ni serveur : l'adresse et fetch sont de faux.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ReturnPhase } from "./entryApi";

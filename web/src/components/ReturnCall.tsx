@@ -1,5 +1,5 @@
 // « Voir ma fiche » : sur l'accueil de qui revient (§18.52), et sous la fiche de quelqu'un
-// d'autre quand elle est aussi la sienne (§18.85).
+// d'autre quand elle est aussi la sienne (§18.89).
 import { starsFor } from "../../../shared/types";
 import { useT } from "../i18n";
 import { onLinkClick } from "../lib/router";

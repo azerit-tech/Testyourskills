@@ -134,7 +134,7 @@ function useMemory(): Memory {
       }
     };
     void check();
-    // La fiche de qui s'est connecté ici, rendue par le serveur après le premier rendu (§18.85).
+    // La fiche de qui s'est connecté ici, rendue par le serveur après le premier rendu (§18.89).
     const on = () => setMem((m) => ({ ...m, mine: myCard() }));
     window.addEventListener(MINE_EVENT, on);
     return () => {

@@ -1,4 +1,4 @@
-// « Se connecter avec LinkedIn » (SPEC §18.80, §18.85) : entrer sans rien taper.
+// « Se connecter avec LinkedIn » (SPEC §18.80, §18.89) : entrer sans rien taper.
 //
 // L'API de LinkedIn ne rend jamais l'adresse du profil sans accès partenaire :
 // « Sign in with LinkedIn » donne un nom, une photo et un email vérifié. La
@@ -21,7 +21,7 @@
 // un cookie httpOnly signé (`tys_enter`). L'email ne quitte cette mémoire que
 // pour la fiche que la personne lance (app.ts), jamais vers le front.
 //
-// Qui s'est connecté (§18.85) : un second cookie httpOnly signé, `tys_who`, 90
+// Qui s'est connecté (§18.89) : un second cookie httpOnly signé, `tys_who`, 90
 // jours, garde dans le navigateur le nom, puis l'adresse du profil sûr et
 // l'identifiant de la fiche. Il ne donne aucun droit : il sert à montrer « Voir
 // ma fiche » à la place des boutons de connexion (GET /api/entry/me), même quand

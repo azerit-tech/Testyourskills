@@ -1,4 +1,4 @@
-// Qui s'est connecté ici (SPEC §18.85) : le serveur rend sa fiche, le navigateur la
+// Qui s'est connecté ici (SPEC §18.89) : le serveur rend sa fiche, le navigateur la
 // retient comme « Ma fiche ». Sans navigateur ni serveur.
 import { afterEach, describe, expect, it, vi } from "vitest";
 

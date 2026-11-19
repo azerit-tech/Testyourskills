@@ -76,7 +76,7 @@ const fr = frTypoDeep({
     linkLabel: "Lien LinkedIn, lien GitHub ou pseudo GitHub",
     linkPlaceholder: "Lien LinkedIn, GitHub ou pseudo",
     backToLogin: "Se connecter",
-    /** Au retour de LinkedIn (§18.85) : le temps de retrouver le profil, puis, sans personne, la phrase qui le dit. */
+    /** Au retour de LinkedIn (§18.89) : le temps de retrouver le profil, puis, sans personne, la phrase qui le dit. */
     finding: "On te retrouve sur LinkedIn…",
     findingNote: "30 secondes au plus.",
     lostNone: "On ne t'a pas retrouvé sur LinkedIn. Colle le lien de ton profil.",

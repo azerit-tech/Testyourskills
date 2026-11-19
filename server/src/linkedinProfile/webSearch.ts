@@ -1,4 +1,4 @@
-// Retrouver un profil LinkedIn sans lire LinkedIn (SPEC §18.85) : un index de
+// Retrouver un profil LinkedIn sans lire LinkedIn (SPEC §18.89) : un index de
 // recherche web rend les adresses `/in/` et leurs titres (« Nom - Entreprise |
 // LinkedIn ») en une seconde. Reprise de l'application Azerit
 // (`linkedin_discover.py` : `build_queries`, `score_hit`, `_name_in_url`,

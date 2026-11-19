@@ -1228,7 +1228,7 @@ svg {
 .home-another {
   justify-self: center;
 }
-/* sous la fiche de sa propre personne (§18.85) : « Voir ma fiche », puis la dénonciation */
+/* sous la fiche de sa propre personne (§18.89) : « Voir ma fiche », puis la dénonciation */
 .you-mine .home-return {
   max-width: none;
 }
@@ -1903,7 +1903,7 @@ svg {
   gap: 0 10px;
   color: var(--c-text-2);
 }
-/* le retour de LinkedIn (§18.85) : le temps de retrouver le profil, une ligne, la barre de
+/* le retour de LinkedIn (§18.89) : le temps de retrouver le profil, une ligne, la barre de
    l'attente (.load-bar) et sa durée, à la place des deux boutons, sur leur hauteur */
 .entry-find {
   display: grid;

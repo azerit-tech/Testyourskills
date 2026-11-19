@@ -104,7 +104,7 @@ function initialEntry(raw: string | undefined): { open: Open | null; login: stri
 }
 
 /**
- * Au retour de LinkedIn, le temps de retrouver le profil (§18.85) : une ligne, la barre de
+ * Au retour de LinkedIn, le temps de retrouver le profil (§18.89) : une ligne, la barre de
  * l'attente et sa durée, à la place des deux boutons. Jamais un bloc qui revient tel quel.
  */
 function FindWait({ since }: { since: number }) {
@@ -157,11 +157,11 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
   const [login, setLogin] = useState(first.login);
   /** Parti chez LinkedIn ou GitHub : son bouton attend. */
   const [signing, setSigning] = useState<Door | null>(null);
-  /** La connexion est revenue sans personne (§18.85) : la phrase le dit, le champ est ouvert sur un lien à coller. */
+  /** La connexion est revenue sans personne (§18.89) : la phrase le dit, le champ est ouvert sur un lien à coller. */
   const [lost, setLost] = useState<Door | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
-  // Le retour de « Se connecter avec LinkedIn » ou « avec GitHub » (§18.80, §18.85) : son état vit hors
+  // Le retour de « Se connecter avec LinkedIn » ou « avec GitHub » (§18.80, §18.89) : son état vit hors
   // du composant (entryApi.ts). Un seul formulaire de la page le porte, jamais le second de l'accueil ;
   // s'il se démonte, le suivant le reprend où il en est.
   const self = useRef({});

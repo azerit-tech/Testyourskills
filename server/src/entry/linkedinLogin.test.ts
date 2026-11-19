@@ -423,7 +423,7 @@ describe("la fiche de la personne connectée", () => {
   });
 });
 
-describe("qui s'est connecté : le navigateur s'en souvient (SPEC §18.85)", () => {
+describe("qui s'est connecté : le navigateur s'en souvient (SPEC §18.89)", () => {
   const me = async (ctx: EntryCtx, jar: string) => {
     const res = await ctx.app.request("/api/entry/me", { headers: jar ? { cookie: jar } : {} });
     expect(res.headers.get("cache-control")).toBe("no-store");

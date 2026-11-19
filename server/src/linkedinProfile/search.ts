@@ -1,4 +1,4 @@
-// Recherche d'un profil LinkedIn par nom (SPEC §18.80, §18.85) : ce qui remplace le
+// Recherche d'un profil LinkedIn par nom (SPEC §18.80, §18.89) : ce qui remplace le
 // lien collé. Deux usages : les suggestions pendant la frappe (« Ton nom », « Son
 // nom »), et le retour de « Se connecter avec LinkedIn » (les candidats au nom rendu
 // par LinkedIn).

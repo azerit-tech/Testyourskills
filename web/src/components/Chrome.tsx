@@ -90,7 +90,7 @@ export function TopBar() {
   useEffect(() => {
     const on = () => reread((n) => n + 1);
     window.addEventListener(MINE_EVENT, on);
-    // Qui s'est connecté ici retrouve « Ma fiche », même mémoire vidée (§18.85).
+    // Qui s'est connecté ici retrouve « Ma fiche », même mémoire vidée (§18.89).
     void syncMine();
     return () => window.removeEventListener(MINE_EVENT, on);
   }, []);
