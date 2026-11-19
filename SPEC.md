@@ -2216,7 +2216,7 @@ Jacques, jour du lancement : « Devoir rentrer son LinkedIn à la main en copier
 - **Jamais de bouton mort.** Un bouton dont la connexion n'est pas réglée côté serveur ouvre ce même champ sur sa source (« Ton nom » ou le lien du profil pour LinkedIn, « Ton nom ou pseudo » pour GitHub). Si le serveur ne lit pas LinkedIn du tout, son bouton disparaît et GitHub prend le rose.
 - **« Se connecter avec LinkedIn »** : la connexion OpenID de LinkedIn (`openid profile email`), sur l'adresse de retour déjà déclarée, `/auth/linkedin/callback` ; l'entrée et la photo de « C'est moi » se distinguent par leur `state`. Rien à changer dans la console LinkedIn. **L'API de LinkedIn ne rend jamais l'adresse du profil sans accès partenaire : la certitude vient de l'email et de la photo.** Dans l'ordre : (a) le profil d'après l'email, si un fournisseur le permet (Crustdata, emails professionnels seulement, 1 crédit par profil trouvé, `LINKEDIN_EMAIL_LOOKUP=crustdata` ; Apify ne le fait pas) ; (b) la recherche par nom, puis la photo rendue par LinkedIn comparée à celle de chaque candidat (empreinte dHash de 144 bits, calculée sur le serveur ; même photo à 14 bits près : mesuré sur de vrais avatars, 8 bits au plus pour la même photo, 45 au moins pour deux photos) ; (c) sinon seulement, « C'est toi ? », trois profils au plus (photo, nom, titre), une feuille au bas du téléphone, une fenêtre au bureau. Profil sûr : la fiche part sans rien demander. Personne à ce nom : le champ s'ouvre sur le nom.
 - **Le GitHub, sans le demander** (règle de l'app Azerit, `resolve_github`) : (a) l'email vérifié dans les commits et les comptes publics de GitHub (`author-email:`, `in:email`), correspondance sûre ; (b) les liens GitHub du profil LinkedIn (§18.24) ; (c) le nom, gardé seulement si un seul compte de personne porte exactement ce nom public, deux mots d'au moins deux lettres. Trouvé par l'email sur un profil sûr : la comparaison est prouvée. Trouvé par le nom : la comparaison sort, pas prouvée (pas de top de la semaine). Rien : la fiche LinkedIn seule, avec « Ajoute ton GitHub ».
-- **L'email** : vérifié par LinkedIn, gardé 15 minutes en mémoire du serveur, jamais rendu au navigateur ni journalisé, puis écrit seulement sur la fiche, comme un email laissé dessous (contact pour Azerit, relais `LEADS_ENDPOINT`). Aucun jeton LinkedIn ou GitHub n'est gardé. Page Confidentialité : section « Entrer sans rien coller ».
+- **L'email** : vérifié par LinkedIn, gardé 15 minutes en mémoire du serveur, jamais rendu au navigateur ni journalisé, puis écrit seulement sur la fiche, comme un email laissé dessous (contact pour Azerit, relais `LEADS_ENDPOINT`). Aucun jeton LinkedIn ou GitHub n'est gardé ; le compte léger (§18.85) ne garde que l'identifiant GitHub ou une empreinte de l'identifiant LinkedIn. Page Confidentialité : section « Entrer sans rien coller ».
 - **« Se connecter avec GitHub »** : OAuth sans aucune portée, qui rend le pseudo ; la fiche part. Adresse de retour : `https://skills.azerit.tech/auth/github/callback`, la même que « C'est moi ». `GITHUB_OAUTH_CLIENT_ID` et `GITHUB_OAUTH_CLIENT_SECRET`, sinon l'application de « C'est moi » (`GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, avec `SESSION_SECRET`). Le pseudo revient par un cookie signé lu une fois, jamais par l'adresse : un lien ne lance pas une fiche.
 - **La recherche de profils LinkedIn** (`/api/search/linkedin`) : acteur Apify `harvestapi~linkedin-profile-search-by-name`, mode court, 0,004 $ la recherche (4 $ les 1 000), un prénom et un nom au moins. Cache de 24 h (6 h pour une recherche vide), 30 recherches payantes par IP et par jour, plafond du jour `LINKEDIN_DAILY_SEARCHES` (2 000 par défaut, soit 8 $ au plus). Plafond atteint, panne ou fournisseur absent : le champ prend un lien, sans rien dire. Variante `LINKEDIN_SEARCH_PROVIDER=crustdata` (0,03 crédit par résultat).
 - **La recherche de comptes GitHub** (`/api/search/github`) : la recherche d'utilisateurs de GitHub par le serveur, gratuite ; cinq lignes (avatar, nom, pseudo), cache de 10 minutes, 200 recherches par IP et par jour.
@@ -2317,3 +2317,51 @@ Jacques, jour du lancement : « il faut juger les gens avec le même niveau d'ex
 - Les notes d'avant sont celles du moteur 0.4.0 sur des dossiers de test, pas celles de la base de production, qui n'a pas été lue ni touchée ; les fiches déjà faites gardent leur note 0.4.0 jusqu'à ce qu'elles soient refaites.
 - Pas vérifié : un vrai profil LinkedIn, un vrai téléphone.
 - `tsc -b` et `vitest run` verts : 1 966 tests.
+
+### 18.85 Le compte léger : se connecter suffit (19 novembre 2026, branche `site/compte-leger`)
+
+Jacques, jour du lancement : un compte qui se crée tout seul quand on se connecte avec GitHub ou LinkedIn, sans inscription, sans mot de passe, sans page de profil, et la personne retrouve sa fiche partout. Ce paragraphe complète le §18.1 (« C'est moi ») et le §18.80 (les deux connexions) ; il ne change ni les bandes, ni les primes, ni la dénonciation, ni la table `owners`.
+
+**Le compte**
+
+- **La table `accounts`** (`server/src/account.ts`, créée par `CREATE TABLE IF NOT EXISTS` dans `migrate()`, la base en ligne n'a rien à faire) : `id` tiré au hasard, `linkedin_key` unique, `github_id` unique, `card_id`, `created_at`, `seen_at` (touchée une fois par jour au plus). `linkedin_key` est le HMAC-SHA256 du `sub` OpenID de LinkedIn avec `SESSION_SECRET`, sous son propre préfixe d'usage : le `sub` n'est jamais rangé en clair. Ni nom, ni photo, ni email, ni jeton LinkedIn ou GitHub.
+- **Le cookie `tys_acct`** : httpOnly, SameSite=Lax, Secure en production, 180 jours, signé comme la session de « C'est moi » mais sous son propre préfixe (une session ne vaut pas un compte, ni l'inverse) ; renouvelé passé la moitié de sa vie. `tys_owner` garde son format et ses 30 jours. Le code de signature est partagé (`server/src/signing.ts`).
+- **Sans `SESSION_SECRET`** : pas de compte, aucun cookie posé, `/api/me` comme avant ; l'entrée garde ses deux boutons d'aujourd'hui.
+
+**Connexion = compte**
+
+- **Retour de GitHub** (l'entrée et « C'est moi ») : compte trouvé ou créé par l'identifiant GitHub. **Retour de LinkedIn par l'entrée** (pas la photo de « C'est moi ») : par `linkedin_key`.
+- **Un navigateur qui a déjà un compte et se connecte par l'autre source** : les deux identités vont sur le même compte. Si l'autre identité a déjà son compte, les deux fusionnent : reste celui qui a une fiche en ligne, sinon le plus ancien ; la date de création la plus ancienne est gardée. Un compte qui a déjà une identité de cette source (une autre personne sur ce navigateur) n'est pas fusionné : le navigateur passe au compte de la personne qui vient de se connecter.
+- **Un GitHub attaché ainsi est prouvé** (OAuth). Une fiche dont le lien LinkedIn ↔ GitHub est « à confirmer » ne passe pas prouvée : il faudrait relire le profil et recalculer (laissé de côté, plus bas).
+- **« Ma fiche »** : pour un compte au GitHub prouvé et revendiqué (ligne `owners`, quand « C'est moi » est réglé), la dernière fiche racine en ligne de ce pseudo, dossier compris ; sinon la fiche liée au lancement : celle que lance l'entrée connectée (le profil sûr ou choisi au retour de LinkedIn, le pseudo rendu par `/api/entry/github`). Un lien collé, un nom tapé, une dénonciation ne lient jamais. `superseded_by` est toujours suivi.
+- **Revenir** : au retour d'une connexion, un compte qui a une fiche en ligne va droit à `/c/<id>`, sans recherche de profil, sans calcul, sans dépense. Sans fiche (jamais faite, expirée, supprimée) : le parcours d'aujourd'hui. « Refaire ma fiche » passe `redo=1` et fait le parcours d'aujourd'hui même avec une fiche.
+
+**Les droits**
+
+- **La session du compte vaut le jeton de sa fiche**, pour tout ce qui est réservé à la personne fichée : `mine` sur `GET /api/card/:id`, l'email, la photo LinkedIn, « Ajoute ton GitHub », « Ajoute ton LinkedIn », la suppression, les bandes. Toute écriture garde le contrôle d'origine. Le lien GET de suppression ne vaut que par son jeton.
+- **Un compte au GitHub prouvé reste propriétaire de son pseudo** (`ownerFromRequest`) au-delà des 30 jours de `tys_owner` : masquer, « C'est moi » déjà fait.
+- **Supprimer sa fiche par son compte** (sans jeton) supprime aussi la ligne du compte et efface les deux cookies. Supprimer par le jeton laisse le compte, sans fiche.
+- **`POST /auth/logout`** efface `tys_owner` et `tys_acct`.
+- **`GET /api/me`** garde `login` et `hidden` (`login` nul pour un compte sans GitHub revendiqué) et ajoute `cardId` (ou nul), `sources` (`linkedin`, `github`), `avatarUrl` et `initial`, lus sur la fiche, pas sur le compte. Non nul dès qu'un compte est valide, LinkedIn seul compris.
+
+**Le front** (390 px d'abord)
+
+- **La barre** : connecté avec une fiche, une petite pastille « Ma fiche » / « My sheet » (la photo de la fiche, sinon l'initiale) à la place du lien texte. Rien de plus quand on n'est pas connecté.
+- **L'entrée**, partout où elle sert (accueil, « À ton tour » sous une fiche partagée, bandes, primes) : connecté avec une fiche, un seul rose « Voir ma fiche » et dessous une petite ligne « Refaire ma fiche · Se déconnecter ». « Refaire » relance la connexion de la source connectée (LinkedIn d'abord), ou ouvre le champ si elle n'est pas réglée. Connecté sans fiche : les boutons d'aujourd'hui. Un retour de connexion dans l'adresse (`?li=`, `?gh=`) va jusqu'au bout avant tout.
+- **L'accueil** adopte la fiche du compte comme « Ta fiche », même faite sur un autre appareil : la ligne de la fiche, puis l'entrée connectée. Sur la fiche d'un autre, la fiche en mémoire donne le duel, comme avant.
+- **Sa fiche, vue sans jeton** : la page de la personne (partage, dénonciation, suppression), pas celle du visiteur.
+- Le navigateur garde en indice local ce que `/api/me` a dit (`tys_account`) pour que la pastille soit là dès la première image ; `/api/me` corrige.
+- **Démo** : le compte en mémoire de session ; les connexions de démo le créent et suivent la même règle de retour ; `?compte=li` ou `?compte=gh` en pose un avec sa fiche, `?compte=0` l'enlève.
+- **Confidentialité** : section « Ton compte » / « Your account ». Le §18.80 (« Aucun jeton LinkedIn ou GitHub n'est gardé ») reste vrai.
+
+**À régler à la main** : `SESSION_SECRET` doit être posé (il l'est déjà pour « C'est moi ») ; rien à changer dans les consoles LinkedIn et GitHub, les adresses de retour sont les mêmes.
+
+**Laissé de côté**
+
+- Le lien « à confirmer » d'un dossier ne devient pas prouvé quand la personne attache ensuite son GitHub : le profil sûr n'est pas rangé et `superseded_by` ne se pose qu'à l'écriture d'une fiche ; il faudrait un recalcul.
+- Sans « C'est moi » réglé, un compte GitHub n'a pas de ligne `owners` : « Ma fiche » est la fiche liée au lancement, pas la dernière fiche du pseudo.
+- La photo LinkedIn d'une fiche qui porte un pseudo, « C'est moi » réglé, demande toujours la preuve GitHub, comme avec le jeton.
+- Les textes « sans compte » (accroche de l'accueil, « À ton tour ») sont gardés : rien à créer, la connexion suffit.
+- `tys_enter` (la session d'entrée LinkedIn, 15 minutes) n'est pas effacé à la déconnexion.
+
+- **Vérifié** : tests serveur (`server/src/account.test.ts`, `accountLogin.test.ts`, `accountRights.test.ts`, 29 tests) : un compte par source, la même au second tour, l'attache et la fusion, le cookie falsifié, expiré, d'un autre secret ou d'un autre usage, le renouvellement, les droits depuis un navigateur sans jeton, le refus sur la fiche d'un autre, `superseded_by` suivi, le retour de connexion vers la fiche sans recherche ni calcul, `redo`, la suppression qui emporte le compte, la déconnexion, l'absence du secret. Tests front (`web/src/components/account.test.ts`, 6 tests) : la pastille et l'entrée connectée. `tsc -b`, `vitest run` (2 001 tests) et `vite build` verts. En démo, Chrome sans tête et muet, à 390 × 700 puis 1280 × 800 : l'accueil connecté et sa pastille, sa fiche vue sans jeton, « À ton tour » connecté ; aucun défilement horizontal. **Pas vérifié** : un vrai aller-retour chez LinkedIn et chez GitHub, un vrai téléphone.
