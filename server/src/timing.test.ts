@@ -39,7 +39,11 @@ describe("Trace", () => {
       trace.count("rest", 65);
       trace.count("graphql", 16);
     });
-    await trace.phase("fichiers", async () => void c.tick(1800));
+    await trace.phase("fichiers", async () => {
+      // Les étapes du choix des fichiers ne sont pas listées, et ne passent pas pour la fin de la collecte.
+      await trace.phase("lu.commits", async () => void c.tick(1400));
+      await trace.phase("lu.contenus", async () => void c.tick(400));
+    });
     await trace.phase("code", async () => {
       c.tick(3600);
       trace.noteAi({ ...ai, ms: 3600 });
@@ -50,13 +54,13 @@ describe("Trace", () => {
     );
   });
 
-  it("dit le raisonnement, le cache, une relance et un échec", async () => {
+  it("dit le fournisseur, le raisonnement, le cache, une relance et un échec", async () => {
     const c = clock();
     const trace = new Trace(c.now);
     await trace
       .phase("parcours", async () => {
         c.tick(9000);
-        trace.noteAi({ ...ai, label: "readCv", ms: 9000, outputTokens: 5815, reasoningTokens: 4642, cachedTokens: 7058, finish: "length" });
+        trace.noteAi({ ...ai, label: "readCv", provider: "Azure", ms: 9000, outputTokens: 5815, reasoningTokens: 4642, cachedTokens: 7058, finish: "length" });
         c.tick(3000);
         trace.noteAi({ ...ai, label: "readCv", ms: 3000, inputTokens: 0, outputTokens: 0, finish: "error" });
         throw new Error("panne");
@@ -64,7 +68,7 @@ describe("Trace", () => {
       .catch(() => {});
     trace.count("linkedin_cache");
     expect(trace.line("x")).toBe(
-      "x · parcours@0.0+12.0! (claude-haiku-5.5 25445→5815 raisonnement 4642 cache 7058 9.0s length, claude-haiku-5.5 0→0 3.0s error) · linkedin_cache 1",
+      "x · parcours@0.0+12.0! (claude-haiku-5.5@Azure 25445→5815 raisonnement 4642 cache 7058 9.0s length, claude-haiku-5.5 0→0 3.0s error) · linkedin_cache 1",
     );
   });
 

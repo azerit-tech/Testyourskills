@@ -20,6 +20,8 @@ export interface AiTiming {
   /** La lecture qui a fait l'appel (`readCode`, `readCv`). */
   label: string;
   model: string;
+  /** Le fournisseur qui a répondu, quand la réponse le dit : le même modèle ne va pas partout à la même vitesse. */
+  provider?: string;
   at: number;
   ms: number;
   inputTokens: number;
@@ -82,10 +84,12 @@ export class Trace {
 
   /**
    * La ligne du journal. Chaque phase : `nom@début+durée`, en secondes depuis le
-   * début du traitement (une phase qui a échoué porte un `!`). Les étapes de la
-   * collecte GitHub (`gh.*`) ne sont pas listées : la collecte dit seulement
-   * laquelle a fini la dernière, et ses comptes d'appels. Une lecture IA dit son
-   * modèle, ses tokens d'entrée → de sortie, et la part d'entrée lue en cache.
+   * début du traitement (une phase qui a échoué porte un `!`). Les étapes d'une
+   * phase (`gh.*` pour la collecte GitHub, `lu.*` pour le choix des fichiers) ne
+   * sont pas listées : la collecte dit seulement laquelle des siennes a fini la
+   * dernière, et les comptes d'appels à GitHub. Une lecture IA dit son
+   * modèle (`@fournisseur` quand la réponse le dit), ses tokens d'entrée → de
+   * sortie, et la part d'entrée lue en cache.
    */
   line(head: string): string {
     const s = (ms: number) => (ms / 1000).toFixed(1);
@@ -93,7 +97,7 @@ export class Trace {
     const last = subs.reduce<Phase | null>((a, p) => (!a || p.at + p.ms > a.at + a.ms ? p : a), null);
     const calls = ["rest", "graphql", "raw"].filter((k) => this.counts[k]).map((k) => `${k} ${this.counts[k]}`);
     const parts = this.phases
-      .filter((p) => !p.name.startsWith("gh."))
+      .filter((p) => !p.name.includes("."))
       .sort((a, b) => a.at - b.at)
       .map((p) => {
         let out = `${p.name}@${s(p.at)}+${s(p.ms)}${p.ok ? "" : "!"}`;
@@ -105,7 +109,7 @@ export class Trace {
         // Les appels IA de la phase : ceux qui ont commencé pendant elle, sous son nom de lecture.
         for (const a of this.ai.filter((a) => AI_PHASE[a.label] === p.name && a.at >= p.at - 1 && a.at <= p.at + p.ms)) {
           const detail = [a.reasoningTokens ? `raisonnement ${a.reasoningTokens}` : "", a.cachedTokens ? `cache ${a.cachedTokens}` : ""].filter(Boolean).join(" ");
-          notes.push(`${shortModel(a.model)} ${a.inputTokens}→${a.outputTokens}${detail ? ` ${detail}` : ""} ${s(a.ms)}s${a.finish === "stop" ? "" : ` ${a.finish}`}`);
+          notes.push(`${shortModel(a.model)}${a.provider ? `@${a.provider}` : ""} ${a.inputTokens}→${a.outputTokens}${detail ? ` ${detail}` : ""} ${s(a.ms)}s${a.finish === "stop" ? "" : ` ${a.finish}`}`);
         }
         if (notes.length) out += ` (${notes.join(", ")})`;
         return out;

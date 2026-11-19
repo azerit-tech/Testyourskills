@@ -217,6 +217,52 @@ describe("collecte complète, faux GitHub", () => {
   });
 });
 
+describe("faits donnés en avance (SPEC §18.89)", () => {
+  it("onProfile : le profil seul, une fois, avant la fin de la collecte", async () => {
+    const f = fakeGithub();
+    vi.stubGlobal("fetch", f.impl);
+    const early: { facts: unknown; restAtThatTime: number }[] = [];
+    const facts = await collectGithub(LOGIN, {
+      token: "ghp_test_not_a_real_token",
+      onProfile: (p) => early.push({ facts: p, restAtThatTime: f.seen.rest.length }),
+    });
+    expect(early).toHaveLength(1);
+    // De quoi retrouver le LinkedIn affiché : le profil des faits (l'avatar par défaut n'est pas encore reconnu).
+    expect(early[0]!.facts).toEqual({ schema: 1, login: LOGIN, profile: { ...facts.profile, avatarUrl: "https://avatars.example.invalid/u/1" } });
+    expect(early[0]!.restAtThatTime).toBeLessThan(f.seen.rest.length);
+  });
+
+  it("onReadable : la liste des repos, les arbres et les commits des faits, une fois, avant la fin", async () => {
+    const f = fakeGithub();
+    vi.stubGlobal("fetch", f.impl);
+    const early: unknown[] = [];
+    let done = false;
+    const facts = await collectGithub(LOGIN, {
+      token: "ghp_test_not_a_real_token",
+      onReadable: (r) => early.push({ ...r, done }),
+    }).finally(() => (done = true));
+    const { repos, activeRepos, trees, commits } = facts;
+    expect(early).toEqual([{ repos, activeRepos, trees, commits, done: false }]);
+  });
+
+  it("un écouteur qui lève ne casse pas la collecte", async () => {
+    const f = fakeGithub();
+    vi.stubGlobal("fetch", f.impl);
+    const boom = () => {
+      throw new Error("écouteur");
+    };
+    const facts = await collectGithub(LOGIN, { token: "ghp_test_not_a_real_token", onProfile: boom, onReadable: boom });
+    expect(facts.login).toBe(LOGIN);
+  });
+
+  it("le nombre de requêtes ne change pas avec les écouteurs", async () => {
+    const f = fakeGithub();
+    vi.stubGlobal("fetch", f.impl);
+    await collectGithub(LOGIN, { token: "ghp_test_not_a_real_token", onProfile: () => {}, onReadable: () => {} });
+    expect({ rest: f.seen.rest.length, graphql: f.seen.graphql.length, raw: f.seen.raw.length, other: f.seen.other.length }).toEqual(BASELINE);
+  });
+});
+
 describe("arbres et dépôts", () => {
   it("les fichiers d'agent d'IA d'un dépôt actif, lus dans l'arbre déjà demandé", async () => {
     const { facts } = await collect();

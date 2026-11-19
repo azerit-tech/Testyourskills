@@ -5,6 +5,11 @@
 // GitHub : collect → (lecture IA si dispo : pickFilesForReading → readCode) → scoreGithub
 // CV     : extractPdfText → cvTextCounts → readCv → scoreCv
 // Les deux : branches en parallèle, puis scoreDossier : un calcul sur les deux pièces, une note.
+//
+// Rien n'attend ce qui ne lui sert pas (SPEC §18.89) : la lecture du LinkedIn part
+// dès que le profil GitHub est lu, la lecture du code dès que les arbres et les
+// commits le sont, pendant que la collecte finit ; à l'entrée LinkedIn, le GitHub
+// déjà connu par l'identité se collecte pendant la lecture du profil.
 
 import { randomBytes, randomInt } from "node:crypto";
 import type { CardData, ComparisonData, ErrorCode, Fact, Finding, Grid, JobState, Lang, ProgressEvent } from "../../shared/types";
@@ -48,10 +53,23 @@ export interface RenderInput {
  * deps.ts passer les vraies fonctions typées avec `GithubFacts`.
  */
 export interface Deps {
+  /**
+   * `onProfile` et `onReadable` : des faits partiels, donnés en avance pendant la
+   * collecte (collect.ts). Le premier suffit à retrouver le LinkedIn affiché, le
+   * second à choisir les fichiers à lire. Un moteur qui ne les appelle pas marche
+   * aussi : tout part alors à la fin de la collecte.
+   */
   collectGithub(
     login: string,
-    opts: { token: GithubAuth; onProgress?: (e: { key: string; n?: number }) => void; signal?: AbortSignal },
+    opts: {
+      token: GithubAuth;
+      onProgress?: (e: { key: string; n?: number }) => void;
+      signal?: AbortSignal;
+      onProfile?: (facts: unknown) => void;
+      onReadable?: (facts: unknown) => void;
+    },
   ): Promise<unknown>;
+  /** `facts` : les faits entiers, ou ceux d'`onReadable`. */
   pickFilesForReading(facts: unknown, opts: { token: GithubAuth; signal?: AbortSignal }): Promise<RepoFiles[]>;
   readCode(repos: RepoFiles[], opts?: { signal?: AbortSignal }): Promise<CodeReadingResult | null>;
   /** IA configurée. Plafond atteint ou crédit épuisé : readCode/readCv lèvent une erreur `closed`. */
@@ -470,6 +488,8 @@ interface CvResult {
 
 export class Pipeline {
   private jobs = new Map<string, Job>();
+  /** Fiches sorties de `jobs` dont les suites (`wait`) n'ont pas encore couru. */
+  private settling = new Map<string, Promise<void>>();
   private inflight = new Map<string, string>(); // pseudo en minuscules → id du job GitHub en cours
   private readonly timeoutMs: number;
   private readonly errorTtlMs: number;
@@ -529,9 +549,13 @@ export class Pipeline {
     return this.inflight.get(login.toLowerCase());
   }
 
-  /** Attend la fin d'un job (tests, arrêt propre). */
+  /**
+   * Attend la fin d'un job (tests, arrêt propre, suites d'une fiche posée). Une
+   * fiche tout juste sortie de `jobs` s'attend encore : qui arrive à cet instant
+   * ne passe pas devant ceux qui attendaient déjà.
+   */
   async wait(id: string): Promise<void> {
-    await this.jobs.get(id)?.done;
+    await (this.jobs.get(id)?.done ?? this.settling.get(id));
   }
 
   async drain(): Promise<void> {
@@ -682,6 +706,8 @@ export class Pipeline {
       outcome = root.kind === "comparison" ? `dossier ${root.source}` : root.source;
       this.opts.store.recordEvent("card_generated", root.id, { source: root.source, kind: root.kind });
       this.jobs.delete(job.id); // la base fait foi désormais
+      this.settling.set(job.id, job.done);
+      void job.done.then(() => this.settling.delete(job.id));
     } catch (err) {
       const e = timedOut ? new JobError("timeout", MESSAGES.timeout) : classifyError(err);
       if (e.code === "internal" && !(err instanceof JobError)) console.error(`[job ${job.id}] échec :`, err);
@@ -713,8 +739,16 @@ export class Pipeline {
     const { lang, pdf } = input;
     let login = input.login;
 
+    // Entrée LinkedIn avec un GitHub prouvé par l'email (§18.80) : ce pseudo sera
+    // celui de la fiche quoi que dise le profil, sa collecte part donc pendant la
+    // lecture du profil (4 s chez Apify) au lieu de l'attendre.
+    const isEntry = !!input.linkedinUrl && !login && !pdf;
+    const sure = isEntry && input.identity?.how === "email" && !this.opts.store.isHidden(input.identity.githubLogin) ? input.identity.githubLogin : undefined;
+    const earlyGh = sure ? this.githubBranch(sure, ctx, true) : undefined;
+    earlyGh?.catch(() => {}); // lu plus bas ; si le profil échoue, la fiche s'arrête et coupe cette branche
+
     // Entrée LinkedIn (§18.24) : le profil, et le GitHub que ses liens donnent.
-    const entry = input.linkedinUrl && !login && !pdf ? await this.linkedinEntry(input.linkedinUrl, input, ctx) : null;
+    const entry = isEntry ? await this.linkedinEntry(input.linkedinUrl!, input, ctx) : null;
     if (entry?.githubLogin) login = entry.githubLogin;
     // Le GitHub de l'identité (§18.80) : l'email d'abord, puis les liens du profil,
     // puis le nom. Masqué par son propriétaire : la fiche LinkedIn sort seule.
@@ -743,7 +777,7 @@ export class Pipeline {
           }
         : undefined;
 
-    const ghP = login ? this.githubBranch(login, ctx, !!pdf || !!input.linkedinUrl, onFacts) : Promise.resolve(null);
+    const ghP = !login ? Promise.resolve(null) : earlyGh && login === sure ? earlyGh : this.githubBranch(login, ctx, !!pdf || !!input.linkedinUrl, onFacts);
     const [gh, cv] = await Promise.all([
       // Le GitHub que le profil donne n'existe plus : la fiche LinkedIn sort seule.
       entry ? ghP.catch((err) => (!ctx.signal.aborted && isMissingGithub(err) ? null : Promise.reject(err))) : ghP,
@@ -929,39 +963,62 @@ export class Pipeline {
         return { facts: row.facts, ai: row.ai as CodeReadingResult | null, degraded: false, cached: row.data as CardData };
       }
     }
+    // Les deux suites de la collecte partent dès que leurs entrées existent, une
+    // fois chacune : la recherche du LinkedIn sur le profil seul, la lecture du
+    // code sur les arbres et les commits. Si la collecte ne les donne pas en
+    // avance, elles partent à sa fin, sur les faits entiers.
+    let told = false;
+    const tellFacts = (f: unknown) => {
+      if (told) return;
+      told = true;
+      onFacts?.(f);
+    };
+    let reading: Promise<{ ai: CodeReadingResult | null; degraded: boolean }> | undefined;
+    const read = (f: unknown) => {
+      if (!reading) {
+        reading = this.readCodeOf(login, f, ctx);
+        reading.catch(() => {}); // attendue plus bas ; si la collecte échoue d'abord, c'est son erreur qui sort
+      }
+      return reading;
+    };
     const facts = await phase("faits", () =>
       deps.collectGithub(login, {
         token: this.github,
         signal: ctx.signal,
         onProgress: (e) => ctx.emit(e.key, e.n),
+        onProfile: tellFacts,
+        onReadable: (f) => void read(f),
       }),
     );
-    onFacts?.(facts);
+    tellFacts(facts);
     ctx.emit("recruiter");
-    // L'enquête en direct (§18.26) : les trouvailles sortent avant la lecture IA, pour l'attente.
+    // L'enquête en direct (§18.26) : les trouvailles sortent avant la fin de la lecture IA, pour l'attente.
     ctx.find(githubFindings(facts));
-    let ai: CodeReadingResult | null = null;
+    return { facts, ...(await read(facts)) };
+  }
+
+  /**
+   * La lecture du code : le choix des fichiers, puis l'appel IA. `facts` : les
+   * faits entiers, ou la part que la collecte donne en avance (arbres et commits).
+   */
+  private async readCodeOf(login: string, facts: unknown, ctx: Ctx): Promise<{ ai: CodeReadingResult | null; degraded: boolean }> {
+    const { deps } = this.opts;
     // Sans IA, rien n'a été lu : fiche dégradée. Rien à lire (aucun fichier) : la
     // fiche est la même à chaque fois, elle se met en cache normalement. Des
     // fichiers à lire mais aucun téléchargé : pickFilesForReading lève, la fiche
     // sort dégradée (ni resservie du cache, ni classée), comme sans lecture IA.
-    let degraded = !deps.aiAvailable();
-    if (deps.aiAvailable()) {
-      try {
-        const files = await phase("fichiers", () => deps.pickFilesForReading(facts, { token: this.github, signal: ctx.signal }));
-        if (files.length) {
-          ai = await phase("code", () => deps.readCode(files, { signal: ctx.signal }));
-          degraded = ai === null;
-        }
-      } catch (err) {
-        // IA coupée : pas de fiche sans lecture (§2.3), la fiche échoue en `closed`.
-        if (ctx.signal.aborted || isAiClosed(err)) throw err;
-        console.warn(`[github ${login}] lecture IA indisponible, carte sans lecture :`, (err as Error).message);
-        ai = null;
-        degraded = true;
-      }
+    if (!deps.aiAvailable()) return { ai: null, degraded: true };
+    try {
+      const files = await phase("fichiers", () => deps.pickFilesForReading(facts, { token: this.github, signal: ctx.signal }));
+      if (!files.length) return { ai: null, degraded: false };
+      const ai = await phase("code", () => deps.readCode(files, { signal: ctx.signal }));
+      return { ai, degraded: ai === null };
+    } catch (err) {
+      // IA coupée : pas de fiche sans lecture (§2.3), la fiche échoue en `closed`.
+      if (ctx.signal.aborted || isAiClosed(err)) throw err;
+      console.warn(`[github ${login}] lecture IA indisponible, carte sans lecture :`, (err as Error).message);
+      return { ai: null, degraded: true };
     }
-    return { facts, ai, degraded };
   }
 
   private async cvBranch(pdf: Uint8Array, ctx: Ctx): Promise<CvResult> {

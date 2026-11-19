@@ -29,24 +29,41 @@ export interface Ctx {
   signal?: AbortSignal;
   /** Délai par requête, en ms. */
   timeoutMs: number;
-  limit: <T>(fn: () => Promise<T>) => Promise<T>;
+  /** `urgent` : passe devant les appels en attente (voir `urgent`). */
+  limit: <T>(fn: () => Promise<T>, urgent?: boolean) => Promise<T>;
   /** Compteurs de requêtes, pour le diagnostic. */
   calls: { rest: number; graphql: number; raw: number };
 }
 
+/**
+ * Au plus `max` appels en vol. Les appels urgents en attente passent devant les
+ * autres, dans leur ordre d'arrivée : le débit total ne change pas, seul l'ordre.
+ */
 export function makeLimiter(max: number) {
   let active = 0;
+  const first: (() => void)[] = [];
   const queue: (() => void)[] = [];
-  return async function limit<T>(fn: () => Promise<T>): Promise<T> {
-    if (active >= max) await new Promise<void>((r) => queue.push(r));
-    active++;
+  return async function limit<T>(fn: () => Promise<T>, urgent = false): Promise<T> {
+    // La place libérée est remise à celui qu'on réveille : personne ne la lui prend entre-temps.
+    if (active >= max) await new Promise<void>((r) => (urgent ? first : queue).push(r));
+    else active++;
     try {
       return await fn();
     } finally {
-      active--;
-      queue.shift()?.();
+      const next = first.shift() ?? queue.shift();
+      if (next) next();
+      else active--;
     }
   };
+}
+
+/**
+ * Le même contexte, dont les appels passent devant ceux qui attendent : pour ce
+ * que la suite de la fiche attend (les arbres et les commits, d'où part la
+ * lecture du code, SPEC §18.89), pendant que le reste de la collecte suit.
+ */
+export function urgent(ctx: Ctx): Ctx {
+  return { ...ctx, limit: (fn) => ctx.limit(fn, true) };
 }
 
 export function makeCtx(auth: GithubAuth, signal?: AbortSignal, timeoutMs = 8000): Ctx {
