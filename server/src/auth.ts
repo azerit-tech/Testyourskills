@@ -37,7 +37,7 @@ import type { Context, Hono } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { fileOf } from "../../shared/caseFile";
 import type { CardData, ComparisonData } from "../../shared/types";
-import type { AccountKit } from "./account";
+import { accountFromRequest, type AccountKit } from "./account";
 import { sameString, sign, unsign } from "./signing";
 import { autoJoinBands } from "./bands";
 import type { CardRow, Store } from "./db";
@@ -152,14 +152,19 @@ declare module "hono" {
   }
 }
 
-/** Propriétaire connecté (voir l'en-tête du module), sinon null. */
+/**
+ * Propriétaire connecté (voir l'en-tête du module), sinon null. Le compte léger
+ * (§18.85) dont le GitHub est prouvé le reste au-delà des 30 jours de `tys_owner`.
+ */
 export function ownerFromRequest(c: Context): Owner | null {
   const auth = c.get("ownerAuth");
   if (!auth) return null;
   const s = verifySession(auth.secret, getCookie(c, SESSION_COOKIE));
-  if (!s) return null;
-  const row = auth.store.getOwnerById(s.githubId);
-  return row ? { login: row.login, githubId: row.githubId } : null;
+  const row = s ? auth.store.getOwnerById(s.githubId) : null;
+  if (row) return { login: row.login, githubId: row.githubId };
+  const githubId = accountFromRequest(c)?.githubId ?? null;
+  const proven = githubId !== null ? auth.store.getOwnerById(githubId) : null;
+  return proven ? { login: proven.login, githubId: proven.githubId } : null;
 }
 
 /** Une requête qui annonce une origine doit venir du site lui-même. */
@@ -257,10 +262,12 @@ export function mountAuth(app: Hono, o: AuthRoutesOptions) {
   }
 
   // Toujours là : le front ne sait pas encore si l'OAuth est configuré quand il demande.
+  // Se déconnecter efface les deux cookies : la revendication et le compte (§18.85).
   app.post("/auth/logout", (c) => {
     c.header("Cache-Control", "no-store");
     if (!sameOrigin(c, o.baseUrl)) return c.json({ ok: false }, 403);
     clearSession(c);
+    o.account?.clear(c);
     return c.json({ ok: true });
   });
 

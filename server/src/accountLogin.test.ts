@@ -2,95 +2,14 @@
 // connexion = compte, la fiche liée au lancement, revenir droit sur sa fiche, et
 // rien sans SESSION_SECRET.
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { ACCOUNT_COOKIE, ACCOUNT_TTL_MS, linkedinKey, signAccount } from "./account";
-import { GH_TOKEN_URL, GH_USER_URL } from "./auth";
-import { TOKEN_URL, USERINFO_URL } from "./linkedin";
-import { CAMILLE, CAMILLE_URL, cookiesOf, postCard, setupEntry, type EntryCtx } from "./entry/testing";
+import { BASE, EMAIL, PICTURE, SECRET, SUB, closeAll, githubCard, githubIn, linkedinCard, linkedinIn, me, rows, setupAccount, type AccountSetup } from "./accountTesting";
+import { cookiesOf, postCard } from "./entry/testing";
 
-const BASE = "https://skills.test";
-const SECRET = "s".repeat(40);
-const SUB = "oidc-sub-4f2a";
-const EMAIL = "camille@ardent.dev";
-const PICTURE = "https://media.licdn.com/dms/image/v2/D4E03AQoidc/profile-displayphoto-shrink_100_100/0/9";
+afterEach(closeAll);
 
-const ctxs: EntryCtx[] = [];
-afterEach(() => {
-  while (ctxs.length) ctxs.pop()!.store.close();
-  vi.restoreAllMocks();
-});
-
-interface Opts {
-  /** SESSION_SECRET ; null : absent. */
-  secret?: string | null;
-  /** « C'est moi » configuré (le GitHub prouvé donne un propriétaire). */
-  claim?: boolean;
-  ghUser?: { login: string; id: number };
-  sub?: string;
-}
-
-function setup(o: Opts = {}) {
-  let ghUser = o.ghUser ?? { login: "camille-dev", id: 4242 };
-  let sub = o.sub ?? SUB;
-  const fetchImpl = vi.fn(async (input: string | URL | Request) => {
-    const url = String(input);
-    if (url === TOKEN_URL || url === GH_TOKEN_URL) return Response.json({ access_token: "T" });
-    if (url === USERINFO_URL) return Response.json({ sub, name: "Camille Ardent", picture: PICTURE, email: EMAIL, email_verified: true });
-    if (url === GH_USER_URL) return Response.json(ghUser);
-    throw new Error(`appel réseau inattendu : ${url}`);
-  }) as unknown as typeof fetch;
-  const secret = o.secret === null ? undefined : (o.secret ?? SECRET);
-  const ctx = setupEntry({
-    app: {
-      fetchImpl,
-      linkedin: { clientId: "client", clientSecret: "secret" },
-      githubLogin: { clientId: "gh", clientSecret: "gh-secret" },
-      githubAuth: o.claim && secret ? { clientId: "gh", clientSecret: "gh-secret", sessionSecret: secret } : undefined,
-      accountSecret: secret,
-      githubIdentity: async () => null,
-      samePhoto: async (a, b) => a === PICTURE && b === CAMILLE.photoUrl,
-    },
-  });
-  ctxs.push(ctx);
-  return { ctx, setGithub: (u: { login: string; id: number }) => (ghUser = u), setSub: (s: string) => (sub = s) };
-}
-
-/** Le tour chez LinkedIn par l'entrée ; `jar` : les cookies que le navigateur a déjà. */
-async function linkedinIn(ctx: EntryCtx, jar = "", query = "") {
-  const start = await ctx.app.request(`/auth/linkedin/enter${query}`, { headers: { cookie: jar } });
-  const state = new URL(start.headers.get("location")!).searchParams.get("state");
-  jar = cookiesOf(start, jar);
-  const back = await ctx.app.request(`/auth/linkedin/callback?code=abc&state=${state}`, { headers: { cookie: jar } });
-  return { back, jar: cookiesOf(back, jar), location: back.headers.get("location") };
-}
-
-async function githubIn(ctx: EntryCtx, jar = "", query = "") {
-  const start = await ctx.app.request(`/auth/github/enter${query}`, { headers: { cookie: jar } });
-  const state = new URL(start.headers.get("location")!).searchParams.get("state");
-  jar = cookiesOf(start, jar);
-  const back = await ctx.app.request(`/auth/github/callback?code=abc&state=${state}`, { headers: { cookie: jar } });
-  return { back, jar: cookiesOf(back, jar), location: back.headers.get("location") };
-}
-
-const me = async (ctx: EntryCtx, jar: string) => (await (await ctx.app.request("/api/me", { headers: { cookie: jar } })).json()) as null | { login: string | null; hidden: boolean; cardId: string | null; sources: string[]; initial: string | null };
-const rows = (ctx: EntryCtx) => ctx.store.db.prepare(`SELECT * FROM accounts`).all() as { id: string; linkedin_key: string | null; github_id: number | null; card_id: string | null }[];
-
-/** La fiche lancée par l'entrée LinkedIn connectée : le profil sûr, la fiche part. */
-async function linkedinCard(ctx: EntryCtx, jar: string) {
-  const r = await ctx.app.request("/api/entry/linkedin", { headers: { cookie: jar } });
-  expect(((await r.json()) as { auto?: { url: string } }).auto?.url).toBe(CAMILLE_URL);
-  const card = await postCard(ctx, { linkedin: CAMILLE_URL }, jar);
-  return { ...card, jar: cookiesOf(card.res, jar) };
-}
-
-/** La fiche lancée par l'entrée GitHub connectée : le pseudo échangé, puis la fiche. */
-async function githubCard(ctx: EntryCtx, jar: string) {
-  const r = await ctx.app.request("/api/entry/github", { headers: { cookie: jar } });
-  const { login } = (await r.json()) as { login: string };
-  jar = cookiesOf(r, jar);
-  const card = await postCard(ctx, { login }, jar);
-  return { ...card, jar: cookiesOf(card.res, jar) };
-}
+const setup = (o: AccountSetup = {}) => ({ ctx: setupAccount(o) });
 
 describe("connexion = compte", () => {
   it("LinkedIn : un compte, et seulement l'empreinte du sub ; un cookie de 180 jours", async () => {

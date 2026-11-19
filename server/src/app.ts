@@ -19,7 +19,8 @@ import { genericMeta, HOME_IMAGE_PATH, HOME_IMAGE_PATH_EN, injectConfig, injectH
 import { ID_RE, MAX_PDF_BYTES, MESSAGES, Pipeline, type Deps, type RenderInput } from "./pipeline";
 import { CARDS_PER_BROWSER, CARDS_PER_DAY, RateLimiter, browserId, clientIp } from "./ratelimit";
 import { inlineAvatar, mountLinkedin, removeAvatars, type LinkedinConfig } from "./linkedin";
-import { mountAuth, ownerFromRequest, sameOrigin, type GithubAuthConfig } from "./auth";
+import { deleteCookie } from "hono/cookie";
+import { mountAuth, ownerFromRequest, sameOrigin, SESSION_COOKIE, type GithubAuthConfig } from "./auth";
 import { createAccounts, mountAccount } from "./account";
 import { DENOUNCE_LIMITED, DENOUNCE_PER_DAY, mountDenounce, parseDenunciation } from "./denounce";
 import { mountJury } from "./jury";
@@ -387,12 +388,14 @@ export function createApp(opts: AppOptions) {
 
   /**
    * La personne connectée est propriétaire revendiquée du login de cette fiche
-   * (§18.1). Pour agir sur la fiche, la requête doit aussi venir du site.
+   * (§18.1), ou son compte a cette fiche pour « Ma fiche » (§18.85) : sa session
+   * vaut alors le jeton. Pour agir sur la fiche, la requête doit aussi venir du site.
    */
   const ownedBy = (c: Context, row: CardRow): boolean => {
     const login = store.loginOf(row);
     const owner = login ? ownerFromRequest(c) : null;
-    return !!owner && owner.login === login!.toLowerCase() && sameOrigin(c, baseUrl);
+    const byOwner = !!owner && owner.login === login!.toLowerCase();
+    return (byOwner || !!account?.owns(c, row)) && sameOrigin(c, baseUrl);
   };
 
   /**
@@ -819,7 +822,15 @@ export function createApp(opts: AppOptions) {
     if (!ID_RE.test(id)) return { status: 404 };
     const row = store.getCard(id);
     if (!row) return { status: 404 };
-    if (!tokenMatches(c.req.query("token"), row.deleteToken) && !(bySession && ownedBy(c, row))) return { status: 403 };
+    const bySessionOk = bySession && ownedBy(c, row);
+    if (!tokenMatches(c.req.query("token"), row.deleteToken) && !bySessionOk) return { status: 403 };
+    // Supprimée par sa personne connectée : son compte part avec, et elle sort (§18.85).
+    const leaving = bySessionOk ? account?.fromRequest(c) : null;
+    if (leaving) {
+      account!.accounts.remove(leaving.id);
+      account!.clear(c);
+      deleteCookie(c, SESSION_COOKIE, { httpOnly: true, secure: opts.secureCookies ?? baseUrl.startsWith("https://"), sameSite: "Lax", path: "/" });
+    }
     // Fiche LinkedIn supprimée : le profil en cache part avec elle (§18.24).
     forgetLinkedinOfCard(store.db, (row.parentId ? store.getCard(row.parentId) : row)?.facts);
     const ids = store.deleteGroup(id);

@@ -309,7 +309,8 @@ export function mountLinkedin(app: Hono, o: LinkedinRoutesOptions) {
           403,
         );
       }
-    } else if (!o.tokenMatches(c.req.query("token"), row.deleteToken)) {
+    } else if (!o.tokenMatches(c.req.query("token"), row.deleteToken) && !o.account?.owns(c, row)) {
+      // Ni le jeton de la fiche, ni le compte dont c'est la fiche (§18.85).
       return c.json({ ok: false, message: { fr: "Changer la photo est réservé à qui a créé la fiche.", en: "Only the sheet's creator can change its photo." } }, 403);
     }
     const state = states.create(id);
